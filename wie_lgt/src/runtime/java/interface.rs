@@ -1,10 +1,28 @@
 use alloc::format;
+use alloc::string::String;
+use alloc::vec::Vec;
 
+use jvm::Jvm;
+
+use wie_backend::System;
 use wie_core_arm::ArmCore;
-use wie_util::{Result, WieError};
+use wie_util::{Result, WieError, read_generic, read_null_terminated_string_bytes};
 
+use crate::runtime::wipi_c::invoke_lcdui_main;
 use crate::runtime::{SVC_CATEGORY_INIT, svc_ids::InitSvcId};
 
+// LGT "java-interface" import module (table 0x64). The native application is an
+// AOT-compiled Java program (ez-i / Xceed toolchain): its classes are emitted as
+// native ARM code that registers itself with the platform through this module and
+// calls platform classes (`org/kwis/...`, `java/...`) by resolved offset.
+//
+// Decoded import indices (see `get_java_interface_method`):
+//   0x03 -> java_unk0          register main-class metadata (name, args)
+//   0x06 -> java_unk12         (paired with 0x07; takes the same struct ptr)
+//   0x07 -> java_unk5          register the app's OWN classes (native methods)
+//   0x14 -> java_load_classes  declare IMPORTED platform classes + resolve offsets
+//   0x82 -> java_unk9          (boot hook, arg always 0)
+//   0x83 -> java_unk11         invoke-static org/kwis/msp/lcdui/Main.main(argv)
 pub fn get_java_interface_method(core: &mut ArmCore, function_index: u32) -> Result<u32> {
     Ok(match function_index {
         0x03 => core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaInterfaceUnk0)?,
@@ -17,24 +35,64 @@ pub fn get_java_interface_method(core: &mut ArmCore, function_index: u32) -> Res
     })
 }
 
-pub async fn java_unk0(_core: &mut ArmCore, _: &mut (), a0: u32, a1: u32, a2: u32) -> Result<()> {
-    tracing::warn!("java_unk0({a0:#x}, {a1:#x}, {a2:#x})");
+// ---- memory-decode helpers (best-effort, never fail) ----
+
+/// Read a null-terminated C string at `address` as a Rust String (lossy).
+fn read_cstring(core: &ArmCore, address: u32) -> Option<String> {
+    if address == 0 {
+        return None;
+    }
+    let bytes = read_null_terminated_string_bytes(core, address).ok()?;
+    Some(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+/// Read `count` u32 words starting at `address` (stops early on a read error).
+fn peek_words(core: &ArmCore, address: u32, count: usize) -> Vec<u32> {
+    let mut out = Vec::with_capacity(count);
+    let mut cursor = address;
+    for _ in 0..count {
+        match read_generic::<u32, _>(core, cursor) {
+            Ok(v) => out.push(v),
+            Err(_) => break,
+        }
+        cursor += 4;
+    }
+    out
+}
+
+pub async fn java_unk0(core: &mut ArmCore, _: &mut (), a0: u32, a1: u32, a2: u32) -> Result<()> {
+    // (main_class_name_ptr, params_ptr, flag_str_ptr) — e.g. ("Game", _, "true")
+    tracing::debug!(
+        "java_unk0(main_class={:?}, {a1:#x}, flag={:?})",
+        read_cstring(core, a0),
+        read_cstring(core, a2)
+    );
 
     Ok(())
 }
 
-pub async fn java_unk5(_core: &mut ArmCore, _: &mut (), a0: u32, a1: u32) -> Result<()> {
-    tracing::warn!("java_unk5({a0:#x}, {a1:#x})");
-
-    // a0: class list
+pub async fn java_unk5(core: &mut ArmCore, _: &mut (System, Jvm), a0: u32, a1: u32) -> Result<()> {
+    // a0: the application's OWN class table.
+    //   [0]   = class count
+    //   [1]   = 0
+    //   [2..] = `count` pointers to per-class descriptors (in app RAM, ~0x140xxxx),
+    //           each carrying native method/field info incl. ARM code pointers for
+    //           the method bodies (text region, e.g. 0xd_xxxx / 0x8_xxxx / 0x1_xxxx).
+    // Class/method names are AOT-obfuscated to single characters; only the public
+    // entry name ("Game") survives, supplied separately via java_unk0/java_unk11.
+    //
+    // Registering these as native-backed JVM classes is the remaining work (see
+    // BRIDGE_REPORT.md) and is required for java apps to actually execute.
+    let count = read_generic::<u32, _>(core, a0).unwrap_or(0);
+    tracing::debug!("java_unk5: app declares {count} native classes (table @ {a0:#x}, aux @ {a1:#x}) — not yet bridged");
 
     Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
 pub async fn java_load_classes(
-    _core: &mut ArmCore,
-    _: &mut (),
+    core: &mut ArmCore,
+    _: &mut (System, Jvm),
     classes: u32,
     fields: u32,
     static_fields: u32,
@@ -47,29 +105,70 @@ pub async fn java_load_classes(
     a9: u32,
     static_method_offsets: u32,
 ) -> Result<()> {
-    tracing::debug!(
-        "java_load_classes({classes:#x}, {fields:#x}, {static_fields:#x}, {virtual_methods:#x}, {a4:#x}, {static_methods:#x}, {field_offsets:#x}, {static_field_offsets:#x}, {virtual_method_offsets:#x}, {a9:#x}, {static_method_offsets:#x})"
-    );
+    // Declares the platform classes the app imports and resolves the layout the
+    // native code uses to dispatch into them. Inputs:
+    //   classes        = LgtJavaImportedClass[count] (count-prefixed); each entry is
+    //                    { ptr_name, _, static_field_off/cnt, virtual_method_off/cnt,
+    //                      _, static_method_off/cnt } (24 bytes).
+    //   fields/static_fields/virtual_methods/a4/static_methods = arrays of
+    //                    { ptr_name, ptr_type } pairs the imported classes reference.
+    // Outputs (writable app RAM, e.g. 0x15006f4): the platform is expected to fill
+    //   *_offsets with the resolved indices/vtable offsets so the native code can
+    //   call platform methods. Not yet implemented (see BRIDGE_REPORT.md).
+    let _ = (fields, static_fields, virtual_methods, a4, static_methods);
+    let _ = (field_offsets, static_field_offsets, virtual_method_offsets, a9, static_method_offsets);
+
+    let count = read_generic::<u32, _>(core, classes).unwrap_or(0);
+    if tracing::enabled!(tracing::Level::DEBUG) {
+        tracing::debug!("java_load_classes: {count} imported platform classes @ {classes:#x}");
+        for i in 0..count.min(64) {
+            let base = classes + 4 + i * 24;
+            let ptr_name = read_generic::<u32, _>(core, base).unwrap_or(0);
+            tracing::debug!("  import[{i}] {:?}", read_cstring(core, ptr_name));
+        }
+    }
 
     Ok(())
 }
 
 pub async fn java_unk9(_core: &mut ArmCore, _: &mut (), a0: u32) -> Result<()> {
-    tracing::warn!("java_unk9({a0:#x})");
+    tracing::debug!("java_unk9({a0:#x})");
 
     Ok(())
 }
 
-pub async fn java_unk11(_core: &mut ArmCore, _: &mut (), a0: u32, a1: u32, a2: u32, a3: u32) -> Result<()> {
-    tracing::warn!("java_unk11({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x})");
+pub async fn java_unk11(core: &mut ArmCore, (_system, jvm): &mut (System, Jvm), a0: u32, a1: u32, a2: u32, a3: u32) -> Result<()> {
+    // Decoded calling convention (LGT java-interface import 0x83 — invoke-static):
+    //   a0 = ptr to class name cstring  (observed: "org/kwis/msp/lcdui/Main")
+    //   a1 = 0 (unused / implicit method "main")
+    //   a2 = argc
+    //   a3 = ptr to argv (array of `argc` cstring pointers)
+    // argv[0] is the application's main Jlet class name (e.g. "Game"). This mirrors
+    // the WIPI-C clet boot, which invokes the same Main.main with "net/wie/CletWrapper".
+    let _ = a1;
+    let class_name = read_cstring(core, a0).unwrap_or_default();
+    let argc = a2 as usize;
+    let argv_ptrs = peek_words(core, a3, argc.min(16));
+    let argv: Vec<String> = argv_ptrs.iter().map(|&p| read_cstring(core, p).unwrap_or_default()).collect();
 
-    // invoke static? used to be called with org/kwis/msp/lcdui/Main
+    tracing::debug!("java_unk11: invoke-static {class_name}.main argv={argv:?}");
 
-    Err(WieError::Unimplemented("LGT Java apps are not implemented yet".into()))
+    if class_name != "org/kwis/msp/lcdui/Main" {
+        return Err(WieError::Unimplemented(format!(
+            "LGT java_unk11: unexpected invoke target {class_name} (argv={argv:?})"
+        )));
+    }
+    let main_class = argv.first().cloned().unwrap_or_default();
+    if main_class.is_empty() {
+        return Err(WieError::FatalError("LGT java_unk11: empty main class name in argv[0]".into()));
+    }
+
+    // Boot the application's main Jlet through the shared lcdui Main path.
+    invoke_lcdui_main(jvm, &main_class).await
 }
 
 pub async fn java_unk12(_core: &mut ArmCore, _: &mut (), a0: u32) -> Result<()> {
-    tracing::warn!("java_unk12({a0:#x})");
+    tracing::debug!("java_unk12({a0:#x})");
 
     Ok(())
 }
