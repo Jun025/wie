@@ -35,7 +35,7 @@ use core::{
 };
 
 use java_constants::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
-use jvm::{ClassDefinition, ClassInstance, Field, JavaError, JavaType, JavaValue, Jvm, Method, Result as JvmResult};
+use jvm::{ClassDefinition, ClassInstance, Field, JavaError, JavaType, JavaValue, Jvm, Method, Result as JvmResult, runtime::JavaLangString};
 use spin::Mutex;
 
 use wie_backend::System;
@@ -114,10 +114,18 @@ impl LgtJvmShared {
     /// instance of `class_name` (the constructor's class) and return it. App classes
     /// become an [`LgtClassInstance`] reusing this guest pointer; platform classes
     /// are instantiated by the JVM and keyed by the guest pointer.
-    async fn bind_pending(&self, guest_ptr: u32, class_name: &str) -> Option<Box<dyn ClassInstance>> {
+    async fn bind_pending(&self, core: &mut ArmCore, guest_ptr: u32, class_name: &str) -> Option<Box<dyn ClassInstance>> {
         if !self.pending_new.lock().remove(&guest_ptr) {
             return None;
         }
+        // If the constructed platform class has a per-class vtable (hardcoded indices
+        // that collide with the global table — e.g. StringBuffer's append@19), point
+        // the guest object's `+0x00` at it now that the class is known. The object was
+        // allocated by the native `new` primitive with the global vtable word.
+        if let Some(&vt) = self.class_vtables.lock().get(class_name) {
+            let _ = write_generic(core, guest_ptr, vt);
+        }
+
         let class = self.jvm.resolve_class(class_name).await.ok()?;
         let definition = class.definition;
         let instance: Box<dyn ClassInstance> = if let Some(lgt) = definition.as_any().downcast_ref::<LgtClassDefinition>() {
@@ -160,22 +168,29 @@ impl LgtJvmShared {
                 if let Some(o) = inst.as_any().downcast_ref::<LgtClassInstance>() {
                     return o.guest_ptr;
                 }
-                // platform object: allocate an opaque proxy block whose vtable word
-                // is its own class's per-class vtable (so foreign indices read 0),
-                // and register it.
-                let class_name = inst.class_definition().name();
-                let vtable = self.class_vtables.lock().get(&class_name).copied().unwrap_or_else(|| self.vtable_word());
-                match Allocator::alloc(core, OBJ_HEADER_SIZE) {
-                    Ok(ptr) => {
-                        let _ = write_generic(core, ptr, vtable);
-                        let _ = write_generic(core, ptr + 4, 0u32);
-                        let _ = write_generic(core, ptr + OBJ_PTR_FIELDS_OFFSET, 0u32);
-                        self.instances.lock().insert(ptr, inst.clone());
-                        ptr
-                    }
-                    Err(_) => 0,
-                }
+                self.register_platform_object(core, inst.clone())
             }
+        }
+    }
+
+    /// Give a JVM platform object a guest identity: allocate an opaque proxy block
+    /// whose vtable word is the object's own per-class vtable (so a hardcoded index
+    /// that belongs to another class reads 0 rather than misfiring), register it in
+    /// the instance map, and return the guest pointer. Returns 0 on allocation
+    /// failure. Used both when marshalling a platform return/arg into native code and
+    /// by the native String factory (java-interface import).
+    pub fn register_platform_object(&self, core: &mut ArmCore, inst: Box<dyn ClassInstance>) -> u32 {
+        let class_name = inst.class_definition().name();
+        let vtable = self.class_vtables.lock().get(&class_name).copied().unwrap_or_else(|| self.vtable_word());
+        match Allocator::alloc(core, OBJ_HEADER_SIZE) {
+            Ok(ptr) => {
+                let _ = write_generic(core, ptr, vtable);
+                let _ = write_generic(core, ptr + 4, 0u32);
+                let _ = write_generic(core, ptr + OBJ_PTR_FIELDS_OFFSET, 0u32);
+                self.instances.lock().insert(ptr, inst);
+                ptr
+            }
+            Err(_) => 0,
         }
     }
 
@@ -542,7 +557,7 @@ pub async fn handle_java_trampoline(core: &mut ArmCore, shared: &mut LgtJvmShare
     // `obj = new50(); obj.<init>()`: the native object allocator hands `<init>` a
     // pending guest block. Bind it to a JVM instance of the constructed class now.
     if this.is_none() && entry.name == "<init>" && this_raw != 0 {
-        this = shared.bind_pending(this_raw, &entry.class_name).await;
+        this = shared.bind_pending(core, this_raw, &entry.class_name).await;
     }
     let mut jargs = Vec::with_capacity(arg_types.len());
     for ty in &arg_types {
@@ -565,6 +580,21 @@ pub async fn handle_java_trampoline(core: &mut ArmCore, shared: &mut LgtJvmShare
     );
 
     let jvm = shared.jvm.clone();
+
+    // wie's StringBuffer implements `append([CII)` but not `append(Ljava/lang/String;)`
+    // / `append(Object)`, which the AOT calls (vtable[19]). Synthesise it from the
+    // argument String's chars so the builder chain (`"txt/"+arg+".dat"`) works.
+    if entry.class_name == "java/lang/StringBuffer" && entry.name == "append" && entry.descriptor.starts_with("(Ljava/lang/") {
+        let result = stringbuffer_append_string(&jvm, this, jargs.into_iter().next()).await;
+        let result = match result {
+            Ok(v) => v,
+            Err(e) => return Err(JvmSupport::to_wie_err(&jvm, e).await),
+        };
+        let r0 = shared.value_to_guest(core, &result);
+        core.set_next_pc(lr)?;
+        return Ok(r0);
+    }
+
     let result: core::result::Result<JavaValue, JavaError> = if entry.name == "<init>" {
         match &this {
             Some(this) => jvm.invoke_special(this, &entry.class_name, "<init>", &entry.descriptor, jargs).await,
@@ -591,6 +621,33 @@ pub async fn handle_java_trampoline(core: &mut ArmCore, shared: &mut LgtJvmShare
     Ok(r0)
 }
 
+/// Synthesise `StringBuffer.append(String)` (absent in wie's StringBuffer) by routing
+/// through the existing `append([CII)`: read the argument String's chars and append
+/// them. `append(null)` appends the text "null" (Java semantics). Returns the
+/// StringBuffer (the chainable result the AOT expects).
+async fn stringbuffer_append_string(
+    jvm: &Jvm,
+    this: Option<Box<dyn ClassInstance>>,
+    arg: Option<JavaValue>,
+) -> core::result::Result<JavaValue, JavaError> {
+    let this = match this {
+        Some(t) => t,
+        None => return Err(jvm.exception("java/lang/NullPointerException", "StringBuffer.append this").await),
+    };
+    let str_obj: Box<dyn ClassInstance> = match arg {
+        Some(JavaValue::Object(Some(s))) => s,
+        _ => JavaLangString::from_rust_string(jvm, "null").await?,
+    };
+    let chars = jvm.invoke_virtual(&str_obj, "toCharArray", "()[C", Vec::<JavaValue>::new()).await?;
+    let chars_arr = match chars {
+        JavaValue::Object(Some(a)) => a,
+        _ => return Err(jvm.exception("java/lang/NullPointerException", "toCharArray result").await),
+    };
+    let len = jvm.array_length(&chars_arr).await? as i32;
+    let args = alloc::vec![JavaValue::Object(Some(chars_arr)), JavaValue::Int(0), JavaValue::Int(len)];
+    jvm.invoke_virtual(&this, "append", "([CII)Ljava/lang/StringBuffer;", args).await
+}
+
 // ---- registration + table install ----
 
 pub fn register_java_trampoline_handler(core: &mut ArmCore, shared: &LgtJvmShared) -> Result<()> {
@@ -608,6 +665,17 @@ fn known_java_lang_vtable(class: &str) -> &'static [(u32, &'static str, &'static
         // Game.<init> startup: getRuntime().<14>() result discarded (void => gc),
         // then getRuntime().<13>() result used as a value (=> freeMemory).
         "java/lang/Runtime" => &[(13, "freeMemory", "()J"), (14, "gc", "()V")],
+        // cp10: `new StringBuffer(); sb.append(s1).append(s2).append(s3).toString()`
+        // at 0x4720 builds `"txt/" + arg + ".dat"`. Disassembly: vtable[19] (offset
+        // 0x4c) is called with one String arg and returns the StringBuffer (chained
+        // 3x) => `append(String)`; vtable[5] (offset 0x14) on the result is then read
+        // as a String => `toString()`. Behaviour-confirmed via the constant pool the
+        // append args come from. `append(String)` is synthesised in the trampoline
+        // (wie's StringBuffer has only `append([CII)`), see `handle_java_trampoline`.
+        "java/lang/StringBuffer" => &[
+            (5, "toString", "()Ljava/lang/String;"),
+            (19, "append", "(Ljava/lang/String;)Ljava/lang/StringBuffer;"),
+        ],
         _ => &[],
     }
 }

@@ -11,10 +11,13 @@ use wie_core_arm::{Allocator, ArmCore, EmulatedFunction, ResultWriter, SvcId};
 use wie_util::{Result, WieError, read_generic, write_generic};
 
 use super::{
-    SVC_CATEGORY_INIT, SVC_CATEGORY_STDLIB, SVC_CATEGORY_WIPIC,
+    SVC_CATEGORY_INIT, SVC_CATEGORY_JAVA_INTERFACE, SVC_CATEGORY_STDLIB, SVC_CATEGORY_WIPIC,
     java::{
         get_java_interface_method,
-        interface::{java_interface_stub, java_interface_unk84, java_load_classes, java_unk0, java_unk5, java_unk9, java_unk11, java_unk12},
+        interface::{
+            handle_java_interface_svc, java_interface_stub, java_interface_unk84, java_load_classes, java_unk0, java_unk5, java_unk9, java_unk11,
+            java_unk12,
+        },
         native_jvm::{LgtJvmShared, register_app_classes, register_java_trampoline_handler},
     },
     stdlib::register_stdlib_svc_handler,
@@ -67,6 +70,7 @@ pub async fn load_native(core: &mut ArmCore, system: &mut System, jvm: &Jvm, dat
     register_stdlib_svc_handler(core, &shared)?;
     register_java_trampoline_handler(core, &shared)?;
     register_init_svc_handler(core, &shared)?;
+    core.register_svc_handler(SVC_CATEGORY_JAVA_INTERFACE, handle_java_interface_svc, &shared)?;
 
     let ptr_init_param_1 = Allocator::alloc(core, size_of::<InitParam1>() as u32)?;
     let ptr_init_param_2 = Allocator::alloc(core, size_of::<InitParam2>() as u32)?;

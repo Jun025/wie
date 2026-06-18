@@ -2,12 +2,14 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use wie_core_arm::ArmCore;
+use jvm::runtime::JavaLangString;
+use wie_core_arm::{ArmCore, ResultWriter, SvcId};
+use wie_jvm_support::JvmSupport;
 use wie_util::{Result, WieError, read_generic, read_null_terminated_string_bytes};
 
 use crate::runtime::java::native_jvm::{LgtJvmShared, install_platform_tables};
 use crate::runtime::wipi_c::invoke_lcdui_main;
-use crate::runtime::{SVC_CATEGORY_INIT, svc_ids::InitSvcId};
+use crate::runtime::{SVC_CATEGORY_INIT, SVC_CATEGORY_JAVA_INTERFACE, svc_ids::InitSvcId};
 
 // LGT "java-interface" import module (table 0x64). The native application is an
 // AOT-compiled Java program (ez-i / Xceed toolchain): its classes are emitted as
@@ -36,13 +38,65 @@ pub fn get_java_interface_method(core: &mut ArmCore, function_index: u32) -> Res
         // first in every method with a small per-method constant — looks like a
         // method-entry / stack-check / safepoint helper). Stubbed as a no-op.
         0x54 => core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaInterfaceUnk84)?,
-        // Other AOT-runtime helpers resolved lazily during native dispatch. Stubbed
-        // as no-ops (return 0) to advance; implement properly as they prove needed.
-        _ => {
-            tracing::warn!("LGT java import {function_index:#x} stubbed (no-op)");
-            core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaInterfaceStub)?
-        }
+        // Every other java-interface import is routed by its index (the SVC id *is*
+        // the import index) so it keeps its identity: it is logged with its index and
+        // specific imports (e.g. the native String factory) are implemented in
+        // `handle_java_interface_svc`. Unimplemented indices return 0 (no-op).
+        _ => core.make_svc_stub(SVC_CATEGORY_JAVA_INTERFACE, function_index)?,
     })
+}
+
+/// Dispatch for java-interface imports routed by `function_index` (the SVC id).
+/// Reads the four ARM argument registers, runs the import, and writes the result.
+pub async fn handle_java_interface_svc(core: &mut ArmCore, shared: &mut LgtJvmShared, id: SvcId) -> Result<()> {
+    let (_, lr) = core.read_pc_lr()?;
+    let index = id.0;
+    let (a0, a1, a2, a3) = (core.read_param(0)?, core.read_param(1)?, core.read_param(2)?, core.read_param(3)?);
+
+    let result = match index {
+        // Native String factory: build a `java/lang/String` from UTF-16 constant data
+        // and hand the native code a guest pointer bound to that JVM instance.
+        //   a0 = context (string-pool/runtime handle, unused here)
+        //   a1 = pointer to UTF-16 char data (the constant's length prefix already skipped)
+        //   a2 = char count
+        //   a3 = output slot (.bss) the native code also stashes the result in
+        // Confirmed by RE: `func@0x1834` reads `const[idx] = {len:u16, char[len]:u16}`
+        // then calls this import to materialise the String passed to StringBuffer.append.
+        i if i == STRING_FACTORY_INDEX => java_new_string(core, shared, a1, a2).await?,
+        _ => {
+            tracing::debug!("LGT java-interface import {index:#x}({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x}) -> 0 (no-op)");
+            0
+        }
+    };
+
+    result.write(core, lr)
+}
+
+/// java-interface import index of the native String factory (UTF-16 chars -> String).
+/// Identified empirically (cp10): import `0x9` is invoked as
+/// `(0x1400154, <.text UTF-16 ptr>, <char count>, <.bss out slot>)` immediately
+/// before `StringBuffer.append`, and the char data matches the constant pool (e.g.
+/// `0xe7512`,len 4 = "txt/"). `func@0x1834` reads `const[idx]={len,chars}` then calls
+/// this import to materialise the String.
+const STRING_FACTORY_INDEX: u32 = 0x9;
+
+/// Materialise a `java/lang/String` from `count` UTF-16 chars at guest `chars_ptr`,
+/// register it in the instance map behind a fresh guest proxy block, and return the
+/// guest pointer (so it round-trips back to the JVM String when used as an argument).
+async fn java_new_string(core: &mut ArmCore, shared: &mut LgtJvmShared, chars_ptr: u32, count: u32) -> Result<u32> {
+    let mut units = Vec::with_capacity(count as usize);
+    for i in 0..count {
+        units.push(read_generic::<u16, _>(core, chars_ptr + i * 2)?);
+    }
+    let text = String::from_utf16_lossy(&units);
+    tracing::debug!("java-interface String factory: {count} chars -> {text:?}");
+
+    let jvm = shared.jvm.clone();
+    let instance = match JavaLangString::from_rust_string(&jvm, &text).await {
+        Ok(s) => s,
+        Err(e) => return Err(JvmSupport::to_wie_err(&jvm, e).await),
+    };
+    Ok(shared.register_platform_object(core, instance))
 }
 
 // ---- memory-decode helpers (best-effort, never fail) ----
