@@ -1,134 +1,118 @@
 # STEP 2 — LGT native-backed JVM (implementation pass)
 
 Goal: register the LGT java app's native classes with the JVM and dispatch their
-methods to ARM code, so `Main.main` can instantiate `Game` (break
-`NoClassDefFoundError`) and drive `Game`/`startApp`.
+methods to **real ARM code**, so the app's own AOT methods (`Game.<init>`,
+`a.<init>`, `a.startApp`, …) execute natively.
 
 Reference app: BattleMonster `00025C2B`. Branch: `feat/lgt-java-interface-bridge`
 (local only). Builds on the RE pass (`docs/lgt_native_classes.md`,
 `wie_lgt/src/runtime/java/native_class.rs`).
 
+Approach agreed in Discussion #1232: an LGT-specific PoC object model is fine; this
+pass covers dispatch of the **app's own** methods. Calls into platform classes go
+through the `java_load_classes` method/offset tables — that is checkpoint 3.
+
 ## Status summary
 
-| ask | result |
+| item | result |
 |---|---|
 | `NoClassDefFoundError: Game` resolved | ✅ yes |
-| `Game` instantiated (`new Game()`) | ✅ yes (`Game.<init>` invoked) |
-| `Game`/app `startApp` reached | ✅ yes — `a.startApp([Ljava/lang/String;)V` is invoked |
-| Title screen / first battle | ❌ not yet — needs real ARM dispatch (see blocker) |
+| `Game` instantiated (`new Game()`) | ✅ yes |
+| App methods run as **real ARM** | ✅ yes — `Game.<init>` → `a.<init>` execute natively |
+| Next stop | ⏹ platform method-table call in `a.<init>` (= **checkpoint 3**) |
 | Clet path regression (`test_helloworld`) | ✅ still passes |
+| clippy | ✅ clean |
 
-Boot now runs to a **stable MIDP event loop** with no crash; the screen is blank
-because the native `startApp` body is still a stub.
+The earlier interim (`<init>` super-chaining through the JVM, which reached a blank
+event loop) has been **removed** in favour of real dispatch. With real dispatch the
+boot now stops earlier — at the first platform call — which is the correct,
+expected checkpoint-2 endpoint.
 
 ## Checkpoint 1 — register native classes ✅
 
-`wie_lgt/src/runtime/java/native_jvm.rs`:
-- `scan_class_headers`: walks the app's `.data` segment (range captured from the
-  ELF in `load_executable`) for class headers matching the documented layout.
-- `build_class_definition`: converts each parsed `LgtNativeClass` into a
-  `jvm_rust::ClassDefinitionImpl` — fields from the field records, methods from the
-  method records with a custom `MethodBody` (`LgtNativeMethodBody`). Built directly
-  via `ClassDefinitionImpl::new` + `MethodImpl::from_method_proto` so runtime
-  (obfuscated) names work without `&'static`.
-- `register_app_classes`: registers all classes in **superclass-dependency order**
-  (`register_class` resolves the parent eagerly, so e.g. `a` must precede `Game`,
-  `o` before `b/d/e/j/l`). Platform parents (`Jlet`, `Card`, `Object`) resolve via
-  the bootstrap loader.
+`register_app_classes` (in `native_jvm.rs`) scans the app's `.data` (range captured
+from the ELF in `load_executable`) for class headers, parses each via
+`native_class.rs`, and registers all **20** app classes with the JVM in
+superclass-dependency order (`register_class` resolves the parent eagerly). No-op
+for clet apps (no descriptors in `.data`), so the clet path is unaffected.
+`resolve_class` then finds `Game` → `NoClassDefFoundError` gone.
 
-Wired in `init.rs` before the app initializer runs. No-op for clet apps (their
-`.data` has no class descriptors), so the clet path is unaffected.
+## Checkpoint 2 — ARM-backed object model + real dispatch ✅
 
-Result: all **20** app classes register
-(`a c f g h k m n o p r s Game b d e i j l q`), `resolve_class` finds `Game` via the
-registered-classes map, and `Game.<init>` is invoked — `NoClassDefFoundError` gone.
+### Object model (`wie_lgt/src/runtime/java/native_jvm.rs`)
 
-## Checkpoint 2 — method dispatch ⚠️ (interim; real ARM dispatch blocked)
+Custom `jvm` trait impls (pure-Rust metadata; no guest reflection, unlike wie_ktf):
 
-**Blocker (structural):** real dispatch — marshal JVM args → ARM `r0..r3`,
-`core.run_function(code_ptr)`, marshal the return — requires the app's **objects to
-be ARM-memory-backed**, because:
-- every instance method receives `this` as a guest pointer, and native bodies
-  operate on it directly. Disassembly of `Game.<init>` (`0x10c8`):
-  ```
-  mov ip, sp ; push {r4,r5,r6,fp,ip,lr,pc} ; ldr r3,[pc,#0xe0]
-  mov r4, r0        ; r4 = this
-  mov r0, #0xc ; mov lr, pc ; bx r3   ; call runtime helper
-  ```
-- object args/returns must marshal to/from guest pointers. In `wie_ktf` this works
-  because its `JavaClassInstance` is ARM-backed (`ptr_raw`); our classes use
-  `jvm_rust::ClassInstanceImpl`, which has no guest-memory backing.
+- **`LgtClassDefinition`** — `name`/`super`/`access`, method/field lookup, static
+  fields (Rust map). `instantiate()` allocates a **guest object block**: a 12-byte
+  header whose **`+0x08` points to a zeroed field array**. This matches the layout
+  the AOT code requires — observed `r1 = [this, #8]; str rX, [r1, idx<<2]`.
+- **`LgtClassInstance`** — identified by its guest pointer (`guest_ptr`). JVM-side
+  `get_field`/`put_field` use a separate Rust map (enough for the platform
+  `Jlet`/`Display` glue that touches inherited fields). Unifying that with the guest
+  field array requires the platform field-offset table → checkpoint 3.
+- **`LgtMethod::run`** — real dispatch:
+  1. marshal JVM args → ARM `r0..r3` (+stack): `this` (args[0]) and object args
+     become guest pointers; primitives become raw words (`marshal_arg`).
+  2. `core.run_function(code_ptr, &params)`.
+  3. marshal the return per the descriptor's return type (`marshal_return`).
+- **`LgtField`** — name/descriptor/access.
 
-So real dispatch needs a custom **ARM-backed `ClassInstance`/`ClassDefinition`**
-(allocate a guest object block on `instantiate`, lay fields out per the descriptor
-`index`, dispatch methods via `run_function`, marshal values like
-`wie_ktf/.../jvm_support/value.rs`). This is the KTF-scale object-model port and is
-the **pending architectural decision** with the maintainer, so it is intentionally
-not implemented here.
+### Runtime helpers (lazily resolved during dispatch)
 
-**Interim implemented** (isolated in `LgtNativeMethodBody::call`, easy to remove):
-a parameterless `<init>` is chained to its superclass `<init>` through the JVM.
-Recursively this runs `Game.<init>` → `a.<init>` → `org/kwis/msp/lcdui/Jlet.<init>`
-(the real platform constructor), which calls `setCurrentJlet(this)` and creates the
-`Display`/`EventQueue`. All other native methods remain logging stubs returning a
-type-appropriate default.
+Native bodies resolve AOT-runtime helpers through the java-interface import table
+(`0x64`) *while executing*. Observed during `Game.<init>`: imports `0x54`, then
+`0xb`/`0xc`/`0xd`. These are stubbed (no-ops returning 0) so dispatch advances:
+`0x54` has a dedicated handler; other unknown java imports route to a generic logged
+no-op (`java_interface_stub`). The `.data` trampoline at `0x140466c` (real app code)
+runs as-is. (Implement these properly as they prove to need real behaviour.)
 
-Observed boot with the interim:
+### Reach (verified by ARM trace)
+
 ```
 register 20 app classes
-new Game -> Game.<init> -> a.<init> -> Jlet.<init> (setCurrentJlet(Game), Display, EventQueue)
-Launcher.startMIDlet -> WIPIMIDlet.startApp -> a.startApp([Ljava/lang/String;)V  [stub]
-Launcher spawns event loop -> EventQueue.getNextEvent/dispatchEvent looping (no crash)
+new Game -> LGT instantiate Game (guest object) -> invoke <init>
+LGT dispatch Game.<init>()V code=0x10c8       <- real ARM
+   helper(0xc)=import 0x54 [stub], 0x1908, ...
+   bx 0x194c  -> a.<init> (superclass ctor)   <- real ARM
+       helper(0xb) [stub] returns to 0x1970
+       ldr ip,[r4,#0x108] ; bx ip  with r4=0x1500820  -> bx 0
+=> java/lang/Error "Invalid memory access; address: 0"
 ```
 
-## Checkpoint 3 — `java_load_classes` offset tables ❌ not started
+So `Game.<init>` and its superclass `a.<init>` run as real ARM. Execution stops in
+`a.<init>` at `bx [0x1500820 + 0x108]`: `0x1500820` is the platform method table in
+`.bss` (the `java_load_classes` `static_method_offsets` output), still **null**
+because `java_load_classes` is a stub. This null call is the next blocker.
 
-Filling the `*_offsets` output tables (so native code can call platform methods like
-`Graphics`/`Image`/`Display` by resolved index) only becomes exercisable once native
-bodies actually run (checkpoint 2 real dispatch). Deferred behind the object model.
+## Checkpoint 3 (next) — platform method/field offset tables
 
-## Checkpoint 4 — wire + advance to title ⚠️ partial
-
-The java-app path is wired and boots to the running event loop. Reaching the title
-screen requires the native `a.startApp` (`0x1ad8`) to execute: it creates the Card
-subclass `o` (which has `paint(Lorg/kwis/msp/lcdui/Graphics;)V`@`0xd8d70`,
-`keyNotify`), pushes it on the `Display`, and starts the game threads. That is real
-ARM dispatch → blocked as above.
-
-## Furthest point reached & next stop
-
-- **Furthest:** `new Game()` succeeds; the platform `Jlet` is initialised; the app's
-  `startApp` is invoked; the MIDP event loop runs steadily with no crash.
-- **Next stop / cause:** the screen stays blank because `a.startApp` and all other
-  native bodies are stubs. The single blocker for everything beyond this is the
-  **ARM-backed instance object model** (custom `ClassInstance`/`ClassDefinition` +
-  value marshaling), which is the pending structural decision.
-
-### Recommended next step (once the object model is agreed)
-
-1. Add `LgtClassInstance` (guest object block; `instantiate` allocates via
-   `Allocator`, field offsets from descriptor `index`) and a `LgtClassDefinition`
-   (or extend `ClassDefinitionImpl` to allocate guest backing).
-2. Implement `LgtNativeMethodBody::call` for real: marshal `this`+args into `r0..r3`
-   (+stack), `run_function(code_ptr)`, marshal the return (mirror
-   `wie_ktf/.../value.rs`). Remove the interim `<init>` chain.
-3. Resolve & fill `java_load_classes` `*_offsets` so native→platform calls dispatch.
-4. Re-run; expect `a.startApp` → push Card `o` → `paint(Graphics)` → toward title.
+The single remaining blocker is exactly what the maintainer flagged: external
+(platform) Java API references are **vtable/offset-indexed**. `java_load_classes`
+must populate the `.bss` tables so native calls like `bx [0x1500820 + N]` and field
+accesses via `[0x15006f4 + idx]` resolve to the platform implementations
+(`org/kwis/msp/lcdui/{Jlet,Card,Graphics,Image,Display}`, `java/lang/*`, …). Each
+slot needs to point at a trampoline that re-enters the JVM and invokes the
+corresponding platform method/field (decoded from the `java_load_classes` imported-
+class tables in `docs/lgt_native_classes.md`). Once wired:
+`a.<init>` → `Jlet.<init>` (real) → `setCurrentJlet`/Display/EventQueue → `startApp`
+→ Card `o` `paint(Graphics)` → toward the title screen.
 
 ## Reproduce
 
 ```sh
 cargo build -p wie_cli
-RUST_LOG=wie_lgt=debug,wie=debug,wie_core_arm=warn \
+RUST_LOG=wie_lgt=debug,wie_core_arm=error \
   cargo run -p wie_cli -- /absolute/path/to/00025C2B.jar
-# look for: "registered 20 app classes", the <init> chain, WIPIMIDlet.startApp,
-# a.startApp stub, then EventQueue.getNextEvent/dispatchEvent looping.
+# look for: "registered 20 app classes", "LGT dispatch Game.<init>()V",
+# then the Error at the platform method-table call (address 0).
 ```
 
-## Module layout (kept separate per maintainer-pending design)
+## Module layout (kept separate per the agreed PoC design)
 
-- `wie_lgt/src/runtime/java/native_class.rs` — read-only descriptor parser (RE pass).
-- `wie_lgt/src/runtime/java/native_jvm.rs` — class registration + method bodies
-  (this pass). The real object model would slot in here / a sibling module.
-- `wie_lgt/src/runtime/init.rs` — captures `.data` range, registers app classes
-  before the app initializer.
+- `native_class.rs` — read-only descriptor parser (RE pass).
+- `native_jvm.rs` — ARM-backed object model + real dispatch + class registration.
+- `init.rs` — captures `.data` range, registers app classes before the initializer;
+  routes the lazily-resolved runtime-helper imports.
+- `interface.rs` / `svc_ids.rs` — java-interface import handlers/ids incl. the
+  runtime-helper stubs.
