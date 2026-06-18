@@ -1,126 +1,115 @@
-# STEP report — LGT native-backed JVM (checkpoints 1–5)
+# STEP report — LGT native-backed JVM (checkpoints 1–6)
 
 Goal: run the AOT-compiled LGT app (BattleMonster `00025C2B`) on wie's JVM, toward
-`startApp` → `paint(Graphics)` (title screen). Branch `feat/lgt-java-interface-bridge`
-(local only). PoC `LgtJvmShared` kept LGT-specific per Discussion #1232.
+`startApp` → `paint(Graphics)` (title). Branch `feat/lgt-java-interface-bridge`
+(local only). PoC `LgtJvmShared` kept LGT-specific per Discussion #1232; shared
+`wie_wipi_java`/`wie_midp` classes are **not** modified.
 
 ## Status summary
 
 | item | result |
 |---|---|
 | cp1–2: app classes registered; methods run as real ARM | ✅ |
-| cp3: `java_load_classes` fills tables; native↔platform bridge | ✅ |
-| cp4: per-class platform vtables (proxies) | ✅ |
-| cp5: **Runtime vtable wall crossed** → `a.startApp` reached as real ARM | ✅ |
-| `paint(Graphics)` / title | ❌ — two newly-localized blockers below |
+| cp3: `java_load_classes` tables; native↔platform bridge | ✅ |
+| cp4–5: per-class platform vtables; Runtime vtable wall crossed | ✅ |
+| **cp6: two-level virtual dispatch (the a.startApp fix)** | ✅ implemented + validated |
+| reach | `a.startApp` → `Game.a()` **native ARM**; deep into app logic |
+| next blocker | stdlib import `0x32` (50) requested by `Game.a()` |
+| `paint`/title | ❌ not yet (blocked behind the stdlib tail) |
 | clet regression (`test_helloworld`) | ✅ | clippy | ✅ |
 
-cp1–4 are in the git history; this revision covers **checkpoint 5** (the `java/lang`
-vtable investigation) and the two blockers it exposed.
+cp1–5 are in the git history; this revision covers **checkpoint 6**.
 
-## Checkpoint 5 — the `java/lang` vtable wall
+## Checkpoint 6 — two-level virtual dispatch
 
-### Investigation (ordering source)
+### Re-RE of the methodref index space (work item 2)
 
-1. **Dependency spec (cheapest):** searched `wipi`/`wipi_types`. **No `java/lang`
-   vtable-index layout exists** — the reference invokes platform methods **by name**
-   (`java_invoke_special(c"…", c".()V+<init>", …)`), not by index. So BattleMonster's
-   AOT (ez-i) baked indices that aren't recorded in the dependency. → unavailable.
-2. **Reconstruct from wie:** wie's `java/lang/Object` has 11 virtual methods; the LGT
-   platform's must have ~13 (Runtime's methods are called at indices 13/14). The
-   counts don't match, so wie's order can't be used directly.
-3. **Empirical (decisive for the method):** disassembling `Game.<init>`:
-   - `0x5538`: `getRuntime().<vtable 14>()` — **result discarded** ⇒ a void method ⇒ `gc()`.
-   - `0x1144`: `getRuntime().<vtable 13>()` — **result used** (passed to `0xdb8f0`) ⇒ a
-     value-returning memory query ⇒ `freeMemory()`.
-   This is the classic `getRuntime().gc(); … freeMemory()` startup memory check.
+From the `.bss` table layout (addresses from the `java_load_classes` args):
+- `static_method_offsets` `0x1500820`: **99 × u32** (direct function pointers).
+- `virtual_method_offsets` `0x15009ac`: **102 × halfword** (an INDEX table).
+- `field_offsets` `0x15006f4`: **150 × halfword**.
 
-### Implementation (추정, evidence-grounded)
+The `virtual_methods` INPUT array is **larger than the 29 I'd parsed**: refs **0–28
+= platform methods** (the imported classes), refs **29–100 = the app's own virtual
+methods** (obfuscated names `b,c,…`), e.g. ref 100 = app `a()V`. So the methodref
+space spans platform + app virtual methods.
 
-`known_java_lang_vtable()` places the empirically-identified slots into a `java/lang`
-class's per-class vtable — currently `Runtime{13: freeMemory()J, 14: gc()V}`. These
-are **estimates** at the **observed** indices, not a derived spec.
+### Model (decoded in cp5, implemented here)
 
-### Result
+The AOT dispatches virtuals two ways:
 ```
-Game.<init> -> Jlet.<init> (real) -> BackLight.alwaysOn
-  -> getRuntime().gc()        [vtable 14, void]
-  -> getRuntime().freeMemory()[vtable 13, value used]   ← startup memory check passes
--> a.startApp([Ljava/lang/String;)V  [real ARM]
+idx = virtual_method_offsets[ref]; obj.vtable[idx]()   (indirect, ref baked)
+obj.vtable[hardcoded]()                                (direct, index baked)
 ```
-The Runtime vtable wall (the pass's primary objective) is **crossed**; `a.startApp`
-now runs as real ARM.
+`virtual_method_offsets` is a **halfword index table**, `obj+0x00` is a **separate
+pointer vtable**. cp3–4 wrote pointers into the offset table and pointed `obj+0`
+there — which served direct calls but fed garbage indices to indirect calls (the
+`a.startApp` hang).
 
-## Two blockers exposed inside `a.startApp` (next work)
+### Implementation (`install_platform_tables`)
 
-### Blocker A — wie/LGT class-hierarchy gap (`Jlet.getHeight`)
-`a.startApp` calls `Component.getHeight()I` on the `Game`(Jlet) object. In the LGT
-platform the Jlet is a Component/Canvas (has `getHeight`); in wie `Jlet → Object`,
-so `invoke_virtual` fails: `NoSuchMethodError: Game.getHeight`. A one-line
-delegating `Jlet.getHeight`/`getWidth` resolves it (tried, then reverted to avoid a
-speculative shared-class edit and because it then hits Blocker B). This is a small,
-tractable platform-hierarchy reconciliation.
+- **One global pointer vtable**: `slot[ref] = trampoline` that `invoke_virtual`s
+  `virtual_methods[ref]` **by name** on `this`. Because dispatch is by name, this
+  single vtable serves *every* object: a platform proxy → the wie method; an app
+  object → its native ARM method. Every object's `+0x00` points here.
+- `virtual_method_offsets[ref*2] = ref` (halfword **identity** — the vtable index is
+  the method's global array position, which the direct hardcoded indices also use:
+  `drawLine@14`, `getHeight@1/4/27`).
+- `static_method_offsets[i*4]` = direct function pointer (unchanged).
+- **java/lang override**: classes the AOT calls by a hardcoded index that collides
+  with another class's slot (Runtime 13/14) get a per-class vtable = a copy of the
+  global one with the [`known_java_lang_vtable`] slots overridden.
 
-### Blocker B — virtual dispatch is **two-level** (model correction, 확정 via disasm)
-The biggest finding: my cp3/cp4 virtual model is structurally wrong. In `a.startApp`:
+### Validation (trace — indirect & direct both consistent)
 ```
-r3 = 0x15009ac (virtual_method_offsets)
-ldrsh r2, [r3, #0xc8]      ; r2 = virtual_method_offsets[ref]  -- a HALFWORD index
-r3 = [sb]                  ; r3 = [this+0]  -- the object's own vtable (pointers)
-add r3, r3, r2, lsl #2     ; &vtable[idx]
-ldr ip, [r3, #4]; bx ip    ; call obj.vtable[idx]
+a.startApp([Ljava/lang/String;)V               [native ARM]
+  trampoline ref100 -> app.a()V, this=Game      [indirect: virtual_method_offsets[100]=100
+                                                  -> global_vtable[100] -> invoke_virtual(Game,"a")]
+  dispatch -> native Game.a()V @0x11dc           [resolved to the app's own ARM method ✓]
 ```
-So the AOT does **two-level** virtual dispatch:
-`idx = virtual_method_offsets[methodref]` (a **halfword index table**), then
-`obj.vtable[idx]()` where `obj+0` is a **separate pointer vtable**.
+Direct calls still resolve (`Runtime.gc/freeMemory`@13/14, `Display.getDefaultDisplay`,
+…). The `a.startApp` hang is gone; boot now runs the app's real logic.
 
-My code instead wrote 4-byte *pointers* into `virtual_method_offsets` and pointed
-`obj+0` at that same table. This happens to serve **direct hardcoded-index** calls
-(`obj.vtable[const]` — e.g. `Runtime`@13/14, `Component.getHeight`@1, which is why
-cp3–5 worked), but **breaks index-table calls** (`a.startApp` reads
-`virtual_method_offsets` as halfwords → garbage index → the observed hang after
-`getHeight`).
+## Reach & next blocker
 
-Correct model for the next pass:
-- `virtual_method_offsets[methodref*2]` (halfword) = the method's vtable index.
-- `static_method_offsets[i*4]` (word) = direct function pointer (already correct).
-- `field_offsets[i*2]` (halfword) = field slot (already correct).
-- `obj+0` = a **separate** per-(class) pointer vtable, `vtable[idx] = trampoline`.
-- Open question (needs RE): the `methodref` index space (`0xc8` ⇒ ref 100) is larger
-  than the 29-entry `virtual_methods` input array — the ref→method mapping that
-  `java_load_classes` must honour when filling `virtual_method_offsets` is not yet
-  decoded.
+`Game.a()` (native) constructs app objects (`e`, `j`, …), stores them into its fields,
+and — via a `.data` lazy-bind trampoline — requests **C stdlib import `0x32` (50)**:
+```
+dispatch -> native Game.a()V @0x11dc
+get_import_table(0x1); get_import_function(0x1, 50)
+=> Unknown lgt stdlib import: 0x32
+```
+`0x32` is far below the known WIPI stdlib range (`0x3f6`–`0x424`: `strlen`, `memcpy`,
+`memset`, …), so its identity isn't established. Per the task, it is **not** stubbed
+blindly (a wrong C-function stub diverges). This is the next, incremental blocker —
+a missing native-library function, not a structural issue.
 
-## Evidence table — `(java/lang class, vtable index)` the AOT calls (maintainer Q)
-
-| object class | vtable index | inferred method | basis | status |
-|---|---|---|---|---|
-| `java/lang/Runtime` | 13 | `freeMemory()J` | result used as value | 추정 (placed) |
-| `java/lang/Runtime` | 14 | `gc()V` | result discarded (void) | 추정 (placed) |
-| `java/lang/System`/Object | (after the above) | — | reached later | 미해결 |
+(`Component.getHeight` on the Jlet, the cp5 "Blocker A", is **not** reached on this
+path yet — `a.startApp` goes through `Game.a()` first.)
 
 확정 / 추정 / 미해결:
-- **확정**: no java/lang vtable spec in the dependency; virtual dispatch is two-level
-  (index table + object pointer vtable).
-- **추정**: `Runtime.vtable[13]=freeMemory`, `[14]=gc` (from usage); validated by
-  reaching `a.startApp`.
-- **미해결**: the full `java/lang/{Object,Runtime,System}` vtable layout, and the
-  `methodref → method` index-space mapping for `virtual_method_offsets`.
+- **확정**: two-level dispatch model; methodref space (102 virtual refs, 0–28
+  platform + 29–100 app); the global-by-name vtable serves all objects.
+- **추정**: `Runtime` 13/14 = `freeMemory`/`gc` (from cp5; still valid).
+- **미해결**: stdlib import `0x32`; full `java/lang/{Object,System}` vtable layout;
+  Blocker A (`Jlet` Component methods); field-storage unification (cp3 item 4).
 
 ## Reproduce
 ```sh
 cargo build -p wie_cli
 RUST_LOG=wie_lgt=debug,wie=error,wie_core_arm=error \
   cargo run -p wie_cli -- /absolute/path/to/00025C2B.jar
-# trace: Runtime.gc()/freeMemory() dispatch, then a.startApp, then NoSuchMethodError
-# Game.getHeight (Blocker A). Disasm shows the two-level dispatch (Blocker B).
+# trace: a.startApp -> ref100 app.a() -> Game.a() native -> get_import_function(0x1, 50)
+# -> Unknown lgt stdlib import: 0x32.
 ```
 
-## Remaining work
-1. Rework virtual dispatch to the two-level model (Blocker B); decode the
-   `virtual_method_offsets` methodref index space.
-2. Reconcile the wie/LGT platform hierarchy (Blocker A: `Jlet` as Component/Canvas).
-3. Obtain the `java/lang/{Object,Runtime,System}` vtable layout (platform spec) to
-   replace the 추정 placements.
-4. Field-storage unification (cp3 item 4).
+## Remaining work (incremental)
+1. Identify/implement stdlib import `0x32` (and the rest of the low-index stdlib
+   tail) requested by the app's native code.
+2. Blocker A: `Jlet` Component methods (`getHeight`/`getWidth`) — handle in the LGT
+   PoC layer (synthetic methods on app classes / delegation), without touching
+   shared classes.
+3. Field-storage unification (cp3 item 4).
+4. `java/lang/{Object,System}` vtable slots as they appear (extend
+   `known_java_lang_vtable`).
 With these, expect `a.startApp` → Card `o` → `paint(Graphics)` toward the title.
