@@ -72,19 +72,45 @@ pub async fn java_unk0(core: &mut ArmCore, _: &mut (), a0: u32, a1: u32, a2: u32
 }
 
 pub async fn java_unk5(core: &mut ArmCore, _: &mut (System, Jvm), a0: u32, a1: u32) -> Result<()> {
-    // a0: the application's OWN class table.
-    //   [0]   = class count
-    //   [1]   = 0
-    //   [2..] = `count` pointers to per-class descriptors (in app RAM, ~0x140xxxx),
-    //           each carrying native method/field info incl. ARM code pointers for
-    //           the method bodies (text region, e.g. 0xd_xxxx / 0x8_xxxx / 0x1_xxxx).
-    // Class/method names are AOT-obfuscated to single characters; only the public
-    // entry name ("Game") survives, supplied separately via java_unk0/java_unk11.
+    // a0: the application's OWN native class registry.
+    //   [0]    = handle count
+    //   [1]    = 0
+    //   [2..]  = `count` class HANDLES (each = class_header + 0x4c); the handle's
+    //            +0x08 word points back to the class header record in `.data`.
+    //   [2+n..]= trailing per-class byte array (small counts; role unconfirmed).
+    // Each class record carries native method/field tables whose method bodies are
+    // ARM code pointers (`.text`). See docs/lgt_native_classes.md and native_class.rs.
     //
-    // Registering these as native-backed JVM classes is the remaining work (see
-    // BRIDGE_REPORT.md) and is required for java apps to actually execute.
+    // This is read-only decoding only — registering these as native-backed JVM
+    // classes is the remaining work (see BRIDGE_REPORT.md).
     let count = read_generic::<u32, _>(core, a0).unwrap_or(0);
-    tracing::debug!("java_unk5: app declares {count} native classes (table @ {a0:#x}, aux @ {a1:#x}) — not yet bridged");
+    tracing::debug!("java_unk5: app registry @ {a0:#x} ({count} class handles, aux @ {a1:#x}) — not yet bridged");
+
+    if tracing::enabled!(tracing::Level::DEBUG) {
+        for i in 0..count.min(64) {
+            let handle = match read_generic::<u32, _>(core, a0 + 8 + i * 4) {
+                Ok(h) => h,
+                Err(_) => continue,
+            };
+            match crate::runtime::java::native_class::parse_native_class_from_handle(core, handle) {
+                Ok(class) => {
+                    tracing::debug!(
+                        "  class[{i}] {:?} (tag={:#x} access={:#x}) parent={:?} methods={} fields={}",
+                        class.name,
+                        class.tag,
+                        class.access_flags,
+                        class.parent_name,
+                        class.methods.len(),
+                        class.fields.len()
+                    );
+                    for m in class.methods.iter().take(3) {
+                        tracing::debug!("      {}{} code={:#x} locals={}", m.name, m.signature, m.code_ptr, m.num_locals);
+                    }
+                }
+                Err(e) => tracing::debug!("  class[{i}] handle={handle:#x} parse failed: {e}"),
+            }
+        }
+    }
 
     Ok(())
 }
