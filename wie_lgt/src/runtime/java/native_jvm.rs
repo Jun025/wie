@@ -547,6 +547,21 @@ pub fn register_java_trampoline_handler(core: &mut ArmCore, shared: &LgtJvmShare
     core.register_svc_handler(SVC_CATEGORY_JAVA_TRAMPOLINE, handle_java_trampoline, shared)
 }
 
+/// Empirically-identified vtable slots for `java/lang/*` classes whose layout is
+/// NOT in the app's import data (they declare 0 imported virtual methods) but which
+/// the AOT calls by hardcoded vtable index. Each entry is `(vtable_index, name,
+/// descriptor)`. These are **estimates (추정)** grounded in how the native code uses
+/// the call (see STEP report's evidence table), not a derived spec — extend as more
+/// (class, index) pairs are observed.
+fn known_java_lang_vtable(class: &str) -> &'static [(u32, &'static str, &'static str)] {
+    match class {
+        // Game.<init> startup: getRuntime().<14>() result discarded (void => gc),
+        // then getRuntime().<13>() result used as a value (=> freeMemory).
+        "java/lang/Runtime" => &[(13, "freeMemory", "()J"), (14, "gc", "()V")],
+        _ => &[],
+    }
+}
+
 fn read_pair(core: &ArmCore, base: u32, idx: u32) -> (Option<String>, Option<String>) {
     let n = read_generic::<u32, _>(core, base + idx * 8).unwrap_or(0);
     let t = read_generic::<u32, _>(core, base + idx * 8 + 4).unwrap_or(0);
@@ -625,6 +640,19 @@ pub fn install_platform_tables(
             let (mname, mtype) = read_pair(core, static_methods, idx);
             let stub = make_method_trampoline(core, shared, &name, mname, mtype, false)?;
             write_generic(core, static_method_offsets + idx * 4, stub)?;
+            method_slots += 1;
+        }
+
+        // `java/lang/*` classes declare 0 imported virtual methods, yet the AOT calls
+        // them by hardcoded vtable index (their layout isn't in the app data — see
+        // STEP report). Fill the few slots identified empirically (from how the AOT
+        // uses the result) so the boot can get past the startup memory check. These
+        // are 추정 (estimated) placements, marked as such.
+        for &(idx, mname, mtype) in known_java_lang_vtable(&name) {
+            let stub = make_method_trampoline(core, shared, &name, Some(mname.into()), Some(mtype.into()), true)?;
+            if idx < VTABLE_WORDS {
+                write_generic(core, class_vtable + idx * 4, stub)?;
+            }
             method_slots += 1;
         }
         // Fields: write a distinct, non-colliding guest slot per field so native
