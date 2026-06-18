@@ -49,9 +49,6 @@ use crate::runtime::SVC_CATEGORY_JAVA_TRAMPOLINE;
 const OBJ_HEADER_SIZE: u32 = 0x0c;
 const OBJ_PTR_FIELDS_OFFSET: u32 = 0x08;
 const FIELD_ARRAY_WORDS: u32 = 256;
-/// Per-class vtable size (words). Imported virtual-method global indices are small
-/// (< ~30); this covers them with margin.
-const VTABLE_WORDS: u32 = 64;
 
 // ---- shared runtime ----
 
@@ -579,9 +576,23 @@ fn read_cstr(core: &ArmCore, ptr: u32) -> Option<String> {
     Some(String::from_utf8_lossy(&bytes).into_owned())
 }
 
-/// Implement `java_load_classes`: for each imported platform class, resolve its
-/// requested virtual/static methods to trampolines and write them into the
-/// fixed-offset output tables the native code reads.
+/// Number of virtual-method references to build (the `virtual_method_offsets` table
+/// is ~102 halfwords; this covers it with margin).
+const VTABLE_REFS: u32 = 128;
+
+/// Implement `java_load_classes` with the two-level virtual-dispatch model decoded
+/// in checkpoint 5 (see STEP report):
+///
+/// - **Virtual** (`r3=[this]; bx [r3 + idx*4]`, optionally `idx =
+///   virtual_method_offsets[ref]`): the object's `+0x00` points to a **pointer
+///   vtable** indexed by the global `virtual_methods` array position; each slot is a
+///   trampoline that `invoke_virtual`s that method *by name* on `this`. So one
+///   global vtable serves every object (platform proxy → wie method; app object →
+///   native ARM method), and `virtual_method_offsets[ref] = ref` (identity).
+/// - **Static** (`bx [static_method_offsets + i*4]`): direct function pointers.
+/// - **java/lang** classes the AOT calls by a hardcoded index that collides with
+///   another class's slot (Runtime 13/14) get a per-class vtable (copy of the global
+///   one with the [`known_java_lang_vtable`] slots overridden).
 #[allow(clippy::too_many_arguments)]
 pub fn install_platform_tables(
     core: &mut ArmCore,
@@ -596,77 +607,98 @@ pub fn install_platform_tables(
     let count = read_generic::<u32, _>(core, classes).unwrap_or(0);
     tracing::debug!("install_platform_tables: {count} imported classes");
 
-    // The AOT code's per-object vtable pointer (`this+0`) indexes this global table.
-    *shared.vmethod_table.lock() = virtual_method_offsets;
+    // Gather the imported-class method/field ranges.
+    struct Cls {
+        name: String,
+        vmo: u32,
+        sfo: u32,
+        sfc: u32,
+        smo: u32,
+        smc: u32,
+        vmc: u32,
+    }
+    let mut classes_vec = Vec::new();
+    for i in 0..count {
+        let base = classes + 4 + i * 24;
+        if let Some(name) = read_cstr(core, read_generic::<u32, _>(core, base).unwrap_or(0)) {
+            classes_vec.push(Cls {
+                name,
+                sfo: read_generic::<u16, _>(core, base + 8).unwrap_or(0) as u32,
+                sfc: read_generic::<u16, _>(core, base + 10).unwrap_or(0) as u32,
+                vmo: read_generic::<u16, _>(core, base + 12).unwrap_or(0) as u32,
+                vmc: read_generic::<u16, _>(core, base + 14).unwrap_or(0) as u32,
+                smo: read_generic::<u16, _>(core, base + 20).unwrap_or(0) as u32,
+                smc: read_generic::<u16, _>(core, base + 22).unwrap_or(0) as u32,
+            });
+        }
+    }
+    // ref -> declaring platform class (for logging only; dispatch is by name).
+    let vref_class = |r: u32| -> String {
+        classes_vec
+            .iter()
+            .find(|c| c.vmo <= r && r < c.vmo + c.vmc)
+            .map(|c| c.name.clone())
+            .unwrap_or_else(|| "app".into())
+    };
 
     let mut method_slots = 0usize;
     let mut field_slots = 0usize;
 
-    for i in 0..count {
-        let base = classes + 4 + i * 24;
-        let name = match read_cstr(core, read_generic::<u32, _>(core, base).unwrap_or(0)) {
-            Some(n) => n,
-            None => continue,
-        };
-        let vmo = read_generic::<u16, _>(core, base + 12).unwrap_or(0) as u32;
-        let vmc = read_generic::<u16, _>(core, base + 14).unwrap_or(0) as u32;
-        let sfo = read_generic::<u16, _>(core, base + 8).unwrap_or(0) as u32;
-        let sfc = read_generic::<u16, _>(core, base + 10).unwrap_or(0) as u32;
-        let smo = read_generic::<u16, _>(core, base + 20).unwrap_or(0) as u32;
-        let smc = read_generic::<u16, _>(core, base + 22).unwrap_or(0) as u32;
-
-        // Per-class vtable: a fresh, zeroed array; the class's own virtual methods
-        // are placed at their global indices. A platform proxy of this class points
-        // here, so an index belonging to another class reads 0 (a clean null) instead
-        // of a foreign trampoline. Created for every imported class — even those with
-        // 0 virtual methods (e.g. Runtime), whose empty vtable makes an unresolvable
-        // index fail cleanly rather than misfire onto another class's method.
-        let class_vtable = Allocator::alloc(core, VTABLE_WORDS * 4)?;
-        wie_util::ByteWrite::write_bytes(core, class_vtable, &[0u8; (VTABLE_WORDS * 4) as usize])?;
-        shared.class_vtables.lock().insert(name.clone(), class_vtable);
-
-        for j in 0..vmc {
-            let idx = vmo + j;
-            let (mname, mtype) = read_pair(core, virtual_methods, idx);
-            let stub = make_method_trampoline(core, shared, &name, mname, mtype, true)?;
-            write_generic(core, virtual_method_offsets + idx * 4, stub)?;
-            if idx < VTABLE_WORDS {
-                write_generic(core, class_vtable + idx * 4, stub)?;
-            }
+    // 1) Global virtual vtable + identity index table.
+    let global_vtable = Allocator::alloc(core, VTABLE_REFS * 4)?;
+    wie_util::ByteWrite::write_bytes(core, global_vtable, &[0u8; (VTABLE_REFS * 4) as usize])?;
+    for r in 0..VTABLE_REFS {
+        let (mname, mtype) = read_pair(core, virtual_methods, r);
+        if let (Some(mname), Some(mtype)) = (mname, mtype)
+            && mtype.starts_with('(')
+        {
+            let cls = vref_class(r);
+            let stub = make_method_trampoline(core, shared, &cls, Some(mname), Some(mtype), true)?;
+            write_generic(core, global_vtable + r * 4, stub)?;
             method_slots += 1;
         }
-        for j in 0..smc {
-            let idx = smo + j;
+        write_generic(core, virtual_method_offsets + r * 2, r as u16)?; // identity
+    }
+    // Every object's `+0x00` points here (app objects + platform proxies).
+    *shared.vmethod_table.lock() = global_vtable;
+
+    // 2) Static methods (direct pointers) + field slots, per imported class.
+    for c in &classes_vec {
+        for j in 0..c.smc {
+            let idx = c.smo + j;
             let (mname, mtype) = read_pair(core, static_methods, idx);
-            let stub = make_method_trampoline(core, shared, &name, mname, mtype, false)?;
+            let stub = make_method_trampoline(core, shared, &c.name, mname, mtype, false)?;
             write_generic(core, static_method_offsets + idx * 4, stub)?;
             method_slots += 1;
         }
-
-        // `java/lang/*` classes declare 0 imported virtual methods, yet the AOT calls
-        // them by hardcoded vtable index (their layout isn't in the app data — see
-        // STEP report). Fill the few slots identified empirically (from how the AOT
-        // uses the result) so the boot can get past the startup memory check. These
-        // are 추정 (estimated) placements, marked as such.
-        for &(idx, mname, mtype) in known_java_lang_vtable(&name) {
-            let stub = make_method_trampoline(core, shared, &name, Some(mname.into()), Some(mtype.into()), true)?;
-            if idx < VTABLE_WORDS {
-                write_generic(core, class_vtable + idx * 4, stub)?;
-            }
-            method_slots += 1;
-        }
-        // Fields: write a distinct, non-colliding guest slot per field so native
-        // field accesses don't all alias slot 0. (Full JVM<->native unification is
-        // tracked as item 4.)
-        for j in 0..sfc {
-            let idx = sfo + j;
-            let slot = (idx % FIELD_ARRAY_WORDS) as u16;
-            write_generic(core, field_offsets + idx * 2, slot)?;
+        for j in 0..c.sfc {
+            let idx = c.sfo + j;
+            write_generic(core, field_offsets + idx * 2, (idx % FIELD_ARRAY_WORDS) as u16)?;
             field_slots += 1;
         }
     }
 
-    tracing::info!("LGT java_load_classes: filled {method_slots} method slots, {field_slots} field slots");
+    // 3) java/lang per-class override vtables: copy the global vtable, then override
+    //    the empirically-identified hardcoded slots (추정; see STEP report).
+    for c in &classes_vec {
+        let known = known_java_lang_vtable(&c.name);
+        if known.is_empty() {
+            continue;
+        }
+        let vt = Allocator::alloc(core, VTABLE_REFS * 4)?;
+        let mut buf = alloc::vec![0u8; (VTABLE_REFS * 4) as usize];
+        wie_util::ByteRead::read_bytes(core, global_vtable, &mut buf)?;
+        wie_util::ByteWrite::write_bytes(core, vt, &buf)?;
+        for &(idx, mname, mtype) in known {
+            let stub = make_method_trampoline(core, shared, &c.name, Some(mname.into()), Some(mtype.into()), true)?;
+            if idx < VTABLE_REFS {
+                write_generic(core, vt + idx * 4, stub)?;
+            }
+        }
+        shared.class_vtables.lock().insert(c.name.clone(), vt);
+    }
+
+    tracing::info!("LGT java_load_classes: filled {method_slots} method slots, {field_slots} field slots (two-level vtable)");
     Ok(())
 }
 
