@@ -55,7 +55,7 @@ async fn handle_init_svc(core: &mut ArmCore, (wipic_category, stdlib_category, s
 }
 
 pub async fn load_native(core: &mut ArmCore, system: &mut System, jvm: &Jvm, data: &[u8]) -> Result<()> {
-    let entrypoint = load_executable(core, data)?;
+    let LoadedExecutable { entrypoint, data_range } = load_executable(core, data)?;
     register_wipic_svc_handler(core, system, jvm)?;
     register_stdlib_svc_handler(core, system)?;
     register_init_svc_handler(core, system, jvm)?;
@@ -90,6 +90,16 @@ pub async fn load_native(core: &mut ArmCore, system: &mut System, jvm: &Jvm, dat
 
     tracing::debug!("InitStruct: {:#x?}", init_param_1.ptr_init_struct);
     let init_struct: InitStruct = read_generic(core, init_param_1.ptr_init_struct)?;
+
+    // Register the app's native classes with the JVM before the initializer runs
+    // (the initializer drives the Java-interface boot, incl. Main.main -> new Game).
+    // No-op for WIPI-C clet apps, whose `.data` holds no class descriptors.
+    if let Some((data_start, data_end)) = data_range {
+        let registered = super::java::native_jvm::register_app_classes(jvm, core, system, data_start, data_end).await?;
+        if !registered.is_empty() {
+            tracing::info!("LGT native JVM: registered {} app classes: {registered:?}", registered.len());
+        }
+    }
 
     tracing::debug!("Calling initializer at {:#x}", init_struct.fn_init);
     let _: () = core.run_function(init_struct.fn_init, &[]).await?;
@@ -128,7 +138,14 @@ async fn get_import_function(core: &mut ArmCore, wipic_category: u32, stdlib_cat
     })
 }
 
-fn load_executable(core: &mut ArmCore, data: &[u8]) -> Result<u32> {
+/// The loaded executable's entrypoint plus the `.data` segment range
+/// (`start..end`), used to locate the app's native class descriptors.
+struct LoadedExecutable {
+    entrypoint: u32,
+    data_range: Option<(u32, u32)>,
+}
+
+fn load_executable(core: &mut ArmCore, data: &[u8]) -> Result<LoadedExecutable> {
     let elf = ElfBytes::<AnyEndian>::minimal_parse(data).map_err(|x| WieError::FatalError(format!("Failed to parse ELF binary.mod: {x}")))?;
 
     if elf.ehdr.e_machine != elf::abi::EM_ARM {
@@ -147,6 +164,8 @@ fn load_executable(core: &mut ArmCore, data: &[u8]) -> Result<u32> {
     let shdrs = shdrs_opt.ok_or_else(|| WieError::FatalError("ELF is missing section headers".into()))?;
     let strtab = strtab_opt.ok_or_else(|| WieError::FatalError("ELF is missing section name string table".into()))?;
 
+    let mut data_range = None;
+
     for shdr in shdrs {
         let section_name = strtab
             .get(shdr.sh_name as usize)
@@ -154,6 +173,10 @@ fn load_executable(core: &mut ArmCore, data: &[u8]) -> Result<u32> {
 
         if shdr.sh_addr != 0 {
             tracing::debug!("Section {section_name} at {:x}", shdr.sh_addr);
+
+            if section_name == ".data" {
+                data_range = Some((shdr.sh_addr as u32, (shdr.sh_addr + shdr.sh_size) as u32));
+            }
 
             let data = elf
                 .section_data(&shdr)
@@ -166,7 +189,10 @@ fn load_executable(core: &mut ArmCore, data: &[u8]) -> Result<u32> {
 
     tracing::debug!("Entrypoint: {:#x}", elf.ehdr.e_entry);
 
-    Ok(elf.ehdr.e_entry as u32)
+    Ok(LoadedExecutable {
+        entrypoint: elf.ehdr.e_entry as u32,
+        data_range,
+    })
 }
 
 async fn unk0(_core: &mut ArmCore, _: &mut (), a0: u32, a1: u32, a2: u32, a3: u32) -> Result<()> {
