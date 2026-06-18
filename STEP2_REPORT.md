@@ -15,11 +15,127 @@ Goal: run the AOT-compiled LGT app (BattleMonster `00025C2B`) on wie's JVM, towa
 | cp6: two-level virtual dispatch | ✅ |
 | cp7: stdlib `0x32` = native allocator | ✅ |
 | cp8: java `0xf` = native object allocator; `new StringBuffer()` constructs | ✅ |
-| **cp9: per-class platform vtable / native-object investigation** | ⏹ **STOP (condition B)** |
-| `paint`/title | ❌ blocked — external spec / major infra needed |
+| cp9: per-class platform vtable / native-object investigation | ⏹ STOP (B) — **superseded by cp10** |
+| cp10: StringBuffer wall crossed — String factory + per-class vtable + append bridge | ✅ |
+| **cp11: native-instantiated platform object (Graphics) — investigation → STOP (B)** | ⏹ **STOP (B)** |
+| `paint`/title | ❌ blocked — native-object model decision needed (see cp11) |
 | clet (`test_helloworld`) | ✅ | clippy | ✅ |
 
-## Checkpoint 9 — per-class platform vtables: investigation → STOP (B)
+## Checkpoint 11 — native-instantiated platform object → STOP (condition B)
+
+After cp10 the game runs its data-load loop and reaches `Graphics` setup, then stops:
+```
+LGT UNBOUND this for org/kwis/msp/lcdui/Graphics.getClipWidth:
+    this_raw=0x48840400 pending_new=true vtable_word=0x4d85a000 (global=0x4d85a000)
+java/lang/NullPointerException: getClipWidth   (at Game.a -> i.<init>)
+```
+
+### Airtight diagnosis (RE of `i.<init>`@`0x1c348`, helper@`0x1adc8`)
+`i.<init>` does `r8 = new(); helper@0x1adc8(r8, …); if (r8!=null) r8.vtable[11]()`
+(offset 0x2c → slot 11 → `getClipWidth`; the result is discarded — a null-guarded
+virtual call). Instrumentation confirms `r8` (`0x48840400`):
+- **`pending_new = true`** — it was produced by the native allocator (stdlib `0x32` /
+  java `0xf`, both → `alloc_native_object`) and **never bound to a JVM class**.
+- **`vtable_word = global`** — so `vtable[11]` resolves through the global
+  by-name table to `Graphics.getClipWidth`, invoked on an unregistered `this` → NPE.
+
+`helper@0x1adc8` is a **compiler codegen helper** (not a Java `<init>`): it fills
+`r8`'s fields with sub-objects from two platform factories (import slots
+`0x140451c`, `0x140453c`). So the app constructs `r8` **entirely in native code** —
+the platform `<init>` trampoline (which `bind_pending` hooks) never fires.
+
+### Why this is a structural wall (B), not an empirical one
+- The native allocator is **class-agnostic**: its `r0` is leftover from the prior
+  call (verified in both the StringBuffer and `i.<init>` sites), so the object's
+  class identity is **not present at allocation**.
+- App `<init>`/constructors run as **raw native ARM**, invisible to the bridge —
+  there is no observation point to learn an object's class. (Game and the Cards were
+  bindable only because they go through the JVM / a platform `<init>` trampoline.)
+- `getClipWidth` is meaningful only on a real **Graphics with a backing**. The app
+  expects native `new` + native init to yield a working platform Graphics; wie's
+  Graphics needs proper construction (Image/screen backing). Binding `r8` to any
+  class by guesswork is exactly the disallowed move (추측/블랭킷 → divergence).
+
+Resolving this needs a **maintainer/design decision on the native-object model**:
+how a natively-`new`'d platform object (e.g. Graphics) is recognised and bound to a
+wie instance with the correct backing — e.g. (a) make the LGT allocator carry/record
+a class tag, (b) a per-class native-vtable of ARM code pointers for app→app/app→self
+dispatch (needs the app/platform vtable layout — the same external dependency cp9
+flagged), or (c) intercept the specific platform factory imports
+(`0x140451c`/`0x140453c`) to mint bound objects. Each is a structural change, not a
+single empirical function.
+
+### Evidence table — `(class, vtable index)` / native-object binding
+| site | observation | basis | status |
+|---|---|---|---|
+| `Graphics.getClipWidth` | called on `pending_new` `r8`, global vtable slot 11 | runtime warn + `i.<init>` disasm | ❌ unbound native object |
+| native allocator (`0x32`/`0xf`) | class-agnostic (no class/size arg) | call-site RE (StringBuffer + `i.<init>`) | confirmed |
+| app `<init>` (`helper@0x1adc8`) | raw native codegen helper, builds composite | disasm `0x1adc8` | confirmed |
+
+확정 / 추정 / 미해결:
+- **확정**: `r8` is a native-allocated, never-bound object; the global by-name vtable
+  cannot serve it; the allocator carries no class identity; app constructors are
+  invisible to the bridge.
+- **추정**: `r8` is intended to be a platform `Graphics` (getClipWidth target) the app
+  `new`s and inits natively; many more such native-instantiated objects likely follow.
+- **미해결 (needs maintainer / design)**: the native-object model for natively-`new`'d
+  platform objects (class binding + correct vtable/backing). Also still pending from
+  cp9: platform per-class vtable spec, app field unification (cp3 item 4).
+
+## Checkpoint 10 — StringBuffer wall CROSSED (supersedes cp9 STOP-B)
+
+Re-ran the cp9 RE (playbook P3) and found the STOP-B conclusion was premature. Both
+"walls" were empirically solvable, no external spec or guessing required.
+
+### What the AOT actually does (RE of `0x4720`, `0x1834`)
+`Game.a()` builds resource filenames `"txt/" + arg + ".dat"` via StringBuffer:
+```
+r6 = new()                      ; allocator import @0x140452c
+StringBuffer.<init>(r6)         ; .bss table [r4+0x160], trampoline id=189
+s  = String factory(const[26])  ; func@0x1834 -> import 0x9; const[26]="txt/"
+r6.vtable[19](r6, s)            ; offset 0x4c -> append(String), chained x3
+r6.vtable[5]()                  ; offset 0x14 -> toString() -> String
+```
+- **vtable[19] = `append(String)`**: behaviour-confirmed — the arg is a String from
+  the constant pool, the result is re-`append`ed twice (builder chain), then
+  `toString`'d. Index is StringBuffer's *own* class-vtable slot, not a global ref.
+- **vtable[5] = `toString()`**: the result is read as a String.
+- **`func@0x1834`** = string-constant loader: reads `const[idx]={len:u16, u16 chars}`
+  and calls **java-interface import `0x9`** = a native **String factory**
+  `(ctx, char_ptr, count, out_slot)`. Identified from the import-resolution log:
+  `0x9(0x1400154, 0xe7512, 4, …)` with char data matching the pool ("txt/").
+
+### Fix (three small, evidence-grounded pieces)
+1. **String factory** (`interface.rs`): java-interface imports now route by
+   `function_index` through `SVC_CATEGORY_JAVA_INTERFACE` (the SVC id *is* the index),
+   so each keeps its identity. Import `0x9` reads the UTF-16 chars, builds a
+   `java/lang/String`, and registers it behind a guest proxy
+   (`register_platform_object`) so it round-trips back to the JVM String when used as
+   an argument. The "native String isn't a JVM object" wall dissolves: the factory
+   *is* where native Strings are born, so it just makes JVM ones.
+2. **Per-class StringBuffer vtable** (`known_java_lang_vtable`): slot 19 →
+   `append(String)`, slot 5 → `toString()`. `bind_pending` now rewrites the guest
+   object's `+0x00` vtable word to the per-class vtable at `<init>` time (the native
+   allocator set the global one before the class was known).
+3. **Synthetic `append(String)`** (`handle_java_trampoline`): wie's StringBuffer has
+   `append([CII)` but not `append(String)`/`append(Object)`; the trampoline
+   special-cases it, reading the String's chars and forwarding to `append([CII)`
+   (no shared-class edits — rule-compliant). `append(null)` appends "null".
+
+### Result
+`new StringBuffer(); …append…toString()` now produces real filenames —
+`txt/mon_info.dat`, `txt/SUB_QST_INFO.dat`, `txt/upgrade_attr.dat`,
+`txt/mon_attr_init.dat`, `txt/gradePoint.dat`, … — i.e. the game's data-load loop
+runs. Execution advances well past the cp9 stop into `Graphics` setup.
+
+### New stop (next checkpoint, NOT a wall)
+`org/kwis/msp/lcdui/Graphics.getClipWidth()I` with `this_actual=None`. The `this`
+(`r8`) is a fresh object from the allocator import `0x140452c` (java `0xf` `new`)
+that is used as a Graphics without a platform `<init>` binding it, so it is not in the
+instance map. RE of `0x1c604`/`0x1adc8` (what `new`s it and what `func@0x1adc8`
+initialises) is the next step — same empirical loop, no external input expected.
+
+## Checkpoint 9 — per-class platform vtables: investigation → STOP (B)  [SUPERSEDED]
 
 The dominant blocker is per-class vtables for platform classes the AOT calls by a
 hardcoded vtable index but which `java_load_classes` does not list (StringBuffer,
@@ -85,23 +201,33 @@ with blanket fills). Reporting for maintainer input per the autopilot stop rule.
   platform classes; native↔JVM object/String bridge; (also still pending: app field
   unification cp3 item 4, Blocker A Jlet Component methods).
 
-## Reproduce
+## Reproduce (current, post-cp10)
 ```sh
 cargo build -p wie_cli
 RUST_LOG=wie_lgt=debug,wie=error,wie_core_arm=error \
   cargo run -p wie_cli -- /absolute/path/to/00025C2B.jar
-# ... Game.a() -> new StringBuffer() (constructs) -> stringBuffer.vtable[19] ->
-# NoSuchMethodError StringBuffer.setXORMode (global-slot collision; the AOT wants
-# append(String) at vtable 19, which wie's order places at 12).
+# Game.a() -> data-load loop: new StringBuffer().append("txt/").append(name)
+#   .append(".dat").toString() now builds real filenames (txt/mon_info.dat, ...).
+# Then i.<init> -> r8 = new(); native init; r8.getClipWidth() with r8 unbound
+#   (pending_new) -> NullPointerException. See cp11 "LGT UNBOUND this" warn.
 ```
 
 ## Recommended next steps (need a decision / external input)
-1. **Platform vtable-index spec.** Obtain (or reverse-engineer from the LGT/ez-i
-   runtime) the per-class vtable layout for StringBuffer and java/lang/*; fill the
-   per-class vtables from it. Without it, only per-slot empirical RE (slow, bounded
-   to observed calls) is no-guess-safe.
-2. **Native↔JVM object/String bridge.** Decide how natively-allocated objects
-   (string constants, StringBuffer, etc.) map to JVM instances (e.g. read native
-   object fields on demand, or intern native Strings into JVM Strings).
-3. Then resume: app field unification (cp3 item 4), Blocker A (Jlet Component
-   methods), and the stdlib/java-runtime tail, toward Card `o` / `paint`.
+The cp9 items below were partly resolved by cp10 and reframed by cp11:
+
+1. **Native-object model (cp11 — the live blocker).** Decide how a natively-`new`'d
+   *platform* object (e.g. `Graphics`, created by stdlib `0x32`/java `0xf` + a raw
+   native init, never reaching a platform `<init>` trampoline) is recognised and bound
+   to a wie instance with the correct backing. Options: (a) tag the allocation with a
+   class, (b) per-class native-vtable of ARM code pointers (needs the app/platform
+   vtable layout), (c) intercept the platform factory imports
+   (`0x140451c`/`0x140453c`, resolved via imports `0xe`/`0x10`) to mint bound objects.
+2. **Native↔JVM String bridge — DONE (cp10).** The native String factory is
+   java-interface import `0x9`; it now mints real `java/lang/String`s. (Generalising
+   to other native objects is subsumed by item 1.)
+3. **StringBuffer per-class vtable — DONE (cp10).** Slot 19 = `append(String)` (synth
+   via `append([CII)`), slot 5 = `toString()`; object vtable rebound at `<init>`. The
+   cp9 "order not derivable" worry was moot: the index is the per-class slot, pinned
+   empirically per playbook P1 — no full-layout spec was needed for the observed slots.
+4. Platform per-class vtable spec (cp9) is still the general fallback for *other*
+   classes; app field unification (cp3 item 4) and Blocker A remain pending.

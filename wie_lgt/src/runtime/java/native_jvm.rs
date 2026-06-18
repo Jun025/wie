@@ -559,6 +559,16 @@ pub async fn handle_java_trampoline(core: &mut ArmCore, shared: &mut LgtJvmShare
     if this.is_none() && entry.name == "<init>" && this_raw != 0 {
         this = shared.bind_pending(core, this_raw, &entry.class_name).await;
     }
+    if this.is_none() && !is_static && entry.name != "<init>" && this_raw != 0 {
+        let pending = shared.pending_new.lock().contains(&this_raw);
+        let vt = read_generic::<u32, _>(core, this_raw).unwrap_or(0);
+        let global = *shared.vmethod_table.lock();
+        tracing::warn!(
+            "LGT UNBOUND this for {}.{}: this_raw={this_raw:#x} pending_new={pending} vtable_word={vt:#x} (global={global:#x})",
+            entry.class_name,
+            entry.name
+        );
+    }
     let mut jargs = Vec::with_capacity(arg_types.len());
     for ty in &arg_types {
         let raw = core.read_param(pos)?;
