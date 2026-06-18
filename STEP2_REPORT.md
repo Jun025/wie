@@ -1,4 +1,4 @@
-# STEP report — LGT native-backed JVM (checkpoints 1–8)
+# STEP report — LGT native-backed JVM (checkpoints 1–9)
 
 Goal: run the AOT-compiled LGT app (BattleMonster `00025C2B`) on wie's JVM, toward
 `startApp` → `paint(Graphics)` (title). Branch `feat/lgt-java-interface-bridge`
@@ -11,84 +11,97 @@ Goal: run the AOT-compiled LGT app (BattleMonster `00025C2B`) on wie's JVM, towa
 |---|---|
 | cp1–2: app classes registered; methods run as real ARM | ✅ |
 | cp3: `java_load_classes` tables; native↔platform bridge | ✅ |
-| cp4–5: per-class platform vtables; Runtime vtable wall crossed | ✅ |
+| cp4–5: per-class vtables; Runtime vtable wall crossed | ✅ |
 | cp6: two-level virtual dispatch | ✅ |
 | cp7: stdlib `0x32` = native allocator | ✅ |
-| **cp8: java `0xf` = native object allocator; `new StringBuffer()` constructs** | ✅ |
-| reach | `Game.a()` → constructs StringBuffers → `stringBuffer.vtable[19]()` |
-| next blocker | StringBuffer's per-class vtable (idx 19 collides with Graphics global slot) |
-| `paint`/title | ❌ not yet |
+| cp8: java `0xf` = native object allocator; `new StringBuffer()` constructs | ✅ |
+| **cp9: per-class platform vtable / native-object investigation** | ⏹ **STOP (condition B)** |
+| `paint`/title | ❌ blocked — external spec / major infra needed |
 | clet (`test_helloworld`) | ✅ | clippy | ✅ |
 
-cp1–7 are in the git history; this revision covers **checkpoint 8**.
+## Checkpoint 9 — per-class platform vtables: investigation → STOP (B)
 
-## Checkpoint 8 — construction sequence RE + java `0xf` (object allocator)
+The dominant blocker is per-class vtables for platform classes the AOT calls by a
+hardcoded vtable index but which `java_load_classes` does not list (StringBuffer,
+java/lang/{Object,Runtime,System}). I investigated whether they can be reconstructed
+without the platform spec.
 
-### The cp8 hypothesis (field round-trip) was wrong — RE found the real cause
+### Method enumeration is available
+`java_runtime::loader::get_runtime_class_proto(name)` (public) + `wie_wipi_java`/
+`wie_midp::get_protos()` expose every platform class's method list — so a
+**standard-order** vtable (`[reserved slot 0] ++ [ancestor virtuals] ++ [own
+virtuals]`, proto declaration order, with override dedup) can be built.
 
-The task hypothesised the `new StringBuffer()` null-`this` came from a field
-store/load mismatch. Disassembling the actual sequence (`0xfc00` / `0x4740`):
-```
-r0 = java(0x64 / 0x0f)();    // .data trampoline 0x140452c -> resolver -> (table 0x64, index 0xf)
-StringBuffer.<init>(r0);      // r0 is the object's `this`
-```
-The `this` is the **return of java-interface import `0xf`**, not a field. And `0xf`
-fell into the cp5 **generic no-op java stub** (returns 0) — so `this` was 0. **Not a
-field-storage problem.**
+### Validation result: standard order does NOT generalize
+- **Runtime — matches (coincidentally).** Object has 11 virtual methods; with a
+  reserved slot 0 its vtable size is 12. Runtime (extends Object) own virtuals are
+  `totalMemory, freeMemory, gc` → slots 12, 13, 14. This matches the cp5 observation
+  (`freeMemory@13`, `gc@14`). ✅
+- **StringBuffer — disproven.** Disassembly of `new StringBuffer(); sb.append(...)`
+  (`0x4740`) shows the native calls `stringBuffer.vtable[19](this, arg)`. The arg
+  comes from `0x1834`, which is a **string-constant loader** (reads the pool at
+  `0x140019c`), so `vtable[19] = append(Ljava/lang/String;)Ljava/lang/StringBuffer;`
+  (behaviour-confirmed). But in wie's `StringBuffer`, `append(String)` is the **first
+  own virtual** → standard-order vtable index **12**, not 19. **So wie's method order
+  ≠ the AOT's order**; the Runtime match was a 3-method coincidence.
 
-### Fix — java `0xf` = native object allocator
+→ The per-class vtable **order** for platform classes is **not derivable** from the
+app data or wie's protos. It needs the original **LGT/ez-i platform vtable-index
+spec** (external). Per-slot empirical RE (cp5-style) can pin *individual* observed
+slots without guessing, but is not a general solution (each class has many slots).
 
-Routed java-interface `0xf` to `LgtJvmShared::alloc_native_object` (added cp7): it
-returns a pending guest object, and the **`<init>` trampoline binds** it to a JVM
-instance of the constructed class (the native-`new` ↔ JVM-object path). 
+### A second, compounding wall: native objects aren't JVM objects
+Even the one confirmed slot can't be exercised: `vtable[19] = append(String)`'s
+argument is a **native** String produced by the string-constant loader (`0x1834`),
+which is **not** registered as a JVM object. Marshalling it would yield `null`. So
+StringBuffer (and string constants, and other natively-created objects) need a
+general **native↔JVM object/String bridge** (read native object state → JVM
+instance) — substantial new infrastructure, beyond a single function.
 
-Result:
-```
-stdlib new (0x32) -> 0x48840090
-StringBuffer.<init>()V  this_raw=0x48840090 this_actual="java/lang/StringBuffer"   ✓
-... a second StringBuffer constructs too ...
-```
-The new'd object now reaches `<init>` with a correct `this` — **cp8's goal,
-achieved via the actual mechanism** (object allocator), not field unification.
+### Why STOP (condition B)
+Clean, no-guess forward progress to `paint` is blocked on **two large items that
+need information/infrastructure beyond the app**: (1) the external per-class
+vtable-index spec for platform classes (wie order disproven), and (2) a native↔JVM
+object/String bridge. The only remaining "advance" would be risky guessing of
+vtable orders — explicitly disallowed (divergence/regression already seen at cp7/cp8
+with blanket fills). Reporting for maintainer input per the autopilot stop rule.
 
-### Next blocker — StringBuffer per-class vtable (idx 19)
+### Evidence table — `(class, vtable index)` the AOT calls vs. derivability
 
-After construction the native does (`0x4784`): `r3=[stringBuffer]; bx [r3 + 0x4c]`
-— `stringBuffer.vtable[19](arg)`, an **append-like** call. The StringBuffer's
-`+0x00` is the global vtable, whose slot 19 is `Graphics.setXORMode` (Graphics'
-imported global position) → `NoSuchMethodError: StringBuffer.setXORMode`.
-
-StringBuffer's virtual methods are **not imported** (`java_load_classes` lists only
-Graphics/Card/Display/… methods), so its per-class vtable index 19 collides with
-Graphics'. This is the **same per-class platform-vtable wall as java/lang**
-(Runtime): a platform class the AOT calls by hardcoded vtable index whose layout is
-not in the app data. Resolving it needs per-class vtables built from a platform
-vtable-index spec (or `wie` method lists, with index matching) — **not forced**
-(would diverge).
+| class | vtable idx | method (confirmed/inferred) | basis | wie standard-order idx | status |
+|---|---|---|---|---|---|
+| `java/lang/Runtime` | 13 | `freeMemory()J` | cp5 usage | 13 (Object=12 +1) | ✅ matches |
+| `java/lang/Runtime` | 14 | `gc()V` | cp5 usage | 14 | ✅ matches |
+| `java/lang/StringBuffer` | 19 | `append(Ljava/lang/String;)` | `0x1834` = string-const loader; arg is a String; result chained | 12 | ❌ order mismatch |
+| platform String args | — | native String, not a JVM object | `0x1834` returns a native obj | — | ❌ needs bridge |
 
 확정 / 추정 / 미해결:
-- **확정**: the `new StringBuffer()` null-`this` was java `0xf` (object allocator)
-  no-op'd, not a field issue; implementing `0xf` fixes it.
-- **추정**: StringBuffer `vtable[19]` ≈ `append` (called `this` + 1 arg).
-- **미해결**: per-class vtables for platform classes whose methods aren't imported
-  (StringBuffer, java/lang `{Object,Runtime,System}`); field-storage unification
-  (cp3 item 4) for app-declared fields (not the cause here, still future work).
+- **확정**: method enumeration is available; Runtime standard-order matches; for
+  StringBuffer the AOT order (`append(String)@19`) ≠ wie order (`@12`);
+  `vtable[19]=append(String)` (behaviour-confirmed via the string-constant loader).
+- **추정**: other platform classes likely also diverge from wie order (StringBuffer
+  shows it is not reliable).
+- **미해결 (needs maintainer / external spec)**: per-class vtable-index layout for
+  platform classes; native↔JVM object/String bridge; (also still pending: app field
+  unification cp3 item 4, Blocker A Jlet Component methods).
 
 ## Reproduce
 ```sh
 cargo build -p wie_cli
 RUST_LOG=wie_lgt=debug,wie=error,wie_core_arm=error \
   cargo run -p wie_cli -- /absolute/path/to/00025C2B.jar
-# trace: ... -> Game.a() -> StringBuffer.<init> (this_actual=java/lang/StringBuffer)
-# -> NoSuchMethodError StringBuffer.setXORMode (vtable[19] collision).
+# ... Game.a() -> new StringBuffer() (constructs) -> stringBuffer.vtable[19] ->
+# NoSuchMethodError StringBuffer.setXORMode (global-slot collision; the AOT wants
+# append(String) at vtable 19, which wie's order places at 12).
 ```
 
-## Remaining work
-1. **Per-class platform vtables for non-imported-method classes** (StringBuffer,
-   java/lang). This is the dominant recurring wall: build each platform class's
-   vtable (index→method) — needs the WIPI/ez-i vtable spec or a `wie`-method-list
-   reconstruction validated by observed `(class, index)` calls.
-2. Field-storage unification (cp3 item 4) for app-declared fields.
-3. Continue the stdlib/java-runtime tail as functions appear.
-With per-class platform vtables, `Game.a()` should finish building app state →
-`a.startApp` → Card `o` → `paint(Graphics)` toward the title.
+## Recommended next steps (need a decision / external input)
+1. **Platform vtable-index spec.** Obtain (or reverse-engineer from the LGT/ez-i
+   runtime) the per-class vtable layout for StringBuffer and java/lang/*; fill the
+   per-class vtables from it. Without it, only per-slot empirical RE (slow, bounded
+   to observed calls) is no-guess-safe.
+2. **Native↔JVM object/String bridge.** Decide how natively-allocated objects
+   (string constants, StringBuffer, etc.) map to JVM instances (e.g. read native
+   object fields on demand, or intern native Strings into JVM Strings).
+3. Then resume: app field unification (cp3 item 4), Blocker A (Jlet Component
+   methods), and the stdlib/java-runtime tail, toward Card `o` / `paint`.
