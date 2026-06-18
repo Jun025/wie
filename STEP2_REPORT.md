@@ -18,9 +18,79 @@ Goal: run the AOT-compiled LGT app (BattleMonster `00025C2B`) on wie's JVM, towa
 | cp9: per-class platform vtable / native-object investigation | ⏹ STOP (B) — **superseded by cp10** |
 | cp10: StringBuffer wall crossed — String factory + per-class vtable + append bridge | ✅ |
 | cp11: native-instantiated object — first investigation → STOP (B) | ⏹ |
-| **cp12: P3 re-attack — import thunks decoded, `r8` is an app object w/ compiled-away class** | ⏹ **STOP (B), refined** |
-| `paint`/title | ❌ blocked — platform base-class vtable layout needed (see cp12) |
+| cp12: P3 re-attack — import thunks decoded, `r8` is an app object w/ compiled-away class | ⏹ |
+| **cp13: static-type identification of `r8` — disproven (AOT slot reuse)** | ⏹ **STOP (B), single-fact** |
+| `paint`/title | ❌ blocked — `r8` class unrecoverable from static type; see cp13 |
 | clet (`test_helloworld`) | ✅ | clippy | ✅ |
+
+## Checkpoint 13 — identify `r8` by static type (P4): disproven, AOT erases the type
+
+Per the directive, I exhausted P4 (a/b/c) + P5 to identify `r8`'s class from static
+type info where it flows. Result: the type is **not in any reliable static position**.
+
+### Where `r8` flows (full RE of `i.<init>`@`0x1c348`)
+`r8 = [0x140452c]()` = import `0xf` (the class-agnostic allocator), then
+`helper@0x1adc8(r8, this_i)` fills its fields, then it is stored and `vtable[11]`'d:
+```
+r5 = func@0xd8640()         ; getInstance-style: starts from o's handle 0x1403e08
+                            ;   (= o header 0x1403dbc + 0x4c), tail-calls -> the o INSTANCE
+str r8, [[r5+8] + 0x14]     ; r8 -> o-instance app-field array, offset 0x14 = index 5
+if (r8 != null) r8.vtable[11]()   ; result DISCARDED
+```
+`o` = `class o`, which **extends `org/kwis/msp/lcdui/Card`** (the game's title Card).
+So `r8` is stored as a field of the game's Card instance.
+
+### P4(a) — owning field descriptor: **misleading (slot reuse)**
+The store offset `0x14` = `o`'s **own app-declared field index 5**. `o`'s field table
+(descriptor): index 5 = name `f`, **type `I` (int)**. But `r8` is an *object*. The AOT
+**reuses the int-declared slot for an object reference** — native code is untyped, so
+the Java field descriptor (`I`) does **not** type `r8`. P4(a) is not just unavailable
+here, it is actively misleading.
+
+### P4(b) — typed method argument: **none**
+`r8` is only ever passed to (i) the untyped `helper@0x1adc8` (a compiler codegen helper,
+no signature) and (ii) `vtable[11]` (the collision). It is never an argument to a
+descriptor-typed app/platform method ⇒ no signature to read.
+
+### P4(c) — field-fingerprint: **non-unique**
+`helper@0x1adc8` writes `r8`'s field-array words 1–4 (results of imports `0xe`/`0x10`,
+unknown return type). Matching against all 19 app descriptors: the only class with
+*object* fields at indices 1–4 is `Game` (and `r8`≠`Game`, the Jlet); if `0xe`/`0x10`
+return ints, the match is ambiguous across many classes. No unique identification.
+
+### P5 — factory interception: **cannot mint `r8`**
+`r8` comes from the generic import `0xf` allocator (no type). Imports `0xe`/`0x10` build
+`r8`'s *fields*, not `r8`. So there is no typed factory to intercept for `r8` itself
+(unlike cp10's String factory `0x9`).
+
+### `vtable[11]` is a *void* method (decisive, theory confirmed)
+Both branches of `if (r8!=null) r8.vtable[11]()` discard the result
+(`bx ip` → method; next insn `ldr r0,[fp,#-0x2c]` overwrites `r0` with `this`). A
+discarded call to `Graphics.getClipWidth()I` (an `int` getter, global ref `g11`) is
+meaningless ⇒ `vtable[11]` for `r8`'s real class is a **void** method; the global
+by-name table misroutes slot 11 to `getClipWidth`. `r8` is an app object whose
+per-class vtable slot 11 is some inherited/own void virtual.
+
+### Narrowed single-fact wall (B)
+Everything is solved except: **`r8`'s class identity, which the AOT erased** (allocated
+class-agnostically; stored into an int-declared, reused field slot; constructed by a
+shared codegen helper; never passed to a typed method). The static-type strategy is
+disproven for this object. The minimal external fact that would unblock:
+> For `org/kwis/msp/lcdui/Card`'s subclass hierarchy, **what method is at per-class
+> vtable index 11** (a void method on the game's Card-field object), and/or a way to
+> bind the natively-`new`'d object stored at Card-instance field `f`. Equivalently:
+> the Card/Component/Object vtable layout for the single slot 11.
+
+This is one slot, not a full layout — but it is genuinely not derivable from the app's
+own data (the type is erased at every observable point). Reporting per the STOP-B rule
+after exhausting P3+P4+P5.
+
+### Reference data gathered this checkpoint
+- Import-thunk format `[str lr,[sp,#-4]! | bl disp | .word table=0x64 | .word index]`:
+  `0x140452c`→`0xf` (alloc), `0x140451c`→`0xe`, `0x140453c`→`0x10`, `0x140466c`→`0x54`.
+- `func@0xd8640`/`0xd85e4` = the `o`-singleton (Card) getInstance accessor
+  (`o` handle `0x1403e08`).
+- `class o` extends `org/kwis/msp/lcdui/Card`; `o`'s field 5 = `f:I` (reused for `r8`).
 
 ## Checkpoint 12 — P3 re-attack on the cp11 wall: identify `r8`'s class
 
