@@ -60,10 +60,10 @@ async fn handle_init_svc(core: &mut ArmCore, (wipic_category, stdlib_category, s
 pub async fn load_native(core: &mut ArmCore, system: &mut System, jvm: &Jvm, data: &[u8]) -> Result<()> {
     let LoadedExecutable { entrypoint, data_range } = load_executable(core, data)?;
     register_wipic_svc_handler(core, system, jvm)?;
-    register_stdlib_svc_handler(core, system)?;
 
     // Shared LGT native-JVM runtime (instance registry + native->platform trampolines).
     let shared = LgtJvmShared::new(jvm.clone(), system.clone());
+    register_stdlib_svc_handler(core, &shared)?;
     register_java_trampoline_handler(core, &shared)?;
     register_init_svc_handler(core, &shared)?;
 

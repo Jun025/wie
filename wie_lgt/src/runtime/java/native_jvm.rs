@@ -72,6 +72,11 @@ pub struct LgtJvmShared {
     /// its class's vtable so an index that belongs to another class (e.g. Graphics'
     /// `drawLine`@14) does not misfire on, say, a `Runtime` — it reads 0 instead.
     class_vtables: Arc<Mutex<BTreeMap<String, u32>>>,
+    /// Guest object blocks allocated by the native `new` primitive (stdlib `0x32`)
+    /// that have not yet been bound to a JVM instance. The constructor trampoline
+    /// (`<init>`) binds them: it knows the class, so it instantiates and registers
+    /// the JVM object for the pending guest pointer.
+    pending_new: Arc<Mutex<BTreeSet<u32>>>,
 }
 
 impl LgtJvmShared {
@@ -83,11 +88,52 @@ impl LgtJvmShared {
             trampolines: Arc::new(Mutex::new(Vec::new())),
             vmethod_table: Arc::new(Mutex::new(0)),
             class_vtables: Arc::new(Mutex::new(BTreeMap::new())),
+            pending_new: Arc::new(Mutex::new(BTreeSet::new())),
         }
     }
 
     fn register_instance(&self, guest_ptr: u32, instance: Box<dyn ClassInstance>) {
         self.instances.lock().insert(guest_ptr, instance);
+    }
+
+    /// The native `new` primitive (stdlib `0x32`): allocate a guest object block
+    /// (header + zeroed field array, vtable word at `+0x00`) and mark it pending;
+    /// the `<init>` trampoline binds it to a JVM instance of the constructed class.
+    pub fn alloc_native_object(&self, core: &mut ArmCore) -> Result<u32> {
+        let ptr_fields = Allocator::alloc(core, FIELD_ARRAY_WORDS * 4)?;
+        wie_util::ByteWrite::write_bytes(core, ptr_fields, &[0u8; (FIELD_ARRAY_WORDS * 4) as usize])?;
+        let ptr_raw = Allocator::alloc(core, OBJ_HEADER_SIZE)?;
+        write_generic(core, ptr_raw, self.vtable_word())?;
+        write_generic(core, ptr_raw + 4, 0u32)?;
+        write_generic(core, ptr_raw + OBJ_PTR_FIELDS_OFFSET, ptr_fields)?;
+        self.pending_new.lock().insert(ptr_raw);
+        Ok(ptr_raw)
+    }
+
+    /// If `guest_ptr` is a pending native-`new` object, bind it to a fresh JVM
+    /// instance of `class_name` (the constructor's class) and return it. App classes
+    /// become an [`LgtClassInstance`] reusing this guest pointer; platform classes
+    /// are instantiated by the JVM and keyed by the guest pointer.
+    async fn bind_pending(&self, guest_ptr: u32, class_name: &str) -> Option<Box<dyn ClassInstance>> {
+        if !self.pending_new.lock().remove(&guest_ptr) {
+            return None;
+        }
+        let class = self.jvm.resolve_class(class_name).await.ok()?;
+        let definition = class.definition;
+        let instance: Box<dyn ClassInstance> = if let Some(lgt) = definition.as_any().downcast_ref::<LgtClassDefinition>() {
+            // app class: reuse the native guest block as the instance backing.
+            Box::new(LgtClassInstance {
+                guest_ptr,
+                core: lgt.inner.core.clone(),
+                definition: lgt.clone(),
+                jvm_fields: Arc::new(Mutex::new(BTreeMap::new())),
+            })
+        } else {
+            // platform class: instantiate normally; the guest block is its handle.
+            definition.instantiate(&self.jvm).await.ok()?
+        };
+        self.instances.lock().insert(guest_ptr, instance.clone());
+        Some(instance)
     }
 
     /// Object `+0x00` value: the virtual-method table base (for AOT vtable dispatch).
@@ -484,13 +530,20 @@ pub async fn handle_java_trampoline(core: &mut ArmCore, shared: &mut LgtJvmShare
     // `this` first for virtual/<init>; then one guest word per arg slot.
     let is_static = !entry.is_virtual && entry.name != "<init>";
     let mut pos = 0usize;
-    let this = if is_static {
+    let mut this_raw = 0u32;
+    let mut this = if is_static {
         None
     } else {
-        let raw = core.read_param(pos)?;
+        this_raw = core.read_param(pos)?;
         pos += 1;
-        shared.instances.lock().get(&raw).cloned()
+        shared.instances.lock().get(&this_raw).cloned()
     };
+
+    // `obj = new50(); obj.<init>()`: the native object allocator hands `<init>` a
+    // pending guest block. Bind it to a JVM instance of the constructed class now.
+    if this.is_none() && entry.name == "<init>" && this_raw != 0 {
+        this = shared.bind_pending(this_raw, &entry.class_name).await;
+    }
     let mut jargs = Vec::with_capacity(arg_types.len());
     for ty in &arg_types {
         let raw = core.read_param(pos)?;
@@ -503,7 +556,7 @@ pub async fn handle_java_trampoline(core: &mut ArmCore, shared: &mut LgtJvmShare
 
     let this_class = this.as_ref().map(|t| t.class_definition().name());
     tracing::debug!(
-        "LGT trampoline id={} -> {}.{}{}  this_actual={:?}",
+        "LGT trampoline id={} -> {}.{}{}  this_raw={this_raw:#x} this_actual={:?}",
         id.0,
         entry.class_name,
         entry.name,
@@ -655,14 +708,16 @@ pub fn install_platform_tables(
             let cls = vref_class(r);
             let stub = make_method_trampoline(core, shared, &cls, Some(mname), Some(mtype), true)?;
             write_generic(core, global_vtable + r * 4, stub)?;
+            // Identity: the vtable index of method-ref `r` is `r` itself. Only written
+            // for real method refs to stay within the offset table's bounds.
+            write_generic(core, virtual_method_offsets + r * 2, r as u16)?;
             method_slots += 1;
         }
-        write_generic(core, virtual_method_offsets + r * 2, r as u16)?; // identity
     }
     // Every object's `+0x00` points here (app objects + platform proxies).
     *shared.vmethod_table.lock() = global_vtable;
 
-    // 2) Static methods (direct pointers) + field slots, per imported class.
+    // 2) Static methods (direct pointers) + static-field slots, per imported class.
     for c in &classes_vec {
         for j in 0..c.smc {
             let idx = c.smo + j;
@@ -671,6 +726,9 @@ pub fn install_platform_tables(
             write_generic(core, static_method_offsets + idx * 4, stub)?;
             method_slots += 1;
         }
+        // Static-field slots only. A blanket identity fill regressed a.startApp
+        // (the field semantics are more subtle), so full field-offset/unification
+        // handling is left to cp3 item 4.
         for j in 0..c.sfc {
             let idx = c.sfo + j;
             write_generic(core, field_offsets + idx * 2, (idx % FIELD_ARRAY_WORDS) as u16)?;
@@ -678,7 +736,7 @@ pub fn install_platform_tables(
         }
     }
 
-    // 3) java/lang per-class override vtables: copy the global vtable, then override
+    // 4) java/lang per-class override vtables: copy the global vtable, then override
     //    the empirically-identified hardcoded slots (추정; see STEP report).
     for c in &classes_vec {
         let known = known_java_lang_vtable(&c.name);
