@@ -17,9 +17,81 @@ Goal: run the AOT-compiled LGT app (BattleMonster `00025C2B`) on wie's JVM, towa
 | cp8: java `0xf` = native object allocator; `new StringBuffer()` constructs | ✅ |
 | cp9: per-class platform vtable / native-object investigation | ⏹ STOP (B) — **superseded by cp10** |
 | cp10: StringBuffer wall crossed — String factory + per-class vtable + append bridge | ✅ |
-| **cp11: native-instantiated platform object (Graphics) — investigation → STOP (B)** | ⏹ **STOP (B)** |
-| `paint`/title | ❌ blocked — native-object model decision needed (see cp11) |
+| cp11: native-instantiated object — first investigation → STOP (B) | ⏹ |
+| **cp12: P3 re-attack — import thunks decoded, `r8` is an app object w/ compiled-away class** | ⏹ **STOP (B), refined** |
+| `paint`/title | ❌ blocked — platform base-class vtable layout needed (see cp12) |
 | clet (`test_helloworld`) | ✅ | clippy | ✅ |
+
+## Checkpoint 12 — P3 re-attack on the cp11 wall: identify `r8`'s class
+
+Per the cp9→cp10 precedent (STOP-B was premature), I re-RE'd the cp11 blocker to try
+to **identify** `r8`'s class empirically (no guess binding). The dig produced a lot of
+new ground but the specific identity is **compiled away** — refined STOP-B below.
+
+### New ground (all confirmed)
+**Import thunk format.** Each `.data` import slot is a 16-byte thunk
+`[0xe52de004 = str lr,[sp,#-4]!] [bl dispatcher] [.word table] [.word index]`. Reading
+the table/index words decodes every slot:
+| slot | table | index | = |
+|---|---|---|---|
+| `0x140452c` | `0x64` | `0xf`  | native allocator (`new`) |
+| `0x140451c` | `0x64` | `0xe`  | factory A (builds `r8` fields) |
+| `0x140453c` | `0x64` | `0x10` | factory B (builds `r8` fields) |
+| `0x140466c` | `0x64` | `0x54` | per-method entry helper (stubbed no-op) |
+| `0x14045fc` | `0x64` | `0x22` | (an object-finalise/`0x21` pair helper) |
+
+**`i.<init>`@`0x1c348` → `r8` provenance.** `r8 = [0x140452c]()` = **import `0xf`**, the
+**class-agnostic** allocator: at all three observed call sites (`i.<init>`,
+StringBuffer, here) its `r0` is leftover from the prior call — it takes **no class/size
+argument**. So `r8` carries no type. `helper@0x1adc8` then fills `r8`'s fields via
+imports `0xe`/`0x10` (currently no-op), and `i.<init>` does
+`if (r8!=null) r8.vtable[11]()`.
+
+**`r8` is an app object, not a Graphics (decisive).** Global vtable slot 11 = Graphics
+`getClipWidth()I` (an `int` getter — see the imported-class table below). But the call
+site **discards the result** (`bx ip` → `getClipWidth`; the next insn
+`ldr r0,[fp,#-0x2c]` overwrites `r0`). A discarded `int` getter is meaningless ⇒
+`r8`'s **real** class has a **void** method at vtable index 11, and the global by-name
+table misroutes it to `getClipWidth` — exactly the StringBuffer@19 collision class.
+So `r8` needs a **per-class vtable**, and the slot-11 method is some inherited/own
+**void** virtual of `r8`'s class.
+
+### Why the class is not empirically recoverable (refined STOP-B)
+- The allocator is class-agnostic (proven), so there is no type tag at `new`.
+- The factories `0xe`/`0x10` build `r8`'s *fields*, not `r8`; they don't name its class.
+- App `<init>`/constructors are **raw-native codegen** (`helper@0x1adc8` is a compiler
+  helper, not a Java method), invisible to the bridge — no observation point.
+- Back-deriving the class from the observed *void slot 11* requires the **platform
+  base-class vtable layout** (Object/Component/Card slot counts): the app classes
+  extend `Card`/`Component`, and index 11 in *their* per-class vtable maps to a method
+  only if that base layout is known. This is the **same external spec cp9 flagged** —
+  now proven to also gate app-object virtual dispatch (cp11 anticipated this; cp12
+  proves it with the void-slot-11 evidence). Guessing the layout / the class is the
+  disallowed move.
+
+### The precise maintainer question
+Provide (or RE from the LGT/ez-i runtime) the **vtable layout of the platform base
+classes** `java/lang/Object`, `org/kwis/msp/lwc/Component`, `org/kwis/msp/lcdui/Card`
+(method → index). With it: (1) hardcoded indices like `vtable[11]` on app objects
+resolve to the right method, and (2) per-class **native** vtables (ARM code pointers)
+can be built for app objects so app→app/app→self virtual dispatch needs no JVM
+round-trip or runtime class tag. Absent it, only the global-ref slots that happen to
+coincide (lcdui-hierarchy inherited methods) work — app-specific indices collide.
+
+### Reference — imported platform classes (from `java_load_classes`, cp12 dump)
+Global virtual refs `gN` are the global-vtable slots; getClipWidth = `g11`.
+```
+[4]  org/kwis/msp/lwc/Component   virt: g1 getHeight
+[5]  org/kwis/msp/lcdui/Card      virt: g2 serviceRepaints, g3 repaint, g4 getHeight, g5 getWidth
+[12] org/kwis/msp/lcdui/Graphics  virt: g10 getClipHeight, g11 getClipWidth, g12 getClipY,
+       g13 getClipX, g14 drawLine, g15 drawRect, g16 drawImage, g17 setColor, g18 fillRect,
+       g19 setXORMode, g20 setColor, g21 getColor, g22 setClip
+[20] org/kwis/msp/lcdui/Display   virt: g23 pushCard, g24 removeAllCards
+[23] org/kwis/msp/lcdui/Jlet      virt: g25 notifyDestroyed
+[26] org/kwis/msp/lcdui/Image     virt: g26 getGraphics, g27 getHeight, g28 getWidth
+```
+The app `new`s `r8` and calls `vtable[11]` on it — but `r8` is not in the lcdui import
+hierarchy at that slot (its slot 11 is a void method), so the global table is wrong for it.
 
 ## Checkpoint 11 — native-instantiated platform object → STOP (condition B)
 
@@ -215,13 +287,15 @@ RUST_LOG=wie_lgt=debug,wie=error,wie_core_arm=error \
 ## Recommended next steps (need a decision / external input)
 The cp9 items below were partly resolved by cp10 and reframed by cp11:
 
-1. **Native-object model (cp11 — the live blocker).** Decide how a natively-`new`'d
-   *platform* object (e.g. `Graphics`, created by stdlib `0x32`/java `0xf` + a raw
-   native init, never reaching a platform `<init>` trampoline) is recognised and bound
-   to a wie instance with the correct backing. Options: (a) tag the allocation with a
-   class, (b) per-class native-vtable of ARM code pointers (needs the app/platform
-   vtable layout), (c) intercept the platform factory imports
-   (`0x140451c`/`0x140453c`, resolved via imports `0xe`/`0x10`) to mint bound objects.
+1. **Platform base-class vtable layout (cp12 — the live blocker).** `r8` is an app
+   object whose hardcoded `vtable[11]` (a *void* method) collides with the global
+   by-name table's `getClipWidth`. Its class isn't tagged at `new` (the allocator is
+   class-agnostic — proven) and is compiled away. To resolve, provide the vtable layout
+   (method→index) of `java/lang/Object`, `org/kwis/msp/lwc/Component`,
+   `org/kwis/msp/lcdui/Card`; then app objects can get **per-class native vtables** (ARM
+   code pointers) so `vtable[11]` dispatches correctly without a runtime class tag or
+   JVM round-trip. (Factories `0xe`/`0x10` build `r8`'s *fields*, not `r8`, so
+   intercepting them — cp11 option c — does not mint `r8`.)
 2. **Native↔JVM String bridge — DONE (cp10).** The native String factory is
    java-interface import `0x9`; it now mints real `java/lang/String`s. (Generalising
    to other native objects is subsumed by item 1.)
