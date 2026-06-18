@@ -1,4 +1,4 @@
-# STEP report — LGT native-backed JVM (checkpoints 1–7)
+# STEP report — LGT native-backed JVM (checkpoints 1–8)
 
 Goal: run the AOT-compiled LGT app (BattleMonster `00025C2B`) on wie's JVM, toward
 `startApp` → `paint(Graphics)` (title). Branch `feat/lgt-java-interface-bridge`
@@ -12,88 +12,83 @@ Goal: run the AOT-compiled LGT app (BattleMonster `00025C2B`) on wie's JVM, towa
 | cp1–2: app classes registered; methods run as real ARM | ✅ |
 | cp3: `java_load_classes` tables; native↔platform bridge | ✅ |
 | cp4–5: per-class platform vtables; Runtime vtable wall crossed | ✅ |
-| cp6: two-level virtual dispatch (the a.startApp fix) | ✅ |
-| **cp7: stdlib `0x32` = native object allocator (`new`)** | ✅ implemented |
-| reach | `a.startApp` → `Game.a()` native → `new StringBuffer()` |
-| next blocker | `StringBuffer.<init>` called with **null `this`** (field-route, not the allocator) |
+| cp6: two-level virtual dispatch | ✅ |
+| cp7: stdlib `0x32` = native allocator | ✅ |
+| **cp8: java `0xf` = native object allocator; `new StringBuffer()` constructs** | ✅ |
+| reach | `Game.a()` → constructs StringBuffers → `stringBuffer.vtable[19]()` |
+| next blocker | StringBuffer's per-class vtable (idx 19 collides with Graphics global slot) |
 | `paint`/title | ❌ not yet |
-| clet regression (`test_helloworld`) | ✅ | clippy | ✅ |
+| clet (`test_helloworld`) | ✅ | clippy | ✅ |
 
-cp1–6 are in the git history; this revision covers **checkpoint 7**.
+cp1–7 are in the git history; this revision covers **checkpoint 8**.
 
-## Checkpoint 7 — stdlib `0x32` (native object allocator)
+## Checkpoint 8 — construction sequence RE + java `0xf` (object allocator)
 
-### Identification (no guessing)
+### The cp8 hypothesis (field round-trip) was wrong — RE found the real cause
 
-1. **Dependency**: `wipi`/`wipi_types` define no stdlib index map (only
-   `ImportModule::WIPIC=0x1fb`); the reference invokes platform methods by name. The
-   known `StdlibSvcId` range is `0x3f6`–`0x424`, far from `0x32`. → unavailable.
-2. **Disassembly**: `0xe2c50` is the lazy-bind trampoline for `(table=1, index=0x32)`
-   (`str lr; bl resolver; .word 1; .word 0x32`).
-3. **Behavioral probe** (logged args, returned 0): the next event was
-   `StringBuffer.<init>()` with a **null `this`**. So the AOT pattern is
-   `obj = 0x32(...); obj.<init>()` → **stdlib `0x32` is the native object allocator
-   (`new`)**, not a leaf libc function.
-
-### Implementation
-
-- `LgtJvmShared::alloc_native_object`: allocate a guest object block (header +
-  zeroed field array, vtable word at `+0x00`), mark it **pending**; stdlib `0x32`
-  returns it.
-- The **`<init>` trampoline binds** a pending native object to a JVM instance of the
-  constructed class: an app class → an `LgtClassInstance` reusing the guest block; a
-  platform class → JVM-instantiated, keyed by the guest pointer. (This is the
-  native-`new` ↔ JVM-object integration.)
-- Threaded `LgtJvmShared` into the stdlib handler.
-- Fixed `virtual_method_offsets` to write the identity index only for real method
-  refs (avoids overshooting the ~102-entry table).
-
-### Reach
+The task hypothesised the `new StringBuffer()` null-`this` came from a field
+store/load mismatch. Disassembling the actual sequence (`0xfc00` / `0x4740`):
 ```
-a.startApp -> Game.a() [native ARM]
-  stdlib new (0x32) -> 0x48840070           (allocator implemented; past the fatal)
-  java/lang/StringBuffer.<init>()V  this_raw=0x0   <- BLOCKER
+r0 = java(0x64 / 0x0f)();    // .data trampoline 0x140452c -> resolver -> (table 0x64, index 0xf)
+StringBuffer.<init>(r0);      // r0 is the object's `this`
 ```
+The `this` is the **return of java-interface import `0xf`**, not a field. And `0xf`
+fell into the cp5 **generic no-op java stub** (returns 0) — so `this` was 0. **Not a
+field-storage problem.**
 
-### Next blocker — `StringBuffer.<init>` with null `this`
+### Fix — java `0xf` = native object allocator
 
-`new StringBuffer()` reaches `StringBuffer.<init>` with `this_raw = 0`. Crucially
-this is **independent of the allocator**: the allocator returned a valid block
-(`0x48840070`), but the `this` passed to `<init>` is **0**, arriving via a
-field/local route, not the allocator's return. So the object reference is being
-**lost across a field store/load** — a field-storage / construction-flow issue.
+Routed java-interface `0xf` to `LgtJvmShared::alloc_native_object` (added cp7): it
+returns a pending guest object, and the **`<init>` trampoline binds** it to a JVM
+instance of the constructed class (the native-`new` ↔ JVM-object path). 
 
-A blanket identity `field_offsets` fill was tried to make native field round-trips
-self-consistent, but it **regressed `a.startApp`** (crashed earlier at address 0):
-the field semantics are subtler than identity (some refs are inherited platform
-fields whose values live JVM-side, not in the guest field array). So this is the
-**field-storage unification problem (cp3 item 4)**, now on the critical path, and
-needs dedicated RE of the construction sequence (how the `new`'d object reference
-flows to `<init>`).
+Result:
+```
+stdlib new (0x32) -> 0x48840090
+StringBuffer.<init>()V  this_raw=0x48840090 this_actual="java/lang/StringBuffer"   ✓
+... a second StringBuffer constructs too ...
+```
+The new'd object now reaches `<init>` with a correct `this` — **cp8's goal,
+achieved via the actual mechanism** (object allocator), not field unification.
+
+### Next blocker — StringBuffer per-class vtable (idx 19)
+
+After construction the native does (`0x4784`): `r3=[stringBuffer]; bx [r3 + 0x4c]`
+— `stringBuffer.vtable[19](arg)`, an **append-like** call. The StringBuffer's
+`+0x00` is the global vtable, whose slot 19 is `Graphics.setXORMode` (Graphics'
+imported global position) → `NoSuchMethodError: StringBuffer.setXORMode`.
+
+StringBuffer's virtual methods are **not imported** (`java_load_classes` lists only
+Graphics/Card/Display/… methods), so its per-class vtable index 19 collides with
+Graphics'. This is the **same per-class platform-vtable wall as java/lang**
+(Runtime): a platform class the AOT calls by hardcoded vtable index whose layout is
+not in the app data. Resolving it needs per-class vtables built from a platform
+vtable-index spec (or `wie` method lists, with index matching) — **not forced**
+(would diverge).
 
 확정 / 추정 / 미해결:
-- **확정**: stdlib `0x32` = native object allocator (`obj=0x32(); obj.<init>()`).
-- **추정**: the allocator's size argument (impl uses a fixed generous block; args
-  `(0,8,1)` not fully pinned).
-- **미해결**: `StringBuffer.<init>` null `this` (field-route); field-storage
-  unification (cp3 item 4); Blocker A (`Jlet` Component methods); remaining
-  `java/lang/{Object,System}` vtable slots.
+- **확정**: the `new StringBuffer()` null-`this` was java `0xf` (object allocator)
+  no-op'd, not a field issue; implementing `0xf` fixes it.
+- **추정**: StringBuffer `vtable[19]` ≈ `append` (called `this` + 1 arg).
+- **미해결**: per-class vtables for platform classes whose methods aren't imported
+  (StringBuffer, java/lang `{Object,Runtime,System}`); field-storage unification
+  (cp3 item 4) for app-declared fields (not the cause here, still future work).
 
 ## Reproduce
 ```sh
 cargo build -p wie_cli
 RUST_LOG=wie_lgt=debug,wie=error,wie_core_arm=error \
   cargo run -p wie_cli -- /absolute/path/to/00025C2B.jar
-# trace: ... -> Game.a() -> "stdlib new (0x32) -> 0x..." ->
-# StringBuffer.<init>() this_raw=0x0 (NullPointerException).
+# trace: ... -> Game.a() -> StringBuffer.<init> (this_actual=java/lang/StringBuffer)
+# -> NoSuchMethodError StringBuffer.setXORMode (vtable[19] collision).
 ```
 
 ## Remaining work
-1. RE how the `new`'d object reference reaches `<init>` (field store/load) and fix
-   field-storage so native-written object refs are read back correctly — likely the
-   general field-unification (cp3 item 4), now blocking.
-2. Continue the stdlib/native-runtime tail as functions appear.
-3. Blocker A (`Jlet` Component methods) in the LGT PoC layer; remaining `java/lang`
-   vtable slots.
-With these, expect `Game.a()` to finish constructing app state → `a.startApp` →
-Card `o` → `paint(Graphics)` toward the title.
+1. **Per-class platform vtables for non-imported-method classes** (StringBuffer,
+   java/lang). This is the dominant recurring wall: build each platform class's
+   vtable (index→method) — needs the WIPI/ez-i vtable spec or a `wie`-method-list
+   reconstruction validated by observed `(class, index)` calls.
+2. Field-storage unification (cp3 item 4) for app-declared fields.
+3. Continue the stdlib/java-runtime tail as functions appear.
+With per-class platform vtables, `Game.a()` should finish building app state →
+`a.startApp` → Card `o` → `paint(Graphics)` toward the title.
