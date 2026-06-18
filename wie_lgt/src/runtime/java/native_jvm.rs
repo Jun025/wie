@@ -49,6 +49,9 @@ use crate::runtime::SVC_CATEGORY_JAVA_TRAMPOLINE;
 const OBJ_HEADER_SIZE: u32 = 0x0c;
 const OBJ_PTR_FIELDS_OFFSET: u32 = 0x08;
 const FIELD_ARRAY_WORDS: u32 = 256;
+/// Per-class vtable size (words). Imported virtual-method global indices are small
+/// (< ~30); this covers them with margin.
+const VTABLE_WORDS: u32 = 64;
 
 // ---- shared runtime ----
 
@@ -64,9 +67,14 @@ pub struct LgtJvmShared {
     /// native -> platform method trampolines, indexed by SVC id.
     trampolines: Arc<Mutex<Vec<TrampEntry>>>,
     /// Base of the global virtual-method offset table (`java_load_classes` output).
-    /// Stored in every object's `+0x00` so the AOT code's virtual dispatch
-    /// (`r3=[this]; bx [r3 + idx*4]`) resolves to a platform-method trampoline.
+    /// Used as the vtable word for **app** objects, which extend the lcdui hierarchy
+    /// and so dispatch through the union of all imported lcdui-hierarchy methods.
     vmethod_table: Arc<Mutex<u32>>,
+    /// Per-platform-class vtable base (only that class's own imported virtual methods
+    /// at their global indices, everything else 0). A **platform proxy** object uses
+    /// its class's vtable so an index that belongs to another class (e.g. Graphics'
+    /// `drawLine`@14) does not misfire on, say, a `Runtime` — it reads 0 instead.
+    class_vtables: Arc<Mutex<BTreeMap<String, u32>>>,
 }
 
 impl LgtJvmShared {
@@ -77,6 +85,7 @@ impl LgtJvmShared {
             instances: Arc::new(Mutex::new(BTreeMap::new())),
             trampolines: Arc::new(Mutex::new(Vec::new())),
             vmethod_table: Arc::new(Mutex::new(0)),
+            class_vtables: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
 
@@ -108,11 +117,14 @@ impl LgtJvmShared {
                 if let Some(o) = inst.as_any().downcast_ref::<LgtClassInstance>() {
                     return o.guest_ptr;
                 }
-                // platform object: allocate an opaque proxy block (with the vtable
-                // word so the native code can virtual-dispatch on it) and register it.
+                // platform object: allocate an opaque proxy block whose vtable word
+                // is its own class's per-class vtable (so foreign indices read 0),
+                // and register it.
+                let class_name = inst.class_definition().name();
+                let vtable = self.class_vtables.lock().get(&class_name).copied().unwrap_or_else(|| self.vtable_word());
                 match Allocator::alloc(core, OBJ_HEADER_SIZE) {
                     Ok(ptr) => {
-                        let _ = write_generic(core, ptr, self.vtable_word());
+                        let _ = write_generic(core, ptr, vtable);
                         let _ = write_generic(core, ptr + 4, 0u32);
                         let _ = write_generic(core, ptr + OBJ_PTR_FIELDS_OFFSET, 0u32);
                         self.instances.lock().insert(ptr, inst.clone());
@@ -492,12 +504,14 @@ pub async fn handle_java_trampoline(core: &mut ArmCore, shared: &mut LgtJvmShare
         jargs.push(shared.guest_to_value(raw, ty));
     }
 
+    let this_class = this.as_ref().map(|t| t.class_definition().name());
     tracing::debug!(
-        "LGT trampoline -> platform {}.{}{} (this={})",
+        "LGT trampoline id={} -> {}.{}{}  this_actual={:?}",
+        id.0,
         entry.class_name,
         entry.name,
         entry.descriptor,
-        this.is_some()
+        this_class
     );
 
     let jvm = shared.jvm.clone();
@@ -515,24 +529,10 @@ pub async fn handle_java_trampoline(core: &mut ArmCore, shared: &mut LgtJvmShare
         }
     };
 
+    // No no-op fallback (it diverges — confirmed: a 0 return for getHeight loops the
+    // layout). Unresolved calls fail loudly so the blocker stays visible.
     let result = match result {
         Ok(v) => v,
-        // The AOT code virtual-dispatches some platform methods through hardcoded
-        // vtable indices (e.g. `Runtime.getRuntime().<idx14>()`). Our single global
-        // virtual table can't disambiguate per-class indices, so such a call resolves
-        // to the wrong name. PoC fallback: swallow NoSuchMethodError and return 0 so
-        // the boot can advance; the proper fix is per-class platform vtables (see
-        // STEP2_REPORT.md). Other exceptions are still fatal.
-        Err(JavaError::JavaException(ex)) if jvm.is_instance(&*ex, "java/lang/NoSuchMethodError") => {
-            tracing::warn!(
-                "LGT trampoline: unresolved virtual {}.{}{} -> returning 0 (per-class vtable TODO)",
-                entry.class_name,
-                entry.name,
-                entry.descriptor
-            );
-            core.set_next_pc(lr)?;
-            return Ok(0);
-        }
         Err(e) => return Err(JvmSupport::to_wie_err(&jvm, e).await),
     };
 
@@ -600,11 +600,24 @@ pub fn install_platform_tables(
         let smo = read_generic::<u16, _>(core, base + 20).unwrap_or(0) as u32;
         let smc = read_generic::<u16, _>(core, base + 22).unwrap_or(0) as u32;
 
+        // Per-class vtable: a fresh, zeroed array; the class's own virtual methods
+        // are placed at their global indices. A platform proxy of this class points
+        // here, so an index belonging to another class reads 0 (a clean null) instead
+        // of a foreign trampoline. Created for every imported class — even those with
+        // 0 virtual methods (e.g. Runtime), whose empty vtable makes an unresolvable
+        // index fail cleanly rather than misfire onto another class's method.
+        let class_vtable = Allocator::alloc(core, VTABLE_WORDS * 4)?;
+        wie_util::ByteWrite::write_bytes(core, class_vtable, &[0u8; (VTABLE_WORDS * 4) as usize])?;
+        shared.class_vtables.lock().insert(name.clone(), class_vtable);
+
         for j in 0..vmc {
             let idx = vmo + j;
             let (mname, mtype) = read_pair(core, virtual_methods, idx);
             let stub = make_method_trampoline(core, shared, &name, mname, mtype, true)?;
             write_generic(core, virtual_method_offsets + idx * 4, stub)?;
+            if idx < VTABLE_WORDS {
+                write_generic(core, class_vtable + idx * 4, stub)?;
+            }
             method_slots += 1;
         }
         for j in 0..smc {
