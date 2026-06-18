@@ -1,3 +1,11 @@
 /target
 .vscode
 .cargo
+
+# Test ROMs and game binaries (never commit)
+_roms/
+roms/
+*.sav
+*.mod
+*.log
+00025C2B*
