@@ -564,9 +564,10 @@ pub async fn handle_java_trampoline(core: &mut ArmCore, shared: &mut LgtJvmShare
         let vt = read_generic::<u32, _>(core, this_raw).unwrap_or(0);
         let global = *shared.vmethod_table.lock();
         tracing::warn!(
-            "LGT UNBOUND this for {}.{}: this_raw={this_raw:#x} pending_new={pending} vtable_word={vt:#x} (global={global:#x})",
+            "LGT UNBOUND this for {}.{}{}: this_raw={this_raw:#x} pending_new={pending} vtable_word={vt:#x} (global={global:#x}) lr={lr:#x}",
             entry.class_name,
-            entry.name
+            entry.name,
+            entry.descriptor
         );
     }
     let mut jargs = Vec::with_capacity(arg_types.len());

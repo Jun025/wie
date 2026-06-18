@@ -19,9 +19,75 @@ Goal: run the AOT-compiled LGT app (BattleMonster `00025C2B`) on wie's JVM, towa
 | cp10: StringBuffer wall crossed — String factory + per-class vtable + append bridge | ✅ |
 | cp11: native-instantiated object — first investigation → STOP (B) | ⏹ |
 | cp12: P3 re-attack — import thunks decoded, `r8` is an app object w/ compiled-away class | ⏹ |
-| **cp13: static-type identification of `r8` — disproven (AOT slot reuse)** | ⏹ **STOP (B), single-fact** |
-| `paint`/title | ❌ blocked — `r8` class unrecoverable from static type; see cp13 |
+| cp13: static-type identification of `r8` — disproven (AOT slot reuse) | ⏹ |
+| **cp14: forward-probe — `r8` is a non-critical discarded probe; path continues; pervasive per-class collisions gated by Object's vtable** | ⏹ **STOP (B), single-fact** |
+| `paint`/title | ❌ blocked — platform `java/lang/Object` vtable layout (~12 slots); see cp14 |
 | clet (`test_helloworld`) | ✅ | clippy | ✅ |
+
+## Checkpoint 14 — forward-probe past `r8`: the wall is Object's vtable layout
+
+Since `r8`'s class is unrecoverable (cp13) but `r8.vtable[11]`'s result is *discarded*
+(RE-confirmed), I ran a **temporary investigation** pass: return the discarded probe's
+value instead of NPE-ing, to see whether `r8` is actually critical and to map the path
+forward. (The pass was reverted — a blanket default is a disallowed no-op; it was only
+to gather evidence.)
+
+### Result: `r8` is NOT critical; the game keeps going
+With `getClipWidth(r8)` returning a value (discarded anyway), execution continued well
+past `r8`: it constructed more `Card`s, an `AnnunciatorComponent`, and began reading
+files — i.e. `r8`'s `vtable[11]` is a genuine no-op-equivalent here. **`r8` is not a
+real blocker**; it is one instance of the per-class-vtable collision pattern.
+
+### The next stop is the SAME pattern on a *bound* object (tractable in principle)
+```
+LGT trampoline id=119 -> AnnunciatorComponent.<init>(Z)  this_raw=0x48840420   (bound OK)
+LGT trampoline id=7   -> File.read([B)I  this_raw=0x48840420  this_actual=AnnunciatorComponent
+  => NoSuchMethodError AnnunciatorComponent.read([B)I
+```
+The app `new`s an `AnnunciatorComponent` (static slot 18 = its `<init>`, correctly
+bound), then calls `obj.vtable[idx]` where `idx` comes from the `.bss`
+`virtual_method_offsets` table (`r2=[0x15009ac+0xc]`) and the call uses `vtable[r2+1]`.
+That resolves to **global slot 7 = `File.read` (g7)**, but the object is an
+`AnnunciatorComponent` whose own virtual is `show` (g6). Classic global-by-name
+collision — `AnnunciatorComponent` needs a **per-class vtable** so its slot maps to its
+own/inherited method, not `File.read`.
+
+### The single fact that unblocks ALL of these: Object's vtable layout
+Every collision (StringBuffer@19 [solved cp10 by behaviour], Runtime@13/14 [cp5], `r8`
+slot 11, AnnunciatorComponent) is a per-class vtable whose index layout is
+`[Object virtuals] ++ [intermediate platform parents] ++ [own virtuals]`. The one
+missing constant is **`java/lang/Object`'s virtual-method count and order**:
+- **Object vtable size ≈ 12 (slots 0–11)** — derived: cp5 saw `Runtime` (extends
+  Object) own methods `freeMemory@13, gc@14` ⇒ `totalMemory@12` ⇒ Object occupies 0–11.
+- **slot 5 = `toString`** — cp10: `StringBuffer.toString` is called at vtable index 5.
+- **slot 11 = a *void* Object method** — `r8`'s `vtable[11]` result is discarded; with
+  Object size 12, slot 11 is Object's last virtual (a void one — `wait`/`notify*`/
+  `finalize`-class).
+
+With Object's 12-slot layout (method→index) known, per-class vtables for `r8`,
+`AnnunciatorComponent`, and the rest can be built **without guessing** (P1):
+`[Object 0–11] ++ [parent imported methods at their java_load_classes indices] ++ [own
+native code_ptrs]`, set on each object's `+0x00`. This is one bounded table, not a
+per-class spec.
+
+### Why STOP-B here (single fact, P3/P4/P5 exhausted)
+- P3: re-RE'd repeatedly (cp11–14) — found the o-instance/Card chain, the thunk format,
+  and now the forward path; the pattern is understood, not mysterious.
+- P4: `r8`'s class is provably erased (cp13: stored in an int-declared reused slot).
+- P5: the generic `0xf` allocator can't be type-intercepted; factories build fields.
+- Forward-probe shows the blocker is **not** `r8` specifically but the **shared Object
+  vtable layout** gating every per-class vtable. That single constant
+  (`java/lang/Object` method→index, ~12 slots) is the precise external fact needed.
+  Pinning slot 11 / AnnunciatorComponent's slot by guessing the method is the
+  disallowed move.
+
+### Evidence — observed `(class, vtable index)` needing Object's layout
+| class | observed slot | what it should be | basis |
+|---|---|---|---|
+| `java/lang/StringBuffer` | 5 / 19 | `toString` / `append(String)` | solved cp10 (behaviour) |
+| `java/lang/Runtime` | 13 / 14 | `freeMemory` / `gc` | solved cp5 (Object size 12) |
+| `r8` (erased app class) | 11 | a void Object virtual (result discarded) | cp14 probe |
+| `AnnunciatorComponent` | `r2+1`→7 | its own/inherited method (not `File.read`) | cp14 trace |
 
 ## Checkpoint 13 — identify `r8` by static type (P4): disproven, AOT erases the type
 
