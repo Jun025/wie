@@ -2,12 +2,10 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use jvm::Jvm;
-
-use wie_backend::System;
 use wie_core_arm::ArmCore;
 use wie_util::{Result, WieError, read_generic, read_null_terminated_string_bytes};
 
+use crate::runtime::java::native_jvm::{LgtJvmShared, install_platform_tables};
 use crate::runtime::wipi_c::invoke_lcdui_main;
 use crate::runtime::{SVC_CATEGORY_INIT, svc_ids::InitSvcId};
 
@@ -80,7 +78,7 @@ pub async fn java_unk0(core: &mut ArmCore, _: &mut (), a0: u32, a1: u32, a2: u32
     Ok(())
 }
 
-pub async fn java_unk5(core: &mut ArmCore, _: &mut (System, Jvm), a0: u32, a1: u32) -> Result<()> {
+pub async fn java_unk5(core: &mut ArmCore, _: &mut LgtJvmShared, a0: u32, a1: u32) -> Result<()> {
     // a0: the application's OWN native class registry.
     //   [0]    = handle count
     //   [1]    = 0
@@ -127,7 +125,7 @@ pub async fn java_unk5(core: &mut ArmCore, _: &mut (System, Jvm), a0: u32, a1: u
 #[allow(clippy::too_many_arguments)]
 pub async fn java_load_classes(
     core: &mut ArmCore,
-    _: &mut (System, Jvm),
+    shared: &mut LgtJvmShared,
     classes: u32,
     fields: u32,
     static_fields: u32,
@@ -150,20 +148,21 @@ pub async fn java_load_classes(
     // Outputs (writable app RAM, e.g. 0x15006f4): the platform is expected to fill
     //   *_offsets with the resolved indices/vtable offsets so the native code can
     //   call platform methods. Not yet implemented (see BRIDGE_REPORT.md).
-    let _ = (fields, static_fields, virtual_methods, a4, static_methods);
-    let _ = (field_offsets, static_field_offsets, virtual_method_offsets, a9, static_method_offsets);
+    // Unused input arrays (field type pairs / alternate views) and unused output
+    // tables for this checkpoint.
+    let _ = (fields, static_fields, a4, static_field_offsets, a9);
 
-    let count = read_generic::<u32, _>(core, classes).unwrap_or(0);
-    if tracing::enabled!(tracing::Level::DEBUG) {
-        tracing::debug!("java_load_classes: {count} imported platform classes @ {classes:#x}");
-        for i in 0..count.min(64) {
-            let base = classes + 4 + i * 24;
-            let ptr_name = read_generic::<u32, _>(core, base).unwrap_or(0);
-            tracing::debug!("  import[{i}] {:?}", read_cstring(core, ptr_name));
-        }
-    }
-
-    Ok(())
+    // Fill the native -> platform method/field offset tables.
+    install_platform_tables(
+        core,
+        shared,
+        classes,
+        virtual_methods,
+        static_methods,
+        field_offsets,
+        virtual_method_offsets,
+        static_method_offsets,
+    )
 }
 
 pub async fn java_unk9(_core: &mut ArmCore, _: &mut (), a0: u32) -> Result<()> {
@@ -172,7 +171,7 @@ pub async fn java_unk9(_core: &mut ArmCore, _: &mut (), a0: u32) -> Result<()> {
     Ok(())
 }
 
-pub async fn java_unk11(core: &mut ArmCore, (_system, jvm): &mut (System, Jvm), a0: u32, a1: u32, a2: u32, a3: u32) -> Result<()> {
+pub async fn java_unk11(core: &mut ArmCore, shared: &mut LgtJvmShared, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<()> {
     // Decoded calling convention (LGT java-interface import 0x83 — invoke-static):
     //   a0 = ptr to class name cstring  (observed: "org/kwis/msp/lcdui/Main")
     //   a1 = 0 (unused / implicit method "main")
@@ -199,7 +198,8 @@ pub async fn java_unk11(core: &mut ArmCore, (_system, jvm): &mut (System, Jvm), 
     }
 
     // Boot the application's main Jlet through the shared lcdui Main path.
-    invoke_lcdui_main(jvm, &main_class).await
+    let mut jvm = shared.jvm.clone();
+    invoke_lcdui_main(&mut jvm, &main_class).await
 }
 
 pub async fn java_unk12(_core: &mut ArmCore, _: &mut (), a0: u32) -> Result<()> {
