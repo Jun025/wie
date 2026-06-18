@@ -20,9 +20,67 @@ Goal: run the AOT-compiled LGT app (BattleMonster `00025C2B`) on wie's JVM, towa
 | cp11: native-instantiated object — first investigation → STOP (B) | ⏹ |
 | cp12: P3 re-attack — import thunks decoded, `r8` is an app object w/ compiled-away class | ⏹ |
 | cp13: static-type identification of `r8` — disproven (AOT slot reuse) | ⏹ |
-| **cp14: forward-probe — `r8` is a non-critical discarded probe; path continues; pervasive per-class collisions gated by Object's vtable** | ⏹ **STOP (B), single-fact** |
-| `paint`/title | ❌ blocked — platform `java/lang/Object` vtable layout (~12 slots); see cp14 |
+| cp14: forward-probe — `r8` non-critical; collisions gated by offset-table dispatch | ⏹ |
+| **cp15: reserved-slot-0 global vtable — offset-table off-by-one fixed; FULL BOOT + paint loop** | ✅ |
+| **cp16: post-boot diagnosis — data-load gated by uninitialised instance field_offsets** | ⏹ (next task) |
+| `paint`/title | ◑ paint LOOP runs (empty canvas); app card not pushed — see cp16 |
 | clet (`test_helloworld`) | ✅ | clippy | ✅ |
+| clet (`test_helloworld`) | ✅ | clippy | ✅ |
+
+## Checkpoint 16 — full boot achieved; next gate = instance field_offsets
+
+cp15 (reserved-slot-0) was a turning point: the app now **boots completely**, runs
+`Game.<init>` → `a.startApp`, sets `Display.setCurrent(CardCanvas)`, and reaches the
+wie MIDP **main event loop** driving `CardCanvas.paint(Graphics)` steadily with **no
+crash**. The off-by-one that masked everything is gone (see cp15). This exposed the
+app's *true* control flow and the next, precisely-located blocker.
+
+### The "no title yet" cause (RE of `a.startApp`@`0x1ad8`)
+`CardCanvas.paint` iterates `cards` (a Vector) and paints each; the app populates it
+via `Display.getDefaultDisplay().pushCard(card)`. The app **never calls pushCard**, so
+the canvas is empty. Why: `a.startApp` begins with a gate:
+```
+r3 = field_offsets[148]          ; 0x15006f4 + 0x128  (halfword idx 148)
+ip = Game.field[r3]              ; read an instance field of `this`(Game)
+if (ip != 0) goto 0x1d60         ; "already initialised" -> skip setup, run per-frame app.b
+else        run app.a (0x1b58)   ; first run -> data load + card setup
+```
+`field_offsets[148]` is the resolved object-slot of an **instance field reference**.
+Dumping the `fields` array: **`FIELDREF[148] = name "a", type "Lorg/kwis/msp/lcdui/Display;"`**
+— i.e. the inherited `Display` field of app base class `a`. The gate is literally "is
+my Display already set?". On first run it must read **null** so the setup branch runs.
+
+But `install_platform_tables` only fills `field_offsets` for **static** fields (small
+indices); **instance** field refs (like 148) are left **0**. So the read becomes
+`Game.field[0]`, which in the AOT's own-fields-first layout is `Game`'s field 0
+(`"a":Lj;`, set non-null by `<init>`) — *not* the Display field. The gate sees non-null,
+wrongly takes the "already initialised" branch, **skips the data load + card setup**,
+and falls straight through to the per-frame `app.b` and the (empty) event loop.
+
+This is the long-deferred **cp3 item 4 (field unification)**: the app addresses
+instance fields through `field_offsets[K]` (object slot of field-ref K), but the table
+isn't populated for instance fields. A prior *blanket identity* fill regressed
+`a.startApp` (noted in code), so the correct fix is **inheritance-aware**:
+`field_offsets[K] = (sum of ancestor field counts) + declared_index` for field-ref K's
+owning class, consistent with how the AOT lays out and writes the same fields.
+
+### Verified mapping facts (ground truth, cp15/cp16 instrumentation)
+- Global vtable is uniform: method-ref `r` → physical slot `r+1`; `offset[r]=r`;
+  dispatch `vtable[offset[r]+1]=vtable[r+1]=ref r`. Confirmed for platform
+  (`show`=ref6→slot7, `read`=ref7→slot8) **and** app (`b()V`=ref99→slot100,
+  `a()V`=ref100→slot101) methods. So cp15 is correct for both; the pre-cp15 data-load
+  was the off-by-one calling the wrong (similar) app method.
+- `a.startApp` two dispatches: `@0x1b58` index 100 → `app.a` (data load, gated),
+  `@0x1d68` index 99 → `app.b` (per-frame).
+- `FIELDREF[148]` = inherited `a.Display`; the data-load gate.
+
+### Next task (resume here — concrete, no external spec)
+Populate `field_offsets` for **instance** field references with inheritance-aware
+object slots (decode the per-class instance-field range in the import class table +
+the app class field tables + parent chain). Then the gate reads the real (null)
+Display field, runs the data load + `pushCard`, and `CardCanvas.paint` draws the app's
+`o` Card → the title. Risk: must match the AOT field layout exactly (own-first vs
+inherited-first) — verify by behaviour, not blanket identity.
 
 ## Checkpoint 14 — forward-probe past `r8`: the wall is Object's vtable layout
 
