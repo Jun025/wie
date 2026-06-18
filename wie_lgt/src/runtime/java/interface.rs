@@ -29,6 +29,9 @@ pub fn get_java_interface_method(core: &mut ArmCore, function_index: u32) -> Res
         0x14 => core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaLoadClasses)?,
         0x82 => core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaUnk9)?,
         0x83 => core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaUnk11)?,
+        // Native object allocator (`new`): `obj = java(0xf)(...); obj.<init>()`. Returns
+        // a guest object the <init> trampoline binds to a JVM instance of its class.
+        0x0f => core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaNewObject)?,
         // Runtime helper resolved lazily during native method execution (called
         // first in every method with a small per-method constant — looks like a
         // method-entry / stack-check / safepoint helper). Stubbed as a no-op.

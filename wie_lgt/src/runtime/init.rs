@@ -54,6 +54,7 @@ async fn handle_init_svc(core: &mut ArmCore, (wipic_category, stdlib_category, s
         InitSvcId::JavaUnk11 => EmulatedFunction::call(&java_unk11, core, &mut java_ctx).await?.write(core, lr),
         InitSvcId::JavaInterfaceUnk84 => EmulatedFunction::call(&java_interface_unk84, core, &mut ()).await?.write(core, lr),
         InitSvcId::JavaInterfaceStub => EmulatedFunction::call(&java_interface_stub, core, &mut ()).await?.write(core, lr),
+        InitSvcId::JavaNewObject => java_ctx.alloc_native_object(core)?.write(core, lr),
     }
 }
 

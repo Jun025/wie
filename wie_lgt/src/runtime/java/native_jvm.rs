@@ -556,7 +556,7 @@ pub async fn handle_java_trampoline(core: &mut ArmCore, shared: &mut LgtJvmShare
 
     let this_class = this.as_ref().map(|t| t.class_definition().name());
     tracing::debug!(
-        "LGT trampoline id={} -> {}.{}{}  this_raw={this_raw:#x} this_actual={:?}",
+        "LGT trampoline id={} -> {}.{}{}  this_raw={this_raw:#x} this_actual={:?} lr={lr:#x}",
         id.0,
         entry.class_name,
         entry.name,
