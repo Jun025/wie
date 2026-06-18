@@ -38,15 +38,35 @@ struct LgtNativeMethodBody {
     class_name: String,
     name: String,
     descriptor: String,
+    parent_name: Option<String>,
     code_ptr: u32,
     is_static: bool,
 }
 
 #[async_trait::async_trait]
 impl MethodBody<JavaError, LgtClassContext> for LgtNativeMethodBody {
-    async fn call(&self, _jvm: &Jvm, _context: &mut LgtClassContext, _args: Box<[JavaValue]>) -> core::result::Result<JavaValue, JavaError> {
-        // Checkpoint 1: native dispatch not implemented yet — log and return a
-        // type-appropriate default so the JVM can proceed (e.g. Game.<init>).
+    async fn call(&self, jvm: &Jvm, _context: &mut LgtClassContext, args: Box<[JavaValue]>) -> core::result::Result<JavaValue, JavaError> {
+        // Real ARM dispatch (marshal args -> r0..r3, run_function(code_ptr), marshal
+        // the return value) requires the app's objects to be ARM-memory-backed so
+        // `this`/object args can be passed as guest pointers — i.e. a custom
+        // ARM-backed ClassInstance, like wie_ktf's jvm_support. That object-model
+        // port is the pending structural decision; until it lands, method bodies
+        // are stubs (see STEP2_REPORT.md).
+        //
+        // Interim: chain a parameterless `<init>` to its superclass constructor so
+        // the platform `org/kwis/msp/lcdui/Jlet` machinery initialises (registers the
+        // current Jlet, creates Display/EventQueue). This lets the boot proceed past
+        // `WIPIMIDlet.startApp` to the app's `startApp` without running native code.
+        if self.name == "<init>"
+            && self.descriptor == "()V"
+            && let (Some(parent), Some(this_val @ JavaValue::Object(Some(_)))) = (&self.parent_name, args.first())
+        {
+            tracing::debug!("LGT native <init> chain: {}.<init> -> {parent}.<init> (interim)", self.class_name);
+            let this: Box<dyn jvm::ClassInstance> = this_val.clone().into();
+            let _: () = jvm.invoke_special(&this, parent, "<init>", "()V", ()).await?;
+            return Ok(JavaValue::Void);
+        }
+
         tracing::warn!(
             "LGT native dispatch stub: {}.{}{} code={:#x} static={} (returning default)",
             self.class_name,
@@ -94,6 +114,7 @@ fn build_class_definition(class: &LgtNativeClass, context: LgtClassContext) -> C
                     class_name: class.name.clone(),
                     name: m.name.clone(),
                     descriptor: m.signature.clone(),
+                    parent_name: class.parent_name.clone(),
                     code_ptr: m.code_ptr,
                     is_static,
                 }) as Box<dyn MethodBody<_, _>>,
