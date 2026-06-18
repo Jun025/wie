@@ -777,8 +777,16 @@ pub fn install_platform_tables(
     let mut field_slots = 0usize;
 
     // 1) Global virtual vtable + identity index table.
-    let global_vtable = Allocator::alloc(core, VTABLE_REFS * 4)?;
-    wie_util::ByteWrite::write_bytes(core, global_vtable, &[0u8; (VTABLE_REFS * 4) as usize])?;
+    //
+    // RESERVED SLOT 0 (cp15): the AOT's offset-table virtual dispatch is
+    // `idx = virtual_method_offsets[ref]; bx vtable[idx + 1]` — the `+1` (a literal
+    // `ldr ip,[r3,#4]` after `add r3, r3, idx<<2`) means physical vtable slot 0 is
+    // reserved and methods start at slot 1. So method-ref `r` lives at PHYSICAL slot
+    // `r + 1`, with `virtual_method_offsets[r] = r` (the logical index). Then
+    // `vtable[offset[r] + 1] = vtable[r + 1]` correctly invokes ref `r` (verified by
+    // RE of AnnunciatorComponent.show@ref6 → was misrouting to vtable[7]=File.read).
+    let global_vtable = Allocator::alloc(core, (VTABLE_REFS + 1) * 4)?;
+    wie_util::ByteWrite::write_bytes(core, global_vtable, &[0u8; ((VTABLE_REFS + 1) * 4) as usize])?;
     for r in 0..VTABLE_REFS {
         let (mname, mtype) = read_pair(core, virtual_methods, r);
         if let (Some(mname), Some(mtype)) = (mname, mtype)
@@ -786,9 +794,9 @@ pub fn install_platform_tables(
         {
             let cls = vref_class(r);
             let stub = make_method_trampoline(core, shared, &cls, Some(mname), Some(mtype), true)?;
-            write_generic(core, global_vtable + r * 4, stub)?;
-            // Identity: the vtable index of method-ref `r` is `r` itself. Only written
-            // for real method refs to stay within the offset table's bounds.
+            write_generic(core, global_vtable + (r + 1) * 4, stub)?; // physical slot r+1
+            // Logical index of method-ref `r` is `r`; the dispatch adds the reserved
+            // slot (`+1`). Only written for real method refs to stay in the table.
             write_generic(core, virtual_method_offsets + r * 2, r as u16)?;
             method_slots += 1;
         }
@@ -822,13 +830,16 @@ pub fn install_platform_tables(
         if known.is_empty() {
             continue;
         }
-        let vt = Allocator::alloc(core, VTABLE_REFS * 4)?;
-        let mut buf = alloc::vec![0u8; (VTABLE_REFS * 4) as usize];
+        let vt = Allocator::alloc(core, (VTABLE_REFS + 1) * 4)?;
+        let mut buf = alloc::vec![0u8; ((VTABLE_REFS + 1) * 4) as usize];
         wie_util::ByteRead::read_bytes(core, global_vtable, &mut buf)?;
         wie_util::ByteWrite::write_bytes(core, vt, &buf)?;
+        // `known` indices are PHYSICAL slots (the AOT direct-dispatches `vtable[idx]`
+        // with the reserved slot already baked into `idx`, e.g. StringBuffer.append at
+        // physical 19, Runtime.freeMemory at physical 13).
         for &(idx, mname, mtype) in known {
             let stub = make_method_trampoline(core, shared, &c.name, Some(mname.into()), Some(mtype.into()), true)?;
-            if idx < VTABLE_REFS {
+            if idx <= VTABLE_REFS {
                 write_generic(core, vt + idx * 4, stub)?;
             }
         }
