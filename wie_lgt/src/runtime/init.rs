@@ -14,7 +14,7 @@ use super::{
     SVC_CATEGORY_INIT, SVC_CATEGORY_STDLIB, SVC_CATEGORY_WIPIC,
     java::{
         get_java_interface_method,
-        interface::{java_load_classes, java_unk0, java_unk5, java_unk9, java_unk11, java_unk12},
+        interface::{java_interface_stub, java_interface_unk84, java_load_classes, java_unk0, java_unk5, java_unk9, java_unk11, java_unk12},
     },
     stdlib::register_stdlib_svc_handler,
     svc_ids::InitSvcId,
@@ -51,6 +51,8 @@ async fn handle_init_svc(core: &mut ArmCore, (wipic_category, stdlib_category, s
         InitSvcId::JavaLoadClasses => EmulatedFunction::call(&java_load_classes, core, &mut java_ctx).await?.write(core, lr),
         InitSvcId::JavaUnk9 => EmulatedFunction::call(&java_unk9, core, &mut ()).await?.write(core, lr),
         InitSvcId::JavaUnk11 => EmulatedFunction::call(&java_unk11, core, &mut java_ctx).await?.write(core, lr),
+        InitSvcId::JavaInterfaceUnk84 => EmulatedFunction::call(&java_interface_unk84, core, &mut ()).await?.write(core, lr),
+        InitSvcId::JavaInterfaceStub => EmulatedFunction::call(&java_interface_stub, core, &mut ()).await?.write(core, lr),
     }
 }
 

@@ -31,7 +31,16 @@ pub fn get_java_interface_method(core: &mut ArmCore, function_index: u32) -> Res
         0x14 => core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaLoadClasses)?,
         0x82 => core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaUnk9)?,
         0x83 => core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaUnk11)?,
-        _ => return Err(WieError::FatalError(format!("Unknown lgt java import: {function_index:#x}"))),
+        // Runtime helper resolved lazily during native method execution (called
+        // first in every method with a small per-method constant — looks like a
+        // method-entry / stack-check / safepoint helper). Stubbed as a no-op.
+        0x54 => core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaInterfaceUnk84)?,
+        // Other AOT-runtime helpers resolved lazily during native dispatch. Stubbed
+        // as no-ops (return 0) to advance; implement properly as they prove needed.
+        _ => {
+            tracing::warn!("LGT java import {function_index:#x} stubbed (no-op)");
+            core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaInterfaceStub)?
+        }
     })
 }
 
@@ -197,4 +206,20 @@ pub async fn java_unk12(_core: &mut ArmCore, _: &mut (), a0: u32) -> Result<()> 
     tracing::debug!("java_unk12({a0:#x})");
 
     Ok(())
+}
+
+/// java-interface import `0x54`: runtime helper resolved lazily at the start of
+/// native method execution. Treated as a no-op (returns 0) until its semantics are
+/// confirmed. Appears benign (a stack/safepoint check).
+pub async fn java_interface_unk84(_core: &mut ArmCore, _: &mut (), a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
+    tracing::trace!("java_interface_unk84({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x})");
+
+    Ok(0)
+}
+
+/// Generic no-op stub for not-yet-implemented java-interface imports (returns 0).
+pub async fn java_interface_stub(_core: &mut ArmCore, _: &mut (), a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
+    tracing::debug!("java_interface_stub({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x}) -> 0");
+
+    Ok(0)
 }

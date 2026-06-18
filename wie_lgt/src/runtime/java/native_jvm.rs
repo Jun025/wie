@@ -1,149 +1,400 @@
-//! LGT native-backed JVM: registers an AOT-compiled app's native classes (decoded
-//! by [`super::native_class`]) as real JVM classes whose method bodies dispatch to
-//! the app's ARM code.
+//! LGT native-backed JVM (PoC): registers an AOT-compiled app's native classes
+//! (decoded by [`super::native_class`]) as real JVM classes whose instances are
+//! backed by guest (ARM) memory and whose methods dispatch to the app's ARM code.
 //!
-//! Design note: this mirrors `wie_ktf`'s `jvm_support`, but LGT keeps its own class
-//! metadata in `.data` (see `docs/lgt_native_classes.md`) rather than reflecting JVM
-//! metadata into guest memory — so we only need (a) JVM `ClassDefinition`s built from
-//! the parsed descriptors and (b) method bodies that marshal to/from ARM. The
-//! approach is under discussion with the maintainer, so it is kept in its own module.
+//! Design (agreed in Discussion #1232 — keep LGT-specific, don't over-engineer):
+//!  - Each app instance is a guest object block; `this+0x08` points to a zeroed
+//!    field array, matching what the AOT code expects (`r1=[this,#8]; str rX,
+//!    [r1, idx<<2]`). This is the minimal layout needed for native bodies to run.
+//!  - JVM-side field get/put use a separate Rust map (sufficient for the platform
+//!    `Jlet`/`Display` glue that touches inherited fields). Unifying the two stores
+//!    needs the platform field-offset table — that is checkpoint 3.
+//!  - Method dispatch marshals `this`+args into `r0..r3`, `run_function(code_ptr)`,
+//!    and marshals the return per the descriptor.
 //!
-//! Checkpoint status (see STEP2_REPORT.md):
-//!  - C1: classes registered, method bodies are logging stubs (Game instantiation).
-//!  - C2+: real ARM dispatch — not yet wired (`dispatch` is a stub).
+//! Scope (checkpoint 2): the app's OWN methods dispatch to real ARM. Calls into
+//! platform classes go through the `java_load_classes` method/offset tables
+//! (`.bss` @ `0x1500xxx`), which are not yet filled — that is checkpoint 3.
 
-use alloc::{boxed::Box, collections::BTreeSet, string::String, vec::Vec};
+use alloc::{
+    boxed::Box,
+    collections::{BTreeMap, BTreeSet},
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
+use core::{
+    fmt::{self, Debug, Formatter},
+    hash::{Hash, Hasher},
+};
 
-use java_class_proto::{JavaFieldProto, JavaMethodProto, MethodBody};
 use java_constants::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
-use jvm::{JavaError, JavaValue, Jvm};
-use jvm_rust::{ClassDefinitionImpl, FieldImpl, MethodImpl};
+use jvm::{ClassDefinition, ClassInstance, Field, JavaType, JavaValue, Jvm, Method, Result as JvmResult};
+use spin::Mutex;
 
 use wie_backend::System;
-use wie_core_arm::ArmCore;
-use wie_util::Result;
+use wie_core_arm::{Allocator, ArmCore};
+use wie_util::{Result, read_generic, write_generic};
 
 use super::native_class::{LgtNativeClass, parse_native_class};
 
-/// Context handed to every native method body: enough to dispatch into ARM.
-#[derive(Clone)]
-#[allow(dead_code)] // `core`/`system` are consumed by ARM dispatch in a later checkpoint
-pub struct LgtClassContext {
-    pub core: ArmCore,
-    pub system: System,
-}
+/// `this+0x08` holds the pointer to the instance's field array.
+const OBJ_HEADER_SIZE: u32 = 0x0c;
+const OBJ_PTR_FIELDS_OFFSET: u32 = 0x08;
+/// Generous field-array size (words). The AOT code indexes fields by slot; until
+/// the platform offset table is wired (cp3) most writes land near slot 0.
+const FIELD_ARRAY_WORDS: u32 = 128;
 
-/// A JVM method whose implementation is native ARM code at `code_ptr`.
-struct LgtNativeMethodBody {
-    class_name: String,
+// ---- metadata (pure Rust; no guest reflection, unlike wie_ktf) ----
+
+#[derive(Clone, Debug)]
+struct MethodMeta {
     name: String,
     descriptor: String,
-    parent_name: Option<String>,
+    access_flags: MethodAccessFlags,
     code_ptr: u32,
-    is_static: bool,
 }
 
-#[async_trait::async_trait]
-impl MethodBody<JavaError, LgtClassContext> for LgtNativeMethodBody {
-    async fn call(&self, jvm: &Jvm, _context: &mut LgtClassContext, args: Box<[JavaValue]>) -> core::result::Result<JavaValue, JavaError> {
-        // Real ARM dispatch (marshal args -> r0..r3, run_function(code_ptr), marshal
-        // the return value) requires the app's objects to be ARM-memory-backed so
-        // `this`/object args can be passed as guest pointers — i.e. a custom
-        // ARM-backed ClassInstance, like wie_ktf's jvm_support. That object-model
-        // port is the pending structural decision; until it lands, method bodies
-        // are stubs (see STEP2_REPORT.md).
-        //
-        // Interim: chain a parameterless `<init>` to its superclass constructor so
-        // the platform `org/kwis/msp/lcdui/Jlet` machinery initialises (registers the
-        // current Jlet, creates Display/EventQueue). This lets the boot proceed past
-        // `WIPIMIDlet.startApp` to the app's `startApp` without running native code.
-        if self.name == "<init>"
-            && self.descriptor == "()V"
-            && let (Some(parent), Some(this_val @ JavaValue::Object(Some(_)))) = (&self.parent_name, args.first())
-        {
-            tracing::debug!("LGT native <init> chain: {}.<init> -> {parent}.<init> (interim)", self.class_name);
-            let this: Box<dyn jvm::ClassInstance> = this_val.clone().into();
-            let _: () = jvm.invoke_special(&this, parent, "<init>", "()V", ()).await?;
-            return Ok(JavaValue::Void);
+#[derive(Clone, Debug)]
+struct FieldMeta {
+    name: String,
+    descriptor: String,
+    access_flags: FieldAccessFlags,
+}
+
+#[derive(Clone)]
+pub struct LgtClassDefinition {
+    inner: Arc<ClassInner>,
+}
+
+struct ClassInner {
+    name: String,
+    super_name: Option<String>,
+    access_flags: ClassAccessFlags,
+    methods: Vec<MethodMeta>,
+    fields: Vec<FieldMeta>,
+    statics: Mutex<BTreeMap<String, JavaValue>>,
+    core: ArmCore,
+}
+
+impl LgtClassDefinition {
+    fn from_native(class: &LgtNativeClass, core: ArmCore) -> Self {
+        let methods = class
+            .methods
+            .iter()
+            .map(|m| MethodMeta {
+                name: m.name.clone(),
+                descriptor: m.signature.clone(),
+                access_flags: MethodAccessFlags::from_bits_truncate(m.access_flags as u16),
+                code_ptr: m.code_ptr,
+            })
+            .collect();
+        let fields = class
+            .fields
+            .iter()
+            .map(|f| FieldMeta {
+                name: f.name.clone(),
+                descriptor: f.type_descriptor.clone(),
+                access_flags: FieldAccessFlags::from_bits_truncate(f.access_flags as u16),
+            })
+            .collect();
+
+        Self {
+            inner: Arc::new(ClassInner {
+                name: class.name.clone(),
+                super_name: class.parent_name.clone(),
+                // PUBLIC only: never block instantiation on a mis-decoded flag.
+                access_flags: ClassAccessFlags::PUBLIC,
+                methods,
+                fields,
+                statics: Mutex::new(BTreeMap::new()),
+                core,
+            }),
         }
-
-        tracing::warn!(
-            "LGT native dispatch stub: {}.{}{} code={:#x} static={} (returning default)",
-            self.class_name,
-            self.name,
-            self.descriptor,
-            self.code_ptr,
-            self.is_static
-        );
-
-        Ok(default_return_value(&self.descriptor))
     }
 }
 
-/// Default `JavaValue` for a method descriptor's return type (`(...)R`).
-fn default_return_value(descriptor: &str) -> JavaValue {
-    let ret = descriptor.rsplit(')').next().unwrap_or("V");
-    match ret.chars().next().unwrap_or('V') {
-        'V' => JavaValue::Void,
-        'Z' => JavaValue::Boolean(false),
-        'B' => JavaValue::Byte(0),
-        'C' => JavaValue::Char(0),
-        'S' => JavaValue::Short(0),
-        'I' => JavaValue::Int(0),
-        'J' => JavaValue::Long(0),
-        'F' => JavaValue::Float(0.0),
-        'D' => JavaValue::Double(0.0),
-        'L' | '[' => JavaValue::Object(None),
+impl Debug for LgtClassDefinition {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "LgtClassDefinition({})", self.inner.name)
+    }
+}
+
+#[async_trait::async_trait]
+impl ClassDefinition for LgtClassDefinition {
+    fn name(&self) -> String {
+        self.inner.name.clone()
+    }
+
+    fn super_class_name(&self) -> Option<String> {
+        self.inner.super_name.clone()
+    }
+
+    fn access_flags(&self) -> ClassAccessFlags {
+        self.inner.access_flags
+    }
+
+    async fn instantiate(&self, jvm: &Jvm) -> JvmResult<Box<dyn ClassInstance>> {
+        let mut core = self.inner.core.clone();
+
+        // Allocate the guest object block + a zeroed field array, link this+8 -> array.
+        let alloc = (|| -> Result<u32> {
+            let ptr_fields = Allocator::alloc(&mut core, FIELD_ARRAY_WORDS * 4)?;
+            wie_util::ByteWrite::write_bytes(&mut core, ptr_fields, &[0u8; (FIELD_ARRAY_WORDS * 4) as usize])?;
+            let ptr_raw = Allocator::alloc(&mut core, OBJ_HEADER_SIZE)?;
+            write_generic(&mut core, ptr_raw, 0u32)?; // +0 (class tag, unused for now)
+            write_generic(&mut core, ptr_raw + 4, 0u32)?; // +4
+            write_generic(&mut core, ptr_raw + OBJ_PTR_FIELDS_OFFSET, ptr_fields)?;
+            Ok(ptr_raw)
+        })();
+        let ptr_raw = match alloc {
+            Ok(p) => p,
+            Err(e) => return Err(jvm.exception("java/lang/OutOfMemoryError", &e.to_string()).await),
+        };
+
+        tracing::trace!("LGT instantiate {} -> guest {ptr_raw:#x}", self.inner.name);
+
+        Ok(Box::new(LgtClassInstance {
+            guest_ptr: ptr_raw,
+            core,
+            definition: self.clone(),
+            jvm_fields: Arc::new(Mutex::new(BTreeMap::new())),
+        }))
+    }
+
+    fn method(&self, name: &str, descriptor: &str, _is_static: bool) -> Option<Box<dyn Method>> {
+        self.inner.methods.iter().find(|m| m.name == name && m.descriptor == descriptor).map(|m| {
+            Box::new(LgtMethod {
+                class_name: self.inner.name.clone(),
+                meta: m.clone(),
+                core: self.inner.core.clone(),
+            }) as Box<dyn Method>
+        })
+    }
+
+    fn field(&self, name: &str, descriptor: &str, _is_static: bool) -> Option<Box<dyn Field>> {
+        self.inner
+            .fields
+            .iter()
+            .find(|f| f.name == name && f.descriptor == descriptor)
+            .map(|f| Box::new(LgtField { meta: f.clone() }) as Box<dyn Field>)
+    }
+
+    fn fields(&self) -> Vec<Box<dyn Field>> {
+        self.inner
+            .fields
+            .iter()
+            .map(|f| Box::new(LgtField { meta: f.clone() }) as Box<dyn Field>)
+            .collect()
+    }
+
+    fn get_static_field(&self, field: &dyn Field) -> JvmResult<JavaValue> {
+        let key = field_key(&field.name(), &field.descriptor());
+        Ok(self
+            .inner
+            .statics
+            .lock()
+            .get(&key)
+            .cloned()
+            .unwrap_or_else(|| JavaType::parse(&field.descriptor()).default()))
+    }
+
+    fn put_static_field(&mut self, field: &dyn Field, value: JavaValue) -> JvmResult<()> {
+        self.inner.statics.lock().insert(field_key(&field.name(), &field.descriptor()), value);
+        Ok(())
+    }
+}
+
+// ---- instance ----
+
+#[derive(Clone)]
+pub struct LgtClassInstance {
+    guest_ptr: u32,
+    #[allow(dead_code)] // used for guest-memory field access in checkpoint 3
+    core: ArmCore,
+    definition: LgtClassDefinition,
+    jvm_fields: Arc<Mutex<BTreeMap<String, JavaValue>>>,
+}
+
+impl Debug for LgtClassInstance {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}@{:#x}", self.definition.inner.name, self.guest_ptr)
+    }
+}
+
+impl Hash for LgtClassInstance {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.guest_ptr.hash(state)
+    }
+}
+
+#[async_trait::async_trait]
+impl ClassInstance for LgtClassInstance {
+    fn destroy(self: Box<Self>) {}
+
+    fn class_definition(&self) -> Box<dyn ClassDefinition> {
+        Box::new(self.definition.clone())
+    }
+
+    fn equals(&self, other: &dyn ClassInstance) -> JvmResult<bool> {
+        Ok(other
+            .as_any()
+            .downcast_ref::<LgtClassInstance>()
+            .map(|o| o.guest_ptr == self.guest_ptr)
+            .unwrap_or(false))
+    }
+
+    // JVM-side field storage (separate from the guest field array the native code
+    // uses; see module docs). Sufficient for the platform Jlet/Display glue.
+    fn get_field(&self, field: &dyn Field) -> JvmResult<JavaValue> {
+        let key = field_key(&field.name(), &field.descriptor());
+        Ok(self
+            .jvm_fields
+            .lock()
+            .get(&key)
+            .cloned()
+            .unwrap_or_else(|| JavaType::parse(&field.descriptor()).default()))
+    }
+
+    fn put_field(&mut self, field: &dyn Field, value: JavaValue) -> JvmResult<()> {
+        self.jvm_fields.lock().insert(field_key(&field.name(), &field.descriptor()), value);
+        Ok(())
+    }
+}
+
+// ---- field / method ----
+
+#[derive(Debug)]
+struct LgtField {
+    meta: FieldMeta,
+}
+
+impl Field for LgtField {
+    fn name(&self) -> String {
+        self.meta.name.clone()
+    }
+    fn descriptor(&self) -> String {
+        self.meta.descriptor.clone()
+    }
+    fn access_flags(&self) -> FieldAccessFlags {
+        self.meta.access_flags
+    }
+}
+
+struct LgtMethod {
+    class_name: String,
+    meta: MethodMeta,
+    core: ArmCore,
+}
+
+impl Debug for LgtMethod {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "LgtMethod({}.{}{})", self.class_name, self.meta.name, self.meta.descriptor)
+    }
+}
+
+#[async_trait::async_trait]
+impl Method for LgtMethod {
+    fn name(&self) -> String {
+        self.meta.name.clone()
+    }
+    fn descriptor(&self) -> String {
+        self.meta.descriptor.clone()
+    }
+    fn access_flags(&self) -> MethodAccessFlags {
+        self.meta.access_flags
+    }
+
+    async fn run(&self, jvm: &Jvm, args: Box<[JavaValue]>) -> JvmResult<JavaValue> {
+        // Marshal JVM args -> ARM r0..r3 (+stack). `this` (args[0] for instance
+        // methods) and object args become guest pointers; primitives become raw words.
+        let params: Vec<u32> = args.iter().map(marshal_arg).collect();
+
+        tracing::debug!(
+            "LGT dispatch {}.{}{} code={:#x} params={:x?}",
+            self.class_name,
+            self.meta.name,
+            self.meta.descriptor,
+            self.meta.code_ptr,
+            params
+        );
+
+        let mut core = self.core.clone();
+        let r0: u32 = match core.run_function(self.meta.code_ptr, &params).await {
+            Ok(r) => r,
+            Err(e) => {
+                let msg = format!(
+                    "LGT native dispatch {}.{}{} @ {:#x} failed: {e}",
+                    self.class_name, self.meta.name, self.meta.descriptor, self.meta.code_ptr
+                );
+                return Err(jvm.exception("java/lang/Error", &msg).await);
+            }
+        };
+
+        // Marshal the return value per the descriptor's return type.
+        let ret = match JavaType::parse(&self.meta.descriptor) {
+            JavaType::Method(_, ret) => *ret,
+            _ => JavaType::Void,
+        };
+        Ok(marshal_return(&ret, r0))
+    }
+}
+
+// ---- marshaling ----
+
+fn marshal_arg(v: &JavaValue) -> u32 {
+    match v {
+        JavaValue::Void => 0,
+        JavaValue::Boolean(x) => *x as u32,
+        JavaValue::Byte(x) => *x as i32 as u32,
+        JavaValue::Char(x) => *x as u32,
+        JavaValue::Short(x) => *x as i32 as u32,
+        JavaValue::Int(x) => *x as u32,
+        JavaValue::Float(x) => x.to_bits(),
+        JavaValue::Long(x) => *x as u32, // low word only (cp2 path has no long args)
+        JavaValue::Double(x) => x.to_bits() as u32,
+        JavaValue::Object(Some(inst)) => match inst.as_any().downcast_ref::<LgtClassInstance>() {
+            Some(o) => o.guest_ptr,
+            // Non-native object (e.g. a platform array/string): no guest backing yet.
+            None => {
+                tracing::warn!("LGT marshal: non-native object arg passed as null (needs cp3 platform objects)");
+                0
+            }
+        },
+        JavaValue::Object(None) => 0,
+    }
+}
+
+fn marshal_return(ret: &JavaType, r0: u32) -> JavaValue {
+    match ret {
+        JavaType::Void => JavaValue::Void,
+        JavaType::Boolean => JavaValue::Boolean(r0 != 0),
+        JavaType::Byte => JavaValue::Byte(r0 as i8),
+        JavaType::Char => JavaValue::Char(r0 as u16),
+        JavaType::Short => JavaValue::Short(r0 as i16),
+        JavaType::Int => JavaValue::Int(r0 as i32),
+        JavaType::Float => JavaValue::Float(f32::from_bits(r0)),
+        JavaType::Long => JavaValue::Long(r0 as i64),
+        JavaType::Double => JavaValue::Double(f64::from_bits(r0 as u64)),
+        // Reconstructing a JVM object from a returned guest pointer needs an
+        // instance registry; not on the cp2 path (methods return void/primitive).
+        JavaType::Class(_) | JavaType::Array(_) => JavaValue::Object(None),
         _ => JavaValue::Void,
     }
 }
 
-/// Build a JVM `ClassDefinitionImpl` from a parsed native class. Method bodies are
-/// [`LgtNativeMethodBody`]; the parent is the resolved (obfuscated or platform) name.
-fn build_class_definition(class: &LgtNativeClass, context: LgtClassContext) -> ClassDefinitionImpl {
-    let methods: Vec<MethodImpl> = class
-        .methods
-        .iter()
-        .map(|m| {
-            let access_flags = MethodAccessFlags::from_bits_truncate(m.access_flags as u16);
-            let is_static = access_flags.contains(MethodAccessFlags::STATIC);
-            let proto = JavaMethodProto {
-                name: m.name.clone(),
-                descriptor: m.signature.clone(),
-                body: Box::new(LgtNativeMethodBody {
-                    class_name: class.name.clone(),
-                    name: m.name.clone(),
-                    descriptor: m.signature.clone(),
-                    parent_name: class.parent_name.clone(),
-                    code_ptr: m.code_ptr,
-                    is_static,
-                }) as Box<dyn MethodBody<_, _>>,
-                access_flags,
-            };
-            MethodImpl::from_method_proto(proto, Box::new(context.clone()) as Box<_>)
-        })
-        .collect();
-
-    let fields: Vec<FieldImpl> = class
-        .fields
-        .iter()
-        .map(|f| {
-            let access_flags = FieldAccessFlags::from_bits_truncate(f.access_flags as u16);
-            FieldImpl::from_field_proto(JavaFieldProto::new(&f.name, &f.type_descriptor, access_flags))
-        })
-        .collect();
-
-    // Keep class flags minimal (PUBLIC) so instantiation is never blocked by a
-    // spuriously-decoded ABSTRACT/INTERFACE bit; refine in a later checkpoint.
-    ClassDefinitionImpl::new(&class.name, class.parent_name.clone(), ClassAccessFlags::PUBLIC, methods, fields)
+fn field_key(name: &str, descriptor: &str) -> String {
+    format!("{name}:{descriptor}")
 }
 
-/// Heuristic class-header detector over the app's `.data` segment, matching the
-/// layout documented in `docs/lgt_native_classes.md`: a record whose `+0x08` is a
-/// short cstring (class name), `+0x10` is 0 / a cstring / a `.data` pointer
-/// (parent), and `+0x38`/`+0x3c` are 0 / `.data` count-prefixed tables.
+// ---- registration ----
+
+/// Heuristic class-header detector over the app's `.data` segment (see
+/// `docs/lgt_native_classes.md`): `+0x08` short cstring name, `+0x10` parent
+/// (0 / cstring / `.data` ptr), `+0x38`/`+0x3c` 0 / `.data` count-prefixed tables.
 fn scan_class_headers(core: &ArmCore, data_start: u32, data_end: u32) -> Vec<u32> {
-    use wie_util::{read_generic, read_null_terminated_string_bytes};
+    use wie_util::read_null_terminated_string_bytes;
 
     let in_data = |v: u32| v >= data_start && v < data_end;
     let is_short_name = |ptr: u32| -> bool {
@@ -170,13 +421,8 @@ fn scan_class_headers(core: &ArmCore, data_start: u32, data_end: u32) -> Vec<u32
     while va + 0x40 <= data_end {
         let read = |off: u32| read_generic::<u32, _>(core, va + off).unwrap_or(0);
         let tag = read(0);
-        let ptr_name = read(0x08);
-        let ptr_parent = read(0x10);
-        let ptr_methods = read(0x38);
-        let ptr_fields = read(0x3c);
-
-        let parent_ok = ptr_parent == 0 || in_data(ptr_parent) || is_short_name(ptr_parent);
-        if tag > 0 && tag < 0x1000 && is_short_name(ptr_name) && parent_ok && small_count(ptr_methods) && small_count(ptr_fields) {
+        let parent_ok = read(0x10) == 0 || in_data(read(0x10)) || is_short_name(read(0x10));
+        if tag > 0 && tag < 0x1000 && is_short_name(read(0x08)) && parent_ok && small_count(read(0x38)) && small_count(read(0x3c)) {
             out.push(va);
         }
         va += 4;
@@ -185,10 +431,10 @@ fn scan_class_headers(core: &ArmCore, data_start: u32, data_end: u32) -> Vec<u32
     out
 }
 
-/// Scan the app's `.data` for native class headers and register each as a JVM class.
-/// Read-only w.r.t. guest memory; returns the registered class names. No-op (returns
-/// empty) when no headers are found — so the WIPI-C clet path is unaffected.
-pub async fn register_app_classes(jvm: &Jvm, core: &mut ArmCore, system: &System, data_start: u32, data_end: u32) -> Result<Vec<String>> {
+/// Scan the app's `.data` for native class headers and register each as an
+/// ARM-backed JVM class. No-op (empty) when none are found, so the WIPI-C clet
+/// path is unaffected. `system` is accepted for parity / future use.
+pub async fn register_app_classes(jvm: &Jvm, core: &mut ArmCore, _system: &System, data_start: u32, data_end: u32) -> Result<Vec<String>> {
     let headers = scan_class_headers(core, data_start, data_end);
     if headers.is_empty() {
         return Ok(Vec::new());
@@ -196,21 +442,14 @@ pub async fn register_app_classes(jvm: &Jvm, core: &mut ArmCore, system: &System
 
     tracing::debug!("LGT native JVM: found {} app class headers in .data", headers.len());
 
-    let context = LgtClassContext {
-        core: core.clone(),
-        system: system.clone(),
-    };
-
-    // Parse all classes (dedupe by name), then register in dependency order:
-    // `register_class` resolves the superclass eagerly, so an app-class parent must
-    // be registered first (e.g. Game -> a, b -> o). App parents not yet registered
-    // are deferred; platform parents resolve via the bootstrap loader.
+    // Parse all (dedupe by name), then register parents before children
+    // (`register_class` resolves the superclass eagerly).
     let mut pending: Vec<LgtNativeClass> = Vec::new();
-    let mut seen_names = BTreeSet::new();
+    let mut seen = BTreeSet::new();
     for header in headers {
         if let Ok(class) = parse_native_class(core, header)
             && !class.name.is_empty()
-            && seen_names.insert(class.name.clone())
+            && seen.insert(class.name.clone())
         {
             pending.push(class);
         }
@@ -221,29 +460,21 @@ pub async fn register_app_classes(jvm: &Jvm, core: &mut ArmCore, system: &System
     let mut done = BTreeSet::new();
     loop {
         let mut progressed = false;
-        let mut still_pending = Vec::new();
+        let mut still = Vec::new();
         for class in pending {
             let parent_ready = match &class.parent_name {
-                // platform parent (not one of ours) -> resolvable via bootstrap loader
                 Some(p) => !app_names.contains(p) || done.contains(p),
                 None => true,
             };
             if !parent_ready {
-                still_pending.push(class);
+                still.push(class);
                 continue;
             }
-
             let name = class.name.clone();
-            let definition = build_class_definition(&class, context.clone());
+            let definition = LgtClassDefinition::from_native(&class, core.clone());
             match jvm.register_class(Box::new(definition), None).await {
                 Ok(_) => {
-                    tracing::debug!(
-                        "LGT native JVM: registered {:?} (parent={:?}, {} methods, {} fields)",
-                        name,
-                        class.parent_name,
-                        class.methods.len(),
-                        class.fields.len()
-                    );
+                    tracing::debug!("LGT native JVM: registered {name:?} (parent={:?})", class.parent_name);
                     done.insert(name.clone());
                     registered.push(name);
                     progressed = true;
@@ -251,17 +482,14 @@ pub async fn register_app_classes(jvm: &Jvm, core: &mut ArmCore, system: &System
                 Err(e) => tracing::warn!("LGT native JVM: failed to register {name:?}: {e:?}"),
             }
         }
-        pending = still_pending;
+        pending = still;
         if pending.is_empty() || !progressed {
             break;
         }
     }
     if !pending.is_empty() {
         let names: Vec<&String> = pending.iter().map(|c| &c.name).collect();
-        tracing::warn!(
-            "LGT native JVM: {} classes left unregistered (parent cycle/missing): {names:?}",
-            pending.len()
-        );
+        tracing::warn!("LGT native JVM: {} classes left unregistered: {names:?}", pending.len());
     }
 
     Ok(registered)
