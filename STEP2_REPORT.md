@@ -1,113 +1,136 @@
-# STEP report — LGT native-backed JVM (checkpoints 1–3)
+# STEP report — LGT native-backed JVM (checkpoints 1–4)
 
 Goal: run the AOT-compiled LGT app (BattleMonster `00025C2B`) on wie's JVM —
 register its native classes, dispatch its methods to real ARM, and bridge calls
-into the platform classes (`Jlet`/`Card`/`Graphics`/`Display`/`java/lang/*`).
+into the platform classes, toward `startApp` → `paint(Graphics)` (title screen).
 
-Branch `feat/lgt-java-interface-bridge` (local only). Builds on the RE pass
-(`docs/lgt_native_classes.md`, `native_class.rs`). PoC object model agreed in
-Discussion #1232 (LGT-specific, not over-engineered).
+Branch `feat/lgt-java-interface-bridge` (local only). PoC `LgtJvmShared` kept
+LGT-specific per Discussion #1232. RE basis: `docs/lgt_native_classes.md`.
 
 ## Status summary
 
 | item | result |
 |---|---|
-| `NoClassDefFoundError: Game` resolved | ✅ |
-| `Game` instantiated; app methods run as real ARM | ✅ |
-| `java_load_classes` fills the platform method/field tables | ✅ |
-| native → platform calls dispatch by name | ✅ (Jlet.<init>, getDefaultDisplay, getRuntime, System.gc, BackLight.alwaysOn, Graphics.drawLine, …) |
-| `a.<init>`→`Jlet.<init>` wires the Jlet; `a.startApp` reached as real ARM | ✅ |
-| Card `o`.paint(Graphics) / title screen | ❌ blocked on per-class platform vtables |
+| `NoClassDefFoundError` resolved; app methods run as real ARM | ✅ (cp1–2) |
+| `java_load_classes` fills the platform method/field tables | ✅ (cp3) |
+| native → platform static/special dispatch (by name) | ✅ (cp3) |
+| native → platform **virtual** dispatch via **per-class vtables** | ✅ implemented (cp4) |
+| reach | ⏹ clean null at `Runtime.vtable[14]` — an un-imported `java/lang` virtual method |
+| `paint(Graphics)` / title screen | ❌ blocked on the platform vtable-index spec |
 | clet regression (`test_helloworld`) | ✅ | clippy | ✅ |
 
-## Checkpoint 1 — register native classes ✅
-`register_app_classes` scans `.data` for class headers, parses them, and registers
-all 20 app classes (superclass-dependency order). No-op for clet apps.
+cp1–3 are summarized in the git history; this revision focuses on **checkpoint 4**.
 
-## Checkpoint 2 — ARM-backed objects + real dispatch ✅
-Custom `ClassDefinition`/`ClassInstance`/`Method`/`Field`. Instances are guest
-object blocks (`this+0x08` -> field array). `LgtMethod::run` marshals `this`+args
-into `r0..r3`, `run_function(code_ptr)`, marshals the return.
+## Checkpoint 4 — per-class platform vtables
 
-## Checkpoint 3 — `java_load_classes` + native↔platform bridge ✅ (core), ⏹ (per-class vtables)
+### Investigation (the vtable-index ordering source)
 
-### Trampoline design (`native_jvm.rs`)
+The AOT virtual-dispatches platform methods as `r3 = [this]; bx [r3 + idx*4]`
+(read the object's vtable pointer at `+0x00`, branch through a fixed index). The
+question was whether `idx` indexes (A) the `java_load_classes` virtual-method
+array position, (B) a standard inheritance-ordered vtable, or (C) something else.
 
-- **Shared runtime** `LgtJvmShared`: an instance registry (`guest_ptr ↔ ClassInstance`),
-  the trampoline table, and the virtual-method-table base.
-- **Object bridge**: `value_to_guest` turns a JVM value into the guest word the AOT
-  code expects — an app instance yields its `guest_ptr`; a platform object gets a
-  freshly-allocated **proxy block** registered in the map; primitives pass raw.
-  `guest_to_value` is the inverse (a guest pointer round-trips to its JVM object).
-- **`install_platform_tables`** (the real `java_load_classes`): reads the imported-
-  class table and each class's `virtual/static` method ranges; for every requested
-  method it creates a **native→platform trampoline** (an SVC stub in
-  `SVC_CATEGORY_JAVA_TRAMPOLINE`) and writes the stub pointer into the fixed-offset
-  output table the AOT code reads — `static_method_offsets[idx*4]` /
-  `virtual_method_offsets[idx*4]` (index = the global method-array index, matching
-  the AOT's baked offset). `field_offsets[idx]` gets a distinct guest slot.
-- **`handle_java_trampoline`**: on a native→platform call, reads `this` (`r0`, via
-  the instance registry) + args (`r1..`, per the descriptor), invokes the matching
-  `wie_wipi_java`/`wie_midp` method by name+descriptor (`<init>`→invoke_special,
-  static→invoke_static, else invoke_virtual), and marshals the return into `r0`.
-- **Vtable word**: every object carries the `virtual_method_offsets` base at
-  `+0x00`, so the AOT's virtual dispatch `r3=[this]; bx [r3 + idx*4]` lands in the
-  table.
+Evidence gathered (logging each trampoline's intended method **and the actual
+class of `this`**):
 
-### Reach (verified by trace)
 ```
-java_load_classes: filled 128 method slots, 1 field slot
+trampoline -> Jlet.<init>()V                 this_actual = Game            ✓ (Game is-a Jlet)
+trampoline -> BackLight.alwaysOn()V          this_actual = None (static)   ✓
+trampoline -> Runtime.getRuntime()...        this_actual = None (static)   ✓
+trampoline -> Graphics.drawLine(IIII)V       this_actual = java/lang/Runtime  ✗
+trampoline -> Graphics.getClipX()I           this_actual = java/lang/Runtime  ✗
+trampoline -> Component.getHeight()I         this_actual = Game               ✗
+```
+
+The `virtual_methods` array is laid out **per class**, each class's methods at
+distinct positions, and the same name recurs at different positions for different
+classes:
+
+```
+Component.getHeight @ 1     Card.{serviceRepaints@2, repaint@3, getHeight@4, getWidth@5}
+Graphics.{getClipHeight@10 … drawLine@14 … setClip@22}    Display.{pushCard@23, removeAllCards@24}
+Jlet.notifyDestroyed @ 25   Image.{getGraphics@26, getHeight@27, getWidth@28}
+```
+
+So `getHeight` is at array index 1 (Component) **and** 4 (Card) **and** 27 (Image):
+the index is a **per-class vtable index**, not a global one. With a single shared
+table, `Runtime.getRuntime().<idx 14>()` resolved to `Graphics.drawLine` (the
+occupant of global slot 14) and was invoked on a `Runtime` — confirming the
+conflation. **Conclusion (확정): per-class vtables are required.**
+
+### Implementation
+
+`java_load_classes` (`install_platform_tables`) now builds, for **every** imported
+platform class, a zeroed guest vtable (`VTABLE_WORDS`) and places that class's own
+virtual methods at their global indices. A **platform proxy** object's `+0x00`
+points to its class's vtable (`class_vtables[name]`); **app** objects keep the
+union global table (they extend the lcdui hierarchy, so their dispatch spans many
+imported classes' methods). Static/special calls keep the by-name offset-table
+path from cp3. The no-op/0 fallback was removed (it diverges — `getHeight()→0`
+loops the layout).
+
+Effect: a `Runtime` proxy now carries its **own** (empty) vtable, so
+`[runtime+0 + 0x38]` reads **0** — a clean null at the unresolvable index — instead
+of misfiring onto `drawLine`.
+
+### Reach
+```
 new Game -> Game.<init> [real ARM]
-  -> a.<init> [real ARM] -> trampoline Jlet.<init>()V (wires currentJlet/Display/EventQueue)
-  -> trampoline BackLight.alwaysOn, Runtime.getRuntime, System.gc, Display.getDefaultDisplay,
-     Graphics.drawLine, Component.getHeight ...
--> a.startApp([Ljava/lang/String;)V [real ARM]
+  -> trampoline Jlet.<init>()V (this=Game)         [real platform Jlet ctor]
+  -> trampoline BackLight.alwaysOn (static)
+  -> trampoline Runtime.getRuntime() (static) -> Runtime proxy
+  -> [runtime.vtable + 0x38] == 0  => clean null  (Invalid memory access; address 0)
 ```
-Static/special platform dispatch is correct (methods invoked by their real names).
 
-### Next stop — per-class platform vtables
+### Unresolved (미해결) — needs the platform vtable-index spec
 
-The AOT virtual-dispatches some platform methods through **hardcoded vtable
-indices** baked per the *original* platform's class layout, e.g.
-`Runtime.getRuntime().<vtable 14>()` and `Component.getHeight()`. Our single global
-`virtual_method_offsets` table can't disambiguate index 14 across classes (it holds
-`Graphics.drawLine` at 14), so the call resolves to the wrong method on a `Runtime`
-(`NoSuchMethodError: Runtime.drawLine`).
+The next call is `Runtime.getRuntime().<vtable index 14>()` — a **`java/lang/Runtime`
+virtual method** (behaviorally a startup memory query: `freeMemory`/`totalMemory`).
+`Runtime`, `System`, and `Object` declare **0 virtual methods** in the app's import
+tables (`freeMemory`/`totalMemory`/`gc` do not appear anywhere in `virtual_methods`),
+yet the AOT calls them by hardcoded vtable index. Their vtable layout therefore
+**cannot be derived from the app's data** — it requires the original LGT platform's
+per-class vtable-index assignment for the `java/lang/*` (and base `Object`)
+classes.
 
-A PoC fallback (swallow `NoSuchMethodError`, return 0) advances execution to
-`a.startApp`, but then **hangs**: `Component.getHeight()` returns 0, so the native
-layout code loops forever. This confirms (and matches the maintainer's warning)
-that no-op/0 returns diverge — **correct per-class platform vtables are required**:
-each platform class needs its own vtable whose slot *i* is that class's actual
-vtable method *i* (inherited + declared), matching the original LGT vtable
-ordering. The import tables alone don't encode that ordering (e.g. `Runtime`
-declares 0 virtual methods yet a vtable-14 call is made), so this needs a
-platform vtable-index spec / per-class vtable construction. Nothing is drawn yet
-(the hang precedes any `paint`).
+Per the task's honesty requirement, this is left as a clean, loud failure (no
+forced advance). Evidence for the maintainer — `(class, vtable index)` pairs the
+app calls but the import data cannot resolve:
 
-### Recommended next step
-1. Build a per-class vtable for each imported platform class: resolve its full
-   virtual-method list in vtable order (Object + supers + declared) against the
-   `wie_wipi_java`/`wie_midp` definitions; store each class's vtable base.
-2. Set each object's `+0x00` to its class's vtable base (instead of the single
-   global table); proxies use the platform class's vtable.
-3. Remove the `NoSuchMethodError→0` fallback once vtables are correct.
-4. Re-run: `getHeight()` returns the real height, `startApp` builds the Card `o`,
-   pushes it, and `paint(Graphics)` is reached → toward the title screen.
+| object class | vtable index (byte off) | likely method | in import data? |
+|---|---|---|---|
+| `java/lang/Runtime` | 14 (`0x38`) | `freeMemory`/`totalMemory` | no (Runtime vmc=0) |
+| `java/lang/System`/Object | (reached after the above) | — | no |
+
+Imported lcdui-hierarchy classes (`Graphics`, `Card`, `Display`, `Image`,
+`Component`, `Jlet`) **are** resolvable by index (their methods are in
+`virtual_methods` at the indices the AOT uses, e.g. `drawLine@14`); they are on the
+`paint` path and should work once execution gets past the `java/lang` wall.
+
+확정 / 추정 / 미해결:
+- **확정**: per-class vtable indices (not global); the lcdui classes' indices match
+  their `virtual_methods` array positions.
+- **추정**: `Runtime.vtable[14]` is `freeMemory`/`totalMemory` (startup memory query).
+- **미해결**: the vtable layout (index→method) for `java/lang/{Object,Runtime,System}`
+  — absent from app data; needs the platform spec.
 
 ## Reproduce
 ```sh
 cargo build -p wie_cli
 RUST_LOG=wie_lgt=debug,wie=error,wie_core_arm=error \
   cargo run -p wie_cli -- /absolute/path/to/00025C2B.jar
-# look for: "filled 128 method slots", the trampoline platform calls, "a.startApp",
-# then the per-class-vtable warning / layout-loop hang.
+# trace shows the per-class vtable dispatch and the clean null at Runtime.vtable[14].
 ```
 
 ## Module layout
-- `native_class.rs` — read-only descriptor parser (RE pass).
-- `native_jvm.rs` — ARM-backed object model, native↔platform bridge, trampolines,
-  `java_load_classes` table fill, class registration.
-- `init.rs` — captures `.data`, registers the trampoline handler + app classes,
-  threads `LgtJvmShared`.
-- `interface.rs` / `svc_ids.rs` — java-interface imports incl. runtime-helper stubs.
+- `native_class.rs` — read-only descriptor parser.
+- `native_jvm.rs` — ARM-backed objects, native↔platform bridge, trampolines,
+  `java_load_classes` table + **per-class vtable** construction, class registration.
+- `init.rs` / `interface.rs` / `svc_ids.rs` — wiring, java-interface imports.
+
+## Remaining work (beyond this pass)
+1. Obtain/define the `java/lang/{Object,Runtime,System}` vtable-index layout (the
+   WIPI/ez-i platform spec) and fill those per-class vtables.
+2. Field-storage unification (cp3 item 4) — JVM `get/put_field` ↔ the guest field
+   array — so native-written and JVM-read fields agree on shared fields.
+3. With both, expect `startApp` → Card `o` → `paint(Graphics)` toward the title.
