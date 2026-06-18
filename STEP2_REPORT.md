@@ -1,118 +1,113 @@
-# STEP 2 — LGT native-backed JVM (implementation pass)
+# STEP report — LGT native-backed JVM (checkpoints 1–3)
 
-Goal: register the LGT java app's native classes with the JVM and dispatch their
-methods to **real ARM code**, so the app's own AOT methods (`Game.<init>`,
-`a.<init>`, `a.startApp`, …) execute natively.
+Goal: run the AOT-compiled LGT app (BattleMonster `00025C2B`) on wie's JVM —
+register its native classes, dispatch its methods to real ARM, and bridge calls
+into the platform classes (`Jlet`/`Card`/`Graphics`/`Display`/`java/lang/*`).
 
-Reference app: BattleMonster `00025C2B`. Branch: `feat/lgt-java-interface-bridge`
-(local only). Builds on the RE pass (`docs/lgt_native_classes.md`,
-`wie_lgt/src/runtime/java/native_class.rs`).
-
-Approach agreed in Discussion #1232: an LGT-specific PoC object model is fine; this
-pass covers dispatch of the **app's own** methods. Calls into platform classes go
-through the `java_load_classes` method/offset tables — that is checkpoint 3.
+Branch `feat/lgt-java-interface-bridge` (local only). Builds on the RE pass
+(`docs/lgt_native_classes.md`, `native_class.rs`). PoC object model agreed in
+Discussion #1232 (LGT-specific, not over-engineered).
 
 ## Status summary
 
 | item | result |
 |---|---|
-| `NoClassDefFoundError: Game` resolved | ✅ yes |
-| `Game` instantiated (`new Game()`) | ✅ yes |
-| App methods run as **real ARM** | ✅ yes — `Game.<init>` → `a.<init>` execute natively |
-| Next stop | ⏹ platform method-table call in `a.<init>` (= **checkpoint 3**) |
-| Clet path regression (`test_helloworld`) | ✅ still passes |
-| clippy | ✅ clean |
-
-The earlier interim (`<init>` super-chaining through the JVM, which reached a blank
-event loop) has been **removed** in favour of real dispatch. With real dispatch the
-boot now stops earlier — at the first platform call — which is the correct,
-expected checkpoint-2 endpoint.
+| `NoClassDefFoundError: Game` resolved | ✅ |
+| `Game` instantiated; app methods run as real ARM | ✅ |
+| `java_load_classes` fills the platform method/field tables | ✅ |
+| native → platform calls dispatch by name | ✅ (Jlet.<init>, getDefaultDisplay, getRuntime, System.gc, BackLight.alwaysOn, Graphics.drawLine, …) |
+| `a.<init>`→`Jlet.<init>` wires the Jlet; `a.startApp` reached as real ARM | ✅ |
+| Card `o`.paint(Graphics) / title screen | ❌ blocked on per-class platform vtables |
+| clet regression (`test_helloworld`) | ✅ | clippy | ✅ |
 
 ## Checkpoint 1 — register native classes ✅
+`register_app_classes` scans `.data` for class headers, parses them, and registers
+all 20 app classes (superclass-dependency order). No-op for clet apps.
 
-`register_app_classes` (in `native_jvm.rs`) scans the app's `.data` (range captured
-from the ELF in `load_executable`) for class headers, parses each via
-`native_class.rs`, and registers all **20** app classes with the JVM in
-superclass-dependency order (`register_class` resolves the parent eagerly). No-op
-for clet apps (no descriptors in `.data`), so the clet path is unaffected.
-`resolve_class` then finds `Game` → `NoClassDefFoundError` gone.
+## Checkpoint 2 — ARM-backed objects + real dispatch ✅
+Custom `ClassDefinition`/`ClassInstance`/`Method`/`Field`. Instances are guest
+object blocks (`this+0x08` -> field array). `LgtMethod::run` marshals `this`+args
+into `r0..r3`, `run_function(code_ptr)`, marshals the return.
 
-## Checkpoint 2 — ARM-backed object model + real dispatch ✅
+## Checkpoint 3 — `java_load_classes` + native↔platform bridge ✅ (core), ⏹ (per-class vtables)
 
-### Object model (`wie_lgt/src/runtime/java/native_jvm.rs`)
+### Trampoline design (`native_jvm.rs`)
 
-Custom `jvm` trait impls (pure-Rust metadata; no guest reflection, unlike wie_ktf):
+- **Shared runtime** `LgtJvmShared`: an instance registry (`guest_ptr ↔ ClassInstance`),
+  the trampoline table, and the virtual-method-table base.
+- **Object bridge**: `value_to_guest` turns a JVM value into the guest word the AOT
+  code expects — an app instance yields its `guest_ptr`; a platform object gets a
+  freshly-allocated **proxy block** registered in the map; primitives pass raw.
+  `guest_to_value` is the inverse (a guest pointer round-trips to its JVM object).
+- **`install_platform_tables`** (the real `java_load_classes`): reads the imported-
+  class table and each class's `virtual/static` method ranges; for every requested
+  method it creates a **native→platform trampoline** (an SVC stub in
+  `SVC_CATEGORY_JAVA_TRAMPOLINE`) and writes the stub pointer into the fixed-offset
+  output table the AOT code reads — `static_method_offsets[idx*4]` /
+  `virtual_method_offsets[idx*4]` (index = the global method-array index, matching
+  the AOT's baked offset). `field_offsets[idx]` gets a distinct guest slot.
+- **`handle_java_trampoline`**: on a native→platform call, reads `this` (`r0`, via
+  the instance registry) + args (`r1..`, per the descriptor), invokes the matching
+  `wie_wipi_java`/`wie_midp` method by name+descriptor (`<init>`→invoke_special,
+  static→invoke_static, else invoke_virtual), and marshals the return into `r0`.
+- **Vtable word**: every object carries the `virtual_method_offsets` base at
+  `+0x00`, so the AOT's virtual dispatch `r3=[this]; bx [r3 + idx*4]` lands in the
+  table.
 
-- **`LgtClassDefinition`** — `name`/`super`/`access`, method/field lookup, static
-  fields (Rust map). `instantiate()` allocates a **guest object block**: a 12-byte
-  header whose **`+0x08` points to a zeroed field array**. This matches the layout
-  the AOT code requires — observed `r1 = [this, #8]; str rX, [r1, idx<<2]`.
-- **`LgtClassInstance`** — identified by its guest pointer (`guest_ptr`). JVM-side
-  `get_field`/`put_field` use a separate Rust map (enough for the platform
-  `Jlet`/`Display` glue that touches inherited fields). Unifying that with the guest
-  field array requires the platform field-offset table → checkpoint 3.
-- **`LgtMethod::run`** — real dispatch:
-  1. marshal JVM args → ARM `r0..r3` (+stack): `this` (args[0]) and object args
-     become guest pointers; primitives become raw words (`marshal_arg`).
-  2. `core.run_function(code_ptr, &params)`.
-  3. marshal the return per the descriptor's return type (`marshal_return`).
-- **`LgtField`** — name/descriptor/access.
-
-### Runtime helpers (lazily resolved during dispatch)
-
-Native bodies resolve AOT-runtime helpers through the java-interface import table
-(`0x64`) *while executing*. Observed during `Game.<init>`: imports `0x54`, then
-`0xb`/`0xc`/`0xd`. These are stubbed (no-ops returning 0) so dispatch advances:
-`0x54` has a dedicated handler; other unknown java imports route to a generic logged
-no-op (`java_interface_stub`). The `.data` trampoline at `0x140466c` (real app code)
-runs as-is. (Implement these properly as they prove to need real behaviour.)
-
-### Reach (verified by ARM trace)
-
+### Reach (verified by trace)
 ```
-register 20 app classes
-new Game -> LGT instantiate Game (guest object) -> invoke <init>
-LGT dispatch Game.<init>()V code=0x10c8       <- real ARM
-   helper(0xc)=import 0x54 [stub], 0x1908, ...
-   bx 0x194c  -> a.<init> (superclass ctor)   <- real ARM
-       helper(0xb) [stub] returns to 0x1970
-       ldr ip,[r4,#0x108] ; bx ip  with r4=0x1500820  -> bx 0
-=> java/lang/Error "Invalid memory access; address: 0"
+java_load_classes: filled 128 method slots, 1 field slot
+new Game -> Game.<init> [real ARM]
+  -> a.<init> [real ARM] -> trampoline Jlet.<init>()V (wires currentJlet/Display/EventQueue)
+  -> trampoline BackLight.alwaysOn, Runtime.getRuntime, System.gc, Display.getDefaultDisplay,
+     Graphics.drawLine, Component.getHeight ...
+-> a.startApp([Ljava/lang/String;)V [real ARM]
 ```
+Static/special platform dispatch is correct (methods invoked by their real names).
 
-So `Game.<init>` and its superclass `a.<init>` run as real ARM. Execution stops in
-`a.<init>` at `bx [0x1500820 + 0x108]`: `0x1500820` is the platform method table in
-`.bss` (the `java_load_classes` `static_method_offsets` output), still **null**
-because `java_load_classes` is a stub. This null call is the next blocker.
+### Next stop — per-class platform vtables
 
-## Checkpoint 3 (next) — platform method/field offset tables
+The AOT virtual-dispatches some platform methods through **hardcoded vtable
+indices** baked per the *original* platform's class layout, e.g.
+`Runtime.getRuntime().<vtable 14>()` and `Component.getHeight()`. Our single global
+`virtual_method_offsets` table can't disambiguate index 14 across classes (it holds
+`Graphics.drawLine` at 14), so the call resolves to the wrong method on a `Runtime`
+(`NoSuchMethodError: Runtime.drawLine`).
 
-The single remaining blocker is exactly what the maintainer flagged: external
-(platform) Java API references are **vtable/offset-indexed**. `java_load_classes`
-must populate the `.bss` tables so native calls like `bx [0x1500820 + N]` and field
-accesses via `[0x15006f4 + idx]` resolve to the platform implementations
-(`org/kwis/msp/lcdui/{Jlet,Card,Graphics,Image,Display}`, `java/lang/*`, …). Each
-slot needs to point at a trampoline that re-enters the JVM and invokes the
-corresponding platform method/field (decoded from the `java_load_classes` imported-
-class tables in `docs/lgt_native_classes.md`). Once wired:
-`a.<init>` → `Jlet.<init>` (real) → `setCurrentJlet`/Display/EventQueue → `startApp`
-→ Card `o` `paint(Graphics)` → toward the title screen.
+A PoC fallback (swallow `NoSuchMethodError`, return 0) advances execution to
+`a.startApp`, but then **hangs**: `Component.getHeight()` returns 0, so the native
+layout code loops forever. This confirms (and matches the maintainer's warning)
+that no-op/0 returns diverge — **correct per-class platform vtables are required**:
+each platform class needs its own vtable whose slot *i* is that class's actual
+vtable method *i* (inherited + declared), matching the original LGT vtable
+ordering. The import tables alone don't encode that ordering (e.g. `Runtime`
+declares 0 virtual methods yet a vtable-14 call is made), so this needs a
+platform vtable-index spec / per-class vtable construction. Nothing is drawn yet
+(the hang precedes any `paint`).
+
+### Recommended next step
+1. Build a per-class vtable for each imported platform class: resolve its full
+   virtual-method list in vtable order (Object + supers + declared) against the
+   `wie_wipi_java`/`wie_midp` definitions; store each class's vtable base.
+2. Set each object's `+0x00` to its class's vtable base (instead of the single
+   global table); proxies use the platform class's vtable.
+3. Remove the `NoSuchMethodError→0` fallback once vtables are correct.
+4. Re-run: `getHeight()` returns the real height, `startApp` builds the Card `o`,
+   pushes it, and `paint(Graphics)` is reached → toward the title screen.
 
 ## Reproduce
-
 ```sh
 cargo build -p wie_cli
-RUST_LOG=wie_lgt=debug,wie_core_arm=error \
+RUST_LOG=wie_lgt=debug,wie=error,wie_core_arm=error \
   cargo run -p wie_cli -- /absolute/path/to/00025C2B.jar
-# look for: "registered 20 app classes", "LGT dispatch Game.<init>()V",
-# then the Error at the platform method-table call (address 0).
+# look for: "filled 128 method slots", the trampoline platform calls, "a.startApp",
+# then the per-class-vtable warning / layout-loop hang.
 ```
 
-## Module layout (kept separate per the agreed PoC design)
-
+## Module layout
 - `native_class.rs` — read-only descriptor parser (RE pass).
-- `native_jvm.rs` — ARM-backed object model + real dispatch + class registration.
-- `init.rs` — captures `.data` range, registers app classes before the initializer;
-  routes the lazily-resolved runtime-helper imports.
-- `interface.rs` / `svc_ids.rs` — java-interface import handlers/ids incl. the
-  runtime-helper stubs.
+- `native_jvm.rs` — ARM-backed object model, native↔platform bridge, trampolines,
+  `java_load_classes` table fill, class registration.
+- `init.rs` — captures `.data`, registers the trampoline handler + app classes,
+  threads `LgtJvmShared`.
+- `interface.rs` / `svc_ids.rs` — java-interface imports incl. runtime-helper stubs.
