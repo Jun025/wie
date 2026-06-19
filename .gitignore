@@ -1,6 +1,10 @@
 /target
 .vscode
 .cargo
+.DS_Store
+
+# Local agent working notes (never commit)
+/CLAUDE_TASK_*.md
 
 # Test ROMs and game binaries (never commit)
 _roms/
