@@ -388,12 +388,25 @@ dispatched at that call site, and `o.paint` runs **without fatal** (cp28 aborted
 So the platform-side mis-classification was wrong; this was an ordinary `java/lang/*`
 vtable slot, RE'd like the others.
 
-*Still no title text yet* — the glyph loop reads zero chars: wie marshals the
-`toCharArray` result via `register_platform_object`, whose proxy has `[ptr+8]=0`, but the
-ez-i loop expects `[arr+8] -> {u32 len, u16 chars[]}`. *cp31 target (one line):* marshal
-char-array (and array) returns into the ez-i guest layout (`[arr+8]` → `{len, u16
-chars}`) in `wie_lgt`'s `value_to_guest` so the glyph loop reads the text — app-side,
-no shared-class change.
+**cp31 — char-array guest marshalling (fix), but the glyph loop is gated elsewhere.**
+The glyph loop reads a `char[]` as `data = [arr+8]; len = [data]; char = [data+4+i*2]`
+(u16 LE). wie marshalled the `toCharArray` result via `register_platform_object`, whose
+proxy has `[ptr+8]=0` (empty). cp31 adds `materialize_char_array` (in
+`handle_java_trampoline`'s result path, scoped to `[C`): it allocates a guest data
+block `{u32 len, u16 chars[len]}` and points the object's `+0x08` at it — the exact
+layout RE'd above. Behaviour-confirmed: the `[C` return is materialised, and the block
+is correct (logged `char[] len=10 text="LOADING..."`; unit-tested via
+`write_char_array_block`).
+
+*Still no title text* — but not for lack of chars: the draw-text helper `@0x10228`
+**never enters its glyph loop**. Before the loop it gates on `g.vtable[r2]() ==
+0x00ffffff` (a Graphics colour query at `lr=0x10278`, result stored then compared at
+`0x10298`); the branch is not taken, so the loop body (and the `char[]`) is skipped —
+the glyph draw fn `@0x1050c` is never called. So the char-array marshalling is correct
+and necessary (the loop needs it) but currently unreached. *cp32 target (one line):*
+identify the Graphics method the helper calls at `0x10228+0x38` (vtable index
+`[lit+0x2a]`) and why wie's return isn't the `0x00ffffff` the glyph loop expects to
+enter — an app-side Graphics-vtable/return issue, not char-array.
 
 ### The single missing answer (for the maintainer)
 
@@ -428,5 +441,6 @@ which is exactly what the ez-i per-frame entry above would do.
 | app `Card.paint` ticked in wie's loop (cp26 experiment) | ◑ wires in & runs per-frame, but `o.paint` gates on `o.g` which its (never-run) virtual `o.k()V` writer would set → **0 draws** (cp27, §7) |
 | render path with `o.g` forced to 1 (cp28 experiment) | ✅ `o.paint` draws (21× setColor, 18× fillRect) to back-buffer + flushes → **render path works end-to-end**; only "set `o.g`" (ez-i per-frame drive) is missing (§7) |
 | `java/lang/String` slot 35 = `toCharArray()[C` (cp30) | ✅ per-class override added; `String.e` abort gone, `o.paint` runs without fatal. Title text still blocked on char-array guest marshalling (cp31) |
+| char-array guest marshalling (cp31) | ✅ `materialize_char_array` → `{u32 len, u16 chars}` at `[arr+8]` (RE'd, unit-tested; `len=10 "LOADING..."`). Text still blocked: the helper @0x10228 skips its glyph loop on a Graphics colour gate (cp32) |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
