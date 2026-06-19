@@ -763,6 +763,14 @@ fn known_java_lang_vtable(class: &str) -> &'static [(u32, &'static str, &'static
         // Thread, result unused => `start()V`. Behaviour-confirmed (Thread spawns the
         // Runnable). Thread declares 0 imported virtuals, so it needs this per-class slot.
         "java/lang/Thread" => &[(11, "start", "()V")],
+        // cp30: the draw-text wrapper `B(Graphics, String)` (@0x100d8) calls
+        // `s.vtable[physical 35]()` (no args) then iterates the result as a char array:
+        // `r2 = [ret+8]; len = [r2]; for i in 0..len { char = [r2 + i*2 + 4] }` — a
+        // per-char glyph loop (bitmap font). The no-arg, char-array-returning String
+        // method is `toCharArray()[C`. Behaviour-RE'd cp30 (the loop reads `[ret+8]` as
+        // `{u32 len, u16 chars[]}` and bounds on `len`). String declares 0 imported
+        // virtuals, so it needs this per-class slot.
+        "java/lang/String" => &[(35, "toCharArray", "()[C")],
         _ => &[],
     }
 }
@@ -1245,6 +1253,8 @@ mod tests {
         let sb = known_java_lang_vtable("java/lang/StringBuffer");
         assert!(sb.iter().any(|&(i, n, _)| i == 5 && n == "toString"));
         assert!(sb.iter().any(|&(i, n, _)| i == 19 && n == "append"));
+        // cp30: String dispatches char access via hardcoded physical slot 35 = toCharArray.
+        assert_eq!(known_java_lang_vtable("java/lang/String"), [(35u32, "toCharArray", "()[C")].as_slice());
         // unknown classes get no override (they use the global identity vtable)
         assert!(known_java_lang_vtable("java/lang/Object").is_empty());
         assert!(known_java_lang_vtable("Game").is_empty());
