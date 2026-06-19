@@ -210,7 +210,9 @@ declared index `+0x10` (all 150 reference-app fields matched after fixing an ini
 > field written by ARM code and the same field read via the JVM agree, by mapping each
 > JVM field through the `field_offsets` slot map onto the guest array. Not yet needed:
 > for the current reach (boot + setup) no field is written on one side and read on the
-> other.
+> other. (cp27 confirmed this for the render path: `o.paint` reads, and `o.k` writes,
+> the *same* guest field-array slot — both ARM-side — so the title-render wall is **not**
+> a field-store split. See §7.)
 
 ---
 
@@ -306,6 +308,41 @@ state lives in the ez-i-native (unbound) objects, not in the JVM-bound cards. So
 correctly ticking `Card.paint` still paints nothing. This **excludes the app
 `Card.paint` instance path** and re-points at the same missing piece below.
 
+**cp27 — render-field provenance, traced (diagnosis only).** cp26's "empty shell" was
+an inference from `g==0`; cp27 traced the actual writer of the one field that gates
+`o.paint`, to classify the wall as app-side (fixable) vs platform-side (maintainer).
+
+- *Gate field S.* `o.paint` (`@0xd8d70`) early-outs on `bl 0xd8640` → `getInstance(o)`
+  (`0xd85e4`, import idx `0xc`, confirmed) returning the **o class singleton**; the gate
+  is that singleton's guest field-array slot 6 (`[obj+8][+0x18]`) = **`o.g : I`** (int,
+  declared index 6; `o` extends the platform `Card`, so slot = declared index). The gate
+  is the *class singleton*, not `this`.
+- *Writers of `o.g`.* Found in the app ARM — both inside one method, **`o.k()V`
+  (`@0xda7f8`)**: `0xda8a0` writes `g ← 0` (reset), `0xdb240` writes `g ← 1` (set, from a
+  literal). Both reach the singleton via `bl 0xd8640` (`getInstance(o)`), i.e. they write
+  **the same singleton and the same guest field-array store that `o.paint` reads**. No
+  JVM-side writer exists (the AOT writes its own fields with ARM `str`, not a JVM
+  putfield). Data source is a literal `0/1` (a game state flag — not a `.dat` load, not a
+  native-import return).
+- *Instance identity.* gate object = writer target = the instance cp26 pushed = the
+  `getInstance(o)` singleton (`0x48840130`) — all the same. The unbound native objects
+  carried by `0x21`/`0x57` are separate, but `o.paint` never reads them (it gates on the
+  class singleton).
+- *Why `o.g` stays 0.* `o.k()V` (the writer) is a **virtual method with no static call
+  site** (no `bl 0xda7f8`, no pointer-word ref anywhere in `.text`) — it is only reachable
+  via the two-level vtable dispatch, i.e. called by the game's state machine each
+  frame/step. In the reachable run only `o.paint` is dispatched on `o`; `o.k` never runs,
+  so `g` is never set.
+
+**Classification — platform-side (§7), now traced, not inferred.** The wall is *not* a
+field-store split (§5: writer and reader use the same guest array) and *not* an
+instance mis-pick (cp26 pushed the very singleton `o.paint` gates on). The `o.g` writer
+exists and targets the right store/instance; it just never runs, because the virtual
+`o.k()V` that holds it is driven by the game state machine, which only advances under a
+per-frame tick. That tick is the ez-i runtime's job — the same missing piece below.
+So **field unification (§5) and "find the live instance" are *not* fixes** for the title
+render; the one missing thing remains the ez-i per-frame drive.
+
 ### The single missing answer (for the maintainer)
 
 > In ez-i, when an app `new`s a bare native object and hands it to platform import
@@ -330,6 +367,6 @@ all from the `wie_lgt` / `LgtJvmShared` side, without touching shared classes.
 | two-level vtable + per-class overrides + instance field layout | ✅ |
 | `getInstance` singletons, `Thread.start`, game thread spawns `a.run` | ✅ |
 | data load → 240×320 back-buffer → `getGraphics` → Cards/RNG | ✅ |
-| app `Card.paint` ticked in wie's loop (cp26 experiment) | ◑ wires in & runs per-frame, but the bound card is an empty shell → **0 draws** (§7) |
+| app `Card.paint` ticked in wie's loop (cp26 experiment) | ◑ wires in & runs per-frame, but `o.paint` gates on `o.g` which its (never-run) virtual `o.k()V` writer would set → **0 draws** (cp27, §7) |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
