@@ -26,10 +26,57 @@ Goal: run the AOT-compiled LGT app (BattleMonster `00025C2B`) on wie's JVM, towa
 | **cp17: inheritance-aware instance field_offsets — data load + 240×320 back-buffer run** | ✅ |
 | **cp18: Thread.start per-class slot + pending-new pass-through — game-loop thread spawns a.run()** | ✅ |
 | cp19: diagnosis — a.run() returns early on `getInstance(a)` run-flag (no-op import) | ⏹ |
-| **cp20: implement `getInstance` (java-interface `0xc`) singletons — a.run enters loop + back-buffer Graphics** | ✅ |
-| `paint`/title | ◑ boots, data, back-buffer, loop thread enters loop + `getGraphics`; loop exits ~1 iter on imports 0x55/0x56/0x57 |
+| cp20: implement `getInstance` (java-interface `0xc`) singletons — a.run enters loop + back-buffer Graphics | ✅ |
+| **cp21: diagnosis — a.run is a one-shot; render gated by AOT-runtime import substrate (0x55/56/57, 0x1f/20/21/22, 0x12)** | ⏹ (next task) |
+| `paint`/title | ◑ boots, data, back-buffer + `getGraphics`; a.run runs once (sets up via no-op imports) and returns; main thread spins on empty CardCanvas |
 | clet (`test_helloworld`) | ✅ | clippy | ✅ |
 | clet (`test_helloworld`) | ✅ | clippy | ✅ |
+
+## Checkpoint 21 — a.run is a one-shot; render gated by the AOT-runtime import substrate
+
+After cp20 `a.run` enters its body. Full RE of the body (`0x1f10`–`0x2128`) shows it
+is **not** a continuous render loop — it is `if (run-flag) { body }` and the body's
+main path **returns** (`0x1ff4 → 0x1ffc → 0x2100 → 0x2140`). Confirmed at runtime:
+`a.run RETURNED -> 0`, after which the **main thread spins at ~99% CPU** on
+`CardCanvas.paint` (whose `cards` vector is empty → draws nothing).
+
+### What a.run's body does (main path), and the blocker
+```
+import 0x55(a-singleton, code@0x1a24, 0)   ; result discarded
+import 0x56(this,        code@0x1a24, 0)   ; result discarded
+import 0x1f(0)
+obj = stdlib_0x32()                        ; native allocator (cp7) — non-null
+import 0x57(this, obj, this)               ; result discarded
+import 0x21(obj)                           ; result discarded
+return
+```
+- `code@0x1a24` (passed to 0x55/0x56) is a **state initialiser** for the a-singleton:
+  it `getInstance(a)`s, sets fields `[9]=0,[13]=1,[14]=1,[15]=new(),[18]=3,…`, and
+  does **not** draw. So 0x55/0x56 carry an init routine the runtime is meant to run
+  (or register); as no-ops, that init never happens.
+- `obj` (allocated, then handed to 0x57/0x21) looks like a runtime object the game
+  **registers** for its real per-frame driver (timer/thread/callback). 0x57/0x21 are
+  no-ops, so nothing is registered → no render driver runs.
+
+So `a.run` only **sets up** the game's run substrate through a batch of java-interface
+imports — **`0x55, 0x56, 0x57` (code/object lifecycle), `0x1f, 0x20, 0x21, 0x22`
+(object alloc/init/register/finalise), `0x12` (a loop-continue gate elsewhere in the
+body: `cmp r0,#0; bne …` — returning 0 exits)** — all currently no-op stubs. Without
+them the game's actual render driver never starts.
+
+### Render model: back-buffer blit, not pushCard (confirmed)
+The game never calls `Display.pushCard` (no `push_card` in any trace) — so the empty
+`CardCanvas` is expected. It renders by drawing to its **240×320 back-buffer Image**
+(`getGraphics` obtained) and blitting to screen — driven by the substrate above.
+
+### Next (cp22) — identify + implement the substrate imports (P2), no guessing
+RE each of `0x55/0x56/0x57` and `0x1f/0x20/0x21/0x22`, `0x12` from their call sites
+(args, result use, the dispatcher) and the AOT runtime — they are the object/thread/
+timer/monitor/exception primitives. In particular determine whether 0x55/0x56 *run*
+or *register* `code@0x1a24`, and what `obj` (0x57/0x21) is (a timer/thread for the
+per-frame loop). Implement per evidence so the run substrate starts → the game draws
+to the back-buffer and blits → title pixels. This is a multi-import batch, not a
+single fix; a guess/blanket is disallowed.
 
 ## Checkpoint 20 — getInstance singletons; a.run enters its loop
 
