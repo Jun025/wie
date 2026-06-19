@@ -292,6 +292,20 @@ carried code `0x55/0x56` is inert, cp23). The app registers nothing into wie's M
 card system, so there is no safe wie-side connection point. Calling any native vtable
 slot here would be a guess (forbidden).
 
+**cp26 — the app `Card.paint` path is reachable but empty (experiment, reverted).**
+The app's `Card` subclasses *are* known JVM classes: `o` (extends
+`org/kwis/msp/lcdui/Card`) has a real `paint(Lorg/kwis/msp/lcdui/Graphics;)V`
+(`@0xd8d70`, draws on its Graphics arg), inherited by `d`/`e`/`j`/`l`, and each is
+created as a bound singleton via `getInstance` (`0xc`). A one-shot experiment pushed the
+bound `o`-card into wie's `Display`/`CardCanvas`: **`o.paint` then ticked every frame on
+the back-buffer** (the Card.paint path wires cleanly into wie's existing tick) — but
+issued **zero draw calls**. `o.paint` ran without error and made no `Graphics`/draw
+calls at all, i.e. it took its empty-state early-out. Root cause is the same wall: the
+`getInstance` singletons are **empty shells** (zeroed fields); the live title-screen
+state lives in the ez-i-native (unbound) objects, not in the JVM-bound cards. So
+correctly ticking `Card.paint` still paints nothing. This **excludes the app
+`Card.paint` instance path** and re-points at the same missing piece below.
+
 ### The single missing answer (for the maintainer)
 
 > In ez-i, when an app `new`s a bare native object and hands it to platform import
@@ -316,5 +330,6 @@ all from the `wie_lgt` / `LgtJvmShared` side, without touching shared classes.
 | two-level vtable + per-class overrides + instance field layout | ✅ |
 | `getInstance` singletons, `Thread.start`, game thread spawns `a.run` | ✅ |
 | data load → 240×320 back-buffer → `getGraphics` → Cards/RNG | ✅ |
+| app `Card.paint` ticked in wie's loop (cp26 experiment) | ◑ wires in & runs per-frame, but the bound card is an empty shell → **0 draws** (§7) |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
