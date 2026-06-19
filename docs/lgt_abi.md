@@ -1,4 +1,4 @@
-# LGT / ez-i Java-app ABI (BattleMonster `00025C2B`)
+# LGT / ez-i Java-app ABI
 
 Reverse-engineered ABI for running an **AOT-compiled LGT Java app** (ez-i / Xceed
 toolchain) on wie's JVM. Each Java class is emitted as a native ARM record: methods
@@ -7,10 +7,10 @@ talks to the platform through the "java-interface" import module (table `0x64`).
 
 Scope: the PoC lives entirely in `wie_lgt` (`LgtJvmShared`, LGT-specific per #1232);
 shared `wie_midp` / `wie_wipi_java` classes are **not** modified. This document is the
-consolidated ABI; see `docs/lgt_native_classes.md` for the byte-level descriptor RE
-and `STEP2_REPORT.md` for the per-checkpoint derivation log.
+consolidated ABI; see `docs/lgt_native_classes.md` for the byte-level descriptor RE.
+The `cpNN` tags below mark the reverse-engineering milestone each fact was pinned at.
 
-Notation: addresses are from BattleMonster `00025C2B` (`.text` `0x1000..0xe7800`,
+Notation: addresses are from the ez-i reference app (`.text` `0x1000..0xe7800`,
 `.data` `0x1400000..`, `.bss` `0x1500000..`). Anything not pinned by RE is labelled
 **(추정)**.
 
@@ -78,7 +78,7 @@ FieldRecord (20 bytes):
 `H`. The handle's `+0x08` points back to `H`. `getInstance` and singleton lookups take
 a handle and resolve `handle → header → name` (`parse_native_class_from_handle`).
 
-### App class graph (BattleMonster, from `.data` scan)
+### App class graph (reference app, from `.data` scan)
 
 ```
 Jlet (platform)
@@ -155,7 +155,7 @@ class is known. Indices are **physical** (reserved slot already baked in):
 | `java/lang/Thread` | 11 → `start()V` |
 
 (These slots are empirically identified — **추정** where not cross-checked against a
-second call site; see STEP report. Runtime/StringBuffer/Thread are all confirmed by a
+second call site. Runtime/StringBuffer/Thread are all confirmed by a
 working call.)
 
 ### Static methods / fields
@@ -188,7 +188,7 @@ JVM side). `register_app_classes` computes each class's `(name, type, slot)` lis
 `app_field_layouts`; `install_platform_tables` then segments the flat `fields` ref
 array by matching each window to a class's exact field set and writes the resolved slot
 into `field_offsets[k]`. Field-record parse offsets: name `+0x04`, type `+0x08`,
-declared index `+0x10` (all 150 BattleMonster fields matched after fixing an initial
+declared index `+0x10` (all 150 reference-app fields matched after fixing an initial
 `+0x00` vs `+0x04` off-by-4).
 
 ### Object binding lifecycle
@@ -261,7 +261,7 @@ bookkeeping; leaving them as `→ 0` has caused no regression across full boot +
   the displayable's per-frame paint + flush.
 - wie already drives WIPI-C clets; `CardCanvas.paint` already loops every frame.
 
-### What BattleMonster actually does (RE, cp21–cp25)
+### What the reference app actually does (RE, cp21–cp25)
 
 - The app does **not** use `pushCard`/`CardCanvas` normally. It runs full setup
   (data load → 240×320 back-buffer → `getGraphics` → Cards/RNG/Thread) and then **0

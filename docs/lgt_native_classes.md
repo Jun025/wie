@@ -1,6 +1,6 @@
 # LGT native class-descriptor format (reverse-engineering notes)
 
-Reference app: **배틀몬스터 / BattleMonster**, AID `00025C2B` (LGT WIPI / ez-i).
+Reference app: one ez-i AOT-compiled LGT WIPI app (a Java game).
 Scope: this is a **read-only RE pass**. It documents the byte layout of the native
 class descriptors that the app hands to the platform via `java_unk5` (java-interface
 import `0x07`). No JVM registration is implemented here.
@@ -10,7 +10,7 @@ Parser implementation: [`wie_lgt/src/runtime/java/native_class.rs`](../wie_lgt/s
 ## 1. Background
 
 The app's `binary.mod` is a 1 MB ARM ELF and the jar contains **no `.class` files** —
-BattleMonster is **AOT-compiled Java** (ez-i / Xceed-style toolchain). Each Java class
+The app is **AOT-compiled Java** (ez-i / Xceed-style toolchain). Each Java class
 is emitted as a metadata record in the ELF `.data` segment; the class's methods are
 plain native ARM functions whose entry points live in `.text`. The platform is expected
 to read these records to expose the app's classes to the (platform-provided) Java
@@ -33,7 +33,7 @@ file — which is how the layout below was confirmed, then cross-checked against
 `a0` (observed `0x1400154`) is a container:
 
 ```
-a0[0]            = handle_count            (16 for BattleMonster)
+a0[0]            = handle_count            (16 for the reference app)
 a0[1]            = 0
 a0[2 .. 2+n]     = `count` class HANDLES   (each = class_header + 0x4c)
 a0[2+n ..]       = trailing per-entry byte array (small values 0x01..0x11;
@@ -222,7 +222,7 @@ java_unk5: app registry @ 0x1400154 (16 class handles, aux @ 0x1400878) — not 
 ```sh
 # live decode (parses each a0 handle through native_class.rs and logs it)
 RUST_LOG=wie_lgt=debug,wie_core_arm=warn \
-  cargo run -p wie_cli -- /absolute/path/to/00025C2B.jar
+  cargo run -p wie_cli -- /path/to/<app>.jar
 ```
 Static decode was done by parsing `binary.mod`'s ELF `.data`/`.text` directly (absolute
 pointers, no relocation needed); the live decode matches it byte-for-byte.

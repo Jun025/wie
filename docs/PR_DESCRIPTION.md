@@ -7,7 +7,7 @@ toolchain), where each Java class is emitted as native ARM code with `.data` met
 rather than JVM bytecode. The app boots through wie's existing lcdui `Main.main` path
 and runs its real native methods, dispatched through reconstructed platform tables.
 
-Reference app: BattleMonster (`00025C2B`). The app reaches **full boot + game setup**
+Reverse-engineered against one ez-i reference app. It reaches **full boot + game setup**
 (class registration, platform dispatch, data load, 240×320 back-buffer, `getGraphics`,
 Cards/RNG/Thread). The **per-frame render driver does not yet run** — it depends on the
 ez-i displayable/clet tick ABI, which is not derivable from the app binary and is the
@@ -33,9 +33,8 @@ The PoC keeps everything LGT-specific in `LgtJvmShared` (per #1232); shared
 - **Object model**: native `new` primitive (stdlib `0x32` / java `0xf`) +
   `<init>`-trampoline binding to JVM instances, `getInstance` singletons
   (java-interface `0xc`), and the native String factory (`0x9`).
-- **Docs**: `docs/lgt_abi.md` (consolidated ABI), `docs/lgt_native_classes.md`
-  (descriptor RE). `STEP2_REPORT.md` / `BRIDGE_REPORT.md` are the checkpoint
-  derivation logs.
+- **Docs**: `docs/lgt_abi.md` (consolidated, reverse-engineered ABI) and
+  `docs/lgt_native_classes.md` (descriptor byte layout).
 
 ## Architecture (one paragraph)
 
