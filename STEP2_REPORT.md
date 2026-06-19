@@ -30,9 +30,79 @@ Goal: run the AOT-compiled LGT app (BattleMonster `00025C2B`) on wie's JVM, towa
 | cp21: diagnosis — a.run is a one-shot; render gated by AOT-runtime import substrate | ⏹ |
 | cp22: substrate RE — no draws anywhere; imports overloaded/stack-ptr args | ⏹ |
 | **cp23: dispatcher/driver RE — running carried code is inert; driver = unbound obj via 0x57; tick needs ez-i lifecycle (STOP)** | ⏹ |
+| cp24: tried `0x57`→`Display.pushCard` (show-card) — disproven & reverted; `0x57`'s arg is the app `this`, not a card | ⏹ |
+| **cp25: runtime RE — registered driver/card objects are UNBOUND ez-i-native (no `<init>`/class); per-frame tick needs ez-i ABI (STOP)** | ⏹ |
 | `paint`/title | ◑ full setup (data, back-buffer, getGraphics, Cards, RNG); render driver never starts → zero draw calls |
 | clet (`test_helloworld`) | ✅ | clippy | ✅ |
-| clet (`test_helloworld`) | ✅ | clippy | ✅ |
+
+## Checkpoint 25 — runtime RE: the driver objects are unbound ez-i-native (STOP)
+
+cp24 implemented `0x57(this, obj, this)` as "show card" → `Display.pushCard`, on the
+hypothesis that `0x57`'s object arg is a bound app `Card`. A runtime trace (logging
+every java-interface import with its call-site `lr`) **disproved** this and pinned the
+exact architecture. The cp24 code is reverted (keeping a stub on a disproven premise
+would violate the no-misunderstood-stub rule). `0x57` is back to the logged no-op.
+
+### What actually runs (ground-truth trace, ARM-verified)
+
+`a.run()V` (`@0x1f10`) and `a.b(Lo;I)V` (`@0x2200`) were disassembled and matched
+1:1 against the runtime import log (call-site `lr` ↔ literal-pool descriptor index):
+
+- **`a.run` is a confirmed one-shot.** It runs `getInstance(0xe)` → helper → checks
+  `obj.field[8]` → body: `0x55(obj)`, `0x56(this)`, `0x1f(0)`, then **returns** via
+  the epilogue at `0x2140` (`sub sp,fp,#0x1c; ldm sp,{…}; bx lr`). No frame loop.
+- **`a.b(Lo;I)` runs once at setup** (≈`.775s`, before `a.run`), not per frame. Its
+  body (literal pool re-resolved; descriptor index = `*(desc+0xc)`):
+  - `0x2248`: `bx 0xe2c50` — that "helper" is itself an **import thunk** whose index
+    word (`*0xe2c5c`) is `0x32` = the stdlib **`new`** primitive → returns a fresh
+    object `r4` (logged `stdlib new (0x32) -> 0x48840540`).
+  - `0x2264` (lr `0x226c`): **`0x57(a0 = this)`** — arg is the **app instance**, *not*
+    a card. (cp24 wrongly read this as a card and used the wrong register `a1`.)
+  - `0x2274` (lr `0x227c`): **`0x21(a0 = r4 = the new object)`** — this is where the
+    freshly-allocated object is handed to the platform.
+
+### Why this is a hard STOP (P4 cannot bind; needs ez-i ABI)
+
+The objects registered as the render driver/cards (`0x21`'s arg in both `a.run` and
+`a.b`) come straight from the native `new` primitive (`alloc_native_object`): they get
+only the **global** vtable word and are marked `pending_new` (**unbound**). In `a.b`
+there is **no `<init>` call between `new` and `0x21`** — so the registered object has
+**no JVM class, no static descriptor, no per-class vtable**. P4 (static-type
+identification) has nothing to latch onto; these are raw ez-i-native structs whose
+methods are defined by the ez-i platform, not by any app class descriptor.
+
+Consequently there is **no identifiable per-frame method to call**: the object exposes
+no bound `paint`/`run`. The per-frame invocation is the **ez-i runtime's** job —
+ez-i's event loop calls the registered native object's per-frame entry — and wie does
+not emulate that loop (cp23 confirmed: replaying the carried code `0x55/0x56` is
+inert). Bridging into wie's existing `CardCanvas.paint` tick is impossible from this
+side because the app registers *nothing* into wie's MIDP card system; it uses ez-i's
+own native registration (`0x21`/`0x55`/`0x56`/`0x57`), which we no-op.
+
+This is exactly the directive's STOP limit: *obj's per-frame method is not identifiable
+via P4, and a safe wie-backend connection alone cannot tick it (it needs ez-i-specific
+mapping).* Guessing a native method/vtable slot to call is forbidden.
+
+### The single missing answer (for the maintainer)
+
+> In ez-i, when an app `new`s a bare native object and hands it to platform import
+> `0x21` (and registers app callbacks via `0x55`/`0x56`), **which registered object's
+> which native entry point does the ez-i runtime invoke each frame to paint**, and how
+> does its back-buffer reach the screen (the ez-i equivalent of `DisplayProxy.flush`)?
+> Equivalently: what is the ez-i native displayable/clet ABI that `0x21`/`0x55`/`0x56`
+> bind — so wie can call that per-frame entry from its existing paint tick?
+
+Without this, the registered object is an opaque ez-i-native handle with no callable
+per-frame method, and every forward step would be a guess.
+
+## Checkpoint 24 — `0x57`→pushCard hypothesis (disproven, reverted)
+
+Implemented `show_card(card_ptr)` = `Display.pushCard` and routed import `0x57` to it,
+on the cp23 read that `0x57(this, obj, this)`'s middle arg is a bound app `Card`. The
+cp25 trace showed `0x57`'s only real arg is `a0 = this` (the app instance) and the
+object actually registered is `0x21`'s unbound `new` result — so the premise was wrong.
+Reverted `show_card` + the `0x57` branch; `0x57` is the logged no-op again. (Net effect
+on the tree: no behavior change; the value of cp24 was the disproof that drove cp25.)
 
 ## Checkpoint 23 — driver RE: carried-code is inert; tick needs ez-i lifecycle (STOP)
 
