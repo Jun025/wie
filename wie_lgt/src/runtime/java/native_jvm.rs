@@ -248,6 +248,38 @@ impl LgtJvmShared {
         }
     }
 
+    /// Materialise a JVM `char[]` return into the ez-i guest layout the AOT reads for
+    /// text (cp30/cp31 RE of the glyph loop @0x10228): an object whose `+0x08` points
+    /// at a data block `{ u32 len, u16 chars[len] }` (chars start at data+4, stride 2,
+    /// little-endian). Used for `String.toCharArray()[C` (slot 35) so the per-char draw
+    /// loop reads real characters. The data block is allocated in the guest heap (same
+    /// allocator as native `new`).
+    ///
+    /// PoC: the block is not freed (a per-frame text alloc can leak — TODO: pool/free
+    /// once a frame boundary hook exists). Scoped to `char[]` only; other element types
+    /// have different guest strides and must be RE-confirmed at their call site before
+    /// being materialised (see `char_array_data_size` / `write_char_array_block`).
+    async fn materialize_char_array(&self, core: &mut ArmCore, array: Box<dyn ClassInstance>) -> Result<u32> {
+        let jvm = self.jvm.clone();
+        let len = match jvm.array_length(&array).await {
+            Ok(l) => l,
+            Err(e) => return Err(JvmSupport::to_wie_err(&jvm, e).await),
+        };
+        let chars: Vec<u16> = match jvm.load_array(&array, 0, len).await {
+            Ok(c) => c,
+            Err(e) => return Err(JvmSupport::to_wie_err(&jvm, e).await),
+        };
+        let data = Allocator::alloc(core, char_array_data_size(chars.len()))?;
+        write_char_array_block(core, data, &chars)?;
+
+        let obj = Allocator::alloc(core, OBJ_HEADER_SIZE)?;
+        write_generic(core, obj, self.vtable_word())?;
+        write_generic(core, obj + 4, 0u32)?;
+        write_generic(core, obj + OBJ_PTR_FIELDS_OFFSET, data)?;
+        self.instances.lock().insert(obj, array);
+        Ok(obj)
+    }
+
     /// Map a guest word back to a JVM value of the given type (args/returns from
     /// native into platform methods).
     fn guest_to_value(&self, raw: u32, ty: &JavaType) -> JavaValue {
@@ -560,6 +592,22 @@ fn field_key(name: &str, descriptor: &str) -> String {
     format!("{name}:{descriptor}")
 }
 
+/// Byte size of the ez-i `char[]` data block for `len` chars: `u32 len + u16[len]`.
+fn char_array_data_size(len: usize) -> u32 {
+    4 + len as u32 * 2
+}
+
+/// Write the ez-i `char[]` data block at `data`: `[data] = len (u32)`, then each char
+/// as a little-endian `u16` at `data + 4 + i*2` (the layout the glyph loop @0x10228
+/// reads — cp30/cp31). Pure over guest memory.
+fn write_char_array_block(core: &mut ArmCore, data: u32, chars: &[u16]) -> Result<()> {
+    write_generic(core, data, chars.len() as u32)?;
+    for (i, &ch) in chars.iter().enumerate() {
+        write_generic(core, data + 4 + i as u32 * 2, ch)?;
+    }
+    Ok(())
+}
+
 // ---- native -> platform trampolines ----
 
 #[derive(Clone)]
@@ -697,7 +745,13 @@ pub async fn handle_java_trampoline(core: &mut ArmCore, shared: &mut LgtJvmShare
         Err(e) => return Err(JvmSupport::to_wie_err(&jvm, e).await),
     };
 
-    let r0 = shared.value_to_guest(core, &result);
+    // A `char[]` return (e.g. `String.toCharArray()`) must be materialised into the
+    // ez-i guest layout `{u32 len, u16 chars}` the AOT reads, not the empty proxy a
+    // plain object marshals to — otherwise the text glyph loop reads zero chars (cp31).
+    let r0 = match &result {
+        JavaValue::Object(Some(o)) if o.class_definition().name() == "[C" => shared.materialize_char_array(core, o.clone()).await?,
+        _ => shared.value_to_guest(core, &result),
+    };
     core.set_next_pc(lr)?;
     Ok(r0)
 }
@@ -1166,9 +1220,13 @@ fn compute_field_layouts(classes: &[LgtNativeClass]) -> AppFieldLayouts {
 mod tests {
     use alloc::collections::BTreeSet;
     use alloc::vec;
+    use alloc::vec::Vec;
 
     use super::super::native_class::LgtNativeField;
-    use super::{LgtNativeClass, VTABLE_REFS, compute_field_layouts, known_java_lang_vtable, physical_vtable_slot};
+    use super::{
+        LgtNativeClass, VTABLE_REFS, char_array_data_size, compute_field_layouts, known_java_lang_vtable, physical_vtable_slot,
+        write_char_array_block,
+    };
 
     fn cls(name: &str, parent: Option<&str>, fields: &[(&str, &str, u32)]) -> LgtNativeClass {
         LgtNativeClass {
@@ -1258,5 +1316,35 @@ mod tests {
         // unknown classes get no override (they use the global identity vtable)
         assert!(known_java_lang_vtable("java/lang/Object").is_empty());
         assert!(known_java_lang_vtable("Game").is_empty());
+    }
+
+    /// cp31: the ez-i `char[]` guest layout — `{u32 len, u16 chars}` (chars at +4,
+    /// stride 2, little-endian) — that the glyph loop @0x10228 reads. Locks the byte
+    /// layout `materialize_char_array` writes.
+    #[test]
+    fn char_array_guest_layout() {
+        use wie_core_arm::ArmCore;
+        use wie_util::read_generic;
+
+        // size = 4 (len) + 2 per char
+        assert_eq!(char_array_data_size(0), 4);
+        assert_eq!(char_array_data_size(10), 24);
+
+        let mut core = ArmCore::new(false, None).unwrap();
+        core.map(0x40000000, 0x1000).unwrap();
+        let data = 0x40000000u32;
+        let chars: Vec<u16> = "LOADING...".encode_utf16().collect();
+        assert_eq!(chars.len(), 10);
+        write_char_array_block(&mut core, data, &chars).unwrap();
+
+        // [data] = len (u32)
+        assert_eq!(read_generic::<u32, _>(&core, data).unwrap(), 10);
+        // [data + 4 + i*2] = char[i] (u16 LE)
+        for (i, &ch) in chars.iter().enumerate() {
+            assert_eq!(read_generic::<u16, _>(&core, data + 4 + i as u32 * 2).unwrap(), ch);
+        }
+        // 'L' = 0x4c, '.' = 0x2e
+        assert_eq!(read_generic::<u16, _>(&core, data + 4).unwrap(), b'L' as u16);
+        assert_eq!(read_generic::<u16, _>(&core, data + 4 + 9 * 2).unwrap(), b'.' as u16);
     }
 }
