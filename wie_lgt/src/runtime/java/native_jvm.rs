@@ -783,6 +783,15 @@ fn read_cstr(core: &ArmCore, ptr: u32) -> Option<String> {
 /// is ~102 halfwords; this covers it with margin).
 const VTABLE_REFS: u32 = 128;
 
+/// Physical vtable word index for virtual method-ref `r`. The AOT dispatches via
+/// `vtable[virtual_method_offsets[r] + 1]` (a literal `ldr ip,[r3,#4]` after
+/// `add r3, r3, idx<<2`), so physical slot 0 is RESERVED and refs start at slot 1.
+/// With `virtual_method_offsets[r] = r`, dispatch reads `vtable[r + 1]` — the slot
+/// this returns. Keeping install and dispatch in one helper locks the cp15 fix.
+const fn physical_vtable_slot(r: u32) -> u32 {
+    r + 1
+}
+
 /// Implement `java_load_classes` with the two-level virtual-dispatch model decoded
 /// in checkpoint 5 (see STEP report):
 ///
@@ -866,7 +875,7 @@ pub fn install_platform_tables(
         {
             let cls = vref_class(r);
             let stub = make_method_trampoline(core, shared, &cls, Some(mname), Some(mtype), true)?;
-            write_generic(core, global_vtable + (r + 1) * 4, stub)?; // physical slot r+1
+            write_generic(core, global_vtable + physical_vtable_slot(r) * 4, stub)?; // reserved slot 0
             // Logical index of method-ref `r` is `r`; the dispatch adds the reserved
             // slot (`+1`). Only written for real method refs to stay in the table.
             write_generic(core, virtual_method_offsets + r * 2, r as u16)?;
@@ -1058,39 +1067,8 @@ pub async fn register_app_classes(jvm: &Jvm, core: &mut ArmCore, shared: &LgtJvm
     let app_names: BTreeSet<String> = pending.iter().map(|c| c.name.clone()).collect();
 
     // Compute each app class's instance-field object slots (inherited-first flat
-    // layout): `slot = app-ancestor field count + declared index`. Stored for
-    // `java_load_classes` to fill `field_offsets`. Platform ancestors contribute 0
-    // (their fields live JVM-side, not in the guest array). See STEP report cp17.
-    {
-        // (parent_name, field_count) by class name — owned, so no borrow of `pending`
-        // survives into the registration loop below.
-        let meta: BTreeMap<String, (Option<String>, u32)> = pending
-            .iter()
-            .map(|c| (c.name.clone(), (c.parent_name.clone(), c.fields.len() as u32)))
-            .collect();
-        let mut layouts: AppFieldLayouts = Vec::with_capacity(pending.len());
-        for c in &pending {
-            // app-ancestor field count (platform parents end the chain at 0)
-            let mut base = 0u32;
-            let mut name = c.parent_name.clone();
-            while let Some(n) = name {
-                match meta.get(&n) {
-                    Some((parent, count)) => {
-                        base += count;
-                        name = parent.clone();
-                    }
-                    None => break,
-                }
-            }
-            let fields = c
-                .fields
-                .iter()
-                .map(|f| (f.name.clone(), f.type_descriptor.clone(), base + f.index))
-                .collect();
-            layouts.push((c.name.clone(), fields));
-        }
-        *shared.app_field_layouts.lock() = layouts;
-    }
+    // layout). Stored for `java_load_classes` to fill `field_offsets`. See cp17.
+    *shared.app_field_layouts.lock() = compute_field_layouts(&pending);
 
     let mut registered = Vec::new();
     let mut done = BTreeSet::new();
@@ -1128,4 +1106,135 @@ pub async fn register_app_classes(jvm: &Jvm, core: &mut ArmCore, shared: &LgtJvm
         tracing::warn!("LGT native JVM: {} classes left unregistered: {names:?}", pending.len());
     }
     Ok(registered)
+}
+
+/// Compute each app class's instance-field object slots using the inherited-first
+/// flat guest layout: `slot = (field count of all app ancestors) + declared index`.
+/// Platform ancestors terminate the chain contributing 0 (their fields live JVM-side,
+/// not in the guest field array). Pure over the parsed class set — see cp17.
+fn compute_field_layouts(classes: &[LgtNativeClass]) -> AppFieldLayouts {
+    // (parent_name, field_count) by class name.
+    let meta: BTreeMap<String, (Option<String>, u32)> = classes
+        .iter()
+        .map(|c| (c.name.clone(), (c.parent_name.clone(), c.fields.len() as u32)))
+        .collect();
+    let mut layouts: AppFieldLayouts = Vec::with_capacity(classes.len());
+    for c in classes {
+        // app-ancestor field count (platform parents end the chain at 0)
+        let mut base = 0u32;
+        let mut name = c.parent_name.clone();
+        while let Some(n) = name {
+            match meta.get(&n) {
+                Some((parent, count)) => {
+                    base += count;
+                    name = parent.clone();
+                }
+                None => break,
+            }
+        }
+        let fields = c
+            .fields
+            .iter()
+            .map(|f| (f.name.clone(), f.type_descriptor.clone(), base + f.index))
+            .collect();
+        layouts.push((c.name.clone(), fields));
+    }
+    layouts
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::collections::BTreeSet;
+    use alloc::vec;
+
+    use super::super::native_class::LgtNativeField;
+    use super::{LgtNativeClass, VTABLE_REFS, compute_field_layouts, known_java_lang_vtable, physical_vtable_slot};
+
+    fn cls(name: &str, parent: Option<&str>, fields: &[(&str, &str, u32)]) -> LgtNativeClass {
+        LgtNativeClass {
+            ptr: 0,
+            tag: 0x21,
+            name: name.into(),
+            ptr_parent: 0,
+            parent_name: parent.map(Into::into),
+            access_flags: 0,
+            methods: vec![],
+            fields: fields
+                .iter()
+                .map(|(n, t, i)| LgtNativeField {
+                    ptr_class: 0,
+                    name: (*n).into(),
+                    type_descriptor: (*t).into(),
+                    access_flags: 0,
+                    index: *i,
+                })
+                .collect(),
+        }
+    }
+
+    /// Instance fields use an inherited-first flat layout: `slot = (field count of all
+    /// app ancestors) + declared index`, platform parents terminating the chain at 0.
+    /// Mirrors the 150/150 BattleMonster fields validated at runtime (cp17); locked
+    /// here with a deterministic hierarchy (`a`→`Game`, `o`→`d`/`e`).
+    #[test]
+    fn field_layout_inherited_first() {
+        let classes = vec![
+            cls("a", None, &[("appA", "I", 0), ("appB", "I", 1)]),
+            cls("Game", Some("a"), &[("g", "I", 0)]),
+            cls("o", Some("org/kwis/msp/lcdui/Card"), &[("f0", "I", 0), ("f1", "I", 1), ("f2", "I", 2)]),
+            cls("d", Some("o"), &[("d0", "I", 0), ("d1", "I", 1)]),
+            cls("e", Some("o"), &[("e0", "I", 0)]),
+        ];
+        let layouts = compute_field_layouts(&classes);
+        let slot = |cn: &str, fname: &str| -> u32 {
+            let (_, fl) = layouts.iter().find(|(n, _)| n == cn).unwrap();
+            fl.iter().find(|(n, _, _)| n == fname).unwrap().2
+        };
+        // platform-terminated chain (`o` extends Card → base 0)
+        assert_eq!(slot("o", "f0"), 0);
+        assert_eq!(slot("o", "f2"), 2);
+        // `a` is a root app class (base 0)
+        assert_eq!(slot("a", "appA"), 0);
+        assert_eq!(slot("a", "appB"), 1);
+        // `Game` inherits a's 2 fields → base 2
+        assert_eq!(slot("Game", "g"), 2);
+        // `d`/`e` inherit o's 3 fields → base 3 (siblings share the base)
+        assert_eq!(slot("d", "d0"), 3);
+        assert_eq!(slot("d", "d1"), 4);
+        assert_eq!(slot("e", "e0"), 3);
+    }
+
+    /// Reserved-slot-0 two-level dispatch (cp15): install writes ref `r` at
+    /// `physical_vtable_slot(r)`; the AOT reads `vtable[virtual_method_offsets[r] + 1]`
+    /// with `virtual_method_offsets[r] = r`. The two must coincide for every ref, never
+    /// touch slot 0, and never collide.
+    #[test]
+    fn vtable_reserved_slot_zero() {
+        assert_eq!(physical_vtable_slot(0), 1);
+        let mut seen = BTreeSet::new();
+        for r in 0..VTABLE_REFS {
+            let install = physical_vtable_slot(r);
+            let dispatch = r + 1; // vtable[offset[r] + 1], offset[r] = r
+            assert_eq!(install, dispatch, "ref {r}: install/dispatch slot mismatch");
+            assert!(install >= 1, "ref {r} must not use reserved slot 0");
+            assert!(seen.insert(install), "ref {r} collides on physical slot {install}");
+        }
+    }
+
+    /// Per-class override vtables: the AOT direct-dispatches a few `java/lang` classes
+    /// at hardcoded PHYSICAL slots (reserved slot already baked in).
+    #[test]
+    fn per_class_override_slots() {
+        assert_eq!(
+            known_java_lang_vtable("java/lang/Runtime"),
+            [(13u32, "freeMemory", "()J"), (14u32, "gc", "()V")].as_slice()
+        );
+        assert_eq!(known_java_lang_vtable("java/lang/Thread"), [(11u32, "start", "()V")].as_slice());
+        let sb = known_java_lang_vtable("java/lang/StringBuffer");
+        assert!(sb.iter().any(|&(i, n, _)| i == 5 && n == "toString"));
+        assert!(sb.iter().any(|&(i, n, _)| i == 19 && n == "append"));
+        // unknown classes get no override (they use the global identity vtable)
+        assert!(known_java_lang_vtable("java/lang/Object").is_empty());
+        assert!(known_java_lang_vtable("Game").is_empty());
+    }
 }

@@ -187,3 +187,161 @@ pub fn parse_native_class_from_handle(core: &ArmCore, handle: u32) -> Result<Lgt
     let header = read_generic::<u32, _>(core, handle + 8)?;
     parse_native_class(core, header)
 }
+
+#[cfg(test)]
+mod tests {
+    use wie_core_arm::ArmCore;
+    use wie_util::{ByteWrite, Result, write_generic};
+
+    use super::{parse_native_class, parse_native_class_from_handle};
+
+    // BattleMonster `.text` bounds (0x1000..0xe7800); method code pointers must fall
+    // inside this range — the 283/283 in-`.text` invariant, here on a synthetic class.
+    const TEXT_START: u32 = 0x1000;
+    const TEXT_END: u32 = 0xe7800;
+
+    /// Bump-allocating writer over a mapped guest region, for hand-encoding the ez-i
+    /// class-descriptor byte format the parser consumes.
+    struct Mem {
+        core: ArmCore,
+        cur: u32,
+    }
+
+    impl Mem {
+        fn new() -> Result<Self> {
+            let mut core = ArmCore::new(false, None)?;
+            core.map(0x40000000, 0x4000)?;
+            Ok(Self { core, cur: 0x40000000 })
+        }
+        fn align(&mut self) {
+            self.cur = (self.cur + 3) & !3;
+        }
+        fn cstr(&mut self, s: &str) -> Result<u32> {
+            self.align();
+            let at = self.cur;
+            let mut bytes = s.as_bytes().to_vec();
+            bytes.push(0);
+            self.core.write_bytes(at, &bytes)?;
+            self.cur += bytes.len() as u32;
+            Ok(at)
+        }
+        fn words(&mut self, ws: &[u32]) -> Result<u32> {
+            self.align();
+            let at = self.cur;
+            for (i, w) in ws.iter().enumerate() {
+                write_generic(&mut self.core, at + i as u32 * 4, *w)?;
+            }
+            self.cur += ws.len() as u32 * 4;
+            Ok(at)
+        }
+        /// Zeroed 0x40-byte class header; caller patches the meaningful offsets.
+        fn header(&mut self) -> Result<u32> {
+            self.words(&[0u32; 16])
+        }
+        fn put(&mut self, base: u32, off: u32, val: u32) -> Result<()> {
+            write_generic(&mut self.core, base + off, val)
+        }
+    }
+
+    /// Parse a hand-encoded class descriptor and assert every header offset, the 28B
+    /// method / 20B field record strides, the in-`.text` code-pointer invariant, class
+    /// handle indirection (`from_handle`), and a parent declared via another class's
+    /// handle (`d` → `o`).
+    #[test]
+    fn parse_descriptor_fixture() -> Result<()> {
+        let mut m = Mem::new()?;
+
+        // strings
+        let name_o = m.cstr("o")?;
+        let card = m.cstr("org/kwis/msp/lcdui/Card")?;
+        let pn = m.cstr("paint")?;
+        let ps = m.cstr("(Lorg/kwis/msp/lcdui/Graphics;)V")?;
+        let un = m.cstr("update")?;
+        let us = m.cstr("(I)V")?;
+        let f0n = m.cstr("hp")?;
+        let f0t = m.cstr("I")?;
+        let f1n = m.cstr("mp")?;
+        let f1t = m.cstr("I")?;
+        let name_d = m.cstr("d")?;
+
+        // method table: count=2, two 28-byte records
+        //   [ptr_class, ptr_name, ptr_sig, access, num_locals, code_ptr, unk]
+        let mtable = m.words(&[
+            2, //
+            0, pn, ps, 0x1, 3, 0x1f10, 0, //
+            0, un, us, 0x1, 1, 0x2200, 0,
+        ])?;
+        // field table: count=2, two 20-byte records
+        //   [ptr_class, ptr_name, ptr_type, access, index]
+        let ftable = m.words(&[
+            2, //
+            0, f0n, f0t, 0x1, 0, //
+            0, f1n, f1t, 0x1, 1,
+        ])?;
+
+        // class `o` header (parent = platform cstring "Card")
+        let header_o = m.header()?;
+        m.put(header_o, 0x00, 0x21)?; // tag
+        m.put(header_o, 0x08, name_o)?;
+        m.put(header_o, 0x10, card)?; // parent: cstring
+        m.put(header_o, 0x18, 0x20021)?; // access (| 0x20000 app marker)
+        m.put(header_o, 0x38, mtable)?;
+        m.put(header_o, 0x3c, ftable)?;
+
+        // class handle: { 0, 0, header }
+        let handle_o = m.words(&[0, 0, header_o])?;
+
+        // class `d` header (parent = the HANDLE of `o`, not a cstring)
+        let empty_tbl = m.words(&[0])?; // count=0
+        let header_d = m.header()?;
+        m.put(header_d, 0x00, 0x21)?;
+        m.put(header_d, 0x08, name_d)?;
+        m.put(header_d, 0x10, handle_o)?; // parent: app-class handle
+        m.put(header_d, 0x38, empty_tbl)?;
+        m.put(header_d, 0x3c, empty_tbl)?;
+
+        // --- assertions: header offsets + record strides ---
+        let o = parse_native_class(&m.core, header_o)?;
+        assert_eq!(o.tag, 0x21);
+        assert_eq!(o.name, "o");
+        assert_eq!(o.parent_name.as_deref(), Some("org/kwis/msp/lcdui/Card"));
+        assert_eq!(o.access_flags, 0x20021);
+        assert_eq!(o.methods.len(), 2);
+        assert_eq!(o.methods[0].name, "paint");
+        assert_eq!(o.methods[0].signature, "(Lorg/kwis/msp/lcdui/Graphics;)V");
+        assert_eq!(o.methods[0].num_locals, 3);
+        assert_eq!(o.methods[0].code_ptr, 0x1f10);
+        assert_eq!(o.methods[1].name, "update");
+        assert_eq!(o.methods[1].signature, "(I)V");
+        assert_eq!(o.methods[1].code_ptr, 0x2200);
+        assert_eq!(o.fields.len(), 2);
+        assert_eq!(o.fields[0].name, "hp");
+        assert_eq!(o.fields[0].type_descriptor, "I");
+        assert_eq!(o.fields[0].index, 0);
+        assert_eq!(o.fields[1].name, "mp");
+        assert_eq!(o.fields[1].index, 1);
+
+        // invariant: every method's native entry lies inside `.text`
+        for mth in &o.methods {
+            assert!(
+                (TEXT_START..TEXT_END).contains(&mth.code_ptr),
+                "method {} code_ptr {:#x} outside .text",
+                mth.name,
+                mth.code_ptr
+            );
+        }
+
+        // class handle indirection resolves to the same class
+        let via_handle = parse_native_class_from_handle(&m.core, handle_o)?;
+        assert_eq!(via_handle.name, "o");
+        assert_eq!(via_handle.methods.len(), 2);
+
+        // parent declared via another class's handle resolves to its name
+        let d = parse_native_class(&m.core, header_d)?;
+        assert_eq!(d.name, "d");
+        assert_eq!(d.parent_name.as_deref(), Some("o"));
+        assert_eq!(d.methods.len(), 0);
+
+        Ok(())
+    }
+}
