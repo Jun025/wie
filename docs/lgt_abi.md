@@ -343,6 +343,24 @@ per-frame tick. That tick is the ez-i runtime's job — the same missing piece b
 So **field unification (§5) and "find the live instance" are *not* fixes** for the title
 render; the one missing thing remains the ez-i per-frame drive.
 
+**cp28 — force `o.g = 1`: the render path works end-to-end (experiment, reverted).**
+A one-shot surgical probe pushed the `o`-singleton into wie's tick (cp26 wiring) and
+wrote `1` into its gate slot (`[obj+8][+0x18]`, the `o.g` cp27 traced). Result:
+`o.paint` **passed the early-out and drew on the back-buffer** — 39 real draw calls
+(**21× `Graphics.setColor`, 18× `Graphics.fillRect`**) through wie's standard paint
+event (`Display.handlePaintEvent → CardCanvas.handlePaintEvent(Graphics) → o.paint`),
+which presents the buffer to the screen. This **proves `o.g` is the genuine render gate
+and the whole render path (gate → `o.paint` → `Graphics` → back-buffer → flush) works**;
+the only thing missing for those draws is *setting `o.g`* (i.e. running the virtual
+`o.k()V`, i.e. the ez-i per-frame drive).
+Caveat: `o.paint` did not run to completion — after the 39 draws it hit a *separate*
+`NoSuchMethodError: java/lang/String.e()V` (a later call where an app object is
+mis-bound as a `java/lang/String` — an unrelated vtable/binding gap, **not** a second
+empty-state field gate; draws did occur). The draws are background/box fills
+(`fillRect`), not yet the title sprite/text (`drawImage`/`drawString`), consistent with
+`o.paint` aborting partway. Experiment reverted (force-g=1 is a test hook, not a fix);
+only the finding is recorded.
+
 ### The single missing answer (for the maintainer)
 
 > In ez-i, when an app `new`s a bare native object and hands it to platform import
@@ -356,6 +374,12 @@ With that, the connection is: on each wie paint tick, invoke the registered obje
 per-frame entry with a Graphics, then map its flush to wie's `present`/screen blit —
 all from the `wie_lgt` / `LgtJvmShared` side, without touching shared classes.
 
+cp28 narrows what this drive must accomplish: wie's paint→`Graphics`→back-buffer→flush
+path already works (forcing one gate flag made `o.paint` draw to screen). The missing
+piece is purely **advancing the game state machine each frame** — running the virtual
+state-update methods (e.g. `o.k()V`) that set the per-card render flags like `o.g`,
+which is exactly what the ez-i per-frame entry above would do.
+
 ---
 
 ## 8. Current reach
@@ -368,5 +392,6 @@ all from the `wie_lgt` / `LgtJvmShared` side, without touching shared classes.
 | `getInstance` singletons, `Thread.start`, game thread spawns `a.run` | ✅ |
 | data load → 240×320 back-buffer → `getGraphics` → Cards/RNG | ✅ |
 | app `Card.paint` ticked in wie's loop (cp26 experiment) | ◑ wires in & runs per-frame, but `o.paint` gates on `o.g` which its (never-run) virtual `o.k()V` writer would set → **0 draws** (cp27, §7) |
+| render path with `o.g` forced to 1 (cp28 experiment) | ✅ `o.paint` draws (21× setColor, 18× fillRect) to back-buffer + flushes → **render path works end-to-end**; only "set `o.g`" (ez-i per-frame drive) is missing (§7) |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
