@@ -490,9 +490,28 @@ all from the `wie_lgt` / `LgtJvmShared` side, without touching shared classes.
 
 cp28 narrows what this drive must accomplish: wie's paint→`Graphics`→back-buffer→flush
 path already works (forcing one gate flag made `o.paint` draw to screen). The missing
-piece is purely **advancing the game state machine each frame** — running the virtual
-state-update methods (e.g. `o.k()V`) that set the per-card render flags like `o.g`,
-which is exactly what the ez-i per-frame entry above would do.
+piece is purely **advancing the game state machine each frame** so the per-card render
+flags like `o.g` get set.
+
+**cp36 — driving the state methods from wie does NOT substitute for the ez-i tick
+(confirmed).** Tested whether wie can just call the state-advance methods each frame
+instead of the ez-i runtime:
+- *Correction to cp27:* the `o.g` writer is **not** the registered virtual `o.k()V`.
+  `o.k @0xda7f8` is a short method (returns at `0xda85c`, no `+0x18`/`o.g` store) — it
+  copies a singleton field. The real `o.g` writer is an **unregistered helper
+  `@0xda870`** (not in any class's method table): `getInstance(o)` → reset `o.g=0` (and
+  siblings) → conditionally `o.g=1` at `0xdb240`.
+- *Experiment (reverted):* drove both, 3× each, reading `o.g` after each call. `o.k()`
+  (JVM `invoke_virtual`) → `o.g` stays `0`. `fn@0xda870` (native `run_function`) → `o.g`
+  stays `0` too: the helper runs and resets `o.g=0`, but its conditional `o.g=1` branch
+  (`0xdb240`) is **not taken** — that branch depends on accumulated game state
+  (load-complete / timer / input / card-transition), not satisfiable by calling the
+  method in isolation.
+- *Conclusion:* **a single JVM/native method drive cannot advance the state** — `o.g=1`
+  needs the whole game loop's accumulated conditions, which is exactly the ez-i per-frame
+  drive. So substituting wie method-calls for the ez-i tick is ruled out; the §7 entry
+  (the real per-frame driver the ez-i runtime invokes) is the single remaining gate, the
+  same one that gates the live render state, `o.g`, and the font load. Maintainer path.
 
 ---
 
@@ -513,5 +532,6 @@ which is exactly what the ez-i per-frame entry above would do.
 | glyph-draw fn runs; no font image (cp33) | ◑ `@0x109b4` is called per char but takes its `r6==0` (no font image) path → `import 0x22` no-op, **0 drawImage**. Root cause: bitmap-font sheet absent guest-side |
 | glyph blit mechanism RE'd (cp34) | ◑ blit = `g.drawImage(sheet, src_x=(char-0x21)*10, w=10)`; font path via `import 0x22(a0=font_img, a1=0x11264→fn 0x10fb0)` |
 | font path resolved → platform-gated (cp35) | ⛔ probe: `r6=g` (not the font img — cp33/4 corrected); font img = `0x22` a0 = **0** every char; `0x10fb0` = strb bookkeeping (no draw); **no font `createImage`** in the reachable run (only the 240×320 back-buffer). Font load/native render is §7-gated, not an app one-liner |
+| wie can't substitute the ez-i tick (cp36) | ⛔ `o.k()` (registered) and `fn@0xda870` (real `o.g` writer, unregistered) both driven from wie → `o.g` stays 0: the `o.g=1` branch needs accumulated game state, not a single method call. §7 ez-i per-frame drive is the sole remaining gate |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
