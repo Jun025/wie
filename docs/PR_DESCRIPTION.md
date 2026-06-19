@@ -33,6 +33,13 @@ The PoC keeps everything LGT-specific in `LgtJvmShared` (per #1232); shared
 - **Object model**: native `new` primitive (stdlib `0x32` / java `0xf`) +
   `<init>`-trampoline binding to JVM instances, `getInstance` singletons
   (java-interface `0xc`), and the native String factory (`0x9`).
+- **Unit tests** (`cargo test -p wie_lgt`, 4 tests): the descriptor parser against a
+  hand-encoded fixture (header offsets, 28/20-byte record strides, in-`.text`
+  code-pointer invariant, handle indirection); the reserved-slot-0 vtable model
+  (install slot == dispatch slot for every ref, no slot-0 use, no collisions) and the
+  per-class override slots; and the inheritance-aware field layout on a known
+  hierarchy. Two pure helpers (`physical_vtable_slot`, `compute_field_layouts`) were
+  extracted to make the core invariants testable without a live app.
 - **Docs**: `docs/lgt_abi.md` (consolidated, reverse-engineered ABI) and
   `docs/lgt_native_classes.md` (descriptor byte layout).
 
@@ -74,7 +81,8 @@ tick — no shared-class changes needed. PoC `LgtJvmShared` stays LGT-specific (
 
 ## Verification
 
+- `cargo test -p wie_lgt` — **4 passed** (descriptor parser, vtable model, field layout).
 - `cargo test -p wie_ktf test_helloworld` (clet regression) — **pass**.
-- `cargo clippy -p wie_lgt` — **clean**.
+- `cargo clippy --workspace --tests` — **clean**.
 - `cargo build --workspace` — **builds**.
 - Diff contains no ROMs / logs / `.DS_Store` / local task notes (`.gitignore` updated).

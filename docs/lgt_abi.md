@@ -205,6 +205,13 @@ declared index `+0x10` (all 150 reference-app fields matched after fixing an ini
   Must be stable across calls/threads (per-class state like `a.run`'s run-flag at
   `obj+0x20` is shared through it — cp20).
 
+> Roadmap — field unification: an `LgtClassInstance`'s JVM-side fields and the guest
+> field array at `guest_ptr` are currently separate stores. They should be unified so a
+> field written by ARM code and the same field read via the JVM agree, by mapping each
+> JVM field through the `field_offsets` slot map onto the guest array. Not yet needed:
+> for the current reach (boot + setup) no field is written on one side and read on the
+> other.
+
 ---
 
 ## 6. java-interface import table (status)

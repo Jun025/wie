@@ -187,7 +187,6 @@ impl LgtJvmShared {
             // app class: reuse the native guest block as the instance backing.
             Box::new(LgtClassInstance {
                 guest_ptr,
-                core: lgt.inner.core.clone(),
                 definition: lgt.clone(),
                 jvm_fields: Arc::new(Mutex::new(BTreeMap::new())),
             })
@@ -380,7 +379,6 @@ impl ClassDefinition for LgtClassDefinition {
 
         let instance = LgtClassInstance {
             guest_ptr: ptr_raw,
-            core,
             definition: self.clone(),
             jvm_fields: Arc::new(Mutex::new(BTreeMap::new())),
         };
@@ -438,15 +436,11 @@ impl ClassDefinition for LgtClassDefinition {
 #[derive(Clone)]
 pub struct LgtClassInstance {
     guest_ptr: u32,
-    // Held for the planned field-unification step (reading/writing the guest field
-    // array directly); not yet read — see the `jvm_fields` note below.
-    #[allow(dead_code)]
-    core: ArmCore,
     definition: LgtClassDefinition,
-    // JVM-side field storage. TODO: unify with the guest field array (at `guest_ptr`,
-    // via the `field_offsets` slot map) so native-written and JVM-read fields agree.
-    // Until then, fields written by ARM code and fields written via the JVM diverge;
-    // for the current reach (boot + setup) the two paths don't alias the same field.
+    // JVM-side field storage. Not yet unified with the guest field array at
+    // `guest_ptr` (see `docs/lgt_abi.md` §5): fields written by ARM code and via the
+    // JVM currently live in separate stores. For the current reach (boot + setup) the
+    // two paths don't alias the same field, so this hasn't surfaced.
     jvm_fields: Arc<Mutex<BTreeMap<String, JavaValue>>>,
 }
 
