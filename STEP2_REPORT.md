@@ -21,11 +21,67 @@ Goal: run the AOT-compiled LGT app (BattleMonster `00025C2B`) on wie's JVM, towa
 | cp12: P3 re-attack — import thunks decoded, `r8` is an app object w/ compiled-away class | ⏹ |
 | cp13: static-type identification of `r8` — disproven (AOT slot reuse) | ⏹ |
 | cp14: forward-probe — `r8` non-critical; collisions gated by offset-table dispatch | ⏹ |
-| **cp15: reserved-slot-0 global vtable — offset-table off-by-one fixed; FULL BOOT + paint loop** | ✅ |
-| **cp16: post-boot diagnosis — data-load gated by uninitialised instance field_offsets** | ⏹ (next task) |
-| `paint`/title | ◑ paint LOOP runs (empty canvas); app card not pushed — see cp16 |
+| cp15: reserved-slot-0 global vtable — offset-table off-by-one fixed; FULL BOOT + paint loop | ✅ |
+| cp16: diagnosis — data-load gated by uninitialised instance field_offsets | ⏹ |
+| **cp17: inheritance-aware instance field_offsets — data load + 240×320 back-buffer run** | ✅ |
+| **cp18: Thread.start per-class slot + pending-new pass-through — game-loop thread spawns a.run()** | ✅ |
+| **cp19: diagnosis — a.run() returns early on class-`a` header run-flag (+0x20 == 0)** | ⏹ (next task) |
+| `paint`/title | ◑ boots fully, loads data, builds back-buffer, spawns loop thread; loop self-gates off |
 | clet (`test_helloworld`) | ✅ | clippy | ✅ |
 | clet (`test_helloworld`) | ✅ | clippy | ✅ |
+
+## Checkpoint 17–19 — data load, back-buffer, game thread; now at the run-flag
+
+A productive arc on top of cp15's full boot. Each step was an evidence-based,
+no-guess fix; the app now executes deep into its own startup.
+
+### cp17 — inheritance-aware instance `field_offsets` (data load + back-buffer)
+cp16's gate (`a.startApp`: `if (Game.field[field_offsets[148]] != 0) skip-setup`)
+was wrong because `field_offsets` was filled for static fields only, so every
+instance ref aliased slot 0. Fix: `register_app_classes` now computes each app
+class's instance-field object slots = **(app-ancestor field count) + declared
+index** (inherited-first flat guest layout; platform ancestors → 0, their fields
+live JVM-side) and stores them; `java_load_classes` segments the `fields` array
+(grouped by owning app class — verified offline: 150/150 matched, e.g. o's 11
+fields, then l's 56, …) and writes `field_offsets[k] = slot`. The gate now reads
+the real (null) `a.Display`, so the setup branch runs: **`Game.a()` data load
+executes** (StringBuffer filenames ×18) and the game **builds its 240×320
+back-buffer** (`Image.createImage(240,320)`).
+
+### cp18 — game-loop thread (Thread.start + r8 pass-through)
+`a.startApp` then spawns the loop thread; two direct-`vtable[N]` collisions:
+- **r8 back-buffer probe** (cp11/14): `i.<init>` does `r8 = new(); raw-init;
+  if(r8) r8.vtable[11]()` with the result discarded. r8 is a native-`new`'d app
+  object (class compiled away); slot 11 misroutes to `Graphics.getClipHeight`.
+  Pass it through (return 0), scoped to `pending_new` unbound objects (bound
+  platform calls never reach it) — the cp14-proven discarded probe.
+- **Thread.start** (P1 per-class slot): `t = new Thread(this); t.vtable[11]()`
+  then returns (result discarded; the Runnable is Jlet base `a`, `run()` = game
+  loop) ⇒ `vtable[11] = start()V`. Added to `known_java_lang_vtable`.
+
+Result: `Thread.start` spawns **`a.run()` (the game loop) on a thread** — confirmed
+dispatched (`native a.run()V code=0x1f10`).
+
+### cp19 — the run-flag (next task)
+`a.run()` body (`0x212c`): `obj = getInstance@0x1908(); if (obj.field[8] != 0)
+loop else return`. RE of `0x1908`/`0x18ac`: it returns **class `a`'s descriptor
+handle** `0x1400df4`, and the gate reads **`a`'s header word at +0x20** — a
+class-level "running"/state flag, not an instance field. It is **0**, so `a.run()`
+returns immediately and nothing renders. (Header `+0x20` is one of the descriptor
+words documented as "mostly zero" / unconfirmed — likely a class static the AOT
+stores in the header.) Next: find where this flag is set (a class-static write to
+`0x1400da8+0x20`) and why it has not happened — likely a static-field-storage path
+(the header-static mechanism, cf. cp17's instance-field work). Then `a.run()` enters
+its loop and should `pushCard` / draw the title.
+
+### Verified layout tables (cumulative, this arc)
+- Global vtable: method-ref `r` → physical slot `r+1`, `offset[r]=r`, dispatch
+  `vtable[offset[r]+1]` (reserved slot 0). Per-class overrides (physical/absolute):
+  Runtime `freeMemory@13, gc@14`; StringBuffer `toString@5, append(String)@19`;
+  **Thread `start@11`**.
+- Instance fields: object slot = app-ancestor field count + declared index
+  (inherited-first). e.g. Game object: `a`'s fields 0–3, Game's 4–8
+  (`a.Display`→0, Game's `e:Le;`→8).
 
 ## Checkpoint 16 — full boot achieved; next gate = instance field_offsets
 
