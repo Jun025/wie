@@ -88,6 +88,11 @@ pub struct LgtJvmShared {
     /// it to fill `field_offsets` for instance fields (de-aliasing the otherwise
     /// all-zero table — see STEP report cp17).
     app_field_layouts: Arc<Mutex<AppFieldLayouts>>,
+    /// `class descriptor handle -> singleton instance guest pointer`. The AOT's
+    /// `getInstance` (java-interface import `0xc`) returns the one canonical instance
+    /// of a class; it must be stable across calls (and threads) so per-class state
+    /// (e.g. the `a.run` run-flag) is shared. Lazily created + cached here.
+    singletons: Arc<Mutex<BTreeMap<u32, u32>>>,
 }
 
 impl LgtJvmShared {
@@ -101,7 +106,38 @@ impl LgtJvmShared {
             class_vtables: Arc::new(Mutex::new(BTreeMap::new())),
             pending_new: Arc::new(Mutex::new(BTreeSet::new())),
             app_field_layouts: Arc::new(Mutex::new(Vec::new())),
+            singletons: Arc::new(Mutex::new(BTreeMap::new())),
         }
+    }
+
+    /// java-interface import `0xc` (`getInstance`): return the canonical singleton
+    /// instance for the class identified by `class_handle` (`= class_header + 0x4c`).
+    /// Created once (a bound app instance with its guest field array) and cached, so
+    /// every `getInstance` call — across the main thread and spawned game-loop thread
+    /// — sees the same object and its per-class state (run-flag etc.). Returns 0 if
+    /// the class can't be resolved.
+    pub async fn singleton_instance(&self, core: &mut ArmCore, class_handle: u32) -> u32 {
+        if let Some(&p) = self.singletons.lock().get(&class_handle) {
+            return p;
+        }
+        let name = match super::native_class::parse_native_class_from_handle(core, class_handle) {
+            Ok(c) if !c.name.is_empty() => c.name,
+            _ => return 0,
+        };
+        let class = match self.jvm.resolve_class(&name).await {
+            Ok(c) => c,
+            Err(_) => return 0,
+        };
+        let instance = match class.definition.instantiate(&self.jvm).await {
+            Ok(i) => i,
+            Err(_) => return 0,
+        };
+        let guest_ptr = instance.as_any().downcast_ref::<LgtClassInstance>().map(|o| o.guest_ptr).unwrap_or(0);
+        if guest_ptr != 0 {
+            self.singletons.lock().insert(class_handle, guest_ptr);
+        }
+        tracing::trace!("LGT getInstance({class_handle:#x}) = {name} @ {guest_ptr:#x} (created)");
+        guest_ptr
     }
 
     fn register_instance(&self, guest_ptr: u32, instance: Box<dyn ClassInstance>) {
@@ -496,7 +532,6 @@ impl Method for LgtMethod {
             self.meta.code_ptr,
             params
         );
-
         let r0: u32 = match core.run_function(self.meta.code_ptr, &params).await {
             Ok(r) => r,
             Err(e) => {

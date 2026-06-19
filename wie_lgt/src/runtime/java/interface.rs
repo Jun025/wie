@@ -63,6 +63,14 @@ pub async fn handle_java_interface_svc(core: &mut ArmCore, shared: &mut LgtJvmSh
         // Confirmed by RE: `func@0x1834` reads `const[idx] = {len:u16, char[len]:u16}`
         // then calls this import to materialise the String passed to StringBuffer.append.
         i if i == STRING_FACTORY_INDEX => java_new_string(core, shared, a1, a2).await?,
+        // `getInstance`: return the singleton instance of the class whose descriptor
+        // handle is `a0`. The AOT's `getInstance` (`func@0x18ac`) calls this and
+        // dereferences the result as an object (`obj.field[..]`); it must be stable
+        // across calls/threads so per-class state (e.g. the `a.run` run-flag at
+        // `obj+0x20`) is shared. Identified cp20: `getInstance = import_0xc(class_handle,
+        // registry)`; left as a no-op it returned 0, so the run-flag was never shared
+        // and the game loop self-gated off.
+        i if i == GET_INSTANCE_INDEX => shared.singleton_instance(core, a0).await,
         _ => {
             tracing::debug!("LGT java-interface import {index:#x}({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x}) -> 0 (no-op)");
             0
@@ -79,6 +87,11 @@ pub async fn handle_java_interface_svc(core: &mut ArmCore, shared: &mut LgtJvmSh
 /// `0xe7512`,len 4 = "txt/"). `func@0x1834` reads `const[idx]={len,chars}` then calls
 /// this import to materialise the String.
 const STRING_FACTORY_INDEX: u32 = 0x9;
+
+/// java-interface import index of `getInstance(class_handle)` — returns a class's
+/// canonical singleton instance. Identified cp20 (the `func@0x18ac` getInstance path
+/// calls `import_0xc(class_handle, registry)` and dereferences the result).
+const GET_INSTANCE_INDEX: u32 = 0xc;
 
 /// Materialise a `java/lang/String` from `count` UTF-16 chars at guest `chars_ptr`,
 /// register it in the instance map behind a fresh guest proxy block, and return the
