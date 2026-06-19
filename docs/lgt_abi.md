@@ -410,13 +410,26 @@ always entered. And it **runs**: the loop body's `import 0x55` at `0x102d0` fire
 `lr=0x102dc` **30×** (3 frames × 10 chars), reading `data=0x49048000`, `len=10`, chars
 `0x4c='L'`… — i.e. `materialize_char_array` works end-to-end and the loop consumes
 "LOADING...". (`register_platform_object` readback confirmed `[obj+8]=data`, `[data]=10`.)
-What's missing is **glyph drawing**: the ASCII char path reaches the glyph-draw call at
-`0x1040c` (→ fn `@0x109b4`) **0×** — each char is read but never drawn, so no
-`drawImage`/`drawChar` is issued and the text stays invisible. *cp33 target (one line):*
-trace the per-char glyph path in the draw helper (`0x102dc` → range branches at
-`0x10300`/`0x10378`/`0x103dc`, gated on `fp[4]`/`fp[8]` = the helper's x/clip args) to
-find why ASCII chars skip the glyph-draw fn `@0x109b4` — a font/glyph render gap, not
-char-array.
+What's missing is **glyph drawing**, traced in cp33 below.
+
+**cp33 — the glyph-draw fn runs but has no font image (platform/font gap).** The
+glyph-draw fn `@0x109b4` *is* called per char (each char's `0xb(a1=char, a2=x)` lookup
+then the fn's body fire). It branches on its first arg `r6` (the font image): at
+`0x10b1c cmp r6,#0; 0x10b2c bne 0x10b44`, `r6 != 0` → `r6.vtable[r2]()` (the blit /
+drawImage), `r6 == 0` → `import 0x22` (a no-op fallback). Measured: every char takes the
+**`r6 == 0`** path — `import 0x22` fires at `lr=0x10b40` once per char — so **no
+drawImage is ever issued**. (The earlier `getColor`/clip branches are *not* the skip;
+they all reach the glyph fn.) Root cause **(C): the font glyph image is absent** (`r6 ==
+0`) — the bitmap-font sheet the AOT expects to blit each glyph from is not present
+guest-side, so the draw falls back to a no-op. char data is correct ("LOADING..." is
+read); the glyphs just have no font to draw from.
+
+This is a font/image-marshalling task (its own checkpoint), not a one-liner. *cp34
+target (one line):* find where the AOT loads the bitmap-font sheet (the `r6` image —
+likely a `createImage`/`getResource` of one of the 18 `.dat`s) and marshal it
+guest-readable so `r6 != 0` and the glyph blit (`r6.vtable[r2]`) runs — or, if the glyph
+path is the native `import 0x22` blit itself, RE and implement `0x22`. Either is an
+image/font subsystem, kept in `wie_lgt`, no shared-class change.
 
 ### The single missing answer (for the maintainer)
 
@@ -452,6 +465,7 @@ which is exactly what the ez-i per-frame entry above would do.
 | render path with `o.g` forced to 1 (cp28 experiment) | ✅ `o.paint` draws (21× setColor, 18× fillRect) to back-buffer + flushes → **render path works end-to-end**; only "set `o.g`" (ez-i per-frame drive) is missing (§7) |
 | `java/lang/String` slot 35 = `toCharArray()[C` (cp30) | ✅ per-class override added; `String.e` abort gone, `o.paint` runs without fatal. Title text still blocked on char-array guest marshalling (cp31) |
 | char-array guest marshalling (cp31) | ✅ `materialize_char_array` → `{u32 len, u16 chars}` at `[arr+8]` (RE'd, unit-tested; `len=10 "LOADING..."`) |
-| glyph loop runs, consumes chars (cp32) | ✅ confirmed: loop runs 30× (3 frames × 10 chars), reads "LOADING..."; the `0x10298` "gate" is just `getColor` (both paths fall through). Text still invisible: per-char glyph-draw fn @0x109b4 called 0× (cp33) |
+| glyph loop runs, consumes chars (cp32) | ✅ confirmed: loop runs 30× (3 frames × 10 chars), reads "LOADING..."; the `0x10298` "gate" is just `getColor` (both paths fall through) |
+| glyph-draw fn runs; no font image (cp33) | ◑ `@0x109b4` is called per char but takes its `r6==0` (no font image) path → `import 0x22` no-op, **0 drawImage**. Root cause: bitmap-font sheet absent guest-side. Font/image marshalling = cp34 |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
