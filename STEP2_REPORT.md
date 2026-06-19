@@ -28,10 +28,72 @@ Goal: run the AOT-compiled LGT app (BattleMonster `00025C2B`) on wie's JVM, towa
 | cp19: diagnosis — a.run() returns early on `getInstance(a)` run-flag (no-op import) | ⏹ |
 | cp20: implement `getInstance` (java-interface `0xc`) singletons — a.run enters loop + back-buffer Graphics | ✅ |
 | cp21: diagnosis — a.run is a one-shot; render gated by AOT-runtime import substrate | ⏹ |
-| **cp22: substrate RE — no draws anywhere; imports overloaded/stack-ptr args, resist single-shot RE (STOP D, stuck)** | ⏹ |
+| cp22: substrate RE — no draws anywhere; imports overloaded/stack-ptr args | ⏹ |
+| **cp23: dispatcher/driver RE — running carried code is inert; driver = unbound obj via 0x57; tick needs ez-i lifecycle (STOP)** | ⏹ |
 | `paint`/title | ◑ full setup (data, back-buffer, getGraphics, Cards, RNG); render driver never starts → zero draw calls |
 | clet (`test_helloworld`) | ✅ | clippy | ✅ |
 | clet (`test_helloworld`) | ✅ | clippy | ✅ |
+
+## Checkpoint 23 — driver RE: carried-code is inert; tick needs ez-i lifecycle (STOP)
+
+New angle per the directive: RE the import dispatcher + identify/bind the render
+driver object, and connect it to wie's tick.
+
+### Experiment: running the carried code (0x55/0x56/0x57) is inert
+The strongest evidence-based lead was that `0x55/0x56/0x57` carry `code@0x1ad4`
+(`→0x1a24`, the a-singleton state initialiser) — clearly executable `.text` meant to
+run. Implemented `0x55/0x56/0x57` to **run `a1` as code** (with `a0` as `this`) when
+`a1 ∈ .text` (else no-op; this cleanly skips `i.Q`'s `0x55(0,4,8)` and
+`0x57(this,obj,this)` where `a1` is an int/object). Result: `code@0x1a24` ran 3×, **no
+crash, no regression (clet ✓), and ZERO new activity — no draw calls, no new platform
+calls.** So running the carried code is **not** the render trigger; reverted (an inert
+heuristic is not a fix).
+
+### The render driver is the unbound object registered via `0x57(this, obj, this)`
+`a.run` allocates `obj` with `stdlib 0x32` (a raw `pending_new` block — **never
+`<init>`'d**, so unbound/classless), then `0x57(this, obj, this)` + `0x21(obj, 0, sp)`,
+then returns. `0x21`'s stack-ptr arg marks it GC-ish (no-op-safe). **`0x57(this, obj,
+this)` is the driver registration** — but `obj` has no class and `0x57`'s semantics
+(what it registers `obj` *as*, and what per-frame method it expects) are not derivable
+from the call site, and `0x57` is itself overloaded (`(this, code, 0)` vs `(this, obj,
+this)`).
+
+### Dispatcher RE is a dead end for semantics
+The `bl 0xe31a8` thunks dispatch via `blx 0xe31d8` — **Thumb** code; and regardless,
+the dispatcher only *routes* to the resolved stub (the calling convention), it does not
+encode the platform-side *semantics* of each import. So dispatcher RE cannot yield what
+`0x57`/`0x55`/`0x56` mean — that is ez-i platform behaviour.
+
+### Why STOP — the precise maintainer question
+The app finishes ALL setup (data, 240×320 back-buffer, `getGraphics`, Cards, RNG,
+annunciator) and registers a render-driver object, but **no per-frame mechanism ever
+invokes it** (no `pushCard`, no timer, no second thread, no draw). Connecting it safely
+needs **ez-i WIPI lifecycle knowledge** that cannot be RE'd from the app alone:
+
+> **How does ez-i WIPI tick the per-frame render driver for a java-interface Jlet
+> that does NOT use `pushCard` and instead blits a 240×320 back-buffer to screen?**
+> Specifically: java-interface import **`0x57(this, obj, this)`** registers an unbound
+> native object `obj` (from `stdlib 0x32`) as the driver — what is `obj`'s role
+> (Timer? render thread? repaint callback?), what per-frame method does the platform
+> invoke on it, and how should that be hooked into wie's MIDP event loop
+> (`getNextEvent`/`dispatchEvent`) so it draws to the back-buffer Graphics and blits?
+> (Secondary: `0x55(obj, code, 0)`/`0x56(this, code, 0)` carrying `code@0x1a24` —
+> run-now vs register-as-handler? Running it proved inert.)
+
+Per the directive (don't spin on a 3rd diagnosis-only pass), STOP here with this
+question. Everything up to the driver tick is solved and committed (cp15–cp20).
+
+### Cumulative layout tables (vtable / fields / imports)
+- **Global vtable**: method-ref `r` → physical slot `r+1`; `offset[r]=r`; dispatch
+  `vtable[offset[r]+1]` (reserved slot 0). Per-class overrides (physical): Runtime
+  `freeMemory@13,gc@14`; StringBuffer `toString@5,append(String)@19`; Thread `start@11`.
+- **Instance fields**: object slot = app-ancestor field count + declared index
+  (inherited-first), filled via per-class segmentation of the `fields` array (150/150).
+- **java-interface imports**: implemented — `0x9`=String factory, `0xc`=getInstance
+  (singletons), `0xf`=native new, `0x54`=method-entry helper (no-op). Identified
+  no-op-safe — `0x12/0x1f/0x21/0x22` (GC/safepoint/exception-frame: stack-ptr/obj/count
+  args). **Unresolved (needs ez-i lifecycle)** — `0x55/0x56` (carry code; run inert),
+  **`0x57`** (driver-object registration), and the per-frame tick.
 
 ## Checkpoint 22 — substrate RE: no draws; imports resist single-shot RE (STOP D, stuck)
 
