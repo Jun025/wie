@@ -25,10 +25,43 @@ Goal: run the AOT-compiled LGT app (BattleMonster `00025C2B`) on wie's JVM, towa
 | cp16: diagnosis — data-load gated by uninitialised instance field_offsets | ⏹ |
 | **cp17: inheritance-aware instance field_offsets — data load + 240×320 back-buffer run** | ✅ |
 | **cp18: Thread.start per-class slot + pending-new pass-through — game-loop thread spawns a.run()** | ✅ |
-| **cp19: diagnosis — a.run() returns early on class-`a` header run-flag (+0x20 == 0)** | ⏹ (next task) |
-| `paint`/title | ◑ boots fully, loads data, builds back-buffer, spawns loop thread; loop self-gates off |
+| cp19: diagnosis — a.run() returns early on `getInstance(a)` run-flag (no-op import) | ⏹ |
+| **cp20: implement `getInstance` (java-interface `0xc`) singletons — a.run enters loop + back-buffer Graphics** | ✅ |
+| `paint`/title | ◑ boots, data, back-buffer, loop thread enters loop + `getGraphics`; loop exits ~1 iter on imports 0x55/0x56/0x57 |
 | clet (`test_helloworld`) | ✅ | clippy | ✅ |
 | clet (`test_helloworld`) | ✅ | clippy | ✅ |
+
+## Checkpoint 20 — getInstance singletons; a.run enters its loop
+
+cp19's run-gate is `a.run: obj = getInstance(a); if (obj.field[8] != 0) loop`.
+RE of `getInstance` (`func@0x1908` → `func@0x18ac`): it is **java-interface import
+`0xc`** — `import_0xc(class_handle, registry)` returns the class's canonical
+singleton instance, which the AOT dereferences (`obj.field[..]`). Left as a no-op it
+returned **0**, so every `getInstance` produced an inconsistent phantom: `a.startApp`
+wrote the run-flag into one, `a.run` read another → flag always 0 → loop self-gated
+off. (Memory IS shared across the spawned thread — confirmed: `a.Display` written on
+the main thread is visible to `a.run`.)
+
+### Fix (P2/P5)
+`import 0xc = singleton_instance(class_handle)` now returns a **stable, cached**
+instance per class descriptor handle — lazily instantiated as a bound app object
+(with its guest field array), shared via `LgtJvmShared.singletons` across threads.
+
+### Verified
+- `getInstance(a-handle 0x1400df4)` → stable `a` singleton `@0x48840020`.
+- `a.startApp` writes its `field[8] = 0x48840010` (the Game instance); `a.run` reads
+  the **same** `field[8]` (non-zero) → **enters the game loop** (`0x1f38`).
+- The loop obtains the back-buffer Graphics (`Image.getGraphics()`).
+
+### Next (cp21) — the game loop's imports
+`a.run`'s loop body (`0x1f38`) calls java-interface imports **`0x55`, `0x56`,
+`0x57`** (new), plus `0x1f/0x12/0x20/0x21/0x22` and app fns `0xe2c50`/`0x235c`. They
+are no-op stubs; the loop runs **~1 iteration then exits** (not spinning — each of
+0x55/56/57 fires 1–2×). Args: `0x55(a-singleton, code@0x1ad4, 0)`,
+`0x56(this, code@0x1ad4, 0)`, `0x57(this, obj, this)` — shaped like
+register-callback / monitor / event-poll primitives. Identify 0x55–0x57 (and whether
+`func@0xe2c50` is the per-frame render/update gated by them), implement per P2, so the
+loop iterates and renders → `pushCard` + `drawImage` → the title.
 
 ## Checkpoint 17–19 — data load, back-buffer, game thread; now at the run-flag
 
