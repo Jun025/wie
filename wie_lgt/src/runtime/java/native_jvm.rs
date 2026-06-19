@@ -573,10 +573,28 @@ pub async fn handle_java_trampoline(core: &mut ArmCore, shared: &mut LgtJvmShare
     }
     if this.is_none() && !is_static && entry.name != "<init>" && this_raw != 0 {
         let pending = shared.pending_new.lock().contains(&this_raw);
+        // A native-`new`'d object (`pending_new`) that was initialised by raw native
+        // code (no platform `<init>` trampoline) and is now the target of a DIRECT
+        // hardcoded `vtable[N]` call. Its class is compiled away (cp12/13), so the
+        // global by-name vtable misroutes slot N to a foreign platform method (here
+        // Graphics.getClip*). RE proved (cp14) the result is DISCARDED at this call
+        // pattern (`bx ip` then `ldr r0,[fp,#-0x2c]` overwrites it) — i.e. a no-op
+        // probe. Pass it through (return 0) instead of NPE-ing, per the autopilot's
+        // r8 pass-through rule. Scoped to `pending_new` so genuinely-bound platform
+        // calls (which need a real value, e.g. layout getHeight) never reach here.
+        if pending {
+            tracing::debug!(
+                "LGT pending-new probe {}.{} this={this_raw:#x} lr={lr:#x} -> 0 (discarded, cp14)",
+                entry.class_name,
+                entry.name
+            );
+            core.set_next_pc(lr)?;
+            return Ok(0);
+        }
         let vt = read_generic::<u32, _>(core, this_raw).unwrap_or(0);
         let global = *shared.vmethod_table.lock();
         tracing::warn!(
-            "LGT UNBOUND this for {}.{}{}: this_raw={this_raw:#x} pending_new={pending} vtable_word={vt:#x} (global={global:#x}) lr={lr:#x}",
+            "LGT UNBOUND this for {}.{}{}: this_raw={this_raw:#x} vtable_word={vt:#x} (global={global:#x}) lr={lr:#x}",
             entry.class_name,
             entry.name,
             entry.descriptor
@@ -699,6 +717,12 @@ fn known_java_lang_vtable(class: &str) -> &'static [(u32, &'static str, &'static
             (5, "toString", "()Ljava/lang/String;"),
             (19, "append", "(Ljava/lang/String;)Ljava/lang/StringBuffer;"),
         ],
+        // cp18: a.startApp tail does `t = new Thread(this); t.<11>()` then returns
+        // (the call's result is discarded; the Runnable is the Jlet base `a`, whose
+        // `run()` is the game loop). vtable[11] (offset 0x2c) on a freshly-constructed
+        // Thread, result unused => `start()V`. Behaviour-confirmed (Thread spawns the
+        // Runnable). Thread declares 0 imported virtuals, so it needs this per-class slot.
+        "java/lang/Thread" => &[(11, "start", "()V")],
         _ => &[],
     }
 }
