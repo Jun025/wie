@@ -398,15 +398,25 @@ layout RE'd above. Behaviour-confirmed: the `[C` return is materialised, and the
 is correct (logged `char[] len=10 text="LOADING..."`; unit-tested via
 `write_char_array_block`).
 
-*Still no title text* — but not for lack of chars: the draw-text helper `@0x10228`
-**never enters its glyph loop**. Before the loop it gates on `g.vtable[r2]() ==
-0x00ffffff` (a Graphics colour query at `lr=0x10278`, result stored then compared at
-`0x10298`); the branch is not taken, so the loop body (and the `char[]`) is skipped —
-the glyph draw fn `@0x1050c` is never called. So the char-array marshalling is correct
-and necessary (the loop needs it) but currently unreached. *cp32 target (one line):*
-identify the Graphics method the helper calls at `0x10228+0x38` (vtable index
-`[lit+0x2a]`) and why wie's return isn't the `0x00ffffff` the glyph loop expects to
-enter — an app-side Graphics-vtable/return issue, not char-array.
+*(cp31's note that the glyph loop "never enters" was wrong — an `lr` mis-calc; cp32
+shows it runs.)* *cp32 target (one line):* find why the glyph loop, once entered,
+draws no glyphs.
+
+**cp32 — char-array marshalling confirmed working; glyph render is the real gap.**
+Re-traced with corrected `lr`s. The colour "gate" at `0x10298` is **not** a gate:
+`g.vtable[ref21]()` = `Graphics.getColor()I` (id 21); both branches (`== 0x00ffffff`
+and the `setColor(~c)` else-path) **fall through to `0x102c0`**, so the glyph loop is
+always entered. And it **runs**: the loop body's `import 0x55` at `0x102d0` fires
+`lr=0x102dc` **30×** (3 frames × 10 chars), reading `data=0x49048000`, `len=10`, chars
+`0x4c='L'`… — i.e. `materialize_char_array` works end-to-end and the loop consumes
+"LOADING...". (`register_platform_object` readback confirmed `[obj+8]=data`, `[data]=10`.)
+What's missing is **glyph drawing**: the ASCII char path reaches the glyph-draw call at
+`0x1040c` (→ fn `@0x109b4`) **0×** — each char is read but never drawn, so no
+`drawImage`/`drawChar` is issued and the text stays invisible. *cp33 target (one line):*
+trace the per-char glyph path in the draw helper (`0x102dc` → range branches at
+`0x10300`/`0x10378`/`0x103dc`, gated on `fp[4]`/`fp[8]` = the helper's x/clip args) to
+find why ASCII chars skip the glyph-draw fn `@0x109b4` — a font/glyph render gap, not
+char-array.
 
 ### The single missing answer (for the maintainer)
 
@@ -441,6 +451,7 @@ which is exactly what the ez-i per-frame entry above would do.
 | app `Card.paint` ticked in wie's loop (cp26 experiment) | ◑ wires in & runs per-frame, but `o.paint` gates on `o.g` which its (never-run) virtual `o.k()V` writer would set → **0 draws** (cp27, §7) |
 | render path with `o.g` forced to 1 (cp28 experiment) | ✅ `o.paint` draws (21× setColor, 18× fillRect) to back-buffer + flushes → **render path works end-to-end**; only "set `o.g`" (ez-i per-frame drive) is missing (§7) |
 | `java/lang/String` slot 35 = `toCharArray()[C` (cp30) | ✅ per-class override added; `String.e` abort gone, `o.paint` runs without fatal. Title text still blocked on char-array guest marshalling (cp31) |
-| char-array guest marshalling (cp31) | ✅ `materialize_char_array` → `{u32 len, u16 chars}` at `[arr+8]` (RE'd, unit-tested; `len=10 "LOADING..."`). Text still blocked: the helper @0x10228 skips its glyph loop on a Graphics colour gate (cp32) |
+| char-array guest marshalling (cp31) | ✅ `materialize_char_array` → `{u32 len, u16 chars}` at `[arr+8]` (RE'd, unit-tested; `len=10 "LOADING..."`) |
+| glyph loop runs, consumes chars (cp32) | ✅ confirmed: loop runs 30× (3 frames × 10 chars), reads "LOADING..."; the `0x10298` "gate" is just `getColor` (both paths fall through). Text still invisible: per-char glyph-draw fn @0x109b4 called 0× (cp33) |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
