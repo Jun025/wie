@@ -424,12 +424,34 @@ they all reach the glyph fn.) Root cause **(C): the font glyph image is absent**
 guest-side, so the draw falls back to a no-op. char data is correct ("LOADING..." is
 read); the glyphs just have no font to draw from.
 
-This is a font/image-marshalling task (its own checkpoint), not a one-liner. *cp34
-target (one line):* find where the AOT loads the bitmap-font sheet (the `r6` image —
-likely a `createImage`/`getResource` of one of the 18 `.dat`s) and marshal it
-guest-readable so `r6 != 0` and the glyph blit (`r6.vtable[r2]`) runs — or, if the glyph
-path is the native `import 0x22` blit itself, RE and implement `0x22`. Either is an
-image/font subsystem, kept in `wie_lgt`, no shared-class change.
+This is a font/image-marshalling task (its own checkpoint), not a one-liner.
+
+**cp34 — glyph blit mechanism RE'd; contract not yet complete → cp35 plan.** The
+glyph-draw fn `@0x109b4` has two paths, gated on its font-image arg `r6`:
+- **`r6 != 0`** → `g.drawImage(font_sheet, …)` with **`src_x = (char - 0x21) * 10`,
+  `width = 10`** (`0x10ac0`: `r3 = char - 0x21; r4 = r3 * 10`) — i.e. a fixed-pitch
+  10px ASCII glyph grid blitted from a font sheet (`char 0x21='!'` is grid origin).
+- **`r6 == 0`** (measured) → `import 0x22(a0=0, a1=0x11264, a2=x)`. `a1=0x11264` is a
+  **.text thunk → `0x10fb0`** (an app native fn that itself calls `getInstance`/imports),
+  i.e. `0x22` here is a **carried-code/callback shape** (a1 = a function pointer), and
+  wie no-ops it → the native font render never runs. x advances +6 per char (14/20/26…).
+
+So the per-char render is *not* a one-liner: with no font image (`r6==0`), the app falls
+to a native font path (`0x22` → fn `0x10fb0`) that wie doesn't run. **Two unknowns block
+a confident impl** (so no code this checkpoint, per the "no half-guess" rule):
+1. *Why `r6==0`.* Statically `r6` traces to the `Graphics` arg (≠0), but it's measured
+   as 0 at the blit — needs a guest-register read (the static trace can't resolve a
+   mid-fn reassignment). Determines path (i) JVM-image vs (ii) native.
+2. *What `0x22`/`0x10fb0` actually do* — is `0x22` "run carried code a1" (cp23 showed
+   replaying carried code can be inert), or a blit primitive? And does `0x10fb0` render
+   a glyph to the back-buffer, and from what font data?
+
+*cp35 plan:* (a) add a one-shot guest-register probe at `@0x109b4`/the `0x22` site to
+fix `r6`'s real value and source; (b) RE `0x10fb0` (the `0x22` a1 fn) — does it draw a
+glyph, and from which font `.dat`/sheet; (c) then implement the confirmed path in
+`wie_lgt` — either marshal the font sheet so `r6 != 0` (path i, `g.drawImage` runs) or
+implement `0x22` as the native glyph blit (path ii). Font/image subsystem, no
+shared-class change.
 
 ### The single missing answer (for the maintainer)
 
@@ -466,6 +488,7 @@ which is exactly what the ez-i per-frame entry above would do.
 | `java/lang/String` slot 35 = `toCharArray()[C` (cp30) | ✅ per-class override added; `String.e` abort gone, `o.paint` runs without fatal. Title text still blocked on char-array guest marshalling (cp31) |
 | char-array guest marshalling (cp31) | ✅ `materialize_char_array` → `{u32 len, u16 chars}` at `[arr+8]` (RE'd, unit-tested; `len=10 "LOADING..."`) |
 | glyph loop runs, consumes chars (cp32) | ✅ confirmed: loop runs 30× (3 frames × 10 chars), reads "LOADING..."; the `0x10298` "gate" is just `getColor` (both paths fall through) |
-| glyph-draw fn runs; no font image (cp33) | ◑ `@0x109b4` is called per char but takes its `r6==0` (no font image) path → `import 0x22` no-op, **0 drawImage**. Root cause: bitmap-font sheet absent guest-side. Font/image marshalling = cp34 |
+| glyph-draw fn runs; no font image (cp33) | ◑ `@0x109b4` is called per char but takes its `r6==0` (no font image) path → `import 0x22` no-op, **0 drawImage**. Root cause: bitmap-font sheet absent guest-side |
+| glyph blit mechanism RE'd (cp34) | ◑ blit = `g.drawImage(sheet, src_x=(char-0x21)*10, w=10)` if `r6!=0`, else `import 0x22(a1=0x11264→fn 0x10fb0)` (carried-code shape) — wie no-ops it. Impl blocked on 2 unknowns (why `r6==0`; what `0x10fb0`/`0x22` do) = cp35 |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
