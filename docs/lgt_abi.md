@@ -446,12 +446,34 @@ a confident impl** (so no code this checkpoint, per the "no half-guess" rule):
    replaying carried code can be inert), or a blit primitive? And does `0x10fb0` render
    a glyph to the back-buffer, and from what font data?
 
-*cp35 plan:* (a) add a one-shot guest-register probe at `@0x109b4`/the `0x22` site to
-fix `r6`'s real value and source; (b) RE `0x10fb0` (the `0x22` a1 fn) — does it draw a
-glyph, and from which font `.dat`/sheet; (c) then implement the confirmed path in
-`wie_lgt` — either marshal the font sheet so `r6 != 0` (path i, `g.drawImage` runs) or
-implement `0x22` as the native glyph blit (path ii). Font/image subsystem, no
-shared-class change.
+*cp35 plan:* (a) guest-register probe at the `0x22` site to fix `r6`/the font image; (b)
+RE `0x10fb0`; (c) implement the confirmed path. (Resolved in cp35 below.)
+
+**cp35 — both unknowns resolved; the font path is platform-gated (§7), STOP.** A
+one-shot `dump_reg_stack` probe at the per-char `import 0x22` (filtered `a1=0x11264,
+a2=14`) settled both:
+- **Unknown 1 (corrected cp33/cp34):** `r6` is **not** the font image — `R6 = 0x48840550
+  = g (the back-buffer Graphics, ≠0)`. The font image is `import 0x22`'s **a0**
+  (`R0 = [singleton.field5] = 0`), measured **0** every char (with `R7=0`, `SB=x`,
+  `SL=char`, e.g. `0x4c='L'`). So the **font sheet image is absent/null**, and the glyph
+  draw falls back to the native `0x22` path.
+- **Unknown 2:** `0x10fb0` (the `0x22` a1 fn) is **`strb` into an object's field array**
+  (`[r2+4..+0xb]`, 8 bytes) with **no `Graphics`/drawImage vtable call** — i.e.
+  bookkeeping, not an on-screen blit. So the native path renders nothing (cp23-style
+  inert), even if run.
+- **No font load happens.** A full `debug` run shows `Image.createImage` called **once**
+  — the 240×320 **back-buffer** — and **no** `createImage`/`getResource` for a font
+  sheet anywhere. So path (i) JVM-image has no load site in the reachable run, and path
+  (ii) native is inert.
+
+**Classification: platform-side (§7).** Either the font sheet would be loaded by a later
+init step the game never reaches (a.run is one-shot — same per-frame-drive gap as the
+render driver), or the font is an ez-i-native resource the `0x22`/`0x10fb0` runtime draws
+(which wie doesn't emulate). Both are the §7 missing piece, not an app-side one-liner;
+forcing a font would be a guess. *cp36 (one line):* once the per-frame drive (§7) runs,
+re-check whether the game then loads the font sheet via `createImage` (→ path i becomes
+implementable, `g.drawImage(sheet, src_x=(char-0x21)*10, w=10)`); until then the title
+text is blocked on the same §7 gate as the rest of the live render state.
 
 ### The single missing answer (for the maintainer)
 
@@ -489,6 +511,7 @@ which is exactly what the ez-i per-frame entry above would do.
 | char-array guest marshalling (cp31) | ✅ `materialize_char_array` → `{u32 len, u16 chars}` at `[arr+8]` (RE'd, unit-tested; `len=10 "LOADING..."`) |
 | glyph loop runs, consumes chars (cp32) | ✅ confirmed: loop runs 30× (3 frames × 10 chars), reads "LOADING..."; the `0x10298` "gate" is just `getColor` (both paths fall through) |
 | glyph-draw fn runs; no font image (cp33) | ◑ `@0x109b4` is called per char but takes its `r6==0` (no font image) path → `import 0x22` no-op, **0 drawImage**. Root cause: bitmap-font sheet absent guest-side |
-| glyph blit mechanism RE'd (cp34) | ◑ blit = `g.drawImage(sheet, src_x=(char-0x21)*10, w=10)` if `r6!=0`, else `import 0x22(a1=0x11264→fn 0x10fb0)` (carried-code shape) — wie no-ops it. Impl blocked on 2 unknowns (why `r6==0`; what `0x10fb0`/`0x22` do) = cp35 |
+| glyph blit mechanism RE'd (cp34) | ◑ blit = `g.drawImage(sheet, src_x=(char-0x21)*10, w=10)`; font path via `import 0x22(a0=font_img, a1=0x11264→fn 0x10fb0)` |
+| font path resolved → platform-gated (cp35) | ⛔ probe: `r6=g` (not the font img — cp33/4 corrected); font img = `0x22` a0 = **0** every char; `0x10fb0` = strb bookkeeping (no draw); **no font `createImage`** in the reachable run (only the 240×320 back-buffer). Font load/native render is §7-gated, not an app one-liner |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
