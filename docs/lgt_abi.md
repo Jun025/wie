@@ -153,6 +153,7 @@ class is known. Indices are **physical** (reserved slot already baked in):
 | `java/lang/Runtime` | 13 → `freeMemory()J`, 14 → `gc()V` |
 | `java/lang/StringBuffer` | 5 → `toString()`, 19 → `append(Ljava/lang/String;)Ljava/lang/StringBuffer;` |
 | `java/lang/Thread` | 11 → `start()V` |
+| `java/lang/String` | 35 → `toCharArray()[C` (cp30) |
 
 (These slots are empirically identified — **추정** where not cross-checked against a
 second call site. Runtime/StringBuffer/Thread are all confirmed by a
@@ -371,12 +372,28 @@ imported virtual methods) — so wie has no per-class String vtable and the glob
 holds an unrelated *app* method (`e()V`), giving `String.e()` → `NoSuchMethodError`.
 The correct slot-35 method is an entry of **ez-i's own `java/lang/String` vtable**, which
 is **not present in the app binary** (`vmc=0`; ez-i provides it). This is the same shape
-as the `java/lang/*` per-class vtables (Runtime/StringBuffer/Thread, cp4–6/cp10) — but
-unlike those, the call context (a draw-text helper) doesn't pin a single method, and the
-layout is the ez-i runtime's. **Classification: platform-side.** Forcing a guessed
-binding is barred; recorded and stopped. *cp30 target (one line):* identify ez-i's
-`java/lang/String` physical-vtable-slot-35 method (empirically, cp10-style, or from a
-maintainer spec) and add a per-class String override in `known_java_lang_vtable`.
+as the `java/lang/*` per-class vtables (Runtime/StringBuffer/Thread, cp4–6/cp10).
+cp29 initially over-classified this as maintainer-gated from a single call site; cp30
+corrected and resolved it by RE.
+
+**cp30 — String physical slot 35 = `toCharArray()[C`, RE-confirmed (fix).** Fully
+disassembling the draw-text wrapper `B(Graphics, String)` (`@0x100d8`) and its draw
+helper (`@0x10228`): `B` calls `s.vtable[35]()` (no args) and the helper then iterates
+the result `r` as a char array — `data = [r+8]; len = [data]; for i in 0..len { char =
+[data + 4 + i*2] }` (a per-char glyph loop, bitmap font). The only no-arg, char-array-
+returning String method is **`toCharArray()[C`**. Added as a per-class String override
+(physical slot 35) in `known_java_lang_vtable`. Behaviour-confirmed under the force-g=1
+harness: `String.e()V NoSuchMethodError` is **gone**, `String.toCharArray()[C` is now
+dispatched at that call site, and `o.paint` runs **without fatal** (cp28 aborted there).
+So the platform-side mis-classification was wrong; this was an ordinary `java/lang/*`
+vtable slot, RE'd like the others.
+
+*Still no title text yet* — the glyph loop reads zero chars: wie marshals the
+`toCharArray` result via `register_platform_object`, whose proxy has `[ptr+8]=0`, but the
+ez-i loop expects `[arr+8] -> {u32 len, u16 chars[]}`. *cp31 target (one line):* marshal
+char-array (and array) returns into the ez-i guest layout (`[arr+8]` → `{len, u16
+chars}`) in `wie_lgt`'s `value_to_guest` so the glyph loop reads the text — app-side,
+no shared-class change.
 
 ### The single missing answer (for the maintainer)
 
@@ -410,5 +427,6 @@ which is exactly what the ez-i per-frame entry above would do.
 | data load → 240×320 back-buffer → `getGraphics` → Cards/RNG | ✅ |
 | app `Card.paint` ticked in wie's loop (cp26 experiment) | ◑ wires in & runs per-frame, but `o.paint` gates on `o.g` which its (never-run) virtual `o.k()V` writer would set → **0 draws** (cp27, §7) |
 | render path with `o.g` forced to 1 (cp28 experiment) | ✅ `o.paint` draws (21× setColor, 18× fillRect) to back-buffer + flushes → **render path works end-to-end**; only "set `o.g`" (ez-i per-frame drive) is missing (§7) |
+| `java/lang/String` slot 35 = `toCharArray()[C` (cp30) | ✅ per-class override added; `String.e` abort gone, `o.paint` runs without fatal. Title text still blocked on char-array guest marshalling (cp31) |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
