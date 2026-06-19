@@ -354,12 +354,29 @@ and the whole render path (gate → `o.paint` → `Graphics` → back-buffer →
 the only thing missing for those draws is *setting `o.g`* (i.e. running the virtual
 `o.k()V`, i.e. the ez-i per-frame drive).
 Caveat: `o.paint` did not run to completion — after the 39 draws it hit a *separate*
-`NoSuchMethodError: java/lang/String.e()V` (a later call where an app object is
-mis-bound as a `java/lang/String` — an unrelated vtable/binding gap, **not** a second
+`NoSuchMethodError: java/lang/String.e()V` (diagnosed in cp29 below — **not** a second
 empty-state field gate; draws did occur). The draws are background/box fills
 (`fillRect`), not yet the title sprite/text (`drawImage`/`drawString`), consistent with
 `o.paint` aborting partway. Experiment reverted (force-g=1 is a test hook, not a fix);
 only the finding is recorded.
+
+**cp29 — the `String.e()V` abort is an ez-i `java/lang/String` vtable slot (platform,
+STOP).** Traced the cp28 caveat under the same harness. The receiver is a *genuine*
+`java/lang/String` (`"LOADING..."`, just made by the String factory): a draw-text
+wrapper `B(Graphics, String)` (`@0x100d8`) does `setColor` → `s.vtable[slot 35]()` →
+draw. So the String is the intended argument, **not** a mis-bound app object. The crash
+is that the app calls `java/lang/String`'s hardcoded **physical vtable slot 35**
+(ref 34), but the app's import data declares `java/lang/String` with **`vmc=0`** (zero
+imported virtual methods) — so wie has no per-class String vtable and the global slot 35
+holds an unrelated *app* method (`e()V`), giving `String.e()` → `NoSuchMethodError`.
+The correct slot-35 method is an entry of **ez-i's own `java/lang/String` vtable**, which
+is **not present in the app binary** (`vmc=0`; ez-i provides it). This is the same shape
+as the `java/lang/*` per-class vtables (Runtime/StringBuffer/Thread, cp4–6/cp10) — but
+unlike those, the call context (a draw-text helper) doesn't pin a single method, and the
+layout is the ez-i runtime's. **Classification: platform-side.** Forcing a guessed
+binding is barred; recorded and stopped. *cp30 target (one line):* identify ez-i's
+`java/lang/String` physical-vtable-slot-35 method (empirically, cp10-style, or from a
+maintainer spec) and add a per-class String override in `known_java_lang_vtable`.
 
 ### The single missing answer (for the maintainer)
 
