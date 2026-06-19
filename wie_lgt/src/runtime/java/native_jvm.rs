@@ -50,6 +50,10 @@ const OBJ_HEADER_SIZE: u32 = 0x0c;
 const OBJ_PTR_FIELDS_OFFSET: u32 = 0x08;
 const FIELD_ARRAY_WORDS: u32 = 256;
 
+/// Per app-class instance-field layout: `(class_name, [(field_name, field_type,
+/// object_slot)])`. See `LgtJvmShared::app_field_layouts`.
+type AppFieldLayouts = Vec<(String, Vec<(String, String, u32)>)>;
+
 // ---- shared runtime ----
 
 /// Process-wide LGT JVM glue, shared (cheap `Arc` clones) between class
@@ -77,6 +81,13 @@ pub struct LgtJvmShared {
     /// (`<init>`) binds them: it knows the class, so it instantiates and registers
     /// the JVM object for the pending guest pointer.
     pending_new: Arc<Mutex<BTreeSet<u32>>>,
+    /// Per app-class instance-field layout: `class -> [(field_name, field_type,
+    /// object_slot)]`, where `object_slot = (app-ancestor field count) + declared
+    /// index` (the flat guest-array slot the AOT lays the field out at, inherited
+    /// fields first). Built in `register_app_classes`; `java_load_classes` consumes
+    /// it to fill `field_offsets` for instance fields (de-aliasing the otherwise
+    /// all-zero table — see STEP report cp17).
+    app_field_layouts: Arc<Mutex<AppFieldLayouts>>,
 }
 
 impl LgtJvmShared {
@@ -89,6 +100,7 @@ impl LgtJvmShared {
             vmethod_table: Arc::new(Mutex::new(0)),
             class_vtables: Arc::new(Mutex::new(BTreeMap::new())),
             pending_new: Arc::new(Mutex::new(BTreeSet::new())),
+            app_field_layouts: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -730,6 +742,7 @@ pub fn install_platform_tables(
     core: &mut ArmCore,
     shared: &LgtJvmShared,
     classes: u32,
+    fields: u32,
     virtual_methods: u32,
     static_methods: u32,
     field_offsets: u32,
@@ -846,6 +859,52 @@ pub fn install_platform_tables(
         shared.class_vtables.lock().insert(c.name.clone(), vt);
     }
 
+    // 5) Instance field_offsets. The AOT addresses instance fields as
+    //    `obj.field[field_offsets[K]]`; left all-zero, every field-ref aliases slot 0
+    //    (e.g. the `a.startApp` "is Display set?" gate read a sibling field and wrongly
+    //    skipped setup — cp16/cp17). The `fields` array is grouped by owning app class;
+    //    segment it by matching each window to a class's field set, then write the
+    //    inherited-first object slot computed in `register_app_classes`.
+    let layouts = shared.app_field_layouts.lock().clone();
+    if !layouts.is_empty() {
+        // Read the flat (name, type) field-ref array until a null entry.
+        let mut refs: Vec<(String, String)> = Vec::new();
+        for k in 0..1024u32 {
+            let n = read_cstr(core, read_generic::<u32, _>(core, fields + k * 8).unwrap_or(0));
+            let t = read_cstr(core, read_generic::<u32, _>(core, fields + k * 8 + 4).unwrap_or(0));
+            match (n, t) {
+                (Some(n), Some(t)) => refs.push((n, t)),
+                _ => break,
+            }
+        }
+        let mut i = 0usize;
+        let mut filled = 0usize;
+        'outer: while i < refs.len() {
+            // Find an app class whose field set exactly matches the window at `i`.
+            for (_, fl) in &layouts {
+                let n = fl.len();
+                if n == 0 || i + n > refs.len() {
+                    continue;
+                }
+                let window: BTreeSet<(&str, &str)> = refs[i..i + n].iter().map(|(a, b)| (a.as_str(), b.as_str())).collect();
+                let set: BTreeSet<(&str, &str)> = fl.iter().map(|(a, b, _)| (a.as_str(), b.as_str())).collect();
+                if window.len() == n && window == set {
+                    let slot_of: BTreeMap<(&str, &str), u32> = fl.iter().map(|(a, b, s)| ((a.as_str(), b.as_str()), *s)).collect();
+                    for (j, (rn, rt)) in refs[i..i + n].iter().enumerate() {
+                        if let Some(&slot) = slot_of.get(&(rn.as_str(), rt.as_str())) {
+                            write_generic(core, field_offsets + (i + j) as u32 * 2, slot as u16)?;
+                            filled += 1;
+                        }
+                    }
+                    i += n;
+                    continue 'outer;
+                }
+            }
+            i += 1; // unmatched ref (rare tail entry) — leave as-is
+        }
+        tracing::debug!("LGT java_load_classes: filled {filled}/{} instance field_offsets", refs.len());
+    }
+
     tracing::info!("LGT java_load_classes: filled {method_slots} method slots, {field_slots} field slots (two-level vtable)");
     Ok(())
 }
@@ -938,6 +997,41 @@ pub async fn register_app_classes(jvm: &Jvm, core: &mut ArmCore, shared: &LgtJvm
         }
     }
     let app_names: BTreeSet<String> = pending.iter().map(|c| c.name.clone()).collect();
+
+    // Compute each app class's instance-field object slots (inherited-first flat
+    // layout): `slot = app-ancestor field count + declared index`. Stored for
+    // `java_load_classes` to fill `field_offsets`. Platform ancestors contribute 0
+    // (their fields live JVM-side, not in the guest array). See STEP report cp17.
+    {
+        // (parent_name, field_count) by class name — owned, so no borrow of `pending`
+        // survives into the registration loop below.
+        let meta: BTreeMap<String, (Option<String>, u32)> = pending
+            .iter()
+            .map(|c| (c.name.clone(), (c.parent_name.clone(), c.fields.len() as u32)))
+            .collect();
+        let mut layouts: AppFieldLayouts = Vec::with_capacity(pending.len());
+        for c in &pending {
+            // app-ancestor field count (platform parents end the chain at 0)
+            let mut base = 0u32;
+            let mut name = c.parent_name.clone();
+            while let Some(n) = name {
+                match meta.get(&n) {
+                    Some((parent, count)) => {
+                        base += count;
+                        name = parent.clone();
+                    }
+                    None => break,
+                }
+            }
+            let fields = c
+                .fields
+                .iter()
+                .map(|f| (f.name.clone(), f.type_descriptor.clone(), base + f.index))
+                .collect();
+            layouts.push((c.name.clone(), fields));
+        }
+        *shared.app_field_layouts.lock() = layouts;
+    }
 
     let mut registered = Vec::new();
     let mut done = BTreeSet::new();

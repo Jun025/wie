@@ -207,13 +207,14 @@ pub async fn java_load_classes(
     //   call platform methods. Not yet implemented (see BRIDGE_REPORT.md).
     // Unused input arrays (field type pairs / alternate views) and unused output
     // tables for this checkpoint.
-    let _ = (fields, static_fields, a4, static_field_offsets, a9);
+    let _ = (static_fields, a4, static_field_offsets, a9);
 
     // Fill the native -> platform method/field offset tables.
     install_platform_tables(
         core,
         shared,
         classes,
+        fields,
         virtual_methods,
         static_methods,
         field_offsets,
