@@ -23,6 +23,18 @@ use crate::runtime::{SVC_CATEGORY_INIT, SVC_CATEGORY_JAVA_INTERFACE, svc_ids::In
 //   0x14 -> java_load_classes  declare IMPORTED platform classes + resolve offsets
 //   0x82 -> java_unk9          (boot hook, arg always 0)
 //   0x83 -> java_unk11         invoke-static org/kwis/msp/lcdui/Main.main(argv)
+
+/// Resolve java-interface import `function_index` (table `0x64`) to the SVC stub the
+/// native code will call.
+///
+/// How an app reaches here: each import site is a 16-byte thunk (`str lr; bl
+/// <dispatcher>; .word table; .word index`). On first use the dispatcher asks the
+/// platform to resolve `(table=0x64, index)` — which lands in this function — and the
+/// returned SVC stub is what subsequent calls trap through. Boot imports get dedicated
+/// `SVC_CATEGORY_INIT` handlers; everything else is routed by index through
+/// `SVC_CATEGORY_JAVA_INTERFACE` so each import keeps its identity (the SVC id *is* the
+/// index) and unimplemented ones are logged rather than silently merged. See
+/// `docs/lgt_abi.md` §1 for the thunk/dispatcher format and §6 for the import table.
 pub fn get_java_interface_method(core: &mut ArmCore, function_index: u32) -> Result<u32> {
     Ok(match function_index {
         0x03 => core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaInterfaceUnk0)?,
@@ -158,10 +170,12 @@ pub async fn java_unk5(core: &mut ArmCore, _: &mut LgtJvmShared, a0: u32, a1: u3
     // Each class record carries native method/field tables whose method bodies are
     // ARM code pointers (`.text`). See docs/lgt_native_classes.md and native_class.rs.
     //
-    // This is read-only decoding only — registering these as native-backed JVM
-    // classes is the remaining work (see BRIDGE_REPORT.md).
+    // This handler is diagnostic only (decode + trace). The actual registration of
+    // the app's native classes as JVM classes is done by `register_app_classes`,
+    // which scans the `.data` segment directly during `load_native` (it does not rely
+    // on this registry pointer). See `docs/lgt_abi.md` §3.
     let count = read_generic::<u32, _>(core, a0).unwrap_or(0);
-    tracing::debug!("java_unk5: app registry @ {a0:#x} ({count} class handles, aux @ {a1:#x}) — not yet bridged");
+    tracing::debug!("java_unk5: app registry @ {a0:#x} ({count} class handles, aux @ {a1:#x})");
 
     if tracing::enabled!(tracing::Level::DEBUG) {
         for i in 0..count.min(64) {
@@ -215,11 +229,12 @@ pub async fn java_load_classes(
     //                      _, static_method_off/cnt } (24 bytes).
     //   fields/static_fields/virtual_methods/a4/static_methods = arrays of
     //                    { ptr_name, ptr_type } pairs the imported classes reference.
-    // Outputs (writable app RAM, e.g. 0x15006f4): the platform is expected to fill
-    //   *_offsets with the resolved indices/vtable offsets so the native code can
-    //   call platform methods. Not yet implemented (see BRIDGE_REPORT.md).
-    // Unused input arrays (field type pairs / alternate views) and unused output
-    // tables for this checkpoint.
+    // Outputs (writable app RAM, e.g. 0x15006f4): the platform fills *_offsets with the
+    //   resolved indices / vtable offsets so the native code can call platform methods.
+    //   `install_platform_tables` (below) builds the global vtable + per-class
+    //   overrides + instance field layout that fill these. See `docs/lgt_abi.md` §4–5.
+    // The remaining input arrays (field-type pairs / alternate views) and the static
+    // output tables are not consumed yet (the resolved method/field tables suffice).
     let _ = (static_fields, a4, static_field_offsets, a9);
 
     // Fill the native -> platform method/field offset tables.

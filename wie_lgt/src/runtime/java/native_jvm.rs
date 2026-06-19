@@ -19,7 +19,8 @@
 //!    it re-enters the JVM and invokes the matching `wie_wipi_java`/`wie_midp`
 //!    method by name+descriptor.
 //!
-//! See `docs/lgt_native_classes.md` (descriptor layout) and STEP2_REPORT.md.
+//! See `docs/lgt_abi.md` (consolidated ABI) and `docs/lgt_native_classes.md`
+//! (descriptor byte layout).
 
 use alloc::{
     boxed::Box,
@@ -86,7 +87,7 @@ pub struct LgtJvmShared {
     /// index` (the flat guest-array slot the AOT lays the field out at, inherited
     /// fields first). Built in `register_app_classes`; `java_load_classes` consumes
     /// it to fill `field_offsets` for instance fields (de-aliasing the otherwise
-    /// all-zero table — see STEP report cp17).
+    /// all-zero table — see `docs/lgt_abi.md` §5).
     app_field_layouts: Arc<Mutex<AppFieldLayouts>>,
     /// `class descriptor handle -> singleton instance guest pointer`. The AOT's
     /// `getInstance` (java-interface import `0xc`) returns the one canonical instance
@@ -144,9 +145,12 @@ impl LgtJvmShared {
         self.instances.lock().insert(guest_ptr, instance);
     }
 
-    /// The native `new` primitive (stdlib `0x32`): allocate a guest object block
-    /// (header + zeroed field array, vtable word at `+0x00`) and mark it pending;
-    /// the `<init>` trampoline binds it to a JVM instance of the constructed class.
+    /// The native `new` primitive (stdlib `0x32` / java-interface `0xf`): allocate a
+    /// guest object block (header + zeroed field array, global vtable word at `+0x00`)
+    /// and mark it **pending** (unbound — no JVM class yet). The native code then calls
+    /// the constructor, whose `<init>` trampoline runs [`Self::bind_pending`] to attach
+    /// a JVM instance. This is the first half of the `new` → `<init>` bind lifecycle
+    /// (see `docs/lgt_abi.md` §5).
     pub fn alloc_native_object(&self, core: &mut ArmCore) -> Result<u32> {
         let ptr_fields = Allocator::alloc(core, FIELD_ARRAY_WORDS * 4)?;
         wie_util::ByteWrite::write_bytes(core, ptr_fields, &[0u8; (FIELD_ARRAY_WORDS * 4) as usize])?;
@@ -158,10 +162,13 @@ impl LgtJvmShared {
         Ok(ptr_raw)
     }
 
-    /// If `guest_ptr` is a pending native-`new` object, bind it to a fresh JVM
-    /// instance of `class_name` (the constructor's class) and return it. App classes
-    /// become an [`LgtClassInstance`] reusing this guest pointer; platform classes
-    /// are instantiated by the JVM and keyed by the guest pointer.
+    /// Second half of the `new` → `<init>` bind lifecycle: if `guest_ptr` is a pending
+    /// native-`new` object, bind it to a fresh JVM instance of `class_name` (the
+    /// constructor's class) and return it. App classes become an [`LgtClassInstance`]
+    /// reusing this guest pointer (so native field writes and the JVM object share one
+    /// block); platform classes are instantiated by the JVM and keyed by the guest
+    /// pointer. If the class has a per-class override vtable, the object's `+0x00` word
+    /// is repointed to it now (the class is finally known). See `docs/lgt_abi.md` §5.
     async fn bind_pending(&self, core: &mut ArmCore, guest_ptr: u32, class_name: &str) -> Option<Box<dyn ClassInstance>> {
         if !self.pending_new.lock().remove(&guest_ptr) {
             return None;
@@ -431,11 +438,15 @@ impl ClassDefinition for LgtClassDefinition {
 #[derive(Clone)]
 pub struct LgtClassInstance {
     guest_ptr: u32,
-    #[allow(dead_code)] // for guest-memory field unification (item 4, partial)
+    // Held for the planned field-unification step (reading/writing the guest field
+    // array directly); not yet read — see the `jvm_fields` note below.
+    #[allow(dead_code)]
     core: ArmCore,
     definition: LgtClassDefinition,
-    // JVM-side field storage. TODO(cp3 item 4): unify with the guest field array so
-    // native-written and JVM-read fields agree (needs the field-offset slot map).
+    // JVM-side field storage. TODO: unify with the guest field array (at `guest_ptr`,
+    // via the `field_offsets` slot map) so native-written and JVM-read fields agree.
+    // Until then, fields written by ARM code and fields written via the JVM diverge;
+    // for the current reach (boot + setup) the two paths don't alias the same field.
     jvm_fields: Arc<Mutex<BTreeMap<String, JavaValue>>>,
 }
 
@@ -734,7 +745,7 @@ pub fn register_java_trampoline_handler(core: &mut ArmCore, shared: &LgtJvmShare
 /// NOT in the app's import data (they declare 0 imported virtual methods) but which
 /// the AOT calls by hardcoded vtable index. Each entry is `(vtable_index, name,
 /// descriptor)`. These are **estimates (추정)** grounded in how the native code uses
-/// the call (see STEP report's evidence table), not a derived spec — extend as more
+/// the call (see `docs/lgt_abi.md` §4), not a derived spec — extend as more
 /// (class, index) pairs are observed.
 fn known_java_lang_vtable(class: &str) -> &'static [(u32, &'static str, &'static str)] {
     match class {
@@ -787,13 +798,14 @@ const VTABLE_REFS: u32 = 128;
 /// `vtable[virtual_method_offsets[r] + 1]` (a literal `ldr ip,[r3,#4]` after
 /// `add r3, r3, idx<<2`), so physical slot 0 is RESERVED and refs start at slot 1.
 /// With `virtual_method_offsets[r] = r`, dispatch reads `vtable[r + 1]` — the slot
-/// this returns. Keeping install and dispatch in one helper locks the cp15 fix.
+/// this returns. Centralising the `+1` keeps install and dispatch in lock-step (a
+/// prior off-by-one here misrouted ref 6 to ref 7). See `docs/lgt_abi.md` §4.
 const fn physical_vtable_slot(r: u32) -> u32 {
     r + 1
 }
 
-/// Implement `java_load_classes` with the two-level virtual-dispatch model decoded
-/// in checkpoint 5 (see STEP report):
+/// Implement `java_load_classes` with the two-level virtual-dispatch model
+/// (see `docs/lgt_abi.md` §4):
 ///
 /// - **Virtual** (`r3=[this]; bx [r3 + idx*4]`, optionally `idx =
 ///   virtual_method_offsets[ref]`): the object's `+0x00` points to a **pointer
@@ -894,9 +906,9 @@ pub fn install_platform_tables(
             write_generic(core, static_method_offsets + idx * 4, stub)?;
             method_slots += 1;
         }
-        // Static-field slots only. A blanket identity fill regressed a.startApp
-        // (the field semantics are more subtle), so full field-offset/unification
-        // handling is left to cp3 item 4.
+        // Static-field slots only (identity fill). A blanket identity fill of the
+        // *instance* field table regressed a.startApp (instance field semantics are
+        // more subtle — handled separately by the inheritance-aware pass in step 5).
         for j in 0..c.sfc {
             let idx = c.sfo + j;
             write_generic(core, field_offsets + idx * 2, (idx % FIELD_ARRAY_WORDS) as u16)?;
@@ -905,7 +917,8 @@ pub fn install_platform_tables(
     }
 
     // 4) java/lang per-class override vtables: copy the global vtable, then override
-    //    the empirically-identified hardcoded slots (추정; see STEP report).
+    //    the empirically-identified hardcoded slots (추정; see `known_java_lang_vtable`
+    //    and `docs/lgt_abi.md` §4).
     for c in &classes_vec {
         let known = known_java_lang_vtable(&c.name);
         if known.is_empty() {
@@ -1111,7 +1124,12 @@ pub async fn register_app_classes(jvm: &Jvm, core: &mut ArmCore, shared: &LgtJvm
 /// Compute each app class's instance-field object slots using the inherited-first
 /// flat guest layout: `slot = (field count of all app ancestors) + declared index`.
 /// Platform ancestors terminate the chain contributing 0 (their fields live JVM-side,
-/// not in the guest field array). Pure over the parsed class set — see cp17.
+/// not in the guest field array). Pure over the parsed class set.
+///
+/// Why inherited-first: the AOT addresses an instance field as
+/// `obj.field[field_offsets[K]]` into one flat per-object array, laying a subclass's
+/// own fields *after* every inherited field. Mapping each ref to this slot de-aliases
+/// the otherwise all-zero `field_offsets` table. See `docs/lgt_abi.md` §5.
 fn compute_field_layouts(classes: &[LgtNativeClass]) -> AppFieldLayouts {
     // (parent_name, field_count) by class name.
     let meta: BTreeMap<String, (Option<String>, u32)> = classes
@@ -1174,7 +1192,7 @@ mod tests {
 
     /// Instance fields use an inherited-first flat layout: `slot = (field count of all
     /// app ancestors) + declared index`, platform parents terminating the chain at 0.
-    /// Mirrors the 150/150 BattleMonster fields validated at runtime (cp17); locked
+    /// Mirrors the 150/150 reference-app fields validated at runtime (cp17); locked
     /// here with a deterministic hierarchy (`a`→`Game`, `o`→`d`/`e`).
     #[test]
     fn field_layout_inherited_first() {

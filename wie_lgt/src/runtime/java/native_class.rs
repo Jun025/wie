@@ -1,13 +1,12 @@
 //! Read-only parser for the LGT native class-descriptor format.
 //!
-//! BattleMonster-class LGT apps are AOT-compiled Java (ez-i/Xceed): each Java
-//! class is emitted as a record in the ELF `.data` segment whose method bodies
-//! are native ARM code (pointers into `.text`). This module decodes those
-//! records into plain structs for inspection — it does **not** register anything
-//! with the JVM. See `docs/lgt_native_classes.md` for the full byte layout and
-//! how it was reverse-engineered.
+//! ez-i AOT-compiled LGT apps emit each Java class as a record in the ELF `.data`
+//! segment whose method bodies are native ARM code (pointers into `.text`). This
+//! module decodes those records into plain structs for inspection — it does **not**
+//! register anything with the JVM. See `docs/lgt_native_classes.md` for the full
+//! byte layout and how it was reverse-engineered.
 //!
-//! Confirmed layout (BattleMonster `00025C2B`, all offsets little-endian u32
+//! Confirmed layout (from the ez-i reference app, all offsets little-endian u32
 //! unless noted; 283/283 method code pointers validated inside `.text`):
 //!
 //! ```text
@@ -195,7 +194,7 @@ mod tests {
 
     use super::{parse_native_class, parse_native_class_from_handle};
 
-    // BattleMonster `.text` bounds (0x1000..0xe7800); method code pointers must fall
+    // Reference-app `.text` bounds (0x1000..0xe7800); method code pointers must fall
     // inside this range — the 283/283 in-`.text` invariant, here on a synthetic class.
     const TEXT_START: u32 = 0x1000;
     const TEXT_END: u32 = 0xe7800;
