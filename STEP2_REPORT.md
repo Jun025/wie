@@ -27,10 +27,69 @@ Goal: run the AOT-compiled LGT app (BattleMonster `00025C2B`) on wie's JVM, towa
 | **cp18: Thread.start per-class slot + pending-new pass-through — game-loop thread spawns a.run()** | ✅ |
 | cp19: diagnosis — a.run() returns early on `getInstance(a)` run-flag (no-op import) | ⏹ |
 | cp20: implement `getInstance` (java-interface `0xc`) singletons — a.run enters loop + back-buffer Graphics | ✅ |
-| **cp21: diagnosis — a.run is a one-shot; render gated by AOT-runtime import substrate (0x55/56/57, 0x1f/20/21/22, 0x12)** | ⏹ (next task) |
-| `paint`/title | ◑ boots, data, back-buffer + `getGraphics`; a.run runs once (sets up via no-op imports) and returns; main thread spins on empty CardCanvas |
+| cp21: diagnosis — a.run is a one-shot; render gated by AOT-runtime import substrate | ⏹ |
+| **cp22: substrate RE — no draws anywhere; imports overloaded/stack-ptr args, resist single-shot RE (STOP D, stuck)** | ⏹ |
+| `paint`/title | ◑ full setup (data, back-buffer, getGraphics, Cards, RNG); render driver never starts → zero draw calls |
 | clet (`test_helloworld`) | ✅ | clippy | ✅ |
 | clet (`test_helloworld`) | ✅ | clippy | ✅ |
+
+## Checkpoint 22 — substrate RE: no draws; imports resist single-shot RE (STOP D, stuck)
+
+Pushed on the cp21 substrate. Two firm results + a refined wall.
+
+### Confirmed: the render driver never starts (zero draw calls)
+Across a full run, **no** `drawImage`/`fillRect`/`drawString`/`drawLine`/`copyArea`/
+`flushLcd`/`setColor` — anywhere. Every platform call is **setup**: class `<init>`s,
+`getInstance`, `Card.getHeight/getWidth`, `Component.getHeight`,
+`AnnunciatorComponent.show`, `Random.<init>`, `Math.min`, the StringBuffer/data load,
+`getGraphics`. So the game completes setup but its per-frame render driver never runs.
+
+### a.run is structurally one-shot (not import-gated)
+a.run's body main path returns **unconditionally** (`b 0x1ff4` → `b 0x2100` → return),
+so it is not a loop regardless of the imports. Confirmed at runtime (a.run RETURNED;
+its `0x55` fires exactly once). So the render driver is *not* a.run's loop — it is the
+object a.run allocates (`stdlib 0x32`) and hands to `0x57`/`0x21`; whatever per-frame
+mechanism should invoke it (timer/thread/callback) is **never observed** (no timer
+call, no second thread, no `pushCard`).
+
+### The substrate imports resist confident single-shot RE
+Call-site args (a3 is the dispatch thunk, ignore it):
+| import | observed args | shape |
+|---|---|---|
+| `0x12` | `(0, 0, sp=0x4010022c)` | stack ptr only |
+| `0x1f` | `(0, obj/type, count)` e.g. `(0,obj,4)`, `(0,0xda958,0x38)` | obj/type + count |
+| `0x21` | `(obj, 0, sp)` | obj + stack ptr |
+| `0x22` | `(0, n, …)` | small ints |
+| `0x55` | **`(a-sing, code@0x1ad4, 0)`** *and* **`(0, 4, 8)`** (different call sites: a.run vs `i.Q`) | **overloaded** |
+| `0x56` | `(this, code@0x1ad4, 0)` | obj + code |
+| `0x57` | `(this, code@0x1ad4, 0)` and `(this, obj, this)` | obj + code/obj |
+
+- `0x12/0x21` pass a **stack pointer** (`0x40100…`), and `0x1f/0x22` pass obj+count —
+  the signature of **GC / safepoint / exception-frame** primitives, which are
+  plausibly *safe* as no-ops in an emulator without GC (consistent with the game not
+  crashing). So these are likely **not** the render blocker.
+- `0x55/0x56/0x57` carry `code@0x1a24` (an a-singleton **state initialiser**: sets
+  fields `[9],[13],[14],[15],[18]…`, allocates a sub-object, does **not** draw). But
+  `0x55` is **overloaded** — `i.Q` calls `0x55(0, 4, 8)` (a1=4 is not a code pointer) —
+  so it is **not** a uniform "run code@a1". They look like a try/synchronized triple
+  (handler code passed, no-op-safe if no exception) rather than the render trigger.
+
+### Why STOP (condition D — stuck, 2 passes)
+The substrate is **not** a single missing function: it is a batch of AOT-runtime
+primitives with overloaded, context-dependent args (stack ptrs, codes, objects) that
+**cannot be implemented from the call sites alone without guessing** — and a guess/
+blanket is disallowed (and risky: these touch GC/exception/threading). The render
+driver's per-frame mechanism is also unobserved. Two passes (cp21, cp22) produced
+diagnosis but no safe functional fix. This needs a deeper, different RE angle.
+
+### Recommended next angle (cp23)
+- RE the **import dispatcher** `0xe31d8`/`0xe31a8` (behind the `bl`+`.word table/idx`
+  thunks) — it may reveal the intended ABI/semantics of the whole java-interface table
+  at once (vs guessing per index).
+- Or trace the **object a.run registers** (`stdlib 0x32` alloc → `0x57`/`0x21`): bind
+  it, see what methods are later invoked on it, to identify the per-frame driver.
+- Or look for a **timer**/repaint registration path the game expects wie to drive
+  (the game never `pushCard`s; it blits a back-buffer — find what triggers the blit).
 
 ## Checkpoint 21 — a.run is a one-shot; render gated by the AOT-runtime import substrate
 

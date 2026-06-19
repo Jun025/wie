@@ -72,7 +72,7 @@ pub async fn handle_java_interface_svc(core: &mut ArmCore, shared: &mut LgtJvmSh
         // and the game loop self-gated off.
         i if i == GET_INSTANCE_INDEX => shared.singleton_instance(core, a0).await,
         _ => {
-            tracing::debug!("LGT java-interface import {index:#x}({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x}) -> 0 (no-op)");
+            tracing::debug!("LGT java-interface import {index:#x}({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x}) lr={lr:#x} -> 0 (no-op)");
             0
         }
     };
