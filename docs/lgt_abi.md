@@ -513,6 +513,54 @@ instead of the ez-i runtime:
   (the real per-frame driver the ez-i runtime invokes) is the single remaining gate, the
   same one that gates the live render state, `o.g`, and the font load. Maintainer path.
 
+**cp37 — per-frame-driver recon (disasm + word dumps; logging-only, reverted). Verdict:
+self-contained (A), NOT external-injection (B).** Settled whether the §7 driver is
+derivable from the app binary, by examining the three things ez-i registers.
+
+- *Recon 1 — `code@0x1ad4` (the "carried code" of `0x55`/`0x56`).* `0x1ad4 = b 0x1a24`.
+  Full disasm of `0x1a24`: prologue → `bl 0x1908` (getInstance fetches its own object,
+  no `this` arg) → writes **constants** into the object's field array (`field[9]=0`,
+  `field[13]=1`, `field[14]=1`, `field[15]=<import ret>`, `field[17]=3`, others `0`) →
+  return. It reads/writes **no accumulated state** (no timer/frame-counter increment),
+  takes **no `r0-r3` arg**. ⇒ this is a **one-shot init/reset helper, not a per-frame
+  step**. (Matches cp23: replaying it is inert.)
+- *Recon 2 — the unbound object handed to `0x21` (word dump).* Instrumented the `0x21`
+  handler (logging only, returns 0). Both driver objects dump identically:
+
+  | site | a0 (obj) | a1 | `[obj+0]` | `[obj+8]`=fldptr | field array `[+0..+0x80]` |
+  |---|---|---|---|---|---|
+  | a.b `lr=0x227c` | `0x48840540` | `0x48840120` | `0x4010022c` (global vtable) | `0x4010a9a0` | **all 0** |
+  | a.run `lr=0x2108` | `0x48840550` | `0x1ad4` (carried code) | `0x4010022c` (global vtable) | `0x4010ada8` | **all 0** |
+
+  ⇒ the registered object is just `{global-vtable word, empty field array}` — **no code
+  pointer anywhere** in header or fields. There is no per-frame native entry *stored in
+  the object*; ez-i would dispatch through a vtable slot, but the object is unbound (no
+  class/methods). Confirms cp25.
+- *Recon 3 — what actually sets `o.g=1` (corrects cp27/cp36).* The `o.g` writer is **not**
+  `o.k()V` (`@0xda7f8`, a short field-copy that returns at `0xda85c`) nor the helper
+  `0xda870`. It is a **separate function `@0xdb200`**: `r4 = r0` (arg) → getInstance(o) →
+  `o.field[12] = max(o.field[12], r4)` → **unconditionally `o.g = 1`** (`0xdb240`). It has
+  **no `bl` callers**; it's reached only via 8 `ldr+bx` (vtable/dispatch) sites
+  (`0x1d4e0`, `0x1dd58`, `0x2d714…`, `0x702fc`, `0x747a0`). At each site the arg is a
+  **literal constant** — `0x1dd58: r0=#9`, `0x1d4e0: r0=#1` — **not** an elapsed-time /
+  input / event value.
+
+**Verdict (A), with evidence.** `o.g=1` is set **unconditionally from a constant** — no
+external per-frame value is injected, so **(B) is ruled out**: ez-i does **not** need to
+pass elapsed-time/input each frame for the state to advance. The state machine is
+self-contained; it just needs its step methods *called*. So the §7 gap is **not** an
+ABI-data problem (no per-frame argument signature is required) but purely a **call-trigger**
+one: the `0xdb200`-calling game methods (card-step logic, in the `0x1d…`/`0x2d…` region)
+are never dispatched in the reachable run (trace shows no `lr=0x1d…/0x2d…`), because
+`a.run` is one-shot and nothing drives the step loop.
+
+*Next move (cp38):* drive the state step from wie's tick — unlike cp36 (which drove the
+wrong methods: `o.k`/`0xda870`, both non-writers), the real `o.g=1` writer is `@0xdb200`,
+reached from card-step methods. RE which registered/bound method on the card or `a`
+singleton sits on the `0xdb200` path, then invoke it each frame from wie's existing
+`CardCanvas.paint` tick (no args needed — self-contained). If that lands `o.g=1`, cp28
+already proved `o.paint` then draws ⇒ live render from the wie side, no maintainer ABI.
+
 ---
 
 ## 8. Current reach
@@ -532,6 +580,7 @@ instead of the ez-i runtime:
 | glyph-draw fn runs; no font image (cp33) | ◑ `@0x109b4` is called per char but takes its `r6==0` (no font image) path → `import 0x22` no-op, **0 drawImage**. Root cause: bitmap-font sheet absent guest-side |
 | glyph blit mechanism RE'd (cp34) | ◑ blit = `g.drawImage(sheet, src_x=(char-0x21)*10, w=10)`; font path via `import 0x22(a0=font_img, a1=0x11264→fn 0x10fb0)` |
 | font path resolved → platform-gated (cp35) | ⛔ probe: `r6=g` (not the font img — cp33/4 corrected); font img = `0x22` a0 = **0** every char; `0x10fb0` = strb bookkeeping (no draw); **no font `createImage`** in the reachable run (only the 240×320 back-buffer). Font load/native render is §7-gated, not an app one-liner |
-| wie can't substitute the ez-i tick (cp36) | ⛔ `o.k()` (registered) and `fn@0xda870` (real `o.g` writer, unregistered) both driven from wie → `o.g` stays 0: the `o.g=1` branch needs accumulated game state, not a single method call. §7 ez-i per-frame drive is the sole remaining gate |
+| wie can't substitute the ez-i tick (cp36) | ⛔ `o.k()` (registered) and `fn@0xda870` (unregistered) both driven from wie → `o.g` stays 0 — but cp37 shows these were the *wrong* methods (neither is the `o.g` writer) |
+| per-frame driver is self-contained, not ABI (cp37) | ◑ recon: carried code = const init; `0x21` obj has no code ptr; real `o.g=1` writer `@0xdb200` sets g **unconditionally from a constant arg** ⇒ **(A) self-contained, (B) external-injection ruled out**. Gap is a call-trigger, not an ABI signature. cp38 = drive the `0xdb200`-path step from wie's tick |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
