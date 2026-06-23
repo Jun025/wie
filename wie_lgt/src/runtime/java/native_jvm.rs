@@ -945,9 +945,17 @@ fn known_java_lang_vtable(class: &str) -> &'static [(u32, &'static str, &'static
         // as a String => `toString()`. Behaviour-confirmed via the constant pool the
         // append args come from. `append(String)` is synthesised in the trampoline
         // (wie's StringBuffer has only `append([CII)`), see `handle_java_trampoline`.
+        // cp40: `i.a(Z)V` (@0x2fd94) builds resource paths
+        // (`append(String).append(int)…` → e.g. `"txt/" + id + ".dat"`): physical
+        // slot 19 (offset 0x4c) = `append(String)`, physical slot 24 (offset 0x60) =
+        // `append(int)`. RE'd by the call shape (`r5.slot24(r1)` returns the chainable
+        // receiver, `r1 = singleton.field[0x74]`) and a runtime probe (raw arg = `8`, a
+        // small int). Without slot 24 the call fell through to global slot 24 =
+        // `Display.pushCard` → fatal, blocking the scene's data/sprite loads.
         "java/lang/StringBuffer" => &[
             (5, "toString", "()Ljava/lang/String;"),
             (19, "append", "(Ljava/lang/String;)Ljava/lang/StringBuffer;"),
+            (24, "append", "(I)Ljava/lang/StringBuffer;"),
         ],
         // cp18: a.startApp tail does `t = new Thread(this); t.<11>()` then returns
         // (the call's result is discarded; the Runnable is the Jlet base `a`, whose
