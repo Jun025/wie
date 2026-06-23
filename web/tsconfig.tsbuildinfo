@@ -1,1 +1,0 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/components/keyremap.tsx","./src/components/virtualpad.tsx","./src/lib/emulator.ts","./src/lib/idb.ts","./src/lib/keymap.ts","./src/wasm/wie_web.d.ts","./src/wasm/wie_web.js","./src/wasm/wie_web_bg.wasm.d.ts"],"version":"5.9.3"}
