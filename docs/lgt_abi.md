@@ -779,6 +779,31 @@ not an external input/time wall (cp37 holds). Next-RE thread: pin the `0xb`/`0xd
 class/static-field import contract (result usage: used vs discarded) — that tier, not a
 file-read, is where the id-indexed data originates.
 
+**cp51 — `0xb`/`0xd` measured + implemented (lazy class/instance init); A/B gate ⇒ B.**
+Pinned the `0xb`/`0xd` contract by the call shape in the getInstance helpers and a
+runtime probe:
+- **`0xd(instance, init_fn)` = lazy instance init.** Guard `if [inst.field+0x10] != 5 {
+  0xd(inst, init_fn) }` (`5` = initialised). Runs the instance initialiser once
+  (`init_fn` is passed by the call site, e.g. `i.c @0x788a0` for the `b`/`o` singleton).
+- **`0xb(class)` = lazy class init.** Guard `if [[class+8]+0x1a] != 3 { 0xb(class) }`
+  (`3` = initialised). Marks the class header init flag.
+- Both no-op'd: `0xb` spun **3665×/run** (the flag never reached 3) and instances/classes
+  never initialised. Implemented in `LgtJvmShared` (`lazy_instance_init` runs `init_fn` +
+  marks `field[0x10]=5`; `lazy_class_init` marks `header[+0x1a]=3`). Verified: spin gone
+  (`0xb` 3665→0), 16 instance inits run, no crash, frame loop intact. **This is a genuine
+  fix** (a real no-op'd init subsystem + per-frame spin), kept.
+- **Decisive A/B measurement (this refutes cp50's premise):** implementing `0xb`/`0xd`
+  does **not** populate the scene data — after init + scene-enter + step,
+  `getInstance(b).field[0x44]=0` (count), `field[0x84]=0` (the `0x706c` array),
+  `field[0xd4]=0`, **all zero**. So `0xb`/`0xd` are *init*, **not** the static-field data
+  source cp50 guessed; the scene data still comes only from the deeper obfuscated resource
+  mechanism (cp49/50: `o.g→i.b→0x706c`), which has **no pinnable single contract** and is
+  **not reached** this run. ⇒ **Path B**: the data is in another layer not supplied by the
+  measurable tier; converge to a **Foundation PR** of the resolved baseline (boot + first
+  pixels + self-sustaining background render — §7 resolved). The full title (sprites/text)
+  is scoped future work blocked on that whole subsystem. Still **internal**, not an
+  external input/time wall (cp37 holds).
+
 ---
 
 ## 8. Current reach
@@ -805,5 +830,6 @@ file-read, is where the id-indexed data originates.
 | StringBuffer slot 24 = `append(I)`; scene-enter completes (cp40) | ✅ vtable[24] misdispatch fixed; `i.a(card,0)` runs to completion (loads `txt/*.dat`); background still the only draw |
 | self-sustaining frame loop (cp44) | ✅ `drive_card_step` schedules `repaint()` each tick → o.paint 3 → 362 frames (~45 fps); idle gone; background renders continuously |
 | `[+0xd4]` keystone measured (cp47) | ✅ identity split real (`getInstance(b)≠card`) but **not** the blocker — `[+0xd4]=0` on both ⇒ the populate command (`i.b(0x46)`) never runs (hyp 3). cp48 identity-alias reverted (regressed flow) |
-| full title (logo/sprites/text) | ⛔ root = the app's **obfuscated resource/data subsystem** (cp50): `o.g(id)`→`i.b(id)`→`0x706c` is in-memory scene-object array mgmt; the byte source is the no-op'd class/static-field tier `0xb`/`0xd` (186×/179×) — **no single clean `read→bytes` import** to pin/implement. Not File/Image/stdlib; not an input/time wall (cp37). Needs whole-subsystem RE, not a one-import fix |
+| `0xb`/`0xd` lazy class/instance init (cp51) | ✅ implemented (`0xd`=run instance init_fn at `field[0x10]!=5`; `0xb`=mark class flag at `[[class+8]+0x1a]!=3`); removed a 3665×/run spin; genuine init fix |
+| full title (logo/sprites/text) — **Path B (scoped future work)** | ⛔ root = the app's **obfuscated resource/data subsystem** (cp49/50): `o.g(id)`→`i.b(id)`→`0x706c` in-memory scene-object array builder, fed from a deeper layer that is **not reached** this run. cp51 proved `0xb`/`0xd` are *init*, not the data source (`getInstance(b).field[0x44]/0x84/0xd4` all 0 after init+enter+step). **No pinnable single read contract** (cp50); not File/Image/stdlib; not an input/time wall (cp37). Whole-subsystem RE, not a one-import fix |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |

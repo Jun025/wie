@@ -8,12 +8,15 @@ rather than JVM bytecode. The app boots through wie's existing lcdui `Main.main`
 and runs its real native methods, dispatched through reconstructed platform tables.
 
 Reverse-engineered against one ez-i reference app. It reaches **boot + game setup +
-first render**: class registration, platform dispatch, data load, 240×320 back-buffer,
-`getGraphics`, Cards/RNG/Thread, and — after implementing the show-card import and
-driving the card lifecycle — the card's `o.paint` runs each frame and **draws to the
-back-buffer** (`fillRect`/`setColor`). The full title (logo/sprites/text) is still in
-progress, blocked on an unbound-class vtable misdispatch in the scene resource setup
-(see below).
+a self-sustaining render loop**: class registration, platform dispatch, data load,
+240×320 back-buffer, `getGraphics`, Cards/RNG/Thread, and — after implementing the
+show-card import and driving the card lifecycle — the card's `o.paint` runs **every
+frame (~45 fps, continuous)** and draws to the back-buffer (`fillRect`/`setColor`,
+background). The **central open question of the earlier draft — the ez-i per-frame
+render driver (§7) — is resolved**: it was not an undocumented ABI but a no-op'd
+show-card import plus the card's own lifecycle, now driven from `LgtJvmShared`. The
+**full title (logo/sprites/text)** is scoped as future work, blocked on the app's
+obfuscated resource/data subsystem (see *Deferred*).
 
 The PoC keeps everything LGT-specific in `LgtJvmShared` (per #1232); shared
 `wie_midp` / `wie_wipi_java` classes are **not modified**.
@@ -35,6 +38,13 @@ The PoC keeps everything LGT-specific in `LgtJvmShared` (per #1232); shared
 - **Object model**: native `new` primitive (stdlib `0x32` / java `0xf`) +
   `<init>`-trampoline binding to JVM instances, `getInstance` singletons
   (java-interface `0xc`), and the native String factory (`0x9`).
+- **Render driver** (`LgtJvmShared`): java-interface `0x57` (show-card) binds + pushes
+  the title card to wie's Display; `drive_card_step` runs the card lifecycle (scene-enter
+  `i.a`, per-frame step `i.aE`) before each `o.paint` and schedules `repaint()` so the
+  frame loop self-sustains (~45 fps) — the resolution of the §7 per-frame-driver question.
+- **Lazy init + slot fixes**: lazy class/instance init (java-interface `0xb`/`0xd` —
+  run an instance/class initialiser on first use, removing a 3665×/run no-op spin);
+  `StringBuffer.append(int)` per-class override (a hardcoded scene-setup vtable slot).
 - **Unit tests** (`cargo test -p wie_lgt`, 5 tests): the descriptor parser against a
   hand-encoded fixture (header offsets, 28/20-byte record strides, in-`.text`
   code-pointer invariant, handle indirection); the reserved-slot-0 vtable model
@@ -63,30 +73,42 @@ guest blocks (vtable word + 256-word field array) bound to JVM instances at `<in
 - ✅ Platform dispatch (two-level vtable, per-class overrides, instance fields),
   `getInstance` singletons, `Thread.start`, game thread spawns `a.run`.
 - ✅ Game setup: data load → 240×320 back-buffer → `getGraphics` → Cards/RNG.
-- ✅ **Render: the card draws.** Implementing java-interface `0x57` (show-card) +
-  driving the card lifecycle (scene-enter `i.a` once, per-frame step `i.aE`) sets the
-  `o.g` render gate and runs `o.paint` each frame through wie's MIDP paint loop →
-  **`fillRect` / `setColor` draws to the back-buffer** (background fills). First pixels.
-- ◑ Full title (logo / sprites / text) not yet complete — blocked on a `vtable[24]`
-  misdispatch in the scene resource setup (an unbound-class object's hardcoded vtable
-  slot misroutes to `Display.pushCard`; the cp14/25 unbound-vtable problem).
+- ✅ **Render: the card draws every frame, self-sustaining.** java-interface `0x57`
+  (show-card) + the card lifecycle (scene-enter `i.a` once, per-frame step `i.aE`) sets
+  the `o.g` render gate, and `drive_card_step` schedules `repaint()` each tick so
+  `o.paint` runs **continuously (~45 fps)** through wie's MIDP loop →
+  **`fillRect` / `setColor` to the back-buffer** (background). `o.g` is set by the app's
+  **own** scene setup (not a force).
+- ✅ `StringBuffer.append(int)` per-class override (a hardcoded vtable slot the scene
+  setup uses); lazy class/instance init (`0xb`/`0xd`) — both real no-op'd subsystems.
+- ◑ Full title (logo / sprites / text) — scoped future work; blocked on the app's
+  obfuscated resource/data subsystem (see *Deferred*).
 
 ## Deferred (out of scope for this PR)
 
-**ez-i render driver — resolved (cp38–39, `docs/lgt_abi.md` §7).** The §7 open question
-("which entry does ez-i invoke per frame") turned out to be a single no-op'd import, not
-an unknown ABI: `a.run` hands the platform the title card via java-interface `0x57`
+**ez-i per-frame render driver — RESOLVED (cp38–44, `docs/lgt_abi.md` §7).** The earlier
+draft's single open question ("which entry does ez-i invoke per frame to paint?") turned
+out **not** to be an undocumented displayable/clet ABI but a no-op'd import plus the
+card's own lifecycle: `a.run` hands the platform the title card via java-interface `0x57`
 (show-card / `Display.setCurrent`), which wie left as a no-op, so the card was never
-pushed and `o.paint` never ran. `LgtJvmShared::show_card` now rebinds the card to its app
-class and `pushCard`s it; `drive_card_step` runs the genuine card lifecycle from the
-paint tick. `o.g` is set by the app's **own** scene setup (`i.a`'s `@0xdb200` writer,
-not a force), and `o.paint` draws. All LGT-specific (`LgtJvmShared`); shared classes
-untouched (#1232).
+pushed and `o.paint` never ran. `LgtJvmShared::show_card` now binds + `pushCard`s the
+card; `drive_card_step` runs the genuine card lifecycle (`i.a` enter, `i.aE` step) and
+schedules `repaint()` so the loop self-sustains. The back-buffer flushes through wie's
+existing MIDP path — **no shared-class changes** (#1232). This is the landmark the
+foundation set out to find.
 
-**Remaining for the full title.** The scene resource setup (`i.a(Z)V`) makes a hardcoded
-`vtable[24]` call on an object whose class isn't in the import tables, which wie's global
-by-name vtable misroutes — the same unbound-vtable issue tracked since cp14/25. Resolving
-it (and confirming the precise title scene state) unblocks sprite/image/text rendering.
+**Remaining for the full title — the app's resource/data subsystem.** Sprites/logo/text
+need the scene-object array (`getInstance(b).field[0xd4]`) populated; it is fed by an
+in-memory builder (`o.g(id)`→`i.b(id)`→`0x706c`) whose **byte source is a deeply nested,
+obfuscated app data subsystem** that uses **no** standard `File`/`Image`/stream API and
+exposes **no single measurable `read(id|path)→bytes` contract** (traced to its leaf in
+`docs/lgt_abi.md` §7, cp42/45/49/50). The class/instance lazy-init tier (`0xb`/`0xd`) was
+measured and implemented (cp51) but proven **not** to be that data source
+(`field[0x44]/0x84/0xd4` stay 0 after init). Unblocking the full title requires
+reverse-engineering that whole subsystem (id→data mapping + in-memory layout) — a large,
+self-contained future effort. It is an **internal** mechanism, not an external input/time
+dependency (cp37), so it is implementable, just sizeable; the precise unknowns are
+recorded in §7/§8.
 
 ## Verification
 
