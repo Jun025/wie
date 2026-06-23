@@ -1,0 +1,236 @@
+//! Browser entry point for the wie emulator.
+//!
+//! Game bytes arrive here as a `Uint8Array` that the user picked locally; they
+//! are injected straight into the emulator core in wasm memory and never touch
+//! the network. There is no `fetch`, `XMLHttpRequest`, `WebSocket`, or upload of
+//! any kind in this crate — the only data leaving wasm is the rendered frame
+//! (to the canvas) and audio samples (to WebAudio).
+//!
+//! The crate is compiled only for `wasm32`; on every other target it is empty so
+//! that native workspace jobs keep building.
+#![cfg(target_arch = "wasm32")]
+
+extern crate alloc;
+
+mod audio;
+mod database;
+mod filesystem;
+mod platform;
+mod screen;
+
+use alloc::sync::Arc;
+use std::sync::Mutex;
+
+use js_sys::{Object, Reflect, Uint8Array};
+use wasm_bindgen::prelude::*;
+use web_sys::{AudioContext, HtmlCanvasElement};
+
+use wie_backend::{Emulator, Event, KeyCode, Options, extract_zip};
+use wie_j2me::J2MEEmulator;
+use wie_ktf::KtfEmulator;
+use wie_lgt::LgtEmulator;
+use wie_skt::SktEmulator;
+
+use crate::database::{DbStore, WebDatabaseRepository};
+use crate::filesystem::{FsStore, WebFilesystem};
+use crate::platform::WebPlatform;
+use crate::screen::WebScreen;
+
+const SEP: char = '\u{1}';
+
+/// Installs a panic hook that surfaces Rust panics in the browser console.
+#[wasm_bindgen(start)]
+pub fn init() {
+    console_error_panic_hook::set_once();
+}
+
+/// A running emulator instance, owned by JS for the lifetime of one loaded app.
+#[wasm_bindgen]
+pub struct WieEmulator {
+    inner: Box<dyn Emulator>,
+    fs_store: FsStore,
+    db_store: DbStore,
+}
+
+#[wasm_bindgen]
+impl WieEmulator {
+    /// Construct an emulator from an uploaded file.
+    ///
+    /// * `filename` — the original name (its extension picks the loader).
+    /// * `data` — the raw file bytes (kept entirely in wasm memory).
+    /// * `canvas` — the `<canvas>` the framebuffer is blitted onto.
+    /// * `audio_ctx` — an already-resumed `AudioContext`, or `null` for silence.
+    /// * `width` / `height` — emulator screen size (240×320 is the usual default).
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        filename: &str,
+        data: Vec<u8>,
+        canvas: &HtmlCanvasElement,
+        audio_ctx: Option<AudioContext>,
+        width: u32,
+        height: u32,
+    ) -> Result<WieEmulator, JsValue> {
+        let ctx = canvas
+            .get_context("2d")
+            .map_err(|_| JsValue::from_str("failed to get 2d context"))?
+            .ok_or_else(|| JsValue::from_str("canvas has no 2d context"))?
+            .dyn_into::<web_sys::CanvasRenderingContext2d>()
+            .map_err(|_| JsValue::from_str("unexpected context type"))?;
+        canvas.set_width(width);
+        canvas.set_height(height);
+
+        let fs_store: FsStore = Arc::new(Mutex::new(Default::default()));
+        let db_store: DbStore = Arc::new(Mutex::new(Default::default()));
+
+        let platform = Box::new(WebPlatform::new(
+            WebScreen::new(ctx, width, height),
+            WebFilesystem::new(fs_store.clone()),
+            WebDatabaseRepository::new(db_store.clone()),
+            audio_ctx,
+        ));
+
+        let options = Options {
+            enable_gdbserver: false,
+            profile: None,
+        };
+
+        let inner = build_emulator(platform, filename, data, options).map_err(|e| JsValue::from_str(&e))?;
+
+        Ok(WieEmulator { inner, fs_store, db_store })
+    }
+
+    /// Advance the emulator one frame and repaint. Call this from
+    /// `requestAnimationFrame`.
+    pub fn tick(&mut self) -> Result<(), JsValue> {
+        self.inner.tick().map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
+        self.inner.handle_event(Event::Redraw);
+        Ok(())
+    }
+
+    pub fn key_down(&mut self, code: &str) {
+        if let Some(key) = parse_key(code) {
+            self.inner.handle_event(Event::Keydown(key));
+        }
+    }
+
+    pub fn key_up(&mut self, code: &str) {
+        if let Some(key) = parse_key(code) {
+            self.inner.handle_event(Event::Keyup(key));
+        }
+    }
+
+    pub fn key_repeat(&mut self, code: &str) {
+        if let Some(key) = parse_key(code) {
+            self.inner.handle_event(Event::Keyrepeat(key));
+        }
+    }
+
+    /// Snapshot the in-memory save filesystem as a plain JS object
+    /// (`{ "aidpath": Uint8Array }`) for the JS layer to persist in
+    /// IndexedDB. Game files are never in this store.
+    pub fn export_fs(&self) -> Result<Object, JsValue> {
+        let obj = Object::new();
+        for ((aid, path), data) in self.fs_store.lock().unwrap().iter() {
+            let key = format!("{aid}{SEP}{path}");
+            let value = Uint8Array::from(data.as_slice());
+            Reflect::set(&obj, &JsValue::from_str(&key), &value)?;
+        }
+        Ok(obj)
+    }
+
+    /// Restore a previously exported save snapshot. Replaces the current store.
+    pub fn import_fs(&self, snapshot: &Object) -> Result<(), JsValue> {
+        let mut store = self.fs_store.lock().unwrap();
+        store.clear();
+        let keys = Object::keys(snapshot);
+        for key in keys.iter() {
+            let key_str = key.as_string().unwrap_or_default();
+            let Some((aid, path)) = key_str.split_once(SEP) else {
+                continue;
+            };
+            let value = Reflect::get(snapshot, &key)?;
+            let bytes = Uint8Array::new(&value).to_vec();
+            store.insert((aid.to_owned(), path.to_owned()), bytes);
+        }
+        Ok(())
+    }
+
+    /// True once any save data exists, so JS knows whether to persist.
+    pub fn has_saves(&self) -> bool {
+        !self.fs_store.lock().unwrap().is_empty() || !self.db_store.lock().unwrap().is_empty()
+    }
+}
+
+fn build_emulator(platform: Box<WebPlatform>, filename: &str, data: Vec<u8>, options: Options) -> Result<Box<dyn Emulator>, String> {
+    let name = &filename[filename.rfind('/').map(|i| i + 1).unwrap_or(0)..];
+
+    if filename.ends_with("zip") {
+        let files = extract_zip(&data).map_err(|e| format!("{e:?}"))?;
+        if KtfEmulator::loadable_archive(&files) {
+            Ok(Box::new(
+                KtfEmulator::from_archive(platform, files, options).map_err(|e| format!("{e:?}"))?,
+            ))
+        } else if LgtEmulator::loadable_archive(&files) {
+            Ok(Box::new(
+                LgtEmulator::from_archive(platform, files, options).map_err(|e| format!("{e:?}"))?,
+            ))
+        } else if SktEmulator::loadable_archive(&files) {
+            Ok(Box::new(SktEmulator::from_archive(platform, files).map_err(|e| format!("{e:?}"))?))
+        } else {
+            Err("Unknown archive format".to_owned())
+        }
+    } else if filename.ends_with("jar") {
+        let name_without_ext = name.trim_end_matches(".jar");
+        if KtfEmulator::loadable_jar(&data) {
+            Ok(Box::new(
+                KtfEmulator::from_jar(platform, name, data, name_without_ext, name_without_ext, None, options).map_err(|e| format!("{e:?}"))?,
+            ))
+        } else if LgtEmulator::loadable_jar(&data) {
+            Ok(Box::new(
+                LgtEmulator::from_jar(platform, name, data, name_without_ext, name_without_ext, None, options).map_err(|e| format!("{e:?}"))?,
+            ))
+        } else if SktEmulator::loadable_jar(&data) {
+            Ok(Box::new(
+                SktEmulator::from_jar(platform, name, data, name_without_ext, None).map_err(|e| format!("{e:?}"))?,
+            ))
+        } else {
+            Ok(Box::new(J2MEEmulator::from_jar(platform, name, data).map_err(|e| format!("{e:?}"))?))
+        }
+    } else if filename.ends_with("jad") {
+        Err("A .jad needs its companion .jar — please upload the .jar file instead.".to_owned())
+    } else {
+        Err("Unknown file format (expected .jar or .zip)".to_owned())
+    }
+}
+
+/// Map a frontend key name to a core [`KeyCode`]. Names match the `KeyCode`
+/// variants so the JS remapping UI can use the same vocabulary.
+fn parse_key(code: &str) -> Option<KeyCode> {
+    Some(match code {
+        "UP" => KeyCode::UP,
+        "DOWN" => KeyCode::DOWN,
+        "LEFT" => KeyCode::LEFT,
+        "RIGHT" => KeyCode::RIGHT,
+        "OK" => KeyCode::OK,
+        "LEFT_SOFT_KEY" => KeyCode::LEFT_SOFT_KEY,
+        "RIGHT_SOFT_KEY" => KeyCode::RIGHT_SOFT_KEY,
+        "CLEAR" => KeyCode::CLEAR,
+        "CALL" => KeyCode::CALL,
+        "HANGUP" => KeyCode::HANGUP,
+        "VOLUME_UP" => KeyCode::VOLUME_UP,
+        "VOLUME_DOWN" => KeyCode::VOLUME_DOWN,
+        "NUM0" => KeyCode::NUM0,
+        "NUM1" => KeyCode::NUM1,
+        "NUM2" => KeyCode::NUM2,
+        "NUM3" => KeyCode::NUM3,
+        "NUM4" => KeyCode::NUM4,
+        "NUM5" => KeyCode::NUM5,
+        "NUM6" => KeyCode::NUM6,
+        "NUM7" => KeyCode::NUM7,
+        "NUM8" => KeyCode::NUM8,
+        "NUM9" => KeyCode::NUM9,
+        "HASH" => KeyCode::HASH,
+        "STAR" => KeyCode::STAR,
+        _ => return None,
+    })
+}

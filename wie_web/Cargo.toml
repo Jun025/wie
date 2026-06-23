@@ -1,0 +1,51 @@
+# wie_web — browser host adapter for the wie emulator core.
+#
+# This crate is ADDITIVE: it implements the `wie_backend::Platform` abstraction
+# for the browser (canvas / WebAudio / in-memory + IndexedDB-snapshot storage)
+# and exposes a small `#[wasm_bindgen]` entry point. It does NOT modify any core
+# crate. Game bytes are injected straight into wasm memory from a user upload and
+# never leave the browser.
+#
+# The crate compiles to an empty library on non-wasm targets so that native
+# workspace jobs (`cargo build` / `cargo test --all` / `cargo clippy --all`)
+# stay green; all real code is gated behind `cfg(target_arch = "wasm32")`.
+
+[package]
+name = "wie_web"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "=0.2.108"
+js-sys = "=0.3.85"
+web-sys = { version = "=0.3.85", features = [
+    "Window",
+    "Document",
+    "Navigator",
+    "HtmlCanvasElement",
+    "CanvasRenderingContext2d",
+    "ImageData",
+    "console",
+    "AudioContext",
+    "BaseAudioContext",
+    "AudioBuffer",
+    "AudioBufferSourceNode",
+    "AudioNode",
+    "AudioDestinationNode",
+] }
+console_error_panic_hook = "0.1"
+getrandom = { version = "^0.4", features = ["wasm_js"] } # transitive; broken without wasm_js in wasm build
+
+async-trait = { workspace = true }
+tracing = { workspace = true }
+
+wie_backend = { workspace = true }
+wie_util = { workspace = true }
+wie_j2me = { path = "../wie_j2me" }
+wie_ktf = { path = "../wie_ktf" }
+wie_lgt = { path = "../wie_lgt" }
+wie_skt = { path = "../wie_skt" }
