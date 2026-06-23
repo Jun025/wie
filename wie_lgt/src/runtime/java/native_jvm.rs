@@ -94,6 +94,11 @@ pub struct LgtJvmShared {
     /// of a class; it must be stable across calls (and threads) so per-class state
     /// (e.g. the `a.run` run-flag) is shared. Lazily created + cached here.
     singletons: Arc<Mutex<BTreeMap<u32, u32>>>,
+    /// Whether the shown card's initial scene has been entered yet (cp39). The per-frame
+    /// driver runs the scene-enter `i.a(I)V` once on the first paint tick, then the
+    /// per-frame step `i.aE()V` every tick. Set false until the first paint so the enter
+    /// runs at a clean dispatch boundary (not mid-`a.run`, which clobbers the ARM core).
+    card_entered: Arc<Mutex<bool>>,
 }
 
 impl LgtJvmShared {
@@ -108,6 +113,7 @@ impl LgtJvmShared {
             pending_new: Arc::new(Mutex::new(BTreeSet::new())),
             app_field_layouts: Arc::new(Mutex::new(Vec::new())),
             singletons: Arc::new(Mutex::new(BTreeMap::new())),
+            card_entered: Arc::new(Mutex::new(false)),
         }
     }
 
@@ -273,7 +279,54 @@ impl LgtJvmShared {
             Ok(v) => v,
             Err(e) => return Err(JvmSupport::to_wie_err(&jvm, e).await),
         };
+        // The scene-enter is driven from the first paint tick (a clean dispatch
+        // boundary), not here: `show_card` runs mid-`a.run` and driving native code on
+        // the same core would clobber that in-flight context. See `drive_card_step`.
+        *self.card_entered.lock() = false;
         Ok(())
+    }
+
+    /// Per-frame card step (cp39): run the shown card's step method `i.aE()V`
+    /// (@0x72f2c) on the card `this`. ez-i ticks the current card each frame — advance
+    /// the scene state machine, then paint — but wie only drives `paint`, so we run the
+    /// step here, immediately before the card's `o.paint` (see [`LgtMethod::run`]).
+    /// `i.aE` is the per-frame state machine that reaches the `o.g` render-gate setter
+    /// (one of the four `0xdb200` callers — cp38); `o.paint` early-returns forever while
+    /// `o.g==0`, so without this tick the card never renders. Errors are logged and
+    /// swallowed so a step fault doesn't abort the frame. See `docs/lgt_abi.md` §7.
+    pub async fn drive_card_step(&self, core: &mut ArmCore, card_this: u32) {
+        if card_this == 0 {
+            return;
+        }
+        const SCENE_ENTER_PTR: u32 = 0x1d4ac; // i.a(I)V — scene-enter (cp38)
+        const INITIAL_SCENE: u32 = 0; // initial/title scene (state arg, used deeper)
+        const STEP_PTR: u32 = 0x72f2c; // i.aE()V — per-frame step (cp38)
+
+        // First tick: enter the initial scene. `i.a(I)V`'s prologue sets the `o.g`
+        // render gate (via the @0xdb200 setter) and runs the scene setup that
+        // initialises the state the per-frame step advances; without it `i.aE`
+        // early-returns on uninitialised state and `o.paint` stays gated (cp38).
+        let need_enter = {
+            let mut entered = self.card_entered.lock();
+            if *entered {
+                false
+            } else {
+                *entered = true;
+                true
+            }
+        };
+        if need_enter {
+            let r: Result<u32> = core.run_function(SCENE_ENTER_PTR, &[card_this, INITIAL_SCENE]).await;
+            match r {
+                Ok(_) => tracing::debug!("LGT drive_card_step: entered scene via i.a({card_this:#x}, {INITIAL_SCENE})"),
+                Err(e) => tracing::warn!("LGT scene-enter i.a @{SCENE_ENTER_PTR:#x} this={card_this:#x} failed: {e}"),
+            }
+        }
+
+        let r: Result<u32> = core.run_function(STEP_PTR, &[card_this]).await;
+        if let Err(e) = r {
+            tracing::warn!("LGT card step i.aE @{STEP_PTR:#x} this={card_this:#x} failed: {e}");
+        }
     }
 
     /// Object `+0x00` value: the virtual-method table base (for AOT vtable dispatch).
@@ -647,6 +700,13 @@ impl Method for LgtMethod {
             self.meta.code_ptr,
             params
         );
+        // cp39: drive the per-frame card step just before the card's paint, mirroring
+        // ez-i's per-frame tick (advance state machine, then paint). Without it `o.paint`
+        // early-returns forever (the `o.g` gate stays 0). See `Self::drive_card_step`.
+        if self.class_name == "o" && self.meta.name == "paint" {
+            let card_this = params.first().copied().unwrap_or(0);
+            self.shared.drive_card_step(&mut core, card_this).await;
+        }
         let r0: u32 = match core.run_function(self.meta.code_ptr, &params).await {
             Ok(r) => r,
             Err(e) => {
