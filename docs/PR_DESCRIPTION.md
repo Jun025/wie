@@ -116,8 +116,20 @@ internally) — so it is implementable, just sizeable; the precise unknowns are 
 
 ## Verification
 
+CI gates (`.github/workflows/rust.yml`), all green locally:
+
+- `cargo fmt --all -- --check` — **clean**.
+- `cargo clippy --all -- -D warnings` — **clean** (workspace, warnings denied).
 - `cargo test -p wie_lgt` — **5 passed** (descriptor parser, vtable model, field layout).
 - `cargo test -p wie_ktf test_helloworld` (clet regression) — **pass**.
-- `cargo clippy --workspace --tests` — **clean**.
 - `cargo build --workspace` — **builds**.
-- Diff contains no ROMs / logs / `.DS_Store` / local task notes (`.gitignore` updated).
+
+Scope / hygiene:
+
+- Diff touches **only** `wie_lgt/` + `docs/` (14 files, +3539/−39); no ROMs / binaries /
+  logs / `.DS_Store` / probe code (`.gitignore` covers `*.jar`/`*.mod`/`*.log`/etc.).
+- Shared `wie_midp` / `wie_wipi_java` classes are **not modified** (#1232); the Java-app
+  PoC is entirely in `LgtJvmShared`.
+- `wasm32-unknown-unknown` clippy (a CI target) not run locally; the `wie_lgt` additions
+  are pure `no_std` (`core`/`alloc` + workspace crates, no new external deps), so they are
+  wasm-safe and CI will confirm.
