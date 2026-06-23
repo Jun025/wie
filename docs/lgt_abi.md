@@ -713,6 +713,41 @@ result) that wie returns 0 for. This is **not** a proven external input/time wal
 (`currentTimeMillis` is called once, not polled; `keyNotify` is processed) — cp37 holds;
 it is an unresolved internal advance condition needing focused RE.
 
+**cp47 — DECISIVE measurement of the `[+0xd4]` keystone (logging-only probe).** `i.aE`
+reads the scene array from `getInstance(class b = handle 0x1400fc4)` (via `0x564c`);
+the would-be writers (`i.b`/`o.g`/…) are dispatched on `this=card 0x48840120`. Dumped
+`[+0xd4]` of both after the scene-enter+step:
+- `getInstance(b) = 0x488401c0 ≠ card 0x48840120` → **instance-identity split is real**
+  (cp26/27): wie mints a fresh per-class singleton instead of returning the card.
+- **but `[+0xd4] = 0` on _both_** → the populate never wrote to either object. Cross-ref:
+  `i.b` is an arg-dispatched command (switch on the int); its `[+0xd4]` write branch
+  needs arg `~0x46`, but `i.b` only ran with `0x3e9` (a different branch). **The
+  populate command was never dispatched** ⇒ the blocker is hyp **(3)** (populate not run),
+  not hyp (1) (identity).
+
+**cp48 — identity alias (hyp 1): implemented, REVERTED (not the keystone + regressed).**
+Made `getInstance` for the card's app classes `{i,b,o}` return the card (cp17: the card
+is the single instance holding all inherited fields). Verified it unifies them
+(`getInstance(b)=card`), but `[+0xd4]` stayed 0 **and** it *changed control flow
+harmfully*: the resource-load-by-ID methods that ran before (`o.g(0x3e9)`, `o.e/o.f(0x23)`,
+`i.b(0x3e9)`) **stopped running** (the card's pre-existing field state made the loader
+think work was already done). Reverted to baseline. The identity split is a real latent
+issue but **not** the blocker, and blanket-aliasing is the wrong fix.
+
+**cp49 — the populate chain bottoms out at the obfuscated resource read (same root).**
+RE'd the loader `o.g(I)V @0xda518` (called with resource id `0x3e9`): it stores the id at
+`field[0x74]=0x3e9` and `field[0x78]=0` (the *data* slot, empty), then dispatches a
+polymorphic virtual `this.vtable[X](id)` — the read that should fill `field[0x78]` lives
+in that handler and bottoms out in the no-op'd obfuscated import (cp42–45). The populate
+`i.b(0x46) → [+0xd4] = [obj.field+0x44]` is gated on `field[0x78]` filling. So the chain
+is: **obfuscated resource read no-ops → `field[0x78]` stays 0 → loaded-data object is
+null → populate command never fires / writes null → `[+0xd4]` empty → `i.aE` idles over
+an empty scene → no sprites/text.** The genuine root is the **obfuscated resource-read
+import** (multi-layer: app loader stores id → virtual handler → import that returns 0),
+still unpinned and not the standard `File`/`Image`/stdlib APIs (cp42/45). This is an
+internal I/O mechanism, **not** an external input/time wall (cp37 holds) — but cracking it
+needs sustained focused RE; per the guardrails I did not guess past it.
+
 ---
 
 ## 8. Current reach
@@ -738,5 +773,6 @@ it is an unresolved internal advance condition needing focused RE.
 | **show-card `0x57` + card lifecycle → FIRST PIXELS (cp39)** | ✅ `0x57`→`show_card` rebinds card to `i` + `Display.pushCard`; `drive_card_step` runs scene-enter `i.a` once + per-frame step `i.aE` before paint → **`o.g` 0→1 (genuine setup, not force), `o.paint` draws 18× `fillRect` + 24× `setColor` through real MIDP Graphics**. First LGT pixels in wie |
 | StringBuffer slot 24 = `append(I)`; scene-enter completes (cp40) | ✅ vtable[24] misdispatch fixed; `i.a(card,0)` runs to completion (loads `txt/*.dat`); background still the only draw |
 | self-sustaining frame loop (cp44) | ✅ `drive_card_step` schedules `repaint()` each tick → o.paint 3 → 362 frames (~45 fps); idle gone; background renders continuously |
-| full title (logo/sprites/text) | ⛔ corrected (cp45): the app **never reaches** resource loading in 362 frames (0 `File`/`Image`/`createImage`/stream) — it builds paths but never opens them. The scene state machine (`i.aE`) is stuck pre-load over an **empty** scene-object array; `0x22` image-blit no-ops (image arg 0). Open Q: why `i.a(0)`+`i.aE` doesn't advance to the load state (wrong initial scene? gated read branch?). Not an input/time wall (cp37 holds) |
+| `[+0xd4]` keystone measured (cp47) | ✅ identity split real (`getInstance(b)≠card`) but **not** the blocker — `[+0xd4]=0` on both ⇒ the populate command (`i.b(0x46)`) never runs (hyp 3). cp48 identity-alias reverted (regressed flow) |
+| full title (logo/sprites/text) | ⛔ root = **obfuscated resource read** (cp49): loaders (`o.g`/`i.b`) store a resource id at `field[0x74]` + data slot `field[0x78]=0`, then a virtual handler should read it — bottoms out in the no-op'd import (cp42/45, not File/Image/stdlib). `field[0x78]` stays 0 → scene array empty → `i.aE` idles → no sprites/text. Internal I/O, not an input/time wall (cp37 holds) |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
