@@ -117,6 +117,58 @@ impl LgtJvmShared {
         }
     }
 
+    /// java-interface import `0xd` (cp51): **lazy instance initialisation**. The AOT
+    /// guards every lazy use of an instance with `if [inst.field+0x10] != 5 { 0xd(inst,
+    /// init_fn) }` — `5` = "initialised". `0xd` runs the instance's initialiser
+    /// `init_fn(inst)` once, then marks it initialised. Left as a no-op (cp50), every
+    /// getInstance singleton stayed uninitialised, so its fields (e.g. the scene-object
+    /// count `field[0x44]`) were 0 ⇒ empty scene ⇒ `[+0xd4]` never populated ⇒ no
+    /// sprites/text. `init_fn` is passed by the call site (e.g. `i.c` @0x788a0 for the
+    /// `b`/`o` card singleton). Marks initialised *before* running so a re-entrant
+    /// lazy-init guard on the same instance doesn't recurse.
+    pub async fn lazy_instance_init(&self, core: &mut ArmCore, instance: u32, init_fn: u32) -> Result<()> {
+        if instance == 0 || init_fn == 0 {
+            return Ok(());
+        }
+        let fields = read_generic::<u32, _>(core, instance + OBJ_PTR_FIELDS_OFFSET)?;
+        if fields == 0 {
+            return Ok(());
+        }
+        let state = read_generic::<u16, _>(core, fields + 0x10)?;
+        if state == 5 {
+            return Ok(());
+        }
+        write_generic(core, fields + 0x10, 5u16)?;
+        if let Err(e) = core.run_function::<u32>(init_fn, &[instance]).await {
+            tracing::warn!("LGT lazy_instance_init inst={instance:#x} fn={init_fn:#x} failed: {e}");
+        } else {
+            tracing::debug!("LGT lazy_instance_init inst={instance:#x} fn={init_fn:#x} done");
+        }
+        Ok(())
+    }
+
+    /// java-interface import `0xb` (cp51): **lazy class initialisation**. The AOT guards
+    /// class use with `if [[class+8]+0x1a] != 3 { 0xb(class) }` (`3` = "initialised";
+    /// the class header at `[class+8]` holds the state halfword at `+0x1a`). No-op'd, the
+    /// flag never reached 3, so the guard re-fired on every access (3665× per run — a
+    /// spin) and the class never set up. Mark the class initialised so the guard passes.
+    pub async fn lazy_class_init(&self, core: &mut ArmCore, class_handle: u32) -> Result<()> {
+        if class_handle == 0 {
+            return Ok(());
+        }
+        let header = read_generic::<u32, _>(core, class_handle + 8)?;
+        if header == 0 {
+            return Ok(());
+        }
+        let state = read_generic::<u16, _>(core, header + 0x1a)?;
+        if state == 3 {
+            return Ok(());
+        }
+        write_generic(core, header + 0x1a, 3u16)?;
+        tracing::trace!("LGT lazy_class_init class={class_handle:#x} header={header:#x} (state {state}->3)");
+        Ok(())
+    }
+
     /// java-interface import `0xc` (`getInstance`): return the canonical singleton
     /// instance for the class identified by `class_handle` (`= class_header + 0x4c`).
     /// Created once (a bound app instance with its guest field array) and cached, so

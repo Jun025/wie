@@ -91,6 +91,20 @@ pub async fn handle_java_interface_svc(core: &mut ArmCore, shared: &mut LgtJvmSh
             shared.show_card(a1).await?;
             0
         }
+        // Lazy instance init (cp51): `0xd(instance, init_fn)` runs the instance's
+        // initialiser if it hasn't run yet (guarded on `field[0x10] != 5`). No-op'd,
+        // getInstance singletons stayed uninitialised (empty fields → empty scene).
+        // See `LgtJvmShared::lazy_instance_init`.
+        i if i == LAZY_INSTANCE_INIT_INDEX => {
+            shared.lazy_instance_init(core, a0, a1).await?;
+            0
+        }
+        // Lazy class init (cp51): `0xb(class)` marks a class initialised so the AOT's
+        // `if [[class+8]+0x1a] != 3` guard stops re-firing (it spun 3665× while no-op'd).
+        i if i == LAZY_CLASS_INIT_INDEX => {
+            shared.lazy_class_init(core, a0).await?;
+            0
+        }
         _ => {
             tracing::debug!("LGT java-interface import {index:#x}({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x}) lr={lr:#x} -> 0 (no-op)");
             0
@@ -118,6 +132,16 @@ const GET_INSTANCE_INDEX: u32 = 0xc;
 /// hands the platform the card the app `new`'d (the title card, guest `0x48840120`).
 /// Left as a no-op before cp39, so the card was never pushed and `o.paint` never ran.
 const SHOW_CARD_INDEX: u32 = 0x57;
+
+/// java-interface import index of lazy instance init (cp51): `0xd(instance, init_fn)`
+/// runs an instance's deferred initialiser the first time it's used (guarded by the AOT
+/// on `field[0x10] != 5`). Identified by the call shape in the getInstance helper
+/// `@0x1c304` (`if [inst+8].h[0x10] != 5 { r1 = init_fn; 0xd(inst, init_fn) }`).
+const LAZY_INSTANCE_INIT_INDEX: u32 = 0xd;
+
+/// java-interface import index of lazy class init (cp51): `0xb(class)` ensures a class is
+/// initialised the first time it's used (AOT guard `if [[class+8]+0x1a] != 3`).
+const LAZY_CLASS_INIT_INDEX: u32 = 0xb;
 
 /// Materialise a `java/lang/String` from `count` UTF-16 chars at guest `chars_ptr`,
 /// register it in the instance map behind a fresh guest proxy block, and return the
