@@ -83,6 +83,14 @@ pub async fn handle_java_interface_svc(core: &mut ArmCore, shared: &mut LgtJvmSh
         // registry)`; left as a no-op it returned 0, so the run-flag was never shared
         // and the game loop self-gated off.
         i if i == GET_INSTANCE_INDEX => shared.singleton_instance(core, a0).await,
+        // `show-card` (Display.setCurrent / pushCard equivalent): the app hands the
+        // platform a card guest block to display (`a0=jlet, a1=card, a2=jlet`). Rebind
+        // it to the app card class and push it to wie's Display so the MIDP paint loop
+        // ticks `o.paint` each frame (cp39). See `LgtJvmShared::show_card`.
+        i if i == SHOW_CARD_INDEX => {
+            shared.show_card(a1).await?;
+            0
+        }
         _ => {
             tracing::debug!("LGT java-interface import {index:#x}({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x}) lr={lr:#x} -> 0 (no-op)");
             0
@@ -104,6 +112,12 @@ const STRING_FACTORY_INDEX: u32 = 0x9;
 /// canonical singleton instance. Identified cp20 (the `func@0x18ac` getInstance path
 /// calls `import_0xc(class_handle, registry)` and dereferences the result).
 const GET_INSTANCE_INDEX: u32 = 0xc;
+
+/// java-interface import index of `show-card` (Display.setCurrent / pushCard
+/// equivalent). Identified cp39 from the `a.run` trace: `0x57(jlet, card_guest, jlet)`
+/// hands the platform the card the app `new`'d (the title card, guest `0x48840120`).
+/// Left as a no-op before cp39, so the card was never pushed and `o.paint` never ran.
+const SHOW_CARD_INDEX: u32 = 0x57;
 
 /// Materialise a `java/lang/String` from `count` UTF-16 chars at guest `chars_ptr`,
 /// register it in the instance map behind a fresh guest proxy block, and return the

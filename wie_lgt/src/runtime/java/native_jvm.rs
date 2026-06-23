@@ -198,6 +198,84 @@ impl LgtJvmShared {
         Some(instance)
     }
 
+    /// LGT java-interface import `0x57` (show-card): the app `new`'d a card and hands
+    /// it to the platform to display (observed `0x57(jlet, card_guest, jlet)` in
+    /// `a.run` — cp39 trace). The guest block was bound to the platform `Card` base by
+    /// its `<init>` trampoline: only the `super Card.<init>` runs through wie, so the
+    /// app's most-derived class isn't visible at bind time and `paint` would resolve to
+    /// the empty platform `Card.paint`. Rebind the guest block to the app's title-card
+    /// class (`i` — cp38) as an [`LgtClassInstance`] reusing the SAME guest pointer, so
+    /// `paint` dispatches through `i -> b -> o` to the native `o.paint` (the real draw
+    /// @0xd8d70), then push it to wie's `Display` so the MIDP paint loop ticks it each
+    /// frame. Left no-op before cp39, which is why `o.paint` never ran. See
+    /// `docs/lgt_abi.md` §7.
+    pub async fn show_card(&self, card_guest: u32) -> Result<()> {
+        if card_guest == 0 {
+            return Ok(());
+        }
+        // `0x57` is overloaded: the Game-flow call passes a real card guest object
+        // (heap-allocated, already bound by its `<init>`), but `a.run` also calls
+        // `0x57(jlet, <carried code ptr>, jlet)` where arg1 is a `.text` code pointer,
+        // not a card. Only act on a genuine bound object (present in `instances`) so the
+        // carried-code call is ignored.
+        if !self.instances.lock().contains_key(&card_guest) {
+            tracing::trace!("LGT show_card: {card_guest:#x} is not a bound object (carried-code 0x57?); ignoring");
+            return Ok(());
+        }
+        // App card class to rebind to. For the current reach (title) this is the title
+        // card `i` (cp38); other cards would each need their class resolved once shown.
+        const CARD_CLASS: &str = "i";
+        let jvm = self.jvm.clone();
+
+        let class = match jvm.resolve_class(CARD_CLASS).await {
+            Ok(c) => c,
+            Err(_) => {
+                tracing::warn!("LGT show_card: app card class {CARD_CLASS:?} not registered; card {card_guest:#x} left as platform Card");
+                return Ok(());
+            }
+        };
+        let definition = match class.definition.as_any().downcast_ref::<LgtClassDefinition>() {
+            Some(def) => def.clone(),
+            None => {
+                tracing::warn!("LGT show_card: {CARD_CLASS:?} is not an app class; card {card_guest:#x} left as-is");
+                return Ok(());
+            }
+        };
+        let card: Box<dyn ClassInstance> = Box::new(LgtClassInstance {
+            guest_ptr: card_guest,
+            definition,
+            jvm_fields: Arc::new(Mutex::new(BTreeMap::new())),
+        });
+        self.instances.lock().insert(card_guest, card.clone());
+        tracing::debug!("LGT show_card: rebound card {card_guest:#x} -> {CARD_CLASS:?}; pushing to Display");
+
+        let display_val: JavaValue = match jvm
+            .invoke_static(
+                "org/kwis/msp/lcdui/Display",
+                "getDefaultDisplay",
+                "()Lorg/kwis/msp/lcdui/Display;",
+                Vec::<JavaValue>::new(),
+            )
+            .await
+        {
+            Ok(v) => v,
+            Err(e) => return Err(JvmSupport::to_wie_err(&jvm, e).await),
+        };
+        let display = match display_val {
+            JavaValue::Object(Some(d)) => d,
+            _ => {
+                tracing::warn!("LGT show_card: getDefaultDisplay returned null");
+                return Ok(());
+            }
+        };
+        let args = alloc::vec![JavaValue::Object(Some(card))];
+        let _: JavaValue = match jvm.invoke_virtual(&display, "pushCard", "(Lorg/kwis/msp/lcdui/Card;)V", args).await {
+            Ok(v) => v,
+            Err(e) => return Err(JvmSupport::to_wie_err(&jvm, e).await),
+        };
+        Ok(())
+    }
+
     /// Object `+0x00` value: the virtual-method table base (for AOT vtable dispatch).
     fn vtable_word(&self) -> u32 {
         *self.vmethod_table.lock()
