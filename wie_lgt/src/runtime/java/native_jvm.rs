@@ -327,6 +327,16 @@ impl LgtJvmShared {
         if let Err(e) = r {
             tracing::warn!("LGT card step i.aE @{STEP_PTR:#x} this={card_this:#x} failed: {e}");
         }
+
+        // cp44: sustain the frame loop. `a.run` is one-shot and the app's per-frame
+        // repaint request (import `0xe2`) is not yet wired, so wie paints a few times
+        // then idles. Schedule the next repaint so the card's step+paint run each frame
+        // — a legitimate continuous render mirroring the platform's per-frame tick (not
+        // a force; `repaint` only enqueues a paint event, which runs after this one).
+        let card = self.instances.lock().get(&card_this).cloned();
+        if let Some(card) = card {
+            let _: core::result::Result<JavaValue, JavaError> = self.jvm.invoke_virtual(&card, "repaint", "()V", Vec::<JavaValue>::new()).await;
+        }
     }
 
     /// Object `+0x00` value: the virtual-method table base (for AOT vtable dispatch).
