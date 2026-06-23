@@ -561,6 +561,39 @@ singleton sits on the `0xdb200` path, then invoke it each frame from wie's exist
 `CardCanvas.paint` tick (no args needed — self-contained). If that lands `o.g=1`, cp28
 already proved `o.paint` then draws ⇒ live render from the wie side, no maintainer ABI.
 
+**cp38 — game-flow RE: `i` is the title card; its scene-setup `i.a(I)V` runs the o.g=1
+path; the gap is the card lifecycle, not an ABI (disasm + trace).** Traced the whole
+reachable game flow and where it stops:
+
+- *Flow.* `a.startApp` (gate `a.field[slot]==0` → init, else polymorphic
+  `a.vtable[slot]` = `Game.startApp`) → `Game.a` (data load) / `Game.b` → i-card init
+  (the `0x1c…` region runs: `i.Q` etc. — array clears) → registration (`0x57` show-card
+  with a1=`0x48840120`, `0x21` driver `0x48840540`) → `Thread.start(a)` → `a.run`
+  (one-shot: `0x55/0x56/0x1f/0x57/0x21`, returns). Native methods dispatched:
+  `Game.a/b`, `a.startApp`, `a.run` — **no card paint/step**.
+- *`i` is the title card.* The card handed to `0x57` (`0x48840120`) is constructed via
+  `Card.<init>` from an `o.<init>` chain (`lr=0xd86c4`) — i.e. an instance of `i`
+  (`i extends b extends o extends Card`). `i` has 151 methods (the game's main logic).
+- *`i.a(I)V` (@0x1d4ac) is the scene-setup.* Disasm: takes a state arg `I`, calls the
+  `o.g` setter `@0xdb200` with **literal constants** (`r0=#1`, `#2`, …), runs object/
+  resource setup and many `bl` helpers + vtable calls. It is the per-scene **enter/setup
+  (run once on card entry)**, not a per-frame step, and it is **never reached** in the
+  run (the `0x1d4ac+` range shows no `lr` in trace; only `i`-init `0x1c…` runs).
+- *Where it stops.* The game registers the card (`0x57`) and the driver (`0x21`) and
+  returns from the one-shot `a.run`. In real ez-i, `0x57` (show card) then drives the
+  card's lifecycle — setup (→ `i.a`) and the per-frame paint loop. wie no-ops `0x57`, so
+  the card is never *entered* (no `i.a`, so `o.g` stays 0) and never *painted* by the
+  game (only the manual `pushCard` of cp26/28 paints, on an empty singleton).
+
+**This refines, not contradicts, cp37 (A).** `o.g=1` is still self-contained (constants).
+The missing piece is the **card lifecycle that `0x57` should trigger**: enter the shown
+card (run its setup, which sets `o.g=1` and loads resources) and add it to the per-frame
+paint loop. That is app-side work wie can do from the `0x57` handler — no ez-i argument
+needed. *cp39 target:* implement `0x57` (show-card) as a real card-enter in
+`LgtJvmShared` — bind/resolve the shown card instance, run its enter/setup, push it to
+wie's `CardCanvas` paint tick — then re-drive and chase the resulting cascade
+(font/sprite loads, missing imports) to the title.
+
 ---
 
 ## 8. Current reach
