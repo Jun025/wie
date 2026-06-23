@@ -1,5 +1,25 @@
 # feat(lgt): native-backed JVM foundation for AOT-compiled LGT/ez-i Java apps
 
+> **TL;DR** — Adds a `wie_lgt` foundation for **AOT-compiled LGT/ez-i Java apps** (each
+> class emitted as native ARM + a `.data` descriptor, not JVM bytecode). It **boots
+> through wie's shared lcdui path and reaches a self-sustaining render loop** (the card
+> paints every frame, ~45 fps, real MIDP Graphics — background). The boundary is precise:
+> the title's sprites/text are blocked at one spot — a requested resource's data slot
+> (`field[0x78]`) never fills, inside the app's obfuscated internal data subsystem. Shared
+> `wie_midp` / `wie_wipi_java` classes are **not modified** (#1232) — all PoC code is in
+> `LgtJvmShared`.
+>
+> **Why this might be useful** — The hard part was the ez-i **per-frame render driver**,
+> which earlier looked like an undocumented displayable/clet ABI. RE showed it is *not* an
+> unknown ABI: it was a no-op'd `0x57` (show-card) import plus the card's own lifecycle,
+> now driven from `LgtJvmShared`. As a sanity check that this is genuine and not a hack,
+> the `o.g` render gate is set by the **app's own scene setup**, not forced.
+>
+> **What I'd like feedback on** — (a) whether a `wie_lgt` foundation in roughly this shape
+> is something you'd consider taking, and what you'd want changed; (b) the branch is 73
+> small RE checkpoints, so **"Squash and merge" is probably best**. I may well have missed
+> existing context or conventions here — happy to adjust.
+
 ## Summary
 
 Adds a foundation in `wie_lgt` for running **AOT-compiled LGT Java apps** (ez-i / Xceed
