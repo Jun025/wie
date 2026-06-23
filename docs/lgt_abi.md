@@ -631,6 +631,49 @@ swallowed fatal, so sprite/image/text loads don't complete (only `fillRect`/`set
 so far, no `drawImage`/`drawString`). Next: resolve that per-object vtable slot (or the
 correct title scene state — `0` is a starting value) to unblock the full title.
 
+**cp40 — StringBuffer physical slot 24 = `append(I)`; scene-enter completes.** Resolved
+cp39's residual blocker with the cp30 methodology. `i.a(Z)V` (@0x2fd94) builds resource
+paths via `append(String).append(int)…` (e.g. `"img/map" + id`): physical vtable slot 19
+(offset 0x4c) = `append(String)`, slot 24 (offset 0x60) = `append(int)`. The app calls
+slot 24 on a StringBuffer (`r5.slot24(r1)` returns the chainable receiver; `r1 =
+singleton.field[0x74]`), but slot 24 wasn't overridden so it fell through to global slot
+24 = `Display.pushCard` → swallowed fatal, aborting the scene's loads. Classified by call
+shape + a logging-only runtime probe (raw arg = `8`, a small int) ⇒ `append(I)`; added
+`(24, "append", "(I)Ljava/lang/StringBuffer;")` to StringBuffer's `known_java_lang_vtable`.
+Verified: `i.a(card, 0)` now completes (no fatal); the deep setup loads `txt/*.dat` data
+(`mon_info`, `SUB_QST_INFO`, `mon_name`, …). Background still the only draw.
+
+**cp41 — RE map: the next blocker is the resource-load subsystem (+ continuous frame
+drive), not a single slot.** Dumped the full imported-platform-API vocabulary and traced
+the loader and the post-load idle. Findings:
+
+- *Import vocabulary (30 platform classes).* Relevant: `org/kwis/msp/io/File`
+  (`read([B)I` + statics — raw file bytes), `org/kwis/msp/lcdui/Image`
+  (`createImage(String)`, `createImage([BII)`, `createImage(II)`, `getGraphics`,
+  `getWidth/Height`), `Graphics.drawImage(Image,III)`. wie's shared classes already
+  implement `File` + `Image` over `system.filesystem()`, and the JAR carries the 802
+  resources (`img/*.mbm` Symbian bitmaps, `img/*.png`, `txt/*.dat`).
+- *Loader.* `b.a(Ljava/lang/String;Z)V` (@0x5874) is the app's resource loader: it builds
+  `path + ext` with a StringBuffer (slot 19/24/5), then calls into the app's **own**
+  resource-manager object (`r6 = this.slot1(); r6.slot17(path)`), which bottoms out in a
+  java-interface **import** (the `0xe2c50` thunk → dispatcher `0xe31a8`) — currently
+  no-op'd, so the file read returns 0. So no `File`/`Image`/`createImage` is reached;
+  the manager uses low-level imports, not the platform classes directly.
+- *Post-load idle (NOT a spin, NOT a proven external wall).* After the scene-enter +
+  data load + 3 paints (background), the guest goes fully idle in ~0.2 s: `a.run` (the
+  game thread) is one-shot and returns; wie's MIDP painted 3× then stopped. The app
+  requests frames via `Card.repaint(IIII)` (Card vref 3) / import `0xe2`, which wie
+  no-ops, so no further paints/steps run. This is plausibly downstream of the empty
+  loads (the loading scene can't advance without real data) and/or a missing continuous
+  repaint drive — to be disambiguated after the load import lands. cp37's "no external
+  injection" still holds (the frame request is self-contained: `repaint` → paint → step).
+
+*cp42+ target:* implement the resource-load import (read the named file from
+`system.filesystem()` and return bytes/handle the manager expects), wire `Card.repaint`
+/ `0xe2` to wie's repaint so the frame loop self-sustains, then chase
+`createImage`/MBM-decode → `drawImage` (sprites) and the glyph font sheet (cp33-35) →
+`drawString`/glyphs. Per-frame image/char allocs must pool/free.
+
 ---
 
 ## 8. Current reach
@@ -654,5 +697,6 @@ correct title scene state — `0` is a starting value) to unblock the full title
 | per-frame driver is self-contained, not ABI (cp37) | ◑ recon: carried code = const init; `0x21` obj has no code ptr; real `o.g=1` writer `@0xdb200` sets g **unconditionally from a constant arg** ⇒ **(A) self-contained, (B) external-injection ruled out**. Gap is a call-trigger, not an ABI signature |
 | game-flow RE: `i` = title card, gap = card lifecycle `0x57` (cp38) | ✅ traced flow stops at one-shot `a.run`; `0x57` show-card no-op'd → card never pushed, never painted |
 | **show-card `0x57` + card lifecycle → FIRST PIXELS (cp39)** | ✅ `0x57`→`show_card` rebinds card to `i` + `Display.pushCard`; `drive_card_step` runs scene-enter `i.a` once + per-frame step `i.aE` before paint → **`o.g` 0→1 (genuine setup, not force), `o.paint` draws 18× `fillRect` + 24× `setColor` through real MIDP Graphics**. First LGT pixels in wie |
-| full title (logo/sprites/text) | ◑ background fills render; sprite/image/text loads blocked on a `vtable[24]` misdispatch in `i.a(Z)V` scene setup (cp14/25 unbound-vtable class) — next cp |
+| StringBuffer slot 24 = `append(I)`; scene-enter completes (cp40) | ✅ vtable[24] misdispatch fixed; `i.a(card,0)` runs to completion (loads `txt/*.dat`); background still the only draw |
+| full title (logo/sprites/text) | ◑ blocked on the **resource-load subsystem** (cp41): app loader `b.a(String,Z)` bottoms out in a no-op'd file-open import → empty loads → no `createImage`/`drawImage`; guest then idles (no continuous frame drive). cp42+ = load import + `repaint`/`0xe2` wire + MBM decode |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
