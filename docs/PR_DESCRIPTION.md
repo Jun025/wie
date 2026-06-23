@@ -7,11 +7,13 @@ toolchain), where each Java class is emitted as native ARM code with `.data` met
 rather than JVM bytecode. The app boots through wie's existing lcdui `Main.main` path
 and runs its real native methods, dispatched through reconstructed platform tables.
 
-Reverse-engineered against one ez-i reference app. It reaches **full boot + game setup**
-(class registration, platform dispatch, data load, 240×320 back-buffer, `getGraphics`,
-Cards/RNG/Thread). The **per-frame render driver does not yet run** — it depends on the
-ez-i displayable/clet tick ABI, which is not derivable from the app binary and is the
-one documented open question (see below).
+Reverse-engineered against one ez-i reference app. It reaches **boot + game setup +
+first render**: class registration, platform dispatch, data load, 240×320 back-buffer,
+`getGraphics`, Cards/RNG/Thread, and — after implementing the show-card import and
+driving the card lifecycle — the card's `o.paint` runs each frame and **draws to the
+back-buffer** (`fillRect`/`setColor`). The full title (logo/sprites/text) is still in
+progress, blocked on an unbound-class vtable misdispatch in the scene resource setup
+(see below).
 
 The PoC keeps everything LGT-specific in `LgtJvmShared` (per #1232); shared
 `wie_midp` / `wie_wipi_java` classes are **not modified**.
@@ -61,23 +63,30 @@ guest blocks (vtable word + 256-word field array) bound to JVM instances at `<in
 - ✅ Platform dispatch (two-level vtable, per-class overrides, instance fields),
   `getInstance` singletons, `Thread.start`, game thread spawns `a.run`.
 - ✅ Game setup: data load → 240×320 back-buffer → `getGraphics` → Cards/RNG.
-- ⛔ **Title pixels not yet drawn** — 0 draw calls; blocked on the render-tick ABI.
+- ✅ **Render: the card draws.** Implementing java-interface `0x57` (show-card) +
+  driving the card lifecycle (scene-enter `i.a` once, per-frame step `i.aE`) sets the
+  `o.g` render gate and runs `o.paint` each frame through wie's MIDP paint loop →
+  **`fillRect` / `setColor` draws to the back-buffer** (background fills). First pixels.
+- ◑ Full title (logo / sprites / text) not yet complete — blocked on a `vtable[24]`
+  misdispatch in the scene resource setup (an unbound-class object's hardcoded vtable
+  slot misroutes to `Display.pushCard`; the cp14/25 unbound-vtable problem).
 
 ## Deferred (out of scope for this PR)
 
-**ez-i render-tick ABI.** The app `new`s a bare native object, hands it to platform
-import `0x21`, and registers callbacks via `0x55`/`0x56`. That object is **unbound**
-(no `<init>`, no JVM class), so there is no identifiable per-frame method to call — the
-ez-i runtime is what invokes the registered object's paint each frame, and wie does not
-emulate that loop. `a.run` is a confirmed one-shot (it returns after registration). The
-single missing fact, recorded in `docs/lgt_abi.md` §7:
+**ez-i render driver — resolved (cp38–39, `docs/lgt_abi.md` §7).** The §7 open question
+("which entry does ez-i invoke per frame") turned out to be a single no-op'd import, not
+an unknown ABI: `a.run` hands the platform the title card via java-interface `0x57`
+(show-card / `Display.setCurrent`), which wie left as a no-op, so the card was never
+pushed and `o.paint` never ran. `LgtJvmShared::show_card` now rebinds the card to its app
+class and `pushCard`s it; `drive_card_step` runs the genuine card lifecycle from the
+paint tick. `o.g` is set by the app's **own** scene setup (`i.a`'s `@0xdb200` writer,
+not a force), and `o.paint` draws. All LGT-specific (`LgtJvmShared`); shared classes
+untouched (#1232).
 
-> Which registered object's native entry does the ez-i runtime invoke per frame to
-> paint, and how does its back-buffer flush to screen (the ez-i `DisplayProxy.flush`
-> equivalent / the displayable/clet ABI that `0x21`/`0x55`/`0x56` bind)?
-
-With that, the per-frame call can be driven from `LgtJvmShared` on wie's existing paint
-tick — no shared-class changes needed. PoC `LgtJvmShared` stays LGT-specific (#1232).
+**Remaining for the full title.** The scene resource setup (`i.a(Z)V`) makes a hardcoded
+`vtable[24]` call on an object whose class isn't in the import tables, which wie's global
+by-name vtable misroutes — the same unbound-vtable issue tracked since cp14/25. Resolving
+it (and confirming the precise title scene state) unblocks sprite/image/text rendering.
 
 ## Verification
 
