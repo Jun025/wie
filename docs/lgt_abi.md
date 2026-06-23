@@ -674,6 +674,45 @@ the loader and the post-load idle. Findings:
 `createImage`/MBM-decode → `drawImage` (sprites) and the glyph font sheet (cp33-35) →
 `drawString`/glyphs. Per-frame image/char allocs must pool/free.
 
+**cp42 — resource-I/O RE corrections (no code): cp41's read-import claim was wrong.**
+Read every thunk's `.word table; .word index`:
+- `0xe2c50` = stdlib (table 1) **index 0x32 = `new`**, not a read import (cp41 misread it).
+- The file read is **not stdlib** (wie's stdlib `_ =>` is `FatalError`; it never fires,
+  so the 0x3e9-0x3ec ops in that thunk table are never called) and **not** the `File`/
+  `Image` platform classes (no `File`/`Image` trampolines fire — see cp45).
+- `b.a(String,Z)V` @0x5874 uses java-interface `0x54`(safepoint)/`0x1f`/`0x12`/`0xf` and
+  StringBuffer/System statics; it is **config/setup, not the byte reader** (with `new`
+  always non-zero it takes the no-read branch). The app's resource-read path does not use
+  the expected platform APIs and is obfuscated — exact contract still unpinned.
+
+**cp44 — self-sustaining frame loop (continuous card tick). IMPLEMENTED + verified.**
+`drive_card_step` now schedules the card's `repaint()` after each step, so the shown
+card's step+paint run every frame (continuous render mirroring the platform tick;
+`repaint` only enqueues a paint event — not a force). **o.paint 3 → 362 frames over 8 s
+(~45 fps), self-sustaining**, each frame drawing background (~6 `fillRect` + ~8
+`setColor`). The idle is gone; the game still shows only the background.
+
+**cp45 — KEY CORRECTION: the I/O is never reached; the game is stuck pre-load.** Over
+362 continuous frames the app exercises **zero** `File`/`Image`/`InputStream`/
+`createImage`/`getResourceAsStream` — it builds path strings (StringBuffer) but never
+opens them. So the blocker is **not** "implement the load import" (that code is never
+reached) — the **scene state machine is stuck in an early state before loading**:
+- `i.aE` (per-frame step) iterates a scene-object array (`[singleton+0xd4]`, calling
+  slot 18 per element); the array is **empty** (no objects loaded) so each frame is a
+  no-op update over background.
+- import `0x22` (the image blit, fired 64× during enter) no-ops because its image arg is
+  **0** — the image was never `createImage`'d, because the create-image code is never
+  reached.
+
+So the real open question (revised): **why does the driven scene (`i.a(0)` + `i.aE`) not
+advance to the resource-load state?** Candidates to RE next, by evidence (no guessing):
+(a) the forced initial scene `0` may be the wrong entry (a state that idles vs the
+splash/loading state the game would normally enter — the scene state still unconfirmed);
+(b) the loader's read branch is gated behind a condition (e.g. `b.a`'s `import 0x12`
+result) that wie returns 0 for. This is **not** a proven external input/time wall
+(`currentTimeMillis` is called once, not polled; `keyNotify` is processed) — cp37 holds;
+it is an unresolved internal advance condition needing focused RE.
+
 ---
 
 ## 8. Current reach
@@ -698,5 +737,6 @@ the loader and the post-load idle. Findings:
 | game-flow RE: `i` = title card, gap = card lifecycle `0x57` (cp38) | ✅ traced flow stops at one-shot `a.run`; `0x57` show-card no-op'd → card never pushed, never painted |
 | **show-card `0x57` + card lifecycle → FIRST PIXELS (cp39)** | ✅ `0x57`→`show_card` rebinds card to `i` + `Display.pushCard`; `drive_card_step` runs scene-enter `i.a` once + per-frame step `i.aE` before paint → **`o.g` 0→1 (genuine setup, not force), `o.paint` draws 18× `fillRect` + 24× `setColor` through real MIDP Graphics**. First LGT pixels in wie |
 | StringBuffer slot 24 = `append(I)`; scene-enter completes (cp40) | ✅ vtable[24] misdispatch fixed; `i.a(card,0)` runs to completion (loads `txt/*.dat`); background still the only draw |
-| full title (logo/sprites/text) | ◑ blocked on the **resource-load subsystem** (cp41): app loader `b.a(String,Z)` bottoms out in a no-op'd file-open import → empty loads → no `createImage`/`drawImage`; guest then idles (no continuous frame drive). cp42+ = load import + `repaint`/`0xe2` wire + MBM decode |
+| self-sustaining frame loop (cp44) | ✅ `drive_card_step` schedules `repaint()` each tick → o.paint 3 → 362 frames (~45 fps); idle gone; background renders continuously |
+| full title (logo/sprites/text) | ⛔ corrected (cp45): the app **never reaches** resource loading in 362 frames (0 `File`/`Image`/`createImage`/stream) — it builds paths but never opens them. The scene state machine (`i.aE`) is stuck pre-load over an **empty** scene-object array; `0x22` image-blit no-ops (image arg 0). Open Q: why `i.a(0)`+`i.aE` doesn't advance to the load state (wrong initial scene? gated read branch?). Not an input/time wall (cp37 holds) |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
