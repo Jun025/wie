@@ -594,6 +594,43 @@ needed. *cp39 target:* implement `0x57` (show-card) as a real card-enter in
 wie's `CardCanvas` paint tick — then re-drive and chase the resulting cascade
 (font/sprite loads, missing imports) to the title.
 
+**cp39 — implemented show-card + card lifecycle → FIRST PIXELS (o.g set, `o.paint`
+draws).** A live trace (`RUST_LOG=wie_lgt=debug`) pinned the §7 gap to a single
+no-op'd import and turned it into working render:
+
+- *The gap was one import.* `a.run` calls java-interface `0x57(jlet, card=0x48840120,
+  jlet)` — the show-card / `Display.setCurrent` equivalent — which wie left as a no-op.
+  So the card was never pushed to wie's Display and **`o.paint` never ran** (0 frames).
+  (`0x57` is overloaded: `a.run` also calls `0x57(jlet, <carried code 0x1ad4>, jlet)`,
+  arg1 a `.text` pointer not a card.)
+- *show-card (`LgtJvmShared::show_card`).* The card guest block was bound to the
+  platform `Card` base by its `<init>` trampoline (only `super Card.<init>` runs through
+  wie, so the app's most-derived class isn't visible at bind time → `paint` would resolve
+  to the empty platform `Card.paint`). Rebind it to the app class `i` (cp38) as an
+  `LgtClassInstance` reusing the **same** guest pointer, then `Display.pushCard`. `paint`
+  now dispatches through `i→b→o` to native `o.paint` (@0xd8d70). Guarded to genuine bound
+  heap objects (ignores the carried-code `0x57`).
+- *card lifecycle (`drive_card_step`, called from `LgtMethod::run` just before the
+  card's `o.paint`).* First paint tick: run scene-enter `i.a(I)V` (@0x1d4ac) once; every
+  tick: run per-frame step `i.aE()V` (@0x72f2c). Both RE'd o.g-setter reachers (cp38).
+  The enter MUST run at the paint boundary, **not** mid-`a.run` — driving native code on
+  the same `ArmCore` mid-SVC clobbers the in-flight context (an enter from `show_card`
+  faulted the whole flow).
+- *Result (verified vs ROM).* `o.g` goes 0→1 (`i.a`'s prologue sets it via the `@0xdb200`
+  setter during **real** scene setup — not a force), `o.paint` passes the gate
+  (`ldr r7,[fields+0x18]; cmp r7,#0; beq`) and **draws each frame through the real MIDP
+  Graphics: 18× `fillRect` + 24× `setColor` + 3× `getColor`** (background fills). This is
+  the first time the LGT/ez-i app renders pixels in wie.
+
+*Remaining cascade (next cp).* `i.a`'s deep setup (state `0`) builds resource paths
+(`"img/map"`, `".dat"`) and in the sub-helper `i.a(Z)V` (@0x2fd94) does
+`ldr r3,[r5]; ldr ip,[r3,#0x60]; bx ip` — a hardcoded `vtable[24]` call on a String/
+resource object whose class isn't in the import tables, so wie's **global** by-name
+vtable misroutes slot 24 to `Display.pushCard` (the cp14/25 unbound-vtable problem) →
+swallowed fatal, so sprite/image/text loads don't complete (only `fillRect`/`setColor`
+so far, no `drawImage`/`drawString`). Next: resolve that per-object vtable slot (or the
+correct title scene state — `0` is a starting value) to unblock the full title.
+
 ---
 
 ## 8. Current reach
@@ -614,6 +651,8 @@ wie's `CardCanvas` paint tick — then re-drive and chase the resulting cascade
 | glyph blit mechanism RE'd (cp34) | ◑ blit = `g.drawImage(sheet, src_x=(char-0x21)*10, w=10)`; font path via `import 0x22(a0=font_img, a1=0x11264→fn 0x10fb0)` |
 | font path resolved → platform-gated (cp35) | ⛔ probe: `r6=g` (not the font img — cp33/4 corrected); font img = `0x22` a0 = **0** every char; `0x10fb0` = strb bookkeeping (no draw); **no font `createImage`** in the reachable run (only the 240×320 back-buffer). Font load/native render is §7-gated, not an app one-liner |
 | wie can't substitute the ez-i tick (cp36) | ⛔ `o.k()` (registered) and `fn@0xda870` (unregistered) both driven from wie → `o.g` stays 0 — but cp37 shows these were the *wrong* methods (neither is the `o.g` writer) |
-| per-frame driver is self-contained, not ABI (cp37) | ◑ recon: carried code = const init; `0x21` obj has no code ptr; real `o.g=1` writer `@0xdb200` sets g **unconditionally from a constant arg** ⇒ **(A) self-contained, (B) external-injection ruled out**. Gap is a call-trigger, not an ABI signature. cp38 = drive the `0xdb200`-path step from wie's tick |
-| **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
+| per-frame driver is self-contained, not ABI (cp37) | ◑ recon: carried code = const init; `0x21` obj has no code ptr; real `o.g=1` writer `@0xdb200` sets g **unconditionally from a constant arg** ⇒ **(A) self-contained, (B) external-injection ruled out**. Gap is a call-trigger, not an ABI signature |
+| game-flow RE: `i` = title card, gap = card lifecycle `0x57` (cp38) | ✅ traced flow stops at one-shot `a.run`; `0x57` show-card no-op'd → card never pushed, never painted |
+| **show-card `0x57` + card lifecycle → FIRST PIXELS (cp39)** | ✅ `0x57`→`show_card` rebinds card to `i` + `Display.pushCard`; `drive_card_step` runs scene-enter `i.a` once + per-frame step `i.aE` before paint → **`o.g` 0→1 (genuine setup, not force), `o.paint` draws 18× `fillRect` + 24× `setColor` through real MIDP Graphics**. First LGT pixels in wie |
+| full title (logo/sprites/text) | ◑ background fills render; sprite/image/text loads blocked on a `vtable[24]` misdispatch in `i.a(Z)V` scene setup (cp14/25 unbound-vtable class) — next cp |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
