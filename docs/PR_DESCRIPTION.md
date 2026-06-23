@@ -97,18 +97,22 @@ schedules `repaint()` so the loop self-sustains. The back-buffer flushes through
 existing MIDP path — **no shared-class changes** (#1232). This is the landmark the
 foundation set out to find.
 
-**Remaining for the full title — the app's resource/data subsystem.** Sprites/logo/text
-need the scene-object array (`getInstance(b).field[0xd4]`) populated; it is fed by an
-in-memory builder (`o.g(id)`→`i.b(id)`→`0x706c`) whose **byte source is a deeply nested,
-obfuscated app data subsystem** that uses **no** standard `File`/`Image`/stream API and
-exposes **no single measurable `read(id|path)→bytes` contract** (traced to its leaf in
-`docs/lgt_abi.md` §7, cp42/45/49/50). The class/instance lazy-init tier (`0xb`/`0xd`) was
-measured and implemented (cp51) but proven **not** to be that data source
-(`field[0x44]/0x84/0xd4` stay 0 after init). Unblocking the full title requires
-reverse-engineering that whole subsystem (id→data mapping + in-memory layout) — a large,
-self-contained future effort. It is an **internal** mechanism, not an external input/time
-dependency (cp37), so it is implementable, just sizeable; the precise unknowns are
-recorded in §7/§8.
+**Remaining for the full title — the app's resource/data subsystem (precise wall).**
+A per-frame probe of the scene singleton (cp52) pinned exactly where it stops: the data
+load **is requested** — `getInstance(b).field[0x74] = 8` (resource id) — and the game
+**polls `field[0x78]` (the data slot) every frame for completion**, but it **never fills**
+(0 over 293 frames), so the scene-machine state (`field[0x54]`) never advances, the
+scene-object array (`field[0xd4]`) stays empty, and no `createImage`/`drawImage` is ever
+reached. The completion (`field[0x78]` fill) is **not** a single drivable hook: every
+`field[0x78]` writer only *clears* it (request markers); the actual *fill* with bytes is
+the app's obfuscated resource subsystem (`o.g(id)`→`i.b(id)`→`0x706c`, traced to its leaf
+in `docs/lgt_abi.md` §7, cp42/45/49/50/52) which uses **no** standard `File`/`Image`/
+stream API and exposes **no single measurable `read(id)→bytes` contract**. The
+class/instance lazy-init tier (`0xb`/`0xd`) was measured and implemented (cp51) but proven
+**not** to be that data source. Unblocking the full title is a large, self-contained
+RE effort (the id→data mapping + in-memory layout of that subsystem). It is an **internal**
+mechanism — **not** an external input/time dependency (cp37: `field[0x78]` is polled
+internally) — so it is implementable, just sizeable; the precise unknowns are in §7/§8.
 
 ## Verification
 

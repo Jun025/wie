@@ -804,6 +804,32 @@ runtime probe:
   is scoped future work blocked on that whole subsystem. Still **internal**, not an
   external input/time wall (cp37 holds).
 
+**cp52 — the load-trigger question, answered (single decision session). The load is
+*requested* but never *completes*; the completion is the unpinnable subsystem ⇒ (ii)
+wall, Foundation PR finalised.** A per-frame probe of the scene singleton
+`getInstance(b)` over 293 frames showed the state **totally stuck**: `field[0x1c]=0`
+(`i.a` state), `field[0x54]=0` (`i.aE` scene-machine state — never advances),
+`field[0x44]=0` (scene count), `field[0xd4]=0` (scene array) — **but `field[0x74]=8`**
+(a resource id *is* requested) while **`field[0x78]=0`** (its data **never fills**). So:
+- The load **is reached/triggered** — `o.g(8)` requested resource id `8` (`field[0x74]=8`)
+  and the game **polls** `field[0x78]` every frame for completion. It is *not* a simply
+  "missing trigger" (the earlier cp45 "never reached" was the *image* load; the *data*
+  load is requested here). The whole state machine is gated on `field[0x78]` filling.
+- The completion (`field[0x78]` fill) is **not** a drivable hook: every `field[0x78]`
+  writer (`o.g`, `o.h`, …) only **clears** it to 0 (request markers); the actual *fill*
+  with loaded bytes is the obfuscated resource subsystem (cp50) — **no single measurable
+  contract, no clean per-frame processor**, diffuse across the same multi-layer
+  mechanism. Candidate A (a no-op'd platform hook): none — `o.g` requests via no resource
+  import. Candidate B/C (missing lifecycle / `a.run` one-shot): the would-be load
+  processor is part of the obfuscated subsystem, **not a single confirmable drivable
+  method this session**.
+- Per the decision gate (a deeper-keystone candidate that can't be confirmed as a single
+  drivable trigger ⇒ treat as (ii) evidence; no 7th-keystone chase): **(ii) — the
+  practical wall is the obfuscated resource read/completion subsystem.** It is **reached
+  but no-ops**, has no pinnable contract (cp50), uses no standard `File`/`Image`/stream,
+  and is **internal** — not an external input/time wall (cp37 holds: `field[0x78]` is
+  polled internally, no input/timer dependency). **Foundation PR finalised.**
+
 ---
 
 ## 8. Current reach
@@ -831,5 +857,5 @@ runtime probe:
 | self-sustaining frame loop (cp44) | ✅ `drive_card_step` schedules `repaint()` each tick → o.paint 3 → 362 frames (~45 fps); idle gone; background renders continuously |
 | `[+0xd4]` keystone measured (cp47) | ✅ identity split real (`getInstance(b)≠card`) but **not** the blocker — `[+0xd4]=0` on both ⇒ the populate command (`i.b(0x46)`) never runs (hyp 3). cp48 identity-alias reverted (regressed flow) |
 | `0xb`/`0xd` lazy class/instance init (cp51) | ✅ implemented (`0xd`=run instance init_fn at `field[0x10]!=5`; `0xb`=mark class flag at `[[class+8]+0x1a]!=3`); removed a 3665×/run spin; genuine init fix |
-| full title (logo/sprites/text) — **Path B (scoped future work)** | ⛔ root = the app's **obfuscated resource/data subsystem** (cp49/50): `o.g(id)`→`i.b(id)`→`0x706c` in-memory scene-object array builder, fed from a deeper layer that is **not reached** this run. cp51 proved `0xb`/`0xd` are *init*, not the data source (`getInstance(b).field[0x44]/0x84/0xd4` all 0 after init+enter+step). **No pinnable single read contract** (cp50); not File/Image/stdlib; not an input/time wall (cp37). Whole-subsystem RE, not a one-import fix |
+| full title (logo/sprites/text) — **(ii) wall, scoped future work** | ⛔ cp52: the data load **is requested** (`getInstance(b).field[0x74]=8`) but its data **never fills** (`field[0x78]=0` over 293 frames; state machine stuck, `field[0x54]=0`). The completion (`field[0x78]` fill) is the obfuscated resource subsystem (cp49/50) — `field[0x78]` writers only *clear* it; the *fill* has **no single measurable contract / no drivable hook** (cp50/52). Not File/Image/stdlib; **internal**, not an input/time wall (cp37). Whole-subsystem RE, not a one-import fix |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
