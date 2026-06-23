@@ -830,6 +830,37 @@ wall, Foundation PR finalised.** A per-frame probe of the scene singleton
   and is **internal** — not an external input/time wall (cp37 holds: `field[0x78]` is
   polled internally, no input/timer dependency). **Foundation PR finalised.**
 
+**cp53 — title-assets RE (exploration branch `exp/lgt-title-assets`; corrects cp52's
+framing, reframes the blocker as a stuck scene-state machine).** Deeper RE of the stuck
+scene:
+- *Correction to cp52.* `field[0x78]` is a **counter/state field**, NOT the resource-data
+  slot: of the 28 `str [.,#0x78]` sites, `o.f` does `add ip,ip,#1` (increment), `o.k` does
+  `sub r2,r2,#1` (decrement), `i.aa` stores a literal-pool constant, and `o.g`/`o.h` clear
+  it to 0. So cp52's "data never fills" coordinate was imprecise — `field[0x78]` is not a
+  load-completion data pointer.
+- *The scene-state driver is `i.a()V` @0x6fac4* — a big switch on **`field[0x74]`** (the
+  field cp52 read as `8`); it calls `i.U` which advances `field[0x54]`. The drive used by
+  the foundation (`i.a(I)V` enter + `i.aE` step) does **not** run this machine: `i.a(I)V`
+  writes `field[0x1c]`, `i.aE` only iterates the (empty) `field[0xd4]` array — neither
+  advances `field[0x74]/[0x54]`.
+- *`field[0x74]=8` is a stuck/unhandled state.* `i.a()V`'s switch handles
+  `0/3/0xc/0xd/0x14/0x1e/0x1f/0x21/0x28/0x31/0x50/0x51` — **not 8**, which falls to the
+  default (no progress). *Experiment (reverted):* driving `i.a()V` per frame left
+  `st74=8, st54=0, cnt44=0, d4=0` unchanged across the run — no advance, no draws.
+- *The populate path is internal but data-gated:* the scene-object array is built by
+  `i.c(I)→i.aa(I)` (singleton-field state machine, not a file read); it runs under a real
+  `field[0x74]` scene state, which is never reached because the machine is parked on the
+  unhandled `8`, waiting on data the obfuscated subsystem never supplies.
+- *(가)/(나) status — not yet decisively provable.* The app uses no `File`/`Image`/stream
+  (cp45) and the relevant field offsets (`0x44/0x54/0x74/0x78/0xd4`) are **reused across
+  many classes** (d/i/j/l/o), so static writer-attribution to the b-singleton is
+  ambiguous; driving the candidate state methods doesn't unblock. Distinguishing
+  internal-reachable (가) from external-runtime-provisioned (나, e.g. the ez-i runtime
+  bulk-loading resources by id into an app-expected memory layout) needs either the ez-i
+  resource-runtime spec or memory-watchpoint dynamic tracing (which wie's `ArmCore` does
+  not provide). It remains **internal** (no external input/time — cp37/52), but the
+  precise mechanism is unresolved. Exploration only — no code change kept on this branch.
+
 ---
 
 ## 8. Current reach
