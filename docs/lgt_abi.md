@@ -748,6 +748,37 @@ still unpinned and not the standard `File`/`Image`/stdlib APIs (cp42/45). This i
 internal I/O mechanism, **not** an external input/time wall (cp37 holds) — but cracking it
 needs sustained focused RE; per the guardrails I did not guess past it.
 
+**cp50 — traced the loader chain to its leaf: there is NO single clean read import; the
+data path is a multi-layer obfuscated in-memory system.** Followed the cp49 chain all the
+way down (full disasm + `.word table;index` on every thunk + runtime arg cross-ref):
+- `o.g(I)V @0xda518`(id) → `bx this.vtable[X](id)` where `X=[0x15009ac+0x3a]` resolves
+  (by trace order) to the handler **`i.b(I)V`**.
+- `i.b`'s arg-switch routes `id=0x3e9` → `0x20860`, which calls helper **`0x706c`** (in
+  `b.e`) with `getInstance(b).field[0xc0/0xc4]`.
+- **`0x706c` is in-memory scene-object array management** — not a file read: it reads
+  `getInstance(b).field[0x44]` as a count, scales by `<<4` (16-byte elements), and runs
+  alloc/copy/`Math` ops (`static_method_offsets[76/78/80]`) to grow/copy the object
+  array, storing to `field[0x84]`.
+- The only imports anywhere on this path are `0x54` (safepoint) and the class/static
+  field tier **`0xb`/`0xd`** (called 186×/179×, both no-op'd) and `0x22` — **none a clean
+  `read(id|path) → bytes`**. The resource *bytes* never enter via a single identifiable
+  import; the IDs (`0x3e9`, `0x23`) index an in-memory data system fed by the no-op'd
+  `0xb`/`0xd` static/class-field tier.
+
+**Conclusion (refines the mission premise).** The blocker is **not** one measurable
+"resource-read import" that can be implemented from a pinned contract — it is the app's
+**entire obfuscated resource/data subsystem** (id→in-memory struct via the `0xb`/`0xd`
+class-field tier + multi-layer array builders `i.b`/`b.e`/`0x706c`), which does not use
+the standard `File`/`Image`/stream APIs and exposes no single leaf byte-read with a
+measurable `(input → field[0x78]/bytes)` contract. Implementing it would require RE'ing
+the whole subsystem (the `0xb`/`0xd` static-field semantics + the id→data table + the
+in-memory object layout) — a large effort, not a one-import fix. Per the guardrails
+(no fabricating a read without a measured byte contract, and none is pinnable here) this
+is the honest stopping point for the resource cascade. It remains an **internal** system,
+not an external input/time wall (cp37 holds). Next-RE thread: pin the `0xb`/`0xd`
+class/static-field import contract (result usage: used vs discarded) — that tier, not a
+file-read, is where the id-indexed data originates.
+
 ---
 
 ## 8. Current reach
@@ -774,5 +805,5 @@ needs sustained focused RE; per the guardrails I did not guess past it.
 | StringBuffer slot 24 = `append(I)`; scene-enter completes (cp40) | ✅ vtable[24] misdispatch fixed; `i.a(card,0)` runs to completion (loads `txt/*.dat`); background still the only draw |
 | self-sustaining frame loop (cp44) | ✅ `drive_card_step` schedules `repaint()` each tick → o.paint 3 → 362 frames (~45 fps); idle gone; background renders continuously |
 | `[+0xd4]` keystone measured (cp47) | ✅ identity split real (`getInstance(b)≠card`) but **not** the blocker — `[+0xd4]=0` on both ⇒ the populate command (`i.b(0x46)`) never runs (hyp 3). cp48 identity-alias reverted (regressed flow) |
-| full title (logo/sprites/text) | ⛔ root = **obfuscated resource read** (cp49): loaders (`o.g`/`i.b`) store a resource id at `field[0x74]` + data slot `field[0x78]=0`, then a virtual handler should read it — bottoms out in the no-op'd import (cp42/45, not File/Image/stdlib). `field[0x78]` stays 0 → scene array empty → `i.aE` idles → no sprites/text. Internal I/O, not an input/time wall (cp37 holds) |
+| full title (logo/sprites/text) | ⛔ root = the app's **obfuscated resource/data subsystem** (cp50): `o.g(id)`→`i.b(id)`→`0x706c` is in-memory scene-object array mgmt; the byte source is the no-op'd class/static-field tier `0xb`/`0xd` (186×/179×) — **no single clean `read→bytes` import** to pin/implement. Not File/Image/stdlib; not an input/time wall (cp37). Needs whole-subsystem RE, not a one-import fix |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
