@@ -47,8 +47,14 @@ jobs:
         with:
           tool: wasm-bindgen-cli@0.2.108
 
+      # The apt `binaryen` is too old and fails to parse modern wasm. Pull a
+      # recent release so `wasm-opt -Oz` works (build-wasm.sh falls back to the
+      # unoptimized bundle if this is ever unavailable).
       - name: Install binaryen (wasm-opt)
-        run: sudo apt-get update && sudo apt-get install -y binaryen
+        run: |
+          VER=version_119
+          curl -sSL "https://github.com/WebAssembly/binaryen/releases/download/${VER}/binaryen-${VER}-x86_64-linux.tar.gz" | tar xz
+          echo "$PWD/binaryen-${VER}/bin" >> "$GITHUB_PATH"
 
       # `npm run build` runs scripts/build-wasm.sh (cargo + wasm-bindgen +
       # wasm-opt → web/src/wasm), then `tsc -b` and `vite build` → web/dist.
