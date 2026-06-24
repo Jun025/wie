@@ -1,0 +1,6 @@
+# Copy to `.dev.vars` for local `wrangler pages dev`. NEVER commit `.dev.vars`.
+# In production this value is a Pages *secret* (Settings → Environment variables
+# → encrypted) named SESSION_SECRET — set by the user, never by code.
+#
+# Generate a strong value, e.g.:  openssl rand -hex 32
+SESSION_SECRET="dev-only-insecure-secret-change-me-0000000000000000"

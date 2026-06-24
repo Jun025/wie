@@ -1,3 +1,31 @@
 /target
 .vscode
 .cargo
+.DS_Store
+
+# ── wie web service (ops) ────────────────────────────────────────────────────
+/dist
+node_modules
+.wrangler
+
+# Local-only secrets / dev vars (NEVER commit — S3)
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# Game binaries & saves must never enter the repo or any build output (S5/S6).
+# BYOF only: games live in the browser (IndexedDB), not on disk or in git.
+_roms/
+roms/
+*.jar
+*.jad
+*.kdf
+*.skm
+*.mod
+*.sav
+*.smc
+*.gba
+*.nes
+
+# transient verification screenshots (committed copies live in docs/verification/)
+/verify_*.png

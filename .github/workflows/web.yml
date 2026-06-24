@@ -1,0 +1,75 @@
+name: Web (wasm build + Pages deploy)
+
+# Cloudflare Pages build images do not ship Rust, so the wasm is prebuilt here
+# and only the static `web/dist` (assets + Pages Functions) is shipped. No game
+# files are ever produced or bundled by this workflow.
+
+on:
+  push:
+    branches: [main, feat/cf-web-service]
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Cache cargo
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-web-wasm-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-web-wasm-
+
+      - name: Install wasm-bindgen-cli (pinned to the wasm-bindgen crate version)
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@0.2.108
+
+      - name: Install binaryen (wasm-opt)
+        run: sudo apt-get update && sudo apt-get install -y binaryen
+
+      # `npm run build` runs scripts/build-wasm.sh (cargo + wasm-bindgen +
+      # wasm-opt → web/src/wasm), then `tsc -b` and `vite build` → web/dist.
+      - name: Build frontend (wasm + React/Vite)
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wie-web-dist
+          path: web/dist
+
+      # Direct-Upload deploy. Skipped automatically until the user has created
+      # the Pages project and added the CLOUDFLARE_API_TOKEN / ACCOUNT_ID
+      # secrets (S3/S8 — secrets are referenced, never embedded). functions/ at
+      # the repo root is uploaded alongside the static assets.
+      - name: Deploy to Cloudflare Pages
+        if: ${{ env.CF_TOKEN != '' }}
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy web/dist --project-name=wie-web --branch=${{ github.ref_name }}

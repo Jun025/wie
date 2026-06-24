@@ -1,12 +1,14 @@
 // Thin wrapper around the wasm `WieEmulator`.
 //
-// Responsibilities: load the wasm module once, build an emulator from uploaded
-// bytes, drive the requestAnimationFrame tick loop, forward input, and persist
-// saves to IndexedDB. The uploaded bytes go straight into the wasm constructor
-// and are never transmitted anywhere.
+// Loads the wasm module once, builds an emulator from in-memory game bytes,
+// drives the requestAnimationFrame tick loop, forwards input, and autosaves the
+// opaque (RMS + filesystem) snapshot to IndexedDB keyed by the game's content
+// hash. The bytes come straight from the device-local library and are never
+// transmitted anywhere.
 
 import init, { WieEmulator } from "../wasm/wie_web.js";
-import { loadSaves, saveSaves } from "./idb";
+import * as lib from "./library";
+import { autosaveLocal, getLocalSnapshot } from "./saveSync";
 
 const SCREEN_W = 240;
 const SCREEN_H = 320;
@@ -17,33 +19,41 @@ function ensureInit(): Promise<unknown> {
   return initPromise;
 }
 
+export interface LoadableGame {
+  hash: string;
+  name: string;
+  bytes: ArrayBuffer;
+}
+
 export class EmulatorSession {
   private emu: WieEmulator | null = null;
   private rafId = 0;
   private running = false;
-  private gameKey = "";
+  private gameHash = "";
   private saveTimer = 0;
 
   onError?: (message: string) => void;
 
-  async start(file: File, canvas: HTMLCanvasElement, audioCtx: AudioContext | null): Promise<void> {
+  async start(game: LoadableGame, canvas: HTMLCanvasElement, audioCtx: AudioContext | null): Promise<void> {
     await ensureInit();
 
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    this.gameKey = file.name;
+    this.gameHash = game.hash;
+    const bytes = new Uint8Array(game.bytes);
 
     // Construction injects the bytes directly into wasm memory.
-    this.emu = new WieEmulator(file.name, bytes, canvas, audioCtx ?? undefined, SCREEN_W, SCREEN_H);
+    this.emu = new WieEmulator(game.name, bytes, canvas, audioCtx ?? undefined, SCREEN_W, SCREEN_H);
 
-    // Restore prior saves for this game, if any.
-    const snapshot = await loadSaves(this.gameKey);
+    // Restore prior saves (opaque blob) for this game, if any.
+    const snapshot = await getLocalSnapshot(this.gameHash);
     if (snapshot) {
       try {
-        this.emu.import_fs(snapshot);
+        this.emu.import_saves(snapshot);
       } catch {
-        // ignore incompatible / corrupt snapshot
+        /* ignore incompatible / corrupt snapshot */
       }
     }
+
+    await lib.touchGame(this.gameHash);
 
     this.running = true;
     this.rafId = requestAnimationFrame(this.loop);
@@ -65,23 +75,26 @@ export class EmulatorSession {
   keyDown(code: string): void {
     this.emu?.key_down(code);
   }
-
   keyUp(code: string): void {
     this.emu?.key_up(code);
   }
-
   keyRepeat(code: string): void {
     this.emu?.key_repeat(code);
   }
 
+  // Opaque save snapshot (RMS + filesystem), or null if nothing was written.
+  exportBlob(): Uint8Array | null {
+    if (!this.emu || !this.emu.has_saves()) return null;
+    return this.emu.export_saves();
+  }
+
   async persist(): Promise<void> {
-    if (!this.emu) return;
+    const blob = this.exportBlob();
+    if (!blob) return;
     try {
-      if (!this.emu.has_saves()) return;
-      const snapshot = this.emu.export_fs() as unknown as Record<string, Uint8Array>;
-      await saveSaves(this.gameKey, snapshot);
+      await autosaveLocal(this.gameHash, blob);
     } catch {
-      // persistence is best-effort; never interrupt play
+      /* best-effort; never interrupt play */
     }
   }
 

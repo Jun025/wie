@@ -159,6 +159,121 @@ impl WieEmulator {
     pub fn has_saves(&self) -> bool {
         !self.fs_store.lock().unwrap().is_empty() || !self.db_store.lock().unwrap().is_empty()
     }
+
+    /// Export ALL save state — both the RMS database records and the save
+    /// filesystem — as one opaque binary blob (`WIESAV01`). Unlike `export_fs`,
+    /// this also captures RMS records, so titles that persist via the record
+    /// store keep their progress. The blob is what the JS layer stores in
+    /// IndexedDB and (base64-encoded) syncs to the server as opaque save bytes —
+    /// the server never learns which game it belongs to.
+    pub fn export_saves(&self) -> Vec<u8> {
+        let db = self.db_store.lock().unwrap();
+        let fs = self.fs_store.lock().unwrap();
+        let mut out = Vec::new();
+        out.extend_from_slice(SAVE_MAGIC);
+
+        let dbs: Vec<_> = db.iter().filter(|(_, recs)| !recs.is_empty()).collect();
+        put_u32(&mut out, dbs.len() as u32);
+        for ((app_id, name), recs) in dbs {
+            put_str(&mut out, app_id);
+            put_str(&mut out, name);
+            put_u32(&mut out, recs.len() as u32);
+            for (id, data) in recs {
+                put_u32(&mut out, *id);
+                put_bytes(&mut out, data);
+            }
+        }
+
+        put_u32(&mut out, fs.len() as u32);
+        for ((aid, path), data) in fs.iter() {
+            put_str(&mut out, aid);
+            put_str(&mut out, path);
+            put_bytes(&mut out, data);
+        }
+        out
+    }
+
+    /// Restore an opaque blob produced by `export_saves`, replacing the current
+    /// save state. A malformed/empty blob is ignored (returns `false`).
+    pub fn import_saves(&self, blob: &[u8]) -> bool {
+        let Some((dbs, files)) = parse_saves(blob) else {
+            return false;
+        };
+        *self.db_store.lock().unwrap() = dbs;
+        *self.fs_store.lock().unwrap() = files;
+        true
+    }
+}
+
+const SAVE_MAGIC: &[u8; 8] = b"WIESAV01";
+
+fn put_u32(out: &mut Vec<u8>, v: u32) {
+    out.extend_from_slice(&v.to_le_bytes());
+}
+fn put_bytes(out: &mut Vec<u8>, b: &[u8]) {
+    put_u32(out, b.len() as u32);
+    out.extend_from_slice(b);
+}
+fn put_str(out: &mut Vec<u8>, s: &str) {
+    put_bytes(out, s.as_bytes());
+}
+
+#[allow(clippy::type_complexity)]
+fn parse_saves(
+    blob: &[u8],
+) -> Option<(
+    std::collections::BTreeMap<(String, String), std::collections::BTreeMap<wie_backend::RecordId, Vec<u8>>>,
+    std::collections::BTreeMap<(String, String), Vec<u8>>,
+)> {
+    use std::collections::BTreeMap;
+    if blob.len() < 8 || &blob[..8] != SAVE_MAGIC {
+        return None;
+    }
+    let mut pos = 8usize;
+    let take_u32 = |buf: &[u8], pos: &mut usize| -> Option<u32> {
+        let end = pos.checked_add(4)?;
+        if end > buf.len() {
+            return None;
+        }
+        let v = u32::from_le_bytes(buf[*pos..end].try_into().ok()?);
+        *pos = end;
+        Some(v)
+    };
+    let take_bytes = |buf: &[u8], pos: &mut usize| -> Option<Vec<u8>> {
+        let len = take_u32(buf, pos)? as usize;
+        let end = pos.checked_add(len)?;
+        if end > buf.len() {
+            return None;
+        }
+        let v = buf[*pos..end].to_vec();
+        *pos = end;
+        Some(v)
+    };
+    let take_str = |buf: &[u8], pos: &mut usize| -> Option<String> { String::from_utf8(take_bytes(buf, pos)?).ok() };
+
+    let mut dbs = BTreeMap::new();
+    let db_count = take_u32(blob, &mut pos)?;
+    for _ in 0..db_count {
+        let app_id = take_str(blob, &mut pos)?;
+        let name = take_str(blob, &mut pos)?;
+        let rec_count = take_u32(blob, &mut pos)?;
+        let mut recs = BTreeMap::new();
+        for _ in 0..rec_count {
+            let id = take_u32(blob, &mut pos)?;
+            let data = take_bytes(blob, &mut pos)?;
+            recs.insert(id, data);
+        }
+        dbs.insert((app_id, name), recs);
+    }
+    let mut files = BTreeMap::new();
+    let file_count = take_u32(blob, &mut pos)?;
+    for _ in 0..file_count {
+        let aid = take_str(blob, &mut pos)?;
+        let path = take_str(blob, &mut pos)?;
+        let data = take_bytes(blob, &mut pos)?;
+        files.insert((aid, path), data);
+    }
+    Some((dbs, files))
 }
 
 fn build_emulator(platform: Box<WebPlatform>, filename: &str, data: Vec<u8>, options: Options) -> Result<Box<dyn Emulator>, String> {

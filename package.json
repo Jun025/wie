@@ -1,0 +1,22 @@
+{
+  "name": "wie-web-ops",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Ops scripts for the wie web service (wrangler dev/deploy, D1 migrations, no-leak audit, browser verification). The React frontend lives in web/. No game files or game-ownership metadata are ever sent to or stored on the server.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "frontend": "cd web && npm install && npm run build",
+    "build:wasm": "bash scripts/build-wasm.sh",
+    "dev": "wrangler pages dev web/dist",
+    "db:migrate:local": "wrangler d1 migrations apply wie-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply wie-db --remote",
+    "deploy": "wrangler pages deploy web/dist",
+    "audit": "bash scripts/audit-no-leak.sh",
+    "verify": "node scripts/verify-browser.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1",
+    "wrangler": "^4.0.0"
+  }
+}

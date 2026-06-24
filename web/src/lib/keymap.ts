@@ -16,6 +16,8 @@ export type EmuKey =
   | "CLEAR"
   | "CALL"
   | "HANGUP"
+  | "VOLUME_UP"
+  | "VOLUME_DOWN"
   | "NUM0"
   | "NUM1"
   | "NUM2"
@@ -31,7 +33,7 @@ export type EmuKey =
 
 export const ALL_KEYS: EmuKey[] = [
   "UP", "DOWN", "LEFT", "RIGHT", "OK",
-  "LEFT_SOFT_KEY", "RIGHT_SOFT_KEY", "CLEAR", "CALL", "HANGUP",
+  "LEFT_SOFT_KEY", "RIGHT_SOFT_KEY", "CLEAR", "CALL", "HANGUP", "VOLUME_UP", "VOLUME_DOWN",
   "NUM1", "NUM2", "NUM3", "NUM4", "NUM5", "NUM6", "NUM7", "NUM8", "NUM9",
   "STAR", "NUM0", "HASH",
 ];
@@ -59,6 +61,10 @@ export const DEFAULT_KEYMAP: Record<string, EmuKey> = {
   Backspace: "CLEAR",
   ShiftLeft: "LEFT_SOFT_KEY",
   ShiftRight: "RIGHT_SOFT_KEY",
+  F1: "CALL",
+  F2: "HANGUP",
+  Backquote: "VOLUME_UP",
+  Tab: "VOLUME_DOWN",
 };
 
 const STORAGE_KEY = "wie.keymap.v1";
