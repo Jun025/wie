@@ -6,6 +6,7 @@ import { KeyRemap } from "./KeyRemap";
 import { Overlay } from "./Overlay";
 import { autosaveLocal, deviceName, pushToCloud } from "../lib/saveSync";
 import { useTheme } from "../hooks/useTheme";
+import { audioState, getAudioContext, unlockAudio } from "../lib/audio";
 import type { User } from "../lib/api";
 
 interface Props {
@@ -43,6 +44,7 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
   const [showRemap, setShowRemap] = useState(false);
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
+  const [volOpen, setVolOpen] = useState(false); // compact volume popover
   const [keyset, setKeyset] = useState<Keyset>(loadKeyset);
 
   // Boot once per game; opening overlays / switching keyset does NOT remount the
@@ -65,19 +67,23 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
     setMuted(session.isMuted());
 
     (async () => {
-      let audioCtx: AudioContext | null = null;
-      try {
-        audioCtx = new AudioContext();
-        await audioCtx.resume();
-      } catch {
-        audioCtx = null;
-      }
+      // Reuse the single app-wide AudioContext that the global unlock listener
+      // created+resumed synchronously inside the launch tap (iOS WebKit only
+      // honours resume/unlock from within a user gesture). Calling unlockAudio()
+      // here too is a cheap, in-case retry; getAudioContext() never makes a new
+      // one if it already exists.
+      unlockAudio();
+      const audioCtx = getAudioContext();
       await new Promise((r) => requestAnimationFrame(r));
       const canvas = canvasRef.current;
       if (!canvas || cancelled) return;
       try {
         await session.start(game, canvas, audioCtx);
-        if (!cancelled) setStatus("running");
+        if (!cancelled) {
+          setStatus("running");
+          // Diagnostic for headless/console verification of the unlock path.
+          console.info("[wie audio]", audioState());
+        }
       } catch (e) {
         if (!cancelled) {
           setError(typeof e === "string" ? e : (e as Error)?.message ?? "로드 실패");
@@ -158,32 +164,67 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
       )}
 
       {/* display + side rails (no bottom bar; no top header). flex-1 so the canvas
-          fills the available vertical space; gap-1 trims the side margins. */}
+          fills the available vertical space; gap-1 trims the side margins.
+
+          Both rails are 7-row grids of EQUAL height (items-stretch) with equal
+          1fr rows, so a given row index sits at the same y on both sides. The
+          game-key pairs are pinned to matching rows — L/R on row 5, 통화/종료 on
+          row 6, 동기화/CLR on row 7 (bottom) — so they line up regardless of how
+          many service buttons each rail carries. */}
       <div className="flex min-h-0 flex-1 items-stretch justify-center gap-1 p-1">
-        {/* LEFT rail: 나가기 · 음량(긴) · L · 통화 · 동기화 */}
-        <div className="flex flex-col items-center justify-center gap-1.5">
-          <button type="button" onClick={onExit} className={svc} aria-label="게임 나가기" title="나가기">←</button>
-          {/* tall vertical volume area (~2 buttons high) */}
-          <div className="flex flex-col items-center gap-1 rounded-md border border-edge bg-surface2 px-1 py-1.5">
-            <button type="button" onClick={() => sessionRef.current?.toggleMute()} aria-pressed={muted} aria-label={muted ? "음소거 해제" : "음소거"} title={muted ? "음소거 해제" : "음소거"} className="text-sm">
-              {volIcon}
+        {/* LEFT rail: 나가기 · 음량(콤팩트) · … · L · 통화 · 동기화 */}
+        <div className="grid grid-rows-7 gap-1.5">
+          <button type="button" onClick={onExit} className={`${svc} row-start-1 place-self-center`} aria-label="게임 나가기" title="나가기">←</button>
+
+          {/* compact volume: one button-high. Tap to open a slider popover; the
+              GainNode stays the single, device-local, real-time source of truth. */}
+          <div className="relative row-start-2 place-self-center">
+            <button
+              type="button"
+              onClick={() => setVolOpen((o) => !o)}
+              aria-label={`음량 ${pct}% — 눌러서 조절`}
+              aria-expanded={volOpen}
+              title="음량"
+              className={`${svc} flex h-11 w-11 flex-col items-center justify-center gap-0 px-0 py-0`}
+            >
+              <span className="text-sm leading-none">{volIcon}</span>
+              <span className="text-[9px] leading-none tabular-nums">{pct}%</span>
             </button>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={pct}
-              onChange={(e) => sessionRef.current?.setVolume(Number(e.target.value) / 100)}
-              aria-label="음량"
-              aria-orientation="vertical"
-              aria-valuenow={pct}
-              className="h-24 w-5 accent-accent [direction:rtl] [writing-mode:vertical-lr]"
-            />
-            <span className="text-[10px] tabular-nums text-fg-dim">{pct}%</span>
+            {volOpen && (
+              <>
+                {/* click-away backdrop */}
+                <div className="fixed inset-0 z-20" onClick={() => setVolOpen(false)} aria-hidden="true" />
+                <div className="absolute left-full top-1/2 z-30 ml-1 flex -translate-y-1/2 flex-col items-center gap-2 rounded-md border border-edge bg-surface2 p-2 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => sessionRef.current?.toggleMute()}
+                    aria-pressed={muted}
+                    aria-label={muted ? "음소거 해제" : "음소거"}
+                    title={muted ? "음소거 해제" : "음소거"}
+                    className="text-base"
+                  >
+                    {volIcon}
+                  </button>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={pct}
+                    onChange={(e) => sessionRef.current?.setVolume(Number(e.target.value) / 100)}
+                    aria-label="음량"
+                    aria-orientation="vertical"
+                    aria-valuenow={pct}
+                    className="h-24 w-5 accent-accent [direction:rtl] [writing-mode:vertical-lr]"
+                  />
+                  <span className="text-[10px] tabular-nums text-fg-dim">{pct}%</span>
+                </div>
+              </>
+            )}
           </div>
-          <GameButton label="◀L" title="왼쪽 소프트키" {...gkey("LEFT_SOFT_KEY")} className={side} />
-          <GameButton label="📞" title="통화" {...gkey("CALL")} className={`${side} bg-green-600 text-white border-green-700`} />
-          <button type="button" onClick={() => void syncCloud()} className={svc} aria-label="세이브 동기화(클라우드 업로드)" title="동기화">☁ 동기화</button>
+
+          <GameButton label="◀L" title="왼쪽 소프트키" {...gkey("LEFT_SOFT_KEY")} className={`${side} row-start-5 place-self-center`} />
+          <GameButton label="📞" title="통화" {...gkey("CALL")} className={`${side} row-start-6 place-self-center bg-green-600 text-white border-green-700`} />
+          <button type="button" onClick={() => void syncCloud()} className={`${svc} row-start-7 place-self-center`} aria-label="세이브 동기화(클라우드 업로드)" title="동기화">☁ 동기화</button>
         </div>
 
         {/* canvas fills the space between the rails (object-fit contain keeps the
@@ -202,16 +243,16 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
         </div>
 
         {/* RIGHT rail: 키세트 · 키설정 · 테마 · 메뉴 · R · 종료 · CLR */}
-        <div className="flex flex-col items-center justify-center gap-1.5">
-          <button type="button" onClick={cycleKeyset} className={svc} aria-label={`키보드 세트 모드 ${keyset} — 눌러서 전환`} title="키세트 모드 전환">🎛 모드{keyset}</button>
-          <button type="button" onClick={() => setShowRemap(true)} className={svc} aria-label="키 설정(리매핑)" title="키 설정">⌨</button>
-          <button type="button" onClick={toggleTheme} className={svc} aria-label={theme === "dark" ? "라이트 모드" : "다크 모드"} title={theme === "dark" ? "라이트 모드" : "다크 모드"}>
+        <div className="grid grid-rows-7 gap-1.5">
+          <button type="button" onClick={cycleKeyset} className={`${svc} row-start-1 place-self-center`} aria-label={`키보드 세트 모드 ${keyset} — 눌러서 전환`} title="키세트 모드 전환">🎛 모드{keyset}</button>
+          <button type="button" onClick={() => setShowRemap(true)} className={`${svc} row-start-2 place-self-center`} aria-label="키 설정(리매핑)" title="키 설정">⌨</button>
+          <button type="button" onClick={toggleTheme} className={`${svc} row-start-3 place-self-center`} aria-label={theme === "dark" ? "라이트 모드" : "다크 모드"} title={theme === "dark" ? "라이트 모드" : "다크 모드"}>
             {theme === "dark" ? "☀️" : "🌙"}
           </button>
-          <button type="button" onClick={onMenu} className={svc} aria-label="메뉴 (라이브러리·세이브·문의·계정·도움말)" title="메뉴">☰</button>
-          <GameButton label="R▶" title="오른쪽 소프트키" {...gkey("RIGHT_SOFT_KEY")} className={side} />
-          <GameButton label="⛔" title="종료(게임 키)" {...gkey("HANGUP")} className={`${side} bg-red-600 text-white border-red-700`} />
-          <GameButton label="CLR" title="지우기" repeat {...gkey("CLEAR")} className={`${side} text-xs`} />
+          <button type="button" onClick={onMenu} className={`${svc} row-start-4 place-self-center`} aria-label="메뉴 (라이브러리·세이브·문의·계정·도움말)" title="메뉴">☰</button>
+          <GameButton label="R▶" title="오른쪽 소프트키" {...gkey("RIGHT_SOFT_KEY")} className={`${side} row-start-5 place-self-center`} />
+          <GameButton label="⛔" title="종료(게임 키)" {...gkey("HANGUP")} className={`${side} row-start-6 place-self-center bg-red-600 text-white border-red-700`} />
+          <GameButton label="CLR" title="지우기" repeat {...gkey("CLEAR")} className={`${side} row-start-7 place-self-center text-xs`} />
         </div>
       </div>
 
