@@ -24,7 +24,7 @@ use std::sync::Mutex;
 
 use js_sys::{Object, Reflect, Uint8Array};
 use wasm_bindgen::prelude::*;
-use web_sys::{AudioContext, HtmlCanvasElement};
+use web_sys::{AudioContext, GainNode, HtmlCanvasElement};
 
 use wie_backend::{Emulator, Event, KeyCode, Options, extract_zip};
 use wie_j2me::J2MEEmulator;
@@ -69,6 +69,7 @@ impl WieEmulator {
         data: Vec<u8>,
         canvas: &HtmlCanvasElement,
         audio_ctx: Option<AudioContext>,
+        gain: Option<GainNode>,
         width: u32,
         height: u32,
     ) -> Result<WieEmulator, JsValue> {
@@ -81,6 +82,22 @@ impl WieEmulator {
         canvas.set_width(width);
         canvas.set_height(height);
 
+        // Offscreen back buffer for double-buffered presentation (see WebScreen).
+        let document = canvas.owner_document().ok_or_else(|| JsValue::from_str("canvas has no owner document"))?;
+        let back_canvas = document
+            .create_element("canvas")
+            .map_err(|_| JsValue::from_str("failed to create back buffer"))?
+            .dyn_into::<HtmlCanvasElement>()
+            .map_err(|_| JsValue::from_str("back buffer is not a canvas"))?;
+        back_canvas.set_width(width);
+        back_canvas.set_height(height);
+        let back_ctx = back_canvas
+            .get_context("2d")
+            .map_err(|_| JsValue::from_str("failed to get back 2d context"))?
+            .ok_or_else(|| JsValue::from_str("back canvas has no 2d context"))?
+            .dyn_into::<web_sys::CanvasRenderingContext2d>()
+            .map_err(|_| JsValue::from_str("unexpected back context type"))?;
+
         let fs_store: FsStore = Arc::new(Mutex::new(Default::default()));
         let db_store: DbStore = Arc::new(Mutex::new(Default::default()));
         // Start "true" so the very first composed frame is shown even if a title
@@ -88,10 +105,11 @@ impl WieEmulator {
         let redraw: RedrawFlag = Arc::new(AtomicBool::new(true));
 
         let platform = Box::new(WebPlatform::new(
-            WebScreen::new(ctx, width, height, redraw.clone()),
+            WebScreen::new(ctx, back_canvas, back_ctx, width, height, redraw.clone()),
             WebFilesystem::new(fs_store.clone()),
             WebDatabaseRepository::new(db_store.clone()),
             audio_ctx,
+            gain,
         ));
 
         let options = Options {

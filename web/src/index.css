@@ -82,11 +82,17 @@ body {
   background: #f4f7fb;
 }
 
-/* Crisp upscaling of the low-res framebuffer. */
+/* Crisp upscaling of the low-res framebuffer. The translateZ/backface hints
+   promote the canvas to its own compositor layer so the presented frame stays
+   stable even when the page is idle (helps the "flicker while not scrolling"
+   case alongside the double-buffered blit in wie_web). */
 .emulator-canvas {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   background: #000;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: transform;
 }
 
 /* Disable text selection on the touch controls. */

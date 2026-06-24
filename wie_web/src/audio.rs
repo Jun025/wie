@@ -1,6 +1,6 @@
 use core::cell::Cell;
 
-use web_sys::AudioContext;
+use web_sys::{AudioContext, GainNode};
 
 use wie_backend::AudioSink;
 
@@ -17,6 +17,9 @@ use wie_backend::AudioSink;
 /// is a no-op.
 pub struct WebAudioSink {
     ctx: Option<AudioContext>,
+    // Output node: the JS-owned master gain (gain → destination). When present,
+    // PCM is routed through it so the UI volume control governs the real output.
+    gain: Option<GainNode>,
     // Next free playback position on the audio timeline (seconds).
     next_time: Cell<f64>,
 }
@@ -26,9 +29,10 @@ unsafe impl Send for WebAudioSink {}
 unsafe impl Sync for WebAudioSink {}
 
 impl WebAudioSink {
-    pub fn new(ctx: Option<AudioContext>) -> Self {
+    pub fn new(ctx: Option<AudioContext>, gain: Option<GainNode>) -> Self {
         Self {
             ctx,
+            gain,
             next_time: Cell::new(0.0),
         }
     }
@@ -56,7 +60,15 @@ impl WebAudioSink {
 
         let source = ctx.create_buffer_source()?;
         source.set_buffer(Some(&buffer));
-        source.connect_with_audio_node(&ctx.destination())?;
+        // Route through the master gain when available, else straight to output.
+        match &self.gain {
+            Some(gain) => {
+                source.connect_with_audio_node(gain)?;
+            }
+            None => {
+                source.connect_with_audio_node(&ctx.destination())?;
+            }
+        }
 
         // Schedule at the later of "now" and the running cursor. If the cursor
         // fell behind (underrun), resync to now to avoid a growing delay.

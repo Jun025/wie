@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use web_sys::AudioContext;
+use web_sys::{AudioContext, GainNode};
 
 use wie_backend::{AudioSink, DatabaseRepository, Filesystem, Instant, Platform, Screen};
 
@@ -19,6 +19,9 @@ pub struct WebPlatform {
     filesystem: WebFilesystem,
     database_repository: WebDatabaseRepository,
     audio_ctx: Option<AudioContext>,
+    // JS-owned master gain node (output = gain → destination). Audio is routed
+    // through it so the UI volume slider is the single source of truth.
+    gain: Option<GainNode>,
 }
 
 // Single-threaded browser runtime; the only non-Send field is the JS audio
@@ -27,12 +30,19 @@ unsafe impl Send for WebPlatform {}
 unsafe impl Sync for WebPlatform {}
 
 impl WebPlatform {
-    pub fn new(screen: WebScreen, filesystem: WebFilesystem, database_repository: WebDatabaseRepository, audio_ctx: Option<AudioContext>) -> Self {
+    pub fn new(
+        screen: WebScreen,
+        filesystem: WebFilesystem,
+        database_repository: WebDatabaseRepository,
+        audio_ctx: Option<AudioContext>,
+        gain: Option<GainNode>,
+    ) -> Self {
         Self {
             screen,
             filesystem,
             database_repository,
             audio_ctx,
+            gain,
         }
     }
 }
@@ -55,7 +65,7 @@ impl Platform for WebPlatform {
     }
 
     fn audio_sink(&self) -> Box<dyn AudioSink> {
-        Box::new(WebAudioSink::new(self.audio_ctx.clone()))
+        Box::new(WebAudioSink::new(self.audio_ctx.clone(), self.gain.clone()))
     }
 
     fn write_stdout(&self, buf: &[u8]) {

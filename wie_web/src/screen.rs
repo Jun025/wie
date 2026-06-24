@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use wasm_bindgen::Clamped;
-use web_sys::{CanvasRenderingContext2d, ImageData};
+use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, ImageData};
 
 use wie_backend::{Screen, canvas::Image};
 use wie_util::Result;
@@ -18,12 +18,18 @@ pub type RedrawFlag = Arc<AtomicBool>;
 
 /// Browser screen backed by a 2D `<canvas>` context.
 ///
-/// The emulator core produces an in-memory RGBA framebuffer and hands it to
-/// [`Screen::paint`]; we translate it to `ImageData` and blit it 1:1 onto the
-/// canvas. Display scaling is handled by CSS on the canvas element (the JS side
-/// sets `image-rendering: pixelated`), so no resampling happens here.
+/// Double-buffered: the core's RGBA framebuffer is written with `putImageData`
+/// onto an OFFSCREEN back-buffer canvas, then composited onto the visible canvas
+/// with a single `drawImage`. Writing `putImageData` straight to the on-screen
+/// canvas could let the compositor present a half-updated surface when the page
+/// is otherwise idle (the reported "flickers only while NOT scrolling" symptom);
+/// `drawImage` from the back buffer is one atomic composited blit, so the
+/// visible canvas only ever shows complete frames. Scaling is CSS-only
+/// (`image-rendering: pixelated`).
 pub struct WebScreen {
     ctx: CanvasRenderingContext2d,
+    back_canvas: HtmlCanvasElement,
+    back_ctx: CanvasRenderingContext2d,
     width: u32,
     height: u32,
     redraw: RedrawFlag,
@@ -35,8 +41,22 @@ unsafe impl Send for WebScreen {}
 unsafe impl Sync for WebScreen {}
 
 impl WebScreen {
-    pub fn new(ctx: CanvasRenderingContext2d, width: u32, height: u32, redraw: RedrawFlag) -> Self {
-        Self { ctx, width, height, redraw }
+    pub fn new(
+        ctx: CanvasRenderingContext2d,
+        back_canvas: HtmlCanvasElement,
+        back_ctx: CanvasRenderingContext2d,
+        width: u32,
+        height: u32,
+        redraw: RedrawFlag,
+    ) -> Self {
+        Self {
+            ctx,
+            back_canvas,
+            back_ctx,
+            width,
+            height,
+            redraw,
+        }
     }
 }
 
@@ -70,7 +90,12 @@ impl Screen for WebScreen {
             Ok(data) => data,
             Err(_) => return,
         };
-        let _ = self.ctx.put_image_data(&image_data, 0.0, 0.0);
+        // 1) write the finished frame to the offscreen back buffer …
+        if self.back_ctx.put_image_data(&image_data, 0.0, 0.0).is_err() {
+            return;
+        }
+        // 2) … then present it in one atomic composited blit.
+        let _ = self.ctx.draw_image_with_html_canvas_element(&self.back_canvas, 0.0, 0.0);
     }
 
     fn width(&self) -> u32 {
