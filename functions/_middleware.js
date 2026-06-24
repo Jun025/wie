@@ -11,6 +11,8 @@ const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
   "X-Frame-Options": "DENY",
+  // The app needs none of these powerful features; deny them outright.
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), usb=(), payment=(), interest-cohort=()",
   "Content-Security-Policy": [
     "default-src 'self'",
     "script-src 'self' 'wasm-unsafe-eval'",

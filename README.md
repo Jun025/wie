@@ -9,6 +9,25 @@ This project is dedicated to digital preservation and educational research. Our 
 - [Contribution guide](https://github.com/dlunch/wie/blob/main/CONTRIBUTING.md)
 - Architecture docs: [Emulator](docs/architecture.md) | [KTF](docs/ktf.md) | [LGT](docs/lgt.md)
 
+## Web service (this fork)
+
+A browser front-end (`web/`, React + Vite) plus a Cloudflare Pages Functions + D1
+backend (`functions/`) for **accounts** and **save sync**. See
+[docs/web.md](docs/web.md) and [docs/CLOUDFLARE_SETUP.md](docs/CLOUDFLARE_SETUP.md).
+
+**Privacy (BYOF):** game files are processed **entirely in your browser** — the
+bytes, filenames, content hashes, and the "which games this device has" list are
+never sent to or stored on the server. Only account info, opaque save data, and
+inquiry text reach the server. Enforced by `scripts/audit-no-leak.sh`.
+
+> **Legal note.** This project is for digital preservation and educational
+> research. The notices and policy text in the app and docs are **not legal
+> advice** — operators should have them reviewed by a qualified Korean
+> intellectual-property lawyer before running the service publicly. A
+> rights-holder report / takedown channel is provided in the app's inquiry page;
+> the service does not host or distribute game files (BYOF only), and posting
+> download links to infringing material is prohibited.
+
 ## Related projects
 
 - [RustJava](https://github.com/dlunch/RustJava)

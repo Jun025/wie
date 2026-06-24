@@ -127,6 +127,8 @@ export function Player({ game, user, onExit, toast }: Props) {
         width={240}
         height={320}
         data-testid="screen"
+        role="img"
+        aria-label={`${game.name} 게임 화면`}
         className="emulator-canvas rounded-md border border-slate-700"
         style={{ width: "min(90vw, 360px)", aspectRatio: "240 / 320" }}
       />
