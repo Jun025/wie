@@ -1,8 +1,20 @@
+use alloc::sync::Arc;
+use core::sync::atomic::{AtomicBool, Ordering};
+
 use wasm_bindgen::Clamped;
 use web_sys::{CanvasRenderingContext2d, ImageData};
 
 use wie_backend::{Screen, canvas::Image};
 use wie_util::Result;
+
+/// Shared "the core wants the display updated" signal. The core calls
+/// [`Screen::request_redraw`] only after it has finished composing a frame; the
+/// host ([`crate::WieEmulator::tick`]) consumes the flag and delivers exactly
+/// one `Event::Redraw`. Driving repaints off this flag — instead of forcing one
+/// every animation frame — means we only ever blit COMPLETE frames, which fixes
+/// the flicker some titles showed (a forced mid-compose blit could expose a
+/// cleared-but-not-yet-drawn framebuffer).
+pub type RedrawFlag = Arc<AtomicBool>;
 
 /// Browser screen backed by a 2D `<canvas>` context.
 ///
@@ -14,6 +26,7 @@ pub struct WebScreen {
     ctx: CanvasRenderingContext2d,
     width: u32,
     height: u32,
+    redraw: RedrawFlag,
 }
 
 // wasm32 in the browser is single-threaded; the JS handle is never sent across
@@ -22,15 +35,15 @@ unsafe impl Send for WebScreen {}
 unsafe impl Sync for WebScreen {}
 
 impl WebScreen {
-    pub fn new(ctx: CanvasRenderingContext2d, width: u32, height: u32) -> Self {
-        Self { ctx, width, height }
+    pub fn new(ctx: CanvasRenderingContext2d, width: u32, height: u32, redraw: RedrawFlag) -> Self {
+        Self { ctx, width, height, redraw }
     }
 }
 
 impl Screen for WebScreen {
     fn request_redraw(&self) -> Result<()> {
-        // The JS animation loop forwards an `Event::Redraw` every frame, so the
-        // core's explicit redraw requests need no extra plumbing here.
+        // Signal the host loop; it will deliver one Event::Redraw on the next tick.
+        self.redraw.store(true, Ordering::Release);
         Ok(())
     }
 

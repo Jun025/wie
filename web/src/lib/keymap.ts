@@ -74,6 +74,14 @@ export interface KeymapPreset {
   map: Record<string, EmuKey>;
 }
 
+// Phone keys shared by every preset so none leaves CALL/HANGUP/volume unbound.
+const PHONE_KEYS: Record<string, EmuKey> = {
+  F1: "CALL",
+  F2: "HANGUP",
+  Backquote: "VOLUME_UP",
+  Tab: "VOLUME_DOWN",
+};
+
 const WASD_KEYMAP: Record<string, EmuKey> = {
   KeyW: "UP",
   KeyS: "DOWN",
@@ -96,11 +104,40 @@ const WASD_KEYMAP: Record<string, EmuKey> = {
   Digit8: "NUM8",
   Digit9: "NUM9",
   Digit0: "NUM0",
+  ...PHONE_KEYS,
+};
+
+// Phone-keypad layout: the 3×3 block Q/W/E · A/S/D · Z/X/C maps to 1-9 just like
+// a feature-phone keypad, with the column R/F/V as * / 0 / #.
+const NUMPAD_KEYMAP: Record<string, EmuKey> = {
+  ArrowUp: "UP",
+  ArrowDown: "DOWN",
+  ArrowLeft: "LEFT",
+  ArrowRight: "RIGHT",
+  Space: "OK",
+  Enter: "OK",
+  Backspace: "CLEAR",
+  KeyQ: "NUM1",
+  KeyW: "NUM2",
+  KeyE: "NUM3",
+  KeyA: "NUM4",
+  KeyS: "NUM5",
+  KeyD: "NUM6",
+  KeyZ: "NUM7",
+  KeyX: "NUM8",
+  KeyC: "NUM9",
+  KeyR: "STAR",
+  KeyF: "NUM0",
+  KeyV: "HASH",
+  ShiftLeft: "LEFT_SOFT_KEY",
+  ShiftRight: "RIGHT_SOFT_KEY",
+  ...PHONE_KEYS,
 };
 
 export const PRESETS: KeymapPreset[] = [
   { id: "arrows", label: "방향키 + Z/X", map: DEFAULT_KEYMAP },
   { id: "wasd", label: "WASD + J/K/L", map: WASD_KEYMAP },
+  { id: "numpad", label: "숫자패드 QWE/ASD/ZXC", map: NUMPAD_KEYMAP },
 ];
 
 // Emulator keys that currently have no physical binding (for a UI warning).

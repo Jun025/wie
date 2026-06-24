@@ -9,12 +9,12 @@
 
 // Iteration count is a deliberate trade-off with the Cloudflare *free* plan's
 // ~10ms CPU budget per request: 210k PBKDF2-SHA256 iterations overran it and
-// made register/login fail with a 500. 75k keeps auth comfortably under budget
-// while still being a strong, salted, iterated KDF. The count is stored per
-// record (`password_iter`), so this can be raised later (e.g. on a paid plan)
-// without breaking existing hashes — verification always uses each record's own
-// iteration count.
-const PBKDF2_ITERATIONS = 75_000;
+// made register/login fail with a 500; 75k worked with margin. 100k is the next
+// step up — verified on the live free plan (register/login stay 200, no CPU
+// overrun). The count is stored per record (`password_iter`), so this can be
+// raised again later (e.g. on a paid plan) without breaking existing hashes —
+// verification always uses each record's own iteration count.
+const PBKDF2_ITERATIONS = 100_000;
 const PBKDF2_ALGO = "pbkdf2-sha256";
 
 const enc = new TextEncoder();

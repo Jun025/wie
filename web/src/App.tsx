@@ -1,14 +1,16 @@
 import { useCallback, useState } from "react";
-import { useAuth } from "./hooks/useAuth";
+import { useAuth, type AuthState } from "./hooks/useAuth";
 import { useTheme } from "./hooks/useTheme";
 import { GameLibrary } from "./components/GameLibrary";
 import { Player } from "./components/Player";
 import { AuthPanel } from "./components/AuthPanel";
 import { CloudSaves } from "./components/CloudSaves";
 import { InquiryForm } from "./components/InquiryForm";
+import { Help } from "./components/Help";
+import { Overlay } from "./components/Overlay";
 import type { LoadableGame } from "./lib/emulator";
 
-type View = "library" | "cloud" | "inquiry" | "account";
+type View = "library" | "cloud" | "inquiry" | "account" | "help";
 type Toast = { msg: string; kind: "ok" | "err" | "" } | null;
 
 const TABS: { id: View; label: string }[] = [
@@ -16,13 +18,42 @@ const TABS: { id: View; label: string }[] = [
   { id: "cloud", label: "세이브 동기화" },
   { id: "inquiry", label: "문의·건의" },
   { id: "account", label: "계정" },
+  { id: "help", label: "도움말" },
 ];
+
+// Maps a view id to its panel. Shared by the full-page nav (not playing) and the
+// slide-over overlay (while playing) so a running game is never torn down.
+function ViewPanel({
+  view,
+  authState,
+  onRun,
+  toast,
+}: {
+  view: View;
+  authState: AuthState;
+  onRun: (g: LoadableGame) => void;
+  toast: (m: string, k?: "ok" | "err") => void;
+}) {
+  switch (view) {
+    case "library":
+      return <GameLibrary onRun={onRun} toast={toast} />;
+    case "cloud":
+      return <CloudSaves user={authState.user} toast={toast} />;
+    case "inquiry":
+      return <InquiryForm user={authState.user} toast={toast} />;
+    case "account":
+      return <AuthPanel authState={authState} toast={toast} />;
+    case "help":
+      return <Help />;
+  }
+}
 
 export default function App() {
   const authState = useAuth();
   const { theme, toggle: toggleTheme } = useTheme();
   const [view, setView] = useState<View>("library");
   const [running, setRunning] = useState<LoadableGame | null>(null);
+  const [overlay, setOverlay] = useState<View | "menu" | null>(null); // shown on top of the player
   const [toast, setToast] = useState<Toast>(null);
 
   const showToast = useCallback((msg: string, kind: "ok" | "err" | "" = "") => {
@@ -30,28 +61,70 @@ export default function App() {
     window.setTimeout(() => setToast(null), 3200);
   }, []);
 
-  const onRun = useCallback((game: LoadableGame) => setRunning(game), []);
-  const exitPlayer = useCallback(() => setRunning(null), []);
+  const onRun = useCallback((game: LoadableGame) => {
+    setRunning(game); // starting (or switching) a game
+    setOverlay(null);
+  }, []);
 
+  const exitPlayer = useCallback(() => {
+    setRunning(null);
+    setOverlay(null);
+  }, []);
+
+  const tabLabel = (id: View) => TABS.find((t) => t.id === id)?.label ?? "";
+
+  // ── Playing: player stays mounted; tabs open as overlays (game keeps running) ─
+  if (running) {
+    return (
+      <>
+        <Player game={running} user={authState.user} onExit={exitPlayer} toast={showToast} onMenu={() => setOverlay("menu")} />
+
+        {overlay === "menu" && (
+          <Overlay title="메뉴" onClose={() => setOverlay(null)}>
+            <div className="w-full max-w-sm flex flex-col gap-2">
+              <p className="text-sm text-fg-dim">게임은 계속 실행 중입니다. 항목을 보고 닫으면 그대로 이어집니다.</p>
+              {TABS.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setOverlay(t.id)}
+                  className="rounded-md border border-edge bg-surface2 px-4 py-3 text-left text-fg hover:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </Overlay>
+        )}
+
+        {overlay && overlay !== "menu" && (
+          <Overlay title={tabLabel(overlay)} onClose={() => setOverlay(null)}>
+            <ViewPanel view={overlay} authState={authState} onRun={onRun} toast={showToast} />
+          </Overlay>
+        )}
+
+        {toast && <ToastView toast={toast} />}
+      </>
+    );
+  }
+
+  // ── Not playing: normal header + full-page view ───────────────────────────────
   return (
     <div className="min-h-full flex flex-col">
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-edge bg-surface/85 px-4 py-2 backdrop-blur">
         <div className="font-extrabold tracking-wide text-fg">
           WIE<span className="font-normal text-fg-dim">/web</span>
         </div>
-        <nav className="flex flex-1 gap-1" aria-label="주요 메뉴">
+        <nav className="flex flex-1 gap-1 overflow-x-auto" aria-label="주요 메뉴">
           {TABS.map((t) => (
             <button
               key={t.id}
               type="button"
-              aria-current={view === t.id && !running ? "page" : undefined}
-              onClick={() => {
-                setRunning(null);
-                setView(t.id);
-              }}
+              aria-current={view === t.id ? "page" : undefined}
+              onClick={() => setView(t.id)}
               className={
-                "rounded-md px-2.5 py-1.5 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent " +
-                (view === t.id && !running ? "bg-surface2 text-fg" : "text-fg-dim hover:text-fg")
+                "shrink-0 rounded-md px-2.5 py-1.5 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent " +
+                (view === t.id ? "bg-surface2 text-fg" : "text-fg-dim hover:text-fg")
               }
             >
               {t.label}
@@ -73,25 +146,13 @@ export default function App() {
       </header>
 
       <main className="flex flex-1 flex-col items-center gap-5 px-4 py-5">
-        {!running && (
+        {view === "library" && (
           <div className="w-full max-w-xl rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-200">
             🔒 게임 파일은 <strong>이 기기에만</strong> 저장됩니다. 업로드한 게임의 바이트·파일명·해시·“보유 목록”은 서버로 전송되지 않으며
-            브라우저(IndexedDB)에만 보관됩니다. 서버에 올라가는 것은 <em>계정 정보</em>와 <em>세이브 데이터</em>뿐이며, 라이브러리는 로그인과
-            무관하게 이 기기에서 동작합니다.
+            브라우저(IndexedDB)에만 보관됩니다. 서버에 올라가는 것은 <em>계정 정보</em>와 <em>세이브 데이터</em>뿐입니다.
           </div>
         )}
-
-        {running ? (
-          <Player game={running} user={authState.user} onExit={exitPlayer} toast={showToast} />
-        ) : view === "library" ? (
-          <GameLibrary onRun={onRun} toast={showToast} />
-        ) : view === "cloud" ? (
-          <CloudSaves user={authState.user} toast={showToast} />
-        ) : view === "inquiry" ? (
-          <InquiryForm user={authState.user} toast={showToast} />
-        ) : (
-          <AuthPanel authState={authState} toast={showToast} />
-        )}
+        <ViewPanel view={view} authState={authState} onRun={onRun} toast={showToast} />
       </main>
 
       <footer className="mt-auto px-4 py-6 text-center text-xs text-fg-dim">
@@ -104,22 +165,26 @@ export default function App() {
         </p>
       </footer>
 
-      {toast && (
-        <div
-          role="status"
-          aria-live="polite"
-          className={
-            "fixed bottom-5 left-1/2 -translate-x-1/2 rounded-lg border px-4 py-2 text-sm shadow-lg " +
-            (toast.kind === "err"
-              ? "border-red-500 bg-red-500/15 text-red-700 dark:text-red-200"
-              : toast.kind === "ok"
-                ? "border-emerald-500 bg-emerald-500/15 text-emerald-700 dark:text-emerald-200"
-                : "border-edge bg-surface2 text-fg")
-          }
-        >
-          {toast.msg}
-        </div>
-      )}
+      {toast && <ToastView toast={toast} />}
+    </div>
+  );
+}
+
+function ToastView({ toast }: { toast: NonNullable<Toast> }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={
+        "fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-lg border px-4 py-2 text-sm shadow-lg " +
+        (toast.kind === "err"
+          ? "border-red-500 bg-red-500/15 text-red-700 dark:text-red-200"
+          : toast.kind === "ok"
+            ? "border-emerald-500 bg-emerald-500/15 text-emerald-700 dark:text-emerald-200"
+            : "border-edge bg-surface2 text-fg")
+      }
+    >
+      {toast.msg}
     </div>
   );
 }

@@ -3,25 +3,32 @@ import { EmulatorSession, type LoadableGame } from "../lib/emulator";
 import { type EmuKey, loadKeymap } from "../lib/keymap";
 import { VirtualPad } from "./VirtualPad";
 import { KeyRemap } from "./KeyRemap";
+import { Overlay } from "./Overlay";
 import { autosaveLocal, deviceName, pushToCloud } from "../lib/saveSync";
+import { useTheme } from "../hooks/useTheme";
 import type { User } from "../lib/api";
 
 interface Props {
   game: LoadableGame;
   user: User | null;
   onExit: () => void;
+  onMenu: () => void;
   toast: (msg: string, kind?: "ok" | "err") => void;
 }
 
-export function Player({ game, user, onExit, toast }: Props) {
+export function Player({ game, user, onExit, onMenu, toast }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sessionRef = useRef<EmulatorSession | null>(null);
   const keymapRef = useRef<Record<string, EmuKey>>(loadKeymap());
+  const { theme, toggle: toggleTheme } = useTheme();
   const [status, setStatus] = useState<"loading" | "running" | "error">("loading");
   const [error, setError] = useState("");
   const [showRemap, setShowRemap] = useState(false);
+  const [muted, setMuted] = useState(false);
 
-  // Boot the session once the canvas is mounted.
+  // Boot the session once the canvas is mounted. This effect is keyed on `game`,
+  // so it runs ONCE per game and is NOT disturbed by opening overlays elsewhere
+  // (the player stays mounted) — switching tabs never ends the game.
   useEffect(() => {
     let cancelled = false;
     const session = new EmulatorSession();
@@ -88,6 +95,14 @@ export function Player({ game, user, onExit, toast }: Props) {
   const press = useCallback((k: EmuKey) => sessionRef.current?.keyDown(k), []);
   const release = useCallback((k: EmuKey) => sessionRef.current?.keyUp(k), []);
 
+  const toggleMute = useCallback(() => {
+    setMuted((m) => {
+      const next = !m;
+      sessionRef.current?.setMuted(next);
+      return next;
+    });
+  }, []);
+
   const saveLocal = useCallback(async () => {
     const blob = sessionRef.current?.exportBlob();
     if (!blob) return toast("저장할 세이브가 없습니다");
@@ -109,51 +124,63 @@ export function Player({ game, user, onExit, toast }: Props) {
     }
   }, [game.hash, user, toast]);
 
+  const iconBtn = "rounded-md bg-surface2 border border-edge px-2.5 py-1.5 text-sm text-fg-dim hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent";
+
   return (
-    <section className="w-full max-w-xl flex flex-col items-center gap-4">
-      <div className="w-full flex items-center justify-between">
-        <h2 className="text-base font-semibold text-slate-100 truncate">{game.name}</h2>
-        <button type="button" onClick={onExit} className="rounded-md bg-slate-700 hover:bg-slate-600 px-3 py-1.5 text-sm text-slate-200">
-          ← 라이브러리
+    <section className="fixed inset-0 z-20 flex flex-col bg-surface">
+      {/* compact top bar — keeps the canvas unobstructed */}
+      <div className="flex items-center gap-2 border-b border-edge px-3 py-1.5">
+        <button type="button" onClick={onExit} className={iconBtn} aria-label="게임 종료">
+          ← 종료
+        </button>
+        <span className="flex-1 truncate text-sm font-medium text-fg">{game.name}</span>
+        <button type="button" onClick={onMenu} className={iconBtn} aria-label="메뉴 (라이브러리·세이브·문의·계정·도움말)" title="메뉴">
+          ☰
+        </button>
+        <button type="button" onClick={toggleMute} aria-pressed={muted} aria-label={muted ? "음소거 해제" : "음소거"} title={muted ? "음소거 해제" : "음소거"} className={iconBtn}>
+          {muted ? "🔇" : "🔊"}
+        </button>
+        <button type="button" onClick={toggleTheme} aria-label={theme === "dark" ? "라이트 모드" : "다크 모드"} title={theme === "dark" ? "라이트 모드" : "다크 모드"} className={iconBtn}>
+          {theme === "dark" ? "☀️" : "🌙"}
         </button>
       </div>
 
-      {status === "error" && (
-        <div className="w-full rounded-lg border border-red-700/50 bg-red-900/20 px-4 py-3 text-sm text-red-200 whitespace-pre-wrap">⚠ {error}</div>
+      {error && (
+        <div className="m-2 rounded-lg border border-red-500 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-200 whitespace-pre-wrap">⚠ {error}</div>
       )}
 
-      <canvas
-        ref={canvasRef}
-        width={240}
-        height={320}
-        data-testid="screen"
-        role="img"
-        aria-label={`${game.name} 게임 화면`}
-        className="emulator-canvas rounded-md border border-slate-700"
-        style={{ width: "min(90vw, 360px)", aspectRatio: "240 / 320" }}
-      />
-
-      {status === "running" && (
-        <>
-          <VirtualPad onPress={press} onRelease={release} />
-          <div className="w-full max-w-md flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => void saveLocal()} className="rounded bg-slate-700 hover:bg-slate-600 px-3 py-1.5 text-sm text-slate-200">
-              세이브 저장(로컬)
-            </button>
-            <button type="button" onClick={() => void syncCloud()} className="rounded bg-slate-700 hover:bg-slate-600 px-3 py-1.5 text-sm text-slate-200">
-              클라우드 업로드
-            </button>
-            <button type="button" onClick={() => setShowRemap((v) => !v)} className="rounded bg-slate-700 hover:bg-slate-600 px-3 py-1.5 text-sm text-slate-200">
-              {showRemap ? "키 설정 닫기" : "⌨ 키 설정"}
-            </button>
+      {/* play area — canvas + pad coexist; column in portrait, row in landscape */}
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-start gap-2 overflow-y-auto p-2 landscape:flex-row landscape:items-center landscape:justify-center">
+        <canvas
+          ref={canvasRef}
+          width={240}
+          height={320}
+          data-testid="screen"
+          role="img"
+          aria-label={`${game.name} 게임 화면`}
+          className="emulator-canvas shrink-0 rounded-md border border-edge max-h-[46vh] landscape:max-h-[86vh] w-auto"
+          style={{ aspectRatio: "240 / 320" }}
+        />
+        {status === "running" && (
+          <div className="w-full max-w-md shrink-0 landscape:w-auto">
+            <VirtualPad onPress={press} onRelease={release} />
           </div>
-          {showRemap && (
-            <div className="w-full max-w-md rounded-lg bg-slate-900/60 border border-slate-700 p-4">
-              <KeyRemap onChange={(m) => (keymapRef.current = m)} />
-            </div>
-          )}
-          <p className="text-xs text-slate-500 text-center">키보드: 방향키 = D-pad · Enter/Space = OK · Shift = 소프트키 · 숫자키 = 키패드</p>
-        </>
+        )}
+      </div>
+
+      {/* bottom controls */}
+      {status === "running" && (
+        <div className="flex flex-wrap items-center justify-center gap-2 border-t border-edge px-3 py-1.5">
+          <button type="button" onClick={() => void saveLocal()} className={iconBtn}>세이브 저장</button>
+          <button type="button" onClick={() => void syncCloud()} className={iconBtn}>클라우드 업로드</button>
+          <button type="button" onClick={() => setShowRemap(true)} className={iconBtn}>⌨ 키 설정</button>
+        </div>
+      )}
+
+      {showRemap && (
+        <Overlay title="키 설정" onClose={() => setShowRemap(false)}>
+          <KeyRemap onChange={(m) => (keymapRef.current = m)} />
+        </Overlay>
       )}
     </section>
   );

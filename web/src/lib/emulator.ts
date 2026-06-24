@@ -32,6 +32,7 @@ export class EmulatorSession {
   private gameHash = "";
   private saveTimer = 0;
   private audioCtx: AudioContext | null = null;
+  private muted = false;
 
   onError?: (message: string) => void;
 
@@ -75,9 +76,23 @@ export class EmulatorSession {
   };
 
   // Resume the AudioContext if the browser suspended it under the autoplay
-  // policy. Safe to call on every input — it's a no-op once running.
+  // policy. Safe to call on every input — a no-op once running, and respects the
+  // user's mute choice (muting suspends the context).
   resumeAudio(): void {
-    if (this.audioCtx && this.audioCtx.state === "suspended") void this.audioCtx.resume();
+    if (!this.muted && this.audioCtx && this.audioCtx.state === "suspended") void this.audioCtx.resume();
+  }
+
+  // Mute by suspending the AudioContext (silences scheduled buffers); unmute
+  // resumes it. The emulator keeps ticking either way.
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+    if (!this.audioCtx) return;
+    if (muted) void this.audioCtx.suspend();
+    else void this.audioCtx.resume();
+  }
+
+  isMuted(): boolean {
+    return this.muted;
   }
 
   keyDown(code: string): void {
