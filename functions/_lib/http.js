@@ -2,7 +2,12 @@
 // Files/dirs under functions/ whose name starts with "_" are NOT routed by
 // Cloudflare Pages, so this module is import-only.
 
-export const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
+// `no-store`: API responses can carry session-scoped data (account, saves), so
+// they must never be cached by the browser or any intermediary.
+export const JSON_HEADERS = {
+  "content-type": "application/json; charset=utf-8",
+  "cache-control": "no-store",
+};
 
 export function json(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {

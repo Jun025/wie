@@ -37,17 +37,18 @@ export default function App() {
         <div className="font-extrabold tracking-wide text-slate-100">
           WIE<span className="font-normal text-slate-500">/web</span>
         </div>
-        <nav className="flex flex-1 gap-1">
+        <nav className="flex flex-1 gap-1" aria-label="주요 메뉴">
           {TABS.map((t) => (
             <button
               key={t.id}
               type="button"
+              aria-current={view === t.id && !running ? "page" : undefined}
               onClick={() => {
                 setRunning(null);
                 setView(t.id);
               }}
               className={
-                "rounded-md px-2.5 py-1.5 text-sm transition-colors " +
+                "rounded-md px-2.5 py-1.5 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400 " +
                 (view === t.id && !running ? "bg-slate-800 text-slate-100" : "text-slate-400 hover:text-slate-200")
               }
             >
@@ -94,6 +95,8 @@ export default function App() {
 
       {toast && (
         <div
+          role="status"
+          aria-live="polite"
           className={
             "fixed bottom-5 left-1/2 -translate-x-1/2 rounded-lg border px-4 py-2 text-sm shadow-lg " +
             (toast.kind === "err"
