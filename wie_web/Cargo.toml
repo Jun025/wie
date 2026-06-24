@@ -25,6 +25,7 @@ js-sys = "=0.3.85"
 web-sys = { version = "=0.3.85", features = [
     "Window",
     "Document",
+    "Element",
     "Navigator",
     "HtmlCanvasElement",
     "CanvasRenderingContext2d",
@@ -36,6 +37,8 @@ web-sys = { version = "=0.3.85", features = [
     "AudioBufferSourceNode",
     "AudioNode",
     "AudioDestinationNode",
+    "GainNode",
+    "AudioParam",
 ] }
 console_error_panic_hook = "0.1"
 getrandom = { version = "^0.4", features = ["wasm_js"] } # transitive; broken without wasm_js in wasm build

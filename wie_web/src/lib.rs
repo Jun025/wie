@@ -19,11 +19,12 @@ mod platform;
 mod screen;
 
 use alloc::sync::Arc;
+use core::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use js_sys::{Object, Reflect, Uint8Array};
 use wasm_bindgen::prelude::*;
-use web_sys::{AudioContext, HtmlCanvasElement};
+use web_sys::{AudioContext, GainNode, HtmlCanvasElement};
 
 use wie_backend::{Emulator, Event, KeyCode, Options, extract_zip};
 use wie_j2me::J2MEEmulator;
@@ -34,7 +35,7 @@ use wie_skt::SktEmulator;
 use crate::database::{DbStore, WebDatabaseRepository};
 use crate::filesystem::{FsStore, WebFilesystem};
 use crate::platform::WebPlatform;
-use crate::screen::WebScreen;
+use crate::screen::{RedrawFlag, WebScreen};
 
 const SEP: char = '\u{1}';
 
@@ -50,6 +51,7 @@ pub struct WieEmulator {
     inner: Box<dyn Emulator>,
     fs_store: FsStore,
     db_store: DbStore,
+    redraw: RedrawFlag,
 }
 
 #[wasm_bindgen]
@@ -67,6 +69,7 @@ impl WieEmulator {
         data: Vec<u8>,
         canvas: &HtmlCanvasElement,
         audio_ctx: Option<AudioContext>,
+        gain: Option<GainNode>,
         width: u32,
         height: u32,
     ) -> Result<WieEmulator, JsValue> {
@@ -79,14 +82,34 @@ impl WieEmulator {
         canvas.set_width(width);
         canvas.set_height(height);
 
+        // Offscreen back buffer for double-buffered presentation (see WebScreen).
+        let document = canvas.owner_document().ok_or_else(|| JsValue::from_str("canvas has no owner document"))?;
+        let back_canvas = document
+            .create_element("canvas")
+            .map_err(|_| JsValue::from_str("failed to create back buffer"))?
+            .dyn_into::<HtmlCanvasElement>()
+            .map_err(|_| JsValue::from_str("back buffer is not a canvas"))?;
+        back_canvas.set_width(width);
+        back_canvas.set_height(height);
+        let back_ctx = back_canvas
+            .get_context("2d")
+            .map_err(|_| JsValue::from_str("failed to get back 2d context"))?
+            .ok_or_else(|| JsValue::from_str("back canvas has no 2d context"))?
+            .dyn_into::<web_sys::CanvasRenderingContext2d>()
+            .map_err(|_| JsValue::from_str("unexpected back context type"))?;
+
         let fs_store: FsStore = Arc::new(Mutex::new(Default::default()));
         let db_store: DbStore = Arc::new(Mutex::new(Default::default()));
+        // Start "true" so the very first composed frame is shown even if a title
+        // somehow paints before its first request_redraw.
+        let redraw: RedrawFlag = Arc::new(AtomicBool::new(true));
 
         let platform = Box::new(WebPlatform::new(
-            WebScreen::new(ctx, width, height),
+            WebScreen::new(ctx, back_canvas, back_ctx, width, height, redraw.clone()),
             WebFilesystem::new(fs_store.clone()),
             WebDatabaseRepository::new(db_store.clone()),
             audio_ctx,
+            gain,
         ));
 
         let options = Options {
@@ -96,14 +119,25 @@ impl WieEmulator {
 
         let inner = build_emulator(platform, filename, data, options).map_err(|e| JsValue::from_str(&e))?;
 
-        Ok(WieEmulator { inner, fs_store, db_store })
+        Ok(WieEmulator {
+            inner,
+            fs_store,
+            db_store,
+            redraw,
+        })
     }
 
-    /// Advance the emulator one frame and repaint. Call this from
-    /// `requestAnimationFrame`.
+    /// Advance the emulator one tick. Call this from `requestAnimationFrame`.
+    ///
+    /// We deliver `Event::Redraw` (which drives the actual blit) ONLY when the
+    /// core asked for it via `Screen::request_redraw` — i.e. after it finished a
+    /// frame. Forcing a redraw every animation frame could blit a half-composed
+    /// framebuffer and made some titles flicker.
     pub fn tick(&mut self) -> Result<(), JsValue> {
         self.inner.tick().map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
-        self.inner.handle_event(Event::Redraw);
+        if self.redraw.swap(false, Ordering::AcqRel) {
+            self.inner.handle_event(Event::Redraw);
+        }
         Ok(())
     }
 

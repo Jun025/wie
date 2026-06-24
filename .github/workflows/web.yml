@@ -6,7 +6,10 @@ name: Web (wasm build + Pages deploy)
 
 on:
   push:
-    branches: [main, feat/cf-web-service]
+    # feat/ux-redesign is included so its push produces a Pages *preview*
+    # deployment (feat-ux-redesign.wie-web.pages.dev) for the user to review
+    # before any merge.
+    branches: [main, feat/cf-web-service, feat/ux-redesign]
   pull_request:
     types: [opened, synchronize]
 
