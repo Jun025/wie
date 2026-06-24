@@ -1,23 +1,35 @@
 import { useCallback, useEffect, useState } from "react";
 import { auth, type User } from "../lib/api";
+import { sendHeartbeat } from "../lib/device";
+
+export interface RegisterResult {
+  pending: boolean; // account created but must verify email before login
+  emailSent: boolean;
+  user: User;
+}
 
 export interface AuthState {
   user: User | null;
   loading: boolean;
+  emailConfigured: boolean; // whether the server has email delivery set up
   refresh: () => Promise<void>;
   login: (id: string, pw: string) => Promise<void>;
-  register: (id: string, pw: string, email?: string) => Promise<void>;
+  register: (id: string, pw: string, email?: string) => Promise<RegisterResult>;
   logout: () => Promise<void>;
 }
 
 export function useAuth(): AuthState {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [emailConfigured, setEmailConfigured] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
       const res = await auth.me();
-      setUser(res.authenticated && res.user ? res.user : null);
+      setEmailConfigured(!!res.emailConfigured);
+      const u = res.authenticated && res.user ? res.user : null;
+      setUser(u);
+      if (u) void sendHeartbeat(); // update last-seen + anonymous aggregate
     } catch {
       setUser(null);
     } finally {
@@ -29,17 +41,19 @@ export function useAuth(): AuthState {
     void refresh();
   }, [refresh]);
 
-  const login = useCallback(
-    async (id: string, pw: string) => {
-      const res = await auth.login(id, pw);
-      setUser(res.user);
-    },
-    [],
-  );
-
-  const register = useCallback(async (id: string, pw: string, email?: string) => {
-    const res = await auth.register(id, pw, email);
+  const login = useCallback(async (id: string, pw: string) => {
+    const res = await auth.login(id, pw);
     setUser(res.user);
+    void sendHeartbeat({ login: true });
+  }, []);
+
+  const register = useCallback(async (id: string, pw: string, email?: string): Promise<RegisterResult> => {
+    const res = await auth.register(id, pw, email);
+    if (!res.pending) {
+      setUser(res.user);
+      void sendHeartbeat({ login: true });
+    }
+    return { pending: !!res.pending, emailSent: !!res.emailSent, user: res.user };
   }, []);
 
   const logout = useCallback(async () => {
@@ -47,5 +61,5 @@ export function useAuth(): AuthState {
     setUser(null);
   }, []);
 
-  return { user, loading, refresh, login, register, logout };
+  return { user, loading, emailConfigured, refresh, login, register, logout };
 }

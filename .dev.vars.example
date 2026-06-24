@@ -4,3 +4,9 @@
 #
 # Generate a strong value, e.g.:  openssl rand -hex 32
 SESSION_SECRET="dev-only-insecure-secret-change-me-0000000000000000"
+
+# (Optional) Email verification + password reset via Resend (https://resend.com).
+# Leave BOTH unset to run without email — signup/login still work and the
+# email-only features are disabled with an in-app notice. Never commit real keys.
+#   RESEND_API_KEY="re_xxxxxxxxxxxxxxxxxxxxxxxx"
+#   EMAIL_FROM="WIE <noreply@yourdomain>"

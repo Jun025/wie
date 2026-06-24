@@ -10,6 +10,32 @@ export interface User {
   id: string;
   login_id: string;
   email: string | null;
+  email_verified?: boolean;
+}
+
+// A registered device (no game identity — only counts/sizes + timestamps).
+export interface Device {
+  device_id: string;
+  label: string;
+  last_login_at: number;
+  last_seen_at: number;
+  item_count: number;
+  total_bytes: number;
+  last_run_at: number;
+  last_save_at: number;
+  slot_count: number;
+}
+
+// Anonymous storage aggregate the client reports for the CURRENT device. Contains
+// counts/sizes only — never a filename, hash, or title.
+export interface DeviceHeartbeat {
+  device_id: string;
+  label: string;
+  item_count: number;
+  total_bytes: number;
+  last_run_at: number;
+  last_save_at: number;
+  login?: boolean;
 }
 
 export interface CloudSave {
@@ -31,15 +57,20 @@ export interface DeviceSlot {
 
 export interface Inquiry {
   id: string;
-  category: string;
   title: string;
   body: string;
-  game_title: string;
-  game_vendor: string;
-  device_model: string;
-  symptom: string;
+  env_info?: string;
+  attachment_name?: string;
+  attachment_mime?: string;
+  has_attachment?: number | boolean;
   status: string;
   created_at: number;
+}
+
+export interface InquiryAttachment {
+  name: string;
+  mime: string;
+  data: string; // base64
 }
 
 export class ApiError extends Error {
@@ -70,12 +101,15 @@ async function call<T = unknown>(path: string, opts: { method?: string; body?: u
 }
 
 export const auth = {
-  me: () => call<{ ok: boolean; authenticated: boolean; user?: User }>("/auth/me"),
+  me: () => call<{ ok: boolean; authenticated: boolean; emailConfigured?: boolean; user?: User }>("/auth/me"),
   register: (login_id: string, password: string, email?: string) =>
-    call<{ ok: boolean; user: User }>("/auth/register", { method: "POST", body: { login_id, password, email } }),
+    call<{ ok: boolean; user: User; pending?: boolean; emailSent?: boolean }>("/auth/register", { method: "POST", body: { login_id, password, email } }),
   login: (login_id: string, password: string) =>
     call<{ ok: boolean; user: User }>("/auth/login", { method: "POST", body: { login_id, password } }),
   logout: () => call("/auth/logout", { method: "POST" }),
+  resend: (login_id: string) => call<{ ok: boolean; emailConfigured?: boolean }>("/auth/resend", { method: "POST", body: { login_id } }),
+  requestReset: (login_id: string) => call<{ ok: boolean; emailConfigured?: boolean }>("/auth/request-reset", { method: "POST", body: { login_id } }),
+  reset: (token: string, password: string) => call<{ ok: boolean }>("/auth/reset", { method: "POST", body: { token, password } }),
 };
 
 export const saves = {
@@ -88,11 +122,14 @@ export const saves = {
 };
 
 export const devices = {
-  list: () => call<{ ok: boolean; devices: DeviceSlot[] }>("/devices"),
+  list: () => call<{ ok: boolean; devices: Device[] }>("/devices"),
+  // Heartbeat carries ONLY counts/sizes + timestamps — never a game identity.
+  heartbeat: (hb: DeviceHeartbeat) => call<{ ok: boolean }>("/devices", { method: "POST", body: hb }),
 };
 
 export const inquiries = {
-  create: (payload: Record<string, string>) => call<{ ok: boolean; inquiry: Inquiry }>("/inquiries", { method: "POST", body: payload }),
+  create: (payload: { title: string; body: string; env_info?: string; attachment?: InquiryAttachment | null }) =>
+    call<{ ok: boolean; inquiry: Inquiry }>("/inquiries", { method: "POST", body: payload }),
   list: () => call<{ ok: boolean; inquiries: Inquiry[] }>("/inquiries"),
 };
 

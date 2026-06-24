@@ -2,6 +2,8 @@ import { ok, err, readJson, handleError, str, HttpError } from "../../_lib/http.
 import { hashPassword, uuid } from "../../_lib/crypto.js";
 import { createSession, sessionCookie } from "../../_lib/session.js";
 import { rateLimit } from "../../_lib/ratelimit.js";
+import { emailConfigured, sendEmail, verifyEmailTemplate } from "../../_lib/email.js";
+import { createToken, VERIFY_TTL_MS } from "../../_lib/tokens.js";
 
 export async function onRequestPost(context) {
   try {
@@ -10,11 +12,13 @@ export async function onRequestPost(context) {
 
     const loginId = str(body.login_id, { name: "login_id", min: 3, max: 254 });
     const password = str(body.password, { name: "password", min: 8, max: 256, trim: false });
-    // email is optional; reserved for future verification flow.
     const email = body.email == null || body.email === "" ? null : str(body.email, { name: "email", max: 254 });
 
     if (!/^[\w.+@-]+$/.test(loginId)) {
       throw new HttpError("login_id may contain letters, digits and . _ + - @ only", 400);
+    }
+    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      throw new HttpError("이메일 형식이 올바르지 않습니다", 400, "bad_email");
     }
 
     const existing = await context.env.DB.prepare("SELECT id FROM users WHERE login_id = ?").bind(loginId).first();
@@ -24,15 +28,39 @@ export async function onRequestPost(context) {
     const now = Date.now();
     const id = uuid();
 
+    // When email delivery is configured AND the user supplied an email, the
+    // account starts 'pending' and must verify before it becomes 'active'. With
+    // no email service (or no email given) we cannot verify, so the account is
+    // 'active' immediately — graceful degradation, never a lockout.
+    const willVerify = !!email && emailConfigured(context.env);
+    const status = willVerify ? "pending" : "active";
+
     await context.env.DB.prepare(
       `INSERT INTO users (id, login_id, email, email_verified, password_algo, password_iter, password_salt, password_hash, status, created_at, updated_at)
-       VALUES (?, ?, ?, 0, ?, ?, ?, ?, 'active', ?, ?)`,
+       VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`,
     )
-      .bind(id, loginId, email, pw.algo, pw.iter, pw.salt, pw.hash, now, now)
+      .bind(id, loginId, email, pw.algo, pw.iter, pw.salt, pw.hash, status, now, now)
       .run();
 
-    const { cookieValue } = await createSession(context.env, id);
-    return ok({ user: { id, login_id: loginId, email } }, { "Set-Cookie": sessionCookie(cookieValue, 30 * 24 * 3600) });
+    let emailSent = false;
+    if (willVerify) {
+      const raw = await createToken(context.env, id, "verify", VERIFY_TTL_MS);
+      const origin = new URL(context.request.url).origin;
+      const url = `${origin}/api/auth/verify?token=${encodeURIComponent(raw)}`;
+      const r = await sendEmail(context.env, { to: email, ...verifyEmailTemplate(url) });
+      emailSent = r.ok;
+    }
+
+    // A pending account does NOT get a session — it must verify first. An active
+    // account is logged in right away.
+    if (status === "active") {
+      const { cookieValue } = await createSession(context.env, id);
+      return ok(
+        { user: { id, login_id: loginId, email, email_verified: false }, emailSent },
+        { "Set-Cookie": sessionCookie(cookieValue, 30 * 24 * 3600) },
+      );
+    }
+    return ok({ user: { id, login_id: loginId, email, email_verified: false }, pending: true, emailSent });
   } catch (e) {
     return handleError(e);
   }

@@ -8,22 +8,28 @@ import { AuthPanel } from "./components/AuthPanel";
 import { CloudSaves } from "./components/CloudSaves";
 import { InquiryForm } from "./components/InquiryForm";
 import { Help } from "./components/Help";
+import { ServiceInfo } from "./components/ServiceInfo";
 import { Overlay } from "./components/Overlay";
 import type { LoadableGame } from "./lib/emulator";
 
-type View = "library" | "cloud" | "inquiry" | "account" | "help";
-type Toast = { msg: string; kind: "ok" | "err" | "" } | null;
+type View = "library" | "cloud" | "inquiry" | "help" | "info";
+type ToastKind = "ok" | "err" | "";
+interface Toast {
+  id: number;
+  msg: string;
+  kind: ToastKind;
+}
 
+// 계정(account) is intentionally NOT a tab anymore — it lives behind the
+// top-right profile entry (opened as an overlay so the game never tears down).
 const TABS: { id: View; label: string }[] = [
   { id: "library", label: "라이브러리" },
   { id: "cloud", label: "세이브 동기화" },
   { id: "inquiry", label: "문의·건의" },
-  { id: "account", label: "계정" },
   { id: "help", label: "도움말" },
+  { id: "info", label: "서비스 정보" },
 ];
 
-// Maps a view id to its panel. Shared by the full-page nav (not playing) and the
-// slide-over overlay (while playing) so a running game is never torn down.
 function ViewPanel({
   view,
   authState,
@@ -44,11 +50,27 @@ function ViewPanel({
       return <CloudSaves user={authState.user} toast={toast} />;
     case "inquiry":
       return <InquiryForm user={authState.user} toast={toast} />;
-    case "account":
-      return <AuthPanel authState={authState} toast={toast} />;
     case "help":
       return <Help />;
+    case "info":
+      return <ServiceInfo />;
   }
+}
+
+function ProfileButton({ user, onClick }: { user: AuthState["user"]; onClick: () => void }) {
+  const initials = user ? user.login_id.slice(0, 2).toUpperCase() : "👤";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={user ? `계정 (@${user.login_id})` : "로그인 / 가입"}
+      aria-label={user ? `계정 @${user.login_id}` : "로그인 / 가입"}
+      className="flex items-center gap-2 rounded-full border border-edge bg-surface2 py-1 pl-1 pr-2.5 text-xs text-fg-dim hover:text-fg hover:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+    >
+      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-accent-fg">{initials}</span>
+      <span className="max-w-[8rem] truncate">{user ? `@${user.login_id}` : "로그인"}</span>
+    </button>
+  );
 }
 
 export default function App() {
@@ -56,21 +78,37 @@ export default function App() {
   const { theme, toggle: toggleTheme } = useTheme();
   const [view, setView] = useState<View>("library");
   const [running, setRunning] = useState<LoadableGame | null>(null);
-  const [overlay, setOverlay] = useState<View | "menu" | null>(null); // shown on top of the player
-  const [toast, setToast] = useState<Toast>(null);
+  const [overlay, setOverlay] = useState<View | "menu" | null>(null); // panels shown over the player
+  const [accountOpen, setAccountOpen] = useState(false); // profile/account overlay (any state)
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [resetToken, setResetToken] = useState<string | null>(null);
 
-  // Install the global audio-unlock listeners once, before any game-launch tap,
-  // so the first user gesture creates+resumes+unlocks the shared AudioContext
-  // synchronously (required by iOS WebKit).
+  // Install the global audio-unlock listeners once (iOS WebKit needs the first
+  // gesture to create+resume+unlock the shared AudioContext synchronously).
   useEffect(() => installAudioUnlock(), []);
 
-  const showToast = useCallback((msg: string, kind: "ok" | "err" | "" = "") => {
-    setToast({ msg, kind });
-    window.setTimeout(() => setToast(null), 3200);
+  // A password-reset link (`/?reset=TOKEN`) opens the account overlay in reset mode.
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("reset");
+    if (t) {
+      setResetToken(t);
+      setAccountOpen(true);
+    }
+  }, []);
+
+  // Unified toast system: one queue, one render location, opaque + kind-colored.
+  // Consecutive duplicates are collapsed so a repeated message doesn't stack.
+  const showToast = useCallback((msg: string, kind: ToastKind = "") => {
+    setToasts((prev) => {
+      if (prev.length && prev[prev.length - 1].msg === msg && prev[prev.length - 1].kind === kind) return prev;
+      const id = (prev[prev.length - 1]?.id ?? 0) + 1;
+      window.setTimeout(() => setToasts((cur) => cur.filter((t) => t.id !== id)), 3600);
+      return [...prev.slice(-2), { id, msg, kind }]; // keep at most 3
+    });
   }, []);
 
   const onRun = useCallback((game: LoadableGame) => {
-    setRunning(game); // starting (or switching) a game
+    setRunning(game);
     setOverlay(null);
   }, []);
 
@@ -81,14 +119,27 @@ export default function App() {
 
   const tabLabel = (id: View) => TABS.find((t) => t.id === id)?.label ?? "";
 
-  // Guide the user from a rejected upload to the inquiry form (or login first).
-  const reportTarget: View = authState.user ? "inquiry" : "account";
+  // A rejected upload routes the user to the inquiry form, logging in first if needed.
   const onReport = useCallback(() => {
-    if (running) setOverlay(reportTarget);
-    else setView(reportTarget);
-  }, [running, reportTarget]);
+    if (!authState.user) return setAccountOpen(true);
+    if (running) setOverlay("inquiry");
+    else setView("inquiry");
+  }, [running, authState.user]);
 
-  // ── Playing: player stays mounted; tabs open as overlays (game keeps running) ─
+  const closeReset = useCallback(() => {
+    setResetToken(null);
+    setAccountOpen(false);
+    // Drop the ?reset= param so a refresh doesn't reopen it.
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
+
+  const accountOverlay = accountOpen && (
+    <Overlay title={resetToken ? "비밀번호 재설정" : "계정"} onClose={resetToken ? closeReset : () => setAccountOpen(false)}>
+      <AuthPanel authState={authState} toast={showToast} resetToken={resetToken} onResetDone={closeReset} />
+    </Overlay>
+  );
+
+  // ── Playing: player stays mounted; everything opens as overlays ────────────────
   if (running) {
     return (
       <>
@@ -96,8 +147,21 @@ export default function App() {
 
         {overlay === "menu" && (
           <Overlay title="메뉴" onClose={() => setOverlay(null)}>
-            <div className="w-full max-w-sm flex flex-col gap-2">
+            <div className="flex w-full max-w-sm flex-col gap-2">
               <p className="text-sm text-fg-dim">게임은 계속 실행 중입니다. 항목을 보고 닫으면 그대로 이어집니다.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setOverlay(null);
+                  setAccountOpen(true);
+                }}
+                className="flex items-center gap-2 rounded-md border border-edge bg-surface2 px-4 py-3 text-left text-fg hover:border-accent"
+              >
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-accent-fg">
+                  {authState.user ? authState.user.login_id.slice(0, 2).toUpperCase() : "👤"}
+                </span>
+                {authState.user ? `계정 (@${authState.user.login_id})` : "로그인 / 가입"}
+              </button>
               {TABS.map((t) => (
                 <button
                   key={t.id}
@@ -118,14 +182,15 @@ export default function App() {
           </Overlay>
         )}
 
-        {toast && <ToastView toast={toast} />}
+        {accountOverlay}
+        <ToastStack toasts={toasts} />
       </>
     );
   }
 
-  // ── Not playing: normal header + full-page view ───────────────────────────────
+  // ── Not playing: header + full-page view ──────────────────────────────────────
   return (
-    <div className="min-h-full flex flex-col">
+    <div className="flex min-h-full flex-col">
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-edge bg-surface/85 px-4 py-2 backdrop-blur">
         <div className="font-extrabold tracking-wide text-fg">
           WIE<span className="font-normal text-fg-dim">/web</span>
@@ -155,15 +220,7 @@ export default function App() {
         >
           {theme === "dark" ? "☀️" : "🌙"}
         </button>
-        <button
-          type="button"
-          onClick={() => setView("account")}
-          aria-current={view === "account" ? "page" : undefined}
-          title={authState.user ? "계정" : "로그인 / 가입"}
-          className="rounded-full border border-edge bg-surface2 px-2.5 py-1 text-xs text-fg-dim hover:text-fg hover:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-        >
-          {authState.user ? `@${authState.user.login_id}` : "로그인 안 됨"}
-        </button>
+        <ProfileButton user={authState.user} onClick={() => setAccountOpen(true)} />
       </header>
 
       <main className="flex flex-1 flex-col items-center gap-5 px-4 py-5">
@@ -177,35 +234,32 @@ export default function App() {
       </main>
 
       <footer className="mt-auto px-4 py-6 text-center text-xs text-fg-dim">
-        <p>이 프로젝트는 디지털 보존 및 교육·연구 목적의 비영리 서비스입니다 (digital preservation / educational research).</p>
-        <p className="mt-1">
-          에뮬레이터 코어: MIT 라이선스, © 2020 Inseok Lee ·{" "}
-          <a className="underline hover:text-fg" href="https://github.com/dlunch/wie" target="_blank" rel="noreferrer noopener">
-            upstream: dlunch/wie
-          </a>
-        </p>
+        <button type="button" onClick={() => setView("info")} className="underline hover:text-fg">
+          서비스 정보 · 라이선스
+        </button>
       </footer>
 
-      {toast && <ToastView toast={toast} />}
+      {accountOverlay}
+      <ToastStack toasts={toasts} />
     </div>
   );
 }
 
-function ToastView({ toast }: { toast: NonNullable<Toast> }) {
+function ToastStack({ toasts }: { toasts: Toast[] }) {
+  if (!toasts.length) return null;
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      className={
-        "fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-lg border px-4 py-2 text-sm shadow-lg " +
-        (toast.kind === "err"
-          ? "border-red-500 bg-red-500/15 text-red-700 dark:text-red-200"
-          : toast.kind === "ok"
-            ? "border-emerald-500 bg-emerald-500/15 text-emerald-700 dark:text-emerald-200"
-            : "border-edge bg-surface2 text-fg")
-      }
-    >
-      {toast.msg}
+    <div className="fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-2" role="status" aria-live="polite">
+      {toasts.map((t) => {
+        const icon = t.kind === "err" ? "⚠️" : t.kind === "ok" ? "✓" : "•";
+        const border = t.kind === "err" ? "border-red-500" : t.kind === "ok" ? "border-emerald-500" : "border-edge";
+        const iconColor = t.kind === "err" ? "text-red-500" : t.kind === "ok" ? "text-emerald-500" : "text-fg-dim";
+        return (
+          <div key={t.id} className={`flex max-w-[90vw] items-start gap-2 rounded-lg border ${border} bg-surface2 px-4 py-2 text-sm text-fg shadow-lg`}>
+            <span className={`shrink-0 ${iconColor}`} aria-hidden="true">{icon}</span>
+            <span className="break-words">{t.msg}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
