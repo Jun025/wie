@@ -17,6 +17,8 @@
 | Pages 프로젝트명 (예: `wie-web`) | Pages 생성 시 | `wrangler.toml`의 `name`과 일치해야 함 → 알려주세요 |
 | D1 `database_id` | `wrangler d1 create` 또는 대시보드 | `wrangler.toml`의 `database_id`에 반영 → 알려주세요 |
 | `SESSION_SECRET` (랜덤 32바이트) | 본인 생성 | Pages → Settings → 환경변수(암호화 secret). **값은 공유 금지** |
+| `RESEND_API_KEY` (이메일 인증/재설정용, 선택) | resend.com → API Keys | Pages → Settings → 환경변수(암호화 secret). 미설정 시 메일 기능만 비활성 |
+| `EMAIL_FROM` (예: `WIE <noreply@yourdomain>`) | 본인의 인증된 발신주소 | Pages → Settings → 환경변수(일반 변수 가능) |
 | `CLOUDFLARE_API_TOKEN` | My Profile → API Tokens | GitHub repo Secrets (CI 배포용, 선택) |
 | `CLOUDFLARE_ACCOUNT_ID` | 대시보드 우측 | GitHub repo Secrets (CI 배포용, 선택) |
 
@@ -112,6 +114,29 @@ GitHub Actions가 `pages deploy`까지 하려면:
 2. GitHub `Jun025/wie` → **Settings → Secrets and variables → Actions** →
    `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` 등록.
    - 미등록 시 CI는 빌드/아티팩트까지만 하고 배포 단계는 자동 skip됩니다.
+
+### (선택) 이메일 인증·비밀번호 재설정 — Resend (사용자 작업)
+
+이메일 인증 가입 + 비밀번호 재설정 메일은 **Resend**(https://resend.com)로 보냅니다.
+SMTP 소켓을 못 여는 Workers/Pages Functions에서 HTTPS API 한 번으로 동작하고, **무료
+한도**가 넉넉하기 때문입니다.
+
+- **무료 한도(작성 시점):** 월 3,000통 / 일 100통. 본 용도(인증·재설정)에는 충분합니다.
+- **발신 도메인 요건:** 임의의 수신자에게 보내려면 Resend에서 **본인 도메인을 인증**해야
+  합니다. 샌드박스 발신주소 `onboarding@resend.dev`는 **계정 소유자 본인에게만** 전달되므로
+  테스트용입니다.
+- **등록할 값(사용자만 입력 — S3):**
+  1. Resend → **API Keys → Create** → 키 생성.
+  2. Pages → **Settings → Environment variables** →
+     - `RESEND_API_KEY` = 생성한 키, **Type: Secret(암호화)**.
+     - `EMAIL_FROM` = 인증된 발신주소(예: `WIE <noreply@yourdomain>`). 일반 변수 가능.
+     - Production/Preview 양쪽에 등록.
+  3. 로컬 개발은 `.dev.vars`에 `RESEND_API_KEY="..."`, `EMAIL_FROM="..."` 추가(gitignore됨).
+- **graceful 처리:** 두 값이 없으면 메일 단계만 비활성화됩니다 — 가입/로그인은 그대로
+  동작하고(이메일 없이 즉시 active), 인증/재설정 UI는 "이메일 기능 미설정"으로 안내합니다.
+  키를 넣지 않아도 빌드/기존 기능은 죽지 않습니다.
+
+> 값은 **사용자만** 입력합니다. 키 자체를 저에게 알려줄 필요는 없습니다(이름만 알면 됩니다).
 
 ---
 

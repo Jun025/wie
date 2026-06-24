@@ -6,7 +6,7 @@
 // so the server can never learn which game a save belongs to.
 
 import * as lib from "./library";
-import { saves as savesApi, devices as devicesApi } from "./api";
+import { saves as savesApi } from "./api";
 
 export function bytesToB64(bytes: Uint8Array): string {
   let bin = "";
@@ -55,10 +55,6 @@ export async function pushToCloud(gameHash: string, slotLabel: string, deviceLab
 
 export async function listCloud() {
   return (await savesApi.list(false)).saves;
-}
-
-export async function listCloudDevices() {
-  return (await devicesApi.list()).devices;
 }
 
 // Download a cloud slot's opaque payload and attach it to a chosen LOCAL game.

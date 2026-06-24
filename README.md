@@ -4,7 +4,7 @@
 
 A standalone web-based emulator for old mobile apps based on WIPI, SKVM or J2ME.
 
-This project is dedicated to digital preservation and educational research. Our goal is to revive the legacy of classic mobile games and allow them to be experienced in modern web environments.
+Our goal is to revive the legacy of classic mobile games and allow them to be experienced in modern web environments.
 
 - [Contribution guide](https://github.com/dlunch/wie/blob/main/CONTRIBUTING.md)
 - Architecture docs: [Emulator](docs/architecture.md) | [KTF](docs/ktf.md) | [LGT](docs/lgt.md)
@@ -20,8 +20,7 @@ bytes, filenames, content hashes, and the "which games this device has" list are
 never sent to or stored on the server. Only account info, opaque save data, and
 inquiry text reach the server. Enforced by `scripts/audit-no-leak.sh`.
 
-> **Legal note.** This project is for digital preservation and educational
-> research. The notices and policy text in the app and docs are **not legal
+> **Legal note.** The notices and policy text in the app and docs are **not legal
 > advice** — operators should have them reviewed by a qualified Korean
 > intellectual-property lawyer before running the service publicly. A
 > rights-holder report / takedown channel is provided in the app's inquiry page;
