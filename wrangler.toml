@@ -3,17 +3,18 @@
 # The React/Vite frontend builds to `web/dist` (its Vite `outDir`). The backend
 # lives in `functions/` (Pages Functions) and talks to D1 via the `DB` binding.
 #
-# SECRETS / IDS ARE NOT STORED HERE (S3). `database_id` is filled in by the user
-# after they create the D1 database (see docs/CLOUDFLARE_SETUP.md). The session
-# signing key is a Pages *secret* named SESSION_SECRET, never committed.
+# SECRETS ARE NOT STORED HERE (S3). The session signing key is a Pages *secret*
+# named SESSION_SECRET, never committed. The D1 `database_id` below is NOT a
+# secret — it is the public database identifier and is safe to commit.
 
 name = "wie-web"
 compatibility_date = "2024-09-23"
 pages_build_output_dir = "web/dist"
 
-# D1 binding. `database_id` is intentionally a placeholder — replace it with the
-# id printed by `wrangler d1 create wie-db`, or bind it in the Pages dashboard.
+# D1 binding. The dashboard binding (Pages → Settings → Functions → D1) is the
+# binding actually used at runtime; this entry keeps `wrangler` CLI commands
+# (d1 migrations apply, pages dev) pointed at the same database.
 [[d1_databases]]
 binding = "DB"
 database_name = "wie-db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "a016e967-2bc3-4eb3-9204-706c812d4aa9"

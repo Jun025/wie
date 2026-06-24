@@ -1,3 +1,5 @@
+use core::cell::Cell;
+
 use web_sys::AudioContext;
 
 use wie_backend::AudioSink;
@@ -6,11 +8,17 @@ use wie_backend::AudioSink;
 /// `AudioContext`; MIDI events are accepted but not yet synthesized (silent
 /// stub) — a soft-synth can be layered on later without touching the core.
 ///
+/// Consecutive PCM chunks are scheduled back-to-back on a moving cursor
+/// (`next_time`) instead of all at "now", so streamed game audio plays gaplessly
+/// rather than overlapping into noise.
+///
 /// The `AudioContext` must be created and resumed by the JS side on a user
 /// gesture (browser autoplay policy). When no context is supplied, every method
 /// is a no-op.
 pub struct WebAudioSink {
     ctx: Option<AudioContext>,
+    // Next free playback position on the audio timeline (seconds).
+    next_time: Cell<f64>,
 }
 
 // Single-threaded in the browser; the JS handle never crosses threads.
@@ -19,10 +27,13 @@ unsafe impl Sync for WebAudioSink {}
 
 impl WebAudioSink {
     pub fn new(ctx: Option<AudioContext>) -> Self {
-        Self { ctx }
+        Self {
+            ctx,
+            next_time: Cell::new(0.0),
+        }
     }
 
-    fn try_play(ctx: &AudioContext, channels: u8, sampling_rate: u32, wave_data: &[i16]) -> Result<(), wasm_bindgen::JsValue> {
+    fn try_play(&self, ctx: &AudioContext, channels: u8, sampling_rate: u32, wave_data: &[i16]) -> Result<(), wasm_bindgen::JsValue> {
         let channels = channels.max(1) as u32;
         if sampling_rate == 0 || wave_data.is_empty() {
             return Ok(());
@@ -46,7 +57,14 @@ impl WebAudioSink {
         let source = ctx.create_buffer_source()?;
         source.set_buffer(Some(&buffer));
         source.connect_with_audio_node(&ctx.destination())?;
-        source.start()?;
+
+        // Schedule at the later of "now" and the running cursor. If the cursor
+        // fell behind (underrun), resync to now to avoid a growing delay.
+        let now = ctx.current_time();
+        let start_at = self.next_time.get().max(now);
+        source.start_with_when(start_at)?;
+        let duration = frames as f64 / sampling_rate as f64;
+        self.next_time.set(start_at + duration);
         Ok(())
     }
 }
@@ -56,7 +74,7 @@ impl AudioSink for WebAudioSink {
         if let Some(ctx) = self.ctx.as_ref() {
             // Errors are non-fatal: a failed audio schedule must never abort the
             // emulation tick.
-            let _ = Self::try_play(ctx, channel, sampling_rate, wave_data);
+            let _ = self.try_play(ctx, channel, sampling_rate, wave_data);
         }
     }
 

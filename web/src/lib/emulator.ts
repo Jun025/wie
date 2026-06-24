@@ -31,6 +31,7 @@ export class EmulatorSession {
   private running = false;
   private gameHash = "";
   private saveTimer = 0;
+  private audioCtx: AudioContext | null = null;
 
   onError?: (message: string) => void;
 
@@ -38,6 +39,7 @@ export class EmulatorSession {
     await ensureInit();
 
     this.gameHash = game.hash;
+    this.audioCtx = audioCtx;
     const bytes = new Uint8Array(game.bytes);
 
     // Construction injects the bytes directly into wasm memory.
@@ -72,7 +74,14 @@ export class EmulatorSession {
     this.rafId = requestAnimationFrame(this.loop);
   };
 
+  // Resume the AudioContext if the browser suspended it under the autoplay
+  // policy. Safe to call on every input — it's a no-op once running.
+  resumeAudio(): void {
+    if (this.audioCtx && this.audioCtx.state === "suspended") void this.audioCtx.resume();
+  }
+
   keyDown(code: string): void {
+    this.resumeAudio();
     this.emu?.key_down(code);
   }
   keyUp(code: string): void {
