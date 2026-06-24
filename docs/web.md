@@ -77,7 +77,8 @@ See `docs/CLOUDFLARE_SETUP.md` for the (user-side) Cloudflare dashboard steps.
 
 ## Backend
 
-- **Auth**: PBKDF2-HMAC-SHA256 passwords (210k iterations, per-user salt — the
+- **Auth**: PBKDF2-HMAC-SHA256 passwords (75k iterations to fit the free plan's
+  ~10ms CPU budget; per-record iteration count, raise it on a paid plan — the
   strong KDF natively in the Workers WebCrypto runtime); HMAC-SHA256-signed
   session cookie (`HttpOnly; Secure; SameSite=Lax`) backed by a `sessions` row
   for revocation/expiry; best-effort D1 rate limiting keyed by a salted IP hash.

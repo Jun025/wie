@@ -7,7 +7,14 @@
 // "Workers 가용 검증 알고리즘" choice. Plaintext passwords are never stored or
 // logged.
 
-const PBKDF2_ITERATIONS = 210_000; // OWASP-recommended floor for PBKDF2-SHA256
+// Iteration count is a deliberate trade-off with the Cloudflare *free* plan's
+// ~10ms CPU budget per request: 210k PBKDF2-SHA256 iterations overran it and
+// made register/login fail with a 500. 75k keeps auth comfortably under budget
+// while still being a strong, salted, iterated KDF. The count is stored per
+// record (`password_iter`), so this can be raised later (e.g. on a paid plan)
+// without breaking existing hashes — verification always uses each record's own
+// iteration count.
+const PBKDF2_ITERATIONS = 75_000;
 const PBKDF2_ALGO = "pbkdf2-sha256";
 
 const enc = new TextEncoder();
