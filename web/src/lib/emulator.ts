@@ -25,6 +25,24 @@ export interface LoadableGame {
   bytes: ArrayBuffer;
 }
 
+// Structured runtime/load error for the on-screen diagnostic panel. Carries the
+// raw message, the JS error name, an optional stack, the phase it happened in,
+// and the detected platform backend — but NEVER any game-file identity
+// (filename/hash/bytes/title stay out of this, per the no-leak baseline).
+export interface EmuError {
+  message: string;
+  name: string;
+  stack?: string;
+  phase: "load" | "runtime";
+  platformKind?: string;
+}
+
+export function normalizeError(e: unknown, phase: EmuError["phase"], platformKind?: string): EmuError {
+  if (typeof e === "string") return { message: e, name: "Error", phase, platformKind };
+  if (e instanceof Error) return { message: e.message || String(e), name: e.name || "Error", stack: e.stack, phase, platformKind };
+  return { message: String(e), name: "Error", phase, platformKind };
+}
+
 // Volume + mute are a device-local preference (localStorage only, never sent).
 const VOL_KEY = "wie-volume";
 const MUTE_KEY = "wie-muted";
@@ -83,10 +101,20 @@ export class EmulatorSession {
   private volume = loadVolume();
   private muted = loadMuted();
 
-  onError?: (message: string) => void;
+  onError?: (err: EmuError) => void;
   // Fired whenever volume/mute changes (slider, pad, keyboard) so the UI gauge
   // stays in sync — the session is the single source of truth.
   onVolumeChange?: (volume: number, muted: boolean) => void;
+
+  // Detected emulator backend ("KTF"/"LGT"/"SKT"/"J2ME"), or null before load.
+  // A runtime label for diagnostics only — not game identity.
+  platformKind(): string | null {
+    try {
+      return this.emu?.platform_kind() ?? null;
+    } catch {
+      return null;
+    }
+  }
 
   async start(game: LoadableGame, canvas: HTMLCanvasElement, audioCtx: AudioContext | null): Promise<void> {
     await ensureInit();
@@ -130,8 +158,9 @@ export class EmulatorSession {
     try {
       this.emu.tick();
     } catch (e) {
+      const kind = this.platformKind() ?? undefined;
       this.stop();
-      this.onError?.(typeof e === "string" ? e : (e as Error)?.message ?? "emulator error");
+      this.onError?.(normalizeError(e, "runtime", kind));
       return;
     }
     this.rafId = requestAnimationFrame(this.loop);
