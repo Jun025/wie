@@ -28,7 +28,10 @@ export function emailConfigured(env) {
 export async function sendEmail(env, { to, subject, html, text }) {
   if (!emailConfigured(env)) return { ok: false, error: "email_not_configured" };
   try {
-    const res = await fetch("https://api.resend.com/emails", {
+    // Endpoint is overridable (RESEND_API_BASE) for local testing / a compatible
+    // proxy; defaults to Resend's API. Never logged.
+    const base = env.RESEND_API_BASE || "https://api.resend.com";
+    const res = await fetch(`${base}/emails`, {
       method: "POST",
       headers: {
         authorization: `Bearer ${env.RESEND_API_KEY}`,

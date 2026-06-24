@@ -33,13 +33,15 @@ export async function onRequestPost(context) {
     // no email service (or no email given) we cannot verify, so the account is
     // 'active' immediately — graceful degradation, never a lockout.
     const willVerify = !!email && emailConfigured(context.env);
-    const status = willVerify ? "pending" : "active";
 
+    // Insert tentatively; the verification token's FK needs the row to exist
+    // before we attempt to send. We finalize the status after the send result.
+    const initialStatus = willVerify ? "pending" : "active";
     await context.env.DB.prepare(
       `INSERT INTO users (id, login_id, email, email_verified, password_algo, password_iter, password_salt, password_hash, status, created_at, updated_at)
        VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`,
     )
-      .bind(id, loginId, email, pw.algo, pw.iter, pw.salt, pw.hash, status, now, now)
+      .bind(id, loginId, email, pw.algo, pw.iter, pw.salt, pw.hash, initialStatus, now, now)
       .run();
 
     let emailSent = false;
@@ -51,15 +53,23 @@ export async function onRequestPost(context) {
       emailSent = r.ok;
     }
 
-    // A pending account does NOT get a session — it must verify first. An active
-    // account is logged in right away.
-    if (status === "active") {
+    // CRITICAL anti-lockout rule: gate as 'pending' ONLY when the verification
+    // email actually went out. If sending failed (e.g. Resend test mode only
+    // delivers to the account owner, so other recipients 403), un-gate to
+    // 'active' and log the user in — otherwise that account could never verify
+    // and would be locked out forever.
+    const pending = willVerify && emailSent;
+    if (!pending) {
+      if (initialStatus === "pending") {
+        await context.env.DB.prepare("UPDATE users SET status = 'active', updated_at = ? WHERE id = ?").bind(Date.now(), id).run();
+      }
       const { cookieValue } = await createSession(context.env, id);
       return ok(
-        { user: { id, login_id: loginId, email, email_verified: false }, emailSent },
+        { user: { id, login_id: loginId, email, email_verified: false }, emailSent, emailConfigured: emailConfigured(context.env) },
         { "Set-Cookie": sessionCookie(cookieValue, 30 * 24 * 3600) },
       );
     }
+    // Email sent → must verify before first login (no session yet).
     return ok({ user: { id, login_id: loginId, email, email_verified: false }, pending: true, emailSent });
   } catch (e) {
     return handleError(e);
