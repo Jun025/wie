@@ -27,9 +27,19 @@ cargo build --target wasm32-unknown-unknown --release -p wie_web
 echo "==> wasm-bindgen"
 wasm-bindgen --target web --out-dir "$OUT_DIR" --out-name wie_web "$WASM_IN"
 
+# wasm-opt is optional. An OLD binaryen can fail to parse wasm emitted by a
+# recent rustc/wasm-bindgen ("Fatal: error parsing wasm"), so we optimize into a
+# temp file and only swap it in on success — a failure ships the (larger but
+# valid) unoptimized bundle instead of breaking the build.
 if command -v wasm-opt >/dev/null 2>&1; then
   echo "==> wasm-opt -Oz"
-  wasm-opt -Oz -o "$OUT_DIR/wie_web_bg.wasm" "$OUT_DIR/wie_web_bg.wasm"
+  if wasm-opt -Oz --enable-bulk-memory --enable-nontrapping-float-to-int \
+      -o "$OUT_DIR/wie_web_bg.opt.wasm" "$OUT_DIR/wie_web_bg.wasm"; then
+    mv "$OUT_DIR/wie_web_bg.opt.wasm" "$OUT_DIR/wie_web_bg.wasm"
+  else
+    echo "==> wasm-opt failed (old binaryen?) — shipping unoptimized wasm"
+    rm -f "$OUT_DIR/wie_web_bg.opt.wasm"
+  fi
 else
   echo "==> wasm-opt not found, skipping (optional)"
 fi
