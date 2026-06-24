@@ -28,7 +28,10 @@ export function emailConfigured(env) {
 export async function sendEmail(env, { to, subject, html, text }) {
   if (!emailConfigured(env)) return { ok: false, error: "email_not_configured" };
   try {
-    const res = await fetch("https://api.resend.com/emails", {
+    // Endpoint is overridable (RESEND_API_BASE) for local testing / a compatible
+    // proxy; defaults to Resend's API. Never logged.
+    const base = env.RESEND_API_BASE || "https://api.resend.com";
+    const res = await fetch(`${base}/emails`, {
       method: "POST",
       headers: {
         authorization: `Bearer ${env.RESEND_API_KEY}`,
@@ -37,11 +40,13 @@ export async function sendEmail(env, { to, subject, html, text }) {
       body: JSON.stringify({ from: env.EMAIL_FROM, to, subject, html, text }),
     });
     if (!res.ok) {
-      // Log only the status, never the key or recipient PII.
+      // Log only the status, never the key or recipient PII. The numeric status
+      // is returned (not secret) so the operator can tell a valid key in test
+      // mode (403 = recipient restricted) from a bad key (401).
       console.error("resend send failed:", res.status);
-      return { ok: false, error: `send_failed_${res.status}` };
+      return { ok: false, error: `send_failed_${res.status}`, status: res.status };
     }
-    return { ok: true };
+    return { ok: true, status: 200 };
   } catch (e) {
     console.error("resend send error:", e && e.message);
     return { ok: false, error: "send_error" };

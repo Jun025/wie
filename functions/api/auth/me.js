@@ -5,12 +5,16 @@ import { emailConfigured } from "../../_lib/email.js";
 export async function onRequestGet(context) {
   try {
     const user = await getUser(context);
-    if (!user) return json({ ok: true, authenticated: false, emailConfigured: emailConfigured(context.env) }, 200);
+    // Presence-only email diagnostic (NEVER the values) so the operator can see
+    // which env var is missing without exposing secrets.
+    const emailDiag = { hasKey: !!context.env.RESEND_API_KEY, hasFrom: !!context.env.EMAIL_FROM };
+    if (!user) return json({ ok: true, authenticated: false, emailConfigured: emailConfigured(context.env), emailDiag }, 200);
     return json(
       {
         ok: true,
         authenticated: true,
         emailConfigured: emailConfigured(context.env),
+        emailDiag,
         user: { id: user.id, login_id: user.login_id, email: user.email, email_verified: !!user.email_verified },
       },
       200,
