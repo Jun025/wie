@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { EmulatorSession, type LoadableGame } from "../lib/emulator";
+import { EmulatorSession, type EmuError, type LoadableGame, normalizeError } from "../lib/emulator";
 import { type EmuKey, loadKeymap } from "../lib/keymap";
 import { GameButton } from "./GameButton";
 import { KeyRemap } from "./KeyRemap";
@@ -40,7 +40,8 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
   const keymapRef = useRef<Record<string, EmuKey>>(loadKeymap());
   const { theme, toggle: toggleTheme } = useTheme();
   const [status, setStatus] = useState<"loading" | "running" | "error">("loading");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<EmuError | null>(null);
+  const [bootNonce, setBootNonce] = useState(0); // bump to re-boot the same game (restart after error)
   const [showRemap, setShowRemap] = useState(false);
   const [volume, setVolume] = useState(0.8);
   const [muted, setMuted] = useState(false);
@@ -51,11 +52,13 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
   // player, so the game keeps running.
   useEffect(() => {
     let cancelled = false;
+    setStatus("loading");
+    setError(null);
     const session = new EmulatorSession();
     sessionRef.current = session;
-    session.onError = (msg) => {
+    session.onError = (err) => {
       if (cancelled) return;
-      setError(msg);
+      setError(err);
       setStatus("error");
     };
     session.onVolumeChange = (v, m) => {
@@ -86,7 +89,7 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
         }
       } catch (e) {
         if (!cancelled) {
-          setError(typeof e === "string" ? e : (e as Error)?.message ?? "로드 실패");
+          setError(normalizeError(e, "load", session.platformKind() ?? undefined));
           setStatus("error");
         }
       }
@@ -97,7 +100,13 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
       void session.persist();
       session.stop();
     };
-  }, [game]);
+  }, [game, bootNonce]);
+
+  const restart = useCallback(() => {
+    setError(null);
+    setStatus("loading");
+    setBootNonce((n) => n + 1);
+  }, []);
 
   const press = useCallback((k: EmuKey) => sessionRef.current?.keyDown(k), []);
   const release = useCallback((k: EmuKey) => sessionRef.current?.keyUp(k), []);
@@ -159,9 +168,7 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
 
   return (
     <section className="fixed inset-0 z-20 flex flex-col overflow-y-auto bg-surface">
-      {error && (
-        <div className="m-2 rounded-lg border border-red-500 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-200 whitespace-pre-wrap">⚠ {error}</div>
-      )}
+      {error && <ErrorPanel error={error} onRestart={restart} onExit={onExit} toast={toast} />}
 
       {/* display + side rails (no bottom bar; no top header). flex-1 so the canvas
           fills the available vertical space; gap-1 trims the side margins.
@@ -289,5 +296,103 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
         </Overlay>
       )}
     </section>
+  );
+}
+
+// Best-effort short "Browser / OS" label. The full userAgent goes in the copy
+// text; this is just a glanceable summary. userAgent is environment info, not
+// game identity, so it is fine to show/copy.
+function envSummary(): string {
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  const os = /iPhone|iPad|iPod/.test(ua) ? "iOS" : /Android/.test(ua) ? "Android" : /Mac OS X|Macintosh/.test(ua) ? "macOS" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "기타";
+  const br = /Edg\//.test(ua) ? "Edge" : /CriOS|Chrome\//.test(ua) ? "Chrome" : /FxiOS|Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : "기타";
+  return `${br} / ${os}`;
+}
+
+// Build the copyable diagnostic text. CONTAINS NO GAME IDENTITY — no filename,
+// hash, bytes, or title — only the error and the environment (1번 기준선 / S5).
+function buildErrorReport(error: EmuError): string {
+  return [
+    "[wie 오류 보고]",
+    `유형: ${error.phase === "load" ? "로드" : "실행"}`,
+    `이름: ${error.name}`,
+    `메시지: ${error.message}`,
+    error.platformKind ? `플랫폼: ${error.platformKind}` : null,
+    `환경: ${typeof navigator !== "undefined" ? navigator.userAgent : "unknown"}`,
+    `경로: ${location.origin}${location.pathname}`, // origin+path only — never query/hash
+    error.stack ? `스택:\n${error.stack}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+// Copy with the same defensive guard the vibrate fix taught us: navigator.clipboard
+// is undefined in insecure contexts / older WebViews, so check it's a function and
+// fall back to a hidden-textarea execCommand. Never throws.
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* fall through to the legacy path */
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+function ErrorPanel({ error, onRestart, onExit, toast }: { error: EmuError; onRestart: () => void; onExit: () => void; toast: (msg: string, kind?: "ok" | "err") => void }) {
+  const [copied, setCopied] = useState(false);
+  const phaseLabel = error.phase === "load" ? "로드 중 오류" : "게임 실행 중 오류";
+  const btn = "rounded-md border border-red-500/60 bg-red-500/10 px-3 py-1.5 text-xs font-medium hover:bg-red-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500";
+
+  const onCopy = async () => {
+    const ok = await copyToClipboard(buildErrorReport(error));
+    setCopied(ok);
+    toast(ok ? "에러 상세를 복사했습니다 (게임 정보 미포함)" : "복사에 실패했습니다", ok ? "ok" : "err");
+    if (ok) window.setTimeout(() => setCopied(false), 2500);
+  };
+
+  return (
+    <div role="alert" className="m-2 rounded-lg border border-red-500 bg-red-500/10 p-4 text-sm text-red-700 dark:text-red-200">
+      <div className="flex items-start gap-2">
+        <span aria-hidden="true">⚠</span>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold break-words">
+            {error.name}: {error.message}
+          </p>
+          <p className="mt-1 text-xs opacity-80">
+            {phaseLabel}
+            {error.platformKind ? ` · 플랫폼 ${error.platformKind}` : ""} · {envSummary()}
+          </p>
+          {error.stack && (
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs underline">스택 트레이스 보기</summary>
+              <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-black/20 p-2 text-[11px] leading-snug">{error.stack}</pre>
+            </details>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={() => void onCopy()} className={btn}>
+              {copied ? "복사됨 ✓" : "에러 상세 복사"}
+            </button>
+            <button type="button" onClick={onRestart} className={btn}>다시 시작</button>
+            <button type="button" onClick={onExit} className={btn}>나가기</button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

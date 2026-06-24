@@ -1,5 +1,7 @@
 use alloc::boxed::Box;
 
+use js_sys::{Function, Reflect};
+use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{AudioContext, GainNode};
 
 use wie_backend::{AudioSink, DatabaseRepository, Filesystem, Instant, Platform, Screen};
@@ -81,8 +83,24 @@ impl Platform for WebPlatform {
     }
 
     fn vibrate(&self, duration_ms: u64, _intensity: u8) {
-        if let Some(window) = web_sys::window() {
-            let _ = window.navigator().vibrate_with_duration(duration_ms as u32);
+        // `navigator.vibrate` is ABSENT on iOS (every browser is WebKit) and in
+        // many desktop / insecure contexts. The web-sys `vibrate_with_duration`
+        // binding is not a catching binding, so on those hosts it throws
+        // `TypeError: navigator.vibrate is not a function`, which propagates out
+        // of `tick()` and aborts the game (the reported crash on 영웅서기4).
+        //
+        // Look the method up reflectively and invoke it through
+        // `Function::call1`, which returns a `Result` and swallows any JS
+        // exception. Vibration is best-effort hardware feedback; its absence (or
+        // a throwing implementation) is normal and must be a silent no-op that
+        // never interrupts emulation — including under rapid repeated calls.
+        let Some(window) = web_sys::window() else { return };
+        let navigator = window.navigator();
+        let Ok(vibrate) = Reflect::get(navigator.as_ref(), &JsValue::from_str("vibrate")) else {
+            return;
+        };
+        if let Some(func) = vibrate.dyn_ref::<Function>() {
+            let _ = func.call1(navigator.as_ref(), &JsValue::from_f64(duration_ms as f64));
         }
     }
 }

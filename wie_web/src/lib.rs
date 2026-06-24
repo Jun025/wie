@@ -52,6 +52,7 @@ pub struct WieEmulator {
     fs_store: FsStore,
     db_store: DbStore,
     redraw: RedrawFlag,
+    platform_kind: &'static str,
 }
 
 #[wasm_bindgen]
@@ -117,14 +118,21 @@ impl WieEmulator {
             profile: None,
         };
 
-        let inner = build_emulator(platform, filename, data, options).map_err(|e| JsValue::from_str(&e))?;
+        let (inner, platform_kind) = build_emulator(platform, filename, data, options).map_err(|e| JsValue::from_str(&e))?;
 
         Ok(WieEmulator {
             inner,
             fs_store,
             db_store,
             redraw,
+            platform_kind,
         })
+    }
+
+    /// The detected emulator backend ("KTF" / "LGT" / "SKT" / "J2ME"). A runtime
+    /// label for error diagnostics only — NOT game-file identity, never sent out.
+    pub fn platform_kind(&self) -> String {
+        self.platform_kind.to_owned()
     }
 
     /// Advance the emulator one tick. Call this from `requestAnimationFrame`.
@@ -310,40 +318,55 @@ fn parse_saves(
     Some((dbs, files))
 }
 
-fn build_emulator(platform: Box<WebPlatform>, filename: &str, data: Vec<u8>, options: Options) -> Result<Box<dyn Emulator>, String> {
+// Returns the loaded emulator plus the detected platform kind ("KTF"/"LGT"/
+// "SKT"/"J2ME"). The kind is a backend/runtime label (NOT game-file identity);
+// it is surfaced only in on-screen error diagnostics, never sent to the server.
+fn build_emulator(platform: Box<WebPlatform>, filename: &str, data: Vec<u8>, options: Options) -> Result<(Box<dyn Emulator>, &'static str), String> {
     let name = &filename[filename.rfind('/').map(|i| i + 1).unwrap_or(0)..];
 
     if filename.ends_with("zip") {
         let files = extract_zip(&data).map_err(|e| format!("{e:?}"))?;
         if KtfEmulator::loadable_archive(&files) {
-            Ok(Box::new(
-                KtfEmulator::from_archive(platform, files, options).map_err(|e| format!("{e:?}"))?,
+            Ok((
+                Box::new(KtfEmulator::from_archive(platform, files, options).map_err(|e| format!("{e:?}"))?),
+                "KTF",
             ))
         } else if LgtEmulator::loadable_archive(&files) {
-            Ok(Box::new(
-                LgtEmulator::from_archive(platform, files, options).map_err(|e| format!("{e:?}"))?,
+            Ok((
+                Box::new(LgtEmulator::from_archive(platform, files, options).map_err(|e| format!("{e:?}"))?),
+                "LGT",
             ))
         } else if SktEmulator::loadable_archive(&files) {
-            Ok(Box::new(SktEmulator::from_archive(platform, files).map_err(|e| format!("{e:?}"))?))
+            Ok((Box::new(SktEmulator::from_archive(platform, files).map_err(|e| format!("{e:?}"))?), "SKT"))
         } else {
             Err("Unknown archive format".to_owned())
         }
     } else if filename.ends_with("jar") {
         let name_without_ext = name.trim_end_matches(".jar");
         if KtfEmulator::loadable_jar(&data) {
-            Ok(Box::new(
-                KtfEmulator::from_jar(platform, name, data, name_without_ext, name_without_ext, None, options).map_err(|e| format!("{e:?}"))?,
+            Ok((
+                Box::new(
+                    KtfEmulator::from_jar(platform, name, data, name_without_ext, name_without_ext, None, options).map_err(|e| format!("{e:?}"))?,
+                ),
+                "KTF",
             ))
         } else if LgtEmulator::loadable_jar(&data) {
-            Ok(Box::new(
-                LgtEmulator::from_jar(platform, name, data, name_without_ext, name_without_ext, None, options).map_err(|e| format!("{e:?}"))?,
+            Ok((
+                Box::new(
+                    LgtEmulator::from_jar(platform, name, data, name_without_ext, name_without_ext, None, options).map_err(|e| format!("{e:?}"))?,
+                ),
+                "LGT",
             ))
         } else if SktEmulator::loadable_jar(&data) {
-            Ok(Box::new(
-                SktEmulator::from_jar(platform, name, data, name_without_ext, None).map_err(|e| format!("{e:?}"))?,
+            Ok((
+                Box::new(SktEmulator::from_jar(platform, name, data, name_without_ext, None).map_err(|e| format!("{e:?}"))?),
+                "SKT",
             ))
         } else {
-            Ok(Box::new(J2MEEmulator::from_jar(platform, name, data).map_err(|e| format!("{e:?}"))?))
+            Ok((
+                Box::new(J2MEEmulator::from_jar(platform, name, data).map_err(|e| format!("{e:?}"))?),
+                "J2ME",
+            ))
         }
     } else if filename.ends_with("jad") {
         Err("A .jad needs its companion .jar — please upload the .jar file instead.".to_owned())
