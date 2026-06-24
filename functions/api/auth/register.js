@@ -45,12 +45,14 @@ export async function onRequestPost(context) {
       .run();
 
     let emailSent = false;
+    let emailStatus; // numeric Resend HTTP status when a send was attempted (diagnostic, not secret)
     if (willVerify) {
       const raw = await createToken(context.env, id, "verify", VERIFY_TTL_MS);
       const origin = new URL(context.request.url).origin;
       const url = `${origin}/api/auth/verify?token=${encodeURIComponent(raw)}`;
       const r = await sendEmail(context.env, { to: email, ...verifyEmailTemplate(url) });
       emailSent = r.ok;
+      emailStatus = r.status;
     }
 
     // CRITICAL anti-lockout rule: gate as 'pending' ONLY when the verification
@@ -65,12 +67,12 @@ export async function onRequestPost(context) {
       }
       const { cookieValue } = await createSession(context.env, id);
       return ok(
-        { user: { id, login_id: loginId, email, email_verified: false }, emailSent, emailConfigured: emailConfigured(context.env) },
+        { user: { id, login_id: loginId, email, email_verified: false }, emailSent, emailStatus, emailConfigured: emailConfigured(context.env) },
         { "Set-Cookie": sessionCookie(cookieValue, 30 * 24 * 3600) },
       );
     }
     // Email sent → must verify before first login (no session yet).
-    return ok({ user: { id, login_id: loginId, email, email_verified: false }, pending: true, emailSent });
+    return ok({ user: { id, login_id: loginId, email, email_verified: false }, pending: true, emailSent, emailStatus });
   } catch (e) {
     return handleError(e);
   }
