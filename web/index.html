@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="브라우저에서 동작하는 WIPI / SKVM / J2ME 피처폰 에뮬레이터. 게임 파일은 당신의 브라우저에서만 처리됩니다." />
     <title>WIE — 브라우저 피처폰 에뮬레이터</title>
+    <script>
+      // Set the theme before first paint to avoid a flash. Device-local only.
+      (function () {
+        try {
+          var t = localStorage.getItem("wie-theme");
+          document.documentElement.setAttribute("data-theme", t === "light" ? "light" : "dark");
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "dark");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

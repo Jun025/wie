@@ -1,6 +1,64 @@
 @import "tailwindcss";
 
-:root {
+/* Make the `dark:` variant follow our explicit theme toggle (data-theme) instead
+   of the OS media query, so the in-app switch controls it. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ── Design tokens ────────────────────────────────────────────────────────────
+   Tailwind v4 @theme generates utilities (bg-surface, text-fg, …) backed by CSS
+   variables. We ALSO remap Tailwind's `slate` scale to the same variables, so
+   components that still use `bg-slate-800`/`text-slate-100` theme automatically.
+   Defaults (no attribute) = dark; [data-theme="light"] flips every token at
+   runtime, so the whole app switches with one toggle. */
+@theme {
+  --color-surface: #0f172a;
+  --color-surface2: #1e293b;
+  --color-edge: #334155;
+  --color-fg: #f1f5f9;
+  --color-fg-dim: #94a3b8;
+  --color-accent: #3b82f6;
+  --color-accent-hover: #60a5fa;
+  --color-accent-fg: #ffffff;
+
+  /* slate scale (dark defaults = stock Tailwind values) */
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #020617;
+}
+
+[data-theme="light"] {
+  --color-surface: #ffffff;
+  --color-surface2: #eef2f8;
+  --color-edge: #d4dbe6;
+  --color-fg: #0f1115;
+  --color-fg-dim: #51596a;
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  color-scheme: light;
+
+  /* slate scale inverted so bg-slate-900 → light, text-slate-100 → dark, etc. */
+  --color-slate-950: #ffffff;
+  --color-slate-900: #f4f7fb;
+  --color-slate-800: #e7edf5;
+  --color-slate-700: #d4dbe6;
+  --color-slate-600: #aab4c4;
+  --color-slate-500: #6b7486;
+  --color-slate-400: #51596a;
+  --color-slate-300: #3b4253;
+  --color-slate-200: #232a39;
+  --color-slate-100: #0f1115;
+  --color-slate-50: #060810;
+}
+
+[data-theme="dark"] {
   color-scheme: dark;
 }
 
@@ -12,11 +70,16 @@ body,
 }
 
 body {
-  background: #0b0e14;
-  color: #e6e6e6;
+  background: var(--color-surface);
+  color: var(--color-fg);
   font-family: ui-sans-serif, system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior: none;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+[data-theme="light"] body {
+  background: #f4f7fb;
 }
 
 /* Crisp upscaling of the low-res framebuffer. */

@@ -67,6 +67,48 @@ export const DEFAULT_KEYMAP: Record<string, EmuKey> = {
   Tab: "VOLUME_DOWN",
 };
 
+// ── Presets the user can apply with one click ────────────────────────────────
+export interface KeymapPreset {
+  id: string;
+  label: string;
+  map: Record<string, EmuKey>;
+}
+
+const WASD_KEYMAP: Record<string, EmuKey> = {
+  KeyW: "UP",
+  KeyS: "DOWN",
+  KeyA: "LEFT",
+  KeyD: "RIGHT",
+  KeyJ: "OK",
+  Space: "OK",
+  KeyK: "LEFT_SOFT_KEY",
+  KeyL: "RIGHT_SOFT_KEY",
+  Backspace: "CLEAR",
+  KeyU: "STAR",
+  KeyI: "HASH",
+  Digit1: "NUM1",
+  Digit2: "NUM2",
+  Digit3: "NUM3",
+  Digit4: "NUM4",
+  Digit5: "NUM5",
+  Digit6: "NUM6",
+  Digit7: "NUM7",
+  Digit8: "NUM8",
+  Digit9: "NUM9",
+  Digit0: "NUM0",
+};
+
+export const PRESETS: KeymapPreset[] = [
+  { id: "arrows", label: "방향키 + Z/X", map: DEFAULT_KEYMAP },
+  { id: "wasd", label: "WASD + J/K/L", map: WASD_KEYMAP },
+];
+
+// Emulator keys that currently have no physical binding (for a UI warning).
+export function unboundKeys(map: Record<string, EmuKey>): EmuKey[] {
+  const bound = new Set(Object.values(map));
+  return ALL_KEYS.filter((k) => !bound.has(k));
+}
+
 const STORAGE_KEY = "wie.keymap.v1";
 
 export function loadKeymap(): Record<string, EmuKey> {
