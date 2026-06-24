@@ -39,6 +39,39 @@ function loadMuted(): boolean {
   return localStorage.getItem(MUTE_KEY) === "1";
 }
 
+// Validate that bytes are a loadable game by dry-constructing the emulator (which
+// runs the format detection + archive/jar loader) on a throwaway canvas. Returns
+// null on success, or the loader's error message if the file isn't a valid game.
+// The bytes never leave the browser; nothing is stored here.
+export async function validateGame(name: string, bytes: ArrayBuffer): Promise<string | null> {
+  await ensureInit();
+  const u8 = new Uint8Array(bytes);
+  const lower = name.toLowerCase();
+
+  // Fast structural check: .jar/.zip must carry the ZIP signature "PK".
+  if ((lower.endsWith(".jar") || lower.endsWith(".zip")) && !(u8[0] === 0x50 && u8[1] === 0x4b)) {
+    return "유효한 ZIP/JAR 형식이 아닙니다 (압축 파일 시그니처를 찾을 수 없습니다).";
+  }
+
+  const probe = document.createElement("canvas");
+  let emu: WieEmulator | null = null;
+  try {
+    // Construct + tick a few frames so the loader actually parses the archive /
+    // boots the main class; a bad file throws here instead of being stored.
+    emu = new WieEmulator(name, u8, probe, undefined, undefined, SCREEN_W, SCREEN_H);
+    for (let i = 0; i < 6; i++) emu.tick();
+    return null;
+  } catch (e) {
+    return typeof e === "string" ? e : ((e as Error)?.message ?? "알 수 없는 형식");
+  } finally {
+    try {
+      emu?.free();
+    } catch {
+      /* already dropped */
+    }
+  }
+}
+
 export class EmulatorSession {
   private emu: WieEmulator | null = null;
   private rafId = 0;

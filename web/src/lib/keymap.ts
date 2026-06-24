@@ -38,31 +38,59 @@ export const ALL_KEYS: EmuKey[] = [
   "STAR", "NUM0", "HASH",
 ];
 
-// Defaults mirror the desktop wie_cli key layout.
+// Default mapping. The map is code→EmuKey, so MULTIPLE physical keys can drive
+// the same EmuKey (alias / simultaneous keys) — e.g. both KeyW and ArrowUp = UP.
+// Each line below's "or" is two codes pointing at one EmuKey.
 export const DEFAULT_KEYMAP: Record<string, EmuKey> = {
+  // directions: WASD or arrows
+  KeyW: "UP",
   ArrowUp: "UP",
-  ArrowDown: "DOWN",
+  KeyA: "LEFT",
   ArrowLeft: "LEFT",
+  KeyS: "DOWN",
+  ArrowDown: "DOWN",
+  KeyD: "RIGHT",
   ArrowRight: "RIGHT",
+  // OK: Space or Enter
   Space: "OK",
   Enter: "OK",
-  Digit1: "NUM1",
-  Digit2: "NUM2",
-  Digit3: "NUM3",
-  KeyQ: "NUM4",
-  KeyW: "NUM5",
-  KeyE: "NUM6",
-  KeyA: "NUM7",
-  KeyS: "NUM8",
-  KeyD: "NUM9",
-  KeyZ: "STAR",
-  KeyX: "NUM0",
-  KeyC: "HASH",
+  // CLR: Backspace or Esc
   Backspace: "CLEAR",
+  Escape: "CLEAR",
+  // CALL: [ or F1   ·   HANGUP: ] or F2
+  BracketLeft: "CALL",
+  F1: "CALL",
+  BracketRight: "HANGUP",
+  F2: "HANGUP",
+  // numbers: digit row or the T/Y/U · G/H/J · B/N/M grid
+  Digit1: "NUM1",
+  KeyT: "NUM1",
+  Digit2: "NUM2",
+  KeyY: "NUM2",
+  Digit3: "NUM3",
+  KeyU: "NUM3",
+  Digit4: "NUM4",
+  KeyG: "NUM4",
+  Digit5: "NUM5",
+  KeyH: "NUM5",
+  Digit6: "NUM6",
+  KeyJ: "NUM6",
+  Digit7: "NUM7",
+  KeyB: "NUM7",
+  Digit8: "NUM8",
+  KeyN: "NUM8",
+  Digit9: "NUM9",
+  KeyM: "NUM9",
+  Digit0: "NUM0",
+  Comma: "NUM0",
+  // * : - or .   ·   # : = or /
+  Minus: "STAR",
+  Period: "STAR",
+  Equal: "HASH",
+  Slash: "HASH",
+  // soft keys + volume (unchanged from before)
   ShiftLeft: "LEFT_SOFT_KEY",
   ShiftRight: "RIGHT_SOFT_KEY",
-  F1: "CALL",
-  F2: "HANGUP",
   Backquote: "VOLUME_UP",
   Tab: "VOLUME_DOWN",
 };
@@ -135,7 +163,7 @@ const NUMPAD_KEYMAP: Record<string, EmuKey> = {
 };
 
 export const PRESETS: KeymapPreset[] = [
-  { id: "arrows", label: "방향키 + Z/X", map: DEFAULT_KEYMAP },
+  { id: "default", label: "기본 (WASD·방향키 + T/Y/U…)", map: DEFAULT_KEYMAP },
   { id: "wasd", label: "WASD + J/K/L", map: WASD_KEYMAP },
   { id: "numpad", label: "숫자패드 QWE/ASD/ZXC", map: NUMPAD_KEYMAP },
 ];

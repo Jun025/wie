@@ -89,7 +89,9 @@ body {
 .emulator-canvas {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  background: #000;
+  /* transparent so the object-fit letterbox blends with the page instead of
+     showing black bars when the portrait screen sits in a wider area. */
+  background: transparent;
   transform: translateZ(0);
   backface-visibility: hidden;
   will-change: transform;

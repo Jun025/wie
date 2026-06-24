@@ -141,6 +141,6 @@ export async function setMeta<T>(key: string, value: T): Promise<void> {
   await withStore("meta", "readwrite", (s) => reqAsync(s.put({ key, value })));
 }
 
-export const DEFAULT_CAPACITY_MB = 256;
+export const DEFAULT_CAPACITY_MB = 5;
 export const capacityMB = () => getMeta("capacityMB", DEFAULT_CAPACITY_MB);
 export const setCapacityMB = (mb: number) => setMeta("capacityMB", mb);

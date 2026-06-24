@@ -157,9 +157,10 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
         <div className="m-2 rounded-lg border border-red-500 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-200 whitespace-pre-wrap">⚠ {error}</div>
       )}
 
-      {/* display + side rails (no bottom bar; no top header) */}
-      <div className="flex shrink-0 items-stretch justify-center gap-1.5 p-1.5">
-        {/* LEFT rail: 나가기 · 음량(긴) · L · 통화 · 동기화 · 키세트 */}
+      {/* display + side rails (no bottom bar; no top header). flex-1 so the canvas
+          fills the available vertical space; gap-1 trims the side margins. */}
+      <div className="flex min-h-0 flex-1 items-stretch justify-center gap-1 p-1">
+        {/* LEFT rail: 나가기 · 음량(긴) · L · 통화 · 동기화 */}
         <div className="flex flex-col items-center justify-center gap-1.5">
           <button type="button" onClick={onExit} className={svc} aria-label="게임 나가기" title="나가기">←</button>
           {/* tall vertical volume area (~2 buttons high) */}
@@ -183,22 +184,26 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
           <GameButton label="◀L" title="왼쪽 소프트키" {...gkey("LEFT_SOFT_KEY")} className={side} />
           <GameButton label="📞" title="통화" {...gkey("CALL")} className={`${side} bg-green-600 text-white border-green-700`} />
           <button type="button" onClick={() => void syncCloud()} className={svc} aria-label="세이브 동기화(클라우드 업로드)" title="동기화">☁ 동기화</button>
-          <button type="button" onClick={cycleKeyset} className={svc} aria-label={`키보드 세트 모드 ${keyset} — 눌러서 전환`} title="키세트 모드 전환">🎛 모드{keyset}</button>
         </div>
 
-        <canvas
-          ref={canvasRef}
-          width={240}
-          height={320}
-          data-testid="screen"
-          role="img"
-          aria-label={`${game.name} 게임 화면`}
-          className="emulator-canvas self-center rounded-md border border-edge max-h-[58vh] landscape:max-h-[80vh] w-auto"
-          style={{ aspectRatio: "240 / 320" }}
-        />
+        {/* canvas fills the space between the rails (object-fit contain keeps the
+            aspect + pixelated dots), so the display is as large as possible. */}
+        <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center">
+          <canvas
+            ref={canvasRef}
+            width={240}
+            height={320}
+            data-testid="screen"
+            role="img"
+            aria-label={`${game.name} 게임 화면`}
+            className="emulator-canvas h-full w-full"
+            style={{ objectFit: "contain" }}
+          />
+        </div>
 
-        {/* RIGHT rail: 키설정 · 테마 · 메뉴 · R · 종료 · CLR */}
+        {/* RIGHT rail: 키세트 · 키설정 · 테마 · 메뉴 · R · 종료 · CLR */}
         <div className="flex flex-col items-center justify-center gap-1.5">
+          <button type="button" onClick={cycleKeyset} className={svc} aria-label={`키보드 세트 모드 ${keyset} — 눌러서 전환`} title="키세트 모드 전환">🎛 모드{keyset}</button>
           <button type="button" onClick={() => setShowRemap(true)} className={svc} aria-label="키 설정(리매핑)" title="키 설정">⌨</button>
           <button type="button" onClick={toggleTheme} className={svc} aria-label={theme === "dark" ? "라이트 모드" : "다크 모드"} title={theme === "dark" ? "라이트 모드" : "다크 모드"}>
             {theme === "dark" ? "☀️" : "🌙"}

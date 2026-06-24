@@ -28,15 +28,17 @@ function ViewPanel({
   authState,
   onRun,
   toast,
+  onReport,
 }: {
   view: View;
   authState: AuthState;
   onRun: (g: LoadableGame) => void;
   toast: (m: string, k?: "ok" | "err") => void;
+  onReport: () => void;
 }) {
   switch (view) {
     case "library":
-      return <GameLibrary onRun={onRun} toast={toast} />;
+      return <GameLibrary onRun={onRun} toast={toast} user={authState.user} onReport={onReport} />;
     case "cloud":
       return <CloudSaves user={authState.user} toast={toast} />;
     case "inquiry":
@@ -73,6 +75,13 @@ export default function App() {
 
   const tabLabel = (id: View) => TABS.find((t) => t.id === id)?.label ?? "";
 
+  // Guide the user from a rejected upload to the inquiry form (or login first).
+  const reportTarget: View = authState.user ? "inquiry" : "account";
+  const onReport = useCallback(() => {
+    if (running) setOverlay(reportTarget);
+    else setView(reportTarget);
+  }, [running, reportTarget]);
+
   // ── Playing: player stays mounted; tabs open as overlays (game keeps running) ─
   if (running) {
     return (
@@ -99,7 +108,7 @@ export default function App() {
 
         {overlay && overlay !== "menu" && (
           <Overlay title={tabLabel(overlay)} onClose={() => setOverlay(null)}>
-            <ViewPanel view={overlay} authState={authState} onRun={onRun} toast={showToast} />
+            <ViewPanel view={overlay} authState={authState} onRun={onRun} toast={showToast} onReport={onReport} />
           </Overlay>
         )}
 
@@ -152,7 +161,7 @@ export default function App() {
             브라우저(IndexedDB)에만 보관됩니다. 서버에 올라가는 것은 <em>계정 정보</em>와 <em>세이브 데이터</em>뿐입니다.
           </div>
         )}
-        <ViewPanel view={view} authState={authState} onRun={onRun} toast={showToast} />
+        <ViewPanel view={view} authState={authState} onRun={onRun} toast={showToast} onReport={onReport} />
       </main>
 
       <footer className="mt-auto px-4 py-6 text-center text-xs text-fg-dim">
