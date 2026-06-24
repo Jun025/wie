@@ -1,5 +1,6 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth, type AuthState } from "./hooks/useAuth";
+import { installAudioUnlock } from "./lib/audio";
 import { useTheme } from "./hooks/useTheme";
 import { GameLibrary } from "./components/GameLibrary";
 import { Player } from "./components/Player";
@@ -57,6 +58,11 @@ export default function App() {
   const [running, setRunning] = useState<LoadableGame | null>(null);
   const [overlay, setOverlay] = useState<View | "menu" | null>(null); // shown on top of the player
   const [toast, setToast] = useState<Toast>(null);
+
+  // Install the global audio-unlock listeners once, before any game-launch tap,
+  // so the first user gesture creates+resumes+unlocks the shared AudioContext
+  // synchronously (required by iOS WebKit).
+  useEffect(() => installAudioUnlock(), []);
 
   const showToast = useCallback((msg: string, kind: "ok" | "err" | "" = "") => {
     setToast({ msg, kind });
@@ -149,9 +155,15 @@ export default function App() {
         >
           {theme === "dark" ? "☀️" : "🌙"}
         </button>
-        <div className="rounded-full border border-edge bg-surface2 px-2.5 py-1 text-xs text-fg-dim">
+        <button
+          type="button"
+          onClick={() => setView("account")}
+          aria-current={view === "account" ? "page" : undefined}
+          title={authState.user ? "계정" : "로그인 / 가입"}
+          className="rounded-full border border-edge bg-surface2 px-2.5 py-1 text-xs text-fg-dim hover:text-fg hover:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+        >
           {authState.user ? `@${authState.user.login_id}` : "로그인 안 됨"}
-        </div>
+        </button>
       </header>
 
       <main className="flex flex-1 flex-col items-center gap-5 px-4 py-5">
