@@ -19,17 +19,24 @@ function num(v, max = Number.MAX_SAFE_INTEGER) {
 export async function onRequestGet(context) {
   try {
     const user = await requireUser(context);
-    const { results } = await context.env.DB.prepare(
-      `SELECT d.device_id, d.label, d.last_login_at, d.last_seen_at,
-              d.item_count, d.total_bytes, d.last_run_at, d.last_save_at,
-              (SELECT COUNT(*) FROM saves s WHERE s.user_id = d.user_id AND s.device_label = d.label) AS slot_count
-         FROM devices d
-        WHERE d.user_id = ?
-        ORDER BY d.last_seen_at DESC`,
-    )
-      .bind(user.id)
-      .all();
-    return ok({ devices: results || [] });
+    try {
+      const { results } = await context.env.DB.prepare(
+        `SELECT d.device_id, d.label, d.last_login_at, d.last_seen_at,
+                d.item_count, d.total_bytes, d.last_run_at, d.last_save_at,
+                (SELECT COUNT(*) FROM saves s WHERE s.user_id = d.user_id AND s.device_label = d.label) AS slot_count
+           FROM devices d
+          WHERE d.user_id = ?
+          ORDER BY d.last_seen_at DESC`,
+      )
+        .bind(user.id)
+        .all();
+      return ok({ devices: results || [] });
+    } catch (schemaErr) {
+      // GRACEFUL: the `devices` table doesn't exist until migration 0002 is
+      // applied to the remote D1. Until then, report no devices instead of 500.
+      console.error("devices list (pre-migration?):", schemaErr && schemaErr.message);
+      return ok({ devices: [], migration_pending: true });
+    }
   } catch (e) {
     return handleError(e);
   }
@@ -51,22 +58,28 @@ export async function onRequestPost(context) {
     const last_save_at = num(body.last_save_at);
     const loginStamp = body.login ? now : 0;
 
-    await context.env.DB.prepare(
-      `INSERT INTO devices (user_id, device_id, label, last_login_at, last_seen_at, item_count, total_bytes, last_run_at, last_save_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(user_id, device_id) DO UPDATE SET
-         label = excluded.label,
-         last_seen_at = excluded.last_seen_at,
-         last_login_at = MAX(devices.last_login_at, excluded.last_login_at),
-         item_count = excluded.item_count,
-         total_bytes = excluded.total_bytes,
-         last_run_at = excluded.last_run_at,
-         last_save_at = excluded.last_save_at`,
-    )
-      .bind(user.id, deviceId, label, loginStamp, now, item_count, total_bytes, last_run_at, last_save_at, now)
-      .run();
-
-    return ok({});
+    try {
+      await context.env.DB.prepare(
+        `INSERT INTO devices (user_id, device_id, label, last_login_at, last_seen_at, item_count, total_bytes, last_run_at, last_save_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(user_id, device_id) DO UPDATE SET
+           label = excluded.label,
+           last_seen_at = excluded.last_seen_at,
+           last_login_at = MAX(devices.last_login_at, excluded.last_login_at),
+           item_count = excluded.item_count,
+           total_bytes = excluded.total_bytes,
+           last_run_at = excluded.last_run_at,
+           last_save_at = excluded.last_save_at`,
+      )
+        .bind(user.id, deviceId, label, loginStamp, now, item_count, total_bytes, last_run_at, last_save_at, now)
+        .run();
+      return ok({});
+    } catch (schemaErr) {
+      // GRACEFUL: no `devices` table yet (pre-migration) — accept the heartbeat
+      // as a no-op so login/usage never breaks before the remote migration.
+      console.error("device heartbeat (pre-migration?):", schemaErr && schemaErr.message);
+      return ok({ migration_pending: true });
+    }
   } catch (e) {
     return handleError(e);
   }

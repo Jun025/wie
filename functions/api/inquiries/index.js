@@ -105,14 +105,27 @@ export async function onRequestPost(context) {
 
     const id = uuid();
     const now = Date.now();
-    await context.env.DB.prepare(
-      `INSERT INTO inquiries (id, user_id, category, title, body, game_title, game_vendor, device_model, symptom, env_info, attachment_name, attachment_mime, attachment_data, status, created_at)
-       VALUES (?, ?, 'question', ?, ?, '', '', '', '', ?, ?, ?, ?, 'open', ?)`,
-    )
-      .bind(id, user.id, title, text, env, att?.name ?? "", att?.mime ?? "", att?.data ?? "", now)
-      .run();
-
-    return ok({ inquiry: { id, title, created_at: now, has_attachment: !!att } });
+    try {
+      await context.env.DB.prepare(
+        `INSERT INTO inquiries (id, user_id, category, title, body, game_title, game_vendor, device_model, symptom, env_info, attachment_name, attachment_mime, attachment_data, status, created_at)
+         VALUES (?, ?, 'question', ?, ?, '', '', '', '', ?, ?, ?, ?, 'open', ?)`,
+      )
+        .bind(id, user.id, title, text, env, att?.name ?? "", att?.mime ?? "", att?.data ?? "", now)
+        .run();
+      return ok({ inquiry: { id, title, created_at: now, has_attachment: !!att } });
+    } catch (schemaErr) {
+      // GRACEFUL: env_info/attachment columns don't exist until migration 0002
+      // is applied to the remote D1. Fall back to the legacy column set (the
+      // env/attachment are dropped) so inquiries keep working before migration.
+      console.error("inquiry insert (pre-migration?):", schemaErr && schemaErr.message);
+      await context.env.DB.prepare(
+        `INSERT INTO inquiries (id, user_id, category, title, body, game_title, game_vendor, device_model, symptom, status, created_at)
+         VALUES (?, ?, 'question', ?, ?, '', '', '', '', 'open', ?)`,
+      )
+        .bind(id, user.id, title, text, now)
+        .run();
+      return ok({ inquiry: { id, title, created_at: now, has_attachment: false }, migration_pending: true });
+    }
   } catch (e) {
     return handleError(e);
   }
@@ -123,15 +136,27 @@ export async function onRequestGet(context) {
     const user = await requireUser(context);
     // Do NOT return attachment_data in the list (no bulk re-download path); only
     // a flag + metadata, owner-scoped.
-    const { results } = await context.env.DB.prepare(
-      `SELECT id, title, body, env_info, attachment_name, attachment_mime,
-              (CASE WHEN attachment_data != '' THEN 1 ELSE 0 END) AS has_attachment,
-              status, created_at
-         FROM inquiries WHERE user_id = ? ORDER BY created_at DESC`,
-    )
-      .bind(user.id)
-      .all();
-    return ok({ inquiries: results || [] });
+    try {
+      const { results } = await context.env.DB.prepare(
+        `SELECT id, title, body, env_info, attachment_name, attachment_mime,
+                (CASE WHEN attachment_data != '' THEN 1 ELSE 0 END) AS has_attachment,
+                status, created_at
+           FROM inquiries WHERE user_id = ? ORDER BY created_at DESC`,
+      )
+        .bind(user.id)
+        .all();
+      return ok({ inquiries: results || [] });
+    } catch (schemaErr) {
+      // GRACEFUL: pre-migration schema lacks env_info/attachment_* — read the
+      // legacy columns so the history still renders.
+      console.error("inquiry list (pre-migration?):", schemaErr && schemaErr.message);
+      const { results } = await context.env.DB.prepare(
+        "SELECT id, title, body, status, created_at FROM inquiries WHERE user_id = ? ORDER BY created_at DESC",
+      )
+        .bind(user.id)
+        .all();
+      return ok({ inquiries: results || [] });
+    }
   } catch (e) {
     return handleError(e);
   }
