@@ -44,23 +44,22 @@ function PasswordField({ value, onChange, autoComplete, placeholder, id }: { val
 export function AuthPanel({ authState, toast, resetToken, onResetDone }: Props) {
   const { user, login, register, logout, emailConfigured } = authState;
   const [mode, setMode] = useState<"login" | "register" | "forgot">("login");
-  const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(""); // the login identifier
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [pendingNotice, setPendingNotice] = useState<string | null>(null); // after register-with-verify
-  const [unverifiedId, setUnverifiedId] = useState<string | null>(null); // login blocked: offer resend
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null); // login blocked: offer resend
 
   // ── Password-reset completion (arrived via the emailed ?reset=TOKEN link) ─────
   if (resetToken) {
     return <ResetForm token={resetToken} toast={toast} onDone={onResetDone} />;
   }
 
-  const resend = async (id: string) => {
+  const resend = async (addr: string) => {
     try {
-      await auth.resend(id);
+      await auth.resend(addr);
       toast("인증 메일을 다시 보냈습니다 (등록된 주소가 있는 경우)", "ok");
     } catch (e) {
       toast(`재발송 실패: ${(e as Error).message}`, "err");
@@ -70,13 +69,13 @@ export function AuthPanel({ authState, toast, resetToken, onResetDone }: Props) 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setUnverifiedId(null);
+    setUnverifiedEmail(null);
     setPendingNotice(null);
 
     if (mode === "forgot") {
       setBusy(true);
       try {
-        const r = await auth.requestReset(loginId.trim());
+        const r = await auth.requestReset(email.trim());
         toast(r.emailConfigured ? "재설정 메일을 보냈습니다 (등록된 주소가 있는 경우 도착합니다)" : "이메일 기능이 설정되지 않아 메일을 보낼 수 없습니다", r.emailConfigured ? "ok" : "err");
       } catch (err) {
         setError((err as Error).message);
@@ -91,8 +90,8 @@ export function AuthPanel({ authState, toast, resetToken, onResetDone }: Props) 
         setError("비밀번호가 일치하지 않습니다");
         return;
       }
-      if (emailConfigured && !email.trim()) {
-        setError("이메일 인증을 위해 이메일을 입력해 주세요");
+      if (!email.trim()) {
+        setError("이메일을 입력해 주세요");
         return;
       }
     }
@@ -100,12 +99,12 @@ export function AuthPanel({ authState, toast, resetToken, onResetDone }: Props) 
     setBusy(true);
     try {
       if (mode === "register") {
-        const res = await register(loginId.trim(), password, email.trim() || undefined);
+        const res = await register(email.trim(), password);
         if (res.pending) {
           setPendingNotice("인증 메일을 보냈습니다. 메일함(스팸함 포함)에서 링크를 열어 인증을 완료한 뒤 로그인하세요. 메일이 안 오면 아래에서 다시 보낼 수 있습니다.");
-          setUnverifiedId(loginId.trim());
+          setUnverifiedEmail(email.trim());
           setMode("login");
-        } else if (emailConfigured && email.trim() && !res.emailSent) {
+        } else if (emailConfigured && !res.emailSent) {
           // Email configured but the verification mail couldn't be delivered
           // (e.g. Resend test mode → only the account owner receives mail). We
           // activated the account instead of locking it out.
@@ -114,14 +113,14 @@ export function AuthPanel({ authState, toast, resetToken, onResetDone }: Props) 
           toast("가입 완료", "ok");
         }
       } else {
-        await login(loginId.trim(), password);
+        await login(email.trim(), password);
         toast("로그인 완료", "ok");
       }
       setPassword("");
       setConfirm("");
     } catch (err) {
       if (err instanceof ApiError && err.code === "email_unverified") {
-        setUnverifiedId(loginId.trim());
+        setUnverifiedEmail(email.trim());
         setError(err.message);
       } else {
         setError((err as Error).message || "요청을 처리하지 못했습니다");
@@ -139,20 +138,15 @@ export function AuthPanel({ authState, toast, resetToken, onResetDone }: Props) 
         <div>
           <h2 className="text-lg font-semibold text-fg">계정</h2>
           <p className="mt-1 text-fg">
-            로그인됨: <strong>@{user.login_id}</strong>
+            로그인됨: <strong>{user.email}</strong>{" "}
+            {verified ? (
+              <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[11px] text-emerald-600 dark:text-emerald-300">인증됨</span>
+            ) : (
+              <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[11px] text-amber-600 dark:text-amber-300">미인증</span>
+            )}
           </p>
-          {user.email && (
-            <p className="mt-1 text-sm text-fg-dim">
-              {user.email}{" "}
-              {verified ? (
-                <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[11px] text-emerald-600 dark:text-emerald-300">인증됨</span>
-              ) : (
-                <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[11px] text-amber-600 dark:text-amber-300">미인증</span>
-              )}
-            </p>
-          )}
-          {user.email && !verified && emailConfigured && (
-            <button type="button" onClick={() => void resend(user.login_id)} className="mt-2 rounded-md border border-edge bg-surface2 px-3 py-1.5 text-xs text-fg hover:border-accent">
+          {!verified && emailConfigured && (
+            <button type="button" onClick={() => void resend(user.email)} className="mt-2 rounded-md border border-edge bg-surface2 px-3 py-1.5 text-xs text-fg hover:border-accent">
               인증 메일 다시 보내기
             </button>
           )}
@@ -199,8 +193,16 @@ export function AuthPanel({ authState, toast, resetToken, onResetDone }: Props) 
 
       <form onSubmit={submit} className="flex flex-col gap-3">
         <label className={labelCls}>
-          아이디{mode === "register" ? " (3자 이상)" : ""}
-          <input value={loginId} onChange={(e) => setLoginId(e.target.value)} autoComplete="username" required minLength={mode === "register" ? 3 : 1} className={inputCls} />
+          이메일
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete={mode === "register" ? "email" : "username"}
+            required
+            placeholder="you@example.com"
+            className={inputCls}
+          />
         </label>
 
         {mode !== "forgot" && (
@@ -217,27 +219,23 @@ export function AuthPanel({ authState, toast, resetToken, onResetDone }: Props) 
               <PasswordField value={confirm} onChange={setConfirm} autoComplete="new-password" />
               {confirm && password !== confirm && <span className="text-xs text-red-600 dark:text-red-300">비밀번호가 일치하지 않습니다</span>}
             </label>
-            <label className={labelCls}>
-              이메일{emailConfigured ? " (인증에 사용)" : " (선택)"}
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required={emailConfigured} className={inputCls} />
-            </label>
             {emailConfigured ? (
-              <p className="text-xs text-fg-dim">가입 후 인증 메일의 링크를 열면 로그인할 수 있습니다. 메일이 안 오면 스팸함을 확인하거나 재발송하세요(서비스 설정에 따라 일부 주소는 수신이 제한될 수 있습니다).</p>
+              <p className="text-xs text-fg-dim">이메일이 곧 로그인 아이디입니다. 가입 후 인증 메일의 링크를 열면 로그인할 수 있습니다. 메일이 안 오면 스팸함을 확인하거나 재발송하세요(서비스 설정에 따라 일부 주소는 수신이 제한될 수 있습니다).</p>
             ) : (
-              <p className="text-xs text-fg-dim">현재 이메일 인증 기능이 설정되어 있지 않아, 가입 즉시 사용할 수 있습니다.</p>
+              <p className="text-xs text-fg-dim">이메일이 곧 로그인 아이디입니다. 현재 이메일 인증 기능이 설정되어 있지 않아, 가입 즉시 사용할 수 있습니다.</p>
             )}
           </>
         )}
 
-        {mode === "forgot" && <p className="text-xs text-fg-dim">가입 시 등록한 이메일로 재설정 링크를 보냅니다. (이메일 기능이 설정된 경우)</p>}
+        {mode === "forgot" && <p className="text-xs text-fg-dim">가입한 이메일로 재설정 링크를 보냅니다. (이메일 기능이 설정된 경우)</p>}
 
         {error && (
           <p role="alert" className="text-sm text-red-600 dark:text-red-300">
             {error}
           </p>
         )}
-        {unverifiedId && (
-          <button type="button" onClick={() => void resend(unverifiedId)} className="self-start rounded-md border border-edge bg-surface2 px-3 py-1.5 text-xs text-fg hover:border-accent">
+        {unverifiedEmail && (
+          <button type="button" onClick={() => void resend(unverifiedEmail)} className="self-start rounded-md border border-edge bg-surface2 px-3 py-1.5 text-xs text-fg hover:border-accent">
             인증 메일 다시 보내기
           </button>
         )}

@@ -13,8 +13,8 @@ export interface AuthState {
   loading: boolean;
   emailConfigured: boolean; // whether the server has email delivery set up
   refresh: () => Promise<void>;
-  login: (id: string, pw: string) => Promise<void>;
-  register: (id: string, pw: string, email?: string) => Promise<RegisterResult>;
+  login: (email: string, pw: string) => Promise<void>;
+  register: (email: string, pw: string) => Promise<RegisterResult>;
   logout: () => Promise<void>;
 }
 
@@ -41,14 +41,14 @@ export function useAuth(): AuthState {
     void refresh();
   }, [refresh]);
 
-  const login = useCallback(async (id: string, pw: string) => {
-    const res = await auth.login(id, pw);
+  const login = useCallback(async (email: string, pw: string) => {
+    const res = await auth.login(email, pw);
     setUser(res.user);
     void sendHeartbeat({ login: true });
   }, []);
 
-  const register = useCallback(async (id: string, pw: string, email?: string): Promise<RegisterResult> => {
-    const res = await auth.register(id, pw, email);
+  const register = useCallback(async (email: string, pw: string): Promise<RegisterResult> => {
+    const res = await auth.register(email, pw);
     if (!res.pending) {
       setUser(res.user);
       void sendHeartbeat({ login: true });

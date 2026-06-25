@@ -1,4 +1,4 @@
-// POST /api/auth/request-reset { login_id } — send a password-reset link.
+// POST /api/auth/request-reset { email } — send a password-reset link.
 //
 // Always returns ok (no account enumeration). The reset link points at the SPA
 // (`/?reset=TOKEN`) which shows a "set new password" form posting to /auth/reset.
@@ -13,9 +13,9 @@ export async function onRequestPost(context) {
   try {
     await rateLimit(context, "request-reset", { limit: 5, windowSec: 600 });
     const body = await readJson(context.request);
-    const loginId = str(body.login_id, { name: "login_id", min: 1, max: 254 });
+    const email = str(body.email, { name: "email", min: 1, max: 254 }).toLowerCase();
 
-    const user = await context.env.DB.prepare("SELECT id, email FROM users WHERE login_id = ?").bind(loginId).first();
+    const user = await context.env.DB.prepare("SELECT id, email FROM users WHERE email = ?").bind(email).first();
     if (user && user.email && emailConfigured(context.env)) {
       await invalidateTokens(context.env, user.id, "reset");
       const raw = await createToken(context.env, user.id, "reset", RESET_TTL_MS);
