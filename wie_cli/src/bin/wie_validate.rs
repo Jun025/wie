@@ -54,6 +54,10 @@ struct HeadlessScreen {
     /// Set once any painted frame contains >=2 distinct pixel values, i.e. the
     /// game drew real content rather than a uniform blank/black screen.
     saw_content: AtomicBool,
+    /// Largest magenta-pixel count seen in any single painted frame (the color-key
+    /// 0xFF00FF leaking through), tracked across the whole run since the menu that
+    /// shows it may scroll away before the final frame.
+    max_magenta_px: AtomicU64,
 }
 
 impl Screen for HeadlessScreen {
@@ -73,6 +77,11 @@ impl Screen for HeadlessScreen {
         {
             self.saw_content.store(true, Ordering::SeqCst);
         }
+        let magenta = data
+            .iter()
+            .filter(|&&p| ((p >> 16) & 0xff) > 200 && (p & 0xff) > 200 && ((p >> 8) & 0xff) < 60)
+            .count() as u64;
+        self.max_magenta_px.fetch_max(magenta, Ordering::SeqCst);
         *self.last_frame.lock().unwrap() = Some(data);
         self.paints.fetch_add(1, Ordering::SeqCst);
     }
@@ -310,6 +319,7 @@ fn run(args: &Args) -> Outcome {
         redraw_requested: AtomicBool::new(false),
         last_frame: Mutex::new(None),
         saw_content: AtomicBool::new(false),
+        max_magenta_px: AtomicU64::new(0),
     });
     let exited = Arc::new(AtomicBool::new(false));
     let stdout = Arc::new(Mutex::new(Vec::new()));
@@ -462,12 +472,28 @@ fn run(args: &Args) -> Outcome {
         eprintln!("screenshot write failed: {e}");
     }
 
+    // Peak fraction of any frame that was the magenta color-key (RGB ~255,0,255).
+    // A large magenta area means a sprite/offscreen blit didn't drop the key.
+    // Calibrated above the levels normal screens reach, so the regression-baseline
+    // games do not false-fail. This catches the color-key class; it cannot judge
+    // subtler glyph/graphic correctness (that stays a human check).
+    let magenta_frac = screen.max_magenta_px.load(Ordering::SeqCst) as f64 / (SCREEN_W * SCREEN_H) as f64;
+
     // ── classify ─────────────────────────────────────────────────────────────
     if let Some(reason) = run_err {
         return fail(&platform_name, reason, ticks, paints, content);
     }
     if exited.load(Ordering::SeqCst) {
         return pass(&platform_name, "clean exit".into(), ticks, paints, content);
+    }
+    if magenta_frac >= 0.15 {
+        return fail(
+            &platform_name,
+            format!("render: magenta color-key not applied ({:.0}% of frame)", magenta_frac * 100.0),
+            ticks,
+            paints,
+            content,
+        );
     }
     if content {
         let reason = if args.inject {
