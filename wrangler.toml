@@ -18,3 +18,17 @@ pages_build_output_dir = "web/dist"
 binding = "DB"
 database_name = "wie-db"
 database_id = "a016e967-2bc3-4eb3-9204-706c812d4aa9"
+
+# R2 bucket for the logged-in user's PRIVATE game-file vault (B안). Bytes live
+# here; metadata in D1 (user_files). As with D1, the binding that actually applies
+# at runtime is the Pages → Settings → Functions → R2 dashboard binding (a human
+# task — S8: create the bucket and bind it as `GAMES`). This entry keeps
+# `wrangler pages dev` / CLI pointed at the same bucket locally. If the binding is
+# absent on a deployment, the file feature stays DORMANT (filesEnabled()=false) —
+# it never 500s, so deploying this code cannot break the live site.
+#
+# The bucket MUST stay PRIVATE: no public bucket URL, no custom domain, no public
+# access. Bytes are only ever served by the owner-checked /api/files/:id endpoint.
+[[r2_buckets]]
+binding = "GAMES"
+bucket_name = "wie-games"

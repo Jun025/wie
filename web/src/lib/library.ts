@@ -131,7 +131,7 @@ export async function deleteLocalSave(hash: string): Promise<void> {
   await withStore("saves", "readwrite", (s) => reqAsync(s.delete(hash)));
 }
 
-// ── meta (capacity limit etc.) ───────────────────────────────────────────────
+// ── meta (misc device-local prefs) ───────────────────────────────────────────
 export async function getMeta<T>(key: string, fallback: T): Promise<T> {
   const row = await withStore("meta", "readonly", (s) => reqAsync<{ key: string; value: T } | undefined>(s.get(key)));
   return row ? row.value : fallback;
@@ -141,6 +141,8 @@ export async function setMeta<T>(key: string, value: T): Promise<void> {
   await withStore("meta", "readwrite", (s) => reqAsync(s.put({ key, value })));
 }
 
-export const DEFAULT_CAPACITY_MB = 5;
-export const capacityMB = () => getMeta("capacityMB", DEFAULT_CAPACITY_MB);
-export const setCapacityMB = (mb: number) => setMeta("capacityMB", mb);
+// ★Device-local (not-logged-in) game capacity is FIXED at 10 MB and is NOT
+// user-modifiable — the limit lives in code, there is no setter and no settings
+// UI for it. Logged-in users instead get a 1 GB server vault (also server-fixed).
+export const LOCAL_CAP_MB = 10;
+export const LOCAL_CAP_BYTES = LOCAL_CAP_MB * 1024 * 1024;

@@ -1,9 +1,13 @@
 // Backend client (Cloudflare Pages Functions).
 //
-// ┌─ GUARDRAIL (1번 기준선 / S5) ───────────────────────────────────────────────┐
-// │ The ONLY things sent to the server are: account info, opaque save payloads  │
-// │ + a USER-CHOSEN slot/device alias, and inquiry text. NEVER game bytes,      │
-// │ filenames, content hashes, or a "games on this device" list.                │
+// ┌─ BASELINE (개정 / S5) ──────────────────────────────────────────────────────┐
+// │ • NOT logged in: game files stay on the device (IndexedDB) — ZERO bytes,    │
+// │   filenames, hashes or "owned list" are ever sent. (unchanged)              │
+// │ • Logged in: the user MAY upload their own game files to a PRIVATE, per-     │
+// │   owner server vault (files.*). Strictly owner-isolated — no sharing,       │
+// │   public URL, listing, search, or discovery. Dedup is per-user only.        │
+// │ Plus: account info, opaque save payloads + a user alias, inquiry text, and  │
+// │ rights-holder takedown reports.                                             │
 // └────────────────────────────────────────────────────────────────────────────┘
 
 export interface User {
@@ -131,6 +135,74 @@ export const inquiries = {
   create: (payload: { title: string; body: string; env_info?: string; attachment?: InquiryAttachment | null }) =>
     call<{ ok: boolean; inquiry: Inquiry }>("/inquiries", { method: "POST", body: payload }),
   list: () => call<{ ok: boolean; inquiries: Inquiry[] }>("/inquiries"),
+};
+
+// ── Private per-owner server file vault (B안) ──────────────────────────────────
+export interface ServerFile {
+  id: string;
+  file_name: string;
+  kind: string;
+  content_hash: string;
+  size: number;
+  created_at: number;
+  last_seen_at?: number;
+}
+export interface FilesUsage {
+  used: number;
+  quota: number;
+}
+
+export const files = {
+  // List THIS user's files + quota. `enabled:false` when the R2 vault is not yet
+  // provisioned on the server (S8) — the UI hides the feature in that case.
+  list: () => call<{ ok: boolean; enabled: boolean; files: ServerFile[]; usage: FilesUsage }>("/files"),
+
+  // Upload one game file: raw bytes (octet-stream) + metadata headers. The server
+  // verifies the hash, screens the content, enforces the quota, and dedups per-user.
+  upload: async (name: string, kind: string, contentHash: string, bytes: ArrayBuffer) => {
+    const res = await fetch("/api/files", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "content-type": "application/octet-stream",
+        "x-file-name": encodeURIComponent(name),
+        "x-content-hash": contentHash,
+        "x-kind": kind,
+      },
+      body: bytes,
+    });
+    let data: { error?: string; code?: string; file?: ServerFile; usage?: FilesUsage } | null = null;
+    try {
+      data = await res.json();
+    } catch {
+      /* non-JSON */
+    }
+    if (!res.ok) throw new ApiError(data?.error || `HTTP ${res.status}`, res.status, data?.code);
+    return data as { ok: boolean; file: ServerFile; usage: FilesUsage };
+  },
+
+  // Download one file's bytes (owner-only) for running / restoring locally.
+  download: async (id: string): Promise<ArrayBuffer> => {
+    const res = await fetch(`/api/files/${encodeURIComponent(id)}`, { credentials: "same-origin" });
+    if (!res.ok) {
+      let data: { error?: string; code?: string } | null = null;
+      try {
+        data = await res.json();
+      } catch {
+        /* non-JSON */
+      }
+      throw new ApiError(data?.error || `HTTP ${res.status}`, res.status, data?.code);
+    }
+    return res.arrayBuffer();
+  },
+
+  remove: (id: string) => call<{ ok: boolean; usage: FilesUsage }>(`/files/${encodeURIComponent(id)}`, { method: "DELETE" }),
+};
+
+// Rights-holder takedown notice intake (compliance). Anonymous-allowed.
+export const reports = {
+  create: (payload: { reporter_name?: string; reporter_contact?: string; work_title?: string; statement: string; target_hint?: string }) =>
+    call<{ ok: boolean; report: { id: string; status: string; created_at: number } }>("/reports", { method: "POST", body: payload }),
 };
 
 export const health = () => call("/health");
