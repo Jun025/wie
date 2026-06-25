@@ -134,6 +134,8 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::Unk8 => database::exists_database.into_body(),
         WIPICSvcId::Connect => net::connect.into_body(),
         WIPICSvcId::Close => net::close.into_body(),
+        WIPICSvcId::SocketWrite => net_socket_write.into_body(),
+        WIPICSvcId::SocketRead => net_socket_read.into_body(),
         WIPICSvcId::SocketClose => net::socket_close.into_body(),
         WIPICSvcId::ClipCreate => media::clip_create.into_body(),
         WIPICSvcId::ClipFree => media::clip_free.into_body(),
@@ -249,6 +251,25 @@ async fn list_databases(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u
     tracing::debug!("MC_dbListDataBase({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x}) -> 0 (no databases)");
 
     Ok(0)
+}
+
+/// `MC_netSocketWrite` (net table index 4, SVC 0x25c) and `MC_netSocketRead`
+/// (index 5, 0x25d). The emulator has no real network, so instead of crashing on
+/// an unknown SVC we return -1 (error). Games (테라-영원의혼돈) that attempt an
+/// online connection then see the write/read fail and fall back to offline play
+/// rather than dying. Identified by the net base (0x258) + canonical index, but
+/// the in-game network path is not reachable from a headless boot, so the
+/// graceful-failure behavior is pending on-device/web verification.
+async fn net_socket_write(_context: &mut dyn WIPICContext, fd: u32, buf: u32, len: u32, _a3: u32) -> Result<i32> {
+    tracing::warn!("MC_netSocketWrite(fd={fd:#x}, buf={buf:#x}, len={len:#x}) -> -1 (no network)");
+
+    Ok(-1)
+}
+
+async fn net_socket_read(_context: &mut dyn WIPICContext, fd: u32, buf: u32, len: u32, _a3: u32) -> Result<i32> {
+    tracing::warn!("MC_netSocketRead(fd={fd:#x}, buf={buf:#x}, len={len:#x}) -> -1 (no network)");
+
+    Ok(-1)
 }
 
 async fn unk0(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
