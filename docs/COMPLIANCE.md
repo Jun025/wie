@@ -40,7 +40,7 @@ npx wrangler d1 execute wie-db --remote --command \
 npx wrangler d1 execute wie-db --remote --command \
   "UPDATE users SET strikes = strikes + 1 WHERE id=(SELECT user_id FROM user_files WHERE id='<file-id>');"
 # (optional) purge the bytes from R2 once the dispute window has passed
-npx wrangler r2 object delete wie-games/<r2_key>
+npx wrangler r2 object delete wie-data/<r2_key>
 # log the action on the report
 npx wrangler d1 execute wie-db --remote --command \
   "UPDATE file_reports SET status='actioned', action_log='<when> / file <file-id> disabled / <handler>', updated_at=<epoch_ms> WHERE id='<report-id>';"

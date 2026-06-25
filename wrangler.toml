@@ -19,18 +19,21 @@ binding = "DB"
 database_name = "wie-db"
 database_id = "a016e967-2bc3-4eb3-9204-706c812d4aa9"
 
-# R2 bucket for the logged-in user's PRIVATE game-file vault (B안). Bytes live in
-# R2; metadata in D1 (user_files). The runtime binding is configured in the
-# Cloudflare dashboard (Pages → Settings → Functions → R2 bindings) as `GAMES` →
-# the `wie-games` bucket — a HUMAN task (S8). It is intentionally NOT declared here
-# as `[[r2_buckets]]`, because `wrangler pages deploy` validates that block at
-# deploy time and FAILS the whole deploy if the bucket doesn't exist yet. Keeping
-# it out means deploys always succeed and the feature stays DORMANT
-# (filesEnabled()=!!env.GAMES is false) until the dashboard binding is added — at
-# which point it activates with no code/config change.
+# R2 binding for the logged-in user's PRIVATE game-file vault (B안). Bytes live in
+# R2; metadata in D1 (user_files). Declared here (like the D1 binding above)
+# because this Pages project's bindings are wrangler.toml-managed — the dashboard
+# R2 binding is locked ("managed by wrangler.toml"). The `wie-data` bucket already
+# exists (created by the user, Public access OFF), so this declaration is safe:
+# `wrangler pages deploy` validates the block and the bucket is present. (If the
+# bucket were absent, this block would FAIL the whole deploy — that earlier bit us.)
 #
-# Local dev: pass the bucket on the CLI instead, e.g.
-#   npx wrangler pages dev web/dist --r2 GAMES=wie-games
+# The code references only the GAMES *binding* (`env.GAMES`), never the bucket
+# name, so the bucket can be renamed without any code change. filesEnabled() =
+# !!env.GAMES, so this binding flips the feature from dormant to active. The
+# binding applies to BOTH Production and Preview (same as the single D1 binding).
 #
 # The bucket MUST stay PRIVATE: no public bucket URL, no custom domain, no public
 # access. Bytes are only ever served by the owner-checked /api/files/:id endpoint.
+[[r2_buckets]]
+binding = "GAMES"
+bucket_name = "wie-data"
