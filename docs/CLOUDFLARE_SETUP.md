@@ -176,18 +176,21 @@ node scripts/verify-browser.mjs /path/to/your/game.jar
 > access를 **켜지 마세요**. 파일 바이트는 오직 인증·소유자검사를 거친 `/api/files/:id`
 > 엔드포인트로만 스트리밍됩니다. (presigned/공개 URL 경로 없음.)
 
-### 8-1. R2 버킷 생성
-- 대시보드 → **R2** → **Create bucket** → 이름 `wie-games` → 생성.
-  (무료 한도 10GB. 다른 이름을 쓰려면 알려주세요 — 코드 기본은 `wie-games`.)
-- **Public access는 비활성 유지**(기본값). 커스텀 도메인 연결하지 마세요.
+### 8-1. R2 버킷 생성 — ✅ 완료됨 (`wie-data`)
+- 사용자가 대시보드 → **R2** → **Create bucket** → 이름 **`wie-data`** 로 생성(Public access OFF).
+  무료 한도 10GB. 코드는 버킷명에 의존하지 않고 **`GAMES` 바인딩 변수명**만 사용하므로 버킷명은 자유.
 
-### 8-2. Pages에 R2 바인딩 추가 (★이게 활성화 스위치)
-- Pages 프로젝트(`wie-web`) → **Settings → Functions → R2 bucket bindings** →
-  **Variable name = `GAMES`**, **R2 bucket = `wie-games`** → Save.
-- **Production/Preview 양쪽**에 추가.
-- ⚠️ 이 바인딩을 추가하면 다음 배포부터 기능이 켜집니다. (런타임 바인딩은 대시보드가
-  기준이며, `wrangler.toml`에는 의도적으로 넣지 않았습니다 — 넣으면 버킷이 없을 때 배포
-  자체가 실패하기 때문. 로컬 개발은 `npx wrangler pages dev web/dist --r2 GAMES=wie-games`.)
+### 8-2. R2 바인딩 — ✅ `wrangler.toml`로 선언 (이 프로젝트는 바인딩이 wrangler.toml 관리)
+- 이 Pages 프로젝트는 대시보드 바인딩이 잠겨 있고("managed by wrangler.toml") D1도 toml로
+  선언돼 있어, R2도 **`wrangler.toml`의 `[[r2_buckets]]`** 로 선언합니다(D1과 동일 방식):
+  ```toml
+  [[r2_buckets]]
+  binding = "GAMES"
+  bucket_name = "wie-data"
+  ```
+  버킷이 이미 존재하므로 이 선언은 배포를 깨뜨리지 않습니다(버킷이 없을 때만 배포 실패).
+  Production/Preview 양쪽에 자동 적용(단일 D1 바인딩과 동일). 로컬 개발은
+  `npx wrangler pages dev web/dist` 가 이 바인딩을 그대로 사용(로컬 R2). 이 선언이 곧 활성화 스위치.
 
 ### 8-3. 마이그레이션 0003 원격 적용
 ```bash
