@@ -165,6 +165,49 @@ node scripts/verify-browser.mjs /path/to/your/game.jar
 
 ---
 
+## 8. (B안) 로그인 사용자 게임 파일 서버 보관함 — R2 + 마이그레이션 0003 (사용자 작업)
+
+로그인 사용자의 게임 파일을 **본인 전용(1GB) 서버 보관함**에 저장하는 기능입니다.
+코드/스키마는 이미 들어 있고, 아래 3가지만 사용자가 대시보드에서 해주면 **활성화**됩니다.
+하기 전까지 기능은 **자동 비활성(dormant)** 이며 기존 기능/배포는 영향받지 않습니다
+(`filesEnabled()=!!env.GAMES` → 바인딩 없으면 비활성).
+
+> ★격리 원칙: 버킷은 **반드시 비공개**로 둡니다. Public bucket URL/custom domain/public
+> access를 **켜지 마세요**. 파일 바이트는 오직 인증·소유자검사를 거친 `/api/files/:id`
+> 엔드포인트로만 스트리밍됩니다. (presigned/공개 URL 경로 없음.)
+
+### 8-1. R2 버킷 생성
+- 대시보드 → **R2** → **Create bucket** → 이름 `wie-games` → 생성.
+  (무료 한도 10GB. 다른 이름을 쓰려면 알려주세요 — 코드 기본은 `wie-games`.)
+- **Public access는 비활성 유지**(기본값). 커스텀 도메인 연결하지 마세요.
+
+### 8-2. Pages에 R2 바인딩 추가 (★이게 활성화 스위치)
+- Pages 프로젝트(`wie-web`) → **Settings → Functions → R2 bucket bindings** →
+  **Variable name = `GAMES`**, **R2 bucket = `wie-games`** → Save.
+- **Production/Preview 양쪽**에 추가.
+- ⚠️ 이 바인딩을 추가하면 다음 배포부터 기능이 켜집니다. (런타임 바인딩은 대시보드가
+  기준이며, `wrangler.toml`에는 의도적으로 넣지 않았습니다 — 넣으면 버킷이 없을 때 배포
+  자체가 실패하기 때문. 로컬 개발은 `npx wrangler pages dev web/dist --r2 GAMES=wie-games`.)
+
+### 8-3. 마이그레이션 0003 원격 적용
+```bash
+npx wrangler d1 migrations apply wie-db --remote
+```
+- `migrations/0003_user_files_and_reports.sql` — `user_files`(소유자별, content_hash는
+  **회원 단위 UNIQUE** = 회원 단위 dedup), `file_reports`(신고 접수), `users.strikes`(반복침해).
+- 적용 전이면 `/api/reports`는 503(graceful)로 응답하고 보관함 기능은 비활성입니다.
+
+### 8-4. 활성화 후 확인
+- `/api/auth/me` 의 `filesConfigured`가 `true`인지.
+- 로그인 후 라이브러리에 "서버 보관함" 섹션이 보이고, 게임 업로드→다운로드→삭제가 되는지.
+- 신고/삭제: 권리자 신고는 서비스 정보의 "권리 침해 신고" 폼 → `file_reports`.
+  운영자 조치(파일 비활성화·반복침해 계정 제한/해지)는 `docs/COMPLIANCE.md`의 D1 명령 참고.
+
+> 필요 토큰 권한: 원격 마이그레이션은 **D1 Edit** 권한 토큰으로 실행하세요(배포 토큰은
+> Pages 권한만 — 최소권한). R2 버킷/바인딩 생성은 대시보드에서 직접 합니다.
+
+---
+
 ## 7. 알려주실 값 요약 (다음 런 반영용)
 - [ ] Pages 프로젝트명 (기본 `wie-web` 유지 여부)
 - [ ] D1 `database_id`
