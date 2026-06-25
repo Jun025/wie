@@ -53,7 +53,7 @@ function ViewPanel({
     case "help":
       return <Help />;
     case "info":
-      return <ServiceInfo />;
+      return <ServiceInfo toast={toast} />;
   }
 }
 
