@@ -17,6 +17,16 @@ pub async fn memcpy(core: &mut ArmCore, _: &mut (), ptr_dst: u32, ptr_src: u32, 
     Ok(())
 }
 
+/// Overlap-safe copy (C `memmove`): stage the whole source before writing so
+/// forward/backward overlap can't corrupt the copy. R0 already holds `ptr_dst`
+/// for the ARM ABI return, so this returns `()` and leaves R0 untouched.
+pub async fn memmove(core: &mut ArmCore, _: &mut (), ptr_dst: u32, ptr_src: u32, len: u32) -> Result<()> {
+    let mut buf = alloc::vec![0u8; len as usize];
+    core.read_bytes(ptr_src, &mut buf)?;
+    core.write_bytes(ptr_dst, &buf)?;
+    Ok(())
+}
+
 pub async fn memset(core: &mut ArmCore, _: &mut (), ptr_dst: u32, value: u32, len: u32) -> Result<()> {
     let buf = [value as u8; COPY_CHUNK];
     let mut offset: u32 = 0;
