@@ -112,6 +112,32 @@ pub async fn set_context(context: &mut dyn WIPICContext, p_grp_ctx: WIPICWord, o
     Ok(())
 }
 
+/// `MC_grpGetContext` — read a single field of a graphics context into the
+/// caller's buffer. Mirror of [`set_context`]; games (바이오크로니클, 메이플스토리
+/// 도적편) call it right after `MC_grpSetContext` to read a value back.
+pub async fn get_context(context: &mut dyn WIPICContext, p_grp_ctx: WIPICWord, op: WIPICGraphicsContextIdx, out_ptr: WIPICWord) -> Result<()> {
+    tracing::debug!("MC_grpGetContext({p_grp_ctx:#x}, {op:?}, {out_ptr:#x})");
+
+    let grp_ctx: WIPICGraphicsContext = read_generic(context, p_grp_ctx)?;
+    match op {
+        WIPICGraphicsContextIdx::ClipIdx => write_generic(context, out_ptr, grp_ctx.clip)?,
+        WIPICGraphicsContextIdx::FgPixelIdx => write_generic(context, out_ptr, grp_ctx.fgpxl)?,
+        WIPICGraphicsContextIdx::BgPixelIdx => write_generic(context, out_ptr, grp_ctx.bgpxl)?,
+        WIPICGraphicsContextIdx::TransPixelIdx => write_generic(context, out_ptr, grp_ctx.transpxl)?,
+        WIPICGraphicsContextIdx::AlphaIdx => write_generic(context, out_ptr, grp_ctx.alpha)?,
+        WIPICGraphicsContextIdx::PixelopIdx => write_generic(context, out_ptr, grp_ctx.pixel_op_func_ptr)?,
+        WIPICGraphicsContextIdx::PixelParam1Idx => write_generic(context, out_ptr, grp_ctx.param1)?,
+        WIPICGraphicsContextIdx::FontIdx => write_generic(context, out_ptr, grp_ctx.font)?,
+        WIPICGraphicsContextIdx::StyleIdx => write_generic(context, out_ptr, grp_ctx.style)?,
+        WIPICGraphicsContextIdx::OffsetIdx => write_generic(context, out_ptr, grp_ctx.offset)?,
+        _ => {
+            tracing::warn!("MC_grpGetContext: unhandled op {op:?}, writing 0");
+            write_generic(context, out_ptr, 0u32)?;
+        }
+    }
+    Ok(())
+}
+
 pub async fn put_pixel(context: &mut dyn WIPICContext, dst_fb: WIPICIndirectPtr, x: i32, y: i32, p_gctx: WIPICWord) -> Result<()> {
     tracing::debug!("MC_grpPutPixel({:#x}, {x}, {y}, {p_gctx:?})", dst_fb.0);
 
