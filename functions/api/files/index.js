@@ -12,7 +12,7 @@ import { ok, err, handleError, str, HttpError } from "../../_lib/http.js";
 import { uuid, sha256Hex } from "../../_lib/crypto.js";
 import { requireUser } from "../../_lib/session.js";
 import { rateLimit } from "../../_lib/ratelimit.js";
-import { FILE_QUOTA_BYTES, PER_FILE_MAX_BYTES, ALLOWED_KINDS, filesEnabled, makeR2Key, usedBytes, looksDisallowed } from "../../_lib/files.js";
+import { FILE_QUOTA_BYTES, PER_FILE_MAX_BYTES, ALLOWED_KINDS, filesEnabled, makeR2Key, usedBytes, looksDisallowed, isMissingTable } from "../../_lib/files.js";
 
 // GET — list the user's files (no bytes) + quota. When the R2 binding is not yet
 // provisioned (S8), report `enabled:false` so the UI can hide the feature without
@@ -23,16 +23,26 @@ export async function onRequestGet(context) {
     if (!filesEnabled(context.env)) {
       return ok({ enabled: false, files: [], usage: { used: 0, quota: FILE_QUOTA_BYTES } });
     }
-    const { results } = await context.env.DB.prepare(
-      `SELECT id, file_name, kind, content_hash, size, created_at, last_seen_at
-         FROM user_files
-        WHERE user_id = ? AND disabled = 0
-        ORDER BY created_at DESC`,
-    )
-      .bind(user.id)
-      .all();
-    const used = await usedBytes(context.env, user.id);
-    return ok({ enabled: true, files: results || [], usage: { used, quota: FILE_QUOTA_BYTES } });
+    try {
+      const { results } = await context.env.DB.prepare(
+        `SELECT id, file_name, kind, content_hash, size, created_at, last_seen_at
+           FROM user_files
+          WHERE user_id = ? AND disabled = 0
+          ORDER BY created_at DESC`,
+      )
+        .bind(user.id)
+        .all();
+      const used = await usedBytes(context.env, user.id);
+      return ok({ enabled: true, files: results || [], usage: { used, quota: FILE_QUOTA_BYTES } });
+    } catch (schemaErr) {
+      // GRACEFUL: R2 binding is live but migration 0003 hasn't been applied yet —
+      // report the vault as not-enabled (UI hides it) instead of 500ing.
+      if (isMissingTable(schemaErr)) {
+        console.error("files list (pre-migration 0003?):", schemaErr && schemaErr.message);
+        return ok({ enabled: false, files: [], usage: { used: 0, quota: FILE_QUOTA_BYTES }, migration_pending: true });
+      }
+      throw schemaErr;
+    }
   } catch (e) {
     return handleError(e);
   }
@@ -76,8 +86,19 @@ export async function onRequestPost(context) {
       throw new HttpError(`파일이 너무 큽니다 (단일 파일 최대 ${PER_FILE_MAX_BYTES / 1024 / 1024}MB)`, 413, "file_too_large");
     }
 
-    // PER-USER dedup: same owner cannot store the same file twice.
-    const dup = await env.DB.prepare("SELECT id FROM user_files WHERE user_id = ? AND content_hash = ?").bind(user.id, clientHash).first();
+    // PER-USER dedup: same owner cannot store the same file twice. This is also
+    // the first user_files access, so a missing-table error here means migration
+    // 0003 isn't applied yet — fail gracefully (503) BEFORE writing any R2 bytes.
+    let dup;
+    try {
+      dup = await env.DB.prepare("SELECT id FROM user_files WHERE user_id = ? AND content_hash = ?").bind(user.id, clientHash).first();
+    } catch (schemaErr) {
+      if (isMissingTable(schemaErr)) {
+        console.error("file upload (pre-migration 0003?):", schemaErr && schemaErr.message);
+        return err("서버 보관함이 아직 준비되지 않았습니다 (마이그레이션 대기)", 503, "files_not_ready");
+      }
+      throw schemaErr;
+    }
     if (dup) return err("이미 보관함에 있는 파일입니다", 409, "duplicate");
 
     // Buffer (≤ per-file cap) so we can verify the hash + screen the magic bytes

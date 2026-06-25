@@ -60,3 +60,11 @@ const DENY_MAGICS = [
 export function looksDisallowed(bytes) {
   return DENY_MAGICS.some((m) => m.every((b, i) => bytes[i] === b));
 }
+
+// True when a D1 error is "the user_files table/column doesn't exist yet" — i.e.
+// the R2 binding is live but migration 0003 hasn't been applied to the remote DB
+// (a human task, S8). Callers degrade gracefully (no 500) until it is applied.
+export function isMissingTable(err) {
+  const m = err && err.message ? err.message.toLowerCase() : "";
+  return m.includes("no such table") || m.includes("no such column");
+}
