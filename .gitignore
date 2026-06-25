@@ -31,3 +31,9 @@ roms/
 
 # transient verification screenshots (committed copies live in docs/verification/)
 /verify_*.png
+
+# Local agent working notes / RE derivation logs (kept local, not committed;
+# their content is consolidated into docs/lgt_abi.md)
+/CLAUDE_TASK_*.md
+/STEP2_REPORT.md
+/BRIDGE_REPORT.md
