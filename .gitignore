@@ -17,6 +17,8 @@ node_modules
 # BYOF only: games live in the browser (IndexedDB), not on disk or in git.
 _roms/
 roms/
+# Local game validation/classification workspace — never commit game zips.
+/game_lab/
 *.jar
 *.jad
 *.kdf
