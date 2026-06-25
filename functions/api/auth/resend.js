@@ -1,4 +1,4 @@
-// POST /api/auth/resend { login_id } — resend the email-verification link.
+// POST /api/auth/resend { email } — resend the email-verification link.
 //
 // No session required (a pending user cannot log in yet). Always returns ok so
 // the endpoint can't be used to probe which ids exist. Rate-limited.
@@ -12,9 +12,9 @@ export async function onRequestPost(context) {
   try {
     await rateLimit(context, "resend", { limit: 5, windowSec: 600 });
     const body = await readJson(context.request);
-    const loginId = str(body.login_id, { name: "login_id", min: 1, max: 254 });
+    const email = str(body.email, { name: "email", min: 1, max: 254 }).toLowerCase();
 
-    const user = await context.env.DB.prepare("SELECT id, email, status FROM users WHERE login_id = ?").bind(loginId).first();
+    const user = await context.env.DB.prepare("SELECT id, email, status FROM users WHERE email = ?").bind(email).first();
     if (user && user.email && user.status === "pending" && emailConfigured(context.env)) {
       await invalidateTokens(context.env, user.id, "verify");
       const raw = await createToken(context.env, user.id, "verify", VERIFY_TTL_MS);

@@ -12,8 +12,7 @@
 
 export interface User {
   id: string;
-  login_id: string;
-  email: string | null;
+  email: string; // the login identifier
   email_verified?: boolean;
 }
 
@@ -106,13 +105,13 @@ async function call<T = unknown>(path: string, opts: { method?: string; body?: u
 
 export const auth = {
   me: () => call<{ ok: boolean; authenticated: boolean; emailConfigured?: boolean; user?: User }>("/auth/me"),
-  register: (login_id: string, password: string, email?: string) =>
-    call<{ ok: boolean; user: User; pending?: boolean; emailSent?: boolean }>("/auth/register", { method: "POST", body: { login_id, password, email } }),
-  login: (login_id: string, password: string) =>
-    call<{ ok: boolean; user: User }>("/auth/login", { method: "POST", body: { login_id, password } }),
+  register: (email: string, password: string) =>
+    call<{ ok: boolean; user: User; pending?: boolean; emailSent?: boolean }>("/auth/register", { method: "POST", body: { email, password } }),
+  login: (email: string, password: string) =>
+    call<{ ok: boolean; user: User }>("/auth/login", { method: "POST", body: { email, password } }),
   logout: () => call("/auth/logout", { method: "POST" }),
-  resend: (login_id: string) => call<{ ok: boolean; emailConfigured?: boolean }>("/auth/resend", { method: "POST", body: { login_id } }),
-  requestReset: (login_id: string) => call<{ ok: boolean; emailConfigured?: boolean }>("/auth/request-reset", { method: "POST", body: { login_id } }),
+  resend: (email: string) => call<{ ok: boolean; emailConfigured?: boolean }>("/auth/resend", { method: "POST", body: { email } }),
+  requestReset: (email: string) => call<{ ok: boolean; emailConfigured?: boolean }>("/auth/request-reset", { method: "POST", body: { email } }),
   reset: (token: string, password: string) => call<{ ok: boolean }>("/auth/reset", { method: "POST", body: { token, password } }),
 };
 

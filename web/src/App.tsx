@@ -58,17 +58,17 @@ function ViewPanel({
 }
 
 function ProfileButton({ user, onClick }: { user: AuthState["user"]; onClick: () => void }) {
-  const initials = user ? user.login_id.slice(0, 2).toUpperCase() : "👤";
+  const initials = user ? user.email.slice(0, 2).toUpperCase() : "👤";
   return (
     <button
       type="button"
       onClick={onClick}
-      title={user ? `계정 (@${user.login_id})` : "로그인 / 가입"}
-      aria-label={user ? `계정 @${user.login_id}` : "로그인 / 가입"}
+      title={user ? `계정 (${user.email})` : "로그인 / 가입"}
+      aria-label={user ? `계정 ${user.email}` : "로그인 / 가입"}
       className="flex items-center gap-2 rounded-full border border-edge bg-surface2 py-1 pl-1 pr-2.5 text-xs text-fg-dim hover:text-fg hover:border-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
     >
       <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-accent-fg">{initials}</span>
-      <span className="max-w-[8rem] truncate">{user ? `@${user.login_id}` : "로그인"}</span>
+      <span className="max-w-[10rem] truncate">{user ? user.email : "로그인"}</span>
     </button>
   );
 }
@@ -158,9 +158,9 @@ export default function App() {
                 className="flex items-center gap-2 rounded-md border border-edge bg-surface2 px-4 py-3 text-left text-fg hover:border-accent"
               >
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent text-[11px] font-bold text-accent-fg">
-                  {authState.user ? authState.user.login_id.slice(0, 2).toUpperCase() : "👤"}
+                  {authState.user ? authState.user.email.slice(0, 2).toUpperCase() : "👤"}
                 </span>
-                {authState.user ? `계정 (@${authState.user.login_id})` : "로그인 / 가입"}
+                {authState.user ? `계정 (${authState.user.email})` : "로그인 / 가입"}
               </button>
               {TABS.map((t) => (
                 <button

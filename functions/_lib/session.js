@@ -55,7 +55,7 @@ function readCookie(request, name) {
   return null;
 }
 
-// Returns { id, login_id, email } for the authenticated user, or null.
+// Returns { id, email } for the authenticated user, or null.
 export async function getUser(context) {
   const { request, env } = context;
   const raw = readCookie(request, COOKIE_NAME);
@@ -70,7 +70,7 @@ export async function getUser(context) {
   if (!sessionId) return null;
 
   const row = await env.DB.prepare(
-    `SELECT s.id AS sid, s.expires_at, s.revoked, u.id AS uid, u.login_id, u.email, u.email_verified, u.status
+    `SELECT s.id AS sid, s.expires_at, s.revoked, u.id AS uid, u.email, u.email_verified, u.status
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.id = ?`,
   )
@@ -80,7 +80,7 @@ export async function getUser(context) {
   if (!row) return null;
   if (row.revoked) return null;
   if (row.expires_at < Date.now()) return null;
-  return { id: row.uid, login_id: row.login_id, email: row.email, email_verified: !!row.email_verified, status: row.status, sessionId: row.sid };
+  return { id: row.uid, email: row.email, email_verified: !!row.email_verified, status: row.status, sessionId: row.sid };
 }
 
 export async function requireUser(context) {

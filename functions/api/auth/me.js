@@ -19,7 +19,7 @@ export async function onRequestGet(context) {
         emailConfigured: emailConfigured(context.env),
         emailDiag,
         filesConfigured: files,
-        user: { id: user.id, login_id: user.login_id, email: user.email, email_verified: !!user.email_verified },
+        user: { id: user.id, email: user.email, email_verified: !!user.email_verified },
       },
       200,
     );
