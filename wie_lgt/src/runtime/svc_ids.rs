@@ -124,6 +124,8 @@ pub enum WIPICSvcId {
     ListRecord = 0x197,
     UpdateRecord = 0x198,
     SelectRecord = 0x199,
+    // Database table index 12 (0x190 + 12). Canonical WIPI-C MC_dbListDataBase.
+    ListDatabases = 0x19c,
     Unk8 = 0x1a0,
     Connect = 0x258,
     Close = 0x259,
@@ -226,6 +228,7 @@ impl TryFrom<SvcId> for WIPICSvcId {
             0x197 => Self::ListRecord,
             0x198 => Self::UpdateRecord,
             0x199 => Self::SelectRecord,
+            0x19c => Self::ListDatabases,
             0x1a0 => Self::Unk8,
             0x258 => Self::Connect,
             0x259 => Self::Close,

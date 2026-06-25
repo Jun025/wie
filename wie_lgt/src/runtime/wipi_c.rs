@@ -44,6 +44,15 @@ struct CMethodProxy {
 async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm), id: SvcId) -> Result<()> {
     let wipic_context = LgtWIPICContext::new(core.clone(), system.clone(), jvm.clone());
     let (_, lr) = core.read_pc_lr()?;
+    tracing::debug!(
+        "WIPIC_SVC id={:#x}({}) args={:#x},{:#x},{:#x},{:#x}",
+        id.0,
+        id.0,
+        u32::get(core, 0),
+        u32::get(core, 1),
+        u32::get(core, 2),
+        u32::get(core, 3)
+    );
     let method = match WIPICSvcId::try_from(id)? {
         WIPICSvcId::CletRegister => {
             return EmulatedFunction::call(&clet_register, core, jvm).await?.write(core, lr);
@@ -121,6 +130,7 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::ListRecord => database::list_record.into_body(),
         WIPICSvcId::UpdateRecord => database::update_record.into_body(),
         WIPICSvcId::SelectRecord => database::select_record.into_body(),
+        WIPICSvcId::ListDatabases => list_databases.into_body(),
         WIPICSvcId::Unk8 => database::exists_database.into_body(),
         WIPICSvcId::Connect => net::connect.into_body(),
         WIPICSvcId::Close => net::close.into_body(),
@@ -225,6 +235,20 @@ async fn clet_register(core: &mut ArmCore, jvm: &mut Jvm, function_table: u32, a
     }
 
     Ok(())
+}
+
+/// WIPI-C `MC_dbListDataBase` (database table index 12, SVC 0x19c).
+///
+/// Enumerates the database names matching a pattern into a caller buffer and
+/// returns the count. Games (제노니아1, 하이브리드) call this at startApp right
+/// after OpenDatabase/Exists to discover existing save databases. We have no
+/// on-disk database directory to enumerate, so we report "no databases found"
+/// (return 0) without touching the output buffer — the game then proceeds to
+/// create/initialize its data fresh instead of crashing on an unknown SVC.
+async fn list_databases(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<i32> {
+    tracing::debug!("MC_dbListDataBase({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x}) -> 0 (no databases)");
+
+    Ok(0)
 }
 
 async fn unk0(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
