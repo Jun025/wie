@@ -226,8 +226,18 @@ export default function App() {
       <main className="flex flex-1 flex-col items-center gap-5 px-4 py-5">
         {view === "library" && (
           <div className="w-full max-w-xl rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-200">
-            🔒 게임 파일은 <strong>이 기기에만</strong> 저장됩니다. 업로드한 게임의 바이트·파일명·해시·“보유 목록”은 서버로 전송되지 않으며
-            브라우저(IndexedDB)에만 보관됩니다. 서버에 올라가는 것은 <em>계정 정보</em>와 <em>세이브 데이터</em>뿐입니다.
+            {authState.user ? (
+              <>
+                🔒 게임 파일은 기본적으로 <strong>이 기기(브라우저)</strong>에 저장됩니다. 원하시면 <strong>본인만 접근 가능한 서버 보관함(1GB)</strong>에
+                올릴 수 있어요 — 회원님 파일은 <em>공유·공개되지 않으며</em> 다른 누구도(직접 링크·검색 포함) 접근할 수 없습니다.
+                미로그인 상태의 게임 파일은 서버로 전송되지 않습니다.
+              </>
+            ) : (
+              <>
+                🔒 게임 파일은 <strong>이 기기에만</strong> 저장됩니다. 업로드한 게임의 바이트·파일명·해시·“보유 목록”은 서버로 전송되지 않으며
+                브라우저(IndexedDB)에만 보관됩니다(미로그인). 로그인하면 본인 전용 서버 보관함(1GB)에 올릴 수 있습니다.
+              </>
+            )}
           </div>
         )}
         <ViewPanel view={view} authState={authState} onRun={onRun} toast={showToast} onReport={onReport} />
