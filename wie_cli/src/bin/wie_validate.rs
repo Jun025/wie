@@ -32,7 +32,8 @@ use std::{
 use clap::Parser;
 
 use wie_backend::{
-    AudioSink, Database, DatabaseRepository, Emulator, Event, Filesystem, Instant, Options, Platform, RecordId, Screen, canvas::Image, extract_zip,
+    AudioSink, Database, DatabaseRepository, Emulator, Event, Filesystem, Instant, KeyCode, Options, Platform, RecordId, Screen, canvas::Image,
+    extract_zip,
 };
 use wie_j2me::J2MEEmulator;
 use wie_ktf::KtfEmulator;
@@ -50,6 +51,9 @@ struct HeadlessScreen {
     paints: AtomicU64,
     redraw_requested: AtomicBool,
     last_frame: Mutex<Option<Vec<u32>>>,
+    /// Set once any painted frame contains >=2 distinct pixel values, i.e. the
+    /// game drew real content rather than a uniform blank/black screen.
+    saw_content: AtomicBool,
 }
 
 impl Screen for HeadlessScreen {
@@ -64,6 +68,11 @@ impl Screen for HeadlessScreen {
             .iter()
             .map(|x| ((x.a as u32) << 24) | ((x.r as u32) << 16) | ((x.g as u32) << 8) | (x.b as u32))
             .collect::<Vec<_>>();
+        if let Some(first) = data.first()
+            && data.iter().any(|p| p != first)
+        {
+            self.saw_content.store(true, Ordering::SeqCst);
+        }
         *self.last_frame.lock().unwrap() = Some(data);
         self.paints.fetch_add(1, Ordering::SeqCst);
     }
@@ -233,6 +242,22 @@ struct Args {
     /// Write a PNG of the last rendered frame here
     #[arg(long)]
     screenshot: Option<PathBuf>,
+    /// Enable scripted input injection (press confirm/soft keys, navigate with
+    /// arrows + select) after boot, watching for crash/panic/hang/blank screen
+    /// across the whole sequence. NOTE: this only proves the game does not die on
+    /// input; it cannot judge whether the on-screen result is visually correct.
+    #[arg(long, default_value_t = false)]
+    inject: bool,
+    /// Directory for time-series screenshots (one per input step; filename
+    /// encodes the step + key). Requires --inject.
+    #[arg(long)]
+    shotdir: Option<PathBuf>,
+    /// Seconds to let the game boot before the first injected input.
+    #[arg(long, default_value_t = 2.5)]
+    boot_secs: f64,
+    /// Seconds per injected input step (press, then settle + screenshot).
+    #[arg(long, default_value_t = 0.6)]
+    action_secs: f64,
 }
 
 const SCREEN_W: u32 = 240;
@@ -253,13 +278,14 @@ fn main() {
 
     // Emit a single JSON line for the batch wrapper to parse.
     let json = format!(
-        "{{\"file\":{:?},\"platform\":{:?},\"result\":{:?},\"reason\":{:?},\"ticks\":{},\"paints\":{},\"ms\":{}}}",
+        "{{\"file\":{:?},\"platform\":{:?},\"result\":{:?},\"reason\":{:?},\"ticks\":{},\"paints\":{},\"content\":{},\"ms\":{}}}",
         args.filename,
         result.platform,
         if result.passed { "PASS" } else { "FAIL" },
         result.reason,
         result.ticks,
         result.paints,
+        result.content,
         elapsed_ms
     );
     println!("{json}");
@@ -273,6 +299,7 @@ struct Outcome {
     reason: String,
     ticks: u64,
     paints: u64,
+    content: bool,
 }
 
 fn run(args: &Args) -> Outcome {
@@ -282,6 +309,7 @@ fn run(args: &Args) -> Outcome {
         paints: AtomicU64::new(0),
         redraw_requested: AtomicBool::new(false),
         last_frame: Mutex::new(None),
+        saw_content: AtomicBool::new(false),
     });
     let exited = Arc::new(AtomicBool::new(false));
     let stdout = Arc::new(Mutex::new(Vec::new()));
@@ -297,24 +325,105 @@ fn run(args: &Args) -> Outcome {
     // ── load & route (mirrors wie_cli/src/main.rs) ──────────────────────────
     let buf = match fs::read(&args.filename) {
         Ok(b) => b,
-        Err(e) => return fail("unknown", format!("read error: {e}"), 0, 0),
+        Err(e) => return fail("unknown", format!("read error: {e}"), 0, 0, false),
     };
 
     let load = catch_unwind(AssertUnwindSafe(|| build_emulator(platform, &args.filename, buf)));
     let (mut emulator, platform_name) = match load {
         Ok(Ok(v)) => v,
-        Ok(Err((name, e))) => return fail(&name, format!("load error: {e}"), 0, 0),
-        Err(p) => return fail("unknown", format!("load panic: {}", panic_message(&p)), 0, 0),
+        Ok(Err((name, e))) => return fail(&name, format!("load error: {e}"), 0, 0, false),
+        Err(p) => return fail("unknown", format!("load panic: {}", panic_message(&p)), 0, 0, false),
     };
 
+    // ── input schedule (scripted fuzzing) ────────────────────────────────────
+    let stem = std::path::Path::new(&args.filename)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("game")
+        .to_string();
+
+    let mut schedule: Vec<(f64, ScheduledEv)> = Vec::new();
+    let mut deadline_secs = args.timeout as f64;
+    if args.inject {
+        // Confirm keys (OK/soft-key/keypad-5) interleaved with directional
+        // navigation + select — covers single-button and two-button menus.
+        let script: &[(KeyCode, &str)] = &[
+            (KeyCode::OK, "OK"),
+            (KeyCode::OK, "OK"),
+            (KeyCode::LEFT_SOFT_KEY, "LSOFT"),
+            (KeyCode::NUM5, "NUM5"),
+            (KeyCode::DOWN, "DOWN"),
+            (KeyCode::OK, "OK"),
+            (KeyCode::DOWN, "DOWN"),
+            (KeyCode::OK, "OK"),
+            (KeyCode::UP, "UP"),
+            (KeyCode::OK, "OK"),
+            (KeyCode::LEFT, "LEFT"),
+            (KeyCode::OK, "OK"),
+            (KeyCode::RIGHT, "RIGHT"),
+            (KeyCode::OK, "OK"),
+            (KeyCode::NUM5, "NUM5"),
+            (KeyCode::LEFT_SOFT_KEY, "LSOFT"),
+            (KeyCode::RIGHT_SOFT_KEY, "RSOFT"),
+            (KeyCode::DOWN, "DOWN"),
+            (KeyCode::DOWN, "DOWN"),
+            (KeyCode::OK, "OK"),
+            (KeyCode::UP, "UP"),
+            (KeyCode::OK, "OK"),
+            (KeyCode::STAR, "STAR"),
+            (KeyCode::HASH, "HASH"),
+            (KeyCode::NUM1, "NUM1"),
+            (KeyCode::OK, "OK"),
+            (KeyCode::OK, "OK"),
+        ];
+        schedule.push((args.boot_secs, ScheduledEv::Shot("00_boot".into())));
+        let mut t = args.boot_secs + 0.3;
+        for (i, (kc, name)) in script.iter().enumerate() {
+            let label = format!("{:02}_{name}", i + 1);
+            schedule.push((t, ScheduledEv::Key(*kc, true, label.clone())));
+            schedule.push((t + 0.15, ScheduledEv::Key(*kc, false, label.clone())));
+            schedule.push((t + args.action_secs - 0.05, ScheduledEv::Shot(label)));
+            t += args.action_secs;
+        }
+        deadline_secs = (t + 1.0).min(120.0); // hard cap against runaway
+    }
+    let deadline = Duration::from_secs_f64(deadline_secs.max(1.0));
+
     // ── drive ───────────────────────────────────────────────────────────────
-    let timeout = Duration::from_secs(args.timeout);
     let loop_start = StdInstant::now();
     let mut ticks = 0u64;
     let mut run_err: Option<String> = None;
+    let mut phase = String::from("boot");
+    let mut sched_idx = 0usize;
 
     while !exited.load(Ordering::SeqCst) {
-        if loop_start.elapsed() > timeout || ticks >= args.max_ticks {
+        let elapsed = loop_start.elapsed();
+        if elapsed > deadline || ticks >= args.max_ticks {
+            break;
+        }
+
+        // Fire any scheduled input/screenshot events that are now due.
+        while sched_idx < schedule.len() && schedule[sched_idx].0 <= elapsed.as_secs_f64() {
+            match &schedule[sched_idx].1 {
+                ScheduledEv::Key(kc, down, label) => {
+                    phase = label.clone();
+                    let ev = if *down { Event::Keydown(*kc) } else { Event::Keyup(*kc) };
+                    if let Err(p) = catch_unwind(AssertUnwindSafe(|| emulator.handle_event(ev))) {
+                        run_err = Some(format!("panic on input '{label}': {}", panic_message(&p)));
+                        break;
+                    }
+                }
+                ScheduledEv::Shot(label) => {
+                    if let Some(dir) = &args.shotdir
+                        && let Some(frame) = screen.last_frame.lock().unwrap().as_ref()
+                    {
+                        let _ = save_png(&dir.join(format!("{stem}__{label}.png")), frame, SCREEN_W, SCREEN_H);
+                    }
+                }
+            }
+            sched_idx += 1;
+        }
+        if run_err.is_some() {
             break;
         }
 
@@ -331,11 +440,11 @@ fn run(args: &Args) -> Outcome {
         match step {
             Ok(Ok(())) => {}
             Ok(Err(e)) => {
-                run_err = Some(format!("tick error: {e}"));
+                run_err = Some(format!("tick error during '{phase}': {e}"));
                 break;
             }
             Err(p) => {
-                run_err = Some(format!("panic: {}", panic_message(&p)));
+                run_err = Some(format!("panic during '{phase}': {}", panic_message(&p)));
                 break;
             }
         }
@@ -343,8 +452,9 @@ fn run(args: &Args) -> Outcome {
     }
 
     let paints = screen.paints.load(Ordering::SeqCst);
+    let content = screen.saw_content.load(Ordering::SeqCst);
 
-    // ── screenshot ──────────────────────────────────────────────────────────
+    // ── final screenshot (back-compat single frame) ───────────────────────────
     if let Some(path) = &args.screenshot
         && let Some(frame) = screen.last_frame.lock().unwrap().as_ref()
         && let Err(e) = save_png(path, frame, SCREEN_W, SCREEN_H)
@@ -354,20 +464,30 @@ fn run(args: &Args) -> Outcome {
 
     // ── classify ─────────────────────────────────────────────────────────────
     if let Some(reason) = run_err {
-        return fail(&platform_name, reason, ticks, paints);
+        return fail(&platform_name, reason, ticks, paints, content);
     }
     if exited.load(Ordering::SeqCst) {
-        return pass(&platform_name, "clean exit".into(), ticks, paints);
+        return pass(&platform_name, "clean exit".into(), ticks, paints, content);
+    }
+    if content {
+        let reason = if args.inject {
+            "booted + rendered + survived input sequence (visual correctness NOT checked)"
+        } else {
+            "booted + rendered"
+        };
+        return pass(&platform_name, reason.into(), ticks, paints, content);
     }
     if paints >= 1 {
-        return pass(&platform_name, "booted + rendered".into(), ticks, paints);
+        return fail(&platform_name, "only blank/uniform frames (black screen)".into(), ticks, paints, content);
     }
-    fail(
-        &platform_name,
-        "no frame rendered and no exit within budget (hang/black screen)".into(),
-        ticks,
-        paints,
-    )
+    fail(&platform_name, "no frame rendered (hang/black screen)".into(), ticks, paints, content)
+}
+
+enum ScheduledEv {
+    /// key code, is_down, step label
+    Key(KeyCode, bool, String),
+    /// screenshot with step label
+    Shot(String),
 }
 
 #[allow(clippy::type_complexity)]
@@ -445,22 +565,24 @@ fn panic_message(p: &Box<dyn std::any::Any + Send>) -> String {
     }
 }
 
-fn pass(platform: &str, reason: String, ticks: u64, paints: u64) -> Outcome {
+fn pass(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) -> Outcome {
     Outcome {
         platform: platform.to_string(),
         passed: true,
         reason,
         ticks,
         paints,
+        content,
     }
 }
 
-fn fail(platform: &str, reason: String, ticks: u64, paints: u64) -> Outcome {
+fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) -> Outcome {
     Outcome {
         platform: platform.to_string(),
         passed: false,
         reason,
         ticks,
         paints,
+        content,
     }
 }
