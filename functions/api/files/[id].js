@@ -8,7 +8,18 @@
 
 import { ok, err, handleError } from "../../_lib/http.js";
 import { requireUser } from "../../_lib/session.js";
-import { filesEnabled, usedBytes, FILE_QUOTA_BYTES } from "../../_lib/files.js";
+import { filesEnabled, usedBytes, FILE_QUOTA_BYTES, isMissingTable } from "../../_lib/files.js";
+
+// Owner-scoped row lookup; if migration 0003 isn't applied yet the table is
+// missing → treat as "not found" (no 500) rather than leaking a schema error.
+async function ownerRow(env, sql, id, userId) {
+  try {
+    return await env.DB.prepare(sql).bind(id, userId).first();
+  } catch (schemaErr) {
+    if (isMissingTable(schemaErr)) return null;
+    throw schemaErr;
+  }
+}
 
 export async function onRequestGet(context) {
   const { env, params } = context;
@@ -16,11 +27,7 @@ export async function onRequestGet(context) {
     const user = await requireUser(context);
     if (!filesEnabled(env)) return err("서버 보관함이 아직 설정되지 않았습니다", 503, "files_not_configured");
 
-    const row = await env.DB.prepare(
-      "SELECT id, file_name, kind, r2_key, disabled FROM user_files WHERE id = ? AND user_id = ?",
-    )
-      .bind(params.id, user.id)
-      .first();
+    const row = await ownerRow(env, "SELECT id, file_name, kind, r2_key, disabled FROM user_files WHERE id = ? AND user_id = ?", params.id, user.id);
     if (!row || row.disabled) return err("Not found", 404);
 
     const obj = await env.GAMES.get(row.r2_key);
@@ -52,7 +59,7 @@ export async function onRequestDelete(context) {
     const user = await requireUser(context);
     if (!filesEnabled(env)) return err("서버 보관함이 아직 설정되지 않았습니다", 503, "files_not_configured");
 
-    const row = await env.DB.prepare("SELECT r2_key FROM user_files WHERE id = ? AND user_id = ?").bind(params.id, user.id).first();
+    const row = await ownerRow(env, "SELECT r2_key FROM user_files WHERE id = ? AND user_id = ?", params.id, user.id);
     if (!row) return err("Not found", 404);
 
     await env.GAMES.delete(row.r2_key).catch(() => {});
