@@ -129,6 +129,9 @@ pub enum WIPICSvcId {
     Unk8 = 0x1a0,
     Connect = 0x258,
     Close = 0x259,
+    // net base 0x258 + index: idx4 SocketWrite, idx5 SocketRead, idx6 SocketClose.
+    SocketWrite = 0x25c,
+    SocketRead = 0x25d,
     SocketClose = 0x25e,
     ClipCreate = 0x4b0,
     ClipFree = 0x4b1,
@@ -232,6 +235,8 @@ impl TryFrom<SvcId> for WIPICSvcId {
             0x1a0 => Self::Unk8,
             0x258 => Self::Connect,
             0x259 => Self::Close,
+            0x25c => Self::SocketWrite,
+            0x25d => Self::SocketRead,
             0x25e => Self::SocketClose,
             0x4b0 => Self::ClipCreate,
             0x4b1 => Self::ClipFree,
