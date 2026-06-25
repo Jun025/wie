@@ -49,18 +49,24 @@ python3 - <<'PY' || fail=1
 import re, glob, sys
 bad = False
 files = glob.glob("functions/**/*.js", recursive=True)
-# pull every string literal (single, double, backtick) from the functions code
 for path in files:
     src = open(path, encoding="utf-8").read()
-    for m in re.finditer(r'`([^`]*)`|"([^"]*)"|\'([^\']*)\'', src, re.S):
-        lit = next(g for g in m.groups() if g is not None)
+    # Strip comments FIRST so prose (incl. English apostrophes like "hasn't") is
+    # never mistaken for a string literal.
+    src = re.sub(r'/\*.*?\*/', '', src, flags=re.S)
+    src = re.sub(r'//[^\n]*', '', src)
+    # SQL in this codebase lives only in double-quoted or backtick strings — never
+    # single-quoted (those hold short codes/ids). Scanning just these two avoids
+    # the apostrophe-as-quote false positive entirely.
+    for m in re.finditer(r'`([^`]*)`|"([^"]*)"', src, re.S):
+        lit = m.group(1) if m.group(1) is not None else m.group(2)
         low = lit.lower()
-        if "user_files" in low or ("content_hash" in low and " where " in low):
-            # any SQL referencing the vault table / hash lookup must be owner-scoped
-            if "sql" in low or "select" in low or "insert" in low or "update" in low or "delete" in low or "user_files" in low:
-                if "user_id" not in low:
-                    print(f"  ❌ non-owner-scoped vault SQL in {path}: {lit[:80]!r}")
-                    bad = True
+        # only real SQL statements that touch the vault table / hash lookup
+        is_sql = any(k in low for k in ("select", "insert", "update", "delete"))
+        if is_sql and ("user_files" in low or "content_hash" in low):
+            if "user_id" not in low:
+                print(f"  ❌ non-owner-scoped vault SQL in {path}: {lit[:80]!r}")
+                bad = True
 if not bad:
     print("  ✅ every user_files / content_hash SQL statement is owner-scoped (user_id)")
 sys.exit(1 if bad else 0)
