@@ -758,6 +758,47 @@ the other AOT-Java titles that reach this same gate) stay at **0 draw calls**.
 
 ---
 
+## 7b. AOT-Java title sweep (cp43)
+
+Headless `wie_validate` sweep of all 39 `broken/lgt` titles to map the LGT-Java (AOT) set
+beyond 배틀몬스터 and bucket each by its blocker. AOT-Java = the app registers native class
+descriptors (`registered N app classes` > 0); the rest are WIPI-C clets. **17 AOT-Java titles**
+found. **Result: 0 of them render; 배틀몬스터 is the only one that even *reaches* §7 — the other
+16 die earlier, at boot, on app-side walls.** (The 6 LGT titles that *do* render — 리듬페스티발,
+메이플스토리 도적편, 블레이드마스터3, 아니마, 창세기전3ep1, 판타지포에버3 — are **WIPI-C clets,
+not AOT-Java**, and were already passing.)
+
+| bucket | count | titles | blocker (raw validator/JVM error) |
+|---|---|---|---|
+| **[§7]** per-frame ABI wall | 1 | 배틀몬스터 | reaches the wall (cp37–42); `content:false`, 0 draw |
+| **[X-paint]** card bound to platform `Card` | 7 | 간호사타이쿤2, 당신은골프왕, 레전드오브마스터, 붕어빵타이쿤3, 서든어택포켓, 슈퍼액션히어로, 현영맞고2006 | `AbstractMethodError: Abstract paint(Lorg/kwis/msp/lcdui/Graphics;)V` via `CardCanvas.paint → card.paint` |
+| **[X-vtable]** misrouted hardcoded vtable slot | 8 | 놈3, 메이플스토리2007, 스파이더맨3, 월드장기체스, 체스마스터, 턴, 학교가는길, 훼밀리마트타이쿤 | `NoSuchMethodError` on nonsense pairings: `Thread.serviceRepaints`, `Vector.setVolume`, `Card.d:(II)V`, `String.getWidth`, `Card.A:()V`, `Card.startEngine`, `ShellComponent.getWidth`, `String.setString` |
+| **[X-class]** missing app class | 1 | 일지매영웅전기 | `NoClassDefFoundError: atdata.JimaeMD` |
+
+*Two boot walls, both app-side but not one-liners (and all §7-gated even once past boot):*
+
+- **[X-paint] (7) — card-instance binding.** The app card classes (e.g. `GameCanvas`/`Title`/`Logo`)
+  *do* declare a concrete `paint` (verified: `paint` method records present in the binary), but the
+  instance pushed to `CardCanvas`'s card vector is bound to the **platform `Card`** (whose `paint` is
+  abstract), so dispatch hits the abstract method. Root cause: the most-derived `<init>` that wie sees
+  is the platform `Card.<init>` (the app subclass `<init>` runs as native ARM and chains to it), so
+  `bind_pending` binds to `Card`, losing the app-subclass identity. 배틀몬스터 avoids this because its
+  cards come via `getInstance` (handle→class), not `new`+`Card.<init>`. A fix means resolving the
+  app subclass at card-bind time — a core change to the bind/dispatch path (regression risk to the
+  working `getInstance` path and to clets), so **not attempted this turn**.
+- **[X-vtable] (8) — per-class vtable overrides.** Same family as cp4–6/cp29–30 (`known_java_lang_vtable`):
+  the AOT calls a class's method by a hardcoded *physical* vtable slot that collides with the global
+  identity table, and wie lacks the override for that `(class, slot)`. Each title needs its own slot
+  RE'd to the correct method (like cp30 did for `String[35]=toCharArray`). Per-title work.
+
+**Verdict (cp43).** The AOT-Java title set is fully mapped: **0 render**, 1 at §7, 16 boot-walled in
+three clusters. Crucially, every cluster is **upstream of §7** — fixing a boot wall only moves a title
+to the same §7 per-frame-ABI wall 배틀몬스터 sits at (cp42). So no AOT-Java title can reach `draw>0`
+without the §7 platform ABI, regardless of the boot fixes. The boot clusters are nonetheless real,
+pinned, app-side next-steps for *reaching* §7: **[X-paint]** = resolve app card subclass at bind time;
+**[X-vtable]** = RE each colliding `(class, slot)` and extend `known_java_lang_vtable`. No fix shipped
+this turn (both are risky/RE-heavy and §7-gated downstream); buckets recorded for future work.
+
 ## 8. Current reach
 
 | stage | state |
