@@ -73,11 +73,26 @@ jobs:
           name: wie-web-dist
           path: web/dist
 
-      # NOTE: D1 migrations are intentionally NOT applied here. The deploy token
-      # carries Pages permission only (least privilege); applying migrations
-      # needs a D1-Edit-scoped token. Run migrations deliberately instead:
-      #   npx wrangler d1 migrations apply wie-db --remote
-      # (with a D1-scoped token), not on every Pages deploy.
+      # Apply D1 migrations to the REMOTE prod DB BEFORE deploying, so the live
+      # schema always matches the new code (no schema-mismatch window). Requires
+      # CLOUDFLARE_API_TOKEN to carry D1 Edit (in addition to Pages Edit). The
+      # token is referenced from secrets, never echoed/embedded (S3). Idempotent:
+      # wrangler skips already-applied migrations, so this is a no-op when nothing
+      # is new. Gated to `main` only — migrations touch the single shared prod DB
+      # and must be deliberate (preview branches rely on graceful fallbacks).
+      #
+      # ★DESTRUCTIVE-AUTO-APPLY POLICY: migrations are applied automatically even
+      # when they contain destructive statements (DROP TABLE / DELETE FROM /
+      # TRUNCATE) — the service is pre-launch and migrations are authored
+      # deliberately. Documented in docs/CLOUDFLARE_SETUP.md.
+      - name: Apply D1 migrations (remote, main only)
+        if: ${{ github.event_name == 'push' && github.ref_name == 'main' && env.HAS_CF_TOKEN == 'true' }}
+        uses: cloudflare/wrangler-action@v3
+        with:
+          wranglerVersion: "4.104.0"
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 migrations apply wie-db --remote
 
       # Direct-Upload deploy on push only (not PRs). Gated on the token being
       # present (S3/S8 — secrets are referenced, never embedded). functions/ at

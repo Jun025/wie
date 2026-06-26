@@ -192,13 +192,16 @@ node scripts/verify-browser.mjs /path/to/your/game.jar
   Production/Preview 양쪽에 자동 적용(단일 D1 바인딩과 동일). 로컬 개발은
   `npx wrangler pages dev web/dist` 가 이 바인딩을 그대로 사용(로컬 R2). 이 선언이 곧 활성화 스위치.
 
-### 8-3. 마이그레이션 0003 원격 적용
-```bash
-npx wrangler d1 migrations apply wie-db --remote
-```
-- `migrations/0003_user_files_and_reports.sql` — `user_files`(소유자별, content_hash는
-  **회원 단위 UNIQUE** = 회원 단위 dedup), `file_reports`(신고 접수), `users.strikes`(반복침해).
-- 적용 전이면 `/api/reports`는 503(graceful)로 응답하고 보관함 기능은 비활성입니다.
+### 8-3. 마이그레이션 — ★이제 CI 자동 적용 (main push 시)
+- `CLOUDFLARE_API_TOKEN`에 **D1 Edit + Pages Edit** 권한이 있으면, `main` push마다 `.github/
+  workflows/web.yml`가 **배포 직전** `wrangler d1 migrations apply wie-db --remote`를 자동 실행합니다
+  (idempotent — 새 마이그레이션 없으면 no-op). 마이그레이션→배포 순서라 스키마 불일치가 없습니다.
+- 수동 적용도 가능: `npx wrangler d1 migrations apply wie-db --remote`.
+- ★**파괴적 자동 적용 정책**: 서비스가 미운영(pre-launch)이므로, 마이그레이션에 **파괴적 구문
+  (DROP TABLE / DELETE FROM / TRUNCATE)**이 있어도 CI가 **자동 적용**합니다. 마이그레이션은
+  신중히 작성되며, 데이터 정리/스키마 재정의(예: 0004 users 재정의, 0005 saves rom_hash 키잉)를
+  포함할 수 있습니다. 운영 전환 시 이 자동 적용 정책을 비파괴-only로 강화하는 것을 고려하세요.
+- 토큰에 D1 Edit가 없으면 이 단계는 실패하므로, 토큰 권한을 먼저 확인하세요(값은 GitHub Secret에만).
 
 ### 8-4. 활성화 후 확인
 - `/api/auth/me` 의 `filesConfigured`가 `true`인지.

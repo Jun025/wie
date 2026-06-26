@@ -43,13 +43,18 @@ export interface DeviceHeartbeat {
 
 export interface CloudSave {
   id: string;
+  rom_hash: string; // the ROM content hash this save belongs to (per-owner)
   slot_label: string;
   device_label: string;
-  payload?: string; // base64, only when ?include=payload
+  payload?: string; // base64, present on getByRom
   payload_bytes: number;
   checksum: string;
   updated_at: number;
   created_at: number;
+}
+export interface SavesUsage {
+  used: number;
+  quota: number;
 }
 
 export interface DeviceSlot {
@@ -116,16 +121,29 @@ export const auth = {
 };
 
 export const saves = {
-  list: (withPayload = false) => call<{ ok: boolean; saves: CloudSave[] }>(`/saves${withPayload ? "?include=payload" : ""}`),
-  get: (id: string) => call<{ ok: boolean; save: CloudSave }>(`/saves/${encodeURIComponent(id)}`),
-  // payload is an opaque base64 save snapshot; slot/device are USER aliases.
-  upsert: (slot_label: string, device_label: string, payload: string) =>
-    call<{ ok: boolean; save: CloudSave }>("/saves", { method: "POST", body: { slot_label, device_label, payload } }),
+  // list metadata + total usage (no payloads).
+  list: () => call<{ ok: boolean; saves: CloudSave[]; usage: SavesUsage }>("/saves"),
+  // fetch the single save (with payload) for a ROM, or null if none.
+  getByRom: async (romHash: string): Promise<CloudSave | null> => {
+    try {
+      const r = await call<{ ok: boolean; save: CloudSave }>(`/saves?rom=${encodeURIComponent(romHash)}`);
+      return r.save;
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) return null;
+      throw e;
+    }
+  },
+  // upsert the save for a ROM (opaque base64 payload, keyed by rom_hash).
+  upsert: (rom_hash: string, payload: string, slot_label: string, device_label: string) =>
+    call<{ ok: boolean; save: CloudSave; usage: SavesUsage }>("/saves", { method: "POST", body: { rom_hash, payload, slot_label, device_label } }),
   remove: (id: string) => call(`/saves/${encodeURIComponent(id)}`, { method: "DELETE" }),
 };
 
 export const devices = {
   list: () => call<{ ok: boolean; devices: Device[] }>("/devices"),
+  // Rename ONLY the alias of one of the user's devices (any device, owner-scoped);
+  // counts/timestamps are untouched.
+  rename: (device_id: string, label: string) => call<{ ok: boolean; renamed?: string }>("/devices", { method: "POST", body: { device_id, label, rename: true } }),
   // Heartbeat carries ONLY counts/sizes + timestamps — never a game identity.
   heartbeat: (hb: DeviceHeartbeat) => call<{ ok: boolean }>("/devices", { method: "POST", body: hb }),
 };

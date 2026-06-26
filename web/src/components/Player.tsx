@@ -4,7 +4,7 @@ import { type EmuKey, loadKeymap } from "../lib/keymap";
 import { GameButton } from "./GameButton";
 import { KeyRemap } from "./KeyRemap";
 import { Overlay } from "./Overlay";
-import { autosaveLocal, deviceName, pushToCloud } from "../lib/saveSync";
+import { deviceName } from "../lib/saveSync";
 import { useTheme } from "../hooks/useTheme";
 import { audioState, getAudioContext, unlockAudio } from "../lib/audio";
 import type { User } from "../lib/api";
@@ -81,7 +81,7 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
       const canvas = canvasRef.current;
       if (!canvas || cancelled) return;
       try {
-        await session.start(game, canvas, audioCtx);
+        await session.start(game, canvas, audioCtx, { syncToServer: !!user, deviceLabel: deviceName() });
         if (!cancelled) {
           setStatus("running");
           // Diagnostic for headless/console verification of the unlock path.
@@ -144,19 +144,17 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
     });
   }, []);
 
+  // Saves already auto-sync (write-through, keyed by ROM hash). This button forces
+  // an immediate persist + server push for reassurance.
   const syncCloud = useCallback(async () => {
-    if (!user) return toast("로그인 후 업로드할 수 있습니다", "err");
-    const blob = sessionRef.current?.exportBlob();
-    if (blob) await autosaveLocal(game.hash, blob);
-    const label = prompt("클라우드 슬롯 별칭 (게임 이름이 아닌 사용자 별칭):", "내 세이브 1");
-    if (!label) return;
+    if (!user) return toast("로그인하면 세이브가 서버에 자동 저장됩니다", "err");
     try {
-      await pushToCloud(game.hash, label, deviceName());
-      toast("클라우드에 업로드됨 (세이브만)", "ok");
+      const r = await sessionRef.current?.syncNow();
+      toast(r && !r.ok ? r.reason || "동기화 실패" : "세이브를 서버에 동기화했습니다", r && !r.ok ? "err" : "ok");
     } catch (e) {
-      toast(`업로드 실패: ${(e as Error).message}`, "err");
+      toast(`동기화 실패: ${(e as Error).message}`, "err");
     }
-  }, [game.hash, user, toast]);
+  }, [user, toast]);
 
   // onRepeat sends the core's Keyrepeat (feature-phone long-press), so a held key
   // is one Keydown + Keyrepeats + one Keyup — never a burst of fake re-presses.
