@@ -132,7 +132,7 @@ pub async fn alloc(context: &mut dyn WIPICContext, size: WIPICWord) -> Result<WI
         return Ok(WIPICIndirectPtr(0));
     }
 
-    context.alloc(size)
+    alloc_or_null(context, size)
 }
 
 pub async fn calloc(context: &mut dyn WIPICContext, size: WIPICWord) -> Result<WIPICIndirectPtr> {
@@ -142,12 +142,38 @@ pub async fn calloc(context: &mut dyn WIPICContext, size: WIPICWord) -> Result<W
         return Ok(WIPICIndirectPtr(0));
     }
 
-    let memory = context.alloc(size)?;
+    let memory = alloc_or_null(context, size)?;
+    if memory.0 == 0 {
+        return Ok(memory);
+    }
 
     let zero = iter::repeat_n(0, size as _).collect::<Vec<_>>();
     context.write_bytes(context.data_ptr(memory)?, &zero)?;
 
     Ok(memory)
+}
+
+/// Allocate `size` bytes, returning a NULL handle (0) when the heap can't satisfy
+/// the request — the C/WIPI-C `malloc`/`calloc` contract — instead of propagating
+/// `AllocationFailure` as a fatal VM error.
+///
+/// LGT clets have been seen requesting wildly oversized buffers from a corrupted
+/// size argument (놈ZERO's "처음부터 시작" asks for `calloc(0x72657473)` ≈ 1.9 GB —
+/// the size is ASCII "ster"/resource garbage, not a real length). That exceeds the
+/// 256 MB heap, so the allocator correctly fails; turning that into a fatal abort
+/// killed the whole VM. A real device's `malloc` returns NULL here, letting the app
+/// notice the failed allocation and continue. Successful allocations are unchanged,
+/// and any non-OOM allocator error still propagates — so no normal game's behaviour
+/// changes.
+fn alloc_or_null(context: &mut dyn WIPICContext, size: WIPICWord) -> Result<WIPICIndirectPtr> {
+    match context.alloc(size) {
+        Ok(memory) => Ok(memory),
+        Err(WieError::AllocationFailure) => {
+            tracing::warn!("allocation of {size:#x} bytes failed (out of memory); returning NULL");
+            Ok(WIPICIndirectPtr(0))
+        }
+        Err(e) => Err(e),
+    }
 }
 
 pub async fn free(context: &mut dyn WIPICContext, memory: WIPICIndirectPtr) -> Result<WIPICIndirectPtr> {
