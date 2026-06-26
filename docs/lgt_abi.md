@@ -869,6 +869,38 @@ for WIPI-C clets and the redirect is inert on the clet path.
   resolution for multi-`Card`-subclass titles (당신은골프왕). The §7 titles (battle + the 4 newly
   measured) remain blocked on the external platform ABI (cp42).
 
+**cp46 — the 체스마스터 alloc-loop diagnosed + a runaway guard added; binding fix + guard pushed
+(every title now strictly better-or-equal).** Diagnosed the ~461 s hang the cp45 binding fix
+exposed in 체스마스터, then bounded it so it fast-fails.
+
+- *Diagnosis (measured).* Past the card-binding wall, 체스마스터's `startApp` enters a loop whose body
+  is `obj = new(); import 0x1f(0, code=0x1b252, obj, slot)` — the ez-i object/carried-code
+  registration — and it **never terminates**: in 5 s of debug trace it ran **29 238×** (`import 0x1f`
+  + `stdlib new`, 1:1). wie no-ops `import 0x1f` (registration), and the loop's termination depends on
+  the runtime side wie doesn't emulate, so it `new`s ~2.6M objects over ~461 s until the allocator
+  (which slows as the heap fills, ~5800→~1100 obj/s) finally OOMs. Type (ii)/(iii): a non-terminating
+  loop wie can't close (same §7-family gap — the registration semantics live platform-side), **not**
+  the binding fix being wrong.
+- *Guard (cp46).* `alloc_native_object` (the AOT `new` primitive, stdlib `0x32` / java `0xf`) now caps
+  native-object count at `NATIVE_OBJECT_LIMIT = 16384` and returns a fatal error past it (returning
+  NULL doesn't help — the loop ignores `new`'s result and just spins faster). So a runaway loop
+  **fast-fails (~4 s, surfaced "tick error")** instead of hanging ~461 s. The cap is far above any
+  real boot: every AOT title measured creates **< 1000** native objects at boot (battle ≈ 12; the §7
+  titles 턴/레전드오브마스터/서든어택포켓/현영맞고2006 all < 1000), so it never trips a legitimate game.
+  Clets don't use `alloc_native_object` (WIPI-C alloc path), so it is inert for them.
+- *Verification (run alone, no host-load contamination).* 체스마스터: **4 s fast-fail** (`runaway
+  guard`) vs the old 461 s hang. §7 titles still reach the blank screen (`content:false`, unaffected
+  by the cap). Regression 0: clets 제노니아1 (d=9) / 그랜드체이스 (2) / 하이브리드 PASS-as-baseline;
+  battle unchanged; baseline 막시민편 (3); renderers 아니마 (36) / 창세기전3ep1 (257) / 판타지포에버3
+  (4) / 메이플스토리 도적편 (34) all identical. `fmt`/`clippy --workspace`/`test --workspace` (33
+  suites) green.
+- *Shipped.* With the alloc-hang bounded, the cp45 card-binding fix + this guard are **pushed
+  together**: every title is now strictly better-or-equal (체스마스터 461 s hang → 4 s fail; 9/10
+  binding titles advanced; 0 regressions). Still **0 new on-screen render** — the advanced titles sit
+  at §7 (4, platform-ABI) or deeper per-method walls. Remaining app-side follow-ups unchanged:
+  multi-`Card`-subclass per-instance resolution (당신은골프왕), and the per-method `NoSuchMethod`
+  cascade (스파이더맨3 `c.show`, 슈퍼액션히어로 `h.getNumberOfRecords`, etc.).
+
 ## 8. Current reach
 
 | stage | state |
@@ -895,6 +927,6 @@ for WIPI-C clets and the redirect is inert on the clet path.
 | `0x21` objects are BARE handles → §7 wall confirmed empirically (cp42) | ⛔ all 10 `0x21`-registered objects = GLOBAL vtable, no JVM class, `pending_new` (live classifier). No `invoke_virtual` possible; global-vtable slots no-op on a classless `this` (cp14). The per-frame entry is platform-runtime ABI not in `binary.mod`. **App-side exhausted (cp37→42); external escalation: obtain LGT/ez-i platform ABI** |
 | AOT-Java title sweep: 17 titles, 0 render (cp43) | ⛔ 1 at §7 (battle), 7 [X-paint] `AbstractMethodError paint`, 8 [X-vtable] misrouted `NoSuchMethod`, 1 [X-class] `NoClassDef`. All boot walls upstream of §7 |
 | [X-paint]+[X-vtable-`Card`] = card-binding; cascade not §7 (cp44) | ◑ measured: app card `new`+platform `Card.<init>` binds to `Card`, losing app subclass (paint/A/d fail). Unique-subclass bind-redirect **advances** titles but hits a **cascade** of further boot walls. (cp44's "clet regression" was host load, not the fix — see cp45) |
-| clet-safe card-binding fix (committed, push held); 9/10 advance, 4 reach §7 (cp45) | ✅ `bind_pending` redirects a `new`+platform-`Card.<init>` object to the unique app subclass; map empty for clets ⇒ inert on clet path. Regression 0 (제노니아1 d=9 no hang, all renderers identical, `test --workspace` green). Measures 턴/레전드오브마스터/서든어택포켓/현영맞고2006 to §7; 5 others to deeper walls. **0 new render** (still §7/next-wall) |
+| clet-safe card-binding fix + runaway alloc guard, **pushed** (cp45/cp46) | ✅ `bind_pending` redirects a `new`+platform-`Card.<init>` object to the unique app subclass; map empty for clets ⇒ inert on clet path. Regression 0 (제노니아1 d=9 no hang, all renderers identical, `test --workspace` green). Measures 턴/레전드오브마스터/서든어택포켓/현영맞고2006 to §7; 5 others to deeper walls. **0 new render** (still §7/next-wall) |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |

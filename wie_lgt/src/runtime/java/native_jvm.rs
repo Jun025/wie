@@ -51,6 +51,11 @@ const OBJ_HEADER_SIZE: u32 = 0x0c;
 const OBJ_PTR_FIELDS_OFFSET: u32 = 0x08;
 const FIELD_ARRAY_WORDS: u32 = 256;
 
+/// Ceiling on native `new` objects per emulator instance (cp46 runaway guard). Far above
+/// any legitimate boot (battle ≈ 12; every AOT title measured at boot creates < 1000),
+/// so only a non-terminating alloc loop reaches it.
+const NATIVE_OBJECT_LIMIT: u32 = 16384;
+
 /// Per app-class instance-field layout: `(class_name, [(field_name, field_type,
 /// object_slot)])`. See `LgtJvmShared::app_field_layouts`.
 type AppFieldLayouts = Vec<(String, Vec<(String, String, u32)>)>;
@@ -105,6 +110,15 @@ pub struct LgtJvmShared {
     /// is therefore inert on the clet path (cp45). Only covers single-subclass platform
     /// classes; multi-subclass cases (e.g. 당신은골프왕) need per-instance class resolution.
     platform_to_app_subclass: Arc<Mutex<BTreeMap<String, String>>>,
+    /// Count of native `new` objects allocated (the AOT `new` primitive). A runaway
+    /// guard: some AOT titles, once past the card-binding wall (cp45), enter a loop that
+    /// `new`s + registers objects without terminating (체스마스터: ~2.6M objects over
+    /// ~461 s to OOM — wie no-ops the ez-i registration import `0x1f` the loop's
+    /// termination depends on). Past `NATIVE_OBJECT_LIMIT`, `alloc_native_object` returns
+    /// a NULL pointer (the OOM signal the native code already checks, `cmp r0,#0`), so the
+    /// loop breaks and the title **fast-fails** instead of hanging. The limit is far above
+    /// any legitimate boot (battle ≈ 12 objects), so it never trips a real game (cp46).
+    native_object_count: Arc<Mutex<u32>>,
 }
 
 impl LgtJvmShared {
@@ -120,6 +134,7 @@ impl LgtJvmShared {
             app_field_layouts: Arc::new(Mutex::new(Vec::new())),
             singletons: Arc::new(Mutex::new(BTreeMap::new())),
             platform_to_app_subclass: Arc::new(Mutex::new(BTreeMap::new())),
+            native_object_count: Arc::new(Mutex::new(0)),
         }
     }
 
@@ -164,6 +179,21 @@ impl LgtJvmShared {
     /// a JVM instance. This is the first half of the `new` → `<init>` bind lifecycle
     /// (see `docs/lgt_abi.md` §5).
     pub fn alloc_native_object(&self, core: &mut ArmCore) -> Result<u32> {
+        // Runaway guard (cp46): past a generous ceiling, fail the allocation so a
+        // non-terminating `new`-loop stops and the title **fast-fails** (a surfaced
+        // "tick error") instead of hanging ~461 s to true OOM. The loop's termination
+        // does not depend on `new`'s return (returning NULL just spins faster), so this
+        // raises an error to unwind the boot. Far above any real boot (battle ≈ 12).
+        {
+            let mut count = self.native_object_count.lock();
+            *count += 1;
+            if *count >= NATIVE_OBJECT_LIMIT {
+                tracing::warn!("LGT native `new` runaway guard tripped at {NATIVE_OBJECT_LIMIT} objects (non-terminating alloc loop)");
+                return Err(WieError::FatalError(format!(
+                    "LGT native `new` runaway guard: exceeded {NATIVE_OBJECT_LIMIT} objects (non-terminating alloc loop)"
+                )));
+            }
+        }
         let ptr_fields = Allocator::alloc(core, FIELD_ARRAY_WORDS * 4)?;
         wie_util::ByteWrite::write_bytes(core, ptr_fields, &[0u8; (FIELD_ARRAY_WORDS * 4) as usize])?;
         let ptr_raw = Allocator::alloc(core, OBJ_HEADER_SIZE)?;
