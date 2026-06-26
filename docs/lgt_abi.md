@@ -833,6 +833,42 @@ advances games past it but reveals a *cascade* of further boot walls (not §7) a
   exclude the descriptor-scan false positives clets trip), then re-measure the cascade depth. Until
   then these titles stay boot-walled; battle's §7 remains the only *confirmed* §7 case.
 
+**cp45 — the card-binding fix IS clet-safe (cp44's "regression" was load, not the fix); kept in
+tree, push held. It advances 9/10 binding titles and MEASURES 4 more to reach §7 (still 0 render).**
+The cp44 fix is made permanent in the tree (push held — 0 new render, and a 체스마스터 alloc-hang to
+weigh first): in `bind_pending`, when exactly one app class directly extends the platform class
+being constructed, bind the guest object to that app subclass instead of the platform class. The
+map (`platform_to_app_subclass`) is populated only from registered **app** classes, so it is empty
+for WIPI-C clets and the redirect is inert on the clet path.
+
+- *cp44's clet "regression" was a false alarm.* 제노니아1 registers **0 app classes** ⇒ the redirect
+  map is empty ⇒ the fix is provably inert for it. Re-tested run **alone** (not contending with the
+  leftover 체스마스터 ~461 s alloc-loop processes that were starving the cp44 batch): 제노니아1 **PASS
+  `content=true` d=9, no hang**, identical to baseline. The cp44 hang was host load, not the fix.
+- *Regression gate — 0 (all run alone).* Clets 제노니아1 (d=9) / 그랜드체이스 (d=2) PASS; 하이브리드 /
+  배틀몬스터 unchanged (`content:false`, §7); baseline 막시민편 (d=3) and the rendering clets 아니마
+  (36) / 창세기전3ep1 (257) / 블레이드마스터3 (27) / 판타지포에버3 (4) / 메이플스토리 도적편 (34) /
+  리듬페스티발 (15) all PASS with identical `distinct_colors`. `getInstance` path (battle) untouched.
+  `cargo test --workspace` = 33 suites green; `clippy --workspace` clean.
+- *Cascade endpoints, measured with the fix (35 s watchdog):* the redirect advances **9 of 10**
+  binding titles past the card-binding wall:
+  - **(b) reach §7** (the battle-type blank screen, `content:false` d≈1): **턴, 레전드오브마스터,
+    서든어택포켓, 현영맞고2006** — so these 4 are now *measured* (not inferred) to be §7-gated, like
+    battle. cp43's "all §7" inference is **confirmed for these**.
+  - **(c) deeper app-side wall**: 체스마스터 → `Allocation failure` (~461 s alloc loop in `startApp`;
+    a separate wie/app alloc issue, not the binding); 스파이더맨3 → `NoSuchMethodError c.show()V`;
+    슈퍼액션히어로 → `h.getNumberOfRecords()I`; 붕어빵타이쿤3 → `d.show()V`; 간호사타이쿤2 →
+    `NetClient.getWidth()I`. A further per-method cascade, still pre-§7.
+  - **unchanged**: 당신은골프왕 (multiple app `Card` subclasses ⇒ no *unique* redirect; needs
+    per-instance class resolution, not covered).
+  - **(a) render: 0** — no title reaches `draw>0`; every advanced title hits either §7 or a deeper wall.
+- *Net.* The fix is a correct, clet-safe bug fix that turns 4 titles' §7-gating from inference into
+  measurement and pushes 5 others to deeper, named app-side walls — real forward progress, but **no
+  new on-screen render** (all still black: §7 or the next wall). Two open follow-ups, both app-side:
+  (1) the 체스마스터 `startApp` alloc loop (bound or fix the runaway allocation); (2) per-instance class
+  resolution for multi-`Card`-subclass titles (당신은골프왕). The §7 titles (battle + the 4 newly
+  measured) remain blocked on the external platform ABI (cp42).
+
 ## 8. Current reach
 
 | stage | state |
@@ -858,6 +894,7 @@ advances games past it but reveals a *cascade* of further boot walls (not §7) a
 | **CORRECTION: `a.run` is one-shot; `field[0x5c]` is dead code (cp41)** | ⛔ CFG + live: `a.run` body takes the `new`-succeeds path (`0x55/0x56/0x57/0x21`, one each) → returns at `0x2108`; the `field[0x5c]` check (`0x20e8`) is on the unreached `new`-failed branch. Reverts the wall to §7/cp37: per-frame driver = ez-i runtime invoking the `0x21`-registered object (`0x48840550`) — platform-ABI, absent from `binary.mod` |
 | `0x21` objects are BARE handles → §7 wall confirmed empirically (cp42) | ⛔ all 10 `0x21`-registered objects = GLOBAL vtable, no JVM class, `pending_new` (live classifier). No `invoke_virtual` possible; global-vtable slots no-op on a classless `this` (cp14). The per-frame entry is platform-runtime ABI not in `binary.mod`. **App-side exhausted (cp37→42); external escalation: obtain LGT/ez-i platform ABI** |
 | AOT-Java title sweep: 17 titles, 0 render (cp43) | ⛔ 1 at §7 (battle), 7 [X-paint] `AbstractMethodError paint`, 8 [X-vtable] misrouted `NoSuchMethod`, 1 [X-class] `NoClassDef`. All boot walls upstream of §7 |
-| [X-paint]+[X-vtable-`Card`] = card-binding; cascade not §7 (cp44) | ◑ measured: app card `new`+platform `Card.<init>` binds to `Card`, losing app subclass (paint/A/d fail). Unique-subclass bind-redirect **advances** titles (체스마스터 past `Card.A`→Allocation failure; 스파이더맨3→`c.show`) but hits a **cascade** of further boot walls (not §7) and **regresses clets** (제노니아1 hangs). Reverted; needs a clet-safe binding fix |
+| [X-paint]+[X-vtable-`Card`] = card-binding; cascade not §7 (cp44) | ◑ measured: app card `new`+platform `Card.<init>` binds to `Card`, losing app subclass (paint/A/d fail). Unique-subclass bind-redirect **advances** titles but hits a **cascade** of further boot walls. (cp44's "clet regression" was host load, not the fix — see cp45) |
+| clet-safe card-binding fix (committed, push held); 9/10 advance, 4 reach §7 (cp45) | ✅ `bind_pending` redirects a `new`+platform-`Card.<init>` object to the unique app subclass; map empty for clets ⇒ inert on clet path. Regression 0 (제노니아1 d=9 no hang, all renderers identical, `test --workspace` green). Measures 턴/레전드오브마스터/서든어택포켓/현영맞고2006 to §7; 5 others to deeper walls. **0 new render** (still §7/next-wall) |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |

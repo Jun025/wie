@@ -94,6 +94,17 @@ pub struct LgtJvmShared {
     /// of a class; it must be stable across calls (and threads) so per-class state
     /// (e.g. the `a.run` run-flag) is shared. Lazily created + cached here.
     singletons: Arc<Mutex<BTreeMap<u32, u32>>>,
+    /// Platform class name -> the unique app class that directly extends it (recorded
+    /// only when exactly one app subclass exists). When the AOT `new`s a card and calls
+    /// the platform super-constructor directly (e.g. `Card.<init>`, because the app
+    /// subclass has no own `<init>`), `bind_pending` would bind the object to the
+    /// platform class and lose the app-subclass identity, so later app-method dispatch
+    /// (`paint`/`A`/`d`) fails (cp43/cp44 [X-paint]+[X-vtable-Card] cluster). When the
+    /// subclass is unique, redirect the bind to it. Populated in `register_app_classes`,
+    /// so it is **empty for WIPI-C clets** (which register no app classes) — the redirect
+    /// is therefore inert on the clet path (cp45). Only covers single-subclass platform
+    /// classes; multi-subclass cases (e.g. 당신은골프왕) need per-instance class resolution.
+    platform_to_app_subclass: Arc<Mutex<BTreeMap<String, String>>>,
 }
 
 impl LgtJvmShared {
@@ -108,6 +119,7 @@ impl LgtJvmShared {
             pending_new: Arc::new(Mutex::new(BTreeSet::new())),
             app_field_layouts: Arc::new(Mutex::new(Vec::new())),
             singletons: Arc::new(Mutex::new(BTreeMap::new())),
+            platform_to_app_subclass: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
 
@@ -173,6 +185,21 @@ impl LgtJvmShared {
         if !self.pending_new.lock().remove(&guest_ptr) {
             return None;
         }
+        // The AOT `new`s a card and calls the platform super-constructor directly (e.g.
+        // `Card.<init>`) because the app subclass has no own `<init>`. Binding to the
+        // platform class loses the app-subclass identity (later `paint`/`A`/`d` dispatch
+        // fails — cp44). When exactly one app class extends this platform class, the
+        // object is unambiguously that subclass — bind to it instead. The map is empty
+        // for clets (no app classes), so this is inert on the clet path. The caller's
+        // next `invoke_special(this, <platform-class>, "<init>")` still runs the platform
+        // constructor on the app instance (it walks up the hierarchy).
+        let class_name = self
+            .platform_to_app_subclass
+            .lock()
+            .get(class_name)
+            .cloned()
+            .unwrap_or_else(|| class_name.to_string());
+        let class_name = class_name.as_str();
         // If the constructed platform class has a per-class vtable (hardcoded indices
         // that collide with the global table — e.g. StringBuffer's append@19), point
         // the guest object's `+0x00` at it now that the class is known. The object was
@@ -1134,6 +1161,35 @@ pub async fn register_app_classes(jvm: &Jvm, core: &mut ArmCore, shared: &LgtJvm
         }
     }
     let app_names: BTreeSet<String> = pending.iter().map(|c| c.name.clone()).collect();
+
+    // Map each PLATFORM parent class to its unique app subclass (cp44/cp45). The AOT may
+    // `new` an app card and call the platform super-constructor directly; binding to the
+    // platform class then loses the app-subclass identity. When exactly one app class
+    // directly extends a given platform class, a `new`'d object constructed via that
+    // platform `<init>` is unambiguously the subclass, so `bind_pending` redirects to it.
+    // Empty for clets (no app classes) => inert on the clet path.
+    {
+        let mut by_platform_parent: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for c in &pending {
+            if let Some(parent) = &c.parent_name
+                && !app_names.contains(parent)
+            {
+                by_platform_parent.entry(parent.clone()).or_default().push(c.name.clone());
+            }
+        }
+        let unique: BTreeMap<String, String> = by_platform_parent
+            .into_iter()
+            .filter_map(|(p, subs)| {
+                if subs.len() == 1 {
+                    Some((p, subs.into_iter().next().unwrap()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        tracing::debug!("LGT cp45 platform->unique app subclass: {unique:?}");
+        *shared.platform_to_app_subclass.lock() = unique;
+    }
 
     // Compute each app class's instance-field object slots (inherited-first flat
     // layout). Stored for `java_load_classes` to fill `field_offsets`. See cp17.
