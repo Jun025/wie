@@ -616,6 +616,48 @@ ez-i protocol for choosing the current displayable and dispatching its per-frame
 (the analog of `i.a`/`i.b`) — which method/slot, what args (e.g. `i.b`'s `p3`), what cadence
 (frame vs key/timer event)?"** That protocol is platform-side; the app side is exhausted.
 
+**cp39 — `a.run` IS the game loop; it exits because the current displayable (`a.field[0x5c]`)
+is 0, not because of the run-flag. Premise correction + concrete next gate (decode + live,
+reverted).** A follow-up hypothesised the per-frame driver was a `notifyEvent` override fed by
+wie's existing `Event::Notify → CardCanvas.handleNotifyEvent → card.notifyEvent` path. **That
+premise is false** and a sharper, more concrete blocker was found:
+
+- *No `notifyEvent` override exists.* The string `notifyEvent` is **absent** from `binary.mod`.
+  The app keeps the platform-override names it *does* implement — `o.paint`,
+  `o.keyNotify(II)Z`, `a.run()V`, `a.startApp([Ljava/lang/String;)V` (method-record scan) — so
+  cp38's `i.b` (name literally `b`) is **not** a `notifyEvent` override; pushing `Event::Notify`
+  would hit wie's default `Card.notifyEvent` and never reach it. The `i.a`/`i.b` o.g-setters are
+  app-internal methods the **game's own loop** dispatches, not platform event callbacks.
+- *`a.run` (`@0x1f10`) is the real per-frame loop (full disasm).* Shape:
+  `r5 = getInstance(a)` (helper `0x1908→0x18ac`, class handle `0x1400df4` = `a`);
+  `while (a.field[0x20] != 0) { …body…; cur = a.field[0x5c]; if (cur == 0) { call [0x14045fc];
+  return; } else { cur.vtable[off]()  // 0x2128: per-frame update dispatch } }`. So each
+  iteration dispatches the **current displayable's** update method — exactly the
+  `i.a`/`i.b`-shaped call cp38 wanted — **iff a current displayable exists**.
+- *Live values at boot stop (temp diag, reverted).* `a` singleton `@0x48840020`:
+  **`field[0x20]` (run-flag) = `0x48840010` (SET, non-zero)**, but **`field[0x5c]` (current
+  displayable) = `0`**. So `a.run` does **not** stall on the run-flag — it bails every iteration
+  at `cur == 0` (via `[0x14045fc]`) **before** the per-frame dispatch. (`o` singleton:
+  `o.g(field[0x18]) = 0` as expected.)
+- *Where `a.field[0x5c]` should come from.* It is the "current displayable" the game establishes
+  at startup (a.startApp invokes static `Display.getDefaultDisplay()` and constructs Cards —
+  `Card.<init>` ×5, `getDefaultDisplay` ×2 in the boot trampoline trace). In wie it ends up `0`
+  on the `a` singleton. The single `str […,#0x5c]` inside the `a`-class code is `0x1c3c` in
+  a.startApp, but it targets a *different* object's field array (not the `a` singleton), so the
+  writer of **`a_singleton.field[0x5c]`** is **not yet pinned** — that is the next concrete step.
+
+*Verdict.* The wall narrows again and for the first time points at a **wie-side startup wiring
+gap rather than an absent per-frame ABI**: `a.run` is present, is the loop, and *would* dispatch
+the current card's update each iteration — but `a.field[0x5c]` (current displayable) is never set
+on the `a` singleton, so the loop self-exits before the first update. This is a **potential (b)
+APP-drivable/wie-fixable candidate** (set/propagate the current displayable into the `a`
+singleton's `field[0x5c]` through the legitimate startup path), **not yet confirmed**: it hinges
+on pinning the `a_singleton.field[0x5c]` writer and whether wie's `Display.setCurrent`/`pushCard`
+path is supposed to feed it. Not implemented this turn (would need that pin; guessing forbidden).
+No forcing, no shipped code. *cp40 start:* find the writer of `a_singleton.field[0x5c]` (scan the
+"set current displayable" path — likely a `Display`/`Jlet` static the AOT calls whose result the
+game stores; check whether wie returns a usable object there) → decide (b) wiring vs (a) wall.
+
 ---
 
 ## 8. Current reach
@@ -638,5 +680,6 @@ ez-i protocol for choosing the current displayable and dispatching its per-frame
 | wie can't substitute the ez-i tick (cp36) | ⛔ ~~`fn@0xda870` driven → `o.g` stays 0~~ — **corrected by cp38**: `fn@0xda870` is the `o.g=0` *resetter*, not the setter; the "accumulated state" conclusion is withdrawn |
 | registered carried code is INIT, not the frame step (cp37) | ⛔ `0x55/0x56/0x57/0x21` all register one entry `0x1ad4→0x1a24` = straight-line idempotent init (full disasm; arg-ignoring). Synthesized per-frame drive of it ran clean but **stayed black** (inert, extends cp23). Per-frame entry is a method on the `0x21` object via the platform's native-displayable ABI (absent from `binary.mod`). Reverted |
 | `o.g=1` store decoded; gate = un-dispatched card method (cp38) | ⛔ store `0xdb240` is **unconditional** within `fn@0xdb200` ("show card"); reached only from card `i.b(_,_,0)` / `i.a()`, which are **vtable-dispatch-only**. Boot dispatches **5 methods, zero card methods**; `o.g=0` at stop; driving `i.b(0,0,0)` flips `o.g=1` in one call (forcing, reverted). Gap = absent ez-i dispatch of the current card's update method (§7), not an unsatisfiable predicate |
+| `a.run` is the loop; exits on null current displayable (cp39) | ◑ **no `notifyEvent` override exists** (premise corrected). `a.run@0x1f10` = `while(a.field[0x20]){…; cur=a.field[0x5c]; if cur==0 exit; else cur.vtable[upd]()}`. Live: run-flag **set** (`0x48840010`) but **`a.field[0x5c]`=0** → exits before the per-frame dispatch. **Potential (b) wie-fix**: wire the current displayable into `a_singleton.field[0x5c]`. Next: pin its writer (cp40) |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
