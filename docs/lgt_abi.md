@@ -658,6 +658,38 @@ No forcing, no shipped code. *cp40 start:* find the writer of `a_singleton.field
 "set current displayable" path — likely a `Display`/`Jlet` static the AOT calls whose result the
 game stores; check whether wie returns a usable object there) → decide (b) wiring vs (a) wall.
 
+**cp40 — the `getInstance(a)` ↔ `currentJlet` identity split is real but is NOT the cause;
+`field[0x5c]` is 0 on BOTH Jlet objects (hypothesis refuted, reverted).** Tested the hypothesis
+that `a.run` reads `field[0x5c]` from a *different* `a` instance than the one a.startApp wrote it
+on (a `getInstance` returns-fresh-instance bug). Live dump at boot stop:
+
+| object | guest_ptr | `field[0x20]` (run-flag) | `field[0x5c]` (current displayable) |
+|---|---|---|---|
+| `getInstance(a)` (a.run reads this) | `0x48840020` | `0x48840010` (set) | **`0`** |
+| `Jlet.currentJlet` (boot Jlet `this`) | `0x48840010` | `0x48840120` (set) | **`0`** |
+
+- *Identity split confirmed:* `getInstance(a)` (`0x48840020`) **is** a distinct fresh instance
+  from the running `currentJlet` (`0x48840010`) — `singleton_instance` instantiates a new object
+  rather than returning the live Jlet. (A real latent issue, but see below.)
+- *…but it is not the cause:* **`field[0x5c]` = 0 on *both*** objects. Unifying
+  `getInstance(a) → currentJlet` would make `a.run` read `currentJlet`, whose `field[0x5c]` is
+  **also 0** — the loop would still bail. The current displayable is **never set on either Jlet**.
+- *2.2(a) — the `0x1c3c` `str[…,#0x5c]` in a.startApp targets a THIRD object*, not `this`/the
+  Jlet: `r6 = fn@0xe3274(a.field[0x14]); r4 = [r6+8]; str r0,[r4+0x5c]`. So a.startApp does not
+  write the Jlet's `field[0x5c]` at all. Per the task's own stop rule (third-object ⇒ stop), the
+  identity-unification fix is **not implemented** (it cannot start the loop, and would change
+  `getInstance` semantics the cp20 run-flag sharing relies on — a regression risk for no gain).
+
+*Refined blocker (cp41 start).* `a.run`'s loop gate `a.field[0x5c]` (current displayable) is
+never written on the `a`/Jlet object during boot — not by a.startApp (writes a third object), not
+by anything reachable (live = 0). So the open question is **which method is supposed to store the
+initial displayable into the Jlet's `field[0x5c]`, and why it never runs / stores 0 in wie** —
+i.e. trace the app's "set current card/displayable" call (the AOT analog of
+`Display.setCurrent`/`pushCard`) and find the `str […,#0x5c]` whose base resolves (live) to
+`0x48840020` or `0x48840010`. That writer (or the platform call feeding its value) is the real
+gate; the `getInstance` identity split is a side issue to revisit only if it turns out the writer
+*does* target a third instance that `a.run` should but doesn't read.
+
 ---
 
 ## 8. Current reach
@@ -681,5 +713,6 @@ game stores; check whether wie returns a usable object there) → decide (b) wir
 | registered carried code is INIT, not the frame step (cp37) | ⛔ `0x55/0x56/0x57/0x21` all register one entry `0x1ad4→0x1a24` = straight-line idempotent init (full disasm; arg-ignoring). Synthesized per-frame drive of it ran clean but **stayed black** (inert, extends cp23). Per-frame entry is a method on the `0x21` object via the platform's native-displayable ABI (absent from `binary.mod`). Reverted |
 | `o.g=1` store decoded; gate = un-dispatched card method (cp38) | ⛔ store `0xdb240` is **unconditional** within `fn@0xdb200` ("show card"); reached only from card `i.b(_,_,0)` / `i.a()`, which are **vtable-dispatch-only**. Boot dispatches **5 methods, zero card methods**; `o.g=0` at stop; driving `i.b(0,0,0)` flips `o.g=1` in one call (forcing, reverted). Gap = absent ez-i dispatch of the current card's update method (§7), not an unsatisfiable predicate |
 | `a.run` is the loop; exits on null current displayable (cp39) | ◑ **no `notifyEvent` override exists** (premise corrected). `a.run@0x1f10` = `while(a.field[0x20]){…; cur=a.field[0x5c]; if cur==0 exit; else cur.vtable[upd]()}`. Live: run-flag **set** (`0x48840010`) but **`a.field[0x5c]`=0** → exits before the per-frame dispatch. **Potential (b) wie-fix**: wire the current displayable into `a_singleton.field[0x5c]`. Next: pin its writer (cp40) |
+| `getInstance(a)`≠`currentJlet` but both `field[0x5c]`=0 (cp40) | ◑ identity split **confirmed** (`getInstance(a)=0x48840020` ≠ `currentJlet=0x48840010`) but **not the cause**: `field[0x5c]=0` on **both**, so unifying them won't start `a.run`. a.startApp's `str[…,0x5c]`@0x1c3c targets a **third object**, not the Jlet. Hypothesis refuted, not implemented. Next: find the writer of the Jlet's `field[0x5c]` (cp41) |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
