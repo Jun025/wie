@@ -12,7 +12,7 @@ import { ok, err, handleError, str, HttpError } from "../../_lib/http.js";
 import { uuid, sha256Hex } from "../../_lib/crypto.js";
 import { requireUser } from "../../_lib/session.js";
 import { rateLimit } from "../../_lib/ratelimit.js";
-import { FILE_QUOTA_BYTES, PER_FILE_MAX_BYTES, ALLOWED_KINDS, filesEnabled, makeR2Key, usedBytes, looksDisallowed, isMissingTable } from "../../_lib/files.js";
+import { FILE_QUOTA_BYTES, PER_FILE_MAX_BYTES, filesEnabled, makeR2Key, usedBytes, looksDisallowed, isMissingTable } from "../../_lib/files.js";
 
 // GET — list the user's files (no bytes) + quota. When the R2 binding is not yet
 // provisioned (S8), report `enabled:false` so the UI can hide the feature without
@@ -77,8 +77,11 @@ export async function onRequestPost(context) {
     fileName = str(fileName, { name: "file_name", min: 1, max: 200 });
     const clientHash = str(request.headers.get("x-content-hash") || "", { name: "content_hash", min: 64, max: 64 });
     if (!/^[0-9a-f]{64}$/.test(clientHash)) throw new HttpError("content_hash must be sha-256 hex", 400);
-    const kind = str(request.headers.get("x-kind") || "", { name: "kind", min: 1, max: 8 }).toLowerCase();
-    if (!ALLOWED_KINDS.has(kind)) throw new HttpError("게임 파일만 업로드할 수 있습니다 (jar/jad/zip/kdf/skm)", 415, "bad_kind");
+    // 4번: any extension may be stored in the user's PRIVATE vault — it is a
+    // personal archive, not a public host. The content-level abuse guards stay:
+    // `looksDisallowed` (exe/script/web payload magic), the per-file size cap, and
+    // the 1 GiB quota below. `kind` is just the lowercased extension label (bounded).
+    const kind = str(request.headers.get("x-kind") || "file", { name: "kind", min: 1, max: 16 }).toLowerCase();
 
     // Reject oversized uploads early using the declared length, before buffering.
     const declaredLen = Number(request.headers.get("content-length") || "0");

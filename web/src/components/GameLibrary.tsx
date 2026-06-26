@@ -4,12 +4,15 @@ import { validateGame, type LoadableGame } from "../lib/emulator";
 import { files as filesApi, type ServerFile, type FilesUsage, type User } from "../lib/api";
 import { migrateLocalToServer, fmtBytes, type FileUploadEvent } from "../lib/serverLibrary";
 
-const KNOWN_EXTS = ["jar", "jad", "zip", "kdf", "skm"];
-
 function extOf(name: string): string {
   const i = name.lastIndexOf(".");
   return i >= 0 ? name.slice(i + 1).toLowerCase() : "";
 }
+
+// Game container formats — used to gate the server-vault "실행" button (the server
+// stores any file as a private archive, but only game-format kinds are loadable).
+// The device-local list uses the validated `runnable` flag instead.
+const GAME_KINDS = new Set(["jar", "jad", "zip", "kdf", "skm"]);
 
 interface Props {
   onRun: (game: LoadableGame) => void;
@@ -69,18 +72,22 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey }: Props) 
     void refreshServer();
   }, [refreshLocal, refreshServer, reloadKey]);
 
-  // Store a candidate game ONLY after it validates as a loadable format. Invalid
-  // files are never written to IndexedDB and are surfaced for reporting.
+  // Store a file in the private device vault. ANY extension is accepted (4번:
+  // 확장자 무관 저장) — it is a personal private vault. We still try to VALIDATE it
+  // as a loadable game: if it boots, mark it runnable (실행 허용); otherwise keep it
+  // as a stored-only file (보관만, 실행 불가). Returns the stored record's hash +
+  // runnable flag, or null on a storage error.
   const tryStore = useCallback(
-    async (name: string, kind: string, bytes: ArrayBuffer, jadBytes?: ArrayBuffer): Promise<string | null> => {
-      const reason = await validateGame(name, bytes);
-      if (reason) {
-        setRejected({ name, reason });
-        return null;
+    async (name: string, kind: string, bytes: ArrayBuffer, jadBytes?: ArrayBuffer): Promise<{ hash: string; runnable: boolean } | null> => {
+      let runnable = false;
+      try {
+        runnable = !(await validateGame(name, bytes));
+      } catch {
+        runnable = false; // unparseable as a game → store-only
       }
       const hash = await lib.sha256Hex(bytes);
-      await lib.putGame({ hash, name, kind, bytes, jadBytes, size: bytes.byteLength + (jadBytes?.byteLength ?? 0), addedAt: Date.now() });
-      return hash;
+      await lib.putGame({ hash, name, kind, bytes, jadBytes, size: bytes.byteLength + (jadBytes?.byteLength ?? 0), addedAt: Date.now(), runnable });
+      return { hash, runnable };
     },
     [],
   );
@@ -89,7 +96,7 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey }: Props) 
     async (fileList: FileList | File[], runFirst = false) => {
       setRejected(null);
       const files = [...fileList];
-      let firstHash: string | null = null;
+      let firstRunnable: string | null = null;
       const byBase = new Map<string, File[]>();
       for (const f of files) {
         const base = f.name.replace(/\.[^.]+$/, "");
@@ -100,60 +107,60 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey }: Props) 
       // users with a server vault can store far more there (1 GB) — see below.
       const capBytes = lib.LOCAL_CAP_BYTES;
       let usedBytes = await lib.totalGameBytes();
-      let added = 0;
+      let addedGames = 0;
+      let addedFiles = 0;
 
       for (const f of files) {
         const ext = extOf(f.name);
         const base = f.name.replace(/\.[^.]+$/, "");
         if (ext === "jar" && (byBase.get(base) ?? []).some((x) => extOf(x.name) === "jad")) continue; // companion of a .jad
-        if (!KNOWN_EXTS.includes(ext)) {
-          setRejected({ name: f.name, reason: `지원하지 않는 확장자입니다 (.jar / .jad+.jar / .zip 만 가능).` });
-          continue;
-        }
 
+        // .jad + .jar pair → store together as one runnable game entry.
         if (ext === "jad") {
           const jar = (byBase.get(base) ?? []).find((x) => extOf(x.name) === "jar");
-          if (!jar) {
-            setRejected({ name: f.name, reason: ".jad 는 짝이 되는 .jar 파일과 함께 선택해야 합니다." });
+          if (jar) {
+            const jarBytes = await jar.arrayBuffer();
+            const jadBytes = await f.arrayBuffer();
+            if (usedBytes + jarBytes.byteLength + jadBytes.byteLength > capBytes) {
+              toast(`이 기기 보관 한도(${lib.LOCAL_CAP_MB}MB) 초과 — 로그인 후 서버 보관함(1GB)에 올리거나 파일을 삭제하세요`, "err");
+              return;
+            }
+            const r = await tryStore(jar.name, "jad", jarBytes, jadBytes);
+            if (r) {
+              usedBytes += jarBytes.byteLength + jadBytes.byteLength;
+              r.runnable ? addedGames++ : addedFiles++;
+              if (r.runnable) firstRunnable = firstRunnable ?? r.hash;
+            }
             continue;
           }
-          const jarBytes = await jar.arrayBuffer();
-          const jadBytes = await f.arrayBuffer();
-          if (usedBytes + jarBytes.byteLength + jadBytes.byteLength > capBytes) {
-            toast(`이 기기 보관 한도(${lib.LOCAL_CAP_MB}MB) 초과 — 로그인 후 서버 보관함(1GB)에 올리거나 게임을 삭제하세요`, "err");
-            return;
-          }
-          const h = await tryStore(jar.name, "jad", jarBytes, jadBytes);
-          if (h) {
-            usedBytes += jarBytes.byteLength + jadBytes.byteLength;
-            added++;
-            firstHash = firstHash ?? h;
-          }
-          continue;
+          // a lone .jad with no .jar — fall through and store it as a plain file.
         }
 
         const bytes = await f.arrayBuffer();
         if (usedBytes + bytes.byteLength > capBytes) {
-          toast(`이 기기 보관 한도(${lib.LOCAL_CAP_MB}MB) 초과 — 로그인 후 서버 보관함(1GB)에 올리거나 게임을 삭제하세요`, "err");
+          toast(`이 기기 보관 한도(${lib.LOCAL_CAP_MB}MB) 초과 — 로그인 후 서버 보관함(1GB)에 올리거나 파일을 삭제하세요`, "err");
           break;
         }
-        const h = await tryStore(f.name, ext, bytes);
-        if (h) {
+        const r = await tryStore(f.name, ext || "file", bytes);
+        if (r) {
           usedBytes += bytes.byteLength;
-          added++;
-          firstHash = firstHash ?? h;
+          r.runnable ? addedGames++ : addedFiles++;
+          if (r.runnable) firstRunnable = firstRunnable ?? r.hash;
         }
       }
       await refreshLocal();
-      // "업로드하고 바로 실행": play the first game we just added.
-      if (runFirst && firstHash) {
-        const g = await lib.getGame(firstHash);
+      // "추가하고 바로 실행": play the first RUNNABLE game we just added.
+      if (runFirst && firstRunnable) {
+        const g = await lib.getGame(firstRunnable);
         if (g) {
           onRun({ hash: g.hash, name: g.name, bytes: g.bytes });
           return;
         }
       }
-      if (added > 0) toast(`${added}개 라이브러리에 추가됨 (이 기기에 저장)`, "ok");
+      // Tailored result toast: games vs. stored-only files.
+      if (addedGames && addedFiles) toast(`게임 ${addedGames}개 추가 · 파일 ${addedFiles}개 보관 (이 기기에 저장)`, "ok");
+      else if (addedGames) toast(`게임 ${addedGames}개 라이브러리에 추가됨 (이 기기에 저장)`, "ok");
+      else if (addedFiles) toast(`${addedFiles}개 파일을 보관했습니다 — 게임 파일이 아니라 실행하지 않고 보관만 합니다`, "ok");
     },
     [refreshLocal, toast, tryStore, onRun],
   );
@@ -253,11 +260,14 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey }: Props) 
     <section className="w-full max-w-xl flex flex-col gap-4">
       <h2 className="text-lg font-semibold text-fg">내 게임 라이브러리</h2>
 
-      {/* PRIMARY: add the file AND immediately play it — click OR drag-and-drop. */}
+      {/* PRIMARY drop-zone: add the file AND immediately play it — click OR drag-and-
+          drop. Any file is accepted; game files run immediately, other files are kept
+          in the private vault (4번). Dashed border + dragover highlight make the
+          drag-and-drop affordance obvious. */}
       <input
         ref={playInputRef}
         type="file"
-        accept=".jar,.jad,.zip,.kdf,.skm"
+        multiple
         className="hidden"
         data-testid="file-input-play"
         onChange={(e) => {
@@ -278,14 +288,15 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey }: Props) 
           setDragPlay(false);
           if (e.dataTransfer.files.length) void addFiles(e.dataTransfer.files, true);
         }}
-        aria-label="게임 파일 추가하고 바로 실행 (클릭 또는 끌어다 놓기)"
+        aria-label="파일 추가하고 바로 실행 (클릭 또는 끌어다 놓기) — 게임이면 즉시 실행, 아니면 보관"
         className={
-          "rounded-lg px-4 py-4 text-center font-semibold text-accent-fg shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent " +
-          (dragPlay ? "bg-accent-hover ring-2 ring-accent" : "bg-accent hover:bg-accent-hover")
+          "flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent " +
+          (dragPlay ? "border-accent bg-accent/15 ring-2 ring-accent/60" : "border-accent/60 bg-accent/5 hover:border-accent hover:bg-accent/10")
         }
       >
-        ▶ 게임 파일 추가하고 바로 실행
-        <span className="mt-0.5 block text-xs font-normal opacity-90">.jar / .jad+.jar / .zip · 클릭하거나 파일을 여기로 끌어다 놓기 · 추가 즉시 플레이</span>
+        <span className="text-2xl leading-none" aria-hidden="true">⬇</span>
+        <span className="font-semibold text-fg">▶ 파일을 끌어다 놓거나 클릭해 추가</span>
+        <span className="text-xs font-normal text-fg-dim">게임 파일은 추가 즉시 실행 · 그 외 파일은 비공개 보관함에 저장(실행 안 함)</span>
       </button>
 
       {/* Capacity bar. Logged in → ALWAYS show the server-vault usage (used/quota +
@@ -398,11 +409,14 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey }: Props) 
                   <div className="truncate font-medium text-fg">{f.file_name}</div>
                   <div className="text-xs text-fg-dim">
                     {f.kind.toUpperCase()} · {fmtBytes(f.size)} · ☁ 서버
+                    {!GAME_KINDS.has(f.kind.toLowerCase()) && " · 보관 전용"}
                   </div>
                 </div>
-                <button type="button" onClick={() => void runServer(f)} disabled={busyId === f.id} className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg hover:bg-accent-hover disabled:opacity-60">
-                  {busyId === f.id ? "…" : "실행"}
-                </button>
+                {GAME_KINDS.has(f.kind.toLowerCase()) && (
+                  <button type="button" onClick={() => void runServer(f)} disabled={busyId === f.id} className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg hover:bg-accent-hover disabled:opacity-60">
+                    {busyId === f.id ? "…" : "실행"}
+                  </button>
+                )}
                 <button type="button" onClick={() => void removeServer(f)} disabled={busyId === f.id} aria-label="서버에서 삭제" className="rounded-md bg-surface px-2 py-1.5 text-sm text-red-500 hover:bg-red-500/15 disabled:opacity-60">
                   삭제
                 </button>
@@ -424,13 +438,16 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey }: Props) 
                 <div className="truncate font-medium text-fg">{g.name}</div>
                 <div className="text-xs text-fg-dim">
                   {g.kind.toUpperCase()} · {fmtBytes(g.size)}
+                  {!lib.isRunnable(g) && " · 보관 전용(게임 아님)"}
                   {sv && ` · 세이브 ${sv.serverId ? "동기화됨" : "로컬"}`}
                   {g.lastPlayedAt && ` · 마지막 실행 ${new Date(g.lastPlayedAt).toLocaleDateString()}`}
                 </div>
               </div>
-              <button type="button" data-testid="run-game" onClick={() => void run(g.hash)} className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg hover:bg-accent-hover">
-                실행
-              </button>
+              {lib.isRunnable(g) && (
+                <button type="button" data-testid="run-game" onClick={() => void run(g.hash)} className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg hover:bg-accent-hover">
+                  실행
+                </button>
+              )}
               <button type="button" onClick={() => void remove(g.hash)} aria-label="삭제" className="rounded-md bg-surface px-2 py-1.5 text-sm text-red-500 hover:bg-red-500/15">
                 삭제
               </button>
@@ -461,8 +478,8 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey }: Props) 
             if (e.dataTransfer.files.length) void addFiles(e.dataTransfer.files);
           }}
         >
-          <input ref={inputRef} type="file" multiple accept=".jar,.jad,.zip,.kdf,.skm" className="hidden" data-testid="file-input" onChange={(e) => e.target.files && void addFiles(e.target.files)} />
-          <span className="font-medium text-fg-dim">업로드만 (실행하지 않고 목록에 추가)</span>
+          <input ref={inputRef} type="file" multiple className="hidden" data-testid="file-input" onChange={(e) => e.target.files && void addFiles(e.target.files)} />
+          <span className="font-medium text-fg-dim">보관만 (실행하지 않고 목록에 추가)</span>
           <span className="ml-1 text-[11px] text-fg-dim">· 여러 개 끌어다 놓거나 클릭{showServer ? " · 추가 후 “서버에 올리기”" : " · 미로그인은 이 기기에만 저장"}</span>
         </label>
       </div>

@@ -11,14 +11,24 @@ const DB_NAME = "wie-local";
 const DB_VERSION = 1;
 
 export interface GameRecord {
-  hash: string; // sha-256 of the runnable bytes — LOCAL key, never transmitted
+  hash: string; // sha-256 of the bytes — LOCAL key, never transmitted
   name: string;
-  kind: string; // jar | zip | jad | kdf | skm
-  bytes: ArrayBuffer; // runnable payload (jar/zip)
+  kind: string; // jar | zip | jad | kdf | skm — or any extension for a stored non-game
+  bytes: ArrayBuffer; // payload bytes
   jadBytes?: ArrayBuffer;
   size: number;
   addedAt: number;
   lastPlayedAt?: number;
+  // LOCAL-only: whether the file validated as a loadable game. Non-game files are
+  // kept in the private vault (4번: 확장자 무관 저장) but cannot be run. Absent on
+  // pre-existing records → treated as runnable (see `isRunnable`).
+  runnable?: boolean;
+}
+
+// A record is runnable unless it was explicitly stored as a non-game. Pre-existing
+// records (no `runnable` field) were game-validated at import time → runnable.
+export function isRunnable(g: { runnable?: boolean }): boolean {
+  return g.runnable !== false;
 }
 
 export interface LocalSave {
