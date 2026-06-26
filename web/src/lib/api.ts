@@ -141,6 +141,9 @@ export const saves = {
 
 export const devices = {
   list: () => call<{ ok: boolean; devices: Device[] }>("/devices"),
+  // Rename ONLY the alias of one of the user's devices (any device, owner-scoped);
+  // counts/timestamps are untouched.
+  rename: (device_id: string, label: string) => call<{ ok: boolean; renamed?: string }>("/devices", { method: "POST", body: { device_id, label, rename: true } }),
   // Heartbeat carries ONLY counts/sizes + timestamps — never a game identity.
   heartbeat: (hb: DeviceHeartbeat) => call<{ ok: boolean }>("/devices", { method: "POST", body: hb }),
 };

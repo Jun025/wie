@@ -7,7 +7,7 @@
 // does this device have". The reading device shows its own filenames purely from
 // its local IndexedDB; other devices appear as counts/sizes only.
 
-import { ok, readJson, handleError, str, HttpError } from "../_lib/http.js";
+import { ok, err, readJson, handleError, str, HttpError } from "../_lib/http.js";
 import { requireUser } from "../_lib/session.js";
 
 function num(v, max = Number.MAX_SAFE_INTEGER) {
@@ -51,6 +51,22 @@ export async function onRequestPost(context) {
     const deviceId = str(body.device_id, { name: "device_id", min: 8, max: 64 });
     if (!/^[A-Za-z0-9_-]+$/.test(deviceId)) throw new HttpError("bad device_id", 400);
     const label = body.label == null ? "" : str(body.label, { name: "label", max: 60 });
+
+    // Rename ONLY: update the alias of ANY of the user's devices (owner-scoped),
+    // without touching its counts/timestamps. Used by the inline rename in the
+    // device list (works for the current device and any other device).
+    if (body.rename === true) {
+      try {
+        const res = await context.env.DB.prepare("UPDATE devices SET label = ? WHERE user_id = ? AND device_id = ?").bind(label, user.id, deviceId).run();
+        const changed = res.meta && res.meta.changes ? res.meta.changes : 0;
+        if (!changed) return err("기기를 찾을 수 없습니다", 404);
+        return ok({ renamed: deviceId, label });
+      } catch (schemaErr) {
+        console.error("device rename (pre-migration?):", schemaErr && schemaErr.message);
+        return ok({ migration_pending: true });
+      }
+    }
+
     const now = Date.now();
     const item_count = num(body.item_count, 100000);
     const total_bytes = num(body.total_bytes);
