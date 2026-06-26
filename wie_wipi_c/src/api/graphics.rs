@@ -669,11 +669,33 @@ pub async fn post_event(context: &mut dyn WIPICContext, id: i32, r#type: i32, pa
     Ok(0)
 }
 
+/// Read a `WIPICFramebuffer` from an indirect handle, or `None` if the handle is
+/// null (0).
+///
+/// LGT clets have been observed handing a 0 framebuffer handle to the framebuffer
+/// info accessors below mid-render (놈ZERO, reached after repeated input). A 0
+/// handle resolves to guest address 0, so the unconditional struct read faulted
+/// ("Invalid memory access; address: 0") and killed the whole VM. A null handle is
+/// invalid input, not a fatal condition on real hardware, so the accessors treat it
+/// as an empty framebuffer and return a benign default, letting the game's input
+/// loop continue. Valid (non-zero) handles are read byte-for-byte as before, so no
+/// normal game's behaviour changes.
+fn read_framebuffer_or_null(context: &mut dyn WIPICContext, framebuffer: WIPICIndirectPtr) -> Result<Option<WIPICFramebuffer>> {
+    if framebuffer.0 == 0 {
+        tracing::warn!("WIPI-C framebuffer accessor called with null (0) handle; treating as empty framebuffer");
+        return Ok(None);
+    }
+
+    Ok(Some(read_generic(context, context.data_ptr(framebuffer)?)?))
+}
+
 // it's not documented api, but lgt apps gets pointer via api call
 pub async fn get_framebuffer_pointer(context: &mut dyn WIPICContext, framebuffer: WIPICIndirectPtr) -> Result<WIPICWord> {
     tracing::debug!("MC_GRP_GET_FRAME_BUFFER_POINTER({:#x})", framebuffer.0);
 
-    let framebuffer: WIPICFramebuffer = read_generic(context, context.data_ptr(framebuffer)?)?;
+    let Some(framebuffer) = read_framebuffer_or_null(context, framebuffer)? else {
+        return Ok(0);
+    };
 
     Ok(framebuffer.buf.0)
 }
@@ -681,7 +703,9 @@ pub async fn get_framebuffer_pointer(context: &mut dyn WIPICContext, framebuffer
 pub async fn get_framebuffer_width(context: &mut dyn WIPICContext, framebuffer: WIPICIndirectPtr) -> Result<i32> {
     tracing::debug!("MC_GRP_GET_FRAME_BUFFER_WIDTH({:#x})", framebuffer.0);
 
-    let framebuffer: WIPICFramebuffer = read_generic(context, context.data_ptr(framebuffer)?)?;
+    let Some(framebuffer) = read_framebuffer_or_null(context, framebuffer)? else {
+        return Ok(0);
+    };
 
     Ok(framebuffer.width as _)
 }
@@ -689,7 +713,9 @@ pub async fn get_framebuffer_width(context: &mut dyn WIPICContext, framebuffer: 
 pub async fn get_framebuffer_height(context: &mut dyn WIPICContext, framebuffer: WIPICIndirectPtr) -> Result<i32> {
     tracing::debug!("MC_GRP_GET_FRAME_BUFFER_HEIGHT({:#x})", framebuffer.0);
 
-    let framebuffer: WIPICFramebuffer = read_generic(context, context.data_ptr(framebuffer)?)?;
+    let Some(framebuffer) = read_framebuffer_or_null(context, framebuffer)? else {
+        return Ok(0);
+    };
 
     Ok(framebuffer.height as _)
 }
@@ -697,7 +723,9 @@ pub async fn get_framebuffer_height(context: &mut dyn WIPICContext, framebuffer:
 pub async fn get_framebuffer_bpl(context: &mut dyn WIPICContext, framebuffer: WIPICIndirectPtr) -> Result<i32> {
     tracing::debug!("MC_GRP_GET_FRAME_BUFFER_BPL({:#x})", framebuffer.0);
 
-    let framebuffer: WIPICFramebuffer = read_generic(context, context.data_ptr(framebuffer)?)?;
+    let Some(framebuffer) = read_framebuffer_or_null(context, framebuffer)? else {
+        return Ok(0);
+    };
 
     Ok(framebuffer.bpl as _)
 }
@@ -705,7 +733,11 @@ pub async fn get_framebuffer_bpl(context: &mut dyn WIPICContext, framebuffer: WI
 pub async fn get_framebuffer_bpp(context: &mut dyn WIPICContext, framebuffer: WIPICIndirectPtr) -> Result<i32> {
     tracing::debug!("MC_GRP_GET_FRAME_BUFFER_BPP({:#x})", framebuffer.0);
 
-    let framebuffer: WIPICFramebuffer = read_generic(context, context.data_ptr(framebuffer)?)?;
+    // Fall back to the default depth (not 0) so a caller deriving a pixel stride
+    // from bpp on a null framebuffer doesn't divide by zero.
+    let Some(framebuffer) = read_framebuffer_or_null(context, framebuffer)? else {
+        return Ok(FRAMEBUFFER_DEPTH as _);
+    };
 
     Ok(framebuffer.bpp as _)
 }
