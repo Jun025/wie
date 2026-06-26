@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { auth, type User } from "../lib/api";
 import { sendHeartbeat } from "../lib/device";
+import { mergeLocalSavesToServer } from "../lib/saveSync";
 
 export interface RegisterResult {
   pending: boolean; // account created but must verify email before login
@@ -45,6 +46,7 @@ export function useAuth(): AuthState {
     const res = await auth.login(email, pw);
     setUser(res.user);
     void sendHeartbeat({ login: true });
+    void mergeLocalSavesToServer(); // bring device-local saves up to the server (by ROM hash)
   }, []);
 
   const register = useCallback(async (email: string, pw: string): Promise<RegisterResult> => {
@@ -52,6 +54,7 @@ export function useAuth(): AuthState {
     if (!res.pending) {
       setUser(res.user);
       void sendHeartbeat({ login: true });
+      void mergeLocalSavesToServer();
     }
     return { pending: !!res.pending, emailSent: !!res.emailSent, user: res.user };
   }, []);

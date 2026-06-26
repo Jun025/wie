@@ -85,9 +85,13 @@ export async function listGames(): Promise<GameMeta[]> {
     .sort((a, b) => (b.lastPlayedAt ?? b.addedAt) - (a.lastPlayedAt ?? a.addedAt));
 }
 
-export async function deleteGame(hash: string): Promise<void> {
+// Delete the ROM from this device. The SAVE is intentionally KEPT (keyed by ROM
+// hash) so re-adding the ROM — or running it from the server after upload —
+// resumes the same save. Saves are never lost on a ROM delete. `dropSave: true`
+// is for an explicit "delete this save too" action.
+export async function deleteGame(hash: string, opts?: { dropSave?: boolean }): Promise<void> {
   await withStore("games", "readwrite", (s) => reqAsync(s.delete(hash)));
-  await deleteLocalSave(hash);
+  if (opts?.dropSave) await deleteLocalSave(hash);
 }
 
 export async function clearGames(): Promise<void> {

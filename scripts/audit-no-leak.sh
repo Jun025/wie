@@ -32,10 +32,13 @@ echo "── 2. device-local code never hits the network ───────�
 if grep -nE "$NET_RE" web/src/lib/library.ts >/dev/null 2>&1; then
   bad "library.ts (device-local store) contains a network call"
 else good "library.ts has no network calls"; fi
-# saveSync may import the api (opaque save sync) but must never send the game hash.
-if grep -nE "upsert|savesApi|fetch" web/src/lib/saveSync.ts | grep -iE "hash" >/dev/null 2>&1; then
-  bad "saveSync.ts appears to mix the game hash into a server call"
-else good "saveSync.ts never sends a game hash to the server"; fi
+# saveSync: NOT-logged-in saves must stay local (never sent to the server). The
+# server sync (savesApi) is gated on `loggedIn`. We assert the not-logged-in
+# early-return / guard is present so anonymous users are never synced. (Logged-in
+# saves DO carry the owner's own rom_hash — per-owner, isolated, allowed.)
+if grep -q "opts.loggedIn" web/src/lib/saveSync.ts && grep -qE "if \(!opts.loggedIn\)" web/src/lib/saveSync.ts; then
+  good "saveSync gates server sync on login (not-logged-in saves stay local)"
+else bad "saveSync.ts missing the not-logged-in local-only guard (anonymous saves could leak)"; fi
 # serverLibrary.ts (migration) must go through api.ts, not raw fetch.
 if grep -nE "$NET_RE" web/src/lib/serverLibrary.ts >/dev/null 2>&1; then
   bad "serverLibrary.ts makes a raw network call (must go via api.ts)"
@@ -61,14 +64,15 @@ for path in files:
     for m in re.finditer(r'`([^`]*)`|"([^"]*)"', src, re.S):
         lit = m.group(1) if m.group(1) is not None else m.group(2)
         low = lit.lower()
-        # only real SQL statements that touch the vault table / hash lookup
+        # only real SQL statements that touch the vault/saves tables or a hash lookup
         is_sql = any(k in low for k in ("select", "insert", "update", "delete"))
-        if is_sql and ("user_files" in low or "content_hash" in low):
+        touches_owned = any(t in low for t in ("user_files", "content_hash", "rom_hash")) or " from saves" in low or "into saves" in low or "update saves" in low
+        if is_sql and touches_owned:
             if "user_id" not in low:
-                print(f"  ❌ non-owner-scoped vault SQL in {path}: {lit[:80]!r}")
+                print(f"  ❌ non-owner-scoped owned-data SQL in {path}: {lit[:80]!r}")
                 bad = True
 if not bad:
-    print("  ✅ every user_files / content_hash SQL statement is owner-scoped (user_id)")
+    print("  ✅ every user_files/saves/content_hash/rom_hash SQL is owner-scoped (user_id)")
 sys.exit(1 if bad else 0)
 PY
 # 3b: no public / presigned / public-bucket access path. Match call/identifier
@@ -105,10 +109,15 @@ else good "D1 schema has no cross-user inventory column"; fi
 if grep -niE 'unique.*content_hash' migrations/*.sql | grep -viE 'user_id' >/dev/null 2>&1; then
   bad "a UNIQUE content_hash index is GLOBAL (must be composite with user_id — per-user dedup only)"
 else good "content_hash uniqueness is per-user (composite with user_id), no global dedup"; fi
-# there must be no standalone index on content_hash alone (would enable "who else has this").
-if grep -niE 'create( unique)? index[^(]*\(\s*content_hash\s*\)' migrations/*.sql >/dev/null 2>&1; then
-  bad "a standalone content_hash index exists (could reveal cross-user ownership)"
-else good "no standalone content_hash index (cannot answer 'who else has this file')"; fi
+# there must be no standalone index on content_hash / rom_hash alone (would enable
+# "who else has this ROM / save").
+if grep -niE 'create( unique)? index[^(]*\(\s*(content_hash|rom_hash)\s*\)' migrations/*.sql >/dev/null 2>&1; then
+  bad "a standalone content_hash/rom_hash index exists (could reveal cross-user ownership)"
+else good "no standalone content_hash/rom_hash index (cannot answer 'who else has this')"; fi
+# saves uniqueness (rom_hash) must be composite with user_id (per-owner), never global.
+if grep -niE 'unique.*rom_hash' migrations/*.sql | grep -viE 'user_id' >/dev/null 2>&1; then
+  bad "a UNIQUE rom_hash index is GLOBAL (must be composite with user_id — per-owner)"
+else good "rom_hash (saves) uniqueness is per-owner (composite with user_id)"; fi
 
 echo "── 5. no game files in the build output / repo (S6) ────────────────────"
 DIST="web/dist"

@@ -8,7 +8,7 @@
 
 import init, { WieEmulator } from "../wasm/wie_web.js";
 import * as lib from "./library";
-import { autosaveLocal, getLocalSnapshot } from "./saveSync";
+import { persistSnapshot, loadSnapshot, deviceName } from "./saveSync";
 
 const SCREEN_W = 240;
 const SCREEN_H = 320;
@@ -96,6 +96,9 @@ export class EmulatorSession {
   private running = false;
   private gameHash = "";
   private saveTimer = 0;
+  // Cloud-save config: when syncToServer is true (user logged in), the save is
+  // written through to the server (authoritative) and restored from there if newer.
+  private cloud: { syncToServer: boolean; deviceLabel: string } = { syncToServer: false, deviceLabel: "" };
   private audioCtx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private volume = loadVolume();
@@ -116,10 +119,11 @@ export class EmulatorSession {
     }
   }
 
-  async start(game: LoadableGame, canvas: HTMLCanvasElement, audioCtx: AudioContext | null): Promise<void> {
+  async start(game: LoadableGame, canvas: HTMLCanvasElement, audioCtx: AudioContext | null, cloud?: { syncToServer: boolean; deviceLabel?: string }): Promise<void> {
     await ensureInit();
 
     this.gameHash = game.hash;
+    this.cloud = { syncToServer: !!cloud?.syncToServer, deviceLabel: cloud?.deviceLabel || deviceName() };
     this.audioCtx = audioCtx;
     const bytes = new Uint8Array(game.bytes);
 
@@ -136,8 +140,10 @@ export class EmulatorSession {
     // Construction injects the bytes directly into wasm memory.
     this.emu = new WieEmulator(game.name, bytes, canvas, audioCtx ?? undefined, gain ?? undefined, SCREEN_W, SCREEN_H);
 
-    // Restore prior saves (opaque blob) for this game, if any.
-    const snapshot = await getLocalSnapshot(this.gameHash);
+    // Restore prior save (keyed by ROM hash). Logged in → the server save wins if
+    // newer; otherwise the local cache. So the SAME ROM always resumes the SAME
+    // save, whether it now lives locally or on the server.
+    const snapshot = await loadSnapshot(this.gameHash, { loggedIn: this.cloud.syncToServer, deviceLabel: this.cloud.deviceLabel });
     if (snapshot) {
       try {
         this.emu.import_saves(snapshot);
@@ -233,14 +239,24 @@ export class EmulatorSession {
     return this.emu.export_saves();
   }
 
+  // Last persist result (so the UI can surface a local-cap rejection).
+  lastPersist: { ok: boolean; reason?: string } = { ok: true };
+
   async persist(): Promise<void> {
     const blob = this.exportBlob();
     if (!blob) return;
     try {
-      await autosaveLocal(this.gameHash, blob);
+      // Keyed by ROM hash; logged in → also write through to the server.
+      this.lastPersist = await persistSnapshot(this.gameHash, blob, { loggedIn: this.cloud.syncToServer, deviceLabel: this.cloud.deviceLabel });
     } catch {
       /* best-effort; never interrupt play */
     }
+  }
+
+  // Force an immediate persist + server sync (manual "동기화" button).
+  async syncNow(): Promise<{ ok: boolean; reason?: string }> {
+    await this.persist();
+    return this.lastPersist;
   }
 
   stop(): void {

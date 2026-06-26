@@ -14,6 +14,7 @@
 
 import * as lib from "./library";
 import { files as filesApi, ApiError } from "./api";
+import { pushSaveToServer, deviceName } from "./saveSync";
 
 export interface MigrateResult {
   uploaded: number;
@@ -42,12 +43,16 @@ export async function migrateLocalToServer(onProgress?: (done: number, total: nu
       // g.hash is sha-256 of g.bytes (set at import time) — the server re-hashes
       // the same bytes and matches it, so content_hash stays honest.
       await filesApi.upload(g.name, g.kind, g.hash, g.bytes);
-      await lib.deleteGame(g.hash); // success → free local
+      // Push the ROM's save to the server too (keyed by the SAME hash) and KEEP
+      // the local save — so running the now-server ROM resumes the same save.
+      await pushSaveToServer(g.hash, deviceName()).catch(() => {});
+      await lib.deleteGame(g.hash); // free local ROM (save kept by default)
       uploaded++;
     } catch (e) {
       const err = e as ApiError;
       if (err.code === "duplicate") {
-        await lib.deleteGame(g.hash); // already in this user's vault → just free local
+        await pushSaveToServer(g.hash, deviceName()).catch(() => {});
+        await lib.deleteGame(g.hash); // already in vault → free local ROM (save kept)
         deduped++;
       } else if (err.code === "quota_exceeded") {
         stopped = true;
@@ -64,9 +69,5 @@ export async function migrateLocalToServer(onProgress?: (done: number, total: nu
   return { uploaded, deduped, failed, stopped, message };
 }
 
-export function fmtBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
-  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
-}
+// 1-decimal byte formatter (re-exported from the shared limits module).
+export { fmtBytes1 as fmtBytes } from "./limits";
