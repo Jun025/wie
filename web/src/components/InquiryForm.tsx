@@ -37,6 +37,19 @@ async function readAttachment(file: File): Promise<InquiryAttachment> {
   return { name: file.name, mime: file.type, data: bytesToB64(buf) };
 }
 
+// Evidence for a takedown report (7번): allow image / PDF / text proof up to 256KB;
+// game/exec/archive payloads are still blocked. Mirrors the server's /api/reports policy.
+const MAX_EVIDENCE = 256 * 1024;
+const EVIDENCE_MIME = /^(image\/(png|jpeg|gif|webp|bmp)|application\/pdf|text\/plain)$/;
+async function readEvidence(file: File): Promise<InquiryAttachment> {
+  const buf = new Uint8Array(await file.arrayBuffer());
+  if (buf.length > MAX_EVIDENCE) throw new Error("증빙 파일이 너무 큽니다 (최대 256KB)");
+  if (BLOCKED_EXT.test(file.name)) throw new Error("게임/실행/압축 파일은 증빙으로 첨부할 수 없습니다");
+  if (!EVIDENCE_MIME.test(file.type || "")) throw new Error("증빙은 이미지·PDF·텍스트만 첨부할 수 있습니다");
+  if (BLOCKED_MAGICS.some((m) => m.every((b, i) => buf[i] === b))) throw new Error("게임/실행/압축 파일은 증빙으로 첨부할 수 없습니다");
+  return { name: file.name, mime: file.type, data: bytesToB64(buf) };
+}
+
 type Kind = "inquiry" | "report";
 
 // Unified 문의·신고 screen — one screen, a type toggle:
@@ -56,12 +69,18 @@ export function InquiryForm({ user, toast }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const env = envInfoText();
 
-  // report fields
+  // report (권리 침해 신고·삭제요청) fields — standard takedown intake
+  const [rType, setRType] = useState<"owner" | "agent">("owner");
   const [rName, setRName] = useState("");
   const [rContact, setRContact] = useState("");
   const [rWork, setRWork] = useState("");
+  const [rBasis, setRBasis] = useState("");
   const [rStatement, setRStatement] = useState("");
   const [rHint, setRHint] = useState("");
+  const [rGoodFaith, setRGoodFaith] = useState(false);
+  const [rEvidence, setREvidence] = useState<InquiryAttachment | null>(null);
+  const [rShowEnv, setRShowEnv] = useState(false);
+  const reFileRef = useRef<HTMLInputElement>(null);
   const [reportDone, setReportDone] = useState(false);
 
   const [busy, setBusy] = useState(false);
@@ -108,12 +127,37 @@ export function InquiryForm({ user, toast }: Props) {
     }
   };
 
+  const onPickEvidence = async (f: File | undefined) => {
+    if (!f) return setREvidence(null);
+    try {
+      setREvidence(await readEvidence(f));
+    } catch (e) {
+      setREvidence(null);
+      if (reFileRef.current) reFileRef.current.value = "";
+      toast((e as Error).message, "err");
+    }
+  };
+
   const submitReport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rStatement.trim().length < 10) return toast("침해 내용을 조금 더 자세히 적어 주세요", "err");
+    if (!rName.trim()) return toast("신고자 성명/법인명을 입력해 주세요", "err");
+    if (!rContact.trim()) return toast("회신용 연락처(이메일)를 입력해 주세요", "err");
+    if (!rGoodFaith) return toast("선의·정확성에 대한 진술에 동의해 주세요", "err");
     setBusy(true);
     try {
-      await reports.create({ reporter_name: rName, reporter_contact: rContact, work_title: rWork, statement: rStatement, target_hint: rHint });
+      await reports.create({
+        reporter_type: rType,
+        reporter_name: rName,
+        reporter_contact: rContact,
+        work_title: rWork,
+        right_basis: rBasis,
+        statement: rStatement,
+        target_hint: rHint,
+        good_faith: rGoodFaith,
+        env_info: env,
+        attachment: rEvidence,
+      });
       setReportDone(true);
       toast("신고가 접수되었습니다. 검토 후 조치하겠습니다.", "ok");
     } catch (err) {
@@ -150,15 +194,59 @@ export function InquiryForm({ user, toast }: Props) {
         (reportDone ? (
           <p className="text-sm text-emerald-600 dark:text-emerald-300">신고가 접수되었습니다. 검토 후 대상 파일을 비활성화하는 등 조치하겠습니다. 추가 확인이 필요하면 남겨 주신 연락처로 연락드립니다.</p>
         ) : (
-          <form onSubmit={submitReport} className="flex flex-col gap-2">
+          <form onSubmit={submitReport} className="flex flex-col gap-2.5">
             <p className="text-xs text-fg-dim">
-              권리자(또는 대리인)는 <strong>로그인 없이</strong> 신고할 수 있습니다. 접수된 신고는 검토 후 대상 파일을 즉시 비활성화하며, 반복 침해 계정은 이용이 제한·해지될 수 있습니다. 본 서비스는 게임 파일을 공개·공유·배포하지 않으며 업로드 파일은 업로더 본인만 접근합니다.
+              권리자(또는 대리인)는 <strong>로그인 없이</strong> 신고할 수 있습니다. 접수된 신고는 검토 후 대상 파일을 비활성화하며, 반복 침해 계정은 이용이 제한·해지될 수 있습니다. 본 서비스는 게임 파일을 공개·공유·배포하지 않으며 업로드 파일은 업로더 본인만 접근합니다.
+              <br />아래 정보는 <strong>신고 처리(회신·진위 확인) 목적으로만</strong> 운영자가 사용하며 외부에 공개되지 않습니다.
             </p>
-            <input className={input} placeholder="신고자 이름/단체 (선택)" value={rName} onChange={(e) => setRName(e.target.value)} maxLength={200} />
-            <input className={input} placeholder="연락처 이메일 (선택, 회신용)" value={rContact} onChange={(e) => setRContact(e.target.value)} maxLength={200} />
-            <input className={input} placeholder="침해된 저작물 제목 (선택)" value={rWork} onChange={(e) => setRWork(e.target.value)} maxLength={300} />
-            <textarea className={`${input} min-h-24`} placeholder="침해 내용 / 권리 보유에 대한 선의의 진술 (필수)" value={rStatement} onChange={(e) => setRStatement(e.target.value)} maxLength={8000} required />
-            <input className={input} placeholder="식별에 도움이 될 정보 (파일명 등, 선택)" value={rHint} onChange={(e) => setRHint(e.target.value)} maxLength={1000} />
+
+            {/* 신고 자격 */}
+            <fieldset className="flex flex-wrap items-center gap-3 text-sm text-fg">
+              <legend className="mb-1 text-xs text-fg-dim">신고 자격 *</legend>
+              <label className="flex items-center gap-1.5">
+                <input type="radio" name="rtype" checked={rType === "owner"} onChange={() => setRType("owner")} className="accent-accent" /> 권리자 본인
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input type="radio" name="rtype" checked={rType === "agent"} onChange={() => setRType("agent")} className="accent-accent" /> 대리인(위임받음)
+              </label>
+            </fieldset>
+
+            <input className={input} placeholder="신고자 성명 / 법인명 *" value={rName} onChange={(e) => setRName(e.target.value)} maxLength={200} required />
+            <input className={input} type="email" placeholder="회신용 연락처 이메일 *" value={rContact} onChange={(e) => setRContact(e.target.value)} maxLength={200} required />
+            <input className={input} placeholder="침해된 저작물 제목" value={rWork} onChange={(e) => setRWork(e.target.value)} maxLength={300} />
+            <textarea className={`${input} min-h-16`} placeholder="권리 근거 / 권원 (저작권·상표권 등 보유 근거, 등록번호 등)" value={rBasis} onChange={(e) => setRBasis(e.target.value)} maxLength={2000} />
+            <textarea className={`${input} min-h-24`} placeholder="침해 주장 내용 — 어떤 권리가 어떻게 침해되었는지 구체적으로 (필수)" value={rStatement} onChange={(e) => setRStatement(e.target.value)} maxLength={8000} required />
+            <input className={input} placeholder="대상 식별정보 (파일명·업로더 단서 등, 알고 있으면)" value={rHint} onChange={(e) => setRHint(e.target.value)} maxLength={1000} />
+
+            {/* 증빙 첨부 */}
+            <div className="flex flex-col gap-1 text-sm text-fg-dim">
+              증빙 자료 첨부 (선택 · 이미지/PDF/텍스트, 최대 256KB)
+              <input
+                ref={reFileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,application/pdf,text/plain,.txt,.pdf"
+                onChange={(e) => void onPickEvidence(e.target.files?.[0])}
+                className="text-xs text-fg-dim file:mr-2 file:rounded file:border file:border-edge file:bg-surface2 file:px-2 file:py-1 file:text-fg"
+              />
+              {rEvidence && <span className="text-xs text-emerald-600 dark:text-emerald-300">첨부됨: {rEvidence.name} ({rEvidence.mime})</span>}
+              <span className="text-[11px] text-fg-dim">게임/실행/압축 파일은 증빙으로 첨부할 수 없습니다. 첨부는 운영자만 열람합니다(공개 URL 없음).</span>
+            </div>
+
+            {/* 환경정보 자동 첨부 (문의와 동일) */}
+            <div className="rounded-md border border-edge bg-surface2 px-3 py-2 text-xs text-fg-dim">
+              <button type="button" onClick={() => setRShowEnv((v) => !v)} className="underline">
+                {rShowEnv ? "자동 첨부 환경정보 숨기기" : "자동으로 첨부될 환경정보 보기"}
+              </button>
+              {rShowEnv && <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words text-[11px] text-fg">{env}</pre>}
+              <p className="mt-1">접수 시 신고자 환경정보가 자동 첨부됩니다(처리 참고용).</p>
+            </div>
+
+            {/* 선의·정확성 진술 */}
+            <label className="flex items-start gap-2 text-xs text-fg">
+              <input type="checkbox" checked={rGoodFaith} onChange={(e) => setRGoodFaith(e.target.checked)} className="mt-0.5 accent-accent" required />
+              <span>본인은 위 신고 내용이 사실이며 정당한 권리에 근거함을 선의로 진술하고, 본인이 권리자 또는 그 적법한 대리인임을 확인합니다. (허위 신고 시 책임을 질 수 있음을 이해합니다.) *</span>
+            </label>
+
             <button type="submit" disabled={busy} className="self-start rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-fg hover:opacity-90 disabled:opacity-60">
               {busy ? "접수 중…" : "신고 접수"}
             </button>

@@ -223,7 +223,18 @@ export const files = {
 
 // Rights-holder takedown notice intake (compliance). Anonymous-allowed.
 export const reports = {
-  create: (payload: { reporter_name?: string; reporter_contact?: string; work_title?: string; statement: string; target_hint?: string }) =>
+  create: (payload: {
+    reporter_name?: string;
+    reporter_contact?: string;
+    work_title?: string;
+    statement: string;
+    target_hint?: string;
+    reporter_type?: "owner" | "agent" | "";
+    right_basis?: string;
+    good_faith?: boolean;
+    env_info?: string;
+    attachment?: InquiryAttachment | null;
+  }) =>
     call<{ ok: boolean; report: { id: string; status: string; created_at: number } }>("/reports", { method: "POST", body: payload }),
 };
 

@@ -55,7 +55,14 @@ export function ServiceInfo() {
 
       <div className="rounded-lg border border-edge bg-surface2 p-4 text-sm">
         <h3 className="text-sm font-semibold text-fg">권리 침해 신고 · 삭제 요청</h3>
-        <p className="mt-1 text-xs text-fg-dim">권리자(또는 대리인)는 상단 <strong>“문의·신고”</strong> 메뉴의 <strong>“권리 침해 신고·삭제요청”</strong> 탭에서 <strong>로그인 없이</strong> 신고할 수 있습니다. 접수 후 검토하여 대상 파일을 비활성화하는 등 신속히 조치합니다.</p>
+        <p className="mt-1 text-xs text-fg-dim">권리자(또는 대리인)는 상단 <strong>“문의·신고”</strong> 메뉴의 <strong>“권리 침해 신고·삭제요청”</strong> 탭에서 <strong>로그인 없이</strong> 신고할 수 있습니다. 원활한 처리·진위 확인을 위해 다음을 받습니다:</p>
+        <ul className="mt-1 space-y-0.5 text-xs text-fg-dim">
+          <li>• <strong>신고 자격</strong>(권리자 본인 / 대리인) · <strong>성명·법인명</strong> · <strong>회신용 이메일</strong>(필수)</li>
+          <li>• <strong>권리 근거·권원</strong>(저작권·상표권 등 보유 근거) · <strong>침해 주장 내용</strong> · 대상 식별정보(파일명 등)</li>
+          <li>• <strong>선의·정확성 진술</strong> 동의(필수) · <strong>증빙 자료</strong> 첨부(선택, 이미지·PDF·텍스트)</li>
+          <li>• 신고자 <strong>환경정보 자동 첨부</strong>(처리 참고용)</li>
+        </ul>
+        <p className="mt-1 text-xs text-fg-dim">신고자 신원·연락처·증빙은 <strong>신고 처리 목적으로만 운영자가 열람</strong>하며 외부에 공개되지 않습니다(공개 URL 없음). 접수 후 검토하여 대상 파일을 비활성화하는 등 조치하고, 반복 침해 계정은 이용을 제한·해지합니다.</p>
       </div>
 
       <div className="rounded-lg border border-edge bg-surface2 p-4 text-sm">
