@@ -26,16 +26,16 @@ export async function onRequestGet(context) {
     if (rom) {
       if (!ROM_HASH_RE.test(rom)) throw new HttpError("bad rom hash", 400);
       const row = await context.env.DB.prepare(
-        "SELECT id, rom_hash, slot_label, device_label, payload, payload_bytes, checksum, updated_at, created_at FROM saves WHERE user_id = ? AND rom_hash = ?",
+        "SELECT id, rom_hash, slot_label, device_label, payload, payload_bytes, checksum, updated_at, created_at, prev_payload_bytes, prev_updated_at FROM saves WHERE user_id = ? AND rom_hash = ?",
       )
         .bind(user.id, rom)
         .first();
       if (!row) return err("Not found", 404);
-      return ok({ save: row });
+      return ok({ save: { ...row, has_prev: row.prev_updated_at > 0 } });
     }
 
     const { results } = await context.env.DB.prepare(
-      "SELECT id, rom_hash, slot_label, device_label, payload_bytes, checksum, updated_at, created_at FROM saves WHERE user_id = ? ORDER BY updated_at DESC",
+      "SELECT id, rom_hash, slot_label, device_label, payload_bytes, checksum, updated_at, created_at, prev_payload_bytes, prev_updated_at FROM saves WHERE user_id = ? ORDER BY updated_at DESC",
     )
       .bind(user.id)
       .all();
@@ -55,6 +55,32 @@ export async function onRequestPost(context) {
 
     const romHash = str(body.rom_hash, { name: "rom_hash", min: 64, max: 64 }).toLowerCase();
     if (!ROM_HASH_RE.test(romHash)) throw new HttpError("rom_hash must be sha-256 hex", 400);
+
+    // Revert one step: restore the retained previous version as current (swap
+    // current↔prev, so it can also be re-applied). LWW is unchanged; this only
+    // un-does the last overwrite from the 1-version safety net.
+    if (body.revert === true) {
+      const r = await context.env.DB.prepare(
+        "SELECT id, payload, payload_bytes, updated_at, prev_payload, prev_payload_bytes, prev_updated_at FROM saves WHERE user_id = ? AND rom_hash = ?",
+      )
+        .bind(user.id, romHash)
+        .first();
+      if (!r || !r.prev_updated_at) return err("되돌릴 이전 버전이 없습니다", 404, "no_prev");
+      const now2 = Date.now();
+      let cs = "";
+      try {
+        cs = await sha256Hex(b64decode(r.prev_payload));
+      } catch {
+        /* keep '' */
+      }
+      await context.env.DB.prepare(
+        "UPDATE saves SET payload = ?, payload_bytes = ?, checksum = ?, updated_at = ?, prev_payload = ?, prev_payload_bytes = ?, prev_updated_at = ? WHERE id = ? AND user_id = ?",
+      )
+        .bind(r.prev_payload, r.prev_payload_bytes, cs, now2, r.payload, r.payload_bytes, r.updated_at, r.id, user.id)
+        .run();
+      return ok({ reverted: true, save: { id: r.id, rom_hash: romHash, payload_bytes: r.prev_payload_bytes, updated_at: now2, has_prev: true } });
+    }
+
     const slotLabel = body.slot_label == null ? "" : str(body.slot_label, { name: "slot_label", max: 120 });
     const deviceLabel = body.device_label == null ? "" : str(body.device_label, { name: "device_label", max: 120 });
     const payload = str(body.payload, { name: "payload", min: 0, max: MAX_PAYLOAD_B64, trim: false });
@@ -69,7 +95,7 @@ export async function onRequestPost(context) {
     const now = Date.now();
 
     // Upsert keyed on (user_id, rom_hash): the SAME ROM always maps to one save.
-    const existing = await context.env.DB.prepare("SELECT id, payload_bytes FROM saves WHERE user_id = ? AND rom_hash = ?").bind(user.id, romHash).first();
+    const existing = await context.env.DB.prepare("SELECT id, payload, payload_bytes, updated_at FROM saves WHERE user_id = ? AND rom_hash = ?").bind(user.id, romHash).first();
 
     // Quota: total of all OTHER saves + this new payload must fit 100 MB.
     const sumRow = await context.env.DB.prepare("SELECT COALESCE(SUM(payload_bytes),0) AS used FROM saves WHERE user_id = ?").bind(user.id).first();
@@ -81,10 +107,12 @@ export async function onRequestPost(context) {
     let id;
     if (existing) {
       id = existing.id;
+      // Move the CURRENT version into prev_* (1-version safety net) before writing
+      // the new one. LWW for the live value; the overwritten version is recoverable.
       await context.env.DB.prepare(
-        "UPDATE saves SET slot_label = ?, device_label = ?, payload = ?, payload_bytes = ?, checksum = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+        "UPDATE saves SET slot_label = ?, device_label = ?, payload = ?, payload_bytes = ?, checksum = ?, updated_at = ?, prev_payload = ?, prev_payload_bytes = ?, prev_updated_at = ? WHERE id = ? AND user_id = ?",
       )
-        .bind(slotLabel, deviceLabel, payload, bytes.length, checksum, now, id, user.id)
+        .bind(slotLabel, deviceLabel, payload, bytes.length, checksum, now, existing.payload, existing.payload_bytes, existing.updated_at, id, user.id)
         .run();
     } else {
       id = uuid();
