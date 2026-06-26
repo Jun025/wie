@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth, type AuthState } from "./hooks/useAuth";
 import { installAudioUnlock } from "./lib/audio";
 import { useTheme } from "./hooks/useTheme";
@@ -11,6 +11,8 @@ import { Help } from "./components/Help";
 import { ServiceInfo } from "./components/ServiceInfo";
 import { Overlay } from "./components/Overlay";
 import type { LoadableGame } from "./lib/emulator";
+import * as lib from "./lib/library";
+import { migrateLocalToServer } from "./lib/serverLibrary";
 
 type View = "library" | "cloud" | "inquiry" | "help" | "info";
 type ToastKind = "ok" | "err" | "";
@@ -25,7 +27,7 @@ interface Toast {
 const TABS: { id: View; label: string }[] = [
   { id: "library", label: "라이브러리" },
   { id: "cloud", label: "세이브 동기화" },
-  { id: "inquiry", label: "문의·건의" },
+  { id: "inquiry", label: "문의·신고" },
   { id: "help", label: "도움말" },
   { id: "info", label: "서비스 정보" },
 ];
@@ -36,16 +38,18 @@ function ViewPanel({
   onRun,
   toast,
   onReport,
+  reloadKey,
 }: {
   view: View;
   authState: AuthState;
   onRun: (g: LoadableGame) => void;
   toast: (m: string, k?: "ok" | "err") => void;
   onReport: () => void;
+  reloadKey: number;
 }) {
   switch (view) {
     case "library":
-      return <GameLibrary onRun={onRun} toast={toast} user={authState.user} onReport={onReport} />;
+      return <GameLibrary onRun={onRun} toast={toast} user={authState.user} onReport={onReport} reloadKey={reloadKey} />;
     case "cloud":
       return <CloudSaves user={authState.user} toast={toast} />;
     case "inquiry":
@@ -53,7 +57,7 @@ function ViewPanel({
     case "help":
       return <Help />;
     case "info":
-      return <ServiceInfo toast={toast} />;
+      return <ServiceInfo />;
   }
 }
 
@@ -82,6 +86,8 @@ export default function App() {
   const [accountOpen, setAccountOpen] = useState(false); // profile/account overlay (any state)
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [resetToken, setResetToken] = useState<string | null>(null);
+  const [libVersion, setLibVersion] = useState(0); // bump to make GameLibrary re-read after auto-upload
+  const autoUploadedFor = useRef<string | null>(null);
 
   // Install the global audio-unlock listeners once (iOS WebKit needs the first
   // gesture to create+resume+unlock the shared AudioContext synchronously).
@@ -106,6 +112,31 @@ export default function App() {
       return [...prev.slice(-2), { id, msg, kind }]; // keep at most 3
     });
   }, []);
+
+  // ── Auto-upload local ROMs to the server once on login (Task 1) ───────────────
+  // On login (and the vault provisioned), push device-local ROMs to the user's
+  // private server vault and free the local copy — but ONLY after the server's
+  // confirmed ACK (200/duplicate). Quota/errors keep the file local (no loss).
+  // migrateLocalToServer() already enforces that ACK-gated deletion + the save
+  // merge runs from useAuth. After this completes a logged-in device is empty.
+  useEffect(() => {
+    const u = authState.user;
+    if (!u || !authState.filesConfigured) {
+      if (!u) autoUploadedFor.current = null; // allow re-run after a re-login
+      return;
+    }
+    if (autoUploadedFor.current === u.id) return;
+    autoUploadedFor.current = u.id;
+    void (async () => {
+      const games = await lib.listGames();
+      if (games.length === 0) return;
+      showToast(`이 기기 게임 ${games.length}개를 서버 보관함에 올리는 중…`);
+      const r = await migrateLocalToServer();
+      setLibVersion((v) => v + 1);
+      const parts = [`업로드 ${r.uploaded}`, r.deduped ? `중복 ${r.deduped}` : null, r.failed ? `실패 ${r.failed}(로컬 보존)` : null].filter(Boolean);
+      showToast(r.message ?? `서버 보관함에 자동 반영됨 — ${parts.join(" · ")}`, r.stopped || r.failed ? "err" : "ok");
+    })();
+  }, [authState.user, authState.filesConfigured, showToast]);
 
   const onRun = useCallback((game: LoadableGame) => {
     setRunning(game);
@@ -178,7 +209,7 @@ export default function App() {
 
         {overlay && overlay !== "menu" && (
           <Overlay title={tabLabel(overlay)} onClose={() => setOverlay(null)}>
-            <ViewPanel view={overlay} authState={authState} onRun={onRun} toast={showToast} onReport={onReport} />
+            <ViewPanel view={overlay} authState={authState} onRun={onRun} toast={showToast} onReport={onReport} reloadKey={libVersion} />
           </Overlay>
         )}
 
@@ -240,7 +271,7 @@ export default function App() {
             )}
           </div>
         )}
-        <ViewPanel view={view} authState={authState} onRun={onRun} toast={showToast} onReport={onReport} />
+        <ViewPanel view={view} authState={authState} onRun={onRun} toast={showToast} onReport={onReport} reloadKey={libVersion} />
       </main>
 
       <footer className="mt-auto px-4 py-6 text-center text-xs text-fg-dim">

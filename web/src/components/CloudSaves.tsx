@@ -37,6 +37,21 @@ export function CloudSaves({ user, toast }: Props) {
     [refresh, toast],
   );
 
+  // F1: revert one step to the retained previous version (recovery safety net).
+  const revert = useCallback(
+    async (romHash: string) => {
+      if (!confirm("이 세이브를 직전 버전으로 되돌릴까요? (현재 버전은 안전망에 보관됩니다)")) return;
+      try {
+        await savesApi.revert(romHash);
+        await refresh();
+        toast("직전 버전으로 되돌렸습니다", "ok");
+      } catch (e) {
+        toast(`되돌리기 실패: ${(e as Error).message}`, "err");
+      }
+    },
+    [refresh, toast],
+  );
+
   if (!user) {
     return (
       <section className="w-full max-w-xl">
@@ -81,6 +96,11 @@ export function CloudSaves({ user, toast }: Props) {
                 {fmtBytes1(s.payload_bytes)} · {new Date(s.updated_at).toLocaleString()}
               </div>
             </div>
+            {(s.prev_updated_at ?? 0) > 0 && (
+              <button type="button" onClick={() => void revert(s.rom_hash)} title={`직전 버전(${new Date(s.prev_updated_at as number).toLocaleString()})으로 되돌리기`} className="rounded-md border border-edge bg-surface px-2 py-1 text-xs text-fg-dim hover:text-fg hover:border-accent">
+                ↺ 되돌리기
+              </button>
+            )}
             <button type="button" onClick={() => void del(s.id)} className="rounded-md border border-edge bg-surface px-2 py-1 text-xs text-red-500 hover:bg-red-500/15">
               삭제
             </button>

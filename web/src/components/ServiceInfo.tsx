@@ -1,11 +1,10 @@
 import { clientEnv, APP_VERSION } from "../lib/device";
-import { ReportForm } from "./ReportForm";
 
 // "서비스 정보" — distribution/license notices (moved here from the main screen)
 // plus a read-only view of THIS device/network (client-side only, never sent to
 // the server, no over-collection). The MIT license + original author + upstream
 // link are preserved here (S7).
-export function ServiceInfo({ toast }: { toast: (msg: string, kind?: "ok" | "err") => void }) {
+export function ServiceInfo() {
   const e = clientEnv();
   const rows: [string, string][] = [
     ["브라우저", e.browser],
@@ -56,8 +55,7 @@ export function ServiceInfo({ toast }: { toast: (msg: string, kind?: "ok" | "err
 
       <div className="rounded-lg border border-edge bg-surface2 p-4 text-sm">
         <h3 className="text-sm font-semibold text-fg">권리 침해 신고 · 삭제 요청</h3>
-        <p className="mb-2 mt-1 text-xs text-fg-dim">권리자(또는 대리인)는 아래로 침해 사실을 신고할 수 있습니다. 검토 후 대상 파일을 비활성화하는 등 신속히 조치합니다.</p>
-        <ReportForm toast={toast} />
+        <p className="mt-1 text-xs text-fg-dim">권리자(또는 대리인)는 상단 <strong>“문의·신고”</strong> 메뉴의 <strong>“권리 침해 신고·삭제요청”</strong> 탭에서 <strong>로그인 없이</strong> 신고할 수 있습니다. 접수 후 검토하여 대상 파일을 비활성화하는 등 신속히 조치합니다.</p>
       </div>
 
       <div className="rounded-lg border border-edge bg-surface2 p-4 text-sm">

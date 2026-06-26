@@ -51,6 +51,9 @@ export interface CloudSave {
   checksum: string;
   updated_at: number;
   created_at: number;
+  prev_updated_at?: number; // timestamp of the retained previous version (0 = none)
+  prev_payload_bytes?: number;
+  has_prev?: boolean;
 }
 export interface SavesUsage {
   used: number;
@@ -109,7 +112,7 @@ async function call<T = unknown>(path: string, opts: { method?: string; body?: u
 }
 
 export const auth = {
-  me: () => call<{ ok: boolean; authenticated: boolean; emailConfigured?: boolean; user?: User }>("/auth/me"),
+  me: () => call<{ ok: boolean; authenticated: boolean; emailConfigured?: boolean; filesConfigured?: boolean; user?: User }>("/auth/me"),
   register: (email: string, password: string) =>
     call<{ ok: boolean; user: User; pending?: boolean; emailSent?: boolean }>("/auth/register", { method: "POST", body: { email, password } }),
   login: (email: string, password: string) =>
@@ -136,6 +139,8 @@ export const saves = {
   // upsert the save for a ROM (opaque base64 payload, keyed by rom_hash).
   upsert: (rom_hash: string, payload: string, slot_label: string, device_label: string) =>
     call<{ ok: boolean; save: CloudSave; usage: SavesUsage }>("/saves", { method: "POST", body: { rom_hash, payload, slot_label, device_label } }),
+  // revert one step: restore the retained previous version as current.
+  revert: (rom_hash: string) => call<{ ok: boolean; reverted: boolean; save: CloudSave }>("/saves", { method: "POST", body: { rom_hash, revert: true } }),
   remove: (id: string) => call(`/saves/${encodeURIComponent(id)}`, { method: "DELETE" }),
 };
 

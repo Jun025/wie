@@ -13,6 +13,7 @@ export interface AuthState {
   user: User | null;
   loading: boolean;
   emailConfigured: boolean; // whether the server has email delivery set up
+  filesConfigured: boolean; // whether the server file vault (R2) is provisioned
   refresh: () => Promise<void>;
   login: (email: string, pw: string) => Promise<void>;
   register: (email: string, pw: string) => Promise<RegisterResult>;
@@ -23,11 +24,13 @@ export function useAuth(): AuthState {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [emailConfigured, setEmailConfigured] = useState(false);
+  const [filesConfigured, setFilesConfigured] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
       const res = await auth.me();
       setEmailConfigured(!!res.emailConfigured);
+      setFilesConfigured(!!res.filesConfigured);
       const u = res.authenticated && res.user ? res.user : null;
       setUser(u);
       if (u) void sendHeartbeat(); // update last-seen + anonymous aggregate
@@ -64,5 +67,5 @@ export function useAuth(): AuthState {
     setUser(null);
   }, []);
 
-  return { user, loading, emailConfigured, refresh, login, register, logout };
+  return { user, loading, emailConfigured, filesConfigured, refresh, login, register, logout };
 }

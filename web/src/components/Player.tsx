@@ -102,6 +102,21 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
     };
   }, [game, bootNonce]);
 
+  // Flush the save immediately when the tab is backgrounded / left (logged-in →
+  // write-through to the server). Together with the 5s autosave + restore-newest-
+  // on-open, this gives "real-time-like" cross-device saves without a socket.
+  useEffect(() => {
+    const flush = () => {
+      if (document.visibilityState === "hidden") void sessionRef.current?.persist();
+    };
+    document.addEventListener("visibilitychange", flush);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", flush);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, []);
+
   const restart = useCallback(() => {
     setError(null);
     setStatus("loading");
@@ -239,7 +254,7 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
           <div className="flex flex-col items-center gap-1.5">
             <GameButton label="◀L" title="왼쪽 소프트키" {...gkey("LEFT_SOFT_KEY")} className={side} />
             <GameButton label="📞" title="통화" {...gkey("CALL")} className={`${side} bg-green-600 text-white border-green-700`} />
-            <button type="button" onClick={() => void syncCloud()} className={svc} aria-label="세이브 동기화(클라우드 업로드)" title="세이브 동기화">☁</button>
+            <button type="button" onClick={() => void syncCloud()} className={svc} aria-label="세이브 자동 동기화 중 — 눌러서 지금 저장" title={user ? "세이브 자동 동기화 중 (눌러서 지금 저장)" : "로그인하면 세이브가 자동 동기화됩니다"}>☁</button>
           </div>
         </div>
 

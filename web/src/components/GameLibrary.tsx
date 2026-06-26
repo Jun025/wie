@@ -16,6 +16,7 @@ interface Props {
   toast: (msg: string, kind?: "ok" | "err") => void;
   user: User | null;
   onReport: () => void; // navigate to inquiry (or login) to report a bad file
+  reloadKey?: number; // bump to force a re-read (e.g. after login auto-upload)
 }
 
 interface Rejection {
@@ -23,11 +24,12 @@ interface Rejection {
   reason: string;
 }
 
-export function GameLibrary({ onRun, toast, user, onReport }: Props) {
+export function GameLibrary({ onRun, toast, user, onReport, reloadKey }: Props) {
   const [games, setGames] = useState<lib.GameMeta[]>([]);
   const [saves, setSaves] = useState<Record<string, lib.LocalSave>>({});
   const [used, setUsed] = useState(0);
   const [drag, setDrag] = useState(false);
+  const [dragPlay, setDragPlay] = useState(false);
   const [rejected, setRejected] = useState<Rejection | null>(null);
   // server vault state (only meaningful when logged in + provisioned)
   const [serverEnabled, setServerEnabled] = useState(false);
@@ -64,7 +66,7 @@ export function GameLibrary({ onRun, toast, user, onReport }: Props) {
   useEffect(() => {
     void refreshLocal();
     void refreshServer();
-  }, [refreshLocal, refreshServer]);
+  }, [refreshLocal, refreshServer, reloadKey]);
 
   // Store a candidate game ONLY after it validates as a loadable format. Invalid
   // files are never written to IndexedDB and are surfaced for reporting.
@@ -239,36 +241,7 @@ export function GameLibrary({ onRun, toast, user, onReport }: Props) {
     <section className="w-full max-w-xl flex flex-col gap-4">
       <h2 className="text-lg font-semibold text-fg">내 게임 라이브러리</h2>
 
-      {/* device-local capacity (FIXED 10MB — no edit control) */}
-      <div className="rounded-lg border border-edge bg-surface2 px-3 py-2">
-        <div className="mb-1 flex items-center justify-between text-xs">
-          <span className="text-fg-dim">
-            <span className="font-medium text-fg">{fmtBytes(used)}</span> / {fmtBytes(lib.LOCAL_CAP_BYTES)} · 이 기기(브라우저) 사용량
-          </span>
-          <span className="text-fg-dim">한도 고정</span>
-        </div>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-surface" role="progressbar" aria-valuenow={localPct} aria-valuemin={0} aria-valuemax={100} aria-label="이 기기 라이브러리 사용량">
-          <div className={`h-full ${localBar} transition-all`} style={{ width: `${localPct}%` }} />
-        </div>
-      </div>
-
-      {/* server vault capacity (1GB, owner-only) — only when logged in + provisioned */}
-      {showServer && (
-        <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2">
-          <div className="mb-1 flex items-center justify-between text-xs">
-            <span className="text-emerald-700 dark:text-emerald-200">
-              <span className="font-medium">{fmtBytes(serverUsage.used)}</span> / {fmtBytes(serverUsage.quota)} · 내 서버 보관함 (본인만 접근)
-              {/* 1-decimal via fmtBytes (e.g. 2.4 MB / 1.0 GB) */}
-            </span>
-            <span className="text-emerald-700/80 dark:text-emerald-200/80">한도 고정</span>
-          </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-surface" role="progressbar" aria-valuenow={srvPct} aria-valuemin={0} aria-valuemax={100} aria-label="서버 보관함 사용량">
-            <div className={`h-full ${srvBar} transition-all`} style={{ width: `${srvPct}%` }} />
-          </div>
-        </div>
-      )}
-
-      {/* PRIMARY: add the file AND immediately play it. */}
+      {/* PRIMARY: add the file AND immediately play it — click OR drag-and-drop. */}
       <input
         ref={playInputRef}
         type="file"
@@ -283,38 +256,55 @@ export function GameLibrary({ onRun, toast, user, onReport }: Props) {
       <button
         type="button"
         onClick={() => playInputRef.current?.click()}
-        className="rounded-lg bg-accent px-4 py-3 text-center font-semibold text-accent-fg shadow-sm hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-      >
-        ▶ 게임 파일 추가하고 바로 실행
-        <span className="mt-0.5 block text-xs font-normal opacity-90">.jar / .jad+.jar / .zip · 추가 즉시 플레이</span>
-      </button>
-
-      {/* SECONDARY: add to the library only (drop or click). */}
-      <label
-        className={
-          "cursor-pointer rounded-lg border-2 border-dashed px-4 py-4 text-center transition-colors " +
-          (drag ? "border-accent bg-accent/10" : "border-edge bg-surface2 hover:border-accent")
-        }
         onDragOver={(e) => {
           e.preventDefault();
-          setDrag(true);
+          setDragPlay(true);
         }}
-        onDragLeave={() => setDrag(false)}
+        onDragLeave={() => setDragPlay(false)}
         onDrop={(e) => {
           e.preventDefault();
-          setDrag(false);
-          if (e.dataTransfer.files.length) void addFiles(e.dataTransfer.files);
+          setDragPlay(false);
+          if (e.dataTransfer.files.length) void addFiles(e.dataTransfer.files, true);
         }}
+        aria-label="게임 파일 추가하고 바로 실행 (클릭 또는 끌어다 놓기)"
+        className={
+          "rounded-lg px-4 py-4 text-center font-semibold text-accent-fg shadow-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent " +
+          (dragPlay ? "bg-accent-hover ring-2 ring-accent" : "bg-accent hover:bg-accent-hover")
+        }
       >
-        <input ref={inputRef} type="file" multiple accept=".jar,.jad,.zip,.kdf,.skm" className="hidden" data-testid="file-input" onChange={(e) => e.target.files && void addFiles(e.target.files)} />
-        <div className="text-sm font-medium text-fg">업로드만 (목록에 추가)</div>
-        <div className="mt-0.5 text-xs text-fg-dim">여러 개 끌어다 놓거나 클릭</div>
-        <div className="mt-1 text-[11px] text-fg-dim">
-          {showServer
-            ? "추가하면 먼저 이 기기에 저장됩니다. 아래 “서버 보관함에 올리기”로 본인 전용 서버(1GB)에 보관할 수 있어요."
-            : "파일은 브라우저(IndexedDB)에만 저장되며 서버로 전송되지 않습니다(미로그인)."}
+        ▶ 게임 파일 추가하고 바로 실행
+        <span className="mt-0.5 block text-xs font-normal opacity-90">.jar / .jad+.jar / .zip · 클릭하거나 파일을 여기로 끌어다 놓기 · 추가 즉시 플레이</span>
+      </button>
+
+      {/* server vault capacity (1GB) — logged in + provisioned. Local capacity is
+          shown ONLY when NOT logged in (logged-in devices keep no local ROMs). */}
+      {showServer ? (
+        <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2">
+          <div className="mb-1 flex items-center justify-between text-xs">
+            <span className="text-emerald-700 dark:text-emerald-200">
+              <span className="font-medium">{fmtBytes(serverUsage.used)}</span> / {fmtBytes(serverUsage.quota)} · 내 서버 보관함 (본인만 접근)
+            </span>
+            <span className="text-emerald-700/80 dark:text-emerald-200/80">한도 고정</span>
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-surface" role="progressbar" aria-valuenow={srvPct} aria-valuemin={0} aria-valuemax={100} aria-label="서버 보관함 사용량">
+            <div className={`h-full ${srvBar} transition-all`} style={{ width: `${srvPct}%` }} />
+          </div>
         </div>
-      </label>
+      ) : (
+        !user && (
+          <div className="rounded-lg border border-edge bg-surface2 px-3 py-2">
+            <div className="mb-1 flex items-center justify-between text-xs">
+              <span className="text-fg-dim">
+                <span className="font-medium text-fg">{fmtBytes(used)}</span> / {fmtBytes(lib.LOCAL_CAP_BYTES)} · 이 기기(브라우저) 사용량
+              </span>
+              <span className="text-fg-dim">한도 고정 · 로그인 시 서버 1GB</span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-surface" role="progressbar" aria-valuenow={localPct} aria-valuemin={0} aria-valuemax={100} aria-label="이 기기 라이브러리 사용량">
+              <div className={`h-full ${localBar} transition-all`} style={{ width: `${localPct}%` }} />
+            </div>
+          </div>
+        )
+      )}
 
       {/* rejected file notice + report/login guidance */}
       {rejected && (
@@ -370,9 +360,9 @@ export function GameLibrary({ onRun, toast, user, onReport }: Props) {
       )}
 
       {/* ── device-local list ────────────────────────────────────────────────── */}
-      {showServer && <h3 className="text-sm font-semibold text-fg">이 기기 (브라우저)</h3>}
+      {showServer && games.length > 0 && <h3 className="text-sm font-semibold text-fg">이 기기 (브라우저) — 서버로 올리지 않은 항목</h3>}
       <ul className="flex flex-col gap-2">
-        {games.length === 0 && <li className="py-4 text-center text-sm text-fg-dim">이 기기에 추가된 게임이 없습니다.</li>}
+        {games.length === 0 && !showServer && <li className="py-4 text-center text-sm text-fg-dim">이 기기에 추가된 게임이 없습니다.</li>}
         {games.map((g) => {
           const sv = saves[g.hash];
           return (
@@ -399,6 +389,30 @@ export function GameLibrary({ onRun, toast, user, onReport }: Props) {
       {games.length > 0 && (
         <button type="button" onClick={clearAll} className="self-end text-xs text-red-500 hover:text-red-400">이 기기 전체 삭제</button>
       )}
+
+      {/* ── SECONDARY: "업로드만" — smaller, at the bottom (not the main action) ──── */}
+      <div className="mt-2 border-t border-edge pt-3">
+        <label
+          className={
+            "block cursor-pointer rounded-md border border-dashed px-3 py-2 text-center text-xs transition-colors " +
+            (drag ? "border-accent bg-accent/10" : "border-edge bg-surface2 hover:border-accent")
+          }
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDrag(true);
+          }}
+          onDragLeave={() => setDrag(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDrag(false);
+            if (e.dataTransfer.files.length) void addFiles(e.dataTransfer.files);
+          }}
+        >
+          <input ref={inputRef} type="file" multiple accept=".jar,.jad,.zip,.kdf,.skm" className="hidden" data-testid="file-input" onChange={(e) => e.target.files && void addFiles(e.target.files)} />
+          <span className="font-medium text-fg-dim">업로드만 (실행하지 않고 목록에 추가)</span>
+          <span className="ml-1 text-[11px] text-fg-dim">· 여러 개 끌어다 놓거나 클릭{showServer ? " · 추가 후 “서버에 올리기”" : " · 미로그인은 이 기기에만 저장"}</span>
+        </label>
+      </div>
     </section>
   );
 }
