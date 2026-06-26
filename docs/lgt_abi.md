@@ -723,6 +723,39 @@ still stands (the `o.g=1` store and its card-`i` callers are real); what cp39–
 **negative** result that `a.run` is not the loop and `field[0x5c]` is not the gate — pin
 control-flow against an execution trace before building on it.
 
+**cp42 — the `0x21`-registered objects are BARE native handles (no class, global vtable); no
+known entry is dispatchable on them → §7 wall confirmed *empirically*, not just inferred
+(diagnostic, reverted).** Characterised every object the app hands to import `0x21` at the moment
+of registration (temporary classifier on the live guest object):
+
+- *All ten `0x21` registrations are bare.* Each `a0` is `vtable=0x4010022c` (**the GLOBAL identity
+  vtable**, not a per-class Card vtable), `pending_new=true`, **not in the instance map** (no JVM
+  class — never `<init>`'d). The a.run one (`0x48840550`) is identical. So 3.2 resolves to
+  **(ii) bare** for every candidate: there is **no** mapping to app overrides (`o.paint`/`i.a`/`i.b`)
+  or to any known platform Card slot *on these objects*.
+- *No known entry can be driven on them (3.3 not executable).* A bare object has no JVM class, so
+  `invoke_virtual` is impossible; and its only vtable is the global identity table, whose slots are
+  platform-method-**by-name** trampolines that `invoke_virtual` on `this` — which NPEs/no-ops for a
+  classless `this`. wie's existing trampoline path already **no-ops any vtable slot call on a
+  `pending_new` object** (the cp14 "discarded probe" branch). So every candidate per-frame entry on
+  the registered object is, by construction, inert in wie — there is nothing to legitimately drive.
+- *The behaviour lives in the platform registry, not the object.* `0x21(obj, code=0x1ad4, slot)`
+  hands the platform an (object, carried-code, `.data` slot) triple; `0x1ad4` is idempotent init
+  (cp37), and the per-frame behaviour is whatever the **ez-i runtime's** registry/dispatch does
+  with these triples — code that is **not in `binary.mod`** (the app only *registers*; the loop and
+  the choice of which entry to call each frame are the platform's).
+
+*Verdict — §7 platform-ABI wall, empirically established (3.4).* The registered render driver is a
+bare opaque handle with no descriptor and no bound method; the ez-i per-frame dispatch is a fact of
+the LGT/ez-i platform runtime, absent from the app binary and from public WIPI docs. Reaching it
+from wie would require **fabricating** the dispatch (which entry/slot, which object, what cadence)
+— forbidden. This closes the app-side investigation: cp37→cp42 have exhausted what `binary.mod`
+can yield. **External escalation path:** obtain the LGT/ez-i platform ABI for the native
+displayable/clet registry (the `0x21`/`0x55`/`0x56`/`0x57` semantics and the runtime's per-frame
+invocation) — e.g. an LGT SDK/runtime reference or a device-side trace of the real platform — then
+wie can emulate that registry + per-frame call from the `wie_lgt` side. Until then 배틀몬스터 (and
+the other AOT-Java titles that reach this same gate) stay at **0 draw calls**.
+
 ---
 
 ## 8. Current reach
@@ -748,5 +781,6 @@ control-flow against an execution trace before building on it.
 | ~~`a.run` is the loop; exits on null current displayable (cp39)~~ | **WITHDRAWN by cp41** — CFG mis-trace. Still valid from cp39: **no `notifyEvent` override exists** (the app keeps `o.paint`/`o.keyNotify`/`a.run`/`a.startApp` names). |
 | ~~`getInstance(a)`≠`currentJlet` (cp40)~~ | identity split is **true but irrelevant** (cp41): `field[0x5c]` is never read by `a.run`. Recorded for the record only. |
 | **CORRECTION: `a.run` is one-shot; `field[0x5c]` is dead code (cp41)** | ⛔ CFG + live: `a.run` body takes the `new`-succeeds path (`0x55/0x56/0x57/0x21`, one each) → returns at `0x2108`; the `field[0x5c]` check (`0x20e8`) is on the unreached `new`-failed branch. Reverts the wall to §7/cp37: per-frame driver = ez-i runtime invoking the `0x21`-registered object (`0x48840550`) — platform-ABI, absent from `binary.mod` |
+| `0x21` objects are BARE handles → §7 wall confirmed empirically (cp42) | ⛔ all 10 `0x21`-registered objects = GLOBAL vtable, no JVM class, `pending_new` (live classifier). No `invoke_virtual` possible; global-vtable slots no-op on a classless `this` (cp14). The per-frame entry is platform-runtime ABI not in `binary.mod`. **App-side exhausted (cp37→42); external escalation: obtain LGT/ez-i platform ABI** |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
