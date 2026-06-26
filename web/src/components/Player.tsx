@@ -198,11 +198,41 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
           exactly 3 equally-sized game keys there, so L/R · 통화/종료 · 동기화/CLR
           line up across the two sides. Every rail control is the SAME square size. */}
       <div className="flex min-h-0 flex-1 items-stretch justify-center gap-1 px-1 pt-1">
-        {/* LEFT rail */}
+        {/* LEFT rail — top service cluster: exit, keyset, key-remap (3 buttons, to
+            balance the right rail's exit-side count after moving volume right). */}
         <div className="flex flex-col justify-between gap-1.5">
           <div className="flex flex-col items-center gap-1.5">
             <button type="button" onClick={onExit} className={svc} aria-label="게임 나가기" title="나가기">←</button>
+            <button type="button" onClick={cycleKeyset} className={svc} aria-label={`키보드 세트 모드 ${keyset} — 눌러서 전환`} title="키세트 모드 전환">{keyset}</button>
+            <button type="button" onClick={() => setShowRemap(true)} className={svc} aria-label="키 설정(리매핑)" title="키 설정">⌨</button>
+          </div>
 
+          <div className="flex flex-col items-center gap-1.5">
+            <GameButton label="◀L" title="왼쪽 소프트키" {...gkey("LEFT_SOFT_KEY")} className={side} />
+            <GameButton label="📞" title="통화" {...gkey("CALL")} className={`${side} bg-green-600 text-white border-green-700`} />
+            <button type="button" onClick={() => void syncCloud()} className={svc} aria-label="세이브 자동 동기화 중 — 눌러서 지금 저장" title={user ? "세이브 자동 동기화 중 (눌러서 지금 저장)" : "로그인하면 세이브가 자동 동기화됩니다"}>☁</button>
+          </div>
+        </div>
+
+        {/* canvas fills the space between the rails (object-fit contain keeps the
+            aspect + pixelated dots), so the display is as large as possible. */}
+        <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center">
+          <canvas
+            ref={canvasRef}
+            width={240}
+            height={320}
+            data-testid="screen"
+            role="img"
+            aria-label={`${game.name} 게임 화면`}
+            className="emulator-canvas h-full w-full"
+            style={{ objectFit: "contain" }}
+          />
+        </div>
+
+        {/* RIGHT rail — top service cluster: volume, theme, menu (3 buttons, mirrors
+            the left rail's 3 so both rails carry the same count). */}
+        <div className="flex flex-col justify-between gap-1.5">
+          <div className="flex flex-col items-center gap-1.5">
             {/* compact volume: same square footprint as every other rail button.
                 Tap to open a slider popover; the GainNode stays the single,
                 device-local, real-time source of truth. */}
@@ -222,7 +252,8 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
                 <>
                   {/* click-away backdrop */}
                   <div className="fixed inset-0 z-20" onClick={() => setVolOpen(false)} aria-hidden="true" />
-                  <div className="absolute left-full top-1/2 z-30 ml-1 flex -translate-y-1/2 flex-col items-center gap-2 rounded-md border border-edge bg-surface2 p-2 shadow-lg">
+                  {/* opens to the LEFT (this is the right rail) */}
+                  <div className="absolute right-full top-1/2 z-30 mr-1 flex -translate-y-1/2 flex-col items-center gap-2 rounded-md border border-edge bg-surface2 p-2 shadow-lg">
                     <button
                       type="button"
                       onClick={() => sessionRef.current?.toggleMute()}
@@ -249,35 +280,6 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
                 </>
               )}
             </div>
-          </div>
-
-          <div className="flex flex-col items-center gap-1.5">
-            <GameButton label="◀L" title="왼쪽 소프트키" {...gkey("LEFT_SOFT_KEY")} className={side} />
-            <GameButton label="📞" title="통화" {...gkey("CALL")} className={`${side} bg-green-600 text-white border-green-700`} />
-            <button type="button" onClick={() => void syncCloud()} className={svc} aria-label="세이브 자동 동기화 중 — 눌러서 지금 저장" title={user ? "세이브 자동 동기화 중 (눌러서 지금 저장)" : "로그인하면 세이브가 자동 동기화됩니다"}>☁</button>
-          </div>
-        </div>
-
-        {/* canvas fills the space between the rails (object-fit contain keeps the
-            aspect + pixelated dots), so the display is as large as possible. */}
-        <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center">
-          <canvas
-            ref={canvasRef}
-            width={240}
-            height={320}
-            data-testid="screen"
-            role="img"
-            aria-label={`${game.name} 게임 화면`}
-            className="emulator-canvas h-full w-full"
-            style={{ objectFit: "contain" }}
-          />
-        </div>
-
-        {/* RIGHT rail */}
-        <div className="flex flex-col justify-between gap-1.5">
-          <div className="flex flex-col items-center gap-1.5">
-            <button type="button" onClick={cycleKeyset} className={svc} aria-label={`키보드 세트 모드 ${keyset} — 눌러서 전환`} title="키세트 모드 전환">{keyset}</button>
-            <button type="button" onClick={() => setShowRemap(true)} className={svc} aria-label="키 설정(리매핑)" title="키 설정">⌨</button>
             <button type="button" onClick={toggleTheme} className={svc} aria-label={theme === "dark" ? "라이트 모드" : "다크 모드"} title={theme === "dark" ? "라이트 모드" : "다크 모드"}>
               {theme === "dark" ? "☀️" : "🌙"}
             </button>

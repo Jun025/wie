@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as lib from "../lib/library";
 import { validateGame, type LoadableGame } from "../lib/emulator";
 import { files as filesApi, type ServerFile, type FilesUsage, type User } from "../lib/api";
-import { migrateLocalToServer, fmtBytes } from "../lib/serverLibrary";
+import { migrateLocalToServer, fmtBytes, type FileUploadEvent } from "../lib/serverLibrary";
 
 const KNOWN_EXTS = ["jar", "jad", "zip", "kdf", "skm"];
 
@@ -36,6 +36,7 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey }: Props) 
   const [serverFiles, setServerFiles] = useState<ServerFile[]>([]);
   const [serverUsage, setServerUsage] = useState<FilesUsage>({ used: 0, quota: 1024 * 1024 * 1024 });
   const [migrating, setMigrating] = useState(false);
+  const [uploads, setUploads] = useState<FileUploadEvent[]>([]); // live per-file upload progress (1번)
   const [busyId, setBusyId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const playInputRef = useRef<HTMLInputElement>(null);
@@ -188,8 +189,19 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey }: Props) 
     if (games.length === 0) return;
     if (!confirm(`이 기기의 게임 ${games.length}개를 내 서버 보관함(1GB, 본인만 접근)으로 올립니다.\n업로드된 게임은 이 기기에서 삭제됩니다(서버에 보관됨). 계속할까요?`)) return;
     setMigrating(true);
+    setUploads([]);
     try {
-      const r = await migrateLocalToServer();
+      // Live per-file progress: upsert each file's status as it moves through the
+      // queue (대기→업로드중→완료/실패). A failure does NOT block the rest.
+      const r = await migrateLocalToServer(undefined, (e) =>
+        setUploads((prev) => {
+          const next = prev.slice();
+          const i = next.findIndex((x) => x.hash === e.hash);
+          if (i >= 0) next[i] = e;
+          else next.push(e);
+          return next;
+        }),
+      );
       await refreshLocal();
       await refreshServer();
       const parts = [`업로드 ${r.uploaded}`, r.deduped ? `중복 ${r.deduped}(이미 보관함)` : null, r.failed ? `실패 ${r.failed}` : null].filter(Boolean);
@@ -276,34 +288,33 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey }: Props) 
         <span className="mt-0.5 block text-xs font-normal opacity-90">.jar / .jad+.jar / .zip · 클릭하거나 파일을 여기로 끌어다 놓기 · 추가 즉시 플레이</span>
       </button>
 
-      {/* server vault capacity (1GB) — logged in + provisioned. Local capacity is
-          shown ONLY when NOT logged in (logged-in devices keep no local ROMs). */}
-      {showServer ? (
+      {/* Capacity bar. Logged in → ALWAYS show the server-vault usage (used/quota +
+          %), even before the vault is provisioned, so it never silently vanishes
+          (cp/5번). Not logged in → show the device-local capacity. */}
+      {user ? (
         <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2">
           <div className="mb-1 flex items-center justify-between text-xs">
             <span className="text-emerald-700 dark:text-emerald-200">
               <span className="font-medium">{fmtBytes(serverUsage.used)}</span> / {fmtBytes(serverUsage.quota)} · 내 서버 보관함 (본인만 접근)
             </span>
-            <span className="text-emerald-700/80 dark:text-emerald-200/80">한도 고정</span>
+            <span className="text-emerald-700/80 dark:text-emerald-200/80 tabular-nums">{srvPct}%</span>
           </div>
           <div className="h-2 w-full overflow-hidden rounded-full bg-surface" role="progressbar" aria-valuenow={srvPct} aria-valuemin={0} aria-valuemax={100} aria-label="서버 보관함 사용량">
             <div className={`h-full ${srvBar} transition-all`} style={{ width: `${srvPct}%` }} />
           </div>
         </div>
       ) : (
-        !user && (
-          <div className="rounded-lg border border-edge bg-surface2 px-3 py-2">
-            <div className="mb-1 flex items-center justify-between text-xs">
-              <span className="text-fg-dim">
-                <span className="font-medium text-fg">{fmtBytes(used)}</span> / {fmtBytes(lib.LOCAL_CAP_BYTES)} · 이 기기(브라우저) 사용량
-              </span>
-              <span className="text-fg-dim">한도 고정 · 로그인 시 서버 1GB</span>
-            </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-surface" role="progressbar" aria-valuenow={localPct} aria-valuemin={0} aria-valuemax={100} aria-label="이 기기 라이브러리 사용량">
-              <div className={`h-full ${localBar} transition-all`} style={{ width: `${localPct}%` }} />
-            </div>
+        <div className="rounded-lg border border-edge bg-surface2 px-3 py-2">
+          <div className="mb-1 flex items-center justify-between text-xs">
+            <span className="text-fg-dim">
+              <span className="font-medium text-fg">{fmtBytes(used)}</span> / {fmtBytes(lib.LOCAL_CAP_BYTES)} · 이 기기(브라우저) 사용량
+            </span>
+            <span className="text-fg-dim tabular-nums">{localPct}% · 로그인 시 서버 1GB</span>
           </div>
-        )
+          <div className="h-2 w-full overflow-hidden rounded-full bg-surface" role="progressbar" aria-valuenow={localPct} aria-valuemin={0} aria-valuemax={100} aria-label="이 기기 라이브러리 사용량">
+            <div className={`h-full ${localBar} transition-all`} style={{ width: `${localPct}%` }} />
+          </div>
+        </div>
       )}
 
       {/* rejected file notice + report/login guidance */}
@@ -337,6 +348,48 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey }: Props) 
               </button>
             )}
           </div>
+
+          {/* live per-file upload progress (1번) */}
+          {uploads.length > 0 && (
+            <div className="rounded-lg border border-edge bg-surface2 px-3 py-2">
+              <div className="mb-1.5 flex items-center justify-between text-xs">
+                <span className="font-medium text-fg">서버 업로드 진행</span>
+                <span className="tabular-nums text-fg-dim">
+                  완료 {uploads.filter((u) => u.status === "uploaded" || u.status === "deduped").length}
+                  {uploads.some((u) => u.status === "failed") ? ` · 실패 ${uploads.filter((u) => u.status === "failed").length}` : ""} / {uploads.length}
+                </span>
+              </div>
+              <ul className="flex flex-col gap-1">
+                {uploads.map((u) => {
+                  const badge =
+                    u.status === "uploaded"
+                      ? { t: "완료 ✓", c: "text-emerald-600 dark:text-emerald-400" }
+                      : u.status === "deduped"
+                        ? { t: "이미 보관함 ✓", c: "text-emerald-600 dark:text-emerald-400" }
+                        : u.status === "uploading"
+                          ? { t: "업로드중…", c: "text-accent" }
+                          : u.status === "failed"
+                            ? { t: "실패", c: "text-red-500" }
+                            : { t: "대기", c: "text-fg-dim" };
+                  return (
+                    <li key={u.hash} className="flex items-center gap-2 text-xs">
+                      <span className="min-w-0 flex-1 truncate text-fg-dim">
+                        {u.name} <span className="opacity-70">· {fmtBytes(u.size)}</span>
+                      </span>
+                      <span className={`shrink-0 tabular-nums ${badge.c}`} title={u.reason}>
+                        {u.status === "uploading" && <span className="mr-1 inline-block animate-pulse">●</span>}
+                        {badge.t}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+              {uploads.some((u) => u.status === "failed") && (
+                <p className="mt-1 text-[11px] text-red-500/90">실패한 항목은 이 기기에 그대로 보존되었습니다. 다시 시도할 수 있습니다.</p>
+              )}
+            </div>
+          )}
+
           <ul className="flex flex-col gap-2">
             {serverFiles.length === 0 && <li className="py-3 text-center text-xs text-fg-dim">서버 보관함이 비어 있습니다.</li>}
             {serverFiles.map((f) => (

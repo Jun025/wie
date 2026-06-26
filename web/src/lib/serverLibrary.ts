@@ -24,7 +24,21 @@ export interface MigrateResult {
   message?: string;
 }
 
-export async function migrateLocalToServer(onProgress?: (done: number, total: number) => void): Promise<MigrateResult> {
+// Per-file lifecycle status for the live upload UI (1번): each local game moves
+// 대기(pending) → 업로드중(uploading) → 완료(uploaded|deduped) | 실패(failed).
+export type FileUploadStatus = "pending" | "uploading" | "uploaded" | "deduped" | "failed";
+export interface FileUploadEvent {
+  hash: string;
+  name: string;
+  size: number;
+  status: FileUploadStatus;
+  reason?: string; // populated for `failed`
+}
+
+export async function migrateLocalToServer(
+  onProgress?: (done: number, total: number) => void,
+  onFile?: (e: FileUploadEvent) => void,
+): Promise<MigrateResult> {
   const metas = await lib.listGames();
   let uploaded = 0;
   let deduped = 0;
@@ -32,13 +46,20 @@ export async function migrateLocalToServer(onProgress?: (done: number, total: nu
   let stopped = false;
   let message: string | undefined;
 
+  // Seed the UI with every file as 대기(pending) so the full list + total shows
+  // from the start.
+  for (const m of metas) onFile?.({ hash: m.hash, name: m.name, size: m.size, status: "pending" });
+
   for (let i = 0; i < metas.length; i++) {
-    const g = await lib.getGame(metas[i].hash);
+    const meta = metas[i];
+    const g = await lib.getGame(meta.hash);
     if (!g) {
       failed++;
+      onFile?.({ hash: meta.hash, name: meta.name, size: meta.size, status: "failed", reason: "로컬에서 파일을 찾지 못함" });
       onProgress?.(i + 1, metas.length);
       continue;
     }
+    onFile?.({ hash: g.hash, name: g.name, size: g.size, status: "uploading" });
     try {
       // g.hash is sha-256 of g.bytes (set at import time) — the server re-hashes
       // the same bytes and matches it, so content_hash stays honest.
@@ -48,19 +69,23 @@ export async function migrateLocalToServer(onProgress?: (done: number, total: nu
       await pushSaveToServer(g.hash, deviceName()).catch(() => {});
       await lib.deleteGame(g.hash); // free local ROM (save kept by default)
       uploaded++;
+      onFile?.({ hash: g.hash, name: g.name, size: g.size, status: "uploaded" });
     } catch (e) {
       const err = e as ApiError;
       if (err.code === "duplicate") {
         await pushSaveToServer(g.hash, deviceName()).catch(() => {});
         await lib.deleteGame(g.hash); // already in vault → free local ROM (save kept)
         deduped++;
+        onFile?.({ hash: g.hash, name: g.name, size: g.size, status: "deduped" });
       } else if (err.code === "quota_exceeded") {
         stopped = true;
         message = "보관함 용량(1GB)이 가득 찼습니다. 남은 게임은 이 기기에 그대로 보존했습니다.";
+        onFile?.({ hash: g.hash, name: g.name, size: g.size, status: "failed", reason: "보관함 용량(1GB) 초과 — 이 기기에 보존" });
         break; // keep the rest local
       } else {
         failed++;
         message = err.message; // keep local on any other failure
+        onFile?.({ hash: g.hash, name: g.name, size: g.size, status: "failed", reason: err.message });
       }
     }
     onProgress?.(i + 1, metas.length);

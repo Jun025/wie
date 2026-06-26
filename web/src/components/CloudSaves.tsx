@@ -77,7 +77,7 @@ export function CloudSaves({ user, toast }: Props) {
           <span className="text-emerald-700 dark:text-emerald-200">
             <span className="font-medium">{fmtBytes1(usage.used)}</span> / {fmtBytes1(usage.quota)} · 서버 세이브 사용량
           </span>
-          <span className="text-emerald-700/80 dark:text-emerald-200/80">한도 고정</span>
+          <span className="text-emerald-700/80 dark:text-emerald-200/80 tabular-nums">{pct}%</span>
         </div>
         <div className="h-2 w-full overflow-hidden rounded-full bg-surface" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="서버 세이브 사용량">
           <div className={`h-full ${bar} transition-all`} style={{ width: `${pct}%` }} />
