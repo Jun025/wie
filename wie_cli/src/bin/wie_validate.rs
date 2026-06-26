@@ -58,6 +58,78 @@ struct HeadlessScreen {
     /// 0xFF00FF leaking through), tracked across the whole run since the menu that
     /// shows it may scroll away before the final frame.
     max_magenta_px: AtomicU64,
+    /// Content-richness metrics, each tracked as the MAX over all painted frames
+    /// (the "richest" frame the run ever produced — content may scroll in/out).
+    /// These distinguish a real game frame from a chrome-only blank (a UI shell:
+    /// a status bar + an empty canvas box + a thin border) which the coarse
+    /// `saw_content` >=2-colors test mis-reads as content. Measured for every game;
+    /// see `frame_richness`.
+    ///
+    /// Distinct color count in the richest frame (capped at RICHNESS_COLOR_CAP).
+    max_distinct_colors: AtomicU64,
+    /// Fraction (basis points, 0..10000) of the richest frame NOT equal to its single
+    /// most common color — i.e. how much of the screen is non-background.
+    max_nondominant_bp: AtomicU64,
+    /// Fraction (basis points) of the CENTER region (chrome-excluded: skips the top
+    /// status bar, bottom soft-key strip, and side borders) that differs from that
+    /// region's dominant color. A chrome-only shell has a uniform (empty) center, so
+    /// this stays ~0; a real game draws content into the center, so it rises.
+    max_center_nonuniform_bp: AtomicU64,
+}
+
+/// Distinct-color counting stops here (a real game frame blows past this; the cap
+/// just bounds the per-frame set size).
+const RICHNESS_COLOR_CAP: usize = 512;
+
+/// Compute the three richness metrics for one frame: (distinct color count capped at
+/// RICHNESS_COLOR_CAP, non-dominant fraction in basis points, center-region
+/// non-uniform fraction in basis points). Pure function, unit-tested.
+fn frame_richness(data: &[u32], width: u32, height: u32) -> (u64, u64, u64) {
+    use std::collections::HashMap;
+
+    if data.is_empty() {
+        return (0, 0, 0);
+    }
+
+    // Whole-frame distinct colors + dominant color.
+    let mut counts: HashMap<u32, u32> = HashMap::new();
+    for &p in data {
+        if counts.len() < RICHNESS_COLOR_CAP || counts.contains_key(&p) {
+            *counts.entry(p).or_insert(0) += 1;
+        }
+    }
+    let distinct = counts.len() as u64;
+    let dominant = counts.values().copied().max().unwrap_or(0) as u64;
+    let total = data.len() as u64;
+    let nondominant_bp = ((total - dominant) * 10000) / total;
+
+    // Center region: skip top 28% (status bar / title chrome), bottom 12% (soft-key
+    // strip), and 12% side margins (borders). What's left is where real gameplay /
+    // menu content lives; a chrome-only shell leaves it uniform.
+    let (w, h) = (width as usize, height as usize);
+    let x0 = w * 12 / 100;
+    let x1 = w - x0;
+    let y0 = h * 28 / 100;
+    let y1 = h - h * 12 / 100;
+    let mut center: HashMap<u32, u32> = HashMap::new();
+    let mut center_total: u64 = 0;
+    for y in y0..y1 {
+        for x in x0..x1 {
+            let idx = y * w + x;
+            if idx < data.len() {
+                *center.entry(data[idx]).or_insert(0) += 1;
+                center_total += 1;
+            }
+        }
+    }
+    let center_bp = if center_total == 0 {
+        0
+    } else {
+        let center_dominant = center.values().copied().max().unwrap_or(0) as u64;
+        ((center_total - center_dominant) * 10000) / center_total
+    };
+
+    (distinct, nondominant_bp, center_bp)
 }
 
 impl Screen for HeadlessScreen {
@@ -82,6 +154,12 @@ impl Screen for HeadlessScreen {
             .filter(|&&p| ((p >> 16) & 0xff) > 200 && (p & 0xff) > 200 && ((p >> 8) & 0xff) < 60)
             .count() as u64;
         self.max_magenta_px.fetch_max(magenta, Ordering::SeqCst);
+
+        let (distinct, nondominant_bp, center_bp) = frame_richness(&data, self.width, self.height);
+        self.max_distinct_colors.fetch_max(distinct, Ordering::SeqCst);
+        self.max_nondominant_bp.fetch_max(nondominant_bp, Ordering::SeqCst);
+        self.max_center_nonuniform_bp.fetch_max(center_bp, Ordering::SeqCst);
+
         *self.last_frame.lock().unwrap() = Some(data);
         self.paints.fetch_add(1, Ordering::SeqCst);
     }
@@ -287,7 +365,8 @@ fn main() {
 
     // Emit a single JSON line for the batch wrapper to parse.
     let json = format!(
-        "{{\"file\":{:?},\"platform\":{:?},\"result\":{:?},\"reason\":{:?},\"ticks\":{},\"paints\":{},\"content\":{},\"ms\":{}}}",
+        "{{\"file\":{:?},\"platform\":{:?},\"result\":{:?},\"reason\":{:?},\"ticks\":{},\"paints\":{},\"content\":{},\
+         \"distinct_colors\":{},\"nondominant_pct\":{:.1},\"center_nonuniform_pct\":{:.1},\"ms\":{}}}",
         args.filename,
         result.platform,
         if result.passed { "PASS" } else { "FAIL" },
@@ -295,6 +374,9 @@ fn main() {
         result.ticks,
         result.paints,
         result.content,
+        result.distinct_colors,
+        result.nondominant_bp as f64 / 100.0,
+        result.center_nonuniform_bp as f64 / 100.0,
         elapsed_ms
     );
     println!("{json}");
@@ -309,6 +391,10 @@ struct Outcome {
     ticks: u64,
     paints: u64,
     content: bool,
+    // Content-richness metrics (measure-only; do not affect passed). See HeadlessScreen.
+    distinct_colors: u64,
+    nondominant_bp: u64,
+    center_nonuniform_bp: u64,
 }
 
 fn run(args: &Args) -> Outcome {
@@ -320,6 +406,9 @@ fn run(args: &Args) -> Outcome {
         last_frame: Mutex::new(None),
         saw_content: AtomicBool::new(false),
         max_magenta_px: AtomicU64::new(0),
+        max_distinct_colors: AtomicU64::new(0),
+        max_nondominant_bp: AtomicU64::new(0),
+        max_center_nonuniform_bp: AtomicU64::new(0),
     });
     let exited = Arc::new(AtomicBool::new(false));
     let stdout = Arc::new(Mutex::new(Vec::new()));
@@ -480,33 +569,38 @@ fn run(args: &Args) -> Outcome {
     let magenta_frac = screen.max_magenta_px.load(Ordering::SeqCst) as f64 / (SCREEN_W * SCREEN_H) as f64;
 
     // ── classify ─────────────────────────────────────────────────────────────
-    if let Some(reason) = run_err {
-        return fail(&platform_name, reason, ticks, paints, content);
-    }
-    if exited.load(Ordering::SeqCst) {
-        return pass(&platform_name, "clean exit".into(), ticks, paints, content);
-    }
-    if magenta_frac >= 0.15 {
-        return fail(
+    // NOTE: the richness metrics below are MEASURE-ONLY — they are recorded in the
+    // JSON for triage but deliberately do NOT influence PASS/FAIL (phase A1). The
+    // PASS/FAIL logic is byte-for-byte the existing behaviour.
+    let mut outcome = if let Some(reason) = run_err {
+        fail(&platform_name, reason, ticks, paints, content)
+    } else if exited.load(Ordering::SeqCst) {
+        pass(&platform_name, "clean exit".into(), ticks, paints, content)
+    } else if magenta_frac >= 0.15 {
+        fail(
             &platform_name,
             format!("render: magenta color-key not applied ({:.0}% of frame)", magenta_frac * 100.0),
             ticks,
             paints,
             content,
-        );
-    }
-    if content {
+        )
+    } else if content {
         let reason = if args.inject {
             "booted + rendered + survived input sequence (visual correctness NOT checked)"
         } else {
             "booted + rendered"
         };
-        return pass(&platform_name, reason.into(), ticks, paints, content);
-    }
-    if paints >= 1 {
-        return fail(&platform_name, "only blank/uniform frames (black screen)".into(), ticks, paints, content);
-    }
-    fail(&platform_name, "no frame rendered (hang/black screen)".into(), ticks, paints, content)
+        pass(&platform_name, reason.into(), ticks, paints, content)
+    } else if paints >= 1 {
+        fail(&platform_name, "only blank/uniform frames (black screen)".into(), ticks, paints, content)
+    } else {
+        fail(&platform_name, "no frame rendered (hang/black screen)".into(), ticks, paints, content)
+    };
+
+    outcome.distinct_colors = screen.max_distinct_colors.load(Ordering::SeqCst);
+    outcome.nondominant_bp = screen.max_nondominant_bp.load(Ordering::SeqCst);
+    outcome.center_nonuniform_bp = screen.max_center_nonuniform_bp.load(Ordering::SeqCst);
+    outcome
 }
 
 enum ScheduledEv {
@@ -599,6 +693,9 @@ fn pass(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         ticks,
         paints,
         content,
+        distinct_colors: 0,
+        nondominant_bp: 0,
+        center_nonuniform_bp: 0,
     }
 }
 
@@ -610,5 +707,68 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         ticks,
         paints,
         content,
+        distinct_colors: 0,
+        nondominant_bp: 0,
+        center_nonuniform_bp: 0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{RICHNESS_COLOR_CAP, frame_richness};
+
+    const W: u32 = 240;
+    const H: u32 = 320;
+
+    fn solid(color: u32) -> Vec<u32> {
+        vec![color; (W * H) as usize]
+    }
+
+    #[test]
+    fn blank_screen_is_not_rich() {
+        let (distinct, nondominant, center) = frame_richness(&solid(0x000000), W, H);
+        assert_eq!(distinct, 1);
+        assert_eq!(nondominant, 0);
+        assert_eq!(center, 0);
+    }
+
+    #[test]
+    fn chrome_only_shell_has_empty_center() {
+        // A green status bar (top 12%) + a thin green border around an otherwise
+        // all-white canvas: the 게임빌/놈ZERO blank-but-PASS pattern. The chrome adds
+        // a couple of colors and some non-dominant pixels, but the CENTER region is
+        // uniform white, so center_nonuniform must stay ~0.
+        let (w, h) = (W as usize, H as usize);
+        let mut frame = vec![0x00FF_FFFFu32; w * h]; // white
+        for y in 0..h {
+            for x in 0..w {
+                let bar = y < h * 12 / 100;
+                let border = x == 0 || x == w - 1 || y == 0 || y == h - 1;
+                if bar || border {
+                    frame[y * w + x] = 0x009A_CD00; // lime-green chrome
+                }
+            }
+        }
+        let (distinct, _nondominant, center) = frame_richness(&frame, W, H);
+        assert!(distinct <= 3, "chrome-only should have very few colors, got {distinct}");
+        assert_eq!(center, 0, "chrome-only center must be uniform (empty canvas)");
+    }
+
+    #[test]
+    fn textured_center_is_rich() {
+        // A frame whose center carries a multi-colour pattern (a real game scene):
+        // distinct colors high and center_nonuniform well above zero.
+        let (w, h) = (W as usize, H as usize);
+        let mut frame = vec![0x0000_0000u32; w * h];
+        for y in 0..h {
+            for x in 0..w {
+                // a noisy gradient-ish pattern across the whole frame
+                frame[y * w + x] = (((x * 7 + y * 13) % 251) as u32) << 8 | ((x ^ y) as u32 & 0xFF);
+            }
+        }
+        let (distinct, nondominant, center) = frame_richness(&frame, W, H);
+        assert_eq!(distinct as usize, RICHNESS_COLOR_CAP, "rich frame should hit the color cap");
+        assert!(nondominant > 5000, "rich frame: most pixels non-dominant, got {nondominant}bp");
+        assert!(center > 5000, "rich frame: center is non-uniform, got {center}bp");
     }
 }
