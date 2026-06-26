@@ -799,6 +799,40 @@ pinned, app-side next-steps for *reaching* §7: **[X-paint]** = resolve app card
 **[X-vtable]** = RE each colliding `(class, slot)` and extend `known_java_lang_vtable`. No fix shipped
 this turn (both are risky/RE-heavy and §7-gated downstream); buckets recorded for future work.
 
+**cp44 — [X-paint] and [X-vtable-`Card`] are ONE root cause (card-instance binding); a probe fix
+advances games past it but reveals a *cascade* of further boot walls (not §7) and regresses clets
+(experiment, reverted).** Measured (not inferred) where an X-vtable title goes once past its boot wall.
+
+- *Unified root cause.* In 체스마스터 the app declares class `a` extending `org/kwis/msp/lcdui/Card`
+  with concrete `paint(Graphics)V`, `A()V`, `d(IIII)V` (method records present), and `b`/`c` extend
+  `Object`. `MobiChess.startApp` `new`s the card and calls the **platform** `Card.<init>` directly (the
+  app subclass has no own `<init>`), so `bind_pending` binds the object to platform `Card`; the later
+  `card.A()` then dispatches on `Card` → `NoSuchMethodError: Card.A`. The `AbstractMethodError: paint`
+  cluster ([X-paint], 7) is the **same** mechanism — `paint` is declared *abstract* on the platform
+  `Card`, so it surfaces as `AbstractMethodError` instead of `NoSuchMethodError`. So [X-paint] (7) +
+  [X-vtable-`Card`] (스파이더맨3 `Card.d`, 체스마스터 `Card.A`, 턴 `Card.startEngine`) ≈ **10 titles, one
+  card-binding bug.** (배틀몬스터 avoids it: its cards come via `getInstance` (handle→class), not
+  `new`+`Card.<init>`.)
+- *Probe fix (reverted).* When exactly one app class directly extends a platform class, redirect
+  `bind_pending` to that subclass (체스마스터: `Card`→`a`). It **works and advances**: 체스마스터 boots
+  past `Card.A` deep into `startApp` (PC `0x1626`→`0x19a8e`); 스파이더맨3 advances `Card.d`→
+  `NoSuchMethodError c.show()V`; 슈퍼액션히어로 → `h.getNumberOfRecords()I`. But:
+  - **Not §7.** 체스마스터's new endpoint is `Allocation failure` after a ~461 s alloc loop in `startApp`
+    — a *different, deeper* wall, reached **before** `a.run`/§7. The others hit **more** `NoSuchMethod`
+    walls (a per-method/per-class cascade), also pre-§7.
+  - **Regresses clets.** 제노니아1 (WIPI-C clet, normally PASS `content=true`) **hangs >30 s** with the
+    fix and **recovers to PASS on revert** — confirmed regression (clets register descriptors that
+    populate the redirect map and mis-bind). So the naive unique-subclass redirect is **unsafe**.
+- *Measurement verdict.* cp43's "all 16 are §7-gated" is **not confirmed** for the X-paint/X-vtable
+  titles: they are blocked by a **cascade of boot walls** (card-binding → more vtable/NoSuchMethod →
+  allocation) that is **measured to not cleanly reach §7**. Fixing one wall reveals the next.
+  Recommendation: **do not** ship the unique-subclass redirect (clet regression) and **do not** pursue
+  the 8-title full vtable RE (each title is a multi-wall cascade, not one slot). The tractable next
+  step is a **clet-safe** card-binding fix (bind a `new`+platform-`Card.<init>` object to its app
+  subclass *without* touching the clet path — e.g. gate on app-class registration being non-empty AND
+  exclude the descriptor-scan false positives clets trip), then re-measure the cascade depth. Until
+  then these titles stay boot-walled; battle's §7 remains the only *confirmed* §7 case.
+
 ## 8. Current reach
 
 | stage | state |
@@ -823,5 +857,7 @@ this turn (both are risky/RE-heavy and §7-gated downstream); buckets recorded f
 | ~~`getInstance(a)`≠`currentJlet` (cp40)~~ | identity split is **true but irrelevant** (cp41): `field[0x5c]` is never read by `a.run`. Recorded for the record only. |
 | **CORRECTION: `a.run` is one-shot; `field[0x5c]` is dead code (cp41)** | ⛔ CFG + live: `a.run` body takes the `new`-succeeds path (`0x55/0x56/0x57/0x21`, one each) → returns at `0x2108`; the `field[0x5c]` check (`0x20e8`) is on the unreached `new`-failed branch. Reverts the wall to §7/cp37: per-frame driver = ez-i runtime invoking the `0x21`-registered object (`0x48840550`) — platform-ABI, absent from `binary.mod` |
 | `0x21` objects are BARE handles → §7 wall confirmed empirically (cp42) | ⛔ all 10 `0x21`-registered objects = GLOBAL vtable, no JVM class, `pending_new` (live classifier). No `invoke_virtual` possible; global-vtable slots no-op on a classless `this` (cp14). The per-frame entry is platform-runtime ABI not in `binary.mod`. **App-side exhausted (cp37→42); external escalation: obtain LGT/ez-i platform ABI** |
+| AOT-Java title sweep: 17 titles, 0 render (cp43) | ⛔ 1 at §7 (battle), 7 [X-paint] `AbstractMethodError paint`, 8 [X-vtable] misrouted `NoSuchMethod`, 1 [X-class] `NoClassDef`. All boot walls upstream of §7 |
+| [X-paint]+[X-vtable-`Card`] = card-binding; cascade not §7 (cp44) | ◑ measured: app card `new`+platform `Card.<init>` binds to `Card`, losing app subclass (paint/A/d fail). Unique-subclass bind-redirect **advances** titles (체스마스터 past `Card.A`→Allocation failure; 스파이더맨3→`c.show`) but hits a **cascade** of further boot walls (not §7) and **regresses clets** (제노니아1 hangs). Reverted; needs a clet-safe binding fix |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
