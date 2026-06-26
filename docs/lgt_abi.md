@@ -558,6 +558,64 @@ device trace, calls into the `0xda870→0xdb240` (`o.g`) writer chain — i.e. R
 platform's native-displayable dispatch (the absent caller), not the app; the app side is
 exhausted.
 
+**cp38 — the `o.g=1` store is UNCONDITIONAL; the gate is *which method runs*, and the
+o.g-setter is a card method reached only by vtable dispatch (decode + live values, reverted).**
+cp36 attributed the stuck `o.g` to an unsatisfied predicate "needing accumulated state."
+cp38 decoded the actual control flow and it is **not** a predicate at the store — it is a
+*never-dispatched method*. Two corrections + hard evidence:
+
+- *The store `0xdb240` is unconditional.* `str r4,[r3,#0x18]` (`r4=1`, `r3=[o_singleton+8]`
+  = the `o.g` slot) sits in a self-contained function whose **prologue is `0xdb200`**; there
+  is **no conditional branch between `0xdb200` and `0xdb240`** that can skip it. So `o.g=1`
+  **iff `fn@0xdb200` is entered**. `fn@0xdb200` is a private helper ("show/activate card N":
+  takes a card-id in `r0`, does `o[0x30]=max(o[0x30],id)`, `o.g=1`, `o[0x70]=0`); it has
+  **no method-table entry** — it is called via 4 `.text` literal-pool `ldr;bx` sites.
+- *cp36 drove the WRONG function.* `fn@0xda870` (which cp36 drove and saw `o.g` stay 0) is
+  the **resetter**: prologue `0xda870`, it does `getInstance(o)` (`bl 0xd8640`) then
+  `str 0,[…+0x18]` (`o.g=0`) and **returns at `0xda940`** — it never reaches `0xdb240`. So
+  driving it can only ever *clear* `o.g`. cp36's "needs accumulated state" conclusion is
+  **withdrawn**.
+- *Who calls the setter (the real gate), with exact predicates.* The 2 reachable
+  literal-pool call sites of `fn@0xdb200` are inside two **registered card-`i` methods**
+  (`i` extends `b` … extends `Card`):
+  - `i.b(III)V` (`@0x2d6b4`, rec `0x14020d0`): `cmp r7,#0; bne skip` where `r7` = its **3rd
+    int arg `p3`**. So **`o.g=1` iff `i.b(_, _, 0)` is invoked** (then `0xdb200(card=3)`).
+  - `i.a()V` (`@0x6fac4`, rec `0x1402c4c`): `cmp [fp-0x30], o[0x74]; bne skip` (a local vs
+    the `o` field at `+0x74`); if equal → `0xdb200(card=5)` then `(9)`.
+  Both `i.a`/`i.b` have **no direct `bl` anywhere in `.text`** — only their method-table
+  entry — so they are reached **only by virtual (vtable) dispatch**, i.e. by the game state
+  machine / ez-i event loop, never by a static app call.
+- *Live values (temporary diag, reverted).* At the natural boot stop the `o` singleton
+  exists (`o@0x48840130`) with **`o.g=0, o[0x30]=0, o[0x74]=0`**; a full debug trace shows
+  **only 5 app dispatches in the entire boot** — `Game.<init>/a/b`, `a.startApp`, `a.run` —
+  and **zero card methods** (`i/o/b/d/e/j/l`) ever run. Driving `i.b(0,0,0)` via the JVM
+  **flips `o.g` to `1` in a single call** (then `i.b` errors later in the same font/`String`
+  path as cp28–35 — the `o.g` store already happened); `i.a()` runs clean and `o.g` stays 1.
+
+*Label table (the §2.2 deliverable):*
+
+| input that gates `o.g=1` | what it is | writer / supplier | label |
+|---|---|---|---|
+| `fn@0xdb200` is entered | "show card N" helper; the unconditional `o.g=1` store | the 2 card-`i` call sites below | — |
+| `i.b` arg `p3 == 0` | 3rd int param of `i.b(III)V` | **`i.b`'s caller** (state machine, via vtable) — no static app caller | **PLATFORM** (per-frame/event dispatch) |
+| `i.a` local `== o[0x74]` | a value computed in `i.a` vs `o` field `+0x74` | `i.a`'s own body once `i.a` is dispatched; `o[0x74]=0` at boot | **PLATFORM** (`i.a` itself is dispatch-only) |
+| `i.a` / `i.b` are invoked | the card update methods themselves | **ez-i runtime vtable dispatch of the current card** (absent in `binary.mod`) | **PLATFORM** |
+
+*Verdict — §7 wall HARD-confirmed, with a sharper shape.* Every gate resolves to the same
+thing: the **card-`i` update methods (`i.a`/`i.b`) are never dispatched** because nothing
+drives the ez-i per-frame/per-event loop. The `o.g` store is healthy and reachable by a
+**single** legitimate method call (so it is **not** the unsatisfiable accumulated-state
+predicate cp36 supposed); the lone missing piece is the runtime's natural dispatch of the
+current card's update method. Driving `i.a`/`i.b` out-of-band sets `o.g` but is **forcing**
+(it jumps to a card irrespective of game logic / args), the same class as force-`g`, so it is
+**not** an APP-drivable precondition wie has legitimately completed. **No (b) candidate — pure
+(a).** Encouragingly, the gap is now a *normal card-method dispatch* (vtable + a "current
+displayable / update entry" protocol), closer to wie's existing `Card.paint` tick than to an
+opaque native handle: the open question narrows from "what native entry?" to **"what is the
+ez-i protocol for choosing the current displayable and dispatching its per-frame update method
+(the analog of `i.a`/`i.b`) — which method/slot, what args (e.g. `i.b`'s `p3`), what cadence
+(frame vs key/timer event)?"** That protocol is platform-side; the app side is exhausted.
+
 ---
 
 ## 8. Current reach
@@ -577,7 +635,8 @@ exhausted.
 | glyph-draw fn runs; no font image (cp33) | ◑ `@0x109b4` is called per char but takes its `r6==0` (no font image) path → `import 0x22` no-op, **0 drawImage**. Root cause: bitmap-font sheet absent guest-side |
 | glyph blit mechanism RE'd (cp34) | ◑ blit = `g.drawImage(sheet, src_x=(char-0x21)*10, w=10)`; font path via `import 0x22(a0=font_img, a1=0x11264→fn 0x10fb0)` |
 | font path resolved → platform-gated (cp35) | ⛔ probe: `r6=g` (not the font img — cp33/4 corrected); font img = `0x22` a0 = **0** every char; `0x10fb0` = strb bookkeeping (no draw); **no font `createImage`** in the reachable run (only the 240×320 back-buffer). Font load/native render is §7-gated, not an app one-liner |
-| wie can't substitute the ez-i tick (cp36) | ⛔ `o.k()` (registered) and `fn@0xda870` (real `o.g` writer, unregistered) both driven from wie → `o.g` stays 0: the `o.g=1` branch needs accumulated game state, not a single method call. §7 ez-i per-frame drive is the sole remaining gate |
+| wie can't substitute the ez-i tick (cp36) | ⛔ ~~`fn@0xda870` driven → `o.g` stays 0~~ — **corrected by cp38**: `fn@0xda870` is the `o.g=0` *resetter*, not the setter; the "accumulated state" conclusion is withdrawn |
 | registered carried code is INIT, not the frame step (cp37) | ⛔ `0x55/0x56/0x57/0x21` all register one entry `0x1ad4→0x1a24` = straight-line idempotent init (full disasm; arg-ignoring). Synthesized per-frame drive of it ran clean but **stayed black** (inert, extends cp23). Per-frame entry is a method on the `0x21` object via the platform's native-displayable ABI (absent from `binary.mod`). Reverted |
+| `o.g=1` store decoded; gate = un-dispatched card method (cp38) | ⛔ store `0xdb240` is **unconditional** within `fn@0xdb200` ("show card"); reached only from card `i.b(_,_,0)` / `i.a()`, which are **vtable-dispatch-only**. Boot dispatches **5 methods, zero card methods**; `o.g=0` at stop; driving `i.b(0,0,0)` flips `o.g=1` in one call (forcing, reverted). Gap = absent ez-i dispatch of the current card's update method (§7), not an unsatisfiable predicate |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
