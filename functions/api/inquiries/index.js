@@ -103,6 +103,13 @@ export async function onRequestPost(context) {
 
     const att = validateAttachment(body.attachment ?? null);
 
+    // 6번: optional references to the user's OWN vault files (by id — never bytes).
+    // Bounded list; each id is validated for ownership below before any ref is stored.
+    let fileIds = [];
+    if (Array.isArray(body.file_ids)) {
+      fileIds = [...new Set(body.file_ids.filter((x) => typeof x === "string" && /^[0-9a-f-]{1,40}$/i.test(x)))].slice(0, 20);
+    }
+
     const id = uuid();
     const now = Date.now();
     try {
@@ -112,7 +119,24 @@ export async function onRequestPost(context) {
       )
         .bind(id, user.id, title, text, env, att?.name ?? "", att?.mime ?? "", att?.data ?? "", now)
         .run();
-      return ok({ inquiry: { id, title, created_at: now, has_attachment: !!att } });
+
+      // Attach vault-file references (ownership-checked: only the user's OWN files).
+      // Best-effort + graceful: a missing inquiry_file_refs table (pre-migration 0008)
+      // must not fail the inquiry itself.
+      let refs = 0;
+      if (fileIds.length) {
+        try {
+          for (const fid of fileIds) {
+            const owned = await context.env.DB.prepare("SELECT id FROM user_files WHERE id = ? AND user_id = ?").bind(fid, user.id).first();
+            if (!owned) continue; // not the user's file → silently skip (never reference others')
+            await context.env.DB.prepare("INSERT OR IGNORE INTO inquiry_file_refs (inquiry_id, file_id, user_id, created_at) VALUES (?, ?, ?, ?)").bind(id, fid, user.id, now).run();
+            refs++;
+          }
+        } catch (refErr) {
+          console.error("inquiry file refs (pre-migration 0008?):", refErr && refErr.message);
+        }
+      }
+      return ok({ inquiry: { id, title, created_at: now, has_attachment: !!att, file_refs: refs } });
     } catch (schemaErr) {
       // GRACEFUL: env_info/attachment columns don't exist until migration 0002
       // is applied to the remote D1. Fall back to the legacy column set (the

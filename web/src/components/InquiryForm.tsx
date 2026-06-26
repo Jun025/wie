@@ -5,6 +5,7 @@ import { envInfoText } from "../lib/device";
 interface Props {
   user: User | null;
   toast: (msg: string, kind?: "ok" | "err") => void;
+  initialFileRefs?: { id: string; name: string }[]; // 6번: vault files carried in by reference
 }
 
 const MAX_ATTACH = 96 * 1024;
@@ -57,17 +58,27 @@ type Kind = "inquiry" | "report";
 //                  (game/exec files blocked, 415). 게임 식별정보 미포함.
 //   • 권리 침해 신고·삭제요청 — anonymous-allowed (no login); intake only, no file
 //                  access; game/exec attachments are not part of this form.
-export function InquiryForm({ user, toast }: Props) {
+export function InquiryForm({ user, toast, initialFileRefs }: Props) {
   const [kind, setKind] = useState<Kind>("inquiry");
 
   // inquiry fields
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [attach, setAttach] = useState<InquiryAttachment | null>(null);
+  const [fileRefs, setFileRefs] = useState<{ id: string; name: string }[]>([]); // 6번: referenced vault files
   const [showEnv, setShowEnv] = useState(false);
   const [list, setList] = useState<Inquiry[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const env = envInfoText();
+
+  // When the library hands over selected vault files, pre-attach them (by reference)
+  // and make sure we're on the 문의 tab.
+  useEffect(() => {
+    if (initialFileRefs && initialFileRefs.length) {
+      setFileRefs(initialFileRefs);
+      setKind("inquiry");
+    }
+  }, [initialFileRefs]);
 
   // report (권리 침해 신고·삭제요청) fields — standard takedown intake
   const [rType, setRType] = useState<"owner" | "agent">("owner");
@@ -113,11 +124,18 @@ export function InquiryForm({ user, toast }: Props) {
     e.preventDefault();
     setBusy(true);
     try {
-      await inquiries.create({ title: title.trim(), body: body.trim(), env_info: env, attachment: attach });
-      toast("문의가 접수되었습니다 (환경정보 자동 첨부)", "ok");
+      await inquiries.create({
+        title: title.trim(),
+        body: body.trim(),
+        env_info: env,
+        attachment: attach,
+        file_ids: fileRefs.map((r) => r.id),
+      });
+      toast(fileRefs.length ? `문의가 접수되었습니다 (보관 파일 ${fileRefs.length}개 참조 첨부)` : "문의가 접수되었습니다 (환경정보 자동 첨부)", "ok");
       setTitle("");
       setBody("");
       setAttach(null);
+      setFileRefs([]);
       if (fileRef.current) fileRef.current.value = "";
       await refresh();
     } catch (err) {
@@ -270,6 +288,22 @@ export function InquiryForm({ user, toast }: Props) {
                 내용
                 <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} maxLength={8000} required className={input} />
               </label>
+
+              {/* 6번: vault files carried in by reference (no byte re-upload) */}
+              {fileRefs.length > 0 && (
+                <div className="flex flex-col gap-1 rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-sm">
+                  <span className="text-xs text-fg-dim">첨부된 보관함 파일 (참조 · 운영자만 열람)</span>
+                  <ul className="flex flex-wrap gap-1.5">
+                    {fileRefs.map((r) => (
+                      <li key={r.id} className="flex items-center gap-1 rounded-full bg-surface2 px-2 py-0.5 text-xs text-fg">
+                        📎 <span className="max-w-[12rem] truncate">{r.name}</span>
+                        <button type="button" aria-label={`${r.name} 첨부 제거`} onClick={() => setFileRefs((prev) => prev.filter((x) => x.id !== r.id))} className="ml-0.5 text-fg-dim hover:text-red-500">✕</button>
+                      </li>
+                    ))}
+                  </ul>
+                  <span className="text-[11px] text-fg-dim">바이트를 다시 올리지 않고 본인 보관함 파일을 <strong>참조</strong>로 첨부합니다. 운영자는 소유자 검사 경로로만 확인합니다(공개 URL 없음).</span>
+                </div>
+              )}
 
               <div className="flex flex-col gap-1 text-sm text-fg-dim">
                 파일 첨부 (선택 · 이미지/텍스트/로그만)

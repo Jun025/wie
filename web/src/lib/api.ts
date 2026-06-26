@@ -154,7 +154,7 @@ export const devices = {
 };
 
 export const inquiries = {
-  create: (payload: { title: string; body: string; env_info?: string; attachment?: InquiryAttachment | null }) =>
+  create: (payload: { title: string; body: string; env_info?: string; attachment?: InquiryAttachment | null; file_ids?: string[] }) =>
     call<{ ok: boolean; inquiry: Inquiry }>("/inquiries", { method: "POST", body: payload }),
   list: () => call<{ ok: boolean; inquiries: Inquiry[] }>("/inquiries"),
 };

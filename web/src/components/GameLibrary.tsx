@@ -20,6 +20,7 @@ interface Props {
   user: User | null;
   onReport: () => void; // navigate to inquiry (or login) to report a bad file
   reloadKey?: number; // bump to force a re-read (e.g. after login auto-upload)
+  onInquireWithFiles?: (refs: { id: string; name: string }[]) => void; // 6번: 선택 보관 파일로 문의 전환
 }
 
 interface Rejection {
@@ -27,7 +28,7 @@ interface Rejection {
   reason: string;
 }
 
-export function GameLibrary({ onRun, toast, user, onReport, reloadKey }: Props) {
+export function GameLibrary({ onRun, toast, user, onReport, reloadKey, onInquireWithFiles }: Props) {
   const [games, setGames] = useState<lib.GameMeta[]>([]);
   const [saves, setSaves] = useState<Record<string, lib.LocalSave>>({});
   const [used, setUsed] = useState(0);
@@ -40,6 +41,7 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey }: Props) 
   const [serverUsage, setServerUsage] = useState<FilesUsage>({ used: 0, quota: 1024 * 1024 * 1024 });
   const [migrating, setMigrating] = useState(false);
   const [uploads, setUploads] = useState<FileUploadEvent[]>([]); // live per-file upload progress (1번)
+  const [selected, setSelected] = useState<Set<string>>(new Set()); // 6번: checked server files for "문의"
   const [busyId, setBusyId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const playInputRef = useRef<HTMLInputElement>(null);
@@ -360,6 +362,26 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey }: Props) 
             )}
           </div>
 
+          {/* 6번: select vault files → carry them (by reference) into a 문의 */}
+          {onInquireWithFiles && selected.size > 0 && (
+            <div className="flex items-center justify-between rounded-md border border-accent/40 bg-accent/10 px-3 py-1.5 text-xs">
+              <span className="text-fg">{selected.size}개 선택됨</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const refs = serverFiles.filter((f) => selected.has(f.id)).map((f) => ({ id: f.id, name: f.file_name }));
+                    if (refs.length) onInquireWithFiles(refs);
+                  }}
+                  className="rounded-md bg-accent px-3 py-1 font-medium text-accent-fg hover:bg-accent-hover"
+                >
+                  선택 파일로 문의
+                </button>
+                <button type="button" onClick={() => setSelected(new Set())} className="text-fg-dim hover:text-fg">선택 해제</button>
+              </div>
+            </div>
+          )}
+
           {/* live per-file upload progress (1번) */}
           {uploads.length > 0 && (
             <div className="rounded-lg border border-edge bg-surface2 px-3 py-2">
@@ -405,6 +427,21 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey }: Props) 
             {serverFiles.length === 0 && <li className="py-3 text-center text-xs text-fg-dim">서버 보관함이 비어 있습니다.</li>}
             {serverFiles.map((f) => (
               <li key={f.id} className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-surface2 px-3 py-2">
+                {onInquireWithFiles && (
+                  <input
+                    type="checkbox"
+                    aria-label={`${f.file_name} 선택`}
+                    checked={selected.has(f.id)}
+                    onChange={(e) =>
+                      setSelected((prev) => {
+                        const next = new Set(prev);
+                        e.target.checked ? next.add(f.id) : next.delete(f.id);
+                        return next;
+                      })
+                    }
+                    className="h-4 w-4 shrink-0 accent-accent"
+                  />
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium text-fg">{f.file_name}</div>
                   <div className="text-xs text-fg-dim">

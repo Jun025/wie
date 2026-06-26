@@ -39,6 +39,8 @@ function ViewPanel({
   toast,
   onReport,
   reloadKey,
+  onInquireWithFiles,
+  inquiryFileRefs,
 }: {
   view: View;
   authState: AuthState;
@@ -46,14 +48,16 @@ function ViewPanel({
   toast: (m: string, k?: "ok" | "err") => void;
   onReport: () => void;
   reloadKey: number;
+  onInquireWithFiles: (refs: { id: string; name: string }[]) => void;
+  inquiryFileRefs: { id: string; name: string }[];
 }) {
   switch (view) {
     case "library":
-      return <GameLibrary onRun={onRun} toast={toast} user={authState.user} onReport={onReport} reloadKey={reloadKey} />;
+      return <GameLibrary onRun={onRun} toast={toast} user={authState.user} onReport={onReport} reloadKey={reloadKey} onInquireWithFiles={onInquireWithFiles} />;
     case "cloud":
       return <CloudSaves user={authState.user} toast={toast} />;
     case "inquiry":
-      return <InquiryForm user={authState.user} toast={toast} />;
+      return <InquiryForm user={authState.user} toast={toast} initialFileRefs={inquiryFileRefs} />;
     case "help":
       return <Help />;
     case "info":
@@ -87,6 +91,7 @@ export default function App() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [libVersion, setLibVersion] = useState(0); // bump to make GameLibrary re-read after auto-upload
+  const [inquiryFileRefs, setInquiryFileRefs] = useState<{ id: string; name: string }[]>([]); // 6번: vault files carried into 문의
   const autoUploadedFor = useRef<string | null>(null);
 
   // Install the global audio-unlock listeners once (iOS WebKit needs the first
@@ -157,6 +162,17 @@ export default function App() {
     else setView("inquiry");
   }, [running, authState.user]);
 
+  // 6번: carry selected vault files (by reference) into the 문의 form + switch to it.
+  const onInquireWithFiles = useCallback(
+    (refs: { id: string; name: string }[]) => {
+      setInquiryFileRefs(refs);
+      if (!authState.user) return setAccountOpen(true);
+      if (running) setOverlay("inquiry");
+      else setView("inquiry");
+    },
+    [running, authState.user],
+  );
+
   const closeReset = useCallback(() => {
     setResetToken(null);
     setAccountOpen(false);
@@ -209,7 +225,7 @@ export default function App() {
 
         {overlay && overlay !== "menu" && (
           <Overlay title={tabLabel(overlay)} onClose={() => setOverlay(null)}>
-            <ViewPanel view={overlay} authState={authState} onRun={onRun} toast={showToast} onReport={onReport} reloadKey={libVersion} />
+            <ViewPanel view={overlay} authState={authState} onRun={onRun} toast={showToast} onReport={onReport} reloadKey={libVersion} onInquireWithFiles={onInquireWithFiles} inquiryFileRefs={inquiryFileRefs} />
           </Overlay>
         )}
 
@@ -271,7 +287,7 @@ export default function App() {
             )}
           </div>
         )}
-        <ViewPanel view={view} authState={authState} onRun={onRun} toast={showToast} onReport={onReport} reloadKey={libVersion} />
+        <ViewPanel view={view} authState={authState} onRun={onRun} toast={showToast} onReport={onReport} reloadKey={libVersion} onInquireWithFiles={onInquireWithFiles} inquiryFileRefs={inquiryFileRefs} />
       </main>
 
       <footer className="mt-auto px-4 py-6 text-center text-xs text-fg-dim">
