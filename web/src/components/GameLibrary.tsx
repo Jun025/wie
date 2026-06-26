@@ -36,6 +36,7 @@ export function GameLibrary({ onRun, toast, user, onReport }: Props) {
   const [migrating, setMigrating] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const playInputRef = useRef<HTMLInputElement>(null);
 
   const refreshLocal = useCallback(async () => {
     const [list, total, localSaves] = await Promise.all([lib.listGames(), lib.totalGameBytes(), lib.listLocalSaves()]);
@@ -68,23 +69,24 @@ export function GameLibrary({ onRun, toast, user, onReport }: Props) {
   // Store a candidate game ONLY after it validates as a loadable format. Invalid
   // files are never written to IndexedDB and are surfaced for reporting.
   const tryStore = useCallback(
-    async (name: string, kind: string, bytes: ArrayBuffer, jadBytes?: ArrayBuffer): Promise<boolean> => {
+    async (name: string, kind: string, bytes: ArrayBuffer, jadBytes?: ArrayBuffer): Promise<string | null> => {
       const reason = await validateGame(name, bytes);
       if (reason) {
         setRejected({ name, reason });
-        return false;
+        return null;
       }
       const hash = await lib.sha256Hex(bytes);
       await lib.putGame({ hash, name, kind, bytes, jadBytes, size: bytes.byteLength + (jadBytes?.byteLength ?? 0), addedAt: Date.now() });
-      return true;
+      return hash;
     },
     [],
   );
 
   const addFiles = useCallback(
-    async (fileList: FileList | File[]) => {
+    async (fileList: FileList | File[], runFirst = false) => {
       setRejected(null);
       const files = [...fileList];
+      let firstHash: string | null = null;
       const byBase = new Map<string, File[]>();
       for (const f of files) {
         const base = f.name.replace(/\.[^.]+$/, "");
@@ -118,9 +120,11 @@ export function GameLibrary({ onRun, toast, user, onReport }: Props) {
             toast(`이 기기 보관 한도(${lib.LOCAL_CAP_MB}MB) 초과 — 로그인 후 서버 보관함(1GB)에 올리거나 게임을 삭제하세요`, "err");
             return;
           }
-          if (await tryStore(jar.name, "jad", jarBytes, jadBytes)) {
+          const h = await tryStore(jar.name, "jad", jarBytes, jadBytes);
+          if (h) {
             usedBytes += jarBytes.byteLength + jadBytes.byteLength;
             added++;
+            firstHash = firstHash ?? h;
           }
           continue;
         }
@@ -128,17 +132,27 @@ export function GameLibrary({ onRun, toast, user, onReport }: Props) {
         const bytes = await f.arrayBuffer();
         if (usedBytes + bytes.byteLength > capBytes) {
           toast(`이 기기 보관 한도(${lib.LOCAL_CAP_MB}MB) 초과 — 로그인 후 서버 보관함(1GB)에 올리거나 게임을 삭제하세요`, "err");
-          return;
+          break;
         }
-        if (await tryStore(f.name, ext, bytes)) {
+        const h = await tryStore(f.name, ext, bytes);
+        if (h) {
           usedBytes += bytes.byteLength;
           added++;
+          firstHash = firstHash ?? h;
         }
       }
-      if (added > 0) toast(`${added}개 라이브러리에 추가됨 (이 기기에만 저장)`, "ok");
       await refreshLocal();
+      // "업로드하고 바로 실행": play the first game we just added.
+      if (runFirst && firstHash) {
+        const g = await lib.getGame(firstHash);
+        if (g) {
+          onRun({ hash: g.hash, name: g.name, bytes: g.bytes });
+          return;
+        }
+      }
+      if (added > 0) toast(`${added}개 라이브러리에 추가됨 (이 기기에 저장)`, "ok");
     },
-    [refreshLocal, toast, tryStore],
+    [refreshLocal, toast, tryStore, onRun],
   );
 
   const run = useCallback(
@@ -152,10 +166,10 @@ export function GameLibrary({ onRun, toast, user, onReport }: Props) {
 
   const remove = useCallback(
     async (hash: string) => {
-      if (!confirm("이 게임을 이 기기에서 삭제할까요? (세이브 로컬 캐시도 함께 삭제)")) return;
-      await lib.deleteGame(hash);
+      if (!confirm("이 게임을 이 기기에서 삭제할까요? (세이브는 보존되어 다시 추가하면 이어서 할 수 있습니다)")) return;
+      await lib.deleteGame(hash); // save kept (keyed by ROM hash) — no save loss
       await refreshLocal();
-      toast("삭제됨");
+      toast("삭제됨 (세이브는 보존)");
     },
     [refreshLocal, toast],
   );
@@ -229,7 +243,7 @@ export function GameLibrary({ onRun, toast, user, onReport }: Props) {
       <div className="rounded-lg border border-edge bg-surface2 px-3 py-2">
         <div className="mb-1 flex items-center justify-between text-xs">
           <span className="text-fg-dim">
-            <span className="font-medium text-fg">{fmtBytes(used)}</span> / {lib.LOCAL_CAP_MB} MB · 이 기기(브라우저) 사용량
+            <span className="font-medium text-fg">{fmtBytes(used)}</span> / {fmtBytes(lib.LOCAL_CAP_BYTES)} · 이 기기(브라우저) 사용량
           </span>
           <span className="text-fg-dim">한도 고정</span>
         </div>
@@ -244,6 +258,7 @@ export function GameLibrary({ onRun, toast, user, onReport }: Props) {
           <div className="mb-1 flex items-center justify-between text-xs">
             <span className="text-emerald-700 dark:text-emerald-200">
               <span className="font-medium">{fmtBytes(serverUsage.used)}</span> / {fmtBytes(serverUsage.quota)} · 내 서버 보관함 (본인만 접근)
+              {/* 1-decimal via fmtBytes (e.g. 2.4 MB / 1.0 GB) */}
             </span>
             <span className="text-emerald-700/80 dark:text-emerald-200/80">한도 고정</span>
           </div>
@@ -253,9 +268,31 @@ export function GameLibrary({ onRun, toast, user, onReport }: Props) {
         </div>
       )}
 
+      {/* PRIMARY: add the file AND immediately play it. */}
+      <input
+        ref={playInputRef}
+        type="file"
+        accept=".jar,.jad,.zip,.kdf,.skm"
+        className="hidden"
+        data-testid="file-input-play"
+        onChange={(e) => {
+          if (e.target.files?.length) void addFiles(e.target.files, true);
+          e.target.value = "";
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => playInputRef.current?.click()}
+        className="rounded-lg bg-accent px-4 py-3 text-center font-semibold text-accent-fg shadow-sm hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+      >
+        ▶ 게임 파일 추가하고 바로 실행
+        <span className="mt-0.5 block text-xs font-normal opacity-90">.jar / .jad+.jar / .zip · 추가 즉시 플레이</span>
+      </button>
+
+      {/* SECONDARY: add to the library only (drop or click). */}
       <label
         className={
-          "cursor-pointer rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors " +
+          "cursor-pointer rounded-lg border-2 border-dashed px-4 py-4 text-center transition-colors " +
           (drag ? "border-accent bg-accent/10" : "border-edge bg-surface2 hover:border-accent")
         }
         onDragOver={(e) => {
@@ -270,12 +307,12 @@ export function GameLibrary({ onRun, toast, user, onReport }: Props) {
         }}
       >
         <input ref={inputRef} type="file" multiple accept=".jar,.jad,.zip,.kdf,.skm" className="hidden" data-testid="file-input" onChange={(e) => e.target.files && void addFiles(e.target.files)} />
-        <div className="font-medium text-fg">게임 파일 추가 (BYOF)</div>
-        <div className="mt-1 text-xs text-fg-dim">.jar / .jad+.jar / .zip · 끌어다 놓거나 클릭</div>
-        <div className="mt-2 text-[11px] text-fg-dim">
+        <div className="text-sm font-medium text-fg">업로드만 (목록에 추가)</div>
+        <div className="mt-0.5 text-xs text-fg-dim">여러 개 끌어다 놓거나 클릭</div>
+        <div className="mt-1 text-[11px] text-fg-dim">
           {showServer
             ? "추가하면 먼저 이 기기에 저장됩니다. 아래 “서버 보관함에 올리기”로 본인 전용 서버(1GB)에 보관할 수 있어요."
-            : "파일은 브라우저(IndexedDB)에만 저장되며 서버로 전송되지 않습니다."}
+            : "파일은 브라우저(IndexedDB)에만 저장되며 서버로 전송되지 않습니다(미로그인)."}
         </div>
       </label>
 
