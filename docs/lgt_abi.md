@@ -690,6 +690,39 @@ i.e. trace the app's "set current card/displayable" call (the AOT analog of
 gate; the `getInstance` identity split is a side issue to revisit only if it turns out the writer
 *does* target a third instance that `a.run` should but doesn't read.
 
+**cp41 — CORRECTION: `a.run` is ONE-SHOT, not a loop; the `field[0x5c]` gate (cp39) is dead
+code. The cp39/40/41 "a.run loop" line is withdrawn; the wall reverts to §7 (cp37).** Before
+acting on the cp41 H1/H2 hypotheses, the `a.run` control flow was re-traced from `binary.mod`
+**and** cross-checked against the live import trace — and cp39's premise is **false**.
+
+- *Executed path (CFG + live, conclusive).* `a.run@0x1f10` enters at `b 0x212c` (run-flag check:
+  `getInstance(a).field[0x20] != 0` → true) → body `0x1f38`. The body calls imports `0x55`
+  (`lr=0x1f44`), `0x56` (`0x1f58`), `0x1f` (`0x1f68`), then **`new()` at `0x1f68`** which
+  **succeeds** (`r0 != 0`) → `0x1f7c` → import `0x57` (`0x1f94`) → `b 0x1ff4` → import `0x21`
+  (`0x48840550`, `lr=0x2108`) → **`0x2108: b 0x2140` = return**. Live trace: each of these imports
+  fires **exactly once**, `0x21` at `lr=0x2108` exactly once, and **no import fires at any
+  `lr` in `0x2000..0x20f8`** — so the `field[0x5c]` check at `0x20e8` is **never reached** (it sits
+  on the `new`-**failed** branch `0x1f9c→…`, not taken because `new` always succeeds).
+- *Consequence.* cp39's "`a.run` = `while(field[0x20]){…; if field[0x5c]==0 exit}`" mis-read the
+  CFG: the loop-back (`0x213c`) and the `field[0x5c]` exit (`0x20f8`) are both on the unreached
+  `new`-failed path. `a.run` actually does **one** registration pass (carried code via
+  `0x55/0x56/0x57`, an object via `0x21`) and returns — i.e. exactly the one-shot registrar of
+  **cp37**. cp40's identity split (`getInstance(a)=0x48840020` ≠ `currentJlet=0x48840010`, both
+  `field[0x5c]=0`) is **factually true but irrelevant**: `field[0x5c]` is never read.
+- *H1/H2 not applicable.* Both hypotheses assumed `a.run` reads `field[0x5c]` and loops; since it
+  does neither, there is nothing to wire (H1) or unify (H2) for this gate. Not implemented.
+
+*Where this leaves the wall — back to §7 (cp37), re-confirmed.* The per-frame driver is **not**
+`a.run` (one-shot). It is the **ez-i runtime driving the object `a.run` registered via `0x21`**
+(`0x48840550`, a bare `new`'d native handle) plus the carried code `0x1ad4` (`0x55/0x56/0x57`).
+cp37 already showed driving `0x1ad4` is inert (it is init code), and the `0x21` object has no
+bound method to call (guessing its vtable slot is forbidden). So the single open question is the
+original §7 one: **which entry of which registered object does the ez-i runtime invoke each
+frame** — a platform-ABI fact absent from `binary.mod`. *Meta-note:* cp38's `o.g`/`i.b` decode
+still stands (the `o.g=1` store and its card-`i` callers are real); what cp39–41 add is the
+**negative** result that `a.run` is not the loop and `field[0x5c]` is not the gate — pin
+control-flow against an execution trace before building on it.
+
 ---
 
 ## 8. Current reach
@@ -712,7 +745,8 @@ gate; the `getInstance` identity split is a side issue to revisit only if it tur
 | wie can't substitute the ez-i tick (cp36) | ⛔ ~~`fn@0xda870` driven → `o.g` stays 0~~ — **corrected by cp38**: `fn@0xda870` is the `o.g=0` *resetter*, not the setter; the "accumulated state" conclusion is withdrawn |
 | registered carried code is INIT, not the frame step (cp37) | ⛔ `0x55/0x56/0x57/0x21` all register one entry `0x1ad4→0x1a24` = straight-line idempotent init (full disasm; arg-ignoring). Synthesized per-frame drive of it ran clean but **stayed black** (inert, extends cp23). Per-frame entry is a method on the `0x21` object via the platform's native-displayable ABI (absent from `binary.mod`). Reverted |
 | `o.g=1` store decoded; gate = un-dispatched card method (cp38) | ⛔ store `0xdb240` is **unconditional** within `fn@0xdb200` ("show card"); reached only from card `i.b(_,_,0)` / `i.a()`, which are **vtable-dispatch-only**. Boot dispatches **5 methods, zero card methods**; `o.g=0` at stop; driving `i.b(0,0,0)` flips `o.g=1` in one call (forcing, reverted). Gap = absent ez-i dispatch of the current card's update method (§7), not an unsatisfiable predicate |
-| `a.run` is the loop; exits on null current displayable (cp39) | ◑ **no `notifyEvent` override exists** (premise corrected). `a.run@0x1f10` = `while(a.field[0x20]){…; cur=a.field[0x5c]; if cur==0 exit; else cur.vtable[upd]()}`. Live: run-flag **set** (`0x48840010`) but **`a.field[0x5c]`=0** → exits before the per-frame dispatch. **Potential (b) wie-fix**: wire the current displayable into `a_singleton.field[0x5c]`. Next: pin its writer (cp40) |
-| `getInstance(a)`≠`currentJlet` but both `field[0x5c]`=0 (cp40) | ◑ identity split **confirmed** (`getInstance(a)=0x48840020` ≠ `currentJlet=0x48840010`) but **not the cause**: `field[0x5c]=0` on **both**, so unifying them won't start `a.run`. a.startApp's `str[…,0x5c]`@0x1c3c targets a **third object**, not the Jlet. Hypothesis refuted, not implemented. Next: find the writer of the Jlet's `field[0x5c]` (cp41) |
+| ~~`a.run` is the loop; exits on null current displayable (cp39)~~ | **WITHDRAWN by cp41** — CFG mis-trace. Still valid from cp39: **no `notifyEvent` override exists** (the app keeps `o.paint`/`o.keyNotify`/`a.run`/`a.startApp` names). |
+| ~~`getInstance(a)`≠`currentJlet` (cp40)~~ | identity split is **true but irrelevant** (cp41): `field[0x5c]` is never read by `a.run`. Recorded for the record only. |
+| **CORRECTION: `a.run` is one-shot; `field[0x5c]` is dead code (cp41)** | ⛔ CFG + live: `a.run` body takes the `new`-succeeds path (`0x55/0x56/0x57/0x21`, one each) → returns at `0x2108`; the `field[0x5c]` check (`0x20e8`) is on the unreached `new`-failed branch. Reverts the wall to §7/cp37: per-frame driver = ez-i runtime invoking the `0x21`-registered object (`0x48840550`) — platform-ABI, absent from `binary.mod` |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
