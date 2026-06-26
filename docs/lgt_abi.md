@@ -513,6 +513,51 @@ instead of the ez-i runtime:
   (the real per-frame driver the ez-i runtime invokes) is the single remaining gate, the
   same one that gates the live render state, `o.g`, and the font load. Maintainer path.
 
+**cp37 — the registered "carried code" is one-time INIT, not the per-frame step;
+sustained drive of it is inert (experiment, reverted).** Directly attacked the §7 gate by
+synthesizing an ez-i per-frame drive in `wie_lgt` (LGT-Java-gated): capture the carried-code
+pointer the app registers, then invoke it once per ~frame from a spawned task paced by
+`system.sleep` (so wie's clock advances and the MIDP paint/event loop interleaves). New facts,
+all RE-confirmed against the app binary (`binary.mod`; 배틀몬스터 **is** the reference app —
+`.text 0x1000..0xe7800`, `.data 0x1400000`, matching this doc):
+
+- *AOT method bodies are ARM (A32), not Thumb.* The init entrypoint is entered Thumb
+  (`entry+1`), but every class method / carried-code body is 32-bit ARM (`mov ip,sp;
+  stmfd sp!,{…,lr}` prologue). `run_function` selects mode by `address & 1`, so the even
+  code pointers run as ARM (consistent with methods already working).
+- *The registered callback is a single entry `0x1ad4`.* Runtime trace of `a.run`: it calls
+  `0x55(obj=0x48840020, a1=0x1ad4, 0)`, `0x56(this=0x48840010, a1=0x1ad4, 0)`,
+  `0x57(this, 0x1ad4, 0)`, `0x21(newobj=0x48840550, 0x1ad4, 0)` — **all four carry the same
+  code pointer `a1=0x1ad4`**, with distinct `.data` stash slots in `a3` (`0x140467c/8c/9c`).
+  `0x1ad4` is `b 0x1a24`.
+- *`0x1a24` is straight-line INIT, arg-ignoring and idempotent (full disasm).* It does
+  `getInstance(0xa)` (immediately `mov r0,#0xa`, discarding any incoming arg), `bl 0x1908`,
+  then unconditionally `str`s constants into the singleton's field array
+  (`[+0x24]=0, [+0x34]=1, [+0x38]=1, [+0x3c]=…, [+0x48]=3, [+0x44/0x4c..0x60]=0`) and
+  returns. **No conditional branch, no per-frame state read.** Re-running it just re-sets
+  the same constants — semantically a one-time "start/init" callback (the ez-i analog of
+  the clet `startClet`), **not** a frame step.
+- *Experiment result (reverted):* the loop captured `0x1ad4` and drove it every ~33 ms
+  with no error — and the screen **stayed black** (`content:false`, 1 paint). So a *sustained*
+  drive of the registered carried code is **inert** (extends cp23's one-shot finding), and
+  driving init code per-frame is also semantically wrong (it would re-init a progressed
+  game). Reverted: the carried code is not the per-frame entry, so capturing/driving it is
+  dead weight and a (small) regression risk to the other AOT games.
+
+*Refined classification.* The per-frame entry the ez-i runtime invokes is **not** any
+pointer the app hands to `0x55/0x56/0x57` (those are its init/lifecycle callbacks). Per §7
+it is the runtime's invocation of a **method on the registered native object** (the unbound
+`0x21` object `0x48840550`) through the **ez-i native-displayable vtable ABI** — which lives
+in the LGT platform, **not in the app binary**, so its slot/signature cannot be derived from
+`binary.mod` and choosing one would be a guess (forbidden). cp37 thus narrows the §7 question
+to its sharpest form below and **rules out the most natural non-guess avenue** (drive the
+registered callback). Genuinely maintainer/platform-ABI-gated.
+
+*cp38 starting point (one line):* find the per-frame entry by locating who, in a real LGT
+device trace, calls into the `0xda870→0xdb240` (`o.g`) writer chain — i.e. RE the LGT/ez-i
+platform's native-displayable dispatch (the absent caller), not the app; the app side is
+exhausted.
+
 ---
 
 ## 8. Current reach
@@ -533,5 +578,6 @@ instead of the ez-i runtime:
 | glyph blit mechanism RE'd (cp34) | ◑ blit = `g.drawImage(sheet, src_x=(char-0x21)*10, w=10)`; font path via `import 0x22(a0=font_img, a1=0x11264→fn 0x10fb0)` |
 | font path resolved → platform-gated (cp35) | ⛔ probe: `r6=g` (not the font img — cp33/4 corrected); font img = `0x22` a0 = **0** every char; `0x10fb0` = strb bookkeeping (no draw); **no font `createImage`** in the reachable run (only the 240×320 back-buffer). Font load/native render is §7-gated, not an app one-liner |
 | wie can't substitute the ez-i tick (cp36) | ⛔ `o.k()` (registered) and `fn@0xda870` (real `o.g` writer, unregistered) both driven from wie → `o.g` stays 0: the `o.g=1` branch needs accumulated game state, not a single method call. §7 ez-i per-frame drive is the sole remaining gate |
+| registered carried code is INIT, not the frame step (cp37) | ⛔ `0x55/0x56/0x57/0x21` all register one entry `0x1ad4→0x1a24` = straight-line idempotent init (full disasm; arg-ignoring). Synthesized per-frame drive of it ran clean but **stayed black** (inert, extends cp23). Per-frame entry is a method on the `0x21` object via the platform's native-displayable ABI (absent from `binary.mod`). Reverted |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
