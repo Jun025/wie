@@ -23,6 +23,21 @@ use crate::runtime::{SVC_CATEGORY_INIT, SVC_CATEGORY_JAVA_INTERFACE, svc_ids::In
 //   0x14 -> java_load_classes  declare IMPORTED platform classes + resolve offsets
 //   0x82 -> java_unk9          (boot hook, arg always 0)
 //   0x83 -> java_unk11         invoke-static org/kwis/msp/lcdui/Main.main(argv)
+//
+// ── 0x64 ordinal triage (SSOT) — see docs/lgt_abi.md cp59 ─────────────────────
+// The 0x64 table is a single GLOBAL flat ordinal over the ez-i platform natives
+// (`docs/reference/ezi_native_surface.txt`). Status of every ordinal we have seen:
+//   LIVE      0x09 String factory · 0x0c getInstance · 0x21 pushCard-family
+//   BOOT      0x03/0x06/0x07/0x0f/0x14/0x54/0x82/0x83 (routed in get_java_interface_method)
+//   EXC       0x0b try-push · 0x0d try-pop  (setjmp/longjmp; render-irrelevant, no-op-safe, cp58)
+//   PENDING   0x0e/0x10/0x12/0x1f/0x22  — RENDER-relevant, native UNCONFIRMED. Intentionally
+//             left as no-op (return 0): the ordinal→native mapping is the one missing artifact
+//             (cp53-58). DO NOT bind a guessed native here (a fabricated handle is deref'd into a
+//             crash). When the mapping arrives (firmware/registry-order dump, dual-form title, or
+//             device trace — docs/lgt_abi.md cp59 §resolver), implement per the AromaWIPI semantics
+//             and the per-import fingerprints recorded in cp58, then enable the LGT-AOT TIMER driver.
+//   Fingerprints (cp58): 0x0e=(1|2,0,8|9|0xa)->handle · 0x10=(0,idx,n)->field ·
+//                        0x12=(0,0,outbuf)->bool · 0x1f=(0,code|val,n) · 0x22=(0,small,ptr) font/img
 
 /// Resolve java-interface import `function_index` (table `0x64`) to the SVC stub the
 /// native code will call.

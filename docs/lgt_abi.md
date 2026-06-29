@@ -1378,6 +1378,66 @@ emulator dump giving ordinal↔name), or a **dual-form (JAR+binary.mod) title**,
 trace**. Then `{0xe,0x10,0x12,0x1f,0x22}` + TIMER(cp55) + pushCard(cp50) → title render. Doc-only; no
 code, no game behavior changes.
 
+**cp59 — drop-in scaffold for the ordinal arrival: SSOT triage (code-side + here), a self-verification
+harness, and the resolver-extraction procedure. All default-inactive ⇒ regression 0.**
+
+This round does **not** chase the ordinal (exhausted — cp53–58); it makes everything *else* ready so
+that the moment the `0x64` ordinal→native table arrives, activation is a small, well-scoped change. No
+runtime behavior changes (byte-identical): the only `.rs` edit is a **comment** (the SSOT triage in
+`interface.rs`); the harness is a standalone script; the render-`PENDING` imports stay no-op (no
+fabricated handlers — a guessed handle would be deref'd into a crash).
+
+### SSOT — the `0x64` ordinal table (single source of truth)
+
+| ordinal | status | meaning / fingerprint (cp53/58) |
+|---|---|---|
+| `0x03/06/07/14/82/83` | BOOT | class/main registration + `Main.main` (routed in `get_java_interface_method`) |
+| `0x09` | LIVE | native String factory (UTF-16 → String) |
+| `0x0c` | LIVE | `getInstance(classHandle)` |
+| `0x0f` | BOOT | `new` (object allocator) |
+| `0x21` | LIVE | pushCard-family (displayable registration, cp48) |
+| `0x54` | BOOT | method-entry / safepoint helper |
+| `0x0b` | EXC (cleared) | try-block **push** — `(scope, catch-code-ptr)`, render-irrelevant (cp58) |
+| `0x0d` | EXC (cleared) | try-block **pop** (paired 36/36 with `0x0b`) |
+| `0x0e` | **PENDING-render** | `(1\|2, 0, 8\|9\|0xa)` → handle, null-checked — typed alloc/create |
+| `0x10` | **PENDING-render** | `(0, idx∈{2,5,7,8}, n)` → field — indexed accessor |
+| `0x12` | **PENDING-render** | `(0, 0, outbuf)` → bool — query writing a `.bss` out-buffer |
+| `0x1f` | **PENDING-render** | `(0, code\|val, n)` — register-op |
+| `0x22` | **PENDING-render** | `(0, small∈{3,4,0x10}, ptr)` — font/image (cp33-35) |
+
+Semantics for the PENDING natives are in `docs/reference/AromaWIPI_classes.zip` (javadoc) +
+`ezi_native_surface.txt`; the **only** missing datum is which native each ordinal is.
+
+### Resolver — extraction procedure (run when the artifact arrives)
+
+1. **Best artifact:** the ez-i/WIPIEmul native registry **in registration order** (a firmware or
+   emulator dump). The unsorted order *is* the ordinal table: `ordinal == registry index`.
+   Alternatives: a **dual-form title** (named-bytecode JAR + AOT `binary.mod`) — correlate each
+   `0x64(i)` call site in `binary.mod` with the named call at the same source point in the JAR; or a
+   **device import-table trace** logging `(table=0x64, index) → resolved fn`.
+2. With the table: for each PENDING ordinal look up its native, confirm against the cp58 fingerprint
+   (arg shape / return), and route it to wie's existing `org.kwis.msp.*` impl (createImage/loadImage/
+   isColor/…) — the bodies mostly already exist in `wie_wipi_java`.
+3. Enable the **LGT-AOT-gated `TIMER_EVENT(21)`** driver (cp55 mechanism: post `[21,…]` at the
+   `setEventTimer` cadence on the LGT-AOT Jlet only; clet/SKT/KTF never post 21 ⇒ inert). Keep the
+   shared `Redraw→RepaintEvent(41)` mapping untouched.
+4. Re-run the harness; expect `getNextEvent ≫ 2`, `field[0x74]` to advance, `createImage`/`drawImage`
+   counts > 0, and `ADVANCE=YES`.
+
+### Self-verification harness — `scripts/lgt_render_probe.sh`
+
+Live (never trusts cache, cp47) structured metrics for an LGT-AOT title (game file via `GAME_ZIP=`,
+not committed): `result/paints/content`, `getNextEvent` (loop ticking?), `graphics_reset` (per-frame
+paint), `createImage/getResource`, `draw_fillRect/draw_drawImage`, `noop_imports` (PENDING hits), and an
+`ADVANCE=YES/NO` oracle (non-blank backbuffer with `drawImage`). Current baseline (배틀몬스터):
+`getNextEvent=2, graphics_reset=2, draws=0, noop_imports=42, ADVANCE=NO` — i.e. the documented gated
+state; flipping any PENDING ordinal + enabling TIMER will move these immediately.
+
+*Verdict — regression 0, committed.* `.rs` change is comment-only (SSOT in `interface.rs`); new script +
+docs. PENDING imports remain no-op, no TIMER driver wired ⇒ runtime byte-identical to cp58. "Remaining
+work to a render attempt once the ordinal arrives" is exactly the 4 steps above (no new RE on the wie
+side). Doc + harness + comment; no game behavior changes.
+
 ## 8. Current reach
 
 | stage | state |
@@ -1418,4 +1478,5 @@ code, no game behavior changes.
 | AromaWIPI ref obtained; TIMER+payload insufficient; 0x64 index needs native runtime (cp56) | ◑ AromaWIPI classes/javadoc/WIPIHeader.h committed (authoritative LGT ez-i API). Confirms: Card has NO update method (game self-updates on TIMER); EventQueue/Image/Display/Jlet signatures. Experiment (reverted): TIMER(21)+elapsed-ms payload → loop runs (279 paints) but **still 0 advance** (field[0x74]=8 stuck). ★The Java classes give method *semantics* but NOT the native 0x64 import *index table* → cp54 mapping gap persists. Next: midp3.exe native RE (Ghidra) for the import table. Code 0 |
 | descriptor-guided 0x64 probe insufficient; need ordinal table (cp57) | ◑ `ezi_native_surface.txt` (~1200 natives) is the candidate set but **sorted by descriptor, not ordinal**. Probed `0x12→1` (isColor/hasPointerEvents cand.) → **no advance** (boot identical). `0xe`/`0x22` (handle) arg-shapes don't match `createImage`/`loadImage` → unmappable (fake handle = crash); `0xd`→carried-code = inert (cp37). ★Need the **0x64 ordinal→native table**: WIPIEmul registry in *registration order*, or a dual-form (JAR+binary.mod) title, or device trace. Code 0; probe reverted |
 | 17-title triangulation: 0xb/0xd = exception push/pop; rest non-unique (cp58) | ◑ 5 AOT titles' import fingerprints: **0xb/0xd identified = try-block push/pop** (args `(scope, catch-code-ptr)`, paired 36/36 — render-irrelevant, cleared). Render-relevant `{0xe,0x10,0x12,0x1f,0x22}` are static value-arg natives (no receiver class), descriptors map to many candidates, no ordinal-locality derivable → **non-unique**. Ordinal table still required (firmware/registry-order dump or dual-form title or device trace). Code 0 |
+| drop-in scaffold ready for ordinal arrival; default-inactive (cp59) | ✅ SSOT `0x64` triage (comment in `interface.rs` + table here), `scripts/lgt_render_probe.sh` live harness (ADVANCE oracle), resolver-extraction procedure. PENDING imports no-op, no TIMER wired ⇒ **byte-identical runtime (regression 0)**. Activation = fill ordinal → route to existing `org.kwis` impl → enable LGT-gated TIMER → run harness (4 steps, no new wie-side RE) |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
