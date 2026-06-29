@@ -1179,6 +1179,46 @@ Per the round's framing, **no further binary-side rounds are warranted** (dispat
 data-flow audited cp53; the remaining unknowns are all external ABI/semantics). Pure analysis (disasm +
 boot trace); no code; doc-only checkpoint; no game behavior changes.
 
+**cp54 — consumed no-op 0x64 imports classified: (가) "wire existing impl" bucket is EMPTY (all are
+ez-i primitives / type-ambiguous) → (Y) re-confirmed, code 0.**
+
+Tested cp53's open hypothesis that the consumed no-ops might be **standard methods wie already implements
+but hasn't wired** (like 0x9/0xc). Disassembled each consumer; cross-checked against how LGT already
+handles standard ops (method calls → trampoline; field access → direct guest memory; class registration
+→ `.data` scan; object `new` → `0xf`/`0x32`+`<init>`; `getInstance` → `0xc`).
+
+| import | signature (from consumer) | return consumed? | classification |
+|---|---|---|---|
+| `0xb` | `(data_ptr, ptr, n)` | **ignored** (r0 overwritten @0x18dc) | (나) ez-i notify/register — void, no-op-safe |
+| `0xd` | `(obj, code_ptr, n)` | **ignored** (void @0x1938; a1=`0x1ad4`) | (나) ez-i carried-code register (cp37) |
+| `0xe` | `(1, 0, size)` e.g. (1,0,8)/(1,0,10) | stored→field, null-checked | (나) alloc/create-like, **exact type unconfirmable** |
+| `0x10` | `(handle, idx)` e.g. (·,2)/(·,4) | stored→field[0x1c/0x20] | (나) op-on-handle, role ambiguous |
+| `0x12` | `(0, 0, out_buf)` | **branched** (`beq` on 0 @0x2bd4) | (나) query/probe flag, correct value unknown |
+| `0x1f` | `(0, code/size, n)` | varies | (나) ez-i register |
+| `0x22` | `(0, idx, n)` | font path | (나) font/image (cp33-35), a0=0, ambiguous |
+
+**(가) bucket = ∅.** None maps 1:1 to a wie-implemented `org.kwis.msp.*`/`java.lang.*` method: LGT's
+standard operations are already served by other mechanisms (above), so these 0x64 imports are the
+*remaining* ez-i VM primitives (register-callback, create-handle, query-flag). The two with consumed
+returns that *look* allocish (`0xe`/`0x10`) cannot be wired without guessing their type/role encoding
+(`(1,0,8)` → which class/element-type?), which the guardrails forbid. `0xb`/`0xd` returns are ignored
+(void), so wiring them changes nothing observable.
+
+*STEP 3 — decoupling test: inconclusive→coupled.* With no (가) to wire, the render cannot be decoupled
+from the per-frame dispatch on available evidence: `field[0x74]` is read by the per-frame-dispatched
+`i.a@0x6fac4` (cp53), boot left it stuck at 8, and the only signals that might advance it (the consumed
+no-ops `0xe`/`0x10`/`0x12`) have unknown correct values. So render stays coupled to cp52's runtime
+dispatch.
+
+*Verdict — (Y) final, code 0.* No free wiring exists; the consumed no-ops are ez-i primitives whose
+semantics, plus the per-frame dispatch, require external sources. **Precise external need (firmed):**
+(나)-bucket import semantics {0xb,0xd,0xe,0x10,0x12,0x1f,0x22} + per-frame dispatch (cp52: registered
+object's true class + method/args/cadence), obtainable from an **ez-i/WIPI reference implementation or
+device state trace** (candidate tooling to evaluate: AromaSoft LGT WIPI emulator, DownTown/Velox
+emulator, XCE/Xceed VM tools, or a firmware VM dump). Binary-side investigation is **complete**
+(dispatch cp37–52, data-flow cp53, import-classification cp54); no further binary-side rounds. Pure
+analysis (disasm); no code; doc-only checkpoint; no game behavior changes.
+
 ## 8. Current reach
 
 | stage | state |
@@ -1214,4 +1254,5 @@ boot trace); no code; doc-only checkpoint; no game behavior changes.
 | wall A: subclass identity compiled away; r1-binding falsified (cp51) | ⛔ disasm: gate=`o.g` field idx 6; cards `new`'d in `Game.a`, each `new` r1=mid-method carried-code ptr (0x120→`e.b`+0x154, others→i/d/i/l). All 3 paths fail: r1=callback not class (disasm), global vtable + only `Card.<init>` at boot (no witness), and **rebinding 0x120→`e` + driving `e.a/b(I)`+paint → still 0 draws** (falsified). Class compiled away ⇒ evidence-insufficient. New lead: r1 callbacks = ez-i carried-code per-frame entries (mid-method, runtime ABI). Code 0; probe reverted |
 | cp51 r1-closure lead FALSIFIED; all binary leads exhausted (cp52) | ⛔ disasm: `0x1ad1c`=`b 0x1ac50` (mid-`e.b` branch, after epilogue+literal-pool) — not an entry; `Game.a` has **no `r1` write** before the `new` ⇒ r1 is leftover register residue, not a carried-code/class ptr. No per-card closure exists. Hardens cp51: global-vtable object, class compiled away, per-frame dispatch absent from `binary.mod`. Branch (iii): runtime-gated. External: ez-i/Xceed native runtime or device exec/state trace. Code 0; no probe |
 | data-flow audit + import census: binary-side EXHAUSTED (cp53) | ⛔ `i.a@0x6fac4` reads `field[0x74]` from `getInstance(31)` (implemented import 0xc) → switch {0,3,0x14,0x28,0x31,0x50,0x51}, value 8 = default/no-advance; writers app-internal. Census: 0 WIPI-C at boot; all java-interface no-op except 0x9/0xc. **New: no-op returns ARE consumed** (0x12 branched @0x2bd4, 0xe/0x10 stored to fields) — real gap, but correct values undeterminable from consumer (guessing forbidden). (Y) runtime-gated. Sharpened spec: WIPI 1.1.1/ez-i java-interface semantics {0xb,0xd,0xe,0x10,0x12,0x1f,0x22} + per-frame dispatch. **No further binary-side rounds.** Code 0 |
+| consumed no-op imports classified: (가) bucket EMPTY (cp54) | ⛔ disasm each consumer: 0xb/0xd = void registration (return ignored); 0xe/0x10 = alloc/handle-like but type encoding unconfirmable; 0x12 = query flag (correct value unknown); 0x1f/0x22 = ez-i register/font. None maps 1:1 to a wie impl (LGT serves call/field/alloc/register via other mechanisms) ⇒ **nothing to wire** ⇒ (Y) re-confirmed. External: ez-i/WIPI ref impl or device trace (AromaSoft / DownTown-Velox / XCE / firmware VM). Binary-side complete. Code 0 |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
