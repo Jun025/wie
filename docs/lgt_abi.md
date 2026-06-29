@@ -1341,6 +1341,43 @@ or (c) a **device import-table trace**. With that table, the consumed imports be
 implementable (the semantics are already in `AromaWIPI_classes.zip`/`ezi_native_surface.txt`). Probe
 reverted; doc-only (+ reference committed); no code, no game behavior changes.
 
+**cp58 — 17-title triangulation: identified `0xb`/`0xd` as exception push/pop (render-irrelevant);
+render-relevant imports stay non-unique → ordinal table still required. Code 0.**
+
+Collected the unknown-import call fingerprints across 5 AOT titles (배틀몬스터/놈3/턴/슈퍼액션히어로/
+레전드오브마스터 — several reach these imports before their cp43 boot wall):
+
+| import | fingerprint (args across titles) | return use | reading |
+|---|---|---|---|
+| `0xb` | `(obj, code_ptr\|0, …)` ×36, a1∈{`0x1ad4`,handler addrs} | ignored | **try-block push** (exception handler) |
+| `0xd` | `(obj, code_ptr, …)` ×36, a1∈{`0xda958`,`0x788a0`,`0x2b8e0`,`0x1ad4`} = catch targets | ignored | **try-block pop** (paired 36/36 with 0xb) |
+| `0xe` | `(1\|2, 0, 8\|9\|0xa, …)` → handle, null-checked | field+null-check | typed alloc/create (type,? ,count) — **no surface descriptor match** |
+| `0x10` | `(0, idx∈{2,5,7,8}, n, …)` → field | field store | indexed accessor — ambiguous |
+| `0x12` | `(0, 0, outbuf)` → bool | branched | query **writing a .bss outbuf** (not the `()Z` isColor — has an out-arg) |
+| `0x1f` | `(0, code\|val, n, …)` | varies | register-ish |
+| `0x22` | `(0, small∈{3,4,0x10}, ptr)` | font path | font/image (cp33-35) |
+
+*Findings.* (1) **`0xb`/`0xd` = exception-handler push/pop** — the args are `(scope, catch-target
+code-ptr)`, paired 36/36, with per-call-site handler addresses; this is the KTF setjmp/longjmp
+try/catch model (`docs/ktf.md`), so they are **render-irrelevant** (correctly no-op when nothing
+throws). That removes 2 of the 7 suspects. (2) The render-relevant remainder `{0xe,0x10,0x12,0x1f,
+0x22}` are **static value-arg natives** (a0 = 0 or a small tag, **not** a `getInstance` object handle) —
+so there is **no receiver-class** to disambiguate by, and their descriptors map to many surface
+candidates; `0xe`'s `(1,0,8)` shape matches **no** `createImage`/`loadImage` descriptor (cp57), and
+`0x12` has an out-buffer arg so it is not the `()Z` query guessed earlier. (3) The 0x64 table is global
+flat ordinal; the surface is descriptor-sorted; the 5 anchors are too sparse and the within-class order
+unknown, so **no ordinal-locality** can be derived to localize these.
+
+*Verdict — code 0.* Triangulation **narrowed** the suspects (0xb/0xd identified & cleared) but did **not**
+yield a unique ordinal→native match for any render-relevant import, and the no-fabrication guardrail
+forbids implementing on a guess (a wrong handle would be dereferenced into a crash). **★The single
+remaining blocker is unchanged and now firmly isolated: the 0x64 ordinal→native table.** Available
+data (sorted surface + arg fingerprints + sparse anchors) is provably insufficient to derive it.
+Required external artifact: the **WIPIEmul/ez-i native registry in registration order** (a firmware/
+emulator dump giving ordinal↔name), or a **dual-form (JAR+binary.mod) title**, or a **device import
+trace**. Then `{0xe,0x10,0x12,0x1f,0x22}` + TIMER(cp55) + pushCard(cp50) → title render. Doc-only; no
+code, no game behavior changes.
+
 ## 8. Current reach
 
 | stage | state |
@@ -1380,4 +1417,5 @@ reverted; doc-only (+ reference committed); no code, no game behavior changes.
 | ★cp42/52 model WRONG; TIMER_EVENT(21) loop driver CONFIRMED (cp55) | ◑ ref (ez-i emulators): game's getNextEvent loop self-dispatches `event[0]`∈{17,19,21}; binary confirms (dispatcher @0x831xx: TIMER21→card-update). Game was **blocked in getNextEvent** (wie never posts TIMER). Experiment (reverted): post `[21,…]` at cadence → loop iterated **159×**, `paint()` ran each frame (`Graphics::reset` 159×). Render still 0 (`field[0x74]=8` doesn't advance, spins idle) — gated downstream on 0x64 import semantics (cp54). Reverted (broke shared path + no oracle). **Per-frame driver is implementable, NOT proprietary** — narrows external need to 0x64 import decompile. `ezi_dispatch_reference.md` committed |
 | AromaWIPI ref obtained; TIMER+payload insufficient; 0x64 index needs native runtime (cp56) | ◑ AromaWIPI classes/javadoc/WIPIHeader.h committed (authoritative LGT ez-i API). Confirms: Card has NO update method (game self-updates on TIMER); EventQueue/Image/Display/Jlet signatures. Experiment (reverted): TIMER(21)+elapsed-ms payload → loop runs (279 paints) but **still 0 advance** (field[0x74]=8 stuck). ★The Java classes give method *semantics* but NOT the native 0x64 import *index table* → cp54 mapping gap persists. Next: midp3.exe native RE (Ghidra) for the import table. Code 0 |
 | descriptor-guided 0x64 probe insufficient; need ordinal table (cp57) | ◑ `ezi_native_surface.txt` (~1200 natives) is the candidate set but **sorted by descriptor, not ordinal**. Probed `0x12→1` (isColor/hasPointerEvents cand.) → **no advance** (boot identical). `0xe`/`0x22` (handle) arg-shapes don't match `createImage`/`loadImage` → unmappable (fake handle = crash); `0xd`→carried-code = inert (cp37). ★Need the **0x64 ordinal→native table**: WIPIEmul registry in *registration order*, or a dual-form (JAR+binary.mod) title, or device trace. Code 0; probe reverted |
+| 17-title triangulation: 0xb/0xd = exception push/pop; rest non-unique (cp58) | ◑ 5 AOT titles' import fingerprints: **0xb/0xd identified = try-block push/pop** (args `(scope, catch-code-ptr)`, paired 36/36 — render-irrelevant, cleared). Render-relevant `{0xe,0x10,0x12,0x1f,0x22}` are static value-arg natives (no receiver class), descriptors map to many candidates, no ordinal-locality derivable → **non-unique**. Ordinal table still required (firmware/registry-order dump or dual-form title or device trace). Code 0 |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
