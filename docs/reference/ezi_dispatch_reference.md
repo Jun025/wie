@@ -73,3 +73,55 @@ advance past state 8 until the import that loads its resources returns a real ha
    implement those whose semantics are confirmed (esp. `Image.createImage`/resource-load so
    `field[0x74]` advances and sprites load; `callSerially` for the timer).
 3. Validate vs the title oracle (cream bg + BATTLE Monster logo + sprites) and the video cadence.
+
+---
+
+# v3 addendum — the 0x64 ordinal is NOT in any host emulator (and the native surface)
+
+## A. midp3.exe / WIPIEmul.exe RE is a DEAD END for the ordinal table (confirmed)
+
+`lgt_abi.md` (wie's own RE) is explicit: the 0x64 java-interface table is a **global flat ordinal**
+— "the SVC id **is** the import index" (anchors: `0x9`=string, `0xc`=getInstance, `0xf/0x32`=new,
+`0x21`=pushCard-class, `0x54`=entry-helper). That ordinal numbering is an **on-device AOT-runtime /
+COD-link-time** artifact.
+
+The host emulators do **not** contain it — verified:
+- **midp3.exe** is a phoneME **bytecode interpreter** (`@_interpreter`, `SlowInterpret()`,
+  `Interpreter$Engine`) — resolves natives by name.
+- **WIPIEmul.exe** registers natives **by name+descriptor** (JNI-style, e.g.
+  `(Ljava/lang/Runnable;)V+callSerially`) — no global ordinal table.
+- KEmulator-mmpp is pure-Java bytecode likewise.
+
+⇒ Do not spend a round RE-ing these for the ordinal numbering; it isn't there. The ordinal→method
+map can only come from: (B1) an ez-i title in **both** JAR + `binary.mod` form (correlate named
+bytecode calls ↔ indexed AOT imports → derive the shared ordinal table), or (B2) a device
+import-table trace — **or** be discovered empirically in wie (see C).
+
+## B. The complete native surface (deliverable: `ezi_native_surface.txt`)
+
+Extracted the full java-interface native registry from WIPIEmul.exe: **1200 native methods** (155 on
+the render path) as `(descriptor)+name`. This is the **candidate set** the 0x64 ordinal enumerates.
+Render-path natives that match the cp54 unknown signatures:
+
+| cp54 import (sig) | native candidate(s) (exact descriptor) |
+|---|---|
+| `0xe (1,0,size)->handle` | `(II)Lorg/kwis/msp/lcdui/Image;+createImage`, `(Ljava/lang/String;)I+loadImage0` (returns int handle) |
+| `0x22 (0,idx,n)` font | `loadImage0(String)I`, `(Ljava/lang/String;)[B+getResource`, `(Ljava/lang/String;)Lorg/kwis/msp/lcdui/Image;+createImage` |
+| `0xd (obj,code,n)` | **`(II)V+setEventTimer`** (← per-frame timer!), `(Ljava/lang/Runnable;I)V+callSerially`, `(I)V+callSeriallyRunnable`, `()V+postCallSeriallyEvent` |
+| `0x12 (0,0,outbuf)->bool` | `()Z+isColor`, `()Z+hasPointerEvents`, `()Z+hasRepeatEvents` |
+| `0xb (data,ptr,n)` void | `(ILorg/kwis/msp/lcdui/JletEventListener;)V+hookEvent`, `setSystemEventListener`, `addJletEventListener` |
+| `0x10 (handle,idx)->field` | `()I+getWidth/getHeight`, `()Lorg/kwis/msp/lcdui/Graphics;+getGraphics`, clip getters |
+
+**★ `setEventTimer(int,int)`** is the explicit per-frame driver native: game calls it, platform posts
+`TIMER_EVENT(21)` at that interval. Pairs with §2. Also note low-level primitives
+`createImage0/1/Basic/Ext`, `decodeNextImage*`, `loadImage0` — the AOT imports map to these **native
+primitives**, not the public Java wrappers.
+
+## C. The path that works NOW: in-wie empirical reference-guided probe
+
+Because the candidate semantics are known (above) and the oracle is sharp (`field[0x74]` advance /
+real draw), the unknown consumed indices `{0xb,0xd,0xe,0x10,0x12,0x1f,0x22}` can be cracked **inside
+wie** by structured probing — implement a candidate's real semantics on an index, run, and KEEP it
+only if the game's **own** code then advances (return flows through app logic to a real scene-advance).
+That game-driven advance is the signature of a *correct* import — categorically different from forcing
+a gate. Bounded set + known candidates + clear oracle = tractable without the device.

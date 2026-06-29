@@ -85,7 +85,7 @@ that does logic + `repaint()` each frame; wie drives it via the cooperative sche
 apps drive per-frame work off the **`org.kwis.msp.lcdui.EventQueue`**: the platform posts a
 `TIMER_EVENT` (type **21**) at frame cadence, and the app's own `getNextEvent` loop reads
 `event[0]` and self-dispatches (`dispatchEvent` is a stub in ez-i — see
-`docs/ezi_dispatch_reference.md`). **wie never posts `TIMER_EVENT(21)`**, so the app's
+`docs/reference/ezi_dispatch_reference.md`). **wie never posts `TIMER_EVENT(21)`**, so the app's
 `getNextEvent` loop blocks forever and never ticks (cp55). *(Earlier cp42/52 wrongly modelled this
 as "the runtime dispatches a method on a registered bare handle"; cp55 corrects it.)*
 

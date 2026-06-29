@@ -1223,7 +1223,7 @@ analysis (disasm); no code; doc-only checkpoint; no game behavior changes.
 TIMER_EVENT(21) unblocks it (159 per-frame ticks, paint runs each frame). Render still gated at
 `field[0x74]=8`; experiment reverted (broke shared path + no oracle), but the mechanism is now CONFIRMED.**
 
-New reference (`docs/ezi_dispatch_reference.md`, from decompiled real ez-i emulators KEmulator-mmpp /
+New reference (`docs/reference/ezi_dispatch_reference.md`, from decompiled real ez-i emulators KEmulator-mmpp /
 midp3): `org.kwis.msp.lcdui.EventQueue` is an `int[15]` ring buffer with `KEY_EVENT=17`,
 `POINTER_EVENT=19`, `TIMER_EVENT=21`; `dispatchEvent` is a stub; the **game's own getNextEvent loop**
 reads `event[0]` and self-dispatches; a screen-timer posts `TIMER_EVENT` at frame cadence.
@@ -1264,15 +1264,15 @@ loop, implementable in wie (confirmed by experiment). The remaining external nee
 import semantics** (decompile `KEmulator-mmpp.jar`'s `org/kwis/msp/*` + the phoneME/ez-i methods in
 `midp3.exe`) that unblock `field[0x74]`. Next round (implementation): (a) LGT-AOT-gated `TIMER_EVENT(21)`
 cadence driver; (b) map+implement the consumed 0x64 imports from the reference; (c) re-test the title
-oracle. `docs/ezi_dispatch_reference.md` committed. Experiment reverted; doc-only checkpoint; no code,
+oracle. `docs/reference/ezi_dispatch_reference.md` committed. Experiment reverted; doc-only checkpoint; no code,
 no game behavior changes.
 
 **cp56 — AromaWIPI reference (the authoritative LGT ez-i `org.kwis.msp.*` impl) obtained & API
 confirmed; TIMER+payload still doesn't advance; the blocker (0x64 import index→method) is NOT in the
 Java classes — it's the native runtime's import table. Code 0, experiment reverted.**
 
-`docs/AromaWIPI_classes.zip` (224 classes, the LGT Ez-Java platform BattleMonster was compiled against)
-+ `AromaWIPI_javadoc.zip` + `WIPIHeader.h` committed. No JRE/decompiler on host, but the **javadoc**
+`docs/reference/AromaWIPI_classes.zip` (224 classes, the LGT Ez-Java platform BattleMonster was compiled against)
++ `docs/reference/AromaWIPI_javadoc.zip` + `docs/reference/WIPIHeader.h` committed. No JRE/decompiler on host, but the **javadoc**
 gives the exact API contract:
 - **`Card`** (the displayable): `abstract paint(Graphics)`, `keyNotify(int,int)`, `pointerNotify(int,
   int,int)`, `showNotify(boolean)`, `repaint`/`serviceRepaints` — **NO timer/update method.** ⇒ the
@@ -1307,6 +1307,39 @@ driver alone: it produces no visible change (oracle unmet) and would need shared
 land it together with the import fix once the index table is known. Next round is **native-runtime
 (midp3.exe) RE**, not pure-binary or Java-class work. Experiment reverted; docs + reference committed;
 no code, no game behavior changes.
+
+**cp57 — descriptor-guided 0x64 probe: the one cheaply-testable import (`0x12`) doesn't advance; the
+rest are unmappable/inert without the ordinal table. Code 0, probe reverted.**
+
+New reference `docs/reference/ezi_native_surface.txt` = ~1200 ez-i native `(descriptor)+name` entries
+(the 0x64 ordinal candidate set). **Critically it is sorted by descriptor, NOT by ordinal**, so it gives
+*candidate natives per arg-shape* but **not** the index→native table the AOT needs. Candidate matches:
+
+| import (cp54 arg shape) | surface candidates (descriptor match) | probe verdict |
+|---|---|---|
+| `0x12(0,0,outbuf)`→bool, branched | `()Z+isColor`, `()Z+hasPointerEvents` | **probed `→1`: NO change** (boot identical, 0 new resource calls) ⇒ not the gate |
+| `0xe(1,0,size)`→handle, null-checked | `(II)Image+createImage`, `(String)I+loadImage0` | **arg shape mismatch** (`(1,0,8)`≠`(w,h)`/`(String)`) ⇒ can't map; a fake non-null handle would be deref'd→crash (forbidden) |
+| `0x22(0,idx,n)` font | `loadImage0`/`getResource`/`createImage(String)` | same — shape unconfirmed, needs real handle |
+| `0xd(obj,code,n)` (a1=`0x1ad4`) | `(II)V+setEventTimer` / `callSerially(Runnable,int)` | code-ptr arg ≠ int-id; if `callSerially(0x1ad4)` → schedules the carried code, which cp37 proved **inert** |
+| `0xb`/`0x10`/`0x1f` | hookEvent/listener / accessor / register | return ignored (cp56) or shape-ambiguous |
+
+*Probe result.* The only import cheaply testable without fabricating a handle — `0x12` (bool query) —
+returned `1` (candidate `isColor`/`hasPointerEvents`=true) and produced **no change**: identical boot
+(5 dispatches), `field[0x74]=8`, no new `createImage`/`getResource`. So `0x12` is not the gate. The
+handle-returning imports (`0xe`/`0x22`) can't be probed because their arg shapes don't match the
+candidate `createImage`/`loadImage` descriptors and a fabricated non-null handle would be dereferenced
+into a crash (forbidden by the no-fabrication guardrail). `0xd`→`callSerially(carried-code)` is inert
+(cp37).
+
+*Verdict — code 0.* The descriptor-guided probe is **insufficient**: the surface gives candidate
+semantics but not the ordinal mapping, and the one shape-unambiguous probe (`0x12`) doesn't advance.
+**★Refined external unlock (the precise missing artifact):** the **0x64 ordinal→native table** —
+obtainable from (a) the **WIPIEmul.exe native registry in REGISTRATION ORDER** (`ezi_native_surface.txt`
+is sorted; the *unsorted* registry order would BE the ordinal table); or (b) a **dual-form ez-i title
+shipping both a named-bytecode JAR and an AOT `binary.mod`** (correlate call sites → derive ordinals);
+or (c) a **device import-table trace**. With that table, the consumed imports become directly
+implementable (the semantics are already in `AromaWIPI_classes.zip`/`ezi_native_surface.txt`). Probe
+reverted; doc-only (+ reference committed); no code, no game behavior changes.
 
 ## 8. Current reach
 
@@ -1346,4 +1379,5 @@ no code, no game behavior changes.
 | consumed no-op imports classified: (가) bucket EMPTY (cp54) | ⛔ disasm each consumer: 0xb/0xd = void registration (return ignored); 0xe/0x10 = alloc/handle-like but type encoding unconfirmable; 0x12 = query flag (correct value unknown); 0x1f/0x22 = ez-i register/font. None maps 1:1 to a wie impl (LGT serves call/field/alloc/register via other mechanisms) ⇒ **nothing to wire** ⇒ (Y) re-confirmed. External: ez-i/WIPI ref impl or device trace (AromaSoft / DownTown-Velox / XCE / firmware VM). Binary-side complete. Code 0 |
 | ★cp42/52 model WRONG; TIMER_EVENT(21) loop driver CONFIRMED (cp55) | ◑ ref (ez-i emulators): game's getNextEvent loop self-dispatches `event[0]`∈{17,19,21}; binary confirms (dispatcher @0x831xx: TIMER21→card-update). Game was **blocked in getNextEvent** (wie never posts TIMER). Experiment (reverted): post `[21,…]` at cadence → loop iterated **159×**, `paint()` ran each frame (`Graphics::reset` 159×). Render still 0 (`field[0x74]=8` doesn't advance, spins idle) — gated downstream on 0x64 import semantics (cp54). Reverted (broke shared path + no oracle). **Per-frame driver is implementable, NOT proprietary** — narrows external need to 0x64 import decompile. `ezi_dispatch_reference.md` committed |
 | AromaWIPI ref obtained; TIMER+payload insufficient; 0x64 index needs native runtime (cp56) | ◑ AromaWIPI classes/javadoc/WIPIHeader.h committed (authoritative LGT ez-i API). Confirms: Card has NO update method (game self-updates on TIMER); EventQueue/Image/Display/Jlet signatures. Experiment (reverted): TIMER(21)+elapsed-ms payload → loop runs (279 paints) but **still 0 advance** (field[0x74]=8 stuck). ★The Java classes give method *semantics* but NOT the native 0x64 import *index table* → cp54 mapping gap persists. Next: midp3.exe native RE (Ghidra) for the import table. Code 0 |
+| descriptor-guided 0x64 probe insufficient; need ordinal table (cp57) | ◑ `ezi_native_surface.txt` (~1200 natives) is the candidate set but **sorted by descriptor, not ordinal**. Probed `0x12→1` (isColor/hasPointerEvents cand.) → **no advance** (boot identical). `0xe`/`0x22` (handle) arg-shapes don't match `createImage`/`loadImage` → unmappable (fake handle = crash); `0xd`→carried-code = inert (cp37). ★Need the **0x64 ordinal→native table**: WIPIEmul registry in *registration order*, or a dual-form (JAR+binary.mod) title, or device trace. Code 0; probe reverted |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
