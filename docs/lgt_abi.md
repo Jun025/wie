@@ -1142,6 +1142,43 @@ the registered object's true runtime class and (b) the per-frame dispatch (metho
 runtime applies to it. The paint pipeline (cp50) stays the high-water mark. No probe this round (pure
 disasm); doc-only checkpoint; no code, no game behavior changes.
 
+**cp53 — data-flow audit of `field[0x74]` + native-import census: scene-state input is read via an
+*implemented* import; no confirmable fixable no-op import → (Y) runtime-gated, binary-side EXHAUSTED.**
+
+The first non-dispatch (data-flow) round, audited two ways:
+
+*STEP 1 — `field[0x74]` / `field[0xd4]` data-flow.* Full disasm: **14** `str …,[rX,#0x74]` writers and
+**13** `[rX,#0xd4]` writers (offsets reused across `o`/`i`/`d`/`j`/`l`). The scene-state machine
+**`i.a@0x6fac4`** does: `mov r0,#31; <import>` (= **`getInstance(31)` — import `0xc`, which wie
+implements**) → `ldr r2,[r0,#8]` (singleton field array) → **`ldr r5,[r2,#0x74]`** → `cmp`-chain switch
+on **{0,3,0x14,0x28,0x31,0x50,0x51,…}**; the live value **8** is unhandled → `default`, no advance. So
+the scene-state **input is app-internal state on a singleton, read via an *implemented* import** — not a
+no-op-import supply. The writers compute their stored values app-internally (calls/arith), not from a
+no-op import return (spot-checked).
+
+*STEP 2 — native-import census (boot, paint-pipeline-off).* The app makes **zero WIPI-C SVCs** at boot;
+all platform interaction is java-interface imports. Implemented: `0x9` (string), `0xc` (getInstance).
+**No-op (return 0):** `0xb`×36, `0xd`×36, `0x10`×13, `0x1f`×10, `0x21`×10, `0xe`×8, `0x12`×8, `0x22`×3,
+`0x55/0x56/0x57`. **★New finding — these no-ops are NOT harmless:** their returns are *consumed* —
+`0x12@0x2bd4` does `subs r4,r0,#0; beq 0x2d80; b 0x2e28` (branches on the value; wie's 0 forces one
+path); `0xe`/`0x10@0xe05xx` save the return (`mov r5,r0`) and **store it into object fields**
+(`str r0,[r3,#0x1c]`). `0xd` = register-callback `(obj, code_ptr, n)` (a1 = 0x1ad4 / 0xdbb6c). So wie
+supplies `0` where the app uses the value — a real, previously-unrecorded gap.
+
+*X/Y verdict — (Y), with a sharpened spec.* I could **not** establish (X): the scene-state read uses an
+*implemented* import (`getInstance`), the writers are app-internal, and although the consumed no-op
+imports (`0xe`/`0x10`/`0x12`/`0xb`/`0xd`/`0x1f`) clearly receive wrong (`0`) returns, their **correct**
+values are **not determinable from the binary consumer** (both 0x12 branches continue with no abort;
+0xe/0x10 want real handles) — implementing them would be guessing, which the guardrails forbid. The
+render remains gated downstream on the per-frame `i.a` dispatch (cp52, runtime-gated). **Sharpened
+external spec (binary-side EXHAUSTED):** to proceed, obtain the **WIPI 1.1.1 / ez-i java-interface ABI
+semantics for indices {0xb,0xd,0xe,0x10,0x12,0x1f,0x22}** (which return what, so the consumed values are
+correct) **and** the per-frame runtime dispatch (cp52: registered object's true class + method/args/
+cadence) — from the **ez-i SDK simulator / Xceed VM / firmware VM / device execution-state trace**.
+Per the round's framing, **no further binary-side rounds are warranted** (dispatch audited cp37–52,
+data-flow audited cp53; the remaining unknowns are all external ABI/semantics). Pure analysis (disasm +
+boot trace); no code; doc-only checkpoint; no game behavior changes.
+
 ## 8. Current reach
 
 | stage | state |
@@ -1176,4 +1213,5 @@ disasm); doc-only checkpoint; no code, no game behavior changes.
 | coordinated reconstruction: paint pipeline WIRED, 3 walls remain (cp50) | ◑ `0x21(_,Card,Jlet)`→`pushCard` works; per-frame `handlePaintEvent`→`CardCanvas.paint`→`card.paint` **301×** (cp48's empty-cards resolved; card=class `o`). But 0 draws: **(A)** card binds to base `o`, true subclass (i/l/b) invisible — `new` carries no class handle, `card.b(III)` NoSuchMethod (cp44 multi-subclass); **(B)** JVM-field force ≠ guest-field (paint reads guest mem); **(C)** sprites need `field[0x74]` scene advance (cp28 force→bg only). Branch (b); code 0; probe reverted |
 | wall A: subclass identity compiled away; r1-binding falsified (cp51) | ⛔ disasm: gate=`o.g` field idx 6; cards `new`'d in `Game.a`, each `new` r1=mid-method carried-code ptr (0x120→`e.b`+0x154, others→i/d/i/l). All 3 paths fail: r1=callback not class (disasm), global vtable + only `Card.<init>` at boot (no witness), and **rebinding 0x120→`e` + driving `e.a/b(I)`+paint → still 0 draws** (falsified). Class compiled away ⇒ evidence-insufficient. New lead: r1 callbacks = ez-i carried-code per-frame entries (mid-method, runtime ABI). Code 0; probe reverted |
 | cp51 r1-closure lead FALSIFIED; all binary leads exhausted (cp52) | ⛔ disasm: `0x1ad1c`=`b 0x1ac50` (mid-`e.b` branch, after epilogue+literal-pool) — not an entry; `Game.a` has **no `r1` write** before the `new` ⇒ r1 is leftover register residue, not a carried-code/class ptr. No per-card closure exists. Hardens cp51: global-vtable object, class compiled away, per-frame dispatch absent from `binary.mod`. Branch (iii): runtime-gated. External: ez-i/Xceed native runtime or device exec/state trace. Code 0; no probe |
+| data-flow audit + import census: binary-side EXHAUSTED (cp53) | ⛔ `i.a@0x6fac4` reads `field[0x74]` from `getInstance(31)` (implemented import 0xc) → switch {0,3,0x14,0x28,0x31,0x50,0x51}, value 8 = default/no-advance; writers app-internal. Census: 0 WIPI-C at boot; all java-interface no-op except 0x9/0xc. **New: no-op returns ARE consumed** (0x12 branched @0x2bd4, 0xe/0x10 stored to fields) — real gap, but correct values undeterminable from consumer (guessing forbidden). (Y) runtime-gated. Sharpened spec: WIPI 1.1.1/ez-i java-interface semantics {0xb,0xd,0xe,0x10,0x12,0x1f,0x22} + per-frame dispatch. **No further binary-side rounds.** Code 0 |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
