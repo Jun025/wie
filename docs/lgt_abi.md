@@ -1219,6 +1219,54 @@ emulator, XCE/Xceed VM tools, or a firmware VM dump). Binary-side investigation 
 (dispatch cp37–52, data-flow cp53, import-classification cp54); no further binary-side rounds. Pure
 analysis (disasm); no code; doc-only checkpoint; no game behavior changes.
 
+**cp55 — ★the cp42/52 dispatch model was WRONG: the game's getNextEvent loop is the driver, and posting
+TIMER_EVENT(21) unblocks it (159 per-frame ticks, paint runs each frame). Render still gated at
+`field[0x74]=8`; experiment reverted (broke shared path + no oracle), but the mechanism is now CONFIRMED.**
+
+New reference (`docs/ezi_dispatch_reference.md`, from decompiled real ez-i emulators KEmulator-mmpp /
+midp3): `org.kwis.msp.lcdui.EventQueue` is an `int[15]` ring buffer with `KEY_EVENT=17`,
+`POINTER_EVENT=19`, `TIMER_EVENT=21`; `dispatchEvent` is a stub; the **game's own getNextEvent loop**
+reads `event[0]` and self-dispatches; a screen-timer posts `TIMER_EVENT` at frame cadence.
+
+*In-binary confirmation (1차 근거).* BattleMonster's event dispatcher (~0x831xx) switches on `event[0]`
+∈ {17,19,21,…}: `cmp lr,#21; blt; cmp lr,#28; bgt` routes **21 (TIMER) → a card-update call**; KEY codes
+{4,5,7,8,10,11,13,15,17,19,20,24,25} → handlers. And a `wie_midp`/`wie_wipi_java` trace shows the game
+thread ends at **`getNextEvent` with nothing after** — i.e. **blocked in `getNextEvent`** because wie
+posts no per-frame event. wie's codes (`KeyEvent=1`, `RepaintEvent=41`, `NotifyEvent=1000`) don't match
+ez-i's (17/19/21), and **no `TIMER_EVENT(21)` is ever posted** → the loop never ticks.
+
+*Experiment (reverted).* Posted `[21,…]` at ~50 ms cadence + taught `net/wie/EventQueue.dispatchEvent`
+to accept 21. Result: **the game's getNextEvent loop unblocked and iterated 159×** (was 1), calling
+`Graphics::reset` **159×** — i.e. **`paint()` now runs every frame** via the legitimate
+TIMER→loop→dispatch path. This overturns cp42/52 (no "runtime dispatches a bare handle"; the game
+self-drives off the EventQueue) and is the **largest mechanistic advance** so far. The first attempt
+crashed in wie's `dispatchEvent` (`IllegalArgumentException` on type 21 — wie only knew 1/41/1000),
+proving the game *does* route through it.
+
+*Remaining wall (render still 0 draws).* Even with the loop running 159×, there are **no `fillRect`/
+`drawImage`, no `getResource`/`createImage`, no new imports** — the game **spins idly with
+`field[0x74]=8` (cp53) never advancing**, so `o.g` stays 0 and `o.paint` draws nothing. So TIMER is
+**necessary but not sufficient**: the advance from state 8 is gated *downstream* on the consumed no-op
+0x64 imports (cp53/54: `0xe`/`0x10`/`0x12` — resource/handle/query primitives) whose correct returns
+need the reference decompile. The render path is now: **TIMER loop (this round) → field[0x74] advance
+(needs 0x64 import semantics) → resource load → draw**.
+
+*Why reverted (not committed).* (1) No oracle match (still blank) — the hard guardrail requires
+structural oracle agreement to commit. (2) The experiment remapped `Redraw→21` and added a cadence post
+on the **shared** `net/wie/EventQueue`, which would break clet/SKT/KTF (they expect `RepaintEvent=41`).
+A clean commit needs an **LGT-AOT-gated** TIMER source (don't touch the shared Redraw mapping) — and is
+only worth landing once it produces a visible advance (i.e. together with the 0x64 import fix that lets
+`field[0x74]` advance).
+
+*Status — reframed, not exhausted.* cp53/54 said "binary-side exhausted / runtime-gated"; cp55 **partly
+revises that**: the per-frame driver is **not** proprietary — it is the standard ez-i EventQueue TIMER
+loop, implementable in wie (confirmed by experiment). The remaining external need narrows to the **0x64
+import semantics** (decompile `KEmulator-mmpp.jar`'s `org/kwis/msp/*` + the phoneME/ez-i methods in
+`midp3.exe`) that unblock `field[0x74]`. Next round (implementation): (a) LGT-AOT-gated `TIMER_EVENT(21)`
+cadence driver; (b) map+implement the consumed 0x64 imports from the reference; (c) re-test the title
+oracle. `docs/ezi_dispatch_reference.md` committed. Experiment reverted; doc-only checkpoint; no code,
+no game behavior changes.
+
 ## 8. Current reach
 
 | stage | state |
@@ -1255,4 +1303,5 @@ analysis (disasm); no code; doc-only checkpoint; no game behavior changes.
 | cp51 r1-closure lead FALSIFIED; all binary leads exhausted (cp52) | ⛔ disasm: `0x1ad1c`=`b 0x1ac50` (mid-`e.b` branch, after epilogue+literal-pool) — not an entry; `Game.a` has **no `r1` write** before the `new` ⇒ r1 is leftover register residue, not a carried-code/class ptr. No per-card closure exists. Hardens cp51: global-vtable object, class compiled away, per-frame dispatch absent from `binary.mod`. Branch (iii): runtime-gated. External: ez-i/Xceed native runtime or device exec/state trace. Code 0; no probe |
 | data-flow audit + import census: binary-side EXHAUSTED (cp53) | ⛔ `i.a@0x6fac4` reads `field[0x74]` from `getInstance(31)` (implemented import 0xc) → switch {0,3,0x14,0x28,0x31,0x50,0x51}, value 8 = default/no-advance; writers app-internal. Census: 0 WIPI-C at boot; all java-interface no-op except 0x9/0xc. **New: no-op returns ARE consumed** (0x12 branched @0x2bd4, 0xe/0x10 stored to fields) — real gap, but correct values undeterminable from consumer (guessing forbidden). (Y) runtime-gated. Sharpened spec: WIPI 1.1.1/ez-i java-interface semantics {0xb,0xd,0xe,0x10,0x12,0x1f,0x22} + per-frame dispatch. **No further binary-side rounds.** Code 0 |
 | consumed no-op imports classified: (가) bucket EMPTY (cp54) | ⛔ disasm each consumer: 0xb/0xd = void registration (return ignored); 0xe/0x10 = alloc/handle-like but type encoding unconfirmable; 0x12 = query flag (correct value unknown); 0x1f/0x22 = ez-i register/font. None maps 1:1 to a wie impl (LGT serves call/field/alloc/register via other mechanisms) ⇒ **nothing to wire** ⇒ (Y) re-confirmed. External: ez-i/WIPI ref impl or device trace (AromaSoft / DownTown-Velox / XCE / firmware VM). Binary-side complete. Code 0 |
+| ★cp42/52 model WRONG; TIMER_EVENT(21) loop driver CONFIRMED (cp55) | ◑ ref (ez-i emulators): game's getNextEvent loop self-dispatches `event[0]`∈{17,19,21}; binary confirms (dispatcher @0x831xx: TIMER21→card-update). Game was **blocked in getNextEvent** (wie never posts TIMER). Experiment (reverted): post `[21,…]` at cadence → loop iterated **159×**, `paint()` ran each frame (`Graphics::reset` 159×). Render still 0 (`field[0x74]=8` doesn't advance, spins idle) — gated downstream on 0x64 import semantics (cp54). Reverted (broke shared path + no oracle). **Per-frame driver is implementable, NOT proprietary** — narrows external need to 0x64 import decompile. `ezi_dispatch_reference.md` committed |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |

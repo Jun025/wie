@@ -66,7 +66,7 @@ LGT-specific: provides C standard library functions (memcpy, strlen, etc.) that 
 | Function binding | Direct callback pointers | Import table lookup |
 | Java integration | AOT-compiled into ARM binary | **AOT-compiled into ARM ELF** (`binary.mod`) — same model (H1) |
 | C stdlib | Included in binary | Provided by platform |
-| Per-frame render driver | app self-loop (`Thread.run` game loop) | **ez-i runtime tick** (`a.run` is a one-shot registrar, not a loop) — *see below* |
+| Per-frame render driver | app self-loop (`Thread.run` game loop) | **`EventQueue` `TIMER_EVENT(21)` at frame cadence** drives the app's own `getNextEvent` loop (cp55) — *see below* |
 
 ## How We Emulate This
 
@@ -82,9 +82,17 @@ LGT-specific: provides C standard library functions (memcpy, strlen, etc.) that 
 
 KTF AOT-Java titles render because the **app** spawns its own game-loop thread (`Thread.run`)
 that does logic + `repaint()` each frame; wie drives it via the cooperative scheduler. LGT ez-i
-apps do **not** self-loop — `a.run` is a one-shot that **registers** the displayable with the
-platform (native import `0x21`) and returns (cp41). The **ez-i runtime** then invokes the
-registered object's per-frame entry — and that runtime code is **not in `binary.mod`**.
+apps drive per-frame work off the **`org.kwis.msp.lcdui.EventQueue`**: the platform posts a
+`TIMER_EVENT` (type **21**) at frame cadence, and the app's own `getNextEvent` loop reads
+`event[0]` and self-dispatches (`dispatchEvent` is a stub in ez-i — see
+`docs/ezi_dispatch_reference.md`). **wie never posts `TIMER_EVENT(21)`**, so the app's
+`getNextEvent` loop blocks forever and never ticks (cp55). *(Earlier cp42/52 wrongly modelled this
+as "the runtime dispatches a method on a registered bare handle"; cp55 corrects it.)*
+
+cp55 confirmed this in-binary (BattleMonster's dispatcher @0x831xx switches `event[0]`∈{17,19,21},
+routing TIMER 21 → a card-update call) and by experiment: posting `[21,…]` at cadence unblocked the
+loop (159 per-frame iterations, `paint()` ran each frame). So the per-frame driver **is**
+implementable in wie (LGT-AOT-gated `TIMER_EVENT` cadence) — it is *not* proprietary.
 
 Measured consequences (배틀몬스터, the one title reaching this wall):
 - The app sets its displayable via native `import 0x21`, never `Display.pushCard`, so the MSP
