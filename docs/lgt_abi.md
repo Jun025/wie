@@ -988,6 +988,49 @@ repaint / fixed timer / vsync?). **Resolvable only by:** the ez-i SDK *native* r
 `org.kwis.msp` platform impl, not the Java API stubs) / the LGE Xceed VM runtime / a real-device
 execution trace of an AOT title. Doc-only checkpoint; no code, no game behavior changes.
 
+**cp49 — wie_ktf per-frame model contrast + STEP 3 probe: driving the update method per-frame yields
+0 draws; §7 is NOT the sole gate (branch (a), code 0, probe reverted).**
+
+*STEP 1 — KTF reference model (the working AOT-Java bridge).* `docs/ktf.md` + both emulators: KTF and
+LGT are the **same AOT model** (Java compiled to ARM in `client.bin`/`binary.mod`; class/method
+metadata in-binary; methods dispatch via `core.run_function`). KTF↔LGT bridge correspondence:
+AOT→Java call (KTF `java_jump_1/2/3` ↔ LGT java-trampoline `native_jvm.rs::handle_java_trampoline`),
+JNI native (`call_native` ↔ stdlib/WIPI-C SVC), class+sig resolve / runtime class register (KtfClassLoader
+`fn_get_class` ↔ `register_app_classes` scanning `.data`), object/array alloc (↔ `alloc_native_object`),
+string constants (↔ import `0x9` string factory), exception/type (↔ trampoline unwind). **Decisive
+difference:** KTF has **no** "runtime invokes a registered object's tick" mechanism — the **app**
+self-loops (`Thread.run` game loop) and wie schedules it. LGT ez-i does the opposite: `a.run` is a
+one-shot **registrar** (cp41), and the absent ez-i runtime ticks the registered object. So KTF gives
+**no** "registered→tick" precedent for LGT's `0x21`; the models are structurally different.
+
+*STEP 2 — bare-handle is NOT BattleMonster's blocker.* `singleton_instance` (getInstance) binds an
+object to its **app** class with full vtable (`LgtClassInstance`); cp43 established 배틀몬스터's cards
+come via getInstance ⇒ they are properly-bound JVM instances whose update method **is** invocable. The
+"10 bare `0x21` handles" (cp42) are separate registration **wrappers**, not the card. So `bind_pending`-
+style binding is not the gap here; the gap is purely the per-frame **trigger**.
+
+*STEP 3 — bounded probe (reverted; not committed).* Drove 배틀몬스터's update methods per-frame
+(`Game.a@0x11dc`, `Game.b@0x1484` on app instance `0x48840010`, from the live trace) for 600 frames +
+Redraw each. Result: `Game.b` returns `Ok(0)` **idempotently every frame, 0 draw calls, backbuffer
+blank** (`content:false`, 1 color, 601 paints = just cleared buffers). (First attempt called `code_ptr+1`
+→ "Undefined instruction"; AOT method bodies are entered at `code_ptr` with no thumb bit, matching
+`LgtMethod::run`.) Update-ticking alone renders nothing because (i) the app's **paint** is never
+dispatched (CardCanvas card-vector empty — cp48) and (ii) `Game.b` does not itself draw / advance
+visibly. Combined with cp28 (force `o.g` + drive paint → background `fillRect`/`setColor` only, **no
+`drawImage`/sprites**) and `FOLLOWUP_ISSUE.md` (scene-state `field[0x74]=8` unhandled → scene array empty
+→ no sprite load): **§7 is not the last gate.** Per the screenshot oracle (title = tree-monster sprite),
+the reachable forced output is at most background fills — the title's sprites need the scene-state machine
+to advance, which neither one-time force nor per-frame update-ticking achieves.
+
+*STEP 4 — branch (a), code 0.* A legitimate render needs the ez-i runtime's **coordinated** per-frame
+protocol — drive the card **update** (advances scene state, sets `o.g`) **and** the card **paint**
+(draws) **and** the scene-state/event plumbing that loads sprite resources — with the exact object /
+method+vtable-slot / args / cadence. None is in `binary.mod`, derivable from the in-repo MSP Java
+reference, or precedented by KTF's self-loop model. cp48's 4-fact spec stands, now with measured values:
+update method `Game.b()V`@`0x1484` runs but is gated (returns 0); paint dispatch + scene-state advance
+are the additional unknowns. Recoverable only from the **ez-i native runtime / LGE Xceed VM / a device
+trace**. STEP 3 probe reverted; doc-only checkpoint; no code, no game behavior changes.
+
 ## 8. Current reach
 
 | stage | state |
@@ -1018,4 +1061,5 @@ execution trace of an AOT title. Doc-only checkpoint; no code, no game behavior 
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** (AOT-Java path) |
 | 놈ZERO (clet) renders; "garbage size" not a wie bug (cp47) | ✅ boots, 153 paints, menus+text+textured `.pzx` bg, survives full inject. `calloc(0x01010101)`/"ster" = game loader reading byte-correct `cur_figure.dat` (offset+4 = `01 01 01 01` in the jar; verified). Size ≠ pixel root; FB path RGB565-consistent. Open: `.pzx`/`.ft2` fidelity (external spec / watchpoint-gated) |
 | live re-baseline + §7 free-MSP option exhausted (cp48) | ⛔ AOT 0/17 draw (cp43 buckets hold); 배틀몬스터 at §7 blank. App sets displayable via native `import 0x21` (no-op in wie), never `Display.pushCard`; even wired, draw-gate `o.g` is set by card update `i.b` (cp38), which MSP `card.paint` never calls ⇒ 0 draws without forcing. Missing ez-i fact: which registered obj / which method+slot / which args / which cadence the runtime ticks. **External: ez-i native runtime / Xceed VM / device trace.** Code 0. (Pre-existing clet issues noted: 하이브리드 blank+null-OK, 제노니아1 inject spin) |
+| KTF model contrast + STEP3 probe: §7 not the sole gate (cp49) | ⛔ KTF AOT renders via app self-loop (`Thread.run`); LGT `a.run` one-shot registrar ⇒ no KTF "registered→tick" precedent. 배틀몬스터 card IS bound (getInstance), update invocable — bare-handle not the blocker. Probe (reverted): driving `Game.b()V`@`0x1484` per-frame → `Ok(0)` idempotent, **0 draws, blank** (paint undispatched + scene-state gated). With cp28 (force→bg fills only) + FOLLOWUP (`field[0x74]` wall): render needs full ez-i protocol (update+paint+scene-advance). Code 0; probe reverted |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
