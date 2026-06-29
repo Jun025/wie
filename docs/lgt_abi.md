@@ -943,6 +943,51 @@ on-device judgment) — advancing it needs either the **`.pzx`/`.ft2` format spe
 repo/env → external, hold) or **dynamic ARM memory-watchpoint tracing** (not exposed by wie's
 `ArmCore`), exactly as cp35/cp42 flagged. Doc-only checkpoint; no game behavior changes.
 
+**cp48 — live LGT/AOT re-baseline + the §7 "free MSP option" exhausted by trace: the per-frame
+driver is an ez-i UPDATE-tick dispatch, NOT the MSP paint contract (branch (a), code 0).**
+
+*STEP 1 — live matrix (no cached reports; current code, headless boot + 27-key inject).* The cp43
+buckets **hold** — the validator now wraps each inner error as `native dispatch <App>.startApp/<init>
+@…: <inner>`, but the `<inner>` is the cp43 error verbatim (e.g. 놈3 = `NoSuchMethodError
+Thread.serviceRepaints` = cp43 [X-vtable]; 당신은골프왕 = `AbstractMethodError paint` = [X-paint];
+일지매영웅전기 = `NoClassDefFoundError atdata.JimaeMD` = [X-class]). **AOT-Java: 0/17 draw.**
+배틀몬스터 alone reaches §7 (`paints:1`, `content:false`, blank). **Clets (live):** 놈ZERO ✅230p/69c,
+그랜드체이스 ✅228p/512c, 라테일 ✅147p/316c, 게임빌2010슈퍼사커 ✅280p/4c. **Two pre-existing
+clet issues surfaced (NOT introduced here — this round changed 0 code):** 하이브리드 = blank at boot
+(`content:false`) + null-jump (`PC=0`) in `EventQueue.getNextEvent` on first OK; 제노니아1 = runaway
+single-`tick()` spin under inject (host-load-sensitive, same family as 체스마스터/cp46). Both are
+clet-path, pinned for a dedicated round.
+
+*STEP 2 — free MSP option (in-repo WIPI 1.1.1 `org.kwis.msp.lcdui`) exhausted on 배틀몬스터 (the only
+§7 title).* The Java contract is intact and live: `Display.<init>` makes `net/wie/CardCanvas` the MIDP
+current Displayable; each repaint runs `Display.handlePaintEvent → Canvas.handlePaintEvent →
+CardCanvas.paint → ∀ card: card.paint(g)`. Trace of 배틀몬스터 shows this loop **runs** (2×
+`handlePaintEvent`/`CardCanvas.paint`) but produces **0 `Graphics` draw calls** because:
+- The app **never calls `Display.pushCard`** (0 occurrences) — so `CardCanvas.cards` is empty. It
+  constructs `Card::<init>` ×10 (handles `0x…120/170/190/1b0/4f0…`) and instead hands a displayable to
+  the ez-i runtime via **native `import 0x21`** — which wie implements as a **no-op** (only `0x9`
+  string-factory / `0xc` getInstance are live). `0x21` is overloaded: 8 calls `(obj,0,const)`, one
+  `(0x48840540, Card 0x48840120, Jlet 0x48840010)` @lr `0x227c`, one `(0x48840550, code 0x1ad4, 0)`
+  @lr `0x2108` (= a.run carried code, cp41).
+- *Why wiring `0x21(_,Card,_) → CardCanvas.pushCard(Card)` would still not render (the key result):*
+  the app's draw is gated on **`o.g`**, set **only** by the card's **update** method `i.b(_,_,0)`
+  (cp38) — **not** by `paint`. The MSP dispatch contract only ever invokes `card.paint(g)` on repaint;
+  it never invokes the card's update method. Trace confirms `Game.<init>/a/b` + `a.startApp/a.run` each
+  run **exactly once** at boot (one-shot, cp41) — `Game.b` (=`i.b`, the `o.g` setter) fires once at
+  init and **never per-frame**. So even a fully-wired pushCard yields `paint` with `o.g=0` ⇒ 0 draws.
+  No forcing-free MSP path dispatches `i.b` per frame.
+
+*Verdict — branch (a), platform-ABI-gated, code 0.* The in-repo MSP reference defines the **paint**
+contract but not the **per-frame update-tick dispatch** the app actually depends on; that is ez-i
+runtime-private and its consumer is absent from `binary.mod` (cp42). **★ The precise missing fact:**
+on each frame the ez-i runtime invokes — *on which registered object* (the `0x21` a0 handle e.g.
+`0x48840550`, or the carried `Card` a1 `0x48840120`?) — *which method* (the card update `i.b`? via
+which vtable slot, given the registered object is a bare global-vtable handle with no JVM class, cp42)
+— *with which arguments* (cp38 saw `i.b(_,_,0)`; p1/p2/p3 unconfirmed) — *at which cadence* (every
+repaint / fixed timer / vsync?). **Resolvable only by:** the ez-i SDK *native* runtime (the
+`org.kwis.msp` platform impl, not the Java API stubs) / the LGE Xceed VM runtime / a real-device
+execution trace of an AOT title. Doc-only checkpoint; no code, no game behavior changes.
+
 ## 8. Current reach
 
 | stage | state |
@@ -972,4 +1017,5 @@ repo/env → external, hold) or **dynamic ARM memory-watchpoint tracing** (not e
 | clet-safe card-binding fix + runaway alloc guard, **pushed** (cp45/cp46) | ✅ `bind_pending` redirects a `new`+platform-`Card.<init>` object to the unique app subclass; map empty for clets ⇒ inert on clet path. Regression 0 (제노니아1 d=9 no hang, all renderers identical, `test --workspace` green). Measures 턴/레전드오브마스터/서든어택포켓/현영맞고2006 to §7; 5 others to deeper walls. **0 new render** (still §7/next-wall) |
 | **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** (AOT-Java path) |
 | 놈ZERO (clet) renders; "garbage size" not a wie bug (cp47) | ✅ boots, 153 paints, menus+text+textured `.pzx` bg, survives full inject. `calloc(0x01010101)`/"ster" = game loader reading byte-correct `cur_figure.dat` (offset+4 = `01 01 01 01` in the jar; verified). Size ≠ pixel root; FB path RGB565-consistent. Open: `.pzx`/`.ft2` fidelity (external spec / watchpoint-gated) |
+| live re-baseline + §7 free-MSP option exhausted (cp48) | ⛔ AOT 0/17 draw (cp43 buckets hold); 배틀몬스터 at §7 blank. App sets displayable via native `import 0x21` (no-op in wie), never `Display.pushCard`; even wired, draw-gate `o.g` is set by card update `i.b` (cp38), which MSP `card.paint` never calls ⇒ 0 draws without forcing. Missing ez-i fact: which registered obj / which method+slot / which args / which cadence the runtime ticks. **External: ez-i native runtime / Xceed VM / device trace.** Code 0. (Pre-existing clet issues noted: 하이브리드 blank+null-OK, 제노니아1 inject spin) |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
