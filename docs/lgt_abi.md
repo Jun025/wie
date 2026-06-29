@@ -901,6 +901,48 @@ exposed in 체스마스터, then bounded it so it fast-fails.
   multi-`Card`-subclass per-instance resolution (당신은골프왕), and the per-method `NoSuchMethod`
   cascade (스파이더맨3 `c.show`, 슈퍼액션히어로 `h.getNumberOfRecords`, etc.).
 
+**cp47 — 놈ZERO "garbage calloc size" is NOT a wie marshalling/struct-offset bug: ground-truth
+file extraction disproves it; the clet renders menus+text+textured bg.** A round had reframed the
+놈ZERO failure as a single Rust↔ARM boundary defect — a struct field offset / endianness /
+pointer-width / ABI constant that supplies garbage where an integer size belongs (the
+`calloc(0x72657473)` ≈ "ster" / "monster" signature), unifying "garbage size" and "garbage decode
+pixels" under one root. **Measurement disproves this framing on every count:**
+
+- *The crash reports were stale.* `game_lab/reports/놈ZERO.json` (SVC `0x415`, `getNextEvent`) and
+  `제노니아1.json` (SVC `412`) predate landed fixes (`memmove 0x415`, `getNextEvent` null-guard,
+  `calloc` OOM→NULL, `ListDatabases 412`). **Current headless 놈ZERO = PASS**: boots, 153 paints,
+  34 distinct colors, survives the full 27-key inject sequence with no crash/panic. Screens progress
+  LGT loading-frame → menus with legible Korean bitmap-font text + a textured (`.pzx`) background.
+  Not garbage stripes, not black.
+- *The "garbage size" is the game's own data, supplied byte-perfectly.* Trace at the `calloc` site:
+  the game `stream_read`s `table/cur_figure.dat` (1036 B) into a buffer, then reads the dword at
+  **buffer+4** as a size → `calloc(0x01010101)`. Extracting the real `table/cur_figure.dat` from the
+  jar and hexdumping it: bytes are `0d 3c 11 01 | 01 01 01 01 | …` — **offset 4 genuinely is
+  `0x01010101`**. wie's DB `stream_read` AND `MC_knlGetResource` both deliver these exact bytes
+  (verified against the jar). The sibling `string/popup.zt1` has offset+4 = `0x1274` (its real zlib
+  uncompressed length, header `78 9c`) and the game `calloc`s that correctly. ⇒ The game's resource
+  loader applies the `.zt1` `[complen][uncomplen][zlib]` convention to a **raw `.dat` table**, reads
+  a stat byte-run (`01 01 01 01`) as a length, over-allocs ~16 MB, and **frees it immediately**
+  (observed). No struct offset, no endianness, no pointer-width, no ABI error — the marshalling is
+  correct. The `0x72657473`="ster" variant (different file/branch, "처음부터 시작") is the **same
+  mechanism**; the existing `calloc` OOM→NULL guard is the correct WIPI `malloc` contract for it.
+- *Size and pixels share NO root.* 놈ZERO issues **zero blit SVCs** (no `DrawImage`/`PutPixel`/
+  `SetRgbPixels`/`CreateImage`) — only `FillRect`/`DrawRect` + direct writes to a framebuffer pointer
+  from `GetScreenFrameBuffer`/`CreateOffScreenFrameBuffer`, with `GetPixelFromRGB` (569×) for color.
+  That path is format-consistent 16bpp RGB565 across `get_pixel_from_rgb` / `get_display_info` /
+  `FRAMEBUFFER_DEPTH` / `FrameBuffer` storage / `flush_lcd` (re-confirms prior "stride/FB normal").
+- *Differential (제노니아1 clean vs 놈ZERO broken) inverts.* In current headless, 제노니아1 sits at
+  the **same** green LGT loading frame and renders **less** than 놈ZERO, which advances to textured
+  menus. So 놈ZERO (clet) is not the regressed one; the framing that drove "여러 라운드 교착" was the
+  stale-report bug-attribution, now corrected.
+
+*Verdict (cp47).* No confirmed wie-side defect behind the "garbage size." Per the no-blind-fix /
+preserve-passing-games rule, **0 code changed** (a blind special-case would risk the now-passing
+state for no proven gain). Remaining open item is **full `.pzx`/`.ft2` sprite fidelity** (a visual,
+on-device judgment) — advancing it needs either the **`.pzx`/`.ft2` format spec** (absent from
+repo/env → external, hold) or **dynamic ARM memory-watchpoint tracing** (not exposed by wie's
+`ArmCore`), exactly as cp35/cp42 flagged. Doc-only checkpoint; no game behavior changes.
+
 ## 8. Current reach
 
 | stage | state |
@@ -928,5 +970,6 @@ exposed in 체스마스터, then bounded it so it fast-fails.
 | AOT-Java title sweep: 17 titles, 0 render (cp43) | ⛔ 1 at §7 (battle), 7 [X-paint] `AbstractMethodError paint`, 8 [X-vtable] misrouted `NoSuchMethod`, 1 [X-class] `NoClassDef`. All boot walls upstream of §7 |
 | [X-paint]+[X-vtable-`Card`] = card-binding; cascade not §7 (cp44) | ◑ measured: app card `new`+platform `Card.<init>` binds to `Card`, losing app subclass (paint/A/d fail). Unique-subclass bind-redirect **advances** titles but hits a **cascade** of further boot walls. (cp44's "clet regression" was host load, not the fix — see cp45) |
 | clet-safe card-binding fix + runaway alloc guard, **pushed** (cp45/cp46) | ✅ `bind_pending` redirects a `new`+platform-`Card.<init>` object to the unique app subclass; map empty for clets ⇒ inert on clet path. Regression 0 (제노니아1 d=9 no hang, all renderers identical, `test --workspace` green). Measures 턴/레전드오브마스터/서든어택포켓/현영맞고2006 to §7; 5 others to deeper walls. **0 new render** (still §7/next-wall) |
-| **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** |
+| **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** (AOT-Java path) |
+| 놈ZERO (clet) renders; "garbage size" not a wie bug (cp47) | ✅ boots, 153 paints, menus+text+textured `.pzx` bg, survives full inject. `calloc(0x01010101)`/"ster" = game loader reading byte-correct `cur_figure.dat` (offset+4 = `01 01 01 01` in the jar; verified). Size ≠ pixel root; FB path RGB565-consistent. Open: `.pzx`/`.ft2` fidelity (external spec / watchpoint-gated) |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
