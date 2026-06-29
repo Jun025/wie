@@ -1,94 +1,75 @@
-# ez-i / LGT WIPI-Java per-frame dispatch — reference (from real emulators)
+# ez-i / LGT WIPI-Java reference v2 — authoritative (AromaSoft WIPI 1.1.1)
 
-Extracted from two reference implementations of the LGT ez-i / DownTown platform:
+Updates v1 with the **authoritative platform library**. AromaSoft built the LGT WIPI / ez-i
+("자바스테이션") platform (confirmed in the official WIPI 2004 deck: *모바일 표준 플랫폼 개발 —
+아로마소프트*; *Ez-Java / LGT / Aromasoft*). So **`AromaWIPI_classes.zip` IS the `org.kwis.msp.*`
+implementation that BattleMonster's COD/AOTC compiled against** — the 0x64 java-interface imports
+are the AOT-compiled equivalents of calls into these exact classes.
 
-- **KEmulator-mmpp.jar** (pure Java; `SK-VM, ez-i 에뮬레이터`) — contains
-  `org/kwis/msp/lcdui/{Jlet,EventQueue,JletStateChangeException}` + the host MIDP
-  dispatch core `emulator/EventQueue` + `emulator/lcdui/*`.
-- **midp3.exe** (`LGT_MIDP_Emulator`) — native LGT ez-i MIDP runtime, **phoneME-derived**
-  (`com/sun/midp/...`) with LGT ez-i extensions (`initializeEzi`, `comeToEzI`, `EZI_*`,
-  `LGTSMSParser`, `setEziPasswd`).
+## Reference files (commit alongside this doc)
 
-Both are **host re-implementations that run the JAR (bytecode)** form, not the AOT
-`binary.mod`. So they give the **platform Java-API contract + dispatch semantics**, which is
-exactly the §7 unknown — not the on-device 0x64 native import index table (that still needs
-mapping, see §4).
+- **`AromaWIPI_classes.zip`** — WIPI 1.1.1 platform class library (bytecode): the real
+  `org.kwis.msp.{lcdui,lwc,db,io,handset,media}`, `org.kwis.msf.{core,io}`. Decompile for exact
+  method behavior/return values.
+- **`AromaWIPI_javadoc.zip`** — official API docs (signatures, params, returns) for every class.
+- **`WIPIHeader.h`** — the WIPI **C** API (`MC_grp*`, `MC_knl*`, `MC_GrpFrameBuffer`, `MC_db*`,
+  `MC_net*`, …) = the **0x1fb** (WIPI-C) table spec.
+- (from SK-VM bundle) `KEmulator-mmpp.jar` — cross-check; `midp3.exe` — native phoneME+ez-i.
 
----
+## 1. Event model — CONFIRMED (`org.kwis.msp.lcdui.EventQueue`)
 
-## 1. The ez-i event model (CONFIRMED, concrete constants)
+`int[15]` ring buffer. `EVENT_SIZE=15`, **`KEY_EVENT=17`, `POINTER_EVENT=19`, `TIMER_EVENT=21`**.
+Methods: `getNextEvent(int[])` (blocking dequeue), `postEvent(int[])`, `postEvent(int,int[])`,
+`dispatchEvent(int[])`, **`hookEvent(int,JletEventListener)`**, **`setSystemEventListener(int,
+SystemEventListener)`**, `removeSystemEventListener(int)`. `Jlet`: `ACTIVE=11/PAUSED=13/DESTROYED=15`.
 
-`org.kwis.msp.lcdui.EventQueue` — a producer/consumer **ring buffer of `int[15]` events**:
+## 2. §7 driver — CONFIRMED implementable (cp55)
 
-| const | value |
-|---|---|
-| `EVENT_SIZE` | **15** (each event is `int[15]`) |
-| `KEY_EVENT` | **17** |
-| `POINTER_EVENT` | **19** |
-| `TIMER_EVENT` | **21** |
+The platform posts `TIMER_EVENT(21)` at frame cadence; the **game's own** `getNextEvent` loop reads
+`event[0]` and self-dispatches (BattleMonster dispatcher @0x831xx switches `event[0] in {17,19,21}`,
+routing TIMER -> card-update). wie never posts `TIMER_EVENT(21)` -> loop blocks -> 0 draw. cp55 proved
+posting `[21,...]` at ~50ms unblocks it (159 iterations, `paint()` per frame). **Implement LGT-AOT-gated
+TIMER post.** Cadence: KEmulator `_repaintInterval`/`j2lStyleFpsLimit`; confirm against gameplay video.
 
-Methods (all `([I)V`):
-- `postEvent([I])` — enqueue a 15-int event (producer; platform side).
-- `getNextEvent([I])` — **blocking dequeue** into the caller's array (`wait()`/`notifyAll`,
-  `System.arraycopy`). ← this is the method wie crashed in (`net/wie/EventQueue.getNextEvent`).
-- `dispatchEvent([I])` — **EMPTY stub** in this impl. ⇒ the routing to the card is **NOT** in
-  the platform class; the **game's own run loop** reads `event[0]` (the type) and dispatches itself.
+## 3. Consumed no-op 0x64 imports -> platform-method mapping (cp53/54 -> resolve via classes.zip)
 
-`org.kwis.msp.lcdui.Jlet` lifecycle (CONFIRMED):
-- states `ACTIVE=11 / PAUSED=13 / DESTROYED=15`; fields `eventQueue`, static `activeJlet`.
-- `setActiveJlet / getActiveJlet / getJletFromPID(I) / getCurrentJlet / getCurrentProgramID`,
-  `startApp([String]) / pauseApp / resumeApp / destroyApp(Z) / notifyDestroyed`,
-  `getAppProperty(String) / getEventQueue() / removeAllResource(I)`.
+The 0x64 table is the AOT image of `org.kwis.msp.*` calls. Map each cp54 import by its **usage
+signature** to the method below, then implement per the decompiled class / javadoc. Anchor the
+index->method numbering off the already-known ones (`0x9`=string, `0xc`=getInstance/getDefaultDisplay).
 
-## 2. The per-frame CADENCE (CONFIRMED, KEmulator core)
+| import (cp54 sig) | strong candidate(s) | notes |
+|---|---|---|
+| `0xd (obj,code_ptr,n)` | **`Display.callSerially(Runnable,int)`** | deferred/timer callback -> ties the TIMER loop (s2). Also cf. `EventQueue.hookEvent`/`setSystemEventListener`. cp37 "carried-code 0x1ad4" = the Runnable. |
+| `0xb (data,ptr,n)` void | `Display.add/setJletEventListener`, `grabKey(int,listener)`, `EventQueue.hookEvent` | event/listener registration (return ignored). |
+| `0xe (1,0,size)->handle` | **`Image.createImage(int,int)`** (mutable) / `createImage(byte[],int,int)` | returns an Image handle stored in a field; null-checked. |
+| `0x10 (handle,idx)->field` | `Image.getGraphics()/getWidth()/getHeight()`, `Display.get*` | accessor on a handle. |
+| `0x12 (0,0,outbuf)->bool` | `Display.isColor/hasPointerEvents/isDoubleBuffered/where`, or a resource-exists query | branch-on-return; pick by the outbuf usage. |
+| `0x1f (0,code/size,n)` | `Card`/displayable register, or `Image` resource | ez-i register; cross-ref classes.zip. |
+| `0x22 (0,idx,n)` font | **`Image.createImage(String)/loadImage(String,obs)/getResourceAsStream(String)`** | cp33-35 font-sheet path: the font Image is created here; currently no-op->a0=0->no glyph blit. |
 
-`emulator/EventQueue` (the host MIDP dispatch core) drives frames with a **screen timer**:
-- fields: `screenTimer:java.util.Timer`, `screenTimerTask:TimerTask` (`ScreenTimerTask extends
-  TimerTask`), `_repaintInterval`, `_fpsLimiter`, `j2lStyleFpsLimit`, `repaintPending`,
-  `repaintX/Y/W/H`.
-- `ScreenTimerTask.run()` is `schedule`d at a fixed interval → posts repaint/timer →
-  `queueRepaint → internalRepaint → serviceRepaints → paint`.
-- i.e. a **fixed-interval timer** posts the per-frame tick; cadence = the fps limiter.
+Resource/sprite load (the `field[0x74]` scene-state inputs, cp53) flows through `Image.*` +
+`org.kwis.msp.io.File.openInputStream` + `Kernel`/DB (`org.kwis.msp.db.DataBase`). The scene won't
+advance past state 8 until the import that loads its resources returns a real handle (not 0).
 
-## 3. ★ Re-diagnosis of wie's §7 (the model cp37–54 had WRONG)
+## 4. Platform API surface (from javadoc — anchors for mapping)
 
-cp42/cp52 assumed §7 = "the ez-i runtime selects & dispatches a method on a registered **bare
-handle**." The reference shows that is **not** the model. The real model:
+- **Display** (the `0x21` registration target, cp50): `getDefaultDisplay`, `getDisplay(String)`,
+  **`pushCard(Card)`**, `popCard`, `removeCard`, `countCard`, **`callSerially(Runnable[,int])`**,
+  `flush`, `getWidth/Height`, `isColor`, `numColors`, `hasPointerEvents`, `grabKey/ungrabKey`,
+  `set/add/removeJletEventListener`, `where`.
+- **Card**: `paint(Graphics)`, `keyNotify(int,int)`, `pointerNotify(int,int,int)`,
+  `showNotify(boolean)`, `repaint([iiii])`, `serviceRepaints`, `isShown`, `getDisplay`. (No
+  "update" method -> game update is app-internal `i.a/i.b`, driven by the TIMER event it reads.)
+- **Image**: `createImage(byte[],int,int)`, `createImage(int,int)`, `createImage(String)`,
+  `loadImage(String,obs)`, `getResourceAsStream(String)`, `getGraphics`, `getWidth/Height`,
+  `isAnimated`, `play/stop`.
+- **Kernel** (`org.kwis.msf.core`): `execute/load`, `getPrgID/getAMID/getParentPrgID`, `getPrgInfo`,
+  `stop`, `getAccessLevel`.
 
-1. The platform **posts a `TIMER_EVENT` (type 21) into the EventQueue at frame cadence** (the
-   screen timer), plus `KEY_EVENT` (17) on keypress, `POINTER_EVENT` (19) on touch.
-2. The **game's own loop** calls `getNextEvent([I])`, reads `event[0]`, and dispatches itself:
-   `TIMER_EVENT → advance scene-state + repaint`, `KEY_EVENT → key handler`.
-3. The card update (`i.a`/`i.b` → sets `o.g`) and scene-state advance (`field[0x74]`) are driven
-   **by the game off the TIMER_EVENT**, not by a runtime method-dispatch on a bare handle.
+## 5. Plan (cp56)
 
-**⇒ The actual wie gap: wie never posts `TIMER_EVENT(21)` into its `EventQueue` at a frame
-cadence.** So the game's `getNextEvent` loop never receives the per-frame tick → `i.a`/`i.b`
-never run → `o.g=0`, `field[0x74]` stuck at 8 → 0 draws. cp50 wired `pushCard→paint` (the PAINT
-half) but not the **TIMER_EVENT update half**.
-
-This is **implementable inside wie without the proprietary runtime**: post a 15-int event with
-`event[0]=21` at cadence, deliver it via the game's existing `getNextEvent` path; the game's own
-code does the scene-advance + paint. (This is reconstruction of the standard ez-i EventQueue
-timer model — confirmed by two reference emulators — not forcing.)
-
-Open: the exact `event[1..14]` payload for `TIMER_EVENT` (timer id? elapsed ms?) and cadence ms.
-Recover the payload from the game's `getNextEvent` consumer disasm; recover/confirm cadence from
-KEmulator's `_repaintInterval`/`j2lStyleFpsLimit` and the gameplay video frame rate.
-
-## 4. Still to map: the consumed no-op 0x64 imports
-
-cp53/54's `{0xb,0xd,0xe,0x10,0x12,0x1f,0x22}` are AOT-call equivalents of platform Java methods.
-The reference emulators implement those methods (kwis + the phoneME `com/sun/midp` + ez-i
-extensions). Map LGT `0x64` index → `org.kwis.msp.*`/ez-i method **by the app's usage signature**
-(cp54 table) cross-referenced against the **decompiled reference implementations**, then implement
-each import per the reference's semantics. Note `0xd=(obj,code_ptr,n)` is plausibly the
-**event-handler / timer-callback registration** that wires §3's TIMER path — re-interpret it in
-the EventQueue model.
-
-## 5. Files
-
-- `KEmulator-mmpp.jar` → `org/kwis/msp/lcdui/*`, `emulator/EventQueue*`, `emulator/lcdui/*`,
-  `emulator/Emulator*`, `javax/microedition/lcdui/*`. Decompile these (CFR/procyon/jadx).
-- `midp3.exe` → native phoneME+ez-i; strings/IDA/Ghidra for the ez-i additions (`initializeEzi`,
-  `EZI_*`) and, if present, the AOT/native dispatch — the closest artifact to wie's on-device ABI.
+1. LGT-AOT-gated `TIMER_EVENT(21)` cadence driver on `net/wie/EventQueue` (s2). Clet/KTF/SKT inert.
+2. Decompile `AromaWIPI_classes.zip` (+ javadoc) -> resolve each consumed 0x64 import (s3 table),
+   implement those whose semantics are confirmed (esp. `Image.createImage`/resource-load so
+   `field[0x74]` advances and sprites load; `callSerially` for the timer).
+3. Validate vs the title oracle (cream bg + BATTLE Monster logo + sprites) and the video cadence.

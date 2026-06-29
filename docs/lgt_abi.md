@@ -1267,6 +1267,47 @@ cadence driver; (b) map+implement the consumed 0x64 imports from the reference; 
 oracle. `docs/ezi_dispatch_reference.md` committed. Experiment reverted; doc-only checkpoint; no code,
 no game behavior changes.
 
+**cp56 — AromaWIPI reference (the authoritative LGT ez-i `org.kwis.msp.*` impl) obtained & API
+confirmed; TIMER+payload still doesn't advance; the blocker (0x64 import index→method) is NOT in the
+Java classes — it's the native runtime's import table. Code 0, experiment reverted.**
+
+`docs/AromaWIPI_classes.zip` (224 classes, the LGT Ez-Java platform BattleMonster was compiled against)
++ `AromaWIPI_javadoc.zip` + `WIPIHeader.h` committed. No JRE/decompiler on host, but the **javadoc**
+gives the exact API contract:
+- **`Card`** (the displayable): `abstract paint(Graphics)`, `keyNotify(int,int)`, `pointerNotify(int,
+  int,int)`, `showNotify(boolean)`, `repaint`/`serviceRepaints` — **NO timer/update method.** ⇒ the
+  per-frame *update* (i.a/i.b → `o.g`) is the **game's own code** in its TIMER handler, not a Card
+  method. (Confirms cp55's "game self-dispatches off TIMER".)
+- **`EventQueue`**: `getNextEvent([I)` (blocking), `postEvent`, static `postEvent(int,[I)`, `hookEvent`,
+  `setSystemEventListener`, `dispatchEvent([I)`. **`Image`**: `createImage(int,int)`, `createImage(byte[],
+  int,int)`, `createImage(String)`, `loadImage(String,ImageObserver)`, `getGraphics`. **`Display`**:
+  `pushCard/popCard/removeCard/countCard`, `callSerially(Runnable[,int])`, `isColor/numColors/
+  hasPointerEvents/hasRepeatEvents`, `getKeyCode/getGameAction`, `flush`. **`Jlet`**: `startApp/
+  pauseApp/resumeApp/destroyApp`, `getEventQueue`, `getActiveJlet`.
+
+*Experiment (reverted) — TIMER with elapsed-ms payload.* cp55 posted `[21,0,0,0]`; cp56 posted
+`[21, dt=50, total, 0]` (real elapsed-ms) at 50 ms cadence (+ `dispatchEvent` accepts 21). Result:
+loop runs (279 paints) but **still 0 advance** — no `getResource`/`createImage`/`drawImage`/`fillRect`,
+`field[0x74]=8` stuck. So the payload isn't the gate either; the scene-advance is blocked **downstream**
+on the consumed no-op 0x64 imports (cp53/54).
+
+*★Key limit of the reference (sharpens the external need).* The AromaWIPI **Java classes give the event
+model + method *semantics*** (which is what cp55 needed for TIMER) **but NOT the native `0x64` import-
+table *index numbering***. wie's `0x64` index→handler map is the **device/native-runtime's** table
+(`get_import_function` in `init.rs`); the `.class` files don't encode it. So cp54's "which index =
+which method" gap **persists even with the reference** — the consumed imports `{0xe,0x10,0x12,…}` can't
+be mapped to `Image.createImage`/`Display.*`/etc. on confirmable evidence (the arg shapes like
+`0xe(1,0,8)` don't match any `createImage` signature; guessing forbidden).
+
+*Verdict — code 0 (reverted).* Net: **TIMER half is solved by the reference** (event model confirmed,
+implementable — cp55). **Render is blocked on the `0x64` import index→method mapping, which the Java
+classes do not provide** — it needs the **native ez-i runtime** (`midp3.exe` native code via Ghidra/
+IDA — the `EZI_*`/phoneME import table) or a **device import-table trace**. Not committing the TIMER
+driver alone: it produces no visible change (oracle unmet) and would need shared-`EventQueue` gating;
+land it together with the import fix once the index table is known. Next round is **native-runtime
+(midp3.exe) RE**, not pure-binary or Java-class work. Experiment reverted; docs + reference committed;
+no code, no game behavior changes.
+
 ## 8. Current reach
 
 | stage | state |
@@ -1304,4 +1345,5 @@ no game behavior changes.
 | data-flow audit + import census: binary-side EXHAUSTED (cp53) | ⛔ `i.a@0x6fac4` reads `field[0x74]` from `getInstance(31)` (implemented import 0xc) → switch {0,3,0x14,0x28,0x31,0x50,0x51}, value 8 = default/no-advance; writers app-internal. Census: 0 WIPI-C at boot; all java-interface no-op except 0x9/0xc. **New: no-op returns ARE consumed** (0x12 branched @0x2bd4, 0xe/0x10 stored to fields) — real gap, but correct values undeterminable from consumer (guessing forbidden). (Y) runtime-gated. Sharpened spec: WIPI 1.1.1/ez-i java-interface semantics {0xb,0xd,0xe,0x10,0x12,0x1f,0x22} + per-frame dispatch. **No further binary-side rounds.** Code 0 |
 | consumed no-op imports classified: (가) bucket EMPTY (cp54) | ⛔ disasm each consumer: 0xb/0xd = void registration (return ignored); 0xe/0x10 = alloc/handle-like but type encoding unconfirmable; 0x12 = query flag (correct value unknown); 0x1f/0x22 = ez-i register/font. None maps 1:1 to a wie impl (LGT serves call/field/alloc/register via other mechanisms) ⇒ **nothing to wire** ⇒ (Y) re-confirmed. External: ez-i/WIPI ref impl or device trace (AromaSoft / DownTown-Velox / XCE / firmware VM). Binary-side complete. Code 0 |
 | ★cp42/52 model WRONG; TIMER_EVENT(21) loop driver CONFIRMED (cp55) | ◑ ref (ez-i emulators): game's getNextEvent loop self-dispatches `event[0]`∈{17,19,21}; binary confirms (dispatcher @0x831xx: TIMER21→card-update). Game was **blocked in getNextEvent** (wie never posts TIMER). Experiment (reverted): post `[21,…]` at cadence → loop iterated **159×**, `paint()` ran each frame (`Graphics::reset` 159×). Render still 0 (`field[0x74]=8` doesn't advance, spins idle) — gated downstream on 0x64 import semantics (cp54). Reverted (broke shared path + no oracle). **Per-frame driver is implementable, NOT proprietary** — narrows external need to 0x64 import decompile. `ezi_dispatch_reference.md` committed |
+| AromaWIPI ref obtained; TIMER+payload insufficient; 0x64 index needs native runtime (cp56) | ◑ AromaWIPI classes/javadoc/WIPIHeader.h committed (authoritative LGT ez-i API). Confirms: Card has NO update method (game self-updates on TIMER); EventQueue/Image/Display/Jlet signatures. Experiment (reverted): TIMER(21)+elapsed-ms payload → loop runs (279 paints) but **still 0 advance** (field[0x74]=8 stuck). ★The Java classes give method *semantics* but NOT the native 0x64 import *index table* → cp54 mapping gap persists. Next: midp3.exe native RE (Ghidra) for the import table. Code 0 |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
