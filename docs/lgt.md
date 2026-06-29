@@ -96,7 +96,19 @@ Measured consequences (배틀몬스터, the one title reaching this wall):
   only, **no sprites** — sprite load is further gated by the scene-state machine
   (`field[0x74]`, see `docs/FOLLOWUP_ISSUE.md`).
 
-So the missing piece is the ez-i runtime's coordinated per-frame protocol (which registered
-object / which method+vtable-slot / which args / which cadence, plus scene-state plumbing) —
-platform-ABI, recoverable only from the ez-i native runtime / LGE Xceed VM / a device trace.
-Full RE trail: `docs/lgt_abi.md` §7 and checkpoints cp37–cp49.
+A coordinated reconstruction (cp50) wired the **paint** pipeline: routing the native `0x21(_,Card,
+Jlet)` registration to `Display.pushCard(card)` and driving `Display.handlePaintEvent` per frame
+runs `CardCanvas.paint → card.paint` every frame. But three walls still block any draw:
+- **(A) multi-subclass binding:** the card binds to its **base** Card subclass (`o`), not its true
+  type (e.g. `i`), because wie only sees the platform `Card.<init>` (app `<init>`s are bypassed) and
+  the `new` primitive carries no class handle — so the subclass update method that sets the draw gate
+  is unreachable (`NoSuchMethodError`).
+- **(B) JVM-field vs guest-field:** AOT field reads hit guest memory, so the gate must be set by the
+  real ARM update method, not a JVM-side `put_field`.
+- **(C) scene-state:** even with the gate open, only background `fillRect`/`setColor` draws; sprites
+  need the scene-state machine (`field[0x74]`) to advance (see `docs/FOLLOWUP_ISSUE.md`).
+
+So the missing pieces are app-internal obfuscated RE (per-`new`-site true subclass; the subclass
+update method/args) plus the ez-i runtime's scene-state inputs — recoverable only from the ez-i
+native runtime / LGE Xceed VM / a device execution trace. Full RE trail: `docs/lgt_abi.md` §7 and
+checkpoints cp37–cp50.

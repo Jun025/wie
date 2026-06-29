@@ -1031,6 +1031,47 @@ update method `Game.b()V`@`0x1484` runs but is gated (returns 0); paint dispatch
 are the additional unknowns. Recoverable only from the **ez-i native runtime / LGE Xceed VM / a device
 trace**. STEP 3 probe reverted; doc-only checkpoint; no code, no game behavior changes.
 
+**cp50 — coordinated ez-i reconstruction probe (all 3 halves at once): the per-frame PAINT pipeline
+is now wired & dispatching, but 3 further walls block any draw (branch (b), code 0, probe reverted).**
+
+Unlike cp48/49 (which wired one half each), this round wired all three in one loop and measured each
+against the title oracle (cream bg + BATTLE Monster logo + bottom sprites). All handles from the live
+배틀몬스터 trace; full probe reverted.
+
+- *✅ Half (1)+(3) — paint pipeline WIRED.* The displayable registration `0x21(0x48840540, Card
+  0x48840120, Jlet 0x48840010)@lr0x227c` maps to **pushCard**: routing it to `Display.pushCard(card)`
+  succeeded (`pushCard ok`), and driving the MIDP `Display.handlePaintEvent` per frame ran
+  `CardCanvas.paint → card.paint` **301× (every frame)**. This **resolves cp48's "cards empty / 0 paint
+  dispatch"** — the card is class **`o`** (`o extends org/kwis/msp/lcdui/Card`; a real Card subclass),
+  confirming the `0x21`→pushCard semantic. The class graph: `o ← {b,d,e,j,l}`, and `i ← b ← o`
+  (i = 151 methods, the gameplay card); `Game` is the MIDlet controller.
+- *⛔ Wall A — card binds to BASE `o`, true subclass lost (cp44 multi-subclass, now the active
+  blocker).* The 5 cards (`0x120/170/190/1b0/4f0`) all bind to `o` because the only `<init>` wie sees is
+  the platform `Card.<init>` (the app calls it directly, skipping app `<init>`s) and `platform_to_app_
+  subclass` maps Card→`o` (unique direct subclass). `card.b(III)V` (cp38's gate-setter `i.b`) →
+  **NoSuchMethodError** on `o`. The `new` primitive (`0x32`/java `0xf`) carries **no class handle**
+  (measured: r0/r1 = heap/code ptrs, not class descriptors) ⇒ the true class (i/l/b/…) is
+  **runtime-invisible**; correct binding needs per-`new`-site obfuscated RE.
+- *⛔ Wall B — JVM-field vs guest-field split.* Forcing the gate via `jvm.put_field(card,"g","I",1)`
+  succeeded JVM-side but had **0 effect** — `o.paint` reads the field from **guest memory** (the
+  `LgtClassInstance` guest_ptr field array), not the JVM `jvm_fields` map. So the gate can only be set by
+  the real ARM update method (the subclass `i.b`), which is unreachable per Wall A. (Contrast cp28, which
+  wrote the *guest* offset directly and did draw background.)
+- *⛔ Wall C — sprites need scene-state advance.* Even past A/B (cp28: gate forced in guest mem → 21
+  setColor + 18 fillRect = **background only, no `drawImage`/sprites**); the title sprites need the
+  scene-state machine (`field[0x74]=8` unhandled → scene array `field[0xd4]` empty, `FOLLOWUP_ISSUE.md`).
+
+*Verdict — branch (b), code 0.* The reconstruction got **further than any prior round** (per-frame paint
+pipeline dispatching), but reproduced **no pixels** because the draw gate is reachable only through the
+true-subclass update method, which is gated behind: **(A)** per-card true-subclass identity (per-`new`-
+site RE; runtime-invisible — the `new` carries no class handle and app `<init>`s are bypassed), **(B)** the
+subclass update method+args that write the *guest* gate field, **(C)** the scene-state inputs that populate
+the sprite/scene array. (A)+(B) are obfuscated **app-internal** RE (not pixel-recoverable); (C) is likely
+**runtime-gated** (timer/event/callback values the ez-i runtime supplies). The video oracle gives output
+pixels, not these internals — so the irreducible external need is the **ez-i/Xceed native runtime or a
+device execution/state trace**, plus per-`new`-site disassembly for the subclass binding. Probe fully
+reverted; doc-only checkpoint; no code, no game behavior changes.
+
 ## 8. Current reach
 
 | stage | state |
@@ -1062,4 +1103,5 @@ trace**. STEP 3 probe reverted; doc-only checkpoint; no code, no game behavior c
 | 놈ZERO (clet) renders; "garbage size" not a wie bug (cp47) | ✅ boots, 153 paints, menus+text+textured `.pzx` bg, survives full inject. `calloc(0x01010101)`/"ster" = game loader reading byte-correct `cur_figure.dat` (offset+4 = `01 01 01 01` in the jar; verified). Size ≠ pixel root; FB path RGB565-consistent. Open: `.pzx`/`.ft2` fidelity (external spec / watchpoint-gated) |
 | live re-baseline + §7 free-MSP option exhausted (cp48) | ⛔ AOT 0/17 draw (cp43 buckets hold); 배틀몬스터 at §7 blank. App sets displayable via native `import 0x21` (no-op in wie), never `Display.pushCard`; even wired, draw-gate `o.g` is set by card update `i.b` (cp38), which MSP `card.paint` never calls ⇒ 0 draws without forcing. Missing ez-i fact: which registered obj / which method+slot / which args / which cadence the runtime ticks. **External: ez-i native runtime / Xceed VM / device trace.** Code 0. (Pre-existing clet issues noted: 하이브리드 blank+null-OK, 제노니아1 inject spin) |
 | KTF model contrast + STEP3 probe: §7 not the sole gate (cp49) | ⛔ KTF AOT renders via app self-loop (`Thread.run`); LGT `a.run` one-shot registrar ⇒ no KTF "registered→tick" precedent. 배틀몬스터 card IS bound (getInstance), update invocable — bare-handle not the blocker. Probe (reverted): driving `Game.b()V`@`0x1484` per-frame → `Ok(0)` idempotent, **0 draws, blank** (paint undispatched + scene-state gated). With cp28 (force→bg fills only) + FOLLOWUP (`field[0x74]` wall): render needs full ez-i protocol (update+paint+scene-advance). Code 0; probe reverted |
+| coordinated reconstruction: paint pipeline WIRED, 3 walls remain (cp50) | ◑ `0x21(_,Card,Jlet)`→`pushCard` works; per-frame `handlePaintEvent`→`CardCanvas.paint`→`card.paint` **301×** (cp48's empty-cards resolved; card=class `o`). But 0 draws: **(A)** card binds to base `o`, true subclass (i/l/b) invisible — `new` carries no class handle, `card.b(III)` NoSuchMethod (cp44 multi-subclass); **(B)** JVM-field force ≠ guest-field (paint reads guest mem); **(C)** sprites need `field[0x74]` scene advance (cp28 force→bg only). Branch (b); code 0; probe reverted |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
