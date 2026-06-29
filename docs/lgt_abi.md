@@ -1113,6 +1113,35 @@ irreducible external need is unchanged: ez-i/Xceed native runtime or a device ex
 (exposes the real per-instance type + the carried-code entry convention). Probe fully reverted; doc-only
 checkpoint; no code, no game behavior changes.
 
+**cp52 — the cp51 "carried-code closure" lead is FALSIFIED by disassembly: r1 is leftover register
+state, `0x1ad1c` is a branch instruction; no closure exists to drive (branch (iii), code 0, no probe).**
+
+Targeted the cp51 r1-carried-code hypothesis head-on with static disasm of the card new-site
+(`Game.a@0x11dc`) and the alleged entry `0x1ad1c`. Both legs collapse:
+- *`0x1ad1c` is not an entry.* Disasm: `0x1ad00 ldm sp,{r4,r5,r6,r11,sp,lr}` + `0x1ad04 bx lr` (a
+  function **epilogue/return**), then `0x1ad08–0x1ad18` = **literal pool** (`.data` ptrs + 0x1834),
+  then `0x1ad1c: b 0x1ac50` — a **back-edge branch inside e.b's body**. It is plain mid-method control
+  flow, not a closure prologue; "entering" it is meaningless.
+- *r1 is not a `new` argument.* Full disasm of `Game.a` 0x11dc→0x1228 shows **no `r1` write** of any
+  kind (grep for `mov/ldr/add/... r1` = empty). The new-stub (`bx r5`, r5=`.data` thunk `0x0140452c`)
+  is reached with r1 = **whatever the prior helper call left** (`bx [0x1440]`=`0x18160`); r0 is likewise
+  leftover (a previously-`new`'d object `0x48840110`). The new primitive takes only an implicit
+  size/type — **no per-instance class or carried-code pointer is passed**. cp51's "coherent r1→subclass"
+  mapping was reading **incidental register residue** from card-setup helpers, not a discriminator.
+  (Aside: `.data`@0x01400000 is `TYPE=TEXT` — it holds import/call thunks, so `bx <.data>` is normal.)
+
+*Verdict — branch (iii), code 0.* There is **no per-card carried-code closure** in `binary.mod` to
+drive; the cp51 lead was spurious. This **hardens** cp51's core finding: the registered displayable is a
+**global-vtable object with its true class compiled away**, and the per-frame render driver is the ez-i
+runtime selecting+invoking a method on it — logic that is **not present in `binary.mod`** in any
+drivable form (no closure pointer, no class discriminator, no boot-time dispatch witness). All
+binary-side leads (cp37 carried-code, cp42 bare handles, cp48 MSP path, cp49 update-tick, cp50
+pushCard+paint pipeline, cp51 r1-subclass, cp52 r1-closure) are now exhausted. The render is reachable
+only with the **ez-i/Xceed native runtime ABI** or a **device execution/state trace** that exposes (a)
+the registered object's true runtime class and (b) the per-frame dispatch (method + args + cadence) the
+runtime applies to it. The paint pipeline (cp50) stays the high-water mark. No probe this round (pure
+disasm); doc-only checkpoint; no code, no game behavior changes.
+
 ## 8. Current reach
 
 | stage | state |
@@ -1146,4 +1175,5 @@ checkpoint; no code, no game behavior changes.
 | KTF model contrast + STEP3 probe: §7 not the sole gate (cp49) | ⛔ KTF AOT renders via app self-loop (`Thread.run`); LGT `a.run` one-shot registrar ⇒ no KTF "registered→tick" precedent. 배틀몬스터 card IS bound (getInstance), update invocable — bare-handle not the blocker. Probe (reverted): driving `Game.b()V`@`0x1484` per-frame → `Ok(0)` idempotent, **0 draws, blank** (paint undispatched + scene-state gated). With cp28 (force→bg fills only) + FOLLOWUP (`field[0x74]` wall): render needs full ez-i protocol (update+paint+scene-advance). Code 0; probe reverted |
 | coordinated reconstruction: paint pipeline WIRED, 3 walls remain (cp50) | ◑ `0x21(_,Card,Jlet)`→`pushCard` works; per-frame `handlePaintEvent`→`CardCanvas.paint`→`card.paint` **301×** (cp48's empty-cards resolved; card=class `o`). But 0 draws: **(A)** card binds to base `o`, true subclass (i/l/b) invisible — `new` carries no class handle, `card.b(III)` NoSuchMethod (cp44 multi-subclass); **(B)** JVM-field force ≠ guest-field (paint reads guest mem); **(C)** sprites need `field[0x74]` scene advance (cp28 force→bg only). Branch (b); code 0; probe reverted |
 | wall A: subclass identity compiled away; r1-binding falsified (cp51) | ⛔ disasm: gate=`o.g` field idx 6; cards `new`'d in `Game.a`, each `new` r1=mid-method carried-code ptr (0x120→`e.b`+0x154, others→i/d/i/l). All 3 paths fail: r1=callback not class (disasm), global vtable + only `Card.<init>` at boot (no witness), and **rebinding 0x120→`e` + driving `e.a/b(I)`+paint → still 0 draws** (falsified). Class compiled away ⇒ evidence-insufficient. New lead: r1 callbacks = ez-i carried-code per-frame entries (mid-method, runtime ABI). Code 0; probe reverted |
+| cp51 r1-closure lead FALSIFIED; all binary leads exhausted (cp52) | ⛔ disasm: `0x1ad1c`=`b 0x1ac50` (mid-`e.b` branch, after epilogue+literal-pool) — not an entry; `Game.a` has **no `r1` write** before the `new` ⇒ r1 is leftover register residue, not a carried-code/class ptr. No per-card closure exists. Hardens cp51: global-vtable object, class compiled away, per-frame dispatch absent from `binary.mod`. Branch (iii): runtime-gated. External: ez-i/Xceed native runtime or device exec/state trace. Code 0; no probe |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
