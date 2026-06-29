@@ -1072,6 +1072,47 @@ pixels, not these internals — so the irreducible external need is the **ez-i/X
 device execution/state trace**, plus per-`new`-site disassembly for the subclass binding. Probe fully
 reverted; doc-only checkpoint; no code, no game behavior changes.
 
+**cp51 — wall A (true-subclass identification) attacked with disassembly: class identity is compiled
+away / evidence-insufficient; r1-binding falsified by the oracle (branch (b), code 0, probe reverted).**
+
+Disassembled `binary.mod` (elf32-littlearm; `.text`@0x1000 = guest addrs directly; `objdump -d`).
+Dumped the full class→method→`code_ptr` map and field map. Confirmed: gate field **`o.g:I` = field
+index 6**; class graph `o ← {b,d,e,j,l}`, `i ← b ← o`. The 5 cards are `new`'d sequentially in
+`Game.a@0x11dc` (new-sites 0x122c/1264/1294/12c4/12f4); each `new` passes **`r1` = a per-card
+code-ptr**, and those r1 bracket distinct `o`-subclass methods:
+
+| card | r1 | falls in | ⇒ candidate class |
+|---|---|---|---|
+| `0x48840120` (the registered displayable) | `0x1ad1c` | `e.b()V` (0x1abc8) | e |
+| `0x48840170` | `0x82360` | `i.K()I` | i |
+| `0x48840190` | `0x180dc` | `d.r()V` | d |
+| `0x488401b0` | `0x788a0` | `i.c(III)V` | i |
+| `0x488404f0` | `0xd7cb4` | `l.b()V` | l |
+
+The mapping is *coherent* (all five land in `o`-subclasses, none elsewhere), which looked like a class
+discriminator. **But all three evidence paths fail:**
+- *(3) static disasm:* each r1 points **mid-method** (e.g. `e.b`+0x154), i.e. a **carried-code /
+  callback** pointer — not a class descriptor; the new-site loads **no `.data` class descriptor**.
+- *(2) dispatch witness:* the card receives only `Card.<init>` at boot and uses the **global vtable**
+  (cp42) — no class-specific method is ever dispatched.
+- *(1) r1→class — falsified by the oracle:* rebound the registered card `0x48840120` to class **`e`**
+  (its r1's bracketing class), `pushCard`'d it, and drove `e.a(I)`/`e.b(I)` + `handlePaintEvent` per
+  frame (240f). Result: `pushCard ok`, methods ran without `NoSuchMethodError`, **but still 0 draws,
+  blank** — so the r1-bracketing class is **not** a usable class id, and driving named update methods
+  does not open the `o.g` gate.
+
+*Verdict — branch (b), code 0 (narrowed condition met).* The card's true subclass is **not recoverable
+from available evidence**: the AOT `new` carries a callback code-ptr (not a class), the object uses the
+global vtable, and no class-specific method is dispatched — the class identity is compiled away. So a
+committable per-instance multi-subclass binding cannot be made on solid evidence (rebinding by the only
+available signal, r1, was empirically falsified). **New lead for the spec:** the per-card r1 callbacks
+(`e.b`+0x154, `i.K`, `d.r`, `i.c`, `l.b`) are the likely ez-i **carried-code per-frame entries** — this
+refines cp48's "which method" unknown from a named vtable slot to a **mid-method carried-code address
+entered with a runtime-specific frame/args/cadence** (the ez-i ABI, absent from `binary.mod`). The
+irreducible external need is unchanged: ez-i/Xceed native runtime or a device execution/state trace
+(exposes the real per-instance type + the carried-code entry convention). Probe fully reverted; doc-only
+checkpoint; no code, no game behavior changes.
+
 ## 8. Current reach
 
 | stage | state |
@@ -1104,4 +1145,5 @@ reverted; doc-only checkpoint; no code, no game behavior changes.
 | live re-baseline + §7 free-MSP option exhausted (cp48) | ⛔ AOT 0/17 draw (cp43 buckets hold); 배틀몬스터 at §7 blank. App sets displayable via native `import 0x21` (no-op in wie), never `Display.pushCard`; even wired, draw-gate `o.g` is set by card update `i.b` (cp38), which MSP `card.paint` never calls ⇒ 0 draws without forcing. Missing ez-i fact: which registered obj / which method+slot / which args / which cadence the runtime ticks. **External: ez-i native runtime / Xceed VM / device trace.** Code 0. (Pre-existing clet issues noted: 하이브리드 blank+null-OK, 제노니아1 inject spin) |
 | KTF model contrast + STEP3 probe: §7 not the sole gate (cp49) | ⛔ KTF AOT renders via app self-loop (`Thread.run`); LGT `a.run` one-shot registrar ⇒ no KTF "registered→tick" precedent. 배틀몬스터 card IS bound (getInstance), update invocable — bare-handle not the blocker. Probe (reverted): driving `Game.b()V`@`0x1484` per-frame → `Ok(0)` idempotent, **0 draws, blank** (paint undispatched + scene-state gated). With cp28 (force→bg fills only) + FOLLOWUP (`field[0x74]` wall): render needs full ez-i protocol (update+paint+scene-advance). Code 0; probe reverted |
 | coordinated reconstruction: paint pipeline WIRED, 3 walls remain (cp50) | ◑ `0x21(_,Card,Jlet)`→`pushCard` works; per-frame `handlePaintEvent`→`CardCanvas.paint`→`card.paint` **301×** (cp48's empty-cards resolved; card=class `o`). But 0 draws: **(A)** card binds to base `o`, true subclass (i/l/b) invisible — `new` carries no class handle, `card.b(III)` NoSuchMethod (cp44 multi-subclass); **(B)** JVM-field force ≠ guest-field (paint reads guest mem); **(C)** sprites need `field[0x74]` scene advance (cp28 force→bg only). Branch (b); code 0; probe reverted |
+| wall A: subclass identity compiled away; r1-binding falsified (cp51) | ⛔ disasm: gate=`o.g` field idx 6; cards `new`'d in `Game.a`, each `new` r1=mid-method carried-code ptr (0x120→`e.b`+0x154, others→i/d/i/l). All 3 paths fail: r1=callback not class (disasm), global vtable + only `Card.<init>` at boot (no witness), and **rebinding 0x120→`e` + driving `e.a/b(I)`+paint → still 0 draws** (falsified). Class compiled away ⇒ evidence-insufficient. New lead: r1 callbacks = ez-i carried-code per-frame entries (mid-method, runtime ABI). Code 0; probe reverted |
 | clet regression (`test_helloworld`) / `clippy -p wie_lgt` | ✅ clean |
