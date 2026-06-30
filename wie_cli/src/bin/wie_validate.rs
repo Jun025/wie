@@ -122,11 +122,9 @@ fn frame_richness(data: &[u32], width: u32, height: u32) -> (u64, u64, u64) {
             }
         }
     }
-    let center_bp = if center_total == 0 {
-        0
-    } else {
+    let center_bp = {
         let center_dominant = center.values().copied().max().unwrap_or(0) as u64;
-        ((center_total - center_dominant) * 10000) / center_total
+        ((center_total - center_dominant) * 10000).checked_div(center_total).unwrap_or(0)
     };
 
     (distinct, nondominant_bp, center_bp)

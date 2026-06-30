@@ -62,7 +62,7 @@ pub fn extract_zip(zip: &[u8]) -> Result<BTreeMap<String, Vec<u8>>> {
 
     let mut archive = ZipArchive::new(Cursor::new(zip)).map_err(|x| WieError::FatalError(format!("Invalid zip archive: {x}")))?;
 
-    (0..archive.len())
+    let files: BTreeMap<String, Vec<u8>> = (0..archive.len())
         .filter_map(|x| {
             let mut file = match archive.by_index(x) {
                 Ok(file) => file,
@@ -79,5 +79,78 @@ pub fn extract_zip(zip: &[u8]) -> Result<BTreeMap<String, Vec<u8>>> {
 
             Some(Ok((file.name().to_string(), data)))
         })
-        .collect::<Result<_>>()
+        .collect::<Result<_>>()?;
+
+    Ok(strip_common_wrapper_dir(files))
+}
+
+/// Some archives wrap every game file inside a single top-level directory (e.g.
+/// `<game-name>/__adf__`, `<game-name>/foo.jar`). The platform detectors and
+/// loaders look for markers (`__adf__`, `app_info`, `.msd`) and jar entries at
+/// the archive root, so a uniform wrapper directory makes an otherwise valid
+/// game look unrecognized. If — and only if — every entry shares the same first
+/// path component, strip it so the contents sit at the root. A multi-root
+/// archive (no shared prefix) is returned unchanged.
+fn strip_common_wrapper_dir(files: BTreeMap<String, Vec<u8>>) -> BTreeMap<String, Vec<u8>> {
+    if files.is_empty() {
+        return files;
+    }
+
+    let first_component = |path: &str| -> Option<String> {
+        let idx = path.find('/')?;
+        Some(path[..idx].to_string())
+    };
+
+    let prefix = match files.keys().next().and_then(|k| first_component(k)) {
+        Some(p) => p,
+        None => return files, // first entry is at the root already
+    };
+    if !files.keys().all(|k| first_component(k).as_deref() == Some(prefix.as_str())) {
+        return files;
+    }
+
+    files
+        .into_iter()
+        .map(|(path, data)| (path[prefix.len() + 1..].to_string(), data))
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn map(entries: &[&str]) -> BTreeMap<String, Vec<u8>> {
+        entries.iter().map(|p| ((*p).to_string(), Vec::new())).collect()
+    }
+
+    #[test]
+    fn strips_single_wrapper_dir() {
+        let out = strip_common_wrapper_dir(map(&["game/__adf__", "game/foo.jar", "game/P/data"]));
+        assert!(out.contains_key("__adf__"));
+        assert!(out.contains_key("foo.jar"));
+        assert!(out.contains_key("P/data"));
+    }
+
+    #[test]
+    fn leaves_root_level_files_untouched() {
+        let out = strip_common_wrapper_dir(map(&["__adf__", "foo.jar"]));
+        assert!(out.contains_key("__adf__"));
+        assert!(out.contains_key("foo.jar"));
+    }
+
+    #[test]
+    fn keeps_multi_root_archive() {
+        // No shared first component: must not strip anything.
+        let out = strip_common_wrapper_dir(map(&["a/__adf__", "b/foo.jar"]));
+        assert!(out.contains_key("a/__adf__"));
+        assert!(out.contains_key("b/foo.jar"));
+    }
+
+    #[test]
+    fn keeps_mixed_root_and_dir() {
+        // A root-level marker alongside a directory must not be stripped.
+        let out = strip_common_wrapper_dir(map(&["__adf__", "P/data"]));
+        assert!(out.contains_key("__adf__"));
+        assert!(out.contains_key("P/data"));
+    }
 }

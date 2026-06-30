@@ -66,3 +66,14 @@ wie_wipi_java = { path = "wie_wipi_java" }
 futures-test = { version = "^0.3" }
 
 test_utils = { path = "test_utils" }
+
+# Patched RustJava fork: panic→exception hardening for KTF compatibility
+# (String/ByteArrayInputStream null array → NPE, Integer.parseInt → NFE +
+# NumberFormatException class, Integer.byteValue/shortValue/longValue).
+# Independent fork of dlunch/RustJava @ bee850f; see Jun025/RustJava wie-ktf-hardening.
+[patch."https://github.com/dlunch/RustJava.git"]
+java_class_proto = { git = "https://github.com/Jun025/RustJava.git", rev = "1f0e52e78f262e7ac8c42ab77bb8bda3f8fe92c6" }
+java_constants = { git = "https://github.com/Jun025/RustJava.git", rev = "1f0e52e78f262e7ac8c42ab77bb8bda3f8fe92c6" }
+java_runtime = { git = "https://github.com/Jun025/RustJava.git", rev = "1f0e52e78f262e7ac8c42ab77bb8bda3f8fe92c6" }
+jvm = { git = "https://github.com/Jun025/RustJava.git", rev = "1f0e52e78f262e7ac8c42ab77bb8bda3f8fe92c6" }
+jvm_rust = { git = "https://github.com/Jun025/RustJava.git", rev = "1f0e52e78f262e7ac8c42ab77bb8bda3f8fe92c6" }

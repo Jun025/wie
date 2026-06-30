@@ -29,6 +29,12 @@ impl Player {
     async fn play(jvm: &Jvm, _context: &mut WieJvmContext, clip: ClassInstanceRef<Clip>, repeat: bool) -> JvmResult<bool> {
         tracing::debug!("org.kwis.msp.media.Player::play({clip:?}, {repeat})");
 
+        // A null clip means there is nothing to play; treat it as a no-op rather
+        // than dereferencing null (which would abort the whole emulator).
+        if clip.is_null() {
+            return Ok(false);
+        }
+
         let player = Clip::player(jvm, &clip).await?;
 
         if !player.is_null() {
@@ -42,6 +48,12 @@ impl Player {
 
     async fn stop(jvm: &Jvm, _: &mut WieJvmContext, clip: ClassInstanceRef<Clip>) -> JvmResult<bool> {
         tracing::debug!("org.kwis.msp.media.Player::stop({clip:?})");
+
+        // A null clip has nothing to stop; treat it as a no-op rather than
+        // dereferencing null (which would abort the whole emulator).
+        if clip.is_null() {
+            return Ok(false);
+        }
 
         let player = Clip::player(jvm, &clip).await?;
 
