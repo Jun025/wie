@@ -1,8 +1,8 @@
 # smoke_gate baseline — titles expected to boot + render real content.
 # Identifiers + expected status only; NO game files. Regenerate: UPDATE_BASELINE=1.
-# 139 titles (ktf 95 / lgt 32 / skt 12), each PASSed two independent full live runs.
-# Excluded: titles that fail deterministically (e.g. lgt/하이브리드 — blank/black) and a
-# tail that only flakes under the optional INJECT=1 advisory (timed-input nondeterminism).
+# 149 titles (ktf 95 / lgt 42 / skt 12), each PASSed two independent full live runs.
+# Excluded: deterministic fails (e.g. lgt/하이브리드 — blank/black) and a tail that only
+# flakes under the optional INJECT=1 advisory (timed-input nondeterminism).
 ktf/2006독일축구.zip	PASS
 ktf/MR.때밀이왕.zip	PASS
 ktf/SBS포트리스2.zip	PASS
@@ -98,6 +98,16 @@ ktf/피파7.zip	PASS
 ktf/하베스트타이쿤.zip	PASS
 ktf/한게임신맞고1.zip	PASS
 ktf/헬로우닌자.zip	PASS
+lgt/(LGT) 리듬스타1.zip	PASS
+lgt/(LGT)검은방3.zip	PASS
+lgt/(LGT)나는마왕이다2.zip	PASS
+lgt/(LGT)던전앤파이터귀검사.zip	PASS
+lgt/(LGT)레이카르나.zip	PASS
+lgt/(LGT)이노티아연대기.zip	PASS
+lgt/LGT 얍.zip	PASS
+lgt/LGT 영웅서기3 (1.01ver).zip	PASS
+lgt/lgt 테라 영원의 혼돈.zip	PASS
+lgt/lgt 하얀섬.zip	PASS
 lgt/검은방2.zip	PASS
 lgt/검은방3.zip	PASS
 lgt/게임빌2010슈퍼사커.zip	PASS
