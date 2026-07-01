@@ -6,6 +6,8 @@ interface Props {
   user: User | null;
   toast: (msg: string, kind?: "ok" | "err") => void;
   initialFileRefs?: { id: string; name: string }[]; // 6번: vault files carried in by reference
+  initialTitle?: string; // 5번: crash-report pre-fill
+  initialBody?: string; // 5번: crash-report pre-fill (error details + repro prompt)
 }
 
 const MAX_ATTACH = 96 * 1024;
@@ -58,7 +60,7 @@ type Kind = "inquiry" | "report";
 //                  (game/exec files blocked, 415). 게임 식별정보 미포함.
 //   • 권리 침해 신고·삭제요청 — anonymous-allowed (no login); intake only, no file
 //                  access; game/exec attachments are not part of this form.
-export function InquiryForm({ user, toast, initialFileRefs }: Props) {
+export function InquiryForm({ user, toast, initialFileRefs, initialTitle, initialBody }: Props) {
   const [kind, setKind] = useState<Kind>("inquiry");
 
   // inquiry fields
@@ -69,6 +71,7 @@ export function InquiryForm({ user, toast, initialFileRefs }: Props) {
   const [showEnv, setShowEnv] = useState(false);
   const [list, setList] = useState<Inquiry[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
   const env = envInfoText();
 
   // When the library hands over selected vault files, pre-attach them (by reference)
@@ -79,6 +82,23 @@ export function InquiryForm({ user, toast, initialFileRefs }: Props) {
       setKind("inquiry");
     }
   }, [initialFileRefs]);
+
+  // 5번: crash-report pre-fill — drop the error details + repro prompt into the
+  // form and focus the body so the user only has to add the reproduction steps
+  // (cursor placed at the end, after the pre-filled text).
+  useEffect(() => {
+    if (initialTitle === undefined && initialBody === undefined) return;
+    if (initialTitle) setTitle(initialTitle);
+    if (initialBody) setBody(initialBody);
+    setKind("inquiry");
+    requestAnimationFrame(() => {
+      const el = bodyRef.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(el.value.length, el.value.length);
+      }
+    });
+  }, [initialTitle, initialBody]);
 
   // report (권리 침해 신고·삭제요청) fields — standard takedown intake
   const [rType, setRType] = useState<"owner" | "agent">("owner");
@@ -286,7 +306,7 @@ export function InquiryForm({ user, toast, initialFileRefs }: Props) {
               </label>
               <label className="flex flex-col gap-1 text-sm text-fg-dim">
                 내용
-                <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} maxLength={8000} required className={input} />
+                <textarea ref={bodyRef} value={body} onChange={(e) => setBody(e.target.value)} rows={8} maxLength={8000} required className={input} />
               </label>
 
               {/* 6번: vault files carried in by reference (no byte re-upload) */}

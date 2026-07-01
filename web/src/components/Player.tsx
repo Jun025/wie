@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { EmulatorSession, type EmuError, type LoadableGame, normalizeError } from "../lib/emulator";
 import { type EmuKey, loadKeymap } from "../lib/keymap";
 import { GameButton } from "./GameButton";
+import { Joystick } from "./Joystick";
 import { KeyRemap } from "./KeyRemap";
 import { Overlay } from "./Overlay";
 import { deviceName } from "../lib/saveSync";
@@ -9,12 +10,22 @@ import { useTheme } from "../hooks/useTheme";
 import { audioState, getAudioContext, unlockAudio } from "../lib/audio";
 import type { User } from "../lib/api";
 
+// Materials for a one-click crash report (5번): the crashing game (so it can be
+// referenced from the user's vault) + the pre-filled error/repro text. The save
+// rides along on the server, keyed by the game's ROM hash (see App.resolveCrashReport).
+export interface CrashReport {
+  game: LoadableGame;
+  title: string;
+  body: string;
+}
+
 interface Props {
   game: LoadableGame;
   user: User | null;
   onExit: () => void;
   onMenu: () => void;
   toast: (msg: string, kind?: "ok" | "err") => void;
+  onReportCrash: (payload: CrashReport) => void;
 }
 
 // Keyset mode = onscreen control LAYOUT preset (NOT key remapping — that lives in
@@ -26,15 +37,16 @@ function loadKeyset(): Keyset {
   return v === 2 ? 2 : v === 3 ? 3 : 1;
 }
 
-// Per-mode sizing for the two control blocks below the display.
-//   1 = balanced · 2 = D-pad/OK emphasized · 3 = numpad emphasized
+// Per-mode sizing for the control blocks below the display.
+//   1 = balanced · 2 = joystick emphasized · 3 = numpad emphasized
+//   joy = joystick pad · ok = CLR/OK column button · num/ngrid = numpad
 const MODE = {
-  1: { dir: "h-12 w-12 text-lg", ok: "h-12 w-12 text-base", dgrid: "w-40", num: "h-10 text-base", ngrid: "w-36" },
-  2: { dir: "h-16 w-16 text-2xl", ok: "h-16 w-16 text-lg", dgrid: "w-52", num: "h-7 text-xs", ngrid: "w-28" },
-  3: { dir: "h-9 w-9 text-sm", ok: "h-9 w-9 text-xs", dgrid: "w-28", num: "h-12 text-xl", ngrid: "w-48" },
+  1: { joy: "h-36 w-36", ok: "h-12 text-base", num: "h-10 text-base", ngrid: "w-36" },
+  2: { joy: "h-44 w-44", ok: "h-14 text-lg", num: "h-8 text-xs", ngrid: "w-28" },
+  3: { joy: "h-28 w-28", ok: "h-10 text-sm", num: "h-12 text-xl", ngrid: "w-48" },
 } as const;
 
-export function Player({ game, user, onExit, onMenu, toast }: Props) {
+export function Player({ game, user, onExit, onMenu, toast, onReportCrash }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sessionRef = useRef<EmulatorSession | null>(null);
   const keymapRef = useRef<Record<string, EmuKey>>(loadKeymap());
@@ -123,6 +135,25 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
     setBootNonce((n) => n + 1);
   }, []);
 
+  // 5번: one-click 문의·제보 from the crash panel. Snapshot the crash-time save
+  // (persist writes it to IndexedDB, and to the server when logged in), copy the
+  // error details to the clipboard as a fallback, then hand the crashing game +
+  // pre-filled body to App, which references the game from the vault and opens the
+  // inquiry form ready to send.
+  const reportCrash = useCallback(
+    async (err: EmuError) => {
+      try {
+        await sessionRef.current?.persist();
+      } catch {
+        /* best-effort snapshot */
+      }
+      const body = buildCrashBody(err);
+      void copyToClipboard(body);
+      onReportCrash({ game, title: `[게임 오류] ${err.name}`, body });
+    },
+    [game, onReportCrash],
+  );
+
   const press = useCallback((k: EmuKey) => sessionRef.current?.keyDown(k), []);
   const release = useCallback((k: EmuKey) => sessionRef.current?.keyUp(k), []);
 
@@ -159,18 +190,6 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
     });
   }, []);
 
-  // Saves already auto-sync (write-through, keyed by ROM hash). This button forces
-  // an immediate persist + server push for reassurance.
-  const syncCloud = useCallback(async () => {
-    if (!user) return toast("로그인하면 세이브가 서버에 자동 저장됩니다", "err");
-    try {
-      const r = await sessionRef.current?.syncNow();
-      toast(r && !r.ok ? r.reason || "동기화 실패" : "세이브를 서버에 동기화했습니다", r && !r.ok ? "err" : "ok");
-    } catch (e) {
-      toast(`동기화 실패: ${(e as Error).message}`, "err");
-    }
-  }, [user, toast]);
-
   // onRepeat sends the core's Keyrepeat (feature-phone long-press), so a held key
   // is one Keydown + Keyrepeats + one Keyup — never a burst of fake re-presses.
   const gkey = (k: EmuKey) => ({ onDown: () => press(k), onUp: () => release(k), onRepeat: () => sessionRef.current?.keyRepeat(k) });
@@ -187,7 +206,7 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
 
   return (
     <section className="fixed inset-0 z-20 flex flex-col overflow-y-auto overscroll-contain bg-surface">
-      {error && <ErrorPanel error={error} onRestart={restart} onExit={onExit} toast={toast} />}
+      {error && <ErrorPanel error={error} onRestart={restart} onExit={onExit} onReport={() => void reportCrash(error)} toast={toast} />}
 
       {/* display + side rails (no bottom bar; no top header). flex-1 so the canvas
           fills the available vertical space; gap-1 trims the side margins.
@@ -195,8 +214,8 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
           Each rail is a flex column split into a TOP cluster (service buttons) and
           a BOTTOM cluster (game keys), packed tightly (gap-1.5) with no empty rows.
           justify-between pins the bottom clusters to the bottom; both rails carry
-          exactly 3 equally-sized game keys there, so L/R · 통화/종료 · 동기화/CLR
-          line up across the two sides. Every rail control is the SAME square size. */}
+          exactly 2 equally-sized game keys there (L/R · 통화/종료), so they line up
+          across the two sides. Every rail control is the SAME square size. */}
       <div className="flex min-h-0 flex-1 items-stretch justify-center gap-1 px-1 pt-1">
         {/* LEFT rail — top service cluster: exit, keyset, key-remap (3 buttons, to
             balance the right rail's exit-side count after moving volume right). */}
@@ -210,7 +229,6 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
           <div className="flex flex-col items-center gap-1.5">
             <GameButton label="◀L" title="왼쪽 소프트키" {...gkey("LEFT_SOFT_KEY")} className={side} />
             <GameButton label="📞" title="통화" {...gkey("CALL")} className={`${side} bg-green-600 text-white border-green-700`} />
-            <button type="button" onClick={() => void syncCloud()} className={svc} aria-label="세이브 자동 동기화 중 — 눌러서 지금 저장" title={user ? "세이브 자동 동기화 중 (눌러서 지금 저장)" : "로그인하면 세이브가 자동 동기화됩니다"}>☁</button>
           </div>
         </div>
 
@@ -289,37 +307,35 @@ export function Player({ game, user, onExit, onMenu, toast }: Props) {
           <div className="flex flex-col items-center gap-1.5">
             <GameButton label="R▶" title="오른쪽 소프트키" {...gkey("RIGHT_SOFT_KEY")} className={side} />
             <GameButton label="⛔" title="종료(게임 키)" {...gkey("HANGUP")} className={`${side} bg-red-600 text-white border-red-700`} />
-            <GameButton label="CLR" title="지우기" repeat {...gkey("CLEAR")} className={`${side} text-xs`} />
           </div>
         </div>
       </div>
 
-      {/* below the display: left = D-pad + OK, right = numpad. Block weights shift
-          with the keyset mode (the player never unmounts, so switching is instant
-          and the game keeps running). */}
-      {status === "running" && (
-        <div className="flex shrink-0 items-center justify-center gap-3 px-1.5 pb-1.5 pt-1">
-          <div className={`grid grid-cols-3 grid-rows-3 gap-1 ${m.dgrid}`}>
-            <span />
-            <GameButton label="▲" title="위" repeat {...gkey("UP")} className={`${m.dir} w-full`} />
-            <span />
-            <GameButton label="◀" title="왼쪽" repeat {...gkey("LEFT")} className={`${m.dir} w-full`} />
-            <GameButton label="OK" title="확인" {...gkey("OK")} className={`${m.ok} w-full bg-accent text-accent-fg`} />
-            <GameButton label="▶" title="오른쪽" repeat {...gkey("RIGHT")} className={`${m.dir} w-full`} />
-            <span />
-            <GameButton label="▼" title="아래" repeat {...gkey("DOWN")} className={`${m.dir} w-full`} />
-            <span />
-          </div>
-          <div className={`grid grid-cols-3 gap-1 ${m.ngrid}`}>
-            {(["NUM1", "NUM2", "NUM3", "NUM4", "NUM5", "NUM6", "NUM7", "NUM8", "NUM9"] as EmuKey[]).map((k) => (
-              <GameButton key={k} label={k.replace("NUM", "")} title={k.replace("NUM", "")} repeat {...gkey(k)} className={`${m.num} w-full`} />
-            ))}
-            <GameButton label="✳" title="별표" {...gkey("STAR")} className={`${m.num} w-full`} />
-            <GameButton label="0" title="0" repeat {...gkey("NUM0")} className={`${m.num} w-full`} />
-            <GameButton label="#" title="우물정" {...gkey("HASH")} className={`${m.num} w-full`} />
-          </div>
+      {/* below the display: [ joystick ] [ numpad ] [ CLR / OK column ]. Rendered
+          from the LOADING screen on (1번: fixed layout — the controls never pop in,
+          so nothing reflows when the game reaches "running"). Presses before boot
+          are safe no-ops (emu is null). Block weights shift with the keyset mode;
+          the player never unmounts, so switching is instant. */}
+      <div className="flex shrink-0 items-center justify-center gap-3 px-1.5 pb-1.5 pt-1">
+        {/* hold-and-slide joystick (2번) — replaces the four fixed arrow squares */}
+        <Joystick press={press} release={release} repeat={(k) => sessionRef.current?.keyRepeat(k)} className={m.joy} />
+
+        <div className={`grid grid-cols-3 gap-1 ${m.ngrid}`}>
+          {(["NUM1", "NUM2", "NUM3", "NUM4", "NUM5", "NUM6", "NUM7", "NUM8", "NUM9"] as EmuKey[]).map((k) => (
+            <GameButton key={k} label={k.replace("NUM", "")} title={k.replace("NUM", "")} repeat {...gkey(k)} className={`${m.num} w-full`} />
+          ))}
+          <GameButton label="✳" title="별표" {...gkey("STAR")} className={`${m.num} w-full`} />
+          <GameButton label="0" title="0" repeat {...gkey("NUM0")} className={`${m.num} w-full`} />
+          <GameButton label="#" title="우물정" {...gkey("HASH")} className={`${m.num} w-full`} />
         </div>
-      )}
+
+        {/* far right: CLR on top of OK (2번) — OK sits to the right of the numbers,
+            CLR moved up from the side rail for reach. */}
+        <div className="flex flex-col justify-center gap-1">
+          <GameButton label="CLR" title="지우기" repeat {...gkey("CLEAR")} className={`${m.ok} w-14`} />
+          <GameButton label="OK" title="확인" {...gkey("OK")} className={`${m.ok} w-14 bg-accent text-accent-fg`} />
+        </div>
+      </div>
 
       {showRemap && (
         <Overlay title="키 설정" onClose={() => setShowRemap(false)}>
@@ -357,6 +373,22 @@ function buildErrorReport(error: EmuError): string {
     .join("\n");
 }
 
+// Body pre-filled into the 문의 form for a crash report (5번). The error details are
+// auto-included; the user only needs to add the reproduction steps. The prompt
+// makes clear the save reflects the LAST save point, not the crash moment, so the
+// user should describe what they did after that save.
+function buildCrashBody(error: EmuError): string {
+  return [
+    buildErrorReport(error),
+    "",
+    "──────────────────────────────",
+    "※ 첨부된 세이브는 '오류 발생 시점'이 아니라 '마지막 저장 시점' 기준입니다.",
+    "아래에 세이브 이후 어떤 행동을 했을 때 오류가 발생했는지 적어 주세요:",
+    "· 재현 순서: ",
+    "· 발생 빈도(항상/가끔): ",
+  ].join("\n");
+}
+
 // Copy with the same defensive guard the vibrate fix taught us: navigator.clipboard
 // is undefined in insecure contexts / older WebViews, so check it's a function and
 // fall back to a hidden-textarea execCommand. Never throws.
@@ -385,7 +417,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-function ErrorPanel({ error, onRestart, onExit, toast }: { error: EmuError; onRestart: () => void; onExit: () => void; toast: (msg: string, kind?: "ok" | "err") => void }) {
+function ErrorPanel({ error, onRestart, onExit, onReport, toast }: { error: EmuError; onRestart: () => void; onExit: () => void; onReport: () => void; toast: (msg: string, kind?: "ok" | "err") => void }) {
   const [copied, setCopied] = useState(false);
   const phaseLabel = error.phase === "load" ? "로드 중 오류" : "게임 실행 중 오류";
   const btn = "rounded-md border border-red-500/60 bg-red-500/10 px-3 py-1.5 text-xs font-medium hover:bg-red-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-500";
@@ -416,6 +448,9 @@ function ErrorPanel({ error, onRestart, onExit, toast }: { error: EmuError; onRe
             </details>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={onReport} className="rounded-md border border-accent bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+              문의·제보하기
+            </button>
             <button type="button" onClick={() => void onCopy()} className={btn}>
               {copied ? "복사됨 ✓" : "에러 상세 복사"}
             </button>

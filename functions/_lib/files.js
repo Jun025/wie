@@ -15,9 +15,28 @@ import { randomHex } from "./crypto.js";
 // within the Workers request-body / memory budget (real WIPI/SKVM/J2ME games are
 // far smaller; the 1 GiB is a *sum* across many small files).
 export const FILE_QUOTA_BYTES = 1024 * 1024 * 1024; // 1 GiB per user (total)
-export const PER_FILE_MAX_BYTES = 64 * 1024 * 1024; // 64 MiB per single file
+export const PER_FILE_MAX_BYTES = 100 * 1024 * 1024; // 100 MB per single file (4번)
 
 export const ALLOWED_KINDS = new Set(["jar", "jad", "zip", "kdf", "skm"]);
+
+// 4번: executable / script / web-shell extensions blocked at the source, even in
+// the private vault (BLOCKLIST — game containers + ordinary files stay allowed).
+// Mirrors web/src/lib/limits.ts BLOCKED_UPLOAD_EXT. The byte-level magic screen
+// (looksDisallowed) is the anti-spoof layer; this is the declared-type layer.
+export const BLOCKED_UPLOAD_EXT = new Set([
+  "exe", "msi", "com", "scr", "cpl", "dll", "so", "dylib", "apk", "app", "deb", "rpm", "dmg",
+  "sh", "bash", "zsh", "ksh", "csh", "command",
+  "bat", "cmd", "ps1", "psm1", "vbs", "vbe", "wsf", "wsh", "hta",
+  "php", "php3", "php4", "php5", "phtml", "jsp", "jspx", "asp", "aspx", "cgi", "pl", "py", "rb",
+]);
+
+// True when a filename's (or kind's) extension is a blocked executable/script.
+export function looksBlockedExtension(nameOrKind) {
+  const s = String(nameOrKind || "").toLowerCase();
+  const i = s.lastIndexOf(".");
+  const ext = i >= 0 ? s.slice(i + 1) : s; // accept a bare "kind" or a "name.ext"
+  return BLOCKED_UPLOAD_EXT.has(ext);
+}
 
 // The R2 binding is provisioned in the Cloudflare dashboard (a human task — S8).
 // Until it exists the whole feature is dormant: endpoints report "not configured"
@@ -51,10 +70,14 @@ const DENY_MAGICS = [
   [0x7f, 0x45, 0x4c, 0x46], // ELF — Linux/Android native exec
   [0xcf, 0xfa, 0xed, 0xfe], // Mach-O (LE)
   [0xfe, 0xed, 0xfa, 0xce], // Mach-O (BE)
+  [0xce, 0xfa, 0xed, 0xfe], // Mach-O 32-bit (LE)
   [0x23, 0x21], // "#!" shebang script
   [0x3c, 0x3f, 0x78, 0x6d, 0x6c], // "<?xml"
+  [0x3c, 0x3f, 0x70, 0x68, 0x70], // "<?php"
+  [0x3c, 0x25], // "<%" — JSP/ASP scriptlet
   [0x3c, 0x68, 0x74, 0x6d, 0x6c], // "<html"
   [0x3c, 0x21, 0x44, 0x4f, 0x43], // "<!DOC"
+  [0xd0, 0xcf, 0x11, 0xe0], // MS CFBF (OLE) — .msi / legacy Office
 ];
 
 export function looksDisallowed(bytes) {

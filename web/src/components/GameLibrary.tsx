@@ -3,11 +3,7 @@ import * as lib from "../lib/library";
 import { validateGame, type LoadableGame } from "../lib/emulator";
 import { files as filesApi, type ServerFile, type FilesUsage, type User } from "../lib/api";
 import { migrateLocalToServer, fmtBytes, type FileUploadEvent } from "../lib/serverLibrary";
-
-function extOf(name: string): string {
-  const i = name.lastIndexOf(".");
-  return i >= 0 ? name.slice(i + 1).toLowerCase() : "";
-}
+import { extOf, isBlockedUploadExt, UPLOAD_BATCH_MAX_FILES, UPLOAD_PER_FILE_MAX_BYTES, fmtBytes1 } from "../lib/limits";
 
 // Game container formats — used to gate the server-vault "실행" button (the server
 // stores any file as a private archive, but only game-format kinds are loadable).
@@ -39,7 +35,6 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey, onInquire
   const [serverEnabled, setServerEnabled] = useState(false);
   const [serverFiles, setServerFiles] = useState<ServerFile[]>([]);
   const [serverUsage, setServerUsage] = useState<FilesUsage>({ used: 0, quota: 1024 * 1024 * 1024 });
-  const [migrating, setMigrating] = useState(false);
   const [uploads, setUploads] = useState<FileUploadEvent[]>([]); // live per-file upload progress (1번)
   const [selected, setSelected] = useState<Set<string>>(new Set()); // 6번: checked server files for "문의"
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -94,10 +89,68 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey, onInquire
     [],
   );
 
+  // Live per-file upload-status upsert for the progress list (shared by every path
+  // that pushes local files to the server).
+  const onUploadEvent = useCallback((e: FileUploadEvent) => {
+    setUploads((prev) => {
+      const next = prev.slice();
+      const i = next.findIndex((x) => x.hash === e.hash);
+      if (i >= 0) next[i] = e;
+      else next.push(e);
+      return next;
+    });
+  }, []);
+
+  // 3번: logged-in users have NO local-only path — device-local files auto-upload
+  // to the private server vault and the local copy is freed on ACK. No manual
+  // button. Best-effort (quota/offline keeps files local, retried later).
+  const autoUpload = useCallback(async () => {
+    if (!user) return;
+    setUploads([]);
+    try {
+      const r = await migrateLocalToServer(undefined, onUploadEvent);
+      await refreshLocal();
+      await refreshServer();
+      if (r.failed || r.stopped) {
+        const parts = [`업로드 ${r.uploaded}`, r.deduped ? `중복 ${r.deduped}` : null, r.failed ? `실패 ${r.failed}(로컬 보존)` : null].filter(Boolean);
+        toast(r.message ?? `서버 보관함 반영 — ${parts.join(" · ")}`, "err");
+      }
+    } catch {
+      /* best-effort — local copy is safe, retried on next add/login */
+    }
+  }, [user, onUploadEvent, refreshLocal, refreshServer, toast]);
+
   const addFiles = useCallback(
     async (fileList: FileList | File[], runFirst = false) => {
       setRejected(null);
-      const files = [...fileList];
+      const incoming = [...fileList];
+
+      // 4번: batch-count cap (100 files per add) — enforced before any read.
+      if (incoming.length > UPLOAD_BATCH_MAX_FILES) {
+        toast(`한 번에 최대 ${UPLOAD_BATCH_MAX_FILES}개까지 추가할 수 있습니다 (선택: ${incoming.length}개)`, "err");
+        return;
+      }
+
+      // 4번: block executable/script files (원천 차단) + per-file 100MB cap. Rejected
+      // files never touch storage; the first rejection surfaces in the notice box.
+      const rejections: Rejection[] = [];
+      const files = incoming.filter((f) => {
+        if (isBlockedUploadExt(f.name)) {
+          rejections.push({ name: f.name, reason: "실행 파일·스크립트는 업로드할 수 없습니다" });
+          return false;
+        }
+        if (f.size > UPLOAD_PER_FILE_MAX_BYTES) {
+          rejections.push({ name: f.name, reason: `파일이 너무 큽니다 (최대 ${fmtBytes1(UPLOAD_PER_FILE_MAX_BYTES)}, 이 파일 ${fmtBytes1(f.size)})` });
+          return false;
+        }
+        return true;
+      });
+      if (rejections.length) {
+        setRejected(rejections[0]);
+        toast(rejections.length === 1 ? `${rejections[0].name}: ${rejections[0].reason}` : `${rejections.length}개 파일을 차단했습니다 (실행 파일·용량 초과)`, "err");
+        if (files.length === 0) return;
+      }
+
       let firstRunnable: string | null = null;
       const byBase = new Map<string, File[]>();
       for (const f of files) {
@@ -151,20 +204,32 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey, onInquire
         }
       }
       await refreshLocal();
-      // "추가하고 바로 실행": play the first RUNNABLE game we just added.
+
+      // Resolve the "추가하고 바로 실행" target NOW — read its bytes before any
+      // auto-upload can free the local copy (avoids a delete/read race).
+      let runTarget: LoadableGame | null = null;
       if (runFirst && firstRunnable) {
         const g = await lib.getGame(firstRunnable);
-        if (g) {
-          onRun({ hash: g.hash, name: g.name, bytes: g.bytes });
-          return;
-        }
+        if (g) runTarget = { hash: g.hash, name: g.name, bytes: g.bytes };
       }
-      // Tailored result toast: games vs. stored-only files.
-      if (addedGames && addedFiles) toast(`게임 ${addedGames}개 추가 · 파일 ${addedFiles}개 보관 (이 기기에 저장)`, "ok");
-      else if (addedGames) toast(`게임 ${addedGames}개 라이브러리에 추가됨 (이 기기에 저장)`, "ok");
-      else if (addedFiles) toast(`${addedFiles}개 파일을 보관했습니다 — 게임 파일이 아니라 실행하지 않고 보관만 합니다`, "ok");
+
+      // 3번: logged-in → the just-added files auto-upload to the server vault.
+      // Fire-and-forget so play starts immediately.
+      if (user) void autoUpload();
+
+      if (runTarget) {
+        onRun(runTarget);
+        return;
+      }
+
+      // Tailored result toast. Logged in → files are on their way to the server;
+      // not logged in → stored on this device only.
+      const dest = user ? "서버 보관함에 올리는 중" : "이 기기에 저장";
+      if (addedGames && addedFiles) toast(`게임 ${addedGames}개 추가 · 파일 ${addedFiles}개 보관 (${dest})`, "ok");
+      else if (addedGames) toast(`게임 ${addedGames}개 라이브러리에 추가됨 (${dest})`, "ok");
+      else if (addedFiles) toast(`${addedFiles}개 파일을 보관했습니다 — 게임 파일이 아니라 실행하지 않고 보관만 합니다 (${dest})`, "ok");
     },
-    [refreshLocal, toast, tryStore, onRun],
+    [refreshLocal, toast, tryStore, onRun, user, autoUpload],
   );
 
   const run = useCallback(
@@ -194,32 +259,6 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey, onInquire
   }, [refreshLocal, toast]);
 
   // ── server vault actions ────────────────────────────────────────────────────
-  const migrate = useCallback(async () => {
-    if (games.length === 0) return;
-    if (!confirm(`이 기기의 게임 ${games.length}개를 내 서버 보관함(1GB, 본인만 접근)으로 올립니다.\n업로드된 게임은 이 기기에서 삭제됩니다(서버에 보관됨). 계속할까요?`)) return;
-    setMigrating(true);
-    setUploads([]);
-    try {
-      // Live per-file progress: upsert each file's status as it moves through the
-      // queue (대기→업로드중→완료/실패). A failure does NOT block the rest.
-      const r = await migrateLocalToServer(undefined, (e) =>
-        setUploads((prev) => {
-          const next = prev.slice();
-          const i = next.findIndex((x) => x.hash === e.hash);
-          if (i >= 0) next[i] = e;
-          else next.push(e);
-          return next;
-        }),
-      );
-      await refreshLocal();
-      await refreshServer();
-      const parts = [`업로드 ${r.uploaded}`, r.deduped ? `중복 ${r.deduped}(이미 보관함)` : null, r.failed ? `실패 ${r.failed}` : null].filter(Boolean);
-      toast(r.message ?? `서버 보관함에 반영됨 — ${parts.join(" · ")}`, r.stopped || r.failed ? "err" : "ok");
-    } finally {
-      setMigrating(false);
-    }
-  }, [games.length, refreshLocal, refreshServer, toast]);
-
   const runServer = useCallback(
     async (f: ServerFile) => {
       setBusyId(f.id);
@@ -350,16 +389,7 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey, onInquire
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">서버 보관함 (본인만 접근)</h3>
-            {games.length > 0 && (
-              <button
-                type="button"
-                onClick={() => void migrate()}
-                disabled={migrating}
-                className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-60"
-              >
-                {migrating ? "올리는 중…" : `이 기기 게임 ${games.length}개 서버에 올리기`}
-              </button>
-            )}
+            {games.length > 0 && <span className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80">이 기기 파일은 자동으로 서버에 올라갑니다</span>}
           </div>
 
           {/* 6번: select vault files → carry them (by reference) into a 문의 */}
@@ -517,7 +547,7 @@ export function GameLibrary({ onRun, toast, user, onReport, reloadKey, onInquire
         >
           <input ref={inputRef} type="file" multiple className="hidden" data-testid="file-input" onChange={(e) => e.target.files && void addFiles(e.target.files)} />
           <span className="font-medium text-fg-dim">보관만 (실행하지 않고 목록에 추가)</span>
-          <span className="ml-1 text-[11px] text-fg-dim">· 여러 개 끌어다 놓거나 클릭{showServer ? " · 추가 후 “서버에 올리기”" : " · 미로그인은 이 기기에만 저장"}</span>
+          <span className="ml-1 text-[11px] text-fg-dim">· 여러 개 끌어다 놓거나 클릭{user ? " · 서버 보관함에 자동 업로드" : " · 미로그인은 이 기기에만 저장"}</span>
         </label>
       </div>
     </section>

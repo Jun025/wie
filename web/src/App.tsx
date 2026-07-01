@@ -11,8 +11,12 @@ import { Help } from "./components/Help";
 import { ServiceInfo } from "./components/ServiceInfo";
 import { Overlay } from "./components/Overlay";
 import type { LoadableGame } from "./lib/emulator";
+import type { CrashReport } from "./components/Player";
 import * as lib from "./lib/library";
+import { files as filesApi } from "./lib/api";
+import { extOf } from "./lib/limits";
 import { migrateLocalToServer } from "./lib/serverLibrary";
+import { deviceName, pushSaveToServer, syncPendingSaves } from "./lib/saveSync";
 
 type View = "library" | "cloud" | "inquiry" | "help" | "info";
 type ToastKind = "ok" | "err" | "";
@@ -41,6 +45,7 @@ function ViewPanel({
   reloadKey,
   onInquireWithFiles,
   inquiryFileRefs,
+  inquiryInitial,
 }: {
   view: View;
   authState: AuthState;
@@ -50,6 +55,7 @@ function ViewPanel({
   reloadKey: number;
   onInquireWithFiles: (refs: { id: string; name: string }[]) => void;
   inquiryFileRefs: { id: string; name: string }[];
+  inquiryInitial: { title?: string; body?: string };
 }) {
   switch (view) {
     case "library":
@@ -57,7 +63,7 @@ function ViewPanel({
     case "cloud":
       return <CloudSaves user={authState.user} toast={toast} />;
     case "inquiry":
-      return <InquiryForm user={authState.user} toast={toast} initialFileRefs={inquiryFileRefs} />;
+      return <InquiryForm user={authState.user} toast={toast} initialFileRefs={inquiryFileRefs} initialTitle={inquiryInitial.title} initialBody={inquiryInitial.body} />;
     case "help":
       return <Help />;
     case "info":
@@ -92,6 +98,8 @@ export default function App() {
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [libVersion, setLibVersion] = useState(0); // bump to make GameLibrary re-read after auto-upload
   const [inquiryFileRefs, setInquiryFileRefs] = useState<{ id: string; name: string }[]>([]); // 6번: vault files carried into 문의
+  const [inquiryInitial, setInquiryInitial] = useState<{ title?: string; body?: string }>({}); // 5번: crash-report pre-fill
+  const [pendingCrash, setPendingCrash] = useState<CrashReport | null>(null); // 5번: awaiting login before reporting
   const autoUploadedFor = useRef<string | null>(null);
 
   // Install the global audio-unlock listeners once (iOS WebKit needs the first
@@ -143,6 +151,18 @@ export default function App() {
     })();
   }, [authState.user, authState.filesConfigured, showToast]);
 
+  // Retry pushing offline saves to the server when the network returns (logged-in
+  // only). persistSnapshot already write-throughs on every autosave; this closes
+  // the gap where a save was made while offline. Also runs once on mount to flush
+  // anything left pending from a previous session.
+  useEffect(() => {
+    if (!authState.user) return;
+    const flush = () => void syncPendingSaves(deviceName());
+    window.addEventListener("online", flush);
+    flush();
+    return () => window.removeEventListener("online", flush);
+  }, [authState.user]);
+
   const onRun = useCallback((game: LoadableGame) => {
     setRunning(game);
     setOverlay(null);
@@ -173,6 +193,63 @@ export default function App() {
     [running, authState.user],
   );
 
+  // 5번: turn a crash into a ready-to-send 문의. Reference the crashing game from
+  // the user's private vault (uploading it if it isn't there yet) and make sure the
+  // crash-time save is on the server (keyed by the ROM hash) so it rides along —
+  // then open the inquiry pre-filled with the error details + repro prompt.
+  const resolveCrashReport = useCallback(
+    async (payload: CrashReport) => {
+      const { game, title, body } = payload;
+      let fileRef: { id: string; name: string } | null = null;
+      try {
+        const list = await filesApi.list();
+        if (list.enabled) {
+          const existing = list.files.find((f) => f.content_hash === game.hash);
+          if (existing) fileRef = { id: existing.id, name: existing.file_name };
+          else {
+            const up = await filesApi.upload(game.name, extOf(game.name) || "file", game.hash, game.bytes);
+            fileRef = { id: up.file.id, name: up.file.file_name };
+          }
+        }
+      } catch {
+        /* best-effort — proceed without the game reference if the vault is unavailable */
+      }
+      try {
+        await pushSaveToServer(game.hash, deviceName());
+      } catch {
+        /* best-effort — the local save is still safe and syncs later */
+      }
+      setInquiryFileRefs(fileRef ? [fileRef] : []);
+      setInquiryInitial({ title, body });
+      if (running) setOverlay("inquiry");
+      else setView("inquiry");
+    },
+    [running],
+  );
+
+  // 5번: from the crash panel. Logged in → report now; otherwise stash the payload,
+  // open login, and an effect below resumes once the user is authenticated.
+  const onReportCrash = useCallback(
+    (payload: CrashReport) => {
+      if (!authState.user) {
+        setPendingCrash(payload);
+        setAccountOpen(true);
+        return;
+      }
+      void resolveCrashReport(payload);
+    },
+    [authState.user, resolveCrashReport],
+  );
+
+  // Resume a pending crash report after the user logs in (attachments need a session).
+  useEffect(() => {
+    if (!authState.user || !pendingCrash) return;
+    const p = pendingCrash;
+    setPendingCrash(null);
+    setAccountOpen(false);
+    void resolveCrashReport(p);
+  }, [authState.user, pendingCrash, resolveCrashReport]);
+
   const closeReset = useCallback(() => {
     setResetToken(null);
     setAccountOpen(false);
@@ -190,7 +267,7 @@ export default function App() {
   if (running) {
     return (
       <>
-        <Player game={running} user={authState.user} onExit={exitPlayer} toast={showToast} onMenu={() => setOverlay("menu")} />
+        <Player game={running} user={authState.user} onExit={exitPlayer} toast={showToast} onMenu={() => setOverlay("menu")} onReportCrash={onReportCrash} />
 
         {overlay === "menu" && (
           <Overlay title="메뉴" onClose={() => setOverlay(null)}>
@@ -225,7 +302,7 @@ export default function App() {
 
         {overlay && overlay !== "menu" && (
           <Overlay title={tabLabel(overlay)} onClose={() => setOverlay(null)}>
-            <ViewPanel view={overlay} authState={authState} onRun={onRun} toast={showToast} onReport={onReport} reloadKey={libVersion} onInquireWithFiles={onInquireWithFiles} inquiryFileRefs={inquiryFileRefs} />
+            <ViewPanel view={overlay} authState={authState} onRun={onRun} toast={showToast} onReport={onReport} reloadKey={libVersion} onInquireWithFiles={onInquireWithFiles} inquiryFileRefs={inquiryFileRefs} inquiryInitial={inquiryInitial} />
           </Overlay>
         )}
 
@@ -275,9 +352,9 @@ export default function App() {
           <div className="w-full max-w-xl rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-200">
             {authState.user ? (
               <>
-                🔒 게임 파일은 기본적으로 <strong>이 기기(브라우저)</strong>에 저장됩니다. 원하시면 <strong>본인만 접근 가능한 서버 보관함(1GB)</strong>에
-                올릴 수 있어요 — 회원님 파일은 <em>공유·공개되지 않으며</em> 다른 누구도(직접 링크·검색 포함) 접근할 수 없습니다.
-                미로그인 상태의 게임 파일은 서버로 전송되지 않습니다.
+                🔒 게임 파일은 <strong>본인만 접근 가능한 서버 보관함(1GB)</strong>에 <strong>자동으로 저장</strong>됩니다 — 이 기기에
+                추가하면 곧바로 서버에 올라갑니다(별도 “올리기” 버튼 없음). 회원님 파일은 <em>공유·공개되지 않으며</em> 다른
+                누구도(직접 링크·검색 포함) 접근할 수 없습니다.
               </>
             ) : (
               <>
@@ -287,7 +364,7 @@ export default function App() {
             )}
           </div>
         )}
-        <ViewPanel view={view} authState={authState} onRun={onRun} toast={showToast} onReport={onReport} reloadKey={libVersion} onInquireWithFiles={onInquireWithFiles} inquiryFileRefs={inquiryFileRefs} />
+        <ViewPanel view={view} authState={authState} onRun={onRun} toast={showToast} onReport={onReport} reloadKey={libVersion} onInquireWithFiles={onInquireWithFiles} inquiryFileRefs={inquiryFileRefs} inquiryInitial={inquiryInitial} />
       </main>
 
       <footer className="mt-auto px-4 py-6 text-center text-xs text-fg-dim">

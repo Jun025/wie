@@ -130,6 +130,36 @@ export async function mergeLocalSavesToServer(deviceLabel?: string): Promise<{ p
   return { pushed, kept };
 }
 
+// Retry syncing local saves that have NOT reached the server yet — e.g. writes
+// made while offline (persistSnapshot's server push is best-effort, so an offline
+// write leaves syncedAt < updatedAt). For each pending save, last-write-wins
+// against the server: local newer → push; server newer → pull into the local
+// cache. Best-effort per save; wired to the window 'online' event so a save made
+// offline is pushed as soon as the network returns ("네트워크 정상화 시 동기화").
+export async function syncPendingSaves(deviceLabel?: string): Promise<{ pushed: number; pulled: number }> {
+  const all = await lib.listLocalSaves();
+  let pushed = 0;
+  let pulled = 0;
+  for (const s of all) {
+    if (!s.blob) continue;
+    if ((s.syncedAt ?? 0) >= (s.updatedAt ?? 0)) continue; // already synced — skip
+    try {
+      const server = await savesApi.getByRom(s.hash);
+      if (!server || (s.updatedAt ?? 0) > (server.updated_at ?? 0)) {
+        await pushSaveToServer(s.hash, deviceLabel || deviceName()); // local is newer → push
+        pushed++;
+      } else if (server.payload) {
+        // server is newer → pull it into the local cache (conflict resolved in favor of newest)
+        await lib.putLocalSave({ hash: s.hash, blob: b64ToBytes(server.payload).buffer as ArrayBuffer, updatedAt: server.updated_at, slotLabel: server.slot_label, serverId: server.id, syncedAt: Date.now() });
+        pulled++;
+      }
+    } catch {
+      /* still offline / transient — leave it pending, retried on the next 'online' */
+    }
+  }
+  return { pushed, pulled };
+}
+
 export async function listCloud() {
   return (await savesApi.list()).saves;
 }
