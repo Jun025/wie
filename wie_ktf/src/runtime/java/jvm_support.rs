@@ -137,14 +137,21 @@ impl KtfJvmSupport {
 
         jvm.register_class(Box::new(class_loader_class), None).await.unwrap();
 
-        let class_loader = jvm
+        // KtfClassLoader.<init> loads client.bin and runs the native wipi init; a
+        // failure there is raised as a Java exception (see ktf_class_loader::init).
+        // Propagate it as a WieError instead of unwrapping — a guest that fails to
+        // initialize must not abort the host process.
+        let class_loader = match jvm
             .new_class(
                 "net/wie/KtfClassLoader",
                 "(Ljava/lang/ClassLoader;Ljava/lang/String;II)V",
                 (system_class_loader, binary_name, ptr_jvm_context as i32, ptr_jvm_exception_context as i32),
             )
             .await
-            .unwrap();
+        {
+            Ok(class_loader) => class_loader,
+            Err(e) => return Err(JvmSupport::to_wie_err(&jvm, e).await),
+        };
 
         Ok((jvm, class_loader))
     }
