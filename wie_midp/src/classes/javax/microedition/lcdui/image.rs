@@ -1,4 +1,4 @@
-use alloc::{borrow::Cow, boxed::Box, vec, vec::Vec};
+use alloc::{borrow::Cow, boxed::Box, format, vec, vec::Vec};
 use core::marker::PhantomData;
 
 use bytemuck::cast_vec;
@@ -114,7 +114,12 @@ impl Image {
         let name = JavaLangString::to_rust_string(jvm, &name).await?;
 
         let class_loader = jvm.current_class_loader().await?;
-        let stream = JavaLangClassLoader::get_resource_as_stream(jvm, &class_loader, &name).await?.unwrap();
+        // MIDP Image.createImage(String) throws IOException when the named resource
+        // cannot be found — do that instead of unwrapping None (host-process panic).
+        let stream = match JavaLangClassLoader::get_resource_as_stream(jvm, &class_loader, &name).await? {
+            Some(stream) => stream,
+            None => return Err(jvm.exception("java/io/IOException", &format!("Resource not found: {name}")).await),
+        };
 
         let image_data = JavaIoInputStream::read_until_end(jvm, &stream).await?;
         let image_data_len = image_data.len() as i32;

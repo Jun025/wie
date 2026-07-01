@@ -438,7 +438,7 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
             WIPICGraphicsMethodId::CreateOffscreenFramebuffer => Some(graphics::create_offscreen_framebuffer.into_body()),
             WIPICGraphicsMethodId::InitContext => Some(graphics::init_context.into_body()),
             WIPICGraphicsMethodId::SetContext => Some(graphics::set_context.into_body()),
-            WIPICGraphicsMethodId::GetContext => Some(gen_stub(7, "MC_grpGetContext")),
+            WIPICGraphicsMethodId::GetContext => Some(graphics::get_context.into_body()),
             WIPICGraphicsMethodId::PutPixel => Some(graphics::put_pixel.into_body()),
             WIPICGraphicsMethodId::DrawLine => Some(graphics::draw_line.into_body()),
             WIPICGraphicsMethodId::DrawRect => Some(graphics::draw_rect.into_body()),

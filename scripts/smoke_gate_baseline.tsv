@@ -1,6 +1,6 @@
 # smoke_gate baseline — titles expected to boot + render real content.
 # Identifiers + expected status only; NO game files. Regenerate: UPDATE_BASELINE=1.
-# 173 titles (ktf 119 / lgt 42 / skt 12), each PASSed boot+render in two independent
+# 177 titles (ktf 122 / lgt 42 / skt 13), each PASSed boot+render in two independent
 # full runs. Excluded: deterministic fails and ~50%-flaky titles (e.g. 추억의달고나 —
 # game paint() NPE ~half the runs; lgt/하이브리드 — blank/black).
 ktf/(KTF) 마이프린세스2.zip	PASS
@@ -11,6 +11,7 @@ ktf/(KTF)마린블루스.zip	PASS
 ktf/(KTF)메이플스토리 도적편.zip	PASS
 ktf/(KTF)점핑펭.zip	PASS
 ktf/(KTF)정무문2.zip	PASS
+ktf/(KTF)질주쾌감스케쳐2.zip	PASS
 ktf/(KTF)케로로미니게임.zip	PASS
 ktf/[큰화]페이블오브나이트.zip	PASS
 ktf/2006독일축구.zip	PASS
@@ -41,6 +42,7 @@ ktf/더팜2.zip	PASS
 ktf/데빌헌터.zip	PASS
 ktf/도신노홍철맞고.zip	PASS
 ktf/동전쌓기2006.zip	PASS
+ktf/드래곤로드.zip	PASS
 ktf/떡볶이타이쿤3.zip	PASS
 ktf/라이덴3.zip	PASS
 ktf/레드망고타이쿤.zip	PASS
@@ -80,6 +82,7 @@ ktf/액션퍼즐패밀리.zip	PASS
 ktf/어스토니시아ep1.zip	PASS
 ktf/어스토니시아ep2.zip	PASS
 ktf/어스토니시아ep3.zip	PASS
+ktf/에픽크로니클2.zip	PASS
 ktf/엑스맨3.zip	PASS
 ktf/열혈교사전설2.zip	PASS
 ktf/영어뇌습격_1[1].2_큰화.zip	PASS
@@ -169,10 +172,11 @@ skt/강호동맞고2.zip	PASS
 skt/나이트메이커.zip	PASS
 skt/노리맥스영웅전.zip	PASS
 skt/노리타이쿤.zip	PASS
-skt/당신은골프왕 (1).zip	PASS
 skt/대해적시대.zip	PASS
 skt/더팜1.zip	PASS
 skt/더팜2.zip	PASS
+skt/드래곤나이트EX.zip	PASS
+skt/로맨스소드.zip	PASS
 skt/미니동화TING.zip	PASS
 skt/삼국지연의2.zip	PASS
 skt/웰루시아.zip	PASS
