@@ -1,6 +1,6 @@
 # smoke_gate baseline — titles expected to boot + render real content.
 # Identifiers + expected status only; NO game files. Regenerate: UPDATE_BASELINE=1.
-# 178 titles (ktf 123 / lgt 42 / skt 13), each PASSed boot+render in two independent
+# 180 titles (ktf 123 / lgt 44 / skt 13), each PASSed boot+render in two independent
 # full runs. Excluded: deterministic fails and ~50%-flaky titles (e.g. 추억의달고나 —
 # game paint() NPE ~half the runs; lgt/하이브리드 — blank/black).
 ktf/(KTF) 마이프린세스2.zip	PASS
@@ -168,6 +168,8 @@ lgt/테일즈위버 막시민편.zip	PASS
 lgt/테일즈위버 이스핀편.zip	PASS
 lgt/하얀섬.zip	PASS
 lgt/하이브리드2.zip	PASS
+lgt/(LGT) 메탈슬러그 서바이벌.zip	PASS
+lgt/메탈슬러그 서바이벌.zip	PASS
 skt/Chaos블레이드.zip	PASS
 skt/강호동맞고2.zip	PASS
 skt/나이트메이커.zip	PASS

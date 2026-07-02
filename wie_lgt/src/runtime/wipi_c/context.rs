@@ -39,6 +39,13 @@ impl WIPICContext for LgtWIPICContext {
     }
 
     fn free(&mut self, memory: WIPICIndirectPtr) -> Result<()> {
+        // Freeing a null handle is a defined no-op (C `free(NULL)` / `MC_knlFree(NULL)`).
+        // Games double-destroy or destroy a never-created framebuffer (e.g.
+        // `MC_grpDestroyOffScreenFrameBuffer(0)`); without this the `- 4` below underflows.
+        if memory.0 == 0 {
+            return Ok(());
+        }
+
         let base_address = memory.0 - size_of::<WIPICWord>() as WIPICWord;
 
         let size: WIPICWord = read_generic(&self.core, base_address)?;
