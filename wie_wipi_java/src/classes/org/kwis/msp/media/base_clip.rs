@@ -19,6 +19,7 @@ impl BaseClip {
             methods: vec![
                 JavaMethodProto::new("<init>", "()V", Self::init, Default::default()),
                 JavaMethodProto::new("putData", "([BII)I", Self::put_data, Default::default()),
+                JavaMethodProto::new("setBuffer", "([BI)Z", Self::set_buffer, Default::default()),
                 JavaMethodProto::new("clearData", "()V", Self::clear_data, Default::default()),
                 JavaMethodProto::new("availableDataSize", "()I", Self::available_data_size, Default::default()),
             ],
@@ -39,6 +40,22 @@ impl BaseClip {
         tracing::warn!("stub org.kwis.msp.media.BaseClip::availableDataSize({this:?})");
 
         Ok(10000000 as _)
+    }
+
+    // setBuffer([B, size) -> success: same as feeding the data via putData (Clip.setBuffer does
+    // this); returns true on success.
+    async fn set_buffer(
+        jvm: &Jvm,
+        _: &mut WieJvmContext,
+        this: ClassInstanceRef<Self>,
+        buffer: ClassInstanceRef<Array<i8>>,
+        size: i32,
+    ) -> JvmResult<bool> {
+        tracing::debug!("org.kwis.msp.media.BaseClip::setBuffer({this:?}, {buffer:?}, {size})");
+
+        let _: i32 = jvm.invoke_virtual(&this, "putData", "([BII)I", (buffer, 0, size)).await?;
+
+        Ok(true)
     }
 
     async fn put_data(

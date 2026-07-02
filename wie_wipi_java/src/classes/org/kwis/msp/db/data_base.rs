@@ -32,6 +32,7 @@ impl DataBase {
                     MethodAccessFlags::STATIC,
                 ),
                 JavaMethodProto::new("getNumberOfRecords", "()I", Self::get_number_of_records, Default::default()),
+                JavaMethodProto::new("getSizeAvailable", "()I", Self::get_size_available, Default::default()),
                 JavaMethodProto::new("closeDataBase", "()V", Self::close_data_base, Default::default()),
                 JavaMethodProto::new("insertRecord", "([B)I", Self::insert_record, Default::default()),
                 JavaMethodProto::new("insertRecord", "([BII)I", Self::insert_record_with_offset, Default::default()),
@@ -116,6 +117,13 @@ impl DataBase {
 
         let record_store = jvm.get_field(&this, "recordStore", "Ljavax/microedition/rms/RecordStore;").await?;
         jvm.invoke_virtual(&record_store, "getNumRecords", "()I", ()).await
+    }
+
+    async fn get_size_available(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::debug!("org.kwis.msp.db.DataBase::getSizeAvailable({this:?})");
+
+        let record_store = jvm.get_field(&this, "recordStore", "Ljavax/microedition/rms/RecordStore;").await?;
+        jvm.invoke_virtual(&record_store, "getSizeAvailable", "()I", ()).await
     }
 
     async fn close_data_base(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<DataBase>) -> JvmResult<()> {

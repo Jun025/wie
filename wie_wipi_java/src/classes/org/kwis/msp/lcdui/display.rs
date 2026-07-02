@@ -54,6 +54,7 @@ impl Display {
                 ),
                 JavaMethodProto::new("getWidth", "()I", Self::get_width, Default::default()),
                 JavaMethodProto::new("getHeight", "()I", Self::get_height, Default::default()),
+                JavaMethodProto::new("getBitsPerPixel", "()I", Self::get_bits_per_pixel, Default::default()),
                 JavaMethodProto::new("callSerially", "(Ljava/lang/Runnable;)V", Self::call_serially, Default::default()),
                 JavaMethodProto::new(
                     "getGameAction",
@@ -190,6 +191,13 @@ impl Display {
         let height: i32 = jvm.invoke_virtual(&midp_display, "getHeight", "()I", ()).await?;
 
         Ok(height)
+    }
+
+    // wie renders into a 16bpp (RGB565) framebuffer — report that honestly.
+    async fn get_bits_per_pixel(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::debug!("org.kwis.msp.lcdui.Display::getBitsPerPixel({this:?})");
+
+        Ok(16)
     }
 
     async fn call_serially(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, r: ClassInstanceRef<Runnable>) -> JvmResult<()> {

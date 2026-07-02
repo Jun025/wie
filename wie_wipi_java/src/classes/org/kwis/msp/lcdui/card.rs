@@ -21,7 +21,10 @@ impl Card {
             methods: vec![
                 JavaMethodProto::new("<init>", "()V", Self::init, Default::default()),
                 JavaMethodProto::new("<init>", "(I)V", Self::init_int, Default::default()),
+                JavaMethodProto::new("<init>", "(Z)V", Self::init_bool, Default::default()),
                 JavaMethodProto::new("<init>", "(Lorg/kwis/msp/lcdui/Display;)V", Self::init_with_display, Default::default()),
+                JavaMethodProto::new("move", "(II)V", Self::move_to, Default::default()),
+                JavaMethodProto::new("resize", "(II)V", Self::resize, Default::default()),
                 JavaMethodProto::new("getWidth", "()I", Self::get_width, Default::default()),
                 JavaMethodProto::new("getHeight", "()I", Self::get_height, Default::default()),
                 JavaMethodProto::new("getDisplay", "()Lorg/kwis/msp/lcdui/Display;", Self::get_display, Default::default()),
@@ -72,6 +75,40 @@ impl Card {
         let _: () = jvm
             .invoke_special(&this, "org/kwis/msp/lcdui/Card", "<init>", "(Lorg/kwis/msp/lcdui/Display;)V", (display,))
             .await?;
+
+        Ok(())
+    }
+
+    // <init>(Z): full-screen flag variant seen in some clets; behaves like the default ctor.
+    async fn init_bool(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Card>, a0: bool) -> JvmResult<()> {
+        tracing::debug!("stub org.kwis.msp.lcdui.Card::<init>({this:?}, {a0})");
+
+        let display: ClassInstanceRef<Display> = jvm
+            .invoke_static("org/kwis/msp/lcdui/Display", "getDefaultDisplay", "()Lorg/kwis/msp/lcdui/Display;", [])
+            .await?;
+
+        let _: () = jvm
+            .invoke_special(&this, "org/kwis/msp/lcdui/Card", "<init>", "(Lorg/kwis/msp/lcdui/Display;)V", (display,))
+            .await?;
+
+        Ok(())
+    }
+
+    // move(x, y) / resize(w, h): update the card's stored geometry fields (set at <init>).
+    async fn move_to(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Card>, x: i32, y: i32) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lcdui.Card::move({this:?}, {x}, {y})");
+
+        jvm.put_field(&mut this, "x", "I", x).await?;
+        jvm.put_field(&mut this, "y", "I", y).await?;
+
+        Ok(())
+    }
+
+    async fn resize(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Card>, w: i32, h: i32) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lcdui.Card::resize({this:?}, {w}, {h})");
+
+        jvm.put_field(&mut this, "w", "I", w).await?;
+        jvm.put_field(&mut this, "h", "I", h).await?;
 
         Ok(())
     }

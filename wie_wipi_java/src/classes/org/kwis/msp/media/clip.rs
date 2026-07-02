@@ -2,7 +2,7 @@ use alloc::vec;
 
 use bytemuck::cast_vec;
 
-use java_class_proto::JavaMethodProto;
+use java_class_proto::{JavaFieldProto, JavaMethodProto};
 use java_runtime::classes::java::lang::String;
 use jvm::{Array, ClassInstanceRef, Jvm, Result as JvmResult, runtime::JavaIoInputStream};
 
@@ -31,6 +31,7 @@ impl Clip {
                     Default::default(),
                 ),
                 JavaMethodProto::new("setVolume", "(I)Z", Self::set_volume, Default::default()),
+                JavaMethodProto::new("getVolume", "()I", Self::get_volume, Default::default()),
                 JavaMethodProto::new(
                     "setListener",
                     "(Lorg/kwis/msp/media/PlayListener;)V",
@@ -39,7 +40,7 @@ impl Clip {
                 ),
                 JavaMethodProto::new("setBuffer", "([BI)V", Self::set_buffer, Default::default()),
             ],
-            fields: vec![],
+            fields: vec![JavaFieldProto::new("volume", "I", Default::default())],
             access_flags: Default::default(),
         }
     }
@@ -121,10 +122,20 @@ impl Clip {
         Ok(())
     }
 
-    async fn set_volume(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Clip>, level: i32) -> JvmResult<()> {
-        tracing::warn!("stub org.kwis.msp.media.Clip::setVolume({this:?}, {level})");
+    async fn set_volume(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Clip>, level: i32) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.media.Clip::setVolume({this:?}, {level})");
+
+        // wie doesn't attenuate playback, but track the level so getVolume round-trips honestly.
+        jvm.put_field(&mut this, "volume", "I", level).await?;
 
         Ok(())
+    }
+
+    async fn get_volume(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Clip>) -> JvmResult<i32> {
+        tracing::debug!("org.kwis.msp.media.Clip::getVolume({this:?})");
+
+        // The clip's last-set volume (0 until set) — the value setVolume stored, not a fabricated constant.
+        jvm.get_field(&this, "volume", "I").await
     }
 
     async fn set_listener(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, listener: ClassInstanceRef<PlayListener>) -> JvmResult<()> {
