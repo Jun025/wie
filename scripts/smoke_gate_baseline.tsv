@@ -1,6 +1,6 @@
 # smoke_gate baseline — titles expected to boot + render real content.
 # Identifiers + expected status only; NO game files. Regenerate: UPDATE_BASELINE=1.
-# 177 titles (ktf 122 / lgt 42 / skt 13), each PASSed boot+render in two independent
+# 178 titles (ktf 123 / lgt 42 / skt 13), each PASSed boot+render in two independent
 # full runs. Excluded: deterministic fails and ~50%-flaky titles (e.g. 추억의달고나 —
 # game paint() NPE ~half the runs; lgt/하이브리드 — blank/black).
 ktf/(KTF) 마이프린세스2.zip	PASS
@@ -39,6 +39,7 @@ ktf/다크사이드스토리m.zip	PASS
 ktf/대물낚시광2.zip	PASS
 ktf/더팜1.zip	PASS
 ktf/더팜2.zip	PASS
+ktf/데몬헌터.zip	PASS
 ktf/데빌헌터.zip	PASS
 ktf/도신노홍철맞고.zip	PASS
 ktf/동전쌓기2006.zip	PASS

@@ -170,6 +170,18 @@ pub async fn list_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
     Ok(ids.len() as _)
 }
 
+/// `MC_dbGetNumberOfRecords(dbID)` — number of records in the database, or the
+/// M_E_INVALIDHANDLE error for a bad handle. Routes to the existing DB layer.
+pub async fn get_number_of_records(context: &mut dyn WIPICContext, db_id: i32) -> Result<i32> {
+    tracing::debug!("MC_dbGetNumberOfRecords({db_id:#x})");
+
+    let Some(db) = get_database_from_db_id(context, db_id).await? else {
+        return Ok(-25); // M_E_INVALIDHANDLE
+    };
+
+    Ok(db.get_record_ids().await.len() as _)
+}
+
 pub async fn seek_record_single(context: &mut dyn WIPICContext, db_id: i32, offset: i32, origin: i32) -> Result<i32> {
     tracing::debug!("MC_dbSeekRecordSingle({db_id:#x}, {offset}, {origin})");
 
