@@ -6,8 +6,19 @@ pub mod classes;
 
 use wie_jvm_support::WieJavaClassProto;
 
-pub fn get_protos() -> [WieJavaClassProto; 35] {
+pub fn get_protos() -> [WieJavaClassProto; 46] {
     [
+        crate::classes::java::io::InterruptedIOException::as_proto(),
+        crate::classes::java::io::UnsupportedEncodingException::as_proto(),
+        crate::classes::java::lang::VirtualMachineError::as_proto(),
+        crate::classes::java::lang::OutOfMemoryError::as_proto(),
+        crate::classes::org::kwis::msp::lcdui::ImageObserver::as_proto(),
+        crate::classes::org::kwis::msp::lcdui::InputMethodListener::as_proto(),
+        crate::classes::org::kwis::msp::lwc::ActionListener::as_proto(),
+        crate::classes::org::kwis::msp::lwc::FormComponent::as_proto(),
+        crate::classes::org::kwis::msp::lwc::GrabKeyListener::as_proto(),
+        crate::classes::org::kwis::msp::lwc::LabelComponent::as_proto(),
+        crate::classes::org::kwis::msp::media::MediaUnsupportedException::as_proto(),
         crate::classes::org::kwis::msf::io::Network::as_proto(),
         crate::classes::org::kwis::msf::io::SchemeNotFoundException::as_proto(),
         crate::classes::org::kwis::msp::db::DataBase::as_proto(),
