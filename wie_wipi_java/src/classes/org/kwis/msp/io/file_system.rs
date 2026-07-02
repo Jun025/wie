@@ -18,10 +18,18 @@ impl FileSystem {
             interfaces: vec![],
             methods: vec![
                 JavaMethodProto::new("isFile", "(Ljava/lang/String;)Z", Self::is_file, MethodAccessFlags::STATIC),
+                JavaMethodProto::new("isFile", "(Ljava/lang/String;I)Z", Self::is_file_with_flag, MethodAccessFlags::STATIC),
                 JavaMethodProto::new("isDirectory", "(Ljava/lang/String;I)Z", Self::is_directory, MethodAccessFlags::STATIC),
+                JavaMethodProto::new(
+                    "isDirectory",
+                    "(Ljava/lang/String;)Z",
+                    Self::is_directory_no_flag,
+                    MethodAccessFlags::STATIC,
+                ),
                 JavaMethodProto::new("exists", "(Ljava/lang/String;)Z", Self::exists, MethodAccessFlags::STATIC),
                 JavaMethodProto::new("exists", "(Ljava/lang/String;I)Z", Self::exists_with_flag, MethodAccessFlags::STATIC),
                 JavaMethodProto::new("mkdir", "(Ljava/lang/String;I)V", Self::mkdir, MethodAccessFlags::STATIC),
+                JavaMethodProto::new("mkdir", "(Ljava/lang/String;)V", Self::mkdir_no_flag, MethodAccessFlags::STATIC),
                 JavaMethodProto::new("available", "()I", Self::available, MethodAccessFlags::STATIC),
             ],
             fields: vec![],
@@ -38,6 +46,15 @@ impl FileSystem {
         Ok(is_file)
     }
 
+    // Namespace flag (MC_DIR_*) selects sys/shared storage; wie's backend is single-namespace,
+    // so the flagged/unflagged overloads delegate to each other (matching the exists() pair).
+    async fn is_file_with_flag(jvm: &Jvm, _: &mut WieJvmContext, name: ClassInstanceRef<String>, flag: i32) -> JvmResult<bool> {
+        tracing::debug!("org.kwis.msp.io.FileSystem::isFile({name:?}, {flag:?})");
+
+        jvm.invoke_static("org/kwis/msp/io/FileSystem", "isFile", "(Ljava/lang/String;)Z", (name,))
+            .await
+    }
+
     async fn is_directory(jvm: &Jvm, _: &mut WieJvmContext, name: ClassInstanceRef<String>, flag: i32) -> JvmResult<bool> {
         tracing::debug!("org.kwis.msp.io.FileSystem::isDirectory({name:?}, {flag:?})");
 
@@ -45,6 +62,13 @@ impl FileSystem {
         let is_directory = jvm.invoke_virtual(&file, "isDirectory", "()Z", ()).await?;
 
         Ok(is_directory)
+    }
+
+    async fn is_directory_no_flag(jvm: &Jvm, _: &mut WieJvmContext, name: ClassInstanceRef<String>) -> JvmResult<bool> {
+        tracing::debug!("org.kwis.msp.io.FileSystem::isDirectory({name:?})");
+
+        jvm.invoke_static("org/kwis/msp/io/FileSystem", "isDirectory", "(Ljava/lang/String;I)Z", (name, 0))
+            .await
     }
 
     async fn exists(jvm: &Jvm, _context: &mut WieJvmContext, name: ClassInstanceRef<String>) -> JvmResult<bool> {
@@ -67,6 +91,13 @@ impl FileSystem {
         tracing::warn!("stub org.kwis.msp.io.FileSystem::mkdir({name:?}, {flag:?})");
 
         Ok(())
+    }
+
+    async fn mkdir_no_flag(jvm: &Jvm, _context: &mut WieJvmContext, name: ClassInstanceRef<String>) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.io.FileSystem::mkdir({name:?})");
+
+        jvm.invoke_static("org/kwis/msp/io/FileSystem", "mkdir", "(Ljava/lang/String;I)V", (name, 0))
+            .await
     }
 
     async fn available(_: &Jvm, _: &mut WieJvmContext) -> JvmResult<i32> {

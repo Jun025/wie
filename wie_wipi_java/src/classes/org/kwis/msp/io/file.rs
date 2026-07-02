@@ -2,7 +2,7 @@ use alloc::vec;
 
 use java_class_proto::{JavaFieldProto, JavaMethodProto};
 use java_runtime::classes::java::{
-    io::{DataInputStream, InputStream},
+    io::{DataInputStream, DataOutputStream, InputStream, OutputStream},
     lang::String,
 };
 use jvm::{Array, ClassInstanceRef, Jvm, Result as JvmResult, runtime::JavaLangString};
@@ -57,6 +57,18 @@ impl File {
                     "openDataInputStream",
                     "()Ljava/io/DataInputStream;",
                     Self::open_data_input_stream,
+                    Default::default(),
+                ),
+                JavaMethodProto::new(
+                    "openOutputStream",
+                    "()Ljava/io/OutputStream;",
+                    Self::open_output_stream,
+                    Default::default(),
+                ),
+                JavaMethodProto::new(
+                    "openDataOutputStream",
+                    "()Ljava/io/DataOutputStream;",
+                    Self::open_data_output_stream,
                     Default::default(),
                 ),
             ],
@@ -217,5 +229,31 @@ impl File {
             .await?;
 
         Ok(data_input_stream.into())
+    }
+
+    // Output side, mirroring `openInputStream`/`openDataInputStream`: a WIPI `File` opened
+    // for writing yields a `java/io/FileOutputStream` over the same underlying `java/io/File`.
+    async fn open_output_stream(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<OutputStream>> {
+        tracing::debug!("org.kwis.msp.io.File::openOutputStream({this:?})");
+
+        let file: ClassInstanceRef<File> = jvm.get_field(&this, "file", "Ljava/io/File;").await?;
+        let output_stream = jvm.new_class("java/io/FileOutputStream", "(Ljava/io/File;)V", (file,)).await?;
+
+        Ok(output_stream.into())
+    }
+
+    async fn open_data_output_stream(
+        jvm: &Jvm,
+        _: &mut WieJvmContext,
+        this: ClassInstanceRef<Self>,
+    ) -> JvmResult<ClassInstanceRef<DataOutputStream>> {
+        tracing::debug!("org.kwis.msp.io.File::openDataOutputStream({this:?})");
+
+        let output_stream: ClassInstanceRef<OutputStream> = jvm.invoke_virtual(&this, "openOutputStream", "()Ljava/io/OutputStream;", ()).await?;
+        let data_output_stream = jvm
+            .new_class("java/io/DataOutputStream", "(Ljava/io/OutputStream;)V", (output_stream,))
+            .await?;
+
+        Ok(data_output_stream.into())
     }
 }

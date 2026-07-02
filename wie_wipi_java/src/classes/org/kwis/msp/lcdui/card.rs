@@ -24,6 +24,7 @@ impl Card {
                 JavaMethodProto::new("<init>", "(Lorg/kwis/msp/lcdui/Display;)V", Self::init_with_display, Default::default()),
                 JavaMethodProto::new("getWidth", "()I", Self::get_width, Default::default()),
                 JavaMethodProto::new("getHeight", "()I", Self::get_height, Default::default()),
+                JavaMethodProto::new("getDisplay", "()Lorg/kwis/msp/lcdui/Display;", Self::get_display, Default::default()),
                 JavaMethodProto::new("isShown", "()Z", Self::is_shown, Default::default()),
                 JavaMethodProto::new("repaint", "(IIII)V", Self::repaint_with_area, Default::default()),
                 JavaMethodProto::new("repaint", "()V", Self::repaint, Default::default()),
@@ -112,6 +113,15 @@ impl Card {
         tracing::debug!("org.kwis.msp.lcdui.Card::getHeight({this:?})");
 
         jvm.get_field(&this, "h", "I").await
+    }
+
+    // WIPI `Card.getDisplay()` returns the Display the card belongs to (javadoc: "카드의
+    // display를 돌려줍니다"). The display is stored at construction (`<init>(Display)`), so
+    // just return that field.
+    async fn get_display(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Card>) -> JvmResult<ClassInstanceRef<Display>> {
+        tracing::debug!("org.kwis.msp.lcdui.Card::getDisplay({this:?})");
+
+        jvm.get_field(&this, "display", "Lorg/kwis/msp/lcdui/Display;").await
     }
 
     async fn repaint(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Card>) -> JvmResult<()> {

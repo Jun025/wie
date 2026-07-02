@@ -1,6 +1,6 @@
 # smoke_gate baseline — titles expected to boot + render real content.
 # Identifiers + expected status only; NO game files. Regenerate: UPDATE_BASELINE=1.
-# 180 titles (ktf 123 / lgt 44 / skt 13), each PASSed boot+render in two independent
+# 187 titles (ktf 130 / lgt 44 / skt 13), each PASSed boot+render in two independent
 # full runs. Excluded: deterministic fails and ~50%-flaky titles (e.g. 추억의달고나 —
 # game paint() NPE ~half the runs; lgt/하이브리드 — blank/black).
 ktf/(KTF) 마이프린세스2.zip	PASS
@@ -126,6 +126,13 @@ ktf/피파7.zip	PASS
 ktf/하베스트타이쿤.zip	PASS
 ktf/한게임신맞고1.zip	PASS
 ktf/헬로우닌자.zip	PASS
+ktf/(KTF)아포칼립스.zip	PASS
+ktf/방탈출.zip	PASS
+ktf/스노우브라더스2.zip	PASS
+ktf/(KTF)크아bnb2007(큰화면).zip	PASS
+ktf/배틀동전판치기.zip	PASS
+ktf/초밥의달인3.zip	PASS
+ktf/크아bnb2007.zip	PASS
 lgt/(LGT) 리듬스타1.zip	PASS
 lgt/(LGT)검은방3.zip	PASS
 lgt/(LGT)나는마왕이다2.zip	PASS
