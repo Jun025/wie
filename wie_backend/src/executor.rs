@@ -1,11 +1,10 @@
-use alloc::{boxed::Box, sync::Arc};
+use alloc::{boxed::Box, collections::BTreeMap, sync::Arc};
 use core::{
     future::Future,
     pin::Pin,
     task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
 };
 
-use hashbrown::HashMap;
 use spin::Mutex;
 
 use wie_util::{Result, WieError};
@@ -16,8 +15,11 @@ type Task = Pin<Box<dyn Future<Output = Result<()>> + Send>>;
 
 pub struct ExecutorInner {
     current_task_id: Option<usize>,
-    tasks: HashMap<usize, Task>,
-    sleeping_tasks: HashMap<usize, Instant>,
+    // BTreeMap, not HashMap: task ids are monotonic, so iteration follows spawn
+    // order. Hash-order polling made scheduling differ per build artifact and
+    // per run, flipping boot-order-sensitive titles between PASS and blank.
+    tasks: BTreeMap<usize, Task>,
+    sleeping_tasks: BTreeMap<usize, Instant>,
     last_task_id: usize,
     last_now: Instant,
 }
@@ -69,8 +71,8 @@ impl Executor {
     pub fn new() -> Self {
         let inner = Arc::new(Mutex::new(ExecutorInner {
             current_task_id: None,
-            tasks: HashMap::new(),
-            sleeping_tasks: HashMap::new(),
+            tasks: BTreeMap::new(),
+            sleeping_tasks: BTreeMap::new(),
             last_task_id: 0,
             last_now: Instant::from_epoch_millis(0),
         }));
@@ -140,10 +142,11 @@ impl Executor {
     fn step(&mut self, now: Instant) -> Result<()> {
         self.inner.lock().last_now = now;
 
-        let mut next_tasks = HashMap::new();
-        let tasks = self.inner.lock().tasks.drain().collect::<HashMap<_, _>>();
-        let mut sleeping_tasks = self.inner.lock().sleeping_tasks.drain().collect::<HashMap<_, _>>();
+        let mut next_tasks = BTreeMap::new();
+        let tasks = core::mem::take(&mut self.inner.lock().tasks);
+        let mut sleeping_tasks = core::mem::take(&mut self.inner.lock().sleeping_tasks);
 
+        // ascending task id == spawn order; keeps dispatch deterministic
         for (task_id, mut task) in tasks.into_iter() {
             let item = sleeping_tasks.get(&task_id);
             if let Some(item) = item {
