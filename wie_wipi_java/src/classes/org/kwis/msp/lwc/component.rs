@@ -23,6 +23,7 @@ impl Component {
                 JavaMethodProto::new("configure", "(IIIII)V", Self::configure, Default::default()),
                 JavaMethodProto::new("setFocus", "()V", Self::set_focus, Default::default()),
                 JavaMethodProto::new("getHeight", "()I", Self::get_height, Default::default()),
+                JavaMethodProto::new("repaint", "()V", Self::repaint, Default::default()),
             ],
             fields: vec![],
             access_flags: Default::default(),
@@ -71,5 +72,13 @@ impl Component {
         tracing::warn!("stub org.kwis.msp.lwc.Component::getHeight({this:?})");
 
         Ok(0)
+    }
+
+    // The lwc widget layer has no paint plumbing in wie (all peers here are logged
+    // stubs); repaint follows the same contract. Games draw through Card/Canvas.
+    async fn repaint(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::repaint({this:?})");
+
+        Ok(())
     }
 }
