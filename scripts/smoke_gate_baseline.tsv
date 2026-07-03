@@ -1,6 +1,6 @@
 # smoke_gate baseline — titles expected to boot + render real content.
 # Identifiers + expected status only; NO game files. Regenerate: UPDATE_BASELINE=1.
-# 230 titles (ktf 173 / lgt 44 / skt 13), each PASSed boot+render in two independent
+# 231 titles (ktf 174 / lgt 44 / skt 13), each PASSed boot+render in two independent
 # full runs. Excluded: deterministic fails and ~50%-flaky titles (e.g. 추억의달고나 —
 # game paint() NPE ~half the runs; lgt/하이브리드 — blank/black).
 ktf/(KTF) 건담시드.zip	PASS
@@ -64,6 +64,7 @@ ktf/동전쌓기에볼루션.zip	PASS
 ktf/드래곤로드.zip	PASS
 ktf/떡볶이타이쿤3.zip	PASS
 ktf/라이덴3.zip	PASS
+ktf/라피스라줄리.zip	PASS
 ktf/레드망고타이쿤.zip	PASS
 ktf/렛츠골프2005.zip	PASS
 ktf/리듬스타1.zip	PASS
