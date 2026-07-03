@@ -57,6 +57,12 @@ impl Display {
                 JavaMethodProto::new("getBitsPerPixel", "()I", Self::get_bits_per_pixel, Default::default()),
                 JavaMethodProto::new("callSerially", "(Ljava/lang/Runnable;)V", Self::call_serially, Default::default()),
                 JavaMethodProto::new(
+                    "callSerially",
+                    "(Ljava/lang/Runnable;I)V",
+                    Self::call_serially_with_param,
+                    Default::default(),
+                ),
+                JavaMethodProto::new(
                     "getGameAction",
                     "(I)I",
                     Self::get_game_action,
@@ -203,6 +209,26 @@ impl Display {
     async fn call_serially(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, r: ClassInstanceRef<Runnable>) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.lcdui.Display::callSerially({this:?}, {r:?})");
 
+        let midp_display: ClassInstanceRef<MidpDisplay> = jvm.get_field(&this, "midpDisplay", "Ljavax/microedition/lcdui/Display;").await?;
+        let _: () = jvm.invoke_virtual(&midp_display, "callSerially", "(Ljava/lang/Runnable;)V", (r,)).await?;
+
+        Ok(())
+    }
+
+    async fn call_serially_with_param(
+        jvm: &Jvm,
+        _: &mut WieJvmContext,
+        this: ClassInstanceRef<Self>,
+        r: ClassInstanceRef<Runnable>,
+        param: i32,
+    ) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lcdui.Display::callSerially({this:?}, {r:?}, {param})");
+
+        // Same serialized-on-event-thread contract as the one-arg form. The extra int is
+        // a KTF extension; observed as a constant 30 (피자타이쿤 paint pacing, likely a
+        // delay in ms). The event pump already paces queued runnables at 16ms+, so the
+        // runnable is queued immediately; exact delay semantics stay unimplemented until
+        // confirmed against a device trace.
         let midp_display: ClassInstanceRef<MidpDisplay> = jvm.get_field(&this, "midpDisplay", "Ljavax/microedition/lcdui/Display;").await?;
         let _: () = jvm.invoke_virtual(&midp_display, "callSerially", "(Ljava/lang/Runnable;)V", (r,)).await?;
 

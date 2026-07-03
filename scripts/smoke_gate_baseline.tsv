@@ -1,6 +1,6 @@
 # smoke_gate baseline — titles expected to boot + render real content.
 # Identifiers + expected status only; NO game files. Regenerate: UPDATE_BASELINE=1.
-# 231 titles (ktf 174 / lgt 44 / skt 13), each PASSed boot+render in two independent
+# 232 titles (ktf 175 / lgt 44 / skt 13), each PASSed boot+render in two independent
 # full runs. Excluded: deterministic fails and ~50%-flaky titles (e.g. 추억의달고나 —
 # game paint() NPE ~half the runs; lgt/하이브리드 — blank/black).
 ktf/(KTF) 건담시드.zip	PASS
@@ -170,6 +170,7 @@ ktf/페노아전기2.zip	PASS
 ktf/프리스타일_어택.zip	PASS
 ktf/프린세스메이커4 작은화면.zip	PASS
 ktf/프린세스메이커4.zip	PASS
+ktf/피자타이쿤.zip	PASS
 ktf/피자타이쿤2.zip	PASS
 ktf/피파7.zip	PASS
 ktf/하베스트타이쿤.zip	PASS
