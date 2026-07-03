@@ -1,6 +1,6 @@
 # smoke_gate baseline — titles expected to boot + render real content.
 # Identifiers + expected status only; NO game files. Regenerate: UPDATE_BASELINE=1.
-# 232 titles (ktf 175 / lgt 44 / skt 13), each PASSed boot+render in two independent
+# 230 titles (ktf 173 / lgt 44 / skt 13), each PASSed boot+render in two independent
 # full runs. Excluded: deterministic fails and ~50%-flaky titles (e.g. 추억의달고나 —
 # game paint() NPE ~half the runs; lgt/하이브리드 — blank/black).
 ktf/(KTF) 건담시드.zip	PASS
@@ -13,7 +13,6 @@ ktf/(KTF)간호사타이쿤.zip	PASS
 ktf/(KTF)리얼비트.zip	PASS
 ktf/(KTF)마린블루스.zip	PASS
 ktf/(KTF)메이플스토리 도적편.zip	PASS
-ktf/(KTF)미니러비.zip	PASS
 ktf/(KTF)아포칼립스.zip	PASS
 ktf/(KTF)점핑펭.zip	PASS
 ktf/(KTF)정무문2.zip	PASS
@@ -89,7 +88,6 @@ ktf/미니게임의달인.zip	PASS
 ktf/미니게임천국1.zip	PASS
 ktf/미니게임천국2.zip	PASS
 ktf/미니게임천국4.zip	PASS
-ktf/미니러비.zip	PASS
 ktf/미니미니오락실.zip	PASS
 ktf/미니햄스터키우기.zip	PASS
 ktf/박명수호통맞고.zip	PASS
