@@ -1,6 +1,6 @@
 # smoke_gate baseline — titles expected to boot + render real content.
 # Identifiers + expected status only; NO game files. Regenerate: UPDATE_BASELINE=1.
-# 232 titles (ktf 175 / lgt 44 / skt 13), each PASSed boot+render in two independent
+# 254 titles (ktf 183 / lgt 52 / skt 19), each PASSed boot+render in two independent
 # full runs. Excluded: deterministic fails and ~50%-flaky titles (e.g. 추억의달고나 —
 # game paint() NPE ~half the runs; lgt/하이브리드 — blank/black).
 ktf/(KTF) 건담시드.zip	PASS
@@ -10,9 +10,11 @@ ktf/(KTF) 창세기전 CROW2.zip	PASS
 ktf/(KTF) 크로노스 윙.zip	PASS
 ktf/(KTF)2007루노베이스볼.zip	PASS
 ktf/(KTF)간호사타이쿤.zip	PASS
+ktf/(KTF)괴도키리.zip	PASS
 ktf/(KTF)리얼비트.zip	PASS
 ktf/(KTF)마린블루스.zip	PASS
 ktf/(KTF)메이플스토리 도적편.zip	PASS
+ktf/(KTF)미니러비.zip	PASS
 ktf/(KTF)아포칼립스.zip	PASS
 ktf/(KTF)점핑펭.zip	PASS
 ktf/(KTF)정무문2.zip	PASS
@@ -20,6 +22,7 @@ ktf/(KTF)정무문3.zip	PASS
 ktf/(KTF)질주쾌감스케쳐2.zip	PASS
 ktf/(KTF)케로로미니게임.zip	PASS
 ktf/(KTF)크아bnb2007(큰화면).zip	PASS
+ktf/(KTF)푸시푸시삼국지.zip	PASS
 ktf/[큰화]페이블오브나이트.zip	PASS
 ktf/2006독일축구.zip	PASS
 ktf/2007루노베이스볼.zip	PASS
@@ -89,6 +92,8 @@ ktf/미니게임의달인.zip	PASS
 ktf/미니게임천국1.zip	PASS
 ktf/미니게임천국2.zip	PASS
 ktf/미니게임천국4.zip	PASS
+ktf/미니게임파티.zip	PASS
+ktf/미니러비.zip	PASS
 ktf/미니미니오락실.zip	PASS
 ktf/미니햄스터키우기.zip	PASS
 ktf/박명수호통맞고.zip	PASS
@@ -152,6 +157,7 @@ ktf/짜요짜요타이쿤4.zip	PASS
 ktf/창세기전 크로우2.zip	PASS
 ktf/체스마스터.zip	PASS
 ktf/초밥의달인3.zip	PASS
+ktf/추억의달고나.zip	PASS
 ktf/컴삼촉.zip	PASS
 ktf/컴투스_맞고_2006.zip	PASS
 ktf/컴투스_바이러스.zip	PASS
@@ -159,6 +165,7 @@ ktf/컴투스사커2006_한글명단.zip	PASS
 ktf/케로로미니게임.zip	PASS
 ktf/쿠키하우스.zip	PASS
 ktf/크로노스윙.zip	PASS
+ktf/크로스워드.zip	PASS
 ktf/크로이센1.04.zip	PASS
 ktf/크아bnb2007.zip	PASS
 ktf/타운스토리+신대륙편.zip	PASS
@@ -167,6 +174,7 @@ ktf/파랜드택틱스 kt.zip	PASS
 ktf/판타지포에버2.zip	PASS
 ktf/팝픈뮤직.zip	PASS
 ktf/페노아전기2.zip	PASS
+ktf/푸시푸시삼국지.zip	PASS
 ktf/프리스타일_어택.zip	PASS
 ktf/프린세스메이커4 작은화면.zip	PASS
 ktf/프린세스메이커4.zip	PASS
@@ -184,6 +192,8 @@ lgt/(LGT)검은방3.zip	PASS
 lgt/(LGT)나는마왕이다2.zip	PASS
 lgt/(LGT)던전앤파이터귀검사.zip	PASS
 lgt/(LGT)레이카르나.zip	PASS
+lgt/(LGT)리듬페스티발.zip	PASS
+lgt/(LGT)알바타이쿤2.zip	PASS
 lgt/(LGT)이노티아연대기.zip	PASS
 lgt/LGT 얍.zip	PASS
 lgt/LGT 영웅서기3 (1.01ver).zip	PASS
@@ -202,12 +212,16 @@ lgt/라켓스타.zip	PASS
 lgt/라테일.zip	PASS
 lgt/레이카르나.zip	PASS
 lgt/리듬스타2.zip	PASS
+lgt/리듬페스티발.zip	PASS
+lgt/메이플스토리 도적편.zip	PASS
 lgt/메탈슬러그 서바이벌.zip	PASS
 lgt/무한신맞고2009.zip	PASS
 lgt/미니게임천국4.zip	PASS
 lgt/바이오크로니클.zip	PASS
 lgt/부루마블2009.zip	PASS
+lgt/블레이드마스터3.zip	PASS
 lgt/블레이드마스터4.zip	PASS
+lgt/아니마.zip	PASS
 lgt/얍.zip	PASS
 lgt/에바스토-천공의렙소디.zip	PASS
 lgt/영웅서기3.zip	PASS
@@ -217,9 +231,11 @@ lgt/이터니티-천상의화원.zip	PASS
 lgt/일지매영웅전기2.zip	PASS
 lgt/제노니아1.zip	PASS
 lgt/제노니아2.zip	PASS
+lgt/창세기전3ep1.zip	PASS
 lgt/테라-영원의혼돈.zip	PASS
 lgt/테일즈위버 막시민편.zip	PASS
 lgt/테일즈위버 이스핀편.zip	PASS
+lgt/판타지포에버3.zip	PASS
 lgt/하얀섬.zip	PASS
 lgt/하이브리드2.zip	PASS
 skt/Chaos블레이드.zip	PASS
@@ -233,5 +249,11 @@ skt/더팜2.zip	PASS
 skt/드래곤나이트EX.zip	PASS
 skt/로맨스소드.zip	PASS
 skt/미니동화TING.zip	PASS
+skt/사고뭉치트윈스.zip	PASS
 skt/삼국지연의2.zip	PASS
+skt/생존일기.zip	PASS
 skt/웰루시아.zip	PASS
+skt/크리스탈보더.zip	PASS
+skt/프리스톤테일(3500406052).zip	PASS
+skt/프린세스메이커4_작은화면.zip	PASS
+skt/프린세스메이커4_큰화면.zip	PASS
