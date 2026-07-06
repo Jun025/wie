@@ -1,6 +1,6 @@
 # smoke_gate baseline — titles expected to boot + render real content.
 # Identifiers + expected status only; NO game files. Regenerate: UPDATE_BASELINE=1.
-# 254 titles (ktf 183 / lgt 52 / skt 19), each PASSed boot+render in two independent
+# 256 titles (ktf 185 / lgt 52 / skt 19), each PASSed boot+render in two independent
 # full runs. Excluded: deterministic fails and ~50%-flaky titles (e.g. 추억의달고나 —
 # game paint() NPE ~half the runs; lgt/하이브리드 — blank/black).
 ktf/(KTF) 건담시드.zip	PASS
@@ -14,7 +14,6 @@ ktf/(KTF)괴도키리.zip	PASS
 ktf/(KTF)리얼비트.zip	PASS
 ktf/(KTF)마린블루스.zip	PASS
 ktf/(KTF)메이플스토리 도적편.zip	PASS
-ktf/(KTF)미니러비.zip	PASS
 ktf/(KTF)아포칼립스.zip	PASS
 ktf/(KTF)점핑펭.zip	PASS
 ktf/(KTF)정무문2.zip	PASS
@@ -77,6 +76,7 @@ ktf/리얼싸커2009.zip	PASS
 ktf/리얼타짜맞고.zip	PASS
 ktf/마린블루스.zip	PASS
 ktf/마이프린세스2.zip	PASS
+ktf/만귀토벌전.zip	PASS
 ktf/멋지다김밥군.zip	PASS
 ktf/메르헨전기 KTF.zip	PASS
 ktf/메르헨전기.zip	PASS
@@ -93,7 +93,7 @@ ktf/미니게임천국1.zip	PASS
 ktf/미니게임천국2.zip	PASS
 ktf/미니게임천국4.zip	PASS
 ktf/미니게임파티.zip	PASS
-ktf/미니러비.zip	PASS
+ktf/미니고치.zip	PASS
 ktf/미니미니오락실.zip	PASS
 ktf/미니햄스터키우기.zip	PASS
 ktf/박명수호통맞고.zip	PASS
@@ -112,12 +112,14 @@ ktf/삼국축구대전.zip	PASS
 ktf/생존일기.zip	PASS
 ktf/서든어택.zip	PASS
 ktf/세븐스소드.zip	PASS
+ktf/소울카드마스터2.zip	PASS
 ktf/슈퍼로봇_택틱스_r.zip	PASS
 ktf/슈퍼액션히어로.zip	PASS
 ktf/스노우브라더스2.zip	PASS
 ktf/스파이더맨3.zip	PASS
 ktf/시네마미니게임.zip	PASS
 ktf/심시티_2억에디트1.zip	PASS
+ktf/아르덴전기.zip	PASS
 ktf/액션퍼즐패밀리.zip	PASS
 ktf/어스토니시아ep1.zip	PASS
 ktf/어스토니시아ep2.zip	PASS
