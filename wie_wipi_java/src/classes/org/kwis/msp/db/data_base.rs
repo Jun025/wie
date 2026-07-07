@@ -38,6 +38,7 @@ impl DataBase {
                 JavaMethodProto::new("insertRecord", "([B)I", Self::insert_record, Default::default()),
                 JavaMethodProto::new("insertRecord", "([BII)I", Self::insert_record_with_offset, Default::default()),
                 JavaMethodProto::new("selectRecord", "(I)[B", Self::select_record, Default::default()),
+                JavaMethodProto::new("selectRecord", "(I[BI)V", Self::select_record_into, Default::default()),
                 JavaMethodProto::new("updateRecord", "(I[B)V", Self::update_record, Default::default()),
                 JavaMethodProto::new("updateRecord", "(I[BII)V", Self::update_record_with_offset, Default::default()),
                 JavaMethodProto::new(
@@ -192,6 +193,35 @@ impl DataBase {
         }
 
         Ok(result.unwrap())
+    }
+
+    // Buffer-fill variant of selectRecord: copy the record's bytes into `buffer` at
+    // `offset` (delegates to RecordStore.getRecord(I,[B,I), same as select_record(I)[B
+    // but into a caller buffer). Missing record → DataBaseRecordException (matching
+    // select_record). Buffer-too-small propagates as an array-store exception, not a
+    // silent truncation. Void return: success/failure signalled only by exception.
+    async fn select_record_into(
+        jvm: &Jvm,
+        _context: &mut WieJvmContext,
+        this: ClassInstanceRef<Self>,
+        record_id: i32,
+        buffer: ClassInstanceRef<Array<i8>>,
+        offset: i32,
+    ) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.db.DataBase::selectRecord({this:?}, {record_id}, {buffer:?}, {offset})");
+
+        let record_id = DataBase::to_midp_record_id(record_id);
+
+        let record_store = jvm.get_field(&this, "recordStore", "Ljavax/microedition/rms/RecordStore;").await?;
+        let result: JvmResult<i32> = jvm
+            .invoke_virtual(&record_store, "getRecord", "(I[BI)I", (record_id, buffer, offset))
+            .await;
+
+        if result.is_err() {
+            return Err(jvm.exception("org/kwis/msp/db/DataBaseRecordException", "Record not found").await);
+        }
+
+        Ok(())
     }
 
     async fn update_record(

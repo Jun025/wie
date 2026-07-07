@@ -1,6 +1,6 @@
 # smoke_gate baseline — titles expected to boot + render real content.
 # Identifiers + expected status only; NO game files. Regenerate: UPDATE_BASELINE=1.
-# 257 titles (ktf 186 / lgt 52 / skt 19), each PASSed boot+render in two independent
+# 259 titles (ktf 188 / lgt 52 / skt 19), each PASSed boot+render in two independent
 # full runs. Excluded: deterministic fails and ~50%-flaky titles (e.g. 추억의달고나 —
 # game paint() NPE ~half the runs; lgt/하이브리드 — blank/black).
 ktf/(KTF) 건담시드.zip	PASS
@@ -85,6 +85,7 @@ ktf/메이플스토리 도적편.zip	PASS
 ktf/메이플스토리(법사편).zip	PASS
 ktf/메이플스토리(전사편).zip	PASS
 ktf/메이플스토리2007.zip	PASS
+ktf/모바일크래프트2.zip	PASS
 ktf/무한의통통.zip	PASS
 ktf/미궁미술관살인사건.zip	PASS
 ktf/미니게임레드맨.zip	PASS
@@ -144,6 +145,7 @@ ktf/이노티아1.zip	PASS
 ktf/이누야샤.zip	PASS
 ktf/이터널사가2.zip	PASS
 ktf/인형뽑기타이쿤.zip	PASS
+ktf/전국호텔왕plus.zip	PASS
 ktf/전설의_마법학교2.zip	PASS
 ktf/절묘한타이밍_01.00.01.zip	PASS
 ktf/정무문2.zip	PASS
