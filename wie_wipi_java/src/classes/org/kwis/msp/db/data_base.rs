@@ -33,6 +33,7 @@ impl DataBase {
                 ),
                 JavaMethodProto::new("getNumberOfRecords", "()I", Self::get_number_of_records, Default::default()),
                 JavaMethodProto::new("getSizeAvailable", "()I", Self::get_size_available, Default::default()),
+                JavaMethodProto::new("getRecordSize", "()I", Self::get_record_size, Default::default()),
                 JavaMethodProto::new("closeDataBase", "()V", Self::close_data_base, Default::default()),
                 JavaMethodProto::new("insertRecord", "([B)I", Self::insert_record, Default::default()),
                 JavaMethodProto::new("insertRecord", "([BII)I", Self::insert_record_with_offset, Default::default()),
@@ -46,11 +47,10 @@ impl DataBase {
                     MethodAccessFlags::STATIC,
                 ),
             ],
-            fields: vec![JavaFieldProto::new(
-                "recordStore",
-                "Ljavax/microedition/rms/RecordStore;",
-                Default::default(),
-            )],
+            fields: vec![
+                JavaFieldProto::new("recordStore", "Ljavax/microedition/rms/RecordStore;", Default::default()),
+                JavaFieldProto::new("recordSize", "I", Default::default()),
+            ],
             access_flags: Default::default(),
         }
     }
@@ -105,9 +105,13 @@ impl DataBase {
             )
             .await?;
 
-        let instance = jvm
+        let mut instance = jvm
             .new_class("org/kwis/msp/db/DataBase", "(Ljavax/microedition/rms/RecordStore;)V", (record_store,))
             .await?;
+
+        // WIPI DataBase is a fixed-record-size store; getRecordSize() returns the size
+        // the store was opened with, so remember it here.
+        jvm.put_field(&mut instance, "recordSize", "I", record_size).await?;
 
         Ok(instance.into())
     }
@@ -124,6 +128,15 @@ impl DataBase {
 
         let record_store = jvm.get_field(&this, "recordStore", "Ljavax/microedition/rms/RecordStore;").await?;
         jvm.invoke_virtual(&record_store, "getSizeAvailable", "()I", ()).await
+    }
+
+    // WIPI DataBase has a fixed record size set at openDataBase; getRecordSize()
+    // returns that size (the game allocates record buffers from it — 0 would break
+    // allocation). Not the RecordStore.getRecordSize(int) per-record variant.
+    async fn get_record_size(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::debug!("org.kwis.msp.db.DataBase::getRecordSize({this:?})");
+
+        jvm.get_field(&this, "recordSize", "I").await
     }
 
     async fn close_data_base(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<DataBase>) -> JvmResult<()> {
