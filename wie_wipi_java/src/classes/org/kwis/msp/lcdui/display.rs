@@ -45,6 +45,7 @@ impl Display {
                 JavaMethodProto::new("isDoubleBuffered", "()Z", Self::is_double_buffered, Default::default()),
                 JavaMethodProto::new("getDockedCard", "()Lorg/kwis/msp/lcdui/Card;", Self::get_docked_card, Default::default()),
                 JavaMethodProto::new("pushCard", "(Lorg/kwis/msp/lcdui/Card;)V", Self::push_card, Default::default()),
+                JavaMethodProto::new("popCard", "()Lorg/kwis/msp/lcdui/Card;", Self::pop_card, Default::default()),
                 JavaMethodProto::new("removeAllCards", "()V", Self::remove_all_cards, Default::default()),
                 JavaMethodProto::new(
                     "addJletEventListener",
@@ -159,6 +160,13 @@ impl Display {
         let _: () = jvm.invoke_virtual(&card_canvas, "pushCard", "(Lorg/kwis/msp/lcdui/Card;)V", (c,)).await?;
 
         Ok(())
+    }
+
+    async fn pop_card(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<Card>> {
+        tracing::debug!("org.kwis.msp.lcdui.Display::popCard({this:?})");
+
+        let card_canvas = jvm.get_field(&this, "cardCanvas", "Lnet/wie/CardCanvas;").await?;
+        jvm.invoke_virtual(&card_canvas, "popCard", "()Lorg/kwis/msp/lcdui/Card;", ()).await
     }
 
     async fn remove_all_cards(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {

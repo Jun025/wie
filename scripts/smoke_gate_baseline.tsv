@@ -1,6 +1,6 @@
 # smoke_gate baseline — titles expected to boot + render real content.
 # Identifiers + expected status only; NO game files. Regenerate: UPDATE_BASELINE=1.
-# 259 titles (ktf 188 / lgt 52 / skt 19), each PASSed boot+render in two independent
+# 260 titles (ktf 189 / lgt 52 / skt 19), each PASSed boot+render in two independent
 # full runs. Excluded: deterministic fails and ~50%-flaky titles (e.g. 추억의달고나 —
 # game paint() NPE ~half the runs; lgt/하이브리드 — blank/black).
 ktf/(KTF) 건담시드.zip	PASS
@@ -118,6 +118,7 @@ ktf/소울카드마스터2.zip	PASS
 ktf/슈퍼로봇_택틱스_r.zip	PASS
 ktf/슈퍼액션히어로.zip	PASS
 ktf/스노우브라더스2.zip	PASS
+ktf/스맥vs로우.zip	PASS
 ktf/스파이더맨3.zip	PASS
 ktf/시네마미니게임.zip	PASS
 ktf/심시티_2억에디트1.zip	PASS

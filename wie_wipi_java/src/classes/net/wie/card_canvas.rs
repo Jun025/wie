@@ -121,6 +121,7 @@ impl CardCanvas {
                 JavaMethodProto::new("keyRepeated", "(I)V", Self::key_repeated, Default::default()),
                 JavaMethodProto::new("keyReleased", "(I)V", Self::key_released, Default::default()),
                 JavaMethodProto::new("pushCard", "(Lorg/kwis/msp/lcdui/Card;)V", Self::push_card, Default::default()),
+                JavaMethodProto::new("popCard", "()Lorg/kwis/msp/lcdui/Card;", Self::pop_card, Default::default()),
                 JavaMethodProto::new("removeAllCards", "()V", Self::remove_all_cards, Default::default()),
                 // wie private
                 JavaMethodProto::new("handleNotifyEvent", "(III)V", Self::handle_notify_event, Default::default()),
@@ -251,6 +252,29 @@ impl CardCanvas {
         }
 
         Ok(())
+    }
+
+    // Pop the top (last-pushed) card off the stack and return it; tears it down
+    // (setCanvas(null) + showNotify(false)) mirroring removeAllCards, then repaints
+    // so the new top shows. Empty stack → null (nothing to pop). Inverse of pushCard.
+    async fn pop_card(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<Card>> {
+        tracing::debug!("net.wie.CardCanvas::popCard({this:?})");
+
+        let cards = jvm.get_field(&this, "cards", "Ljava/util/Vector;").await?;
+        let length: i32 = jvm.invoke_virtual(&cards, "size", "()I", ()).await?;
+        if length <= 0 {
+            return Ok(None.into());
+        }
+
+        let card: ClassInstanceRef<Card> = jvm.invoke_virtual(&cards, "remove", "(I)Ljava/lang/Object;", (length - 1,)).await?;
+
+        let _: () = jvm
+            .invoke_virtual(&card, "setCanvas", "(Ljavax/microedition/lcdui/Canvas;)V", (None,))
+            .await?;
+        let _: () = jvm.invoke_virtual(&card, "showNotify", "(Z)V", (false,)).await?;
+        let _: () = jvm.invoke_virtual(&this, "repaint", "()V", ()).await?;
+
+        Ok(card)
     }
 
     async fn remove_all_cards(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
