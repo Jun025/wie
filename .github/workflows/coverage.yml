@@ -8,6 +8,11 @@ jobs:
     container:
       image: xd009642/tarpaulin:latest
       options: --security-opt seccomp=unconfined
+    # Job-level env so the upload step's `if:` can see it (same pattern as
+    # web.yml). Forks without CODECOV_TOKEN skip the upload instead of
+    # failing every push; the token itself is never printed.
+    env:
+      HAS_CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN != '' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -35,6 +40,7 @@ jobs:
           cargo tarpaulin --all-features --skip-clean --workspace --timeout 120 --out xml
 
       - name: Upload to codecov.io
+        if: ${{ env.HAS_CODECOV_TOKEN == 'true' }}
         uses: codecov/codecov-action@v6
         with:
           fail_ci_if_error: true
