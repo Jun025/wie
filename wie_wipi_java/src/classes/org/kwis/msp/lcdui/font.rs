@@ -21,6 +21,7 @@ impl Font {
                 JavaMethodProto::new("<clinit>", "()V", Self::cl_init, MethodAccessFlags::STATIC),
                 JavaMethodProto::new("<init>", "(Ljavax/microedition/lcdui/Font;)V", Self::init, Default::default()),
                 JavaMethodProto::new("getHeight", "()I", Self::get_height, Default::default()),
+                JavaMethodProto::new("getBaselinePosition", "()I", Self::get_baseline_position, Default::default()),
                 JavaMethodProto::new(
                     "getDefaultFont",
                     "()Lorg/kwis/msp/lcdui/Font;",
@@ -94,6 +95,13 @@ impl Font {
 
         let midp_font = jvm.get_field(&this, "midpFont", "Ljavax/microedition/lcdui/Font;").await?;
         jvm.invoke_virtual(&midp_font, "getHeight", "()I", ()).await
+    }
+
+    async fn get_baseline_position(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::debug!("org.kwis.msp.lcdui.Font::getBaselinePosition");
+
+        let midp_font = jvm.get_field(&this, "midpFont", "Ljavax/microedition/lcdui/Font;").await?;
+        jvm.invoke_virtual(&midp_font, "getBaselinePosition", "()I", ()).await
     }
 
     async fn get_default_font(jvm: &Jvm, _: &mut WieJvmContext) -> JvmResult<ClassInstanceRef<Self>> {
