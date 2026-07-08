@@ -1,0 +1,150 @@
+name: Publish engine artifact (→ otterpebble propagation)
+
+# Federation ① sender. When the engine changes on main, build a FRESH wie_web WASM
+# from current source, publish it as a versioned, hash-pinned GitHub Release asset,
+# and signal otterpebble via repository_dispatch so featurephone.otterpebble.com
+# serves the new engine with no human step. otterpebble owns the receiver
+# (apps/featurephone/.github/workflows/wie-artifact-receive.yml, event_type
+# wie-artifact-published) — this workflow only produces the signal it consumes.
+#
+# Public repo → free Actions and PUBLIC release-asset download URLs (the receiver
+# curls them unauthenticated). No game files are produced or bundled (WASM only).
+#
+# Dispatch is TOKEN-GATED: it needs a token with contents:write on otterpebble
+# (the default GITHUB_TOKEN only reaches this repo). Absent → build+release still
+# run, dispatch skips (dormant), activates the instant the secret is injected.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**/*.rs"
+      - "**/Cargo.toml"
+      - "Cargo.lock"
+      - "scripts/build-wasm.sh"
+      - ".github/workflows/publish-artifact.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write # gh release create (this repo)
+
+concurrency:
+  group: publish-artifact
+  cancel-in-progress: false
+
+jobs:
+  build-publish:
+    runs-on: ubuntu-latest
+    env:
+      # Job-level so the dispatch step's `if:` can read it (step-level env is not
+      # visible to that same step's `if:`). The token itself is never printed.
+      HAS_DISPATCH_TOKEN: ${{ secrets.OTTERPEBBLE_DISPATCH_TOKEN != '' }}
+      OTTERPEBBLE_REPO: Jun025/otterpebble
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-publish-wasm-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-publish-wasm-
+
+      - name: Install wasm-bindgen-cli (pinned to Cargo.lock)
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@0.2.108
+
+      # apt binaryen is too old for modern wasm; pull a recent release so
+      # `wasm-opt -Oz` (in build-wasm.sh) shrinks the bundle. build-wasm.sh falls
+      # back to the unoptimized (valid) wasm if this is ever unavailable.
+      - name: Install binaryen (wasm-opt)
+        run: |
+          VER=version_119
+          curl -sSL "https://github.com/WebAssembly/binaryen/releases/download/${VER}/binaryen-${VER}-x86_64-linux.tar.gz" | tar xz
+          echo "$PWD/binaryen-${VER}/bin" >> "$GITHUB_PATH"
+
+      - name: Build fresh wie_web WASM (current source)
+        run: bash scripts/build-wasm.sh
+
+      - name: Compute artifact metadata (version · sha · hashes)
+        id: meta
+        run: |
+          set -euo pipefail
+          WASM=web/src/wasm/wie_web_bg.wasm
+          GLUE=web/src/wasm/wie_web.js
+          test -f "$WASM" && test -f "$GLUE"
+          VERSION=$(grep -m1 '^version' Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')
+          WIE_HEAD=$(git rev-parse HEAD)
+          SHORT=$(git rev-parse --short HEAD)
+          WASM_SHA=$(sha256sum "$WASM" | cut -d' ' -f1)
+          GLUE_SHA=$(sha256sum "$GLUE" | cut -d' ' -f1)
+          {
+            echo "version=$VERSION"
+            echo "wie_head=$WIE_HEAD"
+            echo "tag=engine-$SHORT"
+            echo "wasm_sha=$WASM_SHA"
+            echo "glue_sha=$GLUE_SHA"
+          } >> "$GITHUB_OUTPUT"
+          echo "built version=$VERSION head=$WIE_HEAD wasm=$WASM_SHA glue=$GLUE_SHA"
+
+      - name: Publish GitHub Release (assets = wasm + glue)
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # Idempotent: a re-run on the same commit (same tag) reuses the release.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG exists — uploading/overwriting assets"
+            gh release upload "$TAG" web/src/wasm/wie_web_bg.wasm web/src/wasm/wie_web.js --clobber
+          else
+            gh release create "$TAG" \
+              --title "wie engine $TAG" \
+              --notes "Fresh wie_web WASM (${{ steps.meta.outputs.wie_head }}). Auto-published for otterpebble/featurephone propagation." \
+              web/src/wasm/wie_web_bg.wasm web/src/wasm/wie_web.js
+          fi
+          BASE="${{ github.server_url }}/${{ github.repository }}/releases/download/$TAG"
+          {
+            echo "wasm_url=$BASE/wie_web_bg.wasm"
+            echo "glue_url=$BASE/wie_web.js"
+          } >> "$GITHUB_OUTPUT"
+
+      # Signal otterpebble. Token-gated: skips (dormant) when the secret is absent.
+      - name: Dispatch to otterpebble (repository_dispatch)
+        if: ${{ env.HAS_DISPATCH_TOKEN == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.OTTERPEBBLE_DISPATCH_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          set -euo pipefail
+          payload=$(jq -n \
+            --arg version    "${{ steps.meta.outputs.version }}" \
+            --arg wieHead    "${{ steps.meta.outputs.wie_head }}" \
+            --arg wasmUrl    "${{ steps.release.outputs.wasm_url }}" \
+            --arg glueUrl    "${{ steps.release.outputs.glue_url }}" \
+            --arg wasmSha256 "${{ steps.meta.outputs.wasm_sha }}" \
+            --arg glueSha256 "${{ steps.meta.outputs.glue_sha }}" \
+            '{event_type:"wie-artifact-published",
+              client_payload:{version:$version, wieHead:$wieHead,
+                wasmUrl:$wasmUrl, glueUrl:$glueUrl,
+                wasmSha256:$wasmSha256, glueSha256:$glueSha256,
+                confirmedPlatforms:["KTF","SKT"]}}')
+          echo "$payload" | gh api "repos/$OTTERPEBBLE_REPO/dispatches" --input -
+          echo "::notice title=dispatched::wie-artifact-published → $OTTERPEBBLE_REPO ($TAG)"
+
+      - name: Dispatch skipped (notice)
+        if: ${{ env.HAS_DISPATCH_TOKEN != 'true' }}
+        run: |
+          echo "::notice title=dispatch dormant::OTTERPEBBLE_DISPATCH_TOKEN 미설정 → 릴리스까지 실행, dispatch skip. \
+          otterpebble contents:write PAT 를 이 레포 secret 으로 주입하면 자동 전파 활성."
