@@ -306,9 +306,9 @@ where
     fn colors(&self) -> Vec<Color> {
         let buffer = self.raw();
 
-        buffer
-            .chunks_exact(size_of::<T::DataType>())
-            .map(|chunk| T::to_color(*bytemuck::from_bytes(chunk)))
+        bytemuck::pod_collect_to_vec::<u8, T::DataType>(&buffer)
+            .into_iter()
+            .map(T::to_color)
             .collect()
     }
 }
