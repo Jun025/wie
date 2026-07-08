@@ -21,6 +21,7 @@ impl Font {
                 JavaMethodProto::new("<clinit>", "()V", Self::cl_init, MethodAccessFlags::STATIC),
                 JavaMethodProto::new("<init>", "()V", Self::init, Default::default()),
                 JavaMethodProto::new("getHeight", "()I", Self::get_height, Default::default()),
+                JavaMethodProto::new("getBaselinePosition", "()I", Self::get_baseline_position, Default::default()),
                 JavaMethodProto::new("stringWidth", "(Ljava/lang/String;)I", Self::string_width, Default::default()),
                 JavaMethodProto::new("substringWidth", "(Ljava/lang/String;II)I", Self::substring_width, Default::default()),
                 JavaMethodProto::new("charWidth", "(C)I", Self::char_width, Default::default()),
@@ -82,6 +83,17 @@ impl Font {
         tracing::warn!("stub javax.microedition.lcdui.Font::getHeight");
 
         Ok(12) // TODO: hardcoded
+    }
+
+    // The stub font has no real ascent metric; baseline is derived from getHeight as
+    // height * 4 / 5 (floored). MIDP baseline ≈ ascent, which is most of the font
+    // height minus descent, so 4/5 is a reasoned approximation (e.g. height 12 → 9).
+    async fn get_baseline_position(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::debug!("javax.microedition.lcdui.Font::getBaselinePosition");
+
+        let height: i32 = jvm.invoke_virtual(&this, "getHeight", "()I", ()).await?;
+
+        Ok(height * 4 / 5)
     }
 
     async fn get_default_font(jvm: &Jvm, _: &mut WieJvmContext) -> JvmResult<ClassInstanceRef<Self>> {
@@ -146,5 +158,36 @@ impl Font {
         let string = RustString::from_utf16(&chars).unwrap();
 
         Ok(canvas::string_width(&string, 10.0) as _)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use alloc::boxed::Box;
+
+    use jvm::ClassInstanceRef;
+
+    use test_utils::run_jvm_test;
+    use wie_util::Result;
+
+    use crate::{classes::javax::microedition::lcdui::Font, get_protos};
+
+    #[test]
+    fn test_baseline_position() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            let font: ClassInstanceRef<Font> = jvm
+                .invoke_static("javax/microedition/lcdui/Font", "getDefaultFont", "()Ljavax/microedition/lcdui/Font;", ())
+                .await?;
+
+            let height: i32 = jvm.invoke_virtual(&font, "getHeight", "()I", ()).await?;
+            let baseline: i32 = jvm.invoke_virtual(&font, "getBaselinePosition", "()I", ()).await?;
+
+            // baseline = floor(height * 4 / 5), strictly inside the font box
+            assert_eq!(baseline, height * 4 / 5);
+            assert_eq!(baseline, 9); // stub height 12 → 9
+            assert!(baseline < height);
+
+            Ok(())
+        })
     }
 }
