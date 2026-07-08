@@ -125,6 +125,7 @@ jobs:
         if: ${{ env.HAS_DISPATCH_TOKEN == 'true' }}
         env:
           GH_TOKEN: ${{ secrets.OTTERPEBBLE_DISPATCH_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
         run: |
           set -euo pipefail
           payload=$(jq -n \
