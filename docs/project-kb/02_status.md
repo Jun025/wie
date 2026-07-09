@@ -30,14 +30,19 @@
 - **Web**(`web.yml`): wasm 빌드 + Cloudflare Pages 배포, Pages 프로젝트(`wie-web`) 부재 시 자가 재생성(`pages project create || true`).
 - **Security audit**(`rust-audit.yaml`, 매일): **red** — 취약 3건: `quick-xml` 0.39.2 (RUSTSEC-2026-0194·0195, XML DoS — ≥0.41.0 필요) · `crossbeam-epoch` 0.9.18 (RUSTSEC-2026-0204 — ≥0.9.20). 경고: `ttf-parser` unmaintained · `anyhow` <1.0.103 unsound · `memmap2` <0.9.11 unsound. 부가로 audit 액션의 이슈 생성 권한 부족(workflow permissions) — 알림 경로도 손봐야 함.
 
-## 지원 플랫폼 실상
+## 두 트랙 — 엔진 정상화 현황
 
-- **회귀 베이스라인**(`scripts/smoke_gate_baseline.tsv`): **261 타이틀 부팅+렌더 PASS — KTF 190 / LGT 52 / SKT 19**(2회 독립 전수 실행 검증, 게임파일 미포함·식별자만). 게이트는 부팅+렌더만 판정(입력 생존은 비게이팅 어드바이저리).
-- dispatch 의 `confirmedPlatforms` 는 **KTF·SKT** — LGT 는 상당수 부팅되나 아직 "확정" 아님(ABI RE 진행 중: `docs/lgt_abi.md`·`docs/lgt.md`). J2ME 는 웹 로더 폴백으로 지원.
-- 최근 흐름(git log): WIPI-Java/MIDP 메서드 보강·RustJava 포크 핀 상승·결정적 실행기(BTreeMap 폴링)로 타이틀 복구가 주 리듬(232→261).
+**트랙 ① 타이틀 회수(모드 A — 자율주행 진행 중)**
+- **회귀 베이스라인**(`scripts/smoke_gate_baseline.tsv`): **261 타이틀 부팅+렌더 PASS — KTF 190 / LGT 52 / SKT 19**(2-run 교집합 검증, 게임파일 미포함·식별자만). 게이트는 부팅+렌더만 판정(입력 생존은 비게이팅 어드바이저리). 구 스냅샷(2026-07-02) 202 대비 **+59**.
+- 최근 리듬(git log): WIPI-Java/MIDP 메서드 보강 · RustJava 포크 핀 상승(트랙2 클러스터 다수 귀속: readUnsignedByte·TimeZone·Byte 등) · 결정적 실행기(BTreeMap 폴링·스레드 스케줄링 = 구 트랙1 반영)로 232→261.
+- dispatch 의 `confirmedPlatforms` 는 **KTF·SKT** — LGT 는 clet 52종이 부팅+렌더하나 아직 "확정" 승격 전. J2ME 는 웹 로더 폴백 지원.
+
+**트랙 ② §7 벽 — LGT AOT-Java 렌더(모드 B — 외부 산출물 대기)**
+- LGT AOT-Java 24종은 렌더 0 유지. 바이너리-측 조사는 cp59 로 완결: per-frame 구동은 TIMER_EVENT(21) 모델로 확정(구현 가능), 유일 블로커는 **0x64 ordinal→native 등록표**. 오프라인 획득 소진 증명(AromaWIPI 비공번호 — `docs/reference/lgt_0x64_ordinal_table.md`) → **실기 트레이스 필요**. 도착 시 4단계 즉시 활성화 스캐폴드 커밋됨(기본 비활성·회귀 0). 요약: `10_deep-assets.md`, 원문: `docs/lgt_abi.md` §7·§8.
 
 ## 로드맵 위치 · 잔여
 
 1. **dispatch PAT 권한 수정**(사람 1스텝, 위) → 자동 전파 완전 라이브.
 2. **security audit red 해소** — quick-xml ≥0.41 / crossbeam-epoch ≥0.9.20 업그레이드 + audit 워크플로 이슈 권한.
-3. 타이틀 복구 지속(261+) · LGT 확정 승격 · 플레이키 타이틀(입력 타이밍) 분류.
+3. 트랙 ① 지속(261+) · LGT clet 확정 승격 · 플레이키 타이틀(입력 타이밍) 분류.
+4. 트랙 ② 는 실기 트레이스 확보(사람/외부) 전까지 동결 — 재조사 금지 목록 준수(`10_deep-assets.md` 가드레일).

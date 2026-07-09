@@ -1,6 +1,6 @@
 # wie — Claude Project 기본지식 인덱스 (00_INDEX)
 
-> **최종 갱신** 2026-07-09 · **갱신 주체** Claude Code (wie 레포 세션)
+> **최종 갱신** 2026-07-09 (구 2026-07-02 Project 지식의 깊은 자산[§7·가드레일·용어집·모드 A/B]을 `10_deep-assets.md` 로 승계 통합) · **갱신 주체** Claude Code (wie 레포 세션)
 > **이 폴더의 정체** `docs/project-kb/` = **wie 엔진 레포의 외부 Claude Project(선택적 조언자)에 주입하는 기획-계층 요약본**.
 > 원본(SoT)이 아니다. 원본은 이 레포의 `AGENTS.md` · `CLAUDE.md` · `README.md` · `docs/` · `.github/workflows/` 다.
 > otterpebble admin `/kb` 가 이 폴더를 GitHub API 로 온디맨드 조회해 다운로드만 제공한다(복제 없음).
@@ -23,8 +23,9 @@
 |---|---|---|
 | `00_INDEX.md` | 본 인덱스 · 골든룰 | 파일이 늘 때 |
 | `01_brief.md` | wie 가 무엇인가 · 연방 내 역할 · featurephone 공급 관계 · 기획 맥락 | 방향 바뀔 때 |
-| `02_status.md` | **현재 상태** — 자동발행 파이프라인 · 엔진 웹 계약 · CI · 지원 플랫폼 · 잔여 | 매 작업 세션 |
-| `90_project-setup.md` | 이 레포용 외부 Project 세팅 권장안(이름·설명·지침 — admin /kb 렌더) | 역할 모델 바뀔 때 |
+| `02_status.md` | **현재 상태** — 자동발행 파이프라인 · 엔진 웹 계약 · CI · 두 트랙(타이틀 회수·§7) · 잔여 | 매 작업 세션 |
+| `10_deep-assets.md` | 고유 기술자산 요약 — §7 벽(LGT AOT-Java) · 가드레일 · 용어집 (원문: docs/lgt_abi.md 등) | §7 국면 바뀔 때 |
+| `90_project-setup.md` | 이 레포용 외부 Project 세팅 권장안(이름·설명·지침 — admin /kb 렌더) · 모드 A/B 규약 | 역할 모델 바뀔 때 |
 
 > 신규 KB 파일 명명 규칙: `NN_주제.md`(두 자리 접두). 새 파일을 만들면 위 표에 한 줄 추가 — admin /kb 는 폴더를 자동 스캔하므로 커밋 즉시 반영된다.
 
