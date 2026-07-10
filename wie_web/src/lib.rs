@@ -52,6 +52,9 @@ pub struct WieEmulator {
     fs_store: FsStore,
     db_store: DbStore,
     redraw: RedrawFlag,
+    // Sticky clean-exit flag, set by `WebPlatform::exit` when the core requests
+    // a normal shutdown (the "[wie] emulator requested exit" path).
+    exited: Arc<AtomicBool>,
     platform_kind: &'static str,
 }
 
@@ -104,6 +107,7 @@ impl WieEmulator {
         // Start "true" so the very first composed frame is shown even if a title
         // somehow paints before its first request_redraw.
         let redraw: RedrawFlag = Arc::new(AtomicBool::new(true));
+        let exited: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 
         let platform = Box::new(WebPlatform::new(
             WebScreen::new(ctx, back_canvas, back_ctx, width, height, redraw.clone()),
@@ -111,6 +115,7 @@ impl WieEmulator {
             WebDatabaseRepository::new(db_store.clone()),
             audio_ctx,
             gain,
+            exited.clone(),
         ));
 
         let options = Options {
@@ -125,6 +130,7 @@ impl WieEmulator {
             fs_store,
             db_store,
             redraw,
+            exited,
             platform_kind,
         })
     }
@@ -141,12 +147,31 @@ impl WieEmulator {
     /// core asked for it via `Screen::request_redraw` — i.e. after it finished a
     /// frame. Forcing a redraw every animation frame could blit a half-composed
     /// framebuffer and made some titles flicker.
+    ///
+    /// Once [`has_exited`](Self::has_exited) is true this is a safe no-op that
+    /// returns `Ok(())` — the core is never advanced past its requested exit, so
+    /// a render loop that keeps firing before JS observes the flag cannot crash.
     pub fn tick(&mut self) -> Result<(), JsValue> {
+        if self.exited.load(Ordering::Acquire) {
+            return Ok(());
+        }
         self.inner.tick().map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
         if self.redraw.swap(false, Ordering::AcqRel) {
             self.inner.handle_event(Event::Redraw);
         }
         Ok(())
+    }
+
+    /// True once the emulator core requested a NORMAL shutdown (the
+    /// "[wie] emulator requested exit" path, e.g. WIPI `MC_knlExit`). Sticky:
+    /// once true it stays true for the lifetime of this instance.
+    ///
+    /// This is how JS distinguishes a clean exit (flag flips true, `tick` keeps
+    /// resolving as a no-op) from a failure (`tick` throws). Save state remains
+    /// readable after the flip — poll this after each `tick` and, when true,
+    /// persist via `export_saves` before tearing the instance down.
+    pub fn has_exited(&self) -> bool {
+        self.exited.load(Ordering::Acquire)
     }
 
     pub fn key_down(&mut self, code: &str) {

@@ -1,4 +1,6 @@
 use alloc::boxed::Box;
+use alloc::sync::Arc;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use js_sys::{Function, Reflect};
 use wasm_bindgen::{JsCast, JsValue};
@@ -24,6 +26,9 @@ pub struct WebPlatform {
     // JS-owned master gain node (output = gain → destination). Audio is routed
     // through it so the UI volume slider is the single source of truth.
     gain: Option<GainNode>,
+    // Sticky clean-exit flag shared with `WieEmulator::has_exited`: set once when
+    // the core requests a normal shutdown, never cleared for this instance.
+    exited: Arc<AtomicBool>,
 }
 
 // Single-threaded browser runtime; the only non-Send field is the JS audio
@@ -38,6 +43,7 @@ impl WebPlatform {
         database_repository: WebDatabaseRepository,
         audio_ctx: Option<AudioContext>,
         gain: Option<GainNode>,
+        exited: Arc<AtomicBool>,
     ) -> Self {
         Self {
             screen,
@@ -45,6 +51,7 @@ impl WebPlatform {
             database_repository,
             audio_ctx,
             gain,
+            exited,
         }
     }
 }
@@ -80,6 +87,7 @@ impl Platform for WebPlatform {
 
     fn exit(&self) {
         web_sys::console::log_1(&"[wie] emulator requested exit".into());
+        self.exited.store(true, Ordering::Release);
     }
 
     fn vibrate(&self, duration_ms: u64, _intensity: u8) {
