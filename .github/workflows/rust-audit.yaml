@@ -2,6 +2,11 @@ name: Security audit
 on:
   schedule:
     - cron: "0 0 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+  checks: write
 jobs:
   audit:
     runs-on: ubuntu-latest
@@ -31,3 +36,10 @@ jobs:
       - uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          # RUSTSEC-2026-0194/0195 (quick-xml XML DoS): patched only in >=0.41.0, but our sole
+          # consumer wayland-scanner (latest 0.31.10) still requires ^0.39, so no compatible
+          # upgrade exists. quick-xml runs exclusively at build time inside the wayland-scanner
+          # proc-macro, parsing vendored trusted Wayland protocol XML — attacker-controlled XML
+          # never reaches it. Remove once wayland-scanner bumps to quick-xml >=0.41.
+          # Tracked as PENDING in docs/project-kb/02_status.md.
+          ignore: RUSTSEC-2026-0194,RUSTSEC-2026-0195
