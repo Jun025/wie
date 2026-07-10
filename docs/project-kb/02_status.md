@@ -1,6 +1,6 @@
 # wie 현재 상태 (02_status)
 
-> **기준일 2026-07-09** · 레포 실측 기반(워크플로 실행 로그·커밋·베이스라인). 이 파일이 KB 의 최신 현황이다 — 매 작업 세션(main 반영) 시 재생성.
+> **기준일 2026-07-10** · 레포 실측 기반(워크플로 실행 로그·커밋·베이스라인). 이 파일이 KB 의 최신 현황이다 — 매 작업 세션(main 반영) 시 재생성.
 
 ## 자동발행 파이프라인 (연방 ① 발신부) — 빌드·릴리스 라이브, dispatch 만 권한 이슈
 
@@ -28,7 +28,7 @@
 - **Rust CI**(`rust.yml`): 3-OS 매트릭스, `fmt --check` + `clippy -D warnings`(wasm32 타깃 포함) + 전체 테스트 — **green**(clippy red 해소됨).
 - **coverage**(`coverage.yml`): `CODECOV_TOKEN` 없으면 업로드만 skip(fork-safe) — green.
 - **Web**(`web.yml`): wasm 빌드 + Cloudflare Pages 배포, Pages 프로젝트(`wie-web`) 부재 시 자가 재생성(`pages project create || true`).
-- **Security audit**(`rust-audit.yaml`, 매일): **red** — 취약 3건: `quick-xml` 0.39.2 (RUSTSEC-2026-0194·0195, XML DoS — ≥0.41.0 필요) · `crossbeam-epoch` 0.9.18 (RUSTSEC-2026-0204 — ≥0.9.20). 경고: `ttf-parser` unmaintained · `anyhow` <1.0.103 unsound · `memmap2` <0.9.11 unsound. 부가로 audit 액션의 이슈 생성 권한 부족(workflow permissions) — 알림 경로도 손봐야 함.
+- **Security audit**(`rust-audit.yaml`, 매일 + `workflow_dispatch`): **green**(2026-07-10 해소) — `crossbeam-epoch` 0.9.18→**0.9.20**(RUSTSEC-2026-0204) · `anyhow` 1.0.102→**1.0.103**(unsound) · `memmap2` 0.9.10→**0.9.11**(unsound) 은 lockfile 패치 상향으로 제거(호출부 무수정 — 전부 semver-호환 패치 라인). 워크플로에 `permissions: issues/checks: write` 추가로 이슈 생성 권한 복구. **PENDING 2건**: ① `quick-xml` 0.39.2(RUSTSEC-2026-0194·0195, XML DoS) — 패치는 0.41.0에만 존재하나 유일 소비자 `wayland-scanner`(최신 0.31.10)가 `^0.39` 요구로 상위 차단. 빌드타임 proc-macro 가 vendored 신뢰 XML 만 파싱해 공격면 없음 — 근거 명시 후 workflow `ignore` 처리, wayland-scanner 가 ≥0.41 채택 시 ignore 제거. ② `ttf-parser` 0.25.1 unmaintained(RUSTSEC-2026-0192, patched 버전 없음) — 대안 skrifa 이행은 `ab_glyph`(최신 0.2.32도 ttf-parser 의존) 교체가 선행돼야 해 보류. 경고는 audit 비게이팅.
 
 ## 두 트랙 — 엔진 정상화 현황
 
@@ -43,6 +43,6 @@
 ## 로드맵 위치 · 잔여
 
 1. **dispatch PAT 권한 수정**(사람 1스텝, 위) → 자동 전파 완전 라이브.
-2. **security audit red 해소** — quick-xml ≥0.41 / crossbeam-epoch ≥0.9.20 업그레이드 + audit 워크플로 이슈 권한.
+2. ~~security audit red 해소~~ — **완료(2026-07-10)**. 잔여 PENDING(quick-xml 상위 차단·ttf-parser unmaintained)은 CI 현황 참조. ※ 이번 세션은 game_lab 코퍼스 부재(BYOF)로 smoke_gate 미실행 — 의존성 패치 상향 3건뿐이라 전체 테스트 + 3-OS CI 로 회귀 검증, 코퍼스 복귀 시 261 베이스라인 1회 재확인 권장.
 3. 트랙 ① 지속(261+) · LGT clet 확정 승격 · 플레이키 타이틀(입력 타이밍) 분류.
 4. 트랙 ② 는 실기 트레이스 확보(사람/외부) 전까지 동결 — 재조사 금지 목록 준수(`10_deep-assets.md` 가드레일).
