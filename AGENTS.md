@@ -11,7 +11,7 @@
 ## Git Workflow
 - **Run every task to completion**: branch → commit → PR → merge into `main`. Do not stop at "changes made" — land it on `main` unless genuinely blocked.
 - **Never commit directly to `main`**: always work on a short-lived branch.
-- **Clean up merged branches (MANDATORY)**: once a branch is merged into `main`, delete it — remote and local — and sync local `main`. Prefer `gh pr merge --delete-branch`; then `git branch -d <branch>` locally and `git fetch --prune`. Leave no stale merged branches behind.
+- **Clean up merged branches (MANDATORY)**: once a branch's work is complete and merged into `main`, delete it — remote and local — and sync local `main`. Prefer `gh pr merge --delete-branch` (deletes the remote), then locally `git branch -D <branch>` and `git fetch --prune`. Use `-D` (force) because squash-merged branches aren't recognized as merged by `-d`. Leave no stale merged branches behind — only `main` and in-progress work remain. Never re-merge or re-PR an already-merged branch.
 - **GitHub CLI**: scope `gh` commands with `-R Jun025/wie`.
 - **Commit trailer**: end commit messages with the `Co-Authored-By:` trailer.
 
