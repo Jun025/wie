@@ -37,6 +37,13 @@ function loadKeyset(): Keyset {
   return v === 2 ? 2 : v === 3 ? 3 : 1;
 }
 
+// Hard ceiling on how long the player waits for a game to boot before it gives
+// up and shows the error/restart panel. Covers wasm-fetch stalls and hung loads
+// so "loading" can never persist indefinitely. (A synchronous infinite loop
+// inside wasm construction can't be interrupted from JS — that's a separate,
+// title-level render-wall issue, not a boot hang.)
+const BOOT_TIMEOUT_MS = 20_000;
+
 // Per-mode sizing for the control blocks below the display.
 //   1 = balanced · 2 = joystick emphasized · 3 = numpad emphasized
 //   joy = joystick pad · ok = CLR/OK column button · num/ngrid = numpad
@@ -64,6 +71,7 @@ export function Player({ game, user, onExit, onMenu, toast, onReportCrash }: Pro
   // player, so the game keeps running.
   useEffect(() => {
     let cancelled = false;
+    let settled = false; // boot has reached running/error/timeout — ignore later transitions
     setStatus("loading");
     setError(null);
     const session = new EmulatorSession();
@@ -81,6 +89,23 @@ export function Player({ game, user, onExit, onMenu, toast, onReportCrash }: Pro
     setVolume(session.getVolume());
     setMuted(session.isMuted());
 
+    // Boot watchdog: if start() never resolves (e.g. the wasm binary stalls on a
+    // slow/failed network, or a title's async load hangs), the player would sit
+    // in "loading" forever with no feedback and no way out. Force a transition to
+    // the error state so the "다시 시작 / 나가기" panel always appears.
+    const watchdog = window.setTimeout(() => {
+      if (cancelled || settled) return;
+      settled = true;
+      session.stop();
+      setError({
+        message: "게임이 제한 시간 안에 시작되지 않았습니다. 다시 시작하거나 다른 브라우저·기기에서 시도해 보세요.",
+        name: "BootTimeout",
+        phase: "load",
+        platformKind: session.platformKind() ?? undefined,
+      });
+      setStatus("error");
+    }, BOOT_TIMEOUT_MS);
+
     (async () => {
       // Reuse the single app-wide AudioContext that the global unlock listener
       // created+resumed synchronously inside the launch tap (iOS WebKit only
@@ -94,21 +119,30 @@ export function Player({ game, user, onExit, onMenu, toast, onReportCrash }: Pro
       if (!canvas || cancelled) return;
       try {
         await session.start(game, canvas, audioCtx, { syncToServer: !!user, deviceLabel: deviceName() });
-        if (!cancelled) {
-          setStatus("running");
-          // Diagnostic for headless/console verification of the unlock path.
-          console.info("[wie audio]", audioState());
+        // The watchdog may have already timed us out (or the effect was torn
+        // down) while start() was in flight — start() arms the run loop right
+        // before resolving, so stop it or it runs on behind the error panel.
+        if (cancelled || settled) {
+          session.stop();
+          return;
         }
+        settled = true;
+        window.clearTimeout(watchdog);
+        setStatus("running");
+        // Diagnostic for headless/console verification of the unlock path.
+        console.info("[wie audio]", audioState());
       } catch (e) {
-        if (!cancelled) {
-          setError(normalizeError(e, "load", session.platformKind() ?? undefined));
-          setStatus("error");
-        }
+        if (cancelled || settled) return;
+        settled = true;
+        window.clearTimeout(watchdog);
+        setError(normalizeError(e, "load", session.platformKind() ?? undefined));
+        setStatus("error");
       }
     })();
 
     return () => {
       cancelled = true;
+      window.clearTimeout(watchdog);
       void session.persist();
       session.stop();
     };
@@ -207,6 +241,21 @@ export function Player({ game, user, onExit, onMenu, toast, onReportCrash }: Pro
   return (
     <section className="fixed inset-0 z-20 flex flex-col overflow-y-auto overscroll-contain bg-surface">
       {error && <ErrorPanel error={error} onRestart={restart} onExit={onExit} onReport={() => void reportCrash(error)} toast={toast} />}
+
+      {/* Loading feedback: without it, a booting game shows only a blank canvas —
+          indistinguishable from a frozen/running one — so a slow boot reads as a
+          hang. Clears the moment status flips to "running" (or an error panel
+          replaces it). The watchdog above guarantees it can't linger forever. */}
+      {status === "loading" && !error && (
+        <div
+          className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-surface/70 backdrop-blur-sm"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="h-8 w-8 animate-spin rounded-full border-2 border-edge border-t-accent" aria-hidden="true" />
+          <p className="text-sm text-fg-dim">게임을 불러오는 중…</p>
+        </div>
+      )}
 
       {/* display + side rails (no bottom bar; no top header). flex-1 so the canvas
           fills the available vertical space; gap-1 trims the side margins.

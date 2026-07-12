@@ -15,7 +15,15 @@ const SCREEN_H = 320;
 
 let initPromise: Promise<unknown> | null = null;
 function ensureInit(): Promise<unknown> {
-  if (!initPromise) initPromise = init();
+  if (!initPromise) {
+    // Reset the memo if the wasm fetch/instantiate fails, so a later retry
+    // (game restart) re-attempts init instead of forever awaiting a dead,
+    // permanently-rejected promise — which would leave the player stuck.
+    initPromise = init().catch((e) => {
+      initPromise = null;
+      throw e;
+    });
+  }
   return initPromise;
 }
 
