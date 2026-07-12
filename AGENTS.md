@@ -8,6 +8,13 @@
 - **Format**: `cargo fmt` (uses rustfmt.toml: max_width=150, use_field_init_shorthand=true)
 - **Pre-commit (MANDATORY)**: Always run `cargo fmt` and `cargo clippy --workspace` before every commit. CI will reject unformatted or lint-failing code.
 
+## Git Workflow
+- **Run every task to completion**: branch → commit → PR → merge into `main`. Do not stop at "changes made" — land it on `main` unless genuinely blocked.
+- **Never commit directly to `main`**: always work on a short-lived branch.
+- **Clean up merged branches (MANDATORY)**: once a branch is merged into `main`, delete it — remote and local — and sync local `main`. Prefer `gh pr merge --delete-branch`; then `git branch -d <branch>` locally and `git fetch --prune`. Leave no stale merged branches behind.
+- **GitHub CLI**: scope `gh` commands with `-R Jun025/wie`.
+- **Commit trailer**: end commit messages with the `Co-Authored-By:` trailer.
+
 ## Code Style Guidelines
 - **Edition**: Rust 2024
 - **no_std**: Most crates are `#![no_std]` with `extern crate alloc`

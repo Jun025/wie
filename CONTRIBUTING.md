@@ -12,6 +12,11 @@
 
 Web interface is on the private repository and occasionally built with wie's main branch.
 
+## Git Workflow
+
+- Work on a short-lived branch, open a PR, and merge into `main` — never commit directly to `main`.
+- **Branch hygiene**: once a branch is merged, delete it (remote + local) and prune. Merged branches are not kept around; `main` and open work are the only branches that should linger.
+
 ## References
 
 - WIPI Java API 1.1.1: https://nikita36078.github.io/J2ME_Docs/docs/WIPI_API_1_1_1
