@@ -15,7 +15,7 @@ Web interface is on the private repository and occasionally built with wie's mai
 ## Git Workflow
 
 - Work on a short-lived branch, open a PR, and merge into `main` — never commit directly to `main`.
-- **Branch hygiene**: once a branch is merged, delete it (remote + local) and prune. Merged branches are not kept around; `main` and open work are the only branches that should linger.
+- **Branch hygiene**: once a branch is merged, delete it — remote (`gh pr merge --delete-branch`) and local (`git branch -D <branch>`; force `-D` because squash-merged branches aren't recognized as merged by `-d`) — and `git fetch --prune`. Merged branches are not kept around; `main` and open work are the only branches that should linger. Never re-merge or re-PR an already-merged branch.
 
 ## References
 
