@@ -114,7 +114,16 @@ export function Player({ game, user, onExit, onMenu, toast, onReportCrash }: Pro
       // one if it already exists.
       unlockAudio();
       const audioCtx = getAudioContext();
-      await new Promise((r) => requestAnimationFrame(r));
+      // Double rAF, not single: session.start() runs `new WieEmulator(...)`
+      // fully synchronously — a 2.6MB archive parse + core init that blocks the
+      // main thread for a noticeable beat. A single rAF resolves in the callback
+      // that fires BEFORE this frame's paint, so its continuation (the blocking
+      // construction) starves the "게임을 불러오는 중…" spinner and it never
+      // appears — the game looks dead-black until it either boots or hangs.
+      // Scheduling a second rAF inside the first defers the resolve until after
+      // that paint has flushed, guaranteeing the loading overlay is on screen
+      // before the thread is seized.
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(undefined))));
       const canvas = canvasRef.current;
       if (!canvas || cancelled) return;
       try {
