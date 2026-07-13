@@ -43,10 +43,16 @@
 **트랙 ② §7 벽 — LGT AOT-Java 렌더(모드 B — 외부 산출물 대기)**
 - LGT AOT-Java 24종은 렌더 0 유지. 바이너리-측 조사는 cp59 로 완결: per-frame 구동은 TIMER_EVENT(21) 모델로 확정(구현 가능), 유일 블로커는 **0x64 ordinal→native 등록표**. 오프라인 획득 소진 증명(AromaWIPI 비공번호 — `docs/reference/lgt_0x64_ordinal_table.md`) → **실기 트레이스 필요**. 도착 시 4단계 즉시 활성화 스캐폴드 커밋됨(기본 비활성·회귀 0). 요약: `10_deep-assets.md`, 원문: `docs/lgt_abi.md` §7·§8.
 
+**LGT confirmed 승격 선결조건 = AOT-Java graceful 제외 신호 (2026-07-13 조사, 미구현)**
+- **Q1 실패모드 실측**(배틀몬스터 2빌드, wie_validate=웹과 동일 `LgtEmulator::from_archive` 경로): 진짜 AOT-Java 는 **silent blank(throw 없음)** — paints=1·content=false·max_ticks(5천만) 완주, `run_err` 미발생(reason="only blank/uniform frames"). 부팅은 성공(`registered 20 app classes` + import table `0x64` 다수)하나 §7 렌더 드라이버 부재로 조용히 검은화면. **최악 케이스**: 셸의 현행 실패감지(tick() throw / has_exited)로 감지 불가. ※ 대조: broken/lgt 의 clet 미완성분(영웅서기4=WIPIC SVC 111, 붉은보석=stdlib 0x3f7)은 **throw** 하고, 제노니아2 는 이제 PASS — 즉 broken 폴더는 AOT 전용 아님, 실패모드는 서브셋별로 갈림.
+- **Q2 판별 신호 가용성**: clet↔AOT 구분은 컨테이너/파일명으론 불가(양쪽 다 jar 안 `binary.mod` + `app_info`, MClass 필드는 대부분 공란이라 비신뢰). **판별점 2개 실재**: ⓐ **정적(로드 전)** — `binary.mod` ELF import thunk 의 `0x64`(Java-interface) 참조 유무. deep-assets 가 16바이트 thunk 패턴으로 24/102 정적 특정 완료해 **로드 전 파일 바이트만으로 판별 가능** 실증됨. ⓑ **부팅 극초기(첫 tick 전, `load_native` 내)** — `register_app_classes` 반환 non-empty(AOT 는 `.data` 에 class descriptor, clet 은 없음) + 첫 import table `0x64`(AOT) vs `0x1fb`(WIPI-C clet). 현 로더는 `loadable_archive`(app_info 존재)·`loadable_jar`(binary.mod 존재)로 **LGT 판정만** 하고 컴파일모델은 표면에 미노출 — `platform_kind()="LGT"` 한 단계 아래 정보는 내부에 존재하나 셸이 못 봄.
+- **최소 additive 제안(구현 금지·형태만)**: `platform_kind()` 무변경 유지 + ▸옵션1(선호, 정적) 별도 판별 getter 예 `lgt_compile_model() -> "clet"|"aot-java"` — 로더가 binary.mod 의 0x64 thunk 정적 스캔(추출기 기존)으로 셋, 셸이 "aot-java"면 사전 "미지원 서브셋" 안내 후 제외. ▸옵션2(로드실패 명시화) AOT 감지 시(class descriptor non-empty && 렌더드라이버 부재) 로드 단계에서 명시적 `WieError` 반환해 현행 silent-blank 를 explicit-throw 로 승격 — 단 런타임 동작 변경이라 계약·회귀 검토 필요. 둘 다 기존 표면 무변경 후방호환.
+- **승격 안전성 판정**: Q1(AOT=silent blank, 감지불가) + Q2(판별신호 명확히 가용) 종합 → **"명시적 caveat + graceful 제외 신호 선행 필요"**. 신호는 구현 가능하나 현재 미노출이므로, 노출 전까지 **LGT 일괄 confirmed 승격 유보 권고**. 위 additive 신호를 노출하고 셸이 AOT 서브셋을 사전 제외하면 승격 안전(그때 clet 서브셋만 confirmedPlatforms 승격). ※ 본 조사는 탐지/분류 국한 — §7 렌더 미시도, 엔진/계약 무변경(wie_validate sha 동일), 동결 목록 미접촉.
+
 ## 로드맵 위치 · 잔여
 
 1. ~~dispatch PAT 권한 수정~~ — **완료(2026-07-10 확인)**: d7b5b024 발행 런 dispatch success, 자동 전파 완전 라이브.
 2. ~~security audit red 해소~~ — **완료(2026-07-10)**. 잔여 PENDING(quick-xml 상위 차단·ttf-parser unmaintained)은 CI 현황 참조. ~~코퍼스 복귀 시 261 재확인 권장~~ → **소급 확정 완료(2026-07-10, 트랙① 참조)**.
-3. 트랙 ① 지속(261+) · LGT clet 확정 승격 · 플레이키 타이틀(입력 타이밍) 분류.
+3. 트랙 ① 지속(292+) · **LGT clet 확정 승격은 AOT-Java graceful 제외 신호 선행 필요**(트랙② 하단 조사 참조 — Q1 silent blank·Q2 판별신호 가용, 유보 권고) · 플레이키 타이틀(입력 타이밍) 분류.
 4. 트랙 ② 는 실기 트레이스 확보(사람/외부) 전까지 동결 — 재조사 금지 목록 준수(`10_deep-assets.md` 가드레일).
 5. **[미래 트랙 — 착수 아님] ab_glyph→skrifa 폰트스택 이행**: `ttf-parser` RUSTSEC-2026-0192(unmaintained) 해소의 선행요건. `ab_glyph` 가 최신(0.2.32)까지 ttf-parser 에 의존하므로 폰트 렌더 스택 자체를 skrifa 계열로 교체해야 경고가 사라진다. 지금 구현 착수 금지 — 매일 audit 의 비게이팅 경고를 이 항목으로 추적(ab_glyph 의 탈-ttf-parser 릴리스 또는 skrifa 직접 이행 타당성 재평가 시 활성화).
