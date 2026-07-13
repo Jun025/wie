@@ -1,8 +1,5 @@
 # smoke_gate baseline — titles expected to boot + render real content.
 # Identifiers + expected status only; NO game files. Regenerate: UPDATE_BASELINE=1.
-# 261 titles (ktf 190 / lgt 52 / skt 19), each PASSed boot+render in two independent
-# full runs. Excluded: deterministic fails and ~50%-flaky titles (e.g. 추억의달고나 —
-# game paint() NPE ~half the runs; lgt/하이브리드 — blank/black).
 ktf/(KTF) 건담시드.zip	PASS
 ktf/(KTF) 데몬헌터.zip	PASS
 ktf/(KTF) 마이프린세스2.zip	PASS
@@ -245,22 +242,53 @@ lgt/테일즈위버 이스핀편.zip	PASS
 lgt/판타지포에버3.zip	PASS
 lgt/하얀섬.zip	PASS
 lgt/하이브리드2.zip	PASS
+skt/(SKT) 교실이데아.zip	PASS
+skt/(SKT) 테일즈판타지 SKVM.zip	PASS
+skt/(SKT)메이플스토리-궁수편.zip	PASS
+skt/(SKT)메이플스토리-법사편.zip	PASS
+skt/(SKT)메이플스토리-전사편.zip	PASS
+skt/(SKT)아슬아슬타워쿤.zip	PASS
+skt/(SKT)웰루시아.zip	PASS
+skt/[SKVM]얼라이브.zip	PASS
+skt/3523930101-고래사냥2.zip	PASS
 skt/Chaos블레이드.zip	PASS
+skt/skt 노리타이쿤.zip	PASS
+skt/skt 더팜1.zip	PASS
 skt/강호동맞고2.zip	PASS
 skt/나이트메이커.zip	PASS
 skt/노리맥스영웅전.zip	PASS
 skt/노리타이쿤.zip	PASS
+skt/당골왕.zip	PASS
+skt/당신은골프왕.zip	PASS
 skt/대해적시대.zip	PASS
 skt/더팜1.zip	PASS
 skt/더팜2.zip	PASS
 skt/드래곤나이트EX.zip	PASS
+skt/러브다이어리.zip	PASS
+skt/로디아전기.zip	PASS
 skt/로맨스소드.zip	PASS
+skt/매지컬프린세스.zip	PASS
 skt/미니동화TING.zip	PASS
+skt/부루마블2005.zip	PASS
 skt/사고뭉치트윈스.zip	PASS
+skt/삼국쟁패 패왕전기.zip	PASS
+skt/삼국쟁패2열왕전기.zip	PASS
 skt/삼국지연의2.zip	PASS
+skt/생과일타이쿤2.zip	PASS
 skt/생존일기.zip	PASS
+skt/신시티.zip	PASS
+skt/어스토니시아ep1.zip	PASS
+skt/에이지오브엠파이어2.zip	PASS
+skt/영웅모바일귀령천마 skt.zip	PASS
+skt/영웅서기-추가다운완료.zip	PASS
+skt/영웅서기2.zip	PASS
+skt/우뇌♥트레이닝 .zip	PASS
 skt/웰루시아.zip	PASS
+skt/이터널사가.zip	PASS
+skt/카트라이더-그랑프리.zip	PASS
+skt/컴투스프로야구2SKT.zip	PASS
 skt/크리스탈보더.zip	PASS
+skt/킹덤언더파이어.zip	PASS
 skt/프리스톤테일(3500406052).zip	PASS
 skt/프린세스메이커4_작은화면.zip	PASS
 skt/프린세스메이커4_큰화면.zip	PASS
