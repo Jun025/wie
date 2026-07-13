@@ -29,7 +29,7 @@ use web_sys::{AudioContext, GainNode, HtmlCanvasElement};
 use wie_backend::{Emulator, Event, KeyCode, Options, extract_zip};
 use wie_j2me::J2MEEmulator;
 use wie_ktf::KtfEmulator;
-use wie_lgt::LgtEmulator;
+use wie_lgt::{LgtEmulator, detect_compile_model};
 use wie_skt::SktEmulator;
 
 use crate::database::{DbStore, WebDatabaseRepository};
@@ -56,6 +56,9 @@ pub struct WieEmulator {
     // a normal shutdown (the "[wie] emulator requested exit" path).
     exited: Arc<AtomicBool>,
     platform_kind: &'static str,
+    // For LGT titles, the statically-detected compile model ("clet"/"aot-java");
+    // `None` for non-LGT platforms. Set once at construction, never changes.
+    lgt_compile_model: Option<&'static str>,
 }
 
 #[wasm_bindgen]
@@ -123,7 +126,7 @@ impl WieEmulator {
             profile: None,
         };
 
-        let (inner, platform_kind) = build_emulator(platform, filename, data, options).map_err(|e| JsValue::from_str(&e))?;
+        let (inner, platform_kind, lgt_compile_model) = build_emulator(platform, filename, data, options).map_err(|e| JsValue::from_str(&e))?;
 
         Ok(WieEmulator {
             inner,
@@ -132,6 +135,7 @@ impl WieEmulator {
             redraw,
             exited,
             platform_kind,
+            lgt_compile_model,
         })
     }
 
@@ -139,6 +143,21 @@ impl WieEmulator {
     /// label for error diagnostics only — NOT game-file identity, never sent out.
     pub fn platform_kind(&self) -> String {
         self.platform_kind.to_owned()
+    }
+
+    /// For an LGT title, the statically-detected compile model — `"clet"`
+    /// (WIPI-C, wie renders it) or `"aot-java"` (AOT-compiled Java, boots but
+    /// does not yet render — the §7 wall). Returns `null` for every non-LGT
+    /// platform (KTF / SKT / J2ME), where the notion does not apply.
+    ///
+    /// Detected once at construction from the app's own import thunks (read-only,
+    /// no execution) and never changes for this instance. Because it is set in
+    /// the constructor it is valid immediately — a shell can call it right after
+    /// `new WieEmulator(...)` succeeds, before the first `tick()`, to decide
+    /// whether to run the title. Recommended use: block `"aot-java"` at upload
+    /// with a "not yet supported" notice and run only `"clet"`.
+    pub fn lgt_compile_model(&self) -> Option<String> {
+        self.lgt_compile_model.map(str::to_owned)
     }
 
     /// Advance the emulator one tick. Call this from `requestAnimationFrame`.
@@ -343,10 +362,18 @@ fn parse_saves(
     Some((dbs, files))
 }
 
-// Returns the loaded emulator plus the detected platform kind ("KTF"/"LGT"/
-// "SKT"/"J2ME"). The kind is a backend/runtime label (NOT game-file identity);
-// it is surfaced only in on-screen error diagnostics, never sent to the server.
-fn build_emulator(platform: Box<WebPlatform>, filename: &str, data: Vec<u8>, options: Options) -> Result<(Box<dyn Emulator>, &'static str), String> {
+// Returns the loaded emulator, the detected platform kind ("KTF"/"LGT"/"SKT"/
+// "J2ME"), and — for LGT only — the statically-detected compile model
+// ("clet"/"aot-java"), else `None`. The kind is a backend/runtime label (NOT
+// game-file identity); it is surfaced only in on-screen error diagnostics,
+// never sent to the server.
+#[allow(clippy::type_complexity)]
+fn build_emulator(
+    platform: Box<WebPlatform>,
+    filename: &str,
+    data: Vec<u8>,
+    options: Options,
+) -> Result<(Box<dyn Emulator>, &'static str, Option<&'static str>), String> {
     let name = &filename[filename.rfind('/').map(|i| i + 1).unwrap_or(0)..];
 
     if filename.ends_with("zip") {
@@ -355,14 +382,22 @@ fn build_emulator(platform: Box<WebPlatform>, filename: &str, data: Vec<u8>, opt
             Ok((
                 Box::new(KtfEmulator::from_archive(platform, files, options).map_err(|e| format!("{e:?}"))?),
                 "KTF",
+                None,
             ))
         } else if LgtEmulator::loadable_archive(&files) {
+            // Detect the compile model before `files` is moved into the loader.
+            let model = detect_compile_model(&files).map(|m| m.as_str());
             Ok((
                 Box::new(LgtEmulator::from_archive(platform, files, options).map_err(|e| format!("{e:?}"))?),
                 "LGT",
+                model,
             ))
         } else if SktEmulator::loadable_archive(&files) {
-            Ok((Box::new(SktEmulator::from_archive(platform, files).map_err(|e| format!("{e:?}"))?), "SKT"))
+            Ok((
+                Box::new(SktEmulator::from_archive(platform, files).map_err(|e| format!("{e:?}"))?),
+                "SKT",
+                None,
+            ))
         } else {
             Err("Unknown archive format".to_owned())
         }
@@ -374,23 +409,29 @@ fn build_emulator(platform: Box<WebPlatform>, filename: &str, data: Vec<u8>, opt
                     KtfEmulator::from_jar(platform, name, data, name_without_ext, name_without_ext, None, options).map_err(|e| format!("{e:?}"))?,
                 ),
                 "KTF",
+                None,
             ))
         } else if LgtEmulator::loadable_jar(&data) {
+            // The jar is itself a zip; its extracted contents hold binary.mod.
+            let model = extract_zip(&data).ok().and_then(|inner| detect_compile_model(&inner)).map(|m| m.as_str());
             Ok((
                 Box::new(
                     LgtEmulator::from_jar(platform, name, data, name_without_ext, name_without_ext, None, options).map_err(|e| format!("{e:?}"))?,
                 ),
                 "LGT",
+                model,
             ))
         } else if SktEmulator::loadable_jar(&data) {
             Ok((
                 Box::new(SktEmulator::from_jar(platform, name, data, name_without_ext, None).map_err(|e| format!("{e:?}"))?),
                 "SKT",
+                None,
             ))
         } else {
             Ok((
                 Box::new(J2MEEmulator::from_jar(platform, name, data).map_err(|e| format!("{e:?}"))?),
                 "J2ME",
+                None,
             ))
         }
     } else if filename.ends_with("jad") {
