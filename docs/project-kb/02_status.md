@@ -1,6 +1,6 @@
 # wie 현재 상태 (02_status)
 
-> **기준일 2026-07-10** · 레포 실측 기반(워크플로 실행 로그·커밋·베이스라인). 이 파일이 KB 의 최신 현황이다 — 매 작업 세션(main 반영) 시 재생성.
+> **기준일 2026-07-13** · 레포 실측 기반(워크플로 실행 로그·커밋·베이스라인). 이 파일이 KB 의 최신 현황이다 — 매 작업 세션(main 반영) 시 재생성.
 
 ## 자동발행 파이프라인 (연방 ① 발신부) — **완전 라이브(dispatch 포함)**
 
@@ -33,10 +33,12 @@
 ## 두 트랙 — 엔진 정상화 현황
 
 **트랙 ① 타이틀 회수(모드 A — 자율주행 진행 중)**
-- **회귀 베이스라인**(`scripts/smoke_gate_baseline.tsv`): **261 타이틀 부팅+렌더 PASS — KTF 190 / LGT 52 / SKT 19**(2-run 교집합 검증, 게임파일 미포함·식별자만). 게이트는 부팅+렌더만 판정(입력 생존은 비게이팅 어드바이저리). 구 스냅샷(2026-07-02) 202 대비 **+59**.
+- **회귀 베이스라인**(`scripts/smoke_gate_baseline.tsv`): **292 타이틀 부팅+렌더 PASS — KTF 190 / LGT 52 / SKT 50**(2-run 교집합 검증, 게임파일 미포함·식별자만). 게이트는 부팅+렌더만 판정(입력 생존은 비게이팅 어드바이저리). 구 스냅샷(2026-07-02) 202 대비 **+90**.
+- **커버리지 오딧 승격(2026-07-13)**: 코퍼스 전량(ktf190/lgt54/skt50=294) 대비 기존 261 등재분을 대조해 "PASS-both 이나 미등재" 후보 **31종(전부 SKT)** 특정 → 각 타이틀 SKT 2-run 독립 실행(A/B 각 SKT50/50 전수 PASS)으로 교집합 승격, **261→292**. 후보가 SKT 뿐인 이유: KTF 코퍼스 190=베이스라인 190(전량 등재 완료), LGT 코퍼스 54 중 52 PASS 전량 등재(FAIL 2 제외). 승격 후 전체 코퍼스 2-run 재검증 — 두 런 모두 **292 전수 회귀-0·absent 0**. baseline.tsv 데이터 등재만(엔진 런타임 무변경, 회귀-0 자명).
+- **제외 2건(등재 금지)**: `lgt/놈ZERO` = 기지의 per-game FAIL(누락 blit SVC 아님, 게임별 near-blank). `lgt/하이브리드` = 선재 핀 이슈(널점프 inject runaway) **PENDING·미접촉** — 승격/수정 금지.
 - **d7b5b024(sec/audit-green 머지) 게이트 소급 확정(2026-07-10)**: 코퍼스 복귀 후 2-run 실측 — 두 런 모두 **베이스라인 261 전수 회귀-0**(294 중 292 PASS, FAIL 2건은 두 런 동일한 비-베이스라인 LGT 타이틀 놈ZERO·하이브리드). crossbeam-epoch 0.9.20 등 lockfile 패치 상향의 회귀-블라인드 해소. ② has_exited getter 변경은 wasm32 전용 `wie_web` 한정 — 네이티브 `wie_validate` 바이너리 sha256 동일 실증(재컴파일 미발생, wie_cli 의존트리 무관)으로 동일 2-run 이 변경 후 트리에도 유효.
 - 최근 리듬(git log): WIPI-Java/MIDP 메서드 보강 · RustJava 포크 핀 상승(트랙2 클러스터 다수 귀속: readUnsignedByte·TimeZone·Byte 등) · 결정적 실행기(BTreeMap 폴링·스레드 스케줄링 = 구 트랙1 반영)로 232→261.
-- dispatch 의 `confirmedPlatforms` 는 **KTF·SKT** — LGT 는 clet 52종이 부팅+렌더하나 아직 "확정" 승격 전. J2ME 는 웹 로더 폴백 지원.
+- dispatch 의 `confirmedPlatforms` 는 **KTF·SKT** — SKT 는 코퍼스 50종 전량이 이제 베이스라인 등재(2026-07-13). LGT 는 clet 52종이 부팅+렌더하나 아직 "확정" 승격 전. J2ME 는 웹 로더 폴백 지원.
 
 **트랙 ② §7 벽 — LGT AOT-Java 렌더(모드 B — 외부 산출물 대기)**
 - LGT AOT-Java 24종은 렌더 0 유지. 바이너리-측 조사는 cp59 로 완결: per-frame 구동은 TIMER_EVENT(21) 모델로 확정(구현 가능), 유일 블로커는 **0x64 ordinal→native 등록표**. 오프라인 획득 소진 증명(AromaWIPI 비공번호 — `docs/reference/lgt_0x64_ordinal_table.md`) → **실기 트레이스 필요**. 도착 시 4단계 즉시 활성화 스캐폴드 커밋됨(기본 비활성·회귀 0). 요약: `10_deep-assets.md`, 원문: `docs/lgt_abi.md` §7·§8.
