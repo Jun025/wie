@@ -109,9 +109,10 @@ fn scan_binary_mod(data: &[u8]) -> LgtCompileModel {
 /// table`). Scanning for the `BL` context (not a bare `0x64` constant) is what
 /// keeps this free of false positives.
 fn has_java_interface_thunk(code: &[u8]) -> bool {
+    let (words, _rem) = code.as_chunks::<4>();
     let mut prev_is_bl = false;
-    for w in code.chunks_exact(4) {
-        let word = u32::from_le_bytes([w[0], w[1], w[2], w[3]]);
+    for w in words {
+        let word = u32::from_le_bytes(*w);
         if prev_is_bl && word == TABLE_JAVA_INTERFACE {
             return true;
         }
