@@ -22,6 +22,7 @@
 - **오디오**: JS 가 사용자 제스처에서 만든 `AudioContext`+`GainNode` 를 주입, PCM 은 WebAudio 로 갭리스 스케줄, MIDI 는 무음 스텁.
 - **세이브**: `has_saves()` / `export_saves()`(불투명 `WIESAV01` 블롭: RMS+FS) / `import_saves(blob)` / `export_fs`·`import_fs`. 해제는 `free()`.
 - **로더**: `.zip`→KTF→LGT→SKT 순 판별, `.jar`→KTF→LGT→SKT→J2ME 폴백, `.jad` 는 거부(.jar 요구). `platform_kind()` 가 `"KTF"|"LGT"|"SKT"|"J2ME"` 반환.
+- **LGT 컴파일모델**: `lgt_compile_model(): string | null` — **additive getter(2026-07-13, featurephone 옵션1 확정·셸소유 계약변경)**. LGT 타이틀이면 `"clet"`(WIPI-C, wie 렌더 가능) 또는 `"aot-java"`(AOT-Java, 부팅되나 §7 벽으로 미렌더), **비-LGT(KTF/SKT/J2ME)는 `null`**(개념 부적용 — wasm-bindgen `Option<String>`→JS null, 셸이 `=== "aot-java"` 한 줄로 차단 판정·나머지는 falsy 통과라 구분 최단). 판별근거=앱 자신의 import thunk 정적 스캔(`binary.mod` ELF 실행섹션에서 `bl`+`.word 0x64` java-interface thunk 유무; 0x64⇒aot-java, 부재⇒clet). **생성자에서 1회 산정, 인스턴스 수명 내 불변 — 첫 `tick()` 전 즉시 유효**(로드 성공 직후 호출 가능). read-only 조회, 런타임 무영향. 코퍼스 실측: working/lgt 54 전부 clet, broken/lgt 24 aot-java(deep-assets 알려진 24종과 정확 일치)+22 clet, ambiguous 0. `platform_kind()` 등 기존 표면 전부 무변경 순수 additive. 권고 셸 패턴: `"aot-java"` 업로드 시점 실행 차단+"준비 중" 안내, `"clet"`만 실행.
 
 ## CI 현황
 
@@ -47,7 +48,8 @@
 - **Q1 실패모드 실측**(배틀몬스터 2빌드, wie_validate=웹과 동일 `LgtEmulator::from_archive` 경로): 진짜 AOT-Java 는 **silent blank(throw 없음)** — paints=1·content=false·max_ticks(5천만) 완주, `run_err` 미발생(reason="only blank/uniform frames"). 부팅은 성공(`registered 20 app classes` + import table `0x64` 다수)하나 §7 렌더 드라이버 부재로 조용히 검은화면. **최악 케이스**: 셸의 현행 실패감지(tick() throw / has_exited)로 감지 불가. ※ 대조: broken/lgt 의 clet 미완성분(영웅서기4=WIPIC SVC 111, 붉은보석=stdlib 0x3f7)은 **throw** 하고, 제노니아2 는 이제 PASS — 즉 broken 폴더는 AOT 전용 아님, 실패모드는 서브셋별로 갈림.
 - **Q2 판별 신호 가용성**: clet↔AOT 구분은 컨테이너/파일명으론 불가(양쪽 다 jar 안 `binary.mod` + `app_info`, MClass 필드는 대부분 공란이라 비신뢰). **판별점 2개 실재**: ⓐ **정적(로드 전)** — `binary.mod` ELF import thunk 의 `0x64`(Java-interface) 참조 유무. deep-assets 가 16바이트 thunk 패턴으로 24/102 정적 특정 완료해 **로드 전 파일 바이트만으로 판별 가능** 실증됨. ⓑ **부팅 극초기(첫 tick 전, `load_native` 내)** — `register_app_classes` 반환 non-empty(AOT 는 `.data` 에 class descriptor, clet 은 없음) + 첫 import table `0x64`(AOT) vs `0x1fb`(WIPI-C clet). 현 로더는 `loadable_archive`(app_info 존재)·`loadable_jar`(binary.mod 존재)로 **LGT 판정만** 하고 컴파일모델은 표면에 미노출 — `platform_kind()="LGT"` 한 단계 아래 정보는 내부에 존재하나 셸이 못 봄.
 - **최소 additive 제안(구현 금지·형태만)**: `platform_kind()` 무변경 유지 + ▸옵션1(선호, 정적) 별도 판별 getter 예 `lgt_compile_model() -> "clet"|"aot-java"` — 로더가 binary.mod 의 0x64 thunk 정적 스캔(추출기 기존)으로 셋, 셸이 "aot-java"면 사전 "미지원 서브셋" 안내 후 제외. ▸옵션2(로드실패 명시화) AOT 감지 시(class descriptor non-empty && 렌더드라이버 부재) 로드 단계에서 명시적 `WieError` 반환해 현행 silent-blank 를 explicit-throw 로 승격 — 단 런타임 동작 변경이라 계약·회귀 검토 필요. 둘 다 기존 표면 무변경 후방호환.
-- **승격 안전성 판정**: Q1(AOT=silent blank, 감지불가) + Q2(판별신호 명확히 가용) 종합 → **"명시적 caveat + graceful 제외 신호 선행 필요"**. 신호는 구현 가능하나 현재 미노출이므로, 노출 전까지 **LGT 일괄 confirmed 승격 유보 권고**. 위 additive 신호를 노출하고 셸이 AOT 서브셋을 사전 제외하면 승격 안전(그때 clet 서브셋만 confirmedPlatforms 승격). ※ 본 조사는 탐지/분류 국한 — §7 렌더 미시도, 엔진/계약 무변경(wie_validate sha 동일), 동결 목록 미접촉.
+- **승격 안전성 판정**: Q1(AOT=silent blank, 감지불가) + Q2(판별신호 명확히 가용) 종합 → **"명시적 caveat + graceful 제외 신호 선행 필요"**. additive 신호를 노출하고 셸이 AOT 서브셋을 사전 제외하면 승격 안전(그때 clet 서브셋만 confirmedPlatforms 승격).
+- **LGT confirmed 승격 4단계 진행**: **① 엔진 getter 노출 = 완료(2026-07-13)** — `lgt_compile_model()` 라이브(엔진 웹 계약 참조, 옵션1 정적 0x64 thunk 스캔). **② 셸 배선(featurephone: 업로드 시 "aot-java" 차단+안내) = 대기**. **③ clet-only 재검증 = 대기**. **④ confirmedPlatforms 에 LGT 승격 = 대기**. ②~④ 는 featurephone 소관/후속 세션. ※ 본 세션은 ①만 — §7 렌더 미시도, 판별은 read-only 정적 조회, 동결 목록 미접촉.
 
 ## 로드맵 위치 · 잔여
 

@@ -17,7 +17,9 @@
 #![no_std]
 extern crate alloc;
 
+mod compile_model;
 mod emulator;
 mod runtime;
 
+pub use compile_model::{LgtCompileModel, detect_compile_model};
 pub use emulator::LgtEmulator;
