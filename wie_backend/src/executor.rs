@@ -111,36 +111,10 @@ impl Executor {
         T: Fn() -> Instant,
     {
         let end = now() + 8; // TODO hardcoded
-
-        // Conservative boot-flip mitigation. The 8ms wall-clock budget alone ties
-        // the amount of work done per tick to real elapsed time, so under host
-        // load or coarse/jittery `Platform::now()` (e.g. browser `Date.now()`) a
-        // frame can advance the emulator by wildly different amounts — even zero
-        // steps if two `now()` reads straddle the 8ms window. That makes
-        // boot-order-sensitive titles flip between booting and a blank screen.
-        //
-        // Guaranteeing a small floor of executor steps whenever there is runnable
-        // work makes boot progress consistently regardless of real-time jitter,
-        // while the idle break below (all tasks sleeping) still yields immediately
-        // in the steady frame loop — so gameplay pace is unchanged. MAX caps the
-        // loop so a permanently-runnable task can never freeze the caller (the rAF
-        // frame / CLI loop); the wall-clock budget still governs work above the
-        // floor. This is a mitigation, not a determinism fix — the real cure is a
-        // virtual/fixed-timestep clock decoupled from wall time.
-        const MIN_STEPS_PER_TICK: u32 = 64;
-        const MAX_STEPS_PER_TICK: u32 = 65_536;
-        let mut steps: u32 = 0;
-
         loop {
-            if steps >= MAX_STEPS_PER_TICK {
-                break;
-            }
-
             let now = now();
 
-            // Honour the wall-clock budget only once the deterministic step floor
-            // is met, so a slow/jittery host frame can't starve boot to a blank.
-            if steps >= MIN_STEPS_PER_TICK && now > end {
+            if now > end {
                 break;
             }
 
@@ -150,15 +124,12 @@ impl Executor {
                 if running_task_count == 0 && !inner.sleeping_tasks.is_empty() {
                     let next_wakeup = *inner.sleeping_tasks.values().min().unwrap();
                     if now < next_wakeup {
-                        // Nothing runnable this instant — yield regardless of the
-                        // step floor so idle frames don't spin (keeps real-time pace).
                         break;
                     }
                 }
             }
 
             self.step(now)?;
-            steps += 1;
         }
 
         Ok(())

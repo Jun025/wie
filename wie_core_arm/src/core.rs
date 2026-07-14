@@ -34,51 +34,6 @@ const PROFILE_MAX_STACK: usize = 32;
 /// Flush the per-stack counter map every this many samples taken.
 const PROFILE_FLUSH_INTERVAL: u32 = 1000;
 
-/// Guest instructions executed per synchronous `engine.run` batch inside
-/// `run_function`.
-const RUN_FUNCTION_BATCH_INSN: u32 = 1000;
-
-/// Cooperatively yield once this many *consecutive* batches run without an SVC or
-/// return (× `RUN_FUNCTION_BATCH_INSN` guest instructions with no syscall). Normal
-/// guest code makes syscalls (SVCs) often, so the counter resets constantly and
-/// never yields — paint, init, etc. run to completion with NO mid-function thread
-/// switch (yielding every batch regressed 만귀토벌전: a paint ran before init and
-/// hit a null pointer). A pure-ARM spin/busy-wait (no SVC) reaches the threshold
-/// and yields, letting the guest thread that would satisfy the wait run — otherwise
-/// the single cooperative thread is monopolised and boot hard-freezes (blank
-/// screen, JS watchdog starved; ~25% on iOS/WebKit).
-const YIELD_AFTER_SVCLESS_BATCHES: u32 = 64;
-
-/// Absolute backstop: yield after this many batches within a single `run_function`
-/// call regardless of SVCs (SVCs reset the consecutive counter above, but not this
-/// one). Catches a spin that DOES make (synchronous) syscalls each iteration, which
-/// the consecutive counter alone would never trip. Set high (≈1M guest instructions)
-/// so ordinary functions — which return or finish well before it — never yield mid
-/// call; only a genuinely unbounded loop reaches it.
-const YIELD_AFTER_TOTAL_BATCHES: u32 = 1024;
-
-/// One-shot cooperative yield. Returns `Pending` exactly once so the executor can
-/// poll other guest threads/tasks, then `Ready` on the next poll. Used to preempt
-/// a guest that runs a long / spin loop without hitting an SVC (the only other
-/// yield point). Mirrors `wie_backend`'s `YieldFuture`, which is not re-exported.
-/// The executor re-polls `Pending` tasks every step regardless of the waker, so
-/// the `wake_by_ref` is belt-and-suspenders.
-struct YieldOnce(bool);
-
-impl core::future::Future for YieldOnce {
-    type Output = ();
-
-    fn poll(mut self: core::pin::Pin<&mut Self>, cx: &mut core::task::Context<'_>) -> core::task::Poll<()> {
-        if self.0 {
-            core::task::Poll::Ready(())
-        } else {
-            self.0 = true;
-            cx.waker().wake_by_ref();
-            core::task::Poll::Pending
-        }
-    }
-}
-
 struct ProfileState {
     samples: BTreeMap<Vec<u32>, u64>,
     counter: u32,
@@ -328,39 +283,18 @@ impl ArmCore {
             inner.engine.reg_write(ArmRegister::Cpsr, new_cpsr);
         }
 
-        let mut svcless_batches: u32 = 0;
-        let mut total_batches: u32 = 0;
         loop {
             let result = {
                 let mut inner = self.inner.lock();
-                inner.engine.run(RUN_FUNCTION_LR, RUN_FUNCTION_BATCH_INSN)?
+                inner.engine.run(RUN_FUNCTION_LR, 1000)?
             };
 
             self.sample_profile();
 
             match result {
                 EngineRunResult::End => break,
-                EngineRunResult::CountExhausted => {
-                    // A full batch ran with no SVC / no return. Only a long syscall-free
-                    // stretch (a pure-ARM spin/busy-wait, or heavy compute) climbs the
-                    // consecutive counter; normal syscall-driven code resets it below. The
-                    // total counter is the absolute backstop for a spin that DOES make a
-                    // synchronous syscall each iteration. On either threshold, cooperatively
-                    // yield so other guest threads run — else the spin monopolises the single
-                    // cooperative thread and hard-freezes boot. Resumes at the current PC on
-                    // the next poll. Gated (not every batch) so normal code — e.g. paint —
-                    // is not interrupted mid-call (that regressed 만귀토벌전).
-                    svcless_batches += 1;
-                    total_batches += 1;
-                    if svcless_batches >= YIELD_AFTER_SVCLESS_BATCHES || total_batches >= YIELD_AFTER_TOTAL_BATCHES {
-                        svcless_batches = 0;
-                        total_batches = 0;
-                        YieldOnce(false).await;
-                    }
-                }
+                EngineRunResult::CountExhausted => {}
                 EngineRunResult::Svc { category, lr, spsr } => {
-                    // A syscall = the guest is making normal progress, not a bare spin.
-                    svcless_batches = 0;
                     {
                         let mut inner = self.inner.lock();
                         // Restore the pre-exception execution state before running the Rust SVC handler.
