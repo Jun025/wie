@@ -1,6 +1,6 @@
 # wie 현재 상태 (02_status)
 
-> **기준일 2026-07-13** · 레포 실측 기반(워크플로 실행 로그·커밋·베이스라인). 이 파일이 KB 의 최신 현황이다 — 매 작업 세션(main 반영) 시 재생성.
+> **기준일 2026-07-14** · 레포 실측 기반(워크플로 실행 로그·커밋·베이스라인). 이 파일이 KB 의 최신 현황이다 — 매 작업 세션(main 반영) 시 재생성.
 
 ## 자동발행 파이프라인 (연방 ① 발신부) — **완전 라이브(dispatch 포함)**
 
@@ -8,7 +8,7 @@
 
 - main push(엔진 소스 경로: `**/*.rs`·`Cargo.toml`·`Cargo.lock`·`build-wasm.sh`) → **fresh** `wie_web` WASM 빌드(wasm-bindgen 0.2.108 핀 + wasm-opt) → GitHub Release `engine-<shortsha>` 에 `wie_web_bg.wasm` + `wie_web.js` 발행(sha256 메타 포함, 같은 커밋 재실행 멱등).
 - 최신 릴리스: **`engine-d7b5b02`**(2026-07-10).
-- 이어서 otterpebble 에 `repository_dispatch`(event `wie-artifact-published`, payload: version·wieHead·wasmUrl/glueUrl·sha256·confirmedPlatforms `["KTF","SKT"]`) → 리시버(otterpebble 소유 `wie-artifact-receive.yml`)가 featurephone 재배포.
+- 이어서 otterpebble 에 `repository_dispatch`(event `wie-artifact-published`, payload: version·wieHead·wasmUrl/glueUrl·sha256·confirmedPlatforms `["KTF","SKT","LGT"]`) → 리시버(otterpebble 소유 `wie-artifact-receive.yml`)가 featurephone 재배포. (SoT: `publish-artifact.yml` dispatch 스텝 payload.)
 - ~~PAT 403 잔여~~ — **해소 확인(2026-07-10)**: d7b5b024 발행 런에서 "Dispatch to otterpebble" 스텝 success. 구 403(2026-07-08)은 fine-grained PAT 권한 부족이었고 재발급·재주입으로 종결.
 
 ## 엔진 웹 계약 (소비자 featurephone 이 의존 — 변경 = 기획 사안)
@@ -39,7 +39,7 @@
 - **제외 2건(등재 금지)**: `lgt/놈ZERO` = 기지의 per-game FAIL(누락 blit SVC 아님, 게임별 near-blank). `lgt/하이브리드` = 선재 핀 이슈(널점프 inject runaway) **PENDING·미접촉** — 승격/수정 금지.
 - **d7b5b024(sec/audit-green 머지) 게이트 소급 확정(2026-07-10)**: 코퍼스 복귀 후 2-run 실측 — 두 런 모두 **베이스라인 261 전수 회귀-0**(294 중 292 PASS, FAIL 2건은 두 런 동일한 비-베이스라인 LGT 타이틀 놈ZERO·하이브리드). crossbeam-epoch 0.9.20 등 lockfile 패치 상향의 회귀-블라인드 해소. ② has_exited getter 변경은 wasm32 전용 `wie_web` 한정 — 네이티브 `wie_validate` 바이너리 sha256 동일 실증(재컴파일 미발생, wie_cli 의존트리 무관)으로 동일 2-run 이 변경 후 트리에도 유효.
 - 최근 리듬(git log): WIPI-Java/MIDP 메서드 보강 · RustJava 포크 핀 상승(트랙2 클러스터 다수 귀속: readUnsignedByte·TimeZone·Byte 등) · 결정적 실행기(BTreeMap 폴링·스레드 스케줄링 = 구 트랙1 반영)로 232→261.
-- dispatch 의 `confirmedPlatforms` 는 **KTF·SKT** — SKT 는 코퍼스 50종 전량이 이제 베이스라인 등재(2026-07-13). LGT 는 clet 52종이 부팅+렌더하나 아직 "확정" 승격 전. J2ME 는 웹 로더 폴백 지원.
+- dispatch 의 `confirmedPlatforms` 는 **KTF·SKT·LGT**(2026-07-14 LGT 승격). SKT 는 코퍼스 50종 전량 베이스라인 등재. **LGT 는 clet 52종 confirmed** — 셸이 `lgt_compile_model()==="aot-java"` 로 AOT-Java 24종을 사전 제외하므로 confirmed 는 **clet 서브셋 정식 지원**을 의미(AOT 24종은 §7 동결·"준비 중", 렌더 가능 승격 아님). J2ME 는 웹 로더 폴백 지원.
 
 **트랙 ② §7 벽 — LGT AOT-Java 렌더(모드 B — 외부 산출물 대기)**
 - LGT AOT-Java 24종은 렌더 0 유지. 바이너리-측 조사는 cp59 로 완결: per-frame 구동은 TIMER_EVENT(21) 모델로 확정(구현 가능), 유일 블로커는 **0x64 ordinal→native 등록표**. 오프라인 획득 소진 증명(AromaWIPI 비공번호 — `docs/reference/lgt_0x64_ordinal_table.md`) → **실기 트레이스 필요**. 도착 시 4단계 즉시 활성화 스캐폴드 커밋됨(기본 비활성·회귀 0). 요약: `10_deep-assets.md`, 원문: `docs/lgt_abi.md` §7·§8.
@@ -49,7 +49,7 @@
 - **Q2 판별 신호 가용성**: clet↔AOT 구분은 컨테이너/파일명으론 불가(양쪽 다 jar 안 `binary.mod` + `app_info`, MClass 필드는 대부분 공란이라 비신뢰). **판별점 2개 실재**: ⓐ **정적(로드 전)** — `binary.mod` ELF import thunk 의 `0x64`(Java-interface) 참조 유무. deep-assets 가 16바이트 thunk 패턴으로 24/102 정적 특정 완료해 **로드 전 파일 바이트만으로 판별 가능** 실증됨. ⓑ **부팅 극초기(첫 tick 전, `load_native` 내)** — `register_app_classes` 반환 non-empty(AOT 는 `.data` 에 class descriptor, clet 은 없음) + 첫 import table `0x64`(AOT) vs `0x1fb`(WIPI-C clet). 현 로더는 `loadable_archive`(app_info 존재)·`loadable_jar`(binary.mod 존재)로 **LGT 판정만** 하고 컴파일모델은 표면에 미노출 — `platform_kind()="LGT"` 한 단계 아래 정보는 내부에 존재하나 셸이 못 봄.
 - **최소 additive 제안(구현 금지·형태만)**: `platform_kind()` 무변경 유지 + ▸옵션1(선호, 정적) 별도 판별 getter 예 `lgt_compile_model() -> "clet"|"aot-java"` — 로더가 binary.mod 의 0x64 thunk 정적 스캔(추출기 기존)으로 셋, 셸이 "aot-java"면 사전 "미지원 서브셋" 안내 후 제외. ▸옵션2(로드실패 명시화) AOT 감지 시(class descriptor non-empty && 렌더드라이버 부재) 로드 단계에서 명시적 `WieError` 반환해 현행 silent-blank 를 explicit-throw 로 승격 — 단 런타임 동작 변경이라 계약·회귀 검토 필요. 둘 다 기존 표면 무변경 후방호환.
 - **승격 안전성 판정**: Q1(AOT=silent blank, 감지불가) + Q2(판별신호 명확히 가용) 종합 → **"명시적 caveat + graceful 제외 신호 선행 필요"**. additive 신호를 노출하고 셸이 AOT 서브셋을 사전 제외하면 승격 안전(그때 clet 서브셋만 confirmedPlatforms 승격).
-- **LGT confirmed 승격 4단계 진행**: **① 엔진 getter 노출 = 완료(2026-07-13)** — `lgt_compile_model()` 라이브(엔진 웹 계약 참조, 옵션1 정적 0x64 thunk 스캔). **② 셸 배선(featurephone: 업로드 시 "aot-java" 차단+안내) = 대기**. **③ clet-only 재검증 = 대기**. **④ confirmedPlatforms 에 LGT 승격 = 대기**. ②~④ 는 featurephone 소관/후속 세션. ※ 본 세션은 ①만 — §7 렌더 미시도, 판별은 read-only 정적 조회, 동결 목록 미접촉.
+- **LGT confirmed 승격 4단계 = 전체 완료(2026-07-14)**: **① 엔진 getter 노출 = 완료(2026-07-13, #33)** — `lgt_compile_model()` 라이브(엔진 웹 계약 참조, 옵션1 정적 0x64 thunk 스캔). **② 셸 배선(featurephone "aot-java" 차단+안내) = 완료**. **③ clet-only 재검증 = 완료**. **④ confirmedPlatforms 에 LGT 승격 = 완료(2026-07-14)** — `publish-artifact.yml` dispatch payload `["KTF","SKT"]`→`["KTF","SKT","LGT"]`(발신부 메타데이터 한정, 런타임 무변경). **범위 불변식**: clet 52종의 platform-level confirmed 선언일 뿐 AOT-Java 24종을 렌더 가능으로 만들지 않음 — 셸이 aot-java 를 사전 제외하므로 confirmed=clet 서브셋 정식 지원, AOT 24종은 §7 동결 유지.
 
 ## 로드맵 위치 · 잔여
 

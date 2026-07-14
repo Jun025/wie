@@ -139,7 +139,7 @@ jobs:
               client_payload:{version:$version, wieHead:$wieHead,
                 wasmUrl:$wasmUrl, glueUrl:$glueUrl,
                 wasmSha256:$wasmSha256, glueSha256:$glueSha256,
-                confirmedPlatforms:["KTF","SKT"]}}')
+                confirmedPlatforms:["KTF","SKT","LGT"]}}')
           echo "$payload" | gh api "repos/$OTTERPEBBLE_REPO/dispatches" --input -
           echo "::notice title=dispatched::wie-artifact-published → $OTTERPEBBLE_REPO ($TAG)"
 
