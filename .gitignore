@@ -37,3 +37,5 @@ roms/
 /CLAUDE_TASK_*.md
 /STEP2_REPORT.md
 /BRIDGE_REPORT.md
+.direnv/
+.claude/settings.local.json
