@@ -71,9 +71,9 @@ impl PixelType for Rgb332Pixel {
     type DataType = u8;
 
     fn from_color(color: Color) -> Self::DataType {
-        let r = (color.r * 7 + 127) / 255;
-        let g = (color.g * 7 + 127) / 255;
-        let b = (color.b * 3 + 127) / 255;
+        let r = ((color.r as u16 * 7 + 127) / 255) as u8;
+        let g = ((color.g as u16 * 7 + 127) / 255) as u8;
+        let b = ((color.b as u16 * 3 + 127) / 255) as u8;
 
         (r << 5) | (g << 2) | b
     }
@@ -503,7 +503,7 @@ pub fn decode_image(data: &[u8]) -> Result<Box<dyn Image>> {
 
     use std::io::Cursor;
 
-    if data[0] == b'L' && data[1] == b'B' && data[2] == b'M' && data[3] == b'P' {
+    if data.len() >= 4 && data[0] == b'L' && data[1] == b'B' && data[2] == b'M' && data[3] == b'P' {
         return decode_lbmp(data);
     }
 
@@ -531,11 +531,154 @@ pub fn string_width(string: &str, pt_size: f32) -> f32 {
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec::Vec;
+
     use wie_util::Result;
 
-    use crate::canvas::{Clip, Image, ImageBufferCanvas};
+    use crate::canvas::{Clip, Image, ImageBufferCanvas, decode_image};
 
-    use super::{ArgbPixel, Canvas, Color, VecImageBuffer};
+    use super::{AbgrPixel, ArgbPixel, Canvas, Color, PixelType, Rgb8Pixel, Rgb332Pixel, Rgb565Pixel, VecImageBuffer};
+
+    // 2x2 RGBA PNG: (255,0,0,255) (0,255,0,128) / (0,0,255,255) (255,255,255,0)
+    const PNG_2X2: [u8; 78] = [
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
+        0x02, 0x08, 0x06, 0x00, 0x00, 0x00, 0x72, 0xb6, 0x0d, 0x24, 0x00, 0x00, 0x00, 0x15, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0xf8, 0xcf,
+        0xc0, 0xf0, 0x1f, 0x08, 0x1b, 0x18, 0x80, 0x34, 0x08, 0x30, 0x00, 0x00, 0x43, 0xd3, 0x08, 0x79, 0xc9, 0x15, 0x1c, 0x0f, 0x00, 0x00, 0x00,
+        0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+    ];
+
+    #[test]
+    fn test_decode_image_short_input_returns_err() {
+        for data in [&[] as &[u8], &[b'L'], &[b'L', b'B'], &[b'L', b'B', b'M']] {
+            let result = decode_image(data);
+            assert!(result.is_err(), "expected Err for {}-byte input", data.len());
+        }
+    }
+
+    #[test]
+    fn test_decode_lbmp_truncated_header_returns_err() {
+        // valid tag but header shorter than 24 bytes
+        for len in 4..24 {
+            let mut data = Vec::new();
+            data.extend_from_slice(b"LBMP");
+            data.resize(len, 0);
+
+            let result = decode_image(&data);
+            assert!(result.is_err(), "expected Err for {len}-byte LBMP input");
+        }
+    }
+
+    #[test]
+    fn test_decode_image_png() -> Result<()> {
+        let image = decode_image(&PNG_2X2)?;
+
+        assert_eq!(image.width(), 2);
+        assert_eq!(image.height(), 2);
+        assert_eq!(image.bytes_per_pixel(), 4);
+
+        let expected = [(255, 255, 0, 0), (128, 0, 255, 0), (255, 0, 0, 255), (0, 255, 255, 255)];
+        for (i, &(a, r, g, b)) in expected.iter().enumerate() {
+            let color = image.get_pixel((i % 2) as i32, (i / 2) as i32);
+            assert_eq!((color.a, color.r, color.g, color.b), (a, r, g, b), "pixel {i}");
+        }
+
+        // raw is stored BGRA per pixel (little-endian ArgbPixel)
+        let raw = image.raw();
+        assert_eq!(&raw[0..4], &[0, 0, 255, 255]);
+        assert_eq!(&raw[4..8], &[0, 255, 0, 128]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_decode_lbmp_rgb332() -> Result<()> {
+        let mut data = Vec::new();
+        data.extend_from_slice(b"LBMP"); // descriptor
+        data.extend_from_slice(&8u32.to_le_bytes()); // type
+        data.extend_from_slice(&2u32.to_le_bytes()); // width
+        data.extend_from_slice(&2u32.to_le_bytes()); // height
+        data.extend_from_slice(&4u32.to_le_bytes()); // size
+        data.extend_from_slice(&0u32.to_le_bytes()); // mask
+        data.extend_from_slice(&[0b111_000_00, 0b000_111_00, 0b000_000_11, 0xff]);
+
+        let image = decode_image(&data)?;
+
+        assert_eq!(image.width(), 2);
+        assert_eq!(image.height(), 2);
+        assert_eq!(image.bytes_per_pixel(), 1);
+
+        let expected = [(252, 0, 0), (0, 252, 0), (0, 0, 255), (252, 252, 255)];
+        for (i, &(r, g, b)) in expected.iter().enumerate() {
+            let color = image.get_pixel((i % 2) as i32, (i / 2) as i32);
+            assert_eq!((color.r, color.g, color.b), (r, g, b), "pixel {i}");
+        }
+
+        Ok(())
+    }
+
+    fn gray(v: u8) -> Color {
+        Color { a: 0xff, r: v, g: v, b: v }
+    }
+
+    #[test]
+    fn test_rgb332_roundtrip() {
+        // (input gray value, expected raw, expected roundtrip rgb)
+        let cases = [
+            (0, 0b000_000_00, (0, 0, 0)),
+            (18, 0b000_000_00, (0, 0, 0)),
+            (19, 0b001_001_00, (36, 36, 0)),
+            (128, 0b100_100_10, (144, 144, 170)),
+            (255, 0b111_111_11, (252, 252, 255)),
+        ];
+
+        for (v, raw, (r, g, b)) in cases {
+            assert_eq!(Rgb332Pixel::from_color(gray(v)), raw, "from_color({v})");
+            let color = Rgb332Pixel::to_color(raw);
+            assert_eq!((color.a, color.r, color.g, color.b), (0xff, r, g, b), "to_color({raw:#010b})");
+        }
+    }
+
+    #[test]
+    fn test_rgb565_roundtrip() {
+        let cases = [
+            (0, (0, 0, 0)),
+            (18, (16, 16, 16)),
+            (19, (16, 16, 16)),
+            (128, (132, 130, 132)),
+            (255, (255, 255, 255)),
+        ];
+
+        for (v, (r, g, b)) in cases {
+            let color = Rgb565Pixel::to_color(Rgb565Pixel::from_color(gray(v)));
+            assert_eq!((color.a, color.r, color.g, color.b), (0xff, r, g, b), "roundtrip({v})");
+        }
+    }
+
+    #[test]
+    fn test_rgb8_roundtrip() {
+        for v in [0, 18, 19, 128, 255] {
+            let color = Rgb8Pixel::to_color(Rgb8Pixel::from_color(gray(v)));
+            assert_eq!((color.a, color.r, color.g, color.b), (0xff, v, v, v), "roundtrip({v})");
+        }
+    }
+
+    #[test]
+    fn test_argb_abgr_roundtrip() {
+        for v in [0, 18, 19, 128, 255] {
+            let input = Color {
+                a: v,
+                r: v,
+                g: 255 - v,
+                b: v,
+            };
+
+            let color = ArgbPixel::to_color(ArgbPixel::from_color(input));
+            assert_eq!((color.a, color.r, color.g, color.b), (v, v, 255 - v, v), "argb roundtrip({v})");
+
+            let color = AbgrPixel::to_color(AbgrPixel::from_color(input));
+            assert_eq!((color.a, color.r, color.g, color.b), (v, v, 255 - v, v), "abgr roundtrip({v})");
+        }
+    }
 
     #[test]
     fn test_canvas() -> Result<()> {
