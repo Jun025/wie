@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "consumer": "Jun025/otterpebble apps/featurephone (lib/engine.ts + .github/workflows/wie-artifact-receive.yml)",
+  "pinnedAt": "2026-07-22",
+  "note": "featurephone 웹 로더가 의존하는 wie 엔진 계약의 기계판독 정본. scripts/check-engine-contract.mjs(정적)와 scripts/contract-roundtrip.mjs(브라우저 왕복)가 이 파일을 읽어 검증한다. 계약을 의도적으로 바꿀 때는 이 파일과 소비자(otterpebble) 양쪽을 함께 바꿔야 한다 — 사람이 눈치채게 만드는 것이 이 파일의 존재 이유.",
+  "artifacts": {
+    "dir": "web/src/wasm",
+    "files": ["wie_web.js", "wie_web_bg.wasm"],
+    "glueFetchesWasmByName": "wie_web_bg.wasm"
+  },
+  "glueExports": {
+    "default": "function (wasm-bindgen __wbg_init; WebAssembly.Module 인자 경로가 featurephone 1차 경로, 무인자 상대 fetch 가 폴백 경로)",
+    "init": "function (panic hook — 인스턴스화 후 1회 호출)",
+    "WieEmulator": "class"
+  },
+  "constructorArity": 7,
+  "constructorShape": "new WieEmulator(filename: string, data: Uint8Array, canvas: HTMLCanvasElement, audioCtx: AudioContext|undefined, gain: GainNode|undefined, width: number, height: number)",
+  "methods": [
+    "tick",
+    "key_down",
+    "key_up",
+    "platform_kind",
+    "lgt_compile_model",
+    "has_exited",
+    "export_saves",
+    "has_saves",
+    "import_saves",
+    "free"
+  ],
+  "keyVocabulary": [
+    "UP", "DOWN", "LEFT", "RIGHT", "OK",
+    "LEFT_SOFT_KEY", "RIGHT_SOFT_KEY", "CLEAR",
+    "NUM0", "NUM1", "NUM2", "NUM3", "NUM4", "NUM5", "NUM6", "NUM7", "NUM8", "NUM9",
+    "STAR", "HASH"
+  ],
+  "saveMagic": "WIESAV01",
+  "screen": { "width": 240, "height": 320 },
+  "lgtCompileModels": ["clet", "aot-java"],
+  "behavior": {
+    "selfBlit": "엔진이 캔버스에 직접 blit 한다 — tick 루프 후 캔버스에 비검정 픽셀이 생겨야 한다",
+    "tickThrowsOnFailure": "런타임 오류·패닉은 tick() throw 로 온다 (정상 종료와 분리)",
+    "hasExitedSticky": "has_exited() 는 정상 종료 시 true 로 flip 후 불변; flip 후 tick() 은 안전 no-op",
+    "importSavesRejectsGarbage": "불량/빈 블롭 import_saves() 는 false (throw 아님)"
+  },
+  "dispatch": {
+    "workflow": ".github/workflows/publish-artifact.yml",
+    "eventType": "wie-artifact-published",
+    "payloadKeys": ["version", "wieHead", "wasmUrl", "glueUrl", "wasmSha256", "glueSha256"]
+  }
+}

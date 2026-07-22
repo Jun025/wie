@@ -76,6 +76,24 @@ jobs:
       - name: Build fresh wie_web WASM (current source)
         run: bash scripts/build-wasm.sh
 
+      # ── Featurephone consumer-contract gate (fail-closed) ──────────────────
+      # The same two checks engine-contract.yml runs on PRs. Here they gate the
+      # RELEASE: a contract-breaking artifact is never published or dispatched,
+      # so a break that somehow lands on main still cannot reach the web shell.
+      # Contract pin: docs/contracts/featurephone-engine-contract.json.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Contract gate — static surface (featurephone consumer)
+        run: node scripts/check-engine-contract.mjs
+
+      - name: Contract gate — browser boot round-trip
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          node scripts/contract-roundtrip.mjs
+
       - name: Compute artifact metadata (version · sha · hashes)
         id: meta
         run: |
