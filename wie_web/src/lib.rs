@@ -445,7 +445,7 @@ fn build_emulator(
 /// variants so the JS remapping UI can use the same vocabulary.
 fn parse_key(code: &str) -> Option<KeyCode> {
     Some(match code {
-        "UP" => KeyCode::UP,
+        "UP" => KeyCode::DOWN,
         "DOWN" => KeyCode::DOWN,
         "LEFT" => KeyCode::LEFT,
         "RIGHT" => KeyCode::RIGHT,
