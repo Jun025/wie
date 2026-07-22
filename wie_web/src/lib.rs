@@ -291,7 +291,7 @@ impl WieEmulator {
     }
 }
 
-const SAVE_MAGIC: &[u8; 8] = b"WIESAV01";
+const SAVE_MAGIC: &[u8; 8] = b"WIESAV02";
 
 fn put_u32(out: &mut Vec<u8>, v: u32) {
     out.extend_from_slice(&v.to_le_bytes());
