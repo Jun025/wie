@@ -20,6 +20,10 @@ struct LbmpHeader {
 }
 
 pub fn decode_lbmp(data: &[u8]) -> Result<Box<dyn Image>> {
+    if data.len() < 24 {
+        return Err(WieError::FatalError(format!("Truncated LBMP header: {} bytes", data.len())));
+    }
+
     let header: &LbmpHeader = from_bytes(&data[0..24]);
     let data = &data[24..];
 
