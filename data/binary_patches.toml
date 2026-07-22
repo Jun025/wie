@@ -100,3 +100,4 @@ kind = "strlen"
 pattern = "30 b5 03 23 03 40 04 1c 00 2b"
 
 # probe: data-only change for engine-contract paths-filter trigger verification (wie-contract-gate-paths-key-mapping) — safe to drop
+# probe phase 2: synchronize after #39 merge — engine-contract must now trigger
