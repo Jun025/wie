@@ -23,7 +23,7 @@ GitHub Release 로 발행하고 `repository_dispatch` 로 수신부를 깨우면
 | glue export | `default`(init, `WebAssembly.Module` 인자 = 셸 1차 경로/무인자 = 폴백), `init`(panic hook), `WieEmulator` | 정적 + 왕복 A/B |
 | 생성자 7-인자 | `(filename, data:Uint8Array, canvas, audioCtx?, gain?, width, height)` — 오디오 미전달 = 무음 모드 | 정적(arity) + 왕복(실호출) |
 | 메서드 10종 | `tick`·`key_down`·`key_up`·`platform_kind`·`lgt_compile_model`·`has_exited`·`export_saves`·`has_saves`·`import_saves`·`free` | 정적 + 왕복(실호출) |
-| 키 어휘 18종 | `UP/DOWN/LEFT/RIGHT/OK/LEFT_SOFT_KEY/RIGHT_SOFT_KEY/CLEAR/NUM0–9` (셸 `KEY_MAP` 송신분) | 정적(소스 핀 — 미매핑은 **무음 no-op 이라 JS 에서 관측 불가**) + 왕복(no-throw) |
+| 키 어휘 20종 | `UP/DOWN/LEFT/RIGHT/OK/LEFT_SOFT_KEY/RIGHT_SOFT_KEY/CLEAR/NUM0–9/STAR/HASH` (셸 키보드 `KEY_MAP` + 화면 키패드 `player.tsx` 송신분 — ＊/＃는 키패드 전용) | 정적(소스 핀 — 미매핑은 **무음 no-op 이라 JS 에서 관측 불가**) + 왕복(no-throw) |
 | 정상 종료 체인 | 코어 exit 요청 → `has_exited()` sticky true → 이후 `tick()` 안전 no-op → 세이브는 계속 읽힘 | 왕복(픽스처가 실제 clean-exit 수행) |
 | 세이브 블롭 | `WIESAV01` 매직의 불투명 블롭, 왕복 가능, 불량 블롭은 `false`(throw 아님) | 정적(소스 핀) + 왕복(export→import 실측) |
 | LGT 판별 | `lgt_compile_model()` ∈ {"clet","aot-java",undefined}, 생성 직후 유효 — 셸은 "aot-java" denylist | 왕복(KTF=undefined·LGT=clet 실측) |

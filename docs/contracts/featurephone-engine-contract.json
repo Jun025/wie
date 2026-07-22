@@ -30,7 +30,8 @@
   "keyVocabulary": [
     "UP", "DOWN", "LEFT", "RIGHT", "OK",
     "LEFT_SOFT_KEY", "RIGHT_SOFT_KEY", "CLEAR",
-    "NUM0", "NUM1", "NUM2", "NUM3", "NUM4", "NUM5", "NUM6", "NUM7", "NUM8", "NUM9"
+    "NUM0", "NUM1", "NUM2", "NUM3", "NUM4", "NUM5", "NUM6", "NUM7", "NUM8", "NUM9",
+    "STAR", "HASH"
   ],
   "saveMagic": "WIESAV01",
   "screen": { "width": 240, "height": 320 },
