@@ -98,3 +98,5 @@ pattern = "70 b5 0b 1c 03 43 03 22 13 40 04 1c"
 [[entry.hook]]
 kind = "strlen"
 pattern = "30 b5 03 23 03 40 04 1c 00 2b"
+
+# probe: data-only change for engine-contract paths-filter trigger verification (wie-contract-gate-paths-key-mapping) — safe to drop
