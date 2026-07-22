@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "date": "2026-07-22",
+  "task": "wie-featurephone-engine-contract-selftest",
+  "title": "featurephone 소비 계약 드리프트 가드 — 엔진 CI 정적+브라우저 왕복 이중 검사 (웹 셀프테스트 인수분)",
+  "services": ["ci", "web"],
+  "summary": "운영자 지시(제안 2026-07-20--featurephone-selftest-removal-seo#p2 채택)로, 웹 셸에서 제거된 부팅 왕복 셀프테스트 커버리지를 엔진 레포 CI 가 인수했다. otterpebble apps/featurephone/lib/engine.ts·wie-artifact-receive.yml 실측으로 계약 표면(아티팩트 쌍·glue export 3종·생성자 7-인자·메서드 10종·키 어휘 18종·WIESAV01 세이브 블롭·clean-exit 체인·lgt_compile_model·dispatch payload 6키)을 docs/contracts/featurephone-engine-contract.json 에 핀하고, 정적 검사(check-engine-contract.mjs)와 실브라우저 부팅 왕복(contract-roundtrip.mjs, 레포 자체 helloworld 픽스처 — 게임 파일 0)을 신설해 PR CI(engine-contract.yml)와 릴리스 게이트(publish-artifact.yml fail-closed)에 이중 편입했다. 웹 레포 무변경.",
+  "changes": [
+    "docs/contracts/featurephone-engine-contract.json — 계약 기계판독 정본(검사기 SoT)",
+    "docs/contracts/featurephone-engine-contract.md — 계약 표면·커버리지 정직 고지·의도적 변경 절차",
+    "scripts/check-engine-contract.mjs — 정적 드리프트 검사(glue export·arity·메서드·소스 핀 키어휘/매직·publish payload 키)",
+    "scripts/contract-roundtrip.mjs — 헤드리스 Chromium 부팅 왕복(featurephone 호출 형상 그대로: precompiled-Module 1차 경로 + 무인자 폴백 경로, KTF/LGT 픽스처, clean-exit 체인·세이브 왕복 실측)",
+    ".github/workflows/engine-contract.yml — PR/push 계약검사 워크플로(publish 와 캐시 키 공유)",
+    ".github/workflows/publish-artifact.yml — 릴리스 전 동일 2검사 fail-closed 게이트(깨진 아티팩트는 발행·전파 불가)",
+    "package-lock.json — 루트 lockfile 신설(playwright 재현 설치·npm ci)"
+  ],
+  "verification": [
+    "정적 46항 green·왕복 22항 green(로컬, 시스템 Chrome)",
+    "위반 주입 실측 ①정적: NUM5 키 제거+매직 변경 → 2위반 검출·exit 1 → 원복 green",
+    "위반 주입 실측 ②행동: WIESAV02 매직 → 재빌드 → 브라우저 왕복 21/22 실패(exit 1) → 원복 green",
+    "gate①: cargo fmt ✓ clippy(-D warnings) ✓ test --workspace 120 passed/0 failed(33 스위트)",
+    "CI 실측(위반 주입 probe PR → engine-contract 실패 확인)은 done 리포트에 런 URL 기재"
+  ],
+  "limits": [
+    "렌더 blit 회귀 검사 불가 — helloworld 픽스처는 화면을 그리지 않음(픽셀 수 info 만). 실게임 렌더는 292종 smoke_gate·수동 몫",
+    "상용 게임 런타임 회귀는 ROM ZERO 로 CI 커버 밖",
+    "행동 검사는 1회 왕복 증거이지 전 입력 공간 증명 아님(키 어휘 미매핑은 소스 핀으로만 검출)"
+  ],
+  "adoptedProposals": ["2026-07-20--featurephone-selftest-removal-seo#p2"]
+}

@@ -1,0 +1,111 @@
+name: Engine contract (featurephone consumer)
+
+# The otterpebble featurephone shell consumes this engine as a prebuilt artifact
+# pair (wie_web.js glue + wie_web_bg.wasm) and calls a pinned surface on it —
+# docs/contracts/featurephone-engine-contract.json is the machine-readable pin.
+#
+# This workflow rebuilds the artifact from the changed source and fails when the
+# surface or the boot behavior drifts from that pin, so a consumer-breaking
+# engine change dies HERE (engine CI, on the PR) — before publish-artifact.yml
+# ever propagates it and before a user can see a broken screen. It is the
+# engine-side replacement for the web shell's removed boot self-test
+# (2026-07-20 delegation decision; the web repo stays untouched).
+#
+# Two layers:
+#   1. scripts/check-engine-contract.mjs  — static surface (node-only)
+#   2. scripts/contract-roundtrip.mjs     — real-browser boot round-trip using
+#      the repo's own hello-world fixtures (no game files involved)
+# publish-artifact.yml runs the same two checks as a fail-closed pre-release
+# gate, so even a break that lands on main cannot reach featurephone.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**/*.rs"
+      - "**/Cargo.toml"
+      - "Cargo.lock"
+      - "scripts/build-wasm.sh"
+      - "scripts/check-engine-contract.mjs"
+      - "scripts/contract-roundtrip.mjs"
+      - "docs/contracts/**"
+      - "test_data/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/engine-contract.yml"
+      - ".github/workflows/publish-artifact.yml"
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - "**/*.rs"
+      - "**/Cargo.toml"
+      - "Cargo.lock"
+      - "scripts/build-wasm.sh"
+      - "scripts/check-engine-contract.mjs"
+      - "scripts/contract-roundtrip.mjs"
+      - "docs/contracts/**"
+      - "test_data/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/engine-contract.yml"
+      - ".github/workflows/publish-artifact.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engine-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      # Same cache key family as publish-artifact.yml — either workflow warms
+      # the other (identical build: wasm32 release of wie_web).
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-publish-wasm-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-publish-wasm-
+
+      - name: Install wasm-bindgen-cli (pinned to Cargo.lock)
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@0.2.108
+
+      # Parity with the published artifact: same optimizer as publish-artifact.yml
+      # (build-wasm.sh falls back to unoptimized-but-valid wasm if unavailable).
+      - name: Install binaryen (wasm-opt)
+        run: |
+          VER=version_119
+          curl -sSL "https://github.com/WebAssembly/binaryen/releases/download/${VER}/binaryen-${VER}-x86_64-linux.tar.gz" | tar xz
+          echo "$PWD/binaryen-${VER}/bin" >> "$GITHUB_PATH"
+
+      - name: Build wie_web WASM (current source)
+        run: bash scripts/build-wasm.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Contract check — static surface
+        run: node scripts/check-engine-contract.mjs
+
+      - name: Contract check — browser boot round-trip
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          node scripts/contract-roundtrip.mjs
