@@ -3,10 +3,14 @@ on:
   schedule:
     - cron: "0 0 * * *"
   workflow_dispatch:
+# Only read access is needed. We run `cargo audit` directly and let the JOB
+# STATUS carry the signal — no GitHub Issue or check-run is created, so this
+# works on a fork (where Issues are disabled and cannot be enabled via token).
+# The previous rustsec/audit-check action tried to open an Issue for every
+# warning and died with "Issues has been disabled in this repository." on every
+# scheduled run; `issues: write` / `checks: write` were ineffective residue.
 permissions:
   contents: read
-  issues: write
-  checks: write
 jobs:
   audit:
     runs-on: ubuntu-latest
@@ -23,23 +27,30 @@ jobs:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Cache cargo build
-        uses: actions/cache@v5
-        with:
-          path: target
-          key: ${{ runner.os }}-stable-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-
       - uses: actions/checkout@v6
         with:
           submodules: "recursive"
 
-      - uses: rustsec/audit-check@v2
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          # RUSTSEC-2026-0194/0195 (quick-xml XML DoS): patched only in >=0.41.0, but our sole
-          # consumer wayland-scanner (latest 0.31.10) still requires ^0.39, so no compatible
-          # upgrade exists. quick-xml runs exclusively at build time inside the wayland-scanner
-          # proc-macro, parsing vendored trusted Wayland protocol XML — attacker-controlled XML
-          # never reaches it. Remove once wayland-scanner bumps to quick-xml >=0.41.
-          # Tracked as PENDING in docs/project-kb/02_status.md.
-          ignore: RUSTSEC-2026-0194,RUSTSEC-2026-0195
+          tool: cargo-audit
+
+      # Vulnerabilities (vulnerabilities.count > 0) FAIL the job (cargo-audit
+      # exits non-zero). Informational warnings (unmaintained / yanked) are
+      # printed but NON-gating — cargo-audit exits 0 on warnings unless
+      # `--deny warnings` is passed, which we deliberately do not. This keeps
+      # the daily job green on the two current warnings (ttf-parser
+      # unmaintained RUSTSEC-2026-0192, spin 0.12.0 yanked) while still turning
+      # red the moment a real vulnerability appears — the two classes are
+      # distinguished by exit code, not squashed by continue-on-error.
+      #
+      # RUSTSEC-2026-0194/0195 (quick-xml XML DoS): patched only in >=0.41.0, but our sole
+      # consumer wayland-scanner (latest 0.31.10) still requires ^0.39, so no compatible
+      # upgrade exists. quick-xml runs exclusively at build time inside the wayland-scanner
+      # proc-macro, parsing vendored trusted Wayland protocol XML — attacker-controlled XML
+      # never reaches it. These are real vulnerabilities suppressed by explicit ID only
+      # (never a blanket ignore); removing either --ignore makes this job red. Remove once
+      # wayland-scanner bumps to quick-xml >=0.41. Tracked as PENDING in docs/project-kb/02_status.md.
+      - name: cargo audit
+        run: cargo audit --ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195

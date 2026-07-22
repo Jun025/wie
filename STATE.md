@@ -6,6 +6,10 @@
   (`gh pr merge --squash --delete-branch`, 머지 커밋에 `[wie-featurephone-engine-contract-selftest]` 태그).
 
 ## 완료 (최근)
+- 2026-07-22: Security audit schedule 상시 red 정정 (`wie-security-audit-schedule-red`) —
+  fork+Issues 비활성으로 `rustsec/audit-check` 의 Issue 생성이 매 schedule 런 실패하던 것을
+  `cargo audit` 직접 실행으로 전환(무효 `issues/checks: write` 권한 제거). 취약점=red / 경고=green
+  부류 분리 확립(로컬 실증). KB `02_status.md` 의 오독 green 기록도 실측대로 정정.
 - 2026-07-22: featurephone 소비 계약 드리프트 가드 구현 — `docs/contracts/` 계약 핀 +
   정적/브라우저 왕복 검사기 + `engine-contract.yml`(PR CI) + `publish-artifact.yml` 릴리스
   fail-closed 게이트. 상세: `docs/worklog/2026-07-22--featurephone-engine-contract-selftest.json`.
