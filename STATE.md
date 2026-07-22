@@ -6,6 +6,12 @@
   (`gh pr merge --squash --delete-branch`, 머지 커밋에 `[wie-featurephone-engine-contract-selftest]` 태그).
 
 ## 완료 (최근)
+- 2026-07-22: main 브랜치 보호 코드 준비 (`wie-main-branch-protection`) — `engine-contract.yml`
+  `contract` 잡을 always-run 래퍼로 전환(`paths:` 제거 + 내부 `dorny/paths-filter` 감지, 경로
+  미해당 시 즉시 성공·잡 이름 안정)해 required check 로 걸 수 있게 준비. `web.yml` 배포는 머지
+  게이트가 통제점이라 무배선 판단(주석 문서화). REPORT.md 의 "PR 단계 차단" 과장 정정.
+  ★human-step 잔여: 운영자가 branch-protection ruleset 1회 적용(리뷰 승인 필수 제외) — 상세는
+  `~/orchestrator/reports/wie-main-branch-protection.done.md` C항.
 - 2026-07-22: Security audit schedule 상시 red 정정 (`wie-security-audit-schedule-red`) —
   fork+Issues 비활성으로 `rustsec/audit-check` 의 Issue 생성이 매 schedule 런 실패하던 것을
   `cargo audit` 직접 실행으로 전환(무효 `issues/checks: write` 권한 제거). 취약점=red / 경고=green

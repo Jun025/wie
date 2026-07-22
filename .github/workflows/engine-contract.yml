@@ -17,42 +17,23 @@ name: Engine contract (featurephone consumer)
 #      the repo's own hello-world fixtures (no game files involved)
 # publish-artifact.yml runs the same two checks as a fail-closed pre-release
 # gate, so even a break that lands on main cannot reach featurephone.
+#
+# ── Always-run wrapper (required-check safe) ──────────────────────────────────
+# The `contract` job is the STABLE name registered as a required status check on
+# `main`. It has NO paths: filter on its triggers, so it ALWAYS runs and ALWAYS
+# reports a status. A required check that is instead paths-filtered would sit at
+# "Expected — Waiting for status" forever on any PR that doesn't touch the
+# filtered paths, deadlocking the merge. Path relevance is detected INSIDE the
+# job (dorny/paths-filter, `changes` step): when nothing engine-relevant changed
+# the expensive build/checks are skipped and the job succeeds immediately; the
+# job name and its required-check contract never change. Keep the filter list
+# below in sync with publish-artifact.yml's on.push.paths.
 
 on:
   push:
     branches: [main]
-    paths:
-      - "**/*.rs"
-      - "**/Cargo.toml"
-      - "Cargo.lock"
-      - "scripts/build-wasm.sh"
-      - "scripts/check-engine-contract.mjs"
-      - "scripts/contract-roundtrip.mjs"
-      - "docs/contracts/**"
-      - "test_data/**"
-      - "data/**"
-      - "fonts/**"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/engine-contract.yml"
-      - ".github/workflows/publish-artifact.yml"
   pull_request:
     types: [opened, synchronize]
-    paths:
-      - "**/*.rs"
-      - "**/Cargo.toml"
-      - "Cargo.lock"
-      - "scripts/build-wasm.sh"
-      - "scripts/check-engine-contract.mjs"
-      - "scripts/contract-roundtrip.mjs"
-      - "docs/contracts/**"
-      - "test_data/**"
-      - "data/**"
-      - "fonts/**"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/engine-contract.yml"
-      - ".github/workflows/publish-artifact.yml"
 
 permissions:
   contents: read
@@ -69,13 +50,43 @@ jobs:
         with:
           submodules: recursive
 
+      # Detect whether this diff touches anything that can change the built
+      # artifact or the pinned surface. If not, the job short-circuits to success
+      # (see the wrapper note in the header). Same list as publish-artifact.yml.
+      - name: Detect engine-relevant changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            engine:
+              - '**/*.rs'
+              - '**/Cargo.toml'
+              - 'Cargo.lock'
+              - 'scripts/build-wasm.sh'
+              - 'scripts/check-engine-contract.mjs'
+              - 'scripts/contract-roundtrip.mjs'
+              - 'docs/contracts/**'
+              - 'test_data/**'
+              - 'data/**'
+              - 'fonts/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.github/workflows/engine-contract.yml'
+              - '.github/workflows/publish-artifact.yml'
+
+      - name: No engine-relevant changes — skipping contract check
+        if: steps.changes.outputs.engine != 'true'
+        run: echo "No engine-relevant paths changed in this diff; the featurephone contract cannot have drifted. Reporting success without rebuilding."
+
       - uses: dtolnay/rust-toolchain@stable
+        if: steps.changes.outputs.engine == 'true'
         with:
           targets: wasm32-unknown-unknown
 
       # Same cache key family as publish-artifact.yml — either workflow warms
       # the other (identical build: wasm32 release of wie_web).
       - name: Cache cargo
+        if: steps.changes.outputs.engine == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -86,6 +97,7 @@ jobs:
           restore-keys: ${{ runner.os }}-publish-wasm-
 
       - name: Install wasm-bindgen-cli (pinned to Cargo.lock)
+        if: steps.changes.outputs.engine == 'true'
         uses: taiki-e/install-action@v2
         with:
           tool: wasm-bindgen-cli@0.2.108
@@ -93,22 +105,27 @@ jobs:
       # Parity with the published artifact: same optimizer as publish-artifact.yml
       # (build-wasm.sh falls back to unoptimized-but-valid wasm if unavailable).
       - name: Install binaryen (wasm-opt)
+        if: steps.changes.outputs.engine == 'true'
         run: |
           VER=version_119
           curl -sSL "https://github.com/WebAssembly/binaryen/releases/download/${VER}/binaryen-${VER}-x86_64-linux.tar.gz" | tar xz
           echo "$PWD/binaryen-${VER}/bin" >> "$GITHUB_PATH"
 
       - name: Build wie_web WASM (current source)
+        if: steps.changes.outputs.engine == 'true'
         run: bash scripts/build-wasm.sh
 
       - uses: actions/setup-node@v4
+        if: steps.changes.outputs.engine == 'true'
         with:
           node-version: 22
 
       - name: Contract check — static surface
+        if: steps.changes.outputs.engine == 'true'
         run: node scripts/check-engine-contract.mjs
 
       - name: Contract check — browser boot round-trip
+        if: steps.changes.outputs.engine == 'true'
         run: |
           npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
