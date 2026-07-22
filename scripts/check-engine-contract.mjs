@@ -77,9 +77,25 @@ try {
 // key_down("NUM5") with an unmapped code is a SILENT no-op (parse_key → None),
 // so vocabulary loss is unobservable from JS — pin it at the source level.
 const libRs = await readFile(path.join(root, "wie_web/src/lib.rs"), "utf8");
-for (const key of contract.keyVocabulary) {
-  if (new RegExp(`"${key}"\\s*=>`).test(libRs)) ok(`parse_key covers "${key}"`);
-  else bad(`key vocabulary drift: parse_key no longer maps "${key}" — featurephone KEY_MAP sends this code`);
+// Scope to the parse_key fn body so stray string matches elsewhere in the file
+// can't satisfy (or confuse) the check. Fail-closed: if the fn can't be located
+// or an arm can't be parsed, that is a violation — never a silent pass.
+const parseKeyStart = libRs.indexOf("fn parse_key(");
+const parseKeyEnd = parseKeyStart === -1 ? -1 : libRs.indexOf("\n}", parseKeyStart);
+if (parseKeyStart === -1 || parseKeyEnd === -1) {
+  bad("key mapping unverifiable: `fn parse_key(` not found (or unterminated) in wie_web/src/lib.rs — refusing to fail-open; fix the checker's locator if the fn moved");
+} else {
+  const parseKeyBody = libRs.slice(parseKeyStart, parseKeyEnd);
+  for (const key of contract.keyVocabulary) {
+    // Pair check: the arm's RIGHT side must be the same-named KeyCode variant
+    // ("UP" => KeyCode::UP). A left-side-only check would pass a miswired
+    // "UP" => KeyCode::DOWN.
+    const arms = [...parseKeyBody.matchAll(new RegExp(`"${key}"\\s*=>\\s*([A-Za-z0-9_:]+)`, "g"))];
+    if (arms.length === 0) bad(`key vocabulary drift: parse_key no longer maps "${key}" — featurephone KEY_MAP sends this code`);
+    else if (arms.length > 1) bad(`key mapping unverifiable: "${key}" has ${arms.length} match arms in parse_key — refusing to fail-open`);
+    else if (arms[0][1] === `KeyCode::${key}`) ok(`parse_key maps "${key}" => KeyCode::${key}`);
+    else bad(`key mapping miswired: parse_key maps "${key}" => ${arms[0][1]}, expected KeyCode::${key}`);
+  }
 }
 if (libRs.includes(`b"${contract.saveMagic}"`)) ok(`save magic pinned: ${contract.saveMagic}`);
 else bad(`save magic drift: b"${contract.saveMagic}" not found in wie_web/src/lib.rs — stored featurephone save blobs would stop importing`);

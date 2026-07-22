@@ -22,6 +22,8 @@ on:
       - "**/Cargo.toml"
       - "Cargo.lock"
       - "scripts/build-wasm.sh"
+      - "data/**"
+      - "fonts/**"
       - ".github/workflows/publish-artifact.yml"
   workflow_dispatch:
 
