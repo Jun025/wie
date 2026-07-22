@@ -3,6 +3,19 @@ name: Web (wasm build + Pages deploy)
 # Cloudflare Pages build images do not ship Rust, so the wasm is prebuilt here
 # and only the static `web/dist` (assets + Pages Functions) is shipped. No game
 # files are ever produced or bundled by this workflow.
+#
+# ── Why the prod deploy is NOT gated on Rust CI (rust.yml) ────────────────────
+# The D1 migration + Pages production deploy run as later steps of the SAME
+# build-web job, so they already require this job's wasm+frontend build to pass.
+# They are deliberately NOT wired (via workflow_run) to rust.yml's result: the
+# correct control point is the MERGE gate, not the deploy trigger. Once main is
+# protected (required checks rust_ci/build-web/contract + PR-before-merge — see
+# docs and the wie-main-branch-protection rollout), every commit that reaches a
+# main push has already passed Rust CI, so the deploy is CI-green by
+# construction. A cross-workflow workflow_run rewire would add real fragility
+# (default-branch context, ref/secret handling) and could halt deploys for
+# marginal benefit, so it is intentionally avoided. Residual risk — a direct
+# push to main bypassing PRs — is closed by the same branch protection.
 
 on:
   push:
