@@ -45,12 +45,12 @@ jobs:
       # red the moment a real vulnerability appears — the two classes are
       # distinguished by exit code, not squashed by continue-on-error.
       #
-      # RUSTSEC-2026-0194/0195 (quick-xml XML DoS): patched only in >=0.41.0, but our sole
-      # consumer wayland-scanner (latest 0.31.10) still requires ^0.39, so no compatible
-      # upgrade exists. quick-xml runs exclusively at build time inside the wayland-scanner
-      # proc-macro, parsing vendored trusted Wayland protocol XML — attacker-controlled XML
-      # never reaches it. These are real vulnerabilities suppressed by explicit ID only
-      # (never a blanket ignore); removing either --ignore makes this job red. Remove once
-      # wayland-scanner bumps to quick-xml >=0.41. Tracked as PENDING in docs/project-kb/02_status.md.
+      # The former `--ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195`
+      # (quick-xml XML DoS) is GONE as of 2026-07-31: wayland-scanner 0.31.11
+      # adopted quick-xml ^0.41, so `cargo update -p wayland-scanner` lifted us
+      # to the patched 0.41.0 and the suppression is no longer needed. This step
+      # now runs with NO ignores at all — any future suppression must be added
+      # back by explicit advisory ID with its reachability argument, never as a
+      # blanket ignore.
       - name: cargo audit
-        run: cargo audit --ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195
+        run: cargo audit
