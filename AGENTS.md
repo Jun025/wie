@@ -27,7 +27,7 @@ interpreter recursion overflows the default test-thread stack without it.
 Web-surface commands (only when touching `web/`, `functions/`, `scripts/`, or `migrations/`):
 
 ```sh
-node scripts/check-engine-contract.mjs   # static featurephone-contract surface check (node only, offline)
+node scripts/check-engine-contract.mjs   # static featurephone-contract surface check (node only; needs web/src/wasm present)
 npm run audit                            # scripts/audit-no-leak.sh: no game bytes / no cross-user leak (offline)
 npm run build:wasm                       # scripts/build-wasm.sh: cargo wasm32 + wasm-bindgen + wasm-opt -> web/src/wasm
 npm run frontend                         # cd web && npm install && npm run build (wasm + tsc -b + vite build) -> web/dist
@@ -35,8 +35,12 @@ node scripts/contract-roundtrip.mjs      # real-browser boot round-trip; needs `
 npm run verify                           # scripts/verify-browser.mjs: browser verification pass
 ```
 
-The first two run offline against the committed tree and are the cheap pre-push check for any
-`functions/` or `web/src/lib` change. The rest need a toolchain fetch (`wasm-bindgen-cli`,
+`npm run audit` runs offline against the checked-out tree; the contract check is offline too but
+assumes the WASM artifact already exists in `web/src/wasm/` (run `npm run build:wasm` first, or
+reuse an earlier local build) — on a clean checkout it fails with missing-artifact violations.
+CI runs them in that order (`engine-contract.yml`: `build-wasm.sh` at :116, then the check at :125).
+Together they are the cheap pre-push check for any `functions/` or `web/src/lib` change.
+The rest need a toolchain fetch (`wasm-bindgen-cli`,
 `binaryen`, npm install, Playwright browsers), so run them when the change actually touches the
 built artifact or the UI.
 
@@ -108,7 +112,7 @@ embeds the engine as WASM. Nothing above the engine is allowed to reach back int
 
 | Path | Role |
 |---|---|
-| `web/` | React 19 + Vite + Tailwind frontend. `web/src/wasm/` holds the committed engine artifact (`wie_web.js` glue + `wie_web_bg.wasm`) that `build-wasm.sh` regenerates. |
+| `web/` | React 19 + Vite + Tailwind frontend. `web/src/wasm/` holds the engine artifact (`wie_web.js` glue + `wie_web_bg.wasm`) that `build-wasm.sh` generates — git-ignored, never committed (`web/.gitignore`). |
 | `functions/` | Cloudflare Pages Functions (the API). `functions/_lib/` is import-only (Pages does not route `_`-prefixed paths); `functions/api/` is the routed surface. |
 | `migrations/` | D1 SQL migrations, auto-applied to the prod DB on `main` pushes. |
 | `scripts/` | Build and gate scripts: `build-wasm.sh`, `check-engine-contract.mjs`, `contract-roundtrip.mjs`, `audit-no-leak.sh`, `verify-browser.mjs`, `smoke_gate.sh`, `lgt_render_probe.sh`. |
