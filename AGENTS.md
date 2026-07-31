@@ -15,6 +15,11 @@
 - **GitHub CLI**: scope `gh` commands with `-R Jun025/wie`.
 - **Commit trailer**: end commit messages with the `Co-Authored-By:` trailer.
 
+## Session Discipline
+- **Never rewrite published history**: no `git push --force`, no rebasing a branch that has been pushed. Before a risky change (bulk deletion, migration/schema edit, deploy wiring), commit a checkpoint first, so recovering the previous state never needs a force-push.
+- **Local surfaces only**: work this repo from a local session. Do not move the work onto cloud surfaces (`claude --remote`, Cowork/Dispatch, app chat/Projects) — game bytes and secrets must never leave this machine, which is what the `.gitignore` blocklist, `scripts/audit-no-leak.sh`, and the `.dev.vars` read-deny in `.claude/settings.json` exist to enforce.
+- **`STATE.md` and `REPORT.md` are tracked files, not scratch**: keep `STATE.md`'s 진행중/완료/다음 current as a task starts and lands, and append a dated 무엇을·왜·사용자 영향 entry to the top of `REPORT.md` when it lands.
+
 ## Code Style Guidelines
 - **Edition**: Rust 2024
 - **no_std**: Most crates are `#![no_std]` with `extern crate alloc`
