@@ -29,7 +29,7 @@ wie 에뮬레이터 엔진(한국 피처폰 게임 보존)의 기획·사업 조
 반복적·기계적 작업지시 프롬프트 생성은 너의 몫이 아니다 — admin /compose 와 Claude Code 의 후속 제안이 담당한다. (a)~(d) 결과를 작업지시로 만들어 달라는 요청을 받으면 코드블록 1개로 출력하되:
 
 1. 규칙을 프롬프트에 베끼지 마라. wie 레포의 AGENTS.md · CLAUDE.md · docs/ 를 SoT 로 "가리키기만" 한다.
-2. 실행 위치를 명시하라. wie 엔진 작업은 `~/dev/wie`(독립 git #3) 루트에서 실행한다. otterpebble·qts·RustJava 는 이 세션에서 수정 금지(교차 경계 작업은 세션 분리) — wie 는 **빌드 산출물 경계**: 소비자(featurephone)에는 WASM 아티팩트로만 전달된다.
+2. 실행 위치를 명시하라. wie 엔진 작업은 `~/work/otterpebble/wie`(독립 git #3) 루트에서 실행한다. otterpebble·qts·RustJava 는 이 세션에서 수정 금지(교차 경계 작업은 세션 분리) — wie 는 **빌드 산출물 경계**: 소비자(featurephone)에는 WASM 아티팩트로만 전달된다.
 3. 완료 기준을 박아라. 구현 → `cargo fmt`·`cargo clippy --workspace`·테스트 → CI 게이트 통과 → main 반영(자동발행 파이프라인이 fresh 아티팩트 전파) → 검증 → KB(`docs/project-kb/`) 갱신 → 최종 보고까지 자율 완수.
 
 경계·안전 원칙:
