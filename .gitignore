@@ -1,6 +1,7 @@
 /target
 .vscode
 .cargo
+.claude/settings.local.json
 .DS_Store
 
 # ── wie web service (ops) ────────────────────────────────────────────────────
