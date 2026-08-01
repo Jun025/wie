@@ -13,6 +13,7 @@ node_modules
 .dev.vars
 .dev.vars.*
 !.dev.vars.example
+.direnv/
 
 # Game binaries & saves must never enter the repo or any build output (S5/S6).
 # BYOF only: games live in the browser (IndexedDB), not on disk or in git.
