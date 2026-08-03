@@ -45,11 +45,27 @@ The rest need a toolchain fetch (`wasm-bindgen-cli`,
 built artifact or the UI.
 
 ## Git Workflow
-- **Run every task to completion**: branch → commit → PR → merge into `main`. Do not stop at "changes made" — land it on `main` unless genuinely blocked.
+
+**Completion is an open PR, not a merge.** Your task ends when the branch is pushed and the PR is
+open awaiting review approval. Merging and branch deletion are a *separate* `-merge` task that runs
+only after the review gate approves. This is not a formality: merging your own PR bypasses the
+review gate, and this repo has been burned by exactly that five times.
+
+- **Run every task to completion**: branch → commit → push → **open a PR, and stop there**. Do not stop earlier at "changes made" — an unpushed branch or an unopened PR is an unfinished task. But do not go further either.
+- **Never merge your own PR**, and never merge on the strength of green CI alone. CI passing is necessary, not sufficient — approval is what authorizes the merge, and it is not yours to grant.
 - **Never commit directly to `main`**: always work on a short-lived branch.
-- **Clean up merged branches (MANDATORY)**: once a branch's work is complete and merged into `main`, delete it — remote and local — and sync local `main`. Prefer `gh pr merge --delete-branch` (deletes the remote), then locally `git branch -D <branch>` and `git fetch --prune`. Use `-D` (force) because squash-merged branches aren't recognized as merged by `-d`. Leave no stale merged branches behind — only `main` and in-progress work remain. Never re-merge or re-PR an already-merged branch.
+- **Leave your branch in place**: deleting it is the merge task's job (see below). Never re-merge or re-PR an already-merged branch.
 - **GitHub CLI**: scope `gh` commands with `-R Jun025/wie`.
 - **Commit trailer**: end commit messages with the `Co-Authored-By:` trailer.
+
+### For the `-merge` task only
+
+The steps below belong to the separate post-approval merge task. They are recorded here so the
+knowledge is not lost — **not** as something to do at the end of an implementation task.
+
+- Squash-merge, then delete the remote branch (`gh pr merge --squash --delete-branch`) and the local one (`git branch -D <branch>`, then `git fetch --prune`). `-D` is required because squash-merged branches aren't recognized as merged by `-d`.
+- Leave no stale merged branches behind — only `main` and in-progress work remain.
+- Sync local `main` afterwards.
 
 ## Session Discipline
 - **Never rewrite published history**: no `git push --force`, no rebasing a branch that has been pushed. Before a risky change (bulk deletion, migration/schema edit, deploy wiring), commit a checkpoint first, so recovering the previous state never needs a force-push.
@@ -144,7 +160,7 @@ saying so, and treat any refactor that trips one as wrong until proven otherwise
 9. **No game bytes, ever.** Game binaries/saves must never enter the repo, the build output, or any log (`.gitignore` blocklist + `scripts/audit-no-leak.sh`). Server-side, the file vault is per-owner isolated with no cross-user identity path — `npm run audit` encodes those checks.
 10. **Secrets are referenced, never embedded or printed.** `.dev.vars*` is git-ignored (`.dev.vars.example` is the committed template); CI reads tokens from `secrets.*` and gates steps on presence flags rather than echoing values.
 11. **D1 migrations auto-apply to prod on `main`, including destructive statements.** This is a documented pre-launch policy (`docs/CLOUDFLARE_SETUP.md`, `web.yml`). Author migrations accordingly.
-12. **Branch discipline** (see Git Workflow above): never commit to `main`; branch → PR → squash-merge → delete the branch.
+12. **Branch discipline** (see Git Workflow above): never commit to `main`; branch → PR, and stop. The merge and the branch deletion belong to a separate `-merge` task gated on review approval — merging your own PR bypasses that gate.
 
 ## Agent Environment
 
