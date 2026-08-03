@@ -7,6 +7,11 @@
   브랜치 `docs/agents-md-gate2-contradiction-fix`. **문서 전용 · PR 게이트② 리뷰 대기.**
 - `wie-rustsec-advisory-sweep-batch2` — 공급망 추적 대장 등재 완료. 브랜치
   `sec/rustsec-advisory-sweep-batch2`, PR #52 게이트② 리뷰 대기.
+- `wie-rustsec-advisory-sweep-batch2` — 배치1 이월분 **등재 완료**(`docs/project-kb/02_status.md`
+  «공급망 추적 대장»: 권고·공급망 3건 + upstream 이슈 9건) · 신규 권고 2건 판정 완료
+  (`event-listener` RUSTSEC-2026-0221 · `spin` yanked — **둘 다 도달 불가**) · upstream 9건 재조회
+  (#1292 종결로 실질 개발 후보 3→2건). **문서 전용 — 코드/lockfile 무변경**. 브랜치
+  `sec/rustsec-advisory-sweep-batch2`, PR 게이트② 리뷰 대기(**머지·브랜치 삭제는 별도 `-merge` 티켓**).
 - `wie-featurephone-engine-contract-selftest` — 구현·로컬 검증 완료, PR 게이트② 리뷰 대기.
   브랜치 `feat/wie-featurephone-engine-contract-selftest`.
   ※머지·브랜치 삭제는 **워커가 하지 않는다** — approve 후 별도 `-merge` 티켓의 몫
@@ -28,6 +33,9 @@
   fail-closed 게이트. 상세: `docs/worklog/2026-07-22--featurephone-engine-contract-selftest.json`.
 
 ## 다음
+- **공급망 위생 상향 2건 발권**(대장 A-2·A-3): `cargo update -p event-listener`(5.4.1→5.4.2) ·
+  `cargo update -p spin`(0.12.0→0.12.2). 각 dry-run 1패키지 이동 실측 완료 · 긴급도 0(도달 불가).
+- **upstream 이월 개발 후보 발권**(대장 B): #1260(LGT Unknown SVC 1409) · #1122(실행중 정지 재현).
 - (게이트② approve 후) **별도 `-merge` 티켓**이 PR 머지 + 브랜치 삭제 + 로컬 main 동기화를 수행.
   ★워커는 여기까지 오지 않는다 — 완주는 PR 을 열어 둔 시점이다(`AGENTS.md` §Git Workflow).
 - 로컬 main 이 origin/main 과 분기 상태(로컬 전용 커밋 `0f13ab87` chore: 자율운영 하드닝, ahead 1 / behind 12).
