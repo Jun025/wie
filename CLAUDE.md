@@ -7,6 +7,15 @@
   읽기전용 조사까지만 하고 **총괄에게 확인을 구한다.**
   (dispatcher 를 거치지 않고 생성된 세션 — `Dispatch(Cowork)` 등 — 의 **원장 밖 변경 방지**.)
 
+## 완주 규율
+
+- ★**완주 = PR 을 열어 둔 상태이지 머지가 아니다.** 브랜치 push + PR 생성까지가 네 몫이고,
+  **머지와 브랜치 삭제는 검수 approve 후 별도 `-merge` 티켓의 몫**이다.
+  **네 PR 을 네가 머지하지 마라** — CI green 은 필요조건일 뿐 승인이 아니다.
+  (정본 = `AGENTS.md` §Git Workflow · Hard Req 12. 위 `@AGENTS.md` 로 이미 로드됨.)
+  ★이 조항이 리터럴로 적힌 이유: 종전 헌장이 «완주 = main 에 머지» 라고 가르쳐
+  **동일 실패형이 5건** 났다(`wie-agents-md-gate2-contradiction-fix`, 2026-08-02).
+
 ## 에이전트 개발환경
 
 정본은 `AGENTS.md`(위 `@AGENTS.md` 로 이미 로드됨)다. 이 절은 진입점만 가리킨다.

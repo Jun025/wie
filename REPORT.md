@@ -1,5 +1,13 @@
 # REPORT
 
+## [2026-08-02] 헌장이 머지를 «지시» 하던 문장 제거 — 게이트② 우회의 근인 (wie-agents-md-gate2-contradiction-fix)
+- **무엇을**: 워커에게 머지·브랜치 삭제를 **지시**하던 문장 **5곳**을 개정했다 — `AGENTS.md` **3곳**(§Git Workflow «완주 = merge into main» · «Clean up merged branches (MANDATORY)» + `gh pr merge --delete-branch` 권장 · Hard Req 12 «squash-merge → delete the branch»)과 `CONTRIBUTING.md` **2곳**(§Git Workflow 17·18행). 더해 ①`AGENTS.md` 에 «For the `-merge` task only» 절을 신설해 브랜치 정리 절차를 **머지 티켓 소유로 이관**(지식은 보존, 수행 주체만 변경) ②`CLAUDE.md` 에 «완주 규율» 절 신설 ③`STATE.md` 의 머지 지시 문안 2곳 정정. **코드·워크플로 로직 무변경.**
+- **왜**: 게이트② 사후 감사(`wie-rustsec-advisory-sweep-batch1.review.md`, severity **critical**)가 근인으로 확정한 것이 이 문장들이다. 헌장이 «완주 = `main` 에 머지» 라고 가르치니 **워커는 규율을 어긴 게 아니라 자기 repo 의 헌장을 따랐고**, 그 결과 검수 approve 전 머지가 **5건**(#48·#43·#42·#39·#38) 났다. 07-22 사후 회신들이 이미 «wie 4건 동일 실패형» 이라 적어 뒀는데 **헌장을 안 고쳐서 8일 만에 5건째**가 났다 — «알고 있었다» 가 «고쳤다» 를 대체하지 못한다.
+- **핵심 개정**: 완주의 정의를 **«PR 을 열어 둔 상태»** 로 바꿨다. 머지와 브랜치 삭제는 검수 approve 후 **별도 `-merge` 티켓**의 몫이며, «CI green 은 필요조건일 뿐 승인이 아니다» 를 명시했다. 종전 문안은 «changes made 에서 멈추지 마라» 는 압력만 있고 상한이 없어 워커를 머지까지 밀어냈으므로, 하한(«push·PR 안 하면 미완주»)과 상한(«그 이상 가지 마라»)을 **양쪽 다** 적었다.
+- **★감사가 놓친 2곳**: 감사는 `AGENTS.md` 3곳만 지목했으나, 전수 스캔에서 **`CONTRIBUTING.md` 에 같은 지시가 2곳 더** 있었다. blame 결과 이 절은 upstream `dlunch/wie` 에 **없는 우리 자작**이고 커밋 `1960d9c9`(«codify git workflow — **merge to main**», 2026-07-12)이 **두 파일에 동시에** 심은 것이다. 근인 커밋이 하나인데 사본이 둘이었으므로, 3곳만 고쳤으면 살아 있는 사본이 남았다.
+- **사용자 영향**: 없음(문서 전용). 다만 검수 전 머지가 구조적으로 막히면 **미검수 변경이 `main` 에 들어가 featurephone 으로 자동 전파될 확률이 낮아진다** — `publish-artifact.yml` 이 `main` push 에서 발행·dispatch 하므로 게이트② 우회는 곧 사용자 도달 경로의 우회였다.
+- **후속 추천**: ①(운영자) `main` branch-protection 에 «PR 승인 필수» 를 걸면 문서가 아니라 **플랫폼이** 강제 — 현재 강제력은 여전히 문서뿐이다(`wie-main-branch-protection` human-step 미적용 상태) ②`-merge` 티켓 문안 표준화 시 `AGENTS.md` §For the `-merge` task only 를 참조점으로 사용.
+
 ## [2026-08-01] RUSTSEC 이월분 등재 + 신규 권고 2건 판정 (wie-rustsec-advisory-sweep-batch2)
 - **무엇을**: ①`docs/project-kb/02_status.md` 에 **«공급망 추적 대장»** 신설 — 배치1(2026-07-31)이 완료 보고서 본문에만 남겼던 이월분을 KB 로 옮겨 등재(**A. 권고·공급망 3건** + **B. upstream 이슈 9건**, 총 **12행**). ②신규 경고 2건 판정: `event-listener` **RUSTSEC-2026-0221**(unsound) · `spin` **0.12.0 yanked**. ③upstream 9건 재조회. ④로드맵에 발권 대기 항목 6·7번 추가. **문서 전용 — 코드·`Cargo.lock`·워크플로 무변경.**
 - **왜**: 배치1 게이트② 사후 감사가 «이월 목록이 done 본문 단 한 곳에만 존재 = 사실상 유실»(severity major)로 지목했다. 티켓·큐·KB 어디에도 없어 추적 대기열 밖에 있었고, 이 저장소의 반복 실패형이다. 등재가 곧 최소 산출물.
