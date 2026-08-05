@@ -1,5 +1,48 @@
 # REPORT
 
+## [2026-08-05] 에이전트 지침 선언형 재구조화 — 잠금 테이블 + 지도 이관 (wie-agents-md-declarative-restructure)
+- **무엇을**: `AGENTS.md` 를 **Goal / Constraints / Definition of Done / 사건 대장** 골격으로 재배치했다.
+  ①Hard Requirements 12항 산문 → **12행 잠금 테이블**(각 항 = 한 줄 + «무엇이 잡는가» 포인터)
+  ②아키텍처 지도 4종(레이어 다이어그램·crate roles 표·non-Rust surfaces 표, ~44줄)을
+  `docs/architecture.md` 로 **이관**(삭제 아님) + 한 줄 crate 목록과 포인터만 잔류
+  ③ponytail 절의 do-not-cut 재열거 제거 → 「Constraints 표가 그 목록이다」
+  ④`CLAUDE.md` 축소금지 목록도 포인터 1줄로 대체(같은 목록이 **3벌**이었다)
+  ⑤Hard Req 1·2 의 «왜» 를 `rust.yml`·`coverage.yml` **헤더 주석으로 이관**.
+  **실측: 16,888 → 13,099 바이트(−22.4%)**, 상시 로드 합계(AGENTS+CLAUDE) 19,209 → 15,360(−20.0%).
+  **코드·빌드설정·CI 동작 무변경** — 워크플로는 주석만 늘었고 파싱된 YAML 이 main 과 동일함을 확인했다.
+- **왜**: 2026-08-05 전 프로젝트 지침 감사(`reports/audit-agent-instructions-2026-08-05.md` §3-1)가
+  이 repo 의 Hard Req 12항 **대부분이 이미 CI 워크플로로 잠겨 있는데 산문이 한 번 더 적고 있다**고
+  지목했다. ★지표도 바꿨다 — **줄 수가 아니라 바이트다**. 종전 189줄은 줄당 89바이트라 줄 수로는
+  부하가 보이지 않았다.
+- **★보존한 것(축약 금지)**: 「Completion is an open PR, not a merge」 전문과 §Git Workflow 전체,
+  `CLAUDE.md` §완주 규율의 **리터럴 반복**(중복이지만 **의도된 것**), 게임바이트·시크릿·로컬전용
+  3종 전문, `RUST_MIN_STACK` «not decorative», always-run 래퍼 교착 인과, 정확버전 핀 근거.
+  뒤의 둘은 새 **사건 대장** 절로 옮겼다 — 서술형이 보호되는 자리다.
+- **★부수 실측 ①**: `**/Cargo.toml` 이 `publish-artifact.yml` 의 `on.push.paths` 에 있다 —
+  **paths-filter 는 내용이 아니라 경로만 본다**(otterpebble `free-tier.md` 기실측의 재확인). 즉
+  **주석만 고친 Cargo.toml 도** 머지되면 릴리스 발행 + otterpebble `repository_dispatch` 를 발화시킨다.
+  ⇒ Hard Req 8 의 «왜» 를 Cargo.toml 주석으로 내리려던 계획을 **철회**하고 `AGENTS.md` 에 남겼다.
+  이 인과를 사건 대장에 등재했다.
+- **★부수 실측 ②**: **MCP 등록 0개**(`claude mcp list` 무 · `~/.claude.json`·`~/.claude/settings.json`·
+  `$CLAUDE_CONFIG_DIR` 2개 파일 전부 `mcpServers` 빈 값). `AGENTS.md` 는 「3종이 매 세션 사용 가능」이라
+  적고 있었다 — **사실이 아니었다**. 문안을 실측대로 정정했고, 이로써 티켓 C2 의 「serena 로 대체
+  가능한가」는 **불가**로 확정 → 지도는 삭제가 아니라 읽을 수 있는 문서로 이관했다.
+- **★plan mode 시뮬레이션이 잡은 결함 1건**: 신·구 지침으로 각각 대표 작업 2건을 계획시켜 비교했더니,
+  신 지침을 읽은 에이전트가 **순수 `web/` CSS 수정에서 Rust 게이트 4종을 누락**했다(«.rs 무변경이니
+  web 명령만» 으로 읽음). 구 지침에는 «Pre-commit (MANDATORY)» 문장이 그 일을 하고 있었는데 게이트
+  블록에 접으면서 «every commit» 이 사라진 것이다. ⇒ 「4종은 무엇을 고쳤든 **매 커밋 전**에 돌린다 ·
+  web 명령은 **추가**이지 대체가 아니다」를 명시해 수정했다. 나머지 6개 점검 문항은 신·구 동등하거나
+  신 지침이 우세했다(구 지침은 playwright MCP 가 쓸 수 있다고 **오판**).
+- **사용자 영향**: 없음(문서 전용). 간접 영향은 매 세션 상시 로드가 약 3.8KB 줄어 같은 컨텍스트로
+  실제 작업에 쓸 여지가 늘고, 잠금 포인터 덕에 「이 규칙을 누가 강제하나」를 파일을 뒤지지 않고 안다.
+- **경계 / 미달**: 목표 바이트는 **≤12,288 이었고 결과는 13,099 — 811 초과**다. 파일의 약 6,500바이트가
+  C3 무접촉 문안이거나 이번 산출물인 잠금 테이블이라, 남은 초과분을 없애려면 **보호 대상 서술을
+  압축**해야 했다. 감사 자신의 결론(「선언화하면 가장 비싼 정보가 증발한다」)에 반하므로 멈추고 수치를
+  보고한다. 시뮬레이션 수정분 214바이트도 이 초과에 포함돼 있다 — 정확성을 바이트에 양보하지 않았다.
+- **후속 추천**: ①`CONTRIBUTING.md` 가 §Git Workflow 를 또 한 벌 갖고 있는지 재점검(#53 이 2곳을
+  고쳤으나 이번 재구조화로 절 이름이 바뀌었다) ②감사 §4 훅(H2 「티켓 없는 착수 금지」)이 도입되면
+  `CLAUDE.md` §착수 규율도 포인터로 축약 가능 — 현재는 강제력이 산문뿐이라 유지했다.
+
 ## [2026-08-02] 헌장이 머지를 «지시» 하던 문장 제거 — 게이트② 우회의 근인 (wie-agents-md-gate2-contradiction-fix)
 - **무엇을**: 워커에게 머지·브랜치 삭제를 **지시**하던 문장 **5곳**을 개정했다 — `AGENTS.md` **3곳**(§Git Workflow «완주 = merge into main» · «Clean up merged branches (MANDATORY)» + `gh pr merge --delete-branch` 권장 · Hard Req 12 «squash-merge → delete the branch»)과 `CONTRIBUTING.md` **2곳**(§Git Workflow 17·18행). 더해 ①`AGENTS.md` 에 «For the `-merge` task only» 절을 신설해 브랜치 정리 절차를 **머지 티켓 소유로 이관**(지식은 보존, 수행 주체만 변경) ②`CLAUDE.md` 에 «완주 규율» 절 신설 ③`STATE.md` 의 머지 지시 문안 2곳 정정. **코드·워크플로 로직 무변경.**
 - **왜**: 게이트② 사후 감사(`wie-rustsec-advisory-sweep-batch1.review.md`, severity **critical**)가 근인으로 확정한 것이 이 문장들이다. 헌장이 «완주 = `main` 에 머지» 라고 가르치니 **워커는 규율을 어긴 게 아니라 자기 repo 의 헌장을 따랐고**, 그 결과 검수 approve 전 머지가 **5건**(#48·#43·#42·#39·#38) 났다. 07-22 사후 회신들이 이미 «wie 4건 동일 실패형» 이라 적어 뒀는데 **헌장을 안 고쳐서 8일 만에 5건째**가 났다 — «알고 있었다» 가 «고쳤다» 를 대체하지 못한다.
