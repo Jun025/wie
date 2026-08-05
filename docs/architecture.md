@@ -19,6 +19,57 @@ The repository is organized around three layers:
 
 Platform crates such as `wie_ktf`, `wie_lgt`, `wie_skt`, and `wie_j2me` sit on top of those layers and choose which execution model to use.
 
+## Crate Map
+
+The repo is one Cargo workspace (the emulator engine) plus a Cloudflare Pages web service that
+embeds the engine as WASM. Nothing above the engine is allowed to reach back into it.
+
+```
+                    ┌─ hosts ────────────────────────────────────────┐
+  wie_cli  (native desktop: winit/softbuffer/rodio/midir)            │
+  wie_web  (browser: wasm-bindgen; empty lib on non-wasm targets)    │
+                    └───────────────┬────────────────────────────────┘
+                                    │ implements wie_backend::Platform
+                    ┌───────────────▼────────────────────────────────┐
+  wie_backend       │ Platform / Screen / AudioSink / Filesystem /   │
+                    │ Database traits, canvas, executor, event queue │
+                    └───────────────┬────────────────────────────────┘
+        ┌───────────────────────────┼───────────────────────────┐
+  wie_ktf / wie_lgt / wie_skt / wie_j2me   ← per-carrier emulator entry points
+        └───────────┬───────────────┴──────────────┬────────────┘
+  wie_core_arm (ARM32 CPU + binary patches)   wie_jvm_support (RustJava bridge)
+  wie_wipi_c / wie_wipi_java / wie_midp / wie_skvm  ← the emulated API surfaces
+                                    │
+                              wie_util (Result/WieError, byte read/write helpers)
+```
+
+### Crate roles
+
+| Crate | Role |
+|---|---|
+| `wie_util` | `Result`/`WieError`, `ByteRead`/`ByteWrite`, generic memory read/write helpers. Bottom of the stack — depends on nothing in-tree. |
+| `wie_backend` | The host-abstraction boundary. Owns the `Platform`, `Screen`, `AudioSink`, `Filesystem`, `Database`, `TaskRunner`, `Emulator` traits plus canvas/font/zip/audio services. Every host implements these. |
+| `wie_core_arm` | ARM32 interpretation (`arm32_cpu`), the emulated-function calling convention, and the `data/binary_patches.toml`-driven per-game patch table. |
+| `wie_jvm_support` | Bridges the emulated Java world onto the patched RustJava JVM (`JvmImplementation`, class-proto plumbing). |
+| `wie_wipi_c` | WIPI C API (`WIPICContext`): graphics, kernel, media, network shims called from ARM code. |
+| `wie_wipi_java`, `wie_midp`, `wie_skvm` | The emulated Java class libraries — WIPI (`org.kwis.msp.*`), MIDP (`javax.microedition.*`), and SK-VM respectively. |
+| `wie_ktf`, `wie_lgt`, `wie_skt`, `wie_j2me` | Per-platform entry points: archive layout, boot/relocation, and which API surfaces get wired. `wie_ktf`/`wie_lgt` carry the heavy reverse-engineered runtimes. |
+| `wie_cli` | Native host. Also ships `src/bin/wie_validate.rs`, a headless PASS/FAIL triage runner for batch game validation. |
+| `wie_web` | Browser host. Compiles to an empty library off `wasm32` on purpose, so native workspace jobs stay green. |
+| `wie_ktf_dump` | Dev-only binary: dumps a KTF game's relocated `client.bin` for IDA/Ghidra. |
+| `test_utils` | Shared in-memory `Platform`/`Filesystem`/`Database`/JVM fixtures for tests. |
+
+### Non-Rust surfaces
+
+| Path | Role |
+|---|---|
+| `web/` | React 19 + Vite + Tailwind frontend. `web/src/wasm/` holds the engine artifact (`wie_web.js` glue + `wie_web_bg.wasm`) that `build-wasm.sh` generates — git-ignored, never committed (`web/.gitignore`). |
+| `functions/` | Cloudflare Pages Functions (the API). `functions/_lib/` is import-only (Pages does not route `_`-prefixed paths); `functions/api/` is the routed surface. |
+| `migrations/` | D1 SQL migrations, auto-applied to the prod DB on `main` pushes. |
+| `scripts/` | Build and gate scripts: `build-wasm.sh`, `check-engine-contract.mjs`, `contract-roundtrip.mjs`, `audit-no-leak.sh`, `verify-browser.mjs`, `smoke_gate.sh`, `lgt_render_probe.sh`. |
+| `docs/` | This file, per-platform RE notes (`ktf.md`, `lgt.md`, `lgt_abi.md`), `contracts/` (the featurephone consumer pin), `project-kb/`, `verification/` screenshots, `worklog/`. |
+| `data/`, `fonts/`, `test_data/` | Binary-patch table, the bundled `neodgm.ttf`, and the hello-world fixtures the tests and the round-trip gate boot. |
+
 ## Why Most Crates Are `no_std`
 
 Most crates in the repository are written as `no_std` crates so the core emulator logic is not tied to a native desktop runtime.
