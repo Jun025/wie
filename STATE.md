@@ -1,6 +1,15 @@
 # STATE
 
 ## 진행중
+- `wie-agents-md-declarative-restructure` — `AGENTS.md` 를 Goal/Constraints/DoD/사건 대장 골격으로
+  재구조화 + Hard Req 12항 → **잠금 테이블**. **16,888 → 13,099 바이트**(−22.4%, 목표 12,288 대비 811 초과 —
+  초과분은 C3 무접촉 문안 + 시뮬레이션 수정 214바이트라 남겼다). 지도 4종(다이어그램·crate roles·non-Rust surfaces)은
+  `docs/architecture.md` 로 **이관**(삭제 아님), `CLAUDE.md` 축소금지 목록은 포인터 1줄로 대체.
+  워크플로는 **주석만** 추가(`rust.yml`·`coverage.yml` — 파싱 YAML 이 main 과 동일함을 실측 확인).
+  ★부수 실측 2건: ①`**/Cargo.toml` 이 `publish-artifact.yml` 발행 경로라 **주석만 고쳐도 릴리스+dispatch 발화**
+  ⇒ Cargo.toml 무접촉 ②**MCP 등록 0개**(종전 «3종 상시 가용» 기재는 사실 아님) ⇒ 문안 정정.
+  브랜치 `feat/wie-agents-md-declarative-restructure`, PR #54. **문서 전용 · 게이트② 리뷰 대기**
+  (머지·브랜치 삭제는 별도 `-merge` 티켓).
 - `wie-agents-md-gate2-contradiction-fix` (P0) — 헌장이 워커에게 머지를 «지시» 하던 문장
   **5곳 개정**(`AGENTS.md` 3 + `CONTRIBUTING.md` 2) + `CLAUDE.md` 에 «완주 규율» 신설.
   완주의 정의를 **«PR 을 열어 둔 상태»** 로 바꾸고 머지·브랜치 삭제를 별도 `-merge` 티켓으로 이관.
