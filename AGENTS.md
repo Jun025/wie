@@ -57,10 +57,13 @@ RUST_MIN_STACK=4194304 cargo test --all          # rust.yml: tests (the env var 
 `RUST_MIN_STACK=4194304` is not decorative — CI sets it on every platform because the JVM/ARM
 interpreter recursion overflows the default test-thread stack without it.
 
+**All four run before every commit, whatever you changed** — a docs- or `web/`-only diff is not an
+exemption. The web-surface commands below are *additional* to these, never an alternative.
+
 Narrower commands are conveniences, not gates: `cargo build` (default member `wie_cli`),
 `cargo test -p <crate> <test_name>`, `cargo fmt` to fix formatting (`rustfmt.toml`: max_width=150).
 
-### Web-surface commands (only when touching `web/`, `functions/`, `scripts/`, or `migrations/`)
+### Web-surface commands (on top of the four gates, when touching `web/`, `functions/`, `scripts/`, or `migrations/`)
 
 ```sh
 node scripts/check-engine-contract.mjs   # static featurephone-contract surface check (node only; needs web/src/wasm present)
