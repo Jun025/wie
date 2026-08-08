@@ -1,6 +1,11 @@
 # STATE
 
 ## 진행중
+- `wie-supply-chain-cargo-updates-a2-a3` — 대장 **A-2·A-3 적용 완료**: `event-listener 5.4.1→5.4.2` ·
+  `spin 0.12.0→0.12.2`. `Cargo.lock` 만 변경(4행 +/5행 −) · 전파 0(2건 외 이동 없음) ·
+  코드 변경 0. ★부수 실측: 5.4.2 가 `concurrent-queue` 의존 간선을 끊었지만 다른 2개 crate 가
+  계속 쓰므로 패키지 자체는 잠금에 잔류. 브랜치 `chore/supply-chain-cargo-updates-a2-a3`.
+  **게이트② 리뷰 대기**(머지·브랜치 삭제는 별도 `-merge` 티켓).
 - `wie-agents-md-gate2-contradiction-fix` (P0) — 헌장이 워커에게 머지를 «지시» 하던 문장
   **5곳 개정**(`AGENTS.md` 3 + `CONTRIBUTING.md` 2) + `CLAUDE.md` 에 «완주 규율» 신설.
   완주의 정의를 **«PR 을 열어 둔 상태»** 로 바꾸고 머지·브랜치 삭제를 별도 `-merge` 티켓으로 이관.
@@ -33,8 +38,6 @@
   fail-closed 게이트. 상세: `docs/worklog/2026-07-22--featurephone-engine-contract-selftest.json`.
 
 ## 다음
-- **공급망 위생 상향 2건 발권**(대장 A-2·A-3): `cargo update -p event-listener`(5.4.1→5.4.2) ·
-  `cargo update -p spin`(0.12.0→0.12.2). 각 dry-run 1패키지 이동 실측 완료 · 긴급도 0(도달 불가).
 - **upstream 이월 개발 후보 발권**(대장 B): #1260(LGT Unknown SVC 1409) · #1122(실행중 정지 재현).
 - (게이트② approve 후) **별도 `-merge` 티켓**이 PR 머지 + 브랜치 삭제 + 로컬 main 동기화를 수행.
   ★워커는 여기까지 오지 않는다 — 완주는 PR 을 열어 둔 시점이다(`AGENTS.md` §Git Workflow).
