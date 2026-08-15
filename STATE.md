@@ -1,8 +1,11 @@
 # STATE
 
-> 실측 기준일 **2026-08-15** (`wie-lane-restart-upstream-carryover-and-main-divergence`).
+> 실측 기준일 **2026-08-15**, `## 다음` ①②는 **2026-08-16 재실측**
+> (`wie-lane-restart-upstream-carryover-and-main-divergence` → `-fix`).
 > 직전 갱신은 2026-08-08 이었고 그 사이 `## 다음` 4항 중 2항이 조용히 해소돼 레인이 25시간 굶었다.
 > ★**`## 다음` 이 낡으면 이 레인은 굶는다** — 착지할 때마다 갱신하라(`AGENTS.md` §Session Discipline).
+> ★★**그리고 «새로 쓰는 항목»도 diff 를 열고 써라** — 초판의 ①②는 PR 제목·개설일만 보고 작성돼
+> **둘 다 사실과 어긋났다**(게이트② 반려). 낡음을 지운 자리에 새 부정확을 심으면 병은 그대로다.
 
 ## 진행중
 - `wie-lane-restart-upstream-carryover-and-main-divergence` — 본 문서 갱신 + `## 다음` 재판정.
@@ -30,13 +33,24 @@
 ## 다음
 
 **① PR #54 충돌 해소** — `feat/wie-agents-md-declarative-restructure` (2026-08-05 개설).
-`mergeable: CONFLICTING` · CI 전건 green. `AGENTS.md` 를 Goal/Constraints/DoD 로 재구성하는 PR 인데
-그 뒤 PR #53(완주 규율)·#49(에이전트 환경)가 같은 파일에 착지해 충돌했다. **재베이스 티켓 필요.**
+`mergeable: CONFLICTING` · CI 전건 green. `AGENTS.md` 를 Goal/Constraints/DoD 로 재구성하는 PR.
+★**충돌 파일은 `AGENTS.md` 가 아니라 `STATE.md` «하나»이고, 원인은 PR #55 다**(2026-08-16 실측):
+`merge-base` = `78f40a6f` 이고 **PR #53·#49 는 둘 다 그 base 의 조상**이므로(`merge-base --is-ancestor`
+양쪽 YES) 충돌 원인이 될 수 없다 — base 이후 착지분은 **PR #55 커밋 1개**(`Cargo.lock` + `STATE.md`)뿐이다.
+`merge-tree --write-tree --name-only origin/main <#54 head>` 도 `STATE.md` 단 1건만 보고한다.
+- ★★**순서 주의 — 이 PR(#56)이 착지하면 #54 의 충돌은 «커진다».** #56 이 `STATE.md` 를 전면
+  재작성하고 `REPORT.md` 상단에 항목을 얹으므로, 같은 `merge-tree` 를 #56 head 기준으로 돌리면
+  충돌 파일이 **`STATE.md` 1건 → `STATE.md`+`REPORT.md` 2건**으로 늘어난다(실측).
+  ⇒ **#54 재작업은 #56 착지 «후»에 착수하라.** 순서를 모르면 같은 충돌을 두 번 푼다.
+- 해소는 이 회차 밖이다 — 이 PR 은 사실을 기록만 하고 #54 를 건드리지 않는다.
 
-**② PR #46 처분** — `kb-path-update-2026-07-25` (2026-07-25 개설, **21일 정체**).
-`mergeable: MERGEABLE` · CI 전건 green · 검수 미착. KB 의 repo 경로를 `~/dev/wie` 로 고치는
-1줄급 문서 PR 인데, ★**실제 경로는 `~/work/otterpebble/wie` 다** — 내용 자체를 재확인한 뒤
-검수로 올리든 닫든 **결론을 내라**. 열어 둔 채 두는 것이 최악이다.
+**② PR #46 처분 = «검수 상신»** — `kb-path-update-2026-07-25` (2026-07-25 개설, **22일 정체**).
+`mergeable: MERGEABLE` · CI 전건 green · 검수 미착. ★**내용은 옳다**(2026-08-16 `gh pr diff 46` 전문 확인):
+**1파일 1줄**(`docs/project-kb/90_project-setup.md`)로 실행 위치를
+`~/Documents/dev/wie` → **`~/work/otterpebble/wie`** 로 고친다 — **이 repo 의 실제 경로가 후자다.**
+현재 `origin/main` 은 여전히 **틀린 경로 `~/Documents/dev/wie`** 를 담고 있고, KB 전체에서 이 1곳뿐이다.
+★**PR 제목만 낡았다**(`correct repo path to ~/dev/wie`) — 제목의 `~/dev/wie` 는 diff 에 없는 경로다.
+⇒ 필요한 것은 **게이트② 검수 상신뿐**이다. 내용 재조사도, 닫는 선택지도 필요 없다.
 
 **③ upstream #1260 발권** (대장 B · 실질 개발 후보) — 영웅서기5 LGT `Unknown SVC id 1409`.
 2026-08-15 실측: upstream **OPEN** 유지, `wie_lgt/src/runtime/svc_ids.rs` 의 `WIPICSvcId` 표에
@@ -51,7 +65,9 @@
 
 **⑤ (선택) 화면을 실제로 그리는 초소형 픽스처** — 여전히 유효. `scripts/contract-roundtrip.mjs` 는
 `nonBlackPixels()` 를 세지만 `test_data/helloworld_*.zip` 이 아무것도 그리지 않아 픽셀 수가
-**info-only** 로만 보고된다(같은 파일 :16 주석·:130). 그리는 픽스처를 넣으면 왕복 검사가 blit 회귀까지 커버한다.
+**info-only** 로만 보고된다 — 같은 파일 상단 주석 «the fixtures never draw, so canvas blit is reported
+as info» 와 `check()` 호출의 «fixture draws nothing — pixels are info only» 문구가 그 한계를 명시한다.
+그리는 픽스처를 넣으면 왕복 검사가 blit 회귀까지 커버한다.
 
 ### 2026-08-15 재판정에서 «해소»로 내린 항목 (다시 발권하지 마라)
 - ~~게이트② approve 후 `-merge` 티켓~~ — **해소.** 당시 대기하던 PR #52·#53·#55 전건 머지 완료.
