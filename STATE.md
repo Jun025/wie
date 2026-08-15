@@ -1,46 +1,80 @@
 # STATE
 
+> 실측 기준일 **2026-08-15**, `## 다음` ①②는 **2026-08-16 재실측**
+> (`wie-lane-restart-upstream-carryover-and-main-divergence` → `-fix`).
+> 직전 갱신은 2026-08-08 이었고 그 사이 `## 다음` 4항 중 2항이 조용히 해소돼 레인이 25시간 굶었다.
+> ★**`## 다음` 이 낡으면 이 레인은 굶는다** — 착지할 때마다 갱신하라(`AGENTS.md` §Session Discipline).
+> ★★**그리고 «새로 쓰는 항목»도 diff 를 열고 써라** — 초판의 ①②는 PR 제목·개설일만 보고 작성돼
+> **둘 다 사실과 어긋났다**(게이트② 반려). 낡음을 지운 자리에 새 부정확을 심으면 병은 그대로다.
+
 ## 진행중
-- `wie-supply-chain-cargo-updates-a2-a3` — 대장 **A-2·A-3 적용 완료**: `event-listener 5.4.1→5.4.2` ·
-  `spin 0.12.0→0.12.2`. `Cargo.lock` 만 변경(4행 +/5행 −) · 전파 0(2건 외 이동 없음) ·
-  코드 변경 0. ★부수 실측: 5.4.2 가 `concurrent-queue` 의존 간선을 끊었지만 다른 2개 crate 가
-  계속 쓰므로 패키지 자체는 잠금에 잔류. 브랜치 `chore/supply-chain-cargo-updates-a2-a3`.
-  **게이트② 리뷰 대기**(머지·브랜치 삭제는 별도 `-merge` 티켓).
-- `wie-agents-md-gate2-contradiction-fix` (P0) — 헌장이 워커에게 머지를 «지시» 하던 문장
-  **5곳 개정**(`AGENTS.md` 3 + `CONTRIBUTING.md` 2) + `CLAUDE.md` 에 «완주 규율» 신설.
-  완주의 정의를 **«PR 을 열어 둔 상태»** 로 바꾸고 머지·브랜치 삭제를 별도 `-merge` 티켓으로 이관.
-  브랜치 `docs/agents-md-gate2-contradiction-fix`. **문서 전용 · PR 게이트② 리뷰 대기.**
-- `wie-rustsec-advisory-sweep-batch2` — 공급망 추적 대장 등재 완료. 브랜치
-  `sec/rustsec-advisory-sweep-batch2`, PR #52 게이트② 리뷰 대기.
-- `wie-rustsec-advisory-sweep-batch2` — 배치1 이월분 **등재 완료**(`docs/project-kb/02_status.md`
-  «공급망 추적 대장»: 권고·공급망 3건 + upstream 이슈 9건) · 신규 권고 2건 판정 완료
-  (`event-listener` RUSTSEC-2026-0221 · `spin` yanked — **둘 다 도달 불가**) · upstream 9건 재조회
-  (#1292 종결로 실질 개발 후보 3→2건). **문서 전용 — 코드/lockfile 무변경**. 브랜치
-  `sec/rustsec-advisory-sweep-batch2`, PR 게이트② 리뷰 대기(**머지·브랜치 삭제는 별도 `-merge` 티켓**).
-- `wie-featurephone-engine-contract-selftest` — 구현·로컬 검증 완료, PR 게이트② 리뷰 대기.
-  브랜치 `feat/wie-featurephone-engine-contract-selftest`.
-  ※머지·브랜치 삭제는 **워커가 하지 않는다** — approve 후 별도 `-merge` 티켓의 몫
-  (머지 커밋에 `[wie-featurephone-engine-contract-selftest]` 태그).
+- `wie-lane-restart-upstream-carryover-and-main-divergence` — 본 문서 갱신 + `## 다음` 재판정.
+  브랜치 `docs/wie-lane-restart-state-refresh`. **문서 전용 · 게이트② 리뷰 대기.**
+- ★**코드 작업 0건.** 열려 있는 PR 2건(#54·#46)은 이 레인이 만든 것이 아니라 **적체분**이고,
+  둘 다 검수 미착 상태다 — 아래 `## 다음` ①② 참조.
 
 ## 완료 (최근)
-- 2026-07-22: main 브랜치 보호 코드 준비 (`wie-main-branch-protection`) — `engine-contract.yml`
-  `contract` 잡을 always-run 래퍼로 전환(`paths:` 제거 + 내부 `dorny/paths-filter` 감지, 경로
-  미해당 시 즉시 성공·잡 이름 안정)해 required check 로 걸 수 있게 준비. `web.yml` 배포는 머지
-  게이트가 통제점이라 무배선 판단(주석 문서화). REPORT.md 의 "PR 단계 차단" 과장 정정.
-  ★human-step 잔여: 운영자가 branch-protection ruleset 1회 적용(리뷰 승인 필수 제외) — 상세는
+- 2026-08-08: 공급망 대장 **A-2·A-3 착지** (PR #55, `wie-supply-chain-cargo-updates-a2-a3`) —
+  `event-listener 5.4.1→5.4.2` · `spin 0.12.0→0.12.2`. `Cargo.lock` 만 변경 · 코드 변경 0.
+- 2026-08-03: **완주의 정의를 «PR 을 열어 둔 상태»로 개정** (PR #53, `wie-agents-md-gate2-contradiction-fix`) —
+  헌장이 워커에게 머지를 «지시» 하던 문장 5곳(`AGENTS.md` 3 + `CONTRIBUTING.md` 2) 개정 + `CLAUDE.md` «완주 규율» 신설.
+- 2026-08-03: **공급망 추적 대장 등재** (PR #52, `wie-rustsec-advisory-sweep-batch2`) —
+  `docs/project-kb/02_status.md` 에 권고·공급망 3건 + upstream 이슈 9건 표. `#1292` 종결로 실질 개발 후보 3→2건.
+- 2026-08-01: `.direnv/` gitignore (PR #51).
+- 2026-07-31: **PR #45 잔재 착지** (PR #50, `wie-pr45-orphan-close-and-remnant-land-r2`) —
+  `.dev.vars` read-deny + session discipline. ★**PR #45 본체는 미머지 종결**(2026-07-31 CLOSED);
+  살릴 값만 골라 옮긴 것이 #50 이다. 이 경위가 아래 «해소된 항목» ③의 근거다.
+- 2026-07-22: featurephone 소비 계약 드리프트 가드 (PR #36·#39) · main 브랜치 보호 코드 준비 (PR #43) ·
+  security audit schedule red 정정 (PR #42). 상세는 `REPORT.md` 및
+  `docs/worklog/2026-07-22--featurephone-engine-contract-selftest.json`.
+  ★human-step 잔여: 운영자가 branch-protection ruleset 1회 적용 —
   `~/orchestrator/reports/wie-main-branch-protection.done.md` C항.
-- 2026-07-22: Security audit schedule 상시 red 정정 (`wie-security-audit-schedule-red`) —
-  fork+Issues 비활성으로 `rustsec/audit-check` 의 Issue 생성이 매 schedule 런 실패하던 것을
-  `cargo audit` 직접 실행으로 전환(무효 `issues/checks: write` 권한 제거). 취약점=red / 경고=green
-  부류 분리 확립(로컬 실증). KB `02_status.md` 의 오독 green 기록도 실측대로 정정.
-- 2026-07-22: featurephone 소비 계약 드리프트 가드 구현 — `docs/contracts/` 계약 핀 +
-  정적/브라우저 왕복 검사기 + `engine-contract.yml`(PR CI) + `publish-artifact.yml` 릴리스
-  fail-closed 게이트. 상세: `docs/worklog/2026-07-22--featurephone-engine-contract-selftest.json`.
 
 ## 다음
-- **upstream 이월 개발 후보 발권**(대장 B): #1260(LGT Unknown SVC 1409) · #1122(실행중 정지 재현).
-- (게이트② approve 후) **별도 `-merge` 티켓**이 PR 머지 + 브랜치 삭제 + 로컬 main 동기화를 수행.
-  ★워커는 여기까지 오지 않는다 — 완주는 PR 을 열어 둔 시점이다(`AGENTS.md` §Git Workflow).
-- 로컬 main 이 origin/main 과 분기 상태(로컬 전용 커밋 `0f13ab87` chore: 자율운영 하드닝, ahead 1 / behind 12).
-  별도 소티켓으로 해당 커밋을 브랜치→PR 경유 착지시키고 로컬 main 을 origin 에 재동기 필요.
-- (선택) 화면을 실제로 그리는 초소형 픽스처를 추가하면 왕복 검사가 blit 회귀까지 커버 가능(현재 한계).
+
+**① PR #54 충돌 해소** — `feat/wie-agents-md-declarative-restructure` (2026-08-05 개설).
+`mergeable: CONFLICTING` · CI 전건 green. `AGENTS.md` 를 Goal/Constraints/DoD 로 재구성하는 PR.
+★**충돌 파일은 `AGENTS.md` 가 아니라 `STATE.md` «하나»이고, 원인은 PR #55 다**(2026-08-16 실측):
+`merge-base` = `78f40a6f` 이고 **PR #53·#49 는 둘 다 그 base 의 조상**이므로(`merge-base --is-ancestor`
+양쪽 YES) 충돌 원인이 될 수 없다 — base 이후 착지분은 **PR #55 커밋 1개**(`Cargo.lock` + `STATE.md`)뿐이다.
+`merge-tree --write-tree --name-only origin/main <#54 head>` 도 `STATE.md` 단 1건만 보고한다.
+- ★★**순서 주의 — 이 PR(#56)이 착지하면 #54 의 충돌은 «커진다».** #56 이 `STATE.md` 를 전면
+  재작성하고 `REPORT.md` 상단에 항목을 얹으므로, 같은 `merge-tree` 를 #56 head 기준으로 돌리면
+  충돌 파일이 **`STATE.md` 1건 → `STATE.md`+`REPORT.md` 2건**으로 늘어난다(실측).
+  ⇒ **#54 재작업은 #56 착지 «후»에 착수하라.** 순서를 모르면 같은 충돌을 두 번 푼다.
+- 해소는 이 회차 밖이다 — 이 PR 은 사실을 기록만 하고 #54 를 건드리지 않는다.
+
+**② PR #46 처분 = «검수 상신»** — `kb-path-update-2026-07-25` (2026-07-25 개설, **22일 정체**).
+`mergeable: MERGEABLE` · CI 전건 green · 검수 미착. ★**내용은 옳다**(2026-08-16 `gh pr diff 46` 전문 확인):
+**1파일 1줄**(`docs/project-kb/90_project-setup.md`)로 실행 위치를
+`~/Documents/dev/wie` → **`~/work/otterpebble/wie`** 로 고친다 — **이 repo 의 실제 경로가 후자다.**
+현재 `origin/main` 은 여전히 **틀린 경로 `~/Documents/dev/wie`** 를 담고 있고, KB 전체에서 이 1곳뿐이다.
+★**PR 제목만 낡았다**(`correct repo path to ~/dev/wie`) — 제목의 `~/dev/wie` 는 diff 에 없는 경로다.
+⇒ 필요한 것은 **게이트② 검수 상신뿐**이다. 내용 재조사도, 닫는 선택지도 필요 없다.
+
+**③ upstream #1260 발권** (대장 B · 실질 개발 후보) — 영웅서기5 LGT `Unknown SVC id 1409`.
+2026-08-15 실측: upstream **OPEN** 유지, `wie_lgt/src/runtime/svc_ids.rs` 의 `WIPICSvcId` 표에
+**`0x581`(=1409) 없음** — 인접 등재는 `0x578 BackLight` 가 최대. **미구현이 확정된 엔진 결함**이고
+대상 게임은 `MClass: Clet` = 이 repo 가 confirmed 로 지원하는 서브셋이다. 착수 가능.
+
+**④ upstream #1122 발권 판단** (대장 B · 실질 개발 후보) — 컴투스 삼국지 촉, 스테이지 5 부근 정지.
+2026-08-15 실측: upstream **OPEN** 유지(2026-05-10 이후 정체), upstream 오너도 «에뮬레이터 버그로
+추정 · 디버깅 난해»로만 답했다. ★**착수 전에 재현 가능성부터 판정하라** — 현 회귀 게이트는
+**부팅+렌더까지만** 판정하므로(`scripts/smoke_gate_baseline.tsv` 의 `ktf/컴삼촉.zip PASS` 도 그 의미다)
+스테이지 5 심도는 **기존 자동화로 도달하지 못한다.** ③보다 난도가 한 단계 높다.
+
+**⑤ (선택) 화면을 실제로 그리는 초소형 픽스처** — 여전히 유효. `scripts/contract-roundtrip.mjs` 는
+`nonBlackPixels()` 를 세지만 `test_data/helloworld_*.zip` 이 아무것도 그리지 않아 픽셀 수가
+**info-only** 로만 보고된다 — 같은 파일 상단 주석 «the fixtures never draw, so canvas blit is reported
+as info» 와 `check()` 호출의 «fixture draws nothing — pixels are info only» 문구가 그 한계를 명시한다.
+그리는 픽스처를 넣으면 왕복 검사가 blit 회귀까지 커버한다.
+
+### 2026-08-15 재판정에서 «해소»로 내린 항목 (다시 발권하지 마라)
+- ~~게이트② approve 후 `-merge` 티켓~~ — **해소.** 당시 대기하던 PR #52·#53·#55 전건 머지 완료.
+  `feat/wie-featurephone-engine-contract-selftest` 는 브랜치조차 없다 — 내용은 PR #36·#39(07-22)로 착지했다.
+- ~~로컬 main 분기(`0f13ab87`, ahead 1 / behind 12)~~ — **해소·무효.** 2026-08-15 실측 **0 / 0**.
+  ★그 커밋을 «PR 로 착지시킬» 필요는 **없다**: PR #45 로 올라갔다가 미머지 종결됐고, 세 헝크 중
+  `.claude/settings.json` deny 와 `.gitignore` 2줄은 **이미 origin/main 에 있다**(PR #50·#51 경유).
+  남은 `CLAUDE.md` «자율운영 SOP» 블록은 **되살리면 안 된다** — 그 4개 조항은 전부
+  `AGENTS.md` §Session Discipline 에 있고, 첫 조항 「확인 없이 이어서 완료한다」는 현행
+  `CLAUDE.md` §착수 규율(**티켓 없는 착수 금지**)과 **정면으로 충돌**한다.
