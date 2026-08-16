@@ -8,9 +8,22 @@ jobs:
     container:
       image: xd009642/tarpaulin:latest
       options: --security-opt seccomp=unconfined
+    # ── Why this job exists and must stay green ──────────────────────────────
+    # Coverage is wired deliberately: it runs on EVERY push, not just main, so a
+    # branch that deletes tests shows up as a coverage drop before it merges.
+    # The failure mode this guards against is making the number go up by
+    # deleting tests rather than by covering code — if a change makes this job
+    # awkward, fix the change, do not delete tests to make coverage "simpler".
+    #
+    # `codecov.yml` at the repo root is INTENTIONALLY EMPTY. That is not an
+    # oversight or dead config: an empty file means Codecov's defaults apply,
+    # and it is the pre-made hook for adding thresholds later without having to
+    # rediscover where they go. Deleting it is a regression, not a cleanup.
+    #
     # Job-level env so the upload step's `if:` can see it (same pattern as
     # web.yml). Forks without CODECOV_TOKEN skip the upload instead of
-    # failing every push; the token itself is never printed.
+    # failing every push (the job stays green, the signal is just absent);
+    # the token itself is never printed.
     env:
       HAS_CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN != '' }}
     steps:

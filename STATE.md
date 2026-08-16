@@ -10,6 +10,17 @@
 ## 진행중
 - `wie-lane-restart-upstream-carryover-and-main-divergence` — 본 문서 갱신 + `## 다음` 재판정.
   브랜치 `docs/wie-lane-restart-state-refresh`. **문서 전용 · 게이트② 리뷰 대기.**
+- `wie-agents-md-declarative-restructure` — `AGENTS.md` 를 Goal/Constraints/DoD/사건 대장 골격으로
+  재구조화 + Hard Req 12항 → **잠금 테이블**. **16,888 → 13,099 바이트**(−22.4%, 목표 12,288 대비 811 초과 —
+  초과분은 C3 무접촉 문안 + 시뮬레이션 수정 214바이트라 남겼다). 지도 4종(다이어그램·crate roles·non-Rust surfaces)은
+  `docs/architecture.md` 로 **이관**(삭제 아님), `CLAUDE.md` 축소금지 목록은 포인터 1줄로 대체.
+  워크플로는 **주석만** 추가(`rust.yml`·`coverage.yml` — 파싱 YAML 이 main 과 동일함을 실측 확인).
+  ★부수 실측 2건: ①`**/Cargo.toml` 이 `publish-artifact.yml` 발행 경로라 **주석만 고쳐도 릴리스+dispatch 발화**
+  ⇒ Cargo.toml 무접촉 ②**MCP 등록 0개**(종전 «3종 상시 가용» 기재는 사실 아님) ⇒ 문안 정정.
+  브랜치 `feat/wie-agents-md-declarative-restructure`, PR #54. **문서 전용 · 게이트② 리뷰 대기**
+  (머지·브랜치 삭제는 별도 `-merge` 티켓).
+  ★2026-08-16 `wie-pr54-agents-md-restructure-conflict-resolve` 로 **충돌 해소**(`origin/main` 머지 —
+  `STATE.md`·`REPORT.md` 2건, 둘 다 «양쪽 보존»). 리베이스·force-push 0.
 - ★**코드 작업 0건.** 열려 있는 PR 2건(#54·#46)은 이 레인이 만든 것이 아니라 **적체분**이고,
   둘 다 검수 미착 상태다 — 아래 `## 다음` ①② 참조.
 
@@ -32,17 +43,14 @@
 
 ## 다음
 
-**① PR #54 충돌 해소** — `feat/wie-agents-md-declarative-restructure` (2026-08-05 개설).
-`mergeable: CONFLICTING` · CI 전건 green. `AGENTS.md` 를 Goal/Constraints/DoD 로 재구성하는 PR.
-★**충돌 파일은 `AGENTS.md` 가 아니라 `STATE.md` «하나»이고, 원인은 PR #55 다**(2026-08-16 실측):
-`merge-base` = `78f40a6f` 이고 **PR #53·#49 는 둘 다 그 base 의 조상**이므로(`merge-base --is-ancestor`
-양쪽 YES) 충돌 원인이 될 수 없다 — base 이후 착지분은 **PR #55 커밋 1개**(`Cargo.lock` + `STATE.md`)뿐이다.
-`merge-tree --write-tree --name-only origin/main <#54 head>` 도 `STATE.md` 단 1건만 보고한다.
-- ★★**순서 주의 — 이 PR(#56)이 착지하면 #54 의 충돌은 «커진다».** #56 이 `STATE.md` 를 전면
-  재작성하고 `REPORT.md` 상단에 항목을 얹으므로, 같은 `merge-tree` 를 #56 head 기준으로 돌리면
-  충돌 파일이 **`STATE.md` 1건 → `STATE.md`+`REPORT.md` 2건**으로 늘어난다(실측).
-  ⇒ **#54 재작업은 #56 착지 «후»에 착수하라.** 순서를 모르면 같은 충돌을 두 번 푼다.
-- 해소는 이 회차 밖이다 — 이 PR 은 사실을 기록만 하고 #54 를 건드리지 않는다.
+**① PR #54 = «충돌 해소됨 · 게이트② 검수 상신 대기»** — `feat/wie-agents-md-declarative-restructure`
+(2026-08-05 개설). `AGENTS.md` 를 Goal/Constraints/DoD 로 재구성하는 PR.
+2026-08-16 `wie-pr54-agents-md-restructure-conflict-resolve` 가 충돌을 풀었다:
+#56 착지 **후** 실측한 `merge-tree --write-tree --name-only origin/main <#54 head>` 는
+**`STATE.md`+`REPORT.md` 2건**을 보고했고(#56 착지 전 1건에서 늘어난다는 예고가 실측으로 맞았다),
+`origin/main` 을 브랜치로 **머지**해 둘 다 «양쪽 보존»으로 해소했다. 리베이스·force-push 0.
+- ⇒ 남은 것은 **게이트② 검수 상신뿐**이다. 재구성 내용 자체는 이 회차가 손대지 않았다.
+- ★적체 PR 은 형제 PR 이 착지할 때마다 다시 충돌한다 — **상신을 미루면 이 작업을 또 해야 한다.**
 
 **② PR #46 처분 = «검수 상신»** — `kb-path-update-2026-07-25` (2026-07-25 개설, **22일 정체**).
 `mergeable: MERGEABLE` · CI 전건 green · 검수 미착. ★**내용은 옳다**(2026-08-16 `gh pr diff 46` 전문 확인):
