@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, string::ToString, vec};
+use alloc::{boxed::Box, format, string::ToString, vec};
 
 mod context;
 
@@ -10,7 +10,7 @@ use wipi_types::wipic::WIPICIndirectPtr;
 use wie_backend::System;
 use wie_core_arm::{ArmCore, EmulatedFunction, EmulatedFunctionParam, ResultWriter, SvcId};
 use wie_jvm_support::JvmSupport;
-use wie_util::{Result, read_generic, write_generic, write_null_terminated_string_bytes};
+use wie_util::{Result, WieError, read_generic, write_generic, write_null_terminated_string_bytes};
 use wie_wipi_c::{
     MethodImpl, WIPICContext, WIPICMethodBody, WIPICResult,
     api::{database, graphics, kernel, media, misc, net},
@@ -155,6 +155,7 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::SetMuteState => media::set_mute_state.into_body(),
         WIPICSvcId::GetMuteState => media::get_mute_state.into_body(),
         WIPICSvcId::BackLight => misc::back_light.into_body(),
+        WIPICSvcId::MiscUnk9 => misc_unk9.into_body(),
     };
 
     EmulatedFunction::call(
@@ -281,6 +282,18 @@ async fn net_socket_read(_context: &mut dyn WIPICContext, fd: u32, buf: u32, len
     tracing::warn!("MC_netSocketRead(fd={fd:#x}, buf={buf:#x}, len={len:#x}) -> -1 (no network)");
 
     Ok(-1)
+}
+
+/// misc table index 9 (misc base 0x578 + 9 = SVC 0x581). 영웅서기5 LGT calls it from
+/// `CletWrapper.startApp` and dies (upstream dlunch/wie#1260). Which misc function index 9 is
+/// stays unidentified — see the `MiscUnk9` comment in `svc_ids.rs` — so this deliberately fails
+/// instead of stubbing a return value: a wrong success value would corrupt the game's init state
+/// silently, whereas `Unimplemented` names the module and index and puts the argument shape in the
+/// log, which is the input the next attempt needs.
+async fn misc_unk9(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
+    Err(WieError::Unimplemented(format!(
+        "LGT WIPIC misc index 9 (SVC 0x581): unidentified function, args {a0:#x}, {a1:#x}, {a2:#x}, {a3:#x}"
+    )))
 }
 
 async fn unk0(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {

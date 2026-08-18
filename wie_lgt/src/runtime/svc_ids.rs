@@ -157,6 +157,12 @@ pub enum WIPICSvcId {
     SetMuteState = 0x4d1,
     GetMuteState = 0x4d2,
     BackLight = 0x578,
+    // misc base 0x578 + index 9. The function behind index 9 is *not* identified: the only misc
+    // reference table in this repo (KTF `get_misc_method_table`) stops at index 4, and the LGT
+    // tables are a different spec revision (its graphics table runs +1 against KTF's from index 14
+    // on), so naming index 9 would be a guess. Registered anyway so 영웅서기5 LGT
+    // (upstream dlunch/wie#1260) reports an unimplemented misc call instead of an unknown SVC id.
+    MiscUnk9 = 0x581,
 }
 
 impl TryFrom<SvcId> for WIPICSvcId {
@@ -263,6 +269,7 @@ impl TryFrom<SvcId> for WIPICSvcId {
             0x4d1 => Self::SetMuteState,
             0x4d2 => Self::GetMuteState,
             0x578 => Self::BackLight,
+            0x581 => Self::MiscUnk9,
             _ => return Err(wie_util::WieError::FatalError(alloc::format!("Unknown LGT WIPIC SVC id {}", value.0))),
         })
     }
@@ -298,5 +305,23 @@ pub enum StdlibSvcId {
 impl From<StdlibSvcId> for u32 {
     fn from(value: StdlibSvcId) -> Self {
         value as u32
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use wie_core_arm::SvcId;
+
+    use super::WIPICSvcId;
+
+    // `handle_wipic_svc` branches on exactly this conversion, so an id missing here is what
+    // produced "Unknown LGT WIPIC SVC id 1409" for 영웅서기5 LGT (upstream dlunch/wie#1260).
+    #[test]
+    fn wipic_svc_0x581_maps_and_table_stays_fail_closed() {
+        let id = WIPICSvcId::try_from(SvcId(0x581)).expect("SVC 0x581 (misc index 9) must be in the table");
+        assert_eq!(u32::from(id), 0x581);
+
+        // ...and ids that really are unmapped still error rather than silently resolving.
+        assert!(WIPICSvcId::try_from(SvcId(0x582)).is_err());
     }
 }
