@@ -291,9 +291,16 @@ async fn net_socket_read(_context: &mut dyn WIPICContext, fd: u32, buf: u32, len
 /// silently, whereas `Unimplemented` names the module and index and puts the argument shape in the
 /// log, which is the input the next attempt needs.
 async fn misc_unk9(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
-    Err(WieError::Unimplemented(format!(
+    Err(misc_unk9_error(a0, a1, a2, a3))
+}
+
+/// Split out of `misc_unk9` only so a test can read it without a `WIPICContext`. The judgment
+/// worth locking is the wording: it has to keep naming the module, the index and the arguments,
+/// because that log line is the whole payoff of failing here instead of inventing a return value.
+fn misc_unk9_error(a0: u32, a1: u32, a2: u32, a3: u32) -> WieError {
+    WieError::Unimplemented(format!(
         "LGT WIPIC misc index 9 (SVC 0x581): unidentified function, args {a0:#x}, {a1:#x}, {a2:#x}, {a3:#x}"
-    )))
+    ))
 }
 
 async fn unk0(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
@@ -467,4 +474,27 @@ async fn unk15(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u
     // media
 
     Ok(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::string::ToString;
+
+    use wie_util::WieError;
+
+    use super::misc_unk9_error;
+
+    // `misc_unk9` — the body the dispatcher runs for SVC 0x581 — returns exactly this. Registers
+    // are the ones upstream dlunch/wie#1260 captured at the 영웅서기5 LGT crash.
+    #[test]
+    fn misc_unk9_error_names_the_module_index_and_arguments() {
+        let error = misc_unk9_error(0x12394c, 0x123a50, 0xffffff, 0x1400c94);
+
+        // Unimplemented, not FatalError: the debugger routes the two differently.
+        assert!(matches!(error, WieError::Unimplemented(_)));
+        assert_eq!(
+            error.to_string(),
+            "Unimplemented: LGT WIPIC misc index 9 (SVC 0x581): unidentified function, args 0x12394c, 0x123a50, 0xffffff, 0x1400c94"
+        );
+    }
 }
