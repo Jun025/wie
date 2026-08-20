@@ -19,11 +19,18 @@ only the *trigger* is a human operator step.
 - `users.strikes` → running count of upheld infringements for the repeat-infringer
   policy.
 
+## Before running any command here
+Every `wrangler` line below touches the **remote prod account**, so each block opens with the
+account pin — keep it when you copy one. Unpinned, wrangler silently uses whichever account your
+local OAuth login belongs to (`docs/CLOUDFLARE_SETUP.md` §0-1), and a wrong-account run against a
+prod dataset is not something you get to undo.
+
 ## Intake
 Rights-holder notices arrive via `POST /api/reports` (the "권리 침해 신고" form in
 서비스 정보, usable without an account) and land in `file_reports` (status `open`).
 
 ```sh
+export CLOUDFLARE_ACCOUNT_ID=<the account wie lives in>   # §0-1 — never run these unpinned
 # review open notices
 npx wrangler d1 execute wie-db --remote --command \
   "SELECT id, work_title, reporter_contact, target_hint, created_at FROM file_reports WHERE status='open' ORDER BY created_at"
@@ -34,6 +41,7 @@ Identify the offending file id (the reporter's hint + the owner's own metadata;
 the operator never browses other users' files casually). Then:
 
 ```sh
+export CLOUDFLARE_ACCOUNT_ID=<the account wie lives in>   # §0-1 — never run these unpinned
 npx wrangler d1 execute wie-db --remote --command \
   "UPDATE user_files SET disabled=1, disabled_reason='DMCA/notice <report-id>', disabled_at=<epoch_ms> WHERE id='<file-id>';"
 # increment the owner's strike count
@@ -51,6 +59,7 @@ Policy (suggested): 1st–2nd strike → notify; 3rd → `restricted` (no new up
 4th → `disabled` (account suspended).
 
 ```sh
+export CLOUDFLARE_ACCOUNT_ID=<the account wie lives in>   # §0-1 — never run these unpinned
 # restrict uploads
 npx wrangler d1 execute wie-db --remote --command "UPDATE users SET status='restricted' WHERE id='<user-id>';"
 # suspend the account

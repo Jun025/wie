@@ -1,8 +1,8 @@
 # STATE
 
-> 실측 기준일 **2026-08-20**(`wie-wrangler-pages-account-id-breaks-prod-deploy-fix`).
-> 직전 갱신 시점의 열린 PR #59·#60 은 **둘 다 착지**해 `## 완료` 로 옮겼고, 지금 열린 것은
-> 이 회차 1건이다(`## 진행중`).
+> 실측 기준일 **2026-08-21**(`wie-cf-setup-bare-d1-create-and-wrangler-pin-consolidate`).
+> 직전 갱신 시점의 `## 진행중` 1건(PR #61)은 **착지**해 `## 완료` 로 옮겼다 — 착수 시점 실측
+> `gh pr list -R Jun025/wie --state open` = `[]`(**열린 PR 0**)이고, 지금 열린 것은 이 회차 1건이다.
 > 직전 갱신은 2026-08-08 이었고 그 사이 `## 다음` 4항 중 2항이 조용히 해소돼 레인이 25시간 굶었다.
 > ★**`## 다음` 이 낡으면 이 레인은 굶는다** — 착지할 때마다 갱신하라(`AGENTS.md` §Session Discipline).
 > ★★**그리고 «새로 쓰는 항목»도 diff 를 열고 써라** — 초판의 ①②는 PR 제목·개설일만 보고 작성돼
@@ -12,13 +12,19 @@
 > 「열린 PR 0건」 줄과 서로를 반증했고, 앞줄만 읽은 총괄은 **죽은 `-merge` 를 발권할 수 있었다.**
 
 ## 진행중
-- 2026-08-20: **Pages 가 거부하는 `account_id` 로 prod 배포 red — 핀을 env 로 이전**
-  (`wie-wrangler-pages-account-id-breaks-prod-deploy-fix`) — `wrangler.toml` 의 `account_id` 제거 +
-  `package.json` 의 `deploy`·`db:migrate:remote` 에 `CLOUDFLARE_ACCOUNT_ID` 가드 + `web.yml` 에
-  PR 에서도 도는 Pages 설정 검증 스텝. ★**착지 전까지는 「고쳤다」가 아니라 「고쳤다고 본다」**다 —
-  배포 스텝이 `if: main` 이라 PR 에서 돌지 않으므로 확정은 머지 후 `web.yml` on main 실측이다.
+- 2026-08-21: **문서의 맨손 원격 변이 wrangler 명령 + `web.yml` 판본 핀 단일화**
+  (`wie-cf-setup-bare-d1-create-and-wrangler-pin-consolidate`) — 위 착지 회차의 게이트② 승계 2건.
+  ①`docs/CLOUDFLARE_SETUP.md` 의 `wrangler d1 create` 를 계정 핀 접두로 + ★전수 grep 이 찾아낸
+  `docs/COMPLIANCE.md` 의 원격 변이 7건(`d1 execute --remote` UPDATE 6 · `r2 object delete` 1)도 블록마다 핀
+  ②`web.yml` 판본 리터럴 **5곳 → job env `WRANGLER_VERSION` 1곳**(값 무변경) ③`CLOUDFLARE_ACCOUNT_ID`
+  가 비면 배포 전에 **시끄럽게 죽는** 가드 스텝. 코드·의존성·판본 변경 0.
 
 ## 완료 (최근)
+- 2026-08-20: **Pages 가 거부하는 `account_id` — 핀을 env 로 이전 착지** (PR #61 `eef08184`,
+  `wie-wrangler-pages-account-id-breaks-prod-deploy-fix`) — `wrangler.toml` 의 `account_id` 제거 +
+  `package.json` 의 `deploy`·`db:migrate:remote` 에 `CLOUDFLARE_ACCOUNT_ID` 가드 + `web.yml` 에
+  PR 에서도 도는 Pages 설정 검증 스텝. ★**「고쳤다고 본다」가 「고쳤다」로 확정됐다** — 머지 후
+  `web.yml` on main run **32375925645 success**(2026-08-20T13:43Z), 직전 red run 32364381443 대비.
 - 2026-08-20: **wrangler `account_id` 고정 착지** (PR #59, `wie-wrangler-account-id-pin`) —
   `wrangler.toml` 최상단에 otterpebble 계정을 박아 «어느 계정으로 배포되는지»를 파일이
   선언하게 했다. 게이트②는 08-20 에 approve 였으나 아래 beta clippy red 가 게이트③ `ci-presence` 를
