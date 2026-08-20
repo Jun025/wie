@@ -11,13 +11,17 @@
 > 「열린 PR 0건」 줄과 서로를 반증했고, 앞줄만 읽은 총괄은 **죽은 `-merge` 를 발권할 수 있었다.**
 
 ## 진행중
-- `wie-rust-ci-beta-clippy-double-must-use-red` — beta clippy `double_must_use` 로 인한 **repo 전역 CI red** 해소.
-  브랜치 `fix/beta-clippy-double-must-use`. **게이트② 리뷰 대기.**
-- **PR #59**(`chore/wrangler-account-id-pin`, wrangler `account_id` 고정) — 게이트② **approve** 이나
-  위 red 가 게이트③ `ci-presence` 를 막고 있었다. 위 PR 착지 후 CI 재실행 → `-merge` 발권 대기.
-- ★**그 밖에 진행중 0** — 2026-08-20 실측 `gh pr list -R Jun025/wie --state open` = **#59 1건**.
+- ★**진행중 0** — 이 항목(PR #59)의 착지로 열린 PR 이 비었다.
+  2026-08-20 실측 `gh pr list -R Jun025/wie --state open` = **#59 1건**이었고 그 1건이 이 회차다.
 
 ## 완료 (최근)
+- 2026-08-20: **wrangler `account_id` 고정 착지** (PR #59, `wie-wrangler-account-id-pin`) —
+  `wrangler.toml` 최상단에 otterpebble 계정 `17024dfe…` 를 박아 «어느 계정으로 배포되는지»를 파일이
+  선언하게 했다. 게이트②는 08-20 에 approve 였으나 아래 beta clippy red 가 게이트③ `ci-presence` 를
+  막고 있었고(1회차 `-merge` 는 그 rc=1 로 **정확히 거부**했다), 그 red 착지 후 base 를 당겨 착지했다.
+- 2026-08-20: **beta clippy `double_must_use` repo 전역 CI red 해소 착지** (PR #60 `7a49aff0`,
+  `wie-rust-ci-beta-clippy-double-must-use-red`) — `async-trait` 0.1.89 → 0.1.92(`Cargo.lock`) +
+  `wie_ktf` `find_java_method` 국소 `allow` 1줄. 코드 동작 변경 0.
 - 2026-08-18: **`STATE.md` 착지 잔재 정리 + `misc_unk9` 에러 문면 잠금 착지** (PR #58 `6f9dbae7`,
   `wie-state-landed-pr56-residue-and-misc-unk9-error-lock`).
 - 2026-08-18: **LGT SVC 0x581 등재 착지** (PR #57 `bccf11f1`, `wie-lgt-svc-1409-unknown-and-state-stale-next`) —
