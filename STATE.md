@@ -1,7 +1,7 @@
 # STATE
 
-> 실측 기준일 **2026-08-19**(`wie-state-landed-pr56-residue-and-misc-unk9-error-lock`).
-> 열린 PR **0건** · `## 진행중` 의 착지분(PR #56·#57)은 `## 완료` 로 이관 완료.
+> 실측 기준일 **2026-08-20**(`wie-rust-ci-beta-clippy-double-must-use-red`).
+> 열린 PR **1건**(#59) · `## 진행중` 의 착지분(PR #58)은 `## 완료` 로 이관 완료.
 > 직전 갱신은 2026-08-08 이었고 그 사이 `## 다음` 4항 중 2항이 조용히 해소돼 레인이 25시간 굶었다.
 > ★**`## 다음` 이 낡으면 이 레인은 굶는다** — 착지할 때마다 갱신하라(`AGENTS.md` §Session Discipline).
 > ★★**그리고 «새로 쓰는 항목»도 diff 를 열고 써라** — 초판의 ①②는 PR 제목·개설일만 보고 작성돼
@@ -11,11 +11,15 @@
 > 「열린 PR 0건」 줄과 서로를 반증했고, 앞줄만 읽은 총괄은 **죽은 `-merge` 를 발권할 수 있었다.**
 
 ## 진행중
-- `wie-state-landed-pr56-residue-and-misc-unk9-error-lock` — 본 절의 착지 잔재 정리 + `misc_unk9` 에러 문면
-  테스트 잠금. 브랜치 `docs/wie-state-pr56-residue-misc-unk9-lock`. **게이트② 리뷰 대기.**
-- ★**그 밖에 진행중 0 · 열린 PR 0건** — 2026-08-19 실측 `gh pr list -R Jun025/wie --state open` = `[]`.
+- `wie-rust-ci-beta-clippy-double-must-use-red` — beta clippy `double_must_use` 로 인한 **repo 전역 CI red** 해소.
+  브랜치 `fix/beta-clippy-double-must-use`. **게이트② 리뷰 대기.**
+- **PR #59**(`chore/wrangler-account-id-pin`, wrangler `account_id` 고정) — 게이트② **approve** 이나
+  위 red 가 게이트③ `ci-presence` 를 막고 있었다. 위 PR 착지 후 CI 재실행 → `-merge` 발권 대기.
+- ★**그 밖에 진행중 0** — 2026-08-20 실측 `gh pr list -R Jun025/wie --state open` = **#59 1건**.
 
 ## 완료 (최근)
+- 2026-08-18: **`STATE.md` 착지 잔재 정리 + `misc_unk9` 에러 문면 잠금 착지** (PR #58 `6f9dbae7`,
+  `wie-state-landed-pr56-residue-and-misc-unk9-error-lock`).
 - 2026-08-18: **LGT SVC 0x581 등재 착지** (PR #57 `bccf11f1`, `wie-lgt-svc-1409-unknown-and-state-stale-next`) —
   `WIPICSvcId::MiscUnk9 = 0x581` + `WieError::Unimplemented`(모듈·인덱스·인자 4개). 영웅서기5 LGT 는 여전히
   이 지점에서 멈추지만 로그가 「알 수 없는 SVC」에서 「misc index 9 미구현」으로 바뀌었다.
