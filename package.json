@@ -10,8 +10,8 @@
     "build:wasm": "bash scripts/build-wasm.sh",
     "dev": "wrangler pages dev web/dist",
     "db:migrate:local": "wrangler d1 migrations apply wie-db --local",
-    "db:migrate:remote": "wrangler d1 migrations apply wie-db --remote",
-    "deploy": "wrangler pages deploy web/dist",
+    "db:migrate:remote": ": ${CLOUDFLARE_ACCOUNT_ID:?refusing to touch the remote account: export CLOUDFLARE_ACCOUNT_ID (the wie account id) first, or wrangler silently uses whichever account your local OAuth login belongs to}; wrangler d1 migrations apply wie-db --remote",
+    "deploy": ": ${CLOUDFLARE_ACCOUNT_ID:?refusing to touch the remote account: export CLOUDFLARE_ACCOUNT_ID (the wie account id) first, or wrangler silently uses whichever account your local OAuth login belongs to}; wrangler pages deploy web/dist",
     "audit": "bash scripts/audit-no-leak.sh",
     "verify": "node scripts/verify-browser.mjs"
   },

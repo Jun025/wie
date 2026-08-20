@@ -7,11 +7,19 @@
 # named SESSION_SECRET, never committed. The D1 `database_id` below is NOT a
 # secret — it is the public database identifier and is safe to commit.
 
-# Cloudflare account pin. NOT a secret (account IDs are public identifiers).
-# This machine's local `wrangler` OAuth login is the *dodu* account, while wie
-# belongs to the otterpebble account — unpinned, a local wrangler command would
-# silently act on dodu. Pinned, it fails loudly instead. (2026-08-20 운영자 지시)
-account_id = "17024dfe5a8ff38798c35942d116026b"
+# ★NO `account_id` HERE. Pages rejects the key outright ('Configuration file for
+# Pages projects does not support "account_id"') and every `wrangler pages *`
+# command aborts before it does anything — which is how a one-line pin took the
+# prod deploy red on 2026-08-20 (web.yml run 32364381443). `wrangler d1` accepts
+# the same key, so a local d1 command masks the breakage; only Pages trips it.
+#
+# The pin it replaced still matters: this machine's `wrangler` OAuth login is a
+# *different* Cloudflare account than the one wie lives in, and an unpinned
+# `wrangler pages deploy` silently uses that login's account instead of failing.
+# So the account is pinned by the `CLOUDFLARE_ACCOUNT_ID` env var instead —
+# wrangler honours it, Pages does not parse it, and the account-touching npm
+# scripts refuse to run without it (see package.json / docs/CLOUDFLARE_SETUP.md).
+# CI already passes the same value from `secrets.CLOUDFLARE_ACCOUNT_ID`.
 
 name = "wie-web"
 compatibility_date = "2024-09-23"
