@@ -138,6 +138,10 @@ async fn get_java_method(core: &mut ArmCore, _: &mut (), ptr_class: u32, ptr_ful
     Ok(method.ptr_raw)
 }
 
+// `async_recursion` stamps its own `#[must_use]` onto a return type that is already
+// `#[must_use]`, which beta clippy flags as `double_must_use`. The attribute is not ours to
+// remove and async-recursion is at its latest release (1.1.1) with no fix, so allow it here.
+#[allow(clippy::double_must_use)]
 #[async_recursion::async_recursion]
 async fn find_java_method(class: &JavaClassDefinition, name: &str, descriptor: &str) -> Result<Option<JavaMethod>> {
     let method = class.method(name, descriptor, false)?;
