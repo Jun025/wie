@@ -1,7 +1,8 @@
 # STATE
 
-> 실측 기준일 **2026-08-20**(`wie-rust-ci-beta-clippy-double-must-use-red`).
-> 열린 PR **1건**(#59) · `## 진행중` 의 착지분(PR #58)은 `## 완료` 로 이관 완료.
+> 실측 기준일 **2026-08-20**(`wie-wrangler-pages-account-id-breaks-prod-deploy-fix`).
+> 직전 갱신 시점의 열린 PR #59·#60 은 **둘 다 착지**해 `## 완료` 로 옮겼고, 지금 열린 것은
+> 이 회차 1건이다(`## 진행중`).
 > 직전 갱신은 2026-08-08 이었고 그 사이 `## 다음` 4항 중 2항이 조용히 해소돼 레인이 25시간 굶었다.
 > ★**`## 다음` 이 낡으면 이 레인은 굶는다** — 착지할 때마다 갱신하라(`AGENTS.md` §Session Discipline).
 > ★★**그리고 «새로 쓰는 항목»도 diff 를 열고 써라** — 초판의 ①②는 PR 제목·개설일만 보고 작성돼
@@ -11,14 +12,20 @@
 > 「열린 PR 0건」 줄과 서로를 반증했고, 앞줄만 읽은 총괄은 **죽은 `-merge` 를 발권할 수 있었다.**
 
 ## 진행중
-- ★**진행중 0** — 이 항목(PR #59)의 착지로 열린 PR 이 비었다.
-  2026-08-20 실측 `gh pr list -R Jun025/wie --state open` = **#59 1건**이었고 그 1건이 이 회차다.
+- 2026-08-20: **Pages 가 거부하는 `account_id` 로 prod 배포 red — 핀을 env 로 이전**
+  (`wie-wrangler-pages-account-id-breaks-prod-deploy-fix`) — `wrangler.toml` 의 `account_id` 제거 +
+  `package.json` 의 `deploy`·`db:migrate:remote` 에 `CLOUDFLARE_ACCOUNT_ID` 가드 + `web.yml` 에
+  PR 에서도 도는 Pages 설정 검증 스텝. ★**착지 전까지는 「고쳤다」가 아니라 「고쳤다고 본다」**다 —
+  배포 스텝이 `if: main` 이라 PR 에서 돌지 않으므로 확정은 머지 후 `web.yml` on main 실측이다.
 
 ## 완료 (최근)
 - 2026-08-20: **wrangler `account_id` 고정 착지** (PR #59, `wie-wrangler-account-id-pin`) —
-  `wrangler.toml` 최상단에 otterpebble 계정 `17024dfe…` 를 박아 «어느 계정으로 배포되는지»를 파일이
+  `wrangler.toml` 최상단에 otterpebble 계정을 박아 «어느 계정으로 배포되는지»를 파일이
   선언하게 했다. 게이트②는 08-20 에 approve 였으나 아래 beta clippy red 가 게이트③ `ci-presence` 를
   막고 있었고(1회차 `-merge` 는 그 rc=1 로 **정확히 거부**했다), 그 red 착지 후 base 를 당겨 착지했다.
+  ★★**그리고 이 착지가 prod Pages 배포를 red 로 만들었다** — Pages 는 `account_id` 키를 문법으로
+  거부한다(`web.yml` run 32364381443). ⇒ 위 「파일이 선언한다」는 **더 이상 참이 아니다**(env 핀으로
+  이전 · 위 `## 진행중`). 사료로 남긴다.
 - 2026-08-20: **beta clippy `double_must_use` repo 전역 CI red 해소 착지** (PR #60 `7a49aff0`,
   `wie-rust-ci-beta-clippy-double-must-use-red`) — `async-trait` 0.1.89 → 0.1.92(`Cargo.lock`) +
   `wie_ktf` `find_java_method` 국소 `allow` 1줄. 코드 동작 변경 0.

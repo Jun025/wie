@@ -1,5 +1,14 @@
 # REPORT
 
+## [2026-08-20] Pages 가 거부하는 `account_id` 로 prod 배포가 red — 핀을 env 로 이전 (wie-wrangler-pages-account-id-breaks-prod-deploy-fix)
+- **무엇을**: ①`wrangler.toml` 의 `account_id` 한 줄 **제거**(사유 주석으로 대체) ②`package.json` 의 원격을 건드리는 두 스크립트(`deploy`·`db:migrate:remote`)를 `: ${CLOUDFLARE_ACCOUNT_ID:?…}` 가드로 감싸 **env 가 비면 wrangler 를 실행조차 하지 않게** 함 ③`web.yml` 에 **PR 에서도 도는** Pages 설정 검증 스텝 1개 추가(배포 없음) ④`docs/CLOUDFLARE_SETUP.md` 에 「0-1. 로컬 wrangler 계정 고정」 신설. **4파일 · 코드·의존성 변경 0**.
+- **왜**: 직전 회차(PR #59)가 박은 `account_id` 를 **Pages 가 문법으로 거부**한다 — `Configuration file for Pages projects does not support "account_id"`. 그 착지 직후 `web.yml` run **32364381443** 이 배포 스텝에서 failure 였고, 앞 4회는 전건 success 였다. ★**`wrangler d1` 은 같은 키를 받아들여서**(같은 run 의 D1 마이그레이션 스텝은 성공) d1 로 시험하면 이 고장이 보이지 않는다 — 이번 회차가 d1 경로를 건드리지 않은 이유다.
+- **★CI 가 못 잡은 이유(구조적)**: `web.yml` 의 배포 스텝은 `if: push && main` 게이트라 **PR 에서 한 번도 실행되지 않는다**. ⇒ 이 계열 결함은 항상 «PR green → main 착지 → red» 로만 드러난다. 그래서 추가한 검증 스텝은 **인증도 업로드도 하지 않는 자리**를 노린다: `wrangler pages deploy` 는 **설정 파일 검증을 인증·디렉터리 읽기보다 먼저** 하므로, 존재하지 않는 디렉터리를 가리키고 토큰을 주지 않으면 **검증기까지만 도달**한다. 실측 양방향 — 개악(`account_id` 재삽입) 시 **red**, 현 트리에서 **green**(인증 오류로 죽고 «validation for Pages» 는 나오지 않는다).
+- **오계정 방지는 어디로 갔나**: 원 티켓의 목적(로컬 wrangler 가 **다른 계정**에 조용히 작업하는 것 방지)은 버리지 않고 **env 로 이전**했다. 실측 2건 — ⑴핀 없이 `wrangler pages deploy` 를 태우면 **에러 없이 로컬 로그인 계정을 그대로 사용**한다(에러 메시지가 사용 중인 계정을 그 계정으로 지목했다) ⑵`CLOUDFLARE_ACCOUNT_ID` 를 **틀린 값**으로 주면 `Authentication error [code: 10000]` 로 **시끄럽게** 죽고 로그인 계정으로 **되돌아가지 않는다**. 여기에 npm 가드가 «비어 있음»까지 막는다(unset → rc≠0, wrangler 미실행).
+- **★남는 구멍(숨기지 않는다)**: 파일 핀과 달리 env 핀은 **맨손 `npx wrangler …` 를 구속하지 못한다**. 가드가 서는 것은 npm 스크립트 경로뿐이다. 파일 핀으로 되돌리는 길은 Pages 가 막혀 있으므로, 더 조이려면 `--profile`/래퍼가 필요하고 그것은 별건이다.
+- **사용자 영향**: 없음(에뮬레이터 동작 무변경). 사이트도 내려간 적이 없다 — Pages 는 직전 성공 배포를 계속 서빙했고 이번 착지 diff 에 `migrations/**` 0파일이라 데이터 영향도 0. 되살아나는 것은 **신규 배포 반영**이다.
+- **★판정의 한계**: 배포 스텝은 PR 에서 돌지 않으므로, 착지 전 이 회차는 「고쳤다」가 아니라 **「고쳤다고 본다」**다. 확정은 머지 후 `web.yml` on main 이 green 인지 실측해야 한다.
+
 ## [2026-08-20] wrangler `account_id` 를 otterpebble 계정으로 고정 (wie-wrangler-account-id-pin)
 - **무엇을**: `wrangler.toml` 최상단에 `account_id = "17024dfe5a8ff38798c35942d116026b"` 를 사유 주석과 함께 박았다. **1파일 +6/-0** — 코드·워크플로·의존성 무변경.
 - **왜**: 이 맥에는 Cloudflare 계정이 둘(otterpebble·dodu) 있고, `wrangler` 는 계정이 명시되지 않으면 **자격증명이 가리키는 아무 계정**으로 붙는다. `wie-db`(D1)·R2 버킷은 otterpebble 계정 소유이므로 잘못된 계정으로 붙으면 조용히 «빈 프로젝트에 배포»가 된다. 게이트② 검수가 `wrangler d1 info wie-db` 를 이 자격증명으로 돌려 **핀한 계정이 실제로 `wie-db` 를 소유함**을 양성 대조로 확인했다.

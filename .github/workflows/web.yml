@@ -48,6 +48,32 @@ jobs:
         with:
           node-version: 22
 
+      # ── Why this exists ──────────────────────────────────────────────────────
+      # The deploy step below is `if: push && main`, so a wrangler.toml that Pages
+      # refuses to parse cannot fail on a PR — it fails only after the merge, on
+      # main. That happened 2026-08-20 (run 32364381443): `account_id` is valid for
+      # `wrangler d1` but Pages rejects the key, and the prod deploy went red one
+      # commit after the PR was green.
+      #
+      # `wrangler pages deploy` validates the config file BEFORE it authenticates
+      # or reads the directory, so pointing it at a directory that does not exist,
+      # with no CLOUDFLARE_API_TOKEN in this step's env, reaches the validator and
+      # nothing else — no upload, no deployment, no account touched. Every outcome
+      # other than a config-validation error is a pass; we are not testing auth.
+      - name: Validate wrangler.toml as a Pages config (no deploy)
+        run: |
+          # Separate, ungated: if wrangler itself cannot be fetched the step must
+          # fail here rather than sail past a grep that finds nothing.
+          npx --yes wrangler@4.104.0 --version
+          out=$(npx --yes wrangler@4.104.0 pages deploy ./__pages-config-check__ \
+                  --project-name=wie-web --branch=pages-config-check 2>&1 || true)
+          if grep -qi 'validation for Pages' <<<"$out"; then
+            echo "$out"
+            echo "::error file=wrangler.toml::wrangler.toml is not a valid Cloudflare Pages config — the prod deploy in this same workflow would fail on it after merge."
+            exit 1
+          fi
+          echo "wrangler.toml passes Pages config validation."
+
       - name: Cache cargo
         uses: actions/cache@v5
         with:

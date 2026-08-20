@@ -20,7 +20,27 @@
 | `RESEND_API_KEY` (이메일 인증/재설정용, 선택) | resend.com → API Keys | Pages → Settings → 환경변수(암호화 secret). 미설정 시 메일 기능만 비활성 |
 | `EMAIL_FROM` (예: `WIE <noreply@yourdomain>`) | 본인의 인증된 발신주소 | Pages → Settings → 환경변수(일반 변수 가능) |
 | `CLOUDFLARE_API_TOKEN` | My Profile → API Tokens | GitHub repo Secrets (CI 배포용, 선택) |
-| `CLOUDFLARE_ACCOUNT_ID` | 대시보드 우측 | GitHub repo Secrets (CI 배포용, 선택) |
+| `CLOUDFLARE_ACCOUNT_ID` | 대시보드 우측 | GitHub repo Secrets (CI 배포용, 선택) + **로컬 셸 env**(아래 0-1) |
+
+---
+
+## 0-1. ★로컬 wrangler 계정 고정 (원격을 건드리기 전에)
+
+`wrangler`는 계정이 지정되지 않으면 **로컬 OAuth 로그인이 속한 계정을 조용히 사용**합니다.
+이 맥의 wrangler 로그인은 wie 가 사는 계정과 **다른 계정**이라, 고정 없이 `wrangler pages
+deploy` / `d1 ... --remote` 를 돌리면 **엉뚱한 계정에 작업이 나갑니다**(실패도 하지 않습니다).
+
+```sh
+export CLOUDFLARE_ACCOUNT_ID=<wie 가 사는 계정의 account id>   # 대시보드 우측에서 확인
+npm run deploy            # 또는 db:migrate:remote
+```
+
+- 이 두 npm 스크립트는 **`CLOUDFLARE_ACCOUNT_ID` 가 비어 있으면 wrangler 를 실행하지 않고
+  거부**합니다(`package.json`). 값이 틀리면 wrangler 가 인증 오류로 **시끄럽게** 실패합니다.
+- ★**`wrangler.toml` 에 `account_id` 를 넣지 마세요.** Pages 가 그 키를 문법으로 거부해
+  `wrangler pages *` 전체가 죽습니다(2026-08-20 prod 배포 red 의 원인). `wrangler d1` 은
+  같은 키를 받아들이므로 d1 로 시험하면 이 고장이 보이지 않습니다.
+- CI 는 같은 값을 `secrets.CLOUDFLARE_ACCOUNT_ID` 로 주입하므로 별도 조치가 필요 없습니다.
 
 ---
 
@@ -87,7 +107,8 @@ database_id = "여기에-사용자의-database_id"   # 현재는 placeholder
 - Production/Preview 양쪽 환경에 모두 추가.
 
 ### 3-4. 마이그레이션 적용
-- **원격(프로덕션)**: `npx wrangler d1 migrations apply wie-db --remote`
+- **원격(프로덕션)**: `npm run db:migrate:remote` (★계정 고정은 0-1 참고 — 맨손 `npx wrangler
+  d1 migrations apply wie-db --remote` 는 계정 가드를 건너뜁니다)
 - **로컬 테스트**: `npx wrangler d1 migrations apply wie-db --local`
 - 마이그레이션 파일은 `migrations/0001_init.sql` (users / sessions / saves / inquiries /
   rate_limits). 게임 파일/보유목록 컬럼은 없습니다.
@@ -196,7 +217,7 @@ node scripts/verify-browser.mjs /path/to/your/game.jar
 - `CLOUDFLARE_API_TOKEN`에 **D1 Edit + Pages Edit** 권한이 있으면, `main` push마다 `.github/
   workflows/web.yml`가 **배포 직전** `wrangler d1 migrations apply wie-db --remote`를 자동 실행합니다
   (idempotent — 새 마이그레이션 없으면 no-op). 마이그레이션→배포 순서라 스키마 불일치가 없습니다.
-- 수동 적용도 가능: `npx wrangler d1 migrations apply wie-db --remote`.
+- 수동 적용도 가능: `npm run db:migrate:remote` (★0-1 의 `CLOUDFLARE_ACCOUNT_ID` 고정 필요).
 - ★**파괴적 자동 적용 정책**: 서비스가 미운영(pre-launch)이므로, 마이그레이션에 **파괴적 구문
   (DROP TABLE / DELETE FROM / TRUNCATE)**이 있어도 CI가 **자동 적용**합니다. 마이그레이션은
   신중히 작성되며, 데이터 정리/스키마 재정의(예: 0004 users 재정의, 0005 saves rom_hash 키잉)를
