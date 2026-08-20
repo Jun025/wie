@@ -37,6 +37,12 @@ jobs:
     # available in that same step's `if:`). The token itself is never printed.
     env:
       HAS_CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+      HAS_CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+      # One pin for every wrangler invocation in this job — the config *validator*
+      # below and the actual *deployers* further down must never drift apart, or a
+      # config one version accepts is rejected by the other at deploy time (which is
+      # the exact shape of the 2026-08-20 outage).
+      WRANGLER_VERSION: "4.104.0"
     steps:
       - uses: actions/checkout@v6
 
@@ -64,8 +70,8 @@ jobs:
         run: |
           # Separate, ungated: if wrangler itself cannot be fetched the step must
           # fail here rather than sail past a grep that finds nothing.
-          npx --yes wrangler@4.104.0 --version
-          out=$(npx --yes wrangler@4.104.0 pages deploy ./__pages-config-check__ \
+          npx --yes "wrangler@$WRANGLER_VERSION" --version
+          out=$(npx --yes "wrangler@$WRANGLER_VERSION" pages deploy ./__pages-config-check__ \
                   --project-name=wie-web --branch=pages-config-check 2>&1 || true)
           if grep -qi 'validation for Pages' <<<"$out"; then
             echo "$out"
@@ -112,6 +118,16 @@ jobs:
           name: wie-web-dist
           path: web/dist
 
+      # The deploy gates below key off HAS_CF_TOKEN alone, so a set token with an
+      # empty CLOUDFLARE_ACCOUNT_ID would open them with no account pin. Fail here
+      # rather than widen those `if:`s: skipping would leave a green run that shipped
+      # nothing, and a misconfigured secret should be loud, not invisible.
+      - name: Require the account pin before touching the remote account
+        if: ${{ github.event_name == 'push' && env.HAS_CF_TOKEN == 'true' && env.HAS_CF_ACCOUNT != 'true' }}
+        run: |
+          echo "::error::CLOUDFLARE_API_TOKEN is set but CLOUDFLARE_ACCOUNT_ID is empty — register it in repo Secrets (docs/CLOUDFLARE_SETUP.md §0-1). Refusing to deploy without the account pin."
+          exit 1
+
       # Apply D1 migrations to the REMOTE prod DB BEFORE deploying, so the live
       # schema always matches the new code (no schema-mismatch window). Requires
       # CLOUDFLARE_API_TOKEN to carry D1 Edit (in addition to Pages Edit). The
@@ -128,7 +144,7 @@ jobs:
         if: ${{ github.event_name == 'push' && github.ref_name == 'main' && env.HAS_CF_TOKEN == 'true' }}
         uses: cloudflare/wrangler-action@v3
         with:
-          wranglerVersion: "4.104.0"
+          wranglerVersion: ${{ env.WRANGLER_VERSION }}
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: d1 migrations apply wie-db --remote
@@ -144,7 +160,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx --yes wrangler@4.104.0 pages project create wie-web --production-branch=main || true
+        run: npx --yes "wrangler@$WRANGLER_VERSION" pages project create wie-web --production-branch=main || true
 
       # Direct-Upload deploy on push only (not PRs). Gated on the token being
       # present (S3/S8 — secrets are referenced, never embedded). functions/ at
@@ -154,7 +170,7 @@ jobs:
         if: ${{ github.event_name == 'push' && env.HAS_CF_TOKEN == 'true' }}
         uses: cloudflare/wrangler-action@v3
         with:
-          wranglerVersion: "4.104.0"
+          wranglerVersion: ${{ env.WRANGLER_VERSION }}
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy web/dist --project-name=wie-web --branch=${{ github.ref_name }}

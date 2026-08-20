@@ -15,7 +15,7 @@
 | 사용자가 산출하는 값 | 어디서 | 누구에게/어디에 |
 | --- | --- | --- |
 | Pages 프로젝트명 (예: `wie-web`) | Pages 생성 시 | `wrangler.toml`의 `name`과 일치해야 함 → 알려주세요 |
-| D1 `database_id` | `wrangler d1 create` 또는 대시보드 | `wrangler.toml`의 `database_id`에 반영 → 알려주세요 |
+| D1 `database_id` | 아래 3-1 (계정 고정 필수) 또는 대시보드 | `wrangler.toml`의 `database_id`에 반영 → 알려주세요 |
 | `SESSION_SECRET` (랜덤 32바이트) | 본인 생성 | Pages → Settings → 환경변수(암호화 secret). **값은 공유 금지** |
 | `RESEND_API_KEY` (이메일 인증/재설정용, 선택) | resend.com → API Keys | Pages → Settings → 환경변수(암호화 secret). 미설정 시 메일 기능만 비활성 |
 | `EMAIL_FROM` (예: `WIE <noreply@yourdomain>`) | 본인의 인증된 발신주소 | Pages → Settings → 환경변수(일반 변수 가능) |
@@ -88,7 +88,10 @@ npm run deploy            # 또는 db:migrate:remote
 ## 3. D1 데이터베이스 생성 + 바인딩 + 마이그레이션
 
 ### 3-1. 생성 (둘 중 하나)
-- **CLI**: `npx wrangler d1 create wie-db`
+- **CLI**: `CLOUDFLARE_ACCOUNT_ID=<wie 가 사는 계정 id> npx wrangler d1 create wie-db`
+  - ★**계정 고정 없이 맨손으로 돌리지 마세요**(0-1 참고). `create` 는 원격에 리소스를 **만드는**
+    명령이라, 핀이 없으면 로컬 OAuth 로그인이 속한 **엉뚱한 계정에 `wie-db` 가 조용히 생깁니다**
+    — 실패하지 않으므로 알아채기 어렵습니다.
   - 출력의 `database_id = "xxxxxxxx-...."` 값을 복사 → **알려주세요**.
 - **대시보드**: Workers & Pages → **D1** → Create → 이름 `wie-db` → 생성 후 상세에서 ID 확인.
 
