@@ -7,6 +7,12 @@
 # named SESSION_SECRET, never committed. The D1 `database_id` below is NOT a
 # secret — it is the public database identifier and is safe to commit.
 
+# Cloudflare account pin. NOT a secret (account IDs are public identifiers).
+# This machine's local `wrangler` OAuth login is the *dodu* account, while wie
+# belongs to the otterpebble account — unpinned, a local wrangler command would
+# silently act on dodu. Pinned, it fails loudly instead. (2026-08-20 운영자 지시)
+account_id = "17024dfe5a8ff38798c35942d116026b"
+
 name = "wie-web"
 compatibility_date = "2024-09-23"
 pages_build_output_dir = "web/dist"
