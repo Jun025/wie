@@ -1,8 +1,9 @@
 # STATE
 
-> 실측 기준일 **2026-08-27**(`wie-drawing-fixture-makes-pixel-count-a-real-assertion`).
-> 직전 갱신 시점의 `## 진행중` 1건(PR #63)은 **착지**해 `## 완료` 로 옮겼다 — 착수 시점 실측
-> `gh pr list -R Jun025/wie --state open` = `[]`(**열린 PR 0**)이고, 지금 열린 것은 이 회차 1건이다.
+> 실측 기준일 **2026-08-27**(`wie-rust-ci-beta-leg-blocks-gate-on-external-outage`).
+> 직전 갱신 시점의 `## 진행중` 1건(PR #64)은 **착지**해 `## 완료` 로 옮겼다(squash `1853d49e`) —
+> 게이트③ 회차가 「2-b 가 별도 원장 PR 을 금지하고 `main` 직커밋도 금지라 다음 회차가 옮긴다」고
+> 인계한 그 한 건이고, 이 회차가 그 인계를 받았다. 지금 열린 것은 이 회차 1건(PR #65)이다.
 > 직전 갱신은 2026-08-08 이었고 그 사이 `## 다음` 4항 중 2항이 조용히 해소돼 레인이 25시간 굶었다.
 > ★**`## 다음` 이 낡으면 이 레인은 굶는다** — 착지할 때마다 갱신하라(`AGENTS.md` §Session Discipline).
 > ★★**그리고 «새로 쓰는 항목»도 diff 를 열고 써라** — 초판의 ①②는 PR 제목·개설일만 보고 작성돼
@@ -12,14 +13,22 @@
 > 「열린 PR 0건」 줄과 서로를 반증했고, 앞줄만 읽은 총괄은 **죽은 `-merge` 를 발권할 수 있었다.**
 
 ## 진행중
-- 2026-08-27: **화면을 그리는 초소형 픽스처 + 픽셀 계수 실단언 승격**
-  (`wie-drawing-fixture-makes-pixel-count-a-real-assertion`) — `scripts/make-draw-fixture.mjs`
+- 2026-08-27: **외부 apt 장애가 착지를 막던 경로 차단 + `fail-fast: false`**
+  (`wie-rust-ci-beta-leg-blocks-gate-on-external-outage`, PR #65) — `rust.yml` 1파일.
+  ubuntu 스텝이 `bash -e` 아래에서 `apt update` 의 100(우리가 쓰지 않는
+  `packages.microsoft.com` 403)에 죽어 `apt install` 에 도달조차 못 하던 것을
+  「update 는 best-effort · install 은 fatal」로 가른다. ★**게이트를 무르게 하지 않았다** —
+  `libasound2-dev` 를 못 받으면 여전히 red 다. 제품 코드 변경 0.
+
+## 완료 (최근)
+- 2026-08-27: **화면을 그리는 초소형 픽스처 + 픽셀 계수 실단언 승격 착지** (PR #64 `1853d49e`,
+  `wie-drawing-fixture-makes-pixel-count-a-real-assertion`) — `scripts/make-draw-fixture.mjs`
   (JDK 없이 class 파일 바이트를 직접 찍는다 · jar 는 **커밋하지 않고** 메모리에서 서빙 —
   `*.jar` 는 git-ignore + 유출 감사가 tracked jar 를 거부한다) + `contract-roundtrip.mjs`
   **Scenario C**(J2ME · `nonBlackPixels() > 0` 실단언). 26/26 green · 개악 시 25/26 red.
-  ★기존 픽스처·엔진 코드 변경 0.
-
-## 완료 (최근)
+  ★**게이트③ 이 1회차는 `blocked`** 였다 — 외부 apt 장애로 `ci-presence` rc=1(그 red 가 위 `## 진행중`
+  회차를 낳았다). 2회차가 `rerun` **1회**로 green(rc=0)을 받아 착지시켰고, 머지 후 main 4런 전건 green ·
+  Pages prod 배포 + D1 원격 마이그레이션 실집행 · self-verify `https://wie-web.pages.dev` **200 · 콘솔 0에러**.
 - 2026-08-26: **회차 워크로그 `.json` + `proposals` 규약 이식 착지** (PR #63 `92c25276`,
   `wie-worklog-json-proposals-convention`) — cockpit 「후속 작업 추천」이 wie 를 구조적으로 0건으로
   읽던 것을 풀었다(착수 실측 `/api/proposals` `derived.coverage`: wie `json:1 · md:0 · proposals:0`).

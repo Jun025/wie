@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "date": "2026-08-27",
+  "task": "wie-rust-ci-beta-leg-blocks-gate-on-external-outage",
+  "title": "외부 apt 장애가 착지를 막던 경로 차단 + fail-fast: false",
+  "summary": "ubuntu 레그의 apt 스텝이 bash -e 아래에서 `apt update` 의 exit 100(우리가 쓰지 않는 packages.microsoft.com 403)에 죽어 `apt install` 에 도달조차 못 하던 것을 'update 는 best-effort, install 은 fatal' 로 갈랐다. 함께 fail-fast: false 를 넣어 1레그 실패가 6레그 실패로 보이던 오독을 없앴다.",
+  "changes": [
+    ".github/workflows/rust.yml — Install required packages(ubuntu): `sudo apt update;sudo apt install libasound2-dev` → `sudo apt-get update || true; sudo apt-get install -y libasound2-dev`.",
+    ".github/workflows/rust.yml — strategy.fail-fast: false (사유·대가를 주석에 수로 기재)."
+  ],
+  "verification": {
+    "pr": "65",
+    "ci-presence": "rc=0 CI_GREEN Jun025/wie#65 b4741966 — 검사 5건 전건 완료·성공",
+    "legs": "rust_ci 6레그 전건 SUCCESS · contract/build-web/coverage SUCCESS",
+    "apt-step": "ubuntu-latest, beta 의 Install required packages 스텝 conclusion=success",
+    "gates": "cargo fmt/clippy/clippy-wasm/test --all 전건 rc=0 (test result: ok x33)",
+    "fail-fast-cost": "최근 성공 6런 레그별 중앙값 — 실패 레그 제외 5레그 합 1051s ↔ PR#64 attempt1 cancelled 실측 260s ⇒ +791s(13.2 러너-분) · 벽시계 66s→377s"
+  },
+  "limits": [
+    "fail-fast: false 는 green run 으로 증명되지 않는다 — 실효 확인은 다음 red 회차에 난다.",
+    "windows 의 `choco install ninja` 는 같은 형상이 남아 있다(실측 실패 0건이라 범위 밖).",
+    "제3자 저장소를 제거하지는 않았다 — `|| true` 는 그 실패를 무시할 뿐 로그 소음은 남는다."
+  ],
+  "proposals": [
+    {
+      "title": "windows 레그의 `choco install ninja` 에도 같은 실패 전파 차단을 적용한다",
+      "plainSummary": "리눅스 쪽은 외부 패키지 저장소가 잠깐 죽어도 빌드가 멈추지 않게 고쳤습니다. 윈도우 쪽은 아직 같은 형태로 남아 있습니다.",
+      "userBenefit": "외부 패키지 저장소(Chocolatey)의 일시 장애가 착지를 막는 경로를 하나 더 닫는다.",
+      "why": "windows 레그의 `choco install ninja` 도 외부 서비스에 의존하고 같은 `-e` 셸 아래에 있다. 다만 이 repo 에서 그 스텝의 실패는 아직 실측 0건이라 이번 범위에 넣지 않았다.",
+      "tradeoff": "실측 근거가 없는 상태에서 손대면 «없는 병을 고치는» 변경이 된다. 실제로 한 번 red 가 난 뒤에 하는 편이 근거가 선다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "`ci-presence` 에 레그 단위 제외를 넣을지 총괄이 판정한다",
+      "plainSummary": "지금은 여섯 갈래 중 하나만 실패해도 전체가 실패로 판정되어 배포가 막힙니다. 특정 갈래만 참고용으로 돌리는 선택지는 현재 없습니다.",
+      "userBenefit": "실험적(beta) 갈래의 일시 실패가 착지를 막지 않게 하는 선택지가 생긴다 — 지금은 그 선택지 자체가 없다.",
+      "why": "이 회차가 `~/orchestrator/bin/ci-presence` 를 읽어 확인한 사실: 판정 단위가 workflow run 의 conclusion 이고 job/leg 조회 코드도 제외 인자도 없다. 그래서 '레그만 게이트에서 제외' 갈래는 이 repo 에서 선택 불가였다.",
+      "tradeoff": "그 도구는 전 repo 공용이라 wie 한 곳의 사정으로 고칠 것이 아니고, 제외 목록은 «조용한 회귀»의 통로가 될 수 있다. 그래서 wie 가 아니라 orchestrator 축의 판단이다.",
+      "effort": "M",
+      "target": "orchestrator"
+    }
+  ]
+}
