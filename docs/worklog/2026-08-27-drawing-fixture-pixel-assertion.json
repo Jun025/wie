@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "date": "2026-08-27",
+  "task": "wie-drawing-fixture-makes-pixel-count-a-real-assertion",
+  "title": "화면을 그리는 초소형 픽스처 — nonBlackPixels() 를 info-only 에서 실단언으로",
+  "summary": "JDK 없이 class 파일 바이트를 직접 찍어 사각형 하나를 칠하는 J2ME MIDlet jar 를 만들고, 왕복 검사에 Scenario C 를 넣어 그 픽스처에 한해 nonBlackPixels() > 0 을 실단언으로 올렸다. 기존 helloworld 픽스처는 손대지 않았고 그쪽 픽셀 수는 info-only 로 남는다.",
+  "changes": [
+    "scripts/make-draw-fixture.mjs 신설 — DrawMIDlet + DrawCanvas class 파일(버전 47.0) + STORED zip 을 메모리에서 생성. jar 는 커밋하지 않는다(*.jar git-ignore + audit-no-leak.sh 가 tracked jar 를 거부).",
+    "scripts/contract-roundtrip.mjs — Scenario C 추가(J2ME 경로 · nonBlackPixels() > 0 실단언), tickLoop 에 첫 페인트에서 멈추는 인자 1개, 헤더 주석의 info-only 문구를 helloworld_* 한정으로 축소.",
+    ".github/workflows/engine-contract.yml — 관련성 필터에 scripts/make-draw-fixture.mjs 1줄(이 파일을 고치면 검사가 증명하는 내용이 바뀐다)."
+  ],
+  "verification": {
+    "roundtrip": "26/26 green — 'C: canvas blit ASSERTED' = 1024 non-black px after 2 frames (32x32 사각형 넓이와 정확히 일치)",
+    "sabotage-draw": "생성기에서 fillRect 바이트코드 제거 → 25/26 red, 0 non-black px after 2099 frames",
+    "sabotage-assertion": "위 상태에서 단언 1줄까지 제거 → 25/25 green, rc=0 (그 단언이 유일한 탐지 축임을 보인다)",
+    "native": "wie_validate test_data/draw_j2me.jar → paints:1, content:true, distinct_colors:2, 3 tick 안에 페인트",
+    "gates": "cargo fmt/clippy/clippy-wasm/test 4종 + npm run audit + check-engine-contract + check-worklog-json"
+  },
+  "limits": [
+    "helloworld_*.zip 의 픽셀 수는 여전히 info-only (전역 승격하면 기존 픽스처가 전부 red).",
+    "새 픽스처는 J2ME(MIDP) 경로 — KTF/LGT 의 그리기 경로는 아직 단언 밖.",
+    "픽스처가 exit 하지 않는다 — 그리기와 정상 종료를 한 픽스처로 함께 보지 않는다."
+  ],
+  "proposals": [
+    {
+      "title": "KTF 또는 LGT 경로에도 그리는 픽스처를 하나 붙인다",
+      "plainSummary": "지금 '화면이 실제로 나온다'를 CI 가 확인하는 것은 J2ME 방식으로 만든 게임 하나뿐입니다. 실제 서비스에서 더 많이 쓰이는 KTF·LGT 방식은 아직 확인 대상이 아닙니다.",
+      "userBenefit": "KTF/LGT 게임이 검은 화면으로 뜨는 회귀를 배포 전에 잡는다 — 지금은 그 두 경로의 화면 출력이 깨져도 CI 가 green 이다.",
+      "why": "이번 회차의 픽스처는 J2ME 경로만 지난다. KTF·LGT 는 ARM 네이티브 코드라 같은 방법(class 파일 조립)으로는 만들 수 없고, ARM 툴체인이나 실기 유래 최소 샘플이 필요하다.",
+      "tradeoff": "ARM 크로스 툴체인을 CI 나 개발 환경에 들여야 하고, 그 산출물도 게임 바이트가 아님을 보이는 절차가 필요하다. 비용이 이번 회차보다 한 단계 높다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "그리기 + 정상 종료를 한 픽스처로 함께 본다",
+      "plainSummary": "지금 픽스처는 그림을 그린 뒤 스스로 끝나지 않아, '그렸다'와 '깨끗하게 종료했다'를 한 번에 확인하지 못합니다.",
+      "userBenefit": "게임을 끝냈을 때 종료 화면으로 제대로 빠져나오는 경로까지 한 픽스처로 함께 검증된다.",
+      "why": "현재 Scenario C 는 첫 페인트에서 멈춘다. MIDlet 이 그린 뒤 notifyDestroyed() 를 부르게 하면 has_exited() 축까지 같은 시나리오에서 볼 수 있다.",
+      "tradeoff": "Canvas 가 MIDlet 을 되참조해야 해서 바이트코드가 늘고(정적 필드 1개), 생성기가 조금 덜 단순해진다. 종료 축 자체는 Scenario A/B 가 이미 본다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}

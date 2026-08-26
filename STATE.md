@@ -1,7 +1,7 @@
 # STATE
 
-> 실측 기준일 **2026-08-26**(`wie-worklog-json-proposals-convention`).
-> 직전 갱신 시점의 `## 진행중` 1건(PR #62)은 **착지**해 `## 완료` 로 옮겼다 — 착수 시점 실측
+> 실측 기준일 **2026-08-27**(`wie-drawing-fixture-makes-pixel-count-a-real-assertion`).
+> 직전 갱신 시점의 `## 진행중` 1건(PR #63)은 **착지**해 `## 완료` 로 옮겼다 — 착수 시점 실측
 > `gh pr list -R Jun025/wie --state open` = `[]`(**열린 PR 0**)이고, 지금 열린 것은 이 회차 1건이다.
 > 직전 갱신은 2026-08-08 이었고 그 사이 `## 다음` 4항 중 2항이 조용히 해소돼 레인이 25시간 굶었다.
 > ★**`## 다음` 이 낡으면 이 레인은 굶는다** — 착지할 때마다 갱신하라(`AGENTS.md` §Session Discipline).
@@ -12,14 +12,19 @@
 > 「열린 PR 0건」 줄과 서로를 반증했고, 앞줄만 읽은 총괄은 **죽은 `-merge` 를 발권할 수 있었다.**
 
 ## 진행중
-- 2026-08-26: **회차 워크로그 `.json` + `proposals` 규약 이식**
-  (`wie-worklog-json-proposals-convention`) — cockpit 「후속 작업 추천」이 wie 를 구조적으로 0건으로
-  읽던 것을 푼다(착수 실측 `/api/proposals` `derived.coverage`: wie `json:1 · md:0 · proposals:0`).
-  qts #453 규약 복제 — `AGENTS.md` §Landing paperwork 에 워크로그 `.json` 의무 + 소비 키 표,
-  `scripts/check-worklog-json.mjs` 5축 잠금, `engine-contract.yml` 의 항상 도는 잡에 편입.
-  ★**소급 변환 0** · 코드·의존성 변경 0.
+- 2026-08-27: **화면을 그리는 초소형 픽스처 + 픽셀 계수 실단언 승격**
+  (`wie-drawing-fixture-makes-pixel-count-a-real-assertion`) — `scripts/make-draw-fixture.mjs`
+  (JDK 없이 class 파일 바이트를 직접 찍는다 · jar 는 **커밋하지 않고** 메모리에서 서빙 —
+  `*.jar` 는 git-ignore + 유출 감사가 tracked jar 를 거부한다) + `contract-roundtrip.mjs`
+  **Scenario C**(J2ME · `nonBlackPixels() > 0` 실단언). 26/26 green · 개악 시 25/26 red.
+  ★기존 픽스처·엔진 코드 변경 0.
 
 ## 완료 (최근)
+- 2026-08-26: **회차 워크로그 `.json` + `proposals` 규약 이식 착지** (PR #63 `92c25276`,
+  `wie-worklog-json-proposals-convention`) — cockpit 「후속 작업 추천」이 wie 를 구조적으로 0건으로
+  읽던 것을 풀었다(착수 실측 `/api/proposals` `derived.coverage`: wie `json:1 · md:0 · proposals:0`).
+  `AGENTS.md` §Landing paperwork 에 워크로그 `.json` 의무 + 소비 키 표, `scripts/check-worklog-json.mjs`
+  5축 잠금, `engine-contract.yml` 의 항상 도는 잡에 편입. ★**소급 변환 0** · 코드·의존성 변경 0.
 - 2026-08-21: **문서의 맨손 원격 변이 wrangler 명령 + `web.yml` 판본 핀 단일화 착지**
   (PR #62 `4cd0f43e`, `wie-cf-setup-bare-d1-create-and-wrangler-pin-consolidate`) —
   ①`docs/CLOUDFLARE_SETUP.md` 의 `wrangler d1 create` 를 계정 핀 접두로 + `docs/COMPLIANCE.md` 의
@@ -88,11 +93,16 @@
 **부팅+렌더까지만** 판정하므로(`scripts/smoke_gate_baseline.tsv` 의 `ktf/컴삼촉.zip PASS` 도 그 의미다)
 스테이지 5 심도는 **기존 자동화로 도달하지 못한다.** ①보다 난도가 한 단계 높다.
 
-**③ (선택) 화면을 실제로 그리는 초소형 픽스처** — 여전히 유효. `scripts/contract-roundtrip.mjs` 는
-`nonBlackPixels()` 를 세지만 `test_data/helloworld_*.zip` 이 아무것도 그리지 않아 픽셀 수가
-**info-only** 로만 보고된다 — 같은 파일 상단 주석 «the fixtures never draw, so canvas blit is reported
-as info» 와 `check()` 호출의 «fixture draws nothing — pixels are info only» 문구가 그 한계를 명시한다.
-그리는 픽스처를 넣으면 왕복 검사가 blit 회귀까지 커버한다.
+**③ ~~(선택) 화면을 실제로 그리는 초소형 픽스처~~** — **해소**(2026-08-27,
+`wie-drawing-fixture-makes-pixel-count-a-real-assertion` · 아래 `## 진행중`).
+`scripts/make-draw-fixture.mjs` 가 사각형 하나를 칠하는 J2ME MIDlet jar 를 만들고,
+왕복 검사 **Scenario C** 가 그 픽스처에 대해 `nonBlackPixels() > 0` 을 **실단언**한다
+(실측 **1024 px / 2 frames**). ⇒ 왕복 검사가 **blit 회귀까지** 커버한다 — 코어가 프레임을
+합성하지 못하거나 `WebScreen::paint` 가 캔버스에 닿지 못하면 CI 가 red 다.
+★**남는 것 3가지(사실만)**: ⑴`helloworld_*.zip` 은 **그대로**이고 그쪽 픽셀 수는 여전히
+**info-only** 다(전역 승격이 아니라 픽스처별 승격이다) ⑵새 픽스처는 **J2ME 경로**를 지난다 —
+KTF·LGT 의 그리기 경로는 여전히 왕복 검사의 단언 밖이다 ⑶픽스처가 **exit 하지 않는다**
+(Scenario C 는 첫 페인트에서 멈춘다) — 그리기 + 정상 종료를 한 픽스처로 함께 보진 않는다.
 
 ### «해소»로 내린 항목 — 다시 발권하지 마라 (판정일은 항목마다 표기)
 > ★절 제목에 날짜를 박지 않는다. 회차마다 항목이 붙는데 제목 날짜는 안 따라와서

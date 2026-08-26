@@ -77,6 +77,9 @@ jobs:
               - 'scripts/build-wasm.sh'
               - 'scripts/check-engine-contract.mjs'
               - 'scripts/contract-roundtrip.mjs'
+              # builds the draw fixture the round-trip asserts the blit with —
+              # editing it changes what the contract check proves.
+              - 'scripts/make-draw-fixture.mjs'
               - 'docs/contracts/**'
               - 'test_data/**'
               - 'data/**'

@@ -13,11 +13,16 @@
 //   so the full WIPI-exit → sticky has_exited() → tick-no-op chain is observed
 //   end-to-end) → key vocabulary sweep → save export/import round-trip
 //   (WIESAV01, still readable after exit — the shell persists post-exit) →
-//   free(). NOTE the fixtures never draw, so canvas blit is reported as info
-//   only, not asserted (documented limit).
+//   free(). NOTE the helloworld_* fixtures print and exit but never draw, so
+//   their pixel count stays info only — Scenario C is what asserts the blit.
 // Scenario B (LGT fixture — featurephone FALLBACK init path + fresh glue):
 //   cache-busted glue re-import → default() no-arg (glue must fetch
 //   wie_web_bg.wasm by its pinned name) → lgt_compile_model() === "clet".
+// Scenario C (J2ME draw fixture — the canvas blit path, ASSERTED):
+//   test_data/draw_j2me.jar paints one filled rect (scripts/make-draw-fixture.mjs
+//   builds it), so nonBlackPixels() > 0 is a real assertion here: it fails if the
+//   core stops composing frames or WebScreen::paint stops reaching the canvas.
+//   This fixture never exits — the loop stops at the first painted frame.
 //
 // Usage: node scripts/contract-roundtrip.mjs        (after scripts/build-wasm.sh)
 //   WIE_CHROME_CHANNEL=chrome  — use a system Chrome instead of the playwright
@@ -27,6 +32,8 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { drawFixtureJar } from "./make-draw-fixture.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const contract = JSON.parse(await readFile(path.join(root, "docs/contracts/featurephone-engine-contract.json"), "utf8"));
@@ -39,6 +46,13 @@ const server = createServer(async (req, res) => {
   if (url.pathname === "/") {
     res.writeHead(200, { "content-type": "text/html" });
     res.end("<!doctype html><html><body></body></html>");
+    return;
+  }
+  // Built in memory, not on disk: *.jar is git-ignored (Constraint 9).
+  if (url.pathname === "/fixtures/draw_j2me.jar") {
+    const jar = drawFixtureJar();
+    res.writeHead(200, { "content-type": "application/java-archive", "content-length": jar.length });
+    res.end(jar);
     return;
   }
   if (url.pathname.startsWith("/wasm/")) file = path.join(root, contract.artifacts.dir, path.basename(url.pathname));
@@ -81,7 +95,9 @@ const steps = await page.evaluate(async (contract) => {
   // Drive the emulator like RunningGame does: tick per animation frame (the
   // core is an async executor — a tight loop without yielding cannot progress),
   // polling has_exited() after every tick exactly like the shell's loop.
-  const tickLoop = async (emu, canvas, deadlineMs) => {
+  // `untilPainted` is for the draw fixture, which never exits: stop at the first
+  // frame that reaches the canvas instead of burning the whole deadline.
+  const tickLoop = async (emu, canvas, deadlineMs, untilPainted = false) => {
     const start = performance.now();
     let frames = 0;
     let threw = null;
@@ -94,6 +110,7 @@ const steps = await page.evaluate(async (contract) => {
       }
       frames++;
       if (emu.has_exited()) break;
+      if (untilPainted && nonBlackPixels(canvas) > 0) break;
       await new Promise((r) => requestAnimationFrame(r));
     }
     return { frames, threw, pixels: nonBlackPixels(canvas) };
@@ -176,6 +193,15 @@ const steps = await page.evaluate(async (contract) => {
     check("B: clean exit observed (has_exited() flips true)", b.emu.has_exited() === true, `${runB.frames} frames, ${runB.pixels} px (fixture draws nothing — pixels are info only)`);
     b.emu.free();
     check("B: free() (no throw)", true);
+
+    // ── Scenario C: J2ME draw fixture — canvas blit, ASSERTED not reported ───
+    const c = await bootFixture(mod2, "draw_j2me.jar");
+    check('C: platform_kind() === "J2ME"', c.emu.platform_kind() === "J2ME", `got ${c.emu.platform_kind()}`);
+    const runC = await tickLoop(c.emu, c.canvas, 30_000, true);
+    check("C: tick loop survives (no throw)", runC.threw === null, runC.threw ?? `${runC.frames} frames`);
+    check("C: canvas blit ASSERTED — fixture's rect reaches the canvas", runC.pixels > 0, `${runC.pixels} non-black px after ${runC.frames} frames`);
+    c.emu.free();
+    check("C: free() (no throw)", true);
   } catch (e) {
     check("scenario aborted by exception", false, (e && e.stack) || String(e));
   }
