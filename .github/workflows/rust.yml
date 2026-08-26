@@ -35,6 +35,12 @@ jobs:
   rust_ci:
     runs-on: ${{ matrix.os }}
     strategy:
+      # One leg failing must not cancel the other five. Without this, a single
+      # red leg leaves the rest `cancelled`, and `gh pr checks` renders all six
+      # as `fail` — twice now (2026-08-27, PR #64) that was read as "the whole
+      # matrix is broken" when exactly one leg was. The cost is paid only on
+      # failing runs: ~13 runner-minutes, ~5 min wall (medians, n=6 runs).
+      fail-fast: false
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
         rust: [stable, beta]
@@ -66,7 +72,15 @@ jobs:
 
       - name: Install required packages
         if: matrix.os == 'ubuntu-latest'
-        run: sudo apt update;sudo apt install libasound2-dev
+        # `update` is best-effort, `install` is not. The runner image ships
+        # third-party repos we do not use (packages.microsoft.com); when one of
+        # them 403s, `apt update` exits 100 and — under the default `bash -e` —
+        # the step dies before installing anything. That is what reddened PR #64
+        # on 2026-08-27: an external outage, in a step that runs before any
+        # compilation, blocking a merge whose diff touched no Rust at all.
+        # libasound2-dev comes from the Ubuntu archive, so if it genuinely
+        # cannot be fetched or installed, the install below still fails the job.
+        run: sudo apt-get update || true; sudo apt-get install -y libasound2-dev
 
       - name: Install required packages
         if: matrix.os == 'windows-latest'
