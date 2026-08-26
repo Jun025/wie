@@ -1,7 +1,7 @@
 # STATE
 
-> 실측 기준일 **2026-08-21**(`wie-cf-setup-bare-d1-create-and-wrangler-pin-consolidate`).
-> 직전 갱신 시점의 `## 진행중` 1건(PR #61)은 **착지**해 `## 완료` 로 옮겼다 — 착수 시점 실측
+> 실측 기준일 **2026-08-26**(`wie-worklog-json-proposals-convention`).
+> 직전 갱신 시점의 `## 진행중` 1건(PR #62)은 **착지**해 `## 완료` 로 옮겼다 — 착수 시점 실측
 > `gh pr list -R Jun025/wie --state open` = `[]`(**열린 PR 0**)이고, 지금 열린 것은 이 회차 1건이다.
 > 직전 갱신은 2026-08-08 이었고 그 사이 `## 다음` 4항 중 2항이 조용히 해소돼 레인이 25시간 굶었다.
 > ★**`## 다음` 이 낡으면 이 레인은 굶는다** — 착지할 때마다 갱신하라(`AGENTS.md` §Session Discipline).
@@ -12,14 +12,19 @@
 > 「열린 PR 0건」 줄과 서로를 반증했고, 앞줄만 읽은 총괄은 **죽은 `-merge` 를 발권할 수 있었다.**
 
 ## 진행중
-- 2026-08-21: **문서의 맨손 원격 변이 wrangler 명령 + `web.yml` 판본 핀 단일화**
-  (`wie-cf-setup-bare-d1-create-and-wrangler-pin-consolidate`) — 위 착지 회차의 게이트② 승계 2건.
-  ①`docs/CLOUDFLARE_SETUP.md` 의 `wrangler d1 create` 를 계정 핀 접두로 + ★전수 grep 이 찾아낸
-  `docs/COMPLIANCE.md` 의 원격 변이 7건(`d1 execute --remote` UPDATE 6 · `r2 object delete` 1)도 블록마다 핀
-  ②`web.yml` 판본 리터럴 **5곳 → job env `WRANGLER_VERSION` 1곳**(값 무변경) ③`CLOUDFLARE_ACCOUNT_ID`
-  가 비면 배포 전에 **시끄럽게 죽는** 가드 스텝. 코드·의존성·판본 변경 0.
+- 2026-08-26: **회차 워크로그 `.json` + `proposals` 규약 이식**
+  (`wie-worklog-json-proposals-convention`) — cockpit 「후속 작업 추천」이 wie 를 구조적으로 0건으로
+  읽던 것을 푼다(착수 실측 `/api/proposals` `derived.coverage`: wie `json:1 · md:0 · proposals:0`).
+  qts #453 규약 복제 — `AGENTS.md` §Landing paperwork 에 워크로그 `.json` 의무 + 소비 키 표,
+  `scripts/check-worklog-json.mjs` 5축 잠금, `engine-contract.yml` 의 항상 도는 잡에 편입.
+  ★**소급 변환 0** · 코드·의존성 변경 0.
 
 ## 완료 (최근)
+- 2026-08-21: **문서의 맨손 원격 변이 wrangler 명령 + `web.yml` 판본 핀 단일화 착지**
+  (PR #62 `4cd0f43e`, `wie-cf-setup-bare-d1-create-and-wrangler-pin-consolidate`) —
+  ①`docs/CLOUDFLARE_SETUP.md` 의 `wrangler d1 create` 를 계정 핀 접두로 + `docs/COMPLIANCE.md` 의
+  원격 변이 7건도 블록마다 핀 ②`web.yml` 판본 리터럴 **5곳 → job env `WRANGLER_VERSION` 1곳**
+  ③`CLOUDFLARE_ACCOUNT_ID` 가 비면 배포 전에 시끄럽게 죽는 가드 스텝. 코드·의존성·판본 변경 0.
 - 2026-08-20: **Pages 가 거부하는 `account_id` — 핀을 env 로 이전 착지** (PR #61 `eef08184`,
   `wie-wrangler-pages-account-id-breaks-prod-deploy-fix`) — `wrangler.toml` 의 `account_id` 제거 +
   `package.json` 의 `deploy`·`db:migrate:remote` 에 `CLOUDFLARE_ACCOUNT_ID` 가드 + `web.yml` 에

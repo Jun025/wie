@@ -50,6 +50,18 @@ jobs:
         with:
           submodules: recursive
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Unrelated to the engine surface, and deliberately OUTSIDE the paths filter
+      # below: this is the repo's only always-run node job, and a broken worklog
+      # `.json` is silent everywhere else (the cockpit proposals panel just shows
+      # zero cards). Node-only, no build, ~1s — it cannot slow or gate the engine
+      # checks, and the job stays the always-run wrapper described in the header.
+      - name: Worklog .json contract (AGENTS.md §Landing paperwork)
+        run: node scripts/check-worklog-json.mjs
+
       # Detect whether this diff touches anything that can change the built
       # artifact or the pinned surface. If not, the job short-circuits to success
       # (see the wrapper note in the header). Same list as publish-artifact.yml.
@@ -114,11 +126,6 @@ jobs:
       - name: Build wie_web WASM (current source)
         if: steps.changes.outputs.engine == 'true'
         run: bash scripts/build-wasm.sh
-
-      - uses: actions/setup-node@v4
-        if: steps.changes.outputs.engine == 'true'
-        with:
-          node-version: 22
 
       - name: Contract check — static surface
         if: steps.changes.outputs.engine == 'true'

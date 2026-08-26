@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "date": "2026-08-26",
+  "task": "wie-worklog-json-proposals-convention",
+  "title": "회차 워크로그 `.json` + `proposals` 규약 이식 — cockpit 「후속 작업 추천」이 wie 를 0건으로 읽던 구조 해소",
+  "services": ["docs", "ci"],
+  "summary": "cockpit 「후속 작업 추천」 커버리지가 6 repo 중 2개(otterpebble·dodu)만 차 있었고 wie 는 `json:1 · proposals:0` — 워크로그 파일은 있는데 그 안에 소비처가 읽는 `proposals[]` 가 없었다. qts 회차(#453)가 만든 규약을 그대로 복제해 `AGENTS.md` §Landing paperwork 에 「후속 제안은 `docs/worklog/*.json` 에 적지 않으면 존재하지 않는다」 + 소비 키 표를 심고, 형식 이탈이 조용히 카드 0장을 만드는 무증상을 `scripts/check-worklog-json.mjs` 로 red 로 바꿨다. 새 스키마·새 폴더·소급 변환 0.",
+  "changes": [
+    "`AGENTS.md` §Landing paperwork — `STATE.md`/`REPORT.md` 줄 바로 아래에 워크로그 `.json` 의무 1줄 + §Worklog `.json` schema 소절(소비처가 실제로 읽는 키만: `date` · `proposals[]` 7키 · `adoptedProposals`/`declinedProposals`). 그 밖의 키는 자유임을 명시(발명 0).",
+    "`scripts/check-worklog-json.mjs` 신설 — `docs/worklog/*.json` 전건에 파싱·`date`↔파일명·`proposals[]` 7키 전수·처분 ref 형식 5축. 의존성 0(node 내장만).",
+    "`.github/workflows/engine-contract.yml` — 항상 도는 `contract` 잡의 checkout 직후에 무조건 실행 스텝 1개(+ `actions/setup-node` 를 조건부에서 무조건으로 올림). paths 필터 «밖»에 둔 이유를 주석으로 적었다.",
+    "`docs/worklog/2026-08-26-worklog-json-proposals-convention.json` — 규약의 자기증명 1건(이 파일)."
+  ],
+  "verification": "기준선을 실측으로 잡았다 — 로컬 cockpit `GET :4477/api/proposals` 의 `derived.coverage` (2026-08-26 09:48 KST): wie `{json:1, md:0, proposals:0}` · qts `{json:1, md:13, proposals:3}` · dodu `{json:12, md:0, proposals:39}` · RustJava·orchestrator `docs/worklog ENOENT`. 스키마는 추정이 아니라 소비처 코드(`~/tower/bin/cockpitd.js` `scanRepoSimple`)를 읽어 확정했다: 읽는 키는 `j.date` · `j.proposals[]` 의 7키 · `j.adoptedProposals`/`j.declinedProposals` 뿐이고 `ref` 는 `<basename>#p<0기반 index>` 파생이다. 검사기 양방향 실측 — 현 트리 green(`OK (2 file(s))`), 제품 호출부 개악 시 red. 착지 전 cockpit 수치는 변하지 않는다(`worklogDirOf` 가 `git archive origin/main` 으로 읽는다) — 머지 후 wie 는 `json:2 · proposals:3` 이어야 한다.",
+  "limits": [
+    "★규약을 심는 것과 커버리지가 오르는 것은 다른 일이다 — 이후 회차가 워크로그를 «쓰지 않으면» 수치는 그대로다. 잠금은 「`.json` 이 있으면 형식이 맞는가」만 묻지 「회차마다 쓰라」를 강제하지 않는다.",
+    "기존 워크로그 1건(2026-07-22)은 소급 변환하지 않았다 — `proposals` 가 없어 카드 0장인 상태 그대로다(발권이 소급 0 을 명시).",
+    "검사기가 `engine-contract.yml` 에 얹혀 있다 — 그 잡의 주제(엔진 계약)와 무관하지만 이 repo 의 유일한 «항상 도는 node 잡»이라 골랐다."
+  ],
+  "issues": [],
+  "proposals": [
+    {
+      "title": "워크로그 작성을 회차 의무로 올릴지 결정 — 규약만으로는 커버리지가 오르지 않는다",
+      "plainSummary": "이번에 만든 것은 «워크로그를 쓸 때 형식을 맞추는» 규약이다. 워크로그를 아예 안 쓰는 회차는 여전히 화면에 아무것도 남기지 않는다.",
+      "userBenefit": "후속 제안이 어느 회차에서 나왔든 빠짐없이 화면에 모인다 — 지금은 «워크로그를 쓴 회차»만 모인다.",
+      "why": "wie 의 회차 기록 정본은 `REPORT.md`(항목 수십 건)인데 `docs/worklog/*.json` 은 착수 시점 1건이었다(≈수 %). 후속 제안이 실제로 가장 많이 쌓이는 곳은 `REPORT.md` 의 「남는 구멍」 절과 `~/orchestrator/reports/*.done.md` 인데 전자는 산문이라 기계가 못 읽고 후자는 repo 밖이라 스캐너가 보지 않는다.",
+      "tradeoff": "⑴매 회차 의무화하면 정직한 작성 부담이 는다(otterpebble 이 그 길이다 — 1,086건). ⑵`REPORT.md` 를 파싱하면 그것이 정확히 이 리니지가 반복해 기각한 «파서 제2원본»이 된다. ⑶현상 유지면 제공률이 낮은 채로 남는다. 셋 다 공짜가 아니라 총괄 판단거리다.",
+      "effort": "S — ⑴은 `AGENTS.md` 1줄 + 검사기에 축 1개. ⑵는 별건 설계.",
+      "target": "AGENTS.md · scripts/check-worklog-json.mjs"
+    },
+    {
+      "title": "기존 워크로그 1건(2026-07-22)에 `proposals` 를 손으로 채울지 결정",
+      "plainSummary": "이미 있는 워크로그 1건은 후속 제안 칸이 비어 있어 화면에 카드가 안 뜬다. 본문에는 「남는 한계」가 3줄 적혀 있다.",
+      "userBenefit": "그 회차가 남긴 미해결 항목(렌더 회귀 검사 불가 등)이 화면에 올라와 잊힌 숙제로 드러난다.",
+      "why": "발권이 소급 0 을 명시해 이번 회차는 손대지 않았다. 다만 그 파일의 `limits` 3항은 실체가 있는 후속거리이고(픽셀 회귀 미검사·상용 ROM 커버 밖·1회 왕복 증거), 옮길지 버릴지는 «작업»이 아니라 «판단»이다.",
+      "tradeoff": "손으로 옮기면 산문 → 7키 매핑에 사람의 해석이 들어간다. 변환기를 만들면 그것이 기각된 파서 제2원본이다. ⇒ 하려면 손으로, 1건만.",
+      "effort": "XS — 파일 1건 · 10분 내외.",
+      "target": "docs/worklog/2026-07-22--featurephone-engine-contract-selftest.json"
+    },
+    {
+      "title": "워크로그 검사기의 집 — `engine-contract.yml` 에 얹은 것을 유지할지 옮길지",
+      "plainSummary": "새 검사는 엔진 계약 워크플로에 얹혀 돈다. 주제가 다른 두 검사가 한 필수 체크를 공유한다.",
+      "userBenefit": "직접 영향 없음 — 어느 검사가 왜 빨간지 사람이 읽어내는 속도의 문제다.",
+      "why": "이 repo 의 «항상 도는 node 잡»은 `engine-contract.yml` 의 `contract` 뿐이다(`web.yml` 의 `build-web` 은 실패가 배포 잡과 한 몸이라 문서 결함이 배포를 막는다). 그래서 주제 불일치를 감수하고 그쪽을 골랐다.",
+      "tradeoff": "전용 워크플로를 새로 만들면 필수 체크가 하나 늘고(브랜치 보호 갱신 필요) 잡 기동 비용이 붙는다. 지금 자리는 그 비용 0 이지만 `contract` 가 «엔진 계약 전용»이라는 헤더 설명과 어긋난다.",
+      "effort": "XS — 옮기면 워크플로 1개 신설 + 브랜치 보호 갱신(운영자 손).",
+      "target": ".github/workflows/engine-contract.yml"
+    }
+  ],
+  "adoptedProposals": ["2026-08-23-worklog-json-with-proposals-convention#p2"],
+  "declinedProposals": []
+}
