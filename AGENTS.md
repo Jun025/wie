@@ -82,6 +82,29 @@ then `:125`). The rest need a toolchain fetch — run them only when the artifac
 ### Landing paperwork
 
 - **`STATE.md` and `REPORT.md` are tracked files, not scratch**: keep `STATE.md`'s 진행중/완료/다음 current as a task starts and lands, and append a dated 무엇을·왜·사용자 영향 entry to the top of `REPORT.md` when it lands.
+- **Follow-up proposals go in a `docs/worklog/*.json`, or they do not exist.** When a task leaves
+  follow-up recommendations (or adopts/declines earlier ones), write
+  `docs/worklog/YYYY-MM-DD-<slug>.json` in the same PR. The cockpit 「후속 작업 추천」 panel reads
+  `.json` in that directory and nothing else — a proposal left only in prose (`REPORT.md`, the done
+  reply, a `.md` worklog) never reaches the screen. Schema below.
+
+#### Worklog `.json` schema (2026-08-26)
+
+**Do not invent keys** — these are the ones the consumer (`/api/proposals` → `scanRepoSimple`)
+actually reads. Everything else in the file (`schema`, `task`, `title`, `summary`, `changes`,
+`verification`, `limits`, …) is free-form: the consumer ignores it, so it is for humans and for
+the next task.
+
+| key | type | what the consumer does with it |
+|---|---|---|
+| `date` | `"YYYY-MM-DD"` | sort axis; must equal the filename's first 10 chars (it falls back to them, so a mismatch makes the sort lie) |
+| `proposals[]` | array of objects | one array element = one card. Its `ref` is derived as `<basename>#p<0-based index>` |
+| `proposals[].title` `plainSummary` `userBenefit` `why` `tradeoff` `effort` `target` | string | the card body — fill **all seven**; an empty one renders as an empty field |
+| `adoptedProposals[]` / `declinedProposals[]` | array of `ref` strings | removes that `ref` from the open recommendations (disposition record) |
+
+Locked by `scripts/check-worklog-json.mjs` (run it directly; `engine-contract.yml` runs it on every
+PR). It validates every `.json` in `docs/worklog/` and nothing else — **existing worklogs are not
+retroactively converted**, and no `.md` sibling is required (wie's worklogs are `.json`-only).
 
 ### Git Workflow
 
