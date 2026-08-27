@@ -1,10 +1,13 @@
 # STATE
 
-> 실측 기준일 **2026-08-27**(`wie-rust-ci-beta-leg-blocks-gate-on-external-outage`).
-> 직전 갱신 시점의 `## 진행중` 1건(PR #64)은 **착지**해 `## 완료` 로 옮겼다(squash `1853d49e`) —
-> 게이트③ 회차가 「2-b 가 별도 원장 PR 을 금지하고 `main` 직커밋도 금지라 다음 회차가 옮긴다」고
-> 인계한 그 한 건이고, 이 회차가 그 인계를 받았다. 지금 열린 것은 이 회차 1건(PR #65)이다.
-> 직전 갱신은 2026-08-08 이었고 그 사이 `## 다음` 4항 중 2항이 조용히 해소돼 레인이 25시간 굶었다.
+> 실측 기준일 **2026-08-27**(`wie-upstream-realign-verdict`).
+> ★★**이 회차로 이 repo 의 «위치»가 바뀌었다 — 위 절들보다 이 줄을 먼저 읽어라.**
+> `origin/main`(`250d7e4c`)은 `upstream/main`(`dlunch/wie` `73938944`)보다 **1,067커밋 뒤**이고
+> **192커밋 앞**이며, 공통조상 `fa641a8a` 는 **2026-06-10 이후 한 번도 움직인 적이 없다**
+> (우리 192커밋에 upstream 동기화 시도 **0건** — 실측).
+> 판정 정본 = **`docs/upstream-realign-verdict.md`**. 채택 갈래 = ★**⒟ — fork 를 배포·제품
+> 오버레이로 남기고 엔진은 upstream 을 쓴다.** 집행은 이 회차가 하지 않는다(P1~P4 초안은 `REPORT.md`).
+> ★**직전 갱신 시점의 `## 진행중` 1건(PR #65)은 착지**했다(squash `250d7e4c`) — `## 완료` 로 옮겼다.
 > ★**`## 다음` 이 낡으면 이 레인은 굶는다** — 착지할 때마다 갱신하라(`AGENTS.md` §Session Discipline).
 > ★★**그리고 «새로 쓰는 항목»도 diff 를 열고 써라** — 초판의 ①②는 PR 제목·개설일만 보고 작성돼
 > **둘 다 사실과 어긋났다**(게이트② 반려). 낡음을 지운 자리에 새 부정확을 심으면 병은 그대로다.
@@ -12,15 +15,33 @@
 > 2026-08-19 게이트②가 잡은 형태가 그것이다: 이미 머지된 PR 이 `## 진행중` 에 남아 바로 아래의
 > 「열린 PR 0건」 줄과 서로를 반증했고, 앞줄만 읽은 총괄은 **죽은 `-merge` 를 발권할 수 있었다.**
 
+## fork 의 현재 위치 (2026-08-27 실측 · 정본 `docs/upstream-realign-verdict.md`)
+
+| 축 | 값 |
+|---|---|
+| 공통조상 | `fa641a8a` **2026-06-10** (이후 **불변**) |
+| behind / ahead | **1,067** / **192** |
+| 우리 고유 변경 | 220파일 **+25,690/−164** (문서·CI 제외 시 148파일 +17,890/−127) |
+| ① 중복(upstream 이 자기 구현으로 착지) | Rust **3,437줄 = 우리 Rust 의 64.3%** |
+| ② 엔진 고유·가치 | Rust 1,134줄 (21.2%) |
+| ③ 로컬 스캐폴딩(웹 제품·문서·CI) | **20,291줄 = 전체의 79.0%** |
+| LGT Java import `0x64` 구현 | ours **8** ↔ upstream **31** · ★**ours 에만 있는 것 0** |
+| `Jun025/RustJava` `[patch]` fork | ★**upstream RustJava 의 진부분집합**(우리에만 있는 `.rs` **0**) |
+
+★**핵심**: fork 가 private 이라서가 아니라 **전진하지 않아서** 문제다(`Jun025/wie` 는 이미 public).
+★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
+
 ## 진행중
-- 2026-08-27: **외부 apt 장애가 착지를 막던 경로 차단 + `fail-fast: false`**
-  (`wie-rust-ci-beta-leg-blocks-gate-on-external-outage`, PR #65) — `rust.yml` 1파일.
-  ubuntu 스텝이 `bash -e` 아래에서 `apt update` 의 100(우리가 쓰지 않는
-  `packages.microsoft.com` 403)에 죽어 `apt install` 에 도달조차 못 하던 것을
-  「update 는 best-effort · install 은 fatal」로 가른다. ★**게이트를 무르게 하지 않았다** —
-  `libasound2-dev` 를 못 받으면 여전히 red 다. 제품 코드 변경 0.
+- 2026-08-27: **upstream 재정렬 판정** (`wie-upstream-realign-verdict`, PR #66) —
+  `docs/upstream-realign-verdict.md` 신설(3분류 표 + 갈래 판정 + LGT 코드 대조 + RustJava fork 실측).
+  ★**제품 코드 변경 0 · upstream 발신 0.** 채택 갈래 ⒟, 집행은 후속 P1~P4.
 
 ## 완료 (최근)
+- 2026-08-27: **외부 apt 장애가 착지를 막던 경로 차단 + `fail-fast: false` 착지**
+  (PR #65 `250d7e4c`, `wie-rust-ci-beta-leg-blocks-gate-on-external-outage`) — `rust.yml` 1파일.
+  ubuntu 스텝이 `bash -e` 아래에서 `apt update` 의 100(우리가 쓰지 않는 `packages.microsoft.com` 403)에
+  죽어 `apt install` 에 도달조차 못 하던 것을 「update 는 best-effort · install 은 fatal」로 갈랐다.
+  ★게이트를 무르게 하지 않았다 — `libasound2-dev` 를 못 받으면 여전히 red 다. 제품 코드 변경 0.
 - 2026-08-27: **화면을 그리는 초소형 픽스처 + 픽셀 계수 실단언 승격 착지** (PR #64 `1853d49e`,
   `wie-drawing-fixture-makes-pixel-count-a-real-assertion`) — `scripts/make-draw-fixture.mjs`
   (JDK 없이 class 파일 바이트를 직접 찍는다 · jar 는 **커밋하지 않고** 메모리에서 서빙 —
@@ -84,7 +105,27 @@
 
 ## 다음
 
-**① upstream #1260 후속 — ★«재발권 금지» 축이다(해제 조건 있음)**. 영웅서기5 LGT `Unknown SVC id 1409`.
+**★① upstream 재정렬 집행 — 이 회차의 판정을 잇는 축**(정본 `docs/upstream-realign-verdict.md`).
+채택 갈래 **⒟**. 순서는 **P1 → P2 → P3/P4** 이고 ★**P1 은 나머지와 독립이라 먼저 간다**:
+- **P1**(S·low·선행없음) `Cargo.toml` `[patch]` **13줄 제거** + `Cargo.lock` 재해결 +
+  `AGENTS.md` **Constraint 8 개정**. ★근거가 실측으로 반증된 조항이다 — 우리 `Jun025/RustJava`
+  `c66f08d`(2026-07-07)는 upstream `ba5797b`(2026-08-16)의 **진부분집합**이고(우리에만 있는 `.rs` **0**),
+  fork 명목이던 NPE 하드닝은 **모든 파일에서 upstream 이 같거나 더 많다**.
+- **P2**(M·측정전용·선행 P1) ★**이 회차가 못 한 단 하나의 측정 = ⒟ 전체의 go/no-go.**
+  `upstream/main` 체크아웃에 `scripts/smoke_gate.sh` 를 걸어 **코퍼스가 있는 머신에서**
+  `ktf 190 / lgt 52 / skt 50` 재측정 → 차이표 1장. ★`game_lab/` 은 **이 머신에 없다**(실측) —
+  게임 바이트는 Constraint 9 로 repo 에 들어올 수 없으므로 **구조적으로** 여기선 못 잰다.
+- **P3**(L·med·선행 P2) `wie_web` → `wie_featurephone` **개명**(upstream 이 같은 이름을 자기 용도로 쓴다)
+  후 upstream 을 base 로 ③ 오버레이 재적용 + `compile_model.rs` **122줄 이식**. ★여러 회차로 쪼개라.
+- **P4**(M·low·P3 와 병행) ② 를 upstream PR 로. ★**IP 방침 선 안쪽만**(#1239 2026-06-29
+  「공개 문서 기반으로만 구현 · 펌웨어 리버스 계획 없음」) — `wipi_java` 공개 API 스텁 10종 +
+  `canvas.rs` 단위테스트 9개는 **보낼 수 있고**, `docs/lgt_abi.md`·`docs/reference/` 는 **보내지 마라**.
+★★**P3 의 DoD 에 리터럴로 박아라**: 머지 후 `git merge-base origin/main upstream/main` 이
+`fa641a8a` 가 **아니어야** 한다. 그대로면 그 회차는 **실패**다 — 게이트③ `--squash` 가 upstream 계보를
+평평하게 만들어 다음 회차를 **또 1,067커밋 뒤**에서 시작시킨다(동시 발권
+`rustjava-upstream-sync-squash-defeats-convergence` 가 RustJava 에서 실측한 바로 그 형태).
+
+**② upstream #1260 후속 — ★«재발권 금지» 축이다(해제 조건 있음)**. 영웅서기5 LGT `Unknown SVC id 1409`.
 1차 착수분(표 등재 + 미지원 예외)은 **PR #57 `bccf11f1` 로 착지**했다. 남은 것은 **misc index 9 의 정체 규명**이고,
 ★**이 repo 안의 근거로는 닫혀 있다** — 2026-08-19 게이트② 검수가 총괄 질의에 «동의한다 — 재발권 금지에 찬성»으로
 답하며 근거 3개를 실측으로 댔다:
@@ -96,13 +137,13 @@
 ⑴실기 덤프 ⑵다른 구현체의 LGT misc 표 ⑶게임 바이너리 호출부 디스어셈.
 ★조건 없이 발권하면 다음 사람이 **같은 벽에 다시 부딪힌다** — 그 왕복을 막으려고 여기 적어 둔다.
 
-**② upstream #1122 발권 판단** (대장 B · 실질 개발 후보) — 컴투스 삼국지 촉, 스테이지 5 부근 정지.
+**③ upstream #1122 발권 판단** (대장 B · 실질 개발 후보) — 컴투스 삼국지 촉, 스테이지 5 부근 정지.
 2026-08-15 실측: upstream **OPEN** 유지(2026-05-10 이후 정체), upstream 오너도 «에뮬레이터 버그로
 추정 · 디버깅 난해»로만 답했다. ★**착수 전에 재현 가능성부터 판정하라** — 현 회귀 게이트는
 **부팅+렌더까지만** 판정하므로(`scripts/smoke_gate_baseline.tsv` 의 `ktf/컴삼촉.zip PASS` 도 그 의미다)
 스테이지 5 심도는 **기존 자동화로 도달하지 못한다.** ①보다 난도가 한 단계 높다.
 
-**③ ~~(선택) 화면을 실제로 그리는 초소형 픽스처~~** — **해소**(2026-08-27,
+**④ ~~(선택) 화면을 실제로 그리는 초소형 픽스처~~** — **해소**(2026-08-27,
 `wie-drawing-fixture-makes-pixel-count-a-real-assertion` · 아래 `## 진행중`).
 `scripts/make-draw-fixture.mjs` 가 사각형 하나를 칠하는 J2ME MIDlet jar 를 만들고,
 왕복 검사 **Scenario C** 가 그 픽스처에 대해 `nonBlackPixels() > 0` 을 **실단언**한다
