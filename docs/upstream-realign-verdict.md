@@ -15,8 +15,14 @@
 판정의 형태다. 근거는 §2~§4 의 실측이고, 대가는 §5 에 **수로** 적었다.
 
 ★**그리고 운영자의 의구심은 정확하되 축이 하나 더 있다** — 문제는 `Jun025/wie` 가 아니라
-★**`Jun025/RustJava`** 다. 그쪽이 진짜 «불필요한 private 의존»이고(§4), 나머지와 **독립적으로**
-지금 당장 버릴 수 있다.
+★**`Jun025/RustJava`** 다. ★**단 그쪽도 «private» 이 아니다**(실측 `isPrivate=false`) — 정확한 이름은
+★**«멈춰 있는 fork 의존»**이고(§4), 그것이 이 문서 제목의 문장과도 정합한다.
+
+★★**[2026-08-27 정정 · 게이트② 반려 승계] 「그러니 지금 당장 싸게 버릴 수 있다」는 초판의 문장은 «참이 아니었다».**
+`Cargo.toml` base 의존에 `rev` 가 없어 `[patch]` 를 지우면 의존이 **47커밋 앞으로 끌려가고**,
+그 전진면에 우리 호출부 ★**218곳(⑴209 ⑵6 ⑶3)**을 깨뜨리는 공개 API 변경 **3종**이 실재한다(§4-B).
+⇒ P1 은 `size: S`·`risk: low` 가 **아니고**, 갈래가 **둘**이며 각각 대가가 다르다(§6-P1 의 ⒜⒝).
+★**이 문서는 그 둘을 나란히 적을 뿐 고르지 않는다 — 선택은 총괄 몫이다.**
 
 ## 1. 재측정값 (티켓 실측표의 재확인)
 
@@ -163,7 +169,7 @@ upstream 은 `graphics::`(LGT 전용)와 `shared_graphics::`(공용)를 **갈라
 `LgtEmulator::from_archive` 에 넘긴다. 우리 판은 그대로 넘긴다.
 ⇒ **엔트리포인트 규약이 갈렸다.** 재정렬 시 컨테이너 명명 규약을 맞춰야 한다(작은 일이지만 **조용히 깨지는** 자리다).
 
-## 4. ★진짜 «불필요한 private 의존» — `Jun025/RustJava` `[patch]` 표
+## 4. ★진짜 사슬 — `Jun025/RustJava` `[patch]` 표는 «멈춰 있는 fork 의존»이다
 
 이것이 이 회차의 **가장 실행하기 쉬운** 발견이고, 재정렬과 **독립적**이다.
 
@@ -188,10 +194,81 @@ ours `c66f08d`(2026-07-07) ↔ upstream `ba5797b`(**2026-08-16**).
 
 ⇒ ★★**Constraint 8 의 「not stale duplication」은 «측정으로 반증됐다».**
 우리 fork 가 존재 이유로 든 **모든** 축에서 upstream 이 **같거나 더 많다**. 우리 fork 는
-**upstream RustJava 의 진부분집합**이며, 2026-07-07 에 멈춰 있다.
+★**«기능·파일 축»에서 upstream RustJava 의 진부분집합**이며, 2026-07-07 에 멈춰 있다.
 
-★**이것이 운영자가 물은 그 「불필요한 private 의존」이다.** `Jun025/wie` 는 이미 public 이고
-(`isPrivate=false`), 실제로 우리를 upstream 에서 떼어놓고 있던 사슬은 **`[patch]` 표 한 덩어리**다.
+★★**축을 반드시 명시해서 읽어라 — 초판은 이 한정 없이 «진부분집합»이라고만 적었고, 거기서 P1 견적이 어긋났다.**
+★**`jvm` 크레이트 «공개 API» 축에서는 진부분집합이 «아니다»**: 우리 fork 의 12커밋 중 2건이
+`jvm/src/jvm.rs`(+33/−1)·`jvm/src/thread.rs`·`jvm/src/garbage_collector.rs` 를 만졌고, `pub fn` **4종**
+(`set_current_java_thread`·`current_java_thread`·`add_pending_java_thread`·`remove_pending_java_thread`)을
+**추가**했다(실측: `bee850f` 에 0 · `c66f08d` 에 1). ⇒ ★**「기능은 부분집합인데 API 는 아니다」가 정확한 문장이고,
+그 어긋남이 §4-B 의 파열을 낳는다.**
+
+★★**그런데 이것도 «private 의존»이 아니다 — 초판이 여기서 같은 실수를 반복했다.**
+실측(2026-08-27): ★**`Jun025/RustJava` 도 `isPrivate=false`**(`isFork=true` · parent `dlunch`).
+⇒ 초판은 「private 축이 틀린 축이다」를 논지로 세워 놓고 **그 틀린 라벨을 RustJava 로 옮겨 붙였다**
+(`Jun025/wie` 에는 `isPrivate` 를 실제로 조회해 교정했으면서 RustJava 에는 같은 조회를 하지 않았다 —
+게이트② §6 지적). ★**정확한 이름은 「불필요한 private 의존」이 아니라 «멈춰 있는 fork 의존»이다.**
+그리고 그것이 이 문서 제목의 문장(「private 이라서가 아니라 전진하지 않아서」)과도 **비로소 정합한다.**
+⇒ 실제로 우리를 upstream 에서 떼어놓고 있던 사슬은 **`[patch]` 표 한 덩어리**다.
+
+## 4-B. ★★P1 의 실제 비용 — `[patch]` 제거는 «13줄 삭제»가 아니다
+
+> ★**이 절은 게이트② 반려(`reports/wie-upstream-realign-verdict.review.md` §5)로 «추가»된 것이다.**
+> 초판에는 **이 축이 통째로 없었다.** 아래 수는 전부 **이 회차가 직접 다시 잰 값**이다(옮겨 적지 않았다).
+
+### 4-B-1. 왜 파열이 생기는가 — `rev` 가 없다
+
+`Cargo.toml` 의 **base 의존에는 `rev` 가 없다**(실측 `Cargo.toml:49-53`):
+
+```toml
+java_class_proto = { git = "https://github.com/dlunch/RustJava.git" }   # rev 없음
+java_constants   = { git = "https://github.com/dlunch/RustJava.git" }
+java_runtime     = { git = "https://github.com/dlunch/RustJava.git" }
+jvm              = { git = "https://github.com/dlunch/RustJava.git" }
+jvm_rust         = { git = "https://github.com/dlunch/RustJava.git" }
+```
+
+⇒ ★**`[patch]`(`Cargo.toml:76-81`) 를 지우면 `Cargo.lock` 의 `Jun025` source 가 무효가 되어
+`dlunch/RustJava` main HEAD(`ba5797b` · 우리 fork 기준 47커밋 앞)로 «재해결»된다.**
+★**«원래 자리로 돌아가는» 것이 아니라 «47커밋 앞으로 끌려가는» 것이다** — 이것이 초판이 놓친 기전이다.
+
+### 4-B-2. 그 판본과 우리 코드 사이의 컴파일 파열 **3종** (★이 회차 재측정)
+
+| # | 파열 | ours (`c66f08d`) | upstream (`ba5797b`) | wie 파열 지점 |
+|---|---|---|---|---|
+| ⑴ | `Jvm::invoke_virtual` 에 `class_name: &str` **인자 추가** | `jvm.rs:282` **4인자** | `jvm.rs:345` **5인자** | ★**209곳 / 37파일** |
+| ⑵ | `current_class_loader` 가 ★**비공개로 닫혔다** | `jvm.rs:718` `pub async fn` | `jvm.rs:1147` `async fn` | ★**6곳** |
+| ⑶ | `attach_thread` 가 **arity + async 둘 다** 바뀜 | `jvm.rs:665` `pub fn attach_thread(&self)` | `jvm.rs:1087` `pub async fn attach_thread(&self, Option<Box<dyn ClassInstance>>)` | ★**3곳** |
+
+★**⑴의 209 는 «해부해서» 얻은 수다 — 옮겨 적지 않았다.** 맨 `grep -c 'invoke_virtual'` 은 **210** 을 주는데,
+그 1건은 `wie_lgt/src/runtime/java/native_jvm.rs:926` 의 ★**doc 주석**(「trampoline that \`invoke_virtual\`s that
+method *by name*」)이고 호출부가 아니다. `\.invoke_virtual` 로 좁히면 **209 / 37파일**이고 게이트② 수와 일치한다.
+크레이트별: `wie_wipi_java` **124** · `wie_midp` **43** · `wie_skvm` **24** · `wie_ktf` **10** · `wie_lgt` **5** ·
+`wie_jvm_support` **2** · `wie_j2me` **1**.
+
+⑵의 6곳(실측): `wie_lgt/src/runtime/wipi_c/context.rs:98,110` · `wie_lgt/src/emulator.rs:114` ·
+`wie_midp/src/classes/javax/microedition/lcdui/image.rs:116` · `wie_ktf/src/runtime/wipi_c/context.rs:93,106`.
+⑶의 3곳(실측): `wie_lgt/src/runtime/wipi_c/context.rs:81` · `wie_midp/src/classes/net/wie/launcher.rs:64` ·
+`wie_ktf/src/runtime/wipi_c/context.rs:76`.
+
+★★**⑵가 가장 나쁘다 — «기계적»이 아니다.** upstream `jvm.rs` 의 `pub fn` 전수를 훑어도
+★**현재 클래스로더를 얻는 공개 대체 API 가 없다**(공개면에 남은 유일한 class-loader 언급은
+`Jvm::new(bootstrap_class_loader, …)` 생성자 인자뿐이고, 그것은 «부트스트랩»이지 «현재»가 아니다).
+⇒ **대체 경로를 «설계»해야 한다.** ⑴의 209 도 순수 기계 치환이 아니다 — 각 호출의 **«선언 클래스»를 알아야**
+새 인자를 채울 수 있으므로 **의미 작업**이다.
+
+★**그리고 이 3종은 «전수»가 아니다** — 47커밋 안의 다른 파열은 **세지 않았다**(§7-4 참조).
+
+### 4-B-3. ★그래서 `size`·`risk` 를 다시 적는다
+
+| | 초판 | **정정** |
+|---|---|---|
+| `size` | `S` | ★**`L`**(갈래 ⒜ 채택 시) / **`S`**(갈래 ⒝ 채택 시 — §6-P1 참조) |
+| `risk` | `low` | ★**`med`** |
+| 범위 | 「`Cargo.toml` 13줄 삭제 + `Cargo.lock` 재해결 + `AGENTS.md` 개정」 | ★**그것 «아니다»** — 위 ⑴209 ⑵6 ⑶3 의 처분이 **본체**다 |
+
+**근거 1줄**: ★**`[patch]` 삭제는 의존을 «원위치»시키는 것이 아니라 47커밋 앞으로 «전진»시키고,
+그 전진면에 우리 호출부 218곳(209+6+3)을 깨뜨리는 공개 API 변경이 3종 실재하기 때문이다.**
 
 ## 5. 갈래 판정 — 무엇을 «버리는지»를 먼저 센다
 
@@ -239,19 +316,27 @@ ours `c66f08d`(2026-07-07) ↔ upstream `ba5797b`(**2026-08-16**).
 
   ★**공통조상 열을 같이 봐라** — 우리도 늘렸지만(175→222), upstream 은 **1,159** 로 갔다.
 
-### ⒜-부록 — P1(`[patch]` 제거)의 KTF 회귀 위험을 수로 재어 둔다
+### ⒜-부록 — P1(`[patch]` 제거)의 KTF **동작** 회귀 위험
 
-`[patch]` 의 명목이 «KTF panic→exception hardening» 이므로 「빼면 KTF 가 깨지지 않나」가 정당한 반문이다.
-★**그 위험면을 재어 보면 작다**:
+> ★★★**이 표는 «자»가 하나뿐이다 — 「KTF 동작 회귀」만 재고 「API 호환」은 재지 않는다.**
+> ★**이 표를 P1 비용의 «상한»으로 읽지 마라.** 아래 두 값이 아무리 작아도 §4-B 의 컴파일 파열
+> ⑴209곳 ⑵6곳 ⑶3곳 중 **무엇도 움직이지 않는다** — 그 파열은 `wie_ktf` 의 diff 크기나 크레이트 LOC 로는
+> **구조적으로 보이지 않는다**(`jvm` 크레이트의 **공개 API 형태**가 축이기 때문이다).
+> ★**초판이 정확히 그 오독을 했다** — 이 표만 보고 P1 을 `size: S`·`risk: low` 로 적었고,
+> 게이트②가 그 자리를 반려했다(`reports/wie-upstream-realign-verdict.review.md` §5).
+> ⇒ **P1 의 실제 비용은 §4-B 와 §6-P1 을 봐라. 이 표는 그 비용의 «다른 축»이다.**
+
+`[patch]` 의 명목이 «KTF panic→exception hardening» 이므로 「빼면 KTF 동작이 깨지지 않나」가 정당한 반문이다.
+★**그 «동작» 위험면은 작다**:
 
 | 축 | 값 |
 |---|---|
 | 우리 `wie_ktf` 고유 변경 **전량** | **5파일 +30/−13** (`init.rs`·`java/interface.rs`·`java/jvm_support.rs`·`ktf_class_loader.rs`·`wipi_c/method_table.rs`) |
 | `wie_ktf` 크레이트 규모 | ours **4,484** LOC ↔ upstream **4,934** LOC (파일 수는 30 동수) |
-| RustJava 쪽 하드닝 | §4 대로 **upstream 이 전 축에서 같거나 많다** |
+| RustJava 쪽 하드닝 **기능 축** | §4 대로 **upstream 이 전 축에서 같거나 많다** |
 
-⇒ ★**KTF 축에서도 우리가 앞선 자리가 없다.** P1 의 1차 판정은 4게이트 + `ktf`/`lgt` helloworld 로 서고,
-코퍼스 회귀는 P2 에 합류시키면 된다. 되돌리기는 **`[patch]` 13줄 복구**로 끝난다.
+⇒ ★**KTF «동작» 축에서 우리가 앞선 자리는 없다.** ★**그러나 이것은 P1 이 싸다는 뜻이 «아니다»** —
+비용은 동작이 아니라 **API 형태**에서 나온다(§4-B).
 
 ### ⒝ 단계 머지 (RustJava `docs/upstream-sync-approach.md` 선례 이식)
 
@@ -295,13 +380,61 @@ upstream 이 낫다는 것과 **우리 기준선을 upstream 이 통과한다는
 
 ## 6. 집행 후속 티켓 초안 (★이 회차는 집행하지 않는다)
 
-### P1 — `[patch]` RustJava fork 제거 · size **S** · risk **low** · 선행 없음
-`Cargo.toml` 의 `[patch]` 13줄 삭제 + `Cargo.lock` 재해결 + `AGENTS.md` Constraint 8 개정
-(★「not stale duplication」문장을 §4 실측으로 교체 — 근거가 반증된 조항을 남겨 두면 다음 사람이 되돌린다).
-**검증**: 4게이트 + `cargo test --all` + `wie_lgt`/`wie_ktf` helloworld.
-★**이것만으로도 운영자 지시의 「불필요한 private 의존을 버려」는 충족된다.** 나머지와 독립이므로 **먼저 간다.**
-※`wie_ktf` 회귀 위험은 실재한다(패치의 원래 명목이 KTF hardening) — ★그래서 P1 은 **코퍼스 없이도**
-`ktf` helloworld + 4게이트로 1차 판정하고, 코퍼스 회귀는 P2 에 합류시킨다.
+### P1 — `Jun025/RustJava` fork 이탈 · ★**갈래가 «둘»이고 크기가 갈린다** · risk **med**
+
+> ★★**초판은 여기를 `size: S` · `risk: low` · 선행 없음 · 「`Cargo.toml` 13줄 삭제 + `Cargo.lock` 재해결」로
+> 적고 「이것만으로 충족된다 · 먼저 간다」로 headline 했다. ★그 문장들은 «참이 아니었다» — §4-B 참조.**
+> 게이트②가 그 자리를 반려했고(`…review.md` §5), 이 절은 그 정정이다.
+
+★★**아래 ⒜⒝ 는 «나란히» 적는다. 이 회차는 «고르지 않는다» — 선택은 총괄 몫이다.**
+
+#### ⒜ 파열을 P1 범위에 «포함»한다 — `size: L` · risk **med**
+
+`[patch]` 제거 → `dlunch/RustJava@ba5797b` 로 재해결 → ★**§4-B 의 ⑴209 ⑵6 ⑶3 = 218곳을 처분**한다.
+
+- **대가**: ⑴209곳은 각 호출의 «선언 클래스»를 알아야 하는 **의미 작업**이고, ⑵6곳은
+  ★**공개 대체 API 가 없어 «설계»가 필요**하다. ★**47커밋 안의 다른 파열은 아직 세지도 않았다**
+  ⇒ **218 은 하한이지 상한이 아니다.**
+- **얻는 것**: ★**upstream RustJava 최신(2026-08-16)을 그대로 탄다** — 12커밋 하드닝을 **잃지 않는다**
+  (게이트②가 12건 전건이 upstream 에 실재함을 커밋 단위로 재현했다). fork 의존 **완전 소멸**.
+- ★**여러 회차로 쪼개라** — 한 PR 에 218곳을 넣으면 검수가 불가능하다.
+
+#### ⒝ base 의존을 `rev` 로 못박아 «fork 이탈»만 먼저 한다 — `size: S` · risk **med**
+
+`[patch]` 를 지우는 대신 `Cargo.toml:49-53` 의 base 의존 5줄에 `rev = "bee850f…"`(= fork 시점)를
+**박는다**. `Jun025/RustJava` 참조는 사라지고 의존은 `dlunch/RustJava` 한 곳이 된다.
+
+- ★**API 작업 «0곳»이다**(이 회차 실측): `bee850f` 에서 ⑴`invoke_virtual` 은 **4인자**(`jvm.rs:278`) ·
+  ⑵`current_class_loader` 는 **`pub`**(`jvm.rs:686`) · ⑶`attach_thread` 는 **`pub fn …(&self)`**(`jvm.rs:660`)
+  ⇒ ★**세 파열이 «전부 부재»한다.** `bee850f`↔`c66f08d` 의 `jvm` 공개 API 차이는 우리가 **추가**한
+  `pub fn` 4종뿐이고, ★**wie 는 그 4종을 «0곳» 호출한다**(실측) ⇒ 제거해도 호출부가 깨지지 않는다.
+- ★★**대가 — «12커밋 하드닝을 잃는다». 그리고 그 손실이 «조용하다».**
+  잃는 것(실측 목록): `panic→exception hardening for KTF` · `System.arraycopy`/`Class.forName` null 가드 ·
+  `Thread.currentThread()` 참조 동일성 + pending-thread GC 루트 · `StringBuffer.append(char[],int,int)` NPE ·
+  `StringBuffer.insert` · `Vector.copyInto`/`capacity` · `DataInputStream.readUnsignedByte` ·
+  `Timer.schedule(TimerTask,long)` · `java.lang.Byte` · `File.length()` 미존재 파일 0 · `TimeZone.getAvailableIDs`.
+  ★★**이것들은 전부 «Java 레벨» 동작이라 «4게이트가 green 인 채로» 사라진다** — 컴파일도 되고
+  `cargo test --all` 도 통과한다. ★**드러나는 곳은 코퍼스(P2)뿐이고, 증상은 게임이 특정 지점에서 죽는 것이다.**
+  ⇒ ★**⒝ 를 고른다면 P2 를 «선택»이 아니라 «필수 후속»으로 묶어야 한다.**
+- ★**미측정 1건(정직하게)**: 12축 전건이 upstream 에 실재하므로(게이트② 재현) ★**하드닝은 있고 API 파열은
+  없는 «중간 rev»가 `dlunch/RustJava` 안에 존재할 수 있다.** 그 rev 를 찾으면 ⒝ 의 대가가 **0 에 가까워진다.**
+  ★**이 회차는 그것을 재지 않았다**(47커밋을 rev 단위로 이분해야 한다 — 그 자체가 별도 측정이다).
+  ⇒ **총괄이 ⒝ 를 검토한다면 이 측정을 먼저 발권할 값이 있다.**
+
+#### 두 갈래 공통
+
+`AGENTS.md` Constraint 8 개정(★「not stale duplication」문장을 §4 실측으로 교체 — 근거가 반증된 조항을
+남겨 두면 다음 사람이 되돌린다) · **검증** = 4게이트 + `cargo test --all` + `wie_lgt`/`wie_ktf` helloworld.
+★**단 ⒝ 에서는 4게이트 green 이 «안전»을 뜻하지 않는다**(위 대가 참조).
+
+★★**초판의 두 문장을 이렇게 대체한다**:
+- ~~「이것만으로도 운영자 지시의 «불필요한 private 의존을 버려»는 충족된다」~~
+  → ★**「⒜⒝ 어느 쪽도 «13줄»로는 충족되지 않는다. ⒜는 218곳의 처분을, ⒝는 12커밋 하드닝 상실의
+  수용을 각각 «대가»로 요구한다. 그리고 애초에 그것은 «private 의존»이 아니라 «멈춰 있는 fork 의존»이다»(§4).**
+- ~~「나머지와 독립이므로 먼저 간다」~~
+  → ★**「fork 이탈이라는 «목적»은 여전히 나머지와 독립이다. 그러나 «순서»는 자명하지 않다」** —
+  ⒜를 고르면 P1 이 **가장 비싼 회차**가 되어 ★**「가장 싼 판정 측정(P2)」이 「가장 비싼 선행」 뒤에 서게 된다.**
+  ⇒ ★**P2 의 `선행: P1` 배치를 총괄이 재검토하라**(게이트② §6 도 같은 지적). ★**이 회차는 결정하지 않는다.**
 
 ### P2 — upstream base 코퍼스 회귀 측정 · size **M** · risk **low**(측정 전용) · 선행 P1
 ★**이 회차가 못 한 단 하나의 측정이고, ⒟ 전체의 go/no-go 다.**
@@ -312,7 +445,10 @@ upstream 이 낫다는 것과 **우리 기준선을 upstream 이 통과한다는
 ### P3 — 재정렬 집행 · size **L** · risk **med** · 선행 P2
 ⑴`wie_web` → `wie_featurephone` 개명(계약·`build-wasm.sh`·`check-engine-contract.mjs` 동반)
 ⑵`upstream/main` 을 base 로 삼고 ③ 오버레이 재적용 ⑶`compile_model.rs` 122줄 이식
-⑷② 1,134줄 중 upstream 에 이미 있는 것을 걷어내고 남은 것만 재적용.
+⑷② 1,134줄 중 upstream 에 이미 있는 것을 걷어내고 남은 것만 재적용
+⑸★**엔트리포인트 규약 정합**(§3-5) — upstream `LgtEmulator` 는 아카이브에서 **`application.jar`** 를 찾고
+   우리는 `00000000.jar` 를 그대로 넘긴다. ★**«부수 발견»으로 흘리지 말고 작업목록의 «리터럴 항목»으로 둔다** —
+   본문 표현대로 「조용히 깨질 자리」이고, 조용한 것은 목록에 없으면 잊힌다(게이트② §6 지적).
 ★**여러 회차로 쪼개라 — 한 PR 에 넣지 마라.**
 
 ### P4 — ② 를 upstream 에 PR · size **M** · risk **low** · P3 와 병행 가능
@@ -352,3 +488,15 @@ upstream 이 낫다는 것과 **우리 기준선을 upstream 이 통과한다는
    (`#1343` GC 중 AOT static 보존 · `#1352` ABI 디스패치 · `#1368` 그래픽/런타임 호환) 예외·모니터·배열까지
    구현했다. ★**그러나 「그래서 렌더가 되는가」는 그 타이틀로 직접 돌려야 답이 나온다 — P2 에서 함께 재라.**
 3. **웹 계약 왕복이 upstream base 에서 성립하는가** — `contract-roundtrip.mjs` 는 브라우저 툴체인이 필요하다. **P3.**
+4. ★★**[게이트②가 추가시킨 4항] `[patch]` 제거 시의 «API 호환» 축** — §4-B.
+   ★★**그리고 이 항목은 «앞의 셋과 계급이 다르다». 흐리지 마라.**
+   ⑴⑵⑶은 **구조적 부재**다 — 코퍼스가 이 머신에 없고(Constraint 9 로 반입 불가) 브라우저 툴체인이 없다.
+   ★**4항은 «구조적 부재가 아니다» — 이 머신에서, 이 회차에, `grep -c` 두 번이면 잴 수 있었다.**
+   실제로 이번 정정 회차가 **그 두 번의 `grep`** 으로 209·6·3 을 전부 얻었다(외부 자원 0 · 네트워크 0 · 수 분).
+   ⇒ ★**초판이 이 축을 빠뜨린 것은 «못 잰 것»이 아니라 «잴 생각을 못 한 것»이다.**
+   ★**근인**: 「위험면」을 `wie_ktf` **diff 크기**와 **크레이트 LOC** 라는 **동작 축의 자**로만 쟀고
+   (§5-⒜부록), ★**그 자로는 API 형태 변화가 «구조적으로 보이지 않는다»** — 그런데 「작다」로 단정했다.
+   ⇒ ★★**다음 회차를 위한 규율**: 「의존을 바꾼다」는 제안의 위험면은 ★**«그 의존의 공개 API 형태»**로 재라.
+   diff 크기·LOC·기능 커버리지는 **전부 다른 축**이고, 셋 다 작아도 API 는 깨진다.
+   ★**「측정하지 못한 것」에 올리기 전에 «정말 못 재는가»를 한 번 물어라** — 이 항목은 그 질문을 안 해서
+   목록에조차 오르지 못했다(게이트②의 자기 지적을 그대로 옮긴다).
