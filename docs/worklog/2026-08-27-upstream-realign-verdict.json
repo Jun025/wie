@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "date": "2026-08-27",
+  "task": "wie-upstream-realign-verdict",
+  "title": "upstream 재정렬 판정 — fork 는 «private 이라서»가 아니라 «전진하지 않아서» 문제다",
+  "summary": "origin/main 은 upstream/main 보다 1,067커밋 뒤이고 공통조상 fa641a8a(2026-06-10)는 한 번도 움직인 적이 없다. 우리 192커밋을 수로 3분류한 결과 Rust 기준 64.3%(3,437줄)가 upstream 이 자기 구현으로 이미 착지시킨 중복이고, 전체 줄의 79.0%는 upstream 에 대응물이 없는 웹 제품 스캐폴딩이다. 채택 갈래는 ⒟ — fork 를 배포·제품 오버레이로 남기고 엔진은 upstream 을 쓴다. 집행은 이 회차가 하지 않는다.",
+  "changes": [
+    "docs/upstream-realign-verdict.md 신설 — 재측정표 + 3분류(파일·줄) + 갈래 판정 + LGT 코드 대조 + Jun025/RustJava fork 실측",
+    "STATE.md — «fork 의 현재 위치» 절 신설, ## 다음 최상단에 재정렬 집행 축(P1~P4) 등재",
+    "REPORT.md — 회차 항목 + 후속 추천"
+  ],
+  "verification": [
+    "git rev-list --left-right --count origin/main...upstream/main → 192 1067 (티켓 실측표와 일치)",
+    "git diff --numstat fa641a8a origin/main (문서·CI·md 제외) → 148파일 +17890/-127 (티켓 수치 정확히 재현)",
+    "LGT Java import 0x64 디스패치 arm 계수: ours 8 / upstream 31 / ours-only 0",
+    "RUST_MIN_STACK=4194304 cargo test -p wie_lgt --test test_helloworld (ours, 250d7e4c) → ok, 1 passed",
+    "동일 테스트를 upstream/main 격리 worktree 에서 실행 — 결과는 docs/upstream-realign-verdict.md §3-5 참조",
+    "~/.cargo/git/checkouts 두 RustJava 체크아웃 직접 비교: ours 216 .rs / upstream 439 .rs / ours-only 0",
+    "게이트② 반려 승계 재측정: invoke_virtual 호출부 209곳/37파일(맨 grep 210 중 1건은 native_jvm.rs:926 doc 주석 — 해부해서 제외) · current_class_loader 6곳 · attach_thread 3곳 · bee850f 에서 세 파열 전부 부재 · bee850f↔c66f08d jvm 공개 API 차이는 우리가 추가한 pub fn 4종뿐이고 wie 호출 0곳",
+    "gh repo view Jun025/RustJava → isPrivate=false (초판의 «불필요한 private 의존» 라벨이 틀렸음을 확인 → «멈춰 있는 fork 의존»으로 정정)"
+  ],
+  "limits": [
+    "upstream base 에서 회귀 기준선 292건(ktf 190 · lgt 52 · skt 50)이 통과하는지는 측정하지 못했다 — game_lab/ 코퍼스가 이 머신에 없고 게임 바이트는 Constraint 9 로 repo 에 들어올 수 없다. 후속 P2 가 진다.",
+    "AOT-Java 렌더 벽(docs/lgt.md §7)이 upstream 에서 풀렸는지도 같은 이유로 미측정 — 배틀몬스터 1건을 직접 돌려야 답이 난다.",
+    "웹 계약 왕복(contract-roundtrip.mjs)이 upstream base 에서 성립하는지는 브라우저 툴체인이 필요해 P3 로 넘긴다.",
+    "제품 코드 변경 0 · upstream(dlunch/wie) 발신 0 · force-push 0 · history rewrite 0.",
+    "★[정정으로 추가] 「측정하지 못한 것」 4항 = [patch] 제거 시의 API 호환 축. 이것은 앞의 셋과 달리 구조적 부재가 아니었다 — 이 머신에서 grep 두 번이면 잴 수 있었고 초판이 잴 생각을 못 했다. 근인은 위험면을 wie_ktf diff 크기/크레이트 LOC 라는 «동작 축»의 자로만 쟀기 때문이다.",
+    "★47커밋 안의 다른 컴파일 파열은 세지 않았다 — 209/6/3 은 하한이지 상한이 아니다.",
+    "★⒝(base 를 rev 로 핀)의 대가를 0 에 가깝게 만들 «중간 rev»(하드닝은 있고 API 파열은 없는 dlunch/RustJava rev)의 존재 여부는 미측정 — 47커밋 이분 탐색이 필요한 별도 측정이다."
+  ],
+  "proposals": [
+    {
+      "title": "`Jun025/RustJava` fork 이탈 — ★갈래 ⒜(size L)·⒝(size S) 중 총괄이 고른다",
+      "plainSummary": "우리가 따로 들고 있던 자바 런타임 사본을 그만 쓴다. 다만 그냥 지우면 원본의 최신판으로 끌려가면서 우리 코드 218곳이 컴파일되지 않는다 — 그래서 «다 고치고 최신을 쓴다»와 «옛 시점에 못 박아 사본만 뗀다» 두 길이 있고, 각각 잃는 것이 다르다.",
+      "userBenefit": "⒜를 고르면 원본의 최신 자바 런타임을 그대로 타서 게임이 예외 상황에서 죽는 경우가 줄어든다. ⒝를 고르면 그 이득 없이 사본 의존만 사라지고, 지금 있는 방어 코드 12건을 잃는다.",
+      "why": "★초판은 이 제안을 size S · risk low · 「Cargo.toml 13줄 삭제」로 적었고 게이트②가 반려했다. 근인: Cargo.toml:49-53 의 base 의존에 rev 가 없어 [patch] 를 지우면 dlunch/RustJava HEAD 로 47커밋 «전진»한다(원위치가 아니다). 그 면의 공개 API 변경 3종 — invoke_virtual 인자 추가(209곳/37파일) · current_class_loader 비공개화(6곳, 공개 대체 API 없음) · attach_thread arity+async(3곳) — 이 우리 호출부 218곳을 깬다. Constraint 8 반증 자체는 참이고 검수자가 재현했다.",
+      "tradeoff": "⒜(size L · risk med): 218곳 처분. ⑴209 는 각 호출의 «선언 클래스»를 알아야 하는 의미 작업이고 ⑵6 은 공개 대체 API 가 없어 설계가 필요하다. 47커밋 안의 다른 파열은 세지도 않아 218 은 하한이다. 대신 12커밋 하드닝을 잃지 않는다(전건 upstream 에 실재 — 검수자 재현). ⒝(size S · risk med): base 를 bee850f 로 rev 핀 — API 작업 0곳임을 실측 확인했다. 대가는 12커밋 하드닝 상실이고 ★그 손실이 조용하다 — 전부 Java 레벨이라 4게이트가 green 인 채로 사라지고 코퍼스(P2)에서만 드러난다. ⒝를 고르면 P2 를 필수 후속으로 묶어야 한다. ★선택은 총괄 몫이고 이 회차는 고르지 않았다.",
+      "effort": "⒜ L — 218곳 처분, 여러 회차로 쪼갤 것. / ⒝ S — Cargo.toml 5줄에 rev 핀. ★risk 는 둘 다 med.",
+      "target": "wie · Cargo.toml · Cargo.lock · AGENTS.md (★이 회차는 무접촉 — 집행은 별건)"
+    },
+    {
+      "title": "upstream base 에서 회귀 기준선 292건을 재측정한다 (측정 전용 · ⒟ 전체의 go/no-go)",
+      "plainSummary": "지금 잘 돌아가는 게임 292개가 원본 엔진에서도 똑같이 돌아가는지 실제로 돌려서 확인한다. 코드는 한 줄도 바꾸지 않고 표 한 장만 만든다.",
+      "userBenefit": "엔진을 갈아끼운 뒤 어떤 게임이 새로 되고 어떤 게임이 깨지는지 미리 안다. 확인 없이 갈아끼우면 이용자가 그 차이를 대신 발견하게 된다.",
+      "why": "이 회차가 못 한 단 하나의 측정이고 나머지 전부의 전제다. 현 기준선(ktf 190 · lgt 52 · skt 50)은 우리 엔진에서 잰 값이라 upstream base 에서 유효하다는 보장이 없다. game_lab/ 코퍼스가 이 머신에 없어 여기서는 구조적으로 잴 수 없다 — 게임 바이트는 Constraint 9 로 repo 에 들어올 수 없다.",
+      "tradeoff": "코퍼스가 있는 머신이 필요하다. 측정 전용이라 실패 위험은 없지만, 결과가 나쁘면 P3 의 범위가 커진다 — 그것이 이 측정의 목적이다. ★[정정] 초판은 이 측정을 «선행 P1» 로 배치했는데, P1 이 ⒜(=L)로 확정되면 가장 싼 판정 측정이 가장 비싼 선행 뒤에 서게 된다 — 총괄이 순서를 재검토하라(게이트② §6). 이 회차는 결정하지 않았다.",
+      "effort": "M — upstream/main 체크아웃 + scripts/smoke_gate.sh 3회(platform 별). 산출물은 차이표 1장. 1~2회차.",
+      "target": "wie · scripts/smoke_gate.sh · scripts/smoke_gate_baseline.tsv"
+    },
+    {
+      "title": "wie_web 을 개명한 뒤 upstream/main 을 base 로 삼아 ③ 오버레이를 재적용한다",
+      "plainSummary": "우리 웹 서비스 부분만 남기고 에뮬레이터 본체는 원본 것을 쓰도록 갈아끼운다. 크레이트 이름이 원본과 겹치므로 우리 것을 먼저 다른 이름으로 옮긴다.",
+      "userBenefit": "LGT 게임의 자바 런타임 지원이 8종에서 31종으로, LGT 전용 그래픽이 0줄에서 1,095줄로 늘어난다. 지금 부팅만 되고 화면이 안 나오던 LGT AOT 게임들이 그려질 가능성이 여기서 열린다.",
+      "why": "upstream 이 우리 wie_web 과 «같은 이름의 다른 크레이트»를 쓰고 있어 디렉터리가 정면 충돌한다. 개명하면 공존이 가능해지고 그 순간 upstream 이 fast-forward 가능한 base 가 된다. 우리 wie_web 은 featurephone 소비 계약(WieEmulator 7인자 + 10메서드)을 노출하므로 upstream 것으로 드롭인 대체가 불가능하다 — 버리는 것이 아니라 옮기는 것이다. ★[정정 추가] 엔트리포인트 규약 갈림도 여기 속한다 — upstream LgtEmulator 는 아카이브에서 application.jar 를 찾고 우리는 00000000.jar 를 그대로 넘긴다. 초판이 «부수 발견»으로만 적었으나 조용히 깨지는 자리는 작업목록에 없으면 잊히므로 리터럴 항목으로 올렸다.",
+      "tradeoff": "가장 큰 회차다. Constraint 7(wie_web 은 wasm32 밖에서 빈 라이브러리)이 upstream 과 양립 불가라 개명한 크레이트로 따라가야 하고, compile_model.rs 122줄은 upstream 에 대응물이 없어 이식이 필요하다. 여러 회차로 쪼개지 않으면 검수가 불가능하다.",
+      "effort": "L — ①개명 ②base 교체 ③③오버레이 재적용 ④compile_model 이식 ⑤② 중 upstream 에 없는 것만 재적용. 최소 4~5회차.",
+      "target": "wie · wie_web → wie_featurephone · docs/contracts/featurephone-engine-contract.json · scripts/build-wasm.sh"
+    },
+    {
+      "title": "② 고유·가치 중 IP 방침 선 안쪽만 골라 upstream 에 PR 로 보낸다",
+      "plainSummary": "우리가 따로 만든 것 중 원본에 도움이 되고 보내도 되는 것만 골라 원본에 기여한다. 게임기 펌웨어를 뜯어 알아낸 자료는 보내지 않는다.",
+      "userBenefit": "다음 회차부터 그 기능들이 원본에 있으므로 우리가 다시 유지보수하지 않아도 된다. fork 가 또 벌어지는 속도가 느려진다.",
+      "why": "메인테이너가 #1239(2026-06-29)에서 「공개 문서 기반으로만 구현 · 펌웨어 리버스 계획 없음」을 명시했다. 그 선 안쪽 = wipi_java 공개 API 스텁 10종(InterruptedIOException, UnsupportedEncodingException, OutOfMemoryError, VirtualMachineError, InputMethodListener, ActionListener, FormComponent, GrabKeyListener, LabelComponent, MediaUnsupportedException)과 wie_backend/src/canvas.rs 의 +149줄(실측 결과 전부 단위테스트 9개이고 구현이 아니다). 선 바깥 = docs/lgt_abi.md 1,482줄 · docs/lgt_native_classes.md · docs/reference/ 7건.",
+      "tradeoff": "PR 이 반려되거나 방치될 수 있다 — 선례가 #1239 다(반려가 아니라 upstream 이 먼저 자기 구현을 착지시켜 닫혔다). 그래서 P3 를 이 PR 들의 착지에 의존시키면 안 된다. 병행하되 독립으로 둔다.",
+      "effort": "M — 축별로 작은 PR 여러 개. P3 와 병행 가능.",
+      "target": "dlunch/wie (upstream PR) · wie_wipi_java · wie_backend/src/canvas.rs"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": [
+    "2026-08-26-worklog-json-proposals-convention#p2"
+  ],
+  "dispositionNotes": {
+    "2026-08-26-worklog-json-proposals-convention#p2": "declined — 「워크로그 검사기를 engine-contract.yml 에 둘지 옮길지」는 P3 가 CI 오버레이 전체를 upstream 워크플로 집합 위로 다시 얹으면서 통째로 재결정한다. 지금 판정하면 P3 가 같은 판정을 다시 한다(브랜치 보호 갱신도 그때 함께 필요하다). ★취소가 아니라 «P3 로 흡수»다.",
+    "kept-open": "나머지 6건은 이 판정으로 무의미해지지 않는다 — 억지로 처분하지 않았다. ⑴worklog#p0(워크로그를 회차 의무로 올릴지)·#p1(2026-07-22 워크로그 backfill)은 재정렬과 직교한다. ⑵drawing-fixture#p0(KTF 또는 LGT 그리기 픽스처)은 「또는」이라 KTF 갈래가 살아 있다 — 단 LGT 갈래는 우리 wie_lgt 가 교체 대상이므로 P2/P3 이후로 미뤄라. ⑶drawing-fixture#p1(그리기+정상종료 한 픽스처)도 엔진 무관이라 유효하다. ⑷rust-ci#p0(windows choco 실패 전파 차단)은 P3 가 rust.yml 오버레이를 재적용할 때 함께 옮겨지지만, P1/P2 가 도는 동안 CI 구멍을 열어 둘 이유가 없으므로 지금 해도 된다. ⑸rust-ci#p1 은 target 이 orchestrator 라 이 판정의 사정권 밖이다."
+  },
+  "revision": "2026-08-27 게이트② 반려 승계(wie-upstream-realign-verdict-fix) — P1 제안의 size·risk·범위를 API 호환 축으로 재측정해 정정. 판정(갈래 ⒟)과 Constraint 8 반증은 검수자가 전 축 재현했고 흔들지 않았다."
+}
