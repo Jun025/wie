@@ -26,5 +26,18 @@
     "상용 게임 런타임 회귀는 ROM ZERO 로 CI 커버 밖",
     "행동 검사는 1회 왕복 증거이지 전 입력 공간 증명 아님(키 어휘 미매핑은 소스 핀으로만 검출)"
   ],
-  "adoptedProposals": ["2026-07-20--featurephone-selftest-removal-seo#p2"]
+  "adoptedProposals": [
+    "2026-07-20--featurephone-selftest-removal-seo#p2"
+  ],
+  "proposals": [
+    {
+      "title": "키 입력이 게스트에 «도달했는지»를 행동으로 단언한다 — 지금은 소스 핀 하나가 유일한 탐지축이다",
+      "plainSummary": "브라우저 왕복 검사는 키 18종을 눌러 보지만 «예외가 안 났다»만 확인합니다. 그 키가 실제로 게임까지 전달됐는지는 보지 않습니다.",
+      "userBenefit": "키 매핑이 끊겨 게임 조작이 통째로 먹통이 되는 회귀를 배포 전에 잡는다 — 지금은 그 상태로도 왕복 검사가 green 이다.",
+      "why": "이 회차가 `limits` 3항에 적은 그대로다 — 「행동 검사는 1회 왕복 증거이지 전 입력 공간 증명 아님(키 어휘 미매핑은 소스 핀으로만 검출)」. `contract-roundtrip.mjs` 의 Scenario A 는 `key_down`/`key_up` 을 어휘 전건에 쓸어 넣고 `no throw` 만 단언하는데, 미매핑 코드는 `parse_key → None` 인 **조용한 no-op** 이라 그 단언을 그대로 통과한다. 실제 탐지는 `check-engine-contract.mjs` 가 `wie_web/src/lib.rs` 의 `parse_key` 본문을 문자열로 대조하는 **소스 핀 1개**뿐이고, 그것은 매핑이 그 함수 밖으로 옮겨가거나 런타임에서 갈리는 형태를 구조적으로 못 본다.",
+      "tradeoff": "키를 받아 «그리는 것이 바뀌는» 픽스처가 필요하다. 2026-08-27 회차의 `scripts/make-draw-fixture.mjs`(class 파일 직접 조립) 위에 얹을 수는 있지만 바이트코드 생성기가 커지고, 픽셀 단언이 프레임 타이밍에 묶여 flaky 해질 여지가 는다. 어휘 18종 전부를 행동으로 보려 하면 비용이 급히 오르므로 «대표 1~2종» 이 현실적인 범위다.",
+      "effort": "S — 픽스처 1개 확장 + 시나리오 1개. 어휘 전건이 아니라 대표 키 한정.",
+      "target": "scripts/contract-roundtrip.mjs · scripts/make-draw-fixture.mjs"
+    }
+  ]
 }
