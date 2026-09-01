@@ -32,11 +32,19 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- 2026-08-27: **upstream 재정렬 판정** (`wie-upstream-realign-verdict`, PR #66) —
-  `docs/upstream-realign-verdict.md` 신설(3분류 표 + 갈래 판정 + LGT 코드 대조 + RustJava fork 실측).
-  ★**제품 코드 변경 0 · upstream 발신 0.** 채택 갈래 ⒟, 집행은 후속 P1~P4.
+- 2026-09-01: **워크로그 «회차 의무» 기각 + 2026-07-22 백필** (`wie-worklog-mandate-decision-and-2026-07-22-backfill`) —
+  ★**결정: 의무화하지 «않는다».** 규약 착지(`92c25276`) 후 착지한 **3회차 전건**이
+  워크로그를 썼고(**3/3 = 100%** · `-fix` 승계까지 세는 커밋 축으로는 4/4), 직전 19회차는 **0/19** 였다 ⇒ 무조건 의무를 얹어 얻을 커버리지가 남아 있지
+  않고, 이미 있는 **조건부** 문장이 면제까지 포함한다. ★그래서 `AGENTS.md`·검사기 **무접촉**이다.
+  백필은 `limits` 3줄 중 **1줄만** 승격했다(1줄은 `1853d49e` 가 이미 닫았고 1줄은 Constraint 9 의 영구 경계).
+  ★**분모가 3회차뿐**이라 기각은 영구 판정이 아니다 — 재측정 시점·임계는 이 회차의 유일한 후속 제안이다.
 
 ## 완료 (최근)
+- 2026-08-27: **upstream 재정렬 판정 착지** (PR #66 `0cb309b4`, `wie-upstream-realign-verdict`
+  + 반려 승계 `-fix`) — `docs/upstream-realign-verdict.md` 신설(3분류 표 + 갈래 판정 + LGT 코드
+  대조 + RustJava fork 실측). ★**제품 코드 변경 0 · upstream 발신 0.** 채택 갈래 ⒟, 집행은 후속
+  P1~P4(위 `## 다음` ①). ★**이 줄은 2026-09-01 회차가 옮겼다** — 착지 후에도 `## 진행중` 에 남아
+  있어 바로 위 머리글의 「착지 즉시 `## 완료` 로 옮겨라」와 어긋났다(그 시점 열린 PR **0건** 실측).
 - 2026-08-27: **외부 apt 장애가 착지를 막던 경로 차단 + `fail-fast: false` 착지**
   (PR #65 `250d7e4c`, `wie-rust-ci-beta-leg-blocks-gate-on-external-outage`) — `rust.yml` 1파일.
   ubuntu 스텝이 `bash -e` 아래에서 `apt update` 의 100(우리가 쓰지 않는 `packages.microsoft.com` 403)에

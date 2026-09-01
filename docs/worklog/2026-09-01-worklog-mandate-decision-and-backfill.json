@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "date": "2026-09-01",
+  "task": "wie-worklog-mandate-decision-and-2026-07-22-backfill",
+  "title": "워크로그 «회차 의무» 기각 — 커버리지가 이미 100% 다 · 그리고 2026-07-22 워크로그 백필 1건",
+  "services": ["docs"],
+  "summary": "운영자가 Tower 패널에서 채택한 제안 2건(2026-08-26-worklog-json-proposals-convention #p0·#p1)을 처분했다. ⑴ 「워크로그 작성을 회차 의무로 올릴지」는 **기각**한다 — 규약 착지(2026-08-26 `92c25276`) 이후 착지한 3회차 전건이 워크로그를 썼고(3/3 = 100%), 착지 직전 19회차는 0/19 였다. 즉 지금 커버리지를 만들고 있는 것은 이미 있는 조건부 문장(「후속 제안은 `.json` 에 적지 않으면 존재하지 않는다」)이고, 그 위에 무조건 의무를 얹으면 마찰만 는다. ⑵ 2026-07-22 워크로그의 `proposals` 를 본문 `limits` 3줄에서 유래시켜 **1건** 채웠다 — 3줄 중 1줄은 이미 해소됐고 1줄은 Constraint 9 로 구조적 불가라 **승격 가능한 것은 1줄뿐**이었다. 없는 제안을 지어내지 않았다. 코드·CI·`AGENTS.md` 무접촉.",
+  "changes": [
+    "`docs/worklog/2026-07-22--featurephone-engine-contract-selftest.json` — `proposals[]` 1건 추가(파일 내 다른 키 무접촉 · 순수 추가 diff).",
+    "`REPORT.md`·`STATE.md` — 착지 문서(§Landing paperwork).",
+    "`AGENTS.md` **무변경** · `scripts/check-worklog-json.mjs` **무변경** · `.github/workflows/**` **무변경** — ⑴을 기각했으므로 발권이 예고한 「`AGENTS.md` 1줄 + 검사기 축 1개」는 **쓰지 않았다**."
+  ],
+  "verification": {
+    "coverage": "`git show --name-only` 로 회차별 `docs/worklog/*.json` 접촉을 셌다. 규약 착지 후(`92c25276..HEAD`) **3/3 회차 전건**(drawing-fixture #64 `1853d49e` · rust-ci-beta #65 `250d7e4c` · upstream-realign #66 `0cb309b4`, `-fix` 승계 포함해 squash 됨 — 승계를 따로 세는 커밋 축으로는 4/4). 착지 직전 19회차(`2a087a06`…`4cd0f43e`) **0/19**. 규약 이전 유일한 워크로그는 2026-07-22(`1a934313`) 1건이다.",
+    "limit#1-closed": "「렌더 blit 회귀 검사 불가 — 픽셀 수 info 만」은 2026-08-27 회차(`1853d49e`)가 닫았다. `scripts/contract-roundtrip.mjs:202` 에 `C: canvas blit ASSERTED — fixture's rect reaches the canvas` 가 실단언으로 있다. ⇒ 제안으로 올리면 **닫힌 항목을 되살리는 것**이라 올리지 않았다.",
+    "limit#2-structural": "「상용 게임 런타임 회귀는 ROM ZERO 로 CI 커버 밖」은 Constraint 9(No game bytes, ever)가 만드는 **영구 경계**이지 후속거리가 아니다. 코퍼스 축은 이미 `2026-08-27-upstream-realign-verdict.json` 의 P2(코퍼스가 있는 머신에서 측정)가 지고 있어 여기서 올리면 중복이다.",
+    "limit#3-open": "「키 어휘 미매핑은 소스 핀으로만 검출」은 **지금도 참이다**. `contract-roundtrip.mjs:158-168` 의 Scenario A 는 어휘 전건에 `key_down`/`key_up` 을 돌리고 `no throw` 만 단언하는데, 미매핑 코드는 `parse_key → None` 인 조용한 no-op 이라 통과한다(`check-engine-contract.mjs:77-97` 이 그 사실을 주석으로 자인하고, 그 소스 핀이 유일한 탐지축이다). ⇒ **이 1줄만** 제안으로 승격했다.",
+    "gates": "`node scripts/check-worklog-json.mjs` → `OK (6 file(s))`. 4게이트(`cargo fmt`/`clippy -D warnings`/`clippy --target wasm32`/`RUST_MIN_STACK=4194304 cargo test --all`)는 문서-only diff 라도 §Definition of Done 이 매 커밋 요구하므로 돌렸다 — 결과는 done 리포트."
+  },
+  "limits": [
+    "★커버리지 100% 의 분모가 **3회차**뿐이다. 규약이 착지한 지 6일이고, 그 4건 전부가 «갓 착지한 `AGENTS.md` 를 읽은» 회차라 표본이 낙관 쪽으로 기울어 있을 수 있다. 기각은 «지금 수»에 근거하고 영구 판정이 아니다.",
+    "「워크로그를 안 쓴 회차」를 **기계가 탐지하지는 않는다** — 발권이 그 설계를 명시적으로 범위 밖에 뒀다. 즉 위 커버리지는 사람이 `git log` 로 센 값이고, 다음에 다시 재려면 같은 방식으로 손으로 세야 한다.",
+    "2026-07-22 백필은 산문 `limits` → 7키 카드로 옮기는 과정에 **사람의 해석이 들어간다**(제안 원문 #p1 이 예고한 대가 그대로다). 다만 3줄 중 2줄을 «올리지 않는» 판단이 이 회차 산출물의 절반이고, 그 근거를 위 `verification` 에 파일·줄로 남겼다."
+  ],
+  "issues": [],
+  "proposals": [
+    {
+      "title": "커버리지 기각을 되돌릴 «수»를 정해 둔다 — 지금은 재측정 시점도 임계도 없다",
+      "plainSummary": "이번에 「워크로그를 매 회차 의무로 만들지 말자」고 정한 근거는 '최근 3회차가 모두 썼다'는 수 하나입니다. 그 수가 언제 다시 재지고 얼마나 떨어지면 결정을 뒤집는지는 아직 정해져 있지 않습니다.",
+      "userBenefit": "후속 제안 화면이 조용히 비어 가는 것을 «몇 달 뒤에 눈치채는» 대신 정해진 시점에 알아챈다.",
+      "why": "이 회차의 기각은 4/4(100%)라는 실측 위에 서 있는데 분모가 3회차뿐이고, 규약 착지 6일차의 표본이다. 기각 자체는 지금 옳지만 «언제 다시 재는가»가 없으면 그 수는 다시 재어지지 않고, 결정만 영구로 남는다 — 이 repo 의 원장이 반복해 지적한 「낡은 절이 스스로를 반증하지 못한다」 형태다.",
+      "tradeoff": "임계를 글자로 박으면 그 자체가 지켜야 할 규칙이 하나 더 느는 것이고(의무화를 피하려다 다른 의무를 만드는 셈), 재측정을 사람이 손으로 해야 하는 한 잊히기 쉽다. 반대로 임계 없이 두면 이 기각이 근거 없이 계속 인용된다.",
+      "effort": "XS — `AGENTS.md` 또는 `STATE.md` 1줄(예: 「착지 10회차마다 커버리지를 다시 세고 80% 미만이면 의무화를 재검토한다」).",
+      "target": "AGENTS.md · STATE.md"
+    }
+  ],
+  "adoptedProposals": ["2026-08-26-worklog-json-proposals-convention#p1"],
+  "declinedProposals": ["2026-08-26-worklog-json-proposals-convention#p0"]
+}
