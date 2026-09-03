@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "date": "2026-09-04",
+  "task": "wie-featurephone-keypress-reaches-guest-behavioral-axis",
+  "title": "키 입력이 게스트에 «도달했는지»를 행동으로 단언한다 — 왕복 검사 Scenario D",
+  "services": ["scripts", "ci"],
+  "summary": "종전에 키 축을 보던 것은 둘뿐이었고 **둘 다 «도달»은 보지 않았다**: ⒜왕복 검사 Scenario A 의 「어휘 20종을 눌러도 예외가 안 났다」 ⒝`check-engine-contract.mjs` §4 의 소스 핀(`fn parse_key` 본문의 `\"UP\" => KeyCode::UP` 쌍 검사). 이 회차는 그리기 픽스처가 `keyPressed()` 를 override 해 **받은 MIDP 코드만큼 넓은 막대**를 그리게 만들어, 캔버스 픽셀 수(`1024 + code*8`)가 «게스트가 어느 코드를 봤는지»를 말하게 했다. 대표 키 3종(소프트/숫자/방향) 한정 — 어휘 전건으로 넓히지 않았다. 개악 대조에서 `key_down` 이 이벤트를 버리게 하면 소스 핀은 48 pass/0 위반, Scenario A 는 ✓ 20 codes 로 **둘 다 통과**하고 Scenario D 만 3건 red 다. 오탐 0(29/29). 제품 코드 변경 0.",
+  "changes": [
+    "`scripts/make-draw-fixture.mjs` — 상수풀에 `Fieldref`(tag 9) 추가 · `classFile()` 에 fields 섹션 · `DrawCanvas` 에 정적 `int keyHit` + `keyPressed(I)V` override(`putstatic` → `repaint()`) + `paint` 에 `ifeq` 분기로 「폭 = keyHit」 막대. 기하 상수(`BASE_RECT_PX`·`KEY_BAR_Y`·`KEY_BAR_H`·`keyBarPixels()`)를 export 해 기대 픽셀 수의 진실원을 **그리는 쪽 한 곳**에 뒀다.",
+    "`scripts/contract-roundtrip.mjs` — **Scenario D** 3체크 신설 + `REPRESENTATIVE_KEYS` 표(코드·MIDP 값·계급) + `tickLoop` 의 `untilPainted` 불리언을 `until(pixels)` 술어로 일반화(Scenario C 는 `(px) => px > 0` 으로 동치 유지).",
+    "`STATE.md`·`REPORT.md`·`docs/worklog/2026-09-04-featurephone-keypress-reaches-guest.json` — 착지 문서(§Landing paperwork).",
+    "`wie_web/src/lib.rs` **무변경** — 개악 대조(M1·M2)에만 임시로 쓰고 되돌렸다(`git diff` 0).",
+    "`.github/workflows/**` **무변경** — 두 스크립트 다 `engine-contract.yml` 의 `paths-filter` 목록에 **이미** 있어 이 PR 에서 새 축이 실제로 돈다.",
+    "`docs/contracts/featurephone-engine-contract.json` **무변경** — 노출면·어휘·계약 키가 하나도 바뀌지 않았다(Constraint 3 발화 없음)."
+  ],
+  "verification": {
+    "premise-a-what-scenario-A-asserts": "`contract-roundtrip.mjs` 의 키 스윕은 `contract.keyVocabulary` 전건에 `emu.key_down(code)`/`key_up(code)` 를 돌리고 `try/catch` 로 예외만 본다 — 체크 이름이 그대로 `A: key vocabulary down/up sweep (no throw)` 다. ★게스트 상태는 읽지 않는다.",
+    "premise-b-the-source-pin": "「소스 핀 하나」 = `scripts/check-engine-contract.mjs` §4. `wie_web/src/lib.rs` 를 읽어 `fn parse_key(` 본문만 잘라내고, 어휘마다 `\"<KEY>\"\\s*=>\\s*([A-Za-z0-9_:]+)` 로 **좌우 쌍**을 맞춘다(좌변만 보면 `\"UP\" => KeyCode::DOWN` 을 통과시킨다고 주석이 자인한다). fn 을 못 찾으면 fail-closed.",
+    "premise-correction": "제안 문안의 「키 **18종**」은 실측 **20종**이다(`docs/contracts/featurephone-engine-contract.json` `keyVocabulary` 배열 · 왕복 검사 출력도 `20 codes`). 결론에는 영향이 없다.",
+    "delivery-path": "코드에서 확인한 경로: `WieEmulator::key_down` → `Event::Keydown(KeyCode)` → `wie_midp/src/classes/net/wie/event_queue.rs:207` 이 `MIDPKeyCode::from_key_code` 로 변환 → `Display::handleKeyEvent`(`display.rs:223`) → 현재 Displayable → `Canvas::handleKeyEvent`(`canvas.rs:148`) → `jvm.invoke_virtual(this, \"keyPressed\", \"(I)V\", (code,))`(`canvas.rs:158`). ⇒ 서브클래스 override 가 그 코드를 받는다.",
+    "representative-keys": "`LEFT_SOFT_KEY`(MIDP 6 · 소프트키) · `NUM5`(53 · 숫자) · `UP`(141 · 방향, MIDP Canvas 명명키 141~148 대). 세 계급 · 세 값대 · **오름차순**(막대가 프레임 간 합집합이어도 기대값이 정확히 맞는다).",
+    "green": "`node scripts/check-engine-contract.mjs` → **48 pass / 0 violation** (rc=0). `node scripts/contract-roundtrip.mjs` → **29/29** — D 3건이 `1072`/`1448`/`2152` px 를 정확히 읽었다(= 1024 + 6·53·141 × 8). Scenario C 는 `1024 px` 로 종전과 동일.",
+    "mutation-M1-delivery-cut": "`wie_web/src/lib.rs` 의 `key_down` 을 `if let Some(_key) = parse_key(code) {}` 로 고쳐(파싱은 하고 이벤트는 버린다) `npm run build:wasm` 재빌드. 결과 — 소스 핀 **48 pass / 0 violation · rc=0(못 잡는다)** · Scenario A **✓ 20 codes(못 잡는다)** · ★**Scenario D 3건 전부 red**(`1024 px, expected 1072` / `expected 1448` / `expected 2152`, 각 566·638·606 프레임 소진 후) ⇒ 왕복 **26/29**.",
+    "mutation-M2-miswire": "`\"UP\" => KeyCode::DOWN` 으로 오배선(소스만 — 핀은 소스를 읽으므로 재빌드 불요). 소스 핀 → **47 pass / 1 violation · rc=1**, 문면 `key mapping miswired: parse_key maps \"UP\" => KeyCode::DOWN, expected KeyCode::UP`. ⇒ ★**두 축은 «다른 개악»을 잡는다** — 핀은 오배선을, D 는 전달 절단을. 겹치지 않는다.",
+    "no-false-positive": "개악 2건을 되돌리고 wasm 을 다시 빌드한 뒤 정적 48/0 · 왕복 **29/29**(종전 26건 전건 통과). 새로 red 가 된 기존 검사 **0건**.",
+    "other-gates": "`npm run audit` → `AUDIT PASSED`. 4게이트: `cargo fmt --all -- --check` rc=0 · `cargo clippy --all -- -D warnings` rc=0 · `cargo clippy --target wasm32-unknown-unknown -- -D warnings` rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` rc=0(**130 passed / 0 failed**). `node scripts/check-worklog-json.mjs` OK."
+  },
+  "limits": [
+    "★**대표 3종만 «도달»을 재고 나머지 17종은 여전히 «예외 없음»만 본다.** 그 17종의 유일한 탐지축은 소스 핀이고, 소스 핀은 M1 형태(전달 절단)를 **못 잡는다** — 즉 17종에 대해서는 이 회차 이전과 같은 사각이 남아 있다. 제안이 「대표 키 한정」을 명시했으므로 넓히지 않았다.",
+    "★Scenario D 는 **J2ME 경로만** 지난다. KTF·LGT 의 키 전달 경로는 여전히 왕복 검사의 단언 밖이다(Scenario C 의 그리기 한계와 같은 형태이고, 그 두 플랫폼의 픽스처는 아무것도 그리지 않아 같은 기법을 그대로 쓸 수 없다).",
+    "`key_repeat` 은 계약 `methods` 목록에 없어 이 회차가 재지 않았다(엔진에는 있다).",
+    "대표 키의 MIDP 값 3개(6·53·141)가 JS 쪽에 리터럴로 박힌다 — `wie_midp` 의 `MIDPKeyCode` 와 이중 기재다. 다만 어긋나면 픽셀 수가 달라져 **시끄럽게** 실패하므로 조용한 드리프트는 아니고, 오히려 그 값이 «게스트가 보는 수»라는 것이 이 단언의 요지다.",
+    "막대는 프레임 간 **합집합**이라(호스트가 프레임버퍼를 지우지 않으면 이전 막대가 남는다) Scenario D 는 코드 **오름차순**에 의존한다. 순서를 바꾸면 기대값이 틀려진다 — 두 파일 주석에 그 이유를 적었다."
+  ],
+  "issues": [],
+  "proposals": [
+    {
+      "title": "KTF·LGT 키 경로에도 «도달» 단언을 붙이려면 그쪽에 그리는 픽스처가 먼저 필요하다",
+      "plainSummary": "이번에 만든 '키가 게임에 닿았는지' 검사는 J2ME 게임 경로에서만 돕니다. 실제 사용자가 쓰는 KTF·LGT 게임 경로는 아직 같은 검사가 없습니다.",
+      "userBenefit": "featurephone 셸이 실제로 돌리는 두 플랫폼에서도 「키가 게임에 안 닿는」 회귀가 배포 전에 잡힌다.",
+      "why": "Scenario D 는 `draw_j2me.jar` 픽스처의 `keyPressed()` override 에 얹혀 있다. KTF·LGT 픽스처(`helloworld_ktf.zip`·`helloworld_lgt.zip`)는 **아무것도 그리지 않고** 곧바로 종료하므로 같은 기법(캔버스 픽셀로 읽기)을 쓸 수 없다. 두 경로의 키 전달은 J2ME 와 다른 코드를 지나므로(WIPI SVC 대 MIDP 이벤트 큐) 지금 축은 그쪽을 **전혀** 덮지 않는다.",
+      "tradeoff": "KTF·LGT 픽스처는 WIPI C 진입점이라 J2ME class 파일 생성기(`make-draw-fixture.mjs`)를 재사용할 수 없고 새 생성기가 필요하다 — 이번 회차(S)보다 확실히 크다. 반대로 안 하면 «실제 제품 경로»는 계속 no-throw 축만 갖는다.",
+      "effort": "M — 그리고 키에 반응하는 최소 WIPI 픽스처 1종 + Scenario 1개.",
+      "target": "scripts/make-draw-fixture.mjs · scripts/contract-roundtrip.mjs · test_data/"
+    },
+    {
+      "title": "남은 17종의 사각을 «닫을지 말지»를 정해 둔다 — 지금은 소스 핀만 보고 있고 그 핀은 전달 절단을 못 잡는다",
+      "plainSummary": "20개 키 중 3개만 '게임까지 닿았는지'를 확인합니다. 나머지 17개는 예전 방식 그대로라 이번에 드러난 사각이 그대로 남아 있습니다.",
+      "userBenefit": "어떤 키는 검사되고 어떤 키는 아닌지가 문서로 정해져 있어, 다음 사람이 「전부 검사되는 줄 알았다」로 착각하지 않는다.",
+      "why": "이 회차의 개악 대조가 실측으로 보인 것: 전달 경로를 끊으면 소스 핀은 통과하고 Scenario A 도 통과한다. 대표 3종에 대해서만 그 사각이 닫혔고, 17종은 여전히 같은 상태다. 제안 원문이 「대표 키 한정」이라 넓히지 않은 것은 옳았지만, **남은 사각의 크기가 어디에도 «결정»으로 적혀 있지 않다**.",
+      "tradeoff": "전건으로 넓히면 왕복 검사 시간이 늘고(키마다 repaint + 틱 대기) 픽스처가 «코드 값을 그린다」는 지금 설계로는 폭이 240px 캔버스를 넘지 않는 범위에서만 안전하다. 반대로 그냥 두면 이 한계가 잊히고, 잊힌 한계는 «검사가 있다」는 오해로 굳는다.",
+      "effort": "XS(결정 + 문장 1줄) ~ S(전건 확대를 고를 경우).",
+      "target": "docs/contracts/featurephone-engine-contract.json · scripts/contract-roundtrip.mjs · AGENTS.md"
+    }
+  ],
+  "adoptedProposals": ["2026-07-22--featurephone-engine-contract-selftest#p0"],
+  "declinedProposals": []
+}

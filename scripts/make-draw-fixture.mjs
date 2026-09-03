@@ -9,6 +9,11 @@
 // to make scripts/contract-roundtrip.mjs assert nonBlackPixels() > 0 instead of
 // reporting it as info (the helloworld_* fixtures never draw — untouched).
 //
+// It also REACTS: keyPressed() stores the MIDP code it was handed and repaints a
+// bar that wide, so the canvas encodes "the guest received exactly this code".
+// That is what turns the round-trip's key sweep from "no exception was thrown"
+// into a delivery assertion (Scenario D).
+//
 // Usage: imported by scripts/contract-roundtrip.mjs; run it directly to write
 // test_data/draw_j2me.jar for `wie_validate` (the jar itself is never committed
 // — *.jar is git-ignored and the leak audit rejects tracked ones).
@@ -52,6 +57,11 @@ class ConstantPool {
     const nt = this.nameAndType(name, desc);
     return this.#add(`m:${cls}:${name}:${desc}`, Buffer.concat([Buffer.from([10]), u2(c), u2(nt)]));
   }
+  field(cls, name, desc) {
+    const c = this.class_(cls);
+    const nt = this.nameAndType(name, desc);
+    return this.#add(`f:${cls}:${name}:${desc}`, Buffer.concat([Buffer.from([9]), u2(c), u2(nt)]));
+  }
   serialize() {
     return Buffer.concat([u2(this.#items.length + 1), ...this.#items]);
   }
@@ -63,7 +73,11 @@ const method = (cp, name, desc, maxStack, maxLocals, code) => {
   return Buffer.concat([u2(0x0001), u2(cp.utf8(name)), u2(cp.utf8(desc)), u2(1), u2(cp.utf8("Code")), u4(body.length), body]);
 };
 
-const classFile = (cp, thisClass, superClass, methods) => {
+// One field_info. ACC_PUBLIC | ACC_STATIC, no attributes — a static int with no
+// ConstantValue starts at 0, which is the "no key seen yet" state paint() tests.
+const staticIntField = (cp, name) => Buffer.concat([u2(0x0009), u2(cp.utf8(name)), u2(cp.utf8("I")), u2(0)]);
+
+const classFile = (cp, thisClass, superClass, methods, fields = []) => {
   // Resolve every index BEFORE serializing the pool — an entry added afterwards
   // would be referenced but never written (parsers then unwrap() a None).
   const self_ = cp.class_(thisClass);
@@ -77,12 +91,20 @@ const classFile = (cp, thisClass, superClass, methods) => {
     u2(self_),
     u2(parent),
     u2(0), // interfaces
-    u2(0), // fields
+    u2(fields.length),
+    ...fields,
     u2(methods.length),
     ...methods,
     u2(0), // class attributes
   ]);
 };
+
+// Geometry the round-trip reads back. Exported so the expected pixel count lives
+// in ONE place — the fixture that draws it.
+export const BASE_RECT_PX = 32 * 32; // the always-drawn rect (Scenario C)
+export const KEY_BAR_Y = 32; // just below the base rect, so the two never overlap
+export const KEY_BAR_H = 8; // px per unit of key code → pixels = BASE + code*8
+export const keyBarPixels = (midpCode) => BASE_RECT_PX + midpCode * KEY_BAR_H;
 
 const CANVAS = "javax/microedition/lcdui/Canvas";
 const GRAPHICS = "javax/microedition/lcdui/Graphics";
@@ -90,15 +112,38 @@ const DISPLAY = "javax/microedition/lcdui/Display";
 const DISPLAYABLE = "javax/microedition/lcdui/Displayable";
 const MIDLET = "javax/microedition/midlet/MIDlet";
 
-// ── DrawCanvas extends Canvas — paint() fills one rect ───────────────────────
+// ── DrawCanvas extends Canvas ────────────────────────────────────────────────
+// paint() fills the base rect, and — once keyPressed() has stored a code — a
+// second bar whose WIDTH IS THE MIDP KEY CODE the guest received. That makes the
+// canvas readable from JS as an exact number: 1024 base px + code*8 bar px, so
+// scripts/contract-roundtrip.mjs can assert not just "a key arrived" but "the
+// guest saw exactly this code" (Scenario D).
+//
+// The bar is drawn WITHOUT clearing first, so the count is the union of every
+// bar painted so far. Scenario D therefore presses its keys in ASCENDING code
+// order — then union == widest == current, and the assertion is exact whether or
+// not the host clears the framebuffer between frames.
 const drawCanvas = () => {
   const cp = new ConstantPool();
   const superInit = cp.method(CANVAS, "<init>", "()V");
   const color = cp.integer(0x00ff00);
   const setColor = cp.method(GRAPHICS, "setColor", "(I)V");
   const fillRect = cp.method(GRAPHICS, "fillRect", "(IIII)V");
+  const keyHit = cp.field("DrawCanvas", "keyHit", "I");
+  const repaint = cp.method(CANVAS, "repaint", "()V");
 
   const init = Buffer.concat([Buffer.from([0x2a]), Buffer.from([0xb7]), u2(superInit), Buffer.from([0xb1])]);
+
+  // if (keyHit != 0) g.fillRect(0, KEY_BAR_Y, keyHit, KEY_BAR_H)
+  const keyBar = Buffer.concat([
+    Buffer.from([0x2b, 0x03]), // aload_1 (Graphics), iconst_0 (x = 0)
+    Buffer.from([0x10, KEY_BAR_Y]), // bipush  (y)
+    Buffer.from([0xb2]),
+    u2(keyHit), // getstatic keyHit (width = the received code)
+    Buffer.from([0x10, KEY_BAR_H]), // bipush  (h)
+    Buffer.from([0xb6]),
+    u2(fillRect),
+  ]);
   const paint = Buffer.concat([
     Buffer.from([0x2b]), // aload_1 (Graphics)
     Buffer.from([0x13]),
@@ -109,10 +154,37 @@ const drawCanvas = () => {
     Buffer.from([0x2b, 0x03, 0x03, 0x10, 32, 0x10, 32]), // aload_1, iconst_0, iconst_0, bipush 32, bipush 32
     Buffer.from([0xb6]),
     u2(fillRect),
+    Buffer.from([0xb2]),
+    u2(keyHit), // getstatic keyHit
+    Buffer.from([0x99]),
+    u2(3 + keyBar.length), // ifeq → skip the bar (offset is from this opcode)
+    keyBar,
     Buffer.from([0xb1]), // return
   ]);
 
-  return classFile(cp, "DrawCanvas", CANVAS, [method(cp, "<init>", "()V", 1, 1, init), method(cp, "paint", `(L${GRAPHICS};)V`, 5, 2, paint)]);
+  // keyPressed(int) — the guest-side proof of delivery: store the code and ask
+  // for a repaint (the host only blits after the core requests a redraw).
+  const keyPressed = Buffer.concat([
+    Buffer.from([0x1b]), // iload_1 (key)
+    Buffer.from([0xb3]),
+    u2(keyHit), // putstatic keyHit
+    Buffer.from([0x2a]), // aload_0
+    Buffer.from([0xb6]),
+    u2(repaint), // invokevirtual repaint()V
+    Buffer.from([0xb1]), // return
+  ]);
+
+  return classFile(
+    cp,
+    "DrawCanvas",
+    CANVAS,
+    [
+      method(cp, "<init>", "()V", 1, 1, init),
+      method(cp, "paint", `(L${GRAPHICS};)V`, 5, 2, paint),
+      method(cp, "keyPressed", "(I)V", 1, 2, keyPressed),
+    ],
+    [staticIntField(cp, "keyHit")],
+  );
 };
 
 // ── DrawMIDlet extends MIDlet — startApp() shows the canvas ──────────────────
