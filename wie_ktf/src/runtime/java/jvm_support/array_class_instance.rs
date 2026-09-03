@@ -4,7 +4,7 @@ use core::{
     hash::{Hash, Hasher},
 };
 
-use jvm::{ArrayClassInstance, ArrayRawBuffer, ArrayRawBufferMut, ClassDefinition, ClassInstance, JavaType, JavaValue, Result as JvmResult};
+use jvm::{ArrayClassInstance, ArrayRawBuffer, ArrayRawBufferMut, ClassDefinition, ClassInstance, Field, JavaType, JavaValue, Result as JvmResult};
 
 use wie_core_arm::ArmCore;
 use wie_util::{ByteRead, ByteWrite, read_generic, write_generic};
@@ -73,12 +73,35 @@ impl JavaArrayClassInstance {
     }
 }
 
+// `ArrayClassInstance: ClassInstance` since the +33 pin, so the object half and the
+// array half are two impls. Everything that is not array-specific lives here.
 #[async_trait::async_trait]
-impl ArrayClassInstance for JavaArrayClassInstance {
+impl ClassInstance for JavaArrayClassInstance {
     fn destroy(self: Box<Self>) {
         let field_size = self.element_size().unwrap() * self.array_length().unwrap() + 4;
 
         self.class_instance.destroy(field_size as _).unwrap()
+    }
+
+    /// Same rule as a plain instance: the guest address *is* the identity.
+    fn identity(&self) -> usize {
+        self.class_instance.ptr_raw as usize
+    }
+
+    /// `array.clone()` — a fresh guest array of the same length with the element block
+    /// copied. Cloning the Rust struct would alias the same guest buffer.
+    fn shallow_clone(&self) -> JvmResult<Box<dyn ClassInstance>> {
+        let mut core = self.core.clone();
+        let array_class = JavaArrayClassDefinition::from_raw(self.class_instance.class().unwrap().ptr_raw, &core);
+        let length = self.array_length().unwrap();
+
+        let cloned = Self::new(&mut core, &array_class, length).unwrap();
+
+        let mut buf = vec![0u8; self.element_size().unwrap() * length];
+        core.read_bytes(self.base_address().unwrap(), &mut buf).unwrap();
+        core.write_bytes(cloned.base_address().unwrap(), &buf).unwrap();
+
+        Ok(Box::new(cloned))
     }
 
     fn class_definition(&self) -> Box<dyn ClassDefinition> {
@@ -94,6 +117,27 @@ impl ArrayClassInstance for JavaArrayClassInstance {
         Ok(self.class_instance.ptr_raw == other.unwrap().class_instance.ptr_raw)
     }
 
+    // Arrays have no declared fields; delegate so an accidental call behaves like the
+    // object half rather than silently returning a default.
+    fn get_field(&self, field: &dyn Field) -> JvmResult<JavaValue> {
+        self.class_instance.get_field(field)
+    }
+
+    fn put_field(&mut self, field: &dyn Field, value: JavaValue) -> JvmResult<()> {
+        self.class_instance.put_field(field, value)
+    }
+
+    fn as_array_instance(&self) -> Option<&dyn ArrayClassInstance> {
+        Some(self)
+    }
+
+    fn as_array_instance_mut(&mut self) -> Option<&mut dyn ArrayClassInstance> {
+        Some(self)
+    }
+}
+
+#[async_trait::async_trait]
+impl ArrayClassInstance for JavaArrayClassInstance {
     fn store(&mut self, offset: usize, values: Box<[JavaValue]>) -> JvmResult<()> {
         let element_size = self.element_size().unwrap();
 

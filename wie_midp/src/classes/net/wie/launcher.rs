@@ -61,7 +61,10 @@ struct EventLoopRunner;
 #[async_trait::async_trait]
 impl MethodBody<JavaError, WieJvmContext> for EventLoopRunner {
     async fn call(&self, jvm: &Jvm, _context: &mut WieJvmContext, _args: Box<[JavaValue]>) -> Result<JavaValue, JavaError> {
-        jvm.attach_thread()?;
+        // +33 pin: `attach_thread` is async and takes the Java `Thread` object.
+        // This is the host-side event loop, which has no Java Thread — `None`,
+        // the same value RustJava's own bootstrap passes (jvm/src/jvm.rs:87).
+        jvm.attach_thread(None).await?;
 
         // event loop
         let event_queue = jvm

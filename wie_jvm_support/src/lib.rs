@@ -2,6 +2,7 @@
 extern crate alloc;
 
 mod context;
+mod hardening;
 mod jvm_implementation;
 mod runtime;
 

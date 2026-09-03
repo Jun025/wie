@@ -1,4 +1,4 @@
-use alloc::boxed::Box;
+use alloc::{boxed::Box, format};
 use core::{
     future,
     ops::{Deref, DerefMut},
@@ -7,7 +7,7 @@ use core::{
 
 use java_class_proto::JavaClassProto;
 use jvm::{ClassDefinition, Jvm, Result as JvmResult};
-use jvm_rust::{ArrayClassDefinitionImpl, ClassDefinitionImpl};
+use jvm_rust::{ArrayClassDefinitionImpl, ClassDefinitionError, ClassDefinitionImpl};
 
 pub trait JvmImplementation: Clone {
     #[allow(clippy::type_complexity)]
@@ -42,8 +42,29 @@ impl JvmImplementation for RustJavaJvmImplementation {
         Box::pin(future::ready(Ok(Box::new(ClassDefinitionImpl::from_class_proto(proto, context)) as _)))
     }
 
-    async fn define_class_java(&self, _jvm: &Jvm, data: &[u8]) -> JvmResult<Box<dyn ClassDefinition>> {
-        ClassDefinitionImpl::from_classfile(data).map(|x| Box::new(x) as Box<_>)
+    async fn define_class_java(&self, jvm: &Jvm, data: &[u8]) -> JvmResult<Box<dyn ClassDefinition>> {
+        // `from_classfile` reports a typed `ClassDefinitionError` rather than a
+        // `JavaError`; map each variant onto the JLS-specified throwable, matching
+        // dlunch/RustJava's own host (src/runtime.rs). Collapsing them into one
+        // exception would hide *why* a guest class was rejected, which is the only
+        // signal we get for a malformed jar.
+        match ClassDefinitionImpl::from_classfile(data) {
+            Ok(class) => Ok(Box::new(class) as Box<_>),
+            Err(ClassDefinitionError::InvalidClassFile) => Err(jvm.exception("java/lang/ClassFormatError", "Invalid class file").await),
+            Err(ClassDefinitionError::UnsupportedClassVersion(version)) => Err(jvm
+                .exception(
+                    "java/lang/UnsupportedClassVersionError",
+                    &format!("Unsupported class file version {version}"),
+                )
+                .await),
+            Err(ClassDefinitionError::Verification) => Err(jvm.exception("java/lang/VerifyError", "Bytecode verification failed").await),
+            Err(ClassDefinitionError::UnsupportedFeature(feature)) => Err(jvm
+                .exception(
+                    "java/lang/UnsupportedOperationException",
+                    &format!("Unsupported class file feature: {feature}"),
+                )
+                .await),
+        }
     }
 
     async fn define_array_class(&self, _jvm: &Jvm, element_type_name: &str) -> JvmResult<Box<dyn ClassDefinition>> {

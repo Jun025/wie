@@ -852,3 +852,87 @@ fork 는 그동안 upstream 을 **29커밋** 당겨 왔고, 우리가 그것을 
 - ★**총괄 결정(282회차)은 그대로다** — 「P1 갈래는 P2 결과 «뒤»에 고른다」. ★**이 회차는 P1 을
   착수하지 않았다**(`Cargo.toml`·`Cargo.lock`·호출부 **무접촉** · 프로브는 전부 격리 워크트리에서
   돌고 제거됐다). ★다만 §8-6 이 적은 대로 **그 「뒤」는 오지 않는다** — P2 가 이 머신에서 영구 불가다.
+
+## 9. P1 집행 — 총괄 채택(2026-09-04) · 핀 `5b84dd1`(+33) · `wie-upstream-realign-p1-execute-pin-plus33-and-cost-hardening-port`
+
+> ★★**§8-6 의 권고가 «채택»됐고 이 절은 그 집행 기록이다.** 총괄 결정(2026-09-04): 갈래 **⒝** · 핀 **`5b84dd1`**.
+> ⇒ ★**`Jun025/RustJava` `[patch]` 표는 «없어졌다».** §4 가 「진짜 사슬」이라 부른 것이 끊겼다.
+> ★**§8 의 계단·차이표를 다시 만들지 않았다** — 이 절은 그 위에 «실제로 든 값»만 적는다.
+
+### 9-1. ★API 파열 — 예상 **≥7** ↔ 실제 **11개소 / 7파일**
+
+| # | 파열 | §8-4⑶ 예상 | ★실제 | 개소 |
+|---|---|---|---|---|
+| ⑴ | `ClassDefinitionImpl::from_classfile` 오류형 `JavaError` → `ClassDefinitionError` | 1 | **1** | `wie_jvm_support/src/jvm_implementation.rs` |
+| ⑵ | `java_runtime::Runtime` 트레이트에 `fn exit(&self, i32)` 추가 | 1 | **1** | `wie_jvm_support/src/runtime.rs` |
+| ⑶ | `Jvm::attach_thread` **async + `Option<Java Thread>`** | 3 | **3** | `wie_midp`·`wie_ktf`·`wie_lgt` |
+| ⑷ | `ClassDefinition::{interface_names, prepare}` | 2 impl | **2 impl** | `wie_ktf/.../class_definition.rs` · `wie_lgt/.../native_jvm.rs` |
+| ★⑸ | **`ClassInstance::{identity, shallow_clone}`** | ★**예상에 없었다** | **3 impl** | `wie_ktf` 객체·배열 · `wie_lgt` |
+| ★⑹ | **`ArrayClassInstance: ClassInstance` 로 승격**(→ `destroy`/`class_definition`/`equals` 가 그 트레이트에서 빠짐) | ★**예상에 없었다** | **1 impl 재구조화** | `wie_ktf/.../array_class_instance.rs` |
+
+⇒ ★★**「≥7」은 하한이었고 실제는 11 이다.** ★**그 하한 표기가 옳았다** — §8-7-2 가 「모든 칸의 파열 수는
+«측정된 하한»이다 · `cargo check` 는 첫 실패 크레이트에서 멈춘다」고 미리 적었고, ⑸⑹은 정확히
+`wie_jvm_support` 가 통과한 «뒤에야» 보이는 자리였다.
+
+★**⑸ 는 «시그니처만 채우면 끝나는» 파열이 아니었다** — `shallow_clone` 은 `Object.clone()` 의 구현체다.
+KTF·LGT 인스턴스는 **게스트 메모리**에 살아서 Rust 구조체를 복제하면 같은 주소를 가리킨다(=복제본에 쓰면
+원본이 바뀐다) ⇒ **새 게스트 객체를 할당하고 필드 블록을 복사**하도록 구현했다. LGT 쪽은 `instantiate` 안의
+동기 할당 클로저를 `alloc_guest_object` 로 빼내 두 곳이 같은 모양을 쓰게 했다.
+★**`identity` 는 반대로 «공짜»였다** — KTF·LGT 객체는 게스트 주소가 곧 정체성이라 `ptr_raw`/`guest_ptr` 그대로다.
+
+★**⑷ 의 `interface_names` 는 «값을 모른다»는 것을 시끄럽게 만들었다**: KTF 클래스 서술자에 `ptr_interfaces`
+필드가 있으나 wie 가 정의하는 클래스는 전부 0 을 쓰고 그 표의 형식은 해독돼 있지 않다. ⇒ 빈 목록을 돌려주되
+**0 이 아니면 `tracing::warn!`** 을 찍는다(그때만 답이 틀리기 때문이다). LGT 는 애초에 그 필드가 없다.
+
+### 9-2. ★★하드닝 6축 — ⒤사라졌나 ⒥이식 비용 ⒥⒦ 잠글 수 있나 · 그리고 **고른 갈래**
+
+★**⒤ 13행 프로브를 새 핀에서 재실행했다**(§8-4⑸ 와 같은 자). §8-6 이 예고한 **6축이 전부 사라졌다** — 추가 손실 0.
+
+| 축 | ⒤새 핀에서 | ⒥이식 비용(원본 커밋) | ⒦코퍼스 없이 잠글 수 있나 | **처분** |
+|---|---|---|---|---|
+| 1'' `ByteArrayInputStream` null NPE | **사라짐**(1→0) | 4줄 | ✔ | ★**이식** |
+| 2a `System.arraycopy` null NPE | **사라짐**(2→0) | 5줄 | ✔ | ★**이식** |
+| 4 `StringBuffer.append([CII)` null NPE | **사라짐**(1→0) | 4줄 | ✔ | ★**이식** |
+| 8 `StringBuffer.insert(I,String)` | **사라짐**(1→0) | **53줄** + 시험 36줄 | ✔ | **미이식** |
+| 9 `Timer.schedule(TimerTask,long)` | **사라짐**(1→0) | **17줄** + 시험 26줄 | △(시계 의존) | **미이식** |
+| 5 pending-thread GC 루트 | **사라짐**(2→0) | 34줄 — ★**그중 25줄이 `jvm` 크레이트 내부**(`garbage_collector.rs`·`jvm.rs`) | ✘ | ★**불가** |
+
+★★**갈래 = ⒝ «일부 이식». 고른 이유는 «줄 수»가 아니라 «실패의 등급»이다.**
+- ★**이식한 3축은 «호스트 프로세스가 죽는다»** — 새 핀의 코드는 null `ClassInstanceRef` 를 곧장 역참조한다.
+  ★**실측으로 재현했다**(9-3 개악 대조): `jvm/src/class_instance.rs:108` 의 `Option::unwrap()` 패닉.
+  ⇒ 에뮬레이터가 통째로 죽고, 게스트는 잡을 수 없다.
+- ★**미이식 2축(8·9)은 «메서드 부재»다** — 실패가 Java 레벨 해석 오류로 나와 **시끄럽고 잡을 수 있다.**
+  ⇒ ★**같은 «하드닝»이라는 이름 아래 등급이 다르다.** 줄 수(53·17)보다 이 차이가 결정적이다.
+- ★**축 5 는 «불가»다** — 34줄 중 25줄이 `jvm` 크레이트 내부이고 wie 가 닿을 이음매가 없다.
+  ★**fork 없이는 되돌릴 수 없다** — 이것이 이 회차가 «갚지 못한» 유일한 값이다.
+
+★★**그리고 이식이 «가능»했던 이유를 적어 둔다 — 이 회차의 구조적 발견이다.**
+`JvmRuntime::find_rustjar_class`(**wie 쪽 코드**)가 `java_runtime::get_runtime_class_proto(class)` 로 프로토를
+받아 JVM 에 넘긴다. `JavaClassProto` 의 필드는 전부 `pub` 다 ⇒ ★**wie 가 그 사이에서 메서드 본문을 감쌀 수 있다.**
+⇒ ★**「하드닝을 되돌리려면 fork 가 필요하다」는 참이 아니었다** — §8-6 은 그 가능성을 재지 않았다.
+
+### 9-3. ★이식분의 잠금 — `wie_jvm_support/src/hardening.rs` (본문 103줄 · 시험 99줄 · 배선 19줄)
+
+- `harden(&mut proto) -> usize` 가 프로토를 지나가며 `NullArgGuard` 로 본문을 감싼다. **적용 개수를 돌려주고**,
+  못 찾으면 `tracing::error!` 를 찍는다 — ★**조용히 안 걸리는 것이 이 하드닝이 처음 사라진 방식**이기 때문이다.
+- 시험 3종(**전부 `run_jvm_test` = 게임 파일 0**): ⒜`every_guard_is_actually_applied`(적용 수 == 1) ⒝세 null 인자가
+  **NPE 로 온다** ⒞null 아닌 인자는 동작 불변(`arraycopy` 왕복).
+- ★★**개악 대조**: `harden` 을 `return 0` 으로 무력화하면 ⒜는 `left: 0 / right: 1` 로, ⒝는
+  ★**`jvm/src/class_instance.rs:108:32: called Option::unwrap() on a None value` 패닉**으로 red 가 된다.
+  ⇒ ★**가드가 막고 있는 것이 «정확히 그 패닉»임을 코퍼스 없이 보였다.**
+
+### 9-4. ★fork 의존 소멸 (실측)
+
+`Cargo.toml` `[patch]` 절 **0** · `Cargo.lock` 의 `Jun025` 문자열 **0건** ·
+`Cargo.lock` 의 RustJava source 6행 전건 `git+https://github.com/dlunch/RustJava.git?rev=5b84dd1c039f613f…` ·
+`cargo tree -p wie_jvm_support` 의 `java_class_proto`·`java_constants`·`java_runtime`·`jvm`·`jvm_rust` **전건 dlunch@5b84dd1**.
+※`Cargo.toml` 에 남은 `Jun025` 1건은 **주석**(무엇이 왜 없어졌는지를 다음 사람에게 알리는 문장)이다.
+
+### 9-5. ★검증의 «한계» — green 을 하드닝 보존의 증거로 읽지 마라
+
+4게이트 전건 green · `cargo test --all` **133 passed / 0 failed**(직전 130 + 이 회차 시험 3) ·
+`wie_ktf`·`wie_lgt` helloworld **둘 다 ok**.
+★★**그러나 §8-6 이 못박은 그대로다 — 「4게이트도 `cargo test --all` 도 green 인 채로 사라진다」.**
+⇒ ★**green 은 «회귀 없음»의 증거이지 «하드닝 보존»의 증거가 아니다.** 보존의 증거는 오직 9-2 의 프로브와
+9-3 의 개악 대조뿐이고, ★**축 5·8·9 에 대해서는 그 증거가 «없다»**(축 5 는 영원히 없을 것이다).
+★**코퍼스 축(P2)은 여전히 이 머신에서 불가**다(§8-1) — 이 회차가 그것을 바꾸지 않았다.

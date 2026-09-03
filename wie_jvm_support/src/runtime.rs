@@ -171,6 +171,18 @@ where
         self.system.spawn(SpawnProxy { jvm: jvm.clone(), callback });
     }
 
+    /// `System.exit(int)` — the guest asked to stop. dlunch/RustJava's own host
+    /// calls `std::process::exit` here; we cannot (the emulator is a library on
+    /// both hosts), so we route it through the platform's normal shutdown path —
+    /// the same one WIPI `MC_knlExit` uses, which is what `wie_web`'s sticky
+    /// `has_exited()` observes. The status code is not propagated: neither host
+    /// surface has a place to put it.
+    fn exit(&self, status: i32) {
+        tracing::debug!("Runtime::exit({status})");
+
+        self.system.platform().exit();
+    }
+
     fn now(&self) -> u64 {
         self.system.platform().now().raw()
     }
@@ -229,7 +241,12 @@ where
     async fn find_rustjar_class(&self, jvm: &Jvm, classpath: &str, class: &str) -> JvmResult<Option<Box<dyn ClassDefinition>>> {
         if classpath == RT_RUSTJAR {
             let proto = get_runtime_class_proto(class);
-            if let Some(proto) = proto {
+            if let Some(mut proto) = proto {
+                // Re-add the null guards the dropped RustJava fork carried (see
+                // `hardening`): the proto passes through here before the class is
+                // defined, so no fork is needed to wrap a method body.
+                crate::hardening::harden(&mut proto);
+
                 return Ok(Some(
                     self.implementation
                         .define_class_rust(jvm, proto, Box::new(self.clone()) as Box<_>)

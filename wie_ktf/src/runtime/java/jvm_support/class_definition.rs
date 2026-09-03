@@ -276,11 +276,38 @@ impl ClassDefinition for JavaClassDefinition {
         self.parent_class().unwrap().map(|x| x.name().unwrap())
     }
 
+    /// KTF class descriptors do carry a `ptr_interfaces` table, but every class wie
+    /// defines writes 0 there and the table's layout is not reverse-engineered. The JVM
+    /// uses this list to preload superinterfaces and to answer `instanceof`, so report
+    /// "none" — and make a non-zero pointer LOUD rather than silently dropped, because
+    /// that is the case where the answer would be wrong.
+    fn interface_names(&self) -> Vec<String> {
+        let raw: RawJavaClass = read_generic(&self.core, self.ptr_raw).unwrap();
+        let descriptor: RawJavaClassDescriptor = read_generic(&self.core, raw.ptr_descriptor).unwrap();
+
+        if descriptor.ptr_interfaces != 0 {
+            tracing::warn!(
+                "{}: interface table at {:#x} is not decoded — instanceof against its interfaces will answer false",
+                self.name().unwrap(),
+                descriptor.ptr_interfaces
+            );
+        }
+
+        Vec::new()
+    }
+
     fn access_flags(&self) -> ClassAccessFlags {
         let raw: RawJavaClass = read_generic(&self.core, self.ptr_raw).unwrap();
         let descriptor: RawJavaClassDescriptor = read_generic(&self.core, raw.ptr_descriptor).unwrap();
 
         ClassAccessFlags::from_bits_truncate(descriptor.access_flag)
+    }
+
+    /// Class preparation applies classfile `ConstantValue` attributes to static fields.
+    /// KTF classes are not loaded from classfiles — their statics are initialised by the
+    /// guest's own `<clinit>` — so there is nothing to apply here.
+    async fn prepare(&self, _: &Jvm) -> JvmResult<()> {
+        Ok(())
     }
 
     async fn instantiate(&self, jvm: &Jvm) -> JvmResult<Box<dyn ClassInstance>> {

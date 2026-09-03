@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "date": "2026-09-04",
+  "task": "wie-upstream-realign-p1-execute-pin-plus33-and-cost-hardening-port",
+  "title": "P1 집행 — `Jun025/RustJava` fork 이탈(핀 `dlunch/RustJava@5b84dd1`, +33) + 하드닝 3축을 wie 안으로 이식",
+  "services": ["engine"],
+  "summary": "총괄이 `docs/upstream-realign-verdict.md` §8-6 권고를 채택(갈래 ⒝ · 핀 `5b84dd1`)했고 이 회차가 집행했다. `[patch]` 표를 지워 fork 의존을 소멸시키고(`Cargo.lock` 의 `Jun025` **0건**) upstream 33커밋을 얻었다. API 파열은 §8-4⑶ 예상 **≥7** 이었는데 실제는 **11개소 / 7파일** — 예상 밖 둘은 `ClassInstance::{identity, shallow_clone}`(3 impl)과 `ArrayClassInstance: ClassInstance` 승격(1 impl)이고, 「≥7」이 하한 표기였던 것이 옳았다. 그리고 권고가 남긴 유일한 구멍(하드닝 ≈4/12 상실)을 «값으로» 닫았다: 6축이 전부 사라졌음을 프로브로 확인한 뒤 각 축의 이식 비용과 «코퍼스 없이 잠글 수 있는가»를 재고 **3축 이식 · 2축 미이식 · 1축 불가**를 골랐다. 이식이 가능했던 이유가 이 회차의 구조적 발견이다 — `find_rustjar_class` 가 `get_runtime_class_proto` 의 프로토를 JVM 에 넘기기 «전»에 wie 가 본문을 감쌀 수 있어 **fork 가 필요 없다**.",
+  "changes": [
+    "`Cargo.toml` — `[patch.\"…dlunch/RustJava\"]` 표(6줄) **삭제** · base 5줄에 `rev = \"5b84dd1c039f613ff5cd82fb9ddce4552f77ec05\"` · 「왜 +33 이고 왜 함부로 올리면 안 되는가」 주석 8줄. `Cargo.lock` 재해결.",
+    "API 파열 처분 **11개소 / 7파일** — `wie_jvm_support`(`jvm_implementation.rs` `from_classfile` 오류형 매핑 · `runtime.rs` `Runtime::exit`) · `wie_midp`·`wie_ktf`·`wie_lgt`(`attach_thread(None).await`) · `wie_ktf`(`ClassDefinition::{interface_names,prepare}` · `ClassInstance::{identity,shallow_clone}` · 배열 인스턴스를 `ClassInstance`+`ArrayClassInstance` 두 impl 로 분리) · `wie_lgt`(같은 넷 + 게스트 할당을 `alloc_guest_object` 로 추출).",
+    "★**신규 `wie_jvm_support/src/hardening.rs`**(본문 103 · 시험 99) + 배선 19줄 — null 가드 3축을 프로토 통과 시점에 다시 얹는다.",
+    "`docs/upstream-realign-verdict.md` **§9 추가**(순수 추가 · §1~§8 무접촉) · `STATE.md`(§다음 P1 을 «집행 완료»로 · 착지한 두 회차를 `## 완료` 로 이관) · `REPORT.md` · 이 워크로그."
+  ],
+  "verification": {
+    "api-breaks-actual-vs-expected": "예상 **≥7**(§8-4⑶: `ClassDefinition` 2 + `attach_thread` 3 + `Runtime::exit` 1 + `from_classfile` 1) ↔ 실제 **11개소**. 예상 밖 둘: ★`ClassInstance::{identity, shallow_clone}` **3 impl**(`wie_ktf` 객체·배열 · `wie_lgt`) · ★`ArrayClassInstance: ClassInstance` 승격으로 `destroy`/`class_definition`/`equals` 가 그 트레이트에서 빠져 **1 impl 재구조화**. ⇒ §8-7-2 의 「모든 칸의 파열 수는 측정된 하한 — `cargo check` 는 첫 실패 크레이트에서 멈춘다」가 그대로 실현됐다(둘 다 `wie_jvm_support` 통과 «뒤»에야 보인다). 최종 `cargo check --workspace --all-targets` **rc=0**.",
+    "shallow-clone-is-not-a-stub": "KTF·LGT 인스턴스는 게스트 메모리에 산다 ⇒ Rust 구조체를 복제하면 같은 주소를 가리켜 «복제본에 쓰면 원본이 바뀐다». KTF 는 `JavaClassInstance::instantiate` 로 새 객체를 만들고 `field_address(0)` 부터 `field_size` 바이트를 복사(vtable 워드는 그 앞이라 건드리지 않는다). 배열도 같은 방식(길이·element_size 로 계산). LGT 는 `instantiate` 안의 동기 할당 클로저를 `alloc_guest_object(&self, &mut ArmCore)` 로 추출해 두 경로가 같은 모양을 쓰게 하고, `jvm_fields`(Arc<Mutex<BTreeMap>>)는 **스냅샷**을 뜬다. `identity` 는 `ptr_raw`/`guest_ptr` 그대로 — 게스트 주소가 곧 정체성이다.",
+    "interface-names-is-loud-about-what-it-does-not-know": "KTF 클래스 서술자에 `ptr_interfaces` 필드가 있으나 wie 가 정의하는 클래스는 전부 0 을 쓰고 표 형식은 해독돼 있지 않다 ⇒ 빈 목록을 돌려주되 **0 이 아니면 `tracing::warn!`**(그때만 답이 틀린다). LGT 는 `0x64` import table 에서 합성돼 인터페이스 정보 자체가 없다. `prepare` 는 둘 다 `Ok(())` — 이 클래스들은 classfile 이 아니라 `ConstantValue` 속성이 없다.",
+    "hardening-probe-at-new-pin": "§8-4⑸ 와 같은 13행 트리 프로브를 `5b84dd1` 에서 재실행. §8-6 이 예고한 **6축이 전부 사라졌다**(추가 손실 0): `ByteArrayInputStream` NPE 1→0 · `System.arraycopy` NPE 2→0 · `StringBuffer.append([CII)` NPE 1→0 · pending GC 루트 2→0 · `StringBuffer.insert` 1→0 · `Timer.schedule(TimerTask,J)` 1→0. 유지된 축: NFE 클래스 · `String` NPE(6) · CNFE · thread identity · `readUnsignedByte` · `copyInto` · `java.lang.Byte` · `File.length` · `getAvailableIDs`.",
+    "port-cost-and-choice": "⒥원본 커밋 줄 수: 이식 3축 합 **13줄**(4+5+4) · `StringBuffer.insert` **53줄**(+시험 36) · `Timer.schedule(TimerTask,long)` **17줄**(+시험 26) · pending GC 루트 **34줄 중 25줄이 `jvm` 크레이트 내부**(`garbage_collector.rs` 7 · `jvm.rs` 18). ⒦셋 다 `run_jvm_test` 로 잠글 수 있으나 Timer 는 시계 의존이라 △. ★**고른 갈래 = ⒝ 일부 이식**이고 기준은 줄 수가 아니라 **실패의 등급**이다: 이식한 3축은 null 이면 호스트 프로세스가 패닉하고(아래 개악 대조), 미이식 2축은 «메서드 부재»라 Java 레벨 해석 오류로 시끄럽게 잡힌다. 축 5 는 wie 가 닿을 이음매가 없어 fork 없이 불가.",
+    "why-porting-was-possible": "`JvmRuntime::find_rustjar_class`(**wie 쪽 코드**)가 `java_runtime::get_runtime_class_proto(class)` 로 `RuntimeClassProto` 를 받아 `define_class_rust` 에 넘긴다. `JavaClassProto`/`JavaMethodProto` 의 필드는 전부 `pub` 다 ⇒ wie 가 그 사이에서 메서드 본문을 `NullArgGuard` 로 감쌀 수 있다. ⇒ ★「하드닝을 되돌리려면 fork 가 필요하다」는 참이 아니었고, §8-6 은 그 가능성을 재지 않았다.",
+    "lock-and-mutation": "`harden(&mut proto) -> usize` 는 **적용 개수를 돌려주고** 메서드를 못 찾으면 `tracing::error!` 를 찍는다(조용히 안 걸리는 것이 이 하드닝이 처음 사라진 방식이다). 시험 3종 — ⒜`every_guard_is_actually_applied`(세 클래스 각각 적용 수 == 1) ⒝`null_arguments_raise_npe_instead_of_panicking`(세 null 인자가 NPE 로 온다) ⒞`non_null_arguments_still_work`(`arraycopy` 왕복 불변). ★**전부 `run_jvm_test` = 게임 파일 0** ⇒ 코퍼스 없는 이 머신에서 돈다. ★**개악 대조**: `harden` 을 `return 0` 으로 무력화 → ⒜ `left: 0 / right: 1` FAILED · ⒝ ★**`jvm/src/class_instance.rs:108:32: called Option::unwrap() on a None value` 패닉**으로 FAILED · ⒞ 만 ok. ⇒ 가드가 막는 것이 «정확히 그 패닉»임을 코퍼스 없이 보였다.",
+    "fork-dependency-gone": "`Cargo.toml` `[patch]` 절 **0** · `Cargo.lock` 의 `Jun025` 문자열 **0건** · `Cargo.lock` 의 RustJava source **6행 전건** `git+https://github.com/dlunch/RustJava.git?rev=5b84dd1c039f613ff5cd82fb9ddce4552f77ec05` · `cargo tree -p wie_jvm_support` 상 `java_class_proto`·`java_constants`·`java_runtime`·`jvm`·`jvm_rust` **전건 dlunch@5b84dd1**. ※`Cargo.toml` 에 남은 `Jun025` 1건은 «무엇이 왜 없어졌나»를 적은 주석이다.",
+    "gates": "`cargo fmt --all -- --check` rc=0 · `cargo clippy --all -- -D warnings` rc=0 · `cargo clippy --target wasm32-unknown-unknown -- -D warnings` rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` rc=0 — **133 passed / 0 failed**(직전 130 + 이 회차 3). `wie_ktf`·`wie_lgt` `test_helloworld` **둘 다 ok** ⇒ 핀 이동이 부팅 경로를 깨뜨리지 않았다."
+  },
+  "limits": [
+    "★★**green 을 «하드닝 보존»의 증거로 읽지 마라.** §8-6 이 「4게이트도 `cargo test --all` 도 green 인 채로 사라진다」고 이미 못박았고 이 회차가 그것을 바꾸지 않았다. 보존의 증거는 13행 프로브와 개악 대조뿐이고, ★**축 5·8·9 에 대해서는 그 증거가 없다**(축 5 는 영원히 없을 것이다).",
+    "★**축 5(pending-thread GC 루트)는 영구 미복구다** — `Thread.start()` 뒤 spawn 태스크가 attach 하기 전 구간의 GC 루트가 없다. 증상은 그 창에서 GC 가 돌 때 스레드 객체가 수거되는 것이고, 34줄 중 25줄이 `jvm` 크레이트 내부라 fork 없이는 손댈 수 없다. ⇒ 이 회차가 갚지 못한 유일한 값이다.",
+    "★**미이식 2축(`StringBuffer.insert` · `Timer.schedule(TimerTask,long)`)은 «없는 채로» 남는다.** 그 메서드를 부르는 게스트는 Java 레벨 오류를 본다 — 잡히긴 하지만 그 지점에서 멈출 수 있다. 이식 비용(53·17줄 + 시험)은 쟀으니 필요해지면 값이 나와 있다.",
+    "★**KTF `interface_names` 는 빈 목록이다** — `ptr_interfaces` 가 0 이 아닌 클래스가 실제로 나타나면 그 인터페이스에 대한 `instanceof` 가 false 로 답한다. 경고는 찍지만 **고치지는 않았다**(표 형식이 해독돼 있지 않다).",
+    "★**코퍼스 축(P2)은 여전히 이 머신에서 불가**다(§8-1: 코퍼스 부재 + 러너 부재). ⇒ 「이 핀에서 292 타이틀이 어떻게 되는가」는 **미측정**이고 이 회차가 답하지 않는다.",
+    "★**계단의 종점(갈래 ⒜ · `ba5797b`(+47) · ≥222곳 + crates.io 개명)까지 가지 않았다** — 이번은 세 번째 칸이다. 다음 벽은 `+34`(`current_class_loader` 비공개화 6곳 · **공개 대체 API 없음** ⇒ 설계가 필요하다)."
+  ],
+  "issues": [],
+  "proposals": [
+    {
+      "title": "이식하지 않은 하드닝 2축을 «닫을지 말지» 결정한다 — 비용은 이미 재어 놨다",
+      "plainSummary": "예전 포크에 있던 기능 두 개(문자열 끼워넣기, 1회성 타이머)는 이번에 옮기지 않았습니다. 그 기능을 쓰는 게임은 그 지점에서 오류를 봅니다. 옮기는 데 드는 양은 이미 측정해 두었습니다.",
+      "userBenefit": "그 두 메서드를 부르는 게임이 그 지점에서 멈추지 않는다 — 또는 «멈춰도 된다»는 것이 결정으로 남아 다음 사람이 다시 재지 않는다.",
+      "why": "새 핀에 `StringBuffer.insert(I,String)` 과 `Timer.schedule(TimerTask,long)` 이 없다(프로브 실측 1→0). 이 회차는 «실패의 등급»(호스트 패닉 ↔ Java 레벨 오류)으로 갈라 미이식을 골랐고 그 판단은 지금도 옳지만, ★**「안 옮긴다」가 결정으로 적혀 있지 않으면 다음 핀 이동 때 같은 계산을 처음부터 다시 한다.** 이식 비용은 각각 53줄(+시험 36)·17줄(+시험 26)로 이미 측정돼 있다.",
+      "tradeoff": "옮기면 wie 가 `java_runtime` 의 클래스 표면을 «확장»하기 시작한다 — 지금 `hardening.rs` 는 기존 메서드를 감싸기만 하는데, 메서드를 추가하면 upstream 이 나중에 같은 메서드를 넣었을 때 충돌·중복 판정이 필요해진다. 반대로 안 옮기면 그 두 축은 계속 비어 있고, 어느 게임이 그것을 부르는지는 코퍼스가 없어 알 수 없다.",
+      "effort": "S(둘 다 이식) / XS(「안 옮긴다」를 `hardening.rs` 주석과 §9 에 결정으로 못박기).",
+      "target": "wie_jvm_support/src/hardening.rs · docs/upstream-realign-verdict.md §9-2"
+    },
+    {
+      "title": "핀을 +34 이상으로 올리는 다음 칸은 «`current_class_loader` 대체 API 설계»가 선행이다",
+      "plainSummary": "엔진이 참조하는 업스트림 지점을 더 최신으로 올리려면, 지금 쓰는 내부 기능 하나가 비공개로 바뀌어 대체 방법을 새로 설계해야 합니다.",
+      "userBenefit": "업스트림의 최신 수정을 계속 받아올 수 있는 길이 열린다 — 지금 핀은 2026-07-20 에 멈춰 있다.",
+      "why": "§8-4⑶ 계단: `+34`(`7dc1b90`)에서 `Jvm::current_class_loader` 가 비공개가 되고 **공개 대체 API 가 없다**(호출부 6곳). 그 앞칸(+33)이 이번에 착지했으므로 다음 벽이 정확히 이것이다. 그리고 `+47`(`ba5797b`)의 209곳은 그 뒤에 있다.",
+      "tradeoff": "설계가 필요해 «핀 한 줄 bump»가 아니다. 반대로 미루면 핀이 계속 낡고, 이번에 얻은 33커밋 뒤의 수정(특히 upstream 이 그 뒤에 넣은 하드닝)은 계속 못 받는다. 그리고 upstream wie 는 이미 RustJava 를 crates.io 로 소비하므로(§8-5) 언젠가는 그 축과도 만나야 한다.",
+      "effort": "M — 대체 경로 설계 + 호출부 6곳 + `cargo check` 로 그 칸의 «완전한» 파열 집합 재측정(지금 수는 grep 값이다).",
+      "target": "Cargo.toml · wie_ktf/wie_lgt/wie_midp 의 current_class_loader 호출부 · docs/upstream-realign-verdict.md §8-4⑶"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}

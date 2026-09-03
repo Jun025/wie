@@ -46,11 +46,11 @@ md5 = { version = "^0.8", default-features = false }
 spin = { version = "^0.12", features = ["spin_mutex", "rwlock"], default-features = false }
 tracing = { version = "^0.1", default-features = false, features = ["attributes"] }
 
-java_class_proto = { git = "https://github.com/dlunch/RustJava.git" }
-java_constants = { git = "https://github.com/dlunch/RustJava.git" }
-java_runtime = { git = "https://github.com/dlunch/RustJava.git" }
-jvm = { git = "https://github.com/dlunch/RustJava.git" }
-jvm_rust = { git = "https://github.com/dlunch/RustJava.git" }
+java_class_proto = { git = "https://github.com/dlunch/RustJava.git", rev = "5b84dd1c039f613ff5cd82fb9ddce4552f77ec05" }
+java_constants = { git = "https://github.com/dlunch/RustJava.git", rev = "5b84dd1c039f613ff5cd82fb9ddce4552f77ec05" }
+java_runtime = { git = "https://github.com/dlunch/RustJava.git", rev = "5b84dd1c039f613ff5cd82fb9ddce4552f77ec05" }
+jvm = { git = "https://github.com/dlunch/RustJava.git", rev = "5b84dd1c039f613ff5cd82fb9ddce4552f77ec05" }
+jvm_rust = { git = "https://github.com/dlunch/RustJava.git", rev = "5b84dd1c039f613ff5cd82fb9ddce4552f77ec05" }
 wipi_types = { git = "https://github.com/dlunch/wipi.git" }
 
 wie_backend = { path = "wie_backend" }
@@ -67,15 +67,11 @@ futures-test = { version = "^0.3" }
 
 test_utils = { path = "test_utils" }
 
-# Patched RustJava fork: panic→exception hardening for KTF compatibility
-# (String/ByteArrayInputStream null array → NPE, Integer.parseInt → NFE +
-# NumberFormatException class, Integer.byteValue/shortValue/longValue).
-# Independent fork of dlunch/RustJava @ bee850f; see Jun025/RustJava wie-ktf-hardening.
-# daee53b adds Thread.currentThread() reference identity (+ pending-thread GC roots)
-# and StringBuffer null-append NPE; cd4804f adds DataInputStream.readUnsignedByte.
-[patch."https://github.com/dlunch/RustJava.git"]
-java_class_proto = { git = "https://github.com/Jun025/RustJava.git", rev = "c66f08d4939e02fee00305aa28d189e9daa46195" }
-java_constants = { git = "https://github.com/Jun025/RustJava.git", rev = "c66f08d4939e02fee00305aa28d189e9daa46195" }
-java_runtime = { git = "https://github.com/Jun025/RustJava.git", rev = "c66f08d4939e02fee00305aa28d189e9daa46195" }
-jvm = { git = "https://github.com/Jun025/RustJava.git", rev = "c66f08d4939e02fee00305aa28d189e9daa46195" }
-jvm_rust = { git = "https://github.com/Jun025/RustJava.git", rev = "c66f08d4939e02fee00305aa28d189e9daa46195" }
+# RustJava is pinned to dlunch/RustJava@5b84dd1 (bee850f+33) — NOT a fork.
+# The Jun025/RustJava [patch] table was removed 2026-09-04 (P1 branch ⒝, orchestrator
+# decision; rationale + cost staircase in docs/upstream-realign-verdict.md §8-4/§8-6).
+# +33 is the last rev before `current_class_loader` goes private (+34) and before
+# `invoke_virtual` gains a class_name argument (+47, 209 call sites). Moving the pin
+# forward past +33 is a separate, much larger task — do not bump it casually.
+# What the old fork carried and this pin does NOT: see §8-3 row 4/5/8/9/1''/2a and
+# wie_jvm_support/src/hardening.rs, which re-adds the reachable half in wie itself.

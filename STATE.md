@@ -32,8 +32,21 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- 2026-09-04: **키 입력 «도달»을 행동으로 단언 — 왕복 검사 Scenario D 신설**
-  (`wie-featurephone-keypress-reaches-guest-behavioral-axis` · 채택 제안
+- 2026-09-04: **P1 집행 — `Jun025/RustJava` 핀 이탈(`dlunch/RustJava@5b84dd1`, +33) + 하드닝 3축 이식**
+  (`wie-upstream-realign-p1-execute-pin-plus33-and-cost-hardening-port`) — ★**총괄이 §8-6 권고를 채택했고
+  이 회차가 집행했다.** `[patch]` 표 삭제 ⇒ ★**fork 의존 소멸**(`Cargo.lock` 의 `Jun025` **0건**).
+  ★**API 파열은 예상 ≥7 ↔ 실제 «11개소 / 7파일»** — 예상 밖 둘은 `ClassInstance::{identity, shallow_clone}`(3 impl)과
+  `ArrayClassInstance: ClassInstance` 승격(1 impl). ★`shallow_clone` 은 게스트 객체를 **새로 할당해 필드를 복사**한다
+  (구조체 복제는 같은 주소를 가리켜 «복제본에 쓰면 원본이 바뀐다»).
+  ★**하드닝 6축 전부 사라졌고 3축을 wie 안으로 이식**했다 — `wie_jvm_support/src/hardening.rs`(본문 103·시험 99·배선 19).
+  ★**fork 없이 됐다**: `find_rustjar_class` 가 프로토를 JVM 에 넘기기 «전»에 wie 가 본문을 감쌀 수 있다.
+  ★**기준은 줄 수가 아니라 «실패의 등급»** — 이식분은 null 이면 호스트가 패닉(개악 대조로 재현), 미이식 2축은
+  메서드 부재라 Java 레벨에서 잡힌다. ★축 5(pending GC 루트)는 `jvm` 크레이트 내부라 **fork 없이 불가**.
+  정본 = `docs/upstream-realign-verdict.md` **§9**. 4게이트 green · `cargo test --all` **133 passed**.
+
+## 완료 (최근)
+- 2026-09-04: **키 입력 «도달»을 행동으로 단언 — 왕복 검사 Scenario D 신설** (PR #69 `f4569f3f`,
+  `wie-featurephone-keypress-reaches-guest-behavioral-axis` · 채택 제안
   `2026-07-22--featurephone-engine-contract-selftest#p0`) — 종전에 키 축을 보던 것은 둘뿐이었다:
   ⒜왕복 검사 Scenario A 의 「어휘 **20종**을 눌러도 **예외가 안 났다**」 ⒝`check-engine-contract.mjs`
   §4 의 **소스 핀**(`wie_web/src/lib.rs` 의 `fn parse_key` 본문에서 `"UP" => KeyCode::UP` **쌍**을 읽는다).
@@ -42,7 +55,7 @@
   ★**개악 대조**: `key_down` 이 이벤트를 **버리게** 하면 소스 핀은 **48 pass / 0 위반**, Scenario A 도
   **✓ 20 codes** — ★**둘 다 못 잡는다.** Scenario D 만 **3건 red**. 오탐 0(기존 26건 전건 통과 · **29/29**).
   ★**제품 코드 변경 0**(`wie_web/src/lib.rs` 무접촉 — 개악은 되돌렸다) · CI 워크플로 변경 0.
-- 2026-09-03: **P2 — ⒟ go/no-go 측정 회차** (`wie-upstream-realign-p2-gate-measurement-before-p1`) —
+- 2026-09-03: **P2 — ⒟ go/no-go 측정 회차** (PR #68 `7fb11c34`, `wie-upstream-realign-p2-gate-measurement-before-p1` + 반려 승계 `-fix`) —
   ★**총괄 결정으로 P2 를 P1 «보다 먼저» 돌렸다.** 판정 = ★**「P2 는 이 머신에서 측정 불가」**이고
   ★**사유가 «둘»이다**: ⒜코퍼스 부재(구조적 · Constraint 9 · 종전부터 알던 축) ⒝★**러너 부재 —
   upstream 에는 `wie_cli`·`wie_validate`·`scripts/` 가 «없고» 크레이트가 `wie_ktf`→`wie-ktf` 로
@@ -52,8 +65,6 @@
   (`ClassDefinition` 파열이 **+1·+2**에 있다 — `cargo check` rc=101 로 확인), 그 자리에서
   ★**비용 계단 2 → 5 → 11 → 220**이 드러났다. 정본 = `docs/upstream-realign-verdict.md` **§8**.
   ★**제품 코드 변경 0 · `Cargo.toml` 무접촉 · upstream 발신 0.**
-
-## 완료 (최근)
 - 2026-09-01: **워크로그 «회차 의무» 기각 + 2026-07-22 백필** (PR #67 `ec1b7027`,
   `wie-worklog-mandate-decision-and-2026-07-22-backfill`) —
   ★**결정: 의무화하지 «않는다».** 규약 착지(`92c25276`) 후 착지한 **3회차 전건**이
@@ -139,7 +150,10 @@
 ## 다음
 
 **★① upstream 재정렬 집행 — 이 회차의 판정을 잇는 축**(정본 `docs/upstream-realign-verdict.md`).
-채택 갈래 **⒟**. ★★★**[2026-09-03 갱신 · P2 회차] 순서 결정은 «내려졌다»** — 총괄이 **P2 를 P1 보다
+채택 갈래 **⒟**. ★★★**[2026-09-04 갱신 · P1 집행 회차] P1 은 «끝났다» — 총괄 결정 대기 «아니다».**
+총괄이 §8-6 권고를 **채택**했고(갈래 ⒝ · 핀 `5b84dd1`) 이 레인이 **집행**했다 — 집행 기록은
+`docs/upstream-realign-verdict.md` ★**§9**. ★**「총괄 결정 대기」 문구를 되살리지 마라.**
+★★★**[2026-09-03 갱신 · P2 회차] 순서 결정은 «내려졌다»** — 총괄이 **P2 를 P1 보다
 먼저** 돌렸고 그 결과가 아래를 다시 썼다. 정본 = `docs/upstream-realign-verdict.md` ★**§8**.
 - **P2**(측정전용) ★★**돌았다 — 판정 = 「이 머신에서 측정 불가」이고 사유가 «둘»이다**(§8-1).
   ⒜코퍼스 부재(구조적 · Constraint 9 · `find ~ -maxdepth 4 -name game_lab` **0건**)
@@ -150,39 +164,23 @@
   ⇒ ★★**P2 를 살리려면 «코퍼스 있는 머신» + «`wie_validate` 772줄을 upstream 크레이트 위로 이식» 이
   «둘 다» 필요하다.** 종전 `size: M` 은 그 몫을 세지 않았다. ★**차이표는 지어내지 않았다.**
   ★잰 것: 커밋된 픽스처 2건이 양쪽에서 **2/2 ↔ 2/2**(신규 FAIL 0) — ★**코퍼스가 아니다. 부풀리지 마라.**
-- **P1**(★**총괄 결정 대기 · 권고 있음** · 선행없음) `Jun025/RustJava` **핀 이탈**.
-  ★★★**[2026-09-04 재정정 · 게이트② 반려 승계 `-fix`] 아래는 «두 번째» 판이다.**
-  ★**초판은 `dlunch/RustJava` `bee850f`+N 위에만 계단을 세우고 «우리 fork 자신의 `origin/main` 을
-  한 번도 재지 않았다»** — 그래서 ⑴계단에 칸이 하나 빠지고 ⑵`822504b`(+21)의 파열 2종을 놓쳐
-  +33·+46·+47 의 수가 낮았으며 ⑶EUC-KR 문장의 주체가 틀렸다. 근인 = ★**`docs/upstream-realign-verdict.md` §8-8**.
-  ★★**「멈춰 있는 fork 의존」은 «핀»에 대해 참이고 «fork»에 대해 «거짓»이다** — 핀 `c66f08d` 는
-  **2026-07-07 · 브랜치 `wie-ktf-hardening` · main 밖**인데, `Jun025/RustJava` `origin/main`(`8c1238b`)은
-  그 사이 **52커밋**(dlunch **+29** 흡수) 전진했다. ★**멈춘 것은 저장소가 아니라 우리가 가리키는 rev 다.**
-  ★**비용 계단(개정 · 전부 같은 자 · 정본 §8-4⑶)** — API 파열은 ★**컴파일 측정**(`cargo check`):
-  `bee850f`(+0) **0곳/상실 12** → `fe5d116`(+16) **2곳/≈10.5** → ★**`5b84dd1`(+33) ≥7곳/≈4** →
-  〔칸 F: fork main 핀 bump — **≥7곳/≈4** 인데 ★**fork 의존 «유지»**〕 → `95ebc5c`(+46) ≥13곳/≈0~1 →
-  `ba5797b`(+47) ★**≥222곳**(209 가 «마지막 한 커밋»에 몰려 있다).
-  ★**+33 이 「+3 = 5곳」이 아닌 이유**: `822504b`(+21)가 `Runtime::exit`(impl 1곳)과
-  `from_classfile` 오류형(1곳)을 더 깨뜨린다 — 초판은 이 칸을 grep 으로만 봐서 놓쳤다.
-  ★★**권고(한 줄 · 집행하지 않았다 · ★`fe5d116` 에서 «바뀌었다»)**: ⒝ 를 고르되 핀을
-  ★**`5b84dd1`(+33)** 으로 잡아라 — 컴파일 측정 대가 **≥7곳**으로 upstream 33건을 사고
-  하드닝 상실을 **≈10.5/12 → ≈4/12** 로 내리며 `Jun025/RustJava` 의존이 **소멸**한다.
-  ★**왜 바뀌었나**: 초판이 「16건을 산다」고 한 그 16건은 ★**이미 fork main 안에 있었다**
-  (`merge-base --is-ancestor fe5d116 origin/main` rc=0) — 값어치 계산의 전제가 틀렸다.
-  ★**왜 칸 F 가 아닌가**: F 와 +33 은 ⒝⒞ 가 **같고**(같은 두 에러에서 멈춘다) 다른 것은
-  **fork 의존 유지 여부**뿐이다 ⇒ ★**+33 이 F 를 지배한다.**
-  ★★**대가를 같은 줄에 적는다**: 상실 **≈4/12 는 «측정»이다**(잃는 축: `StringBuffer.append` NPE 가드 ·
-  pending-thread GC 루트 · `StringBuffer.insert` · `Timer.schedule(TimerTask,long)` · `BAIS` NPE ·
-  `arraycopy` NPE). 그리고 ★**P2 가 이 머신에서 영구 불가라 그 상실은 «영구 미검증»으로 남는다.**
-  ★**근거의 성격**: **API·하드닝 축 = 측정** · **「그 상실이 게임을 깨뜨리는가」 = 미측정**.
-  ★**EUC-KR 정정**: `8ac70cb`(+5)의 `readUTF` panic 수정을 놓치고 있는 것은 ★**«핀 `c66f08d`»이고
-  fork main 은 이미 고쳐져 있다**(그쪽은 modified-UTF-8 디코더로 재작성 · `.unwrap()` **0건**).
-  초판의 「우리 fork 가 회귀를 갖고 있다」는 ★**주체가 틀렸다.**
-  ★부기: Constraint 8 반증 자체는 **참**이고 게이트②가 재현했다. 단 「진부분집합」은 ★**«기능·파일 축»
-  한정**이다 — `jvm` 공개 API 축에서는 우리 fork 가 `pub fn` 4종을 **추가**했다(wie 호출 0곳).
-  ★그리고 ★**upstream 은 이제 RustJava 를 crates.io(`jvm 0.1.1`·`rustjava-runtime 0.1.1`)로 쓴다**(§8-5)
-  — ⒜ 의 목적지(`dlunch/RustJava` git HEAD)는 «upstream 이 실제로 쓰는 것»이 아니고, 정합하려면
-  크레이트 **개명**까지 따라가야 한다. ★**그 몫도 220 에 세어져 있지 않다.**
+- **P1**(★★**집행 완료 · 2026-09-04**) `Jun025/RustJava` **핀 이탈** — ★**끝났다.**
+  ★**핀 = `dlunch/RustJava@5b84dd1`(+33)** · `[patch]` 표 **삭제** · `Cargo.lock` 의 `Jun025` **0건** ·
+  `cargo tree` 상 `java_class_proto`·`java_constants`·`java_runtime`·`jvm`·`jvm_rust` **전건 dlunch@5b84dd1**.
+  ★**API 파열은 예상 ≥7 ↔ 실제 «11개소 / 7파일»**(§9-1) — 예상에 없던 것 둘:
+  `ClassInstance::{identity, shallow_clone}`(3 impl · `shallow_clone` 은 **게스트 객체를 새로 할당해 필드를
+  복사**해야 했다) · `ArrayClassInstance: ClassInstance` 승격(1 impl 재구조화).
+  ★**하드닝 6축은 전부 사라졌고**(프로브 재실행) ★**그중 3축을 wie 안으로 «이식»했다** —
+  `wie_jvm_support/src/hardening.rs`(본문 103 · 시험 99 · 배선 19). ★**fork 없이 됐다**:
+  `find_rustjar_class` 가 `get_runtime_class_proto` 의 프로토를 JVM 에 넘기기 «전»에 wie 가 본문을 감쌀 수 있다.
+  ★**고른 기준은 줄 수가 아니라 «실패의 등급»이다** — 이식한 3축은 null 이면 ★**호스트가 패닉**하고
+  (개악 대조로 `jvm/src/class_instance.rs:108` `Option::unwrap()` 재현), 미이식 2축(8·9)은 **메서드 부재**라
+  Java 레벨에서 시끄럽게 잡힌다. ★**축 5(pending-thread GC 루트)는 «불가»** — 34줄 중 25줄이 `jvm` 크레이트
+  내부라 wie 가 닿을 이음매가 없다(★fork 없이는 영구 미복구 · 이 회차가 갚지 못한 유일한 값).
+  ★**4게이트 green · `cargo test --all` 133 passed** · ktf·lgt helloworld ok — ★**단 green 을 «하드닝 보존»의
+  증거로 읽지 마라**(§9-5). 보존의 증거는 프로브와 개악 대조뿐이다.
+  ★**다음 칸**: 계단의 종점은 갈래 ⒜(`ba5797b`(+47) · **≥222곳** + crates.io 개명)이고 ★**이 회차는 거기까지
+  가지 않았다.** `+34`(`current_class_loader` 비공개화 6곳 · 공개 대체 없음)가 그 앞의 벽이다.
 - **P3**(L·med·★**선행 = P2 아님**. P2 가 답을 못 내므로 P1 결정 뒤로 붙인다) `wie_web` → `wie_featurephone` **개명**(upstream 이 같은 이름을 자기 용도로 쓴다)
   후 upstream 을 base 로 ③ 오버레이 재적용 + `compile_model.rs` **122줄 이식** + ★**엔트리포인트 규약 정합**
   (upstream `LgtEmulator` 는 `application.jar` 를 찾고 우리는 `00000000.jar` 를 넘긴다 — ★«부수 발견»이
