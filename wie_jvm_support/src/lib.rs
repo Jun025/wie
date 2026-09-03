@@ -2,6 +2,7 @@
 extern crate alloc;
 
 mod context;
+mod hardening;
 mod jvm_implementation;
 mod runtime;
 
@@ -19,6 +20,20 @@ use runtime::JvmRuntime;
 
 pub static WIE_RUSTJAR: &str = "net.wie.rustjar";
 
+/// Separator for `java.class.path`.
+///
+/// `ClassLoader.getSystemClassLoader` splits that property with `java.io.File.pathSeparator`,
+/// which RustJava defines as `;` on Windows and `:` everywhere else. Hardcoding `:` makes the
+/// whole class path parse as ONE entry on Windows: no element ends in `.rustjar`, so
+/// `RustJarClassLoader` finds nothing and the first runtime class lookup unwraps a null.
+/// That failure is invisible on macOS/Linux — `path_separator_matches_the_runtime` keeps the
+/// two definitions in sync from any host.
+const PATH_SEPARATOR: &str = path_separator(cfg!(windows));
+
+const fn path_separator(windows: bool) -> &'static str {
+    if windows { ";" } else { ":" }
+}
+
 pub struct JvmSupport;
 
 impl JvmSupport {
@@ -35,9 +50,9 @@ impl JvmSupport {
         let runtime = JvmRuntime::new(system.clone(), implementation, protos);
 
         let class_path = if let Some(x) = jar_name {
-            format!("{RT_RUSTJAR}:{WIE_RUSTJAR}:{x}")
+            format!("{RT_RUSTJAR}{PATH_SEPARATOR}{WIE_RUSTJAR}{PATH_SEPARATOR}{x}")
         } else {
-            format!("{RT_RUSTJAR}:{WIE_RUSTJAR}")
+            format!("{RT_RUSTJAR}{PATH_SEPARATOR}{WIE_RUSTJAR}")
         };
 
         let properties = [
@@ -79,5 +94,42 @@ impl JvmSupport {
                 WieError::FatalError(format!("\n{}", JavaLangString::to_rust_string(jvm, &trace).await.unwrap()))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::{boxed::Box, string::String};
+
+    use jvm::{ClassInstanceRef, runtime::JavaLangString};
+
+    use test_utils::run_jvm_test;
+    use wie_util::Result;
+
+    use crate::{PATH_SEPARATOR, path_separator};
+
+    /// Host-independent: the mapping itself. The runtime check below can only ever compare the
+    /// *host's* separator, so on macOS/Linux it is `":" == ":"` and would not have caught the
+    /// Windows-only regression this test pair exists for.
+    #[test]
+    fn path_separator_mapping() {
+        assert_eq!(path_separator(true), ";");
+        assert_eq!(path_separator(false), ":");
+    }
+
+    /// `java.class.path` is split by `java.io.File.pathSeparator`, so the constant we build it
+    /// with has to be the one the runtime splits with. Getting this wrong breaks class loading
+    /// **only on the platform whose separator differs**, which is exactly the kind of bug a
+    /// three-platform CI catches days later — assert it here so any host catches it.
+    #[test]
+    fn path_separator_matches_the_runtime() -> Result<()> {
+        run_jvm_test(Box::new([]), |jvm| async move {
+            let separator: ClassInstanceRef<String> = jvm.get_static_field("java/io/File", "pathSeparator", "Ljava/lang/String;").await?;
+            let separator = JavaLangString::to_rust_string(&jvm, &separator).await?;
+
+            assert_eq!(separator, PATH_SEPARATOR);
+
+            Ok(())
+        })
     }
 }

@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, vec, vec::Vec};
 use core::{
     fmt::{self, Debug, Formatter},
     hash::{Hash, Hasher},
@@ -11,7 +11,7 @@ use jvm::{ClassDefinition, ClassInstance, Field, JavaType, JavaValue, Result as 
 use wipi_types::ktf::java::JavaClassInstance as RawJavaClassInstance;
 
 use wie_core_arm::{Allocator, ArmCore};
-use wie_util::{ByteWrite, read_generic, write_generic};
+use wie_util::{ByteRead, ByteWrite, read_generic, write_generic};
 
 use crate::runtime::java::jvm_support::KtfJvmSupport;
 
@@ -96,6 +96,31 @@ impl ClassInstance for JavaClassInstance {
         let field_size = self.class().unwrap().field_size().unwrap();
 
         (*self).destroy(field_size as _).unwrap()
+    }
+
+    /// Object identity for `hashCode`/monitors. A KTF object *is* its guest address,
+    /// so the pointer is the identity — no side table needed.
+    fn identity(&self) -> usize {
+        self.ptr_raw as usize
+    }
+
+    /// `Object.clone()`. The object lives in guest memory, so a real copy needs a fresh
+    /// guest allocation: returning `self.clone()` would alias `ptr_raw` and make writes
+    /// to the "copy" land on the original.
+    fn shallow_clone(&self) -> JvmResult<Box<dyn ClassInstance>> {
+        let class = self.class().unwrap();
+        let field_size = class.field_size().unwrap();
+        let mut core = self.core.clone();
+
+        let cloned = Self::instantiate(&mut core, &class, field_size).unwrap();
+
+        // Copy the field block only. `instantiate` already wrote the vtable word that
+        // sits *before* it, and `field_address(0)` starts past that word.
+        let mut buf = vec![0u8; field_size];
+        core.read_bytes(self.field_address(0).unwrap(), &mut buf).unwrap();
+        core.write_bytes(cloned.field_address(0).unwrap(), &buf).unwrap();
+
+        Ok(Box::new(cloned))
     }
 
     fn class_definition(&self) -> Box<dyn ClassDefinition> {

@@ -436,6 +436,24 @@ impl Debug for LgtClassDefinition {
     }
 }
 
+impl LgtClassDefinition {
+    /// Allocate one zeroed guest object (header + field array) and return its address.
+    /// Extracted from `instantiate` so `LgtClassInstance::shallow_clone`, which is sync
+    /// and has no `&Jvm`, can allocate the same shape.
+    fn alloc_guest_object(&self, core: &mut ArmCore) -> Result<u32> {
+        let vtable_word = self.inner.shared.vtable_word();
+
+        let ptr_fields = Allocator::alloc(core, FIELD_ARRAY_WORDS * 4)?;
+        wie_util::ByteWrite::write_bytes(core, ptr_fields, &[0u8; (FIELD_ARRAY_WORDS * 4) as usize])?;
+        let ptr_raw = Allocator::alloc(core, OBJ_HEADER_SIZE)?;
+        write_generic(core, ptr_raw, vtable_word)?; // +0: virtual-method table base
+        write_generic(core, ptr_raw + 4, 0u32)?;
+        write_generic(core, ptr_raw + OBJ_PTR_FIELDS_OFFSET, ptr_fields)?;
+
+        Ok(ptr_raw)
+    }
+}
+
 #[async_trait::async_trait]
 impl ClassDefinition for LgtClassDefinition {
     fn name(&self) -> String {
@@ -444,24 +462,27 @@ impl ClassDefinition for LgtClassDefinition {
     fn super_class_name(&self) -> Option<String> {
         self.inner.super_name.clone()
     }
+    /// LGT native classes are synthesised from the guest's `0x64` import table, which
+    /// carries no interface list at all (`docs/lgt_abi.md` §5). Nothing to report — and
+    /// unlike KTF there is not even a pointer that could be non-zero, so no warning.
+    fn interface_names(&self) -> Vec<String> {
+        Vec::new()
+    }
+
     fn access_flags(&self) -> ClassAccessFlags {
         ClassAccessFlags::PUBLIC
+    }
+
+    /// Preparation applies classfile `ConstantValue` attributes; these classes have no
+    /// classfile, so there is nothing to apply.
+    async fn prepare(&self, _: &Jvm) -> JvmResult<()> {
+        Ok(())
     }
 
     async fn instantiate(&self, jvm: &Jvm) -> JvmResult<Box<dyn ClassInstance>> {
         let mut core = self.inner.core.clone();
 
-        let vtable_word = self.inner.shared.vtable_word();
-        let alloc = (|| -> Result<u32> {
-            let ptr_fields = Allocator::alloc(&mut core, FIELD_ARRAY_WORDS * 4)?;
-            wie_util::ByteWrite::write_bytes(&mut core, ptr_fields, &[0u8; (FIELD_ARRAY_WORDS * 4) as usize])?;
-            let ptr_raw = Allocator::alloc(&mut core, OBJ_HEADER_SIZE)?;
-            write_generic(&mut core, ptr_raw, vtable_word)?; // +0: virtual-method table base
-            write_generic(&mut core, ptr_raw + 4, 0u32)?;
-            write_generic(&mut core, ptr_raw + OBJ_PTR_FIELDS_OFFSET, ptr_fields)?;
-            Ok(ptr_raw)
-        })();
-        let ptr_raw = match alloc {
+        let ptr_raw = match self.alloc_guest_object(&mut core) {
             Ok(p) => p,
             Err(e) => return Err(jvm.exception("java/lang/OutOfMemoryError", &e.to_string()).await),
         };
@@ -547,6 +568,31 @@ impl Hash for LgtClassInstance {
 #[async_trait::async_trait]
 impl ClassInstance for LgtClassInstance {
     fn destroy(self: Box<Self>) {}
+
+    /// The guest address is the identity, same rule as KTF.
+    fn identity(&self) -> usize {
+        self.guest_ptr as usize
+    }
+
+    /// `Object.clone()`. Both halves have to be copied: a fresh guest object (sharing
+    /// `guest_ptr` would make the copy write through to the original) and a *snapshot* of
+    /// the JVM-side field map (the map is behind an `Arc`, so cloning the struct would
+    /// share it).
+    fn shallow_clone(&self) -> JvmResult<Box<dyn ClassInstance>> {
+        let mut core = self.definition.inner.core.clone();
+
+        let ptr_raw = self.definition.alloc_guest_object(&mut core).unwrap();
+
+        let cloned = LgtClassInstance {
+            guest_ptr: ptr_raw,
+            definition: self.definition.clone(),
+            jvm_fields: Arc::new(Mutex::new(self.jvm_fields.lock().clone())),
+        };
+        self.definition.inner.shared.register_instance(ptr_raw, Box::new(cloned.clone()));
+
+        Ok(Box::new(cloned))
+    }
+
     fn class_definition(&self) -> Box<dyn ClassDefinition> {
         Box::new(self.definition.clone())
     }

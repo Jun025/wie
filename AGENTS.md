@@ -24,7 +24,7 @@ the file that enforces it; causes no file enforces are in the ledger.
 | 5 | `cargo audit` with no ignores. A suppression needs a named advisory ID and a written reachability argument — never blanket, never `continue-on-error` | `rust-audit.yaml:39-54` |
 | 6 | `no_std` + `extern crate alloc` in the engine crates — reaching for `std` breaks the web build | wasm clippy gate in `rust.yml`; `docs/architecture.md` |
 | 7 | `wie_web` is an empty library off `wasm32`. Do not "clean up" the `cfg(target_arch = "wasm32")` gates | `wie_web/Cargo.toml:1-11`; native jobs in `rust.yml` |
-| 8 | The exact version pins and the `[patch]` table are deliberate | `Cargo.toml:70-75`; full rationale in the ledger |
+| 8 | The exact version pins and the RustJava `rev` pin are deliberate | `Cargo.toml` — comment above the `rev` lines; full rationale in the ledger |
 | 9 | No game bytes, ever | `.gitignore` blocklist + `audit-no-leak.sh` — full text below |
 | 10 | Secrets are referenced, never embedded or printed | `.dev.vars*` git-ignored + `.claude/settings.json` read-deny — full text below |
 | 11 | D1 migrations auto-apply to prod on `main`, destructive statements included — author accordingly | `web.yml:97-100`; `docs/CLOUDFLARE_SETUP.md` |
@@ -59,6 +59,20 @@ interpreter recursion overflows the default test-thread stack without it.
 
 **All four run before every commit, whatever you changed** — a docs- or `web/`-only diff is not an
 exemption. The web-surface commands below are *additional* to these, never an alternative.
+
+**Touching engine code? The four gates are not enough — run the repo's own runner.**
+
+```sh
+node scripts/make-draw-fixture.mjs                                    # builds the J2ME fixture
+for f in test_data/draw_j2me.jar test_data/helloworld_ktf.zip test_data/helloworld_lgt.zip; do
+  cargo run -q -p wie_cli --bin wie_validate -- "$f"                  # each must report "result":"PASS"
+done
+```
+
+`cargo test --all` boots KTF and LGT but **nothing in it boots a J2ME guest**. 2026-09-04 shipped a
+RustJava pin bump whose four gates were all green while `draw_j2me.jar` failed with
+`NoClassDefFoundError` on the first tick — one `wie_validate` line reproduced it locally, and the
+round had not run it. Every fixture here is committed; no game files are involved.
 
 Narrower commands are conveniences, not gates: `cargo build` (default member `wie_cli`),
 `cargo test -p <crate> <test_name>`, `cargo fmt` to fix formatting (`rustfmt.toml`: max_width=150).
@@ -180,9 +194,20 @@ edit is a comment.
 
 **Exact version pins are deliberate.** `wasm-bindgen = "=0.2.108"` (and `js-sys`/`web-sys`
 `=0.3.85`) must match the `wasm-bindgen-cli@0.2.108` CI pin, or the generated glue and the runtime
-disagree. `tracing-attributes = "<0.1.29"` is pinned for a no_std compile error. The `[patch]`
-table redirecting RustJava to the `Jun025/RustJava` fork at a fixed rev carries KTF
-panic→exception hardening — it is not stale duplication.
+disagree. `tracing-attributes = "<0.1.29"` is pinned for a no_std compile error.
+
+**The RustJava `[patch]` fork is gone (2026-09-04); the `rev` pin that replaced it is not
+arbitrary.** This row used to justify a `[patch]` table pointing at `Jun025/RustJava`, on the
+grounds that it "is not stale duplication". That claim was measured and disproven — the fork was a
+subset of upstream on every axis it named, frozen at 2026-07-07 (`docs/upstream-realign-verdict.md`
+§4). P1 removed it and pinned `dlunch/RustJava@5b84dd1` (§9). **`5b84dd1` is the last rev before
+`current_class_loader` goes private and before `invoke_virtual` gains a `class_name` argument (209
+call sites)**, so bumping the pin is a design task, not a one-line edit — §8-4⑶ has the cost per
+step. Six hardening axes the fork carried do not exist at that rev; the three whose absence
+*panics the host* were re-added in `wie_jvm_support/src/hardening.rs`, which wraps method bodies as
+they pass through `find_rustjar_class`. **If you move the pin, re-run that module's tests** — they
+assert the guards still attach, and a guard that silently stops attaching is how this hardening was
+lost the first time.
 
 **`RUST_MIN_STACK=4194304` is not decorative.** Without it `cargo test --all` stack-overflows
 rather than failing an assertion. See the four-gates block.
@@ -206,7 +231,7 @@ above the engine reaches back into it.
 - `wie_util` — `Result`/`WieError`, byte read/write helpers. Bottom of the stack.
 - `wie_backend` — host-abstraction boundary: `Platform`/`Screen`/`AudioSink`/`Filesystem`/`Database`, canvas, executor, event queue.
 - `wie_core_arm` — ARM32 emulation + the `data/binary_patches.toml` per-game patch table.
-- `wie_jvm_support` — bridge onto the patched RustJava JVM.
+- `wie_jvm_support` — bridge onto the pinned RustJava JVM; also `hardening.rs`, the null guards that pin does not carry.
 - `wie_wipi_c`, `wie_wipi_java`, `wie_midp`, `wie_skvm` — the emulated API surfaces.
 - `wie_ktf`, `wie_lgt`, `wie_skt`, `wie_j2me` — per-carrier entry points (`wie_ktf`/`wie_lgt` hold the heavy reverse-engineered runtimes).
 - `wie_cli` — native host (also `wie_validate`, a headless triage runner); `wie_web` — browser host, empty library off `wasm32` (Constraint 7).
