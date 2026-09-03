@@ -32,6 +32,16 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- 2026-09-04: **키 입력 «도달»을 행동으로 단언 — 왕복 검사 Scenario D 신설**
+  (`wie-featurephone-keypress-reaches-guest-behavioral-axis` · 채택 제안
+  `2026-07-22--featurephone-engine-contract-selftest#p0`) — 종전에 키 축을 보던 것은 둘뿐이었다:
+  ⒜왕복 검사 Scenario A 의 「어휘 **20종**을 눌러도 **예외가 안 났다**」 ⒝`check-engine-contract.mjs`
+  §4 의 **소스 핀**(`wie_web/src/lib.rs` 의 `fn parse_key` 본문에서 `"UP" => KeyCode::UP` **쌍**을 읽는다).
+  ★**둘 다 «게스트에 도달했는가»는 보지 않는다.** ⇒ 픽스처의 `keyPressed()` 가 **받은 MIDP 코드만큼 넓은 막대**를
+  그리게 해서 캔버스가 **어느 코드가 도달했는지**를 말하게 했다(대표 키 **3종** — 소프트/숫자/방향).
+  ★**개악 대조**: `key_down` 이 이벤트를 **버리게** 하면 소스 핀은 **48 pass / 0 위반**, Scenario A 도
+  **✓ 20 codes** — ★**둘 다 못 잡는다.** Scenario D 만 **3건 red**. 오탐 0(기존 26건 전건 통과 · **29/29**).
+  ★**제품 코드 변경 0**(`wie_web/src/lib.rs` 무접촉 — 개악은 되돌렸다) · CI 워크플로 변경 0.
 - 2026-09-03: **P2 — ⒟ go/no-go 측정 회차** (`wie-upstream-realign-p2-gate-measurement-before-p1`) —
   ★**총괄 결정으로 P2 를 P1 «보다 먼저» 돌렸다.** 판정 = ★**「P2 는 이 머신에서 측정 불가」**이고
   ★**사유가 «둘»이다**: ⒜코퍼스 부재(구조적 · Constraint 9 · 종전부터 알던 축) ⒝★**러너 부재 —
