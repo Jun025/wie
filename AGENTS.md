@@ -92,16 +92,25 @@ then `:125`). The rest need a toolchain fetch — run them only when the artifac
   had written one. A number with no re-measure date quietly becomes a permanent rule, so:
 
   > **Re-measure every 10 landed rounds since `92c25276`, over the most recent 10. Below 70%,
-  > re-open the mandate decision.** A landed round is one squash commit on `main`.
+  > re-open the mandate decision.** A landed round is one **first-parent** commit on `main`.
 
   ```sh
-  OLD=$(git log --format=%h -n 10 92c25276..origin/main | tail -1)   # window = last 10 rounds
-  git rev-list --count "$OLD^..origin/main"                          # denominator
-  git rev-list --count "$OLD^..origin/main" -- docs/worklog          # numerator
+  OLD=$(git log --first-parent --format=%h -n 10 92c25276..origin/main | tail -1)  # window
+  git rev-list --count --first-parent "$OLD^..origin/main"                         # denominator
+  git rev-list --count --first-parent "$OLD^..origin/main" -- docs/worklog         # numerator
   ```
 
+  **`--first-parent` is load-bearing in all three, and the definition says "first-parent", not
+  "squash".** This repo is registered as an upstream-sync fork and must *not* squash-merge, so
+  landings arrive as merge commits: PR #69 landed that way on 2026-09-03. Without the flag the
+  commands walk every reachable commit — branch commits and, once upstream is merged, thousands of
+  upstream commits — and count them as "rounds". Measured on 2026-09-04, one landed merge already
+  moved the unflagged answer to **6/5 = 83.3%**, and simulating a single `upstream/main` merge
+  takes it to **204/7 = 3.4%**, below the 70% line in one round. The window breaks the same way:
+  7 of its top 10 become upstream commits, so `OLD` stops being the 10th landed round.
+
   **Never let the window reach past `92c25276`** — the 19 rounds before it are 0/19 by
-  construction and would trip the rule on history. Baseline 2026-09-04: **4/4 = 100%**; only 4
+  construction and would trip the rule on history. Baseline 2026-09-04: **5/5 = 100%**; only 5
   rounds exist since the convention, so the first re-measure is due at round 10.
   *Why 10*: the original denominator was **3**, where one round moves the number 33pp and no
   threshold separates a habit from a coincidence; 10 rounds is ≈20 days at the measured cadence
