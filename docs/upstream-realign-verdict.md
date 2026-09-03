@@ -500,3 +500,189 @@ upstream 이 낫다는 것과 **우리 기준선을 upstream 이 통과한다는
    diff 크기·LOC·기능 커버리지는 **전부 다른 축**이고, 셋 다 작아도 API 는 깨진다.
    ★**「측정하지 못한 것」에 올리기 전에 «정말 못 재는가»를 한 번 물어라** — 이 항목은 그 질문을 안 해서
    목록에조차 오르지 못했다(게이트②의 자기 지적을 그대로 옮긴다).
+
+## 8. P2 — go/no-go 측정 회차 (2026-09-03 · `wie-upstream-realign-p2-gate-measurement-before-p1`)
+
+> ★**총괄 결정으로 P2 를 P1 «보다 먼저» 돌렸다**(「가장 싼 판정 측정이 가장 비싼 선행 뒤에 서는 것은
+> 순서가 뒤집힌 것이다」). 이 절은 그 회차의 산출이고, §6-P2 · §7-1 · §6-P1 의 「미측정 1건」에 답한다.
+> ★**제품 코드 변경 0 · upstream 발신 0 · `Cargo.toml` 무접촉**(아래 API 프로브는 전부
+> `git worktree` 격리 체크아웃에서 돌고 제거됐다 — 이 저장소 diff 에 남지 않는다).
+
+**측정 시각 2026-09-03 23:00~23:15 KST · `origin/main` `ec1b7027` · `upstream/main` `6cafdb0e`**
+(`git rev-list --count`: behind **1,089** / ahead **194** · `merge-base` 여전히 `fa641a8a` — §1 의 1,067/192 는
+2026-08-27 값이고, ★**이 수는 조회 시각과 함께 읽어라**).
+
+### 8-1. ★★결론 먼저 — **P2 는 이 머신에서 측정 불가다. 그리고 사유가 «둘»이다**
+
+| # | 코퍼스 | 측정 가능? | 사유 |
+|---|---|---|---|
+| — | `ktf` 190 | ★**불가** | 아래 ⒜ ⒝ **둘 다** |
+| — | `lgt` 52 | ★**불가** | 〃 |
+| — | `skt` 50 | ★**불가** | 〃 |
+| — | `test_data/helloworld_{ktf,lgt}.zip` (커밋된 픽스처 2건) | **가능** | §8-2 |
+
+**⒜ 코퍼스 부재 — 구조적**(§5 · §7-1 이 이미 적은 축, 이 회차 재확인).
+`find ~ -maxdepth 4 -name game_lab` → **0건**, `~/work`·`~/Documents` 깊이 5 에 `ktf`/`skt` 디렉터리 **0건**.
+게임 바이트는 Constraint 9 로 repo 에 들어올 수 없다 ⇒ 이 머신에서는 **영구히** 못 잰다.
+
+**⒝ ★★러너 부재 — 이 회차가 «새로» 찾은 축이고, §6-P2 의 처방을 그대로는 집행할 수 없게 만든다.**
+§6-P2 는 「`upstream/main` 체크아웃 + 우리 `scripts/smoke_gate.sh`」라고 적었다. ★**그 조합은 성립하지 않는다**:
+
+| 축 | ours `ec1b7027` | upstream `6cafdb0e` |
+|---|---|---|
+| 게이트 스크립트 | `scripts/smoke_gate.sh` | ★**없다**(`scripts/` 자체가 없고 `.github/scripts/release/` 3건뿐) |
+| 헤드리스 러너 | `wie_cli/src/bin/wie_validate.rs` **772줄** | ★**없다** — `wie_cli` 크레이트 자체가 없다 |
+| 네이티브 호스트 | `wie_cli` | 루트 패키지 `wie`(`src/main.rs`) + `wie-app`(Tauri) |
+| 그 바이너리의 인자 | `--timeout`·`--inject`·JSON `"result":"PASS\|FAIL"` | `filename`·`--debug`·`--profile-out`·`--midi-device`·`--list-midi-devices` — ★**타임아웃 없음 · JSON 판정 출력 없음 · 창을 띄운다** |
+| 크레이트 디렉터리 명명 | `wie_ktf`… (밑줄) | `wie-ktf`… (하이픈) — ★**전면 개명됐다** |
+
+`scripts/smoke_gate.sh` 는 `BIN=target/debug/wie_validate` 와 `cargo build -p wie_cli --bin wie_validate` 에
+하드코딩돼 있다 ⇒ upstream 체크아웃에서는 **빌드 대상 자체가 해결되지 않는다.**
+⇒ ★★**P2 를 실행하려면 «코퍼스가 있는 머신»만으로는 부족하고 `wie_validate` 772줄을 upstream 의
+개명된 크레이트 위로 이식하는 선행 작업이 필요하다.** §6-P2 의 `size: M` 은 그 몫을 세지 않았다.
+
+★**그래서 이 회차는 차이표를 «지어내지 않았다»** — 티켓이 허용한 대로 「측정 불가」를 판정으로 적는다.
+
+**무엇이 있으면 잴 수 있나(한 줄)**: ★`game_lab/working/{ktf,lgt,skt}` 코퍼스가 있는 머신 **그리고**
+그 머신에서 `wie_validate` 를 upstream 크레이트 이름 위로 이식한 판본 — **둘 다** 있어야 한다.
+
+### 8-2. 잴 수 있는 범위에서 잰 것 — 차이표 1장 (★코퍼스가 아니다)
+
+양쪽 저장소가 **각자 갖고 있는** helloworld 픽스처 통합테스트를 그대로 돌렸다.
+
+| | 명령 | ktf | lgt | 벽시계 |
+|---|---|---|---|---|
+| ours `ec1b7027` | `RUST_MIN_STACK=4194304 cargo test -p wie_ktf -p wie_lgt --test test_helloworld` | ★**ok** (0.53s) | ★**ok** (0.27s) | 1m16s (캐시 적중) |
+| upstream `6cafdb0e` | `… cargo test -p wie-ktf -p wie-lgt --test test_helloworld` | ★**ok** (3.72s) | ★**ok** (0.70s) | 7m42s (콜드) |
+
+⇒ **신규 FAIL 0 · 신규 PASS 0**(2/2 ↔ 2/2). §3-5 가 lgt 1건에 대해 얻은 신호를 ktf 로 넓힌 것이고,
+★**그 절의 경고를 여기서도 반복한다 — 이 신호의 크기를 부풀리지 마라.** helloworld 는 stdout 한 줄이고
+회귀 기준선 **292건**에 대한 답이 **아니다**. 이것은 «go/no-go» 가 아니라 «최소 안전 신호»다.
+
+### 8-3. 「12커밋 하드닝 상실」의 크기 — 열거와 판정
+
+`Jun025/RustJava` `bee850f..c66f08d` = **정확히 12커밋**(실측). 각 커밋이 upstream 의 어느 rev 에서
+대응물을 갖는지를 트리 프로브로 쟀다(`git show <rev>:<파일>` + 심볼 계수 · 옮겨 적지 않았다).
+
+| # | 우리 커밋 | 축 | `bee850f` (+0 · ⒝ 핀) | `fe5d116` (+16) | `ba5797b` (+47 · ⒜ 목적지) |
+|---|---|---|---|---|---|
+| 1 | `1f0e52e` | panic→exception (NFE 클래스 · `Integer.parseInt`) | 없음 | ★**있음** | 있음 |
+| 1' | 〃 | 같은 커밋의 `String`·`ByteArrayInputStream` null NPE | 없음 | ★**없음** | 있음 |
+| 2 | `0f4f0bb` | `System.arraycopy` NPE / `Class.forName` CNFE | 없음 / 없음 | 없음 / ★**있음** | 있음 / 있음 |
+| 3 | `9970ab6` | `Thread.currentThread()` 참조 동일성 | 없음 | 없음 | 있음 (= `f9a315e` **+17**) |
+| 4 | `45ff9c2` | `StringBuffer.append(char[],int,int)` NPE | 없음 | 없음 | 있음 |
+| 5 | `daee53b` | pending-thread GC 루트 | 없음 | 없음 | 있음 |
+| 6 | `cd4804f` | `DataInputStream.readUnsignedByte` | 없음 | 없음 | 있음 |
+| 7 | `58c1525` | `Vector.copyInto`/`capacity` | 없음 | 없음 | 있음 |
+| 8 | `9cfc346` | `StringBuffer.insert(I,String)` | 없음 | 없음 | 있음 |
+| 9 | `3cb4d7d` | `Timer.schedule(TimerTask,long)` | 없음 | 없음 | 있음 |
+| 10 | `d61cf07` | `java.lang.Byte` | 없음 | 없음 | 있음 |
+| 11 | `9be0ea3` | `File.length()` 미존재 → 0 | 없음 | 없음 | 있음 |
+| 12 | `c66f08d` | `TimeZone.getAvailableIDs` | 없음 | 없음 | 있음 |
+
+⇒ ⒜ 에서 상실 **0/12**(§6-P1 이 적은 그대로) · ⒝(`bee850f`) 에서 상실 **12/12** ·
+`fe5d116` 핀에서 상실 **약 10.5/12**.
+
+★★**「그중 코퍼스 통과에 영향이 있는 것이 몇 건인가」 — 답은 「모른다」이고, «왜 모르는지»가 §8-1 이다.**
+이 12축은 전부 **게임 바이트코드가 그 Java 메서드를 부를 때** 발화한다. 우리 Rust 는 그 메서드들을
+직접 호출하지 않으므로 ★**이 저장소 안의 어떤 정적 자로도 순위를 매길 수 없다**(호출자는 게임이다).
+⇒ 코퍼스 없이는 «종류»만 알고 «빈도»를 모른다. **종류는 전부 crash 급이다**(미등록 클래스 →
+`ClassNotFoundException` · 미구현 메서드 → 미해결 · null → panic).
+
+### 8-4. ★★§6-P1 의 「미측정 1건」에 답한다 — **「하드닝은 있고 API 파열은 없는 중간 rev」는 «존재하지 않는다»**
+
+§6-P1 은 「그 rev 를 찾으면 ⒝ 의 대가가 0 에 가까워진다」고 적고 재지 않았다. 이 회차가 **쟀다**.
+
+**⑴ 알려진 파열 3종의 도입 지점**(`bee850f..ba5797b` 47커밋을 rev 단위로 훑어 `jvm/src/jvm.rs` 의
+시그니처가 «바뀌는 커밋»만 뽑았다):
+
+| 파열 | 도입 rev | 위치 | wie 호출부 |
+|---|---|---|---|
+| ⑶ `attach_thread` arity+async | `f9a315e` (#175) | ★**+17** | 3곳 |
+| ⑵ `current_class_loader` 비공개화 | `7dc1b90` | ★**+34** | 6곳(공개 대체 없음) |
+| ⑴ `invoke_virtual` `class_name` 인자 | `ba5797b` (#201) | ★**+47 = 마지막 커밋** | 209곳 |
+
+⇒ 여기까지만 보면 **+16 까지가 「API 안전 천장」**으로 보인다. ★**그래서 실제로 컴파일해 봤다.**
+
+**⑵ ★그리고 «네 번째» 파열이 나왔다 — 컴파일이 아니면 안 보였다.**
+격리 워크트리에서 base 5줄을 `rev = "fe5d116"`(+16)로 핀하고 `[patch]` 를 지운 뒤
+`cargo check --workspace --all-targets` → ★**rc=101**:
+
+```
+error[E0046]: not all trait items implemented, missing: `interface_names`, `prepare`
+  --> wie_ktf/src/runtime/java/jvm_support/class_definition.rs:270   (impl ClassDefinition for JavaClassDefinition)
+  --> wie_lgt/src/runtime/java/native_jvm.rs:440                     (impl ClassDefinition for LgtClassDefinition)
+```
+
+트리 프로브로 도입 지점을 좁혔다: `ClassDefinition::interface_names` = ★**`ebd9c03` (+1)** ·
+`ClassDefinition::prepare` = ★**`07fc404` (+2)**.
+⇒ ★★**API 안전 천장은 `bee850f` «자신»이다. upstream 은 우리 fork 시점 «바로 다음 커밋»에서
+`ClassDefinition` 트레이트를 넓혔고, 그 뒤로 API 파열 없는 rev 는 하나도 없다.**
+★**§6-P1 의 가설은 반증됐다 — ⒝ 의 대가는 0 에 가까워지지 않는다.**
+
+**⑶ ★그 대신 «비용 계단»이 드러났다 — 이것이 이 회차의 실질 산출이다.**
+
+| 핀 | 누적 API 파열 | 호출부 | 얻는 upstream 커밋 |
+|---|---|---:|---|
+| `bee850f` (+0) | 없음 | **0** | 0 |
+| `ebd9c03`(+1) ~ `fe5d116`(+16) | `ClassDefinition::{interface_names, prepare}` | ★**2 impl**(측정) | **16**(수정 5 · 기능 5 · 잡무 6) |
+| `f9a315e`(+17) ~ `5b84dd1`(+33) | + `attach_thread` | +3 | 33 |
+| `7dc1b90`(+34) ~ `95ebc5c`(+46) | + `current_class_loader` **설계 필요** | +6 | 46 |
+| `ba5797b`(+47) | + `invoke_virtual` | ★**+209** | 47 |
+
+★**계단의 «측정된» 칸은 +16 하나다**(`cargo check`). +17·+34·+47 의 도입 지점은 측정이고,
+**호출부 수 3/6/209 는 §4-B 의 grep 값**이다. ★그리고 **+38 이후 칸에는 lockfile 축의 추가 대가가 있다**(§8-7-3).
+
+⇒ ★★**§4-B 의 「218곳」은 **220곳**으로 정정된다**(=209+6+3+**2**). 그 문서가 스스로 「전수가 아니다 ·
+하한이다」라고 적은 그대로였고, 이 회차가 하한을 **한 칸 올렸다**(그리고 여전히 하한이다 — §8-6).
+⇒ ★**그리고 209 는 «마지막 한 커밋»에 몰려 있다.** P1 은 「218 아니면 0」의 동전던지기가 아니라
+★**2 → 5 → 11 → 220 의 계단**이고, **앞 세 칸을 따로 착지시킬 수 있다.**
+
+**⑷ ★부수 실측 — 우리 fork 는 «한국어 인코딩 panic 수정»을 놓치고 있다.**
+`8ac70cb`(**+5** · #162 「Fix `DataInputStream.readUTF()` panic on non-UTF-8 (EUC-KR) input」)은
+`RustString::from_utf8(buf)` 의 `.unwrap()` 을 EUC-KR 폴백으로 바꾼다.
+★**우리 fork `c66f08d` 의 같은 파일 203줄은 여전히 `.unwrap()` 이다**(실측 인용).
+⇒ ★**「우리 fork 가 더 하드닝돼 있다」는 방향은 이 축에서 반대다** — 그리고 대상이 EUC-KR 이라
+한국 피처폰 게임 경로에 정확히 얹힌다. 이 수정은 ★**+5 라 API 파열 «앞»에 있다.**
+
+### 8-5. ★부수 실측 — upstream 은 이제 RustJava 를 «git 이 아니라 crates.io» 로 쓴다
+
+`upstream/main` 의 `Cargo.toml`·`Cargo.lock` 실측: `jvm 0.1.1` · `jvm-bytecode 0.1.1` ·
+`jvm-class-proto 0.1.1` · `jvm-types 0.1.1` · `rustjava-runtime 0.1.1` — 전부
+`source = "registry+https://github.com/rust-lang/crates.io-index"`. `[patch]` 표 **없음**.
+⇒ ★**⒜ 의 목적지(`dlunch/RustJava` git HEAD)는 «upstream 이 실제로 쓰는 것»이 아니다.**
+정합하려면 크레이트 **개명**까지 따라가야 한다(`java_class_proto`→`jvm-class-proto` ·
+`java_runtime`→`rustjava-runtime` · `java_constants`/`jvm_rust` 는 소멸/분할).
+★**이 몫도 §4-B 의 220 에 세어져 있지 않다.**
+
+### 8-6. ★P1 갈래 권고 (한 줄) — ★**「집행하지 않는다」**
+
+> ★**권고: ⒝ 를 고르되 핀을 `bee850f` 가 아니라 `fe5d116`(+16)로 잡아라 — 측정된 대가는
+> `ClassDefinition` **2 impl** 이고, 그 값으로 upstream 커밋 16건(EUC-KR panic 수정 포함)을 사면서
+> `Jun025/RustJava` 의존은 똑같이 소멸한다.**
+
+- **근거의 성격**: ★**API 축은 «측정»이다**(위 `cargo check` rc=101 · 시그니처 rev 훑기 · 트리 프로브).
+  ★**코퍼스 축은 «측정도 추정도 아니다 — 미측정»이다**(§8-1). ⇒ ★**흐리지 마라.**
+- ★★**총괄 결정 ②의 전제를 정정해야 한다**: 「P2 가 조용한 손실의 «크기»를 답한다」였는데,
+  ★**P2 는 이 머신에서 그 답을 낼 수 없고**(§8-1 의 사유 ⒜⒝ 는 둘 다 이 회차가 못 고친다)
+  ★**«코퍼스가 있는 머신»을 구해도 러너 이식이 먼저다.** ⇒ 결정 ②를 P2 뒤로 계속 미루면
+  **무기한 대기**가 된다. 이 권고는 「그 답을 기다리지 않고도 고를 수 있는 축」으로 갈아탄 것이다.
+- **⒜ 를 권하지 않는 이유**: 220곳(하한) + §8-5 의 crates.io 개명 + ⑵의 «공개 대체 API 없음»(설계).
+  ★**그러나 ⒜ 를 «버리는» 것이 아니다** — 위 계단의 종점이 ⒜ 이고, `fe5d116` 핀은 그 계단의 **첫 칸**이다.
+- **⒝(`bee850f`)를 권하지 않는 이유**: 대가 0 처럼 보이지만 ★**얻는 것도 0** 이고, 우리 fork 가 이미
+  놓치고 있는 EUC-KR panic 수정(+5)까지 그대로 놓친다. ★**「멈춰 있는 fork 의존」을 «멈춰 있는 rev 핀»으로
+  이름만 바꾸는 것**이라 §4 가 진단한 병이 그대로 남는다.
+
+### 8-7. ★이 회차가 «측정하지 못한» 것
+
+1. ★**코퍼스 292건** — §8-1(사유 둘). **바뀐 것 없음**, 다만 사유가 하나 늘었다.
+2. ★**`fe5d116` 핀의 «완전한» 파열 집합** — `cargo check` 는 `wie_ktf`·`wie_lgt` 에서 멈췄고
+   그 뒤 크레이트(`wie_cli`·`wie_web`)에는 **도달하지 못했다**. ⇒ ★**「2 impl」은 «측정된 하한»이다.**
+   2 impl 을 채운 뒤 다시 돌려야 상한이 나온다 — 그것은 P1 의 첫 번째 행동이지 측정이 아니다.
+3. ★**+33·+46 칸의 파열 집합** — 위 계단의 +3/+6 은 §4-B 의 **grep 값**이고 컴파일로 확인하지 않았다.
+   ★**+46(`95ebc5c`) 프로브는 «컴파일에 도달조차 못 했다» — 의존 해결에서 죽는다.** 3회 시도 전부:
+   ⒜lock 유지 → `regex-syntax` 충돌(upstream `#193` 의 `regex ^1.13.1` ↔ 우리 `tracing-subscriber 0.3.20`
+   이 잠근 `regex-syntax 0.8.10`) ⒝`Cargo.lock` 삭제 → `smaf_player` 해결 불가 ⒞`cargo update regex-syntax`
+   → 이번엔 `regex-automata` 충돌. ⇒ ★★**이것이 +38 이후 칸의 «세지 않은 대가» 한 건이다** —
+   그 칸을 밟으려면 `tracing-subscriber` 계열까지 함께 올려야 하고, 그 몫은 220 에 **없다**.
+4. **AOT-Java 렌더 벽 · 웹 계약 왕복** — §7-2·§7-3 그대로. 바뀐 것 없음.
