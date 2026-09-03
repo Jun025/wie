@@ -32,7 +32,21 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- 2026-09-04: **P1 집행 — `Jun025/RustJava` 핀 이탈(`dlunch/RustJava@5b84dd1`, +33) + 하드닝 3축 이식**
+- 2026-09-04: **미이식 하드닝 2축 처분 — «둘 다 이식»** (`wie-unported-hardening-two-axes-decide-with-a-corpus-probe`
+  · 채택 제안 `2026-09-04-upstream-realign-p1-pin-plus33#p0`) — ★**결정의 근거가 바뀌었다.**
+  상수풀 프로브(우리 아카이브 전수 · `.class` **226개**)는 게스트 호출부 **0/0** 이었으나 ★**그 표본으로는 답이 안 난다**
+  (`test_data` 3건은 우리가 만든 것 · `AromaWIPI` 는 게임이 아니라 플랫폼 라이브러리다).
+  ★★**두 번째 측정이 갈랐다** — ⒜플랫폼은 `StringBuffer.insert` **9종** · `Timer.schedule` **4종+cancel** 을 선언하는데
+  핀은 **0종 / 2종**뿐이고, ⒝★**버린 fork 의 커밋 로그에 «실제 타이틀»이 박혀 있었다**
+  (`Timer.schedule` → **소울카드마스터2** · `StringBuffer.insert` → **미니고치** · 둘 다 「trace-specified as method-not-found」).
+  ⇒ 규칙 ⒜(호출이 있으면 이식)가 **둘 다**에 걸린다. ★**§9-2 의 「등급이 낮아 미룬다」 판단을 이것이 정정한다** —
+  증거는 우리 의존성 이력 안에 «이미» 있었고 아무도 거기를 보지 않았다(§8-4⑸ 프로브와 같은 형태의 실수).
+  이식은 `hardening.rs` 의 `add()`(감싸기가 아니라 «추가» · 핀이 나중에 같은 메서드를 가지면 덮지 않고 신고) ·
+  시험 2건은 **게임 파일 0 · 시계 비의존**(Timer 는 `TimerThread` 가 읽는 두 필드로 단언). 정본 §10.
+  ★**남은 부분 표면**(`insert` 9중 1 · `Timer` 5중 3 · `cancel` 없음)은 ★**재개 조건을 «수»로** 달았다 — 누락 오버로드를 지목한 게스트 실패 **1건**.
+
+## 완료 (최근)
+- 2026-09-04: **P1 집행 (PR #71 `19955ba1`) — `Jun025/RustJava` 핀 이탈(`dlunch/RustJava@5b84dd1`, +33) + 하드닝 3축 이식**
   (`wie-upstream-realign-p1-execute-pin-plus33-and-cost-hardening-port`) — ★**총괄이 §8-6 권고를 채택했고
   이 회차가 집행했다.** `[patch]` 표 삭제 ⇒ ★**fork 의존 소멸**(`Cargo.lock` 의 `Jun025` **0건**).
   ★**API 파열은 예상 ≥7 ↔ 실제 «11개소 / 7파일»** — 예상 밖 둘은 `ClassInstance::{identity, shallow_clone}`(3 impl)과
@@ -48,8 +62,6 @@
   ★**왜 틀렸나 — 프로브는 «`pending` 이라는 fork 의 식별자»를 세지 «보호»를 세지 않는다.**
   ⇒ ★**상실은 6축이 아니라 5축이고, 갚지 못한 값은 «미이식 2축»뿐이다.** 정본 §9-2.
   정본 = `docs/upstream-realign-verdict.md` **§9**. 4게이트 green · `cargo test --all` **133 passed**.
-
-## 완료 (최근)
 - 2026-09-04: **키 입력 «도달»을 행동으로 단언 — 왕복 검사 Scenario D 신설** (PR #69 `f4569f3f`,
   `wie-featurephone-keypress-reaches-guest-behavioral-axis` · 채택 제안
   `2026-07-22--featurephone-engine-contract-selftest#p0`) — 종전에 키 축을 보던 것은 둘뿐이었다:

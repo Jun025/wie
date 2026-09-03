@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "date": "2026-09-04",
+  "task": "wie-unported-hardening-two-axes-decide-with-a-corpus-probe",
+  "title": "미이식 하드닝 2축 처분 — «둘 다 이식». 근거는 우리가 버린 fork 의 커밋 로그에 있었다",
+  "services": ["engine"],
+  "summary": "P1 회차가 미이식으로 남긴 두 축(`Timer.schedule(TimerTask,long)` · `StringBuffer.insert(int,String)`)의 처분. 총괄 결정대로 «한 덩어리»로 보지 않고 측정으로 갈랐다. ★첫 측정(우리 아카이브 전수 상수풀 프로브 · `.class` 226개)은 게스트 호출부 **0/0** 이었으나 ★**그 표본으로는 답이 나지 않는다** — `test_data` 3건은 우리가 만든 것이고 `AromaWIPI` 는 게임이 아니라 플랫폼 라이브러리다. ★★두 번째 측정이 갈랐다: ⒜플랫폼이 게스트에게 약속하는 표면은 `insert` **9종**·`Timer.schedule` **4종+cancel** 인데 핀은 **0종/2종**뿐이고, ⒝★**버린 fork 의 커밋 로그에 실제 타이틀이 박혀 있었다**(`Timer.schedule` → 소울카드마스터2 · `StringBuffer.insert` → 미니고치 · 둘 다 「trace-specified as method-not-found」). ⇒ 규칙 ⒜(호출이 있으면 이식)가 둘 다에 걸려 **둘 다 이식**했다. 핀 무접촉 · 이식한 3축 무접촉.",
+  "changes": [
+    "`wie_jvm_support/src/hardening.rs` — `add()` 헬퍼(핀이 나중에 같은 메서드를 가지면 **덮지 않고** `tracing::error!`) + `timer_schedule_once` + `string_buffer_insert_string` + `harden()` 에 두 축 등재. 모듈 문서에 «남은 부분 표면(1/9 · 3/5)»과 «재개 조건(수)» 명시.",
+    "신규 `wie_jvm_support/tests/absent_methods.rs` — 시험 2건. ★유닛이 아니라 통합 시험인 이유를 헤더에 적었다: `test_utils` 가 «라이브러리» 빌드를 링크하므로 `#[cfg(test)]` 안에서 만든 proto 는 `WieJvmContext` 타입이 달라 unify 되지 않는다.",
+    "`docs/upstream-realign-verdict.md` **§10 추가**(순수 추가 · §1~§9 무접촉) · `STATE.md`(이 회차 등재 + 착지한 P1 회차를 `## 완료` 로 이관) · `REPORT.md` · 이 워크로그.",
+    "★`Cargo.toml`·`Cargo.lock` **무변경**(핀 무접촉) · 이식한 3축(null 가드) **무접촉** · `wie_jvm_support/Cargo.toml` 은 dev-dep 자기참조 1줄만."
+  ],
+  "verification": {
+    "probe-1-constant-pool": "저장소가 가진 게스트 아카이브 **전수**를 `.class` 상수풀의 `Methodref`/`InterfaceMethodref` 로 훑었다(★문자열 grep 이 아니라 상수풀 파싱 · 게스트 실행 0 · 중첩 jar 재귀). 대상 = `test_data/draw_j2me.jar`·`test_data/helloworld_ktf.zip`·`test_data/helloworld_lgt.zip`·`docs/reference/AromaWIPI_classes.zip` ⇒ **표본 `.class` 226개**. 결과: `java/util/Timer.schedule(Ljava/util/TimerTask;J)V` **정확 일치 0건** · `java/lang/StringBuffer.insert(ILjava/lang/String;)…` **1건**인데 그 1건은 `AromaWIPI` 라이브러리 **자신의 `StringBuffer.class`**(다른 오버로드가 이것에 위임) ⇒ **게스트 호출부 0/0**.",
+    "probe-1-limit": "★**그 표본으로는 질문에 답할 수 없다** — 226개 중 `test_data` 3건은 **우리가 직접 만든** hello-world/draw 이고 `AromaWIPI` 는 **게임이 아니라 플랫폼 라이브러리**다. ⇒ 「게임이 이 메서드를 부르는가」의 표본은 **사실상 0**. 규칙 ⒝(둘 다 0 ⇒ 미이식)를 여기서 적용했다면 그것은 측정이 아니라 **표본 부재**를 근거로 삼는 것이었다.",
+    "probe-2-platform-surface": "`AromaWIPI_classes.zip` 의 **선언 메서드**를 파싱했다(게스트가 컴파일 대상으로 삼는 플랫폼 표면). `java/lang/StringBuffer.insert` **9개 오버로드**(`(I,Object)`·`(I,String)`·`(I,[C)`·`(I,Z)`·`(I,C)`·`(I,I)`·`(I,J)`·`(I,F)`·`(I,D)`) ↔ 핀 **0개**. `java/util/Timer` = `schedule(TT,J)`·`schedule(TT,Date)`·`schedule(TT,JJ)`·`schedule(TT,Date,J)`·`scheduleAtFixedRate(TT,JJ)`·`scheduleAtFixedRate(TT,Date,J)`·**`cancel()`** ↔ 핀은 `schedule(TT,JJ)`·`scheduleAtFixedRate(TT,JJ)` **뿐**.",
+    "probe-2-named-titles": "★★**결정적 증거는 버린 fork 의 커밋 메시지에 있었다**: `3cb4d7d` 「Trace-specified as method-not-found on **소울카드마스터2**」(Timer.schedule 1회성) · `9cfc346` 「… on **미니고치**」(StringBuffer.insert). ⇒ 둘 다 **실제 타이틀에서 관측된 호출**이고, 코퍼스가 없는 이 머신에서 어떤 프로브를 돌려도 그것을 대체하지 못한다. ⇒ 규칙 ⒜ 가 **둘 다**에 걸린다.",
+    "corrects-9-2": "★이것이 §9-2 의 판단을 정정한다 — P1 회차는 두 축을 「실패 등급이 낮다(메서드 부재는 시끄럽다)」로 미뤘고 검수는 「게스트가 부르는지는 코퍼스가 없어 못 쟀다」로 남겼는데, **그 증거는 우리 의존성의 이력 안에 이미 있었다**. §8-4⑸ 프로브가 「식별자를 센다」였던 것과 **같은 형태의 실수**다(이 티켓 Contract 5 가 경고한 그 축).",
+    "port-shape": "`Timer.schedule(TT,J)` → 핀의 `(TT,J,J)` 에 **period 0** 으로 위임(`TimerThread` 는 `period > 0` 일 때만 반복 · `timer_thread.rs:68`). ★**대체 수단이 없다** — 아무 period 나 주면 1회성 태스크가 영원히 반복된다. `StringBuffer.insert(I,String)` → fork 구현을 **그대로 이식**(재유도 0): null String 은 문자 네 개 `\"null\"`, 범위 밖 offset 은 `IndexOutOfBoundsException`(사양의 `StringIndexOutOfBoundsException` 은 이 런타임에 없는 클래스라 등록된 상위형). 용량 증가는 핀의 private `ensure_capacity` 와 **같은 정책**(초과 시 2배)을 재진술했다 — 호출할 수 없어서다.",
+    "tests-and-mutation": "`wie_jvm_support/tests/absent_methods.rs` 2건 — `string_buffer_insert`(삽입 결과 문자열 · null → `\"null\"` · 범위 밖 → `IndexOutOfBoundsException`) · `timer_schedule_one_shot`. ★**둘 다 `run_jvm_test` = 게임 파일 0** · ★**Timer 는 시계를 기다리지 않는다** — `TimerThread` 가 읽는 `period`(0 이어야 한다)와 `nextExecutionTime`(now + delay)으로 단언한다 ⇒ 직전 회차가 「시계 의존이라 ⒦ △」로 남긴 한계를 **닫았다**. ★**개악 대조**: `add()` 를 `return false` 로 무력화 → 행동 시험 **2/2 FAILED** + `every_guard_is_actually_applied` FAILED(`java/lang/StringBuffer: hardening not applied`). 원복 후 전건 ok.",
+    "gates": "`cargo fmt --all -- --check` rc=0 · `cargo clippy --all -- -D warnings` rc=0 · `cargo clippy --target wasm32-unknown-unknown -- -D warnings` rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` rc=0 — **137 passed / 0 failed**(직전 135 + 이 회차 2). ★**그리고 `AGENTS.md` §DoD 가 새로 요구하는 repo 러너**: `wie_validate` 3픽스처 **전건 PASS**(`draw_j2me.jar` booted + rendered · ktf·lgt clean exit)."
+  },
+  "limits": [
+    "★**닫은 것은 `insert` 9중 1 · `Timer` 5중 3 이다.** 나머지는 **일부러** 두었다 — 이름 붙은 타이틀 없이 사양만 보고 넣으면 «어느 것을 게임이 부르는지»를 추측하는 일이 된다. ★**재개 조건을 «수»로 달았다: 누락 오버로드를 지목한 게스트 실패 «1건» 관측**(`wie_validate` 가 디스크립터가 든 해석 오류로 보고하므로 트레이스 한 건이면 다음 대상이 정해진다).",
+    "★**부수 발견 — `Timer.cancel()` 도 핀에 없다**(플랫폼은 선언한다). 이 회차 범위(2축) 밖이라 손대지 않았고, 같은 재개 조건이 적용된다.",
+    "★**첫 프로브의 「0/0」은 «안전»이 아니다** — 표본이 우리가 만든 픽스처 3건 + 플랫폼 라이브러리뿐이라 게임 호출부에 대해 아무것도 말하지 않는다. 이 수를 「게임이 안 쓴다」로 인용하지 마라.",
+    "★**`StringBuffer.insert` 의 용량 증가 정책을 «재진술»했다** — 핀의 `ensure_capacity` 는 private 이라 호출할 수 없다. 핀이 그 정책을 바꾸면 우리 쪽이 조용히 갈린다(동작은 맞고 재할당 횟수만 달라진다).",
+    "★**코퍼스 축(P2)은 여전히 이 머신에서 불가**다 — 이 회차의 이식이 «그 타이틀에서 실제로 통과하는가»는 미측정이고, 증거는 fork 시절의 트레이스 관측뿐이다."
+  ],
+  "issues": [],
+  "proposals": [
+    {
+      "title": "«버린 fork 의 커밋 로그»를 한 번 통독해 남은 근거를 회수한다 — 이번에 두 건이 거기서 나왔다",
+      "plainSummary": "예전에 쓰던 포크의 커밋 기록에 '어느 게임에서 무엇이 없어서 멈췄다'가 이름과 함께 적혀 있었습니다. 이번 결정의 근거가 바로 거기서 나왔는데, 아직 통독해 본 적이 없습니다.",
+      "userBenefit": "게임이 실제로 멈췄던 지점들을 추측이 아니라 기록으로 골라 고칠 수 있다 — 코퍼스가 없어도.",
+      "why": "이 회차의 결정적 증거는 `Jun025/RustJava` 의 커밋 메시지 두 줄(「Trace-specified as method-not-found on 소울카드마스터2 / 미니고치」)이었다. 그 fork 는 이 estate 가 코퍼스를 갖고 있던 시기에 만들어졌고, 그 12커밋 외에도 브랜치·이력에 같은 형태의 «타이틀 이름이 붙은 관측»이 더 있을 수 있다. ★코퍼스가 사라진 지금 그것은 **재현 불가능한 유일한 1차 자료**다.",
+      "tradeoff": "통독은 값이 나올지 미리 알 수 없는 조사이고(12커밋은 이미 다 읽었으니 남은 것은 브랜치·PR·이슈), 나오는 것이 0건일 수 있다. 반대로 미루면 그 저장소가 정리되거나 접근이 끊길 때 함께 사라진다 — 이미 `[patch]` 에서 떼어냈으므로 «쓰이지 않는 저장소»가 됐다.",
+      "effort": "S — `git log --all` + PR/이슈 훑기 · 산출물은 「타이틀 이름이 붙은 관측」 목록 1장.",
+      "target": "docs/upstream-realign-verdict.md · Jun025/RustJava (읽기 전용)"
+    }
+  ],
+  "adoptedProposals": ["2026-09-04-upstream-realign-p1-pin-plus33#p0"],
+  "declinedProposals": []
+}

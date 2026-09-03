@@ -1,5 +1,16 @@
 # REPORT
 
+## [2026-09-04] 미이식 하드닝 2축 처분 — «둘 다 이식» · 근거는 버린 fork 의 커밋 로그에 있었다 (wie-unported-hardening-two-axes-decide-with-a-corpus-probe)
+- **무엇을**: `wie_jvm_support/src/hardening.rs`(`add()` 헬퍼 + `Timer.schedule(TimerTask,long)` + `StringBuffer.insert(int,String)` · 모듈 문서에 «남은 부분 표면 + 재개 조건») · 신규 `wie_jvm_support/tests/absent_methods.rs`(시험 2건) · `docs/upstream-realign-verdict.md` **§10 추가** · `STATE.md`·`REPORT.md`·워크로그. ★**핀 무접촉**(`Cargo.toml`·`Cargo.lock` 변경 0) · 이식한 3축 무접촉.
+- **왜**: 운영자 채택 제안 `2026-09-04-upstream-realign-p1-pin-plus33#p0`(「2축을 «닫을지 말지» 결정하라」) + 총괄 결정(「둘을 한 덩어리로 보지 않고 한 번의 값싼 측정으로 가른다」).
+- **★⑴ 첫 측정은 «답을 못 냈다» — 그 사실부터 적는다**: 저장소가 가진 게스트 아카이브 전수를 `.class` **상수풀 파싱**으로 훑었다(문자열 grep 아님 · 실행 0 · 표본 **226개**). `Timer.schedule(TT,J)` **0건** · `StringBuffer.insert(I,String)` **1건인데 그것은 `AromaWIPI` 라이브러리 «자신»의 클래스**(다른 오버로드가 위임한다) ⇒ 게스트 호출부 **0/0**. ★**그러나 `test_data` 3건은 우리가 만든 hello-world/draw 이고 `AromaWIPI` 는 게임이 아니라 플랫폼 라이브러리다** ⇒ 「게임이 부르는가」의 표본이 **사실상 0**. ★규칙 ⒝(둘 다 0 ⇒ 미이식)를 여기서 적용했다면 **측정이 아니라 «표본 부재»를 근거로 삼는 것**이었다.
+- **★★⑵ 두 번째 측정이 갈랐다 — «보호»를 세라**: ⒜플랫폼(`AromaWIPI_classes.zip`)이 게스트에게 약속하는 표면을 선언 메서드 파싱으로 셌다 — `StringBuffer.insert` **9종**(핀은 **0종**) · `Timer` 는 `schedule` **4종 + `cancel`**(핀은 **2종**). ⒝★★**그리고 «누가 실제로 불렀는지»가 버린 fork 의 커밋 메시지에 남아 있었다**: `3cb4d7d` 「Trace-specified as method-not-found on **소울카드마스터2**」 · `9cfc346` 「… on **미니고치**」. ⇒ ★**코퍼스가 있던 시절의 관측이고 여기서 어떤 프로브를 돌려도 대체하지 못한다** ⇒ 규칙 ⒜(호출이 있으면 이식)가 **둘 다**에 걸린다.
+- **★⑶ 이것이 §9-2 의 판단을 정정한다**: P1 회차는 두 축을 「실패 등급이 낮다」로 미뤘고 검수는 「게스트가 부르는지는 코퍼스가 없어 못 쟀다」로 남겼는데, ★**그 증거는 우리 의존성 이력 안에 «이미» 있었다. 아무도 거기를 보지 않았다** — §8-4⑸ 프로브가 「식별자를 센다」였던 것과 **같은 형태의 실수**다.
+- **★⑷ 이식 형태**: `Timer.schedule(TT,J)` 는 핀의 `(TT,J,J)` 에 **period 0** 으로 위임한다(`TimerThread` 는 `period > 0` 일 때만 반복한다) — ★대체 수단이 없다(아무 period 나 주면 1회성이 영원히 반복된다). `StringBuffer.insert` 는 fork 구현을 **그대로 이식**(null String → 문자 네 개 `"null"` · 범위 밖 offset → `IndexOutOfBoundsException`). ★**둘 다 «감싸기»가 아니라 «추가»**이고, `add()` 는 핀이 나중에 같은 메서드를 가지면 **덮지 않고 `tracing::error!` 로 신고**한다.
+- **★⑸ 잠금**: 시험 2건 **전부 게임 파일 0** · ★**Timer 는 시계를 기다리지 않는다**(`TimerThread` 가 읽는 `period`·`nextExecutionTime` 두 필드로 단언) ⇒ 직전 회차가 「시계 의존이라 △」로 남긴 한계를 **닫았다**. ★**개악 대조**: `add()` 를 `return false` 로 무력화하면 행동 시험 **2/2 red** + 계수 시험 red.
+- **사용자 영향**: 그 두 메서드를 부르는 게임(소울카드마스터2·미니고치 계열)이 그 지점에서 해석 오류로 멈추지 않는다. 엔진 의존·핀·배포 산출물 무변경.
+- **★남는 구멍**: 이 회차가 닫은 것은 ★**`insert` 9중 1 · `Timer` 5중 3**이다. 나머지는 **일부러** 두었다(이름 붙은 타이틀 없이 사양만 보고 넣으면 추측이다). ★**재개 조건을 «수»로 달았다 — 누락 오버로드를 지목한 게스트 실패 «1건» 관측**(`wie_validate` 가 디스크립터가 든 해석 오류로 보고한다). 부수 발견: ★`Timer.cancel()` 도 핀에 없다(플랫폼은 선언한다) — 범위 밖이라 손대지 않았고 같은 재개 조건이 적용된다.
+
 ## [2026-09-04] P1 집행 — `Jun025/RustJava` fork 이탈(핀 `dlunch/RustJava@5b84dd1`) + 하드닝 3축 wie 로 이식 (wie-upstream-realign-p1-execute-pin-plus33-and-cost-hardening-port)
 - **무엇을**: `Cargo.toml`(`[patch]` 표 **삭제** + base 5줄에 `rev` 핀 · 왜/한계 주석)·`Cargo.lock` · 호출부 **11개소 / 7파일** 수정 · **신규 `wie_jvm_support/src/hardening.rs`**(본문 103 · 시험 99) + 배선 19줄 · 정본 `docs/upstream-realign-verdict.md` **§9 추가** · `STATE.md`·`REPORT.md`·워크로그.
 - **왜**: 총괄 결정(2026-09-04)이 §8-6 권고를 **채택**했다 — 갈래 ⒝ · 핀 **`5b84dd1`(+33)**. 근거 셋: ⑴+16 이 「산다」던 16건은 이미 fork main 안에 있었다 ⑵칸 F 는 +33 과 대가가 같은데 fork 의존을 유지한다 ⑶P2 가 이 머신에서 영구 불가라 계속 미루면 무기한 대기다.
