@@ -87,6 +87,27 @@ then `:125`). The rest need a toolchain fetch — run them only when the artifac
   `docs/worklog/YYYY-MM-DD-<slug>.json` in the same PR. The cockpit 「후속 작업 추천」 panel reads
   `.json` in that directory and nothing else — a proposal left only in prose (`REPORT.md`, the done
   reply, a `.md` worklog) never reaches the screen. Schema below.
+- **That rule stays *conditional* — and the decision to keep it conditional expires.** 2026-09-01
+  declined to make a worklog a per-round mandate, on one number: every round since the convention
+  had written one. A number with no re-measure date quietly becomes a permanent rule, so:
+
+  > **Re-measure every 10 landed rounds since `92c25276`, over the most recent 10. Below 70%,
+  > re-open the mandate decision.** A landed round is one squash commit on `main`.
+
+  ```sh
+  OLD=$(git log --format=%h -n 10 92c25276..origin/main | tail -1)   # window = last 10 rounds
+  git rev-list --count "$OLD^..origin/main"                          # denominator
+  git rev-list --count "$OLD^..origin/main" -- docs/worklog          # numerator
+  ```
+
+  **Never let the window reach past `92c25276`** — the 19 rounds before it are 0/19 by
+  construction and would trip the rule on history. Baseline 2026-09-04: **4/4 = 100%**; only 4
+  rounds exist since the convention, so the first re-measure is due at round 10.
+  *Why 10*: the original denominator was **3**, where one round moves the number 33pp and no
+  threshold separates a habit from a coincidence; 10 rounds is ≈20 days at the measured cadence
+  (15 landed rounds in the 30 days to 2026-09-04). *Why 70 and not higher*: the count above is
+  mechanical but the obligation is conditional — a round that left no follow-ups owes no worklog
+  and still counts as a miss, so a tighter line fires on rounds that obeyed.
 
 #### Worklog `.json` schema (2026-08-26)
 
