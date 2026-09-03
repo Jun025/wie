@@ -17,8 +17,12 @@
 //! - `StringBuffer.insert(I,String)` and `Timer.schedule(TimerTask,long)` are *absent
 //!   methods*, not missing guards. Their failure mode is a Java-level resolution error,
 //!   which is loud and catchable — a different severity class from a host panic.
-//! - Pending-thread GC roots live inside the `jvm` crate's collector. There is no seam
-//!   for wie to reach them, so that axis cannot be restored without a fork.
+//! - Pending-thread GC roots need no port at all. The 13-row probe that produced the "six
+//!   axes" list greps for `pending` — the *fork's identifier* — not for the protection, and
+//!   the pin closes the same window under another name: `Thread.start` holds a
+//!   `GlobalRef<Thread>` for the whole spawn callback and the collector walks
+//!   `global_references` as roots. (Corrected 2026-09-04; the first version of this comment
+//!   called it "impossible without a fork", which reported a risk that does not exist.)
 
 use alloc::boxed::Box;
 

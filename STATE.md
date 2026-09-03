@@ -41,7 +41,12 @@
   ★**하드닝 6축 전부 사라졌고 3축을 wie 안으로 이식**했다 — `wie_jvm_support/src/hardening.rs`(본문 103·시험 99·배선 19).
   ★**fork 없이 됐다**: `find_rustjar_class` 가 프로토를 JVM 에 넘기기 «전»에 wie 가 본문을 감쌀 수 있다.
   ★**기준은 줄 수가 아니라 «실패의 등급»** — 이식분은 null 이면 호스트가 패닉(개악 대조로 재현), 미이식 2축은
-  메서드 부재라 Java 레벨에서 잡힌다. ★축 5(pending GC 루트)는 `jvm` 크레이트 내부라 **fork 없이 불가**.
+  메서드 부재라 Java 레벨에서 잡힌다.
+  ★★**[2026-09-04 정정 · 게이트② 반려] 종전의 「축 5(pending GC 루트)는 fork 없이 불가·영구 미복구」는 «거짓»이다** —
+  새 핀이 **같은 창을 다른 설계로 이미 닫아 놓았다**(`GlobalRef<Thread>` 를 `ThreadStartProxy` 가 들고,
+  `determine_garbage` 가 `global_references` 를 루트로 돌고, `Drop` 이 콜백 종료 시 해제한다).
+  ★**왜 틀렸나 — 프로브는 «`pending` 이라는 fork 의 식별자»를 세지 «보호»를 세지 않는다.**
+  ⇒ ★**상실은 6축이 아니라 5축이고, 갚지 못한 값은 «미이식 2축»뿐이다.** 정본 §9-2.
   정본 = `docs/upstream-realign-verdict.md` **§9**. 4게이트 green · `cargo test --all` **133 passed**.
 
 ## 완료 (최근)

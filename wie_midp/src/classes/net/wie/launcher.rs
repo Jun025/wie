@@ -2,8 +2,8 @@ use alloc::{boxed::Box, vec};
 
 use java_class_proto::{JavaMethodProto, MethodBody};
 use java_constants::MethodAccessFlags;
-use java_runtime::classes::java::lang::String;
-use jvm::{ClassInstanceRef, JavaError, JavaValue, Jvm, Result as JvmResult, runtime::JavaLangString};
+use java_runtime::classes::java::lang::{Class, ClassLoader, String};
+use jvm::{ClassInstanceRef, JavaError, JavaValue, Jvm, Result as JvmResult};
 
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
@@ -35,9 +35,26 @@ impl Launcher {
     async fn start(jvm: &Jvm, _context: &mut WieJvmContext, main_class: ClassInstanceRef<String>) -> JvmResult<()> {
         tracing::debug!("net.wie.Launcher::start({main_class:?})");
 
-        // create main class
-        let main_class = JavaLangString::to_rust_string(jvm, &main_class).await?;
-        let main_class = jvm.new_class(&main_class, "()V", ()).await?;
+        // Load the MIDlet through the SYSTEM class loader, not through an ambient
+        // `jvm.new_class`.
+        //
+        // `net/wie/Launcher` is itself defined by `RustJarClassLoader` (net.wie.rustjar is
+        // a `.rustjar` class-path entry). `jvm.new_class` resolves against the *calling*
+        // class's loader, and that loader's parent is null while `findClass` skips every
+        // entry that does not end in `.rustjar` — so from here the guest jar is
+        // unreachable and any MIDlet name comes back `NoClassDefFoundError`. The system
+        // loader is the `URLClassLoader` that owns the jar (its parent is the rustjar
+        // loader, so runtime classes still resolve), which is also where the JLS says an
+        // application class belongs.
+        let class_loader: ClassInstanceRef<ClassLoader> = jvm
+            .invoke_static("java/lang/ClassLoader", "getSystemClassLoader", "()Ljava/lang/ClassLoader;", ())
+            .await?;
+
+        let main_class: ClassInstanceRef<Class> = jvm
+            .invoke_virtual(&class_loader, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;", (main_class,))
+            .await?;
+
+        let main_class: ClassInstanceRef<MIDlet> = jvm.invoke_virtual(&main_class, "newInstance", "()Ljava/lang/Object;", ()).await?;
 
         jvm.invoke_static("net/wie/Launcher", "startMIDlet", "(Ljavax/microedition/midlet/MIDlet;)V", (main_class,))
             .await

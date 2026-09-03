@@ -60,6 +60,20 @@ interpreter recursion overflows the default test-thread stack without it.
 **All four run before every commit, whatever you changed** — a docs- or `web/`-only diff is not an
 exemption. The web-surface commands below are *additional* to these, never an alternative.
 
+**Touching engine code? The four gates are not enough — run the repo's own runner.**
+
+```sh
+node scripts/make-draw-fixture.mjs                                    # builds the J2ME fixture
+for f in test_data/draw_j2me.jar test_data/helloworld_ktf.zip test_data/helloworld_lgt.zip; do
+  cargo run -q -p wie_cli --bin wie_validate -- "$f"                  # each must report "result":"PASS"
+done
+```
+
+`cargo test --all` boots KTF and LGT but **nothing in it boots a J2ME guest**. 2026-09-04 shipped a
+RustJava pin bump whose four gates were all green while `draw_j2me.jar` failed with
+`NoClassDefFoundError` on the first tick — one `wie_validate` line reproduced it locally, and the
+round had not run it. Every fixture here is committed; no game files are involved.
+
 Narrower commands are conveniences, not gates: `cargo build` (default member `wie_cli`),
 `cargo test -p <crate> <test_name>`, `cargo fmt` to fix formatting (`rustfmt.toml`: max_width=150).
 
