@@ -21,4 +21,3 @@ wie_util = { workspace = true }
 [dev-dependencies]
 futures-test = { workspace = true }
 test_utils = { workspace = true }
-wie_jvm_support = { workspace = true }
