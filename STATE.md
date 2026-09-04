@@ -32,7 +32,16 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- (없음 — 열린 PR 0건)
+- 2026-09-04: **남은 17종 키 사각 처분 — «닫았다»** (`wie-featurephone-keypress-remaining-17-keys-close-or-declare`
+  · 채택 제안 `2026-09-04-featurephone-keypress-reaches-guest#p1`) — ★**「17개의 구멍」이 아니었다.**
+  전달 경로를 홉으로 갈라 재니 ⒜**키 무관** 부분(이벤트 큐 → `Canvas::handleKeyEvent` → `keyPressed`)은
+  ★**키로 분기하는 `match` 가 0건**이라 Scenario D 의 3증인으로 **이미 전건 닫혀 있었고**,
+  ⒝**키별** 부분은 ★**표가 «둘»**인데(`parse_key` · `MIDPKeyCode::from_key_code`) 소스 핀이 **첫 표만** 지켰다.
+  ⇒ ★**실제로 열린 것은 «둘째 표의 17행»**이고 그 결함은 「7을 눌렀는데 8이 입력된다」로 나온다(JS 표면 불가시).
+  ⇒ Scenario D 를 넓히지 않고(그건 ⒜를 17번 더 증명하는 일이다) **계약 파일 + 정적 핀 §4b** 로 닫았다 —
+  정적 **48 → 68 pass** · 왕복 **29/29 유지** · 개악 2종(팔 스왑 · 판별식 변경) 모두 red.
+  ★**재개 조건**: 전달 경로에 «키로 분기하는 곳»이 1군데라도 생기면 다시 연다(현재 0).
+  ★**남는 구멍**: KTF/WIPI 의 **셋째 표** `WIPIKeyCode::from_midp_raw` 20행 미핀 — Non-goal 이라 제안으로 올렸다.
 
 ## 완료 (최근)
 - 2026-09-04: **미이식 하드닝 2축 처분 — «둘 다 이식»** (PR #72 착지 · `wie-unported-hardening-two-axes-decide-with-a-corpus-probe`

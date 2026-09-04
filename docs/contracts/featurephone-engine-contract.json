@@ -33,6 +33,14 @@
     "NUM0", "NUM1", "NUM2", "NUM3", "NUM4", "NUM5", "NUM6", "NUM7", "NUM8", "NUM9",
     "STAR", "HASH"
   ],
+  "keyMidpCodesNote": "keyVocabulary 의 각 이름이 «게스트에게 도달하는 정수». 셸은 이름만 보내지만 게스트는 이 수를 받으므로, 이 표가 틀리면 5 를 눌러 8 이 입력된다 — 셸에서는 보이지 않는다. 정본은 wie_midp MIDPKeyCode 이고 이 파일이 그것을 핀한다(check-engine-contract.mjs §4). 방향키는 MIDP Canvas 이름 대역(141..148) · 숫자·기호는 ASCII.",
+  "keyMidpCodes": {
+    "UP": 141, "DOWN": 146, "LEFT": 142, "RIGHT": 145, "OK": 148,
+    "LEFT_SOFT_KEY": 6, "RIGHT_SOFT_KEY": 7, "CLEAR": 8,
+    "NUM0": 48, "NUM1": 49, "NUM2": 50, "NUM3": 51, "NUM4": 52,
+    "NUM5": 53, "NUM6": 54, "NUM7": 55, "NUM8": 56, "NUM9": 57,
+    "STAR": 42, "HASH": 35
+  },
   "saveMagic": "WIESAV01",
   "screen": { "width": 240, "height": 320 },
   "lgtCompileModels": ["clet", "aot-java"],
