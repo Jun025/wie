@@ -32,9 +32,22 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- (없음 — 이 회차 PR 착지 · 형제 #80 은 별 리니지)
+- **DoD 에 beta 축 한 줄** (PR **#81** 열림 · `wie-dod-four-gates-add-beta-axis` · 별 리니지)
+  — `AGENTS.md` §Definition of Done 에 `cargo +beta clippy --all -- -D warnings` 블록 1개.
+  ★이 착지(#80)로 그쪽이 **원장 2파일 충돌**이 될 것이다(코드 0) — 그쪽 게이트③이 2-c⒜ 로 해소한다.
 
 ## 완료 (최근)
+- 2026-09-05: **`current_class_loader` 대체 API 설계(`+34` 벽)** (PR **#80** 착지 · `wie-current-class-loader-replacement-api-design-for-plus34`
+  · 채택 제안 `2026-09-04-upstream-realign-p1-pin-plus33#p1`) — ★**결론: 벽이 아니었다.**
+  ⒜파열은 계단표의 `+46` 이 아니라 ★**`+34`(`7dc1b90`)에서 시작**한다(그 커밋은 `pub` 한 줄만 내렸다)
+  ⒝호출부 **6곳이 전부 같은 두 줄** — 클래스 «로딩»에 쓰는 자리 **0곳**
+  ⒞★**공개 대체가 있다** — `get_system_class_loader` 가 **핀·HEAD 둘 다 `pub`** 이고 ★`current_class_loader`
+    자신이 떨어지는 **폴백**이다(우회가 아니다) ⒟★**핀에서도 공개라 «bump 전»에 이행 가능** ⇒ 그 칸 **6 → 0**.
+  ★프로브로 확인(6곳 스왑 → `cargo test --all` **139/0** · `wie_validate` 5픽스처 PASS → **원복** · 코드 델타 0).
+  ★남는 구멍: `Image.createImage(String)` 자리는 스위트가 «부르지 않는다»(논증으로만 선다). 정본 **§8-4⑶-b**.
+  ★**형제 #79 착지로 원장 2파일이 충돌했고** 이 게이트③이 2-c⒜(원장 한정 승인)로 합집합 해소했다
+  (코드 충돌 0 · `docs/upstream-realign-verdict.md` 는 **auto-merge** 되어 hunk 가 바이트 동일).
+  ★**착지 형태 = merge commit(부모 2개)** — `wie` 는 `contracts/upstream-sync-repos.conf:23` 등재라 스쿼시 금지.
 - 2026-09-05: **«버린 fork» 커밋 로그 통독** (PR #79 착지 · `wie-abandoned-fork-commit-log-harvest`
   · 채택 제안 `2026-09-04-unported-hardening-two-axes#p0`) — ★**가설은 맞았다**: §10-2 가 인용한 «두 줄»은
   전부가 아니었고 실제로는 **9커밋 · 타이틀 13종 · API 10종**이다(2 → 9). ★**«타이틀 지목» 축의 후보는 0건** —

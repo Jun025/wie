@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "date": "2026-09-05",
+  "task": "wie-current-class-loader-replacement-api-design-for-plus34",
+  "title": "«다음 벽»을 설계했더니 벽이 아니었다 — 공개 대체가 이미 있고, 핀을 올리기 «전»에 이행할 수 있다",
+  "services": ["engine"],
+  "summary": "핀을 `+34` 이상으로 올릴 때의 다음 벽(`Jvm::current_class_loader` 비공개화 · 호출부 6곳)의 대체 API 설계. ★**결론: 벽이 아니다.** ⒜파열은 계단표가 적은 `+46` 이 아니라 ★**`+34`(`7dc1b90`)에서 «시작»한다**(그 커밋은 `pub` 한 줄만 내렸고 대체를 «추가하지 않았다») ⒝호출부 **6곳이 전부 같은 두 줄**이고 ★**클래스 «로딩»에 쓰는 자리는 0곳** — 필요한 능력은 「게스트 리소스를 이름으로 여는 것」뿐이다 ⒞★**공개 대체가 «있다»** — `JavaLangClassLoader::get_system_class_loader` 가 **핀에서도 HEAD 에서도 `pub`** 이고, ★그것은 우회가 아니라 **`current_class_loader` 자신이 떨어지는 폴백**이다 ⒟★**핀에서도 공개라 «핀을 올리기 전»에 이행할 수 있다** ⇒ `+34` 칸의 파열 호출부가 **6 → 0** 이 된다. ★설계를 **프로브**로 확인했다(6곳 스왑 → 스위트 전건 → 원복 · 코드 델타 0).",
+  "changes": [
+    "`docs/upstream-realign-verdict.md` — **§8-4⑶-b 신설**(⒜~⒣: 벽의 시작점 · 호출부 6행 표 · 공개 대체 실측 · 고른 길 · 선이행 실익 · 프로브 출력 · 남는 한 자리 · `+47` 계단) + ★계단표 4번 칸에 **인라인 정정 1줄**.",
+    "★**기존 계단 서술 무접촉**(계약 5 — «잇는다») · ★**핀 변경 0**(`Cargo.toml` 무접촉) · ★**코드 변경 0**(프로브는 원복했다) · upstream 발신 0."
+  ],
+  "verification": {
+    "measuring-tree": "★**측정 트리**: wie = `~/work/otterpebble/wie` @ **`origin/main`**(`HEAD..origin/main` = **0커밋**) · rustjava = `~/work/otterpebble/rustjava` 의 **로컬 ref**를 ★**fetch 없이** 쓰되 `gh api` 로 원격과 같은지 먼저 확인(`upstream/main bd42427` ✔). 핀·+34·HEAD 조회는 전부 `git show <rev>:<경로>`.",
+    "wall-starts-at-34": "`git log -1 7dc1b90` → 「**Make current_class_loader private**」(2026-07-24) · `git show 7dc1b90` → **`jvm/src/jvm.rs` 1파일 · +1/−1**(`pub async fn` → `async fn`) ★**대체 API 추가 0** · `git rev-list --count 5b84dd1..7dc1b90` → **1** ⇒ ★**우리 핀의 «바로 다음 칸»**이다. 계단표는 그 파열을 «누적»으로 4번 칸(+46)에 적었는데, ★**시작은 +34** 다(모순이 아니라 정밀화 — 표에 인라인으로 달았다).",
+    "call-sites": "★**지금 세었다(제안의 「6곳」을 옮겨 적지 않았다) — 6곳**: `wie_lgt/src/emulator.rs:114`(부팅 직후 `binary.mod`) · `wie_lgt/…/wipi_c/context.rs:100·112` · `wie_ktf/…/wipi_c/context.rs:95·108`(WIPI `get_resource_size`/`read_resource`) · `wie_midp/…/lcdui/image.rs:116`(`Image.createImage(String)`). ★★**여섯이 전부 같은 두 줄**이다 — 로더를 얻고 곧바로 `JavaLangClassLoader::get_resource_as_stream(...)`. ⇒ ★**클래스 «로딩»에 쓰는 자리 0곳** · 필요한 능력은 «리소스 열기»다.",
+    "public-replacement-exists": "★**있다**: `JavaLangClassLoader::get_system_class_loader(jvm)` — `jvm/src/runtime/java_lang_class_loader.rs` 에 ★**핀(`5b84dd1`)·HEAD(`bd42427`) 둘 다 `pub`**(6곳이 이미 쓰는 `get_resource_as_stream` 의 **바로 옆**이라 import 도 이미 있다). ★★**그리고 «우회»가 아니다** — `current_class_loader` 전문을 읽으면 「게스트 프레임 없음」·「호출 클래스의 로더가 `None`」 두 갈래에서 **그 함수를 그대로 부른다**. ⇒ 두 API 가 갈리는 경우는 «호출한 게스트 클래스가 자기 로더를 가질 때»뿐이고, 그 자리는 6곳 중 **1곳**(image.rs)이다. ★Jvm 의 «공개» 메서드 중 로더를 내주는 것은 HEAD 에도 **0건**(별도 실측) — 즉 대체는 `Jvm` 이 아니라 **런타임 헬퍼** 쪽에 있다.",
+    "chosen-path": "★**⒝(우리 쪽 대체)** — ⒜(upstream 공개 요청)는 ★**요청할 것이 없어** 기각(공개 API 가 이미 있다) · ⒞(핀 유지)도 기각(이 벽을 이유로 멈출 근거가 사라졌다). ★★**그리고 실익 하나**: 대체가 **현재 핀에서도 공개**라 6곳 이행을 **지금 핀 위에서 착지·검증**한 뒤 `+34` 로 올릴 수 있다 ⇒ 그 칸의 파열 호출부 **6 → 0** · 두 변경이 한 PR 에서 얽히지 않는다.",
+    "probe": "★**설계를 «프로브»로 확인했다**(스왑 → 스위트 → ★**원복**): 6곳 전건 치환 → `cargo build --workspace` **rc=0** · 남은 `current_class_loader` **0건** → `RUST_MIN_STACK=4194304 cargo test --all` **139 passed / 0 failed** → `wie_validate` **5픽스처 전건 PASS**(`draw_j2me` booted+rendered · `helloworld_ktf`·`helloworld_lgt` clean exit · `keydraw_{ktf,lgt}` `--inject` booted+rendered+survived input). ★원복 후 `git status` **빈 출력** · 호출부 6곳 복귀 ⇒ **이 회차의 코드 델타 0**. ★`helloworld_lgt` 통과가 **1번 자리**(부팅 직후 `binary.mod`)의 직접 증거이고 `keydraw_*`·`helloworld_ktf` 가 **2~5번**을 태운다.",
+    "next-stair": "★**계단은 유지된다** — 이 벽을 넘으면 다음은 `+47`(`ba5797b`)의 `invoke_virtual` 가 `class_name` 인자를 얻어 **209곳**(누적 **≥222**)을 깨뜨리는 칸이다. ★**이 설계가 그 칸을 줄여 주지 않는다** — 성격이 다르다(여기는 «공개 대체가 있었다», 저기는 «전 호출부 서명 변경»).",
+    "gates": "`cargo fmt --all -- --check` rc=0 · `check-worklog-json.mjs` OK · `check-worklog-coverage.mjs` **rc=0** · 정적 계약 **107 pass / 0 violation** · `npm run audit` PASSED. ★문서 1파일 변경이라 Rust 회귀 여지 0(프로브의 139 passed 는 «대체본»의 값이고, 원복본은 main 과 바이트 동일하다)."
+  },
+  "limits": [
+    "★★**6번 자리(`Image.createImage(String)`)는 프로브가 «부르지 않는다»** — `createImage` 를 호출하는 시험·픽스처가 **0건**이다(실측). ⇒ 그 자리는 «측정»이 아니라 **논증**으로 남는다: MIDP 게스트는 시스템(URL) 클래스로더가 적재하므로 두 API 가 같은 값을 준다(P1 의 `net/wie/Launcher` 수정이 `getSystemClassLoader().loadClass(main)` 로 이미 그것을 쓴다). ★**커스텀 로더를 쓰는 게스트에서는 갈릴 수 있다** — 이행 회차는 픽스처 한 건을 붙이거나 최소한 이 단서를 커밋 메시지에 남겨라.",
+    "★**이 회차는 «설계»다 — 핀도 코드도 바꾸지 않았다**(계약 1). 6곳 이행과 `+34` bump 는 **다음 회차**이고, ★그 둘을 «같은 PR 에 넣지 마라»(선이행의 실익이 사라진다).",
+    "★**`+34` 이후 `+46` 사이에 다른 파열이 있는지는 이 회차가 재지 않았다** — 계단표의 4번 칸은 «누적 ≥13」이고, 그 13 중 `current_class_loader` 6 을 뺀 나머지가 어디서 오는지는 §8-4⑶ 의 앞 칸들이 답한다. 이행 회차는 **bump 대상 rev 를 정한 뒤** `cargo check` 로 다시 세라.",
+    "★**`get_system_class_loader` 자체의 동작은 게스트 `java/lang/ClassLoader.getSystemClassLoader()` 에 위임된다** — 그 프로토가 사라지거나 바뀌면 이 대체도 함께 깨진다. 지금은 핀·HEAD 둘 다에 있다."
+  ],
+  "issues": [],
+  "proposals": [
+    {
+      "title": "6곳을 «지금 핀 위에서» `get_system_class_loader` 로 이행한다 — `+34` 벽을 0으로 만들어 두는 선이행",
+      "plainSummary": "엔진이 게임 파일 속 리소스를 열 때 쓰는 통로가 다음 업스트림 판본에서 «비공개»가 됩니다. 그런데 공개된 같은 값의 통로가 지금도 있어서, 업그레이드 «전»에 미리 갈아타 두면 나중에 올릴 때 고칠 곳이 0이 됩니다.",
+      "userBenefit": "업스트림 따라잡기가 한 칸 싸진다 — 그리고 그 칸에서 «엔진 동작이 바뀌는지»를 업그레이드와 «분리해» 검증할 수 있다(둘이 섞이면 어느 쪽이 깨뜨렸는지 못 가린다).",
+      "why": "★이 회차의 프로브가 이미 통과했다 — 6곳을 치환해 `cargo test --all` **139 passed / 0 failed** · `wie_validate` **5픽스처 전건 PASS** 를 받고 원복했다. `get_system_class_loader` 는 **현재 핀에서도 `pub`** 이므로 bump 없이 착지한다. ⇒ 남은 일은 «그 스왑을 되살려 PR 로 내는 것»과 6번 자리(`Image.createImage(String)`)의 단서를 처리하는 것뿐이다.",
+      "tradeoff": "6곳 중 1곳(`image.rs`)은 스위트가 부르지 않아 **프로브로 확인되지 않았다** ⇒ 그 회차는 ⒜픽스처 한 건을 붙이거나 ⒝단서를 커밋 메시지에 남기는 선택을 해야 한다. 반대로 미루면 나중에 «bump + 6곳 이행»이 한 PR 에 얽혀, 회귀가 나도 어느 쪽 탓인지 가릴 수 없다.",
+      "effort": "S — 6줄 치환(각 1줄) · import 추가 0(이미 있다) · 검증은 기존 스위트 + `wie_validate` 5픽스처.",
+      "target": "wie_lgt/src/emulator.rs · wie_lgt/src/runtime/wipi_c/context.rs · wie_ktf/src/runtime/wipi_c/context.rs · wie_midp/src/classes/javax/microedition/lcdui/image.rs"
+    }
+  ],
+  "adoptedProposals": ["2026-09-04-upstream-realign-p1-pin-plus33#p1"],
+  "declinedProposals": []
+}
