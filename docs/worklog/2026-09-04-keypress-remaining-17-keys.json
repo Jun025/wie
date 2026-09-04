@@ -3,7 +3,10 @@
   "date": "2026-09-04",
   "task": "wie-featurephone-keypress-remaining-17-keys-close-or-declare",
   "title": "남은 17종의 사각 — 「17개의 구멍」이 아니라 「핀이 없는 표 하나」였다. 닫았다",
-  "services": ["engine", "web"],
+  "services": [
+    "engine",
+    "web"
+  ],
   "summary": "선행 회차가 「대표 3종만 도달을 재고 나머지 17종은 소스 핀뿐」이라 남긴 사각의 처분. ★결정하기 전에 «사각의 모양»을 쟀더니 전제가 갈렸다 — 키 전달은 «키별» 부분과 «키 무관» 부분으로 나뉘고, 둘은 다른 보증을 필요로 한다. ⒜키 무관 부분(handle_event → 이벤트 큐 → Canvas::handleKeyEvent → keyPressed)은 ★실측상 키로 분기하는 곳이 «한 군데도 없어» 아무 키 1종이 도달하면 증명된다 ⇒ Scenario D 의 3증인으로 이미 «전건» 닫혀 있다. ⒝키별 부분은 «표 두 개»다 — `parse_key`(이름→KeyCode)와 `MIDPKeyCode::from_key_code`(KeyCode→게스트가 받는 정수). ★소스 핀은 «첫 표만» 지켰다. ⇒ 실제로 열려 있던 것은 17종의 도달이 아니라 ★«둘째 표의 17행»이고, 그 결함은 「7을 눌렀는데 8이 입력된다」로 나타나며 JS 표면에서 보이지 않는다. ⇒ 닫았다 — Scenario D 를 넓히지 않고, 첫 표를 지키던 «그 기구»(계약 파일 + 정적 핀)를 둘째 표에도 붙였다.",
   "changes": [
     "`docs/contracts/featurephone-engine-contract.json` — `keyMidpCodes`(어휘 20종 → 게스트가 받는 정수) + 그 존재 이유 1줄 신설. ★새 파일·새 기구 0 — 이 계약 파일이 이미 `keyVocabulary` 를 담고 두 검사기가 그것을 읽는다.",
@@ -12,7 +15,7 @@
     "★제품 코드(`wie_web/src/lib.rs`·`wie_midp`·`wie_wipi_java`) **변경 0** · 새 하네스 0 · 브라우저 검사 재설계 0 · 픽스처 변경 0."
   ],
   "verification": {
-    "decomposition": "★결정의 근거가 된 실측. 전달 경로를 홉으로 갈랐다: ⑴`parse_key`(이름→KeyCode) **키별** — 소스 핀 §4 가 20/20 쌍 검사 ⑵`MIDPKeyCode::from_key_code`(KeyCode→MIDP 정수) **키별** — ★핀 **0**, Scenario D 가 3/20 ⑶이벤트 큐→게스트 `keyPressed(int)` ★**키 무관** — `event_queue.rs:207-223` 은 `from_key_code(x)` 를 값으로 실어 보내고 `canvas.rs::handle_key_event` 는 `code` 를 그대로 `keyPressed` 로 넘긴다(★키로 분기하는 `match` **0건**). ⇒ **실제로 열린 N = 17**(⑵의 17행)이고 **도달 자체의 사각은 0**이다.",
+    "decomposition": "★결정의 근거가 된 실측. 전달 경로를 홉으로 갈랐다: ⑴`parse_key`(이름→KeyCode) **키별** — 소스 핀 §4 가 20/20 쌍 검사 ⑵`MIDPKeyCode::from_key_code`(KeyCode→MIDP 정수) **키별** — ★핀 **0**, Scenario D 가 3/20 ⑶이벤트 큐→게스트 `keyPressed(int)` ★**키 무관** — 실측 사슬은 `key_down → handle_event → EventQueue → Display::handleKeyEvent → Displayable/Canvas::handleKeyEvent → keyPressed` **5파일**이고(★`-fix` 회차가 `display.rs`·`displayable.rs` 2개를 추가로 찾았다 · 둘 다 `match` **0건**), `event_queue.rs:207-223` 은 `from_key_code(x)` 를 값으로 실어 보내며 `canvas.rs::handle_key_event` 는 `code` 를 그대로 `keyPressed` 로 넘긴다(★경로 위에서 키로 분기하는 `match` **0건** — 열거는 `limits`). ⇒ **실제로 열린 N = 17**(⑵의 17행)이고 **도달 자체의 사각은 0**이다.",
     "why-not-widen-scenario-d": "★대안(Scenario D 를 20종으로 확대)을 «기각»한 근거: 그것은 ⑶을 17번 더 증명하는 일이고(키 무관이므로 새 정보 0), 브라우저 프레임 루프를 17회 더 돌린다. 반면 ⑵는 그렇게 해도 «막대 폭 = MIDP 코드»라는 간접 관측으로만 잡히는데, 정적 핀은 그 값을 **직접** 대조한다. ⇒ 더 싸고 더 정확한 쪽을 골랐다.",
     "mutation": "★개악 대조 2종(원문을 실제로 고쳐 돌리고 원복): **M2** `KeyCode::NUM7 => Self::KEY_NUM8`(팔 스왑) → `✗ guest key code miswired: \"NUM7\" now reaches the guest as 56 … contract pins 55`. **M3** `KEY_NUM7 = 155`(판별식 변경) → `✗ … as 155 … pins 55`. ⇒ ★**두 갈래(팔·판별식) 모두 red 를 낸다** — 한쪽만 보면 다른 쪽으로 빠져나간다. 원복 후 68 pass / 0 violation.",
     "coverage-delta": "정적 검사 **48 pass → 68 pass**(신규 20 = 어휘 전건). 왕복 검사 **29/29 유지**(오탐 0 · Scenario D 3건은 이제 계약에서 읽은 값으로 통과한다).",
@@ -20,10 +23,13 @@
   },
   "limits": [
     "★**닫은 것은 «표»이지 «도달»이 아니다.** ⑵가 옳다는 것은 정적으로 잠겼지만, 17종이 실제로 게스트에 «도착»하는 것은 여전히 ⑶의 «키 무관성» 위에서 추론된다.",
-    "★★**재개 조건(「나중에」가 아니다)**: ★**전달 경로에 «키로 분기하는 곳»이 «1군데» 생기면 이 결정을 다시 연다** — 그 순간 3증인이 20종을 대신하지 못하게 되고 Scenario D 목록을 넓혀야 한다. ★**판정 방법도 함께 적는다**(다음 사람이 재지 못하면 조건이 아니다): `key_down` 부터 `keyPressed` 사이(`wie_web/src/lib.rs` · `wie_midp/src/classes/net/wie/event_queue.rs` · `wie_midp/src/classes/javax/microedition/lcdui/canvas.rs`)에서 `KeyCode`/`MIDPKeyCode` 를 **`match` 하는 곳**을 세라 — 2026-09-04 기준 **`from_key_code` 그 자체 1곳뿐**이고 그것은 표(⑵)이지 경로가 아니다. ⇒ **그 수가 2 이상이 되면 재개.**",
+    "★★**재개 조건(「나중에」가 아니다) — 방아쇠는 «수»가 아니라 «목록에 없는 새 히트»다.** ★초판은 「그 수가 2 이상이면 재개」라고 적었는데 ★**태어난 날 이미 10이었다**(참인 채 태어난 조건은 방아쇠가 아니라 잡음이고, 다음 사람은 «세는 것을 그만둔다»). ⇒ **오늘의 히트를 전건 열거하고 각각 포함/제외 사유를 붙인다. 이 목록에 «없는» 히트가 생기면 재개한다.** 술어(그대로 쳐라): `grep -nE '(^|[^[:alnum:]_])match[^[:alnum:]_]'` 를 **전달 5파일**(`wie_web/src/lib.rs` · `wie_midp/src/classes/net/wie/event_queue.rs` · `wie_midp/src/classes/javax/microedition/lcdui/{display,displayable,canvas}.rs`)에. ★**2026-09-04 = 10건이고 그중 «경로 위의 키별 분기»는 0건**이다: ⒜**not code 1** — `lib.rs:444`(독 주석) ⒝**표 3** — `lib.rs:447` `parse_key`(§4 핀) · `event_queue.rs:120` `from_key_code`(§4b 핀) · `event_queue.rs:90` `MIDPKeyCode::from_raw`(§4b 가 핀한 «같은 판별식»을 읽으므로 :120 과 어긋날 수 없다) ⒞**경로 안 · 키 무관 5** — `event_queue.rs:25`(EventQueueEvent 종류) · `:46`(KeyboardEventType) · `:205`(Event 형 — 키 값은 `from_key_code(x)` 로 통째 위임) · `:298`(이벤트 종류) · `canvas.rs:157`(이벤트 형 → keyPressed/Released/Repeated · `code` 는 그대로 통과) ⒟**경로 밖 1** — `canvas.rs:94` `Canvas::getGameAction`(아래 별항).",
+    "★★**「사이(between)」를 판정 가능하게 못박았다** — 초판은 「`key_down` 과 `keyPressed` 사이」라고만 적었고 ★**grep 은 «어느 것이 사이인지» 알려 주지 않는다**(`get_game_action` 은 `key_pressed` 와 **같은 impl** 이다). ⇒ ★**정의**: 어떤 함수가 «경로 위»에 있다 ⟺ ★**게스트가 호출을 시작하지 «않고» `WieEmulator::key_down` 에서 도달된다.** ★**돌릴 수 있는 판정**: `getGameAction` 을 전 저장소에서 grep 하면 **`JavaMethodProto` 등록 1 + 정의 1 뿐 — 내부 호출자 0** ⇒ 게스트가 부를 때만 돈다 ⇒ **경로 밖**. ★**그리고 이 정의를 적용하니 초판이 «빠뜨린 파일 2개»가 드러났다** — 실측 사슬은 `key_down → handle_event → EventQueue → Display::handleKeyEvent → Displayable/Canvas::handleKeyEvent → keyPressed` 이고, `display.rs`·`displayable.rs` 도 경로 위다(둘 다 `match` **0건** · `code` 를 그대로 넘긴다). ⇒ 술어의 파일 목록을 3 → **5**로 고쳤다.",
+    "★★**부류 면제를 쓰지 않았다** — 초판의 「표이지 경로가 아니다」는 **한 곳을 지목하지 않고 «부류»를 면제**했고, 그러면 앞으로 그 파일들에 생기는 «어떤 키별 표»도 같은 말로 접혀 조건이 «영영» 안 걸린다. ⇒ 위 열거는 **파일·줄·이름을 하나씩 지목**한다.",
     "★★**같은 형태의 «둘째 사각»을 발견했고 이 회차에서 닫지 «않았다»** — KTF/WIPI 경로의 `WIPIKeyCode::from_midp_raw`(`wie_wipi_java/src/classes/net/wie/card_canvas.rs:77`)는 MIDP 정수를 WIPI 정수로 다시 바꾸는 **셋째 표**이고 핀이 **0**이다(어휘 20종 전건 미핀). 이 티켓의 Non-goal 이 KTF 경로를 형제 제안 `#p0` 로 미뤄 뒀으므로 **손대지 않았다** — 제안으로 올린다. ※그 표는 «도달 단언»(#p0 · 픽스처 선행 · effort M)이 아니라 **순수 함수 표 핀**이라 #p0 와 다른 일이다.",
     "★`keyMidpCodes` 는 어휘 **20종**만 담는다. `from_key_code` 에는 4행이 더 있고(`CALL`·`HANGUP`·`VOLUME_UP`·`VOLUME_DOWN`) **셸이 보내지 않는 코드**라 계약 밖으로 두었다 — 그 4행은 여전히 미핀이다.",
-    "★`key_repeat` 은 이 회차 대상이 아니다(선행 회차 한계 3 그대로). 계약 `methods` 에도 없다."
+    "★`key_repeat` 은 이 회차 대상이 아니다(선행 회차 한계 3 그대로). 계약 `methods` 에도 없다.",
+    "★**열거가 «넷째 표»를 하나 더 드러냈다** — `Canvas::getGameAction`(`canvas.rs:94`)은 MIDP 정수를 게임 액션(1·2·5·6·8)으로 바꾸는 **키별 표**인데 핀이 **0**이다. ★전달 경로 «밖»이라 이 결정의 재개 조건에는 걸리지 않지만(게스트가 자발적으로 부른다) ★**미핀인 것은 사실**이라 잔여로 적어 둔다 — WIPI 의 `from_midp_raw` 와 **같은 부류**이고, 그 제안이 닫힐 때 함께 보라."
   ],
   "issues": [],
   "proposals": [
@@ -37,6 +43,8 @@
       "target": "docs/contracts/featurephone-engine-contract.json · scripts/check-engine-contract.mjs · wie_wipi_java/src/classes/net/wie/card_canvas.rs (읽기 전용)"
     }
   ],
-  "adoptedProposals": ["2026-09-04-featurephone-keypress-reaches-guest#p1"],
+  "adoptedProposals": [
+    "2026-09-04-featurephone-keypress-reaches-guest#p1"
+  ],
   "declinedProposals": []
 }

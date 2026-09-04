@@ -45,9 +45,45 @@
 //   pin" — that was only half true and is why the gap survived: the source pin
 //   covered the FIRST table only, so a swapped row in the second one (NUM7 ->
 //   56: press 7, type 8) was caught by nothing. §4b closes that.
-//   REOPEN this decision if a per-key branch ever appears in the delivery path
-//   (grep for `match` on KeyCode/MIDPKeyCode between key_down and keyPressed) —
-//   then 3 witnesses stop covering 20 keys and this list must grow.
+//
+//   ── REOPEN when a hit appears that is NOT in the table below ──────────────
+//   The trigger is a NEW ENTRY, not a count: every `match` in the delivery
+//   files is enumerated here with why it is in or out, so "does this still
+//   hold?" is a diff against this list instead of a judgement call. (The first
+//   version of this condition said "reopen when the count exceeds 1" and was
+//   already false on the day it was written — the count is 10.)
+//     $ grep -nE '(^|[^[:alnum:]_])match[^[:alnum:]_]' \
+//         wie_web/src/lib.rs \
+//         wie_midp/src/classes/net/wie/event_queue.rs \
+//         wie_midp/src/classes/javax/microedition/lcdui/display.rs \
+//         wie_midp/src/classes/javax/microedition/lcdui/displayable.rs \
+//         wie_midp/src/classes/javax/microedition/lcdui/canvas.rs
+//   2026-09-04 — 10 hits, and NOT ONE of them is a per-key branch on the path:
+//     lib.rs:444         not code   — doc comment ("Names match the `KeyCode`")
+//     lib.rs:447         TABLE      — parse_key: name -> KeyCode         (pinned, §4)
+//     event_queue.rs:120 TABLE      — from_key_code: KeyCode -> guest int (pinned, §4b)
+//     event_queue.rs:90  TABLE      — MIDPKeyCode::from_raw: int -> variant; reads the same
+//                                     discriminants §4b pins, so it cannot disagree with :120
+//     event_queue.rs:25  path, key-agnostic — EventQueueEvent kind (KeyEvent/Repaint/Notify)
+//     event_queue.rs:46  path, key-agnostic — KeyboardEventType (pressed/released/repeated)
+//     event_queue.rs:205 path, key-agnostic — Event shape; the key value is handed whole to
+//                                     from_key_code(x), never inspected here
+//     event_queue.rs:298 path, key-agnostic — event kind again, on the dispatch side
+//     canvas.rs:157      path, key-agnostic — event type -> keyPressed/Released/Repeated;
+//                                     `code` passes through untouched
+//     canvas.rs:94       OFF-PATH   — Canvas::getGameAction. Guest-initiated: its only entry is
+//                                     the JavaMethodProto the guest calls (zero internal callers,
+//                                     measured), so it runs AFTER delivery on a code the guest
+//                                     already holds. It IS an unpinned per-key table — carried as
+//                                     residual (see the worklog proposal), not as delivery.
+//   "On the path" is decidable, not a vibe: a function is on it iff it is reachable from
+//   WieEmulator::key_down WITHOUT the guest initiating the call. Measured chain —
+//     key_down -> handle_event -> EventQueue -> Display::handleKeyEvent
+//              -> Displayable/Canvas::handleKeyEvent -> keyPressed
+//   display.rs and displayable.rs are on it too (that is why they are in the grep) and have
+//   ZERO `match`; both forward `code` unchanged.
+//   Every line above names a file, a line and a reason — no exemption is granted to a *kind*
+//   of thing, so a new table cannot fold itself into this list by resembling an old one.
 //
 // Usage: node scripts/contract-roundtrip.mjs        (after scripts/build-wasm.sh)
 //   WIE_CHROME_CHANNEL=chrome  — use a system Chrome instead of the playwright
