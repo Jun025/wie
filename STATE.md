@@ -32,9 +32,20 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- (없음 — 열린 PR 0건)
+- (없음 — 이 회차 PR 착지 · 형제 #78·#79 는 별 리니지)
 
 ## 완료 (최근)
+- 2026-09-05: **KTF·LGT 키 «도달» 단언 + 픽스처 레시피** (PR #77 착지 · `wie-ktf-lgt-drawing-fixtures-for-key-reach-assertions`
+  · 채택 제안 `2026-09-04-featurephone-keypress-reaches-guest#p0`) — J2ME 만 덮던 도달 축을 **두 경로에 다** 붙였다.
+  ★**근인은 픽스처가 아니라 «레시피 부재»였다** — `helloworld_{ktf,lgt}.zip` 은 `dlunch/wipi` 에서 빌드된 ARM
+  게스트인데 만드는 법이 wie 어디에도 없었다 ⇒ 핀된 rev 로 클론·주입·빌드하는 스크립트를 세웠다(게스트 소스 포함).
+  ★**도달의 증거 = 게스트 stdout**(픽셀 아님) — `TestScreen` 이 프레임버퍼를 안 갖고, stdout 은 «정확한 정수»를
+  단언하게 하며, 헤드리스라 3 OS 전부 돈다. ★이 시험들이 §4b·§4c 정적 핀을 **행동으로 관통**한다.
+  ★개악 3칸 전부 제품 실물 — 값 오배선(`key:56`)·전달 절단(`""`)·★**LGT 전용 절단(LGT red · KTF green)** 으로
+  **두 시험의 독립**까지 보였다. `cargo test --all` **137 → 139**.
+  ★**주의**: 새 픽스처는 `--inject` 없이 `wie_validate` 를 돌리면 FAIL 이 정상이다(키 전엔 검은 화면).
+  ★**착지 형태 = merge commit(부모 2개)** — `wie` 는 `contracts/upstream-sync-repos.conf:23` 등재 repo 라 스쿼시가 금지다.
+  ★**형제 PR #78·#79 가 원장 2파일을 함께 만진다** — 이 착지가 그쪽 base 를 움직인다(그쪽 게이트③이 해소한다).
 - 2026-09-04: **게임 액션 표 둘 핀** (PR #76 착지 · `wie-key-contract-pin-game-action-tables`
   · 채택 제안 `2026-09-04-ktf-third-key-table-pin#p1`) — 게스트가 「방금 받은 키가 어느 방향인가」를
   되묻는 통로 둘이 **전달 경로 밖**이라 아무 검사도 안 보고 있었다(틀리면 «위를 눌렀는데 아래로 간다»).

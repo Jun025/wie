@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "date": "2026-09-05",
+  "task": "wie-ktf-lgt-drawing-fixtures-for-key-reach-assertions",
+  "title": "KTF·LGT 키 «도달»을 «둘 다» 단언했다 — 픽셀이 아니라 게스트 stdout 으로, 그리고 픽스처 레시피를 처음으로 남겼다",
+  "services": ["engine"],
+  "summary": "J2ME 는 Scenario D 가 키 도달을 단언하는데 KTF·LGT 는 «전혀» 덮이지 않았다 — 그 픽스처들이 아무것도 그리지 않고 곧바로 종료하기 때문이다. ★근인은 픽스처가 아니라 **레시피 부재**였다: `helloworld_{ktf,lgt}.zip` 은 손으로 만든 ARM 게스트 바이너리이고 **만드는 법이 저장소 어디에도 없었다** ⇒ 아무도 «다른» 픽스처를 만들 수 없었다. ⇒ 그 레시피를 `scripts/make-wipi-keydraw-fixture.sh` 로 세우고, 키에 반응해 **찍고(print) 그리는** 픽스처 2종을 만들어 **두 경로 다** 도달을 단언했다(부분 완료가 아니라 전건). 개악 3칸으로 잠갔고 그중 하나는 두 시험의 **독립**을 보인다.",
+  "changes": [
+    "신규 `scripts/make-wipi-keydraw-fixture.sh` — `dlunch/wipi` 를 **핀된 rev(`068312d`)** 로 클론해 `keydraw` 예제를 주입·빌드·아카이브해 `test_data/keydraw_{ktf,lgt}.zip` 을 만든다. ★**게스트 소스가 스크립트 안에 있다** — 픽스처가 무엇을 하는지 읽으려고 ARM 바이너리를 뜯을 필요가 없다.",
+    "신규 픽스처 `test_data/keydraw_ktf.zip`(25,086B) · `test_data/keydraw_lgt.zip`(42,252B) — 키다운마다 `key:<code>` 를 찍고 폭 `<code>` 인 막대를 그린다. ★게임 파일 0(우리 소스에서 빌드).",
+    "신규 `wie_ktf/tests/test_key_reach.rs` · `wie_lgt/tests/test_key_reach.rs` — `Event::Keydown(KeyCode::NUM5)` 를 넣고 게스트 stdout 이 **`key:53`** 을 내는지 단언한다.",
+    "★제품 코드 **0줄** · 기존 J2ME Scenario D **무접촉** · 기존 픽스처 3종 **무접촉** · CI 워크플로 변경 0."
+  ],
+  "verification": {
+    "root-cause": "★**「픽스처가 안 그린다」는 증상이고 근인은 «레시피 부재»다.** `helloworld_{ktf,lgt}.zip` 의 실체를 열어 보니 `client.bin12`(ARM thumb 원시 이미지)·`binary.mod`(ARM ELF)였고, 문자열에 `wipi/src/ktf/start.rs`·`rustc 1.90.0-nightly` 가 박혀 있다 ⇒ ★**`dlunch/wipi` 에서 빌드된 게스트**다. 그 저장소에 `build_examples.sh`·`wipi-archiver`·`examples/src/{input,paint}.rs` 가 **이미 있었다** — ⇒ 막고 있던 것은 기술이 아니라 **그 사실이 wie 어디에도 적혀 있지 않았던 것**이다(`Cargo.toml` 의 `wipi_types` git 의존이 유일한 실마리였다).",
+    "evidence-axis": "★**도달의 증거로 «게스트 stdout» 을 골랐다 — 캔버스 픽셀이 아니다.** ⒜Rust 통합 시험의 `TestPlatform` 은 `TestScreen`(유닛 구조체)이라 **프레임버퍼를 보관하지 않는다** ⇒ 픽셀을 읽을 수 없다 ⒝stdout 은 «몇 픽셀» 이 아니라 ★**정확한 정수**를 단언하게 한다(`key:53`) ⒞헤드리스라 `cargo test --all` 안에서 3 OS 전부 돈다 — Scenario D 는 **브라우저에서만** 돈다. ★**J2ME 축과의 차이**: 그쪽은 «막대 폭 = MIDP 코드»를 캔버스 픽셀 수로 «간접» 읽고 프레임 누적(union) 때문에 **오름차순 제약**이 붙는다. 이쪽은 매 프레임 배경을 지우고 다시 그리므로 **순서 제약이 없고**, 단언은 stdout 의 «값»을 직접 본다. ★단 픽스처는 **그리기도 한다**(티켓이 「그리는 픽스처」를 요구했고, 브라우저 축을 나중에 얹을 수 있게).",
+    "what-the-tests-actually-cover": "★**이 두 시험은 앞선 회차들이 «정적으로» 핀한 표를 «행동으로» 관통한다.** 실측: `Event::Keydown` 을 소비하는 곳은 저장소 전체에서 **단 하나**(`wie_midp/…/event_queue.rs`) ⇒ 세 플랫폼이 같은 큐를 지나고, KTF·LGT 게스트는 `net/wie/CardCanvas`(MIDP Canvas 하위형) 아래에서 돈다. 경로: `KeyCode::NUM5` → §4b `from_key_code`(MIDP **53**) → `CardCanvas::key_pressed` → §4c `from_midp_raw`(WIPI **53**) → `Card.keyNotify` → (LGT) `CletWrapperCard::key_notify` → `run_function(handleCletEvent)` → 게스트 `KeyCode::from_raw(53)=Key5` → `key:53`. ⇒ ★**§4b·§4c 가 «값이 맞다»를 정적으로 잠갔다면, 이 시험은 «그 값이 실제로 게스트에 닿는다»를 잠근다.**",
+    "mutation": "★**개악 3칸 — 전부 «제품 실물»에 심고 원복**(`git diff --stat` 확인): ⒜**값 오배선**(§4c 표의 `KEY_NUM5 => NUM5` → `NUM8`) → **둘 다 red**, 실패 문면이 `guest stdout was \"key:56\\n\"` ⇒ ★**«무엇이 잘못 왔는지»까지 말한다** ⒝**전달 절단**(`CardCanvas::key_pressed` 초입에서 `return`) → **둘 다 red**, `guest stdout was \"\"` ⇒ 두 실패 모드가 **구별된다** ⒞★**LGT 전용 절단**(`CletWrapperCard::key_notify` 의 `run_function` 앞에서 `return`) → ★**LGT red · KTF green** ⇒ **두 시험이 독립**이다(한쪽만 잡히는 결함을 다른 쪽이 가려 주지 않는다). ⒟**무개악** → 둘 다 ok.",
+    "reproducibility": "★스크립트를 **실제로 돌려** 재생성했다: `./scripts/make-wipi-keydraw-fixture.sh` rc=0 → 두 zip 재생성(25,086B / 42,252B) → **재생성본으로 두 시험 재실행 ok**. ★**md5 는 달라진다**(빌드가 경로를 박는다) ⇒ 스크립트 주석에 「zip 을 diff 하지 말고 시험을 다시 돌려 확인하라」로 적었다.",
+    "third-axis": "★**저장소 자신의 러너로도 픽셀 축을 확인했다**: `wie_validate --inject`(기존 기능 · 이 회차가 만든 것이 아니다) → **둘 다 PASS**(`booted + rendered + survived input sequence` · `distinct_colors 2` · `nondominant_pct 2.1` · paints 55/83) ⇒ 키를 넣으면 **흰 막대가 실제로 그려진다**. ★`--inject` **없이** 돌리면 `FAIL: only blank/uniform frames` 다 — **키가 없으면 화면이 검은 것이 설계**다(아래 limits).",
+    "gates": "`cargo fmt --all -- --check`·`clippy --all -D warnings`·`clippy --target wasm32-unknown-unknown -D warnings` 전건 rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` **139 passed / 0 failed**(직전 137 + 이 회차 2) · 정적 계약 **107 pass / 0 violation**(무변경) · `npm run audit` **PASSED** · `check-worklog-json` OK · ★**repo 러너** DoD 3픽스처 **전건 PASS**(`draw_j2me` **booted + rendered**)."
+  },
+  "limits": [
+    "★★**`wie_validate` 를 `--inject` «없이» 새 픽스처에 돌리면 `FAIL: only blank/uniform frames` 다 — 이것은 «정상»이다.** 키가 오기 전에는 검은 화면을 그리는 것이 이 픽스처의 설계다. ⇒ ★**DoD 의 «3픽스처 루프»에 이 둘을 넣지 마라**(넣으면 상시 red 로 보인다). 넣을 거면 `--inject` 와 함께다.",
+    "★**두 시험은 «게스트 stdout» 을 본다 — 화면은 보지 않는다.** `TestScreen` 이 프레임버퍼를 보관하지 않아서다. 픽셀 축은 `wie_validate --inject`(수동)와 «미래의 브라우저 Scenario»가 진다 — 픽스처는 이미 그리므로 그쪽은 **픽스처 작업 없이** 얹을 수 있다.",
+    "★**대표 키는 `NUM5` «한 종»이다.** 숫자·기호는 막대 폭 = WIPI 코드라 값이 그대로 단언되지만, 방향키는 WIPI 공간에서 **음수**(-1..-4)라 폭이 될 수 없어 픽스처가 **양수 슬롯(101..104)** 으로 접는다 ⇒ 그쪽을 단언하려면 «프록시를 본다»고 적어야 한다. 이 회차는 값이 그대로 서는 키만 골랐다.",
+    "★**스크립트는 네트워크와 nightly+`rust-src` 를 요구한다** — `-Zbuild-std` 로 `core`/`alloc` 을 `thumbv4t-none-eabi` 용으로 새로 빌드하기 때문이다(그래서 `rustup target add` 는 **불요**). ★**CI 는 이 스크립트를 돌리지 않는다** — 픽스처가 커밋돼 있어서다. 재생성은 사람이 필요할 때 한다.",
+    "★**픽스처가 커졌다**(1.5KB/2.2KB → 25KB/42KB) — 프레임버퍼·alloc 코드가 들어와서다. 게임 파일이 아니라 **우리 소스에서 빌드한 것**이고 `npm run audit` 를 통과한다.",
+    "★**`dlunch/wipi` 는 upstream 이다 — 이 회차는 그쪽에 아무것도 보내지 않았다**(읽기 전용 클론). 예제는 «우리 스크립트가 주입»한다 ⇒ upstream 이 움직여도 우리 픽스처는 핀된 rev 에 묶여 있다."
+  ],
+  "issues": [],
+  "proposals": [
+    {
+      "title": "브라우저 왕복에 KTF 키 도달 Scenario 를 얹는다 — 픽스처는 이미 그리고 있다",
+      "plainSummary": "구형 KTF 게임에서 키가 실제로 전달되는지를 이제 헤드리스 시험이 확인합니다. 같은 확인을 «실제 브라우저»에서도 하려면 새로 만들 것이 없습니다 — 이번에 만든 픽스처가 이미 키에 반응해 막대를 그리기 때문입니다.",
+      "userBenefit": "featurephone 셸이 «실제로 쓰는» 경로(브라우저 + wasm)에서 KTF 키 전달이 깨지면 착지 전에 잡힌다 — 지금 그 축은 J2ME 만 덮는다.",
+      "why": "왕복 검사(`scripts/contract-roundtrip.mjs`)의 Scenario A 는 KTF 픽스처를 부팅하지만 **키는 «예외가 안 난다»만** 본다(그 픽스처가 곧바로 종료해서다). 이제 `test_data/keydraw_ktf.zip` 이 있고 **키 코드만큼 넓은 막대**를 그리므로, Scenario C/D 가 J2ME 에 쓴 «픽셀 수 = base + code*bar» 기법을 **그대로** 쓸 수 있다. ★브라우저는 wasm 빌드를 지나므로 헤드리스 Rust 시험이 덮지 못하는 층(glue·WebScreen)을 함께 잰다.",
+      "tradeoff": "왕복 검사에 픽스처 하나와 시나리오 하나가 늘어 브라우저 프레임 루프가 몇 번 더 돈다(현재 29검사에서 +3~4). 그리고 KTF 픽스처는 **종료하지 않으므로** Scenario A 의 «clean exit» 형태와 달리 tick 상한을 따로 둬야 한다. 반대로 미루면 «헤드리스에서는 잡히는데 브라우저에서는 안 잡히는» 층이 남는다.",
+      "effort": "S — `contract-roundtrip.mjs` 에 시나리오 1개 + 정적 서버에 zip 1개 노출. 픽스처·생성 스크립트는 **이미 있다**.",
+      "target": "scripts/contract-roundtrip.mjs · test_data/keydraw_ktf.zip"
+    }
+  ],
+  "adoptedProposals": ["2026-09-04-featurephone-keypress-reaches-guest#p0"],
+  "declinedProposals": []
+}
