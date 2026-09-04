@@ -35,6 +35,20 @@
 - (없음 — 열린 PR 0건)
 
 ## 완료 (최근)
+- 2026-09-04: **KTF 의 «셋째 키 표» 핀** (PR #74 착지 · `wie-ktf-third-key-table-pin-wipi-from-midp-raw`
+  · 채택 제안 `2026-09-04-keypress-remaining-17-keys#p0`) — KTF(WIPI) 게스트는 키 번호를 **한 번 더**
+  바꿔서 받는다(`CardCanvas` 가 `Canvas.keyPressed` 를 **재정의** → `WIPIKeyCode::from_midp_raw` → `Card.keyNotify`).
+  ★**그 표를 잡는 것이 정말 0이었다**(검사기·계약·시험 전수 실측) ⇒ §4b 와 **같은 방식**으로 **§4c** 신설.
+  ★**착수 재확인에서 등재값이 틀렸다** — 「20행」이 아니라 ★**24행**이다(초과 4 = `CALL`·`HANGUP`·`VOLUME_*` ·
+  계약 어휘 밖이라 미핀으로 남겼다). 핀 범위는 **어휘 20종**(§4b 와 같은 키 집합).
+  ★★**[정정 · 게이트② 반려] 초판이 그 넷을 묶어 「셸이 보내지 않는다」로 적은 것은 «거짓»이다** — 상류 실측상
+  `VOLUME_*` 만 참이고 ★**`CALL`·`HANGUP` 은 «오늘 보낸다»**(피처폰 화면의 «통화»·«종료» 버튼 2개).
+  ⇒ ★**사용자가 실제로 누르는 2키가 세 표 전부에서 미핀**이다 — 어휘 확장은 §4b 접촉이라 **제안**으로 올렸다.
+  ★**「5를 눌러 8이 입력된다」는 참**이다 — 개악 출력이 `as 56 (Self::NUM8), contract pins 53` 이고 **56 = ASCII '8'**.
+  정적 **68 → 88 pass** · 개악 5칸(팔 스왑·계약 변조·행 삭제·위치자 개명 → fail-closed·무개악 green) 전부 제품 실물.
+  ★**J2ME 결론과 충돌하지 않는다** — 그쪽은 MIDP 경로 범위였고 이 표는 그 밖이다(재개 조건 무접촉).
+  ★**남는 구멍**: 게임 액션 표 **둘**(`Canvas::getGameAction` · WIPI `Display::getGameAction`) 미핀 — 제안으로 올렸다.
+  ★**착지 형태 = merge commit(부모 2개)** — `wie` 는 `contracts/upstream-sync-repos.conf:23` 등재 repo 라 스쿼시가 금지다(부모가 접히면 계보가 소실된다 · 자매 repo `rustjava` 가 「스쿼시했으면 behind 0 → 12」를 «수»로 보였다).
 - 2026-09-04: **남은 17종 키 사각 처분 — «닫았다»** (PR #73 착지 · `wie-featurephone-keypress-remaining-17-keys-close-or-declare`
   · 채택 제안 `2026-09-04-featurephone-keypress-reaches-guest#p1`) — ★**「17개의 구멍」이 아니었다.**
   전달 경로를 홉으로 갈라 재니 ⒜**키 무관** 부분(이벤트 큐 → `Canvas::handleKeyEvent` → `keyPressed`)은

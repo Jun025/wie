@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "date": "2026-09-04",
+  "task": "wie-ktf-third-key-table-pin-wipi-from-midp-raw",
+  "title": "KTF 의 «셋째 키 표»를 핀했다 — 그리고 그 표는 «20행»이 아니라 «24행»이었다",
+  "services": ["engine", "web"],
+  "summary": "직전 회차가 J2ME/MIDP 경로의 두 표(`parse_key` · `MIDPKeyCode::from_key_code`)를 전건 핀했는데, KTF(WIPI) 게스트는 «한 번 더» 바뀐 수를 받는다 — `net.wie.CardCanvas` 가 `Canvas.keyPressed` 를 **재정의**해 `WIPIKeyCode::from_midp_raw` 를 태우고 게스트의 `Card.keyNotify` 로 넘긴다. ★그 표를 잡는 것이 **정말 0**이었다(검사기·시험·계약 전수 실측). ⇒ §4b 와 **같은 방식**(계약 파일 + 값 쌍 대조 + fail-closed)으로 **§4c** 를 신설해 어휘 20종을 잠갔다. ★**J2ME 회차의 「닫혔다」와 충돌하지 않는다** — 그쪽은 MIDP 경로 범위였고 이 표는 그 밖이다.",
+  "changes": [
+    "`docs/contracts/featurephone-engine-contract.json` — `keyWipiCodes`(어휘 20종 → KTF 게스트가 받는 정수) + 존재 이유 1줄. ★그 1줄에 «5를 눌러 8이 입력된다»를 **실측된 예**로 남겼다(아래 참조).",
+    "`scripts/check-engine-contract.mjs` — **§4c 신설**: `wie_wipi_java/.../card_canvas.rs` 의 `from_midp_raw` 팔과 `enum WIPIKeyCode` 판별식을 2단 해석해(팔 → variant → 판별식) 계약값과 **«값»으로** 대조한다. ★팔이 «MIDP variant» 로 쓰여 있고 계약은 «정수»를 핀하므로 `enum MIDPKeyCode` 를 **독립으로 다시 읽어** 정수→variant 역표를 만든다 — ★§4b 의 파싱을 재사용하지 «않는다»(한쪽 실패가 다른 쪽을 조용한 무동작으로 만들지 않게).",
+    "★**§4·§4b·`REPRESENTATIVE_KEYS`·「닫는다」 결정·재개 조건 무접촉**(직전 회차 산출물) · ★**Rust 0줄** · 픽스처 0 · 새 하네스 0 · 브라우저 검사 재설계 0."
+  ],
+  "verification": {
+    "recount": "★**착수 재확인에서 등재값이 틀렸다** — 제안은 「20행 전건 미핀」이었으나 실제 `from_midp_raw` 는 **24행**이다(`awk '/pub fn from_midp_raw/,/^    }$/' … | grep -c 'Some(MIDPKeyCode::'` → **24**, `enum WIPIKeyCode` 도 **24**). 초과 4행은 `CALL`·`HANGUP`·`VOLUME_UP`·`VOLUME_DOWN` 으로 **계약 `keyVocabulary` 밖**이다. ★★**[2026-09-04 정정 · 게이트② 반려] 초판은 이 넷을 «한 덩어리»로 묶고 「셸이 보내지 않는다」를 근거로 달았는데 «절반이 거짓»이다** — ★그것은 «측정»이 아니라 «추정»이었고, 그 추정 위에 범위 결정이 섰다. **상류(otterpebble featurephone 셸)를 `origin/main` 에서 직접 재니**: ⒜`VOLUME_UP`·`VOLUME_DOWN` → `apps/featurephone/**` 전체에 **0건** ⇒ 셸이 엔진에 보내지 «않는다»(음량은 호스트 게인 노드 `setVolume` 이 진다) — **참** ⒝★**`CALL`·`HANGUP` 은 «오늘 보낸다»** — `apps/featurephone/app/player.tsx:784·792·827·859` 의 `<GameKey code=\"CALL\"|\"HANGUP\">` 이 `RunningGame.press(code)`(`lib/engine.ts:457`) → `emu.key_down(code)`(`:466`)로 흐른다(화면 버튼 2개 · 두 레이아웃). ⇒ ★**「셸이 보내지 않는다」는 `VOLUME_*` 둘에만 참이다.** ※★**검수 회신의 인용(`Player.tsx:200-201,207` · `keymap.ts:61-64,107` · `F1`/`[`·`F2`/`]` 키바인딩)은 «내 실측에서 재현되지 않았다»** — `origin/main` 에 `keymap.ts` 라는 파일이 **없고** `KEY_MAP`(45항목)에 `CALL`/`HANGUP` 이 **0건**이다(★키보드 바인딩은 없고 «화면 버튼»만 있다). ★**핵심 주장(둘은 오늘 도달한다)은 참이고 그것이 이 정정의 근거**이며, 위치는 내가 잰 값을 적는다. ⇒ **핀 범위는 어휘 20종**으로 뒀다 — `keyMidpCodes`(§4b)와 **같은 키 집합**이라 두 표가 같은 자로 재진다. ★그 4행은 두 표에서 **여전히 미핀**이고 `limits` 에 적었다.",
+    "zero-coverage": "★「잡는 것이 0」을 **세는 명령과 함께** 확인했다: `grep -rn 'from_midp_raw\\|WIPIKeyCode\\|keyWipi' scripts/ docs/contracts/ .github/ web/ functions/` → **0건** · `card_canvas.rs` 안 `#[cfg(test)]`/`#[test]` → **0건** · 저장소 전체 `from_midp_raw` 출현 → `card_canvas.rs` **4**(정의 1 + 호출 3)와 직전 워크로그 산문 **4**뿐. ⇒ ★**검사기·시험·계약 전부 0** — 회차 크기는 제안대로 XS 다.",
+    "on-path": "★이 표가 «전달 경로 위»임을 호출부로 확인했다 — `CardCanvas` 는 `javax/microedition/lcdui/Canvas` 의 **하위형**이고 `keyPressed`/`keyReleased`/`keyRepeated` **3개를 재정의**한다(`JavaMethodProto` 등록 실측). ⇒ `Canvas::handleKeyEvent` 의 `invoke_virtual(this,\"keyPressed\")` 가 **그 재정의로 내려앉고**, 거기서 `from_midp_raw` 가 돌아 `Card.keyNotify(type, keyCode)` 로 나간다.",
+    "five-to-eight": "★**「5를 눌러 8이 입력된다」는 참이다 — 가정이 아니라 개악 출력이다.** 팔 스왑을 심으니 검사기가 `\"NUM5\" now reaches the KTF guest as 56 (Self::NUM8), contract pins 53` 을 냈고, ★**56 은 ASCII '8'** 이다(WIPI 숫자도 ASCII). 그 문장을 `keyWipiCodesNote` 와 §4c 주석에 남겼다.",
+    "mutation": "★**개악 5칸 — 전부 «제품 실물»에 심고 원복**(재타이핑 사본 아님 · `git diff --stat` 으로 원복 확인): ⒜**팔 스왑**(NUM5↔NUM8) → **2 violation**(양방향 `miswired`) ⒝**계약 1행 변조**(`keyWipiCodes.NUM7` 55→99 · ★**WIPI 표만** 건드리는 단일 축으로 정밀 재실행) → **1 violation** ⒞**표에서 1행 삭제**(계약엔 남김) → `WIPI key code drift: from_midp_raw no longer maps MIDPKeyCode::KEY_NUM5 … the None arm falls through` ⒟**위치자 개명**(`pub enum WIPIKeyCode` → `WipiKeyCodeRenamed`) → ★**fail-closed** `refusing to fail-open`(88 → 68 pass 로 그 축이 «통째로 사라졌음»도 보인다) ⒠**무개악** → **88 pass / 0 violation**(오탐 0).",
+    "coverage-delta": "정적 검사 **68 pass → 88 pass**(신규 20 = 어휘 전건). 왕복 **29/29 유지**(오탐 0) — 왕복은 J2ME 경로라 이 회차와 무관하지만 회귀 확인으로 돌렸다.",
+    "gates": "`cargo fmt --all -- --check`·`cargo clippy --all -- -D warnings`·`cargo clippy --target wasm32-unknown-unknown -- -D warnings` 전건 rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` **137 passed / 0 failed**(★Rust 무접촉이라 직전과 동수) · `npm run audit` PASSED · `check-worklog-json.mjs` OK. ★**repo 러너** `wie_validate` 3픽스처 **전건 PASS**(`draw_j2me.jar` **booted + rendered**)."
+  },
+  "limits": [
+    "★**닫은 것은 «표»이지 «도달»이 아니다** — KTF 게스트에 그 수가 실제로 «도착»하는 것은 여전히 미측정이다(픽스처가 아무것도 그리지 않아 Scenario D 기법을 못 쓴다). 그 축은 형제 제안(도달 단언 · effort M · 픽스처 선행)이고 **총괄 보류분**이다.",
+    "★**초과 4행은 여전히 미핀**이다 — `CALL`·`HANGUP`·`VOLUME_UP`·`VOLUME_DOWN` 은 계약 `keyVocabulary` 밖이라 `keyMidpCodes`·`keyWipiCodes` 둘 다에서 뺐다. ★★**[정정] 그 넷을 한 덩어리로 「셸이 보내지 않는다」로 적은 것은 «거짓»이었다** — 실측상 그 문장은 **`VOLUME_*` 둘에만** 참이다(아래 항 참조).",
+    "★★★**`CALL`·`HANGUP` 은 «세 표 전부»(§4 `parse_key` · §4b `from_key_code` · §4c `from_midp_raw`)에서 «미핀»인데 «지금 도달 가능»하다.** ★엔진은 셋 다 매핑을 갖고 있다(`lib.rs:456-457` · `event_queue.rs:69-70,129-130`(CALL=10 · HANGUP=-1) · `card_canvas.rs:27-28,87-88`(CALL=-10 · HANGUP=-11)) — ★**없는 것은 «매핑»이 아니라 «핀»이다.** ⇒ 그 둘 중 한 행이 어긋나면 **사용자가 실제로 누르는 버튼**이 다른 키로 나가고 **아무 검사도 울지 않는다**. ★**이 회차에서 닫지 않은 이유**: 어휘 확장은 `keyVocabulary` 를 늘리는 일이고 그것은 **§4b 접촉**이라 이 티켓의 Non-goal 이다 ⇒ **`proposals` 로 올렸다**. ★**`VOLUME_*` 는 다르다** — 셸이 보내지 않으므로 «미핀이지만 도달 불가»다. **그 둘을 같은 칸에 적지 마라.**",
+    "★**`None` 팔은 «값 대조»의 대상이 아니다** — `None => keycode`(변환 없이 통과)라 어휘 20종 밖의 코드는 MIDP 값 그대로 게스트에 간다. ⒞ 개악이 보인 것이 정확히 그 경로다(행이 사라지면 조용히 그 팔로 떨어진다) ⇒ **§4c 가 그것을 red 로 잡는다.**",
+    "★**`WIPIKeyCode::from_raw` → 게임 액션 표**(`wie_wipi_java/.../lcdui/display.rs:249`)는 이 회차 밖이다 — J2ME 쪽 `Canvas::getGameAction` 과 **같은 부류**(게스트가 자발적으로 부르는 조회 API · 전달 경로 밖)이고 **둘 다 미핀**이다. 직전 회차가 남긴 잔여와 함께 본다.",
+    "★★**형제 회차(J2ME) REOPEN 열거의 under-inclusion 을 «기록»한다 — 고치는 것은 이 회차가 아니다**(그쪽 축 무접촉이 Non-goal). 실측 문구 그대로: 「그 grep 는 지금도 **10 hits** 로 불변이고(재실행 확인), ★**목록 밖 `card_canvas.rs` 의 `match` 2개 중 하나가 이 per-key 표다**(`:78 match MIDPKeyCode::from_raw(keycode)` = `from_midp_raw` · 나머지 `:48` 은 `WIPIKeyCode::from_raw`). 그 블록 «자신»의 판정 규칙(`key_down` 에서 게스트 개시 없이 도달 가능하면 on-path)으로는 ★**포함됐어야 한다** — `CardCanvas` 가 `Canvas.keyPressed` 를 재정의하므로 KTF 게스트에게는 그 표가 «경로 위»다.」 ⇒ ★**결함은 «열거가 좁았던 것»이고, 그것이 «기록되지 않은 채» 남는 것이 더 나쁘다.** 술어 파일 목록 확장은 형제 축의 후속 몫이다."
+  ],
+  "issues": [],
+  "proposals": [
+    {
+      "title": "`CALL`·`HANGUP` 을 계약 어휘에 넣어 세 표 전부에서 핀한다 — 사용자가 «오늘 누르는» 2키가 어디에도 안 잠겨 있다",
+      "plainSummary": "피처폰 화면의 «통화»·«종료» 버튼은 지금도 실제로 눌리는데, 그 두 키만은 번호 대응표 검사에서 빠져 있습니다. 틀려도 아무 검사가 울지 않습니다.",
+      "userBenefit": "화면에 실재하는 버튼 2개가 «다른 키로 나가는» 오작동을 착지 전에 잡는다 — 나머지 20종은 이미 그렇게 잡힌다.",
+      "why": "실측: otterpebble `origin/main` 의 `apps/featurephone/app/player.tsx:784·792·827·859` 가 `<GameKey code=\"CALL\"|\"HANGUP\">` 로 `emu.key_down` 을 태운다(`lib/engine.ts:457·466`). 엔진도 세 표 모두 매핑을 갖는다(`parse_key` · `from_key_code` CALL=10·HANGUP=-1 · `from_midp_raw` CALL=-10·HANGUP=-11). ★**빠진 것은 «핀»뿐**이고, 계약 `keyVocabulary` 가 20종이라 §4·§4b·§4c 가 셋 다 그 둘을 건너뛴다. ★이 회차가 그것을 「범위 밖」으로 적었던 근거(「셸이 보내지 않는다」)는 **거짓으로 판명됐다**.",
+      "tradeoff": "`keyVocabulary` 를 20 → 22 로 늘리면 §4·§4b·§4c 의 «검사 대상»이 함께 늘고 세 계약 표에 각각 2행이 붙는다. ★그리고 어휘 변경은 **소비자 계약**이라 otterpebble 쪽과 함께 봐야 한다(Constraint 3 — 같은 롤아웃). 반대로 미루면 «실재하는 버튼 2개»가 계속 무보호다. ★`VOLUME_UP`/`VOLUME_DOWN` 은 **함께 넣지 마라** — 셸이 보내지 않으므로 도달 불가이고, 넣으면 계약이 «쓰이지 않는 표면»을 약속하게 된다.",
+      "effort": "XS — 계약 3표에 각 2행 + 어휘 2행. 검사기 로직 변경 0(전부 어휘를 순회한다). ★단 §4b 접촉이므로 형제 회차 산출물을 만지는 판단이 선행한다.",
+      "target": "docs/contracts/featurephone-engine-contract.json · scripts/check-engine-contract.mjs · Jun025/otterpebble apps/featurephone (읽기 전용 근거)"
+    },
+    {
+      "title": "게임 액션 표 «둘»(`Canvas::getGameAction` · WIPI `Display::getGameAction`)도 같은 방식으로 핀한다 — 남은 미핀 쌍이다",
+      "plainSummary": "게임이 «방금 누른 키가 위쪽인가?»를 엔진에 되묻는 통로가 두 개 있는데, 그 대응표가 어느 쪽도 확인되지 않습니다. 틀리면 위를 눌렀는데 캐릭터가 아래로 갑니다. 이번에 키 표에 붙인 것과 같은 방법으로 붙일 수 있습니다.",
+      "userBenefit": "방향키로 도는 게임에서 «누른 방향과 다른 쪽으로 움직이는» 오작동을 착지 전에 잡는다.",
+      "why": "키 표 세 개를 잠그는 동안 **게임 액션 표 두 개**가 계속 미핀으로 남았다: `wie_midp/.../lcdui/canvas.rs:94`(MIDP 코드 → 1·2·5·6·8)와 `wie_wipi_java/.../lcdui/display.rs:249`(WIPI 코드 → 1·2·5·6·8·99). ★둘 다 «전달 경로 밖»(게스트가 부른다)이라 재개 조건에는 안 걸리지만, ★**게스트가 실제로 쓰는 API** 이고 방향 오배선의 결과가 곧바로 «조작이 반대로 도는 것»이다. ★그리고 두 표는 **서로 값이 달라야** 정상이라(입력 코드 대역이 다르다) 한쪽만 보고 다른 쪽을 추론할 수 없다.",
+      "tradeoff": "계약에 `gameActions` 류 항목이 하나 더 늘고 §4d 블록이 붙는다(§4b·§4c 와 닮아 중복처럼 보인다). 반대로 미루면 «키 표는 셋 다 잠갔는데 그 키로 무엇을 하는지는 아무도 안 본다»가 남는다. ★MIDP 게임 액션 상수(1=UP·2=LEFT·5=RIGHT·6=DOWN·8=FIRE)는 사양값이라 계약에 적을 근거가 분명하다.",
+      "effort": "XS — 계약 2블록 + 검사기 약 20줄. 픽스처 불요(순수 함수 표).",
+      "target": "docs/contracts/featurephone-engine-contract.json · scripts/check-engine-contract.mjs · wie_midp/src/classes/javax/microedition/lcdui/canvas.rs (읽기 전용) · wie_wipi_java/src/classes/org/kwis/msp/lcdui/display.rs (읽기 전용)"
+    }
+  ],
+  "adoptedProposals": ["2026-09-04-keypress-remaining-17-keys#p0"],
+  "declinedProposals": []
+}

@@ -41,6 +41,14 @@
     "NUM5": 53, "NUM6": 54, "NUM7": 55, "NUM8": 56, "NUM9": 57,
     "STAR": 42, "HASH": 35
   },
+  "keyWipiCodesNote": "KTF(WIPI) 게스트가 받는 정수. MIDP 경로와 «다른 표»다 — net.wie.CardCanvas 가 Canvas.keyPressed 를 재정의해 WIPIKeyCode::from_midp_raw 로 한 번 더 바꾼 뒤 게스트의 Card.keyNotify 로 넘긴다. ★이 표가 한 행이라도 어긋나면 «5를 눌러 8이 입력된다»(숫자는 WIPI 에서도 ASCII 라 NUM5 의 53 이 NUM8 의 56 으로 나간다). 정본은 wie_wipi_java WIPIKeyCode 이고 이 파일이 그것을 핀한다(check-engine-contract.mjs §4c). 방향·소프트키는 음수 대역 · 숫자·기호는 ASCII.",
+  "keyWipiCodes": {
+    "UP": -1, "DOWN": -2, "LEFT": -3, "RIGHT": -4, "OK": -5,
+    "LEFT_SOFT_KEY": -6, "RIGHT_SOFT_KEY": -7, "CLEAR": -16,
+    "NUM0": 48, "NUM1": 49, "NUM2": 50, "NUM3": 51, "NUM4": 52,
+    "NUM5": 53, "NUM6": 54, "NUM7": 55, "NUM8": 56, "NUM9": 57,
+    "STAR": 42, "HASH": 35
+  },
   "saveMagic": "WIESAV01",
   "screen": { "width": 240, "height": 320 },
   "lgtCompileModels": ["clet", "aot-java"],
