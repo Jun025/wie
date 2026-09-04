@@ -43,6 +43,18 @@
   ★**형제 PR #75 와 같은 두 파일**을 만진다 — 나중에 착지하는 쪽에서 충돌 해소가 필요할 수 있다.
 
 ## 완료 (최근)
+- 2026-09-04: **«통화»·«종료» 두 키를 세 표 전부에서 잠갔다** (PR #75 착지 · `wie-key-contract-pin-call-and-hangup`
+  · 채택 제안 `2026-09-04-ktf-third-key-table-pin#p0`) — 화면 버튼 2개가 **지금도 눌리는데**
+  `CALL`·`HANGUP` 만 계약 어휘 밖이라 §4·§4b·§4c 어디에서도 안 잠겨 있었다.
+  ⇒ 어휘 2행 + 세 표에 각 2행(`CALL` 10/-10 · `HANGUP` -1/-11). ★**검사기 0줄 · 제품 코드 0줄** —
+  세 블록이 전부 계약 데이터를 순회한다는 것을 **루프 머리로 확인**했다(정적 **88 → 94 pass**).
+  ★**개악 3건을 «표마다 하나씩»** 제품 실물에 심어 셋이 각각 울었다(무개악 94 pass / 0 violation).
+  ★왕복 Scenario A 스윕이 자동으로 **20 → 22 codes**(29/29 유지).
+  ★★**제안의 「otterpebble 과 같은 롤아웃 필요」는 «과했다»** — 실측상 그쪽은 이 계약 파일을 **읽지 않는다**
+  (수신부는 sha256 검증 + 핀 범프뿐) ⇒ 교차 저장소 롤아웃 불요.
+  ★**`VOLUME_*` 2행은 일부러 열어 뒀다** — 셸이 보내지 않아 «도달 불가»(24행 중 22행 잠김).
+  ★**착지 형태 = merge commit(부모 2개)** — `wie` 는 `contracts/upstream-sync-repos.conf:23` 등재 repo 라 스쿼시가 금지다.
+  ★**형제 PR #76**(게임 액션 표 · 게이트② 진행 중)이 «같은 두 파일»을 만진다 — 이 착지가 그쪽 base 를 움직인다.
 - 2026-09-04: **KTF 의 «셋째 키 표» 핀** (PR #74 착지 · `wie-ktf-third-key-table-pin-wipi-from-midp-raw`
   · 채택 제안 `2026-09-04-keypress-remaining-17-keys#p0`) — KTF(WIPI) 게스트는 키 번호를 **한 번 더**
   바꿔서 받는다(`CardCanvas` 가 `Canvas.keyPressed` 를 **재정의** → `WIPIKeyCode::from_midp_raw` → `Card.keyNotify`).
