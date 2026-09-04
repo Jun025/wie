@@ -32,9 +32,18 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- **브라우저 왕복 KTF 키 «도달» Scenario E** (`wie-browser-roundtrip-ktf-key-reach-scenario`
+  · 채택 제안 `2026-09-05-ktf-lgt-key-reach-fixtures#p0`) — 왕복 **29 → 35 pass** · 제품 코드 **0줄**.
+  ★**D 가 못 보는 홉을 잰다**(KTF 는 `CardCanvas` 가 MIDP 코드를 WIPI 코드로 한 번 더 바꾼다) —
+  개악 ⒝(`KEY_NUM5 => Self::NUM1`)에서 ★**E 만 red · D 전건 green** 으로 독립을 실행으로 보였다.
+  ★상수는 픽스처 소스(`make-wipi-keydraw-fixture.sh`)에서 **파싱해 파생**하고 표류 시 fail-closed throw.
+  ★★**LGT 는 부분 완료 — 막은 것이 «키»가 아니다**: 키는 도달하는데(콘솔 `key:42`·`key:53`) 캔버스가 **0 px**.
+  순서·픽스처 배제(네이티브 `wie_validate --inject` 는 같은 zip 을 **PASS · paints 83**) ⇒ 축은
+  **LGT paint → WebScreen → canvas**. red 를 착지시키지 않고 «왜 없는가»를 헤더에 남기고 제안 1건.
 - **DoD 에 beta 축 한 줄** (PR **#81** 열림 · `wie-dod-four-gates-add-beta-axis` · 별 리니지)
   — `AGENTS.md` §Definition of Done 에 `cargo +beta clippy --all -- -D warnings` 블록 1개.
-  ★이 착지(#80)로 그쪽이 **원장 2파일 충돌**이 될 것이다(코드 0) — 그쪽 게이트③이 2-c⒜ 로 해소한다.
+  ★#80 착지로 그쪽은 **원장 2파일 충돌** 상태다(코드 0) — 그쪽 게이트③이 2-c⒜ 로 해소한다.
+  ★이 회차도 같은 두 파일을 만진다 ⇒ 먼저 착지하는 쪽이 나머지의 base 를 다시 움직인다.
 
 ## 완료 (최근)
 - 2026-09-05: **`current_class_loader` 대체 API 설계(`+34` 벽)** (PR **#80** 착지 · `wie-current-class-loader-replacement-api-design-for-plus34`

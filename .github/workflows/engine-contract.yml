@@ -97,6 +97,12 @@ jobs:
               # builds the draw fixture the round-trip asserts the blit with —
               # editing it changes what the contract check proves.
               - 'scripts/make-draw-fixture.mjs'
+              # Same reason, for Scenario E: the round-trip READS this script at
+              # startup to derive the KTF fixture's bar height and key table, so
+              # editing it can make the contract check throw (fail-closed) even
+              # though no .rs changed. `test_data/**` below covers the built zip;
+              # this covers its source.
+              - 'scripts/make-wipi-keydraw-fixture.sh'
               - 'docs/contracts/**'
               - 'test_data/**'
               - 'data/**'

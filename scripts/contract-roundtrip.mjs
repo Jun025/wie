@@ -85,6 +85,27 @@
 //   Every line above names a file, a line and a reason — no exemption is granted to a *kind*
 //   of thing, so a new table cannot fold itself into this list by resembling an old one.
 //
+// Scenario E (KTF keydraw fixture — KEY DELIVERY ON THE *WIPI* PATH, ASSERTED):
+//   D proves delivery down the MIDP path with a J2ME guest. KTF guests get one
+//   more hop — CardCanvas overrides keyPressed and re-maps the MIDP code through
+//   WIPIKeyCode::from_midp_raw before the guest sees it — so D says nothing about
+//   the number a WIPI guest receives. test_data/keydraw_ktf.zip paints a bar as
+//   wide as that number, so the canvas answers for the whole three-hop chain.
+//   wie_ktf/tests/test_key_reach.rs already asserts this headlessly via guest
+//   stdout; the browser adds the layers that test cannot reach — the wasm build,
+//   the wasm-bindgen glue, and WebScreen -> canvas.
+//
+//   ── Only positive WIPI codes are asserted, and that is the fixture's rule ──
+//   The guest source (scripts/make-wipi-keydraw-fixture.sh) says it outright:
+//   for digits and symbols the bar width IS the WIPI code the host delivered,
+//   while the named keys (UP/OK/CALL/...) are NEGATIVE in WIPI space, cannot be
+//   a bar width, and get an arbitrary positive slot each. Asserting a slot would
+//   mean restating a table no contract pins — a second source of truth, which is
+//   the failure this file exists to prevent. The named rows are not unguarded:
+//   check-engine-contract.mjs §4c pins all 22 WIPI codes statically against
+//   WIPIKeyCode::from_midp_raw. What the browser adds is the key-agnostic half,
+//   and any one arriving key proves that (same argument as Scenario D).
+//
 // Usage: node scripts/contract-roundtrip.mjs        (after scripts/build-wasm.sh)
 //   WIE_CHROME_CHANNEL=chrome  — use a system Chrome instead of the playwright
 //                                bundled chromium (local dev convenience).
@@ -123,6 +144,38 @@ const REPRESENTATIVE_KEYS = [
   if (typeof midp !== "number") throw new Error(`contract.keyMidpCodes has no code for representative key "${k.code}"`);
   return { ...k, midp, expectPixels: keyBarPixels(midp) };
 });
+
+// ── Scenario E constants: DERIVED from the fixture's own source, never restated ──
+// keydraw_ktf.zip is a committed binary, so its constants cannot be exported the
+// way make-draw-fixture.mjs exports Scenario C/D's. They are read back out of the
+// guest source embedded in scripts/make-wipi-keydraw-fixture.sh instead, so the
+// fixture stays the single source and a drift shows up as a parse failure here.
+// Fail-closed on every step: a silent `undefined` would compare equal to nothing
+// and burn the whole tick deadline instead of failing.
+const keydrawSh = await readFile(path.join(root, "scripts/make-wipi-keydraw-fixture.sh"), "utf8");
+const barH = Number(keydrawSh.match(/^const BAR_H: i32 = (\d+);$/m)?.[1]);
+if (!Number.isInteger(barH) || barH <= 0) throw new Error("keydraw fixture: cannot read `const BAR_H: i32 = N;` from scripts/make-wipi-keydraw-fixture.sh — refusing to fail-open");
+// The guest's `match key_code { KeyCode::X => N, ... }` arms. Only the arms whose
+// variant names a positive-WIPI key are usable (see the Scenario E header).
+const keydrawArms = new Map([...keydrawSh.matchAll(/^\s*KeyCode::([A-Za-z0-9]+)(?:\(_\))? => (\d+),$/gm)].map((m) => [m[1], Number(m[2])]));
+if (keydrawArms.size === 0) throw new Error("keydraw fixture: no `KeyCode::X => N` arms parsed — locator drift, refusing to fail-open");
+// variant -> contract vocabulary name, for the positive-WIPI rows only.
+const KTF_VARIANT_TO_KEY = { Key0: "NUM0", Key1: "NUM1", Key2: "NUM2", Key3: "NUM3", Key4: "NUM4", Key5: "NUM5", Key6: "NUM6", Key7: "NUM7", Key8: "NUM8", Key9: "NUM9", Star: "STAR", Hash: "HASH" };
+// The single-source claim, made mechanical: every positive row the guest paints
+// must equal the WIPI code the contract pins. If the fixture is ever rebuilt with
+// a different table, this throws instead of asserting a stale number below.
+for (const [variant, key] of Object.entries(KTF_VARIANT_TO_KEY)) {
+  const width = keydrawArms.get(variant);
+  const wipi = contract.keyWipiCodes?.[key];
+  if (typeof width !== "number") throw new Error(`keydraw fixture: no arm for KeyCode::${variant} — refusing to fail-open`);
+  if (width !== wipi) throw new Error(`keydraw fixture paints ${width} for KeyCode::${variant}, but contract.keyWipiCodes["${key}"] is ${wipi} — the fixture and the contract disagree`);
+}
+// One representative per positive band, mirroring Scenario D's three.
+const KTF_KEYS = ["HASH", "STAR", "NUM5"].map((code) => ({
+  code,
+  wipi: contract.keyWipiCodes[code],
+  expectPixels: contract.keyWipiCodes[code] * barH,
+}));
 
 // ── Tiny static server: glue+wasm and fixtures, query string ignored ─────────
 const MIME = { ".js": "text/javascript", ".wasm": "application/wasm", ".zip": "application/zip", ".html": "text/html" };
@@ -166,7 +219,7 @@ page.on("pageerror", (e) => consoleLog.push(`[pageerror] ${e.message}`));
 await page.goto(base + "/");
 page.setDefaultTimeout(120_000);
 
-const steps = await page.evaluate(async ({ contract, representativeKeys }) => {
+const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys }) => {
   const steps = [];
   const check = (name, pass, info = "") => {
     steps.push({ name, pass: !!pass, info: String(info) });
@@ -305,11 +358,51 @@ const steps = await page.evaluate(async ({ contract, representativeKeys }) => {
 
     c.emu.free();
     check("C: free() (no throw)", true);
+
+    // ── Scenario E: does a key reach a *WIPI* guest, as the right WIPI code? ──
+    // KTF adds a hop D never sees (CardCanvas -> WIPIKeyCode::from_midp_raw), so
+    // this fixture's bar width answers for the whole chain, through the wasm glue.
+    const fixtureBytes = await (await fetch("/fixtures/keydraw_ktf.zip")).arrayBuffer();
+    check("E: static server delivers keydraw_ktf.zip", fixtureBytes.byteLength > 0, `${fixtureBytes.byteLength} bytes over HTTP`);
+
+    const e = await bootFixture(mod2, "keydraw_ktf.zip");
+    check('E: platform_kind() === "KTF"', e.emu.platform_kind() === "KTF", `got ${e.emu.platform_kind()}`);
+    // Unlike the helloworld fixtures this one never exits — it waits for a key,
+    // painting an all-black screen until one arrives. The first key is therefore
+    // queued BEFORE the first tick (the event queue buffers it), which is how
+    // wie_ktf/tests/test_key_reach.rs avoids having to guess a boot length.
+    for (const k of ktfKeys) {
+      e.emu.key_down(k.code);
+      const runE = await tickLoop(e.emu, e.canvas, 15_000, (px) => px === k.expectPixels);
+      e.emu.key_up(k.code);
+      check(
+        `E: "${k.code}" reaches the KTF guest as WIPI code ${k.wipi}`,
+        runE.threw === null && runE.pixels === k.expectPixels,
+        runE.threw ?? `${runE.pixels} px, expected ${k.expectPixels} (${k.wipi}*barH) after ${runE.frames} frames`,
+      );
+    }
+
+    e.emu.free();
+    check("E: free() (no throw)", true);
+
+    // ── Why there is no LGT twin of Scenario E (measured 2026-09-05) ──────────
+    // keydraw_lgt.zip is built from the SAME guest source by the same script, so
+    // the constants above would hold unchanged and the scenario is ~10 lines.
+    // It was written, run, and REMOVED because it fails for a reason that is not
+    // about keys: in the browser the LGT instance boots (platform_kind "LGT") and
+    // the key DOES reach the guest — the page console carries the fixture's own
+    // `key:42` / `key:53`, the right WIPI codes — but the canvas stays at 0 px
+    // over ~300-700 frames. Ruled out: instance ordering (0 px as the first
+    // keydraw instance too) and the fixture (`wie_validate --inject` on the same
+    // zip natively reports PASS with 83 paints, vs 55 for the KTF one).
+    // So the gap is LGT paint -> WebScreen -> canvas, not key delivery, and a
+    // pixel-based assertion cannot express it. Landing a red check to document a
+    // separate defect would just disable this whole file. See the worklog.
   } catch (e) {
     check("scenario aborted by exception", false, (e && e.stack) || String(e));
   }
   return steps;
-}, { contract, representativeKeys: REPRESENTATIVE_KEYS });
+}, { contract, representativeKeys: REPRESENTATIVE_KEYS, ktfKeys: KTF_KEYS });
 
 await browser.close();
 server.close();
