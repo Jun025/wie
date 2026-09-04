@@ -74,6 +74,20 @@ RustJava pin bump whose four gates were all green while `draw_j2me.jar` failed w
 `NoClassDefFoundError` on the first tick — one `wie_validate` line reproduced it locally, and the
 round had not run it. Every fixture here is committed; no game files are involved.
 
+**Then read the PR's CI — a local pass is not a CI pass, and CI is the last gate.**
+
+```sh
+gh pr checks <n> -R Jun025/wie          # every check, with its conclusion
+```
+
+Local green predicts CI green for the four gates and no further. Three jobs run only up there and
+have each gone red on a locally-green branch: `coverage` runs the tests under `cargo tarpaulin`
+(a different execution engine — 2026-09-04 a test that passes natively segfaulted under it),
+`rust.yml` runs the matrix on Windows and Ubuntu (2026-09-04 a `:`-vs-`;` path separator passed on
+macOS and panicked on Windows), and `engine-contract` diffs the WASM export surface. **Quote the
+result in the report even when it is red** — twice on this branch's lineage a CI-red PR was
+reported as complete, which is what makes this a gate and not a suggestion.
+
 Narrower commands are conveniences, not gates: `cargo build` (default member `wie_cli`),
 `cargo test -p <crate> <test_name>`, `cargo fmt` to fix formatting (`rustfmt.toml`: max_width=150).
 
