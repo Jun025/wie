@@ -888,14 +888,16 @@ KTF·LGT 인스턴스는 **게스트 메모리**에 살아서 Rust 구조체를 
 
 ★**⒤ 13행 프로브를 새 핀에서 재실행했다**(§8-4⑸ 와 같은 자). §8-6 이 예고한 6축이 전부 «프로브상» 0 이 됐다 — 추가 손실 0.
 ★★**[2026-09-04 정정] 그중 축 5 는 «프로브가 틀린 것»이지 사라진 것이 아니다**(아래 정정 항목) ⇒ ★**실제 상실은 5축이다.**
+★★**[2026-09-04 2차 정정 · §10] 그리고 아래 표의 「미이식」 2칸(축 8·9)은 «더 이상 참이 아니다» — 둘 다 이식됐다.**
+★**이 절만 읽고 「2축은 미이식」으로 인용하지 마라** — 정정은 각 칸·각 문장에 인라인으로 박아 두었다.
 
 | 축 | ⒤새 핀에서 | ⒥이식 비용(원본 커밋) | ⒦코퍼스 없이 잠글 수 있나 | **처분** |
 |---|---|---|---|---|
 | 1'' `ByteArrayInputStream` null NPE | **사라짐**(1→0) | 4줄 | ✔ | ★**이식** |
 | 2a `System.arraycopy` null NPE | **사라짐**(2→0) | 5줄 | ✔ | ★**이식** |
 | 4 `StringBuffer.append([CII)` null NPE | **사라짐**(1→0) | 4줄 | ✔ | ★**이식** |
-| 8 `StringBuffer.insert(I,String)` | **사라짐**(1→0) | **53줄** + 시험 36줄 | ✔ | **미이식** |
-| 9 `Timer.schedule(TimerTask,long)` | **사라짐**(1→0) | **17줄** + 시험 26줄 | △(시계 의존) | **미이식** |
+| 8 `StringBuffer.insert(I,String)` | **사라짐**(1→0) | **53줄** + 시험 36줄 | ✔ | ~~미이식~~ → ★**이식**(2026-09-04 · §10) |
+| 9 `Timer.schedule(TimerTask,long)` | **사라짐**(1→0) | **17줄** + 시험 26줄 | ~~△(시계 의존)~~ → ★**✔**(§10 이 시계 의존을 없앴다) | ~~미이식~~ → ★**이식**(2026-09-04 · §10) |
 | 5 pending-thread GC 루트 | ★**«사라지지 않았다»** — 프로브가 틀렸다(아래 정정) | — | — | ★**이식 불요** |
 
 ★★**갈래 = ⒝ «일부 이식». 고른 이유는 «줄 수»가 아니라 «실패의 등급»이다.**
@@ -904,6 +906,10 @@ KTF·LGT 인스턴스는 **게스트 메모리**에 살아서 Rust 구조체를 
   ⇒ 에뮬레이터가 통째로 죽고, 게스트는 잡을 수 없다.
 - ★**미이식 2축(8·9)은 «메서드 부재»다** — 실패가 Java 레벨 해석 오류로 나와 **시끄럽고 잡을 수 있다.**
   ⇒ ★**같은 «하드닝»이라는 이름 아래 등급이 다르다.** 줄 수(53·17)보다 이 차이가 결정적이다.
+  ★★**[2026-09-04 2차 정정 · §10] 등급 판단은 그대로 서지만 «처분»은 뒤집혔다 — 두 축은 이제 «이식»이다.**
+  뒤집은 것은 등급이 아니라 **새 측정**이다: 버린 fork 의 커밋 메시지가 두 축 모두를 **실제 타이틀에서
+  관측된 method-not-found** 로 지목한다(`3cb4d7d` 소울카드마스터2 · `9cfc346` 미니고치).
+  ⇒ ★**「시끄러우니 미룬다」는 「게스트가 그 지점에서 멈춘다」를 이기지 못한다.** 전말은 §10.
 - ★★**[2026-09-04 정정 · 게이트② 반려] 축 5 의 「사라짐 · 불가 · 영구 미복구」는 «참이 아니었다».**
   새 핀은 **같은 창을 다른 설계로 이미 닫아 놓았다**(이 회차가 소스로 재확인):
   `java/lang/Thread::start` 가 `jvm.new_global_ref(&this)` 로 만든 **`GlobalRef<Thread>`** 를
@@ -917,6 +923,8 @@ KTF·LGT 인스턴스는 **게스트 메모리**에 살아서 Rust 구조체를 
   「사라짐(2→0) · 불가 · 영구 미복구」로 «올렸다».** ⇒ ★**총괄에게 «없는 리스크»를 올린 것이고 그것이 더 나쁘다.**
   ※원본 커밋 계수(`daee53b` 34 insertions · `garbage_collector.rs` 7 + `jvm.rs` 18 = 25)는 **정확하다** — 그 수는 둔다.
   ⇒ ★**이 회차가 «갚지 못한» 값은 축 5 가 아니라 «미이식 2축(8·9)»뿐이다.**
+  ★★**[2026-09-04 2차 정정 · §10] 그 잔액도 «갚혔다» — 축 8·9 는 이식됐다.** ⇒ ★**남은 잔액은 0 이다**
+  (열려 있는 것은 «이식된 오버로드 밖»의 부분 표면뿐이고, 그 재개 조건은 §10-4 에 수로 달려 있다).
 
 ★★**그리고 이식이 «가능»했던 이유를 적어 둔다 — 이 회차의 구조적 발견이다.**
 `JvmRuntime::find_rustjar_class`(**wie 쪽 코드**)가 `java_runtime::get_runtime_class_proto(class)` 로 프로토를
@@ -947,4 +955,99 @@ KTF·LGT 인스턴스는 **게스트 메모리**에 살아서 Rust 구조체를 
 ★★**그러나 §8-6 이 못박은 그대로다 — 「4게이트도 `cargo test --all` 도 green 인 채로 사라진다」.**
 ⇒ ★**green 은 «회귀 없음»의 증거이지 «하드닝 보존»의 증거가 아니다.** 보존의 증거는 오직 9-2 의 프로브와
 9-3 의 개악 대조뿐이고, ★**축 8·9 에 대해서는 그 증거가 «없다»**(★**축 5 는 목록에서 빠졌다 — 2026-09-04 정정 · §9-2**).
+★★**[2026-09-04 2차 정정 · §10] 축 8·9 에도 이제 그 증거가 «있다»** — 이식과 함께 행동 시험 2건 + 개악 대조
+(`add()` → `return false` ⇒ 2/2 red)가 붙었다. ⇒ ★**이 문장이 가리키던 공백은 닫혔다.**
 ★**코퍼스 축(P2)은 여전히 이 머신에서 불가**다(§8-1) — 이 회차가 그것을 바꾸지 않았다.
+
+## 10. 미이식 하드닝 2축의 처분 (2026-09-04 · `wie-unported-hardening-two-axes-decide-with-a-corpus-probe`)
+
+> 운영자 채택 제안 **`2026-09-04-upstream-realign-p1-pin-plus33#p0`** — 「이식하지 않은 2축을 «닫을지 말지» 결정하라」.
+> 총괄 결정: ★**둘을 «한 덩어리»로 보지 않고 한 번의 값싼 측정으로 가른다.**
+> ★**결론: 둘 다 이식했다.** 근거는 아래 «두 번째» 측정이다.
+
+### 10-1. ★첫 측정 — 우리가 «가진» 아카이브의 상수풀 프로브 (결론을 내지 못했다)
+
+저장소가 가진 게스트 아카이브 전수를 `.class` 상수풀의 `Methodref`/`InterfaceMethodref` 로 훑었다
+(★문자열 grep 이 아니라 **상수풀 파싱** · 실행 0):
+`test_data/draw_j2me.jar` · `test_data/helloworld_ktf.zip` · `test_data/helloworld_lgt.zip` ·
+`docs/reference/AromaWIPI_classes.zip` ⇒ ★**표본 `.class` 226개.**
+
+| 축 | 정확 일치 호출 |
+|---|---|
+| `java/util/Timer.schedule(Ljava/util/TimerTask;J)V` | **0건** |
+| `java/lang/StringBuffer.insert(ILjava/lang/String;)…` | **1건** — ★그러나 그 1건은 `AromaWIPI` 라이브러리 **자신의 `StringBuffer.class`**(다른 오버로드가 이 것에 위임한다) ⇒ ★**게스트 호출부는 0건** |
+
+★★**그리고 이 표본으로는 답이 «나오지 않는다» — 그 사실을 먼저 적는다.** 226개 중
+`test_data` 3건은 **우리가 직접 만든 hello-world/draw** 이고, `AromaWIPI` 는 **게임이 아니라 플랫폼 라이브러리**다.
+⇒ ★**「게임이 이 메서드를 부르는가」에 대한 표본이 «사실상 0» 이다.** 규칙 ⒝(둘 다 0 ⇒ 미이식)을
+여기서 적용했다면 그것은 **측정이 아니라 표본 부재를 근거로 삼는 것**이었다.
+
+### 10-2. ★★두 번째 측정 — «보호»를 세라: 플랫폼 표면 + ★**fork 커밋 로그의 실제 게임 이름**
+
+★**⒜ 플랫폼이 게스트에게 «약속»하는 표면**(`AromaWIPI_classes.zip` 의 선언 메서드 파싱):
+
+| 클래스 | 플랫폼이 선언 | 우리 핀(`5b84dd1`)이 가진 것 |
+|---|---|---|
+| `java/lang/StringBuffer.insert` | ★**9개 오버로드**(`(I,Object)`·`(I,String)`·`(I,[C)`·`(I,Z)`·`(I,C)`·`(I,I)`·`(I,J)`·`(I,F)`·`(I,D)`) | ★**0개** |
+| `java/util/Timer` | `schedule(TT,J)` · `schedule(TT,Date)` · `schedule(TT,JJ)` · `schedule(TT,Date,J)` · `scheduleAtFixedRate(TT,JJ)` · `scheduleAtFixedRate(TT,Date,J)` · ★`cancel()` | `schedule(TT,JJ)` · `scheduleAtFixedRate(TT,JJ)` **뿐** |
+
+★**⒝ 그리고 «누가 실제로 불렀는지»가 남아 있었다 — 버린 fork 의 커밋 메시지에.**
+```
+3cb4d7d  feat(java_runtime): Timer.schedule(TimerTask, long) one-shot overload
+         "Trace-specified as method-not-found on 소울카드마스터2."
+9cfc346  feat(java_runtime): StringBuffer.insert(I, String)
+         "Trace-specified as method-not-found on 미니고치."
+```
+⇒ ★★★**둘 다 «실제 타이틀에서 관측된» 호출이다.** 코퍼스가 있던 시절의 관측이고, 여기서 어떤 프로브를 돌려도
+그것을 대체하지 못한다. ⇒ ★**규칙 ⒜(「어느 한쪽이라도 호출이 있다 ⇒ 이식」)가 «둘 다»에 걸린다.**
+
+★★**이것이 §9-2 의 판단을 정정한다** — P1 회차는 두 축을 「실패 등급이 낮다(메서드 부재는 시끄럽다)」로 미뤘고
+검수는 「게스트가 부르는지는 코퍼스가 없어 못 쟀다」로 남겼는데, ★**그 증거는 우리 의존성의 이력 안에 이미 있었다.**
+★**아무도 «거기»를 보지 않았다.** — §8-4⑸ 의 프로브가 「식별자를 센다」였던 것과 같은 형태의 실수다.
+
+### 10-3. 처분 — 둘 다 이식(`wie_jvm_support/src/hardening.rs`) · 시험은 코퍼스 비의존
+
+- `Timer.schedule(TimerTask,long)` — 핀의 `(TT,J,J)` 에 **period 0** 으로 위임한다(`TimerThread` 가 `period > 0` 일 때만 반복한다).
+  ★**대체 수단이 없다**: 아무 period 나 주면 1회성 태스크가 «영원히 반복»된다.
+- `StringBuffer.insert(int,String)` — fork 구현을 **그대로 이식**(재유도하지 않았다). 두 사양이 잃기 쉽다 —
+  ★null String 은 문자 네 개 `"null"` 을 넣고 ★범위 밖 offset 은 던진다(`StringIndexOutOfBoundsException` 은
+  이 런타임에 없는 클래스라 등록된 상위형 `IndexOutOfBoundsException`).
+- ★**둘 다 «감싸기»가 아니라 «추가»다** — `add()` 는 핀이 나중에 같은 메서드를 갖게 되면 ★**덮지 않고 `tracing::error!` 로 신고**한다.
+- **시험**(게임 파일 0 · 시계 비의존): `tests/absent_timer_schedule.rs` · `tests/absent_string_buffer_insert.rs` 각 1건 ·
+  ★Timer 는 «시계를 기다리지 않고» `TimerThread` 가 읽는 두 필드(`period`·`nextExecutionTime`)로 단언한다.
+  ★**개악 대조**: `add()` 를 `return false` 로 무력화하면 행동 시험 **2/2 red** + 계수 시험 red.
+  ★★**시험당 파일 1개인 이유는 취향이 아니라 «측정»이다 — 아래 10-5.**
+
+### 10-5. ★`cargo tarpaulin` 아래서 «두 시험이 한 바이너리에 같이 있으면» segfault 한다
+
+초판은 두 시험을 `tests/absent_methods.rs` **한 파일**에 두었고 `coverage` 잡이 red 였다:
+```
+running …/deps/absent_methods-800da2d465a64e21   running 2 tests
+ERROR cargo_tarpaulin: Failed to run tests: A segfault occurred while executing tests
+```
+★**로컬에서는 재현되지 않는다** — macOS 에서 `--test-threads=1` · `ulimit -s 1024` · `--all-features` 전부 pass 이고,
+이 머신에 docker 가 없어 `xd009642/tarpaulin` 이미지를 그대로 돌릴 수도 없다.
+★**그리고 tarpaulin 로그는 «시험»이 아니라 «바이너리»를 지목한다** ⇒ 어느 쪽이 죽는지가 미측정이었다.
+
+★★**시험당 바이너리 1개로 갈라 재측했다**(CI run `33819851230` · **success**):
+```
+running …/deps/absent_timer_schedule-ec2299050fb64818        ← 죽지 않는다
+running …/deps/absent_string_buffer_insert-d5b1f62e269c3412  ← 죽지 않는다
+|| wie_jvm_support/tests/absent_string_buffer_insert.rs: 31/31
+|| wie_jvm_support/tests/absent_timer_schedule.rs: 29/32
+```
+⇒ ★**어느 «한 시험»도 원인이 아니다. 두 시험의 «동거»가 원인이다.**
+★**그리고 「tarpaulin 아래서 JVM 부팅이 안 된다」도 아니다** — 같은 run 에서 `hardening::tests` 3건이
+lib 바이너리 안에서 JVM 을 부팅하고 전건 ok 다. ⇒ ★**두 가설 다 측정으로 죽었다.**
+★**정확한 기전(ptrace 브레이크포인트와 libtest 병렬 스레드의 상호작용으로 보이나)은 Linux 재현 수단이
+이 머신에 없어 «미측정»이다** — 여기서 주장하지 않는다. 측정된 것은 트리거뿐이다.
+★★**처방으로 시험을 지우거나 `#[ignore]` 로 덮지 않았다** — `coverage.yml` 머리 주석이 명시로 금지한다
+(「fix the change, do not delete tests」). 단언·시험 수 무변경이고, 바뀐 것은 «파일 경계» 하나다.
+
+### 10-4. ★남아 있는 «부분 표면» — 재개 조건을 «수»로 단다
+
+이 회차가 닫은 것은 ★**`insert` 9개 중 1개 · `Timer` 5개 중 3개**다. 나머지는 **일부러** 두었다 —
+이름이 붙은 타이틀이 없는 것을 사양만 보고 넣으면 «어느 것을 게임이 부르는지»를 추측하는 일이 된다.
+★★**재개 조건(「나중에」가 아니다)**: ★**누락 오버로드를 지목한 게스트 실패 «1건» 관측.**
+`wie_validate` 가 그 실패를 **디스크립터가 들어간 해석 오류**로 보고하므로 **트레이스 한 건이면 다음 대상이 정해진다.**
+※부수 발견: `Timer.cancel()` 도 핀에 **없다**(플랫폼은 선언한다). ★이 회차 범위 밖이라 손대지 않았다 — 같은 재개 조건이 적용된다.

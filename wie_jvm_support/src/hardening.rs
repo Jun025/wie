@@ -13,10 +13,24 @@
 //! `RuntimeClassProto` from `java_runtime` and hands it to the JVM itself, so wie can
 //! wrap a method body on the way past. That is all this module does.
 //!
+//! It also re-adds two *absent methods*. The P1 round left those out on the grounds that a
+//! missing method fails loudly while a missing null guard kills the host — true, but it also
+//! assumed nobody had measured whether guests call them. They had: the fork's own commit log
+//! names the title that hit each one (`Timer.schedule` → 소울카드마스터2, `StringBuffer.insert`
+//! → 미니고치, both "trace-specified as method-not-found"). Those are corpus observations from
+//! when the corpus still existed, and no probe run here can replace them.
+//!
+//! **What is still missing, and when to revisit it.** The pin's `StringBuffer` declares no
+//! `insert` at all while the WIPI platform library games compile against
+//! (`docs/reference/AromaWIPI_classes.zip`) declares **nine** overloads; its `Timer` declares
+//! four `schedule` forms plus `cancel`, of which the pin has two and we add a third. So this
+//! module closes **1 of 9** and **3 of 5**. Only the two with a named title behind them were
+//! ported — adding the rest on spec alone would be guessing at which one a game calls.
+//! **Resume condition, as a number rather than "later": one (1) observed guest failure naming a
+//! missing overload.** `wie_validate` reports it as a resolution error carrying the descriptor,
+//! so a single trace is enough to pick the next one.
+//!
 //! Deliberately NOT covered (measured, not overlooked):
-//! - `StringBuffer.insert(I,String)` and `Timer.schedule(TimerTask,long)` are *absent
-//!   methods*, not missing guards. Their failure mode is a Java-level resolution error,
-//!   which is loud and catchable — a different severity class from a host panic.
 //! - Pending-thread GC roots need no port at all. The 13-row probe that produced the "six
 //!   axes" list greps for `pending` — the *fork's identifier* — not for the protection, and
 //!   the pin closes the same window under another name: `Thread.start` holds a
@@ -24,11 +38,17 @@
 //!   `global_references` as roots. (Corrected 2026-09-04; the first version of this comment
 //!   called it "impossible without a fork", which reported a risk that does not exist.)
 
-use alloc::boxed::Box;
+use alloc::{boxed::Box, format, vec::Vec};
 
 use java_class_proto::{JavaMethodProto, MethodBody};
-use java_runtime::{Runtime, RuntimeClassProto};
-use jvm::{JavaError, JavaValue, Jvm};
+use java_runtime::{
+    Runtime, RuntimeClassProto, RuntimeContext,
+    classes::java::{
+        lang::{String, StringBuffer},
+        util::{Timer, TimerTask},
+    },
+};
+use jvm::{ClassInstanceRef, JavaChar, JavaError, JavaValue, Jvm, Result as JvmResult, runtime::JavaLangString};
 
 /// Wraps a method body so a null in any of `args` raises NPE instead of reaching code
 /// that unwraps it.
@@ -79,6 +99,94 @@ fn guard(proto: &mut RuntimeClassProto, name: &str, descriptor: &str, args: &'st
     true
 }
 
+/// Adds a method the pin does not define. Refuses to shadow an existing one: if the pin grows
+/// the method later, we must drop ours rather than silently win the lookup.
+fn add(proto: &mut RuntimeClassProto, method: JavaMethodProto<dyn Runtime>) -> bool {
+    if proto.methods.iter().any(|x| x.name == method.name && x.descriptor == method.descriptor) {
+        tracing::error!(
+            "hardening: {}::{}{} now exists upstream — drop the wie-side copy",
+            proto.name,
+            method.name,
+            method.descriptor
+        );
+        return false;
+    }
+
+    proto.methods.push(method);
+
+    true
+}
+
+/// `Timer.schedule(TimerTask, long)` — one-shot. The pin only has the repeating
+/// `(TimerTask, long, long)` form, and there is no safe substitute: passing a period would
+/// make a one-shot task repeat forever. `TimerThread` already treats `period == 0` as
+/// non-repeating, so this is the two-argument form expressed in terms of the three.
+async fn timer_schedule_once(
+    jvm: &Jvm,
+    _: &mut RuntimeContext,
+    this: ClassInstanceRef<Timer>,
+    task: ClassInstanceRef<TimerTask>,
+    delay: i64,
+) -> JvmResult<()> {
+    tracing::debug!("java.util.Timer::schedule({this:?}, {task:?}, {delay})");
+
+    jvm.invoke_virtual(&this, "schedule", "(Ljava/util/TimerTask;JJ)V", (task, delay, 0i64))
+        .await
+}
+
+/// `StringBuffer.insert(int, String)`.
+///
+/// Ported from the dropped fork rather than re-derived. Two spec details are easy to lose:
+/// a null String inserts the four characters `"null"`, and an out-of-range offset throws —
+/// as `IndexOutOfBoundsException`, because the spec's `StringIndexOutOfBoundsException` is
+/// not a class this runtime defines.
+async fn string_buffer_insert_string(
+    jvm: &Jvm,
+    _: &mut RuntimeContext,
+    mut this: ClassInstanceRef<StringBuffer>,
+    offset: i32,
+    string: ClassInstanceRef<String>,
+) -> JvmResult<ClassInstanceRef<StringBuffer>> {
+    tracing::debug!("java.lang.StringBuffer::insert({this:?}, {offset}, {string:?})");
+
+    let count: i32 = jvm.get_field(&this, "count", "I").await?;
+    if offset < 0 || offset > count {
+        return Err(jvm
+            .exception("java/lang/IndexOutOfBoundsException", &format!("offset {offset}, length {count}"))
+            .await);
+    }
+
+    let insert: Vec<JavaChar> = if string.is_null() {
+        "null".encode_utf16().collect()
+    } else {
+        JavaLangString::to_rust_string(jvm, &string).await?.encode_utf16().collect()
+    };
+
+    let value = jvm.get_field(&this, "value", "[C").await?;
+    let chars: Vec<JavaChar> = jvm.load_array(&value, 0, count as _).await?;
+
+    let new_chars = chars[..offset as usize]
+        .iter()
+        .chain(insert.iter())
+        .chain(chars[offset as usize..].iter())
+        .copied()
+        .collect::<Vec<_>>();
+    let new_count = new_chars.len();
+
+    // Same growth policy as the pin's private `ensure_capacity` (double on overflow); we
+    // cannot call it from here, so it is restated rather than approximated.
+    if jvm.array_length(&value).await? < new_count {
+        let grown = jvm.instantiate_array("C", new_count * 2).await?;
+        jvm.put_field(&mut this, "value", "[C", grown).await?;
+    }
+
+    let mut value = jvm.get_field(&this, "value", "[C").await?;
+    jvm.store_array(&mut value, 0, new_chars).await?;
+    jvm.put_field(&mut this, "count", "I", new_count as i32).await?;
+
+    Ok(this)
+}
+
 /// Applies every guard that belongs to `proto`. Returns how many were applied, so a test
 /// can assert the count rather than trust that the lookups still match.
 pub fn harden(proto: &mut RuntimeClassProto) -> usize {
@@ -99,7 +207,25 @@ pub fn harden(proto: &mut RuntimeClassProto) -> usize {
         "java/io/ByteArrayInputStream" => guard(proto, "<init>", "([B)V", &[1], "byte array is null") as usize,
 
         // `sb.append((char[]) null, 0, 0)` — same shape, `load_array` on a null ref.
-        "java/lang/StringBuffer" => guard(proto, "append", "([CII)Ljava/lang/StringBuffer;", &[1], "str is null") as usize,
+        // `insert` is absent from the pin entirely (미니고치 hit it) — added, not wrapped.
+        "java/lang/StringBuffer" => {
+            guard(proto, "append", "([CII)Ljava/lang/StringBuffer;", &[1], "str is null") as usize
+                + add(
+                    proto,
+                    JavaMethodProto::new(
+                        "insert",
+                        "(ILjava/lang/String;)Ljava/lang/StringBuffer;",
+                        string_buffer_insert_string,
+                        Default::default(),
+                    ),
+                ) as usize
+        }
+
+        // One-shot `schedule` is absent from the pin (소울카드마스터2 hit it).
+        "java/util/Timer" => add(
+            proto,
+            JavaMethodProto::new("schedule", "(Ljava/util/TimerTask;J)V", timer_schedule_once, Default::default()),
+        ) as usize,
 
         _ => 0,
     }
@@ -117,13 +243,19 @@ mod tests {
 
     use super::harden;
 
-    /// Each guarded class must still resolve to exactly one method — if the pin moves and
-    /// a descriptor changes, this fails instead of the guard quietly vanishing.
+    /// Every guarded/extended class must still resolve — if the pin moves and a descriptor
+    /// changes, this fails instead of the hardening quietly vanishing.
     #[test]
     fn every_guard_is_actually_applied() {
-        for name in ["java/lang/System", "java/io/ByteArrayInputStream", "java/lang/StringBuffer"] {
+        // StringBuffer carries two: one wrapped guard and one added method.
+        for (name, expected) in [
+            ("java/lang/System", 1),
+            ("java/io/ByteArrayInputStream", 1),
+            ("java/lang/StringBuffer", 2),
+            ("java/util/Timer", 1),
+        ] {
             let mut proto = get_runtime_class_proto(name).unwrap();
-            assert_eq!(harden(&mut proto), 1, "{name}: guard not applied");
+            assert_eq!(harden(&mut proto), expected, "{name}: hardening not applied");
         }
     }
 
