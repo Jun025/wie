@@ -1,5 +1,16 @@
 # REPORT
 
+## [2026-09-04] 남은 17종의 키 사각 — 「17개의 구멍」이 아니라 「핀 없는 표 하나」였다 (wie-featurephone-keypress-remaining-17-keys-close-or-declare)
+- **무엇을**: `docs/contracts/featurephone-engine-contract.json` 에 `keyMidpCodes`(어휘 20종 → 게스트가 받는 정수) 신설 · `scripts/check-engine-contract.mjs` **§4b** 신설(그 표를 `wie_midp` 원본과 대조) · `scripts/contract-roundtrip.mjs` 의 하드코딩 제거 + Scenario D 머리 주석에 결정·재개 조건 기재. ★**제품 코드 변경 0** · 새 하네스 0 · 브라우저 검사 재설계 0.
+- **왜**: 운영자 채택 제안 `2026-09-04-featurephone-keypress-reaches-guest#p1`(「남은 17종의 사각을 «닫을지 말지» 정해 둔다」).
+- **★⑴ 결정 «전»에 사각의 모양부터 쟀고, 그것이 전제를 갈랐다**: 키 전달은 ⒜**키 무관** 부분(`handle_event` → 이벤트 큐 → `Canvas::handleKeyEvent` → `keyPressed`)과 ⒝**키별** 부분으로 나뉜다. ⒜는 ★**키로 분기하는 `match` 가 «한 군데도 없어»** 아무 키 1종이 도달하면 증명된다 ⇒ Scenario D 의 3증인으로 **이미 전건 닫혀 있었다**. ⒝는 ★**표가 «둘»**인데(`parse_key` · `MIDPKeyCode::from_key_code`) ★**소스 핀은 첫 표만 지키고 있었다.**
+- **★★⑵ 그래서 「실제로 열린 N」은 «17종의 도달»이 아니라 «둘째 표의 17행»이다**: 그 결함은 **「7을 눌렀는데 8이 입력된다」**로 나오고 ★JS 표면에서 보이지 않으며 소스 핀도 보지 않는다. ⇒ **닫았다** — Scenario D 를 20종으로 넓히는 대신(그것은 ⒜를 17번 더 증명하는 일이다) **첫 표를 지키던 그 기구를 둘째 표에 붙였다.**
+- **★⑶ 정정 1건 — 이 사각이 여기까지 온 «경로»**: `contract-roundtrip.mjs` Scenario D 머리 주석이 「나머지 어휘는 `check-engine-contract.mjs` 의 소스 핀이 본다」고 적고 있었다. ★**절반만 참이었고**, 그 문장이 둘째 표의 부재를 가렸다.
+- **★⑷ 개악 대조 2종**(원문을 고쳐 돌리고 원복): 팔 스왑(`NUM7 => KEY_NUM8`) → `✗ … reaches the guest as 56 … pins 55` · 판별식 변경(`KEY_NUM7 = 155`) → `✗ … as 155 … pins 55`. ⇒ ★**두 갈래 모두 red** — 한쪽만 보면 다른 쪽으로 샌다. 정적 검사 **48 → 68 pass** · 왕복 **29/29 유지**(오탐 0).
+- **★재개 조건 — 방아쇠는 «수»가 아니라 «목록에 없는 새 히트»다**: 전달 **5파일**의 `match` 를 세는 술어를 돌려 **오늘의 10건을 전건 열거**하고 각각 포함/제외 사유를 붙였다(표 3 · 경로 안·키 무관 5 · 경로 밖 1 · 독 주석 1) ⇒ ★**그 목록에 없는 히트가 생기면 재개**. ★초판의 「그 수가 2 이상이면 재개」는 ★**태어난 날 이미 10이라 거짓**이었고(게이트② 반려), 「표이지 경로가 아니다」라는 **부류 면제**도 걷어내 파일·줄·이름으로 **지목**했다. ★「사이」도 판정 가능하게 못박았다 — «게스트가 호출을 시작하지 않고 `key_down` 에서 도달되는가»이고, 그 정의를 적용하니 ★**빠뜨린 경로 파일 2개**(`display.rs`·`displayable.rs` · 둘 다 `match` 0건)가 드러나 술어의 파일 목록이 3 → **5**가 됐다.
+- **사용자 영향**: 키가 «다른 키로» 입력되는 조용한 오작동이 어휘 20종 전건에 대해 착지 전에 잡힌다. 엔진 동작·배포 산출물 변경 0.
+- **★남는 구멍**: KTF/WIPI 경로의 **셋째 표** `WIPIKeyCode::from_midp_raw` 는 20행 전건 미핀이다 — 이 티켓의 Non-goal(KTF 경로)이라 손대지 않고 **제안으로 올렸다**(XS · 픽스처 불요).
+
 ## [2026-09-04] 미이식 하드닝 2축 처분 — «둘 다 이식» · 근거는 버린 fork 의 커밋 로그에 있었다 (wie-unported-hardening-two-axes-decide-with-a-corpus-probe)
 - **무엇을**: `wie_jvm_support/src/hardening.rs`(`add()` 헬퍼 + `Timer.schedule(TimerTask,long)` + `StringBuffer.insert(int,String)` · 모듈 문서에 «남은 부분 표면 + 재개 조건») · 신규 `wie_jvm_support/tests/absent_timer_schedule.rs`·`tests/absent_string_buffer_insert.rs`(시험 각 1건 — ★시험당 파일 1개인 이유는 §10-5) · `docs/upstream-realign-verdict.md` **§10 추가** · `STATE.md`·`REPORT.md`·워크로그. ★**핀 무접촉**(`Cargo.toml`·`Cargo.lock` 변경 0) · 이식한 3축 무접촉.
 - **왜**: 운영자 채택 제안 `2026-09-04-upstream-realign-p1-pin-plus33#p0`(「2축을 «닫을지 말지» 결정하라」) + 총괄 결정(「둘을 한 덩어리로 보지 않고 한 번의 값싼 측정으로 가른다」).

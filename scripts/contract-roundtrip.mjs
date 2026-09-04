@@ -27,8 +27,63 @@
 //   Scenario A's sweep only proves key_down/key_up don't throw, which an engine
 //   that drops every event also passes. Here the fixture's keyPressed() paints a
 //   bar as wide as the MIDP code it received, so the canvas says WHICH code
-//   reached the guest. Representative keys only (soft/numeric/direction) — the
-//   full vocabulary stays check-engine-contract.mjs's source pin.
+//   reached the guest. Representative keys only (soft/numeric/direction).
+//
+//   ── Why 3 and not all 20 (decided 2026-09-04, do not "complete" this list) ──
+//   Delivery splits into a per-key part and a key-agnostic part, and they need
+//   different guards:
+//     · per-key   — two tables: parse_key (name -> KeyCode) and
+//                   MIDPKeyCode::from_key_code (KeyCode -> the int the guest
+//                   sees). BOTH are pinned statically for all 20 keys by
+//                   check-engine-contract.mjs §4 / §4b.
+//     · key-agnostic — handle_event -> event queue -> Canvas::handleKeyEvent ->
+//                   keyPressed(code). Measured: not one branch on which key, so
+//                   this half is proven by ANY key that arrives. 3 witnesses
+//                   (one per code band) already prove it; keys 4..20 would
+//                   re-prove the same path at ~1 browser frame-loop each.
+//   Earlier revisions of this comment said the remaining 17 "stay the source
+//   pin" — that was only half true and is why the gap survived: the source pin
+//   covered the FIRST table only, so a swapped row in the second one (NUM7 ->
+//   56: press 7, type 8) was caught by nothing. §4b closes that.
+//
+//   ── REOPEN when a hit appears that is NOT in the table below ──────────────
+//   The trigger is a NEW ENTRY, not a count: every `match` in the delivery
+//   files is enumerated here with why it is in or out, so "does this still
+//   hold?" is a diff against this list instead of a judgement call. (The first
+//   version of this condition said "reopen when the count exceeds 1" and was
+//   already false on the day it was written — the count is 10.)
+//     $ grep -nE '(^|[^[:alnum:]_])match[^[:alnum:]_]' \
+//         wie_web/src/lib.rs \
+//         wie_midp/src/classes/net/wie/event_queue.rs \
+//         wie_midp/src/classes/javax/microedition/lcdui/display.rs \
+//         wie_midp/src/classes/javax/microedition/lcdui/displayable.rs \
+//         wie_midp/src/classes/javax/microedition/lcdui/canvas.rs
+//   2026-09-04 — 10 hits, and NOT ONE of them is a per-key branch on the path:
+//     lib.rs:444         not code   — doc comment ("Names match the `KeyCode`")
+//     lib.rs:447         TABLE      — parse_key: name -> KeyCode         (pinned, §4)
+//     event_queue.rs:120 TABLE      — from_key_code: KeyCode -> guest int (pinned, §4b)
+//     event_queue.rs:90  TABLE      — MIDPKeyCode::from_raw: int -> variant; reads the same
+//                                     discriminants §4b pins, so it cannot disagree with :120
+//     event_queue.rs:25  path, key-agnostic — EventQueueEvent kind (KeyEvent/Repaint/Notify)
+//     event_queue.rs:46  path, key-agnostic — KeyboardEventType (pressed/released/repeated)
+//     event_queue.rs:205 path, key-agnostic — Event shape; the key value is handed whole to
+//                                     from_key_code(x), never inspected here
+//     event_queue.rs:298 path, key-agnostic — event kind again, on the dispatch side
+//     canvas.rs:157      path, key-agnostic — event type -> keyPressed/Released/Repeated;
+//                                     `code` passes through untouched
+//     canvas.rs:94       OFF-PATH   — Canvas::getGameAction. Guest-initiated: its only entry is
+//                                     the JavaMethodProto the guest calls (zero internal callers,
+//                                     measured), so it runs AFTER delivery on a code the guest
+//                                     already holds. It IS an unpinned per-key table — carried as
+//                                     residual (see the worklog proposal), not as delivery.
+//   "On the path" is decidable, not a vibe: a function is on it iff it is reachable from
+//   WieEmulator::key_down WITHOUT the guest initiating the call. Measured chain —
+//     key_down -> handle_event -> EventQueue -> Display::handleKeyEvent
+//              -> Displayable/Canvas::handleKeyEvent -> keyPressed
+//   display.rs and displayable.rs are on it too (that is why they are in the grep) and have
+//   ZERO `match`; both forward `code` unchanged.
+//   Every line above names a file, a line and a reason — no exemption is granted to a *kind*
+//   of thing, so a new table cannot fold itself into this list by resembling an old one.
 //
 // Usage: node scripts/contract-roundtrip.mjs        (after scripts/build-wasm.sh)
 //   WIE_CHROME_CHANNEL=chrome  — use a system Chrome instead of the playwright
@@ -41,25 +96,33 @@ import { fileURLToPath } from "node:url";
 
 import { drawFixtureJar, keyBarPixels } from "./make-draw-fixture.mjs";
 
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const contract = JSON.parse(await readFile(path.join(root, "docs/contracts/featurephone-engine-contract.json"), "utf8"));
+
 // Scenario D's representative keys — one per class of the contract vocabulary,
-// deliberately NOT all 20 (this asserts that delivery works, not that every code
-// is mapped; the mapping table is what check-engine-contract.mjs pins).
+// deliberately NOT all 20 — the reasoning is in the Scenario D header above.
 //   soft key  — the shell's menu/back key, low "phone key" code band
 //   numeric   — ASCII-valued band
 //   direction — MIDP Canvas named-key band (141..148), the shell's D-pad
-// `midp` mirrors MIDPKeyCode in wie_midp/src/classes/net/wie/event_queue.rs: it
-// is the number the GUEST sees, so a rewiring there fails here loudly (the guest
-// paints a differently-sized bar) instead of silently.
+// The expected `midp` is READ FROM THE CONTRACT (keyMidpCodes), not restated
+// here: it is the number the GUEST sees, and check-engine-contract.mjs §4b pins
+// the same contract entry against MIDPKeyCode in
+// wie_midp/src/classes/net/wie/event_queue.rs. So a rewiring there fails twice
+// — statically there, and here loudly (the guest paints a differently-sized
+// bar) — instead of silently.
 // ASCENDING code order is required — see make-draw-fixture.mjs (the bar is a
 // union across frames, so ascending keeps every expected count exact).
 const REPRESENTATIVE_KEYS = [
-  { code: "LEFT_SOFT_KEY", midp: 6, cls: "soft key" },
-  { code: "NUM5", midp: 53, cls: "numeric" },
-  { code: "UP", midp: 141, cls: "direction" },
-].map((k) => ({ ...k, expectPixels: keyBarPixels(k.midp) }));
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const contract = JSON.parse(await readFile(path.join(root, "docs/contracts/featurephone-engine-contract.json"), "utf8"));
+  { code: "LEFT_SOFT_KEY", cls: "soft key" },
+  { code: "NUM5", cls: "numeric" },
+  { code: "UP", cls: "direction" },
+].map((k) => {
+  const midp = contract.keyMidpCodes?.[k.code];
+  // Fail-closed: a missing contract entry must not silently become `undefined`
+  // pixels (which would compare equal to nothing and hang the tick loop).
+  if (typeof midp !== "number") throw new Error(`contract.keyMidpCodes has no code for representative key "${k.code}"`);
+  return { ...k, midp, expectPixels: keyBarPixels(midp) };
+});
 
 // ── Tiny static server: glue+wasm and fixtures, query string ignored ─────────
 const MIME = { ".js": "text/javascript", ".wasm": "application/wasm", ".zip": "application/zip", ".html": "text/html" };

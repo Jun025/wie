@@ -97,6 +97,43 @@ if (parseKeyStart === -1 || parseKeyEnd === -1) {
     else bad(`key mapping miswired: parse_key maps "${key}" => ${arms[0][1]}, expected KeyCode::${key}`);
   }
 }
+
+// ── 4b. Second hop: KeyCode -> the MIDP int the GUEST is handed ──────────────
+// parse_key above is only half the wiring. The number the guest actually sees
+// comes from MIDPKeyCode::from_key_code, and nothing pinned it: a swapped row
+// there (NUM7 -> 56) makes pressing 7 type 8, which the JS surface cannot see
+// and 4's pair check does not look at. contract-roundtrip.mjs's Scenario D
+// proves it behaviorally for 3 representative keys only — the delivery PATH is
+// key-agnostic so 3 witnesses suffice for it, but the TABLE is per-key, so the
+// remaining 17 rows are pinned here. Resolved in two steps (arm -> variant ->
+// discriminant) rather than by name, because the names differ on purpose:
+// OK => FIRE, NUM0 => KEY_NUM0, HASH => KEY_POUND.
+const eventQueueRs = "wie_midp/src/classes/net/wie/event_queue.rs";
+const eqRs = await readFile(path.join(root, eventQueueRs), "utf8");
+const enumStart = eqRs.indexOf("pub enum MIDPKeyCode");
+const enumEnd = enumStart === -1 ? -1 : eqRs.indexOf("\n}", enumStart);
+const fromKeyStart = eqRs.indexOf("fn from_key_code(");
+const fromKeyEnd = fromKeyStart === -1 ? -1 : eqRs.indexOf("\n    }", fromKeyStart);
+if (enumStart === -1 || enumEnd === -1 || fromKeyStart === -1 || fromKeyEnd === -1) {
+  bad(`guest key codes unverifiable: \`pub enum MIDPKeyCode\` or \`fn from_key_code(\` not found (or unterminated) in ${eventQueueRs} — refusing to fail-open; fix the checker's locator if it moved`);
+} else {
+  const discriminants = new Map(
+    [...eqRs.slice(enumStart, enumEnd).matchAll(/^\s*([A-Z][A-Z0-9_]*)\s*=\s*(-?\d+)\s*,/gm)].map((m) => [m[1], Number(m[2])]),
+  );
+  const fromKeyBody = eqRs.slice(fromKeyStart, fromKeyEnd);
+  for (const [key, expected] of Object.entries(contract.keyMidpCodes)) {
+    const arms = [...fromKeyBody.matchAll(new RegExp(`KeyCode::${key}\\s*=>\\s*Self::([A-Za-z0-9_]+)`, "g"))];
+    if (arms.length === 0) bad(`guest key code drift: from_key_code no longer maps KeyCode::${key} — that key would stop reaching the guest`);
+    else if (arms.length > 1) bad(`guest key code unverifiable: KeyCode::${key} has ${arms.length} match arms in from_key_code — refusing to fail-open`);
+    else if (!discriminants.has(arms[0][1])) bad(`guest key code unverifiable: from_key_code maps KeyCode::${key} => Self::${arms[0][1]}, which has no literal discriminant in enum MIDPKeyCode`);
+    else if (discriminants.get(arms[0][1]) === expected) ok(`from_key_code hands the guest ${expected} for "${key}" (Self::${arms[0][1]})`);
+    else bad(`guest key code miswired: "${key}" now reaches the guest as ${discriminants.get(arms[0][1])} (Self::${arms[0][1]}), contract pins ${expected} — pressing this key would input a different one`);
+  }
+  for (const key of contract.keyVocabulary) {
+    if (!(key in contract.keyMidpCodes)) bad(`contract gap: keyVocabulary lists "${key}" but keyMidpCodes does not pin its guest-visible code`);
+  }
+}
+
 if (libRs.includes(`b"${contract.saveMagic}"`)) ok(`save magic pinned: ${contract.saveMagic}`);
 else bad(`save magic drift: b"${contract.saveMagic}" not found in wie_web/src/lib.rs — stored featurephone save blobs would stop importing`);
 
