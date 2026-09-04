@@ -32,6 +32,15 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- 2026-09-05: **커버리지 재측정 «기계화» 결정** (`wie-coverage-remeasure-mechanize-decision`
+  · 채택 제안 `2026-09-04-worklog-mandate-reopen-threshold#p0`) — ★**결정: 기계화한다. 단 «임계 판정»이
+  아니라 «재측정 약속»을.** 두 축은 오탐 성질이 정반대다 — 비율은 «정당한 미달»이 구조적으로 들어 있어
+  (후속 없는 회차·upstream 동기 머지) red 로 걸면 **지킨 회차를 물고**, 「기한이 지났다」는 판단이 아니라
+  **사실**이라 오탐이 0이다. ⇒ `scripts/check-worklog-coverage.mjs`(측정 정본) + 기록 파일 +
+  `engine-contract.yml` 상시 스텝. ★`AGENTS.md` 의 셸 3줄은 스크립트 호출로 «교체»했다(정본 두 벌 금지).
+  ★**지금 한 번 쟀다 — 10/10 = 100%**(착지 회차 13 ⇒ 규칙이 정한 첫 기한이 실제로 찼다).
+  개악 4칸: OVERDUE red · BELOW-UNANSWERED red · `reopened` 기록 시 해소 · 얕은 클론 **fail-closed**.
+  ★**형제 PR #77 과 원장 2파일을 함께 만진다** — 나중에 착지하는 쪽에서 충돌 예상.
 - (없음 — 열린 PR 0건)
 
 ## 완료 (최근)

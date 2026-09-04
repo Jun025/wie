@@ -49,6 +49,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          # The re-measure check below counts first-parent commits back to the
+          # commit that landed the worklog convention; a shallow clone would make
+          # that count a lie, and the script refuses rather than report one.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -61,6 +65,19 @@ jobs:
       # checks, and the job stays the always-run wrapper described in the header.
       - name: Worklog .json contract (AGENTS.md §Landing paperwork)
         run: node scripts/check-worklog-json.mjs
+
+      # Same reasoning as the step above (always-run, node-only, ~1s), for the
+      # OTHER half of §Landing paperwork: the promise to re-measure worklog
+      # coverage every 10 landed rounds. This does NOT gate on the ratio — that
+      # obligation is conditional and a red would recreate the per-round mandate
+      # 2026-09-01 declined. It gates on the promise being kept: overdue, or a
+      # sub-threshold measurement nobody answered. `origin/main` is fetched
+      # explicitly because checkout leaves no remote-tracking branch for it on
+      # PR builds, and HEAD there is the PR's merge commit — one phantom round.
+      - name: Worklog coverage re-measure is current (AGENTS.md §Landing paperwork)
+        run: |
+          git fetch --no-tags --quiet origin main
+          node scripts/check-worklog-coverage.mjs
 
       # Detect whether this diff touches anything that can change the built
       # artifact or the pinned surface. If not, the job short-circuits to success

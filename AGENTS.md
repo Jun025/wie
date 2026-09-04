@@ -123,12 +123,18 @@ then `:125`). The rest need a toolchain fetch — run them only when the artifac
   > re-open the mandate decision.** A landed round is one **first-parent** commit on `main`.
 
   ```sh
-  OLD=$(git log --first-parent --format=%h -n 10 92c25276..origin/main | tail -1)  # window
-  git rev-list --count --first-parent "$OLD^..origin/main"                         # denominator
-  git rev-list --count --first-parent "$OLD^..origin/main" -- docs/worklog         # numerator
+  node scripts/check-worklog-coverage.mjs   # prints the numbers; fails if the promise is overdue
   ```
 
-  **`--first-parent` is load-bearing in all three, and the definition says "first-parent", not
+  **The commands live in that script, not here** — a second copy would drift from the one CI runs.
+  It also mechanizes the *promise*, not the ratio: `engine-contract.yml` fails when 10+ rounds have
+  landed with no recorded re-measure, or when a recorded measurement is under the line and nobody
+  answered it. It deliberately does **not** fail on the ratio itself, because that obligation is
+  conditional — gating PRs on it would rebuild the per-round mandate 2026-09-01 declined. The
+  record of each re-measure is `docs/worklog-coverage-remeasures.json`; appending the entry the
+  script prints *is* the re-measurement.
+
+  **`--first-parent` is load-bearing in every one of the script's three counts, and the definition says "first-parent", not
   "squash".** This repo is registered as an upstream-sync fork and must *not* squash-merge, so
   landings arrive as merge commits: PR #69 landed that way on 2026-09-03. Without the flag the
   commands walk every reachable commit — branch commits and, once upstream is merged, thousands of
@@ -140,6 +146,9 @@ then `:125`). The rest need a toolchain fetch — run them only when the artifac
   **Never let the window reach past `92c25276`** — the 19 rounds before it are 0/19 by
   construction and would trip the rule on history. Baseline 2026-09-04: **5/5 = 100%**; only 5
   rounds exist since the convention, so the first re-measure is due at round 10.
+  That first re-measure ran on schedule (round 13, **10/10 = 100%**) and is recorded in
+  `docs/worklog-coverage-remeasures.json` — read the numbers there, not here; this paragraph is the
+  baseline it started from.
   *Why 10*: the original denominator was **3**, where one round moves the number 33pp and no
   threshold separates a habit from a coincidence; 10 rounds is ≈20 days at the measured cadence
   (15 landed rounds in the 30 days to 2026-09-04). *Why 70 and not higher*: the count above is

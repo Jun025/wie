@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "note": "AGENTS.md §Landing paperwork 가 약속한 «10회차마다 재측정»의 기록. 이 파일이 «약속을 지켰다»의 증거이고, scripts/check-worklog-coverage.mjs 가 그것을 기계로 확인한다(밀리면 red). ★임계·주기·세는 법은 AGENTS.md 가 소유한다 — 여기서 바꾸지 마라. ★항목은 «추가»만 한다(지난 측정을 고쳐 쓰면 이 파일이 증거이기를 그만둔다). ★pct 가 임계 미만이면 그 항목에 \"reopened\": true 와 \"decision\" 을 적어야 검사가 통과한다 — 그것이 「임계 미달이 «무언가»를 하게」 하는 자리다.",
+  "measurements": [
+    {
+      "date": "2026-09-05",
+      "landedRounds": 13,
+      "window": "ec1b7027..8e9185de",
+      "num": 10,
+      "den": 10,
+      "pct": 100.0,
+      "decision": "임계 이상 — 커버리지 기각 유지. 이것이 2026-09-04 규칙이 정한 «첫 재측정»이고, 착지 회차 13 ≥ 10 으로 기한이 찼을 때 실제로 돌았다."
+    }
+  ]
+}
