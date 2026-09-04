@@ -32,6 +32,14 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- 2026-09-05: **`current_class_loader` 대체 API 설계(`+34` 벽)** (`wie-current-class-loader-replacement-api-design-for-plus34`
+  · 채택 제안 `2026-09-04-upstream-realign-p1-pin-plus33#p1`) — ★**결론: 벽이 아니었다.**
+  ⒜파열은 계단표의 `+46` 이 아니라 ★**`+34`(`7dc1b90`)에서 시작**한다(그 커밋은 `pub` 한 줄만 내렸다)
+  ⒝호출부 **6곳이 전부 같은 두 줄** — 클래스 «로딩»에 쓰는 자리 **0곳**
+  ⒞★**공개 대체가 있다** — `get_system_class_loader` 가 **핀·HEAD 둘 다 `pub`** 이고 ★`current_class_loader`
+    자신이 떨어지는 **폴백**이다(우회가 아니다) ⒟★**핀에서도 공개라 «bump 전»에 이행 가능** ⇒ 그 칸 **6 → 0**.
+  ★프로브로 확인(6곳 스왑 → `cargo test --all` **139/0** · `wie_validate` 5픽스처 PASS → **원복** · 코드 델타 0).
+  ★남는 구멍: `Image.createImage(String)` 자리는 스위트가 «부르지 않는다»(논증으로만 선다). 정본 **§8-4⑶-b**.
 - (없음 — 이 회차 PR 착지 · 형제 #79 는 별 리니지)
 
 ## 완료 (최근)

@@ -1,5 +1,16 @@
 # REPORT
 
+## [2026-09-05] «다음 벽»을 설계했더니 벽이 아니었다 — 공개 대체가 이미 있다 (wie-current-class-loader-replacement-api-design-for-plus34)
+- **무엇을**: `docs/upstream-realign-verdict.md` **§8-4⑶-b 신설** + 계단표 4번 칸 **인라인 정정 1줄**. ★핀 변경 0 · **코드 변경 0**(프로브는 원복) · 기존 계단 서술 무접촉.
+- **왜**: 운영자 채택 제안 `2026-09-04-upstream-realign-p1-pin-plus33#p1` — 「`+34` 에서 `current_class_loader` 가 비공개가 되고 **공개 대체 API 가 없다**」.
+- **★⑴ 벽은 «+46」이 아니라 «+34»에서 시작한다**: `7dc1b90` = 「Make current_class_loader private」이고 **`jvm.rs` 1파일 +1/−1**(`pub` 한 줄)뿐 — ★**대체 API 를 추가하지 않았다**. `5b84dd1..7dc1b90` = **1커밋** ⇒ 우리 핀의 바로 다음 칸.
+- **★⑵ 호출부 6곳이 «전부 같은 두 줄»이다**(지금 세었다): 로더를 얻고 곧바로 `get_resource_as_stream`. ⇒ ★**클래스 «로딩»에 쓰는 자리 0곳** — 필요한 능력은 「게스트 리소스를 이름으로 여는 것」뿐이다.
+- **★★⑶ 공개 대체가 «있다» — 제안의 전제가 틀렸다**: `JavaLangClassLoader::get_system_class_loader` 가 ★**핀에서도 HEAD 에서도 `pub`**(6곳이 이미 쓰는 함수 바로 옆). ★그리고 «우회»가 아니다 — `current_class_loader` 전문을 읽으면 「게스트 프레임 없음」·「호출 클래스의 로더가 None」 두 갈래에서 **그 함수를 그대로 부른다**. 갈리는 경우는 6곳 중 **1곳**뿐이다.
+- **★⑷ 고른 길 = ⒝(우리 쪽 대체)**. ⒜(upstream 공개 요청)는 ★**요청할 것이 없어** 기각 · ⒞(핀 유지)도 기각. ★★**실익**: 대체가 **현재 핀에서도 공개**라 6곳 이행을 **지금 핀 위에서 착지·검증**한 뒤 올리면 그 칸의 파열 호출부가 **6 → 0** 이 되고, 두 변경이 한 PR 에서 얽히지 않는다.
+- **★⑸ 설계를 «프로브»로 확인했다**(스왑 → 스위트 → **원복**): `cargo build` rc=0 · `cargo test --all` **139 passed / 0 failed** · `wie_validate` **5픽스처 전건 PASS** · 원복 후 `git status` 빈 출력 ⇒ **코드 델타 0**.
+- **사용자 영향**: 없음(문서). 대신 「다음 칸이 막혀 있다」가 **「막혀 있지 않고, 미리 치워 둘 수도 있다」**로 바뀌었다.
+- **★남는 구멍**: 6번 자리(`Image.createImage(String)`)는 ★**스위트가 부르지 않는다**(`createImage` 호출 시험·픽스처 **0건**) ⇒ 그 자리는 «측정»이 아니라 **논증**으로 남는다(커스텀 로더 게스트에서는 갈릴 수 있다). ★그리고 `+47`(209곳)은 **이 설계가 줄여 주지 않는다**.
+
 ## [2026-09-05] 기계화한다 — 단 «임계 판정»이 아니라 «재측정 약속»을 (wie-coverage-remeasure-mechanize-decision)
 - **무엇을**: 신규 `scripts/check-worklog-coverage.mjs`(측정의 **유일한 정본**) · 신규 기록 `docs/worklog-coverage-remeasures.json` · `engine-contract.yml` 상시 스텝 1개(+`fetch-depth: 0`) · `AGENTS.md` 의 셸 3줄을 **스크립트 호출 1줄로 교체**. ★제품 코드 0줄 · 임계·주기 값 무접촉 · 커버리지 기각 결정 무접촉.
 - **왜**: 운영자 채택 제안 `2026-09-04-worklog-mandate-reopen-threshold#p0` — 「약속은 남겼는데 **그 약속을 지킬 기계가 없다**」.

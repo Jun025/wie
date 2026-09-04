@@ -663,7 +663,7 @@ error[E0046]: not all trait items implemented, missing: `interface_names`, `prep
 | 2 | `fe5d116`(+16) | ★**소멸** | upstream **16** | `ClassDefinition::{interface_names,prepare}` — ★**2 impl(컴파일 측정)** | ≈**10.5/12** | 〃 |
 | 3 | `5b84dd1`(+33) | ★**소멸** | upstream **33** | + `attach_thread`(3) + ★**`Runtime::exit`(1)** + ★**`from_classfile` 오류형(1)** ⇒ ★**≥7(컴파일 측정)** | ≈**4/12** | 〃 |
 | ★**F** | ★**`Jun025/RustJava` `origin/main`**(`8c1238b`) | ★**유지** | **52**(= dlunch **29** + 우리 **23**) | ★**≥7 — 3번 칸과 «에러가 글자까지 같다»(컴파일 측정)** | ≈**4/12** | ★**핀 5줄 bump(+5/−5)** |
-| 4 | `95ebc5c`(+46) | 소멸 | upstream 46 | + `current_class_loader`(6 · **공개 대체 없음 ⇒ 설계**) ⇒ **≥13** | ≈**0~1/12** | 〃 |
+| 4 | `95ebc5c`(+46) | 소멸 | upstream 46 | + `current_class_loader`(6 · ~~공개 대체 없음 ⇒ 설계~~ → ★**2026-09-05 정정: 공개 대체가 «있다»**(`get_system_class_loader`) · 파열 시작은 **+34** · §8-4⑶-b) ⇒ **≥13** | ≈**0~1/12** | 〃 |
 | 5 | `ba5797b`(+47) | 소멸 | upstream 47 | + `invoke_virtual`(**209**) ⇒ ★**≥222** | ≈**0~1/12** | 〃 |
 
 ★★**초판 대비 무엇이 바뀌었나 — 셋이다.**
@@ -689,6 +689,79 @@ error[E0046]: not all trait items implemented, missing: `interface_names`, `prep
 §4-B 의 **grep 값**이고, ★**+38 이후 칸에는 lockfile 축의 추가 대가가 있다**(§8-7-3).
 ⇒ ★**209 는 여전히 «마지막 한 커밋»에 몰려 있다.** P1 은 「222 아니면 0」의 동전던지기가 아니라
 ★**0 → 2 → ≥7 → ≥13 → ≥222 의 계단**이고, **앞 세 칸을 따로 착지시킬 수 있다.**
+
+**⑶-b ★★[2026-09-05 · `wie-current-class-loader-replacement-api-design-for-plus34`] 그 계단의 «다음 벽»을 설계했다 — ★결론: 벽이 아니었다.**
+
+★**이 절은 위 표를 «잇는다» — 지우지 않는다.** 표의 4번 칸이 `current_class_loader`(6 · **공개 대체 없음 ⇒ 설계**)라고
+적어 둔 그 칸이다. ★**그 괄호 안의 「공개 대체 없음」이 «틀렸다»** — 아래가 실측이다.
+
+**⒜ 벽은 «+46」이 아니라 «+34»에서 시작한다**(표는 «누적»을 적으므로 모순이 아니라 «정밀화»다).
+```
+git log -1 7dc1b90        →  "Make current_class_loader private"  (2026-07-24 · Inseok Lee)
+git show 7dc1b90          →  jvm/src/jvm.rs 1파일 · +1/−1 · `pub async fn` → `async fn`  ★그뿐이다
+git rev-list --count 5b84dd1..7dc1b90  →  1        ⇒ 우리 핀의 «바로 다음 칸»
+```
+★그 커밋은 **대체 API 를 «추가하지 않았다»** — 가시성 한 줄만 내렸다.
+
+**⒝ 호출부는 «6곳»이고 ★전부 같은 모양이다**(2026-09-05 실측 · 트리 `~/work/otterpebble/wie` @ `origin/main`):
+
+| # | 파일 | 무엇을 하려고 쓰나 | 대체 가능성 |
+|---|---|---|---|
+| 1 | `wie_lgt/src/emulator.rs:114` | 부팅 직후 게스트 jar 에서 **`binary.mod`** 를 연다 | ★**동일**(아래 ⒞ — 그 지점엔 게스트 프레임이 없다) |
+| 2·3 | `wie_lgt/src/runtime/wipi_c/context.rs:100·112` | WIPI C `get_resource_size`/`read_resource` | ★동일 |
+| 4·5 | `wie_ktf/src/runtime/wipi_c/context.rs:95·108` | 〃(KTF) | ★동일 |
+| 6 | `wie_midp/…/lcdui/image.rs:116` | MIDP `Image.createImage(String)` 의 리소스 열기 | 동일 — ★단 유일하게 «게스트 프레임 안»이다(⒞ 단서) |
+
+★★**여섯 곳이 «전부» 똑같은 두 줄이다**: `current_class_loader()` 로 로더를 얻고 곧바로
+`JavaLangClassLoader::get_resource_as_stream(...)` 을 부른다. ⇒ ★**필요한 능력은 «현재 클래스로더»가 아니라
+«게스트 리소스를 이름으로 여는 것»이다.** 클래스 «로딩»에 쓰는 자리는 **0곳**이다.
+
+**⒞ ★공개 대체 경로 — «있다».** `JavaLangClassLoader::get_system_class_loader(jvm)` 이고,
+★**핀(`5b84dd1`)에서도 HEAD(`bd42427`)에서도 `pub`** 이다(같은 모듈 `jvm/src/runtime/java_lang_class_loader.rs` —
+6곳이 이미 쓰는 `get_resource_as_stream` 의 **바로 옆**이라 import 도 이미 있다).
+★★**그리고 그것은 «우회»가 아니다 — `current_class_loader` 자신이 떨어지는 폴백이다**(핀의 함수 전문):
+```rust
+pub async fn current_class_loader(&self) -> Result<Box<dyn ClassInstance>> {
+    let calling_class = self.find_calling_class()?;
+    if let Some((class, class_instance)) = calling_class {
+        …  if let Some(x) = calling_class_class_loader { Ok(x) }
+           else { Ok(JavaLangClassLoader::get_system_class_loader(self).await?) }   // ← 같은 것
+    } else {
+        Ok(JavaLangClassLoader::get_system_class_loader(self).await?)               // ← 같은 것
+    }
+}
+```
+⇒ ★**「게스트 프레임이 없거나, 있어도 그 클래스의 로더가 `None`」이면 두 API 는 «같은 값»을 돌려준다.**
+갈리는 경우는 **호출한 게스트 클래스가 자기 로더를 갖는 때**뿐이고, 그 자리는 위 표의 **6번 하나**다.
+
+**⒟ ★고른 길 = ⒝(우리 쪽 대체) — 그리고 ⒜(upstream 공개 요청)는 «필요 없다».**
+요청할 것이 없다: 공개 API 가 이미 있고, 그것이 비공개가 된 함수의 폴백과 같다.
+⒞(핀 유지)도 고르지 않았다 — 이 벽을 이유로 멈출 근거가 사라졌기 때문이다.
+
+**⒠ ★★그리고 그 대체는 «핀을 올리기 전»에 할 수 있다 — 이것이 이 설계의 실익이다.**
+`get_system_class_loader` 는 **현재 핀에서도 공개**다 ⇒ 6곳 이행을 **지금 핀 위에서 착지·검증**한 뒤
+`+34` 로 올리면 그 칸의 파열 호출부는 ★**6 → 0** 이 된다. 두 변경이 한 PR 에서 얽히지 않는다.
+
+**⒡ ★설계를 «프로브»로 확인했다**(2026-09-05 · 스왑 → 스위트 → ★**원복** · 이 회차의 코드 델타 **0**):
+```
+6곳 전건 치환 → cargo build --workspace rc=0 · 남은 current_class_loader 0건
+RUST_MIN_STACK=4194304 cargo test --all      → 139 passed / 0 failed
+wie_validate  draw_j2me PASS(booted+rendered) · helloworld_ktf PASS · helloworld_lgt PASS
+              keydraw_ktf/lgt --inject PASS(booted + rendered + survived input)
+원복 후 git status 빈 출력 · current_class_loader 6곳 복귀
+```
+★`helloworld_lgt` 통과가 **1번 자리**(부팅 직후 `binary.mod` 열기)의 직접 증거이고,
+`keydraw_*`·`helloworld_ktf` 가 **2~5번**(WIPI 리소스)을 태운다.
+
+**⒢ ★남는 한 자리 — 숨기지 않는다.** **6번**(`Image.createImage(String)`)은 ★**스위트가 부르지 않는다**
+(`createImage` 를 호출하는 시험·픽스처 **0건** — 실측). ⇒ 그 자리는 «프로브로 확인된 것이 아니라 «논증»으로 남는다»:
+MIDP 게스트는 시스템(URL) 클래스로더가 적재하므로 두 API 가 같은 값을 준다(P1 의 `net/wie/Launcher` 수정이
+`getSystemClassLoader().loadClass(main)` 로 그것을 이미 쓴다). ★**커스텀 로더를 쓰는 게스트에서는 갈릴 수 있다** —
+이행 회차는 그 자리에 «픽스처 한 건»을 붙이거나, 최소한 이 단서를 커밋 메시지에 남겨라.
+
+**⒣ ★계단은 유지된다 — 이 벽을 넘으면 다음은 `+47`이다.** `ba5797b`(+47)의 `invoke_virtual` 이
+`class_name` 인자를 얻어 **209곳**(누적 **≥222**)을 깨뜨린다 — 위 표 5번 칸 그대로다.
+★**그 칸은 이 설계가 줄여 주지 않는다**(성격이 다르다: 여기는 «공개 대체가 있었다», 저기는 «전 호출부 서명 변경»이다).
 
 **⑷ ★★[2026-09-04 정정] EUC-KR panic 수정 — «주체»가 틀렸다. 「우리 fork」가 아니라 「우리 핀」이다.**
 `8ac70cb`(**+5** · #162 「Fix `DataInputStream.readUTF()` panic on non-UTF-8 (EUC-KR) input」)은
