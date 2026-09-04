@@ -32,7 +32,13 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- (없음 — 이 회차 PR 착지 · 형제 #80 은 별 리니지)
+- **DoD 에 beta 축 한 줄** (`wie-dod-four-gates-add-beta-axis` · 채택 제안 `2026-09-04-parity-sibling-repo-survey#p0`)
+  — `AGENTS.md` §Definition of Done 에 `cargo +beta clippy --all -- -D warnings` 블록 1개. ★**코드 0 · CI 워크플로 0.**
+  ★근거는 내가 다시 센 수다: `rust.yml` run **전량 246건**(`ac4ce1aa` 2026-06-24 → `11a35252` 2026-09-04) 중 실패 **34**,
+  그중 **9건이 beta 다리 단독**이고 ★**9/9 가 린트 게이트**(8 × `chunks_exact_to_as_chunks` · 1 × `double_must_use`) ⇒ 한 줄.
+  ★비용 실측 = 회차당 **+7.6~7.7s**(최초 1회 36.3s) · **스래싱 없음**(stable 복귀 0.50s).
+  ★한계: 그 9건의 stable 다리는 전부 `cancelled` 이었다(`fail-fast: false` 는 2026-08-27 PR #64) — 증명은 린트 정체가 진다.
+  ★**형제 #80 과 `REPORT.md`·`STATE.md` 를 함께 만진다** — 나중에 착지하는 쪽에서 원장 2파일 충돌이 예상된다(게이트③ 2-c⒜ 범위).
 
 ## 완료 (최근)
 - 2026-09-05: **«버린 fork» 커밋 로그 통독** (PR #79 착지 · `wie-abandoned-fork-commit-log-harvest`

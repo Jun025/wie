@@ -60,6 +60,38 @@ interpreter recursion overflows the default test-thread stack without it.
 **All four run before every commit, whatever you changed** — a docs- or `web/`-only diff is not an
 exemption. The web-surface commands below are *additional* to these, never an alternative.
 
+**The matrix has a second toolchain. Run the lint gate on it too.**
+
+```sh
+rustup toolchain install beta --component clippy   # once; idempotent, and covers a minimal-profile beta
+cargo +beta clippy --all -- -D warnings            # rust.yml: the lint gate, again on beta
+```
+
+`rust.yml`'s matrix is `[macos, ubuntu, windows] × [stable, beta]`, so all four gates above already
+run twice up there — but only the lint gate has ever caught anything on beta that stable missed.
+Measured over every `rust.yml` run to date, `ac4ce1aa` (2026-06-24) through `11a35252`
+(2026-09-04): **246 runs, 34 failed, and in 9 of those a beta leg was the only failing job. All 9
+were `cargo clippy --all -- -D warnings`** — 8 × `clippy::chunks_exact_to_as_chunks` (2026-07-06 →
+07-13, fixed by `e3cbaa08`) and 1 × `clippy::double_must_use` (2026-08-20). Zero on `cargo fmt`,
+zero on the wasm lint gate, zero on the tests. That is why this is one line and not four; add
+another only when a run makes you.
+
+**A new lint reddens code you did not write, so "I only touched config" does not exempt you.** The
+2026-08-20 red landed on a PR whose entire diff was six added lines in `wrangler.toml` and no Rust
+at all: the `double_must_use` violations were pre-existing and repo-wide, and clearing them took a
+whole separate round (PR #60). The 2026-07 cluster is the same shape — it reddened `main` itself on
+eight pushes across seven days before a fix landed.
+
+**Cost, measured on `11a35252`.** The first `cargo +beta clippy` in a target dir holding only
+stable artifacts is **36.3s**; after that, following an engine-crate edit, it adds **7.6–7.7s** to
+the round. Cargo keys artifacts by rustc version and keeps both sets side by side, so alternating
+toolchains does *not* thrash — going back to stable right after beta took 0.50s. No separate
+`CARGO_TARGET_DIR` is needed, and none is configured.
+
+The sibling `RustJava` repo hit this same gap and went further, mechanically diffing its documented
+gates against its workflows (`scripts/check-dod-ci-parity.py`). Nothing like that is ported here —
+this block is prose that a human keeps in sync, and a `rust.yml` matrix change will not notice it.
+
 **Touching engine code? The four gates are not enough — run the repo's own runner.**
 
 ```sh
