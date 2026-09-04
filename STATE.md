@@ -32,7 +32,10 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- 2026-09-04: **미이식 하드닝 2축 처분 — «둘 다 이식»** (`wie-unported-hardening-two-axes-decide-with-a-corpus-probe`
+- (없음 — 열린 PR 0건)
+
+## 완료 (최근)
+- 2026-09-04: **미이식 하드닝 2축 처분 — «둘 다 이식»** (PR #72 착지 · `wie-unported-hardening-two-axes-decide-with-a-corpus-probe`
   · 채택 제안 `2026-09-04-upstream-realign-p1-pin-plus33#p0`) — ★**결정의 근거가 바뀌었다.**
   상수풀 프로브(우리 아카이브 전수 · `.class` **226개**)는 게스트 호출부 **0/0** 이었으나 ★**그 표본으로는 답이 안 난다**
   (`test_data` 3건은 우리가 만든 것 · `AromaWIPI` 는 게임이 아니라 플랫폼 라이브러리다).
@@ -49,8 +52,8 @@
   ⇒ ★**어느 한 시험도 원인이 아니라 «동거»가 트리거다**(정본 **§10-5** · 시험 삭제 0 · `#[ignore]` 0).
   ⒝**CI 를 게이트 목록에 박았다**(`AGENTS.md` §DoD — 네 게이트 뒤 `gh pr checks`). ⒞**§9-2 인라인 정정** — 축 8·9 의
   「미이식」 3자리에 각각 박았다(§10 의 정정문만으로는 §9-2 에 착지한 독자가 낡은 표를 읽는다).
-
-## 완료 (최근)
+  ★**착지 형태 = merge commit(부모 2개)** — `wie` 는 `contracts/upstream-sync-repos.conf` 등재 repo 라
+  스쿼시가 금지다(계보가 접힌다 · 자매 repo `rustjava` 에서 스쿼시 3회가 족보를 원점으로 되돌렸다).
 - 2026-09-04: **P1 집행 (PR #71 `19955ba1`) — `Jun025/RustJava` 핀 이탈(`dlunch/RustJava@5b84dd1`, +33) + 하드닝 3축 이식**
   (`wie-upstream-realign-p1-execute-pin-plus33-and-cost-hardening-port`) — ★**총괄이 §8-6 권고를 채택했고
   이 회차가 집행했다.** `[patch]` 표 삭제 ⇒ ★**fork 의존 소멸**(`Cargo.lock` 의 `Jun025` **0건**).
