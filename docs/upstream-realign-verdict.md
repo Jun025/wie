@@ -1060,7 +1060,7 @@ lib 바이너리 안에서 JVM 을 부팅하고 전건 ok 다. ⇒ ★**두 가�
 코퍼스가 사라진 지금 ★**어떤 프로브로도 재현할 수 없다.** §10-2 는 그중 «두 줄»만 인용했다 — 아래가 전수다.
 
 **훑은 범위(실측)**: `Jun025/RustJava` 브랜치 **2**(`main` · `wie-ktf-hardening`) · 태그 **0** ·
-전체 커밋 **1,103** · upstream(`dlunch/RustJava`)에 없는 고유 커밋 **87**(`wie-ktf-hardening` **12** + `main` **75**) ·
+전체 커밋 **1,103** · upstream 에 없는 고유 커밋 **87**(`wie-ktf-hardening` **12** + `main` **75** · ★**base = `dlunch/RustJava` `main` @ `bd42427`** — `--not upstream/main` 으로 셌다) ·
 PR **30**(전건 MERGED) · 이슈 ★**저장소가 비활성화**(`the 'Jun025/RustJava' repository has disabled issues`).
 ★**`main` 의 고유 75커밋에는 관측이 «0건»이다** — 전부 이 estate 의 `rustjava-*` 레인 작업(upstream 동기·문서·CI)이고,
 타이틀 지목 문구가 **0건**이다(술어 실행으로 확인). ⇒ ★**관측은 전부 `wie-ktf-hardening` 12커밋 안에 있다.**
@@ -1081,16 +1081,44 @@ PR **30**(전건 MERGED) · 이슈 ★**저장소가 비활성화**(`the 'Jun025
 소울카드마스터2 · 미니고치 · 광란의수족관! · 대통령타이쿤 · 만귀토벌전 · 아르덴전기 · 리얼사커2007 ·
 타운스토리 · 파랜드택틱스 · 라피스라줄리) · 지목된 API **10종**.
 ★**핀 보유**: 있다 **6** / 없다 **3** — ★**그 3은 «전부» 이미 `wie_jvm_support/src/hardening.rs` 가 이식했다**
-⇒ ★★**이 통독이 만든 «다음 회차 후보»는 0건이다.**
-★나머지 3커밋(`9970ab6` currentThread 정체성 · `0f4f0bb` arraycopy/forName 가드 · `1f0e52e` String/parseInt 하드닝)은
-**타이틀을 지목하지 않는다**(각각 「standard MIDP game-loop pattern」·사양 인용으로만 정당화한다) ⇒ 이 표에 넣지 않았다.
+⇒ ★★**«타이틀 지목 관측» 축에서 이 통독이 만든 후보는 0건이다.**
+★★**[2026-09-05 정정 · 게이트② 반려] 그 «0» 의 «경계»를 여기 박는다 — 초판은 그것을 «통독 전체»의 결론처럼 썼다.**
+0 은 **위 9행 표(= 타이틀이 지목된 관측)에서만** 도출된다. ★**타이틀이 없는 3커밋까지 세면 «0 이 아니다»** — 아래 표.
 
-★**찾은 술어와 그 한계**(다음 사람이 다시 돌릴 수 있게):
+### 10-6-b. ★타이틀이 «없는» 3커밋 — 그중 **하나**는 지금도 열려 있다
+
+| 커밋 | 무엇을 고쳤나(원문) | 타이틀 | 핀 · `hardening.rs` |
+|---|---|---|---|
+| `9970ab6` | `Thread.currentThread()` reference identity via per-thread registry | 없음(「standard MIDP game-loop pattern」) | ★**닫혔다** — 핀 `thread.rs:366` 이 `jvm.current_java_thread()` 를 돌려준다 |
+| `0f4f0bb` | 「System.arraycopy: throw NullPointerException when src or dest is null … Class.forName: null name → NPE; unknown class → ClassNotFoundException」 | 없음 | ★**닫혔다** — `hardening.rs` 가 `System.arraycopy` 를 가드하고 `Class.forName` 은 핀이 자체 처리 |
+| ★**`1f0e52e`** | 「**`String.<init>([B)/([C)`**: throw NullPointerException on a null array instead of unwrapping None (**which aborts the host emulator process**)」 | 없음 | ★★**열려 있다 — 후보 1건** |
+
+★**`1f0e52e` 를 «후보»로 남기는 근거(실측 · 핀 트리 `5b84dd1`)**:
+`java_runtime/src/classes/java/lang/string.rs` 의 `init_with_byte_array`·`init_with_char_array` 가 **둘 다**
+null 검사 없이 `jvm.array_length(&value)` 를 즉시 부른다 · `hardening.rs` 의 `harden()` arm 은
+`java/lang/System` · `java/io/ByteArrayInputStream` · `java/lang/StringBuffer` · `java/util/Timer` ★**넷뿐**이고
+`origin/main` 에 `"java/lang/String"` 가드는 **0건**이다.
+★★**그리고 wie 자신이 «같은 형태»를 이미 «위험»으로 인정했다** — 핀의 `byte_array_input_stream.rs` 의 `<init>([B)` 는
+`String::<init>([B)` 와 **한 줄도 다르지 않은 모양**(`jvm.array_length(&data)` 즉시 호출)인데 `hardening.rs` 가 그것을 가드한다.
+⇒ ★**「String 생성자만 안전하다」고 볼 근거가 없다.**
+★**이 회차는 «표에 남기는 데»까지다** — 가드 구현·발권은 이 회차 몫이 아니다(그 판단은 총괄).
+
+★**찾은 술어와 그 한계**(다음 사람이 다시 돌릴 수 있게 — ★**로케일까지 그대로 쳐라**):
 ```
-술어 1(과수집) : 커밋 메시지에 한글이 있는가        → wie-ktf-hardening 12중 10 · main 75중 69
-                 ⇒ main 은 «한글 문서 회차»가 대부분이라 이 술어만으로는 못 가른다
-술어 2(정밀)   : 'Trace-specified|Surfaced by|seen flaky on|method-not-found'  → 8커밋
+술어 1(한글) : LC_ALL=en_US.UTF-8 /usr/bin/grep -c '[가-힣]'   ← ★로케일이 «결과를 바꾼다». 아래 정정 참조
+               → wie-ktf-hardening 12중 ★9 · main 75중 ★61
+술어 2(정밀) : 'Trace-specified|Surfaced by|seen flaky on|method-not-found'      → 8커밋
 ```
+★★**[2026-09-05 정정 · 게이트② 반려] 초판의 「12중 10 · 75중 69」는 «재현되지 않는다» — 내 술어가 틀렸다.**
+`LC_ALL=C` 로 친 `[가-힣]` 은 UTF-8 을 **바이트 클래스**로 접어 **한글이 아닌 CJK 까지 문다**.
+★**대조군으로 확인했다**: `printf '漢字' | LC_ALL=C grep -c '[가-힣]'` → **1**(거짓) ↔ `LC_ALL=en_US.UTF-8` → **0**(참).
+⇒ 옳은 수는 **9 / 61** 이다. ★**`LC_ALL=C` 는 «이진 안전»에는 맞고 «문자 클래스»에는 틀리다** — 두 용도를 섞지 마라.
+★★**그리고 고치니 논지가 «세진다»** — `wie-ktf-hardening` 에서 한글 술어가 잡는 **9건은 위 표의 9건과 «정확히 같은 집합»**이다
+(술어만 0 · 표만 0 · 집합 동일 확인). ⇒ ★**그 브랜치 안에서 한글은 «과수집»이 아니라 «완전 판별자»**이고,
+과수집은 **`main`(61/75)에서만** 일어난다. 초판이 「과수집」을 브랜치 양쪽에 걸쳐 말한 것도 그래서 부정확했다.
+★★**초판 술어의 «거짓 양성» 1건이 하필 `1f0e52e` 였다** — 아래 «남는 후보»가 실린 바로 그 커밋이다.
+그것을 «한글 있음»으로 세어 놓고 본문은 「타이틀 없음」으로 뺐으니, 그 커밋은 두 번 다 **잘못된 이유로** 지나쳤다.
+
 ★★**술어 2 는 «한 건을 놓친다»** — `9be0ea3`(박정석_영웅탄생)은 그 문구가 **없고** 괄호 안에 타이틀만 적혀 있다.
 ⇒ ★**최종 9건은 «12커밋을 사람이 통독»해서 나왔다.** 문구 술어를 «전수»로 믿지 마라 — 이 표가 그 반례다.
 
