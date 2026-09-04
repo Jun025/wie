@@ -909,6 +909,8 @@ KTF·LGT 인스턴스는 **게스트 메모리**에 살아서 Rust 구조체를 
   ★★**[2026-09-04 2차 정정 · §10] 등급 판단은 그대로 서지만 «처분»은 뒤집혔다 — 두 축은 이제 «이식»이다.**
   뒤집은 것은 등급이 아니라 **새 측정**이다: 버린 fork 의 커밋 메시지가 두 축 모두를 **실제 타이틀에서
   관측된 method-not-found** 로 지목한다(`3cb4d7d` 소울카드마스터2 · `9cfc346` 미니고치).
+  ★★**[2026-09-05 추가 · `wie-abandoned-fork-commit-log-harvest`] 그 «두 줄»은 «전부»가 아니었다** —
+  fork 전 브랜치·PR 통독 결과 ★**타이틀 이름이 붙은 관측이 9커밋 · 타이틀 13종**이다. 목록은 **§10-6**.
   ⇒ ★**「시끄러우니 미룬다」는 「게스트가 그 지점에서 멈춘다」를 이기지 못한다.** 전말은 §10.
 - ★★**[2026-09-04 정정 · 게이트② 반려] 축 5 의 「사라짐 · 불가 · 영구 미복구」는 «참이 아니었다».**
   새 핀은 **같은 창을 다른 설계로 이미 닫아 놓았다**(이 회차가 소스로 재확인):
@@ -1051,3 +1053,46 @@ lib 바이너리 안에서 JVM 을 부팅하고 전건 ok 다. ⇒ ★**두 가�
 ★★**재개 조건(「나중에」가 아니다)**: ★**누락 오버로드를 지목한 게스트 실패 «1건» 관측.**
 `wie_validate` 가 그 실패를 **디스크립터가 들어간 해석 오류**로 보고하므로 **트레이스 한 건이면 다음 대상이 정해진다.**
 ※부수 발견: `Timer.cancel()` 도 핀에 **없다**(플랫폼은 선언한다). ★이 회차 범위 밖이라 손대지 않았다 — 같은 재개 조건이 적용된다.
+
+### 10-6. ★«버린 fork» 커밋 로그 통독 — 타이틀 이름이 붙은 관측 «전수» (2026-09-05 · `wie-abandoned-fork-commit-log-harvest`)
+
+★**왜 이 목록이 자료인가**: 이 관측들은 이 estate 가 **코퍼스를 갖고 있던 시기**(2026-06-30 ~ 07-07)에 적혔고,
+코퍼스가 사라진 지금 ★**어떤 프로브로도 재현할 수 없다.** §10-2 는 그중 «두 줄»만 인용했다 — 아래가 전수다.
+
+**훑은 범위(실측)**: `Jun025/RustJava` 브랜치 **2**(`main` · `wie-ktf-hardening`) · 태그 **0** ·
+전체 커밋 **1,103** · upstream(`dlunch/RustJava`)에 없는 고유 커밋 **87**(`wie-ktf-hardening` **12** + `main` **75**) ·
+PR **30**(전건 MERGED) · 이슈 ★**저장소가 비활성화**(`the 'Jun025/RustJava' repository has disabled issues`).
+★**`main` 의 고유 75커밋에는 관측이 «0건»이다** — 전부 이 estate 의 `rustjava-*` 레인 작업(upstream 동기·문서·CI)이고,
+타이틀 지목 문구가 **0건**이다(술어 실행으로 확인). ⇒ ★**관측은 전부 `wie-ktf-hardening` 12커밋 안에 있다.**
+
+| # | 커밋 | 메시지 원문 인용(요약하지 않음) | 지목된 타이틀 | 지목된 API | 우리 핀(`dlunch/RustJava@5b84dd1`)에 있는가 |
+|---|---|---|---|---|---|
+| 1 | `c66f08d` | 「Trace-specified: **두뇌게임q** fails boot with NoSuchMethodError `getAvailableIDs()[Ljava/lang/String;`」 | 두뇌게임q | `TimeZone.getAvailableIDs()` | ★**있다** — `java_runtime/…/time_zone.rs:28` 에 proto + 전용 시험 |
+| 2 | `9be0ea3` | 「The impl unwrapped `context.metadata()`, so a missing path panicked the VM (**박정석_영웅탄생** boot).」 | 박정석_영웅탄생 | `File.length()` 미존재 → 0 | ★**있다** — `file.rs:144` `map_or(0, …)` + 「File.length() is 0 when the file does not exist」 주석까지 |
+| 3 | `d61cf07` | 「Trace-specified: **레스토랑타이쿤2006** fails boot with NoClassDefFoundError: `java/lang/Byte`」 | 레스토랑타이쿤2006 | `java.lang.Byte` 박싱 클래스 | ★**있다** — `loader.rs` 에 등록 |
+| 4 | `3cb4d7d` | 「Trace-specified as method-not-found on **소울카드마스터2**.」 | 소울카드마스터2 | `Timer.schedule(TimerTask, long)` | ✗**없다** ⇒ ★**wie `hardening.rs` 가 이식**(§10-3) |
+| 5 | `9cfc346` | 「Trace-specified as method-not-found on **미니고치**.」 | 미니고치 | `StringBuffer.insert(I, String)` | ✗**없다** ⇒ ★**wie `hardening.rs` 가 이식**(§10-3) |
+| 6 | `58c1525` | 「Both trace-specified as method-not-found on the KTF corpus (copyInto: **광란의수족관!/대통령타이쿤/만귀토벌전**; capacity: **아르덴전기**).」 | 광란의수족관! · 대통령타이쿤 · 만귀토벌전 · 아르덴전기 | `Vector.copyInto([Ljava/lang/Object;)V` · `capacity()I` | ★**있다** — `vector.rs` 에 proto **둘 다** |
+| 7 | `cd4804f` | 「Trace-specified: **리얼사커2007**'s paint path calls it and died with method-not-found once `Display.callSerially` opened that path.」 | 리얼사커2007 | `DataInputStream.readUnsignedByte` | ★**있다** — `data_input_stream.rs` 에 proto |
+| 8 | `daee53b` | 「(KTF: InvalidMemoryAccess panic in `JavaClassDefinition::name` during `determine_garbage`, seen flaky on **타운스토리/파랜드택틱스** boot).」 | 타운스토리 · 파랜드택틱스 | `Thread.start()` 의 GC 루팅 | ★**있다 — 단 «다른 설계»로**: 핀은 `thread.rs:256` `jvm.new_global_ref(&this)`(§9-2 정정 항목) |
+| 9 | `45ff9c2` | 「Surfaced by **라피스라줄리** once its game loop actually runs after the currentThread identity fix.」 | 라피스라줄리 | `StringBuffer.append([CII)` null → NPE | ✗**없다**(핀의 `append_char_array` 에 null 가드 0) ⇒ ★**wie `hardening.rs` 가 이식**(축 4) |
+
+★**계**: 관측 **9커밋** · 지목된 타이틀 ★**13종**(중복 없음 — 두뇌게임q · 박정석_영웅탄생 · 레스토랑타이쿤2006 ·
+소울카드마스터2 · 미니고치 · 광란의수족관! · 대통령타이쿤 · 만귀토벌전 · 아르덴전기 · 리얼사커2007 ·
+타운스토리 · 파랜드택틱스 · 라피스라줄리) · 지목된 API **10종**.
+★**핀 보유**: 있다 **6** / 없다 **3** — ★**그 3은 «전부» 이미 `wie_jvm_support/src/hardening.rs` 가 이식했다**
+⇒ ★★**이 통독이 만든 «다음 회차 후보»는 0건이다.**
+★나머지 3커밋(`9970ab6` currentThread 정체성 · `0f4f0bb` arraycopy/forName 가드 · `1f0e52e` String/parseInt 하드닝)은
+**타이틀을 지목하지 않는다**(각각 「standard MIDP game-loop pattern」·사양 인용으로만 정당화한다) ⇒ 이 표에 넣지 않았다.
+
+★**찾은 술어와 그 한계**(다음 사람이 다시 돌릴 수 있게):
+```
+술어 1(과수집) : 커밋 메시지에 한글이 있는가        → wie-ktf-hardening 12중 10 · main 75중 69
+                 ⇒ main 은 «한글 문서 회차»가 대부분이라 이 술어만으로는 못 가른다
+술어 2(정밀)   : 'Trace-specified|Surfaced by|seen flaky on|method-not-found'  → 8커밋
+```
+★★**술어 2 는 «한 건을 놓친다»** — `9be0ea3`(박정석_영웅탄생)은 그 문구가 **없고** 괄호 안에 타이틀만 적혀 있다.
+⇒ ★**최종 9건은 «12커밋을 사람이 통독»해서 나왔다.** 문구 술어를 «전수»로 믿지 마라 — 이 표가 그 반례다.
+
+★**이 통독의 천장**: 커밋 메시지·PR 제목/본문만 본다. **삭제된 브랜치·force-push 로 사라진 커밋·로컬에만 있던 기록**은
+`git log --all` 에 잡히지 않는다(reflog 는 원격에 없다). ⇒ ★**「9건이 전부다」가 아니라 「«남아 있는» 것이 9건이다».**

@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "date": "2026-09-05",
+  "task": "wie-abandoned-fork-commit-log-harvest",
+  "title": "«버린 fork» 통독 — 관측은 «두 줄»이 아니라 9커밋·타이틀 13종이었다. 그리고 그 전부가 이미 덮여 있다",
+  "services": ["engine"],
+  "summary": "제안의 가설(「그 12커밋에 같은 형태의 관측이 더 있을 수 있다」)을 통독으로 검증했다. ★**가설은 맞았다** — §10-2 가 인용한 «두 줄»은 전부가 아니었고, 실제로는 ★**9커밋 · 타이틀 13종 · API 10종**이다(2 → 9, 4.5배). ★**그리고 그 전부가 이미 덮여 있다**: 핀(`dlunch/RustJava@5b84dd1`)이 6, wie `hardening.rs` 가 나머지 3 ⇒ ★**이 통독이 만든 «다음 회차 후보»는 0건**이다. 산출은 목록 1장(§10-6)이고 ★**이식은 하지 않았다**(티켓 2).",
+  "changes": [
+    "`docs/upstream-realign-verdict.md` — **§10-6 신설**(통독 목록 · 원문 인용 · 타이틀 · API · 핀 보유 여부) + §10-2 에 포인터 **1줄**. ★기존 절 **무접촉**(순수 추가).",
+    "★코드 변경 **0** · 핀(`5b84dd1`) **무접촉** · `Jun025/RustJava` **쓰기 0**(bare 클론 읽기 전용 · PR/이슈 코멘트 0) · upstream 발신 0."
+  ],
+  "verification": {
+    "scope": "★훑은 범위를 «수»로: `Jun025/RustJava` 브랜치 **2**(`main` · `wie-ktf-hardening`) · 태그 **0** · 전체 커밋 **1,103** · upstream 에 없는 고유 커밋 **87**(`wie-ktf-hardening` **12** + `main` **75**) · PR **30**(전건 MERGED) · 이슈 ★**저장소가 비활성화**(`the 'Jun025/RustJava' repository has disabled issues` — 조회 자체가 그렇게 답한다). ★**공유 체크아웃(`~/work/otterpebble/rustjava`)은 건드리지 않았다** — 스크래치에 `--bare` 로 새로 클론했다.",
+    "harvest": "★**관측 9커밋 · 타이틀 13종**: 두뇌게임q(`c66f08d` TimeZone.getAvailableIDs) · 박정석_영웅탄생(`9be0ea3` File.length) · 레스토랑타이쿤2006(`d61cf07` java.lang.Byte) · 소울카드마스터2(`3cb4d7d` Timer.schedule) · 미니고치(`9cfc346` StringBuffer.insert) · 광란의수족관!·대통령타이쿤·만귀토벌전·아르덴전기(`58c1525` Vector.copyInto·capacity) · 리얼사커2007(`cd4804f` DataInputStream.readUnsignedByte) · 타운스토리·파랜드택틱스(`daee53b` Thread.start GC 루팅) · 라피스라줄리(`45ff9c2` StringBuffer.append([CII) null NPE). ★원문은 요약하지 않고 **인용**했다(§10-6) — 코퍼스가 없어 재현이 불가능하므로 인용이 곧 자료다.",
+    "pin-presence": "★각 행의 「우리 핀에 있는가」를 **실측으로** 채웠다: **있다 6**(`time_zone.rs:28` proto+시험 · `file.rs:144` `map_or(0,…)` 주석까지 동일 · `loader.rs` 의 Byte 등록 · `vector.rs` 의 copyInto/capacity proto 둘 다 · `data_input_stream.rs` proto · `thread.rs:256` `new_global_ref`) · **없다 3**(`Timer.schedule(TT,J)` · `StringBuffer.insert(I,String)` · `append([CII)` null 가드 — 핀의 `append_char_array` 에 가드 **0**). ★**없는 3은 전부 `wie_jvm_support/src/hardening.rs` 가 이미 이식했다**(축 4·8·9) ⇒ **후속 후보 0건**.",
+    "predicate-and-limit": "★**술어를 밝혔다**: ⑴과수집 = 「커밋 메시지에 한글이 있는가」 → `wie-ktf-hardening` 12중 **10** · `main` 75중 **69** ⇒ ★`main` 은 한글 «문서 회차»가 대부분이라 이 술어만으로는 못 가른다 ⑵정밀 = `Trace-specified|Surfaced by|seen flaky on|method-not-found` → **8커밋**. ★★**그 술어가 «한 건을 놓친다»** — `9be0ea3`(박정석_영웅탄생)은 그 문구가 **없고** 괄호 안에 타이틀만 있다 ⇒ 최종 9건은 **사람이 12커밋을 통독**해서 나왔다. ★**문구 술어를 전수로 믿지 마라 — 이 표가 그 반례다.**",
+    "main-branch-is-not-a-source": "★`main` 의 고유 **75커밋에는 관측이 0건**이다 — 전부 이 estate 의 `rustjava-*` 레인 작업(upstream 동기 S1~S8·문서·CI)이고, 타이틀 지목 문구를 세니 **0건**이었다. ⇒ ★**「버린 fork」는 저장소 전체가 아니라 «`wie-ktf-hardening` 브랜치»다** — 그 저장소 자체는 지금도 활동 중이다(PR 30건 · 최신 push 2026-09-05).",
+    "gates": "`cargo fmt --all -- --check` rc=0 · `check-worklog-json.mjs` OK · 정적 계약 **107 pass / 0 violation** · `npm run audit` PASSED. ★코드 변경이 0이라 Rust 시험·왕복 축은 이 회차의 대상이 아니다(회귀 여지 0)."
+  },
+  "limits": [
+    "★★**이 통독의 천장 — 「9건이 전부다」가 아니라 「«남아 있는» 것이 9건이다».** `git log --all` 은 **삭제된 브랜치·force-push 로 사라진 커밋·로컬에만 있던 기록**을 잡지 못한다(원격에는 reflog 가 없다). 제안의 가설은 «남아 있는 범위»에서 확인된 것이다.",
+    "★**PR 본문은 커밋 메시지와 같은 내용이었다** — PR 30건은 전부 `rustjava-*` 레인 회차라 새 관측을 담지 않았다. 이슈는 **저장소가 비활성화**해 훑을 대상이 애초에 없다.",
+    "★**「핀에 있다」는 «API 가 있다»이지 «그 타이틀이 지금 뜬다»가 아니다** — 코퍼스가 없어 그것은 이 머신에서 여전히 측정 불가다(§8-1). 이 표가 답하는 것은 「그때 막았던 API 가 지금 있는가」뿐이다.",
+    "★**`daee53b`(타운스토리·파랜드택틱스)만 «다른 설계»로 있다** — 핀은 fork 의 `add/remove_pending_java_thread` 가 아니라 `GlobalRef` 로 같은 창을 닫는다(§9-2 정정 항목). 같은 «보호»이지 같은 «코드»가 아니라는 것을 표에 적어 뒀다.",
+    "★**부수 관측(이 회차 범위 밖)**: `scripts/check-worklog-coverage.mjs`(PR #78, 아직 미착지)를 `main` 에서 돌리면 기록 파일이 없어 **처리되지 않은 예외**로 죽는다(깨끗한 메시지가 아니다). 두 파일이 함께 착지하므로 실사용에서는 나지 않지만, 그 PR 의 검수가 볼 값이다. ★이 회차는 **고치지 않았다**(다른 PR 의 파일이고 손대면 충돌한다)."
+  ],
+  "issues": [],
+  "proposals": [],
+  "adoptedProposals": ["2026-09-04-unported-hardening-two-axes#p0"],
+  "declinedProposals": []
+}
