@@ -50,6 +50,13 @@
     "NUM5": 53, "NUM6": 54, "NUM7": 55, "NUM8": 56, "NUM9": 57,
     "STAR": 42, "HASH": 35
   },
+  "gameActionsNote": "게스트가 «방금 받은 키가 어느 방향인가»를 되묻는 통로(getGameAction)의 반환값. MIDP Canvas 사양의 게임 액션 상수이고 «두 경로가 같은 수를 써야» 한다 — 틀리면 위를 눌렀는데 캐릭터가 아래로 간다. ★그래서 여기 «한 번만» 적고 check-engine-contract.mjs §4d 가 두 표(MIDP Canvas::getGameAction · WIPI Display::getGameAction) 모두를 이 값에 대조한다.",
+  "gameActions": { "UP": 1, "LEFT": 2, "RIGHT": 5, "DOWN": 6, "FIRE": 8 },
+  "gameActionTablesNote": "두 표가 «갈리는» 자리는 여기 둘뿐이고 «의도»다: ⑴WIPI 만 CLEAR→99 를 갖는다(KTF 고유) ⑵미매칭 반환이 다르다 — MIDP 는 0(사양: 게임키가 아니면 0), WIPI 는 key(입력을 그대로 돌려주는 KTF 관례). ★어느 쪽도 상대에 맞추면 그 플랫폼이 깨지므로 «통일하지 마라». 갈리는 자리를 계약에 적어 두는 이유는, 다음 사람이 이 차이를 «버그»로 보고 없애지 않게 하려는 것이다.",
+  "gameActionTables": {
+    "midp": { "fn": "Canvas::getGameAction", "file": "wie_midp/src/classes/javax/microedition/lcdui/canvas.rs", "keyEnum": "MIDPKeyCode", "extra": {}, "fallback": "0" },
+    "wipi": { "fn": "Display::getGameAction", "file": "wie_wipi_java/src/classes/org/kwis/msp/lcdui/display.rs", "keyEnum": "WIPIKeyCode", "extra": { "CLEAR": 99 }, "fallback": "key" }
+  },
   "saveMagic": "WIESAV01",
   "screen": { "width": 240, "height": 320 },
   "lgtCompileModels": ["clet", "aot-java"],

@@ -1,5 +1,13 @@
 # REPORT
 
+## [2026-09-04] 게임 액션 표 둘을 잠갔다 — 공통 5행은 «한 곳에서» 파생, 갈리는 두 자리는 «의도»로 못박음 (wie-key-contract-pin-game-action-tables)
+- **무엇을**: 계약에 `gameActions`(공통 5 · **단일 출처**) + `gameActionTables`(플랫폼별 `extra`·`fallback`) 신설 · `scripts/check-engine-contract.mjs` **§4d**(약 35줄)가 두 표를 그 값에 대조. ★**제품 코드 0줄 · 픽스처 0.**
+- **왜**: 운영자 채택 제안 `2026-09-04-ktf-third-key-table-pin#p1`. 게스트가 「방금 받은 키가 어느 방향인가」를 되묻는 통로 둘(`Canvas::getGameAction` · WIPI `Display::getGameAction`)이 **전달 경로 밖**이라 §4·§4b·§4c 가 보지 않았고 **핀이 0**이었다 — 틀리면 «위를 눌렀는데 아래로 간다».
+- **★⑴ 두 표의 «차이» 판정을 먼저 했다**: 공통 5행(UP·DOWN·LEFT·RIGHT·FIRE) **값 전건 동일**(1·6·2·5·8 = MIDP Canvas 사양) ⇒ ★**한 곳에서 파생**시켰다. 갈리는 자리는 **정확히 둘** — ⑴WIPI 에만 `CLEAR→99` ⑵미매칭 반환 `0`(MIDP 사양) ↔ `key`(KTF 관례). ★**둘 다 의도이지 결함이 아니다**(어느 쪽도 상대에 맞추면 그 플랫폼이 깨진다) ⇒ 통일하지 않고 **«갈린다»는 사실을 계약에 적었다** — 이 차이가 문서화된 적이 없어 다음 사람이 «버그»로 볼 위험이 실재했다.
+- **★★⑵ 개악 5칸 — 전부 제품 실물**: MIDP `UP => 6` → `miswired … pins 1` · WIPI `LEFT => 5` → `… pins 2`(★**둘이 각각 하나씩만** 울었다) · ★«통일»처럼 보이는 개악(WIPI `_ => key` → `_ => 0`) → `fallback drift … see gameActionTablesNote before "fixing" this` · 계약에 없는 행 추가 → `contract pins no action for it` · 무개악 **101 pass / 0 violation**.
+- **★★⑶ 개악이 «fail-open 구멍»을 하나 잡아냈다**: 위치자 개명 개악이 **처음엔 통과**했다 — `indexOf("async fn get_game_action")` 가 **접두 일치**라 `..._renamed` 도 매치했다. 이름 끝을 **괄호로 고정**(형제 §4b·§4c 관용구와 같게)해 재시험하니 **95 pass / 1 violation**(`refusing to fail-open`). ★**개악 칸을 실제로 돌리지 않았으면 그 구멍은 남았다.**
+- **사용자 영향**: 방향 대응이 어긋나 «조작이 반대로 도는» 오작동이 두 플랫폼 모두에서 착지 전에 잡힌다. 엔진 동작·배포 산출물 변경 0.
+- **★남는 구멍**: WIPI `CLEAR => 99` 의 «99» 근거는 코드 안에 없다(사양 미확인) — 계약은 «지금 값»을 핀할 뿐이라 조용한 표류는 막지만 그 값이 옳은지는 **미측정**이다. ★그리고 형제 PR #75 와 **같은 두 파일**을 만져 나중에 착지하는 쪽에서 충돌 해소가 필요할 수 있다.
 ## [2026-09-04] «통화»·«종료» 두 키를 세 표 전부에서 잠갔다 — 「소비자와 함께 롤아웃」은 필요 없었다 (wie-key-contract-pin-call-and-hangup)
 - **무엇을**: `docs/contracts/featurephone-engine-contract.json` — `keyVocabulary` +2(`CALL`·`HANGUP`) · `keyMidpCodes` +2(10 · -1) · `keyWipiCodes` +2(-10 · -11) + `keyVocabularyNote` 신설. ★**검사기 0줄 · 제품 코드 0줄.**
 - **왜**: 운영자 채택 제안 `2026-09-04-ktf-third-key-table-pin#p0`. 화면의 «통화»·«종료» 버튼은 **지금도 눌리는데** 그 둘만 세 표 어디에서도 안 잠겨 있었다.

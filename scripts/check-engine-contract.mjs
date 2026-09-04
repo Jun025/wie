@@ -180,6 +180,46 @@ if (wipiEnumStart === -1 || wipiEnumEnd === -1 || fromMidpStart === -1 || fromMi
   }
 }
 
+// ── 4d. The other direction: the guest asks "was that key UP?" ──────────────
+// getGameAction is not on the delivery path (the guest calls it, on a code it
+// already holds), so §4/§4b/§4c never look at it — yet a swapped row there is
+// "you pressed up and walked down". Two tables answer that question, one per
+// platform, and they agree on all five shared actions, so the numbers live ONCE
+// in the contract (gameActions) and both tables are checked against them.
+// The two places they diverge are pinned separately as `extra`/`fallback`,
+// because each is that platform's own rule — see gameActionTablesNote.
+for (const [platform, spec] of Object.entries(contract.gameActionTables)) {
+  const src = await readFile(path.join(root, spec.file), "utf8");
+  const fnStart = src.indexOf("async fn get_game_action(");
+  const fnEnd = fnStart === -1 ? -1 : src.indexOf("\n    }", fnStart);
+  if (fnStart === -1 || fnEnd === -1) {
+    bad(`game action table unverifiable: \`async fn get_game_action(\` not found (or unterminated) in ${spec.file} — refusing to fail-open; fix the checker's locator if it moved`);
+    continue;
+  }
+  if (src.indexOf("async fn get_game_action(", fnStart + 1) !== -1) {
+    bad(`game action table unverifiable: ${spec.file} defines \`get_game_action\` more than once — refusing to fail-open`);
+    continue;
+  }
+  const body = src.slice(fnStart, fnEnd);
+  const arms = new Map(
+    [...body.matchAll(new RegExp(`Some\\(${spec.keyEnum}::([A-Z][A-Z0-9_]*)\\)\\s*=>\\s*(-?\\d+)\\s*,`, "g"))].map((m) => [m[1], Number(m[2])]),
+  );
+  const expected = { ...contract.gameActions, ...spec.extra };
+  for (const [variant, want] of Object.entries(expected)) {
+    if (!arms.has(variant)) bad(`game action drift (${platform}, ${spec.fn}): ${spec.keyEnum}::${variant} no longer returns an action — the guest would read it as "not a game key"`);
+    else if (arms.get(variant) === want) ok(`${spec.fn} maps ${spec.keyEnum}::${variant} to game action ${want}`);
+    else bad(`game action miswired (${platform}, ${spec.fn}): ${spec.keyEnum}::${variant} returns ${arms.get(variant)}, contract pins ${want} — the guest would move the wrong way`);
+  }
+  for (const variant of arms.keys()) {
+    if (!(variant in expected)) bad(`game action drift (${platform}, ${spec.fn}): ${spec.keyEnum}::${variant} returns ${arms.get(variant)} but the contract pins no action for it — add it to gameActions (shared) or this table's extra`);
+  }
+  // The wildcard arm is half the contract: MIDP owes 0, WIPI owes the key back.
+  const fallback = body.match(/_\s*=>\s*([^,\n]+)\s*,/);
+  if (!fallback) bad(`game action table unverifiable: ${spec.fn} has no \`_ =>\` arm — refusing to fail-open`);
+  else if (fallback[1].trim() === spec.fallback) ok(`${spec.fn} falls back to \`${spec.fallback}\` for non-game keys`);
+  else bad(`game action fallback drift (${platform}, ${spec.fn}): \`_ => ${fallback[1].trim()}\`, contract pins \`${spec.fallback}\` — see gameActionTablesNote before "fixing" this`);
+}
+
 if (libRs.includes(`b"${contract.saveMagic}"`)) ok(`save magic pinned: ${contract.saveMagic}`);
 else bad(`save magic drift: b"${contract.saveMagic}" not found in wie_web/src/lib.rs — stored featurephone save blobs would stop importing`);
 
