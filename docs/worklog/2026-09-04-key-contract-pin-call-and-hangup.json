@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "date": "2026-09-04",
+  "task": "wie-key-contract-pin-call-and-hangup",
+  "title": "«통화»·«종료» 두 키를 세 표 전부에서 잠갔다 — 그리고 「소비자와 함께 롤아웃」은 필요 없었다",
+  "services": ["engine", "web"],
+  "summary": "피처폰 화면의 «통화»·«종료» 버튼은 지금도 실제로 눌리는데 `CALL`·`HANGUP` 만 계약 어휘 밖이라 세 표(§4 `parse_key` · §4b `from_key_code` · §4c `from_midp_raw`) 어디에서도 잠겨 있지 않았다. ⇒ 어휘 2행 + 세 표에 각 2행을 넣어 닫았다. ★**검사기 로직 변경 0** — 세 블록이 전부 계약 데이터를 순회한다는 제안의 주장을 **루프 머리로 확인**했다. ★그리고 제안이 조건으로 달았던 「§4b 접촉이므로 형제 회차 판단이 선행」과 「어휘는 소비자 계약이라 otterpebble 과 같은 롤아웃」 **둘 다 실측으로 해소**됐다 — 형제 리니지는 착지 완료이고, ★**otterpebble 은 이 계약 파일을 읽지 않는다**.",
+  "changes": [
+    "`docs/contracts/featurephone-engine-contract.json` — `keyVocabulary` +2(`CALL`·`HANGUP`) · `keyMidpCodes` +2(`CALL: 10` · `HANGUP: -1`) · `keyWipiCodes` +2(`CALL: -10` · `HANGUP: -11`). 값은 제품 원본에서 읽었다(`event_queue.rs` `enum MIDPKeyCode` · `card_canvas.rs` `enum WIPIKeyCode`).",
+    "`keyVocabularyNote` 신설 — ★**왜 이 둘이 여기 있고 `VOLUME_*` 는 없는지**를 다음 사람이 즉시 알도록. 셸 실측 근거(화면 버튼 · 키보드 바인딩 0)와 「`VOLUME_UP`·`VOLUME_DOWN` 은 넣지 마라」를 함께 적었다.",
+    "★**검사기(`scripts/check-engine-contract.mjs`) 0줄** · ★**제품 코드 0줄** · 픽스처 0 · 새 하네스 0."
+  ],
+  "verification": {
+    "precondition": "★제안이 «스스로» 붙인 선행 조건(「§4b 접촉이므로 형제 회차 산출물을 만지는 판단이 선행한다」)을 먼저 쟀다: §4b 는 `wie-featurephone-keypress-remaining-17-keys-close-or-declare(-fix)` 산출물로 머지 **`6b4bf150`**, §4c 는 `wie-ktf-third-key-table-pin-*` 로 머지 **`b02467fc`** — ★**둘 다 `origin/main` 조상**(`git merge-base --is-ancestor` rc=0) · ★**열린 PR 0건** · 그 리니지의 큐·running 잔여 **0건**. ⇒ 갈래 ⒜(닫혀 있음)로 진행했다. ★실제로 §4b 코드는 **한 줄도 만지지 않았다**(계약 데이터만 늘었다).",
+    "checker-iterates": "★**「검사기 로직 변경 0」을 «주장»하지 않고 «확인»했다** — 세 블록의 루프 머리: §4 `for (const key of contract.keyVocabulary)` · §4b `for (const [key, expected] of Object.entries(contract.keyMidpCodes))` · §4c `for (const [key, expected] of Object.entries(contract.keyWipiCodes))` + 각 블록 뒤의 «어휘 커버리지» 역검사 2개(`keyVocabulary` 에 있는데 표에 없으면 `contract gap` 위반). ⇒ **계약 데이터만 늘리면 검사가 자동으로 늘어난다** — 실측: **88 pass → 94 pass**(+6 = 2키 × 3표), 검사기 diff **0**.",
+    "consumer-coupling": "★★**제안의 tradeoff 「어휘 변경은 소비자 계약이라 otterpebble 과 같은 롤아웃이 필요하다」는 «과했다» — 실측으로 정정한다.** `git -C otterpebble grep -linE 'featurephone-engine-contract|keyVocabulary|keyMidpCodes' origin/main` → **0건**. 수신부 `.github/workflows/wie-artifact-receive.yml` 은 아티팩트 **sha256 검증 + 핀 범프**만 하고 이 계약 파일을 **읽지 않는다**. ⇒ 이 파일의 소비자는 **wie 자신의 두 검사기뿐**이고 어휘 확장에 교차 저장소 롤아웃은 **불요**다. ★그 문장은 내가(직전 회차가) 근거 없이 적은 것이고, 이번에 상류를 재서 지웠다.",
+    "mutation": "★**개악 3건 — «표마다 하나씩», 전부 제품 실물에 심고 원복**(`git diff --stat` 으로 원복 확인 · 재타이핑 사본 아님): ⒜**§4** `wie_web/src/lib.rs` 의 `\"CALL\" => KeyCode::HANGUP` → `✗ key mapping miswired: parse_key maps \"CALL\" => KeyCode::HANGUP, expected KeyCode::CALL` ⒝**§4b** `event_queue.rs` 의 `KeyCode::CALL => Self::HANGUP` → `✗ guest key code miswired: \"CALL\" now reaches the guest as -1 (Self::HANGUP), contract pins 10` ⒞**§4c** `card_canvas.rs` 의 `Some(MIDPKeyCode::CALL) => Self::HANGUP as i32` → `✗ WIPI key code miswired: \"CALL\" now reaches the KTF guest as -11 (Self::HANGUP), contract pins -10`. ★**셋이 «각각 하나씩만» 울었다** — 한 표만 red 였다면 나머지 둘은 안 잠긴 것이다. ⒟**무개악** → **94 pass / 0 violation**(오탐 0).",
+    "roundtrip-widened": "★왕복 검사의 Scenario A 는 `contract.keyVocabulary` 를 순회하므로 이 회차로 **자동으로 넓어졌다** — `A: key vocabulary down/up sweep (no throw) — ★22 codes`(직전 20). 전체 **29/29 유지**(오탐 0). ⇒ 두 키가 `key_down`/`key_up` 을 실제로 통과하는 것도 브라우저에서 확인된다.",
+    "gates": "`cargo fmt --all -- --check`·`clippy --all -D warnings`·`clippy --target wasm32-unknown-unknown -D warnings` 전건 rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` **137 passed / 0 failed**(★Rust 무접촉이라 직전과 동수) · `npm run audit` PASSED · `check-worklog-json.mjs` OK · ★**repo 러너** `wie_validate` 3픽스처 **전건 PASS**(`draw_j2me.jar` **booted + rendered**)."
+  },
+  "limits": [
+    "★**닫은 것은 «표»이지 «도달»이 아니다** — `CALL`·`HANGUP` 이 게스트에 실제로 도착하는지는 여전히 미측정이다(대표 3종 Scenario D 는 J2ME 픽스처 기준이고 이 둘은 그 목록에 없다). ★단 Scenario A 의 22종 스윕이 «예외 없이 통과»는 보인다.",
+    "★**`VOLUME_UP`·`VOLUME_DOWN` 은 «일부러» 넣지 않았다** — 셸이 엔진에 보내지 않는다(otterpebble `apps/featurephone/**` 전체 **0건** · 음량은 호스트 게인 노드 `setVolume` 이 진다). 넣으면 계약이 «쓰이지 않는 표면»을 약속하게 된다. ⇒ 세 표의 **24행 중 22행**이 잠겼고 나머지 2행은 **도달 불가라서** 열려 있다. ★셸이 그 이름을 보내기 시작하면 그때 넣어라.",
+    "★**게임 액션 표 2종은 이 회차 밖**(`Canvas::getGameAction` · WIPI `Display::getGameAction`) — 별 티켓 `wie-key-contract-pin-game-action-tables` 가 진다. 손대지 않았다.",
+    "★**어휘가 늘면 Scenario A 스윕도 는다**(자동) — 지금은 22종 × down/up 이라 비용이 무시할 수준이지만, 어휘를 크게 늘릴 때는 그 축의 프레임 비용을 함께 보라."
+  ],
+  "issues": [],
+  "proposals": [],
+  "adoptedProposals": ["2026-09-04-ktf-third-key-table-pin#p0"],
+  "declinedProposals": []
+}

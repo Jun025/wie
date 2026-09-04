@@ -27,16 +27,17 @@
     "import_saves",
     "free"
   ],
+  "keyVocabularyNote": "셸이 engine.key_down/key_up 으로 «실제로 보내는» 이름. CALL·HANGUP 은 화면의 «통화»·«종료» 버튼이 보낸다(otterpebble apps/featurephone/app/player.tsx 의 <GameKey code=\"CALL\"|\"HANGUP\"> → RunningGame.press → emu.key_down · 2026-09-04 origin/main 실측). ★키보드 바인딩은 없다(KEY_MAP 에 0건) — 버튼만이다. VOLUME_UP·VOLUME_DOWN 은 «넣지 마라»: 셸이 엔진에 보내지 않고(호스트 게인 노드 setVolume 이 진다) 넣으면 계약이 쓰이지 않는 표면을 약속하게 된다.",
   "keyVocabulary": [
     "UP", "DOWN", "LEFT", "RIGHT", "OK",
-    "LEFT_SOFT_KEY", "RIGHT_SOFT_KEY", "CLEAR",
+    "LEFT_SOFT_KEY", "RIGHT_SOFT_KEY", "CLEAR", "CALL", "HANGUP",
     "NUM0", "NUM1", "NUM2", "NUM3", "NUM4", "NUM5", "NUM6", "NUM7", "NUM8", "NUM9",
     "STAR", "HASH"
   ],
   "keyMidpCodesNote": "keyVocabulary 의 각 이름이 «게스트에게 도달하는 정수». 셸은 이름만 보내지만 게스트는 이 수를 받으므로, 이 표가 틀리면 5 를 눌러 8 이 입력된다 — 셸에서는 보이지 않는다. 정본은 wie_midp MIDPKeyCode 이고 이 파일이 그것을 핀한다(check-engine-contract.mjs §4). 방향키는 MIDP Canvas 이름 대역(141..148) · 숫자·기호는 ASCII.",
   "keyMidpCodes": {
     "UP": 141, "DOWN": 146, "LEFT": 142, "RIGHT": 145, "OK": 148,
-    "LEFT_SOFT_KEY": 6, "RIGHT_SOFT_KEY": 7, "CLEAR": 8,
+    "LEFT_SOFT_KEY": 6, "RIGHT_SOFT_KEY": 7, "CLEAR": 8, "CALL": 10, "HANGUP": -1,
     "NUM0": 48, "NUM1": 49, "NUM2": 50, "NUM3": 51, "NUM4": 52,
     "NUM5": 53, "NUM6": 54, "NUM7": 55, "NUM8": 56, "NUM9": 57,
     "STAR": 42, "HASH": 35
@@ -44,7 +45,7 @@
   "keyWipiCodesNote": "KTF(WIPI) 게스트가 받는 정수. MIDP 경로와 «다른 표»다 — net.wie.CardCanvas 가 Canvas.keyPressed 를 재정의해 WIPIKeyCode::from_midp_raw 로 한 번 더 바꾼 뒤 게스트의 Card.keyNotify 로 넘긴다. ★이 표가 한 행이라도 어긋나면 «5를 눌러 8이 입력된다»(숫자는 WIPI 에서도 ASCII 라 NUM5 의 53 이 NUM8 의 56 으로 나간다). 정본은 wie_wipi_java WIPIKeyCode 이고 이 파일이 그것을 핀한다(check-engine-contract.mjs §4c). 방향·소프트키는 음수 대역 · 숫자·기호는 ASCII.",
   "keyWipiCodes": {
     "UP": -1, "DOWN": -2, "LEFT": -3, "RIGHT": -4, "OK": -5,
-    "LEFT_SOFT_KEY": -6, "RIGHT_SOFT_KEY": -7, "CLEAR": -16,
+    "LEFT_SOFT_KEY": -6, "RIGHT_SOFT_KEY": -7, "CLEAR": -16, "CALL": -10, "HANGUP": -11,
     "NUM0": 48, "NUM1": 49, "NUM2": 50, "NUM3": 51, "NUM4": 52,
     "NUM5": 53, "NUM6": 54, "NUM7": 55, "NUM8": 56, "NUM9": 57,
     "STAR": 42, "HASH": 35
