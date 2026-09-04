@@ -134,6 +134,52 @@ if (enumStart === -1 || enumEnd === -1 || fromKeyStart === -1 || fromKeyEnd === 
   }
 }
 
+// ── 4c. Third hop, KTF only: the MIDP int -> the WIPI int the guest is handed ─
+// net.wie.CardCanvas overrides Canvas.keyPressed and converts once more through
+// WIPIKeyCode::from_midp_raw before handing the code to the guest's
+// Card.keyNotify. Nothing pinned that table either (measured: zero checkers,
+// zero tests, zero contract entries), and a swapped row there means pressing 5
+// types 8 — WIPI numerics are ASCII too, so NUM5's 53 goes out as NUM8's 56.
+// Same shape as §4b on purpose: contract value vs. the product's own literals,
+// resolved arm -> variant -> discriminant. This block re-reads MIDPKeyCode
+// itself rather than reusing §4b's parse, so the two are independent.
+const cardCanvasRs = "wie_wipi_java/src/classes/net/wie/card_canvas.rs";
+const ccRs = await readFile(path.join(root, cardCanvasRs), "utf8");
+const wipiEnumStart = ccRs.indexOf("pub enum WIPIKeyCode");
+const wipiEnumEnd = wipiEnumStart === -1 ? -1 : ccRs.indexOf("\n}", wipiEnumStart);
+const fromMidpStart = ccRs.indexOf("pub fn from_midp_raw(");
+const fromMidpEnd = fromMidpStart === -1 ? -1 : ccRs.indexOf("\n    }", fromMidpStart);
+// enumStart/enumEnd are §4b's locators for MIDPKeyCode; re-derived here so a
+// failure over there cannot silently turn this block into a no-op.
+const midpEnumStart = eqRs.indexOf("pub enum MIDPKeyCode");
+const midpEnumEnd = midpEnumStart === -1 ? -1 : eqRs.indexOf("\n}", midpEnumStart);
+if (wipiEnumStart === -1 || wipiEnumEnd === -1 || fromMidpStart === -1 || fromMidpEnd === -1 || midpEnumStart === -1 || midpEnumEnd === -1) {
+  bad(`WIPI key codes unverifiable: \`pub enum WIPIKeyCode\` or \`pub fn from_midp_raw(\` not found (or unterminated) in ${cardCanvasRs} — refusing to fail-open; fix the checker's locator if it moved`);
+} else {
+  const arm = /^\s*([A-Z][A-Z0-9_]*)\s*=\s*(-?\d+)\s*,/gm;
+  const wipiDisc = new Map([...ccRs.slice(wipiEnumStart, wipiEnumEnd).matchAll(arm)].map((m) => [m[1], Number(m[2])]));
+  // MIDP int -> variant name, because from_midp_raw's arms are written with the
+  // variant, while the contract pins the int (keyMidpCodes).
+  const midpByCode = new Map([...eqRs.slice(midpEnumStart, midpEnumEnd).matchAll(arm)].map((m) => [Number(m[2]), m[1]]));
+  const fromMidpBody = ccRs.slice(fromMidpStart, fromMidpEnd);
+  for (const [key, expected] of Object.entries(contract.keyWipiCodes)) {
+    const midpVariant = midpByCode.get(contract.keyMidpCodes?.[key]);
+    if (midpVariant === undefined) {
+      bad(`WIPI key code unverifiable: "${key}" has no MIDPKeyCode variant carrying its pinned code ${contract.keyMidpCodes?.[key]} — the KTF hop is keyed off that variant`);
+      continue;
+    }
+    const arms = [...fromMidpBody.matchAll(new RegExp(`Some\\(MIDPKeyCode::${midpVariant}\\)\\s*=>\\s*Self::([A-Za-z0-9_]+)`, "g"))];
+    if (arms.length === 0) bad(`WIPI key code drift: from_midp_raw no longer maps MIDPKeyCode::${midpVariant} ("${key}") — the KTF guest would receive the raw MIDP code instead (the None arm falls through)`);
+    else if (arms.length > 1) bad(`WIPI key code unverifiable: MIDPKeyCode::${midpVariant} ("${key}") has ${arms.length} match arms in from_midp_raw — refusing to fail-open`);
+    else if (!wipiDisc.has(arms[0][1])) bad(`WIPI key code unverifiable: from_midp_raw maps "${key}" to Self::${arms[0][1]}, which has no literal discriminant in enum WIPIKeyCode`);
+    else if (wipiDisc.get(arms[0][1]) === expected) ok(`from_midp_raw hands the KTF guest ${expected} for "${key}" (Self::${arms[0][1]})`);
+    else bad(`WIPI key code miswired: "${key}" now reaches the KTF guest as ${wipiDisc.get(arms[0][1])} (Self::${arms[0][1]}), contract pins ${expected} — pressing this key would input a different one`);
+  }
+  for (const key of contract.keyVocabulary) {
+    if (!(key in contract.keyWipiCodes)) bad(`contract gap: keyVocabulary lists "${key}" but keyWipiCodes does not pin its KTF-visible code`);
+  }
+}
+
 if (libRs.includes(`b"${contract.saveMagic}"`)) ok(`save magic pinned: ${contract.saveMagic}`);
 else bad(`save magic drift: b"${contract.saveMagic}" not found in wie_web/src/lib.rs — stored featurephone save blobs would stop importing`);
 

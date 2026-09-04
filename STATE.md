@@ -32,7 +32,16 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- (없음 — 열린 PR 0건)
+- 2026-09-04: **KTF 의 «셋째 키 표» 핀** (`wie-ktf-third-key-table-pin-wipi-from-midp-raw`
+  · 채택 제안 `2026-09-04-keypress-remaining-17-keys#p0`) — KTF(WIPI) 게스트는 키 번호를 **한 번 더**
+  바꿔서 받는다(`CardCanvas` 가 `Canvas.keyPressed` 를 **재정의** → `WIPIKeyCode::from_midp_raw` → `Card.keyNotify`).
+  ★**그 표를 잡는 것이 정말 0이었다**(검사기·계약·시험 전수 실측) ⇒ §4b 와 **같은 방식**으로 **§4c** 신설.
+  ★**착수 재확인에서 등재값이 틀렸다** — 「20행」이 아니라 ★**24행**이다(초과 4 = `CALL`·`HANGUP`·`VOLUME_*` ·
+  계약 어휘 밖이라 미핀으로 남겼다). 핀 범위는 **어휘 20종**(§4b 와 같은 키 집합).
+  ★**「5를 눌러 8이 입력된다」는 참**이다 — 개악 출력이 `as 56 (Self::NUM8), contract pins 53` 이고 **56 = ASCII '8'**.
+  정적 **68 → 88 pass** · 개악 5칸(팔 스왑·계약 변조·행 삭제·위치자 개명 → fail-closed·무개악 green) 전부 제품 실물.
+  ★**J2ME 결론과 충돌하지 않는다** — 그쪽은 MIDP 경로 범위였고 이 표는 그 밖이다(재개 조건 무접촉).
+  ★**남는 구멍**: 게임 액션 표 **둘**(`Canvas::getGameAction` · WIPI `Display::getGameAction`) 미핀 — 제안으로 올렸다.
 
 ## 완료 (최근)
 - 2026-09-04: **남은 17종 키 사각 처분 — «닫았다»** (PR #73 착지 · `wie-featurephone-keypress-remaining-17-keys-close-or-declare`

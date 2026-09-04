@@ -1,5 +1,16 @@
 # REPORT
 
+## [2026-09-04] KTF 의 «셋째 키 표»를 핀했다 — 그리고 그 표는 «20행»이 아니라 «24행»이었다 (wie-ktf-third-key-table-pin-wipi-from-midp-raw)
+- **무엇을**: `docs/contracts/featurephone-engine-contract.json` 에 `keyWipiCodes`(어휘 20종 → KTF 게스트가 받는 정수) 신설 · `scripts/check-engine-contract.mjs` **§4c** 신설(그 표를 `wie_wipi_java` 원본과 «값»으로 대조 · fail-closed). ★**Rust 0줄** · 픽스처 0 · 새 하네스 0.
+- **왜**: 운영자 채택 제안 `2026-09-04-keypress-remaining-17-keys#p0`. KTF(WIPI) 게스트는 키 번호를 **한 번 더** 바꿔서 받는데 그 표를 확인하는 장치가 **하나도 없었다**.
+- **★⑴ 착수 재확인에서 등재값이 틀렸다**: 제안은 「20행」이었으나 실제 `from_midp_raw` 는 ★**24행**이다(초과 4 = `CALL`·`HANGUP`·`VOLUME_*` — 계약 어휘 밖). ⇒ 핀 범위는 **어휘 20종**(§4b 와 같은 키 집합)으로 두고 4행 미핀을 한계로 적었다. ★「잡는 것 0」도 세는 명령으로 재확인했다 — 검사기·계약·워크플로 **0건** · `#[test]` **0건**.
+- **★⑵ 이 표는 «전달 경로 위»다**: `net.wie.CardCanvas` 는 `Canvas` 의 하위형이고 `keyPressed`/`keyReleased`/`keyRepeated` **3개를 재정의**한다 ⇒ `Canvas::handleKeyEvent` 의 `invoke_virtual` 이 그 재정의로 내려앉아 `from_midp_raw` 를 태우고 `Card.keyNotify` 로 나간다.
+- **★★⑶ 「5를 눌러 8이 입력된다」는 참이다 — 가정이 아니라 개악 출력이다**: 팔 스왑을 심으니 `"NUM5" now reaches the KTF guest as 56 (Self::NUM8), contract pins 53` 이 나왔고 ★**56 = ASCII '8'** 이다. 그 문장을 계약 주석과 §4c 에 남겼다.
+- **★⑷ 개악 5칸 전부 «제품 실물»에 심었다**(재타이핑 사본 아님): 팔 스왑 → 2 violation(양방향) · 계약 1행 변조 → 1 · 표 1행 삭제 → `None` 팔 낙하를 지목하는 drift · 위치자 개명 → ★**fail-closed**(88 → 68 pass 로 축이 통째로 사라진 것까지 보인다) · 무개악 → **88 pass / 0 violation**. 정적 검사 **68 → 88 pass**.
+- **★⑸ J2ME 결론과 충돌하지 않는다**: 직전 회차의 「닫혔다」는 **MIDP 경로 범위**였고 이 표는 그 밖이다. 그쪽 재개 조건(5파일 열거)은 **무접촉**이다.
+- **사용자 영향**: KTF 게임에서 «누른 키와 다른 키가 입력되는» 조용한 오작동이 어휘 20종 전건에 대해 착지 전에 잡힌다. 엔진 동작·배포 산출물 변경 0.
+- **★남는 구멍**: 게임 액션 표 **둘**(`Canvas::getGameAction` · WIPI `Display::getGameAction`)이 여전히 미핀 — 둘 다 경로 밖(게스트가 부른다)이지만 방향 오배선이 곧 «조작이 반대로 도는 것»이라 제안으로 올렸다.
+
 ## [2026-09-04] 남은 17종의 키 사각 — 「17개의 구멍」이 아니라 「핀 없는 표 하나」였다 (wie-featurephone-keypress-remaining-17-keys-close-or-declare)
 - **무엇을**: `docs/contracts/featurephone-engine-contract.json` 에 `keyMidpCodes`(어휘 20종 → 게스트가 받는 정수) 신설 · `scripts/check-engine-contract.mjs` **§4b** 신설(그 표를 `wie_midp` 원본과 대조) · `scripts/contract-roundtrip.mjs` 의 하드코딩 제거 + Scenario D 머리 주석에 결정·재개 조건 기재. ★**제품 코드 변경 0** · 새 하네스 0 · 브라우저 검사 재설계 0.
 - **왜**: 운영자 채택 제안 `2026-09-04-featurephone-keypress-reaches-guest#p1`(「남은 17종의 사각을 «닫을지 말지» 정해 둔다」).
