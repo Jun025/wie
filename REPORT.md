@@ -9,6 +9,16 @@
 - **★⑷ 임계 미달 시 무엇이 일어나는가**: 기한 초과 → **red**(붙여 넣을 한 줄을 함께 찍는다) · 기록이 임계 미만인데 `reopened` 없음 → **red**(「다시 열었다」를 기록해야 통과) · 비율 자체 → ★**red 아님**. 개악 4칸 실행: OVERDUE rc=1 · BELOW-UNANSWERED rc=1 · `reopened:true` 추가 시 **rc=0**(해소 경로 실재) · 얕은 클론 rc=1 **fail-closed** · 무개악 rc=0.
 - **사용자 영향**: 없음(문서·CI 축). 대신 「10회차마다 다시 잰다」는 약속이 **사람의 기억에서 기계로** 옮겨졌다.
 - **★남는 구멍**: 비율이 40% 로 떨어져도 **기록만 하면** CI 는 통과한다 — 그것이 **고른 값**이다(비율 red 는 기각된 회차 의무를 다른 이름으로 되살린다). 그리고 upstream 을 실제로 병합하면 `fetch-depth: 0` 비용을 다시 재야 한다.
+## [2026-09-05] KTF·LGT 키 «도달»을 둘 다 단언했다 — 픽셀이 아니라 게스트 stdout 으로, 그리고 픽스처 «레시피»를 처음 남겼다 (wie-ktf-lgt-drawing-fixtures-for-key-reach-assertions)
+- **무엇을**: 신규 `scripts/make-wipi-keydraw-fixture.sh`(게스트 소스 포함) · 신규 픽스처 `test_data/keydraw_{ktf,lgt}.zip` · 신규 시험 `wie_{ktf,lgt}/tests/test_key_reach.rs`. ★**제품 코드 0줄** · 기존 J2ME Scenario D·기존 픽스처 3종 **무접촉**.
+- **왜**: 운영자 채택 제안 `2026-09-04-featurephone-keypress-reaches-guest#p0`. J2ME 는 Scenario D 가 키 도달을 단언하는데 **KTF·LGT 는 전혀 덮이지 않았다**.
+- **★⑴ 근인은 픽스처가 아니라 «레시피 부재»였다**: `helloworld_{ktf,lgt}.zip` 을 열어 보니 ARM 게스트 바이너리(`client.bin12`·`binary.mod`)이고 문자열에 `wipi/src/ktf/start.rs`·`rustc …nightly` 가 박혀 있다 ⇒ `dlunch/wipi` 에서 빌드된 것이다. ★그쪽엔 `build_examples.sh`·`wipi-archiver`·`examples/src/{input,paint}.rs` 가 **이미 있었고**, 막고 있던 것은 «그 사실이 wie 어디에도 없었던 것»이다. ⇒ 핀된 rev 로 클론·주입·빌드·아카이브하는 스크립트를 세웠다.
+- **★★⑵ 도달의 증거로 «게스트 stdout» 을 골랐다 — 캔버스 픽셀이 아니다**: ⒜Rust 시험의 `TestScreen` 은 **프레임버퍼를 보관하지 않아** 픽셀을 읽을 수 없고 ⒝stdout 은 «몇 픽셀»이 아니라 ★**정확한 정수**(`key:53`)를 단언하게 하며 ⒞헤드리스라 `cargo test --all` 로 **3 OS 전부** 돈다(Scenario D 는 브라우저에서만 돈다). ★J2ME 축과의 차이: 그쪽은 프레임 누적 때문에 **오름차순 제약**이 붙는데, 이 픽스처는 매 프레임 배경을 지우고 다시 그려 **순서 제약이 없다**.
+- **★⑶ 이 시험들이 «앞선 정적 핀»을 행동으로 관통한다**: `Event::Keydown` 을 소비하는 곳은 저장소 전체에 **하나**뿐이고(`wie_midp/…/event_queue.rs`) KTF·LGT 게스트도 `net/wie/CardCanvas` 아래에서 돈다 ⇒ 경로가 §4b(`from_key_code`) → §4c(`from_midp_raw`) → `Card.keyNotify` → 게스트다. ★**정적 핀이 «값이 맞다»를, 이 시험이 «그 값이 닿는다»를 잠근다.**
+- **★★⑷ 개악 3칸 — 전부 제품 실물**: 값 오배선(§4c NUM5→NUM8) → 둘 다 red 이고 문면이 `guest stdout was "key:56"` ⇒ **무엇이 잘못 왔는지까지** 말한다 · 전달 절단(`CardCanvas::key_pressed`) → 둘 다 red `""` ⇒ 두 실패 모드가 구별된다 · ★**LGT 전용 절단**(`CletWrapperCard::key_notify`) → **LGT red · KTF green** ⇒ 두 시험이 **독립**이다. 무개악 둘 다 ok.
+- **★⑸ 재현성**: 스크립트를 **실제로 돌려** 재생성하고 그 산출물로 시험을 다시 통과시켰다. md5 는 달라진다(빌드가 경로를 박는다) ⇒ 「zip 을 diff 하지 말고 시험을 다시 돌려라」를 주석에 적었다.
+- **사용자 영향**: 구형 KTF·LGT 게임에서 «키가 게스트에 닿지 않는» 회귀가 착지 전에 잡힌다 — 지금까지 그 경로엔 어떤 도달 단언도 없었다. 엔진 동작·배포 산출물 변경 0.
+- **★남는 구멍**: ⒜`wie_validate` 를 `--inject` **없이** 새 픽스처에 돌리면 `FAIL: only blank/uniform frames` 인데 **그게 설계다**(키 전엔 검은 화면) ⇒ DoD 의 3픽스처 루프에 넣지 마라 ⒝대표 키는 `NUM5` 한 종(방향키는 WIPI 공간에서 음수라 막대 폭이 못 된다) ⒞브라우저 축은 아직 J2ME 만 — 픽스처가 이미 그리므로 **픽스처 작업 없이** 얹을 수 있다(제안).
 
 ## [2026-09-04] 게임 액션 표 둘을 잠갔다 — 공통 5행은 «한 곳에서» 파생, 갈리는 두 자리는 «의도»로 못박음 (wie-key-contract-pin-game-action-tables)
 - **무엇을**: 계약에 `gameActions`(공통 5 · **단일 출처**) + `gameActionTables`(플랫폼별 `extra`·`fallback`) 신설 · `scripts/check-engine-contract.mjs` **§4d**(약 35줄)가 두 표를 그 값에 대조. ★**제품 코드 0줄 · 픽스처 0.**
