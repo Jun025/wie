@@ -18,9 +18,15 @@ fn repo_root() -> PathBuf {
         .to_path_buf()
 }
 
+/// ★CRLF 를 «여기서» 접는다 — 유일한 읽기 지점이다.
+/// 근거는 실측이다: 이 시험의 초판이 windows-latest 두 다리에서만 red 였고(2026-09-05 PR #87 ·
+/// macos·ubuntu 4다리는 green), 원인은 Windows 체크아웃의 `\r\n` 이라 개악 대조의 앵커 문자열이
+/// 하나도 안 맞았다. ★그때 터진 것은 파리티 판정이 아니라 **「앵커가 표류했다」 가드**였다 —
+/// 즉 «조용히 통과»하지 않았다. 줄끝은 파리티의 축이 아니므로 비교 전에 정규화하는 것이 맞다.
 fn read(rel: &str) -> String {
     let p = repo_root().join(rel);
-    std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("{} 를 읽지 못했다: {e}", p.display()))
+    let raw = std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("{} 를 읽지 못했다: {e}", p.display()));
+    raw.replace("\r\n", "\n")
 }
 
 fn pin_files_present() -> Vec<&'static str> {
@@ -177,4 +183,26 @@ fn dod_region_has_both_fenced_blocks() {
     let lines = checker::parse_dod(&read("AGENTS.md")).expect("마커 구간 파싱");
     assert!(lines.iter().any(|l| l.starts_with("cargo fmt")), "첫 블록을 못 읽었다: {lines:?}");
     assert!(lines.iter().any(|l| l.contains("+beta")), "둘째 블록(beta)을 못 읽었다: {lines:?}");
+}
+
+#[test]
+fn crlf_is_folded_before_the_anchors_are_used() {
+    // ★2026-09-05 회귀(PR #87 초판) — windows-latest **두 다리만** red 였고 macos·ubuntu 4다리는 green 이었다.
+    //   근인은 파서가 아니라 **개악 대조의 앵커**다: Windows 체크아웃은 `\r\n` 이라 `replace(anchor, …)` 가
+    //   하나도 안 맞았고, 그때 터진 것은 파리티 판정이 아니라 「앵커가 표류했다」 가드였다(= 조용히 통과하지 않았다).
+    // ★이 시험은 그 «이유»를 잠근다. 로컬 파일은 항상 LF 라 `read()` 의 정규화를 지워도 로컬은 green 이다 —
+    //   그 삭제를 실제로 잡는 그물은 **CI 의 windows 다리**이고, 그 사실을 여기 적어 둔다.
+    const ANCHOR: &str = "cargo clippy --target wasm32-unknown-unknown -- -D warnings   # rust.yml: wasm lint gate\n";
+    let crlf = read("AGENTS.md").replace('\n', "\r\n");
+    assert!(
+        !crlf.contains(ANCHOR),
+        "전제가 깨졌다 — CRLF 본문에 LF 앵커가 맞아 버리면 이 회귀는 재현되지 않는다"
+    );
+    assert!(crlf.replace("\r\n", "\n").contains(ANCHOR), "read() 의 정규화가 앵커를 되살리지 못한다");
+
+    // 파서 자신은 원래부터 CRLF 안전하다(`str::lines()` 가 `\r` 을 떼고 `norm()` 이 공백을 접는다) — 함께 못박는다.
+    let lf = read("AGENTS.md");
+    assert_eq!(checker::parse_dod(&lf).expect("LF"), checker::parse_dod(&crlf).expect("CRLF"));
+    let yml = read(".github/workflows/rust.yml");
+    assert_eq!(checker::parse_ci(&yml).0, checker::parse_ci(&yml.replace('\n', "\r\n")).0);
 }
