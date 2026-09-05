@@ -32,7 +32,7 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- **LGT 브라우저 검은 화면 «규명»** (`wie-lgt-browser-canvas-paint-not-reaching-localize`
+- **LGT 브라우저 검은 화면 «규명»** (PR **#85** 열림 · `wie-lgt-browser-canvas-paint-not-reaching-localize`
   · 채택 제안 `2026-09-05-roundtrip-ktf-key-reach-scenario#p0`) — ★**선행 서술이 반증됐다**:
   프레임은 캔버스에 **닿는다**(`incoming_nonblack=424` · `draw_image ok`). ★**그 «직후» MIDP 가**
   **비어 있는 screenImage 로 덮는다**(`disable_paint=false` → `incoming_nonblack=0`) ⇒ 마지막 프레임이 검정.
@@ -41,10 +41,18 @@
   ★반증 실험(원복함): 점 형식 1개 추가 → 브라우저 LGT **0 px → 424 px** · 네이티브 paints **83 → 55**(KTF 동일).
   ★**고치지 않았다** — 수정은 다음 회차(제안 2건). 제품 코드 변경 **0**.
 - **`get_system_class_loader` 6곳 선이행** (PR **#83** 열림 · `wie-system-class-loader-preemptive-migration-six-sites` · 별 리니지)
-  ★`REPORT.md`·`STATE.md` 를 함께 만진다 — 이 착지(#82)로 그쪽이 다시 **원장 2파일 충돌**이 된다(코드 0).
-  그쪽 게이트③이 **2-c⒜** 로 해소한다.
+  ★**위 둘이 `REPORT.md`·`STATE.md` 를 함께 만진다** — 먼저 착지하는 쪽이 나머지의 base 를 움직인다(2-c⒜ 범위 · 코드 충돌 0).
 
 ## 완료 (최근)
+- 2026-09-05: **`rust.yml` 머리 주석에 beta 린트 줄** (PR **#84** 착지 · `wie-rust-yml-header-comment-beta-lint-line`
+  · 채택 제안 `2026-09-05-dod-four-gates-beta-axis#p0`) — 「로컬에서 돌려라」 목록이
+  `rust.yml` **4** ↔ `AGENTS.md` **6** 으로 갈려 있었다(PR #81 이 문서 쪽에만 더했다).
+  ⇒ 같은 2줄을 더해 ★**명령 6개·순서까지 기계 대조로 일치**. ★**CI 동작 변경 0**(주석 제거 후 바이트 동일).
+  ★★**잠금은 «하지 않기로» 정했다(⒝)** — 배선 없는 검사기는 「잠긴 것처럼 보이는데 안 도는」 것이고,
+  배선 없이 되는 길은 **파리티 검사기 이식(`#p2`)과 충돌**하며, 더 나은 처방은 **중복 제거**다(제안 2건).
+  ★대신 «잠금이 없다»를 주석에 **리터럴로** 적었다.
+  ★**착지 형태 = merge commit(부모 2개)** — `wie` 는 `contracts/upstream-sync-repos.conf:23` 등재라 스쿼시 금지.
+  ★충돌 **0**(형제 착지가 그 사이 없었다) · 착지 시점에 형제 **#83·#85** 가 열려 있다(같은 원장 2파일).
 - 2026-09-05: **브라우저 왕복 KTF 키 «도달» Scenario E** (PR **#82** 착지 · `wie-browser-roundtrip-ktf-key-reach-scenario`
   · 채택 제안 `2026-09-05-ktf-lgt-key-reach-fixtures#p0`) — 왕복 **29 → 35 pass** · 제품 코드 **0줄**.
   ★**D 가 못 보는 홉을 잰다**(KTF 는 `CardCanvas` 가 MIDP 코드를 WIPI 코드로 한 번 더 바꾼다) —
