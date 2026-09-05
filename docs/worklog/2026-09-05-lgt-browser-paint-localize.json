@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "date": "2026-09-05",
+  "task": "wie-lgt-browser-canvas-paint-not-reaching-localize",
+  "title": "LGT 화면은 «닿지 않은» 것이 아니라 «닿은 뒤 덮인다» — 슬래시/점 한 글자에서 끊긴다",
+  "services": [
+    "engine",
+    "web"
+  ],
+  "summary": "선행 회차가 「LGT paint → WebScreen → canvas 에서 끊긴다」로 남긴 자리를 양쪽 호스트에 **같은 단계 프로브**를 넣어 좁혔다. ★★**그 서술은 틀렸다** — LGT 프레임은 캔버스에 **실제로 그려진다**(`incoming_nonblack=424` · `draw_image ok=true`). ★**그 «직후» MIDP `Display::handle_paint_event` 가 «비어 있는» screenImage 로 덮는다**(`incoming_nonblack=0`) ⇒ 마지막 프레임이 검정이라 사용자는 검은 화면을 본다. ★근인은 `net/wie/CardCanvas` 가 `Class.getName()`(**점** 형식 `net.wie.CletWrapperCard`)을 **슬래시** 리터럴 `\"net/wie/CletWrapperCard\"` 와 비교해 ★**절대 매치되지 않는 것**이다 ⇒ `disablePaint()` 미호출 ⇒ MIDP 덮어쓰기가 켜진 채 남는다. KTF 카드는 `CletCard`(패키지 없음)라 매치돼 무사하다. ★**반증 실험**(점 형식 1개 추가 → 원복): 브라우저 LGT **0 px → 424 px**, 네이티브 paints **83 → 55** 로 **KTF 와 정확히 같아진다**. ★**고치지 않았다** — 이 회차는 규명이고 수정은 다음 회차다.",
+  "changes": [
+    "`scripts/contract-roundtrip.mjs` — 「왜 LGT 트윈이 없는가」 헤더에 ★**CORRECTION 블록**: 「LGT paint → WebScreen → canvas 에서 끊긴다」가 **반증**됐음과 실제 단계 추적·근인·반증 실험 결과를 적었다. ★검사 로직 **0줄 변경**(Scenario F 는 여전히 없다 — 수정 회차 몫).",
+    "★**제품 코드 변경 0** — 프로브 6종과 반증 실험 1건은 **전건 원복**(`git status` 빈 출력 · `WIEPROBE` 잔재 0). CI 워크플로 0 · bump 0 · KTF 경로 0."
+  ],
+  "verification": {
+    "instrumentation": "★**양쪽에 «같은 단계»를 넣었다**(계약 1). 채널은 `Platform::write_stdout` — 브라우저는 `web_sys::console::log_1`(`wie_web/src/platform.rs:80`), 네이티브는 `wie_validate` 의 버퍼(임시로 stderr 덤프)로 **둘 다 보이는** 유일한 대칭 채널이다. 단계는 **코드에서** 골랐다: **P1** `MC_grpRepaint`(`wie_wipi_c/src/api/graphics.rs` — 게스트가 repaint 요청 → `Screen::request_redraw`) · **P2** `MC_grpFlushLcd`(같은 파일 — 게스트가 프레임버퍼를 `screen.paint` 로) · **P3** `Display::handle_paint_event` 의 blit 분기(`wie_midp/…/lcdui/display.rs` — ★`disable_paint` **값과 함께**) · **P4** 호스트 루프가 `Event::Redraw` 를 전달(`wie_web/src/lib.rs` / `wie_cli/src/bin/wie_validate.rs`) · **P5** `Screen::paint` **구현 진입**(`WebScreen::paint` / `HeadlessScreen::paint`) — ★**받은 이미지의 비-검정 픽셀 수**와 `draw_image` 성패까지. ※P4·P5 는 호스트별 코드라 «같은 지점»이되 «같은 파일»은 아니다 — 그 사실을 적는다.",
+    "stage-counts-native": "★**네이티브**(`wie_validate --inject` · 무개악): | 단계 | LGT | KTF | 로 **P1 27 / 27 · P2 55 / 55 · P3 28 / 28 · P4 28 / 28 · P5 ★83 / 55**. ★**P3 의 값이 갈린다** — LGT `disable_paint=false` **28회** ↔ KTF `disable_paint=true` **28회**. ⇒ ★**LGT 의 83 = P2 의 55 + MIDP 의 28**. 그리고 `incoming_nonblack=0` 인 paint 가 **LGT 30건 ↔ KTF 0건**이다.",
+    "stage-counts-browser": "★**브라우저**(900프레임 · 각각 새 글루 인스턴스 · 순서 효과 배제): 두 픽스처 모두 **P1 1 · P2 3 · P3 2 · P4 2**로 **동일**한데 **P5 는 LGT 5 / KTF 3**, 그리고 `P5c draw_image ok=true 240x320` 이 **전건 성공**이다. ⇒ ★**«닿지 않는다»가 아니다 — 오히려 LGT 가 «두 번 더» 닿는다.** 캔버스 결과는 KTF **424 px** / LGT **0 px**.",
+    "pinpoint-ordered-trace": "★★**끊기는 지점을 «하나»로 지목하고, 그 지목을 «순서»로 보였다**(계약 3). 브라우저 LGT 의 마지막 6줄(그대로):\n```\nP2 MC_grpFlushLcd\nP5 WebScreen::paint enter incoming_nonblack=424\nP5c draw_image ok=true w=240 h=320\nP3 midp_paint_event disable_paint=false\nP5 WebScreen::paint enter incoming_nonblack=0     ← ★여기\nP5c draw_image ok=true w=240 h=320\n```\nKTF 는 같은 자리에서 `P3 … disable_paint=true` 로 끝나고 **뒤따르는 P5 가 없다**. ⇒ ★**지목 = `wie_midp/src/classes/javax/microedition/lcdui/display.rs` 의 `handle_paint_event` blit** 이고, 그것이 **비어 있는 `screenImage`**(`incoming_nonblack=0`)를 좋은 WIPI 프레임 «위에» 덮는다.",
+    "root-cause": "★**왜 LGT 만 그 분기가 켜지는가** — `wie_wipi_java/src/classes/net/wie/card_canvas.rs` 의 `if class_name_str == \"CletCard\" || class_name_str == \"net/wie/CletWrapperCard\"` 에서만 `Display.disablePaint()` 가 호출된다. 실측(카드 클래스명 프로브): **LGT = `net.wie.CletWrapperCard`**(★**점**) · **KTF = `CletCard`**(패키지 없음). ⇒ ★**`Class.getName()` 은 binary name(점)을 주는데 리터럴은 internal name(슬래시)이라 LGT 는 «영원히» 매치되지 않는다.** KTF 는 패키지가 없어 두 형식이 같아 우연히 통과한다.",
+    "falsifiable-experiment": "★★**반증 가능하게 적으라는 계약 3 을 «실험»으로 갚았다**(임시 주입 → 측정 → **원복**): 조건절에 `|| class_name_str == \"net.wie.CletWrapperCard\"` 한 개를 더하니 — **브라우저 LGT `0 px → 424 px`**(KTF 와 동일) · 그 추적이 KTF 와 **같은 모양**(`disable_paint=true` · 뒤따르는 blank P5 없음) · **네이티브 LGT `disable_paint` false→true(28회)** · `incoming_nonblack=0` paint **30 → 2** · `paints` **83 → 55**(KTF 와 정확히 같은 수). ⇒ ★**지목이 틀렸다면 이 실험이 아무것도 바꾸지 않았어야 한다.**",
+    "why-native-passed": "★**「네이티브는 정상」이라는 선행 관측도 «정확히» 다시 적는다** — 네이티브도 **같은 덮어쓰기가 일어난다**(LGT `incoming_nonblack=0` 30건). `wie_validate` 가 PASS 인 것은 그 판정이 **«어느 한 프레임이라도» 내용이 있었나**(`saw_content` = 프레임 전체에 대한 max/any)이기 때문이고, ★**«마지막 프레임»을 보지 않는다.** 브라우저 캔버스는 마지막 프레임만 남는다. ⇒ ★**호스트 차이가 아니라 «판정 축» 차이였다** — 이것이 선행 회차가 「네이티브는 닿는다」로 읽은 이유다.",
+    "control-ktf": "★**대조군**(계약 4): KTF 는 **같은 브라우저 경로 · 같은 게스트 소스**로 정상이다. 갈리는 축은 **브라우저가 아니라 카드 클래스명 한 개**다 — 그것이 이 회차의 값이다.",
+    "reverted": "★**제품 동작 무접촉**(계약 5): 프로브 6종 + 반증 실험 1건 전건 원복 후 `git status --porcelain` **빈 출력** · `.rs` 전수에 `WIEPROBE`/`TEMP PROBE`/`FALSIFICATION` **0건**. 남긴 것은 `contract-roundtrip.mjs` 헤더의 **CORRECTION 주석**뿐이고, 남긴 이유는 ★**그 자리에 «반증된 서술»이 있었기 때문**이다(고치지 않으면 다음 사람이 그 위에서 판단한다).",
+    "gates": "`cargo fmt --all -- --check`·`clippy --all -D warnings`·`clippy --target wasm32-unknown-unknown -D warnings`·★`cargo +beta clippy --all -D warnings` 전건 rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` **139 passed / 0 failed**(제품 코드 0줄이라 무변경) · `wie_validate` 5픽스처 **전건 PASS** · 정적 계약 **107 pass** · `contract-roundtrip.mjs` **35/35** · `check-worklog-json` OK · `check-worklog-coverage` rc=0 · `npm run audit` PASSED."
+  },
+  "limits": [
+    "★**이 회차는 «고치지 않았다»** — 반증 실험은 원복했다. 실제 수정과 회귀 방어(Scenario F)는 아래 제안이 진다. ★**«분리»가 이 리니지의 값**이고, 규명과 수정을 한 PR 에 담으면 회귀 책임을 못 가린다.",
+    "★★**미검증으로 남긴 자리**: ⑴**상용 LGT 타이틀에서도 같은가** — 코퍼스가 없다(Constraint 9) ⇒ 잰 것은 `keydraw_lgt.zip` **하나**다. ⑵**`CletCard`(KTF) 쪽 리터럴이 옳은 형식인지**는 이 회차가 «매치된다»만 확인했지 그 이름이 어디서 오는지는 추적하지 않았다. ⑶`net/wie/CletWrapperCard` 슬래시 리터럴이 **한때 맞았는지**(과거 `getName()` 이 슬래시를 줬는지)는 조사하지 않았다 — 수정 회차가 그 형식을 정할 때 볼 축이다.",
+    "★**수정안을 «고르지» 않았다** — 점 형식을 «추가»할지, `getName()` 을 정규화할지, 아예 클래스명 비교를 그만둘지는 수정 회차의 판단이다. 이 회차가 실험한 것은 **«추가»가 통한다**는 것 하나뿐이다.",
+    "★**`wie_validate` 의 판정 축(`saw_content` = any-frame)은 이 결함을 «구조적으로» 못 본다** — 마지막 프레임을 보지 않기 때문이다. 그 축을 바꾸는 것도 별 판단이다(바꾸면 다른 픽스처가 흔들릴 수 있다)."
+  ],
+  "issues": [],
+  "proposals": [
+    {
+      "title": "LGT 화면이 검게 남는 근인을 고쳐라 — `CletWrapperCard` 이름 비교가 슬래시 형식이라 절대 매치되지 않는다",
+      "plainSummary": "LGT 방식 게임이 브라우저에서 검은 화면으로 보이는 원인을 찾았다. 화면은 제대로 그려지는데, 그 «직후» 빈 화면이 위에 덮인다. 덮기를 꺼야 하는 조건문이 클래스 이름을 잘못된 형식으로 비교해서 한 번도 켜지지 않는다.",
+      "userBenefit": "LGT 게임이 브라우저에서 **보인다**. 지금은 키도 들어가고 게임도 도는데 화면만 검다 — 사용자에게 곧바로 보이는 고장이다.",
+      "why": "실측(2026-09-05 · 이 회차): `wie_wipi_java/.../card_canvas.rs` 는 `class_name_str == \"net/wie/CletWrapperCard\"`(슬래시)를 보는데 `Class.getName()` 은 **`net.wie.CletWrapperCard`**(점)를 준다 ⇒ `disablePaint()` 미호출 ⇒ MIDP 가 비어 있는 screenImage 로 매 프레임 덮는다(브라우저 순서 추적으로 확인 · `incoming_nonblack=424` 직후 `=0`). ★**반증 실험**: 점 형식 한 개 추가 → 브라우저 LGT **0 px → 424 px** · 네이티브 paints **83 → 55**(KTF 와 동일).",
+      "tradeoff": "⑴**어느 처방인지 고르는 것이 그 회차의 일이다** — ⒜점 형식 추가(1줄 · 실험으로 통함이 확인됨) ⒝`getName()` 결과를 정규화해 비교(같은 함정이 다른 자리에 또 있는지 먼저 재라) ⒞클래스명 비교 자체를 그만두고 다른 술어로(가장 크고 가장 안전할 수 있다). ★★**⒜를 고르기 전에 이것을 읽어라 — KTF 가 무사한 것은 «안전해서»가 아니라 그 게스트 클래스에 «패키지가 없어서»다.** `CletCard` 는 **게스트에서 오는 이름**이고(픽스처 `keydraw_ktf.zip → 00000000.jar → client.bin52` 상수풀에 실재 · LGT 쪽 `binary.mod` 에는 0건), 슬래시가 없어 `getName()` 의 슬래시→점 치환이 **무동작**이라 우연히 통과할 뿐이다 ⇒ ★**카드 클래스에 패키지가 붙는 순간 KTF 도 «같은 형태로» 깨진다.** ⒜(점 형식 «추가»)는 지금의 두 이름만 맞출 뿐 ★**그 «형식 취약성»을 그대로 남긴다** — 없애는 것은 ⒝(정규화)나 ⒞(술어 교체)다. ⑵★**회귀 방어를 같이 넣어라** — `contract-roundtrip.mjs` 헤더에 **Scenario F 10줄**이 그대로 있다(고치면 그 자리가 green 이 된다). ⑶`wie_validate` 는 이 결함을 못 본다(any-frame 판정) ⇒ **브라우저 시나리오가 유일한 회귀 그물**이다. ⑷상용 LGT 코퍼스가 없어 «실제 게임»으로는 확인할 수 없다.",
+      "effort": "S — 근인이 지목돼 있고 실험도 끝났다. 대부분은 «어느 처방인가»와 Scenario F 다.",
+      "target": "wie · wie_wipi_java/src/classes/net/wie/card_canvas.rs + scripts/contract-roundtrip.mjs"
+    },
+    {
+      "title": "`wie_validate` 의 «그렸다» 판정에 «마지막 프레임» 축을 더하라 — 지금은 덮어쓰기를 구조적으로 못 본다",
+      "plainSummary": "PC용 검사기는 「도는 동안 한 번이라도 그림이 있었나」만 본다. 그래서 마지막에 화면이 검게 덮여도 통과한다 — 사용자가 보는 것은 마지막 화면인데도.",
+      "userBenefit": "「검사는 통과하는데 화면은 검다」는 이번 형태를 PC 검사기도 잡는다. 지금은 브라우저 왕복만이 그물이다.",
+      "why": "실측: LGT 는 `incoming_nonblack=0` 인 paint 가 **30건**이고 마지막 프레임이 검은데도 `wie_validate --inject` 가 **PASS · paints 83** 을 냈다. 판정 축 `saw_content` 가 프레임 전체에 대한 **any/max** 라 마지막 프레임을 보지 않기 때문이다. ★이것이 선행 회차가 「네이티브는 정상」으로 읽어 축을 «호스트 차이»로 오독한 이유다.",
+      "tradeoff": "⑴**기존 픽스처가 흔들릴 수 있다** — 정상 종료하는 helloworld 계열은 마지막 프레임이 비어 있을 수 있다 ⇒ 새 축은 **추가 필드로 보고**하고 게이트는 나중에 거는 것이 안전하다. ⑵위 제안이 근인을 고치면 이 축의 «급함»은 내려간다 — 그러나 **같은 형태의 다음 결함**은 여전히 못 본다. ⑶`--inject` 경로에서만 의미가 있을 수 있다(키 전에는 검은 화면이 정상인 픽스처가 있다).",
+      "effort": "S — 판정 필드 1개 + 문서.",
+      "target": "wie · wie_cli/src/bin/wie_validate.rs"
+    }
+  ],
+  "adoptedProposals": [
+    "2026-09-05-roundtrip-ktf-key-reach-scenario#p0"
+  ],
+  "declinedProposals": []
+}
