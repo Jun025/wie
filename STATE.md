@@ -38,12 +38,45 @@
   ★★**자리별 커버리지를 «심어서» 쟀더니 6곳 중 «1곳»만 커버된다** — ③ LGT 부팅만 red(123/1 · 픽스처 2건 FAIL) ·
   나머지 5곳은 `panic!()` 을 심어도 **139/0 · 5/5 무변화**. ⇒ ★설계 문서 §8-4⑶-b⒡ 의 「2~5번을 태운다」는
   **거짓**이었고 표로 정정했다. 미커버 5자리는 **단서 주석 + 제안 2건**으로 닫았다(계약 3⒝).
-- **DoD 에 beta 축 한 줄** (PR **#81** 열림 · `wie-dod-four-gates-add-beta-axis` · 별 리니지 · 게이트② 재검 대기)
-- **브라우저 왕복 KTF 키 도달 Scenario E** (PR **#82** 열림 · `wie-browser-roundtrip-ktf-key-reach-scenario` · 별 리니지)
-  ★위 둘과 이 회차가 **`REPORT.md`·`STATE.md` 를 함께 만진다** — 먼저 착지하는 쪽이 나머지의 base 를 움직인다
-  (각 게이트③이 2-c⒜ 로 해소한다 · 코드 충돌 0).
+- **LGT 브라우저 검은 화면 «규명»** (PR **#85** 열림 · `wie-lgt-browser-canvas-paint-not-reaching-localize` · 별 리니지)
+  ★위 둘 다 `REPORT.md`·`STATE.md` 를 만진다 — 이 착지(#84)로 그쪽이 **원장 2파일 충돌**이 된다(코드 0).
+  각 게이트③이 **2-c⒜** 로 해소한다.
 
 ## 완료 (최근)
+- 2026-09-05: **`rust.yml` 머리 주석에 beta 린트 줄** (PR **#84** 착지 · `wie-rust-yml-header-comment-beta-lint-line`
+  · 채택 제안 `2026-09-05-dod-four-gates-beta-axis#p0`) — 「로컬에서 돌려라」 목록이
+  `rust.yml` **4** ↔ `AGENTS.md` **6** 으로 갈려 있었다(PR #81 이 문서 쪽에만 더했다).
+  ⇒ 같은 2줄을 더해 ★**명령 6개·순서까지 기계 대조로 일치**. ★**CI 동작 변경 0**(주석 제거 후 바이트 동일).
+  ★★**잠금은 «하지 않기로» 정했다(⒝)** — 배선 없는 검사기는 「잠긴 것처럼 보이는데 안 도는」 것이고,
+  배선 없이 되는 길은 **파리티 검사기 이식(`#p2`)과 충돌**하며, 더 나은 처방은 **중복 제거**다(제안 2건).
+  ★대신 «잠금이 없다»를 주석에 **리터럴로** 적었다.
+  ★**착지 형태 = merge commit(부모 2개)** — `wie` 는 `contracts/upstream-sync-repos.conf:23` 등재라 스쿼시 금지.
+  ★충돌 **0**(형제 착지가 그 사이 없었다) · 착지 시점에 형제 **#83·#85** 가 열려 있다(같은 원장 2파일).
+- 2026-09-05: **브라우저 왕복 KTF 키 «도달» Scenario E** (PR **#82** 착지 · `wie-browser-roundtrip-ktf-key-reach-scenario`
+  · 채택 제안 `2026-09-05-ktf-lgt-key-reach-fixtures#p0`) — 왕복 **29 → 35 pass** · 제품 코드 **0줄**.
+  ★**D 가 못 보는 홉을 잰다**(KTF 는 `CardCanvas` 가 MIDP 코드를 WIPI 코드로 한 번 더 바꾼다) —
+  개악 ⒝(`KEY_NUM5 => Self::NUM1`)에서 ★**E 만 red · D 전건 green** 으로 독립을 실행으로 보였다.
+  ★상수는 픽스처 소스(`make-wipi-keydraw-fixture.sh`)에서 **파싱해 파생**하고 표류 시 fail-closed throw.
+  ★★**LGT 는 부분 완료 — 막은 것이 «키»가 아니다**: 키는 도달하는데(콘솔 `key:42`·`key:53`) 캔버스가 **0 px**.
+  순서·픽스처 배제(네이티브 `wie_validate --inject` 는 같은 zip 을 **PASS · paints 83**) ⇒ 축은
+  **LGT paint → WebScreen → canvas**. red 를 착지시키지 않고 «왜 없는가»를 헤더에 남기고 제안 1건.
+  ★**형제 #81 착지로 원장 2파일이 충돌했고** 이 게이트③이 **2-c⒜**(원장 한정 승인)로 합집합 해소했다(코드 충돌 0).
+  ★**착지 형태 = merge commit(부모 2개)** — `wie` 는 `contracts/upstream-sync-repos.conf:23` 등재라 스쿼시 금지.
+  ★착지 시점에 형제 **#83** 이 열려 있다(같은 원장 2파일 · 그쪽 게이트③이 해소한다).
+- 2026-09-05: **DoD 에 beta 축 한 줄** (PR **#81** 착지 · `wie-dod-four-gates-add-beta-axis` · 채택 제안 `2026-09-04-parity-sibling-repo-survey#p0`)
+  — `AGENTS.md` §Definition of Done 에 `cargo +beta clippy --all -- -D warnings` 블록 1개. ★**코드 0 · CI 워크플로 0.**
+  ★근거는 내가 다시 센 수다: `rust.yml` run **전량 246건**(`ac4ce1aa` 2026-06-24 → `11a35252` 2026-09-04) 중 실패 **34**,
+  그중 **9건이 beta 다리 단독**이고 ★**9/9 가 린트 게이트**(8 × `chunks_exact_to_as_chunks` · 1 × `double_must_use`) ⇒ 한 줄.
+  ★비용 실측 = 회차당 **+7.6~7.7s**(최초 1회 36.3s) · **스래싱 없음**(stable 복귀 0.50s).
+  ★한계: 그 9건의 stable 다리는 전부 `cancelled` 이었다(`fail-fast: false` 는 2026-08-27 **PR #65**(`250d7e4c`)) — 증명은 린트 정체가 진다.
+  ★★**[게이트② 반려 · `-fix`] «배경 서술»의 수를 정정했다**(헤드라인 34/9/9 는 재현돼 무접촉):
+  2026-07 클러스터는 `main` 을 **6 push · 약 36시간**(07-06T18:24 → 07-08T05:51 · 전건 `image.rs:310`) red 로 뒀고
+  해소는 ★**`37e3e4f6`(PR #21)** 이다. ★**`e3cbaa08`(PR #33)은 «07-13 `wie_lgt` 의 다른 자리»**(피처 브랜치)라
+  그 클러스터의 해소가 **아니다** — 초판이 두 사건을 한 커밋에 귀속시키고 기간을 «7일」로 부풀렸다.
+  ★권장 ③④도 넣었다: 설치 줄 주석을 「beta 가 구를 때마다 다시 쳐라」로 · 「내 변경 탓이 아닌 beta red 는 **별 회차로 분리**하라」 한 문단.
+  ★**형제 #80 착지로 실제로 `REPORT.md`·`STATE.md` 가 충돌했고**(예고가 정확했다) 이 `-fix` 회차가 **머지로** 해소했다(리베이스 0).
+  ★**착지 형태 = merge commit(부모 2개)** — `wie` 는 `contracts/upstream-sync-repos.conf:23` 등재라 스쿼시 금지.
+  ★착지 시점에 형제 **#82·#83** 이 열려 있다(같은 원장 2파일 · 각자 해소).
 - 2026-09-05: **`current_class_loader` 대체 API 설계(`+34` 벽)** (PR **#80** 착지 · `wie-current-class-loader-replacement-api-design-for-plus34`
   · 채택 제안 `2026-09-04-upstream-realign-p1-pin-plus33#p1`) — ★**결론: 벽이 아니었다.**
   ⒜파열은 계단표의 `+46` 이 아니라 ★**`+34`(`7dc1b90`)에서 시작**한다(그 커밋은 `pub` 한 줄만 내렸다)
