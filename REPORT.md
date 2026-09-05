@@ -1,5 +1,15 @@
 # REPORT
 
+## [2026-09-05] «검증을 분리했다» — 6곳 선이행 · 그리고 «5곳은 아무 픽스처도 지나지 않는다» (wie-system-class-loader-preemptive-migration-six-sites)
+- **무엇을**: `Jvm::current_class_loader` **6곳**(4파일)을 공개 대체 `JavaLangClassLoader::get_system_class_loader` 로 치환 + 미커버 5자리에 **단서 주석** + `docs/upstream-realign-verdict.md` §8-4⑶-b **인라인 정정**. ★`use` 줄 변경 **0** · **bump 0** · 로더 기전 변경 0.
+- **왜**: 운영자 채택 제안 `2026-09-05-current-class-loader-replacement-design#p0`. 다음 칸 `+34`(`7dc1b90`)에서 현 통로가 **비공개**가 되는데 공개 대체가 **현재 핀에서도 `pub`** 이다. ★**값은 «6줄»이 아니라 «검증의 분리»다** — bump 와 함께 하면 회귀가 나도 «핀 탓인지 이행 탓인지» 못 가린다. 이 착지로 그 칸의 파열 호출부가 **6 → 0**.
+- **★⑴ 전제 3항 재실측**: ⒜핀(`5b84dd1`) 체크아웃에서 `jvm/src/runtime/java_lang_class_loader.rs:10` **`pub`** 확인(대비: `jvm/src/jvm.rs:980` 이 `+34` 에서 `pub` 를 잃는다) ⒝치환 대상 **정확히 6곳 · 4파일** ⒞★**«같은 값»을 함수 전문으로 보였다** — `current_class_loader` 는 「Java 프레임 없음」·「호출 클래스의 로더가 `None`」 두 갈래에서 ★**`get_system_class_loader` 를 그대로 부른다**(우회가 아니라 그 함수 «자신의 폴백»).
+- **★★⑵ 급소 — 자리별 커버리지를 «심어서» 쟀다**: 무개악 기준선이 치환 «전·후» 모두 **139 passed / 0 failed · `wie_validate` 5/5** 라 그 수는 «지났다»의 증거가 **아니다**. 자리마다 `panic!()` 을 심으니 — ★**커버 = 1곳뿐**(③ LGT 부팅 `binary.mod` → **123 passed / 1 failed** · `helloworld_lgt`·`keydraw_lgt` **FAIL**). ①② KTF 리소스 · ④⑤ LGT 리소스 · ⑥ MIDP `Image.createImage(String)` 은 **전부 무변화 = 미커버**.
+- **★★⑶ 설계 문서를 정정했다**: §8-4⑶-b⒡ 의 「`keydraw_*`·`helloworld_ktf` 가 2~5번을 태운다」는 ★**거짓**이었다(그 회차가 «치환 후 green» 을 «지났다»로 읽었다). 놓친 자리는 6번 하나가 아니라 **다섯**이다 — 표를 박고 ⒢의 「남는 «한» 자리」도 「«다섯» 자리」로 고쳤다. ★**착지한 문서가 «검증됐다»고 말하는데 아니면 다음 사람이 그 위에서 판단한다.**
+- **★⑷ 미커버 5자리는 ⒝(단서)로 닫았다 — 「비싸다」가 아니라 «무엇이 필요한지»를 적었다**: 1·2·4·5 는 WIPI 리소스 API 를 **부르는 게스트**가 저장소에 **0건**이라 `dlunch/wipi` 클론 + nightly·`thumbv4t` + `-Zbuild-std` 로 **새 픽스처 2종**을 빌드해야 하고(부모 회차 하나 분량), 6 은 `make-draw-fixture.mjs` 가 **바이트코드를 손으로 조립**해 호출 1개 추가가 상수풀 변경이다. ⇒ 코드 주석 + 제안 **2건**으로 넘겼다.
+- **사용자 영향**: 없음을 **의도**한다(두 API 가 같은 값). 실행으로 확인된 것은 3번 자리뿐이고 나머지 5곳은 «호출되지 않으므로 바뀔 것도 없다»가 정확한 서술이다.
+- **★남는 구멍**: ★**6자리 중 5자리는 «측정되지 않았다»** — 근거는 코드 논증이다. 특히 **6번은 유일하게 게스트 프레임 «안»**이라 커스텀 클래스로더 게스트에서는 갈릴 수 있다.
+
 ## [2026-09-05] «다음 벽»을 설계했더니 벽이 아니었다 — 공개 대체가 이미 있다 (wie-current-class-loader-replacement-api-design-for-plus34)
 - **무엇을**: `docs/upstream-realign-verdict.md` **§8-4⑶-b 신설** + 계단표 4번 칸 **인라인 정정 1줄**. ★핀 변경 0 · **코드 변경 0**(프로브는 원복) · 기존 계단 서술 무접촉.
 - **왜**: 운영자 채택 제안 `2026-09-04-upstream-realign-p1-pin-plus33#p1` — 「`+34` 에서 `current_class_loader` 가 비공개가 되고 **공개 대체 API 가 없다**」.

@@ -113,7 +113,11 @@ impl Image {
 
         let name = JavaLangString::to_rust_string(jvm, &name).await?;
 
-        let class_loader = jvm.current_class_loader().await?;
+        // get_system_class_loader, NOT current_class_loader: the latter goes private one
+        // commit past our pin, and the two coincide when the calling class has no loader of its own.
+        // NOT covered by any fixture — a planted panic!() here left the suite green
+        // (measured 2026-09-05). Per-site table: docs/upstream-realign-verdict.md §8-4(3)-b.
+        let class_loader = JavaLangClassLoader::get_system_class_loader(jvm).await?;
         // MIDP Image.createImage(String) throws IOException when the named resource
         // cannot be found — do that instead of unwrapping None (host-process panic).
         let stream = match JavaLangClassLoader::get_resource_as_stream(jvm, &class_loader, &name).await? {

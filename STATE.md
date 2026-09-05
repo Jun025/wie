@@ -32,9 +32,16 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- **DoD 에 beta 축 한 줄** (PR **#81** 열림 · `wie-dod-four-gates-add-beta-axis` · 별 리니지)
-  — `AGENTS.md` §Definition of Done 에 `cargo +beta clippy --all -- -D warnings` 블록 1개.
-  ★이 착지(#80)로 그쪽이 **원장 2파일 충돌**이 될 것이다(코드 0) — 그쪽 게이트③이 2-c⒜ 로 해소한다.
+- **`get_system_class_loader` 6곳 선이행** (`wie-system-class-loader-preemptive-migration-six-sites`
+  · 채택 제안 `2026-09-05-current-class-loader-replacement-design#p0`) — `+34` 에서 비공개가 되는 통로를
+  **bump 없이** 지금 핀 위에서 갈아탔다(6줄 · `use` 변경 0). ★**값은 «6줄»이 아니라 «검증의 분리»다.**
+  ★★**자리별 커버리지를 «심어서» 쟀더니 6곳 중 «1곳»만 커버된다** — ③ LGT 부팅만 red(123/1 · 픽스처 2건 FAIL) ·
+  나머지 5곳은 `panic!()` 을 심어도 **139/0 · 5/5 무변화**. ⇒ ★설계 문서 §8-4⑶-b⒡ 의 「2~5번을 태운다」는
+  **거짓**이었고 표로 정정했다. 미커버 5자리는 **단서 주석 + 제안 2건**으로 닫았다(계약 3⒝).
+- **DoD 에 beta 축 한 줄** (PR **#81** 열림 · `wie-dod-four-gates-add-beta-axis` · 별 리니지 · 게이트② 재검 대기)
+- **브라우저 왕복 KTF 키 도달 Scenario E** (PR **#82** 열림 · `wie-browser-roundtrip-ktf-key-reach-scenario` · 별 리니지)
+  ★위 둘과 이 회차가 **`REPORT.md`·`STATE.md` 를 함께 만진다** — 먼저 착지하는 쪽이 나머지의 base 를 움직인다
+  (각 게이트③이 2-c⒜ 로 해소한다 · 코드 충돌 0).
 
 ## 완료 (최근)
 - 2026-09-05: **`current_class_loader` 대체 API 설계(`+34` 벽)** (PR **#80** 착지 · `wie-current-class-loader-replacement-api-design-for-plus34`

@@ -750,10 +750,29 @@ wie_validate  draw_j2me PASS(booted+rendered) · helloworld_ktf PASS · hellowor
               keydraw_ktf/lgt --inject PASS(booted + rendered + survived input)
 원복 후 git status 빈 출력 · current_class_loader 6곳 복귀
 ```
-★`helloworld_lgt` 통과가 **1번 자리**(부팅 직후 `binary.mod` 열기)의 직접 증거이고,
-`keydraw_*`·`helloworld_ktf` 가 **2~5번**(WIPI 리소스)을 태운다.
+★★**[정정 2026-09-05 · 이행 회차 `wie-system-class-loader-preemptive-migration-six-sites`]
+초판의 이 문장 — 「`keydraw_*`·`helloworld_ktf` 가 **2~5번**(WIPI 리소스)을 태운다」 — 은 «거짓»이다.**
+★**근인은 술어다**: 「치환 후에도 139 passed / 5픽스처 PASS」는 «그 줄을 지났다»의 증거가 **아니다**
+— 지나지 않아도 같은 수가 나온다. 이행 회차가 **자리마다 `panic!()` 을 심어** 다시 쟀다:
 
-**⒢ ★남는 한 자리 — 숨기지 않는다.** **6번**(`Image.createImage(String)`)은 ★**스위트가 부르지 않는다**
+| # | 자리 | 심었을 때 | 커버 |
+|---|---|---|---|
+| 1 | `wie_ktf/…/wipi_c/context.rs:95` `get_resource_size` | 139/0 · 5/5 **무변화** | ★**아니오** |
+| 2 | `wie_ktf/…/wipi_c/context.rs:108` `read_resource` | 139/0 · 5/5 **무변화** | ★**아니오** |
+| 3 | `wie_lgt/src/emulator.rs:114` 부팅 `binary.mod` | ★**123 passed / 1 failed** · `helloworld_lgt` **FAIL** · `keydraw_lgt` **FAIL** | ★**예** |
+| 4 | `wie_lgt/…/wipi_c/context.rs:100` `get_resource_size` | 139/0 · 5/5 **무변화** | ★**아니오** |
+| 5 | `wie_lgt/…/wipi_c/context.rs:112` `read_resource` | 139/0 · 5/5 **무변화** | ★**아니오** |
+| 6 | `wie_midp/…/lcdui/image.rs:116` `Image.createImage(String)` | 139/0 · 5/5 **무변화** | ★**아니오** |
+
+⇒ ★**커버되는 자리는 «1곳»(3번)이지 «5곳»이 아니다.** 초판이 놓친 것은 6번 하나가 아니라 **다섯**이다.
+★**직접 증거로 서는 것은 `helloworld_lgt`·`keydraw_lgt` 가 태우는 3번뿐**이고, 그 자리는
+「Java 프레임이 없다」 갈래의 실증이다(부팅 직후라 게스트 프레임이 아직 없다).
+★**WIPI-C 리소스 API(1·2·4·5)를 부르는 게스트가 이 저장소에 «없다»** — 커밋된 픽스처 5종 중 리소스를
+읽는 것이 0건이라, 값을 대조할 런타임 지점 자체가 생기지 않는다.
+
+**⒢ ★남는 자리 — ★[정정 2026-09-05] «한 자리»가 아니라 «다섯 자리»다**(위 ⒡ 의 표).
+아래 6번에 대한 서술은 그대로 유효하고, ★**같은 성질이 1·2·4·5 에도 붙는다**(그쪽은 «게스트 프레임이 없다»
+갈래라 논증이 더 세지만, «측정되지 않았다»는 사실은 동일하다). **6번**(`Image.createImage(String)`)은 ★**스위트가 부르지 않는다**
 (`createImage` 를 호출하는 시험·픽스처 **0건** — 실측). ⇒ 그 자리는 «프로브로 확인된 것이 아니라 «논증»으로 남는다»:
 MIDP 게스트는 시스템(URL) 클래스로더가 적재하므로 두 API 가 같은 값을 준다(P1 의 `net/wie/Launcher` 수정이
 `getSystemClassLoader().loadClass(main)` 로 그것을 이미 쓴다). ★**커스텀 로더를 쓰는 게스트에서는 갈릴 수 있다** —
