@@ -14,6 +14,25 @@
 //!
 //! This is a triage tool, not a correctness oracle: a headless run cannot prove
 //! a game is visually correct or audible. It catches crashes/hangs/black boots.
+//!
+//! ── Two content axes, same predicate, different scope ────────────────────────
+//! `content`            — `has_content` ORed over EVERY painted frame ("did the game
+//!                         ever draw something?"). This is what PASS/FAIL uses.
+//! `last_frame_content` — the same predicate on the LAST painted frame only ("is the
+//!                         screen a user ends up looking at non-blank?").
+//!
+//! They disagree exactly when a good frame is drawn and then OVERPAINTED, which the
+//! any-frame axis cannot see by construction. Measured 2026-09-05 on LGT: 30 paints
+//! arrived with an all-black image and the final frame was black, yet
+//! `wie_validate --inject` reported PASS with `content: true` — the browser
+//! round-trip was the only thing that caught it.
+//!
+//! `last_frame_content` is REPORT-ONLY and deliberately not a gate. Two reasons,
+//! both measured rather than assumed: a fixture may legitimately end on a blank
+//! frame (helloworld_lgt draws nothing at all and exits cleanly), and without
+//! `--inject` a key-driven fixture is black until a key arrives. Gating is a
+//! separate decision that needs a per-fixture expectation; this field is what makes
+//! that decision measurable instead of theoretical.
 
 extern crate alloc;
 
@@ -75,6 +94,20 @@ struct HeadlessScreen {
     /// region's dominant color. A chrome-only shell has a uniform (empty) center, so
     /// this stays ~0; a real game draws content into the center, so it rises.
     max_center_nonuniform_bp: AtomicU64,
+}
+
+/// Does this frame contain content, i.e. >=2 distinct pixel values (as opposed to a
+/// uniform blank/black screen)?
+///
+/// Deliberately shared by BOTH content axes so they differ only in SCOPE, never in
+/// predicate: `saw_content` ORs it over every painted frame, `last_frame_content`
+/// applies it to the final frame alone. Comparing two axes that also disagreed on the
+/// test would prove nothing.
+fn has_content(data: &[u32]) -> bool {
+    match data.first() {
+        Some(first) => data.iter().any(|p| p != first),
+        None => false,
+    }
 }
 
 /// Distinct-color counting stops here (a real game frame blows past this; the cap
@@ -142,9 +175,7 @@ impl Screen for HeadlessScreen {
             .iter()
             .map(|x| ((x.a as u32) << 24) | ((x.r as u32) << 16) | ((x.g as u32) << 8) | (x.b as u32))
             .collect::<Vec<_>>();
-        if let Some(first) = data.first()
-            && data.iter().any(|p| p != first)
-        {
+        if has_content(&data) {
             self.saw_content.store(true, Ordering::SeqCst);
         }
         let magenta = data
@@ -364,6 +395,7 @@ fn main() {
     // Emit a single JSON line for the batch wrapper to parse.
     let json = format!(
         "{{\"file\":{:?},\"platform\":{:?},\"result\":{:?},\"reason\":{:?},\"ticks\":{},\"paints\":{},\"content\":{},\
+         \"last_frame_content\":{},\
          \"distinct_colors\":{},\"nondominant_pct\":{:.1},\"center_nonuniform_pct\":{:.1},\"ms\":{}}}",
         args.filename,
         result.platform,
@@ -372,6 +404,7 @@ fn main() {
         result.ticks,
         result.paints,
         result.content,
+        result.last_frame_content,
         result.distinct_colors,
         result.nondominant_bp as f64 / 100.0,
         result.center_nonuniform_bp as f64 / 100.0,
@@ -389,6 +422,10 @@ struct Outcome {
     ticks: u64,
     paints: u64,
     content: bool,
+    /// Same predicate as `content`, but scoped to the LAST painted frame instead of
+    /// ORed over all of them. Measure-only: it does NOT affect `passed`. See the
+    /// module header for why the two can disagree and why this one is not a gate yet.
+    last_frame_content: bool,
     // Content-richness metrics (measure-only; do not affect passed). See HeadlessScreen.
     distinct_colors: u64,
     nondominant_bp: u64,
@@ -595,6 +632,10 @@ fn run(args: &Args) -> Outcome {
         fail(&platform_name, "no frame rendered (hang/black screen)".into(), ticks, paints, content)
     };
 
+    // The last frame is what a user actually sees. `content` cannot answer for it: it is
+    // an ANY-frame OR, so a run that draws correctly and is then overpainted with a blank
+    // screen still reports `content: true`.
+    outcome.last_frame_content = screen.last_frame.lock().unwrap().as_deref().is_some_and(has_content);
     outcome.distinct_colors = screen.max_distinct_colors.load(Ordering::SeqCst);
     outcome.nondominant_bp = screen.max_nondominant_bp.load(Ordering::SeqCst);
     outcome.center_nonuniform_bp = screen.max_center_nonuniform_bp.load(Ordering::SeqCst);
@@ -691,6 +732,7 @@ fn pass(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         ticks,
         paints,
         content,
+        last_frame_content: false,
         distinct_colors: 0,
         nondominant_bp: 0,
         center_nonuniform_bp: 0,
@@ -705,6 +747,7 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         ticks,
         paints,
         content,
+        last_frame_content: false,
         distinct_colors: 0,
         nondominant_bp: 0,
         center_nonuniform_bp: 0,
@@ -713,7 +756,35 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
 
 #[cfg(test)]
 mod tests {
-    use super::{RICHNESS_COLOR_CAP, frame_richness};
+    use super::{RICHNESS_COLOR_CAP, frame_richness, has_content};
+
+    #[test]
+    fn has_content_is_the_two_distinct_values_test() {
+        assert!(!has_content(&[]));
+        assert!(!has_content(&[0x000000]));
+        assert!(!has_content(&[0x112233; 64])); // uniform, any color — still blank
+        assert!(has_content(&[0x000000, 0x000001]));
+    }
+
+    #[test]
+    fn the_two_axes_disagree_exactly_on_overpaint() {
+        // The shape this axis exists for: good frame, then a blank one on top.
+        let good = vec![0x000000, 0xFFFFFF];
+        let blank = vec![0x000000, 0x000000];
+
+        // `content` is an OR over the run …
+        let any_frame = [&good, &blank].iter().any(|f| has_content(f));
+        // … `last_frame_content` looks only at what is left on screen.
+        let last_frame = has_content(&blank);
+
+        assert!(any_frame, "any-frame axis must still see the good frame");
+        assert!(!last_frame, "last-frame axis must see the overpaint");
+        assert_ne!(any_frame, last_frame, "this disagreement IS the blind spot being closed");
+
+        // And they must AGREE when nothing overpaints — otherwise the new axis would
+        // just be noise on every healthy run.
+        assert_eq!([&good, &good].iter().any(|f| has_content(f)), has_content(&good));
+    }
 
     const W: u32 = 240;
     const H: u32 = 320;

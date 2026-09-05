@@ -32,7 +32,15 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- (없음 — 열린 PR **0건**. `## 다음` 에서 고르라)
+- **`wie_validate` «마지막 프레임» 축** (PR **#89** 열림 · `wie-lgt-validate-last-frame-axis`
+  · 채택 제안 `2026-09-05-lgt-browser-paint-localize#p1`) — `saw_content` 가 프레임 전체에 대한 **OR** 이라
+  ★**마지막 프레임을 구조적으로 못 본다**(OR 은 단조 — 나중 프레임이 값을 되돌릴 수 없다) ⇒ 같은 술어를
+  마지막 프레임에만 적용하는 **`last_frame_content`** 를 더했다. ★**보고 전용 · `passed` 분기 무접촉.**
+  ★**양방향을 «살아 있는 결함»으로** 보였다(#p0 이 미착지라 main 에 검은 화면이 그대로 있다):
+  현 main LGT `content=true · ★last_frame_content=false` ↔ #88 을 얹으면 `true` · KTF 는 둘 다 불변.
+  ★**게이트로 안 올린 이유도 실측이다** — 지금 걸면 `helloworld_*` 2픽스처가 PASS → FAIL 로 뒤집힌다.
+- **LGT 검은 화면 «근인» 수정** (PR **#88** 열림 · `wie-lgt-browser-paint-black-screen-name-compare`) — 게이트② 대기.
+  ★**두 PR 은 파일이 겹치지 않는다**(`wie_validate.rs` ↔ `card_canvas.rs`) — 원장 파일만 공유한다.
 
 ## 완료 (최근)
 - 2026-09-05: **`get_system_class_loader` 6곳 선이행** (PR **#83** 착지 · `wie-system-class-loader-preemptive-migration-six-sites`
