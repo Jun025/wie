@@ -3,7 +3,9 @@
   "date": "2026-09-05",
   "task": "wie-system-class-loader-preemptive-migration-six-sites",
   "title": "«검증을 분리했다» — 6곳을 지금 핀 위에서 선이행 · 그리고 «5곳은 아무 픽스처도 지나지 않는다»를 측정으로 밝혔다",
-  "services": ["engine"],
+  "services": [
+    "engine"
+  ],
   "summary": "다음 업스트림 칸(`+34`)에서 `Jvm::current_class_loader` 가 비공개가 된다. 공개 통로 `JavaLangClassLoader::get_system_class_loader` 가 **현재 핀에서도 `pub`** 이므로 6곳을 **bump 없이** 미리 갈아탔다 — 6줄 · import 추가 0. ★★**[정정 · 게이트② 반려 `-fix`] 초판의 「동작 변경 의도 0 / 두 API 가 같은 값」은 «거짓»이었다** — ⑥번은 **갈리고**, 그 갈림은 «회귀»가 아니라 **잠재 수정**이다(아래 `divergence-at-6`). ★**이 회차의 값은 «6줄»이 아니라 «검증의 분리»다**: 나중에 bump 와 함께 하면 회귀가 나도 «핀 탓인지 이행 탓인지» 가릴 수 없다. ★★**그리고 급소를 하나 잡았다** — 설계 회차가 「`keydraw_*`·`helloworld_ktf` 가 2~5번 자리를 태운다」고 적었는데, **자리마다 `panic!()` 을 심어 다시 재니 «거짓»이었다**: 커버되는 자리는 **6곳 중 1곳**(LGT 부팅)뿐이다. 「139 passed / 5픽스처 PASS」는 치환 «전에도» 같은 수라 **«그 줄을 지났다»의 증거가 아니다.**",
   "changes": [
     "6곳 치환(4파일 · 각 1줄): `wie_ktf/src/runtime/wipi_c/context.rs` **2** · `wie_lgt/src/runtime/wipi_c/context.rs` **2** · `wie_lgt/src/emulator.rs` **1** · `wie_midp/src/classes/javax/microedition/lcdui/image.rs` **1**. ★`use` 줄 변경 **0**(`JavaLangClassLoader` 가 네 파일 모두 이미 import — diff 에 `use` 줄 0).",
@@ -40,15 +42,17 @@
       "target": "wie · scripts/make-wipi-keydraw-fixture.sh + test_data/"
     },
     {
-      "title": "`Image.createImage(String)` 픽스처 — 6번 자리는 논증으로만 서 있다",
-      "plainSummary": "게임이 이름으로 이미지를 여는 통로가 시험에서 한 번도 실행되지 않는다. 커스텀 클래스로더를 쓰는 게임에서는 이번 변경이 다르게 동작할 수 있는 유일한 자리다.",
-      "userBenefit": "「이미지를 못 불러온다」류 고장을 커밋 전에 잡는다 — 지금은 그 경로에 시험이 0개다.",
-      "why": "실측: `image.rs:116` 에 `panic!()` 을 심어도 스위트·5픽스처가 **전건 통과**한다. 그리고 이 자리는 6곳 중 **유일하게 게스트 Java 프레임 안**이라, `current_class_loader` 의 ⑴⑵ 갈래(호출 클래스가 자기 로더를 가짐)가 실제로 갈릴 수 있는 자리다.",
-      "tradeoff": "⑴`scripts/make-draw-fixture.mjs` 가 **JVM 바이트코드를 손으로 조립**하므로 호출 1개 추가가 상수풀·메서드 조립 변경이다(작지 않다) ⑵jar 안에 이미지 리소스도 넣어야 한다 ⑶대안: 커스텀 로더 게스트가 없으면 두 API 가 같으므로, «지금 우리 런처 경로»만 확인할 거면 값이 낮다 — **커스텀 로더 시나리오까지 덮을 때** 값이 선다.",
+      "title": "`Image.createImage(String)` 픽스처 — ⑥의 «갈림»은 측정됐고, «넓어진 가시 범위가 무엇을 찾는가»가 미측정이다",
+      "plainSummary": "게임이 이름으로 이미지를 여는 통로가 시험에서 한 번도 실행되지 않는다. ★이 통로는 이번 변경으로 **지금 실제로 달라졌다** — 종전에는 그 이름으로 무엇을 물어도 «못 찾음»이었고 이제는 시스템 로더가 찾는다. 그 «찾음»이 실제로 어떤 파일을 열어 주는지는 아직 아무도 돌려 보지 못했다.",
+      "userBenefit": "「이미지를 못 불러온다」류 고장을 커밋 전에 잡는다 — 지금은 그 경로에 시험이 **0개**다. ★그리고 이 자리는 6곳 중 **유일하게 동작이 달라진 자리**라, 회귀 그물이 없는 채로 남기기에 가장 나쁜 칸이다.",
+      "why": "실측: `image.rs:116` 에 `panic!()` 을 심어도 스위트·5픽스처가 **전건 통과**한다(회귀 그물 0). ★★**그리고 이 자리는 «갈릴 수 있는» 자리가 아니라 «지금 갈리는» 자리다** — `execute_method` 가 **모든** 메서드에 Java 프레임을 밀고 `find_calling_class` 가 `top_java_frame()` 을 주므로, 프로토가 도는 동안 «호출 클래스»는 게스트가 아니라 **프로토 자신(`Image`)** 이고 그것을 **`RustJarClassLoader` 가 정의**한다 ⇒ `current_class_loader` 는 그 로더를 주는데 **그 로더의 `getResourceAsStream` 은 항상 null** 이다(`findResource` = 기반 구현 `Ok(None)` · `parent` = `None`). ⇒ 종전 경로는 **영원히 못 찾았고**(= 항상 `IOException`) 새 경로(시스템 `URLClassLoader`)는 찾는다. ★**갈림 «자체»는 측정됐다**(`verification.divergence-at-6` · 게이트② 실측 `same=false`) — ★**미측정인 것은 «넓어진 가시 범위가 실제로 무엇을 찾는가»** 하나다. 이 제안은 그것을 닫는다.",
+      "tradeoff": "⑴`scripts/make-draw-fixture.mjs` 가 **JVM 바이트코드를 손으로 조립**하므로 호출 1개 추가가 상수풀·메서드 조립 변경이다(작지 않다) ⑵jar 안에 이미지 리소스도 넣어야 한다 ⑶★★**「커스텀 로더 게스트가 없으면 두 API 가 같으니 값이 낮다」는 «거짓»이다** — 그 전제는 이 워크로그의 `limits[1]`·`verification.divergence-at-6` 이 철회했다. 갈림은 **커스텀 로더 «없이» 지금** 일어나므로 ★**값은 «낮은» 게 아니라 «높다»**: 6곳 중 **유일하게 동작이 달라진 칸**인데 회귀 그물이 **0**이다. ⑷상용 코퍼스가 없어(Constraint 9) 확인은 **커밋된 픽스처 범위**에 머문다.",
       "effort": "M — 바이트코드 조립기 변경 + 리소스 동봉.",
       "target": "wie · scripts/make-draw-fixture.mjs + wie_midp"
     }
   ],
-  "adoptedProposals": ["2026-09-05-current-class-loader-replacement-design#p0"],
+  "adoptedProposals": [
+    "2026-09-05-current-class-loader-replacement-design#p0"
+  ],
   "declinedProposals": []
 }

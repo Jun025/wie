@@ -3,7 +3,9 @@
   "date": "2026-09-05",
   "task": "wie-current-class-loader-replacement-api-design-for-plus34",
   "title": "«다음 벽»을 설계했더니 벽이 아니었다 — 공개 대체가 이미 있고, 핀을 올리기 «전»에 이행할 수 있다",
-  "services": ["engine"],
+  "services": [
+    "engine"
+  ],
   "summary": "핀을 `+34` 이상으로 올릴 때의 다음 벽(`Jvm::current_class_loader` 비공개화 · 호출부 6곳)의 대체 API 설계. ★**결론: 벽이 아니다.** ⒜파열은 계단표가 적은 `+46` 이 아니라 ★**`+34`(`7dc1b90`)에서 «시작»한다**(그 커밋은 `pub` 한 줄만 내렸고 대체를 «추가하지 않았다») ⒝호출부 **6곳이 전부 같은 두 줄**이고 ★**클래스 «로딩»에 쓰는 자리는 0곳** — 필요한 능력은 「게스트 리소스를 이름으로 여는 것」뿐이다 ⒞★**공개 대체가 «있다»** — `JavaLangClassLoader::get_system_class_loader` 가 **핀에서도 HEAD 에서도 `pub`** 이고, ★그것은 우회가 아니라 **`current_class_loader` 자신이 떨어지는 폴백**이다 ⒟★**핀에서도 공개라 «핀을 올리기 전»에 이행할 수 있다** ⇒ `+34` 칸의 파열 호출부가 **6 → 0** 이 된다. ★설계를 **프로브**로 확인했다(6곳 스왑 → 스위트 전건 → 원복 · 코드 델타 0).",
   "changes": [
     "`docs/upstream-realign-verdict.md` — **§8-4⑶-b 신설**(⒜~⒣: 벽의 시작점 · 호출부 6행 표 · 공개 대체 실측 · 고른 길 · 선이행 실익 · 프로브 출력 · 남는 한 자리 · `+47` 계단) + ★계단표 4번 칸에 **인라인 정정 1줄**.",
@@ -20,7 +22,7 @@
     "gates": "`cargo fmt --all -- --check` rc=0 · `check-worklog-json.mjs` OK · `check-worklog-coverage.mjs` **rc=0** · 정적 계약 **107 pass / 0 violation** · `npm run audit` PASSED. ★문서 1파일 변경이라 Rust 회귀 여지 0(프로브의 139 passed 는 «대체본»의 값이고, 원복본은 main 과 바이트 동일하다)."
   },
   "limits": [
-    "★★**6번 자리(`Image.createImage(String)`)는 프로브가 «부르지 않는다»** — `createImage` 를 호출하는 시험·픽스처가 **0건**이다(실측). ⇒ 그 자리는 «측정»이 아니라 **논증**으로 남는다: MIDP 게스트는 시스템(URL) 클래스로더가 적재하므로 두 API 가 같은 값을 준다(P1 의 `net/wie/Launcher` 수정이 `getSystemClassLoader().loadClass(main)` 로 이미 그것을 쓴다). ★**커스텀 로더를 쓰는 게스트에서는 갈릴 수 있다** — 이행 회차는 픽스처 한 건을 붙이거나 최소한 이 단서를 커밋 메시지에 남겨라.",
+    "★★**6번 자리(`Image.createImage(String)`)는 프로브가 «부르지 않는다»** — `createImage` 를 호출하는 시험·픽스처가 **0건**이다(실측). ⇒ 그 자리는 «측정»이 아니라 **논증**으로 남는다: MIDP 게스트는 시스템(URL) 클래스로더가 적재하므로 두 API 가 같은 값을 준다(P1 의 `net/wie/Launcher` 수정이 `getSystemClassLoader().loadClass(main)` 로 이미 그것을 쓴다). ★**커스텀 로더를 쓰는 게스트에서는 갈릴 수 있다** — 이행 회차는 픽스처 한 건을 붙이거나 최소한 이 단서를 커밋 메시지에 남겨라. ★★**[정정 2026-09-05 · 이행 회차 `wie-system-class-loader-preemptive-migration` 의 `-fix`] 위 문장 「MIDP 게스트는 시스템(URL) 클래스로더가 적재하므로 두 API 가 «같은 값»을 준다」는 «거짓»이다** — 핀 소스 실측: `execute_method` 가 **모든** 메서드에 Java 프레임을 밀고 `find_calling_class` 는 `top_java_frame()` 을 주므로, 프로토가 도는 동안 «호출 클래스»는 게스트가 아니라 **프로토 자신(`Image`)** 이고 그것은 **`RustJarClassLoader`** 가 정의한다 ⇒ 두 API 는 **갈린다**(게이트② 실측 `same=false`). ★그리고 그 갈림은 «회귀»가 아니라 «잠재 수정»이다 — `RustJarClassLoader` 의 `getResourceAsStream` 은 항상 null 이라 종전 경로는 리소스를 **영원히 못 찾았다**. 정본 = `docs/worklog/2026-09-05-system-class-loader-preemptive-migration.json` 의 `verification.divergence-at-6` · `docs/upstream-realign-verdict.md` §8-4⑶-b⒢.",
     "★**이 회차는 «설계»다 — 핀도 코드도 바꾸지 않았다**(계약 1). 6곳 이행과 `+34` bump 는 **다음 회차**이고, ★그 둘을 «같은 PR 에 넣지 마라»(선이행의 실익이 사라진다).",
     "★**`+34` 이후 `+46` 사이에 다른 파열이 있는지는 이 회차가 재지 않았다** — 계단표의 4번 칸은 «누적 ≥13」이고, 그 13 중 `current_class_loader` 6 을 뺀 나머지가 어디서 오는지는 §8-4⑶ 의 앞 칸들이 답한다. 이행 회차는 **bump 대상 rev 를 정한 뒤** `cargo check` 로 다시 세라.",
     "★**`get_system_class_loader` 자체의 동작은 게스트 `java/lang/ClassLoader.getSystemClassLoader()` 에 위임된다** — 그 프로토가 사라지거나 바뀌면 이 대체도 함께 깨진다. 지금은 핀·HEAD 둘 다에 있다."
@@ -37,6 +39,8 @@
       "target": "wie_lgt/src/emulator.rs · wie_lgt/src/runtime/wipi_c/context.rs · wie_ktf/src/runtime/wipi_c/context.rs · wie_midp/src/classes/javax/microedition/lcdui/image.rs"
     }
   ],
-  "adoptedProposals": ["2026-09-04-upstream-realign-p1-pin-plus33#p1"],
+  "adoptedProposals": [
+    "2026-09-04-upstream-realign-p1-pin-plus33#p1"
+  ],
   "declinedProposals": []
 }
