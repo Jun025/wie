@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "date": "2026-09-05",
+  "task": "wie-dod-four-gates-add-beta-axis",
+  "title": "DoD 에 beta 축 «한 줄» — 실패 34건 중 9건이 beta 다리 단독이었고, 그 9건이 «전부» 린트 게이트다",
+  "services": ["engine"],
+  "summary": "`rust.yml` 매트릭스는 `[macos·ubuntu·windows] × [stable·beta]` 인데 `AGENTS.md` §Definition of Done 은 stable 만 적어 두어, beta 에서만 나는 린트가 **PR 을 열어야 보였다**. ★**총괄 제안의 「9/34」를 옮겨 적지 않고 내가 다시 셌다** — `rust.yml` run **전량 246건**(`ac4ce1aa` 2026-06-24 → `11a35252` 2026-09-04) 중 실패 **34**, 그중 **9건이 beta 다리 단독 실패**이고 ★**9건 전부가 `cargo clippy --all -- -D warnings`** 다(`fmt` 0 · wasm 린트 0 · 테스트 0). ⇒ 그래서 네 줄이 아니라 **한 줄**을 더했다: `cargo +beta clippy --all -- -D warnings`. 추가 비용은 회차당 **7.6~7.7초**(최초 1회만 36.3초)이고 stable 과 **스래싱하지 않는다**(실측).",
+  "changes": [
+    "`AGENTS.md` §Definition of Done — four gates 코드블록 «다음»에 beta 축 블록 신설: 전제 `rustup toolchain install beta --component clippy` + 명령 `cargo +beta clippy --all -- -D warnings` + ⑴이력 실측 ⑵왜 한 줄인가 ⑶비용 ⑷RustJava 선례 1문단.",
+    "★**`CLAUDE.md` 무접촉** — 그 파일은 「커밋 전 게이트: `AGENTS.md` §Definition of Done 의 4종」이라고 **가리키기만** 하고 「여기에 재열거하지 않는다 — 같은 사실을 두 곳에 적으면 한쪽이 낡는다」를 스스로 못박고 있다. beta 축을 «다섯째 게이트»가 아니라 «린트 게이트의 두 번째 툴체인»으로 쓴 것도 그래서다 — 그렇게 쓰면 CLAUDE.md 의 「4종」과 Constraint 1 의 「four gates」가 **낡지 않는다**.",
+    "★**CI 워크플로 변경 0**(Non-goal) · 파리티 검사기 포팅 **0** · 코드 변경 **0**."
+  ],
+  "verification": {
+    "ci-beta-axis": "★**실측(계약 1)**: beta 를 거는 곳은 `rust.yml` **한 곳**뿐이다 — `matrix.rust: [stable, beta]`(`os: [macos-latest, ubuntu-latest, windows-latest]`) ⇒ **6다리**, `dtolnay/rust-toolchain@stable` 액션에 `toolchain: ${{ matrix.rust }}` 로 주입. 그 6다리가 **four gates 를 전부** 친다(fmt · clippy · wasm clippy · test). 나머지 워크플로(`engine-contract.yml:113`·`publish-artifact.yml:50`·`web.yml:49`)는 **stable 고정**이고 `rust-toolchain.toml` 은 **없다**.",
+    "history-window": "★**창을 밝힌다**: `rust.yml` run **#1 `ac4ce1aa` 2026-06-24T00:48:42Z ~ #246 `11a35252` 2026-09-04T22:05:19Z**(전량 · `--paginate`). 결론 분포 = success **212** / failure **34**. 실패 34건의 실패 job 은 **35개**(run #213 만 2개).",
+    "beta-only-9": "★**9건 명세**(run# · sha · 린트): #92 `65a240e4` · #93 `23833e86` · #94 `32e5c1fe` · #95 `8262842f` · #96 `5dc6da82` · #97 `cf77947a` · #98 `bfb84c60` · #126 `a7cc83d5` → **8건 전부 `clippy::chunks_exact_to_as_chunks`**(2026-07-06 → 07-13 · ★해소는 «두 커밋»이다 — 아래 `not-a-hypothetical` 참조) · #182 `a68e57f7` → **`clippy::double_must_use`**(2026-08-20 · 해소는 별도 회차 PR **#60** `7a49aff0`). ⇒ ★**9/9 가 린트 게이트**이고 fmt·wasm 린트·테스트는 **0**이다. 나머지 실패는 stable 다리 24건 + 혼합 1건(#213 windows stable+beta 동시 — 경로 구분자 `:`↔`;` 로 **beta 가 아니라 windows 가 잡은 것**).",
+    "not-a-hypothetical": "★**#182 이 이 조항의 근거로 가장 세다** — 그 PR 의 diff 는 `wrangler.toml` **6줄 추가 · Rust 0줄**인데 beta 린트가 red 였다. 즉 **자기가 쓰지 않은 코드**가 새 린트에 걸렸고, 해소에 **회차 하나가 통째로** 들었다(`wie-rust-ci-beta-clippy-double-must-use-red`). ★★**[게이트② 반려 · 정정] 2026-07 클러스터의 초판 서술(「7일간 8회 push · 해소 `e3cbaa08`」)은 «세 축 모두» 재현되지 않는다.** 실측: `main` 을 red 로 만든 것은 **6 push · 약 36시간**(`2026-07-06T18:24` → `07-08T05:51`)이고 실패 좌표는 전건 **`wie_midp/…/lcdui/image.rs:310`**, 해소는 ★**`37e3e4f6`(PR #21 · merged `2026-07-08T10:02Z`)** 다(직후 run #100 부터 main push 가 전건 success). ★**`e3cbaa08`(PR #33 · 07-13)이 고친 것은 `wie_lgt/src/compile_model.rs:113`** 이고 그것은 **피처 브랜치 PR(#126)에서만** 났다 — `main` 을 red 로 만든 적이 **없다**. ⇒ 같은 린트의 **«두 사건»을 한 커밋에 귀속**시켰던 것이고, #97·#126 은 `pull_request` 라 애초에 main push 계수에 들어가지 않는다. ★헤드라인 34/9/9 는 검수자가 재현했고 **무접촉**이다.",
+    "measured-caveat": "★**숨기지 않는 한계**: 그 9건 전부에서 stable 다리는 `success` 가 아니라 **`cancelled`** 이었다 — `fail-fast: false` 는 **2026-08-27 PR #65**(`250d7e4c`)에 들어왔고 그 전에는 한 다리가 지면 나머지가 취소됐다. ⇒ ★**「같은 run 안에서 stable 이 초록이었다」는 run 만으로는 증명되지 않는다.** 증명은 **린트 정체와 해소 경로**가 진다: 두 린트 다 clippy 린트이고, #182 은 Rust 무변경 PR 인데 red 였으며 해소가 **repo 전역 수정**이었다 ⇒ 그 코드는 그때까지 stable 을 계속 통과하고 있었다.",
+    "cost": "★**계약 4 — 1회 실측(`11a35252` · macOS aarch64 10코어 · stable 1.98.0 / beta 1.99.0-beta.1)**: ⒜stable 아티팩트만 있는 `target/` 에서 **첫** `cargo +beta clippy --all -- -D warnings` = **36.27s** ⒝같은 명령 재실행(warm) = **1.36s** ⒞★**회차 실제형** — 엔진 크레이트 1개 편집 후: bottom-of-stack(`wie_util`) stable **13.05s** / beta **7.63s** · 잎쪽(`wie_ktf`) stable **15.78s** / beta **7.72s** ⇒ ★**회차당 추가 +7.6~7.7초** ⒟★**스래싱 없음** — beta 직후 stable 로 돌아가면 **0.50s**(cargo 가 rustc 버전으로 아티팩트를 키잉해 두 벌을 나란히 둔다) ⇒ ★**별도 `CARGO_TARGET_DIR` 불요**(그 완화책을 «넣지 않은» 근거다).",
+    "precondition": "★전제 실측: `rustup show profile` = **default** 이고 default 프로필에 **clippy 가 포함**된다(beta 설치분에 `clippy`·`rustfmt`·`rust-std-wasm32` 실재). 그래도 `--component clippy` 를 명시로 적었다 — **minimal 프로필 설치를 덮고 멱등**이기 때문이다(RustJava 는 정확히 그 함정에서 beta 에 `rustfmt` 가 없었다).",
+    "green-on-main": "★**새로 적은 명령이 지금 `main` 에서 실제로 초록이다** — `cargo +beta clippy --all -- -D warnings` rc=0(경고는 `block v0.1.6` future-incompat 뿐 · 기존 stable 실행과 동일 계열). ★red 인 줄을 문서에 심지 않았다.",
+    "gates": "`cargo fmt --all -- --check` rc=0 · `cargo clippy --all -- -D warnings` rc=0 · `cargo clippy --target wasm32-unknown-unknown -- -D warnings` rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` **139 passed / 0 failed** · ★신설 `cargo +beta clippy --all -- -D warnings` rc=0 · `check-worklog-json.mjs` OK · `check-worklog-coverage.mjs` rc=0 · 정적 계약 **107 pass** · `npm run audit` PASSED."
+  },
+  "limits": [
+    "★**이 블록은 «사람이 동기화하는 산문»이다** — `rust.yml` 의 매트릭스에 툴체인이 하나 더 붙어도 `AGENTS.md` 는 아무 말도 하지 않는다. 기계 대조(RustJava 의 `scripts/check-dod-ci-parity.py` 형태)는 **이 회차 범위 밖**이고 형제 제안 `#p2` 소관이다. 그 사실을 블록 안에 적어 뒀다.",
+    "★**「9/34」는 창에 묶인 수다** — 2026-08-27 `fail-fast: false` 이후로는 beta 가 져도 stable 이 끝까지 돌아 **같은 계수기가 다른 모양의 답**을 준다(이후 창에서 beta 단독 실패는 아직 0건). 다음에 이 수를 인용할 사람은 **창을 다시 밝히고 다시 세라**.",
+    "★**wasm 린트·fmt·테스트의 beta 판을 «일부러» 넣지 않았다** — 이력상 0건이기 때문이다. 그것들이 실제로 한 번 red 를 내면 그때 줄을 늘려라(블록에 그렇게 적었다).",
+    "★**`rust.yml` 머리 주석은 여전히 four gates 만 나열한다** — Non-goal 이 CI 파일 변경을 0으로 못박아 손대지 않았다. 그 정합은 아래 제안 1건이 진다."
+  ],
+  "issues": [],
+  "proposals": [
+    {
+      "title": "`rust.yml` 머리 주석의 «로컬에서 돌려라» 목록에도 beta 린트 한 줄을 넣어라",
+      "plainSummary": "CI 설정 파일 맨 위에 「커밋 전에 이 네 개를 로컬에서 돌려라」는 안내가 적혀 있는데, 이번에 문서 쪽에만 다섯째 줄(beta 린트)을 더했다. 두 곳이 서로 다른 목록을 말하게 됐다.",
+      "userBenefit": "워크플로 파일을 먼저 여는 사람(대개 CI 를 고치러 온 사람)이 같은 안내를 받는다. 지금은 그 사람만 beta 줄을 못 본다.",
+      "why": "실측: `rust.yml:1-10` 머리 주석이 four gates 명령 4줄을 그대로 나열하고 「Run all four locally before committing」이라고 적는다. `AGENTS.md` 는 이제 5줄이다 — ★이 estate 가 반복해 규탄한 «같은 사실 두 벌 중 한쪽이 낡는다» 의 형태이고, 이번 회차가 그것을 «만들었다».",
+      "tradeoff": "⑴이 회차의 Non-goal 이 CI 워크플로 변경 0 이라 못 했다 — 별 티켓이어야 한다. ⑵더 나은 처방은 주석에서 목록을 **지우고 `AGENTS.md` 를 가리키게** 하는 것일 수 있다(두 벌을 한 벌로). 어느 쪽인지는 그 회차가 정하라. ⑶`rust.yml` 은 `publish-artifact.yml` 의 `paths` 에 걸리지 않아 배포를 흔들지 않는다.",
+      "effort": "XS — 주석 몇 줄.",
+      "target": "wie · .github/workflows/rust.yml"
+    }
+  ],
+  "adoptedProposals": ["2026-09-04-parity-sibling-repo-survey#p0"],
+  "declinedProposals": []
+}

@@ -10,6 +10,17 @@
 - **사용자 영향**: 없음(검사 추가). 대신 「5를 눌렀는데 KTF 게스트가 8을 받는다」류가 **브라우저 층까지 포함해** 커밋 전에 잡힌다. ★그리고 **LGT 화면이 브라우저에서 안 나올 수 있다**는 사실이 처음으로 측정됐다.
 - **★남는 구멍**: 단언 대상은 **양성 WIPI 코드**뿐이다(이름 키는 WIPI 공간에서 음수라 막대 폭이 될 수 없고, 게스트의 임의 슬롯표를 검사로 옮기면 **두 번째 진실원**이 생긴다 — 그 22행은 정적 §4c 가 진다). LGT blit 원인은 **모른다**(측정만 했다).
 
+## [2026-09-05] DoD 에 beta 축 «한 줄» — 실패 34건 중 9건이 beta 단독이었고 그 9건이 전부 린트 게이트다 (wie-dod-four-gates-add-beta-axis)
+- **무엇을**: `AGENTS.md` §Definition of Done 에 beta 축 블록 1개(전제 `rustup toolchain install beta --component clippy` + 명령 `cargo +beta clippy --all -- -D warnings` + 이력·비용·선례). ★**코드 0줄 · CI 워크플로 0줄 · 파리티 검사기 포팅 0.**
+- **왜**: 운영자 채택 제안 `2026-09-04-parity-sibling-repo-survey#p0` — 「`rust.yml` 은 stable·beta **둘 다** 치는데 로컬 DoD 는 stable 만 적어 두었다」. 문자열 `beta` 가 `AGENTS.md`·`CLAUDE.md` 어디에도 **0건**이었다.
+- **★⑴ 제안의 수를 옮겨 적지 않고 다시 셌다(창을 밝힌다)**: `rust.yml` run **전량 246건**(`ac4ce1aa` 2026-06-24T00:48:42Z → `11a35252` 2026-09-04T22:05:19Z) · success 212 / failure **34** · 그중 ★**beta 다리가 «유일한» 실패 job 인 run 9건**. ★**9/9 가 `cargo clippy --all -- -D warnings`** — 8 × `clippy::chunks_exact_to_as_chunks`(#92·93·94·95·96·97·98·126 · 2026-07-06→07-13) + 1 × `clippy::double_must_use`(#182 · 2026-08-20 · 해소는 **별도 회차 PR #60**). fmt **0** · wasm 린트 **0** · 테스트 **0** ⇒ ★**그래서 네 줄이 아니라 한 줄이다.**
+- **★⑵ 가정이 아니다**: #182 의 diff 는 `wrangler.toml` **6줄 추가 · Rust 0줄**인데 beta 린트가 red 였다 — 자기가 쓰지 않은 repo 전역 코드가 새 린트에 걸렸고 해소에 회차 하나가 들었다. ★★**[게이트② 반려 · 정정]** 2026-07 클러스터는 `main` 을 **6 push · 약 36시간**(07-06T18:24 → 07-08T05:51 · 전건 `wie_midp/…/lcdui/image.rs:310`) red 로 뒀고 해소는 ★**`37e3e4f6`(PR #21)** 이다. ★**`e3cbaa08`(PR #33)은 «07-13 `wie_lgt/src/compile_model.rs:113`»** — **다른 자리 · 피처 브랜치**이고 `main` 을 red 로 만든 적이 **없다**. 초판의 「7일 · 8회 push · 해소 `e3cbaa08`」는 **세 축 모두 재현되지 않는다**(두 사건을 한 커밋에 귀속시켰다). ※#97·#126 은 `pull_request` 라 애초에 main push 가 아니다.
+- **★⑶ 한계를 숨기지 않는다**: 그 9건 전부에서 stable 다리는 `success` 가 아니라 **`cancelled`** 다(`fail-fast: false` 는 **2026-08-27 PR #65**(`250d7e4c`)에 들어왔다 — ★초판의 「PR #64」는 오기다. 날짜는 옳았다) ⇒ 「같은 run 에서 stable 이 초록」은 run 만으로 증명되지 않는다. 증명은 **린트 정체 + 해소 경로**가 진다(위 ⑵).
+- **★⑷ 비용 1회 실측**(`11a35252` · macOS aarch64 10코어 · stable 1.98.0 / beta 1.99.0-beta.1): 첫 beta clippy **36.27s** → warm **1.36s** → ★**회차 실제형(엔진 1파일 편집 후) +7.6~7.7s** · ★**스래싱 없음**(beta 직후 stable 복귀 **0.50s**) ⇒ 별도 `CARGO_TARGET_DIR` **불요**.
+- **★⑸ 한 곳에만 적었다**: `AGENTS.md`. `CLAUDE.md` 는 「§Definition of Done 의 4종」을 **가리키기만** 하고 「두 곳에 적으면 한쪽이 낡는다」를 자기 규율로 갖는다 ⇒ **무접촉**. beta 를 «다섯째 게이트»가 아니라 «린트 게이트의 두 번째 툴체인»으로 쓴 것도 그래서다 — Constraint 1 의 「four gates」와 CLAUDE.md 의 「4종」이 **낡지 않는다**.
+- **사용자 영향**: 없음(문서 1개). 대신 이력 26%(9/34)의 실패형이 **PR 을 열기 전에** 잡힌다.
+- **★남는 구멍**: 이 블록은 사람이 동기화하는 산문이다 — 매트릭스에 툴체인이 하나 더 붙어도 아무도 말하지 않는다(RustJava 는 `scripts/check-dod-ci-parity.py` 로 기계 대조까지 갔다 · 포팅은 형제 제안 `#p2` 소관). 그리고 `rust.yml` 머리 주석은 여전히 four gates 만 나열한다(Non-goal 로 무접촉 · 워크로그 제안 1건).
+
 ## [2026-09-05] «다음 벽»을 설계했더니 벽이 아니었다 — 공개 대체가 이미 있다 (wie-current-class-loader-replacement-api-design-for-plus34)
 - **무엇을**: `docs/upstream-realign-verdict.md` **§8-4⑶-b 신설** + 계단표 4번 칸 **인라인 정정 1줄**. ★핀 변경 0 · **코드 변경 0**(프로브는 원복) · 기존 계단 서술 무접촉.
 - **왜**: 운영자 채택 제안 `2026-09-04-upstream-realign-p1-pin-plus33#p1` — 「`+34` 에서 `current_class_loader` 가 비공개가 되고 **공개 대체 API 가 없다**」.
