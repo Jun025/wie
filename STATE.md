@@ -32,11 +32,26 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- **DoD 에 beta 축 한 줄** (PR **#81** 열림 · `wie-dod-four-gates-add-beta-axis` · 별 리니지)
-  — `AGENTS.md` §Definition of Done 에 `cargo +beta clippy --all -- -D warnings` 블록 1개.
-  ★이 착지(#80)로 그쪽이 **원장 2파일 충돌**이 될 것이다(코드 0) — 그쪽 게이트③이 2-c⒜ 로 해소한다.
+- **브라우저 왕복 KTF 키 «도달» Scenario E** (PR **#82** 열림 · `wie-browser-roundtrip-ktf-key-reach-scenario` · 별 리니지)
+- **`get_system_class_loader` 6곳 선이행** (PR **#83** 열림 · `wie-system-class-loader-preemptive-migration-six-sites` · 별 리니지)
+  ★둘 다 `REPORT.md`·`STATE.md` 를 만진다 — 이 착지(#81)로 그쪽이 **원장 2파일 충돌**이 된다(코드 0).
+  각 게이트③이 **2-c⒜** 로 해소한다.
 
 ## 완료 (최근)
+- 2026-09-05: **DoD 에 beta 축 한 줄** (PR **#81** 착지 · `wie-dod-four-gates-add-beta-axis` · 채택 제안 `2026-09-04-parity-sibling-repo-survey#p0`)
+  — `AGENTS.md` §Definition of Done 에 `cargo +beta clippy --all -- -D warnings` 블록 1개. ★**코드 0 · CI 워크플로 0.**
+  ★근거는 내가 다시 센 수다: `rust.yml` run **전량 246건**(`ac4ce1aa` 2026-06-24 → `11a35252` 2026-09-04) 중 실패 **34**,
+  그중 **9건이 beta 다리 단독**이고 ★**9/9 가 린트 게이트**(8 × `chunks_exact_to_as_chunks` · 1 × `double_must_use`) ⇒ 한 줄.
+  ★비용 실측 = 회차당 **+7.6~7.7s**(최초 1회 36.3s) · **스래싱 없음**(stable 복귀 0.50s).
+  ★한계: 그 9건의 stable 다리는 전부 `cancelled` 이었다(`fail-fast: false` 는 2026-08-27 **PR #65**(`250d7e4c`)) — 증명은 린트 정체가 진다.
+  ★★**[게이트② 반려 · `-fix`] «배경 서술»의 수를 정정했다**(헤드라인 34/9/9 는 재현돼 무접촉):
+  2026-07 클러스터는 `main` 을 **6 push · 약 36시간**(07-06T18:24 → 07-08T05:51 · 전건 `image.rs:310`) red 로 뒀고
+  해소는 ★**`37e3e4f6`(PR #21)** 이다. ★**`e3cbaa08`(PR #33)은 «07-13 `wie_lgt` 의 다른 자리»**(피처 브랜치)라
+  그 클러스터의 해소가 **아니다** — 초판이 두 사건을 한 커밋에 귀속시키고 기간을 «7일」로 부풀렸다.
+  ★권장 ③④도 넣었다: 설치 줄 주석을 「beta 가 구를 때마다 다시 쳐라」로 · 「내 변경 탓이 아닌 beta red 는 **별 회차로 분리**하라」 한 문단.
+  ★**형제 #80 착지로 실제로 `REPORT.md`·`STATE.md` 가 충돌했고**(예고가 정확했다) 이 `-fix` 회차가 **머지로** 해소했다(리베이스 0).
+  ★**착지 형태 = merge commit(부모 2개)** — `wie` 는 `contracts/upstream-sync-repos.conf:23` 등재라 스쿼시 금지.
+  ★착지 시점에 형제 **#82·#83** 이 열려 있다(같은 원장 2파일 · 각자 해소).
 - 2026-09-05: **`current_class_loader` 대체 API 설계(`+34` 벽)** (PR **#80** 착지 · `wie-current-class-loader-replacement-api-design-for-plus34`
   · 채택 제안 `2026-09-04-upstream-realign-p1-pin-plus33#p1`) — ★**결론: 벽이 아니었다.**
   ⒜파열은 계단표의 `+46` 이 아니라 ★**`+34`(`7dc1b90`)에서 시작**한다(그 커밋은 `pub` 한 줄만 내렸다)
