@@ -49,6 +49,15 @@
       "tradeoff": "⑴`scripts/make-draw-fixture.mjs` 가 **JVM 바이트코드를 손으로 조립**하므로 호출 1개 추가가 상수풀·메서드 조립 변경이다(작지 않다) ⑵jar 안에 이미지 리소스도 넣어야 한다 ⑶★★**「커스텀 로더 게스트가 없으면 두 API 가 같으니 값이 낮다」는 «거짓»이다** — 그 전제는 이 워크로그의 `limits[1]`·`verification.divergence-at-6` 이 철회했다. 갈림은 **커스텀 로더 «없이» 지금** 일어나므로 ★**값은 «낮은» 게 아니라 «높다»**: 6곳 중 **유일하게 동작이 달라진 칸**인데 회귀 그물이 **0**이다. ⑷상용 코퍼스가 없어(Constraint 9) 확인은 **커밋된 픽스처 범위**에 머문다.",
       "effort": "M — 바이트코드 조립기 변경 + 리소스 동봉.",
       "target": "wie · scripts/make-draw-fixture.mjs + wie_midp"
+    },
+    {
+      "title": "WIPI-C 4자리의 `the two coincide wherever there is no Java frame` 주석 — 조건절은 참인데 «그 자리에서 전제가 거짓»이다",
+      "plainSummary": "엔진 소스 4곳에 「이 자리엔 자바 호출 흔적이 없으니 두 통로가 같다」는 주석이 달려 있는데, 실제로는 그 자리들 전부 자바 호출 «안»에서 돌고 있습니다. 결론(두 통로가 같은 파일을 찾는다)은 맞지만 «이유»가 틀려서, 다음 사람이 그 이유를 믿고 판단하면 어긋납니다.",
+      "userBenefit": "겉으로 달라지는 것은 없습니다. 대신 다음에 이 통로를 손대는 사람이 «틀린 이유»를 근거로 안전하다고 판단하는 일을 막습니다.",
+      "why": "★실측(이 회차): ②③은 `net/wie/CletWrapper::startApp` 이라는 Java 메서드 «안»에서 `core.run_function(start_clet)` 로 ARM 을 동기 실행하므로 프레임이 **있고**, ④⑤는 KTF 앱 전 구간이 `invoke_static(\"org/kwis/msp/lcdui/Main\",\"main\")` 아래서 돌아 **항상 있다**. ⇒ 「wherever there is no Java frame」의 조건절 자체는 참이나 ★**그 네 자리에서 전제가 성립하지 않는다**. ②③이 안전한 진짜 이유는 「그 클래스의 로더가 `None`(`register_class(…, None)`)이라 폴백 갈래로 떨어진다」이고, ④⑤는 「로더가 `KtfClassLoader` 라 **객체는 다르지만** `findResource` 재정의가 없고 **부모가 시스템 로더**라 `get_resource` 가 parent 로 위임한다」이다. ★두 사유가 서로 다른데 한 문장이 넷을 덮고 있다.",
+      "tradeoff": "★**코드 동작 변경 0 — 주석 4줄뿐이다.** 그런데 `*.rs` 를 만지므로 4게이트 6다리 + coverage 를 한 바퀴 돌린다(문서 회차보다 비싸다). ⇒ ★**다른 `*.rs` 회차에 얹어 태우는 것이 싸다.** ★반대로 미루는 대가: 이 주석은 «호출부 바로 위»에 있어 다음 사람이 가장 먼저 읽는 자리이고, 이 리니지가 다섯 회차를 쓴 원인이 정확히 「반증된 전제가 서술로 남아 이월된다」였다.",
+      "effort": "S — 4파일 4줄. 사유가 ②③(로더 `None`)과 ④⑤(부모 위임)로 갈리므로 «두 문장»으로 나눠 쓴다.",
+      "target": "wie_lgt/src/runtime/wipi_c/context.rs:101·117 · wie_ktf/src/runtime/wipi_c/context.rs:96·113"
     }
   ],
   "adoptedProposals": [

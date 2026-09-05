@@ -707,7 +707,7 @@ git rev-list --count 5b84dd1..7dc1b90  →  1        ⇒ 우리 핀의 «바로 
 
 | # | 파일 | 무엇을 하려고 쓰나 | 대체 가능성 |
 |---|---|---|---|
-| 1 | `wie_lgt/src/emulator.rs:114` | 부팅 직후 게스트 jar 에서 **`binary.mod`** 를 연다 | ★**동일**(아래 ⒞ — 그 지점엔 게스트 프레임이 없다) |
+| 1 | `wie_lgt/src/emulator.rs:114` | 부팅 직후 게스트 jar 에서 **`binary.mod`** 를 연다 | ★**동일**(아래 ⒞ — 그 지점엔 **Java 프레임이 없다**. ★2026-09-05 `-fix5`: 종전 「«게스트» 프레임이 없다」는 판별식을 잘못 적은 것이다 — 판별식은 「스택에 Java 프레임이 있는가 · 그 클래스의 로더가 `None` 인가」다) |
 | 2·3 | `wie_lgt/src/runtime/wipi_c/context.rs:100·112` | WIPI C `get_resource_size`/`read_resource` | 동일로 «보인다» — ★**미측정**(`-fix` 2026-09-05: 그 자리를 부르는 게스트가 0건이라 확인할 지점이 없다) |
 | 4·5 | `wie_ktf/src/runtime/wipi_c/context.rs:95·108` | 〃(KTF) | 〃 **미측정** |
 | 6 | `wie_midp/…/lcdui/image.rs:116` | MIDP `Image.createImage(String)` 의 리소스 열기 | ★**갈린다**(2026-09-05 `-fix` 정정 — 초판 「동일」은 거짓 · 근거는 ⒢) |
@@ -735,6 +735,13 @@ pub async fn current_class_loader(&self) -> Result<Box<dyn ClassInstance>> {
 갈리는 경우는 **호출 클래스가 자기 로더를 갖는 때**뿐이고, 그 자리는 위 표의 **6번 하나**다.
 ★★**[정정 2026-09-05 `-fix`] 그 6번은 «갈릴 수 있다»가 아니라 «실제로 갈린다»** — 그리고 «호출 클래스»는
 게스트가 아니라 **프로토 자신**(`Image`)이다. 근거·측정은 ⒢ 의 정정 블록에 있다.
+★★★**[재도출 2026-09-05 `-fix5`] 바로 위 「그 자리는 6번 «하나»다」는 «수 하나로 적을 수 없다» — 뜻이 둘이다.**
+판별식은 「호출 클래스가 «게스트»인가」가 **아니라** 「스택에 Java 프레임이 있는가 · 그 클래스의 로더가 `None` 인가」다.
+자리별 재도출: ①프레임 없음 / ②③프레임 있음·로더 `None`(`wipi_c.rs:207·208`·`native_jvm.rs:1290` 전부 `register_class(…, None)`) /
+★**④⑤프레임 있음·로더 `net/wie/KtfClassLoader`**(`wie_ktf/…/interface.rs:186` `register_class(…, Some(ktf_class_loader))`) / ⑥`RustJarClassLoader`.
+⇒ ★**«다른 객체»를 준다는 뜻이면 «3곳»(④⑤⑥)**, ★**«리소스 해결이 갈린다»는 뜻이면 «1곳»(⑥)** 이다.
+★★**④⑤ 가 안전한 이유는 「프레임이 없다」가 «아니다»**(그 전제는 거짓) — `KtfClassLoader::as_proto()` 에 `findResource` 재정의가 **없고**
+그 인스턴스의 **부모가 시스템 로더**라(`jvm_support.rs:145-148` 첫 인자) 핀의 `ClassLoader::get_resource` 가 **parent 를 먼저 물어** 같은 것을 찾는다.
 
 **⒟ ★고른 길 = ⒝(우리 쪽 대체) — 그리고 ⒜(upstream 공개 요청)는 «필요 없다».**
 요청할 것이 없다: 공개 API 가 이미 있고, 그것이 비공개가 된 함수의 폴백과 같다.
