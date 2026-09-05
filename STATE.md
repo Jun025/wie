@@ -32,7 +32,7 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- **`rust.yml` 주석 목록 «한 벌»로** (`wie-rust-yml-header-single-source-point-to-agents-md`
+- **`rust.yml` 주석 목록 «한 벌»로** (PR **#86** 열림 · `wie-rust-yml-header-single-source-point-to-agents-md`
   · 채택 제안 `2026-09-05-rust-yml-header-beta-lint-line#p0`) — 주석의 명령 **6줄 삭제** →
   `AGENTS.md` §Definition of Done 의 「The four gates」를 **경로+절+«두 `sh` 블록»**까지 밝혀 가리킨다.
   ★주석 안 명령 목록 **6 → 0** · ★**CI 동작 변경 0**(비-주석 변경 0행 · 주석 제거 후 바이트 동일).
@@ -40,11 +40,23 @@
   ★★**과장하지 않는다**: 없앤 것은 «산문 사본 2 → 1» 이고 `steps:` 라는 기계 사본은 남는다 —
   문서↔steps 축은 파리티 검사기(`#p2`) 몫이라고 주석에 적었다. ★잠금은 ⒝(안 한다 — 대상이 사라졌다).
 - **`get_system_class_loader` 6곳 선이행** (PR **#83** 열림 · `wie-system-class-loader-preemptive-migration-six-sites` · 별 리니지)
-- **LGT 브라우저 검은 화면 «규명»** (PR **#85** 열림 · `wie-lgt-browser-canvas-paint-not-reaching-localize` · 별 리니지)
-  ★위 둘 다 `REPORT.md`·`STATE.md` 를 만진다 — 이 착지(#84)로 그쪽이 **원장 2파일 충돌**이 된다(코드 0).
-  각 게이트③이 **2-c⒜** 로 해소한다.
+  ★**위 둘이 `REPORT.md`·`STATE.md` 를 함께 만진다** — 먼저 착지하는 쪽이 나머지의 base 를 움직인다(2-c⒜ 범위 · 코드 충돌 0).
 
 ## 완료 (최근)
+- 2026-09-05: **LGT 브라우저 검은 화면 «규명»** (PR **#85** 착지 · `wie-lgt-browser-canvas-paint-not-reaching-localize`
+  · 채택 제안 `2026-09-05-roundtrip-ktf-key-reach-scenario#p0`) — ★**선행 서술이 반증됐다**:
+  프레임은 캔버스에 **닿는다**(`incoming_nonblack=424` · `draw_image ok`). ★**그 «직후» MIDP 가**
+  **비어 있는 screenImage 로 덮는다**(`disable_paint=false` → `incoming_nonblack=0`) ⇒ 마지막 프레임이 검정.
+  ★근인 = `card_canvas.rs` 가 `Class.getName()`(**점** `net.wie.CletWrapperCard`)을 **슬래시** 리터럴과 비교 ⇒
+  `disablePaint()` 영원히 미호출. KTF 카드는 `CletCard`(패키지 없음)라 우연히 매치된다.
+  ★반증 실험(원복함): 점 형식 1개 추가 → 브라우저 LGT **0 px → 424 px** · 네이티브 paints **83 → 55**(KTF 동일).
+  ★**고치지 않았다** — 수정은 다음 회차(제안 2건). 제품 코드 변경 **0**.
+  ★★**[게이트② 반려 `-fix`] KTF 의 «앞으로»를 적었다**: `CletCard` 는 **게스트에서 오는 이름**이라
+  카드 클래스에 **패키지가 붙는 순간 KTF 도 같은 형태로 깨진다** ⇒ ★처방 ⒜(점 형식 «추가»)는
+  그 **형식 취약성을 남긴다**. 제안 1 `tradeoff` + 왕복 검사 헤더 두 곳에 넣었다.
+  ★**착지 형태 = merge commit(부모 2개)** — `wie` 는 `contracts/upstream-sync-repos.conf:23` 등재라 스쿼시 금지.
+  ★형제 #84 착지로 `REPORT.md` 가 충돌했고 `-fix` 회차가 **머지로** 해소했다(코드 충돌 0) ·
+  착지 시점에 형제 **#83·#86** 이 열려 있다.
 - 2026-09-05: **`rust.yml` 머리 주석에 beta 린트 줄** (PR **#84** 착지 · `wie-rust-yml-header-comment-beta-lint-line`
   · 채택 제안 `2026-09-05-dod-four-gates-beta-axis#p0`) — 「로컬에서 돌려라」 목록이
   `rust.yml` **4** ↔ `AGENTS.md` **6** 으로 갈려 있었다(PR #81 이 문서 쪽에만 더했다).
