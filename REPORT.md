@@ -1,5 +1,17 @@
 # REPORT
 
+## [2026-09-05] 두 목록을 «명령 단위로» 일치시켰다 — 그리고 «잠그지 않기로» 정하고 사유를 적었다 (wie-rust-yml-header-comment-beta-lint-line)
+- **무엇을**: `.github/workflows/rust.yml` **머리 주석**의 「로컬에서 돌려라」 목록에 beta 2줄 추가 + 「Run all four」 → 「Run them all」 + ★**«잠금이 없다»를 주석 안에 리터럴로** 명시. ★`on:`·`jobs:`·`steps:` **무접촉** · 다른 주석·문서 무접촉.
+- **왜**: 운영자 채택 제안 `2026-09-05-dod-four-gates-beta-axis#p0` — 선행 회차(PR #81)가 `AGENTS.md` 에만 다섯째·여섯째 줄을 더해 **두 곳이 서로 다른 목록**을 말하게 됐다. ★**그 회차가 스스로 만든 구멍이고 스스로 제안으로 올린 것**이다.
+- **★⑴ 정말 갈렸다(전)**: `rust.yml` **4** (「Run all four locally」) ↔ `AGENTS.md` **6**(four gates + `rustup toolchain install beta --component clippy` + `cargo +beta clippy --all -- -D warnings`).
+- **★⑵ 후 — «글자로 일치»를 주장이 아니라 기계로 쟀다**: 양쪽에서 명령만 뽑아(`#   ` 접두·꼬리 주석 제거) `diff` → ★**출력 없음 · 각 6줄 · 순서 동일**. 문안은 **새로 쓰지 않고** `AGENTS.md` 것을 그대로 옮겼다(단 `# rust.yml:` 접두만 뺐다 — `rust.yml` 안에서 자기를 가리키게 되므로).
+- **★⑶ CI 동작 변경 0 을 수로 보였다**: 비-주석 변경 행 **0**(전 행이 `#`) · 주석·빈줄 제거 후 착지 전/후가 ★**바이트 동일** · `- run:|if:|uses:|name:` 줄 수 **11 ↔ 11**. ※`pyyaml` 부재로 파서 대조는 못 했고 그 사실을 적는다.
+- **★⑷ 주석 ↔ 실동작 정합**: `rust: [stable, beta]`(`:46`) · `toolchain: ${{ matrix.rust }}`(`:69`) ⇒ **6다리가 four gates 를 그대로** 친다. 로컬 대응물은 `cargo +beta clippy` 하나이고 `rustup toolchain install` 은 CI 에선 `dtolnay/rust-toolchain` 액션이 대신한다 ⇒ ★**주석이 «없는 것»을 안내하지 않는다.**
+- **★★⑸ 잠금 결정 = ⒝(잠그지 않는다) · 사유 셋**: ⑴이 회차 Non-goal 이 CI 변경 0 이라 **배선 없는 검사기**밖에 못 만드는데 그것은 «잠긴 것처럼 보이는데 안 도는» 것이라 없는 것보다 나쁘다 ⑵배선 없이 되는 길(`cargo test` 가 줍는 Rust `#[test]`)은 있으나 ★**이미 식별된 파리티 검사기 이식(`#p2`)과 충돌**한다(`AGENTS.md` 자신이 「Nothing like that is ported here」로 그 자리를 표시해 뒀다) ⑶구조적으로 더 나은 처방은 잠금이 아니라 **중복 제거**인데 이 티켓 계약 1 이 «더해서 일치»를 지시했다. ⇒ 두 갈래 다 **제안**으로 올렸다. ★**대신 «잠금 없음»을 주석에 리터럴로 적었다** — 다음 사람이 「검사가 잡아 주겠지」로 읽지 않도록.
+- **★⑹ 「잠금 0」도 실측이다**: `scripts/` 에서 `rust.yml` 을 읽는 파일 **0건** · `AGENTS.md` 를 «읽는» 스크립트 **0건**(히트 3건은 전부 주석 속 언급).
+- **사용자 영향**: 없음(주석). 대신 CI 파일을 먼저 여는 사람이 더 이상 **짧은 답**을 받지 않는다.
+- **★남는 구멍**: ★**여전히 사람이 동기화한다** — 이 회차가 고친 것은 «지금 갈린 것»이지 «다시 갈리는 것»이 아니다. 문장은 검사가 아니다.
+
 ## [2026-09-05] 브라우저 왕복에 KTF 키 «도달» Scenario E — 그리고 LGT 는 «키»가 아니라 «화면»에서 막혔다 (wie-browser-roundtrip-ktf-key-reach-scenario)
 - **무엇을**: `scripts/contract-roundtrip.mjs` 에 **Scenario E 신설**(검사 6개 · 왕복 **29 → 35 pass**) + 상수를 픽스처 소스에서 읽는 **파생 블록** + `engine-contract.yml` 관련성 필터 **1줄**. ★**제품 코드 0줄** · 기존 Scenario A~D **무접촉**.
 - **왜**: 운영자 채택 제안 `2026-09-05-ktf-lgt-key-reach-fixtures#p0` — 「Scenario A 는 KTF 를 부팅하지만 키는 «예외가 안 난다»만 본다. 이제 막대를 그리는 픽스처가 있다」.
