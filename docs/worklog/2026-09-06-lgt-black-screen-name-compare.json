@@ -1,0 +1,52 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-06",
+  "task": "wie-lgt-browser-paint-black-screen-name-compare",
+  "title": "LGT 검은 화면의 «근인» — `Class.getName()` 은 점 형식인데 슬래시 리터럴과 비교하고 있었다",
+  "adoptedProposals": ["2026-09-05-lgt-browser-paint-localize#p0"],
+  "summary": "LGT 게임이 브라우저에서 검게 보이던 근인을 고쳤다. `net/wie/CardCanvas::push_card` 가 `Class.getName()`(★**바이너리 이름 = 점**)을 «슬래시» 리터럴과 비교해 ★**`disablePaint()` 분기가 «한 번도» 돈 적이 없었고**, MIDP 가 빈 `screenImage` 로 매 프레임 덮어 마지막 프레임이 검정이었다. ★**처방은 제안이 제시한 ⒜(점 형식 «추가»)가 아니라 ⒝(정규화)** — ⒜는 지금의 두 이름만 맞추고 «형식 취약성»을 남긴다.",
+  "prescription-choice": "★**제안 원문이 «고르는 것이 그 회차의 일»이라고 명시**했고, 같은 문단이 ⒜의 대가까지 적어 뒀다: 「KTF 가 무사한 것은 «안전해서»가 아니라 그 게스트 클래스에 «패키지가 없어서»다 … 카드 클래스에 패키지가 붙는 순간 KTF 도 «같은 형태로» 깨진다」. ⇒ ★**⒝(정규화)를 골랐다** — `binary_name.replace('.', \"/\")` 로 내부 형식으로 접고 비교한다. ⒞(술어 교체)는 「가장 크고 가장 안전할 수 있다」였으나 ★**대체 술어가 무엇인지 제안이 말하지 않았고**, 이 회차 계약 3 이 «그 한 자리»로 범위를 못박았다 ⇒ 별건. ★**정규화는 «양방향»으로 안전하다**: 런타임이 점을 주든 슬래시를 주든 같은 값이 된다.",
+  "root-cause": "핀 소스 실측(`~/.cargo/git/checkouts/rustjava-*/5b84dd1/java_runtime/src/classes/java/lang/class.rs:68-75`): `Class::getName` 이 `JavaLangClass::name(...)` 을 받아 ★**`class_name.replace('/', \".\")`** 로 만든다 ⇒ LGT 카드는 **`net.wie.CletWrapperCard`**. 종전 비교는 `\"net/wie/CletWrapperCard\"` (슬래시)라 ★**항상 거짓**이었다.",
+  "changes": [
+    "`wie_wipi_java/src/classes/net/wie/card_canvas.rs` — 인라인 비교 2항을 `fn is_clet_card(binary_name: &str) -> bool` 로 빼고 **내부 형식으로 정규화**한 뒤 비교. 왜 그런지(핀의 `replace('/', \".\")` · KTF 가 «패키지 없음»으로 우연히 통과한다는 점)를 doc 주석에 적었다.",
+    "같은 파일 `#[cfg(test)] mod tests` **2건** — ⑴세 이름 형식(점·슬래시·무패키지)이 «전부» 매치 ⑵무관한 카드 4종이 «매치되지 않음»(`com.example.CletCard` 접미 매치 금지 포함). ★`cargo test --all` 이 6다리 전부에서 줍는다.",
+    "`scripts/contract-roundtrip.mjs` — ★**Scenario F 신설**(제안 ⑵가 지목한 자리). 헤더의 「왜 LGT 쌍둥이가 없는가」 10줄을 «시나리오 그 자체»로 교체하고, 사고 기록(순서 추적·근인·2026-09-06 처방)을 그 자리에 보존했다. 29 → **41 체크**."
+  ],
+  "verification": {
+    "branch-actually-runs": "★**계약 5 — 「그 분기가 실제로 도는가」를 «직접» 보였다**(픽셀 결과가 아니라 호출 계수로). 술어 = `RUST_LOG=debug … | grep -c 'Display::disablePaint'`(그 메서드에 이미 `tracing::debug!` 가 있어 코드를 건드리지 않았다). 실측: **수정 후** `keydraw_lgt` **1회** · `keydraw_ktf` **1회** / ★**개악(정규화 제거)** `keydraw_lgt` ★**0회** · `keydraw_ktf` **1회**. ⇒ ★**LGT 에서 그 분기는 정말로 «한 번도» 돈 적이 없었고, 이제 돈다.** KTF 는 두 형상에서 동일 = 변경이 «겨냥한 곳에만» 닿았다.",
+    "mutation-browser": "★**양방향 · 브라우저에서 실제로 돌렸다**(`npm run build:wasm` → `node scripts/contract-roundtrip.mjs`). **무개악** = `41/41 checks passed` · rc=0 · F 세 키 **280·336·424 px**. ★**개악(정규화 제거 · 종전 형상)** = rc=**1** · F 세 키 전부 ★**0 px**(415~494 프레임을 다 태우고 실패) · ★**E(KTF) 는 두 형상에서 green** ⇒ 시나리오가 «무는» 대상이 정확하다.",
+    "gates": "4게이트 + `cargo +beta clippy` 전건 rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` **152 passed / 0 failed**(종전 150 + 신규 2) · `check-engine-contract` rc=0 · `check-worklog-json` rc=0 · `check-worklog-coverage` rc=0 · `npm run audit` PASSED.",
+    "engine-runner": "★엔진 코드 회차라 저장소 러너도 돌렸다(AGENTS.md): `node scripts/make-draw-fixture.mjs` rc=0 → `wie_validate` 3픽스처 전건 `\"result\":\"PASS\"`."
+  },
+  "limits": [
+    "★**상용 LGT 코퍼스가 없다**(Constraint 9) ⇒ 확인은 **커밋된 픽스처 범위**에 머문다. 「LGT 게임이 보인다」는 `keydraw_lgt.zip` 이 그린 막대가 마지막 프레임까지 살아남는다는 뜻이고, 실제 게임의 화면을 본 것은 아니다.",
+    "★**`wie_validate` 는 이 계급의 결함을 «못 본다»** — 그 판정자 `saw_content` 가 **sticky any-frame** 술어라 ★«마지막 프레임»을 보지 않는다. 검은 화면이 있어도 PASS 다. ⇒ ★**Scenario F 가 유일한 회귀 그물**이고, 그래서 그 시나리오 주석에 「KEEP THIS SCENARIO」를 박았다.",
+    "★**단위시험은 «술어»만 잠근다** — `is_clet_card` 가 옳은 이름을 매치한다는 것이지, 그 분기가 실제로 화면을 살린다는 것은 아니다. 후자는 Scenario F 몫이다.",
+    "★**«이름으로 카드를 식별한다»는 설계 자체는 남아 있다**(제안의 ⒞ 축) — 정규화는 «형식» 취약성만 없앤다. 게스트가 다른 이름의 클렛 카드를 쓰면 여전히 안 걸린다."
+  ],
+  "adjacent-not-fixed": [
+    "★**`wie_validate` 의 any-frame 판정**(`saw_content`) — 「마지막 프레임」을 보지 않아 검은 화면을 PASS 로 낸다. ★이번 결함이 헤드리스에서 안 보인 이유가 정확히 이것인데, 계약 3(범위 고정)에 따라 **고치지 않았다**. 아래 제안 `#p0`.",
+    "★**`keydraw_{ktf,lgt}` 는 `wie_validate` 에서 `--inject` 없이는 FAIL 이다**(키를 기다리며 끝나지 않는다) — 두 형상 모두 FAIL 이라 이번 판정에 영향은 없었으나, 위 러너 3픽스처 목록에 그 둘이 없는 이유다. **고치지 않았다**.",
+    "★**`getName()` 결과를 비교하는 자리는 저장소에 «이 한 곳»뿐이다**(전수: `git grep -n 'getName' -- '*.rs'` → 2건 중 나머지는 `JarEntry::getName`). ⇒ 같은 함정의 «다른 자리»는 **없다**(제안 ⒝가 「먼저 재라」고 한 그 축을 쟀다)."
+  ],
+  "proposals": [
+    {
+      "title": "`wie_validate` 가 «마지막 프레임»을 보지 않는다 — 검은 화면을 PASS 로 낸다",
+      "plainSummary": "헤드리스 검사기는 「한 번이라도 뭔가 그렸으면 통과」로 판정합니다. 그래서 화면이 제대로 그려진 «뒤» 빈 화면으로 덮여도 통과가 나옵니다 — 이번 LGT 검은 화면이 정확히 그렇게 숨어 있었습니다.",
+      "userBenefit": "「사용자가 실제로 보는 화면」이 깨졌을 때 브라우저 시나리오 없이도 잡힙니다. 지금은 playwright 가 도는 자리에서만 보입니다.",
+      "why": "★실측(이 회차): 개악 형상에서 `wie_validate keydraw_lgt.zip` 은 «검은 화면인데도» 종전과 같은 판정을 냈고, 브라우저 Scenario F 만 0 px 로 잡았다. 판정자가 `saw_content` = **sticky any-frame** 이기 때문이다. ⇒ ★**헤드리스 그물에 «마지막 프레임» 축이 통째로 없다.**",
+      "tradeoff": "⑴「마지막 프레임」의 정의가 필요하다 — 종료하는 픽스처(`helloworld_*`)와 종료하지 않는 픽스처(`keydraw_*`)가 다르고, 후자는 `--inject` 가 있어야 의미가 생긴다 ⑵**기존 3픽스처의 판정이 바뀔 수 있다**(그중 하나는 「아무것도 그리지 않고 종료」다) ⇒ 축을 «추가»하되 기존 PASS 를 깨지 않게 해야 한다 ⑶★**미루는 대가는 실측됐다**: 이 결함은 브라우저 시나리오가 없었다면 **사용자 신고로만** 발견된다.",
+      "effort": "M — 판정자에 축 하나 추가 + 픽스처별 기대값 정의 + 개악 대조.",
+      "target": "wie · wie_cli/src/bin/wie_validate.rs"
+    },
+    {
+      "title": "클렛 카드 식별을 «클래스 이름»으로 하는 설계 자체를 걷어낼 것인가 (제안 ⒞ 의 잔여 축)",
+      "plainSummary": "지금은 카드가 «클렛의 것»인지 클래스 이름 두 개와 대조해 알아냅니다. 이름이 바뀌거나 새 카드가 생기면 또 놓칩니다.",
+      "userBenefit": "같은 계급의 고장이 «다시는» 안 납니다 — 이번 수정은 이름의 «형식»만 안전하게 만들었습니다.",
+      "why": "★이번 회차가 고른 것은 제안의 ⒝(정규화)이고, ⒞(술어 교체)는 「가장 크고 가장 안전할 수 있다」로 남아 있다. ★**정규화가 없애는 것은 «점/슬래시» 취약성뿐**이고 「이름 두 개를 하드코딩한다」는 성질은 그대로다. 대체 술어 후보: 카드가 `net/wie/CletWrapperCard` 의 **인스턴스인가**(`isInstance`) · 클렛 부팅 경로가 카드를 밀 때 **플래그를 세운다**.",
+      "tradeoff": "⑴대체 술어가 무엇인지 **제안도 말하지 않았다** — 설계가 먼저다 ⑵`CletCard`(KTF)는 ★**게스트에서 오는 클래스**라 우리가 정의한 타입이 아니다 ⇒ `isInstance` 한 벌로 둘을 덮지 못할 수 있다 ⑶★**지금 급하지 않다**: 정규화 + Scenario F 로 «현재 두 경로»는 잠겼고, 회귀는 브라우저가 잡는다.",
+      "effort": "M — 설계 + 두 경로(KTF/LGT) 각각의 실측.",
+      "target": "wie · wie_wipi_java/src/classes/net/wie/card_canvas.rs"
+    }
+  ]
+}

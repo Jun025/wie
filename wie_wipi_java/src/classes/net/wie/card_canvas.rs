@@ -12,6 +12,24 @@ use wie_midp::classes::{
 
 use crate::classes::org::kwis::msp::lcdui::{Card, Display};
 
+/// Is this the clet wrapper card, whose Java-level paint must be disabled?
+///
+/// `Class.getName()` hands back the BINARY name — the pinned runtime builds it with
+/// `class_name.replace('/', ".")` (`java_runtime/.../java/lang/class.rs`), so LGT's card arrives as
+/// `net.wie.CletWrapperCard`. Comparing that against a slash literal never matched, so the branch
+/// in `push_card` had never run once and MIDP kept overpainting the good WIPI frame with a blank
+/// `screenImage`: the browser showed a black screen while the emulator was working
+/// (measured 2026-09-05 — `incoming_nonblack=424` immediately followed by `=0`).
+///
+/// So normalise instead of adding a second literal. KTF's `CletCard` passes today only because it
+/// has no package — that name is a guest constant-pool string, so a packaged card class would
+/// break KTF the same way. Normalising is what removes the shape-dependence; a second literal
+/// would only have covered the two names that exist right now.
+fn is_clet_card(binary_name: &str) -> bool {
+    let internal = binary_name.replace('.', "/");
+    internal == "CletCard" || internal == "net/wie/CletWrapperCard"
+}
+
 #[repr(i32)]
 #[allow(clippy::upper_case_acronyms, non_camel_case_types)]
 #[derive(Copy, Clone)]
@@ -242,7 +260,7 @@ impl CardCanvas {
         let class_name: ClassInstanceRef<String> = jvm.invoke_virtual(&class, "getName", "()Ljava/lang/String;", ()).await?;
         let class_name_str = JavaLangString::to_rust_string(jvm, &class_name).await?;
 
-        if class_name_str == "CletCard" || class_name_str == "net/wie/CletWrapperCard" {
+        if is_clet_card(&class_name_str) {
             let wipi_display: ClassInstanceRef<Display> = jvm
                 .invoke_static("org/kwis/msp/lcdui/Display", "getDefaultDisplay", "()Lorg/kwis/msp/lcdui/Display;", ())
                 .await?;
@@ -312,5 +330,29 @@ impl CardCanvas {
         let _: () = jvm.invoke_virtual(&top_card, "notifyEvent", "(III)V", (r#type, param1, param2)).await?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_clet_card;
+
+    #[test]
+    fn both_name_shapes_match() {
+        // The shape the pinned runtime actually produces …
+        assert!(is_clet_card("net.wie.CletWrapperCard"));
+        // … and the internal one, so a runtime that stops rewriting `/` keeps working.
+        assert!(is_clet_card("net/wie/CletWrapperCard"));
+        // KTF's unpackaged card is shape-independent by accident; assert it stays matched.
+        assert!(is_clet_card("CletCard"));
+    }
+
+    #[test]
+    fn unrelated_cards_do_not_match() {
+        // Disabling Java-level paint for an ordinary card would blank a MIDP guest.
+        assert!(!is_clet_card("javax.microedition.lcdui.Canvas"));
+        assert!(!is_clet_card("net.wie.CletWrapper")); // the Jlet, not the Card
+        assert!(!is_clet_card("com.example.CletCard")); // suffix match must not be enough
+        assert!(!is_clet_card(""));
     }
 }

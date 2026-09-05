@@ -32,7 +32,15 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- (없음 — 열린 PR **0건**. `## 다음` 에서 고르라)
+- **LGT 검은 화면 «근인» 수정** (PR **#88** 열림 · `wie-lgt-browser-paint-black-screen-name-compare`
+  · 채택 제안 `2026-09-05-lgt-browser-paint-localize#p0`) — `Class.getName()` 은 **점**(핀이 `replace('/', ".")`)인데
+  `card_canvas.rs` 가 «슬래시» 리터럴과 비교해 ★**`disablePaint()` 분기가 한 번도 돈 적이 없었다** ⇒ MIDP 가 빈
+  `screenImage` 로 덮어 마지막 프레임이 검정.
+  ★**처방은 ⒜(점 형식 추가)가 «아니라» ⒝(정규화)** — ⒜는 지금의 두 이름만 맞추고 형식 취약성을 남긴다
+  (KTF 가 무사한 것은 그 게스트 클래스에 **패키지가 없어서**다).
+  ★**「분기가 실제로 도는가」를 호출 계수로 보였다**: 수정 후 LGT **1회** ↔ 개악 ★**0회**(KTF 는 둘 다 1회).
+  ★**브라우저 양방향**: 무개악 **41/41 rc=0** ↔ 개악 **rc=1 · F 세 키 0 px**. `contract-roundtrip.mjs` **Scenario F 신설**.
+  ★그물이 «그것뿐»이다 — `wie_validate` 는 sticky any-frame 이라 검은 화면을 PASS 로 낸다(별건 제안).
 
 ## 완료 (최근)
 - 2026-09-05: **`get_system_class_loader` 6곳 선이행** (PR **#83** 착지 · `wie-system-class-loader-preemptive-migration-six-sites`
