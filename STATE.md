@@ -32,9 +32,16 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- **`rust.yml` 머리 주석에 beta 린트 줄** (`wie-rust-yml-header-comment-beta-lint-line`
+  · 채택 제안 `2026-09-05-dod-four-gates-beta-axis#p0`) — 「로컬에서 돌려라」 목록이
+  `rust.yml` **4** ↔ `AGENTS.md` **6** 으로 갈려 있었다(PR #81 이 문서 쪽에만 더했다).
+  ⇒ 같은 2줄을 더해 ★**명령 6개·순서까지 기계 대조로 일치**. ★**CI 동작 변경 0**(주석 제거 후 바이트 동일).
+  ★★**잠금은 «하지 않기로» 정했다(⒝)** — 배선 없는 검사기는 「잠긴 것처럼 보이는데 안 도는」 것이고,
+  배선 없이 되는 길은 **파리티 검사기 이식(`#p2`)과 충돌**하며, 더 나은 처방은 **중복 제거**다(제안 2건).
+  ★대신 «잠금이 없다»를 주석에 **리터럴로** 적었다.
 - **`get_system_class_loader` 6곳 선이행** (PR **#83** 열림 · `wie-system-class-loader-preemptive-migration-six-sites` · 별 리니지)
-  ★`REPORT.md`·`STATE.md` 를 함께 만진다 — 이 착지(#82)로 그쪽이 다시 **원장 2파일 충돌**이 된다(코드 0).
-  그쪽 게이트③이 **2-c⒜** 로 해소한다.
+  ★위 회차와 #83 이 `REPORT.md`·`STATE.md` 를 함께 만진다 — 먼저 착지하는 쪽이 나머지의 base 를 움직인다
+  (각 게이트③이 **2-c⒜** 로 해소한다 · 코드 충돌 0).
 
 ## 완료 (최근)
 - 2026-09-05: **브라우저 왕복 KTF 키 «도달» Scenario E** (PR **#82** 착지 · `wie-browser-roundtrip-ktf-key-reach-scenario`
