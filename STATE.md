@@ -32,7 +32,13 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- **LGT 브라우저 검은 화면 «규명»** (PR **#85** 열림 · `wie-lgt-browser-canvas-paint-not-reaching-localize`
+- **`get_system_class_loader` 6곳 선이행** (PR **#83** 열림 · `wie-system-class-loader-preemptive-migration-six-sites` · 별 리니지)
+- **`rust.yml` 주석 목록 «한 벌»로** (PR **#86** 열림 · `wie-rust-yml-header-single-source-point-to-agents-md` · 별 리니지)
+  ★위 둘이 `REPORT.md`·`STATE.md` 를 만진다 — 이 착지(#85)로 그쪽이 **원장 파일 충돌**이 된다(코드 0).
+  각 게이트③이 **2-c⒜** 로 해소한다.
+
+## 완료 (최근)
+- 2026-09-05: **LGT 브라우저 검은 화면 «규명»** (PR **#85** 착지 · `wie-lgt-browser-canvas-paint-not-reaching-localize`
   · 채택 제안 `2026-09-05-roundtrip-ktf-key-reach-scenario#p0`) — ★**선행 서술이 반증됐다**:
   프레임은 캔버스에 **닿는다**(`incoming_nonblack=424` · `draw_image ok`). ★**그 «직후» MIDP 가**
   **비어 있는 screenImage 로 덮는다**(`disable_paint=false` → `incoming_nonblack=0`) ⇒ 마지막 프레임이 검정.
@@ -43,10 +49,9 @@
   ★★**[게이트② 반려 `-fix`] KTF 의 «앞으로»를 적었다**: `CletCard` 는 **게스트에서 오는 이름**이라
   카드 클래스에 **패키지가 붙는 순간 KTF 도 같은 형태로 깨진다** ⇒ ★처방 ⒜(점 형식 «추가»)는
   그 **형식 취약성을 남긴다**. 제안 1 `tradeoff` + 왕복 검사 헤더 두 곳에 넣었다.
-- **`get_system_class_loader` 6곳 선이행** (PR **#83** 열림 · `wie-system-class-loader-preemptive-migration-six-sites` · 별 리니지)
-  ★**위 둘이 `REPORT.md`·`STATE.md` 를 함께 만진다** — 먼저 착지하는 쪽이 나머지의 base 를 움직인다(2-c⒜ 범위 · 코드 충돌 0).
-
-## 완료 (최근)
+  ★**착지 형태 = merge commit(부모 2개)** — `wie` 는 `contracts/upstream-sync-repos.conf:23` 등재라 스쿼시 금지.
+  ★형제 #84 착지로 `REPORT.md` 가 충돌했고 `-fix` 회차가 **머지로** 해소했다(코드 충돌 0) ·
+  착지 시점에 형제 **#83·#86** 이 열려 있다.
 - 2026-09-05: **`rust.yml` 머리 주석에 beta 린트 줄** (PR **#84** 착지 · `wie-rust-yml-header-comment-beta-lint-line`
   · 채택 제안 `2026-09-05-dod-four-gates-beta-axis#p0`) — 「로컬에서 돌려라」 목록이
   `rust.yml` **4** ↔ `AGENTS.md` **6** 으로 갈려 있었다(PR #81 이 문서 쪽에만 더했다).
