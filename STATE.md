@@ -32,7 +32,11 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- **`rust.yml` 주석 목록 «한 벌»로** (PR **#86** 열림 · `wie-rust-yml-header-single-source-point-to-agents-md`
+- **`get_system_class_loader` 6곳 선이행** (PR **#83** 열림 · `wie-system-class-loader-preemptive-migration-six-sites` · 별 리니지)
+  ★**#86 이 먼저 착지했다**(아래 완료) ⇒ 이 PR 의 base 가 움직였다 — `REPORT.md`·`STATE.md` 재충돌은 **정상**이다(2-c⒜ 범위 · 코드 충돌 0).
+
+## 완료 (최근)
+- 2026-09-05: **`rust.yml` 주석 목록 «한 벌»로** (PR **#86** 착지 · `wie-rust-yml-header-single-source-point-to-agents-md`
   · 채택 제안 `2026-09-05-rust-yml-header-beta-lint-line#p0`) — 주석의 명령 **6줄 삭제** →
   `AGENTS.md` 의 `<!-- COMMIT-GATES:BEGIN … -->` ~ `:END` **마커 구간**을 가리킨다.
   ★★**[게이트② 반려 `-fix`] 초판의 「두 `sh` 블록」은 «거짓»이었다** — 그 소절엔 블록이 **4개**다
@@ -50,10 +54,6 @@
   이름 붙은 마커는 없어지면 `grep` 이 0건으로 **즉시** 답한다(**silent → loud**). 그래도 기계는 없다 —
   `engine-contract.yml` 필터에 `AGENTS.md`·`rust.yml` 이 **없어** 이 드리프트를 내는 PR 에선 어떤 in-filter 검사도
   돌지 않고, 상시 스텝 추가는 `steps:` 변경이라 이 티켓이 금지한다. ★**«알고» 남긴다.**
-- **`get_system_class_loader` 6곳 선이행** (PR **#83** 열림 · `wie-system-class-loader-preemptive-migration-six-sites` · 별 리니지)
-  ★**위 둘이 `REPORT.md`·`STATE.md` 를 함께 만진다** — 먼저 착지하는 쪽이 나머지의 base 를 움직인다(2-c⒜ 범위 · 코드 충돌 0).
-
-## 완료 (최근)
 - 2026-09-05: **LGT 브라우저 검은 화면 «규명»** (PR **#85** 착지 · `wie-lgt-browser-canvas-paint-not-reaching-localize`
   · 채택 제안 `2026-09-05-roundtrip-ktf-key-reach-scenario#p0`) — ★**선행 서술이 반증됐다**:
   프레임은 캔버스에 **닿는다**(`incoming_nonblack=424` · `draw_image ok`). ★**그 «직후» MIDP 가**
