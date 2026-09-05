@@ -1,14 +1,21 @@
 # The commands to run locally before committing — the four commit gates plus the
-# lint gate again on beta — are listed in EXACTLY ONE place:
+# lint gate again on beta — are listed in EXACTLY ONE place, between two markers:
 #
-#   AGENTS.md → "## Definition of Done" → "### The four gates (what `rust.yml`
-#   actually runs)". Both fenced `sh` blocks in that subsection are the list.
+#   AGENTS.md, the region delimited by
+#       <!-- COMMIT-GATES:BEGIN … -->   …   <!-- COMMIT-GATES:END … -->
+#   (in "## Definition of Done" → "### The four gates (what `rust.yml` actually
+#   runs)"). Grep the marker; do not count code blocks. The `sh` blocks BELOW the
+#   END marker in that same subsection are conditional extras — engine-code
+#   runner, PR CI read-back — not the commit-gate list.
 #
-# This header deliberately does NOT repeat them. It used to, and the two copies
-# drifted: on 2026-09-05 this file said four commands while AGENTS.md said six,
-# so whoever opened the CI file first got the shorter answer. That was fixed by
+# This header deliberately does NOT repeat the commands. It used to, and the two
+# copies drifted: on 2026-09-05 this file said four while AGENTS.md said six, so
+# whoever opened the CI file first got the shorter answer. That was fixed by
 # hand, and nothing machine-checks such a fix — so the copy was removed instead.
-# One list cannot disagree with itself.
+# One list cannot disagree with itself. (The first version of THIS pointer said
+# "both fenced sh blocks in that subsection", which was already wrong when
+# written — the subsection holds four. A count is a silent identifier; a named
+# marker fails loudly, which is why the markers exist.)
 #
 # What stays here is the part AGENTS.md does not carry: why this job is shaped
 # the way it is. (The steps below remain the enforcing copy — a doc/steps drift

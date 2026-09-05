@@ -1,7 +1,7 @@
 # REPORT
 
 ## [2026-09-05] 목록을 «한 벌»로 줄였다 — 갈릴 대상 자체를 없앤다 (wie-rust-yml-header-single-source-point-to-agents-md)
-- **무엇을**: `.github/workflows/rust.yml` 머리 주석의 **명령 6줄을 삭제**하고 ★**`AGENTS.md` → `## Definition of Done` → `### The four gates (what \`rust.yml\` actually runs)`** 를 «경로+절+«두 `sh` 블록이 목록이다»»까지 밝혀 가리킨다. ★`on:`·`jobs:`·`steps:` **무접촉** · `AGENTS.md` **무접촉**.
+- **무엇을**: `.github/workflows/rust.yml` 머리 주석의 **명령 6줄을 삭제**하고 ★**`AGENTS.md` 의 `<!-- COMMIT-GATES:BEGIN … -->` ~ `:END` 구간**을 가리킨다(경로+절+소절+**마커**). ★`on:`·`jobs:`·`steps:` **무접촉** · `AGENTS.md` **무접촉**.
 - **왜**: 운영자 채택 제안 `2026-09-05-rust-yml-header-beta-lint-line#p0`. 선행 회차가 두 목록을 **손으로** 일치시켰는데, ★**목록이 둘인 한 언젠가 다시 갈린다**(그 실사고가 2026-09-05 의 4↔6 이다). ⇒ ★**한 벌로 줄이면 갈릴 대상이 사라진다.**
 - **★⑴ 정본이 «정본일 만한가»를 먼저 쟀다**: `AGENTS.md` 6줄 ↔ CI 실동작을 자리마다 대조 — `fmt`↔`:96` · `clippy`↔`:97` · `wasm clippy`↔`:98` · `RUST_MIN_STACK … test`↔`:102-103`/`:107-108` · `cargo +beta clippy`↔`rust: [stable, beta]`(`:53`)×`toolchain: ${{ matrix.rust }}`(`:76`) 의 beta 다리가 `:97` 을 친다 · `rustup toolchain install` ↔ `dtolnay/rust-toolchain`+`components`(`:78`, **게이트가 아니라 전제**). ⇒ ★**6줄 전건 정합** — 정본이 틀렸으면 «가리키기»가 오히려 나빴을 자리인데 **틀리지 않았다**.
 - **★★⑵ Constraint 1 정합 판단 = «충족»**(제안이 지목한 자리 · 생략하지 않았다): 표 머리가 「Each row's **why** lives in the file that enforces it」이므로 `Locked by` 열이 요구하는 것은 ★**«목록»이 아니라 «why 의 거처»**다. ⑴그 행 자신이 이미 `(see Definition of Done)` 로 목록을 **가리킨다** ⑵실제로 enforce 하는 것은 주석이 아니라 `steps:`(무접촉) ⑶주석에 남은 **why 두 블록**(matrix · RUST_MIN_STACK)은 ★**이 파일에만 있고 그대로**다 ⇒ why-거처가 비지 않는다.
@@ -9,8 +9,10 @@
 - **★⑷ CI 동작 변경 0 을 수로**: 비-주석 변경 행 **0** · 주석·빈줄 제거 후 전/후 ★**바이트 동일** · `git diff --stat` **1파일 +13/−14**(전부 주석).
 - **★★⑸ 과장하지 않는다 — «한 벌»의 범위**: 없앤 것은 **산문 사본 2 → 1** 이고 `steps:` 는 여전히 **같은 명령의 «기계 사본»**이다 ⇒ ★**문서 ↔ steps 드리프트는 남는다.** 그 축이 파리티 검사기(`#p2`)의 몫이라는 것을 **주석 안에 한 문장으로** 적었다(다음 사람이 「이제 안전하다」로 읽지 않도록).
 - **★⑹ 잠금 = ⒝ 하지 않는다**: ★**이 회차가 «잠금이 지키려던 대상»을 제거했다** — 두 산문 목록의 일치를 감시할 검사는 이제 감시할 것이 없다. 남는 축은 다른 검사(`#p2`)이고, 이 회차 Non-goal 이 CI 변경 0 이라 배선할 자리도 없다.
+- **★★⑺ [`-fix`] 잠금을 «다시» 판단했다 — ⒝ 유지, 단 사유가 바뀌었다**: ⑴★**실패 모드를 바꿨다** — 「Both(=2)」는 대상이 4로 늘어도 **조용히** 틀렸지만, 이름 붙은 마커는 사라지면 `grep` 이 **0건**으로 즉시 답한다(**silent → loud**) ⑵★**그래도 기계는 없다 — 알고 남긴다**: `engine-contract.yml` 관련성 필터 16원소에 ★**`AGENTS.md` 도 `rust.yml` 도 없다** ⇒ 필터 안의 유일한 node 검사에 무엇을 넣어도 **이 드리프트를 내는 PR 에선 안 돈다**. 필터 밖 상시 스텝은 둘뿐이고 셋째 추가는 `steps:` 변경 = **이 티켓이 금지**한다 ⑶`cargo test` 가 줍는 Rust `#[test]` 는 CI 무접촉으로 가능하나 **`#p2` 와 같은 축**이고, 명령을 다시 적지 않고 주장할 불변식은 「마커가 있고 순서가 맞다」 정도로 얇아 ⑴이 이미 덮은 위험과 겹친다.
 - **부수**: `--workspace` 설명 문장도 지웠다 — `AGENTS.md` 목록 머리가 **같은 말**을 하고 있어 남기면 그것도 두 벌이 된다.
 - **사용자 영향**: 없음(주석). 대가는 **클릭 한 번**이고, 그것을 «다시 갈리지 않는 것»과 바꿨다.
+- **★★[게이트② 반려 `-fix`] 초판 로케이터의 「Both fenced `sh` blocks」는 «거짓»이었다** — 그 소절의 `sh` 블록은 **2가 아니라 4**다(내 재계수: ①four gates 4줄 ②beta 2줄 ③`wie_validate` 러너 4줄 ④`gh pr checks` 1줄 · §Definition of Done 절 전체로는 5). ★**하필 ③④도 «커밋 전에 돌릴 명령»이라 «4개 전부»를 목록으로 읽는 것이 자연스럽고**, 그러면 머리 주석 자신의 범위 선언과 어긋난다. ⇒ ★**«세는 식별자»를 버리고 `AGENTS.md` 에 `COMMIT-GATES:BEGIN/END` 마커를 넣어 «grep 하면 끝나는» 로케이터로 바꿨다**(목록 «내용» 무접촉 — 소절의 `sh` 블록 내용은 바이트 동일).
 - **★남는 구멍**: Constraint 1 의 `Locked by` 를 「목록이 있어야 한다」로 읽으면 이 회차를 되돌릴 수 있다 — 그 판단 근거를 워크로그 `constraint-1` 에 남겼다.
 
 ## [2026-09-05] LGT 화면은 «닿지 않은» 것이 아니라 «닿은 뒤 덮인다» — 슬래시/점 한 글자에서 끊긴다 (wie-lgt-browser-canvas-paint-not-reaching-localize)

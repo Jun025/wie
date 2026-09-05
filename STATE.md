@@ -34,11 +34,17 @@
 ## 진행중
 - **`rust.yml` 주석 목록 «한 벌»로** (PR **#86** 열림 · `wie-rust-yml-header-single-source-point-to-agents-md`
   · 채택 제안 `2026-09-05-rust-yml-header-beta-lint-line#p0`) — 주석의 명령 **6줄 삭제** →
-  `AGENTS.md` §Definition of Done 의 「The four gates」를 **경로+절+«두 `sh` 블록»**까지 밝혀 가리킨다.
+  `AGENTS.md` 의 `<!-- COMMIT-GATES:BEGIN … -->` ~ `:END` **마커 구간**을 가리킨다.
+  ★★**[게이트② 반려 `-fix`] 초판의 「두 `sh` 블록」은 «거짓»이었다** — 그 소절엔 블록이 **4개**다
+  (③`wie_validate` 러너 ④`gh pr checks` 도 «커밋 전 명령»이라 오독이 자연스럽다) ⇒ **세는 식별자를 버리고 마커로**.
   ★주석 안 명령 목록 **6 → 0** · ★**CI 동작 변경 0**(비-주석 변경 0행 · 주석 제거 후 바이트 동일).
   ★**Constraint 1 정합 = 충족** — 그 표의 `Locked by` 는 «why 의 거처»를 뜻하고 why 두 블록은 그대로다.
   ★★**과장하지 않는다**: 없앤 것은 «산문 사본 2 → 1» 이고 `steps:` 라는 기계 사본은 남는다 —
   문서↔steps 축은 파리티 검사기(`#p2`) 몫이라고 주석에 적었다. ★잠금은 ⒝(안 한다 — 대상이 사라졌다).
+  ★★**[`-fix`] 잠금 재판단 = ⒝ 유지 · 사유 교체** — 「Both(=2)」는 대상이 4로 늘어도 **조용히** 틀렸고
+  이름 붙은 마커는 없어지면 `grep` 이 0건으로 **즉시** 답한다(**silent → loud**). 그래도 기계는 없다 —
+  `engine-contract.yml` 필터에 `AGENTS.md`·`rust.yml` 이 **없어** 이 드리프트를 내는 PR 에선 어떤 in-filter 검사도
+  돌지 않고, 상시 스텝 추가는 `steps:` 변경이라 이 티켓이 금지한다. ★**«알고» 남긴다.**
 - **`get_system_class_loader` 6곳 선이행** (PR **#83** 열림 · `wie-system-class-loader-preemptive-migration-six-sites` · 별 리니지)
   ★**위 둘이 `REPORT.md`·`STATE.md` 를 함께 만진다** — 먼저 착지하는 쪽이 나머지의 base 를 움직인다(2-c⒜ 범위 · 코드 충돌 0).
 

@@ -47,6 +47,8 @@ Run these — not just `cargo clippy --workspace` — when you want local green 
 `--workspace` checks lib targets only in the default profile; CI additionally denies warnings and
 lints the wasm target, and the test run needs a raised stack.
 
+<!-- COMMIT-GATES:BEGIN — rust.yml's header comment points at this marked region; keep both markers -->
+
 ```sh
 cargo fmt --all -- --check                       # rust.yml: formatting gate
 cargo clippy --all -- -D warnings                # rust.yml: lint gate (warnings are errors)
@@ -66,6 +68,9 @@ exemption. The web-surface commands below are *additional* to these, never an al
 rustup toolchain install beta --component clippy   # re-run whenever beta rolls — install IS update
 cargo +beta clippy --all -- -D warnings            # rust.yml: the lint gate, again on beta
 ```
+
+<!-- COMMIT-GATES:END — the two `sh` blocks above are the commit-gate list. The `sh` blocks
+     BELOW this marker (wie_validate runner, gh pr checks) are conditional extras, not the list. -->
 
 `rust.yml`'s matrix is `[macos, ubuntu, windows] × [stable, beta]`, so all four gates above already
 run twice up there — but only the lint gate has ever caught anything on beta that stable missed.
