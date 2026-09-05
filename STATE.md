@@ -32,7 +32,10 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- **`get_system_class_loader` 6곳 선이행** (PR **#83** 열림 · `wie-system-class-loader-preemptive-migration-six-sites`
+- (없음 — 열린 PR **0건**. `## 다음` 에서 고르라)
+
+## 완료 (최근)
+- 2026-09-05: **`get_system_class_loader` 6곳 선이행** (PR **#83** 착지 · `wie-system-class-loader-preemptive-migration-six-sites`
   · 채택 제안 `2026-09-05-current-class-loader-replacement-design#p0`) — `+34` 에서 비공개가 되는 통로를
   **bump 없이** 지금 핀 위에서 갈아탔다(6줄 · `use` 변경 0). ★**값은 «6줄»이 아니라 «검증의 분리»다.**
   ★★**자리별 커버리지를 «심어서» 쟀더니 6곳 중 «1곳»만 커버된다** — ★**①** LGT 부팅만 red(123/1 · 픽스처 2건 FAIL) ·
@@ -72,10 +75,6 @@
   회신에 옮겨 적은 `'…|…'` 이 **0건**을 냈다(실행본은 `\|` 라 맞았고, **옮길 때 백슬래시를 떨어뜨렸다**).
   ⇒ 설계 워크로그 `proposals[0]` 의 **plainSummary·tradeoff** 2건을 마저 정정했다.
   ★처분 후 전수 25건 판정 = 무관 6 · 정정문 8 · 정정 부착 4 · 여전히 참 6 · 이번 처분 1 ⇒ **바레 주장 0**.
-  ★**#86 에 이어 #87 도 착지했다**(아래 완료) ⇒ 이 PR 의 base 가 또 움직였다 — `REPORT.md`·`STATE.md` 재충돌은 **정상**이다(2-c⒜ 범위 · 코드 충돌 0).
-  ★**#87 은 `wie_cli/tests/` 를 더했으므로 `*.rs` 충돌은 여전히 «없다»**(파일이 겹치지 않는다).
-
-## 완료 (최근)
 - 2026-09-05: **DoD ↔ `rust.yml` 파리티 잠금** (PR **#87** 착지 · `wie-dod-ci-parity-checker-port-from-rustjava`
   · 채택 제안 `2026-09-05-rust-yml-header-beta-lint-line#p1`) — RustJava 의 `check-dod-ci-parity.py` 를 «이식»했다.
   ★대조 대상은 형제 회차 #86 착지 «위에서» 정했다 — 「머리 주석 ↔ steps」가 아니라 ★**「`AGENTS.md` COMMIT-GATES 마커 구간 ↔ steps」**.
