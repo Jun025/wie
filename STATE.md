@@ -33,10 +33,11 @@
 
 ## 진행중
 - **`get_system_class_loader` 6곳 선이행** (PR **#83** 열림 · `wie-system-class-loader-preemptive-migration-six-sites` · 별 리니지)
-  ★**#86 이 먼저 착지했다**(아래 완료) ⇒ 이 PR 의 base 가 움직였다 — `REPORT.md`·`STATE.md` 재충돌은 **정상**이다(2-c⒜ 범위 · 코드 충돌 0).
+  ★**#86 에 이어 #87 도 착지했다**(아래 완료) ⇒ 이 PR 의 base 가 또 움직였다 — `REPORT.md`·`STATE.md` 재충돌은 **정상**이다(2-c⒜ 범위 · 코드 충돌 0).
+  ★**#87 은 `wie_cli/tests/` 를 더했으므로 `*.rs` 충돌은 여전히 «없다»**(파일이 겹치지 않는다).
 
 ## 완료 (최근)
-- 2026-09-05: **DoD ↔ `rust.yml` 파리티 잠금** (`wie-dod-ci-parity-checker-port-from-rustjava`
+- 2026-09-05: **DoD ↔ `rust.yml` 파리티 잠금** (PR **#87** 착지 · `wie-dod-ci-parity-checker-port-from-rustjava`
   · 채택 제안 `2026-09-05-rust-yml-header-beta-lint-line#p1`) — RustJava 의 `check-dod-ci-parity.py` 를 «이식»했다.
   ★대조 대상은 형제 회차 #86 착지 «위에서» 정했다 — 「머리 주석 ↔ steps」가 아니라 ★**「`AGENTS.md` COMMIT-GATES 마커 구간 ↔ steps」**.
   ★**정의**: 축 A = cargo 호출 «집합» · 축 B = toolchain 집합 · **두 축 독립**(교차곱 아님) · **순서는 파리티가 아니다**.
