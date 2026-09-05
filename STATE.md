@@ -32,12 +32,22 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- **브라우저 왕복 KTF 키 «도달» Scenario E** (PR **#82** 열림 · `wie-browser-roundtrip-ktf-key-reach-scenario` · 별 리니지)
 - **`get_system_class_loader` 6곳 선이행** (PR **#83** 열림 · `wie-system-class-loader-preemptive-migration-six-sites` · 별 리니지)
-  ★둘 다 `REPORT.md`·`STATE.md` 를 만진다 — 이 착지(#81)로 그쪽이 **원장 2파일 충돌**이 된다(코드 0).
-  각 게이트③이 **2-c⒜** 로 해소한다.
+  ★`REPORT.md`·`STATE.md` 를 함께 만진다 — 이 착지(#82)로 그쪽이 다시 **원장 2파일 충돌**이 된다(코드 0).
+  그쪽 게이트③이 **2-c⒜** 로 해소한다.
 
 ## 완료 (최근)
+- 2026-09-05: **브라우저 왕복 KTF 키 «도달» Scenario E** (PR **#82** 착지 · `wie-browser-roundtrip-ktf-key-reach-scenario`
+  · 채택 제안 `2026-09-05-ktf-lgt-key-reach-fixtures#p0`) — 왕복 **29 → 35 pass** · 제품 코드 **0줄**.
+  ★**D 가 못 보는 홉을 잰다**(KTF 는 `CardCanvas` 가 MIDP 코드를 WIPI 코드로 한 번 더 바꾼다) —
+  개악 ⒝(`KEY_NUM5 => Self::NUM1`)에서 ★**E 만 red · D 전건 green** 으로 독립을 실행으로 보였다.
+  ★상수는 픽스처 소스(`make-wipi-keydraw-fixture.sh`)에서 **파싱해 파생**하고 표류 시 fail-closed throw.
+  ★★**LGT 는 부분 완료 — 막은 것이 «키»가 아니다**: 키는 도달하는데(콘솔 `key:42`·`key:53`) 캔버스가 **0 px**.
+  순서·픽스처 배제(네이티브 `wie_validate --inject` 는 같은 zip 을 **PASS · paints 83**) ⇒ 축은
+  **LGT paint → WebScreen → canvas**. red 를 착지시키지 않고 «왜 없는가»를 헤더에 남기고 제안 1건.
+  ★**형제 #81 착지로 원장 2파일이 충돌했고** 이 게이트③이 **2-c⒜**(원장 한정 승인)로 합집합 해소했다(코드 충돌 0).
+  ★**착지 형태 = merge commit(부모 2개)** — `wie` 는 `contracts/upstream-sync-repos.conf:23` 등재라 스쿼시 금지.
+  ★착지 시점에 형제 **#83** 이 열려 있다(같은 원장 2파일 · 그쪽 게이트③이 해소한다).
 - 2026-09-05: **DoD 에 beta 축 한 줄** (PR **#81** 착지 · `wie-dod-four-gates-add-beta-axis` · 채택 제안 `2026-09-04-parity-sibling-repo-survey#p0`)
   — `AGENTS.md` §Definition of Done 에 `cargo +beta clippy --all -- -D warnings` 블록 1개. ★**코드 0 · CI 워크플로 0.**
   ★근거는 내가 다시 센 수다: `rust.yml` run **전량 246건**(`ac4ce1aa` 2026-06-24 → `11a35252` 2026-09-04) 중 실패 **34**,

@@ -1,5 +1,15 @@
 # REPORT
 
+## [2026-09-05] 브라우저 왕복에 KTF 키 «도달» Scenario E — 그리고 LGT 는 «키»가 아니라 «화면»에서 막혔다 (wie-browser-roundtrip-ktf-key-reach-scenario)
+- **무엇을**: `scripts/contract-roundtrip.mjs` 에 **Scenario E 신설**(검사 6개 · 왕복 **29 → 35 pass**) + 상수를 픽스처 소스에서 읽는 **파생 블록** + `engine-contract.yml` 관련성 필터 **1줄**. ★**제품 코드 0줄** · 기존 Scenario A~D **무접촉**.
+- **왜**: 운영자 채택 제안 `2026-09-05-ktf-lgt-key-reach-fixtures#p0` — 「Scenario A 는 KTF 를 부팅하지만 키는 «예외가 안 난다»만 본다. 이제 막대를 그리는 픽스처가 있다」.
+- **★⑴ D 가 못 보는 홉을 잰다**: KTF 게스트는 `CardCanvas` 가 MIDP 코드를 `WIPIKeyCode::from_midp_raw` 로 한 번 더 바꾼 **셋째 코드**를 받는다 ⇒ J2ME 로 재는 Scenario D 는 그 홉에 대해 **아무 말도 하지 않는다**. 그리고 브라우저는 헤드리스 Rust 시험이 못 지나는 층(**wasm 빌드 · glue · WebScreen → canvas**)을 함께 지난다.
+- **★⑵ 상수는 «한 곳»에서 파생시켰다**: `keydraw_ktf.zip` 은 커밋된 바이너리라 export 가 불가능하므로 **픽스처를 만드는 스크립트의 게스트 소스를 되읽는다**(`barH=8` · `KeyCode::X => N` 팔 21개). 위치자가 표류하면 **throw**(fail-closed). ★그리고 양성 WIPI 12행이 `contract.keyWipiCodes` 와 같은지를 **기동 시 검증**한다 — 단일 출처 주장을 문장이 아니라 기계로 만들었다.
+- **★★⑶ 개악 4칸 — 전부 실행 출력 · 전부 원복**: ⒜glue `key_down` no-op → **D 3 + E 3 이 «함께» red**(공유 경계) ⒝★**KTF 전용 홉만 오배선**(`KEY_NUM5 => Self::NUM1`) → ★**E 의 NUM5 만 red**(`392 px` = 49×8) · ★**D 전건 green** ⇒ **E 의 독립을 실행으로 보였다** ⒞`BAR_H` 개명 → fail-closed throw ⒟게스트 표 변조 → 「픽스처와 계약이 어긋난다」 throw. 무개악 재빌드 **35/35 rc=0**.
+- **★★⑷ LGT 는 «부분 완료» — 막은 것이 키가 아니었다**: 시나리오를 실제로 써서 돌렸더니 `platform_kind()=="LGT"` 는 ✓ 인데 3키 전건 **0 px**. ★**키는 도달한다** — 페이지 콘솔에 게스트 자신의 `key:42`·`key:53`(올바른 WIPI 코드). ★배제 둘: **순서**(첫 keydraw 인스턴스로 돌려도 0 px) · **픽스처**(네이티브 `wie_validate --inject` 는 같은 zip 을 **PASS · paints 83**). ⇒ 결함 축은 **LGT paint → WebScreen → canvas** 이고 픽셀 단언으로 표현할 수 없다 ⇒ ★**red 를 착지시키지 않고**(그러면 이 파일이 CI 에서 꺼진다) 제거 + **왜 없는지를 헤더에 기록** + 제안 1건.
+- **사용자 영향**: 없음(검사 추가). 대신 「5를 눌렀는데 KTF 게스트가 8을 받는다」류가 **브라우저 층까지 포함해** 커밋 전에 잡힌다. ★그리고 **LGT 화면이 브라우저에서 안 나올 수 있다**는 사실이 처음으로 측정됐다.
+- **★남는 구멍**: 단언 대상은 **양성 WIPI 코드**뿐이다(이름 키는 WIPI 공간에서 음수라 막대 폭이 될 수 없고, 게스트의 임의 슬롯표를 검사로 옮기면 **두 번째 진실원**이 생긴다 — 그 22행은 정적 §4c 가 진다). LGT blit 원인은 **모른다**(측정만 했다).
+
 ## [2026-09-05] DoD 에 beta 축 «한 줄» — 실패 34건 중 9건이 beta 단독이었고 그 9건이 전부 린트 게이트다 (wie-dod-four-gates-add-beta-axis)
 - **무엇을**: `AGENTS.md` §Definition of Done 에 beta 축 블록 1개(전제 `rustup toolchain install beta --component clippy` + 명령 `cargo +beta clippy --all -- -D warnings` + 이력·비용·선례). ★**코드 0줄 · CI 워크플로 0줄 · 파리티 검사기 포팅 0.**
 - **왜**: 운영자 채택 제안 `2026-09-04-parity-sibling-repo-survey#p0` — 「`rust.yml` 은 stable·beta **둘 다** 치는데 로컬 DoD 는 stable 만 적어 두었다」. 문자열 `beta` 가 `AGENTS.md`·`CLAUDE.md` 어디에도 **0건**이었다.
