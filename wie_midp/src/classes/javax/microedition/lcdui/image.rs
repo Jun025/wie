@@ -114,7 +114,15 @@ impl Image {
         let name = JavaLangString::to_rust_string(jvm, &name).await?;
 
         // get_system_class_loader, NOT current_class_loader: the latter goes private one
-        // commit past our pin, and the two coincide when the calling class has no loader of its own.
+        // commit past our pin. Here the two DIVERGE — measured, not assumed, and an earlier
+        // revision of this comment claimed the opposite. In the pin every method pushes a
+        // Java frame (proto methods included) and find_calling_class returns the TOP one, so
+        // while this Rust proto runs the calling class is `Image` itself — which
+        // RustJarClassLoader defines. current_class_loader therefore hands back
+        // RustJarClassLoader, whose findResource is the base ClassLoader's (always null) and
+        // whose parent is None: it can never resolve a guest resource, so this call used to
+        // throw IOException every time. The system URLClassLoader (parent=RustJar + the guest
+        // jar URLs) does resolve it. So this is NOT "no change" — it widens what the call sees.
         // NOT covered by any fixture — a planted panic!() here left the suite green
         // (measured 2026-09-05). Per-site table: docs/upstream-realign-verdict.md §8-4(3)-b.
         let class_loader = JavaLangClassLoader::get_system_class_loader(jvm).await?;
