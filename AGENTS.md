@@ -105,8 +105,13 @@ toolchains does *not* thrash — going back to stable right after beta took 0.50
 `CARGO_TARGET_DIR` is needed, and none is configured.
 
 The sibling `RustJava` repo hit this same gap and went further, mechanically diffing its documented
-gates against its workflows (`scripts/check-dod-ci-parity.py`). Nothing like that is ported here —
-this block is prose that a human keeps in sync, and a `rust.yml` matrix change will not notice it.
+gates against its workflows (`scripts/check-dod-ci-parity.py`). **That is now ported** — the marked
+region above is diffed against `rust.yml` by `wie_cli/tests/dod_ci_parity.rs`, which `cargo test
+--all` runs in all six legs, so a matrix change or a dropped gate reddens the next PR instead of
+waiting for someone to notice. It compares two sets and nothing else: the cargo commands, and the
+toolchains. What it deliberately does **not** see — the OS axis, the gate × toolchain cross
+product, the other workflows, and its own deletion — it prints on every run; read that block
+rather than trusting the word "green".
 
 **Touching engine code? The four gates are not enough — run the repo's own runner.**
 

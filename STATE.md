@@ -36,6 +36,16 @@
   ★**#86 이 먼저 착지했다**(아래 완료) ⇒ 이 PR 의 base 가 움직였다 — `REPORT.md`·`STATE.md` 재충돌은 **정상**이다(2-c⒜ 범위 · 코드 충돌 0).
 
 ## 완료 (최근)
+- 2026-09-05: **DoD ↔ `rust.yml` 파리티 잠금** (`wie-dod-ci-parity-checker-port-from-rustjava`
+  · 채택 제안 `2026-09-05-rust-yml-header-beta-lint-line#p1`) — RustJava 의 `check-dod-ci-parity.py` 를 «이식»했다.
+  ★대조 대상은 형제 회차 #86 착지 «위에서» 정했다 — 「머리 주석 ↔ steps」가 아니라 ★**「`AGENTS.md` COMMIT-GATES 마커 구간 ↔ steps」**.
+  ★**정의**: 축 A = cargo 호출 «집합» · 축 B = toolchain 집합 · **두 축 독립**(교차곱 아님) · **순서는 파리티가 아니다**.
+  ★**바꾼 가정 4개**: 정본 파일(`CLAUDE.md`→`AGENTS.md`) · 구간(첫 블록→마커 구간 전부) ·
+  게이트 판별자(`if:` 없음→**cargo 를 부르는가**) · 블록 스칼라(접기→**env 평탄화**).
+  ★**배선 = `cargo test --all` 이 줍는 `#[test]`** ⇒ ★**워크플로 잡·스텝 변경 0** · rust.yml **6다리 전부**에서 돈다.
+  ★**양방향 3종 실측**: 어긋남 **rc=101** · 무개악 **149 passed/0** · ★검사기 삭제 **rc=101**(2파일 구성의 이유).
+  ★**현 판정 green**(축 A 대칭차 0 · 축 B 일치) — 단 그것은 #86 이 손으로 맞춘 «뒤»의 값이고, 이 회차는 «유지 장치»다.
+  ★**천장 8개를 검사기가 매 실행 출력**한다(OS 축 · 교차곱 · 타 워크플로 · 비-cargo 게이트 · 동의어 · 손파서 · ★검사 자신의 삭제 · 순서).
 - 2026-09-05: **`rust.yml` 주석 목록 «한 벌»로** (PR **#86** 착지 · `wie-rust-yml-header-single-source-point-to-agents-md`
   · 채택 제안 `2026-09-05-rust-yml-header-beta-lint-line#p0`) — 주석의 명령 **6줄 삭제** →
   `AGENTS.md` 의 `<!-- COMMIT-GATES:BEGIN … -->` ~ `:END` **마커 구간**을 가리킨다.
