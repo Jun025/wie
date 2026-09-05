@@ -69,8 +69,9 @@ rustup toolchain install beta --component clippy   # re-run whenever beta rolls 
 cargo +beta clippy --all -- -D warnings            # rust.yml: the lint gate, again on beta
 ```
 
-<!-- COMMIT-GATES:END — the two `sh` blocks above are the commit-gate list. The `sh` blocks
-     BELOW this marker (wie_validate runner, gh pr checks) are conditional extras, not the list. -->
+<!-- COMMIT-GATES:END — everything the BEGIN marker encloses is the commit-gate list; nothing
+     outside it is. The `sh` blocks BELOW this marker (wie_validate runner, gh pr checks) are
+     conditional extras. Read the enclosed region; do not count blocks. -->
 
 `rust.yml`'s matrix is `[macos, ubuntu, windows] × [stable, beta]`, so all four gates above already
 run twice up there — but only the lint gate has ever caught anything on beta that stable missed.
