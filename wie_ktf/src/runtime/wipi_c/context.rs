@@ -92,7 +92,11 @@ impl WIPICContext for KtfWIPICContext {
     }
 
     async fn get_resource_size(&self, name: &str) -> Result<Option<usize>> {
-        let class_loader = self.jvm.current_class_loader().await.unwrap();
+        // get_system_class_loader, NOT current_class_loader: the latter goes private one
+        // commit past our pin, and the two coincide wherever there is no Java frame.
+        // NOT covered by any fixture — a planted panic!() here left the suite green
+        // (measured 2026-09-05). Per-site table: docs/upstream-realign-verdict.md §8-4(3)-b.
+        let class_loader = JavaLangClassLoader::get_system_class_loader(&self.jvm).await.unwrap();
         let stream = JavaLangClassLoader::get_resource_as_stream(&self.jvm, &class_loader, name).await.unwrap();
 
         if stream.is_none() {
@@ -105,7 +109,11 @@ impl WIPICContext for KtfWIPICContext {
     }
 
     async fn read_resource(&self, name: &str) -> Result<Vec<u8>> {
-        let class_loader = self.jvm.current_class_loader().await.unwrap();
+        // get_system_class_loader, NOT current_class_loader: the latter goes private one
+        // commit past our pin, and the two coincide wherever there is no Java frame.
+        // NOT covered by any fixture — a planted panic!() here left the suite green
+        // (measured 2026-09-05). Per-site table: docs/upstream-realign-verdict.md §8-4(3)-b.
+        let class_loader = JavaLangClassLoader::get_system_class_loader(&self.jvm).await.unwrap();
         let stream = JavaLangClassLoader::get_resource_as_stream(&self.jvm, &class_loader, name)
             .await
             .unwrap()

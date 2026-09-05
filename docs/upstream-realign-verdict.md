@@ -707,10 +707,10 @@ git rev-list --count 5b84dd1..7dc1b90  →  1        ⇒ 우리 핀의 «바로 
 
 | # | 파일 | 무엇을 하려고 쓰나 | 대체 가능성 |
 |---|---|---|---|
-| 1 | `wie_lgt/src/emulator.rs:114` | 부팅 직후 게스트 jar 에서 **`binary.mod`** 를 연다 | ★**동일**(아래 ⒞ — 그 지점엔 게스트 프레임이 없다) |
-| 2·3 | `wie_lgt/src/runtime/wipi_c/context.rs:100·112` | WIPI C `get_resource_size`/`read_resource` | ★동일 |
-| 4·5 | `wie_ktf/src/runtime/wipi_c/context.rs:95·108` | 〃(KTF) | ★동일 |
-| 6 | `wie_midp/…/lcdui/image.rs:116` | MIDP `Image.createImage(String)` 의 리소스 열기 | 동일 — ★단 유일하게 «게스트 프레임 안»이다(⒞ 단서) |
+| 1 | `wie_lgt/src/emulator.rs:114` | 부팅 직후 게스트 jar 에서 **`binary.mod`** 를 연다 | ★**동일**(아래 ⒞ — 그 지점엔 **Java 프레임이 없다**. ★2026-09-05 `-fix5`: 종전 「«게스트» 프레임이 없다」는 판별식을 잘못 적은 것이다 — 판별식은 「스택에 Java 프레임이 있는가 · 그 클래스의 로더가 `None` 인가」다) |
+| 2·3 | `wie_lgt/src/runtime/wipi_c/context.rs:100·112` | WIPI C `get_resource_size`/`read_resource` | 동일로 «보인다» — ★**미측정**(`-fix` 2026-09-05: 그 자리를 부르는 게스트가 0건이라 확인할 지점이 없다) |
+| 4·5 | `wie_ktf/src/runtime/wipi_c/context.rs:95·108` | 〃(KTF) | 〃 **미측정** |
+| 6 | `wie_midp/…/lcdui/image.rs:116` | MIDP `Image.createImage(String)` 의 리소스 열기 | ★**갈린다**(2026-09-05 `-fix` 정정 — 초판 「동일」은 거짓 · 근거는 ⒢) |
 
 ★★**여섯 곳이 «전부» 똑같은 두 줄이다**: `current_class_loader()` 로 로더를 얻고 곧바로
 `JavaLangClassLoader::get_resource_as_stream(...)` 을 부른다. ⇒ ★**필요한 능력은 «현재 클래스로더»가 아니라
@@ -732,7 +732,16 @@ pub async fn current_class_loader(&self) -> Result<Box<dyn ClassInstance>> {
 }
 ```
 ⇒ ★**「게스트 프레임이 없거나, 있어도 그 클래스의 로더가 `None`」이면 두 API 는 «같은 값»을 돌려준다.**
-갈리는 경우는 **호출한 게스트 클래스가 자기 로더를 갖는 때**뿐이고, 그 자리는 위 표의 **6번 하나**다.
+갈리는 경우는 **호출 클래스가 자기 로더를 갖는 때**뿐이고, 그 자리는 위 표의 **6번 하나**다.
+★★**[정정 2026-09-05 `-fix`] 그 6번은 «갈릴 수 있다»가 아니라 «실제로 갈린다»** — 그리고 «호출 클래스»는
+게스트가 아니라 **프로토 자신**(`Image`)이다. 근거·측정은 ⒢ 의 정정 블록에 있다.
+★★★**[재도출 2026-09-05 `-fix5`] 바로 위 「그 자리는 6번 «하나»다」는 «수 하나로 적을 수 없다» — 뜻이 둘이다.**
+판별식은 「호출 클래스가 «게스트»인가」가 **아니라** 「스택에 Java 프레임이 있는가 · 그 클래스의 로더가 `None` 인가」다.
+자리별 재도출: ①프레임 없음 / ②③프레임 있음·로더 `None`(`wipi_c.rs:207·208`·`native_jvm.rs:1290` 전부 `register_class(…, None)`) /
+★**④⑤프레임 있음·로더 `net/wie/KtfClassLoader`**(`wie_ktf/…/interface.rs:186` `register_class(…, Some(ktf_class_loader))`) / ⑥`RustJarClassLoader`.
+⇒ ★**«다른 객체»를 준다는 뜻이면 «3곳»(④⑤⑥)**, ★**«리소스 해결이 갈린다»는 뜻이면 «1곳»(⑥)** 이다.
+★★**④⑤ 가 안전한 이유는 「프레임이 없다」가 «아니다»**(그 전제는 거짓) — `KtfClassLoader::as_proto()` 에 `findResource` 재정의가 **없고**
+그 인스턴스의 **부모가 시스템 로더**라(`jvm_support.rs:145-148` 첫 인자) 핀의 `ClassLoader::get_resource` 가 **parent 를 먼저 물어** 같은 것을 찾는다.
 
 **⒟ ★고른 길 = ⒝(우리 쪽 대체) — 그리고 ⒜(upstream 공개 요청)는 «필요 없다».**
 요청할 것이 없다: 공개 API 가 이미 있고, 그것이 비공개가 된 함수의 폴백과 같다.
@@ -750,14 +759,69 @@ wie_validate  draw_j2me PASS(booted+rendered) · helloworld_ktf PASS · hellowor
               keydraw_ktf/lgt --inject PASS(booted + rendered + survived input)
 원복 후 git status 빈 출력 · current_class_loader 6곳 복귀
 ```
-★`helloworld_lgt` 통과가 **1번 자리**(부팅 직후 `binary.mod` 열기)의 직접 증거이고,
-`keydraw_*`·`helloworld_ktf` 가 **2~5번**(WIPI 리소스)을 태운다.
+★★**[정정 2026-09-05 · 이행 회차 `wie-system-class-loader-preemptive-migration-six-sites`]
+초판의 이 문장 — 「`keydraw_*`·`helloworld_ktf` 가 **2~5번**(WIPI 리소스)을 태운다」 — 은 «거짓»이다.**
+★**근인은 술어다**: 「치환 후에도 139 passed / 5픽스처 PASS」는 «그 줄을 지났다»의 증거가 **아니다**
+— 지나지 않아도 같은 수가 나온다. 이행 회차가 **자리마다 `panic!()` 을 심어** 다시 쟀다:
 
-**⒢ ★남는 한 자리 — 숨기지 않는다.** **6번**(`Image.createImage(String)`)은 ★**스위트가 부르지 않는다**
-(`createImage` 를 호출하는 시험·픽스처 **0건** — 실측). ⇒ 그 자리는 «프로브로 확인된 것이 아니라 «논증»으로 남는다»:
-MIDP 게스트는 시스템(URL) 클래스로더가 적재하므로 두 API 가 같은 값을 준다(P1 의 `net/wie/Launcher` 수정이
-`getSystemClassLoader().loadClass(main)` 로 그것을 이미 쓴다). ★**커스텀 로더를 쓰는 게스트에서는 갈릴 수 있다** —
-이행 회차는 그 자리에 «픽스처 한 건»을 붙이거나, 최소한 이 단서를 커밋 메시지에 남겨라.
+★★**번호는 «위 ⒝ 표와 같다»**(2026-09-05 `-fix`): 초판의 이 표가 자리 번호를 **다시 매겨** 같은 절의 ⒝ 와
+1~5 가 전부 어긋나 있었다 — 「커버되는 자리는 3번」이 ⒝ 기준으로는 **미커버 자리**를 가리켰다.
+★**픽스처를 어느 자리에 붙일지를 그 번호로 고르면 정확히 «반대 자리»에 붙는다.** ⇒ ⒝ 순서로 되돌렸다.
+
+| # | 자리 | 심었을 때 | 커버 |
+|---|---|---|---|
+| 1 | `wie_lgt/src/emulator.rs:114` 부팅 `binary.mod` | ★**123 passed / 1 failed** · `helloworld_lgt` **FAIL** · `keydraw_lgt` **FAIL** | ★**예** |
+| 2 | `wie_lgt/…/wipi_c/context.rs:100` `get_resource_size` | 139/0 · 5/5 **무변화** | ★**아니오** |
+| 3 | `wie_lgt/…/wipi_c/context.rs:112` `read_resource` | 139/0 · 5/5 **무변화** | ★**아니오** |
+| 4 | `wie_ktf/…/wipi_c/context.rs:95` `get_resource_size` | 139/0 · 5/5 **무변화** | ★**아니오** |
+| 5 | `wie_ktf/…/wipi_c/context.rs:108` `read_resource` | 139/0 · 5/5 **무변화** | ★**아니오** |
+| 6 | `wie_midp/…/lcdui/image.rs:116` `Image.createImage(String)` | 139/0 · 5/5 **무변화** | ★**아니오** |
+
+⇒ ★**커버되는 자리는 «1곳»(★1번 = LGT 부팅)이지 «5곳»이 아니다.** 초판이 놓친 것은 6번 하나가 아니라 **다섯**이다.
+★**직접 증거로 서는 것은 `helloworld_lgt`·`keydraw_lgt` 가 태우는 1번뿐**이고, 그 자리는
+「Java 프레임이 없다」 갈래의 실증이다(부팅 직후라 게스트 프레임이 아직 없다 — 게이트② 재현: `same=true`).
+★**[어휘 정정 `-fix6`] 「게스트 프레임이 아직 없다」 → 정확히는 «Java 프레임이 아예 없다»** — ①은 `do_start` 이
+순수 Rust 라 프레임 자체가 없다. ★**«게스트»는 판별식이 아니다**(위 ⒢ 의 정정 · 이 자리는 ①에 한해 결론이 같다).
+★**WIPI-C 리소스 API(2·3·4·5)를 부르는 게스트가 이 저장소에 «없다»** — 커밋된 픽스처 5종 중 리소스를
+읽는 것이 0건이라, 값을 대조할 런타임 지점 자체가 생기지 않는다.
+
+**⒢ ★남는 자리 — ★[정정 2026-09-05] «한 자리»가 아니라 «다섯 자리»다**(위 ⒡ 의 표 · 번호는 ⒝ 와 같다).
+★**같은 성질이 2·3·4·5 에도 붙는다**(그쪽은 «게스트 프레임이 없다» 갈래라 논증이 더 세지만,
+«측정되지 않았다»는 사실은 동일하다). **6번**(`Image.createImage(String)`)은 ★**스위트가 부르지 않는다**
+(`createImage` 를 호출하는 시험·픽스처 **0건** — 실측).
+★★★**[정정 2026-09-05 · 게이트² 6회차 `-fix6`] 바로 위 괄호 「그쪽은 «게스트 프레임이 없다» 갈래」는 «거짓»이다** —
+★**같은 절 ⒞ 가 이미 재도출해 놓은 것과 어긋난다**(44줄 위): ★**②③은 프레임이 «있고» 로더가 `None` 이라 폴백**이고,
+★**④⑤는 프레임이 «있고» 로더가 `net/wie/KtfClassLoader` 라 폴백이 «아니다»**(부모=시스템 로더 위임으로 리소스 해결만 같다).
+★**그리고 판별식 어휘 자체가 폐기됐다** — 「호출 클래스가 «게스트»인가」가 아니라
+**「스택에 Java 프레임이 있는가 · 그 프레임 클래스의 로더가 `None` 인가」**다.
+★**이 자리가 가벼운 자리가 아니다**: 치환된 `.rs` **5곳**의 주석이 `§8-4(3)-b` 로 이 절을 가리키므로(★**예외는 ①`wie_lgt/src/emulator.rs` — 치환이 «한 줄»이라 주석이 «아예 없다»**)
+★**코드에서 출발한 독자가 도달하는 «첫 문장»이 반증된 전제**였다.
+★★**[정정 2026-09-05 · 게이트² 7회차 `-fix7`] 직전 회차가 여기에 쓴 「**6곳 전부**」는 «거짓»이었다** — 실측은 **5**다(@`3d69c938` 파일별: `wie_lgt/src/emulator.rs` **0** · `wie_lgt/…/wipi_c/context.rs` 2 · `wie_ktf/…/wipi_c/context.rs` 2 · `wie_midp/…/image.rs` 1). ★**그 수는 검수 회신의 문면을 «옮긴 것»이고 옮기면서 «다시 세지 않았다»** — `git grep -c` 한 번으로 갈렸다. ★**논지는 약해지지 않는다**: 5곳이어도 「코드에서 온 독자의 첫 문장」은 그대로 서고, ★**오히려 ①에는 앵커가 «없다»는 편이 더 정확하다**(그 자리는 문서로 가는 길이 아예 없다).
+★**「«측정되지 않았다»는 사실은 동일하다」는 그대로 참이다** — 바뀐 것은 «왜 그런가»의 귀속이지 커버리지 판정이 아니다.
+정본 = 이 절 **⒞ 의 재도출 블록** · `docs/worklog/2026-09-05-current-class-loader-replacement-design.json` 의
+`verification.public-replacement-exists`.
+
+★★**[정정 2026-09-05 · 게이트② 반려 `-fix`] 종전 이 자리의 문장 — 「MIDP 게스트는 시스템(URL) 클래스로더가
+적재하므로 두 API 가 «같은 값»을 준다」 — 은 «거짓»이다.** 그리고 이행 회차가 그 문장을 「그대로 유효」로
+**명시 존치**했다 — ★**그 문장은 다음 회차의 bump 판단 근거가 된다.** 핀 소스 실측:
+`jvm/src/jvm.rs` 의 `execute_method` 는 ★**모든** 메서드에 `push_java_frame(class, …)` 를 밀고
+`find_calling_class` 는 `top_java_frame()` 을 돌려준다 ⇒ **프로토(러스트) 메서드가 도는 동안 최상단 Java 프레임의
+클래스는 «게스트»가 아니라 «그 프로토 자신»(`Image`)** 이고, `Image` 는 `RustJarClassLoader::find_class` →
+`find_rustjar_class` → `register_class(class, Some(this))` 경로로 ★**`RustJarClassLoader` 가 정의**한다
+⇒ 갈래 ⑵가 잡혀 «자기 로더»가 돌아온다. 「게스트가 시스템 로더로 적재된다」는 참이지만
+★**그 게스트는 프레임 «위에» 없다.** (게이트② 실측도 같다: `ccl=org/rustjava/lang/RustJarClassLoader` ↔
+`scl=java/net/URLClassLoader` · `same=false` · 대조군 1번은 `same=true`.)
+★★**그런데 이것은 회귀가 아니라 «잠재 수정»이다**: `RustJarClassLoader` 프로토는 `<init>`·`findClass` **둘뿐**이라
+`findResource` 는 기반 `java/lang/ClassLoader` 것(★**항상 `Ok(None)`**)을 쓰고 `parent` 는 `None` 으로 만들어진다
+(`class_loader.rs` 의 `new_class("org/rustjava/lang/RustJarClassLoader", …, (class_path_array, None))`)
+⇒ ★**그 로더의 `getResourceAsStream` 은 무엇을 물어도 null 이다** ⇒ 종전 6번 경로는 게스트 리소스를
+**영원히 못 찾았고**(= `createImage` 가 항상 `IOException`), 새 경로는 시스템 `URLClassLoader`
+(parent=RustJar + 게스트 jar URL)로 **실제로 찾는다**.
+⇒ ★**그러므로 6번의 치환은 «무변경»이 아니라 «가시 범위를 시스템 로더로 넓히는 것»이다.**
+★**코드는 되돌리지 않는다** — 되돌릴 것은 서술이었다.
+
+★**커스텀 로더를 쓰는 게스트에서는 그 «넓힘»이 다르게 보일 수 있다** — 회귀 그물은 여전히 0이므로
+픽스처 한 건이 그 자리를 덮어야 한다(후속 제안).
 
 **⒣ ★계단은 유지된다 — 이 벽을 넘으면 다음은 `+47`이다.** `ba5797b`(+47)의 `invoke_virtual` 이
 `class_name` 인자를 얻어 **209곳**(누적 **≥222**)을 깨뜨린다 — 위 표 5번 칸 그대로다.

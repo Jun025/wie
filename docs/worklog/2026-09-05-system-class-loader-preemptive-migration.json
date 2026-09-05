@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "date": "2026-09-05",
+  "task": "wie-system-class-loader-preemptive-migration-six-sites",
+  "title": "«검증을 분리했다» — 6곳을 지금 핀 위에서 선이행 · 그리고 «5곳은 아무 픽스처도 지나지 않는다»를 측정으로 밝혔다",
+  "services": [
+    "engine"
+  ],
+  "summary": "다음 업스트림 칸(`+34`)에서 `Jvm::current_class_loader` 가 비공개가 된다. 공개 통로 `JavaLangClassLoader::get_system_class_loader` 가 **현재 핀에서도 `pub`** 이므로 6곳을 **bump 없이** 미리 갈아탔다 — 6줄 · import 추가 0. ★★**[정정 · 게이트② 반려 `-fix`] 초판의 「동작 변경 의도 0 / 두 API 가 같은 값」은 «거짓»이었다** — ⑥번은 **갈리고**, 그 갈림은 «회귀»가 아니라 **잠재 수정**이다(아래 `divergence-at-6`). ★**이 회차의 값은 «6줄»이 아니라 «검증의 분리»다**: 나중에 bump 와 함께 하면 회귀가 나도 «핀 탓인지 이행 탓인지» 가릴 수 없다. ★★**그리고 급소를 하나 잡았다** — 설계 회차가 「`keydraw_*`·`helloworld_ktf` 가 2~5번 자리를 태운다」고 적었는데, **자리마다 `panic!()` 을 심어 다시 재니 «거짓»이었다**: 커버되는 자리는 **6곳 중 1곳**(LGT 부팅)뿐이다. 「139 passed / 5픽스처 PASS」는 치환 «전에도» 같은 수라 **«그 줄을 지났다»의 증거가 아니다.**",
+  "changes": [
+    "6곳 치환(4파일 · 각 1줄): `wie_ktf/src/runtime/wipi_c/context.rs` **2** · `wie_lgt/src/runtime/wipi_c/context.rs` **2** · `wie_lgt/src/emulator.rs` **1** · `wie_midp/src/classes/javax/microedition/lcdui/image.rs` **1**. ★`use` 줄 변경 **0**(`JavaLangClassLoader` 가 네 파일 모두 이미 import — diff 에 `use` 줄 0).",
+    "★**미커버 5자리에 단서 주석**(계약 3⒝) — 4줄짜리 한 덩어리 × 3파일(자리 5곳). 커버된 3번 자리(`wie_lgt/src/emulator.rs`)에는 **붙이지 않았다**(측정으로 서니 단서가 필요 없다).",
+    "★**`docs/upstream-realign-verdict.md` §8-4⑶-b ⒡·⒢ 인라인 정정** — 초판의 「2~5번을 태운다」를 «거짓»으로 표시하고 **자리별 표**를 박았다. ⒢의 「남는 «한» 자리」도 「«다섯» 자리」로 고쳤다.",
+    "★**업스트림 bump 0** · 로더 기전 변경 0 · 그 밖 리팩터 0 · 머지 0."
+  ],
+  "verification": {
+    "premise-1-pub": "★**`get_system_class_loader` 는 현재 핀에서 `pub` 이다**(성립 전제 — 아니면 이 회차는 없다). 핀 체크아웃 `~/.cargo/git/checkouts/rustjava-b78e8f47b488d719/5b84dd1` 실측: `jvm/src/runtime/java_lang_class_loader.rs:10` `pub async fn get_system_class_loader(jvm: &Jvm) -> Result<Box<dyn ClassInstance>>`. 대비: `jvm/src/jvm.rs:980` `pub async fn current_class_loader(&self)` — 이쪽이 `+34`(`7dc1b90`)에서 `pub` 를 잃는다.",
+    "premise-2-count": "★**정확히 6곳 · 4파일**(제안과 일치). `git grep -n 'current_class_loader' -- '*.rs'` → 6행: `wie_ktf/…/context.rs:95,108` · `wie_lgt/src/emulator.rs:114` · `wie_lgt/…/context.rs:100,112` · `wie_midp/…/image.rs:116`. 치환 후 잔존 **0건**.",
+    "premise-3-same-value": "★**«이름이 비슷하다»로 넘기지 않았다 — 핀의 함수 전문을 읽었다.** `current_class_loader` 는 세 갈래다: ⑴호출 클래스가 `ClassLoader` 하위면 그 인스턴스 ⑵호출 클래스의 로더가 `Some(x)` 면 `x` ⑶**그 밖(로더가 `None` · 또는 Java 프레임이 아예 없음)이면 `JavaLangClassLoader::get_system_class_loader(self)` 를 «그대로» 부른다**. ⇒ ★**대체는 «우회»가 아니라 그 함수 자신의 폴백**이고, 갈리는 것은 ⑴⑵ 경우뿐이다. 1~5번은 게스트 Java 프레임이 없는 자리(부팅·WIPI-C 콜백)로 «보이고», 6번은 프레임 «안»이다. ★★**[정정 · `-fix`] 6번은 그 «안»이라서 실제로 갈린다 — 그리고 그 프레임의 클래스는 «게스트»가 아니라 «프로토 자신»이다**(아래 `divergence-at-6`). ★2~5번의 「프레임 없음」 전제는 **미측정**이다(그 자리를 부르는 게스트가 0건이라 확인할 지점이 없다). ★★**[정정 2026-09-05 · 게이트² 6회차 `-fix6`] 그 전제는 이제 «미측정»이 아니라 «측정돼 거짓»이다** — ②③은 `net/wie/CletWrapper::startApp`(Java 메서드) «안»에서 `core.run_function` 으로 ARM 을 동기 실행하고, ④⑤는 KTF `main` 아래 전 구간이라 ★**넷 다 Java 프레임이 «있다»**. 갈래는 프레임 유무가 아니라 **그 클래스의 로더**가 가른다(②③ `None` ⇒ 폴백 · ④⑤ `net/wie/KtfClassLoader` ⇒ 부모 위임). ⇒ ★**「1~5번은 게스트 Java 프레임이 없는 자리」라는 위 문장도 함께 철회한다.** 미측정으로 남는 것은 «넓어진 가시 범위가 무엇을 찾는가» 하나다.",
+    "coverage-drill": "★★**이 회차의 급소 — 자리마다 `panic!()` 을 심어 red 가 나는지 실행으로 쟀다**(계약 2). 무개악 기준선은 치환 «전»·«후»가 **똑같이 139 passed / 0 failed · wie_validate 5/5** 라, 그 수만으로는 아무것도 증명되지 않는다. 결과: ★**① LGT 부팅 `binary.mod` → 123 passed / 1 failed · `helloworld_lgt` FAIL · `keydraw_lgt` FAIL = 커버** · **② LGT `get_resource_size` → 139/0 · 5/5 무변화 = 미커버** · **③ LGT `read_resource` → 무변화 = 미커버** · **④ KTF `get_resource_size` → 무변화 = 미커버** · **⑤ KTF `read_resource` → 무변화 = 미커버** · **⑥ MIDP `Image.createImage(String)` → 무변화 = 미커버**. ⇒ ★**6곳 중 «1곳»만 커버된다.** ★★**[정정 · `-fix`] 번호는 `§8-4⑶-b` 의 «⒝ 표»와 같게 맞췄다** — 초판이 다시 매겨 같은 절 안에서 1~5 가 어긋나 있었고, 그 번호로 픽스처 자리를 고르면 **반대 자리에 붙는다**. 드릴 후 `git grep 'COVERAGE PROBE'` **0건**(전건 원복).",
+    "design-doc-was-wrong": "★★**설계 회차(§8-4⑶-b⒡)의 「`keydraw_*`·`helloworld_ktf` 가 2~5번을 태운다」는 «거짓»이다** — 그 회차는 «치환 후에도 스위트가 green» 을 «그 줄을 지났다»로 읽었다. ★**그 술어는 지나지 않아도 green 이다.** 놓친 자리는 6번 하나가 아니라 **다섯**이었다. 문서를 인라인 정정하고 표를 박았다 — ★**착지하는 문서가 «검증됐다»고 말하는데 아니면, 다음 사람이 그 위에서 판단한다.**",
+    "why-no-fixture": "★**미커버 5자리를 ⒝(단서)로 닫은 이유 — 「비싸다」가 아니라 «무엇이 필요한지»를 적는다**(계약 3). ⒜를 고르려면 ⑴**②③④⑤** 는 WIPI-C 리소스 API(`get_resource_size`/`read_resource`)를 **부르는 게스트**가 필요한데, 커밋된 픽스처 5종 중 리소스를 읽는 것이 **0건**이다 ⇒ `scripts/make-wipi-keydraw-fixture.sh` 계열로 `dlunch/wipi` 를 클론해 새 예제를 주입하고 **nightly + `thumbv4t-none-eabi` + `-Zbuild-std`** 로 ktf·lgt **2종을 새로 빌드·커밋**해야 한다(부모 회차 하나가 통째로 그 일이었다) ⑵**⑥번** 은 J2ME 게스트가 `Image.createImage(String)` 를 부르고 jar 에 이미지 리소스가 들어 있어야 하는데, `scripts/make-draw-fixture.mjs` 는 **JVM 바이트코드를 손으로 조립**한다 ⇒ 호출 1개 추가가 상수풀·메서드 조립 변경이다. ⇒ ★**이 회차의 목적(검증 «분리»)과 별 축**이라 나누고, 제안으로 올렸다.",
+    "divergence-at-6": "★★**[게이트② 반려 `-fix` · critical] ⑥번은 «같은 값»이 아니라 «갈린다» — 내가 핀 소스를 다시 읽어 확인했다**(검수 회신을 베끼지 않았다). ⑴`jvm/src/jvm.rs` 의 `execute_method` 는 ★**모든** 메서드에 `push_java_frame(class, …)` 를 민다(프로토/러스트 메서드에 대한 예외 분기 **없음**) ⑵`find_calling_class`(`:685-692`)는 `top_java_frame()` 을 돌려준다 ⇒ ★**프로토가 도는 동안 «호출 클래스»는 게스트가 아니라 그 프로토 자신(`Image`)** 이다 ⑶`Image` 는 `RustJarClassLoader::find_class` → `runtime.find_rustjar_class` → `jvm.register_class(class, Some(this))` 로 ★**`RustJarClassLoader` 가 정의**한다 ⇒ `current_class_loader` 의 갈래 ⑵가 잡혀 **자기 로더**가 돌아온다(게이트② 실측 `ccl=org/rustjava/lang/RustJarClassLoader` ↔ `scl=java/net/URLClassLoader` · `same=false` · 대조군 ①번 `same=true`). ★★**그런데 회귀가 아니라 «잠재 수정»이다**: `RustJarClassLoader::as_proto()` 의 메서드는 `<init>`·`findClass` **둘뿐**이라 `findResource` 는 기반 `java/lang/ClassLoader::find_resource`(★**항상 `Ok(None)`**)를 쓰고, 그 인스턴스는 `new_class(\"org/rustjava/lang/RustJarClassLoader\", …, (class_path_array, None))` 로 **parent=None** 이며 `ClassLoader::get_resource` 는 parent → `findResource` 순으로만 찾는다 ⇒ ★**그 로더의 `getResourceAsStream` 은 무엇을 물어도 null** ⇒ 종전 ⑥ 경로는 게스트 리소스를 **영원히 못 찾았다**(= `createImage` 가 항상 `IOException`). 새 경로인 시스템 `URLClassLoader`(parent=RustJar + 게스트 jar URL)는 **실제로 찾는다**. ⇒ ★**코드는 되돌리지 않는다. 되돌린 것은 «서술» 세 곳(+⒝ 표 1칸)이다.**",
+    "before-after": "★**치환 «전»과 «후»를 나란히 적는다**(계약 4 — 한쪽만 적으면 위 함정을 회신이 재생산한다). **전(main 형상)**: `cargo test --all` **139 passed / 0 failed** · `wie_validate` **5/5**(`draw_j2me`·`helloworld_ktf`·`helloworld_lgt` + `keydraw_ktf`·`keydraw_lgt` **--inject**) — **후(치환+주석)**: **139 passed / 0 failed** · **5/5**. ⇒ ★**두 수가 같다는 것이 «동작 무변경»의 증거이자 «커버리지 부재»의 증거다** — 그래서 위 드릴이 필요했다.",
+    "gates": "`cargo fmt --all -- --check` rc=0 · `cargo clippy --all -- -D warnings` rc=0 · `cargo clippy --target wasm32-unknown-unknown -- -D warnings` rc=0 · ★`cargo +beta clippy --all -- -D warnings` rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` **139/0** · `wie_validate` **5픽스처 전건 PASS**."
+  },
+  "limits": [
+    "★★**6자리 중 5자리는 «측정되지 않았다» — 이 PR 을 그렇게 읽어라.** 근거는 코드 논증(핀 함수의 폴백 갈래)이고, 실행 증거는 **①번 한 곳**이다. 그 ①번이 「Java 프레임이 없다」 갈래의 실증이라(게이트② 재현 `same=true`) ②③④⑤ 의 논증을 **같은 형태로** 뒷받침하지만, ★**뒷받침은 측정이 아니다.** ★★**[정정 2026-09-05 · 게이트² 6회차 `-fix6`] 「②③④⑤ 의 논증을 «같은 형태로» 뒷받침한다」는 «거짓»이다** — ①은 프레임이 **아예 없는** 자리이고 ②③④⑤ 는 **전부 프레임이 있다**(②③ 로더 `None` ⇒ 폴백 · ④⑤ 로더 `net/wie/KtfClassLoader` ⇒ 폴백이 «아니라» 부모 위임). ⇒ ★**①은 ②③ 의 «갈래»를 예시할 뿐이고 ④⑤ 는 «다른 갈래»다.** 「5자리 미측정」이라는 커버리지 판정 자체는 **그대로 참**이다. 정본 = `docs/upstream-realign-verdict.md` §8-4⑶-b ⒞ 재도출 블록.",
+    "★★**[정정 · 게이트② 반려 `-fix`] ⑥번에 대한 초판의 이 한계 서술 — 「현 경로에서는 같지만 커스텀 로더에서는 갈릴 수 있다」 — 도 «거짓»이었다.** ⑥은 **지금 갈린다**(아래 `divergence-at-6`). 남는 진짜 한계는 다른 것이다: 그 자리를 **부르는 시험·픽스처가 0건**이라 «넓어진 가시 범위»가 실제로 무엇을 찾는지는 **런타임으로 확인되지 않았다**.",
+    "★**bump 는 안 했다 — 그것이 이 회차의 «분리»가 사라지는 길이다.** 핀은 `dlunch/RustJava@5b84dd1` 그대로이고, 이 착지로 `+34` 칸의 파열 호출부가 **6 → 0** 이 된다(다음 칸 `+47` 의 209곳은 이 설계가 줄여 주지 않는다).",
+    "★**«동작이 바뀌지 않았다»는 ①~⑤ 에만 해당한다**: `wie_validate` 5픽스처가 **부팅+렌더+입력 생존**까지 보므로 ①번은 확실하고, ②③④⑤ 는 «호출되지 않으므로 바뀔 것도 없다»가 정확한 서술이다 — 게스트가 그 API 를 부르는 순간 처음 실행된다. ★**⑥은 다르다 — 바뀐다.**"
+  ],
+  "issues": [],
+  "proposals": [
+    {
+      "title": "WIPI 리소스 픽스처 한 건 — 지금 «아무 시험도 지나지 않는» 4자리를 태워라",
+      "plainSummary": "게임이 자기 파일 안의 데이터(이미지·사운드 같은 리소스)를 읽는 통로가 네 군데 있는데, 저장소의 시험용 게임 중 그 통로를 쓰는 것이 하나도 없다. 그래서 그 코드가 망가져도 시험은 전부 통과한다.",
+      "userBenefit": "리소스를 읽는 실제 게임에서만 터지는 회귀를 커밋 전에 잡는다. 지금은 그 회귀가 CI 를 전부 통과한다.",
+      "why": "실측(2026-09-05 · 이 회차의 드릴): `wie_ktf/…/wipi_c/context.rs:95·108` 과 `wie_lgt/…/wipi_c/context.rs:100·112` 에 `panic!()` 을 심어도 `cargo test --all` **139 passed / 0 failed** · `wie_validate` **5/5** 로 **아무 변화가 없다**. ★커밋된 픽스처 5종 중 WIPI 리소스 API 를 부르는 것이 **0건**이라 그 네 줄은 «실행된 적이 없다».",
+      "tradeoff": "⑴`scripts/make-wipi-keydraw-fixture.sh` 와 **같은 레시피**를 쓴다(핀된 `dlunch/wipi` 클론 → 예제 주입 → nightly + `thumbv4t-none-eabi` + `-Zbuild-std` → 아카이브) ⇒ 레시피는 이미 있고 **ktf·lgt 2종 zip 이 새로 커밋**된다(게임 바이트 아님 · Constraint 9 무관). ⑵그 스크립트가 이미 `examples/resources/<name>` 디렉터리를 만들고 있어 리소스 동봉 경로가 열려 있을 가능성이 높다 — ★**먼저 그것부터 확인하라**(아니면 아카이버 축이 추가된다). ⑶4자리를 한 픽스처로 덮을 수 있다(ktf·lgt 각 2자리).",
+      "effort": "S~M — 부모 회차(`wie-ktf-lgt-drawing-fixtures-for-key-reach-assertions`)와 같은 크기.",
+      "target": "wie · scripts/make-wipi-keydraw-fixture.sh + test_data/"
+    },
+    {
+      "title": "`Image.createImage(String)` 픽스처 — ⑥의 «갈림»은 측정됐고, «넓어진 가시 범위가 무엇을 찾는가»가 미측정이다",
+      "plainSummary": "게임이 이름으로 이미지를 여는 통로가 시험에서 한 번도 실행되지 않는다. ★이 통로는 이번 변경으로 **지금 실제로 달라졌다** — 종전에는 그 이름으로 무엇을 물어도 «못 찾음»이었고 이제는 시스템 로더가 찾는다. 그 «찾음»이 실제로 어떤 파일을 열어 주는지는 아직 아무도 돌려 보지 못했다.",
+      "userBenefit": "「이미지를 못 불러온다」류 고장을 커밋 전에 잡는다 — 지금은 그 경로에 시험이 **0개**다. ★그리고 이 자리는 6곳 중 **유일하게 동작이 달라진 자리**라, 회귀 그물이 없는 채로 남기기에 가장 나쁜 칸이다.",
+      "why": "실측: `image.rs:116` 에 `panic!()` 을 심어도 스위트·5픽스처가 **전건 통과**한다(회귀 그물 0). ★★**그리고 이 자리는 «갈릴 수 있는» 자리가 아니라 «지금 갈리는» 자리다** — `execute_method` 가 **모든** 메서드에 Java 프레임을 밀고 `find_calling_class` 가 `top_java_frame()` 을 주므로, 프로토가 도는 동안 «호출 클래스»는 게스트가 아니라 **프로토 자신(`Image`)** 이고 그것을 **`RustJarClassLoader` 가 정의**한다 ⇒ `current_class_loader` 는 그 로더를 주는데 **그 로더의 `getResourceAsStream` 은 항상 null** 이다(`findResource` = 기반 구현 `Ok(None)` · `parent` = `None`). ⇒ 종전 경로는 **영원히 못 찾았고**(= 항상 `IOException`) 새 경로(시스템 `URLClassLoader`)는 찾는다. ★**갈림 «자체»는 측정됐다**(`verification.divergence-at-6` · 게이트② 실측 `same=false`) — ★**미측정인 것은 «넓어진 가시 범위가 실제로 무엇을 찾는가»** 하나다. 이 제안은 그것을 닫는다.",
+      "tradeoff": "⑴`scripts/make-draw-fixture.mjs` 가 **JVM 바이트코드를 손으로 조립**하므로 호출 1개 추가가 상수풀·메서드 조립 변경이다(작지 않다) ⑵jar 안에 이미지 리소스도 넣어야 한다 ⑶★★**「커스텀 로더 게스트가 없으면 두 API 가 같으니 값이 낮다」는 «거짓»이다** — 그 전제는 이 워크로그의 `limits[1]`·`verification.divergence-at-6` 이 철회했다. 갈림은 **커스텀 로더 «없이» 지금** 일어나므로 ★**값은 «낮은» 게 아니라 «높다»**: 6곳 중 **유일하게 동작이 달라진 칸**인데 회귀 그물이 **0**이다. ⑷상용 코퍼스가 없어(Constraint 9) 확인은 **커밋된 픽스처 범위**에 머문다.",
+      "effort": "M — 바이트코드 조립기 변경 + 리소스 동봉.",
+      "target": "wie · scripts/make-draw-fixture.mjs + wie_midp"
+    },
+    {
+      "title": "WIPI-C 4자리의 `the two coincide wherever there is no Java frame` 주석 — 조건절은 참인데 «그 자리에서 전제가 거짓»이다",
+      "plainSummary": "엔진 소스 4곳에 「이 자리엔 자바 호출 흔적이 없으니 두 통로가 같다」는 주석이 달려 있는데, 실제로는 그 자리들 전부 자바 호출 «안»에서 돌고 있습니다. 결론(두 통로가 같은 파일을 찾는다)은 맞지만 «이유»가 틀려서, 다음 사람이 그 이유를 믿고 판단하면 어긋납니다.",
+      "userBenefit": "겉으로 달라지는 것은 없습니다. 대신 다음에 이 통로를 손대는 사람이 «틀린 이유»를 근거로 안전하다고 판단하는 일을 막습니다.",
+      "why": "★실측(이 회차): ②③은 `net/wie/CletWrapper::startApp` 이라는 Java 메서드 «안»에서 `core.run_function(start_clet)` 로 ARM 을 동기 실행하므로 프레임이 **있고**, ④⑤는 KTF 앱 전 구간이 `invoke_static(\"org/kwis/msp/lcdui/Main\",\"main\")` 아래서 돌아 **항상 있다**. ⇒ 「wherever there is no Java frame」의 조건절 자체는 참이나 ★**그 네 자리에서 전제가 성립하지 않는다**. ②③이 안전한 진짜 이유는 「그 클래스의 로더가 `None`(`register_class(…, None)`)이라 폴백 갈래로 떨어진다」이고, ④⑤는 「로더가 `KtfClassLoader` 라 **객체는 다르지만** `findResource` 재정의가 없고 **부모가 시스템 로더**라 `get_resource` 가 parent 로 위임한다」이다. ★두 사유가 서로 다른데 한 문장이 넷을 덮고 있다.",
+      "tradeoff": "★**코드 동작 변경 0 — 주석 4줄뿐이다.** 그런데 `*.rs` 를 만지므로 4게이트 6다리 + coverage 를 한 바퀴 돌린다(문서 회차보다 비싸다). ⇒ ★**다른 `*.rs` 회차에 얹어 태우는 것이 싸다.** ★반대로 미루는 대가: 이 주석은 «호출부 바로 위»에 있어 다음 사람이 가장 먼저 읽는 자리이고, 이 리니지가 다섯 회차를 쓴 원인이 정확히 「반증된 전제가 서술로 남아 이월된다」였다.",
+      "effort": "S — 4파일 4줄. 사유가 ②③(로더 `None`)과 ④⑤(부모 위임)로 갈리므로 «두 문장»으로 나눠 쓴다.",
+      "target": "wie_lgt/src/runtime/wipi_c/context.rs:101·117 · wie_ktf/src/runtime/wipi_c/context.rs:96·113"
+    }
+  ],
+  "adoptedProposals": [
+    "2026-09-05-current-class-loader-replacement-design#p0"
+  ],
+  "declinedProposals": []
+}
