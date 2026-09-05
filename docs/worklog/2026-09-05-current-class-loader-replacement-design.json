@@ -31,10 +31,10 @@
   "proposals": [
     {
       "title": "6곳을 «지금 핀 위에서» `get_system_class_loader` 로 이행한다 — `+34` 벽을 0으로 만들어 두는 선이행",
-      "plainSummary": "엔진이 게임 파일 속 리소스를 열 때 쓰는 통로가 다음 업스트림 판본에서 «비공개»가 됩니다. 그런데 공개된 같은 값의 통로가 지금도 있어서, 업그레이드 «전»에 미리 갈아타 두면 나중에 올릴 때 고칠 곳이 0이 됩니다.",
+      "plainSummary": "엔진이 게임 파일 속 리소스를 열 때 쓰는 통로가 다음 업스트림 판본에서 «비공개»가 됩니다. 그런데 공개된 대체 통로가 지금도 있어서, 업그레이드 «전»에 미리 갈아타 두면 나중에 올릴 때 고칠 곳이 0이 됩니다. ★★**[정정 2026-09-05 · 이행 회차 `-fix2`/`-fix3`] 초판의 「공개된 «같은 값»의 통로」는 «거짓»이다** — 6곳 중 **⑥(`Image.createImage(String)`)에서는 두 통로가 «갈린다»**(그리고 그 갈림은 «회귀»가 아니라 **잠재 수정**이다 — 종전 통로로는 리소스를 영원히 못 찾았다). 정본 = `docs/worklog/2026-09-05-system-class-loader-preemptive-migration.json` 의 `verification.divergence-at-6` · `docs/upstream-realign-verdict.md` §8-4⑶-b⒢.",
       "userBenefit": "업스트림 따라잡기가 한 칸 싸진다 — 그리고 그 칸에서 «엔진 동작이 바뀌는지»를 업그레이드와 «분리해» 검증할 수 있다(둘이 섞이면 어느 쪽이 깨뜨렸는지 못 가린다).",
       "why": "★이 회차의 프로브가 이미 통과했다 — 6곳을 치환해 `cargo test --all` **139 passed / 0 failed** · `wie_validate` **5픽스처 전건 PASS** 를 받고 원복했다. `get_system_class_loader` 는 **현재 핀에서도 `pub`** 이므로 bump 없이 착지한다. ⇒ 남은 일은 «그 스왑을 되살려 PR 로 내는 것»과 6번 자리(`Image.createImage(String)`)의 단서를 처리하는 것뿐이다.",
-      "tradeoff": "6곳 중 1곳(`image.rs`)은 스위트가 부르지 않아 **프로브로 확인되지 않았다** ⇒ 그 회차는 ⒜픽스처 한 건을 붙이거나 ⒝단서를 커밋 메시지에 남기는 선택을 해야 한다. 반대로 미루면 나중에 «bump + 6곳 이행»이 한 PR 에 얽혀, 회귀가 나도 어느 쪽 탓인지 가릴 수 없다.",
+      "tradeoff": "6곳 중 1곳(`image.rs`)은 스위트가 부르지 않아 **프로브로 확인되지 않았다** ⇒ 그 회차는 ⒜픽스처 한 건을 붙이거나 ⒝단서를 커밋 메시지에 남기는 선택을 해야 한다. 반대로 미루면 나중에 «bump + 6곳 이행»이 한 PR 에 얽혀, 회귀가 나도 어느 쪽 탓인지 가릴 수 없다. ★★**[정정 2026-09-05 · `-fix2`/`-fix3`] 그 1곳(⑥)은 «미검증»에 그치지 않았다 — 실제로 «동작이 갈린다».** 이행 회차가 핀 소스로 확인했다: 프로토가 도는 동안 «호출 클래스»는 게스트가 아니라 **프로토 `Image` 자신**이고 그것을 **`RustJarClassLoader`** 가 정의하므로 `current_class_loader` 는 그 로더를 주는데, 그 로더의 `getResourceAsStream` 은 **항상 null** 이다 ⇒ 종전 ⑥ 경로는 리소스를 **영원히 못 찾았다**. ⇒ ★**선택지는 ⒜/⒝ 가 아니라 「이 치환이 «가시 범위를 넓힌다»는 사실을 적고, 그 넓힘이 무엇을 찾는지는 아직 미측정임을 남기는 것」**이었다(이행 회차가 그렇게 했다).",
       "effort": "S — 6줄 치환(각 1줄) · import 추가 0(이미 있다) · 검증은 기존 스위트 + `wie_validate` 5픽스처.",
       "target": "wie_lgt/src/emulator.rs · wie_lgt/src/runtime/wipi_c/context.rs · wie_ktf/src/runtime/wipi_c/context.rs · wie_midp/src/classes/javax/microedition/lcdui/image.rs"
     }
