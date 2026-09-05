@@ -385,19 +385,28 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     e.emu.free();
     check("E: free() (no throw)", true);
 
-    // ── Why there is no LGT twin of Scenario E (measured 2026-09-05) ──────────
+    // ── Why there is no LGT twin of Scenario E (localized 2026-09-05) ─────────
     // keydraw_lgt.zip is built from the SAME guest source by the same script, so
-    // the constants above would hold unchanged and the scenario is ~10 lines.
-    // It was written, run, and REMOVED because it fails for a reason that is not
-    // about keys: in the browser the LGT instance boots (platform_kind "LGT") and
-    // the key DOES reach the guest — the page console carries the fixture's own
-    // `key:42` / `key:53`, the right WIPI codes — but the canvas stays at 0 px
-    // over ~300-700 frames. Ruled out: instance ordering (0 px as the first
-    // keydraw instance too) and the fixture (`wie_validate --inject` on the same
-    // zip natively reports PASS with 83 paints, vs 55 for the KTF one).
-    // So the gap is LGT paint -> WebScreen -> canvas, not key delivery, and a
-    // pixel-based assertion cannot express it. Landing a red check to document a
-    // separate defect would just disable this whole file. See the worklog.
+    // the constants above would hold unchanged and the scenario is ~10 lines. It
+    // was written, run, and REMOVED because it fails for a reason that is not
+    // about keys — the LGT canvas stays at 0 px while KTF reaches 424.
+    //
+    // CORRECTION. The first version of this note said "the gap is LGT paint ->
+    // WebScreen -> canvas". Staged probes on both hosts disproved that: the LGT
+    // frame DOES reach the canvas. The ordered browser trace is
+    //   MC_grpFlushLcd -> WebScreen::paint(incoming_nonblack=424) -> draw_image ok
+    //   Display::handle_paint_event disable_paint=false
+    //                  -> WebScreen::paint(incoming_nonblack=0)   -> draw_image ok
+    // i.e. the good WIPI frame is painted and then OVERWRITTEN by MIDP's blank
+    // screenImage, so the last frame — the one you see — is black. KTF runs the
+    // same trace with disable_paint=true and no trailing blank blit.
+    // Root cause: net/wie/CardCanvas only calls Display.disablePaint() when the
+    // card class is "CletCard" or "net/wie/CletWrapperCard", and LGT's card
+    // reports Class.getName() as "net.wie.CletWrapperCard" — dots, not slashes,
+    // so the comparison never matches. (KTF's card is "CletCard", no package,
+    // which is why only LGT is hit.) Adding the dot form flips LGT to 424 px in
+    // the browser and its native paints 83 -> 55, exactly matching KTF.
+    // The fix is a separate round; this file stays a checker, not a patch.
   } catch (e) {
     check("scenario aborted by exception", false, (e && e.stack) || String(e));
   }

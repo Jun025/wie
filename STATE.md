@@ -32,6 +32,14 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- **LGT 브라우저 검은 화면 «규명»** (`wie-lgt-browser-canvas-paint-not-reaching-localize`
+  · 채택 제안 `2026-09-05-roundtrip-ktf-key-reach-scenario#p0`) — ★**선행 서술이 반증됐다**:
+  프레임은 캔버스에 **닿는다**(`incoming_nonblack=424` · `draw_image ok`). ★**그 «직후» MIDP 가**
+  **비어 있는 screenImage 로 덮는다**(`disable_paint=false` → `incoming_nonblack=0`) ⇒ 마지막 프레임이 검정.
+  ★근인 = `card_canvas.rs` 가 `Class.getName()`(**점** `net.wie.CletWrapperCard`)을 **슬래시** 리터럴과 비교 ⇒
+  `disablePaint()` 영원히 미호출. KTF 카드는 `CletCard`(패키지 없음)라 우연히 매치된다.
+  ★반증 실험(원복함): 점 형식 1개 추가 → 브라우저 LGT **0 px → 424 px** · 네이티브 paints **83 → 55**(KTF 동일).
+  ★**고치지 않았다** — 수정은 다음 회차(제안 2건). 제품 코드 변경 **0**.
 - **`get_system_class_loader` 6곳 선이행** (PR **#83** 열림 · `wie-system-class-loader-preemptive-migration-six-sites` · 별 리니지)
   ★`REPORT.md`·`STATE.md` 를 함께 만진다 — 이 착지(#82)로 그쪽이 다시 **원장 2파일 충돌**이 된다(코드 0).
   그쪽 게이트③이 **2-c⒜** 로 해소한다.
