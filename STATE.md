@@ -32,7 +32,7 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- **`get_system_class_loader` 6곳 선이행** (`wie-system-class-loader-preemptive-migration-six-sites`
+- **`get_system_class_loader` 6곳 선이행** (PR **#83** 열림 · `wie-system-class-loader-preemptive-migration-six-sites`
   · 채택 제안 `2026-09-05-current-class-loader-replacement-design#p0`) — `+34` 에서 비공개가 되는 통로를
   **bump 없이** 지금 핀 위에서 갈아탔다(6줄 · `use` 변경 0). ★**값은 «6줄»이 아니라 «검증의 분리»다.**
   ★★**자리별 커버리지를 «심어서» 쟀더니 6곳 중 «1곳»만 커버된다** — ★**①** LGT 부팅만 red(123/1 · 픽스처 2건 FAIL) ·
@@ -56,11 +56,27 @@
   회신에 옮겨 적은 `'…|…'` 이 **0건**을 냈다(실행본은 `\|` 라 맞았고, **옮길 때 백슬래시를 떨어뜨렸다**).
   ⇒ 설계 워크로그 `proposals[0]` 의 **plainSummary·tradeoff** 2건을 마저 정정했다.
   ★처분 후 전수 25건 판정 = 무관 6 · 정정문 8 · 정정 부착 4 · 여전히 참 6 · 이번 처분 1 ⇒ **바레 주장 0**.
-- **`rust.yml` 주석 목록 «한 벌»로** (PR **#86** 열림 · `wie-rust-yml-header-single-source-point-to-agents-md` · 별 리니지)
-  ★위 둘이 `REPORT.md`·`STATE.md` 를 만진다 — 먼저 착지하는 쪽이 나머지의 base 를 움직인다(코드 0).
-  각 게이트③이 **2-c⒜** 로 해소한다.
+  ★**#86 이 먼저 착지했다**(아래 완료) ⇒ 이 PR 의 base 가 움직였다 — `REPORT.md`·`STATE.md` 재충돌은 **정상**이다(2-c⒜ 범위 · 코드 충돌 0).
 
 ## 완료 (최근)
+- 2026-09-05: **`rust.yml` 주석 목록 «한 벌»로** (PR **#86** 착지 · `wie-rust-yml-header-single-source-point-to-agents-md`
+  · 채택 제안 `2026-09-05-rust-yml-header-beta-lint-line#p0`) — 주석의 명령 **6줄 삭제** →
+  `AGENTS.md` 의 `<!-- COMMIT-GATES:BEGIN … -->` ~ `:END` **마커 구간**을 가리킨다.
+  ★★**[게이트② 반려 `-fix`] 초판의 「두 `sh` 블록」은 «거짓»이었다** — 그 소절엔 블록이 **4개**다
+  (③`wie_validate` 러너 ④`gh pr checks` 도 «커밋 전 명령»이라 오독이 자연스럽다) ⇒ **세는 식별자를 버리고 마커로**.
+  ★주석 안 명령 목록 **6 → 0** · ★**CI 동작 변경 0**(비-주석 변경 0행 · 주석 제거 후 바이트 동일).
+  ★**Constraint 1 정합 = 충족** — 그 표의 `Locked by` 는 «why 의 거처»를 뜻하고 why 두 블록은 그대로다.
+  ★★**과장하지 않는다**: 없앤 것은 «산문 사본 2 → 1» 이고 `steps:` 라는 기계 사본은 남는다 —
+  문서↔steps 축은 파리티 검사기(`#p2`) 몫이라고 주석에 적었다. ★잠금은 ⒝(안 한다 — 대상이 사라졌다).
+  ★★**[2회차 `-fix2`] 「바레 주장 0」이 «거짓 실측 주장»이었다** — 워크로그 `limits[1]` 이 옛 식별자
+  (「경로+절+«두 블록»까지」)를 그대로 주장하고 있었다. 마커 형태로 고치고 선행 `done` 의 「0」 선언도 맞췄다.
+  ★근인: 술어를 좁게 잡고 **원장(`git grep` 대상 밖)을 따로 세지 않았다** ⇒ 재계수 repo 12 · 원장 13 = **25건**,
+  바레 주장 **0**. ★그리고 **END 마커가 「the two `sh` blocks above」로 다시 세고 있어** 「enclosed region · do not
+  count blocks」로 고쳤다(목적이 «세는 것을 없애기»인데 마커 자신이 셌다).
+  ★★**[`-fix`] 잠금 재판단 = ⒝ 유지 · 사유 교체** — 「Both(=2)」는 대상이 4로 늘어도 **조용히** 틀렸고
+  이름 붙은 마커는 없어지면 `grep` 이 0건으로 **즉시** 답한다(**silent → loud**). 그래도 기계는 없다 —
+  `engine-contract.yml` 필터에 `AGENTS.md`·`rust.yml` 이 **없어** 이 드리프트를 내는 PR 에선 어떤 in-filter 검사도
+  돌지 않고, 상시 스텝 추가는 `steps:` 변경이라 이 티켓이 금지한다. ★**«알고» 남긴다.**
 - 2026-09-05: **LGT 브라우저 검은 화면 «규명»** (PR **#85** 착지 · `wie-lgt-browser-canvas-paint-not-reaching-localize`
   · 채택 제안 `2026-09-05-roundtrip-ktf-key-reach-scenario#p0`) — ★**선행 서술이 반증됐다**:
   프레임은 캔버스에 **닿는다**(`incoming_nonblack=424` · `draw_image ok`). ★**그 «직후» MIDP 가**
