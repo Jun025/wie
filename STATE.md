@@ -40,6 +40,9 @@
   `disablePaint()` 영원히 미호출. KTF 카드는 `CletCard`(패키지 없음)라 우연히 매치된다.
   ★반증 실험(원복함): 점 형식 1개 추가 → 브라우저 LGT **0 px → 424 px** · 네이티브 paints **83 → 55**(KTF 동일).
   ★**고치지 않았다** — 수정은 다음 회차(제안 2건). 제품 코드 변경 **0**.
+  ★★**[게이트② 반려 `-fix`] KTF 의 «앞으로»를 적었다**: `CletCard` 는 **게스트에서 오는 이름**이라
+  카드 클래스에 **패키지가 붙는 순간 KTF 도 같은 형태로 깨진다** ⇒ ★처방 ⒜(점 형식 «추가»)는
+  그 **형식 취약성을 남긴다**. 제안 1 `tradeoff` + 왕복 검사 헤더 두 곳에 넣었다.
 - **`get_system_class_loader` 6곳 선이행** (PR **#83** 열림 · `wie-system-class-loader-preemptive-migration-six-sites` · 별 리니지)
   ★**위 둘이 `REPORT.md`·`STATE.md` 를 함께 만진다** — 먼저 착지하는 쪽이 나머지의 base 를 움직인다(2-c⒜ 범위 · 코드 충돌 0).
 

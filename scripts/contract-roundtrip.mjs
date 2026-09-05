@@ -406,7 +406,14 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     // so the comparison never matches. (KTF's card is "CletCard", no package,
     // which is why only LGT is hit.) Adding the dot form flips LGT to 424 px in
     // the browser and its native paints 83 -> 55, exactly matching KTF.
-    // The fix is a separate round; this file stays a checker, not a patch.
+    //
+    // KTF IS NOT SAFE — IT IS UNPACKAGED. "CletCard" comes from the guest (it is
+    // a constant-pool string in the fixture's own client.bin), so the day a card
+    // class arrives with a package, KTF breaks the same way LGT does. A fix that
+    // only ADDS the dot form leaves that fragility in place; normalising the name
+    // (or dropping the class-name predicate) is what removes it. Weigh that when
+    // picking the prescription — the fix is a separate round, and this file stays
+    // a checker, not a patch.
   } catch (e) {
     check("scenario aborted by exception", false, (e && e.stack) || String(e));
   }
