@@ -1,19 +1,18 @@
-# The four commit gates for this repo, plus the lint gate again on beta. Run
-# them all locally before committing — `cargo clippy --workspace` alone does NOT
-# predict this job, because `--workspace` checks lib targets only in the default
-# profile while this job additionally denies warnings and lints the wasm target:
+# The commands to run locally before committing — the four commit gates plus the
+# lint gate again on beta — are listed in EXACTLY ONE place:
 #
-#   cargo fmt --all -- --check
-#   cargo clippy --all -- -D warnings
-#   cargo clippy --target wasm32-unknown-unknown -- -D warnings
-#   RUST_MIN_STACK=4194304 cargo test --all
-#   rustup toolchain install beta --component clippy   # re-run whenever beta rolls — install IS update
-#   cargo +beta clippy --all -- -D warnings            # the lint gate, again on beta
+#   AGENTS.md → "## Definition of Done" → "### The four gates (what `rust.yml`
+#   actually runs)". Both fenced `sh` blocks in that subsection are the list.
 #
-# Those six lines are the same commands, in the same order, as AGENTS.md
-# §Definition of Done. NOTHING machine-checks that — edit one, edit the other.
-# (Measured 2026-09-05: this file's list said four while AGENTS.md said six, and
-# whoever opened the CI file first got the shorter answer.)
+# This header deliberately does NOT repeat them. It used to, and the two copies
+# drifted: on 2026-09-05 this file said four commands while AGENTS.md said six,
+# so whoever opened the CI file first got the shorter answer. That was fixed by
+# hand, and nothing machine-checks such a fix — so the copy was removed instead.
+# One list cannot disagree with itself.
+#
+# What stays here is the part AGENTS.md does not carry: why this job is shaped
+# the way it is. (The steps below remain the enforcing copy — a doc/steps drift
+# is a different axis, and the one a parity checker would compare.)
 #
 # ── Why the matrix ────────────────────────────────────────────────────────────
 # macOS/Ubuntu/Windows × stable/beta. A warning is a build failure here (-D

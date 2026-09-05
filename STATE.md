@@ -32,6 +32,13 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- **`rust.yml` 주석 목록 «한 벌»로** (`wie-rust-yml-header-single-source-point-to-agents-md`
+  · 채택 제안 `2026-09-05-rust-yml-header-beta-lint-line#p0`) — 주석의 명령 **6줄 삭제** →
+  `AGENTS.md` §Definition of Done 의 「The four gates」를 **경로+절+«두 `sh` 블록»**까지 밝혀 가리킨다.
+  ★주석 안 명령 목록 **6 → 0** · ★**CI 동작 변경 0**(비-주석 변경 0행 · 주석 제거 후 바이트 동일).
+  ★**Constraint 1 정합 = 충족** — 그 표의 `Locked by` 는 «why 의 거처»를 뜻하고 why 두 블록은 그대로다.
+  ★★**과장하지 않는다**: 없앤 것은 «산문 사본 2 → 1» 이고 `steps:` 라는 기계 사본은 남는다 —
+  문서↔steps 축은 파리티 검사기(`#p2`) 몫이라고 주석에 적었다. ★잠금은 ⒝(안 한다 — 대상이 사라졌다).
 - **`get_system_class_loader` 6곳 선이행** (PR **#83** 열림 · `wie-system-class-loader-preemptive-migration-six-sites` · 별 리니지)
 - **LGT 브라우저 검은 화면 «규명»** (PR **#85** 열림 · `wie-lgt-browser-canvas-paint-not-reaching-localize` · 별 리니지)
   ★위 둘 다 `REPORT.md`·`STATE.md` 를 만진다 — 이 착지(#84)로 그쪽이 **원장 2파일 충돌**이 된다(코드 0).

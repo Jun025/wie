@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "date": "2026-09-05",
+  "task": "wie-rust-yml-header-single-source-point-to-agents-md",
+  "title": "목록을 «한 벌»로 줄였다 — 갈릴 대상 자체를 없앤다 · 그리고 «남는 축»을 정직하게 적었다",
+  "services": ["engine"],
+  "summary": "선행 회차가 `rust.yml` 머리 주석과 `AGENTS.md` 의 「로컬에서 돌려라」 목록을 **손으로 일치**시켰다. 목록이 둘인 한 언젠가 다시 갈리므로, 이 회차는 ★**주석의 목록을 지우고 `AGENTS.md` §Definition of Done → 「The four gates」를 «경로+절 이름»으로 가리킨다**. 결과: 주석 안 명령 목록 줄 **6 → 0**. ★**CI 동작 변경 0**(주석·빈줄 제거 후 전/후 바이트 동일 · 비-주석 변경 0행). ★**Constraint 1 정합 판단을 적었다 — 충족**: 그 표의 `Locked by` 는 「행의 *why* 가 사는 파일」을 가리키고, 이 주석의 **why 두 블록**(matrix · RUST_MIN_STACK)은 **그대로 남았다**. ★★**그리고 과장하지 않는다 — «한 벌»은 «산문 사본»이 하나가 됐다는 뜻이고, `steps:` 라는 «기계 사본»은 여전히 있다.** 그 축(문서 ↔ steps)이 파리티 검사기의 몫이라는 것을 주석에 명시했다. 잠금은 **하지 않는다(⒝)** — 이 회차가 **잠금이 지키려던 대상을 제거**했기 때문이다.",
+  "changes": [
+    "`.github/workflows/rust.yml` 머리 주석 — 명령 6줄 **삭제** + 「EXACTLY ONE place: AGENTS.md → \"## Definition of Done\" → \"### The four gates (what `rust.yml` actually runs)\". Both fenced `sh` blocks in that subsection are the list.」 로 대체. ★**경로·절·«무엇이 목록인가»까지** 적었다(「AGENTS.md 참조」로 끝내지 않았다).",
+    "같은 주석 — 왜 사본을 지웠는지(2026-09-05 의 4↔6 드리프트 실사고)와 ★**«steps 는 여전히 기계 사본이다»**를 한 문장으로 남겼다.",
+    "같은 주석 — `--workspace` 설명 문장 **삭제**. ★그 문장은 `AGENTS.md` 목록 머리가 **같은 말**을 하고 있어(「Run these — not just `cargo clippy --workspace` … `--workspace` checks lib targets only in the default profile」) 남기면 그것도 두 벌이 된다. ★**«왜» 두 블록(matrix · RUST_MIN_STACK)은 무접촉** — 그쪽은 이 파일에만 있다.",
+    "★**`on:`·`jobs:`·`steps:` 무접촉** · `AGENTS.md` **무접촉**(Non-goal: 정본 «내용» 변경 0) · bump 0."
+  ],
+  "verification": {
+    "premise-agents-is-fit": "★**정본으로 삼을 만한가 — 자리마다 CI 와 대조했다**(계약 재실측 1). `AGENTS.md` 의 두 `sh` 블록 **6줄** ↔ `rust.yml` 실동작: `cargo fmt --all -- --check` ↔ `:96` · `cargo clippy --all -- -D warnings` ↔ `:97` · `cargo clippy --target wasm32-unknown-unknown -- -D warnings` ↔ `:98` · `RUST_MIN_STACK=4194304 cargo test --all` ↔ `:102-103`(windows) / `:107-108`(비-windows) · `cargo +beta clippy …` ↔ `rust: [stable, beta]`(`:53`) × `toolchain: ${{ matrix.rust }}`(`:76`) 의 **beta 다리가 `:97` 을 친다** · `rustup toolchain install beta --component clippy` ↔ CI 대응물은 `dtolnay/rust-toolchain` + `components: rustfmt, clippy`(`:78`) — **게이트가 아니라 전제**다. ⇒ ★**6줄 전건이 현재 CI 와 맞는다** ⇒ 가리켜도 된다. ★**정본이 틀렸으면 «가리키기»가 오히려 나빴을 자리인데, 틀리지 않았다.**",
+    "constraint-1": "★**정합 판단 — 충족**(계약 4 · 생략하지 않았다). `AGENTS.md` §Constraints 표 머리는 「Each row's **why** lives in the file that enforces it」이고, 1행은 `The four gates pass before every commit (see Definition of Done)` · `Locked by: rust.yml — header comment` 다. ⇒ ★**그 열이 요구하는 것은 «목록»이 아니라 «why 의 거처»다.** ⑴그 행 자신이 이미 **`(see Definition of Done)`** 으로 목록을 «가리키고» 있다(표가 목록을 이 파일에 요구하지 않는다) ⑵실제로 **enforce** 하는 것은 주석이 아니라 `steps:`(무접촉) ⑶주석에 남은 **why 두 블록**(「Why the matrix」·「Why RUST_MIN_STACK …」)은 ★**이 파일에만 있고 그대로 남았다** ⇒ 1행의 why-거처가 비지 않는다. ★**따라서 「Constraint 1 이 목록을 요구한다」는 성립하지 않는다** — 성립했다면 이 회차를 멈췄어야 한다(티켓의 정지 조건).",
+    "reader-path": "★**가리키기가 모호하지 않은지**(계약 재실측 3): 파일 경로 `AGENTS.md` + 절 `## Definition of Done` + 소절 `### The four gates (what \\`rust.yml\\` actually runs)` + ★**「Both fenced `sh` blocks in that subsection are the list」**(두 블록이라는 것까지) 를 적었다. ⇒ CI 파일을 여는 사람이 **한 번의 검색어**로 도착한다. ★대가는 숨기지 않는다 — **클릭 한 번이 는다**(제안이 그 tradeoff 를 적었고, 그것이 선행 회차가 «더하기»를 고른 이유였다).",
+    "list-count-after": "★**「갈릴 대상이 사라졌다」를 «세어» 보였다**(계약 3): 주석 안 명령 목록 줄 **6 → 0**(`awk '/^#   (cargo|rustup|RUST_MIN_STACK)/'`). ★**전수로 다시 훑은 «명령처럼 보이는» 주석 줄 2건은 목록이 아니다** — `# ── Why RUST_MIN_STACK=4194304 …` (절 제목) · `# … it makes \\`cargo test --all\\` crash.`(산문). ⇒ ★**주석에 목록 0.**",
+    "ci-unchanged": "★**계약 2 를 수로 보였다**: ⑴`git diff -U0` 의 비-주석 변경 행 **0**(전 행이 `#`) ⑵주석·빈줄 제거 후 전/후 판본 ★**바이트 동일**(`diff` 무출력) ⑶`git diff --stat` = **1파일 +13/−14**(전부 주석).",
+    "honest-scope": "★★**«한 벌»의 범위를 과장하지 않는다** — 없앤 것은 **산문 사본 2 → 1** 이고, `rust.yml` 의 `steps:` 는 **여전히 같은 명령의 «기계 사본»**이다. ⇒ ★**문서 ↔ steps 드리프트는 남는다**(스텝을 하나 추가해도 `AGENTS.md` 는 아무 말 안 한다). 그 축이 RustJava 의 `scripts/check-dod-ci-parity.py` 가 비교하는 것이고 형제 제안 `#p2` 소관이다 — ★**그 사실을 주석 안에 한 문장으로 적었다**(다음 사람이 «이제 안전하다»로 읽지 않도록).",
+    "gates": "`cargo fmt --all -- --check` rc=0 · `cargo clippy --all -- -D warnings` rc=0 · `cargo clippy --target wasm32-unknown-unknown -- -D warnings` rc=0 · ★`cargo +beta clippy --all -- -D warnings` rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` **139 passed / 0 failed** · 정적 계약 **107 pass** · `check-worklog-json` OK · `check-worklog-coverage` rc=0 · `npm run audit` PASSED."
+  },
+  "limits": [
+    "★★**잠금 결정 = ⒝ «잠그지 않는다»**(계약 5 · 「조용히 두기」는 선택지가 아니므로 명시한다). 사유: ⑴★**이 회차가 «잠금이 지키려던 대상»을 제거했다** — 두 산문 목록의 일치를 감시하는 검사는 이제 **감시할 대상이 없다** ⑵남는 축(문서 ↔ `steps:`)은 **다른 검사**이고 형제 제안 `#p2`(파리티 검사기 이식)가 진다 — 여기서 부분 재구현을 심으면 나중에 합쳐야 한다 ⑶이 회차의 Non-goal 이 **CI 동작 변경 0** 이라 배선할 자리가 없고, 배선 없는 검사기는 「잠긴 것처럼 보이는데 안 도는」 것이라 없는 것보다 나쁘다(선행 회차와 같은 논거).",
+    "★**대가: CI 파일을 여는 사람이 한 번 더 클릭한다.** 그것이 선행 회차가 «더하기»를 고른 이유였고, 이 회차는 그 대가를 «다시 갈리지 않는 것»과 바꿨다. ★가리키기가 모호하면 그 교환이 손해가 되므로 **경로+절+«두 블록»**까지 적었다.",
+    "★**`AGENTS.md` 는 손대지 않았다**(Non-goal) — 정본 목록이 CI 와 맞는지만 확인했고 **맞았다**. 틀렸다면 이 회차는 «보고»로 끝났어야 한다.",
+    "★**Constraint 1 의 `Locked by` 문구(`rust.yml` — header comment)는 그대로 둔다** — 여전히 참이다(why 두 블록이 거기 산다). 다만 다음 사람이 그 열을 「목록이 있어야 한다」로 읽으면 이 회차를 되돌릴 수 있다 ⇒ 그 판단 근거를 이 워크로그 `constraint-1` 에 남겼다."
+  ],
+  "issues": [],
+  "proposals": [],
+  "adoptedProposals": ["2026-09-05-rust-yml-header-beta-lint-line#p0"],
+  "declinedProposals": []
+}
