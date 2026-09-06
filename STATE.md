@@ -32,7 +32,7 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- (그 밖: ★열린 형제 PR: **#98 · #99 · #100 · #102 · #106** — 각자 자기
+- (그 밖: ★열린 형제 PR: **#98 · #99 · #100 · #106 · #108** — 각자 자기
   브랜치에서 진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
 
 ## 완료 (최근)
@@ -45,6 +45,15 @@
   ⇒ ★**호스트 단위시험 1건**으로 덮었다(그 쌍둥이 `-12` 가 이미 쓰는 형태) · **zip 재생성 0** · 픽스처 무접촉.
   ★개악 3/3 물었다(반환값 · 분기 제거 · 경계 `>`→`>=`) — 경계 개악이 물린 것은 **성공 방향도 단언**했기 때문이다.
   ★회귀 0(158 passed · `res:9:602` 단언 유지 · 픽스처 PASS). ★**계약 4 범위를 벗어났고 그 이유를 회신에 적었다.**
+- 2026-09-06: **J2ME 게스트 부팅을 `cargo test --all` 안으로** (PR **#102** 착지 · `wie-j2me-guest-boot-in-cargo-test-all`
+  · 채택 제안 `2026-09-06-createimage-fixture#p1`) — `wie_j2me/tests/test_boot.rs` 1건 + `test_utils` 하니스 확장
+  + 커밋 픽스처 `test_data/draw_j2me.zip`(1,020B). ★**브라우저 잡 무접촉**(`.github/`·`scripts/`·`web/` diff **0파일**).
+  ★**막힌 것은 하니스가 아니라 픽스처였다** — `*.jar` 는 Constraint 9 로 추적 금지라, ★**zip 이 jar 를 담는 기존 관례**
+  (`keydraw_ktf.zip` 안의 `00000000.jar`)를 그대로 썼다(`npm run audit` PASSED).
+  ★**하니스 핵심 = redraw 응답 루프** — 종전 `TestScreen` 이 요청을 기록 안 해 **첫 판이 10,000틱 paints 0** 이었다.
+  ★단언은 «프레임이 합성됐다»(「안 던졌다」는 페인트 전에 죽는 게스트도 통과시킨다 = 2026-09-04 형상).
+  ★양방향 2종 red(메인 클래스 미존재 · `image.rs` 마이그레이션 되돌림) · `cargo test --all` **40/156 → 41/157**(회귀 0).
+  ★**착지 시 배포 있음** — `Cargo.lock`·`Cargo.toml` 이 `publish-artifact.yml` paths 에 매치(Release + otterpebble dispatch).
 - 2026-09-07: **재측 의무 멱등화** (PR **#107** 착지 · `wie-worklog-remeasure-obligation-duplicates-per-round`) —
   `check-worklog-coverage.mjs` 에 **`--record`**(가드 2: 기한 미도래 · 배열 전체 중복) + OVERDUE 문면 교체
   + `AGENTS.md` 정합화. ★**임계·비율 판정 무접촉** · ★**기존 `measurements` 3 → 3 불변(바이트 동일)** ·
