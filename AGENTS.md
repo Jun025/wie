@@ -120,7 +120,17 @@ node scripts/make-draw-fixture.mjs                                    # builds t
 for f in test_data/draw_j2me.jar test_data/helloworld_ktf.zip test_data/helloworld_lgt.zip; do
   cargo run -q -p wie_cli --bin wie_validate -- "$f"                  # each must report "result":"PASS"
 done
+for f in test_data/keydraw_ktf.zip test_data/keydraw_lgt.zip; do      # key-driven — --inject is REQUIRED
+  cargo run -q -p wie_cli --bin wie_validate -- --inject "$f"         # same bar: "result":"PASS"
+done
 ```
+
+**`keydraw_*` without `--inject` reports FAIL, and that is the CORRECT result — you did not break it.**
+Those two fixtures paint only in response to a key, so with no injected input the screen stays black
+and the validator is right to say so. Measured 2026-09-06 on both carriers: without the flag
+`result FAIL · content false · paints 1`, with it `result PASS · content true · paints 55`. The
+misread is not hypothetical — a round chasing an unrelated change stopped on exactly this, took the
+FAIL for its own regression, and only cleared it by reproducing the same FAIL on an untouched tree.
 
 `cargo test --all` boots KTF and LGT but **nothing in it boots a J2ME guest**. 2026-09-04 shipped a
 RustJava pin bump whose four gates were all green while `draw_j2me.jar` failed with
