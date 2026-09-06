@@ -13,6 +13,26 @@
 - **사용자 영향**: 없음(CI). 대신 J2ME 부팅 축이 **브라우저 잡 하나에 매달린 상태를 벗어난다**.
 - **★남는 구멍**: ⒜**옮기지 않았다** — 브라우저 Scenario C 는 그대로이고 이 축은 «두 번째 그물»이다(대체재 아님: 브라우저는 실제 픽셀, 여기는 합성 여부) ⒝커밋 픽스처는 **재생성 가드 없는 스냅샷**(기존 4개와 같은 성질) ⒞`paints > 0` 은 **빈 프레임도 센다** ⒟M-A 의 red 는 **패닉**이지 `tick()` 의 `Err` 가 아니다 — 「예외가 `Err` 로 전파된다」고 적지 않는다(재지 않았다).
 - **★★착지 시 배포가 «있다»**: 착지 diff 에 `Cargo.lock`·`wie_j2me/Cargo.toml` 이 들어가고 그 둘이 `publish-artifact.yml` 의 `on.push.paths` 에 **매치** ⇒ ★**Release 컷 + otterpebble `repository_dispatch` 발화**(문서 전용 착지들과 다르다). 머지 회차는 3-a 예측에 그대로 적고 self-verify 하라.
+## [2026-09-06] WIPI 리소스에 브라우저 단언을 붙였다 — 훅은 «이미» 있었고, 제안이 매긴 대가가 거짓이었다 (wie-resource-axis-has-no-browser-scenario-decision)
+- **무엇을**: `scripts/contract-roundtrip.mjs` 에 **Scenario E-res·F-res 2건**(KTF·LGT 게스트가 부팅 때 읽은 `res.bin` 을 «브라우저에서» 단언). ★**새 zip 0 · 계약 재핀 0 · 글루 변경 0 · 추가 부팅 0 · 키 픽셀 단언 무접촉.**
+- **왜**: 운영자 채택 제안 `2026-09-06-spi-resource-fixture#p1`.
+- **★★⑴ 전제가 «절반» 틀렸다**: 「리소스 축에 브라우저 시나리오가 없다」 — 그런데 **Scenario C-img** 가 이미 «RESOURCE-BY-NAME, ASSERTED» 로 있고 **같은 클래스로더 기구**를 픽셀로 문다. 없던 것은 «리소스 축»이 아니라 ★**WIPI 축의 단언**이고, 그쪽은 **실행은 되는데 아무도 결과를 안 봤다**. ★**E·F 가 green 인 것은 증거가 아니었다** — 게스트가 `Err(_) => println!("res:err")` 로 **절대 패닉하지 않는다**.
+- **★★⑵ 제안이 ⑵(stdout)에 매긴 「계약 표면이 는다」는 «거짓»이다**: 게스트 stdout 은 `MC_knlPrintk → Platform::write_stdout → web_sys::console::log_1`(`wie_web/src/platform.rs:80`)로 ★**이미 콘솔에 도착**하고, 이 파일은 ★**이미 그것을 수집**한다(`:237-238` — 실패 때만 버릴 뿐). 계약 파일의 `stdout|console` 히트 **0** ⇒ Constraint 3 미해당(`check-engine-contract` rc=0 재확인). ⇒ ★**비교가 성립하지 않아 ⑵를 골랐다**(⑴은 zip **+2** · 커밋된 바이너리 재생성).
+- **★★⑶ wasm 특이성은 «있었다» — 다만 «경로·인코딩»이 아니라 «출력 분절»이다**: 게스트의 **한 줄** `res:9:602` 가 브라우저 콘솔에 ★**`res:` / `9` / `:` / `602` / `\n` 다섯 메시지로 쪼개져** 온다(포맷 조각마다 `write_stdout` → 호출마다 `console.log_1`). ★**네이티브는 바이트 스트림이라 저절로 이어진다** ⇒ **브라우저에만 있는 분절**이고, 초판 단언이 실제로 그 때문에 red 였다. ⇒ ★**헤드리스 stdout 시험이 구조적으로 못 보는 축이 실재한다**는 증거다.
+- **★★⑷ 개악이 내 이해를 반증했고, 그것을 주석에 반영했다**: LGT 의 `System::filesystem()` 폴백만 죽였더니 F-res 가 **green** 이었다 ⇒ ★**이 픽스처에서 두 캐리어는 «같은 해결자»(클래스로더)를 쓴다.** 「LGT 는 호스트별 파일시스템을 탄다」는 **이 경로에선 거짓**이다.
+- **★⑸ 양방향 대조**: 기준선(변경 전 · stash 격리) **42/42 rc=0** → 변경 후 ★**44/44 rc=0**(정확히 +2 · 기존 42건 green 유지) → 두 캐리어의 클래스로더 분기 개악 + wasm 재빌드 ★**E-res·F-res 둘 다 FAIL(`res:err`) · 42/44 · rc=1 · 키 단언 6건은 green** → 원복 후 **44/44 rc=0**.
+- **사용자 영향**: 없음(CI 시나리오). 대신 「리소스가 브라우저에서 실제로 읽히는가」가 **처음으로 판정된다**.
+- **★남는 구멍**: ★**`System::filesystem()` 폴백은 여전히 미판정**이고 ★**호스트별 구현이 갈리는 유일한 자리가 거기**다(`WebFilesystem` ↔ `CliFilesystem` · 후자는 **OS 의존** `Path::components()`). 지금은 오버레이의 공유 정규화가 앞에서 막아 «도달 불가»로 **읽히지만**, 그 판정은 **돌려서 낸 것이 아니다** ⇒ 제안 등재.
+## [2026-09-06] `last_frame_content` 를 게이트로 올렸다 — 기대값 선언 자리를 «명령줄»로 골랐다 (wie-validate-last-frame-gate-with-per-fixture-expectation)
+- **무엇을**: `wie_cli/src/bin/wie_validate.rs` 에 **`--expect-last-frame`**(기본 **off**) + 순수 함수 `last_frame_gate_fails()` + 단위시험 1건. ★플래그가 있을 때만 `last_frame_content` 가 판정에 개입하고, ★**PASS → FAIL 한 방향뿐**(이미 실패한 런의 더 구체적인 사유를 덮지 않는다).
+- **왜**: 운영자 채택 제안 `2026-09-06-validate-last-frame-axis#p0`(+ 흡수 `2026-09-06-lgt-black-screen-name-compare#p0` — 그 제안이 요구한 «축 추가»는 이미 착지했고 남은 것이 게이트화뿐이라 중복 발권을 피했다). 축은 있었으나 **REPORT-ONLY** 라 아무것도 막지 않았다.
+- **★★⑴ 전제를 먼저 반증했다**: `git show origin/main:…/wie_validate.rs | grep -n last_frame_content` → **10곳** 실재 · `:30` 이 스스로 「REPORT-ONLY and deliberately not a gate」 ⇒ 여전히 게이트 아님(이미 게이트였다면 이 회차는 거기서 끝났다).
+- **★★⑵ 선언 자리를 «골랐고 이유가 실측이다»**: 후보 셋 중 ⒞ 플래그. ★**기대값의 키가 `픽스처`가 아니라 `픽스처 × 모드`** 이고 — `keydraw_lgt` 는 `--inject` 유무로 기대값이 뒤집힌다(`PASS·last TRUE` ↔ `FAIL·last false`) — ★**그 모드 절반이 이미 명령줄에만 있다**. ⒜사이드카·⒝이름 표는 키의 나머지 절반을 다른 곳에 둬 **두 번째 진실원**이 된다(픽스처 개명·모드 추가·처음 보는 파일에서 드리프트).
+- **★⑶ 계약 4 충족**: 플래그 없이 **6행 전건 현행 판정 불변**(helloworld_* PASS · keydraw_* `--inject` PASS · keydraw_* 모드 없음 FAIL). 기본값 off 라 구조적으로 그렇다. `cargo test --all` **157 passed**(직전 156 + 신규 1).
+- **★★⑷ 개악 대조가 «합성»이 아니다 — 실제로 일어났던 회귀를 되돌렸다**: `is_clet_card` 정규화를 **PR #88 이전** 형태로 → `keydraw_lgt --inject` 플래그 없음 ★**PASS · content true · last_frame_content FALSE**(그때 실제로 새어 나간 형상 그대로) ↔ 같은 형상 + `--expect-last-frame` ★**FAIL**. KTF 대조군은 **PASS**(개악이 LGT 캐리어에만 닿는다).
+- **★⑸ 양의 방향도 보였다**: `helloworld_{ktf,lgt} --expect-last-frame` → **FAIL** ⇒ 제안이 「지금 그대로 게이트를 걸면 뒤집힌다」고 실측한 그 형상이 **선언했을 때만** 일어난다.
+- **사용자 영향**: 없음(기본 동작 불변). 대신 「검사는 통과하는데 화면은 검다」를 ★**브라우저 없이 약 20초에** 잡을 수 있게 됐다(그 그물은 지금까지 wasm 빌드 + `contract` 잡 3~4분뿐이었다).
+- **★남는 구멍**: ⒜★**호출자가 «0»이다** — 선언 자리를 만들었을 뿐 아직 아무도 켜지 않았다. 어느 워크플로도 `wie_validate` 를 부르지 않고, 러너 블록 3종 중 `helloworld_*` 는 「비어야 정상」이라 플래그가 틀린다(제안 등재) ⒝opt-in 은 잊은 호출을 못 막는다(사이드카도 같다) ⒞`keydraw_*` 는 기본 `--timeout 20` 에 바짝 붙어 돈다(`ms 20028`) — 상시 게이트로 올리려면 예산을 먼저 재야 한다 ⒟richness 3축의 같은 사각은 **계약 3 대로 무접촉**(형제 티켓 몫).
 
 ## [2026-09-06] `Image.createImage(String)` 픽스처 — «넓어진 가시 범위가 무엇을 찾는가»를 수로 냈다 (wie-system-class-loader-createimage-fixture)
 - **무엇을**: `scripts/make-draw-fixture.mjs` 가 jar 에 `wie-img.png`(16×8 RGB · 74바이트 · 스크립트가 바이트로 조립)를 동봉하고, `DrawMIDlet.startApp()` 이 **`Image.createImage("/wie-img.png")`** 로 그것을 **이름으로** 연 뒤 `getWidth()`·`getHeight()` 를 정적 필드에 저장하며, `DrawCanvas.paint()` 가 **그 치수 그대로** 사각을 채운다. `scripts/contract-roundtrip.mjs` 에 Scenario C-img 1건. `.rs` 변경은 **주석뿐**.
@@ -36,6 +56,19 @@
 - **★⑷ 미지를 숨기지 않는다 — 그리고 그것이 판정을 흔들지 않는다**: `CletCard` 가 고정 이름이라는 것은 **픽스처 빌더**(`dlunch/wipi@068312d` 의 `clet_card.rs` — `ptr_name: c"CletCard"` · 부모가 `org/kwis/msp/lcdui/Card` **하나**)에서만 확인됐고 실게임은 코퍼스 부재로 확인 불가(Constraint 9). ★**고정이면 「새 카드가 생겨 놓친다」가 KTF 에서 성립하지 않고, 가변이면 대체할 호스트 신호가 없어 어차피 못 고친다** ⇒ 양쪽 갈래가 같은 결론이다.
 - **사용자 영향**: 없음(코드 무변경). 대신 이 축이 **다시 열리지 않는다** — 왜 못 하는지가 실측과 함께 남았다.
 - **★남는 제안 1건**(구현하지 않았다): `getClass().getName()` → **`class_definition().name()`**. 실측상 두 경로 모두 «내부 형식»을 그대로 주므로 점/슬래시가 **방어 대상이 아니라 비존재**가 되고 `pushCard` 마다 도는 JVM invoke 2회가 사라진다. ★단 **#p1 이 원한 것을 주지 않는다**(이름 두 개는 그대로) ⇒ 별건.
+## [2026-09-06] 파리티 가드의 두 문자열 축 — 파서도 툴체인도 사지 않고 **오탐 원인만** 제거했다 (wie-parity-lock-guard-string-axes-to-structure-decision)
+- **무엇을**: `scripts/check-parity-lock-wired.mjs` 축⑶ 의 술어를 ★**«`#[path]` 어트리뷰트 철자» → «검사기 경로 참조»** 로 교체(비교 문자열 1개 · 경로는 `LOCK.checker` 에서 **파생**) + `CEILINGS` 1줄 추가. ★**워크플로 무접촉 · 새 의존성 0 · CI 시간 +0s** · 축⑷ **무접촉**.
+- **왜**: 운영자 채택 제안 `2026-09-06-parity-lock-self-deletion-guard#p1`.
+- **★★⑴ 오탐이 «실재»한다 — 실행으로 냈다**: `#[path]` 를 완전한 `include!` 리팩터로 바꾸면(검사기의 inner doc `//!` 21건을 `//` 로 — `include!` 자리에서 inner doc 은 불법이라 **리팩터의 일부**다) ★**`cargo test` rc=0 · 11 passed** 인데 ★**가드 rc=1** 이었다.
+- **★★⑵ 그 축은 «성질»이 아니라 «철자»를 잡고 있었다**: 같은 `include!` 형태에서 검사기만 지워도 ★**cargo rc=101** ⇒ 주석이 「`#[path]` 만이 준다」고 적은 성질이 **다른 철자에도 있다**. 게다가 `#[path]` 줄만 지우면 ★**`cargo test --all` 이 rc=101**(`E0583 file not found for module \`checker\``) ⇒ ★**축⑶ 의 실패형은 6다리가 이미 문다.**
+- **★★⑶ 축⑷ 는 반대다 — 그래서 손대지 않았다**: 두 파일·`#[path]`·`#[test]` 를 남기고 검사기를 «안 쓰는» 공허한 락은 ★**`cargo test` rc=0 · 1 passed**(경고뿐). **가드만이 잡는다.**
+- **★★⑷ 세 선택지 비용을 «수»로 재고 넷째를 골랐다** — 상시 스텝 구간에는 `npm ci` 도 rust 툴체인도 **없다**(node 3줄 · 최대 ~1s):
+  ⒜**파서** = `tree-sitter`+`tree-sitter-rust` **+4패키지**(네이티브 애드온 · 15.0MB) **+ `npm ci` 신설 41.5s/PR**(93패키지·211MB) ⇒ 문서만 고친 PR 도 문다. `web-tree-sitter` 는 ★**npm 에 rust grammar wasm 이 없어**(tarball 27엔트리 중 `.wasm` **0**) 바이너리를 커밋해야 한다.
+  ⒝**`cargo … -- --list`** = ★**콜드 672.7s(11m11s · 약 230크레이트) / 웜 5.69s** ⇒ 현 스텝(~50ms) 대비 웜에서도 **약 110배**이고 ★**축⑷ 를 덮지도 못한다.**
+  ⒞**무조치** = 0원인데 오탐이 남는다. ⇒ ★**⒟ 경로 참조 = 0원 · 오탐 소멸 · 잡던 것 전부 유지.**
+- **★⑸ 양방향 대조 8종**(guard/cargo): P0 기준선 `0/0` · ★**P1 옳은 리팩터 `include!` `0/0`**(변경 «전»엔 `1` = 오탐) · P2 `#[path]` 제거 `1/`★`101`(`--all`) · P3 다른 파일 겨눔 `1/101` · P4 검사기 삭제 `1/101` · ★**P5 두 파일 함께 삭제 `1/`**★**`0`**(`--all` · 145 passed · 출력에 `dod_ci_parity` **0회** = 원래 구멍이 그대로 재현되고 **가드만** 잡는다) · P6 공허한 락 `1/0` · P7 `#[test]` 0건 `1/0`.
+- **사용자 영향**: 없음(CI 가드). 대신 ★**옳은 리팩터가 더는 빨간불을 켜지 않는다** — 그것이 가드가 지워지는 경로였다.
+- **★남는 구멍**(가드가 매 실행 스스로 출력한다): 축⑷ 는 **부분일치**라 ★**모듈 별칭을 바꿔도 접미가 같으면 통과**한다(실측: `parity_checker::parity(` 가 `checker::parity(` 를 포함 ⇒ 별칭 전건 개명이 `0/0` 으로 지나갔다). 별칭까지 보려면 위에서 기각한 **파서**가 필요하다 ⇒ 제안 등재.
 
 ## [2026-09-06] `Security audit` 3일 red 를 껐다 — `rtrb` 0.3.3 → 0.3.5 (wie-rustsec-2026-0274-rtrb-double-free-audit-red)
 - **무엇을**: `Cargo.lock` **2줄**(`rtrb` version + checksum). `cargo update -p rtrb` 한 번. ★그 밖의 크레이트 이동 **0** · `Cargo.toml` 무접촉.

@@ -32,7 +32,11 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- **J2ME 게스트 부팅을 `cargo test --all` 안으로** (PR 개설 · `wie-j2me-guest-boot-in-cargo-test-all`
+- (이 브랜치 기준 없음. ★열린 형제 PR: **#98 · #99 · #100 · #104 · #105 · #106** — 각자 자기
+  브랜치에서 진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
+
+## 완료 (최근)
+- 2026-09-06: **J2ME 게스트 부팅을 `cargo test --all` 안으로** (PR **#102** 착지 · `wie-j2me-guest-boot-in-cargo-test-all`
   · 채택 제안 `2026-09-06-createimage-fixture#p1`) — `wie_j2me/tests/test_boot.rs` 1건 + `test_utils` 하니스 확장
   + 커밋 픽스처 `test_data/draw_j2me.zip`(1,020B). ★**브라우저 잡 무접촉**(`.github/`·`scripts/`·`web/` diff **0파일**).
   ★**막힌 것은 하니스가 아니라 픽스처였다** — `*.jar` 는 Constraint 9 로 추적 금지라, ★**zip 이 jar 를 담는 기존 관례**
@@ -41,17 +45,46 @@
   ★단언은 «프레임이 합성됐다»(「안 던졌다」는 페인트 전에 죽는 게스트도 통과시킨다 = 2026-09-04 형상).
   ★양방향 2종 red(메인 클래스 미존재 · `image.rs` 마이그레이션 되돌림) · `cargo test --all` **40/156 → 41/157**(회귀 0).
   ★**착지 시 배포 있음** — `Cargo.lock`·`Cargo.toml` 이 `publish-artifact.yml` paths 에 매치(Release + otterpebble dispatch).
-- **클렛 카드 식별 설계 결정 — ★기각** (PR 개설 · `wie-clet-card-identity-by-class-name-design-decision`
+- 2026-09-06: **WIPI 리소스 브라우저 단언** (PR **#101** 착지 · `wie-resource-axis-has-no-browser-scenario-decision`
+  · 채택 제안 `2026-09-06-spi-resource-fixture#p1`) — `contract-roundtrip.mjs` 에 **Scenario E-res·F-res 2건**.
+  ★**새 zip 0 · 계약 재핀 0 · 글루 변경 0 · 추가 부팅 0 · 키 픽셀 단언 무접촉.**
+  ★**제안의 대가 산정이 거짓이었다** — stdout 훅은 `Platform::write_stdout` → `console.log_1` 로 **이미 있었고**
+  이 파일이 **이미 수집**하고 있었다(실패 때만 버렸다). ★**wasm 특이성도 실재했다**: 한 줄이 콘솔에
+  **다섯 메시지로 쪼개져** 온다(네이티브는 바이트 스트림이라 안 쪼개진다) — 초판 단언이 그 때문에 red 였다.
+  ★**개악이 내 이해를 반증**했다: LGT 폴백만 죽여도 green ⇒ 두 캐리어가 **같은 해결자**(클래스로더)를 쓴다.
+  양방향: 기준선 **42/42** → 변경 후 **44/44** → 클래스로더 개악 시 **E-res·F-res 둘 다 red · 키 단언 green**.
+  ★남는 구멍 = `System::filesystem()` 폴백(호스트별 구현이 갈리는 유일한 자리) — 제안 등재.
+- 2026-09-06: **파리티 가드 축⑶ «철자 → 경로»** (PR **#97** 착지 · 머지커밋 `90261612` · `wie-parity-lock-guard-string-axes-to-structure-decision`
+  · 채택 제안 `2026-09-06-parity-lock-self-deletion-guard#p1`) — ★**워크플로 무접촉 · 새 의존성 0 · CI 시간 +0s.**
+  ★**오탐이 실재했다**: 완전한 `include!` 리팩터에서 `cargo test` **rc=0 · 11 passed** 인데 가드 **rc=1**.
+  ★그 축은 «성질»이 아니라 «철자»를 잡고 있었다 — `include!` 형태에서도 검사기만 지우면 cargo **rc=101** 이고,
+  `#[path]` 줄만 지우면 ★**`cargo test --all` 이 rc=101**(6다리가 이미 문다).
+  ★**축⑷ 는 반대라 무접촉** — 공허한 락은 cargo **rc=0 · 1 passed** 로 지나가고 **가드만** 잡는다.
+  ★**세 선택지 비용 실측**: 파서 **+4패키지 + `npm ci` 41.5s/PR** · `--list` **콜드 672.7s / 웜 5.69s**(게다가 축⑷ 미커버) · 무조치 0원(오탐 잔존)
+  ⇒ **넷째(경로 참조)** 를 골랐다. 양방향 8종 대조 통과(★P1 오탐 소멸 · ★P5 원 구멍은 `cargo test --all` rc=0 인데 가드 rc=1).
+- 2026-09-06: **클렛 카드 식별 설계 결정 — ★기각** (PR **#95** 착지 · 머지커밋 `34bca716` · `wie-clet-card-identity-by-class-name-design-decision`
   · 채택 제안 `2026-09-06-lgt-black-screen-name-compare#p1`) — ★**코드 변경 0** · `card_canvas.rs` 무접촉.
   ★**실측**(임시 프로브 · 되돌림): LGT 카드 = `net/wie/CletWrapperCard`(★**우리 Rust 프로토** · `isInstance` **true**) ↔
   KTF 카드 = `CletCard`(★**게스트 ARM 메모리의 클래스 이름** · `isInstance` **false**). `isInstance(Card)` 는 둘 다 true 지만
   ★**모든 카드가 true** 라 쓰면 검은 화면을 전 경로에 재현한다. 부팅 플래그는 LGT 만 가능(KTF 부팅은 ADF `MClass` → `Main.main` 범용 경로).
   ⇒ ★**두 경로를 한 벌로 덮는 대체 술어가 없다.** 미지(실게임의 KTF 카드 이름)는 **양쪽 갈래가 같은 결론**이라 판정을 흔들지 않는다.
   ★남는 제안 1건 = `getClass().getName()` → `class_definition().name()`(구현 안 함 · #p1 이 원한 것을 주지 않는다).
-- (그 밖: ★열린 형제 PR: **#95 · #96 · #97 · #98** — 각자 자기 브랜치에서 진행 중이고,
-  전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
-
-## 완료 (최근)
+- 2026-09-06: **`last_frame_content` 게이트화** (PR **#96** 착지 · `wie-validate-last-frame-gate-with-per-fixture-expectation`
+  · 채택 제안 `2026-09-06-validate-last-frame-axis#p0` + 흡수 `2026-09-06-lgt-black-screen-name-compare#p0`) —
+  축은 이미 있었고 **REPORT-ONLY** 였다. 게이트의 전제는 「빈 마지막 프레임이 정상인 픽스처」를 선언할 자리다.
+  ⇒ ★**기대값 선언 자리를 «명령줄»로 골랐다**(`--expect-last-frame` · 기본 off). 이유는 실측이다:
+  기대값의 키가 `픽스처`가 아니라 ★**`픽스처 × 모드`** 이고(`keydraw_lgt` 는 `--inject` 여부로 기대값이 뒤집힌다)
+  그 모드 절반이 **이미 명령줄에만** 있다 — 사이드카·이름 표는 키의 나머지 절반을 다른 곳에 둬 «두 번째 진실원»이 된다.
+  ★**계약 4 충족**: 플래그 없이 6행 전건 현행 판정 불변.
+  ★★**개악 M1 = «실제로 일어났던» LGT 검은 화면 회귀**(`is_clet_card` 정규화를 PR #88 이전으로 되돌림) →
+  플래그 없음 **PASS·content true·last false**(★그때 새어 나간 형상 그대로) ↔ 플래그 **FAIL** · KTF 대조군 PASS.
+  ⇒ ★**헤드리스가 20초에 그것을 문다**(브라우저 축은 wasm 빌드 + `contract` 잡 3~4분).
+  ★**남는 것**: 호출자 **0** — 선언 자리를 만들었을 뿐 아직 아무도 켜지 않았다(제안 등재).
+  ★★**게이트② 발견 ①(major)를 함께 남긴다 — 이 항목의 「부하 시」 서술은 «반증됐다»**: 검수자가 load **102.77/10CPU**
+  구간에서 같은 개악을 11회 돌려 **전건 `PASS · last=true`**(게이트가 회귀를 **놓친다**)를 관측했고 `content` FAIL 은 **0회**였다.
+  ⇒ REPORT.md 의 「기존 `content` 축이 먼저 FAIL 하므로 새 불안정을 더하지 않는다」는 **사유가 반대로 적혀 있다**.
+  ★**판별자는 `ms > --timeout` 과 `paints` 붕괴**(굶은 런 21.2~29.2s·paints 26~53 ↔ 정상 20.1s·83).
+  ★계약 7 대로 이 회차가 **고치지 않았다** — CI 게이트로 올리는 후속이 «반드시 먼저» 처분해야 한다.
 - 2026-09-06: **「감시를 지웠는데 green」 전수 계수** (PR **#94** 착지 · 머지커밋 `0f7bb2fc` · `wie-count-deletable-checks-that-stay-green-repo-wide`
   · 채택 제안 `2026-09-06-parity-lock-self-deletion-guard#p0`) — ★**세기만 하는 회차 · 가드 0 · 코드 0 · 워크플로 무접촉.**
   술어 「워크플로가 «경로로» 부르는 검사 파일 A」↔「`scripts/`·`*/tests/` 실재 파일 B」 ⇒ ★**A=9 · B=23 · 차집합 14**.
