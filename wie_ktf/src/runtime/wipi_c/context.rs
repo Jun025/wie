@@ -93,7 +93,29 @@ impl WIPICContext for KtfWIPICContext {
 
     async fn get_resource_size(&self, name: &str) -> Result<Option<usize>> {
         // get_system_class_loader, NOT current_class_loader: the latter goes private one
-        // commit past our pin, and the two coincide wherever there is no Java frame.
+        // commit past our pin. Both DO resolve this resource today — but not for the
+        // reason an earlier revision of this comment gave. It said "the two coincide
+        // wherever there is no Java frame": the clause is true in general and the
+        // PREMISE IS FALSE HERE. A KTF app runs entirely under
+        // invoke_static("org/kwis/msp/lcdui/Main", "main"), so a Java frame is always on
+        // the stack and current_class_loader hands back KtfClassLoader — a DIFFERENT
+        // object from the system loader. It still finds the file because KtfClassLoader
+        // overrides no findResource (its proto declares only <init>/findClass) and is
+        // constructed with the system class loader as its PARENT (jvm_support.rs), while
+        // ClassLoader::getResource asks the parent before findResource.
+        // Measured 2026-09-06, two ways. (1) A probe here printed
+        //   current=<net.wie.KtfClassLoader>  system=<java.net.URLClassLoader>
+        // — DIFFERENT objects, which is the direct refutation of "no Java frame".
+        // (2) With all four sites switched to current_class_loader the resource tests
+        // still pass, so the two really do agree; cutting KtfClassLoader's parent link
+        // breaks KTF while LGT keeps passing. NOTE that second cut is blunt, not a clean
+        // isolation: KtfClassLoader::init loads client.bin through the same
+        // getResource->parent path, so KTF then fails on the SHIPPED form too. It shows
+        // the parent link carries KTF resources; it does not by itself separate the two
+        // loader APIs. (1) is what does that.
+        // The LGT twins coincide for a DIFFERENT reason (their class is registered with
+        // no loader at all, so the fallback branch runs). One sentence cannot cover both,
+        // which is exactly how the false premise survived at four sites.
         // Covered since 2026-09-06 by test_data/keydraw_{ktf,lgt}.zip, which bundles res.bin
         // and reads it at boot: wie_{ktf,lgt}/tests/test_resource_reach.rs asserts the guest
         // gets `res:9:602` back, and a planted panic!() here now fails that test (per-site
@@ -113,14 +135,10 @@ impl WIPICContext for KtfWIPICContext {
     }
 
     async fn read_resource(&self, name: &str) -> Result<Vec<u8>> {
-        // get_system_class_loader, NOT current_class_loader: the latter goes private one
-        // commit past our pin, and the two coincide wherever there is no Java frame.
-        // Covered since 2026-09-06 by test_data/keydraw_{ktf,lgt}.zip, which bundles res.bin
-        // and reads it at boot: wie_{ktf,lgt}/tests/test_resource_reach.rs asserts the guest
-        // gets `res:9:602` back, and a planted panic!() here now fails that test (per-site
-        // drill, all four sites). Before that fixture the same drill left the suite at
-        // 150 passed — these lines had never run. Per-site table:
-        // docs/upstream-realign-verdict.md §8-4(3)-b.
+        // get_system_class_loader, NOT current_class_loader — same reason, same measurement
+        // and same coverage as get_resource_size above; read that block. In short: a Java
+        // frame IS on the stack here (so the old "wherever there is no Java frame" premise
+        // is false), and the two agree only because KtfClassLoader delegates to its parent.
         let class_loader = JavaLangClassLoader::get_system_class_loader(&self.jvm).await.unwrap();
         let stream = JavaLangClassLoader::get_resource_as_stream(&self.jvm, &class_loader, name)
             .await
