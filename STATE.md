@@ -32,7 +32,7 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- (그 밖: ★열린 형제 PR: **#98 · #99 · #100 · #109 · #110** — 각자 자기
+- (그 밖: ★열린 형제 PR: **#98 · #99 · #100 · #110 · #112 · #113** — 각자 자기
   브랜치에서 진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
 
 ## 완료 (최근)
@@ -42,6 +42,15 @@
   ★**낡음이 두 겹**이었다 — spin 은 0.12.2 로 올라갔고 chacha20 은 새로 들어왔는데, ★**총 2건이라 수만 보면 멀쩡했다.**
   ★**주석만 · 동작 diff 0**(비-주석 추가·삭제 **0**, 계수 증명) · **suppression 0**(Constraint 5).
   ★착지 시 배포 있음(`web.yml` 은 필터 없음 · `publish-artifact` 는 `.rs`·`Cargo.*` 없어 **미발화**).
+- 2026-09-06: **CI 에서 «안 돌던» 검사 3건 처분** (PR **#109** 착지 · `wie-ci-wire-or-document-three-never-run-checks`
+  · 채택 제안 `2026-09-06-deletable-checks-census#p0`) — ★**셋을 한 덩이로 묶지 않았다**:
+  ⒜`scripts/audit-no-leak.sh` **배선**(`engine-contract.yml` 네 번째 상시 스텝 · 필터 «밖») ·
+  ⒝`verify-browser.mjs`·⒞`smoke_gate.sh` **문서화**(`AGENTS.md` 「Which of these CI actually runs」 절 신설).
+  ★**대전제 ⓐ 실측**: 워크플로 8파일 전수에서 세 스크립트 경로 히트 **전건 0**.
+  ★**계약 2 이행**: ⒞의 「구조적 불가」를 반증하려다 실패 — `game_lab/` 은 `.gitignore:23` · 추적 0건이고 내용물이 Constraint 9 금지 대상이다.
+  ★**양방향**: 기준선 rc=0 ↔ M1(raw `fetch(`) rc=1 ↔ M2'(`git add -f decoy.jar`) rc=1 · 원복 후 rc=0.
+  ★**부수 관측**: M2 첫 시도를 `.gitignore` 가 먼저 막았다 ⇒ Constraint 9 의 두 층은 «순서»가 있다.
+  ★대가 CI **+0.26~0.34s** · `.rs` 0 · 새 의존성 0. ★착지 시 배포 없음(`.rs`·`Cargo.*` 무접촉).
 - 2026-09-07: **`REPORT.md` 회차 파일 이관** (PR **#108** 착지 · `wie-report-md-per-round-files-port-from-otterpebble`) —
   형제 저장소 착지분(`otterpebble` `636bb8e7`)의 **포팅**이다. 643줄/51회차 → `docs/report/` **51파일** ·
   `REPORT.md` 는 자라지 않는 **고정 안내** · `docs/report-migration-revert.md`(되돌림 + 열린 PR 해소 레시피).
