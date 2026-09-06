@@ -1,8 +1,7 @@
 use alloc::vec;
 
 use java_class_proto::{JavaFieldProto, JavaMethodProto};
-use java_runtime::classes::java::lang::{Class, String};
-use jvm::{ClassInstanceRef, Jvm, Result as JvmResult, runtime::JavaLangString};
+use jvm::{ClassInstanceRef, Jvm, Result as JvmResult};
 
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 use wie_midp::classes::{
@@ -14,20 +13,32 @@ use crate::classes::org::kwis::msp::lcdui::{Card, Display};
 
 /// Is this the clet wrapper card, whose Java-level paint must be disabled?
 ///
-/// `Class.getName()` hands back the BINARY name — the pinned runtime builds it with
-/// `class_name.replace('/', ".")` (`java_runtime/.../java/lang/class.rs`), so LGT's card arrives as
-/// `net.wie.CletWrapperCard`. Comparing that against a slash literal never matched, so the branch
-/// in `push_card` had never run once and MIDP kept overpainting the good WIPI frame with a blank
-/// `screenImage`: the browser showed a black screen while the emulator was working
-/// (measured 2026-09-05 — `incoming_nonblack=424` immediately followed by `=0`).
+/// Takes the INTERNAL name — the one `ClassInstance::class_definition().name()` returns. There is
+/// no normalisation here on purpose: the caller no longer has a binary name to undo.
 ///
-/// So normalise instead of adding a second literal. KTF's `CletCard` passes today only because it
-/// has no package — that name is a guest constant-pool string, so a packaged card class would
-/// break KTF the same way. Normalising is what removes the shape-dependence; a second literal
-/// would only have covered the two names that exist right now.
-fn is_clet_card(binary_name: &str) -> bool {
-    let internal = binary_name.replace('.', "/");
-    internal == "CletCard" || internal == "net/wie/CletWrapperCard"
+/// History: this used to read `getClass().getName()`, which hands back the BINARY name (the pinned
+/// runtime builds it with `class_name.replace('/', ".")` in `java_runtime/.../java/lang/class.rs`),
+/// so LGT's card arrived as `net.wie.CletWrapperCard`. Comparing that against a slash literal never
+/// matched, the branch in `push_card` had never run once, and MIDP kept overpainting the good WIPI
+/// frame with a blank `screenImage`: the browser showed a black screen while the emulator was
+/// working (measured 2026-09-05 — `incoming_nonblack=424` immediately followed by `=0`). The first
+/// fix normalised the binary name back to internal form; this one removes the round trip instead,
+/// so the mismatch is not something to defend against — it cannot arise.
+///
+/// Measured 2026-09-07 on both carriers, `class_definition().name()`:
+/// LGT (`helloworld_lgt.zip`) → `net/wie/CletWrapperCard`; KTF (`keydraw_ktf.zip`) → `CletCard`.
+/// Both internal, which is what makes the literals below sufficient.
+///
+/// The two literals stay hardcoded on purpose — replacing them with a derived predicate was
+/// measured and declined (`wie-clet-card-identity-by-class-name-design-decision`, PR #95: no single
+/// predicate covers both carrier paths).
+///
+/// PIN COUPLING: `ClassInstance::class_definition()` and `ClassDefinition::name()` come from the
+/// pinned RustJava (`dlunch/RustJava@5b84dd1`). Moving that pin means re-verifying that `name()`
+/// still returns the internal form for both carriers — the shapes above are the whole safety
+/// argument for this function, and nothing else asserts them.
+fn is_clet_card(internal_name: &str) -> bool {
+    internal_name == "CletCard" || internal_name == "net/wie/CletWrapperCard"
 }
 
 #[repr(i32)]
@@ -256,11 +267,11 @@ impl CardCanvas {
         let _: () = jvm.invoke_virtual(&this, "repaint", "()V", ()).await?;
 
         // HACK: disable java level paint on clet app
-        let class: ClassInstanceRef<Class> = jvm.invoke_virtual(&c, "getClass", "()Ljava/lang/Class;", ()).await?;
-        let class_name: ClassInstanceRef<String> = jvm.invoke_virtual(&class, "getName", "()Ljava/lang/String;", ()).await?;
-        let class_name_str = JavaLangString::to_rust_string(jvm, &class_name).await?;
+        // Ask the class definition directly: it already holds the internal name, so there is no
+        // binary-form round trip to undo. See `is_clet_card` for the pin coupling this creates.
+        let class_name = c.as_ref().class_definition().name();
 
-        if is_clet_card(&class_name_str) {
+        if is_clet_card(&class_name) {
             let wipi_display: ClassInstanceRef<Display> = jvm
                 .invoke_static("org/kwis/msp/lcdui/Display", "getDefaultDisplay", "()Lorg/kwis/msp/lcdui/Display;", ())
                 .await?;
@@ -338,13 +349,22 @@ mod tests {
     use super::is_clet_card;
 
     #[test]
-    fn both_name_shapes_match() {
-        // The shape the pinned runtime actually produces …
-        assert!(is_clet_card("net.wie.CletWrapperCard"));
-        // … and the internal one, so a runtime that stops rewriting `/` keeps working.
+    fn internal_names_from_class_definition_match() {
+        // The exact values `class_definition().name()` produced, measured 2026-09-07 on both
+        // carriers: LGT via helloworld_lgt.zip, KTF via keydraw_ktf.zip (helloworld_ktf never
+        // reaches pushCard). If a pin bump changes either shape, this pair is what stops matching.
         assert!(is_clet_card("net/wie/CletWrapperCard"));
-        // KTF's unpackaged card is shape-independent by accident; assert it stays matched.
         assert!(is_clet_card("CletCard"));
+    }
+
+    #[test]
+    fn binary_names_do_not_match_by_design() {
+        // This used to pass, because the function normalised `.` to `/` first. It must not now:
+        // the caller hands over `class_definition().name()`, which is always internal, and a dotted
+        // name reaching here would mean someone put `getClass().getName()` back at the call site.
+        // Keeping this as a NEGATIVE is what makes that regression visible instead of silent —
+        // a re-introduced `replace('.', "/")` turns this test red.
+        assert!(!is_clet_card("net.wie.CletWrapperCard"));
     }
 
     #[test]
