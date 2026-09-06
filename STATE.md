@@ -32,6 +32,14 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- **러너 목록에 `keydraw_*`·`--inject`** (PR 개설 · `wie-agents-md-runner-list-missing-keydraw-and-inject`
+  · 채택 제안 `2026-09-06-rtrb-rustsec-2026-0274#p1`) — `AGENTS.md` 한 곳(루프 2줄 + 산문 6줄) ·
+  ★**삭제행 0**(순수 추가) · 픽스처·러너 코드 무접촉.
+  ★**전제 실측**(모집단 332줄): `keydraw` **0건** · `--inject` **0건** — 그런데 그 사실은 `wie_validate.rs:34`
+  **코드에는 이미 있었다** ⇒ «읽히는 자리»에만 없었다.
+  ★**갈림을 실행으로**: `keydraw_{ktf,lgt}` 플래그 없음 **FAIL · content false · paints 1** ↔
+  `--inject` **PASS · content true · paints 55**(두 캐리어 동일).
+  ★파리티 락 무영향(마커 구간 «밖» · `dod_ci_parity` 11 passed).
 - **파리티 가드 축⑶ «철자 → 경로»** (PR 개설 · `wie-parity-lock-guard-string-axes-to-structure-decision`
   · 채택 제안 `2026-09-06-parity-lock-self-deletion-guard#p1`) — ★**워크플로 무접촉 · 새 의존성 0 · CI 시간 +0s.**
   ★**오탐이 실재했다**: 완전한 `include!` 리팩터에서 `cargo test` **rc=0 · 11 passed** 인데 가드 **rc=1**.
