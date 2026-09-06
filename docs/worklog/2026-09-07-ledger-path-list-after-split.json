@@ -1,0 +1,32 @@
+{
+  "schema": "worklog/v1",
+  "date": "2026-09-07",
+  "task": "wie-merge-contract-path-list-stale-after-report-split",
+  "title": "원장 파일 목록에 docs/report/** 를 적었다 — 승인 열거가 이관보다 오래됐다",
+  "summary": "AGENTS.md §Landing paperwork 에 「이 저장소의 원장 파일 = STATE.md · REPORT.md · docs/report/** · docs/worklog/**, 충돌은 합집합」 한 블록을 적었다. REPORT 는 존치했다(고정 안내로 실재한다). 머지 계약 2-c⒜ 의 승인 열거는 이 저장소 밖(~/orchestrator/templates/merge-ticket.tpl)이라 여기서 고칠 수 없고, 그 파일은 형제 저장소의 2026-08-23 이관 뒤에도 갱신되지 않았다(docs/report 히트 0).",
+  "changes": [
+    "AGENTS.md §Landing paperwork — 원장 파일 4경로 + 합집합 해소 + 왜(이관 2026-09-07 · 머지 a5091df6) 한 블록",
+    "docs/report/0056--… 회차 항목 · STATE.md 진행중 1항목(착지 서류)"
+  ],
+  "verification": [
+    "읽는 자 실측: roster.conf 의 wie-2 레인 cwd = ~/worktrees/wie-2 · 그 CLAUDE.md 1행이 @AGENTS.md ⇒ 머지 회차를 포함한 이 레인의 모든 회차가 세션 기동 시 이 블록을 읽는다",
+    "파리티 락 무영향: 수정 hunk @@ +184 ↔ COMMIT-GATES 마커 구간 50~72 = 구간 밖 · check-parity-lock-wired rc=0",
+    "네 게이트 + beta clippy + node 검사기 + npm run audit 전건 rc=0"
+  ],
+  "limits": [
+    "머지 계약 2-c⒜ 의 승인 열거 «자체»는 고치지 못했다 — 정본이 ~/orchestrator/templates/merge-ticket.tpl 이고 이 저장소 밖이다. 이 회차가 한 것은 «이미 난 판단을 wie 회차가 읽는 자리에 적은 것»이다.",
+    "그 템플릿은 한 파일이 전 저장소의 머지 티켓을 렌더하므로, 고치면 otterpebble 의 같은 잠복(2026-08-23 이관 뒤 미갱신)도 함께 닫힌다 — 별 estate·별 소관이라 관측으로만 남겼다.",
+    "STATE.md 의 「REPORT.md 회차 파일 이관」 항목이 착지(#108 · a5091df6) 후에도 진행중에 남아 있다 — 머지 회차는 계약 3 으로 커밋을 만들지 않으므로 옮길 주체가 없다. 이 회차의 범위 밖이라 손대지 않았다."
+  ],
+  "proposals": [
+    {
+      "title": "머지 계약 2-c⒜ 의 승인 경로 열거에 docs/report/** 를 더한다 (orchestrator 소관)",
+      "plainSummary": "머지 티켓이 「원장 파일 한정」으로 이름을 대는 목록에 docs/report/** 가 없다. 회차 기록이 거기로 옮겨졌는데도 그렇다.",
+      "userBenefit": "머지 회차마다 「내 회차 기록을 옮길 권한이 있는가」를 다시 유도하지 않아도 된다. 유도가 어긋나면 회차 기록이 조용히 사라진다.",
+      "why": "정본 ~/orchestrator/templates/merge-ticket.tpl 의 docs/report 히트가 0 이다. otterpebble 은 2026-08-23, wie 는 2026-09-07 에 이관했고 그 사이 머지 회신 여러 건이 이미 그 경로를 만졌다. 한 템플릿이 전 저장소를 렌더하므로 한 줄이 둘을 함께 덮는다.",
+      "tradeoff": "제품 repo 워커가 고칠 수 없는 자리다 — orchestrator 레인 발권이 필요하다.",
+      "effort": "XS",
+      "target": "~/orchestrator/templates/merge-ticket.tpl (2-c⒜)"
+    }
+  ]
+}
