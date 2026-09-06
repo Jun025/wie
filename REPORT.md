@@ -11,6 +11,16 @@
 - **사용자 영향**: 없음(기본 동작 불변). 대신 「검사는 통과하는데 화면은 검다」를 ★**브라우저 없이 약 20초에** 잡을 수 있게 됐다(그 그물은 지금까지 wasm 빌드 + `contract` 잡 3~4분뿐이었다).
 - **★남는 구멍**: ⒜★**호출자가 «0»이다** — 선언 자리를 만들었을 뿐 아직 아무도 켜지 않았다. 어느 워크플로도 `wie_validate` 를 부르지 않고, 러너 블록 3종 중 `helloworld_*` 는 「비어야 정상」이라 플래그가 틀린다(제안 등재) ⒝opt-in 은 잊은 호출을 못 막는다(사이드카도 같다) ⒞`keydraw_*` 는 기본 `--timeout 20` 에 바짝 붙어 돈다(`ms 20028`) — 상시 게이트로 올리려면 예산을 먼저 재야 한다 ⒟richness 3축의 같은 사각은 **계약 3 대로 무접촉**(형제 티켓 몫).
 
+## [2026-09-06] `Image.createImage(String)` 픽스처 — «넓어진 가시 범위가 무엇을 찾는가»를 수로 냈다 (wie-system-class-loader-createimage-fixture)
+- **무엇을**: `scripts/make-draw-fixture.mjs` 가 jar 에 `wie-img.png`(16×8 RGB · 74바이트 · 스크립트가 바이트로 조립)를 동봉하고, `DrawMIDlet.startApp()` 이 **`Image.createImage("/wie-img.png")`** 로 그것을 **이름으로** 연 뒤 `getWidth()`·`getHeight()` 를 정적 필드에 저장하며, `DrawCanvas.paint()` 가 **그 치수 그대로** 사각을 채운다. `scripts/contract-roundtrip.mjs` 에 Scenario C-img 1건. `.rs` 변경은 **주석뿐**.
+- **왜**: 운영자 채택 제안 `2026-09-05-system-class-loader-preemptive-migration#p1`. 그 원문이 미완으로 남긴 문장이 이 회차의 Acceptance 다 — 「갈림 «자체»는 측정됐다 … ★**미측정인 것은 «넓어진 가시 범위가 실제로 무엇을 찾는가»** 하나다」.
+- **★★⑴ 산출이 «수»다**(계약 5): 칠해진 픽셀 수가 곧 **호스트가 찾아 디코드한 이미지의 픽셀 수**라, 왕복이 `1024 + 128 = **1152**` 를 ★**등호로** 단언한다(「돌아간다」가 아니다). 상수는 픽스처가 단일 출처로 소유하고 왕복은 `page.evaluate` 인자로 받아 **재진술 0**.
+- **★★⑵ 커버 전/후를 «같은 프로브»로 쟀다**(`image.rs` 그 줄에 `panic!()`): ★**전 — `cargo test --all` rc=0 · 156 passed / 0 failed · 5픽스처 전건 PASS**(`draw_j2me` nondom **1.3%**) ⇒ 아무것도 그 자리를 지나지 않았다(제안의 주장을 독립 재현) ↔ ★**후 — `draw_j2me.jar` FAIL · `panic during 'boot'` · ticks 0**. ⇒ ★**0 → 1.**
+- **★★⑶ 양방향 개악**(계약 4 · 매번 원본 복원 후 실행): **E0** 무개악 → 왕복 ★**42/42 rc=0** · `wie_validate` PASS(nondom **1.5%**) / **E1** `get_system_class_loader` → `jvm.current_class_loader()`(이행 전 형태) → ★**FAIL · `java.io.IOException: Resource not found: /wie-img.png`**(스택 `createImage(String)` ← `startApp`) ⇒ ★**넓어진 범위가 찾는 것 1건 ↔ 종전 경로 0건** / **E2-b** 전달 바이트 절반 절단 → ★**`IllegalArgumentException: Failed to decode image`** ⇒ 바이트도 하중을 받는다.
+- **★⑷ 음성 결과를 숨기지 않는다**: **E2**(바이트 «1개» 절단)는 ★**물지 않았다** — PNG 디코더가 꼬리 1바이트 결손을 견딘다. ⇒ 이 픽스처가 잠그는 것은 «전 바이트 무결»이 아니라 **「이름이 풀렸고 그 결과가 16×8 로 디코드된다」**이다.
+- **★⑸ 거짓이 된 서술을 정정했다**(그 두 곳만): `image.rs` 의 「NOT covered by any fixture」 · `docs/upstream-realign-verdict.md` §8-4⑶-b 의 「남은 미커버는 6번 하나」(→ **0곳**). ★**형제 회차와 같은 형태로 «결론 줄을 다시 쓰지 않고» 정정 블록을 덧댔다**(이력 보존).
+- **사용자 영향**: 없음(시험). 대신 「이미지를 이름으로 못 불러온다」류 회귀가 **커밋 전에** 잡힌다 — 6곳 중 **유일하게 동작이 달라진 칸**인데 그물이 0이었다.
+- **★남는 구멍**: ⒜**실패 갈래 미커버** — 없는 이름·깨진 이미지 경로는 **개악으로만** 지나갔다. 픽스처 어셈블러가 **예외 테이블을 내지 않아** 게스트에 try/catch 를 쓸 수 없는 것이 실제 비용이다(제안 등재) ⒝★**증거 축이 브라우저 왕복과 `wie_validate` 뿐**이다 — `cargo test --all` 은 여전히 J2ME 게스트를 부팅하지 않으므로(AGENTS.md 가 적은 그 사각) 이 커버는 PR 의 `contract` 잡에 의존한다(제안 등재) ⒞커버 = «실행된다»이지 «규격에 맞다»가 아니다 ⒟상용 코퍼스 0(Constraint 9).
 ## [2026-09-06] `Security audit` 3일 red 를 껐다 — `rtrb` 0.3.3 → 0.3.5 (wie-rustsec-2026-0274-rtrb-double-free-audit-red)
 - **무엇을**: `Cargo.lock` **2줄**(`rtrb` version + checksum). `cargo update -p rtrb` 한 번. ★그 밖의 크레이트 이동 **0** · `Cargo.toml` 무접촉.
 - **왜**: 매일 도는 `Security audit`(★`schedule` 전용 — PR 게이트가 아니라 머지를 막은 적은 없다)이 3일 연속 `error: 1 vulnerability found!`. 자문 = `RUSTSEC-2026-0274`(`ReadChunk::commit` 에서 **원소의 `Drop` 이 panic** 하면 double free / UAF).
@@ -19,6 +29,20 @@
 - **★⑶ 검증**: `cargo audit` ★**rc=0**(남은 2건은 비-게이트 allowed warning) · `cargo build -p wie_cli` 0 · 네 게이트 전건 0(**156 passed / 0 failed**) · ★`cargo +beta clippy --all -- -D warnings` **0** · `wie_validate` `draw_j2me`·`helloworld_{ktf,lgt}` ★**전건 PASS**(+ `keydraw_* --inject` PASS · `last_frame_content=true`).
 - **사용자 영향**: 없음. 에뮬레이터 동작은 한 비트도 바뀌지 않는다(오디오 재생 경로는 rtrb 를 지나지 않는다).
 - **★남는 구멍**: ⒜★**실보안 이득은 0에 가깝다** — 위 세 축이 전부 「안 탄다」다. 값은 daily red 를 끈 것과, rodio 가 나중에 `read_chunk` 를 쓰더라도 이미 패치판이라는 것뿐이다 ⒝⑴⒝ 의 근거는 **`rodio 0.22.2` 라는 «지금 그 판본»의 소스 실측**이라 rodio 를 올리면 다시 재야 한다 ⒞`cargo audit` 는 `Cargo.lock` 만 본다 — 「그 코드를 실행하는가」는 이 회차가 **손으로** 답했고 기계가 잠그지 않는다 ⒟`rust-audit.yaml` 주석의 「spin 0.12.0 yanked」는 실측(`chacha20 0.10.0`)과 다르지만 **워크플로 변경 0** 이라 고치지 않았다(제안 등재).
+## [2026-09-06] 「감시를 지웠는데 green」을 저장소 전체에서 세었다 — 「다섯」은 출처가 없고 실측은 8+3 이다 (wie-count-deletable-checks-that-stay-green-repo-wide)
+- **무엇을**: ★**세기만 했다 — 가드 0 · 코드 0 · 워크플로 무접촉.** 산출물은 `docs/worklog/2026-09-06-deletable-checks-census.json` 과 이월된 「다섯 번」 3자리의 인라인 정정뿐이다.
+- **왜**: 운영자 채택 제안 `2026-09-06-parity-lock-self-deletion-guard#p0`.
+- **★⑴ 술어와 수**: 「워크플로 스텝이 «경로로» 부르는 검사 파일 집합 **A**」 ↔ 「`scripts/`·`*/tests/` 에 실재하는 파일 집합 **B**」의 차집합. ★**A=9 · B=23 · B\A=14.** 재현은 `git grep` 두 줄이고 워크로그 `sets.reproduce` 에 그대로 실었다.
+- **★★⑵ 14를 전건 분류했다 — 「지워도 green」은 «한 형태»가 아니라 «두 형태»였다**:
+  ⒜★**「CI 에서 돌고 있는데 지워도 green」 8건** — 전건 rust 통합시험. `cargo test --all`·`tarpaulin --workspace` 가 **glob 으로 줍고** 워크플로가 이름을 부르는 자리가 **0** 이다.
+  ⒝★**「애초에 CI 에서 안 도는 검사」 3건** — `audit-no-leak.sh`·`verify-browser.mjs`·`smoke_gate.sh`. ★**지울 필요도 없다. 이미 안 돈다.** 특히 `audit-no-leak.sh` 는 Constraint 9·10 의 «기계 절반»인데 ★**어느 워크플로도 npm 스크립트도 부르지 않는다**(전수 0건).
+  ⒞검사 아님 2건(`lgt_render_probe.sh` 측정 하네스 · `smoke_gate_baseline.tsv` 데이터) ⒟★**술어의 오탐 1건** = `wie_cli/tests/support/dod_ci_parity.rs` — 직전 회차가 만든 `check-parity-lock-wired.mjs`(집합 A 원소)가 이 경로를 물어 red 가 된다 ⇒ ★**그 가드가 여기서 작동을 증명했다.**
+- **★★⑶ 분류를 «주장»이 아니라 «실행»으로 냈다**: 격리 워크트리에서 ⒜의 하나(`wie_jvm_support/tests/absent_timer_schedule.rs`)를 **실제로 지우고** `RUST_MIN_STACK=4194304 cargo test --all` → ★**기준선 rc=0 · 40줄 · 156 passed · 이름 1회** ↔ ★**삭제 후 rc=0 · 39줄 · 155 passed · 이름 «0회»**. ★**커밋 0 · 워크트리 제거.** 같은 트리에서 `cargo fmt` rc=0 · 두 node 가드 rc=0.
+  ★**커버리지 게이트도 못 잡는다**: `codecov.yml` 이 **0바이트**(Constraint 2 가 «일부러 비워 둔다»고 적은 그것)라 임계가 없다 — `fail_ci_if_error: true` 는 업로드 오류용이다.
+- **★★⑷ 회차를 낳은 수가 «출처 없음»이었다**: 「이 저장소에서 다섯 번 났다」는 `2026-09-05-dod-ci-parity-checker.json` 에서 처음 나와 두 곳으로 인용됐을 뿐 ★**다섯 자리를 열거한 곳이 없다.** 저장소가 실제로 센 「five times」는 `AGENTS.md:234,255` 의 **셀프머지 5건**(다른 형태)이다 ⇒ ★**다른 대장 항목에서 빌려 온 수로 보인다.** 세 자리에 상호참조 정정을 붙였고 **원문은 사료로 보존**했다.
+- **사용자 영향**: 없음(조사·문서). 대신 총괄이 발권 계획을 세울 «수»가 생겼다.
+- **★남는 구멍**: ⒜★**술어가 «파일»을 보지 «모듈»을 안 본다** — 인라인 `#[cfg(test)]` 를 가진 `.rs` 가 **31개** 더 있어 진짜 모집단은 8보다 크다(다만 `mod tests` 삭제는 소스 diff 라 더 눈에 띈다) ⒝스텝«까지» 지우면 A 원소도 사라진다(무한 후퇴 — 직전 회차가 이미 적었다) ⒞`web/`·`functions/` 는 술어 밖이다(현재 시험 파일 **0건** ⇒ 손실 없음).
+- **★권하지 않는 것**: ⒜의 8건에 **각각 가드를 다는 것**. 직전 회차의 가드가 정당했던 이유는 락이 **2파일 구성**이고 **CI 자신을 감시**하기 때문이며, 보통의 시험 1건 삭제는 **PR diff 에 그대로 보인다**. ⇒ ★**값하는 자리는 ⒝의 3건**이다.
 
 ## [2026-09-06] 파리티 락의 «자기 삭제»를 막았다 — 두 파일을 함께 지우면 green 이었다 (wie-dod-ci-parity-self-deletion-guard)
 - **무엇을**: `scripts/check-parity-lock-wired.mjs` 신설 + `engine-contract.yml` `contract` 잡에 **상시 스텝 1개**(비-주석 **2줄** · ★**필터 밖**). ★**paths 필터 목록 무접촉**(Constraint 4).
@@ -110,6 +134,7 @@
   ★**rc=101 · FAILED 1**(「CI 에만 있다 …」) ⒝**무개악 → green** — `10 passed / 0 failed` · 워크스페이스 **149 passed / 0 failed**
   ⒞★**검사기를 지우면 red** — `couldn't read … dod_ci_parity.rs` · `could not compile` ⇒ **rc=101**.
   ★⒞ 를 위해 **2파일**로 나눴다(한 파일이면 「지워도 green」이 된다 — 이 저장소에서 다섯 번 난 형태).
+  ★★**[정정 2026-09-06 · `wie-count-deletable-checks-that-stay-green-repo-wide`] 그 「다섯 번」은 «출처가 없다»** — 다섯 자리를 열거한 곳이 저장소 어디에도 없고, 실제로 센 「five times」는 `AGENTS.md` 의 **셀프머지**(다른 형태)다. ★**세어 본 실측은 8 + 3** 이다 → `docs/worklog/2026-09-06-deletable-checks-census.json`.
   ★그리고 개악 대조 **M1~M6** 이 시험으로 **상주**한다(CI 에만 게이트 / DoD 에서 삭제 / 매트릭스 nightly / DoD 만 nightly /
   마커 삭제 / 핀 파일 출현).
 - **★⑸ 현 저장소 판정 = green** — 축 A 대칭차 **0**(CI 4 · DoD 4) · 축 B `{beta, stable}` 일치. ⇒ 「검사가 옳다 ↔ 파리티가

@@ -1,0 +1,57 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-06",
+  "task": "wie-count-deletable-checks-that-stay-green-repo-wide",
+  "title": "「감시를 지웠는데 green」을 저장소 전체에서 세었다 — 「다섯」은 출처가 없고, 실측은 8+3 이다",
+  "adoptedProposals": ["2026-09-06-parity-lock-self-deletion-guard#p0"],
+  "summary": "★**세기만 하는 회차다 — 가드 0 · 코드 0.** 술어 = 「워크플로 스텝이 «경로로» 부르는 검사 파일 집합 A」 ↔ 「`scripts/`·`*/tests/` 에 실재하는 파일 집합 B」의 차집합. 실측 **A=9 · B=23 · B\\A=14**. 그 14를 전건 분류하니 ★**«CI 에서 돌고 있는데 지워도 green» 8** · ★**«애초에 CI 에서 안 도는 검사» 3**(다른 형태다) · 검사 아님 2 · ★**술어의 오탐 1**. ★**그리고 회차를 낳은 「이 저장소에서 다섯 번 났다」는 «출처가 없다»** — 저장소가 실제로 센 「five times」는 `AGENTS.md` 의 **셀프머지**뿐이고 그것은 다른 형태다.",
+  "sets": {
+    "A": "9 — `.github/workflows/**` 안에서 경로로 불리는 것: `scripts/{build-wasm.sh,check-engine-contract.mjs,check-parity-lock-wired.mjs,check-worklog-coverage.mjs,check-worklog-json.mjs,contract-roundtrip.mjs,make-draw-fixture.mjs,make-wipi-keydraw-fixture.sh}` + `wie_cli/tests/dod_ci_parity.rs`.",
+    "B": "23 — `git ls-files scripts/ '*/tests/*'`.",
+    "reproduce": [
+      "git grep -hoE '(scripts|[a-z_]+/tests)/[A-Za-z0-9_./-]+' -- .github/workflows | sort -u > /tmp/A.txt",
+      "git ls-files scripts/ '*/tests/*' | sort > /tmp/B.txt   # 차집합: comm -13 /tmp/A.txt /tmp/B.txt"
+    ]
+  },
+  "classification": [
+    "★**「돌고 있는데 지워도 green」 8건**(전건 rust 통합시험 · `cargo test --all`·`tarpaulin --workspace` 가 **glob 으로 줍는다** ⇒ 워크플로가 이름을 부르는 자리 0): `wie_jvm_support/tests/{absent_string_buffer_insert,absent_timer_schedule}.rs` · `wie_{ktf,lgt}/tests/{test_helloworld,test_key_reach,test_resource_reach}.rs`.",
+    "★**「애초에 CI 에서 안 도는 검사」 3건 — «지워도 green» 이 아니라 «이미 안 돈다»다**: ⒜`scripts/audit-no-leak.sh`(위반 시 non-zero 인 정적 검사인데 `npm run audit` 로만 불리고 ★**어느 워크플로도 부르지 않는다** — Constraint 9·10 의 «기계 절반»이다) ⒝`scripts/verify-browser.mjs`(실제 크롬+로컬 서버+게임 파일 필요 · `npm run verify` 참조 0) ⒞`scripts/smoke_gate.sh`(★**구조적으로 CI 불가** — 로컬 게임 코퍼스가 필요하고 그 바이트는 Constraint 9 로 CI 에 들어갈 수 없다).",
+    "검사 아님 2건: `scripts/lgt_render_probe.sh`(외부 zip 을 받는 측정 하네스 — 합격/불합격 술어 없음) · `scripts/smoke_gate_baseline.tsv`(⒞의 입력 데이터).",
+    "★**술어의 오탐 1건**: `wie_cli/tests/support/dod_ci_parity.rs` — 워크플로가 이 경로를 직접 부르지는 않지만 ⑴집합 A 원소인 `scripts/check-parity-lock-wired.mjs` 가 이 경로를 **이름으로** 물고 ⑵`#[path]` 결합이 단일 삭제를 컴파일 오류로 만든다 ⇒ 지우면 red. ★**직전 회차가 만든 가드가 여기서 «작동을 증명했다».**"
+  ],
+  "verification": {
+    "the-hole-measured": "★**분류를 «주장»이 아니라 «실행»으로 냈다** — 격리 워크트리(`git worktree add --detach`)에서 8건 중 하나(`wie_jvm_support/tests/absent_timer_schedule.rs`)를 **실제로 지우고** `RUST_MIN_STACK=4194304 cargo test --all` 을 돌렸다. ★**기준선 rc=0 · `test result:` 40줄 · 156 passed · 출력에 `absent_timer_schedule` 1회** ↔ ★**삭제 후 rc=0 · 39줄 · 155 passed · 그 이름 «0회»**. ⇒ ★**검사가 사라졌는데 CI 술어는 green 이고, 움직인 것은 «아무도 읽지 않는 수» 하나뿐이다.** 같은 트리에서 `cargo fmt --all -- --check` rc=0 · `check-parity-lock-wired.mjs` rc=0 · `check-worklog-json.mjs` rc=0. ★**커밋하지 않았다 — 워크트리는 제거했다.**",
+    "coverage-gate-cannot-catch-it-either": "★`codecov.yml` 은 **0바이트**(Constraint 2 가 «일부러 비워 둔다»고 못박은 그것)라 임계가 없다 ⇒ 커버리지 하락으로 red 가 되는 경로가 **없다**. `coverage.yml:59` 의 `fail_ci_if_error: true` 는 **업로드 오류**용이지 커버리지 %가 아니다.",
+    "the-five-has-no-source": "★★**「이 저장소에서 다섯 번 났다」의 출처를 전수로 찾았다 — 없다.** 그 주장은 `docs/worklog/2026-09-05-dod-ci-parity-checker.json`(`wiring`·`proposals[0].userBenefit`)에서 처음 나와 `REPORT.md:92` 와 `2026-09-06-parity-lock-self-deletion-guard.json` 으로 인용됐을 뿐, **다섯 자리를 열거한 곳이 어디에도 없다**(`git grep '다섯\\|five times'` 전수 = 8파일 · 전건 확인). ★저장소가 «실제로 센» five times 는 `AGENTS.md:234,255` 의 ★**셀프머지 5건**이고 그것은 **다른 형태**다. ⇒ ★**수가 다른 대장 항목에서 빌려 왔을 가능성이 높다.** 세어 보니 이 형태의 실측은 **8(+다른 형태 3)** 이다."
+  },
+  "limits": [
+    "★★**술어는 «파일»을 보지 «모듈»을 보지 않는다** — 인라인 `#[cfg(test)]` 를 가진 `.rs` 가 **31개** 더 있고 그것들도 glob 으로 줍힌다 ⇒ ★**「지워도 green」의 «진짜» 모집단은 8보다 크다.** 다만 `mod tests` 삭제는 소스 파일 «안»의 diff 라 파일 삭제보다 눈에 띈다 — 그래서 술어를 넓히지 않았다.",
+    "★**「집합 A 에 있다 = 안전」이 아니다** — 스텝«까지» 함께 지우면 A 원소도 조용히 사라진다(직전 회차가 이미 그 무한 후퇴를 적었다). 이 회차는 그 축을 다시 세지 않았다.",
+    "★**`web/`·`functions/` 는 술어 밖이다** — 실측상 그쪽 시험 파일이 **0건**이라 이번엔 손실이 없지만, 생기면 술어를 넓혀야 한다.",
+    "★**분류의 «검사인가»는 사람 판단이다** — 근거를 원소마다 한 줄로 적은 것이 그 판단의 전부이고, 기계가 재현하는 것은 차집합(14)까지다."
+  ],
+  "not-done-on-purpose": [
+    "★★**가드를 «하나도» 만들지 않았다**(계약 3). 처분은 총괄이 별건으로 발권한다.",
+    "★**8건에 각각 가드를 다는 것을 «권하지 않는다»** — 직전 회차의 가드가 정당했던 이유는 파리티 락이 ⑴**2파일 구성이라 «둘 다» 지우면 시험 대상 자체가 사라지고** ⑵**CI 자신을 감시하는 락**이기 때문이다. 보통의 통합시험 1건 삭제는 **PR diff 에 그대로 보이고** 가드 8개는 그 자체가 유지 부담이다. ⇒ ★**여기서 값하는 것은 8건이 아니라 위 3건**이다(그쪽은 «지우지 않아도 이미 안 돈다»)."
+  ],
+  "proposals": [
+    {
+      "title": "CI 에서 «한 번도 돈 적 없는» 검사 3건을 배선하거나, 안 돈다고 적어라",
+      "plainSummary": "게임 파일 유출을 막는 검사와 브라우저 검증 검사가 저장소에 있지만, 자동 검사에서는 한 번도 실행되지 않습니다. 있다는 사실이 돈다는 뜻이 아닙니다.",
+      "userBenefit": "「유출 방지 검사가 있다」가 「유출 방지 검사가 돈다」와 같아집니다.",
+      "why": "★실측: `scripts/audit-no-leak.sh`·`scripts/verify-browser.mjs`·`scripts/smoke_gate.sh` 는 **어느 워크플로도 경로로도 npm 스크립트로도 부르지 않는다**(`git grep` 전수 = 0건). ★**`audit-no-leak.sh` 는 Constraint 9·10 의 «기계 절반»**이고 `AGENTS.md` 는 그것을 「what … exist to enforce」라고 적는다 — 즉 ★**문서가 집행을 약속하는데 집행이 CI 에 없다.** ⒜는 오프라인·의존성 0 이라 `engine-contract.yml` 상시 스텝 1줄이면 끝난다.",
+      "tradeoff": "⑴⒜만 싸다 — `verify-browser.mjs` 는 playwright+로컬 서버, `smoke_gate.sh` 는 ★**Constraint 9 때문에 CI 에 코퍼스를 넣을 수 없어 «구조적으로» 배선 불가**다 ⇒ 그 둘은 배선이 아니라 «로컬 전용이라고 적는 것»이 정답일 수 있다 ⑵⒜를 배선하면 위반 시 PR 이 red 가 된다 — 지금 green 인지 먼저 재야 한다(이 회차는 재지 않았다) ⑶아무것도 안 하는 선택도 정당하다: 세 검사 다 로컬에서는 돈다.",
+      "effort": "S(⒜ 배선) ~ S(⒝⒞ 문서화).",
+      "target": "wie · .github/workflows/engine-contract.yml · AGENTS.md"
+    },
+    {
+      "title": "출처 없는 「다섯 번」을 세 자리에서 «수»로 고쳐라 — 이번 회차가 그 수를 쟀다",
+      "plainSummary": "「이런 일이 다섯 번 있었다」는 문장이 근거 없이 세 곳에 인용돼 있습니다. 실제로 세어 보니 다른 수였습니다.",
+      "userBenefit": "다음 사람이 반증된 수 위에서 판단하지 않습니다.",
+      "why": "★이 회차가 상호참조 주석은 붙였지만 **원문 문장 자체는 남겨 두었다**(남의 착지본 · 계약 3의 「세기까지」). ★그러나 이 저장소가 반복해 규탄한 형태가 정확히 「반증된 전제가 서술로 남아 이월된다」이고, 그 문장은 지금도 `REPORT.md:92` 에서 단정으로 읽힌다. 실측값은 **8(같은 형태) + 3(다른 형태)** 이고 「다섯」의 출처는 **셀프머지 대장 항목**일 가능성이 높다.",
+      "tradeoff": "⑴문서 3곳 · 코드 0 — 4게이트를 한 바퀴 돌릴 필요도 없다(`.rs` 무접촉) ⑵★**다른 `.md`/`.json` 회차에 얹어 태우는 것이 가장 싸다** ⑶미루는 대가: 그 문장이 다음 제안의 `why` 로 다시 복사된다(이미 두 번 그렇게 됐다).",
+      "effort": "XS.",
+      "target": "wie · docs/worklog/2026-09-05-dod-ci-parity-checker.json · REPORT.md"
+    }
+  ]
+}

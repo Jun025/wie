@@ -123,8 +123,15 @@ impl Image {
         // whose parent is None: it can never resolve a guest resource, so this call used to
         // throw IOException every time. The system URLClassLoader (parent=RustJar + the guest
         // jar URLs) does resolve it. So this is NOT "no change" — it widens what the call sees.
-        // NOT covered by any fixture — a planted panic!() here left the suite green
-        // (measured 2026-09-05). Per-site table: docs/upstream-realign-verdict.md §8-4(3)-b.
+        // COVERED since 2026-09-06 by test_data/draw_j2me.jar: its startApp() opens a bundled
+        // 16x8 PNG through this call and paints a rect of the dimensions the host reported, so
+        // scripts/contract-roundtrip.mjs Scenario C-img asserts 1024+128 px by equality. The
+        // preceding revision of this comment said "NOT covered by any fixture — a planted
+        // panic!() here left the suite green"; that was true on 2026-09-05 and the same probe
+        // now fails draw_j2me.jar at boot (0 -> 1). Reverting the line below to
+        // jvm.current_class_loader() reproduces the old behaviour exactly:
+        // java.io.IOException: Resource not found: /wie-img.png.
+        // Per-site table: docs/upstream-realign-verdict.md §8-4(3)-b.
         let class_loader = JavaLangClassLoader::get_system_class_loader(jvm).await?;
         // MIDP Image.createImage(String) throws IOException when the named resource
         // cannot be found — do that instead of unwrapping None (host-process panic).
