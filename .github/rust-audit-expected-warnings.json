@@ -1,0 +1,25 @@
+{
+  "note": [
+    "EXPECTED, NOT SUPPRESSED. Every entry here is a warning cargo-audit currently prints and",
+    "that we have looked at; nothing in this file changes what cargo-audit reports or what it",
+    "exits with. AGENTS.md Constraint 5 ('cargo audit with no ignores ... never blanket, never",
+    "continue-on-error') is about the AUDIT STEP, which this file does not touch: the audit runs",
+    "unignored and still fails the job on any vulnerability. This is a second, separate step that",
+    "only compares lists.",
+    "",
+    "Read scripts/check-audit-warnings.mjs for the two directions it checks. The short version:",
+    "  - a warning here that cargo-audit NO LONGER prints  -> the job goes RED, because this list",
+    "    is stale and staleness is exactly the defect that produced this file (spin 0.12.0 sat here",
+    "    long after it was gone, while chacha20 arrived and nobody noticed - the COUNT stayed 2, so",
+    "    'two current warnings' read as true the whole time).",
+    "  - a warning cargo-audit prints that is NOT here -> reported as NEW and NOT red, so a fresh",
+    "    unmaintained advisory never creates pressure to reach for --ignore.",
+    "",
+    "To update: run the checker; it prints the exact entry to add or the exact line to delete."
+  ],
+  "measured": "2026-09-06T22:24Z",
+  "expected": [
+    { "package": "ttf-parser", "version": "0.25.1", "kind": "unmaintained", "advisory": "RUSTSEC-2026-0192" },
+    { "package": "chacha20", "version": "0.10.0", "kind": "yanked", "advisory": null }
+  ]
+}

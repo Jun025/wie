@@ -1,0 +1,11 @@
+## [2026-09-07] 「허용 경고」 목록을 기계가 대조한다 — ★수는 못 보는 «스왑»을 목록은 본다 (wie-rust-audit-allowed-warning-list-machine-checked)
+- **무엇을**: ⒜ `.github/rust-audit-expected-warnings.json`(★**기대값 파일 — suppression 이 아니다**) + `scripts/check-audit-warnings.mjs` + `rust-audit.yaml` 에 ★**별도 스텝**(+ Node 핀). ★**`cargo audit` 스텝 자체는 무접촉**(`run: cargo audit` 그대로 · `--ignore` **0**).
+- **왜**: 운영자 채택 제안 `2026-09-06-rust-audit-warning-list-remeasure#p0`. 직전 회차가 고친 것은 «값»이지 «구조»였다 — ★**spin 이 사라지고 chacha20 이 들어왔는데 개수가 둘 다 2 라 「two current warnings」가 계속 참**이었다.
+- **★F1 실측**(2026-09-06T22:24Z): 판정식 = `run: cargo audit` **한 줄뿐**(rc 는 cargo-audit 종료코드 · ★**목록을 대조하는 곳 0**) · `cargo audit --json` 실제 = `ttf-parser 0.25.1 unmaintained RUSTSEC-2026-0192` + `chacha20 0.10.0 yanked` · 취약점 **0**. ★**주석과 실제는 «지금은 일치»한다**(직전 회차가 방금 맞췄다) — 즉 이 회차가 막는 것은 **다음 번 드리프트**다.
+- **★★F2 — «기대값»과 «suppression» 을 «기계로» 갈랐다**: ⒜**사라진 경고 → rc=1**(목록이 낡았다는 신호 · ★이것이 없으면 그냥 suppression 이다) ⒝**새 경고 → 인쇄하되 rc=0**(★새 자문이 매일 잡을 붉히면 `--ignore` 압력이 생긴다 — **Constraint 5** 가 금지한 그것). ⇒ ★**항목을 지워도 «숨겨지지 않는다»** — 그 경고는 «처음 보는 것»이 되어 계속 인쇄된다.
+- **★Constraint 5 인용·충돌 없음**: 「`cargo audit` with no ignores … never blanket, never `continue-on-error`」는 ★**«audit 스텝»에 대한 조항**이고, 이 회차는 그 스텝의 `run`·rc·트리거를 **건드리지 않았다**(별도 스텝 신설). `--ignore` 문자열은 파일에 **3건뿐이고 전부 주석**(옛 quick-xml 이력 + 이 설계 설명)이다.
+- **★양방향 + 위양성 대조**(전건 실행): 현 상태 **rc=0**(오늘 red 아님) · **M1** 새 경고 → **rc=0** 이고 「처음 보는 경고」로 갈라 인쇄 · **M2** 사라진 경고(spin 재현) → **rc=1 · 「더는 내지 않는다」** · ★★**M3 «개수는 2로 같은데 구성만 스왑»** → ★**rc=1**(그리고 양쪽을 다 보여 준다) — ★**이것이 실제로 일어났던 결함 형태이고, 개수로는 영원히 못 잡는다.**
+- **★갱신 규율이 어디 사는가**(제안 tradeoff ⑵): ★**검사기가 «붙여 넣을 JSON 한 줄»과 «지울 줄»을 출력한다** — 사람이 형식을 기억할 필요가 없고, ★**M2 가 red 라 «지우는 것»은 미룰 수 없다**.
+- **대가**: 스텝 **+1** · `cargo audit --json` 1회 추가(웜 실측 **0.89s / 1.09s**) · ★**일 1회 스케줄 잡에만** 붙는다(PR 상시 구간 **무접촉**). 새 npm 의존성 **0**(Node 내장만).
+- **사용자 영향**: 없음(CI). 대신 ★**「예상된 경고」와 「처음 보는 경고」가 자동으로 갈린다.**
+- **★남는 구멍**: 기대값 파일은 **사람이 갱신**한다(M2 red 가 그 규율을 강제할 뿐이다) · 이 검사는 «도달성»을 보지 않는다(그것은 Constraint 5 가 요구하는 **사람의 reachability argument** 몫이다).

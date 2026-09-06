@@ -32,6 +32,13 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- **audit 「허용 경고」 목록 기계 대조** (PR 개설 · `wie-rust-audit-allowed-warning-list-machine-checked`
+  · 채택 제안 `2026-09-06-rust-audit-warning-list-remeasure#p0`) — ⒜ 기대값 파일 + 검사기 + `rust-audit.yaml` **별도 스텝**.
+  ★**`cargo audit` 스텝 무접촉**(`--ignore` 0 · rc·트리거 불변) ⇒ **Constraint 5** 와 충돌 없음.
+  ★**기대값 ≠ suppression 을 기계로**: 사라진 경고 → **rc=1** · 새 경고 → 인쇄하되 **rc=0**.
+  ★**M3(개수는 2로 같고 구성만 스왑) → rc=1** — 실제로 났던 결함 형태이고 개수로는 못 잡는다. 현 상태 rc=0(오늘 red 아님).
+  ★대가: 일 1회 스케줄 잡에 `cargo audit --json` 1회(웜 0.89~1.09s) · PR 상시 구간 무접촉 · npm 의존성 0.
+  ★착지 시 배포 없음 예상(`.rs`·`Cargo.*` 무접촉 — 착지 diff 로 다시 셀 것).
 - **카드 신원을 `class_definition().name()` 으로** (PR 개설 · `wie-clet-card-identity-use-class-definition-name`
   · 채택 제안 `2026-09-06-clet-card-identity-design#p0`) — `card_canvas.rs` 한 파일(**+44/−24**).
   `getClass()`→`getName()` **invoke_virtual 2회 + to_rust_string** → ★**`class_definition().name()` 한 줄** ·
