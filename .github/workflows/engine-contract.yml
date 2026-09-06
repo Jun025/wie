@@ -93,6 +93,31 @@ jobs:
       - name: DoD parity lock is still wired (docs/worklog/2026-09-05-dod-ci-parity-checker.json #p0)
         run: node scripts/check-parity-lock-wired.mjs
 
+      # Fourth always-run step, same reasoning as the three above, for Constraint
+      # 9/10: until now `scripts/audit-no-leak.sh` ran ONLY from a developer's
+      # `npm run audit` — no workflow called it by any path (measured: 0 hits
+      # across all 8 workflow files). AGENTS.md's constraint table nonetheless
+      # listed it under "Locked by", i.e. the doc promised machine enforcement
+      # that did not exist. This step is that enforcement.
+      #
+      # OUTSIDE the paths filter on purpose: what it guards is a *repo-wide*
+      # property ("no game binaries tracked", "network primitives confined to
+      # lib/api.ts", "rom_hash uniqueness is per-owner"), and the diff that
+      # violates it — a stray `.jar`, a raw `fetch()` in a device-local module, a
+      # migration adding a global UNIQUE — need not touch a single engine path.
+      # A filtered step would skip exactly the PR that needed it.
+      #
+      # Cost: bash + find/grep + python3, no node_modules, no network. Measured
+      # 0.26-0.34s over three runs in a clean worktree.
+      #
+      # Ceiling: section 5's `web/dist` scan self-skips here ("not built yet"),
+      # because this step deliberately runs before/without the frontend build.
+      # The half that matters on a PR — `git ls-files` for tracked game binaries —
+      # runs unconditionally, and dist is a fresh build of sources this same
+      # script audits, so the skipped half has no input the checked half missed.
+      - name: No-leak / owner-isolation audit (Constraint 9-10)
+        run: bash scripts/audit-no-leak.sh
+
       # Detect whether this diff touches anything that can change the built
       # artifact or the pinned surface. If not, the job short-circuits to success
       # (see the wrapper note in the header). Same list as publish-artifact.yml.
