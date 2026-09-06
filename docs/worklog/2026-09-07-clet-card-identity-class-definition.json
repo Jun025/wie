@@ -1,0 +1,37 @@
+{
+  "schema": "worklog/v1",
+  "date": "2026-09-07",
+  "task": "wie-clet-card-identity-use-class-definition-name",
+  "title": "카드 신원을 class_definition().name() 으로 — 「되돌릴 것」 자체를 없앴다",
+  "summary": "push_card 가 쓰던 getClass()→getName() invoke_virtual 2회 + JavaLangString::to_rust_string 을 c.as_ref().class_definition().name() 한 줄로 바꾸고, is_clet_card 에서 replace('.', \"/\") 를 지웠다. 두 캐리어를 직접 프로브해 class_definition().name() 이 둘 다 내부 형식임을 확인했다(LGT net/wie/CletWrapperCard · KTF CletCard). 하드코딩 두 이름은 그대로다 — 그 축은 PR #95 가 기각했다.",
+  "changes": [
+    "wie_wipi_java/src/classes/net/wie/card_canvas.rs — push_card 호출부 3줄 → 1줄 · is_clet_card 에서 replace 제거 · 미사용 import 3개 제거 · PIN COUPLING 주석",
+    "단위시험: both_name_shapes_match → internal_names_from_class_definition_match(양성) + binary_names_do_not_match_by_design(★음성 · 새로 세운 축)",
+    "docs/report/0062--… · docs/worklog/… — 착지 서류"
+  ],
+  "verification": [
+    "F1 프로브(양 경로): LGT helloworld_lgt.zip → class_definition=net/wie/CletWrapperCard vs getName=net.wie.CletWrapperCard · KTF keydraw_ktf.zip → 둘 다 CletCard. ※helloworld_ktf.zip 은 pushCard 에 도달하지 않는다",
+    "분기 판정 불변: BRANCHPROBE 로 두 캐리어 모두 matched=true 확인",
+    "개악 M1(정규화 재도입) → binary_names_do_not_match_by_design FAILED(2 passed / 1 failed) · 원복 바이트 동일",
+    "개악 M2(호출부를 바이너리로) → LGT last_frame_content=false · paints 83(=55+28) = 2026-09-05 서명 재현 · --expect-last-frame rc=1 ↔ 원복 rc=0 · KTF 무영향",
+    "러너 5픽스처 전건 PASS · paints LGT/KTF 55/55 = 기준선 그대로",
+    "4게이트 + beta clippy 전건 rc=0 · cargo test --all 161 passed / 0 failed(기준선 160 → +1 = 시험 1개를 둘로 가름)"
+  ],
+  "limits": [
+    "핀 결합: class_definition()·name() 은 핀된 RustJava(dlunch/RustJava@5b84dd1) API 다. 핀을 옮기면 「name() 이 두 캐리어 모두에서 내부 형식을 주는가」를 다시 재야 한다 — 그 문장을 코드 주석(PIN COUPLING)과 이 회신에 남겼고, 핀은 옮기지 않았다(범위 밖).",
+    "단위시험은 순수 함수만 본다 — 호출부가 다시 바이너리 이름을 넘기는 회귀는 단위시험이 못 잡는다. 그 축은 행동 축(wie_validate --expect-last-frame · LGT)이 지며 M2 로 실증했다.",
+    "wie_validate 의 예산은 wall-clock 이라 paints 는 머신 부하에 민감하다. 빌드 중에 재면 55 가 45/43 으로 읽힌다 — 단발 측정으로 인과를 적지 마라(이 회차가 한 번 그렇게 오독했고 반복 측정으로 뒤집었다)."
+  ],
+  "adoptedProposals": ["2026-09-06-clet-card-identity-design#p0"],
+  "proposals": [
+    {
+      "title": "RustJava 핀 이동 회차 체크리스트에 「class_definition().name() 형식 재검증」을 넣는다",
+      "plainSummary": "카드 신원 판정이 이제 핀된 API 가 «내부 형식»을 준다는 사실 위에 서 있다. 핀을 옮기는 회차가 그것을 모르면 조용히 깨진다.",
+      "userBenefit": "핀 범프가 검은 화면(2026-09-05 형상)을 다시 만드는 경로를 닫는다. 그 사고는 브라우저에서만 보였고 네이티브 result 는 PASS 였다.",
+      "why": "docs/upstream-realign-verdict.md §8-4⑶ 이 핀 이동 비용을 항목으로 세는데, 이 결합은 아직 그 목록에 없다. 코드 주석(PIN COUPLING)은 그 회차가 그 파일을 열어야만 보인다.",
+      "tradeoff": "핀 이동 회차의 체크 항목이 하나 는다. 재검증 자체는 프로브 2회(캐리어당 1)로 끝나 비용은 작다.",
+      "effort": "XS",
+      "target": "docs/upstream-realign-verdict.md §8-4 (핀 이동 비용 목록)"
+    }
+  ]
+}
