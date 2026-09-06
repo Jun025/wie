@@ -10,6 +10,14 @@
 - **★⑸ 거짓이 된 서술을 정정했다**(그 두 곳만): `image.rs` 의 「NOT covered by any fixture」 · `docs/upstream-realign-verdict.md` §8-4⑶-b 의 「남은 미커버는 6번 하나」(→ **0곳**). ★**형제 회차와 같은 형태로 «결론 줄을 다시 쓰지 않고» 정정 블록을 덧댔다**(이력 보존).
 - **사용자 영향**: 없음(시험). 대신 「이미지를 이름으로 못 불러온다」류 회귀가 **커밋 전에** 잡힌다 — 6곳 중 **유일하게 동작이 달라진 칸**인데 그물이 0이었다.
 - **★남는 구멍**: ⒜**실패 갈래 미커버** — 없는 이름·깨진 이미지 경로는 **개악으로만** 지나갔다. 픽스처 어셈블러가 **예외 테이블을 내지 않아** 게스트에 try/catch 를 쓸 수 없는 것이 실제 비용이다(제안 등재) ⒝★**증거 축이 브라우저 왕복과 `wie_validate` 뿐**이다 — `cargo test --all` 은 여전히 J2ME 게스트를 부팅하지 않으므로(AGENTS.md 가 적은 그 사각) 이 커버는 PR 의 `contract` 잡에 의존한다(제안 등재) ⒞커버 = «실행된다»이지 «규격에 맞다»가 아니다 ⒟상용 코퍼스 0(Constraint 9).
+## [2026-09-06] `Security audit` 3일 red 를 껐다 — `rtrb` 0.3.3 → 0.3.5 (wie-rustsec-2026-0274-rtrb-double-free-audit-red)
+- **무엇을**: `Cargo.lock` **2줄**(`rtrb` version + checksum). `cargo update -p rtrb` 한 번. ★그 밖의 크레이트 이동 **0** · `Cargo.toml` 무접촉.
+- **왜**: 매일 도는 `Security audit`(★`schedule` 전용 — PR 게이트가 아니라 머지를 막은 적은 없다)이 3일 연속 `error: 1 vulnerability found!`. 자문 = `RUSTSEC-2026-0274`(`ReadChunk::commit` 에서 **원소의 `Drop` 이 panic** 하면 double free / UAF).
+- **★★⑴ 「목록에 있다」와 「그 경로를 탄다」를 갈랐다 — 세 축을 «수»로**: ⒜우리 `.rs`/`.toml` 의 `rtrb|ReadChunk` ★**0건**(`wie_cli/src/main.rs:26` 이 쓰는 rodio 표면은 `DeviceSinkBuilder`·`Player`·`SamplesBuffer`·`SampleTypeConverter` = **재생 전용**) ⒝rodio 가 rtrb 를 쓰는 곳은 `src/microphone.rs` **한 파일뿐**인데 그 파일의 `read_chunk|ReadChunk|.commit` ★**0건**(실사용은 `pop()`·`slots()`) ⇒ ★**취약 함수가 애초에 호출되지 않는다** ⒞원소 타입 `rodio::Sample = Float = f32`(`common.rs:31,43`) = ★**`Drop` 구현 없음** ⇒ 자문의 전제가 **구조적으로 성립 불가**.
+- **★⑵ 처방 = ⒜(버전 상향)**: ⒞(`cargo audit` 예외)는 ★**선택지가 아니었다** — Constraint 5 가 「no ignores」를 잠근다. ⒝(rodio bump)는 **불필요** — rodio 요구가 `^0.3.2` 라 0.3.5 가 이미 in-range. ★이 형태는 `rust-audit.yaml` 주석이 기록한 **2026-07-31 `cargo update -p wayland-scanner`** 선례 그대로이고, 그때처럼 **suppression 을 남기지 않는다**.
+- **★⑶ 검증**: `cargo audit` ★**rc=0**(남은 2건은 비-게이트 allowed warning) · `cargo build -p wie_cli` 0 · 네 게이트 전건 0(**156 passed / 0 failed**) · ★`cargo +beta clippy --all -- -D warnings` **0** · `wie_validate` `draw_j2me`·`helloworld_{ktf,lgt}` ★**전건 PASS**(+ `keydraw_* --inject` PASS · `last_frame_content=true`).
+- **사용자 영향**: 없음. 에뮬레이터 동작은 한 비트도 바뀌지 않는다(오디오 재생 경로는 rtrb 를 지나지 않는다).
+- **★남는 구멍**: ⒜★**실보안 이득은 0에 가깝다** — 위 세 축이 전부 「안 탄다」다. 값은 daily red 를 끈 것과, rodio 가 나중에 `read_chunk` 를 쓰더라도 이미 패치판이라는 것뿐이다 ⒝⑴⒝ 의 근거는 **`rodio 0.22.2` 라는 «지금 그 판본»의 소스 실측**이라 rodio 를 올리면 다시 재야 한다 ⒞`cargo audit` 는 `Cargo.lock` 만 본다 — 「그 코드를 실행하는가」는 이 회차가 **손으로** 답했고 기계가 잠그지 않는다 ⒟`rust-audit.yaml` 주석의 「spin 0.12.0 yanked」는 실측(`chacha20 0.10.0`)과 다르지만 **워크플로 변경 0** 이라 고치지 않았다(제안 등재).
 
 ## [2026-09-06] 파리티 락의 «자기 삭제»를 막았다 — 두 파일을 함께 지우면 green 이었다 (wie-dod-ci-parity-self-deletion-guard)
 - **무엇을**: `scripts/check-parity-lock-wired.mjs` 신설 + `engine-contract.yml` `contract` 잡에 **상시 스텝 1개**(비-주석 **2줄** · ★**필터 밖**). ★**paths 필터 목록 무접촉**(Constraint 4).

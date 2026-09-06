@@ -32,7 +32,11 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- **`Image.createImage(String)` 픽스처** (`wie-system-class-loader-createimage-fixture`
+- (이 브랜치 기준 없음. ★열린 형제 PR: **#94 · #95 · #96 · #97 · #98** — 각자 자기 브랜치에서 진행 중이고,
+  전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
+
+## 완료 (최근)
+- 2026-09-06: **`Image.createImage(String)` 픽스처** (PR **#93** 착지 · `wie-system-class-loader-createimage-fixture`
   · 채택 제안 `2026-09-05-system-class-loader-preemptive-migration#p1`) — 제안이 미완으로 남긴 문장은
   하나였다: 「갈림 «자체»는 측정됐다 … **미측정인 것은 «넓어진 가시 범위가 실제로 무엇을 찾는가»** 하나다」.
   ⇒ jar 에 `wie-img.png`(16×8 · 74바이트)를 동봉하고 `DrawMIDlet.startApp()` 이 그것을 **이름으로** 열어
@@ -42,9 +46,23 @@
   **후**에는 `draw_j2me.jar` 를 부팅에서 죽인다.
   ★**개악 E1**(`get_system_class_loader` → `jvm.current_class_loader()`) → `IOException: Resource not found: /wie-img.png`
   ⇒ ★**넓어진 범위가 찾는 것 = 1건 · 종전 경로 = 0건.** 왕복 **42/42**.
-- **`rtrb` 보안 자문 해소** (PR **#92** 열림 · `wie-rustsec-2026-0274-rtrb-double-free-audit-red`) — 게이트② 대기.
-
-## 완료 (최근)
+  ★**게이트②가 «다른 자리»로 재확인했다** — `wie_backend::decode_image` 를 개악하니(회신이 만진 크레이트 «밖») 이 픽스처만
+  FAIL 하고 대조군 3건은 green ⇒ 공허한 통과가 아니다. ★단 `wie_validate` 는 이 축의 오라클이 아니다(폭을 2배로 해도 PASS) —
+  이 커버는 사실상 **`contract` 잡 단독 의존**이다.
+- 2026-09-06: **`rtrb` 보안 자문 해소** (PR **#92** 착지 · `wie-rustsec-2026-0274-rtrb-double-free-audit-red`) —
+  매일 도는 `Security audit`(schedule 전용 · PR 게이트 아님)이 3일 연속 `error: 1 vulnerability found!` 였다.
+  `RUSTSEC-2026-0274` = `rtrb` 의 `ReadChunk::commit` 에서 **원소의 `Drop` 이 panic 할 때** double free/UAF.
+  ★**전이 의존이다** — `wie_cli → rodio 0.22.2 → rtrb`. rodio 요구가 `^0.3.2` 라 ★**rodio 무접촉**으로
+  `cargo update -p rtrb` 만에 패치판 `0.3.5` 로 간다 ⇒ `Cargo.lock` **2줄** · 다른 크레이트 이동 0.
+  ★★**노출은 «안 탄다»** — 구조는 ★**「⑴이 전제 · 그 아래 ⑵⑶ 이 독립 2중화」**다(게이트② 정정: ⑵⑶ 은
+  rodio 의 단일 인스턴스화만 재므로 ⑴에 기댄다 — 「셋 다 독립」이 아니다. ⑴을 PR head 트리에서 0건으로
+  직접 확인해 전제가 참이므로 결론은 선다):
+  ⑴우리 `.rs`/`.toml` 의 `rtrb|ReadChunk` **0건**(쓰는 rodio 표면은 재생 전용)
+  ⑵rodio 는 `microphone.rs` 에서만 rtrb 를 쓰는데 그 파일의 `read_chunk|ReadChunk|.commit` **0건**(`pop()` 만 쓴다)
+  ⑶원소 타입 `rodio::Sample = f32` = **`Drop` 없음** ⇒ 자문의 전제가 구조적으로 성립 불가.
+  ⇒ ★**red 를 끄는 것이 아니라 「노출되는가」에 답한 뒤 안고 가지 않기로 한 것**이다(실보안 이득은 0에 가깝다).
+  ★검증: `cargo audit` **rc=0** · schedule 전용 검사를 브랜치에서 `workflow_dispatch` 로 돌려 **success**(run 34019000701) ·
+  게이트②가 lock 의 rtrb `version` 한 줄만 되돌리는 돌연변이로 **rc=1 red 재현**.
 - 2026-09-06: **WIPI 리소스 픽스처** (PR **#91** 착지 · `wie-system-class-loader-spi-resource-fixture`
   · 채택 제안 `2026-09-05-system-class-loader-preemptive-migration#p0`) — 아카이버는 이미 리소스 디렉터리를
   jar 에 넣고 있었는데 ★**그 디렉터리가 «비어 있었다»** ⇒ 9바이트 `res.bin` 을 넣고 게스트가 부팅 때 읽어
