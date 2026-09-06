@@ -32,10 +32,15 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- (이 브랜치 기준 없음. ★**형제 PR #91 이 자기 브랜치에서 열려 있다** — 그쪽이 착지할 때 자기 항목을
-  여기 싣는다. `docs/upstream-realign-verdict.md` 는 #91 만 만지고, 나머지는 원장 2파일만 공유한다)
+- (없음 — 열린 PR 0건. #88~#91 전건 착지)
 
 ## 완료 (최근)
+- 2026-09-06: **WIPI 리소스 픽스처** (PR **#91** 착지 · `wie-system-class-loader-spi-resource-fixture`
+  · 채택 제안 `2026-09-05-system-class-loader-preemptive-migration#p0`) — 아카이버는 이미 리소스 디렉터리를
+  jar 에 넣고 있었는데 ★**그 디렉터리가 «비어 있었다»** ⇒ 9바이트 `res.bin` 을 넣고 게스트가 부팅 때 읽어
+  `res:9:602` 를 찍게 했다. ★**한 줄이 «두 홉»을 각각 증명한다**(size=`get_resource_size` · 합=`read_resource`).
+  ★**자리별 드릴로 4자리 «각각» FAILED rc=101**(기준선 rc=0) — 종전에는 4자리에 `panic!()` 을 심어도 **150 passed**.
+  ★회귀 0: key-reach 2건 통과 · 브라우저 왕복 **35/35** · `verdict` ⒡ 표를 「커버 1곳 → 5곳」으로 정정(남은 미커버 = **6번 하나**).
 - 2026-09-06: **파리티 락 «자기 삭제» 가드** (PR **#90** 착지 · `wie-dod-ci-parity-self-deletion-guard`
   · 채택 제안 `2026-09-05-dod-ci-parity-checker#p0`) — 락은 두 파일이고 `#[path]` 결합 덕에 «한쪽만» 지우면
   컴파일 오류지만 ★**둘을 «함께» 지우면 `cargo test --all` 이 rc=0**(실측 · 출력에 `dod_ci_parity` **0회**).

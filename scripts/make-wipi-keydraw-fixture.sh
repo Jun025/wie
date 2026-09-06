@@ -10,8 +10,10 @@
 # recipe, and the guest source below is the fixture: reading it tells you what
 # the assertion is really watching.
 #
-# What the fixture does: on keydown it prints `key:<code>` and paints a bar
-# `<code>` pixels wide. `<code>` is the WIPI code the guest was handed, so the
+# What the fixture does: at boot it reads the bundled resource `res.bin` and prints
+# `res:<size>:<byte-sum>` — the only thing in the repo that drives the host's WIPI
+# resource pair (get_resource_size + read_resource) on either carrier. Then, on
+# keydown, it prints `key:<code>` and paints a bar `<code>` pixels wide. `<code>` is the WIPI code the guest was handed, so the
 # tests can name the exact integer instead of "an event arrived". Two evidence
 # axes on purpose — stdout for the headless Rust tests (the test harness's
 # TestScreen keeps no framebuffer), pixels for a future browser scenario.
@@ -30,6 +32,8 @@
 # regeneration by re-running the tests, not by diffing the zips:
 #   RUST_MIN_STACK=4194304 cargo test -p wie_ktf --test test_key_reach
 #   RUST_MIN_STACK=4194304 cargo test -p wie_lgt --test test_key_reach
+#   RUST_MIN_STACK=4194304 cargo test -p wie_ktf --test test_resource_reach
+#   RUST_MIN_STACK=4194304 cargo test -p wie_lgt --test test_resource_reach
 set -euo pipefail
 
 # Pinned to the same revision Cargo.toml takes `wipi_types` from — a moving
@@ -47,6 +51,20 @@ git -C "$S/wipi" checkout -q "$WIPI_REV"
 
 echo "== inject the keydraw example"
 mkdir -p "$S/wipi/examples/resources/keydraw"
+
+# The archiver already packed this directory into the jar — it was just EMPTY, so
+# every fixture shipped with zero resources and the four host-side resource sites
+# (wie_ktf/wie_lgt `get_resource_size` + `read_resource`) had nothing to answer.
+# Measured 2026-09-05/06: a planted panic!() at all four left `cargo test --all` at
+# 150 passed and every fixture PASS, i.e. those lines had never run.
+#
+# The payload is ASCII on purpose so the numbers the guest prints are checkable by
+# eye against this line: 9 bytes, and 87+73+69+45+82+69+83+45+49 = 602. The guest
+# prints BOTH — size comes from get_resource_id (host `get_resource_size`) and the
+# sum comes from get_resource (host `read_resource`), so one line proves both hops
+# rather than one. Keep the two numbers and this arithmetic in sync with
+# wie_{ktf,lgt}/tests/test_resource_reach.rs if you ever change the payload.
+printf 'WIE-RES-1' > "$S/wipi/examples/resources/keydraw/res.bin"
 cat > "$S/wipi/examples/src/keydraw.rs" <<'RS'
 #![cfg_attr(not(test), no_main)]
 #![no_std]
@@ -57,6 +75,7 @@ use wipi::{
     event::KeyCode,
     framebuffer::{Color, Framebuffer},
     println,
+    resource::Resource,
     wipi_main,
 };
 
@@ -115,6 +134,27 @@ impl App for KeyDrawApp {
 
 #[wipi_main]
 pub fn main() -> KeyDrawApp {
+    // Boot-time resource read. This is the ONLY thing in the repo that exercises
+    // the host's MC_knlGetResourceID -> get_resource_size and MC_knlGetResource ->
+    // read_resource pair, on both carriers. It paints nothing, so the key-reach
+    // pixel assertions (browser Scenario E/F) are untouched; the evidence is one
+    // stdout line, the same axis the headless Rust tests already use.
+    //
+    // Both numbers are load-bearing: `size` came back from get_resource_id and the
+    // sum could only be computed from bytes get_resource actually delivered, so a
+    // single line distinguishes "both hops ran" from "the first one did".
+    // Never panics — a broken resource path must leave the key assertions readable.
+    match Resource::new("res.bin") {
+        Ok(r) => {
+            let mut sum: u32 = 0;
+            for b in r.read() {
+                sum += *b as u32;
+            }
+            println!("res:{}:{}", r.size(), sum);
+        }
+        Err(_) => println!("res:err"),
+    }
+
     KeyDrawApp { width: 0 }
 }
 RS

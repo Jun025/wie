@@ -94,8 +94,12 @@ impl WIPICContext for KtfWIPICContext {
     async fn get_resource_size(&self, name: &str) -> Result<Option<usize>> {
         // get_system_class_loader, NOT current_class_loader: the latter goes private one
         // commit past our pin, and the two coincide wherever there is no Java frame.
-        // NOT covered by any fixture — a planted panic!() here left the suite green
-        // (measured 2026-09-05). Per-site table: docs/upstream-realign-verdict.md §8-4(3)-b.
+        // Covered since 2026-09-06 by test_data/keydraw_{ktf,lgt}.zip, which bundles res.bin
+        // and reads it at boot: wie_{ktf,lgt}/tests/test_resource_reach.rs asserts the guest
+        // gets `res:9:602` back, and a planted panic!() here now fails that test (per-site
+        // drill, all four sites). Before that fixture the same drill left the suite at
+        // 150 passed — these lines had never run. Per-site table:
+        // docs/upstream-realign-verdict.md §8-4(3)-b.
         let class_loader = JavaLangClassLoader::get_system_class_loader(&self.jvm).await.unwrap();
         let stream = JavaLangClassLoader::get_resource_as_stream(&self.jvm, &class_loader, name).await.unwrap();
 
@@ -111,8 +115,12 @@ impl WIPICContext for KtfWIPICContext {
     async fn read_resource(&self, name: &str) -> Result<Vec<u8>> {
         // get_system_class_loader, NOT current_class_loader: the latter goes private one
         // commit past our pin, and the two coincide wherever there is no Java frame.
-        // NOT covered by any fixture — a planted panic!() here left the suite green
-        // (measured 2026-09-05). Per-site table: docs/upstream-realign-verdict.md §8-4(3)-b.
+        // Covered since 2026-09-06 by test_data/keydraw_{ktf,lgt}.zip, which bundles res.bin
+        // and reads it at boot: wie_{ktf,lgt}/tests/test_resource_reach.rs asserts the guest
+        // gets `res:9:602` back, and a planted panic!() here now fails that test (per-site
+        // drill, all four sites). Before that fixture the same drill left the suite at
+        // 150 passed — these lines had never run. Per-site table:
+        // docs/upstream-realign-verdict.md §8-4(3)-b.
         let class_loader = JavaLangClassLoader::get_system_class_loader(&self.jvm).await.unwrap();
         let stream = JavaLangClassLoader::get_resource_as_stream(&self.jvm, &class_loader, name)
             .await
