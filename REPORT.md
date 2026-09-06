@@ -1,5 +1,16 @@
 # REPORT
 
+## [2026-09-06] 「허용 경고」 목록을 다시 재서 고쳤다 — 낡은 쪽이 «무엇을 세어야 하는지»를 정의하는 자리였다 (wie-rust-audit-header-comment-says-spin-but-actual-is-chacha20)
+- **무엇을**: `.github/workflows/rust-audit.yaml` 헤더 주석의 「ttf-parser unmaintained, **spin 0.12.0 yanked**」를 ★**내가 다시 잰 값**으로 교체 + **측정 날짜** 부착. ★**주석만 · 워크플로 동작 diff 0.**
+- **왜**: 운영자 채택 제안 `2026-09-06-rtrb-rustsec-2026-0274#p0`.
+- **★대전제 ⓐ 실측**: `:44` 에 `spin 0.12.0 yanked` 가 **그대로 있었다** ⇒ 「이미 되어 있다」가 아니었다. ※직전 회차(PR #106)가 같은 파일에 포인터 주석을 더한 뒤인데도 **이 줄만** 낡아 있었다.
+- **★★⑴ 내가 다시 쟀다**(2026-09-06T18:07:13Z · advisory-db **1,239건** · `Cargo.lock` **436 크레이트**): `ttf-parser 0.25.1 unmaintained RUSTSEC-2026-0192` + ★**`chacha20 0.10.0 yanked`** ⇒ `2 allowed warnings found` · **rc=0** · **취약점 0**.
+- **★★⑵ 낡음이 «두 겹»이었다**: ⒜`spin` 은 이미 올라갔다(`Cargo.lock` 실측 **0.12.2** ↔ 주석 0.12.0) ⒝그 사이 **`chacha20` 이 새로 들어왔는데 주석에 없었다**. ⇒ ★**수(2)는 우연히 맞고 «구성»이 달랐다** — 「two current warnings」라는 문장은 계속 참이라 ★**수만 보면 아무 일도 없어 보였다**.
+- **★⑶ 왜 이 주석이 값하는가**: `cargo audit` 은 경고에 **rc=0** 을 준다(우리가 `--deny warnings` 를 일부러 안 쓴다) ⇒ ★**게이트가 아니라 이 문장이 «세는 기준»**이다. 낡으면 다음 회차가 없어진 `spin` 을 찾아 헤매거나 새 `chacha20` 을 «예상된 것»으로 오인한다.
+- **★⑷ 동작 무접촉을 «수로» 증명**: `git diff -U0` 에서 **비-주석 추가 0 · 비-주석 삭제 0** · `yaml.safe_load` 파싱 OK · `audit` 잡 스텝 **5개 불변** · ★**suppression 0**(`ignore` 추가 0 · `deny.toml`·`audit.toml`·`.cargo/audit.toml` 전건 **부재** — Constraint 5).
+- **사용자 영향**: 없음(주석). 대신 ★**다음에 audit 이 red 가 됐을 때 「예상된 경고」 목록이 실제와 맞는다.**
+- **★남는 구멍**: ★**주석은 기계가 검사하지 않는다** — 값을 맞췄을 뿐 «다시 틀어지는 것»은 못 막는다. 그래서 치환에 그치지 않고 **「한 항목만 고치지 말고 다시 재라」 한 줄**을 붙였고, 기계 대조는 제안으로 올렸다.
+
 ## [2026-09-06] 재측 의무를 «손 append» 에서 «멱등 명령»으로 — 세 회차가 같은 항목을 각자 썼다 (wie-worklog-remeasure-obligation-duplicates-per-round)
 - **무엇을**: `scripts/check-worklog-coverage.mjs` 에 ★**`--record`**(가드 2개) + OVERDUE 문면 교체 + `AGENTS.md` 정합화. ★**임계·비율 판정 무접촉**(F3) · ★**기존 `measurements` 무접촉**(항목 **3 → 3** · 바이트 동일) · ★**인자 없는 경로(=CI 가 도는 그것) 동작 무변**.
 - **★★⑴ 판정식을 코드에서 인용했다 — «max» 가 아니라 «`at(-1)`» 이다**: `const last = record.measurements.at(-1);` → `if (landed - last.landedRounds >= WINDOW)`. 티켓이 「추정하지 마라」고 한 그 갈림이 실제로 배열 순서 쪽이었다(`last.pct`·`last.reopened` 도 같은 원소를 읽는다).

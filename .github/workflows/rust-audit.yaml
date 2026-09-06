@@ -40,10 +40,15 @@ jobs:
       # exits non-zero). Informational warnings (unmaintained / yanked) are
       # printed but NON-gating — cargo-audit exits 0 on warnings unless
       # `--deny warnings` is passed, which we deliberately do not. This keeps
-      # the daily job green on the two current warnings (ttf-parser
-      # unmaintained RUSTSEC-2026-0192, spin 0.12.0 yanked) while still turning
-      # red the moment a real vulnerability appears — the two classes are
+      # the daily job green on the two current warnings — MEASURED 2026-09-06,
+      # `cargo audit` printing "2 allowed warnings found": ttf-parser 0.25.1
+      # unmaintained (RUSTSEC-2026-0192) and chacha20 0.10.0 yanked — while still
+      # turning red the moment a real vulnerability appears; the two classes are
       # distinguished by exit code, not squashed by continue-on-error.
+      # This list is what "allowed warning" MEANS here, so re-measure it when you
+      # touch it rather than editing one entry: the previous revision named "spin
+      # 0.12.0 yanked", which had stopped being true (Cargo.lock is on spin 0.12.2)
+      # while chacha20 had appeared and gone uncounted.
       #
       # The former `--ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195`
       # (quick-xml XML DoS) is GONE as of 2026-07-31: wayland-scanner 0.31.11

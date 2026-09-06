@@ -32,6 +32,12 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- **audit 「허용 경고」 목록 재측** (PR 개설 · `wie-rust-audit-header-comment-says-spin-but-actual-is-chacha20`
+  · 채택 제안 `2026-09-06-rtrb-rustsec-2026-0274#p0`) — `rust-audit.yaml` 헤더 주석의 낡은
+  「spin 0.12.0 yanked」를 ★**실측값**으로 교체(+측정 날짜): `ttf-parser 0.25.1` + ★**`chacha20 0.10.0 yanked`**.
+  ★**낡음이 두 겹**이었다 — spin 은 0.12.2 로 올라갔고 chacha20 은 새로 들어왔는데, ★**총 2건이라 수만 보면 멀쩡했다.**
+  ★**주석만 · 동작 diff 0**(비-주석 추가·삭제 **0**, 계수 증명) · **suppression 0**(Constraint 5).
+  ★착지 시 배포 있음(`web.yml` 은 필터 없음 · `publish-artifact` 는 `.rs`·`Cargo.*` 없어 **미발화**).
 - (그 밖: ★열린 형제 PR: **#98 · #99 · #100 · #108** — 각자 자기
   브랜치에서 진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
 
