@@ -32,17 +32,33 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- **클렛 카드 식별 설계 결정 — ★기각** (PR 개설 · `wie-clet-card-identity-by-class-name-design-decision`
+- (이 브랜치 기준 없음. ★열린 형제 PR: **#97 · #98 · #99 · #100 · #101** — 각자 자기 브랜치에서
+  진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
+
+## 완료 (최근)
+- 2026-09-06: **클렛 카드 식별 설계 결정 — ★기각** (PR **#95** 착지 · 머지커밋 `34bca716` · `wie-clet-card-identity-by-class-name-design-decision`
   · 채택 제안 `2026-09-06-lgt-black-screen-name-compare#p1`) — ★**코드 변경 0** · `card_canvas.rs` 무접촉.
   ★**실측**(임시 프로브 · 되돌림): LGT 카드 = `net/wie/CletWrapperCard`(★**우리 Rust 프로토** · `isInstance` **true**) ↔
   KTF 카드 = `CletCard`(★**게스트 ARM 메모리의 클래스 이름** · `isInstance` **false**). `isInstance(Card)` 는 둘 다 true 지만
   ★**모든 카드가 true** 라 쓰면 검은 화면을 전 경로에 재현한다. 부팅 플래그는 LGT 만 가능(KTF 부팅은 ADF `MClass` → `Main.main` 범용 경로).
   ⇒ ★**두 경로를 한 벌로 덮는 대체 술어가 없다.** 미지(실게임의 KTF 카드 이름)는 **양쪽 갈래가 같은 결론**이라 판정을 흔들지 않는다.
   ★남는 제안 1건 = `getClass().getName()` → `class_definition().name()`(구현 안 함 · #p1 이 원한 것을 주지 않는다).
-- (그 밖: ★열린 형제 PR: **#95 · #96 · #97 · #98** — 각자 자기 브랜치에서 진행 중이고,
-  전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
-
-## 완료 (최근)
+- 2026-09-06: **`last_frame_content` 게이트화** (PR **#96** 착지 · `wie-validate-last-frame-gate-with-per-fixture-expectation`
+  · 채택 제안 `2026-09-06-validate-last-frame-axis#p0` + 흡수 `2026-09-06-lgt-black-screen-name-compare#p0`) —
+  축은 이미 있었고 **REPORT-ONLY** 였다. 게이트의 전제는 「빈 마지막 프레임이 정상인 픽스처」를 선언할 자리다.
+  ⇒ ★**기대값 선언 자리를 «명령줄»로 골랐다**(`--expect-last-frame` · 기본 off). 이유는 실측이다:
+  기대값의 키가 `픽스처`가 아니라 ★**`픽스처 × 모드`** 이고(`keydraw_lgt` 는 `--inject` 여부로 기대값이 뒤집힌다)
+  그 모드 절반이 **이미 명령줄에만** 있다 — 사이드카·이름 표는 키의 나머지 절반을 다른 곳에 둬 «두 번째 진실원»이 된다.
+  ★**계약 4 충족**: 플래그 없이 6행 전건 현행 판정 불변.
+  ★★**개악 M1 = «실제로 일어났던» LGT 검은 화면 회귀**(`is_clet_card` 정규화를 PR #88 이전으로 되돌림) →
+  플래그 없음 **PASS·content true·last false**(★그때 새어 나간 형상 그대로) ↔ 플래그 **FAIL** · KTF 대조군 PASS.
+  ⇒ ★**헤드리스가 20초에 그것을 문다**(브라우저 축은 wasm 빌드 + `contract` 잡 3~4분).
+  ★**남는 것**: 호출자 **0** — 선언 자리를 만들었을 뿐 아직 아무도 켜지 않았다(제안 등재).
+  ★★**게이트② 발견 ①(major)를 함께 남긴다 — 이 항목의 「부하 시」 서술은 «반증됐다»**: 검수자가 load **102.77/10CPU**
+  구간에서 같은 개악을 11회 돌려 **전건 `PASS · last=true`**(게이트가 회귀를 **놓친다**)를 관측했고 `content` FAIL 은 **0회**였다.
+  ⇒ REPORT.md 의 「기존 `content` 축이 먼저 FAIL 하므로 새 불안정을 더하지 않는다」는 **사유가 반대로 적혀 있다**.
+  ★**판별자는 `ms > --timeout` 과 `paints` 붕괴**(굶은 런 21.2~29.2s·paints 26~53 ↔ 정상 20.1s·83).
+  ★계약 7 대로 이 회차가 **고치지 않았다** — CI 게이트로 올리는 후속이 «반드시 먼저» 처분해야 한다.
 - 2026-09-06: **「감시를 지웠는데 green」 전수 계수** (PR **#94** 착지 · 머지커밋 `0f7bb2fc` · `wie-count-deletable-checks-that-stay-green-repo-wide`
   · 채택 제안 `2026-09-06-parity-lock-self-deletion-guard#p0`) — ★**세기만 하는 회차 · 가드 0 · 코드 0 · 워크플로 무접촉.**
   술어 「워크플로가 «경로로» 부르는 검사 파일 A」↔「`scripts/`·`*/tests/` 실재 파일 B」 ⇒ ★**A=9 · B=23 · 차집합 14**.
