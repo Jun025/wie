@@ -176,7 +176,8 @@ then `:125`). The rest need a toolchain fetch — run them only when the artifac
   > re-open the mandate decision.** A landed round is one **first-parent** commit on `main`.
 
   ```sh
-  node scripts/check-worklog-coverage.mjs   # prints the numbers; fails if the promise is overdue
+  node scripts/check-worklog-coverage.mjs            # prints the numbers; fails if the promise is overdue
+  node scripts/check-worklog-coverage.mjs --record   # discharges it — idempotent, never off-schedule
   ```
 
   **The commands live in that script, not here** — a second copy would drift from the one CI runs.
@@ -185,7 +186,12 @@ then `:125`). The rest need a toolchain fetch — run them only when the artifac
   answered it. It deliberately does **not** fail on the ratio itself, because that obligation is
   conditional — gating PRs on it would rebuild the per-round mandate 2026-09-01 declined. The
   record of each re-measure is `docs/worklog-coverage-remeasures.json`; appending the entry the
-  script prints *is* the re-measurement.
+  script prints *is* the re-measurement — but **append it with `--record`, not by hand.** The
+  obligation is keyed to `origin/main`, so once the cadence is crossed *every* round that pulls base
+  gets the same failure and every one of them discharges it honestly: measured 2026-09-06, three
+  rounds wrote the same entry (six fields identical, only `decision` differed) and a human stopped
+  two of them by hand. `--record` scans the whole record for that `landedRounds` and writes nothing
+  if it is already there, so running it twice — or on a base that already carries it — is a no-op.
 
   **`--first-parent` is load-bearing in every one of the script's three counts, and the definition says "first-parent", not
   "squash".** This repo is registered as an upstream-sync fork and must *not* squash-merge, so
