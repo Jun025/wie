@@ -32,10 +32,16 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- (이 브랜치 기준 없음. ★**형제 PR #90·#91 이 각자 브랜치에서 열려 있다** — 그쪽이 착지할 때 자기 항목을
-  여기 싣는다. 코드 파일은 겹치지 않는다)
+- (이 브랜치 기준 없음. ★**형제 PR #91 이 자기 브랜치에서 열려 있다** — 그쪽이 착지할 때 자기 항목을
+  여기 싣는다. `docs/upstream-realign-verdict.md` 는 #91 만 만지고, 나머지는 원장 2파일만 공유한다)
 
 ## 완료 (최근)
+- 2026-09-06: **파리티 락 «자기 삭제» 가드** (PR **#90** 착지 · `wie-dod-ci-parity-self-deletion-guard`
+  · 채택 제안 `2026-09-05-dod-ci-parity-checker#p0`) — 락은 두 파일이고 `#[path]` 결합 덕에 «한쪽만» 지우면
+  컴파일 오류지만 ★**둘을 «함께» 지우면 `cargo test --all` 이 rc=0**(실측 · 출력에 `dod_ci_parity` **0회**).
+  ⇒ 그 두 경로를 «바깥»에서 부르는 유일한 참조자 `scripts/check-parity-lock-wired.mjs` + `engine-contract.yml`
+  **상시 스텝 1개**(필터 밖 · paths 목록 무접촉). ★존재만이 아니라 `#[path]` 결합과 「검사기를 부르는 `#[test]`」까지 단언한다.
+  ★**개악 8종 전건 red**(M1 = 두 파일 함께 · M8 = 가드 자신) · 기준선 green · 비용 ~50ms.
 - 2026-09-06: **`wie_validate` «마지막 프레임» 축** (PR **#89** 착지 · `wie-lgt-validate-last-frame-axis`
   · 채택 제안 `2026-09-05-lgt-browser-paint-localize#p1`) — `saw_content` 가 프레임 전체에 대한 **OR** 이라
   ★**마지막 프레임을 구조적으로 못 본다**(OR 은 단조 — 나중 프레임이 값을 되돌릴 수 없다) ⇒ 같은 술어를
