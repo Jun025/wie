@@ -32,6 +32,10 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- **원장 파일 목록에 `docs/report/**`** (PR 개설 · `wie-merge-contract-path-list-stale-after-report-split`) —
+  `AGENTS.md` §Landing paperwork 한 블록. ★**`REPORT` 존치**(고정 안내로 실재) · 충돌 해소는 **합집합**.
+  ★**관측(고치지 않았다)**: 그 승인 열거의 정본은 `~/orchestrator/templates/merge-ticket.tpl` = **이 저장소 밖**이고
+  그 파일의 `docs/report` 히트는 **0** ⇒ 형제 `otterpebble`(2026-08-23 이관)도 같은 잠복이다. **총괄 소관.**
 - (그 밖: ★열린 형제 PR: **#98 · #99 · #100 · #110 · #112 · #113** — 각자 자기
   브랜치에서 진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
 

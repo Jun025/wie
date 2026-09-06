@@ -204,6 +204,21 @@ audit` now runs on every PR** as an always-run step of `engine-contract.yml`. Th
   ```
 
   **`-H` is load-bearing, not cosmetic.** It prefixes the path, so `sort -r` keys on the *sequence number*; `-h` keys on the title text, which is the date, and this repo lands up to six rounds a day. Measured over 54 files: the `-h` form is **52 lines out of place**, the `-H` form is **0**. Sort by the **sequence number, not the date** — the ledger's date-monotonicity is a coincidence, not a guarantee. `REPORT.md` explains the rest; `docs/report-migration-revert.md` reverts it.
+- **The ledger files of this repo are `STATE.md`, `REPORT.md`, `docs/report/**`, and `docs/worklog/**`.**
+  Resolve a merge conflict in any of them by **union** — keep both sides' entries, ordered by the
+  authoring time of each entry's round. Never take one side wholesale; the other side's entries
+  vanish silently and the gates stay green.
+
+  **`docs/report/**` is on that list because the round entries moved there** on 2026-09-07 (merge
+  `a5091df6`, ticket `wie-report-md-per-round-files-port-from-otterpebble`). `REPORT.md` stays on it
+  too — the file still exists as the fixed pointer, and a round that edits the pointer is editing a
+  ledger file. **The merge contract's own enumeration (`STATE`·`REPORT`·`docs/worklog/**`·`reports/`·
+  `tasks/`) predates that move and does not name `docs/report/**`** — it is rendered from
+  `~/orchestrator/templates/merge-ticket.tpl`, outside this repo, so a round that needs the authority
+  cannot find it there. This line records the judgement already made rather than making each round
+  re-derive it: 2026-09-07 a merge round reasoned it out and chose to *move* the entry (appending to
+  `REPORT.md` knowingly breaks a convention that landed 20 minutes earlier; dropping the entry loses
+  it), which is the answer — but nothing guaranteed the next round would reach it.
 - **Follow-up proposals go in a `docs/worklog/*.json`, or they do not exist.** When a task leaves
   follow-up recommendations (or adopts/declines earlier ones), write
   `docs/worklog/YYYY-MM-DD-<slug>.json` in the same PR. The cockpit 「후속 작업 추천」 panel reads
