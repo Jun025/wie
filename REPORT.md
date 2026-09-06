@@ -1,5 +1,19 @@
 # REPORT
 
+## [2026-09-06] `createImage` 의 «실패 갈래»를 픽스처로 잠갔다 — 잠근 것은 «던진다»가 아니라 «무슨 타입을 던지는가»다 (wie-createimage-failure-branches-fixture-lock)
+- **무엇을**: `scripts/make-draw-fixture.mjs` 에 ★**예외 테이블**을 넣고 같은 `Image.createImage(String)` 의 실패 갈래 **2종**을 심었다(없는 이름 · 깨진 이미지) + 관측 단언 **2곳**(네이티브 `wie_j2me/tests/test_boot.rs` · 브라우저 Scenario **C-err**). ★**zip 재생성 1회 · 성공 경로 단언 무접촉.**
+- **왜**: 운영자 채택 제안 `2026-09-06-createimage-fixture#p0`.
+- **★★대전제 ⓐ 를 먼저 쟀다**(모집단 = `createImage` 를 담은 추적 파일 **23개** 전수): 어셈블러의 예외 테이블 **0** · 실패 갈래를 관측하는 시험 **0**. ★코드가 아니라 **주석이 그것을 자인**하고 있었다(「the assembler emits no exception table」).
+- **★★⑴ 두 갈래는 «다른 타입»을 던진다 — 호스트 소스에서 읽었다**(`wie_midp/.../lcdui/image.rs`): 없는 이름 = `java/io/IOException` · 깨진 이미지 = `java/lang/IllegalArgumentException`. ★**추측하지 않았다** — 이 파일의 주석 이력이 「guessed and guessed wrong」을 이미 기록하고 있다.
+- **★★⑵ catch 를 «좁게» 걸었다**(`catch_type 0`=any 미사용) ⇒ red 로 가는 길이 **둘**이고 둘 다 실측했다: **타입이 바뀌면** 핸들러가 못 잡아 부팅이 죽고, **안 던지게 되면** 마커가 안 찍혀 `contains` 가 진다.
+- **★⑶ 개악 4종 — 그중 «물지 않은» 하나가 가장 유익했다**: **M1**(`IOException`→`FileNotFoundException`) ★**green** — ★**시험의 구멍이 아니라 JVM 의미론**이다(서브클래스라 잡는 것이 맞다) ⇒ ★**잠근 문장은 「그 타입 «이거나 그 서브클래스»」**이고 그 한계를 회신·worklog 에 적었다. **M1′**(→`IllegalArgumentException`) **rc=101 · 2 failed** · **M2**(깨진 갈래→`IOException`) **rc=101 · 2 failed** · ★**M3**(픽스처에서 없는 이름을 jar 에 실제로 넣어 «안 던지게») **rc=101 · 1 failed** — 진단이 `guest stdout was "imgerr:broken\n"` 로 ★**다른 갈래는 여전히 돈다**를 함께 보였다.
+- **★⑷ 예외 테이블이 «제품 경로»에 있다**(사본 아님): 생성된 jar 의 `DrawMIDlet.class` 를 파싱해 `exception_table_length=2` · `[0] 33..40 h=43 java/io/IOException` · `[1] 53..60 h=63 java/lang/IllegalArgumentException` 확인.
+- **★⑸ 회귀 0**: 브라우저 왕복 ★**기준선 44/44 rc=0**(`git stash` 로 main 형상 격리) → **46/46 rc=0**(정확히 +2 · 기존 44건 전건 green · C-img 여전히 1152px) · `cargo test --all` **159 → 160 passed**.
+- **★⑹ 접두를 갈랐다**(계약 2): 새 줄은 `imgerr:` 접두이고 기존 단언은 **픽셀 수**와 `res:` 접두라 ★**추가 출력이 무엇도 흔들지 못한다** — 기준선 대조가 그것을 실측으로 보였다.
+- **사용자 영향**: 없음(픽스처·시험). 대신 ★**「리소스를 못 찾았을 때 게스트가 무엇을 받는가」가 처음으로 판정된다.**
+- **★남는 구멍**: ⒜타입 잠금은 **서브클래스까지**(M1) · ⒝**메시지 문자열은 안 잠근다** · ⒞★**`wie_validate` 는 이 갈래를 못 본다** — 게스트 stdout 을 버퍼에 모으고 ★**읽는 코드가 0곳**이다(그래서 관측 자리를 네이티브·브라우저로 골랐다). 전건 제안 등재.
+- **★부수 개선**: `test_data/draw_j2me.zip` 타임스탬프를 **고정**했다 — 종전은 벽시계라 재생성마다 바이트가 달랐고, 이제 ★**재생성본을 `cmp` 로 대조할 수 있다**(그 파일 doc 주석이 「diff 로 검증하지 말라」고 적어 둔 이유가 이것이었다).
+
 ## [2026-09-06] 재측 의무를 «손 append» 에서 «멱등 명령»으로 — 세 회차가 같은 항목을 각자 썼다 (wie-worklog-remeasure-obligation-duplicates-per-round)
 - **무엇을**: `scripts/check-worklog-coverage.mjs` 에 ★**`--record`**(가드 2개) + OVERDUE 문면 교체 + `AGENTS.md` 정합화. ★**임계·비율 판정 무접촉**(F3) · ★**기존 `measurements` 무접촉**(항목 **3 → 3** · 바이트 동일) · ★**인자 없는 경로(=CI 가 도는 그것) 동작 무변**.
 - **★★⑴ 판정식을 코드에서 인용했다 — «max» 가 아니라 «`at(-1)`» 이다**: `const last = record.measurements.at(-1);` → `if (landed - last.landedRounds >= WINDOW)`. 티켓이 「추정하지 마라」고 한 그 갈림이 실제로 배열 순서 쪽이었다(`last.pct`·`last.reopened` 도 같은 원소를 읽는다).
