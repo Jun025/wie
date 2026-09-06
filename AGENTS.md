@@ -25,7 +25,7 @@ the file that enforces it; causes no file enforces are in the ledger.
 | 6 | `no_std` + `extern crate alloc` in the engine crates — reaching for `std` breaks the web build | wasm clippy gate in `rust.yml`; `docs/architecture.md` |
 | 7 | `wie_web` is an empty library off `wasm32`. Do not "clean up" the `cfg(target_arch = "wasm32")` gates | `wie_web/Cargo.toml:1-11`; native jobs in `rust.yml` |
 | 8 | The exact version pins and the RustJava `rev` pin are deliberate | `Cargo.toml` — comment above the `rev` lines; full rationale in the ledger |
-| 9 | No game bytes, ever | `.gitignore` blocklist + `audit-no-leak.sh` — full text below |
+| 9 | No game bytes, ever | `.gitignore` blocklist + `scripts/audit-no-leak.sh`, run on every PR by `engine-contract.yml` — full text below |
 | 10 | Secrets are referenced, never embedded or printed | `.dev.vars*` git-ignored + `.claude/settings.json` read-deny — full text below |
 | 11 | D1 migrations auto-apply to prod on `main`, destructive statements included — author accordingly | `web.yml:97-100`; `docs/CLOUDFLARE_SETUP.md` |
 | 12 | Never commit to `main`; branch → PR, and stop. Merge and branch deletion are a separate approved task | **Nothing machine-locks this** — see Definition of Done |
@@ -169,6 +169,29 @@ The first two are the cheap offline pre-push check for any `functions/` or `web/
 The contract check needs the WASM artifact already in `web/src/wasm/` — build it first or reuse a
 local build, else it fails with missing-artifact violations (CI order: `engine-contract.yml:116`
 then `:125`). The rest need a toolchain fetch — run them only when the artifact or UI changes.
+
+**Which of these CI actually runs — "the check exists" is not "the check runs".** Measured
+2026-09-06 across all 8 workflow files: `check-engine-contract.mjs` and `contract-roundtrip.mjs`
+run in `engine-contract.yml`; `build-wasm.sh` and the frontend build run in `web.yml`; **`npm run
+audit` now runs on every PR** as an always-run step of `engine-contract.yml`. The two below do
+**not** run in CI and are **local-only by design** — do not "fix" that by wiring them:
+
+- **`npm run verify` (`scripts/verify-browser.mjs`) — local only.** It drives a *real* Chrome
+  (`chromium.launch({ channel: "chrome" })`, not the bundled chromium `contract-roundtrip.mjs`
+  uses) through the whole app against a server serving `web/dist` **plus `functions/`** — i.e. a
+  `wrangler pages dev` with D1 bindings, not a static file server. And there is no URL to point it
+  at on a PR: `web.yml`'s deploy steps are all gated on `github.event_name == 'push'`, so a PR
+  build produces `web/dist` as an artifact and deploys nothing. Wiring it means standing up the
+  Pages dev stack inside CI — a workflow-sized change, not a step. It needs no game file (its
+  default argument is the committed `test_data/helloworld_ktf.zip`); the browser and the server
+  are the cost. Run it by hand against production after a deploy: `WIE_BASE=https://wie-web.pages.dev
+  node scripts/verify-browser.mjs test_data/helloworld_ktf.zip`.
+- **`scripts/smoke_gate.sh` — local only, and structurally so.** It regresses the working game
+  catalog against `scripts/smoke_gate_baseline.tsv`, reading titles from `WORKING_DIR`
+  (default `game_lab/working`). `game_lab/` is git-ignored and holds real game bytes, which
+  **Constraint 9 forbids from ever entering the repo, the build output, or any log**. There is no
+  version of this check that runs in CI without breaking the constraint it sits beside; the
+  committed baseline is identifiers and expected status only, never paths or bytes.
 
 ### Landing paperwork
 

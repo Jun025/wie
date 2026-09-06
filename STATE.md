@@ -36,7 +36,20 @@
   `AGENTS.md` §Landing paperwork 한 블록. ★**`REPORT` 존치**(고정 안내로 실재) · 충돌 해소는 **합집합**.
   ★**관측(고치지 않았다)**: 그 승인 열거의 정본은 `~/orchestrator/templates/merge-ticket.tpl` = **이 저장소 밖**이고
   그 파일의 `docs/report` 히트는 **0** ⇒ 형제 `otterpebble`(2026-08-23 이관)도 같은 잠복이다. **총괄 소관.**
-- **`REPORT.md` 회차 파일 이관** (PR 개설 · `wie-report-md-per-round-files-port-from-otterpebble`) —
+- (그 밖: ★열린 형제 PR: **#98 · #99 · #100 · #110 · #111** — 각자 자기
+  브랜치에서 진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
+
+## 완료 (최근)
+- 2026-09-06: **CI 에서 «안 돌던» 검사 3건 처분** (PR **#109** 착지 · `wie-ci-wire-or-document-three-never-run-checks`
+  · 채택 제안 `2026-09-06-deletable-checks-census#p0`) — ★**셋을 한 덩이로 묶지 않았다**:
+  ⒜`scripts/audit-no-leak.sh` **배선**(`engine-contract.yml` 네 번째 상시 스텝 · 필터 «밖») ·
+  ⒝`verify-browser.mjs`·⒞`smoke_gate.sh` **문서화**(`AGENTS.md` 「Which of these CI actually runs」 절 신설).
+  ★**대전제 ⓐ 실측**: 워크플로 8파일 전수에서 세 스크립트 경로 히트 **전건 0**.
+  ★**계약 2 이행**: ⒞의 「구조적 불가」를 반증하려다 실패 — `game_lab/` 은 `.gitignore:23` · 추적 0건이고 내용물이 Constraint 9 금지 대상이다.
+  ★**양방향**: 기준선 rc=0 ↔ M1(raw `fetch(`) rc=1 ↔ M2'(`git add -f decoy.jar`) rc=1 · 원복 후 rc=0.
+  ★**부수 관측**: M2 첫 시도를 `.gitignore` 가 먼저 막았다 ⇒ Constraint 9 의 두 층은 «순서»가 있다.
+  ★대가 CI **+0.26~0.34s** · `.rs` 0 · 새 의존성 0. ★착지 시 배포 없음(`.rs`·`Cargo.*` 무접촉).
+- 2026-09-07: **`REPORT.md` 회차 파일 이관** (PR **#108** 착지 · `wie-report-md-per-round-files-port-from-otterpebble`) —
   형제 저장소 착지분(`otterpebble` `636bb8e7`)의 **포팅**이다. 643줄/51회차 → `docs/report/` **51파일** ·
   `REPORT.md` 는 자라지 않는 **고정 안내** · `docs/report-migration-revert.md`(되돌림 + 열린 PR 해소 레시피).
   ★**이력 소실 0** — 연번 내림차순 연결이 원문과 **바이트 동일**(sha256 `4f85ec30…` · 213,785B · 절 51 → 51).
@@ -55,10 +68,6 @@
   직전 회차 실측이 통과했다** — 갈리는 자리는 착지 전/후다. ⇒ 토큰 제거(2곳) + **절수 51 확인 줄** + §1 minor 1줄.
   ★**착지 «시뮬레이션»으로 검증**(`git merge --no-ff` 후 실행): 옛 명령 → 머지 커밋 `56b4f8dd` · sha `06b2fc19…` ·
   절수 **54**(틀림) ↔ 고친 명령 → 이관 커밋 `01ef775b` · sha **`4f85ec30…`** · 절수 **51**(★일치).
-- (그 밖: ★열린 형제 PR: **#98 · #99 · #100 · #108** — 각자 자기
-  브랜치에서 진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
-
-## 완료 (최근)
 - 2026-09-06: **리소스 실패 갈래 커버** (PR **#105** 착지 · `wie-spi-resource-failure-branches-uncovered`
   · 채택 제안 `2026-09-06-spi-resource-fixture#p0`) — ★**전제가 절반 거짓이었다.**
   드릴(분기마다 `panic!()`): `-12`(M_E_NOENT `kernel.rs:203`) → `test_missing_resource_clears_size` **FAILED**

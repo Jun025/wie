@@ -1,0 +1,75 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-06",
+  "task": "wie-ci-wire-or-document-three-never-run-checks",
+  "title": "「한 번도 돈 적 없는」 검사 3건 — 하나는 배선하고 둘은 «로컬 전용»이라고 적었다",
+  "adoptedProposals": ["2026-09-06-deletable-checks-census#p0"],
+  "summary": "★셋을 한 덩이로 묶지 않았다(계약 1). ⒜`scripts/audit-no-leak.sh` = **배선**(engine-contract.yml 의 네 번째 상시 스텝) · ⒝`scripts/verify-browser.mjs` = **문서화**(실 Chrome + Pages dev 스택이 필요하고 ★PR 에는 가리킬 URL 이 없다) · ⒞`scripts/smoke_gate.sh` = **문서화**(Constraint 9 로 구조적 불가 — 선행 판단을 반증 시도했고 «참»이었다).",
+  "premise-a-measured": {
+    "question": "이미 배선돼 있지 않은가(착수 첫 일)",
+    "population": "`.github/workflows/` 8파일 전수",
+    "result": "★경로 리터럴 히트 = `audit-no-leak.sh` **0** · `verify-browser.mjs` **0** · `smoke_gate.sh` **0**. 워크플로 안의 `npm run` 은 **`npm run build` 1건뿐**(web.yml:113 · `web/` 자신의 빌드)이라 루트 `audit`/`verify` 스크립트로 우회 호출되는 경로도 **없다**. ⇒ 세 건 다 «안 돈다»가 참이고 이 티켓은 계속 진행된다.",
+    "method": "`/usr/bin/grep` 절대경로(대화 셸 `grep` = 번들 `ugrep` 회피)"
+  },
+  "decisions": [
+    {
+      "check": "scripts/audit-no-leak.sh",
+      "verdict": "배선",
+      "where": ".github/workflows/engine-contract.yml — 기존 상시 스텝 3개 뒤의 네 번째",
+      "why": "★**문서가 약속한 집행이 없었다**: `AGENTS.md` Constraint 9 행이 이 스크립트를 「Locked by」로 적는데 어느 워크플로도 부르지 않았다. 그리고 이 검사는 오프라인·의존성 0 이라 스텝 1줄로 끝난다.",
+      "why-outside-the-paths-filter": "★지키는 것이 **repo 전역 성질**(추적된 게임 바이너리 0 · 네트워크 프리미티브가 `lib/api.ts` 에만 · `rom_hash` 유일성이 소유자별)이라, 그것을 어기는 diff 가 **엔진 경로를 하나도 안 건드릴 수 있다**. 필터 안에 두면 정확히 그 PR 에서 건너뛴다.",
+      "cost": "★bash + find/grep + python3 · **node_modules 없이 돈다**(깨끗한 워크트리에서 확인) · 3회 실측 **0.26s · 0.26s · 0.34s**",
+      "ceiling": "★섹션 5 의 `web/dist` 스캔은 CI 에서 **자기 스킵**된다(「not built yet」) — 이 스텝은 프런트 빌드 «전/없이» 돌기 때문이다. PR 에서 값하는 절반(`git ls-files` 로 추적된 게임 바이너리)은 **무조건 돈다**. dist 는 이 스크립트가 감사하는 소스로부터 새로 빌드되므로 스킵된 절반이 «검사된 절반이 놓친 입력»을 갖지 않는다."
+    },
+    {
+      "check": "scripts/verify-browser.mjs",
+      "verdict": "문서화(로컬 전용)",
+      "where": "AGENTS.md §Web-surface commands — 「Which of these CI actually runs」 절 신설",
+      "why": "★**게임 파일은 «필요 없다»**(기본 인자가 커밋 픽스처 `test_data/helloworld_ktf.zip` — 원 제안의 「게임 파일 필요」는 **부정확**하다). 실제 비용은 둘이다: ⑴`chromium.launch({ channel: \"chrome\" })` = **실 Chrome**(이미 배선된 `contract-roundtrip.mjs` 의 «번들 chromium» 과 다르다) ⑵`web/dist` **+ `functions/`** 를 서빙하는 서버 = `wrangler pages dev`(D1 바인딩 포함)이지 정적 서버가 아니다. ★그리고 **PR 에는 가리킬 URL 이 없다** — `web.yml` 의 배포 스텝이 전부 `github.event_name == 'push'` 게이트라 PR 빌드는 `web/dist` 를 아티팩트로 올리고 **아무것도 배포하지 않는다**. ⇒ 배선은 «스텝»이 아니라 «워크플로» 규모다."
+    },
+    {
+      "check": "scripts/smoke_gate.sh",
+      "verdict": "문서화(구조적 불가)",
+      "where": "같은 절",
+      "why": "★**선행 판단(「Constraint 9 때문에 구조적 불가」)을 반증하려 했고 실패했다 = 참이다**(계약 2). 근거는 소스와 형상 둘 다: 스크립트가 `WORKING_DIR`(기본 `game_lab/working`)에서 타이틀을 읽고, `game_lab/` 은 ★`.gitignore:23` 에 있고 **추적 파일 0건 · 디렉터리 부재**다. 그 안에 들어갈 것이 실게임 바이트이고 Constraint 9 가 그것을 repo·빌드 산출물·로그 어디에도 금지한다. ⇒ **그 제약을 깨지 않고 CI 에서 도는 판본이 존재하지 않는다.** 커밋된 기준선(`smoke_gate_baseline.tsv`)은 식별자와 기대 상태뿐이라 그것만으로는 게이트가 성립하지 않는다."
+    }
+  ],
+  "verification": {
+    "bidirectional": "★격리 워크트리(`git worktree add --detach`)에서 **개악 2종**을 내가 고른 자리에 심었다. **E0 기준선 rc=0 `AUDIT PASSED`** ↔ **M1**(device-local `web/src/lib/library.ts` 에 raw `fetch(` 추가) → ★**rc=1 · ❌ 2줄**(`unexpected network primitive` + `library.ts … contains a network call`) ↔ **M2'**(0바이트 `decoy.jar` 를 `git add -f` 로 추적에 편입) → ★**rc=1 · ❌ `game binaries tracked in git: decoy.jar`**. 원복 후 **rc=0 · 트리 clean**. 워크트리는 제거했고 **커밋 0**.",
+    "unplanned-finding": "★**M2 의 첫 시도가 «실패»한 것 자체가 관측이다**: 맨 `git add decoy.jar` 는 ★**`.gitignore` 가 거부**했다(`paths are ignored by one of your .gitignore files`). ⇒ Constraint 9 의 두 층은 **순서가 있다** — 블록리스트가 먼저 막고, 스크립트의 `git ls-files` 검사는 **`-f` 로 그것을 뚫었을 때만** 발화하는 둘째 선이다. 그래서 개악은 `-f` 로 다시 냈다.",
+    "workflow-shape": "★`yaml.safe_load` 파싱 OK · `contract` 잡 스텝 **15개** · 새 스텝의 `if:` **없음(= 항상 실행)** · 트리거에 `paths:` **여전히 없음**(Constraint 4 보존)."
+  },
+  "cost": {
+    "ci-time": "★**+0.26~0.34s**(로컬 3회 실측 · bash+find/grep+python3 · 네트워크 0 · `npm ci` 0). self-hosted 러너 1대라는 제약에 유의미한 증가가 아니다 — 같은 잡의 기존 상시 스텝 3개도 같은 급(~1s·~1s·~50ms)이다.",
+    "new-dependencies": "0"
+  },
+  "limits": [
+    "★**`web/dist` 스캔은 CI 에서 안 돈다**(위 ceiling). 덮으려면 `web.yml` 의 프런트 빌드 «뒤»에 같은 스크립트를 한 번 더 부르면 되지만, 이 회차는 **그 두 번째 호출을 넣지 않았다** — 아래 제안으로 넘긴다.",
+    "★**`npm run verify` 는 여전히 «아무도 안 돌린다»** — 문서화는 「왜 안 도는가」를 고정했을 뿐 «돌게» 만들지 않았다. 사람이 배포 뒤 손으로 돌려야 한다(명령을 AGENTS.md 에 적었다).",
+    "★**이 회차는 차집합의 나머지 11건을 건드리지 않았다**(계약 3) · **새 가드 0건**(직전 회차의 「8건에 가드를 달지 마라」 판단을 그대로 승계)."
+  ],
+  "not-done-on-purpose": [
+    "★`web.yml` 에 audit 두 번째 호출 — dist 스캔의 한계 효용이 낮다고 봤다(추적된 게임 바이너리 0 이 이미 증명되고, dist 는 그 소스의 새 빌드다). 판단이 갈릴 수 있어 제안으로 올린다.",
+    "★`verify-browser.mjs` 를 «main push 후 배포 뒤» 스텝으로 넣는 것 — PR 게이트와는 다른 «작은» 모양이라 가능은 하다. 그러나 이 회차의 계약은 ⒜배선 또는 ⒝문서화 중 «하나»를 고르는 것이고, 새 워크플로 스텝 + Chrome 설치를 이 S 티켓에 얹지 않았다."
+  ],
+  "proposals": [
+    {
+      "title": "no-leak 감사를 web.yml 의 프런트 빌드 뒤에도 한 번 — dist 스캔이 CI 에서 도는 유일한 자리",
+      "plainSummary": "유출 방지 검사에는 「빌드 결과물에 게임 파일이 섞였는가」를 보는 절이 있는데, 그 절은 빌드가 없는 자리에서 돌기 때문에 자동으로 건너뜁니다.",
+      "userBenefit": "「빌드 산출물에 게임 파일이 없다」가 사람의 로컬 실행이 아니라 CI 로 확인됩니다.",
+      "why": "★이 회차가 배선한 스텝은 `engine-contract.yml` 의 상시 스텝이라 프런트 빌드 «전/없이» 돌고, `scripts/audit-no-leak.sh` 섹션 5 는 `web/dist` 부재를 보고 `not built yet — skipping dist scan` 으로 자기 스킵한다(실측: 깨끗한 워크트리에서 그 문구가 나오고 rc=0). `web.yml` 은 PR 에서도 `Build frontend` 를 돌려 `web/dist` 를 만든다 ⇒ ★그 뒤 한 줄이면 스킵되는 절반이 덮인다.",
+      "tradeoff": "⑴같은 스크립트를 두 번 부른다(중복) — 다만 두 호출이 «다른 절»을 덮으므로 공허하지 않다 ⑵비용 +0.3s ⑶반대 논거도 실재한다: 추적된 게임 바이너리가 0 임을 첫 호출이 이미 증명하고 dist 는 그 소스의 새 빌드라 ★한계 효용이 낮다. 그래서 이 회차는 «안 하는» 쪽을 골랐다.",
+      "effort": "XS",
+      "target": "wie · .github/workflows/web.yml"
+    },
+    {
+      "title": "verify-browser 를 «main 배포 뒤» 스텝으로 — PR 게이트가 아니라 배포 후 확인",
+      "plainSummary": "브라우저 전체 흐름 검증이 저장소에 있지만 자동으로는 한 번도 실행되지 않습니다. PR 에서 돌리기는 비싸지만, 배포된 주소에 대고 돌리는 것은 훨씬 쌉니다.",
+      "userBenefit": "배포가 실제로 «부팅되고 게임 바이트가 나가지 않는다»를 사람이 기억해서 돌리지 않아도 확인됩니다.",
+      "why": "★PR 배선이 비싼 이유는 «가리킬 URL 이 없다»는 것이다(`web.yml` 배포 스텝이 전부 `event_name == 'push'` 게이트). ★그러나 main push 에서는 배포가 «실제로 일어나고» 주소가 생긴다 — 이 회차가 손으로 `WIE_BASE=https://wie-web.pages.dev` 로 돌려 **rc=0 · off-origin 0 · POST 0 · 게임 헤더 바이트 0** 을 받았다(게이트③ 회차들이 매번 하는 그 확인이다). 그것을 스텝으로 옮기면 사람 기억에서 기계로 넘어간다.",
+      "tradeoff": "⑴러너에 실 Chrome 설치가 필요하다(`channel: \"chrome\"`) — 또는 스크립트를 번들 chromium 도 받게 고쳐야 한다(그쪽이 더 싸고 `contract-roundtrip.mjs` 가 이미 그 형태다) ⑵배포 «후» 확인이라 나쁜 배포를 막지 못하고 «알려줄» 뿐이다 ⑶실패 시 main 이 red 가 된다 — 그 red 를 누가 받는지 정해야 한다.",
+      "effort": "S",
+      "target": "wie · .github/workflows/web.yml · scripts/verify-browser.mjs"
+    }
+  ]
+}
