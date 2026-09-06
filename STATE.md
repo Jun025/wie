@@ -32,6 +32,15 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- **노출 판정을 남길 «자리»** (PR 개설 · `wie-record-dependency-exposure-verdict-for-next-advisory`
+  · 채택 제안 `2026-09-06-rtrb-rustsec-2026-0274#p2`) — `docs/project-kb/02_status.md` 공급망 대장에
+  **`### C. 해소분 — 노출 판정 보존`** 신설(C-1 = RUSTSEC-2026-0274/`rtrb`) + `rust-audit.yaml` 주석 포인터 1곳.
+  ★**2파일 · +46/−0**(순수 추가). ★**새 파일을 만들지 않았다** — 대전제 ⓐ 실측에서 그 대장이 스스로
+  「이 절이 정본이다」라고 선언하고 도달성 판정·버전 축을 이미 갖고 있었다(새 파일 = 두 번째 진실원).
+  ★**A 에 안 넣은 이유** = A 의 자기 불변식(「audit 경고 수 == 행 수」)을 설계상 깨기 때문 — C 는 그 밖이다.
+  ★**유효기간 축을 칸으로**: C-1 은 `rodio@0.22.2` 기준이고 **⑵만 판본 의존**(⑴우리 코드·⑶타입은 무관).
+  ★★**관측(미수정)**: 대장 A 가 이미 낡았다 — 경고 **2건**(`ttf-parser`·★`chacha20` yanked) ↔ 표 **3행** ·
+  A-2·A-3 은 이미 상향돼 사라졌고 `chacha20` 은 표에 없다. 계약 3(소급 금지)으로 손대지 않았다.
 - **파리티 가드 축⑶ «철자 → 경로»** (PR 개설 · `wie-parity-lock-guard-string-axes-to-structure-decision`
   · 채택 제안 `2026-09-06-parity-lock-self-deletion-guard#p1`) — ★**워크플로 무접촉 · 새 의존성 0 · CI 시간 +0s.**
   ★**오탐이 실재했다**: 완전한 `include!` 리팩터에서 `cargo test` **rc=0 · 11 passed** 인데 가드 **rc=1**.
