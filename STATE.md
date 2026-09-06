@@ -32,17 +32,35 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- **파리티 락 «자기 삭제» 가드** (PR **#90** 열림 · `wie-dod-ci-parity-self-deletion-guard`
+- (이 브랜치 기준 없음. ★**형제 PR #91 이 자기 브랜치에서 열려 있다** — 그쪽이 착지할 때 자기 항목을
+  여기 싣는다. `docs/upstream-realign-verdict.md` 는 #91 만 만지고, 나머지는 원장 2파일만 공유한다)
+
+## 완료 (최근)
+- 2026-09-06: **파리티 락 «자기 삭제» 가드** (PR **#90** 착지 · `wie-dod-ci-parity-self-deletion-guard`
   · 채택 제안 `2026-09-05-dod-ci-parity-checker#p0`) — 락은 두 파일이고 `#[path]` 결합 덕에 «한쪽만» 지우면
   컴파일 오류지만 ★**둘을 «함께» 지우면 `cargo test --all` 이 rc=0**(실측 · 출력에 `dod_ci_parity` **0회**).
   ⇒ 그 두 경로를 «바깥»에서 부르는 유일한 참조자 `scripts/check-parity-lock-wired.mjs` + `engine-contract.yml`
   **상시 스텝 1개**(필터 밖 · paths 목록 무접촉). ★존재만이 아니라 `#[path]` 결합과 「검사기를 부르는 `#[test]`」까지 단언한다.
   ★**개악 8종 전건 red**(M1 = 두 파일 함께 · M8 = 가드 자신) · 기준선 green · 비용 ~50ms.
-- **`wie_validate` «마지막 프레임» 축** (PR **#89** 열림 · `wie-lgt-validate-last-frame-axis`) — 게이트② 대기.
-- **LGT 검은 화면 «근인» 수정** (PR **#88** 열림 · `wie-lgt-browser-paint-black-screen-name-compare`) — 게이트② 대기.
-  ★**셋은 파일이 겹치지 않는다**(`engine-contract.yml`+`scripts/` ↔ `wie_validate.rs` ↔ `card_canvas.rs`) — 원장 파일만 공유한다.
-
-## 완료 (최근)
+- 2026-09-06: **`wie_validate` «마지막 프레임» 축** (PR **#89** 착지 · `wie-lgt-validate-last-frame-axis`
+  · 채택 제안 `2026-09-05-lgt-browser-paint-localize#p1`) — `saw_content` 가 프레임 전체에 대한 **OR** 이라
+  ★**마지막 프레임을 구조적으로 못 본다**(OR 은 단조 — 나중 프레임이 값을 되돌릴 수 없다) ⇒ 같은 술어를
+  마지막 프레임에만 적용하는 **`last_frame_content`** 를 더했다. ★**보고 전용 · `passed` 분기 무접촉.**
+  ★**양방향을 «살아 있는 결함»으로** 보였다(#p0 이 미착지라 main 에 검은 화면이 그대로 있다):
+  당시 main LGT `content=true · ★last_frame_content=false` ↔ #88 을 얹으면 `true` · KTF 는 둘 다 불변.
+  ★★**[2026-09-06 갱신] 그 «당시 main» 행은 이제 «재현되지 않는다»** — **#88 이 착지**해(머지커밋 `3c02ce61`)
+  LGT 도 `last_frame_content=true` 다. ★회신이 그 사실을 **미리 적어 뒀다** — 모순이 아니라 «예고된 것»이다.
+  ⇒ ★**이 축의 값은 그대로다**: 같은 형태의 «다음» 덮어쓰기는 여전히 이 필드에서만 보인다.
+  ★**게이트로 안 올린 이유도 실측이다** — 지금 걸면 `helloworld_*` 2픽스처가 PASS → FAIL 로 뒤집힌다.
+- 2026-09-06: **LGT 검은 화면 «근인» 수정** (PR **#88** 착지 · `wie-lgt-browser-paint-black-screen-name-compare`
+  · 채택 제안 `2026-09-05-lgt-browser-paint-localize#p0`) — `Class.getName()` 은 **점**(핀이 `replace('/', ".")`)인데
+  `card_canvas.rs` 가 «슬래시» 리터럴과 비교해 ★**`disablePaint()` 분기가 한 번도 돈 적이 없었다** ⇒ MIDP 가 빈
+  `screenImage` 로 덮어 마지막 프레임이 검정.
+  ★**처방은 ⒜(점 형식 추가)가 «아니라» ⒝(정규화)** — ⒜는 지금의 두 이름만 맞추고 형식 취약성을 남긴다
+  (KTF 가 무사한 것은 그 게스트 클래스에 **패키지가 없어서**다).
+  ★**「분기가 실제로 도는가」를 호출 계수로 보였다**: 수정 후 LGT **1회** ↔ 개악 ★**0회**(KTF 는 둘 다 1회).
+  ★**브라우저 양방향**: 무개악 **41/41 rc=0** ↔ 개악 **rc=1 · F 세 키 0 px**. `contract-roundtrip.mjs` **Scenario F 신설**.
+  ★그물이 «그것뿐»이다 — `wie_validate` 는 sticky any-frame 이라 검은 화면을 PASS 로 낸다(별건 제안).
 - 2026-09-05: **`get_system_class_loader` 6곳 선이행** (PR **#83** 착지 · `wie-system-class-loader-preemptive-migration-six-sites`
   · 채택 제안 `2026-09-05-current-class-loader-replacement-design#p0`) — `+34` 에서 비공개가 되는 통로를
   **bump 없이** 지금 핀 위에서 갈아탔다(6줄 · `use` 변경 0). ★**값은 «6줄»이 아니라 «검증의 분리»다.**
