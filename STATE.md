@@ -32,10 +32,17 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- (이 브랜치 기준 없음. ★열린 형제 PR: **#95 · #97 · #98 · #99 · #100 · #101** — 각자 자기 브랜치에서
+- (이 브랜치 기준 없음. ★열린 형제 PR: **#97 · #98 · #99 · #100 · #101** — 각자 자기 브랜치에서
   진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
 
 ## 완료 (최근)
+- 2026-09-06: **클렛 카드 식별 설계 결정 — ★기각** (PR **#95** 착지 · 머지커밋 `34bca716` · `wie-clet-card-identity-by-class-name-design-decision`
+  · 채택 제안 `2026-09-06-lgt-black-screen-name-compare#p1`) — ★**코드 변경 0** · `card_canvas.rs` 무접촉.
+  ★**실측**(임시 프로브 · 되돌림): LGT 카드 = `net/wie/CletWrapperCard`(★**우리 Rust 프로토** · `isInstance` **true**) ↔
+  KTF 카드 = `CletCard`(★**게스트 ARM 메모리의 클래스 이름** · `isInstance` **false**). `isInstance(Card)` 는 둘 다 true 지만
+  ★**모든 카드가 true** 라 쓰면 검은 화면을 전 경로에 재현한다. 부팅 플래그는 LGT 만 가능(KTF 부팅은 ADF `MClass` → `Main.main` 범용 경로).
+  ⇒ ★**두 경로를 한 벌로 덮는 대체 술어가 없다.** 미지(실게임의 KTF 카드 이름)는 **양쪽 갈래가 같은 결론**이라 판정을 흔들지 않는다.
+  ★남는 제안 1건 = `getClass().getName()` → `class_definition().name()`(구현 안 함 · #p1 이 원한 것을 주지 않는다).
 - 2026-09-06: **`last_frame_content` 게이트화** (PR **#96** 착지 · `wie-validate-last-frame-gate-with-per-fixture-expectation`
   · 채택 제안 `2026-09-06-validate-last-frame-axis#p0` + 흡수 `2026-09-06-lgt-black-screen-name-compare#p0`) —
   축은 이미 있었고 **REPORT-ONLY** 였다. 게이트의 전제는 「빈 마지막 프레임이 정상인 픽스처」를 선언할 자리다.
