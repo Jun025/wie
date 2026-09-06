@@ -11,7 +11,7 @@
     "AGENTS.md §Landing paperwork — 「REPORT.md 상단 append」 → 「docs/report/ 새 파일」"
   ],
   "verification": [
-    "이력 소실 0: { printf '# REPORT\\n\\n'; ls docs/report/*.md | sort -r | xargs cat; } 가 원문과 cmp 바이트 동일 · 절 51 → 51",
+    "이력 소실 0: { printf '# REPORT\\n\\n'; ls docs/report/*.md | sort -r | sed -n '/\\/0051--/,$p' | xargs cat; } | shasum -a 256 → 4f85ec30… (213,785B · 절 51). ★sed 로 «이관분 0001~0051» 만 남긴다 — 이 sha 의 유효 범위가 거기까지이고, 빼면 이관 이후 회차를 함께 먹어 틀린 답이 난다. 독립 축: git show <이관 sha>^:REPORT.md | shasum -a 256 도 같은 값",
     "충돌 0: 두 가짜 회차가 «동시에» 각자 파일을 추가한 형상에서 git merge-tree rc=0",
     "소비자 전수(모집단 485 추적 파일): 프로그램 소비자 0(.github 0 · scripts 0) · 쓰는 쪽 1(AGENTS.md) 이관 완료",
     "네 게이트 + beta clippy + node 검사기 전건 green"

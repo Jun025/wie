@@ -177,10 +177,10 @@ then `:125`). The rest need a toolchain fetch — run them only when the artifac
   ```sh
   N=$(printf '%04d' $(( $(ls docs/report | sed -E 's/^([0-9]{4})--.*/\1/' | sort -n | tail -1 | sed 's/^0*//') + 1 )))
   $EDITOR docs/report/$N--$(date +%F)--<ticket-id>.md   # first line: ## [YYYY-MM-DD] title (<ticket-id>)
-  grep -h '^## \[' docs/report/*.md | sort -r            # reading it back: the directory is the index
+  grep -H '^## \[' docs/report/*.md | sort -r            # reading it back: the directory is the index
   ```
 
-  Sort by the **sequence number, not the date** — the ledger's date-monotonicity is a coincidence, not a guarantee. `REPORT.md` explains the rest; `docs/report-migration-revert.md` reverts it.
+  **`-H` is load-bearing, not cosmetic.** It prefixes the path, so `sort -r` keys on the *sequence number*; `-h` keys on the title text, which is the date, and this repo lands up to six rounds a day. Measured over 54 files: the `-h` form is **52 lines out of place**, the `-H` form is **0**. Sort by the **sequence number, not the date** — the ledger's date-monotonicity is a coincidence, not a guarantee. `REPORT.md` explains the rest; `docs/report-migration-revert.md` reverts it.
 - **Follow-up proposals go in a `docs/worklog/*.json`, or they do not exist.** When a task leaves
   follow-up recommendations (or adopts/declines earlier ones), write
   `docs/worklog/YYYY-MM-DD-<slug>.json` in the same PR. The cockpit 「후속 작업 추천」 panel reads

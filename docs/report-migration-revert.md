@@ -50,12 +50,19 @@ c=0; for f in docs/report/*.md; do [ "$(tail -c1 "$f" | od -An -c | tr -d ' ')" 
 ```
 
 ### ★검산 — ★**순서를 «보는» 것으로 한다**(줄 수 대조는 부적격)
+★★**⒜ 의 기준 sha 는 «이관에 든 `0001`~`0051`» 의 것이다 — 위 복원본은 «이관 이후 회차»까지 포함하므로 그대로 대조하면 «반드시» 어긋난다.**
+★그 어긋남은 결함이 아니라 **범위 차이**다. sha 축으로 보려면 **범위를 잘라서** 재라.
 ```bash
 # ⒜ 기준값과 sha256 대조 — 이관 시점 원문: 4f85ec30…  213,785B  51절
-shasum -a 256 /tmp/REPORT.restored.md
+#    ★sed 로 «이관분만» 남긴다. 빼면 이관 이후 회차를 함께 먹어 틀린 답이 나온다
+{ printf '# REPORT\n\n'; ls docs/report/*.md | sort -r | sed -n '/\/0051--/,$p' | xargs cat; } | shasum -a 256
 
-# ⒝ 더 확실한 축 — §1 의 revert 결과와 «내용 그대로» 대조한다
-git show <이관 sha>^:REPORT.md > /tmp/REPORT.orig.md
+# ⒜-b 독립 축 — 이관 «부모 커밋»에 직접 물으면 범위 지정이 필요 없다
+MIG=$(git log --format=%H --first-parent --grep='wie-report-md-per-round-files-port-from-otterpebble' | tail -1)
+git show "$MIG^:REPORT.md" | shasum -a 256
+
+# ⒝ 더 확실한 축 — §1 의 revert 결과와 «내용 그대로» 대조한다(★복원본 전체를 본다)
+git show "$MIG^:REPORT.md" > /tmp/REPORT.orig.md
 diff /tmp/REPORT.orig.md /tmp/REPORT.restored.md && echo "★순서까지 동일"
 ```
 ★★**「줄 수가 같다」로 검산하지 마라 — 형제 저장소에서 그 검산이 «통과해 버렸다».**
