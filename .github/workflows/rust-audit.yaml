@@ -52,5 +52,15 @@ jobs:
       # now runs with NO ignores at all — any future suppression must be added
       # back by explicit advisory ID with its reachability argument, never as a
       # blanket ignore.
+      #
+      # WHEN THIS GOES RED, READ THE LEDGER FIRST:
+      #   docs/project-kb/02_status.md — "공급망 추적 대장"
+      # Section A is what is still open; section C keeps the EXPOSURE VERDICT of
+      # advisories we already answered ("do we take that path?"), each with the
+      # dependency version it was measured against. That version column is the
+      # point: a verdict read off an old source tree stops being true when the
+      # dependency moves, so re-measure the version-dependent axis rather than
+      # quoting the row. Answering a repeat advisory from scratch is the waste
+      # this exists to prevent.
       - name: cargo audit
         run: cargo audit
