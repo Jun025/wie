@@ -1,5 +1,24 @@
 # REPORT
 
+## [2026-09-06] richness 3축에 «마지막 프레임» 짝을 붙였다 — 보고까지, 임계 0 (wie-validate-richness-three-axes-lack-last-frame-pair)
+- **무엇을**: `wie_cli/src/bin/wie_validate.rs` 에 `last_frame_distinct_colors`·`last_frame_nondominant_pct`·`last_frame_center_nonuniform_pct` 3필드. ★**`frame_richness` 를 마지막 프레임에 run 당 «1회»** 더 돌린다(프레임당이 아니다 — 그 프레임은 이미 메모리에 있다). ★**보고 전용 · 임계 0 · `passed` 무접촉.**
+- **왜**: 운영자 채택 제안 `2026-09-06-validate-last-frame-axis#p1`. 세 축이 전부 `fetch_max` 라 **단조**이고 ⇒ 나중 프레임이 값을 되돌릴 수 없다 = `saw_content` 와 **구조적으로 같은 사각**. 직전 회차는 가장 거친 축(2색 이상)에만 짝을 만들었다.
+- **★⑴ 대전제를 먼저 재측했다**(반증 실패 = 진행): `git show origin/main:… | grep -n 'fetch_max'` → `:185 max_magenta_px` · `:188 distinct` · `:189 nondominant` · `:190 center` ⇒ 세 축 전부 `fetch_max` 맞다.
+- **★★⑵ 짝이 «개악 없이도» 이미 갈린다**: 무개악 `keydraw_{ktf,lgt} --inject` 에서 ★**max nd=2.1 ↔ last nd=1.1**. 근인은 키를 **오름차순**으로 눌러 「가장 넓은 막대」가 MAX 에 남지만 **마지막 프레임에는 마지막 키의 막대만** 있다는 것 ⇒ ★**가상의 위험이 아니라 현행 픽스처에서 이미 값이 다르다.**
+- **★★⑶ Acceptance — max 는 높은데 last 만 무너진다**(개악 = 실제로 일어났던 LGT 검은 화면 회귀):
+
+  | 형상 | max c/nd | last c/nd | result |
+  |---|---|---|---|
+  | E0 무개악 `keydraw_lgt --inject` | 2 / **2.1** | 2 / **1.1** | PASS |
+  | **M1 개악** 같은 픽스처 | 2 / **2.1** ★불변 | ★**1 / 0.0** | PASS |
+  | 대조군 `keydraw_ktf --inject`(M1 하) | 2 / 2.1 | 2 / 1.1 ★불변 | PASS |
+
+  ★**`result` 가 두 형상 다 PASS 인 것이 «설계»다** — 계약 3 대로 **보고까지**이고 임계를 두지 않았다(막는 것은 형제 티켓 몫).
+- **★⑷ 소비자를 «세고» 회귀를 실행으로 확인했다**(계약 2): JSON 을 실제로 파싱하는 소비자는 ★**1개**(`scripts/lgt_render_probe.sh:48`). 그 `field()` 를 그대로 돌려 ★**`field distinct_colors` = 2**(= MAX · 신규 필드 오염 **없음**) 확인 — 지켜 준 것은 **패턴의 여는 따옴표**다. `smoke_gate.sh` 는 `result` 만 읽어 소비자가 아니다.
+- **★⑸ 회귀 0**: 5픽스처 판정·기존 `max_*` 값 **전건 불변** · `cargo test --all` **156 passed / 0 failed** · beta clippy 0.
+- **사용자 영향**: 없음(보고 필드). 대신 「그렸다가 거의 빈 화면으로 덮였다」가 **수로** 보인다 — 지금까지 그 자리를 보는 것은 `last_frame_content`(2색 이상)라는 가장 거친 술어뿐이었다.
+- **★남는 구멍**: ⒜★**막는 회귀는 0건**이다(임계가 없으므로 M1 에서도 PASS) — 값은 「다음 회차가 임계를 «데이터로» 고를 수 있다」에 있다(제안 등재) ⒝★`center_nonuniform` 은 현행 픽스처 전건 **0.0** 이라 ★**짝의 값이 아직 증명되지 않았다**(중앙에 그리는 픽스처가 없다) ⒞`max_magenta_px` 는 짝을 **일부러 안 만들었다** — 그 축은 「어느 프레임에서든 샜나」라 **MAX 가 옳은 술어**다 ⒟신규 3필드에 단위 시험 없음(새 로직이 아니라 기존 `frame_richness` 를 한 번 더 부르는 배선이다).
+
 ## [2026-09-06] `Image.createImage(String)` 픽스처 — «넓어진 가시 범위가 무엇을 찾는가»를 수로 냈다 (wie-system-class-loader-createimage-fixture)
 - **무엇을**: `scripts/make-draw-fixture.mjs` 가 jar 에 `wie-img.png`(16×8 RGB · 74바이트 · 스크립트가 바이트로 조립)를 동봉하고, `DrawMIDlet.startApp()` 이 **`Image.createImage("/wie-img.png")`** 로 그것을 **이름으로** 연 뒤 `getWidth()`·`getHeight()` 를 정적 필드에 저장하며, `DrawCanvas.paint()` 가 **그 치수 그대로** 사각을 채운다. `scripts/contract-roundtrip.mjs` 에 Scenario C-img 1건. `.rs` 변경은 **주석뿐**.
 - **왜**: 운영자 채택 제안 `2026-09-05-system-class-loader-preemptive-migration#p1`. 그 원문이 미완으로 남긴 문장이 이 회차의 Acceptance 다 — 「갈림 «자체»는 측정됐다 … ★**미측정인 것은 «넓어진 가시 범위가 실제로 무엇을 찾는가»** 하나다」.

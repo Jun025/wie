@@ -27,6 +27,16 @@
 //! `wie_validate --inject` reported PASS with `content: true` — the browser
 //! round-trip was the only thing that caught it.
 //!
+//! The three content-RICHNESS metrics have the same shape and, since 2026-09-06, the same
+//! pairing: `distinct_colors` / `nondominant_pct` / `center_nonuniform_pct` are each a MAX
+//! over every painted frame (`fetch_max`, monotonic), so a later frame cannot pull them back
+//! down — structurally the same blind spot. `last_frame_distinct_colors` /
+//! `last_frame_nondominant_pct` / `last_frame_center_nonuniform_pct` are the same three
+//! computed on the final frame alone, ONCE per run. They are REPORTED, never gated: unlike
+//! the boolean pair these are numbers, and a number needs a threshold to fail anything.
+//! No threshold is defined here on purpose — the point is to make one CHOOSABLE from data
+//! instead of invented.
+//!
 //! `last_frame_content` is REPORT-ONLY and deliberately not a gate. Two reasons,
 //! both measured rather than assumed: a fixture may legitimately end on a blank
 //! frame (helloworld_lgt draws nothing at all and exits cleanly), and without
@@ -396,7 +406,9 @@ fn main() {
     let json = format!(
         "{{\"file\":{:?},\"platform\":{:?},\"result\":{:?},\"reason\":{:?},\"ticks\":{},\"paints\":{},\"content\":{},\
          \"last_frame_content\":{},\
-         \"distinct_colors\":{},\"nondominant_pct\":{:.1},\"center_nonuniform_pct\":{:.1},\"ms\":{}}}",
+         \"distinct_colors\":{},\"nondominant_pct\":{:.1},\"center_nonuniform_pct\":{:.1},\
+         \"last_frame_distinct_colors\":{},\"last_frame_nondominant_pct\":{:.1},\"last_frame_center_nonuniform_pct\":{:.1},\
+         \"ms\":{}}}",
         args.filename,
         result.platform,
         if result.passed { "PASS" } else { "FAIL" },
@@ -408,6 +420,9 @@ fn main() {
         result.distinct_colors,
         result.nondominant_bp as f64 / 100.0,
         result.center_nonuniform_bp as f64 / 100.0,
+        result.last_frame_distinct_colors,
+        result.last_frame_nondominant_bp as f64 / 100.0,
+        result.last_frame_center_nonuniform_bp as f64 / 100.0,
         elapsed_ms
     );
     println!("{json}");
@@ -427,9 +442,18 @@ struct Outcome {
     /// module header for why the two can disagree and why this one is not a gate yet.
     last_frame_content: bool,
     // Content-richness metrics (measure-only; do not affect passed). See HeadlessScreen.
+    // These are the MAX over every painted frame, so they carry the same structural blind
+    // spot `content` does: fetch_max is monotonic, and a later frame cannot pull the number
+    // back down. The `last_frame_*` triple below is the same three metrics scoped to the
+    // final frame — the pair is what makes "drew something rich, then overpainted with
+    // near-nothing" visible. Measure-only as well: NO threshold is defined for them and
+    // none is invented here (a number without a threshold cannot fail a run).
     distinct_colors: u64,
     nondominant_bp: u64,
     center_nonuniform_bp: u64,
+    last_frame_distinct_colors: u64,
+    last_frame_nondominant_bp: u64,
+    last_frame_center_nonuniform_bp: u64,
 }
 
 fn run(args: &Args) -> Outcome {
@@ -636,6 +660,17 @@ fn run(args: &Args) -> Outcome {
     // an ANY-frame OR, so a run that draws correctly and is then overpainted with a blank
     // screen still reports `content: true`.
     outcome.last_frame_content = screen.last_frame.lock().unwrap().as_deref().is_some_and(has_content);
+
+    // Same three richness metrics, scoped to the final frame. Computed ONCE per run, not per
+    // painted frame: the last frame is already held in memory, so this is one extra pass over
+    // one frame at the end of a run that painted `paints` of them.
+    let (lf_colors, lf_nondominant, lf_center) = match screen.last_frame.lock().unwrap().as_deref() {
+        Some(frame) => frame_richness(frame, SCREEN_W, SCREEN_H),
+        None => (0, 0, 0),
+    };
+    outcome.last_frame_distinct_colors = lf_colors;
+    outcome.last_frame_nondominant_bp = lf_nondominant;
+    outcome.last_frame_center_nonuniform_bp = lf_center;
     outcome.distinct_colors = screen.max_distinct_colors.load(Ordering::SeqCst);
     outcome.nondominant_bp = screen.max_nondominant_bp.load(Ordering::SeqCst);
     outcome.center_nonuniform_bp = screen.max_center_nonuniform_bp.load(Ordering::SeqCst);
@@ -736,6 +771,9 @@ fn pass(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         distinct_colors: 0,
         nondominant_bp: 0,
         center_nonuniform_bp: 0,
+        last_frame_distinct_colors: 0,
+        last_frame_nondominant_bp: 0,
+        last_frame_center_nonuniform_bp: 0,
     }
 }
 
@@ -751,6 +789,9 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         distinct_colors: 0,
         nondominant_bp: 0,
         center_nonuniform_bp: 0,
+        last_frame_distinct_colors: 0,
+        last_frame_nondominant_bp: 0,
+        last_frame_center_nonuniform_bp: 0,
     }
 }
 
