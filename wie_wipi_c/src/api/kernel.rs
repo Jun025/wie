@@ -401,7 +401,7 @@ mod test {
 
     use crate::{WIPICContext, context::test::TestContext, method::MethodImpl};
 
-    use super::{alloc, calloc, free, get_resource_id, get_system_property, sprintk};
+    use super::{alloc, calloc, free, get_resource, get_resource_id, get_system_property, sprintk};
 
     #[futures_test::test]
     async fn test_sprintk() -> Result<()> {
@@ -470,6 +470,49 @@ mod test {
         let mut result = [0; 4];
         context.read_bytes(size, &mut result).unwrap();
         assert_eq!(u32::from_le_bytes(result), 0);
+
+        Ok(())
+    }
+
+    /// `MC_knlGetResource` must refuse to write past a caller buffer that is too small.
+    ///
+    /// The sibling failure branch (`get_resource_id` -> -12) has had a test since it was
+    /// written; this one had none — measured 2026-09-06 with a planted `panic!()` at the
+    /// branch, which left `cargo test --all` at 157 passed / 0 failed while the same drill
+    /// at the -12 branch killed `test_missing_resource_clears_size`.
+    ///
+    /// This is a HOST-side test on purpose. The guest route the obvious way — have the
+    /// fixture call `wipic_sys::kernel::get_resource` with a short buffer and print the
+    /// code — cannot observe -1 soundly: that function is typed `-> WIPICError`, whose
+    /// variants at the pinned rev are {1, 0, -9, -12, -18, -22, -25}, and `from_raw` is a
+    /// `transmute`. Handing it -1 is an invalid discriminant, i.e. UB. See the round's
+    /// worklog for the proposal about whether -1 is the right code here at all.
+    ///
+    /// Both directions are asserted: a buffer one byte short fails, the exact size passes.
+    /// Asserting only the failure would also pass if the function returned -1 always.
+    #[futures_test::test]
+    async fn test_resource_larger_than_buffer_is_rejected() -> Result<()> {
+        const PAYLOAD: &[u8] = b"0123456789";
+
+        let mut context = TestContext::new().with_resource("big.bin", PAYLOAD);
+        let name = context.alloc_raw(16).unwrap();
+        let size = context.alloc_raw(4).unwrap();
+        write_null_terminated_string_bytes(&mut context, name, b"big.bin").unwrap();
+
+        let id = get_resource_id(&mut context, name, size).await.unwrap();
+        assert!(id > 0, "setup: expected a handle, got {id}");
+        let mut reported = [0; 4];
+        context.read_bytes(size, &mut reported).unwrap();
+        assert_eq!(u32::from_le_bytes(reported) as usize, PAYLOAD.len());
+
+        let short = context.alloc(PAYLOAD.len() as u32 - 1).unwrap();
+        assert_eq!(get_resource(&mut context, id, short, PAYLOAD.len() as u32 - 1).await.unwrap(), -1);
+
+        let exact = context.alloc(PAYLOAD.len() as u32).unwrap();
+        assert_eq!(get_resource(&mut context, id, exact, PAYLOAD.len() as u32).await.unwrap(), 0);
+        let mut got = [0; PAYLOAD.len()];
+        context.read_bytes(context.data_ptr(exact).unwrap(), &mut got).unwrap();
+        assert_eq!(&got, PAYLOAD);
 
         Ok(())
     }
