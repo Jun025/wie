@@ -1,0 +1,59 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-06",
+  "task": "wie-parity-lock-guard-string-axes-to-structure-decision",
+  "title": "가드의 두 문자열 축 — 파서도 툴체인도 사지 않고 축⑶ 의 «오탐 원인»만 제거했다",
+  "adoptedProposals": ["2026-09-06-parity-lock-self-deletion-guard#p1"],
+  "verdict": "★★**세 선택지를 재고 «넷째»를 골랐다** — ⑴Rust 파서 ⑵`cargo … -- --list` ⑶무조치 중 어느 것도 좋지 않다. ⑴⑵는 **상시 스텝 구간**(빌드 없는 node 3줄)에 셋업과 시간을 얹는데 ⑵는 **축⑷ 를 덮지도 못하고**, ⑶은 **실측된 오탐**을 남긴다. ⇒ ★**축⑶ 의 술어를 «어트리뷰트 철자» → «검사기 경로 참조» 로 바꿨다**: 새 의존성 **0** · CI 시간 **+0s** · ★**오탐 소멸** · 잡던 것은 **전부 그대로** 잡는다. 축⑷ 는 **손대지 않았다**(실측상 cargo 백스톱이 «없어» 값을 한다).",
+  "premise-measured-first": {
+    "the-false-positive-is-real": "★**«오탐이 난다»를 주장이 아니라 실행으로 냈다.** `#[path]` 를 완전한 `include!` 리팩터로 바꾸면(★검사기의 inner doc `//!` 21건을 `//` 로 — `include!` 자리에서 inner doc 은 불법이라 **리팩터의 일부**다) ★**`cargo test` rc=0 · 11 passed** 인데 ★**가드 rc=1** 이었다. 제안이 이름 붙인 그 형태가 그대로 재현된다.",
+    "and-the-axis-was-guarding-a-spelling": "★**그 `include!` 형태에서 «검사기만» 지워도 `cargo` 는 여전히 rc=101**(`couldn't read … dod_ci_parity.rs`) ⇒ ★**축⑶ 주석이 「`#[path]` 만이 준다」고 적은 성질이 «다른 철자에도» 있다.** 즉 축은 **성질이 아니라 철자**를 잡고 있었다.",
+    "and-cargo-already-catches-its-failure-mode": "★`#[path]` 줄만 지우면(모듈 선언은 남긴다) ★**`cargo test --all` rc=101**(`error[E0583]: file not found for module \\`checker\\``) ⇒ 축⑶ 의 실패형은 **6다리가 이미 문다**. 가드가 «유일한 그물»인 자리가 아니었다.",
+    "axis-4-is-different-and-stays": "★**축⑷ 는 백스톱이 없다** — 두 파일·`#[path]`·`#[test]` 를 남기고 검사기를 «안 쓰는» 공허한 락은 ★**`cargo test` rc=0 · 1 passed**(경고 15줄뿐)다. **가드만이 rc=1** 로 잡는다. ⇒ 완화 대상이 아니다."
+  },
+  "cost-of-the-three-options": {
+    "where-the-cost-lands": "★**상시 스텝 구간이 어떤 곳인지가 비용을 정한다**: `engine-contract.yml` 의 `contract` 잡은 paths 필터 «밖»에 node 스텝 **3개**(worklog json ~1s · worklog coverage ~1s · 이 가드 ~50ms)만 두고 ★**`npm ci` 도 rust 툴체인도 «없다»**(툴체인 스텝은 필터 «안»에 있고 조건부다). ⇒ ⑴⑵ 는 **문서만 고친 PR 에도** 그 비용을 물린다.",
+    "option-1-rust-parser": "★**+4 패키지 · +1 셋업 스텝(`npm ci`) · +41.5s/PR**. 실측: `tree-sitter` + `tree-sitter-rust` = `added 4 packages`(그 grammar 는 **네이티브 애드온** · unpacked **15.0MB** · 6플랫폼 prebuild). 그리고 ★**상시 구간에 `node_modules` 가 «아예 없다»** ⇒ `npm ci` 를 새로 넣어야 하고, 현 lockfile(**93패키지 · 211MB**) 기준 **41.5s**(로컬·캐시 warm) 다. ★대안 `web-tree-sitter` 는 +1 패키지지만 ★**npm 에 rust grammar wasm 이 없다**(tarball 27엔트리에 `.wasm` **0** · `prebuilds/*.node` 6개뿐) ⇒ 우리가 빌드해 **바이너리를 커밋**해야 한다 — 더 나쁘다. ※`@swc/core` 는 후보가 «아니다»(Rust 로 «쓰인» JS/TS 파서이지 Rust 파서가 아니다).",
+    "option-2-cargo-list": "★**+1~2 셋업 스텝 · 콜드 672.7s / 웜 5.69s**. 실측: 빈 `CARGO_TARGET_DIR` 에서 `cargo test -p wie_cli --test dod_ci_parity -- --list` = ★**11m 11s**(약 230크레이트 · winit·rodio·midir·softbuffer 포함) · 같은 명령 재실행 **5.69s**. ⇒ 상시 구간의 현 스텝(**~50ms**) 대비 웜에서도 ★**약 110배**이고, 콜드를 피하려면 캐시 스텝이 하나 더 붙는다. ★★**그리고 축⑷ 를 «덮지 못한다»** — 공허한 락에서도 `--list` 는 시험을 나열하고 rc=0 이다(위 실측). ⇒ **가장 비싸고 가장 적게 덮는다.**",
+    "option-3-do-nothing": "**비용 0**. 그러나 위 실측된 오탐이 남고, ★제안이 지적한 대로 **오탐 한 번이면 다음 사람이 가드를 지운다**.",
+    "option-4-chosen": "★**새 의존성 0 · 셋업 스텝 0 · CI 시간 +0s**(같은 node 스크립트 · 비교 문자열 하나가 바뀔 뿐). 축⑶ 을 `#[path = \"support/dod_ci_parity.rs\"]` **철자**가 아니라 `support/dod_ci_parity.rs` **경로**로 본다. ★그 경로는 `LOCK.checker` 에서 `path.relative` 로 **파생**한다 — 둘째 상수를 두지 않아 검사기를 옮겨도 낡은 리터럴이 남지 않는다."
+  },
+  "bidirectional-pairs": {
+    "note": "★`guard` = `node scripts/check-parity-lock-wired.mjs` · `cargo` = `cargo test -p wie_cli --test dod_ci_parity`(P5·P2 는 ★**`cargo test --all` 로 재측** — 대상을 이름으로 부르면 «없는 타깃»에 cargo 가 스스로 화내서 원래 구멍이 안 보인다).",
+    "table": [
+      "P0 기준선                      guard 0 · cargo 0",
+      "★P1 옳은 리팩터 include!       guard ★0 (변경 «전»에는 1 = 오탐) · cargo 0 · 11 passed",
+      "P2 #[path] 만 제거             guard 1 · ★cargo test --all ★101 (E0583 file not found for module `checker`)",
+      "P3 «다른 파일»로 겨눔          guard 1 · cargo 101",
+      "P4 검사기만 삭제(축⑴)          guard 1 · cargo 101",
+      "★P5 두 파일 함께 삭제(원 구멍)  guard ★1 · ★cargo test --all ★0 · 145 passed · 출력에 `dod_ci_parity` ★0회",
+      "P6 공허한 락(축⑷)              guard 1 · ★cargo 0 · 1 passed  ⇒ 백스톱 «없다»",
+      "P7 #[test] 0건(축⑷)            guard 1 · cargo 0"
+    ]
+  },
+  "changes": [
+    "`scripts/check-parity-lock-wired.mjs` 축⑶ 술어 교체(비교 문자열 1개) + `LOCK.checkerRef` **파생** + 머리 주석에 «왜 철자가 아니라 경로인가»·«축⑷ 는 왜 안 건드리나»를 실측과 함께 기록.",
+    "★`CEILINGS` 에 **한 줄 추가** — 축⑷ 는 부분일치라 ★**모듈 별칭을 바꿔도 접미가 같으면 통과한다**(실측: `parity_checker::parity(` 가 `checker::parity(` 를 **포함**해 별칭 전건 개명이 guard 0 · cargo 0 으로 지나갔다). ★가드가 **매 실행 출력**하므로 다음 사람이 이 느슨함을 «모른 채» 신뢰하지 않는다."
+  ],
+  "not-done-on-purpose": [
+    "★**축⑷ 를 손대지 않았다** — P6·P7 이 보이듯 cargo 백스톱이 없어 «값을 하는» 축이고, 별칭까지 보려면 정확히 위에서 기각한 **Rust 파서**가 필요하다. ⇒ 완화도 강화도 하지 않고 **천장에 적었다**.",
+    "★**워크플로 무접촉** — 스텝·필터·잡 이름 변경 0(Constraint 4 의 필터 목록도 무접촉).",
+    "★**같은 파일의 「이 저장소에서 그 형태가 다섯 번 났다」(FAIL 메시지)를 고치지 «않았다»** — 그 주장은 `wie-count-deletable-checks-that-stay-green-repo-wide`(PR #94)가 ★**출처 없음**으로 반증했고 그 회차가 세 자리에 정정을 붙였지만, ★**이 티켓의 계약 3 이 「축⑶⑷ «만» 손댄다」**여서 여기서는 범위 밖이다. ★**남겨 두는 것이 아니라 «그 PR 소관»이다** — 그쪽이 착지하면 이 줄도 같이 처분해야 한다."
+  ],
+  "limits": [
+    "★**여전히 문자열이다** — 바뀐 것은 «무엇을 문자열로 보는가»(철자 → 경로)이고 파싱을 하지 않는다. 경로를 주석에 적어 두고 실제로는 다른 파일을 겨누는 식의 «의도적» 우회는 여전히 통과한다(가드의 기존 천장 ①과 같은 계급).",
+    "★**축⑷ 의 부분일치 느슨함은 «남겨 둔 값»이다** — 별칭 접미가 같으면 통과한다. 고치려면 파서이고, 그 비용을 이 회차가 쟀다.",
+    "★**콜드 672.7s 는 이 맥(로컬)의 수다** — GitHub 러너에서는 다를 수 있다. 다만 «상시 구간에 툴체인+230크레이트 빌드를 얹는다»는 결론은 배수가 아니라 **계급**의 문제라 흔들리지 않는다."
+  ],
+  "proposals": [
+    {
+      "title": "축⑷ 의 «모듈 별칭 무관»까지 원하면 파서가 필요하다 — 오늘 비용을 재 뒀으니 그 위에서 결정하라",
+      "plainSummary": "검사 파일이 검사기를 실제로 부르는지 확인하는 축은 아직 문자열 일부만 봅니다. 모듈 이름을 바꾸면 그 확인이 우연히 통과하거나 우연히 실패할 수 있습니다.",
+      "userBenefit": "가드가 «우연»이 아니라 «설계»로 맞습니다.",
+      "why": "★실측: `parity_checker::parity(` 는 `checker::parity(` 를 **부분문자열로 포함**해 별칭 전건 개명이 guard **0** · cargo **0** 으로 지나갔다. 반대로 `dod::parity(` 처럼 접미가 다르면 **배선이 멀쩡한데 red** 다. ⇒ 방향이 양쪽으로 틀릴 수 있다. ★이 회차가 그 사실을 `CEILINGS` 에 박아 «가드가 매 실행 스스로 말하게» 했지만, 없앤 것은 아니다.",
+      "tradeoff": "⑴★**비용이 이미 재져 있다**: `tree-sitter`+`tree-sitter-rust` = **+4패키지 · 네이티브 애드온 · 15.0MB**, 그리고 상시 구간에 `npm ci` 를 새로 넣어야 해 **+41.5s/PR**(93패키지·211MB) ⇒ 문서만 고친 PR 도 문다 ⑵`cargo … -- --list` 는 **콜드 672.7s / 웜 5.69s** 인데 ★**이 축을 덮지도 못한다**(공허한 락에서 rc=0) ⑶★**아무것도 안 하는 선택이 여전히 정당하다** — 오탐 방향은 «안전»쪽이고, 고칠 자리는 `LOCK.callsChecker` 상수 한 곳이며 그 사실이 스크립트 머리와 천장에 적혀 있다.",
+      "effort": "M — 어느 쪽이든 이 회차보다 비싸다.",
+      "target": "wie · scripts/check-parity-lock-wired.mjs"
+    }
+  ]
+}
