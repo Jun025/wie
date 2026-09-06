@@ -1,0 +1,46 @@
+{
+  "schema": "worklog/v1",
+  "date": "2026-09-07",
+  "task": "wie-docs-report-serial-uniqueness-port-from-otterpebble",
+  "title": "docs/report 연번 유일성 축 — 「디스크 최대 + 1」의 디스크는 머지된 트리다",
+  "summary": "형제 저장소 otterpebble 의 착지분(otterpebble-docs-report-serial-uniqueness-unguarded · approve)을 포팅했다. scripts/check-docs-report-serial.mjs 세 모드(기본=사후 중복 검출 · --next-serial=열린 PR 까지 세는 작성 도우미 · --selftest=판별력 9케이스) + engine-contract.yml contract 잡 스텝 1개 + AGENTS.md 규약 스니펫 교체. 오늘 실제로 난 형상을 그대로 잡는다: main 0056(#109 착지) ↔ 열린 PR #112 도 0056 · #111 이 0057 ⇒ 도구가 0058 을 주고 이 회차가 그것을 썼다.",
+  "changes": [
+    "scripts/check-docs-report-serial.mjs 신설 — 기본(사후) · --next-serial(사전) · --selftest(9케이스)",
+    ".github/workflows/engine-contract.yml — contract 잡에 always-run 스텝 1개(주석에 왜 always-run 인지 · 왜 새 잡이 아닌지)",
+    "AGENTS.md §Landing paperwork — 연번 계산을 `ls docs/report` 에서 `--next-serial` 로 교체 + 왜(오늘 실측 수)",
+    "docs/report/0058--… · docs/worklog/… — 착지 서류(연번은 도구가 답한 값)"
+  ],
+  "verification": [
+    "사후 축 종단: 트리에 같은 번호 2건을 실제로 만들자 ::error 1줄 · rc=1 · 제거 후 rc=0 · git status 잔재 0",
+    "★오늘의 형상(열린 PR 이 N+1 을 든 상태)을 잡는가: --next-serial 이 디스크 0057 · claim [0056(#112) 0057(#111)] ⇒ 0058",
+    "양방향 M0(열린 PR 조회 제거 = 포팅 전 형상) → 다시 0057(#111 과 충돌) ↔ 원복 0058",
+    "개악 M1~M3(제품 호출부·순수 함수) → selftest 1·1·2건 불일치 · 원복 바이트 동일 · 9케이스 전건 일치",
+    "네 게이트 + beta clippy + node 검사기 4종 + npm run audit 전건 rc=0 · YAML 파싱 OK"
+  ],
+  "limits": [
+    "사후 축은 «머지된 트리 안 중복»만 red 로 만든다. 열린 PR 이 든 번호는 원리적으로 PR 단위 CI 가 볼 수 없으므로 --next-serial(사람이 부르는 사전 도우미)이 진다 — 그쪽은 CI 축이 아니고 강제되지 않는다.",
+    "--next-serial 은 gh 네트워크에 의존한다. 실패하면 ::warning 만 내고 디스크 기준 답을 준다(막지 않는다) — 그 경우 중복이 다시 가능하다.",
+    "REPORT.md §어떻게 쓰나 의 같은 스니펫은 이 회차의 범위 밖(무접촉)이라 옛 `ls docs/report` 형태로 남았다. 정본은 AGENTS.md 이고 그 절이 그렇게 적지만, 복사할 수 있는 낡은 한 줄이 남는다.",
+    "★열린 PR #112 가 main 의 0056 과 이미 겹친다 — 이 회차가 만든 것이 아니고, 이 회차는 그 PR 을 만지지 않았다(별 PR 을 섞지 않는다). #112 가 그대로 착지하면 새 축이 main 에서 red 를 낸다."
+  ],
+  "proposals": [
+    {
+      "title": "열린 PR #112 의 회차 파일 연번을 0056 → 빈 번호로 옮긴다",
+      "plainSummary": "main 이 이미 0056 을 들고 있는데 열린 PR #112 도 0056 을 추가한다. 그대로 착지하면 main 에 같은 번호 두 건이 생기고 새 축이 red 를 낸다.",
+      "userBenefit": "착지 직후 main 이 red 가 되는 것을 막는다. 그리고 「연번 내림차순으로 이으면 원문과 바이트 동일」이라는 이관 규약의 전제가 유지된다.",
+      "why": "실측: main 에 0056--…-ci-wire-or-document-three-never-run-checks.md(#109 착지) · #112 가 0056--…-merge-contract-path-list-stale-after-report-split.md 를 추가. 파일명이 달라 git 은 조용히 둘 다 받는다.",
+      "tradeoff": "다른 PR 의 브랜치를 만지는 일이라 그 PR 의 회차(또는 게이트③)가 해야 한다 — 이 회차가 손대면 두 PR 이 섞인다. 처방은 `git mv` 한 줄(내용 무변)이고 착지한 파일은 건드리지 않는다.",
+      "effort": "XS",
+      "target": "PR #112 · docs/report/0056--2026-09-07--wie-merge-contract-path-list-stale-after-report-split.md"
+    },
+    {
+      "title": "REPORT.md §어떻게 쓰나 의 연번 스니펫도 도구를 가리키게 한다",
+      "plainSummary": "AGENTS.md 는 `--next-serial` 을 가리키게 고쳤지만 REPORT.md 의 같은 스니펫은 여전히 `ls docs/report | max + 1` 이다.",
+      "userBenefit": "복사해 쓸 수 있는 낡은 한 줄이 사라져, 규약을 따랐는데 충돌하는 오늘의 형상이 재발하지 않는다.",
+      "why": "이 회차의 범위 밖(REPORT.md 무접촉)이라 손대지 못했다. 정본은 AGENTS.md 이고 REPORT.md 가 그렇게 적으므로 갈림 자체는 무해하지만, 두 곳에 같은 명령이 있으면 한쪽이 낡는다는 것이 이 저장소의 반복 교훈이다.",
+      "tradeoff": "한 줄이라 비용은 거의 0. 다만 REPORT.md 는 고정 안내라 회차마다 만지는 파일이 아니어서 누가 언제 하느냐가 정해져 있지 않다.",
+      "effort": "XS",
+      "target": "REPORT.md §어떻게 쓰나 (새 회차)"
+    }
+  ]
+}
