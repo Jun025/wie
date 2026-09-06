@@ -32,6 +32,15 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- **J2ME 게스트 부팅을 `cargo test --all` 안으로** (PR 개설 · `wie-j2me-guest-boot-in-cargo-test-all`
+  · 채택 제안 `2026-09-06-createimage-fixture#p1`) — `wie_j2me/tests/test_boot.rs` 1건 + `test_utils` 하니스 확장
+  + 커밋 픽스처 `test_data/draw_j2me.zip`(1,020B). ★**브라우저 잡 무접촉**(`.github/`·`scripts/`·`web/` diff **0파일**).
+  ★**막힌 것은 하니스가 아니라 픽스처였다** — `*.jar` 는 Constraint 9 로 추적 금지라, ★**zip 이 jar 를 담는 기존 관례**
+  (`keydraw_ktf.zip` 안의 `00000000.jar`)를 그대로 썼다(`npm run audit` PASSED).
+  ★**하니스 핵심 = redraw 응답 루프** — 종전 `TestScreen` 이 요청을 기록 안 해 **첫 판이 10,000틱 paints 0** 이었다.
+  ★단언은 «프레임이 합성됐다»(「안 던졌다」는 페인트 전에 죽는 게스트도 통과시킨다 = 2026-09-04 형상).
+  ★양방향 2종 red(메인 클래스 미존재 · `image.rs` 마이그레이션 되돌림) · `cargo test --all` **40/156 → 41/157**(회귀 0).
+  ★**착지 시 배포 있음** — `Cargo.lock`·`Cargo.toml` 이 `publish-artifact.yml` paths 에 매치(Release + otterpebble dispatch).
 - **클렛 카드 식별 설계 결정 — ★기각** (PR 개설 · `wie-clet-card-identity-by-class-name-design-decision`
   · 채택 제안 `2026-09-06-lgt-black-screen-name-compare#p1`) — ★**코드 변경 0** · `card_canvas.rs` 무접촉.
   ★**실측**(임시 프로브 · 되돌림): LGT 카드 = `net/wie/CletWrapperCard`(★**우리 Rust 프로토** · `isInstance` **true**) ↔
