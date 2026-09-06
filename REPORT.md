@@ -76,11 +76,16 @@ $EDITOR docs/report/$N--$(date +%F)--<slug>.md
   { printf '# REPORT\n\n'; ls docs/report/*.md | sort -r | sed -n '/\/0051--/,$p' | xargs cat; } | shasum -a 256
 
   # 독립 축 — 이관 «부모 커밋»의 원문에 직접 물어도 같은 값이어야 한다(범위 지정이 필요 없다)
-  MIG=$(git log --format=%H --first-parent --grep='wie-report-md-per-round-files-port-from-otterpebble' | tail -1)
+  # ★★--first-parent 를 붙이지 마라(아래 참조). tail -1 = 최고령 매치 = «이관 커밋» 이어야 한다
+  MIG=$(git log --format=%H --grep='wie-report-md-per-round-files-port-from-otterpebble' | tail -1)
   git show "$MIG^:REPORT.md" | shasum -a 256
+  git show "$MIG^:REPORT.md" | grep -c '^## \['     # ★51 이어야 한다. 53 이면 부모를 잘못 짚었다
   ```
   ★**`sed` 를 빼면 «오늘 이미» 틀린 답이 난다** — `ls docs/report/*.md` 가 이관 이후 회차까지 먹기 때문이고,
   회차가 쌓일수록 더 벌어진다. ★**「이력이 깨졌다」로 오독하는 경로가 여기다.**
+  ★★**독립 축에 `--first-parent` 를 붙이면 «착지 뒤» 뒤집힌다** — 이 저장소는 **upstream-sync 라 머지 커밋으로 착지**하므로
+  `main` 의 first-parent 경로에 **이관 커밋이 없다**. 남는 매치는 머지 커밋뿐이고 `$MIG^` = **착지 직전 `main`**
+  (= 이관 이후 회차를 이미 먹은 원문 · 절 **53**)이 된다. ★**브랜치 위에서는 «돌기» 때문에 이 함정은 착지 후에만 발화한다.**
 - ★**경계가 모호했던 구간 0건** — 머리글 `# REPORT` 는 원문 **1행**에 있었고 회차들 사이에 묻힌
   텍스트가 없다(형제 저장소는 여기서 1건이 있었다). 위 검산의 `printf` 두 줄이 그 머리글이다.
 - ★**`STATE.md` 는 «가르지 않았다»** — 형제 저장소도 가르지 않았다. 그 파일은 회차 원장이 아니라

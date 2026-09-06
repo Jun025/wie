@@ -25,6 +25,12 @@ git log --oneline --first-parent origin/main \
 git revert --no-commit -m 1 <그 sha>   # ★-m 1 — 이 저장소는 upstream-sync 라 «머지 커밋»으로 착지한다
 git commit -m 'revert(repo): REPORT.md 회차 파일 이관 되돌림'
 ```
+★★**위 명령이 답하는 것은 «머지 커밋»이지 «이관 커밋»이 아니다** — `--first-parent` 가 브랜치 안쪽을 걷지 않기 때문이다.
+`revert -m 1` 에는 그 머지 sha 가 **맞다**. ★**그러나 §2 의 `$MIG`(이관 커밋)에 그것을 대입하지 마라** —
+`<머지>^` 는 **착지 직전 `main`** 이라 이관 이후 회차를 이미 먹은 원문이 나온다. 이관 커밋은 이렇게 짚는다:
+```bash
+git log --format=%H --grep='wie-report-md-per-round-files-port-from-otterpebble' | tail -1   # ★--first-parent 없음
+```
 ⇒ `REPORT.md` 가 643줄 원장으로 돌아오고 `docs/report/` 가 사라진다.
 ★**이관 뒤 새로 쓰인 회차 파일은 이 revert 로 지워지지 않는다**(그 커밋에 없던 파일이다) — 2 절로 합쳐라.
 
@@ -58,13 +64,20 @@ c=0; for f in docs/report/*.md; do [ "$(tail -c1 "$f" | od -An -c | tr -d ' ')" 
 { printf '# REPORT\n\n'; ls docs/report/*.md | sort -r | sed -n '/\/0051--/,$p' | xargs cat; } | shasum -a 256
 
 # ⒜-b 독립 축 — 이관 «부모 커밋»에 직접 물으면 범위 지정이 필요 없다
-MIG=$(git log --format=%H --first-parent --grep='wie-report-md-per-round-files-port-from-otterpebble' | tail -1)
+# ★★--first-parent 를 붙이지 마라 — 착지 뒤에는 그것이 «머지 커밋»을 집어 답을 뒤집는다(아래 참조)
+MIG=$(git log --format=%H --grep='wie-report-md-per-round-files-port-from-otterpebble' | tail -1)
 git show "$MIG^:REPORT.md" | shasum -a 256
+git show "$MIG^:REPORT.md" | grep -c '^## \['     # ★51 이어야 한다. 53 이면 부모를 잘못 짚었다
 
-# ⒝ 더 확실한 축 — §1 의 revert 결과와 «내용 그대로» 대조한다(★복원본 전체를 본다)
+# ⒝ 더 확실한 축 — §1 의 revert 결과와 «내용 그대로» 대조한다(★복원본 전체를 본다 · 같은 $MIG 를 쓴다)
 git show "$MIG^:REPORT.md" > /tmp/REPORT.orig.md
 diff /tmp/REPORT.orig.md /tmp/REPORT.restored.md && echo "★순서까지 동일"
 ```
+★★**`--first-parent` 를 붙이면 «착지 뒤» 뒤집힌다 — 브랜치 위에서는 돌기 때문에 눈에 안 띈다.**
+이 저장소는 **upstream-sync 라 머지 커밋으로 착지**한다(§1 이 `-m 1` 로 적은 그 사실이다) ⇒
+`main` 의 first-parent 경로에 **이관 커밋이 없고**, 남는 매치는 머지 커밋뿐이며 `$MIG^` = **착지 직전 `main`** 이 된다.
+★그것은 «이관 이후 회차를 이미 먹은 원문»(절 **53**)이라 sha 가 어긋난다 — ★**`--first-parent` 없는 `tail -1`
+= 최고령 매치 = 이관 커밋**이고, 그 형태는 **착지 전에도 후에도 옳다.** ★위 절수 한 줄이 그 갈림을 즉시 가른다.
 ★★**「줄 수가 같다」로 검산하지 마라 — 형제 저장소에서 그 검산이 «통과해 버렸다».**
 줄 수는 **순서에 무감**이라 424절이 뒤섞여도 초록이 난다.
 ※이관 «후» 회차가 쌓였으면 ⒝ 의 `diff` 는 그 회차만큼 차이가 난다 — **그 차이가 «새 회차뿐»인지** 보라.
