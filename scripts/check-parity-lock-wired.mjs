@@ -72,16 +72,27 @@ const CEILINGS = [
   "이 가드는 «배선»을 보지 «의미»를 보지 않는다 — 아래 넷을 통과하면서 단언이 공허한 시험은 못 잡는다.",
   "그 잔여를 무는 것은 파리티 락 «자신»의 개악 대조(M1~M6)이고, 그것은 `cargo test --all` 이 6다리에서 돌린다.",
   "가드 «자신»의 삭제는 워크플로 스텝이 잡는다(스텝이 이 파일을 경로로 부른다). 스텝까지 지우면 diff 로만 보인다.",
-  "축⑷ 는 이제 별칭을 «파일에서 읽는다»(`mod <이름>;`) — 종전의 문자열 부분일치(`checker::parity(` 하드코딩)는 양방향으로 틀렸고 2026-09-07 에 교체했다(위음성: `parity_checker::parity(` 가 `checker::parity(` 를 포함 · 위양성: 정당한 `dod::parity(` 가 red). ★남는 천장: 별칭 «선언»만 읽지 호출부를 파싱하지 않으므로, `mod` 줄이 없는 배선 형태(예: `use` 재수출)는 판정 불가로 «실패» 처리한다 — 통과가 아니라 실패다.",
-  "축⑷ 는 여전히 Rust 파서가 아니다 — 그 도입은 상시 구간에 `npm ci` 를 새로 넣어야 해 «문서만 고친 PR»까지 물게 되고(실측 2026-09-07: 상시 스텝 7개가 전부 Node 내장만 쓰고 `npm ci` 는 필터 «안»에만 있다), 그 대가로 기각했다.",
+  "축⑷ 는 별칭을 «파일에서 읽고»(`#[path = \"<검사기>\"]` 가 붙은 `mod` 로 한정) 그 별칭으로 «좌경계 있는» 호출을 요구한다. 종전 하드코딩(`checker::parity(`)은 양방향으로 틀렸다 — 위양성: 정당한 `dod::parity(` 가 red · 위음성: `parity_checker::parity(` 가 `checker::parity(` 를 «부분문자열로 포함»해 통과. ★후자는 좌경계 `(?<![A-Za-z0-9_])` 로 닫았다(실측: `mod` 는 `checker` 인데 호출만 `parity_checker::parity(` 로 바꾸면 rc=1). ★남는 천장: 별칭 «선언»만 읽지 호출부를 파싱하지 않으므로, 그 `#[path]`+`mod` 짝이 없는 배선(예: `use` 재수출·`include!`)은 판정 불가로 «실패» 처리한다 — 통과가 아니라 실패다.",
+  "축⑷ 는 여전히 Rust 파서가 아니다 — 그 도입은 상시 구간에 `npm ci` 를 새로 넣어야 해 «문서만 고친 PR»까지 물게 된다. 실측 2026-09-07: `engine-contract.yml` 의 상시 스텝은 **8개**(그중 이름 있는 것 6 · 그 6 중 하나는 bash `audit-no-leak.sh`, 하나는 `dorny/paths-filter`)이고 `npm ci` 는 필터 «안»에만 있다. 그 대가로 파서를 기각했다.",
 ];
 
-// The alias the test reaches the checker through: `mod <alias>;`, optionally
-// preceded by `#[path = …]`. Deliberately a narrow, anchored match on the module
-// DECLARATION (not on call sites) — that is the one line Rust makes canonical, so
-// no parser is needed to read it. Returns null when there is no such line, and the
-// caller treats null as a failure rather than a pass.
-const aliasOf = (src) => src.match(/^\s*(?:pub\s+)?mod\s+([A-Za-z_][A-Za-z0-9_]*)\s*;/m)?.[1] ?? null;
+// The alias the test reaches THE CHECKER through. Anchored on the `#[path = …]`
+// that names the checker, not on "the first `mod` in the file" — a test is free to
+// declare other modules, and picking the first one would red a correctly wired lock
+// (the exact false-positive class this axis was rewritten to remove).
+// Returns null when no such declaration exists; the caller treats null as a
+// FAILURE, never as a pass.
+const aliasOf = (src, checkerRef) => {
+  const ref = checkerRef.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return src.match(new RegExp(`#\\[path\\s*=\\s*"${ref}"\\]\\s*(?:pub\\s+)?mod\\s+([A-Za-z_][A-Za-z0-9_]*)\\s*;`))?.[1] ?? null;
+};
+
+// A call THROUGH that alias, with a LEFT BOUNDARY. Without it this check repeats
+// the very bug it was written to fix: `parity_checker::parity(` CONTAINS
+// `checker::parity(`, so a plain substring test cannot tell one from the other.
+// (Measured twice on this branch, once in the shell and once here.)
+const callsThrough = (src, alias, fn) =>
+  new RegExp(`(?<![A-Za-z0-9_])${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}::${fn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(src);
 
 const failures = [];
 const notes = [];
@@ -125,13 +136,13 @@ if (testSrc !== null) {
   // alias — so the axis follows a rename instead of guessing one spelling.
   // FAIL CLOSED: no recognisable `mod <alias>;` means we cannot judge the call at
   // all, and "cannot judge" must not read as "fine".
-  const alias = aliasOf(testSrc);
+  const alias = aliasOf(testSrc, LOCK.checkerRef);
   if (alias === null) {
-    failures.push(`${LOCK.test} 에서 «모듈 별칭»을 읽지 못했다 (\`mod <이름>;\` 이 없다) — 검사기를 무슨 이름으로 부르는지 판정할 수 없다`);
+    failures.push(`${LOCK.test} 에서 «모듈 별칭»을 읽지 못했다 (\`#[path = "${LOCK.checkerRef}"]\` 가 붙은 \`mod <이름>;\` 이 없다) — 검사기를 무슨 이름으로 부르는지 판정할 수 없다`);
   } else {
     notes.push(`${LOCK.test}: 모듈 별칭 \`${alias}\` (하드코딩이 아니라 파일에서 읽었다)`);
     const call = `${alias}::${LOCK.calls}`;
-    if (!testSrc.includes(call)) {
+    if (!callsThrough(testSrc, alias, LOCK.calls)) {
       failures.push(`${LOCK.test} 가 \`${call}\` 를 부르지 않는다 — 검사기를 «선언만» 하고 «쓰지» 않는다`);
     }
   }
