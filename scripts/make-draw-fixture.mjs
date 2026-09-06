@@ -300,8 +300,9 @@ const drawMidlet = () => {
   const init = Buffer.concat([Buffer.from([0x2a]), Buffer.from([0xb7]), u2(superInit), Buffer.from([0xb1])]);
 
   // Open the bundled resource BY NAME and remember the dimensions the host
-  // reported. There is no try/catch — the assembler emits no exception table —
-  // so a throw here propagates out of startApp. MEASURED (2026-09-06), because
+  // reported. The exception table below guards only the two failure-branch
+  // calls, never THIS one, so a throw here propagates out of startApp.
+  // MEASURED (2026-09-06), because
   // an earlier version of this comment guessed and guessed wrong: it does NOT
   // degrade to "the base rect only". net/wie/Launcher.startMIDlet does not
   // swallow it, so the boot aborts and wie_validate reports

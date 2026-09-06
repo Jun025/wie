@@ -3,12 +3,14 @@
   "date": "2026-09-06",
   "task": "wie-createimage-failure-branches-fixture-lock",
   "title": "createImage 의 «실패 갈래»를 픽스처로 잠갔다 — 잠근 것은 «던진다»가 아니라 «무슨 타입을 던지는가»다",
-  "adoptedProposals": ["2026-09-06-createimage-fixture#p0"],
+  "adoptedProposals": [
+    "2026-09-06-createimage-fixture#p0"
+  ],
   "summary": "★어셈블러(`scripts/make-draw-fixture.mjs`)에 **예외 테이블**을 넣고 같은 `Image.createImage(String)` 호출의 실패 갈래 **2종**을 픽스처에 심었다 — 없는 이름(`java/io/IOException`)과 깨진 이미지(`java/lang/IllegalArgumentException`). ★**두 타입은 호스트 소스에서 읽었고 추측하지 않았다.** 관측은 **게스트 stdout** 이고 접두 `imgerr:` 로 갈랐다. 단언은 **두 곳**: `cargo test --all` 안의 네이티브 시험(6다리 전부) + 브라우저 왕복 Scenario **C-err**. ★**zip 재생성 1회 · 성공 경로 단언 무접촉 · 다른 SPI 무접촉.**",
   "premise-a-measured": {
     "question": "이미 되어 있지 않은가",
     "population": "`git ls-files` 로 `createImage` 를 담은 추적 파일 **23개** 전수 · `/usr/bin/grep` 절대경로",
-    "result": "★어셈블러에 예외 테이블 **0**(코드가 아니라 «주석»이 그것을 자인하고 있었다: 「There is no try/catch — the assembler emits no exception table」) · 실패 갈래를 관측하는 시험 **0**. ⇒ 「이미 되어 있다」가 아니었다."
+    "result": "★어셈블러에 예외 테이블 **0**(코드가 아니라 «주석»이 그것을 자인하고 있었다 — 착수 시점 그 줄이 「어셈블러는 예외 테이블을 내지 않는다」고 적었다) · 실패 갈래를 관측하는 시험 **0**. ⇒ 「이미 되어 있다」가 아니었다. ★★**이 회차가 그 문장을 «거짓»으로 만들었으므로 같은 PR 에서 고쳤다** — 지금 그 자리는 「예외 테이블은 실패 갈래 «둘»만 감싸고 성공 경로 호출은 그 «밖»이다」이고, 옆 파일 `contract-roundtrip.mjs` 의 문장과 같은 형태다. ★**옛 문장을 인용해 증거로 쓰지 마라 — 더 이상 그 파일에 없다.**"
   },
   "what-is-locked": {
     "not-just-that-it-throws": "★**catch 를 좁게** 걸었다(`catch_type 0` = any 는 쓰지 않았다). 그래서 red 로 가는 길이 **둘**이고 둘 다 실측했다: ⑴**타입이 바뀌면** 좁은 핸들러가 못 잡아 throw 가 `startApp` 밖으로 나가고 부팅이 죽는다 ⑵**안 던지게 되면** `goto` 로 흘러 마커가 안 찍히고 `contains` 가 진다.",
@@ -24,7 +26,7 @@
     ],
     "exception-table-is-in-the-product-path": "★**사본이 아니라 «어셈블러가 낸» 클래스에서 확인**했다 — 생성된 jar 의 `DrawMIDlet.class` 를 파싱해: `startApp: max_stack=3 max_locals=2 code_len=74 exception_table_length=2` · `[0] start=33 end=40 handler=43 catch_type=java/io/IOException` · `[1] start=53 end=60 handler=63 catch_type=java/lang/IllegalArgumentException`.",
     "no-regression": "★브라우저 왕복 **기준선 44/44 rc=0**(`git stash` 로 main 형상 격리) → **변경 후 46/46 rc=0**. ★정확히 +2 이고 기존 44건 전건 green ⇒ 성공 경로(C-img 1152px)·키 단언·`res:` 단언 무접촉. 네이티브 `cargo test --all` **159 → 160 passed**.",
-    "determinism": "★zip 재생성이 **바이트 동일**(`cmp` rc=0 · jar 도 동일). 종전 zip 은 «그때의 벽시계» 타임스탬프라 재생성마다 달랐다 — 고정해서 **재생성본을 diff 로 대조할 수 있게** 했다(그 파일의 doc 주석이 못 하겠다고 적어 둔 바로 그것)."
+    "determinism": "★**시각**만 고정했다(`00:00`) — ★★**«날짜»는 고정되지 않았다**. 커밋본 헤더를 직접 디코드: `time=0x0000` · `date=0x5d26`(= **작업한 날** 2026-09-06). 재현: **같은 날** 재생성 → 커밋본과 **바이트 동일**(1247 vs 1247) · **다른 날**(2026-09-07) → **다르다**(차이 오프셋 `[12, 1180]` = local·central 의 date 필드). ⇒ ★**정확한 주장 = 「같은 날 재생성하면 `cmp` 로 대조할 수 있다」**이고, 날짜가 바뀌면 성립하지 않는다. ★**날짜까지 고정하지 «않은» 이유**: 이 저장소의 나머지 네 픽스처가 전건 벽시계 타임스탬프이고 `wie_j2me/tests/test_boot.rs` doc 주석이 「재생성은 zip diff 가 아니라 시험 재실행으로 검증하라」를 규칙으로 못박는다 — 이 한 파일만 결정적으로 만들면 네 형제와 그 규칙에서 갈린다. **검증 정본은 시험 재실행이다.**"
   },
   "cost": {
     "zip-regeneration": "★**1회**(계약 3). 두 갈래를 한 번에 넣었다.",
@@ -35,7 +37,8 @@
     "★**타입 잠금은 «서브클래스까지»다**(M1 이 그것을 보여 줬다). 정확한 타입을 원하면 `getClass().getName()` 을 찍어야 하고 그것은 바이트코드가 늘어난다 — 이 회차는 **하지 않았다**.",
     "★**메시지 문자열은 잠그지 않는다** — 마커만 찍고 예외의 `getMessage()` 는 읽지 않는다. 「Resource not found: …」가 바뀌어도 시험은 green 이다.",
     "★**`wie_validate` 는 이 갈래를 여전히 못 본다** — 그 도구는 게스트 stdout 을 `HeadlessPlatform` 버퍼에 모으기만 하고 **어디서도 읽지 않는다**(`wie_cli/src/bin/wie_validate.rs`: 필드 대입 1곳뿐). 그래서 관측 자리를 네이티브 시험과 브라우저로 골랐다. 제안 등재.",
-    "★**성공 경로 호출은 예외 테이블 «밖»이다** — 의도다(그 호출이 실패하면 종전대로 부팅이 죽는 것이 옳은 실패 모드다)."
+    "★**성공 경로 호출은 예외 테이블 «밖»이다** — 의도다(그 호출이 실패하면 종전대로 부팅이 죽는 것이 옳은 실패 모드다).",
+    "★**zip 재생성의 «바이트 동일»은 «같은 날»에만 성립한다**(위 `verification.determinism`). 날짜까지 고정하는 선택지는 «있었고 고르지 않았다» — 이유는 형제 픽스처 4건·문서화된 규칙과의 정합이다."
   ],
   "not-done-on-purpose": [
     "★`wie_validate` 에 stdout 출력 필드를 추가하지 «않았다» — 제품 도구의 JSON 표면 변경이라 이 회차의 범위(계약 4: createImage 실패 갈래) 밖이다. 제안으로 올린다.",
