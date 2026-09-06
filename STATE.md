@@ -40,6 +40,15 @@
   ★**제안의 «위음성» 해석을 정정했다** — 일관 개명은 배선을 안 깨므로 guard 0 이 «옳은 답»이고, 값하는 것은 위양성이었다.
   ★F2: `--list` 는 개명 전/후 출력이 **바이트 동일**이라 이 축을 못 덮는다 · `tree-sitter` 는 상시 구간에 `npm ci` 를 넣어야 해 문서 PR 도 문다(상시 7스텝 전부 Node 내장 · `npm ci` 는 필터 안에만).
   ★착지 시 배포 없음 예상(`.rs`·`Cargo.*` 무접촉 — 착지 diff 로 다시 셀 것).
+- **카드 신원을 `class_definition().name()` 으로** (PR 개설 · `wie-clet-card-identity-use-class-definition-name`
+  · 채택 제안 `2026-09-06-clet-card-identity-design#p0`) — `card_canvas.rs` 한 파일(**+44/−24**).
+  `getClass()`→`getName()` **invoke_virtual 2회 + to_rust_string** → ★**`class_definition().name()` 한 줄** ·
+  `is_clet_card` 의 **`replace('.', "/")` 제거** ⇒ ★**형식 불일치가 «방어 대상»이 아니라 «비존재»** 가 된다.
+  ★**F1 양 경로 프로브**: LGT `net/wie/CletWrapperCard` · KTF `CletCard` — **둘 다 내부 형식**.
+  ★**개악 2종**: M1(정규화 재도입) → 새 음성 시험 **FAILED** · M2(호출부 되돌림) → LGT
+  `last_frame_content=false` · `paints 83`(2026-09-05 서명 재현) · `--expect-last-frame` **rc=1**.
+  ★러너 5픽스처 PASS · `paints` **55/55** 기준선 그대로 · ★**하드코딩 두 이름 무접촉**(PR #95 기각 축).
+  ★**핀 결합을 적었다**(고치지 않았다): `class_definition()` 은 `RustJava@5b84dd1` API ⇒ 핀 이동 시 재검증.
 - (그 밖: ★열린 형제 PR: **#98 · #99 · #100 · #113** — 각자 자기
   브랜치에서 진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
 
