@@ -52,7 +52,16 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LOCK = {
   test: "wie_cli/tests/dod_ci_parity.rs",
   checker: "wie_cli/tests/support/dod_ci_parity.rs",
-  callsChecker: "checker::parity(",
+  // The entry point the test must actually CALL. Only the function is pinned; the
+  // module alias it is reached through is DERIVED from the test's own `mod` line
+  // (see aliasOf below), because hardcoding one spelling made this axis wrong in
+  // BOTH directions — measured 2026-09-07:
+  //   • `dod::parity(`  — a consistent rename, cargo 0 / lock runs — was reported
+  //     as broken wiring (guard rc=1). A legitimate refactor would red CI with a
+  //     message naming a spelling that no longer exists.
+  //   • `parity_checker::parity(` CONTAINS `checker::parity(`, so the substring
+  //     test could not tell a real call from an incidental suffix match.
+  calls: "parity(",
 };
 
 // How the test has to spell the checker to aim a module at it — derived, not a second
@@ -63,8 +72,16 @@ const CEILINGS = [
   "이 가드는 «배선»을 보지 «의미»를 보지 않는다 — 아래 넷을 통과하면서 단언이 공허한 시험은 못 잡는다.",
   "그 잔여를 무는 것은 파리티 락 «자신»의 개악 대조(M1~M6)이고, 그것은 `cargo test --all` 이 6다리에서 돌린다.",
   "가드 «자신»의 삭제는 워크플로 스텝이 잡는다(스텝이 이 파일을 경로로 부른다). 스텝까지 지우면 diff 로만 보인다.",
-  "축⑷ 는 문자열 «부분일치»다 — 모듈 별칭을 바꿔도 접미가 같으면 통과한다(실측: `parity_checker::parity(`). 별칭까지 보려면 Rust 파서가 필요하고, 그 비용은 재서 기각했다(docs/worklog/2026-09-06-parity-lock-guard-axes.json).",
+  "축⑷ 는 이제 별칭을 «파일에서 읽는다»(`mod <이름>;`) — 종전의 문자열 부분일치(`checker::parity(` 하드코딩)는 양방향으로 틀렸고 2026-09-07 에 교체했다(위음성: `parity_checker::parity(` 가 `checker::parity(` 를 포함 · 위양성: 정당한 `dod::parity(` 가 red). ★남는 천장: 별칭 «선언»만 읽지 호출부를 파싱하지 않으므로, `mod` 줄이 없는 배선 형태(예: `use` 재수출)는 판정 불가로 «실패» 처리한다 — 통과가 아니라 실패다.",
+  "축⑷ 는 여전히 Rust 파서가 아니다 — 그 도입은 상시 구간에 `npm ci` 를 새로 넣어야 해 «문서만 고친 PR»까지 물게 되고(실측 2026-09-07: 상시 스텝 7개가 전부 Node 내장만 쓰고 `npm ci` 는 필터 «안»에만 있다), 그 대가로 기각했다.",
 ];
+
+// The alias the test reaches the checker through: `mod <alias>;`, optionally
+// preceded by `#[path = …]`. Deliberately a narrow, anchored match on the module
+// DECLARATION (not on call sites) — that is the one line Rust makes canonical, so
+// no parser is needed to read it. Returns null when there is no such line, and the
+// caller treats null as a failure rather than a pass.
+const aliasOf = (src) => src.match(/^\s*(?:pub\s+)?mod\s+([A-Za-z_][A-Za-z0-9_]*)\s*;/m)?.[1] ?? null;
 
 const failures = [];
 const notes = [];
@@ -104,8 +121,19 @@ if (testSrc !== null) {
   const tests = (testSrc.match(/^\s*#\[test\]\s*$/gm) ?? []).length;
   if (tests === 0) failures.push(`${LOCK.test} 에 \`#[test]\` 가 하나도 없다 — 파일은 남았는데 «아무것도 돌지 않는다»`);
   else notes.push(`${LOCK.test}: #[test] ${tests}건`);
-  if (!testSrc.includes(LOCK.callsChecker)) {
-    failures.push(`${LOCK.test} 가 \`${LOCK.callsChecker}\` 를 부르지 않는다 — 검사기를 «선언만» 하고 «쓰지» 않는다`);
+  // Read the alias the test itself declares, then require a call through THAT
+  // alias — so the axis follows a rename instead of guessing one spelling.
+  // FAIL CLOSED: no recognisable `mod <alias>;` means we cannot judge the call at
+  // all, and "cannot judge" must not read as "fine".
+  const alias = aliasOf(testSrc);
+  if (alias === null) {
+    failures.push(`${LOCK.test} 에서 «모듈 별칭»을 읽지 못했다 (\`mod <이름>;\` 이 없다) — 검사기를 무슨 이름으로 부르는지 판정할 수 없다`);
+  } else {
+    notes.push(`${LOCK.test}: 모듈 별칭 \`${alias}\` (하드코딩이 아니라 파일에서 읽었다)`);
+    const call = `${alias}::${LOCK.calls}`;
+    if (!testSrc.includes(call)) {
+      failures.push(`${LOCK.test} 가 \`${call}\` 를 부르지 않는다 — 검사기를 «선언만» 하고 «쓰지» 않는다`);
+    }
   }
 }
 
