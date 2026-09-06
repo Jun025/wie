@@ -137,8 +137,22 @@ jobs:
       # gate, because a PR cannot know what a sibling will claim after it.
       #
       # Cost: node reading one directory. No network, no node_modules.
+      #
+      # `--selftest` runs FIRST and is not optional. The bare mode only reddens
+      # when the tree already holds a duplicate, so it stays silent when the
+      # check itself is broken: deleting `process.exit(1)` from the product call
+      # site leaves the bare mode at rc=0 even with two duplicate serials on
+      # disk, while `--selftest` catches it (its source-slice case asserts the
+      # call site still calls duplicateSerials and still exits 1). Wiring only
+      # the bare mode is "the tool is right but nobody calls it" — measured on
+      # this exact step during review. The sibling repo wires `--selftest` in
+      # three places (docs-gate.yml, ci.yml, gate-checks.txt); wie has one
+      # always-run PR gate and no local gate-checks chain, so one place is the
+      # whole surface.
       - name: docs/report serials are unique (docs/worklog/2026-09-07-docs-report-serial-uniqueness.json)
-        run: node scripts/check-docs-report-serial.mjs
+        run: |
+          node scripts/check-docs-report-serial.mjs --selftest
+          node scripts/check-docs-report-serial.mjs
 
       # Detect whether this diff touches anything that can change the built
       # artifact or the pinned surface. If not, the job short-circuits to success
