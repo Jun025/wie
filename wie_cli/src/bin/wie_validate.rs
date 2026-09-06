@@ -27,12 +27,37 @@
 //! `wie_validate --inject` reported PASS with `content: true` — the browser
 //! round-trip was the only thing that caught it.
 //!
-//! `last_frame_content` is REPORT-ONLY and deliberately not a gate. Two reasons,
-//! both measured rather than assumed: a fixture may legitimately end on a blank
-//! frame (helloworld_lgt draws nothing at all and exits cleanly), and without
-//! `--inject` a key-driven fixture is black until a key arrives. Gating is a
-//! separate decision that needs a per-fixture expectation; this field is what makes
-//! that decision measurable instead of theoretical.
+//! `last_frame_content` is REPORT-ONLY BY DEFAULT and becomes a gate only when the
+//! caller passes `--expect-last-frame`. Two reasons it cannot be gated
+//! unconditionally, both measured rather than assumed: a fixture may legitimately
+//! end on a blank frame (helloworld_lgt draws nothing at all and exits cleanly),
+//! and without `--inject` a key-driven fixture is black until a key arrives.
+//!
+//! ── Why the expectation lives on the COMMAND LINE and nowhere else ───────────
+//! Gating needs a per-fixture expectation, and the axis is `fixture x mode`, not
+//! `fixture`: measured 2026-09-06 on this tree,
+//!
+//!   helloworld_ktf.zip              PASS  content false  last_frame_content false
+//!   helloworld_lgt.zip              PASS  content false  last_frame_content false
+//!   keydraw_ktf.zip --inject        PASS  content true   last_frame_content TRUE
+//!   keydraw_lgt.zip --inject        PASS  content true   last_frame_content TRUE
+//!   keydraw_ktf.zip                 FAIL  content false  last_frame_content false
+//!   keydraw_lgt.zip                 FAIL  content false  last_frame_content false
+//!
+//! — the same fixture expects a blank final frame in one mode and a drawn one in
+//! the other. `--inject` is already a flag on that command line, so the mode half
+//! of the key is *there and nowhere else*. A sidecar file next to the fixture, or
+//! a fixture-name table inside this binary, would put the other half somewhere
+//! else and make the pair a SECOND SOURCE OF TRUTH that drifts the moment a
+//! fixture is renamed, a mode is added, or the tool is pointed at a file it has
+//! never heard of. The flag keeps both halves in one place: the invocation.
+//!
+//! The cost is honest and worth stating: an opt-in flag only gates the callers
+//! that pass it. It buys nothing for an invocation that forgets — but neither
+//! would a sidecar the caller never reads. Callers today are `scripts/smoke_gate.sh`,
+//! `scripts/lgt_render_probe.sh` and the AGENTS.md runner block; no workflow runs
+//! this binary, so `--expect-last-frame` is a tool for those callers, not a CI gate
+//! by itself.
 
 extern crate alloc;
 
@@ -374,6 +399,15 @@ struct Args {
     /// Seconds per injected input step (press, then settle + screenshot).
     #[arg(long, default_value_t = 0.6)]
     action_secs: f64,
+    /// Require the LAST painted frame to be non-blank, i.e. gate on
+    /// `last_frame_content`. OFF by default so existing verdicts are unchanged;
+    /// pass it for the fixture+mode combinations where a blank final screen is a
+    /// defect (e.g. `keydraw_lgt.zip --inject`, but NOT `helloworld_lgt.zip`,
+    /// which draws nothing at all and exits cleanly). This is the per-fixture
+    /// expectation the module header says gating needs — see there for why it
+    /// lives here rather than in a sidecar or a table.
+    #[arg(long, default_value_t = false)]
+    expect_last_frame: bool,
 }
 
 const SCREEN_W: u32 = 240;
@@ -423,8 +457,9 @@ struct Outcome {
     paints: u64,
     content: bool,
     /// Same predicate as `content`, but scoped to the LAST painted frame instead of
-    /// ORed over all of them. Measure-only: it does NOT affect `passed`. See the
-    /// module header for why the two can disagree and why this one is not a gate yet.
+    /// ORed over all of them. Measure-only UNLESS `--expect-last-frame` is passed,
+    /// in which case a false value turns a PASS into a FAIL. See the module header
+    /// for why the two can disagree and why the expectation lives on the command line.
     last_frame_content: bool,
     // Content-richness metrics (measure-only; do not affect passed). See HeadlessScreen.
     distinct_colors: u64,
@@ -606,7 +641,11 @@ fn run(args: &Args) -> Outcome {
     // ── classify ─────────────────────────────────────────────────────────────
     // NOTE: the richness metrics below are MEASURE-ONLY — they are recorded in the
     // JSON for triage but deliberately do NOT influence PASS/FAIL (phase A1). The
-    // PASS/FAIL logic is byte-for-byte the existing behaviour.
+    // classification below is byte-for-byte the existing behaviour; the ONE thing
+    // that can still change the verdict afterwards is `--expect-last-frame`, and
+    // only in the PASS -> FAIL direction (see just past the last_frame_content
+    // assignment). An earlier revision of this comment said the PASS/FAIL logic was
+    // byte-for-byte existing, full stop; that stopped being true on 2026-09-06.
     let mut outcome = if let Some(reason) = run_err {
         fail(&platform_name, reason, ticks, paints, content)
     } else if exited.load(Ordering::SeqCst) {
@@ -636,6 +675,12 @@ fn run(args: &Args) -> Outcome {
     // an ANY-frame OR, so a run that draws correctly and is then overpainted with a blank
     // screen still reports `content: true`.
     outcome.last_frame_content = screen.last_frame.lock().unwrap().as_deref().is_some_and(has_content);
+
+    if last_frame_gate_fails(args.expect_last_frame, outcome.passed, outcome.last_frame_content) {
+        outcome.passed = false;
+        outcome.reason = format!("last frame blank, but --expect-last-frame was given (otherwise: {})", outcome.reason);
+    }
+
     outcome.distinct_colors = screen.max_distinct_colors.load(Ordering::SeqCst);
     outcome.nondominant_bp = screen.max_nondominant_bp.load(Ordering::SeqCst);
     outcome.center_nonuniform_bp = screen.max_center_nonuniform_bp.load(Ordering::SeqCst);
@@ -724,6 +769,18 @@ fn panic_message(p: &Box<dyn std::any::Any + Send>) -> String {
     }
 }
 
+/// Does `--expect-last-frame` turn this verdict into a FAIL?
+///
+/// Deliberately ONE-DIRECTIONAL: it can only turn a PASS into a FAIL, never rescue
+/// a FAIL. An already-failing run has a more specific reason than "the last frame
+/// was blank" (a panic, a hang, the magenta color-key check), and letting the gate
+/// touch it would either lose that reason or — if the sign were ever flipped —
+/// hand a PASS to a run that crashed. Extracted from `run` so that invariant is
+/// asserted by `cargo test --all` rather than by reading the call site.
+fn last_frame_gate_fails(expect_last_frame: bool, passed: bool, last_frame_content: bool) -> bool {
+    expect_last_frame && passed && !last_frame_content
+}
+
 fn pass(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) -> Outcome {
     Outcome {
         platform: platform.to_string(),
@@ -756,7 +813,29 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
 
 #[cfg(test)]
 mod tests {
-    use super::{RICHNESS_COLOR_CAP, frame_richness, has_content};
+    use super::{RICHNESS_COLOR_CAP, frame_richness, has_content, last_frame_gate_fails};
+
+    #[test]
+    fn last_frame_gate_only_turns_pass_into_fail_test() {
+        // Off by default: every verdict survives untouched, which is what keeps the
+        // existing fixture judgements (helloworld_* PASS on a blank final frame)
+        // from flipping. This row is the whole reason the flag is opt-in.
+        for passed in [true, false] {
+            for last in [true, false] {
+                assert!(!last_frame_gate_fails(false, passed, last), "flag off must never fire: {passed} {last}");
+            }
+        }
+        // Declared, and the last frame is blank -> fail. Measured equivalent:
+        // keydraw_lgt.zip --inject with the is_clet_card normalization reverted.
+        assert!(last_frame_gate_fails(true, true, false));
+        // Declared and satisfied -> untouched.
+        assert!(!last_frame_gate_fails(true, true, true));
+        // Already failing -> the gate does NOT speak, in either direction. A sign
+        // flip here would hand a PASS to a crashed run, so it is asserted, not
+        // left to the reader of the call site.
+        assert!(!last_frame_gate_fails(true, false, false));
+        assert!(!last_frame_gate_fails(true, false, true));
+    }
 
     #[test]
     fn has_content_is_the_two_distinct_values_test() {
