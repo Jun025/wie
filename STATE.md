@@ -32,7 +32,17 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- (없음 — 열린 PR 0건. #88~#91 전건 착지)
+- **`Image.createImage(String)` 픽스처** (`wie-system-class-loader-createimage-fixture`
+  · 채택 제안 `2026-09-05-system-class-loader-preemptive-migration#p1`) — 제안이 미완으로 남긴 문장은
+  하나였다: 「갈림 «자체»는 측정됐다 … **미측정인 것은 «넓어진 가시 범위가 실제로 무엇을 찾는가»** 하나다」.
+  ⇒ jar 에 `wie-img.png`(16×8 · 74바이트)를 동봉하고 `DrawMIDlet.startApp()` 이 그것을 **이름으로** 열어
+  `getWidth()`·`getHeight()` 를 저장하며 `paint()` 가 **그 치수 그대로** 사각을 채운다
+  ⇒ ★**칠해진 픽셀 수 = 호스트가 찾아 디코드한 이미지의 픽셀 수**(왕복 Scenario C-img 가 `1024+128=1152` 를 등호로 단언).
+  ★**커버 0 → 1**: 같은 `panic!()` 프로브가 **전**에는 `cargo test --all` rc=0·156 passed·5픽스처 전건 PASS 였고,
+  **후**에는 `draw_j2me.jar` 를 부팅에서 죽인다.
+  ★**개악 E1**(`get_system_class_loader` → `jvm.current_class_loader()`) → `IOException: Resource not found: /wie-img.png`
+  ⇒ ★**넓어진 범위가 찾는 것 = 1건 · 종전 경로 = 0건.** 왕복 **42/42**.
+- **`rtrb` 보안 자문 해소** (PR **#92** 열림 · `wie-rustsec-2026-0274-rtrb-double-free-audit-red`) — 게이트② 대기.
 
 ## 완료 (최근)
 - 2026-09-06: **WIPI 리소스 픽스처** (PR **#91** 착지 · `wie-system-class-loader-spi-resource-fixture`
