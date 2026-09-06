@@ -1,693 +1,94 @@
 # REPORT
 
-## [2026-09-06] 「한 번도 돈 적 없는」 검사 3건 — 하나는 배선하고 둘은 «로컬 전용»이라고 적었다 (wie-ci-wire-or-document-three-never-run-checks)
-- **무엇을**: `engine-contract.yml` 에 ★**네 번째 상시 스텝**(`bash scripts/audit-no-leak.sh`) + `AGENTS.md` 에 ★**「Which of these CI actually runs」 절 신설**(`verify-browser.mjs`·`smoke_gate.sh` 가 왜 로컬 전용인지) + Constraint 9 행의 「Locked by」를 실제 집행자로 정정. ★**`.rs` 0 · 새 의존성 0.**
-- **왜**: 운영자 채택 제안 `2026-09-06-deletable-checks-census#p0`.
-- **★★대전제 ⓐ 를 «먼저» 쟀다**(모집단 = 워크플로 **8파일** 전수 · `/usr/bin/grep` 절대경로): 세 스크립트의 경로 히트 **전건 0** · 워크플로 안의 `npm run` 은 **`npm run build` 1건뿐**(`web/` 자신의 빌드) ⇒ **우회 호출 경로도 없다.** 「이미 되어 있다」가 아니었다.
-- **★★⑴ 셋을 한 덩이로 묶지 않았다**(계약 1). **⒜ 배선**: `audit-no-leak.sh` 는 ★**문서가 집행을 약속하는데 집행이 없던** 자리다 — `AGENTS.md` Constraint 9 행이 「Locked by」로 적는데 어느 워크플로도 부르지 않았다. 오프라인·의존성 0 이라 **스텝 1줄**로 끝난다.
-- **★⑵ 필터 «밖»에 둔 이유**: 지키는 것이 **repo 전역 성질**(추적 게임 바이너리 0 · 네트워크 프리미티브가 `lib/api.ts` 에만 · `rom_hash` 유일성이 소유자별)이라 ★**그것을 어기는 diff 가 엔진 경로를 하나도 안 건드릴 수 있다.** 필터 안에 두면 정확히 그 PR 에서 건너뛴다.
-- **★★⑶ ⒝⒞ 는 «적었다» — 그리고 그 근거를 소스에서 다시 뽑았다**: `verify-browser.mjs` 는 ★**게임 파일이 필요 없다**(기본 인자가 커밋 픽스처 `helloworld_ktf.zip` — 원 제안의 「게임 파일 필요」는 **부정확**) · 진짜 비용은 **실 Chrome(`channel: "chrome"`)** 과 **`functions/` 까지 서빙하는 Pages dev 스택**이고, ★**PR 에는 가리킬 URL 이 «없다»**(`web.yml` 배포 스텝이 전부 `event_name == 'push'` 게이트). `smoke_gate.sh` 는 ★**선행 판단 「구조적 불가」를 반증하려다 실패**했다(계약 2): `WORKING_DIR` 기본값 `game_lab/`이 **`.gitignore:23` · 추적 0건 · 부재**이고 그 내용물이 Constraint 9 가 금지한 실게임 바이트다.
-- **★⑷ 양방향 — 격리 워크트리에서 개악 2종이 «물었다»**: 기준선 **rc=0** ↔ **M1**(device-local `library.ts` 에 raw `fetch(`) **rc=1 · ❌ 2줄** ↔ **M2'**(0바이트 `decoy.jar` 를 `git add -f` 로 추적 편입) **rc=1 · ❌ `game binaries tracked in git`**. 원복 후 rc=0 · 트리 clean · **커밋 0**.
-- **★★⑸ 계획에 없던 관측 — 개악이 «막혀서» 배운 것**: M2 의 첫 시도는 맨 `git add` 였고 ★**`.gitignore` 가 거부**했다. ⇒ Constraint 9 의 두 층에는 **순서가 있다** — 블록리스트가 먼저 막고, 스크립트의 `git ls-files` 검사는 ★**`-f` 로 그것을 뚫었을 때만** 발화하는 **둘째 선**이다.
-- **대가**: CI **+0.26~0.34s**(로컬 3회 실측 · `node_modules` 없이 돎 · 네트워크 0). 같은 잡의 기존 상시 스텝 3개와 같은 급이다.
-- **사용자 영향**: 없음(CI). 대신 ★**「유출 방지 검사가 있다」가 「돈다」와 같아진다.**
-- **★남는 구멍**: ⒜`web/dist` 스캔은 CI 에서 **자기 스킵**된다(이 스텝이 프런트 빌드 전/없이 돌기 때문) — 덮으려면 `web.yml` 빌드 뒤 한 줄이고, ★**한계 효용이 낮다고 봐서 넣지 않았다**(제안 등재) ⒝`npm run verify` 는 여전히 **아무도 안 돌린다** — 「왜 안 도는가」를 고정했을 뿐이다(제안 등재).
+> ★★**회차 기록은 이 파일이 아니라 `docs/report/` 에 있다**(2026-09-07 이관 · 티켓
+> `wie-report-md-per-round-files-port-from-otterpebble` · 형제 저장소 `otterpebble` 착지분 `636bb8e7` 포팅).
+> **새 회차는 `docs/report/NNNN--YYYY-MM-DD--<slug>.md` 를 «새로 만든다» — 이 파일에 append 하지 마라.**
+> (`NNNN` = 전역 연번 · **가장 큰 수 + 1** · 오래된 것이 `0001`)
 
-## [2026-09-06] 재측 의무를 «손 append» 에서 «멱등 명령»으로 — 세 회차가 같은 항목을 각자 썼다 (wie-worklog-remeasure-obligation-duplicates-per-round)
-- **무엇을**: `scripts/check-worklog-coverage.mjs` 에 ★**`--record`**(가드 2개) + OVERDUE 문면 교체 + `AGENTS.md` 정합화. ★**임계·비율 판정 무접촉**(F3) · ★**기존 `measurements` 무접촉**(항목 **3 → 3** · 바이트 동일) · ★**인자 없는 경로(=CI 가 도는 그것) 동작 무변**.
-- **★★⑴ 판정식을 코드에서 인용했다 — «max» 가 아니라 «`at(-1)`» 이다**: `const last = record.measurements.at(-1);` → `if (landed - last.landedRounds >= WINDOW)`. 티켓이 「추정하지 마라」고 한 그 갈림이 실제로 배열 순서 쪽이었다(`last.pct`·`last.reopened` 도 같은 원소를 읽는다).
-- **★★⑵ 흔들림을 «합성 재현»했다**(landed=35 · 파일 임시 교체 후 바이트 동일 원복): CASE-a 순수 중복 `[...,33,33]` → rc=0(★같은 값 중복은 OVERDUE 를 안 흔든다) · ★**CASE-c `[...,40,25]` → rc=1 OVERDUE** ↔ ★**CASE-d `[...,25,40]` → rc=0** ⇒ ★**같은 집합, 순서만 반대인데 판정이 뒤집힌다.** · ★**CASE-e 중복인데 `pct`=50 → rc=1 `BELOW-UNANSWERED`**(중복은 «비율 축»을 흔든다).
-- **★★⑶ F2 = ⒜ 를 골랐다**: `--record` 는 ⑴**기한 미도래면 안 쓰고** ⑵**배열 «전체»를 훑어** 같은 `landedRounds` 가 있으면 안 쓴다. ★그리고 **OVERDUE 문면을 「손으로 붙여라」→「`--record` 를 돌려라」로 바꿨다** — 회차가 실제로 읽는 자리가 거기라, 문면을 안 바꾸면 도구가 있어도 안 쓴다.
-  ★**⒝를 버린 이유**: ★**판정식을 건드린다**(`at(-1)`→`max` 는 CASE-c 를 뒤집는다) — F3 이 금지한 자리다. 게다가 중복을 **합법화**하고 생성은 줄이지 않는다. ★**⒞를 버린 이유**: 「누가 그 한 자리를 돌리나」가 새 질문이고, 봇이 `main` 에 커밋하는 선례가 이 저장소에 없다.
-- **★⑷ 양방향 — 가드가 «실재 단언»이다**: 형상 `[13, 35, 23]`(35 는 앞·last=23 이라 **due**) 에서 ⓐ가드 있음 → `already recorded` · 항목 **3** · 중복 **없음** ↔ ⓑ`already` 가드 제거 → `appended` · 항목 ★**4** · 중복 ★**{35: 2}**. 개악 원복 후 `MUTANT` 0.
-- **★⑸ 정상 경로도 산다**: 합성으로 기한을 도래시키면 `--record` 가 **항목 2 → 3** 으로 정상 추가하고 직후 `check` **rc=0**. 같은 동작 2회째는 **아무것도 추가하지 않는다**.
-- **사용자 영향**: 없음(CI 도구). 대신 다음 임계(착지 43)에서 ★**사람이 손으로 막을 일이 줄어든다** — 오늘은 두 번 손으로 막았다.
-- **★★남는 구멍 — 숨기지 않는다**: ⒜는 ★**두 브랜치가 «둘 다 착지 전에» 각자 기록하는 경우를 못 막는다**(각 트리가 개별적으로 옳다). 지우는 것은 ⑴한 회차의 이중 실행 ⑵**base 가 이미 그 행을 품은 회차**다. 잔여(순서 민감 판정식)는 ★**판정식 축이라 F3 이 금지**했다 ⇒ 제안 등재.
+## 왜 갈랐나 — 이 파일의 «맨 위»가 열린 PR 전건을 충돌시켰다
 
-## [2026-09-06] 의존성 «노출 판정»을 남길 자리를 정했다 — 새로 만들지 않고 «이미 정본인 대장»을 썼다 (wie-record-dependency-exposure-verdict-for-next-advisory)
-- **무엇을**: `docs/project-kb/02_status.md` 의 **공급망 추적 대장**에 ★**`### C. 해소분 — 노출 판정 보존`** 신설(C-1 = RUSTSEC-2026-0274/`rtrb`) + `rust-audit.yaml` 주석에 ★**포인터 한 곳**. ★**2파일 · +46/−0**(순수 추가).
-- **왜**: 운영자 채택 제안 `2026-09-06-rtrb-rustsec-2026-0274#p2`.
-- **★★⑴ 대전제 ⓐ 가 «반쯤 맞았다» — 그래서 새 파일을 만들지 «않았다»**(모집단 = 추적 파일 482개 · `/usr/bin/grep`): `RUSTSEC` 히트 **5파일** 중 `docs/project-kb/02_status.md` 의 대장이 ★**스스로 「이 절이 이월분의 정본이다」**라고 선언하고 **도달성 판정 + 버전 축을 이미 갖고 있다**. ⇒ ★**새 파일은 «두 번째 진실원»이 됐을 것이다**(계약 1 이 금지한 그것). `deny.toml`·`audit.toml` 전건 부재 · 대장을 가리키는 포인터 **0건**.
-- **★⑵ 빠져 있던 것은 «해소된» 자문의 판정을 둘 자리다**: `AGENTS.md` Constraint 5 는 「**suppression** 에 reachability argument 를 붙여라」인데 ⇒ ★**억제하지 «않고» 상향으로 끝낸 회차의 판정은 둘 곳이 없다.** rtrb 회차가 정확히 그 형상이었다.
-- **★★⑶ A 에 끼워 넣지 «않은» 이유 — 그 절의 자기 불변식**: A 는 스스로 「매일 도는 `cargo audit` 경고가 곧 이 표다 — 경고 수와 행 수가 어긋나면 둘 중 하나가 낡은 것」이라고 적는다 ⇒ ★**해소분을 A 에 넣으면 그 불변식이 «설계상» 깨진다**(해소분은 audit 이 더는 출력하지 않는다). C 가 그 불변식 **밖**임을 절 머리에 명시했다.
-- **★★⑷ 유효기간 축을 «칸»으로 넣었다**(계약 2): 표에 ★**`판정 유효 범위`**. C-1 은 **`rodio@0.22.2` 기준**이고, ★**어느 축이 판본에 걸리는지까지 갈랐다** — ⑵(rodio 내부 소스 실측)만 판본 의존이고 ⑴(우리 코드 `rtrb|ReadChunk` **0건**)·⑶(원소 타입 `f32` = `Drop` 없음)은 무관하다 ⇒ **rodio 를 올리면 ⑵만 다시 재면 된다.** ★그 칸이 빈 행을 만들지 말라는 금지도 함께 적었다.
-- **★⑸ 포인터는 «한 곳»**: `rust-audit.yaml` 주석에 「WHEN THIS GOES RED, READ THE LEDGER FIRST」 + 경로 + ★「**버전 칸이 요점 — 행을 인용하지 말고 판본 의존 축을 다시 재라**」. ★**왜 거기인가**: 사람이 이 질문을 만나는 순간이 «audit 이 red 일 때»다. `AGENTS.md` 에는 **넣지 않았다**(포인터 둘은 곧 한쪽이 낡는다).
-- **사용자 영향**: 없음(문서). 대신 다음 자문에서 **처음부터 다시 파는 일**이 줄어든다.
-- **★★관측 — 고치지 않았다**: ★**대장 A 가 «이미» 낡았다**(내 변경 이전부터). 실측 `cargo audit` 경고 **2건**(`ttf-parser` · ★**`chacha20` 0.10.0 yanked**) ↔ 표 A **3행**이고 ★**구성도 다르다** — A-2 `event-listener` 는 **5.4.2**, A-3 `spin` 은 **0.12.2** 로 이미 올라갔고 `chacha20` 은 표에 **없다**. ★**계약 3 이 「과거 자문 소급 기재 금지」로 범위를 잘라 손대지 않았다** ⇒ 제안 등재.
-- **★남는 구멍**: ⒜C 는 **기계가 검사하지 않는다**(`check-worklog-json` 은 `docs/worklog/` 만 본다 — 유효 범위 칸이 비어도 red 가 아니다) ⒝**한 건뿐이다**(소급 금지) — 산출물은 «자리가 정해졌다»이지 «채워졌다»가 아니다 ⒞포인터가 **스케줄 전용 워크플로**에 있어 PR 을 내는 사람이 지나가며 읽는 자리는 아니다(의도한 배치이자 한계).
+한 회차가 착지할 때마다 다음 회차들이 **같은 자리**(파일 선두)에 붙으므로, 착지 1회가
+**열린 PR 전건의 충돌**로 증폭됐다. 이관 시점 실측(`git merge-tree --write-tree` · 열린 PR 5건 전수):
 
-## [2026-09-06] 리소스 실패 갈래 — 둘 중 «하나»는 이미 커버였고, 나머지는 티켓 처방으로 «UB 없이» 못 본다 (wie-spi-resource-failure-branches-uncovered)
-- **무엇을**: `wie_wipi_c/src/api/kernel.rs` 에 `test_resource_larger_than_buffer_is_rejected` **1건**. ★**제품 코드 무변경** · 픽스처 스크립트 **무접촉** · ★**zip 재생성 0**.
-- **왜**: 운영자 채택 제안 `2026-09-06-spi-resource-fixture#p0`. 「없는 이름 → -12 · 버퍼 초과 → -1 두 분기가 실재하는데 시험이 없다」.
-- **★★⑴ 전제가 «절반 거짓»이었다 — 드릴로 판정**: 분기마다 `panic!()` 을 심고 `cargo test --all` → `-12`(`:203`)는 **rc=101 · `test_missing_resource_clears_size` FAILED** ⇒ ★**이미 커버돼 있었다** / `-1`(`:232-233`)은 **rc=0 · 아무것도 안 죽는다** ⇒ **미커버(참)**. ★줄번호도 다시 찾았다(제안의 `:198-205`·`:232-234` ↔ 실측 `:203`·`:232-233`).
-- **★★⑵ 티켓의 처방을 «쓸 수 없었다» — 소스로 확인**: `-1` 에 게스트가 닿는 유일한 통로 `wipic_sys::kernel::get_resource` 의 반환형이 **`WIPICError`** 인데 그 변종은 **{1,0,-9,-12,-18,-22,-25}** 로 ★**`-1` 이 없고**, `from_raw` 는 ★**`transmute`** 다 ⇒ 게스트가 그 값을 받으면 **유효하지 않은 판별자 = UB**. ⇒ ★**「게스트가 -1 을 찍게 한다」는 «UB 를 관측하는 시험»이라 만들지 않았다.**
-- **★⑶ 그래서 호스트 단위시험**: 그 분기의 **쌍둥이(`-12`)가 이미 같은 파일에서 쓰는 바로 그 형태**다. ⇒ 계약 2(출력 접두 충돌)·계약 3(zip 재생성)이 지불하라고 한 대가를 ★**둘 다 치르지 않았다**(재생성 1회가 아니라 **0회**) — 요령이 아니라 **처방이 바뀐 결과**다.
-- **★⑷ 개악 3/3 물었다**: 반환값 `-1→0` **FAILED** · 분기 제거(`if false`) **FAILED** · 경계 `>`→`>=` **FAILED** · 무개악 **11 passed**. ★**경계 개악이 물린 것은 «성공 방향»도 단언했기 때문**이다(실패만 단언하면 「항상 -1」인 함수도 통과한다).
-- **★⑸ 회귀 0**: `cargo test --all` **158 passed / 0 failed**(직전 157 + 1) · 기존 `res:9:602` 단언 **각 1 passed** · `wie_validate helloworld_{ktf,lgt}` **PASS** · ★픽스처·zip 무접촉이라 **키 픽셀 단언은 구조적으로 불변**.
-- **사용자 영향**: 없음(시험). 대신 「리소스가 버퍼보다 클 때」가 커밋 전에 잡힌다 — 그 분기는 지금까지 **한 번도 실행되지 않았다**.
-- **★남는 구멍**: ⒜★**티켓 Acceptance ⑴ 의 「-12 가 stdout 에 찍히고」는 충족하지 않았다** — 이미 호스트가 덮고 있어 중복이라 판단했다(숨기지 않고 적는다) ⒝**호스트 축이지 게스트 축이 아니다** — 후자는 ★**지금 ABI 로는 성립하지 않는다**(위 UB · 제안 등재) ⒞`-1` 이 **옳은 코드인지는 판정하지 않았다**(시험은 «현행 동작»을 잠근다) ⒟★**같은 파일이 「버퍼가 작다」에 `:57`·`:386` 에서 `-18`(M_E_SHORTBUF)을 쓰는데 여기만 `-1`** 이다 — 동작 변경이라 **고치지 않았다**(제안 등재) ⒠★**계약 4 범위를 벗어났다**(`wie_wipi_c` 1파일) — 이유는 위 ⑵⑶이고 회신에 자인했다.
+| | 값 |
+|---|---:|
+| 열린 PR 중 `REPORT.md`·`STATE.md` **둘 다** 만지는 것 | **5 / 5 (100%)** |
+| `origin/main` 과 이미 충돌(rc=1) | **5 / 5** |
+| 그중 ★**원장 2파일 «만»** 충돌(코드 충돌 0) | **4 / 5** — 나머지 #100 만 `wie_cli/src/bin/wie_validate.rs` 를 함께 문다 |
 
-## [2026-09-06] J2ME 게스트를 `cargo test --all` 안에서 부팅한다 — 그물이 브라우저 잡 «하나»에 매달려 있었다 (wie-j2me-guest-boot-in-cargo-test-all)
-- **무엇을**: `wie_j2me/tests/test_boot.rs` **1건** 신설 + `test_utils` 하니스 확장(페인트 계수기 · redraw 플래그) + 커밋 픽스처 `test_data/draw_j2me.zip`(**1,020바이트**). ★**브라우저 잡 무접촉**(`.github/`·`scripts/`·`web/` diff **0파일**) · 게스트 시나리오 추가 **0**.
-- **왜**: 운영자 채택 제안 `2026-09-06-createimage-fixture#p1`.
-- **★⑴ 전제를 먼저 쟀다**(모집단 명시): base `34bca716` 에서 `git ls-files '*/tests/*.rs'` = **10파일** · 그중 `wie_j2me` 를 부르는 것 ★**0건** · `wie_j2me/tests/` **부재** ⇒ 전제 성립.
-- **★★⑵ 막힌 것은 «하니스»가 아니라 «픽스처»였다**: `test_data/draw_j2me.jar` 는 ★**일부러 커밋하지 않는다**(`.gitignore:24` 가 `*.jar` 무시 · `audit-no-leak.sh:128` 이 **추적된 `*.jar`** 거부 — Constraint 9. 생성기 머리주석의 명문). ⇒ ★**zip 이 jar 를 담는 «기존 관례»를 그대로 썼다** — 이미 커밋된 `keydraw_ktf.zip` 안에 `00000000.jar` 가 들어 있는 그 형태다. ★**blocklist 를 느슨하게 하지 않았고 확장자를 바꿔 규칙을 피하지도 않았다**(`npm run audit` **PASSED · 「no game binaries tracked in git」**).
-- **★★⑶ 하니스의 핵심은 «redraw 응답»이고, 실측이 가르쳐 줬다**: 페인트는 **요청/응답** 루프다 — 코어가 `request_redraw()` 를 부르고 ★**호스트가 `Event::Redraw` 를 돌려줘야** `Screen::paint` 가 돈다. 종전 `TestScreen` 은 그 요청을 **기록하지 않아** ★**첫 판이 10,000틱에 paints 0 으로 실패**했다(추측이 아니라 그 실패를 보고 알았다). ★`wie_validate` 가 **정확히 이 루프**를 돈다 ⇒ 모양을 **발명하지 않고 가져왔다**.
-- **★★⑷ 단언은 「아무것도 안 던졌다」가 아니라 «프레임이 합성됐다»**: 전자는 ★**페인트 전에 죽는 게스트도 통과**시키고 그것이 2026-09-04 형상이다(네 게이트 green · `NoClassDefFoundError` · paints 0). 픽셀은 여전히 브라우저 몫이다.
-- **★⑸ 양방향 2종 — 둘 다 red**: **M-A** 게스트 메인 클래스를 못 찾게(=그 사고 형상) → FAILED · **M-B** `image.rs` 를 마이그레이션 «이전» `current_class_loader` 로 → FAILED. 원복 후 green.
-- **★⑹ 대가를 수로**: 시험 실행 **0.04s** · 한계 링크+실행 **1.50s** · 워크스페이스 `cargo test --all` **62.1s**(**41줄 / 157 passed / 0 failed** = 종전 40/156 에서 **정확히 +1**, 회귀 0) · 커밋 파일 +1(1,020B) · `Cargo.lock` **+1줄** · 새 의존성 **0**.
-  ★**티켓이 인용한 「CI p95 2,400~2,700s」는 이 저장소의 수가 아니다**(그것은 otterpebble self-hosted). `Jun025/wie` 실측(완료 run 496건): **p50 215s · p90 356s · p95 419s · max 958s** ⇒ 이 축의 대가는 **p95 의 0.4% 미만**.
-- **사용자 영향**: 없음(CI). 대신 J2ME 부팅 축이 **브라우저 잡 하나에 매달린 상태를 벗어난다**.
-- **★남는 구멍**: ⒜**옮기지 않았다** — 브라우저 Scenario C 는 그대로이고 이 축은 «두 번째 그물»이다(대체재 아님: 브라우저는 실제 픽셀, 여기는 합성 여부) ⒝커밋 픽스처는 **재생성 가드 없는 스냅샷**(기존 4개와 같은 성질) ⒞`paints > 0` 은 **빈 프레임도 센다** ⒟M-A 의 red 는 **패닉**이지 `tick()` 의 `Err` 가 아니다 — 「예외가 `Err` 로 전파된다」고 적지 않는다(재지 않았다).
-- **★★착지 시 배포가 «있다»**: 착지 diff 에 `Cargo.lock`·`wie_j2me/Cargo.toml` 이 들어가고 그 둘이 `publish-artifact.yml` 의 `on.push.paths` 에 **매치** ⇒ ★**Release 컷 + otterpebble `repository_dispatch` 발화**(문서 전용 착지들과 다르다). 머지 회차는 3-a 예측에 그대로 적고 self-verify 하라.
+⇒ ★**충돌의 대부분이 «내용 다툼»이 아니라 «같은 자리에 붙었다»는 사실 하나에서 나온다.**
+원장이 실제로 그 값을 치렀다 — 워커 회신이 스스로 「#93은 4배차 · #96은 3배차」, 「당김 1회로 끝났지만 ★운이었다」로 적었다.
 
-## [2026-09-06] WIPI 리소스에 브라우저 단언을 붙였다 — 훅은 «이미» 있었고, 제안이 매긴 대가가 거짓이었다 (wie-resource-axis-has-no-browser-scenario-decision)
-- **무엇을**: `scripts/contract-roundtrip.mjs` 에 **Scenario E-res·F-res 2건**(KTF·LGT 게스트가 부팅 때 읽은 `res.bin` 을 «브라우저에서» 단언). ★**새 zip 0 · 계약 재핀 0 · 글루 변경 0 · 추가 부팅 0 · 키 픽셀 단언 무접촉.**
-- **왜**: 운영자 채택 제안 `2026-09-06-spi-resource-fixture#p1`.
-- **★★⑴ 전제가 «절반» 틀렸다**: 「리소스 축에 브라우저 시나리오가 없다」 — 그런데 **Scenario C-img** 가 이미 «RESOURCE-BY-NAME, ASSERTED» 로 있고 **같은 클래스로더 기구**를 픽셀로 문다. 없던 것은 «리소스 축»이 아니라 ★**WIPI 축의 단언**이고, 그쪽은 **실행은 되는데 아무도 결과를 안 봤다**. ★**E·F 가 green 인 것은 증거가 아니었다** — 게스트가 `Err(_) => println!("res:err")` 로 **절대 패닉하지 않는다**.
-- **★★⑵ 제안이 ⑵(stdout)에 매긴 「계약 표면이 는다」는 «거짓»이다**: 게스트 stdout 은 `MC_knlPrintk → Platform::write_stdout → web_sys::console::log_1`(`wie_web/src/platform.rs:80`)로 ★**이미 콘솔에 도착**하고, 이 파일은 ★**이미 그것을 수집**한다(`:237-238` — 실패 때만 버릴 뿐). 계약 파일의 `stdout|console` 히트 **0** ⇒ Constraint 3 미해당(`check-engine-contract` rc=0 재확인). ⇒ ★**비교가 성립하지 않아 ⑵를 골랐다**(⑴은 zip **+2** · 커밋된 바이너리 재생성).
-- **★★⑶ wasm 특이성은 «있었다» — 다만 «경로·인코딩»이 아니라 «출력 분절»이다**: 게스트의 **한 줄** `res:9:602` 가 브라우저 콘솔에 ★**`res:` / `9` / `:` / `602` / `\n` 다섯 메시지로 쪼개져** 온다(포맷 조각마다 `write_stdout` → 호출마다 `console.log_1`). ★**네이티브는 바이트 스트림이라 저절로 이어진다** ⇒ **브라우저에만 있는 분절**이고, 초판 단언이 실제로 그 때문에 red 였다. ⇒ ★**헤드리스 stdout 시험이 구조적으로 못 보는 축이 실재한다**는 증거다.
-- **★★⑷ 개악이 내 이해를 반증했고, 그것을 주석에 반영했다**: LGT 의 `System::filesystem()` 폴백만 죽였더니 F-res 가 **green** 이었다 ⇒ ★**이 픽스처에서 두 캐리어는 «같은 해결자»(클래스로더)를 쓴다.** 「LGT 는 호스트별 파일시스템을 탄다」는 **이 경로에선 거짓**이다.
-- **★⑸ 양방향 대조**: 기준선(변경 전 · stash 격리) **42/42 rc=0** → 변경 후 ★**44/44 rc=0**(정확히 +2 · 기존 42건 green 유지) → 두 캐리어의 클래스로더 분기 개악 + wasm 재빌드 ★**E-res·F-res 둘 다 FAIL(`res:err`) · 42/44 · rc=1 · 키 단언 6건은 green** → 원복 후 **44/44 rc=0**.
-- **사용자 영향**: 없음(CI 시나리오). 대신 「리소스가 브라우저에서 실제로 읽히는가」가 **처음으로 판정된다**.
-- **★남는 구멍**: ★**`System::filesystem()` 폴백은 여전히 미판정**이고 ★**호스트별 구현이 갈리는 유일한 자리가 거기**다(`WebFilesystem` ↔ `CliFilesystem` · 후자는 **OS 의존** `Path::components()`). 지금은 오버레이의 공유 정규화가 앞에서 막아 «도달 불가»로 **읽히지만**, 그 판정은 **돌려서 낸 것이 아니다** ⇒ 제안 등재.
-## [2026-09-06] 러너 목록에 `keydraw_*` 와 `--inject` 를 적었다 — 「FAIL 이 정상」이 문서에 없어 회차가 멈췄다 (wie-agents-md-runner-list-missing-keydraw-and-inject)
-- **무엇을**: `AGENTS.md` 러너 `sh` 블록에 **루프 1개(2줄)** + 「`--inject` 없이는 FAIL 이고 그것이 정답」 산문 **6줄**. ★**삭제행 0**(순수 추가 · 기존 러너 항목 무변경) · 픽스처·러너 코드 **무접촉**.
-- **왜**: 운영자 채택 제안 `2026-09-06-rtrb-rustsec-2026-0274#p1`.
-- **★⑴ 전제를 먼저 쟀다**(모집단 = `AGENTS.md` 332줄 · `/usr/bin/grep` 절대경로): `keydraw` ★**0건** · `--inject` ★**0건** · `wie_validate` 4건 ⇒ 되어 있지 않다. ★역설적으로 그 사실은 **코드에는 이미 있었다** — `wie_validate.rs:34` 가 「without `--inject` a key-driven fixture is black until a key arrives」라고 적는다. ⇒ ★**아는 사실이 «읽히는 자리»에만 없었다.**
-- **★★⑵ 갈림을 «실행»으로 냈다**(두 캐리어 × 플래그 유무 4회):
-  `keydraw_ktf` 없음 → ★**FAIL · content false · paints 1** ↔ `--inject` → ★**PASS · content true · paints 55**
-  `keydraw_lgt` 없음 → **FAIL · false · 1** ↔ `--inject` → **PASS · true · 55**
-  ⇒ ★**플래그 하나가 FAIL↔PASS 를 뒤집고 `paints` 가 1 → 55.** 그 FAIL 은 «입력이 없어 화면이 검은 것»이고 검사기는 옳게 말한 것이다.
-- **★⑶ 오독이 실제로 났다는 사실을 함께 남겼다** — 어느 회차가 그 FAIL 을 «자기 회귀»로 읽고 멈췄다가 무접촉 트리에서 같은 FAIL 을 재현해 풀었다. ★규칙만 적으면 다음 사람이 지운다.
-- **★⑷ 파리티 락 무영향**: 고친 자리가 `COMMIT-GATES` **마커 구간 «밖»**이다(그 END 마커가 스스로 「아래 `sh` 블록들은 conditional extras」라고 적는다). 실행 확인 — `cargo test -p wie_cli --test dod_ci_parity` **11 passed / 0 failed**. 문서에 적은 명령을 그대로 돌려 **둘 다 `result=PASS`** 확인.
-- **사용자 영향**: 없음(문서). 대신 「내가 깨뜨렸나」로 멈추는 자리가 하나 닫힌다.
-- **★남는 구멍**: ⒜러너 목록은 **여전히 사람이 손으로 유지**한다 — 파리티 락은 마커 «안»만 물고 이 블록은 밖이다(설계대로) ⇒ 드리프트를 무는 기계가 **없다**(제안 등재) ⒝`paints 55` 류 절대값은 **이 판본의 값**이다(논지는 «갈리는 방향»이지 수가 아니다).
-- **★인접 — 고치지 않았다**: 바로 아래 「`cargo test --all` … nothing in it boots a J2ME guest」는 열린 **PR #102** 가 반증한다. ★그러나 **#102 가 미착지라 지금 `main` 에서는 그 문장이 «참»**이고, 먼저 고치면 거짓을 심는다 ⇒ **그 문장의 소유자는 #102 착지 회차**다.
+★**파일을 나누는 것만으로는 안 된다** — 「목록이 한 줄이든 파일이든 **추가 지점이 같으면** 결과는 같다」.
+그래서 이 파일에서 **«추가 지점» 자체를 없앴다**: 이 문서는 더 이상 회차마다 자라지 않는 **고정 안내**이고,
+색인은 **생성물**이다(아래).
 
-## [2026-09-06] `last_frame_content` 를 게이트로 올렸다 — 기대값 선언 자리를 «명령줄»로 골랐다 (wie-validate-last-frame-gate-with-per-fixture-expectation)
-- **무엇을**: `wie_cli/src/bin/wie_validate.rs` 에 **`--expect-last-frame`**(기본 **off**) + 순수 함수 `last_frame_gate_fails()` + 단위시험 1건. ★플래그가 있을 때만 `last_frame_content` 가 판정에 개입하고, ★**PASS → FAIL 한 방향뿐**(이미 실패한 런의 더 구체적인 사유를 덮지 않는다).
-- **왜**: 운영자 채택 제안 `2026-09-06-validate-last-frame-axis#p0`(+ 흡수 `2026-09-06-lgt-black-screen-name-compare#p0` — 그 제안이 요구한 «축 추가»는 이미 착지했고 남은 것이 게이트화뿐이라 중복 발권을 피했다). 축은 있었으나 **REPORT-ONLY** 라 아무것도 막지 않았다.
-- **★★⑴ 전제를 먼저 반증했다**: `git show origin/main:…/wie_validate.rs | grep -n last_frame_content` → **10곳** 실재 · `:30` 이 스스로 「REPORT-ONLY and deliberately not a gate」 ⇒ 여전히 게이트 아님(이미 게이트였다면 이 회차는 거기서 끝났다).
-- **★★⑵ 선언 자리를 «골랐고 이유가 실측이다»**: 후보 셋 중 ⒞ 플래그. ★**기대값의 키가 `픽스처`가 아니라 `픽스처 × 모드`** 이고 — `keydraw_lgt` 는 `--inject` 유무로 기대값이 뒤집힌다(`PASS·last TRUE` ↔ `FAIL·last false`) — ★**그 모드 절반이 이미 명령줄에만 있다**. ⒜사이드카·⒝이름 표는 키의 나머지 절반을 다른 곳에 둬 **두 번째 진실원**이 된다(픽스처 개명·모드 추가·처음 보는 파일에서 드리프트).
-- **★⑶ 계약 4 충족**: 플래그 없이 **6행 전건 현행 판정 불변**(helloworld_* PASS · keydraw_* `--inject` PASS · keydraw_* 모드 없음 FAIL). 기본값 off 라 구조적으로 그렇다. `cargo test --all` **157 passed**(직전 156 + 신규 1).
-- **★★⑷ 개악 대조가 «합성»이 아니다 — 실제로 일어났던 회귀를 되돌렸다**: `is_clet_card` 정규화를 **PR #88 이전** 형태로 → `keydraw_lgt --inject` 플래그 없음 ★**PASS · content true · last_frame_content FALSE**(그때 실제로 새어 나간 형상 그대로) ↔ 같은 형상 + `--expect-last-frame` ★**FAIL**. KTF 대조군은 **PASS**(개악이 LGT 캐리어에만 닿는다).
-- **★⑸ 양의 방향도 보였다**: `helloworld_{ktf,lgt} --expect-last-frame` → **FAIL** ⇒ 제안이 「지금 그대로 게이트를 걸면 뒤집힌다」고 실측한 그 형상이 **선언했을 때만** 일어난다.
-- **사용자 영향**: 없음(기본 동작 불변). 대신 「검사는 통과하는데 화면은 검다」를 ★**브라우저 없이 약 20초에** 잡을 수 있게 됐다(그 그물은 지금까지 wasm 빌드 + `contract` 잡 3~4분뿐이었다).
-- **★남는 구멍**: ⒜★**호출자가 «0»이다** — 선언 자리를 만들었을 뿐 아직 아무도 켜지 않았다. 어느 워크플로도 `wie_validate` 를 부르지 않고, 러너 블록 3종 중 `helloworld_*` 는 「비어야 정상」이라 플래그가 틀린다(제안 등재) ⒝opt-in 은 잊은 호출을 못 막는다(사이드카도 같다) ⒞`keydraw_*` 는 기본 `--timeout 20` 에 바짝 붙어 돈다(`ms 20028`) — 상시 게이트로 올리려면 예산을 먼저 재야 한다 ⒟richness 3축의 같은 사각은 **계약 3 대로 무접촉**(형제 티켓 몫).
+★★**`.gitattributes` 의 `merge=union` 은 답이 아니다 — 이 집이 이미 데였다.** union 은 충돌을 «숨겨서»
+자동병합하고, 그 결과 **충돌이 안 나는 대신 의미가 깨진다**. 옳은 방향은 충돌을 숨기는 것이 아니라
+**생기지 않게** 하는 것이다. ★이 저장소에 `.gitattributes` 는 **없고, 이 이관도 만들지 않았다**.
 
-## [2026-09-06] `Image.createImage(String)` 픽스처 — «넓어진 가시 범위가 무엇을 찾는가»를 수로 냈다 (wie-system-class-loader-createimage-fixture)
-- **무엇을**: `scripts/make-draw-fixture.mjs` 가 jar 에 `wie-img.png`(16×8 RGB · 74바이트 · 스크립트가 바이트로 조립)를 동봉하고, `DrawMIDlet.startApp()` 이 **`Image.createImage("/wie-img.png")`** 로 그것을 **이름으로** 연 뒤 `getWidth()`·`getHeight()` 를 정적 필드에 저장하며, `DrawCanvas.paint()` 가 **그 치수 그대로** 사각을 채운다. `scripts/contract-roundtrip.mjs` 에 Scenario C-img 1건. `.rs` 변경은 **주석뿐**.
-- **왜**: 운영자 채택 제안 `2026-09-05-system-class-loader-preemptive-migration#p1`. 그 원문이 미완으로 남긴 문장이 이 회차의 Acceptance 다 — 「갈림 «자체»는 측정됐다 … ★**미측정인 것은 «넓어진 가시 범위가 실제로 무엇을 찾는가»** 하나다」.
-- **★★⑴ 산출이 «수»다**(계약 5): 칠해진 픽셀 수가 곧 **호스트가 찾아 디코드한 이미지의 픽셀 수**라, 왕복이 `1024 + 128 = **1152**` 를 ★**등호로** 단언한다(「돌아간다」가 아니다). 상수는 픽스처가 단일 출처로 소유하고 왕복은 `page.evaluate` 인자로 받아 **재진술 0**.
-- **★★⑵ 커버 전/후를 «같은 프로브»로 쟀다**(`image.rs` 그 줄에 `panic!()`): ★**전 — `cargo test --all` rc=0 · 156 passed / 0 failed · 5픽스처 전건 PASS**(`draw_j2me` nondom **1.3%**) ⇒ 아무것도 그 자리를 지나지 않았다(제안의 주장을 독립 재현) ↔ ★**후 — `draw_j2me.jar` FAIL · `panic during 'boot'` · ticks 0**. ⇒ ★**0 → 1.**
-- **★★⑶ 양방향 개악**(계약 4 · 매번 원본 복원 후 실행): **E0** 무개악 → 왕복 ★**42/42 rc=0** · `wie_validate` PASS(nondom **1.5%**) / **E1** `get_system_class_loader` → `jvm.current_class_loader()`(이행 전 형태) → ★**FAIL · `java.io.IOException: Resource not found: /wie-img.png`**(스택 `createImage(String)` ← `startApp`) ⇒ ★**넓어진 범위가 찾는 것 1건 ↔ 종전 경로 0건** / **E2-b** 전달 바이트 절반 절단 → ★**`IllegalArgumentException: Failed to decode image`** ⇒ 바이트도 하중을 받는다.
-- **★⑷ 음성 결과를 숨기지 않는다**: **E2**(바이트 «1개» 절단)는 ★**물지 않았다** — PNG 디코더가 꼬리 1바이트 결손을 견딘다. ⇒ 이 픽스처가 잠그는 것은 «전 바이트 무결»이 아니라 **「이름이 풀렸고 그 결과가 16×8 로 디코드된다」**이다.
-- **★⑸ 거짓이 된 서술을 정정했다**(그 두 곳만): `image.rs` 의 「NOT covered by any fixture」 · `docs/upstream-realign-verdict.md` §8-4⑶-b 의 「남은 미커버는 6번 하나」(→ **0곳**). ★**형제 회차와 같은 형태로 «결론 줄을 다시 쓰지 않고» 정정 블록을 덧댔다**(이력 보존).
-- **사용자 영향**: 없음(시험). 대신 「이미지를 이름으로 못 불러온다」류 회귀가 **커밋 전에** 잡힌다 — 6곳 중 **유일하게 동작이 달라진 칸**인데 그물이 0이었다.
-- **★남는 구멍**: ⒜**실패 갈래 미커버** — 없는 이름·깨진 이미지 경로는 **개악으로만** 지나갔다. 픽스처 어셈블러가 **예외 테이블을 내지 않아** 게스트에 try/catch 를 쓸 수 없는 것이 실제 비용이다(제안 등재) ⒝★**증거 축이 브라우저 왕복과 `wie_validate` 뿐**이다 — `cargo test --all` 은 여전히 J2ME 게스트를 부팅하지 않으므로(AGENTS.md 가 적은 그 사각) 이 커버는 PR 의 `contract` 잡에 의존한다(제안 등재) ⒞커버 = «실행된다»이지 «규격에 맞다»가 아니다 ⒟상용 코퍼스 0(Constraint 9).
-## [2026-09-06] 클렛 카드 식별을 «이름»에서 걷어낼 수 있는가 — 두 경로를 실행으로 재고 **기각**했다 (wie-clet-card-identity-by-class-name-design-decision)
-- **무엇을**: ★**설계 결정 회차 · 코드 변경 0.** 산출물은 `docs/worklog/2026-09-06-clet-card-identity-design.json` 뿐이다. `card_canvas.rs` **무접촉**.
-- **왜**: 운영자 채택 제안 `2026-09-06-lgt-black-screen-name-compare#p1`. ★그 제안이 요구한 것은 코드 변경이 아니라 「설계 + 두 경로(KTF/LGT) 각각의 실측」이고, 이 회차가 그것을 했다.
-- **★★⑴ 결론 1줄**: ★**대체 술어가 «없다» — 두 경로가 다른 종류의 객체라 한 벌로 덮이지 않고, 각각을 덮으면 술어 하나가 두 기구로 쪼개지면서 KTF 쪽 이름 의존은 그대로 남는다.**
-- **★★⑵ 실측**(임시 프로브 → 픽스처 4종 → ★프로브 되돌림):
-  `keydraw_lgt`·`helloworld_lgt` → `classDef=net/wie/CletWrapperCard` · `isInstance(CletWrapperCard)=`★**true**
-  `keydraw_ktf` → `classDef=CletCard` · `isInstance(CletWrapperCard)=`★**false** / `helloworld_ktf` → ★**pushCard 자체가 안 불린다**
-  ⇒ ★**LGT 의 카드는 «우리 것»**(Rust 프로토 · `CletWrapper::startApp` 이 호스트에서 민다) · ★**KTF 의 카드는 «게스트 것»**(클래스 이름을 **게스트 ARM 메모리의 널종료 문자열**에서 읽는다 — `wie_ktf/…/jvm_support/class_definition.rs`).
-- **★⑶ 후보별 판정**: ⒜`isInstance(CletWrapperCard)` = **LGT 만** ⒝`isInstance(Card)` = 둘 다 true 인데 ★**모든 카드가 true** ⇒ 쓰면 일반 MIDP 게스트에 `disablePaint()` 가 불려 **방금 고친 검은 화면을 전 경로에 재현**한다 ⒞**부팅 플래그** = LGT 가능 · ★**KTF 불가**(부팅이 ADF `MClass` → `Main.main` 범용 경로이고 카드는 게스트 ARM 이 민다. `loadable_jar` 가 **모든** KTF 앱에 `client.bin` 을 요구하므로 「네이티브인가」도 아무것도 가르지 못한다 — 두 픽스처 ADF 가 **둘 다** `MClass:Clet` 인데 하나만 카드를 민다).
-- **★⑷ 미지를 숨기지 않는다 — 그리고 그것이 판정을 흔들지 않는다**: `CletCard` 가 고정 이름이라는 것은 **픽스처 빌더**(`dlunch/wipi@068312d` 의 `clet_card.rs` — `ptr_name: c"CletCard"` · 부모가 `org/kwis/msp/lcdui/Card` **하나**)에서만 확인됐고 실게임은 코퍼스 부재로 확인 불가(Constraint 9). ★**고정이면 「새 카드가 생겨 놓친다」가 KTF 에서 성립하지 않고, 가변이면 대체할 호스트 신호가 없어 어차피 못 고친다** ⇒ 양쪽 갈래가 같은 결론이다.
-- **사용자 영향**: 없음(코드 무변경). 대신 이 축이 **다시 열리지 않는다** — 왜 못 하는지가 실측과 함께 남았다.
-- **★남는 제안 1건**(구현하지 않았다): `getClass().getName()` → **`class_definition().name()`**. 실측상 두 경로 모두 «내부 형식»을 그대로 주므로 점/슬래시가 **방어 대상이 아니라 비존재**가 되고 `pushCard` 마다 도는 JVM invoke 2회가 사라진다. ★단 **#p1 이 원한 것을 주지 않는다**(이름 두 개는 그대로) ⇒ 별건.
-## [2026-09-06] 파리티 가드의 두 문자열 축 — 파서도 툴체인도 사지 않고 **오탐 원인만** 제거했다 (wie-parity-lock-guard-string-axes-to-structure-decision)
-- **무엇을**: `scripts/check-parity-lock-wired.mjs` 축⑶ 의 술어를 ★**«`#[path]` 어트리뷰트 철자» → «검사기 경로 참조»** 로 교체(비교 문자열 1개 · 경로는 `LOCK.checker` 에서 **파생**) + `CEILINGS` 1줄 추가. ★**워크플로 무접촉 · 새 의존성 0 · CI 시간 +0s** · 축⑷ **무접촉**.
-- **왜**: 운영자 채택 제안 `2026-09-06-parity-lock-self-deletion-guard#p1`.
-- **★★⑴ 오탐이 «실재»한다 — 실행으로 냈다**: `#[path]` 를 완전한 `include!` 리팩터로 바꾸면(검사기의 inner doc `//!` 21건을 `//` 로 — `include!` 자리에서 inner doc 은 불법이라 **리팩터의 일부**다) ★**`cargo test` rc=0 · 11 passed** 인데 ★**가드 rc=1** 이었다.
-- **★★⑵ 그 축은 «성질»이 아니라 «철자»를 잡고 있었다**: 같은 `include!` 형태에서 검사기만 지워도 ★**cargo rc=101** ⇒ 주석이 「`#[path]` 만이 준다」고 적은 성질이 **다른 철자에도 있다**. 게다가 `#[path]` 줄만 지우면 ★**`cargo test --all` 이 rc=101**(`E0583 file not found for module \`checker\``) ⇒ ★**축⑶ 의 실패형은 6다리가 이미 문다.**
-- **★★⑶ 축⑷ 는 반대다 — 그래서 손대지 않았다**: 두 파일·`#[path]`·`#[test]` 를 남기고 검사기를 «안 쓰는» 공허한 락은 ★**`cargo test` rc=0 · 1 passed**(경고뿐). **가드만이 잡는다.**
-- **★★⑷ 세 선택지 비용을 «수»로 재고 넷째를 골랐다** — 상시 스텝 구간에는 `npm ci` 도 rust 툴체인도 **없다**(node 3줄 · 최대 ~1s):
-  ⒜**파서** = `tree-sitter`+`tree-sitter-rust` **+4패키지**(네이티브 애드온 · 15.0MB) **+ `npm ci` 신설 41.5s/PR**(93패키지·211MB) ⇒ 문서만 고친 PR 도 문다. `web-tree-sitter` 는 ★**npm 에 rust grammar wasm 이 없어**(tarball 27엔트리 중 `.wasm` **0**) 바이너리를 커밋해야 한다.
-  ⒝**`cargo … -- --list`** = ★**콜드 672.7s(11m11s · 약 230크레이트) / 웜 5.69s** ⇒ 현 스텝(~50ms) 대비 웜에서도 **약 110배**이고 ★**축⑷ 를 덮지도 못한다.**
-  ⒞**무조치** = 0원인데 오탐이 남는다. ⇒ ★**⒟ 경로 참조 = 0원 · 오탐 소멸 · 잡던 것 전부 유지.**
-- **★⑸ 양방향 대조 8종**(guard/cargo): P0 기준선 `0/0` · ★**P1 옳은 리팩터 `include!` `0/0`**(변경 «전»엔 `1` = 오탐) · P2 `#[path]` 제거 `1/`★`101`(`--all`) · P3 다른 파일 겨눔 `1/101` · P4 검사기 삭제 `1/101` · ★**P5 두 파일 함께 삭제 `1/`**★**`0`**(`--all` · 145 passed · 출력에 `dod_ci_parity` **0회** = 원래 구멍이 그대로 재현되고 **가드만** 잡는다) · P6 공허한 락 `1/0` · P7 `#[test]` 0건 `1/0`.
-- **사용자 영향**: 없음(CI 가드). 대신 ★**옳은 리팩터가 더는 빨간불을 켜지 않는다** — 그것이 가드가 지워지는 경로였다.
-- **★남는 구멍**(가드가 매 실행 스스로 출력한다): 축⑷ 는 **부분일치**라 ★**모듈 별칭을 바꿔도 접미가 같으면 통과**한다(실측: `parity_checker::parity(` 가 `checker::parity(` 를 포함 ⇒ 별칭 전건 개명이 `0/0` 으로 지나갔다). 별칭까지 보려면 위에서 기각한 **파서**가 필요하다 ⇒ 제안 등재.
+## 어떻게 읽나
 
-## [2026-09-06] `Security audit` 3일 red 를 껐다 — `rtrb` 0.3.3 → 0.3.5 (wie-rustsec-2026-0274-rtrb-double-free-audit-red)
-- **무엇을**: `Cargo.lock` **2줄**(`rtrb` version + checksum). `cargo update -p rtrb` 한 번. ★그 밖의 크레이트 이동 **0** · `Cargo.toml` 무접촉.
-- **왜**: 매일 도는 `Security audit`(★`schedule` 전용 — PR 게이트가 아니라 머지를 막은 적은 없다)이 3일 연속 `error: 1 vulnerability found!`. 자문 = `RUSTSEC-2026-0274`(`ReadChunk::commit` 에서 **원소의 `Drop` 이 panic** 하면 double free / UAF).
-- **★★⑴ 「목록에 있다」와 「그 경로를 탄다」를 갈랐다 — 세 축을 «수»로**: ⒜우리 `.rs`/`.toml` 의 `rtrb|ReadChunk` ★**0건**(`wie_cli/src/main.rs:26` 이 쓰는 rodio 표면은 `DeviceSinkBuilder`·`Player`·`SamplesBuffer`·`SampleTypeConverter` = **재생 전용**) ⒝rodio 가 rtrb 를 쓰는 곳은 `src/microphone.rs` **한 파일뿐**인데 그 파일의 `read_chunk|ReadChunk|.commit` ★**0건**(실사용은 `pop()`·`slots()`) ⇒ ★**취약 함수가 애초에 호출되지 않는다** ⒞원소 타입 `rodio::Sample = Float = f32`(`common.rs:31,43`) = ★**`Drop` 구현 없음** ⇒ 자문의 전제가 **구조적으로 성립 불가**.
-- **★⑵ 처방 = ⒜(버전 상향)**: ⒞(`cargo audit` 예외)는 ★**선택지가 아니었다** — Constraint 5 가 「no ignores」를 잠근다. ⒝(rodio bump)는 **불필요** — rodio 요구가 `^0.3.2` 라 0.3.5 가 이미 in-range. ★이 형태는 `rust-audit.yaml` 주석이 기록한 **2026-07-31 `cargo update -p wayland-scanner`** 선례 그대로이고, 그때처럼 **suppression 을 남기지 않는다**.
-- **★⑶ 검증**: `cargo audit` ★**rc=0**(남은 2건은 비-게이트 allowed warning) · `cargo build -p wie_cli` 0 · 네 게이트 전건 0(**156 passed / 0 failed**) · ★`cargo +beta clippy --all -- -D warnings` **0** · `wie_validate` `draw_j2me`·`helloworld_{ktf,lgt}` ★**전건 PASS**(+ `keydraw_* --inject` PASS · `last_frame_content=true`).
-- **사용자 영향**: 없음. 에뮬레이터 동작은 한 비트도 바뀌지 않는다(오디오 재생 경로는 rtrb 를 지나지 않는다).
-- **★남는 구멍**: ⒜★**실보안 이득은 0에 가깝다** — 위 세 축이 전부 「안 탄다」다. 값은 daily red 를 끈 것과, rodio 가 나중에 `read_chunk` 를 쓰더라도 이미 패치판이라는 것뿐이다 ⒝⑴⒝ 의 근거는 **`rodio 0.22.2` 라는 «지금 그 판본»의 소스 실측**이라 rodio 를 올리면 다시 재야 한다 ⒞`cargo audit` 는 `Cargo.lock` 만 본다 — 「그 코드를 실행하는가」는 이 회차가 **손으로** 답했고 기계가 잠그지 않는다 ⒟`rust-audit.yaml` 주석의 「spin 0.12.0 yanked」는 실측(`chacha20 0.10.0`)과 다르지만 **워크플로 변경 0** 이라 고치지 않았다(제안 등재).
-## [2026-09-06] 「감시를 지웠는데 green」을 저장소 전체에서 세었다 — 「다섯」은 출처가 없고 실측은 8+3 이다 (wie-count-deletable-checks-that-stay-green-repo-wide)
-- **무엇을**: ★**세기만 했다 — 가드 0 · 코드 0 · 워크플로 무접촉.** 산출물은 `docs/worklog/2026-09-06-deletable-checks-census.json` 과 이월된 「다섯 번」 3자리의 인라인 정정뿐이다.
-- **왜**: 운영자 채택 제안 `2026-09-06-parity-lock-self-deletion-guard#p0`.
-- **★⑴ 술어와 수**: 「워크플로 스텝이 «경로로» 부르는 검사 파일 집합 **A**」 ↔ 「`scripts/`·`*/tests/` 에 실재하는 파일 집합 **B**」의 차집합. ★**A=9 · B=23 · B\A=14.** 재현은 `git grep` 두 줄이고 워크로그 `sets.reproduce` 에 그대로 실었다.
-- **★★⑵ 14를 전건 분류했다 — 「지워도 green」은 «한 형태»가 아니라 «두 형태»였다**:
-  ⒜★**「CI 에서 돌고 있는데 지워도 green」 8건** — 전건 rust 통합시험. `cargo test --all`·`tarpaulin --workspace` 가 **glob 으로 줍고** 워크플로가 이름을 부르는 자리가 **0** 이다.
-  ⒝★**「애초에 CI 에서 안 도는 검사」 3건** — `audit-no-leak.sh`·`verify-browser.mjs`·`smoke_gate.sh`. ★**지울 필요도 없다. 이미 안 돈다.** 특히 `audit-no-leak.sh` 는 Constraint 9·10 의 «기계 절반»인데 ★**어느 워크플로도 npm 스크립트도 부르지 않는다**(전수 0건).
-  ⒞검사 아님 2건(`lgt_render_probe.sh` 측정 하네스 · `smoke_gate_baseline.tsv` 데이터) ⒟★**술어의 오탐 1건** = `wie_cli/tests/support/dod_ci_parity.rs` — 직전 회차가 만든 `check-parity-lock-wired.mjs`(집합 A 원소)가 이 경로를 물어 red 가 된다 ⇒ ★**그 가드가 여기서 작동을 증명했다.**
-- **★★⑶ 분류를 «주장»이 아니라 «실행»으로 냈다**: 격리 워크트리에서 ⒜의 하나(`wie_jvm_support/tests/absent_timer_schedule.rs`)를 **실제로 지우고** `RUST_MIN_STACK=4194304 cargo test --all` → ★**기준선 rc=0 · 40줄 · 156 passed · 이름 1회** ↔ ★**삭제 후 rc=0 · 39줄 · 155 passed · 이름 «0회»**. ★**커밋 0 · 워크트리 제거.** 같은 트리에서 `cargo fmt` rc=0 · 두 node 가드 rc=0.
-  ★**커버리지 게이트도 못 잡는다**: `codecov.yml` 이 **0바이트**(Constraint 2 가 «일부러 비워 둔다»고 적은 그것)라 임계가 없다 — `fail_ci_if_error: true` 는 업로드 오류용이다.
-- **★★⑷ 회차를 낳은 수가 «출처 없음»이었다**: 「이 저장소에서 다섯 번 났다」는 `2026-09-05-dod-ci-parity-checker.json` 에서 처음 나와 두 곳으로 인용됐을 뿐 ★**다섯 자리를 열거한 곳이 없다.** 저장소가 실제로 센 「five times」는 `AGENTS.md:234,255` 의 **셀프머지 5건**(다른 형태)이다 ⇒ ★**다른 대장 항목에서 빌려 온 수로 보인다.** 세 자리에 상호참조 정정을 붙였고 **원문은 사료로 보존**했다.
-- **사용자 영향**: 없음(조사·문서). 대신 총괄이 발권 계획을 세울 «수»가 생겼다.
-- **★남는 구멍**: ⒜★**술어가 «파일»을 보지 «모듈»을 안 본다** — 인라인 `#[cfg(test)]` 를 가진 `.rs` 가 **31개** 더 있어 진짜 모집단은 8보다 크다(다만 `mod tests` 삭제는 소스 diff 라 더 눈에 띈다) ⒝스텝«까지» 지우면 A 원소도 사라진다(무한 후퇴 — 직전 회차가 이미 적었다) ⒞`web/`·`functions/` 는 술어 밖이다(현재 시험 파일 **0건** ⇒ 손실 없음).
-- **★권하지 않는 것**: ⒜의 8건에 **각각 가드를 다는 것**. 직전 회차의 가드가 정당했던 이유는 락이 **2파일 구성**이고 **CI 자신을 감시**하기 때문이며, 보통의 시험 1건 삭제는 **PR diff 에 그대로 보인다**. ⇒ ★**값하는 자리는 ⒝의 3건**이다.
+- **디렉터리 그 자체가 색인이다** — 파일명 앞 **연번**이라 `ls` 만으로 **원장 순서대로** 정렬된다
+  (`sort -r` = 최신이 위 = 옛 `REPORT.md` 배열).
+  ```bash
+  grep -H '^## \[' docs/report/*.md | sort -r          # 최신순 제목 목록(경로 접두 = 연번이 정렬 키)
+  grep -H '^## \[2026-09' docs/report/*.md | sort -r   # 그 달만
+  ```
+- ★★**`-H` 는 «취향»이 아니다 — `-h` 로 바꾸면 정렬 키가 «제목 텍스트 = 날짜»가 되어 순서가 무너진다.**
+  ★무너뜨리는 것은 «날짜 역전»이 아니라 ★**같은 날짜의 동률**이고, 이 저장소는 **하루에 6회차가 난다**.
+  실측(54파일): `-h` 판은 연번순과 **52줄** 어긋나고 `-H` 판은 ★**0줄**(완전 일치).
+  ```bash
+  # 이 단언을 «돌려서» 확인하는 법 — 기준은 «연번순으로 각 파일의 첫 헤딩»이다
+  for f in $(ls docs/report/*.md | sort -r); do grep -m1 '^## \[' "$f"; done            > /tmp/seq.txt
+  grep -H '^## \[' docs/report/*.md | sort -r | sed 's/^[^:]*\.md://'                   > /tmp/new.txt
+  diff /tmp/new.txt /tmp/seq.txt && echo "★어긋남 0"
+  ```
+- ★**날짜가 아니라 «연번»으로 정렬하라.** 이관 시점 `wie` 원장은 날짜 단조였지만(비단조 **0**지점 · 실측)
+  그것은 **보장이 아니라 우연**이고, 형제 저장소는 같은 자리에서 비단조 12지점이었다.
+  ★연번 접두가 그 우연에 기대지 않게 해 준다 — **날짜만으로는 원래 순서를 복원할 수 없다.**
+- ★**연번은 «착지 순서»이지 «원장 위치»가 아니다.** 늦게 갈라진 브랜치가 자기 base 선두에 붙인 절도
+  해소 레시피는 **최대 연번**으로 준다 ⇒ 재구성 순서가 원문과 한 칸 어긋날 수 있다(내용 손실 0 · 순서만).
+- ★**색인을 «파일로 커밋»하지 않는 이유**: 커밋하는 순간 그 파일이 다시 **«추가 지점»**이 되어
+  이 이관이 없앤 충돌이 그대로 되살아난다.
+- ★**전용 렌더러 스크립트도 두지 않았다**: 위 한 줄이 같은 일을 한다.
+  (형제 저장소는 「면제 등재가 하나 더 는다」를 이유로 들었는데 ★**그 축은 `wie` 에 없다**
+  — `scripts/exec-artifact-axis-check.mjs` 부재. ★**그래도 같은 결론이다**: 한 줄로 되는 일에
+  게이트가 부르지 않는 스크립트를 두면 그것이 다음 결손을 가린다.)
 
-## [2026-09-06] 파리티 락의 «자기 삭제»를 막았다 — 두 파일을 함께 지우면 green 이었다 (wie-dod-ci-parity-self-deletion-guard)
-- **무엇을**: `scripts/check-parity-lock-wired.mjs` 신설 + `engine-contract.yml` `contract` 잡에 **상시 스텝 1개**(비-주석 **2줄** · ★**필터 밖**). ★**paths 필터 목록 무접촉**(Constraint 4).
-- **왜**: 운영자 채택 제안 `2026-09-05-dod-ci-parity-checker#p0`.
-- **★★⑴ 구멍을 «주장»이 아니라 «실행»으로 냈다**: 두 파일을 지우고 `RUST_MIN_STACK=4194304 cargo test --all` → ★**rc=0** · `test result:` **37줄 전부 통과** · ★**출력에 `dod_ci_parity` 가 «0회»** ⇒ 락이 사라진 것을 **아무도 말하지 않았다**.
-- **★★⑵ 처방을 골랐다 — ⒝를 고르되 «껍데기» 약점을 함께 닫았다**: ⒜전면(스텝이 `cargo test --test …`)은 ★**node 전용 잡에 rust 툴체인을 얹어 `rust.yml` 이 6다리에서 이미 하는 일을 분 단위로 중복**한다 ⇒ 기각(`.mjs` 두 벌 변형은 **두 번째 진실원**이라 더 나쁘다). ⒞무행동도 정당하나 구멍이 남는다.
-  ⇒ ★**존재만이 아니라 «락을 락이게 만드는» 결합 두 가지**(`#[path]` 선언 · 검사기를 «부르는» `#[test]`)를 함께 단언한다 — 제안이 ⒝에 매긴 약점의 대부분이 사라지고 비용은 ⒝ 그대로(**~50ms · 빌드 0**).
-- **★⑶ 왜 «필터 밖»인가**: ★**락이 그 필터에 없으므로 «락을 지우는 PR»은 필터-무관 변경**이고 필터 «안»의 검사는 전부 skip 된다 ⇒ **항상 보고하는 스텝**이어야 한다(앞선 워크로그 검사 2개와 같은 이유).
-- **★★⑷ 개악 8종 전건 red · 기준선 green**: ★**M1 = 두 파일 «함께» 삭제**(계약 5 가 요구한 형상) · M2 검사기만 · M3 시험만 · M4 시험을 «빈 파일»로 · M5 `#[path]` 만 제거 · M6 검사기 호출만 제거 · M7 `#[test]` 전부 제거 · ★**M8 «가드 자신» 삭제 → `node …` rc=1**(워크플로 스텝이 문다).
-- **사용자 영향**: 없음(CI 가드). 대신 「감시를 지웠는데 green」의 그 자리 하나가 닫혔다.
-- **★남는 구멍**: ⒜★**«배선»을 보지 «의미»를 보지 않는다** — 네 축을 통과하는 공허한 단언은 못 잡는다(그 잔여는 락 자신의 개악 대조 M1~M6 이 6다리에서 문다 ⇒ **두 층이 서로의 사각을 덮는다**) ⒝**스텝«까지» 지우면 diff 로만 보인다** — 기계로 막으려면 «감시를 감시하는 것»이 필요하고 그것도 같은 성질이다(무한 후퇴) ⇒ ★**여기서 멈춘 것은 판단이고 그 판단을 적었다** ⒞문자열 축(`#[path]`·`checker::parity(`)은 리팩터에 민감하다(고칠 자리는 `LOCK` 상수 한 곳).
-## [2026-09-06] `wie_validate` 에 «마지막 프레임» 축을 더했다 — any-frame 술어는 «덮어쓰기»를 구조적으로 못 본다 (wie-lgt-validate-last-frame-axis)
-- **무엇을**: `wie_cli/src/bin/wie_validate.rs` — `fn has_content` 추출 + `Outcome.last_frame_content`(JSON 동명 키) 신설 + 모듈 헤더에 「두 축」 절 + 단위시험 2건. ★**보고 전용 · 게이트 아님** · `passed` 분기 무접촉.
-- **왜**: 운영자 채택 제안 `2026-09-05-lgt-browser-paint-localize#p1`.
-- **★⑴ 사각을 한 문장으로**(계약 5): ★**보는 것 = 「도는 동안 «한 번이라도» 2색 이상인 프레임이 있었나」 · 못 보는 것 = 「그 뒤에 덮였나」** — `saw_content` 가 프레임 전체에 대한 **OR** 이고 OR 은 **단조**라 나중 프레임이 값을 되돌릴 수 없다. ★**튜닝으로 못 고치는 «구조»다.**
-- **★★⑵ 같은 술어, 다른 범위 — 기계로 만들었다**: `has_content` 를 추출해 `paint()`(ANY-frame OR)와 최종 계산(LAST-frame)이 **문자 그대로 같은 술어**를 쓰게 했다. ★술어까지 다른 두 축을 비교하면 아무것도 증명하지 못한다.
-- **★★⑶ 양방향을 «합성»이 아니라 «살아 있는 결함»으로 보였다**: `#p0`(근인 수정)은 **PR #88 로 미착지**라 현 `main` 에 검은 화면이 **그대로 있다** ⇒
-  ⒜**현 main**: `keydraw_lgt --inject` → `PASS · content=true · ★last_frame_content=false` / `keydraw_ktf` → `true · true`(대조군)
-  ⒝**#88 을 «임시로» 얹으면**: LGT → `★last_frame_content=true` · KTF 불변.
-  ★★**`result` 와 `content` 는 두 형상에서 «한 번도» 움직이지 않았다 — 움직인 것은 새 축 하나뿐이다.**
-- **★⑷ 제안 ⑴ 의 경고를 «가정하지 않고 쟀다»**: `helloworld_ktf`·`helloworld_lgt` 는 `paints=0 · clean exit` 이라 ★**`last_frame_content=false`** 다 ⇒ ★**게이트를 걸었으면 지금 PASS 인 2픽스처가 FAIL 로 뒤집힌다.** 보고 전용은 «판단»이 아니라 **측정**에 근거한다.
-- **사용자 영향**: 없음(검사기 필드). 대신 「검사는 통과하는데 화면은 검다」가 ★**PC 검사기 출력에서도 보인다** — 지금까지 그 그물은 브라우저 왕복뿐이었다.
-- **★남는 구멍**: ⒜★**richness 3축도 `fetch_max` = MAX over frames** 라 «똑같은» 사각을 갖는다(마지막-프레임 짝 없음 · **고치지 않았다** · 제안 등재) ⒝게이트 승격은 픽스처별 기대값이 선행(제안 등재) ⒞2색 이상 술어는 거칠어 「단색이 아닌 쓰레기로 덮이면」 두 축 다 true 다.
-## [2026-09-06] LGT 검은 화면의 «근인»을 고쳤다 — 이름 비교가 슬래시라 분기가 «한 번도» 안 돌았다 (wie-lgt-browser-paint-black-screen-name-compare)
-- **무엇을**: `wie_wipi_java/.../net/wie/card_canvas.rs` 의 클렛 카드 판별을 `fn is_clet_card` 로 빼고 ★**이름을 내부 형식으로 정규화**한 뒤 비교. + 단위시험 2건 + ★`scripts/contract-roundtrip.mjs` **Scenario F 신설**(29 → **41 체크**).
-- **왜**: 운영자 채택 제안 `2026-09-05-lgt-browser-paint-localize#p0`. 선행 회차가 근인을 「`Class.getName()` 은 **점**을 주는데 «슬래시» 리터럴과 비교한다」로 좁혀 놓았고, 그 자리를 고치는 것이 이 회차다.
-- **★⑴ 처방을 «골랐다» — 제안이 그것을 이 회차의 일로 명시했다**: ⒜점 형식 «추가» / ⒝**정규화** / ⒞술어 교체 중 ★**⒝**.
-  ★**⒜를 버린 이유는 제안 원문이 이미 적었다** — 「KTF 가 무사한 것은 «안전해서»가 아니라 그 게스트 클래스에 **패키지가 없어서**다 … 카드 클래스에 패키지가 붙는 순간 KTF 도 «같은 형태로» 깨진다」.
-  ⒜는 지금의 두 이름만 맞추고 그 **형식 취약성을 남긴다**. ⒞는 ★**대체 술어가 무엇인지 제안도 말하지 않아** 설계가 먼저다 ⇒ 별건(제안 등재).
-- **★⑵ 근인을 핀 소스로 확정**: `java_runtime/.../java/lang/class.rs:68-75` 의 `Class::getName` 이 ★**`class_name.replace('/', ".")`** 를 한다 ⇒ LGT 카드는 `net.wie.CletWrapperCard`.
-- **★★⑶ 「그 분기가 실제로 도는가」를 «픽셀»이 아니라 «호출 계수»로 보였다**(계약 5): `RUST_LOG=debug … | grep -c 'Display::disablePaint'` —
-  ★**수정 후** `keydraw_lgt` **1회** / ★**개악(정규화 제거)** `keydraw_lgt` ★**0회**. `keydraw_ktf` 는 두 형상 **모두 1회** ⇒ ★**LGT 에서 그 분기는 정말로 한 번도 돈 적이 없었고, 변경은 겨냥한 곳에만 닿았다.**
-- **★★⑷ 양방향 개악 대조를 «브라우저에서» 돌렸다**: 무개악 ★**41/41 · rc=0**(F 세 키 280·336·424 px) ↔ 개악 ★**rc=1 · F 세 키 전부 0 px**(415~494 프레임을 다 태우고 실패) · ★**E(KTF) 는 두 형상 모두 green**.
-- **★⑸ 같은 함정의 «다른 자리»를 쟀다**(제안 ⒝의 요구): `git grep -n 'getName' -- '*.rs'` → **2건**, 그중 나머지는 `JarEntry::getName` ⇒ ★**클래스 이름 비교 자리는 이 한 곳뿐**이다.
-- **사용자 영향**: ★**LGT 게임이 브라우저에서 «보인다»** — 지금까지 키도 들어가고 게임도 도는데 화면만 검었다.
-- **★남는 구멍**: ⒜`wie_validate` 의 판정자 `saw_content` 가 **sticky any-frame** 이라 ★**마지막 프레임을 보지 않는다** ⇒ 검은 화면을 PASS 로 낸다(이번 결함이 헤드리스에서 안 보인 이유 · 계약 3 으로 **고치지 않았다** · 제안 등재).
-  ⒝**상용 LGT 코퍼스 0**(Constraint 9)이라 확인은 커밋된 픽스처 범위에 머문다. ⒞「이름으로 카드를 식별한다」는 설계 자체는 남는다(제안 ⒞ 축).
-## [2026-09-06] WIPI 리소스 픽스처 — «아무 시험도 지나지 않던» 4자리를 태웠다 (wie-system-class-loader-spi-resource-fixture)
-- **무엇을**: `scripts/make-wipi-keydraw-fixture.sh` 에 리소스 1건(`res.bin` · `WIE-RES-1` · 9바이트) + 게스트 부팅 시 읽기 → `res:9:602` 출력. `test_data/keydraw_{ktf,lgt}.zip` 재생성. `wie_{ktf,lgt}/tests/test_resource_reach.rs` 신설.
-- **왜**: 운영자 채택 제안 `2026-09-05-system-class-loader-preemptive-migration#p0`.
-- **★★⑴ 제안 ⑵ 가 「먼저 확인하라」고 한 것을 «먼저» 봤다**: `wipi-archiver/src/lib.rs:96-99` 가 `resource_path` 를 재귀 복사한다 ⇒ ★**동봉 경로는 이미 열려 있었고 아카이버 축은 «추가되지 않았다»**. 스크립트가 그 디렉터리를 `mkdir -p` 하고 ★**아무것도 넣지 않은 것**이 커버리지 0 의 기전이다.
-- **★★⑵ «지금 0» 을 먼저 실행으로 냈다**: 4자리에 `panic!()` 을 심고 `cargo test --all` → ★**rc=0 · 150 passed / 0 failed** · `wie_validate` **5픽스처 전건 PASS** ⇒ 그 네 줄은 «실행된 적이 없다».
-- **★★⑶ 자리별 드릴로 «4자리 각각»을 보였다**(쌍이 아니라 낱개): ①`ktf get_resource_size` ②`ktf read_resource` ③`lgt get_resource_size` ④`lgt read_resource` — ★**전건 FAILED rc=101** · 무개악 기준선 **rc=0**.
-- **★⑷ 한 줄이 «두 홉»을 각각 증명한다**: `size` 는 `MC_knlGetResourceID` ⇒ 호스트 `get_resource_size` · 합(602)은 `MC_knlGetResource` 가 **실제로 넘긴 바이트**로만 계산된다 ⇒ 호스트 `read_resource`. ★`res:err` 를 따로 단언한다 — 「호출이 실패했다」와 「호출이 없었다」는 다른 결함이다.
-- **★⑸ 회귀 0**: 기존 `test_key_reach` 2건이 재생성 zip 으로도 통과 · 브라우저 왕복 ★**35/35 rc=0**(Scenario E 픽셀 280·336·424 불변) · `wie_validate` 3픽스처 PASS. ★게스트는 리소스를 **그리지 않는다** — 키 픽셀 단언을 지키려는 의도적 선택이다.
-- **★⑹ 거짓이 된 서술을 정정했다**(범위 판단을 회신에 적었다): 4자리 `.rs` 주석의 「NOT covered by any fixture」 + `verdict` §8-4⑶-b ⒡ 표 4행·결론(「커버되는 자리는 1곳」 → **5곳** · 남은 미커버는 **6번 하나**). ★`image.rs` 의 같은 주석은 **무접촉**(이 픽스처가 그 자리를 덮지 않는다 — 여전히 참).
-- **사용자 영향**: 없음(시험). 대신 리소스를 읽는 실제 게임에서만 터지던 회귀가 **커밋 전에** 잡힌다.
-- **★남는 구멍**: ⒜**실패 갈래 미커버** — `kernel.rs:198-205`(없는 리소스 → -12) · `:232-234`(버퍼 초과 → -1) 분기가 실재하는데 시험이 없다(제안 등재) ⒝**브라우저 축 없음** — 증거가 전부 헤드리스 stdout 이다(제안 등재) ⒞`wie_wipi_c/…/database.rs:620·624` 의 같은 호출도 미커버(세기만 했다) ⒟커버 = «실행된다»이지 «옳다»가 아니다.
+## 어떻게 쓰나 (새 회차)
 
-## [2026-09-05] «검증을 분리했다» — 6곳 선이행 · 그리고 «5곳은 아무 픽스처도 지나지 않는다» (wie-system-class-loader-preemptive-migration-six-sites)
-- **무엇을**: `Jvm::current_class_loader` **6곳**(4파일)을 공개 대체 `JavaLangClassLoader::get_system_class_loader` 로 치환 + 미커버 5자리에 **단서 주석** + `docs/upstream-realign-verdict.md` §8-4⑶-b **인라인 정정**. ★`use` 줄 변경 **0** · **bump 0** · 로더 기전 변경 0.
-- **왜**: 운영자 채택 제안 `2026-09-05-current-class-loader-replacement-design#p0`. 다음 칸 `+34`(`7dc1b90`)에서 현 통로가 **비공개**가 되는데 공개 대체가 **현재 핀에서도 `pub`** 이다. ★**값은 «6줄»이 아니라 «검증의 분리»다** — bump 와 함께 하면 회귀가 나도 «핀 탓인지 이행 탓인지» 못 가린다. 이 착지로 그 칸의 파열 호출부가 **6 → 0**.
-- **★⑴ 전제 3항 재실측**: ⒜핀(`5b84dd1`) 체크아웃에서 `jvm/src/runtime/java_lang_class_loader.rs:10` **`pub`** 확인(대비: `jvm/src/jvm.rs:980` 이 `+34` 에서 `pub` 를 잃는다) ⒝치환 대상 **정확히 6곳 · 4파일** ⒞«폴백 갈래»를 함수 전문으로 보였다 — `current_class_loader` 는 「Java 프레임 없음」·「호출 클래스의 로더가 `None`」 두 갈래에서 ★**`get_system_class_loader` 를 그대로 부른다**(우회가 아니라 그 함수 «자신의 폴백»). ★★**[정정 · 게이트② 반려 `-fix`] 그러나 «그러므로 6곳 전부 같은 값»은 «거짓»이었다** — 6번은 **갈린다**(아래 ⑸).
-- **★★⑵ 급소 — 자리별 커버리지를 «심어서» 쟀다**: 무개악 기준선이 치환 «전·후» 모두 **139 passed / 0 failed · `wie_validate` 5/5** 라 그 수는 «지났다»의 증거가 **아니다**. 자리마다 `panic!()` 을 심으니 — ★**커버 = 1곳뿐**(★**①** LGT 부팅 `binary.mod` → **123 passed / 1 failed** · `helloworld_lgt`·`keydraw_lgt` **FAIL**). ②③ LGT 리소스 · ④⑤ KTF 리소스 · ⑥ MIDP `Image.createImage(String)` 은 **전부 무변화 = 미커버**. ★★**[정정 · `-fix`] 번호는 `§8-4⑶-b` 의 «⒝ 표»와 같게 맞췄다** — 초판이 자리를 다시 매겨 같은 절 안에서 1~5 가 어긋나 있었고, 그 번호로 픽스처를 고르면 **반대 자리에 붙는다**.
-- **★★⑶ 설계 문서를 정정했다**: §8-4⑶-b⒡ 의 「`keydraw_*`·`helloworld_ktf` 가 2~5번을 태운다」는 ★**거짓**이었다(그 회차가 «치환 후 green» 을 «지났다»로 읽었다). 놓친 자리는 6번 하나가 아니라 **다섯**이다 — 표를 박고 ⒢의 「남는 «한» 자리」도 「«다섯» 자리」로 고쳤다. ★**[`-fix`] 그 표의 번호를 ⒝ 순서로 되돌렸다**(같은 절 안에 번호가 둘이면 정정문이 뒤집혀 읽힌다). ★**착지한 문서가 «검증됐다»고 말하는데 아니면 다음 사람이 그 위에서 판단한다.**
-- **★⑷ 미커버 5자리는 ⒝(단서)로 닫았다 — 「비싸다」가 아니라 «무엇이 필요한지»를 적었다**: ②③④⑤ 는 WIPI 리소스 API 를 **부르는 게스트**가 저장소에 **0건**이라 `dlunch/wipi` 클론 + nightly·`thumbv4t` + `-Zbuild-std` 로 **새 픽스처 2종**을 빌드해야 하고(부모 회차 하나 분량), 6 은 `make-draw-fixture.mjs` 가 **바이트코드를 손으로 조립**해 호출 1개 추가가 상수풀 변경이다. ⇒ 코드 주석 + 제안 **2건**으로 넘겼다.
-- **★★⑸ [정정 · 게이트② 반려 `-fix`] 사용자 영향 — 「없음을 의도한다(두 API 가 같은 값)」는 «거짓»이었다.** ⑥번은 ★**동작이 갈린다**. 핀 소스 실측: `execute_method` 가 **모든** 메서드에 Java 프레임을 밀고 `find_calling_class` 는 `top_java_frame()` 을 준다 ⇒ 프로토(러스트)가 도는 동안 «호출 클래스»는 게스트가 아니라 **`Image` 자신**이고, `Image` 는 `RustJarClassLoader::find_class` → `find_rustjar_class` → `register_class(class, Some(this))` 로 ★**`RustJarClassLoader` 가 정의**한다 ⇒ `current_class_loader` 는 **그 로더**를 준다(게이트② 실측 `same=false`). ★★**그런데 회귀가 아니라 «잠재 수정»이다** — `RustJarClassLoader` 프로토는 `<init>`·`findClass` 둘뿐이라 `findResource` 는 기반 `ClassLoader` 것(**항상 `Ok(None)`**)이고 `parent` 는 `None` ⇒ ★**그 로더로는 게스트 리소스를 «영원히» 못 찾는다**(= `createImage` 가 항상 `IOException`). 새 경로인 시스템 `URLClassLoader`(parent=RustJar + 게스트 jar URL)는 **실제로 찾는다**. ⇒ ★**이 치환은 «무변경»이 아니라 «가시 범위를 시스템 로더로 넓히는 것»이고, 코드는 되돌리지 않았다 — 되돌린 것은 서술이다.**
-- **★★⑺ [3회차 `-fix3`] 전수 계수가 «0 이 아니었다» — 근인은 «술어»다**: `-fix2` 회신이 옮겨 적은 명령 `git grep -n '…|…'` 은 ★**`git grep` 기본이 BRE 라 `|` 가 «리터럴»**이어서 **0건**을 낸다(★내가 «실행»한 것은 `\|` 이스케이프판이라 9건이 맞았지만, ★**회신에 옮길 때 백슬래시를 떨어뜨렸다** — 그래서 검수자가 그대로 치니 0이 나왔다). ⇒ ★**「0건」을 «없다»로 읽지 마라 — «술어가 틀렸나»를 먼저 물어라.** 브리프 술어(「같은 값」류)로 넓히면 남은 것이 드러났고, `docs/worklog/2026-09-05-current-class-loader-replacement-design.json` 의 **`proposals[0].plainSummary`**(「공개된 «같은 값»의 통로」)와 **`proposals[0].tradeoff`**(⑥을 «미검증»으로만 틀 지음)를 **인라인 정정**했다. ★처분 후 전수 **25건 판정**: 무관 6 · 정정문 자신 8 · 정정이 붙은 원문 4 · 여전히 참 6(그중 1건은 포인터 부착) · **이번 처분 1** ⇒ ★**바레 주장 0.**
-- **★★⑻ [4회차 `-fix4`] ★«어휘»로 세면 안 잡히는 자리가 있었다 — `verification.public-replacement-exists`(A2)**: 「갈리는 경우는 «호출한 **게스트** 클래스가 자기 로더를 가질 때»뿐」이 ★**정정도 포인터도 없이** 남아 있었다. ★**«자리 = 6곳 중 1곳(image.rs)»은 맞는데 «기전 귀속»이 정확히 반증된 쪽**이다(호출 클래스는 게스트가 아니라 **프로토 `Image` 자신** · `RustJarClassLoader` 소속 ⇒ 커스텀 로더 게스트가 «없어도» 지금 갈린다). ⇒ 인라인 정정 + 정본 포인터 3개. ★★**근인은 «대상 선정»이 아니라 «술어의 성격»이다** — 직전 회차의 가장 넓은 술어(「같은 값」류)로도 그 줄은 ★**히트 0**이다. A2 는 같은 주장을 ★**«같음» 어휘가 아니라 «갈림·한정» 어휘**로 말한다(「갈리는 «경우»는 … «때»뿐」). ⇒ ★**술어를 «주장»으로 다시 세웠다**(주체어 ∧ 단정어).
-- **★★⑼ [5회차 `-fix5`] 그 술어는 «대조군»을 놓친다 — ⑻ 의 「그 술어만 그 줄을 잡는다」를 «지웠다»**: 같은 주장을 하는 형제 문장 `docs/upstream-realign-verdict.md:735`(짧은 산문)은 ★**주체어 히트 0 ⇒ C 히트 0** 이다. C 가 A2 를 잡은 것은 A2 가 «한 줄짜리 거대 JSON 값»이라 주체어가 우연히 같은 줄에 있었기 때문이고, ★**그 줄을 실제로 찾아낸 것은 C 가 아니라 «검수자 술어(`자기 로더를 (가|갖)`) 단독»이었다** — 회신이 둘을 갈라 적지 않아 「C 가 전수를 덮는다」로 읽혔다.
-- **★★⑾ [6회차 `-fix6`] 이월이 «여섯 곳» 있었다 — 고치기 «전»에 어휘로 전수 훑었다**(★**[정정 `-fix7`] 초판은 「세 곳 더」였는데 같은 문단이 «여섯»을 열거한다**: ⒢ · `REPORT.md` 맨 단정 · `migration.json` `limits[0]`·`premise-3-same-value` · `REPORT.md` ⑹ · `verdict` ⒡): ★**정본 절 `docs/upstream-realign-verdict.md` §8-4⑶-b **⒢**(`:787`)가 «같은 절 44줄 위의 ⒞»와 어긋났다** — ⒞ 는 이미 「②③ 프레임 있음·로더 `None` / ④⑤ 프레임 있음·로더 `KtfClassLoader`」로 재도출돼 있는데 ⒢ 가 2·3·4·5 를 「«게스트 프레임이 없다» 갈래」로 **되돌리고** 있었다. ★★**가벼운 자리가 아니다** — 치환된 `.rs` **5곳**의 주석이 `§8-4(3)-b` 로 이 절을 가리키므로(★**예외는 ①`wie_lgt/src/emulator.rs` — 치환이 «한 줄»이라 주석이 «아예 없다»**) ★★**[정정 2026-09-05 · 게이트² 7회차 `-fix7`] 직전 회차가 여기에 쓴 「**6곳 전부**」는 «거짓»이었다** — 실측은 **5**다(@`3d69c938` 파일별: `wie_lgt/src/emulator.rs` **0** · `wie_lgt/…/wipi_c/context.rs` 2 · `wie_ktf/…/wipi_c/context.rs` 2 · `wie_midp/…/image.rs` 1). ★**그 수는 검수 회신의 문면을 «옮긴 것»이고 옮기면서 «다시 세지 않았다»** — `git grep -c` 한 번으로 갈렸다. ★**논지는 약해지지 않는다**: 5곳이어도 「코드에서 온 독자의 첫 문장」은 그대로 서고, ★**오히려 ①에는 앵커가 «없다»는 편이 더 정확하다**(그 자리는 문서로 가는 길이 아예 없다). ★**코드에서 출발한 독자가 도달하는 «첫 문장»이 반증된 전제**였다. 그리고 `REPORT.md`(이 파일 ⑶ 항목)가 **맨 단정**(「갈리는 경우는 6곳 중 1곳뿐이다」 + 반증된 두 갈래 유도)으로 남아 있었다. 함께 훑어 `migration.json` `limits[0]`·`verification.premise-3-same-value` · 이 파일 ⑹의 「②③④⑤ 전제는 미측정」 (★**이제 «측정돼 거짓»이다**) · `verdict` ⒡(`:782`)의 어휘까지 **한 회차에** 처분했다. ★**원문·기존 각주는 전건 보존**(취소선 아닌 «각주 얹기»). ★코드 변경 0.
-- **★★⑽ [5회차 `-fix5`] 「6곳 중 1곳」을 «맨 단정»으로 두지 않았다 — 재도출**: 판별식은 「호출 클래스가 «게스트»인가」가 아니라 **「스택에 Java 프레임이 있는가 · 그 클래스의 로더가 `None` 인가」**다. ①프레임 없음 / ②③프레임 있음·로더 `None` / ★**④⑤프레임 있음·로더 `net/wie/KtfClassLoader`** / ⑥`RustJarClassLoader` ⇒ ★**«다른 객체»를 준다는 뜻이면 3곳(④⑤⑥) · «리소스 해결이 갈린다»는 뜻이면 1곳(⑥)**. ★★**④⑤ 가 안전한 진짜 이유는 「그 경로엔 Java 프레임이 없다」가 «아니다»**(그 전제는 거짓) — `KtfClassLoader` 에 `findResource` 재정의가 없고 부모가 시스템 로더라(`jvm_support.rs:145-148`) 핀의 `ClassLoader::get_resource` 가 **parent 를 먼저 물어** 같은 것을 찾는다. ★같은 이월이 있던 **세 자리**(verdict ⒝표 1행 · ⒞:735 · 원장 `…six-sites.done.md:44-45`)를 함께 고쳤다. ★**코드 변경 0 · 안전성 판정 불변.**
-- **★★⑹ [게이트② 2회차 `-fix2`] «측정된 것»과 «미측정»을 갈라 적는다** — 이 구별이 흐려지면 다음 회차가 「전부 논증」으로 읽는다.
-  · ★**측정됐다**: ⑥의 **갈림 자체**(핀 소스 + 게이트② 실측 `same=false`) · ①의 커버(`panic!()` → 123/1 · 픽스처 2건 FAIL) · ②③④⑤⑥의 **미커버**(심어도 139/0 · 5/5 무변화) · 치환 전/후 동수(139/0 · 5/5).
-  · ★**미측정이다**: ⑥에서 **«넓어진 가시 범위»가 실제로 무엇을 찾는가**(그 자리를 부르는 시험·픽스처 **0건**) · ②③④⑤ 주석이 기대는 「이 경로엔 Java 프레임이 없다」 전제(부르는 게스트 0건 — ★⑥에서 그 직관이 정확히 틀렸으므로 남겨 적는다).
-  ★★**[정정 `-fix6`] 그 전제는 이제 «미측정»이 아니라 «측정돼 거짓»이다** — ②③은 `net/wie/CletWrapper::startApp` 안,
-  ④⑤는 KTF `main` 아래라 ★**넷 다 Java 프레임이 «있다»**. 미측정으로 남는 것은 «갈림 여부»가 아니라 ★**«넓어진 가시 범위가 무엇을 찾는가»** 하나다.
-  ⇒ ★**「⑥은 논증으로만 선다」는 이제 틀린 요약이다** — 갈림은 측정됐고, 남은 것은 그 결과의 «관측»이다.
-- **★남는 구멍**: ★**6자리 중 5자리는 «커버되지 않았다»**(회귀 그물 0) — 상용 코퍼스 0(Constraint 9)이라 확인은 커밋된 픽스처 범위에 머문다.
-## [2026-09-05] DoD ↔ `rust.yml` 파리티를 «기계»가 대조한다 — RustJava 검사기 이식 (wie-dod-ci-parity-checker-port-from-rustjava)
-- **무엇을**: `wie_cli/tests/dod_ci_parity.rs`(시험) + `wie_cli/tests/support/dod_ci_parity.rs`(검사기) 신설 —
-  `AGENTS.md` 의 `COMMIT-GATES` 마커 구간과 `.github/workflows/rust.yml` 의 cargo 게이트를 **집합으로 대조**한다.
-  ★**워크플로 잡·스텝 변경 0** · `AGENTS.md` 마커 «구간» 바이트 무접촉(구간 «밖» 산문 1문단만 갱신).
-- **왜**: 운영자 채택 제안 `2026-09-05-rust-yml-header-beta-lint-line#p1`. `AGENTS.md` 자신이 「RustJava 는
-  `scripts/check-dod-ci-parity.py` 로 기계 대조하는데 **여기엔 이식된 것이 없다**」고 적고 있었고, 실제로 직전 회차가
-  **4 ↔ 6 어긋남을 손으로** 고쳤다. ⇒ 그 문장을 **사실로 만들었다**(그 문단도 함께 갱신 — 낡은 거짓 문장을 남기지 않는다).
-- **★⑴ 형제 회차 결과 위에서 대조 대상을 정했다**: `depends_on` 의 `…-single-source-point-to-agents-md` 는 **착지했다**
-  (PR #86 · `147858ff`) ⇒ 파리티의 «한쪽 항»이 실제로 바뀌었다 — 후보였던 «머리 주석 목록»은 **없어졌고**(6줄 → 0)
-  정본은 **마커 구간**이다. ★그래서 「머리 주석 ↔ steps」가 아니라 **「마커 구간 ↔ steps」**로 정했다.
-  그 회차가 스스로 「`steps:` 는 여전히 기계 사본 · 문서↔steps 축은 `#p2` 몫」이라 적은 그 축이 이것이다.
-- **★★⑵ 「파리티」를 «내가» 정의했다**(정의 없이 이식하면 원본 정의를 몰래 들여온다): **축 A = cargo 호출 집합** ·
-  **축 B = toolchain 집합**. ★**두 축은 독립 비교이고 교차곱이 아니다**(원본의 의도적 천장 승계) ·
-  ★**«순서»는 파리티가 아니다**(집합 비교라 스텝 순서·줄 순서가 달라도 통과한다).
-- **★★⑶ «복사»가 아니라 «이식» — 바꾼 가정 4개**: ⒜정본 파일 `CLAUDE.md` → **`AGENTS.md`** ⒝구간 「§DoD 의 «첫»
-  코드블록」 → **마커 구간의 «모든» 블록**(첫 것만 읽으면 beta 가 사라져 축 B 가 거짓 red) ⒞게이트 판별자 「`if:` 없음」 →
-  **「cargo 를 부르는가」**(★wie 의 테스트 게이트는 **OS 조건부**라 원본 규칙이면 축 A 에서 빠지고 DoD 쪽이 거짓 red 가 된다) ⒟블록
-  스칼라 「접어서 식별만」 → **env 대입 평탄화**(`export`/`$env:` → `A=B <cmd>` · wie 는 그 형식으로 **진짜 게이트**를 돌린다).
-- **★★⑷ 양방향 3종을 «돌려서» 보였다**: ⒜**어긋남 → red** — `rust.yml` 에 `- run: cargo deny check` 를 실제로 넣으니
-  ★**rc=101 · FAILED 1**(「CI 에만 있다 …」) ⒝**무개악 → green** — `10 passed / 0 failed` · 워크스페이스 **149 passed / 0 failed**
-  ⒞★**검사기를 지우면 red** — `couldn't read … dod_ci_parity.rs` · `could not compile` ⇒ **rc=101**.
-  ★⒞ 를 위해 **2파일**로 나눴다(한 파일이면 「지워도 green」이 된다 — 이 저장소에서 다섯 번 난 형태).
-  ★★**[정정 2026-09-06 · `wie-count-deletable-checks-that-stay-green-repo-wide`] 그 「다섯 번」은 «출처가 없다»** — 다섯 자리를 열거한 곳이 저장소 어디에도 없고, 실제로 센 「five times」는 `AGENTS.md` 의 **셀프머지**(다른 형태)다. ★**세어 본 실측은 8 + 3** 이다 → `docs/worklog/2026-09-06-deletable-checks-census.json`.
-  ★그리고 개악 대조 **M1~M6** 이 시험으로 **상주**한다(CI 에만 게이트 / DoD 에서 삭제 / 매트릭스 nightly / DoD 만 nightly /
-  마커 삭제 / 핀 파일 출현).
-- **★⑸ 현 저장소 판정 = green** — 축 A 대칭차 **0**(CI 4 · DoD 4) · 축 B `{beta, stable}` 일치. ⇒ 「검사가 옳다 ↔ 파리티가
-  깨졌다」를 가를 일이 없었다. ★단 그 green 은 **#86 이 손으로 맞춘 뒤의 값**이다 — 이 회차는 그것을 **유지**하는 장치다.
-- **★★⑹ 천장을 이름으로 적었다 — 「전부 본다」로 쓰지 않았다**(검사기가 **매 실행마다 출력**한다):
-  ①OS 축 ②교차곱 ③`rust.yml` 밖의 워크플로 ④비-cargo 게이트 ⑤동의어·플래그 순서 ⑥YAML 손파서 ⑦★**검사 자신의 삭제**
-  (두 파일을 «둘 다» 지우면 green — 한쪽만이면 red) ⑧순서·중복.
-  ★그리고 **가장 큰 한계**: 이 검사는 두 집합이 «같은가»만 본다 ⇒ ★**두 곳이 «똑같이 틀리면» green 이다.**
-- **사용자 영향**: 없음(시험). 대신 목록이 낡으면 **다음 PR 에서** 6다리 전부가 말한다 — 지금까지는 사람이 발견할 때까지 낡은 안내가 나갔다.
-- **★★⑺ 초판이 windows 두 다리에서 red 였다 — 숨기지 않는다**(`1902b602` · macos·ubuntu 4다리 green). ★**근인은 파서가 아니라 «개악 대조의 앵커»**다: Windows 체크아웃은 `\r\n` 이라 `replace(anchor,…)` 가 하나도 안 맞았고, ★**터진 것은 파리티 판정이 아니라 「앵커가 표류했다」 가드**였다 ⇒ ★**검사가 «조용히 통과»하지 않았다.** 처방 = 읽기 지점 한 곳에서 **CRLF 를 접는다**(줄끝은 파리티의 축이 아니다) + 회귀 시험 1건. ★**정직하게**: 로컬은 항상 LF 라 그 정규화를 지워도 **로컬은 green** 이고 그물은 **windows 다리**뿐이다(천장 ⑨). `AGENTS.md` 의 「local green 은 CI green 을 예측하지 않는다 — windows」가 그대로 재현됐다.
-- **★배선 선택 사유**: 제안이 적은 두 갈래 중 ⒝(`cargo test --all` 이 줍는 `#[test]`)를 골랐다 — ⒜(`engine-contract.yml`
-  스텝 추가)는 이 티켓 Non-goal(**잡·스텝 변경 0**)에 걸린다. ⇒ 남은 구멍(⑦)은 **제안 `#p0`** 로 넘겼다.
+```bash
+# 슬러그는 회차 티켓 id(docs/worklog 관례와 같다)
+N=$(printf '%04d' $(( $(ls docs/report | sed -E 's/^([0-9]{4})--.*/\1/' | sort -n | tail -1 | sed 's/^0*//') + 1 )))
+$EDITOR docs/report/$N--$(date +%F)--<slug>.md
+```
+첫 줄은 `## [YYYY-MM-DD] 한 줄 제목 (<티켓 id>)`, 본문은 **무엇을·왜·사용자 영향**
+(정본 규약 = `AGENTS.md` §Landing paperwork).
 
-## [2026-09-05] 목록을 «한 벌»로 줄였다 — 갈릴 대상 자체를 없앤다 (wie-rust-yml-header-single-source-point-to-agents-md)
-- **무엇을**: `.github/workflows/rust.yml` 머리 주석의 **명령 6줄을 삭제**하고 ★**`AGENTS.md` 의 `<!-- COMMIT-GATES:BEGIN … -->` ~ `:END` 구간**을 가리킨다(경로+절+소절+**마커**). ★`on:`·`jobs:`·`steps:` **무접촉** · `AGENTS.md` **무접촉**.
-- **왜**: 운영자 채택 제안 `2026-09-05-rust-yml-header-beta-lint-line#p0`. 선행 회차가 두 목록을 **손으로** 일치시켰는데, ★**목록이 둘인 한 언젠가 다시 갈린다**(그 실사고가 2026-09-05 의 4↔6 이다). ⇒ ★**한 벌로 줄이면 갈릴 대상이 사라진다.**
-- **★⑴ 정본이 «정본일 만한가»를 먼저 쟀다**: `AGENTS.md` 6줄 ↔ CI 실동작을 자리마다 대조 — `fmt`↔`:96` · `clippy`↔`:97` · `wasm clippy`↔`:98` · `RUST_MIN_STACK … test`↔`:102-103`/`:107-108` · `cargo +beta clippy`↔`rust: [stable, beta]`(`:53`)×`toolchain: ${{ matrix.rust }}`(`:76`) 의 beta 다리가 `:97` 을 친다 · `rustup toolchain install` ↔ `dtolnay/rust-toolchain`+`components`(`:78`, **게이트가 아니라 전제**). ⇒ ★**6줄 전건 정합** — 정본이 틀렸으면 «가리키기»가 오히려 나빴을 자리인데 **틀리지 않았다**.
-- **★★⑵ Constraint 1 정합 판단 = «충족»**(제안이 지목한 자리 · 생략하지 않았다): 표 머리가 「Each row's **why** lives in the file that enforces it」이므로 `Locked by` 열이 요구하는 것은 ★**«목록»이 아니라 «why 의 거처»**다. ⑴그 행 자신이 이미 `(see Definition of Done)` 로 목록을 **가리킨다** ⑵실제로 enforce 하는 것은 주석이 아니라 `steps:`(무접촉) ⑶주석에 남은 **why 두 블록**(matrix · RUST_MIN_STACK)은 ★**이 파일에만 있고 그대로**다 ⇒ why-거처가 비지 않는다.
-- **★⑶ 「갈릴 대상이 사라졌다」를 세어 보였다**: 주석 안 명령 목록 줄 ★**6 → 0**. 전수 재훑기에서 나온 «명령처럼 보이는» 주석 2건은 **절 제목**과 **산문**(「it makes \`cargo test --all\` crash」)이지 목록이 아니다.
-- **★⑷ CI 동작 변경 0 을 수로**: 비-주석 변경 행 **0** · 주석·빈줄 제거 후 전/후 ★**바이트 동일** · `git diff --stat` **1파일 +13/−14**(전부 주석).
-- **★★⑸ 과장하지 않는다 — «한 벌»의 범위**: 없앤 것은 **산문 사본 2 → 1** 이고 `steps:` 는 여전히 **같은 명령의 «기계 사본»**이다 ⇒ ★**문서 ↔ steps 드리프트는 남는다.** 그 축이 파리티 검사기(`#p2`)의 몫이라는 것을 **주석 안에 한 문장으로** 적었다(다음 사람이 「이제 안전하다」로 읽지 않도록).
-- **★⑹ 잠금 = ⒝ 하지 않는다**: ★**이 회차가 «잠금이 지키려던 대상»을 제거했다** — 두 산문 목록의 일치를 감시할 검사는 이제 감시할 것이 없다. 남는 축은 다른 검사(`#p2`)이고, 이 회차 Non-goal 이 CI 변경 0 이라 배선할 자리도 없다.
-- **★★⑻ [2회차 `-fix2`] 「바레 주장 0」이 «거짓 실측 주장»이었다 — 한 곳이 남아 있었다**: 워크로그 `limits[1]` 이 「가리키기가 모호하면 … **경로+절+«두 블록»**까지 적었다」로 ★**옛 식별자를 그대로 주장**하고 있었다(이 리니지의 처방을 «따르지 않은» 마지막 자리). ⇒ 마커 형태로 고치고, ★**선행 `done` ⑶ 의 「0」 선언도 실측과 맞췄다**. ★**근인**: 술어를 「두 `sh` 블록」 문자열 위주로 좁게 잡았고 ★**원장(`~/orchestrator/reports/`)은 `git grep` 대상 밖인데 «따로» 세지 않았다**. ⇒ ★재계수(술어 명시 · `-E`): **repo 12 · 원장 13 = 25건**, 전건 판정 = 「why 두 블록」(참) 7 · 정정문/정정 기록 14 · 옛 문면 인용(정정 부착) 4 ⇒ ★**바레 주장 0**.
-- **★★⑼ [`-fix2`] END 마커가 «다시 세고» 있었다 — 고쳤다**: 「the **two** `sh` blocks above」 → 「**everything the BEGIN marker encloses** … Read the enclosed region; **do not count blocks**」. ★이 리니지의 목적이 「세는 것을 없애기」인데 **마커 자신**이 세고 있었다.
-- **★★⑺ [`-fix`] 잠금을 «다시» 판단했다 — ⒝ 유지, 단 사유가 바뀌었다**: ⑴★**실패 모드를 바꿨다** — 「Both(=2)」는 대상이 4로 늘어도 **조용히** 틀렸지만, 이름 붙은 마커는 사라지면 `grep` 이 **0건**으로 즉시 답한다(**silent → loud**) ⑵★**그래도 기계는 없다 — 알고 남긴다**: `engine-contract.yml` 관련성 필터 16원소에 ★**`AGENTS.md` 도 `rust.yml` 도 없다** ⇒ 필터 안의 유일한 node 검사에 무엇을 넣어도 **이 드리프트를 내는 PR 에선 안 돈다**. 필터 밖 상시 스텝은 둘뿐이고 셋째 추가는 `steps:` 변경 = **이 티켓이 금지**한다 ⑶`cargo test` 가 줍는 Rust `#[test]` 는 CI 무접촉으로 가능하나 **`#p2` 와 같은 축**이고, 명령을 다시 적지 않고 주장할 불변식은 「마커가 있고 순서가 맞다」 정도로 얇아 ⑴이 이미 덮은 위험과 겹친다.
-- **부수**: `--workspace` 설명 문장도 지웠다 — `AGENTS.md` 목록 머리가 **같은 말**을 하고 있어 남기면 그것도 두 벌이 된다.
-- **사용자 영향**: 없음(주석). 대가는 **클릭 한 번**이고, 그것을 «다시 갈리지 않는 것»과 바꿨다.
-- **★★[게이트② 반려 `-fix`] 초판 로케이터의 「Both fenced `sh` blocks」는 «거짓»이었다** — 그 소절의 `sh` 블록은 **2가 아니라 4**다(내 재계수: ①four gates 4줄 ②beta 2줄 ③`wie_validate` 러너 4줄 ④`gh pr checks` 1줄 · §Definition of Done 절 전체로는 5). ★**하필 ③④도 «커밋 전에 돌릴 명령»이라 «4개 전부»를 목록으로 읽는 것이 자연스럽고**, 그러면 머리 주석 자신의 범위 선언과 어긋난다. ⇒ ★**«세는 식별자»를 버리고 `AGENTS.md` 에 `COMMIT-GATES:BEGIN/END` 마커를 넣어 «grep 하면 끝나는» 로케이터로 바꿨다**(목록 «내용» 무접촉 — 소절의 `sh` 블록 내용은 바이트 동일).
-- **★남는 구멍**: Constraint 1 의 `Locked by` 를 「목록이 있어야 한다」로 읽으면 이 회차를 되돌릴 수 있다 — 그 판단 근거를 워크로그 `constraint-1` 에 남겼다.
+## 이관 사실 (숨기지 않는다)
 
-## [2026-09-05] LGT 화면은 «닿지 않은» 것이 아니라 «닿은 뒤 덮인다» — 슬래시/점 한 글자에서 끊긴다 (wie-lgt-browser-canvas-paint-not-reaching-localize)
-- **무엇을**: 양쪽 호스트에 **같은 단계 프로브 6종**을 넣어 LGT 브라우저 검은 화면을 좁혔다. 남긴 것은 `scripts/contract-roundtrip.mjs` 헤더의 **CORRECTION 주석**뿐 — ★**제품 코드 변경 0**(프로브·반증 실험 전건 원복 · `WIEPROBE` 잔재 0).
-- **왜**: 운영자 채택 제안 `2026-09-05-roundtrip-ktf-key-reach-scenario#p0`. ★**규명 회차이고 수정 회차가 아니다**(범위를 넓히면 회귀 책임을 못 가린다).
-- **★★⑴ 선행 서술이 반증됐다**: 「LGT paint → WebScreen → canvas 에서 끊긴다」는 **틀렸다.** 브라우저에서 LGT 프레임은 **실제로 캔버스에 그려진다** — `WebScreen::paint incoming_nonblack=424` · `draw_image ok=true 240x320`. ★오히려 LGT 가 KTF보다 **두 번 더** 닿는다(P5 5 ↔ 3).
-- **★★⑵ 끊기는 지점 = 그 «직후»의 MIDP 덮어쓰기**(브라우저 순서 추적 그대로): `P2 MC_grpFlushLcd` → `P5 incoming_nonblack=424` → `P5c ok` → `P3 disable_paint=false` → ★**`P5 incoming_nonblack=0`** → `P5c ok`. ⇒ 좋은 WIPI 프레임 위에 **비어 있는 MIDP `screenImage`** 가 덮여 **마지막 프레임이 검정**이다. KTF 는 같은 자리가 `disable_paint=true` 라 뒤따르는 blank blit 이 **없다**.
-- **★★⑶ 근인 — 슬래시/점**: `wie_wipi_java/…/card_canvas.rs` 가 `class_name_str == "net/wie/CletWrapperCard"`(**슬래시**)를 보는데 `Class.getName()` 은 **`net.wie.CletWrapperCard`**(**점**)를 준다 ⇒ `disablePaint()` 가 **영원히** 호출되지 않는다. ★KTF 카드는 `CletCard`(패키지 없음)라 두 형식이 같아 **우연히** 통과한다.
-- **★⑷ 반증 실험(주입 → 측정 → 원복)**: 점 형식 1개 추가 → 브라우저 LGT ★**0 px → 424 px**(KTF 와 동일 추적) · 네이티브 `disable_paint` false→**true**(28회) · `incoming_nonblack=0` paint **30 → 2** · `paints` **83 → 55**(KTF 와 정확히 같은 수). ⇒ ★지목이 틀렸다면 이 실험이 아무것도 바꾸지 않았어야 한다.
-- **★⑸ 「네이티브는 정상」도 정확히 고쳐 적었다**: 네이티브에서도 **같은 덮어쓰기가 일어난다**(LGT blank paint 30건). `wie_validate` 가 PASS 인 것은 판정 축이 **«어느 한 프레임이라도» 내용이 있었나**(any/max)라서이고 ★**마지막 프레임을 보지 않기 때문**이다. ⇒ 호스트 차이가 아니라 **판정 축 차이**였다.
-- **사용자 영향**: 이 회차는 없음(주석 1개). 대신 ★**「LGT 게임은 브라우저에서 화면이 안 나온다」가 «추정»에서 «지목된 한 줄»로** 바뀌었다.
-- **★★[게이트② 반려 `-fix`] KTF 대조군의 «앞으로»를 적었다** — 종전에는 「KTF 는 패키지가 없어 **우연히** 통과한다」라는 «현재 사실»만 있었다. ★`CletCard` 는 **게스트에서 오는 이름**이므로(픽스처 `client.bin52` 상수풀에 실재) ★**카드 클래스에 패키지가 붙는 순간 KTF 도 «같은 형태로» 깨진다** ⇒ ★**처방 ⒜(점 형식 «추가»)는 그 «형식 취약성»을 그대로 남긴다.** 그 문장을 **제안 1 의 `tradeoff`**(수정 회차가 처방을 고르며 읽는 자리)와 `contract-roundtrip.mjs` 헤더(그 「우연히」 문장이 사는 자리)에 넣었다.
-- **★남는 구멍**: 잰 것은 `keydraw_lgt.zip` **하나**(상용 코퍼스 0 · Constraint 9) · **수정안을 고르지 않았다**(점 추가 / 정규화 / 비교 폐기 — 수정 회차 판단) · 슬래시 리터럴이 «한때 맞았는지»는 미조사.
+- 원문 **643줄 / 51회차**를 `docs/report/` **51파일**로 갈랐다. ★**요약·편집 0** —
+  ★**연번 내림차순으로 이으면 원문과 «바이트 동일»** 이다(sha256 `4f85ec30…` · 213,785B · 절 51 → 51).
+  ★★**이 sha 의 유효 범위는 `0001`~`0051`**(= 이관에 든 51회차)이다 — **이관 «이후» 회차는 대상이 아니다.**
+  ```bash
+  # 검산 — 이 한 줄이 「소실 0」의 정본이다. ★sed 가 «이관 이후 회차»를 잘라 낸다(없으면 틀린 답이 나온다)
+  { printf '# REPORT\n\n'; ls docs/report/*.md | sort -r | sed -n '/\/0051--/,$p' | xargs cat; } | shasum -a 256
 
-## [2026-09-05] 두 목록을 «명령 단위로» 일치시켰다 — 그리고 «잠그지 않기로» 정하고 사유를 적었다 (wie-rust-yml-header-comment-beta-lint-line)
-- **무엇을**: `.github/workflows/rust.yml` **머리 주석**의 「로컬에서 돌려라」 목록에 beta 2줄 추가 + 「Run all four」 → 「Run them all」 + ★**«잠금이 없다»를 주석 안에 리터럴로** 명시. ★`on:`·`jobs:`·`steps:` **무접촉** · 다른 주석·문서 무접촉.
-- **왜**: 운영자 채택 제안 `2026-09-05-dod-four-gates-beta-axis#p0` — 선행 회차(PR #81)가 `AGENTS.md` 에만 다섯째·여섯째 줄을 더해 **두 곳이 서로 다른 목록**을 말하게 됐다. ★**그 회차가 스스로 만든 구멍이고 스스로 제안으로 올린 것**이다.
-- **★⑴ 정말 갈렸다(전)**: `rust.yml` **4** (「Run all four locally」) ↔ `AGENTS.md` **6**(four gates + `rustup toolchain install beta --component clippy` + `cargo +beta clippy --all -- -D warnings`).
-- **★⑵ 후 — «글자로 일치»를 주장이 아니라 기계로 쟀다**: 양쪽에서 명령만 뽑아(`#   ` 접두·꼬리 주석 제거) `diff` → ★**출력 없음 · 각 6줄 · 순서 동일**. 문안은 **새로 쓰지 않고** `AGENTS.md` 것을 그대로 옮겼다(단 `# rust.yml:` 접두만 뺐다 — `rust.yml` 안에서 자기를 가리키게 되므로).
-- **★⑶ CI 동작 변경 0 을 수로 보였다**: 비-주석 변경 행 **0**(전 행이 `#`) · 주석·빈줄 제거 후 착지 전/후가 ★**바이트 동일** · `- run:|if:|uses:|name:` 줄 수 **11 ↔ 11**. ※`pyyaml` 부재로 파서 대조는 못 했고 그 사실을 적는다.
-- **★⑷ 주석 ↔ 실동작 정합**: `rust: [stable, beta]`(`:46`) · `toolchain: ${{ matrix.rust }}`(`:69`) ⇒ **6다리가 four gates 를 그대로** 친다. 로컬 대응물은 `cargo +beta clippy` 하나이고 `rustup toolchain install` 은 CI 에선 `dtolnay/rust-toolchain` 액션이 대신한다 ⇒ ★**주석이 «없는 것»을 안내하지 않는다.**
-- **★★⑸ 잠금 결정 = ⒝(잠그지 않는다) · 사유 셋**: ⑴이 회차 Non-goal 이 CI 변경 0 이라 **배선 없는 검사기**밖에 못 만드는데 그것은 «잠긴 것처럼 보이는데 안 도는» 것이라 없는 것보다 나쁘다 ⑵배선 없이 되는 길(`cargo test` 가 줍는 Rust `#[test]`)은 있으나 ★**이미 식별된 파리티 검사기 이식(`#p2`)과 충돌**한다(`AGENTS.md` 자신이 「Nothing like that is ported here」로 그 자리를 표시해 뒀다) ⑶구조적으로 더 나은 처방은 잠금이 아니라 **중복 제거**인데 이 티켓 계약 1 이 «더해서 일치»를 지시했다. ⇒ 두 갈래 다 **제안**으로 올렸다. ★**대신 «잠금 없음»을 주석에 리터럴로 적었다** — 다음 사람이 「검사가 잡아 주겠지」로 읽지 않도록.
-- **★⑹ 「잠금 0」도 실측이다**: `scripts/` 에서 `rust.yml` 을 읽는 파일 **0건** · `AGENTS.md` 를 «읽는» 스크립트 **0건**(히트 3건은 전부 주석 속 언급).
-- **사용자 영향**: 없음(주석). 대신 CI 파일을 먼저 여는 사람이 더 이상 **짧은 답**을 받지 않는다.
-- **★남는 구멍**: ★**여전히 사람이 동기화한다** — 이 회차가 고친 것은 «지금 갈린 것»이지 «다시 갈리는 것»이 아니다. 문장은 검사가 아니다.
-
-## [2026-09-05] 브라우저 왕복에 KTF 키 «도달» Scenario E — 그리고 LGT 는 «키»가 아니라 «화면»에서 막혔다 (wie-browser-roundtrip-ktf-key-reach-scenario)
-- **무엇을**: `scripts/contract-roundtrip.mjs` 에 **Scenario E 신설**(검사 6개 · 왕복 **29 → 35 pass**) + 상수를 픽스처 소스에서 읽는 **파생 블록** + `engine-contract.yml` 관련성 필터 **1줄**. ★**제품 코드 0줄** · 기존 Scenario A~D **무접촉**.
-- **왜**: 운영자 채택 제안 `2026-09-05-ktf-lgt-key-reach-fixtures#p0` — 「Scenario A 는 KTF 를 부팅하지만 키는 «예외가 안 난다»만 본다. 이제 막대를 그리는 픽스처가 있다」.
-- **★⑴ D 가 못 보는 홉을 잰다**: KTF 게스트는 `CardCanvas` 가 MIDP 코드를 `WIPIKeyCode::from_midp_raw` 로 한 번 더 바꾼 **셋째 코드**를 받는다 ⇒ J2ME 로 재는 Scenario D 는 그 홉에 대해 **아무 말도 하지 않는다**. 그리고 브라우저는 헤드리스 Rust 시험이 못 지나는 층(**wasm 빌드 · glue · WebScreen → canvas**)을 함께 지난다.
-- **★⑵ 상수는 «한 곳»에서 파생시켰다**: `keydraw_ktf.zip` 은 커밋된 바이너리라 export 가 불가능하므로 **픽스처를 만드는 스크립트의 게스트 소스를 되읽는다**(`barH=8` · `KeyCode::X => N` 팔 21개). 위치자가 표류하면 **throw**(fail-closed). ★그리고 양성 WIPI 12행이 `contract.keyWipiCodes` 와 같은지를 **기동 시 검증**한다 — 단일 출처 주장을 문장이 아니라 기계로 만들었다.
-- **★★⑶ 개악 4칸 — 전부 실행 출력 · 전부 원복**: ⒜glue `key_down` no-op → **D 3 + E 3 이 «함께» red**(공유 경계) ⒝★**KTF 전용 홉만 오배선**(`KEY_NUM5 => Self::NUM1`) → ★**E 의 NUM5 만 red**(`392 px` = 49×8) · ★**D 전건 green** ⇒ **E 의 독립을 실행으로 보였다** ⒞`BAR_H` 개명 → fail-closed throw ⒟게스트 표 변조 → 「픽스처와 계약이 어긋난다」 throw. 무개악 재빌드 **35/35 rc=0**.
-- **★★⑷ LGT 는 «부분 완료» — 막은 것이 키가 아니었다**: 시나리오를 실제로 써서 돌렸더니 `platform_kind()=="LGT"` 는 ✓ 인데 3키 전건 **0 px**. ★**키는 도달한다** — 페이지 콘솔에 게스트 자신의 `key:42`·`key:53`(올바른 WIPI 코드). ★배제 둘: **순서**(첫 keydraw 인스턴스로 돌려도 0 px) · **픽스처**(네이티브 `wie_validate --inject` 는 같은 zip 을 **PASS · paints 83**). ⇒ 결함 축은 **LGT paint → WebScreen → canvas** 이고 픽셀 단언으로 표현할 수 없다 ⇒ ★**red 를 착지시키지 않고**(그러면 이 파일이 CI 에서 꺼진다) 제거 + **왜 없는지를 헤더에 기록** + 제안 1건.
-- **사용자 영향**: 없음(검사 추가). 대신 「5를 눌렀는데 KTF 게스트가 8을 받는다」류가 **브라우저 층까지 포함해** 커밋 전에 잡힌다. ★그리고 **LGT 화면이 브라우저에서 안 나올 수 있다**는 사실이 처음으로 측정됐다.
-- **★남는 구멍**: 단언 대상은 **양성 WIPI 코드**뿐이다(이름 키는 WIPI 공간에서 음수라 막대 폭이 될 수 없고, 게스트의 임의 슬롯표를 검사로 옮기면 **두 번째 진실원**이 생긴다 — 그 22행은 정적 §4c 가 진다). LGT blit 원인은 **모른다**(측정만 했다).
-
-## [2026-09-05] DoD 에 beta 축 «한 줄» — 실패 34건 중 9건이 beta 단독이었고 그 9건이 전부 린트 게이트다 (wie-dod-four-gates-add-beta-axis)
-- **무엇을**: `AGENTS.md` §Definition of Done 에 beta 축 블록 1개(전제 `rustup toolchain install beta --component clippy` + 명령 `cargo +beta clippy --all -- -D warnings` + 이력·비용·선례). ★**코드 0줄 · CI 워크플로 0줄 · 파리티 검사기 포팅 0.**
-- **왜**: 운영자 채택 제안 `2026-09-04-parity-sibling-repo-survey#p0` — 「`rust.yml` 은 stable·beta **둘 다** 치는데 로컬 DoD 는 stable 만 적어 두었다」. 문자열 `beta` 가 `AGENTS.md`·`CLAUDE.md` 어디에도 **0건**이었다.
-- **★⑴ 제안의 수를 옮겨 적지 않고 다시 셌다(창을 밝힌다)**: `rust.yml` run **전량 246건**(`ac4ce1aa` 2026-06-24T00:48:42Z → `11a35252` 2026-09-04T22:05:19Z) · success 212 / failure **34** · 그중 ★**beta 다리가 «유일한» 실패 job 인 run 9건**. ★**9/9 가 `cargo clippy --all -- -D warnings`** — 8 × `clippy::chunks_exact_to_as_chunks`(#92·93·94·95·96·97·98·126 · 2026-07-06→07-13) + 1 × `clippy::double_must_use`(#182 · 2026-08-20 · 해소는 **별도 회차 PR #60**). fmt **0** · wasm 린트 **0** · 테스트 **0** ⇒ ★**그래서 네 줄이 아니라 한 줄이다.**
-- **★⑵ 가정이 아니다**: #182 의 diff 는 `wrangler.toml` **6줄 추가 · Rust 0줄**인데 beta 린트가 red 였다 — 자기가 쓰지 않은 repo 전역 코드가 새 린트에 걸렸고 해소에 회차 하나가 들었다. ★★**[게이트② 반려 · 정정]** 2026-07 클러스터는 `main` 을 **6 push · 약 36시간**(07-06T18:24 → 07-08T05:51 · 전건 `wie_midp/…/lcdui/image.rs:310`) red 로 뒀고 해소는 ★**`37e3e4f6`(PR #21)** 이다. ★**`e3cbaa08`(PR #33)은 «07-13 `wie_lgt/src/compile_model.rs:113`»** — **다른 자리 · 피처 브랜치**이고 `main` 을 red 로 만든 적이 **없다**. 초판의 「7일 · 8회 push · 해소 `e3cbaa08`」는 **세 축 모두 재현되지 않는다**(두 사건을 한 커밋에 귀속시켰다). ※#97·#126 은 `pull_request` 라 애초에 main push 가 아니다.
-- **★⑶ 한계를 숨기지 않는다**: 그 9건 전부에서 stable 다리는 `success` 가 아니라 **`cancelled`** 다(`fail-fast: false` 는 **2026-08-27 PR #65**(`250d7e4c`)에 들어왔다 — ★초판의 「PR #64」는 오기다. 날짜는 옳았다) ⇒ 「같은 run 에서 stable 이 초록」은 run 만으로 증명되지 않는다. 증명은 **린트 정체 + 해소 경로**가 진다(위 ⑵).
-- **★⑷ 비용 1회 실측**(`11a35252` · macOS aarch64 10코어 · stable 1.98.0 / beta 1.99.0-beta.1): 첫 beta clippy **36.27s** → warm **1.36s** → ★**회차 실제형(엔진 1파일 편집 후) +7.6~7.7s** · ★**스래싱 없음**(beta 직후 stable 복귀 **0.50s**) ⇒ 별도 `CARGO_TARGET_DIR` **불요**.
-- **★⑸ 한 곳에만 적었다**: `AGENTS.md`. `CLAUDE.md` 는 「§Definition of Done 의 4종」을 **가리키기만** 하고 「두 곳에 적으면 한쪽이 낡는다」를 자기 규율로 갖는다 ⇒ **무접촉**. beta 를 «다섯째 게이트»가 아니라 «린트 게이트의 두 번째 툴체인»으로 쓴 것도 그래서다 — Constraint 1 의 「four gates」와 CLAUDE.md 의 「4종」이 **낡지 않는다**.
-- **사용자 영향**: 없음(문서 1개). 대신 이력 26%(9/34)의 실패형이 **PR 을 열기 전에** 잡힌다.
-- **★남는 구멍**: 이 블록은 사람이 동기화하는 산문이다 — 매트릭스에 툴체인이 하나 더 붙어도 아무도 말하지 않는다(RustJava 는 `scripts/check-dod-ci-parity.py` 로 기계 대조까지 갔다 · 포팅은 형제 제안 `#p2` 소관). 그리고 `rust.yml` 머리 주석은 여전히 four gates 만 나열한다(Non-goal 로 무접촉 · 워크로그 제안 1건).
-
-## [2026-09-05] «다음 벽»을 설계했더니 벽이 아니었다 — 공개 대체가 이미 있다 (wie-current-class-loader-replacement-api-design-for-plus34)
-- **무엇을**: `docs/upstream-realign-verdict.md` **§8-4⑶-b 신설** + 계단표 4번 칸 **인라인 정정 1줄**. ★핀 변경 0 · **코드 변경 0**(프로브는 원복) · 기존 계단 서술 무접촉.
-- **왜**: 운영자 채택 제안 `2026-09-04-upstream-realign-p1-pin-plus33#p1` — 「`+34` 에서 `current_class_loader` 가 비공개가 되고 **공개 대체 API 가 없다**」.
-- **★⑴ 벽은 «+46」이 아니라 «+34»에서 시작한다**: `7dc1b90` = 「Make current_class_loader private」이고 **`jvm.rs` 1파일 +1/−1**(`pub` 한 줄)뿐 — ★**대체 API 를 추가하지 않았다**. `5b84dd1..7dc1b90` = **1커밋** ⇒ 우리 핀의 바로 다음 칸.
-- **★⑵ 호출부 6곳이 «전부 같은 두 줄»이다**(지금 세었다): 로더를 얻고 곧바로 `get_resource_as_stream`. ⇒ ★**클래스 «로딩»에 쓰는 자리 0곳** — 필요한 능력은 「게스트 리소스를 이름으로 여는 것」뿐이다.
-- **★★⑶ 공개 대체가 «있다» — 제안의 전제가 틀렸다**: `JavaLangClassLoader::get_system_class_loader` 가 ★**핀에서도 HEAD 에서도 `pub`**(6곳이 이미 쓰는 함수 바로 옆). ★그리고 «우회»가 아니다 — `current_class_loader` 전문을 읽으면 「게스트 프레임 없음」·「호출 클래스의 로더가 None」 두 갈래에서 **그 함수를 그대로 부른다**. 갈리는 경우는 6곳 중 **1곳**뿐이다.
-  ★★**[정정 2026-09-05 · 게이트² 6회차 `-fix6`] 위 마지막 두 문장은 «맨 단정»이었고 «붙어 있는 유도»가 반증된 쪽이다.**
-  ⑴어휘: 「**게스트** 프레임 없음」 → 판별식은 「스택에 **Java 프레임**이 있는가 · 그 클래스의 로더가 `None` 인가」다.
-  ⑵★**④⑤ 는 그 두 갈래 «어느 쪽도 아니다»**(프레임 **있음** · 로더 `Some(net/wie/KtfClassLoader)`) — 그런데도 안전한 이유는
-  **부모(시스템 로더) 위임**이지 폴백이 아니다.
-  ⑶★**「6곳 중 1곳」은 «뜻 없이» 쓸 수 없다**: «두 API 가 다른 객체를 준다»는 뜻이면 **3곳(④⑤⑥)** · «리소스 해결이 갈린다»는 뜻이면 **1곳(⑥)**.
-  정본 = `docs/upstream-realign-verdict.md` §8-4⑶-b **⒞ 의 재도출 블록** · 설계 워크로그 `verification.public-replacement-exists`.
-- **★⑷ 고른 길 = ⒝(우리 쪽 대체)**. ⒜(upstream 공개 요청)는 ★**요청할 것이 없어** 기각 · ⒞(핀 유지)도 기각. ★★**실익**: 대체가 **현재 핀에서도 공개**라 6곳 이행을 **지금 핀 위에서 착지·검증**한 뒤 올리면 그 칸의 파열 호출부가 **6 → 0** 이 되고, 두 변경이 한 PR 에서 얽히지 않는다.
-- **★⑸ 설계를 «프로브»로 확인했다**(스왑 → 스위트 → **원복**): `cargo build` rc=0 · `cargo test --all` **139 passed / 0 failed** · `wie_validate` **5픽스처 전건 PASS** · 원복 후 `git status` 빈 출력 ⇒ **코드 델타 0**.
-- **사용자 영향**: 없음(문서). 대신 「다음 칸이 막혀 있다」가 **「막혀 있지 않고, 미리 치워 둘 수도 있다」**로 바뀌었다.
-- **★남는 구멍**: 6번 자리(`Image.createImage(String)`)는 ★**스위트가 부르지 않는다**(`createImage` 호출 시험·픽스처 **0건**) ⇒ 그 자리는 «측정»이 아니라 **논증**으로 남는다(커스텀 로더 게스트에서는 갈릴 수 있다). ★그리고 `+47`(209곳)은 **이 설계가 줄여 주지 않는다**.
-  ★★**[정정 2026-09-05 · 이행 회차 `-fix`] 바로 위 괄호 「커스텀 로더 게스트에서는 갈릴 수 있다」는 «거짓»이다** — 그 자리는 **커스텀 로더 없이 «지금» 갈린다**(호출 클래스가 게스트가 아니라 프로토 `Image` 자신이고 `RustJarClassLoader` 가 정의한다). ★**미측정인 것은 «갈림»이 아니라 «넓어진 가시 범위가 무엇을 찾는가»다.** 정본 = 이 파일 **줄10 의 ⑸ 항목** · 워크로그 `verification.divergence-at-6` · `docs/upstream-realign-verdict.md` §8-4⑶-b⒢.
-
-## [2026-09-05] «버린 fork» 통독 — 관측은 «두 줄»이 아니라 9커밋·타이틀 13종이었다 (wie-abandoned-fork-commit-log-harvest)
-- **무엇을**: `docs/upstream-realign-verdict.md` **§10-6 신설**(통독 목록 · 원문 인용 · 타이틀 · API · 핀 보유 여부) + §10-2 포인터 1줄. ★기존 절 무접촉 · **코드 변경 0** · 핀 무접촉 · `Jun025/RustJava` **쓰기 0**(bare 클론 읽기 전용).
-- **왜**: 운영자 채택 제안 `2026-09-04-unported-hardening-two-axes#p0` — 「코퍼스가 사라진 지금 그 커밋 로그는 **재현 불가능한 유일한 1차 자료**다」.
-- **★⑴ 가설은 맞았다**: §10-2 가 인용한 «두 줄»은 전부가 아니었다 — 실제로는 **9커밋 · 타이틀 13종 · API 10종**(2 → 9, **4.5배**). 두뇌게임q·박정석_영웅탄생·레스토랑타이쿤2006·소울카드마스터2·미니고치·광란의수족관!·대통령타이쿤·만귀토벌전·아르덴전기·리얼사커2007·타운스토리·파랜드택틱스·라피스라줄리.
-- **★★⑵ «타이틀 지목» 축의 후보는 0건 — 단 «0 의 경계»가 있다**: 각 행의 「우리 핀에 있는가」를 실측으로 채우니 **있다 6 / 없다 3**이고, ★**없는 3은 전부 `hardening.rs` 가 이미 이식했다**(축 4·8·9). ★★**[정정 · 게이트② 반려] 그 0 은 «9행 표» 안에서만 참이다** — 타이틀이 «없는» 3커밋까지 세면 ★**후보 1건이 남는다**: `1f0e52e` 의 `String.<init>([B)/([C)` null NPE 가 **핀에도 `hardening.rs` 에도 없다**(핀 `string.rs` 의 두 생성자가 null 검사 없이 `jvm.array_length` 즉시 호출 · `harden()` arm 4종에 `java/lang/String` 없음 · `origin/main` 가드 0건). ★그리고 wie 자신이 **한 줄도 다르지 않은 모양**의 `ByteArrayInputStream::<init>([B)` 를 이미 «위험»으로 보고 가드한다 ⇒ 「String 만 안전하다」고 볼 근거가 없다. 정본 **§10-6-b**. ★가드 구현은 이 회차 몫이 아니다.
-- **★⑶ 술어와 그 한계**: 한글 술어 → `wie-ktf-hardening` 12중 **9** · `main` 75중 **61**(★**[정정] 초판의 「10 · 69」는 재현되지 않는다** — `LC_ALL=C` 로 친 `[가-힣]` 이 UTF-8 을 바이트 클래스로 접어 «한글이 아닌 CJK»까지 물었다. 대조군: `printf '漢字' | LC_ALL=C grep -c` → 1(거짓) ↔ UTF-8 로케일 → 0. ★고치니 논지가 **세진다** — 그 9건은 표의 9건과 **같은 집합**이라 그 브랜치에서 한글은 «완전 판별자»이고 과수집은 `main` 에서만 난다) · 정밀(`Trace-specified|Surfaced by|seen flaky on|method-not-found`) → **8커밋**. ★★**그 술어가 한 건을 놓친다** — `9be0ea3`(박정석_영웅탄생)은 그 문구 없이 괄호 안에 타이틀만 있다 ⇒ 최종 9건은 **사람이 12커밋을 통독**해서 나왔다. **문구 술어를 전수로 믿지 마라.**
-- **★⑷ 범위(수)**: 브랜치 2 · 태그 0 · 커밋 1,103 · 고유 87(`wie-ktf-hardening` 12 + `main` 75) · PR 30(전건 MERGED) · 이슈 **저장소가 비활성화**. ★`main` 의 75커밋에는 관측 **0건**(전부 이 estate 의 `rustjava-*` 레인 작업) ⇒ ★**「버린 fork」는 저장소가 아니라 «`wie-ktf-hardening` 브랜치»다.**
-- **사용자 영향**: 없음(문서 1개). 대신 코퍼스 없이도 「그때 무엇이 어느 게임에서 막혔나」가 **재현 불가능한 자료**로 저장소 안에 남았다.
-- **★남는 구멍**: ★**「9건이 전부다」가 아니라 「«남아 있는» 것이 9건이다»** — `git log --all` 은 삭제된 브랜치·force-push 로 사라진 커밋을 못 잡는다. 그리고 「핀에 있다」는 «API 가 있다»이지 «그 타이틀이 지금 뜬다»가 아니다(코퍼스 축은 여전히 측정 불가).
-## [2026-09-05] 기계화한다 — 단 «임계 판정»이 아니라 «재측정 약속»을 (wie-coverage-remeasure-mechanize-decision)
-- **무엇을**: 신규 `scripts/check-worklog-coverage.mjs`(측정의 **유일한 정본**) · 신규 기록 `docs/worklog-coverage-remeasures.json` · `engine-contract.yml` 상시 스텝 1개(+`fetch-depth: 0`) · `AGENTS.md` 의 셸 3줄을 **스크립트 호출 1줄로 교체**. ★제품 코드 0줄 · 임계·주기 값 무접촉 · 커버리지 기각 결정 무접촉.
-- **왜**: 운영자 채택 제안 `2026-09-04-worklog-mandate-reopen-threshold#p0` — 「약속은 남겼는데 **그 약속을 지킬 기계가 없다**」.
-- **★★⑴ 결정문**: 「**재측정 «약속»은 기계가 강제한다. 커버리지 «비율»은 강제하지 않는다.** 임계 미달은 red 가 아니라 «기록해야 할 사건»이고, 그 기록이 없으면 그때 red 가 난다.」
-- **★⑵ 근거는 «오탐 성질이 정반대»라는 것이다(수)**: ⒜비율은 위험한 적이 **없었다**(규약 이후 **13/13**, 창 10/10 — 70% 근처 0회) ⇒ red 로 걸어 지금 얻는 것이 0 ⒝반대로 비율은 **정당하게** 미달한다 — 후속 없는 회차는 워크로그를 빚지지 않는데도 미달로 계수되고, upstream 동기 머지는 **1회차·워크로그 0** 으로 착지한다(`AGENTS.md` 실측: 플래그 없이는 한 번에 **3.4%** · 플래그를 붙여도 3연속이면 **70%** 선) ⇒ ★비율 red 는 **지킨 회차를 문다** ⒞반면 「기한이 지났다」는 판단이 아니라 **사실**이라 오탐이 **0** ⒟재측정 실행 이력은 **1/1** 인데 ★그 1회를 부른 것은 «일정»이 아니라 «채택된 제안»이다(=이 티켓) ⇒ **일정이 작동한 증거는 아직 0건** ⒠비용: 스크립트 1·기록 1·CI 스텝 1·`fetch-depth: 0`(2,997커밋·26MB ⇒ 무시).
-- **★⑶ 지금 한 번 쟀다**: 창 `ec1b7027..8e9185de` · **10/10 = 100%** · 규약 이후 착지 회차 **13** ⇒ 규칙이 정한 **첫 기한이 실제로 찼고 그 자리에서 돌았다**(전건 `docs/worklog` 접촉 · ★NO 0건).
-- **★⑷ 임계 미달 시 무엇이 일어나는가**: 기한 초과 → **red**(붙여 넣을 한 줄을 함께 찍는다) · 기록이 임계 미만인데 `reopened` 없음 → **red**(「다시 열었다」를 기록해야 통과) · 비율 자체 → ★**red 아님**. 개악 4칸 실행: OVERDUE rc=1 · BELOW-UNANSWERED rc=1 · `reopened:true` 추가 시 **rc=0**(해소 경로 실재) · 얕은 클론 rc=1 **fail-closed** · 무개악 rc=0.
-- **사용자 영향**: 없음(문서·CI 축). 대신 「10회차마다 다시 잰다」는 약속이 **사람의 기억에서 기계로** 옮겨졌다.
-- **★남는 구멍**: 비율이 40% 로 떨어져도 **기록만 하면** CI 는 통과한다 — 그것이 **고른 값**이다(비율 red 는 기각된 회차 의무를 다른 이름으로 되살린다). 그리고 upstream 을 실제로 병합하면 `fetch-depth: 0` 비용을 다시 재야 한다.
-## [2026-09-05] KTF·LGT 키 «도달»을 둘 다 단언했다 — 픽셀이 아니라 게스트 stdout 으로, 그리고 픽스처 «레시피»를 처음 남겼다 (wie-ktf-lgt-drawing-fixtures-for-key-reach-assertions)
-- **무엇을**: 신규 `scripts/make-wipi-keydraw-fixture.sh`(게스트 소스 포함) · 신규 픽스처 `test_data/keydraw_{ktf,lgt}.zip` · 신규 시험 `wie_{ktf,lgt}/tests/test_key_reach.rs`. ★**제품 코드 0줄** · 기존 J2ME Scenario D·기존 픽스처 3종 **무접촉**.
-- **왜**: 운영자 채택 제안 `2026-09-04-featurephone-keypress-reaches-guest#p0`. J2ME 는 Scenario D 가 키 도달을 단언하는데 **KTF·LGT 는 전혀 덮이지 않았다**.
-- **★⑴ 근인은 픽스처가 아니라 «레시피 부재»였다**: `helloworld_{ktf,lgt}.zip` 을 열어 보니 ARM 게스트 바이너리(`client.bin12`·`binary.mod`)이고 문자열에 `wipi/src/ktf/start.rs`·`rustc …nightly` 가 박혀 있다 ⇒ `dlunch/wipi` 에서 빌드된 것이다. ★그쪽엔 `build_examples.sh`·`wipi-archiver`·`examples/src/{input,paint}.rs` 가 **이미 있었고**, 막고 있던 것은 «그 사실이 wie 어디에도 없었던 것»이다. ⇒ 핀된 rev 로 클론·주입·빌드·아카이브하는 스크립트를 세웠다.
-- **★★⑵ 도달의 증거로 «게스트 stdout» 을 골랐다 — 캔버스 픽셀이 아니다**: ⒜Rust 시험의 `TestScreen` 은 **프레임버퍼를 보관하지 않아** 픽셀을 읽을 수 없고 ⒝stdout 은 «몇 픽셀»이 아니라 ★**정확한 정수**(`key:53`)를 단언하게 하며 ⒞헤드리스라 `cargo test --all` 로 **3 OS 전부** 돈다(Scenario D 는 브라우저에서만 돈다). ★J2ME 축과의 차이: 그쪽은 프레임 누적 때문에 **오름차순 제약**이 붙는데, 이 픽스처는 매 프레임 배경을 지우고 다시 그려 **순서 제약이 없다**.
-- **★⑶ 이 시험들이 «앞선 정적 핀»을 행동으로 관통한다**: `Event::Keydown` 을 소비하는 곳은 저장소 전체에 **하나**뿐이고(`wie_midp/…/event_queue.rs`) KTF·LGT 게스트도 `net/wie/CardCanvas` 아래에서 돈다 ⇒ 경로가 §4b(`from_key_code`) → §4c(`from_midp_raw`) → `Card.keyNotify` → 게스트다. ★**정적 핀이 «값이 맞다»를, 이 시험이 «그 값이 닿는다»를 잠근다.**
-- **★★⑷ 개악 3칸 — 전부 제품 실물**: 값 오배선(§4c NUM5→NUM8) → 둘 다 red 이고 문면이 `guest stdout was "key:56"` ⇒ **무엇이 잘못 왔는지까지** 말한다 · 전달 절단(`CardCanvas::key_pressed`) → 둘 다 red `""` ⇒ 두 실패 모드가 구별된다 · ★**LGT 전용 절단**(`CletWrapperCard::key_notify`) → **LGT red · KTF green** ⇒ 두 시험이 **독립**이다. 무개악 둘 다 ok.
-- **★⑸ 재현성**: 스크립트를 **실제로 돌려** 재생성하고 그 산출물로 시험을 다시 통과시켰다. md5 는 달라진다(빌드가 경로를 박는다) ⇒ 「zip 을 diff 하지 말고 시험을 다시 돌려라」를 주석에 적었다.
-- **사용자 영향**: 구형 KTF·LGT 게임에서 «키가 게스트에 닿지 않는» 회귀가 착지 전에 잡힌다 — 지금까지 그 경로엔 어떤 도달 단언도 없었다. 엔진 동작·배포 산출물 변경 0.
-- **★남는 구멍**: ⒜`wie_validate` 를 `--inject` **없이** 새 픽스처에 돌리면 `FAIL: only blank/uniform frames` 인데 **그게 설계다**(키 전엔 검은 화면) ⇒ DoD 의 3픽스처 루프에 넣지 마라 ⒝대표 키는 `NUM5` 한 종(방향키는 WIPI 공간에서 음수라 막대 폭이 못 된다) ⒞브라우저 축은 아직 J2ME 만 — 픽스처가 이미 그리므로 **픽스처 작업 없이** 얹을 수 있다(제안).
-
-## [2026-09-04] 게임 액션 표 둘을 잠갔다 — 공통 5행은 «한 곳에서» 파생, 갈리는 두 자리는 «의도»로 못박음 (wie-key-contract-pin-game-action-tables)
-- **무엇을**: 계약에 `gameActions`(공통 5 · **단일 출처**) + `gameActionTables`(플랫폼별 `extra`·`fallback`) 신설 · `scripts/check-engine-contract.mjs` **§4d**(약 35줄)가 두 표를 그 값에 대조. ★**제품 코드 0줄 · 픽스처 0.**
-- **왜**: 운영자 채택 제안 `2026-09-04-ktf-third-key-table-pin#p1`. 게스트가 「방금 받은 키가 어느 방향인가」를 되묻는 통로 둘(`Canvas::getGameAction` · WIPI `Display::getGameAction`)이 **전달 경로 밖**이라 §4·§4b·§4c 가 보지 않았고 **핀이 0**이었다 — 틀리면 «위를 눌렀는데 아래로 간다».
-- **★⑴ 두 표의 «차이» 판정을 먼저 했다**: 공통 5행(UP·DOWN·LEFT·RIGHT·FIRE) **값 전건 동일**(1·6·2·5·8 = MIDP Canvas 사양) ⇒ ★**한 곳에서 파생**시켰다. 갈리는 자리는 **정확히 둘** — ⑴WIPI 에만 `CLEAR→99` ⑵미매칭 반환 `0`(MIDP 사양) ↔ `key`(KTF 관례). ★**둘 다 의도이지 결함이 아니다**(어느 쪽도 상대에 맞추면 그 플랫폼이 깨진다) ⇒ 통일하지 않고 **«갈린다»는 사실을 계약에 적었다** — 이 차이가 문서화된 적이 없어 다음 사람이 «버그»로 볼 위험이 실재했다.
-- **★★⑵ 개악 5칸 — 전부 제품 실물**: MIDP `UP => 6` → `miswired … pins 1` · WIPI `LEFT => 5` → `… pins 2`(★**둘이 각각 하나씩만** 울었다) · ★«통일»처럼 보이는 개악(WIPI `_ => key` → `_ => 0`) → `fallback drift … see gameActionTablesNote before "fixing" this` · 계약에 없는 행 추가 → `contract pins no action for it` · 무개악 **101 pass / 0 violation**.
-- **★★⑶ 개악이 «fail-open 구멍»을 하나 잡아냈다**: 위치자 개명 개악이 **처음엔 통과**했다 — `indexOf("async fn get_game_action")` 가 **접두 일치**라 `..._renamed` 도 매치했다. 이름 끝을 **괄호로 고정**(형제 §4b·§4c 관용구와 같게)해 재시험하니 **95 pass / 1 violation**(`refusing to fail-open`). ★**개악 칸을 실제로 돌리지 않았으면 그 구멍은 남았다.**
-- **사용자 영향**: 방향 대응이 어긋나 «조작이 반대로 도는» 오작동이 두 플랫폼 모두에서 착지 전에 잡힌다. 엔진 동작·배포 산출물 변경 0.
-- **★남는 구멍**: WIPI `CLEAR => 99` 의 «99» 근거는 코드 안에 없다(사양 미확인) — 계약은 «지금 값»을 핀할 뿐이라 조용한 표류는 막지만 그 값이 옳은지는 **미측정**이다. ★그리고 형제 PR #75 와 **같은 두 파일**을 만져 나중에 착지하는 쪽에서 충돌 해소가 필요할 수 있다.
-## [2026-09-04] «통화»·«종료» 두 키를 세 표 전부에서 잠갔다 — 「소비자와 함께 롤아웃」은 필요 없었다 (wie-key-contract-pin-call-and-hangup)
-- **무엇을**: `docs/contracts/featurephone-engine-contract.json` — `keyVocabulary` +2(`CALL`·`HANGUP`) · `keyMidpCodes` +2(10 · -1) · `keyWipiCodes` +2(-10 · -11) + `keyVocabularyNote` 신설. ★**검사기 0줄 · 제품 코드 0줄.**
-- **왜**: 운영자 채택 제안 `2026-09-04-ktf-third-key-table-pin#p0`. 화면의 «통화»·«종료» 버튼은 **지금도 눌리는데** 그 둘만 세 표 어디에서도 안 잠겨 있었다.
-- **★⑴ 제안이 스스로 붙인 선행 조건 2개를 «실측으로» 해소했다**: ⒜「§4b 접촉이므로 형제 회차 판단이 선행」 → §4b(`6b4bf150`)·§4c(`b02467fc`) **둘 다 `origin/main` 조상** · 열린 PR **0건** · 잔여 티켓 **0건** ⇒ 닫혀 있다(그리고 실제로 §4b 코드는 **한 줄도 안 만졌다** — 계약 데이터만 늘었다). ⒝★**「어휘 변경은 소비자 계약이라 otterpebble 과 같은 롤아웃」은 «과했다»** — 실측: otterpebble 이 이 계약 파일을 참조하는 곳 **0건**이고 수신 워크플로는 아티팩트 **sha256 검증 + 핀 범프**만 한다. ⇒ **교차 저장소 롤아웃 불요**(그 문장은 직전 회차가 근거 없이 적은 것이고 이번에 상류를 재서 지웠다).
-- **★⑵ 「검사기 로직 변경 0」을 주장하지 않고 «확인»했다**: 세 블록의 루프 머리가 각각 `contract.keyVocabulary` · `Object.entries(contract.keyMidpCodes)` · `Object.entries(contract.keyWipiCodes)` 를 순회하고, 블록마다 «어휘 커버리지» 역검사가 붙어 있다 ⇒ 계약 데이터만 늘리면 검사가 자동으로 는다. 실측 **88 → 94 pass**(+6 = 2키 × 3표), 검사기 diff **0**.
-- **★★⑶ 개악 3건 — «표마다 하나씩» 제품 실물에 심었다**: §4 `"CALL" => KeyCode::HANGUP` → `key mapping miswired` · §4b `KeyCode::CALL => Self::HANGUP` → `as -1 … contract pins 10` · §4c `MIDPKeyCode::CALL => Self::HANGUP` → `as -11 … contract pins -10`. ★**셋이 각각 하나씩만 울었다** — 한 표만 red 였다면 나머지 둘은 안 잠긴 것이다. 무개악 **94 pass / 0 violation**.
-- **★⑷ 왕복이 자동으로 넓어졌다**: Scenario A 가 어휘를 순회하므로 스윕이 **20 → 22 codes**(29/29 유지) ⇒ 두 키가 `key_down`/`key_up` 을 실제로 통과하는 것도 브라우저에서 보인다.
-- **사용자 영향**: 화면의 «통화»·«종료» 버튼이 «다른 키로 나가는» 오작동이 착지 전에 잡힌다. 엔진 동작·배포 산출물 변경 0.
-- **★남는 구멍**: `VOLUME_UP`·`VOLUME_DOWN` 2행은 **일부러** 열어 뒀다 — 셸이 보내지 않아 «도달 불가»이고, 넣으면 계약이 쓰이지 않는 표면을 약속하게 된다(세 표 24행 중 **22행** 잠김). 게임 액션 표 2종은 별 티켓 몫이다.
-
-## [2026-09-04] KTF 의 «셋째 키 표»를 핀했다 — 그리고 그 표는 «20행»이 아니라 «24행»이었다 (wie-ktf-third-key-table-pin-wipi-from-midp-raw)
-- **무엇을**: `docs/contracts/featurephone-engine-contract.json` 에 `keyWipiCodes`(어휘 20종 → KTF 게스트가 받는 정수) 신설 · `scripts/check-engine-contract.mjs` **§4c** 신설(그 표를 `wie_wipi_java` 원본과 «값»으로 대조 · fail-closed). ★**Rust 0줄** · 픽스처 0 · 새 하네스 0.
-- **왜**: 운영자 채택 제안 `2026-09-04-keypress-remaining-17-keys#p0`. KTF(WIPI) 게스트는 키 번호를 **한 번 더** 바꿔서 받는데 그 표를 확인하는 장치가 **하나도 없었다**.
-- **★⑴ 착수 재확인에서 등재값이 틀렸다**: 제안은 「20행」이었으나 실제 `from_midp_raw` 는 ★**24행**이다(초과 4 = `CALL`·`HANGUP`·`VOLUME_*`). ⇒ 핀 범위는 **어휘 20종**(§4b 와 같은 키 집합)으로 두고 4행 미핀을 한계로 적었다. ★★**[정정 · 게이트② 반려] 그 넷을 «한 덩어리»로 묶어 「계약 어휘 밖 = 셸이 보내지 않는다」로 적은 것은 «거짓»이었다** — 상류(otterpebble 셸)를 `origin/main` 에서 직접 재니 `VOLUME_*` 는 **0건**(참)이지만 ★**`CALL`·`HANGUP` 은 «오늘 보낸다»**(`apps/featurephone/app/player.tsx:784·792·827·859` 의 `<GameKey code="CALL"|"HANGUP">` → `RunningGame.press` → `emu.key_down` · `lib/engine.ts:457·466`). ⇒ ★**사용자가 «실제로 누르는» 2키가 세 표 전부에서 미핀인데 그 사실이 「범위 밖」으로 덮였다.** 어휘 확장은 §4b 접촉이라 이 회차 밖 ⇒ **제안으로 올렸다**. ★**교훈**: 「…는 …하지 않는다」를 «근거»로 쓸 때는 그 부재를 **상류 코드에서** 재라 — 초판은 측정이 아니라 추정이었다. ★「잡는 것 0」도 세는 명령으로 재확인했다 — 검사기·계약·워크플로 **0건** · `#[test]` **0건**.
-- **★⑵ 이 표는 «전달 경로 위»다**: `net.wie.CardCanvas` 는 `Canvas` 의 하위형이고 `keyPressed`/`keyReleased`/`keyRepeated` **3개를 재정의**한다 ⇒ `Canvas::handleKeyEvent` 의 `invoke_virtual` 이 그 재정의로 내려앉아 `from_midp_raw` 를 태우고 `Card.keyNotify` 로 나간다.
-- **★★⑶ 「5를 눌러 8이 입력된다」는 참이다 — 가정이 아니라 개악 출력이다**: 팔 스왑을 심으니 `"NUM5" now reaches the KTF guest as 56 (Self::NUM8), contract pins 53` 이 나왔고 ★**56 = ASCII '8'** 이다. 그 문장을 계약 주석과 §4c 에 남겼다.
-- **★⑷ 개악 5칸 전부 «제품 실물»에 심었다**(재타이핑 사본 아님): 팔 스왑 → 2 violation(양방향) · 계약 1행 변조 → 1 · 표 1행 삭제 → `None` 팔 낙하를 지목하는 drift · 위치자 개명 → ★**fail-closed**(88 → 68 pass 로 축이 통째로 사라진 것까지 보인다) · 무개악 → **88 pass / 0 violation**. 정적 검사 **68 → 88 pass**.
-- **★⑸ J2ME 결론과 충돌하지 않는다**: 직전 회차의 「닫혔다」는 **MIDP 경로 범위**였고 이 표는 그 밖이다. 그쪽 재개 조건(5파일 열거)은 **무접촉**이다.
-- **사용자 영향**: KTF 게임에서 «누른 키와 다른 키가 입력되는» 조용한 오작동이 어휘 20종 전건에 대해 착지 전에 잡힌다. 엔진 동작·배포 산출물 변경 0.
-- **★남는 구멍**: 게임 액션 표 **둘**(`Canvas::getGameAction` · WIPI `Display::getGameAction`)이 여전히 미핀 — 둘 다 경로 밖(게스트가 부른다)이지만 방향 오배선이 곧 «조작이 반대로 도는 것»이라 제안으로 올렸다. ★그리고 형제 회차(J2ME)의 REOPEN **열거가 좁았다**는 사실을 워크로그에 «기록»했다 — 그 grep 는 지금도 10 hits 로 불변인데 목록 «밖» `card_canvas.rs:78` 이 그 블록 «자신»의 판정 규칙으로는 **포함됐어야 한다**(고치는 것은 형제 축 몫 · 이 회차는 기록만).
-
-## [2026-09-04] 남은 17종의 키 사각 — 「17개의 구멍」이 아니라 「핀 없는 표 하나」였다 (wie-featurephone-keypress-remaining-17-keys-close-or-declare)
-- **무엇을**: `docs/contracts/featurephone-engine-contract.json` 에 `keyMidpCodes`(어휘 20종 → 게스트가 받는 정수) 신설 · `scripts/check-engine-contract.mjs` **§4b** 신설(그 표를 `wie_midp` 원본과 대조) · `scripts/contract-roundtrip.mjs` 의 하드코딩 제거 + Scenario D 머리 주석에 결정·재개 조건 기재. ★**제품 코드 변경 0** · 새 하네스 0 · 브라우저 검사 재설계 0.
-- **왜**: 운영자 채택 제안 `2026-09-04-featurephone-keypress-reaches-guest#p1`(「남은 17종의 사각을 «닫을지 말지» 정해 둔다」).
-- **★⑴ 결정 «전»에 사각의 모양부터 쟀고, 그것이 전제를 갈랐다**: 키 전달은 ⒜**키 무관** 부분(`handle_event` → 이벤트 큐 → `Canvas::handleKeyEvent` → `keyPressed`)과 ⒝**키별** 부분으로 나뉜다. ⒜는 ★**키로 분기하는 `match` 가 «한 군데도 없어»** 아무 키 1종이 도달하면 증명된다 ⇒ Scenario D 의 3증인으로 **이미 전건 닫혀 있었다**. ⒝는 ★**표가 «둘»**인데(`parse_key` · `MIDPKeyCode::from_key_code`) ★**소스 핀은 첫 표만 지키고 있었다.**
-- **★★⑵ 그래서 「실제로 열린 N」은 «17종의 도달»이 아니라 «둘째 표의 17행»이다**: 그 결함은 **「7을 눌렀는데 8이 입력된다」**로 나오고 ★JS 표면에서 보이지 않으며 소스 핀도 보지 않는다. ⇒ **닫았다** — Scenario D 를 20종으로 넓히는 대신(그것은 ⒜를 17번 더 증명하는 일이다) **첫 표를 지키던 그 기구를 둘째 표에 붙였다.**
-- **★⑶ 정정 1건 — 이 사각이 여기까지 온 «경로»**: `contract-roundtrip.mjs` Scenario D 머리 주석이 「나머지 어휘는 `check-engine-contract.mjs` 의 소스 핀이 본다」고 적고 있었다. ★**절반만 참이었고**, 그 문장이 둘째 표의 부재를 가렸다.
-- **★⑷ 개악 대조 2종**(원문을 고쳐 돌리고 원복): 팔 스왑(`NUM7 => KEY_NUM8`) → `✗ … reaches the guest as 56 … pins 55` · 판별식 변경(`KEY_NUM7 = 155`) → `✗ … as 155 … pins 55`. ⇒ ★**두 갈래 모두 red** — 한쪽만 보면 다른 쪽으로 샌다. 정적 검사 **48 → 68 pass** · 왕복 **29/29 유지**(오탐 0).
-- **★재개 조건 — 방아쇠는 «수»가 아니라 «목록에 없는 새 히트»다**: 전달 **5파일**의 `match` 를 세는 술어를 돌려 **오늘의 10건을 전건 열거**하고 각각 포함/제외 사유를 붙였다(표 3 · 경로 안·키 무관 5 · 경로 밖 1 · 독 주석 1) ⇒ ★**그 목록에 없는 히트가 생기면 재개**. ★초판의 「그 수가 2 이상이면 재개」는 ★**태어난 날 이미 10이라 거짓**이었고(게이트② 반려), 「표이지 경로가 아니다」라는 **부류 면제**도 걷어내 파일·줄·이름으로 **지목**했다. ★「사이」도 판정 가능하게 못박았다 — «게스트가 호출을 시작하지 않고 `key_down` 에서 도달되는가»이고, 그 정의를 적용하니 ★**빠뜨린 경로 파일 2개**(`display.rs`·`displayable.rs` · 둘 다 `match` 0건)가 드러나 술어의 파일 목록이 3 → **5**가 됐다.
-- **사용자 영향**: 키가 «다른 키로» 입력되는 조용한 오작동이 어휘 20종 전건에 대해 착지 전에 잡힌다. 엔진 동작·배포 산출물 변경 0.
-- **★남는 구멍**: KTF/WIPI 경로의 **셋째 표** `WIPIKeyCode::from_midp_raw` 는 20행 전건 미핀이다 — 이 티켓의 Non-goal(KTF 경로)이라 손대지 않고 **제안으로 올렸다**(XS · 픽스처 불요).
-
-## [2026-09-04] 미이식 하드닝 2축 처분 — «둘 다 이식» · 근거는 버린 fork 의 커밋 로그에 있었다 (wie-unported-hardening-two-axes-decide-with-a-corpus-probe)
-- **무엇을**: `wie_jvm_support/src/hardening.rs`(`add()` 헬퍼 + `Timer.schedule(TimerTask,long)` + `StringBuffer.insert(int,String)` · 모듈 문서에 «남은 부분 표면 + 재개 조건») · 신규 `wie_jvm_support/tests/absent_timer_schedule.rs`·`tests/absent_string_buffer_insert.rs`(시험 각 1건 — ★시험당 파일 1개인 이유는 §10-5) · `docs/upstream-realign-verdict.md` **§10 추가** · `STATE.md`·`REPORT.md`·워크로그. ★**핀 무접촉**(`Cargo.toml`·`Cargo.lock` 변경 0) · 이식한 3축 무접촉.
-- **왜**: 운영자 채택 제안 `2026-09-04-upstream-realign-p1-pin-plus33#p0`(「2축을 «닫을지 말지» 결정하라」) + 총괄 결정(「둘을 한 덩어리로 보지 않고 한 번의 값싼 측정으로 가른다」).
-- **★⑴ 첫 측정은 «답을 못 냈다» — 그 사실부터 적는다**: 저장소가 가진 게스트 아카이브 전수를 `.class` **상수풀 파싱**으로 훑었다(문자열 grep 아님 · 실행 0 · 표본 **226개**). `Timer.schedule(TT,J)` **0건** · `StringBuffer.insert(I,String)` **1건인데 그것은 `AromaWIPI` 라이브러리 «자신»의 클래스**(다른 오버로드가 위임한다) ⇒ 게스트 호출부 **0/0**. ★**그러나 `test_data` 3건은 우리가 만든 hello-world/draw 이고 `AromaWIPI` 는 게임이 아니라 플랫폼 라이브러리다** ⇒ 「게임이 부르는가」의 표본이 **사실상 0**. ★규칙 ⒝(둘 다 0 ⇒ 미이식)를 여기서 적용했다면 **측정이 아니라 «표본 부재»를 근거로 삼는 것**이었다.
-- **★★⑵ 두 번째 측정이 갈랐다 — «보호»를 세라**: ⒜플랫폼(`AromaWIPI_classes.zip`)이 게스트에게 약속하는 표면을 선언 메서드 파싱으로 셌다 — `StringBuffer.insert` **9종**(핀은 **0종**) · `Timer` 는 `schedule` **4종 + `cancel`**(핀은 **2종**). ⒝★★**그리고 «누가 실제로 불렀는지»가 버린 fork 의 커밋 메시지에 남아 있었다**: `3cb4d7d` 「Trace-specified as method-not-found on **소울카드마스터2**」 · `9cfc346` 「… on **미니고치**」. ⇒ ★**코퍼스가 있던 시절의 관측이고 여기서 어떤 프로브를 돌려도 대체하지 못한다** ⇒ 규칙 ⒜(호출이 있으면 이식)가 **둘 다**에 걸린다.
-- **★⑶ 이것이 §9-2 의 판단을 정정한다**: P1 회차는 두 축을 「실패 등급이 낮다」로 미뤘고 검수는 「게스트가 부르는지는 코퍼스가 없어 못 쟀다」로 남겼는데, ★**그 증거는 우리 의존성 이력 안에 «이미» 있었다. 아무도 거기를 보지 않았다** — §8-4⑸ 프로브가 「식별자를 센다」였던 것과 **같은 형태의 실수**다.
-- **★⑷ 이식 형태**: `Timer.schedule(TT,J)` 는 핀의 `(TT,J,J)` 에 **period 0** 으로 위임한다(`TimerThread` 는 `period > 0` 일 때만 반복한다) — ★대체 수단이 없다(아무 period 나 주면 1회성이 영원히 반복된다). `StringBuffer.insert` 는 fork 구현을 **그대로 이식**(null String → 문자 네 개 `"null"` · 범위 밖 offset → `IndexOutOfBoundsException`). ★**둘 다 «감싸기»가 아니라 «추가»**이고, `add()` 는 핀이 나중에 같은 메서드를 가지면 **덮지 않고 `tracing::error!` 로 신고**한다.
-- **★⑸ 잠금**: 시험 2건 **전부 게임 파일 0** · ★**Timer 는 시계를 기다리지 않는다**(`TimerThread` 가 읽는 `period`·`nextExecutionTime` 두 필드로 단언) ⇒ 직전 회차가 「시계 의존이라 △」로 남긴 한계를 **닫았다**. ★**개악 대조**: `add()` 를 `return false` 로 무력화하면 행동 시험 **2/2 red** + 계수 시험 red.
-- **사용자 영향**: 그 두 메서드를 부르는 게임(소울카드마스터2·미니고치 계열)이 그 지점에서 해석 오류로 멈추지 않는다. 엔진 의존·핀·배포 산출물 무변경.
-- **★⑹ 게이트② 반려 해소(2026-09-04)** — ⒜**`coverage` red 를 «측정»으로 좁혔다**: 초판은 두 시험을 한 파일에 뒀고 `cargo tarpaulin` 이 `A segfault occurred while executing tests` 로 죽었는데 ★**로그가 «시험»이 아니라 «바이너리»를 지목**해 어느 쪽인지가 미측정이었다(로컬 재현 0 · docker 부재). ⇒ **시험당 바이너리 1개로 갈라 CI 로 재측** → 두 바이너리 **둘 다 통과**(run `33819851230` · 커버리지 31/31·29/32) ⇒ ★**어느 한 시험도 원인이 아니라 «동거»가 트리거다**. 같은 run 에서 `hardening::tests` 3건이 JVM 을 부팅하고 ok 이므로 「tarpaulin 아래 JVM 부팅 불가」 가설도 죽었다. ★시험 삭제 0 · `#[ignore]` 0 · 단언 무변경. ⒝**CI 를 게이트 목록에 박았다** — `AGENTS.md` §DoD 에 `gh pr checks` 를 네 게이트 «뒤»의 마지막 게이트로 명시했다(이 리니지가 CI-red PR 을 「완료」로 낸 것이 두 번째였다). ⒞**§9-2 를 «인라인»으로 정정** — 축 8·9 의 「미이식」 3자리에 각각 정정을 박았다(§10 의 정정문만으로는 §9-2 에 착지한 독자가 낡은 표를 읽는다).
-- **★남는 구멍**: 이 회차가 닫은 것은 ★**`insert` 9중 1 · `Timer` 5중 3**이다. 나머지는 **일부러** 두었다(이름 붙은 타이틀 없이 사양만 보고 넣으면 추측이다). ★**재개 조건을 «수»로 달았다 — 누락 오버로드를 지목한 게스트 실패 «1건» 관측**(`wie_validate` 가 디스크립터가 든 해석 오류로 보고한다). 부수 발견: ★`Timer.cancel()` 도 핀에 없다(플랫폼은 선언한다) — 범위 밖이라 손대지 않았고 같은 재개 조건이 적용된다.
-
-## [2026-09-04] P1 집행 — `Jun025/RustJava` fork 이탈(핀 `dlunch/RustJava@5b84dd1`) + 하드닝 3축 wie 로 이식 (wie-upstream-realign-p1-execute-pin-plus33-and-cost-hardening-port)
-- **무엇을**: `Cargo.toml`(`[patch]` 표 **삭제** + base 5줄에 `rev` 핀 · 왜/한계 주석)·`Cargo.lock` · 호출부 **11개소 / 7파일** 수정 · **신규 `wie_jvm_support/src/hardening.rs`**(본문 103 · 시험 99) + 배선 19줄 · 정본 `docs/upstream-realign-verdict.md` **§9 추가** · `STATE.md`·`REPORT.md`·워크로그.
-- **왜**: 총괄 결정(2026-09-04)이 §8-6 권고를 **채택**했다 — 갈래 ⒝ · 핀 **`5b84dd1`(+33)**. 근거 셋: ⑴+16 이 「산다」던 16건은 이미 fork main 안에 있었다 ⑵칸 F 는 +33 과 대가가 같은데 fork 의존을 유지한다 ⑶P2 가 이 머신에서 영구 불가라 계속 미루면 무기한 대기다.
-- **★⑴ API 파열 — 예상 ≥7 ↔ 실제 «11개소 / 7파일»**: ⑴`from_classfile` 오류형 1 ⑵`Runtime::exit` 1 ⑶`attach_thread` async+`Option` 3 ⑷`ClassDefinition::{interface_names, prepare}` 2 impl ★⑸**`ClassInstance::{identity, shallow_clone}` 3 impl**(예상에 없었다) ★⑹**`ArrayClassInstance: ClassInstance` 승격** 1 impl 재구조화(예상에 없었다). ★**「≥7」이 하한 표기였던 것이 옳았다** — ⑸⑹은 `wie_jvm_support` 가 통과한 «뒤»에야 보이는 자리다(§8-7-2 가 그 성질을 미리 적었다).
-- **★⑵ `shallow_clone` 은 시그니처를 채우는 일이 아니었다**: KTF·LGT 인스턴스는 **게스트 메모리**에 산다 ⇒ Rust 구조체 복제는 같은 주소를 가리켜 «복제본에 쓰면 원본이 바뀐다». **새 게스트 객체를 할당하고 필드 블록을 복사**하도록 구현했고, LGT 는 `instantiate` 안의 동기 할당 클로저를 `alloc_guest_object` 로 빼내 두 경로가 같은 모양을 쓰게 했다. 반대로 `identity` 는 공짜였다 — 게스트 주소가 곧 정체성이다.
-- **★★⑶ 하드닝 6축: ⒤전부 사라졌다(프로브 재실행) · ⒥⒦를 재고 «3축 이식 · 2축 미이식 · 1축 불가»를 골랐다**:
-
-  | 축 | ⒥이식 비용 | ⒦코퍼스 없이 잠금 | 처분 |
-  |---|---|---|---|
-  | `ByteArrayInputStream`/`arraycopy`/`StringBuffer.append([CII)` null NPE | 원본 합 13줄 | ✔ | ★**이식** |
-  | `StringBuffer.insert` | 53줄(+시험 36) | ✔ | 미이식 |
-  | `Timer.schedule(TimerTask,long)` | 17줄(+시험 26) | △ | 미이식 |
-  | pending-thread GC 루트 | 34줄 중 **25줄이 `jvm` 크레이트 내부** | ✘ | ★**불가** |
-
-  ★**고른 기준은 줄 수가 아니라 «실패의 등급»이다**: 이식한 3축은 null 이면 ★**호스트 프로세스가 패닉**하고(개악 대조로 `jvm/src/class_instance.rs:108` `Option::unwrap()` 재현), 미이식 2축은 **메서드 부재**라 Java 레벨에서 시끄럽게 잡힌다. ★축 5 는 wie 가 닿을 이음매가 없어 **fork 없이 영구 미복구** — 이 회차가 갚지 못한 유일한 값이다.
-- **★★⑷ 이식이 «가능»했던 이유(구조적 발견)**: `JvmRuntime::find_rustjar_class`(**wie 쪽 코드**)가 `java_runtime::get_runtime_class_proto` 의 프로토를 JVM 에 넘기고 `JavaClassProto` 필드는 전부 `pub` 다 ⇒ ★**wie 가 그 사이에서 메서드 본문을 감쌀 수 있다.** ⇒ ★**「하드닝을 되돌리려면 fork 가 필요하다」는 참이 아니었다** — §8-6 은 그 가능성을 재지 않았다.
-- **★⑸ 잠금**: `harden()` 은 **적용 개수를 돌려주고** 못 찾으면 `tracing::error!` 를 찍는다(★조용히 안 걸리는 것이 이 하드닝이 처음 사라진 방식이다). 시험 3종 전부 `run_jvm_test` = **게임 파일 0**. 개악(`harden` → `return 0`) 시 ⒜적용 수 `0 vs 1` red ⒝★**그 패닉이 그대로 재현**된다.
-- **★⑹ fork 의존 소멸(실측)**: `Cargo.toml` `[patch]` **0** · `Cargo.lock` 의 `Jun025` **0건** · `Cargo.lock` RustJava source 6행 전건 `dlunch/RustJava?rev=5b84dd1c…` · `cargo tree` 상 5개 크레이트 전건 동일. (`Cargo.toml` 에 남은 `Jun025` 1건은 «무엇이 왜 없어졌나»를 적은 주석이다.)
-- **사용자 영향**: 엔진 의존이 fork → upstream 핀으로 바뀌었고 upstream 33커밋을 얻었다. 게임 동작은 **미검증**(아래) — ktf·lgt helloworld 는 ok.
-- **★★[2026-09-04 정정 · 게이트② `request-changes` 승계 — 같은 PR #71]** 위 서술 중 셋이 «참이 아니었다». ⒜★**축 5 「불가·영구 미복구」는 거짓** — 새 핀이 같은 창을 **다른 설계로 이미 닫아 놓았다**(`Thread::start` 의 `GlobalRef<Thread>` + `determine_garbage` 의 `global_references` 루트 순회 + `Drop` 해제). ★**왜 틀렸나: 13행 프로브는 «`pending` 이라는 fork 의 식별자»를 세지 «보호»를 세지 않는다.** ⇒ 상실은 6축이 아니라 **5축**이고 갚지 못한 값은 **미이식 2축뿐**이다. ⒝★**「ktf·lgt 둘 다 ok — 부팅 경로를 깨뜨리지 않았다」는 «macOS 한정»**이었다 — Windows 에서 `wie_ktf::test_helloworld` 가 **호스트 패닉**했다(`java.class.path` 를 하드코딩 `:` 로 만드는데 새 핀은 `File.pathSeparator`(Windows `;`)로 쪼갠다). ⒞★★**J2ME 게스트가 «아예 못 떴다»** — `wie_validate` 로 1명령 재현되는데 이 회차가 **repo 자신의 러너를 돌리지 않았다.** ⒟`ci-presence` 를 묻지 않았고 실제로 **CI red 인 PR 을 「완료」로 냈다.** 승계 회차가 넷 다 고쳤다.
-- **★★남는 구멍 — green 을 하드닝 보존의 증거로 읽지 마라**: 4게이트 green · `cargo test --all` **133 passed**(직전 130 + 3)이지만 §8-6 이 「4게이트도 `cargo test --all` 도 green 인 채로 사라진다」고 이미 못박았다. ⇒ ★**green 은 «회귀 없음»이지 «하드닝 보존»이 아니다.** 보존의 증거는 프로브와 개악 대조뿐이고 ★**축 5·8·9 에는 그 증거가 없다.** 그리고 ★**코퍼스 축(P2)은 여전히 이 머신에서 불가**다 — 이 회차가 바꾸지 않았다.
-
-## [2026-09-04] 커버리지 기각에 «되돌릴 조건»을 박았다 — 주기·임계·방법 3값 (wie-worklog-mandate-rejection-needs-a-reopen-threshold)
-- **무엇을**: `AGENTS.md` §Landing paperwork 에 재검토 조건 블록 1개(주기·임계·측정 명령) · `STATE.md` 의 2026-09-01 항목에 **포인터 1문장**(수는 옮기지 않았다) · `REPORT.md` · `docs/worklog/2026-09-04-worklog-mandate-reopen-threshold.json`. ★**코드·검사기·CI 무접촉 · 과거 회차 backfill 0 · 새 도구 0.**
-- **왜**: 운영자 채택 제안 `2026-09-01-worklog-mandate-decision-and-backfill#p0` — 「기각의 근거는 '최근 3회차가 모두 썼다'는 수 하나인데, **그 수가 언제 다시 재지고 얼마나 떨어지면 결정을 뒤집는지가 없다**」. ★이 저장소가 반복해 이름 붙인 결함(「결정을 수 위에서 내려 놓고 그 수를 다시 잴 약속을 안 남긴다」)의 한 사례다.
-- **★⑴ 어디에 뒀나 = `AGENTS.md`(★`STATE.md` 아니다)**: ⒜`STATE.md` 는 스스로 「낡으면 이 레인은 굶는다」고 적은 **회전하는 상태 파일**이라 항목이 `진행중 → 완료` 로 쓸려 내려간다 — 규칙을 거기 두면 사료 더미에 묻힌다. ⒝`AGENTS.md` §Landing paperwork 에 **그 규칙이 이미 있다** ⇒ 재검토 조건을 «그 규칙 바로 옆»에 두면 한 곳에서 같이 읽힌다. ★**「둘 다」는 하지 않았다** — `STATE.md` 에는 **포인터 한 문장만** 넣고 수는 한 자도 옮기지 않았다.
-- **★★⑵ 세 값과 근거**(★「예시가 10/80 이었으니 10/80」이 아니다 — 값도 근거도 이 회차가 실측 위에서 골랐다):
-  - **⒜ 주기·창 = 「착지 10회차마다 · 직전 10회차」**. 원 결정의 분모는 **3** 이었고 거기서는 한 회차가 **33pp** 를 움직여 «습관»과 «우연»을 어떤 임계로도 못 가른다. 10 이면 한 회차 = 10pp 라 ★**단일 회차가 혼자서는 선을 못 넘는다.** 그리고 실측 케이던스가 **최근 30일 15회차**(0.5회/일)라 10회차 ≈ **20일** — 습관이 식은 것을 원인이 살아 있을 때 잡되 매 회차 재논의하지는 않는 간격이다. ★**누적창이 아니라 이동창**인 이유: 분모가 계속 자라면 새 결손이 희석돼 규칙이 **영영 안 울린다**.
-  - **⒝ 임계 = 70%**(직전 10회차 중 **4건 이상** 미작성이면 재검토). ⒞가 **기계적**인데 의무는 **조건부**라 ★**후속거리가 없어 정당하게 면제된 회차도 «미작성»으로 세어진다** ⇒ 90%(1건 허용)로 잡으면 **첫 면제 회차에서 오발**한다. 70% 는 3건까지 견디므로 관측된 면제율(**0/4** — 아래 ⑷)보다 훨씬 위이면서 규약 이전 체제(**0/19 = 미작성 100%**)보다는 훨씬 아래다. ★비대칭은 의도다: 오발의 대가는 헛된 결정 회차지만, 늦게 우는 대가는 cockpit 패널이 **비어 가는 것으로 이미 눈에 보인다** ⇒ 느슨한 쪽으로 기울여도 된다.
-  - **⒞ 방법 = 「분모 = 창 안 `main` squash 커밋 수 / 분자 = 그중 `docs/worklog` 를 건드린 커밋 수」**, 명령까지 못박았다(`git log --format=%h -n 10 92c25276..origin/main | tail -1` 로 창의 가장 오래된 커밋을 잡고 `git rev-list --count "$OLD^..origin/main"` ↔ `… -- docs/worklog`). ★**「착지 회차」의 정의(=`main` 의 squash 커밋 1건)와 창의 하한(`92c25276` 을 넘어가지 마라 — 그 앞 19회차는 구조적으로 0/19 라 규칙이 사료에 대고 운다)까지 적었다.** ★이것이 빠지면 다음 사람이 «다른 것»을 센다.
-- **★⑶ 원 결정의 근거는 지우지 않았다**: `STATE.md` 의 「규약 착지 후 3회차 전건이 썼다(3/3) · 직전 19회차는 0/19」 문장은 **한 자도 안 건드렸다**. 그 아래에 「그 제안이 채택돼 되돌릴 조건이 박혔다 — 정본은 `AGENTS.md` 한 곳」이라는 포인터만 붙였다. ★**결정 자체도 그대로다** — 의무화는 여전히 «하지 않는다».
-- **★⑷ 지금 한 번 쟀다(다음 재측정의 기준선)**: 창 = `92c25276` 이후 착지 전건(현재 **4회차**뿐이라 10 을 못 채운다) · 분모 **4** · 분자 **4** ⇒ ★**100%**. ★임계 **70% 대비 +30pp 위** — 재검토 사유 없음. 첫 재측정은 **10회차 도달 시**(6회차 남았다). ※사료 재확인: 규약 «직전» 19회차는 같은 명령으로 **0/19 = 0%**.
-- **★★[2026-09-04 정정 · 게이트② 반려 승계 `-fix`] 위 ⒞ 의 명령이 «자기 정의»와 어긋나 있었다 — 고쳤다.** 정의는 「착지 회차 = `main` 의 커밋 하나」인데 명령이 **first-parent 를 걷지 않아** «도달 가능한 «모든» 커밋»을 셌다. 지금 창이 선형이라 **우연히** 같았을 뿐이고, ★**이 repo 는 `contracts/upstream-sync-repos.conf` 등재라 «머지가 들어오는» repo** 다.
-  - ★**고친 갈래 = ⒜ `--first-parent`(세 명령 전부) + 정의 문구 `squash commit` → `first-parent commit`.** ⒝(「명령이 세는 것에 맞춰 정의를 다시 쓴다」)를 고르지 않은 이유: 그러면 「착지 회차」가 **브랜치 커밋과 upstream 커밋까지 포함하는 단위**가 되어 «회차»라는 말이 뜻을 잃는다. 그리고 정의의 `squash` 라는 단어 자체가 ★**이 repo 에서 틀렸다** — upstream-sync 등재라 `--squash` 를 쓰면 안 되고, 실제로 **PR #69 가 2026-09-03 에 `--merge` 로 착지**(`f4569f3f` · 부모 2개)했다. `first-parent` 는 squash·merge **둘 다에서** 참인 유일한 술어다.
-  - ★**결함은 «가정»이 아니라 이미 발생했다**(실측 2026-09-04): 그 `--merge` 착지 하나로 고침 전 명령이 **6/5 = 83.3%** 를 내놨다(참값 **5/5 = 100%**) — 한 회차에 **16.7pp** 오차. upstream 머지 1건을 모사하면 **204/7 = 3.4%** 로 ★**임계 70% 를 한 회차에 뚫는다.** 창도 함께 깨져 상위 10건 중 **7건이 upstream dependabot 커밋**이 된다.
-  - ★**고친 뒤 두 형상 재측**: ⒜지금 **5/5 = 100%**(창 상위 5건 전건이 착지 회차) ⒝upstream 머지 모사 **6/5 = 83.3%**(★upstream 머지 회차가 «1회차 = 미작성 1건»으로 흡수돼 70% 위에 남는다 — ⒝ 임계의 원래 의도 그대로). ★**⒜주기·⒝임계는 건드리지 않았다.**
-  - ★**기준선 갱신**: `4/4 = 100%` → ★**`5/5 = 100%`**(#69 착지가 5번째 회차). ★**표본 5 는 여전히 작다** — 한 회차가 20pp 를 움직이므로 이 100% 는 「습관」의 증거가 아니라 「아직 아무도 빠뜨리지 않았다」는 기술이다.
-  - ★**이 회차가 만진 것은 `AGENTS.md` 그 블록뿐**이다(+ 착지 문서). 위 산문의 ⒞ 인용은 **그 회차의 기록**이라 고치지 않았다 — 정본은 `AGENTS.md` 한 곳이고 이 정정 항목이 그 사실을 가리킨다.
-- **사용자 영향**: 없음(문서만). 엔진·웹 셸·배포·의존성·CI 무변경.
-- **★남는 구멍**: ⑴재측정은 여전히 **사람이 손으로** 돌린다(발권이 검사기 신설을 범위 밖에 뒀다) — 「10회차마다」를 아무도 세지 않으면 이 조항도 같은 병에 걸린다. ⑵⒞ 는 «워크로그 파일을 건드렸는가»만 보고 **내용의 질**(`proposals[]` 가 비었는지)은 보지 않는다 — 빈 카드를 넣어도 분자에 든다. ⑶면제율의 표본이 **0/4** 로 사실상 없다 ⇒ 70% 는 «지금 아는 것» 위의 선이고, 면제 회차가 실제로 나오기 시작하면 그 수부터 다시 봐야 한다.
-## [2026-09-04] 키 입력이 게스트에 «도달했는지»를 행동으로 단언한다 — 왕복 검사 Scenario D (wie-featurephone-keypress-reaches-guest-behavioral-axis)
-- **무엇을**: `scripts/make-draw-fixture.mjs`(픽스처가 `keyPressed()` 를 **override** 하고 받은 MIDP 코드만큼 넓은 막대를 그린다 · 정적 필드 1개 + 메서드 1개 + `paint` 분기) · `scripts/contract-roundtrip.mjs`(**Scenario D** 3체크 + `tickLoop` 의 `untilPainted` 불리언을 `until(pixels)` 술어로 일반화) · `STATE.md`·`REPORT.md`·`docs/worklog/2026-09-04-featurephone-keypress-reaches-guest.json`. ★**제품 코드 변경 0** — `wie_web/src/lib.rs` 는 개악 대조에만 쓰고 **되돌렸다**(`git diff` 0). ★CI 워크플로 변경 **0**(두 파일 다 `engine-contract.yml` 의 `paths-filter` 목록에 **이미** 있다).
-- **왜**: 운영자 채택 제안 `2026-07-22--featurephone-engine-contract-selftest#p0` — 「왕복 검사는 키를 눌러 보지만 «예외가 안 났다»만 확인하고, 그 키가 실제로 게임까지 전달됐는지는 보지 않는다」.
-- **★⑴ 종전에 무엇을 쟀나(제안의 전제 확인)**: ⒜`contract-roundtrip.mjs` Scenario A 는 `contract.keyVocabulary` 전건에 `key_down`/`key_up` 을 돌리고 **`try/catch` 로 «throw 안 함»만** 단언한다(`A: key vocabulary down/up sweep (no throw)`). ⒝「소스 핀 하나」 = `scripts/check-engine-contract.mjs` §4 — `wie_web/src/lib.rs` 의 **`fn parse_key` 본문만 잘라** 어휘마다 `"UP" => KeyCode::UP` **좌우 쌍**을 정규식으로 확인한다(좌변만 보면 `"UP" => KeyCode::DOWN` 을 통과시키므로 쌍으로 본다). ★**부정확 1건 정정**: 제안 문안의 「키 **18종**」은 실제로 **20종**이다(`featurephone-engine-contract.json` `keyVocabulary` 실측) — 결론은 안 바뀌지만 수는 고친다.
-- **★⑵ 대표 키 3종과 이유**(★어휘 전건으로 넓히지 않았다 — 제안이 「대표 키 한정」): `LEFT_SOFT_KEY`(MIDP **6** · 소프트키 · 셸의 메뉴/뒤로) · `NUM5`(**53** · 숫자 · ASCII 값대) · `UP`(**141** · 방향 · MIDP `Canvas` 명명키 141~148 대 · 셸 D-pad). ★**코드 값이 세 갈래로 갈리고 오름차순**이라 ⑴세 계급을 각각 덮고 ⑵막대가 프레임 간 합집합이어도 기대값이 **정확히** 일치한다.
-- **★⑶ 어떻게 «행동»으로 재나**: 픽스처 `DrawCanvas`(J2ME MIDlet)가 `keyPressed(int)` 를 override 해 받은 코드를 정적 필드에 넣고 `repaint()` 를 부른다. `paint` 는 기존 32×32 사각형에 더해 **폭 = 그 코드**인 8px 막대를 그린다 ⇒ 캔버스 비검정 픽셀 = `1024 + code*8`. ★**「키가 왔다」가 아니라 「게스트가 «바로 그 코드»를 봤다」를 단언한다** — 전달 경로 어디서 코드가 바뀌어도 red 다. 경로 실측: `Event::Keydown` → `net.wie.EventQueue.getNextEvent` → `Display.handleKeyEvent` → `Canvas.handleKeyEvent` → `invoke_virtual keyPressed(I)V`.
-- **★★⑷ 개악 대조 — 이 회차의 성공 판정**: `wie_web/src/lib.rs` 의 `key_down` 이 `parse_key` 는 하되 **이벤트를 버리게** 고치고 wasm 을 다시 빌드했다.
-
-  | 축 | M1(전달 경로 절단) | M2(오배선 `"UP" => KeyCode::DOWN`) |
-  |---|---|---|
-  | 소스 핀(`check-engine-contract.mjs`) | ★**48 pass / 0 위반 · rc=0 — 못 잡는다** | ✗ 1 위반 — **잡는다** |
-  | Scenario A(기존 「예외 없음」) | ★**✓ 20 codes — 못 잡는다** | (좌동 성격 — no-throw 축) |
-  | ★**Scenario D(신설)** | ★**✗ 3건 red**(전부 `1024 px, expected 1072/1448/2152`) | 잡는다(141 ≠ 146) |
-
-  ⇒ ★**제안의 전제는 «참»이었다** — 전달이 통째로 끊겨도 종전 두 축은 **둘 다 green** 이다.
-- **★⑸ 오탐 0**: 개악을 되돌리고 다시 빌드한 뒤 정적 **48 pass / 0 위반** · 왕복 **29/29**(종전 26건 전건 통과 + D 3건). `npm run audit` PASSED. 4게이트 전건 green(`cargo test --all` **130 passed / 0 failed**).
-- **사용자 영향**: 없음(검사만). 엔진·웹 셸·배포 산출물·의존성 무변경. 얻는 것은 「키가 게임에 안 닿는 회귀」가 **아티팩트 발행 전에** CI 를 red 로 만든다는 것이다.
-- **★남는 구멍(한계)**: ⑴★**대표 3종만 «도달»을 재고 나머지 17종은 여전히 «예외 없음»만 본다** — 그 17종의 유일한 탐지축은 소스 핀이고, 소스 핀은 M1 형태(전달 절단)를 **못 잡는다**. ⑵Scenario D 는 **J2ME 경로**만 지난다 — KTF·LGT 의 키 경로는 여전히 단언 밖이다(Scenario C 의 그리기 한계와 같은 형태). ⑶`key_repeat` 은 계약 `methods` 에 없어 재지 않았다. ⑷MIDP 코드 3개가 JS 쪽에 리터럴로 박힌다 — `wie_midp` 의 `MIDPKeyCode` 와 이중 기재지만, 어긋나면 **시끄럽게** 실패하므로 조용한 드리프트는 아니다.
-## [2026-09-03] P2 — ⒟ go/no-go 측정: 「이 머신에서 측정 불가」이고 사유가 둘이다 · 대신 P1 의 «비용 계단»을 쟀다 (wie-upstream-realign-p2-gate-measurement-before-p1)
-- **무엇을**: 문서 4파일(`docs/upstream-realign-verdict.md` **§8 추가** · `STATE.md` · `REPORT.md` · `docs/worklog/2026-09-03-upstream-realign-p2-gate-measurement.json` 신설). ★**제품 코드 변경 0 · `Cargo.toml`·`Cargo.lock` 무접촉 · CI 정의 무접촉 · upstream 발신 0.** API 프로브는 전부 `git worktree` 격리 체크아웃에서 돌고 제거됐다.
-- **왜**: 총괄이 「P2 는 ⒟ 전체의 go/no-go 이고 P1 에 의존하지 않는다 — 비싼 선행 뒤에 판정 측정을 세우지 마라」로 **순서를 뒤집어** 발권했다. 그리고 P1 갈래 선택(⒜ 파열 포함 `L` ↔ ⒝ `bee850f` 핀 `S`)을 P2 결과 뒤로 미뤘다.
-- **★⑴ P2 판정 = 「이 머신에서 측정 불가」 — 그리고 사유가 «둘»이다**: ⒜코퍼스 부재(구조적 · Constraint 9 · `find ~ -maxdepth 4 -name game_lab` **0건**) — 이건 알던 축이다. ⒝★**러너 부재 — 이 회차가 새로 찾았다**: `upstream/main` 에는 `wie_cli`·`wie_validate`(772줄)·`scripts/` 가 **없고**, 크레이트가 `wie_ktf` → `wie-ktf` 로 **전면 개명**됐으며, 그쪽 네이티브 바이너리는 창을 띄우는 앱이라 `--timeout` 도 JSON 판정 출력도 없다. `scripts/smoke_gate.sh` 는 `cargo build -p wie_cli --bin wie_validate` 에 하드코딩돼 있어 ★**upstream 체크아웃에서 빌드 대상이 해결되지 않는다.** ⇒ ★**「upstream 체크아웃 + 우리 게이트」라는 P2 의 처방 자체가 성립하지 않는다** — 코퍼스가 있는 머신을 구해도 러너 이식이 **선행**이고, 종전 `size: M` 은 그 몫을 세지 않았다.
-- **★⑵ 차이표는 지어내지 않았다**: 잴 수 있는 범위 = 커밋된 픽스처 2건. `RUST_MIN_STACK=4194304 cargo test --test test_helloworld` 를 양쪽에서 돌려 ours `ec1b7027` **ktf ok · lgt ok** ↔ upstream `6cafdb0e` **ktf ok · lgt ok** = **2/2 ↔ 2/2 · 신규 FAIL 0**. ★**코퍼스 292건(ktf 190·lgt 52·skt 50)에 대한 답이 아니다 — 부풀리지 마라.**
-- **★★⑶ 그 대신 P1 축에서 «측정»이 나왔다 — §6-P1 이 남긴 「미측정 1건」이 반증됐다**: 그 절은 「하드닝은 있고 API 파열은 없는 «중간 rev» 가 있으면 ⒝ 의 대가가 0 에 가까워진다」고 적고 재지 않았다. 47커밋을 rev 단위로 훑어 알려진 파열 3종의 도입 지점을 찾고(`attach_thread` **+17** · `current_class_loader` **+34** · `invoke_virtual` **+47 = 마지막 커밋**) 「+16 이 안전 천장」으로 보이길래 ★**실제로 컴파일했다** — 격리 워크트리에서 base 를 `rev = "fe5d116"` 로 핀하고 `[patch]` 를 지운 뒤 `cargo check --workspace --all-targets` → ★**rc=101, 네 번째 파열**: `ClassDefinition::{interface_names, prepare}` 미구현(`wie_ktf`·`wie_lgt` impl **2곳**). 도입 지점은 ★**`ebd9c03`(+1)·`07fc404`(+2)** ⇒ ★★**API 안전 rev 는 `bee850f` 자신뿐이고, 중간 rev 는 «존재하지 않는다».**
-- **★★⑷ 그래서 P1 은 동전던지기가 아니라 «계단»이다**: `bee850f`(+0) 0곳 → `fe5d116`(+16) ★**2곳**(upstream 16커밋 획득) → `5b84dd1`(+33) 5곳 → `95ebc5c`(+46) 11곳 → `ba5797b`(+47) ★**220곳**. ⇒ §4-B 의 **218 은 220 으로 정정**되고(여전히 하한이다), ★**209 는 «마지막 한 커밋»에 몰려 있어 앞 세 칸을 따로 착지시킬 수 있다.**
-- **★⑸ P1 권고(집행 0)**: ⒝ 를 고르되 핀을 `bee850f` 가 아니라 ★**`fe5d116`(+16)** 으로. 측정된 대가 **2 impl** 로 upstream 커밋 16건을 사고, `Jun025/RustJava` 의존은 똑같이 소멸한다. ★그중 `8ac70cb`(+5)는 `DataInputStream.readUTF()` 의 **EUC-KR panic 수정**인데 ★**우리 fork 는 그 자리가 아직 `.unwrap()` 이다** — 한국 피처폰 경로에 정확히 얹히는 회귀를 **우리가 갖고 있다.** ★**근거의 성격**: API 축 = **측정** / 코퍼스 축 = **미측정**.
-- **★★[2026-09-04 정정 · 게이트② 반려 승계 `-fix`] 위 ⑶⑷⑸ 는 «두 번째 판»으로 교체됐다 — 정본 `docs/upstream-realign-verdict.md` §8-3·§8-4⑶⑷⑸·§8-6·§8-8.** 근인: 초판이 headline 산출을 전부 `dlunch/RustJava` `bee850f`+N 위에만 세우고 ★**`Jun025/RustJava` 자신의 `origin/main` 을 한 번도 재지 않았다.** 바뀐 것 넷:
-  - ⒜★**계단에 칸이 하나 빠져 있었다** — `Jun025/RustJava` `origin/main`(`8c1238b`)은 `bee850f` 대비 **52커밋**(dlunch **+29** 흡수) 전진해 있다. 그 칸을 넣고 `cargo check` 를 돌리자 ★**`5b84dd1`(+33) 칸과 «똑같은 두 에러»에서 멈췄다** — ⒝⒞ 가 같고 다른 것은 **fork 의존 유지 여부**뿐이라 ★**+33 이 그 칸을 지배한다.** 검수자가 「가장 값싼 칸일 가능성이 높다」고 본 지적은 **옳게 제기됐고, 실측은 아니었다**.
-  - ⒝★**+33·+46·+47 의 수가 낮았다** — `822504b`(**+21** · #180)가 `java_runtime::Runtime` 에 `fn exit` 를 더하고 `ClassDefinitionImpl::from_classfile` 의 오류형을 바꿔 `wie_jvm_support` **2곳**을 더 깨뜨린다. 초판은 그 칸들을 grep 으로만 봐서 놓쳤다 ⇒ **5 → ≥7 · 11 → ≥13 · 220 → ≥222**(여전히 하한).
-  - ⒞★★**권고가 `fe5d116`(+16) → `5b84dd1`(+33) 로 바뀌었다.** 초판 권고의 값어치를 「upstream 16건을 산다」로 적었는데 ★**그 16건은 이미 fork main 안에 있었다**(`merge-base --is-ancestor fe5d116 origin/main` rc=0). 계단을 다시 재면 +16 → +33 의 추가 대가는 호출부 **약 5곳**인데 사는 것은 **하드닝 6.5/12**(상실 10.5 → ≈4) + 커밋 17건이다. ★**대가를 같은 줄에 적었다**: 상실 ≈4/12 는 «측정»이고, ★**P2 가 영구 불가라 그 상실은 «영구 미검증»으로 남는다**(초판은 이 둘을 「코퍼스 축 = 미측정」 한 줄로 접어 측정된 손실을 미측정으로 강등했다).
-  - ⒟★**위 ⑸ 의 EUC-KR 문장은 «주체»가 틀렸다** — 그 회귀를 갖고 있는 것은 ★**핀 `c66f08d`(브랜치 `wie-ktf-hardening` · 2026-07-07)**이고 ★**`Jun025/RustJava` `origin/main` 은 이미 고쳐져 있다**(`read_utf` 이 modified-UTF-8 디코더로 재작성 · `from_utf8`·`.unwrap()` **0건** · `8ac70cb` 가 조상). ⇒ ★**「멈춰 있는 fork 의존」은 «핀»에 대해 참이고 «fork»에 대해 거짓이다**(§8-8).
-- **★⑹ 부수 실측**: upstream 은 이제 RustJava 를 **crates.io**(`jvm 0.1.1`·`rustjava-runtime 0.1.1`·`jvm-class-proto`·`jvm-bytecode`·`jvm-types`)로 쓰고 `[patch]` 표가 **없다**. ⇒ ⒜ 의 목적지(`dlunch/RustJava` git HEAD)는 «upstream 이 실제로 쓰는 것»이 아니며 정합하려면 **크레이트 개명**까지 따라가야 한다 — 그 몫도 220 에 세어져 있지 않다.
-- **사용자 영향**: 없음(문서만). 에뮬레이터·웹 셸·배포 산출물·의존성·CI 정의 무변경.
-- **★남는 구멍**: ⑴코퍼스 292건은 **여전히 미측정**이고 이 머신에서는 영구히 그렇다 — 사유가 하나 늘었을 뿐이다. ⑵「2 impl」은 ★**측정된 하한**이다: `cargo check` 가 `wie_ktf`·`wie_lgt` 에서 멈춰 `wie_cli`·`wie_web` 에 **도달하지 못했다**. ⑶계단의 +3/+6 은 §4-B 의 grep 값이지 컴파일 확인이 아니고, ★**+46 프로브는 의존 해결에서 3회 다 죽었다**(`regex-syntax` → `smaf_player` → `regex-automata`) — 그 lockfile 축의 대가도 220 밖이다.
-
-## [2026-09-01] 워크로그 «회차 의무» 기각 — 커버리지가 이미 100% 다 + 2026-07-22 백필 1건 (wie-worklog-mandate-decision-and-2026-07-22-backfill)
-- **무엇을**: 문서 3파일(`docs/worklog/2026-07-22--featurephone-engine-contract-selftest.json` 에 `proposals[]` 1건 추가 · `docs/worklog/2026-09-01-worklog-mandate-decision-and-backfill.json` 신설 · `REPORT.md`·`STATE.md`). ★**`AGENTS.md` 무접촉 · `scripts/check-worklog-json.mjs` 무접촉 · `.github/workflows/**` 무접촉 · 제품 코드 변경 0.** 발권이 예고한 「`AGENTS.md` 1줄 + 검사기 축 1개」는 ⑴을 **기각했기 때문에** 쓰지 않았다.
-- **왜**: 운영자가 Tower 패널에서 채택한 제안 2건(`2026-08-26-worklog-json-proposals-convention` #p0 「회차 의무로 올릴지 결정」 · #p1 「2026-07-22 워크로그 `proposals` 손채움」)의 처분.
-- **★⑴ 결정 = 의무화하지 않는다 — 근거는 커버리지 수다**: 규약 착지(`92c25276`, 2026-08-26) **이후** 착지한 **3회차 전건**이 워크로그를 썼다(**3/3 = 100%** · `-fix` 승계까지 세는 커밋 축으로는 4/4 — #64 drawing-fixture · #65 rust-ci-beta · #66 upstream-realign 및 그 `-fix` 승계). 착지 **직전 19회차는 0/19**. ⇒ ★**커버리지를 만들고 있는 것은 이미 있는 «조건부» 문장**(`AGENTS.md` §Landing paperwork 「후속 제안은 `docs/worklog/*.json` 에 적지 않으면 존재하지 않는다」)**이고, 그 위에 무조건 의무를 얹으면 얻을 커버리지가 남아 있지 않다.** 제안 #p0 이 근거로 든 「`.json` 은 1건뿐(≈수 %)」은 **규약 착지 «전»의 수**이고, 착지 후에 이미 뒤집혔다.
-- **★대가(Contract 2) — 면제 조건은 «필요 없다»**: 면제가 필요해지는 것은 의무가 **무조건**일 때다. 지금 문장은 이미 조건부(「후속 제안을 남기거나 이전 제안을 처분하는 회차」)라 후속거리가 없는 작은 회차는 **처음부터 대상이 아니다** — 즉 면제가 이미 규칙 안에 있다. ★**의무화를 골랐다면 면제를 새로 써야 했고, 그 면제는 지금 조건부 문장과 같은 것으로 수렴한다.** 규칙을 하나 더 만들어 같은 자리로 돌아오는 형태라 기각의 논거가 하나 더 선다.
-- **★그리고 「한다」는 이 회차 범위 안에서 «집행 불가»였다**: 무조건 의무의 유일한 집행 수단은 「워크로그 미작성 회차를 탐지」인데 발권 Contract 4 가 그 설계를 **명시적으로 범위 밖**에 뒀다. ⇒ 「한다」를 골랐다면 `AGENTS.md` 1줄만 남고 **검사기 축은 못 넣는 상태**가 됐을 것이고, 그것은 발권 스스로가 「둘 다 없으면 규약은 또 안 지켜진다」고 적은 실패형이다.
-- **★⑵ 백필 — `limits` 3줄 중 승격한 것은 «1줄»이다(창작 0)**: ⒜「렌더 blit 회귀 검사 불가 — 픽셀 수 info 만」은 **이미 닫혔다**(2026-08-27 `1853d49e` · `scripts/contract-roundtrip.mjs:202` 의 `C: canvas blit ASSERTED` 실단언). 올리면 **닫힌 항목을 되살리는 것**이라 올리지 않았다. ⒝「상용 게임 런타임 회귀는 ROM ZERO 로 CI 커버 밖」은 **Constraint 9 가 만드는 영구 경계**이지 후속거리가 아니고, 코퍼스 축은 이미 `2026-08-27-upstream-realign-verdict.json` 의 P2 가 지고 있어 중복이다. ⒞「행동 검사는 1회 왕복 증거 · 키 어휘 미매핑은 소스 핀으로만 검출」은 **지금도 참**이라 이것만 승격했다 — Scenario A(`contract-roundtrip.mjs:158-168`)는 어휘 전건에 `key_down`/`key_up` 을 돌리고 `no throw` 만 단언하는데 미매핑 코드는 `parse_key → None` 인 **조용한 no-op** 이라 통과하고, 유일한 탐지축은 `check-engine-contract.mjs:77-97` 의 소스 핀 1개다.
-- **사용자 영향**: 없음(문서만). 에뮬레이터·웹 셸·배포 산출물·의존성·CI 정의 무변경. 화면 쪽 영향은 cockpit 「후속 작업 추천」에 wie 카드가 **+2**(2026-07-22 백필 1 + 이번 회차 1) 늘고, 처분된 #p0·#p1 **2건이 열린 목록에서 빠지는** 것뿐이다.
-- **★남는 구멍**: ⑴커버리지 100% 의 **분모가 3회차**이고 규약 착지 6일차 표본이다 — 기각은 「지금 수」에 근거하며 영구 판정이 아니다. ⑵**언제 다시 재는지·얼마면 뒤집는지가 없다**(그래서 그것을 이번 회차의 유일한 후속 제안으로 남겼다 — `docs/worklog/2026-09-01-worklog-mandate-decision-and-backfill.json#p0`). ⑶커버리지는 사람이 `git log` 로 센 값이다 — 기계가 세지 않는다(발권이 그 설계를 범위 밖에 뒀다).
-
-## [2026-08-27] 반려 승계 — P1 견적을 «API 호환»의 자로 다시 쟀다 (wie-upstream-realign-verdict-fix)
-- **무엇을**: 문서 4파일(`docs/upstream-realign-verdict.md`·`STATE.md`·`REPORT.md`·`docs/worklog/…json`). ★**제품 코드 변경 0** · ★**`Cargo.toml`·`Cargo.lock`·`AGENTS.md` 무접촉** · P1 **미집행** · `[patch]` **미삭제** · 의존 재해결 **미시도**. PR **#66** 위에서 이어 갔다(새 PR 0 · 머지 0 · force-push 0).
-- **왜**: 게이트② `request-changes`(`reports/wie-upstream-realign-verdict.review.md` §5). ★**판정(⒟ 채택)과 Constraint 8 반증은 검수자가 전 축 재현했고 반려 사유가 아니다** — 반려는 **P1 초안의 견적**에 대한 것이다.
-- **★근인 — 자를 잘못 골랐다**: 초판은 P1 의 위험면을 `wie_ktf` **diff 크기**(5파일 +30/−13)와 **크레이트 LOC**(4,484↔4,934)로 쟀다. ★**그것은 «KTF 동작 회귀»의 자이고 «API 호환»의 자가 아니다** — 그 자로는 `jvm` 크레이트 공개 API 형태 변화가 **구조적으로 보이지 않는데**, 「작다」로 단정하고 `size: S`·`risk: low`·「13줄 삭제」·「이것만으로 충족된다 · 먼저 간다」로 headline 했다.
-- **★기전(초판이 놓친 것)**: `Cargo.toml:49-53` 의 base 의존에 ★**`rev` 가 없다**. ⇒ `[patch]`(`:76-81`)를 지우면 `Cargo.lock` 의 `Jun025` source 가 무효가 되어 `dlunch/RustJava` **main HEAD(`ba5797b`)로 재해결**된다 — ★**«원위치»가 아니라 «47커밋 전진»이다.**
-- **★재측정(전부 이 회차가 직접 쟀다 — 옮겨 적지 않았다)**: ⑴`Jvm::invoke_virtual` 에 `class_name: &str` 인자 추가(ours `jvm.rs:282` 4인자 ↔ upstream `jvm.rs:345` 5인자) → 호출부 ★**209곳 / 37파일**(`wie_wipi_java` 124 · `wie_midp` 43 · `wie_skvm` 24 · `wie_ktf` 10 · `wie_lgt` 5 · `wie_jvm_support` 2 · `wie_j2me` 1). ⑵`current_class_loader` 가 `pub async fn`(`:718`) → ★**비공개 `async fn`**(`:1147`) → **6곳**, ★**공개 대체 API 없음**(upstream `pub fn` 전수 확인 — 공개면의 유일한 class-loader 언급은 `Jvm::new` 의 `bootstrap_class_loader` 인자뿐이고 그것은 «부트스트랩»이지 «현재»가 아니다) ⇒ **설계 필요**. ⑶`attach_thread` 가 `pub fn (&self)`(`:665`) → ★**`pub async fn (&self, Option<Box<dyn ClassInstance>>)`**(`:1087`) → **3곳**(arity+async 둘 다).
-- **★검수자 수와의 1건 차이를 «해부»했다**: 맨 `grep -c 'invoke_virtual'` 은 **210** 을 준다. 그 1건은 `wie_lgt/src/runtime/java/native_jvm.rs:926` 의 ★**doc 주석**이고 호출부가 아니다. `\.invoke_virtual` 로 좁히면 **209/37파일** — ★**검수자 수가 맞다.** 옮겨 적지 않고 재확인해서 일치를 확인했다.
-- **★정정 결과**: `size` **S → ⒜`L` / ⒝`S`** · `risk` **low → med** · 범위 **「13줄 삭제+재해결」 → 218곳(209+6+3)의 처분이 본체**. ★**갈래 ⒜⒝를 나란히 적고 «고르지 않았다»**(선택은 총괄 몫). ⒝(base 를 `bee850f` 로 `rev` 핀)는 ★**API 작업 0곳임을 실측으로 확인**했다 — `bee850f` 에서 세 파열이 **전부 부재**하고(`invoke_virtual` 4인자 `:278` · `current_class_loader` **`pub`** `:686` · `attach_thread` `pub fn (&self)` `:660`), `bee850f`↔`c66f08d` 의 `jvm` 공개 API 차이는 우리가 **추가**한 `pub fn` 4종뿐인데 ★**wie 는 그 4종을 0곳 호출한다.** ⇒ ⒝의 대가는 API 가 아니라 ★**«12커밋 하드닝 상실»이고, 그 손실이 «조용하다»** — 전부 Java 레벨이라 **4게이트가 green 인 채로** 사라지고 코퍼스(P2)에서만 드러난다. ⇒ ★**⒝ 를 고른다면 P2 를 «필수 후속»으로 묶어야 한다.**
-- **★그 밖의 정정 3건(게이트② §6)**: ⒜★**`Jun025/RustJava` 도 `isPrivate=false`**(실측) — 초판은 「private 축이 틀린 축이다」를 논지로 세워 놓고 **그 틀린 라벨을 RustJava 로 옮겨 붙였다**. 「불필요한 private 의존」 → ★**«멈춰 있는 fork 의존»**으로 고쳤다(문서 제목의 문장과 비로소 정합한다). ⒝「진부분집합」에 ★**축을 명시**했다 — «기능·파일 축»에서는 참이나 «`jvm` 공개 API 축»에서는 거짓이다(우리 fork 가 `pub fn` 4종 추가). ★**P1 비용이 튀어나온 지점이 정확히 여기다.** ⒞엔트리포인트 규약 갈림(`00000000.jar`→`application.jar`)을 «부수 발견»에서 ★**P3 작업목록의 리터럴 항목**으로 승격했다.
-- **사용자 영향**: 없음(문서만). 에뮬레이터·웹 셸·배포 산출물·의존성 무변경.
-- **★★「측정하지 못한 것」에 4항을 «추가»했다 — 그리고 계급이 다르다는 것을 적었다**: ⑴⑵⑶은 **구조적 부재**(코퍼스 부재·Constraint 9·툴체인)인데 ★**4항(API 호환)은 구조적 부재가 «아니다» — 이 머신에서, 그 회차에, `grep -c` 두 번이면 잴 수 있었다**(실제로 이번 회차가 그 두 번으로 전부 얻었다 · 네트워크 0). ⇒ 초판이 빠뜨린 것은 「못 잰 것」이 아니라 ★**「잴 생각을 못 한 것」**이다. 다음 회차를 위한 규율로 적었다: ★**「의존을 바꾼다」는 제안의 위험면은 «그 의존의 공개 API 형태»로 재라 — diff 크기·LOC·기능 커버리지는 전부 다른 축이고, 셋 다 작아도 API 는 깨진다.**
-
-## [2026-08-27] upstream 재정렬 판정 — fork 는 «private 이라서»가 아니라 «전진하지 않아서» 문제다 (wie-upstream-realign-verdict)
-- **무엇을**: `docs/upstream-realign-verdict.md` **신설** + `STATE.md` «fork 의 현재 위치» 절 신설 및 `## 다음` 최상단 재정렬 축 등재 + `REPORT.md`·`docs/worklog/2026-08-27-upstream-realign-verdict.json`. ★**제품 코드(`*.rs`·`Cargo.*`·`web/`·`functions/`·`wrangler.toml`) 변경 0 · upstream(`dlunch/wie`) 발신 0 · force-push 0 · history rewrite 0.** 이 회차는 **판정**이고 집행은 후속이다.
-- **왜**: 운영자 지시(2026-08-27) 「불필요한 private 의존을 버려 양질의 기능들과 최신화된 기능들을 사용하는 방향으로 개선하라」. ★**의구심은 정확한데 축이 하나 어긋나 있었다** — `Jun025/wie` 는 **이미 public** 이다(`isPrivate=false`). 우리를 upstream 에서 떼어놓고 있던 실제 사슬은 `Cargo.toml` 의 ★**`[patch]` = `Jun025/RustJava`** 였다.
-- **재측정(티켓 실측표 전건 재현)**: 공통조상 `fa641a8a` **2026-06-10** · behind **1,067** / ahead **192** · 문서·CI·md 제외 시 **148파일 +17,890/−127**(티켓 수치와 **정확히 일치**) · 전체 축 220파일 **+25,690/−164**. ★**upstream 1,067커밋의 67.6%(721건)가 dependabot** 이고 사람 커밋은 ~346건이다.
-- **3분류 (Rust 64파일 · 5,343줄 기준)**: ★**① 중복 3,437줄 = 64.3%**(`wie_lgt` 2,426 + `wie_web` 1,011) · **② 고유·가치 1,134줄 = 21.2%** · **③ fork 전용 도구 772줄 = 14.5%**(`wie_validate`). ★**전체 축(25,690줄)으로 보면 ①은 13.6% 로 떨어지는데 두 수를 섞어 쓰지 마라** — 전체 축이 낮은 이유는 우리가 잘해서가 아니라 **분모의 79.0%(20,291줄)가 엔진이 아닌 웹 제품·문서**이기 때문이다(웹 제품만 77파일 +12,337줄).
-- **★①의 대표사례를 «코드로» 대조했다(DoD 2)**: LGT Java 런타임 import 테이블 `0x64` 의 디스패치 arm 계수 — **ours 8 ↔ upstream 31**, upstream 에만 **23개**, ★**ours 에만 있는 것 0개**. 즉 **우리 구현은 upstream 의 진부분집합**이다. 없는 23개가 무엇인지가 요점이다: 예외 프레임 push/pop/throw(`0x1f`·`0x20`·`0x21`) · NPE/배열인덱스/산술 예외(`0x22`·`0x23`·`0x25`) · 모니터 enter/exit(`0x56`·`0x57`) · 클래스 등록·해석·초기화(`0x0b`~`0x0d`) · 배열 클래스와 1/다차원 배열(`0x0e`·`0x10`·`0x11`) — ★**JVM 의 뼈대가 통째로 없다.** 규모도 `wie_lgt` **4,091 ↔ 7,741줄**이고, upstream 은 `jvm_support/` 모듈 9개로 `wie_ktf` 와 **같은 경로**(`JvmImplementation`)로 붙는 반면 우리 것은 곁테이블 + SVC 트램폴린으로 **옆에 붙였다**(파일 머리에 스스로 «PoC» 라 적혀 있다). LGT 전용 그래픽은 upstream **1,095줄 + 단위테스트 5개**인데 우리는 **파일 자체가 없고**, 그 결과 `DrawArc`/`FillArc` 는 upstream 만 건다(우리 `grep` 0건).
-- **★같은 픽스처로 실제로 돌렸다(문면 대조 아님)**: 양쪽 다 `test_data/helloworld_lgt.zip` + `wie_lgt/tests/test_helloworld.rs` 를 갖고 있어 `RUST_MIN_STACK=4194304 cargo test -p wie_lgt --test test_helloworld` 를 우리 트리와 `upstream/main` **격리 worktree** 양쪽에서 실행했다(결과는 판정 문서 §3-5). ★**부수 발견**: upstream 판 테스트는 `00000000.jar` 를 **`application.jar` 로 개명**해 넘긴다 — **엔트리포인트 규약이 갈렸고**, 재정렬 시 **조용히 깨질** 자리다.
-- **★진짜 발견 — `[patch]` 표의 근거가 실측으로 반증됐다**: `AGENTS.md` Constraint 8 은 이 표를 「KTF panic→exception hardening — **it is not stale duplication**」이라고 정당화한다. 두 체크아웃을 직접 비교했다(ours `c66f08d` 2026-07-07 ↔ upstream `ba5797b` 2026-08-16): `.rs` 파일 **216 ↔ 439**, ★**우리에만 있는 `.rs` 파일 0개**, 그리고 fork 명목이던 **모든** 축에서 upstream 이 같거나 많다 — `String` NPE 가드 **6↔10**, `StringBuffer` **1↔7**, `ByteArrayInputStream` **1↔3**, `NumberFormatException` **6↔15**, `byte/short/long_value` **2/2/2 ↔ 6/6/8**, `readUnsignedByte` 는 upstream 이 `java/io/DataInput` 인터페이스까지 갖췄다. ⇒ ★**우리 fork 는 upstream RustJava 의 진부분집합이고 2026-07-07 에 멈춰 있다.**
-- **채택 갈래 = ⒟** (fork 를 배포·제품 오버레이로 남기고 엔진은 upstream). ⒜의 변형이되 세 축의 **위험도와 게이트가 전부 달라** 분리 처분한다: `[patch]` 제거는 **게이트 없음**(지금 검증 가능) · `wie_lgt` 교체는 **코퍼스 회귀 게이트** · 웹 제품 20,291줄은 **유지**(단 `wie_web` 은 upstream 과 이름이 충돌하므로 **개명**). ★기각 근거: **⒝ 단계 머지**는 비용이 커밋 수가 아니라 **충돌면 43파일 × 그 파일을 건드린 upstream 599커밋**으로 정해지는데, 그 43개 대부분이 「upstream 이 더 많은」 자리라 ★**버릴 것을 한 커밋씩 정성껏 보존하는 작업**이 된다(RustJava 의 33커밋/4회차 비율을 1,067에 곱해 «129회차» 라고 쓰면 **틀린다** — 721건이 dependabot 이라 `Cargo.lock` 한 번으로 접힌다). **⒞ 현상유지**는 ★**우리 쪽이 앞선 축을 하나도 찾지 못해** 성립하지 않는다(유일 예외 `wie_midp/.../font.rs` 메서드 10↔9 는 upstream 에 **보낼** 대상이지 fork 유지 근거가 아니다).
-- **사용자 영향**: 이 회차만으로는 **없다**(문서 3파일). 채택 갈래가 집행되면 LGT Java import **8→31** · LGT 전용 그래픽 **0→1,095줄** · `wie_backend/canvas.rs` **709→1,647줄**(XOR 모드·`copy_area`·round-rect·클리핑 시맨틱 수정) · `lcdui/card.rs` 메서드 **17→32** 등이 들어온다.
-- **★★남는 구멍 — 이것이 후속의 전제다(숨기지 않는다)**: ⑴**upstream base 에서 우리 회귀 기준선 292건(ktf 190·lgt 52·skt 50)이 통과하는지 측정하지 못했다.** `game_lab/` 코퍼스가 **이 머신에 없고**(실측 부재) 게임 바이트는 Constraint 9 로 repo 에 들어올 수 없어 ★**구조적으로** 여기서 못 잰다 — 후속 P2 가 진다. ⑵**AOT-Java 렌더 벽**(`docs/lgt.md` §7 · 「boots but does not render」 · 도달 타이틀 배틀몬스터 **1건**)이 upstream 에서 풀렸는지도 같은 이유로 미측정이다. upstream 은 그 축에 커밋 17건을 쌓았고 예외·모니터·배열까지 구현했지만 ★**「그래서 렌더가 되는가」는 그 타이틀로 직접 돌려야 답이 난다.** ⑶웹 계약 왕복(`contract-roundtrip.mjs`)은 브라우저 툴체인이 필요해 P3 로 넘겼다.
-- **★★계보 전진을 DoD 에 박아야 한다(동시 발권 `rustjava-upstream-sync-squash-defeats-convergence` 의 교훈)**: 우리 192커밋에 **upstream 동기화 시도 0건**이고 `merge-base` 는 **2026-06-10 이후 한 번도 움직이지 않았다**(실측). ⇒ 재정렬 PR 을 게이트③ `--squash` 로 머지하면 upstream 계보가 평평해져 `merge-base` 가 `fa641a8a` 에 **그대로 못박히고 다음 회차가 또 1,067커밋 뒤에서 시작한다.** P3 티켓 DoD 에 **리터럴로** 넣어라: 「머지 후 `git merge-base origin/main upstream/main` 이 `fa641a8a` 가 아니어야 한다. 그대로면 그 회차는 실패다 — 게이트③ `--squash` 예외를 먼저 받아라.」
-
-### 후속 추천 (집행 티켓 초안 · ★이 회차는 집행하지 않는다 · 정본 `docs/worklog/2026-08-27-upstream-realign-verdict.json`)
-- **P1 — `Jun025/RustJava` fork 이탈** (★**갈래 둘 · `risk: med`** · 선행 없음). ★★**[2026-08-27 정정 · 게이트② 반려 승계] 이 자리의 초판 문장(`size: S` · `risk: low` · 「`Cargo.toml` 13줄 삭제 + `Cargo.lock` 재해결」 · 「이것만으로 충족된다 · 먼저 간다」)은 «참이 아니었다».** `Cargo.toml:49-53` base 의존에 `rev` 가 없어 `[patch]` 를 지우면 의존이 `dlunch/RustJava` HEAD 로 **47커밋 전진**하고, 그 면에 우리 호출부 ★**218곳**을 깨뜨리는 공개 API 변경 **3종**이 실재한다 — ⑴`invoke_virtual` 인자 추가 **209곳/37파일** · ⑵`current_class_loader` **비공개화 6곳**(★공개 대체 API **없음** ⇒ 설계 필요) · ⑶`attach_thread` arity+async **3곳**. ⇒ ★**⒜ 파열 포함 = `L`** / ★**⒝ base 를 `bee850f` 로 `rev` 핀 = `S`, 단 «12커밋 하드닝 상실»이 대가이고 ★그 손실은 4게이트 green 인 채로 «조용히» 일어난다**(전부 Java 레벨이라 코퍼스에서만 드러난다). ★**선택은 총괄 몫 — 정본 `docs/upstream-realign-verdict.md` §4-B·§6-P1 에 둘을 나란히 적었고 이 회차는 고르지 않았다.**
-- **P2 — upstream base 코퍼스 회귀 측정** (`size: M` · `risk: low` · 측정 전용 · ★**선행 배치 재검토 대상**). ★**⒟ 전체의 go/no-go.** ★P1 이 ⒜(=`L`)로 확정되면 **가장 싼 판정 측정이 가장 비싼 선행 뒤에 서게 된다** — 총괄이 순서를 재검토하라. ★이 회차는 결정하지 않는다. 코퍼스가 있는 머신에서 `scripts/smoke_gate.sh` 로 292건 재측정 → 차이표 1장. 제품 코드 변경 0.
-- **P3 — 재정렬 집행** (`size: L` · `risk: med` · 선행 P2). ⑴`wie_web` → `wie_featurephone` 개명 ⑵upstream base 로 교체 후 ③ 오버레이 재적용 ⑶`compile_model.rs` 122줄 이식 ⑷② 중 upstream 에 없는 것만 재적용. ★**여러 회차로 쪼개라 — 한 PR 에 넣지 마라.** ★DoD 에 위 `merge-base` 조항 필수.
-- **P4 — ② 를 upstream PR 로** (`size: M` · `risk: low` · P3 와 병행 가능). ★**IP 방침 선 안쪽만**(#1239 2026-06-29 「공개 문서 기반으로만 구현 · 펌웨어 리버스 계획 없음」): 보낼 수 있는 것 = `wipi_java` 공개 API 스텁 **10종** + `wie_backend/canvas.rs` 의 +149줄(실측 결과 **전부 단위테스트 9개**) + `wie_midp/.../font.rs` 메서드 1건. **보내지 마라** = `docs/lgt_abi.md` 1,482줄 · `docs/lgt_native_classes.md` · `docs/reference/` 7건(리버스엔지니어링 산출물).
-- **기존 열린 제안 7건 처분**: ★**`2026-08-26-worklog-json-proposals-convention#p2` 1건만 `declined`** — 「워크로그 검사기의 집」 결정은 P3 가 CI 오버레이를 upstream 워크플로 집합 위로 다시 얹으며 **통째로 재결정**한다(취소가 아니라 **P3 로 흡수**). ★**나머지 6건은 억지로 처분하지 않았다** — 이 판정으로 무의미해지지 않기 때문이다. 단 `2026-08-27-drawing-fixture-pixel-assertion#p0` 의 **LGT 갈래**는 우리 `wie_lgt` 가 교체 대상이므로 **P2/P3 이후로 미뤄라**(KTF 갈래는 지금 유효).
-
-## [2026-08-27] 외부 apt 장애 하나가 «착지 전부»를 막던 경로 차단 + `fail-fast: false` (wie-rust-ci-beta-leg-blocks-gate-on-external-outage)
-- **무엇을**: `rust.yml` **1파일**. ①ubuntu 의 `Install required packages` 를 `sudo apt-get update || true; sudo apt-get install -y libasound2-dev` 로 — **update 는 best-effort · install 은 fatal** ②`strategy.fail-fast: false`. 제품 코드(`*.rs`·`Cargo.*`)·다른 워크플로 변경 **0**.
-- **왜 (축2 · 본체)**: 근인은 «beta 레그»가 아니라 ★**`bash -e` + 남의 저장소**다. Actions 기본 셸이 `/usr/bin/bash -e {0}`(성공 run 로그 실측)라 `sudo apt update` 가 100 으로 죽는 순간 ★**`apt install` 이 실행조차 되지 않는다.** 그 100 은 러너 이미지가 싣고 다니는 **우리가 쓰지 않는** 제3자 저장소가 낸 것이다 — `packages.microsoft.com/repos/azure-cli … 403 Forbidden` · `The repository … is no longer signed.` 같은 로그에서 `azure.archive.ubuntu.com` 은 **전건 정상 수신**이었고 정작 필요한 `libasound2-dev` 는 거기서 온다(성공 attempt: `Get:2 http://azure.archive.ubuntu.com/… libasound2-dev [115 kB]` → `Setting up libasound2-dev`). ⇒ **컴파일 이전 스텝의 외부 장애가 PR #64 의 착지를 막았고**(게이트③ 1회차 `blocked`), 그 PR 의 diff 는 `rust.yml`·`*.rs`·`Cargo.*` 를 **한 파일도** 만지지 않았다.
-- **★게이트를 무르게 하지 않았다**: `libasound2-dev` 를 **진짜로** 받거나 설치하지 못하면 `apt-get install` 이 그대로 job 을 red 로 만든다. 막지 «않게» 된 것은 오직 **「우리가 쓰지 않는 제3자 저장소의 인덱스 갱신 실패」** 하나다. `main` 은 브랜치 보호가 **없어**(`…/branches/main/protection` → **404**) GitHub 강제 required check 가 0개다 — 그래서 «red 를 통과시키는» 갈래는 애초에 후보가 아니었다.
-- **★기각한 갈래 2종**: ⒜**`continue-on-error`(beta)** — beta 회귀가 조용해진다. 이 repo 의 선례는 정반대다(`wie-rust-ci-beta-clippy-double-must-use-red` 착지 `7a49aff0` = **고쳐서** green). 이번엔 원인이 **우리 코드 밖**이라 고칠 대상이 clippy 경고가 아니라 «스텝의 실패 전파 방식»이었을 뿐, 방향(원인 제거)은 같다. ⒝**게이트에서 레그만 제외** — ★**이 repo 에서 불가능**하다: `~/orchestrator/bin/ci-presence` 를 읽어 확인했고 판정 단위가 **workflow run** 이다(`actions/runs?head_sha=…` → `(name,event)` 최신 run 의 `conclusion`). job/leg 조회 코드도 제외 인자도 **없다**.
-- **왜 (축1)**: `fail-fast` 부재가 **1건 실패를 6건으로 보이게** 한다. PR #64 실측 job conclusion = `failure` **1** + `cancelled` **5** 인데 `gh pr checks 64` 는 6레그를 전부 `fail` 로 렌더했고 그 오독이 **두 번**(총괄 1 · 회차 1) 났다. **증가분**(최근 성공 6런 레그별 중앙값): 실패 레그 제외 5레그 합 **1,051s** ↔ #64 attempt1 의 cancelled 실측 **260s** ⇒ ★**+791s = 13.2 러너-분 · 벽시계 ~66s → ~377s(+5.2분)**, ★**실패한 run 에만** 붙는다(public repo 라 분은 무료 — 비용은 벽시계·큐).
-- **★게이트 판정은 안 바뀐다**: run 의 `conclusion` 은 `fail-fast` 와 무관하게 한 잡만 실패해도 `failure` 이고 `ci-presence` 는 그 값을 본다. 바뀌는 것은 **「어디가 진짜 깨졌나」의 가독성**뿐이다.
-- **사용자 영향**: 없음. 에뮬레이터·웹 셸·배포 산출물 무변경.
-- **★남는 구멍(숨기지 않는다)**: ⑴**`fail-fast: false` 는 «green run 으로 증명되지 않는다»** — 실패가 0이면 취소가 애초에 발화하지 않아 6레그가 다 도는 것은 종전과 같다. 증거는 **커밋된 YAML 자체**이고, 실효 확인은 **다음 red 회차**에 난다. ⑵windows 의 `choco install ninja` 는 **같은 형상이 남아 있다**(그쪽은 실측 실패가 0건이라 이번 범위 밖). ⑶제3자 저장소를 **지우지는 않았다** — `|| true` 는 그 실패를 무시할 뿐이라 러너 이미지가 바뀌면 로그의 소음은 그대로다.
-
-## [2026-08-27] 화면을 «그리는» 초소형 픽스처 — `nonBlackPixels()` 를 info-only → 실단언으로 (wie-drawing-fixture-makes-pixel-count-a-real-assertion)
-- **무엇을**: ①`scripts/make-draw-fixture.mjs` 신설 — 사각형 하나를 칠하는 J2ME MIDlet 의 **class 파일 바이트를 직접 찍어** jar 로 묶는다(`DrawMIDlet` + `DrawCanvas`, class 버전 47.0) ②`scripts/contract-roundtrip.mjs` 에 **Scenario C** 추가 — 그 픽스처에 대해 `nonBlackPixels() > 0` 을 **실단언**하고, `tickLoop` 에 「첫 페인트에서 멈춤」 인자 1개 ③`.github/workflows/engine-contract.yml` 의 관련성 필터에 새 스크립트 1줄. **3파일 · 엔진(Rust) 코드 변경 0 · 의존성 0 · 기존 픽스처 변경 0.**
-- **왜**: 왕복 검사는 픽셀을 **세기만** 했다 — `test_data/helloworld_*.zip` 이 아무것도 그리지 않아 계수가 «info-only» 였고, 그 한계를 코드가 스스로 주석에 적어 두고 있었다. ⇒ 「센다」와 「판정한다」가 갈려 있어 **캔버스 blit 회귀가 CI 를 통과**할 수 있었다.
-- **★JDK 없이 어떻게 만들었나**: 이 맥에도 CI 에도 JRE/JDK 가 없다(`java -version` → «Unable to locate a Java Runtime»). 기존 픽스처 2종은 **ARM 네이티브 blob**(KTF `client.bin12` = Thumb 코드 · LGT `binary.mod` = ARM ELF)이라 「조금 고쳐 쓰기」가 불가능하다. ⇒ 상수풀·Code 속성을 직접 조립했다. 버전 47.0 을 고른 이유는 **StackMapTable 이전**이라 검증 메타데이터를 만들어 낼 필요가 없어서다.
-- **★jar 를 커밋하지 않는다**: `.gitignore` 가 `*.jar` 를 막고 `scripts/audit-no-leak.sh` 는 **tracked `*.jar` 를 실패로 판정**한다(Constraint 9). 예외를 파는 대신 **생성기를 정본**으로 두고, 왕복 검사가 `drawFixtureJar()` 를 import 해 **메모리에서 서빙**한다 — 유출 가드·gitignore **무변경**이고, 「그리는 코드」가 사람이 읽고 고칠 수 있는 자리에 남는다. 직접 실행하면 `test_data/draw_j2me.jar` 를 떨궈 `wie_validate` 로 볼 수 있다(출력 결정적).
-- **실측(양방향)**: 현 트리 **26/26 green** — Scenario C 는 `1024 non-black px after 2 frames`(32×32 = 1024, 정확히 사각형 넓이). 개악 ⒜ **제품 파일**의 `fillRect` 바이트코드 제거 → **25/26 red**(`0 non-black px after 2099 frames`). 개악 ⒝ 그 상태에서 단언 1줄까지 지우면 **25/25 green · rc=0** ⇒ ★**그 단언이 이 고장을 잡는 유일한 축이다.** 두 개악 모두 원복 후 `git status --short` 로 잔재 0 확인. 네이티브 교차 실측: `wie_validate test_data/draw_j2me.jar` → `paints:1, content:true, distinct_colors:2` 이고 **3 tick 안에** 페인트한다.
-- **사용자 영향**: 없음. 엔진·웹 셸·배포 산출물 무변경이고, 바뀐 것은 CI 가 **무엇을 증명하는가**뿐이다 — 이제 코어가 프레임을 합성하지 못하거나 `WebScreen::paint` 가 캔버스에 닿지 못하면 **아티팩트 발행 전에** red 다.
-- **★남는 구멍(숨기지 않는다)**: ⑴`helloworld_*.zip` 의 픽셀 수는 **여전히 info-only** 다 — 전역 승격은 그 픽스처들을 전부 red 로 만든다(요구대로 픽스처별 승격). ⑵새 픽스처는 **J2ME(MIDP) 경로**를 지난다 — KTF·LGT 의 그리기 경로는 아직 단언 밖이다. ⑶픽스처가 **exit 하지 않는다** — Scenario C 는 첫 페인트에서 멈추고, 「그리기 + 정상 종료」를 한 픽스처로 함께 보진 않는다.
-
-## [2026-08-26] 회차 워크로그 `.json` + `proposals` 규약 이식 — cockpit 「후속 작업 추천」이 wie 를 0건으로 읽던 구조 해소 (wie-worklog-json-proposals-convention)
-- **무엇을**: ①`AGENTS.md` §Landing paperwork 에 「후속 제안은 `docs/worklog/*.json` 에 적지 않으면 존재하지 않는다」 1줄 + `#### Worklog .json schema` 소절(소비처가 **실제로 읽는 키만**: `date` · `proposals[]` 7키 · `adoptedProposals`/`declinedProposals`) ②`scripts/check-worklog-json.mjs` 신설 — 5축 잠금(파싱 · `date`↔파일명 · `proposals[]` 7키 전수 · 처분 ref 형식 · 배열 형) ③`.github/workflows/engine-contract.yml` 의 **항상 도는** `contract` 잡에 무조건 실행 스텝 1개(+ `setup-node` 를 조건부 → 무조건) ④`docs/worklog/2026-08-26-…json` — 규약의 자기증명 1건. **4파일 · 새 폴더 0 · 새 스키마 0 · 소급 변환 0 · Rust 코드 변경 0**.
-- **왜**: 운영자 지시(2026-08-22 「후속 작업 추천은 모든 서비스들에 대해 제공이 되는 기능이어야 맞아」)의 wie 쪽 몫이다. 착수 실측(로컬 cockpit `GET :4477/api/proposals` `derived.coverage`, 2026-08-26 09:48 KST): wie `{json:1, md:0, proposals:0}` · qts `{json:1, md:13, proposals:3}` · dodu `{json:12, md:0, proposals:39}` · RustJava·orchestrator `docs/worklog ENOENT`. ⇒ 6 repo 중 채워진 것이 2개뿐이었다. wie 는 **폴더도 파일도 있는데** 그 안에 소비처가 읽는 `proposals[]` 가 없어 카드가 0장이었다 — 처방은 「폴더 신설」이 아니라 「규약을 세워 이후 회차가 채우게 하는 것」이다.
-- **★스키마는 발명하지 않았다**: 소비처 코드(`~/tower/bin/cockpitd.js` `scanRepoSimple`)를 읽어 확정했다. 읽는 키는 `j.date` · `j.proposals[]` 의 7키(`title`·`plainSummary`·`userBenefit`·`why`·`tradeoff`·`effort`·`target`) · `j.adoptedProposals`/`j.declinedProposals` 가 전부이고, `ref` 는 `<basename>#p<0기반 index>` 로 **파생**된다(파일에 적는 값이 아니다). 그 밖의 키는 소비처가 읽지 않으므로 자유다.
-- **★왜 잠금이 필요한가**: 형식이 어긋난 `.json` 은 **조용히 아무 카드도 못 만든다** — 오류도 경고도 없고 화면이 그냥 비어 있다(wie 가 한 달 넘게 그 상태였다). 검사기 양방향 실측: 현 트리 green(`OK (2 file(s))`), **제품 파일**(픽스처 사본이 아니라 이 회차의 실제 워크로그)에 개악 3종 주입 시 전건 red — 7키 중 1개 제거 · `date` 1일 어긋남 · 처분 ref 를 문자열 대신 객체로.
-- **★qts 규약과 다른 점 2가지(숨기지 않는다)**: ⑴**짝 `.md` 를 요구하지 않는다** — qts 는 `.json` 마다 `.md` 짝을 요구하지만, wie 의 워크로그는 `.json` 전용이라(실측 `md:0`, dodu 도 같다) 그 축을 그대로 옮기면 **기존 1건이 즉시 red** 가 되어 발권이 금지한 소급 작업을 강제한다. ⑵**잠금이 pytest 가 아니라 node 스크립트**다 — 이 repo 에 파이썬 테스트 계층이 없다. 검사 축·키·문구는 동일하다.
-- **사용자 영향**: 없음. 에뮬레이터·웹 셸·배포 대상 무변경이고, 바뀐 것은 문서 규율과 CI 검사 1개(node 전용·빌드 없음·~1초)다.
-- **★남는 구멍(숨기지 않는다)**: ⑴**규약을 심는 것과 커버리지가 오르는 것은 다른 일이다** — 이후 회차가 워크로그를 쓰지 않으면 수치는 그대로다. 잠금은 「`.json` 이 있으면 형식이 맞는가」만 묻지 「회차마다 쓰라」를 강제하지 않는다(강제 여부는 이 회차 워크로그의 `proposals[0]` 로 올렸다). ⑵기존 1건(2026-07-22)은 `proposals` 가 없는 채로 남아 있다(소급 0 은 발권의 명시 결정). ⑶검사기가 주제상 무관한 `engine-contract.yml` 에 얹혀 있다 — 이 repo 의 유일한 «항상 도는 node 잡»이라 골랐고, 그 대가를 워크플로 주석과 `proposals[2]` 에 적었다.
-
-## [2026-08-21] 문서의 맨손 원격 변이 wrangler 명령 + `web.yml` 판본 핀 5곳 단일화 (wie-cf-setup-bare-d1-create-and-wrangler-pin-consolidate)
-- **무엇을**: ①`docs/CLOUDFLARE_SETUP.md` 의 **`npx wrangler d1 create wie-db`** 를 `CLOUDFLARE_ACCOUNT_ID=…` 접두 형태로 바꾸고 0-1 을 가리키는 사유 3줄 추가(0번 표의 「`wrangler d1 create`」 안내도 「3-1 (계정 고정 필수)」로 교체) ②★**전수 grep 이 같은 형태를 `docs/COMPLIANCE.md` 에서 7건 더 찾았다** — `d1 execute --remote` 로 `UPDATE` 6건 + `r2 object delete` 1건. 3개 `sh` 블록 **전부의 첫 줄에 계정 핀**을 넣고 「Before running any command here」 절 신설 ③`web.yml` 의 wrangler 판본 리터럴 **5곳 → job env `WRANGLER_VERSION` 1곳** ④`web.yml` 에 계정 id 부재 시 **시끄럽게 죽는** 가드 스텝 1개. **3파일 · 코드·의존성·판본 변경 0**.
-- **왜 (축1)**: `create` 는 원격에 리소스를 **만드는** 명령이다. 핀이 없으면 로컬 OAuth 로그인이 속한 **엉뚱한 계정에 `wie-db` 가 조용히 생기고 실패하지 않는다** — 직전 회차가 env 핀으로 옮기며 문서의 d1 «조회» 2곳은 가드된 npm 스크립트로 돌렸으나 이 «생성» 한 줄은 그 밖이었다. ★**「2곳만 봤다」가 이 결함을 낳은 형태라, 이번에는 `*.md` 전수를 원격 변이 동사(`create`·`delete`·`execute --remote`·`deploy`·`publish`·`secret put`)로 재grep 했고 COMPLIANCE.md 7건이 그렇게 나왔다.** 그쪽은 존재하지 않는 DB/버킷을 때려 대개 시끄럽게 죽으므로 위험도는 낮지만, 운영자가 **블록이 아니라 한 줄만 복사**하는 것이 실제 사고 경로라 블록마다 핀을 넣었다.
-- **왜 (축2)**: 판본 `4.104.0` 이 설정 **검증기**(`npx` 2곳)와 실제 **배포기**(`wrangler-action` 2곳) 그리고 프로젝트 생성(`npx` 1곳)에 흩어져 있었다(티켓은 3곳으로 봤으나 실측 **5곳**). 갱신 때 한 곳만 올리면 **검증이 통과시킨 설정을 배포기가 거부**하고, 그것이 정확히 2026-08-20 사고의 모양이다. ⇒ 값은 **그대로 두고** 자리만 하나로 접었다. `env` 컨텍스트는 `steps.*.with` 와 `run:` 셸 양쪽에서 읽히므로 `wranglerVersion: ${{ env.WRANGLER_VERSION }}` 과 `npx --yes "wrangler@$WRANGLER_VERSION"` 이 각각 실제로 먹는다.
-- **왜 (축3)**: 배포·마이그레이션 스텝의 `if:` 가 `HAS_CF_TOKEN` 만 봐서 **`CLOUDFLARE_ACCOUNT_ID` 가 비어도 게이트가 열렸다**. ★**「건너뛴다」가 아니라 「죽는다」를 골랐다** — 건너뛰면 **아무것도 배포하지 않은 green run** 이 남고, 그것은 이 리니지가 이미 한 번 당한 «조용한 실패»다. 토큰이 없는 fork PR 은 종전대로 그냥 skip 된다(가드가 `HAS_CF_TOKEN == 'true'` 를 함께 요구한다).
-- **사용자 영향**: 없음. 에뮬레이터·배포 대상·판본 전부 무변경이고, 바뀐 것은 **문서의 문면**과 **워크플로가 판본을 한 곳에서 읽는다**는 것뿐이다.
-- **★남는 구멍(숨기지 않는다)**: 축1 은 **문서 규율일 뿐 기계가 아니다** — 운영자가 핀 줄을 지우고 복사하면 그대로 통과한다. 기계로 닫으려면 wrangler 래퍼나 `--profile` 이 필요하고 그것은 직전 회차가 이미 「별건」으로 남긴 자리다. 축3 의 가드는 **secret 이 «비었는지»만** 본다 — **틀린 계정 id** 는 여전히 wrangler 의 인증 오류에 맡긴다(그쪽은 시끄럽게 죽는 것이 실측됐다).
-
-## [2026-08-20] Pages 가 거부하는 `account_id` 로 prod 배포가 red — 핀을 env 로 이전 (wie-wrangler-pages-account-id-breaks-prod-deploy-fix)
-- **무엇을**: ①`wrangler.toml` 의 `account_id` 한 줄 **제거**(사유 주석으로 대체) ②`package.json` 의 원격을 건드리는 두 스크립트(`deploy`·`db:migrate:remote`)를 `: ${CLOUDFLARE_ACCOUNT_ID:?…}` 가드로 감싸 **env 가 비면 wrangler 를 실행조차 하지 않게** 함 ③`web.yml` 에 **PR 에서도 도는** Pages 설정 검증 스텝 1개 추가(배포 없음) ④`docs/CLOUDFLARE_SETUP.md` 에 「0-1. 로컬 wrangler 계정 고정」 신설. **4파일 · 코드·의존성 변경 0**.
-- **왜**: 직전 회차(PR #59)가 박은 `account_id` 를 **Pages 가 문법으로 거부**한다 — `Configuration file for Pages projects does not support "account_id"`. 그 착지 직후 `web.yml` run **32364381443** 이 배포 스텝에서 failure 였고, 앞 4회는 전건 success 였다. ★**`wrangler d1` 은 같은 키를 받아들여서**(같은 run 의 D1 마이그레이션 스텝은 성공) d1 로 시험하면 이 고장이 보이지 않는다 — 이번 회차가 d1 경로를 건드리지 않은 이유다.
-- **★CI 가 못 잡은 이유(구조적)**: `web.yml` 의 배포 스텝은 `if: push && main` 게이트라 **PR 에서 한 번도 실행되지 않는다**. ⇒ 이 계열 결함은 항상 «PR green → main 착지 → red» 로만 드러난다. 그래서 추가한 검증 스텝은 **인증도 업로드도 하지 않는 자리**를 노린다: `wrangler pages deploy` 는 **설정 파일 검증을 인증·디렉터리 읽기보다 먼저** 하므로, 존재하지 않는 디렉터리를 가리키고 토큰을 주지 않으면 **검증기까지만 도달**한다. 실측 양방향 — 개악(`account_id` 재삽입) 시 **red**, 현 트리에서 **green**(인증 오류로 죽고 «validation for Pages» 는 나오지 않는다).
-- **오계정 방지는 어디로 갔나**: 원 티켓의 목적(로컬 wrangler 가 **다른 계정**에 조용히 작업하는 것 방지)은 버리지 않고 **env 로 이전**했다. 실측 2건 — ⑴핀 없이 `wrangler pages deploy` 를 태우면 **에러 없이 로컬 로그인 계정을 그대로 사용**한다(에러 메시지가 사용 중인 계정을 그 계정으로 지목했다) ⑵`CLOUDFLARE_ACCOUNT_ID` 를 **틀린 값**으로 주면 `Authentication error [code: 10000]` 로 **시끄럽게** 죽고 로그인 계정으로 **되돌아가지 않는다**. 여기에 npm 가드가 «비어 있음»까지 막는다(unset → rc≠0, wrangler 미실행).
-- **★남는 구멍(숨기지 않는다)**: 파일 핀과 달리 env 핀은 **맨손 `npx wrangler …` 를 구속하지 못한다**. 가드가 서는 것은 npm 스크립트 경로뿐이다. 파일 핀으로 되돌리는 길은 Pages 가 막혀 있으므로, 더 조이려면 `--profile`/래퍼가 필요하고 그것은 별건이다.
-- **사용자 영향**: 없음(에뮬레이터 동작 무변경). 사이트도 내려간 적이 없다 — Pages 는 직전 성공 배포를 계속 서빙했고 이번 착지 diff 에 `migrations/**` 0파일이라 데이터 영향도 0. 되살아나는 것은 **신규 배포 반영**이다.
-- **★판정의 한계**: 배포 스텝은 PR 에서 돌지 않으므로, 착지 전 이 회차는 「고쳤다」가 아니라 **「고쳤다고 본다」**다. 확정은 머지 후 `web.yml` on main 이 green 인지 실측해야 한다.
-
-## [2026-08-20] wrangler `account_id` 를 otterpebble 계정으로 고정 (wie-wrangler-account-id-pin)
-- **무엇을**: `wrangler.toml` 최상단에 `account_id = "17024dfe5a8ff38798c35942d116026b"` 를 사유 주석과 함께 박았다. **1파일 +6/-0** — 코드·워크플로·의존성 무변경.
-- **왜**: 이 맥에는 Cloudflare 계정이 둘(otterpebble·dodu) 있고, `wrangler` 는 계정이 명시되지 않으면 **자격증명이 가리키는 아무 계정**으로 붙는다. `wie-db`(D1)·R2 버킷은 otterpebble 계정 소유이므로 잘못된 계정으로 붙으면 조용히 «빈 프로젝트에 배포»가 된다. 게이트② 검수가 `wrangler d1 info wie-db` 를 이 자격증명으로 돌려 **핀한 계정이 실제로 `wie-db` 를 소유함**을 양성 대조로 확인했다.
-- **★권고 — 핀이 env 를 덮는다**: `wrangler.toml` 의 `account_id` 는 `CLOUDFLARE_ACCOUNT_ID` 환경변수보다 **우선한다**. ⇒ 이후 CI 에서 «다른 계정으로 배포»하려 해도 **`CLOUDFLARE_ACCOUNT_ID` 시크릿 교체만으로는 계정이 바뀌지 않는다** — 이 파일의 핀을 함께 고쳐야 한다(고정의 목적 자체가 그것이므로 의도된 동작이다).
-- **사용자 영향**: 없음(에뮬레이터 동작·배포 대상 무변경). 바뀐 것은 «어느 계정인지»가 자격증명이 아니라 **파일에 적혀 있다**는 것뿐이다.
-
-## [2026-08-20] beta clippy `double_must_use` 로 인한 repo 전역 CI red 해소 (wie-rust-ci-beta-clippy-double-must-use-red)
-- **무엇을**: ①`async-trait` **0.1.89 → 0.1.92**(`Cargo.lock` 만 — 워크스페이스 요구사항은 이미 `^0.1`). 0.1.92 의 `expand.rs` 는 트레이트 메서드에 `#[must_use]` 를 **더 이상 붙이지 않는다**(0.1.89 `expand.rs:69` 의 `method.attrs.push(parse_quote!(#[must_use]))` 가 삭제됨). ②`wie_ktf/src/runtime/java/interface.rs` 의 `find_java_method` 에 `#[allow(clippy::double_must_use)]` 1줄 + 사유 주석 3줄. **코드 동작 변경 0** — 어트리뷰트와 lockfile 뿐이다.
-- **왜**: `rust_ci (macos-latest, beta)` 의 `cargo clippy --all -- -D warnings` 가 **`wie_backend` lib 에서 15건**의 `double_must_use` 로 죽었고, fail-fast 가 나머지 5잡을 cancelled 로 끊었다. ★**이 red 는 특정 PR 의 결함이 아니라 repo 전역**이라 다음 wie PR 이 전부 같은 red 를 문다(PR #59 가 approve 인데도 게이트③ `ci-presence` 에 막힌 형태). 근인은 **우리 코드의 `#[must_use]` 가 아니다** — 15건 전부 `async_trait::async_trait` 매크로 확장에서 나왔고, clippy 가 `1.98.0-beta.1`(2026-07-06)→**`1.99.0-beta.1`(2026-08-17)** 로 넘어오면서 이 패턴을 새로 잡기 시작했다(로컬 구 beta 로는 **재현되지 않았다** — 툴체인을 올려서 재현시킨 뒤 고쳤다).
-- **왜 `allow` 가 1건 남았나**: `async-trait` 을 올리면 15건이 0건이 되지만 **`wie_ktf` 의 `async_recursion` 1건**이 같은 이유로 남는다. `async-recursion` 은 **1.1.1 이 최신**이라 올릴 곳이 없고, 문제의 `#[must_use]` 는 우리가 쓴 것이 아니라 매크로가 찍은 것이다. ⇒ 호출부 1곳(`find_java_method` 유일 사용처)에 국소 `allow` 를 달고 사유를 주석으로 남겼다. **crate 전역·워크스페이스 전역 억제는 쓰지 않았다.**
-- **사용자 영향**: 없음(에뮬레이션 동작 무변경). 바뀐 것은 CI 가 다시 green 이 되어 **wie 레인의 PR 이 머지 가능해졌다**는 것뿐이다.
-- **부수 실측**: ⒜`cargo audit` 취약점 **0건**(정보성 경고 2건 = `ttf-parser` unmaintained / `arrayref` yanked, 둘 다 기존분·비게이팅) — 새로 들어온 전이 의존성은 `syn 3.0.3` 하나다. ⒝`gh repo set-default Jun025/wie` 를 repo 로컬에 설정했다. **이 repo 는 `dlunch/wie` 의 포크**라 그 전까지 맨 `gh pr view N` 이 upstream 을 조회했다(실측: #59 조회가 2023년 dependabot PR 로 갔다). ⒞`Cargo.lock` 과 `**/*.rs` 는 둘 다 `publish-artifact.yml` 의 `on.push.paths` 라 **이 PR 이 main 에 들어가면 아티팩트 발행 + GitHub Release + otterpebble dispatch 가 발화한다**(사건 대장 「`paths-filter` reads paths, not content」 참조). WASM export surface 변경 0 이므로 `docs/contracts/featurephone-engine-contract.json` 은 손대지 않았다.
-
-## [2026-08-19] LGT SVC 0x581 — 정체 미확정이라 «미지원»으로 끊었다 + 낡은 `## 다음` ①② 해소 (wie-lgt-svc-1409-unknown-and-state-stale-next)
-- **무엇을**: ①`wie_lgt/src/runtime/svc_ids.rs` 의 `WIPICSvcId` 표에 **`0x581`(=1409)** 을 `MiscUnk9` 로 등재하고, `wipi_c.rs` 의 디스패치를 **`WieError::Unimplemented`(모듈·인덱스·인자 4개를 로그에 실는다)** 로 연결했다. **값을 지어내 반환하지 않는다.** ②`STATE.md` `## 다음` ①②(PR #54·#46)를 «다시 발권하지 마라» 절로 옮겼다.
-- **왜**: 영웅서기5 LGT(upstream `dlunch/wie#1260`)가 `CletWrapper.startApp` 에서 `Unknown LGT WIPIC SVC id 1409` 로 즉사한다. **`0x581` 이 misc 모듈이라는 것까지는 실측으로 확정된다** — LGT 는 WIPIC 모듈마다 100 의 배수를 기저로 쓰고 `BackLight = 0x578 = 1400+0` 이 misc 를 고정하므로 `0x581` 은 **misc index 9** 다. ★**그러나 index 9 «가 무슨 함수인지»는 확정되지 않는다**: 이 repo 의 유일한 misc 참조표(KTF `get_misc_method_table`)가 **index 4 에서 끝나고**, LGT 표는 **다른 스펙 개정판**이다(graphics 가 index 14 부터 KTF 대비 **+1** — LGT `CopyArea 0xd7`=+15 ↔ KTF 14). ⇒ 이름을 붙이면 **근거 없이 맞아 보이는 문장**이 된다. 그래서 티켓 Contract 2 의 «등재 + 미지원 예외» 갈래로 잘랐다.
-- **사용자 영향**: 영웅서기5 LGT 는 **여전히 이 지점에서 진행하지 못한다.** 바뀐 것은 로그다 — 「알 수 없는 SVC」가 「misc index 9 미구현, 인자 4개는 이러함」이 되고, 그것이 다음 회차의 입력이 된다. 다른 타이틀 영향 0(`scripts/smoke_gate_baseline.tsv` 기준선 변화 0).
-- **후속**: misc index 9 의 정체는 **이 repo 안의 근거로는 못 푼다** — 실기/다른 구현체의 LGT misc 테이블이나 게임 바이너리 호출부 디스어셈이 있어야 한다. 새 근거 없이 재발권하지 마라.
-
-## [2026-08-15] wie 레인 재가동 — 낡은 `## 다음` 이 25시간 공백의 근인이었다 (wie-lane-restart-upstream-carryover-and-main-divergence)
-- **무엇을**: `STATE.md` 를 2026-08-15 실측으로 전면 갱신했다. ①`## 진행중` 5행이 **전건 착지 완료분**(PR #52·#53·#55, 그리고 브랜치조차 없는 `feat/wie-featurephone-engine-contract-selftest`)이었으므로 `## 완료` 로 이관 ②`## 다음` 4항을 **유효/해소/무효**로 재판정하고 해소분은 «다시 발권하지 마라» 절로 분리해 명시 보존 ③적체 PR **#54·#46** 을 `## 다음` ①②로 신규 등재 — 이 둘은 종전 `STATE.md` **어디에도 없었다** ④upstream #1260·#1122 를 실측 재확인하고 착수 브리프로 승격. **로컬 `main` 은 fast-forward 재동기만 했다**(ahead 1 / behind 12 → **0 / 0**). 코드·워크플로·lockfile 무변경.
-- **왜**: `cc-wie` pane 이 2026-08-14 21:02 기동 후 **25시간 동안 지시를 한 번도 받지 못했다**(큐 0 · running 0). 할 일이 없어서가 아니라 **`## 다음` 이 08-08 자 사실에 멈춰 있어서** 아무도 발권하지 않았다. 그 4항 중 2항은 이미 조용히 해소돼 있었고, 정작 살아 있는 축(적체 PR 2건)은 문서에 **적혀 있지도 않았다** — 즉 문서는 낡은 만큼 «없는 일»을 가리키고 «있는 일»을 감췄다.
-- **판정 — 로컬 main 분기(`0f13ab87`)는 «착지 필요» 가 아니라 «이미 처분됨»**: 실측상 그 커밋은 `main@{11}: reset: moving to origin/main` 으로 **버려졌고** 어떤 ref 에도 없다. 다만 그 내용은 브랜치 `chore/claude-autonomy-hardening` → **PR #45 로 올라갔다가 2026-07-31 미머지 종결**됐고, 살릴 값만 골라 **PR #50** 이 착지시켰다. 세 헝크 대조 결과 `.claude/settings.json` deny 블록은 origin/main 에 **있고**(차이는 장식용 `$schema` 1줄뿐), `.gitignore` 2줄(`.direnv/`·`.claude/settings.local.json`)도 **둘 다 있다**(PR #51 등). ★남은 `CLAUDE.md` «자율운영 SOP» 블록은 **되살리면 안 된다** — 4개 조항이 전부 `AGENTS.md` §Session Discipline 에 이미 있고, 첫 조항 「시작 시 … **확인 없이 이어서 완료한다**」는 현행 `CLAUDE.md` §착수 규율(**티켓 없는 착수 금지**)과 **정면 충돌**한다. 즉 PR 로 착지시키는 것이 옳은 조치가 아니었다.
-- **판정 — upstream #1260 은 유효하고 착수 가능**: OPEN 유지. `wie_lgt/src/runtime/svc_ids.rs` 의 `WIPICSvcId` 변환표에 **`0x581`(=1409) 부재**를 직접 확인했다(인접 등재 최대치는 `0x578 BackLight`) — 추정이 아니라 **미구현 확정**이다. 대상 게임(영웅서기5)이 `MClass: Clet` 이라 이 repo 가 confirmed 로 지원하는 서브셋에 속한다.
-- **판정 — upstream #1122 는 유효하되 «재현»이 먼저**: OPEN 유지이나 2026-05-10 이후 정체이고 upstream 오너도 «에뮬레이터 버그 추정 · 디버깅 난해»로만 답했다. ★현 회귀 게이트는 **부팅+렌더까지만** 판정하므로 `scripts/smoke_gate_baseline.tsv` 의 `ktf/컴삼촉.zip PASS` 는 **스테이지 5 도달을 뜻하지 않는다** — 기존 자동화로는 증상 지점에 닿지 못한다. 착수 전 재현 경로 확보가 선행 조건이다.
-- **사용자 영향**: 없음(문서 전용). 다만 이 레인이 다음에 다시 굶지 않는다 — `## 다음` 이 **오늘 실행 가능한 5개 축**을 가리키고, 그중 2개는 이미 CI green 인 채 검수만 기다리는 PR 이다.
-- ★**정정 (2026-08-16 · 게이트② 반려 승계 `-fix`)**: 초판의 `## 다음` **①②가 둘 다 틀렸다.** 옛 4항은 diff 로 검증했는데 **새로 등재한 두 항목은 PR 제목·개설일만 보고 썼다** — 즉 이 항목이 진단한 병(«문서가 낡아 없는 일을 가리키고 있는 일을 감췄다»)을 새 문장을 쓰면서 그대로 재현했다. ⒜**#46**: 「경로를 `~/dev/wie` 로 고치는 PR 이라 의심스럽다」→ **정반대다.** `gh pr diff 46` 전문은 **1파일 1줄**로 `~/Documents/dev/wie` → **`~/work/otterpebble/wie`**(=실제 경로)로 **옳게** 고친다. 낡은 것은 **PR 제목**뿐이고 `origin/main` 이 지금도 틀린 경로를 담고 있다. ⒝**#54**: 「#54 개설 뒤 #53·#49 가 착지해 `AGENTS.md` 충돌」→ **틀렸다.** 둘 다 `merge-base 78f40a6f` 의 **조상**이고(`--is-ancestor` 양쪽 YES), base 이후 착지분은 **PR #55 하나**다. `merge-tree` 실측상 충돌 파일은 **`STATE.md` 단 1건**이며 `AGENTS.md` 는 충돌하지 않는다. ⒞★그리고 **이 PR 이 그 충돌을 키운다** — #56 head 기준 `merge-tree` 는 충돌을 **`STATE.md`+`REPORT.md` 2건**으로 보고한다(초판에 이 부작용 언급 0). ⇒ **#54 재작업은 #56 착지 «후»에.** ★옛 4항 재판정과 「해소」 2항은 검수가 자력 재현해 **참으로 확인**됐다 — 그대로 유지한다.
-- **후속 추천**: ①PR #54 재작업 티켓 — ★충돌 파일은 `AGENTS.md` 가 아니라 **`STATE.md` 하나**이고 원인은 **PR #55** 다(#53·#49 는 `merge-base 78f40a6f` 의 **조상**이라 원인일 수 없다). ★**이 PR(#56)이 착지하면 충돌이 `STATE.md`+`REPORT.md` 2건으로 커지므로 #54 재작업은 #56 착지 «후»에** ②PR #46 은 **검수 상신만 하면 된다** — diff 전문 확인 결과 **1파일 1줄**로 `~/Documents/dev/wie` → **`~/work/otterpebble/wie`**(=실제 경로)로 고치는 **옳은 PR** 이고, 낡은 것은 **PR 제목**뿐이다 ③#1260 구현 티켓 발권 ④#1122 는 «구현» 이 아니라 «재현 경로 조사» 티켓으로 먼저 발권.
-
-## [2026-08-05] 에이전트 지침 선언형 재구조화 — 잠금 테이블 + 지도 이관 (wie-agents-md-declarative-restructure)
-- **무엇을**: `AGENTS.md` 를 **Goal / Constraints / Definition of Done / 사건 대장** 골격으로 재배치했다.
-  ①Hard Requirements 12항 산문 → **12행 잠금 테이블**(각 항 = 한 줄 + «무엇이 잡는가» 포인터)
-  ②아키텍처 지도 4종(레이어 다이어그램·crate roles 표·non-Rust surfaces 표, ~44줄)을
-  `docs/architecture.md` 로 **이관**(삭제 아님) + 한 줄 crate 목록과 포인터만 잔류
-  ③ponytail 절의 do-not-cut 재열거 제거 → 「Constraints 표가 그 목록이다」
-  ④`CLAUDE.md` 축소금지 목록도 포인터 1줄로 대체(같은 목록이 **3벌**이었다)
-  ⑤Hard Req 1·2 의 «왜» 를 `rust.yml`·`coverage.yml` **헤더 주석으로 이관**.
-  **실측: 16,888 → 13,099 바이트(−22.4%)**, 상시 로드 합계(AGENTS+CLAUDE) 19,209 → 15,360(−20.0%).
-  **코드·빌드설정·CI 동작 무변경** — 워크플로는 주석만 늘었고 파싱된 YAML 이 main 과 동일함을 확인했다.
-- **왜**: 2026-08-05 전 프로젝트 지침 감사(`reports/audit-agent-instructions-2026-08-05.md` §3-1)가
-  이 repo 의 Hard Req 12항 **대부분이 이미 CI 워크플로로 잠겨 있는데 산문이 한 번 더 적고 있다**고
-  지목했다. ★지표도 바꿨다 — **줄 수가 아니라 바이트다**. 종전 189줄은 줄당 89바이트라 줄 수로는
-  부하가 보이지 않았다.
-- **★보존한 것(축약 금지)**: 「Completion is an open PR, not a merge」 전문과 §Git Workflow 전체,
-  `CLAUDE.md` §완주 규율의 **리터럴 반복**(중복이지만 **의도된 것**), 게임바이트·시크릿·로컬전용
-  3종 전문, `RUST_MIN_STACK` «not decorative», always-run 래퍼 교착 인과, 정확버전 핀 근거.
-  뒤의 둘은 새 **사건 대장** 절로 옮겼다 — 서술형이 보호되는 자리다.
-- **★부수 실측 ①**: `**/Cargo.toml` 이 `publish-artifact.yml` 의 `on.push.paths` 에 있다 —
-  **paths-filter 는 내용이 아니라 경로만 본다**(otterpebble `free-tier.md` 기실측의 재확인). 즉
-  **주석만 고친 Cargo.toml 도** 머지되면 릴리스 발행 + otterpebble `repository_dispatch` 를 발화시킨다.
-  ⇒ Hard Req 8 의 «왜» 를 Cargo.toml 주석으로 내리려던 계획을 **철회**하고 `AGENTS.md` 에 남겼다.
-  이 인과를 사건 대장에 등재했다.
-- **★부수 실측 ②**: **MCP 등록 0개**(`claude mcp list` 무 · `~/.claude.json`·`~/.claude/settings.json`·
-  `$CLAUDE_CONFIG_DIR` 2개 파일 전부 `mcpServers` 빈 값). `AGENTS.md` 는 「3종이 매 세션 사용 가능」이라
-  적고 있었다 — **사실이 아니었다**. 문안을 실측대로 정정했고, 이로써 티켓 C2 의 「serena 로 대체
-  가능한가」는 **불가**로 확정 → 지도는 삭제가 아니라 읽을 수 있는 문서로 이관했다.
-- **★plan mode 시뮬레이션이 잡은 결함 1건**: 신·구 지침으로 각각 대표 작업 2건을 계획시켜 비교했더니,
-  신 지침을 읽은 에이전트가 **순수 `web/` CSS 수정에서 Rust 게이트 4종을 누락**했다(«.rs 무변경이니
-  web 명령만» 으로 읽음). 구 지침에는 «Pre-commit (MANDATORY)» 문장이 그 일을 하고 있었는데 게이트
-  블록에 접으면서 «every commit» 이 사라진 것이다. ⇒ 「4종은 무엇을 고쳤든 **매 커밋 전**에 돌린다 ·
-  web 명령은 **추가**이지 대체가 아니다」를 명시해 수정했다. 나머지 6개 점검 문항은 신·구 동등하거나
-  신 지침이 우세했다(구 지침은 playwright MCP 가 쓸 수 있다고 **오판**).
-- **사용자 영향**: 없음(문서 전용). 간접 영향은 매 세션 상시 로드가 약 3.8KB 줄어 같은 컨텍스트로
-  실제 작업에 쓸 여지가 늘고, 잠금 포인터 덕에 「이 규칙을 누가 강제하나」를 파일을 뒤지지 않고 안다.
-- **경계 / 미달**: 목표 바이트는 **≤12,288 이었고 결과는 13,099 — 811 초과**다. 파일의 약 6,500바이트가
-  C3 무접촉 문안이거나 이번 산출물인 잠금 테이블이라, 남은 초과분을 없애려면 **보호 대상 서술을
-  압축**해야 했다. 감사 자신의 결론(「선언화하면 가장 비싼 정보가 증발한다」)에 반하므로 멈추고 수치를
-  보고한다. 시뮬레이션 수정분 214바이트도 이 초과에 포함돼 있다 — 정확성을 바이트에 양보하지 않았다.
-- **후속 추천**: ①`CONTRIBUTING.md` 가 §Git Workflow 를 또 한 벌 갖고 있는지 재점검(#53 이 2곳을
-  고쳤으나 이번 재구조화로 절 이름이 바뀌었다) ②감사 §4 훅(H2 「티켓 없는 착수 금지」)이 도입되면
-  `CLAUDE.md` §착수 규율도 포인터로 축약 가능 — 현재는 강제력이 산문뿐이라 유지했다.
-
-## [2026-08-02] 헌장이 머지를 «지시» 하던 문장 제거 — 게이트② 우회의 근인 (wie-agents-md-gate2-contradiction-fix)
-- **무엇을**: 워커에게 머지·브랜치 삭제를 **지시**하던 문장 **5곳**을 개정했다 — `AGENTS.md` **3곳**(§Git Workflow «완주 = merge into main» · «Clean up merged branches (MANDATORY)» + `gh pr merge --delete-branch` 권장 · Hard Req 12 «squash-merge → delete the branch»)과 `CONTRIBUTING.md` **2곳**(§Git Workflow 17·18행). 더해 ①`AGENTS.md` 에 «For the `-merge` task only» 절을 신설해 브랜치 정리 절차를 **머지 티켓 소유로 이관**(지식은 보존, 수행 주체만 변경) ②`CLAUDE.md` 에 «완주 규율» 절 신설 ③`STATE.md` 의 머지 지시 문안 2곳 정정. **코드·워크플로 로직 무변경.**
-- **왜**: 게이트② 사후 감사(`wie-rustsec-advisory-sweep-batch1.review.md`, severity **critical**)가 근인으로 확정한 것이 이 문장들이다. 헌장이 «완주 = `main` 에 머지» 라고 가르치니 **워커는 규율을 어긴 게 아니라 자기 repo 의 헌장을 따랐고**, 그 결과 검수 approve 전 머지가 **5건**(#48·#43·#42·#39·#38) 났다. 07-22 사후 회신들이 이미 «wie 4건 동일 실패형» 이라 적어 뒀는데 **헌장을 안 고쳐서 8일 만에 5건째**가 났다 — «알고 있었다» 가 «고쳤다» 를 대체하지 못한다.
-- **핵심 개정**: 완주의 정의를 **«PR 을 열어 둔 상태»** 로 바꿨다. 머지와 브랜치 삭제는 검수 approve 후 **별도 `-merge` 티켓**의 몫이며, «CI green 은 필요조건일 뿐 승인이 아니다» 를 명시했다. 종전 문안은 «changes made 에서 멈추지 마라» 는 압력만 있고 상한이 없어 워커를 머지까지 밀어냈으므로, 하한(«push·PR 안 하면 미완주»)과 상한(«그 이상 가지 마라»)을 **양쪽 다** 적었다.
-- **★감사가 놓친 2곳**: 감사는 `AGENTS.md` 3곳만 지목했으나, 전수 스캔에서 **`CONTRIBUTING.md` 에 같은 지시가 2곳 더** 있었다. blame 결과 이 절은 upstream `dlunch/wie` 에 **없는 우리 자작**이고 커밋 `1960d9c9`(«codify git workflow — **merge to main**», 2026-07-12)이 **두 파일에 동시에** 심은 것이다. 근인 커밋이 하나인데 사본이 둘이었으므로, 3곳만 고쳤으면 살아 있는 사본이 남았다.
-- **사용자 영향**: 없음(문서 전용). 다만 검수 전 머지가 구조적으로 막히면 **미검수 변경이 `main` 에 들어가 featurephone 으로 자동 전파될 확률이 낮아진다** — `publish-artifact.yml` 이 `main` push 에서 발행·dispatch 하므로 게이트② 우회는 곧 사용자 도달 경로의 우회였다.
-- **후속 추천**: ①(운영자) `main` branch-protection 에 «PR 승인 필수» 를 걸면 문서가 아니라 **플랫폼이** 강제 — 현재 강제력은 여전히 문서뿐이다(`wie-main-branch-protection` human-step 미적용 상태) ②`-merge` 티켓 문안 표준화 시 `AGENTS.md` §For the `-merge` task only 를 참조점으로 사용.
-
-## [2026-08-01] RUSTSEC 이월분 등재 + 신규 권고 2건 판정 (wie-rustsec-advisory-sweep-batch2)
-- **무엇을**: ①`docs/project-kb/02_status.md` 에 **«공급망 추적 대장»** 신설 — 배치1(2026-07-31)이 완료 보고서 본문에만 남겼던 이월분을 KB 로 옮겨 등재(**A. 권고·공급망 3건** + **B. upstream 이슈 9건**, 총 **12행**). ②신규 경고 2건 판정: `event-listener` **RUSTSEC-2026-0221**(unsound) · `spin` **0.12.0 yanked**. ③upstream 9건 재조회. ④로드맵에 발권 대기 항목 6·7번 추가. **문서 전용 — 코드·`Cargo.lock`·워크플로 무변경.**
-- **왜**: 배치1 게이트② 사후 감사가 «이월 목록이 done 본문 단 한 곳에만 존재 = 사실상 유실»(severity major)로 지목했다. 티켓·큐·KB 어디에도 없어 추적 대기열 밖에 있었고, 이 저장소의 반복 실패형이다. 등재가 곧 최소 산출물.
-- **판정 — `event-listener` 5.4.1 (A-2)**: 권고 `patched = [">= 5.4.2"]`·`unaffected = ["< 5.1.0"]` 이므로 **버전축으로는 affected 구간**이다. 그럼에도 **도달 불가** — 결함 대상은 `listener!` 매크로가 만드는 `StackSlot` 이고 전제는 `Event::with_tag` 의 `!Send` 태그인데, 유일 소비자 `jvm`(RustJava fork `c66f08d4`)은 `Event::new()`(태그 `()`=Send+Sync) + 힙 `EventListener` 만 쓴다. fork 전수 grep 에서 `listener!` **0** · `StackSlot` **0** · `Event::with_tag` **0**(`with_tag` 2건은 상수풀 파서 `parse_with_tag` 로 무관). 우리 repo 의 `EventListener` grep **22건은 전부 에뮬레이트되는 자바 클래스명**(`org/kwis/msp/lwc/EventListener` 등)이라 Rust 크레이트와 무관 — ★순진한 grep 이 «22건 도달» 로 오독되는 자리.
-- **판정 — `spin` 0.12.0 yanked (A-3)**: ★**yanked 는 취약점이 아니다** — RustSec 의 `spin` 권고 3건은 전부 미해당(`>=0.5.2`·`>=0.9.8` 이미 상회 · 나머지는 `unaffected=[">= 0"]` 무력화 이력)이고, yanked 는 crates.io 인덱스 상태라 `cargo audit` 도 exit 0 으로만 보고한다. **그럼에도 무시하면 안 되는 이유**: 2026-07-13 하루에 6개 라인 패치본이 동시 발행되고 선행본이 일괄 yanked 된 형상이라 건전성 결함이 의심됐다. 추정하지 않고 `.crate` 2본을 내려받아 diff 해 사유를 확정 — `0.12.1`=`lock_api` 경로 `RwLock::try_upgrade` unsoundness, `0.12.2`=`Once::*into_inner*` unsoundness. **우리는 `default-features=false, features=["spin_mutex","rwlock"]`** 라 `once`·`lock_api`·`lazylock` 이 전부 미활성 = **두 결함 모두 컴파일조차 되지 않는다**(기계 확증: `Cargo.lock` 의 `spin` 블록에 의존 항목 0). 소스도 `spin::` 13건 전부 `Mutex`/`RwLock` 뿐.
-- **upstream 9건 재조회 결과**: **#1292 가 2026-07-31 CLOSED/COMPLETED**(작성자 자진 종결) — 배치1 의 «실질 개발 = 1292·1260·1122» 는 **1260·1122 2건**으로 갱신. ★단 종결이 우리 블로커 해소를 뜻하지 않는다: 같은 문제(트랙② §7 `0x64` ordinal 표)에 대해 upstream 메인테이너가 **저작권 사유로 펌웨어/공식 에뮬레이터 리버싱을 하지 않는다**고 명시했으므로 «해결됨» 이 아니라 «upstream 이 다루지 않음» 이다 — 트랙② 동결 판단은 그대로 유효. #1240 은 REOPENED(upstream PR #1291 진행 중). 문의 2건(#1253·#1127) 분리 유지.
-- **사용자 영향**: 없음(문서 전용). 다만 **매일 도는 `cargo audit` 의 비게이팅 경고 3건이 이제 KB 대장과 1:1 대응**하므로, 경고가 늘거나 줄면 어느 쪽이 낡았는지 즉시 드러난다 — 경고가 잊혀 쌓이던 실패형이 닫힌다.
-- **경계**: **억제 수단 신설 0**(`--ignore`·`audit.toml` 없음 — 현재의 «취약점 0» 은 억제로 만든 0이 아니다) · **구현 0**(lockfile 무변경) · upstream 외부 발신 0(코멘트·이슈 작성 없음, 읽기 조회만).
-- **후속 추천**: ①대장 A-2·A-3 상향 소티켓 2건 발권(각 dry-run **1패키지** 이동 실측 — `event-listener` 5.4.1→5.4.2, `spin` 0.12.0→0.12.2. 긴급도 0, 위생 부채) ②대장 B 의 #1260·#1122 건별 발권 ③(운영자 결정) upstream 이슈에 근거 코멘트를 남길지 — 외부 발신이라 미실행.
-
-## [2026-07-22] main 브랜치 보호 — 계약 게이트 강제력 (wie-main-branch-protection)
-- **무엇을**: ①`engine-contract.yml` 의 `contract` 잡을 **always-run 래퍼**로 전환(트리거 `paths:` 제거 + 잡 내부 `dorny/paths-filter` 감지 — 경로 미해당 시 즉시 성공, 잡 이름 `contract` 안정 유지). ②`web.yml` 프로덕션 배포를 Rust CI 에 배선하지 **않기로** 판단하고 근거를 워크플로 주석으로 문서화. ③운영자용 branch-protection **제안**(ruleset JSON)은 done 에 human-step 으로 분리(워커 미적용).
-- **왜**: `main` 이 완전 무방비(`branches/main/protection`→404, `rulesets`→[])라 engine-contract 가 red 여도 머지되고 직push 도 열려 있었다. required check 로 걸려면 잡이 항상 상태를 보고해야 하는데, `paths:` 필터 잡을 그대로 required 지정하면 경로 미해당 PR 이 "Waiting for status" 로 영구 교착 — 그래서 래퍼가 필요.
-- **정정(과장 시정)**: 종전 REPORT 의 "계약을 깨는 엔진 변경이 **PR 단계에서 차단**" 은 과장이었다. 현재 PR 단계 차단력은 0이고(래퍼+보호설정 적용 전), fail-closed 인 것은 릴리스 게이트(`publish-artifact.yml`)뿐 — featurephone **사용자 도달 경로는 이미 차단**돼 있으나 PR 조기 차단은 이 티켓의 보호설정(human-step)을 적용해야 성립.
-- **배포 판단**: `web.yml` 의 D1 마이그레이션+Pages 배포는 같은 `build-web` 잡의 후속 스텝이라 이미 자기 빌드 성공에 의존. Rust CI 에 `workflow_run` 배선은 하지 않음 — 올바른 통제점은 **머지 게이트**(보호설정)이고, 크로스-워크플로 배선은 배포 중단 위험만 키운다. 최소·가역 원칙에 따라 무변경 + 주석 문서화.
-- **후속 추천**: ①운영자가 done 의 ruleset JSON 을 한 번 적용(required checks + PR-before-merge, **리뷰 승인 필수는 제외** — 단독 소유자 교착 방지) ②`enforce_admins` 상당(bypass_actors) 옵션은 긴급 핫픽스 경로 장단 검토 후 선택.
-
-## [2026-07-22] Security audit schedule 상시 red 정정 (wie-security-audit-schedule-red)
-- **무엇을**: 매일 도는 `Security audit`(`rust-audit.yaml`) 잡을 `rustsec/audit-check` 액션 → `cargo audit` 직접 실행으로 전환. 무효 권한 `issues/checks: write` 제거. KB `02_status.md` 의 "green(2026-07-10 해소)" 오독 기록을 실측(schedule 28건 전건 failure)대로 정정.
-- **왜**: 이 repo 는 `dlunch/wie` fork 라 Issues 가 기본 비활성이고 repo-레벨 disable 은 토큰으로 못 넘긴다. 그런데 audit-check 이 경고 2건(ttf-parser unmaintained·spin yanked)을 Issue 로 올리려다 `Issues has been disabled` 로 매 schedule 런에서 죽었다. 선행 커밋 `7405c50b` 의 `issues: write` 는 성립 불가한 처방이었고 같은 커밋이 KB 를 red→green 으로 오기록. 2026-07-10 "green" 은 check-run 경로를 타는 dispatch 런 오독.
-- **성격 규정(과장 금지)**: 이것은 공급망 **차단 게이트가 아니다**(workflow_run 소비 참조 0건, publish-artifact 독립). 탐지(cargo audit)는 정상 작동했고 red 로 보였으므로 무성 실패도 아님 — 죽었던 것은 **알림 채널과 신호 대 잡음비**.
-- **부류 분리(이 티켓의 실질)**: 취약점(count>0) → `cargo audit` exit 1 = **red**. 경고(unmaintained/yanked) → exit 0 = **green**(비게이팅, 로그엔 보임). `continue-on-error`·전면 억제 없이 종료코드로 구분. quick-xml 2건은 개별 `--ignore` 유지(제거 시 red — 실증됨).
-- **후속 추천**: ①ab_glyph→skrifa 이행으로 ttf-parser 경고 실제 해소(미래 트랙, 02_status 5번) ②schedule 최초 야간 런(다음 00:00 UTC)이 green 이면 정정 최종 확증.
-
-## [2026-07-22] featurephone 소비 계약 드리프트 가드 (wie-featurephone-engine-contract-selftest)
-- **무엇을**: featurephone 웹이 의존하는 엔진 계약(아티팩트 쌍·glue API·키 어휘·세이브 블롭·clean-exit 체인·dispatch payload)을 `docs/contracts/` 에 핀하고, 정적 검사 + 실브라우저 부팅 왕복 검사를 PR CI(`engine-contract.yml`)와 릴리스 게이트(`publish-artifact.yml`)에 이중 편입.
-- **왜**: 웹 셸의 부팅 셀프테스트 제거(2026-07-20)로 사라진 커버리지를 엔진 쪽 CI 가 인수 — 엔진 변경이 웹을 깨면 엔진 레포에서 먼저 실패(운영자 지시, 제안 #p2 채택). 웹 레포는 무변경.
-- **사용자 영향**: main 에 계약 파손이 들어가도 릴리스 게이트가 발행·전파를 fail-closed 차단 — 사용자가 깨진 화면을 볼 확률↓. (★정정: PR 단계 조기 차단은 `wie-main-branch-protection` 의 보호설정 적용 후에만 성립. 이 티켓만으로는 PR 차단력 없음.)
-- **후속 추천**: ①화면을 그리는 초소형 픽스처 추가로 blit 회귀까지 커버 확장(현 한계) ②로컬 main 분기(로컬 전용 커밋 0f13ab87) 브랜치·PR 경유 정리.
+  # 독립 축 — 이관 «부모 커밋»의 원문에 직접 물어도 같은 값이어야 한다(범위 지정이 필요 없다)
+  # ★★--first-parent 를 붙이지 마라(아래 참조). tail -1 = 최고령 매치 = «이관 커밋» 이어야 한다
+  MIG=$(git log --format=%H --grep='wie-report-md-per-round-files-port-from-otterpebble' | tail -1)
+  git show "$MIG^:REPORT.md" | shasum -a 256
+  git show "$MIG^:REPORT.md" | grep -c '^## \['     # ★51 이어야 한다. 53 이면 부모를 잘못 짚었다
+  ```
+  ★**`sed` 를 빼면 «오늘 이미» 틀린 답이 난다** — `ls docs/report/*.md` 가 이관 이후 회차까지 먹기 때문이고,
+  회차가 쌓일수록 더 벌어진다. ★**「이력이 깨졌다」로 오독하는 경로가 여기다.**
+  ★★**독립 축에 `--first-parent` 를 붙이면 «착지 뒤» 뒤집힌다** — 이 저장소는 **upstream-sync 라 머지 커밋으로 착지**하므로
+  `main` 의 first-parent 경로에 **이관 커밋이 없다**. 남는 매치는 머지 커밋뿐이고 `$MIG^` = **착지 직전 `main`**
+  (= 이관 이후 회차를 이미 먹은 원문 · 절 **53**)이 된다. ★**브랜치 위에서는 «돌기» 때문에 이 함정은 착지 후에만 발화한다.**
+- ★**경계가 모호했던 구간 0건** — 머리글 `# REPORT` 는 원문 **1행**에 있었고 회차들 사이에 묻힌
+  텍스트가 없다(형제 저장소는 여기서 1건이 있었다). 위 검산의 `printf` 두 줄이 그 머리글이다.
+- ★**`STATE.md` 는 «가르지 않았다»** — 형제 저장소도 가르지 않았다. 그 파일은 회차 원장이 아니라
+  **현재 상태**(진행중·완료·다음)라 회차별 파일이 성립하지 않는다.
+  ⇒ ★**이 이관은 원장 충돌을 «없애지» 않고 «2파일 → 1파일»로 줄인다. 숨기지 않는다.**
+- 되돌리는 법 = `docs/report-migration-revert.md` (명령으로 적혀 있다).

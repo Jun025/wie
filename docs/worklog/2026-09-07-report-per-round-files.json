@@ -1,0 +1,44 @@
+{
+  "schema": "worklog/v1",
+  "date": "2026-09-07",
+  "task": "wie-report-md-per-round-files-port-from-otterpebble",
+  "title": "REPORT.md 를 회차별 파일로 갈랐다 — 형제 저장소 착지분 포팅",
+  "summary": "643줄/51회차 REPORT.md 를 docs/report/NNNN--YYYY-MM-DD--<ticket-id>.md 51파일로 가르고, REPORT.md 는 자라지 않는 고정 안내로 바꿨다. 연번 내림차순 연결이 원문과 바이트 동일(sha256 4f85ec30… · 213,785B)이라 이력 소실 0. 되돌리는 절차와 열린 PR 해소 레시피는 docs/report-migration-revert.md 에 명령으로 적었다.",
+  "changes": [
+    "docs/report/ 51파일 신설 — REPORT.md 원문을 회차별로 가른 것(요약·편집 0)",
+    "REPORT.md — 원장 → 고정 안내(왜 갈랐나 · 읽는 법 · 쓰는 법 · 이관 사실)",
+    "docs/report-migration-revert.md 신설 — revert 절차 + 이관 직후 열린 PR 해소 레시피(한시)",
+    "AGENTS.md §Landing paperwork — 「REPORT.md 상단 append」 → 「docs/report/ 새 파일」"
+  ],
+  "verification": [
+    "이력 소실 0: { printf '# REPORT\\n\\n'; ls docs/report/*.md | sort -r | sed -n '/\\/0051--/,$p' | xargs cat; } | shasum -a 256 → 4f85ec30… (213,785B · 절 51). ★sed 로 «이관분 0001~0051» 만 남긴다 — 이 sha 의 유효 범위가 거기까지이고, 빼면 이관 이후 회차를 함께 먹어 틀린 답이 난다. 독립 축: git show <이관 sha>^:REPORT.md | shasum -a 256 도 같은 값",
+    "충돌 0: 두 가짜 회차가 «동시에» 각자 파일을 추가한 형상에서 git merge-tree rc=0",
+    "소비자 전수(모집단 485 추적 파일): 프로그램 소비자 0(.github 0 · scripts 0) · 쓰는 쪽 1(AGENTS.md) 이관 완료",
+    "네 게이트 + beta clippy + node 검사기 전건 green"
+  ],
+  "limits": [
+    "STATE.md 는 가르지 않았다(형제 저장소도 가르지 않았다) — 현재 상태 파일이라 회차별 파일이 성립하지 않는다. ⇒ 원장 충돌은 «없어지지» 않고 2파일 → 1파일로 준다.",
+    "STATE.md 의 산문 REPORT.md 언급 7곳은 «완료» 절의 이력이라 고치지 않았다 — 고정 안내 스텁이 그 자리에서 리다이렉트한다.",
+    "docs/report-migration-revert.md 부록(열린 PR 해소 레시피)은 한시적이다 — 이관 시점 열린 5건이 다 착지하면 그 절을 지운다."
+  ],
+  "proposals": [
+    {
+      "title": "STATE.md 의 「완료 (최근)」 절도 회차별로 가른다",
+      "plainSummary": "REPORT.md 는 갈랐지만 STATE.md 안에 466줄짜리 «완료» 이력이 그대로 남아 있어, 회차가 착지할 때마다 열린 PR 이 여전히 그 한 자리에서 충돌한다.",
+      "userBenefit": "머지 회차의 재해소 왕복이 완전히 사라진다. 지금은 절반만 사라졌다.",
+      "why": "이관 시점 실측으로 열린 PR 5건이 전부 STATE.md 를 만지고 전부 충돌한다(4건은 코드 충돌 0 = 원장 때문에만 충돌). REPORT.md 축을 없앤 뒤에도 그 5건은 여전히 충돌한다.",
+      "tradeoff": "STATE.md 는 «현재 상태»(진행중·다음)와 «append-only 이력»(완료)이 한 파일에 섞여 있어, 가르려면 먼저 그 둘을 분리해야 한다 — 포팅이 아니라 설계 판단이고 형제 저장소에 선례가 없다.",
+      "effort": "M",
+      "target": "STATE.md · docs/report/ 또는 신설 디렉터리"
+    },
+    {
+      "title": "이관 직후 열린 PR 이 다 착지하면 되돌림 문서의 부록을 지운다",
+      "plainSummary": "docs/report-migration-revert.md 의 「부록 — 열린 PR 5건을 푸는 법」은 한시적 절이다. #98·#99·#100·#105·#106 이 다 착지하면 쓰일 일이 없다.",
+      "userBenefit": "문서가 «지금 유효한 것»만 담아, 다음 사람이 끝난 상황의 레시피를 현행으로 오독하지 않는다.",
+      "why": "그 절 자신이 「다 풀리면 지운다」고 선언한다. 선언만 있고 소유자가 없으면 관성으로 남는다.",
+      "tradeoff": "너무 일찍 지우면 늦게 되살아난 브랜치가 레시피를 잃는다 — 다섯 건 전건 착지를 확인하고 지워야 한다.",
+      "effort": "S",
+      "target": "docs/report-migration-revert.md"
+    }
+  ]
+}
