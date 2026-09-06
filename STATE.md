@@ -32,7 +32,18 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- (없음 — 열린 PR 0건. #88~#91 전건 착지)
+- **「감시를 지웠는데 green」 전수 계수** (PR 개설 · `wie-count-deletable-checks-that-stay-green-repo-wide`
+  · 채택 제안 `2026-09-06-parity-lock-self-deletion-guard#p0`) — ★**세기만 하는 회차 · 가드 0 · 코드 0 · 워크플로 무접촉.**
+  술어 「워크플로가 «경로로» 부르는 검사 파일 A」↔「`scripts/`·`*/tests/` 실재 파일 B」 ⇒ ★**A=9 · B=23 · 차집합 14**.
+  ★**두 형태로 갈린다**: ⒜**「CI 에서 돌고 있는데 지워도 green」 8**(전건 rust 통합시험 — `cargo test --all`·
+  `tarpaulin --workspace` 가 **glob 으로 줍는다**) ⒝★**「애초에 CI 에서 안 도는 검사」 3**(`audit-no-leak.sh`·
+  `verify-browser.mjs`·`smoke_gate.sh` — ★**지울 필요도 없다**) ⒞검사 아님 2 ⒟★**술어 오탐 1**
+  (`…/tests/support/dod_ci_parity.rs` — 직전 회차 가드가 물어 red ⇒ **가드가 작동을 증명했다**).
+  ★**실측 축**: 격리 워크트리에서 ⒜의 1건을 실제로 지우고 `cargo test --all` → **rc=0 · 156→155 passed ·
+  그 이름 출력 «0회»**(커밋 0). ★`codecov.yml` 0바이트라 **커버리지 게이트도 못 잡는다**.
+  ★★**회차를 낳은 「이 저장소에서 다섯 번」은 «출처가 없다»** — 실제로 센 five times 는 `AGENTS.md` 의
+  **셀프머지**(다른 형태)다. 세 자리에 상호참조 정정(원문 보존). ★**8건에 각각 가드를 다는 것은 권하지 않는다** —
+  값하는 자리는 ⒝의 3건이다.
 
 ## 완료 (최근)
 - 2026-09-06: **WIPI 리소스 픽스처** (PR **#91** 착지 · `wie-system-class-loader-spi-resource-fixture`
