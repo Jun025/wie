@@ -40,7 +40,29 @@
   같은 두 회차를 이관 «전» 부모 커밋에 얹으면 **rc=1 `CONFLICT … REPORT.md`**.
   ★**소비자 전수**(모집단 추적 파일 485): 프로그램 소비자 **0**(`.github` 0 · `scripts` 0) · 쓰는 쪽 **1**(`AGENTS.md`) 이관.
   ★**`.gitattributes` 신설 0** · ★**`STATE.md` 는 가르지 않았다**(현재 상태 파일) ⇒ 원장 충돌은 **2파일 → 1파일**로 준다.
-- **재측 의무 멱등화** (PR 개설 · `wie-worklog-remeasure-obligation-duplicates-per-round`) —
+- (그 밖: ★열린 형제 PR: **#98 · #99 · #100 · #105 · #108** — 각자 자기
+  브랜치에서 진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
+
+## 완료 (최근)
+- 2026-09-06: **노출 판정을 남길 «자리»** (PR **#106** 착지 · `wie-record-dependency-exposure-verdict-for-next-advisory`
+  · 채택 제안 `2026-09-06-rtrb-rustsec-2026-0274#p2`) — `docs/project-kb/02_status.md` 공급망 대장에
+  **`### C. 해소분 — 노출 판정 보존`** 신설(C-1 = RUSTSEC-2026-0274/`rtrb`) + `rust-audit.yaml` 주석 포인터 1곳.
+  ★**2파일 · +46/−0**(순수 추가). ★**새 파일을 만들지 않았다** — 대전제 ⓐ 실측에서 그 대장이 스스로
+  「이 절이 정본이다」라고 선언하고 도달성 판정·버전 축을 이미 갖고 있었다(새 파일 = 두 번째 진실원).
+  ★**A 에 안 넣은 이유** = A 의 자기 불변식(「audit 경고 수 == 행 수」)을 설계상 깨기 때문 — C 는 그 밖이다.
+  ★**유효기간 축을 칸으로**: C-1 은 `rodio@0.22.2` 기준이고 **⑵만 판본 의존**(⑴우리 코드·⑶타입은 무관).
+  ★★**관측(미수정)**: 대장 A 가 이미 낡았다 — 경고 **2건**(`ttf-parser`·★`chacha20` yanked) ↔ 표 **3행** ·
+  A-2·A-3 은 이미 상향돼 사라졌고 `chacha20` 은 표에 없다. 계약 3(소급 금지)으로 손대지 않았다.
+- 2026-09-06: **J2ME 게스트 부팅을 `cargo test --all` 안으로** (PR **#102** 착지 · `wie-j2me-guest-boot-in-cargo-test-all`
+  · 채택 제안 `2026-09-06-createimage-fixture#p1`) — `wie_j2me/tests/test_boot.rs` 1건 + `test_utils` 하니스 확장
+  + 커밋 픽스처 `test_data/draw_j2me.zip`(1,020B). ★**브라우저 잡 무접촉**(`.github/`·`scripts/`·`web/` diff **0파일**).
+  ★**막힌 것은 하니스가 아니라 픽스처였다** — `*.jar` 는 Constraint 9 로 추적 금지라, ★**zip 이 jar 를 담는 기존 관례**
+  (`keydraw_ktf.zip` 안의 `00000000.jar`)를 그대로 썼다(`npm run audit` PASSED).
+  ★**하니스 핵심 = redraw 응답 루프** — 종전 `TestScreen` 이 요청을 기록 안 해 **첫 판이 10,000틱 paints 0** 이었다.
+  ★단언은 «프레임이 합성됐다»(「안 던졌다」는 페인트 전에 죽는 게스트도 통과시킨다 = 2026-09-04 형상).
+  ★양방향 2종 red(메인 클래스 미존재 · `image.rs` 마이그레이션 되돌림) · `cargo test --all` **40/156 → 41/157**(회귀 0).
+  ★**착지 시 배포 있음** — `Cargo.lock`·`Cargo.toml` 이 `publish-artifact.yml` paths 에 매치(Release + otterpebble dispatch).
+- 2026-09-07: **재측 의무 멱등화** (PR **#107** 착지 · `wie-worklog-remeasure-obligation-duplicates-per-round`) —
   `check-worklog-coverage.mjs` 에 **`--record`**(가드 2: 기한 미도래 · 배열 전체 중복) + OVERDUE 문면 교체
   + `AGENTS.md` 정합화. ★**임계·비율 판정 무접촉** · ★**기존 `measurements` 3 → 3 불변(바이트 동일)** ·
   ★**CI 가 도는 «인자 없는» 경로 동작 무변**.
@@ -48,7 +70,7 @@
   `[...,40,25]` **rc=1** ↔ `[...,25,40]` **rc=0**(같은 집합·순서만 반대) · 중복에 `pct` 가 다르면 `BELOW-UNANSWERED`.
   ★양방향: 가드 있음 → no-op(항목 3) ↔ 가드 제거 → 항목 **4** · 중복 **{35:2}**.
   ★**남는 구멍**: 두 브랜치가 둘 다 착지 전에 기록하면 여전히 중복(판정식 축은 F3 이 금지 ⇒ 제안).
-- **러너 목록에 `keydraw_*`·`--inject`** (PR 개설 · `wie-agents-md-runner-list-missing-keydraw-and-inject`
+- 2026-09-06: **러너 목록에 `keydraw_*`·`--inject`** (PR **#104** 착지 · `wie-agents-md-runner-list-missing-keydraw-and-inject`
   · 채택 제안 `2026-09-06-rtrb-rustsec-2026-0274#p1`) — `AGENTS.md` 한 곳(루프 2줄 + 산문 6줄) ·
   ★**삭제행 0**(순수 추가) · 픽스처·러너 코드 무접촉.
   ★**전제 실측**(모집단 332줄): `keydraw` **0건** · `--inject` **0건** — 그런데 그 사실은 `wie_validate.rs:34`
@@ -56,10 +78,6 @@
   ★**갈림을 실행으로**: `keydraw_{ktf,lgt}` 플래그 없음 **FAIL · content false · paints 1** ↔
   `--inject` **PASS · content true · paints 55**(두 캐리어 동일).
   ★파리티 락 무영향(마커 구간 «밖» · `dod_ci_parity` 11 passed).
-- (그 밖: ★열린 형제 PR: **#98 · #99 · #100 · #102 · #103 · #104 · #105** — 각자 자기
-  브랜치에서 진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
-
-## 완료 (최근)
 - 2026-09-06: **WIPI 리소스 브라우저 단언** (PR **#101** 착지 · `wie-resource-axis-has-no-browser-scenario-decision`
   · 채택 제안 `2026-09-06-spi-resource-fixture#p1`) — `contract-roundtrip.mjs` 에 **Scenario E-res·F-res 2건**.
   ★**새 zip 0 · 계약 재핀 0 · 글루 변경 0 · 추가 부팅 0 · 키 픽셀 단언 무접촉.**
