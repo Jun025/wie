@@ -34,10 +34,30 @@
 ## 진행중
 - **no-leak dist 스캔 처분 — ★«안 한다»로 닫음** (PR 개설 · `wie-no-leak-dist-scan-never-runs-in-ci`
   · 채택 제안 `2026-09-06-wire-audit-no-leak-in-ci#p0`) — ★**저울을 다시 쟀고 원 판단이 옳았다.**
-  F1: CI run 10건 중 API 로 10/10 스텝 실재, 로그 취득 5건에서 **5/5 스킵**(나머지 5건은 로그 부분 취득이라 ★«측정 불가»로 제외 — 「로그에 없다」를 「안 돌았다」로 읽지 않았다).
+  F1(★**as of 2026-09-06T22:14Z** · 모집단은 계속 자란다): 그 스텝을 실은 run **19건**(API: **18 success + 1 skipped**) 중
+  ★**성공 18건 전건 로그를 받아 18/18 이 「skipping dist scan」** · `contains no game files` **0/18** · ★**미취득 0건**.
+  ★함정 둘: `gh run view --log` 가 스텝명을 `UNKNOWN STEP` 으로 접는다(스텝명 말고 **출력 문자열**로 grep) ·
+  `gh api …/jobs/<id>/logs` 는 **`--allow-escape-sequences`** 없이는 아무것도 내지 않는다. ★**어느 쪽 0 이든 «부재»가 아니라 측정 artefact 다.**
   ★F2⑶ = **참**: `web/public/` 부재 · 내려받기 0 · 유일한 미추적 입력(`web/src/wasm/`)이 `.js/.wasm/.d.ts` · ★실제 빌드 결과 dist **4파일 · 게임류 0**.
   ⇒ 주석 한 블록으로 근거와 ★**뒤집힐 조건**을 커밋했다. **판정 술어 무접촉**(비-주석 변경 0) · 워크플로 무접촉.
   ★착지 시 배포 없음 예상(`.rs`·`Cargo.*` 무접촉 — 착지 diff 로 다시 셀 것).
+- **카드 신원을 `class_definition().name()` 으로** (PR 개설 · `wie-clet-card-identity-use-class-definition-name`
+  · 채택 제안 `2026-09-06-clet-card-identity-design#p0`) — `card_canvas.rs` 한 파일(**+44/−24**).
+  `getClass()`→`getName()` **invoke_virtual 2회 + to_rust_string** → ★**`class_definition().name()` 한 줄** ·
+  `is_clet_card` 의 **`replace('.', "/")` 제거** ⇒ ★**형식 불일치가 «방어 대상»이 아니라 «비존재»** 가 된다.
+  ★**F1 양 경로 프로브**: LGT `net/wie/CletWrapperCard` · KTF `CletCard` — **둘 다 내부 형식**.
+  ★**개악 2종**: M1(정규화 재도입) → 새 음성 시험 **FAILED** · M2(호출부 되돌림) → LGT
+  `last_frame_content=false` · `paints 83`(2026-09-05 서명 재현) · `--expect-last-frame` **rc=1**.
+  ★러너 5픽스처 PASS · `paints` **55/55** 기준선 그대로 · ★**하드코딩 두 이름 무접촉**(PR #95 기각 축).
+  ★**핀 결합을 적었다**(고치지 않았다): `class_definition()` 은 `RustJava@5b84dd1` API ⇒ 핀 이동 시 재검증.
+- **`STATE.md` 「완료」 분할 판단** (PR 개설 · `wie-state-md-completed-section-per-round-split`
+  · 채택 제안 `2026-09-07-report-per-round-files#p0`) — ★**하지 않는다 · 구현 0.**
+  ★**대조군 실측**: 「완료」 **543줄**을 들어내(681 − 543 = **138** · 자리표시 스텁 4줄을 남겨 파일은 **142줄** · 79% 축소)
+  가짜 회차 둘의
+  `merge-tree` 가 ★**여전히 rc=1** — 추가 지점이 「완료」가 아니라 ★**「진행중」의 맨 위**다.
+  ★열린 PR 5건 중 STATE 접촉 4건이 **전부** 「진행중」을 만지고 ★**「완료」만 만지는 것 0건**.
+  ★형제 판단(approve)의 근거 「살아 있는 절 0」이 wie 엔 **성립하지 않는다** — ★자는 **전체줄**이고
+  서두 17 + fork 16 + 진행중 8 + 다음 97 = **138줄**(= 681 − 완료 543)이 「지금」을 말한다.
 - (그 밖: ★열린 형제 PR: **#98 · #99 · #100 · #113** — 각자 자기
   브랜치에서 진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
 

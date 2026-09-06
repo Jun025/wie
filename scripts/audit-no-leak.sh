@@ -125,7 +125,9 @@ echo "── 5. no game files in the build output / repo (S6) ──────
 # Where this runs: engine-contract.yml calls this script as an always-run step,
 # before/without any frontend build, so `web/dist` is absent and the scan
 # self-skips. Confirmed in real CI logs, not locally, over the WHOLE population:
-# 19 engine-contract runs carry this step (18 success + 1 skipped, per the API);
+# as of 2026-09-06T22:14Z, 19 engine-contract runs carry this step (18 success +
+# 1 skipped, per the API) — the population keeps growing, so re-measure, do not
+# quote this count as if it were fixed;
 # all 18 successful ones print "skipping dist scan" and 0 print "contains no
 # game files" — 18/18, with 0 logs unretrievable.
 # HOW TO RE-MEASURE THIS WITHOUT GETTING A FALSE ZERO (both traps were hit here):
