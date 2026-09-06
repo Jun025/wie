@@ -32,7 +32,17 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- (없음 — 열린 PR **0건**. `## 다음` 에서 고르라)
+- **WIPI 리소스 픽스처** (PR **#91** 열림 · `wie-system-class-loader-spi-resource-fixture`
+  · 채택 제안 `2026-09-05-system-class-loader-preemptive-migration#p0`) — 아카이버는 이미 리소스 디렉터리를
+  jar 에 넣고 있었는데 ★**그 디렉터리가 «비어 있었다»** ⇒ 9바이트 `res.bin` 을 넣고 게스트가 부팅 때 읽어
+  `res:9:602` 를 찍게 했다. ★**한 줄이 «두 홉»을 각각 증명한다**(size=`get_resource_size` · 합=`read_resource`).
+  ★**자리별 드릴로 4자리 «각각» FAILED rc=101**(기준선 rc=0) — 종전에는 4자리에 `panic!()` 을 심어도 **150 passed**.
+  ★회귀 0: key-reach 2건 통과 · 브라우저 왕복 **35/35** · `verdict` ⒡ 표를 「커버 1곳 → 5곳」으로 정정(남은 미커버 = **6번 하나**).
+- **파리티 락 «자기 삭제» 가드** (PR **#90** 열림 · `wie-dod-ci-parity-self-deletion-guard`) — 게이트② 대기.
+- **`wie_validate` «마지막 프레임» 축** (PR **#89** 열림 · `wie-lgt-validate-last-frame-axis`) — 게이트② 대기.
+- **LGT 검은 화면 «근인» 수정** (PR **#88** 열림 · `wie-lgt-browser-paint-black-screen-name-compare`) — 게이트② 대기.
+  ★**넷은 코드 파일이 겹치지 않는다** — 원장 2파일(`REPORT.md`·`STATE.md`)만 공유한다.
+  ※#91 만 `docs/upstream-realign-verdict.md` 를 만진다(#88~#90 무접촉).
 
 ## 완료 (최근)
 - 2026-09-05: **`get_system_class_loader` 6곳 선이행** (PR **#83** 착지 · `wie-system-class-loader-preemptive-migration-six-sites`

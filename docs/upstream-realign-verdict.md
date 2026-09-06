@@ -771,13 +771,20 @@ wie_validate  draw_j2me PASS(booted+rendered) · helloworld_ktf PASS · hellowor
 | # | 자리 | 심었을 때 | 커버 |
 |---|---|---|---|
 | 1 | `wie_lgt/src/emulator.rs:114` 부팅 `binary.mod` | ★**123 passed / 1 failed** · `helloworld_lgt` **FAIL** · `keydraw_lgt` **FAIL** | ★**예** |
-| 2 | `wie_lgt/…/wipi_c/context.rs:100` `get_resource_size` | 139/0 · 5/5 **무변화** | ★**아니오** |
-| 3 | `wie_lgt/…/wipi_c/context.rs:112` `read_resource` | 139/0 · 5/5 **무변화** | ★**아니오** |
-| 4 | `wie_ktf/…/wipi_c/context.rs:95` `get_resource_size` | 139/0 · 5/5 **무변화** | ★**아니오** |
-| 5 | `wie_ktf/…/wipi_c/context.rs:108` `read_resource` | 139/0 · 5/5 **무변화** | ★**아니오** |
+| 2 | `wie_lgt/…/wipi_c/context.rs:100` `get_resource_size` | 139/0 · 5/5 **무변화**(2026-09-05) → ★**시험 FAIL**(2026-09-06) | ★**예**(아래 정정) |
+| 3 | `wie_lgt/…/wipi_c/context.rs:112` `read_resource` | 139/0 · 5/5 **무변화**(2026-09-05) → ★**시험 FAIL**(2026-09-06) | ★**예**(아래 정정) |
+| 4 | `wie_ktf/…/wipi_c/context.rs:95` `get_resource_size` | 139/0 · 5/5 **무변화**(2026-09-05) → ★**시험 FAIL**(2026-09-06) | ★**예**(아래 정정) |
+| 5 | `wie_ktf/…/wipi_c/context.rs:108` `read_resource` | 139/0 · 5/5 **무변화**(2026-09-05) → ★**시험 FAIL**(2026-09-06) | ★**예**(아래 정정) |
 | 6 | `wie_midp/…/lcdui/image.rs:116` `Image.createImage(String)` | 139/0 · 5/5 **무변화** | ★**아니오** |
 
 ⇒ ★**커버되는 자리는 «1곳»(★1번 = LGT 부팅)이지 «5곳»이 아니다.** 초판이 놓친 것은 6번 하나가 아니라 **다섯**이다.
+★★★**[정정 2026-09-06 · `wie-system-class-loader-spi-resource-fixture`] 위 「1곳」은 «그날의 값»이고 지금은 «5곳»이다.**
+채택 제안 `#p0` 이 요구한 **SPI 리소스 픽스처**가 들어왔다: `scripts/make-wipi-keydraw-fixture.sh` 가
+`examples/resources/keydraw/res.bin`(`WIE-RES-1` · 9바이트)을 **비어 있던** 리소스 디렉터리에 넣고, 게스트가 부팅 때 읽어
+`res:9:602` 를 찍는다(size = `get_resource_id` ⇒ 호스트 `get_resource_size` · 합 = `get_resource` ⇒ 호스트 `read_resource`
+⇒ ★**한 줄이 «두 홉»을 각각 증명한다**). `wie_{ktf,lgt}/tests/test_resource_reach.rs` 가 그것을 단언한다.
+★**자리별 드릴을 다시 돌렸다**(한 자리씩 `panic!()`): ★**2·3·4·5 전건 시험 FAIL(rc=101)** · 무개악 기준선 rc=0.
+⇒ ★**남은 미커버는 «6번 하나»다**(`Image.createImage(String)` — 그 자리를 부르는 픽스처는 여전히 0건).
 ★**직접 증거로 서는 것은 `helloworld_lgt`·`keydraw_lgt` 가 태우는 1번뿐**이고, 그 자리는
 「Java 프레임이 없다」 갈래의 실증이다(부팅 직후라 게스트 프레임이 아직 없다 — 게이트② 재현: `same=true`).
 ★**[어휘 정정 `-fix6`] 「게스트 프레임이 아직 없다」 → 정확히는 «Java 프레임이 아예 없다»** — ①은 `do_start` 이
