@@ -32,6 +32,12 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- **`STATE.md` 「완료」 분할 판단** (PR 개설 · `wie-state-md-completed-section-per-round-split`
+  · 채택 제안 `2026-09-07-report-per-round-files#p0`) — ★**하지 않는다 · 구현 0.**
+  ★**대조군 실측**: 「완료」를 들어내 **681 → 142줄**(79% 축소)로 만들어도 가짜 회차 둘의
+  `merge-tree` 가 ★**여전히 rc=1** — 추가 지점이 「완료」가 아니라 ★**「진행중」의 맨 위**다.
+  ★열린 PR 5건 중 STATE 접촉 4건이 **전부** 「진행중」을 만지고 ★**「완료」만 만지는 것 0건**.
+  ★형제 판단(approve)의 근거 「살아 있는 절 0」이 wie 엔 **성립하지 않는다**(진행중 6+다음 91+fork 12 = 138줄).
 - **원장 파일 목록에 `docs/report/**`** (PR 개설 · `wie-merge-contract-path-list-stale-after-report-split`) —
   `AGENTS.md` §Landing paperwork 한 블록. ★**`REPORT` 존치**(고정 안내로 실재) · 충돌 해소는 **합집합**.
   ★**관측(고치지 않았다)**: 그 승인 열거의 정본은 `~/orchestrator/templates/merge-ticket.tpl` = **이 저장소 밖**이고
