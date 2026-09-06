@@ -39,9 +39,35 @@
   ★**모든 카드가 true** 라 쓰면 검은 화면을 전 경로에 재현한다. 부팅 플래그는 LGT 만 가능(KTF 부팅은 ADF `MClass` → `Main.main` 범용 경로).
   ⇒ ★**두 경로를 한 벌로 덮는 대체 술어가 없다.** 미지(실게임의 KTF 카드 이름)는 **양쪽 갈래가 같은 결론**이라 판정을 흔들지 않는다.
   ★남는 제안 1건 = `getClass().getName()` → `class_definition().name()`(구현 안 함 · #p1 이 원한 것을 주지 않는다).
-- (그 밖: ★형제 PR **#93**(`…-createimage-fixture`)이 자기 브랜치에서 열려 있다)
+- (그 밖: ★열린 형제 PR: **#95 · #96 · #97 · #98** — 각자 자기 브랜치에서 진행 중이고,
+  전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
 
 ## 완료 (최근)
+- 2026-09-06: **「감시를 지웠는데 green」 전수 계수** (PR **#94** 착지 · 머지커밋 `0f7bb2fc` · `wie-count-deletable-checks-that-stay-green-repo-wide`
+  · 채택 제안 `2026-09-06-parity-lock-self-deletion-guard#p0`) — ★**세기만 하는 회차 · 가드 0 · 코드 0 · 워크플로 무접촉.**
+  술어 「워크플로가 «경로로» 부르는 검사 파일 A」↔「`scripts/`·`*/tests/` 실재 파일 B」 ⇒ ★**A=9 · B=23 · 차집합 14**.
+  ★**두 형태로 갈린다**: ⒜**「CI 에서 돌고 있는데 지워도 green」 8**(전건 rust 통합시험 — `cargo test --all`·
+  `tarpaulin --workspace` 가 **glob 으로 줍는다**) ⒝★**「애초에 CI 에서 안 도는 검사」 3**(`audit-no-leak.sh`·
+  `verify-browser.mjs`·`smoke_gate.sh` — ★**지울 필요도 없다**) ⒞검사 아님 2 ⒟★**술어 오탐 1**
+  (`…/tests/support/dod_ci_parity.rs` — 직전 회차 가드가 물어 red ⇒ **가드가 작동을 증명했다**).
+  ★**실측 축**: 격리 워크트리에서 ⒜의 1건을 실제로 지우고 `cargo test --all` → **rc=0 · 156→155 passed ·
+  그 이름 출력 «0회»**(커밋 0). ★`codecov.yml` 0바이트라 **커버리지 게이트도 못 잡는다**.
+  ★★**회차를 낳은 「이 저장소에서 다섯 번」은 «출처가 없다»** — 실제로 센 five times 는 `AGENTS.md` 의
+  **셀프머지**(다른 형태)다. 세 자리에 상호참조 정정(원문 보존). ★**8건에 각각 가드를 다는 것은 권하지 않는다** —
+  값하는 자리는 ⒝의 3건이다.
+- 2026-09-06: **`Image.createImage(String)` 픽스처** (PR **#93** 착지 · `wie-system-class-loader-createimage-fixture`
+  · 채택 제안 `2026-09-05-system-class-loader-preemptive-migration#p1`) — 제안이 미완으로 남긴 문장은
+  하나였다: 「갈림 «자체»는 측정됐다 … **미측정인 것은 «넓어진 가시 범위가 실제로 무엇을 찾는가»** 하나다」.
+  ⇒ jar 에 `wie-img.png`(16×8 · 74바이트)를 동봉하고 `DrawMIDlet.startApp()` 이 그것을 **이름으로** 열어
+  `getWidth()`·`getHeight()` 를 저장하며 `paint()` 가 **그 치수 그대로** 사각을 채운다
+  ⇒ ★**칠해진 픽셀 수 = 호스트가 찾아 디코드한 이미지의 픽셀 수**(왕복 Scenario C-img 가 `1024+128=1152` 를 등호로 단언).
+  ★**커버 0 → 1**: 같은 `panic!()` 프로브가 **전**에는 `cargo test --all` rc=0·156 passed·5픽스처 전건 PASS 였고,
+  **후**에는 `draw_j2me.jar` 를 부팅에서 죽인다.
+  ★**개악 E1**(`get_system_class_loader` → `jvm.current_class_loader()`) → `IOException: Resource not found: /wie-img.png`
+  ⇒ ★**넓어진 범위가 찾는 것 = 1건 · 종전 경로 = 0건.** 왕복 **42/42**.
+  ★**게이트②가 «다른 자리»로 재확인했다** — `wie_backend::decode_image` 를 개악하니(회신이 만진 크레이트 «밖») 이 픽스처만
+  FAIL 하고 대조군 3건은 green ⇒ 공허한 통과가 아니다. ★단 `wie_validate` 는 이 축의 오라클이 아니다(폭을 2배로 해도 PASS) —
+  이 커버는 사실상 **`contract` 잡 단독 의존**이다.
 - 2026-09-06: **`rtrb` 보안 자문 해소** (PR **#92** 착지 · `wie-rustsec-2026-0274-rtrb-double-free-audit-red`) —
   매일 도는 `Security audit`(schedule 전용 · PR 게이트 아님)이 3일 연속 `error: 1 vulnerability found!` 였다.
   `RUSTSEC-2026-0274` = `rtrb` 의 `ReadChunk::commit` 에서 **원소의 `Drop` 이 panic 할 때** double free/UAF.

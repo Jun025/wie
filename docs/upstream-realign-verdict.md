@@ -785,6 +785,16 @@ wie_validate  draw_j2me PASS(booted+rendered) · helloworld_ktf PASS · hellowor
 ⇒ ★**한 줄이 «두 홉»을 각각 증명한다**). `wie_{ktf,lgt}/tests/test_resource_reach.rs` 가 그것을 단언한다.
 ★**자리별 드릴을 다시 돌렸다**(한 자리씩 `panic!()`): ★**2·3·4·5 전건 시험 FAIL(rc=101)** · 무개악 기준선 rc=0.
 ⇒ ★**남은 미커버는 «6번 하나»다**(`Image.createImage(String)` — 그 자리를 부르는 픽스처는 여전히 0건).
+★★★**[정정 2026-09-06 · `wie-system-class-loader-createimage-fixture`] 바로 위 「남은 미커버는 6번 하나」도 이제 «그날의 값»이다 — 미커버는 «0곳»이다.**
+채택 제안 `#p1` 이 요구한 **createImage 픽스처**가 들어왔다: `scripts/make-draw-fixture.mjs` 가 jar 에 `wie-img.png`(16×8 RGB PNG · 74바이트)를
+동봉하고, `DrawMIDlet.startApp()` 이 **`Image.createImage("/wie-img.png")`** 로 그것을 **이름으로** 열어
+`getWidth()`·`getHeight()` 를 정적 필드에 저장하며, `DrawCanvas.paint()` 가 **그 치수 그대로** 사각을 채운다
+⇒ ★**칠해진 픽셀 수가 곧 «호스트가 찾아 디코드한 이미지의 픽셀 수»** 다(`scripts/contract-roundtrip.mjs` Scenario C-img 가 `1024 + 128 = 1152` 를 **등호로** 단언).
+★**커버 전/후를 같은 프로브로 쟀다**(`image.rs` 의 그 줄에 `panic!()`): ★**전 — `cargo test --all` rc=0 · 156 passed · 5픽스처 전건 PASS**(= 아무것도 그 자리를 지나지 않았다)
+↔ ★**후 — `draw_j2me.jar` 가 `panic during 'boot'` 로 FAIL**. ⇒ **0 → 1.**
+★★**그리고 이 절이 「⑥은 «갈린다»」로 재도출한 것이 «실행»으로 확인됐다** — `get_system_class_loader` 를 `jvm.current_class_loader()` 로 되돌리면
+★**`java.io.IOException: Resource not found: /wie-img.png`**(스택: `Image.createImage(String)` ← `DrawMIDlet.startApp`) ⇒
+★**넓어진 가시 범위가 «실제로 찾는 것»은 1건이고, 종전 경로가 찾던 것은 0건이다** — 이 절의 예측이 그대로 재현됐다.
 ★**직접 증거로 서는 것은 `helloworld_lgt`·`keydraw_lgt` 가 태우는 1번뿐**이고, 그 자리는
 「Java 프레임이 없다」 갈래의 실증이다(부팅 직후라 게스트 프레임이 아직 없다 — 게이트② 재현: `same=true`).
 ★**[어휘 정정 `-fix6`] 「게스트 프레임이 아직 없다」 → 정확히는 «Java 프레임이 아예 없다»** — ①은 `do_start` 이

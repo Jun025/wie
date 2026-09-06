@@ -23,6 +23,13 @@
 //   builds it), so nonBlackPixels() > 0 is a real assertion here: it fails if the
 //   core stops composing frames or WebScreen::paint stops reaching the canvas.
 //   This fixture never exits — the loop stops at the first painted frame.
+// Scenario C-img (same J2ME instance — RESOURCE-BY-NAME, ASSERTED):
+//   startApp() opens a bundled PNG through Image.createImage(String) and paints
+//   a rect of the dimensions the host reported, so the pixel count answers
+//   "what did the widened class-loader visibility actually find" with a number.
+//   This is the one call site of the six in the get_system_class_loader
+//   migration whose behaviour CHANGED (it used to throw IOException every time);
+//   before this fixture nothing in the repo executed either half.
 // Scenario D (same J2ME instance — KEY DELIVERY, ASSERTED):
 //   Scenario A's sweep only proves key_down/key_up don't throw, which an engine
 //   that drops every event also passes. Here the fixture's keyPressed() paints a
@@ -123,7 +130,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { drawFixtureJar, keyBarPixels } from "./make-draw-fixture.mjs";
+import { BASE_RECT_PX, IMG_H, IMG_RECT_PX, IMG_W, drawFixtureJar, keyBarPixels } from "./make-draw-fixture.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const contract = JSON.parse(await readFile(path.join(root, "docs/contracts/featurephone-engine-contract.json"), "utf8"));
@@ -178,6 +185,12 @@ for (const [variant, key] of Object.entries(KTF_VARIANT_TO_KEY)) {
   if (typeof width !== "number") throw new Error(`keydraw fixture: no arm for KeyCode::${variant} — refusing to fail-open`);
   if (width !== wipi) throw new Error(`keydraw fixture paints ${width} for KeyCode::${variant}, but contract.keyWipiCodes["${key}"] is ${wipi} — the fixture and the contract disagree`);
 }
+// Scenario C-img's numbers, DERIVED from the fixture's own exports (same rule as
+// the Scenario E constants above: never restate a number the fixture owns).
+// Crosses into the page context through page.evaluate's argument — the module
+// import is Node-side only.
+const IMG = { base: BASE_RECT_PX, px: IMG_RECT_PX, w: IMG_W, h: IMG_H };
+
 // One representative per positive band, mirroring Scenario D's three.
 const KTF_KEYS = ["HASH", "STAR", "NUM5"].map((code) => ({
   code,
@@ -227,7 +240,7 @@ page.on("pageerror", (e) => consoleLog.push(`[pageerror] ${e.message}`));
 await page.goto(base + "/");
 page.setDefaultTimeout(120_000);
 
-const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys }) => {
+const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys, img }) => {
   const steps = [];
   const check = (name, pass, info = "") => {
     steps.push({ name, pass: !!pass, info: String(info) });
@@ -348,6 +361,28 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     check("C: tick loop survives (no throw)", runC.threw === null, runC.threw ?? `${runC.frames} frames`);
     check("C: canvas blit ASSERTED — fixture's rect reaches the canvas", runC.pixels > 0, `${runC.pixels} non-black px after ${runC.frames} frames`);
 
+    // ── Scenario C-img: does Image.createImage(String) RESOLVE? (ASSERTED) ────
+    // The one site of the six get_system_class_loader call sites whose behaviour
+    // actually changed. Through current_class_loader this call could never find
+    // a guest resource and threw IOException every time; through the system
+    // URLClassLoader it resolves. Nothing exercised either half before this —
+    // a planted panic!() at image.rs left the suite and all five fixtures green.
+    //
+    // The guest fills a rect of the dimensions the host reported for the decoded
+    // image, so the pixel count is the ANSWER, not a liveness signal: exactly
+    // BASE + IMG_W*IMG_H means the name resolved AND decode_image produced those
+    // dimensions. A failure is LOUD, not a smaller number: startApp has no catch
+    // (the fixture's assembler emits no exception table), so an unresolved name
+    // aborts the boot — measured 2026-09-06 as FAIL/paints 0 under wie_validate.
+    const runCimg = await tickLoop(c.emu, c.canvas, 30_000, (px) => px === img.base + img.px);
+    check(
+      `C: Image.createImage(String) resolves the bundled resource — a ${img.w}x${img.h} image`,
+      runCimg.threw === null && runCimg.pixels === img.base + img.px,
+      runCimg.threw ??
+        `${runCimg.pixels} px, expected ${img.base + img.px} (base ${img.base} + image ${img.px}) — ` +
+          `startApp has no catch, so a resource that does not resolve aborts the boot: expect a throw or 0 px, not ${img.base}`,
+    );
+
     // ── Scenario D: does a key press REACH THE GUEST? (behavioral, not no-throw) ─
     // Scenario A only proves key_down/key_up don't throw — an engine that drops
     // every event passes that. Here the guest itself answers: its keyPressed()
@@ -439,7 +474,7 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     check("scenario aborted by exception", false, (e && e.stack) || String(e));
   }
   return steps;
-}, { contract, representativeKeys: REPRESENTATIVE_KEYS, ktfKeys: KTF_KEYS });
+}, { contract, representativeKeys: REPRESENTATIVE_KEYS, ktfKeys: KTF_KEYS, img: IMG });
 
 await browser.close();
 server.close();
