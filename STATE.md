@@ -32,12 +32,6 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- **key-reach 시험에 `paints > 0` 은 «얹지 않는다»** (PR 개설 · `wie-key-reach-tests-assert-frame-composited`
-  · 채택 제안 `2026-09-06-j2me-guest-boot-in-cargo-test#p0`) — ★**단언 0 · 시험 수 0 증가 · 실행 코드 0줄**(주석만).
-  ★**F4 를 «수»로 먼저 답했다**: Scenario **E**(KTF)·**F**(LGT)가 같은 3키(`HASH·STAR·NUM5`)를 돌아
-  ★**픽셀 단언 6건**으로 두 캐리어를 덮는다 ⇒ 브리프의 ⒞ 조건 충족.
-  ★**더 강한 이유**: 정상 `paints=1` ↔ 2026-09-05 검은 화면 `paints=83` ⇒ ★**`paints > 0` 이 두 상태 다 참**이라
-  인용된 사고를 **가르지 못한다**. ★내 「영영 지는 시험이 된다」 가설은 프로브 실측(`paints=1`)로 **반증**됐다.
 - **카드 신원을 `class_definition().name()` 으로** (PR 개설 · `wie-clet-card-identity-use-class-definition-name`
   · 채택 제안 `2026-09-06-clet-card-identity-design#p0`) — `card_canvas.rs` 한 파일(**+44/−24**).
   `getClass()`→`getName()` **invoke_virtual 2회 + to_rust_string** → ★**`class_definition().name()` 한 줄** ·
@@ -55,10 +49,23 @@
   ★열린 PR 5건 중 STATE 접촉 4건이 **전부** 「진행중」을 만지고 ★**「완료」만 만지는 것 0건**.
   ★형제 판단(approve)의 근거 「살아 있는 절 0」이 wie 엔 **성립하지 않는다** — ★자는 **전체줄**이고
   서두 17 + fork 16 + 진행중 8 + 다음 97 = **138줄**(= 681 − 완료 543)이 「지금」을 말한다.
-- (그 밖: ★열린 형제 PR: **#98 · #99 · #100 · #113** — 각자 자기
+- (그 밖: ★열린 형제 PR: **#98 · #99 · #100 · #115 · #118** — 각자 자기
   브랜치에서 진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
 
 ## 완료 (최근)
+- 2026-09-07: **audit 「허용 경고」 목록 기계 대조** (PR **#119** 착지 · `wie-rust-audit-allowed-warning-list-machine-checked`
+  · 채택 제안 `2026-09-06-rust-audit-warning-list-remeasure#p0`) — ⒜ 기대값 파일 + 검사기 + `rust-audit.yaml` **별도 스텝**.
+  ★**`cargo audit` 스텝 무접촉**(`--ignore` 0 · rc·트리거 불변) ⇒ **Constraint 5** 와 충돌 없음.
+  ★**기대값 ≠ suppression 을 기계로**: 사라진 경고 → **rc=1** · 새 경고 → 인쇄하되 **rc=0**.
+  ★**M3(개수는 2로 같고 구성만 스왑) → rc=1** — 실제로 났던 결함 형태이고 개수로는 못 잡는다. 현 상태 rc=0(오늘 red 아님).
+  ★대가: 일 1회 스케줄 잡에 `cargo audit --json` 1회(웜 0.89~1.09s) · PR 상시 구간 무접촉 · npm 의존성 0.
+  ★착지 시 배포 없음 예상(`.rs`·`Cargo.*` 무접촉 — 착지 diff 로 다시 셀 것).
+- 2026-09-07: **key-reach 시험에 `paints > 0` 은 «얹지 않는다»** (PR **#117** 착지 · `wie-key-reach-tests-assert-frame-composited`
+  · 채택 제안 `2026-09-06-j2me-guest-boot-in-cargo-test#p0`) — ★**단언 0 · 시험 수 0 증가 · 실행 코드 0줄**(주석만).
+  ★**F4 를 «수»로 먼저 답했다**: Scenario **E**(KTF)·**F**(LGT)가 같은 3키(`HASH·STAR·NUM5`)를 돌아
+  ★**픽셀 단언 6건**으로 두 캐리어를 덮는다 ⇒ 브리프의 ⒞ 조건 충족.
+  ★**더 강한 이유**: 정상 `paints=1` ↔ 2026-09-05 검은 화면 `paints=83` ⇒ ★**`paints > 0` 이 두 상태 다 참**이라
+  인용된 사고를 **가르지 못한다**. ★내 「영영 지는 시험이 된다」 가설은 프로브 실측(`paints=1`)로 **반증**됐다.
 - 2026-09-06: **createImage 실패 갈래 픽스처 잠금** (PR **#110** 착지 · `wie-createimage-failure-branches-fixture-lock`
   · 채택 제안 `2026-09-06-createimage-fixture#p0`) — 어셈블러에 ★**예외 테이블** + 갈래 2종
   (없는 이름 `java/io/IOException` · 깨진 이미지 `java/lang/IllegalArgumentException` — ★**호스트 소스에서 읽었다**).
