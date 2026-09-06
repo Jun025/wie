@@ -25,7 +25,7 @@ the file that enforces it; causes no file enforces are in the ledger.
 | 6 | `no_std` + `extern crate alloc` in the engine crates — reaching for `std` breaks the web build | wasm clippy gate in `rust.yml`; `docs/architecture.md` |
 | 7 | `wie_web` is an empty library off `wasm32`. Do not "clean up" the `cfg(target_arch = "wasm32")` gates | `wie_web/Cargo.toml:1-11`; native jobs in `rust.yml` |
 | 8 | The exact version pins and the RustJava `rev` pin are deliberate | `Cargo.toml` — comment above the `rev` lines; full rationale in the ledger |
-| 9 | No game bytes, ever | `.gitignore` blocklist + `audit-no-leak.sh` — full text below |
+| 9 | No game bytes, ever | `.gitignore` blocklist + `scripts/audit-no-leak.sh`, run on every PR by `engine-contract.yml` — full text below |
 | 10 | Secrets are referenced, never embedded or printed | `.dev.vars*` git-ignored + `.claude/settings.json` read-deny — full text below |
 | 11 | D1 migrations auto-apply to prod on `main`, destructive statements included — author accordingly | `web.yml:97-100`; `docs/CLOUDFLARE_SETUP.md` |
 | 12 | Never commit to `main`; branch → PR, and stop. Merge and branch deletion are a separate approved task | **Nothing machine-locks this** — see Definition of Done |
@@ -170,9 +170,55 @@ The contract check needs the WASM artifact already in `web/src/wasm/` — build 
 local build, else it fails with missing-artifact violations (CI order: `engine-contract.yml:116`
 then `:125`). The rest need a toolchain fetch — run them only when the artifact or UI changes.
 
+**Which of these CI actually runs — "the check exists" is not "the check runs".** Measured
+2026-09-06 across all 8 workflow files: `check-engine-contract.mjs` and `contract-roundtrip.mjs`
+run in `engine-contract.yml`; `build-wasm.sh` and the frontend build run in `web.yml`; **`npm run
+audit` now runs on every PR** as an always-run step of `engine-contract.yml`. The two below do
+**not** run in CI and are **local-only by design** — do not "fix" that by wiring them:
+
+- **`npm run verify` (`scripts/verify-browser.mjs`) — local only.** It drives a *real* Chrome
+  (`chromium.launch({ channel: "chrome" })`, not the bundled chromium `contract-roundtrip.mjs`
+  uses) through the whole app against a server serving `web/dist` **plus `functions/`** — i.e. a
+  `wrangler pages dev` with D1 bindings, not a static file server. And there is no URL to point it
+  at on a PR: `web.yml`'s deploy steps are all gated on `github.event_name == 'push'`, so a PR
+  build produces `web/dist` as an artifact and deploys nothing. Wiring it means standing up the
+  Pages dev stack inside CI — a workflow-sized change, not a step. It needs no game file (its
+  default argument is the committed `test_data/helloworld_ktf.zip`); the browser and the server
+  are the cost. Run it by hand against production after a deploy: `WIE_BASE=https://wie-web.pages.dev
+  node scripts/verify-browser.mjs test_data/helloworld_ktf.zip`.
+- **`scripts/smoke_gate.sh` — local only, and structurally so.** It regresses the working game
+  catalog against `scripts/smoke_gate_baseline.tsv`, reading titles from `WORKING_DIR`
+  (default `game_lab/working`). `game_lab/` is git-ignored and holds real game bytes, which
+  **Constraint 9 forbids from ever entering the repo, the build output, or any log**. There is no
+  version of this check that runs in CI without breaking the constraint it sits beside; the
+  committed baseline is identifiers and expected status only, never paths or bytes.
+
 ### Landing paperwork
 
-- **`STATE.md` and `REPORT.md` are tracked files, not scratch**: keep `STATE.md`'s 진행중/완료/다음 current as a task starts and lands, and append a dated 무엇을·왜·사용자 영향 entry to the top of `REPORT.md` when it lands.
+- **`STATE.md` and `docs/report/` are tracked files, not scratch**: keep `STATE.md`'s 진행중/완료/다음 current as a task starts and lands, and write a dated 무엇을·왜·사용자 영향 entry when it lands. **Round entries go in a new `docs/report/NNNN--YYYY-MM-DD--<ticket-id>.md` — do not append to `REPORT.md`**, which is now a fixed pointer (2026-09-07; every round appending to one file's top made every open PR conflict — 5/5 at migration time, 4 of them on the ledger files *only*). `NNNN` is the global sequence, largest + 1:
+
+  ```sh
+  N=$(printf '%04d' $(( $(ls docs/report | sed -E 's/^([0-9]{4})--.*/\1/' | sort -n | tail -1 | sed 's/^0*//') + 1 )))
+  $EDITOR docs/report/$N--$(date +%F)--<ticket-id>.md   # first line: ## [YYYY-MM-DD] title (<ticket-id>)
+  grep -H '^## \[' docs/report/*.md | sort -r            # reading it back: the directory is the index
+  ```
+
+  **`-H` is load-bearing, not cosmetic.** It prefixes the path, so `sort -r` keys on the *sequence number*; `-h` keys on the title text, which is the date, and this repo lands up to six rounds a day. Measured over 54 files: the `-h` form is **52 lines out of place**, the `-H` form is **0**. Sort by the **sequence number, not the date** — the ledger's date-monotonicity is a coincidence, not a guarantee. `REPORT.md` explains the rest; `docs/report-migration-revert.md` reverts it.
+- **The ledger files of this repo are `STATE.md`, `REPORT.md`, `docs/report/**`, and `docs/worklog/**`.**
+  Resolve a merge conflict in any of them by **union** — keep both sides' entries, ordered by the
+  authoring time of each entry's round. Never take one side wholesale; the other side's entries
+  vanish silently and the gates stay green.
+
+  **`docs/report/**` is on that list because the round entries moved there** on 2026-09-07 (merge
+  `a5091df6`, ticket `wie-report-md-per-round-files-port-from-otterpebble`). `REPORT.md` stays on it
+  too — the file still exists as the fixed pointer, and a round that edits the pointer is editing a
+  ledger file. **The merge contract's own enumeration (`STATE`·`REPORT`·`docs/worklog/**`·`reports/`·
+  `tasks/`) predates that move and does not name `docs/report/**`** — it is rendered from
+  `~/orchestrator/templates/merge-ticket.tpl`, outside this repo, so a round that needs the authority
+  cannot find it there. This line records the judgement already made rather than making each round
+  re-derive it: 2026-09-07 a merge round reasoned it out and chose to *move* the entry (appending to
+  `REPORT.md` knowingly breaks a convention that landed 20 minutes earlier; dropping the entry loses
+  it), which is the answer — but nothing guaranteed the next round would reach it.
 - **Follow-up proposals go in a `docs/worklog/*.json`, or they do not exist.** When a task leaves
   follow-up recommendations (or adopts/declines earlier ones), write
   `docs/worklog/YYYY-MM-DD-<slug>.json` in the same PR. The cockpit 「후속 작업 추천」 panel reads
