@@ -106,6 +106,14 @@
 //   WIPIKeyCode::from_midp_raw. What the browser adds is the key-agnostic half,
 //   and any one arriving key proves that (same argument as Scenario D).
 //
+// Scenario F (LGT keydraw fixture — the SAME question on LGT, ASSERTED):
+//   E's twin, and the only net for a whole class of bug: it once failed at 0 px
+//   while KTF reached 424, because MIDP overpainted the good WIPI frame with a
+//   blank screenImage — the browser was black while the emulator worked. Neither
+//   `cargo test` nor `wie_validate` sees that (wie_validate's saw_content is a
+//   sticky ANY-frame predicate and never inspects the LAST frame). Root cause and
+//   the 2026-09-06 fix are recorded at the scenario itself.
+//
 // Usage: node scripts/contract-roundtrip.mjs        (after scripts/build-wasm.sh)
 //   WIE_CHROME_CHANNEL=chrome  — use a system Chrome instead of the playwright
 //                                bundled chromium (local dev convenience).
@@ -385,35 +393,48 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     e.emu.free();
     check("E: free() (no throw)", true);
 
-    // ── Why there is no LGT twin of Scenario E (localized 2026-09-05) ─────────
-    // keydraw_lgt.zip is built from the SAME guest source by the same script, so
-    // the constants above would hold unchanged and the scenario is ~10 lines. It
-    // was written, run, and REMOVED because it fails for a reason that is not
-    // about keys — the LGT canvas stays at 0 px while KTF reaches 424.
-    //
-    // CORRECTION. The first version of this note said "the gap is LGT paint ->
-    // WebScreen -> canvas". Staged probes on both hosts disproved that: the LGT
-    // frame DOES reach the canvas. The ordered browser trace is
+    // ── Scenario F: the SAME question on LGT — and the black-screen regression ─
+    // This scenario existed once and was REMOVED: it failed at 0 px while KTF
+    // reached 424, for a reason that was not about keys at all. The ordered
+    // browser trace was
     //   MC_grpFlushLcd -> WebScreen::paint(incoming_nonblack=424) -> draw_image ok
     //   Display::handle_paint_event disable_paint=false
     //                  -> WebScreen::paint(incoming_nonblack=0)   -> draw_image ok
-    // i.e. the good WIPI frame is painted and then OVERWRITTEN by MIDP's blank
-    // screenImage, so the last frame — the one you see — is black. KTF runs the
-    // same trace with disable_paint=true and no trailing blank blit.
-    // Root cause: net/wie/CardCanvas only calls Display.disablePaint() when the
-    // card class is "CletCard" or "net/wie/CletWrapperCard", and LGT's card
-    // reports Class.getName() as "net.wie.CletWrapperCard" — dots, not slashes,
-    // so the comparison never matches. (KTF's card is "CletCard", no package,
-    // which is why only LGT is hit.) Adding the dot form flips LGT to 424 px in
-    // the browser and its native paints 83 -> 55, exactly matching KTF.
+    // i.e. the good WIPI frame was painted and then OVERWRITTEN by MIDP's blank
+    // screenImage, so the last frame — the one you see — was black. Root cause:
+    // net/wie/CardCanvas only calls Display.disablePaint() for the clet card, and
+    // it compared Class.getName() (BINARY name, dots) against a slash literal, so
+    // for LGT's `net.wie.CletWrapperCard` the branch had never run once.
     //
-    // KTF IS NOT SAFE — IT IS UNPACKAGED. "CletCard" comes from the guest (it is
-    // a constant-pool string in the fixture's own client.bin), so the day a card
-    // class arrives with a package, KTF breaks the same way LGT does. A fix that
-    // only ADDS the dot form leaves that fragility in place; normalising the name
-    // (or dropping the class-name predicate) is what removes it. Weigh that when
-    // picking the prescription — the fix is a separate round, and this file stays
-    // a checker, not a patch.
+    // Fixed 2026-09-06 by normalising the name in `is_clet_card` rather than
+    // adding the dot literal: KTF's `CletCard` passes only because it has no
+    // package, so a packaged card class would have broken KTF the same way.
+    //
+    // KEEP THIS SCENARIO. It is the ONLY net for that class of bug — `cargo test`
+    // and `wie_validate` both pass with the black screen present, because
+    // wie_validate's `saw_content` is a sticky any-frame predicate and never looks
+    // at the LAST frame, which is the one a user sees. This asserts pixels AFTER
+    // the loop settles, so a re-introduced overpaint reads as 0 px here.
+    const fixtureBytesF = await (await fetch("/fixtures/keydraw_lgt.zip")).arrayBuffer();
+    check("F: static server delivers keydraw_lgt.zip", fixtureBytesF.byteLength > 0, `${fixtureBytesF.byteLength} bytes over HTTP`);
+
+    const f = await bootFixture(mod2, "keydraw_lgt.zip");
+    check('F: platform_kind() === "LGT"', f.emu.platform_kind() === "LGT", `got ${f.emu.platform_kind()}`);
+    // Same guest source as keydraw_ktf.zip, built by the same script, so the bar
+    // widths above hold unchanged — that is why this reuses ktfKeys verbatim.
+    for (const k of ktfKeys) {
+      f.emu.key_down(k.code);
+      const runF = await tickLoop(f.emu, f.canvas, 15_000, (px) => px === k.expectPixels);
+      f.emu.key_up(k.code);
+      check(
+        `F: "${k.code}" reaches the LGT guest as WIPI code ${k.wipi} AND survives to the last frame`,
+        runF.threw === null && runF.pixels === k.expectPixels,
+        runF.threw ?? `${runF.pixels} px, expected ${k.expectPixels} (${k.wipi}*barH) after ${runF.frames} frames`,
+      );
+    }
+
+    f.emu.free();
+    check("F: free() (no throw)", true);
   } catch (e) {
     check("scenario aborted by exception", false, (e && e.stack) || String(e));
   }
