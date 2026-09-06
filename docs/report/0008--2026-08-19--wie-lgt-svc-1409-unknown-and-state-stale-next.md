@@ -1,0 +1,6 @@
+## [2026-08-19] LGT SVC 0x581 — 정체 미확정이라 «미지원»으로 끊었다 + 낡은 `## 다음` ①② 해소 (wie-lgt-svc-1409-unknown-and-state-stale-next)
+- **무엇을**: ①`wie_lgt/src/runtime/svc_ids.rs` 의 `WIPICSvcId` 표에 **`0x581`(=1409)** 을 `MiscUnk9` 로 등재하고, `wipi_c.rs` 의 디스패치를 **`WieError::Unimplemented`(모듈·인덱스·인자 4개를 로그에 실는다)** 로 연결했다. **값을 지어내 반환하지 않는다.** ②`STATE.md` `## 다음` ①②(PR #54·#46)를 «다시 발권하지 마라» 절로 옮겼다.
+- **왜**: 영웅서기5 LGT(upstream `dlunch/wie#1260`)가 `CletWrapper.startApp` 에서 `Unknown LGT WIPIC SVC id 1409` 로 즉사한다. **`0x581` 이 misc 모듈이라는 것까지는 실측으로 확정된다** — LGT 는 WIPIC 모듈마다 100 의 배수를 기저로 쓰고 `BackLight = 0x578 = 1400+0` 이 misc 를 고정하므로 `0x581` 은 **misc index 9** 다. ★**그러나 index 9 «가 무슨 함수인지»는 확정되지 않는다**: 이 repo 의 유일한 misc 참조표(KTF `get_misc_method_table`)가 **index 4 에서 끝나고**, LGT 표는 **다른 스펙 개정판**이다(graphics 가 index 14 부터 KTF 대비 **+1** — LGT `CopyArea 0xd7`=+15 ↔ KTF 14). ⇒ 이름을 붙이면 **근거 없이 맞아 보이는 문장**이 된다. 그래서 티켓 Contract 2 의 «등재 + 미지원 예외» 갈래로 잘랐다.
+- **사용자 영향**: 영웅서기5 LGT 는 **여전히 이 지점에서 진행하지 못한다.** 바뀐 것은 로그다 — 「알 수 없는 SVC」가 「misc index 9 미구현, 인자 4개는 이러함」이 되고, 그것이 다음 회차의 입력이 된다. 다른 타이틀 영향 0(`scripts/smoke_gate_baseline.tsv` 기준선 변화 0).
+- **후속**: misc index 9 의 정체는 **이 repo 안의 근거로는 못 푼다** — 실기/다른 구현체의 LGT misc 테이블이나 게임 바이너리 호출부 디스어셈이 있어야 한다. 새 근거 없이 재발권하지 마라.
+
