@@ -32,7 +32,15 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- (없음 — 열린 PR 0건. #88~#91 전건 착지)
+- **`rtrb` 보안 자문 해소** (`wie-rustsec-2026-0274-rtrb-double-free-audit-red`) — 매일 도는 `Security audit`(schedule
+  전용 · PR 게이트 아님)이 3일 연속 `error: 1 vulnerability found!` 였다. `RUSTSEC-2026-0274` = `rtrb` 의
+  `ReadChunk::commit` 에서 **원소의 `Drop` 이 panic 할 때** double free/UAF.
+  ★**전이 의존이다** — `wie_cli → rodio 0.22.2 → rtrb`. rodio 요구가 `^0.3.2` 라 ★**rodio 무접촉**으로
+  `cargo update -p rtrb` 만에 패치판 `0.3.5` 로 간다 ⇒ `Cargo.lock` **2줄**.
+  ★★**노출은 «세 축 전부» 안 탄다**: ⑴우리 `.rs`/`.toml` 의 `rtrb|ReadChunk` **0건**(쓰는 rodio 표면은 재생 전용)
+  ⑵rodio 는 `microphone.rs` 에서만 rtrb 를 쓰는데 그 파일의 `read_chunk|ReadChunk|.commit` **0건**(`pop()` 만 쓴다)
+  ⑶원소 타입 `rodio::Sample = f32` = **`Drop` 없음** ⇒ 자문의 전제가 구조적으로 성립 불가.
+  ⇒ ★**red 를 끄는 것이 아니라 「노출되는가」에 답한 뒤 안고 가지 않기로 한 것**이다.
 
 ## 완료 (최근)
 - 2026-09-06: **WIPI 리소스 픽스처** (PR **#91** 착지 · `wie-system-class-loader-spi-resource-fixture`
