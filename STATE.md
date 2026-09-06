@@ -38,6 +38,15 @@
   ★**픽셀 단언 6건**으로 두 캐리어를 덮는다 ⇒ 브리프의 ⒞ 조건 충족.
   ★**더 강한 이유**: 정상 `paints=1` ↔ 2026-09-05 검은 화면 `paints=83` ⇒ ★**`paints > 0` 이 두 상태 다 참**이라
   인용된 사고를 **가르지 못한다**. ★내 「영영 지는 시험이 된다」 가설은 프로브 실측(`paints=1`)로 **반증**됐다.
+- **카드 신원을 `class_definition().name()` 으로** (PR 개설 · `wie-clet-card-identity-use-class-definition-name`
+  · 채택 제안 `2026-09-06-clet-card-identity-design#p0`) — `card_canvas.rs` 한 파일(**+44/−24**).
+  `getClass()`→`getName()` **invoke_virtual 2회 + to_rust_string** → ★**`class_definition().name()` 한 줄** ·
+  `is_clet_card` 의 **`replace('.', "/")` 제거** ⇒ ★**형식 불일치가 «방어 대상»이 아니라 «비존재»** 가 된다.
+  ★**F1 양 경로 프로브**: LGT `net/wie/CletWrapperCard` · KTF `CletCard` — **둘 다 내부 형식**.
+  ★**개악 2종**: M1(정규화 재도입) → 새 음성 시험 **FAILED** · M2(호출부 되돌림) → LGT
+  `last_frame_content=false` · `paints 83`(2026-09-05 서명 재현) · `--expect-last-frame` **rc=1**.
+  ★러너 5픽스처 PASS · `paints` **55/55** 기준선 그대로 · ★**하드코딩 두 이름 무접촉**(PR #95 기각 축).
+  ★**핀 결합을 적었다**(고치지 않았다): `class_definition()` 은 `RustJava@5b84dd1` API ⇒ 핀 이동 시 재검증.
 - (그 밖: ★열린 형제 PR: **#98 · #99 · #100 · #113** — 각자 자기
   브랜치에서 진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
 
