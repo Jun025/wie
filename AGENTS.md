@@ -198,10 +198,20 @@ audit` now runs on every PR** as an always-run step of `engine-contract.yml`. Th
 - **`STATE.md` and `docs/report/` are tracked files, not scratch**: keep `STATE.md`'s 진행중/완료/다음 current as a task starts and lands, and write a dated 무엇을·왜·사용자 영향 entry when it lands. **Round entries go in a new `docs/report/NNNN--YYYY-MM-DD--<ticket-id>.md` — do not append to `REPORT.md`**, which is now a fixed pointer (2026-09-07; every round appending to one file's top made every open PR conflict — 5/5 at migration time, 4 of them on the ledger files *only*). `NNNN` is the global sequence, largest + 1:
 
   ```sh
-  N=$(printf '%04d' $(( $(ls docs/report | sed -E 's/^([0-9]{4})--.*/\1/' | sort -n | tail -1 | sed 's/^0*//') + 1 )))
+  N=$(node scripts/check-docs-report-serial.mjs --next-serial)   # ask the tool, not the directory
   $EDITOR docs/report/$N--$(date +%F)--<ticket-id>.md   # first line: ## [YYYY-MM-DD] title (<ticket-id>)
   grep -H '^## \[' docs/report/*.md | sort -r            # reading it back: the directory is the index
   ```
+
+  **Ask the tool for `N`; do not compute `max + 1` from the directory.** The directory is the
+  *merged* tree, so two open PRs computing it independently pick the same serial — the filenames
+  differ, git merges both cleanly, and nothing reddens. Measured 2026-09-07: `main` held `0056`,
+  open PR #112 held `0056`, open PR #111 held `0057`; the directory said `0057` and the free number
+  was `0058`. `--next-serial` consults open PRs (`gh api …/pulls/<n>/files`) and prints the number
+  on stdout; if the network is unavailable it warns and falls back to the directory rather than
+  blocking you. The post-hoc half runs in CI (`engine-contract.yml`) and reddens a tree that already
+  holds a duplicate — **it does not renumber anything, and neither should you renumber a landed
+  file**; move the side that has not landed yet.
 
   **`-H` is load-bearing, not cosmetic.** It prefixes the path, so `sort -r` keys on the *sequence number*; `-h` keys on the title text, which is the date, and this repo lands up to six rounds a day. Measured over 54 files: the `-h` form is **52 lines out of place**, the `-H` form is **0**. Sort by the **sequence number, not the date** — the ledger's date-monotonicity is a coincidence, not a guarantee. `REPORT.md` explains the rest; `docs/report-migration-revert.md` reverts it.
 - **The ledger files of this repo are `STATE.md`, `REPORT.md`, `docs/report/**`, and `docs/worklog/**`.**

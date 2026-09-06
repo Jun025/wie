@@ -34,18 +34,28 @@
 ## 진행중
 - **`STATE.md` 「완료」 분할 판단** (PR 개설 · `wie-state-md-completed-section-per-round-split`
   · 채택 제안 `2026-09-07-report-per-round-files#p0`) — ★**하지 않는다 · 구현 0.**
-  ★**대조군 실측**: 「완료」를 들어내 **681 → 142줄**(79% 축소)로 만들어도 가짜 회차 둘의
+  ★**대조군 실측**: 「완료」 **543줄**을 들어내(681 − 543 = **138** · 자리표시 스텁 4줄을 남겨 파일은 **142줄** · 79% 축소)
+  가짜 회차 둘의
   `merge-tree` 가 ★**여전히 rc=1** — 추가 지점이 「완료」가 아니라 ★**「진행중」의 맨 위**다.
   ★열린 PR 5건 중 STATE 접촉 4건이 **전부** 「진행중」을 만지고 ★**「완료」만 만지는 것 0건**.
-  ★형제 판단(approve)의 근거 「살아 있는 절 0」이 wie 엔 **성립하지 않는다**(진행중 6+다음 91+fork 12 = 138줄).
-- **원장 파일 목록에 `docs/report/**`** (PR 개설 · `wie-merge-contract-path-list-stale-after-report-split`) —
-  `AGENTS.md` §Landing paperwork 한 블록. ★**`REPORT` 존치**(고정 안내로 실재) · 충돌 해소는 **합집합**.
-  ★**관측(고치지 않았다)**: 그 승인 열거의 정본은 `~/orchestrator/templates/merge-ticket.tpl` = **이 저장소 밖**이고
-  그 파일의 `docs/report` 히트는 **0** ⇒ 형제 `otterpebble`(2026-08-23 이관)도 같은 잠복이다. **총괄 소관.**
-- (그 밖: ★열린 형제 PR: **#98 · #99 · #100 · #110 · #112 · #113** — 각자 자기
+  ★형제 판단(approve)의 근거 「살아 있는 절 0」이 wie 엔 **성립하지 않는다** — ★자는 **전체줄**이고
+  서두 17 + fork 16 + 진행중 8 + 다음 97 = **138줄**(= 681 − 완료 543)이 「지금」을 말한다.
+- (그 밖: ★열린 형제 PR: **#98 · #99 · #100 · #113** — 각자 자기
   브랜치에서 진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
 
 ## 완료 (최근)
+- 2026-09-06: **createImage 실패 갈래 픽스처 잠금** (PR **#110** 착지 · `wie-createimage-failure-branches-fixture-lock`
+  · 채택 제안 `2026-09-06-createimage-fixture#p0`) — 어셈블러에 ★**예외 테이블** + 갈래 2종
+  (없는 이름 `java/io/IOException` · 깨진 이미지 `java/lang/IllegalArgumentException` — ★**호스트 소스에서 읽었다**).
+  ★**catch 를 좁게** 걸어 «타입»을 잠갔고, 단언은 네이티브 시험 + 브라우저 **C-err** 2곳이다.
+  ★**개악 4종 중 M1 이 «물지 않았고 그것이 옳았다»** — 서브클래스라 잡는 것이 맞다 ⇒ 잠금은 「그 타입 «이거나 서브클래스»」로 **한정해 적었다**.
+  M1′·M2(비-서브타입) **rc=101 · 2 failed** · M3(안 던지게) **rc=101 · 1 failed**.
+  ★**회귀 0**: 브라우저 기준선 **44/44 → 46/46 rc=0** · `cargo test --all` **159 → 160**. ★zip 재생성 **1회** · 타임스탬프 고정으로 **결정적**.
+  ★착지 시 배포 있음(`.rs`·`test_data/**` 접촉).
+- 2026-09-07: **원장 파일 목록에 `docs/report/**`** (PR **#112** 착지 · `wie-merge-contract-path-list-stale-after-report-split`) —
+  `AGENTS.md` §Landing paperwork 한 블록. ★**`REPORT` 존치**(고정 안내로 실재) · 충돌 해소는 **합집합**.
+  ★**관측(고치지 않았다)**: 그 승인 열거의 정본은 `~/orchestrator/templates/merge-ticket.tpl` = **이 저장소 밖**이고
+  그 파일의 `docs/report` 히트는 **0** ⇒ 형제 `otterpebble`(2026-08-23 이관)도 같은 잠복이다. **총괄 소관.**
 - 2026-09-06: **audit 「허용 경고」 목록 재측** (PR **#111** 착지 · `wie-rust-audit-header-comment-says-spin-but-actual-is-chacha20`
   · 채택 제안 `2026-09-06-rtrb-rustsec-2026-0274#p0`) — `rust-audit.yaml` 헤더 주석의 낡은
   「spin 0.12.0 yanked」를 ★**실측값**으로 교체(+측정 날짜): `ttf-parser 0.25.1` + ★**`chacha20 0.10.0 yanked`**.

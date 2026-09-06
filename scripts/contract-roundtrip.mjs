@@ -166,7 +166,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { BASE_RECT_PX, IMG_H, IMG_RECT_PX, IMG_W, drawFixtureJar, keyBarPixels } from "./make-draw-fixture.mjs";
+import { BASE_RECT_PX, IMG_ERR_BROKEN, IMG_ERR_MISSING, IMG_H, IMG_RECT_PX, IMG_W, drawFixtureJar, keyBarPixels } from "./make-draw-fixture.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const contract = JSON.parse(await readFile(path.join(root, "docs/contracts/featurephone-engine-contract.json"), "utf8"));
@@ -234,7 +234,7 @@ const resLine = `res:${resBytes.length}:${resBytes.reduce((a, b) => a + b, 0)}`;
 // the Scenario E constants above: never restate a number the fixture owns).
 // Crosses into the page context through page.evaluate's argument — the module
 // import is Node-side only.
-const IMG = { base: BASE_RECT_PX, px: IMG_RECT_PX, w: IMG_W, h: IMG_H };
+const IMG = { base: BASE_RECT_PX, px: IMG_RECT_PX, w: IMG_W, h: IMG_H, errMissing: IMG_ERR_MISSING, errBroken: IMG_ERR_BROKEN };
 
 // One representative per positive band, mirroring Scenario D's three.
 const KTF_KEYS = ["HASH", "STAR", "NUM5"].map((code) => ({
@@ -415,6 +415,7 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     check("B: free() (no throw)", true);
 
     // ── Scenario C: J2ME draw fixture — canvas blit, ASSERTED not reported ───
+    const markC = guestOut.length;
     const c = await bootFixture(mod2, "draw_j2me.jar");
     check('C: platform_kind() === "J2ME"', c.emu.platform_kind() === "J2ME", `got ${c.emu.platform_kind()}`);
     const runC = await tickLoop(c.emu, c.canvas, 30_000, (px) => px > 0);
@@ -431,16 +432,38 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     // The guest fills a rect of the dimensions the host reported for the decoded
     // image, so the pixel count is the ANSWER, not a liveness signal: exactly
     // BASE + IMG_W*IMG_H means the name resolved AND decode_image produced those
-    // dimensions. A failure is LOUD, not a smaller number: startApp has no catch
-    // (the fixture's assembler emits no exception table), so an unresolved name
-    // aborts the boot — measured 2026-09-06 as FAIL/paints 0 under wie_validate.
+    // dimensions. A failure on THIS name is LOUD, not a smaller number: the
+    // assembler's exception table guards only the two failure-branch calls below,
+    // never this one, so an unresolved /wie-img.png still aborts the boot —
+    // measured 2026-09-06 as FAIL/paints 0 under wie_validate.
     const runCimg = await tickLoop(c.emu, c.canvas, 30_000, (px) => px === img.base + img.px);
     check(
       `C: Image.createImage(String) resolves the bundled resource — a ${img.w}x${img.h} image`,
       runCimg.threw === null && runCimg.pixels === img.base + img.px,
       runCimg.threw ??
         `${runCimg.pixels} px, expected ${img.base + img.px} (base ${img.base} + image ${img.px}) — ` +
-          `startApp has no catch, so a resource that does not resolve aborts the boot: expect a throw or 0 px, not ${img.base}`,
+          `this call is outside the exception table, so a resource that does not resolve aborts the boot: expect a throw or 0 px, not ${img.base}`,
+    );
+
+    // ── Scenario C-err: the FAILURE branches of the same call (ASSERTED) ─────
+    // C-img locks "the host found it". These lock what the guest RECEIVES when it
+    // does not — the half no fixture said anything about, so either branch could
+    // change exception type or stop throwing and every check stayed green.
+    // The markers come from narrow catches in the assembler (java/io/IOException
+    // and java/lang/IllegalArgumentException, read from wie_midp/.../image.rs), so
+    // a wrong type escapes the handler and aborts the boot instead of printing.
+    // Split by PREFIX (`imgerr:`) on purpose: the existing assertions above match
+    // on pixel COUNTS and the `res:` ones on their own prefix, so added output
+    // cannot shift what any of them find.
+    check(
+      `C-err: absent resource name surfaces as java.io.IOException (${img.errMissing})`,
+      sawSince(markC, img.errMissing),
+      guestOut.slice(markC).join("") || "(no guest stdout after the C boot)",
+    );
+    check(
+      `C-err: undecodable bytes surface as java.lang.IllegalArgumentException (${img.errBroken})`,
+      sawSince(markC, img.errBroken),
+      guestOut.slice(markC).join("") || "(no guest stdout after the C boot)",
     );
 
     // ── Scenario D: does a key press REACH THE GUEST? (behavioral, not no-throw) ─
