@@ -124,10 +124,18 @@ echo "── 5. no game files in the build output / repo (S6) ──────
 # re-open this without re-measuring the three facts it rests on.
 # Where this runs: engine-contract.yml calls this script as an always-run step,
 # before/without any frontend build, so `web/dist` is absent and the scan
-# self-skips. Confirmed in real CI logs, not locally: of the engine-contract runs
-# carrying this step whose logs were retrievable, 5/5 print "skipping dist scan"
-# (the step is present in all 10 sampled runs per the API; 5 had truncated logs
-# and were excluded rather than counted as absent).
+# self-skips. Confirmed in real CI logs, not locally, over the WHOLE population:
+# 19 engine-contract runs carry this step (18 success + 1 skipped, per the API);
+# all 18 successful ones print "skipping dist scan" and 0 print "contains no
+# game files" — 18/18, with 0 logs unretrievable.
+# HOW TO RE-MEASURE THIS WITHOUT GETTING A FALSE ZERO (both traps were hit here):
+#   - `gh run view --log` renders the step-name column as "UNKNOWN STEP" for some
+#     runs, so grepping the STEP NAME returns 0 while the line is present (run
+#     34053057393: every step is "UNKNOWN STEP", yet the payload sits at line 241).
+#     Grep the OUTPUT STRING, or use `gh api repos/<o>/<r>/actions/jobs/<id>/logs`.
+#   - that API endpoint needs `--allow-escape-sequences`; without it `gh` prints
+#     nothing and looks like a fetch failure.
+#   A zero from either of these is a measurement artifact, not an absence.
 # Why a second call after web.yml's `Build frontend` was NOT added (2026-09-07):
 # nothing can put an untracked GAME-LIKE file into web/dist under this build.
 #   - `web/public/` does not exist, so Vite has no verbatim-copy directory — that
