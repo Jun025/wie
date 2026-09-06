@@ -79,6 +79,20 @@ jobs:
           git fetch --no-tags --quiet origin main
           node scripts/check-worklog-coverage.mjs
 
+      # Third always-run node step, same reasoning as the two above (~50ms, no
+      # build) and OUTSIDE the paths filter ON PURPOSE: the thing it guards —
+      # wie_cli/tests/dod_ci_parity.rs and its checker — is NOT in that filter, so a
+      # PR that deletes the parity lock changes nothing filter-relevant and every
+      # in-filter check would be skipped. It has to be a step that always reports.
+      #
+      # What it buys: the lock defends itself only through a #[path] reference, so
+      # deleting EITHER file is a compile error, but deleting BOTH removes the test
+      # target and cargo has nothing left to fail on. This step is the only
+      # reference to those paths from outside the pair, which is what turns
+      # "deleted the check" into a red instead of a silent green.
+      - name: DoD parity lock is still wired (docs/worklog/2026-09-05-dod-ci-parity-checker.json #p0)
+        run: node scripts/check-parity-lock-wired.mjs
+
       # Detect whether this diff touches anything that can change the built
       # artifact or the pinned surface. If not, the job short-circuits to success
       # (see the wrapper note in the header). Same list as publish-artifact.yml.

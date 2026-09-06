@@ -32,7 +32,15 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- (없음 — 열린 PR **0건**. `## 다음` 에서 고르라)
+- **파리티 락 «자기 삭제» 가드** (PR **#90** 열림 · `wie-dod-ci-parity-self-deletion-guard`
+  · 채택 제안 `2026-09-05-dod-ci-parity-checker#p0`) — 락은 두 파일이고 `#[path]` 결합 덕에 «한쪽만» 지우면
+  컴파일 오류지만 ★**둘을 «함께» 지우면 `cargo test --all` 이 rc=0**(실측 · 출력에 `dod_ci_parity` **0회**).
+  ⇒ 그 두 경로를 «바깥»에서 부르는 유일한 참조자 `scripts/check-parity-lock-wired.mjs` + `engine-contract.yml`
+  **상시 스텝 1개**(필터 밖 · paths 목록 무접촉). ★존재만이 아니라 `#[path]` 결합과 「검사기를 부르는 `#[test]`」까지 단언한다.
+  ★**개악 8종 전건 red**(M1 = 두 파일 함께 · M8 = 가드 자신) · 기준선 green · 비용 ~50ms.
+- **`wie_validate` «마지막 프레임» 축** (PR **#89** 열림 · `wie-lgt-validate-last-frame-axis`) — 게이트② 대기.
+- **LGT 검은 화면 «근인» 수정** (PR **#88** 열림 · `wie-lgt-browser-paint-black-screen-name-compare`) — 게이트② 대기.
+  ★**셋은 파일이 겹치지 않는다**(`engine-contract.yml`+`scripts/` ↔ `wie_validate.rs` ↔ `card_canvas.rs`) — 원장 파일만 공유한다.
 
 ## 완료 (최근)
 - 2026-09-05: **`get_system_class_loader` 6곳 선이행** (PR **#83** 착지 · `wie-system-class-loader-preemptive-migration-six-sites`
