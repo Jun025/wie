@@ -32,7 +32,11 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- **리소스 실패 갈래 커버** (`wie-spi-resource-failure-branches-uncovered`
+- (그 밖: ★열린 형제 PR: **#98 · #99 · #100 · #102 · #106 · #107** — 각자 자기
+  브랜치에서 진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
+
+## 완료 (최근)
+- 2026-09-06: **리소스 실패 갈래 커버** (PR **#105** 착지 · `wie-spi-resource-failure-branches-uncovered`
   · 채택 제안 `2026-09-06-spi-resource-fixture#p0`) — ★**전제가 절반 거짓이었다.**
   드릴(분기마다 `panic!()`): `-12`(M_E_NOENT `kernel.rs:203`) → `test_missing_resource_clears_size` **FAILED**
   ⇒ ★**이미 커버** / `-1`(버퍼 초과 `:232-233`) → **rc=0 · 아무것도 안 죽는다** ⇒ **미커버(참)**.
@@ -41,8 +45,31 @@
   ⇒ ★**호스트 단위시험 1건**으로 덮었다(그 쌍둥이 `-12` 가 이미 쓰는 형태) · **zip 재생성 0** · 픽스처 무접촉.
   ★개악 3/3 물었다(반환값 · 분기 제거 · 경계 `>`→`>=`) — 경계 개악이 물린 것은 **성공 방향도 단언**했기 때문이다.
   ★회귀 0(158 passed · `res:9:602` 단언 유지 · 픽스처 PASS). ★**계약 4 범위를 벗어났고 그 이유를 회신에 적었다.**
-
-## 완료 (최근)
+- 2026-09-06: **러너 목록에 `keydraw_*`·`--inject`** (PR **#104** 착지 · `wie-agents-md-runner-list-missing-keydraw-and-inject`
+  · 채택 제안 `2026-09-06-rtrb-rustsec-2026-0274#p1`) — `AGENTS.md` 한 곳(루프 2줄 + 산문 6줄) ·
+  ★**삭제행 0**(순수 추가) · 픽스처·러너 코드 무접촉.
+  ★**전제 실측**(모집단 332줄): `keydraw` **0건** · `--inject` **0건** — 그런데 그 사실은 `wie_validate.rs:34`
+  **코드에는 이미 있었다** ⇒ «읽히는 자리»에만 없었다.
+  ★**갈림을 실행으로**: `keydraw_{ktf,lgt}` 플래그 없음 **FAIL · content false · paints 1** ↔
+  `--inject` **PASS · content true · paints 55**(두 캐리어 동일).
+  ★파리티 락 무영향(마커 구간 «밖» · `dod_ci_parity` 11 passed).
+- 2026-09-06: **WIPI 리소스 브라우저 단언** (PR **#101** 착지 · `wie-resource-axis-has-no-browser-scenario-decision`
+  · 채택 제안 `2026-09-06-spi-resource-fixture#p1`) — `contract-roundtrip.mjs` 에 **Scenario E-res·F-res 2건**.
+  ★**새 zip 0 · 계약 재핀 0 · 글루 변경 0 · 추가 부팅 0 · 키 픽셀 단언 무접촉.**
+  ★**제안의 대가 산정이 거짓이었다** — stdout 훅은 `Platform::write_stdout` → `console.log_1` 로 **이미 있었고**
+  이 파일이 **이미 수집**하고 있었다(실패 때만 버렸다). ★**wasm 특이성도 실재했다**: 한 줄이 콘솔에
+  **다섯 메시지로 쪼개져** 온다(네이티브는 바이트 스트림이라 안 쪼개진다) — 초판 단언이 그 때문에 red 였다.
+  ★**개악이 내 이해를 반증**했다: LGT 폴백만 죽여도 green ⇒ 두 캐리어가 **같은 해결자**(클래스로더)를 쓴다.
+  양방향: 기준선 **42/42** → 변경 후 **44/44** → 클래스로더 개악 시 **E-res·F-res 둘 다 red · 키 단언 green**.
+  ★남는 구멍 = `System::filesystem()` 폴백(호스트별 구현이 갈리는 유일한 자리) — 제안 등재.
+- 2026-09-06: **파리티 가드 축⑶ «철자 → 경로»** (PR **#97** 착지 · 머지커밋 `90261612` · `wie-parity-lock-guard-string-axes-to-structure-decision`
+  · 채택 제안 `2026-09-06-parity-lock-self-deletion-guard#p1`) — ★**워크플로 무접촉 · 새 의존성 0 · CI 시간 +0s.**
+  ★**오탐이 실재했다**: 완전한 `include!` 리팩터에서 `cargo test` **rc=0 · 11 passed** 인데 가드 **rc=1**.
+  ★그 축은 «성질»이 아니라 «철자»를 잡고 있었다 — `include!` 형태에서도 검사기만 지우면 cargo **rc=101** 이고,
+  `#[path]` 줄만 지우면 ★**`cargo test --all` 이 rc=101**(6다리가 이미 문다).
+  ★**축⑷ 는 반대라 무접촉** — 공허한 락은 cargo **rc=0 · 1 passed** 로 지나가고 **가드만** 잡는다.
+  ★**세 선택지 비용 실측**: 파서 **+4패키지 + `npm ci` 41.5s/PR** · `--list` **콜드 672.7s / 웜 5.69s**(게다가 축⑷ 미커버) · 무조치 0원(오탐 잔존)
+  ⇒ **넷째(경로 참조)** 를 골랐다. 양방향 8종 대조 통과(★P1 오탐 소멸 · ★P5 원 구멍은 `cargo test --all` rc=0 인데 가드 rc=1).
 - 2026-09-06: **클렛 카드 식별 설계 결정 — ★기각** (PR **#95** 착지 · 머지커밋 `34bca716` · `wie-clet-card-identity-by-class-name-design-decision`
   · 채택 제안 `2026-09-06-lgt-black-screen-name-compare#p1`) — ★**코드 변경 0** · `card_canvas.rs` 무접촉.
   ★**실측**(임시 프로브 · 되돌림): LGT 카드 = `net/wie/CletWrapperCard`(★**우리 Rust 프로토** · `isInstance` **true**) ↔
