@@ -32,6 +32,14 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- **`REPORT.md` 회차 파일 이관** (PR 개설 · `wie-report-md-per-round-files-port-from-otterpebble`) —
+  형제 저장소 착지분(`otterpebble` `636bb8e7`)의 **포팅**이다. 643줄/51회차 → `docs/report/` **51파일** ·
+  `REPORT.md` 는 자라지 않는 **고정 안내** · `docs/report-migration-revert.md`(되돌림 + 열린 PR 해소 레시피).
+  ★**이력 소실 0** — 연번 내림차순 연결이 원문과 **바이트 동일**(sha256 `4f85ec30…` · 213,785B · 절 51 → 51).
+  ★**충돌 0 을 대조군으로 보였다** — 두 가짜 회차가 «동시에» 자기 파일을 추가: 이관 후 `merge-tree` **rc=0** ↔
+  같은 두 회차를 이관 «전» 부모 커밋에 얹으면 **rc=1 `CONFLICT … REPORT.md`**.
+  ★**소비자 전수**(모집단 추적 파일 485): 프로그램 소비자 **0**(`.github` 0 · `scripts` 0) · 쓰는 쪽 **1**(`AGENTS.md`) 이관.
+  ★**`.gitattributes` 신설 0** · ★**`STATE.md` 는 가르지 않았다**(현재 상태 파일) ⇒ 원장 충돌은 **2파일 → 1파일**로 준다.
 - **재측 의무 멱등화** (PR 개설 · `wie-worklog-remeasure-obligation-duplicates-per-round`) —
   `check-worklog-coverage.mjs` 에 **`--record`**(가드 2: 기한 미도래 · 배열 전체 중복) + OVERDUE 문면 교체
   + `AGENTS.md` 정합화. ★**임계·비율 판정 무접촉** · ★**기존 `measurements` 3 → 3 불변(바이트 동일)** ·
