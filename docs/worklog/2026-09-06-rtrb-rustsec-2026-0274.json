@@ -1,0 +1,58 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-06",
+  "task": "wie-rustsec-2026-0274-rtrb-double-free-audit-red",
+  "title": "`Security audit` 3일 red — `rtrb` 를 0.3.3 → 0.3.5 로 올렸다(락 2줄)",
+  "summary": "매일 도는 `Security audit`(schedule 전용)이 3일 연속 `error: 1 vulnerability found!` 로 red 였다. 자문은 `RUSTSEC-2026-0274` — `rtrb` 의 `ReadChunk::commit` 에서 **원소의 `Drop` 이 panic 하면** double free / use-after-free. ★**`rtrb` 는 우리 직접 의존이 아니다**: `wie_cli → rodio 0.22.2 → rtrb`. rodio 의 요구가 `^0.3.2` 라 ★**rodio 를 건드리지 않고** `cargo update -p rtrb` 만으로 패치판 `0.3.5`(자문의 `Solution: ^0.3.5`)로 올라간다 ⇒ `Cargo.lock` **2줄**.",
+  "exposure-measured": "★**「의존성 목록에 있다」와 「그 경로를 탄다」는 다르다 — 세 축을 «수»로 답했다. 셋 다 독립으로 «안 탄다»이다.** ⑴**우리 코드**: `git grep -E 'rtrb|ReadChunk' -- '*.rs' '*.toml'` → ★**0건**. `wie_cli/src/main.rs:26` 이 쓰는 rodio 표면은 `DeviceSinkBuilder, Player, buffer::SamplesBuffer, conversions::SampleTypeConverter` = **재생 전용**이다. ⑵**rodio 안**: rodio 가 rtrb 를 쓰는 곳은 `src/microphone.rs` **한 파일뿐**(`RingBuffer::<Sample>::new` · `rtrb::Consumer<Sample>`)이고, 그 파일에서 `read_chunk`·`ReadChunk`·`.commit` 을 grep 하면 ★**0건** — 실제 사용은 `self.buffer.pop()`(단건)과 `slots()` 다 ⇒ ★**취약 함수 `ReadChunk::commit` 이 애초에 호출되지 않는다.** ⑶**원소 타입**: `rodio::Sample = Float = f32`(`src/common.rs:31,43` · `64bit` 피처면 f64) = ★**`Drop` 구현이 없는 원시 타입** ⇒ 자문의 전제(「원소의 `Drop` 이 panic」)가 **구조적으로 성립 불가**다. ※범위 부기: rtrb 는 `wie_cli`(네이티브 호스트)에만 들어온다 — `wie_web`/wasm 빌드에는 없다.",
+  "changes": [
+    "`Cargo.lock`: `rtrb` 0.3.3 → 0.3.5 (version + checksum 2줄). ★그 밖의 크레이트 이동 0."
+  ],
+  "verification": {
+    "cargo audit": "★**rc=0**(전: `error: 1 vulnerability found!`). 남은 것은 «allowed warnings» 2건(`ttf-parser` unmaintained RUSTSEC-2026-0192 · `chacha20 0.10.0` yanked)이고 워크플로 주석대로 **비-게이트**다 — 이 회차의 범위 밖.",
+    "build": "`cargo build -p wie_cli` rc=0",
+    "네 게이트": "`cargo fmt --all -- --check` 0 · `cargo clippy --all -- -D warnings` 0 · `cargo clippy --target wasm32-unknown-unknown -- -D warnings` 0 · `RUST_MIN_STACK=4194304 cargo test --all` 0 (**156 passed / 0 failed**)",
+    "beta 다리": "`cargo +beta clippy --all -- -D warnings` **rc=0**",
+    "wie_validate": "`draw_j2me.jar`(`make-draw-fixture.mjs` 로 생성) · `helloworld_ktf.zip` · `helloworld_lgt.zip` → ★**전건 PASS**. 추가로 `keydraw_{ktf,lgt}.zip --inject` → **PASS · last_frame_content=true**."
+  },
+  "prescription-call": "★**⒜(버전 상향)를 골랐고 ⒞(`cargo audit` 예외 등재)는 애초에 선택지가 아니었다** — AGENTS.md Constraint 5 가 「`cargo audit` with no ignores」를 잠그고, `rust-audit.yaml` 주석이 그 자리를 「예외는 advisory ID + reachability argument 로만」이라고 못박는다. ⒝(상위 크레이트 상향 = rodio bump)도 **불필요**했다: rodio 의 요구가 `^0.3.2` 라 0.3.5 가 이미 in-range 다. ★그리고 이 처방은 **이 저장소의 선례 그대로**다 — `rust-audit.yaml` 주석이 기록한 2026-07-31 `cargo update -p wayland-scanner`(quick-xml 자문 해소) 와 같은 형태이고, 그때처럼 **suppression 을 남기지 않는다**.",
+  "limits": [
+    "★**상향은 «노출돼서»가 아니라 «자문을 안고 가지 않으려고» 했다** — 위 세 축이 전부 「안 탄다」이므로 이 회차의 실보안 이득은 ★**0에 가깝다**. 값은 ⑴daily red 를 끄는 것과 ⑵rodio 가 나중에 `read_chunk` 를 쓰게 되어도 이미 패치판이라는 것뿐이다.",
+    "⑵의 근거는 **`rodio 0.22.2` 라는 «지금 그 판본»의 소스 실측**이다 — rodio 를 올리면 다시 재야 한다.",
+    "`cargo audit` 는 `Cargo.lock` 만 본다 ⇒ 「우리가 그 코드를 실행하는가」는 이 회차가 **손으로** 답한 것이고 기계가 잠그지 않는다."
+  ],
+  "adjacent-not-fixed": [
+    "★`rust-audit.yaml` 헤더 주석이 현재 경고 2건을 「ttf-parser unmaintained … **spin 0.12.0 yanked**」라고 적는데, 실측 yanked 는 ★**`chacha20 0.10.0`** 이다(spin 아님) — 주석 표류. ★**Non-goals 의 「워크플로 변경 0」 때문에 고치지 않았다**(제안 등재).",
+    "`ttf-parser` 0.25.1 unmaintained(RUSTSEC-2026-0192) — 경고이고 비-게이트라 이 자문 하나만 다루는 이 회차의 범위 밖(제안 등재).",
+    "`keydraw_{ktf,lgt}.zip` 을 `--inject` **없이** `wie_validate` 에 걸면 FAIL 이다. ★**선재**임을 확인했다(내 변경을 stash 하고 main 의 락으로 재현). 그 픽스처는 키 주입 전용이라 정상 동작이지만, AGENTS.md 의 러너 목록에 없어 다음 사람이 밟기 쉽다(제안 등재)."
+  ],
+  "proposals": [
+    {
+      "title": "`rust-audit.yaml` 헤더 주석의 「spin 0.12.0 yanked」를 실측값으로 고친다",
+      "plainSummary": "보안 검사 워크플로의 설명 주석이 «지금 무엇이 경고인지»를 틀리게 적고 있다 — 실제 yanked 는 spin 이 아니라 chacha20 이다.",
+      "userBenefit": "없음(사용자 무영향). 대신 다음에 이 검사가 red 가 됐을 때, 주석을 읽는 사람이 «원래 있던 경고»와 «새로 생긴 것»을 틀리게 가르지 않는다.",
+      "why": "이 저장소는 「낡은 서술이 권위처럼 인용된다」로 반복해 회차를 썼다. 하필 그 주석이 «비-게이트 경고는 무엇인가»를 정의하는 자리라, 틀린 목록은 다음 회차가 «허용된 경고»를 잘못 세게 만든다. 2026-09-06 실측: `ttf-parser` unmaintained + `chacha20 0.10.0` yanked.",
+      "tradeoff": "주석 한 줄이라 값이 작고, 같은 표류가 다음 yank 때 또 난다(경고 목록을 주석에 열거하는 방식 자체의 성질). 열거를 지우고 「비-게이트 경고는 exit code 로 가른다」만 남기는 쪽이 더 나을 수 있다 — 그 판단이 이 제안의 실제 내용이다.",
+      "effort": "XS — 워크플로 주석 1~3줄.",
+      "target": ".github/workflows/rust-audit.yaml"
+    },
+    {
+      "title": "AGENTS.md 러너 목록에 `keydraw_*` 와 `--inject` 를 적는다",
+      "plainSummary": "키 입력 픽스처는 `--inject` 없이 돌리면 실패한다. 문서에 그 사실이 없어서, 확인하려던 사람이 «내가 깨뜨렸나»로 오독한다.",
+      "userBenefit": "없음(개발 절차). 대신 회차가 «선재 실패»를 자기 탓으로 오인해 조사에 시간을 쓰는 일이 줄어든다.",
+      "why": "AGENTS.md §Definition of Done 의 러너 블록은 `draw_j2me.jar`·`helloworld_{ktf,lgt}.zip` 셋만 적는다. 그런데 `test_data/` 에는 `keydraw_{ktf,lgt}.zip` 이 함께 있고, 그것을 목록의 셋과 같은 방식으로 돌리면 FAIL 이 나온다(2026-09-06 실측 · main 의 락으로도 재현되는 선재). 이 회차가 실제로 그 자리에서 한 번 멈췄다.",
+      "tradeoff": "러너 블록이 길어진다 — 그 블록은 「짧아서 실제로 실행된다」가 값의 일부라 무겁게 만들면 손해다. 그래서 목록 확장이 아니라 «각주 한 줄»이 맞을 수 있다.",
+      "effort": "XS — AGENTS.md 1~2줄.",
+      "target": "AGENTS.md"
+    },
+    {
+      "title": "「의존성 노출을 탔는가」 판정을 다음 자문 때 다시 안 파도 되게 남기는 자리를 정한다",
+      "plainSummary": "이번에 «우리가 그 결함 경로를 타는가»를 손으로 셋 재서 「안 탄다」로 답했다. 다음 자문 때 같은 일을 처음부터 다시 한다.",
+      "userBenefit": "없음(개발 절차). 대신 보안 자문이 뜰 때마다 드는 조사 비용이 «두 번째부터» 줄고, 「일단 올리고 보자」 대신 «노출 여부»로 판단하는 관례가 유지된다.",
+      "why": "`cargo audit` 는 `Cargo.lock` 만 본다 — 「그 코드를 실행하는가」는 기계가 답하지 않는다. 이번 판정(rodio 는 `microphone.rs` 에서만 rtrb 를 쓰고 `read_chunk`/`commit` 을 부르지 않으며 원소는 `f32` 다)은 worklog 안에만 있어, 다음 rtrb 자문 때 이 파일을 찾아내는 사람에게만 전달된다.",
+      "tradeoff": "노출 판정을 문서로 굳히면 «그 판정이 낡는다» — rodio 를 올리는 순간 ⑵가 무효인데 문서는 조용하다. 그래서 이 제안의 어려운 부분은 «어디에 적느냐»가 아니라 «무엇이 그것을 무효화하는지 함께 적는 형태»다.",
+      "effort": "S — 자리 결정 + 이번 건 1항 기재.",
+      "target": "docs/ (자리 미정) 또는 .github/workflows/rust-audit.yaml 주석"
+    }
+  ]
+}
