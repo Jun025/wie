@@ -1,5 +1,15 @@
 # REPORT
 
+## [2026-09-06] `Image.createImage(String)` 픽스처 — «넓어진 가시 범위가 무엇을 찾는가»를 수로 냈다 (wie-system-class-loader-createimage-fixture)
+- **무엇을**: `scripts/make-draw-fixture.mjs` 가 jar 에 `wie-img.png`(16×8 RGB · 74바이트 · 스크립트가 바이트로 조립)를 동봉하고, `DrawMIDlet.startApp()` 이 **`Image.createImage("/wie-img.png")`** 로 그것을 **이름으로** 연 뒤 `getWidth()`·`getHeight()` 를 정적 필드에 저장하며, `DrawCanvas.paint()` 가 **그 치수 그대로** 사각을 채운다. `scripts/contract-roundtrip.mjs` 에 Scenario C-img 1건. `.rs` 변경은 **주석뿐**.
+- **왜**: 운영자 채택 제안 `2026-09-05-system-class-loader-preemptive-migration#p1`. 그 원문이 미완으로 남긴 문장이 이 회차의 Acceptance 다 — 「갈림 «자체»는 측정됐다 … ★**미측정인 것은 «넓어진 가시 범위가 실제로 무엇을 찾는가»** 하나다」.
+- **★★⑴ 산출이 «수»다**(계약 5): 칠해진 픽셀 수가 곧 **호스트가 찾아 디코드한 이미지의 픽셀 수**라, 왕복이 `1024 + 128 = **1152**` 를 ★**등호로** 단언한다(「돌아간다」가 아니다). 상수는 픽스처가 단일 출처로 소유하고 왕복은 `page.evaluate` 인자로 받아 **재진술 0**.
+- **★★⑵ 커버 전/후를 «같은 프로브»로 쟀다**(`image.rs` 그 줄에 `panic!()`): ★**전 — `cargo test --all` rc=0 · 156 passed / 0 failed · 5픽스처 전건 PASS**(`draw_j2me` nondom **1.3%**) ⇒ 아무것도 그 자리를 지나지 않았다(제안의 주장을 독립 재현) ↔ ★**후 — `draw_j2me.jar` FAIL · `panic during 'boot'` · ticks 0**. ⇒ ★**0 → 1.**
+- **★★⑶ 양방향 개악**(계약 4 · 매번 원본 복원 후 실행): **E0** 무개악 → 왕복 ★**42/42 rc=0** · `wie_validate` PASS(nondom **1.5%**) / **E1** `get_system_class_loader` → `jvm.current_class_loader()`(이행 전 형태) → ★**FAIL · `java.io.IOException: Resource not found: /wie-img.png`**(스택 `createImage(String)` ← `startApp`) ⇒ ★**넓어진 범위가 찾는 것 1건 ↔ 종전 경로 0건** / **E2-b** 전달 바이트 절반 절단 → ★**`IllegalArgumentException: Failed to decode image`** ⇒ 바이트도 하중을 받는다.
+- **★⑷ 음성 결과를 숨기지 않는다**: **E2**(바이트 «1개» 절단)는 ★**물지 않았다** — PNG 디코더가 꼬리 1바이트 결손을 견딘다. ⇒ 이 픽스처가 잠그는 것은 «전 바이트 무결»이 아니라 **「이름이 풀렸고 그 결과가 16×8 로 디코드된다」**이다.
+- **★⑸ 거짓이 된 서술을 정정했다**(그 두 곳만): `image.rs` 의 「NOT covered by any fixture」 · `docs/upstream-realign-verdict.md` §8-4⑶-b 의 「남은 미커버는 6번 하나」(→ **0곳**). ★**형제 회차와 같은 형태로 «결론 줄을 다시 쓰지 않고» 정정 블록을 덧댔다**(이력 보존).
+- **사용자 영향**: 없음(시험). 대신 「이미지를 이름으로 못 불러온다」류 회귀가 **커밋 전에** 잡힌다 — 6곳 중 **유일하게 동작이 달라진 칸**인데 그물이 0이었다.
+- **★남는 구멍**: ⒜**실패 갈래 미커버** — 없는 이름·깨진 이미지 경로는 **개악으로만** 지나갔다. 픽스처 어셈블러가 **예외 테이블을 내지 않아** 게스트에 try/catch 를 쓸 수 없는 것이 실제 비용이다(제안 등재) ⒝★**증거 축이 브라우저 왕복과 `wie_validate` 뿐**이다 — `cargo test --all` 은 여전히 J2ME 게스트를 부팅하지 않으므로(AGENTS.md 가 적은 그 사각) 이 커버는 PR 의 `contract` 잡에 의존한다(제안 등재) ⒞커버 = «실행된다»이지 «규격에 맞다»가 아니다 ⒟상용 코퍼스 0(Constraint 9).
 ## [2026-09-06] `Security audit` 3일 red 를 껐다 — `rtrb` 0.3.3 → 0.3.5 (wie-rustsec-2026-0274-rtrb-double-free-audit-red)
 - **무엇을**: `Cargo.lock` **2줄**(`rtrb` version + checksum). `cargo update -p rtrb` 한 번. ★그 밖의 크레이트 이동 **0** · `Cargo.toml` 무접촉.
 - **왜**: 매일 도는 `Security audit`(★`schedule` 전용 — PR 게이트가 아니라 머지를 막은 적은 없다)이 3일 연속 `error: 1 vulnerability found!`. 자문 = `RUSTSEC-2026-0274`(`ReadChunk::commit` 에서 **원소의 `Drop` 이 panic** 하면 double free / UAF).
