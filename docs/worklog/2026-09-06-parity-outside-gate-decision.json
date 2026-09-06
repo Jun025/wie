@@ -1,0 +1,58 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-06",
+  "task": "wie-dod-ci-parity-outside-gate-precommit-decision",
+  "title": "「게이트 밖」도 같은 방식으로 잠글 것인가 — ★**확장하지 않는다.** 이유는 취향이 아니라 «술어가 없다»는 것이다",
+  "adoptedProposals": ["2026-09-05-dod-ci-parity-checker#p1"],
+  "proposal-quote-first": "★제안 원문에서 이 회차의 Acceptance 를 그대로 옮긴다(계약 2): `why` — 「★실측: 이 검사의 대상은 `rust.yml` 하나이고, `engine-contract.yml`·`web.yml`·`coverage.yml` 이 도는 명령은 **보지 않는다**(천장 ③). 그리고 `wie_validate` 러너 블록·web 표면 6줄은 CI 의 어느 스텝과도 «집합 대조»가 성립하지 않는다 — CI 는 그 명령들을 «다른 이름·다른 순서»로 돌린다. ⇒ 같은 기법을 그대로 확장할 수 없고, ★**«무엇과 무엇을 대조할지»를 먼저 정해야 한다.**」 / `tradeoff` ⑵ — 「거짓 red 가 나면 게이트가 «치우는 대상»이 되어 검사 자체가 무력해진다」.",
+  "ceilings-quoted-first": "★계약 5 가 「지금 남겨 둔 이유(천장 ③④)를 먼저 인용하라 — 뒤집으려면 그 논거를 반증해야 한다」고 했다. 원문: **③** 「`rust.yml` 밖의 워크플로 — `engine-contract.yml`·`web.yml`·`coverage.yml` 이 도는 명령(`node scripts/…`·`npm run audit`·tarpaulin)은 **대상이 아니다**」 · **④** 「비-cargo 게이트 — 판별자가 「cargo 를 부르는가」라서 `rust.yml` 에 `node …` 게이트가 생기면 «셋업»으로 분류돼 **안 보인다**. ★③과 함께 이것이 이 검사의 가장 큰 사각이다」. ⇒ ★**반증하지 못했다. 오히려 수로 강화됐다.**",
+  "decision": "★**확장하지 않는다(갈래 D = 현상 유지) — 그리고 그 판정을 «읽히는 자리»에 수와 함께 박았다.** 산출물은 `wie_cli/tests/support/dod_ci_parity.rs` 의 `ceilings()` ③ 확장 1건뿐이다(코드 동작 변경 0 · 검사 술어 무접촉). 그 블록은 검사가 **매 실행마다 출력**하므로(AGENTS.md 가 「read that block rather than trusting the word green」이라 지시한 자리) 다음 회차가 이 계산을 다시 하지 않는다.",
+  "why-not-extend": "★★**근본 이유는 제안이 적은 「정의가 어렵다」보다 «강하다»: 집합 술어 자체가 없다.** 네 게이트 축이 서는 이유는 `rust.yml` ↔ 마킹 영역 사이에 ★**양방향 포함(= 상등)** 이 성립하기 때문이다. 게이트 밖에서는 ★**어느 방향의 포함도 성립하지 않는다** — 문서⊄CI(6건) · CI⊄문서(21건). 포함도 상등도 없으면 「같아야 한다」고 말할 대상이 없고, 그러면 검사기는 «차집합을 예외 목록으로 관리하는 장치»가 된다.",
+  "measured": {
+    "갈래 A — 같은 기법(명령 문자열 집합 대조)을 그대로 확장": "★**시제품을 실제로 만들어 돌렸다**(일회용 · 커밋 0). 건강한 트리에서: 문서(게이트 밖) **8** · CI `run:` 같은 계열 **23** · ★**교집합 «2»**(`check-engine-contract.mjs`·`contract-roundtrip.mjs`) · ★**차집합 «27»**(문서−CI **6** · CI−문서 **21**) · ★**그중 참 결함 «0»**. ⇒ 켜는 순간 **red 27 · 참 0**. 제안 `tradeoff` ⑵ 가 수로 확인됐다. **기각.**",
+    "갈래 A 의 차집합이 «왜 전부 정상인가»": "**문서−CI 6**: ⑴`cargo run … wie_validate -- \"$f\"` — ★CI 어디서도 안 돈다 ⑵`node scripts/make-draw-fixture.mjs` — CI 는 `contract-roundtrip.mjs` 가 **import 로 메모리에서** 만든다(디스크에 안 쓴다 · `engine-contract.yml:113` 은 `paths:` 필터일 뿐 `run:` 이 아니다) ⑶`npm run audit` ⑷`npm run verify` — ★둘 다 CI 미실행(형제 회차 `…-deletable-checks-…` 가 「애초에 CI 에서 안 도는 검사 3」으로 이미 세었고 「지울 필요도 없다」로 판정했다) ⑸`npm run build:wasm` ↔ CI 의 `bash scripts/build-wasm.sh` = ★**같은 것, 다른 이름** ⑹`npm run frontend` ↔ CI 의 `npm ci` + `npm run build`(cwd=web) = ★**1:N + cwd 상이**. **CI−문서 21**: `apt`/`choco` 셋업 · `gh release create|upload` · `gh pr review|merge`(자동화) · `cargo tarpaulin` · worklog 검사 3종 · `npm ci` · `npx playwright install` · wrangler 계열 ⇒ ★**전부 «커밋 전 명령»이 아니다.**",
+    "갈래 B — 대조 축을 «명령 문자열» 대신 «스크립트 파일 경로»로 바꾼다": "이름 축(⑸)과 1:N(⑹)은 `package.json` 의 `scripts` 를 한 번 조회하면 녹는다(의존성 0으로 가능). ★**그래도 ⑴⑵⑶⑷ 가 차집합으로 남는다** — 그것들은 «문서에는 있고 CI 엔 없다»가 **정상**인 클래스다. ⇒ 포함 방향을 어느 쪽으로 잡아도 참이 아니므로 ★**축을 바꿔도 술어는 생기지 않는다.** 비용만 늘고(파서 + package.json 해석 = 새 축) 값은 그대로 0. **기각.**",
+    "갈래 C — 집합 대조를 포기하고 «존재»만 잠근다(문서가 이름 대는 파일이 실재하는가)": "★**이것도 시제품을 돌렸다.** AGENTS.md 가 이름 대는 저장소 경로를 뽑아 존재를 확인 → ★**MISS 4 · 그중 참 결함 «0»**: `scripts/check-dod-ci-parity.py`(★**RustJava 의** 파일 — 본문이 「the sibling RustJava repo」라고 명시한다) · `docs/worklog/YYYY-MM-DD-`(파일명 **템플릿**) · `web/dist`(**빌드 산출물** · git-ignored) · ★**`web/Cargo.toml`**(원문은 `wie_web/Cargo.toml:1-11` — ★**내 정규식이 부분문자열을 잡은 «계측 인공물»** 이고 문서가 주장한 적도 없는 경로다). ⇒ 갈래 A 와 **같은 실패형이 규모만 작게** 재현된다. 정확하게 만들려면 예외 목록(=낡는 두 번째 진실원)이나 더 똑똑한 파싱(=새 축)이 필요하다. **기각.**",
+    "★갈래 C 가 준 부수 소득": "`web/Cargo.toml` 오검출은 이 회차의 **가장 값싼 교훈**이다 — ★**「문서에서 경로를 정규식으로 긁는다」는 착수 자체가 없는 결함을 만든다.** 갈래 A·C 를 둘 다 «실제로 돌려 본» 이유가 이것이다(추정으로 기각했으면 이 수를 못 냈다).",
+    "기준선(정상 형상)": "`cargo test -p wie_cli --test dod_ci_parity` → ★**11 passed / 0 failed**(변경 전·후 동일). 네 게이트 축의 상등은 여전히 성립한다 — 이 회차는 그 술어를 **건드리지 않았다**."
+  },
+  "changes": [
+    "`wie_cli/tests/support/dod_ci_parity.rs`: `ceilings()` ③ 에 «확장하지 않기로 한 결정 + 수 + 근거» 8줄 추가. ★검사 술어·비교 로직 **무접촉** · 코드 동작 변경 **0**."
+  ],
+  "verification": {
+    "양방향(계약 4)": "★**정상 형상 green** — `dod_ci_parity` **11 passed**(변경 전·후 동일) · 네 게이트 0(**156 passed / 0 failed**). ★**«개악»은 이 회차가 기각한 갈래 자신이다** — 갈래 A 시제품을 건강한 트리에 대고 돌리면 ★**차집합 27 = red**, 갈래 C 시제품은 ★**MISS 4 = red**. ⇒ 「고친 것이 무는가」가 아니라 ★**「하지 않기로 한 것이 물면 안 되는 자리에서 문다」**를 보였다 — 결정 회차에서 대조군이 가리켜야 하는 것이 그쪽이다.",
+    "ceilings 가 «죽은 문자열»이 아님": "`cargo test … -- --nocapture` 로 그 블록이 **실제로 출력되는 것**을 확인했다(AGENTS.md 가 「read that block rather than trusting the word green」이라 지시한 자리).",
+    "네 게이트": "`fmt --check` 0 · `clippy --all -D warnings` 0 · `clippy --target wasm32-unknown-unknown -D warnings` 0 · `RUST_MIN_STACK=4194304 cargo test --all` 0",
+    "beta 다리": "`cargo +beta clippy --all -- -D warnings` **rc=0**"
+  },
+  "limits": [
+    "★**이 회차는 그물을 «넓히지 않았다»** — 천장 ③④ 는 그대로 사각이다. 바뀐 것은 ★**그 사각이 «측정된 채로» 남는다**는 것뿐이고, 그 이상을 주장하지 않는다.",
+    "★수 27·4 는 **2026-09-06 트리의 값**이다. 워크플로가 바뀌면 달라진다 — ★**다시 재려면 갈래 A 시제품을 다시 만들어야 한다**(일회용이라 커밋하지 않았다). 커밋하지 않은 것은 판단이다: 그것을 남기면 «기각한 검사기»가 저장소에 상주해 다음 사람이 켜고 싶어진다.",
+    "★**«문서가 낡는다»는 위험 자체는 남는다** — 제안의 `userBenefit`(「낡은 안내가 늘어나는 것을 막습니다」)은 이 결정으로 **달성되지 않았다**. 갈래 C 가 그 절반이라도 잡을 뻔했으나 오검출 4/4 로 기각됐다. ⇒ 남은 길은 «집합/존재»가 아니라 **문서가 이름 대는 명령을 실제로 실행해 보는 것**이고 그건 완전히 다른 크기다(제안 등재)."
+  ],
+  "adjacent-not-fixed": [
+    "★`scripts/check-parity-lock-wired.mjs` 는 CI 가 돌리는데 **AGENTS.md 에 0회** 등장한다(실측). ⇒ 「문서 ↔ CI」 간극은 **게이트 밖에도, 그리고 반대 방향으로도** 있다. ★이 회차는 세기만 했다(계약 3).",
+    "★천장 목록이 **두 벌**이다 — 코드 `ceilings()` 는 **7항**, worklog `2026-09-05-dod-ci-parity-checker.json` 의 `ceilings` 는 **9항**(⑧순서·중복 · ⑨줄끝 CRLF 이 코드 쪽에 없다). ★한쪽이 낡을 형태이고, 이번에 내가 만진 것은 **코드 쪽**이다(제안 등재).",
+    "천장 ④(비-cargo 게이트가 `rust.yml` 에 생기면 «셋업»으로 분류돼 안 보인다)는 ★**여전히 열려 있다** — 이 회차의 결정은 ③ 축(다른 워크플로)이고 ④ 는 `rust.yml` «안»의 문제라 갈래가 다르다. 손대지 않았다."
+  ],
+  "proposals": [
+    {
+      "title": "천장 목록을 «한 벌»로 만든다 — 지금 코드 7항 · worklog 9항으로 갈려 있다",
+      "plainSummary": "이 검사가 「못 보는 것」 목록이 두 군데 있고 내용이 다릅니다. 한쪽이 낡습니다.",
+      "userBenefit": "없음(개발 절차). 대신 green 을 믿기 전에 읽으라고 지시받은 그 목록이 실제로 완전해진다 — 지금은 코드만 읽으면 2항을 놓친다.",
+      "why": "실측 2026-09-06: `ceilings()` 는 ①~⑦, `docs/worklog/2026-09-05-dod-ci-parity-checker.json` 의 `ceilings` 는 ①~⑨ 다. 빠진 둘은 ⑧「순서·중복은 집합 비교라 안 본다」 ⑨「줄끝(CRLF) 정규화를 지우면 로컬 green·windows 만 red」인데, ★**⑨는 «로컬 그물이 없다»고 스스로 적은 항목**이라 하필 가장 놓치면 안 되는 축이다.",
+      "tradeoff": "★단순히 코드로 복사하면 **두 벌이 세 벌이 되지 않을 뿐 여전히 두 벌**이다(worklog 은 회차 기록이라 지울 수 없다). ⇒ 실제 처방은 「worklog 은 그 회차의 스냅샷, 코드가 정본」이라는 **방향을 못박고** 코드 쪽을 채우는 것이고, 그 문장을 어디에 둘지가 이 제안의 내용이다.",
+      "effort": "S — 2항 추가 + 정본 선언 1줄.",
+      "target": "wie · wie_cli/tests/support/dod_ci_parity.rs"
+    },
+    {
+      "title": "「문서가 이름 대는 명령이 실제로 도는가」를 잠그려면 «실행»뿐이다 — 그 크기를 먼저 재라",
+      "plainSummary": "문서에 적힌 커밋 전 명령이 아직 유효한지 확인하려면, 결국 그 명령들을 한 번 돌려 보는 수밖에 없습니다.",
+      "userBenefit": "「AGENTS.md 대로 했는데 안 되더라」가 사라진다. 지금 그 목록은 **아무도 대조하지 않으며**, 이 회차가 집합·존재 두 기법 모두 오검출 100% 로 기각했다.",
+      "why": "이 회차 실측: 갈래 A(명령 집합) 차집합 **27 · 참 0** · 갈래 C(파일 존재) MISS **4 · 참 0**. 두 기법 다 «문자열을 비교»해서 실패했다 — 문서와 CI 가 **같은 일을 다른 표현으로** 하기 때문이다. 표현이 아니라 **결과**를 보려면 실행해야 한다.",
+      "tradeoff": "★**비싸다, 그리고 그 비용이 이 제안의 본체다**: `npm run frontend`·`contract-roundtrip.mjs` 는 wasm 빌드 + 브라우저를 요구해 로컬 4게이트(초 단위)와 **크기가 두 자리 다르다**. ⇒ 상시 게이트로는 못 올리고, 「주 1회 예약 잡」이나 「해당 표면을 만진 PR 에서만」 같은 **조건부 배치**를 먼저 정해야 한다. ★그 배치를 정하지 않고 만들면 이 회차가 기각한 것과 같은 이유(거짓 red·치우는 대상)로 죽는다.",
+      "effort": "L — 배치 결정이 선행. 구현만 M.",
+      "target": "wie · .github/workflows/ (배치 미정)"
+    }
+  ]
+}

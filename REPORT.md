@@ -1,5 +1,18 @@
 # REPORT
 
+## [2026-09-06] 「게이트 밖」 파리티 확장 — ★**하지 않기로 결정했다**(술어가 없다) (wie-dod-ci-parity-outside-gate-precommit-decision)
+- **무엇을**: ★**결정 회차다 — 구현이 아니라 판정이 산출물**이다. `wie_cli/tests/support/dod_ci_parity.rs` 의 `ceilings()` ③ 에 「확장하지 않는다 + 수 + 근거」 **8줄**만 더했다. ★**검사 술어·비교 로직 무접촉 · 코드 동작 변경 0.**
+- **왜**: 운영자 채택 제안 `2026-09-05-dod-ci-parity-checker#p1`. 「AGENTS.md 의 `wie_validate` 러너 블록·web 표면 6줄은 아직 아무도 대조하지 않는다」.
+- **★★⑴ 천장 ③④를 먼저 인용하고 반증을 시도했다 — 반증하지 못했고 오히려 «수로 강화»됐다.**
+- **★★⑵ 근본 이유는 제안이 적은 「정의가 어렵다」보다 강하다: «집합 술어 자체가 없다».** 네 게이트 축이 서는 이유는 `rust.yml` ↔ 마킹 영역에 ★**양방향 포함(= 상등)** 이 성립하기 때문인데, 게이트 밖에서는 ★**어느 방향의 포함도 성립하지 않는다** — 문서⊄CI **6건** · CI⊄문서 **21건**.
+- **★★⑶ 두 갈래를 «추정으로» 기각하지 않고 시제품을 실제로 돌렸다**(일회용 · 커밋 0):
+  ⒜**명령 집합 대조** → 건강한 트리에서 문서 **8** · CI `run:` **23** · ★교집합 **2** · ★**차집합 27**(문서−CI 6 · CI−문서 21) · ★**참 결함 0**.
+  ⒝**파일 존재 검사** → ★**MISS 4 · 참 0**(`check-dod-ci-parity.py` 는 **RustJava 의** 파일 · `YYYY-MM-DD-` 는 템플릿 · `web/dist` 는 빌드 산출물 · ★**`web/Cargo.toml` 은 `wie_web/Cargo.toml` 을 부분문자열로 잡은 «정규식 인공물»**).
+  ⇒ ★**둘 다 켜는 순간 red 이고 참 결함은 0** — 제안 `tradeoff` ⑵(「거짓 red 가 나면 게이트가 «치우는 대상»이 된다」)이 수로 확인됐다.
+- **★⑷ 차집합이 «왜 전부 정상인가»도 갈랐다**: 문서−CI 6 = CI 미실행 3(`wie_validate`·`audit`·`verify`) + 이름만 다름 1(`npm run build:wasm` ↔ `bash scripts/build-wasm.sh`) + 1:N 1(`npm run frontend`) + 메모리 생성 1(`make-draw-fixture`) / CI−문서 21 = apt·choco·`gh release`·tarpaulin·worklog 검사 등 ★**커밋 전 명령이 아닌 것**.
+- **사용자 영향**: 없음. 대신 다음 회차가 이 계산을 **다시 하지 않는다** — 그 블록은 검사가 **매 실행마다 출력**한다(AGENTS.md 가 「read that block rather than trusting the word green」이라 지시한 자리).
+- **★남는 구멍**: ⒜★**그물을 넓히지 않았다** — 천장 ③④ 는 그대로 사각이고, 바뀐 것은 **그 사각이 «측정된 채로» 남는다**는 것뿐이다 ⒝제안의 `userBenefit`(「낡은 안내가 늘어나는 것을 막는다」)은 ★**달성되지 않았다** — 남은 길은 문자열 비교가 아니라 **실제 실행**이고 크기가 두 자리 다르다(제안 등재) ⒞수 27·4 는 **오늘 트리의 값**이다(시제품은 커밋하지 않았다 — 남기면 「기각한 검사기」가 상주해 다음 사람이 켜고 싶어진다) ⒟천장 목록이 **코드 7항 ↔ worklog 9항**으로 갈려 있다(제안 등재).
+
 ## [2026-09-06] `Image.createImage(String)` 픽스처 — «넓어진 가시 범위가 무엇을 찾는가»를 수로 냈다 (wie-system-class-loader-createimage-fixture)
 - **무엇을**: `scripts/make-draw-fixture.mjs` 가 jar 에 `wie-img.png`(16×8 RGB · 74바이트 · 스크립트가 바이트로 조립)를 동봉하고, `DrawMIDlet.startApp()` 이 **`Image.createImage("/wie-img.png")`** 로 그것을 **이름으로** 연 뒤 `getWidth()`·`getHeight()` 를 정적 필드에 저장하며, `DrawCanvas.paint()` 가 **그 치수 그대로** 사각을 채운다. `scripts/contract-roundtrip.mjs` 에 Scenario C-img 1건. `.rs` 변경은 **주석뿐**.
 - **왜**: 운영자 채택 제안 `2026-09-05-system-class-loader-preemptive-migration#p1`. 그 원문이 미완으로 남긴 문장이 이 회차의 Acceptance 다 — 「갈림 «자체»는 측정됐다 … ★**미측정인 것은 «넓어진 가시 범위가 실제로 무엇을 찾는가»** 하나다」.
