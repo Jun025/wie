@@ -121,7 +121,7 @@ for f in test_data/draw_j2me.jar test_data/helloworld_ktf.zip test_data/hellowor
   cargo run -q -p wie_cli --bin wie_validate -- "$f"                  # each must report "result":"PASS"
 done
 for f in test_data/keydraw_ktf.zip test_data/keydraw_lgt.zip; do      # key-driven — --inject is REQUIRED
-  cargo run -q -p wie_cli --bin wie_validate -- --inject "$f"         # same bar: "result":"PASS"
+  cargo run -q -p wie_cli --bin wie_validate -- --inject --expect-last-frame "$f"   # PASS *and* rc=0
 done
 ```
 
@@ -131,6 +131,34 @@ and the validator is right to say so. Measured 2026-09-06 on both carriers: with
 `result FAIL · content false · paints 1`, with it `result PASS · content true · paints 55`. The
 misread is not hypothetical — a round chasing an unrelated change stopped on exactly this, took the
 FAIL for its own regression, and only cleared it by reproducing the same FAIL on an untouched tree.
+
+**`--expect-last-frame` is on the `keydraw_*` line and deliberately NOT on the one above it.** It
+turns `last_frame_content` from a reported field into an exit code, which is the only thing that
+catches "the emulator ran fine and the last frame is black" — the 2026-09-05 LGT failure, where
+`result` stayed PASS and `paints` went *up* (55 → 83, the blank MIDP overpaint). It cannot go on the
+line above because that is **one loop over three fixtures** and `helloworld_ktf`/`helloworld_lgt`
+fail it by construction — they are *expected* to end blank, and with the flag they exit 1 (measured).
+**`draw_j2me` does not fail it** — that fixture ends with content (`last_frame_content true`, rc=0
+with the flag), so the reason it goes unflagged is the shared loop, not the fixture. Splitting it
+onto its own line would flag it correctly and cost an extra runner line, which is the one thing this
+block cannot afford. The expectation is per fixture *and mode*, which is why it lives on the command
+line — see `wie_validate.rs`'s header for that reasoning (its table covers `helloworld_*` and
+`keydraw_*`; `draw_j2me` is measured here).
+
+**This is the local net, not the CI one.** The browser round-trip's Scenario F is what gates that
+failure in CI; this line makes the same class visible in ~20 s with no wasm build, before you push.
+Scenario F is not unconditional either — it sits behind `engine-contract.yml`'s `dorny/paths-filter`
+`engine` gate, so a diff that touches no engine path reports "Reporting success without rebuilding"
+and never runs it. Do not read this line as CI enforcement — nothing in `.github/` runs
+`wie_validate` (measured: 0 hits across all workflow files).
+
+**Do not try to shorten these two runs with `--timeout`.** On the `--inject` path that flag is
+overwritten: the deadline is rebuilt from the injection schedule (`--boot-secs 2.5` + 0.3 + 27
+steps × `--action-secs 0.6` + 1.0 = **20.0 s**), so `--timeout 5` and `--timeout 20` both take ~20 s
+(measured). The knobs that do move it are `--boot-secs`/`--action-secs`, and shortening them drops
+paints (`--boot-secs 1.0` → 18.7 s, paints 55 → 37), i.e. it buys time by seeing less. Measured wall
+time over six runs each: KTF **20.1–26.1 s**, LGT **20.2–21.4 s** — the spread above 20.0 is tick
+overrun under load, not budget starvation.
 
 `cargo test --all` boots KTF and LGT but **nothing in it boots a J2ME guest**. 2026-09-04 shipped a
 RustJava pin bump whose four gates were all green while `draw_j2me.jar` failed with

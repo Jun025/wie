@@ -1,0 +1,38 @@
+{
+  "schema": "worklog/v1",
+  "date": "2026-09-07",
+  "task": "wie-expect-last-frame-gate-has-zero-callers",
+  "title": "--expect-last-frame 을 켰다 — 러너 블록의 그 두 줄에, 실행 줄을 늘리지 않고",
+  "summary": "호출자가 0이던 --expect-last-frame 를 AGENTS.md 러너 블록의 keydraw_* 줄에 걸었다(F2 ⒜). 브리프가 ⒜의 대가로 든 「블록이 길어진다」는 이미 사라져 있었다 — PR #104 가 2026-09-06 에 그 두 줄을 이미 넣어서 실행 줄 증가가 0 이다. ⒝는 고른 게 아니라 없었다(CI 가 부르는 스크립트 11개 중 wie_validate 를 실행하는 것 0 · smoke_gate.sh 는 gitignore 된 game_lab/ 이 필요한 로컬 전용). ⒞는 같은 클래스를 매 PR 에 이미 막는 브라우저 Scenario F 와 중복이라 버렸다.",
+  "changes": [
+    "AGENTS.md 러너 블록 — keydraw_* 줄에 --expect-last-frame 한 토큰 추가(실행 줄 0 증가)",
+    "AGENTS.md — 왜 이 줄에만 거는가 · 로컬 그물이지 CI 강제가 아니다 · --timeout 이 이 경로에서 무력한 이유(설명 22줄)",
+    "docs/report/0069--… · docs/worklog/… — 착지 서류"
+  ],
+  "verification": [
+    "F1⑴ .github/ 전수 wie_validate 히트 0건 재현",
+    "F1⑵ 러너 블록 현재 3종 인용(draw_j2me.jar · helloworld_ktf/lgt · keydraw_ktf/lgt --inject)",
+    "F1⑶ 6회 실측 ms — KTF 20090 20260 22230 22331 26094 24452 · LGT 20663 20292 20224 21393 20275 20326",
+    "F1⑷ helloworld_* 는 last_frame_content false 가 정상(wie_validate.rs 헤더의 측정표) · 플래그를 걸면 rc=1 임을 실행으로 확인",
+    "양방향⑴ 2026-09-05 형상 개악 → LGT rc=1(result 는 PASS · last_frame=False · paints=75) · KTF 무영향 · 원복 cmp 바이트 동일",
+    "양방향⑵ 위양성 0 — 정상 keydraw 두 캐리어 rc=0 · helloworld/draw 플래그 없이 rc=0 · 원복 후 rc=0",
+    "파리티 락 무영향(hunk @@124·@@135 ↔ COMMIT-GATES 50~72 구간 밖 · check-parity-lock-wired rc=0)"
+  ],
+  "limits": [
+    "이것은 «로컬» 그물이지 CI 강제가 아니다 — .github/ 는 여전히 wie_validate 를 부르지 않는다(0건). 매 PR 에 그 클래스를 막는 것은 브라우저 Scenario F 이고, 이 줄은 wasm 빌드 없이 ~20초로 같은 클래스를 먼저 보이게 하는 것이다.",
+    "--timeout 은 --inject 경로에서 무력하다(deadline 이 스케줄에서 재계산된다: boot 2.5 + 0.3 + 27×0.6 + 1.0 = 20.0s). 예산을 줄이려면 --boot-secs/--action-secs 를 줄여야 하는데 그러면 paints 가 준다(55 → 37) — 즉 시간을 «덜 봐서» 산다. 그래서 그대로 뒀다.",
+    "6회 실측의 상단(KTF 26.1s)은 틱 오버런이다. 부하가 더 큰 기계에서는 그 위로도 갈 수 있고, 그때 last_frame_content 가 흔들릴지는 재지 않았다 — 이 축을 CI 로 올릴 때 다시 재야 한다."
+  ],
+  "adoptedProposals": ["2026-09-06-validate-last-frame-gate#p0"],
+  "proposals": [
+    {
+      "title": "이 축을 CI 로 올릴지 결정한다 — 단 Scenario F 와의 중복을 먼저 재라",
+      "plainSummary": "--expect-last-frame 은 지금 로컬 러너에만 걸려 있다. CI 에 걸면 강제되지만, 같은 클래스를 브라우저 Scenario F 가 이미 매 PR 에 막고 있다.",
+      "userBenefit": "「적혔는데 아무도 안 켠다」가 「CI 가 막는다」가 된다 — 다만 그 값이 중복분을 넘는지가 먼저 확인돼야 한다.",
+      "why": "이 회차 실측: .github/ 의 wie_validate 호출 0건이고, 2026-09-05 형상을 실제로 잡은 그물은 Scenario F 뿐이다(PR #117 이 수로 확정). CI 로 올리면 cargo 빌드가 붙어 헤드리스 20초의 이점이 사라진다.",
+      "tradeoff": "rust.yml 은 이미 wie_cli 를 빌드하므로 거기 얹으면 추가 빌드는 없지만 6다리 매트릭스라 6회 돈다(한 다리로 좁히는 조건이 필요). engine-contract 의 contract 잡은 node 전용 구간이라 cargo 빌드를 새로 들여야 한다.",
+      "effort": "S",
+      "target": ".github/workflows/rust.yml 또는 engine-contract.yml"
+    }
+  ]
+}
