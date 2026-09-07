@@ -32,15 +32,27 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- **파리티 락 축⑷ 별칭 판정** (PR 개설 · `wie-parity-lock-axis4-module-alias-decision`
+  ★착지 시 배포 없음 예상(`.rs`·`Cargo.*` 무접촉 — 착지 diff 로 다시 셀 것).
+- (그 밖: ★열린 형제 PR: **#98 · #99 · #100** — 각자 자기
+  브랜치에서 진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
+
+## 완료 (최근)
+- 2026-09-07: **파리티 락 축⑷ 별칭 판정** (PR **#118** 착지 · `wie-parity-lock-axis4-module-alias-decision`
   · 채택 제안 `2026-09-06-parity-lock-guard-axes#p0`) — ★**⒝(술어 조이기)를 골랐다**: 별칭을 하드코딩에서
   ★**시험의 `mod <이름>;` 에서 읽기**로 바꿨다. ★의존성 0 · 워크플로 0 · 다른 축 무접촉.
   ★**교환을 수로**: `dod` 개명이 **guard 1/cargo 0 → guard 0/cargo 0**(위양성 해소) · 진짜 깨짐은 여전히 guard 1 ·
   `mod` 선언 제거는 ★**fail-closed(guard 1)**.
   ★**제안의 «위음성» 해석을 정정했다** — 일관 개명은 배선을 안 깨므로 guard 0 이 «옳은 답»이고, 값하는 것은 위양성이었다.
   ★F2: `--list` 는 개명 전/후 출력이 **바이트 동일**이라 이 축을 못 덮는다 · `tree-sitter` 는 상시 구간에 `npm ci` 를 넣어야 해 문서 PR 도 문다(상시 7스텝 전부 Node 내장 · `npm ci` 는 필터 안에만).
-  ★착지 시 배포 없음 예상(`.rs`·`Cargo.*` 무접촉 — 착지 diff 로 다시 셀 것).
-- **카드 신원을 `class_definition().name()` 으로** (PR 개설 · `wie-clet-card-identity-use-class-definition-name`
+- 2026-09-07: **no-leak dist 스캔 처분 — ★«안 한다»로 닫음** (PR **#115** 착지 · `wie-no-leak-dist-scan-never-runs-in-ci`
+  · 채택 제안 `2026-09-06-wire-audit-no-leak-in-ci#p0`) — ★**저울을 다시 쟀고 원 판단이 옳았다.**
+  F1(★**as of 2026-09-06T22:14Z** · 모집단은 계속 자란다): 그 스텝을 실은 run **19건**(API: **18 success + 1 skipped**) 중
+  ★**성공 18건 전건 로그를 받아 18/18 이 「skipping dist scan」** · `contains no game files` **0/18** · ★**미취득 0건**.
+  ★함정 둘: `gh run view --log` 가 스텝명을 `UNKNOWN STEP` 으로 접는다(스텝명 말고 **출력 문자열**로 grep) ·
+  `gh api …/jobs/<id>/logs` 는 **`--allow-escape-sequences`** 없이는 아무것도 내지 않는다. ★**어느 쪽 0 이든 «부재»가 아니라 측정 artefact 다.**
+  ★F2⑶ = **참**: `web/public/` 부재 · 내려받기 0 · 유일한 미추적 입력(`web/src/wasm/`)이 `.js/.wasm/.d.ts` · ★실제 빌드 결과 dist **4파일 · 게임류 0**.
+  ⇒ 주석 한 블록으로 근거와 ★**뒤집힐 조건**을 커밋했다. **판정 술어 무접촉**(비-주석 변경 0) · 워크플로 무접촉.
+- 2026-09-07: **카드 신원을 `class_definition().name()` 으로** (PR **#116** 착지 · `wie-clet-card-identity-use-class-definition-name`
   · 채택 제안 `2026-09-06-clet-card-identity-design#p0`) — `card_canvas.rs` 한 파일(**+44/−24**).
   `getClass()`→`getName()` **invoke_virtual 2회 + to_rust_string** → ★**`class_definition().name()` 한 줄** ·
   `is_clet_card` 의 **`replace('.', "/")` 제거** ⇒ ★**형식 불일치가 «방어 대상»이 아니라 «비존재»** 가 된다.
@@ -49,10 +61,27 @@
   `last_frame_content=false` · `paints 83`(2026-09-05 서명 재현) · `--expect-last-frame` **rc=1**.
   ★러너 5픽스처 PASS · `paints` **55/55** 기준선 그대로 · ★**하드코딩 두 이름 무접촉**(PR #95 기각 축).
   ★**핀 결합을 적었다**(고치지 않았다): `class_definition()` 은 `RustJava@5b84dd1` API ⇒ 핀 이동 시 재검증.
-- (그 밖: ★열린 형제 PR: **#98 · #99 · #100 · #113** — 각자 자기
-  브랜치에서 진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
-
-## 완료 (최근)
+- 2026-09-07: **`STATE.md` 「완료」 분할 판단** (PR **#114** 착지 · `wie-state-md-completed-section-per-round-split`
+  · 채택 제안 `2026-09-07-report-per-round-files#p0`) — ★**하지 않는다 · 구현 0.**
+  ★**대조군 실측**: 「완료」 **543줄**을 들어내(681 − 543 = **138** · 자리표시 스텁 4줄을 남겨 파일은 **142줄** · 79% 축소)
+  가짜 회차 둘의
+  `merge-tree` 가 ★**여전히 rc=1** — 추가 지점이 「완료」가 아니라 ★**「진행중」의 맨 위**다.
+  ★열린 PR 5건 중 STATE 접촉 4건이 **전부** 「진행중」을 만지고 ★**「완료」만 만지는 것 0건**.
+  ★형제 판단(approve)의 근거 「살아 있는 절 0」이 wie 엔 **성립하지 않는다** — ★자는 **전체줄**이고
+  서두 17 + fork 16 + 진행중 8 + 다음 97 = **138줄**(= 681 − 완료 543)이 「지금」을 말한다.
+- 2026-09-07: **audit 「허용 경고」 목록 기계 대조** (PR **#119** 착지 · `wie-rust-audit-allowed-warning-list-machine-checked`
+  · 채택 제안 `2026-09-06-rust-audit-warning-list-remeasure#p0`) — ⒜ 기대값 파일 + 검사기 + `rust-audit.yaml` **별도 스텝**.
+  ★**`cargo audit` 스텝 무접촉**(`--ignore` 0 · rc·트리거 불변) ⇒ **Constraint 5** 와 충돌 없음.
+  ★**기대값 ≠ suppression 을 기계로**: 사라진 경고 → **rc=1** · 새 경고 → 인쇄하되 **rc=0**.
+  ★**M3(개수는 2로 같고 구성만 스왑) → rc=1** — 실제로 났던 결함 형태이고 개수로는 못 잡는다. 현 상태 rc=0(오늘 red 아님).
+  ★대가: 일 1회 스케줄 잡에 `cargo audit --json` 1회(웜 0.89~1.09s) · PR 상시 구간 무접촉 · npm 의존성 0.
+  ★착지 시 배포 없음 예상(`.rs`·`Cargo.*` 무접촉 — 착지 diff 로 다시 셀 것).
+- 2026-09-07: **key-reach 시험에 `paints > 0` 은 «얹지 않는다»** (PR **#117** 착지 · `wie-key-reach-tests-assert-frame-composited`
+  · 채택 제안 `2026-09-06-j2me-guest-boot-in-cargo-test#p0`) — ★**단언 0 · 시험 수 0 증가 · 실행 코드 0줄**(주석만).
+  ★**F4 를 «수»로 먼저 답했다**: Scenario **E**(KTF)·**F**(LGT)가 같은 3키(`HASH·STAR·NUM5`)를 돌아
+  ★**픽셀 단언 6건**으로 두 캐리어를 덮는다 ⇒ 브리프의 ⒞ 조건 충족.
+  ★**더 강한 이유**: 정상 `paints=1` ↔ 2026-09-05 검은 화면 `paints=83` ⇒ ★**`paints > 0` 이 두 상태 다 참**이라
+  인용된 사고를 **가르지 못한다**. ★내 「영영 지는 시험이 된다」 가설은 프로브 실측(`paints=1`)로 **반증**됐다.
 - 2026-09-06: **createImage 실패 갈래 픽스처 잠금** (PR **#110** 착지 · `wie-createimage-failure-branches-fixture-lock`
   · 채택 제안 `2026-09-06-createimage-fixture#p0`) — 어셈블러에 ★**예외 테이블** + 갈래 2종
   (없는 이름 `java/io/IOException` · 깨진 이미지 `java/lang/IllegalArgumentException` — ★**호스트 소스에서 읽었다**).
