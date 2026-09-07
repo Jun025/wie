@@ -229,8 +229,22 @@ pub async fn get_resource(context: &mut dyn WIPICContext, id: i32, buf: WIPICInd
 
     let data = context.read_resource(name).await?;
 
+    // -18, not the -1 this returned until 2026-09-07. -1 is not a `WIPICError` variant at the
+    // pinned rev (`{1, 0, -9, -12, -18, -22, -25}` in wipi_types/src/wipic.rs) and
+    // `wipic_sys::kernel::get_resource` is typed `-> WIPICError` via `from_raw`, which is a
+    // `transmute` — so handing a guest -1 was an invalid discriminant, i.e. UB. Measured at that
+    // rev: `get_resource` and `graphics::create_image` are the *only* host functions reachable
+    // through that transmute (6 wrappers, ktf/lgt/simulation), and create_image only ever returns
+    // 1, so this was the one out-of-vocabulary value on a transmute path.
+    //
+    // Whether a real title branches on -1 CANNOT be checked here: there is no commercial corpus
+    // (Constraint 9) and no WIPI error-code spec in this repo or the pinned wipi repo — `M_E_*` has
+    // zero definitions in either, the names in this file are bare comments. So this trades an
+    // unmeasurable compatibility risk for removing a definite UB. The two sibling sites that
+    // already return -18 for the same condition (`get_system_property`, `get_program_name`) are
+    // deliberately untouched; this makes all three agree.
     if data.len() as u32 > buf_size {
-        return Ok(-1);
+        return Ok(-18); // M_E_SHORTBUF
     }
 
     context.write_bytes(context.data_ptr(buf)?, &data)?;
@@ -397,11 +411,13 @@ pub async fn get_program_name(context: &mut dyn WIPICContext, name_buf: WIPICWor
 mod test {
     use alloc::{boxed::Box, string::String};
 
+    use test_utils::TestPlatform;
+    use wie_backend::{DefaultTaskRunner, System};
     use wie_util::{ByteRead, ByteWrite, Result, read_null_terminated_string_bytes, write_null_terminated_string_bytes};
 
     use crate::{WIPICContext, context::test::TestContext, method::MethodImpl};
 
-    use super::{alloc, calloc, free, get_resource_id, get_system_property, sprintk};
+    use super::{alloc, calloc, free, get_program_name, get_resource, get_resource_id, get_system_property, sprintk};
 
     #[futures_test::test]
     async fn test_sprintk() -> Result<()> {
@@ -470,6 +486,95 @@ mod test {
         let mut result = [0; 4];
         context.read_bytes(size, &mut result).unwrap();
         assert_eq!(u32::from_le_bytes(result), 0);
+
+        Ok(())
+    }
+
+    /// `MC_knlGetResource` must refuse to write past a caller buffer that is too small.
+    ///
+    /// The sibling failure branch (`get_resource_id` -> -12) has had a test since it was
+    /// written; this one had none — measured 2026-09-06 with a planted `panic!()` at the
+    /// branch, which left `cargo test --all` at 157 passed / 0 failed while the same drill
+    /// at the -12 branch killed `test_missing_resource_clears_size`.
+    ///
+    /// This is a HOST-side test on purpose. The guest route the obvious way — have the
+    /// fixture call `wipic_sys::kernel::get_resource` with a short buffer and print the
+    /// code — is what made the old -1 unobservable: that function is typed `-> WIPICError`,
+    /// whose variants at the pinned rev are {1, 0, -9, -12, -18, -22, -25}, and `from_raw`
+    /// is a `transmute`, so -1 was an invalid discriminant. That is why the code is now -18
+    /// (`InsufficientBufferSize`); the reasoning lives at the branch itself.
+    ///
+    /// **-18 is the assertion that matters here.** It is not incidental: reverting the branch
+    /// to -1 fails this test, which is the only machine tie holding the value inside the ABI
+    /// vocabulary — nothing else in the workspace checks it.
+    ///
+    /// Both directions are asserted: a buffer one byte short fails, the exact size passes.
+    /// Asserting only the failure would also pass if the function returned -18 always.
+    #[futures_test::test]
+    async fn test_resource_larger_than_buffer_is_rejected() -> Result<()> {
+        const PAYLOAD: &[u8] = b"0123456789";
+
+        let mut context = TestContext::new().with_resource("big.bin", PAYLOAD);
+        let name = context.alloc_raw(16).unwrap();
+        let size = context.alloc_raw(4).unwrap();
+        write_null_terminated_string_bytes(&mut context, name, b"big.bin").unwrap();
+
+        let id = get_resource_id(&mut context, name, size).await.unwrap();
+        assert!(id > 0, "setup: expected a handle, got {id}");
+        let mut reported = [0; 4];
+        context.read_bytes(size, &mut reported).unwrap();
+        assert_eq!(u32::from_le_bytes(reported) as usize, PAYLOAD.len());
+
+        let short = context.alloc(PAYLOAD.len() as u32 - 1).unwrap();
+        assert_eq!(get_resource(&mut context, id, short, PAYLOAD.len() as u32 - 1).await.unwrap(), -18);
+
+        let exact = context.alloc(PAYLOAD.len() as u32).unwrap();
+        assert_eq!(get_resource(&mut context, id, exact, PAYLOAD.len() as u32).await.unwrap(), 0);
+        let mut got = [0; PAYLOAD.len()];
+        context.read_bytes(context.data_ptr(exact).unwrap(), &mut got).unwrap();
+        assert_eq!(&got, PAYLOAD);
+
+        Ok(())
+    }
+
+    // The two siblings below already returned -18 before `get_resource` was fixed to match them,
+    // and precisely because they were already right, nothing asserted it: mutating either constant
+    // broke no test. These pin the value the same way the resource test above does — as the NUMBER
+    // the guest receives, not a constant name, because `M_E_SHORTBUF` has no definition anywhere in
+    // this repo or the pinned runtime (it lives only in comments).
+    #[futures_test::test]
+    async fn test_system_property_larger_than_buffer_is_rejected() -> Result<()> {
+        // "PHONEMODEL" -> "Emulator": 8 bytes plus the NUL, so 9 fits and 8 cannot.
+        const VALUE: &[u8] = b"Emulator";
+
+        let mut context = TestContext::new();
+        let id = context.alloc_raw(16).unwrap();
+        let out = context.alloc_raw(16).unwrap();
+        write_null_terminated_string_bytes(&mut context, id, b"PHONEMODEL").unwrap();
+
+        assert_eq!(get_system_property(&mut context, id, out, VALUE.len() as u32).await.unwrap(), -18);
+
+        assert_eq!(get_system_property(&mut context, id, out, VALUE.len() as u32 + 1).await.unwrap(), 0);
+        let got = read_null_terminated_string_bytes(&context, out).unwrap();
+        assert_eq!(got, VALUE);
+
+        Ok(())
+    }
+
+    #[futures_test::test]
+    async fn test_program_name_larger_than_buffer_is_rejected() -> Result<()> {
+        // `System::new`'s aid below is the string this writes, so its length drives the boundary.
+        const AID: &[u8] = b"test-aid";
+
+        let system = System::new(Box::new(TestPlatform::new()), "test-pid", "test-aid", DefaultTaskRunner);
+        let mut context = TestContext::with_system(system);
+        let out = context.alloc_raw(16).unwrap();
+
+        assert_eq!(get_program_name(&mut context, out, AID.len() as i32).await.unwrap(), -18);
+
+        assert_eq!(get_program_name(&mut context, out, AID.len() as i32 + 1).await.unwrap(), 0);
+        let got = read_null_terminated_string_bytes(&context, out).unwrap();
+        assert_eq!(got, AID);
 
         Ok(())
     }

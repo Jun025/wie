@@ -27,12 +27,48 @@
 //! `wie_validate --inject` reported PASS with `content: true` — the browser
 //! round-trip was the only thing that caught it.
 //!
-//! `last_frame_content` is REPORT-ONLY and deliberately not a gate. Two reasons,
-//! both measured rather than assumed: a fixture may legitimately end on a blank
-//! frame (helloworld_lgt draws nothing at all and exits cleanly), and without
-//! `--inject` a key-driven fixture is black until a key arrives. Gating is a
-//! separate decision that needs a per-fixture expectation; this field is what makes
-//! that decision measurable instead of theoretical.
+//! The three content-RICHNESS metrics have the same shape and, since 2026-09-06, the same
+//! pairing: `distinct_colors` / `nondominant_pct` / `center_nonuniform_pct` are each a MAX
+//! over every painted frame (`fetch_max`, monotonic), so a later frame cannot pull them back
+//! down — structurally the same blind spot. `last_frame_distinct_colors` /
+//! `last_frame_nondominant_pct` / `last_frame_center_nonuniform_pct` are the same three
+//! computed on the final frame alone, ONCE per run. They are REPORTED, never gated — not
+//! even under `--expect-last-frame`, which reads the boolean pair below and no richness
+//! field at all (`last_frame_gate_fails` takes three bools). Unlike that pair these are
+//! numbers, and a number needs a threshold to fail anything. No threshold is defined here on
+//! purpose — the point is to make one CHOOSABLE from data instead of invented.
+//!
+//! `last_frame_content` is REPORT-ONLY BY DEFAULT and becomes a gate only when the
+//! caller passes `--expect-last-frame`. Two reasons it cannot be gated
+//! unconditionally, both measured rather than assumed: a fixture may legitimately
+//! end on a blank frame (helloworld_lgt draws nothing at all and exits cleanly),
+//! and without `--inject` a key-driven fixture is black until a key arrives.
+//!
+//! ── Why the expectation lives on the COMMAND LINE and nowhere else ───────────
+//! Gating needs a per-fixture expectation, and the axis is `fixture x mode`, not
+//! `fixture`: measured 2026-09-06 on this tree,
+//!
+//!   helloworld_ktf.zip              PASS  content false  last_frame_content false
+//!   helloworld_lgt.zip              PASS  content false  last_frame_content false
+//!   keydraw_ktf.zip --inject        PASS  content true   last_frame_content TRUE
+//!   keydraw_lgt.zip --inject        PASS  content true   last_frame_content TRUE
+//!   keydraw_ktf.zip                 FAIL  content false  last_frame_content false
+//!   keydraw_lgt.zip                 FAIL  content false  last_frame_content false
+//!
+//! — the same fixture expects a blank final frame in one mode and a drawn one in
+//! the other. `--inject` is already a flag on that command line, so the mode half
+//! of the key is *there and nowhere else*. A sidecar file next to the fixture, or
+//! a fixture-name table inside this binary, would put the other half somewhere
+//! else and make the pair a SECOND SOURCE OF TRUTH that drifts the moment a
+//! fixture is renamed, a mode is added, or the tool is pointed at a file it has
+//! never heard of. The flag keeps both halves in one place: the invocation.
+//!
+//! The cost is honest and worth stating: an opt-in flag only gates the callers
+//! that pass it. It buys nothing for an invocation that forgets — but neither
+//! would a sidecar the caller never reads. Callers today are `scripts/smoke_gate.sh`,
+//! `scripts/lgt_render_probe.sh` and the AGENTS.md runner block; no workflow runs
+//! this binary, so `--expect-last-frame` is a tool for those callers, not a CI gate
+//! by itself.
 
 extern crate alloc;
 
@@ -374,6 +410,73 @@ struct Args {
     /// Seconds per injected input step (press, then settle + screenshot).
     #[arg(long, default_value_t = 0.6)]
     action_secs: f64,
+    /// Require the LAST painted frame to be non-blank, i.e. gate on
+    /// `last_frame_content`. OFF by default so existing verdicts are unchanged;
+    /// pass it for the fixture+mode combinations where a blank final screen is a
+    /// defect (e.g. `keydraw_lgt.zip --inject`, but NOT `helloworld_lgt.zip`,
+    /// which draws nothing at all and exits cleanly). This is the per-fixture
+    /// expectation the module header says gating needs — see there for why it
+    /// lives here rather than in a sidecar or a table.
+    #[arg(long, default_value_t = false)]
+    expect_last_frame: bool,
+    /// Add the guest's stdout to the JSON line as `guest_stdout` (+ a
+    /// `guest_stdout_truncated` flag). OFF by default, and the default output is
+    /// byte-identical to before: with the flag absent neither key is emitted.
+    ///
+    /// It is opt-in because of Constraint 9, not because of cost. The guest's
+    /// bytes never appear here — but whatever the guest *prints* does, and a real
+    /// title can print a path. AGENTS.md's own smoke-gate note draws that line
+    /// explicitly ("identifiers and expected status only, never paths or bytes"),
+    /// so "this is not game bytes" mitigates the constraint rather than exempting
+    /// it. Output is capped at GUEST_STDOUT_MAX_BYTES and truncation is reported,
+    /// but nothing here can tell a path from any other string — do not paste this
+    /// output into the repo or a shared log when running against a real game.
+    #[arg(long, default_value_t = false)]
+    guest_stdout: bool,
+}
+
+/// Cap on the `guest_stdout` field, in bytes of the lossy-decoded text.
+///
+/// Sized from what the field is for: the committed fixtures print two short
+/// markers, and a useful diagnostic is a handful of lines or a stack trace. 4 KiB
+/// holds that with room to spare while keeping one JSON line pasteable and
+/// bounding how much a chatty guest can dump into a caller's log.
+const GUEST_STDOUT_MAX_BYTES: usize = 4096;
+
+/// Escape a string for a JSON string literal.
+///
+/// Hand-rolled on purpose: `wie_cli` has no JSON dependency and this is the whole
+/// of the format's string grammar. **`{:?}` is not a substitute** — Rust's Debug
+/// renders a control byte as `\u{1}`, which JSON does not accept.
+fn json_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+/// Decode the collected guest stdout, cap it, and escape it for the JSON line.
+///
+/// Returns the escaped body and whether it was cut. Truncation is signalled by a
+/// **separate key**, never by a marker inside the text: the text is the one part
+/// of this line the guest controls, so an in-band marker would be forgeable by
+/// the very source being bounded.
+fn guest_stdout_field(raw: &[u8], max: usize) -> (String, bool) {
+    let text = String::from_utf8_lossy(raw);
+    let mut end = text.len().min(max);
+    while end > 0 && !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    (json_escape(&text[..end]), end < text.len())
 }
 
 const SCREEN_W: u32 = 240;
@@ -389,14 +492,19 @@ fn main() {
     let args = Args::parse();
     let start = StdInstant::now();
 
-    let result = run(&args);
+    // Hoisted so main can read what the guest printed after `run` returns; `run`
+    // hands the same handle to HeadlessPlatform::write_stdout.
+    let guest_out = Arc::new(Mutex::new(Vec::new()));
+    let result = run(&args, guest_out.clone());
     let elapsed_ms = start.elapsed().as_millis();
 
     // Emit a single JSON line for the batch wrapper to parse.
     let json = format!(
         "{{\"file\":{:?},\"platform\":{:?},\"result\":{:?},\"reason\":{:?},\"ticks\":{},\"paints\":{},\"content\":{},\
          \"last_frame_content\":{},\
-         \"distinct_colors\":{},\"nondominant_pct\":{:.1},\"center_nonuniform_pct\":{:.1},\"ms\":{}}}",
+         \"distinct_colors\":{},\"nondominant_pct\":{:.1},\"center_nonuniform_pct\":{:.1},\
+         \"last_frame_distinct_colors\":{},\"last_frame_nondominant_pct\":{:.1},\"last_frame_center_nonuniform_pct\":{:.1},\
+         \"ms\":{}}}",
         args.filename,
         result.platform,
         if result.passed { "PASS" } else { "FAIL" },
@@ -408,8 +516,29 @@ fn main() {
         result.distinct_colors,
         result.nondominant_bp as f64 / 100.0,
         result.center_nonuniform_bp as f64 / 100.0,
+        result.last_frame_distinct_colors,
+        result.last_frame_nondominant_bp as f64 / 100.0,
+        result.last_frame_center_nonuniform_bp as f64 / 100.0,
         elapsed_ms
     );
+    // Appended, never interleaved, and only when asked: with the flag absent the
+    // line above is byte-identical to what every existing caller already parses.
+    // Both in-tree parsers read this line with `grep -o` over the WHOLE line
+    // (smoke_gate.sh's `"result":"[^"]*"`, lgt_render_probe.sh's `"<key>":[0-9a-z.]*`)
+    // plus `tail -1`, so a guest that printed `"result":"PASS"` would otherwise win
+    // the match by being later on the line. `json_escape` is what stops that: the
+    // quotes become `\"`, so the literal `"result":"` those patterns need never
+    // appears inside the payload. That is asserted below, not assumed.
+    let json = if args.guest_stdout {
+        let (body, truncated) = guest_stdout_field(&guest_out.lock().unwrap(), GUEST_STDOUT_MAX_BYTES);
+        format!(
+            "{}{}",
+            &json[..json.len() - 1],
+            format_args!(",\"guest_stdout\":\"{body}\",\"guest_stdout_truncated\":{truncated}}}")
+        )
+    } else {
+        json
+    };
     println!("{json}");
 
     std::process::exit(if result.passed { 0 } else { 1 });
@@ -423,16 +552,26 @@ struct Outcome {
     paints: u64,
     content: bool,
     /// Same predicate as `content`, but scoped to the LAST painted frame instead of
-    /// ORed over all of them. Measure-only: it does NOT affect `passed`. See the
-    /// module header for why the two can disagree and why this one is not a gate yet.
+    /// ORed over all of them. Measure-only UNLESS `--expect-last-frame` is passed,
+    /// in which case a false value turns a PASS into a FAIL. See the module header
+    /// for why the two can disagree and why the expectation lives on the command line.
     last_frame_content: bool,
     // Content-richness metrics (measure-only; do not affect passed). See HeadlessScreen.
+    // These are the MAX over every painted frame, so they carry the same structural blind
+    // spot `content` does: fetch_max is monotonic, and a later frame cannot pull the number
+    // back down. The `last_frame_*` triple below is the same three metrics scoped to the
+    // final frame — the pair is what makes "drew something rich, then overpainted with
+    // near-nothing" visible. Measure-only as well: NO threshold is defined for them and
+    // none is invented here (a number without a threshold cannot fail a run).
     distinct_colors: u64,
     nondominant_bp: u64,
     center_nonuniform_bp: u64,
+    last_frame_distinct_colors: u64,
+    last_frame_nondominant_bp: u64,
+    last_frame_center_nonuniform_bp: u64,
 }
 
-fn run(args: &Args) -> Outcome {
+fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     let screen = Arc::new(HeadlessScreen {
         width: SCREEN_W,
         height: SCREEN_H,
@@ -446,7 +585,6 @@ fn run(args: &Args) -> Outcome {
         max_center_nonuniform_bp: AtomicU64::new(0),
     });
     let exited = Arc::new(AtomicBool::new(false));
-    let stdout = Arc::new(Mutex::new(Vec::new()));
 
     let platform = Box::new(HeadlessPlatform {
         screen: screen.clone(),
@@ -606,7 +744,11 @@ fn run(args: &Args) -> Outcome {
     // ── classify ─────────────────────────────────────────────────────────────
     // NOTE: the richness metrics below are MEASURE-ONLY — they are recorded in the
     // JSON for triage but deliberately do NOT influence PASS/FAIL (phase A1). The
-    // PASS/FAIL logic is byte-for-byte the existing behaviour.
+    // classification below is byte-for-byte the existing behaviour; the ONE thing
+    // that can still change the verdict afterwards is `--expect-last-frame`, and
+    // only in the PASS -> FAIL direction (see just past the last_frame_content
+    // assignment). An earlier revision of this comment said the PASS/FAIL logic was
+    // byte-for-byte existing, full stop; that stopped being true on 2026-09-06.
     let mut outcome = if let Some(reason) = run_err {
         fail(&platform_name, reason, ticks, paints, content)
     } else if exited.load(Ordering::SeqCst) {
@@ -636,9 +778,40 @@ fn run(args: &Args) -> Outcome {
     // an ANY-frame OR, so a run that draws correctly and is then overpainted with a blank
     // screen still reports `content: true`.
     outcome.last_frame_content = screen.last_frame.lock().unwrap().as_deref().is_some_and(has_content);
+
+    // Order is load-bearing and NOT alphabetical: every field that merely RECORDS what
+    // happened is filled before the one thing that JUDGES. That covers BOTH richness trios —
+    // the `last_frame_*` one just below and the whole-run `max_*` one after it. The gate reads
+    // three bools — `args.expect_last_frame`, `outcome.passed` (set by pass()/fail() above) and
+    // `outcome.last_frame_content` (set just above) — and no richness field, so today the
+    // blocks commute. That is exactly why the order needs writing down: widening the gate to
+    // read a richness field would otherwise compile, run, and read a zero, because the fields
+    // are Default::default() until the blocks below fill them. Both trios are pinned ahead of
+    // the gate by `richness_is_recorded_before_the_gate_judges_test`.
+    //
+    // Same three richness metrics, scoped to the final frame. Computed ONCE per run, not per
+    // painted frame: the last frame is already held in memory, so this is one extra pass over
+    // one frame at the end of a run that painted `paints` of them.
+    let (lf_colors, lf_nondominant, lf_center) = match screen.last_frame.lock().unwrap().as_deref() {
+        Some(frame) => frame_richness(frame, SCREEN_W, SCREEN_H),
+        None => (0, 0, 0),
+    };
+    outcome.last_frame_distinct_colors = lf_colors;
+    outcome.last_frame_nondominant_bp = lf_nondominant;
+    outcome.last_frame_center_nonuniform_bp = lf_center;
+
+    // The whole-run peaks of those same three metrics. Plain atomic loads off `screen`: nothing
+    // between here and the gate writes them, which is why moving them above the gate is a pure
+    // reordering — see the ordering comment above.
     outcome.distinct_colors = screen.max_distinct_colors.load(Ordering::SeqCst);
     outcome.nondominant_bp = screen.max_nondominant_bp.load(Ordering::SeqCst);
     outcome.center_nonuniform_bp = screen.max_center_nonuniform_bp.load(Ordering::SeqCst);
+
+    if last_frame_gate_fails(args.expect_last_frame, outcome.passed, outcome.last_frame_content) {
+        outcome.passed = false;
+        outcome.reason = format!("last frame blank, but --expect-last-frame was given (otherwise: {})", outcome.reason);
+    }
+
     outcome
 }
 
@@ -724,6 +897,18 @@ fn panic_message(p: &Box<dyn std::any::Any + Send>) -> String {
     }
 }
 
+/// Does `--expect-last-frame` turn this verdict into a FAIL?
+///
+/// Deliberately ONE-DIRECTIONAL: it can only turn a PASS into a FAIL, never rescue
+/// a FAIL. An already-failing run has a more specific reason than "the last frame
+/// was blank" (a panic, a hang, the magenta color-key check), and letting the gate
+/// touch it would either lose that reason or — if the sign were ever flipped —
+/// hand a PASS to a run that crashed. Extracted from `run` so that invariant is
+/// asserted by `cargo test --all` rather than by reading the call site.
+fn last_frame_gate_fails(expect_last_frame: bool, passed: bool, last_frame_content: bool) -> bool {
+    expect_last_frame && passed && !last_frame_content
+}
+
 fn pass(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) -> Outcome {
     Outcome {
         platform: platform.to_string(),
@@ -736,6 +921,9 @@ fn pass(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         distinct_colors: 0,
         nondominant_bp: 0,
         center_nonuniform_bp: 0,
+        last_frame_distinct_colors: 0,
+        last_frame_nondominant_bp: 0,
+        last_frame_center_nonuniform_bp: 0,
     }
 }
 
@@ -751,12 +939,128 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         distinct_colors: 0,
         nondominant_bp: 0,
         center_nonuniform_bp: 0,
+        last_frame_distinct_colors: 0,
+        last_frame_nondominant_bp: 0,
+        last_frame_center_nonuniform_bp: 0,
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{RICHNESS_COLOR_CAP, frame_richness, has_content};
+    use super::{GUEST_STDOUT_MAX_BYTES, RICHNESS_COLOR_CAP, frame_richness, guest_stdout_field, has_content, json_escape, last_frame_gate_fails};
+
+    /// The payload is the one part of the JSON line the guest controls, and both
+    /// in-tree parsers `grep -o` over the whole line and take `tail -1`. So a guest
+    /// that prints a fake verdict must not be able to produce the byte sequence
+    /// those patterns look for. Escaping is what prevents it — assert that here
+    /// rather than trusting the reasoning in the comment at the call site.
+    #[test]
+    fn escaped_guest_output_cannot_forge_a_field_the_parsers_match_test() {
+        let hostile = b"\"result\":\"PASS\" \"paints\":999";
+        let (body, truncated) = guest_stdout_field(hostile, GUEST_STDOUT_MAX_BYTES);
+        assert!(!truncated);
+        // smoke_gate.sh: grep -o '"result":"[^"]*"'
+        assert!(!body.contains("\"result\":\""), "forged verdict survived escaping: {body}");
+        // lgt_render_probe.sh: field() greps "\"<name>\":[0-9a-z.]*"
+        assert!(!body.contains("\"paints\":"), "forged metric survived escaping: {body}");
+        // The text is still readable — escaping, not stripping.
+        assert!(body.contains("result"));
+    }
+
+    #[test]
+    fn json_escape_covers_the_string_grammar_test() {
+        assert_eq!(json_escape("a\"b\\c"), "a\\\"b\\\\c");
+        assert_eq!(json_escape("l1\nl2\r\tx"), "l1\\nl2\\r\\tx");
+        // A control byte must become \u00XX, not Rust Debug's \u{1} (invalid JSON).
+        assert_eq!(json_escape("\u{1}"), "\\u0001");
+        // Non-ASCII passes through as UTF-8; JSON does not require escaping it.
+        assert_eq!(json_escape("한"), "한");
+    }
+
+    #[test]
+    fn guest_stdout_is_capped_and_says_so_test() {
+        let (body, truncated) = guest_stdout_field(&vec![b'x'; GUEST_STDOUT_MAX_BYTES + 1], GUEST_STDOUT_MAX_BYTES);
+        assert_eq!(body.len(), GUEST_STDOUT_MAX_BYTES);
+        assert!(truncated, "over-cap input must report truncation");
+
+        let (body, truncated) = guest_stdout_field(b"short", GUEST_STDOUT_MAX_BYTES);
+        assert_eq!(body, "short");
+        assert!(!truncated);
+
+        // Cutting mid-character must not panic or emit a partial code point: the
+        // cap is in bytes and the payload is arbitrary guest output.
+        let (body, truncated) = guest_stdout_field("한글".as_bytes(), 4);
+        assert!(truncated);
+        assert_eq!(body, "한");
+    }
+
+    #[test]
+    fn last_frame_gate_only_turns_pass_into_fail_test() {
+        // Off by default: every verdict survives untouched, which is what keeps the
+        // existing fixture judgements (helloworld_* PASS on a blank final frame)
+        // from flipping. This row is the whole reason the flag is opt-in.
+        for passed in [true, false] {
+            for last in [true, false] {
+                assert!(!last_frame_gate_fails(false, passed, last), "flag off must never fire: {passed} {last}");
+            }
+        }
+        // Declared, and the last frame is blank -> fail. Measured equivalent:
+        // keydraw_lgt.zip --inject with the is_clet_card normalization reverted.
+        assert!(last_frame_gate_fails(true, true, false));
+        // Declared and satisfied -> untouched.
+        assert!(!last_frame_gate_fails(true, true, true));
+        // Already failing -> the gate does NOT speak, in either direction. A sign
+        // flip here would hand a PASS to a crashed run, so it is asserted, not
+        // left to the reader of the call site.
+        assert!(!last_frame_gate_fails(true, false, false));
+        assert!(!last_frame_gate_fails(true, false, true));
+    }
+
+    /// Both richness trios — `last_frame_*` and the whole-run `max_*` — must be filled BEFORE
+    /// `last_frame_gate_fails` is consulted.
+    ///
+    /// This reads the source rather than the behaviour on purpose, and the reason is the
+    /// whole point of the lock: the gate takes three bools and no richness field, so today
+    /// the blocks commute and **no behavioural test can tell the orders apart**. A
+    /// behavioural assertion here would pass in both orders — it would look like a lock and
+    /// hold nothing. What is actually being defended is the next edit: widening the gate to
+    /// read a richness field compiles and runs in either order, and in the wrong one it reads
+    /// a `Default::default()` zero instead of the measured value.
+    ///
+    /// The needles are split with `concat!` so this test's own source does not contain them —
+    /// otherwise it would match itself. The count assertions are what make that safe: if a
+    /// needle ever appears twice, this fails loudly instead of comparing the wrong position.
+    #[test]
+    fn richness_is_recorded_before_the_gate_judges_test() {
+        let src = include_str!("wie_validate.rs");
+        // One needle per trio. Pinning only the last-written one would leave the other free to
+        // drift below the gate while this still passed — which is exactly the hole that let a
+        // widened gate read a zero under a green suite.
+        let records = [
+            concat!("outcome.last_frame_center", "_nonuniform_bp = lf_center;"),
+            concat!(
+                "outcome.center_nonuniform_bp = screen.max_center",
+                "_nonuniform_bp.load(Ordering::SeqCst);"
+            ),
+        ];
+        let judge = concat!("if last_frame_gate", "_fails(args.expect_last_frame,");
+        assert_eq!(
+            src.matches(judge).count(),
+            1,
+            "gate call is not unique — the position below would be arbitrary"
+        );
+        for record in records {
+            assert_eq!(
+                src.matches(record).count(),
+                1,
+                "richness assignment is not unique — the position below would be arbitrary: {record}"
+            );
+            assert!(
+                src.find(record).unwrap() < src.find(judge).unwrap(),
+                "the gate is consulted before the richness fields are filled — see the ordering comment in run(): {record}"
+            );
+        }
+    }
 
     #[test]
     fn has_content_is_the_two_distinct_values_test() {

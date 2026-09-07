@@ -31,6 +31,13 @@ jobs:
         with:
           submodules: "recursive"
 
+      # Pinned rather than relying on whatever Node the runner image ships — the
+      # comparison step below is the only Node in this workflow, and a silent
+      # version drift there would be a checker that stops working quietly.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Install cargo-audit
         uses: taiki-e/install-action@v2
         with:
@@ -40,10 +47,17 @@ jobs:
       # exits non-zero). Informational warnings (unmaintained / yanked) are
       # printed but NON-gating — cargo-audit exits 0 on warnings unless
       # `--deny warnings` is passed, which we deliberately do not. This keeps
-      # the daily job green on the two current warnings (ttf-parser
-      # unmaintained RUSTSEC-2026-0192, spin 0.12.0 yanked) while still turning
-      # red the moment a real vulnerability appears — the two classes are
+      # the daily job green on the two current warnings — MEASURED 2026-09-06,
+      # `cargo audit` printing "2 allowed warnings found": ttf-parser 0.25.1
+      # unmaintained (RUSTSEC-2026-0192) and chacha20 0.10.0 yanked — while still
+      # turning red the moment a real vulnerability appears; the two classes are
       # distinguished by exit code, not squashed by continue-on-error.
+      # This list is what "allowed warning" MEANS here — and as of 2026-09-07 a
+      # MACHINE compares it, in the step after this one. It used to live only in
+      # this comment, and that failed silently: an earlier revision named "spin
+      # 0.12.0 yanked" long after spin had been upgraded away, while chacha20
+      # arrived unlisted. The COUNT was 2 before and after, so "two current
+      # warnings" stayed literally true and nothing looked wrong.
       #
       # The former `--ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195`
       # (quick-xml XML DoS) is GONE as of 2026-07-31: wayland-scanner 0.31.11
@@ -52,5 +66,28 @@ jobs:
       # now runs with NO ignores at all — any future suppression must be added
       # back by explicit advisory ID with its reachability argument, never as a
       # blanket ignore.
+      #
+      # WHEN THIS GOES RED, READ THE LEDGER FIRST:
+      #   docs/project-kb/02_status.md — "공급망 추적 대장"
+      # Section A is what is still open; section C keeps the EXPOSURE VERDICT of
+      # advisories we already answered ("do we take that path?"), each with the
+      # dependency version it was measured against. That version column is the
+      # point: a verdict read off an old source tree stops being true when the
+      # dependency moves, so re-measure the version-dependent axis rather than
+      # quoting the row. Answering a repeat advisory from scratch is the waste
+      # this exists to prevent.
       - name: cargo audit
         run: cargo audit
+
+      # The list ↔ reality comparison. A SEPARATE step on purpose: the audit above
+      # keeps its own exit code and runs with no ignores (Constraint 5), and this
+      # one only compares. Asymmetric by design, which is what keeps the expected
+      # list from becoming a suppression:
+      #   GONE (expected, no longer reported) -> RED. The list is stale, and that
+      #     staleness is the defect this exists to catch. The fix is deleting a line.
+      #   NEW  (reported, not expected)       -> printed, not red. A fresh advisory
+      #     must never create pressure to reach for `--ignore`.
+      # Deleting an entry hides nothing: the warning becomes NEW and keeps printing.
+      # Cost: ~1s (measured warm locally: 0.89s / 1.09s).
+      - name: Allowed-warning list matches reality (.github/rust-audit-expected-warnings.json)
+        run: node scripts/check-audit-warnings.mjs

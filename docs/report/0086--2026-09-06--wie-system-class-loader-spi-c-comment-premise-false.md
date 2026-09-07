@@ -1,0 +1,10 @@
+## [2026-09-06] WIPI-C 4자리 주석의 «전제»를 고쳤다 — 결론은 옳고 이유가 거짓이었다 (wie-system-class-loader-spi-c-comment-premise-false)
+- **무엇을**: `wie_{ktf,lgt}/src/runtime/wipi_c/context.rs` 각 2곳, 총 **4자리**의 `the two coincide wherever there is no Java frame` 을 걷어내고 **캐리어별 진짜 사유**를 그 자리에 적었다. ★**코드 동작 변경 0**(주석뿐 · 2파일 **+54/−18**).
+- **왜**: 운영자 채택 제안 `2026-09-05-system-class-loader-preemptive-migration#p2`. 「조건절은 참인데 **그 자리에서 전제가 거짓**」 — 이 저장소가 「행동은 옳고 자기 서술은 거짓」이라 이름 붙인 병이고, 이 리니지가 다섯 회차를 쓴 원인이 정확히 「반증된 전제가 서술로 이월된다」였다.
+- **★★⑴ 전제가 거짓임을 «직접» 쟀다**(KTF): 그 자리에 프로브를 심어 두 API 가 준 객체의 클래스 이름을 찍었다 → ★**`current=<net.wie.KtfClassLoader>` · `system=<java.net.URLClassLoader>` = 다른 객체** ⇒ **Java 프레임이 스택에 있고 그 클래스에 로더가 있다.** 옛 문장의 직접 반증이다.
+- **★⑵ 못 가르는 것을 «명시»했다**(LGT): 같은 프로브가 `current=<java.net.URLClassLoader>` = `system` 으로 나온다. ★**그것만으로는 「프레임 없음」과 「프레임은 있는데 로더가 `None`」을 가르지 못한다** — 둘 다 같은 폴백이다. ⇒ 프레임의 존재는 **소스로** 세웠다(`clet_wrapper.rs` 의 `start_app` 이 `core.run_function(start_clet)` 로 ARM 을 **동기 실행**한다).
+- **★★⑶ 사유가 캐리어마다 다르다 — 한 문장이 넷을 덮고 있었다**: **LGT** = `wipi_c.rs:207-208` 의 `register_class(…, **None**)` ⇒ 호출 클래스에 로더가 없어 **폴백** / **KTF** = `interface.rs:186` 이 `Some(ktf_class_loader)` 로 등록하는데 `KtfClassLoader::as_proto()` 에 ★**`findResource` 재정의가 없고** `jvm_support.rs:146-149` 가 **시스템 로더를 부모로** 넘긴다 + 핀의 `getResource` 는 **부모를 먼저** 묻는다 ⇒ **부모 위임**.
+- **★⑷ 결론은 참이다**(그래서 코드는 안 고쳤다): 네 자리를 전부 `current_class_loader` 로 바꿔도 `test_resource_reach` **KTF·LGT 모두 통과**. 바뀐 것은 «이유»뿐이다.
+- **★⑸ 양방향 대조**: **C1**(네 자리 `current_class_loader`) → **물지 않는다**(그게 맞다) / **C2**(`KtfClassLoader` 부모 절단) → ★**KTF FAILED · LGT 1 passed** ⇒ 갈래가 실제로 갈린다. ★**C2 의 천장도 적었다** — `KtfClassLoader::init` 이 `client.bin` 을 같은 경로로 읽어 **출하 형상에서도 KTF 가 죽는다**(C3) ⇒ C2 는 「부모 링크가 KTF 리소스를 실어 나른다」를 보이지 「두 API 를 가른다」를 보이지 **않는다**. 그것을 가르는 것은 ⑴의 프로브다.
+- **사용자 영향**: 없음. 대신 이 통로를 다음에 손대는 사람이 **틀린 이유를 근거로 안전하다고 판단하는 일**이 막힌다.
+- **★남는 구멍**: ⒜LGT 의 「프레임이 있다」는 **소스 논증**이지 실행 측정이 아니다(프로브가 그 갈래를 못 가른다 — 명시했다) ⒝코드 동작 변경 0 ⇒ ★**이 회차가 막는 회귀는 0건**이고, 값은 전부 「서술이 참이 된다」에 있다 ⒞`KtfClassLoader` 에 `findResource` 가 없는 것이 의도인지 미구현인지 **어디에도 적혀 있지 않다**(부모가 바뀌면 조용히 빈다 · 제안 등재).
