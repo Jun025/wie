@@ -27,6 +27,17 @@
 //! `wie_validate --inject` reported PASS with `content: true` — the browser
 //! round-trip was the only thing that caught it.
 //!
+//! The three content-RICHNESS metrics have the same shape and, since 2026-09-06, the same
+//! pairing: `distinct_colors` / `nondominant_pct` / `center_nonuniform_pct` are each a MAX
+//! over every painted frame (`fetch_max`, monotonic), so a later frame cannot pull them back
+//! down — structurally the same blind spot. `last_frame_distinct_colors` /
+//! `last_frame_nondominant_pct` / `last_frame_center_nonuniform_pct` are the same three
+//! computed on the final frame alone, ONCE per run. They are REPORTED, never gated — not
+//! even under `--expect-last-frame`, which reads the boolean pair below and no richness
+//! field at all (`last_frame_gate_fails` takes three bools). Unlike that pair these are
+//! numbers, and a number needs a threshold to fail anything. No threshold is defined here on
+//! purpose — the point is to make one CHOOSABLE from data instead of invented.
+//!
 //! `last_frame_content` is REPORT-ONLY BY DEFAULT and becomes a gate only when the
 //! caller passes `--expect-last-frame`. Two reasons it cannot be gated
 //! unconditionally, both measured rather than assumed: a fixture may legitimately
@@ -491,7 +502,9 @@ fn main() {
     let json = format!(
         "{{\"file\":{:?},\"platform\":{:?},\"result\":{:?},\"reason\":{:?},\"ticks\":{},\"paints\":{},\"content\":{},\
          \"last_frame_content\":{},\
-         \"distinct_colors\":{},\"nondominant_pct\":{:.1},\"center_nonuniform_pct\":{:.1},\"ms\":{}}}",
+         \"distinct_colors\":{},\"nondominant_pct\":{:.1},\"center_nonuniform_pct\":{:.1},\
+         \"last_frame_distinct_colors\":{},\"last_frame_nondominant_pct\":{:.1},\"last_frame_center_nonuniform_pct\":{:.1},\
+         \"ms\":{}}}",
         args.filename,
         result.platform,
         if result.passed { "PASS" } else { "FAIL" },
@@ -503,6 +516,9 @@ fn main() {
         result.distinct_colors,
         result.nondominant_bp as f64 / 100.0,
         result.center_nonuniform_bp as f64 / 100.0,
+        result.last_frame_distinct_colors,
+        result.last_frame_nondominant_bp as f64 / 100.0,
+        result.last_frame_center_nonuniform_bp as f64 / 100.0,
         elapsed_ms
     );
     // Appended, never interleaved, and only when asked: with the flag absent the
@@ -541,9 +557,18 @@ struct Outcome {
     /// for why the two can disagree and why the expectation lives on the command line.
     last_frame_content: bool,
     // Content-richness metrics (measure-only; do not affect passed). See HeadlessScreen.
+    // These are the MAX over every painted frame, so they carry the same structural blind
+    // spot `content` does: fetch_max is monotonic, and a later frame cannot pull the number
+    // back down. The `last_frame_*` triple below is the same three metrics scoped to the
+    // final frame — the pair is what makes "drew something rich, then overpainted with
+    // near-nothing" visible. Measure-only as well: NO threshold is defined for them and
+    // none is invented here (a number without a threshold cannot fail a run).
     distinct_colors: u64,
     nondominant_bp: u64,
     center_nonuniform_bp: u64,
+    last_frame_distinct_colors: u64,
+    last_frame_nondominant_bp: u64,
+    last_frame_center_nonuniform_bp: u64,
 }
 
 fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
@@ -754,14 +779,39 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     // screen still reports `content: true`.
     outcome.last_frame_content = screen.last_frame.lock().unwrap().as_deref().is_some_and(has_content);
 
+    // Order is load-bearing and NOT alphabetical: every field that merely RECORDS what
+    // happened is filled before the one thing that JUDGES. That covers BOTH richness trios —
+    // the `last_frame_*` one just below and the whole-run `max_*` one after it. The gate reads
+    // three bools — `args.expect_last_frame`, `outcome.passed` (set by pass()/fail() above) and
+    // `outcome.last_frame_content` (set just above) — and no richness field, so today the
+    // blocks commute. That is exactly why the order needs writing down: widening the gate to
+    // read a richness field would otherwise compile, run, and read a zero, because the fields
+    // are Default::default() until the blocks below fill them. Both trios are pinned ahead of
+    // the gate by `richness_is_recorded_before_the_gate_judges_test`.
+    //
+    // Same three richness metrics, scoped to the final frame. Computed ONCE per run, not per
+    // painted frame: the last frame is already held in memory, so this is one extra pass over
+    // one frame at the end of a run that painted `paints` of them.
+    let (lf_colors, lf_nondominant, lf_center) = match screen.last_frame.lock().unwrap().as_deref() {
+        Some(frame) => frame_richness(frame, SCREEN_W, SCREEN_H),
+        None => (0, 0, 0),
+    };
+    outcome.last_frame_distinct_colors = lf_colors;
+    outcome.last_frame_nondominant_bp = lf_nondominant;
+    outcome.last_frame_center_nonuniform_bp = lf_center;
+
+    // The whole-run peaks of those same three metrics. Plain atomic loads off `screen`: nothing
+    // between here and the gate writes them, which is why moving them above the gate is a pure
+    // reordering — see the ordering comment above.
+    outcome.distinct_colors = screen.max_distinct_colors.load(Ordering::SeqCst);
+    outcome.nondominant_bp = screen.max_nondominant_bp.load(Ordering::SeqCst);
+    outcome.center_nonuniform_bp = screen.max_center_nonuniform_bp.load(Ordering::SeqCst);
+
     if last_frame_gate_fails(args.expect_last_frame, outcome.passed, outcome.last_frame_content) {
         outcome.passed = false;
         outcome.reason = format!("last frame blank, but --expect-last-frame was given (otherwise: {})", outcome.reason);
     }
 
-    outcome.distinct_colors = screen.max_distinct_colors.load(Ordering::SeqCst);
-    outcome.nondominant_bp = screen.max_nondominant_bp.load(Ordering::SeqCst);
-    outcome.center_nonuniform_bp = screen.max_center_nonuniform_bp.load(Ordering::SeqCst);
     outcome
 }
 
@@ -871,6 +921,9 @@ fn pass(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         distinct_colors: 0,
         nondominant_bp: 0,
         center_nonuniform_bp: 0,
+        last_frame_distinct_colors: 0,
+        last_frame_nondominant_bp: 0,
+        last_frame_center_nonuniform_bp: 0,
     }
 }
 
@@ -886,6 +939,9 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         distinct_colors: 0,
         nondominant_bp: 0,
         center_nonuniform_bp: 0,
+        last_frame_distinct_colors: 0,
+        last_frame_nondominant_bp: 0,
+        last_frame_center_nonuniform_bp: 0,
     }
 }
 
@@ -958,6 +1014,52 @@ mod tests {
         // left to the reader of the call site.
         assert!(!last_frame_gate_fails(true, false, false));
         assert!(!last_frame_gate_fails(true, false, true));
+    }
+
+    /// Both richness trios — `last_frame_*` and the whole-run `max_*` — must be filled BEFORE
+    /// `last_frame_gate_fails` is consulted.
+    ///
+    /// This reads the source rather than the behaviour on purpose, and the reason is the
+    /// whole point of the lock: the gate takes three bools and no richness field, so today
+    /// the blocks commute and **no behavioural test can tell the orders apart**. A
+    /// behavioural assertion here would pass in both orders — it would look like a lock and
+    /// hold nothing. What is actually being defended is the next edit: widening the gate to
+    /// read a richness field compiles and runs in either order, and in the wrong one it reads
+    /// a `Default::default()` zero instead of the measured value.
+    ///
+    /// The needles are split with `concat!` so this test's own source does not contain them —
+    /// otherwise it would match itself. The count assertions are what make that safe: if a
+    /// needle ever appears twice, this fails loudly instead of comparing the wrong position.
+    #[test]
+    fn richness_is_recorded_before_the_gate_judges_test() {
+        let src = include_str!("wie_validate.rs");
+        // One needle per trio. Pinning only the last-written one would leave the other free to
+        // drift below the gate while this still passed — which is exactly the hole that let a
+        // widened gate read a zero under a green suite.
+        let records = [
+            concat!("outcome.last_frame_center", "_nonuniform_bp = lf_center;"),
+            concat!(
+                "outcome.center_nonuniform_bp = screen.max_center",
+                "_nonuniform_bp.load(Ordering::SeqCst);"
+            ),
+        ];
+        let judge = concat!("if last_frame_gate", "_fails(args.expect_last_frame,");
+        assert_eq!(
+            src.matches(judge).count(),
+            1,
+            "gate call is not unique — the position below would be arbitrary"
+        );
+        for record in records {
+            assert_eq!(
+                src.matches(record).count(),
+                1,
+                "richness assignment is not unique — the position below would be arbitrary: {record}"
+            );
+            assert!(
+                src.find(record).unwrap() < src.find(judge).unwrap(),
+                "the gate is consulted before the richness fields are filled — see the ordering comment in run(): {record}"
+            );
+        }
     }
 
     #[test]
