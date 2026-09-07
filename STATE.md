@@ -60,6 +60,14 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-08: **WIPI-C 4자리 주석의 «전제» 정정** (PR **#98** 착지 · `wie-system-class-loader-spi-c-comment-premise-false`
+  · 채택 제안 `2026-09-05-system-class-loader-preemptive-migration#p2`) — 「행동은 옳고 자기 서술은 거짓」 형태.
+  `the two coincide wherever there is no Java frame` 이 네 자리에 달려 있었는데 ★**그 자리에서 전제가 거짓**이다.
+  ★**직접 쟀다**(KTF 프로브): `current=<net.wie.KtfClassLoader>` ↔ `system=<java.net.URLClassLoader>` = **다른 객체**
+  ⇒ Java 프레임이 있고 그 클래스에 로더가 있다. ★**사유가 캐리어마다 다르다**: LGT 는 `register_class(…, None)` 이라
+  **폴백**, KTF 는 `findResource` 재정의가 없고 부모가 시스템 로더라 **부모 위임**. 한 문장이 넷을 덮고 있었다.
+  ★**결론은 참**(네 자리를 `current_class_loader` 로 바꿔도 리소스 시험 둘 다 통과) — 바뀐 것은 «이유»뿐이다.
+  ★**코드 동작 변경 0**(주석뿐 · 2파일 +54/−18).
 - 2026-09-08: **「진행중」의 «맨 위 추가»를 없앴다 — 병은 «맨 위»가 아니라 «지점이 하나»였다**
   (PR **#134** 착지 · `wie-state-in-progress-top-insert-conflicts-every-landing` · 채택 제안
   `2026-09-07-state-completed-split-decision#p0`) — §진행중 을 **회차가 만지지 않는 고정 안내**로
