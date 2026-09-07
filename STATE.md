@@ -62,6 +62,16 @@
   ★**확인 명령을 «돌려서» 값까지 적었다**: `RUST_LOG=jvm=debug` + `Register class …Clet…` → LGT `net/wie/CletWrapperCard` · KTF `CletCard`(★코드 변경 0).
   ★★**함정**: `RUST_LOG=debug`(전체)면 LGT 가 **점 형식도 함께** 찍어 판정이 갈린다 ⇒ `jvm=debug` 로 좁히고 JVM 자신의 `Register class` 줄만 보라고 못박았다.
   ★착지 시 배포 **0 예상**(diff 가 문서·원장뿐 — `.rs` **0**).
+- 2026-09-08: **러너 목록이 낡아도 기계가 말해 주지 않던 문제 — ★존재 대조(S) 완료 · 분류(M)는 «안 했다»**
+  (PR **#132** 착지 · `wie-engine-runner-list-vs-fixture-set-drift-check` · 채택 제안 `2026-09-06-agents-runner-keydraw-inject#p0`)
+  — `AGENTS.md` 러너 블록에 `ENGINE-RUNNER` 마커 + `scripts/check-engine-runner-fixtures.mjs` 신설.
+  ★★**첫 측정에서 티켓이 경고한 그 형태가 그대로 나왔다** — 계수 **5:5 로 «같은데»** 경로 집합은 **1:1 로 다르다**
+  (블록 `draw_j2me.jar` ↔ 추적 `draw_j2me.zip`). ★**그 차는 드리프트가 아니다** — 블록 «첫 줄»이 그 `.jar` 를 만들고 `*.jar` 는 gitignore 다.
+  ⇒ 술어 = **stem 집합 동등**(부분문자열 아님) ⇒ ★**현재 차 양방향 0 · 검사는 조용하다.**
+  ★**면제는 «문서 안»에 쓴다**(`NOT-RUN: <경로> — <why>`) — 검사기가 분류를 알면 «두 번째 진실원»이 된다(제안의 대가 ⑴).
+  ★**양방향 실증 4종**: 픽스처 늘림 rc=1 · 목록에서 뺌 rc=1 · **마커 제거 rc=1** · 면제하면 rc=0(★`excused` 로 분류).
+  ★★**required 승격은 «하지 않았다»** — `contract` job 이 required 라 hard-fail 은 «배치만으로 승격»이다 ⇒ `continue-on-error`.
+  승격 = 그 한 줄 삭제(브랜치 보호 무접촉) · 조건은 워크플로 주석에 적었다. ★그때까지 이 검사는 **아무도 막지 않는다**.
 - 2026-09-07: **재측 판정이 «마지막에 붙은 행»을 읽던 문제 — ★⒜(max) 채택** (PR **#128** 착지 · `wie-worklog-coverage-last-vs-max-decision`
   · 채택 제안 `2026-09-06-remeasure-record-idempotent#p0`) — `at(-1)` → **`landedRounds` 최대 행**(동률은 나중에 붙은 쪽).
   ★**비-주석 변경 «한 줄»** · ★**임계(`WINDOW=10`)·`THRESHOLD=70`·「비율은 사람이 판단한다」 무접촉** · 기록 파일 **0줄**(재측 기록 0).
