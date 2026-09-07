@@ -115,6 +115,10 @@ rather than trusting the word "green".
 
 **Touching engine code? The four gates are not enough — run the repo's own runner.**
 
+<!-- ENGINE-RUNNER:BEGIN — scripts/check-engine-runner-fixtures.mjs diffs the fixtures named
+     inside this region against `git ls-files test_data/`, both directions. Keep both markers;
+     the checker fails if either goes missing rather than passing on an empty region. -->
+
 ```sh
 node scripts/make-draw-fixture.mjs                                    # builds the J2ME fixture
 for f in test_data/draw_j2me.jar test_data/helloworld_ktf.zip test_data/helloworld_lgt.zip; do
@@ -124,6 +128,15 @@ for f in test_data/keydraw_ktf.zip test_data/keydraw_lgt.zip; do      # key-driv
   cargo run -q -p wie_cli --bin wie_validate -- --inject --expect-last-frame "$f"   # PASS *and* rc=0
 done
 ```
+
+**A fixture that this runner deliberately does not touch is named here, not omitted** — write
+`NOT-RUN: test_data/<name> — <why>` inside this marked region. That keeps the classification in the
+same document as the list instead of in the checker, which is the one thing the proposal behind this
+check warned about: a checker that knows which fixtures are "runner fixtures" becomes a second source
+of truth and drifts from this block. **There are none today** (the diff is 0 in both directions), so
+this paragraph is the syntax, not a list.
+
+<!-- ENGINE-RUNNER:END -->
 
 **`keydraw_*` without `--inject` reports FAIL, and that is the CORRECT result — you did not break it.**
 Those two fixtures paint only in response to a key, so with no injected input the screen stays black

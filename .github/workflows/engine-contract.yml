@@ -154,6 +154,23 @@ jobs:
           node scripts/check-docs-report-serial.mjs --selftest
           node scripts/check-docs-report-serial.mjs
 
+      # ── Deliberately non-blocking, and that is the whole point of the flag ───
+      # This job is a REQUIRED status check on main, so a hard-failing step here
+      # is a required check by placement — nobody has to touch branch protection
+      # for the first false positive to stop a merge. The round that added this
+      # check was told not to make that call, so `continue-on-error` is the
+      # "measured but not promoted" state: the step still prints ::error:: and
+      # still shows as failed in the run, it just does not fail the job.
+      #
+      # PROMOTING IT means deleting the one `continue-on-error` line below —
+      # nothing else, and no branch-protection edit. Do that once there is a
+      # sample: it has fired at least once on a real fixture change and the
+      # message was right. Until then a wrong accusation costs an annotation,
+      # not a round.
+      - name: Engine-runner list matches the fixture set (docs/worklog/2026-09-07-engine-runner-fixture-drift.json)
+        continue-on-error: true
+        run: node scripts/check-engine-runner-fixtures.mjs
+
       # Detect whether this diff touches anything that can change the built
       # artifact or the pinned surface. If not, the job short-circuits to success
       # (see the wrapper note in the header). Same list as publish-artifact.yml.

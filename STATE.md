@@ -32,6 +32,16 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- **러너 목록이 낡아도 기계가 말해 주지 않던 문제 — ★존재 대조(S) 완료 · 분류(M)는 «안 했다»**
+  (PR 개설 · `wie-engine-runner-list-vs-fixture-set-drift-check` · 채택 제안 `2026-09-06-agents-runner-keydraw-inject#p0`)
+  — `AGENTS.md` 러너 블록에 `ENGINE-RUNNER` 마커 + `scripts/check-engine-runner-fixtures.mjs` 신설.
+  ★★**첫 측정에서 티켓이 경고한 그 형태가 그대로 나왔다** — 계수 **5:5 로 «같은데»** 경로 집합은 **1:1 로 다르다**
+  (블록 `draw_j2me.jar` ↔ 추적 `draw_j2me.zip`). ★**그 차는 드리프트가 아니다** — 블록 «첫 줄»이 그 `.jar` 를 만들고 `*.jar` 는 gitignore 다.
+  ⇒ 술어 = **stem 집합 동등**(부분문자열 아님) ⇒ ★**현재 차 양방향 0 · 검사는 조용하다.**
+  ★**면제는 «문서 안»에 쓴다**(`NOT-RUN: <경로> — <why>`) — 검사기가 분류를 알면 «두 번째 진실원»이 된다(제안의 대가 ⑴).
+  ★**양방향 실증 4종**: 픽스처 늘림 rc=1 · 목록에서 뺌 rc=1 · **마커 제거 rc=1** · 면제하면 rc=0(★`excused` 로 분류).
+  ★★**required 승격은 «하지 않았다»** — `contract` job 이 required 라 hard-fail 은 «배치만으로 승격»이다 ⇒ `continue-on-error`.
+  승격 = 그 한 줄 삭제(브랜치 보호 무접촉) · 조건은 워크플로 주석에 적었다. ★그때까지 이 검사는 **아무도 막지 않는다**.
 - **핀 이동 시 「경로 밖」 판단이 낡는 문제 — ★⒜(상시 검사) · 단 «스크립트»가 아니라 «워크스페이스 시험»**
   (PR 개설 · `wie-transmute-census-on-pin-bump-decision` · 채택 제안 `2026-09-07-abi-vocabulary-outliers#p0`)
   — `wie_wipi_c/src/lib.rs` 에 `#[cfg(test)]` 잠금 **시험 1건**. ★**워크플로 0 · 새 의존 0 · CI 스텝 0 · `~/.cargo` 읽기 0.**
