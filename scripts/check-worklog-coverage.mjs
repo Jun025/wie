@@ -35,8 +35,31 @@
 // What it does NOT fix, stated so nobody assumes otherwise: two branches that
 // both append BEFORE either lands still produce two rows, because each tree is
 // individually correct. That residual is about the checker's tolerance, not the
-// recorder's — see the worklog for the measurement (the predicate below reads
-// `at(-1)`, not `max`, so entry ORDER is load-bearing).
+// recorder's.
+//
+// ── Which row is "the last recorded measurement" — highest, not last-appended ─
+// It reads the row with the largest `landedRounds`, not `at(-1)`. Those differ
+// only when rows arrive out of order, which is exactly what the residual above
+// produces: two branches append independently and the merge decides the order.
+// Under `at(-1)`, `[…, 50, 40]` reports "last recorded at 40" and goes OVERDUE
+// even though a measurement at 50 is sitting right there — a false red, because
+// the promise is "re-measure every 10 landed rounds", not "append in order".
+//
+// **Not a relaxation, and that distinction was measured, not assumed** (all three
+// re-runnable by editing a copy of the record and running this script):
+//   [ …, 50, 40 ]  order-reversed, same set   at(-1) rc=1  ->  max rc=0   fixed
+//   [ …, 40, 50 ]  in order, same set         at(-1) rc=0  ->  max rc=0   unchanged
+//   [ …, 40, 45 ]  in order, genuinely due    at(-1) rc=1  ->  max rc=1   STILL RED
+// The last line is the one that matters: `max` moves the out-of-order case and
+// nothing else. It also makes BELOW-UNANSWERED stricter rather than looser — that
+// check reads the same row, so a later-appended *older* entry can no longer mask a
+// sub-threshold measurement.
+//
+// Ties (two rows with the same `landedRounds`) resolve to the later-appended one:
+// same number, so the newer statement about that round wins. That case is real —
+// measured 2026-09-07, commits `80809604` and `ed70b279` each appended
+// `landedRounds: 53` from separate branches before either landed, and they merged
+// into one row only because the two additions were byte-identical.
 //
 // This file is the single source of the measurement. AGENTS.md keeps the *why*
 // (the threshold, the cadence, why --first-parent is load-bearing) and points
@@ -88,7 +111,9 @@ const newest = git("log", "--first-parent", "--format=%h", "-n", "1", head);
 
 const recordPath = "docs/worklog-coverage-remeasures.json";
 const record = JSON.parse(await readFile(path.join(root, recordPath), "utf8"));
-const last = record.measurements.at(-1);
+// Highest `landedRounds`, ties to the later-appended row — see the header for why
+// this is not `at(-1)` and what it does and does not change.
+const last = record.measurements.reduce((a, b) => (b.landedRounds >= a.landedRounds ? b : a));
 
 console.log(`worklog coverage: ${num}/${den} = ${pct.toFixed(1)}% over the last ${den} landed round(s)`);
 console.log(`  window ${oldest}..${newest} · landed rounds since ${SINCE}: ${landed} · last recorded at: ${last.landedRounds}`);
