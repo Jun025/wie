@@ -32,7 +32,16 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-  ★착지 시 배포 없음 예상(`.rs`·`Cargo.*` 무접촉 — 착지 diff 로 다시 셀 것).
+- **`get_resource` 의 버퍼-부족 코드가 ABI 어휘 밖이었다** (PR 개설 · `wie-get-resource-shortbuf-code-is-not-in-the-abi`
+  · 채택 제안 `2026-09-06-spi-resource-failure-branches#p0`) — ★**⒜(`-18` 통일)** · 비-주석 변경 **2줄**.
+  ★**결정 근거는 «일관성»이 아니라 실측이다**: 핀 rev 에서 `WIPICError::from_raw`(=`transmute`)를 지나는 호스트
+  함수는 `get_resource` 와 `graphics::create_image` **둘뿐**이고(래퍼 6 = ktf·lgt·simulation ×2) 후자는 `1` 만
+  돌려준다 ⇒ ★**이 한 자리가 transmute 경로 위의 유일한 어휘 밖 값 = UB** 였다.
+  ★**⒝를 버린 이유**: 실기가 `-1` 을 정의한다는 근거가 **0건**(이 저장소·핀 저장소 양쪽에 규격 없음 · `M_E_*` 정의 0).
+  ★★**호환성은 «확인할 수 없다»** — 코퍼스 0(Constraint 9). "안전하다"고 적지 않았다: **측정 불가능한 위험 ↔ 확정된 UB** 의 교환이다.
+  ★**개악 대조를 «줄 단위로 한 자리만»**: M1(이 자리) **FAILED** · M2·M3(형제 두 자리) ★**둘 다 통과 = 그쪽은 시험 0건**(제안 등재).
+  ★F1⑶ 목록만: 어휘 밖 값이 `-1` 3곳 + `-23` 1곳 더 있다(전부 transmute 경로 «밖» ⇒ 계급이 다르다 · 고치지 않았다).
+  ★착지 시 실배포 1건 예상(`web.yml` — 착지 diff 로 다시 셀 것).
 - (그 밖: ★열린 형제 PR: **#98 · #99 · #100** — 각자 자기
   브랜치에서 진행 중이고, 전부 `REPORT.md`·`STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장 2파일에서 충돌한다(정상))
 
@@ -52,6 +61,7 @@
   `gh api …/jobs/<id>/logs` 는 **`--allow-escape-sequences`** 없이는 아무것도 내지 않는다. ★**어느 쪽 0 이든 «부재»가 아니라 측정 artefact 다.**
   ★F2⑶ = **참**: `web/public/` 부재 · 내려받기 0 · 유일한 미추적 입력(`web/src/wasm/`)이 `.js/.wasm/.d.ts` · ★실제 빌드 결과 dist **4파일 · 게임류 0**.
   ⇒ 주석 한 블록으로 근거와 ★**뒤집힐 조건**을 커밋했다. **판정 술어 무접촉**(비-주석 변경 0) · 워크플로 무접촉.
+  ★착지 시 배포 없음 예상(`.rs`·`Cargo.*` 무접촉 — 착지 diff 로 다시 셀 것).
 - 2026-09-07: **카드 신원을 `class_definition().name()` 으로** (PR **#116** 착지 · `wie-clet-card-identity-use-class-definition-name`
   · 채택 제안 `2026-09-06-clet-card-identity-design#p0`) — `card_canvas.rs` 한 파일(**+44/−24**).
   `getClass()`→`getName()` **invoke_virtual 2회 + to_rust_string** → ★**`class_definition().name()` 한 줄** ·

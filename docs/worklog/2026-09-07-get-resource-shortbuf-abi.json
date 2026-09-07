@@ -1,0 +1,52 @@
+{
+  "date": "2026-09-07",
+  "task": "wie-get-resource-shortbuf-code-is-not-in-the-abi",
+  "title": "get_resource 의 버퍼-부족 코드 -1 → -18 — 어휘 밖 값이 transmute 경로 위에 있었다",
+  "summary": "★F2 는 ⒜(-18 통일)를 골랐다. 결정적 근거는 「같은 파일이 두 번 -18 을 쓴다」는 일관성이 아니라 ★«이 자리가 transmute 경로 위의 유일한 어휘 밖 값»이라는 실측이다. 핀 rev 에서 `WIPICError::from_raw`(= `transmute`)를 지나는 호스트 함수는 `get_resource` 와 `graphics::create_image` 둘뿐이고(래퍼 6 = ktf·lgt·simulation ×2) `create_image` 는 `1` 만 돌려준다 ⇒ `-1` 은 유효하지 않은 판별자였다. ★호환성은 «확인 불가능»이다 — 상용 코퍼스 0(Constraint 9) · WIPI 오류코드 규격이 이 저장소·핀 저장소 «양쪽에» 0건(`M_E_*` 정의 0). 그래서 「안전하다」고 적지 않았다: 측정 불가능한 위험과 «확정된 UB» 를 맞바꿨다.",
+  "changes": [
+    "wie_wipi_c/src/api/kernel.rs — get_resource 의 버퍼-부족 분기 `Ok(-1)` → `Ok(-18) // M_E_SHORTBUF` (비-주석 변경 1줄)",
+    "wie_wipi_c/src/api/kernel.rs — 그 값을 잠그는 기존 시험 `test_resource_larger_than_buffer_is_rejected` 의 단언 -1 → -18 (비-주석 변경 1줄)",
+    "wie_wipi_c/src/api/kernel.rs — 분기 «자리»에 판단 근거(어휘·transmute 경로·측정 불가 자인·형제 무접촉)를 주석으로 기록. 규칙만 남기면 다음 사람이 되돌린다.",
+    "wie_wipi_c/src/api/kernel.rs — 그 시험의 낡은 doc 주석 정정: 「-1 이 옳은 코드인지는 worklog 의 제안을 보라」가 이 회차로 해소됐다",
+    "STATE.md — 진행중 항목 추가 + ★2026-09-07 머지 회차가 남긴 «고아 본문 줄 1개»를 원 항목 꼬리로 되돌림(아래 limits)"
+  ],
+  "verification": {
+    "F1-⑴ 세 자리 현재 코드": "`get_system_property` bytes.len()+1 > buf_size → -18 · `get_program_name` buf_size < aid.len()+1 → -18 · `get_resource` data.len() > buf_size → ★-1. 같은 조건에 같은 파일이 두 번 -18 을 쓰고 이 한 자리만 달랐다. ★줄번호는 이동하므로 산출물에 박지 않았다.",
+    "F1-⑵ 어휘와 from_raw": "핀 = Cargo.lock 의 `git+https://github.com/dlunch/wipi.git#1e0c634e7305c1a04ce074aac5e9e27a0930b630` · 정의 = `~/.cargo/git/checkouts/wipi-05c13da594aa95be/1e0c634/wipi_types/src/wipic.rs` · `#[repr(i32)] enum WIPICError { ImageDone=1, Success=0, Invalid=-9, NoSuchEntry=-12, InsufficientBufferSize=-18, BadRecordId=-22, InvalidHandle=-25 }` · `from_raw(raw: i32) -> Self { unsafe { core::mem::transmute(raw) } }` ⇒ ★7변종 · -1 없음 · transmute 확인.",
+    "F1-⑵-b 어느 함수가 그 transmute 를 지나는가(제안에 없던 축)": "핀 저장소 `wipic_sys/src` 에서 `-> WIPICError` 는 ★6건 = `kernel::get_resource` ×3(ktf·lgt·simulation) + `graphics::create_image` ×3. `from_raw` 호출도 그 6곳뿐이다. 호스트 `create_image` 의 반환은 `Ok(1)` 하나(MC_GRP_IMAGE_DONE) ⇒ ★어휘 안. ⇒ **이 한 자리가 transmute 경로 위의 유일한 어휘 밖 값이었다.**",
+    "F1-⑶ 이 크레이트의 다른 -1 (수)": "★4건 — `api/kernel.rs`(이 회차) · `api/net.rs` socket_close 스텁 `Ok(-1) // M_E_ERROR` · `api/database.rs` seek 의 알 수 없는 origin `_ => return Ok(-1)` · `api/media.rs` clip_put_data 의 널 클립. ★그리고 어휘 밖 값이 하나 더 있다: `api/database.rs` 의 `Ok(-23) // M_E_EOF`. 음수 상수 반환 전수 = -22:16 · -25:13 · -12:5 · -1:4 · -18:3 · -9:2 · -23:1. ★고치지 않았다(범위 밖) — 다만 ★그 셋 + -23 은 «transmute 경로 위가 아니다»(위 ⑵-b) ⇒ UB 가 아니라 «어휘 밖 정수»이고, 이 자리와 계급이 다르다.",
+    "F1-⑷ 내부에서 -1 을 분기 조건으로 읽는 곳 (수)": "★0건. `get_resource` 의 호스트 측 소비자는 캐리어 디스패치 둘(`wie_lgt` `WIPICSvcId::GetResource` · `wie_ktf` `WIPICKernelMethodId::GetResource`, 둘 다 `into_body()` 로 i32 를 그대로 게스트에 넘긴다)과 이 시험뿐이다. 같은 함수의 `if id < 0` 은 반환값이 아니라 «입력 id» 를 본다.",
+    "F2 버린 이유": "⒝(-1 을 변종으로 추가) — ★실기가 이 조건에 -1 을 정의한다는 근거가 «0건»이다. 이 저장소 `docs/` 에도 핀 저장소에도 WIPI 오류코드 규격이 없고 `M_E_*` 정의는 양쪽 합쳐 0건이다(그 이름들은 이 파일의 맨 주석이다). 티켓이 「근거 없으면 고르지 마라」로 못박은 그대로 기각. ⒞(그대로 두고 자인만) — 정당한 답이지만 ★«확정된 UB» 를 남긴다. ⒜의 위험은 «측정 불가능»이고 ⒞의 위험은 «측정할 것도 없이 정의가 없다» ⇒ 비대칭이 ⒜를 가리킨다.",
+    "F3 개악 대조 (줄 단위로 «한 자리만»)": "M1 `get_resource` 자리만 -18 → -1 ⇒ ★FAILED (`test_resource_larger_than_buffer_is_rejected` · `left: -1 / right: -18` · 10 passed / 1 failed). M2 형제 `get_system_property` 만 ⇒ ★11 passed / 0 failed(안 문다). M3 형제 `get_program_name` 만 ⇒ ★11 passed / 0 failed(안 문다). ⇒ 시험이 «이 자리»에만 걸린다는 것과, ★형제 두 자리는 시험이 «0건»이라는 것이 함께 나왔다.",
+    "게이트": "fmt 0 · clippy --all -D warnings 0 · wasm clippy 0 · RUST_MIN_STACK=4194304 cargo test --all 0 (★161 passed / 0 failed — main 기준선과 같다: 시험을 «추가»한 것이 아니라 기존 시험의 기대값을 옮겼다) · ★beta clippy 0 · 엔진 러너 5픽스처 전건 PASS(keydraw 2건은 --inject).",
+    "형제 두 자리 무접촉 (요구된 증명)": "`git diff --numstat` = `wie_wipi_c/src/api/kernel.rs` 1파일 · hunk 헤더 5개가 전부 `get_resource`(231~247) 와 시험 모듈(486~527) 구간이다 ⇒ 형제 -18 두 자리에는 hunk 가 «없다»."
+  },
+  "limits": [
+    "★★실게임 호환성은 «확인할 수 없다» — 상용 코퍼스 0(Constraint 9) · 규격 문서 0. 실제 타이틀이 -1 을 분기 조건으로 쓰면 «깨진다». 이 회신은 그것을 «안전하다»고 적지 않는다.",
+    "★엔진 러너 5픽스처가 통과한 것은 «회귀 없음»의 증거이지 «호환성»의 증거가 아니다 — 그 픽스처들은 이 분기를 타지 않는다(그것이 애초에 이 분기가 시험 없이 남아 있던 이유다).",
+    "★F1⑶ 의 나머지 어휘 밖 값 4건(-1 3곳 + -23 1곳)은 «고치지 않았다» — 범위 밖이고, 위 ⑵-b 로 계급도 다르다(transmute 경로 밖).",
+    "★F3 M2·M3 가 드러낸 것: 형제 `-18` 두 자리는 시험 커버리지가 «0» 이다. 이 회차의 시험은 그 둘을 덮지 않는다.",
+    "★자인 — 2026-09-07 머지 회차(PR #118)에서 내가 STATE.md 항목을 이동시키며 본문 마지막 줄 하나를 «진행중»에 고아로 남겼고 그대로 착지했다. 이 회차가 그 줄을 원 항목 꼬리로 되돌렸다(원문 그대로 · 다른 항목 무접촉). ★해소 자리가 여기인 이유는 머지 회차가 main 에 직접 커밋할 수 없기 때문이다."
+  ],
+  "adoptedProposals": ["2026-09-06-spi-resource-failure-branches#p0"],
+  "proposals": [
+    {
+      "title": "형제 `-18` 두 자리(`get_system_property`·`get_program_name`)에 시험이 «0건»이다 — 이번 개악 대조가 그것을 드러냈다",
+      "plainSummary": "이번에 고친 자리는 시험이 잡아 주는데, 같은 파일에서 같은 일을 하는 다른 두 자리는 값을 아무렇게나 바꿔도 시험이 통과합니다. 그 둘도 한 번씩 잠가 두자는 제안입니다.",
+      "userBenefit": "리소스 이름이나 프로그램 이름을 읽을 때 버퍼가 모자라면 게스트가 받는 코드가 조용히 달라지는 일을 막는다 — 지금은 바뀌어도 아무도 모른다.",
+      "why": "F3 개악 대조 실측: `get_resource` 자리만 되돌리면 FAILED(10 passed / 1 failed) 인데, `get_system_property` 만·`get_program_name` 만 되돌리면 ★둘 다 11 passed / 0 failed 다. ⇒ 그 두 자리의 반환 코드는 «기계로 잠겨 있지 않다». 이번 회차가 «어휘 밖 값이 조용히 산다»를 고친 자리인 만큼, 같은 파일의 같은 조건이 무방비인 것은 같은 병의 다른 얼굴이다.",
+      "tradeoff": "★시험 2건이 느는 것 자체는 싸지만(이 회차의 시험과 같은 호스트 단위시험 형태 · 게스트 픽스처 재생성 0), «지금 값이 옳은가»는 이 제안이 답하지 않는다 — 잠그는 것은 «현행 동작»이다. 그리고 그 둘은 transmute 경로 밖이라 UB 가 아니므로 ★이번 건보다 계급이 낮다. 급하지 않다.",
+      "effort": "S",
+      "target": "wie_wipi_c/src/api/kernel.rs (시험 모듈)"
+    },
+    {
+      "title": "`wie_wipi_c` 에 남은 «ABI 어휘 밖» 반환값 4건의 처분 — 목록은 이미 있고, 결정만 없다",
+      "plainSummary": "에뮬레이터가 게스트에 돌려주는 오류 번호 중 규격 목록에 없는 값이 아직 네 군데 있습니다. 각각 어떻게 할지 한 번에 정하자는 제안입니다.",
+      "userBenefit": "게임이 받는 오류 번호가 전부 «정의된 값»이 되어, 게임 쪽 분기가 예측 가능해진다.",
+      "why": "이 회차 F1⑶ 실측: `api/net.rs` socket_close(스텁) · `api/database.rs` seek 의 알 수 없는 origin · `api/media.rs` clip_put_data 널 클립 = -1 3곳, 그리고 `api/database.rs` 의 -23(M_E_EOF) 1곳. 핀 어휘는 {1,0,-9,-12,-18,-22,-25} 뿐이다. ★이 회차는 «목록만» 냈고 고치지 않았다(범위 밖).",
+      "tradeoff": "★이번 건과 «계급이 다르다» — 그 넷은 `WIPICError::from_raw` transmute 경로 위가 아니라(핀에서 그 경로는 `get_resource`·`create_image` 뿐이다) UB 가 아니라 «어휘 밖 정수»다. 그리고 넷 다 «어떤 코드가 옳은가»에 이 회차와 같은 근거 공백(규격 0건 · 코퍼스 0건)이 걸린다 ⇒ 자칫 «취향으로 네 자리를 바꾸는» 회차가 된다. ★자리마다 따로 판단하는 편이 낫고, 스텁(socket_close)은 애초에 «구현 없음»이라 결이 또 다르다.",
+      "effort": "M",
+      "target": "wie_wipi_c/src/api/{net,database,media}.rs"
+    }
+  ]
+}
