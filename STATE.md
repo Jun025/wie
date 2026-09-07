@@ -36,7 +36,7 @@
   브랜치에서 진행 중이고, 전부 `STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장에서 충돌한다(정상))
 
 ## 완료 (최근)
-- 2026-09-07: **`verify-browser` 가 저장소에 있는데 한 번도 자동 실행되지 않던 문제 — ★⒜(배포 «뒤» 스텝) 채택**
+- 2026-09-08: **`verify-browser` 가 저장소에 있는데 한 번도 자동 실행되지 않던 문제 — ★⒜(배포 «뒤» 스텝) 채택**
   (PR **#130** 착지 · `wie-verify-browser-as-post-deploy-step-decision` · 채택 제안 `2026-09-06-wire-audit-no-leak-in-ci#p1`)
   — `web.yml` 마지막 스텝으로 추가. ★**배포 «게이트»가 아니다** — 바이트가 올라간 «뒤» 도는 확인이라 나쁜 배포를 막지 못하고 알린다.
   ★**실측 0건**: `.github/` 전수에서 `verify-browser` 참조 **0** (대조군 — 같은 술어가 `contract-roundtrip`·`audit-no-leak` 는 잡는다).
@@ -49,6 +49,39 @@
   ★**CI 증가분 실측**: 같은 형태(`npm ci`+`playwright install`+스크립트)가 `engine-contract.yml` 에서 **27~28초** · `web.yml` job 총 **210초**.
   ★**개악 대조**: 스텝을 지우면 지는 것 — C1 대상 무응답 **rc=1** · C2 앱 아닌 것 배포 **rc=1**(전건 `TimeoutError`).
   ★★**천장을 숨기지 않는다**: `nonBlack: 0` 은 **통과**다 — `rc=0` 을 «화면이 그려졌다»로 읽지 마라(그 축은 Scenario E+F 몫).
+- 2026-09-08: **핀 이동 비용 목록에 「`class_definition().name()` 형식 재검증」 1항 — ★표는 «컴파일이 잡는 것»만 센다**
+  (PR **#133** 착지 · `wie-pin-bump-checklist-must-reverify-class-definition-name-format` · 채택 제안 `2026-09-07-clet-card-identity-class-definition#p0`)
+  — `docs/upstream-realign-verdict.md` §8-4⑶ 표 직후에 **+20/−0**(삭제 **0줄** · hunk 1개). ★**핀 무접촉 · 신원 판정 코드 무접촉 · 새 시험 0.**
+  ★**F1⑶ 판정 = «관찰이지 계약이 아니다»**(핀 `5b84dd1` 실측): `jvm/src/class_definition.rs:12` 의 `fn name(&self) -> String;` 위 doc 주석 **없음** ·
+  ★`jvm` 크레이트 전체 `///` **0건** · `README.md` 의 `name()` 언급 **0건** · `internal form` 을 말하는 유일한 줄(`jvm/src/type.rs:60`)은
+  `CONSTANT_Class_info`(JVMS 4.4.1) 이야기다. ⇒ ★**핀이 반환을 이진 형식으로 바꿔도 컴파일·시험 통과, 신원 판정만 조용히 어긋난다.**
+  ★**반대 증거도 봤다** — `class.rs:72,145` 의 `replace('/', ".")` 는 「`name()` 이 점 없는 쪽」이라는 **구현 사실**이지 **약속**이 아니다(그래서 blocked 아님).
+  ★**확인 명령을 «돌려서» 값까지 적었다**: `RUST_LOG=jvm=debug` + `Register class …Clet…` → LGT `net/wie/CletWrapperCard` · KTF `CletCard`(★코드 변경 0).
+  ★★**함정**: `RUST_LOG=debug`(전체)면 LGT 가 **점 형식도 함께** 찍어 판정이 갈린다 ⇒ `jvm=debug` 로 좁히고 JVM 자신의 `Register class` 줄만 보라고 못박았다.
+  ★착지 시 배포 **0 예상**(diff 가 문서·원장뿐 — `.rs` **0**).
+- 2026-09-08: **createImage 실패 «메시지»를 잠글지 — ★⒝(가지1 이름 토큰만) + ⒞(가지2 미잠금·기록)**
+  (PR **#131** 착지 · `wie-createimage-error-message-lock-decision` · 채택 제안 `2026-09-06-createimage-failure-branches#p1`)
+  — `wie_midp/tests/create_image_missing_name_message.rs` **시험 1건**. ★**제품 코드 무접촉 · 픽스처 바이트코드 0 · jar 재생성 0.**
+  ★**F1⑵ 메시지는 «2개»**(`image.rs` 의 `jvm.exception(` 전수 2건) · ★**F1⑶ 기계 독자 «0»**(추적 591파일 전수 —
+  히트는 생산 지점 소스 줄과 산문뿐: `STATE.md:349` · `docs/report/0047` · `docs/upstream-realign-verdict.md:796` · 주석).
+  ⇒ ★★**그런데도 균일한 답이 틀렸다 — 둘은 같은 종류의 문자열이 아니다**: 가지1은 리소스 이름을 **보간**해 정보를 나르고,
+  가지2(`"Failed to decode image"`)는 **자기 예외 타입의 재진술**이라 잠가도 이득이 0이다(타입은 이미 잠겼다).
+  ★**⒞ 전부를 기각한 근거는 «실적»이다** — 위 산문 히트 3건은 장식이 아니라 **그 보간된 이름을 읽어 회귀를 특정한 기록**이다.
+  ★**⒜ 전부를 기각한 근거는 M2** — 문구만 바꾸고 `{name}` 을 유지한 개악이 **통과**한다(문구 개선 여지가 실제로 남는다).
+  ★**개악 3방향**: M1 보간 제거 → **FAILED** · M2 문구 교체 → **통과** · M3 가지2 상수 한 글자 → ★**전 시험 168/0**(아무것도 안 짐).
+  ★**제안이 예측한 비용이 «틀렸다»** — `tradeoff` ⑵ 「게스트 어셈블리가 는다」는 불필요했다:
+  `test_utils::run_jvm_test` 가 이미 있고 `wie_midp` 가 이미 dev-dep 로 갖는다(`wie_midp/Cargo.toml:27`) · jar 없이 `None =>` 팔에 닿는다.
+  ★착지 시 **실배포 2건** 예상(`web.yml` + `publish-artifact` — 착지 diff 에 `.rs` 가 있다 · ★`paths-filter` 는 «내용»이 아니라 «경로»).
+- 2026-09-08: **러너 목록이 낡아도 기계가 말해 주지 않던 문제 — ★존재 대조(S) 완료 · 분류(M)는 «안 했다»**
+  (PR **#132** 착지 · `wie-engine-runner-list-vs-fixture-set-drift-check` · 채택 제안 `2026-09-06-agents-runner-keydraw-inject#p0`)
+  — `AGENTS.md` 러너 블록에 `ENGINE-RUNNER` 마커 + `scripts/check-engine-runner-fixtures.mjs` 신설.
+  ★★**첫 측정에서 티켓이 경고한 그 형태가 그대로 나왔다** — 계수 **5:5 로 «같은데»** 경로 집합은 **1:1 로 다르다**
+  (블록 `draw_j2me.jar` ↔ 추적 `draw_j2me.zip`). ★**그 차는 드리프트가 아니다** — 블록 «첫 줄»이 그 `.jar` 를 만들고 `*.jar` 는 gitignore 다.
+  ⇒ 술어 = **stem 집합 동등**(부분문자열 아님) ⇒ ★**현재 차 양방향 0 · 검사는 조용하다.**
+  ★**면제는 «문서 안»에 쓴다**(`NOT-RUN: <경로> — <why>`) — 검사기가 분류를 알면 «두 번째 진실원»이 된다(제안의 대가 ⑴).
+  ★**양방향 실증 4종**: 픽스처 늘림 rc=1 · 목록에서 뺌 rc=1 · **마커 제거 rc=1** · 면제하면 rc=0(★`excused` 로 분류).
+  ★★**required 승격은 «하지 않았다»** — `contract` job 이 required 라 hard-fail 은 «배치만으로 승격»이다 ⇒ `continue-on-error`.
+  승격 = 그 한 줄 삭제(브랜치 보호 무접촉) · 조건은 워크플로 주석에 적었다. ★그때까지 이 검사는 **아무도 막지 않는다**.
 - 2026-09-07: **핀 이동 시 「경로 밖」 판단이 낡는 문제 — ★⒜(상시 검사) · 단 «스크립트»가 아니라 «워크스페이스 시험»**
   (PR **#126** 착지 · `wie-transmute-census-on-pin-bump-decision` · 채택 제안 `2026-09-07-abi-vocabulary-outliers#p0`)
   — `wie_wipi_c/src/lib.rs` 에 `#[cfg(test)]` 잠금 **시험 1건**. ★**워크플로 0 · 새 의존 0 · CI 스텝 0 · `~/.cargo` 읽기 0.**

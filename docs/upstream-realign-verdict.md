@@ -690,6 +690,26 @@ error[E0046]: not all trait items implemented, missing: `interface_names`, `prep
 ⇒ ★**209 는 여전히 «마지막 한 커밋»에 몰려 있다.** P1 은 「222 아니면 0」의 동전던지기가 아니라
 ★**0 → 2 → ≥7 → ≥13 → ≥222 의 계단**이고, **앞 세 칸을 따로 착지시킬 수 있다.**
 
+★★**[2026-09-07 · `wie-pin-bump-checklist-must-reverify-class-definition-name-format`] 위 표는 «컴파일이 잡는 것»만 센다 — 핀 이동 회차는 그 밖에 «조용히 깨지는 것»을 하나 손으로 확인하라.**
+★**`ClassDefinition::name()` 의 «형식»은 계약이 아니라 관찰이다**(핀 `5b84dd1` 실측: `jvm/src/class_definition.rs:12`
+의 `fn name(&self) -> String;` 위에 doc 주석 **없음** · `jvm` 크레이트 전체 `///` **0건** · `README.md` 의 `name()` 언급 **0건** ·
+`internal form` 을 말하는 유일한 줄 `jvm/src/type.rs:60` 은 `CONSTANT_Class_info`(JVMS 4.4.1) 이야기이지 `name()` 이야기가 아니다).
+⇒ ★**핀이 그 반환을 이진 형식(`net.wie.CletWrapperCard`)으로 바꿔도 컴파일도 시험도 통과하고,
+`wie_wipi_java/…/card_canvas.rs` 의 `is_clet_card` 비교만 조용히 어긋난다** — 2026-09-05 검은 화면(브라우저에서만 보였고
+네이티브 `result` 는 PASS 였다)이 정확히 그 형상이다.
+★**확인 방법 — 두 캐리어에 각각 한 번**(코드 변경 0 · 2026-09-07 실측으로 아래 값이 나오는 것을 확인했다):
+```sh
+for f in test_data/helloworld_lgt.zip test_data/keydraw_ktf.zip; do
+  RUST_LOG=jvm=debug cargo run -q -p wie_cli --bin wie_validate -- "$f" 2>&1 >/dev/null \
+    | /usr/bin/grep -oE 'Register class [A-Za-z0-9/_$]*Clet[A-Za-z0-9/_$]*' | sort -u
+done
+# LGT → Register class net/wie/CletWrapper · net/wie/CletWrapperCard      (내부 형식 = 슬래시)
+# KTF → Register class Clet             · CletCard                        (내부 형식)
+```
+★**점(`.`)이 보이면 멈춰라** — `is_clet_card` 의 두 리터럴이 그 순간부터 한 번도 매치하지 않는다.
+※`RUST_LOG=debug`(전체)로는 안 된다 — LGT 는 **점 형식도 함께** 찍으므로 판정이 갈린다. ★`jvm=debug` 로 좁히고
+**JVM 자신의 `Register class` 줄**만 보라(그 줄은 정의상 내부 형식이다). 근거 주석 = 같은 파일의 `PIN COUPLING` 블록.
+
 **⑶-b ★★[2026-09-05 · `wie-current-class-loader-replacement-api-design-for-plus34`] 그 계단의 «다음 벽»을 설계했다 — ★결론: 벽이 아니었다.**
 
 ★**이 절은 위 표를 «잇는다» — 지우지 않는다.** 표의 4번 칸이 `current_class_loader`(6 · **공개 대체 없음 ⇒ 설계**)라고
