@@ -23,9 +23,11 @@
 ⑴★**검은 마지막 프레임에서 진다** — 2026-09-05 형상을 개악으로 재현하니 LGT **rc=1**(`result=PASS · last_frame=False · paints=75`).
 ★**`result` 는 PASS 인 채**라 ★**이 플래그만이 아니라고 말한다.** KTF 무영향(rc=0 · 패키지가 없어 형식이 같다).
 ⑵★**위양성 0** — 정상에서 `keydraw_{ktf,lgt}` **rc=0** · `helloworld_{ktf,lgt}`·`draw_j2me`(플래그 없이) **rc=0** · 원복 후 rc=0.
-⑶★**`helloworld_*` 에 걸지 «않았다»** — 걸면 **rc=1** 임을 실측으로 보였다(그 픽스처는 마지막이 비어야 정상이다).
+⑶★**그 줄에 걸지 «않았다»** — 그 줄은 세 픽스처를 도는 **한 루프**이고 `helloworld_{ktf,lgt}` 가 **구성상 진다**(걸면 **rc=1** · 실측). ★★**`draw_j2me` 는 «지지 않는다»** — `last_frame_content true` 라 플래그를 걸어도 **rc=0** 이다(실측 · `wie_validate.rs` 헤더 측정표에는 그 행이 **없다**). ⇒ ★못 거는 이유는 **공유 루프**이지 픽스처가 아니다 — 따로 빼면 걸리지만 **실행 줄이 늘어** 이 회차의 「0 증가」가 깨진다.
 
 **사용자 영향**: 없다(문서 한 파일 · 엔진·CI 산출물 무접촉).
 
 **★한계를 적었다**: 이것은 **로컬 그물**이지 CI 강제가 아니다 — `.github/` 는 여전히 `wie_validate` 를 부르지 않는다.
+★그리고 CI 쪽 `Scenario F` 도 **무조건이 아니다** — `engine-contract.yml` 의 `dorny/paths-filter` **`engine` 게이트 뒤**라
+엔진 경로를 안 건드린 diff 에서는 「Reporting success without rebuilding」으로 **돌지 않는다**(F3 minor 반영).
 그 문장을 러너 블록 옆에 남겨 ★**「적혔으니 CI 가 막는다」로 오독되지 않게** 했다.

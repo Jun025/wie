@@ -136,15 +136,21 @@ FAIL for its own regression, and only cleared it by reproducing the same FAIL on
 turns `last_frame_content` from a reported field into an exit code, which is the only thing that
 catches "the emulator ran fine and the last frame is black" — the 2026-09-05 LGT failure, where
 `result` stayed PASS and `paints` went *up* (55 → 83, the blank MIDP overpaint). It cannot go on the
-`helloworld_*`/`draw_j2me` line: those fixtures are *expected* to end blank (`last_frame_content
-false` is their measured, correct state), so the flag would fail them by construction. The
-expectation is per fixture *and mode*, which is why it lives on the command line — see
-`wie_validate.rs`'s header for that reasoning.
+line above because that is **one loop over three fixtures** and `helloworld_ktf`/`helloworld_lgt`
+fail it by construction — they are *expected* to end blank, and with the flag they exit 1 (measured).
+**`draw_j2me` does not fail it** — that fixture ends with content (`last_frame_content true`, rc=0
+with the flag), so the reason it goes unflagged is the shared loop, not the fixture. Splitting it
+onto its own line would flag it correctly and cost an extra runner line, which is the one thing this
+block cannot afford. The expectation is per fixture *and mode*, which is why it lives on the command
+line — see `wie_validate.rs`'s header for that reasoning (its table covers `helloworld_*` and
+`keydraw_*`; `draw_j2me` is measured here).
 
-**This is the local net, not the CI one.** The browser round-trip's Scenario F is what actually
-gates that failure on every PR; this line makes the same class visible in ~20 s with no wasm build,
-before you push. Do not read it as CI enforcement — nothing in `.github/` runs `wie_validate`
-(measured: 0 hits across all workflow files).
+**This is the local net, not the CI one.** The browser round-trip's Scenario F is what gates that
+failure in CI; this line makes the same class visible in ~20 s with no wasm build, before you push.
+Scenario F is not unconditional either — it sits behind `engine-contract.yml`'s `dorny/paths-filter`
+`engine` gate, so a diff that touches no engine path reports "Reporting success without rebuilding"
+and never runs it. Do not read this line as CI enforcement — nothing in `.github/` runs
+`wie_validate` (measured: 0 hits across all workflow files).
 
 **Do not try to shorten these two runs with `--timeout`.** On the `--inject` path that flag is
 overwritten: the deadline is rebuilt from the injection schedule (`--boot-secs 2.5` + 0.3 + 27
