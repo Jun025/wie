@@ -32,6 +32,15 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- **no-leak dist 스캔 처분 — ★«안 한다»로 닫음** (PR 개설 · `wie-no-leak-dist-scan-never-runs-in-ci`
+  · 채택 제안 `2026-09-06-wire-audit-no-leak-in-ci#p0`) — ★**저울을 다시 쟀고 원 판단이 옳았다.**
+  F1(★**as of 2026-09-06T22:14Z** · 모집단은 계속 자란다): 그 스텝을 실은 run **19건**(API: **18 success + 1 skipped**) 중
+  ★**성공 18건 전건 로그를 받아 18/18 이 「skipping dist scan」** · `contains no game files` **0/18** · ★**미취득 0건**.
+  ★함정 둘: `gh run view --log` 가 스텝명을 `UNKNOWN STEP` 으로 접는다(스텝명 말고 **출력 문자열**로 grep) ·
+  `gh api …/jobs/<id>/logs` 는 **`--allow-escape-sequences`** 없이는 아무것도 내지 않는다. ★**어느 쪽 0 이든 «부재»가 아니라 측정 artefact 다.**
+  ★F2⑶ = **참**: `web/public/` 부재 · 내려받기 0 · 유일한 미추적 입력(`web/src/wasm/`)이 `.js/.wasm/.d.ts` · ★실제 빌드 결과 dist **4파일 · 게임류 0**.
+  ⇒ 주석 한 블록으로 근거와 ★**뒤집힐 조건**을 커밋했다. **판정 술어 무접촉**(비-주석 변경 0) · 워크플로 무접촉.
+  ★착지 시 배포 없음 예상(`.rs`·`Cargo.*` 무접촉 — 착지 diff 로 다시 셀 것).
 - **카드 신원을 `class_definition().name()` 으로** (PR 개설 · `wie-clet-card-identity-use-class-definition-name`
   · 채택 제안 `2026-09-06-clet-card-identity-design#p0`) — `card_canvas.rs` 한 파일(**+44/−24**).
   `getClass()`→`getName()` **invoke_virtual 2회 + to_rust_string** → ★**`class_definition().name()` 한 줄** ·

@@ -120,6 +120,41 @@ if grep -niE 'unique.*rom_hash' migrations/*.sql | grep -viE 'user_id' >/dev/nul
 else good "rom_hash (saves) uniqueness is per-owner (composite with user_id)"; fi
 
 echo "── 5. no game files in the build output / repo (S6) ────────────────────"
+# THE DIST SCAN BELOW NEVER RUNS IN CI, AND THAT IS THE MEASURED ANSWER — do not
+# re-open this without re-measuring the three facts it rests on.
+# Where this runs: engine-contract.yml calls this script as an always-run step,
+# before/without any frontend build, so `web/dist` is absent and the scan
+# self-skips. Confirmed in real CI logs, not locally, over the WHOLE population:
+# as of 2026-09-06T22:14Z, 19 engine-contract runs carry this step (18 success +
+# 1 skipped, per the API) — the population keeps growing, so re-measure, do not
+# quote this count as if it were fixed;
+# all 18 successful ones print "skipping dist scan" and 0 print "contains no
+# game files" — 18/18, with 0 logs unretrievable.
+# HOW TO RE-MEASURE THIS WITHOUT GETTING A FALSE ZERO (both traps were hit here):
+#   - `gh run view --log` renders the step-name column as "UNKNOWN STEP" for some
+#     runs, so grepping the STEP NAME returns 0 while the line is present (run
+#     34053057393: every step is "UNKNOWN STEP", yet the payload sits at line 241).
+#     Grep the OUTPUT STRING, or use `gh api repos/<o>/<r>/actions/jobs/<id>/logs`.
+#   - that API endpoint needs `--allow-escape-sequences`; without it `gh` prints
+#     nothing and looks like a fetch failure.
+#   A zero from either of these is a measurement artifact, not an absence.
+# Why a second call after web.yml's `Build frontend` was NOT added (2026-09-07):
+# nothing can put an untracked GAME-LIKE file into web/dist under this build.
+#   - `web/public/` does not exist, so Vite has no verbatim-copy directory — that
+#     is the usual vector (drop a file in public/, it lands in dist untouched).
+#   - the build is `npm run wasm && tsc -b && vite build`: no downloads, no
+#     external asset fetch.
+#   - the one untracked input that DOES reach dist is web/src/wasm/ (git-ignored,
+#     generated from Rust by scripts/build-wasm.sh) and it emits .js/.wasm/.d.ts,
+#     never a game extension.
+#   - measured: a real `npm run frontend` produces exactly 4 files in web/dist
+#     (.wasm .js .html .css) — zero game-like. With dist present this section
+#     prints "web/dist contains no game files", i.e. it passes vacuously.
+# The half that carries weight on a PR — the `git ls-files` check below — runs
+# unconditionally, and dist is a fresh build of sources this same script audits.
+# WHAT WOULD FLIP THIS: a `web/public/` directory appearing, or any build step
+# that downloads/copies assets into web/dist. Either one re-opens the vector and
+# the second call becomes worth its ~0.3s.
 DIST="web/dist"
 if [ -d "$DIST" ]; then
   leak=$(find "$DIST" -type f \( -iname '*.jar' -o -iname '*.jad' -o -iname '*.zip' -o -iname '*.kdf' -o -iname '*.skm' -o -iname '*.mod' -o -iname '*.smc' -o -iname '*.gba' -o -iname '*.nes' \) || true)
