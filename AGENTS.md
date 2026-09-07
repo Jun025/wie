@@ -242,7 +242,8 @@ audit` now runs on every PR** as an always-run step of `engine-contract.yml`. Th
   file**; move the side that has not landed yet.
 
   **`-H` is load-bearing, not cosmetic.** It prefixes the path, so `sort -r` keys on the *sequence number*; `-h` keys on the title text, which is the date, and this repo lands up to six rounds a day. Measured over 54 files: the `-h` form is **52 lines out of place**, the `-H` form is **0**. Sort by the **sequence number, not the date** — the ledger's date-monotonicity is a coincidence, not a guarantee. `REPORT.md` explains the rest; `docs/report-migration-revert.md` reverts it.
-- **The ledger files of this repo are `STATE.md`, `REPORT.md`, `docs/report/**`, and `docs/worklog/**`.**
+- **The ledger files of this repo are `STATE.md`, `REPORT.md`, `docs/report/**`, `docs/worklog/**`,
+  and `docs/worklog-coverage-remeasures.json`.**
   Resolve a merge conflict in any of them by **union** — keep both sides' entries, ordered by the
   authoring time of each entry's round. Never take one side wholesale; the other side's entries
   vanish silently and the gates stay green.
@@ -257,6 +258,14 @@ audit` now runs on every PR** as an always-run step of `engine-contract.yml`. Th
   re-derive it: 2026-09-07 a merge round reasoned it out and chose to *move* the entry (appending to
   `REPORT.md` knowingly breaks a convention that landed 20 minutes earlier; dropping the entry loses
   it), which is the answer — but nothing guaranteed the next round would reach it.
+
+  **`docs/worklog-coverage-remeasures.json` is on that list for the same reason, plus one of its
+  own.** It is append-only evidence, so union is the only correct resolution — taking one side drops
+  a recorded measurement, and the checker reads `measurements.at(-1)`, so order is load-bearing too.
+  The other reason is authority: the merge contract's enumeration names `docs/worklog/**`, and this
+  file is a *sibling* of that directory, not inside it. Without this line a gate③ round that must
+  discharge an overdue re-measure (see below) has no rule saying it may touch the file, which is
+  exactly the gap that left `main` red on 2026-09-07.
 - **Follow-up proposals go in a `docs/worklog/*.json`, or they do not exist.** When a task leaves
   follow-up recommendations (or adopts/declines earlier ones), write
   `docs/worklog/YYYY-MM-DD-<slug>.json` in the same PR. The cockpit 「후속 작업 추천」 panel reads
@@ -286,6 +295,36 @@ audit` now runs on every PR** as an always-run step of `engine-contract.yml`. Th
   rounds wrote the same entry (six fields identical, only `decision` differed) and a human stopped
   two of them by hand. `--record` scans the whole record for that `landedRounds` and writes nothing
   if it is already there, so running it twice — or on a base that already carries it — is a no-op.
+
+  **The overdue re-measure belongs to the gate③ round, and "every round handles it honestly" is not
+  an owner.** Idempotent `--record` landed on 2026-09-07 (`be37ca7d`) and closed the *duplicate* side
+  of this; the same day the other side arrived — landing #53 crossed the cadence, nobody recorded it,
+  and `main` went red. Both workflows checkout at `fetch-depth: 0`, so `origin/main` is present in
+  `pull_request` runs too: while overdue, **every open PR is red as well**, not just main's badge. So
+  the rule is:
+
+  > **A gate③ round that sees `check-worklog-coverage` overdue runs `--record` and bundles that one
+  > file into the PR before merging.** Nothing else in the round changes.
+
+  Gate③ is the owner because it is the only role that is *already there* at the moment the obligation
+  fires — the crossing round is a landing, and the next thing to touch the repo is another gate③,
+  which is also the role the red blocks. It costs one conditional step, once per ten landings, and
+  needs no new machinery: the tool exists and is idempotent, so two gate③ rounds racing produce one
+  row. **The cost of the alternatives is what rules them out.** A scheduled workflow opening a
+  recording PR (⒝) adds an automated PR that itself needs CI and its own gate③ round — more
+  machinery for a slower answer. Writing at landing time (⒞) is the only option that closes the
+  window completely, and it requires pushing to `main`, which this repo forbids; routed through a PR
+  instead it collapses into ⒝.
+
+  **The hole in this choice, in numbers, because it is real.** Gate③ can only act when a gate③ runs,
+  so the red persists from the crossing landing until the next one. Measured 2026-09-07 over the 53
+  landings since `92c25276`: the cadence of ten took **9h 18m** (#43 04:17 → #53 13:36 KST), the gap
+  between consecutive landings is **70.5m median** (34.1m over the last 15) — but the **maximum gap is
+  115.2h**. So on a quiet stretch `main` can stay red for days. That is accepted rather than fixed,
+  on one observation: the check only goes overdue *by landing*, and the only thing it blocks is
+  landing, so during a quiet stretch nothing is waiting on it — and the first round back is the owner.
+  If that stops being true (a quiet stretch that blocks something real), the answer is ⒝, not a
+  wider tolerance in the checker.
 
   **`--first-parent` is load-bearing in every one of the script's three counts, and the definition says "first-parent", not
   "squash".** This repo is registered as an upstream-sync fork and must *not* squash-merge, so

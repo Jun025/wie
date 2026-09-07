@@ -1,0 +1,46 @@
+{
+  "date": "2026-09-07",
+  "task": "wie-worklog-remeasure-has-no-owner-and-main-is-red",
+  "title": "재측 약속의 소유자 = 게이트③ 회차 · main red 해소 · 그 파일을 만질 «권한»이 없던 것이 진짜 구멍이었다",
+  "summary": "F1 은 멱등 `--record` 로 풀었고(2회 실행 · 2회차 0건 추가), F2 는 ⒜(게이트③ 회차가 진다)를 골랐다. ★고른 이유는 「가장 작다」가 아니라 ★**«막히는 역할»과 «고칠 수 있는 역할»이 같기 때문**이다: 두 워크플로가 `fetch-depth: 0` 이라 `origin/main` 이 `pull_request` 런에도 있어 밀린 동안 **열린 PR 전건이 red** 다 ⇒ 막히는 것이 정확히 게이트③이다. ★★그리고 «규칙만으로는 안 됐을» 이유를 찾았다 — 머지 계약의 원장 파일 열거는 `docs/worklog/**` 인데 이 파일은 그 디렉터리의 **형제**라 ★게이트③에 «만질 권한»이 없었다. 그래서 AGENTS.md 의 원장 파일 목록에 추가하는 것이 F3 의 절반이다.",
+  "changes": [
+    "docs/worklog-coverage-remeasures.json — 착지 53 항목 «추가»(멱등 `--record` · append-only · 기존 4항목 무접촉 · numstat 9/0 = 삭제 0)",
+    "AGENTS.md §Landing paperwork — ★소유자 규칙을 인용 블록으로: 「게이트③ 회차가 OVERDUE 를 보면 `--record` 를 돌려 그 «한 파일»만 PR 에 동봉하고 머지한다」 + ⒝·⒞ 를 버린 이유 + ★남는 구멍을 수로",
+    "AGENTS.md — 원장 파일 목록에 `docs/worklog-coverage-remeasures.json` 추가 + 왜(append-only 라 union 이 유일 해소 · 검사기가 `at(-1)` 을 읽어 순서가 load-bearing · ★그리고 머지 계약 열거의 «형제 파일» 사각)",
+    "scripts/check-worklog-coverage.mjs — OVERDUE 메시지에 `OWNER:` 절 «한 문장» 추가(★판정식·임계·비율 무접촉 — 아래 verification)"
+  ],
+  "verification": {
+    "F1-⑴ 멱등 실증 (요구된 2회 실행)": "1회차: `--record: appended landedRounds 53` · 항목 수 4 → ★5 · `git diff --numstat` = ★`9  0`(추가 9 · ★삭제 0 = append-only 확인). 2회차: ★`--record: landedRounds 53 is already recorded (window 89e64b48..a862dfb4) — nothing to do.` · 항목 수 ★5 그대로 · numstat ★`9  0` 동일 ⇒ **0건 추가**.",
+    "F1-⑵ 검사 rc": "`node scripts/check-worklog-coverage.mjs` → ★rc=0 · `OK — the re-measure promise is current.`",
+    "F1-⑶ main 이 실제로 green 인가": "★착지 후 조회로 확인해야 한다(이 회신 작성 시점은 PR 개설 단계라 «추정하지 않는다»). 이 PR 의 `Engine contract` 가 green 인 것이 선행 증거이고, main 판정은 게이트③ 회차의 몫으로 넘긴다.",
+    "F2 — ⒜ 를 고른 이유": "★**막히는 역할과 고칠 수 있는 역할이 같다.** `engine-contract.yml`·`web.yml` 둘 다 `fetch-depth: 0` 이라 `pull_request` 런에도 `origin/main` 이 있다 ⇒ 밀린 동안 main 배지뿐 아니라 ★열린 PR 전건이 red 다. 그 red 가 막는 것이 게이트③이고, 게이트③은 그 순간 «이미 그 자리에 있는» 유일한 역할이다(주기를 넘기는 사건 자체가 «착지»이므로). 새 기구 0 · 멱등이라 게이트③ 둘이 경합해도 행 1개.",
+    "F2 — ⒝ 를 버린 이유": "전용 스케줄이 «기록 PR» 을 낸다 ⇒ ★그 PR 도 CI 를 타고 «자기 게이트③» 을 요구한다. 기구가 늘고 답은 더 느리다(스케줄 주기 + CI + 머지). 이 저장소의 실제 병목은 «사람이 없다»가 아니라 «권한과 지시가 없었다» 였다.",
+    "F2 — ⒞ 를 버린 이유": "★착지 «직후» 기록은 창을 «완전히» 닫는 유일한 안이지만 `main` 직접 push 가 필요하고 이 집 규율이 그것을 금한다. PR 로 우회하면 ★그것은 사실상 ⒝ 다(티켓 F3 이 그 구분을 명시했다) ⇒ ⒝ 의 대가를 그대로 진다.",
+    "F2 — ★요구된 «게이트③ 공백 기간»을 수로": "`92c25276` 이후 착지 53건 전수 실측(2026-09-07): ★주기 10 = **9h 18m 47s**(#43 04:17:22 → #53 13:36:09 KST) · 연속 착지 간격 ★중앙 **70.5m** · p90 **309.8m** · ★**최대 115.2h**(약 4.8일) · 최근 15간격은 중앙 **34.1m** · 이번 red 지속은 조회 시점 **34분**. ⇒ ★**구멍은 실재한다**: 조용한 구간이면 며칠 red 다.",
+    "F2 — 그 구멍을 «고치지 않고 받아들인» 근거": "★이 검사는 **착지로만** 밀리고(`landed` 가 first-parent 커밋 수다) **착지만** 막는다 ⇒ 조용한 구간에는 기다리는 것이 없고, 첫 복귀 회차가 곧 소유자다. ★그것이 거짓이 되는 관측(조용한 구간이 «진짜로» 무언가를 막는다)이 나오면 답은 ⒝ 이고, ★«검사기의 관용을 넓히는 것»이 아니다 — 그렇게 적어 두었다.",
+    "F3 구현 — 두 겹": "⑴**규칙**: AGENTS.md §Landing paperwork 에 인용 블록으로. ⑵★**권한**: 같은 파일의 원장 파일 목록에 `docs/worklog-coverage-remeasures.json` 추가 — 머지 계약(2-c⒜)의 열거는 `docs/worklog/**` 인데 이 파일은 그 «형제»라 게이트③에 근거가 없었다. `docs/report/**` 가 같은 이유로 그 목록에 오른 선례를 그대로 따랐다. ⑶**발화 지점**: 검사기 OVERDUE 메시지에 `OWNER:` 절 — ★규칙을 «문서»가 아니라 «실패하는 순간»에 둔다.",
+    "F3 — 그 메시지가 실제로 나오는가": "기록 «전» 형상으로 되돌려 1회 조회해 렌더를 확인했다(그 뒤 복원 · 복원 후 rc=0): `✗ OVERDUE: … OWNER: the gate3 round — bundle that one file into the PR before merging (AGENTS.md §Landing paperwork). It is a ledger file, so touching it here is authorized; nothing else in the round changes.`",
+    "★비율·임계·판정식 무접촉 (요구된 증명)": "`git diff -U0 scripts/check-worklog-coverage.mjs` 의 변경은 ★**OVERDUE 문자열 한 곳뿐**(1줄 삭제 → 3줄 추가, 전부 메시지). 상수·술어는 그대로다: `const SINCE = \"92c25276\"` · `const WINDOW = 10` · `const THRESHOLD = 70` · `const due = landed - last.landedRounds >= WINDOW` · `if (last.pct < THRESHOLD && last.reopened !== true)`. ★`.github/workflows/**` 는 **무접촉**(스텝 비활성화 0 · required 해제 0).",
+    "★기존 measurements 무접촉": "numstat 삭제 **0** · 항목 4 → 5(추가만) · 기존 4항목의 `landedRounds` 는 33·43 계열 그대로.",
+    "게이트": "fmt 0 · clippy --all -D warnings 0 · wasm clippy 0 · RUST_MIN_STACK=4194304 cargo test --all 0 (161 passed / 0 failed · ★`dod_ci_parity` 포함 — AGENTS.md 를 만졌으므로 그 파리티 락이 실제로 돌았다) · ★beta clippy 0 · check-worklog-json OK · check-docs-report-serial 0 · check-parity-lock-wired 0 · npm run audit 0.",
+    "★엔진 러너를 «돌리지 않았다»": "AGENTS.md 가 그 러너를 요구하는 조건은 「엔진 코드를 만졌는가」이고 이 회차의 diff 는 `AGENTS.md`·`scripts/`·`docs/` 뿐이다(`.rs` 0건). ★숨기지 않고 적는다.",
+    "연번": "★착수 시 `--next-serial` 을 «다시» 돌렸다 — 디스크는 `0070` 이라 답했지만 ★열린 PR **#120 이 0070 을 claim** 하고 있어 도구가 `0071` 을 줬다. 디스크로 계산했으면 형제 번호를 빼앗았다."
+  },
+  "limits": [
+    "★소유자를 정했다고 창이 «닫히지» 않는다 — 게이트③이 없는 동안은 여전히 red 다(최대 관측 간격 115.2h). 위 근거로 받아들인 것이지 해결한 것이 아니다.",
+    "★F1⑶(main 이 실제로 green) 은 이 회차가 «확정할 수 없다» — 착지 후에야 push 런이 생긴다. 게이트③ 회차가 조회로 확인해야 한다.",
+    "★규칙은 AGENTS.md 와 검사기 메시지에 있고 «기계가 강제하지 않는다» — 게이트③ 회차가 그것을 읽고 따라야 한다. 강제하려면 머지 티켓 템플릿(이 저장소 «밖»)을 고쳐야 하고, 그것은 이 회차의 범위가 아니다.",
+    "★두 브랜치가 «둘 다 착지 전에» 각자 append 하면 여전히 행 2개가 난다 — 검사기 자신의 주석이 이미 적은 잔여이고, 이 회차가 바꾸지 않았다."
+  ],
+  "proposals": [
+    {
+      "title": "소유자 규칙을 «머지 티켓 템플릿»에 옮겨 기계로 강제할 것인가 — 지금은 AGENTS.md 가 말할 뿐이다",
+      "plainSummary": "지금은 「밀린 재측은 게이트③이 기록한다」가 문서와 오류 메시지에만 있습니다. 머지 작업을 만드는 템플릿 자체에 그 단계를 넣으면 빠뜨릴 수 없게 됩니다.",
+      "userBenefit": "main 과 열린 PR 전건이 red 로 서 있는 구간이 «회차의 기억»에 의존하지 않게 된다.",
+      "why": "이번 회차가 고칠 수 있었던 것은 이 저장소 안(AGENTS.md · 검사기 메시지)뿐이다. 게이트③ 회차의 «해야 할 일 목록»은 `~/orchestrator/templates/merge-ticket.tpl` 에서 렌더되고 그것은 이 저장소 밖이다. ★`docs/report/**` 가 원장 목록에 오를 때도 똑같은 경계에 걸렸고(그때는 AGENTS.md 가 판단을 «기록»하는 것으로 끝냈다), 같은 자리가 두 번째다.",
+      "tradeoff": "★템플릿은 «전 저장소 공통»이라 wie 전용 스텝을 넣으면 다른 repo 의 게이트③에 무의미한 지시가 붙는다 — 조건부로 쓰면 템플릿이 복잡해진다. 그리고 이 검사는 wie 에만 있다. ⇒ 「repo 별 후크」 같은 새 배관이 필요할 수 있고, 그러면 이 결함보다 기구가 커진다. ★그래서 «지금은 하지 않는» 것이 옳을 수 있다 — 판단이 필요하다.",
+      "effort": "M",
+      "target": "~/orchestrator/templates/merge-ticket.tpl (이 저장소 밖)"
+    }
+  ]
+}
