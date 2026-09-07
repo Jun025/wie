@@ -35,6 +35,23 @@ M2(CLI 의 traversal 거부 제거) → `traversal_and_empty_are_rejected` + `di
 
 **사용자 영향**: 없다(시험만 · 동작 무접촉).
 
+**★★[R1 후속 · 2026-09-08 · `wie-resource-fallback-branch-unexercised-in-both-targets-fix`] 위 「그 masking 자체를
+시험으로 잠갔다」는 ★«절반이 공허했다» — 고쳤고, 이제 그 문안은 참이다(확인했다).**
+게이트② 가 실측했고 이 회차가 **재현**했다 — `backslash_and_traversal_are_rejected_before_either_backend` 의
+**`..` 절반은 잡히고 `\` 절반은 안 잡혔다**:
+
+| 개악 | 전(반려 시점) | 후(이 회차) |
+|---|---|---|
+| **M-R1b** `normalize_guest_path` 의 `if path.contains('\\') { return None; }` **4줄 삭제** | ★**PASSED=174 FAILED=0** — 한 건도 안 진다 | ★**PASSED=21 FAILED=1** — 그 시험이 `file_system.rs:304 !fs.exists("a\\b")` 에서 **진다** |
+| 대조군 **M-R2b** `".." => return None,` → `continue,` | PASSED=21 FAILED=1 | **PASSED=21 FAILED=1**(불변 — 다른 절반을 깨지 않았다) |
+
+★**원인은 가드가 아니라 «단언의 형태»였다**: 가드를 지워도 `normalize_guest_path("a\b")` 는 `\` 를 **번역하지 않고
+그대로** 내므로 저장소에 없어 여전히 `false`/`None` ⇒ ★**「거부됐다」와 「그대로 통과했는데 «마침» 없었다」가
+구별되지 않았다.** 처방은 **시험 1줄** — `fs.add_virtual("a\\b", vec![2]);`(`add_virtual` 은
+`normalize_guest_path(...).unwrap_or_else(...)` 라 가드가 있으면 키가 `"a\b"` 로 **폴백 저장**되고
+`exists` 는 정규화에서 `None` 이라 못 본다 ⇒ green. 가드를 지우면 양쪽이 **같은 키**로 만나 ⇒ red).
+★**제품 코드 0행**(가드 «동작» 무접촉) · 원복 후 `cargo test -p wie_backend` **22 passed / 0 failed**.
+
 **★안 한 것 — 재개 지점**: 폴백을 **실제로 지나는** 시험(브라우저 시나리오 포함)은 **하지 않았다**.
 필요한 것은 「클래스로더가 못 찾고 파일시스템에는 있는 이름」이고 ⇒ **픽스처 재생성** 또는 `add_virtual` 로 심은 이름을 쓰는
 **새 시나리오**다(제안 tradeoff ⑴ · 노력도 **M**). ★**제안 tradeoff ⑶(「죽은 코드면 제거 결정이 값한다」)은 이 회차가 «닫지 않았다»** —

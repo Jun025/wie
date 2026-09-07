@@ -297,6 +297,13 @@ mod tests {
     async fn backslash_and_traversal_are_rejected_before_either_backend() {
         let fs = setup();
         fs.add_virtual("a/b", vec![1]);
+        // `add_virtual` falls back to the raw path when normalization rejects it, so
+        // this lands under the literal key `a\b`. Without it the backslash half is
+        // vacuous: dropping the guard lets `a\b` through untranslated, it is absent
+        // from the store either way, and the assertions below stay true for the wrong
+        // reason — "rejected" and "passed through but happened to be missing" look
+        // identical. With the key present, only the guard keeps them apart.
+        fs.add_virtual("a\\b", vec![2]);
 
         assert!(!fs.exists("a\\b").await);
         assert_eq!(fs.size("a\\b").await, None);
