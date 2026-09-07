@@ -37,7 +37,7 @@
 
 ## 완료 (최근)
 - 2026-09-08: **공급망 대장 A 를 실제와 맞췄다 — `chacha20` 은 «암호 결함»이 아니었다**
-  (PR 개설 · `wie-supply-chain-ledger-a-is-stale-two-resolved-one-missing` · 채택 제안
+  (PR **#135** 착지 · `wie-supply-chain-ledger-a-is-stale-two-resolved-one-missing` · 채택 제안
   `2026-09-06-dependency-exposure-verdict-place#p0`) — ★**의존 무접촉**(`Cargo.lock`·`Cargo.toml` **0줄** ·
   `cargo update` **0회** · 억제 추가 **0**).
   ★**재현**(`cargo audit` rc=0 · advisory-db `8a1eb4f9` · `Cargo.lock` 436): 경고 **2건** ↔ 대장 A **3행**.
