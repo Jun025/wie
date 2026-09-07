@@ -1,0 +1,28 @@
+{
+  "schema": "worklog/v1",
+  "date": "2026-09-07",
+  "task": "wie-sibling-shortbuf-sites-have-no-tests",
+  "title": "형제 -18 두 자리에 시험을 넣었다 — 「원래 옳던 자리」가 지는 것이 없었다",
+  "summary": "get_system_property 와 get_program_name 의 버퍼-부족 분기를 겨누는 시험이 0건이었다(내가 셌다). 직전 회차가 get_resource 에 넣은 시험의 형태를 그대로 따라 각 자리에 1건씩 넣었다. 제품 코드는 무접촉이고 diff hunk 3건이 전부 mod test 안이다. 개악 대조에서 두 자리가 각각 red 이고 서로 독립이다.",
+  "changes": [
+    "wie_wipi_c/src/api/kernel.rs — 시험 2건 추가(test_system_property_larger_than_buffer_is_rejected · test_program_name_larger_than_buffer_is_rejected) + 시험 모듈 use 3줄",
+    "docs/report/0072--… · docs/worklog/… — 착지 서류"
+  ],
+  "verification": [
+    "F1⑴ 두 분기 인용 — 둘 다 return Ok(-18); // M_E_SHORTBUF (get_system_property 는 bytes.len()+1 > buf_size · get_program_name 은 buf_size < aid.len()+1)",
+    "F1⑵ 시험 0건을 내가 셌다 — kernel.rs 의 시험 5건 중 그 둘을 부르는 것은 test_get_system_property_min 하나이고 성공 경로(buf_size 16 → 0)만 단언한다. get_program_name 은 저장소 전체 시험 참조 0",
+    "F1⑶ 본 = test_resource_larger_than_buffer_is_rejected — 짧은 버퍼 → -18 과 정확한 버퍼 → 성공을 한 시험에서 함께 단언. 그 형태를 그대로 따랐다",
+    "F3 M1(get_system_property -18 → -1) → 그 시험만 FAILED(left -1 · right -18) · 12 passed / 1 failed · 형제 시험 green",
+    "F3 M2(get_program_name -18 → -9) → 그 시험만 FAILED(left -9 · right -18) · 12 passed / 1 failed · 형제 시험 green",
+    "원복 cmp 바이트 동일 · 13 passed / 0 failed · cargo test --all 161 → 163(+2)",
+    "동작 무접촉: diff hunk 3건이 전부 mod test(413행 이후) 안 · 제품 구간 hunk 0 · return Ok(-18) 세 줄 그대로",
+    "4게이트 + beta clippy + node 검사기 4종 + npm run audit 전건 rc=0"
+  ],
+  "limits": [
+    "기대값을 수(-18)로 적었다. M_E_SHORTBUF 는 이 저장소와 핀 저장소 어디에도 정의가 0건이고 주석에만 있어서, 상수 이름을 쓰면 두 번째 진실원이 된다 — 직전 회차의 판단을 그대로 승계했다. 그 상수가 언젠가 정의되면 이 두 시험과 형제 시험을 함께 옮겨야 한다.",
+    "두 시험은 «반환값»만 본다. 버퍼가 충분할 때 실제로 쓰이는 바이트도 함께 단언하지만(성공 경로), 게스트 쪽에서 그 코드를 어떻게 해석하는지는 이 축이 보지 않는다 — 그쪽은 ABI 어휘 축의 몫이다.",
+    "「ABI 어휘 밖 반환값 4건」은 이 회차가 처분하지 않았다 — 별 회차(wie-abi-vocabulary-outliers-disposition)의 몫이다."
+  ],
+  "adoptedProposals": ["2026-09-07-get-resource-shortbuf-abi#p0"],
+  "proposals": []
+}

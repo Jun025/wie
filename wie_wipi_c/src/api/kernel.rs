@@ -411,11 +411,13 @@ pub async fn get_program_name(context: &mut dyn WIPICContext, name_buf: WIPICWor
 mod test {
     use alloc::{boxed::Box, string::String};
 
+    use test_utils::TestPlatform;
+    use wie_backend::{DefaultTaskRunner, System};
     use wie_util::{ByteRead, ByteWrite, Result, read_null_terminated_string_bytes, write_null_terminated_string_bytes};
 
     use crate::{WIPICContext, context::test::TestContext, method::MethodImpl};
 
-    use super::{alloc, calloc, free, get_resource, get_resource_id, get_system_property, sprintk};
+    use super::{alloc, calloc, free, get_program_name, get_resource, get_resource_id, get_system_property, sprintk};
 
     #[futures_test::test]
     async fn test_sprintk() -> Result<()> {
@@ -531,6 +533,48 @@ mod test {
         let mut got = [0; PAYLOAD.len()];
         context.read_bytes(context.data_ptr(exact).unwrap(), &mut got).unwrap();
         assert_eq!(&got, PAYLOAD);
+
+        Ok(())
+    }
+
+    // The two siblings below already returned -18 before `get_resource` was fixed to match them,
+    // and precisely because they were already right, nothing asserted it: mutating either constant
+    // broke no test. These pin the value the same way the resource test above does — as the NUMBER
+    // the guest receives, not a constant name, because `M_E_SHORTBUF` has no definition anywhere in
+    // this repo or the pinned runtime (it lives only in comments).
+    #[futures_test::test]
+    async fn test_system_property_larger_than_buffer_is_rejected() -> Result<()> {
+        // "PHONEMODEL" -> "Emulator": 8 bytes plus the NUL, so 9 fits and 8 cannot.
+        const VALUE: &[u8] = b"Emulator";
+
+        let mut context = TestContext::new();
+        let id = context.alloc_raw(16).unwrap();
+        let out = context.alloc_raw(16).unwrap();
+        write_null_terminated_string_bytes(&mut context, id, b"PHONEMODEL").unwrap();
+
+        assert_eq!(get_system_property(&mut context, id, out, VALUE.len() as u32).await.unwrap(), -18);
+
+        assert_eq!(get_system_property(&mut context, id, out, VALUE.len() as u32 + 1).await.unwrap(), 0);
+        let got = read_null_terminated_string_bytes(&context, out).unwrap();
+        assert_eq!(got, VALUE);
+
+        Ok(())
+    }
+
+    #[futures_test::test]
+    async fn test_program_name_larger_than_buffer_is_rejected() -> Result<()> {
+        // `System::new`'s aid below is the string this writes, so its length drives the boundary.
+        const AID: &[u8] = b"test-aid";
+
+        let system = System::new(Box::new(TestPlatform::new()), "test-pid", "test-aid", DefaultTaskRunner);
+        let mut context = TestContext::with_system(system);
+        let out = context.alloc_raw(16).unwrap();
+
+        assert_eq!(get_program_name(&mut context, out, AID.len() as i32).await.unwrap(), -18);
+
+        assert_eq!(get_program_name(&mut context, out, AID.len() as i32 + 1).await.unwrap(), 0);
+        let got = read_null_terminated_string_bytes(&context, out).unwrap();
+        assert_eq!(got, AID);
 
         Ok(())
     }
