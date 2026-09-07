@@ -60,6 +60,14 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-08: **「게이트 밖」 파리티 확장 여부 «결정»** (PR **#99** 착지 · `wie-dod-ci-parity-outside-gate-precommit-decision`
+  · 채택 제안 `2026-09-05-dod-ci-parity-checker#p1`) — ★**확장하지 않는다.**
+  ★**이유가 취향이 아니라 «술어가 없다»는 것이다**: 네 게이트는 `rust.yml` 과 **양방향 포함(=상등)** 이
+  성립해 집합 비교가 서지만, 게이트 밖은 ★**어느 방향도 서지 않는다**(문서⊄CI 6 · CI⊄문서 21).
+  ★**두 갈래를 «실제로 시제품으로 돌려» 기각했다**: ⒜명령 집합 대조 → 건강한 트리에서 **차집합 27 · 참 결함 0**
+  ⒝파일 존재 검사 → **MISS 4 · 참 0**(하나는 `wie_web/Cargo.toml` 을 `web/Cargo.toml` 로 잡은 **정규식 인공물**).
+  ⇒ 켜면 예외 목록이 곧 검사를 무력화한다(제안 `tradeoff` ⑵ 가 수로 확인됐다).
+  ★**산출물은 «판정을 읽히는 자리에 박은 것» 하나** — `ceilings()` ③ 에 수와 근거 8줄(검사 술어 무접촉 · 동작 변경 0).
 - 2026-09-08: **WIPI-C 4자리 주석의 «전제» 정정** (PR **#98** 착지 · `wie-system-class-loader-spi-c-comment-premise-false`
   · 채택 제안 `2026-09-05-system-class-loader-preemptive-migration#p2`) — 「행동은 옳고 자기 서술은 거짓」 형태.
   `the two coincide wherever there is no Java frame` 이 네 자리에 달려 있었는데 ★**그 자리에서 전제가 거짓**이다.

@@ -135,6 +135,15 @@ pub fn ceilings() -> String {
      \x20   1. OS 축(macos/ubuntu/windows) — 로컬 재현 불가. CI 가 유일한 그물이다.\n\
      \x20   2. 교차곱(4게이트 × 2toolchain) — 두 축을 «독립»으로만 본다(원본 판정 승계).\n\
      \x20   3. `rust.yml` 밖의 워크플로 — engine-contract·web·coverage 의 명령은 대상이 아니다.\n\
+     \x20      ★2026-09-06 «확장하지 않기로» 결정했다(제안 2026-09-05-dod-ci-parity-checker#p1). 이유는\n\
+     \x20      취향이 아니라 «술어가 없다»는 것이다: 네 게이트는 rust.yml 과 «양방향 포함 = 상등»이\n\
+     \x20      성립해 집합 비교가 서지만, 게이트 밖은 어느 방향도 서지 않는다 — 실측(건강한 트리):\n\
+     \x20      문서 8 · CI run: 23 · 교집합 «2» · 차집합 «27»(문서−CI 6 · CI−문서 21) · 그중 참 결함 «0».\n\
+     \x20      문서−CI 6 은 전부 정상이다(CI 가 안 도는 wie_validate·audit·verify, 이름만 다른\n\
+     \x20      npm run build:wasm ↔ bash scripts/build-wasm.sh, 1:N 인 npm run frontend ↔ npm ci+npm run build,\n\
+     \x20      메모리로 만들어 쓰는 make-draw-fixture). CI−문서 21 은 apt/choco·gh release·tarpaulin 등\n\
+     \x20      «커밋 전 명령이 아닌 것»이다. ⇒ 켜면 첫날 red 27 · 참 0 이고, 그 예외 목록이 곧 검사를\n\
+     \x20      무력화한다. 상세·갈래별 비용 = docs/worklog/2026-09-06-parity-outside-gate-decision.json.\n\
      \x20   4. 비-cargo 게이트 — `node …` 같은 게이트가 rust.yml 에 생기면 «셋업»으로 분류돼 안 보인다.\n\
      \x20   5. 동의어·플래그 순서 — 정규화가 «공백 접기»뿐이라 `--all`↔`--workspace` 는 «다르다»로 본다.\n\
      \x20   6. YAML 손파서 — 앵커·다중문서·인용 스칼라 미지원(원본과 같은 선택: 의존성 0).\n\
