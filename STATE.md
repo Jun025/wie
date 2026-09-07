@@ -32,8 +32,12 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- **`verify-browser` 가 저장소에 있는데 한 번도 자동 실행되지 않던 문제 — ★⒜(배포 «뒤» 스텝) 채택**
-  (PR 개설 · `wie-verify-browser-as-post-deploy-step-decision` · 채택 제안 `2026-09-06-wire-audit-no-leak-in-ci#p1`)
+- (그 밖: ★열린 형제 PR: **#98 · #99 · #100** — 각자 자기
+  브랜치에서 진행 중이고, 전부 `STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장에서 충돌한다(정상))
+
+## 완료 (최근)
+- 2026-09-07: **`verify-browser` 가 저장소에 있는데 한 번도 자동 실행되지 않던 문제 — ★⒜(배포 «뒤» 스텝) 채택**
+  (PR **#130** 착지 · `wie-verify-browser-as-post-deploy-step-decision` · 채택 제안 `2026-09-06-wire-audit-no-leak-in-ci#p1`)
   — `web.yml` 마지막 스텝으로 추가. ★**배포 «게이트»가 아니다** — 바이트가 올라간 «뒤» 도는 확인이라 나쁜 배포를 막지 못하고 알린다.
   ★**실측 0건**: `.github/` 전수에서 `verify-browser` 참조 **0** (대조군 — 같은 술어가 `contract-roundtrip`·`audit-no-leak` 는 잡는다).
   ★**대가 ⑴(실 Chrome)은 «사라졌다»** — `channel: "chrome"` 하드코딩을 `contract-roundtrip.mjs` 와 같은 `WIE_CHROME_CHANNEL` 형태로 바꿔 **번들 chromium** 을 쓴다.
@@ -45,10 +49,6 @@
   ★**CI 증가분 실측**: 같은 형태(`npm ci`+`playwright install`+스크립트)가 `engine-contract.yml` 에서 **27~28초** · `web.yml` job 총 **210초**.
   ★**개악 대조**: 스텝을 지우면 지는 것 — C1 대상 무응답 **rc=1** · C2 앱 아닌 것 배포 **rc=1**(전건 `TimeoutError`).
   ★★**천장을 숨기지 않는다**: `nonBlack: 0` 은 **통과**다 — `rc=0` 을 «화면이 그려졌다»로 읽지 마라(그 축은 Scenario E+F 몫).
-- (그 밖: ★열린 형제 PR: **#98 · #99 · #100** — 각자 자기
-  브랜치에서 진행 중이고, 전부 `STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장에서 충돌한다(정상))
-
-## 완료 (최근)
 - 2026-09-07: **핀 이동 시 「경로 밖」 판단이 낡는 문제 — ★⒜(상시 검사) · 단 «스크립트»가 아니라 «워크스페이스 시험»**
   (PR **#126** 착지 · `wie-transmute-census-on-pin-bump-decision` · 채택 제안 `2026-09-07-abi-vocabulary-outliers#p0`)
   — `wie_wipi_c/src/lib.rs` 에 `#[cfg(test)]` 잠금 **시험 1건**. ★**워크플로 0 · 새 의존 0 · CI 스텝 0 · `~/.cargo` 읽기 0.**
