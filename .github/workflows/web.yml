@@ -167,6 +167,10 @@ jobs:
       # the repo root is uploaded alongside the static assets. main → production,
       # other branches → preview deployment.
       - name: Deploy to Cloudflare Pages
+        # `id:` only — the step's behaviour, gating and inputs are untouched. The
+        # verify step below needs `outputs.deployment-url`; the alternative is
+        # hardcoding an alias and guessing how long it takes to swing over.
+        id: deploy
         if: ${{ github.event_name == 'push' && env.HAS_CF_TOKEN == 'true' }}
         uses: cloudflare/wrangler-action@v3
         with:
@@ -174,3 +178,36 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy web/dist --project-name=wie-web --branch=${{ github.ref_name }}
+
+      # Post-deploy, not a deploy gate: this runs AFTER the bytes are live, so it
+      # reports a bad deploy rather than preventing one. Promoting it to a gate is
+      # a separate decision.
+      #
+      # It drives `steps.deploy.outputs.deployment-url` — the immutable per-deploy
+      # URL, which is live when the action returns — NOT the `wie-web.pages.dev`
+      # alias, whose swing-over delay nothing here measures. So it verifies the
+      # artifact that was just uploaded; the gate3 round's own run against the
+      # production alias (merge contract 4-C) verifies the alias, and neither
+      # replaces the other.
+      #
+      # Bundled chromium, not a system Chrome: same knob and same cost as
+      # engine-contract.yml's round-trip step, which measures 27-28s for
+      # `npm ci` + install + script on this runner.
+      #
+      # WHAT A RED MEANS AND WHO TAKES IT: the app did not boot, did not accept a
+      # file, or leaked game bytes off-origin. It cannot redden a PR (this step is
+      # push-only, so PR runs skip it) and it cannot block gate3 (which reads the
+      # PR's checks), so nothing is stuck behind it — the gate3 round that landed
+      # the merge owns it, and AGENTS.md says so where the command is documented.
+      - name: Verify the deployed app in a browser (no-leak audit)
+        if: ${{ github.event_name == 'push' && env.HAS_CF_TOKEN == 'true' }}
+        env:
+          WIE_BASE: ${{ steps.deploy.outputs.deployment-url }}
+        run: |
+          if [ -z "$WIE_BASE" ]; then
+            echo "::error::deploy step produced no deployment-url — nothing to verify"
+            exit 1
+          fi
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          node scripts/verify-browser.mjs test_data/helloworld_ktf.zip
