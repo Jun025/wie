@@ -61,7 +61,7 @@
 
 ## 완료 (최근)
 - 2026-09-08: **「진행중」의 «맨 위 추가»를 없앴다 — 병은 «맨 위»가 아니라 «지점이 하나»였다**
-  (PR 개설 · `wie-state-in-progress-top-insert-conflicts-every-landing` · 채택 제안
+  (PR **#134** 착지 · `wie-state-in-progress-top-insert-conflicts-every-landing` · 채택 제안
   `2026-09-07-state-completed-split-decision#p0`) — §진행중 을 **회차가 만지지 않는 고정 안내**로
   (정본 = `gh pr list`). ★**코드·검사기·워크플로 0 · 새 파일 0.**
   ★**재현**: 최근 착지 **15/15** 가 base 를 당겼고, 복원 가능한 **10쌍**을 다시 병합하니 ★**충돌 10/10** ·
@@ -87,6 +87,24 @@
   실재하는 낡음은 ⑴**`main` 은 «열린 것을 누락»한다**(`9bd48326` 열거 `#98 #99 #100` 인데 그때 **#126·#128**
   이 열려 있었다) ⑵**브랜치는 «착지분을 남긴다»**(PR #98 head 열거 `#96 #97 #99 #100 #101` 중 **4건 착지**).
   ⇒ ★**결론은 그대로 서고 근거가 «양방향»이라 더 강해진다.**
+- 2026-09-08: **공급망 대장 A 를 실제와 맞췄다 — `chacha20` 은 «암호 결함»이 아니었다**
+  (PR **#135** 착지 · `wie-supply-chain-ledger-a-is-stale-two-resolved-one-missing` · 채택 제안
+  `2026-09-06-dependency-exposure-verdict-place#p0`) — ★**의존 무접촉**(`Cargo.lock`·`Cargo.toml` **0줄** ·
+  `cargo update` **0회** · 억제 추가 **0**).
+  ★**재현**(`cargo audit` rc=0 · advisory-db `8a1eb4f9` · `Cargo.lock` 436): 경고 **2건** ↔ 대장 A **3행**.
+  ★**양방향 집합 차**: 경고에만 **`chacha20` 0.10.0 yanked** · 표에만 **A-2·A-3** · 교집합 **A-1 하나**.
+  ★**해소 확인**: `event-listener` **5.4.2**(권고 경계와 일치) · `spin` **0.12.2** — 그 값을 만든 커밋은
+  **`22df9531`(2026-08-08 · PR #55) 하나**다. ★★**그 회차가 `STATE.md` 는 갱신하고 대장 표만 안 고쳤다**
+  (`:822` 에 착지 기록이 있다) ⇒ 등재 닷새 뒤 낡아 **한 달**을 갔다. `chacha20` 은 반대로 **lockfile 변경 없이**
+  나중에 yanked 돼 생긴 경고다. ★**기계 축(`check-audit-warnings.mjs`)은 낡지 않았다 — 틀어진 건 산문 표뿐**.
+  ★**처방**: A-2·A-3 → **C-2·C-3** 이동(**구 ID 병기 · 행 삭제 0 · 번호 재사용 0**) · 새 경고를 **A-4** 로 등재
+  ⇒ 행 **4 → 5** · 불변식 「경고 수 == A 행 수」 **2 == 2 복원** · **형식 무접촉**.
+  ★★**F3 도달성 판정 ⓓ**: yank 사유를 `.crate` 2본 diff 로 확정 — `sse2.rs:133` 이 **SSE4.1 `_mm_extract_epi32`**
+  를 `sse2` 함수 안에서 **무조건** 호출(= SIGILL 이식성 결함, 암호 결함 아님). ★**도달 불가 3축**:
+  ⒜우리 소스 `StdRng`·`ThreadRng`·`rand::rng()`·`make_rng`·`.dither(`·`noise::` **전건 0**(rodio 의 dither/noise 는
+  **옵트인**이고 dither 기본 RNG 는 Xoshiro) ⒝x86 외 타깃은 **SSE2 백엔드 미컴파일** ⒞**AVX2 가 있으면 도달 없음**.
+  ★부수: `wie_web` wasm 트리에 `chacha20` **없음**. ★**전제를 표에 적었다**(rodio@0.22.2 기준 · 우리가 dither/noise 를
+  쓰기 시작하면 무효) — 전제 없는 「해당 없음」을 만들지 않았다.
 - 2026-09-08: **리소스 폴백 가지 — 두 타깃 «모두» 도달 0** (PR **#129** 착지 · `wie-resource-fallback-branch-unexercised-in-both-targets`
   · 채택 제안 `2026-09-06-resource-browser-axis#p0`) — 단위시험 **7건** · ★**제품 코드 무접촉**.
   ★**둘 다 «재현»했다**(추정 0): 네이티브 `unreachable!()` → **167 passed · PROBE 0** ·
