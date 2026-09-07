@@ -32,20 +32,6 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
-- **리소스 폴백 가지 — 두 타깃 «모두» 도달 0** (PR 개설 · `wie-resource-fallback-branch-unexercised-in-both-targets`
-  · 채택 제안 `2026-09-06-resource-browser-axis#p0`) — 단위시험 **7건** · ★**제품 코드 무접촉**.
-  ★**둘 다 «재현»했다**(추정 0): 네이티브 `unreachable!()` → **167 passed · PROBE 0** ·
-  ★브라우저 `panic!()` + **wasm 재빌드** → **46/46 · rc=0 · PROBE 0**(E-res·F-res green) ⇒ **도달 0**.
-  ★**덮은 것은 폴백 «아래»**(제안 tradeoff ⑵ 「그쪽이 먼저다」): `wie_cli` 시험 **0 → 5** ·
-  `wie_backend` **7 → 9**(폴백이 부르는 `size→read` 쌍 · `\`·`..` 마스킹).
-  ★**divergence 를 «돌려서» 적었다**: `/save.dat` → CLI 거부 ↔ Web 수용 · `a\b` → CLI(unix) 한 파일명 ↔ Web `a/b`.
-  ★`wie_web` 은 `#![cfg(target_arch = "wasm32")]` 라 **네이티브 시험 불가**(3벌 중 1벌은 이 축에서 불가능).
-  ★**양방향** M1·M2 각각 FAILED · 원복 바이트 동일 · `cargo test --all` **167 → 174**(+7).
-  ★**안 한 것**: 폴백을 «실제로 지나는» 시험 — 새 픽스처가 필요하다(tradeoff ⑴ · 노력도 M). 재개 지점을 적었다.
-  ★★**[R1 후속 2026-09-08 · `…-fix`] 위 「`\`·`..` 마스킹」의 «`\` 절반»이 공허했다 — 고쳤고 이제 그 문면은 참이다(확인했다).**
-  가드 4줄을 지워도 **한 건도 안 졌다**(PASSED=174 FAILED=0) — 시험이 「거부됐다」와 「통과했는데 마침 없었다」를
-  구별하지 못했다. 처방은 **시험 1줄**(`fs.add_virtual("a\\b", vec![2]);`) ⇒ 같은 개악에 ★**이제 진다**(21/1) ·
-  원복 green(22/0) · 대조군 `".." => continue` **여전히 진다**(21/1). ★**제품 코드 0행**(가드 동작 무접촉).
 - **핀 이동 시 「경로 밖」 판단이 낡는 문제 — ★⒜(상시 검사) · 단 «스크립트»가 아니라 «워크스페이스 시험»**
   (PR 개설 · `wie-transmute-census-on-pin-bump-decision` · 채택 제안 `2026-09-07-abi-vocabulary-outliers#p0`)
   — `wie_wipi_c/src/lib.rs` 에 `#[cfg(test)]` 잠금 **시험 1건**. ★**워크플로 0 · 새 의존 0 · CI 스텝 0 · `~/.cargo` 읽기 0.**
@@ -66,6 +52,20 @@
   브랜치에서 진행 중이고, 전부 `STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장에서 충돌한다(정상))
 
 ## 완료 (최근)
+- 2026-09-08: **리소스 폴백 가지 — 두 타깃 «모두» 도달 0** (PR **#129** 착지 · `wie-resource-fallback-branch-unexercised-in-both-targets`
+  · 채택 제안 `2026-09-06-resource-browser-axis#p0`) — 단위시험 **7건** · ★**제품 코드 무접촉**.
+  ★**둘 다 «재현»했다**(추정 0): 네이티브 `unreachable!()` → **167 passed · PROBE 0** ·
+  ★브라우저 `panic!()` + **wasm 재빌드** → **46/46 · rc=0 · PROBE 0**(E-res·F-res green) ⇒ **도달 0**.
+  ★**덮은 것은 폴백 «아래»**(제안 tradeoff ⑵ 「그쪽이 먼저다」): `wie_cli` 시험 **0 → 5** ·
+  `wie_backend` **7 → 9**(폴백이 부르는 `size→read` 쌍 · `\`·`..` 마스킹).
+  ★**divergence 를 «돌려서» 적었다**: `/save.dat` → CLI 거부 ↔ Web 수용 · `a\b` → CLI(unix) 한 파일명 ↔ Web `a/b`.
+  ★`wie_web` 은 `#![cfg(target_arch = "wasm32")]` 라 **네이티브 시험 불가**(3벌 중 1벌은 이 축에서 불가능).
+  ★**양방향** M1·M2 각각 FAILED · 원복 바이트 동일 · `cargo test --all` **167 → 174**(+7).
+  ★**안 한 것**: 폴백을 «실제로 지나는» 시험 — 새 픽스처가 필요하다(tradeoff ⑴ · 노력도 M). 재개 지점을 적었다.
+  ★★**[R1 후속 2026-09-08 · `…-fix`] 위 「`\`·`..` 마스킹」의 «`\` 절반»이 공허했다 — 고쳤고 이제 그 문면은 참이다(확인했다).**
+  가드 4줄을 지워도 **한 건도 안 졌다**(PASSED=174 FAILED=0) — 시험이 「거부됐다」와 「통과했는데 마침 없었다」를
+  구별하지 못했다. 처방은 **시험 1줄**(`fs.add_virtual("a\\b", vec![2]);`) ⇒ 같은 개악에 ★**이제 진다**(21/1) ·
+  원복 green(22/0) · 대조군 `".." => continue` **여전히 진다**(21/1). ★**제품 코드 0행**(가드 동작 무접촉).
 - 2026-09-08: **러너 목록이 낡아도 기계가 말해 주지 않던 문제 — ★존재 대조(S) 완료 · 분류(M)는 «안 했다»**
   (PR **#132** 착지 · `wie-engine-runner-list-vs-fixture-set-drift-check` · 채택 제안 `2026-09-06-agents-runner-keydraw-inject#p0`)
   — `AGENTS.md` 러너 블록에 `ENGINE-RUNNER` 마커 + `scripts/check-engine-runner-fixtures.mjs` 신설.
