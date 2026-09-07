@@ -152,6 +152,35 @@ Scenario F is not unconditional either — it sits behind `engine-contract.yml`'
 and never runs it. Do not read this line as CI enforcement — nothing in `.github/` runs
 `wie_validate` (measured: 0 hits across all workflow files).
 
+**And it stays that way: promoting `--expect-last-frame` into CI was decided against on 2026-09-07,
+measured rather than assumed.** The question is not "is it in CI" but "is the class caught", and it
+is — twice over, by things that already run:
+
+| what | fixtures | frame | predicate | host | runs when |
+|---|---|---|---|---|---|
+| Scenarios **E + F** | `keydraw_ktf` + `keydraw_lgt` | last (canvas read *after* `tickLoop` returns) | **exact pixel count**, 3 keys each = 6 assertions | `WebScreen` | every PR touching the `engine` filter |
+| `--expect-last-frame` | same two | last | non-blank (boolean) | `HeadlessScreen` | never in CI |
+
+So E+F dominate on every axis except the host — and that exception is empty, because
+`HeadlessScreen::paint` is a **pure sink**: it stores the frame and updates counters, with no
+drawing, compositing or ordering of its own. Everything that can blank a last frame happens *above*
+the `Screen` boundary, in the shared engine both hosts drive. Separately, the flag's own logic is
+already CI-covered — `last_frame_gate_fails` has an 8-row truth-table test that `cargo test --all`
+runs on all six matrix legs. **So promotion buys no detection**, while costing either a new `cargo`
+build in the node-only `contract` job or six redundant runs on `rust.yml`'s matrix.
+
+The paths-filter caveat above is real but bounded: its first entry is `**/*.rs`, so any diff that
+could regress the engine's last frame does fire it (verified on `a4fda020`, a comment-only `.rs`
+landing — step "Contract check — browser boot round-trip" ran and succeeded). A diff that trips
+neither has no engine to regress.
+
+**Reopen this if any of three things happen** — otherwise a later round will re-propose it from the
+same starting point: a last-frame regression is observed that E+F miss; `HeadlessScreen` stops being
+a pure sink; or the shipped native host (`wie_cli`'s `WindowHandle`) needs covering — **note that
+promoting this flag would not do that either**, since it exercises `HeadlessScreen`, not
+`WindowHandle`. That host is covered by neither net today, and saying so is the honest version of
+"the local runner is enough".
+
 **Do not try to shorten these two runs with `--timeout`.** On the `--inject` path that flag is
 overwritten: the deadline is rebuilt from the injection schedule (`--boot-secs 2.5` + 0.3 + 27
 steps × `--action-secs 0.6` + 1.0 = **20.0 s**), so `--timeout 5` and `--timeout 20` both take ~20 s
