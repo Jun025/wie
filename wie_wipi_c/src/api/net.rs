@@ -40,5 +40,9 @@ pub async fn close(_context: &mut dyn WIPICContext) -> Result<()> {
 pub async fn socket_close(_context: &mut dyn WIPICContext, fd: i32) -> Result<i32> {
     tracing::warn!("stub MC_netSocketClose({fd})");
 
+    // -1 is outside the `WIPICError` vocabulary and stays that way: this is a stub, so every
+    // specific variant would blame something ("invalid argument", "bad handle") that is not what
+    // failed. Sound because this call is off the `from_raw` transmute path — census and the other
+    // three sites: docs/wipi-c-abi-error-codes.md.
     Ok(-1) // M_E_ERROR
 }

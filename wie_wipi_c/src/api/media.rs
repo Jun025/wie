@@ -126,6 +126,10 @@ pub async fn clip_put_data(context: &mut dyn WIPICContext, ptr_clip: WIPICWord, 
     tracing::debug!("MC_mdaClipPutData({ptr_clip:#x}, {buf:#x}, {buf_size:#x})");
 
     if ptr_clip == 0 {
+        // -1 is outside the `WIPICError` vocabulary and stays: nothing interprets this value as
+        // that enum. The `wipic_sys` wrapper for this call reads `if result < 0` and carries the
+        // number through as `MediaError::Platform(i32)`, so the SDK's own contract here is
+        // "negative means platform error" — which -1 satisfies. docs/wipi-c-abi-error-codes.md §4.
         return Ok(-1);
     }
 

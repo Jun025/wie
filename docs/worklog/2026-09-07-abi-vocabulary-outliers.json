@@ -1,0 +1,45 @@
+{
+  "date": "2026-09-07",
+  "task": "wie-abi-vocabulary-outliers-disposition",
+  "title": "어휘 밖 반환값 4건 — 전부 ⒝(그대로 두고 자인) · 사유는 건마다 다르다",
+  "summary": "★수부터 정정했다: 브리프의 「5건」은 직전 회차가 «자기가 고친 get_resource 를 포함해» 센 수였고, 실측 잔존은 ★4건(`-1` 3 + `-23` 1)이다. 네 건 전부 ⒝ 로 처분했고 ★코드의 비-주석 변경은 0 이다. ★핵심은 「전부 ⒝」가 아니라 ★«사유가 건마다 다르다»는 것이다 — ⑴스텁이라 어떤 변종도 거짓 주장이 된다 ⑵어휘가 정확히 맞는 유일한 자리인데도 UB 가 없어 그 대가를 사지 않았다 ⑶어휘에 대응이 아예 없고 그 자리가 실제 타이틀에 노출된다 ⑷SDK 계약이 애초에 「음수면 플랫폼 오류」다. ★한 규칙으로 접으면 ⑵가 «놓친 것»으로 읽히고 ⑶이 «게으름»으로 읽힌다.",
+  "changes": [
+    "docs/wipi-c-abi-error-codes.md (신규) — census 정본: 어휘·transmute 경로 실측표·4건 표·건별 사유·★뒤집힐 조건 3가지",
+    "wie_wipi_c/src/api/net.rs — socket_close 자리에 4줄 주석(스텁이라 특정 변종이 거짓 주장이 된다 · 경로 밖 · 문서 지시)",
+    "wie_wipi_c/src/api/database.rs — seek_record_single 자리에 4줄(★어휘가 «맞는데도» 두는 이유) · stream_read EOF 자리에 6줄(대응 부재 + 실제 타이틀 노출)",
+    "wie_wipi_c/src/api/media.rs — clip_put_data 자리에 4줄(게스트 래퍼가 수를 데이터로 나른다는 실측)"
+  ],
+  "verification": {
+    "F1-⑴ 4건 각각 — 함수 · 값 · 어디로 가는가": "⑴`net::socket_close` `-1`(M_E_ERROR) — ktf `method_table.rs` + lgt `WIPICSvcId::SocketClose` 로 «디스패치됨» · wipic_sys 래퍼 ★없음 ⇒ raw i32. ⑵`database::seek_record_single` 의 `_ => Ok(-1)` — ★lgt 만(`WIPICSvcId::Unk12`) · 래퍼 없음 ⇒ raw i32. ⑶`database::stream_read` `-23`(M_E_EOF) — ktf `WIPICDatabaseMethodId::StreamRead` + lgt `ReadRecordSingle` · 래퍼 없음 ⇒ raw i32. ⑷`media::clip_put_data` `-1` — ktf+lgt 디스패치 · ★wipic_sys 래퍼 «있다»(ktf·lgt·simulation) 그러나 반환형이 `Result<usize, MediaError>` 다.",
+    "F1-⑵ 「transmute 경로 밖」이 각각 참인가 — from_raw 호출자 재훑기": "핀 rev 전수: `WIPICError::from_raw` 호출 ★5곳 = `kernel::get_resource` ×3(ktf·lgt·simulation) + `graphics::create_image` ×2(ktf·lgt · simulation 은 match 로 enum 을 «만든다»). `wipic_sys` 의 `-> WIPICError` ★6건도 그 두 함수뿐. ⇒ ★네 건 전부 경로 «밖» — 직전 회차 판정을 뒤집을 근거는 없었고 그대로 받았다. ★추가 실측 1건: `clip_put_data` 는 래퍼가 «있는데» `if result < 0 { Err(MediaError::Platform(result)) }` 로 raw i32 를 데이터로 나른다 ⇒ transmute 아님(그리고 이것이 ⑷의 적극적 근거다 — 「UB 가 아니다」보다 강하다).",
+    "F1-⑶ 내부에서 분기 조건으로 읽는가 (수)": "★4건 전부 0. `-23` 은 `wie_wipi_c` 전체에서 ★반환 1곳뿐(읽는 곳 0). `-1` 비교식은 ★2건 나오지만 «무관»이다 — `graphics.rs` 의 `length == -1`(NUL-종단 센티넬 = 입력 파라미터) 과 `kernel.rs` 의 doc 주석. `stream_read(` 호출부 2건도 실체는 `tracing::debug!` 문자열과 ★성공 경로를 단언하는 시험(`assert_eq!(…, 9)`)이라 반환 코드를 분기하지 않는다.",
+    "F2-⑴ socket_close = ⒝": "★스텁이다(`tracing::warn!(\"stub MC_netSocketClose\")` 후 즉시 반환). 어휘에 «일반 실패» 변종이 없고, 특정 변종은 전부 거짓 주장이 된다 — `Invalid` 는 호출자 인자를, `InvalidHandle` 은 fd 를 탓하는데 ★둘 다 실패 원인이 아니다(구현이 없는 것이다). ⇒ ⒜는 «고를 대상이 없다». ⒞는 근거 0.",
+    "F2-⑵ seek_record_single = ⒝ (★가장 어려운 건)": "★어휘가 «정확히» 맞는 유일한 자리다: `origin ∉ {0,1,2}` = `Invalid = -9`(M_E_INVALID) 이고, ★같은 함수가 이미 `-25` 를, 옆 `list_record_info` 가 `-22` 를 쓴다 ⇒ 파일 관용도 어휘다. 성공은 clamp 된 «음이 아닌» position 을 돌려주므로 `-1` 은 충돌도 없다. ★그런데도 두었다 — 동작 변경이고 호환성을 잴 방법이 없으며(코퍼스 0 · 규격 0), 직전 회차가 그 대가를 치른 이유는 ★UB 였기 때문인데 ★여기엔 UB 가 없다. ★사는 것이 «일관성»뿐이면 그 값에 확인 불가능한 위험을 지불하지 않는다. ※이 건은 «가장 뒤집기 쉬운» 판단이라 문서 §2 에 근거를 길게 남겼다.",
+    "F2-⑶ stream_read = ⒝": "★어휘에 EOF 대응이 «아예 없다» — `NoSuchEntry`(핸들·레코드는 유효하다)도 `Invalid`(인자는 정상이다)도 거짓이다 ⇒ ★⒜는 «옳은 표적이 없다». ⒞(변종 추가)만 형태가 맞는데 실기 근거 0 이라 티켓이 금한 선택이다. ★그리고 이 자리는 위험이 가장 크다: 원래 주석이 「일부 타이틀이 EOF 뒤에 NULL 버퍼로 부른다」를 기록한다 = ★실제로 밟히는 경로다.",
+    "F2-⑷ clip_put_data = ⒝": "★게스트 래퍼가 이 값을 enum 으로 «해석하지 않는다» — `Result<usize, MediaError>` 에 `if result < 0 { Err(MediaError::Platform(result)) }` 로 ★수를 그대로 실어 나른다. ⇒ 이 호출의 SDK 계약은 「음수 = 플랫폼 오류」이고 `-1` 이 그것을 «만족»한다. ★이것은 「UB 가 아니다」(소극)보다 강한 «적극적» 근거다. ⒜(`-25` 도 의미상 그럴듯하다)는 래퍼가 무관심하므로 얻는 것이 0.",
+    "F3 집행 — ⒝의 자인이 «어디에» 들어갔는가": "★코드: `net.rs`(socket_close 직전 4줄) · `database.rs`(seek 분기 직전 4줄 · stream_read EOF 직전 6줄) · `media.rs`(clip_put_data 분기 안 4줄) — ★네 자리 전부. ★문서: `docs/wipi-c-abi-error-codes.md` 신규(census + 건별 사유 + 뒤집힐 조건). ★각 주석이 문서 절 번호를 가리키고 문서가 네 자리를 표로 갖는다 ⇒ 한쪽만 읽어도 나머지에 닿는다.",
+    "★비-주석 변경 0 (요구된 증명)": "`git diff -U0 -- wie_wipi_c/` 에서 `//`·`///` 로 시작하지 않는 `+`/`-` 줄 ★0건. numstat = `database.rs 10/0` · `media.rs 4/0` · `net.rs 4/0` ⇒ ★삭제 0(순수 추가).",
+    "★직전 회차 자리 무접촉": "`wie_wipi_c/src/api/kernel.rs` 가 numstat 에 ★없다. 착지본의 `return Ok(-18); // M_E_SHORTBUF` 3자리(`:57`·`:247`·`:400`) 그대로.",
+    "게이트": "fmt 0 · clippy --all -D warnings 0 · wasm clippy 0 · RUST_MIN_STACK=4194304 cargo test --all 0 (161 passed / 0 failed) · ★beta clippy 0 · ★엔진 러너 5픽스처 전건 PASS(`.rs` 를 만졌으므로 주석뿐이어도 돌렸다 · keydraw 2건은 --inject) · check-worklog-json / check-docs-report-serial / check-worklog-coverage / check-parity-lock-wired / npm run audit 전건 0.",
+    "연번": "★착수 시 `--next-serial` — 디스크 `0072` 인데 ★열린 PR #123 이 0072 를 claim ⇒ `0073` 을 받았다. 디스크로 계산했으면 형제 번호를 빼앗았다.",
+    "worklog 재측": "★«기록하지 않았다»(브리프 경계). base 는 `73324661`(#122 착지본)이고 검사기 rc=0 이다."
+  },
+  "limits": [
+    "★★네 건 다 «호환성을 확인하지 않았다» — 확인할 수 없기 때문이다(상용 코퍼스 0 · WIPI 오류코드 규격이 이 저장소·핀 저장소 양쪽에 0건). ⒝ 는 «안전하다»가 아니라 ★«현행 동작을 바꾸지 않는다»이고, 그 둘은 다르다.",
+    "★⑵(seek_record_single)는 ★뒤집힐 여지가 가장 큰 판단이다 — 어휘가 맞는데 두었기 때문이다. 다음 사람이 다시 제기하면 그것은 «오독»이 아니라 정당한 재검토이고, 문서 §2 가 그때 읽힐 근거다.",
+    "★이 회차는 네 자리의 «시험»을 만들지 않았다 — ⒝ 는 동작을 바꾸지 않으므로 개악 대조의 대상이 없다(값을 바꾸는 개악은 «이 회차가 막으려는 그 변경» 자체다). 그 축은 별 회차(`wie-sibling-shortbuf-sites-have-no-tests` 계열)의 몫이다.",
+    "★census 의 「from_raw 호출 5곳 = 두 함수」는 ★핀 rev 의 사실이다. 핀이 움직이면 다시 세야 하고, 문서의 「뒤집힐 조건」 첫 줄이 그것이다."
+  ],
+  "adoptedProposals": ["2026-09-07-get-resource-shortbuf-abi#p1"],
+  "proposals": [
+    {
+      "title": "핀이 움직일 때 「transmute 경로」 census 를 다시 세게 만들 것인가 — 지금은 문서가 «부탁»할 뿐이다",
+      "plainSummary": "지금 판단은 「이 네 자리는 위험한 경로 밖이다」에 기대고 있는데, 외부 라이브러리 버전을 올리면 그 전제가 조용히 깨질 수 있습니다. 버전을 올릴 때 자동으로 다시 세게 하자는 제안입니다.",
+      "userBenefit": "핀 범프가 조용히 UB 를 되살리는 일을 막는다 — 지금은 사람이 문서를 읽고 기억해야 한다.",
+      "why": "이 회차의 ⒝ 네 건은 전부 «`WIPICError::from_raw` 를 지나지 않는다»에 걸려 있다. 그 사실은 핀 rev(`wipi.git#1e0c634e`)의 성질이고, `wipic_sys` 가 어느 함수를 `-> WIPICError` 로 노출하는지는 상류가 정한다. ⇒ 핀이 움직이면 네 판단이 «한꺼번에» 낡을 수 있는데, 지금 그것을 막는 것은 문서의 「뒤집힐 조건」 한 줄뿐이다. `AGENTS.md` 가 RustJava 핀에 대해 이미 같은 형태를 적었다(「핀을 옮기면 그 모듈의 시험을 다시 돌려라」).",
+      "tradeoff": "★검사기를 만들려면 `~/.cargo` 의 체크아웃을 읽어야 하는데 그 경로는 CI 와 로컬이 다르고 오프라인 보장이 없다 — 상시 구간에 넣으면 «문서만 고친 PR»까지 문다(파리티 락 회차가 같은 이유로 tree-sitter 를 기각했다). ⇒ 상시 검사보다 «핀 범프 회차의 체크리스트 한 줄»이 더 맞을 수 있고, 그러면 그것은 코드가 아니라 AGENTS.md 의 RustJava 핀 절에 붙는다. ★어느 쪽인지는 결정이 필요하다.",
+      "effort": "S",
+      "target": "AGENTS.md §Incident ledger(핀 절) 또는 scripts/"
+    }
+  ]
+}
