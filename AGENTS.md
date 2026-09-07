@@ -152,6 +152,52 @@ Scenario F is not unconditional either — it sits behind `engine-contract.yml`'
 and never runs it. Do not read this line as CI enforcement — nothing in `.github/` runs
 `wie_validate` (measured: 0 hits across all workflow files).
 
+**And it stays that way: promoting `--expect-last-frame` into CI was decided against on 2026-09-07,
+measured rather than assumed.** The question is not "is it in CI" but "is the class caught", and it
+is — twice over, by things that already run:
+
+| what | fixtures | frame it reads | predicate | host | runs when |
+|---|---|---|---|---|---|
+| Scenarios **E + F** | `keydraw_ktf` + `keydraw_lgt` | **the first frame that reaches the expected pixel count** — `tickLoop` breaks on match | **exact pixel count**, 3 keys each = 6 assertions | `WebScreen` | every PR touching the `engine` filter |
+| `--expect-last-frame` | same two | the run's **final** paint | non-blank (boolean) | `HeadlessScreen` | never in CI |
+
+**They differ on two axes, not one, and only the host axis is vacuous.** The *host* axis is
+empty: `HeadlessScreen::paint` is a **pure sink** — it stores the frame and updates counters, with no
+drawing, compositing or ordering of its own, so everything that can blank a frame happens *above* the
+`Screen` boundary, in the shared engine both hosts drive. The *time* axis is **not** empty:
+`tickLoop` exits the moment `until` matches, so E+F assert "the expected count was observed at some
+tick boundary" and stop looking; the flag asserts "the run's last paint is non-blank". After the
+**last** key matches, F does `key_up` → `free()` and sees nothing further, while the headless
+`--inject` run continues through its 27-step schedule (measured 2026-09-07: `paints` 55 on both
+carriers). So a regression that blanks the screen *after* the final key assertion — a follow-up
+action, a stop/shutdown path — passes F and fails the flag. Earlier keys are not exposed: the next
+key's assertion re-reads the canvas.
+
+Separately, the flag's own logic is already CI-covered — `last_frame_gate_fails` has an 8-row
+truth-table test that `cargo test --all` runs on all six matrix legs.
+
+**So the detection delta is narrow, not zero**, and that is the actual reason not to promote: it is
+confined to the window after the last key assertion, **zero incidents have ever been observed in
+it**, and buying it costs either a new `cargo` build in the node-only `contract` job or six
+redundant runs on `rust.yml`'s matrix. The 2026-09-05 LGT failure hides this window rather than
+demonstrating it — that overpaint happened *within* a tick, so the canvas never showed 424 at any
+boundary and the early break never fired.
+
+The paths-filter caveat above is real but bounded: its first entry is `**/*.rs`, so any diff that
+could regress the engine's last frame does fire it (verified on `a4fda020`, a comment-only `.rs`
+landing — step "Contract check — browser boot round-trip" ran and succeeded). A diff that trips
+neither has no engine to regress.
+
+**Reopen this if any of three things happen** — otherwise a later round will re-propose it from the
+same starting point. First and most likely: **a blank-screen regression lands in the window E+F
+structurally cannot see** — after the last key assertion, where the loop has already broken. It will
+not arrive as a CI failure, by construction; it arrives from the local runner line above, or from
+someone running a game, and *that* is the signal to re-price the delta. Second: `HeadlessScreen`
+stops being a pure sink, which would open the host axis too. Third: the shipped native host
+(`wie_cli`'s `WindowHandle`) needs covering — **note that promoting this flag would not do that
+either**, since it exercises `HeadlessScreen`, not `WindowHandle`. That host is covered by neither
+net today, and saying so is the honest version of "the local runner is enough".
+
 **Do not try to shorten these two runs with `--timeout`.** On the `--inject` path that flag is
 overwritten: the deadline is rebuilt from the injection schedule (`--boot-secs 2.5` + 0.3 + 27
 steps × `--action-secs 0.6` + 1.0 = **20.0 s**), so `--timeout 5` and `--timeout 20` both take ~20 s
