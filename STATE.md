@@ -52,6 +52,16 @@
   브랜치에서 진행 중이고, 전부 `STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장에서 충돌한다(정상))
 
 ## 완료 (최근)
+- 2026-09-08: **핀 이동 비용 목록에 「`class_definition().name()` 형식 재검증」 1항 — ★표는 «컴파일이 잡는 것»만 센다**
+  (PR **#133** 착지 · `wie-pin-bump-checklist-must-reverify-class-definition-name-format` · 채택 제안 `2026-09-07-clet-card-identity-class-definition#p0`)
+  — `docs/upstream-realign-verdict.md` §8-4⑶ 표 직후에 **+20/−0**(삭제 **0줄** · hunk 1개). ★**핀 무접촉 · 신원 판정 코드 무접촉 · 새 시험 0.**
+  ★**F1⑶ 판정 = «관찰이지 계약이 아니다»**(핀 `5b84dd1` 실측): `jvm/src/class_definition.rs:12` 의 `fn name(&self) -> String;` 위 doc 주석 **없음** ·
+  ★`jvm` 크레이트 전체 `///` **0건** · `README.md` 의 `name()` 언급 **0건** · `internal form` 을 말하는 유일한 줄(`jvm/src/type.rs:60`)은
+  `CONSTANT_Class_info`(JVMS 4.4.1) 이야기다. ⇒ ★**핀이 반환을 이진 형식으로 바꿔도 컴파일·시험 통과, 신원 판정만 조용히 어긋난다.**
+  ★**반대 증거도 봤다** — `class.rs:72,145` 의 `replace('/', ".")` 는 「`name()` 이 점 없는 쪽」이라는 **구현 사실**이지 **약속**이 아니다(그래서 blocked 아님).
+  ★**확인 명령을 «돌려서» 값까지 적었다**: `RUST_LOG=jvm=debug` + `Register class …Clet…` → LGT `net/wie/CletWrapperCard` · KTF `CletCard`(★코드 변경 0).
+  ★★**함정**: `RUST_LOG=debug`(전체)면 LGT 가 **점 형식도 함께** 찍어 판정이 갈린다 ⇒ `jvm=debug` 로 좁히고 JVM 자신의 `Register class` 줄만 보라고 못박았다.
+  ★착지 시 배포 **0 예상**(diff 가 문서·원장뿐 — `.rs` **0**).
 - 2026-09-08: **createImage 실패 «메시지»를 잠글지 — ★⒝(가지1 이름 토큰만) + ⒞(가지2 미잠금·기록)**
   (PR **#131** 착지 · `wie-createimage-error-message-lock-decision` · 채택 제안 `2026-09-06-createimage-failure-branches#p1`)
   — `wie_midp/tests/create_image_missing_name_message.rs` **시험 1건**. ★**제품 코드 무접촉 · 픽스처 바이트코드 0 · jar 재생성 0.**
