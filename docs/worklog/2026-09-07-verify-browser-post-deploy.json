@@ -1,0 +1,51 @@
+{
+  "schema": "worklog/v1",
+  "date": "2026-09-07",
+  "task": "wie-verify-browser-as-post-deploy-step-decision",
+  "taskId": "T-20260907-vbpd",
+  "title": "verify-browser 를 배포 «뒤» 스텝으로 — ⒜ 채택",
+  "summary": "저장소에 있으나 자동 실행 0건이던 scripts/verify-browser.mjs 를 web.yml 의 마지막 스텝(배포 뒤)으로 옮겼다. 실 Chrome 하드코딩을 번들 chromium 으로 바꿔 제안이 적은 대가 ⑴ 을 없앴고, 실패 시 red 를 받는 주체를 AGENTS.md 에 명시했다.",
+  "changes": [
+    ".github/workflows/web.yml — 배포 뒤 verify 스텝 추가(push 전용) + 배포 스텝에 id: deploy(동작 무변)",
+    "scripts/verify-browser.mjs — channel:\"chrome\" 하드코딩 → WIE_CHROME_CHANNEL(기본 번들 chromium) · rc 의미를 머리주석에 명시",
+    "AGENTS.md — 「local only」 항목을 사실에 맞게 고치고 «red 를 누가 받나» 한 문장을 인용 블록으로 박음",
+    "STATE.md · docs/report/0079--2026-09-07--wie-verify-browser-as-post-deploy-step-decision.md"
+  ],
+  "verification": [
+    "F1⑴ .github 전수 verify-browser 참조 0건(rc=1) · 대조군으로 술어 생존 확인(contract-roundtrip·audit-no-leak 는 잡힌다)",
+    "F1⑵ web.yml 배포 4스텝 전건 event_name=='push' 게이트 · 배포 스텝이 파일의 마지막",
+    "F1⑶ contract-roundtrip.mjs 가 번들 chromium + WIE_CHROME_CHANNEL 형태임을 코드로 확인",
+    "F1⑷ 운영 URL 1회 실행 rc=0 · off-origin 0 · POST/PUT 0 · 게임 헤더 바이트 0",
+    "개악 대조 C1(대상 무응답) rc=1 · C2(앱 아닌 것 배포) rc=1 · C3(실배포본) rc=0",
+    "CI 증가분 실측 — 같은 3종 스텝이 engine-contract.yml 에서 27~28s · web.yml job 총 210s",
+    "web.yml YAML 파싱 + 마지막 스텝의 env.WIE_BASE 표현식 단언"
+  ],
+  "limits": [
+    "배포 «뒤» 확인이라 나쁜 배포를 막지 못하고 알린다 — 게이트 승격은 별 결정이다",
+    "deployment-url(아티팩트)을 검증하고 wie-web.pages.dev 별칭은 검증하지 않는다 — 별칭 전환 지연은 아무도 재지 않았다. 게이트③ 4-C 손 실행이 그 축을 계속 진다",
+    "rc=0 은 «화면이 그려졌다»가 아니다 — nonBlack:0 은 통과다(그 축은 Scenario E+F 몫)",
+    "C1·C2 가 둘 다 TimeoutError/rc=1 이라 스크립트가 «대상 무응답»과 «잘못된 아티팩트»를 구별하지는 못한다",
+    "번들 chromium 에서 «완주»하는 양성 증거는 이 회차가 아니라 CI 의 contract-roundtrip.mjs 가 준다"
+  ],
+  "adoptedProposals": ["2026-09-06-wire-audit-no-leak-in-ci#p1"],
+  "proposals": [
+    {
+      "title": "verify-browser 의 «검은 화면» 축 — rc 로 올릴지 정하기",
+      "plainSummary": "배포 확인 스크립트는 화면이 새까매도 «통과»로 답합니다. 지금은 그것이 옳지만, 그 사실이 회신에서 반복해서 잘못 인용돼 왔습니다.",
+      "userBenefit": "「배포 확인 통과」가 「앱이 실제로 그려졌다」를 뜻하게 되어, 검은 화면으로 배포되는 사고를 배포 직후에 알 수 있습니다.",
+      "why": "★실측: 운영 URL 실행이 nonBlack:0 으로 rc=0 을 냈다(코드상 rc≠0 은 누출과 흐름 미완주뿐). ★그런데 게이트③ 회차들이 rc=0 을 «배포 건강»으로 인용해 왔다(2026-09-07 하루에만 4회). ★지금 fixture(helloworld_*)는 «끝이 비는 것이 정상»이라 그대로 켜면 상시 red 다 ⇒ 켜려면 keydraw_* 처럼 «그려지는» fixture 나 --inject 상당의 입력이 필요하고, 그것은 이 회차의 범위 밖이었다.",
+      "tradeoff": "⑴fixture 를 바꾸면 업로드할 파일이 늘고 실행이 길어진다 ⑵Scenario E+F 가 이미 픽셀 수를 단언하므로 «중복»일 수 있다 — 다만 그쪽은 브라우저 호스트의 tick 경계이고 이쪽은 «배포된 것»이라 축이 다르다 ⑶플래그로 만들면 아무도 안 켠다.",
+      "effort": "M",
+      "target": "wie · scripts/verify-browser.mjs · .github/workflows/web.yml"
+    },
+    {
+      "title": "STATE.md 의 «진행중 최상단» 경합 — 회차 파일로 가르거나 union 드라이버",
+      "plainSummary": "여러 작업이 동시에 열려 있으면 상태 파일의 맨 윗부분에서 매번 충돌이 납니다. 착지 한 건이 다른 모든 작업의 손질을 강제합니다.",
+      "userBenefit": "머지 대기 중인 작업이 남의 착지 때문에 다시 손질되는 일이 없어져, 같은 변경이 더 빨리 배포됩니다.",
+      "why": "★실측(2026-09-07 · PR #126): 게이트③ 배차를 «4번» 썼고 그중 셋이 STATE.md 최상단 재해소로 소모됐다 — 매 배차 형상이 동일했다(착수 재측 rc=0 → base 이동 → 재해소 → push → CI 처음부터). ★docs/report/ 는 회차별 파일로 갈라 이 축을 이미 없앴는데(a5091df6) STATE.md 는 여전히 «한 파일의 맨 위»라 형제 착지마다 100% 충돌한다.",
+      "tradeoff": "⑴회차 파일로 가르면 「지금 무엇이 진행중인가」를 한눈에 못 본다 — 인덱스를 만들면 그 인덱스가 다시 경합한다 ⑵.gitattributes union 드라이버는 더 싸지만 «시간순»을 보장하지 않고 병합 결과가 사람 눈을 안 거친다 ⑶어느 쪽도 이미 열린 PR 4건의 재해소를 한 번은 치러야 한다.",
+      "effort": "M",
+      "target": "wie · STATE.md · .gitattributes · AGENTS.md §Landing paperwork"
+    }
+  ]
+}

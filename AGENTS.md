@@ -115,6 +115,10 @@ rather than trusting the word "green".
 
 **Touching engine code? The four gates are not enough — run the repo's own runner.**
 
+<!-- ENGINE-RUNNER:BEGIN — scripts/check-engine-runner-fixtures.mjs diffs the fixtures named
+     inside this region against `git ls-files test_data/`, both directions. Keep both markers;
+     the checker fails if either goes missing rather than passing on an empty region. -->
+
 ```sh
 node scripts/make-draw-fixture.mjs                                    # builds the J2ME fixture
 for f in test_data/draw_j2me.jar test_data/helloworld_ktf.zip test_data/helloworld_lgt.zip; do
@@ -124,6 +128,15 @@ for f in test_data/keydraw_ktf.zip test_data/keydraw_lgt.zip; do      # key-driv
   cargo run -q -p wie_cli --bin wie_validate -- --inject --expect-last-frame "$f"   # PASS *and* rc=0
 done
 ```
+
+**A fixture that this runner deliberately does not touch is named here, not omitted** — write
+`NOT-RUN: test_data/<name> — <why>` inside this marked region. That keeps the classification in the
+same document as the list instead of in the checker, which is the one thing the proposal behind this
+check warned about: a checker that knows which fixtures are "runner fixtures" becomes a second source
+of truth and drifts from this block. **There are none today** (the diff is 0 in both directions), so
+this paragraph is the syntax, not a list.
+
+<!-- ENGINE-RUNNER:END -->
 
 **`keydraw_*` without `--inject` reports FAIL, and that is the CORRECT result — you did not break it.**
 Those two fixtures paint only in response to a key, so with no injected input the screen stays black
@@ -247,19 +260,37 @@ then `:125`). The rest need a toolchain fetch — run them only when the artifac
 **Which of these CI actually runs — "the check exists" is not "the check runs".** Measured
 2026-09-06 across all 8 workflow files: `check-engine-contract.mjs` and `contract-roundtrip.mjs`
 run in `engine-contract.yml`; `build-wasm.sh` and the frontend build run in `web.yml`; **`npm run
-audit` now runs on every PR** as an always-run step of `engine-contract.yml`. The two below do
-**not** run in CI and are **local-only by design** — do not "fix" that by wiring them:
+audit` now runs on every PR** as an always-run step of `engine-contract.yml`; **`verify-browser.mjs`
+runs after every deploy** (below). The one after that does **not** run in CI and is **local-only by
+design** — do not "fix" that by wiring it:
 
-- **`npm run verify` (`scripts/verify-browser.mjs`) — local only.** It drives a *real* Chrome
-  (`chromium.launch({ channel: "chrome" })`, not the bundled chromium `contract-roundtrip.mjs`
-  uses) through the whole app against a server serving `web/dist` **plus `functions/`** — i.e. a
-  `wrangler pages dev` with D1 bindings, not a static file server. And there is no URL to point it
-  at on a PR: `web.yml`'s deploy steps are all gated on `github.event_name == 'push'`, so a PR
-  build produces `web/dist` as an artifact and deploys nothing. Wiring it means standing up the
-  Pages dev stack inside CI — a workflow-sized change, not a step. It needs no game file (its
-  default argument is the committed `test_data/helloworld_ktf.zip`); the browser and the server
-  are the cost. Run it by hand against production after a deploy: `WIE_BASE=https://wie-web.pages.dev
-  node scripts/verify-browser.mjs test_data/helloworld_ktf.zip`.
+- **`npm run verify` (`scripts/verify-browser.mjs`) — runs post-deploy, never on a PR.** Since
+  2026-09-07 it is the last step of `web.yml`, driving `steps.deploy.outputs.deployment-url` — the
+  immutable per-deploy URL, live when the action returns. It is **not** a deploy gate: it runs after
+  the bytes are up, so it reports a bad deploy rather than blocking one.
+
+  > **If that step goes red, the gate③ round that landed the merge owns it** — it is already running
+  > the same script against production for merge-contract 4-C, so it re-runs it against the URL the
+  > failed step printed and either files a ticket or records in its reply that the deploy is bad.
+
+  That owner is not a formality: this repo has already had a check go red with nobody named
+  (`check-worklog-coverage`, 2026-09-07), and that one blocked every open PR. This one cannot —
+  it is push-only, so PR runs skip it and gate③ reads the PR's checks — which is also why it is
+  allowed to fail hard instead of hiding behind `continue-on-error`.
+
+  **It still does not run on a PR, and that part of the old reasoning stands**: `web.yml`'s deploy
+  steps are all gated on `github.event_name == 'push'`, so a PR build produces `web/dist` as an
+  artifact and deploys nothing, and pointing this script at a PR would mean standing up
+  `wrangler pages dev` with D1 bindings inside CI — a workflow-sized change, not a step.
+
+  **Two things it does not tell you.** It reads the per-deploy URL, not the `wie-web.pages.dev`
+  alias, whose swing-over delay nothing here measures — so keep running it by hand against
+  production after a deploy, which is a *different* assertion: `WIE_BASE=https://wie-web.pages.dev
+  node scripts/verify-browser.mjs test_data/helloworld_ktf.zip`. And `rc=0` does not mean the screen
+  rendered — it exits non-zero on a leak (2) and on the flow not completing, but `nonBlack: 0` is a
+  pass, which for the helloworld fixtures is correct since they are expected to end blank. Read it
+  as "booted, took a file, leaked nothing". It needs no game file (its default argument is the
+  committed `test_data/helloworld_ktf.zip`).
 - **`scripts/smoke_gate.sh` — local only, and structurally so.** It regresses the working game
   catalog against `scripts/smoke_gate_baseline.tsv`, reading titles from `WORKING_DIR`
   (default `game_lab/working`). `game_lab/` is git-ignored and holds real game bytes, which
