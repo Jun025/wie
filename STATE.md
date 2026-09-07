@@ -60,7 +60,7 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
-- 2026-09-08: **대장 A 가 낡는 것을 «기계»가 말한다 — 「수」가 아니라 「집합」으로** (PR 개설 ·
+- 2026-09-08: **대장 A 가 낡는 것을 «기계»가 말한다 — 「수」가 아니라 「집합」으로** (PR **#137** 착지 ·
   `wie-supply-chain-ledger-staleness-invariant-in-checker` · 채택 제안
   `2026-09-08-supply-chain-ledger-a-realign#p1`) — `scripts/check-audit-warnings.mjs` 에 **둘째 대조**:
   `docs/project-kb/02_status.md` **§A 행 집합 ↔ `cargo audit` 경고 집합**.
