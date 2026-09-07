@@ -1,0 +1,31 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-08",
+  "task": "wie-supply-chain-ledger-staleness-invariant-in-checker",
+  "title": "대장 A 가 낡는 것을 기계가 말한다 — 「수」가 아니라 「집합」으로",
+  "summary": "scripts/check-audit-warnings.mjs 에 둘째 대조를 붙였다: docs/project-kb/02_status.md §A 행 집합 ↔ cargo audit 경고 집합(양방향 + 절 머리 선언 수 + fail-closed). 새 스크립트·새 스텝·추가 cargo audit 호출 0.",
+  "changes": [
+    "scripts/check-audit-warnings.mjs — LEDGER-A 대조 추가. 기존 actual 집합을 그대로 재사용해 두 검사가 «무엇이 경고인가»에서 어긋날 수 없다",
+    ".github/workflows/rust-audit.yaml — 스텝 이름을 두 대조를 덮게 바꾸고 주석에 근거·정의·required 미승격 사유 기재",
+    "docs/project-kb/02_status.md — §A 머리에 「이제 기계가 읽는다」 + 세는 대상의 정의(줄머리 | **A-<n>** | 만 · C 행 제외) 기재. ★표의 행은 0건 수정"
+  ],
+  "verification": [
+    "현 상태 rc=0 — §A 행 2건 · 경고 2건 · 절 머리 선언 2건 · 양방향 차 0",
+    "M1 경고 +1(합성 synthetic-crate@9.9.9 yanked) → rc=1 · 「경고에만 있다」",
+    "M2 A 행 −1(A-4 삭제) → rc=1 · 「경고에만 있다: chacha20」 + 「절 머리 2건인데 실제 1건」",
+    "M3 ★계수 동일(2↔2)·집합만 다름(chacha20 → swapped-crate) → rc=1 · 양쪽 차 모두 출력 ⇒ ⒜(수 동등)였다면 침묵했을 개악",
+    "M4 파서 눈멀게(A 행 줄머리 AA- 로) → rc=1 fail-closed 「못 쟀다」",
+    "M5 C 행 오인 대조군 → §A 행 2건(4건 아님) ⇒ 구 ID 병기 셀이 A 로 세어지지 않는다",
+    "대조군: PATH shim 에 «진짜» audit JSON 을 먹이면 rc=0 ⇒ shim 자체는 결과를 바꾸지 않는다",
+    "워크플로 트리거 실측 = schedule + workflow_dispatch 뿐(pull_request·push 없음) ⇒ required 로 승격 불가",
+    "의존 무접촉: Cargo.lock·Cargo.toml 0줄 · cargo update 0 · 억제 파일 3종 여전히 부재 · 워크플로 비-주석 --ignore 0건"
+  ],
+  "limits": [
+    "PR 에서는 돌지 않는다 — 매일 도는 잡이라 PR 이 §A 표를 잘못 고치면 최대 24h 조용하다. 손으로는 node scripts/check-audit-warnings.mjs 한 줄.",
+    "식별자 키는 package@version + (advisory ?? kind) 다. 대장이 성격을 산문으로 적어 kind 를 키로 쓰지 않았다 — 같은 package@version 에 같은 advisory 인 두 경고는 구별하지 못한다(관측된 적 없음).",
+    "파서는 마크다운 표를 파이프로 가른다 — 셀 안에 파이프가 들어오면 깨진다. 그 경우 조용히 통과하지 않고 fail-closed 로 운다.",
+    "C 행 정합(⒞)은 하지 않았다. 「너무 일찍 C 로 옮겼다」는 ⒝ 가 잡지만, 「한 번도 경고난 적 없는 C 행」은 잡지 못한다."
+  ],
+  "adoptedProposals": ["2026-09-08-supply-chain-ledger-a-realign#p1"],
+  "proposals": []
+}
