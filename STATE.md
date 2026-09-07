@@ -48,8 +48,12 @@
   ★★**정직한 범위 — 「지는가」의 답은 «절반»이다**: **어휘 축은 진다**(추가·개번·삭제) · ★**「누가 `from_raw` 를 지나는가」는 «안 진다»**
   (`wipic_sys` 가 이 워크스페이스의 의존이 아니다 — 주석에만 나온다). ⇒ 어휘 밖 4건 중 **2건 온전 + 1건 절반**을 덮는다.
   ★착지 시 **실배포 2건** 예상(`web.yml` + `publish-artifact` — 착지 diff 에 `.rs` 가 있다).
-- **핀 이동 비용 목록에 「`class_definition().name()` 형식 재검증」 1항 — ★표는 «컴파일이 잡는 것»만 센다**
-  (PR 개설 · `wie-pin-bump-checklist-must-reverify-class-definition-name-format` · 채택 제안 `2026-09-07-clet-card-identity-class-definition#p0`)
+- (그 밖: ★열린 형제 PR: **#98 · #99 · #100** — 각자 자기
+  브랜치에서 진행 중이고, 전부 `STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장에서 충돌한다(정상))
+
+## 완료 (최근)
+- 2026-09-08: **핀 이동 비용 목록에 「`class_definition().name()` 형식 재검증」 1항 — ★표는 «컴파일이 잡는 것»만 센다**
+  (PR **#133** 착지 · `wie-pin-bump-checklist-must-reverify-class-definition-name-format` · 채택 제안 `2026-09-07-clet-card-identity-class-definition#p0`)
   — `docs/upstream-realign-verdict.md` §8-4⑶ 표 직후에 **+20/−0**(삭제 **0줄** · hunk 1개). ★**핀 무접촉 · 신원 판정 코드 무접촉 · 새 시험 0.**
   ★**F1⑶ 판정 = «관찰이지 계약이 아니다»**(핀 `5b84dd1` 실측): `jvm/src/class_definition.rs:12` 의 `fn name(&self) -> String;` 위 doc 주석 **없음** ·
   ★`jvm` 크레이트 전체 `///` **0건** · `README.md` 의 `name()` 언급 **0건** · `internal form` 을 말하는 유일한 줄(`jvm/src/type.rs:60`)은
@@ -58,10 +62,6 @@
   ★**확인 명령을 «돌려서» 값까지 적었다**: `RUST_LOG=jvm=debug` + `Register class …Clet…` → LGT `net/wie/CletWrapperCard` · KTF `CletCard`(★코드 변경 0).
   ★★**함정**: `RUST_LOG=debug`(전체)면 LGT 가 **점 형식도 함께** 찍어 판정이 갈린다 ⇒ `jvm=debug` 로 좁히고 JVM 자신의 `Register class` 줄만 보라고 못박았다.
   ★착지 시 배포 **0 예상**(diff 가 문서·원장뿐 — `.rs` **0**).
-- (그 밖: ★열린 형제 PR: **#98 · #99 · #100** — 각자 자기
-  브랜치에서 진행 중이고, 전부 `STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장에서 충돌한다(정상))
-
-## 완료 (최근)
 - 2026-09-07: **재측 판정이 «마지막에 붙은 행»을 읽던 문제 — ★⒜(max) 채택** (PR **#128** 착지 · `wie-worklog-coverage-last-vs-max-decision`
   · 채택 제안 `2026-09-06-remeasure-record-idempotent#p0`) — `at(-1)` → **`landedRounds` 최대 행**(동률은 나중에 붙은 쪽).
   ★**비-주석 변경 «한 줄»** · ★**임계(`WINDOW=10`)·`THRESHOLD=70`·「비율은 사람이 판단한다」 무접촉** · 기록 파일 **0줄**(재측 기록 0).
