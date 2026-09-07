@@ -193,6 +193,10 @@ pub async fn seek_record_single(context: &mut dyn WIPICContext, db_id: i32, offs
         0 => 0,
         1 => handle.read_cursor as i64,
         2 => handle.buffer_len as i64,
+        // -1, though `Invalid = -9` would fit this arm exactly — the one outlier where the
+        // vocabulary does. Left alone deliberately: changing it is a behaviour change whose
+        // compatibility cannot be checked in this repo, and unlike `get_resource` (2026-09-07)
+        // there is no UB here to buy with that price. docs/wipi-c-abi-error-codes.md §2.
         _ => return Ok(-1),
     };
     let position = (base + offset as i64).clamp(0, handle.buffer_len as i64) as u32;
@@ -455,6 +459,12 @@ pub async fn stream_read(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
     if handle.read_cursor >= handle.buffer_len {
         // Don't touch buf — caller may have passed a sentinel (NULL) that
         // we shouldn't write to. Some titles do this past EOF.
+        //
+        // -23 is outside the `WIPICError` vocabulary and stays: there is no EOF variant, and
+        // `NoSuchEntry`/`Invalid` would both be wrong (the handle is valid, the record exists, the
+        // cursor is simply past the end). Widening the enum needs real-device evidence this repo
+        // does not have. The line above is why changing the number is riskier here than at the
+        // other outliers — this path is observed in real titles. docs/wipi-c-abi-error-codes.md §3.
         return Ok(-23); // M_E_EOF
     }
 

@@ -13,6 +13,19 @@
 //! pixel count. `test_data/keydraw_lgt.zip` prints `key:<code>` on keydown
 //! (and paints a bar of that width, for the browser axis). It is built from
 //! `scripts/make-wipi-keydraw-fixture.sh`; no game files are involved.
+//!
+//! ── Why there is no `paints > 0` assertion here (decided 2026-09-07, measured) ──
+//! `TestPlatform::paint_counter()` exists and is carrier-neutral, so adding one
+//! would be two lines. It was declined because the number does not separate the
+//! states it would be added for: this test composes **1** frame when healthy, and
+//! the 2026-09-05 black screen on THIS carrier — MIDP overpainting the good WIPI
+//! frame, the incident such an assertion is reached for — ran at **83** paints with
+//! a blank final frame. `paints > 0` is true in both. The class it would actually
+//! catch (guest prints but nothing is ever composed) is already asserted with
+//! pixels by `scripts/contract-roundtrip.mjs` Scenario F here and Scenario E for
+//! KTF, three keys each; Scenario F's own header records that it is the only net
+//! that saw the 2026-09-05 failure. Adding a weaker restatement here would not
+//! have caught it. If those scenarios are ever removed, re-open this.
 
 use std::sync::{
     Arc, Mutex,

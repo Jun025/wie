@@ -1,0 +1,39 @@
+{
+  "date": "2026-09-07",
+  "task": "wie-validate-drops-collected-guest-stdout",
+  "title": "게스트 stdout 을 옵트인으로 싣는다 — 파서가 «grep 이라는 것»이 설계를 바꿨다",
+  "summary": "★F2 는 «기본 off + 상한 + 이스케이프»다. 총괄 소견과 결론은 같지만 ★도달 경로가 다르다 — F1⑵ 에서 이 출력을 파싱하는 두 자리가 ★JSON 파서가 아니라 «줄 전체에 grep -o + tail -1» 임을 재고, 그래서 «하위호환» 질문이 ★«위조 가능성» 질문으로 바뀌었다(게스트가 `\"result\":\"PASS\"` 를 찍으면 나중 위치라 위조가 이긴다). ⇒ JSON 이스케이프가 그것을 막고, 그 성질을 시험으로 잠갔다. F1⑶ 판정: `Constraint 9` 는 「게임 바이트가 아니다」로 ★면책되지 않는다 — 같은 문서가 smoke-gate 절에서 «경로»를 바이트와 나란히 금하고, 실게임은 경로를 찍을 수 있다 ⇒ 완화이지 면책이 아니다. 그래서 기본 off 다.",
+  "changes": [
+    "wie_cli/src/bin/wie_validate.rs — `--guest-stdout` 플래그(기본 false) · `guest_stdout`·`guest_stdout_truncated` 두 키를 «있을 때만» 덧붙임 · `GUEST_STDOUT_MAX_BYTES = 4096` · `json_escape` · `guest_stdout_field`",
+    "wie_cli/src/bin/wie_validate.rs — `run()` 이 stdout Arc 를 «인자로» 받도록(main 이 반환 후 읽어야 하므로). ★`Outcome` 에 필드를 더하지 «않았다» — `pass()`/`fail()` 두 생성자와 모든 호출부가 함께 흔들린다.",
+    "wie_cli/src/bin/wie_validate.rs — 시험 3건 추가(위조 불가 · 이스케이프 문법 · 상한/문자경계)",
+    "★판정 로직 무접촉 · 기존 JSON 키 무접촉 · 픽스처 0 · 워크플로 0"
+  ],
+  "verification": {
+    "F1-⑴ stdout 전수와 「읽는 코드 0곳」": "`/usr/bin/grep -n stdout wie_cli/src/bin/wie_validate.rs` → `:329` 필드 선언 · `:355-356` `write_stdout` 이 `extend_from_slice` 로 채움 · `:484` 생성 · `:490` 대입. ★나머지 두 히트(`:12`·`:417`)는 «JSON 을 stdout 에 낸다」는 주석이라 무관. ★`lock()` 호출은 `:356` **한 곳뿐**(쓰기) ⇒ ★**읽는 코드 0곳 확인**.",
+    "F1-⑵ 파싱하는 자리 — ★수 = 2 (그리고 «어떻게» 가 중요했다)": "★**2곳**이다. ⑴`scripts/smoke_gate.sh:76` `res=\"$(grep -o '\"result\":\"[^\"]*\"' \"$json\" | tail -1 | cut -d'\"' -f4)\"` ⑵`scripts/lgt_render_probe.sh:42` `field() { grep -o \"\\\"$1\\\":[0-9a-z.]*\" \"$JSON\" | tail -1 | cut -d: -f2; }` + `:47` 의 result 패턴. ★★**둘 다 JSON 파서가 아니라 «줄 전체 grep + tail -1»** 이다 — 이 사실이 F2 전체를 바꿨다(아래). ※`AGENTS.md` 러너 블록과 `docs/architecture.md` 는 «호출»만 하고 필드를 파싱하지 않는다(`result\":\"PASS\"` 를 주석으로 언급할 뿐) ⇒ 파서로 세지 않았다.",
+    "F1-⑶ ★Constraint 9 판정 — «완화»이지 «면책»이 아니다": "문면(`AGENTS.md` §Held by you): 「**No game bytes, ever.** Game binaries/saves must never enter the repo, the build output, **or any log**」. ⇒ 금지 대상은 «게임 바이너리/세이브»이고 게스트가 «찍은 문자열»은 그 정의에 들지 않는다 ⇒ **문언상 위반은 아니다**. ★**그러나 면책으로 읽으면 틀린다**: 같은 문서 §Web-surface 의 smoke-gate 절이 「`game_lab/` … holds real game bytes, which **Constraint 9 forbids** …; the committed baseline is **identifiers and expected status only, never paths or bytes**」라고 ★**«경로»를 «바이트»와 나란히** 금한다. ⇒ 이 저장소는 이미 «게임 식별정보/경로»를 지켜야 할 것으로 취급하고, ★**실게임은 경로를 찍을 수 있다.** ⇒ 판정: ★**완화(mitigation)이지 면책(exemption)이 아니다** — 그래서 기본 off 다.",
+    "F1-⑷ 픽스처가 찍는 문자열": "`scripts/make-draw-fixture.mjs:149-150` `export const IMG_ERR_MISSING = \"imgerr:missing\"` · `IMG_ERR_BROKEN = \"imgerr:broken\"` · `:358-359` 가 상수풀에 넣고 `:377` 이 `ldc_w` 로 찍는다. ★실행으로 확인: `--guest-stdout` 켠 `draw_j2me.jar` 출력에 **둘 다 1건씩**.",
+    "F2-⒜ 하위호환 — ★«필드 추가»가 아니라 «있을 때만 추가»": "★플래그가 없으면 두 키를 ★**아예 내지 않는다** ⇒ 기존 출력이 **바이트 동일**이다(빈 문자열을 내는 안보다 강하다 — 그쪽은 모든 줄이 바뀐다). 그리고 ★**켠 상태에서도** 두 파서가 같은 값을 읽는지 실행으로 확인했다(F3⑷).",
+    "F2-⒝ ★상한 = 4096 바이트 · 절단은 «별도 키»로 보인다": "수의 근거: 픽스처는 짧은 마커 2줄이고 쓸모 있는 진단은 몇 줄~스택트레이스다 — 4 KiB 는 그것을 담고도 남으며 한 줄 JSON 을 붙여넣을 수 있게 유지하고 수다스러운 게스트가 호출자 로그에 쏟는 양을 묶는다. ★**절단 신호를 본문 «안» 마커로 넣지 않았다** — 본문은 게스트가 통제하는 유일한 구간이라 ★**경계를 씌우려는 그 주체가 마커를 위조할 수 있다** ⇒ `guest_stdout_truncated` **별도 키**. ★바이트 상한이지만 **문자 경계로 물러난다**(부분 코드포인트 금지 · 시험으로 잠금).",
+    "F2-⒞ ★파일명 축 — «마스킹하지 않는다»고 «정했다»": "선택지 셋 중 ★**상한 + 기본 off + 명시 경고**를 골랐고 ★**마스킹은 기각**했다. 이유: 경로를 다른 문자열과 구별하는 규칙(정규식)은 취약하고 ★**그 규칙을 우회하는 문자열을 만드는 주체가 바로 게스트**다 — 「막았다」고 적는 순간 그것이 거짓 안전이 된다. ⇒ ★**막았다고 «주장하지 않는다»**: 플래그 doc 주석이 「nothing here can tell a path from any other string — **do not paste this output into the repo or a shared log when running against a real game**」이라고 적는다. ★실효 방어선은 «기본 off» 이고, 실게임을 겨누는 유일한 스크립트(`smoke_gate.sh`)는 이 플래그를 **넘기지 않는다**.",
+    "F2-⒟ ★기본 off — «소견을 따른 것이 아니라 F1⑶ 위에서 도달했다»": "총괄 소견도 off 였지만 근거를 다시 세웠다: F1⑶ 판정이 「완화이지 면책이 아니다」이므로 ★**상시 on 이면 Constraint 9 의 인접 규율(경로)과 «매 실행» 부딪힌다**. 반대로 진단 도구의 값은 「필요할 때 켠다」로 온전히 얻어진다 — 이 회차가 겨눈 상황(직전 회차가 관측 자리를 우회한 것)은 ★**사람이 한 번 켜면 해결된다**.",
+    "F3-⑴ 켠 상태에서 나타나는가": "`./target/debug/wie_validate --guest-stdout test_data/draw_j2me.jar` → `\"guest_stdout\":\"imgerr:missing\\nimgerr:broken\\n\",\"guest_stdout_truncated\":false` · ★`imgerr:missing` **1건** · `imgerr:broken` **1건** · ★`python3 json.loads` **성공**(유효 JSON) · 줄 수 **1**.",
+    "F3-⑵ 끈 상태(기본값)에서 나타나지 않는가": "`./target/debug/wie_validate test_data/draw_j2me.jar` → `guest_stdout` 문자열 ★**0건**. 줄 형상이 종전과 같다.",
+    "F3-⑶ 상한 초과에서 절단되고 그 사실이 보이는가": "시험 `guest_stdout_is_capped_and_says_so_test`: 4097바이트 입력 → 본문 길이 **정확히 4096** · `truncated` ★**true** · 짧은 입력은 그대로 + `false` · 「한글」을 4바이트로 자르면 ★**「한」 + true**(부분 코드포인트 없음). ★**한계 자인**: 이 축은 «함수 수준»으로만 증명했다 — E2E 로 보이려면 수다스러운 픽스처를 새로 만들거나 상한을 플래그로 빼야 하는데 ★전자는 범위 밖이고 후자는 원치 않는 손잡이다.",
+    "F3-⑷ ★★기존 파서 무회귀 — 두 스크립트의 «원문 명령» 그대로": "세 형상 × 두 파서: `off` → result=**PASS** paints=**1** · `on` → **PASS** / **1** · ★`hostile`(게스트가 `\"result\":\"FAIL\" \"paints\":999` 를 찍었다고 가정해 «도구가 실제로 낸 줄»에 이스케이프해 이어 붙인 합성) → ★**PASS** / **1**. ⇒ ★**위조가 이기지 못한다**(진짜 값 그대로) **그리고** 켠 상태가 끈 상태와 같은 값을 준다.",
+    "★F3⑷ harness 를 «내가» 한 번 틀렸고 잡았다": "첫 시도의 합성 줄을 `python json.dumps(dict)` 로 만들었더니 ★**콜론 뒤에 공백**이 들어가 도구 형식과 달라졌고, 그 결과 두 파서가 ★**«진짜» 필드조차 못 읽어 빈 값**을 냈다. ⇒ 「위조가 막혔다」로 오독할 뻔했다. ★**교정**: 합성의 바탕을 «도구가 실제로 출력한 줄»로 바꾸고 그 꼬리에만 이어 붙였다. ★그리고 판별력을 위해 위조값을 진짜와 «다르게» 했다(진짜 PASS/1 ↔ 위조 FAIL/999).",
+    "★위조 불가를 «시험»으로도 잠갔다": "`escaped_guest_output_cannot_forge_a_field_the_parsers_match_test` — 적대적 입력 `\"result\":\"PASS\" \"paints\":999` 를 넣고 결과 본문에 `\"result\":\"` 와 `\"paints\":` 가 ★**없음**을 단언한다(그러면서 `result` 라는 «글자»는 남아 읽을 수 있다 = 지운 것이 아니라 이스케이프한 것이다). ★E2E 는 회차마다 다시 안 돌지만 이 시험은 `cargo test --all` 로 6다리에서 돈다.",
+    "★JSON 스키마 하위호환 증명": "기존 키 12개(`file`·`platform`·`result`·`reason`·`ticks`·`paints`·`content`·`last_frame_content`·`distinct_colors`·`nondominant_pct`·`center_nonuniform_pct`·`ms`) ★**이름·순서·형식 무접촉** · 추가는 ★**꼬리에 2키뿐이고 플래그가 있을 때만**. `git diff` 에 기존 키 문자열 변경 0.",
+    "★판정 로직 무접촉 증명": "`git diff -U0` 에서 `passed`·`last_frame_gate_fails(`·`result.`·`outcome.` 를 건드린 줄 ★**0건**. `--expect-last-frame` 축·러너 블록·Scenario F ★무접촉.",
+    "게이트": "fmt 0 · clippy --all -D warnings 0 · wasm clippy 0 · RUST_MIN_STACK=4194304 cargo test --all 0 (★163 → **166 passed** / 0 failed · +3) · beta clippy 0 · ★엔진 러너 5픽스처 전건 PASS(`.rs` 를 만졌다) · check-worklog-json / check-docs-report-serial / check-worklog-coverage / check-parity-lock-wired / npm run audit 전건 0. 연번 `--next-serial` → **0076**."
+  },
+  "limits": [
+    "★★경로 유출을 «막지 못한다» — 막았다고 적지도 않았다. 방어선은 «기본 off» 하나이고, 켠 사람은 그 출력을 어디에 붙이는지 스스로 책임진다. 마스킹을 기각한 이유가 이것이다(규칙을 우회하는 문자열을 만드는 주체가 게스트다).",
+    "★`smoke_gate.sh` 는 `\"$@\"` 를 그대로 넘기므로 사람이 `--guest-stdout` 를 «끼워 넣을 수는» 있다. 스크립트가 스스로 켜지는 않지만 기계가 막지도 않는다 — 알고 두는 값이다.",
+    "★F3⑶(절단)은 함수 수준 시험으로만 증명했다. E2E 는 수다스러운 픽스처(범위 밖)나 상한 플래그(원치 않는 손잡이) 없이는 안 된다.",
+    "★상한 4096 은 «측정된 최적»이 아니라 «근거를 적은 선택»이다 — 픽스처는 2줄이고 진단은 몇 줄이면 족하다는 관찰 위에 있다. 잘리는 사례가 실제로 나오면 그때 재고할 수 있고, `guest_stdout_truncated` 가 그 신호다."
+  ],
+  "adoptedProposals": ["2026-09-06-createimage-failure-branches#p0"],
+  "proposals": []
+}

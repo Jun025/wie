@@ -4,7 +4,7 @@ use alloc::{
     sync::Arc,
     vec::Vec,
 };
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use hashbrown::HashMap;
 use spin::Mutex;
@@ -36,7 +36,7 @@ impl Default for TestPlatform {
 impl TestPlatform {
     pub fn new() -> Self {
         Self {
-            screen: TestScreen,
+            screen: TestScreen::default(),
             event_handler: None,
             fs: Arc::new(MemoryFilesystem::default()),
             db: Arc::new(MemoryDatabaseRepository::default()),
@@ -48,11 +48,25 @@ impl TestPlatform {
         T: Fn(TestPlatformEvent) + Sync + Send + 'static,
     {
         Self {
-            screen: TestScreen,
+            screen: TestScreen::default(),
             event_handler: Some(Box::new(event_handler)),
             fs: Arc::new(MemoryFilesystem::default()),
             db: Arc::new(MemoryDatabaseRepository::default()),
         }
+    }
+}
+
+impl TestPlatform {
+    /// Frames the guest actually composed — the positive half of a boot assertion.
+    /// Take these BEFORE boxing the platform; the emulator consumes the value.
+    pub fn paint_counter(&self) -> Arc<AtomicUsize> {
+        self.screen.counter()
+    }
+
+    /// Set when the core has a frame ready. The caller must reply with
+    /// `Event::Redraw`, or no paint ever happens (see `TestScreen`).
+    pub fn redraw_flag(&self) -> Arc<AtomicBool> {
+        self.screen.redraw_flag()
     }
 }
 
@@ -193,15 +207,54 @@ impl AudioSink for TestAudioSink {
     }
 }
 
+/// Counts `paint` calls so a headless test can assert the guest actually reached
+/// the screen, not merely that nothing threw.
+///
+/// Why a count and not a framebuffer: the pixel question already has an owner —
+/// the browser round-trip asserts real canvas pixels. What `cargo test --all`
+/// could not answer at all was the coarser one, "did a frame ever get composed",
+/// and that is exactly the axis a J2ME guest lost on 2026-09-04 (four gates green
+/// while the guest died with NoClassDefFoundError before the first paint).
+/// Records the two screen signals a headless test needs, so it can assert the
+/// guest reached the screen instead of merely "nothing threw".
+///
+/// ★The redraw flag is load-bearing, not bookkeeping: painting is a REQUEST/REPLY
+/// loop. The core calls `request_redraw()` when it has a frame ready and only
+/// composes (`Screen::paint`) once the host feeds an `Event::Redraw` back. A test
+/// that ticks without replaying that reply never sees a paint — measured here
+/// first (0 paints in 10,000 ticks) before this flag existed. `wie_validate` runs
+/// exactly this loop (`wie_cli/src/bin/wie_validate.rs`, "faithfully reproduce the
+/// windowed flow"); this is the same shape, not a new one.
+///
+/// The pixel question stays with the browser round-trip, which asserts real canvas
+/// pixels. What this answers is the coarser one: was a frame ever composed.
 #[derive(Default)]
-pub struct TestScreen;
+pub struct TestScreen {
+    paints: Arc<AtomicUsize>,
+    redraw_requested: Arc<AtomicBool>,
+}
+
+impl TestScreen {
+    /// Shared handles, so a caller can keep observing after the platform has been
+    /// boxed and handed to the emulator (which takes it by value).
+    pub fn counter(&self) -> Arc<AtomicUsize> {
+        self.paints.clone()
+    }
+
+    pub fn redraw_flag(&self) -> Arc<AtomicBool> {
+        self.redraw_requested.clone()
+    }
+}
 
 impl Screen for TestScreen {
     fn request_redraw(&self) -> Result<()> {
+        self.redraw_requested.store(true, Ordering::SeqCst);
         Ok(())
     }
 
-    fn paint(&self, _image: &dyn Image) {}
+    fn paint(&self, _image: &dyn Image) {
+        self.paints.fetch_add(1, Ordering::SeqCst);
+    }
 
     fn width(&self) -> u32 {
         320

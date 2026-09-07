@@ -3557,6 +3557,7 @@ dependencies = [
  "async-trait",
  "bytemuck",
  "jvm",
+ "test_utils",
  "tracing",
  "wie_backend",
  "wie_jvm_support",

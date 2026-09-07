@@ -1,0 +1,42 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-06",
+  "task": "wie-rust-audit-header-comment-says-spin-but-actual-is-chacha20",
+  "title": "「허용 경고」 목록을 다시 재서 고쳤다 — 낡은 쪽이 «무엇을 세어야 하는지»를 정의하는 자리였다",
+  "adoptedProposals": ["2026-09-06-rtrb-rustsec-2026-0274#p0"],
+  "summary": "`.github/workflows/rust-audit.yaml` 헤더 주석의 「ttf-parser unmaintained, **spin 0.12.0 yanked**」를 ★**내가 다시 잰 값**으로 교체했다: **ttf-parser 0.25.1 unmaintained(RUSTSEC-2026-0192)** + ★**chacha20 0.10.0 yanked**. ★**워크플로 동작 diff 0**(비-주석 추가 0 · 삭제 0, 수로 증명) · ★**suppression 0**(Constraint 5).",
+  "premise-a-measured": {
+    "question": "이미 고쳐져 있지 않은가(착수 첫 일)",
+    "population": "`.github/workflows/rust-audit.yaml` 전문 · `/usr/bin/grep` 절대경로",
+    "result": "★`:44` 에 `spin 0.12.0 yanked` 가 **그대로 있었다** ⇒ 「이미 되어 있다」가 아니었다. ※이 파일은 직전 회차(PR #106)가 포인터 주석을 더한 뒤라 «최신»인데도 이 줄만 낡아 있었다."
+  },
+  "measurement": {
+    "when": "2026-09-06T18:07:13Z",
+    "how": "`cargo audit`(advisory-db 1,239건 로드 · Cargo.lock 436 크레이트 스캔)",
+    "output": "ttf-parser 0.25.1 / unmaintained / RUSTSEC-2026-0192 · chacha20 0.10.0 / yanked ⇒ `warning: 2 allowed warnings found` · **rc=0**",
+    "vulnerabilities": 0,
+    "why-the-old-line-was-wrong": "★**두 겹으로 틀렸다**: ⑴`spin` 은 이미 올라갔다 — `Cargo.lock` 실측 **0.12.2**(주석은 0.12.0) ⑵그 사이 **chacha20 0.10.0 yanked** 가 새로 들어왔는데 주석에 **없었다**. ⇒ 수(2)는 우연히 맞고 **구성이 달랐다**."
+  },
+  "why-it-mattered": "★**그 주석이 «허용 경고가 무엇인가»를 정의하는 유일한 자리**다. `cargo audit` 은 경고에 rc=0 을 주므로(우리가 `--deny warnings` 를 일부러 안 쓴다) ★**게이트가 아니라 이 문장이 «세는 기준»**이다. 낡은 목록을 기준으로 세면 다음 회차가 ⒜없어진 `spin` 을 찾다가 헤매거나 ⒝새로 들어온 `chacha20` 을 «예상된 것»으로 오인해 넘긴다.",
+  "what-changed": {
+    "scope": "주석 5줄 → 10줄(계약 1: 스텝·명령·조건 무접촉)",
+    "behaviour-diff": "★**0** — `git diff -U0` 에서 비-주석 추가 **0** · 비-주석 삭제 **0**(계수로 증명). `yaml.safe_load` 파싱 OK · `audit` 잡 스텝 **5개** 불변.",
+    "extra-line-and-why": "★단순 치환에 그치지 않고 **「한 항목만 고치지 말고 다시 재라」 한 줄**을 붙였다 — 이번 결함의 형태가 정확히 «한 항목이 낡고 다른 항목이 새로 들어온» 것이라, 다음 사람이 같은 방식으로 고치면 같은 자리에 다시 선다."
+  },
+  "limits": [
+    "★**주석은 기계가 검사하지 않는다** — 이 회차는 값을 맞췄을 뿐 «다시 틀어지는 것»을 막지 못한다. 다음 yank/unmaintained 가 들어오면 같은 방식으로 낡는다(제안 등재).",
+    "★**측정은 «내 로컬 advisory-db» 기준이다** — CI 는 매일 최신 db 를 받으므로 그 사이 목록이 달라질 수 있다. 그래서 주석에 **날짜를 박았다**(계약 2).",
+    "★`cargo audit` 을 **게이트로 바꾸지 않았다**(`--deny warnings` 미추가) · ★**ignore 0**(Constraint 5) · `deny.toml`·`audit.toml`·`.cargo/audit.toml` 전건 **부재** 확인."
+  ],
+  "proposals": [
+    {
+      "title": "「허용 경고」 목록을 주석이 아니라 기계가 대조하게 하라 — 이번 결함은 조용히 다시 난다",
+      "plainSummary": "어떤 보안 경고가 «예상된 것»인지가 사람이 쓴 주석에만 적혀 있어서, 실제 목록이 바뀌어도 아무도 알려주지 않습니다.",
+      "userBenefit": "새 경고가 들어왔을 때 「예상된 것」과 「처음 보는 것」이 자동으로 갈립니다.",
+      "why": "★이번 회차가 고친 것은 **값**이지 **구조**가 아니다. 실측한 결함의 형태가 그 증거다: `spin` 은 사라지고 `chacha20` 이 들어왔는데 ★**총 개수가 둘 다 2라 «수만 보면» 아무 일도 없어 보였다**(주석의 「two current warnings」는 계속 참이었다). 지금은 `rust-audit.yaml` 이 경고에 rc=0 을 주고 목록을 대조하는 것이 **0곳**이다.",
+      "tradeoff": "⑴대조를 «게이트»로 만들면 새 unmaintained 하나에 매일 잡이 red 가 된다 — Constraint 5 의 「no ignores」와 부딪히지 않게 **경고 목록 파일은 suppression 이 아니라 «기대값»**이어야 한다(이 구분을 흐리면 사실상 ignore 가 된다) ⑵`cargo audit --json` 파싱 + 기대값 파일 1개면 되지만, 그 파일을 갱신하는 규율이 다시 사람 몫이다 ⑶아무것도 안 하는 선택도 정당하다: 이 저장소는 매일 그 잡을 돌리고 출력이 짧다.",
+      "effort": "S",
+      "target": "wie · .github/workflows/rust-audit.yaml"
+    }
+  ]
+}
