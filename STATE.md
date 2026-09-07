@@ -32,6 +32,18 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- **`wie_validate` 가 모으던 게스트 stdout — ★«옵트인»으로 싣는다** (PR 개설 · `wie-validate-drops-collected-guest-stdout`
+  · 채택 제안 `2026-09-06-createimage-failure-branches#p0`) — `--guest-stdout` 뒤에 두 키(`guest_stdout`·`guest_stdout_truncated`).
+  ★**기본 off · 플래그 없으면 두 키가 «아예 안 나온다»** ⇒ 기존 출력 **바이트 동일**(빈 문자열을 내는 안보다 강하다).
+  ★★**설계를 바꾼 실측**: 이 출력을 파싱하는 **2곳**(`smoke_gate.sh`·`lgt_render_probe.sh`)이 ★**JSON 파서가 아니라 «줄 전체 `grep -o` + `tail -1`»** 이다
+  ⇒ 게스트가 `"result":"PASS"` 를 찍으면 «나중 위치»라 **위조가 이길 수 있었다**. ★**JSON 이스케이프가 막고, 그 성질을 시험으로 잠갔다.**
+  ★**`Constraint 9` 판정 = «완화»이지 «면책»이 아니다** — 게임 «바이트»는 아니지만 같은 문서가 smoke-gate 절에서 ★**«경로»를 바이트와 나란히** 금하고
+  실게임은 경로를 찍을 수 있다 ⇒ **기본 off**(⒟) + **상한 4 KiB**(⒝) + 명시 경고. ★**마스킹은 기각**했다 — 규칙을 우회하는 문자열을 만드는 주체가 게스트다.
+  ★**절단은 «별도 키»로** 알린다(본문 안 마커는 그 게스트가 위조할 수 있다) · 바이트 상한이되 **문자 경계로 물러난다**.
+  ★**F3 양방향 실행**: 켠 상태 `imgerr:missing`·`imgerr:broken` 각 1건 + 유효 JSON · 끈 상태 **0건** ·
+  ★**기존 파서 무회귀**를 세 형상(off/on/**적대적 합성**)으로 확인 — 위조 `FAIL`/`999` 를 심어도 파서는 **진짜 `PASS`/`1`** 을 읽는다.
+  ★판정 로직 무접촉(`passed`·`last_frame_gate_fails` 등 diff 0) · 기존 12키 무접촉 · 픽스처 0 · 워크플로 0 · 시험 **+3**(163 → 166).
+  ★착지 시 **실배포 2건** 예상(`web.yml` + `publish-artifact` — 착지 diff 에 `.rs` 가 있다).
 - **ABI 어휘 밖 반환값 4건의 처분 — ★«전부 ⒝(그대로 두고 자인)»** (PR 개설 · `wie-abi-vocabulary-outliers-disposition`
   · 채택 제안 `2026-09-07-get-resource-shortbuf-abi#p1`) — ★**코드의 비-주석 변경 0**(주석뿐).
   ★**수부터 정정**: 브리프의 「5건」은 직전 회차가 «자기가 고친 `get_resource` 를 포함해» 센 수다 ⇒ 잔존은 ★**4건**(`-1` 3 + `-23` 1).
