@@ -143,7 +143,9 @@ if (due && !(RECORD && record.measurements.some((m) => m.landedRounds === landed
   problems.push(
     `OVERDUE: ${landed - last.landedRounds} landed rounds since the last recorded measurement (cadence is ${WINDOW}). ` +
       `Run \`node scripts/check-worklog-coverage.mjs --record\` — it appends the entry printed above, idempotently. ` +
-      `Do NOT hand-append: every round that pulls base gets this same rc=1, and hand-appending produced three identical rows on 2026-09-06.`,
+      `Do NOT hand-append: every round that pulls base gets this same rc=1, and hand-appending produced three identical rows on 2026-09-06. ` +
+      `OWNER: the gate3 round — bundle that one file into the PR before merging (AGENTS.md §Landing paperwork). ` +
+      `It is a ledger file, so touching it here is authorized; nothing else in the round changes.`,
   );
 }
 if (last.pct < THRESHOLD && last.reopened !== true) {
