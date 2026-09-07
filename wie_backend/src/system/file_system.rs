@@ -269,6 +269,44 @@ mod tests {
         assert_eq!(fs.read("nope", 0, 4, &mut buf).await, None);
     }
 
+    /// The exact call pair the LGT resource fallback makes when the class loader
+    /// misses: `size(name)` to learn the length, then `read(name, 0, size, buf)`.
+    /// Measured 2026-09-07, that fallback (`wie_lgt/.../wipi_c/context.rs`) is
+    /// reached by nothing — a planted `unreachable!()` at both of its sites left
+    /// `cargo test --all` at 167 passed. This pins what it would get if it ran.
+    #[futures_test::test]
+    async fn fallback_size_then_read_pair_round_trips() {
+        const PAYLOAD: &[u8] = b"WIE-RES-1";
+
+        let fs = setup();
+        fs.add_virtual("res.bin", PAYLOAD.to_vec());
+
+        let size = fs.size("res.bin").await.expect("fallback: size must resolve");
+        assert_eq!(size, PAYLOAD.len());
+
+        let mut buf = vec![0u8; size];
+        assert_eq!(fs.read("res.bin", 0, size, &mut buf).await, Some(size));
+        assert_eq!(buf, PAYLOAD);
+    }
+
+    /// `\\` is rejected outright rather than translated. This is the masking that
+    /// makes `WebFilesystem::key` and `CliFilesystem::path_for` disagreeing harmless
+    /// today: neither backend ever sees a backslash. `wie_cli`'s
+    /// `differs_from_web_on_absolute_and_backslash` records what they would do.
+    #[futures_test::test]
+    async fn backslash_and_traversal_are_rejected_before_either_backend() {
+        let fs = setup();
+        fs.add_virtual("a/b", vec![1]);
+
+        assert!(!fs.exists("a\\b").await);
+        assert_eq!(fs.size("a\\b").await, None);
+        assert!(!fs.exists("../a/b").await);
+        assert_eq!(fs.size("a/../a/b").await, None);
+        // …while the normalized form still resolves, so the rejection is the path
+        // shape and not the entry being absent.
+        assert!(fs.exists("a/b").await);
+    }
+
     #[futures_test::test]
     async fn platform_write_shadows_virtual() {
         let fs = setup();

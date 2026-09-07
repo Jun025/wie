@@ -186,3 +186,71 @@ impl Filesystem for CliFilesystem {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::CliFilesystem;
+
+    /// `path_for` is the whole security boundary of this backend, and until now
+    /// nothing exercised it: measured 2026-09-07, this file had **zero** tests.
+    /// It is also one half of the only host-divergent pair in the resource path —
+    /// `wie_web::WebFilesystem::key` normalizes the same guest strings by hand,
+    /// and the two disagree (see `differs_from_web_on_absolute_and_backslash`).
+    fn fs() -> CliFilesystem {
+        CliFilesystem {
+            base_path: PathBuf::from("/base"),
+        }
+    }
+
+    #[test]
+    fn normal_path_lands_under_aid() {
+        let got = fs().path_for("game", "save/slot1.dat").unwrap();
+        assert_eq!(got, PathBuf::from("/base/game/fs/save/slot1.dat"));
+    }
+
+    #[test]
+    fn cur_dir_segments_are_dropped() {
+        let got = fs().path_for("game", "./save/./slot1.dat").unwrap();
+        assert_eq!(got, PathBuf::from("/base/game/fs/save/slot1.dat"));
+    }
+
+    #[test]
+    fn traversal_and_empty_are_rejected() {
+        // The failure this boundary exists for: escaping the per-aid directory.
+        assert_eq!(fs().path_for("game", "../other/fs/save.dat"), None);
+        assert_eq!(fs().path_for("game", "save/../../escape"), None);
+        // Nothing left after normalization is a rejection, not an empty join.
+        assert_eq!(fs().path_for("game", ""), None);
+        assert_eq!(fs().path_for("game", "."), None);
+    }
+
+    #[test]
+    fn unsafe_aid_is_rejected() {
+        // `aid` is filtered, not normalized: separators are stripped, and what is
+        // left must still be a usable directory name.
+        assert_eq!(fs().path_for("", "a"), None);
+        assert_eq!(fs().path_for("/", "a"), None);
+        assert_eq!(fs().path_for("..", "a"), None);
+        assert_eq!(fs().path_for("a/b", "x").unwrap(), PathBuf::from("/base/ab/fs/x"));
+    }
+
+    /// The divergence the resource fallback would expose, pinned as a fact rather
+    /// than an inference. `FilesystemOverlay::normalize_guest_path` currently masks
+    /// both cases — it strips leading `/` and rejects any `\` before either backend
+    /// sees the string — so today neither reaches here. That masking is the only
+    /// reason the two backends agreeing does not matter; if it is ever relaxed,
+    /// this test says what changes.
+    #[test]
+    fn differs_from_web_on_absolute_and_backslash() {
+        // Absolute: CLI rejects (Component::RootDir), WebFilesystem::key accepts and
+        // yields "save.dat" because splitting on '/' just produces a leading "".
+        assert_eq!(fs().path_for("game", "/save.dat"), None);
+
+        // Backslash: on unix `Path::components` treats it as an ordinary character,
+        // so this is ONE filename; WebFilesystem::key splits on it and yields "a/b".
+        #[cfg(unix)]
+        assert_eq!(fs().path_for("game", "a\\b").unwrap(), PathBuf::from("/base/game/fs/a\\b"));
+    }
+}

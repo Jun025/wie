@@ -32,6 +32,16 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- **리소스 폴백 가지 — 두 타깃 «모두» 도달 0** (PR 개설 · `wie-resource-fallback-branch-unexercised-in-both-targets`
+  · 채택 제안 `2026-09-06-resource-browser-axis#p0`) — 단위시험 **7건** · ★**제품 코드 무접촉**.
+  ★**둘 다 «재현»했다**(추정 0): 네이티브 `unreachable!()` → **167 passed · PROBE 0** ·
+  ★브라우저 `panic!()` + **wasm 재빌드** → **46/46 · rc=0 · PROBE 0**(E-res·F-res green) ⇒ **도달 0**.
+  ★**덮은 것은 폴백 «아래»**(제안 tradeoff ⑵ 「그쪽이 먼저다」): `wie_cli` 시험 **0 → 5** ·
+  `wie_backend` **7 → 9**(폴백이 부르는 `size→read` 쌍 · `\`·`..` 마스킹).
+  ★**divergence 를 «돌려서» 적었다**: `/save.dat` → CLI 거부 ↔ Web 수용 · `a\b` → CLI(unix) 한 파일명 ↔ Web `a/b`.
+  ★`wie_web` 은 `#![cfg(target_arch = "wasm32")]` 라 **네이티브 시험 불가**(3벌 중 1벌은 이 축에서 불가능).
+  ★**양방향** M1·M2 각각 FAILED · 원복 바이트 동일 · `cargo test --all` **167 → 174**(+7).
+  ★**안 한 것**: 폴백을 «실제로 지나는» 시험 — 새 픽스처가 필요하다(tradeoff ⑴ · 노력도 M). 재개 지점을 적었다.
 - **핀 이동 시 「경로 밖」 판단이 낡는 문제 — ★⒜(상시 검사) · 단 «스크립트»가 아니라 «워크스페이스 시험»**
   (PR 개설 · `wie-transmute-census-on-pin-bump-decision` · 채택 제안 `2026-09-07-abi-vocabulary-outliers#p0`)
   — `wie_wipi_c/src/lib.rs` 에 `#[cfg(test)]` 잠금 **시험 1건**. ★**워크플로 0 · 새 의존 0 · CI 스텝 0 · `~/.cargo` 읽기 0.**
