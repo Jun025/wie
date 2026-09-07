@@ -43,18 +43,68 @@
 > **매일 도는 `cargo audit`(`rust-audit.yaml`)의 비게이팅 경고가 곧 이 표다** — 경고 수와 이 표의
 > 행 수가 어긋나면 둘 중 하나가 낡은 것이다.
 
-### A. 권고·공급망 3건 — **전건 비게이팅 경고**(`cargo audit` 무-플래그 **exit 0 · vulnerabilities 0**)
+### A. 권고·공급망 2건 — **전건 비게이팅 경고**(`cargo audit` 무-플래그 **exit 0 · vulnerabilities 0**)
 
-실측 기준: `cargo-audit 0.22.2` · advisory-db `685d32fd`(2026-07-31) · `Cargo.lock` 435 패키지 ·
-2026-08-01 `main` 형상. **억제(`--ignore`·`audit.toml`) 0건** — 이 0은 억제로 만든 0이 아니다.
+실측 기준: `cargo-audit 0.22.2` · advisory-db `8a1eb4f9`(2026-09-07 · 1,242 advisories) ·
+`Cargo.lock` **436 패키지** · **2026-09-08 재측**(`wie-supply-chain-ledger-a-is-stale-two-resolved-one-missing`).
+**억제(`--ignore`·`audit.toml`·`deny.toml`) 0건** — 이 0은 억제로 만든 0이 아니다(세 파일 전건 **부재** 확인).
+
+> ★★**2026-09-08 재측에서 이 표가 «낡아» 있었다 — 경고 2건 ↔ 행 3건.** 위 절이 스스로 적은
+> 「경고 수와 이 표의 행 수가 어긋나면 둘 중 하나가 낡은 것이다」에 **자기가 걸렸다.**
+> ★**A-2·A-3 은 2026-08-08 `22df9531`(PR #55 · `wie-supply-chain-cargo-updates-a2-a3`)에서 이미 상향**돼
+> 경고가 사라졌는데 이 표가 따라오지 않았고, 그 사이 **`chacha20` 이 새로 yanked** 됐는데 표에 없었다.
+> ⇒ 해소분은 **아래 C 로 옮겼고**(행을 지우지 않았다 — 구 ID 를 함께 적는다) 새 경고를 **A-4** 로 등재했다.
+> ★**A-2·A-3 번호는 재사용하지 않는다** — 회차 기록·로드맵이 그 ID 로 이 표를 가리킨다.
+> ★**낡음이 «기계 축»에는 없었다**: `.github/rust-audit-expected-warnings.json` + `scripts/check-audit-warnings.mjs`
+> 는 2026-09-06 부터 실제와 **일치**한다(재측 시점 rc=0). ★**틀어진 것은 «산문 표» 하나였다.**
 
 | # | 대상 | 권고 | 성격 | 설치 버전 → 패치 | 판정 | 다음 행동 |
 |---|---|---|---|---|---|---|
 | **A-1** | `ttf-parser` | RUSTSEC-2026-0192 | `unmaintained`(informational) | `0.25.1` → **`patched = []`** | **수용 유지** — 버전업으로 안 풀린다 | 아래 로드맵 5번(ab_glyph→skrifa)에서 계속 추적. **착수 아님** |
-| **A-2** | `event-listener` | RUSTSEC-2026-0221 | `unsound`(informational) | `5.4.1` → **`>= 5.4.2`** (**버전축 affected**) | **도달 불가**(근거 아래 ⓐ) — 상향은 가능 | `cargo update -p event-listener` **1패키지** 이동(dry-run 실증). **별건 발권 대상** |
-| **A-3** | `spin` | **권고 없음**(yanked) | 취약점 아님 — 레지스트리 신호 | `0.12.0`(yanked) → `0.12.2` | **도달 불가**(근거 아래 ⓑ) — 상향은 가능 | `cargo update -p spin` **1패키지** 이동(dry-run 실증). **별건 발권 대상** |
+| **A-4** | `chacha20` | **권고 없음**(yanked) | 취약점 아님 — 레지스트리 신호 | `0.10.0`(yanked) → `0.10.2`(2026-08-27) | ★**도달 불가**(3축 · 근거 아래 ⓓ) — 상향은 가능 | 간접(`wie_cli → rodio → rand → chacha20`)이라 `cargo update -p chacha20`. **별건 발권 대상** |
 
-#### ⓐ A-2 `event-listener` RUSTSEC-2026-0221 — «버전이 같으니 패치됨» 이 아니라 «도달하지 않는다»
+#### ⓓ A-4 `chacha20` 0.10.0 yanked — ★**«암호 결함»이 아니라 «SSE4.1 명령을 SSE2 경로에 넣은» 이식성 결함이다**
+
+★**성격부터 가른다**(ⓑ 와 같은 형태): advisory-db 에 `chacha20` 권고는 **없다**. `yanked` 는 crates.io
+인덱스 상태이고 `cargo audit` 도 `warning: yanked` 로만 보고한다(**exit 0**). ⇒ **«알려진 취약점» 신호가 아니다.**
+yank 형상: **`0.10.0`(2026-02-07) · `0.10.1`(2026-06-24) 둘 다 yanked** · 비-yanked 최신 **`0.10.2`(2026-08-27)**.
+
+★**사유 확정 — 추정하지 않고 원문을 떴다**(ⓑ 의 방법 그대로 · `.crate` 2본 내려받아 diff):
+패키징된 `CHANGELOG.md` 가 명시한다 — **`0.10.2` = “Use of SSE4.1 intrinsic in SSE2 backend of RNG and
+legacy (64-bit counter) variants” (RustCrypto/stream-ciphers#580)**. 소스에서 그 자리를 찍었다 —
+`src/backends/sse2.rs:114` 의 `rng_inner` 는 `#[target_feature(enable = "sse2")]` 인데
+**`:133` 이 `_mm_extract_epi32`(= SSE4.1 `PEXTRD`)를 «무조건» 부른다**(RNG 경로엔 카운터 폭 가드조차 없다).
+⇒ SSE2 는 있고 SSE4.1 이 없는 CPU 에서 **SIGILL**. 0.10.2 는 그 저장을 SSE2 전용 `save_ctr` 로 바꿨다.
+
+★**도달 불가 판정 — 독립 3축**(하나만으로도 서지만 셋이 각각 지지한다):
+
+1. **호출 축 — 우리가 ChaCha RNG 를 «만들지 않는다»**. `chacha20` 은 `rand` 의 `StdRng`
+   (`rngs/std.rs:14 use chacha20::ChaCha12Rng`)·`ThreadRng`(`rngs/thread.rs:41
+   ChaChaCore<R12, variants::Legacy>`)를 통해서만 돈다. 워크스페이스 전 소스 전수 grep —
+   **`StdRng` 0 · `ThreadRng` 0 · `rand::rng()` 0 · `make_rng` 0 · `chacha20`/`ChaCha` 직접 참조 0**.
+   상류 `rodio 0.22.2` 도 `rand` 를 **`dither`/`noise` 두 모듈에서만** 쓰는데, `dither` 는 기본
+   `SmallRng`(= Xoshiro, **ChaCha 아님**)이고 `noise` 는 `make_rng()`(ChaCha 경유)를 쓰지만
+   **둘 다 «옵트인 콤비네이터»** 다(`.dither(...)` / `noise::*` 를 불러야 돈다 — 재생 경로가 자동으로 태우지 않는다).
+   우리 rodio 표면은 `wie_cli/src/main.rs:26` 의 **`DeviceSinkBuilder`·`Player`·`SamplesBuffer`·
+   `SampleTypeConverter`** 넷뿐이고 **`.dither(` 0 · `Dither` 0 · `noise::` 0**.
+2. **아키텍처 축 — 결함 함수가 «컴파일되지 않는» 타깃이 있다**. `src/lib.rs:167~199` 의 `cfg_if` 상
+   SSE2/AVX2 백엔드는 **`target_arch = "x86"|"x86_64"` 에서만** 컴파일된다(그 밖은 neon 또는 soft).
+3. **런타임 축 — x86 이어도 «AVX2 가 없어야» 그 백엔드가 선택된다**. 디스패치 순서는
+   avx512(옵트인 cfg) → **avx2** → **sse2** → soft (`rng.rs:70~79`) ⇒ AVX2 가 있으면 결함 함수에 **도달 자체가 없다**.
+
+★**추가 축(브라우저 산출물)**: `cargo tree -p wie_web --target wasm32-unknown-unknown -i chacha20`
+→ **`did not match any packages`** ⇒ ★**배포되는 WASM 아티팩트에는 `chacha20` 이 «아예 없다»**.
+`rodio` 는 `wie_cli`(네이티브 호스트) 전용이기 때문이다.
+
+★★**판정 유효 범위 — 이 전제가 깨지면 판정도 무효다**(전제 없는 「해당 없음」을 만들지 않는다):
+⑴**`rodio@0.22.2` 기준**이다 — 축1 의 「dither/noise 는 옵트인」은 그 판본의 소스 실측이다.
+**rodio 를 올리면 축1 을 다시 재라**(재생 경로가 dither 를 자동 적용하도록 바뀌면 즉시 무효).
+⑵**우리가 `.dither(...)`·`noise::*`·`StdRng`·`ThreadRng`·`rand::rng()` 중 하나라도 쓰기 시작하면 무효**다.
+⑶축2·3 은 **우리 코드와 무관한 상류 구조**라 `chacha20` 판본이 바뀌지 않는 한 유효하다.
+⑷★**축2·3 은 «우리 개발기»가 aarch64 라서 안전하다는 뜻이 «아니다»** — 배포되는 네이티브 바이너리는
+x86_64 에서도 돈다. **그 축들이 좁히는 것은 «AVX2 없는 x86» 뿐이고, 그 경우에도 축1 이 지배한다.**
+
+#### ⓐ (구 **A-2** · 2026-09-08 해소분 → C-2) `event-listener` RUSTSEC-2026-0221 — «버전이 같으니 패치됨» 이 아니라 «도달하지 않는다»
 
 권고 원문(advisory-db `685d32fd`): `patched = [">= 5.4.2"]` · `unaffected = ["< 5.1.0"]` ·
 `informational = "unsound"`. 설치본 `5.4.1` 은 **두 경계 사이 = affected 구간**이다.
@@ -80,7 +130,7 @@
 독립 2축이 각각 판정을 지지한다. 상향(`5.4.2`)은 `jvm` 의 요구 `^5.4` 안이라 무마찰이지만,
 **이 티켓은 판정·등재 범위이므로 lockfile 무변경**으로 남긴다.
 
-#### ⓑ A-3 `spin` 0.12.0 yanked — ★**yanked 는 취약점이 아니다**(성격부터 가른다)
+#### ⓑ (구 **A-3** · 2026-09-08 해소분 → C-3) `spin` 0.12.0 yanked — ★**yanked 는 취약점이 아니다**(성격부터 가른다)
 
 - **취약점이 아닌 이유**: RustSec 에 `spin` 권고는 3건뿐이고 **셋 다 우리 설치본에 미해당** —
   RUSTSEC-2019-0013 `patched = [">= 0.5.2"]` · RUSTSEC-2023-0031 `patched = [">= 0.9.8"]`
@@ -153,6 +203,8 @@
 | # | 자문 | 대상 | 처분 | 노출 판정 | ★**판정 유효 범위** |
 |---|---|---|---|---|---|
 | **C-1** | RUSTSEC-2026-0274 | `rtrb`(간접 — `wie_cli → rodio → rtrb`) | `cargo update -p rtrb` **0.3.3 → 0.3.5**(`Cargo.lock` 2줄 · `Cargo.toml` 무접촉) | ★**타지 않는다**(3축 · 아래 ⓒ) | ★**`rodio@0.22.2` 기준** — ⓒ⑵ 가 그 판본의 소스 실측이다. **rodio 를 올리면 ⑵를 다시 재라.** ⓒ⑴⑶ 은 우리 코드/타입 축이라 rodio 와 무관하다 |
+| **C-2**<br>(구 **A-2**) | RUSTSEC-2026-0221 | `event-listener`(간접 — `[patch]` RustJava `jvm` 단독 소비) | ★**해소 2026-08-08** — `22df9531`(PR **#55** · `wie-supply-chain-cargo-updates-a2-a3`) 에서 `5.4.1` → **`5.4.2`** = 권고 `patched = [">= 5.4.2"]` 경계 도달. **2026-09-08 `Cargo.lock` 재확인 = `5.4.2`** | ★**도달 불가**(2축 · 위 ⓐ) — 상향 «전»에도 타지 않았다 | ★**상향으로 «버전축»은 영구 해소** — 이제 도달성 판정 없이도 경고가 없다. ⓐ 의 2축은 **`jvm` 이 `listener!`/`Event::with_tag` 를 안 쓴다**는 그때의 fork 소스 실측이라, **RustJava 핀을 옮기면 다시 재라**(다시 affected 구간으로 내려갈 때만 필요) |
+| **C-3**<br>(구 **A-3**) | **권고 없음**(yanked) | `spin`(직접 — `Cargo.toml:46` · 워크스페이스 6 크레이트 상속) | ★**해소 2026-08-08** — 같은 커밋 `22df9531` 에서 `0.12.0`(yanked) → **`0.12.2`**. **2026-09-08 `Cargo.lock` 재확인 = `0.12.2`** | ★**도달 불가**(feature 축 · 위 ⓑ) — 상향 «전»에도 타지 않았다 | ★**`default-features = false, features = ["spin_mutex","rwlock"]` 가 전제다** — `once`/`lazylock`/`lock_api` 를 켜면 ⓑ 의 판정이 무효가 된다(0.12.1·0.12.2 결함이 정확히 그 두 축이다) |
 
 #### ⓒ C-1 `rtrb` RUSTSEC-2026-0274 — 「목록에 있다」와 「그 경로를 탄다」를 갈랐다
 
@@ -200,5 +252,5 @@ rodio 요구가 `^0.3.2` 라 **rodio 를 건드리지 않고** 패치판으로 �
 3. 트랙 ① 지속(292+) · **LGT clet 확정 승격은 AOT-Java graceful 제외 신호 선행 필요**(트랙② 하단 조사 참조 — Q1 silent blank·Q2 판별신호 가용, 유보 권고) · 플레이키 타이틀(입력 타이밍) 분류.
 4. 트랙 ② 는 실기 트레이스 확보(사람/외부) 전까지 동결 — 재조사 금지 목록 준수(`10_deep-assets.md` 가드레일).
 5. **[미래 트랙 — 착수 아님] ab_glyph→skrifa 폰트스택 이행**: `ttf-parser` RUSTSEC-2026-0192(unmaintained) 해소의 선행요건. `ab_glyph` 가 최신(0.2.32)까지 ttf-parser 에 의존하므로 폰트 렌더 스택 자체를 skrifa 계열로 교체해야 경고가 사라진다. 지금 구현 착수 금지 — 매일 audit 의 비게이팅 경고를 이 항목으로 추적(ab_glyph 의 탈-ttf-parser 릴리스 또는 skrifa 직접 이행 타당성 재평가 시 활성화). = 대장 **A-1**.
-6. **[발권 대기 — 미착수] 공급망 위생 상향 2건**: **A-2** `cargo update -p event-listener`(5.4.1→5.4.2, RUSTSEC-2026-0221 해소) · **A-3** `cargo update -p spin`(0.12.0→0.12.2, yanked 해소). 둘 다 dry-run 실측 **1패키지 이동**이고 도달성 판정은 이미 «도달 불가» 로 끝나 있다(대장 ⓐ·ⓑ) — 즉 **긴급도 0, 위생 부채**. `[wie-rustsec-advisory-sweep-batch2]` 는 **판정·등재까지**라 lockfile 을 건드리지 않았다. 각각 소티켓으로 발권할 것.
+6. ~~**[발권 대기 — 미착수] 공급망 위생 상향 2건**~~ → ★**착지 완료(2026-08-08 `22df9531` · PR #55 · `wie-supply-chain-cargo-updates-a2-a3`)** — 대장 **C-2·C-3** 으로 이동했다. ★**이 항목이 «미착수» 로 한 달간 남아 있었던 것이 대장 A 가 낡은 것과 같은 사건이다**(2026-09-08 정정 · `wie-supply-chain-ledger-a-is-stale-two-resolved-one-missing`). ★**후속으로 남은 위생 상향은 A-4** `cargo update -p chacha20`(0.10.0 yanked → 0.10.2) — **별건 발권 대상**. ↓이하 착지 당시 기재: **A-2** `cargo update -p event-listener`(5.4.1→5.4.2, RUSTSEC-2026-0221 해소) · **A-3** `cargo update -p spin`(0.12.0→0.12.2, yanked 해소). 둘 다 dry-run 실측 **1패키지 이동**이고 도달성 판정은 이미 «도달 불가» 로 끝나 있다(대장 ⓐ·ⓑ) — 즉 **긴급도 0, 위생 부채**. `[wie-rustsec-advisory-sweep-batch2]` 는 **판정·등재까지**라 lockfile 을 건드리지 않았다. 각각 소티켓으로 발권할 것.
 7. **[발권 대기 — 미착수] upstream 이월 이슈**: 실질 개발 후보 **#1260**(LGT Unknown SVC id 1409) · **#1122**(실행중 정지 재현). 대장 B 표 참조 — 건별 발권 대상이며 문의 2건(#1253·#1127)은 구현 대상 아님.

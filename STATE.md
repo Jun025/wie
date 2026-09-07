@@ -36,6 +36,24 @@
   브랜치에서 진행 중이고, 전부 `STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장에서 충돌한다(정상))
 
 ## 완료 (최근)
+- 2026-09-08: **공급망 대장 A 를 실제와 맞췄다 — `chacha20` 은 «암호 결함»이 아니었다**
+  (PR **#135** 착지 · `wie-supply-chain-ledger-a-is-stale-two-resolved-one-missing` · 채택 제안
+  `2026-09-06-dependency-exposure-verdict-place#p0`) — ★**의존 무접촉**(`Cargo.lock`·`Cargo.toml` **0줄** ·
+  `cargo update` **0회** · 억제 추가 **0**).
+  ★**재현**(`cargo audit` rc=0 · advisory-db `8a1eb4f9` · `Cargo.lock` 436): 경고 **2건** ↔ 대장 A **3행**.
+  ★**양방향 집합 차**: 경고에만 **`chacha20` 0.10.0 yanked** · 표에만 **A-2·A-3** · 교집합 **A-1 하나**.
+  ★**해소 확인**: `event-listener` **5.4.2**(권고 경계와 일치) · `spin` **0.12.2** — 그 값을 만든 커밋은
+  **`22df9531`(2026-08-08 · PR #55) 하나**다. ★★**그 회차가 `STATE.md` 는 갱신하고 대장 표만 안 고쳤다**
+  (`:822` 에 착지 기록이 있다) ⇒ 등재 닷새 뒤 낡아 **한 달**을 갔다. `chacha20` 은 반대로 **lockfile 변경 없이**
+  나중에 yanked 돼 생긴 경고다. ★**기계 축(`check-audit-warnings.mjs`)은 낡지 않았다 — 틀어진 건 산문 표뿐**.
+  ★**처방**: A-2·A-3 → **C-2·C-3** 이동(**구 ID 병기 · 행 삭제 0 · 번호 재사용 0**) · 새 경고를 **A-4** 로 등재
+  ⇒ 행 **4 → 5** · 불변식 「경고 수 == A 행 수」 **2 == 2 복원** · **형식 무접촉**.
+  ★★**F3 도달성 판정 ⓓ**: yank 사유를 `.crate` 2본 diff 로 확정 — `sse2.rs:133` 이 **SSE4.1 `_mm_extract_epi32`**
+  를 `sse2` 함수 안에서 **무조건** 호출(= SIGILL 이식성 결함, 암호 결함 아님). ★**도달 불가 3축**:
+  ⒜우리 소스 `StdRng`·`ThreadRng`·`rand::rng()`·`make_rng`·`.dither(`·`noise::` **전건 0**(rodio 의 dither/noise 는
+  **옵트인**이고 dither 기본 RNG 는 Xoshiro) ⒝x86 외 타깃은 **SSE2 백엔드 미컴파일** ⒞**AVX2 가 있으면 도달 없음**.
+  ★부수: `wie_web` wasm 트리에 `chacha20` **없음**. ★**전제를 표에 적었다**(rodio@0.22.2 기준 · 우리가 dither/noise 를
+  쓰기 시작하면 무효) — 전제 없는 「해당 없음」을 만들지 않았다.
 - 2026-09-08: **리소스 폴백 가지 — 두 타깃 «모두» 도달 0** (PR **#129** 착지 · `wie-resource-fallback-branch-unexercised-in-both-targets`
   · 채택 제안 `2026-09-06-resource-browser-axis#p0`) — 단위시험 **7건** · ★**제품 코드 무접촉**.
   ★**둘 다 «재현»했다**(추정 0): 네이티브 `unreachable!()` → **167 passed · PROBE 0** ·
