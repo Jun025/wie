@@ -324,10 +324,25 @@ design** — do not "fix" that by wiring it:
   10 most recent landings that are replayable (the branch tip before it pulled base, merged against
   the `main` it pulled): **10/10 conflicted, and `STATE.md` was the only conflicting file in all
   10** — the `REPORT.md` half is gone, which is what the 2026-09-07 migration bought. Stripping
-  §진행중 from all three sides clears **7/10**; stripping §완료 clears **4/10**; stripping both
+  §진행중 from all three sides clears **7/10**; stripping §완료 clears **3/10**; stripping both
   clears **10/10**. So the two sections are *each* a contention point and neither alone is
   sufficient — and stripping only the shared "열린 형제 PR: #…" enumeration line clears **0/10**, so
   it is the round *entries* that collide, not that line.
+
+  **Those two numbers are a partition, not two independent readings — quote them together.** The
+  seven and the three are disjoint and exhaust the ten: **7 + 3 = 10**, and the set that §완료-
+  stripping clears is *exactly* the set that survives §진행중-stripping (measured:
+  `6ed4ee8e 480e8654 c2c9552d`). That is forced, not a coincidence: stripping both sections clears
+  10/10, so every conflict lives in §진행중 ∪ §완료; nothing is cleared by stripping neither, so
+  no pair conflicts outside them. Hence `|A ∪ B| = 10` with `|A| = 7`, `|B| = 3`, and inclusion-
+  exclusion gives `|A ∩ B| = 0`.
+
+  **So the pair carries its own check, and you should run it before believing a re-measure:
+  `C1_clean + C2_clean ≤ 10`, with equality exactly when the two sets are disjoint.** This is not
+  decorative — the first version of this block put §완료's clear count at **four**, which makes
+  `4 + 7 = 11` and is arithmetically impossible against its own other three cells. Nobody had to
+  re-measure to know it was wrong; the review caught it by arithmetic alone, before measuring.
+  Quote one number without the other and that check disappears.
 
   **This is why `STATE.md`'s 진행중 is a pointer and not an append-only list.** git's three-way
   merge needs exactly **one** unchanged line between two insertions: measured, 0 lines apart →
