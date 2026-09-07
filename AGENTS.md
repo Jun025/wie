@@ -364,16 +364,16 @@ design** — do not "fix" that by wiring it:
     one insertion **1 line** down and it is **clean** (rc=0 at 1, 2 and 3 lines). So *any* two
     concurrent rounds collide here, and this repo lands 10–25 rounds a day. Quote 1/1 forward and
     3/10 historical; they answer different questions.
-  - **`docs/report/` is not a superset of §완료.** Of 87 entries, 82 carry a ticket id and **3 of
+  - **`docs/report/` is not a superset of §완료.** Of 87 entries, 83 carry a ticket id and **3 of
     those have no `docs/report/` file** (`wie-pr45-orphan-close-and-remnant-land-r2`,
     `wie-state-landed-pr56-residue-and-misc-unk9-error-lock`,
-    `wie-supply-chain-cargo-updates-a2-a3`); 5 more are short legacy entries carrying no id. So
-    pointer-ising §완료 the way §진행중 was pointer-ised would **drop 8 entries that exist nowhere
+    `wie-supply-chain-cargo-updates-a2-a3`); 4 more are short legacy entries carrying no id. So
+    pointer-ising §완료 the way §진행중 was pointer-ised would **drop 7 entries that exist nowhere
     else** unless they are backfilled first.
 
   **That gap is the whole difference between the two sections, and it is why the same prescription
   does not transfer.** §진행중 was a *stale mirror* of `gh pr list` — the round that replaced it
-  measured "§진행중 항목 1 → 0, 잃은 서술 0". §완료 is not a mirror; it is the only place 8 of its
+  measured "§진행중 항목 1 → 0, 잃은 서술 0". §완료 is not a mirror; it is the only place 7 of its
   entries live. Removing a point that holds unique content is a migration, not a pointer swap.
 
   **Distributing the point instead (per-year/per-month subheadings) was rejected by measurement, not
@@ -391,7 +391,7 @@ design** — do not "fix" that by wiring it:
   preservation count and not "the conflict markers are gone".
 
   **Reopen this if any of three things change.** First, a machine consumer of §완료 appears — then
-  the format question stops being free. Second, someone backfills those 8 entries into
+  the format question stops being free. Second, someone backfills those 7 entries into
   `docs/report/`; the migration blocker disappears and ⒜ becomes a cheap pointer swap. Third, a
   round loses an entry for real — the silent failure stops being hypothetical and the 1/1 rate makes
   it a matter of time. Absent those, the union edit is cheaper than the migration.
