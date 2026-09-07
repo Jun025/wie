@@ -25,7 +25,7 @@ the file that enforces it; causes no file enforces are in the ledger.
 | 6 | `no_std` + `extern crate alloc` in the engine crates — reaching for `std` breaks the web build | wasm clippy gate in `rust.yml`; `docs/architecture.md` |
 | 7 | `wie_web` is an empty library off `wasm32`. Do not "clean up" the `cfg(target_arch = "wasm32")` gates | `wie_web/Cargo.toml:1-11`; native jobs in `rust.yml` |
 | 8 | The exact version pins and the RustJava `rev` pin are deliberate | `Cargo.toml` — comment above the `rev` lines; full rationale in the ledger |
-| 9 | No game bytes, ever | `.gitignore` blocklist + `audit-no-leak.sh` — full text below |
+| 9 | No game bytes, ever | `.gitignore` blocklist + `scripts/audit-no-leak.sh`, run on every PR by `engine-contract.yml` — full text below |
 | 10 | Secrets are referenced, never embedded or printed | `.dev.vars*` git-ignored + `.claude/settings.json` read-deny — full text below |
 | 11 | D1 migrations auto-apply to prod on `main`, destructive statements included — author accordingly | `web.yml:97-100`; `docs/CLOUDFLARE_SETUP.md` |
 | 12 | Never commit to `main`; branch → PR, and stop. Merge and branch deletion are a separate approved task | **Nothing machine-locks this** — see Definition of Done |
@@ -115,12 +115,109 @@ rather than trusting the word "green".
 
 **Touching engine code? The four gates are not enough — run the repo's own runner.**
 
+<!-- ENGINE-RUNNER:BEGIN — scripts/check-engine-runner-fixtures.mjs diffs the fixtures named
+     inside this region against `git ls-files test_data/`, both directions. Keep both markers;
+     the checker fails if either goes missing rather than passing on an empty region. -->
+
 ```sh
 node scripts/make-draw-fixture.mjs                                    # builds the J2ME fixture
 for f in test_data/draw_j2me.jar test_data/helloworld_ktf.zip test_data/helloworld_lgt.zip; do
   cargo run -q -p wie_cli --bin wie_validate -- "$f"                  # each must report "result":"PASS"
 done
+for f in test_data/keydraw_ktf.zip test_data/keydraw_lgt.zip; do      # key-driven — --inject is REQUIRED
+  cargo run -q -p wie_cli --bin wie_validate -- --inject --expect-last-frame "$f"   # PASS *and* rc=0
+done
 ```
+
+**A fixture that this runner deliberately does not touch is named here, not omitted** — write
+`NOT-RUN: test_data/<name> — <why>` inside this marked region. That keeps the classification in the
+same document as the list instead of in the checker, which is the one thing the proposal behind this
+check warned about: a checker that knows which fixtures are "runner fixtures" becomes a second source
+of truth and drifts from this block. **There are none today** (the diff is 0 in both directions), so
+this paragraph is the syntax, not a list.
+
+<!-- ENGINE-RUNNER:END -->
+
+**`keydraw_*` without `--inject` reports FAIL, and that is the CORRECT result — you did not break it.**
+Those two fixtures paint only in response to a key, so with no injected input the screen stays black
+and the validator is right to say so. Measured 2026-09-06 on both carriers: without the flag
+`result FAIL · content false · paints 1`, with it `result PASS · content true · paints 55`. The
+misread is not hypothetical — a round chasing an unrelated change stopped on exactly this, took the
+FAIL for its own regression, and only cleared it by reproducing the same FAIL on an untouched tree.
+
+**`--expect-last-frame` is on the `keydraw_*` line and deliberately NOT on the one above it.** It
+turns `last_frame_content` from a reported field into an exit code, which is the only thing that
+catches "the emulator ran fine and the last frame is black" — the 2026-09-05 LGT failure, where
+`result` stayed PASS and `paints` went *up* (55 → 83, the blank MIDP overpaint). It cannot go on the
+line above because that is **one loop over three fixtures** and `helloworld_ktf`/`helloworld_lgt`
+fail it by construction — they are *expected* to end blank, and with the flag they exit 1 (measured).
+**`draw_j2me` does not fail it** — that fixture ends with content (`last_frame_content true`, rc=0
+with the flag), so the reason it goes unflagged is the shared loop, not the fixture. Splitting it
+onto its own line would flag it correctly and cost an extra runner line, which is the one thing this
+block cannot afford. The expectation is per fixture *and mode*, which is why it lives on the command
+line — see `wie_validate.rs`'s header for that reasoning (its table covers `helloworld_*` and
+`keydraw_*`; `draw_j2me` is measured here).
+
+**This is the local net, not the CI one.** The browser round-trip's Scenario F is what gates that
+failure in CI; this line makes the same class visible in ~20 s with no wasm build, before you push.
+Scenario F is not unconditional either — it sits behind `engine-contract.yml`'s `dorny/paths-filter`
+`engine` gate, so a diff that touches no engine path reports "Reporting success without rebuilding"
+and never runs it. Do not read this line as CI enforcement — nothing in `.github/` runs
+`wie_validate` (measured: 0 hits across all workflow files).
+
+**And it stays that way: promoting `--expect-last-frame` into CI was decided against on 2026-09-07,
+measured rather than assumed.** The question is not "is it in CI" but "is the class caught", and it
+is — twice over, by things that already run:
+
+| what | fixtures | frame it reads | predicate | host | runs when |
+|---|---|---|---|---|---|
+| Scenarios **E + F** | `keydraw_ktf` + `keydraw_lgt` | **the first frame that reaches the expected pixel count** — `tickLoop` breaks on match | **exact pixel count**, 3 keys each = 6 assertions | `WebScreen` | every PR touching the `engine` filter |
+| `--expect-last-frame` | same two | the run's **final** paint | non-blank (boolean) | `HeadlessScreen` | never in CI |
+
+**They differ on two axes, not one, and only the host axis is vacuous.** The *host* axis is
+empty: `HeadlessScreen::paint` is a **pure sink** — it stores the frame and updates counters, with no
+drawing, compositing or ordering of its own, so everything that can blank a frame happens *above* the
+`Screen` boundary, in the shared engine both hosts drive. The *time* axis is **not** empty:
+`tickLoop` exits the moment `until` matches, so E+F assert "the expected count was observed at some
+tick boundary" and stop looking; the flag asserts "the run's last paint is non-blank". After the
+**last** key matches, F does `key_up` → `free()` and sees nothing further, while the headless
+`--inject` run continues through its 27-step schedule (measured 2026-09-07: `paints` 55 on both
+carriers). So a regression that blanks the screen *after* the final key assertion — a follow-up
+action, a stop/shutdown path — passes F and fails the flag. Earlier keys are not exposed: the next
+key's assertion re-reads the canvas.
+
+Separately, the flag's own logic is already CI-covered — `last_frame_gate_fails` has an 8-row
+truth-table test that `cargo test --all` runs on all six matrix legs.
+
+**So the detection delta is narrow, not zero**, and that is the actual reason not to promote: it is
+confined to the window after the last key assertion, **zero incidents have ever been observed in
+it**, and buying it costs either a new `cargo` build in the node-only `contract` job or six
+redundant runs on `rust.yml`'s matrix. The 2026-09-05 LGT failure hides this window rather than
+demonstrating it — that overpaint happened *within* a tick, so the canvas never showed 424 at any
+boundary and the early break never fired.
+
+The paths-filter caveat above is real but bounded: its first entry is `**/*.rs`, so any diff that
+could regress the engine's last frame does fire it (verified on `a4fda020`, a comment-only `.rs`
+landing — step "Contract check — browser boot round-trip" ran and succeeded). A diff that trips
+neither has no engine to regress.
+
+**Reopen this if any of three things happen** — otherwise a later round will re-propose it from the
+same starting point. First and most likely: **a blank-screen regression lands in the window E+F
+structurally cannot see** — after the last key assertion, where the loop has already broken. It will
+not arrive as a CI failure, by construction; it arrives from the local runner line above, or from
+someone running a game, and *that* is the signal to re-price the delta. Second: `HeadlessScreen`
+stops being a pure sink, which would open the host axis too. Third: the shipped native host
+(`wie_cli`'s `WindowHandle`) needs covering — **note that promoting this flag would not do that
+either**, since it exercises `HeadlessScreen`, not `WindowHandle`. That host is covered by neither
+net today, and saying so is the honest version of "the local runner is enough".
+
+**Do not try to shorten these two runs with `--timeout`.** On the `--inject` path that flag is
+overwritten: the deadline is rebuilt from the injection schedule (`--boot-secs 2.5` + 0.3 + 27
+steps × `--action-secs 0.6` + 1.0 = **20.0 s**), so `--timeout 5` and `--timeout 20` both take ~20 s
+(measured). The knobs that do move it are `--boot-secs`/`--action-secs`, and shortening them drops
+paints (`--boot-secs 1.0` → 18.7 s, paints 55 → 37), i.e. it buys time by seeing less. Measured wall
+time over six runs each: KTF **20.1–26.1 s**, LGT **20.2–21.4 s** — the spread above 20.0 is tick
+overrun under load, not budget starvation.
 
 `cargo test --all` boots KTF and LGT but **nothing in it boots a J2ME guest**. 2026-09-04 shipped a
 RustJava pin bump whose four gates were all green while `draw_j2me.jar` failed with
@@ -160,9 +257,125 @@ The contract check needs the WASM artifact already in `web/src/wasm/` — build 
 local build, else it fails with missing-artifact violations (CI order: `engine-contract.yml:116`
 then `:125`). The rest need a toolchain fetch — run them only when the artifact or UI changes.
 
+**Which of these CI actually runs — "the check exists" is not "the check runs".** Measured
+2026-09-06 across all 8 workflow files: `check-engine-contract.mjs` and `contract-roundtrip.mjs`
+run in `engine-contract.yml`; `build-wasm.sh` and the frontend build run in `web.yml`; **`npm run
+audit` now runs on every PR** as an always-run step of `engine-contract.yml`; **`verify-browser.mjs`
+runs after every deploy** (below). The one after that does **not** run in CI and is **local-only by
+design** — do not "fix" that by wiring it:
+
+- **`npm run verify` (`scripts/verify-browser.mjs`) — runs post-deploy, never on a PR.** Since
+  2026-09-07 it is the last step of `web.yml`, driving `steps.deploy.outputs.deployment-url` — the
+  immutable per-deploy URL, live when the action returns. It is **not** a deploy gate: it runs after
+  the bytes are up, so it reports a bad deploy rather than blocking one.
+
+  > **If that step goes red, the gate③ round that landed the merge owns it** — it is already running
+  > the same script against production for merge-contract 4-C, so it re-runs it against the URL the
+  > failed step printed and either files a ticket or records in its reply that the deploy is bad.
+
+  That owner is not a formality: this repo has already had a check go red with nobody named
+  (`check-worklog-coverage`, 2026-09-07), and that one blocked every open PR. This one cannot —
+  it is push-only, so PR runs skip it and gate③ reads the PR's checks — which is also why it is
+  allowed to fail hard instead of hiding behind `continue-on-error`.
+
+  **It still does not run on a PR, and that part of the old reasoning stands**: `web.yml`'s deploy
+  steps are all gated on `github.event_name == 'push'`, so a PR build produces `web/dist` as an
+  artifact and deploys nothing, and pointing this script at a PR would mean standing up
+  `wrangler pages dev` with D1 bindings inside CI — a workflow-sized change, not a step.
+
+  **Two things it does not tell you.** It reads the per-deploy URL, not the `wie-web.pages.dev`
+  alias, whose swing-over delay nothing here measures — so keep running it by hand against
+  production after a deploy, which is a *different* assertion: `WIE_BASE=https://wie-web.pages.dev
+  node scripts/verify-browser.mjs test_data/helloworld_ktf.zip`. And `rc=0` does not mean the screen
+  rendered — it exits non-zero on a leak (2) and on the flow not completing, but `nonBlack: 0` is a
+  pass, which for the helloworld fixtures is correct since they are expected to end blank. Read it
+  as "booted, took a file, leaked nothing". It needs no game file (its default argument is the
+  committed `test_data/helloworld_ktf.zip`).
+- **`scripts/smoke_gate.sh` — local only, and structurally so.** It regresses the working game
+  catalog against `scripts/smoke_gate_baseline.tsv`, reading titles from `WORKING_DIR`
+  (default `game_lab/working`). `game_lab/` is git-ignored and holds real game bytes, which
+  **Constraint 9 forbids from ever entering the repo, the build output, or any log**. There is no
+  version of this check that runs in CI without breaking the constraint it sits beside; the
+  committed baseline is identifiers and expected status only, never paths or bytes.
+
 ### Landing paperwork
 
-- **`STATE.md` and `REPORT.md` are tracked files, not scratch**: keep `STATE.md`'s 진행중/완료/다음 current as a task starts and lands, and append a dated 무엇을·왜·사용자 영향 entry to the top of `REPORT.md` when it lands.
+- **`STATE.md` and `docs/report/` are tracked files, not scratch**: keep `STATE.md`'s 완료/다음 current as a task lands, and write a dated 무엇을·왜·사용자 영향 entry when it lands. **Do not write a 진행중 entry** — that section became a fixed pointer to `gh pr list` on 2026-09-08, for the reason below. **Round entries go in a new `docs/report/NNNN--YYYY-MM-DD--<ticket-id>.md` — do not append to `REPORT.md`**, which is now a fixed pointer (2026-09-07; every round appending to one file's top made every open PR conflict — 5/5 at migration time, 4 of them on the ledger files *only*). `NNNN` is the global sequence, largest + 1:
+
+  ```sh
+  N=$(node scripts/check-docs-report-serial.mjs --next-serial)   # ask the tool, not the directory
+  $EDITOR docs/report/$N--$(date +%F)--<ticket-id>.md   # first line: ## [YYYY-MM-DD] title (<ticket-id>)
+  grep -H '^## \[' docs/report/*.md | sort -r            # reading it back: the directory is the index
+  ```
+
+  **Ask the tool for `N`; do not compute `max + 1` from the directory.** The directory is the
+  *merged* tree, so two open PRs computing it independently pick the same serial — the filenames
+  differ, git merges both cleanly, and nothing reddens. Measured 2026-09-07: `main` held `0056`,
+  open PR #112 held `0056`, open PR #111 held `0057`; the directory said `0057` and the free number
+  was `0058`. `--next-serial` consults open PRs (`gh api …/pulls/<n>/files`) and prints the number
+  on stdout; if the network is unavailable it warns and falls back to the directory rather than
+  blocking you. The post-hoc half runs in CI (`engine-contract.yml`) and reddens a tree that already
+  holds a duplicate — **it does not renumber anything, and neither should you renumber a landed
+  file**; move the side that has not landed yet.
+
+  **`-H` is load-bearing, not cosmetic.** It prefixes the path, so `sort -r` keys on the *sequence number*; `-h` keys on the title text, which is the date, and this repo lands up to six rounds a day. Measured over 54 files: the `-h` form is **52 lines out of place**, the `-H` form is **0**. Sort by the **sequence number, not the date** — the ledger's date-monotonicity is a coincidence, not a guarantee. `REPORT.md` explains the rest; `docs/report-migration-revert.md` reverts it.
+
+  **What actually conflicts is a *shared insertion point*, not a "top".** Measured 2026-09-08 on the
+  10 most recent landings that are replayable (the branch tip before it pulled base, merged against
+  the `main` it pulled): **10/10 conflicted, and `STATE.md` was the only conflicting file in all
+  10** — the `REPORT.md` half is gone, which is what the 2026-09-07 migration bought. Stripping
+  §진행중 from all three sides clears **7/10**; stripping §완료 clears **3/10**; stripping both
+  clears **10/10**. So the two sections are *each* a contention point and neither alone is
+  sufficient — and stripping only the shared "열린 형제 PR: #…" enumeration line clears **0/10**, so
+  it is the round *entries* that collide, not that line.
+
+  **Those two numbers are a partition, not two independent readings — quote them together.** The
+  seven and the three are disjoint and exhaust the ten: **7 + 3 = 10**, and the set that §완료-
+  stripping clears is *exactly* the set that survives §진행중-stripping (measured:
+  `6ed4ee8e 480e8654 c2c9552d`). That is forced, not a coincidence: stripping both sections clears
+  10/10, so every conflict lives in §진행중 ∪ §완료; nothing is cleared by stripping neither, so
+  no pair conflicts outside them. Hence `|A ∪ B| = 10` with `|A| = 7`, `|B| = 3`, and inclusion-
+  exclusion gives `|A ∩ B| = 0`.
+
+  **So the pair carries its own check, and you should run it before believing a re-measure:
+  `C1_clean + C2_clean ≤ 10`, with equality exactly when the two sets are disjoint.** This is not
+  decorative — the first version of this block put §완료's clear count at **four**, which makes
+  `4 + 7 = 11` and is arithmetically impossible against its own other three cells. Nobody had to
+  re-measure to know it was wrong; the review caught it by arithmetic alone, before measuring.
+  Quote one number without the other and that check disappears.
+
+  **This is why `STATE.md`'s 진행중 is a pointer and not an append-only list.** git's three-way
+  merge needs exactly **one** unchanged line between two insertions: measured, 0 lines apart →
+  CONFLICT, 1 line apart → clean. Appending every round to the *bottom* is still one shared point,
+  so it conflicts identically — a same-position insert collides whether the position is the top or
+  the bottom. Keying the position off the PR number does not save it either, because sibling rounds
+  here carry **consecutive** numbers (#120–#133 measured), which puts their slots back-to-back. The
+  only thing that removes the collision is removing the point, which is what the pointer does.
+  §완료 still has one, and that is the measured **3/10 residual** — recorded, not fixed here.
+- **The ledger files of this repo are `STATE.md`, `REPORT.md`, `docs/report/**`, `docs/worklog/**`,
+  and `docs/worklog-coverage-remeasures.json`.**
+  Resolve a merge conflict in any of them by **union** — keep both sides' entries, ordered by the
+  authoring time of each entry's round. Never take one side wholesale; the other side's entries
+  vanish silently and the gates stay green.
+
+  **`docs/report/**` is on that list because the round entries moved there** on 2026-09-07 (merge
+  `a5091df6`, ticket `wie-report-md-per-round-files-port-from-otterpebble`). `REPORT.md` stays on it
+  too — the file still exists as the fixed pointer, and a round that edits the pointer is editing a
+  ledger file. **The merge contract's own enumeration (`STATE`·`REPORT`·`docs/worklog/**`·`reports/`·
+  `tasks/`) predates that move and does not name `docs/report/**`** — it is rendered from
+  `~/orchestrator/templates/merge-ticket.tpl`, outside this repo, so a round that needs the authority
+  cannot find it there. This line records the judgement already made rather than making each round
+  re-derive it: 2026-09-07 a merge round reasoned it out and chose to *move* the entry (appending to
+  `REPORT.md` knowingly breaks a convention that landed 20 minutes earlier; dropping the entry loses
+  it), which is the answer — but nothing guaranteed the next round would reach it.
+
+  **`docs/worklog-coverage-remeasures.json` is on that list for the same reason, plus one of its
+  own.** It is append-only evidence, so union is the only correct resolution — taking one side drops
+  a recorded measurement, and the checker reads `measurements.at(-1)`, so order is load-bearing too.
+  The other reason is authority: the merge contract's enumeration names `docs/worklog/**`, and this
+  file is a *sibling* of that directory, not inside it. Without this line a gate③ round that must
+  discharge an overdue re-measure (see below) has no rule saying it may touch the file, which is
+  exactly the gap that left `main` red on 2026-09-07.
 - **Follow-up proposals go in a `docs/worklog/*.json`, or they do not exist.** When a task leaves
   follow-up recommendations (or adopts/declines earlier ones), write
   `docs/worklog/YYYY-MM-DD-<slug>.json` in the same PR. The cockpit 「후속 작업 추천」 panel reads
@@ -176,7 +389,8 @@ then `:125`). The rest need a toolchain fetch — run them only when the artifac
   > re-open the mandate decision.** A landed round is one **first-parent** commit on `main`.
 
   ```sh
-  node scripts/check-worklog-coverage.mjs   # prints the numbers; fails if the promise is overdue
+  node scripts/check-worklog-coverage.mjs            # prints the numbers; fails if the promise is overdue
+  node scripts/check-worklog-coverage.mjs --record   # discharges it — idempotent, never off-schedule
   ```
 
   **The commands live in that script, not here** — a second copy would drift from the one CI runs.
@@ -185,7 +399,42 @@ then `:125`). The rest need a toolchain fetch — run them only when the artifac
   answered it. It deliberately does **not** fail on the ratio itself, because that obligation is
   conditional — gating PRs on it would rebuild the per-round mandate 2026-09-01 declined. The
   record of each re-measure is `docs/worklog-coverage-remeasures.json`; appending the entry the
-  script prints *is* the re-measurement.
+  script prints *is* the re-measurement — but **append it with `--record`, not by hand.** The
+  obligation is keyed to `origin/main`, so once the cadence is crossed *every* round that pulls base
+  gets the same failure and every one of them discharges it honestly: measured 2026-09-06, three
+  rounds wrote the same entry (six fields identical, only `decision` differed) and a human stopped
+  two of them by hand. `--record` scans the whole record for that `landedRounds` and writes nothing
+  if it is already there, so running it twice — or on a base that already carries it — is a no-op.
+
+  **The overdue re-measure belongs to the gate③ round, and "every round handles it honestly" is not
+  an owner.** Idempotent `--record` landed on 2026-09-07 (`be37ca7d`) and closed the *duplicate* side
+  of this; the same day the other side arrived — landing #53 crossed the cadence, nobody recorded it,
+  and `main` went red. Both workflows checkout at `fetch-depth: 0`, so `origin/main` is present in
+  `pull_request` runs too: while overdue, **every open PR is red as well**, not just main's badge. So
+  the rule is:
+
+  > **A gate③ round that sees `check-worklog-coverage` overdue runs `--record` and bundles that one
+  > file into the PR before merging.** Nothing else in the round changes.
+
+  Gate③ is the owner because it is the only role that is *already there* at the moment the obligation
+  fires — the crossing round is a landing, and the next thing to touch the repo is another gate③,
+  which is also the role the red blocks. It costs one conditional step, once per ten landings, and
+  needs no new machinery: the tool exists and is idempotent, so two gate③ rounds racing produce one
+  row. **The cost of the alternatives is what rules them out.** A scheduled workflow opening a
+  recording PR (⒝) adds an automated PR that itself needs CI and its own gate③ round — more
+  machinery for a slower answer. Writing at landing time (⒞) is the only option that closes the
+  window completely, and it requires pushing to `main`, which this repo forbids; routed through a PR
+  instead it collapses into ⒝.
+
+  **The hole in this choice, in numbers, because it is real.** Gate③ can only act when a gate③ runs,
+  so the red persists from the crossing landing until the next one. Measured 2026-09-07 over the 53
+  landings since `92c25276`: the cadence of ten took **9h 18m** (#43 04:17 → #53 13:36 KST), the gap
+  between consecutive landings is **70.5m median** (34.1m over the last 15) — but the **maximum gap is
+  115.2h**. So on a quiet stretch `main` can stay red for days. That is accepted rather than fixed,
+  on one observation: the check only goes overdue *by landing*, and the only thing it blocks is
+  landing, so during a quiet stretch nothing is waiting on it — and the first round back is the owner.
+  If that stops being true (a quiet stretch that blocks something real), the answer is ⒝, not a
+  wider tolerance in the checker.
 
   **`--first-parent` is load-bearing in every one of the script's three counts, and the definition says "first-parent", not
   "squash".** This repo is registered as an upstream-sync fork and must *not* squash-merge, so

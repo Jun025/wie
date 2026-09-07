@@ -1,0 +1,44 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-06",
+  "task": "wie-system-class-loader-spi-c-comment-premise-false",
+  "title": "WIPI-C 4자리 주석의 «전제»를 고쳤다 — 결론은 옳고 이유가 거짓이었다(그리고 사유가 캐리어마다 다르다)",
+  "adoptedProposals": ["2026-09-05-system-class-loader-preemptive-migration#p2"],
+  "proposal-quote-first": "★제안 원문에서 이 회차의 Acceptance 를 그대로 옮긴다(계약 2): `why` — 「②③은 `net/wie/CletWrapper::startApp` 이라는 Java 메서드 «안»에서 `core.run_function(start_clet)` 로 ARM 을 동기 실행하므로 프레임이 **있고**, ④⑤는 KTF 앱 전 구간이 `invoke_static(\"org/kwis/msp/lcdui/Main\",\"main\")` 아래서 돌아 **항상 있다**. ⇒ 「wherever there is no Java frame」의 조건절 자체는 참이나 ★**그 네 자리에서 전제가 성립하지 않는다** … ★두 사유가 서로 다른데 한 문장이 넷을 덮고 있다.」 / `effort` — 「사유가 ②③(로더 `None`)과 ④⑤(부모 위임)로 갈리므로 «두 문장»으로 나눠 쓴다.」",
+  "summary": "네 자리(`wie_{ktf,lgt}/src/runtime/wipi_c/context.rs` 각 2곳)의 `the two coincide wherever there is no Java frame` 을 걷어내고, ★**캐리어별 «진짜 사유»를 그 자리에 적었다**. 코드 동작 변경 **0**(주석뿐) · `git diff` = **2파일 +54/−18**.",
+  "measured": {
+    "★전제가 거짓임을 «직접» 쟀다 — KTF": "그 자리에 프로브를 심어 `current_class_loader()` 와 `get_system_class_loader()` 가 준 객체의 클래스 이름을 찍었다 → ★**`current=<net.wie.KtfClassLoader>` · `system=<java.net.URLClassLoader>`** ⇒ **다른 객체**다. `current_class_loader` 가 «호출 클래스의 로더»를 돌려줬다는 뜻이므로 ★**Java 프레임이 스택에 있고 그 클래스에 로더가 있다** — 옛 전제 「no Java frame」의 **직접 반증**이다.",
+    "LGT — ★프로브가 «못 가르는» 것을 명시한다": "같은 프로브 → **`current=<java.net.URLClassLoader>` · `system=<java.net.URLClassLoader>`**(같은 클래스). ★**이것만으로는 「프레임 없음」과 「프레임은 있는데 그 클래스의 로더가 `None`」을 «가르지 못한다»** — 둘 다 같은 폴백으로 끝난다. ⇒ 프레임의 «존재»는 **소스로** 세웠다: `wie_lgt/.../net/wie/clet_wrapper.rs` 의 `start_app` 이 `:68` 에서 `core.run_function(start_clet as _, &[])` 로 ARM 을 **동기 실행**한다 ⇒ 이 호출은 그 Java 메서드 «안»에서 난다.",
+    "사유가 캐리어마다 다르다 — 소스 실측": "**LGT**: `wie_lgt/src/runtime/wipi_c.rs:207-208` 이 `jvm.register_class(…, **None**)` ⇒ 호출 클래스에 로더가 **없다** ⇒ `current_class_loader` 자신의 폴백이 `get_system_class_loader` 를 부른다. **KTF**: `wie_ktf/.../interface.rs:186` 이 `register_class(…, **Some(ktf_class_loader)**)` ⇒ 로더가 **있고 다른 객체**인데, `KtfClassLoader::as_proto()` 가 선언하는 메서드는 **`<init>`·`findClass` 뿐**(★`findResource` 재정의 **없음**)이고 `wie_ktf/.../jvm_support.rs:146-149` 가 **`system_class_loader` 를 부모로** 넘겨 생성한다. 핀의 `ClassLoader::getResource` 는 ★**부모를 먼저** 묻고 그 다음 `findResource` 다 ⇒ **부모 위임**이 KTF 를 실어 나른다.",
+    "결론(두 통로가 같은 파일을 찾는가)": "★**참이다** — 네 자리를 전부 `self.jvm.current_class_loader()` 로 바꿔도 `test_resource_reach` **KTF·LGT 모두 통과**(각 1 passed / 0 failed). 주석이 주장하는 «결론»은 그대로 서고, 바뀐 것은 «이유»뿐이다.",
+    "기준선": "출하 형상 네 게이트 전건 rc=0 · `cargo test --all` **156 passed / 0 failed** · `cargo +beta clippy` rc=0 · `wie_validate helloworld_{ktf,lgt}` **PASS**."
+  },
+  "mutation-controls": {
+    "C1 — 네 자리를 `current_class_loader` 로": "★**물지 않는다(그리고 그것이 맞다)** — KTF·LGT 리소스 시험 **둘 다 통과**. 이 회차가 적는 「둘 다 오늘은 같은 파일을 찾는다」의 근거다.",
+    "C2 — KtfClassLoader 의 부모 위임 절단(`system_class_loader` → null)": "★**문다** — KTF `bundled_resource_reaches_the_ktf_guest` **FAILED**(`jvm/src/value.rs` panic) ↔ ★**LGT 는 1 passed**(사유가 달라 무관하다). ⇒ 「부모 위임이 KTF 를 실어 나른다 · LGT 는 다른 갈래」가 실행으로 갈린다.",
+    "★C2 의 «천장»을 숨기지 않는다": "C2 는 **깨끗한 분리가 아니다**. `KtfClassLoader::init` 이 `client.bin` 을 **같은 `getResource→부모` 경로**로 읽으므로, 부모를 끊으면 ★**출하 형상(`get_system_class_loader`)에서도 KTF 가 FAILED** 다(C3 로 확인). ⇒ C2 가 보이는 것은 「부모 링크가 KTF 리소스를 실어 나른다」이지 「두 로더 API 를 가른다」가 **아니다**. ★**API 를 가르는 것은 프로브(위 KTF `current≠system`)이고, 이 회차의 주석은 그 구분을 그대로 적었다.**",
+    "복원": "매 회차 `cp` 로 원본 복원 · 최종 `git diff --numstat` = **2파일뿐**(`wie_ktf`·`wie_lgt` 의 `wipi_c/context.rs`) · `jvm_support.rs` 무변경 확인."
+  },
+  "what-the-comment-now-says": "★**계약 5 대로 «왜 틀렸는지»를 그 자리에 남겼다**(다음 사람이 되돌리지 않게): 옛 문장을 인용하고 → 조건절은 일반적으로 참이나 **이 자리에서 전제가 거짓**임을 밝히고 → 캐리어별 진짜 사유를 적고 → 서로 다른 사유임을 명시했다(「한 문장이 넷을 덮을 수 없다 — 그것이 이 거짓 전제가 네 자리에서 살아남은 경로다」). ★**사료는 지우지 않았다** — 앞 회차가 붙인 「Covered since 2026-09-06 … 150 passed」 커버리지 블록은 **그대로 보존**했다. ★같은 파일의 두 번째 자리(`read_resource`)는 **위 블록을 가리키는 4줄**로 줄였다 — 같은 파일 안에 같은 설명을 두 벌 두면 한쪽이 낡는다.",
+  "limits": [
+    "★**LGT 쪽 「프레임이 있다」는 «소스 논증»이지 «실행 측정»이 아니다** — 위 프로브가 그 갈래를 가르지 못한다고 명시했다. 가르려면 그 자리에서 Java 프레임 스택을 직접 질의하는 축이 필요하고, 그것은 이 회차 범위 밖이다.",
+    "★**코드 동작 변경 0** ⇒ 이 회차가 막는 회귀는 **0건**이다. 값은 전부 「다음 사람이 틀린 이유를 근거로 판단하지 않는다」에 있다 — 제안 `userBenefit` 이 그렇게 적었고, 그 이상을 주장하지 않는다.",
+    "★`*.rs` 를 만지므로 **4게이트 6다리 + coverage** 를 한 바퀴 돈다(제안 `tradeoff` 가 「문서 회차보다 비싸다 · 다른 `*.rs` 회차에 얹는 것이 싸다」고 적은 그 비용을 실제로 지불했다 — 얹을 회차가 없어 단독으로 냈다)."
+  ],
+  "adjacent-not-fixed": [
+    "★**같은 거짓 전제가 다른 곳에는 «없다»** — `git grep 'no Java frame|Java 프레임'` 전수 결과 `docs/upstream-realign-verdict.md:803` 은 이미 **옳은 판별식**(「스택에 Java 프레임이 있는가 · 그 클래스의 로더가 `None` 인가」)을 적고 있고, `2026-09-05-*.json` 두 워크로그도 `-fix6` 정정을 이미 담았다. ⇒ ★**코드 주석 4자리가 마지막 잔존이었다**(그래서 범위가 넓어질 여지가 없었다).",
+    "`verdict:789` 의 「①은 «Java 프레임이 없다» 갈래의 실증」은 **①번 자리**에 대한 서술이고 `:790` 이 이미 어휘를 정정했다 — 이 회차 대상(②③④⑤)이 아니다. **무접촉**.",
+    "★`KtfClassLoader` 가 `findResource` 를 재정의하지 않는다는 사실은 **의도인지 미구현인지 어디에도 적혀 있지 않다**. 지금은 부모 위임이 덮고 있어 무증상이지만, 부모가 바뀌면 그 자리가 조용히 빈다(제안 등재)."
+  ],
+  "proposals": [
+    {
+      "title": "`KtfClassLoader` 에 `findResource` 가 없는 것이 «의도»인지 그 자리에 적는다",
+      "plainSummary": "KTF 전용 클래스 로더는 리소스를 스스로 찾지 않고 부모에게만 의존합니다. 그게 일부러인지 빠뜨린 건지 아무 데도 적혀 있지 않습니다.",
+      "userBenefit": "없음(주석). 대신 부모 연결을 바꾸는 사람이 「여기 findResource 가 왜 없지」를 다시 조사하지 않아도 되고, 조용히 빈 자리를 만들지 않는다.",
+      "why": "실측: `KtfClassLoader::as_proto()` 가 선언하는 메서드는 `<init>`·`findClass` 둘뿐이고, 핀의 `ClassLoader::getResource` 는 부모 → `findResource` 순서라 **부모가 전부를 실어 나른다**. 이 회차의 C2(부모 절단)에서 KTF 가 `client.bin` 부터 못 읽고 죽은 것이 그 증거다. 그런데 그 의존이 코드 어디에도 문장으로 없다.",
+      "tradeoff": "★주석 한 줄로 끝나 보이지만, 「의도인가」를 판정하려면 KTF 클래스 로더가 **jar 밖의 리소스**(client.bin 은 jar 안이다)를 다뤄야 하는지까지 봐야 한다 — 그 답이 「다뤄야 한다」면 처방은 주석이 아니라 `findResource` 구현이고 크기가 달라진다. ⇒ 이 제안의 본체는 그 판정이다.",
+      "effort": "S — 판정 + 주석(구현이 필요하다고 결론나면 M).",
+      "target": "wie · wie_ktf/src/runtime/java/jvm_support/classes/net/wie/ktf_class_loader.rs"
+    }
+  ]
+}

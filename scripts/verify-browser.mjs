@@ -3,8 +3,17 @@
 // records every network request so we can prove no game bytes ever leave.
 //
 // Usage: node scripts/verify-browser.mjs <gameFilePath> [label]
+//   WIE_BASE=<url>             — what to drive; defaults to a local wrangler dev.
+//   WIE_CHROME_CHANNEL=chrome  — use a system Chrome instead of the playwright
+//                                bundled chromium (same knob as contract-roundtrip.mjs).
 // The game file is read from a path OUTSIDE dist/ and is never committed nor
 // uploaded to any server by the app.
+//
+// This exits non-zero on a leak (2) and on the flow not completing — a missing
+// selector throws. It does NOT assert that anything was drawn: `nonBlack: 0` is
+// a pass, and for the helloworld fixtures that is correct (AGENTS.md: they are
+// expected to end blank). Read "rc=0" as "the app booted, took a file, and
+// leaked nothing", never as "the screen rendered".
 
 import { chromium } from "playwright";
 import path from "node:path";
@@ -15,7 +24,9 @@ const gamePath = process.argv[2] || path.join(root, "test_data", "helloworld_ktf
 const label = process.argv[3] || path.basename(gamePath);
 const BASE = process.env.WIE_BASE || "http://localhost:8788";
 
-const browser = await chromium.launch({ channel: "chrome", headless: true });
+const launchOpts = { headless: true };
+if (process.env.WIE_CHROME_CHANNEL) launchOpts.channel = process.env.WIE_CHROME_CHANNEL;
+const browser = await chromium.launch(launchOpts);
 const page = await browser.newPage();
 
 const logs = [];

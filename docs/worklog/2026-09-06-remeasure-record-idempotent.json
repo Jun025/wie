@@ -1,0 +1,53 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-06",
+  "task": "wie-worklog-remeasure-obligation-duplicates-per-round",
+  "title": "재측 의무를 «손 append» 에서 «멱등 명령»으로 — 세 회차가 같은 항목을 각자 쓴 그 형태를 막는다",
+  "verdict": "★**F2 ⒜ 채택** — `scripts/check-worklog-coverage.mjs` 에 **`--record`** 신설(가드 2개: «기한 미도래면 안 쓴다» + «같은 `landedRounds` 가 배열 «어디에라도» 있으면 안 쓴다»). ★**임계·비율 판정 무접촉**(F3) · ★**기존 `measurements` 무접촉**(항목 수 전/후 **3 → 3** · 바이트 동일).",
+  "f1-measured": {
+    "landed-record": "★`origin/main` 의 `measurements` = **3항목** — `[13 / ec1b7027..8e9185de / 10·10·100.0]` · `[23 / 39ca970f..c691bc9f / 10·10·100]` · `[33 / fe3f5d2a..385f9523 / 10·10·100]`. ★**착지한 중복 «없음»**(`landedRounds` 기준 0건 · 여섯 필드 전부 같은 중복 0건) — 총괄 판정과 일치하고, ★**내가 세어서 확인했다.**",
+    "predicate-quoted": "코드 인용(`scripts/check-worklog-coverage.mjs`): `const last = record.measurements.at(-1);` → `if (landed - last.landedRounds >= WINDOW)`. ★★**`lastRecorded` 는 «max» 가 아니라 «배열의 마지막 원소»다** — 티켓이 「추정하지 마라」고 한 그 갈림이 실제로 `at(-1)` 쪽이었다. `last.pct` · `last.reopened` 도 **같은 원소**를 읽는다.",
+    "shake-reproduced": [
+      "★합성 재현(landed=35 · 파일을 임시 교체 후 바이트 동일 원복):",
+      "CASE-a 순수 중복 [...,33,33]      → rc=0 · last=33  ⇒ ★같은 값의 중복은 OVERDUE 를 «흔들지 않는다»",
+      "★CASE-c 순서 역전 [...,40,25]     → ★**rc=1 OVERDUE** · last=25  (35−25=10 ≥ 10)",
+      "★CASE-d 순서만 반대 [...,25,40]   → ★**rc=0** · last=40",
+      "⇒ ★★**같은 집합인데 순서만 반대면 판정이 «뒤집힌다».** 이것이 `at(-1)` 의 대가이고, 병렬 착지 순서는 아무도 보장하지 않는다.",
+      "★CASE-e 중복인데 `pct`=50   → ★**rc=1 BELOW-UNANSWERED** ⇒ 중복은 OVERDUE 축이 아니라 **비율 축**을 흔든다."
+    ]
+  },
+  "f2-choice": {
+    "picked": "★**⒜ 기록 도구가 멱등**(`--record`). 가드 둘: ⑴**기한 미도래면 쓰지 않는다**(off-schedule 행을 발명하지 못한다) ⑵**배열 «전체»를 훑어** 같은 `landedRounds` 가 있으면 쓰지 않는다(★`at(-1)` 만 보면 순서 역전 상황에서 중복을 만든다 — 그 형상이 아래 양방향 대조의 ⓑ 다). 그리고 ★**OVERDUE 문면을 「손으로 붙여라」에서 「`--record` 를 돌려라」로 바꿨다** — 회차가 실제로 읽는 자리가 거기라, 문면을 안 바꾸면 도구가 있어도 안 쓴다.",
+    "why-not-b": "★**⒝(검사기 관용)는 «판정식»을 건드린다.** `at(-1)` → `max` 로 바꾸면 CASE-c 가 뒤집히는데, F3 이 ★**「임계·비율 판정을 바꾸지 마라」**고 못박았다. ⒝ 는 또 ★**중복을 «합법화»**해 append-only 정본에 영구히 쌓이게 두고, **생성 자체를 줄이지 않는다**. ⇒ 버렸다.",
+    "why-not-c": "★**⒞(소유자 고정)는 「누가 그 한 자리를 돌리나」라는 새 질문을 만든다**(총괄 소견과 같다). 전용 워크플로가 저장소에 쓰려면 **봇이 `main` 에 커밋**해야 하는데 이 저장소에 그 선례가 없다. ⇒ 버렸다.",
+    "residual-stated": "★★**⒜ 가 «못 막는» 것을 숨기지 않는다**: 두 브랜치가 **둘 다 착지 전에** 각자 `--record` 를 돌리면 각 트리에는 그 행이 없으므로 **둘 다 정당하게 1건씩 쓴다** ⇒ 머지 시점에 중복이 난다. ★⒜ 가 지우는 것은 ⑴한 회차의 이중 실행 ⑵**base 가 이미 그 행을 품은 회차**(형제가 먼저 착지한 뒤 당긴 모든 회차 — 오늘 3건 중 «다수»가 여기 해당했을 형태)다. 잔여는 «검사기의 관용» 축이고 그것은 판정식을 만지므로 **별 회차**다 — 제안으로 올렸다."
+  },
+  "verification": {
+    "not-due-path": "현 실제 상태(landed 35 · last 33 ⇒ 2 < 10)에서 `--record` → `not due … nothing to do.` **rc=0 · 항목 3 불변**.",
+    "normal-path": "★합성으로 기한을 도래시킨 뒤(33 항목 제거 ⇒ last=23 · 35−23=12) `--record` → `appended landedRounds 35` · **항목 2 → 3** · 직후 `check` **rc=0**(OVERDUE 해소).",
+    "idempotent": "★**같은 기록 동작 2회** — 두 번째는 `already recorded … nothing to do.` · **항목 3 그대로**.",
+    "bidirectional": "★★**가드가 «실재 단언»임을 개악으로 보였다.** 형상 `[13, 35, 23]`(35 는 앞에 있고 last=23 이라 **due** — 형제가 먼저 착지한 뒤 옛 임계 회차가 나중에 착지한 실제 형태): ⓐ**가드 있음** → `already recorded` · 항목 **3** · 중복 **없음** ↔ ⓑ**`already` 가드 제거** → `appended` · 항목 ★**4** · 중복 ★**{35: 2}**. 개악 원복 후 `MUTANT` 잔존 **0**.",
+    "file-untouched": "★**기존 파일 불변** — 모든 합성은 백업 후 즉시 원복했고, 최종 `docs/worklog-coverage-remeasures.json` 은 `origin/main` 판본과 ★**바이트 동일**(`cmp -s`) · 항목 수 **3 → 3**.",
+    "gates": "4게이트 + `cargo +beta clippy` + worklog 2종 + parity-lock 전건 rc=0. ★`AGENTS.md` 수정은 `COMMIT-GATES` 마커 구간 «밖»이라 파리티 락 무영향(`dod_ci_parity` **11 passed**)."
+  },
+  "changes": [
+    "`scripts/check-worklog-coverage.mjs` — `--record` 모드 + `entry` 객체 **호이스팅**(★출력되는 줄과 append 되는 행이 **같은 객체**라 둘이 드리프트할 수 없다) + OVERDUE 문면 교체 + 머리 주석에 «왜 멱등인가»와 ★**«못 막는 것»**까지. ★**인자 없는 경로(=CI 가 도는 그것)의 동작은 한 비트도 바뀌지 않는다.**",
+    "`AGENTS.md` §Landing paperwork — `sh` 블록에 `--record` 한 줄 + 「손으로 붙이지 말고 `--record` 로」와 그 근거(3건 실측). ★종전 문면 「appending the entry the script prints *is* the re-measurement」는 **지우지 않고** 그대로 두고 이어 붙였다(그 문장 자체는 여전히 참이다)."
+  ],
+  "limits": [
+    "★**`--record` 는 «쓰는» 도구라 CI 가 돌리지 않는다** — `engine-contract.yml` 은 인자 없이 부르고, 그 경로는 무변이다. 즉 이 가드는 **사람/회차가 그 명령을 쓸 때만** 작동한다(문면 교체가 그 배선의 전부다).",
+    "★**`decision` 기본값이 기계 문장이다** — `--decision \"…\"` 로 덮을 수 있게 뒀지만, 기본값으로 남으면 그 행의 «왜»가 얇다. 기존 3항목처럼 사람이 사유를 적는 편이 낫다.",
+    "★★**판정식은 여전히 `at(-1)` 이다** — CASE-c/d 가 보인 순서 민감성은 **그대로 남는다**. F3 이 판정식 변경을 금지했고, ⒝ 를 고르지 않았으므로 이 회차의 산출물이 아니다."
+  ],
+  "proposals": [
+    {
+      "title": "재측 판정식이 `at(-1)` 이라 «항목 순서»가 판정을 뒤집는다 — `max` 로 볼 것인가",
+      "plainSummary": "「마지막으로 기록한 회차」를 목록의 맨 끝 항목으로 읽습니다. 항목이 순서 없이 들어오면 같은 내용인데도 통과/실패가 갈립니다.",
+      "userBenefit": "PR 이 어떤 순서로 착지하든 재측 판정이 같은 답을 냅니다.",
+      "why": "★합성 실측(landed=35): `[...,40,25]` → ★**rc=1 OVERDUE** ↔ `[...,25,40]` → ★**rc=0**. ★**같은 집합, 순서만 반대인데 판정이 뒤집힌다.** 코드가 `record.measurements.at(-1)` 이기 때문이고, 병렬 PR 의 착지 순서는 아무도 보장하지 않는다(옛 임계에서 잰 장수 PR 이 새 임계 뒤에 착지하면 바로 그 형상이다). ★`last.pct`·`last.reopened` 도 같은 원소를 읽어 **비율 축**까지 흔들린다(CASE-e: 중복 하나가 `BELOW-UNANSWERED` 를 켰다).",
+      "tradeoff": "⑴★**판정식 변경이다** — 이번 티켓 F3 이 「임계·비율 판정을 바꾸지 마라」로 명시 금지했으므로 **별 회차의 결정**이어야 한다 ⑵`max` 로 바꾸면 CASE-c 가 뒤집힌다 = **지금 red 를 내던 형상이 green 이 된다**. 그것이 «옳은 완화»인지 «게이트 약화»인지는 판단이 필요하다(동률 시 tie-break 도 정해야 한다) ⑶★**아무것도 안 하는 선택도 정당하다**: 오늘 실측상 착지 중복 **0건**이고, 순서 역전은 아직 관측된 적이 없다(합성으로만 보였다).",
+      "effort": "S(한 줄) ~ M(결정과 회귀 시험 포함).",
+      "target": "wie · scripts/check-worklog-coverage.mjs"
+    }
+  ]
+}

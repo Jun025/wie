@@ -93,6 +93,84 @@ jobs:
       - name: DoD parity lock is still wired (docs/worklog/2026-09-05-dod-ci-parity-checker.json #p0)
         run: node scripts/check-parity-lock-wired.mjs
 
+      # Fourth always-run step, same reasoning as the three above, for Constraint
+      # 9/10: until now `scripts/audit-no-leak.sh` ran ONLY from a developer's
+      # `npm run audit` — no workflow called it by any path (measured: 0 hits
+      # across all 8 workflow files). AGENTS.md's constraint table nonetheless
+      # listed it under "Locked by", i.e. the doc promised machine enforcement
+      # that did not exist. This step is that enforcement.
+      #
+      # OUTSIDE the paths filter on purpose: what it guards is a *repo-wide*
+      # property ("no game binaries tracked", "network primitives confined to
+      # lib/api.ts", "rom_hash uniqueness is per-owner"), and the diff that
+      # violates it — a stray `.jar`, a raw `fetch()` in a device-local module, a
+      # migration adding a global UNIQUE — need not touch a single engine path.
+      # A filtered step would skip exactly the PR that needed it.
+      #
+      # Cost: bash + find/grep + python3, no node_modules, no network. Measured
+      # 0.26-0.34s over three runs in a clean worktree.
+      #
+      # Ceiling: section 5's `web/dist` scan self-skips here ("not built yet"),
+      # because this step deliberately runs before/without the frontend build.
+      # The half that matters on a PR — `git ls-files` for tracked game binaries —
+      # runs unconditionally, and dist is a fresh build of sources this same
+      # script audits, so the skipped half has no input the checked half missed.
+      - name: No-leak / owner-isolation audit (Constraint 9-10)
+        run: bash scripts/audit-no-leak.sh
+
+      # Fifth always-run step. `docs/report/NNNN--…` serials are allocated as
+      # "disk max + 1", and disk is the MERGED tree — so two open PRs computing
+      # it independently pick the same number, the filenames differ so git merges
+      # both cleanly, and nothing reddens. That is the ledger-conflict shape the
+      # 2026-09-07 REPORT.md split removed from file *contents* reappearing in
+      # file *names*. Measured the day this landed: main held 0056, open PR #112
+      # held 0056, open PR #111 held 0057.
+      #
+      # ALWAYS-RUN, not paths-filtered, for the same reason as the audit step
+      # above: the diff that creates a duplicate serial is by construction a
+      # docs-only diff, so any filter keyed on engine paths skips exactly the PR
+      # that needed it. This job is the repo's only unfiltered PR gate
+      # (Constraint 4), which is why the check lives here and not in a new job.
+      #
+      # This is the post-hoc half. The pre-emptive half (`--next-serial`, which
+      # consults open PRs) is a human helper with no CI cost — it cannot be a
+      # gate, because a PR cannot know what a sibling will claim after it.
+      #
+      # Cost: node reading one directory. No network, no node_modules.
+      #
+      # `--selftest` runs FIRST and is not optional. The bare mode only reddens
+      # when the tree already holds a duplicate, so it stays silent when the
+      # check itself is broken: deleting `process.exit(1)` from the product call
+      # site leaves the bare mode at rc=0 even with two duplicate serials on
+      # disk, while `--selftest` catches it (its source-slice case asserts the
+      # call site still calls duplicateSerials and still exits 1). Wiring only
+      # the bare mode is "the tool is right but nobody calls it" — measured on
+      # this exact step during review. The sibling repo wires `--selftest` in
+      # three places (docs-gate.yml, ci.yml, gate-checks.txt); wie has one
+      # always-run PR gate and no local gate-checks chain, so one place is the
+      # whole surface.
+      - name: docs/report serials are unique (docs/worklog/2026-09-07-docs-report-serial-uniqueness.json)
+        run: |
+          node scripts/check-docs-report-serial.mjs --selftest
+          node scripts/check-docs-report-serial.mjs
+
+      # ── Deliberately non-blocking, and that is the whole point of the flag ───
+      # This job is a REQUIRED status check on main, so a hard-failing step here
+      # is a required check by placement — nobody has to touch branch protection
+      # for the first false positive to stop a merge. The round that added this
+      # check was told not to make that call, so `continue-on-error` is the
+      # "measured but not promoted" state: the step still prints ::error:: and
+      # still shows as failed in the run, it just does not fail the job.
+      #
+      # PROMOTING IT means deleting the one `continue-on-error` line below —
+      # nothing else, and no branch-protection edit. Do that once there is a
+      # sample: it has fired at least once on a real fixture change and the
+      # message was right. Until then a wrong accusation costs an annotation,
+      # not a round.
+      - name: Engine-runner list matches the fixture set (docs/worklog/2026-09-07-engine-runner-fixture-drift.json)
+        continue-on-error: true
+        run: node scripts/check-engine-runner-fixtures.mjs
+
       # Detect whether this diff touches anything that can change the built
       # artifact or the pinned surface. If not, the job short-circuits to success
       # (see the wrapper note in the header). Same list as publish-artifact.yml.

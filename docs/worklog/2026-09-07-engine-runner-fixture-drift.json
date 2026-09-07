@@ -1,0 +1,41 @@
+{
+  "schema": "worklog/v1",
+  "date": "2026-09-07",
+  "task": "wie-engine-runner-list-vs-fixture-set-drift-check",
+  "taskId": "T-20260907-erfd",
+  "title": "러너 목록 ↔ 픽스처 집합 드리프트 검사 — 존재 대조(S) 완료",
+  "summary": "AGENTS.md 의 「엔진을 만졌으면 이 러너를 돌려라」 목록을 마커로 감싸고, git ls-files test_data/ 와 양방향으로 대조하는 node 검사를 넣었다. 지금 차는 0 이다. engine-contract.yml 에 continue-on-error 로 붙였다 — 그 job 이 required 라 hard-fail 은 곧 승격이고, 승격은 이 회차의 결정이 아니다.",
+  "changes": [
+    "AGENTS.md — 러너 sh 블록에 ENGINE-RUNNER:BEGIN/END 마커 + NOT-RUN 면제 구문 문서화",
+    "scripts/check-engine-runner-fixtures.mjs 신설 — 마커 구간의 test_data/ 호명 ↔ 추적 픽스처를 stem 집합으로 양방향 대조",
+    ".github/workflows/engine-contract.yml — contract job 에 스텝 1개 추가(continue-on-error · 순수 삽입 17줄 · 삭제 0줄)",
+    "STATE.md · docs/report/0081--2026-09-07--wie-engine-runner-list-vs-fixture-set-drift-check.md"
+  ],
+  "verification": [
+    "F1⑶ 현재 차 — stem 기준 양방향 0 / 0. ★경로 기준으로는 1:1(블록 draw_j2me.jar ↔ 추적 draw_j2me.zip)이고 계수는 5:5 로 «같다»",
+    "방향1 픽스처를 임시로 늘림(keydraw_skt.zip) → rc=1 · 그 파일을 이름으로 지목",
+    "방향2 목록에서 keydraw_lgt.zip 제거 → rc=1 · 그 파일을 이름으로 지목",
+    "방향3 END 마커 제거 → rc=1(빈 구간을 OK 로 읽지 않는다)",
+    "방향4 늘린 뒤 NOT-RUN 으로 면제 → rc=0 이고 excused 로 분류(named 에 섞이지 않는다)",
+    "심은 것 전건 원복 — git status --porcelain 에 계획된 변경만 남음",
+    "cargo test --all · 네 게이트 · beta clippy · 저장소 검사기 전건"
+  ],
+  "limits": [
+    "존재 대조(S)까지다. 분류(M — 「이 종류는 이 러너」)는 «하지 않았다» — 재개 지점은 아래 제안 #p0",
+    "stem 대조라 draw_j2me.zip ↔ draw_j2me.jar 를 같은 픽스처로 본다. 같은 stem 의 «다른» 픽스처를 만들면 조용하다",
+    "test_data/ 밖의 픽스처는 보지 않는다(오늘 0건)",
+    "continue-on-error 라 지금은 «막지 않는다» — PR 을 red 로 만들지도 않는다. 승격 조건은 워크플로 주석에 적었다"
+  ],
+  "adoptedProposals": ["2026-09-06-agents-runner-keydraw-inject#p0"],
+  "proposals": [
+    {
+      "title": "러너 드리프트 검사 — 분류(M)까지 갈지, 그리고 승격할지",
+      "plainSummary": "지금 검사는 「목록에 있나 없나」만 봅니다. 「이 픽스처는 --inject 가 필요한 종류인가」까지는 보지 않습니다.",
+      "userBenefit": "새 픽스처를 목록에 «잘못된 줄»로 넣는 실수까지 잡혀, 문서대로 돌렸는데 헛도는 일이 없어집니다.",
+      "why": "★이 회차는 존재 대조(S)에서 «끝냈다» — F2 가 그렇게 지시했다. 분류(M)는 검사기가 「어떤 픽스처가 --inject 를 요구하는가」를 알아야 하고, 그것이 제안이 경고한 «두 번째 진실원»이다. ★다만 오늘 NOT-RUN 면제 구문으로 «분류를 문서 안에 두는» 형태가 하나 생겼다 — 같은 형태로 `INJECT:` 를 쓸 수 있는지가 재개 지점이다. ★승격(= continue-on-error 제거)도 함께 판단하라: 이 검사가 실제 픽스처 변경에서 «한 번이라도» 울고 그 메시지가 옳았는지가 조건이다.",
+      "tradeoff": "⑴구문이 늘면 블록이 검사기 입력처럼 보이기 시작한다 — 사람이 읽는 문서라는 성격이 흐려진다 ⑵승격을 미루면 그동안은 아무도 안 볼 수 있다(continue-on-error 의 알려진 대가) ⑶분류 없이도 오늘의 실측 차는 0 이라 급하지 않다.",
+      "effort": "M",
+      "target": "wie · scripts/check-engine-runner-fixtures.mjs · .github/workflows/engine-contract.yml · AGENTS.md"
+    }
+  ]
+}

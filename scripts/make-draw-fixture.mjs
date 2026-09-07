@@ -78,8 +78,16 @@ class ConstantPool {
 }
 
 // One method with a Code attribute. `code` is already-resolved bytecode.
-const method = (cp, name, desc, maxStack, maxLocals, code) => {
-  const body = Buffer.concat([u2(maxStack), u2(maxLocals), u4(code.length), code, u2(0), u2(0)]);
+//
+// `handlers` is the Code attribute's exception_table: one {startPc, endPc,
+// handlerPc, catchType} per entry, catchType being a CONSTANT_Class index (0
+// would mean "any", which we never want — see the catch-narrowly note in
+// drawMidlet). Offsets are byte offsets into `code`; the caller computes them
+// from the length of the buffers it concatenated, so a re-ordered instruction
+// cannot silently point the handler at the wrong pc.
+const method = (cp, name, desc, maxStack, maxLocals, code, handlers = []) => {
+  const table = Buffer.concat(handlers.map((h) => Buffer.concat([u2(h.startPc), u2(h.endPc), u2(h.handlerPc), u2(h.catchType)])));
+  const body = Buffer.concat([u2(maxStack), u2(maxLocals), u4(code.length), code, u2(handlers.length), table, u2(0)]);
   return Buffer.concat([u2(0x0001), u2(cp.utf8(name)), u2(cp.utf8(desc)), u2(1), u2(cp.utf8("Code")), u4(body.length), body]);
 };
 
@@ -133,6 +141,13 @@ export const KEY_BAR_H = 8; // px per unit of key code → pixels = BASE + code*
 // repo exercised either half: a planted panic!() at image.rs left the suite and
 // all five fixtures green (measured 2026-09-05).
 export const IMG_RESOURCE_NAME = "/wie-img.png"; // leading slash = MIDP convention; the jar branch of URLClassLoader::findResource trims it
+// The two failure branches. `MISSING` is deliberately NOT a jar entry; `BROKEN`
+// IS one, holding bytes that are not any image format — so the two exercise the
+// two different arms (resource lookup vs. decode) and cannot be confused.
+export const IMG_MISSING_NAME = "/wie-absent.png";
+export const IMG_BROKEN_NAME = "/wie-broken.png";
+export const IMG_ERR_MISSING = "imgerr:missing";
+export const IMG_ERR_BROKEN = "imgerr:broken";
 export const IMG_W = 16;
 export const IMG_H = 8;
 export const IMG_BAR_Y = 48; // below the key bar (32..40), so no rect ever overlaps another
@@ -285,8 +300,9 @@ const drawMidlet = () => {
   const init = Buffer.concat([Buffer.from([0x2a]), Buffer.from([0xb7]), u2(superInit), Buffer.from([0xb1])]);
 
   // Open the bundled resource BY NAME and remember the dimensions the host
-  // reported. There is no try/catch — the assembler emits no exception table —
-  // so a throw here propagates out of startApp. MEASURED (2026-09-06), because
+  // reported. The exception table below guards only the two failure-branch
+  // calls, never THIS one, so a throw here propagates out of startApp.
+  // MEASURED (2026-09-06), because
   // an earlier version of this comment guessed and guessed wrong: it does NOT
   // degrade to "the base rect only". net/wie/Launcher.startMIDlet does not
   // swallow it, so the boot aborts and wie_validate reports
@@ -313,7 +329,61 @@ const drawMidlet = () => {
     u2(imgH), // putstatic DrawCanvas.imgH
   ]);
 
-  const startApp = Buffer.concat([
+  // ── The two FAILURE branches of the same call ─────────────────────────────
+  // The success path above locks "the host found the resource". These lock what
+  // the guest RECEIVES when it does not — which no fixture said anything about
+  // until now, so either branch could change type or stop throwing and every
+  // check stayed green.
+  //
+  // The two branches throw DIFFERENT types, read from the host source, not
+  // guessed (wie_midp/.../lcdui/image.rs):
+  //   • name not in the jar  -> java/io/IOException "Resource not found: {name}"
+  //     (create_image_from_name, the `None =>` arm)
+  //   • bytes are not an image -> java/lang/IllegalArgumentException
+  //     "Failed to decode image" (create_image_from_data, the decode_image err arm)
+  //
+  // CATCH NARROWLY, on purpose. Each handler names its exact class rather than
+  // java/lang/Throwable (catch_type 0 = "any" is never used here), so the TYPE
+  // is part of what the fixture locks: if a branch starts throwing something
+  // else, the handler no longer catches, the throw leaves startApp, and the boot
+  // aborts — a loud red, not a marker that silently keeps meaning "fine".
+  // Symmetrically, if a branch stops throwing at all, control falls through the
+  // `goto` and the marker is never printed — also red, via the stdout assertion.
+  const ioException = cp.class_("java/io/IOException");
+  const illegalArgument = cp.class_("java/lang/IllegalArgumentException");
+  const sysOut = cp.field("java/lang/System", "out", "Ljava/io/PrintStream;");
+  const println = cp.method("java/io/PrintStream", "println", "(Ljava/lang/String;)V");
+  const missingName = cp.string(IMG_MISSING_NAME);
+  const brokenName = cp.string(IMG_BROKEN_NAME);
+  const missingMark = cp.string(IMG_ERR_MISSING);
+  const brokenMark = cp.string(IMG_ERR_BROKEN);
+
+  // try { createImage(name); } catch (<type>) { System.out.println(mark); }
+  // 7 bytes of guarded body, 3 of goto, 10 of handler = 20 per branch.
+  const attempt = (nameIdx) =>
+    Buffer.concat([
+      Buffer.from([0x13]),
+      u2(nameIdx), // ldc_w <resource name>
+      Buffer.from([0xb8]),
+      u2(createImage), // invokestatic Image.createImage(String)
+      Buffer.from([0x57]), // pop — a returned Image is not the point here
+    ]);
+  const report = (markIdx) =>
+    Buffer.concat([
+      Buffer.from([0x4c]), // astore_1 — the caught exception (handler entry stack = [exc])
+      Buffer.from([0xb2]),
+      u2(sysOut), // getstatic System.out
+      Buffer.from([0x13]),
+      u2(markIdx), // ldc_w "imgerr:…"
+      Buffer.from([0xb6]),
+      u2(println), // invokevirtual println(String)
+    ]);
+  const GUARDED = 7; // attempt()
+  const HANDLER = 10; // report()
+  const SKIP = 3; // goto
+  const branch = (nameIdx, markIdx) => Buffer.concat([attempt(nameIdx), Buffer.from([0xa7]), u2(GUARDED + SKIP + HANDLER - GUARDED), report(markIdx)]);
+
+  const prologue = Buffer.concat([
     Buffer.from([0x2a]), // aload_0
     Buffer.from([0xb8]),
     u2(getDisplay), // invokestatic Display.getDisplay(MIDlet)
@@ -325,10 +395,27 @@ const drawMidlet = () => {
     Buffer.from([0xb6]),
     u2(setCurrent), // invokevirtual setCurrent(Displayable)
     loadImage,
-    Buffer.from([0xb1]), // return
   ]);
 
-  return classFile(cp, "DrawMIDlet", MIDLET, [method(cp, "<init>", "()V", 1, 1, init), method(cp, "startApp", "()V", 3, 1, startApp)]);
+  // Offsets are DERIVED from the buffers, never written by hand: a handler that
+  // points at the wrong pc is the classic way an exception table goes silently
+  // wrong (it catches, jumps into the middle of an instruction, and the JVM
+  // reports something unrelated).
+  const b1 = prologue.length;
+  const b2 = b1 + GUARDED + SKIP + HANDLER;
+  const startApp = Buffer.concat([
+    prologue,
+    branch(missingName, missingMark),
+    branch(brokenName, brokenMark),
+    Buffer.from([0xb1]), // return
+  ]);
+  const handlers = [
+    { startPc: b1, endPc: b1 + GUARDED, handlerPc: b1 + GUARDED + SKIP, catchType: ioException },
+    { startPc: b2, endPc: b2 + GUARDED, handlerPc: b2 + GUARDED + SKIP, catchType: illegalArgument },
+  ];
+
+  // max_locals 2: the handlers astore_1 the caught exception (local 0 is `this`).
+  return classFile(cp, "DrawMIDlet", MIDLET, [method(cp, "<init>", "()V", 1, 1, init), method(cp, "startApp", "()V", 3, 2, startApp, handlers)]);
 };
 
 const MANIFEST = ["Manifest-Version: 1.0", "MIDlet-Name: DrawFixture", "MIDlet-1: DrawFixture, , DrawMIDlet", ""].join("\n");
@@ -410,6 +497,12 @@ export const drawFixtureJar = () =>
     // the jar branch of URLClassLoader::findResource trims the one the guest
     // passes (`name_str.trim_start_matches('/')` at the pinned rev).
     [IMG_RESOURCE_NAME.replace(/^\//, ""), png(IMG_W, IMG_H)],
+    // Present but undecodable — the decode arm's input. NOT a truncated PNG: a
+    // valid signature with a broken body could plausibly be handled by some
+    // future partial decoder, and then this branch would quietly stop testing
+    // anything. Bytes that match no format at all keep the branch honest.
+    // (IMG_MISSING_NAME is absent from this list on purpose — that IS its test.)
+    [IMG_BROKEN_NAME.replace(/^\//, ""), Buffer.from("not an image", "utf8")],
   ]);
 
 // Run directly to drop the jar on disk (handy for `wie_validate <jar>`).

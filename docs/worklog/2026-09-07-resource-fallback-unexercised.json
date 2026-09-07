@@ -1,0 +1,38 @@
+{
+  "schema": "worklog/v1",
+  "date": "2026-09-07",
+  "task": "wie-resource-fallback-branch-unexercised-in-both-targets",
+  "title": "리소스 폴백 가지는 두 타깃 모두에서 도달 0 — 그 아래를 단위시험으로 덮었다",
+  "summary": "wie_lgt 의 System::filesystem() 폴백 두 자리가 네이티브와 브라우저 «둘 다»에서 도달 0 임을 프로브로 재현했다(추정 아님). 폴백을 실제로 지나게 하려면 새 픽스처가 필요해(제안 tradeoff ⑴) 하지 않았고, 제안이 「그쪽이 먼저다」로 지목한 tradeoff ⑵ — 호스트가 갈리는 아래쪽 — 을 단위시험 7건으로 덮었다. 제품 코드 무접촉.",
+  "changes": [
+    "wie_cli/src/filesystem.rs — path_for 단위시험 5건 신설(그 파일의 시험 0 → 5)",
+    "wie_backend/src/system/file_system.rs — 폴백이 부르는 size→read 호출쌍 1건 + 백슬래시/traversal 마스킹 1건(7 → 9)",
+    "docs/report/0078--… · docs/worklog/… — 착지 서류"
+  ],
+  "verification": [
+    "F1⑵ 네이티브: 폴백 두 자리에 unreachable!() 심고 cargo test --all → 167 passed / 0 failed · PROBE 히트 0 ⇒ 도달 0 · 원복 후 git status --porcelain 0",
+    "F1⑶ 브라우저: 같은 두 자리에 panic!() 심고 wasm 재빌드 후 contract-roundtrip.mjs → 46/46 checks passed · rc=0 · PROBE 히트 0 · E-res/F-res 둘 다 green ⇒ 도달 0 · 소스와 wasm 산출물 모두 원복",
+    "양방향 M1(오버레이 가상층 폴백 제거) → fallback_size_then_read_pair_round_trips FAILED(20 passed / 2 failed)",
+    "양방향 M2(CLI traversal 거부 제거) → traversal_and_empty_are_rejected + differs_from_web_on_absolute_and_backslash FAILED(3 passed / 2 failed)",
+    "원복 cmp 바이트 동일(두 파일) · cargo test --all 167 → 174(+7 = 넣은 시험 수와 일치) · rc=0",
+    "4게이트 + beta clippy + node 검사기 4종 + npm run audit 전건 rc=0"
+  ],
+  "limits": [
+    "폴백을 «실제로 지나는» 시험은 하지 않았다. 클래스로더가 못 찾고 파일시스템에는 있는 이름이 필요하고, 그건 픽스처 재생성 또는 add_virtual 로 심은 이름을 쓰는 새 시나리오다(제안 tradeoff ⑴ · 노력도 M). 재개 지점은 그것이다.",
+    "wie_web/src/filesystem.rs 는 #![cfg(target_arch = \"wasm32\")] 라 네이티브 cargo test 가 컴파일조차 하지 않는다 ⇒ 「단위시험 3벌」 중 그 한 벌은 이 축에서 불가능하다. Web 쪽 규칙은 CLI 시험의 divergence 케이스에 «상대편 값»으로 적어 두는 것이 지금 할 수 있는 최선이었다.",
+    "제안 tradeoff ⑶(도달 불가면 죽은 코드이므로 제거 결정이 값한다)은 닫지 않았다. 도달 0 은 두 타깃에서 확인됐지만, 그것이 「죽은 코드」인지 「픽스처가 안 건드리는 산 코드」인지는 별 결정이다.",
+    "divergence 시험은 unix 에서만 백슬래시 케이스를 단언한다(#[cfg(unix)]). Windows 레그에서는 Path::components 가 백슬래시를 분리자로 보므로 값이 다르고, 그 축은 재지 않았다."
+  ],
+  "adoptedProposals": ["2026-09-06-resource-browser-axis#p0"],
+  "proposals": [
+    {
+      "title": "리소스 폴백 가지를 «제거할지» 결정한다 — 도달 0 은 두 타깃에서 확인됐다",
+      "plainSummary": "wie_lgt 의 System::filesystem() 폴백은 네이티브에서도 브라우저에서도 한 번도 실행되지 않는다. 남길지 지울지는 아직 아무도 정하지 않았다.",
+      "userBenefit": "죽은 코드면 지워서 읽는 사람을 줄이고, 산 코드면 그것을 지나는 픽스처가 생겨 호스트별 정규화 차이가 실제로 검증된다. 지금은 둘 다 아니다.",
+      "why": "이 회차 실측: 두 자리에 프로브를 심어도 네이티브 167 passed · 브라우저 46/46 로 전건 green(PROBE 히트 0). 제안 자신이 tradeoff ⑶ 에서 「아무것도 안 하는 선택도 정당하다 — 그때 값하는 것은 시험이 아니라 제거 여부 결정」이라 적었다.",
+      "tradeoff": "제거하면 클래스로더가 못 찾는 이름을 게스트가 요청할 때 FatalError 대신 다른 실패가 되고, 그 경로가 실기에서 쓰이는지는 코퍼스 0(Constraint 9)이라 확인할 수 없다 — 「안전하다」고 말할 수 없는 자리다. 남기면 죽은 코드가 남는다.",
+      "effort": "S",
+      "target": "wie_lgt/src/runtime/wipi_c/context.rs (get_resource_size · read_resource)"
+    }
+  ]
+}

@@ -113,6 +113,42 @@
 //   WIPIKeyCode::from_midp_raw. What the browser adds is the key-agnostic half,
 //   and any one arriving key proves that (same argument as Scenario D).
 //
+// Scenario E-res / F-res (same two instances — WIPI RESOURCE READ, ASSERTED):
+//   The keydraw guest reads the bundled `res.bin` at boot and prints
+//   `res:<size>:<byte-sum>`, and that one line distinguishes "both hops ran"
+//   (MC_knlGetResourceID -> get_resource_size, MC_knlGetResource ->
+//   read_resource) from "only the first did". wie_{ktf,lgt}/tests/
+//   test_resource_reach.rs already assert it headlessly; these two checks add
+//   the layers those tests cannot reach — the wasm build and the glue.
+//
+//   ── Why stdout here and pixels everywhere else (measured, not preference) ──
+//   The guest paints nothing for the resource on purpose, so the key-pixel
+//   assertions above stay readable; a pixel axis would need the resource drawn
+//   on the same screen the key assertions own, i.e. two more fixture zips.
+//   Reading stdout costs nothing instead: guest printf goes
+//   MC_knlPrintk -> Platform::write_stdout, and wie_web implements that as
+//   `web_sys::console::log_1` (wie_web/src/platform.rs), so the line is ALREADY
+//   in the browser console. This file already listens (`consoleLog` below) and
+//   only discarded it unless the run failed. No glue hook, no new zip, and
+//   nothing added to docs/contracts/featurephone-engine-contract.json — that
+//   pin has zero stdout/console entries, so Constraint 3 is untouched.
+//
+//   ── Why both carriers, when the resolved path is the same one ─────────────
+//   For THIS fixture both carriers answer from the RustJava class loader
+//   (in-memory jar) — measured, by mutation: killing only LGT's
+//   System::filesystem() fallback left F-res green, because that branch is
+//   never reached while the class loader finds res.bin. So the carriers are not
+//   two host paths here; they are two WIPI-C shims over one resolver, and the
+//   check is per-carrier because the shims are (KTF returns early on
+//   `stream.is_none()`, LGT falls through to the filesystem).
+//   That fallback is still the only place a host-divergent implementation sits
+//   (wie_web::WebFilesystem vs wie_cli::CliFilesystem), and NOTHING here covers
+//   it — see the worklog for why that gap was left open rather than papered
+//   over with a second fixture.
+//
+//   The expected numbers are DERIVED from the fixture's own recipe, never
+//   restated — same rule as the Scenario E constants below.
+//
 // Scenario F (LGT keydraw fixture — the SAME question on LGT, ASSERTED):
 //   E's twin, and the only net for a whole class of bug: it once failed at 0 px
 //   while KTF reached 424, because MIDP overpainted the good WIPI frame with a
@@ -130,7 +166,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { BASE_RECT_PX, IMG_H, IMG_RECT_PX, IMG_W, drawFixtureJar, keyBarPixels } from "./make-draw-fixture.mjs";
+import { BASE_RECT_PX, IMG_ERR_BROKEN, IMG_ERR_MISSING, IMG_H, IMG_RECT_PX, IMG_W, drawFixtureJar, keyBarPixels } from "./make-draw-fixture.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const contract = JSON.parse(await readFile(path.join(root, "docs/contracts/featurephone-engine-contract.json"), "utf8"));
@@ -185,11 +221,20 @@ for (const [variant, key] of Object.entries(KTF_VARIANT_TO_KEY)) {
   if (typeof width !== "number") throw new Error(`keydraw fixture: no arm for KeyCode::${variant} — refusing to fail-open`);
   if (width !== wipi) throw new Error(`keydraw fixture paints ${width} for KeyCode::${variant}, but contract.keyWipiCodes["${key}"] is ${wipi} — the fixture and the contract disagree`);
 }
+// Scenario E-res/F-res's expected line, DERIVED from the recipe that writes the
+// payload — the guest computes size and byte-sum from those same bytes, so the
+// assertion pins the fixture's own arithmetic rather than a copied literal.
+const resPayload = keydrawSh.match(/^printf '([^']*)' > "\$S\/wipi\/examples\/resources\/keydraw\/res\.bin"$/m)?.[1];
+if (typeof resPayload !== "string" || resPayload.length === 0)
+  throw new Error("keydraw fixture: cannot read the `printf '<payload>' > .../res.bin` line from scripts/make-wipi-keydraw-fixture.sh — refusing to fail-open");
+const resBytes = Buffer.from(resPayload, "latin1");
+const resLine = `res:${resBytes.length}:${resBytes.reduce((a, b) => a + b, 0)}`;
+
 // Scenario C-img's numbers, DERIVED from the fixture's own exports (same rule as
 // the Scenario E constants above: never restate a number the fixture owns).
 // Crosses into the page context through page.evaluate's argument — the module
 // import is Node-side only.
-const IMG = { base: BASE_RECT_PX, px: IMG_RECT_PX, w: IMG_W, h: IMG_H };
+const IMG = { base: BASE_RECT_PX, px: IMG_RECT_PX, w: IMG_W, h: IMG_H, errMissing: IMG_ERR_MISSING, errBroken: IMG_ERR_BROKEN };
 
 // One representative per positive band, mirroring Scenario D's three.
 const KTF_KEYS = ["HASH", "STAR", "NUM5"].map((code) => ({
@@ -240,8 +285,23 @@ page.on("pageerror", (e) => consoleLog.push(`[pageerror] ${e.message}`));
 await page.goto(base + "/");
 page.setDefaultTimeout(120_000);
 
-const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys, img }) => {
+const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys, img, resLine }) => {
   const steps = [];
+  // wie_web 은 게스트 stdout 을 console.log 로 낸다(Platform::write_stdout ->
+  // web_sys::console::log_1). 원 함수를 그대로 호출하므로 Node 쪽 진단 수집은
+  // 영향받지 않는다 — 여기서는 «어느 시나리오 구간의» 줄인지 가르려고 기록한다.
+  const guestOut = [];
+  const realLog = console.log.bind(console);
+  console.log = (...a) => {
+    guestOut.push(a.map((x) => String(x)).join(" "));
+    realLog(...a);
+  };
+  // ★한 줄이 «한 메시지»로 오지 않는다 — 실측(2026-09-06): 게스트의 `res:{}:{}` 한 줄이
+  // console 에 `res:` / `9` / `:` / `602` / `\n` 다섯 메시지로 쪼개져 도착한다.
+  // MC_knlPrintk 가 포맷 조각마다 Platform::write_stdout 을 부르고 wie_web 이 그
+  // 호출마다 console.log_1 을 내기 때문이다. 네이티브는 바이트 스트림이라 줄이 저절로
+  // 이어지므로 ★이 쪼개짐은 «브라우저에만» 있다. ⇒ 메시지별이 아니라 «이어붙인» 버퍼에서 찾는다.
+  const sawSince = (mark, needle) => guestOut.slice(mark).join("").includes(needle);
   const check = (name, pass, info = "") => {
     steps.push({ name, pass: !!pass, info: String(info) });
     return !!pass;
@@ -355,6 +415,7 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     check("B: free() (no throw)", true);
 
     // ── Scenario C: J2ME draw fixture — canvas blit, ASSERTED not reported ───
+    const markC = guestOut.length;
     const c = await bootFixture(mod2, "draw_j2me.jar");
     check('C: platform_kind() === "J2ME"', c.emu.platform_kind() === "J2ME", `got ${c.emu.platform_kind()}`);
     const runC = await tickLoop(c.emu, c.canvas, 30_000, (px) => px > 0);
@@ -371,16 +432,38 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     // The guest fills a rect of the dimensions the host reported for the decoded
     // image, so the pixel count is the ANSWER, not a liveness signal: exactly
     // BASE + IMG_W*IMG_H means the name resolved AND decode_image produced those
-    // dimensions. A failure is LOUD, not a smaller number: startApp has no catch
-    // (the fixture's assembler emits no exception table), so an unresolved name
-    // aborts the boot — measured 2026-09-06 as FAIL/paints 0 under wie_validate.
+    // dimensions. A failure on THIS name is LOUD, not a smaller number: the
+    // assembler's exception table guards only the two failure-branch calls below,
+    // never this one, so an unresolved /wie-img.png still aborts the boot —
+    // measured 2026-09-06 as FAIL/paints 0 under wie_validate.
     const runCimg = await tickLoop(c.emu, c.canvas, 30_000, (px) => px === img.base + img.px);
     check(
       `C: Image.createImage(String) resolves the bundled resource — a ${img.w}x${img.h} image`,
       runCimg.threw === null && runCimg.pixels === img.base + img.px,
       runCimg.threw ??
         `${runCimg.pixels} px, expected ${img.base + img.px} (base ${img.base} + image ${img.px}) — ` +
-          `startApp has no catch, so a resource that does not resolve aborts the boot: expect a throw or 0 px, not ${img.base}`,
+          `this call is outside the exception table, so a resource that does not resolve aborts the boot: expect a throw or 0 px, not ${img.base}`,
+    );
+
+    // ── Scenario C-err: the FAILURE branches of the same call (ASSERTED) ─────
+    // C-img locks "the host found it". These lock what the guest RECEIVES when it
+    // does not — the half no fixture said anything about, so either branch could
+    // change exception type or stop throwing and every check stayed green.
+    // The markers come from narrow catches in the assembler (java/io/IOException
+    // and java/lang/IllegalArgumentException, read from wie_midp/.../image.rs), so
+    // a wrong type escapes the handler and aborts the boot instead of printing.
+    // Split by PREFIX (`imgerr:`) on purpose: the existing assertions above match
+    // on pixel COUNTS and the `res:` ones on their own prefix, so added output
+    // cannot shift what any of them find.
+    check(
+      `C-err: absent resource name surfaces as java.io.IOException (${img.errMissing})`,
+      sawSince(markC, img.errMissing),
+      guestOut.slice(markC).join("") || "(no guest stdout after the C boot)",
+    );
+    check(
+      `C-err: undecodable bytes surface as java.lang.IllegalArgumentException (${img.errBroken})`,
+      sawSince(markC, img.errBroken),
+      guestOut.slice(markC).join("") || "(no guest stdout after the C boot)",
     );
 
     // ── Scenario D: does a key press REACH THE GUEST? (behavioral, not no-throw) ─
@@ -408,6 +491,7 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     const fixtureBytes = await (await fetch("/fixtures/keydraw_ktf.zip")).arrayBuffer();
     check("E: static server delivers keydraw_ktf.zip", fixtureBytes.byteLength > 0, `${fixtureBytes.byteLength} bytes over HTTP`);
 
+    const markE = guestOut.length;
     const e = await bootFixture(mod2, "keydraw_ktf.zip");
     check('E: platform_kind() === "KTF"', e.emu.platform_kind() === "KTF", `got ${e.emu.platform_kind()}`);
     // Unlike the helloworld fixtures this one never exits — it waits for a key,
@@ -424,6 +508,13 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
         runE.threw ?? `${runE.pixels} px, expected ${k.expectPixels} (${k.wipi}*barH) after ${runE.frames} frames`,
       );
     }
+
+    // E-res: 부팅 때 읽은 리소스가 «두 홉 다» 돌았는가 — 키 픽셀 단언과 같은 화면을 다투지 않는다.
+    check(
+      `E-res: KTF guest reads res.bin through the wasm build (${resLine})`,
+      sawSince(markE, resLine),
+      guestOut.slice(markE).filter((l) => l.startsWith("res:")).join(" | ") || "no res: line on the console at all",
+    );
 
     e.emu.free();
     check("E: free() (no throw)", true);
@@ -453,6 +544,7 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     const fixtureBytesF = await (await fetch("/fixtures/keydraw_lgt.zip")).arrayBuffer();
     check("F: static server delivers keydraw_lgt.zip", fixtureBytesF.byteLength > 0, `${fixtureBytesF.byteLength} bytes over HTTP`);
 
+    const markF = guestOut.length;
     const f = await bootFixture(mod2, "keydraw_lgt.zip");
     check('F: platform_kind() === "LGT"', f.emu.platform_kind() === "LGT", `got ${f.emu.platform_kind()}`);
     // Same guest source as keydraw_ktf.zip, built by the same script, so the bar
@@ -468,13 +560,20 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
       );
     }
 
+    // F-res: 같은 질문을 LGT 에서 — ★이쪽은 호스트별 Platform::filesystem() 을 먼저 거친다.
+    check(
+      `F-res: LGT guest reads res.bin through the wasm build (${resLine})`,
+      sawSince(markF, resLine),
+      guestOut.slice(markF).filter((l) => l.startsWith("res:")).join(" | ") || "no res: line on the console at all",
+    );
+
     f.emu.free();
     check("F: free() (no throw)", true);
   } catch (e) {
     check("scenario aborted by exception", false, (e && e.stack) || String(e));
   }
   return steps;
-}, { contract, representativeKeys: REPRESENTATIVE_KEYS, ktfKeys: KTF_KEYS, img: IMG });
+}, { contract, representativeKeys: REPRESENTATIVE_KEYS, ktfKeys: KTF_KEYS, img: IMG, resLine });
 
 await browser.close();
 server.close();
