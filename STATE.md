@@ -32,6 +32,14 @@
 ★**그리고 진짜 사슬은 `Jun025/RustJava` `[patch]` 표다** — 재정렬과 **독립적으로 지금 끊을 수 있다**(P1).
 
 ## 진행중
+- **형제 `-18` 두 자리에 시험** (PR 개설 · `wie-sibling-shortbuf-sites-have-no-tests`
+  · 채택 제안 `2026-09-07-get-resource-shortbuf-abi#p0`) — `wie_wipi_c/.../kernel.rs` 시험 **2건**.
+  ★**제품 코드 무접촉** — diff hunk **3건 전부 `mod test` 안** · 제품 구간 hunk **0** · `return Ok(-18)` 세 줄 그대로.
+  ★**시험 0건을 내가 셌다**: `kernel.rs` 시험 5건 중 그 둘을 부르는 것은 성공 경로만 보는 1건뿐이고
+  `get_program_name` 은 저장소 전체 시험 참조 **0**이었다.
+  ★**개악 대조 — 두 자리가 «각각» red 이고 «독립»**: M1(`-18→-1`)·M2(`-18→-9`) 각각 **1 failed**이고
+  ★**형제 시험은 그때마다 green** · 원복 **바이트 동일** · `cargo test --all` **161 → 163**(+2).
+  ★기대값은 «수»로 적었다 — `M_E_SHORTBUF` 는 정의가 **0건**(주석뿐)이라 이름을 쓰면 두 번째 진실원이 된다.
 - **`get_resource` 의 버퍼-부족 코드가 ABI 어휘 밖이었다** (PR 개설 · `wie-get-resource-shortbuf-code-is-not-in-the-abi`
   · 채택 제안 `2026-09-06-spi-resource-failure-branches#p0`) — ★**⒜(`-18` 통일)** · 비-주석 변경 **2줄**.
   ★**결정 근거는 «일관성»이 아니라 실측이다**: 핀 rev 에서 `WIPICError::from_raw`(=`transmute`)를 지나는 호스트
