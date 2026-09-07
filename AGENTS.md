@@ -300,7 +300,7 @@ design** — do not "fix" that by wiring it:
 
 ### Landing paperwork
 
-- **`STATE.md` and `docs/report/` are tracked files, not scratch**: keep `STATE.md`'s 진행중/완료/다음 current as a task starts and lands, and write a dated 무엇을·왜·사용자 영향 entry when it lands. **Round entries go in a new `docs/report/NNNN--YYYY-MM-DD--<ticket-id>.md` — do not append to `REPORT.md`**, which is now a fixed pointer (2026-09-07; every round appending to one file's top made every open PR conflict — 5/5 at migration time, 4 of them on the ledger files *only*). `NNNN` is the global sequence, largest + 1:
+- **`STATE.md` and `docs/report/` are tracked files, not scratch**: keep `STATE.md`'s 완료/다음 current as a task lands, and write a dated 무엇을·왜·사용자 영향 entry when it lands. **Do not write a 진행중 entry** — that section became a fixed pointer to `gh pr list` on 2026-09-08, for the reason below. **Round entries go in a new `docs/report/NNNN--YYYY-MM-DD--<ticket-id>.md` — do not append to `REPORT.md`**, which is now a fixed pointer (2026-09-07; every round appending to one file's top made every open PR conflict — 5/5 at migration time, 4 of them on the ledger files *only*). `NNNN` is the global sequence, largest + 1:
 
   ```sh
   N=$(node scripts/check-docs-report-serial.mjs --next-serial)   # ask the tool, not the directory
@@ -319,6 +319,24 @@ design** — do not "fix" that by wiring it:
   file**; move the side that has not landed yet.
 
   **`-H` is load-bearing, not cosmetic.** It prefixes the path, so `sort -r` keys on the *sequence number*; `-h` keys on the title text, which is the date, and this repo lands up to six rounds a day. Measured over 54 files: the `-h` form is **52 lines out of place**, the `-H` form is **0**. Sort by the **sequence number, not the date** — the ledger's date-monotonicity is a coincidence, not a guarantee. `REPORT.md` explains the rest; `docs/report-migration-revert.md` reverts it.
+
+  **What actually conflicts is a *shared insertion point*, not a "top".** Measured 2026-09-08 on the
+  10 most recent landings that are replayable (the branch tip before it pulled base, merged against
+  the `main` it pulled): **10/10 conflicted, and `STATE.md` was the only conflicting file in all
+  10** — the `REPORT.md` half is gone, which is what the 2026-09-07 migration bought. Stripping
+  §진행중 from all three sides clears **7/10**; stripping §완료 clears **4/10**; stripping both
+  clears **10/10**. So the two sections are *each* a contention point and neither alone is
+  sufficient — and stripping only the shared "열린 형제 PR: #…" enumeration line clears **0/10**, so
+  it is the round *entries* that collide, not that line.
+
+  **This is why `STATE.md`'s 진행중 is a pointer and not an append-only list.** git's three-way
+  merge needs exactly **one** unchanged line between two insertions: measured, 0 lines apart →
+  CONFLICT, 1 line apart → clean. Appending every round to the *bottom* is still one shared point,
+  so it conflicts identically — a same-position insert collides whether the position is the top or
+  the bottom. Keying the position off the PR number does not save it either, because sibling rounds
+  here carry **consecutive** numbers (#120–#133 measured), which puts their slots back-to-back. The
+  only thing that removes the collision is removing the point, which is what the pointer does.
+  §완료 still has one, and that is the measured **3/10 residual** — recorded, not fixed here.
 - **The ledger files of this repo are `STATE.md`, `REPORT.md`, `docs/report/**`, `docs/worklog/**`,
   and `docs/worklog-coverage-remeasures.json`.**
   Resolve a merge conflict in any of them by **union** — keep both sides' entries, ordered by the
