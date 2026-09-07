@@ -229,8 +229,22 @@ pub async fn get_resource(context: &mut dyn WIPICContext, id: i32, buf: WIPICInd
 
     let data = context.read_resource(name).await?;
 
+    // -18, not the -1 this returned until 2026-09-07. -1 is not a `WIPICError` variant at the
+    // pinned rev (`{1, 0, -9, -12, -18, -22, -25}` in wipi_types/src/wipic.rs) and
+    // `wipic_sys::kernel::get_resource` is typed `-> WIPICError` via `from_raw`, which is a
+    // `transmute` — so handing a guest -1 was an invalid discriminant, i.e. UB. Measured at that
+    // rev: `get_resource` and `graphics::create_image` are the *only* host functions reachable
+    // through that transmute (6 wrappers, ktf/lgt/simulation), and create_image only ever returns
+    // 1, so this was the one out-of-vocabulary value on a transmute path.
+    //
+    // Whether a real title branches on -1 CANNOT be checked here: there is no commercial corpus
+    // (Constraint 9) and no WIPI error-code spec in this repo or the pinned wipi repo — `M_E_*` has
+    // zero definitions in either, the names in this file are bare comments. So this trades an
+    // unmeasurable compatibility risk for removing a definite UB. The two sibling sites that
+    // already return -18 for the same condition (`get_system_property`, `get_program_name`) are
+    // deliberately untouched; this makes all three agree.
     if data.len() as u32 > buf_size {
-        return Ok(-1);
+        return Ok(-18); // M_E_SHORTBUF
     }
 
     context.write_bytes(context.data_ptr(buf)?, &data)?;
@@ -483,13 +497,17 @@ mod test {
     ///
     /// This is a HOST-side test on purpose. The guest route the obvious way — have the
     /// fixture call `wipic_sys::kernel::get_resource` with a short buffer and print the
-    /// code — cannot observe -1 soundly: that function is typed `-> WIPICError`, whose
-    /// variants at the pinned rev are {1, 0, -9, -12, -18, -22, -25}, and `from_raw` is a
-    /// `transmute`. Handing it -1 is an invalid discriminant, i.e. UB. See the round's
-    /// worklog for the proposal about whether -1 is the right code here at all.
+    /// code — is what made the old -1 unobservable: that function is typed `-> WIPICError`,
+    /// whose variants at the pinned rev are {1, 0, -9, -12, -18, -22, -25}, and `from_raw`
+    /// is a `transmute`, so -1 was an invalid discriminant. That is why the code is now -18
+    /// (`InsufficientBufferSize`); the reasoning lives at the branch itself.
+    ///
+    /// **-18 is the assertion that matters here.** It is not incidental: reverting the branch
+    /// to -1 fails this test, which is the only machine tie holding the value inside the ABI
+    /// vocabulary — nothing else in the workspace checks it.
     ///
     /// Both directions are asserted: a buffer one byte short fails, the exact size passes.
-    /// Asserting only the failure would also pass if the function returned -1 always.
+    /// Asserting only the failure would also pass if the function returned -18 always.
     #[futures_test::test]
     async fn test_resource_larger_than_buffer_is_rejected() -> Result<()> {
         const PAYLOAD: &[u8] = b"0123456789";
@@ -506,7 +524,7 @@ mod test {
         assert_eq!(u32::from_le_bytes(reported) as usize, PAYLOAD.len());
 
         let short = context.alloc(PAYLOAD.len() as u32 - 1).unwrap();
-        assert_eq!(get_resource(&mut context, id, short, PAYLOAD.len() as u32 - 1).await.unwrap(), -1);
+        assert_eq!(get_resource(&mut context, id, short, PAYLOAD.len() as u32 - 1).await.unwrap(), -18);
 
         let exact = context.alloc(PAYLOAD.len() as u32).unwrap();
         assert_eq!(get_resource(&mut context, id, exact, PAYLOAD.len() as u32).await.unwrap(), 0);
