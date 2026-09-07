@@ -48,8 +48,12 @@
   ★★**정직한 범위 — 「지는가」의 답은 «절반»이다**: **어휘 축은 진다**(추가·개번·삭제) · ★**「누가 `from_raw` 를 지나는가」는 «안 진다»**
   (`wipic_sys` 가 이 워크스페이스의 의존이 아니다 — 주석에만 나온다). ⇒ 어휘 밖 4건 중 **2건 온전 + 1건 절반**을 덮는다.
   ★착지 시 **실배포 2건** 예상(`web.yml` + `publish-artifact` — 착지 diff 에 `.rs` 가 있다).
-- **createImage 실패 «메시지»를 잠글지 — ★⒝(가지1 이름 토큰만) + ⒞(가지2 미잠금·기록)**
-  (PR 개설 · `wie-createimage-error-message-lock-decision` · 채택 제안 `2026-09-06-createimage-failure-branches#p1`)
+- (그 밖: ★열린 형제 PR: **#98 · #99 · #100** — 각자 자기
+  브랜치에서 진행 중이고, 전부 `STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장에서 충돌한다(정상))
+
+## 완료 (최근)
+- 2026-09-08: **createImage 실패 «메시지»를 잠글지 — ★⒝(가지1 이름 토큰만) + ⒞(가지2 미잠금·기록)**
+  (PR **#131** 착지 · `wie-createimage-error-message-lock-decision` · 채택 제안 `2026-09-06-createimage-failure-branches#p1`)
   — `wie_midp/tests/create_image_missing_name_message.rs` **시험 1건**. ★**제품 코드 무접촉 · 픽스처 바이트코드 0 · jar 재생성 0.**
   ★**F1⑵ 메시지는 «2개»**(`image.rs` 의 `jvm.exception(` 전수 2건) · ★**F1⑶ 기계 독자 «0»**(추적 591파일 전수 —
   히트는 생산 지점 소스 줄과 산문뿐: `STATE.md:349` · `docs/report/0047` · `docs/upstream-realign-verdict.md:796` · 주석).
@@ -61,10 +65,6 @@
   ★**제안이 예측한 비용이 «틀렸다»** — `tradeoff` ⑵ 「게스트 어셈블리가 는다」는 불필요했다:
   `test_utils::run_jvm_test` 가 이미 있고 `wie_midp` 가 이미 dev-dep 로 갖는다(`wie_midp/Cargo.toml:27`) · jar 없이 `None =>` 팔에 닿는다.
   ★착지 시 **실배포 2건** 예상(`web.yml` + `publish-artifact` — 착지 diff 에 `.rs` 가 있다 · ★`paths-filter` 는 «내용»이 아니라 «경로»).
-- (그 밖: ★열린 형제 PR: **#98 · #99 · #100** — 각자 자기
-  브랜치에서 진행 중이고, 전부 `STATE.md` 를 만지므로 착지할 때마다 뒤엣것이 원장에서 충돌한다(정상))
-
-## 완료 (최근)
 - 2026-09-07: **재측 판정이 «마지막에 붙은 행»을 읽던 문제 — ★⒜(max) 채택** (PR **#128** 착지 · `wie-worklog-coverage-last-vs-max-decision`
   · 채택 제안 `2026-09-06-remeasure-record-idempotent#p0`) — `at(-1)` → **`landedRounds` 최대 행**(동률은 나중에 붙은 쪽).
   ★**비-주석 변경 «한 줄»** · ★**임계(`WINDOW=10`)·`THRESHOLD=70`·「비율은 사람이 판단한다」 무접촉** · 기록 파일 **0줄**(재측 기록 0).
