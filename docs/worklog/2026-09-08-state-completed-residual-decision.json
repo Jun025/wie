@@ -1,0 +1,38 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-08",
+  "task": "wie-state-completed-top-insert-residual-three",
+  "title": "STATE.md §완료의 «맨 위 삽입 지점» — 그대로 둔다(⒞) · 남은 충돌은 «알고 남긴 값»이다",
+  "summary": "직전 회차가 §진행중을 고정 안내로 바꾼 뒤 남은 §완료 충돌을 없앨지 판단했다. 결론은 ⒞(그대로 둔다)이고, 두 수를 정정했다 — 전향 충돌률은 3/10 이 아니라 1/1 이며, docs/report/ 는 §완료의 상위집합이 아니다(8항목이 다른 데 없다). 기계 소비자가 0 이라 충돌은 어느 게이트도 막지 않고, 비용은 base 당김 안의 union 편집 하나다. 기록은 AGENTS.md §Landing paperwork.",
+  "changes": [
+    "AGENTS.md §Landing paperwork — §완료를 그대로 두는 «결정»과 그 근거(전향률 1/1 · docs/report 미포함 8항목 · 소비자 0 · 되돌릴 신호 3종 · 줄번호 인용 부패)를 #134 검산식 블록 바로 뒤에 기록",
+    "docs/report/0089--2026-09-08--wie-state-completed-top-insert-residual-three.md — 회차 기록",
+    "STATE.md §완료 — 이 회차 항목 1건 추가(형식·기존 항목 무접촉)"
+  ],
+  "verification": [
+    "F1⑴ 전향 충돌률: b0a08d73 에서 일회용 워크트리(git worktree add --detach)로 두 회차를 main 에서 독립 분기 → 둘 다 §완료 머리 삽입 시 merge-tree rc=1 CONFLICT · 간격 1·2·3줄은 전건 rc=0 clean. ★초판 측정은 두 합성 커밋이 «순차»(B의 부모가 A)라 거짓 clean 이 나왔고, 부모를 실측(A^=B^=C^=b0a08d73)해 바로잡았다.",
+    "F1⑴-b 과거 재현: 최근 착지 12건 중 base 당김 머지 9건을 두 부모로 재병합 → 충돌 9/9 · 그중 STATE.md 단독 7건.",
+    "F1⑵ 형식: §완료 최상위 항목 87건 · 861줄(STATE.md 1019줄의 84.5%) · 최신이 위(머리 2026-09-08 ↔ 꼬리 2026-07-22) · 쓰는 주체는 착지 회차(게이트③ 2-b) 또는 구현 회차의 선기재.",
+    "F1⑶ 소비자: 추적 코드/설정 344파일에서 '## 완료' 파서 0건 · 'STATE.md' 언급 1건(wie_midp/tests/create_image_missing_name_message.rs · doc 주석 산문) · .github/ 전체 0건. ★git ls-files -z | xargs -0 형태가 대조군(해당 파일 히트 2)을 놓쳐 «거짓 0» 을 냈고, 전체 목록 필터 루프로 바꿔 재측했다.",
+    "docs/report 커버리지: §완료 87항목 중 id 추출 82 · docs/report 에 없는 id 3건 · id 없는 구형 5건 ⇒ 미포함 8항목.",
+    "줄번호 부패 실측: 그 doc 주석이 가리키는 STATE.md:349 는 지금 무관한 항목이고, 인용이 뜻한 createImage 내용은 510행에 있다.",
+    "격리 원복: git worktree remove --force 후 worktree list 1건 · git status --porcelain 0줄."
+  ],
+  "limits": [
+    "미포함 8항목의 docs/report 백필은 «하지 않았다» — 이 회차는 판단이고, 백필은 ⒜안의 절반 집행이다. 되돌릴 신호 ⒝로 남겼다.",
+    "전향률 1/1 은 «두 회차가 동시에 §완료 머리를 쓸 때»의 값이다. 회차가 겹치지 않으면 충돌하지 않는다 — 하루 10~25건 착지라 겹침이 상례라는 것이 판단의 입력이다.",
+    "AGENTS.md 의 7+3=10 검산식은 §완료를 바꾸지 않았으므로 그대로 참이다. 이 회차의 1/1 은 «다른 축»(과거 표본이 아니라 전향 예측)이라 그 식을 반증하지 않는다 — 회신과 기록 블록에 그 구분을 명시했다."
+  ],
+  "adoptedProposals": ["2026-09-08-state-in-progress-pointer#p0"],
+  "proposals": [
+    {
+      "title": "STATE.md §완료에만 있는 8항목을 docs/report/ 로 백필",
+      "plainSummary": "완료 이력 87건 중 8건은 회차별 파일이 없어 STATE.md 에만 있다. 그 8건을 회차별 파일로 옮기면 완료 절을 고정 안내로 바꾸는 선택지가 처음으로 «값싼» 것이 된다.",
+      "userBenefit": "지금은 완료 절을 손대면 8건이 사라지므로 어떤 정리도 못 한다. 백필하면 그 잠금이 풀리고, 착지마다 나는 원장 재해소도 없앨 수 있는 길이 열린다.",
+      "why": "실측: §완료 87항목 중 id 보유 82 · docs/report 미보유 id 3건(wie-pr45-orphan-close-and-remnant-land-r2 · wie-state-landed-pr56-residue-and-misc-unk9-error-lock · wie-supply-chain-cargo-updates-a2-a3) · id 없는 구형 5건. 이 8건이 포인터화의 유일한 실질 장애다.",
+      "tradeoff": "⑴8건은 «지금 회차가 쓴 것»이 아니라 과거 회차의 요약이라, 옮기면 저자와 시점이 흐려진다 — 옮긴 사실을 파일 안에 적어야 한다. ⑵백필만으로는 충돌이 줄지 않는다(포인터화가 뒤따라야 값한다) ⇒ 두 회차로 갈리는 것을 감수해야 한다. ⑶PR #114 가 «완료 분할 안 함»을 결정했으므로, 이 제안은 분할이 아니라 «이관»임을 명시해야 그 결정과 충돌하지 않는다.",
+      "effort": "S",
+      "target": "docs/report/ · STATE.md §완료"
+    }
+  ]
+}
