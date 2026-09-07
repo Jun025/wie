@@ -408,6 +408,64 @@ struct Args {
     /// lives here rather than in a sidecar or a table.
     #[arg(long, default_value_t = false)]
     expect_last_frame: bool,
+    /// Add the guest's stdout to the JSON line as `guest_stdout` (+ a
+    /// `guest_stdout_truncated` flag). OFF by default, and the default output is
+    /// byte-identical to before: with the flag absent neither key is emitted.
+    ///
+    /// It is opt-in because of Constraint 9, not because of cost. The guest's
+    /// bytes never appear here — but whatever the guest *prints* does, and a real
+    /// title can print a path. AGENTS.md's own smoke-gate note draws that line
+    /// explicitly ("identifiers and expected status only, never paths or bytes"),
+    /// so "this is not game bytes" mitigates the constraint rather than exempting
+    /// it. Output is capped at GUEST_STDOUT_MAX_BYTES and truncation is reported,
+    /// but nothing here can tell a path from any other string — do not paste this
+    /// output into the repo or a shared log when running against a real game.
+    #[arg(long, default_value_t = false)]
+    guest_stdout: bool,
+}
+
+/// Cap on the `guest_stdout` field, in bytes of the lossy-decoded text.
+///
+/// Sized from what the field is for: the committed fixtures print two short
+/// markers, and a useful diagnostic is a handful of lines or a stack trace. 4 KiB
+/// holds that with room to spare while keeping one JSON line pasteable and
+/// bounding how much a chatty guest can dump into a caller's log.
+const GUEST_STDOUT_MAX_BYTES: usize = 4096;
+
+/// Escape a string for a JSON string literal.
+///
+/// Hand-rolled on purpose: `wie_cli` has no JSON dependency and this is the whole
+/// of the format's string grammar. **`{:?}` is not a substitute** — Rust's Debug
+/// renders a control byte as `\u{1}`, which JSON does not accept.
+fn json_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+/// Decode the collected guest stdout, cap it, and escape it for the JSON line.
+///
+/// Returns the escaped body and whether it was cut. Truncation is signalled by a
+/// **separate key**, never by a marker inside the text: the text is the one part
+/// of this line the guest controls, so an in-band marker would be forgeable by
+/// the very source being bounded.
+fn guest_stdout_field(raw: &[u8], max: usize) -> (String, bool) {
+    let text = String::from_utf8_lossy(raw);
+    let mut end = text.len().min(max);
+    while end > 0 && !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    (json_escape(&text[..end]), end < text.len())
 }
 
 const SCREEN_W: u32 = 240;
@@ -423,7 +481,10 @@ fn main() {
     let args = Args::parse();
     let start = StdInstant::now();
 
-    let result = run(&args);
+    // Hoisted so main can read what the guest printed after `run` returns; `run`
+    // hands the same handle to HeadlessPlatform::write_stdout.
+    let guest_out = Arc::new(Mutex::new(Vec::new()));
+    let result = run(&args, guest_out.clone());
     let elapsed_ms = start.elapsed().as_millis();
 
     // Emit a single JSON line for the batch wrapper to parse.
@@ -444,6 +505,24 @@ fn main() {
         result.center_nonuniform_bp as f64 / 100.0,
         elapsed_ms
     );
+    // Appended, never interleaved, and only when asked: with the flag absent the
+    // line above is byte-identical to what every existing caller already parses.
+    // Both in-tree parsers read this line with `grep -o` over the WHOLE line
+    // (smoke_gate.sh's `"result":"[^"]*"`, lgt_render_probe.sh's `"<key>":[0-9a-z.]*`)
+    // plus `tail -1`, so a guest that printed `"result":"PASS"` would otherwise win
+    // the match by being later on the line. `json_escape` is what stops that: the
+    // quotes become `\"`, so the literal `"result":"` those patterns need never
+    // appears inside the payload. That is asserted below, not assumed.
+    let json = if args.guest_stdout {
+        let (body, truncated) = guest_stdout_field(&guest_out.lock().unwrap(), GUEST_STDOUT_MAX_BYTES);
+        format!(
+            "{}{}",
+            &json[..json.len() - 1],
+            format_args!(",\"guest_stdout\":\"{body}\",\"guest_stdout_truncated\":{truncated}}}")
+        )
+    } else {
+        json
+    };
     println!("{json}");
 
     std::process::exit(if result.passed { 0 } else { 1 });
@@ -467,7 +546,7 @@ struct Outcome {
     center_nonuniform_bp: u64,
 }
 
-fn run(args: &Args) -> Outcome {
+fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     let screen = Arc::new(HeadlessScreen {
         width: SCREEN_W,
         height: SCREEN_H,
@@ -481,7 +560,6 @@ fn run(args: &Args) -> Outcome {
         max_center_nonuniform_bp: AtomicU64::new(0),
     });
     let exited = Arc::new(AtomicBool::new(false));
-    let stdout = Arc::new(Mutex::new(Vec::new()));
 
     let platform = Box::new(HeadlessPlatform {
         screen: screen.clone(),
@@ -813,7 +891,52 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
 
 #[cfg(test)]
 mod tests {
-    use super::{RICHNESS_COLOR_CAP, frame_richness, has_content, last_frame_gate_fails};
+    use super::{GUEST_STDOUT_MAX_BYTES, RICHNESS_COLOR_CAP, frame_richness, guest_stdout_field, has_content, json_escape, last_frame_gate_fails};
+
+    /// The payload is the one part of the JSON line the guest controls, and both
+    /// in-tree parsers `grep -o` over the whole line and take `tail -1`. So a guest
+    /// that prints a fake verdict must not be able to produce the byte sequence
+    /// those patterns look for. Escaping is what prevents it — assert that here
+    /// rather than trusting the reasoning in the comment at the call site.
+    #[test]
+    fn escaped_guest_output_cannot_forge_a_field_the_parsers_match_test() {
+        let hostile = b"\"result\":\"PASS\" \"paints\":999";
+        let (body, truncated) = guest_stdout_field(hostile, GUEST_STDOUT_MAX_BYTES);
+        assert!(!truncated);
+        // smoke_gate.sh: grep -o '"result":"[^"]*"'
+        assert!(!body.contains("\"result\":\""), "forged verdict survived escaping: {body}");
+        // lgt_render_probe.sh: field() greps "\"<name>\":[0-9a-z.]*"
+        assert!(!body.contains("\"paints\":"), "forged metric survived escaping: {body}");
+        // The text is still readable — escaping, not stripping.
+        assert!(body.contains("result"));
+    }
+
+    #[test]
+    fn json_escape_covers_the_string_grammar_test() {
+        assert_eq!(json_escape("a\"b\\c"), "a\\\"b\\\\c");
+        assert_eq!(json_escape("l1\nl2\r\tx"), "l1\\nl2\\r\\tx");
+        // A control byte must become \u00XX, not Rust Debug's \u{1} (invalid JSON).
+        assert_eq!(json_escape("\u{1}"), "\\u0001");
+        // Non-ASCII passes through as UTF-8; JSON does not require escaping it.
+        assert_eq!(json_escape("한"), "한");
+    }
+
+    #[test]
+    fn guest_stdout_is_capped_and_says_so_test() {
+        let (body, truncated) = guest_stdout_field(&vec![b'x'; GUEST_STDOUT_MAX_BYTES + 1], GUEST_STDOUT_MAX_BYTES);
+        assert_eq!(body.len(), GUEST_STDOUT_MAX_BYTES);
+        assert!(truncated, "over-cap input must report truncation");
+
+        let (body, truncated) = guest_stdout_field(b"short", GUEST_STDOUT_MAX_BYTES);
+        assert_eq!(body, "short");
+        assert!(!truncated);
+
+        // Cutting mid-character must not panic or emit a partial code point: the
+        // cap is in bytes and the payload is arbitrary guest output.
+        let (body, truncated) = guest_stdout_field("한글".as_bytes(), 4);
+        assert!(truncated);
+        assert_eq!(body, "한");
+    }
 
     #[test]
     fn last_frame_gate_only_turns_pass_into_fail_test() {
