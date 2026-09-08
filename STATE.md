@@ -61,7 +61,7 @@
 
 ## 완료 (최근)
 - 2026-09-09: **`smoke_gate.sh` 의 JSON 읽기도 «같은 안전 술어»로 — ★여기선 «거짓 PASS» 가 가능했다**
-  (PR 개설 · `wie-smoke-gate-json-read-safety-predicate-align` · 채택 제안 `2026-09-08-render-probe-field-safety#p0`)
+  (PR **#144** 착지 · `wie-smoke-gate-json-read-safety-predicate-align` · 채택 제안 `2026-09-08-render-probe-field-safety#p0`)
   — `run_one()` 안 한 자리(**9+/2− · 1파일**). ★**`.rs` 0줄 · 새 의존성 0 · 새 검사기·임계 0 · 리팩터 0.**
   ★**현 상태 확인**: `:76` 에 `tail -1` **실재**(미착수). ★**제안보다 «한 칸 더» 나쁜 것을 찾았다 — 위험의 «방향»**:
   바로 다음 줄이 `[ "$res" = "PASS" ] && echo PASS || echo FAIL` 이라 ★**읽기가 곧 «판정»**이다.
