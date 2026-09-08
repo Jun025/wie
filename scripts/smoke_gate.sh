@@ -62,7 +62,7 @@ esac
 # args this is the deterministic boot+render verdict; "$@" lets the advisory pass --inject.
 run_one() {
   local f="$1"; shift
-  local json pid i res
+  local json pid i res m n
   json="$(mktemp)"
   "$BIN" "$f" --timeout "$TIMEOUT" "$@" >"$json" 2>/dev/null &
   pid=$!
@@ -73,7 +73,14 @@ run_one() {
     sleep 1
   done
   wait "$pid" 2>/dev/null || true
-  res="$(grep -o '"result":"[^"]*"' "$json" | tail -1 | cut -d'"' -f4)"
+  # `tail -1` used to end this line: a repeated "result" key was resolved by POSITION, silently.
+  # That is the same hazard `scripts/lgt_render_probe.sh` field() fixed (2026-09-08) and it bites
+  # harder here — line below turns this read into the PASS/FAIL verdict, so a later occurrence
+  # winning could report PASS for a run that failed. Count first, say so, then take the first.
+  m="$(grep -o '"result":"[^"]*"' "$json" || true)"
+  n="$(printf '%s' "$m" | grep -c . || true)"
+  [ "$n" = 1 ] || echo "   ! $(basename "$f"): \"result\" 매치 ${n}건(기대 1) — 이 판정을 신뢰하지 마라" >&2
+  res="$(printf '%s' "$m" | head -1 | cut -d'"' -f4)"
   rm -f "$json"
   [ "$res" = "PASS" ] && echo PASS || echo FAIL
 }

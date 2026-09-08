@@ -1,0 +1,31 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-09",
+  "task": "wie-smoke-gate-json-read-safety-predicate-align",
+  "title": "smoke_gate.sh 의 JSON 읽기도 같은 안전 술어로 — 여기선 거짓 PASS 가 가능했다",
+  "summary": "렌더 프로브에서 고친 「같은 키가 여럿이면 조용히 위치로 고른다」가 smoke_gate.sh:76 에 그대로 남아 있었다(열어서 확인 · tail -1 실재). 제안을 채택·집행했다. 다만 여기는 읽기가 곧 PASS/FAIL 판정이라 위험의 방향이 다르다 — 반복 키에서 뒤엣것이 이기면 FAIL 인 run 을 PASS 로 보고한다(실증: 옛 PASS ↔ 새 FAIL). 매치 수를 세어 1건이 아니면 stderr 로 말하고 값은 첫 매치로 결정론화했다. 술어는 문자열 값이라 렌더 프로브 것을 그대로 복사하지 않고 값 타입에 맞췄다.",
+  "changes": [
+    "scripts/smoke_gate.sh — run_one() 안 JSON 읽기 한 자리(9+/2−): tail -1 제거 · 매치 수 검사 후 1건이 아니면 stderr · 값은 head -1 · 왜 여기서 더 나쁜지(다음 줄이 판정)를 주석으로",
+    "docs/report/0099--2026-09-09--wie-smoke-gate-json-read-safety-predicate-align.md — 회차 기록",
+    "STATE.md — 완료 항목 1건"
+  ],
+  "verification": [
+    "F1⑴ 제안 원문을 파일에서 열어 읽었다(docs/worklog/2026-09-08-render-probe-field-safety.json proposals[0] — title/plainSummary/userBenefit/why/tradeoff/effort/target 전문).",
+    "F1⑵ 그 회차 done 의 「남는 것」 절과 review(verdict approve · pin c3e53874 · merged cfac2cfc)를 읽었다. 선행은 #142 로 착지 완료.",
+    "F1⑶ 현 상태: scripts/smoke_gate.sh:76 에 grep -o '\"result\":\"[^\"]*\"' | tail -1 | cut 그대로 — tail -1 실재, 미착수. set -eo pipefail · bash 3.2 제약 · CI 미실행(.github/ 전수 smoke_gate 참조 0건).",
+    "위험 방향 실증(합성 JSON): {\"result\":\"FAIL\"}⏎{\"result\":\"PASS\"} 와 {\"run\":{\"result\":\"FAIL\"},\"retry\":{\"result\":\"PASS\"}} → 옛=PASS(거짓 green) · 새=FAIL + stderr 「매치 2건」.",
+    "위양성 0: 정상 단일 문서 PASS/FAIL 각각 옛=새 동일(2/2).",
+    "빈 파일 함정(티켓 지목): 빈 파일·키 부재 둘 다 옛·새 모두 FAIL(fail-closed)이고 새 코드는 「매치 0건」을 말한다. bash -n·cmp 에 기대지 않고 행동으로 확인했다.",
+    "공허하지 않음: run_one 을 스텁 BIN + /bin/bash 3.2.57 로 실제 구동(게임 바이트 0) — PASS→PASS · FAIL→FAIL · 반복→FAIL+경고 · 빈 파일→FAIL+경고. bash -n rc=0.",
+    "게이트: fmt 0 · clippy 0 · clippy(wasm) 0 · cargo test --all rc=0(176 passed / 0 failed) · cargo +beta clippy 0 · npm run audit 0. check-docs-report-serial rc=0(연번 0099 — 도구에 물었다) · check-worklog-json rc=0 · check-worklog-coverage rc=0.",
+    "변경 최소: git diff --stat = scripts/smoke_gate.sh 1파일 9+/2−."
+  ],
+  "limits": [
+    "이 스크립트는 game_lab/(gitignore · 실게임 바이트)를 읽는 로컬 전용이라 CI 로 검증할 수 없다 — 제안 tradeoff ⑴ 그대로다. 대조는 합성 JSON + 스텁 BIN 으로만 했다.",
+    "술어를 렌더 프로브에서 그대로 복사하지 않았다 — result 는 문자열 값이라 문자클래스와 cut 구분자가 다르다(제안 tradeoff ⑵ 가 예고했다). 모양(매치 수 검사 + 첫 매치)만 같게 맞췄다.",
+    "반복 키를 abort 로 만들지 않았다 — set -eo pipefail 아래서 죽으면 카탈로그 나머지 타이틀을 못 본다. 값은 결정론적으로 내되 모호함은 stderr 로 말한다(렌더 프로브와 같은 판단).",
+    "오늘 기준 이 경로는 무증상이다(validator 는 단일 평면 문서를 낸다). 고친 것은 「지금 틀린 값」이 아니라 「조용히 틀릴 수 있는 술어」다."
+  ],
+  "adoptedProposals": ["2026-09-08-render-probe-field-safety#p0"],
+  "proposals": []
+}
