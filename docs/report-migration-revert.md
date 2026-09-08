@@ -122,102 +122,29 @@ git grep -lIF 'REPORT.md' -- . ':!REPORT.md'
 - ★**`.gitattributes` `merge=union` 으로 갈아타고 싶어졌다** → ★**그것이 이 이관이 거부한 방향이다.**
   union 은 충돌을 «없애는» 것이 아니라 «숨기는» 것이고, 그 결과 **충돌이 안 나면서 의미가 깨진다.**
 
----
+## 6. 소진된 부록 — 이관 «직후» 열린 PR 5건 레시피 (2026-09-08 제거)
 
-# 부록 — 이관 «직후» 열린 PR 5건을 푸는 법 (한시적 · 이 절은 다 풀리면 지운다)
+이 문서에는 「부록 — 이관 «직후» 열린 PR 5건을 푸는 법」 **97줄**(헤딩~파일끝 · 앞 구분선까지
+합쳐 diff 상 **−99**)이 있었다. 그 절이 스스로
+「**이 절은 다 풀리면 지운다**」고 선언했고, ★**그 조건이 2026-09-08 충족돼 지웠다** —
+`#98 9533e882` · `#99 b0a08d73` · `#100 53336bae` · `#105 7fa02f16` · `#106 e50eecd4` **전건 착지**,
+그리고 `gh pr list --state open` **0건**(2026-09-08 07:41 KST 실측).
 
-★**이관은 열린 PR 을 «일시적으로 더 나쁘게» 만들지 않는다 — 이 저장소는 이미 전건 충돌이었다.**
-이관 시점 실측(`git merge-tree --write-tree` vs `origin/main`):
+★**복구**: `git show b0a08d73:docs/report-migration-revert.md`(삭제 직전 판본 전문) ·
+부록을 **신설**한 커밋은 `01ef775b`, 이후 `ca0ecf26`·`026bdc4b` 가 그 본문을 고쳤다.
 
-| | REPORT.md 충돌 | 충돌 없음 |
-|---|---:|---:|
-| **이관 «전»** | **5**(#98·#99·#100·#105·#106) | **0** |
+★★**부록과 «함께» 사라진 재측 지시 3곳 — 알고 접었다.** 삭제 전 이 문서의 「이관 시점 값이니 다시
+재라」류는 **7곳**이었고 그중 **3곳이 부록 안**이었다(`:130` 5건 충돌 표 · `:196` `rstrip()` 정규화 전제 ·
+`:214` 원장 append-only 전제). ★**되살리지 않는다** — `:196`·`:214` 는 **부록 레시피의 술어를 지키는**
+지시라 레시피 없이 두면 **참조 대상이 없고**, `:130` 의 측정은 `REPORT.md` §「왜 갈랐나」에 **더 상세히**
+살아 있다. 함정의 «이름»은 `docs/report/0052`(「차집합 기준 `:1` · 추가 절 «전건» 이동 · `rstrip()` 정규화」)에,
+「한쪽 통째 채택 금지」의 일반형은 `AGENTS.md` union 규약에 있다.
+⇒ ★**전문이 필요하면 바로 위 복구 명령이 그 3곳을 «부록째» 되살린다.**
+★**남은 4곳**(`:43 :62 :106 :116`)은 §0~§5 안이라 **그대로 유효**하다 — 되돌리기 «직전»에 다시 재라.
 
-⇒ ★**새로 나빠지는 PR 은 없다.** 다만 **해소 방식이 바뀐다** — 아래 레시피를 쓴다.
-★그리고 **`STATE.md` 충돌은 그대로 남는다**(이관 대상이 아니다) — 그쪽은 종전대로 합집합 해소다.
-
-## 해소 레시피 (그 PR 의 게이트③ 회차가 `git merge origin/main` 직후에 친다)
-
-```bash
-# 1) 내 브랜치가 REPORT.md 에 «추가한 절 전건»을 떼어 각각 새 파일로 옮긴다
-#    ★★기준은 :1(merge-base)이다 — :3(theirs)로 재지 마라.
-#      이 레시피가 쓰이는 시점의 :3 = 착지 후 main 의 REPORT.md = «고정 안내» = 절 0개다.
-#      그러면 `mine ∖ theirs` = 내 절 «전건»이 되어 원장을 통째로 복제한다
-#      (형제 저장소 게이트② 실측: 417건 복제가 «검산 통과»로 넘어갔다).
-#    ★★한 절만 뜨면 안 된다 — 브랜치가 2절 이상 더한 경우가 흔하다(형제 실측: 13건 중 9건).
-git show :1:REPORT.md > /tmp/base.md            # :1 = merge-base(공통 조상) ★차집합의 기준
-git show :2:REPORT.md > /tmp/mine.md            # :2 = ours(내 브랜치 쪽)
-python3 - <<'EOF'
-import os, re, hashlib
-def secs(p):
-    t=open(p,encoding="utf8").read().split("\n"); f=False; st=[]
-    for i,l in enumerate(t):
-        if l.startswith("```"): f=not f
-        if not f and l.startswith("## ["): st.append(i)
-    return ["\n".join(t[s:(st[k+1] if k+1<len(st) else len(t))]) for k,s in enumerate(st)]
-# ★★비교는 반드시 `rstrip()` 위에서 한다 — `secs()` 가 절을 「헤딩 ~ 다음 헤딩 직전」으로 자르므로
-#   슬라이스에 **경계 빈 줄이 포함**된다. 새 절이 삽입되면 «그 앞 절»의 꼬리 빈 줄이 1개 달라져
-#   원문 그대로 비교하면 **기존 절이 «추가»로 오인**된다(형제 실측: 충돌 PR 14건 중 ★4건 = 29%).
-mine, base = secs("/tmp/mine.md"), {b.rstrip() for b in secs("/tmp/base.md")}
-added=[b for b in mine if b.rstrip() not in base]  # ★merge-base 에 없던 = 내가 «추가한» 절
-os.makedirs("docs/report", exist_ok=True)
-def norm(x): return hashlib.sha256(x.rstrip().encode("utf8")).hexdigest()   # ★가드도 같은 정규화
-have={norm(open(f"docs/report/{f}",encoding="utf8").read()) for f in os.listdir("docs/report")}
-dup=[b for b in added if norm(b) in have]
-if dup:                                          # ★독립 축 — 절 «수» 산술이 아니라 «내용»을 본다
-    raise SystemExit(f"★중단 — 이미 docs/report 에 있는 절 {len(dup)}건을 복제하려 한다."
-                     " 기준이 :1 인지 확인하라(아무것도 쓰지 않았다).")
-nxt=max([int(f[:4]) for f in os.listdir("docs/report") if f[:4].isdigit()], default=0)
-for b in reversed(added):                        # 오래된 것부터 = 작은 연번부터
-    nxt+=1
-    d=re.match(r"^## \[(\d{4}-\d{2}-\d{2})\]", b).group(1)
-    n=f"docs/report/{nxt:04d}--{d}--<slug>.md"   # ★<slug> 를 회차 티켓 id 로 바꿔라
-    open(n,"w",encoding="utf8").write(b if b.endswith("\n") else b+"\n")
-    print("옮김:", n, "·", b.split("\n")[0][:60])
-print(f"★추가 절 {len(added)}건 전건 이동")
-EOF
-
-# 2) REPORT.md 는 «main 쪽(고정 안내)»을 그대로 받는다 — 내 절은 이미 1)로 옮겼다
-git checkout --theirs -- REPORT.md 2>/dev/null || git checkout origin/main -- REPORT.md
-
-# 3) 검산 — ★«절 수»로 본다(줄 수는 순서·누락에 둔감하다). ★기준은 여기서도 :1 이다
-/usr/bin/grep -c '^## \[' /tmp/mine.md                     # :2 내 브랜치 절 수
-/usr/bin/grep -c '^## \[' /tmp/base.md                     # :1 merge-base 절 수
-ls docs/report/*.md | wc -l                                # ★(:2 − :1) 만큼 늘었어야 한다
-
-git add docs/report REPORT.md && rm -f /tmp/mine.md /tmp/base.md
-```
-★★**이관 PR «자신»의 머지 회차는 방향이 반대다.** 그 PR 은 `:2`(ours)가 이미 «고정 안내»(절 0개)이고
-새 절은 **main 쪽(`:3`)에** 쌓인다 ⇒ 1단계에서 **mine 을 `:2:` 대신 `:3:` 로** 읽는다(기준 `:1` 은 그대로,
-2단계 `--theirs` 는 **`--ours`** 로 뒤집는다). ★중복 가드는 양쪽 방향 모두에서 그대로 지킨다.
-
-★★**`rstrip()` 정규화가 «안전한» 이유 — 절 본문의 유의미한 꼬리 공백이 원장에 없기 때문이다.**
-`rstrip()` 은 **꼬리 공백만 다른 두 절을 같다고 본다** ⇒ 그 차이가 유의미하면 **진짜 새 절을 버린다**.
-그래서 전제를 수로 확인한다 — 이관 시점 `docs/report` 51건을 `rstrip` 정규화해 세면 **중복 0**이다(실측).
-★**바꾸기 전에 다시 세라**(0 이 아니면 이 정규화를 쓰면 안 된다):
-```bash
-python3 -c 'import os,hashlib,collections
-d="docs/report";c=collections.Counter(hashlib.sha256(open(os.path.join(d,f),encoding="utf8").read().rstrip().encode()).hexdigest() for f in os.listdir(d))
-print("파일",sum(c.values()),"· rstrip 정규화 후 중복",sum(v-1 for v in c.values() if v>1))'
-```
-
-★★**3단계 검산이 red 면 — «새로 쓴 파일을 먼저 지우고» 다시 판단하라.**
-1단계는 검산 **«전»에 이미 파일을 쓴다** ⇒ red 시점에 그 파일들이 디스크에 남아 있다. 회수:
-```bash
-git status --short docs/report          # 이번 실행이 만든 것 확인(?? 또는 A)
-git clean -f docs/report                # 미추적분 제거 · 이미 add 했으면 git rm --cached 후 삭제
-```
-★**지우지 않고 기준만 고쳐 다시 돌리면** 남은 파일 때문에 연번이 어긋나고 중복 가드가 «자기가 만든 것»을 문다.
-
-★★**전제 — 원장은 append-only 다.** `:1` 기준 차집합은 「**내가 더했다**」와 「**상대가 지운 것을 내가 안 지웠다**」를
-구별하지 못한다. 회차 절은 지우지 않는 것이 이 원장의 규율이라 실무상 무해하지만, ★**그 전제가 깨지면 이 기준도 깨진다** —
-그때는 `diff <(/usr/bin/grep '^## \[' /tmp/base.md) <(/usr/bin/grep '^## \[' /tmp/mine.md)` 로 **사라진 절이 있는지** 먼저 보라.
-
-★★**왜 «검산»도 이 모양인가 — 형제 저장소에서 두 회차 연속으로 «초록인데 틀렸다»가 났다.**
-옛 3단계는 `(내 절 수 − theirs 절 수)` 였는데 그것은 **1단계가 쓴 것과 같은 양**이라 1단계가 무엇을 하든 항상 일치한다(항진식).
-그래서 417건 복제를 PASS 시켰다. 지금은 두 축이 서로 다른 것을 본다 —
-⑴3단계 검산이 `:1` 기준이라 1단계가 `:3` 으로 돌아가면 **불일치가 난다**
-⑵1단계 자신이 **내용 동일 중복**을 보고 **쓰기 전에 멈춘다**(절 수 산술과 무관한 축).
-
-★**`--theirs` 를 «내용 판단 없이» 쓰는 유일한 자리다** — 여기서만 안전한 이유는 **내 기여를 1)에서
-이미 다른 파일로 옮겼기** 때문이다. ★다른 충돌에 이 패턴을 옮겨 쓰지 마라(원장 규율: 한쪽 전량 채택 금지).
+★★**잔여 위험 1건 — 숨기지 않는다.** 원격 브랜치 `chore/claude-autonomy-hardening` 이 아직
+**이관 «전» 형상**이다(`REPORT.md` 회차 절 **3개** · `origin/main` 대비 **292 뒤** · 그 PR **#45 는
+2026-07-31 CLOSED**). ⇒ **그 브랜치를 되살려 착지시키려면 위 복구 명령으로 레시피를 꺼내 써라.**
+★나머지 원격 브랜치 **5개는 `REPORT.md` 파일 자체가 없어** 해당 없음이다(실측).
+★**새로 만든 브랜치에는 이 상황이 생기지 않는다** — `origin/main` 의 `REPORT.md` 는 회차 절 **0개**
+(고정 안내)이고 회차 기록은 `docs/report/` 로 간다.
