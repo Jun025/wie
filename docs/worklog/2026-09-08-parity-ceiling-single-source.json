@@ -1,0 +1,30 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-08",
+  "task": "wie-parity-ceiling-list-single-source",
+  "title": "파리티 «천장 목록»을 한 벌로 — 정본은 검사가 «인쇄하는» 쪽이다",
+  "summary": "천장 목록이 코드 7항 ↔ worklog 9항으로 갈려 있었다. 코드를 정본으로 선언하고, 사본에만 있던 2항(순서·중복 · 줄끝/CRLF)을 옮겼으며, 문면이 갈린 ⑤를 사본 쪽 값으로 정정했다. 사본에는 「스냅샷이지 정본이 아니다」를 1키로 남겼다. 술어·임계·워크플로·잡 무접촉 · 코드 동작 0.",
+  "changes": [
+    "wie_cli/tests/support/dod_ci_parity.rs — ceilings() 에 ⑴정본 선언(헤더 + doc 주석) ⑵빠진 2항(8 순서·중복 · 9 줄끝/CRLF) ⑶⑤ 문면 정정(「공백 접기」뿐 → 「공백 접기 + 꼬리 주석 제거」)",
+    "docs/worklog/2026-09-05-dod-ci-parity-checker.json — ceilings-are-a-snapshot-not-the-source-of-truth 1키 추가. ★ceilings 배열 9항은 무접촉(사료)"
+  ],
+  "verification": [
+    "F1 두 목록 실측(핀 d665f477): 코드 ceilings() 7항 · worklog 2026-09-05-dod-ci-parity-checker.json 키 ceilings 9항",
+    "양방향 차집합: 코드에만 0건 · 사본에만 2건(8 순서·중복 · 9 줄끝/CRLF) ⇒ 제안의 「2항 추가」 가정이 맞다(승계 아님·확인)",
+    "문면 갈림 2건도 잡았다 — ⑤는 사본이 정확(:317 이 norm(strip_comment(line.trim())) 이다) ⇒ 정본을 그 값으로 정정 · ③은 코드가 최신(2026-09-06 결정 승격분)이라 코드가 맞다",
+    "옮기기 전 실측: 8 = BTreeSet 집합 비교(:23,34-37) ⇒ 순서·중복 미관측 · 9 = tests/dod_ci_parity.rs:26 fn read() 의 raw.replace(\"\\r\\n\",\"\\n\") 정확히 한 곳",
+    "개악 M-A(AGENTS.md lint 게이트 --all → --workspace) → dod_region_and_rust_yml_agree FAILED(10 passed/1 failed) ⇒ 기존 축 여전히 red · 원복 후 11 passed/0 failed",
+    "그 실패 출력에 정본 선언·8·9 가 실제로 인쇄됐다 ⇒ 「목록이 읽히는 자리에 있다」 실증",
+    "선행 결정(항목 ③ 「넓히지 않는다」 · merged d665f477) 무접촉 — diff 상 ③ 관련 ± 0줄",
+    "술어·임계·워크플로 무접촉 — .github/ 변경 0개 · norm/strip_comment/parse_ci/parity/BTreeSet 변경 0줄",
+    "cargo fmt rc=0 · check-worklog-json rc=0 · check-docs-report-serial rc=0(중복 0)"
+  ],
+  "limits": [
+    "정본을 코드로 정한 대가: worklog 사본은 사료라 지우지 않는다 — 그래서 「그 시점 스냅샷」임을 1키로 명시했다. 다르면 정본이 이긴다.",
+    "이 회차는 «목록»만 본다. 술어를 넓히거나 좁히지 않았고 새 천장도 만들지 않았다(차집합 그대로 2항).",
+    "사본이 다시 자라는 것을 기계가 막지는 않는다 — 막는 것은 「정본이 인쇄된다」는 구조와 이 선언뿐이다.",
+    "형제 제안(#p1·#p2 계열)은 범위 밖이라 손대지 않았다."
+  ],
+  "adoptedProposals": ["2026-09-06-parity-outside-gate-decision#p0"],
+  "proposals": []
+}

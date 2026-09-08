@@ -26,6 +26,7 @@
     "no-ci-change": "`git diff --name-only origin/main...HEAD -- '.github/**'` → **빈 출력**. 잡·스텝·트리거 무접촉.",
     "windows-crlf-regression": "★**초판이 windows-latest 두 다리에서 red 였다 — 숨기지 않는다**(PR #87 `1902b602` · macos·ubuntu 4다리는 green · `build-web`·`contract`·`coverage` 도 pass). ★**근인은 파서가 아니라 «개악 대조의 앵커»다**: Windows 체크아웃은 `\\r\\n` 이라 `replace(anchor, …)` 가 하나도 안 맞았다. ★**그때 터진 것은 파리티 판정이 아니라 「앵커가 표류했다」 가드**였다 — 즉 ★**검사가 «조용히 통과»하지 않았다**(그 가드를 넣어 둔 것이 값을 했다). ⇒ 처방 = 유일한 읽기 지점 `read()` 에서 **CRLF 를 접는다**(줄끝은 파리티의 축이 아니다). 회귀 잠금 = `crlf_is_folded_before_the_anchors_are_used` — CRLF 본문에 LF 앵커가 **안 맞는다**와 정규화 후 **맞는다**를 «양쪽» 단언하고, 파서 자신의 CRLF 안전성도 함께 못박는다. ★**정직하게 적는다: 로컬 파일은 항상 LF 라 그 정규화를 지워도 «로컬은 green» 이다** — 실제 그물은 **CI 의 windows 다리**이고, 그 사실을 시험 주석에 남겼다. `AGENTS.md` 가 적은 「local green 은 CI green 을 예측하지 않는다 — windows」가 그대로 재현된 사례다."
   },
+  "ceilings-are-a-snapshot-not-the-source-of-truth": "★이 목록은 «2026-09-05 시점 스냅샷»이지 정본이 아니다 — 정본은 wie_cli/tests/support/dod_ci_parity.rs 의 ceilings() 다(검사가 매 run 에 «실제로 인쇄»하는 목록). 2026-09-08 실측에서 이 사본 9항 ↔ 코드 7항으로 갈렸고, 여기에만 있던 ⑧순서·중복 · ⑨줄끝(CRLF) 을 그 정본으로 옮겼다(wie-parity-ceiling-list-single-source). ★이 배열은 사료라 «지우지 않는다» — 다르면 정본이 이긴다. ※③은 이 스냅샷이 «결정 전» 문면이다(2026-09-06 «넓히지 않는다» 결정은 정본에만 있다). ※⑤는 오히려 이 사본이 정확했다 — 정본의 「공백 접기»뿐」을 「공백 접기 + 꼬리 주석 제거」로 정정했다.",
   "ceilings": [
     "①OS 축(macos/ubuntu/windows) — 로컬 재현 불가라 CI 가 유일한 그물이다(원본 판정 승계).",
     "②교차곱(4게이트 × 2toolchain) — 두 축을 «독립»으로만 본다. CI 는 네 게이트를 두 toolchain 에서 돌리는데 DoD 는 clippy 만 이중이다. 넓히는 것은 «결정»이지 버그 수정이 아니다(RustJava 2026-09-04 판정).",

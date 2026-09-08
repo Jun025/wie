@@ -130,8 +130,14 @@ impl Report {
 
 /// What this lock does NOT see. Printed on every run, pass or fail — a ceiling that only appears
 /// in a doc is a ceiling nobody reads.
+///
+/// ★**THIS LIST IS THE SINGLE SOURCE OF TRUTH.** Any ceiling list elsewhere (worklogs, reports) is a
+/// dated snapshot, not an authority — if they disagree, this one wins. It lives here because this is
+/// the list the check actually prints, so a reader of a green run and a reader of the list see the
+/// same thing; a copy that nothing prints is the copy that goes stale (measured 2026-09-08: the
+/// worklog copy carried 9 items while this carried 7).
 pub fn ceilings() -> String {
-    "\n  [천장 — 이 검사가 «못 보는» 것]\n\
+    "\n  [천장 — 이 검사가 «못 보는» 것 · ★이 목록이 «정본»이다(다른 곳의 목록은 그 시점 «사본»)]\n\
      \x20   1. OS 축(macos/ubuntu/windows) — 로컬 재현 불가. CI 가 유일한 그물이다.\n\
      \x20   2. 교차곱(4게이트 × 2toolchain) — 두 축을 «독립»으로만 본다(원본 판정 승계).\n\
      \x20   3. `rust.yml` 밖의 워크플로 — ★«못 보는 것»이 아니라 ★**«보지 않기로 «정한» 것»**이다.\n\
@@ -155,10 +161,13 @@ pub fn ceilings() -> String {
      \x20      «커밋 전 명령이 아닌 것»이다. ⇒ 켜면 첫날 red 27 · 참 0 이고, 그 예외 목록이 곧 검사를\n\
      \x20      무력화한다. 상세·갈래별 비용 = docs/worklog/2026-09-06-parity-outside-gate-decision.json.\n\
      \x20   4. 비-cargo 게이트 — `node …` 같은 게이트가 rust.yml 에 생기면 «셋업»으로 분류돼 안 보인다.\n\
-     \x20   5. 동의어·플래그 순서 — 정규화가 «공백 접기»뿐이라 `--all`↔`--workspace` 는 «다르다»로 본다.\n\
+     \x20   5. 동의어·플래그 순서 — 정규화가 «공백 접기 + 꼬리 주석 제거»뿐이라 `--all`↔`--workspace` 는 «다르다»로 본다.\n\
      \x20   6. YAML 손파서 — 앵커·다중문서·인용 스칼라 미지원(원본과 같은 선택: 의존성 0).\n\
      \x20   7. ★이 검사 «자신»의 삭제 — `tests/dod_ci_parity.rs` 와 이 파일을 «둘 다» 지우면 green 이다.\n\
-     \x20      (한쪽만 지우면 컴파일이 깨져 red 다 — 그것이 이 2파일 구성의 이유다.)\n"
+     \x20      (한쪽만 지우면 컴파일이 깨져 red 다 — 그것이 이 2파일 구성의 이유다.)\n\
+     \x20   8. 순서·중복 — 집합 비교라 스텝 «순서»와 «중복 실행»은 안 본다.\n\
+     \x20   9. 줄끝(CRLF) — 정규화는 `tests/dod_ci_parity.rs` 의 `read()` «한 곳»에서 한다. 그것을 지우면\n\
+     \x20      «로컬은 green 이고 windows 다리만 red» 다(실측) — 로컬 그물이 없다.\n"
         .into()
 }
 
