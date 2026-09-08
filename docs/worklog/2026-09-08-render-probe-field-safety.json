@@ -1,0 +1,41 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-08",
+  "task": "wie-render-probe-field-prefix-collision-safety",
+  "title": "lgt_render_probe.sh 의 field() — 제안이 지목한 접두 충돌은 없었고, 옆에 진짜(반복 키)가 있었다",
+  "summary": "field() 를 접두 충돌에 안전하게 만들라는 채택이었다. 심어서 재보니 접두 충돌은 애초에 불가능했다 — 술어 \"$1\": 가 이름 앞뒤를 따옴표·콜론으로 이미 앵커한다(5/5 옛 코드도 정답). 반증된 것은 기전이고, 제안의 관찰(「마지막으로 맞는 것을 집는다」= tail -1)은 옳았다. 진짜 기전은 같은 키의 반복이고 옛 코드는 중첩 JSON 에서 3 을 읽었다(기대 10). 매치 수를 세어 1건이 아니면 stderr 로 말하고 값은 첫 매치로 결정론화했다. 의존성은 기존 관용구 유지(smoke_gate.sh 와 같은 grep+cut) — jq 는 로컬·CI 에 실재하지만 이 스크립트가 CI 밖이라 버렸다.",
+  "changes": [
+    "scripts/lgt_render_probe.sh — field() 하나(13+/1−): tail -1 제거 · 매치 수 검사 후 1건이 아니면 stderr · 값은 head -1 로 결정론화 · 왜 접두는 애초에 안전한지와 왜 jq 가 아닌지를 주석으로",
+    "docs/report/0097--2026-09-08--wie-render-probe-field-prefix-collision-safety.md — 회차 기록",
+    "STATE.md — 완료 항목 1건"
+  ],
+  "verification": [
+    "F1⑴ 옛 술어: field() { grep -o \"\\\"$1\\\":[0-9a-z.]*\" \"$JSON\" | tail -1 | cut -d: -f2; } — 「마지막으로 맞는 것」은 tail -1 이다.",
+    "F1⑵ 뽑는 필드 전수: paints · content · distinct_colors(field 경유) + result(별도 술어 grep -o '\"result\":\"[^\"]*\"' — 무접촉).",
+    "F1⑶ 접두가 겹치는 필드 쌍 = 0. 실측 JSON(wie_validate helloworld_ktf 실행)에서 세 패턴 각각 매치 «1건». JSON 키 전수에 last_frame_* 3종이 있으나 앵커 때문에 후보가 되지 못한다.",
+    "개악 ⒤-a(제안이 말한 형태): {\"content\":false,\"last_frame_content\":true} 양방향 순서 · {\"paints_total\":99,\"paints\":0} · {\"distinct_colors\":7,\"last_frame_distinct_colors\":1} → ★옛 코드도 5/5 정답. ⇒ 제안의 기전은 반증됐다(이 사실을 숨기지 않고 회신·기록에 적었다).",
+    "개악 ⒤-b(진짜 기전): {\"summary\":{\"paints\":10},\"frames\":{\"paints\":3}} 와 한 파일 두 문서 → ★옛=3(틀림) · 새=10(맞음) + stderr 「매치 2건(기대 1)」. 키 부재 {\"other\":1} → 옛 조용한 빈 값 · 새 「매치 0건」 경고.",
+    "ⅱ) 위양성 0: 실측 JSON 에서 paints/content/distinct_colors 값이 옛=새 3/3 동일. result 는 별도 술어라 무접촉(PASS 그대로).",
+    "bash 3.2 실측(/bin/bash 3.2.57): bash -n rc=0 · 함수를 3.2 로 실제 구동해 세 값 정상 출력. local 은 3.2 에서 유효.",
+    "네 게이트 + beta: fmt 0 · clippy 0 · clippy(wasm) 0 · cargo test --all rc=0(176 passed / 0 failed) · cargo +beta clippy 0 · npm run audit rc=0.",
+    "check-docs-report-serial rc=0(연번 0097 — 도구에 물었다) · check-worklog-json rc=0 · check-worklog-coverage rc=0."
+  ],
+  "limits": [
+    "제안이 지목한 결함은 실재하지 않았다 — 고친 것은 «옆에 있던» 다른 기전이다. 그 사실을 회신·회차기록·코드 주석 세 곳에 적었다(다음 사람이 「접두가 위험하다」로 되돌리지 않게).",
+    "새 코드는 «반복 키»를 고르지 않고 «말한다» — 첫 매치를 쓰되 stderr 로 모호함을 알린다. set -eo pipefail 아래서 abort 시키지 않는 형태를 골랐다(진단 스크립트가 첫 이상에서 죽으면 나머지 지표를 못 본다).",
+    "★scripts/smoke_gate.sh:76 에 같은 tail -1 관용구가 있다. 티켓이 field() 하나로 범위를 못박아 고치지 않았다 — 오늘 기준 단일 문서라 무증상이고, 제안으로 올렸다.",
+    "값 문자클래스 [0-9a-z.]* 는 그대로 두었다(음수·대문자·문자열 값 미지원). 현 필드에 충분하고 이 회차 범위 밖이다."
+  ],
+  "adoptedProposals": ["2026-09-06-validate-last-frame-richness#p1"],
+  "proposals": [
+    {
+      "title": "smoke_gate.sh 의 JSON 읽기도 같은 안전 술어로 맞춘다",
+      "plainSummary": "렌더 프로브에서 고친 「같은 키가 여럿이면 조용히 위치로 고른다」가 smoke_gate.sh 에도 그대로 남아 있다. 오늘은 무증상이지만 같은 날 같은 방식으로 틀린다.",
+      "userBenefit": "게임 카탈로그 회귀 판정이 JSON 모양 변화에 조용히 틀리는 경로가 닫힌다. 두 스크립트가 같은 술어를 쓰면 다음 사람이 한 곳만 고치는 실수도 사라진다.",
+      "why": "실측: scripts/smoke_gate.sh:76 이 `grep -o '\"result\":\"[^\"]*\"' | tail -1 | cut` 로 렌더 프로브와 동일한 관용구를 쓴다. 렌더 프로브 쪽은 이 회차에서 매치 수 검사로 바꿨고, 중첩/다중 문서에서 옛 술어가 틀리는 것을 실증했다(옛 3 ↔ 새 10).",
+      "tradeoff": "⑴smoke_gate.sh 는 game_lab/ 의 실제 게임 바이트를 읽는 로컬 전용 스크립트라 CI 에서 검증할 수 없다 — 개악 대조를 로컬 합성 JSON 으로만 할 수 있다. ⑵result 는 문자열 값이라 문자클래스가 달라 술어를 그대로 복사할 수 없다(따옴표 술어를 따로 맞춰야 한다). ⑶오늘 무증상이라 급하지 않다 — 급한 것으로 포장하면 우선순위가 왜곡된다.",
+      "effort": "S",
+      "target": "scripts/smoke_gate.sh"
+    }
+  ]
+}
