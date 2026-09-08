@@ -79,15 +79,33 @@ jobs:
       - name: cargo audit
         run: cargo audit
 
-      # The list ↔ reality comparison. A SEPARATE step on purpose: the audit above
-      # keeps its own exit code and runs with no ignores (Constraint 5), and this
-      # one only compares. Asymmetric by design, which is what keeps the expected
-      # list from becoming a suppression:
-      #   GONE (expected, no longer reported) -> RED. The list is stale, and that
-      #     staleness is the defect this exists to catch. The fix is deleting a line.
-      #   NEW  (reported, not expected)       -> printed, not red. A fresh advisory
-      #     must never create pressure to reach for `--ignore`.
-      # Deleting an entry hides nothing: the warning becomes NEW and keeps printing.
-      # Cost: ~1s (measured warm locally: 0.89s / 1.09s).
-      - name: Allowed-warning list matches reality (.github/rust-audit-expected-warnings.json)
+      # TWO list ↔ reality comparisons, one step, ONE `cargo audit --json`. A SEPARATE
+      # step from the audit above on purpose: that one keeps its own exit code and runs
+      # with no ignores (Constraint 5); this one only compares.
+      #
+      # (1) the expected list, .github/rust-audit-expected-warnings.json. Asymmetric by
+      #     design, which is what keeps it from becoming a suppression:
+      #       GONE (expected, no longer reported) -> RED. The list is stale, and that
+      #         staleness is the defect this exists to catch. The fix is deleting a line.
+      #       NEW  (reported, not expected)       -> printed, not red. A fresh advisory
+      #         must never create pressure to reach for `--ignore`.
+      #     Deleting an entry hides nothing: the warning becomes NEW and keeps printing.
+      #
+      # (2) section A of the prose ledger, docs/project-kb/02_status.md. Added 2026-09-08.
+      #     That table declares "경고 수와 이 표의 행 수가 어긋나면 둘 중 하나가 낡은
+      #     것이다" and then went stale for a month anyway — A-2/A-3 were upgraded away on
+      #     2026-08-08 (22df9531) and chacha20 arrived, while three rows sat there. A human
+      #     realigned it; this makes the machine say it next time. SET equality, not count:
+      #     the 2026-09-06 incident had the count right and the composition wrong, and a
+      #     count cannot see a swap. Both directions are red, and an unreadable table is
+      #     ALSO red — a blind checker is how the ledger went quiet in the first place.
+      #
+      # Both comparisons read the SAME parsed warning set, so they cannot disagree about
+      # what the warnings are. Cost: ~1s (measured warm locally: 0.89s / 1.09s).
+      #
+      # NOT a required check and cannot become one by accident: this workflow has no
+      # `pull_request` / `push` trigger (schedule + workflow_dispatch only), so it never
+      # reports on a PR. Promoting it is a deliberate act — do it after the ledger check
+      # has a track record, not before.
+      - name: Expected-warning list and ledger §A match reality
         run: node scripts/check-audit-warnings.mjs
