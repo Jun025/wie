@@ -60,6 +60,13 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-08: **`main` red 해소 — 재측 기록 **73** 을 `--record` 로 남겼다** (PR **#139** 착지 ·
+  `wie-main-red-worklog-coverage-overdue-73`) — ★**검사기·임계·워크플로 스텝 무접촉 · 코드 0.**
+  ★**진 것은 «비율»이 아니라 «기록 약속»이다**: `10/10 = 100%` 인데 착지 **73** 이 `63+10` 을 채워 `OVERDUE`(rc=1).
+  ★**손으로 붙이지 않았다** — `--record` 는 멱등이고, 손 append 는 2026-09-06 에 동일 행 **3건**을 만들었다.
+  ★★**구조를 적어 둔다**: 이 red 는 «머지 직후»에만 보인다(검사기가 `origin/main` 기준) — 그래서 두 번 났다.
+  ⇒ ★**`landed + 1 − lastRecorded ≥ 10` 은 머지 «전»에 계산된다** ⇒ 넘길 회차가 2-b 동봉에 함께 실으면 red 가 아예 안 난다.
+  (그 계약 변경은 `~/orchestrator/templates/merge-ticket.tpl` 소관이라 이 repo 밖이다 — 후속으로 올렸다.)
 - 2026-09-08: **§완료의 «맨 위 삽입 지점» — ★그대로 둔다(⒞) · 남은 충돌은 «알고 남긴 값»이다**
   (PR 개설 · `wie-state-completed-top-insert-residual-three` · 채택 제안 `2026-09-08-state-in-progress-pointer#p0`)
   — ★**판단 회차 · 형식 무접촉 · 코드 0.** 산출은 `AGENTS.md` §Landing paperwork 의 기록 블록.
