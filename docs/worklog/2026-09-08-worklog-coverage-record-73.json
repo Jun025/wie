@@ -1,0 +1,25 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-08",
+  "task": "wie-main-red-worklog-coverage-overdue-73",
+  "title": "main red 해소 — 재측 기록 73 을 --record 로 남겼다",
+  "summary": "check-worklog-coverage 가 OVERDUE(rc=1)로 main 을 red 로 만들었다. 비율은 10/10 = 100% 로 건강하고 진 것은 기록 약속뿐이라, 도구로 landedRounds 73 을 append 했다. 검사기·임계·스텝 무접촉.",
+  "changes": [
+    "docs/worklog-coverage-remeasures.json — measurements 에 landedRounds 73 항목 1건 추가(★node scripts/check-worklog-coverage.mjs --record 로만 · 손 append 0)"
+  ],
+  "verification": [
+    "기록 전: rc=1 ✗ OVERDUE · window 99503165..f2870071 · landed 73 · last recorded 63 · 10/10 = 100%",
+    "기록 후: rc=0 OK — the re-measure promise is current · last recorded 73",
+    "항목 수 6 → 7 (증분 정확히 1)",
+    "중복 0: 새 항목의 여섯 필드(date·landedRounds·window·num·den·pct)가 기존 6건 어느 것과도 전부 같지 않다 — 최대 일치는 기존[5](63)의 4/6 이고 landedRounds·window 가 다르다",
+    "landedRounds 전수 [13,23,33,43,53,63,73] · 중복 0건",
+    "멱등 재실증: --record 2회차 → 「landedRounds 73 is already recorded — nothing to do」 · 항목 수 7 불변 · rc=0"
+  ],
+  "limits": [
+    "이 회차는 기록만 한다 — 검사기·임계(10회차)·Engine contract required 를 만지지 않았다. 그 규약은 설계대로 발화했다.",
+    "「착지 전에 미리 재서 동봉한다」는 구조 개선은 별 축이다(orch-gate3-worklog-record-must-be-preemptive 로 이미 발권됨).",
+    "티켓이 변경 범위를 「그 JSON 1파일 + worklog 규약분」으로 못박아 STATE.md·docs/report 항목은 만들지 않았다."
+  ],
+  "adoptedProposals": [],
+  "proposals": []
+}
