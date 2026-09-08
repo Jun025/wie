@@ -60,6 +60,16 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-08: **파리티 락 «천장 ③» — ★넓히지 않는다(⒝) · 이미 서 있던 결정에 «배제 전수»와 as-of 를 붙였다**
+  (PR 개설 · `wie-parity-lock-ceiling-three-promote-to-decision` · 채택 제안 `2026-09-07-parity-per-repo-parser-axis-design#p2`)
+  — ★**`ceilings()` 항목 ③ 문면만 · 술어·임계·워크플로·잡 무접촉 · 코드 동작 0.**
+  ★★**전제 정정**: 「천장을 결정으로 승격하라」의 절반은 **이미 되어 있었다** — 항목 ③ 은 2026-09-06 부터
+  「확장하지 않기로 결정했다」를 수와 함께 담았고 그 회차는 **PR #99** 로 착지했다(`docs/report/0087`).
+  ⇒ ★**닫은 것은 «남은 구멍» 둘이다**: ⒜배제 대상이 **3개만** 이름 대어져 있었는데 실측 **7개** ⇒ 전수·분류를 넣었다
+  (후보였던 3 = engine-contract·web·coverage / 애초에 후보가 아닌 4 = publish-artifact·rust-audit·dependabot·opencode —
+  ★그 넷은 «커밋 전에 사람이 돌리는 명령»이 없어 **상등 술어의 좌변이 비어 있다**)
+  ⒝다섯 수에 ★**as-of 2026-09-06** 를 박고 ★**「결정은 수가 아니라 «술어가 없다»에 서 있다」**를 명시 ⇒ 수가 낡아도 결정은 안 흔들린다.
+  ★**기존 축 회귀 0 실증**: 스크래치 클론에서 `rust.yml` 의 `cargo fmt` 게이트 1줄 제거 → **rc=101 · 2 FAILED** · 원복 `porcelain` 0줄.
 - 2026-09-08: **되돌림 문서의 «한시 부록»이 소진됐다 — 지웠다** (PR **#136** 착지 ·
   `wie-report-migration-revert-appendix-is-now-dead` · 채택 제안 `2026-09-07-report-per-round-files#p1`)
   — `docs/report-migration-revert.md` 의 「부록 — 이관 직후 열린 PR 5건을 푸는 법」 **97줄 제거**
