@@ -6,7 +6,7 @@
   "summary": "직전 회차가 §진행중을 고정 안내로 바꾼 뒤 남은 §완료 충돌을 없앨지 판단했다. 결론은 ⒞(그대로 둔다)이고, 두 수를 정정했다 — 전향 충돌률은 3/10 이 아니라 1/1 이며, docs/report/ 는 §완료의 상위집합이 아니다(7항목이 다른 데 없다). 기계 소비자가 0 이라 충돌은 어느 게이트도 막지 않고, 비용은 base 당김 안의 union 편집 하나다. 기록은 AGENTS.md §Landing paperwork.",
   "changes": [
     "AGENTS.md §Landing paperwork — §완료를 그대로 두는 «결정»과 그 근거(전향률 1/1 · docs/report 미포함 7항목 · 소비자 0 · 되돌릴 신호 3종 · 줄번호 인용 부패)를 #134 검산식 블록 바로 뒤에 기록",
-    "docs/report/0089--2026-09-08--wie-state-completed-top-insert-residual-three.md — 회차 기록",
+    "docs/report/0090--2026-09-08--wie-state-completed-top-insert-residual-three.md — 회차 기록(★게이트③에서 0089 → 0090 개번: 형제 #137 이 0089 로 «먼저» 착지했고, 규약은 «착지하지 않은 쪽»을 옮긴다. 내용 무변경)",
     "STATE.md §완료 — 이 회차 항목 1건 추가(형식·기존 항목 무접촉)"
   ],
   "verification": [
