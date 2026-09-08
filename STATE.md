@@ -61,7 +61,7 @@
 
 ## 완료 (최근)
 - 2026-09-08: **파리티 «천장 목록»을 한 벌로 — 정본은 «검사가 인쇄하는» 쪽이다**
-  (PR 개설 · `wie-parity-ceiling-list-single-source` · 채택 제안 `2026-09-06-parity-outside-gate-decision#p0`)
+  (PR **#143** 착지 · `wie-parity-ceiling-list-single-source` · 채택 제안 `2026-09-06-parity-outside-gate-decision#p0`)
   — ★**술어·임계·워크플로·잡 무접촉 · 코드 동작 0 · 새 천장 0.**
   ★**갈림 실측**(핀 `d665f477`): 코드 `ceilings()` **7항** ↔ 사본
   `docs/worklog/2026-09-05-dod-ci-parity-checker.json` 키 `ceilings` **9항** ·
