@@ -352,6 +352,55 @@ design** — do not "fix" that by wiring it:
   here carry **consecutive** numbers (#120–#133 measured), which puts their slots back-to-back. The
   only thing that removes the collision is removing the point, which is what the pointer does.
   §완료 still has one, and that is the measured **3/10 residual** — recorded, not fixed here.
+
+  **§완료 keeps its shared insertion point on purpose. That is a decision, not an oversight**
+  (2026-09-08, ticket `wie-state-completed-top-insert-residual-three`, adopting
+  `2026-09-08-state-in-progress-pointer#p0` as *examined and declined*). Two numbers first, because
+  both correct the proposal that asked for it:
+
+  - **The forward rate is not 3/10, it is 1/1.** The 3/10 was a property of a historical sample, not
+    a prediction. Measured on `b0a08d73` in a throwaway worktree: two rounds branched independently
+    off `main`, each inserting one entry at the §완료 head, **conflict** (`merge-tree` rc=1); move
+    one insertion **1 line** down and it is **clean** (rc=0 at 1, 2 and 3 lines). So *any* two
+    concurrent rounds collide here, and this repo lands 10–25 rounds a day. Quote 1/1 forward and
+    3/10 historical; they answer different questions.
+  - **`docs/report/` is not a superset of §완료.** Of 87 entries, 83 carry a ticket id and **3 of
+    those have no `docs/report/` file** (`wie-pr45-orphan-close-and-remnant-land-r2`,
+    `wie-state-landed-pr56-residue-and-misc-unk9-error-lock`,
+    `wie-supply-chain-cargo-updates-a2-a3`); 4 more are short legacy entries carrying no id. So
+    pointer-ising §완료 the way §진행중 was pointer-ised would **drop 7 entries that exist nowhere
+    else** unless they are backfilled first.
+
+  **That gap is the whole difference between the two sections, and it is why the same prescription
+  does not transfer.** §진행중 was a *stale mirror* of `gh pr list` — the round that replaced it
+  measured "§진행중 항목 1 → 0, 잃은 서술 0". §완료 is not a mirror; it is the only place 7 of its
+  entries live. Removing a point that holds unique content is a migration, not a pointer swap.
+
+  **Distributing the point instead (per-year/per-month subheadings) was rejected by measurement, not
+  taste**: the separation needed is 1 line *per concurrent round*, and at 10–25 landings a day the
+  rounds that race are in the same day, let alone the same month — so every bucket coarser than
+  per-round puts them back on the same line. Per-round files are the only thing that separates them,
+  and that is the `docs/state/<round>.md` shape this repo already declined (PR #114).
+
+  **What the collision actually costs, so the next round can re-price it rather than re-derive it.**
+  Nothing mechanical: **no checker, workflow, or script reads `STATE.md` at all** — measured over
+  344 tracked code/config files, `## 완료` parsers **0**, `STATE.md` mentions **1**, and that one is
+  prose in a Rust doc comment. The cost is one union edit inside a base pull the round performs
+  anyway. The real risk is that its failure mode is **silent** — take one side wholesale and the
+  entries vanish with every gate green — which is why the union rule above demands a both-ways
+  preservation count and not "the conflict markers are gone".
+
+  **Reopen this if any of three things change.** First, a machine consumer of §완료 appears — then
+  the format question stops being free. Second, someone backfills those 7 entries into
+  `docs/report/`; the migration blocker disappears and ⒜ becomes a cheap pointer swap. Third, a
+  round loses an entry for real — the silent failure stops being hypothetical and the 1/1 rate makes
+  it a matter of time. Absent those, the union edit is cheaper than the migration.
+
+  **One measured wrinkle worth knowing before you cite `STATE.md` by line.** Top-insert moves every
+  line below it, so line-number citations into §완료 rot. `wie_midp/tests/create_image_missing_name_message.rs`
+  cites `STATE.md:349`; that line now holds an unrelated entry and the content it meant is at 510.
+  The same comment also cites `docs/report/0047--…`, which is stable — **cite the per-round file, not
+  `STATE.md:<line>`.**
 - **The ledger files of this repo are `STATE.md`, `REPORT.md`, `docs/report/**`, `docs/worklog/**`,
   and `docs/worklog-coverage-remeasures.json`.**
   Resolve a merge conflict in any of them by **union** — keep both sides' entries, ordered by the
