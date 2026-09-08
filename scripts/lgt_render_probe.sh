@@ -39,7 +39,19 @@ pid=$!
 i=0; while kill -0 "$pid" 2>/dev/null; do i=$((i+1)); [ "$i" -ge $((TIMEOUT*3+20)) ] && { kill -9 "$pid" 2>/dev/null; break; }; sleep 1; done
 
 clean() { sed 's/\x1b\[[0-9;]*m//g' "$LOG"; }
-field() { grep -o "\"$1\":[0-9a-z.]*" "$JSON" | tail -1 | cut -d: -f2; }
+# The key match is already exact: the leading `"` anchors the name, so `last_frame_content`
+# cannot satisfy `"content":` (measured 2026-09-08 — five prefix pairs, all read correctly).
+# What was unsafe is the `tail -1` that used to end this line: a key appearing twice (nested
+# objects, or two JSON documents in one file) was resolved by POSITION, silently. Now the count
+# is checked, so an ambiguous read says so on stderr instead of guessing. Deliberately still
+# grep+cut, not jq: `scripts/smoke_gate.sh:76` reads JSON the same way and one idiom beats two.
+field() {
+  local m n
+  m=$(grep -o "\"$1\":[0-9a-z.]*" "$JSON" || true)
+  n=$(printf '%s' "$m" | grep -c . || true)
+  [ "$n" = 1 ] || echo "field($1): 매치 ${n}건(기대 1) — JSON 에 같은 키가 여럿이거나 없다" >&2
+  printf '%s' "$m" | head -1 | cut -d: -f2
+}
 cnt()   { clean | grep -oE "$1" | wc -l | tr -d ' '; }
 
 # ── structured metrics (the §7 advance chain) ────────────────────────────────
