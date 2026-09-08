@@ -134,11 +134,21 @@ pub fn ceilings() -> String {
     "\n  [천장 — 이 검사가 «못 보는» 것]\n\
      \x20   1. OS 축(macos/ubuntu/windows) — 로컬 재현 불가. CI 가 유일한 그물이다.\n\
      \x20   2. 교차곱(4게이트 × 2toolchain) — 두 축을 «독립»으로만 본다(원본 판정 승계).\n\
-     \x20   3. `rust.yml` 밖의 워크플로 — engine-contract·web·coverage 의 명령은 대상이 아니다.\n\
+     \x20   3. `rust.yml` 밖의 워크플로 — ★«못 보는 것»이 아니라 ★**«보지 않기로 «정한» 것»**이다.\n\
      \x20      ★2026-09-06 «확장하지 않기로» 결정했다(제안 2026-09-05-dod-ci-parity-checker#p1). 이유는\n\
      \x20      취향이 아니라 «술어가 없다»는 것이다: 네 게이트는 rust.yml 과 «양방향 포함 = 상등»이\n\
      \x20      성립해 집합 비교가 서지만, 게이트 밖은 어느 방향도 서지 않는다 — 실측(건강한 트리):\n\
-     \x20      문서 8 · CI run: 23 · 교집합 «2» · 차집합 «27»(문서−CI 6 · CI−문서 21) · 그중 참 결함 «0».\n\
+     \x20      ★as-of 2026-09-06 트리: 문서 8 · CI run: 23 · 교집합 «2» · 차집합 «27»(문서−CI 6 · CI−문서 21)\n\
+     \x20      · 그중 참 결함 «0». ★이 다섯 수는 «그때의 값»이다 — 워크플로가 바뀌면 달라지고, 다시 재려면\n\
+     \x20      기각된 갈래 A 시제품을 다시 만들어야 한다(일부러 커밋하지 않았다 — 상주하면 켜고 싶어진다).\n\
+     \x20      ⇒ ★**수를 «현재»로 인용하지 마라. 결정은 수가 아니라 «술어가 없다»에 서 있다.**\n\
+     \x20      ★배제 대상 전수(as-of 2026-09-08 · 워크플로 8개 중 rust.yml 을 뺀 «7개»):\n\
+     \x20        · 판정 대상이었고 «넣지 않기로» 한 것 3 — engine-contract.yml · web.yml · coverage.yml\n\
+     \x20          (PR/push 에 도는 검사라 후보였다. 위 차집합 27 이 이 셋을 두고 나온 수다.)\n\
+     \x20        · 애초에 «후보가 아닌» 것 4 — publish-artifact.yml(릴리스·하류 전파) ·\n\
+     \x20          rust-audit.yaml(schedule 전용 — «커밋 전 게이트»가 아니다) ·\n\
+     \x20          dependabot.yaml(PR 자동 승인/자동 머지) · opencode.yml(issue_comment 봇).\n\
+     \x20          ⇒ ★이 넷은 «커밋 전에 사람이 돌리는 명령»을 갖지 않으므로 상등 술어의 좌변이 비어 있다.\n\
      \x20      문서−CI 6 은 전부 정상이다(CI 가 안 도는 wie_validate·audit·verify, 이름만 다른\n\
      \x20      npm run build:wasm ↔ bash scripts/build-wasm.sh, 1:N 인 npm run frontend ↔ npm ci+npm run build,\n\
      \x20      메모리로 만들어 쓰는 make-draw-fixture). CI−문서 21 은 apt/choco·gh release·tarpaulin 등\n\

@@ -1,0 +1,29 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-08",
+  "task": "wie-parity-lock-ceiling-three-promote-to-decision",
+  "title": "파리티 락 천장 ③ — 넓히지 않는다(⒝) · 이미 서 있던 결정에 배제 전수와 as-of 를 붙였다",
+  "summary": "천장 ③(rust.yml 밖 워크플로)을 넓힐지 정했다. 답은 ⒝(넓히지 않는다)이고, 그 결정은 2026-09-06(PR #99)부터 이미 문면에 서 있었다. 이 회차가 닫은 것은 남아 있던 두 구멍이다 — 배제 대상이 3개만 이름 대어져 있었는데 실측 7개라 전수와 분류를 넣었고, 낡은 다섯 수에 as-of 2026-09-06 을 붙이고 「결정은 수가 아니라 술어가 없다에 서 있다」를 명시했다. 술어·임계·워크플로·잡 무접촉.",
+  "changes": [
+    "wie_cli/tests/support/dod_ci_parity.rs — ceilings() 항목 ③ 문면만: 「못 보는 것」 → 「보지 않기로 정한 것」 · as-of 2026-09-06 명시 · 배제 대상 7개 전수와 분류(후보였던 3 / 애초에 후보가 아닌 4) 추가",
+    "docs/report/0096--2026-09-08--wie-parity-lock-ceiling-three-promote-to-decision.md — 회차 기록",
+    "STATE.md — 완료 항목 1건"
+  ],
+  "verification": [
+    "F1⑴ 술어: wie_cli/tests/dod_ci_parity.rs 가 read(\".github/workflows/rust.yml\") 로 «그 한 파일»만 넘긴다(호출 9곳 전건 동일) · 보고 머리도 「AGENTS.md COMMIT-GATES 구간 ↔ .github/workflows/rust.yml」로 한정을 선언한다.",
+    "F1⑵ 워크플로 8개(coverage · dependabot · engine-contract · opencode · publish-artifact · rust-audit · rust · web). on: 실측 — PR/push 검사 = rust·engine-contract·web·coverage · schedule 전용 = rust-audit · PR 자동화 = dependabot · 코멘트 봇 = opencode · 릴리스 = publish-artifact.",
+    "F1⑶ rust.yml 밖 = 7개(수와 이름 전수). 그중 상등 술어의 후보였던 것 3(engine-contract·web·coverage) · 좌변이 비어 후보가 아닌 것 4(publish-artifact·rust-audit·dependabot·opencode).",
+    "기존 축 회귀 없음(Acceptance): 스크래치 클론(git clone -s · 40자 핀 a51a8cca)에서 rust.yml 의 `cargo fmt --all -- --check` 한 줄 제거 → cargo test --test dod_ci_parity rc=101 · dod_region_and_rust_yml_agree·m1_ci_gains_a_gate_the_dod_does_not_list FAILED(9 passed/2 failed) · 원복 porcelain 0줄.",
+    "ceilings() 가 죽은 문자열이 아님: cargo test -- --nocapture 로 새 「배제 대상 전수」 블록이 실제 출력되는 것을 확인.",
+    "네 게이트 + beta: fmt 0 · clippy 0 · clippy(wasm) 0 · cargo test --all rc=0(176 passed / 0 failed) · cargo +beta clippy 0. dod_ci_parity 11 passed.",
+    "check-docs-report-serial rc=0(연번은 --next-serial 이 준 0096) · check-worklog-json rc=0 · check-worklog-coverage rc=0."
+  ],
+  "limits": [
+    "이 회차는 결정을 «만들지» 않았다 — 결정은 2026-09-06(PR #99 · docs/report/0087)부터 서 있었다. 이 회차가 한 것은 그 결정의 «배제 목록 완성»과 «as-of 표기»다. 티켓 전제(「지금은 천장뿐」)의 절반은 이미 해소돼 있었고, 그 사실을 회신에 적었다.",
+    "다섯 수(문서 8 · CI 23 · 교집합 2 · 차집합 27 · 참 결함 0)는 재측하지 «않았다». 선행 회차가 그 시제품을 일부러 커밋하지 않았고(상주하면 켜고 싶어진다), 재측은 시제품 재작성이 필요해 이 회차 크기(S·결정)를 넘는다. ⇒ 대신 as-of 를 박아 «현재로 읽히는 것»을 막았다.",
+    "「문서가 낡는다」 위험 자체는 남는다 — 선행 회차가 이미 자인했고 이 결정으로 해결되지 않는다. 남은 길은 문서가 이름 대는 명령을 실제로 실행하는 것이고 크기가 다르다.",
+    "천장 ①②④⑤⑥⑦ 은 무접촉이다. 이 회차의 대상은 ③ 하나다."
+  ],
+  "adoptedProposals": ["2026-09-07-parity-per-repo-parser-axis-design#p2"],
+  "proposals": []
+}
