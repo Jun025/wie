@@ -1,0 +1,43 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-10",
+  "task": "wie-doc-named-commands-liveness-placement-decision",
+  "title": "배치 결정 — 「문서가 이름 대는 명령이 도는가」는 ⒞ 주 1회 예약 잡 «하나»로 간다(구현은 별 회차)",
+  "summary": "고르는 회차다 — 0100 회차가 세운 배치 4안(⒜훅·⒝조건부 CI·⒞주 1회 잡·⒟게이트③ 손 실행) 중 ⒞ 하나를 골랐고, 구현은 하지 않았다(이 worklog 의 p0 이 구현 회차 제안이다). 결정 근거: 빈틈은 러너 블록 3명령 + 별칭 층 최소 6건인데, 부작용 명령(작업 트리 쓰기·브라우저 내려받기·배포 URL)을 전부 담을 수 있는 자리는 예약 잡뿐이고, 러너 블록 뒤의 기능 회귀는 이미 CI 가 두 겹으로 잡는다(E+F · 2026-09-07 기결정) ⇒ 남는 것은 «명령 표면의 낡음»이고 그 피해는 착지된 코드가 아니라 다음 회차의 시간이라 주 1회 지연이 맞는 가격이다. ⒞의 치명 교환(차단력 0 · 주인 없는 red)은 AGENTS.md 에 소유자 규칙(빨간 주간 런 뒤 첫 게이트③ 회차)을 잡이 생기기 «전에» 박아 셈했다. 넷 중 하나만 배치했다.",
+  "changes": [
+    "AGENTS.md — §Documented-command liveness 신설: 결정·기각 3안 사유·소유자 규칙·이탈 조건 (워크플로·훅·잡 신설 0 — 잡 자체는 p0 구현 회차 몫)",
+    "docs/report/0101--2026-09-10--wie-doc-named-commands-liveness-placement-decision.md — 회차 기록",
+    "STATE.md — 완료 항목 1건"
+  ],
+  "verification": [
+    "선택 1개 확인: 배치된 것은 0 — 이 회차는 문서(결정 기록)만 만들었고, 워크플로·훅·잡 diff 0 은 git diff --stat 으로 확인(AGENTS.md·docs/**·STATE.md 만).",
+    "기각 사유 각 1줄: ⒜ 커밋당 413s+writer × 하루 10~25 착지 = 지불 불가이고 부작용 명령을 못 담아 별칭 6건이 그대로 남는다(최고가·불완전 커버). ⒝ 차단력이 사는 곳은 러너 블록뿐인데 그 뒤 기능 회귀는 E+F 가 이미 두 겹으로 잡고(2026-09-07 기결정이 같은 cargo-빌드-in-node-잡 가격을 이미 기각), 별칭 층을 덮으려면 CI 가 별칭을 불러야 해 dod_ci_parity.rs 대응을 흔들며, 필터 오설정은 조용히 죽는다(#130 이 방금 고친 병). ⒟ 착지마다 75s+(주당 87~218분 — 주 1회 런 «하나»보다 총비용이 크다)에 작업 트리에 쓰는 명령을 손으로 돌리고(⒜를 기각한 그 반대와 동형) 별칭 6건도 안 덮는다.",
+    "별칭 층 6건 처분: ⒞가 «덮는다» — 잡의 설계 요건을 「문서 문면 그대로(별칭 호출) 실행」으로 명시했다(npm 4: audit·build:wasm·frontend·verify + beta 축 2: rustup toolchain install beta·cargo +beta clippy). 실체(scripts/*.sh·matrix)를 부르면 이 검사의 존재 이유가 사라진다.",
+    "⒞ 소유자: AGENTS.md 에 박았다 — 빨간 주간 런 뒤 «첫 게이트③ 회차»가 소유(최신 런 확인 → red 면 실패 명령을 명시한 티켓 발권 · 인라인 수정 금지). 기존 두 소유자 규칙(verify-browser red·worklog-coverage 연체)과 같은 형태로, 잡이 생기기 전에 규칙이 먼저 있다(활성화는 잡 착지 시점).",
+    "되돌릴 조건 명시: ⑴러너 블록·별칭 낡음이 주간 런보다 먼저 회차를 태우는 일이 분기 2회 → 러너 블록 한정으로 ⒝ 재가격 ⑵빨간 주간 런이 다음 두 착지가 지나도록 무티켓 → 소유자 규칙 실패로 판정, 차단화 또는 잡 제거.",
+    "adoptedProposals 전건 기록: 2026-09-09-doc-named-commands-liveness-sizing#p0~p3 네 ref 를 아래에 실었다(운영자 Tower 채택분).",
+    "구현 0 이므로 비용 실측 의무(Acceptance 「구현했다면」) 해당 없음 — 0100 의 가격표를 «인용»했고 재측정하지 않았다(티켓 자신이 「새로 재지 말고 고르라」)."
+  ],
+  "limits": [
+    "잡은 아직 없다 — 이 결정이 실물이 되는 것은 p0 구현 회차가 착지할 때다. 그때까지 러너 블록·별칭 층은 종전과 똑같이 미검증이고, AGENTS.md 결정 블록이 그 사실을 명시한다.",
+    "소유자 규칙의 「최신 런 확인」은 게이트③ 회차의 규율 준수에 기댄다 — 기계 강제가 아니다. 강제하려면 required 화가 필요한데 스케줄 런은 PR 체크가 아니라 그 길이 없고, 그래서 이탈 조건 ⑵를 함께 박았다.",
+    "주간 잡의 실제 소요는 구현 회차가 1회 실행으로 재야 한다(0100 의 CI 이력 추정: 러너 블록 writer+75s+빌드 · web 계열 217~407s — 명령 단위 분해는 배치 후 측정이 맞다는 0100 limits 그대로)."
+  ],
+  "adoptedProposals": [
+    "2026-09-09-doc-named-commands-liveness-sizing#p0",
+    "2026-09-09-doc-named-commands-liveness-sizing#p1",
+    "2026-09-09-doc-named-commands-liveness-sizing#p2",
+    "2026-09-09-doc-named-commands-liveness-sizing#p3"
+  ],
+  "proposals": [
+    {
+      "title": "doc-liveness 주간 잡 구현 — 문서 문면 그대로를 도는 schedule 워크플로 신설",
+      "plainSummary": "AGENTS.md 가 이름 대는 명령(러너 블록 3 + 별칭 6 포함)을 주 1회 문서에 적힌 표기 그대로 실행하는 워크플로를 만든다. 2026-09-10 배치 결정(⒞)의 구현이다.",
+      "userBenefit": "「문서대로 했는데 안 되더라」가 최대 1주 안에 기계로 드러난다 — 지금은 사람이 밟아야만 드러난다.",
+      "why": "결정은 착지했는데 잡이 없으면 결정 블록 자체가 「문서가 이름 대는 것이 실재하지 않는」 같은 병의 새 사례가 된다. 설계 골자는 결정 블록에 있다: schedule(+workflow_dispatch) · 문서 별칭 호출(실체 호출 금지) · rust-audit.yaml 이 schedule 전용 선례.",
+      "tradeoff": "설계 갈림 하나를 이 회차가 정해야 한다 — 명령을 워크플로에 «복사»하면 문서와 또 드리프트하고(별칭 병의 재생산), 문서 펜스에서 «추출 실행»하면 파서가 새 기계다. dod_ci_parity.rs 의 marked-region 대조가 복사+대조의 기존 선례다. npm run verify 는 운영 URL 을 치므로 주간 잡에 넣을지도 여기서 정한다.",
+      "effort": "M",
+      "target": ".github/workflows/ (신설) · AGENTS.md 결정 블록의 워크플로명 갱신"
+    }
+  ]
+}
