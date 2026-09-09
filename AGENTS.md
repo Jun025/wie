@@ -298,6 +298,48 @@ design** — do not "fix" that by wiring it:
   version of this check that runs in CI without breaking the constraint it sits beside; the
   committed baseline is identifiers and expected status only, never paths or bytes.
 
+### Documented-command liveness — one weekly scheduled job, decided 2026-09-10
+
+**Where "the commands this file names still run" gets checked was decided on 2026-09-10: a weekly
+scheduled workflow — not a pre-commit hook, not a PR-gated CI step, not a per-landing hand run**
+(ticket `wie-doc-named-commands-liveness-placement-decision`, choosing among the four placements
+priced in `docs/report/0100`). **The job does not exist yet** — commissioning it is a follow-up
+proposal (`docs/worklog/2026-09-10-doc-named-commands-liveness-placement.json#p0`); until it lands,
+nothing runs this check, exactly as before this decision.
+
+Why this placement, in report 0100's numbers — it is the only one that can hold the whole gap. The
+gap is the runner block (3 commands, led by a work-tree-writing fixture builder) **plus the alias
+layer (≥6: `npm run audit`/`build:wasm`/`frontend`/`verify`, `rustup toolchain install beta`,
+`cargo +beta clippy`)** — side-effect commands a hook or PR job cannot contain. A scheduled runner
+executes the *documented text verbatim*, which is the entire point: the check asks "does the
+documented invocation run", so it must call the alias, never the script behind it — calling the
+script is how `matrix.rust: [stable, beta]` stays green while the documented `cargo +beta` line
+dies. Blocking power is not being given up where it matters: engine regressions behind the runner
+block are already CI-caught twice over (Scenarios E+F — the 2026-09-07 decision above), and what
+remains is command-surface rot, whose damage is a later round's time rather than shipped code, so a
+≤1-week detection latency is priced correctly. The rejected three: **⒜ pre-commit hook** — 413s +
+writer per commit at 10–25 landings/day, and it still cannot hold the side-effect commands, so the
+alias layer stays uncovered (maximum price, incomplete coverage). **⒝ paths-filtered CI step** —
+buys blocking only for the runner block, at the cargo-build-in-the-node-job price the 2026-09-07
+decision already declined, and covering the alias layer would mean CI calling aliases, which
+perturbs the `dod_ci_parity.rs` correspondence; plus a mis-scoped filter fails silent (the disease
+#130 just fixed). **⒟ gate③ hand-run** — 75s+ × every landing (87–218 min/week against one weekly
+run), hand-executes a work-tree-writing command each time (the same objection that barred those
+commands from ⒜), relies on unforced discipline, and still leaves the alias 6 uncovered.
+
+**The red has an owner, pinned before the job exists** (rule activates when it lands): **the first
+gate③ round that runs after a red weekly run owns it** — read the latest scheduled run alongside
+the PR's checks (`gh run list --workflow=<the doc-liveness workflow> -L1`); if red, file a ticket
+naming the failing command — do not fix inline, merge tickets do not change code. Same shape as the
+two owner rules nearby (verify-browser red → the landing gate③; worklog-coverage overdue → the next
+gate③): the owner is the role already there. A scheduled red with no owner is how a check dies
+(2026-09-07, `check-worklog-coverage`).
+
+**Move off this placement if**: runner-block or alias rot lands and burns a round before the weekly
+run catches it, twice in a quarter → re-price ⒝ for the runner block only; or a red weekly run sits
+unticketed past the next two landings → the owner rule failed; block on it or kill the job rather
+than let it be ignored — a periodically-red check that people scroll past is worse than no check.
+
 ### Landing paperwork
 
 - **`STATE.md` and `docs/report/` are tracked files, not scratch**: keep `STATE.md`'s 완료/다음 current as a task lands, and write a dated 무엇을·왜·사용자 영향 entry when it lands. **Do not write a 진행중 entry** — that section became a fixed pointer to `gh pr list` on 2026-09-08, for the reason below. **Round entries go in a new `docs/report/NNNN--YYYY-MM-DD--<ticket-id>.md` — do not append to `REPORT.md`**, which is now a fixed pointer (2026-09-07; every round appending to one file's top made every open PR conflict — 5/5 at migration time, 4 of them on the ledger files *only*). `NNNN` is the global sequence, largest + 1:
