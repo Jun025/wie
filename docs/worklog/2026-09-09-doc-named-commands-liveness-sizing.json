@@ -1,0 +1,74 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-09",
+  "task": "wie-doc-named-commands-liveness-size-measure-first",
+  "title": "「문서가 이름 대는 명령이 도는가」의 크기 — 빈틈은 러너 블록 3명령 전부이고, 두 번째 빈틈(별칭 층)은 최소 6건이다",
+  "summary": "재는 회차다(구현 0 · 훅/CI/잡 신설 0). AGENTS.md 가 이름 대는 명령 20개를 전수 열거하고 비용을 쟀다. ★게이트② 정정 반영: 초판이 「make-draw-fixture 조차 CI 에서 돈다」고 적은 것은 거짓이다 — engine-contract.yml:191 은 dorny/paths-filter 의 경로 패턴이고 (node|bash|sh) 호출은 0건이며, CI 가 쓰는 것은 contract-roundtrip.mjs:169 이 import 한 모듈이고 writer(:509 main-guard 안 writeFileSync)는 정확히 안 도는 부분이다. ⇒ 미커버는 wie_validate 1종이 아니라 러너 블록 3명령 전부다. 헤드라인 「한 블록」은 오히려 강해지고 ⒟의 가격표가 바뀐다(선행 writer 가 작업 트리에 쓴다). 두 번째 빈틈(별칭 층)은 npm 4 + beta 축 2 = 최소 6건이다. 부작용 있는 8종은 돌리지 않고 CI 이력으로 비용을 쟀다. 배치는 4안을 세우고 고르지 않았다.",
+  "changes": [
+    "docs/report/0100--2026-09-09--wie-doc-named-commands-liveness-size-measure-first.md — 회차 기록(전수·비용·발견)",
+    "STATE.md — 완료 항목 1건",
+    "★코드·워크플로·훅·잡 변경 0 — 이 회차는 재기만 한다"
+  ],
+  "verification": [
+    "F1⑴ 전수: 명령은 AGENTS.md 한 파일에만 있다(CLAUDE.md·README.md 코드펜스 0). 펜스 7블록·실행 가능 줄 25 → 셸 골격 4(for/done) + 자리표시 1($EDITOR) 제외 = 대상 20개.",
+    "★계수기 자체를 대조했다: grep '^```' 은 들여쓴 펜스를 못 봐 2블록 5줄을 놓쳤다(펜스 줄 10 ↔ 실제 14 · 들여쓴 것 4). '^ *```' 로 재추출해 바로잡았다.",
+    "F1⑵ 워크플로 전수 대조(★게이트② R1 로 정정): 어디에도 «명령으로» 안 도는 것 = 러너 블록 3명령 전부(make-draw-fixture · wie_validate ×3 · --inject ×2). 내가 다시 쟀다 — `(node|bash|sh) scripts/make-draw-fixture` 는 .github/·scripts/·package.json 전수에서 0건이고, engine-contract.yml:191 은 dorny/paths-filter 의 경로 패턴이다(:187–191 전부 인용 경로). CI 가 쓰는 것은 contract-roundtrip.mjs:169 의 import(drawFixtureJar) 이고 writer 는 make-draw-fixture.mjs:509 main-guard 안의 :511 writeFileSync 다. 저장소 정본 dod_ci_parity.rs:160 이 이미 「메모리로 만들어 쓰는」으로 분류하고 있었다 — 초판이 거기서 퇴행했다. smoke_gate.sh 0건은 제약 9 로 구조적 불가(기결정). 나머지는 rust.yml/engine-contract.yml/web.yml/publish-artifact.yml 중 하나 이상에서 실재.",
+    "★근인: 계수기가 아니라 «분류기»를 대조하지 않았다 — `grep -rl` 히트를 «실행»으로 읽었다. 이번엔 히트마다 «패턴인가 run: 인가»를 열어서 갈랐다.",
+    "★게이트② R2: sh|bash 펜스를 가진 추적 *.md 는 8개(AGENTS.md · REPORT.md · docs/CLOUDFLARE_SETUP.md · docs/COMPLIANCE.md · docs/lgt_native_classes.md · docs/report-migration-revert.md · docs/upstream-realign-verdict.md · docs/web.md)이고 그중 둘이 이 20개와 겹친다(REPORT.md 의 grep|sort · docs/web.md 의 npm run audit). ⇒ 모집단을 AGENTS.md 로 좁힌 것은 정당하고(제안이 「커밋 전 명령」을 겨눈다), 「한 파일에만 있다」는 전칭 주장은 거뒀다.",
+    "★게이트② R3 검산: 4게이트 합 = 286 · 무해 12종 합 = 371 · 러너 표본 33(9+24)은 371 에 이미 포함. ⇒ ⒜ 재산 = 371 − 33 + 러너 블록 75 = 413s + writer(미측정).",
+    "★게이트② R4: `rustup toolchain install` · `cargo +beta` 워크플로 리터럴 각 0건. CI 는 rust.yml 의 matrix.rust: [stable, beta] 로 표현이 다르게 같은 일을 한다 ⇒ 매트릭스에서 beta 를 빼면 CI green · 문서만 죽는다(별칭 층과 동형). 층 크기 = npm 4 + beta 2 = 최소 6.",
+    "F1⑶ 표본 실행(무해·저비용 12종 전건 rc=0 · 초): fmt 25 · clippy 28 · clippy(wasm) 14 · cargo test --all 219 · beta clippy 7 · npm run audit 27 · grep|sort 3 · check-worklog-coverage 8 · check-docs-report-serial 3 · check-engine-contract 4 · wie_validate helloworld_ktf 9 · wie_validate --inject --expect-last-frame keydraw_ktf 24.",
+    "★부작용 8종 미실행(목록만): rustup toolchain install beta · make-draw-fixture(jar 쓰기) · npm run build:wasm(web/src/wasm 쓰기) · npm run frontend(npm install·dist) · contract-roundtrip(브라우저 내려받기) · npm run verify(실 Chrome + 배포 URL) · check-worklog-coverage --record(원장 append) · check-docs-report-serial --next-serial(gh api). 쓰기 경로는 소스에서 확인했다(build-wasm.sh OUT_DIR=web/src/wasm · make-draw-fixture writeFileSync test_data/draw_j2me.jar · --record 헤더 주석).",
+    "★그 8종의 비용은 CI 이력으로 쟀다(실행 0): web.yml 최근 5회 217·230·231·240·407s · engine-contract.yml 필터 스킵 11~16s ↔ 실제 실행 213~221s(같은 워크플로가 조건에 따라 약 20배).",
+    "★부수: test_data/draw_j2me.jar 는 미추적(.gitignore:24 '*.jar')이라 신선한 클론에 없다 ⇒ 러너 블록 첫 줄은 선행 writer 다. 나머지 5 픽스처는 추적됨.",
+    "구현 0 확인: git diff --stat 이 문서 산출물만(코드·워크플로·훅·잡 0)."
+  ],
+  "limits": [
+    "「어디서 도는가」는 워크플로 파일의 문자열 대조다 — 실제 실행 여부가 아니라 배선 여부를 잰 것이다. 다만 이 회차의 결론(빈틈=러너 블록)은 AGENTS.md 자신이 이미 적은 「nothing in .github runs wie_validate — 0 hits」와 독립으로 일치한다.",
+    "부작용 8종의 비용은 «워크플로 전체» 소요이지 «그 명령 하나»의 소요가 아니다. 명령 단위로 쪼개려면 스텝 타이밍을 봐야 하고, 그것은 배치를 고른 뒤에 재는 것이 맞다.",
+    "표본 실행은 warm 캐시의 이 맥 한 대 값이다. CI 러너·콜드 캐시에서는 다르다(특히 cargo test --all 219s).",
+    "배치를 고르지 않았다 — 티켓이 「고르지 마라 · 총괄·운영자가 고른다」로 못박았다.",
+    "★이 회차(-fix)는 문안·분류 보정이다 — 구현은 여전히 0 이고 배치도 고르지 않았다. 초판의 측정값(표본 12종 초 단위 · CI 이력)은 재측하지 않았고, 바뀐 것은 «분류»와 «라벨»과 «층의 크기»다."
+  ],
+  "adoptedProposals": [
+    "2026-09-06-parity-outside-gate-decision#p1"
+  ],
+  "proposals": [
+    {
+      "title": "배치 ⒜ — 커밋 전 훅에서 문서 명령을 돌린다",
+      "plainSummary": "AGENTS.md 가 이름 대는 명령을 커밋 직전에 실제로 돌려, 문서대로 했는데 안 되는 상태를 그 자리에서 잡는다.",
+      "userBenefit": "「문서대로 했는데 안 되더라」가 커밋 전에 드러난다. 되돌리는 비용이 가장 싼 시점이다.",
+      "why": "실측 비용: 무해 12종 «전부»의 합 371s(4게이트만은 286s)이고 그중 cargo test --all 이 219s 다. 러너 블록 전체(선행 writer + 3×9s + 2×24s = writer + 75s)를 더하면 ★371 − 33(표본 중복) + 75 = 413s + writer.",
+      "tradeoff": "★차단력 최고 · 비용도 최고 — 커밋마다 7분 이상은 이 저장소의 착지 빈도(하루 10~25)에서 지불 불가에 가깝다. ⑵부작용 명령(build:wasm·frontend·roundtrip)을 넣으면 훅이 web/src/wasm 을 덮어 작업 트리를 바꾼다 ⇒ 넣을 수 없다 ⇒ 넣지 않으면 별칭 층(최소 6건)은 여전히 미검증. ⑶오탐 위험: 네트워크가 필요한 명령이 오프라인에서 실패해 커밋을 막는다.",
+      "effort": "M",
+      "target": ".git/hooks 또는 pre-commit 설정"
+    },
+    {
+      "title": "배치 ⒝ — CI 스텝으로, 단 해당 표면을 만진 PR 에서만",
+      "plainSummary": "문서가 이름 대는 명령을 CI 에서 돌리되 engine-contract 가 이미 쓰는 paths-filter 처럼 관련 파일이 바뀐 PR 에서만 돈다.",
+      "userBenefit": "문서와 실제가 갈라지면 PR 에서 잡히고, 무관한 PR 은 비용을 내지 않는다.",
+      "why": "실측: engine-contract.yml 이 이미 그 형태다 — 필터가 접으면 11~16s, 실제로 돌면 213~221s(약 20배). 즉 이 저장소에 조건부 배치의 선례와 배선이 이미 있다.",
+      "tradeoff": "⑴러너 블록은 CI 에서 «명령으로» 도는 곳이 0 이라 새 스텝이 필요하다(writer + 약 75s + wie_cli 빌드). ⑵★별칭 층(npm 4 + beta 2 = 최소 6건)을 검증하려면 CI 가 실체가 아니라 «별칭»을 불러야 한다 — 워크플로를 고쳐야 하고 그 변경이 문서-CI 대조를 다시 흔든다. ⑶필터를 잘못 잡으면 조용히 안 돌아 「검사가 있는데 실행 0건」이 재발한다(#130 이 방금 고친 병).",
+      "effort": "M",
+      "target": ".github/workflows/engine-contract.yml"
+    },
+    {
+      "title": "배치 ⒞ — 주 1회 예약 잡",
+      "plainSummary": "문서가 이름 대는 명령 전체를 주기적으로 한 번 돌려 낡음을 늦게라도 잡는다.",
+      "userBenefit": "부작용·네트워크가 필요한 명령까지 전부 덮을 수 있다 — PR 을 막지 않으므로 비싼 것을 넣을 수 있는 유일한 자리다.",
+      "why": "실측: 부작용 8종은 PR 게이트에 넣을 수 없다(작업 트리 쓰기·브라우저 내려받기·배포 URL 접근). 반면 예약 잡은 전용 러너에서 그 전부를 돌릴 수 있고, rust-audit.yaml 이 이미 schedule 전용 선례다.",
+      "tradeoff": "⑴★차단력 0 — 이미 착지한 뒤에 운다. ⑵실패가 «누구의 것도 아닌» red 가 되기 쉽다(이 저장소가 2026-09-07 에 check-worklog-coverage 로 겪은 형태) ⇒ 소유자를 문서에 먼저 박아야 한다. ⑶주기 red 는 무시되기 시작하면 영원히 무시된다.",
+      "effort": "S",
+      "target": ".github/workflows/ (신설)"
+    },
+    {
+      "title": "배치 ⒟ — 배치하지 않고 «러너 블록만» 게이트③ 회차의 손 실행으로 남긴다",
+      "plainSummary": "빈틈이 러너 블록 하나로 좁혀졌으니, 자동화 대신 착지 회차가 그 한 블록만 돌리고 결과를 회신에 적는다.",
+      "userBenefit": "새 워크플로·훅·잡이 0 이고, 실제로 비어 있는 한 곳만 덮는다. 오탐으로 파이프라인을 막을 위험이 없다.",
+      "why": "실측: 어디에도 «명령으로» 안 도는 것은 러너 블록 3명령(make-draw-fixture + wie_validate ×3 + --inject ×2)뿐이고 비용은 writer + 약 75s + 빌드다. 나머지는 이미 CI 어딘가에서 돈다(단 별칭 층 최소 6건은 «표현»이 달라 여전히 미검증). AGENTS.md 4-C 가 이미 「배포 수반 시 self-verify」를 게이트③에 지우는 선례를 갖는다.",
+      "tradeoff": "⑴★★선행 writer 가 «작업 트리에 쓴다» — make-draw-fixture 는 test_data/draw_j2me.jar 를 생성한다(gitignore 라 커밋되지는 않으나 트리를 바꾼다). ⇒ ⒟는 「신설 0」이지만 ★착지마다 «부작용 명령»을 손으로 도는 안이고, 그것은 ⒜를 탈락시킨 사유와 «같은 반대»다. 그 픽스처를 건너뛰면 draw_j2me 축이 빈다. ⑵★사람 규율에 기댄다 — 기계가 강제하지 않으므로 회차가 건너뛰면 조용히 무너진다. ⑶★별칭 층(최소 6건)은 여전히 미검증으로 남는다 — 이 안은 러너 블록만 덮는다. ⑷착지마다 75s+ 가 게이트③ 회차에 더해진다.",
+      "effort": "S",
+      "target": "AGENTS.md · ~/orchestrator/templates/merge-ticket.tpl(이 repo 밖)"
+    }
+  ]
+}

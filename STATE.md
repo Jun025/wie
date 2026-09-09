@@ -60,6 +60,37 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-09: **「문서가 이름 대는 명령이 도는가」의 «크기»를 쟀다 — ★빈틈은 «20개»가 아니라 «한 블록»이다**
+  (PR 개설 · `wie-doc-named-commands-liveness-size-measure-first` · 채택 제안 `2026-09-06-parity-outside-gate-decision#p1`)
+  — ★**재는 회차 · 구현 0 · 훅/CI/잡 신설 0.** 산출은 회차 기록과 worklog 의 **배치 4안**뿐이다(★고르지 않았다).
+  ★**모집단 정의**: 제안이 「**커밋 전** 명령」을 겨누므로 **`AGENTS.md`** 로 좁혔다 · 펜스 7블록 · 실행 가능 25줄 → 골격·자리표시 제외 **20개**.
+  ★★**[게이트② 정정] 초판의 「명령은 한 파일에만 있다」는 «거짓»이다** — `sh|bash` 펜스를 가진 추적 `*.md` 는 **8개**이고
+  그중 둘이 이 20개와 겹친다(`REPORT.md` 의 `grep -H … | sort -r` · `docs/web.md` 의 `npm run audit`). ★**좁힘은 정당하고, 전칭 주장이 틀렸다.**
+  ★★**계수기부터 틀렸다** — `grep '^```'` 이 «들여쓴 펜스»를 못 봐 **2블록 5줄**을 놓쳤다(10 ↔ 실제 14). 대조군으로 잡았다.
+  ★★**핵심 발견**: 워크플로 전수 대조에서 ★**어디에도 «명령으로» 안 도는 것은 «러너 블록 3명령 전부»다**
+  (`make-draw-fixture` · `wie_validate` ×3 · `wie_validate --inject` ×2). ★★**[게이트② 정정] 초판은
+  「`make-draw-fixture` 조차 CI 에서 돈다」고 적었는데 «거짓»이다** — `engine-contract.yml:191` 은
+  `dorny/paths-filter` 의 **경로 패턴**이지 실행 스텝이 아니고, `(node|bash|sh) scripts/make-draw-fixture`
+  호출은 **0건**이다. CI 가 쓰는 것은 `contract-roundtrip.mjs:169` 이 **import 한 모듈**이고
+  ★**writer(`:509` main-guard 안의 `writeFileSync`)는 정확히 «안 도는 부분»이다**
+  (저장소 정본 `dod_ci_parity.rs:160` 이 이미 「**메모리로 만들어 쓰는**」으로 분류하고 있었다 — 초판이 거기서 퇴행했다).
+  `smoke_gate.sh` 0건은 **제약 9 로 구조적 불가**(기결정).
+  ⇒ ★**헤드라인 「한 블록」은 오히려 강해지고**, 대신 ⒟의 가격표가 바뀐다(아래).
+  ★**두 번째 빈틈(더 미묘) — ★크기는 «최소 6건»이다**: 문서는 **별칭**을, CI 는 **실체**를 돈다
+  ⇒ ★**개명하면 CI 는 green 이고 문서만 죽는다**(천장 ③ 의 「이름만 다름」이 이것이다).
+  ⒜npm 별칭 **4**(`audit`·`build:wasm`·`frontend`·`verify`) ⒝★**beta 축 2**(게이트② 지적) —
+  `rustup toolchain install beta`·`cargo +beta clippy` 는 워크플로 리터럴 **0건**이고 CI 는
+  `rust.yml` 의 `matrix.rust: [stable, beta]` 로 «다른 표현»으로 같은 일을 한다 ⇒ **매트릭스에서 `beta` 를 빼면 CI green · 문서만 죽는다.**
+  ★초판은 이 둘을 「나머지는 이미 CI 에서 돈다」로 접었다. ★**이 층의 크기가 곧 ⒝의 대가 크기다.**
+  ★**표본 12종 전건 rc=0**(초): fmt 25 · clippy 28 · wasm 14 · **test 219** · beta 7 · audit 27 · grep 3 · coverage 8 · serial 3 ·
+  engine-contract 4 · `wie_validate` **9** · `--inject` **24**. ★**부작용 8종은 «돌리지 않았다»**(목록만).
+  ★그 비용은 **CI 이력으로** 쟀다 — `web.yml` 217~407s · `engine-contract.yml` ★**스킵 11~16s ↔ 실행 213~221s(약 20배)**.
+  ★**부수**: `test_data/draw_j2me.jar` 는 **미추적**(`*.jar` gitignore)이라 신선한 클론엔 없다 ⇒ 러너 첫 줄은 **선행 writer**.
+  ★★**[게이트② 정정] 합 라벨**: **371 은 «무해 12종 전부»의 합**이고 **4게이트는 286** 이다.
+  ⒜ 합 `~450s` 는 러너 표본 **33s(9+24)를 이중 계상**했다 — 371 이 이미 그 몫을 품는다.
+  ⇒ ★**재산: 371 − 33 + 러너 블록 75 = «413s» + writer**(`make-draw-fixture` 는 미측정).
+  ★★**⒟ 의 가격표도 바뀐다** — 「신설 0 · 러너만 손 실행」은 ★**착지마다 «작업 트리에 쓰는» 명령(writer)을 손으로 도는 안**이고,
+  그것은 ⒜를 탈락시킨 사유(「부작용 명령은 작업 트리를 덮는다」)와 **같은 반대**다. ⇒ worklog `proposals` 에 명시했다.
 - 2026-09-09: **`smoke_gate.sh` 의 JSON 읽기도 «같은 안전 술어»로 — ★여기선 «거짓 PASS» 가 가능했다**
   (PR **#144** 착지 · `wie-smoke-gate-json-read-safety-predicate-align` · 채택 제안 `2026-09-08-render-probe-field-safety#p0`)
   — `run_one()` 안 한 자리(**9+/2− · 1파일**). ★**`.rs` 0줄 · 새 의존성 0 · 새 검사기·임계 0 · 리팩터 0.**
