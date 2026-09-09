@@ -60,6 +60,20 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-09: **「문서가 이름 대는 명령이 도는가」의 «크기»를 쟀다 — ★빈틈은 «20개»가 아니라 «한 블록»이다**
+  (PR 개설 · `wie-doc-named-commands-liveness-size-measure-first` · 채택 제안 `2026-09-06-parity-outside-gate-decision#p1`)
+  — ★**재는 회차 · 구현 0 · 훅/CI/잡 신설 0.** 산출은 회차 기록과 worklog 의 **배치 4안**뿐이다(★고르지 않았다).
+  ★**전수**: 명령은 `AGENTS.md` 한 파일뿐(다른 문서 펜스 0) · 펜스 7블록 · 실행 가능 25줄 → 골격·자리표시 제외 **20개**.
+  ★★**계수기부터 틀렸다** — `grep '^```'` 이 «들여쓴 펜스»를 못 봐 **2블록 5줄**을 놓쳤다(10 ↔ 실제 14). 대조군으로 잡았다.
+  ★★**핵심 발견**: 워크플로 전수 대조에서 ★**어디에도 안 도는 것은 `wie_validate` 하나**(러너 5줄)다 —
+  `make-draw-fixture` 조차 CI 에서 돈다 · `smoke_gate.sh` 0건은 **제약 9 로 구조적 불가**(기결정).
+  ⇒ ★**제안이 겨눈 크기가 한 자리 줄어든다.**
+  ★**두 번째 빈틈(더 미묘)**: 문서는 **별칭**(`npm run audit`·`build:wasm`·`frontend`·`verify`)을, CI 는 **실체**를 돈다
+  ⇒ ★**`package.json` 이 별칭을 개명하면 CI 는 green 이고 문서만 죽는다**(천장 ③ 의 「이름만 다름 6」이 이것이다).
+  ★**표본 12종 전건 rc=0**(초): fmt 25 · clippy 28 · wasm 14 · **test 219** · beta 7 · audit 27 · grep 3 · coverage 8 · serial 3 ·
+  engine-contract 4 · `wie_validate` **9** · `--inject` **24**. ★**부작용 8종은 «돌리지 않았다»**(목록만).
+  ★그 비용은 **CI 이력으로** 쟀다 — `web.yml` 217~407s · `engine-contract.yml` ★**스킵 11~16s ↔ 실행 213~221s(약 20배)**.
+  ★**부수**: `test_data/draw_j2me.jar` 는 **미추적**(`*.jar` gitignore)이라 신선한 클론엔 없다 ⇒ 러너 첫 줄은 **선행 writer**.
 - 2026-09-09: **`smoke_gate.sh` 의 JSON 읽기도 «같은 안전 술어»로 — ★여기선 «거짓 PASS» 가 가능했다**
   (PR **#144** 착지 · `wie-smoke-gate-json-read-safety-predicate-align` · 채택 제안 `2026-09-08-render-probe-field-safety#p0`)
   — `run_one()` 안 한 자리(**9+/2− · 1파일**). ★**`.rs` 0줄 · 새 의존성 0 · 새 검사기·임계 0 · 리팩터 0.**
