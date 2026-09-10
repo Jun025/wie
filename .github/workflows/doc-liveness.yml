@@ -89,6 +89,14 @@ jobs:
           curl -sSL "https://github.com/WebAssembly/binaryen/releases/download/${VER}/binaryen-${VER}-x86_64-linux.tar.gz" | tar xz
           echo "$PWD/binaryen-${VER}/bin" >> "$GITHUB_PATH"
 
+      # Same step + same reasoning as rust.yml's ubuntu leg: wie_cli's audio stack
+      # (cpal → alsa-sys) needs the system ALSA headers, and `apt-get update` is
+      # best-effort because the runner image ships third-party repos that 403.
+      # (First self-test run failed exactly here: alsa-sys build.rs, "The system
+      # library `alsa` required by crate `alsa-sys` was not found".)
+      - name: Install required packages
+        run: sudo apt-get update || true; sudo apt-get install -y libasound2-dev
+
       # Prose-named prerequisites, not doc commands: the doc says the round-trip
       # "needs `npx playwright install chromium`", and the npm scripts need root deps.
       - name: Scaffolding — root npm deps + playwright chromium
