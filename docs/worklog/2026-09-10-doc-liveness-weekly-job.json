@@ -1,0 +1,32 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-10",
+  "task": "wie-doc-liveness-weekly-job-implementation",
+  "title": "doc-liveness 주간 잡 구현 — 문서 «문면 그대로»를 도는 schedule 워크플로 + 양방향 드리프트 대조",
+  "summary": "2026-09-10 배치 결정(⒞)의 구현이다. .github/workflows/doc-liveness.yml 신설: schedule(주 1회 · 토 20:35 UTC) + workflow_dispatch, AGENTS.md 의 sh 펜스 실행 가능 25줄을 «별칭 그대로» 복사해 돈다(실체 호출 0). 갈림은 ⒜복사+대조를 골랐다 — scripts/check-doc-liveness-parity.mjs 가 문서 펜스 ↔ 워크플로 DOC-COPY 영역을 매 PR 에서 집합 대조한다(engine-contract.yml 상시 스텝 · 양방향 변이 실측으로 확인). 의도적 비실행 2건(gh pr checks <n> 자리표시 · $EDITOR 대화형)은 워크플로 안 NOT-RUN 선언으로 분류를 «사본 옆»에 둔다(러너 블록 NOT-RUN 선례 — 검사기는 분류를 모른다). npm run verify 는 schedule 이벤트에서만 WIE_BASE=프로덕션으로 돈다(외부 접촉 주 1회 상한 · dispatch 는 건너뛴다). 차단력 0 은 잡 머리주석·결정 블록이 명시한다 — 이 잡은 착지 «뒤»에 운다. workflow_dispatch 로 1회 실제 실행해 로그를 회신에 인용했다.",
+  "changes": [
+    ".github/workflows/doc-liveness.yml — 신설(schedule 주 1회 + workflow_dispatch · DOC-COPY 5영역 + NOT-RUN 2선언)",
+    "scripts/check-doc-liveness-parity.mjs — 신설(문서 sh 펜스 ↔ 워크플로 사본 다중집합 대조 · rc 0/1/2)",
+    ".github/workflows/engine-contract.yml — 상시 스텝 1개 추가(매 PR 파리티 대조)",
+    "AGENTS.md §Documented-command liveness — 「잡 미실재」→ 착지 기재 · 워크플로명 채움 · 새 sh 펜스 = 파리티 대상 고지",
+    "docs/report/0102 · STATE.md — 회차 기록"
+  ],
+  "verification": [
+    "파리티 green: node scripts/check-doc-liveness-parity.mjs → 「OK — 25 documented line(s) … nothing extra」 rc=0 (25 = 0100 census 의 실행 가능 줄수와 일치 — 골격 for/done 포함 양측 동일 취급이라 분류 불요).",
+    "양방향 변이 실측: ⑴문서 펜스에 가짜 명령 1줄 추가 → rc=1 「DOC ONLY: cargo fake-doc-mutation --probe」 ⑵워크플로 사본에서 npm run audit 제거 → rc=1 「DOC ONLY: npm run audit」. 둘 다 원복 후 rc=0 재확인.",
+    "별칭 호출 확인: 사본은 npm run audit/build:wasm/frontend/verify · rustup toolchain install beta · cargo +beta clippy 를 그대로 싣는다 — scripts/*.sh 직접 호출·matrix 표현 0(파리티가 문면 동일성을 강제하므로 실체로 바꾸면 그 자체가 red).",
+    "실행 순서 이탈은 문서가 스스로 적은 의존뿐: build:wasm 을 check-engine-contract 앞에 뒀다(AGENTS.md 「build it first」 · CI order engine-contract.yml:116→:125). 파리티는 집합 비교라 순서 무관.",
+    "workflow_dispatch 1회 실행 — 로그는 done 회신·docs/report/0102 에 인용(verify 스텝은 schedule 전용이라 dispatch 런에서는 skipped 로 남는 것이 설계값).",
+    "wie 밖 diff 0 · required 검사 무접촉 · 커밋 훅 무접촉(부작용 명령은 전부 주간 잡 안)."
+  ],
+  "limits": [
+    "verify 의 생존성은 주간 schedule 런에서만 실측된다 — dispatch·PR 런은 외부 접촉 상한(주 1회) 때문에 건너뛴다. 그 명령 자체는 매 배포 후 web.yml 마지막 스텝 + 게이트③ 수동 프로덕션 대조가 이미 돌린다.",
+    "파리티 정규화의 꼬리 주석 규칙은 «공백 2+ 뒤 #» 이다 — 문서 펜스의 주석이 전부 열 정렬돼 있음을 채택 시점에 전수 확인했다. 한 칸 공백 뒤 # 를 명령 중간에 쓰는 새 줄이 생기면 그 줄은 주석까지 명령으로 취급된다(안전한 방향 — 사본과 안 맞으면 red).",
+    "검사기 자신을 지키는 메타 락은 없다 — engine-contract.yml 스텝이 유일한 배선이고, 검사기 파일만 지우면 그 스텝이 ENOENT 로 red 가 되지만 «스텝과 파일을 함께» 지우면 조용하다(check-parity-lock-wired 같은 2차 락은 과기계로 판단해 두지 않았다).",
+    "주간 잡의 실측 소요는 dispatch 1런 값이다 — 콜드 캐시·러너 부하에 따라 변한다."
+  ],
+  "adoptedProposals": [
+    "2026-09-10-doc-named-commands-liveness-placement#p0"
+  ],
+  "proposals": []
+}

@@ -303,9 +303,21 @@ design** — do not "fix" that by wiring it:
 **Where "the commands this file names still run" gets checked was decided on 2026-09-10: a weekly
 scheduled workflow — not a pre-commit hook, not a PR-gated CI step, not a per-landing hand run**
 (ticket `wie-doc-named-commands-liveness-placement-decision`, choosing among the four placements
-priced in `docs/report/0100`). **The job does not exist yet** — commissioning it is a follow-up
-proposal (`docs/worklog/2026-09-10-doc-named-commands-liveness-placement.json#p0`); until it lands,
-nothing runs this check, exactly as before this decision.
+priced in `docs/report/0100`). **The job landed 2026-09-10 as `.github/workflows/doc-liveness.yml`**
+(ticket `wie-doc-liveness-weekly-job-implementation`): schedule + `workflow_dispatch`, executing the
+executable lines of this file's fenced `sh` blocks **verbatim — the alias, never the script behind
+it**. The copy question was decided as ⒜ copy-plus-diff (the `dod_ci_parity.rs` precedent; ⒝
+extract-and-execute was rejected because a markdown-parsing executor is new machinery whose failure
+mode is running garbage or silently skipping, where a diff's failure mode is a red check):
+`scripts/check-doc-liveness-parity.mjs` diffs this file's fenced `sh` lines against the workflow's
+`DOC-COPY` regions on every PR (an `engine-contract.yml` always-run step), both directions.
+**A new fenced `sh` block in this file is therefore parity-checked**: add its lines to the job — or
+a `# NOT-RUN: <line> — <why>` declaration beside the copy — in the same PR, or the next PR reddens.
+Deliberate non-execution lives as NOT-RUN lines *in the workflow*, next to the copy (the
+runner-block NOT-RUN precedent — the checker holds no classification); today: `gh pr checks <n>`
+(placeholder argument) and the `$EDITOR` line (interactive). `npm run verify` runs **only on the
+schedule event**, against production via `WIE_BASE` — one external touch a week is the cap;
+`workflow_dispatch` runs skip it.
 
 Why this placement, in report 0100's numbers — it is the only one that can hold the whole gap. The
 gap is the runner block (3 commands, led by a work-tree-writing fixture builder) **plus the alias
@@ -327,9 +339,9 @@ perturbs the `dod_ci_parity.rs` correspondence; plus a mis-scoped filter fails s
 run), hand-executes a work-tree-writing command each time (the same objection that barred those
 commands from ⒜), relies on unforced discipline, and still leaves the alias 6 uncovered.
 
-**The red has an owner, pinned before the job exists** (rule activates when it lands): **the first
-gate③ round that runs after a red weekly run owns it** — read the latest scheduled run alongside
-the PR's checks (`gh run list --workflow=<the doc-liveness workflow> -L1`); if red, file a ticket
+**The red has an owner** (active since the job landed): **the first gate③ round that runs after a
+red weekly run owns it** — read the latest scheduled run alongside the PR's checks
+(`gh run list --workflow=doc-liveness.yml -L1`); if red, file a ticket
 naming the failing command — do not fix inline, merge tickets do not change code. Same shape as the
 two owner rules nearby (verify-browser red → the landing gate③; worklog-coverage overdue → the next
 gate③): the owner is the role already there. A scheduled red with no owner is how a check dies

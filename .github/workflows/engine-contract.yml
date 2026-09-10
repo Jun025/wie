@@ -93,6 +93,14 @@ jobs:
       - name: DoD parity lock is still wired (docs/worklog/2026-09-05-dod-ci-parity-checker.json #p0)
         run: node scripts/check-parity-lock-wired.mjs
 
+      # The weekly doc-liveness job (doc-liveness.yml) runs the commands AGENTS.md
+      # names as a verbatim COPY — this step is the drift axis that copy requires
+      # (AGENTS.md §Documented-command liveness, choice ⒜): the doc's fenced sh
+      # lines and the workflow's DOC-COPY regions must stay equal, both directions,
+      # or the alias layer dies silently again.
+      - name: doc-liveness weekly job matches the documented commands (AGENTS.md §Documented-command liveness)
+        run: node scripts/check-doc-liveness-parity.mjs
+
       # Fourth always-run step, same reasoning as the three above, for Constraint
       # 9/10: until now `scripts/audit-no-leak.sh` ran ONLY from a developer's
       # `npm run audit` — no workflow called it by any path (measured: 0 hits

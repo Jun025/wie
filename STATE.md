@@ -60,6 +60,15 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-10: **doc-liveness 주간 잡 «구현» — 문서 문면 그대로가 주 1회 돈다**
+  (PR 개설 · `wie-doc-liveness-weekly-job-implementation` · 채택 `2026-09-10-doc-named-commands-liveness-placement#p0`)
+  — `.github/workflows/doc-liveness.yml` 신설(schedule 토 20:35 UTC + dispatch): AGENTS.md sh 펜스 25줄을
+  **별칭 그대로** DOC-COPY 5영역에 복사해 돈다 · NOT-RUN 2건(`gh pr checks <n>` 자리표시 · `$EDITOR` 대화형)은
+  워크플로 안 선언으로(러너 블록 선례 — 검사기는 분류를 모른다). ★갈림 = ⒜복사+대조 채택(⒝추출 실행은 파서가
+  새 기계 + 실패 양식이 «조용»이라 기각): `scripts/check-doc-liveness-parity.mjs` 가 **매 PR**(engine-contract 상시
+  스텝) 양방향 대조 — 변이 실측 2방향 모두 rc=1 확인. ★`npm run verify` 는 **schedule 전용**(WIE_BASE=프로덕션 ·
+  외부 접촉 주 1회 상한 — dispatch 는 skip). ★차단력 0 명시(착지 «뒤»에 운다 · 소유자 = 빨간 런 뒤 첫 게이트③).
+  ★새 sh 펜스는 이제 파리티 대상 — 같은 PR 에서 사본/NOT-RUN 동반 필수. 정본 = `docs/report/0102--….md`.
 - 2026-09-10: **배치 결정 — 문서 명령 생존성 검사는 ⒞ «주 1회 예약 잡» 하나다(구현은 별 회차)**
   (PR 개설 · `wie-doc-named-commands-liveness-placement-decision` · 채택 `2026-09-09-doc-named-commands-liveness-sizing#p0~p3` 전건)
   — ★**고르는 회차 · 구현 0** — 0100 의 4안 중 ⒞를 골랐고 잡 신설은 worklog `#p0` 제안으로 넘겼다.
