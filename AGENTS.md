@@ -304,9 +304,12 @@ design** — do not "fix" that by wiring it:
 scheduled workflow — not a pre-commit hook, not a PR-gated CI step, not a per-landing hand run**
 (ticket `wie-doc-named-commands-liveness-placement-decision`, choosing among the four placements
 priced in `docs/report/0100`). **The job landed 2026-09-10 as `.github/workflows/doc-liveness.yml`**
-(ticket `wie-doc-liveness-weekly-job-implementation`): schedule + `workflow_dispatch`, executing the
-executable lines of this file's fenced `sh` blocks **verbatim — the alias, never the script behind
-it**. The copy question was decided as ⒜ copy-plus-diff (the `dod_ci_parity.rs` precedent; ⒝
+(ticket `wie-doc-liveness-weekly-job-implementation`): schedule + `workflow_dispatch` + a
+`pull_request` self-test scoped to the workflow file itself (a job edit runs once before landing —
+GitHub refuses `workflow_dispatch` for a workflow not yet on the default branch, measured 404;
+**never make this a required check**, the paths-filter deadlock in the Incident ledger). It executes
+the executable lines of this file's fenced `sh` blocks **verbatim — the alias, never the script
+behind it**. The copy question was decided as ⒜ copy-plus-diff (the `dod_ci_parity.rs` precedent; ⒝
 extract-and-execute was rejected because a markdown-parsing executor is new machinery whose failure
 mode is running garbage or silently skipping, where a diff's failure mode is a red check):
 `scripts/check-doc-liveness-parity.mjs` diffs this file's fenced `sh` lines against the workflow's

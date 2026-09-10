@@ -16,7 +16,7 @@
     "양방향 변이 실측: ⑴문서 펜스에 가짜 명령 1줄 추가 → rc=1 「DOC ONLY: cargo fake-doc-mutation --probe」 ⑵워크플로 사본에서 npm run audit 제거 → rc=1 「DOC ONLY: npm run audit」. 둘 다 원복 후 rc=0 재확인.",
     "별칭 호출 확인: 사본은 npm run audit/build:wasm/frontend/verify · rustup toolchain install beta · cargo +beta clippy 를 그대로 싣는다 — scripts/*.sh 직접 호출·matrix 표현 0(파리티가 문면 동일성을 강제하므로 실체로 바꾸면 그 자체가 red).",
     "실행 순서 이탈은 문서가 스스로 적은 의존뿐: build:wasm 을 check-engine-contract 앞에 뒀다(AGENTS.md 「build it first」 · CI order engine-contract.yml:116→:125). 파리티는 집합 비교라 순서 무관.",
-    "workflow_dispatch 1회 실행 — 로그는 done 회신·docs/report/0102 에 인용(verify 스텝은 schedule 전용이라 dispatch 런에서는 skipped 로 남는 것이 설계값).",
+    "실런 1회 — 단 workflow_dispatch 는 «기본 브랜치에 없는 워크플로»라 GitHub 이 404 로 거부한다(실측 인용: 「HTTP 404: workflow doc-liveness.yml not found on the default branch」). 그래서 pull_request 셀프테스트 트리거(paths = 워크플로 파일 자신)를 달아 이 PR 자체가 잡을 1회 돌렸다 — 로그는 done 회신·docs/report/0102 에 인용(verify 스텝은 schedule 전용이라 skipped 가 설계값). 착지 후에는 dispatch 가 가능해진다. ★이 워크플로를 required 로 올리지 마라 — paths 필터 required 는 교착한다(사건 대장).",
     "wie 밖 diff 0 · required 검사 무접촉 · 커밋 훅 무접촉(부작용 명령은 전부 주간 잡 안)."
   ],
   "limits": [

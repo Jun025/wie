@@ -6,7 +6,10 @@
 ### 무엇이 생겼나
 
 - **`.github/workflows/doc-liveness.yml`** — schedule(**토 20:35 UTC = 일 05:35 KST · 주 1회**) +
-  `workflow_dispatch`. AGENTS.md 의 fenced `sh` 블록 실행 가능 **25줄**(0100 census 와 동수)을
+  `workflow_dispatch` + **`pull_request` 셀프테스트**(paths = 워크플로 파일 자신 — 잡을 고치는 PR 이
+  착지 전에 1회 돈다. 계기: `workflow_dispatch` 는 기본 브랜치에 없는 워크플로에 **404** 다(실측) ·
+  ★required 승격 금지 — paths 필터 required 는 교착한다, 사건 대장).
+  AGENTS.md 의 fenced `sh` 블록 실행 가능 **25줄**(0100 census 와 동수)을
   `DOC-COPY` 영역 5곳에 **별칭 그대로** 복사해 돈다 — `npm run audit`(`bash scripts/…` 아님) ·
   `cargo +beta clippy`(matrix 표현 아님). 의도적 비실행 **2건**은 워크플로 안
   `# NOT-RUN: <줄> — <이유>` 로 선언: `gh pr checks <n>`(자리표시 인자) · `$EDITOR …`(대화형).
@@ -32,7 +35,8 @@
 - 파리티 green: 「OK — 25 documented line(s) … nothing extra」 rc=0.
 - **양방향 변이**: 문서에 가짜 명령 추가 → rc=1(`DOC ONLY: cargo fake-doc-mutation --probe`) ·
   워크플로에서 `npm run audit` 제거 → rc=1(`DOC ONLY: npm run audit`). 원복 후 rc=0.
-- `workflow_dispatch` 1회 실행 — 결과·소요는 done 회신에 인용(verify 스텝은 설계대로 skipped).
+- 실런 1회(`pull_request` 셀프테스트 — dispatch 404 실측 후의 경로) — 결과·소요는 done 회신에
+  인용(verify 스텝은 설계대로 skipped). 착지 후엔 `workflow_dispatch` 가 가능해진다.
 
 ### 알고 남긴 것
 

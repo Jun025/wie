@@ -25,7 +25,7 @@
 #   to the copy (the runner-block NOT-RUN precedent: classification lives beside the
 #   list, not inside the checker).
 # ★`npm run verify` drives production (WIE_BASE) and runs ONLY on the schedule event —
-#   the external-touch cap is one per week; workflow_dispatch runs skip it.
+#   the external-touch cap is one per week; workflow_dispatch and pull_request runs skip it.
 # ★Execution order differs from doc order only where the doc itself states the
 #   dependency (build:wasm before the contract check — "build it first"); the parity
 #   check compares sets, not order.
@@ -36,6 +36,15 @@ on:
   schedule:
     - cron: '35 20 * * 6' # Sat 20:35 UTC = Sun 05:35 KST — once a week, quiet slot
   workflow_dispatch:
+  # Self-test: a PR that edits this job runs it once before landing. This exists because
+  # GitHub refuses `workflow_dispatch` for a workflow not yet on the default branch
+  # (measured 2026-09-10: HTTP 404 "not found on the default branch"), so a job edit
+  # would otherwise land untested. The paths scope keeps every other PR at zero cost.
+  # ★This workflow must NEVER become a required check — a paths-filtered required check
+  #   deadlocks every PR that misses the paths (Incident ledger, engine-contract case).
+  pull_request:
+    paths:
+      - '.github/workflows/doc-liveness.yml'
 
 permissions:
   contents: read
