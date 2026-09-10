@@ -1,0 +1,165 @@
+# doc-liveness — runs the commands AGENTS.md names, in the documented notation, once a week.
+#
+# ── What this is, and what it is NOT ─────────────────────────────────────────
+# ★This job BLOCKS NOTHING. It is schedule-driven, so it cries only AFTER a landing —
+#   that is the decided trade (AGENTS.md §Documented-command liveness, 2026-09-10):
+#   the classes that need PR-time blocking are already blocked (the four gates on
+#   rust.yml's matrix; Scenarios E+F for engine regressions). What this catches is
+#   command-surface rot — "the doc says run X and X no longer runs" — whose damage
+#   is a later round's time, not shipped code, so ≤1-week latency is the priced-in cost.
+# ★Owner of a red run: the FIRST gate③ round that runs after it (pinned in AGENTS.md
+#   §Documented-command liveness — read `gh run list --workflow=doc-liveness.yml -L1`
+#   alongside the PR's checks; if red, file a ticket naming the failing command).
+#
+# ── The one rule of the command list below ───────────────────────────────────
+# ★Call the ALIAS the doc names, never the script behind it. `npm run audit`, not
+#   `bash scripts/audit-no-leak.sh`; `cargo +beta clippy`, not a matrix leg. Calling
+#   the substance is how `matrix.rust: [stable, beta]` stays green while the documented
+#   `cargo +beta` line dies — the alias layer (≥6) was this lineage's whole subject.
+# ★Every line between `# DOC-COPY BEGIN` / `# DOC-COPY END` is a verbatim copy of an
+#   executable line of AGENTS.md's fenced sh blocks (trailing `  #` comments stripped).
+#   scripts/check-doc-liveness-parity.mjs diffs the two sides on every PR (a step of
+#   engine-contract.yml) — edit either side alone and the next PR goes red, both
+#   directions. That is choice ⒜ (copy + diff, the dod_ci_parity.rs precedent).
+# ★What is deliberately NOT executed is declared as `# NOT-RUN: <line> — <why>` next
+#   to the copy (the runner-block NOT-RUN precedent: classification lives beside the
+#   list, not inside the checker).
+# ★`npm run verify` drives production (WIE_BASE) and runs ONLY on the schedule event —
+#   the external-touch cap is one per week; workflow_dispatch and pull_request runs skip it.
+# ★Execution order differs from doc order only where the doc itself states the
+#   dependency (build:wasm before the contract check — "build it first"); the parity
+#   check compares sets, not order.
+
+name: doc-liveness
+
+on:
+  schedule:
+    - cron: '35 20 * * 6' # Sat 20:35 UTC = Sun 05:35 KST — once a week, quiet slot
+  workflow_dispatch:
+  # Self-test: a PR that edits this job runs it once before landing. This exists because
+  # GitHub refuses `workflow_dispatch` for a workflow not yet on the default branch
+  # (measured 2026-09-10: HTTP 404 "not found on the default branch"), so a job edit
+  # would otherwise land untested. The paths scope keeps every other PR at zero cost.
+  # ★This workflow must NEVER become a required check — a paths-filtered required check
+  #   deadlocks every PR that misses the paths (Incident ledger, engine-contract case).
+  pull_request:
+    paths:
+      - '.github/workflows/doc-liveness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  doc-liveness:
+    name: doc-liveness (weekly)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # check-worklog-coverage keys off origin/main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      # Same cache key family as engine-contract.yml / publish-artifact.yml — either
+      # workflow warms the others (identical wasm32 release build of wie_web).
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-publish-wasm-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-publish-wasm-
+
+      - name: Install wasm-bindgen-cli (pinned to Cargo.lock)
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@0.2.108
+
+      - name: Install binaryen (wasm-opt)
+        run: |
+          VER=version_119
+          curl -sSL "https://github.com/WebAssembly/binaryen/releases/download/${VER}/binaryen-${VER}-x86_64-linux.tar.gz" | tar xz
+          echo "$PWD/binaryen-${VER}/bin" >> "$GITHUB_PATH"
+
+      # Same step + same reasoning as rust.yml's ubuntu leg: wie_cli's audio stack
+      # (cpal → alsa-sys) needs the system ALSA headers, and `apt-get update` is
+      # best-effort because the runner image ships third-party repos that 403.
+      # (First self-test run failed exactly here: alsa-sys build.rs, "The system
+      # library `alsa` required by crate `alsa-sys` was not found".)
+      - name: Install required packages
+        run: sudo apt-get update || true; sudo apt-get install -y libasound2-dev
+
+      # Prose-named prerequisites, not doc commands: the doc says the round-trip
+      # "needs `npx playwright install chromium`", and the npm scripts need root deps.
+      - name: Scaffolding — root npm deps + playwright chromium
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: The four gates + the beta axis (AGENTS.md §The four gates)
+        run: |
+          # DOC-COPY BEGIN
+          cargo fmt --all -- --check
+          cargo clippy --all -- -D warnings
+          cargo clippy --target wasm32-unknown-unknown -- -D warnings
+          RUST_MIN_STACK=4194304 cargo test --all
+          rustup toolchain install beta --component clippy
+          cargo +beta clippy --all -- -D warnings
+          # DOC-COPY END
+
+      - name: The engine runner block (AGENTS.md §The four gates)
+        run: |
+          # DOC-COPY BEGIN
+          node scripts/make-draw-fixture.mjs
+          for f in test_data/draw_j2me.jar test_data/helloworld_ktf.zip test_data/helloworld_lgt.zip; do
+            cargo run -q -p wie_cli --bin wie_validate -- "$f"
+          done
+          for f in test_data/keydraw_ktf.zip test_data/keydraw_lgt.zip; do
+            cargo run -q -p wie_cli --bin wie_validate -- --inject --expect-last-frame "$f"
+          done
+          # DOC-COPY END
+
+      - name: Web-surface commands (AGENTS.md §Web-surface commands)
+        run: |
+          # DOC-COPY BEGIN
+          npm run audit
+          npm run build:wasm
+          node scripts/check-engine-contract.mjs
+          npm run frontend
+          node scripts/contract-roundtrip.mjs
+          # DOC-COPY END
+
+      # ★Schedule-only: this is the one external touch, capped at once a week. The env
+      # is the doc's own production form ("WIE_BASE=https://wie-web.pages.dev node
+      # scripts/verify-browser.mjs" — §Web-surface commands); the alias stays verbatim.
+      - name: npm run verify — production, weekly only
+        if: github.event_name == 'schedule'
+        env:
+          WIE_BASE: https://wie-web.pages.dev
+        run: |
+          # DOC-COPY BEGIN
+          npm run verify
+          # DOC-COPY END
+
+      - name: Landing-paperwork commands (AGENTS.md §Landing paperwork)
+        env:
+          GH_TOKEN: ${{ github.token }} # check-docs-report-serial asks gh api for open-PR claims
+        run: |
+          # DOC-COPY BEGIN
+          N=$(node scripts/check-docs-report-serial.mjs --next-serial)
+          grep -H '^## \[' docs/report/*.md | sort -r
+          node scripts/check-worklog-coverage.mjs
+          node scripts/check-worklog-coverage.mjs --record
+          # DOC-COPY END
+          # (--record writes the runner's checkout only when a re-measure is due; nothing
+          #  is committed — the liveness question is "does the documented command run".)
+          # NOT-RUN: gh pr checks <n> -R Jun025/wie — <n> is a placeholder; a scheduled run has no PR to ask about
+          # NOT-RUN: $EDITOR docs/report/$N--$(date +%F)--<ticket-id>.md — interactive editor + <ticket-id> placeholder; cannot run unattended
