@@ -60,6 +60,14 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-11: **P3 첫 조각 착지 — `wie_web` → `wie_featurephone` 크레이트 개명** (PR #149 ·
+  `wie-p3-rename-wie-web-to-featurephone`) — upstream `dlunch/wie` 가 `wie-web`(lib 타깃 `wie_web`)를
+  자기 브라우저 앱에 써서 upstream-base 전환 시 정면 충돌하는 이름을 치웠다. 순수 `git mv` 커밋(7파일
+  100% rename)과 참조 커밋(21파일)을 분리해 rename detection 을 살렸다. ★**산출물 쌍
+  `wie_web.js`/`wie_web_bg.wasm` 은 «일부러» 유지** — otterpebble 소비자 계약이라(`--out-name wie_web`
+  이 크레이트명과 분리) 사용자 영향 0. 잔존 `wie_web` 120건 전건 의도 잔존(산출물 이름/사료/개명 기록).
+  4게이트+beta green · `wie_validate` 5/5 PASS · 실빌드로 산출물 이름 보존 실증 · 계약 검사 107/0.
+  정본 = `docs/report/0103--….md` · 후속(산출물 개명 조율) = worklog `2026-09-11-…#p0`.
 - 2026-09-10: **doc-liveness 주간 잡 «구현» — 문서 문면 그대로가 주 1회 돈다**
   (PR 개설 · `wie-doc-liveness-weekly-job-implementation` · 채택 `2026-09-10-doc-named-commands-liveness-placement#p0`)
   — `.github/workflows/doc-liveness.yml` 신설(schedule 토 20:35 UTC + dispatch): AGENTS.md sh 펜스 25줄을
