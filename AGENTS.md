@@ -3,7 +3,7 @@
 ## Goal
 
 Keep the wie emulator engine correct and shippable on two hosts at once: the native `wie_cli`
-desktop host, and the `wie_web` browser host that otterpebble's featurephone shell consumes as a
+desktop host, and the `wie_featurephone` browser host that otterpebble's featurephone shell consumes as a
 prebuilt WASM artifact. Most constraints below exist because those hosts share one workspace — a
 change that is fine natively can break the wasm build, the published artifact, or the consumer
 that boots it. Your task ends with an **open PR**, not a merge.
@@ -23,7 +23,7 @@ the file that enforces it; causes no file enforces are in the ledger.
 | 4 | `engine-contract.yml`'s `contract` job stays an always-run wrapper — no `paths:` on its triggers; relevance is detected inside the job, and its filter list stays in sync with `publish-artifact.yml`'s `on.push.paths` | `engine-contract.yml:21-30`; why → ledger |
 | 5 | `cargo audit` with no ignores. A suppression needs a named advisory ID and a written reachability argument — never blanket, never `continue-on-error` | `rust-audit.yaml:39-54` |
 | 6 | `no_std` + `extern crate alloc` in the engine crates — reaching for `std` breaks the web build | wasm clippy gate in `rust.yml`; `docs/architecture.md` |
-| 7 | `wie_web` is an empty library off `wasm32`. Do not "clean up" the `cfg(target_arch = "wasm32")` gates | `wie_web/Cargo.toml:1-11`; native jobs in `rust.yml` |
+| 7 | `wie_featurephone` is an empty library off `wasm32`. Do not "clean up" the `cfg(target_arch = "wasm32")` gates | `wie_featurephone/Cargo.toml` header; native jobs in `rust.yml` |
 | 8 | The exact version pins and the RustJava `rev` pin are deliberate | `Cargo.toml` — comment above the `rev` lines; full rationale in the ledger |
 | 9 | No game bytes, ever | `.gitignore` blocklist + `scripts/audit-no-leak.sh`, run on every PR by `engine-contract.yml` — full text below |
 | 10 | Secrets are referenced, never embedded or printed | `.dev.vars*` git-ignored + `.claude/settings.json` read-deny — full text below |
@@ -665,7 +665,7 @@ above the engine reaches back into it.
 - `wie_jvm_support` — bridge onto the pinned RustJava JVM; also `hardening.rs`, the null guards that pin does not carry.
 - `wie_wipi_c`, `wie_wipi_java`, `wie_midp`, `wie_skvm` — the emulated API surfaces.
 - `wie_ktf`, `wie_lgt`, `wie_skt`, `wie_j2me` — per-carrier entry points (`wie_ktf`/`wie_lgt` hold the heavy reverse-engineered runtimes).
-- `wie_cli` — native host (also `wie_validate`, a headless triage runner); `wie_web` — browser host, empty library off `wasm32` (Constraint 7).
+- `wie_cli` — native host (also `wie_validate`, a headless triage runner); `wie_featurephone` — browser host, empty library off `wasm32` (Constraint 7; renamed from `wie_web` 2026-09-11 — upstream uses that name).
 - `web/`, `functions/`, `migrations/`, `scripts/`, `docs/`, `data/`, `fonts/`, `test_data/` — non-Rust surfaces.
 
 **Full map: `docs/architecture.md`** — layer diagram, a role for every crate, and what each

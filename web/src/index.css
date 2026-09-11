@@ -85,7 +85,7 @@ body {
 /* Crisp upscaling of the low-res framebuffer. The translateZ/backface hints
    promote the canvas to its own compositor layer so the presented frame stays
    stable even when the page is idle (helps the "flicker while not scrolling"
-   case alongside the double-buffered blit in wie_web). */
+   case alongside the double-buffered blit in wie_featurephone). */
 .emulator-canvas {
   image-rendering: pixelated;
   image-rendering: crisp-edges;

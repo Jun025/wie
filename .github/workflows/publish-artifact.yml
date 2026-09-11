@@ -1,6 +1,6 @@
 name: Publish engine artifact (→ otterpebble propagation)
 
-# Federation ① sender. When the engine changes on main, build a FRESH wie_web WASM
+# Federation ① sender. When the engine changes on main, build a FRESH wie_featurephone WASM
 # from current source, publish it as a versioned, hash-pinned GitHub Release asset,
 # and signal otterpebble via repository_dispatch so featurephone.otterpebble.com
 # serves the new engine with no human step. otterpebble owns the receiver
@@ -75,7 +75,7 @@ jobs:
           curl -sSL "https://github.com/WebAssembly/binaryen/releases/download/${VER}/binaryen-${VER}-x86_64-linux.tar.gz" | tar xz
           echo "$PWD/binaryen-${VER}/bin" >> "$GITHUB_PATH"
 
-      - name: Build fresh wie_web WASM (current source)
+      - name: Build fresh wie_featurephone WASM (current source)
         run: bash scripts/build-wasm.sh
 
       # ── Featurephone consumer-contract gate (fail-closed) ──────────────────
@@ -131,7 +131,7 @@ jobs:
           else
             gh release create "$TAG" \
               --title "wie engine $TAG" \
-              --notes "Fresh wie_web WASM (${{ steps.meta.outputs.wie_head }}). Auto-published for otterpebble/featurephone propagation." \
+              --notes "Fresh wie_featurephone WASM (${{ steps.meta.outputs.wie_head }}). Auto-published for otterpebble/featurephone propagation." \
               web/src/wasm/wie_web_bg.wasm web/src/wasm/wie_web.js
           fi
           BASE="${{ github.server_url }}/${{ github.repository }}/releases/download/$TAG"

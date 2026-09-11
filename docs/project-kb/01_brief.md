@@ -8,7 +8,7 @@
 
 - 코어: `wie_core_arm`(ARM 에뮬), `wie_jvm_support`, `wie_backend`(시스템 서비스)
 - 플랫폼: `wie_ktf` · `wie_skt` · `wie_lgt`(통신사 3사) · `wie_j2me`, API 계층 `wie_midp` · `wie_wipi_*` · `wie_skvm`
-- 소비 형태: `wie_cli`(로컬/검증 — 헤드리스 검증기 포함) · `wie_web`(wasm-bindgen 브라우저 어댑터 — 산출물의 원천)
+- 소비 형태: `wie_cli`(로컬/검증 — 헤드리스 검증기 포함) · `wie_featurephone`(wasm-bindgen 브라우저 어댑터 — 산출물의 원천 · 2026-09-11 `wie_web` 에서 개명)
 
 ## 이중 역할 — ① 엔진 정상화 트랙 + ② featurephone 엔진 공급자
 

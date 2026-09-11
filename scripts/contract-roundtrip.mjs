@@ -60,7 +60,7 @@
 //   version of this condition said "reopen when the count exceeds 1" and was
 //   already false on the day it was written — the count is 10.)
 //     $ grep -nE '(^|[^[:alnum:]_])match[^[:alnum:]_]' \
-//         wie_web/src/lib.rs \
+//         wie_featurephone/src/lib.rs \
 //         wie_midp/src/classes/net/wie/event_queue.rs \
 //         wie_midp/src/classes/javax/microedition/lcdui/display.rs \
 //         wie_midp/src/classes/javax/microedition/lcdui/displayable.rs \
@@ -126,8 +126,8 @@
 //   assertions above stay readable; a pixel axis would need the resource drawn
 //   on the same screen the key assertions own, i.e. two more fixture zips.
 //   Reading stdout costs nothing instead: guest printf goes
-//   MC_knlPrintk -> Platform::write_stdout, and wie_web implements that as
-//   `web_sys::console::log_1` (wie_web/src/platform.rs), so the line is ALREADY
+//   MC_knlPrintk -> Platform::write_stdout, and wie_featurephone implements that as
+//   `web_sys::console::log_1` (wie_featurephone/src/platform.rs), so the line is ALREADY
 //   in the browser console. This file already listens (`consoleLog` below) and
 //   only discarded it unless the run failed. No glue hook, no new zip, and
 //   nothing added to docs/contracts/featurephone-engine-contract.json — that
@@ -142,7 +142,7 @@
 //   check is per-carrier because the shims are (KTF returns early on
 //   `stream.is_none()`, LGT falls through to the filesystem).
 //   That fallback is still the only place a host-divergent implementation sits
-//   (wie_web::WebFilesystem vs wie_cli::CliFilesystem), and NOTHING here covers
+//   (wie_featurephone::WebFilesystem vs wie_cli::CliFilesystem), and NOTHING here covers
 //   it — see the worklog for why that gap was left open rather than papered
 //   over with a second fixture.
 //
@@ -287,7 +287,7 @@ page.setDefaultTimeout(120_000);
 
 const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys, img, resLine }) => {
   const steps = [];
-  // wie_web 은 게스트 stdout 을 console.log 로 낸다(Platform::write_stdout ->
+  // wie_featurephone 은 게스트 stdout 을 console.log 로 낸다(Platform::write_stdout ->
   // web_sys::console::log_1). 원 함수를 그대로 호출하므로 Node 쪽 진단 수집은
   // 영향받지 않는다 — 여기서는 «어느 시나리오 구간의» 줄인지 가르려고 기록한다.
   const guestOut = [];
@@ -298,7 +298,7 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
   };
   // ★한 줄이 «한 메시지»로 오지 않는다 — 실측(2026-09-06): 게스트의 `res:{}:{}` 한 줄이
   // console 에 `res:` / `9` / `:` / `602` / `\n` 다섯 메시지로 쪼개져 도착한다.
-  // MC_knlPrintk 가 포맷 조각마다 Platform::write_stdout 을 부르고 wie_web 이 그
+  // MC_knlPrintk 가 포맷 조각마다 Platform::write_stdout 을 부르고 wie_featurephone 이 그
   // 호출마다 console.log_1 을 내기 때문이다. 네이티브는 바이트 스트림이라 줄이 저절로
   // 이어지므로 ★이 쪼개짐은 «브라우저에만» 있다. ⇒ 메시지별이 아니라 «이어붙인» 버퍼에서 찾는다.
   const sawSince = (mark, needle) => guestOut.slice(mark).join("").includes(needle);

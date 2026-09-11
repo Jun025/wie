@@ -30,7 +30,7 @@ receiver pin-bump → featurephone deploy). This session builds the **sender** o
   matches the receiver's plain `curl -fSL`. This is why we publish to a GitHub Release (not R2/private storage).
 
 ## Build path (reuse existing repo conventions — measured)
-- `scripts/build-wasm.sh` (already in repo): `cargo build --target wasm32-unknown-unknown --release -p wie_web`
+- `scripts/build-wasm.sh` (already in repo): `cargo build --target wasm32-unknown-unknown --release -p wie_featurephone`
   → `wasm-bindgen --target web --out-dir web/src/wasm --out-name wie_web` → optional `wasm-opt -Oz`.
   Outputs `web/src/wasm/{wie_web_bg.wasm, wie_web.js}` (git-ignored build artifacts — no large binaries in git).
 - CI toolchain mirrors `web.yml`: `dtolnay/rust-toolchain` (wasm32 target) + `taiki-e/install-action wasm-bindgen-cli@0.2.108`
