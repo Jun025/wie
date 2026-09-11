@@ -60,6 +60,14 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-11: **P3 첫 조각 착지 — `wie_web` → `wie_featurephone` 크레이트 개명** (PR #149 ·
+  `wie-p3-rename-wie-web-to-featurephone`) — upstream `dlunch/wie` 가 `wie-web`(lib 타깃 `wie_web`)를
+  자기 브라우저 앱에 써서 upstream-base 전환 시 정면 충돌하는 이름을 치웠다. 순수 `git mv` 커밋(7파일
+  100% rename)과 참조 커밋(21파일)을 분리해 rename detection 을 살렸다. ★**산출물 쌍
+  `wie_web.js`/`wie_web_bg.wasm` 은 «일부러» 유지** — otterpebble 소비자 계약이라(`--out-name wie_web`
+  이 크레이트명과 분리) 사용자 영향 0. 잔존 `wie_web` 120건 전건 의도 잔존(산출물 이름/사료/개명 기록).
+  4게이트+beta green · `wie_validate` 5/5 PASS · 실빌드로 산출물 이름 보존 실증 · 계약 검사 107/0.
+  정본 = `docs/report/0103--….md` · 후속(산출물 개명 조율) = worklog `2026-09-11-…#p0`.
 - 2026-09-10: **doc-liveness 주간 잡 «구현» — 문서 문면 그대로가 주 1회 돈다**
   (PR 개설 · `wie-doc-liveness-weekly-job-implementation` · 채택 `2026-09-10-doc-named-commands-liveness-placement#p0`)
   — `.github/workflows/doc-liveness.yml` 신설(schedule 토 20:35 UTC + dispatch): AGENTS.md sh 펜스 25줄을
@@ -1121,10 +1129,17 @@
   증거로 읽지 마라**(§9-5). 보존의 증거는 프로브와 개악 대조뿐이다.
   ★**다음 칸**: 계단의 종점은 갈래 ⒜(`ba5797b`(+47) · **≥222곳** + crates.io 개명)이고 ★**이 회차는 거기까지
   가지 않았다.** `+34`(`current_class_loader` 비공개화 6곳 · 공개 대체 없음)가 그 앞의 벽이다.
-- **P3**(L·med·★**선행 = P2 아님**. P2 가 답을 못 내므로 P1 결정 뒤로 붙인다) `wie_web` → `wie_featurephone` **개명**(upstream 이 같은 이름을 자기 용도로 쓴다)
-  후 upstream 을 base 로 ③ 오버레이 재적용 + `compile_model.rs` **122줄 이식** + ★**엔트리포인트 규약 정합**
-  (upstream `LgtEmulator` 는 `application.jar` 를 찾고 우리는 `00000000.jar` 를 넘긴다 — ★«부수 발견»이
-  아니라 **작업목록 리터럴 항목**이다. 조용히 깨지는 것은 목록에 없으면 잊힌다). ★여러 회차로 쪼개라.
+- **P3**(L·med·★**선행 = P2 아님**. P2 가 답을 못 내므로 P1 결정 뒤로 붙인다) — **여러 회차로 쪼갠다. 첫 조각(개명)은 끝났다.**
+  - ★**[첫 조각 완료 2026-09-11 · `wie-p3-rename-wie-web-to-featurephone`]** `wie_web` → `wie_featurephone` **개명**
+    (upstream 이 `wie-web` 를 자기 브라우저 앱에 쓴다 — lib 타깃 `wie_web` 충돌). 순수 `git mv` 커밋과 참조 커밋 분리
+    (rename detection 보존). ★**산출물 쌍 `wie_web.js`/`wie_web_bg.wasm` 이름은 «일부러» 안 바꿨다** —
+    그것은 upstream 충돌이 아니라 **otterpebble 소비자 계약**이다(`featurephone-engine-contract.json` `files`·
+    `glueFetchesWasmByName` · 리시버가 릴리스 자산을 **이름으로** curl). `build-wasm.sh` 의 `--out-name wie_web` 이
+    그 분리를 만든다. 산출물 개명은 wie+otterpebble **교차 repo 조율 회차**다(선행: otterpebble 리시버·셸 합의).
+  - **남은 조각(후속 회차)**: upstream 을 base 로 ③ 오버레이 재적용 + `compile_model.rs` **122줄 이식** +
+    ★**엔트리포인트 규약 정합**(upstream `LgtEmulator` 는 `application.jar` 를 찾고 우리는 `00000000.jar` 를
+    넘긴다 — ★«부수 발견»이 아니라 **작업목록 리터럴 항목**이다. 조용히 깨지는 것은 목록에 없으면 잊힌다.
+    ※개명은 이 규약을 건드리지 않았다 — jar 이름은 크레이트명과 무관한 게스트 파일시스템 경로다).
 - **P4**(M·low·P3 와 병행) ② 를 upstream PR 로. ★**IP 방침 선 안쪽만**(#1239 2026-06-29
   「공개 문서 기반으로만 구현 · 펌웨어 리버스 계획 없음」) — `wipi_java` 공개 API 스텁 10종 +
   `canvas.rs` 단위테스트 9개는 **보낼 수 있고**, `docs/lgt_abi.md`·`docs/reference/` 는 **보내지 마라**.

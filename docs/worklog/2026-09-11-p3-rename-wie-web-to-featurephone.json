@@ -1,0 +1,20 @@
+{
+  "schema": "worklog-v1",
+  "date": "2026-09-11",
+  "task": "wie-p3-rename-wie-web-to-featurephone",
+  "title": "P3 첫 조각 — wie_web → wie_featurephone 크레이트 개명",
+  "summary": "크레이트/디렉터리 개명(순수 git mv + 참조 커밋 분리). 산출물 쌍 wie_web.js/wie_web_bg.wasm 은 otterpebble 소비자 계약이라 일부러 유지(--out-name wie_web). 상세 = docs/report/0103.",
+  "proposals": [
+    {
+      "title": "산출물 쌍 개명(wie_web.js → wie_featurephone.js) — wie+otterpebble 교차 repo 조율 회차",
+      "plainSummary": "크레이트는 wie_featurephone 인데 배포 산출물은 여전히 wie_web.js/wie_web_bg.wasm 이다. 이름을 맞추려면 wie 의 계약 JSON·build-wasm.sh·워크플로와 otterpebble 의 리시버(wie-artifact-receive.yml)·셸 import 를 한 번에 바꿔야 한다.",
+      "userBenefit": "이름 이원화(크레이트 wie_featurephone ↔ 산출물 wie_web.*)로 인한 다음 회차의 혼동 제거. 기능 변화는 없다.",
+      "why": "이번 개명 회차는 산출물 이름을 일부러 안 바꿨다 — 그것은 upstream 충돌이 아니라 소비자 계약(featurephone-engine-contract.json files·glueFetchesWasmByName)이고, 일방 변경은 otterpebble 리시버의 이름 기반 curl 을 깨뜨린다. 계약은 fail-closed 라 같은 PR 에서 계약 갱신 + 소비자 측 합의가 전제다.",
+      "tradeoff": "하면: 교차 repo 2건 조율 + 배포 경로 1회 리스크. 안 하면: 이름 이원화가 영구화되지만 동작 비용은 0 — 급하지 않다.",
+      "effort": "M (wie 1 PR + otterpebble 1 PR, 착지 순서 조율 필요)",
+      "target": "wie: docs/contracts/featurephone-engine-contract.json, scripts/build-wasm.sh, .github/workflows/publish-artifact.yml · otterpebble: apps/featurephone/.github/workflows/wie-artifact-receive.yml, 셸 import"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}

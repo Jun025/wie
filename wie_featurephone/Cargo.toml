@@ -1,4 +1,9 @@
-# wie_web — browser host adapter for the wie emulator core.
+# wie_featurephone — browser host adapter for the wie emulator core.
+# (Renamed from wie_web 2026-09-11: upstream dlunch/wie uses the wie-web name —
+# lib target wie_web — for its own browser app, which collides once upstream
+# becomes the merge base. The shipped artifact pair keeps its contract-pinned
+# names wie_web.js / wie_web_bg.wasm via build-wasm.sh's --out-name; renaming
+# those is a coordinated wie+otterpebble change, not part of this rename.)
 #
 # This crate is ADDITIVE: it implements the `wie_backend::Platform` abstraction
 # for the browser (canvas / WebAudio / in-memory + IndexedDB-snapshot storage)
@@ -11,7 +16,7 @@
 # stay green; all real code is gated behind `cfg(target_arch = "wasm32")`.
 
 [package]
-name = "wie_web"
+name = "wie_featurephone"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

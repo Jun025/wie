@@ -14,7 +14,7 @@ members = [
     "wie_ktf_dump",
     "wie_lgt",
     "wie_skt",
-    "wie_web",
+    "wie_featurephone",
 ]
 
 default-members = ["wie_cli"]

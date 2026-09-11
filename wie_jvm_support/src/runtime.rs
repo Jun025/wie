@@ -174,7 +174,7 @@ where
     /// `System.exit(int)` — the guest asked to stop. dlunch/RustJava's own host
     /// calls `std::process::exit` here; we cannot (the emulator is a library on
     /// both hosts), so we route it through the platform's normal shutdown path —
-    /// the same one WIPI `MC_knlExit` uses, which is what `wie_web`'s sticky
+    /// the same one WIPI `MC_knlExit` uses, which is what `wie_featurephone`'s sticky
     /// `has_exited()` observes. The status code is not propagated: neither host
     /// surface has a place to put it.
     fn exit(&self, status: i32) {

@@ -11,7 +11,7 @@ A browser build of the wie emulator plus a thin Cloudflare backend for
 ## Layout
 
 ```
-wie_web/            # Rust: browser host adapter (additive; core untouched)
+wie_featurephone/   # Rust: browser host adapter (additive; core untouched)
   src/lib.rs        #   #[wasm_bindgen] entry — WieEmulator
                     #     load/tick/input, export_saves/import_saves (opaque RMS+FS blob)
   src/platform.rs   #   wie_backend::Platform impl for the browser
@@ -39,7 +39,7 @@ migrations/0001_init.sql   # users / sessions / saves / inquiries / rate_limits
 wrangler.toml       # Pages config: output web/dist, D1 binding DB
 ```
 
-`wie_web` compiles to an **empty library on non-wasm targets**, so native
+`wie_featurephone` compiles to an **empty library on non-wasm targets**, so native
 workspace jobs (`cargo build`, `cargo test --all`, `cargo clippy --all`) are
 unaffected. All real code is behind `#[cfg(target_arch = "wasm32")]`.
 

@@ -6,14 +6,14 @@
 
 `.github/workflows/publish-artifact.yml` (2026-07-08 라이브, dispatch 는 2026-07-09 PAT 재주입으로 활성):
 
-- main push(엔진 소스 경로: `**/*.rs`·`Cargo.toml`·`Cargo.lock`·`build-wasm.sh`) → **fresh** `wie_web` WASM 빌드(wasm-bindgen 0.2.108 핀 + wasm-opt) → GitHub Release `engine-<shortsha>` 에 `wie_web_bg.wasm` + `wie_web.js` 발행(sha256 메타 포함, 같은 커밋 재실행 멱등).
+- main push(엔진 소스 경로: `**/*.rs`·`Cargo.toml`·`Cargo.lock`·`build-wasm.sh`) → **fresh** `wie_featurephone` WASM 빌드(wasm-bindgen 0.2.108 핀 + wasm-opt) → GitHub Release `engine-<shortsha>` 에 `wie_web_bg.wasm` + `wie_web.js` 발행(sha256 메타 포함, 같은 커밋 재실행 멱등).
 - 최신 릴리스: **`engine-d7b5b02`**(2026-07-10).
 - 이어서 otterpebble 에 `repository_dispatch`(event `wie-artifact-published`, payload: version·wieHead·wasmUrl/glueUrl·sha256·confirmedPlatforms `["KTF","SKT","LGT"]`) → 리시버(otterpebble 소유 `wie-artifact-receive.yml`)가 featurephone 재배포. (SoT: `publish-artifact.yml` dispatch 스텝 payload.)
 - ~~PAT 403 잔여~~ — **해소 확인(2026-07-10)**: d7b5b024 발행 런에서 "Dispatch to otterpebble" 스텝 success. 구 403(2026-07-08)은 fine-grained PAT 권한 부족이었고 재발급·재주입으로 종결.
 
 ## 엔진 웹 계약 (소비자 featurephone 이 의존 — 변경 = 기획 사안)
 
-원본: `wie_web/src/lib.rs`(wasm-bindgen 표면). 2026-07 현행:
+원본: `wie_featurephone/src/lib.rs`(wasm-bindgen 표면 · 2026-09-11 `wie_web` 에서 개명). 2026-07 현행:
 
 - **생성자**: `new WieEmulator(filename, data: Uint8Array, canvas, audioCtx?, gain?, width, height)` — 7인자, 오디오 2개는 옵션(무음 시 undefined).
 - **렌더**: 엔진이 **캔버스에 직접 blit**(더블버퍼 putImageData→drawImage, CSS pixelated 스케일). 소비자는 `requestAnimationFrame` 에서 `tick()` 만 호출.
@@ -103,7 +103,7 @@ legacy (64-bit counter) variants” (RustCrypto/stream-ciphers#580)**. 소스에
 3. **런타임 축 — x86 이어도 «AVX2 가 없어야» 그 백엔드가 선택된다**. 디스패치 순서는
    avx512(옵트인 cfg) → **avx2** → **sse2** → soft (`rng.rs:70~79`) ⇒ AVX2 가 있으면 결함 함수에 **도달 자체가 없다**.
 
-★**추가 축(브라우저 산출물)**: `cargo tree -p wie_web --target wasm32-unknown-unknown -i chacha20`
+★**추가 축(브라우저 산출물)**: `cargo tree -p wie_featurephone --target wasm32-unknown-unknown -i chacha20`
 → **`did not match any packages`** ⇒ ★**배포되는 WASM 아티팩트에는 `chacha20` 이 «아예 없다»**.
 `rodio` 는 `wie_cli`(네이티브 호스트) 전용이기 때문이다.
 

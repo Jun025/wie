@@ -3551,6 +3551,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "wie_featurephone"
+version = "0.0.1"
+dependencies = [
+ "async-trait",
+ "console_error_panic_hook",
+ "getrandom 0.4.2",
+ "js-sys",
+ "tracing",
+ "wasm-bindgen",
+ "web-sys",
+ "wie_backend",
+ "wie_j2me",
+ "wie_ktf",
+ "wie_lgt",
+ "wie_skt",
+ "wie_util",
+]
+
+[[package]]
 name = "wie_j2me"
 version = "0.0.1"
 dependencies = [
@@ -3710,25 +3729,6 @@ dependencies = [
  "bytemuck",
  "tracing",
  "tracing-attributes",
-]
-
-[[package]]
-name = "wie_web"
-version = "0.0.1"
-dependencies = [
- "async-trait",
- "console_error_panic_hook",
- "getrandom 0.4.2",
- "js-sys",
- "tracing",
- "wasm-bindgen",
- "web-sys",
- "wie_backend",
- "wie_j2me",
- "wie_ktf",
- "wie_lgt",
- "wie_skt",
- "wie_util",
 ]
 
 [[package]]

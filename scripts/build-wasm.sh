@@ -2,7 +2,7 @@
 #
 # Reproducible wasm build for the wie web frontend.
 #
-# 1. compile the wie_web cdylib for wasm32
+# 1. compile the wie_featurephone cdylib for wasm32
 # 2. run wasm-bindgen (--target web) to emit the ES-module glue + bindings wasm
 # 3. optionally shrink with wasm-opt if binaryen is installed
 #
@@ -19,12 +19,19 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 OUT_DIR="web/src/wasm"
-WASM_IN="target/wasm32-unknown-unknown/release/wie_web.wasm"
+WASM_IN="target/wasm32-unknown-unknown/release/wie_featurephone.wasm"
 
 echo "==> cargo build (wasm32, release)"
-cargo build --target wasm32-unknown-unknown --release -p wie_web
+cargo build --target wasm32-unknown-unknown --release -p wie_featurephone
 
 echo "==> wasm-bindgen"
+# --out-name stays wie_web ON PURPOSE: the artifact pair wie_web.js +
+# wie_web_bg.wasm is the featurephone consumer contract
+# (docs/contracts/featurephone-engine-contract.json "files" /
+# "glueFetchesWasmByName") — otterpebble's receiver and the web shell fetch
+# them BY NAME. The 2026-09-11 crate rename (wie_web -> wie_featurephone,
+# upstream collision) deliberately did not touch the artifact names; renaming
+# them is a coordinated wie+otterpebble contract change.
 wasm-bindgen --target web --out-dir "$OUT_DIR" --out-name wie_web "$WASM_IN"
 
 # wasm-opt is optional. An OLD binaryen can fail to parse wasm emitted by a

@@ -222,7 +222,7 @@ jobs:
           targets: wasm32-unknown-unknown
 
       # Same cache key family as publish-artifact.yml — either workflow warms
-      # the other (identical build: wasm32 release of wie_web).
+      # the other (identical build: wasm32 release of wie_featurephone).
       - name: Cache cargo
         if: steps.changes.outputs.engine == 'true'
         uses: actions/cache@v4
@@ -249,7 +249,7 @@ jobs:
           curl -sSL "https://github.com/WebAssembly/binaryen/releases/download/${VER}/binaryen-${VER}-x86_64-linux.tar.gz" | tar xz
           echo "$PWD/binaryen-${VER}/bin" >> "$GITHUB_PATH"
 
-      - name: Build wie_web WASM (current source)
+      - name: Build wie_featurephone WASM (current source)
         if: steps.changes.outputs.engine == 'true'
         run: bash scripts/build-wasm.sh
 

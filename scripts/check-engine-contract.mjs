@@ -76,14 +76,14 @@ try {
 // ── 4. Source pins that the JS surface cannot reveal ─────────────────────────
 // key_down("NUM5") with an unmapped code is a SILENT no-op (parse_key → None),
 // so vocabulary loss is unobservable from JS — pin it at the source level.
-const libRs = await readFile(path.join(root, "wie_web/src/lib.rs"), "utf8");
+const libRs = await readFile(path.join(root, "wie_featurephone/src/lib.rs"), "utf8");
 // Scope to the parse_key fn body so stray string matches elsewhere in the file
 // can't satisfy (or confuse) the check. Fail-closed: if the fn can't be located
 // or an arm can't be parsed, that is a violation — never a silent pass.
 const parseKeyStart = libRs.indexOf("fn parse_key(");
 const parseKeyEnd = parseKeyStart === -1 ? -1 : libRs.indexOf("\n}", parseKeyStart);
 if (parseKeyStart === -1 || parseKeyEnd === -1) {
-  bad("key mapping unverifiable: `fn parse_key(` not found (or unterminated) in wie_web/src/lib.rs — refusing to fail-open; fix the checker's locator if the fn moved");
+  bad("key mapping unverifiable: `fn parse_key(` not found (or unterminated) in wie_featurephone/src/lib.rs — refusing to fail-open; fix the checker's locator if the fn moved");
 } else {
   const parseKeyBody = libRs.slice(parseKeyStart, parseKeyEnd);
   for (const key of contract.keyVocabulary) {
@@ -221,7 +221,7 @@ for (const [platform, spec] of Object.entries(contract.gameActionTables)) {
 }
 
 if (libRs.includes(`b"${contract.saveMagic}"`)) ok(`save magic pinned: ${contract.saveMagic}`);
-else bad(`save magic drift: b"${contract.saveMagic}" not found in wie_web/src/lib.rs — stored featurephone save blobs would stop importing`);
+else bad(`save magic drift: b"${contract.saveMagic}" not found in wie_featurephone/src/lib.rs — stored featurephone save blobs would stop importing`);
 
 // ── 5. Publish-workflow dispatch payload (receiver validates these keys) ─────
 const publishYml = await readFile(path.join(root, contract.dispatch.workflow), "utf8");

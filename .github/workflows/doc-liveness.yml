@@ -67,7 +67,7 @@ jobs:
           targets: wasm32-unknown-unknown
 
       # Same cache key family as engine-contract.yml / publish-artifact.yml — either
-      # workflow warms the others (identical wasm32 release build of wie_web).
+      # workflow warms the others (identical wasm32 release build of wie_featurephone).
       - name: Cache cargo
         uses: actions/cache@v4
         with:

@@ -196,7 +196,7 @@ mod tests {
     /// `path_for` is the whole security boundary of this backend, and until now
     /// nothing exercised it: measured 2026-09-07, this file had **zero** tests.
     /// It is also one half of the only host-divergent pair in the resource path —
-    /// `wie_web::WebFilesystem::key` normalizes the same guest strings by hand,
+    /// `wie_featurephone::WebFilesystem::key` normalizes the same guest strings by hand,
     /// and the two disagree (see `differs_from_web_on_absolute_and_backslash`).
     fn fs() -> CliFilesystem {
         CliFilesystem {
