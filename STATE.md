@@ -60,6 +60,15 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-13: **P3 둘째 조각 — LGT 엔트리포인트 jar 를 «이름»이 아니라 «내용»으로 찾는다**
+  (`wie-lgt-entrypoint-jar-name-contract-align-with-upstream`) — `LgtEmulator::from_archive` 가
+  `format!("{aid}.jar")` 로 이름을 **지어내던** 것을, upstream 과 **같은 3줄**(zip 안에 `binary.mod` 가
+  있는 첫 `*.jar`)로 바꿨다. ★**티켓 전제를 실측이 정정했다** — upstream 은 `application.jar` 를
+  «찾지» 않는다(하드코딩 0 · 내용 탐색). ⇒ ⒤(이름 갈아끼우기)도 ⒥(두 이름 폴백)도 아니라
+  **규약을 하나로** 두는 길이 있었다. 사용자 영향: AID 와 jar 이름이 어긋난 LGT 아카이브가 이제 **뜬다**
+  (전에는 `Option::unwrap()` 패닉). 기존 `00000000.jar` 픽스처 4건 무영향.
+  4게이트+beta green · `cargo test --all` **177 passed** · `wie_validate` 5/5 PASS(lgt keydraw rc=0) ·
+  양방향 증명(탐색 3줄만 되돌리면 새 시험 red). 정본 = `docs/report/0104--….md`.
 - 2026-09-11: **P3 첫 조각 착지 — `wie_web` → `wie_featurephone` 크레이트 개명** (PR #149 ·
   `wie-p3-rename-wie-web-to-featurephone`) — upstream `dlunch/wie` 가 `wie-web`(lib 타깃 `wie_web`)를
   자기 브라우저 앱에 써서 upstream-base 전환 시 정면 충돌하는 이름을 치웠다. 순수 `git mv` 커밋(7파일
@@ -1136,10 +1145,15 @@
     그것은 upstream 충돌이 아니라 **otterpebble 소비자 계약**이다(`featurephone-engine-contract.json` `files`·
     `glueFetchesWasmByName` · 리시버가 릴리스 자산을 **이름으로** curl). `build-wasm.sh` 의 `--out-name wie_web` 이
     그 분리를 만든다. 산출물 개명은 wie+otterpebble **교차 repo 조율 회차**다(선행: otterpebble 리시버·셸 합의).
-  - **남은 조각(후속 회차)**: upstream 을 base 로 ③ 오버레이 재적용 + `compile_model.rs` **122줄 이식** +
-    ★**엔트리포인트 규약 정합**(upstream `LgtEmulator` 는 `application.jar` 를 찾고 우리는 `00000000.jar` 를
-    넘긴다 — ★«부수 발견»이 아니라 **작업목록 리터럴 항목**이다. 조용히 깨지는 것은 목록에 없으면 잊힌다.
-    ※개명은 이 규약을 건드리지 않았다 — jar 이름은 크레이트명과 무관한 게스트 파일시스템 경로다).
+  - ★**[둘째 조각 완료 2026-09-13 · `wie-lgt-entrypoint-jar-name-contract-align-with-upstream`]**
+    **엔트리포인트 규약 정합** — ★**종전 문안 「upstream `LgtEmulator` 는 `application.jar` 를 찾는다」는
+    부정확했다**: upstream 은 어떤 이름도 하드코딩하지 «않고» **내용으로 찾는다**
+    (`*.jar` 중 zip 안에 `binary.mod` 가 있는 것 · `upstream/main:wie-lgt/src/emulator.rs:50-53` ·
+    2026-08-23 PR #1368 이 `format!("{aid}.jar")` 를 그 형태로 바꿨다). upstream 테스트가 픽스처의
+    `00000000.jar` 를 `application.jar` 로 개명해 넘기는 것은 **그 탐색을 증명하려는 장치**다.
+    ⇒ 우리도 그 3줄을 **그대로** 채택했다(`wie_lgt/src/emulator.rs`) — 이름 규약이 «둘»로 남지 않고
+    기존 `00000000.jar` 픽스처도 그대로 산다. 정본 = `docs/report/0104--….md`.
+  - **남은 조각(후속 회차)**: upstream 을 base 로 ③ 오버레이 재적용 + `compile_model.rs` **122줄 이식**.
 - **P4**(M·low·P3 와 병행) ② 를 upstream PR 로. ★**IP 방침 선 안쪽만**(#1239 2026-06-29
   「공개 문서 기반으로만 구현 · 펌웨어 리버스 계획 없음」) — `wipi_java` 공개 API 스텁 10종 +
   `canvas.rs` 단위테스트 9개는 **보낼 수 있고**, `docs/lgt_abi.md`·`docs/reference/` 는 **보내지 마라**.

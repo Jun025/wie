@@ -1,0 +1,40 @@
+{
+  "date": "2026-09-13",
+  "task": "wie-lgt-entrypoint-jar-name-contract-align-with-upstream",
+  "title": "LGT 엔트리포인트 jar — 이름을 지어내지 말고 내용으로 찾는다",
+  "summary": "LgtEmulator::from_archive 가 format!(\"{aid}.jar\") 로 컨테이너 이름을 만들던 것을 upstream 과 같은 내용 탐색(zip 안에 binary.mod 가 있는 첫 *.jar)으로 바꿨다. 티켓 전제(‘upstream 은 application.jar 를 찾는다’)는 실측으로 정정됐다 — upstream 은 이름을 하드코딩하지 않고, 그 이름은 upstream 테스트가 탐색을 증명하려고 쓰는 장치다.",
+  "changes": [
+    "wie_lgt/src/emulator.rs — from_archive 의 이름 생성 → 내용 탐색(upstream wie-lgt/src/emulator.rs:50-53 과 동일) + binary.mod 부재 시 Option::unwrap() → FatalError(jar 이름 포함)",
+    "wie_lgt/tests/test_helloworld.rs — 공통 부팅 헬퍼 추출 + test_helloworld_jar_named_application 추가(픽스처 jar 를 application.jar 로 개명해 넘긴다)"
+  ],
+  "verification": [
+    "양방향: 탐색 3줄만 되돌리면 새 시험 red(FatalError \"Missing binary.mod in 00000000.jar\") · 정상판 green · 기존 test_helloworld 는 양쪽에서 ok(= AID 이름 픽스처로는 이 결함이 보이지 않는다는 증거)",
+    "4게이트 + beta clippy green · cargo test --all 177 passed / 0 failed",
+    "wie_validate 5/5 PASS · keydraw_ktf·keydraw_lgt --inject --expect-last-frame rc=0 · last_frame_content true"
+  ],
+  "limits": [
+    "KTF 는 무접촉 — wie_ktf/src/emulator.rs:44 의 format!(\"{aid}.jar\") 는 upstream/main:wie-ktf/src/emulator.rs:76 과 «같다» ⇒ 불일치가 없다",
+    "P/ 접두 jar(아카이브가 P/foo.jar 로 담는 경우)는 여전히 어긋난다 — load() 는 파일시스템 키에서 P/ 를 떼는데 jar_filename 은 떼지 않는다. upstream 도 똑같으므로 이번 회차에서 갈라 놓지 않았다(아래 제안)",
+    "keydraw_* 의 paints 가 45 로 측정됐다(AGENTS.md 의 2026-09-06 실측값은 55) — 판정 축은 전부 green 이고 그 수는 부하 의존이다"
+  ],
+  "proposals": [
+    {
+      "title": "아카이브가 `P/` 아래 담은 엔트리포인트 jar 는 여전히 열리지 않는다",
+      "plainSummary": "압축 파일이 실행 파일을 P/ 폴더 안에 넣어 둔 경우, 에뮬레이터가 그 파일을 못 찾고 멈춥니다. 지금 커밋된 시험 파일들은 모두 최상위에 두고 있어 드러나지 않습니다.",
+      "userBenefit": "그런 형태로 포장된 LGT 게임이 열립니다 — 지금은 즉시 실패합니다.",
+      "why": "LgtEmulator::load 는 파일시스템에 넣을 때 filename.trim_start_matches(\"P/\") 로 접두를 떼는데, 클래스패스에 넘기는 jar_filename 은 떼지 않는다. 그래서 탐색이 찾아낸 이름이 `P/foo.jar` 면 JVM 클래스패스의 그 항목은 존재하지 않는다. upstream 도 정확히 같은 형태라(wie-lgt/src/emulator.rs:118-120) 이번 회차는 upstream 과 바이트 동일을 택하고 갈라 놓지 않았다.",
+      "tradeoff": "고치면 upstream 과 그 한 줄이 갈리고, 재정렬 회차가 그만큼의 오버레이를 다시 지게 된다. 그리고 이 형태의 실제 아카이브를 «본 적이 없다» — 커밋 픽스처 4건 전부 최상위다. 값을 매길 근거가 생기기 전에는 upstream 수정(P4)으로 올리는 편이 싸다.",
+      "effort": "S",
+      "target": "wie_lgt/src/emulator.rs (또는 upstream PR)"
+    },
+    {
+      "title": "`AGENTS.md` 가 인용한 `paints 55` 를 재측 없이 두면 낡는다",
+      "plainSummary": "문서에 적힌 '프레임 55장'이라는 숫자가 지금 측정하면 45장입니다. 판정 기준은 아니지만, 숫자만 믿고 비교하면 없는 문제를 찾게 됩니다.",
+      "userBenefit": "다음 회차가 정상 편차를 회귀로 오독해 시간을 버리지 않습니다.",
+      "why": "AGENTS.md 는 2026-09-06 실측으로 `paints 55`(양 캐리어)를 적었고, 2026-09-13 같은 명령이 45 를 낸다. 문서 자신이 '20.0s 고정 예산 · 부하에 따른 틱 오버런'을 적어 두었으므로 이 값은 상수가 아니다 — 그런데 문면은 단일 값으로 인용돼 있다.",
+      "tradeoff": "'범위로 적는다'는 그 숫자가 지키던 정보(‘--inject 를 빼면 1, 넣으면 수십’)를 흐릴 수 있다. 값을 재측하는 검사기를 새로 만드는 것은 과하다 — 문면에 '부하 의존 · 하한만 의미 있다'를 한 줄 붙이는 것이 최소 처방이다.",
+      "effort": "S",
+      "target": "AGENTS.md (Definition of Done · 러너 블록)"
+    }
+  ]
+}

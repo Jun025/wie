@@ -1,4 +1,15 @@
+//! The second test here is the only thing that holds the LGT entrypoint-name contract.
+//!
+//! `LgtEmulator::from_archive` used to build the entrypoint name as `format!("{}.jar", aid)`, so
+//! the container name and the AID had to agree — upstream `wie-lgt/src/emulator.rs:50-53` finds it
+//! by content instead (any `*.jar` whose zip holds `binary.mod`) and its own
+//! `wie-lgt/tests/test_helloworld.rs:34-35` renames the fixture's `00000000.jar` to
+//! `application.jar` to prove exactly that. Reverting the discovery to the `format!` form reddens
+//! `test_helloworld_jar_named_application` and leaves `test_helloworld` green, which is the whole
+//! point: the fixture's jar happens to be AID-named, so the AID-named test cannot see the break.
+
 use std::{
+    collections::BTreeMap,
     sync::Arc,
     sync::{
         Mutex,
@@ -11,8 +22,7 @@ use wie_backend::{Emulator, Options, extract_zip};
 use wie_lgt::LgtEmulator;
 use wie_util::Result;
 
-#[test]
-pub fn test_helloworld() -> Result<()> {
+fn run_to_exit(archive: BTreeMap<String, Vec<u8>>) -> Result<String> {
     let stdout = Arc::new(Mutex::new(Vec::new()));
     let exited = Arc::new(AtomicBool::new(false));
 
@@ -29,7 +39,6 @@ pub fn test_helloworld() -> Result<()> {
 
     let platform = Box::new(TestPlatform::with_event_handler(event_handler));
 
-    let archive = extract_zip(include_bytes!("../../test_data/helloworld_lgt.zip"))?;
     let mut emulator = LgtEmulator::from_archive(
         platform,
         archive,
@@ -43,8 +52,25 @@ pub fn test_helloworld() -> Result<()> {
         emulator.tick()?;
     }
 
-    let stdout_str = String::from_utf8(stdout.lock().unwrap().clone()).unwrap();
-    assert_eq!(stdout_str, "Hello, world!");
+    Ok(String::from_utf8(stdout.lock().unwrap().clone()).unwrap())
+}
+
+#[test]
+pub fn test_helloworld() -> Result<()> {
+    let archive = extract_zip(include_bytes!("../../test_data/helloworld_lgt.zip"))?;
+
+    assert_eq!(run_to_exit(archive)?, "Hello, world!");
+
+    Ok(())
+}
+
+#[test]
+pub fn test_helloworld_jar_named_application() -> Result<()> {
+    let mut archive = extract_zip(include_bytes!("../../test_data/helloworld_lgt.zip"))?;
+    let jar = archive.remove("00000000.jar").expect("fixture must hold 00000000.jar");
+    archive.insert("application.jar".into(), jar);
+
+    assert_eq!(run_to_exit(archive)?, "Hello, world!");
 
     Ok(())
 }
