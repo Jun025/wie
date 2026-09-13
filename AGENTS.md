@@ -145,6 +145,15 @@ and the validator is right to say so. Measured 2026-09-06 on both carriers: with
 misread is not hypothetical — a round chasing an unrelated change stopped on exactly this, took the
 FAIL for its own regression, and only cleared it by reproducing the same FAIL on an untouched tree.
 
+**Read the count as a floor, not an equality: the verdict is `PASS` · `content true` · rc=0, never
+the number.** What the 1-vs-dozens gap proves is that the flag reached the guest — that gap is the
+signal, and it is enormous. The exact upper figure is not guaranteed: 55 reproduced 11/11 on
+2026-09-13 (3× per carrier, 3 in parallel, one under 20 CPU burners on 10 cores), yet the same
+command reported **45 on both carriers** earlier that same day, right after `cargo test --all` and
+`cargo +beta clippy` — and CPU oversubscription alone does not reproduce the drop, so the cause is
+unisolated. A lower count is therefore not by itself a regression; a `FAIL`, a blank last frame, or
+a non-zero rc is.
+
 **`--expect-last-frame` is on the `keydraw_*` line and deliberately NOT on the one above it.** It
 turns `last_frame_content` from a reported field into an exit code, which is the only thing that
 catches "the emulator ran fine and the last frame is black" — the 2026-09-05 LGT failure, where

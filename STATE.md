@@ -60,6 +60,13 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-13: **keydraw 의 paint 수를 «하한»으로 한정** (`wie-agents-md-paints-55-is-a-stale-single-value` ·
+  채택 `2026-09-13-lgt-entrypoint-jar-name-contract#p1`) — `AGENTS.md` keydraw 절에 산문 1문단.
+  ★★**채택 제안의 전제가 «반증됐다»** — 「같은 명령이 45 를 낸다」는 재현되지 않았고 **오늘 11/11 이 55**다
+  (순차 6 · 병렬 3 · 대조 1 · ★CPU 버너 20개/10코어 1 — **CPU 포화로는 움직이지 않는다**).
+  ⇒ 결함의 이름이 바뀌었다: 「낡은 수」가 아니라 ★**「보장되지 않는 수가 등식처럼 읽히는 것」**이고
+  처방(하한으로 읽어라 · 판정은 PASS·content true·rc=0)은 그대로 옳다. ★**45 의 기전은 미규명이고 그대로 적었다**
+  (지어내지 않았다). 검사기 0 · 코드·픽스처 무접촉 · 문서 검사기 5종 전건 통과. 정본 = `docs/report/0105--….md`.
 - 2026-09-13: **P3 둘째 조각 — LGT 엔트리포인트 jar 를 «이름»이 아니라 «내용»으로 찾는다**
   (`wie-lgt-entrypoint-jar-name-contract-align-with-upstream`) — `LgtEmulator::from_archive` 가
   `format!("{aid}.jar")` 로 이름을 **지어내던** 것을, upstream 과 **같은 3줄**(zip 안에 `binary.mod` 가

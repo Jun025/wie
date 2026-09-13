@@ -1,0 +1,31 @@
+{
+  "date": "2026-09-13",
+  "task": "wie-agents-md-paints-55-is-a-stale-single-value",
+  "title": "keydraw 의 paint 수는 «하한»이지 «등식»이 아니다 — 그리고 55 는 낡지 않았다",
+  "summary": "AGENTS.md 의 `paints 55` 를 「부하 의존 · 하한만 의미 있다」로 한정하는 산문 1문단. ★그러나 채택 제안의 전제(「같은 명령이 오늘 45 를 낸다」)는 «재현되지 않았다» — 오늘 11회 전건 55 다. 남는 결함은 「낡았다」가 아니라 「보장되지 않는데 단일 값으로 읽힌다」이고, 처방(하한으로 읽어라)은 그대로 옳다.",
+  "changes": [
+    "AGENTS.md — keydraw 절에 한 문단 추가: 판정은 PASS·content true·rc=0 이지 수가 아니다 · 1↔수십 대비가 신호다 · 55 는 11/11 재현되나 45 도 관측됐고 원인 미규명 ⇒ 낮은 수 자체는 회귀가 아니다"
+  ],
+  "verification": [
+    "실측 11회 전건 paints=55 (ktf 3 · lgt 3 순차 · lgt 3 병렬 · lgt 1 대조 · lgt 1 부하하) · 전건 PASS · content true · rc=0",
+    "부하 재현 시도 실패: 10코어에 CPU 버너 20개(load 17.8→27.0)에서도 55 — CPU 포화는 이 수를 움직이지 않는다",
+    "문서 검사기 전건 통과: check-doc-liveness-parity(25줄 커버) · check-worklog-json · check-docs-report-serial · check-worklog-coverage(약속 최신) · npm run audit"
+  ],
+  "limits": [
+    "45 의 원인을 «규명하지 못했다» — 2026-09-13 오전 1회(양 캐리어)뿐이고 CPU 부하로는 재현되지 않는다. 문면에 그 미규명을 «그대로» 적었다(기전을 지어내지 않았다)",
+    "AGENTS.md 의 다른 세 자리(:151 55→83 사건 서술 · :184 27스텝 논거의 방증 · :218 --boot-secs 노브 대비)는 «손대지 않았다» — 전부 «그때의 비교»이지 «지금의 등식»이 아니고, 계약 4 가 일제 점검을 범위 밖으로 뒀다",
+    "검사기를 만들지 않았다(제안이 「과하다」고 명시) ⇒ 이 한정은 기계가 아니라 문면이 진다"
+  ],
+  "adoptedProposals": ["2026-09-13-lgt-entrypoint-jar-name-contract#p1"],
+  "proposals": [
+    {
+      "title": "`test_key_reach.rs` 도 같은 형태로 `83 paints` 를 단일 값으로 인용한다",
+      "plainSummary": "다른 시험 파일의 주석에도 '83장'이라는 숫자가 단일 값으로 적혀 있습니다. 이번에 고친 것과 같은 종류의 문장입니다.",
+      "userBenefit": "같은 오독(정상 편차를 회귀로 읽기)이 그 파일에서 반복되지 않습니다.",
+      "why": "`wie_lgt/tests/test_key_reach.rs:22` 가 「ran at **83** paints with a blank final frame」을 적는다. 그 83 은 2026-09-05 사건의 «그때 값»이라 이번 건과 성격이 다르지만(사건 서술 ↔ 현재 등식), 읽는 사람에게는 같은 모양이다. 이번 회차는 계약 4(범위 밖 = 다른 문서의 인용 수치 일제 점검)를 지켜 손대지 않았다.",
+      "tradeoff": "그 83 은 «사건의 증거»라 한정어를 붙이면 오히려 사건 서술이 흐려질 수 있다 — 고칠 값이 있는지부터 재야 하고, 없으면 그대로 두는 것이 맞다. 일제 점검으로 넓히면 이 리니지가 경계한 «범위 확대»가 된다.",
+      "effort": "S",
+      "target": "wie_lgt/tests/test_key_reach.rs (판단 먼저)"
+    }
+  ]
+}
