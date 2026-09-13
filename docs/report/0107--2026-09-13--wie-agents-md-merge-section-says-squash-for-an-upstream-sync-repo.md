@@ -13,7 +13,7 @@
   ★**그런데 같은 파일이 §Definition of Done 에서 이미 이렇게 적는다**:
   「**This repo is registered as an upstream-sync fork and must *not* squash-merge**, so landings arrive
   as merge commits: PR #69 landed that way on 2026-09-03」.
-  ⇒ ★**한 파일 안에서 정면으로 어긋나 있었고, 그 상태가 «몇 주» 살아 있었다.** 이것이 이 회차의 실제 발견이다 —
+  ⇒ ★**한 파일 안에서 정면으로 어긋나 있었고, 그 상태가 «9일» 살아 있었다.** 이것이 이 회차의 실제 발견이다 —
   티켓이 세운 「문서 ↔ 계약」 프레임보다 **고치기 쉽고 더 부끄러운** 형태다(외부 계약을 몰라서가 아니라,
   자기가 이미 적어 둔 것을 **자기 다른 절이 무시**했다).
 
