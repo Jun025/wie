@@ -107,7 +107,11 @@ impl LgtEmulator {
         let mut core_clone = core.clone();
         let mut system_clone = system.clone();
         let main_class_name_clone = main_class_name.clone();
-        let jar_filename = jar_filename.to_owned();
+        // Diverges from upstream (`wie-lgt/src/emulator.rs:118-120`), which passes `jar_filename`
+        // to the classpath untrimmed: the filesystem keys above drop the `P/` prefix, so an
+        // entrypoint stored as `P/foo.jar` would name a classpath entry that does not exist.
+        // Preserve this hunk on upstream realign.
+        let jar_filename = jar_filename.trim_start_matches("P/").to_owned();
 
         system.spawn(async move || Self::do_start(&mut core_clone, &mut system_clone, jar_filename, main_class_name_clone).await);
 

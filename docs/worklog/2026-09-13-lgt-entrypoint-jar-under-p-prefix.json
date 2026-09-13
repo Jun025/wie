@@ -1,0 +1,32 @@
+{
+  "date": "2026-09-13",
+  "task": "wie-lgt-entrypoint-jar-under-p-prefix-never-opens",
+  "title": "LGT 엔트리포인트 jar 가 P/ 아래 있어도 열린다 — 클래스패스 이름도 같은 정규화를 거친다",
+  "summary": "LgtEmulator::load 가 파일시스템 키에는 trim_start_matches(\"P/\") 를 적용하면서 JVM 클래스패스에 넘기는 jar_filename 에는 적용하지 않아, P/foo.jar 로 담긴 엔트리포인트가 즉시 실패했다. load() 한 곳에서 jar_filename 에도 같은 술어를 적용했다(두 호출자 모두 이 지점을 지난다). 수정 전 실행 실증: FatalError(\"Missing binary.mod in P/00000000.jar\").",
+  "changes": [
+    "wie_lgt/src/emulator.rs — load() 의 jar_filename 에 trim_start_matches(\"P/\") 적용 + upstream 과 갈린 이유·대응 위치·재정렬 시 보존 주석",
+    "wie_lgt/tests/test_helloworld.rs — test_helloworld_jar_under_p_prefix 추가(픽스처 jar 를 P/00000000.jar 로 개명해 부팅)"
+  ],
+  "verification": [
+    "양방향: 수정 전 red(FatalError \"Missing binary.mod in P/00000000.jar\") · 수정 후 green(Hello, world! 완주)",
+    "4게이트 + beta clippy green · cargo test --all 178 passed / 0 failed(직전 177 + 신규 1)",
+    "wie_validate 5/5 PASS · keydraw_ktf·keydraw_lgt --inject --expect-last-frame rc=0(파이프 없이) · last_frame_content true",
+    "upstream 얹힘 확인: upstream/main 의 load() 에 동일한 to_owned() 줄이 같은 문맥으로 실재 — 헝크가 그대로 올라간다"
+  ],
+  "limits": [
+    "접두는 관측된 P/ 하나만 닫았다(티켓 ⓒ가 일반화를 금지) — 술어도 upstream 이 이미 쓰는 그것을 재사용",
+    "이 형태의 실아카이브는 여전히 관측 0건 — 커밋 픽스처는 전부 최상위"
+  ],
+  "proposals": [
+    {
+      "title": "이 한 줄을 upstream(dlunch/wie)에 PR 로 올려 갈림을 없앤다",
+      "plainSummary": "이번에 고친 한 줄은 원본 저장소(upstream)에도 똑같이 존재하는 문제입니다. 원본에 같은 수정을 제안하면 우리 쪽의 '다르게 유지해야 하는 부분'이 하나 줄어듭니다.",
+      "userBenefit": "upstream 재정렬 회차가 보존해야 하는 오버레이가 한 헝크 줄어, 재정렬 비용과 실수 여지가 감소합니다.",
+      "why": "갈린 헝크가 upstream/main 의 load() 에 그대로 얹히는 것을 이번 회차가 확인했다(동일한 to_owned() 줄 · 같은 문맥). 외부 저장소에 내는 행위라 운영자 결정 사안이어서 이번 회차 범위 밖으로 남겼다.",
+      "tradeoff": "upstream 리뷰가 픽스처 없는 수정을 거부하거나 다른 형태를 요구할 수 있고, 그 대응에 회차가 든다. 올리지 않아도 로컬 주석이 재정렬 보존을 이미 지시한다.",
+      "effort": "S",
+      "target": "upstream dlunch/wie — wie-lgt/src/emulator.rs"
+    }
+  ],
+  "adoptedProposals": ["2026-09-13-lgt-entrypoint-jar-name-contract#p0"]
+}
