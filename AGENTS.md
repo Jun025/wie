@@ -612,8 +612,22 @@ review gate, and this repo has been burned by exactly that five times.
 
 Recorded so the knowledge is not lost — **not** something to do at the end of an implementation task.
 
-- Squash-merge, then delete the remote branch (`gh pr merge --squash --delete-branch`) and the local one (`git branch -D <branch>`, then `git fetch --prune`). `-D` is required because squash-merged branches aren't recognized as merged by `-d`.
-- Leave no stale merged branches behind — only `main` and in-progress work remain. Sync local `main` afterwards.
+- **The landing strategy is not this file's to state.** Read it off the `-merge` ticket's
+  `merge_strategy:` frontmatter; the canon for how that is executed is
+  `~/orchestrator/templates/merge-ticket.tpl` §4-A — **outside this repo**, like the other reference to
+  it above — and the ticket's declaration wins over any procedure written here. For this repo the value is
+  `merge` — **never `squash`**: it is a registered upstream-sync fork, so a squash folds the two parents
+  into one and the upstream lineage that every realign round rebases its overlay onto is gone, with no
+  way back. That cost is measured, not hypothetical — the sibling `rustjava` lost it on four landings
+  running. **This file already said so** under §Definition of Done ("registered as an upstream-sync fork
+  and must *not* squash-merge"); what used to stand in this spot was a `--squash --delete-branch` recipe
+  that contradicted it, and two gate③ rounds had to override the recipe to land correctly.
+- **Do not pass `--delete-branch`**, for the reasons that same §4-A measured: the remote branch is deleted by this
+  repo's own `deleteBranchOnMerge` setting, so the flag buys nothing, and it *also* deletes the local
+  branch — which may be checked out by another session. Leave no stale merged branches behind, but
+  `main` and the merged branch can each be held by a different worktree (measured 2026-09-13: both
+  `git checkout main` and `git branch -D` refused), and tidying those is that tree's business, not the
+  merge round's.
 
 ## Incident ledger (사건 대장)
 
