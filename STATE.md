@@ -60,6 +60,19 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-13: **문서↔계약 어긋남 경보 — 판정 «만들지 않는다(⒥)»**
+  (`wie-doc-contract-divergence-has-no-alarm-measure-first` · 채택 `2026-09-13-merge-section-points-at-the-canon#p0`)
+  — 구현 0 · 판정만. 「울지 않는다」는 **참**이다(잡는 기계 **0** · repo 검사기 9종 중 repo 밖을 읽는 것 0).
+  ★**그래도 만들 값이 없다**: ⑴★**CI 가 그 계약을 볼 수 없다** — 워크플로 **7/7 GitHub 호스티드 · self-hosted 0**
+  ⇒ 게이트가 못 되고 «로컬 전용»이면 **매 회차가 기억해야 하는 것**이 하나 더 늘 뿐이다(없애려던 실패 양식의 재생산)
+  ⑵★**참조 쪽의 추적성이 없다** — `~/orchestrator`@live(HEAD `13b88a0c` · `origin/main` 보다 **2,473 커밋 뒤**)에서
+  `templates/merge-ticket.tpl` 커밋본 **63줄(`4-A` 0건)** ↔ 라이브 **1,146줄(`4-A` 11건)** ·
+  `contracts/upstream-sync-repos.conf` 는 ★**untracked** ⇒ 검사기가 **오탐**하거나 ★**낡은 계약으로 틀린 문서를 통과**시킨다
+  ⑶★**지킬 표면이 «값 복사 2곳»뿐**이고 둘 다 오늘 `9ef24b43` 이 고친 **같은 불릿**이다(규칙 재진술 3 · 포인터 3 은 다른 계급).
+  ⇒ 더 싼 대안(**값을 복사하지 말고 정본을 가리켜라**)이 이미 착지해 **표면 자체를 없앴다**.
+  ★남는 방어선은 사람 규율 한 줄이고 **자리까지 정했다**(`AGENTS.md` 「Held by you, not by a machine」) —
+  ★**이 회차가 쓰지는 않았다**(그 파일 재수정이 범위 밖) ⇒ 제안 `#p0`.
+  ★**재개 조건**: self-hosted 러너 도입 · 값 복사 5곳 이상 · 계약 파일의 repo 내 벤더링. 정본 = `docs/report/0109--….md`.
 - 2026-09-13: **`-merge` 절이 스쿼시를 «지시»하던 것을 «정본을 가리키게»**
   (`wie-agents-md-merge-section-says-squash-for-an-upstream-sync-repo`) — §Git Workflow 「For the `-merge`
   task only」 두 불릿 교체: 착지 방식은 **티켓 `merge_strategy:` frontmatter** 가 정하고 집행 정본은
