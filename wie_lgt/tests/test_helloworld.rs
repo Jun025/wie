@@ -74,3 +74,17 @@ pub fn test_helloworld_jar_named_application() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+pub fn test_helloworld_jar_under_p_prefix() -> Result<()> {
+    // `load()` strips `P/` from every filesystem key, so an archive holding its entrypoint as
+    // `P/<name>.jar` boots only if the classpath name is stripped the same way — this test holds
+    // that agreement (the committed fixtures are all top-level, so they cannot see it break).
+    let mut archive = extract_zip(include_bytes!("../../test_data/helloworld_lgt.zip"))?;
+    let jar = archive.remove("00000000.jar").expect("fixture must hold 00000000.jar");
+    archive.insert("P/00000000.jar".into(), jar);
+
+    assert_eq!(run_to_exit(archive)?, "Hello, world!");
+
+    Ok(())
+}

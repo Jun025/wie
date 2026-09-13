@@ -75,6 +75,16 @@
   ★**모든 세션이 그 틀린 문면을 적재**했다 ⇒ 실패 양식은 「잘못 착지한다」가 아니라
   **「매 회차가 스스로 알아차려 이겨 내야 한다」**였고, 실제로 **두 회차가 각자 알아차렸다**.
   절차·플래그 사본 0 · 검사기 0 · 러스트 무접촉 · 문서 검사기 5종 전건 통과. 정본 = `docs/report/0107--….md`.
+- 2026-09-13: **LGT 엔트리포인트 jar 가 `P/` 아래 있어도 열린다**
+  (`wie-lgt-entrypoint-jar-under-p-prefix-never-opens`) — `load()` 가 파일시스템 키에는
+  `trim_start_matches("P/")` 를 적용하면서 클래스패스에 넘기는 `jar_filename` 에는 안 해,
+  `P/foo.jar` 로 담긴 엔트리포인트가 즉시 실패했다(수정 전 실증:
+  `FatalError("Missing binary.mod in P/00000000.jar")`). 같은 함수 한 곳에서 같은 술어를
+  적용했다 — 두 호출자 모두 이 지점을 지난다. upstream 과 이 한 줄이 갈리며, 갈린 지점에
+  보존 주석(왜·대응 위치·재정렬 시 보존)을 남겼고 헝크가 upstream `load()` 에 그대로
+  얹힘을 확인했다. 사용자 영향: 그 형태로 포장된 LGT 아카이브가 뜬다(실아카이브 관측은
+  아직 0건). 4게이트+beta green · **178 passed** · `wie_validate` 5/5 PASS ·
+  keydraw 양 캐리어 rc=0. 정본 = `docs/report/0106--….md`.
 - 2026-09-13: **P3 둘째 조각 — LGT 엔트리포인트 jar 를 «이름»이 아니라 «내용»으로 찾는다**
   (`wie-lgt-entrypoint-jar-name-contract-align-with-upstream`) — `LgtEmulator::from_archive` 가
   `format!("{aid}.jar")` 로 이름을 **지어내던** 것을, upstream 과 **같은 3줄**(zip 안에 `binary.mod` 가
