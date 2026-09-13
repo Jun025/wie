@@ -60,6 +60,17 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-13: **`83 paints`·`30 paints` 두 자리 — «검토하고 기각»**
+  (`wie-two-more-single-value-paint-counts-in-comments` · 채택 `2026-09-13-keydraw-paint-count-is-a-floor#p0`)
+  — **주석 무접촉**. `test_key_reach.rs` 「ran at 83 paints」 · `wie_validate.rs` 「Measured 2026-09-05 on
+  LGT: 30 paints」는 ★**둘 다 «고쳐진» 2026-09-05 사건의 서술**이라 ★**그 수를 다시 낼 «명령이 없다»**
+  ⇒ 「다시 재니 다르더라」가 원리적으로 일어나지 않는다. ★★**판정 기준을 여기 못박는다 — 「단일 값이라
+  낡는다」는 «인용 형태»가 아니라 «재현 가능성»의 문제다**(`AGENTS.md` 의 `paints 55` 는 «치라고 지시한
+  명령 옆»에 있어 위험했다). ★부수: 같은 주석의 현재형 「composes 1 frame when healthy」도 안전하다 —
+  그 루프는 `DELIVER_TICKS` **틱 고정**이고, 선행 회차가 «부하 의존»을 잰 것은 `wie_validate --inject` 의
+  **시간 고정** 축이다. 판정 술어 사용 **0건** · 검사기 0 · 러스트 무접촉.
+  ★**재개 조건**: Scenario F/E 제거 · 그 수가 비교 술어로 코드에 진입 · 그 루프가 시간 고정으로 전환.
+  정본 = `docs/report/0108--….md`.
 - 2026-09-13: **`-merge` 절이 스쿼시를 «지시»하던 것을 «정본을 가리키게»**
   (`wie-agents-md-merge-section-says-squash-for-an-upstream-sync-repo`) — §Git Workflow 「For the `-merge`
   task only」 두 불릿 교체: 착지 방식은 **티켓 `merge_strategy:` frontmatter** 가 정하고 집행 정본은
