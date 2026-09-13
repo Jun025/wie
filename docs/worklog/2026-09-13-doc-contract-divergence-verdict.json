@@ -1,0 +1,37 @@
+{
+  "date": "2026-09-13",
+  "task": "wie-doc-contract-divergence-has-no-alarm-measure-first",
+  "title": "문서↔계약 어긋남 경보 — 판정 «만들지 않는다(⒥)»",
+  "summary": "「울지 않는다」는 참이다(잡는 기계 0). 그러나 만들 값이 없다: ★CI 러너가 그 계약 파일을 볼 수 없다(워크플로 9/9 GitHub 호스티드 · self-hosted 0) — 이 한 다리만으로 판정이 선다. ★[-fix 정정] 초판의 둘째 다리(「정본이 추적되지 않는다」)는 «거짓»이라 철회한다 — orchestrator origin/main 기준으로 두 파일 모두 추적되고 tpl 은 1,228줄·'4-A' 11건이다(내가 «낡은 로컬 체크아웃»을 정본으로 착각했다). ★[-fix 정정] ⓑ 도 repo 전수로 다시 셌다: 살아 있는 지시문의 «값 복사» 7(초판 2 는 두 파일만 본 값) · 이력 제외 45 · 그중 현행 어긋남 1건(CONTRIBUTING.md)은 이 회차가 고쳤다.",
+  "changes": [
+    "코드·검사기 구현 0 — 판정과 근거 수만 기록한다(docs/report/0109 + 이 worklog + STATE.md 완료 1항)"
+  ],
+  "verification": [
+    "ⓐ 잡는 기계 0: repo 검사기 9종 전수에서 repo 밖 경로를 읽는 것 0 · ~/orchestrator/bin/ 에서 AGENTS.md 를 읽는 도구 0",
+    "★[정정] ⓑ repo 전수(git ls-files '*.md' · origin/main): 살아 있는 지시문의 값 복사 7(AGENTS 2 · CONTRIBUTING 1 · REPORT 1 · report-migration-revert 2 는 사실 복사(정확) · STATE §다음/upstream-realign-verdict 는 포인터 동반) · 규칙 재진술 3 · 포인터 4 · ★이력 제외 45(STATE §완료 21 + docs/report/** 24). 세는 기준 = 살아 있는 지시문만 세고 이력 기록은 뺀다(이력은 그 시점 스냅샷이 정본이라 고치면 사료가 거짓이 된다)",
+    "★[정정] ⓒ 워크플로 전수 9종(.yml 만 세면 dependabot.yaml·rust-audit.yaml 을 놓친다 — 초판 7 이 그 오류) · 9/9 runs-on · self-hosted 0 ⇒ CI 에 ~/orchestrator 없음",
+    "★[철회] ⓒ 둘째 다리: orchestrator origin/main 기준 templates/merge-ticket.tpl 추적됨·1,228줄·'4-A' 11건 · contracts/upstream-sync-repos.conf 추적됨·repo 2건 ⇒ 정본은 버전관리된다. 초판의 「untracked·63줄·4-A 0건」은 ~/orchestrator@live(HEAD 13b88a0c · origin/main 보다 2,476 뒤) 에서 본 값이라 «그 트리에서는 이랬다»로 보존한다",
+    "ⓒ(F4) check-engine-contract.mjs 가 otterpebble 소비 계약(docs/contracts/featurephone-engine-contract.json)을 «벤더링»해 추적한다 ⇒ cross-repo 계약을 in-repo↔in-repo 로 바꾸는 수법이 이 repo 에 이미 있다",
+    "ⓓ(F3) ⒥ 의 한계: 절 단위 포인터(§4-A)는 조용히 썩는다 — 정본이 renumber 해도 이 repo 에 신호가 오지 않는다(오늘은 실재 · 오늘 기준으로만 참)"
+  ],
+  "limits": [
+    "판정 ⒥ 는 «불변»이다 — 이 회차가 고친 것은 수·기준·출처·한계 서술이고, 검수자도 「결론을 바꾸라는 것이 아니다」로 못박았다",
+    "★값 복사 7 은 임계(10+)에 미달이지만, 애초에 개수는 이 판정의 «주된» 근거가 아니다 — ⓒ 첫 다리(CI 가 못 본다)가 개수와 무관하게 검사기를 불가능하게 한다",
+    "사람 규율 한 줄은 여전히 «어디에 둘지»만 정했다(AGENTS.md 재수정은 범위 밖) — 제안 #p0",
+    "남의 정본(contracts/·templates/)은 읽기만 했다(git show·wc·grep) · 편집 0"
+  ],
+  "adoptedProposals": [
+    "2026-09-13-merge-section-points-at-the-canon#p0"
+  ],
+  "proposals": [
+    {
+      "title": "「외부 계약은 가리킨다, 복사하지 않는다」를 «기계가 안 잡는 것» 절에 한 줄로 박아라",
+      "plainSummary": "설명서가 다른 곳의 규칙을 그대로 베껴 적으면 조용히 어긋납니다. 베끼지 말고 원본을 가리키라는 한 줄을, 이미 '기계가 못 잡으니 사람이 지킨다'고 모아 둔 자리에 넣자는 제안입니다.",
+      "userBenefit": "오늘 9일간 살아 있던 종류의 모순이 다시 생기지 않습니다 — 그 모순은 매 회차가 스스로 알아차려야 했고, 두 회차가 각자 알아차려서 겨우 막았습니다.",
+      "why": "이 회차의 판정이 ⒥(검사기 만들지 않는다)이므로 남는 방어선은 사람 규율뿐이다. 자리는 AGENTS.md §Constraints 의 「Held by you, not by a machine」 — 「No game bytes」·「Secrets are referenced, never embedded」가 이미 같은 성격(기계가 안 잡는 것 + 왜 안 잡히는지)으로 사는 절이다. 문안도 그 문형을 따른다: 「An external contract is referenced, never copied — point at the canon (path + section) and let the ticket's frontmatter bind. Nothing machine-checks this: CI cannot see ~/orchestrator.」",
+      "tradeoff": "★규율은 기계가 아니다 — 읽지 않는 회차에는 무력하다. 그리고 이 파일은 이미 길다(한 줄이 더해지는 값보다 «길어서 안 읽힌다»는 비용이 클 수 있다). ★그래서 «새 절»을 만들지 말고 기존 절에 한 줄만 얹는 형태여야 한다. 이번 회차가 직접 쓰지 않은 이유는 AGENTS.md 재수정이 티켓 범위 밖(오늘 9ef24b43 으로 닫힌 자리)이기 때문이다.",
+      "effort": "S",
+      "target": "AGENTS.md §Constraints → 「Held by you, not by a machine」"
+    }
+  ]
+}

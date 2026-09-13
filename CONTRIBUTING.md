@@ -15,7 +15,7 @@ Web interface is on the private repository and occasionally built with wie's mai
 ## Git Workflow
 
 - Work on a short-lived branch and open a PR — never commit directly to `main`. **The PR is where your work ends**: merging happens separately, after review approval, and is not the PR author's step.
-- **Branch hygiene**: leave your branch in place while the PR is open. Deleting it goes with the merge — whoever merges removes the remote branch (`gh pr merge --squash --delete-branch`) and the local one (`git branch -D <branch>`; force `-D` because squash-merged branches aren't recognized as merged by `-d`), then runs `git fetch --prune`. Merged branches are not kept around; `main` and open work are the only branches that should linger. Never re-merge or re-PR an already-merged branch.
+- **Branch hygiene**: leave your branch in place while the PR is open. Deleting it goes with the merge, and **how that merge lands is not this file's to state** — the merging round reads it off its own ticket's `merge_strategy:` frontmatter (canon: `~/orchestrator/templates/merge-ticket.tpl` §4-A, outside this repo). For this repo that value is `merge`, **never `squash`**: it is a registered upstream-sync fork, so a squash folds the two parents into one and the upstream lineage is gone irreversibly — `AGENTS.md` §Definition of Done and §Git Workflow carry the full reason. The remote branch is deleted by this repo's own `deleteBranchOnMerge` setting, so no flag is needed and `--delete-branch` is not used (it would also delete a local branch another session may have checked out). Merged branches are not kept around; `main` and open work are the only branches that should linger. Never re-merge or re-PR an already-merged branch.
 
 ## References
 
