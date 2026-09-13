@@ -60,6 +60,17 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-13: **`-merge` 절이 스쿼시를 «지시»하던 것을 «정본을 가리키게»**
+  (`wie-agents-md-merge-section-says-squash-for-an-upstream-sync-repo`) — §Git Workflow 「For the `-merge`
+  task only」 두 불릿 교체: 착지 방식은 **티켓 `merge_strategy:` frontmatter** 가 정하고 집행 정본은
+  `templates/merge-ticket.tpl` §4-A(이 repo 값 = `merge` · **스쿼시 금지** + 왜 1줄) · `--delete-branch` 금지.
+  ★★**결함의 이름이 더 나쁜 쪽으로 바뀌었다 — 「문서 대 계약」이 아니라 «문서 대 자기 자신»이다**:
+  같은 파일 §DoD 가 이미 「registered as an upstream-sync fork and **must *not* squash-merge**」라고 적는데
+  이 절이 그것을 무시했고 그 상태가 «몇 주» 살아 있었다. ★**기계는 옳게 집행했다** —
+  `tpl` 4-A 는 티켓 frontmatter 만 읽고 `AGENTS.md` 를 읽지 않는다. 그런데 `CLAUDE.md:1` = `@AGENTS.md` 라
+  ★**모든 세션이 그 틀린 문면을 적재**했다 ⇒ 실패 양식은 「잘못 착지한다」가 아니라
+  **「매 회차가 스스로 알아차려 이겨 내야 한다」**였고, 실제로 **두 회차가 각자 알아차렸다**.
+  절차·플래그 사본 0 · 검사기 0 · 러스트 무접촉 · 문서 검사기 5종 전건 통과. 정본 = `docs/report/0107--….md`.
 - 2026-09-13: **P3 둘째 조각 — LGT 엔트리포인트 jar 를 «이름»이 아니라 «내용»으로 찾는다**
   (`wie-lgt-entrypoint-jar-name-contract-align-with-upstream`) — `LgtEmulator::from_archive` 가
   `format!("{aid}.jar")` 로 이름을 **지어내던** 것을, upstream 과 **같은 3줄**(zip 안에 `binary.mod` 가
