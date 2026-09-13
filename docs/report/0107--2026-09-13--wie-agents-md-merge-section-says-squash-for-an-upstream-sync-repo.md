@@ -57,6 +57,17 @@
   `npm run audit` **PASSED**.
   **⑷ 러스트 무접촉** ⇒ 4게이트 전량 불요(diff 4파일 전부 `.md`/`.json`).
 
+- ★★**형제 PR 과 «충돌한다» — 예측을 실측으로 내놓는다(머지 회차가 놀라지 않게)**:
+  `git merge-tree --write-tree HEAD origin/wie-agents-md-paints-load-dependent` → **rc=1 ·
+  `CONFLICT (content): Merge conflict in STATE.md`** (단 1파일 · `AGENTS.md` 는 **충돌하지 않는다** —
+  두 편집이 §DoD keydraw 절 ↔ §Git Workflow `-merge` 절로 멀다).
+  ⇒ ★**이 저장소가 스스로 측정한 「§완료 의 공유 삽입점은 동시 회차 1/1 로 충돌한다」가 그대로 재현됐다.**
+  처분은 **합집합**이고(나중에 착지하는 쪽이 해소) ★**한쪽 통째 채택 금지** — 그 규율이 `AGENTS.md` 원장 절에 있다.
+  ※착수 시 **base 를 잘못 골랐다가 고쳤다**: 첫 브랜치를 직전 회차 브랜치(#151 의 커밋) 위에 만들어
+  **스택 PR** 이 될 형상이었다 ⇒ `git checkout -B <브랜치> origin/main` 로 **`8bae4d90` 위로 다시 세웠고**
+  그 과정에서 `AGENTS.md` 의 paints 문단(#151 소관)이 이 PR 로 새지 않음을 **grep 0 으로 확인**했다.
+  ★스택 PR 로 뒀으면 `ci-presence` 가 **rc=9 ⑷(base≠기본 브랜치)** 로 판정 불가가 되고 자식 PR 위험이 붙었다.
+
 - ★**연번은 도구에 물었다**(디렉터리 `max+1` 금지 규율): `--next-serial` → **0107**
   — 디스크 기준 0106 이지만 열린 PR 이 **0105(#151)·0106(#152)** 를 claim 하고 있었다. ⇒ 그 규율이 이번에 값했다.
 
