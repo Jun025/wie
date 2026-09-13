@@ -60,6 +60,16 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-13: **LGT 엔트리포인트 jar 가 `P/` 아래 있어도 열린다**
+  (`wie-lgt-entrypoint-jar-under-p-prefix-never-opens`) — `load()` 가 파일시스템 키에는
+  `trim_start_matches("P/")` 를 적용하면서 클래스패스에 넘기는 `jar_filename` 에는 안 해,
+  `P/foo.jar` 로 담긴 엔트리포인트가 즉시 실패했다(수정 전 실증:
+  `FatalError("Missing binary.mod in P/00000000.jar")`). 같은 함수 한 곳에서 같은 술어를
+  적용했다 — 두 호출자 모두 이 지점을 지난다. upstream 과 이 한 줄이 갈리며, 갈린 지점에
+  보존 주석(왜·대응 위치·재정렬 시 보존)을 남겼고 헝크가 upstream `load()` 에 그대로
+  얹힘을 확인했다. 사용자 영향: 그 형태로 포장된 LGT 아카이브가 뜬다(실아카이브 관측은
+  아직 0건). 4게이트+beta green · **178 passed** · `wie_validate` 5/5 PASS ·
+  keydraw 양 캐리어 rc=0. 정본 = `docs/report/0106--….md`.
 - 2026-09-13: **keydraw 의 paint 수를 «하한»으로 한정** (`wie-agents-md-paints-55-is-a-stale-single-value` ·
   채택 `2026-09-13-lgt-entrypoint-jar-name-contract#p1`) — `AGENTS.md` keydraw 절에 산문 1문단.
   ★★**채택 제안의 전제가 «반증됐다»** — 「같은 명령이 45 를 낸다」는 재현되지 않았고 **오늘 11/11 이 55**다
