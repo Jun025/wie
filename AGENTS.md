@@ -145,6 +145,19 @@ and the validator is right to say so. Measured 2026-09-06 on both carriers: with
 misread is not hypothetical — a round chasing an unrelated change stopped on exactly this, took the
 FAIL for its own regression, and only cleared it by reproducing the same FAIL on an untouched tree.
 
+**Read the count as a floor, not an equality: the verdict is `PASS` · `content true` · rc=0, never
+the number.** What the 1-vs-dozens gap proves is that the flag reached the guest — that gap is the
+signal, and it is enormous. There is no exact upper figure, because `paints` counts the ticks that
+fit a **fixed** ~20 s budget (the `--timeout` note below derives that budget, and says the wall-time
+spread above it is tick overrun under load) — so concurrent work pulls the count straight down.
+Measured 2026-09-13 on `keydraw_lgt`: **48–55 idle**, **38–41** with twelve concurrent runs, **28–36**
+with thirty (n=30). Across all 42 of those runs the verdict never moved once — **42/42 `PASS` ·
+`content true` · rc=0** — and that invariance, not the count, is why the floor is the rule. A lower
+count is therefore not by itself a regression; a `FAIL`, a blank last frame, or a non-zero rc is. The
+same command reported **45 on both carriers** earlier that day, right after `cargo test --all` and
+`cargo +beta clippy`: that sits inside the measured range, which is consistent with load and is not,
+on its own, evidence of anything in the engine.
+
 **`--expect-last-frame` is on the `keydraw_*` line and deliberately NOT on the one above it.** It
 turns `last_frame_content` from a reported field into an exit code, which is the only thing that
 catches "the emulator ran fine and the last frame is black" — the 2026-09-05 LGT failure, where
