@@ -36,11 +36,19 @@ impl LgtEmulator {
 
         tracing::info!("Loading app {}, pid {}, mclass {}", app_info.aid, app_info.pid, app_info.mclass);
 
-        let jar_filename = format!("{}.jar", app_info.aid);
+        // The entrypoint container is found by CONTENT, not by name — `{aid}.jar` was the old rule and
+        // it is not a rule the archive format guarantees. This matches upstream
+        // `wie-lgt/src/emulator.rs:50-53` verbatim so a realign onto it is a no-op here; upstream's own
+        // test renames the fixture's `00000000.jar` to `application.jar`, which the name-derived form
+        // cannot load. `loadable_jar` is the single agreed predicate for "this is the entrypoint".
+        let jar_filename = files
+            .iter()
+            .find_map(|(filename, data)| (filename.ends_with(".jar") && Self::loadable_jar(data)).then_some(filename))
+            .ok_or_else(|| WieError::FatalError("Missing LGT application JAR containing binary.mod".into()))?;
 
         Self::load(
             platform,
-            &jar_filename,
+            jar_filename,
             &app_info.pid,
             &app_info.aid,
             Some(app_info.mclass),
@@ -112,10 +120,12 @@ impl LgtEmulator {
         let jvm = JvmSupport::new_jvm(system, Some(&jar_filename), Box::new(protos), &[], RustJavaJvmImplementation).await?; // TODO use lgt's java implementation
 
         let class_loader = JavaLangClassLoader::get_system_class_loader(&jvm).await.unwrap();
+        // Names the container when it is missing: the old `Option::unwrap()` here is what an
+        // entrypoint-name mismatch actually surfaced as, and it said nothing about the jar.
         let stream = JavaLangClassLoader::get_resource_as_stream(&jvm, &class_loader, "binary.mod")
             .await
             .unwrap()
-            .unwrap();
+            .ok_or_else(|| WieError::FatalError(format!("Missing binary.mod in {jar_filename}")))?;
 
         let binary_mod = JavaIoInputStream::read_until_end(&jvm, &stream).await.unwrap();
 
