@@ -1,0 +1,21 @@
+{
+  "date": "2026-09-13",
+  "task": "wie-two-more-single-value-paint-counts-in-comments",
+  "title": "`83 paints`·`30 paints` 두 자리 — «검토하고 기각»한다(사건 서술이라 잴 수 없다)",
+  "summary": "선행 회차가 AGENTS.md 의 `paints 55` 를 「하한으로 읽어라」로 닫은 뒤, 같은 «단일 값» 형태 둘을 점검했다. ★판정: 둘 다 «그때의 관측»이고, 결정적으로 ★그 수를 다시 잴 «명령이 없다» — 둘 다 2026-09-05 의 «고쳐진» 실패를 서술하기 때문이다. ⇒ 주석 무접촉으로 닫는다.",
+  "changes": [
+    "코드·주석 변경 0 — 판정만 기록한다(docs/report/0108 + 이 worklog + STATE.md 완료 1항)"
+  ],
+  "verification": [
+    "ⓐ 두 자리 실재 확인(문구로 인용 · 줄번호 미기재): wie_lgt/tests/test_key_reach.rs 「ran at **83** paints with a blank final frame」 · wie_cli/src/bin/wie_validate.rs 「Measured 2026-09-05 on LGT: 30 paints arrived with an all-black image」",
+    "ⓒ 그 두 수를 판정 술어로 쓰는 코드 0건(scripts/·.github/·wie_cli/src·wie_lgt 전수 비교연산 검색)",
+    "★결정적 축 — 예산 축이 다르다: test_key_reach 는 `const DELIVER_TICKS: usize = 400_000` + `for _ in 0..DELIVER_TICKS` = «틱 고정»(부하 무관·결정적) ↔ wie_validate --inject 는 `StdInstant::now()`+`deadline_secs`+boot/action 스케줄 = «시간 고정»(선행 회차가 잰 부하 의존은 이쪽 축의 성질이다)",
+    "★그 사건은 고쳐졌다 — contract-roundtrip.mjs Scenario F 가 그 회귀를 픽셀로 실단언하고 main CI 가 green ⇒ 83·30 을 «재현할 명령이 없다»"
+  ],
+  "limits": [
+    "이 회차는 «문장이 어떻게 읽히는가»를 판정했을 뿐, 두 주석의 나머지 내용은 검증하지 않았다",
+    "판정 경계는 「재현 가능한 명령이 그 수를 다시 내는가」다 — 그 경계가 흐려지는 사례가 나오면 이 기각은 다시 열려야 한다(아래 재개 조건)"
+  ],
+  "adoptedProposals": ["2026-09-13-keydraw-paint-count-is-a-floor#p0"],
+  "proposals": []
+}
