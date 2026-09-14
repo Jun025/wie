@@ -60,6 +60,17 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-14: **「외부 계약은 가리킨다, 복사하지 않는다」 — `AGENTS.md` 에 한 줄**
+  (`wie-agents-md-external-contract-is-referenced-never-copied` · 채택 `2026-09-13-doc-contract-divergence-verdict#p0`)
+  — §Constraints 「Held by you, not by a machine」에 불릿 **1개**(`git diff --numstat` = **`1 0`** · 기존 줄 무접촉).
+  ★**선행 판정 ⒥(검사기 만들지 않는다)가 «남긴 방어선»을 적은 것**이지 그것을 뒤집지 않는다 — 검사기 신설 **0**.
+  ★자리·문형은 그 절이 이미 정해 두었다(머리가 「**no gate catches these**」이고 이웃 4줄이 전부
+  「굵은 주장 + 왜 기계가 못 잡는가」다) ⇒ 계약이 요구한 「왜 기계가 안 잡는지를 같은 줄에」는 **문형 그 자체**였다.
+  ★**`Secrets are referenced, never embedded` 바로 다음에 놓았다** — 두 줄이 **`X is referenced, never Y`** 라는
+  같은 구문을 이뤄 **문장 형태만으로** 같은 계급임이 읽힌다. ★중복 없음 확인(그 절 안 히트 **0** ·
+  기존 유사 문장 2건은 전부 «한 사례»이지 «일반 규율»이 아니었다 — 그래서 매번 사례마다 다시 발견해야 했다).
+  ★**새 절 0 · 한 줄 · 사례 서술 0**(9일 모순의 이야기는 `docs/report/0107`·`0109` 에 있고 **옮기지 않았다** —
+  옮기면 그것이 곧 이 규율이 금지하는 «복사»다). 정본 = `docs/report/0110--….md`.
 - 2026-09-13: **문서↔계약 어긋남 경보 — 판정 «만들지 않는다(⒥)»**
   (`wie-doc-contract-divergence-has-no-alarm-measure-first` · 채택 `2026-09-13-merge-section-points-at-the-canon#p0`)
   — 구현 0 · 판정만. 「울지 않는다」는 **참**이다(잡는 기계 **0** · repo 검사기 9종 중 repo 밖을 읽는 것 0).
