@@ -6,12 +6,18 @@ pub mod classes;
 
 use wie_jvm_support::WieJavaClassProto;
 
-pub fn get_protos() -> [WieJavaClassProto; 46] {
+// `java/io/InterruptedIOException`, `java/io/UnsupportedEncodingException`,
+// `java/lang/VirtualMachineError` and `java/lang/OutOfMemoryError` are NOT registered here.
+// They were, from 2026-07-02 (`5603a7f9`), because the Jun025/RustJava fork pinned at the time
+// did not carry them and KTF's `MExe_init` aborts the guest if a preloaded class does not
+// resolve. The pin moved to `dlunch/RustJava@5b84dd1` on 2026-09-04 (`1762a32c`), which
+// registers all four, and `JvmSupport::new_jvm` builds `java.class.path` as
+// `RT_RUSTJAR : WIE_RUSTJAR : <jar>` — runtime first, so the copies here were unreachable.
+// Measured, not reasoned: with them still registered, `new java/lang/VirtualMachineError()`
+// already threw `InstantiationError`, which only the runtime's ABSTRACT definition does.
+// Locked by `tests/preload_classes_come_from_the_runtime.rs`.
+pub fn get_protos() -> [WieJavaClassProto; 42] {
     [
-        crate::classes::java::io::InterruptedIOException::as_proto(),
-        crate::classes::java::io::UnsupportedEncodingException::as_proto(),
-        crate::classes::java::lang::VirtualMachineError::as_proto(),
-        crate::classes::java::lang::OutOfMemoryError::as_proto(),
         crate::classes::org::kwis::msp::lcdui::ImageObserver::as_proto(),
         crate::classes::org::kwis::msp::lcdui::InputMethodListener::as_proto(),
         crate::classes::org::kwis::msp::lwc::ActionListener::as_proto(),
