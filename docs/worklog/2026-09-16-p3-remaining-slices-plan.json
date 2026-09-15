@@ -1,0 +1,82 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-16",
+  "task": "wie-p3-remaining-slices-split-and-verifiability-plan",
+  "title": "P3 남은 조각(⑵⑶⑷) 회차 분할과 검증식",
+  "summary": "P3 의 남은 셋을 5조각(A~E)으로 쪼개고 조각마다 이 머신에서 돌릴 수 있는 검증식을 정했다. 측정 중 upstream base 에서 keydraw_lgt 가 FAIL 하는 것을 찾았고, P2 러너 이식 비용이 21줄임을 실제 컴파일·실행으로 확인했다. 제품 코드 0줄.",
+  "changes": [
+    "docs/upstream-realign-p3-slices.md 신설 — 조각 표 A~E + 못 재는 것 목록",
+    "docs/report/0111--2026-09-16--…md 신설",
+    "STATE.md ## 다음 의 P3 '남은 조각' 문안 교체 + ## 완료 항목 추가"
+  ],
+  "verification": [
+    "git rev-list --left-right --count origin/main...upstream/main → 535 1140 (2026-09-16 04:1x KST, d30cb903 ↔ 44fbf265)",
+    "git merge --no-commit --no-ff upstream/main (격리 워크트리) → rc=1 · 미해결 74 (UU 35 · AU 19 · UD 17 · AA 3) · --abort 후 worktree 제거",
+    "upstream 워크트리 + wie_validate 21줄 어댑터 수정 → cargo check rc=0 (증분 17.5s) · cargo build · 5픽스처 실행",
+    "keydraw_lgt --inject: ours PASS paints 55 rc=0 ↔ upstream FAIL paints 0 (2/2 결정적)"
+  ],
+  "limits": [
+    "292 타이틀 코퍼스는 여전히 이 머신에 없다 (find ~ -maxdepth 4 -name game_lab → 0건)",
+    "브라우저 왕복(contract-roundtrip.mjs)은 툴체인 부재로 안 돌렸다 — 조각 E 몫",
+    "네이티브 창 호스트(wie_cli WindowHandle)는 두 그물 어디에도 안 덮인다",
+    "21줄 이식본은 '컴파일되게 스텁'한 것이다 — Platform::font 는 unimplemented!() · AudioSink::send 는 no-op. 소리·폰트를 판정에 쓰면 거짓이 된다"
+  ],
+  "proposals": [
+    {
+      "title": "upstream base 에서 keydraw_lgt 가 깨지는 원인을 규명한다 (조각 A)",
+      "plainSummary": "우리 엔진에서는 그림이 그려지는 LGT 테스트 파일이, upstream 최신 엔진에서는 그리다가 멈춘다. 왜 그런지 먼저 알아낸다.",
+      "userBenefit": "엔진을 최신으로 갈아타기 전에 LGT 게임이 깨질지 아닐지를 미리 안다. 모르고 갈아타면 특정 게임이 조용히 안 돌게 된다.",
+      "why": "2026-09-16 실측: ours PASS(paints 55) ↔ upstream 44fbf265 FAIL(paints 0) · Undefined instruction at net/wie/CletWrapperCard.paint · 2/2 결정적. verdict §3-1 의 '우리 구현은 upstream 의 진부분집합'은 구현 개수 축에서 참이고 동작 축에서 거짓이다. 코퍼스 없이 얻은 유일한 no-go 신호이고, 조각 D(base swap)의 게이트다.",
+      "tradeoff": "읽기 전용 조사라 제품 코드는 안 바뀌고, 규명에 실패해도 잃는 것은 시간뿐이다. 다만 upstream 에는 그리는 LGT 픽스처가 없어(helloworld 둘뿐) 대조군을 우리 픽스처 하나에 의존한다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "② 엔진 오버레이 51건을 '폐기 / 재적용 / upstream 발신' 으로 분류한다 (조각 B)",
+      "plainSummary": "우리가 엔진에 더한 코드 중 어떤 것이 이미 upstream 에도 있는지 파일별로 정리한다.",
+      "userBenefit": "갈아타기 작업이 절반 크기로 줄어든다. 이미 저쪽에 있는 것을 다시 옮기느라 쓰는 시간이 사라진다.",
+      "why": "머지 예행에서 ② 갈래 미해결이 51건(UU 21 · AU 16 · UD 13 · AA 1)이다. 머지 커밋은 하나라 쪼갤 수 없으므로, 분할의 축은 '머지를 작게 만드는 선행 회차'뿐이다. 분류는 심볼 단위(grep -c 'fn ')로 기계 확인이 된다.",
+      "tradeoff": "분류는 이름만 본다 — 같은 이름이 다르게 동작할 수 있다. 그래서 이 조각은 '폐기 후보'만 만들고 집행은 조각 C 가 4게이트를 지고 한다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "이미 upstream 에 있는 엔진 hunk 를 지금 base 에서 지운다 (조각 C)",
+      "plainSummary": "저쪽에 이미 있는 중복 코드를 우리 쪽에서 먼저 지워, 갈아탈 때 손으로 맞출 자리를 줄인다.",
+      "userBenefit": "갈아타기 PR 이 사람이 읽을 수 있는 크기가 된다. 지금 상태(74건 충돌)로는 검수가 불가능하다.",
+      "why": "우리 현재 base 위에서 지우면 4게이트 + 5픽스처가 전부 살아 검증이 강하다. 머지 안에서 지우면 '삭제가 맞았는가'와 '머지가 맞았는가'가 섞여 아무도 못 가린다. 삭제 전후로 머지 예행을 다시 돌려 74 → N 을 적으면 효과가 수로 보인다.",
+      "tradeoff": "삭제는 조용히 기능을 지운다. 완화책은 지우기 전 grep 으로 우리 안의 호출자 0건을 먼저 보이는 것 — 게임만 부르는 심볼은 코퍼스 없이 못 본다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "upstream/main 을 base 로 삼는 머지 (조각 D)",
+      "plainSummary": "우리 저장소의 엔진을 본가의 최신 엔진 위로 옮긴다. 웹·서비스 쪽은 그대로 남는다.",
+      "userBenefit": "LGT 자바 런타임 8→31, LGT 전용 그래픽 0→1,095줄, 캔버스 709→1,647줄 등 1,140커밋 분량의 개선을 한 번에 받는다.",
+      "why": "이것이 P3 ⑵ 자체다. 머지 커밋은 하나라 이 조각만은 쪼갤 수 없다. DoD 리터럴: 머지 후 git merge-base origin/main upstream/main 이 fa641a8a 가 아니어야 한다 — 그대로면 실패다.",
+      "tradeoff": "risk 를 verdict 의 med 에서 high 로 올렸다. 충돌 74건에 더해 충돌 목록에 세어지지 않는 파열이 둘 있다 — upstream 이 wie_cli 크레이트를 지웠고(그 안에 wie_validate 1,147줄이 있다), data/binary_patches.toml·fonts/neodgm.ttf 가 사라지는데 include 경로는 남는다. 게이트③ 는 반드시 merge_strategy: merge — squash 면 계보가 평평해져 다음 회차가 또 1,140커밋 뒤에서 시작한다.",
+      "effort": "L",
+      "target": "wie"
+    },
+    {
+      "title": "새 base 에서 웹 계약·아티팩트를 확인한다 (조각 E)",
+      "plainSummary": "엔진을 갈아탄 뒤에도 브라우저에서 게임이 뜨고, otterpebble 이 먹는 파일 이름이 그대로인지 확인한다.",
+      "userBenefit": "featurephone 셸이 조용히 깨지지 않는다. 산출물 이름이 바뀌면 소비자가 파일을 못 찾는다.",
+      "why": "Constraint 3 은 WASM export 표면이 바뀌면 같은 PR 에서 계약 파일을 갱신하라고 요구한다. 브라우저 왕복은 툴체인이 필요해 조각 D 안에서 못 돌린다.",
+      "tradeoff": "산출물 이름 wie_web.js / wie_web_bg.wasm 은 바꾸지 않는다 — upstream 충돌이 아니라 otterpebble 소비자 계약이고, 2026-09-11 회차가 일부러 남긴 값이다. 배포 후 실제 셸 동작은 교차 repo라 여기서 못 잰다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "292 타이틀 코퍼스를 이 머신의 git-ignored game_lab/ 에 놓는다 (human-step 후보)",
+      "plainSummary": "회귀 검사에 쓰는 게임 파일 묶음을 이 컴퓨터의 (저장소에 올라가지 않는) 폴더에 놓아 달라는 요청이다.",
+      "userBenefit": "엔진을 갈아탈 때 292개 게임이 여전히 도는지 실제로 확인할 수 있다. 지금은 5개 테스트 파일로만 판단한다.",
+      "why": "verdict §8-1 은 '이 머신에서는 영구히 못 잰다'고 적었으나 그 문장은 참이 아니다 — .gitignore:23 이 /game_lab/ 를 무시하고 AGENTS.md 가 그 배치를 'local only, and structurally so' 라고 스스로 설계로 적는다. 못 재는 이유는 구조가 아니라 코퍼스가 여기 없다는 것뿐이다. 그리고 나머지 블로커(러너 이식)는 21줄로 이미 풀렸다.",
+      "tradeoff": "게임 바이트를 이 머신에 두는 일이라 운영자 판단이 필요하다(Constraint 9 는 저장소·빌드출력·로그 반입만 금지하므로 git-ignored 디렉터리는 위반이 아니다). 불가하면 P2 는 영구 미측정으로 남고, 조각 D 는 5픽스처 증거만으로 착지한다 — 그 경우 skt 50건은 신호가 0 이다(커밋된 skt 픽스처가 하나도 없다).",
+      "effort": "S",
+      "target": "orchestrator"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}
