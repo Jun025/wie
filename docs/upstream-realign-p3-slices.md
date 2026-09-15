@@ -310,6 +310,36 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 
 ### A — `wie-p3-lgt-keydraw-upstream-regression-triage`
 
+> ★★★**[돌았다 2026-09-16 · `wie-p3-slice-a-keydraw-lgt-breaks-on-upstream-base` · 정본 `docs/report/0113--….md`]
+> 원인이 «이름»으로 나왔다 — 이 칸의 ⒜~⒟ 는 그 회차가 실제로 따른 것이고, 아래가 그 답이다.**
+>
+> ★**원인**: upstream 이 graphics SVC **27개**를 LGT 전용 구현(`wie-lgt/src/runtime/wipi_c/graphics.rs` ·
+> **1,095줄**)으로 보내고, 그 구현이 게스트에게 **다른 레코드 ABI** 를 준다 —
+> `LgtFramebuffer{owned_image,ptr_graphics,ptr_image,screen_kind}` **16B**(★`buf` 필드 **없음**) ↔
+> 공용 `WIPICFramebuffer{width,height,bpl,bpp,**buf**}` **20B**(픽셀 포인터 **+16**).
+> 게스트 SDK(`dlunch/wipi` 의 `wipi/src/framebuffer.rs`)가 `fb.buf` = **+16** 을 읽어 **끝 너머**에서 0 을 얻고
+> ★**스스로 패닉**한다(게스트 printk 전문: `panicked at wipi/src/framebuffer.rs : 149 : 18 : null reference produced`).
+> 그 뒤 주소 0 으로 분기해 `Undefined instruction`(PC=0x0)이 난다 ⇒ ★**`CletWrapperCard.paint` 스택은 증상이다.**
+> ★**도입 커밋 = `9a88423b`(2026-08-23) `Fix LGT graphics and runtime compatibility (#1368)`** —
+> ★**⑸ 엔트리포인트를 바꾼 그 PR 과 «같다».**
+>
+> ★**무는 것(결정 실험)**: `wie-lgt/src/runtime/wipi_c.rs` 의 `=> graphics::` **27건**을
+> `=> wie_wipi_c::api::graphics::` 로 치환 → ★**PASS · paints 55**(2/2). 원본은 FAIL · paints 0(3/3).
+>
+> ★**배제된 가설 4종**(전부 실행): 포인터 등록(양쪽 `0x25619` 동일 · `paint` 본체 바이트 동일) ·
+> `init_process_state`/`set_use_annunciator` 2줄(꺼도 FAIL) · **202 단일 치환**(FAIL 불변) ·
+> 공용 구현 자체(두 트리 diff **0**).
+> ★**범위**: `keydraw_ktf` upstream **PASS**(upstream 도 공용 경로) · `helloworld_lgt` upstream **PASS**
+> ⇒ ★**LGT «그리기» 경로 한정**이다.
+>
+> ★★**⇒ 조각 D 로 넘어간 «결정 항목»**: base swap 시 그 **27줄을 어느 쪽으로 두는가**.
+> ⒜upstream LGT 전용 유지 ⇒ **SDK 기반 게스트(우리 픽스처)가 깨진다** ·
+> ⒝공용으로 되돌림 ⇒ **upstream 의 LGT 리버스 1,095줄을 버린다**.
+> ★**이 결정은 코퍼스 없이 «안전하게» 내릴 수 없다** — 아래 「못 재는 것 ⑵」가 그 이유이고,
+> 그 축은 이 회차가 **좁혔지만 닫지 못했다**(`docs/lgt_abi.md:930` 이 실제 clet 타이틀 놈ZERO 에서
+> 「`GetScreenFrameBuffer` 가 준 포인터에 **직접** 픽셀을 쓴다」를 관측했다 ⇒ 우리 픽스처와 **같은 모양**.
+> ★그러나 upstream 이 픽셀을 `ptr_image`→`LgtImage` **한 겹 아래**로 내줄 가능성은 배제되지 않았다).
+
 - **⒜ 범위**: 제품 코드 **0줄**. 격리 워크트리 조사만. 대상 = upstream `wie-lgt` 의 clet paint 경로
   (`net/wie/CletWrapperCard.paint` → ARM `Undefined instruction`) ↔ 우리 `wie_lgt/src/runtime/`.
   산출물 = `docs/report/` 1장 + (필요시) upstream 이슈 **초안**(★**발신하지 마라** — §7).
