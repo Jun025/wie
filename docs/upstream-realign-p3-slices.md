@@ -73,13 +73,20 @@ verdict §3-5·§8-2 는 `helloworld_{ktf,lgt}` **2건**으로 「신규 FAIL 0�
 ★**verdict 는 그것들을 한 번도 upstream 에 대고 돌려 본 적이 없다.** 이 회차가 돌렸다.
 
 **방법**: §4 의 21줄 이식본을 upstream `44fbf265` 격리 워크트리에 얹어 빌드하고, **우리 저장소의
-커밋된 픽스처 5건**을 양쪽 엔진에 같은 명령으로 먹였다. 게임 바이트 0 · 네트워크 0.
+픽스처 5건**을 양쪽 엔진에 같은 명령으로 먹였다. 게임 바이트 0 · 네트워크 0.
+★**정확히는 «커밋 4건 + 생성 1건»이다**(초판의 「커밋된 픽스처 5건」은 부정확했다 · 정정 `-fix`):
+`git ls-tree origin/main test_data/` → `draw_j2me.zip`·`helloworld_{ktf,lgt}.zip`·`keydraw_{ktf,lgt}.zip`
+⇒ ★**`draw_j2me.jar` 는 커밋본이 아니다**(`.gitignore:24` `*.jar` · `git ls-files` **0**). 그것은
+**커밋된 생성기** `scripts/make-draw-fixture.mjs` 가 만든다(`AGENTS.md` 러너 블록의 첫 줄이 그 writer 다).
+★**그리고 커밋본 `draw_j2me.zip` 은 이 러너의 입력이 «아니다»** — 실측:
+`wie_validate test_data/draw_j2me.zip` → `FAIL · unrecognized zip archive (no __adf__/app_info/.msd)`
+(그 zip 은 브라우저 왕복 Scenario C 쪽 자산이다). ⇒ ★**러너 표는 «생성된 `.jar`» 로 읽어라.**
 
 | 픽스처 | 명령 | ours `4cf79b4d` | ★**upstream base `44fbf265`** |
 |---|---|---|---|
 | `helloworld_ktf.zip` | `wie_validate <f>` | PASS · paints 0 | PASS · paints 0 |
 | `helloworld_lgt.zip` | 〃 | PASS · paints 0 | PASS · paints 0 |
-| `draw_j2me.jar` | 〃 | PASS · paints 1 · content | PASS · paints 1 · content |
+| `draw_j2me.jar` ★(생성본) | 〃 | PASS · paints 1 · content | PASS · paints 1 · content |
 | `keydraw_ktf.zip` | `wie_validate --inject --expect-last-frame <f>` | PASS · paints 55 · rc 0 | PASS · paints 55 · rc 0 |
 | ★**`keydraw_lgt.zip`** | 〃 | ★**PASS · paints 55 · rc 0** | ★★**FAIL · paints 0** |
 
@@ -147,17 +154,48 @@ git merge --abort && cd - && git worktree remove --force /tmp/probe
 검증은 `wie_featurephone` 이 `wie_lgt::detect_compile_model` 을 계속 import 할 수 있는가 뿐이다.
 ★**「122줄 이식」이라는 조각을 따로 세우지 마라** — 조각 **D** 안의 한 줄이다.
 
-### 3-2. ★★충돌 목록에 «없는» 파열 2건 — 조용하다
+### 3-2. ★★«충돌 0» 이 «빌드 성공»을 뜻하지 않는 자리 2건
 
-머지가 `D`(자동 삭제)로 조용히 처리하는데 **빌드를 깨는** 자리:
+> ★★**[정정 2026-09-16 · 게이트② 반려 승계 `-fix`] 이 절의 초판은 「이 둘은 충돌 74건 «밖»이다」로
+> 적었고 ★그 주장은 «거짓»이었다 — 두 항목 다 `UD` 로 74 «안»에 있다.**
+> ★**근인**(다음 사람이 같은 자리를 밟지 않도록): 초판이 상태를 **`git status --porcelain -- wie_cli`**
+> 라는 **pathspec 제한 조회**로 읽었다. ★**경로를 제한하면 git 이 rename 짝을 깨고 `R` 을 `D` 로 보여 준다** —
+> 목적지가 pathspec 밖이기 때문이다. 실측 대조(같은 머지 트리, 같은 순간):
+> ```
+> $ git status --porcelain -- wie_cli          $ git status --porcelain | grep wie_cli
+> UD wie_cli/Cargo.toml                        R  wie_cli/src/database.rs   -> src/database.rs
+> D  wie_cli/src/audio_sink.rs                 R  wie_cli/src/filesystem.rs -> src/filesystem.rs
+> D  wie_cli/src/database.rs                   R  wie_cli/src/main.rs       -> src/lib.rs
+> D  wie_cli/src/filesystem.rs                 R  wie_cli/src/window.rs     -> src/window.rs
+> D  wie_cli/src/main.rs                       UD wie_cli/Cargo.toml
+> D  wie_cli/src/window.rs                     D  wie_cli/src/audio_sink.rs
+> ```
+> ⇒ ★**머지 상태를 읽을 때 «경로로 좁히지 마라». 전체를 받아 `grep` 하라.**
 
-| # | 무엇 | 왜 조용한가 |
-|---|---|---|
-| 1 | ★**`wie_cli` 크레이트 소멸** — upstream 이 네이티브 호스트를 루트 패키지 `wie`(`src/`)로 옮기며 `wie_cli/` 를 지웠다. 머지는 `D wie_cli/src/{audio_sink,database,filesystem,main,window}.rs` 를 스테이지한다 | `UD` 는 `wie_cli/Cargo.toml` **1건**뿐이라 목록만 보면 «1파일 충돌»로 보인다. ★그런데 **`wie_validate` 1,147줄이 그 크레이트 안에 있다** — 우리 회귀 러너 전부다 |
-| 2 | ★**자산 include 경로 파열** — 머지 후 `data/binary_patches.toml` 은 `wie-core-arm/data/` 로 rename 탐지되고 `fonts/neodgm.ttf` 는 upstream 의 `assets/neodgm.ttf` 로 접힌다. 그런데 `wie_core_arm/src/binary_patches/parser.rs` 의 `include_str!("../../../data/binary_patches.toml")` 와 `wie_backend/src/canvas.rs` 의 `include_bytes!("../../fonts/neodgm.ttf")` 는 **그대로 남는다** | 두 include 는 **컴파일 타임 경로**라 git 이 못 본다. 머지 후 트리 실측: `data/binary_patches.toml` **GONE** · `fonts/neodgm.ttf` **GONE** |
+★**그래서 남은 참인 명제는 이것 하나다 — 그리고 이것으로 «충분»하다**:
+★★**«미해결 0» 은 «컴파일된다»를 뜻하지 않는다.** 아래 둘은 충돌 목록에 **있지만**,
+그 항목을 「충돌 해소」로만 처리하면(양쪽 중 하나를 고르고 끝내면) **빌드가 깨진다.**
 
-★**이 둘은 「충돌 74건」에 세어지지 않는다.** 조각 **D** 의 검증식이 «4게이트»여야 하는 이유가 이것이다 —
-충돌 해소가 0건 남아도 **컴파일이 안 된다.**
+| # | 무엇 | 실측 상태 | 왜 «해소»만으로 부족한가 |
+|---|---|---|---|
+| 1 | ★**`wie_cli` 매니페스트·bin 타깃 미화해** — upstream 이 네이티브 호스트를 루트 패키지 `wie`(`src/`)로 옮겼다 | ★**`UD wie_cli/Cargo.toml` 1건**(74 안) + ★**`R` 4건**(`src/{database,filesystem,window}.rs` → `src/…` · `src/main.rs` → `src/lib.rs`) + **`D` 1건**(`src/audio_sink.rs`) | ★★**`wie_validate.rs` 는 머지가 «손대지 않는다»** — 실측: 상태 목록 히트 **0건** · 머지 트리에 실재 · `git diff origin/main -- wie_cli/src/bin/wie_validate.rs` = **0줄**. ★**위험은 «소스 소실»이 아니라 «매니페스트·bin 타깃 미화해 시 러너 빌드 불가»** 다: `UD Cargo.toml` 을 upstream 쪽(삭제)으로 고르면 크레이트가 사라지고, 우리 쪽으로 고르면 그 매니페스트가 가리키는 `main.rs`·`window.rs`·`database.rs`·`filesystem.rs` 가 **루트로 이사한 뒤**다 |
+| 2 | ★**`wie_backend` 폰트 include 경로** — upstream 은 폰트를 `assets/neodgm.ttf` 로 옮기고 `Platform::font()` 로 읽는다(실측: `test-utils/src/platform.rs`·`tests/font.rs`). 우리 `canvas.rs:16` 은 `include_bytes!("../../fonts/neodgm.ttf")` 로 **직접** 읽는다 | ★**`UD wie_backend/src/canvas.rs`**(74 안) · 머지 트리에 `fonts/neodgm.ttf` **GONE** · `assets/neodgm.ttf` **실재** | 그 `UD` 를 「우리 +149줄을 upstream 판본 위에 얹는다」로만 풀고 **include 경로를 안 고치면** 컴파일 타임에 없는 파일을 가리킨다. ★**충돌은 «보인다» — 보이지 않는 것은 «그 안에 경로 수정이 들어 있다»는 사실이다** |
+
+★★**`binary_patches` 축은 «파열이 아니다» — 초판이 틀렸다.** upstream **도** 그 코드를 갖고 있고
+자산과 **함께** 이사시켰다. 머지 트리 실측:
+```
+R  data/binary_patches.toml                 -> wie-core-arm/data/binary_patches.toml
+R  wie_core_arm/src/binary_patches/parser.rs -> wie-core-arm/src/binary_patches/parser.rs
+$ grep -n include_str wie-core-arm/src/binary_patches/parser.rs
+11: const BINARY_PATCHES_TOML: &str = include_str!("../../data/binary_patches.toml");   # ★"../../" (우리는 "../../../")
+```
+`wie-core-arm/src/binary_patches/parser.rs` 에서 `../../data/…` = **`wie-core-arm/data/binary_patches.toml`** 이고
+그 파일은 **실재한다**. ⇒ ★**깨지지 않는다.** ★초판의 오류는 **우리 트리의 include 줄**을 읽고
+**머지 트리의 파일 위치**와 맞붙인 것 — ★**한쪽만 읽고 다른 쪽을 가정한, 위 pathspec 오류와 같은 계급**이다.
+
+⇒ ★**조각 D 의 ⒟ 를 «충돌 0» 이 아니라 «빌드 게이트»로 두는 근거는 그대로 살아 있다** —
+근거가 「목록 밖이라 안 보인다」에서 ★**「목록 안에 있어도, 해소 ≠ 컴파일」**로 바뀌었을 뿐이다.
+★**게이트를 빼지 마라.**
 
 ### 3-3. ★★머지는 «쪼갤 수 없다» — 그래서 «머지 앞»에서 쪼갠다
 
@@ -177,8 +215,14 @@ verdict §8-1 은 「코퍼스 있는 머신 **그리고** `wie_validate` 772줄
 
 | 회차 | 결과 |
 |---|---|
-| 원본 그대로 | **15 errors**(콜드 `cargo check` 3m34s) |
-| 어댑터 21줄 수정 후 | ★**rc=0**(증분 17.5s) · `cargo build` · 5픽스처 실행 성공(§2) |
+| 원본 그대로 | ★**12 errors** — `E0407`×5(`AudioSink` 에 없는 메서드) · `E0046`×4(미구현 항목) · `E0050`×3(인자 수) |
+| 어댑터 21줄 수정 후 | ★**rc=0** · `cargo build` · §2 의 픽스처 5건 실행 성공 |
+
+> ★**[정정 `-fix`] 초판은 「15 errors」라고 적었다 — 그 수는 `png` 의존을 «아직 선언하기 전»에 잰 값**이고,
+> 늘어난 3건은 전부 `E0433 cannot find crate png` 였다. `png` 선언은 위 `Cargo.toml` **4줄에 이미 포함**돼
+> 있으므로 **소스 델타로 두 번 세면 안 된다.** ⇒ ★**이식 델타의 정확한 수는 «12» 다**(재측 `cargo check
+> --bin wie_validate` → `due to 12 previous errors`). ★**아래 델타 표가 예측하는 수와 정확히 일치한다**
+> (5 + 4 + 3 = 12). ★**「21줄」 결론은 그대로다** — 같은 21줄을 얹고 `rc=0` 을 다시 받았다.
 
 ★★**「개명 이식」은 **0줄**이다** — cargo 가 패키지명 `wie-ktf` 의 lib 를 **`wie_ktf`** 로 노출하므로
 `use wie_ktf::KtfEmulator;` 가 **한 글자도 바뀌지 않는다**. verdict §8-1 의 「upstream 크레이트 이름 위로 이식」은
@@ -244,6 +288,23 @@ verdict §5·§7-1·§8-1 은 「게임 바이트는 Constraint 9 로 repo 에 �
 > ★**전 조각 공통 DoD**: ⓐ`--squash` **금지**(`contracts/upstream-sync-repos.conf` 등재 repo ·
 > `bin/queue-lint` 검사 22 가 **모든** `*-merge` 티켓에 `merge_strategy:` 선언을 요구 · 값은 `merge`) ·
 > ⓑ**자기 PR 자기 머지 0**(`AGENTS.md` Constraint 12) · ⓒ`STATE.md ## 다음` 갱신 + `docs/report/NNNN--…` 1장.
+
+### ★이미 끝난 것 — 다시 발권하지 마라 (P3 ⑴ · ⑸)
+
+| P3 항 | 언제 | 상태 |
+|---|---|---|
+| ⑴ `wie_web` → `wie_featurephone` 개명 | 2026-09-11 `wie-p3-rename-wie-web-to-featurephone` | ★**끝났다.** 산출물 이름 `wie_web.js`/`wie_web_bg.wasm` 은 **일부러 안 바꿨다**(otterpebble 소비자 계약) |
+| ⑸ 엔트리포인트 규약 정합 | 2026-09-13 `wie-lgt-entrypoint-jar-name-contract-align-with-upstream`(+ `…-under-p-prefix-never-opens`) | ★**끝났고, ⑸ 의 «전제»가 반증됐다** |
+
+★★**⑸ 의 전제 반증을 여기 «리터럴로» 남긴다 — verdict §3-5 의 낡은 문안이 조각 브리프로 되살아나지 않도록**:
+verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`application.jar`** 를 찾고 우리는
+`00000000.jar` 를 그대로 넘긴다」라고 적었다. ★**그 문장은 부정확하다.**
+★**upstream 은 어떤 이름도 하드코딩하지 «않는다»** — `*.jar` 중 **zip 안에 `binary.mod` 가 있는 것**을
+**내용으로** 찾는다(`upstream/main:wie-lgt/src/emulator.rs` · 2026-08-23 PR #1368 이 `format!("{aid}.jar")` 를
+그 형태로 바꿨다). upstream 테스트가 픽스처의 `00000000.jar` 를 `application.jar` 로 개명해 넘기는 것은
+**그 탐색을 증명하려는 장치**였다. ⇒ 우리도 그 술어를 **그대로 채택**했으므로 ★**이름 규약이 «둘»로 남지
+않았고 기존 `00000000.jar` 픽스처도 그대로 산다.** ★**조각 D 의 목록에 「엔트리포인트 이름 맞추기」를
+넣지 마라 — 없는 일이다.**
 
 ### A — `wie-p3-lgt-keydraw-upstream-regression-triage`
 
@@ -322,20 +383,24 @@ verdict §5·§7-1·§8-1 은 「게임 바이트는 Constraint 9 로 repo 에 �
 ### D — `wie-p3-base-swap-merge`
 
 - **⒜ 범위**: ★**⑵ 그 자체.** `git merge upstream/main` 한 커밋 + 해소. ★**리터럴 작업 목록**:
-  ⑴미해결 잔여 전건 해소 ⑵★**`wie_cli` 복원**(upstream 이 지운 5파일 — `wie_validate` 1,147줄이 그 안에 있다 · §3-2)
-  ⑶★**자산 include 2건 교정**(`data/binary_patches.toml` · `fonts/neodgm.ttf` — 충돌 목록에 **없다** · §3-2)
+  ⑴미해결 잔여 전건 해소 ⑵★**`wie_cli` 매니페스트·bin 타깃 화해**(`UD wie_cli/Cargo.toml` **1건** · §3-2 —
+  ★**`wie_validate.rs` 자체는 머지가 손대지 않는다.** 위험은 «소스 소실»이 아니라 «러너 빌드 불가»다:
+  그 매니페스트가 가리키던 `main.rs`·`window.rs`·`database.rs`·`filesystem.rs` 가 **`R` 로 루트 패키지에 이사**했고
+  `audio_sink.rs` 는 **`D`** 다)
+  ⑶★**`wie_backend/src/canvas.rs` 의 폰트 include 교정**(`UD` 를 풀 때 `fonts/` → `assets/neodgm.ttf` ·
+  ★**`binary_patches` 축은 «깨지지 않는다»** — upstream 이 자산과 함께 이사시켰다 · §3-2)
   ⑷`compile_model.rs` 는 `git add`(§3-1) ⑸`wie_featurephone` 무접촉 ⑹`Cargo.toml` 워크스페이스 멤버 화해
   (upstream 은 `default-members=["."]` 루트 패키지 · 우리는 `wie_cli`).
-  ★**⑶⑷⑸ 를 「부수 사항」으로 흘리지 마라** — 전부 조용히 깨지는 자리다.
-- **⒝** size **L** · risk ★**high**(verdict 의 `med` 를 올린다 — 근거: 미해결 74 + 조용한 파열 2건 + §2 의 FAIL)
+  ★**⑵⑶ 을 「충돌 하나 지우면 끝」으로 읽지 마라** — 둘 다 **해소 안에 «코드 수정»이 들어 있다.**
+- **⒝** size **L** · risk ★**high**(verdict 의 `med` 를 올린다 — 근거: 미해결 74 + ★**«해소 ≠ 컴파일» 2건**(§3-2) + §2 의 FAIL)
 - **⒞ 선행**: ★**A**(규명 없이 갈아타지 않는다) · **C**(충돌을 줄인 뒤에 한다) · ★**을 갈래를 고르면 P2 도**
 - **⒟ 검증식**: C 의 5게이트 + 5픽스처 **전부**, 그리고 ★**계보 DoD 를 «리터럴로»**:
   ```sh
   # ★머지 후 반드시 — 이 값이 fa641a8a 이면 그 회차는 «실패»다
   git merge-base origin/main upstream/main    # 기대: fa641a8a 가 «아니다»
-  # 부수 회귀 — 충돌 목록에 없던 것들
-  ls data/binary_patches.toml fonts/neodgm.ttf || echo "★자산 경로 파열 — §3-2"
-  cargo build -p wie_cli --bin wie_validate   # ★wie_cli 가 살아 있는가
+  # ★«미해결 0» 은 «컴파일된다»가 아니다 — §3-2 의 둘을 «빌드»로 확인하라
+  cargo build -p wie_cli --bin wie_validate   # ★러너가 살아 있는가 (⑵)
+  cargo build -p wie_backend                  # ★폰트 include 가 해결되는가 (⑶)
   node scripts/check-engine-contract.mjs      # 웹 계약 표면
   npm run audit
   ```

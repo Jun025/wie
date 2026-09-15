@@ -39,10 +39,28 @@ P3 는 **검증 없는 대규모 교체**가 된다. 이 회차는 「P3 를 할
 그리고 「③ 오버레이 재적용」도 **재적용할 것이 없다** — 머지된 트리에서 `web/` 32 · `functions/` 24 ·
 `migrations/` 8 · `scripts/` 17 · `wie_featurephone/` 7 전건 온존.
 
-**충돌 목록에 «없는» 파열 2건**(그래서 조각 D 의 검증식이 4게이트여야 한다):
-⑴upstream 이 `wie_cli` 크레이트를 지웠다 — `UD` 는 `Cargo.toml` 1건뿐인데 그 안에 `wie_validate`
-1,147줄이 있다. ⑵`data/binary_patches.toml`·`fonts/neodgm.ttf` 가 머지 후 사라지는데
-`include_str!`/`include_bytes!` 경로는 그대로 남는다(둘 다 머지 트리에서 **GONE** 실측).
+**★«미해결 0» 은 «컴파일된다»가 아니다 — 그래서 조각 D 의 ⒟ 가 빌드 게이트다**(2건, 둘 다 `UD` 로
+**충돌 74 «안»에 있다**): ⑴★**`UD wie_cli/Cargo.toml`** — upstream 이 네이티브 호스트를 루트 패키지로
+옮겼다(`R` 4건 `src/{database,filesystem,window}.rs`·`main.rs→lib.rs` + `D` 1건 `audio_sink.rs`).
+★**`wie_validate.rs` 는 머지가 손대지 않는다**(상태 히트 0 · `git diff origin/main` 0줄) — 위험은
+«소스 소실»이 아니라 **«매니페스트·bin 타깃 미화해 시 러너 빌드 불가»** 다. ⑵★**`UD wie_backend/src/canvas.rs`**
+— 그 `UD` 를 풀 때 `include_bytes!("../../fonts/neodgm.ttf")` 를 `assets/` 로 고쳐야 한다(upstream 은 폰트를
+`Platform::font()` 로 옮겼다).
+
+> ★★**[정정 2026-09-16 · 게이트② 반려 승계 `-fix`] 위 문단의 초판은 이 둘을 「충돌 목록 «밖»의 파열 2건」으로
+> 적었고 ★그 주장은 «거짓»이었다 — 두 항목 다 `UD` 로 74 «안»에 있다.** 근인 = 초판이
+> `git status --porcelain -- wie_cli` 라는 **pathspec 제한 조회**로 읽었고, ★**경로를 제한하면 git 이
+> rename 짝을 깨고 `R` 을 `D` 로 보여 준다**(같은 트리에서 제한 없이 읽으면 `R` 4 + `UD` 1 + `D` 1).
+> ★**그리고 `binary_patches` 축은 «파열이 아니다»** — upstream 도 그 코드를 갖고 자산과 **함께** 이사시켰다
+> (머지 트리 `wie-core-arm/src/binary_patches/parser.rs:11` 은 `include_str!("../../data/…")` 이고 그 대상이
+> **실재한다**). 초판은 **우리 트리의 include 줄**을 읽고 **머지 트리의 파일 위치**와 맞붙였다 — pathspec
+> 오류와 **같은 계급**이다. ★**조각 D 의 빌드 게이트는 그대로 남는다** — 근거만 「목록 밖이라 안 보인다」에서
+> **「목록 안에 있어도, 해소 ≠ 컴파일」**로 갈아 끼웠다. 상세 = `docs/upstream-realign-p3-slices.md` §3-2.
+> ※같은 회차에서 함께 정정: **이식 델타 오류 수 = 15 → ★12**(초판은 `png` 의존을 선언하기 전에 쟀고,
+> 늘어난 3건은 전부 `E0433 cannot find crate png` 였다. `png` 는 `Cargo.toml` 4줄에 이미 포함 ⇒ 두 번 세면
+> 안 된다. ★**「21줄」 결론은 불변**) · **「커밋된 픽스처 5건」 → ★「커밋 4건 + 생성 1건」**
+> (`draw_j2me.jar` 는 `.gitignore:24` `*.jar` 로 미추적이고 커밋된 생성기가 만든다. 커밋본 `draw_j2me.zip`
+> 은 이 러너의 입력이 아니다 — 실측 `FAIL · unrecognized zip archive`).
 
 **사용자 영향** — 없음(문서 전용). 다음 회차가 「무엇을 어떤 순서로, 무엇으로 검증하며」 하는지
 읽을 곳이 생겼다. 조각 **A**(LGT 회귀 규명)가 **D**(base swap)의 게이트다.
