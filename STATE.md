@@ -60,6 +60,30 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-16: **P3 남은 조각(⑵⑶⑷) 회차 분할 + 조각별 «이 머신에서의» 검증식**
+  (`wie-p3-remaining-slices-split-and-verifiability-plan`) — 제품 코드 **0줄** ·
+  정본 `docs/upstream-realign-p3-slices.md` · 조각 **A~E**(각 ⒜범위 ⒝size/risk ⒞선행 ⒟명령+기대출력 ·
+  「못 재는 것」은 전부 «무엇이 있으면 잴 수 있는가»와 짝지었다).
+  ★★**코퍼스 없이 go/no-go 신호 1건이 나왔다** — `keydraw_lgt` 가 upstream `44fbf265` 에서 **FAIL**
+  (paints 0 · `Undefined instruction` at `net/wie/CletWrapperCard.paint` · 2/2 결정적) ↔ ours **PASS**(paints 55).
+  ★★**P2 러너 이식 = «21줄»**(verdict 의 772/1,147 아님 — 격리 워크트리에서 `cargo check` rc=0 · 빌드 ·
+  픽스처 5건 실행까지 실제로 했다. 크레이트 개명 비용 **0** · 진입 API **바이트 동일** ·
+  ★**12오류**(`E0407`×5 · `E0046`×4 · `E0050`×3) **전부** 호스트 어댑터).
+  ★★**코퍼스 부재는 «구조적»이 아니다** — `.gitignore:23` `/game_lab/` + `AGENTS.md` 의 「local only,
+  and structurally so」 ⇒ **human-step 후보**로 회신했다(카드 발권은 총괄 몫).
+  ★**조각 둘이 소멸했다**: 「크레이트 하이픈 개명」(git rename 탐지 `R` **146건**) · 「`compile_model.rs` 122줄 이식」
+  (머지가 `AU` 로 데려온다). ★**「③ 오버레이 재적용」도 재적용할 것이 없다.**
+  ★**머지 예행**(격리 워크트리 · `--abort` 후 제거): 미해결 **74**(UU 35 · AU 19 · UD 17 · AA 3) ·
+  자동 A 167 / R 146 / D 104. ★**«미해결 0» 이 «컴파일된다»가 아닌 자리 2건**(`UD wie_cli/Cargo.toml` ·
+  `UD wie_backend/src/canvas.rs` — ★**둘 다 74 «안»에 있다**).
+  정본 = `docs/report/0111--….md`.
+  ★★**[승계 2026-09-16 `-fix` · 게이트② 반려] 같은 PR #157 에서 «근거 문장»을 갈아 끼웠다**(구조·조각 A~E 무접촉):
+  ⑴「이 둘은 충돌 74건 **«밖»이다**」는 주장 **삭제**(세 파일 전부 0건) — 두 항목 다 `UD` 로 74 «안»에 있다.
+  근인 = **pathspec 제한 `git status`** 가 rename 짝을 깨 `R`→`D` 로 보인 것.
+  ⑵`binary_patches` 축은 ★**파열이 아니다**(upstream 이 자산과 함께 이사시켰다) — 남는 실제 항목은 `canvas.rs`(neodgm) **하나**.
+  ⑶이식 오류 수 **15 → 12**(`png` 선언 전 측정 아티팩트 · ★**「21줄」 결론 불변**).
+  ⑷「커밋된 픽스처 5건」 → ★**「커밋 4건 + 생성 1건」**(`draw_j2me.jar` 는 `*.jar` gitignore).
+  ★**조각 D 의 빌드 게이트는 «뺀 것이 아니라» 근거만 바뀌었다** — 「해소 ≠ 컴파일」.
 - 2026-09-14: **「외부 계약은 가리킨다, 복사하지 않는다」 — `AGENTS.md` 에 한 줄**
   (`wie-agents-md-external-contract-is-referenced-never-copied` · 채택 `2026-09-13-doc-contract-divergence-verdict#p0`)
   — §Constraints 「Held by you, not by a machine」에 불릿 **1개**(`git diff --numstat` = **`1 0`** · 기존 줄 무접촉).
@@ -1200,6 +1224,10 @@
   에 하드코딩돼 있어 ★**빌드 대상이 해결되지 않는다.**
   ⇒ ★★**P2 를 살리려면 «코퍼스 있는 머신» + «`wie_validate` 772줄을 upstream 크레이트 위로 이식» 이
   «둘 다» 필요하다.** 종전 `size: M` 은 그 몫을 세지 않았다. ★**차이표는 지어내지 않았다.**
+  ★★**[반증됨 2026-09-16 — 아래 「[P2 재측]」 불릿을 읽어라. 이 줄의 두 축이 «둘 다» 과대평가였다]**
+  ⒝이식은 **772줄이 아니라 «21줄»**(크레이트 개명 비용 **0** · 진입 API 바이트 동일) ·
+  ⒜코퍼스는 **「다른 머신」이 아니라 «이 머신의 git-ignored `game_lab/`»** 으로 풀린다(구조적 불가가 아니다).
+  ★**이 줄은 2026-09-03 P2 회차의 기록이라 «사료로» 남긴다 — 그러나 비용 산정에 인용하지 마라.**
   ★잰 것: 커밋된 픽스처 2건이 양쪽에서 **2/2 ↔ 2/2**(신규 FAIL 0) — ★**코퍼스가 아니다. 부풀리지 마라.**
 - **P1**(★★**집행 완료 · 2026-09-04**) `Jun025/RustJava` **핀 이탈** — ★**끝났다.**
   ★**핀 = `dlunch/RustJava@5b84dd1`(+33)** · `[patch]` 표 **삭제** · `Cargo.lock` 의 `Jun025` **0건** ·
@@ -1233,7 +1261,55 @@
     `00000000.jar` 를 `application.jar` 로 개명해 넘기는 것은 **그 탐색을 증명하려는 장치**다.
     ⇒ 우리도 그 3줄을 **그대로** 채택했다(`wie_lgt/src/emulator.rs`) — 이름 규약이 «둘»로 남지 않고
     기존 `00000000.jar` 픽스처도 그대로 산다. 정본 = `docs/report/0104--….md`.
-  - **남은 조각(후속 회차)**: upstream 을 base 로 ③ 오버레이 재적용 + `compile_model.rs` **122줄 이식**.
+  - ★★★**[셋째 조각 완료 2026-09-16 · `wie-p3-remaining-slices-split-and-verifiability-plan`] 남은 셋(⑵⑶⑷)의
+    «회차 분할 + 검증식»이 정해졌다 — 정본 = `docs/upstream-realign-p3-slices.md`.**
+    ★**종전 문안 「upstream 을 base 로 ③ 오버레이 재적용 + `compile_model.rs` 122줄 이식」은 «둘 다 틀렸다»**:
+    ⑴★**③ 은 재적용할 것이 없다** — 머지 예행에서 `web/` 32 · `functions/` 24 · `migrations/` 8 · `scripts/` 17 ·
+    `wie_featurephone/` 7 **전건 온존**. 비용은 ③이 아니라 **②(51건) + ①(12) + 설정(11)** 에 있다.
+    ⑵★**`compile_model.rs` 는 «이식»이 아니다** — 머지가 `AU wie-lgt/src/compile_model.rs` 로 **혼자 데려온다**
+    (upstream 이 2026-08-30 `49db5171` 로 크레이트를 `wie_x`→`wie-x` 개명했는데 **git rename 탐지가 따라간다** ·
+    `R` **146건** 실측) ⇒ ★**「우리 크레이트 하이픈 개명」 조각도 «만들지 마라».**
+  - ★★★**[go/no-go 신호 1건 — 코퍼스 없이 나왔다] `keydraw_lgt` 가 upstream base 에서 «FAIL» 이다.**
+    ours **PASS**(paints 55 · rc 0) ↔ upstream `44fbf265` ★**FAIL**(paints 0) ·
+    `Undefined instruction` at `net/wie/CletWrapperCard.paint` · **2/2 결정적**.
+    ★**verdict §3-5·§8-2 의 「신규 FAIL 0」은 «아무것도 그리지 않는» helloworld 2건으로 얻은 값**이고,
+    그 뒤(2026-09-06) 커밋된 **그리는 픽스처**(`keydraw_*`)는 upstream 에 대고 돌려진 적이 없었다.
+    ⇒ ★★**「upstream LGT 는 우리의 진부분집합」(§3-1)은 «구현 개수» 축에서 참이고 «동작» 축에서 거짓이다.**
+    ★**base swap 전에 이것부터 규명하라** — 조각 **A** 가 조각 **D** 의 게이트다.
+  - ★★**[P2 재측] 두 블로커는 «비대칭»이고 둘 다 verdict 가 적은 것보다 작다.**
+    ⒝러너 = ★**21줄**(772/1,147 아님 — upstream 격리 워크트리에서 `cargo check` rc=0 · 빌드 · 5픽스처 실행까지 했다).
+    크레이트 개명은 **비용 0**(cargo 가 `wie-ktf` 를 `wie_ktf` 로 노출하므로 `use` 가 안 바뀐다) ·
+    진입 API(`from_archive`/`from_jar`/`loadable_*`)는 ★**바이트 동일** · ★**12개 오류**
+    (`E0407`×5 · `E0046`×4 · `E0050`×3) **전부** 호스트 어댑터(`Screen::resize` · `AudioSink` 5→1 ·
+    `DatabaseRepository` `&System` 제거+`usage` · `Platform::font`) 델타.
+    ★**「15」로 되돌리지 마라** — 그 수는 `png` 의존을 **선언하기 전**에 잰 값이고 늘어난 3건은 전부
+    `E0433 cannot find crate png` 다. ★**`E0433` 은 어댑터 델타가 «아니라» 매니페스트 의존**이고
+    `png` 는 `Cargo.toml` **4줄에 이미 세어져 있다** ⇒ ★**15 로 쓰면 3건을 «두 번» 세어 21줄 산정을 부풀린다.**
+    ⒜코퍼스 = ★**「이 머신에서 구조적 불가」가 아니다** — `.gitignore:23` 이 `/game_lab/` 를 무시하고
+    `AGENTS.md` 가 그 배치를 스스로 「local only, and structurally so」로 설계라고 적는다.
+    못 재는 이유는 구조가 아니라 ★**그냥 코퍼스가 여기 없다**는 것이다(`find ~ -maxdepth 4 -name game_lab` **0건** 재확인)
+    ⇒ ★**human-step 후보**(`game_lab/working/{ktf,lgt,skt}` 292타이틀 배치 · 카드 발권은 총괄 몫).
+  - **조각 A~E**(상세·검증식은 정본 문서): **A** LGT keydraw 회귀 규명(M·low·선행없음 · ★D 의 게이트) →
+    **B** ② 51건 hunk 분류(M·low · 제품코드 0) → **C** 이미 upstream 에 있는 것 삭제(M·med · 선행 B ·
+    ★**우리 base 위라 5게이트가 전부 산다**) → **D** base swap 머지(L·★**high** · 선행 A·C) →
+    **E** 웹 계약·아티팩트(M·med · 선행 D).
+    ★★**D 의 ⒟ 는 «충돌 0» 이 아니라 «빌드 게이트»다 — 근거는 「★«미해결 0» 이 «컴파일된다»를 뜻하지 않는다」이고,
+    ★그 근거는 «참»이다.** 아래 둘은 **충돌 74 «안»에 `UD` 로 있고**, 그 항목을 「한쪽 고르고 끝」으로 풀면 빌드가 깨진다:
+    ⑴★**`UD wie_cli/Cargo.toml`**(1건) — upstream 이 네이티브 호스트를 루트 패키지로 옮겼다
+    (`R` **4건** `src/{database,filesystem,window}.rs` · `src/main.rs`→`src/lib.rs` + `D` **1건** `src/audio_sink.rs`).
+    ★★**`wie_validate.rs` 는 머지가 «손대지 않는다»**(상태 히트 **0건** · 머지 트리 실재 ·
+    `git diff origin/main -- wie_cli/src/bin/wie_validate.rs` **0줄**) ⇒ ★**위험의 이름은 «소스 소실»이 아니라
+    «매니페스트·bin 타깃 미화해 시 러너 빌드 불가»다.**
+    ⑵★**`UD wie_backend/src/canvas.rs`** — 그 `UD` 를 풀 때 `include_bytes!("../../fonts/neodgm.ttf")` 를
+    `assets/` 로 고쳐야 한다(upstream 은 폰트를 `Platform::font()` 로 옮겼다 · `assets/neodgm.ttf` 실재).
+    ★★**[정정 2026-09-16 `-fix`] 종전 문안은 「이 둘은 충돌 74건 «밖»이다」였고 «거짓»이었다 — 되살리지 마라.**
+    근인 = `git status --porcelain -- wie_cli` 라는 **pathspec 제한 조회** ⇒ ★**경로를 제한하면 git 이 rename 짝을
+    깨고 `R` 을 `D` 로 보여 준다.** ★**머지 상태는 «경로로 좁히지 말고» 전체를 받아 `grep` 하라.**
+    ★**그리고 `binary_patches` 축은 «파열이 아니다»** — upstream 도 그 코드를 갖고 자산과 **함께** 이사시켜
+    머지 트리의 `include_str!("../../data/…")` 가 **정확히 맞는다**. 종전 ⑵의 그 절반은 **일이 아니다.**
+  - ★**오늘의 수**(2026-09-16 · `d30cb903` ↔ `44fbf265`): behind **1,140**(verdict 1,067) · ahead **535**(192) ·
+    ② 엔진 **66f +2,629/−96**(45f +1,134) · 머지 미해결 **74**(정적 충돌면 43 → 70).
+    ★**verdict 의 2026-08-27 수를 상수로 인용하지 마라 — 조회 시각과 함께 읽어라.**
 - **P4**(M·low·P3 와 병행) ② 를 upstream PR 로. ★**IP 방침 선 안쪽만**(#1239 2026-06-29
   「공개 문서 기반으로만 구현 · 펌웨어 리버스 계획 없음」) — `wipi_java` 공개 API 스텁 10종 +
   `canvas.rs` 단위테스트 9개는 **보낼 수 있고**, `docs/lgt_abi.md`·`docs/reference/` 는 **보내지 마라**.
