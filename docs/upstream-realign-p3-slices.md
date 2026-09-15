@@ -232,9 +232,11 @@ verdict §8-1 은 「코퍼스 있는 머신 **그리고** `wie_validate` 772줄
 `LgtEmulator`·`SktEmulator`·`J2MEEmulator` 전건. `from_jar` 7인자 시그니처는 양쪽이 **글자 그대로 같다**.
 `test-utils` 의 `MemoryFilesystem` 도 양쪽에 있다.
 
-★**15건 전부가 «호스트 어댑터» 한 덩어리에 있다**(`wie_validate.rs:202~344` = `HeadlessScreen`·
+★★**12건 전부가 «호스트 어댑터» 한 덩어리에 있다**(`wie_validate.rs:202~344` = `HeadlessScreen`·
 `HeadlessAudioSink`·`MemDbRepository`·`HeadlessPlatform`). ★**에뮬레이터를 모는 본문 — 틱 루프 ·
 주입 스케줄 27스텝 · JSON 판정 — 에서는 오류가 «0» 이다.**
+★**여기에 「15」를 쓰면 위 정정 블록과 «자기모순»이다** — 15 의 여분 3건은 `E0433 cannot find crate png`
+이고 그것은 ★**어댑터 델타가 아니라 매니페스트 의존**이다(그리고 `Cargo.toml` 4줄에 이미 세어져 있다).
 
 | 트레이트 | 델타 | 줄 |
 |---|---|---:|

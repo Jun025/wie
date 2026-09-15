@@ -29,7 +29,8 @@ P3 는 **검증 없는 대규모 교체**가 된다. 이 회차는 「P3 를 할
 2. ★**P2 러너 이식 = 21줄**(verdict 의 「772줄 이식」 아님). upstream 격리 워크트리에서 실제로
    `cargo check` rc=0 · 빌드 · 5픽스처 실행까지 했다. 크레이트 개명은 **비용 0**(cargo 가
    `wie-ktf` 를 `wie_ktf` 로 노출) · 진입 API(`from_archive`/`from_jar`/`loadable_*`)는 **바이트 동일** ·
-   15개 오류 **전부** 호스트 어댑터(`Screen`/`AudioSink`/`DatabaseRepository`/`Platform`) 델타.
+   ★**12개 오류**(`E0407`×5 · `E0046`×4 · `E0050`×3) **전부** 호스트 어댑터
+   (`Screen`/`AudioSink`/`DatabaseRepository`/`Platform`) 델타.
 3. ★**코퍼스 부재는 「이 머신에서 구조적 불가」가 아니다** — `.gitignore:23` 이 `/game_lab/` 를
    무시하고 `AGENTS.md` 가 그 배치를 스스로 설계로 적는다. 못 재는 이유는 구조가 아니라
    **코퍼스가 여기 없다**는 것뿐이다 ⇒ **human-step 후보**(회신에 «후보»로만 적었다).
