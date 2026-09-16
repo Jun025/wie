@@ -1,0 +1,44 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-16",
+  "task": "wie-p3-slice-d-merge-upstream-main-as-base-fix3-merge",
+  "title": "조각 D 착지 — upstream/main 을 base 로 삼는다 (게이트③ · PR #161)",
+  "summary": "PR #161 을 --merge(parents=2)로 착지시켰다. 코드 변경 0 — 원장 3파일만 동봉했다. 스쿼시가 금지인 이유는 부모 2개가 1개로 접히면 merge-base(main, upstream/main) 이 fa641a8a 로 되돌아가 조각 D 가 산 것이 통째로 사라지기 때문이고, wie 가 upstream-sync-repos.conf 등재 repo 라 그 선언을 담을 별도 -merge 티켓이 필요했다. 이 착지는 배포를 수반한다 — publish-artifact.yml 과 web.yml 이 둘 다 발화한다.",
+  "changes": [
+    "docs/report/0120--2026-09-16--…-fix3-merge.md 신설 — 게이트③ 실측표 · 3-a 배포 예측 전수 대조 · 한계",
+    "STATE.md 완료 항 — 착지 방식과 그 이유 · 배포 예측 · web.yml 배포 잡이 PR 에서 안 돈다는 한계",
+    "docs/worklog/2026-09-16-slice-d-gate3-merge.json — 이 파일"
+  ],
+  "verification": [
+    "핀 무이동: review.md 줄2 pin 7a439bd040dc64b64d5cdb286823e1aba6bc5f31 == gh pr view 161 --json headRefOid (원격 조회) · state OPEN · mergeable MERGEABLE · mergeStateStatus CLEAN",
+    "2-b⒟ 사전 판정: ~/orchestrator/bin/ci-presence Jun025/wie 161 7a439bd0… → rc=0 CI_GREEN (검사 5건 전건 완료·성공) ⇒ 동봉 후 red 가 나면 «자기유발» 갈래이고 제목 편집은 금지",
+    "PR 체크 전수: rust_ci 6레그(macos/ubuntu/windows × stable/beta) pass · build-web pass · contract pass · coverage pass · dependabot skipping · fail 0",
+    "2-b-2 능력 탐침: git ls-tree -r origin/main | grep -iE 'worklog-coverage|worklog-remeasure' | grep -E '\\.(mjs|js|ts|sh|py)$' → scripts/check-worklog-coverage.mjs 1건",
+    "2-b-2 판정: 검사기 기본 출력 landed 96 / last recorded 93 ⇒ (96+1)−93 = 4 < 주기 10 ⇒ 내 착지는 주기를 넘기지 않는다(착지 후 main red 예측 0)",
+    "3-b 능력 탐침: 같은 형태 grep(merge-base-stale|base-staleness|staleness-check) → 빈 출력 ⇒ 3-b 건너뜀",
+    "3-a 능력 탐침: grep(deploy-trigger|deploy-check|trigger-check) → 빈 출력 ⇒ ⒝ paths 수동 대조",
+    "3-a 착지 diff: git diff --name-only origin/main...HEAD → 460파일(세 점 · 머지 base 기준)",
+    "3-a 대조: 발화 5(publish-artifact·web.yml·engine-contract·rust·coverage) / 미발화 4(release.yaml·web.yaml=workflow_dispatch 전용 · doc-liveness · rust-audit · dependabot). 배포성은 publish-artifact(Release+repository_dispatch→otterpebble)·web.yml(Cloudflare Pages+verify-browser) 둘",
+    "3-a⒞ 공유 앵커: .github/workflows/publish-artifact.yml 자신이 자기 paths 의 원소이고 이 착지가 그것을 M 으로 만진다 ⇒ 다른 매치가 0이어도 발화한다(독립 매치도 실재: **/*.rs 수백 · Cargo.lock · **/Cargo.toml · assets/neodgm.ttf)",
+    "계약 8 중복 발권: tasks/·queue/·running/·reports/ 전수 — 이 리니지의 *-merge 는 이 티켓 1건뿐(#161 을 언급하는 wie-p3-slice-a-…-merge 는 PR #90 · slice-e-…-merge 는 PR #162 대상)",
+    "4-C bin/landed wie-p3-slice-d-merge-upstream-main-as-base-fix3 wie → rc=1 UNLANDED (착수 시점 = 미착지 확정)"
+  ],
+  "limits": [
+    "web.yml 의 배포·검증 스텝은 전부 github.event_name == 'push' 게이트 뒤에 있다 ⇒ PR 의 build-web pass 는 빌드까지만 증명하고, 배포 자체는 착지 후에야 처음 돈다",
+    "3-b(base 낡음)는 판별 도구 0건이라 건너뛰었다 — mergeable CLEAN 은 «텍스트 충돌 없음»이지 «합치면 green»이 아니다. 그 축은 이 회차가 재지 못했다",
+    "wie-app 단독 빌드는 여전히 깨져 있다(직전 회차가 exclude 로 뺀 대가 · 0119 에 기록). 이 착지가 바꾸지 않는다"
+  ],
+  "proposals": [
+    {
+      "title": "upstream 동기 repo 의 «배포를 수반하는 착지»에 배포 후 self-verify 를 게이트③ 계약으로 못박는다",
+      "plainSummary": "이번 착지는 웹사이트 배포와 엔진 아티팩트 발행을 동시에 일으켰는데, 그 배포가 실제로 성공했는지는 PR 단계에서 한 번도 확인할 수 없는 구조였습니다. 착지 후 확인 절차를 규칙으로 정해 둡니다.",
+      "userBenefit": "「CI 가 green 이었으니 배포도 됐겠지」로 끝나지 않는다 — 배포가 깨져도 다음 사람이 발견할 때까지 조용한 상태를 막는다.",
+      "why": "web.yml 의 배포·검증 스텝이 전부 event_name == 'push' 뒤에 있어 PR 런에서는 원리적으로 돌지 않는다. AGENTS.md 는 그 red 의 소유자를 «착지시킨 게이트③ 회차»로 이미 정해 두었는데, 머지 티켓 템플릿 쪽에는 그 의무가 «배포 수반 시 self-verify» 한 줄로만 있고 무엇을 어떻게 재는지가 없다.",
+      "tradeoff": "게이트③ 회차가 배포 완료를 기다리게 되면 슬롯을 그만큼 문다 — 그 저장소의 CI 한 바퀴만큼이다. 대안은 배포 실패를 별도 감시로 잡는 것인데, 그건 새 배관이고 소유자가 다시 흐려진다.",
+      "effort": "S",
+      "target": "orchestrator"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}

@@ -60,6 +60,20 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-16: **조각 D 착지 — upstream/main 을 base 로 삼는다 (게이트③ · PR #161)**
+  (`wie-p3-slice-d-merge-upstream-main-as-base-fix3-merge`) — 정본 `docs/report/0120--….md`.
+  ★★**`--merge`(parents=2)로 착지했다 — `--squash` 는 금지였다.** 스쿼시하면 부모 2개가 1개로 접혀
+  `merge-base(main, upstream/main)` 이 `fa641a8a`(2026-06-10 이후 불변)로 **되돌아가고**, 조각 D 가 산 것
+  = 「upstream/main 을 base 로 삼는다」 **그 자체**가 통째로 사라진다. `wie` 는
+  `contracts/upstream-sync-repos.conf` 등재 repo 라 그 선언(`merge_strategy: merge`)을 담을 별도 `-merge`
+  티켓이 필요했고, 그래서 이 회차가 게이트②에 **묶이지 않았다**(묶음 경로엔 그 선언을 읽을 파일이 없다).
+  ★**핀 무이동**: 검수 핀 `7a439bd0` == 동봉 «전» PR head(원격 조회) · 2-b⒟ 사전 `ci-presence` **rc=0 CI_GREEN**.
+  ★★**이 착지는 «배포를 수반한다»** — 착지 diff **460파일** 기준 `publish-artifact.yml`(엔진 아티팩트
+  Release + `repository_dispatch` → otterpebble)과 `web.yml`(Cloudflare Pages + 배포 후 `verify-browser.mjs`)이
+  **둘 다 발화**한다. ★**착지 diff(`origin/main...HEAD`)로 셌다** — 마지막 회차 delta(5파일)로 세면 그 둘을
+  **모두 놓친다**. 반면 이번 리니지가 «주차»한 `release.yaml`·`web.yaml` 은 `workflow_dispatch` 전용이라 미발화.
+  ★**한계**: `web.yml` 의 배포·검증 스텝은 전부 `event_name == 'push'` 뒤에 있어 PR 의 `build-web pass` 는
+  **빌드까지만** 증명한다 — 배포 판정은 착지 후 그 워크플로의 검증 스텝과 self-verify 가 낸다.
 - 2026-09-16: **조각 D 게이트② 반려 처분 ② — 착지하면 `main` 이 빨개진다: 안 쓰는 데스크톱 크레이트를 workspace 에서 뺐다**
   (`wie-p3-slice-d-merge-upstream-main-as-base-fix3`) — 정본 `docs/report/0119--….md`.
   ★★**base swap 이 들여온 upstream Tauri 셸 `wie-app` 이 GTK/WebKit2GTK/libsoup3 의 «유일한» 뿌리**였고
