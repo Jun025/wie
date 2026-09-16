@@ -63,7 +63,16 @@
 ⇒ 계측기는 살아 있고 **공백은 실재한다**. 프로브·사본은 전부 제거했다(`git status wie_cli/` 빈 값).
 
 **`Platform::font()` — 프로브 없이 판정된다.**
-엔진의 호출부는 **전부 `wie_midp`**(lcdui 텍스트)이고 이 픽스처들 중 문자열을 그리는 것이 없다.
+★**호출부는 «전부 MIDP 가 아니다»** — `git grep -n "\.font()" -- '*.rs'` 로 재면(2026-09-16)
+**30개 표현 = `wie-midp` 28 · ★`wie-wipi-c` 2**(`api/graphics.rs` 의 `MC_grpGetStringWidth` ·
+`api/graphics/primitives.rs` 의 `draw_text` = `MC_grpDrawString` 의 몸통)이고, ★그 둘은
+**이 시나리오들이 실제로 부팅하는 두 호스트에 배선돼 있다**(`wie-ktf/…/wipi_c/method_table.rs` ·
+`wie-lgt/…/runtime/wipi_c.rs` 가 `DrawString`·`GetStringWidth` 를 그리로 보낸다)
+⇒ ★**WIPI 게스트는 `MC_grpDrawString` «한 번»으로 `Platform::font()` 에 닿는다 — MIDP 픽스처가 필요 없다.**
+★**0으로 붙드는 것은 «코드 경로»가 아니라 «픽스처»다** — 이 다섯 중 문자열을 그리는 것이 없을 뿐이다.
+⇒ ★**가장 싼 덮개는 WIPI keydraw 픽스처에 `MC_grpDrawString` 한 줄**이고, 그 생성기
+`scripts/make-wipi-keydraw-fixture.sh` 는 라운드트립이 **기동 시 이미 읽는** 파일이자
+`engine-contract.yml` 필터 등재분이다(★값은 쟀고 **이 회차에서 하지 않았다** — 코드 0줄 전제가 깨진다).
 ★증거는 공짜로 이미 있다 — **`wie_validate` 의 `font()` 가 `unimplemented!()`** 라 닿으면 패닉한다.
 러너 5픽스처 전건이 통과한다(`not implemented` **0건**):
 

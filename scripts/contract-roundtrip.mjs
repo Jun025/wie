@@ -176,10 +176,24 @@
 //   fixtures are binaries, and Scenario E/F assert exact pixel counts against the
 //   current geometry.
 //
-//   `Platform::font()` — every engine caller is in `wie_midp` (lcdui text), and
-//   none of these fixtures draws a string. `wie_validate`'s own `font()` is
+//   `Platform::font()` — the callers are NOT all MIDP, and that matters for how
+//   you would cover this. Measured with `git grep -n "\.font()" -- '*.rs'`
+//   (2026-09-16: 30 expressions — `wie-midp` 28, `wie-wipi-c` 2). The two are
+//   `api/graphics.rs` (`MC_grpGetStringWidth`) and `api/graphics/primitives.rs`
+//   (`draw_text`, the body of `MC_grpDrawString`), and BOTH are wired into the
+//   very hosts these scenarios boot: `wie-ktf/.../wipi_c/method_table.rs` and
+//   `wie-lgt/.../runtime/wipi_c.rs` both map `DrawString`/`GetStringWidth` onto
+//   them. So a WIPI guest reaches `Platform::font()` with ONE `MC_grpDrawString`
+//   call — no MIDP fixture required.
+//   What keeps it at zero here is the fixtures, not the code paths: none of
+//   these five draws a string. `wie_validate`'s own `font()` is
 //   `unimplemented!()`, so it panics if anything reaches it; all five runner
 //   fixtures pass, which prices that at zero calls without needing a probe.
+//   => The cheapest cover is therefore one `MC_grpDrawString` line in the WIPI
+//   keydraw fixture, whose generator (`scripts/make-wipi-keydraw-fixture.sh`)
+//   this script ALREADY reads at startup and which is in `engine-contract.yml`'s
+//   filter. Costed but deliberately NOT done here — it would stop this from
+//   being a zero-code round; it is the next round's call.
 //   What IS covered is the font's CONSTRUCTION: `WebPlatform::new` eagerly does
 //   `Font::try_from_static(include_bytes!(...assets/neodgm.ttf))?`, so a missing
 //   or unparseable asset fails boot and Scenario A goes red. Loading it is
