@@ -172,6 +172,26 @@ jobs:
           node scripts/check-docs-report-serial.mjs --selftest
           node scripts/check-docs-report-serial.mjs
 
+      # Sixth always-run step, same shape as the five above (node reading one
+      # file, no network, no node_modules). It guards the axis the 2026-09-16
+      # upstream base swap proved is UNGUARDED: `wie-app` entered as one line in
+      # Cargo.toml's `members`, dragged tauri -> gtk -> glib-sys/soup3-sys into the
+      # graph, and killed rust_ci(ubuntu × stable,beta) + coverage — while all four
+      # local AGENTS.md gates stayed green, because macOS never compiles those
+      # deps. A human reviewer caught it; nothing mechanical did.
+      #
+      # ALWAYS-RUN rather than inside the paths filter, even though `Cargo.lock`
+      # and `**/Cargo.toml` ARE in that filter: the thing that would be deleted to
+      # silence this guard is the SCRIPT, which is not in the filter, so a PR
+      # removing it would skip every in-filter step and report green. Same
+      # reasoning as the audit and serial steps above.
+      #
+      # It reads the lockfile, not the members list, on purpose — a members
+      # allowlist is a second copy of `members` (every legitimate crate edits two
+      # places) and still misses an EXISTING member gaining a GTK dependency.
+      - name: Linux CI can still build the graph (docs/worklog/2026-09-16-slice-d-base-swap-fix3.json #p0)
+        run: node scripts/check-linux-system-deps.mjs
+
       # ── Deliberately non-blocking, and that is the whole point of the flag ───
       # This job is the one INTENDED to be a required status check on main, so a
       # hard-failing step here is a required check by placement — nobody would
