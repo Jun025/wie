@@ -6,7 +6,8 @@ use js_sys::{Function, Reflect};
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{AudioContext, GainNode};
 
-use wie_backend::{AudioSink, DatabaseRepository, Filesystem, Instant, Platform, Screen};
+use wie_backend::{AudioSink, DatabaseRepository, Filesystem, Instant, Platform, Screen, canvas::Font};
+use wie_util::Result;
 
 use crate::audio::WebAudioSink;
 use crate::database::WebDatabaseRepository;
@@ -22,6 +23,11 @@ pub struct WebPlatform {
     screen: WebScreen,
     filesystem: WebFilesystem,
     database_repository: WebDatabaseRepository,
+    // Embedded, not passed in from JS: taking font bytes through the constructor
+    // would change the `#[wasm_bindgen]` export surface, which the featurephone
+    // engine contract pins (AGENTS.md Constraint 3). Upstream's own hosts embed
+    // the same asset the same way (`src/lib.rs` — `try_from_static`).
+    font: Font,
     audio_ctx: Option<AudioContext>,
     // JS-owned master gain node (output = gain → destination). Audio is routed
     // through it so the UI volume slider is the single source of truth.
@@ -44,19 +50,24 @@ impl WebPlatform {
         audio_ctx: Option<AudioContext>,
         gain: Option<GainNode>,
         exited: Arc<AtomicBool>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        Ok(Self {
             screen,
             filesystem,
             database_repository,
+            font: Font::try_from_static(include_bytes!("../../assets/neodgm.ttf"))?,
             audio_ctx,
             gain,
             exited,
-        }
+        })
     }
 }
 
 impl Platform for WebPlatform {
+    fn font(&self) -> &Font {
+        &self.font
+    }
+
     fn screen(&self) -> &dyn Screen {
         &self.screen
     }

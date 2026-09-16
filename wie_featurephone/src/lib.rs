@@ -112,14 +112,17 @@ impl WieEmulator {
         let redraw: RedrawFlag = Arc::new(AtomicBool::new(true));
         let exited: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 
-        let platform = Box::new(WebPlatform::new(
-            WebScreen::new(ctx, back_canvas, back_ctx, width, height, redraw.clone()),
-            WebFilesystem::new(fs_store.clone()),
-            WebDatabaseRepository::new(db_store.clone()),
-            audio_ctx,
-            gain,
-            exited.clone(),
-        ));
+        let platform = Box::new(
+            WebPlatform::new(
+                WebScreen::new(ctx, back_canvas, back_ctx, width, height, redraw.clone()),
+                WebFilesystem::new(fs_store.clone()),
+                WebDatabaseRepository::new(db_store.clone()),
+                audio_ctx,
+                gain,
+                exited.clone(),
+            )
+            .map_err(|e| JsValue::from_str(&format!("{e:?}")))?,
+        );
 
         let options = Options {
             enable_gdbserver: false,

@@ -1,0 +1,52 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-16",
+  "task": "wie-p3-slice-d-merge-upstream-main-as-base-fix",
+  "title": "조각 D — base swap 집행 + LGT graphics 배선 27줄 공용 복귀",
+  "summary": "총괄이 고른 ⒝(공용 구현 복귀)를 집행했다. git merge upstream/main 으로 미해결 67건을 전건 해소하고, wie-lgt 의 graphics SVC 27줄을 공용 구현으로 되돌렸다. DoD 리터럴 충족: merge-base = 44fbf265 (≠ fa641a8a). keydraw_lgt PASS rc=0 으로 결정 ⒝ 의 목적이 달성됐다. upstream 의 LGT 전용 graphics.rs 1,095줄은 트리에 «남기고» 배선만 끊었다(연기이지 취소가 아니다). cargo test --all 201 passed · 1 failed(KTF 키코드 축) 이 남았다.",
+  "changes": [
+    "git merge upstream/main — 미해결 67 전건 해소(① lgt 12 · ② 엔진 44 · ③ 스캐폴딩 11)",
+    "wie-lgt/src/runtime/wipi_c.rs 의 '=> graphics::' 27건을 공용 구현으로 치환",
+    "그 모듈 «선언»에 #[allow(dead_code)] + 사유(파일 자체는 upstream 과 바이트 동일)",
+    "hardening: upstream 이 흡수한 wie 사본 2건 제거 · invoke_virtual 4곳 +47 API 로",
+    "test_data/helloworld_{ktf,lgt}.zip 복원(머지 rename 으로 upstream 레이아웃에 옮겨졌다)",
+    "docs/report/0117--…md 신설 · docs/upstream-realign-p3-slices.md §D 갱신 · STATE.md 갱신 (★연번은 -fix2 회차가 0115→0117 로 재번호 — 착지한 0115 와 중복이었다)"
+  ],
+  "verification": [
+    "DoD: git merge-base HEAD upstream/main = 44fbf265 (≠ fa641a8a)",
+    "치환 실증: git diff --numstat upstream/main -- wie-lgt/src/runtime/wipi_c.rs = 35 27 (★[정정 -fix2] 종전 27 27 은 재지 않은 인용 · 재배선 자체는 27/27 이고 늘어난 8줄은 allow(dead_code)+사유 주석)",
+    "graphics.rs 무접촉: git diff upstream/main -- <그 파일> = 0줄",
+    "개악 대조: 27줄 되돌림 → keydraw_lgt FAIL paints 0 rc=1 / 정상 → PASS paints 51 content true rc=0 · 복원 후 sha 불변",
+    "4게이트: fmt OK · clippy 0 · beta clippy 0 · wasm clippy 0",
+    "cargo test --all: 384 passed · 0 failed (★[정정 -fix2] 종전 201/1 은 cargo 가 첫 실패 타깃에서 멈춘 부분 계수 · test_key_reach 는 제품 회귀가 아니라 이 회차가 쓴 시험의 탈출 조건 결함이었다)",
+    "5픽스처: draw_j2me/helloworld_ktf/helloworld_lgt/keydraw_ktf/keydraw_lgt 전건 PASS"
+  ],
+  "limits": [
+    "★[정정 2026-09-16 게이트² · -fix2] 이 한계는 «거짓»이었다 — test_key_reach 실패는 제품 동작 회귀가 아니라 이 회차가 새로 쓴 시험의 루프 탈출 조건 결함이다(접두사 key: 에서 break). 그 시험은 머지 양쪽 부모 모두에 대해 신규라 회귀할 이전이 없고, 교정 후 게스트 stdout = res:9:602\\nkey:53\\n 로 WIPI 코드 53 도달이 실측됐다. 후속 제안 #p0 은 그래서 철회됐다",
+    "upstream 의 LGT 전용 graphics.rs 1,095줄은 트리에 있으나 «아무 테스트도 밟지 않는다» — 썩어도 우리 게이트는 조용하다",
+    "재적용 24 중 wie-jvm-support/src/jvm_implementation.rs 의 define_class_java 오류 매핑은 살리지 못했다 — upstream 이 그 트레이트 슬롯 «자체»를 없앴다",
+    "292 코퍼스는 여전히 없다 — ⒜/⒝ 중 무엇이 실게임에 옳은지는 이 회차도 못 잰다"
+  ],
+  "proposals": [
+    {
+      "title": "KTF 키코드 매핑 회귀 1건을 규명한다 (test_key_reach)",
+      "plainSummary": "엔진을 갈아탄 뒤 키를 눌렀을 때 게임이 받는 번호가 달라졌다. 어디서 달라지는지 찾는다.",
+      "userBenefit": "KTF 게임에서 키 입력이 엉뚱하게 동작하는 것을 막는다. 지금은 테스트 하나가 그것을 붙잡고 있다.",
+      "why": "base swap 후 유일하게 남은 실패다. NUM5 가 WIPI 코드 53 으로 게스트에 닿지 않고 guest stdout 이 'key:' 에서 끊긴다. 경로 문제가 아니다(include_bytes! 픽스처). 그런데 keydraw_ktf 는 PASS(paints 55)라 키 자체는 닿는다 ⇒ 코드 매핑 축으로 좁혀져 있다.",
+      "tradeoff": "조사 회차라 제품 코드는 안 바뀔 수도 있다. 다만 이 1건이 남아 있으면 cargo test --all 이 red 라 게이트③이 막힌다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "upstream LGT graphics 1,095줄이 «아무 테스트도 밟지 않는» 상태를 기록으로 남긴다",
+      "plainSummary": "지금 쓰지 않기로 한 본가 코드가 트리에 남아 있다. 나중에 되살릴 때 썩어 있지 않도록 표시해 둔다.",
+      "userBenefit": "되살리는 회차가 '왜 안 도는지'를 처음부터 다시 파지 않는다.",
+      "why": "배선을 끊었으므로 dead_code 다. 코드가 있으나 우리 게이트가 한 줄도 실행하지 않는다 — 그 사실이 조용하다. 되돌리는 조건(292 코퍼스 · upstream SDK 의 framebuffer lgt 분기)이 오면 27줄 재배선이 전부이지만, 그때 그 코드가 여전히 맞는지는 아무도 지켜 주지 않았다.",
+      "tradeoff": "지금 할 수 있는 것은 «기록»뿐이다. 실제 검증은 코퍼스가 있어야 한다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": ["2026-09-16-p3-remaining-slices-plan#p3"],
+  "declinedProposals": []
+}

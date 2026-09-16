@@ -1,0 +1,94 @@
+# ── PARKED by wie-p3-slice-d-merge-upstream-main-as-base-fix2 (2026-09-16) ────
+# This is UPSTREAM's own Web CI, which arrived with the base swap. It cannot pass
+# here: it runs `npm run build:dev`, a script that exists in upstream's
+# package.json and NOT in ours (ours is the Cloudflare Pages service — measured:
+# our scripts are frontend/build:wasm/dev/db:*/deploy/audit/verify). It went red
+# on PR #161 the moment the merge conflict cleared and pull_request workflows
+# could run for the first time.
+#
+# The triggers are reduced to workflow_dispatch instead of deleting the file,
+# because "which upstream workflows do we adopt?" is a decision the P3 realign
+# plan never made, and this round is not the place to make it. Nothing is lost:
+# `git show upstream/main:.github/workflows/web.yaml` is the original, and
+# restoring the two triggers below is the whole revert.
+#
+# Our equivalent is web.yml (job `build-web`, Pages project `wie-web`).
+# See docs/upstream-realign-p3-slices.md §D.
+on:
+  workflow_dispatch:
+
+name: Web CI
+
+jobs:
+  web_ci:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust: [stable]
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: "recursive"
+
+      - name: Restore cache cargo
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.cargo
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo
+
+      - name: Restore cache cargo build
+        uses: actions/cache/restore@v6
+        with:
+          path: target
+          key: ${{ runner.os }}-${{ matrix.rust }}-build-wasm-target-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.rust }}-build-wasm-target-
+
+      - name: Restore cache .npm
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node-
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.rust }}
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: latest
+
+      - name: npm install
+        run: npm ci
+
+      - name: Build
+        run: npm run build:dev
+
+      - name: Save cache cargo
+        uses: actions/cache/save@v6
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: ~/.cargo
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Save cache cargo build
+        uses: actions/cache/save@v6
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: target
+          key: ${{ runner.os }}-${{ matrix.rust }}-build-wasm-target-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Save cache .npm
+        uses: actions/cache/save@v6
+        if: github.ref == 'refs/heads/main'
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}

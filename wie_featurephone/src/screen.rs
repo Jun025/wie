@@ -1,4 +1,5 @@
 use alloc::sync::Arc;
+use core::cell::Cell;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use wasm_bindgen::Clamped;
@@ -30,8 +31,11 @@ pub struct WebScreen {
     ctx: CanvasRenderingContext2d,
     back_canvas: HtmlCanvasElement,
     back_ctx: CanvasRenderingContext2d,
-    width: u32,
-    height: u32,
+    // Cells, not plain fields: `Screen::resize` takes `&self`, and the guest
+    // picks the display size (KTF reads it out of the ADF). Single-threaded
+    // browser, so no lock is needed.
+    width: Cell<u32>,
+    height: Cell<u32>,
     redraw: RedrawFlag,
 }
 
@@ -53,14 +57,30 @@ impl WebScreen {
             ctx,
             back_canvas,
             back_ctx,
-            width,
-            height,
+            width: Cell::new(width),
+            height: Cell::new(height),
             redraw,
         }
     }
 }
 
 impl Screen for WebScreen {
+    fn resize(&self, width: u32, height: u32) -> Result<()> {
+        // Both surfaces must move together: `paint` sizes its ImageData from the
+        // guest frame and then blits the back buffer, so a back canvas left at
+        // the old size would clip or drop the frame. CSS scaling of the visible
+        // canvas is unaffected (attribute size ≠ layout size).
+        if let Some(front) = self.ctx.canvas() {
+            front.set_width(width);
+            front.set_height(height);
+        }
+        self.back_canvas.set_width(width);
+        self.back_canvas.set_height(height);
+        self.width.set(width);
+        self.height.set(height);
+        self.request_redraw()
+    }
+
     fn request_redraw(&self) -> Result<()> {
         // Signal the host loop; it will deliver one Event::Redraw on the next tick.
         self.redraw.store(true, Ordering::Release);
@@ -99,11 +119,11 @@ impl Screen for WebScreen {
     }
 
     fn width(&self) -> u32 {
-        self.width
+        self.width.get()
     }
 
     fn height(&self) -> u32 {
-        self.height
+        self.height.get()
     }
 }
 

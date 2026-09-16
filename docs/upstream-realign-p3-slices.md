@@ -443,6 +443,133 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 
 ### D — `wie-p3-base-swap-merge`
 
+> ★★★**[게이트② 반려 처분 ② 2026-09-16 · `wie-p3-slice-d-merge-upstream-main-as-base-fix3` · 정본 `docs/report/0119--….md`]
+> 착지하면 `main` 이 빨개진다 — 안 쓰는 데스크톱 크레이트를 workspace 에서 뺐다.**
+>
+> ★**base swap 이 들여온 upstream Tauri 셸 `wie-app` 이 GTK/WebKit2GTK/libsoup3 의 «유일한» 뿌리**다
+> (`glib-sys ← atk-sys ← atk ← gtk ← muda ← tauri 2.11.5 ← wie-app` · workspace 안 소비자 **1**).
+> 우리 Linux CI 는 그것을 깔지 않는다(`rust.yml:96` = `libasound2-dev` 하나 · `coverage.yml:48` =
+> `libgtk-3-dev libasound2-dev` — ★gtk3 는 **libsoup2** 라 soup3 를 못 준다) ⇒ `rust_ci (ubuntu × 2)`·`coverage`
+> **3검사 fail**. ★**두 워크플로 다 이 PR 이 건드리지 않았다**(`git diff origin/main` **0줄**).
+> ★★**「구조적 red」가 아니라 «회귀 red»** — swap **전** `7dd70da5` 는 둘 다 **success** · `main` 최근 5회 **전건 success**.
+>
+> ⇒ ★**처방 ⒜ = `members` 제거 + `exclude` 선언**(검수자가 연 두 갈래 중). ★**⒝(ubuntu 에 GTK/WebKit/soup3 설치)를
+> 버린 이유**: ⑴★**채택 0**(우리 참조는 members 한 줄 · 나머지는 **이미 주차된** upstream `release.yaml` · 분석 문서 · 오탐 1)
+> ⑵★**그 크레이트를 빌드하는 «유일한» 파이프라인을 직전 회차가 이미 주차했다** ⇒ ⒝는 «주차한 앱을 빌드하려고 돈을 쓰는» 형태다
+> ⑶**5패키지 × 3레인**을 영구 부양하고 ★**다음 당김이 또 호스트를 들여오면 반복**된다(그 파일에 Android·iOS 잡이 이미 있다)
+> ⑷`AGENTS.md` **Constraint 7** 이 이미 그 관용이다.
+>
+> ★**판정식**(= `coverage.yml` 실제 invocation): `cargo tree --workspace --all-features -i <c> --target x86_64-unknown-linux-gnu`
+> → `glib-sys`·`soup3-sys`·`webkit2gtk-sys`·`gtk-sys`·`tauri` ★**전건 소멸** · 개악(되돌림) → **전건 PRESENT**.
+> ★`cargo test --all` **384 불변** ⇒ **커버리지를 줄여서 산 green 이 아니다.**
+> ★**잃는 것**: `wie-app` **단독 빌드 상실**(전 `cd wie-app && cargo check` **성공 2m33s** → 후
+> `error inheriting 'edition' from workspace root` — `*.workspace = true` 상속 링크가 끊긴다).
+> 살리려면 upstream 매니페스트를 리터럴로 고쳐야 하고 **당김마다 영구 충돌**이다. ★`Cargo.lock` **-2,281줄** ·
+> ★**되돌리기는 members 한 줄**이고 그때는 «의식적 채택»이라 오히려 옳은 시점이다.
+> ★**이 결정은 위 「upstream 워크플로 주차」와 «같은 축»이다** — 파이프라인·크레이트를 **함께** 주차한 상태가 됐고,
+> 채택 결정의 소유자는 여전히 제안 `#p3` 다.
+
+> ★★★**[게이트② 반려 처분 2026-09-16 · `wie-p3-slice-d-merge-upstream-main-as-base-fix2` · 정본 `docs/report/0118--….md`]
+> 「동작 회귀」는 «없었다» — 그리고 두 번째 호스트가 서 있지 않았다.**
+>
+> ★**제품 회귀 0.** 아래 집행 항의 「남은 1건 = 동작 회귀」는 ★**그 회차가 직접 쓴 시험의 탈출 조건 1줄**이었다
+> (`seen.contains("key:")` 가 접두사 write 에서 이미 참) — 교정 후 게스트 stdout **`"res:9:602\nkey:53\n"`**
+> ⇒ ★**코드 53 도달**. 그 시험은 머지 **양쪽 부모 모두에 대해 신규**라 회귀할 이전이 없다.
+> ★★**같은 결함이 형제 `test_resource_reach` 에 하나 더**(★구 base PASS ↔ 새 base FAIL) ⇒ 함께 교정.
+> ★`cargo test --all` = **384 passed · 0 failed**(종전 201·202 는 **첫 실패 타깃에서 멈춘 부분 계수**).
+>
+> ★★**F1 — `npm run build:wasm` rc=101 → rc=0.** `wie_featurephone` 의 4축을 **트레이트 무접촉**으로 맞췄다.
+> ★**선례는 `wie_cli` 가 아니라 members 에 공존하는 upstream 자기 `wie-web` 크레이트다**(같은 4축을 이미 구현).
+> 폰트 = `assets/neodgm.ttf` `include_bytes!` — ★**JS 생성자 인자를 더하지 않는다**(계약 export 표면 불변).
+> ★**어댑터는 «두 벌»로 둔다**(공통화하면 upstream 이 트레이트를 또 바꿀 때 한 번에 둘 다 깨진다).
+>
+> ★★**착지를 막던 둘**(티켓 밖 · ★이 회차 base swap 의 개명 잔재): `contract` 는 `main` 의 **required check** 인데
+> `check-engine-contract.mjs` 가 ENOENT 크래시했다 — 로케이터 2 + ★**계약 JSON 의 `file` 핀 2**(조각 E 는 「낡음 2」로
+> 셌으나 **셋**이다 · 세 번째는 스크립트가 아니라 JSON 안이라 문자열 grep 에 안 걸린다) ⇒ 해소 후
+> **107 pass · 0 violation** = ★**구 base 와 동수 ⇒ export 표면 미표류.** + 워크플로 `paths` 의 죽은 `fonts/**` → `assets/**`.
+>
+> ★**연번**: 티켓의 `0116` 은 그 시점 값이고 #162 가 그것을 claim ⇒ ★**도구가 준 `0117`** 로 재번호(이 처분 리포트는 `0118`).
+>
+> ★★★**[새로 찾았다 — 계획이 «묻지 않은» 축] base swap 이 upstream 워크플로 «둘»을 함께 들여왔고, 그 중 하나는 «나갈» 채비가 돼 있었다.**
+> ★**아무도 못 봤다** — #161 이 `CONFLICTING` 이던 동안 `pull_request` 워크플로가 **한 번도 안 돌아서**(조각 E 의 F3)
+> 게이트② 검수자도 이 red 를 볼 수 없었다. 충돌을 풀자 **첫 실행에서 28초 만에** 드러났다.
+>
+> | 파일 | 무엇 | 지금 판정 |
+> |---|---|---|
+> | `web.yaml`(upstream) | job `web_ci` 가 `npm run build:dev` 실행 — ★**우리 `package.json` 에 없는 스크립트**(upstream 것이다) | **red**(측정) |
+> | `release.yaml`(upstream) | ★**야간 cron `17 0 * * *`** + `pages deploy --project-name=wie`·`wie-dev`(★**우리 `CLOUDFLARE_API_TOKEN`·`ACCOUNT_ID` 로**) + `publish.sh` 로 **이 repo 에 GitHub 릴리스 발행** | ★**무해한 것이 아니라 «운으로» 멈춰 있다** |
+>
+> ★★**`release.yaml` 이 오늘 아무것도 배포하지 않은 이유는 가드가 아니라 «우연»이다** — `web` job 이
+> `npm run build:prod`(역시 부재)에서 죽고 나머지 전 job 이 그것을 `needs:` 한다. ★**그런데 나머지 기계는 전부 실재한다**
+> (`.github/scripts/release/*.sh` 3건 · `wie-app`(members 5행) · favicon) ⇒ ★**`package.json` 에 스크립트 한 줄이
+> 생기는 순간 사슬 전체가 무장된다.** 그리고 ★**우리 Pages 프로젝트는 `wie-web`** 이고 `wie`·`wie-dev` 는 **upstream 것**이며,
+> 릴리스는 `publish-artifact.yml` 이 **이미 소유**한다(otterpebble 이 `repository_dispatch` 로 소비) —
+> ★**한 repo 에 릴리스 발행자가 둘이면 그것은 소비자에게 보이는 사고다.**
+>
+> ⇒ ★**처분 = «주차»(park)이지 «채택»도 «삭제»도 아니다**: 두 파일의 트리거를 **`workflow_dispatch` 만으로** 줄였다
+> (cron 잔여 **0** · YAML 파싱 확인). ★**파일은 그대로 둔다** — 「upstream 워크플로 중 무엇을 채택하나」는
+> ★**이 계획이 «묻지 않은» 질문**이고 `-fix2` 회차가 정할 것이 아니다. ★**되돌리기는 트리거 두 줄**이고
+> 원본은 `git show upstream/main:.github/workflows/{web,release}.yaml` 다.
+> ★**이 축의 결정은 별 회차 몫이다**(제안 발행) — ⒜upstream 앱·Tauri 파이프라인을 우리가 **안 싣는다**면 삭제 ·
+> ⒝싣는다면 `package.json` 스크립트·Pages 프로젝트명·릴리스 소유권을 **먼저** 정해야 한다.
+> ★**한계**: `npm run frontend`·`contract-roundtrip.mjs` **미측정**(CI 몫) · 아티팩트 **+67.6%**(9,205,987 → 15,425,955B)는
+> base swap 의 산물이나 ★**소비자 다운로드 비용이라 기록한다**.
+
+> ★★★**[집행됐다 2026-09-16 · `wie-p3-slice-d-merge-upstream-main-as-base-fix` · 정본 `docs/report/0117--….md`]
+> 총괄이 ⒝(공용 구현 복귀)를 «명시로» 골랐고 이 회차가 base swap 과 함께 집행했다.**
+> ★**DoD 리터럴 충족**: `git merge-base HEAD upstream/main` = **`44fbf265`**(≠ `fa641a8a`).
+> 미해결 **67** 전건 해소(#159 착지로 74→67) · 배선 **27건** 치환 —
+> ★**`git diff --numstat upstream/main` = `35 27`**(종전 `27 27` 은 재지 않은 인용 · 늘어난 8줄은
+> `#[allow(dead_code)]`+7줄 사유 주석 · ★**재배선 자체는 27/27** 이고 역치환의 자기 numstat 이 그 수다).
+>
+> ★**대가 — 축소하지 않는다**: 제안의 benefit 「LGT 전용 그래픽 0→1,095줄」은 ★**«철회»가 아니라 «연기»**다 —
+> 그 1,095줄은 **트리에 있고**(`git diff upstream/main` **0줄** = 바이트 동일) ★**배선되지 않았다.**
+> ⇒ dead code 라 모듈 «선언»에 `#[allow(dead_code)]` 를 달았다(파일 무접촉).
+> ★★**그리고 그 경로는 이 회차 뒤로 «아무 테스트도 밟지 않는다» — 썩어도 우리 게이트는 조용하다.**
+>
+> ★**되돌리는 조건·비용(리터럴)**: ⑴**292 코퍼스(LGT 52건)** 또는 ⑵**upstream SDK 가 `framebuffer.rs` 에
+> LGT 분기를 넣으면** ⇒ ★**배선 27줄을 되돌려 재판정한다**(비용 = 그 27줄, 역방향).
+> ★**`keydraw_lgt` 가 지키는 것** = LGT clet 이 `MC_grpGetScreenFrameBuffer` 레코드에서 픽셀 포인터를
+> **직접 읽어** 그리는 경로 — ★**이 결정의 «유일한» 검증이다.**
+>
+> ★**개악 대조**: 27줄 되돌림 → **FAIL · paints 0 · rc=1** ↔ 정상 → **PASS · paints 51 · rc=0**(sha 불변).
+> ★★**[정정 2026-09-16 게이트② · `-fix2`] 「남은 1건 = 동작 회귀(후보 = WIPI 키코드 매핑)」는 «거짓»이다.**
+> 결함은 ★**이 회차가 새로 쓴 시험의 탈출 조건**이었다 — `seen.contains("key:")` 는 접두사만 담긴 write 에서
+> 이미 참이라 숫자가 오기 전에 break 한다. ⒜그 시험은 **양쪽 부모 모두에 대해 신규**라 회귀할 이전이 없고
+> ⒝교정 후 게스트 stdout 실측 **`"res:9:602\nkey:53\n"`** ⇒ ★**코드 53 도달**. `keydraw_ktf` PASS(paints 55)가
+> 이미 반증이었다(그 픽스처는 코드 폭만큼 막대를 그린다). ⇒ `cargo test --all` **384 passed · 0 failed**.
+
+
+> ★★★**[시도했고 «멈췄다» 2026-09-16 · `wie-p3-slice-d-merge-upstream-main-as-base` · 정본 `docs/report/0114--….md`]
+> 머지 «0». 막은 것은 «크기»가 아니라 «결정»이다 — 다음 회차는 여기서부터 읽어라.**
+>
+> ★**⑴ 중심 결정이 «양쪽 다 검증 불가»다**(조각 A 가 좁힌 graphics **27줄 배선**):
+> ⒜upstream LGT 전용 유지 ⇒ 제안의 **headline benefit**(LGT 전용 그래픽 0→1,095줄)을 얻지만
+> ★**`keydraw_lgt` FAIL**(조각 A 3/3) · ⒝공용 복귀 ⇒ `keydraw_lgt` PASS(2/2)이지만 ★**그 1,095줄을 버려
+> benefit 을 스스로 취소**한다. ★**어느 쪽도 코퍼스 없이 «옳다»를 증명할 수 없다.**
+>
+> ★★**이 회차가 «새로» 쟀다 — ⒜ 를 고르면 그 테스트를 «다시 만들 수도 없다»**:
+> 게스트 SDK(`dlunch/wipi`)에 `lgt` feature 와 `wipic-sys/src/lgt/graphics.rs` 가 **있는데**
+> ★**`wipi/src/framebuffer.rs` 의 `lgt` 분기는 «0건»** 이다(`ledger-grep -c -i lgt` → **0**) —
+> 고수준 `Framebuffer` 가 `width/height/bpl/bpp/buf` 를 **feature 무관하게** 공용 배치로 직접 읽는다.
+> ⇒ `--features lgt` 로 다시 빌드해도 `LgtFramebuffer` 와 **여전히 안 맞는다.**
+>
+> ★**부수로 조각 A 의 미판정 1건을 «닫았다»**: upstream `get_framebuffer_pointer` 가
+> `resolve_framebuffer(handle).framebuffer.0.buf.0` 를 **실제로 준다** ⇒ ★**upstream ABI 는 자기완결적**이다.
+> ★**그래도 결정은 안 풀린다** — 우리 SDK 게스트는 그 접근자를 **부르지 않는다**(레코드를 직접 읽는다).
+>
+> ★**⑵ 선행 둘이 done 인데 «미착지»다**(조각 A **#160** · 조각 C **#159**). 오늘 `main`(`28fb4364`) 기준
+> 미해결 **74** 인데 ★**그중 8건이 정확히 #159 가 지우는 `wie-wipi-java/…` 파일**이다 ⇒ 지금 머지하면
+> 조각 C 가 이미 «재서» 내린 결정을 손으로 다시 내리고 그 뒤 **같은 8파일에서 충돌**한다.
+> ★**이 항은 «정확성»이 아니라 «중복·충돌» 블로커다 — ⑴과 계급이 다르다.**
+>
+> ★**규모(참고 · 블로커 아님)**: `UU` 35파일에 **충돌 헝크 75** + `UD`+`AU`+`AA` **39파일** = **114 결정**.
+> ★티켓이 `size: L`·`risk: high`·180분으로 **알고 발권했다** ⇒ 크기를 사유로 쓰지 않았다.
+>
+> ★★**재개 조건 — 하나가 서면 돈다**: ⑴**292 코퍼스(LGT 52건)** — 가장 곧다 ⑵**운영자·총괄이 ⒜/⒝ 를 명시로 고른다**
+> (⒜면 `keydraw_lgt` 를 **기대 실패로 재분류**, ⒝면 benefit 한 줄을 **철회**해야 한다) ⑶**upstream SDK 가
+> `framebuffer.rs` 에 LGT 분기를 넣는다**. ★**순서는 셋 중 무엇이든 #159 착지 «뒤»다.**
+
 - **⒜ 범위**: ★**⑵ 그 자체.** `git merge upstream/main` 한 커밋 + 해소. ★**리터럴 작업 목록**:
   ⑴미해결 잔여 전건 해소 ⑵★**`wie_cli` 매니페스트·bin 타깃 화해**(`UD wie_cli/Cargo.toml` **1건** · §3-2 —
   ★**`wie_validate.rs` 자체는 머지가 손대지 않는다.** 위험은 «소스 소실»이 아니라 «러너 빌드 불가»다:
