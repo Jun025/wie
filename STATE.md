@@ -65,8 +65,10 @@
   — 조사 전용 · 제품 코드 **0줄** · 프로브는 격리 worktree 에서 돌고 **제거**.
   ★★**원인 = upstream 의 graphics SVC **27개** 배선(LGT 전용 `wie-lgt/…/wipi_c/graphics.rs` **1,095줄**)이
   게스트에게 «다른 레코드 ABI»를 준다** — `LgtFramebuffer` **16B**(`buf` 없음) ↔ 공용 `WIPICFramebuffer` **20B**(`buf` @+16).
-  게스트 SDK 가 +16 을 읽어 0 을 얻고 **스스로 패닉**(`wipi/src/framebuffer.rs : 149 : 18 : null reference produced`)
+  게스트 SDK 가 **스스로 패닉**(`wipi/src/framebuffer.rs : 149 : 18 : null reference produced`)
   → 주소 0 분기 → `Undefined instruction`. ★도입 커밋 **`9a88423b`(2026-08-23 · PR #1368)** = ⑸ 엔트리포인트와 **같은 PR**.
+  ★**[정정 2026-09-16 게이트②]** 그 패닉은 «핸들 역참조»(`:149`)이지 `fb.buf`(+16) 읽기가 **아니다**(+16 을 읽는
+  `:153` 은 raw 포인터를 돌려주므로 이 문구를 못 낸다) ⇒ ★**「+16 에서 0 을 얻는다」는 추론이고 측정되지 않았다.**
   ★**무는 것**: 27줄을 공용으로 치환 → **PASS · paints 55**(2/2) ↔ 원본 **FAIL · paints 0**(3/3) ↔ ours **PASS**(3/3).
   ★**배제 4종 전부 실행으로**(포인터 등록 · init 2줄 · 202 단일 치환 · 공용 구현 자체).
   ★**범위 = LGT 그리기 한정**(`keydraw_ktf`·`helloworld_lgt` upstream PASS). 정본 = `docs/report/0113--….md`.
@@ -1315,10 +1317,16 @@
     원인이 «이름»으로 나왔다 — 「LGT 가 왜인지 깨진다」가 «27줄 배선»으로 좁혀졌다.**
     ★**원인**: upstream 이 graphics SVC **27개**를 LGT 전용 구현(`wie-lgt/src/runtime/wipi_c/graphics.rs` · **1,095줄**)으로
     보내고 그 구현이 게스트에게 **다른 레코드 ABI** 를 준다 — `LgtFramebuffer` **16B**(★`buf` 필드 **없음**) ↔
-    공용 `WIPICFramebuffer` **20B**(픽셀 포인터 **+16**). 게스트 SDK(`dlunch/wipi`)가 `fb.buf`=+16 을 읽어
-    **끝 너머**에서 0 을 얻고 ★**스스로 패닉**한다(게스트 printk: `panicked at wipi/src/framebuffer.rs : 149 : 18 :
+    공용 `WIPICFramebuffer` **20B**(픽셀 포인터 **+16**). 게스트 SDK(`dlunch/wipi`)가 ★**스스로 패닉**한다
+    (게스트 printk: `panicked at wipi/src/framebuffer.rs : 149 : 18 :
     null reference produced`) → 주소 0 분기 → `Undefined instruction`(PC=0x0).
     ⇒ ★**`CletWrapperCard.paint` 스택은 «증상»이지 원인이 아니다.**
+    ★★**[정정 2026-09-16 게이트②] 그 패닉 자리는 «핸들 자신»의 역참조(`:149` `read_fb` · 파일 전체에서 `&*` 는
+    그 한 자리뿐)이고 `fb.buf`(+16) 읽기가 «아니다»** — +16 을 읽는 `:153` `buffer_ptr` 는 **raw 포인터를 돌려주므로**
+    이 문구를 낼 수 없다. ⇒ ★**「+16 을 읽어 끝 너머에서 0 을 얻는다」는 «추론»이고 측정되지 않았다** —
+    측정된 것은 ⒜레이아웃 상이 ⒝`149:18` 널 참조 패닉 ⒞27줄 치환으로 PASS, 셋뿐이고 D 의 결정은 그 셋으로 선다.
+    ★**「레코드만 20B 로 맞춘다」는 선택지가 아니다**(202 단일 치환 FAIL 불변 = 계열 전체 · 검수자가 진짜 20B
+    백킹을 줘도 같은 자리 FAIL — ※그 실험은 결정적이지 않아 **미지지**이지 반증이 아니다).
     ★**도입 커밋 = `9a88423b`(2026-08-23) `Fix LGT graphics and runtime compatibility (#1368)`** —
     ★**⑸ 엔트리포인트를 바꾼 그 PR 과 «같다».**
     ★**무는 것**: 그 27줄을 `wie_wipi_c::api::graphics::*` 로 치환하면 ★**PASS · paints 55**(2/2). 원본 FAIL · paints 0(3/3).
@@ -1328,8 +1336,14 @@
     ⒝공용 복귀(**upstream LGT 리버스 1,095줄을 버린다**) 중 어디로 둘 것인가.
     ★**코퍼스 없이 안전하게 못 정한다** — 단 축이 «좁혀졌다»: `docs/lgt_abi.md:930` 이 실제 clet 타이틀(놈ZERO)에서
     「`GetScreenFrameBuffer` 가 준 포인터에 **직접** 픽셀을 쓴다」를 관측했다(= 우리 픽스처와 **같은 모양**) ⇒
-    ★**위험이 «픽스처 편향»에 한정될 가능성은 낮아졌다.** ★**그래도 확정은 아니다**(upstream 이 `ptr_image`→`LgtImage`
-    한 겹 아래로 픽셀을 내줄 수 있다) ⇒ ★**코퍼스가 생기면 «LGT 52건»을 먼저 돌려라.**
+    ★**위험이 «픽스처 편향»에 한정될 가능성은 낮아졌다.** ★**그래도 확정은 아니다**(실제 clet 이 upstream 의
+    간접 체인을 걸을 수 있다) ⇒ ★**코퍼스가 생기면 «LGT 52건»을 먼저 돌려라.**
+    ★★**[정정 2026-09-16 게이트②] 그 «한 겹 아래»의 주소가 틀렸다** — 화면 FB 는 ★**`ptr_image: 0`**
+    (`graphics.rs:374-381`)이고, 오프스크린의 `ptr_image` 가 가리키는 것도 `WIPICFramebuffer`(`create_backing`)이지
+    `LgtImage`(8B · 이미지 디코드 전용)가 아니다. ★**실제 간접은 «두 겹»**: `핸들 → LgtFramebuffer.ptr_graphics →
+    LgtGraphicsView.ptr_backing → WIPICFramebuffer.buf → 픽셀`. ⇒ ★**코퍼스가 생기면 물을 질문은
+    「실제 clet 이 `GetScreenFrameBuffer` 반환값을 `WIPICFramebuffer` 로 «직접» 읽나, 아니면
+    `ptr_graphics → view.ptr_backing` 을 걷나」**이다(「게임이 `ptr_image` 를 보나」는 **틀린 질문**이다).
     ★**부수 1건(원인 아님)**: 공용 `FrameBuffer::new` 의 `bpl` 이 upstream 에서 `width*bpp` → `buffer_size()` 로 바뀌었다.
     KTF 가 그 판본으로 PASS 하므로 이번 원인은 아니고 ★**조각 B 의 분류 축**이다.
   - ★★**[P2 재측] 두 블로커는 «비대칭»이고 둘 다 verdict 가 적은 것보다 작다.**
