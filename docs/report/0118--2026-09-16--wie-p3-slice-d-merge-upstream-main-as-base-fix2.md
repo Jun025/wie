@@ -164,6 +164,32 @@ check-docs-report-serial(--selftest·bare) / check-worklog-json / check-worklog-
 ★★**그 개악의 자기 numstat 이 정확히 `27 27` 이다** ⇒ ★**직전 회차의 `27 27` 이 «어디서 왔는지»가 이것으로 설명된다** —
 `git diff upstream/main`(=`35 27`)을 잰 것이 아니라 **치환 자체의 diff** 를 옮긴 것이다.
 
+### ★★새로 찾았다 — base swap 이 upstream 워크플로 둘을 들여왔고, 하나는 «나갈» 채비였다
+
+★**CI 를 읽었더니 28초 만에 `web_ci (stable)` 가 red 였다** — `npm error Missing script: "build:dev"`.
+★**아무도 이것을 볼 수 없었다**: #161 이 `CONFLICTING` 이던 동안 `pull_request` 워크플로가 **한 번도 안 돌았다**
+(조각 E 의 F3 가 그 기전을 적었다) ⇒ 게이트② 검수자도, 직전 회차도 못 봤다. 충돌을 푼 **첫 실행**이 이것이다.
+
+| 파일 | 어디서 왔나 | 무엇 |
+|---|---|---|
+| `.github/workflows/web.yaml` | ★**upstream 만**(구 `main` 에 없다) | `npm run build:dev` — ★우리 `package.json` 에 **없는** 스크립트 |
+| `.github/workflows/release.yaml` | ★**upstream 만** | ★**야간 cron `17 0 * * *`** + `pages deploy --project-name=wie`·`wie-dev`(★**우리 토큰으로**) + 이 repo 에 **GitHub 릴리스 발행** |
+
+★★**`release.yaml` 이 오늘 아무것도 배포하지 않은 것은 «가드»가 아니라 «운»이다** — `web` job 이
+`npm run build:prod`(역시 부재)에서 죽고 나머지 전 job 이 그것을 `needs:` 한다. ★**나머지 기계는 전부 실재한다**
+(`.github/scripts/release/*.sh` **3건** · `wie-app`(`Cargo.toml` members 5행) · favicon) ⇒
+★**`package.json` 에 스크립트 한 줄이 생기면 사슬 전체가 무장된다.** 우리 Pages 프로젝트는 **`wie-web`** 이고
+`wie`·`wie-dev` 는 upstream 것이며, 릴리스는 **`publish-artifact.yml` 이 이미 소유**한다
+(otterpebble 이 `repository_dispatch` 로 소비) ⇒ ★**한 repo 에 릴리스 발행자가 둘**이 된다.
+
+⇒ ★**처분 = «주차»다 — 채택도 삭제도 «아니다».** 두 파일의 트리거를 **`workflow_dispatch` 만으로** 줄였다
+(cron 잔여 **0** · YAML 파싱 확인 · 파일 본문 무접촉). ★**왜 삭제하지 않았나**: 「upstream 워크플로 중 무엇을
+채택하나」는 ★**P3 계획이 «묻지 않은» 질문**이고, `-fix2` 회차가 제품 결정을 대신 내릴 자리가 아니다.
+★**되돌리기는 트리거 두 줄**(원본 = `git show upstream/main:.github/workflows/{web,release}.yaml`).
+★**왜 그냥 보고하고 두지 않았나**: 그러면 ★**착지와 동시에 야간 cron 이 우리 자격증명으로 무장된다** —
+경계 ⓐ-2(비가역·외부 노출 작업)와 이 티켓 자신의 F1 논거(「고치지 않고 착지하면 조용하다」)가 같은 방향을 가리킨다.
+★**결정은 후속 제안으로 발행**했다(`#p3`) — 그래야 «아무도 소유하지 않은 red» 로 남지 않는다.
+
 ### 한계 — 숨기지 않는다
 
 - ★**착지 순서**: 이 PR 이 **먼저**다(조각 E 의 F1 이 이 회차로 들어온다). ★#162 는 **구 base 기준 측정 회차**이고

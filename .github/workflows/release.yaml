@@ -1,12 +1,30 @@
+# ── PARKED by wie-p3-slice-d-merge-upstream-main-as-base-fix2 (2026-09-16) ────
+# UPSTREAM's release pipeline, which arrived with the base swap. Parked rather
+# than adopted, and the reason is NOT tidiness — read before restoring:
+#
+#   * it carried a NIGHTLY CRON (`17 0 * * *`), so on `main` it would have fired
+#     every day in THIS repo, unasked;
+#   * its `deploy_web` job runs `pages deploy` against the Cloudflare projects
+#     `wie` and `wie-dev` — upstream's names, not ours (ours is `wie-web`) —
+#     using OUR `secrets.CLOUDFLARE_API_TOKEN` / `vars.CLOUDFLARE_ACCOUNT_ID`;
+#   * its `publish` job cuts GitHub releases here, where publish-artifact.yml
+#     already owns releases and otterpebble consumes them by repository_dispatch.
+#     Two release publishers on one repo is a consumer-visible hazard.
+#
+# Today it stops early — the `web` job runs `npm run build:prod`, which our
+# package.json does not have, and every later job `needs:` it — so nothing has
+# deployed. That is luck, not a guard: all the rest of its machinery IS present
+# (.github/scripts/release/*.sh, wie-app, the favicon), so adding one
+# package.json script would arm the whole chain.
+#
+# Reduced to workflow_dispatch; the file is kept intact so the adoption decision
+# stays open (`git show upstream/main:.github/workflows/release.yaml` is the
+# original, and restoring the two triggers below is the whole revert).
+# See docs/upstream-realign-p3-slices.md §D.
 name: Release
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "17 0 * * *"
-  push:
-    tags:
-      - "v[0-9]*.[0-9]*.[0-9]*"
 
 permissions:
   contents: read

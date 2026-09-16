@@ -463,6 +463,29 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 > **107 pass · 0 violation** = ★**구 base 와 동수 ⇒ export 표면 미표류.** + 워크플로 `paths` 의 죽은 `fonts/**` → `assets/**`.
 >
 > ★**연번**: 티켓의 `0116` 은 그 시점 값이고 #162 가 그것을 claim ⇒ ★**도구가 준 `0117`** 로 재번호(이 처분 리포트는 `0118`).
+>
+> ★★★**[새로 찾았다 — 계획이 «묻지 않은» 축] base swap 이 upstream 워크플로 «둘»을 함께 들여왔고, 그 중 하나는 «나갈» 채비가 돼 있었다.**
+> ★**아무도 못 봤다** — #161 이 `CONFLICTING` 이던 동안 `pull_request` 워크플로가 **한 번도 안 돌아서**(조각 E 의 F3)
+> 게이트② 검수자도 이 red 를 볼 수 없었다. 충돌을 풀자 **첫 실행에서 28초 만에** 드러났다.
+>
+> | 파일 | 무엇 | 지금 판정 |
+> |---|---|---|
+> | `web.yaml`(upstream) | job `web_ci` 가 `npm run build:dev` 실행 — ★**우리 `package.json` 에 없는 스크립트**(upstream 것이다) | **red**(측정) |
+> | `release.yaml`(upstream) | ★**야간 cron `17 0 * * *`** + `pages deploy --project-name=wie`·`wie-dev`(★**우리 `CLOUDFLARE_API_TOKEN`·`ACCOUNT_ID` 로**) + `publish.sh` 로 **이 repo 에 GitHub 릴리스 발행** | ★**무해한 것이 아니라 «운으로» 멈춰 있다** |
+>
+> ★★**`release.yaml` 이 오늘 아무것도 배포하지 않은 이유는 가드가 아니라 «우연»이다** — `web` job 이
+> `npm run build:prod`(역시 부재)에서 죽고 나머지 전 job 이 그것을 `needs:` 한다. ★**그런데 나머지 기계는 전부 실재한다**
+> (`.github/scripts/release/*.sh` 3건 · `wie-app`(members 5행) · favicon) ⇒ ★**`package.json` 에 스크립트 한 줄이
+> 생기는 순간 사슬 전체가 무장된다.** 그리고 ★**우리 Pages 프로젝트는 `wie-web`** 이고 `wie`·`wie-dev` 는 **upstream 것**이며,
+> 릴리스는 `publish-artifact.yml` 이 **이미 소유**한다(otterpebble 이 `repository_dispatch` 로 소비) —
+> ★**한 repo 에 릴리스 발행자가 둘이면 그것은 소비자에게 보이는 사고다.**
+>
+> ⇒ ★**처분 = «주차»(park)이지 «채택»도 «삭제»도 아니다**: 두 파일의 트리거를 **`workflow_dispatch` 만으로** 줄였다
+> (cron 잔여 **0** · YAML 파싱 확인). ★**파일은 그대로 둔다** — 「upstream 워크플로 중 무엇을 채택하나」는
+> ★**이 계획이 «묻지 않은» 질문**이고 `-fix2` 회차가 정할 것이 아니다. ★**되돌리기는 트리거 두 줄**이고
+> 원본은 `git show upstream/main:.github/workflows/{web,release}.yaml` 다.
+> ★**이 축의 결정은 별 회차 몫이다**(제안 발행) — ⒜upstream 앱·Tauri 파이프라인을 우리가 **안 싣는다**면 삭제 ·
+> ⒝싣는다면 `package.json` 스크립트·Pages 프로젝트명·릴리스 소유권을 **먼저** 정해야 한다.
 > ★**한계**: `npm run frontend`·`contract-roundtrip.mjs` **미측정**(CI 몫) · 아티팩트 **+67.6%**(9,205,987 → 15,425,955B)는
 > base swap 의 산물이나 ★**소비자 다운로드 비용이라 기록한다**.
 

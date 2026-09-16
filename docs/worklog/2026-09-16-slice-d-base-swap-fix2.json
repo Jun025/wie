@@ -15,7 +15,8 @@
     "check-engine-contract.mjs 로케이터 2 + featurephone-engine-contract.json 의 file 핀 2 — 크레이트 개명 잔재로 ENOENT 크래시",
     "engine-contract.yml · publish-artifact.yml 의 죽은 fonts/** → assets/**(Constraint 4 동기)",
     "wie-jvm-support/src/hardening.rs — 주석 썩음 3건(검수 지적 2 + 모듈 헤더) · 코드 0줄",
-    "docs/report/0118--…md 신설 · STATE.md 완료 항 · §D 갱신 · git worktree prune"
+    "docs/report/0118--…md 신설 · STATE.md 완료 항 · §D 갱신 · git worktree prune",
+    ".github/workflows/{web,release}.yaml(upstream 만 있는 둘) 트리거를 workflow_dispatch 로 «주차» — release.yaml 의 야간 cron 이 우리 Cloudflare 토큰으로 pages deploy 하고 이 repo 에 릴리스를 발행할 채비였다. 채택/삭제 결정은 #p3 로 넘겼다"
   ],
   "verification": [
     "⑵ 양방향: 종전 술어 → FAILED(guest stdout \"res:9:602\\nkey:\") · 교정 → ok. 1 passed · 실물 프로브 \"res:9:602\\nkey:53\\n\"",
@@ -29,7 +30,8 @@
     "연번: --selftest rc=0 · bare rc=0 · docs/report 114건 중 중복 0 · git merge-tree 트리에서도 접두 중복 0",
     "4게이트: fmt rc=0 · clippy rc=0 · wasm clippy rc=0 · beta clippy rc=0",
     "5픽스처: draw_j2me PASS(1/content) · helloworld_ktf PASS(0) · helloworld_lgt PASS(0) · keydraw_ktf PASS(55/content/rc0) · keydraw_lgt PASS(53/content/rc0)",
-    "npm run audit rc=0 · check-worklog-json / check-worklog-coverage / check-doc-liveness-parity / check-parity-lock-wired 전건 rc=0"
+    "npm run audit rc=0 · check-worklog-json / check-worklog-coverage / check-doc-liveness-parity / check-parity-lock-wired 전건 rc=0",
+    "주차 검증: cron 잔여 0 · YAML 파싱으로 트리거 = [workflow_dispatch] 확인 · 파일 본문 무접촉 · release.yaml 의 나머지 기계 실재 확인(.github/scripts/release/*.sh 3건 · wie-app = Cargo.toml members 5행 · favicon) ⇒ 「build:prod 부재로 멈춘다」는 가드가 아니라 운임을 수로 보였다"
   ],
   "limits": [
     "npm run frontend(tsc -b · vite build)은 돌리지 않았다 — TS 소비 코드는 무접촉이지만 미측정이다",
@@ -38,7 +40,8 @@
     "MIDI·AudioCommand::Stop·repeat 은 버린다 — 이 호스트가 그 API 이전에도 하지 않던 것들이라 회귀는 아니지만 구현도 아니다(ponytail: 주석으로 천장 명시)",
     "조각 E 의 F4 를 «절반만» 닫았다 — 개명 잔재(로케이터 3곳)는 required check 가 red 면 게이트③이 머지할 수 없어 여기서 닫았고, 「ENOENT 스택 트레이스가 아니라 위반 1줄로 실패하라」는 오류 처리 설계는 그쪽 소관으로 남겼다",
     "조각 E 의 F2(wasm clippy 가 브라우저 호스트를 안 본다)·F3(CI 가 웹 축을 안 잰다)·F5(고아 시험)는 손대지 않았다 — 그 회차 소관",
-    "292 코퍼스는 여전히 없다 — 결정 ⒜/⒝ 중 무엇이 실게임에 옳은지는 이 회차도 못 잰다"
+    "292 코퍼스는 여전히 없다 — 결정 ⒜/⒝ 중 무엇이 실게임에 옳은지는 이 회차도 못 잰다",
+    "upstream 워크플로 둘을 «주차»했을 뿐 채택 여부는 정하지 않았다 — 계획이 묻지 않은 질문이고 이 회차가 대신 정할 자리가 아니다. 그대로 두면 착지와 동시에 야간 cron 이 무장되므로 주차까지는 했다"
   ],
   "proposals": [
     {
@@ -67,8 +70,19 @@
       "tradeoff": "Playwright chromium fetch 가 필요해 로컬 회차 비용이 붙는다. CI 는 이미 engine-contract 의 engine 필터 안에서 그것을 돌리므로 «이 PR 이 착지하면 자동으로 답이 나온다» — 그래서 별 회차가 아니라 이 PR 의 CI 를 읽는 것으로 족할 수 있다. 어느 쪽인지가 이 제안의 판단 대상이다.",
       "effort": "S",
       "target": "wie"
+    },
+    {
+      "title": "upstream 워크플로(web.yaml·release.yaml)를 채택할지 정한다 — 지금은 «주차»만 돼 있다",
+      "plainSummary": "upstream 의 자동화 두 개가 이번 병합으로 우리 저장소에 들어왔습니다. 하나는 우리에게 없는 명령을 불러 실패하고, 다른 하나는 매일 밤 우리 계정으로 배포하고 배포판을 발행할 채비였습니다. 일단 «손으로만 실행»되게 세워 뒀고, 실제로 쓸지 버릴지는 아직 정하지 않았습니다.",
+      "userBenefit": "매일 밤 우리 Cloudflare 계정으로 예기치 않은 배포가 나가거나, 한 저장소에서 두 곳이 배포판을 발행해 소비자(otterpebble 셸)가 엉뚱한 파일을 받는 일을 막는다.",
+      "why": "release.yaml 은 cron 17 0 * * * + pages deploy --project-name=wie/wie-dev(우리 secrets.CLOUDFLARE_API_TOKEN) + publish.sh 로 이 repo 에 릴리스를 발행한다. 우리 Pages 프로젝트는 wie-web 이고 릴리스는 publish-artifact.yml 이 이미 소유한다. 오늘 멈춰 있는 이유는 package.json 에 build:prod 가 없는 «운»뿐이고 나머지 기계는 전부 실재한다. web.yaml 은 build:dev 부재로 이미 red 다.",
+      "tradeoff": "⒜삭제하면 upstream 의 앱·Tauri·nightly 파이프라인을 우리가 영구히 안 싣는다는 결정이 되고, 다음 upstream 동기마다 그 삭제를 다시 해야 한다(조각 B 가 분류한 «폐기» 계급과 같은 성질). ⒝채택하면 package.json 스크립트·Pages 프로젝트명·릴리스 소유권을 먼저 정해야 하고, wie-app 의 Tauri 빌드를 우리가 유지하게 된다. 지금의 «주차»는 어느 쪽도 아니어서 안전하지만, 죽은 설정이 트리에 남는 비용이 있다.",
+      "effort": "S",
+      "target": "wie"
     }
   ],
   "adoptedProposals": [],
-  "declinedProposals": ["2026-09-16-slice-d-base-swap-executed#p0"]
+  "declinedProposals": [
+    "2026-09-16-slice-d-base-swap-executed#p0"
+  ]
 }

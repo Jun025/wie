@@ -82,6 +82,15 @@
   ★**연번은 `0116` 이 아니라 `0117`** 이다(#162 가 그 사이 0116 claim) — ★**도구에 물어 얻은 값**이다.
   ★**게이트**: fmt·clippy·wasm·beta **rc=0** · `cargo test --all` ★**384 passed · 0 failed** · 5픽스처 전건 PASS ·
   `build:wasm` rc=0 · 계약 rc=0. ★**개악 대조 3종 전부 양방향**(시험 술어 · `Screen::resize` 제거 · LGT 27줄 역치환).
+  ★★★**CI 를 읽어서 새로 찾았다 — base swap 이 upstream 워크플로 «둘»을 들여왔다**(`web.yaml`·`release.yaml` ·
+  둘 다 구 `main` 에 없다). ★`web_ci` 는 우리에게 없는 `npm run build:dev` 를 불러 **red**(28초) ·
+  ★★**`release.yaml` 은 야간 cron `17 0 * * *` + `pages deploy --project-name=wie`·`wie-dev`(★**우리
+  `CLOUDFLARE_API_TOKEN` 으로**) + 이 repo 에 **릴리스 발행**(★`publish-artifact.yml` 이 이미 소유 —
+  발행자가 둘이 된다). ★**오늘 배포가 안 된 것은 가드가 아니라 «운»이다**(`build:prod` 부재로 선행 job 이 죽는다)
+  — ★**나머지 기계는 전부 실재**하므로 스크립트 한 줄이면 무장된다.
+  ⇒ ★**처분 = «주차»**(트리거를 `workflow_dispatch` 만으로 · cron 잔여 0 · 본문 무접촉) — ★**채택도 삭제도 아니다.**
+  「upstream 워크플로 중 무엇을 채택하나」는 ★**계획이 묻지 않은 질문**이라 후속 제안으로 넘겼다.
+  ★**아무도 못 봤던 이유**: #161 이 `CONFLICTING` 인 동안 `pull_request` 워크플로가 **한 번도 안 돌았다**(조각 E F3).
   ★**한계**: `npm run frontend`·`contract-roundtrip.mjs` **미측정**(CI 몫) ·
   아티팩트 **9,205,987B → 15,425,955B(+67.6%)** = base swap 의 산물이나 **소비자 비용이라 기록한다**.
 - 2026-09-16: **조각 D — base swap 집행 + LGT graphics 배선 27줄 공용 복귀**
