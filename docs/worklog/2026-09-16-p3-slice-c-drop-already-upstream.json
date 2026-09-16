@@ -1,0 +1,62 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-16",
+  "task": "wie-p3-slice-c-drop-hunks-already-upstream",
+  "title": "조각 C — 폐기 21행 중 7행 삭제 · 14행은 «왜 못 지우는지»를 수로 보였다",
+  "summary": "조각 B(PR #158)의 폐기 21행을 행마다 '오늘 우리 base 에서 지울 수 있는가'로 다시 쟀다. 7행(wie_wipi_java/src/classes/java/**)은 삭제 전에도 도달 불가였음을 InstantiationError 실측으로 보이고 지웠다(머지 예행 74→67). 5행은 되돌리면 컴파일 오류 10건·beta clippy red·draw_j2me FAIL 로 구조적으로 막힌다. 9행은 컴파일되지만 되돌려도 test 179/0·5픽스처가 전부 불변이라 검증이 공허해 운영자 판정으로 보류했다.",
+  "changes": [
+    "wie_wipi_java/src/classes/java/** 7파일 삭제 + classes.rs 배선 1줄 + get_protos() 46→42",
+    "wie_wipi_java/tests/preload_classes_come_from_the_runtime.rs 신설 — 삭제가 기대는 전제를 잠근다",
+    "docs/upstream-realign-p3-slice-c-deletability.md 신설 — 21행의 그룹 A/B/C 측정 기록",
+    "docs/upstream-realign-p3-slices.md §6-C 에 완료 포인터",
+    "docs/report/0113--2026-09-16--…md 신설",
+    "STATE.md ## 완료 항목 추가 + ## 다음 의 조각 C 줄 갱신"
+  ],
+  "verification": [
+    "baseline cargo test --all → 178 passed · 0 failed · 42 suites (origin/main c77998ad)",
+    "삭제 «전» 원본 트리 프로브: get_protos() 전적재 상태에서 new java/lang/VirtualMachineError() → InstantiationError (우리 사본은 비-ABSTRACT · java_runtime@5b84dd1 만 ABSTRACT ⇒ 런타임 정의가 이겼다는 직접 증거)",
+    "묶음1 후 4게이트: fmt OK · clippy rc=0 · beta clippy rc=0 · wasm clippy rc=0 · cargo test --all 179 passed · 0 failed · 43 suites (기존 통과 수 불변 · +1 = 잠금 시험)",
+    "5픽스처 전건: draw_j2me.jar PASS paints=1 content=true · helloworld_ktf PASS 0 · helloworld_lgt PASS 0 · keydraw_ktf PASS 55 rc=0 · keydraw_lgt PASS 55 rc=0",
+    "그룹 B 되돌림 실측: #18/#19/#20 → cargo check 오류 10건(E0046 identity·shallow_clone / E0407 destroy ×3 / E0277 ×4 / E0061 attach_thread) · #17 → beta clippy red(double_must_use) · #21 → draw_j2me.jar FAIL(image.rs:117 panic)",
+    "그룹 C 되돌림 실측: cargo check 오류 0 · cargo test --all 179/0 불변 · 5픽스처 전건 PASS 불변 ⇒ Java 가시 메서드 18개 + ImageObserver 등록이 무탐지로 사라진다",
+    "Rust 호출자 전수 17심볼: 14개가 0 · get_record_size/get_volume/set_buffer 가 1 ⇒ 제안의 완화책이 proto 메서드에는 구조적으로 공허하다",
+    "머지 예행(격리 워크트리 · 전건 --abort + worktree remove): 원본 74 → 묶음1 후 67 → (가정)그룹C 까지 59"
+  ],
+  "limits": [
+    "그룹 C 의 18개 메서드를 실제로 부르는 타이틀 수는 못 잰다 — Rust 호출자 계수가 이 축을 정의상 못 본다. 있으면 잴 수 있는 것 = 292 코퍼스(계획 §4-2)",
+    "그룹 A 삭제가 원 커밋 5603a7f9 의 '5 KTF 타이틀'에 무해한가도 코퍼스 없이 직접 못 잰다 — 대체 증거는 InstantiationError 실측뿐",
+    "67·59 는 머지 «예행» 수이지 조각 D 의 착지 수가 아니다",
+    "docs/upstream-realign-p3-slice-b-triage.md 는 이 브랜치에 없다(PR #158 미머지) — 이 PR 은 origin/main 에서 갈라졌고 B 의 표를 복사하지 않고 가리킨다"
+  ],
+  "proposals": [
+    {
+      "title": "조각 D 의 작업 목록에 '폐기 그룹 B 5행은 upstream 쪽을 고른다'를 리터럴로 넣는다",
+      "plainSummary": "갈아타기 회차가 다섯 개 파일에서 어느 쪽을 고를지 미리 정해 둔다. 잘못 고르면 빌드가 깨진다.",
+      "userBenefit": "갈아타기 회차가 같은 자리에서 다시 재지 않는다. 이 회차가 이미 되돌려 보고 무엇이 깨지는지 확인했다.",
+      "why": "#17~#21 은 우리 핀(+33)의 트레이트가 요구하는 코드라 우리 base 에서 지울 수 없고, upstream 도 같은 이유로 갖고 있다. 되돌림 실측: 컴파일 오류 10건 · beta clippy red · draw_j2me FAIL. 조각 D 가 '우리 쪽'을 고르면 upstream 의 개명 크레이트 경로와 어긋나고, '충돌 해소'로만 처리하면 어느 쪽인지 기록이 안 남는다.",
+      "tradeoff": "upstream 쪽을 고르는 것이 항상 옳다고 단정할 수는 없다 — #21 은 우리 쪽에 draw_j2me 가 덮는 동작이 있고, 그것이 upstream 판본에도 있는지는 조각 D 의 트리에서 다시 재야 한다. 그래서 '고른다'가 아니라 '고르고 나서 5픽스처를 돌린다'로 적어야 한다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "그룹 C 9행의 처분을 조각 D «안»으로 옮기고, 조각 C 의 남은 몫은 닫는다",
+      "plainSummary": "남겨 둔 아홉 개 파일은 갈아타는 순간 저절로 정리되므로, 따로 지우는 회차를 다시 만들지 않는다.",
+      "userBenefit": "없는 일을 위해 회차를 하나 더 쓰지 않는다. 그리고 18개 WIPI 메서드가 갈아타기 전까지 살아 있다.",
+      "why": "그룹 C 가 사는 것은 충돌 8건(67→59)이고 그 8건은 전부 UD/UU 라 조각 D 가 upstream 쪽을 고르면 해소된다 — upstream 판본이 그 18개 메서드를 전부 갖는다(조각 B 가 열어서 확인). 선행 삭제의 유일한 이득은 충돌 표시 8줄이고, 대가는 탐지되지 않는 기능 제거다.",
+      "tradeoff": "조각 D 의 머지가 67건을 그대로 받는다 — 59 보다 크다. 그러나 67 이든 59 든 사람이 한 번에 읽을 크기가 아니므로 이 8건이 검수 가능성을 가르지 않는다. 그리고 D 가 무산되면(조각 A 의 no-go 신호) 지운 쪽이 영구 손실이 된다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "292 코퍼스 human-step 카드를 발권한다 — 이 회차가 그 부재의 대가를 처음 «수로» 만났다",
+      "plainSummary": "회귀 검사용 게임 묶음이 이 컴퓨터에 없어서, 지워도 되는지 아닌지를 판단할 수 없는 자리가 생겼다.",
+      "userBenefit": "'지워도 되나'를 추측이 아니라 측정으로 답할 수 있게 된다. 지금은 그 질문에서 회차가 멈춘다.",
+      "why": "그룹 C 9행이 보류된 직접 원인이 코퍼스 부재다. Rust 호출자 계수는 proto 메서드의 호출자를 정의상 못 보고(17심볼 중 14개가 0), 5픽스처와 cargo test 는 18개 메서드 제거를 전혀 감지하지 못했다(179/0 불변). 계획 §4-2 가 이미 '구조가 아니라 코퍼스가 여기 없을 뿐'임을 보였고 .gitignore:23 이 /game_lab/ 를 무시한다.",
+      "tradeoff": "게임 바이트를 이 머신에 두는 일이라 운영자 판단이 필요하다(Constraint 9 는 저장소·빌드출력·로그 반입만 금지하므로 git-ignored 디렉터리는 위반이 아니다). 불가하면 그룹 C 는 조각 D 안에서 처리되고 이 축은 영구 미측정으로 남는다.",
+      "effort": "S",
+      "target": "orchestrator"
+    }
+  ],
+  "adoptedProposals": ["2026-09-16-p3-remaining-slices-plan#p2"],
+  "declinedProposals": []
+}
