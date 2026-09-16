@@ -443,10 +443,35 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 
 ### D — `wie-p3-base-swap-merge`
 
-> ★★★**[집행됐다 2026-09-16 · `wie-p3-slice-d-merge-upstream-main-as-base-fix` · 정본 `docs/report/0115--….md`]
+> ★★★**[게이트② 반려 처분 2026-09-16 · `wie-p3-slice-d-merge-upstream-main-as-base-fix2` · 정본 `docs/report/0118--….md`]
+> 「동작 회귀」는 «없었다» — 그리고 두 번째 호스트가 서 있지 않았다.**
+>
+> ★**제품 회귀 0.** 아래 집행 항의 「남은 1건 = 동작 회귀」는 ★**그 회차가 직접 쓴 시험의 탈출 조건 1줄**이었다
+> (`seen.contains("key:")` 가 접두사 write 에서 이미 참) — 교정 후 게스트 stdout **`"res:9:602\nkey:53\n"`**
+> ⇒ ★**코드 53 도달**. 그 시험은 머지 **양쪽 부모 모두에 대해 신규**라 회귀할 이전이 없다.
+> ★★**같은 결함이 형제 `test_resource_reach` 에 하나 더**(★구 base PASS ↔ 새 base FAIL) ⇒ 함께 교정.
+> ★`cargo test --all` = **384 passed · 0 failed**(종전 201·202 는 **첫 실패 타깃에서 멈춘 부분 계수**).
+>
+> ★★**F1 — `npm run build:wasm` rc=101 → rc=0.** `wie_featurephone` 의 4축을 **트레이트 무접촉**으로 맞췄다.
+> ★**선례는 `wie_cli` 가 아니라 members 에 공존하는 upstream 자기 `wie-web` 크레이트다**(같은 4축을 이미 구현).
+> 폰트 = `assets/neodgm.ttf` `include_bytes!` — ★**JS 생성자 인자를 더하지 않는다**(계약 export 표면 불변).
+> ★**어댑터는 «두 벌»로 둔다**(공통화하면 upstream 이 트레이트를 또 바꿀 때 한 번에 둘 다 깨진다).
+>
+> ★★**착지를 막던 둘**(티켓 밖 · ★이 회차 base swap 의 개명 잔재): `contract` 는 `main` 의 **required check** 인데
+> `check-engine-contract.mjs` 가 ENOENT 크래시했다 — 로케이터 2 + ★**계약 JSON 의 `file` 핀 2**(조각 E 는 「낡음 2」로
+> 셌으나 **셋**이다 · 세 번째는 스크립트가 아니라 JSON 안이라 문자열 grep 에 안 걸린다) ⇒ 해소 후
+> **107 pass · 0 violation** = ★**구 base 와 동수 ⇒ export 표면 미표류.** + 워크플로 `paths` 의 죽은 `fonts/**` → `assets/**`.
+>
+> ★**연번**: 티켓의 `0116` 은 그 시점 값이고 #162 가 그것을 claim ⇒ ★**도구가 준 `0117`** 로 재번호(이 처분 리포트는 `0118`).
+> ★**한계**: `npm run frontend`·`contract-roundtrip.mjs` **미측정**(CI 몫) · 아티팩트 **+67.6%**(9,205,987 → 15,425,955B)는
+> base swap 의 산물이나 ★**소비자 다운로드 비용이라 기록한다**.
+
+> ★★★**[집행됐다 2026-09-16 · `wie-p3-slice-d-merge-upstream-main-as-base-fix` · 정본 `docs/report/0117--….md`]
 > 총괄이 ⒝(공용 구현 복귀)를 «명시로» 골랐고 이 회차가 base swap 과 함께 집행했다.**
 > ★**DoD 리터럴 충족**: `git merge-base HEAD upstream/main` = **`44fbf265`**(≠ `fa641a8a`).
-> 미해결 **67** 전건 해소(#159 착지로 74→67) · 배선 **27건** 치환(`git diff --numstat upstream/main` = **`27 27`**).
+> 미해결 **67** 전건 해소(#159 착지로 74→67) · 배선 **27건** 치환 —
+> ★**`git diff --numstat upstream/main` = `35 27`**(종전 `27 27` 은 재지 않은 인용 · 늘어난 8줄은
+> `#[allow(dead_code)]`+7줄 사유 주석 · ★**재배선 자체는 27/27** 이고 역치환의 자기 numstat 이 그 수다).
 >
 > ★**대가 — 축소하지 않는다**: 제안의 benefit 「LGT 전용 그래픽 0→1,095줄」은 ★**«철회»가 아니라 «연기»**다 —
 > 그 1,095줄은 **트리에 있고**(`git diff upstream/main` **0줄** = 바이트 동일) ★**배선되지 않았다.**
@@ -459,8 +484,11 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 > **직접 읽어** 그리는 경로 — ★**이 결정의 «유일한» 검증이다.**
 >
 > ★**개악 대조**: 27줄 되돌림 → **FAIL · paints 0 · rc=1** ↔ 정상 → **PASS · paints 51 · rc=0**(sha 불변).
-> ★**남은 1건**: `wie-ktf` `test_key_reach` — 경로가 아니라 **동작 회귀**(후보 = WIPI 키코드 매핑).
-> `keydraw_ktf` 는 PASS 라 키 자체는 닿는다.
+> ★★**[정정 2026-09-16 게이트② · `-fix2`] 「남은 1건 = 동작 회귀(후보 = WIPI 키코드 매핑)」는 «거짓»이다.**
+> 결함은 ★**이 회차가 새로 쓴 시험의 탈출 조건**이었다 — `seen.contains("key:")` 는 접두사만 담긴 write 에서
+> 이미 참이라 숫자가 오기 전에 break 한다. ⒜그 시험은 **양쪽 부모 모두에 대해 신규**라 회귀할 이전이 없고
+> ⒝교정 후 게스트 stdout 실측 **`"res:9:602\nkey:53\n"`** ⇒ ★**코드 53 도달**. `keydraw_ktf` PASS(paints 55)가
+> 이미 반증이었다(그 픽스처는 코드 폭만큼 막대를 그린다). ⇒ `cargo test --all` **384 passed · 0 failed**.
 
 
 > ★★★**[시도했고 «멈췄다» 2026-09-16 · `wie-p3-slice-d-merge-upstream-main-as-base` · 정본 `docs/report/0114--….md`]

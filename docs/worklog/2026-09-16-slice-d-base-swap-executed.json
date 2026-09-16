@@ -10,19 +10,19 @@
     "그 모듈 «선언»에 #[allow(dead_code)] + 사유(파일 자체는 upstream 과 바이트 동일)",
     "hardening: upstream 이 흡수한 wie 사본 2건 제거 · invoke_virtual 4곳 +47 API 로",
     "test_data/helloworld_{ktf,lgt}.zip 복원(머지 rename 으로 upstream 레이아웃에 옮겨졌다)",
-    "docs/report/0115--…md 신설 · docs/upstream-realign-p3-slices.md §D 갱신 · STATE.md 갱신"
+    "docs/report/0117--…md 신설 · docs/upstream-realign-p3-slices.md §D 갱신 · STATE.md 갱신 (★연번은 -fix2 회차가 0115→0117 로 재번호 — 착지한 0115 와 중복이었다)"
   ],
   "verification": [
     "DoD: git merge-base HEAD upstream/main = 44fbf265 (≠ fa641a8a)",
-    "치환 실증: git diff --numstat upstream/main -- wie-lgt/src/runtime/wipi_c.rs = 27 27",
+    "치환 실증: git diff --numstat upstream/main -- wie-lgt/src/runtime/wipi_c.rs = 35 27 (★[정정 -fix2] 종전 27 27 은 재지 않은 인용 · 재배선 자체는 27/27 이고 늘어난 8줄은 allow(dead_code)+사유 주석)",
     "graphics.rs 무접촉: git diff upstream/main -- <그 파일> = 0줄",
     "개악 대조: 27줄 되돌림 → keydraw_lgt FAIL paints 0 rc=1 / 정상 → PASS paints 51 content true rc=0 · 복원 후 sha 불변",
     "4게이트: fmt OK · clippy 0 · beta clippy 0 · wasm clippy 0",
-    "cargo test --all: 201 passed · 1 failed(wie-ktf test_key_reach)",
+    "cargo test --all: 384 passed · 0 failed (★[정정 -fix2] 종전 201/1 은 cargo 가 첫 실패 타깃에서 멈춘 부분 계수 · test_key_reach 는 제품 회귀가 아니라 이 회차가 쓴 시험의 탈출 조건 결함이었다)",
     "5픽스처: draw_j2me/helloworld_ktf/helloworld_lgt/keydraw_ktf/keydraw_lgt 전건 PASS"
   ],
   "limits": [
-    "wie-ktf test_key_reach 1건이 실패로 남았다 — 경로가 아니라 실제 동작 회귀이고, keydraw_ktf 는 PASS 라 키가 닿기는 한다 ⇒ 후보는 WIPI 키코드 매핑. 이 회차가 규명하지 못했다",
+    "★[정정 2026-09-16 게이트² · -fix2] 이 한계는 «거짓»이었다 — test_key_reach 실패는 제품 동작 회귀가 아니라 이 회차가 새로 쓴 시험의 루프 탈출 조건 결함이다(접두사 key: 에서 break). 그 시험은 머지 양쪽 부모 모두에 대해 신규라 회귀할 이전이 없고, 교정 후 게스트 stdout = res:9:602\\nkey:53\\n 로 WIPI 코드 53 도달이 실측됐다. 후속 제안 #p0 은 그래서 철회됐다",
     "upstream 의 LGT 전용 graphics.rs 1,095줄은 트리에 있으나 «아무 테스트도 밟지 않는다» — 썩어도 우리 게이트는 조용하다",
     "재적용 24 중 wie-jvm-support/src/jvm_implementation.rs 의 define_class_java 오류 매핑은 살리지 못했다 — upstream 이 그 트레이트 슬롯 «자체»를 없앴다",
     "292 코퍼스는 여전히 없다 — ⒜/⒝ 중 무엇이 실게임에 옳은지는 이 회차도 못 잰다"

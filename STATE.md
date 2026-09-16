@@ -60,20 +60,52 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-16: **조각 D 게이트② 반려 처분 — 「동작 회귀」는 «없었다» + 두 번째 호스트를 세웠다**
+  (`wie-p3-slice-d-merge-upstream-main-as-base-fix2`) — 정본 `docs/report/0118--….md`.
+  ★★**제품 회귀 0.** 직전 회차가 영구 기록 **4곳**에 박은 「실제 동작 회귀(후보 = WIPI 키코드 매핑)」는
+  ★**그 회차가 «직접 쓴» 시험의 루프 탈출 조건 1줄**이었다 — `seen.contains("key:")` 가 접두사만 담긴 stdout
+  write 에서 이미 참이라 숫자가 오기 전에 break 한다. 교정 후 게스트 stdout 실측 **`"res:9:602\nkey:53\n"`**
+  ⇒ ★**NUM5 는 WIPI 코드 53 으로 도달한다.** 그 시험은 머지 **양쪽 부모 모두에 대해 신규**라 «회귀할 이전»이 없다.
+  ★★**같은 결함이 형제 시험(`test_resource_reach`)에 하나 더 있었고 base 를 당기자 드러났다** —
+  ★**구 base PASS ↔ 새 base FAIL**(격리 워크트리 대조) ⇒ 술어가 언제나 경쟁 상태였고 upstream 이 write 를
+  쪼개 노출했다. 같은 1줄 교정을 함께 했다.
+  ★★**F1 — 브라우저 호스트가 통째로 서 있지 않았다**: `npm run build:wasm` **rc=101(12오류·4파일) → rc=0**.
+  4축(`Platform::font`·`Screen::resize`·`AudioSink::send`·`DatabaseRepository`)을 ★**트레이트 무접촉**으로 맞췄다 —
+  선례는 `wie_cli` 가 아니라 ★**members 에 공존하는 upstream 자기 `wie-web` 크레이트**였다.
+  폰트는 `assets/neodgm.ttf` **`include_bytes!`**(★JS 생성자 인자를 더하지 않는다 = 계약 export 표면 불변).
+  ★**어댑터는 «두 벌»로 둔다** — 두 호스트의 정답이 실제로 다르고, 묶으면 upstream 이 트레이트를 또 바꿀 때
+  한 번에 둘 다 깨진다(upstream 자신은 세 벌이다).
+  ★★**착지를 막던 둘도 닫았다**(티켓 밖이나 ★**이 회차 base swap 의 개명 잔재**다): `contract` 는 `main` 의
+  **required check** 인데 `check-engine-contract.mjs` 가 **ENOENT 크래시**했다(로케이터 2 + ★**계약 JSON 의
+  `file` 핀 2** — 조각 E 는 「낡음 2」로 셌으나 **셋**이다) ⇒ 해소 후 **107 pass · 0 violation** =
+  ★**구 base 와 동수 ⇒ export 표면 미표류.** 그리고 워크플로 `paths` 의 **죽은 `fonts/**`** → `assets/**` 동기.
+  ★**연번은 `0116` 이 아니라 `0117`** 이다(#162 가 그 사이 0116 claim) — ★**도구에 물어 얻은 값**이다.
+  ★**게이트**: fmt·clippy·wasm·beta **rc=0** · `cargo test --all` ★**384 passed · 0 failed** · 5픽스처 전건 PASS ·
+  `build:wasm` rc=0 · 계약 rc=0. ★**개악 대조 3종 전부 양방향**(시험 술어 · `Screen::resize` 제거 · LGT 27줄 역치환).
+  ★**한계**: `npm run frontend`·`contract-roundtrip.mjs` **미측정**(CI 몫) ·
+  아티팩트 **9,205,987B → 15,425,955B(+67.6%)** = base swap 의 산물이나 **소비자 비용이라 기록한다**.
 - 2026-09-16: **조각 D — base swap 집행 + LGT graphics 배선 27줄 공용 복귀**
   (`wie-p3-slice-d-merge-upstream-main-as-base-fix` · 채택 `2026-09-16-p3-remaining-slices-plan#p3`)
   ★★**DoD 리터럴 충족 — `git merge-base HEAD upstream/main` = `44fbf265`(≠ `fa641a8a`).**
   총괄이 ⒝(공용 복귀)를 명시로 골랐고 같은 회차에서 집행했다. 미해결 **67** 전건 해소(#159 착지로 74→67) ·
-  배선 **27건** 치환(`git diff --numstat upstream/main` = **`27 27`**).
+  배선 **27건** 치환 — ★**`git diff --numstat upstream/main` = `35 27`**(★종전 기재 `27 27` 은 «재지 않은
+  인용»이었다. 늘어난 8줄은 `#[allow(dead_code)]` + 7줄 사유 주석이고, ★**재배선 자체는 27/27** 이다 —
+  역치환의 자기 numstat 이 정확히 `27 27` 이라 그 수가 여기 잘못 옮겨졌다).
   ★**대가는 «연기»이지 «취소»가 아니다** — upstream LGT 전용 `graphics.rs` **1,095줄**은 **트리에 남았고**
   (`git diff upstream/main` **0줄** = 바이트 동일) **배선만 끊었다**. dead code 라 모듈 «선언»에 `#[allow(dead_code)]`.
   ★★**그 경로는 이제 «아무 테스트도 밟지 않는다» — 썩어도 게이트가 조용하다.**
   ★**되돌림 조건·비용**: ⑴292 코퍼스(LGT 52건) 또는 ⑵upstream SDK 의 `framebuffer.rs` LGT 분기 ⇒ **27줄 역치환**.
   ★**개악 대조**: 되돌리면 `keydraw_lgt` **FAIL·paints 0·rc=1** ↔ 정상 **PASS·paints 51·rc=0**(sha 불변).
-  ★**게이트**: fmt·clippy·beta·wasm **0** · `cargo test --all` **201 passed · ★1 failed**.
-  5픽스처 **전건 PASS**(`keydraw_lgt` rc=0 ← 결정 ⒝ 의 목적).
-  ★★**남은 1건 = `wie-ktf` `test_key_reach`** — 경로가 아니라 **동작 회귀**(`keydraw_ktf` 는 PASS 라 키는 닿는다
-  ⇒ 후보 = **WIPI 키코드 매핑**). ★**이 회차가 규명하지 못했다.** 정본 = `docs/report/0115--….md`.
+  ★**게이트**: fmt·clippy·beta·wasm **0** · 5픽스처 **전건 PASS**(`keydraw_lgt` rc=0 ← 결정 ⒝ 의 목적).
+  ★★**[정정 2026-09-16 게이트② · `-fix2`] 「남은 1건 = 동작 회귀(후보 = WIPI 키코드 매핑)」는 «거짓»이었다.**
+  실패한 것은 제품이 아니라 ★**이 회차가 «새로 쓴» 시험의 루프 탈출 조건**이다 — `seen.contains("key:")` 가
+  접두사만 담긴 stdout write 에서 **이미 참**이라 게스트가 숫자를 쓰기 «전»에 break 하고 잘린 버퍼로 assert 했다.
+  ★**두 겹으로 틀렸다**: ⒜그 시험은 머지 **양쪽 부모 모두에 대해 신규 추가**라 «회귀할 이전»이 없다
+  ⒝동작은 정상이다 — 탈출 조건 1줄 교정 후 게스트 stdout 실측 **`"res:9:602\nkey:53\n"`** ⇒ ★**NUM5 는 WIPI
+  코드 53 으로 도달한다.** ★**반증은 이미 손에 있었다** — `keydraw_ktf` PASS(paints 55)이고 그 픽스처는
+  «코드 폭만큼 막대를 그린다». ⇒ `cargo test --all` **384 passed · 0 failed**(★종전 「201/202」는
+  `cargo test` 가 **첫 실패 타깃에서 멈춘** 부분 계수였다 — `^test result` 행 14 ↔ 45).
+  정본 = `docs/report/0117--….md`(★연번 `0115` 중복이라 재번호 — 아래 `-fix2` 항).
 - 2026-09-16: **조각 A — upstream base 에서 `keydraw_lgt` 가 깨지는 «원인 규명»**
   (`wie-p3-slice-a-keydraw-lgt-breaks-on-upstream-base` · 채택 `2026-09-16-p3-remaining-slices-plan#p0`)
   — 조사 전용 · 제품 코드 **0줄** · 프로브는 격리 worktree 에서 돌고 **제거**.

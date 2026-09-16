@@ -10,7 +10,7 @@
 | # | 내용 | 무는 것 |
 |---|---|---|
 | ⑴ | `git merge upstream/main`(리베이스 0) · 미해결 **67** 전건 해소 | `#159` 착지로 74 → **67**(그 8건이 그 PR 이 지운 파일) |
-| ⑵ | `wie-lgt/src/runtime/wipi_c.rs` 의 `=> graphics::` **27건** → `=> wie_wipi_c::api::graphics::` | ★`git diff --numstat upstream/main` = **`27 27`**(삽입 27·삭제 27 = «치환»의 서명) |
+| ⑵ | `wie-lgt/src/runtime/wipi_c.rs` 의 `=> graphics::` **27건** → `=> wie_wipi_c::api::graphics::` | ★`git diff --numstat upstream/main` = **`35 27`**(★**[정정 `-fix2`] 종전 `27 27` 은 재지 않은 인용** — 늘어난 8줄은 아래 `#[allow(dead_code)]`+7줄 사유 주석이고 **재배선 자체는 27/27** 이다. 역치환의 자기 numstat 이 정확히 `27 27` 이라 그 수가 여기 옮겨졌다) |
 | ⑶ | upstream 의 LGT 전용 `graphics.rs`(**1,095줄**)를 **지우지 않았다** | `git diff upstream/main -- <그 파일>` = ★**0줄**(바이트 동일) |
 
 ★**⑶ 의 부작용을 숨기지 않는다**: 배선을 끊었으므로 그 1,095줄은 **dead code** 가 되어 `-D warnings` 가 **46건**으로 울었다.
@@ -58,15 +58,25 @@
 ### 게이트 · 남은 것
 
 `fmt` **OK** · `clippy` **0** · ★`beta clippy` **0** · `wasm clippy` **0**.
-`cargo test --all` = ★**201 passed · 1 failed**.
+`cargo test --all` = ★**384 passed · 0 failed**(★**[정정 `-fix2`]** 종전 「201 passed · 1 failed」는
+`cargo test` 가 **첫 실패 타깃에서 멈춘** 부분 계수였다 — `^test result` 행 **14 ↔ 45** · `--no-fail-fast` 로 재측해 동일).
 5픽스처: `draw_j2me` PASS · `helloworld_ktf` PASS · `helloworld_lgt` PASS · `keydraw_ktf` PASS(55) ·
 ★**`keydraw_lgt` PASS(51) rc=0** ← **결정 ⒝ 의 목적이 달성됐다**.
 
-★★**남은 1건 — `wie-ktf` `test_key_reach::key_press_reaches_the_ktf_guest`**:
-`NUM5 did not reach the KTF guest as WIPI code 53 — guest stdout was "res:9:602\nkey:"`.
-★**경로 문제가 아니다**(그 시험은 `include_bytes!` 로 픽스처를 품는다) — **실제 동작 회귀**다.
-★**그런데 `keydraw_ktf` 는 PASS(paints 55)** 다 ⇒ 키가 게스트에 **닿기는 한다**.
-⇒ ★**좁혀진 후보는 «WIPI 키코드 매핑»** 이고, 그 규명은 이 회차가 하지 못했다(§아래).
+★★★**[정정 2026-09-16 게이트② · `-fix2`] 이 절의 원문은 «거짓»이었다 — 지우지 않고 판정만 덮는다.**
+원문: 「남은 1건 … ★**경로 문제가 아니다** — **실제 동작 회귀**다 … 좁혀진 후보는 «WIPI 키코드 매핑»」.
+★**제품은 멀쩡했다.** 실패한 것은 ★**이 회차가 «직접 쓴» 84줄짜리 시험**이고, 결함은 그 루프의 탈출 조건
+**1줄**이다 — `seen.contains("key:")` 는 ★**접두사만 담긴 stdout write 에서 이미 참**이라 게스트가 숫자를
+쓰기 «전»에 break 하고, 그 잘린 버퍼(`"res:9:602\nkey:"`)로 assert 한다.
+★**«동작 회귀»는 두 겹으로 틀렸다**: ⒜그 시험 파일은 머지 **양쪽 부모 모두에 대해 신규 추가**라
+(`git log --all -- <그 파일>` = 이 회차 커밋 «한 줄») ★**회귀할 «이전»이 존재하지 않는다**
+⒝동작은 정상이다 — 교정판에서 게스트 stdout 을 직접 찍으면 **`"res:9:602\nkey:53\n"`** ⇒
+★**NUM5 는 WIPI 코드 53 으로 도달해 있다.**
+★★**반증을 이 회차가 이미 손에 쥐고 있었다** — 바로 위에 적은 `keydraw_ktf` **PASS(paints 55)** 이고,
+★그 픽스처는 «코드 폭만큼 막대를 그린다» ⇒ 코드가 안 닿으면 그 막대가 없다.
+⇒ 교정(`seen.split("key:").nth(1).is_some_and(|t| t.contains('\n'))`) 후 **ok. 1 passed**.
+★후속 제안 `#p0`(「키코드 매핑 회귀를 규명한다」 effort M)은 ★**없는 버그를 쫓는 회차**이므로
+`-fix2` 회차가 **철회**했다(`docs/worklog/2026-09-16-slice-d-base-swap-fix2.json` `declinedProposals`).
 
 ### 사용자 영향
 

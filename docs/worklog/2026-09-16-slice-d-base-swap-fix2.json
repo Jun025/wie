@@ -1,0 +1,74 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-16",
+  "task": "wie-p3-slice-d-merge-upstream-main-as-base-fix2",
+  "title": "조각 D 게이트② 반려 처분 — 「동작 회귀」는 없었고, 두 번째 호스트가 안 서 있었다",
+  "summary": "게이트② request-changes 4건 + 형제 조각 E 의 F1 을 한 회차에 닫았다. 제품 회귀는 없었다 — 직전 회차가 영구 기록 4곳에 「실제 동작 회귀(후보 = WIPI 키코드 매핑)」로 박은 것은 그 회차가 직접 쓴 시험의 루프 탈출 조건 1줄이었고, 교정 후 게스트 stdout 실측으로 WIPI 코드 53 도달이 확인됐다. 그리고 base swap 이후 브라우저 호스트(wie_featurephone)가 통째로 빌드가 깨져 있었다(rc=101 → rc=0).",
+  "changes": [
+    "origin/main 병합 — STATE.md 1파일 충돌을 합집합으로(양방향 잔여 0)",
+    "wie-ktf/tests/test_key_reach.rs — 탈출 조건 1줄 교정(seen.contains(\"key:\") 는 접두사 write 에서 이미 참)",
+    "wie-ktf/tests/test_resource_reach.rs — 같은 결함이 형제 시험에 하나 더. 구 base PASS · 새 base FAIL 이라 base 당기기로 드러났다",
+    "「동작 회귀」 서술 4곳 정정(STATE.md · §D · docs/report/0117 · slice-d worklog limits)",
+    "27 27 → 35 27 4곳 정정(티켓은 3곳이라 했다) — 재배선 자체는 27/27 임을 함께 적었다",
+    "연번 0115 → 0117 재번호 + 포인터 3곳(--next-serial 이 0117 을 줬다 — #162 가 0116 을 claim)",
+    "F1 어댑터 이식 — wie_featurephone 의 Platform::font · Screen::resize · AudioSink::send · DatabaseRepository(&System 제거+usage)",
+    "check-engine-contract.mjs 로케이터 2 + featurephone-engine-contract.json 의 file 핀 2 — 크레이트 개명 잔재로 ENOENT 크래시",
+    "engine-contract.yml · publish-artifact.yml 의 죽은 fonts/** → assets/**(Constraint 4 동기)",
+    "wie-jvm-support/src/hardening.rs — 주석 썩음 3건(검수 지적 2 + 모듈 헤더) · 코드 0줄",
+    "docs/report/0118--…md 신설 · STATE.md 완료 항 · §D 갱신 · git worktree prune"
+  ],
+  "verification": [
+    "⑵ 양방향: 종전 술어 → FAILED(guest stdout \"res:9:602\\nkey:\") · 교정 → ok. 1 passed · 실물 프로브 \"res:9:602\\nkey:53\\n\"",
+    "⑵ 귀속: git log --all -- test_key_reach.rs = 이 리니지 커밋 한 줄 ⇒ 머지 양쪽 부모 모두에 대해 신규 = 회귀할 이전이 없다",
+    "형제 시험 귀속: 격리 워크트리로 origin/main 대조 — 구 base ok 1 passed ↔ 새 base FAILED(\"res:\") ⇒ 술어가 언제나 경쟁 상태였고 upstream 이 write 를 쪼개 노출했다",
+    "cargo test --all: 384 passed · 0 failed rc=0 (★종전 201·202 는 cargo 가 첫 실패 타깃에서 멈춘 부분 계수 — ^test result 행 14 ↔ 45 · --no-fail-fast 재측 동일)",
+    "⑹ 판정식: npm run build:wasm rc=101(12오류·4파일) → rc=0 · 아티팩트 4파일 산출",
+    "⑹ 양방향: Screen::resize 제거 → rc=101(E0046 missing: resize) · 복원 → rc=0",
+    "⒠ 개악 대조(제품 호출부 wie-lgt/src/runtime/wipi_c.rs 27줄 역치환): FAIL paints 0 content false rc=1 ↔ 정상 PASS paints 55 content true rc=0 · 복원 후 git status 빈 값 · HEAD 불변 · 신 술어 27",
+    "계약: node scripts/check-engine-contract.mjs rc=0 · 107 pass · 0 violation = 구 base 에서 조각 E 가 잰 수와 동수 ⇒ export 표면 미표류(Constraint 3)",
+    "연번: --selftest rc=0 · bare rc=0 · docs/report 114건 중 중복 0 · git merge-tree 트리에서도 접두 중복 0",
+    "4게이트: fmt rc=0 · clippy rc=0 · wasm clippy rc=0 · beta clippy rc=0",
+    "5픽스처: draw_j2me PASS(1/content) · helloworld_ktf PASS(0) · helloworld_lgt PASS(0) · keydraw_ktf PASS(55/content/rc0) · keydraw_lgt PASS(53/content/rc0)",
+    "npm run audit rc=0 · check-worklog-json / check-worklog-coverage / check-doc-liveness-parity / check-parity-lock-wired 전건 rc=0"
+  ],
+  "limits": [
+    "npm run frontend(tsc -b · vite build)은 돌리지 않았다 — TS 소비 코드는 무접촉이지만 미측정이다",
+    "contract-roundtrip.mjs(Playwright)도 돌리지 않았다(툴체인 fetch) ⇒ Screen::resize·Platform::font 의 실화면 검증은 CI 몫이고 이 회차 기준 미측정",
+    "아티팩트가 커졌다 — wie_web_bg.wasm 9,205,987B(구 base · 조각 E 실측) → 15,425,955B(+67.6%). base swap 이 만든 것이고(내 delta 상한은 폰트 665,904B) 소비자 다운로드 비용이라 기록한다. 판정은 이 회차 범위 밖",
+    "MIDI·AudioCommand::Stop·repeat 은 버린다 — 이 호스트가 그 API 이전에도 하지 않던 것들이라 회귀는 아니지만 구현도 아니다(ponytail: 주석으로 천장 명시)",
+    "조각 E 의 F4 를 «절반만» 닫았다 — 개명 잔재(로케이터 3곳)는 required check 가 red 면 게이트③이 머지할 수 없어 여기서 닫았고, 「ENOENT 스택 트레이스가 아니라 위반 1줄로 실패하라」는 오류 처리 설계는 그쪽 소관으로 남겼다",
+    "조각 E 의 F2(wasm clippy 가 브라우저 호스트를 안 본다)·F3(CI 가 웹 축을 안 잰다)·F5(고아 시험)는 손대지 않았다 — 그 회차 소관",
+    "292 코퍼스는 여전히 없다 — 결정 ⒜/⒝ 중 무엇이 실게임에 옳은지는 이 회차도 못 잰다"
+  ],
+  "proposals": [
+    {
+      "title": "stdout 을 폴링하는 게스트 시험의 «완성된 줄» 술어를 한 곳으로 모은다",
+      "plainSummary": "게임 화면 대신 게임이 인쇄한 글자로 검사하는 시험이 두 개 있는데, 둘 다 글자가 다 도착하기 전에 검사를 시작해서 멀쩡한 기능을 «고장»으로 신고한 적이 있습니다. 기다리는 방법을 한 군데로 모아 세 번째 시험이 같은 실수를 되풀이하지 않게 합니다.",
+      "userBenefit": "없는 버그를 쫓는 회차가 생기지 않는다 — 이번에 실제로 effort M 짜리 제안 하나와 영구 기록 4곳이 그렇게 만들어졌다.",
+      "why": "wie-ktf/tests 의 두 시험이 같은 결함을 독립으로 가졌고(test_key_reach 는 새 base 에서, test_resource_reach 는 구 base 에서 각각 잠복), 한쪽은 게이트② critical 반려를 냈다. 술어는 1줄이지만 «틀리는 방식»이 조용하다 — 통과할 때도 값이 잘려 있을 수 있다.",
+      "tradeoff": "n=2 에 공용 헬퍼를 두는 것은 과설계일 수 있어 이번 회차는 인라인 + 주석으로 남겼다. 세 번째가 생기면 tests/common/ 이 정당해진다. 반대로 지금 만들면 통합 시험 바이너리 사이 모듈 공유(#[path] 또는 tests/common/mod.rs)라는 새 구조가 생긴다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "아티팩트 크기 예산을 계약에 핀한다 (+67.6% 가 조용히 지나갔다)",
+      "plainSummary": "브라우저에서 게임을 켤 때 받아야 하는 파일이 9MB 에서 15MB 로 커졌는데, 아무 검사도 그것을 알려주지 않았습니다. 상한을 계약에 적어 두면 다음에 갑자기 커질 때 PR 에서 바로 보입니다.",
+      "userBenefit": "모바일 회선에서 첫 로딩이 조용히 두 배가 되는 일을 막는다 — 소비자(otterpebble 피처폰 셸)가 그대로 받는 비용이다.",
+      "why": "featurephone-engine-contract.json 은 export 표면·키 표·저장 매직까지 핀하는데 «바이트»는 핀하지 않는다. base swap 한 번에 +6.2MB(+67.6%)가 움직였고 107개 계약 검사 전건이 green 이었다.",
+      "tradeoff": "상한을 너무 좁게 잡으면 정당한 엔진 성장마다 red 가 나서 계약을 고치는 회차가 늘고, 넓게 잡으면 아무것도 못 잡는다. 그리고 wasm-opt 판본에 따라 수가 흔들리므로 절대 바이트보다 «전 커밋 대비 증가율» 축이 나을 수 있다 — 그 선택 자체가 이 제안의 내용이다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "브라우저 호스트를 실제로 한 번 띄우는 축을 이 회차 «뒤»에 붙인다",
+      "plainSummary": "브라우저용 파일이 «만들어지는지»는 확인했지만 «켜지는지»는 이 회차가 확인하지 못했습니다. 화면 크기 조절과 글꼴처럼 이번에 새로 붙인 부분은 실제로 띄워 봐야 확인됩니다.",
+      "userBenefit": "이번에 이식한 Screen::resize·Platform::font 가 실화면에서 맞는지가 처음으로 검증된다.",
+      "why": "이 회차는 npm run build:wasm(rc=0)까지만 쟀고 contract-roundtrip.mjs·npm run frontend 는 돌리지 않았다. 조각 E 의 한계 「F1 의 12 는 첫 크레이트에서 멈춘 수」는 빌드 축에서는 해소됐지만 «부팅 축»에서는 여전히 미판정이다.",
+      "tradeoff": "Playwright chromium fetch 가 필요해 로컬 회차 비용이 붙는다. CI 는 이미 engine-contract 의 engine 필터 안에서 그것을 돌리므로 «이 PR 이 착지하면 자동으로 답이 나온다» — 그래서 별 회차가 아니라 이 PR 의 CI 를 읽는 것으로 족할 수 있다. 어느 쪽인지가 이 제안의 판단 대상이다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": ["2026-09-16-slice-d-base-swap-executed#p0"]
+}
