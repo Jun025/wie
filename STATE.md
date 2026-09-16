@@ -60,6 +60,21 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-16: **조각 E — 새 base 에서 «웹 계약·아티팩트»를 확인했다**
+  (`wie-p3-slice-e-verify-web-contract-on-new-base` · 채택 `2026-09-16-p3-remaining-slices-plan#p4`)
+  — 조사 전용 · 제품 코드 **0줄** · ★**고치지 않았다**(티켓 Contract 3) · 프로브는 격리 worktree 에서 돌고 **제거**.
+  ★**피검체 = `f533ba54`**(조각 D 의 PR #161 head · ★**미착지**) · **대조군 = `origin/main d70b93f8`**.
+  ★★**결론: 산출물 «이름» 계약은 온전하고, 대신 웹 표면이 통째로 서 있지 않다.**
+  ★**F1** `wie_featurephone` 이 **컴파일되지 않는다**(`build:wasm` **rc=101 · 12오류 · 4파일** — `Platform::font` ·
+  `Screen::resize` · `AudioSink` · `DatabaseRepository`) ⇒ 아티팩트 부재 · 계약검사·브라우저 왕복 **불가** ·
+  `npm run frontend` rc=101. ★**조각 A 가 `wie_cli` 에서 잰 그 어댑터 축이고, D 가 `wie_cli` 만 맞췄다.**
+  ★**대조군은 전건 green**(build rc=0 · 계약검사 **107 pass/0 violation** · 왕복 **A~F**) ⇒ 툴체인 아님.
+  ★★**F2(이 회차의 실제 산출)** 그 상태에서 **wasm 게이트가 rc=0 «green»** 이다 — `--all` 이 없어
+  `default-members` 를 고르고(새 base `["."]` · 구 base `["wie_cli"]`) ★**두 base 어느 쪽도 그 크레이트를 린트하지 않는다.**
+  ★**F3** `f533ba54` 에서 발화한 run 은 `coverage · push` **1건뿐**(`CONFLICTING` ⇒ `pull_request` **0건**)
+  ⇒ ★**웹 축은 CI 가 «한 번도 재지 않았다»**(그것을 볼 수 있는 `web.yml Build frontend` 는 PR 에서도 도는 축인데 run 자체가 없다).
+  ★**F4** `check-engine-contract.mjs` 가 옛 경로 2줄로 **ENOENT 크래시** · **F5** 고아 `wie_midp/`(추적 1파일).
+  정본 = `docs/report/0116--….md`.
 - 2026-09-16: **조각 A — upstream base 에서 `keydraw_lgt` 가 깨지는 «원인 규명»**
   (`wie-p3-slice-a-keydraw-lgt-breaks-on-upstream-base` · 채택 `2026-09-16-p3-remaining-slices-plan#p0`)
   — 조사 전용 · 제품 코드 **0줄** · 프로브는 격리 worktree 에서 돌고 **제거**.
