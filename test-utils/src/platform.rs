@@ -39,6 +39,35 @@ pub enum TestPlatformEvent {
     Exit,
 }
 
+/// Has a COMPLETE `<prefix><value>\n` line arrived in a guest's accumulated stdout?
+///
+/// This is the loop-exit predicate for a test that ticks an emulator until the
+/// guest prints something, and it lives here — beside the [`TestPlatformEvent::Stdout`]
+/// buffer it reads — because **two tests wrote it independently and both wrote it
+/// wrong**, in a way that reads as an engine regression rather than as a test bug.
+///
+/// The naive `seen.contains("key:")` is already true while the buffer holds only
+/// `"res:9:602\nkey:"`: a guest emits the prefix and the digits in **separate
+/// writes**, so breaking on the prefix asserts on a truncated line and reports a
+/// value still in flight as a broken host API. Measured cost: `test_key_reach`
+/// failed that way on the 2026-09-16 upstream base and the round recorded "real
+/// behaviour regression (candidate = WIPI keycode mapping)" in four permanent
+/// places before the one-line exit condition was found. `test_resource_reach`
+/// carried the identical defect silently — it passed on the pre-swap base only
+/// because that write happened to land in one piece, so the predicate was always
+/// the race and pulling the base merely exposed it.
+///
+/// Waiting for the terminating newline is what makes it deterministic. A guest
+/// that prints an error outcome on the same line (`res:err`) is caught too, so a
+/// caller can still tell "the call failed" from "the call never happened".
+///
+/// It is a predicate and not a wait-loop on purpose: the tick budget, what to do
+/// on exhaustion, and the assertion text are per-test, and only this one line was
+/// ever duplicated.
+pub fn guest_line_complete(seen: &str, prefix: &str) -> bool {
+    seen.split(prefix).nth(1).is_some_and(|tail| tail.contains('\n'))
+}
+
 pub struct TestPlatform {
     screen: TestScreen,
     event_handler: Option<Box<dyn Fn(TestPlatformEvent) + Sync + Send>>,

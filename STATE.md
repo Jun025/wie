@@ -60,6 +60,26 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-16: **«완성된 줄» 술어를 한 곳으로 모았다 — 제안이 미룬 근거가 실측으로 없었다**
+  (`wie-adopt-slice-d-base-swap-fix2-p0`) — 정본 `docs/report/0123--….md`.
+  채택 제안 `2026-09-16-slice-d-base-swap-fix2#p0` 집행. **제품 코드 0줄**(시험 지원 크레이트 + 통합 시험 2개 ·
+  4파일 **+41/−17**). `test_utils::guest_line_complete(seen, prefix)` 신설 → `test_key_reach`·`test_resource_reach`
+  두 호출부가 그것을 쓴다.
+  ★★**제안이 스스로 미룬 근거를 반증했다** — 「지금 만들면 `#[path]` 또는 `tests/common/mod.rs` 라는
+  **새 구조가 생긴다**」는 **거짓**이다: `test-utils` 는 이미 workspace 크레이트(`Cargo.toml:117`)이고
+  `wie-ktf` `[dev-dependencies]` 이며 ★**두 시험이 이미 `use` 하고 있었다** ⇒ 새 구조 **0**.
+  ★**개악 대조가 이 회차의 산출물이다**: 공유 구현 **1곳**을 종전의 순진한 `contains(prefix)` 로 되돌리면
+  ★**소비자 2건이 동시에 FAILED** · 복원하면 둘 다 ok. ★★**`--no-fail-fast` 없이는 그 표를 못 만든다** —
+  cargo 가 첫 실패 타깃에서 멈춰 **두 번째가 보이지도 않는다**(조각 D `-fix2` 의 `201·202` 부분 계수와 같은 함정).
+  ★**새 실측**: 제안이 「구 base 에서 잠복」이라 적은 `test_resource_reach` 는 **오늘 잠복이 아니다**
+  (이 base 에서 순진한 술어로 실제 FAILED) ⇒ 둘 다 **활성 경쟁 상태**였다.
+  ★**세 번째 소비자는 없다**(Stdout 사용 6파일 전수): helloworld 3케이스는 `while !exited` 라 경쟁이 없고
+  `wie_j2me/tests/test_boot.rs` 는 paints 폴링 + **고아**(member 는 `wie-j2me`) — 무접촉.
+  ★**대가를 적는다**: n=2 에 **간접이 생겼고**(포인터 주석으로 줄였을 뿐), `test-utils` 의 소임이 조금 번졌으며
+  (호스트 대역 크레이트에 문자열 술어 — `TestPlatformEvent::Stdout` 옆에 두고 새 파일 0 으로 완화),
+  술어가 **공개 API** 가 됐다(의도된 비용 — «세 번째»를 받는 것이 목적이다).
+  회귀 0(전건 합산 · `tail` 아님): fmt/clippy/wasm/beta rc=0 · `cargo test --all --no-fail-fast`
+  **42 스위트 384 passed · 0 failed**(`origin/main` 과 동수) · `npm run audit` rc=0.
 - 2026-09-16: **코퍼스 카드에 «첫 질문»을 넣었다 — 그 자리가 본문이면 안 되는 이유**
   (`wie-adopt-p3-adopted-proposals-triage-r2-p0`) — 정본 `docs/report/0122--….md`.
   채택 제안 `2026-09-16-p3-adopted-proposals-triage-r2#p0` 집행. **wie 제품 코드 0줄**(이 저장소 변경은 원장 3파일).
