@@ -200,6 +200,10 @@ fn frame_richness(data: &[u32], width: u32, height: u32) -> (u64, u64, u64) {
 }
 
 impl Screen for HeadlessScreen {
+    fn resize(&self, _width: u32, _height: u32) -> WieResult<()> {
+        Ok(())
+    }
+
     fn request_redraw(&self) -> WieResult<()> {
         self.redraw_requested.store(true, Ordering::SeqCst);
         Ok(())
@@ -243,11 +247,7 @@ impl Screen for HeadlessScreen {
 struct HeadlessAudioSink;
 
 impl AudioSink for HeadlessAudioSink {
-    fn play_wave(&self, _channel: u8, _sampling_rate: u32, _wave_data: &[i16]) {}
-    fn midi_note_on(&self, _channel_id: u8, _note: u8, _velocity: u8) {}
-    fn midi_note_off(&self, _channel_id: u8, _note: u8, _velocity: u8) {}
-    fn midi_program_change(&self, _channel_id: u8, _program: u8) {}
-    fn midi_control_change(&self, _channel_id: u8, _control: u8, _value: u8) {}
+    fn send(&self, _command: wie_backend::AudioCommand) {}
 }
 
 // ── in-memory database ───────────────────────────────────────────────────────
@@ -262,7 +262,7 @@ struct MemDbRepository {
 
 #[async_trait::async_trait]
 impl DatabaseRepository for MemDbRepository {
-    async fn open(&self, _system: &wie_backend::System, name: &str, app_id: &str) -> Box<dyn Database> {
+    async fn open(&self, name: &str, app_id: &str) -> Box<dyn Database> {
         let key = (app_id.to_string(), name.to_string());
         self.store.lock().unwrap().entry(key.clone()).or_default();
         Box::new(MemDatabase {
@@ -271,12 +271,16 @@ impl DatabaseRepository for MemDbRepository {
         })
     }
 
-    async fn exists(&self, _system: &wie_backend::System, name: &str, app_id: &str) -> bool {
+    async fn exists(&self, name: &str, app_id: &str) -> bool {
         self.store.lock().unwrap().contains_key(&(app_id.to_string(), name.to_string()))
     }
 
-    async fn delete(&self, _system: &wie_backend::System, name: &str, app_id: &str) -> bool {
+    async fn delete(&self, name: &str, app_id: &str) -> bool {
         self.store.lock().unwrap().remove(&(app_id.to_string(), name.to_string())).is_some()
+    }
+
+    async fn usage(&self, _app_id: &str) -> u64 {
+        0
     }
 }
 
@@ -342,6 +346,10 @@ struct HeadlessPlatform {
 }
 
 impl Platform for HeadlessPlatform {
+    fn font(&self) -> &wie_backend::Font {
+        unimplemented!()
+    }
+
     fn screen(&self) -> &dyn Screen {
         self.screen.as_ref()
     }

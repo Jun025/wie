@@ -51,9 +51,9 @@ getrandom = { version = "^0.4", features = ["wasm_js"] } # transitive; broken wi
 async-trait = { workspace = true }
 tracing = { workspace = true }
 
-wie_backend = { workspace = true }
-wie_util = { workspace = true }
-wie_j2me = { path = "../wie_j2me" }
-wie_ktf = { path = "../wie_ktf" }
-wie_lgt = { path = "../wie_lgt" }
-wie_skt = { path = "../wie_skt" }
+wie-backend = { workspace = true }
+wie-util = { workspace = true }
+wie-j2me = { workspace = true }
+wie-ktf = { workspace = true }
+wie-lgt = { workspace = true }
+wie-skt = { workspace = true }
