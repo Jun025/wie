@@ -1,0 +1,55 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-16",
+  "task": "wie-p3-slice-a-keydraw-lgt-breaks-on-upstream-base",
+  "title": "조각 A — upstream base 에서 keydraw_lgt 가 깨지는 원인 규명",
+  "summary": "원인은 upstream 이 graphics SVC 27개를 LGT 전용 구현(wie-lgt/src/runtime/wipi_c/graphics.rs · 1,095줄)으로 보내고 그 구현이 게스트에게 다른 레코드 ABI(LgtFramebuffer 16B · buf 필드 없음)를 주는 것이다. 게스트 SDK 는 스스로 패닉한다(wipi/src/framebuffer.rs:149:18 null reference produced). 정정 2026-09-16: 그 자리는 핸들 자신의 역참조이고 fb.buf(+16) 읽기가 아니다 — +16 을 읽는 :153 은 raw 포인터를 돌려주므로 이 문구를 못 낸다. '+16 에서 0 을 얻는다'는 추론이고 측정되지 않았다. 도입 커밋 9a88423b (2026-08-23 · PR #1368). 27줄을 공용 구현으로 돌리면 PASS(paints 55)로 되돌아온다. 제품 코드 0줄.",
+  "changes": [
+    "docs/report/0115--2026-09-16--…md 신설",
+    "docs/upstream-realign-p3-slices.md 조각 A 칸에 «닫혔다 + 무엇을 D 에 넘기나» 반영",
+    "STATE.md ## 다음 의 조각 A 항 갱신"
+  ],
+  "verification": [
+    "전제 재현: upstream 44fbf265 FAIL paints 0 (3/3) ↔ ours c77998ad PASS paints 55/55/47 rc=0 (3/3)",
+    "게스트 자체 패닉 문면(MC_knlPrintk 프로브): 'panicked at wipi/src/framebuffer.rs : 149 : 18 : null reference produced'",
+    "결정 실험: wie-lgt/src/runtime/wipi_c.rs 의 '=> graphics::' 27건을 '=> wie_wipi_c::api::graphics::' 로 치환 → PASS paints 55 (2/2)",
+    "배제 4종: 포인터 등록(양쪽 0x25619 동일) · init_process_state/set_use_annunciator 2줄(꺼도 FAIL) · 202 단일 치환(FAIL 불변) · 공용 구현 자체(diff 0)",
+    "범위: keydraw_ktf upstream PASS(공용 경로) · helloworld_lgt upstream PASS ⇒ LGT 그리기 경로 한정"
+  ],
+  "limits": [
+    "이 FAIL 이 실제 LGT 타이틀 52건 중 몇 건에 닿는지는 모른다 — 코퍼스 부재(game_lab/working/lgt/)",
+    "우리 픽스처가 대표적인가도 확정 못 한다. docs/lgt_abi.md:930 이 실제 clet 타이틀(놈ZERO)에서 'GetScreenFrameBuffer 가 준 포인터에 직접 픽셀을 쓴다'를 관측했으므로 같은 모양이지만, 실제 clet 이 upstream 의 간접 체인을 걸을 가능성을 배제하지 못한다. 정정 2026-09-16: 그 체인은 ptr_image → LgtImage 가 아니다 — 화면 FB 는 ptr_image: 0 (graphics.rs:374-381) 이고 실제 간접은 두 겹(핸들 → LgtFramebuffer.ptr_graphics → LgtGraphicsView.ptr_backing → WIPICFramebuffer.buf → 픽셀)이다",
+    "프로브는 전부 격리 worktree 에서 돌고 제거됐다 — 이 저장소 diff 에 남지 않는다"
+  ],
+  "proposals": [
+    {
+      "title": "조각 D 의 결정 항목을 «graphics 27줄 배선»으로 명시한다",
+      "plainSummary": "엔진을 갈아탈 때 LGT 그래픽을 본가 것으로 쓸지 우리 것으로 쓸지를 미리 정해 둔다.",
+      "userBenefit": "갈아타는 회차가 그 자리에서 즉흥 판단하지 않는다. 잘못 고르면 LGT 게임이 조용히 안 돈다.",
+      "why": "이 회차가 원인을 27줄 배선으로 좁혔다. 종전에는 'LGT 가 왜인지 깨진다' 였다. 두 선택지의 대가가 각각 측정됐다 — upstream LGT 전용을 유지하면 SDK 기반 게스트(우리 픽스처)가 깨지고, 공용으로 되돌리면 upstream 의 LGT 리버스 1,095줄을 버린다.",
+      "tradeoff": "결정 자체는 코퍼스 없이 안전하게 내릴 수 없다. 그래서 이 제안은 '결정하라'가 아니라 '결정 항목으로 목록에 두라'다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "공용 FrameBuffer::new 의 bpl 계산 변경을 조각 B 의 분류 축에 넣는다",
+      "plainSummary": "본가가 화면 한 줄의 바이트 수를 계산하는 방식을 바꿨다. 코드를 합칠 때 이 차이를 놓치지 않게 표시해 둔다.",
+      "userBenefit": "합치는 과정에서 화면이 비뚤어지는 회귀를 미리 막는다.",
+      "why": "실측: ours 는 bpl = width * bytes_per_pixel, upstream 은 buffer_size() 가 계산한 값을 쓴다. KTF 가 그 판본으로 PASS 하므로 이번 결함의 원인은 아니지만, 조각 B 가 wie_wipi_c hunk 를 분류할 때 '이름이 같아도 동작이 다를 수 있다'의 실례다.",
+      "tradeoff": "조각 B 의 분류 대상이 한 축 늘어난다. 그 비용은 파일 하나를 눈으로 더 보는 것이다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "코퍼스 human-step 의 «첫 질문»을 LGT 52건으로 좁힌다",
+      "plainSummary": "게임 묶음을 받게 되면 무엇부터 확인할지 미리 정해 둔다.",
+      "userBenefit": "코퍼스가 생기는 순간 바로 답을 얻는다. 292건 전부를 돌리기 전에 이 결정에 필요한 52건이 먼저다.",
+      "why": "이 회차가 남긴 유일한 미판정이 '실제 clet 이 GetScreenFrameBuffer 반환값을 WIPICFramebuffer 로 직접 읽나, 아니면 ptr_graphics → view.ptr_backing 을 걷나' 하나이고, 그 답이 조각 D 의 27줄 결정을 그대로 정한다. ktf 190 · skt 50 은 이 질문에 답하지 않는다.",
+      "tradeoff": "코퍼스 human-step 자체는 여전히 운영자 몫이고 이 제안이 그것을 앞당기지는 않는다.",
+      "effort": "S",
+      "target": "orchestrator"
+    }
+  ],
+  "adoptedProposals": ["2026-09-16-p3-remaining-slices-plan#p0"],
+  "declinedProposals": []
+}
