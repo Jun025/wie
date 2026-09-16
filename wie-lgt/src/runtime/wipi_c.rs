@@ -8,6 +8,22 @@ mod context;
 // record ABI (`LgtFramebuffer`, 16B, no `buf`) than the guest SDK reads
 // (`WIPICFramebuffer`, 20B, pixel pointer at +16). This is a DEFERRAL, not a rejection:
 // re-wiring is the same 27 lines, in reverse. See docs/upstream-realign-p3-slices.md §D.
+//
+// "NOT WIRED" scopes to those 27 SVCs ONLY — the module is still entered from two other
+// places, so do not read it as unreachable: `clet_register` below calls
+// `graphics::{init_process_state, set_use_annunciator}`, and `init.rs` routes
+// `InitSvcId::SetDisplayProperty` to `graphics::set_display_property`. Measured
+// 2026-09-16: 45 of the 57 top-level items are dead (that is what the `allow` below
+// suppresses; removing it yields exactly those 45 warnings) and 12 are live. Of the
+// three live fns, two RUN on every LGT boot — a `panic!` in `init_process_state`
+// (:70-98) or `set_use_annunciator` (:152-157) turns `keydraw_lgt` and `helloworld_lgt`
+// into FAIL/paints 0; the same probe in `set_display_property` (:121-150) leaves both
+// PASS, so that SVC is reachable but no fixture triggers it.
+//
+// What the gates DO hold: `allow(dead_code)` silences a lint, not compilation, so all
+// 1,095 lines are type-checked by all four gates — this cannot rot into a build error
+// unnoticed. What they do NOT hold is BEHAVIOUR: the 45 dead items are executed by
+// nothing, so a semantic drift in them is silent until the 27 lines are re-wired.
 #[allow(dead_code)]
 pub(super) mod graphics;
 
