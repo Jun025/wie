@@ -1,0 +1,42 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-16",
+  "task": "wie-adopt-slice-d-base-swap-fix2-p2",
+  "title": "브라우저 부팅 축 — 별 회차는 필요 없다. 그리고 resize·font 는 «어느 쪽으로도» 검증되지 않는다",
+  "summary": "채택 제안 2026-09-16-slice-d-base-swap-fix2#p2 의 판단 대상(「별 회차냐, 이 PR 의 CI 를 읽는 것으로 족하냐」)을 실측으로 닫았다. ⑴부팅 축은 CI 가 «이미 답했다» — PR #161 head f6fe7839 의 contract 잡에서 「Contract check — browser boot round-trip」이 skip 이 아니라 success 다(08:23~08:30Z). ⇒ 별 회차 불요. ⑵그러나 제안이 약속한 userBenefit(「이식한 Screen::resize·Platform::font 가 실화면에서 처음 검증된다」)은 ★두 선택지 어느 쪽으로도 달성되지 않는다 — 어떤 시나리오도 그 둘에 닿지 않기 때문이고, 그것은 호스트가 아니라 «픽스처»의 공백이다. 코드 0줄 · 산출물은 판단 + 그 사실을 시나리오 목록 옆에 박은 주석이다.",
+  "changes": [
+    "scripts/contract-roundtrip.mjs 머리 — 「어떤 시나리오도 Screen::resize·Platform::font() 에 닿지 않는다」 + 측정값·양성대조·왜 별 회차가 답이 아닌지 (+27)",
+    "docs/report/0124--2026-09-16--wie-adopt-slice-d-base-swap-fix2-p2.md 신규",
+    "STATE.md 완료 항목 1건"
+  ],
+  "verification": [
+    "⑴ 부팅 축 실측(원격 조회): gh api repos/Jun025/wie/actions/jobs/104720234942 → PR #161 head f6fe7839 의 contract 잡 스텝 「No engine-relevant changes — skipping contract check」= skipped · 「Contract check — browser boot round-trip」= success (08:23:12~08:30:32Z) ⇒ paths-filter 가 발화했고 실제로 돌았다. ★AGENTS.md 가 경고한 「Reporting success without rebuilding」 형태가 아니다",
+    "⑴-b 오늘도 돈다: 같은 두 스텝을 PR #166 head 5af3df8c 의 contract 잡(104844473745)에서 재확인 — skipped / success 동일 ⇒ .rs 를 만지는 PR 마다 자동으로 답이 나온다(일회성 아님)",
+    "★⑵ 양방향(입력 개악 · 네이티브 프로브): wie_validate 의 HeadlessScreen::resize 에 임시 eprintln 을 두고 — ⒜커밋 픽스처 test_data/keydraw_ktf.zip → PROBE-RESIZE 0건 ⒝같은 픽스처에 'DisplaySize:176*220' 한 줄만 추가한 사본 → PROBE-RESIZE 1건('176x220'). ⇒ 0 은 «못 잰 0»이 아니라 «실제 0»이다. 프로브·사본 전부 제거(git status wie_cli/ 빈 값)",
+    "⑵-b resize 호출부 전수: 엔진 전체에서 Screen::resize 호출은 2곳 — wie-ktf/src/emulator.rs:71(adf.display_size 가 Some 일 때만 · Err 는 tracing::warn 으로 삼킨다) · wie-lgt/src/runtime/wipi_c/graphics.rs:195(PR #161 이 배선을 끊은 그 27줄). 두 KTF 픽스처 __adf__ 는 AID/PID/MClass 3줄뿐(DisplaySize 없음)",
+    "⑵-c font 는 프로브 없이 판정된다: wie_validate 의 Platform::font() 가 unimplemented!() 라 닿으면 패닉한다. 러너 5픽스처 전건 통과 · 'not implemented' 0건 ⇒ 어떤 픽스처도 font() 를 부르지 않는다. 실측: draw_j2me PASS rc=0 · helloworld_ktf PASS rc=0 · helloworld_lgt PASS rc=0 · keydraw_ktf --inject --expect-last-frame PASS paints 55 rc=0 · keydraw_lgt 동 PASS paints 55 rc=0",
+    "⑵-d 다만 «구성»은 덮인다: WebPlatform::new 가 Font::try_from_static(include_bytes!(assets/neodgm.ttf))? 를 즉시 평가하므로 자산 결손·파싱 실패는 부팅을 깨뜨리고 Scenario A 가 red 가 된다 ⇒ 「적재는 검증되고 사용은 안 된다」",
+    "회귀 0(전건 합산 · tail 아님): RUST_MIN_STACK=4194304 cargo test --all --no-fail-fast → 42 스위트 384 passed · 0 failed · 0 ignored · fmt/clippy/wasm clippy/+beta clippy rc=0 · npm run audit rc=0 · node --check scripts/contract-roundtrip.mjs OK · check-worklog-json / check-docs-report-serial / check-doc-liveness-parity / check-worklog-coverage 전건 rc=0"
+  ],
+  "limits": [
+    "★이 회차는 커버리지를 «늘리지 않았다» — 공백을 재고 그 사실을 시나리오 목록 옆에 적었을 뿐이다. resize 시나리오는 «크기를 요구하는 픽스처»가 있어야 하고, 커밋 픽스처는 바이너리이며 Scenario E/F 가 현재 기하로 정확 픽셀 수를 단언한다 ⇒ 별 티켓이다(이 회차가 넓히지 않은 이유).",
+    "★contract-roundtrip.mjs 를 이 회차가 «실행»하지는 않았다 — Playwright chromium fetch 가 필요하고, 위 실측이 정확히 「로컬 실행이 CI 보다 더 주는 것이 없다」를 보였으므로 그 비용을 쓰지 않았다. 부팅 축의 근거는 CI 잡 스텝의 원격 조회다.",
+    "★npm run frontend(tsc -b · vite build)도 돌리지 않았다 — 조각 D -fix2 의 한계 그대로 남는다(TS 소비 코드 무접촉).",
+    "형제 #p0(완성된 줄 술어 · PR #166 으로 착지 대기) · #p1(아티팩트 크기 예산) · #p3(upstream 워크플로 채택)은 무접촉 — 각자 별 티켓이다."
+  ],
+  "adoptedProposals": [
+    "2026-09-16-slice-d-base-swap-fix2#p2"
+  ],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "DisplaySize 를 선언하는 KTF 픽스처를 하나 만들어 Screen::resize 를 처음으로 덮는다",
+      "plainSummary": "화면 크기 조절 기능은 지금 어떤 검사도 밟지 않습니다. 크기를 요구하는 시험용 파일을 하나 만들면 그 기능이 처음으로 확인됩니다.",
+      "userBenefit": "브라우저에서 게임이 요구한 화면 크기로 실제로 바뀌는지가 처음 검증된다 — 지금은 앞뒤 두 캔버스가 어긋나도 아무 게이트가 울지 않는다.",
+      "why": "이 회차가 쟀다: 엔진의 Screen::resize 호출부는 2곳이고 하나는 PR #161 이 배선을 끊었으며, 남은 하나(wie_ktf/src/emulator.rs:71)는 adf.display_size 가 Some 일 때만 돈다. 커밋된 두 KTF 픽스처 어디에도 DisplaySize 줄이 없다(프로브 실측 0회 ↔ 한 줄 추가한 사본 1회). 게다가 그 호출부는 Err 를 tracing::warn 으로 삼키므로 실패해도 부팅이 계속된다.",
+      "tradeoff": "새 픽스처는 커밋되는 바이너리이고, 기존 것을 고치면 Scenario E/F 의 정확 픽셀 단언이 현재 기하에 묶여 있어 함께 깨진다. 그래서 «기존 픽스처 수정»이 아니라 «별 픽스처 + 별 시나리오»여야 하고, 그만큼 유지 대상이 하나 늘어난다. 반대로 지금 상태는 resize 회귀가 조용하다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ]
+}
