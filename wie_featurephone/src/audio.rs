@@ -2,7 +2,7 @@ use core::cell::Cell;
 
 use web_sys::{AudioContext, GainNode};
 
-use wie_backend::AudioSink;
+use wie_backend::{AudioCommand, AudioEventData, AudioSink};
 
 /// WebAudio-backed sink. PCM waveforms are scheduled through the shared
 /// `AudioContext`; MIDI events are accepted but not yet synthesized (silent
@@ -37,7 +37,7 @@ impl WebAudioSink {
         }
     }
 
-    fn try_play(&self, ctx: &AudioContext, channels: u8, sampling_rate: u32, wave_data: &[i16]) -> Result<(), wasm_bindgen::JsValue> {
+    fn try_play(&self, ctx: &AudioContext, start_at: f64, channels: u8, sampling_rate: u32, wave_data: &[i16]) -> Result<(), wasm_bindgen::JsValue> {
         let channels = channels.max(1) as u32;
         if sampling_rate == 0 || wave_data.is_empty() {
             return Ok(());
@@ -70,28 +70,45 @@ impl WebAudioSink {
             }
         }
 
-        // Schedule at the later of "now" and the running cursor. If the cursor
-        // fell behind (underrun), resync to now to avoid a growing delay.
-        let now = ctx.current_time();
-        let start_at = self.next_time.get().max(now);
         source.start_with_when(start_at)?;
         let duration = frames as f64 / sampling_rate as f64;
-        self.next_time.set(start_at + duration);
+        // Keep the cursor at the furthest scheduled end so a following sequence
+        // queues after this one instead of overlapping it.
+        self.next_time.set(self.next_time.get().max(start_at + duration));
         Ok(())
     }
 }
 
 impl AudioSink for WebAudioSink {
-    fn play_wave(&self, channel: u8, sampling_rate: u32, wave_data: &[i16]) {
-        if let Some(ctx) = self.ctx.as_ref() {
-            // Errors are non-fatal: a failed audio schedule must never abort the
-            // emulation tick.
-            let _ = self.try_play(ctx, channel, sampling_rate, wave_data);
+    fn send(&self, command: AudioCommand) {
+        let Some(ctx) = self.ctx.as_ref() else { return };
+
+        match command {
+            AudioCommand::Play { sequence, .. } => {
+                // Schedule at the later of "now" and the running cursor. If the
+                // cursor fell behind (underrun), resync to now to avoid a
+                // growing delay. Event times are ms offsets within the sequence.
+                let base = self.next_time.get().max(ctx.current_time());
+                for event in &sequence.events {
+                    if let AudioEventData::Wave {
+                        channels,
+                        sampling_rate,
+                        samples,
+                    } = &event.data
+                    {
+                        // Errors are non-fatal: a failed audio schedule must
+                        // never abort the emulation tick.
+                        let _ = self.try_play(ctx, base + event.time as f64 / 1000.0, *channels, *sampling_rate, samples);
+                    }
+                }
+            }
+            // ponytail: MIDI events and Stop/repeat are dropped, matching what
+            // this host did before the sequence API existed (MIDI was always a
+            // silent stub; there was no stop or loop at all). Upgrade path is
+            // upstream's own browser host: a JS-side AudioPlayer that owns
+            // per-handle scheduling (`wie-web/src/rust/audio_sink.rs` +
+            // `midi.ts`). That is a JS-surface addition, not an adapter change.
+            AudioCommand::Stop { .. } => {}
         }
     }
-
-    fn midi_note_on(&self, _channel_id: u8, _note: u8, _velocity: u8) {}
-    fn midi_note_off(&self, _channel_id: u8, _note: u8, _velocity: u8) {}
-    fn midi_program_change(&self, _channel_id: u8, _program: u8) {}
-    fn midi_control_change(&self, _channel_id: u8, _control: u8, _value: u8) {}
 }

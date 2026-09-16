@@ -54,8 +54,8 @@
   "gameActions": { "UP": 1, "LEFT": 2, "RIGHT": 5, "DOWN": 6, "FIRE": 8 },
   "gameActionTablesNote": "두 표가 «갈리는» 자리는 여기 둘뿐이고 «의도»다: ⑴WIPI 만 CLEAR→99 를 갖는다(KTF 고유) ⑵미매칭 반환이 다르다 — MIDP 는 0(사양: 게임키가 아니면 0), WIPI 는 key(입력을 그대로 돌려주는 KTF 관례). ★어느 쪽도 상대에 맞추면 그 플랫폼이 깨지므로 «통일하지 마라». 갈리는 자리를 계약에 적어 두는 이유는, 다음 사람이 이 차이를 «버그»로 보고 없애지 않게 하려는 것이다.",
   "gameActionTables": {
-    "midp": { "fn": "Canvas::getGameAction", "file": "wie_midp/src/classes/javax/microedition/lcdui/canvas.rs", "keyEnum": "MIDPKeyCode", "extra": {}, "fallback": "0" },
-    "wipi": { "fn": "Display::getGameAction", "file": "wie_wipi_java/src/classes/org/kwis/msp/lcdui/display.rs", "keyEnum": "WIPIKeyCode", "extra": { "CLEAR": 99 }, "fallback": "key" }
+    "midp": { "fn": "Canvas::getGameAction", "file": "wie-midp/src/classes/javax/microedition/lcdui/canvas.rs", "keyEnum": "MIDPKeyCode", "extra": {}, "fallback": "0" },
+    "wipi": { "fn": "Display::getGameAction", "file": "wie-wipi-java/src/classes/org/kwis/msp/lcdui/display.rs", "keyEnum": "WIPIKeyCode", "extra": { "CLEAR": 99 }, "fallback": "key" }
   },
   "saveMagic": "WIESAV01",
   "screen": { "width": 240, "height": 320 },

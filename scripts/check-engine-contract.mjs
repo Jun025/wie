@@ -108,7 +108,7 @@ if (parseKeyStart === -1 || parseKeyEnd === -1) {
 // remaining 17 rows are pinned here. Resolved in two steps (arm -> variant ->
 // discriminant) rather than by name, because the names differ on purpose:
 // OK => FIRE, NUM0 => KEY_NUM0, HASH => KEY_POUND.
-const eventQueueRs = "wie_midp/src/classes/net/wie/event_queue.rs";
+const eventQueueRs = "wie-midp/src/classes/net/wie/event_queue.rs";
 const eqRs = await readFile(path.join(root, eventQueueRs), "utf8");
 const enumStart = eqRs.indexOf("pub enum MIDPKeyCode");
 const enumEnd = enumStart === -1 ? -1 : eqRs.indexOf("\n}", enumStart);
@@ -143,7 +143,7 @@ if (enumStart === -1 || enumEnd === -1 || fromKeyStart === -1 || fromKeyEnd === 
 // Same shape as §4b on purpose: contract value vs. the product's own literals,
 // resolved arm -> variant -> discriminant. This block re-reads MIDPKeyCode
 // itself rather than reusing §4b's parse, so the two are independent.
-const cardCanvasRs = "wie_wipi_java/src/classes/net/wie/card_canvas.rs";
+const cardCanvasRs = "wie-wipi-java/src/classes/net/wie/card_canvas.rs";
 const ccRs = await readFile(path.join(root, cardCanvasRs), "utf8");
 const wipiEnumStart = ccRs.indexOf("pub enum WIPIKeyCode");
 const wipiEnumEnd = wipiEnumStart === -1 ? -1 : ccRs.indexOf("\n}", wipiEnumStart);

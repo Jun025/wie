@@ -23,7 +23,10 @@ on:
       - "Cargo.lock"
       - "scripts/build-wasm.sh"
       - "data/**"
-      - "fonts/**"
+      # fonts/ is gone after the upstream base swap; the embedded font is now
+      # assets/neodgm.ttf (include_bytes!'d by the browser host). Keep in sync
+      # with engine-contract.yml's paths-filter (Constraint 4).
+      - "assets/**"
       - ".github/workflows/publish-artifact.yml"
   workflow_dispatch:
 

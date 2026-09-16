@@ -66,7 +66,14 @@ pub fn bundled_resource_reaches_the_ktf_guest() -> Result<()> {
     for _ in 0..BOOT_TICKS {
         emulator.tick()?;
         seen = String::from_utf8_lossy(&stdout.lock().unwrap().clone()).into_owned();
-        if seen.contains("res:") {
+        // Wait for a COMPLETE line, not the `res:` prefix — the guest writes the
+        // prefix and the digits separately, so `contains("res:")` is already true
+        // while the buffer holds only `"res:"`, and the assert below then reports
+        // a value still in flight as a resource-API failure. This passed on the
+        // pre-upstream base only because the write landed in one piece there;
+        // the predicate was always the race. Same fix as `test_key_reach`.
+        // A newline also terminates the `res:err` outcome, so both are caught.
+        if seen.split("res:").nth(1).is_some_and(|tail| tail.contains('\n')) {
             break;
         }
     }

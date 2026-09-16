@@ -206,7 +206,12 @@ jobs:
               - 'docs/contracts/**'
               - 'test_data/**'
               - 'data/**'
-              - 'fonts/**'
+              # Was 'fonts/**' until the upstream base swap: that directory no
+              # longer exists (0 tracked files, 0 code references) and the
+              # embedded font moved to assets/neodgm.ttf, which the browser host
+              # include_bytes!'s into the artifact. Keep in sync with
+              # publish-artifact.yml's on.push.paths (Constraint 4).
+              - 'assets/**'
               - 'package.json'
               - 'package-lock.json'
               - '.github/workflows/engine-contract.yml'

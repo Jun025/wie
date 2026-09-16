@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
-use wie_backend::{Database, DatabaseRepository, RecordId, System};
+use wie_backend::{Database, DatabaseRepository, RecordId};
 
 /// Shared record store, keyed by `(app_id, db_name)` → records.
 ///
@@ -20,20 +20,23 @@ impl WebDatabaseRepository {
         Self { store }
     }
 
-    fn key(name: &str, app_id: &str) -> (String, String) {
+    fn owner(app_id: &str) -> String {
         let sanitized_app_id: String = app_id.chars().filter(|c| !matches!(c, '/' | '\\' | '\0')).collect();
-        let app_id = if sanitized_app_id.is_empty() || sanitized_app_id == "." || sanitized_app_id == ".." {
+        if sanitized_app_id.is_empty() || sanitized_app_id == "." || sanitized_app_id == ".." {
             "_".to_owned()
         } else {
             sanitized_app_id
-        };
-        (app_id, name.to_owned())
+        }
+    }
+
+    fn key(name: &str, app_id: &str) -> (String, String) {
+        (Self::owner(app_id), name.to_owned())
     }
 }
 
 #[async_trait::async_trait]
 impl DatabaseRepository for WebDatabaseRepository {
-    async fn open(&self, _system: &System, name: &str, app_id: &str) -> Box<dyn Database> {
+    async fn open(&self, name: &str, app_id: &str) -> Box<dyn Database> {
         let key = Self::key(name, app_id);
         self.store.lock().unwrap().entry(key.clone()).or_default();
         Box::new(WebDatabase {
@@ -42,12 +45,27 @@ impl DatabaseRepository for WebDatabaseRepository {
         })
     }
 
-    async fn exists(&self, _system: &System, name: &str, app_id: &str) -> bool {
+    async fn exists(&self, name: &str, app_id: &str) -> bool {
         self.store.lock().unwrap().contains_key(&Self::key(name, app_id))
     }
 
-    async fn delete(&self, _system: &System, name: &str, app_id: &str) -> bool {
+    async fn delete(&self, name: &str, app_id: &str) -> bool {
         self.store.lock().unwrap().remove(&Self::key(name, app_id)).is_some()
+    }
+
+    /// Bytes held by every database this app owns. Goes through `owner()` for
+    /// the same reason the key does: the caller hands us the raw aid, and the
+    /// store is keyed by the sanitized one — comparing raw would report 0 for
+    /// any app whose aid needed sanitizing, i.e. silently understate the quota.
+    async fn usage(&self, app_id: &str) -> u64 {
+        let owner = Self::owner(app_id);
+        self.store
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|((db_owner, _), _)| *db_owner == owner)
+            .map(|(_, records)| records.values().map(|record| record.len() as u64).sum::<u64>())
+            .sum()
     }
 }
 
