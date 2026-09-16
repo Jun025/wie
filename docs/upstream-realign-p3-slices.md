@@ -410,6 +410,14 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 
 ### C — `wie-p3-drop-already-upstreamed-engine-hunks`
 
+> ★★**[집행 2026-09-16 · `wie-p3-slice-c-drop-hunks-already-upstream`] 측정 기록 = `docs/upstream-realign-p3-slice-c-deletability.md`.**
+> ★**폐기 21행은 «세 계급»으로 갈렸다**: **A 7행 지웠다**(머지 예행 **74 → 67**) ·
+> ★**B 5행은 «구조적으로 못 지운다»**(되돌리면 `cargo check` **오류 10건** · beta clippy **red** ·
+> `draw_j2me` **FAIL** — 양쪽이 같은 코드를 가진 이유가 «중복»이 아니라 **«같은 +33 트레이트»**다) ·
+> ★**C 9행은 보류**(운영자 판정 — 되돌려도 `test` **179/0 불변** · 5픽스처 **불변**이라 ⒟의 검증식이
+> 이 9행에서는 «공허»하다. 사는 것 충돌 8 ↔ 파는 것 **Java 가시 메서드 18 + 클래스 1종**).
+> ⇒ ★**아래 ⒟ 의 「우리 base 위라 모든 게이트가 산다」는 «A 에만» 참이다** — 그 문장을 전 행에 적용하지 마라.
+
 - **⒜ 범위**: B 가 «폐기» 로 분류한 것만 **우리 현재 base 에서** 삭제. ★**`wie_lgt/` ① 12건은 여기 넣지 마라**
   (그건 D 의 머지가 `D`/`UD` 로 처리한다). ★**여러 PR 로 쪼개라** — 크레이트 단위가 자연 경계다.
 - **⒝** size **M**(PR 당) · risk **med** — ★삭제는 되돌리기 쉽지만 **조용히 기능을 지운다**.

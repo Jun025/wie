@@ -72,6 +72,41 @@
   ★**무는 것**: 27줄을 공용으로 치환 → **PASS · paints 55**(2/2) ↔ 원본 **FAIL · paints 0**(3/3) ↔ ours **PASS**(3/3).
   ★**배제 4종 전부 실행으로**(포인터 등록 · init 2줄 · 202 단일 치환 · 공용 구현 자체).
   ★**범위 = LGT 그리기 한정**(`keydraw_ktf`·`helloworld_lgt` upstream PASS). 정본 = `docs/report/0113--….md`.
+- 2026-09-16: **조각 C — 이미 upstream 에 있는 엔진 hunk 삭제: 7행 착지 · 14행이 «왜 아닌지»를 수로 보였다**
+  (`wie-p3-slice-c-drop-hunks-already-upstream`) — 측정 기록 정본
+  `docs/upstream-realign-p3-slice-c-deletability.md`.
+  ★**조각 B 의 폐기 21행이 «세 계급»으로 갈린다** — ★**「upstream 이 이미 가졌다」는 「오늘 우리 base 에서
+  지울 수 있다」를 «함의하지 않는다».** B 의 분류는 옳았고(그것은 「머지가 우리 쪽을 버려도 되는가」다),
+  이 회차는 **그 다음 질문**을 쟀다.
+  - ★**A — 7행 «지웠다»**(`wie_wipi_java/src/classes/java/**` · `get_protos()` **46 → 42**).
+    근거는 읽은 것이 아니라 **잰 것**: 삭제 **전** 원본 트리에서 `get_protos()` 전적재 상태로
+    `new java/lang/VirtualMachineError()` 가 **`InstantiationError`** 를 던졌다. 우리 사본은 **비-ABSTRACT** 이고
+    `java_runtime@5b84dd1` 판본만 **ABSTRACT** 이므로 ★**「런타임 정의가 이겼다」의 직접 증거**다
+    (`java.class.path` = `RT_RUSTJAR : WIE_RUSTJAR : <jar>`). 사본 등록 `5603a7f9` **2026-07-02**(당시 포크 핀에
+    그 넷이 없었다) ↔ 핀 이동 `1762a32c` **2026-09-04** ⇒ ★**그 사이에 죽었고 아무도 몰랐다.**
+    ★**잠금 축 신설** `wie_wipi_java/tests/preload_classes_come_from_the_runtime.rs` — 핀이 그 넷 중 하나를
+    잃으면 **게스트가 부팅 중 abort 하는 게 아니라 여기가 붉는다**.
+  - ★★**B — 5행 «구조적으로 못 지운다»**(#17~#21). 양쪽이 같은 코드를 가진 이유가 **«중복»이 아니라
+    «같은 +33 트레이트를 따랐다»**이다. 되돌림 실측: **#18·#19·#20 → `cargo check` 오류 10건**
+    (`E0046 missing: identity, shallow_clone` · `E0407 destroy is not a member of trait ArrayClassInstance` ×3 ·
+    `E0277` ×4 · ★`E0061 attach_thread` 인자 수) · **#17 → beta clippy red**(`double_must_use`) ·
+    **#21 → `draw_j2me.jar` FAIL**(`image.rs:117` panic). ⇒ ★**조각 D 의 머지가 upstream 쪽을 고르면 해소된다.**
+  - ★★**C — 9행 «보류»**(#1 · #9~#16 · 운영자 판정 2026-09-16). ★**제안 #p2 의 검증 논거를 시험했고 거짓이었다**:
+    되돌리기 전후로 `cargo test --all` **179/0 불변** · 5픽스처 **전건 PASS 불변**(`paints` 1/0/0/55/55 동일) ·
+    `cargo check` **오류 0**. 그런데 사라지는 것은 **Java 가시 메서드 18개 + 클래스 `ImageObserver` 등록**이다
+    ⇒ ★**그 green 은 검증이 아니라 «공허한 통과»다.**
+    ★**제안의 완화책도 공허하다** — 「Rust 호출자 0건을 보여라」인데 `JavaMethodProto` 등록 메서드의 호출자는
+    **게스트**라 **정의상 0**이다(17심볼 전수: 14개 0 · 3개 1).
+    ★**대가**: 사는 것 **충돌 8건**(67→59) ↔ 파는 것 **메서드 18 + 클래스 1**. 그 8건은 전부 `UD`/`UU` 라
+    **조각 D 가 upstream 쪽을 고르면 그냥 해소된다**(upstream 이 그 18개를 다 갖는다). 그리고 ★**복원이
+    보장되지 않는다** — D 는 A 에 걸려 있고 A 는 **no-go 신호**(`keydraw_lgt` upstream FAIL)를 들고 있다.
+  ★**머지 예행(실행값)**: 원본 **74** → 묶음1 후 ★**67**(UU 35 · **AU 12** · UD 17 · AA 3) → (가정)그룹C **59**.
+  ★**게이트**: fmt OK · clippy rc=0 · **beta** clippy rc=0 · wasm clippy rc=0 ·
+  `cargo test --all` **178 → 179 passed · failed 0**(+1 = 잠금 시험 · ★**기존 통과 수 불변**) ·
+  5픽스처 전건 PASS(`draw_j2me` 1/content · `helloworld_ktf` 0 · `helloworld_lgt` 0 · `keydraw_ktf` 55/rc0 · `keydraw_lgt` 55/rc0).
+  ★**한계**: 그룹 C 의 18개 메서드를 실제로 부르는 타이틀 수는 **292 코퍼스 없이 못 잰다** ·
+  그룹 A 가 원 커밋의 「5 KTF 타이틀」에 무해한가도 코퍼스로는 못 재고 대체 증거는 위 `InstantiationError` 뿐 ·
+  **67·59 는 «예행» 수이지 D 의 착지 수가 아니다**.
 - 2026-09-16: **조각 B — ② 엔진 오버레이 51건을 「폐기 / 재적용 / upstream 발신」으로 분류**
   (`wie-p3-slice-b-classify-51-engine-overlays`) — 제품 코드 **0줄** ·
   정본 `docs/upstream-realign-p3-slice-b-triage.md` · **폐기 21 · 재적용 24 · 발신 6 = 51 · 미분류 0**.
@@ -1364,6 +1399,14 @@
     정본 `docs/upstream-realign-p3-slice-b-triage.md` · **폐기 21 · 재적용 24 · 발신 6 = 51 · 미분류 0** ·
     ★「51」의 구성은 **② 50 + ③f 1**(아래 §3 표에 `③f` 칸이 없어 접혔다) → **C** 이미 upstream 에 있는 것 삭제(M·med · 선행 B ·
     ★**C 의 기대값은 «미해결 74 → 53» 이 «아니라» `53 ≤ N < 74` 다** — 폐기 21 중 `UU` 5행은 파일이 남고 델타만 사라진다 ·
+    **B** ② 51건 hunk 분류(M·low · 제품코드 0 · ★**2026-09-16 끝났다** — PR #158 ·
+    `docs/upstream-realign-p3-slice-b-triage.md` · 폐기 21 · 재적용 24 · 발신 6) →
+    ★~~**C** 이미 upstream 에 있는 것 삭제~~ **부분 착지(2026-09-16 `wie-p3-slice-c-drop-hunks-already-upstream`)** —
+    정본 `docs/upstream-realign-p3-slice-c-deletability.md` · ★**폐기 21행이 «세 계급»으로 갈렸다**:
+    **A 7행 지웠다**(머지 예행 **74 → 67**) · ★**B 5행 «구조적 불가»**(되돌리면 `cargo check` 오류 10건 ·
+    beta clippy red · `draw_j2me` FAIL) · ★**C 9행 보류**(검증이 공허 — 운영자 판정).
+    ⇒ ★**그룹 B·C 는 조각 D 안에서 처분된다 — 조각 C 를 다시 발권하지 마라.**
+    ★**착지 «전» 기대값 「`53 ≤ N < 74`」는 «실측이 대체했다» — 실제 **74 → 67**(그 기대값 문장은 위에 그대로 남겨 두었다).
     ★**우리 base 위라 5게이트가 전부 산다**) → **D** base swap 머지(L·★**high** · 선행 A·C) →
     **E** 웹 계약·아티팩트(M·med · 선행 D).
     ★★**D 의 ⒟ 는 «충돌 0» 이 아니라 «빌드 게이트»다 — 근거는 「★«미해결 0» 이 «컴파일된다»를 뜻하지 않는다」이고,
