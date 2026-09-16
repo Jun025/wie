@@ -443,6 +443,32 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 
 ### D — `wie-p3-base-swap-merge`
 
+> ★★★**[게이트② 반려 처분 ② 2026-09-16 · `wie-p3-slice-d-merge-upstream-main-as-base-fix3` · 정본 `docs/report/0119--….md`]
+> 착지하면 `main` 이 빨개진다 — 안 쓰는 데스크톱 크레이트를 workspace 에서 뺐다.**
+>
+> ★**base swap 이 들여온 upstream Tauri 셸 `wie-app` 이 GTK/WebKit2GTK/libsoup3 의 «유일한» 뿌리**다
+> (`glib-sys ← atk-sys ← atk ← gtk ← muda ← tauri 2.11.5 ← wie-app` · workspace 안 소비자 **1**).
+> 우리 Linux CI 는 그것을 깔지 않는다(`rust.yml:96` = `libasound2-dev` 하나 · `coverage.yml:48` =
+> `libgtk-3-dev libasound2-dev` — ★gtk3 는 **libsoup2** 라 soup3 를 못 준다) ⇒ `rust_ci (ubuntu × 2)`·`coverage`
+> **3검사 fail**. ★**두 워크플로 다 이 PR 이 건드리지 않았다**(`git diff origin/main` **0줄**).
+> ★★**「구조적 red」가 아니라 «회귀 red»** — swap **전** `7dd70da5` 는 둘 다 **success** · `main` 최근 5회 **전건 success**.
+>
+> ⇒ ★**처방 ⒜ = `members` 제거 + `exclude` 선언**(검수자가 연 두 갈래 중). ★**⒝(ubuntu 에 GTK/WebKit/soup3 설치)를
+> 버린 이유**: ⑴★**채택 0**(우리 참조는 members 한 줄 · 나머지는 **이미 주차된** upstream `release.yaml` · 분석 문서 · 오탐 1)
+> ⑵★**그 크레이트를 빌드하는 «유일한» 파이프라인을 직전 회차가 이미 주차했다** ⇒ ⒝는 «주차한 앱을 빌드하려고 돈을 쓰는» 형태다
+> ⑶**5패키지 × 3레인**을 영구 부양하고 ★**다음 당김이 또 호스트를 들여오면 반복**된다(그 파일에 Android·iOS 잡이 이미 있다)
+> ⑷`AGENTS.md` **Constraint 7** 이 이미 그 관용이다.
+>
+> ★**판정식**(= `coverage.yml` 실제 invocation): `cargo tree --workspace --all-features -i <c> --target x86_64-unknown-linux-gnu`
+> → `glib-sys`·`soup3-sys`·`webkit2gtk-sys`·`gtk-sys`·`tauri` ★**전건 소멸** · 개악(되돌림) → **전건 PRESENT**.
+> ★`cargo test --all` **384 불변** ⇒ **커버리지를 줄여서 산 green 이 아니다.**
+> ★**잃는 것**: `wie-app` **단독 빌드 상실**(전 `cd wie-app && cargo check` **성공 2m33s** → 후
+> `error inheriting 'edition' from workspace root` — `*.workspace = true` 상속 링크가 끊긴다).
+> 살리려면 upstream 매니페스트를 리터럴로 고쳐야 하고 **당김마다 영구 충돌**이다. ★`Cargo.lock` **-2,281줄** ·
+> ★**되돌리기는 members 한 줄**이고 그때는 «의식적 채택»이라 오히려 옳은 시점이다.
+> ★**이 결정은 위 「upstream 워크플로 주차」와 «같은 축»이다** — 파이프라인·크레이트를 **함께** 주차한 상태가 됐고,
+> 채택 결정의 소유자는 여전히 제안 `#p3` 다.
+
 > ★★★**[게이트② 반려 처분 2026-09-16 · `wie-p3-slice-d-merge-upstream-main-as-base-fix2` · 정본 `docs/report/0118--….md`]
 > 「동작 회귀」는 «없었다» — 그리고 두 번째 호스트가 서 있지 않았다.**
 >

@@ -60,6 +60,33 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-16: **조각 D 게이트② 반려 처분 ② — 착지하면 `main` 이 빨개진다: 안 쓰는 데스크톱 크레이트를 workspace 에서 뺐다**
+  (`wie-p3-slice-d-merge-upstream-main-as-base-fix3`) — 정본 `docs/report/0119--….md`.
+  ★★**base swap 이 들여온 upstream Tauri 셸 `wie-app` 이 GTK/WebKit2GTK/libsoup3 의 «유일한» 뿌리**였고
+  우리 Linux CI 는 그것을 깔지 않는다 ⇒ `rust_ci (ubuntu × stable·beta)`·`coverage` **3검사 fail**
+  (`The system library 'glib-2.0' ... was not found` · `libsoup-3.0 not found`).
+  ★★**「구조적 red」가 아니라 «회귀 red»다** — swap **전** head `7dd70da5` 는 둘 다 **success** 이고
+  `main` 최근 5회도 **전건 success** ⇒ ★**착지하면 `main` 의 push CI 둘이 즉시 빨개진다.**
+  ★**로컬 green 이 이것을 못 잡는다** — `384 passed` 는 **참이면서 이 red 를 보지 못하는 자**다.
+  ⇒ ★**처방 ⒜**(members 제거 + `exclude` 선언). 근거: ⑴★**채택 0** — 우리 참조는 members 한 줄뿐이고
+  나머지는 upstream 의 **이미 주차된** `release.yaml`·우리 «분석» 문서·오탐 1건(`indexedDB.open("wie_app_library")`)
+  ⑵★**비대칭이 이미 절반 해소돼 있었다**(그 크레이트를 빌드하는 유일한 파이프라인을 직전 회차가 주차했다)
+  ⑶⒝는 **5패키지 × 3레인**을 **영구** 부양하고 다음 당김마다 반복된다 ⑷`AGENTS.md` **Constraint 7**(안 쓰는
+  호스트를 빌드 밖에 두는 기존 관용). ★**`exclude` 는 cargo 자신이 요구하는 형태**다(실측 안내문).
+  ★**판정식**: `cargo tree --workspace --all-features -i <c> --target x86_64-unknown-linux-gnu`
+  (= `coverage.yml` 의 실제 invocation) → `glib-sys`·`soup3-sys`·`webkit2gtk-sys`·`gtk-sys`·`tauri` ★**전건 소멸** ·
+  개악(되돌림) → **전건 PRESENT**. ★`cargo test --all` **384 불변**(`wie-app` 은 시험 0) ⇒ **커버리지를 줄여서 산 green 이 아니다.**
+  ★**잃는 것**: `wie-app` 단독 빌드가 깨진다(조치 전 `cd wie-app && cargo check` **성공 2m33s** → 후
+  `error inheriting 'edition' from workspace root` · 근인 = `*.workspace = true` 상속 링크 절단).
+  살리려면 upstream 매니페스트를 리터럴로 고쳐야 하고 그것은 **당김마다 영구 충돌**이라 더 싼 쪽을 택했다.
+  ★`Cargo.lock` **-2,281줄**(tauri 트리) · ★되돌리기는 **members 한 줄**.
+  ★★**정정 2건**: ⒤직전 §7 이 「주차 후 red 해소」로 읽히게 적었다 — ★**`f533ba54` 의 `coverage` 도 fail** 이었고
+  주차가 없앤 것은 `web_ci` **하나**다. ★그 회차의 `rc=4 PENDING` 은 **12초 차이로** 못 본 것이고 그 시점엔 참이었다.
+  ⒥★**「`contract` 는 `main` 의 required status check」는 거짓** — `branches/main/protection` **404
+  `Branch not protected`** · `rulesets` **`[]`** · `mergeStateStatus` **`UNSTABLE`**(BLOCKED 아님) ⇒
+  ★**강제 required check 는 0개**다. ★**문서와 실측이 어긋나면 실측이 이긴다.** 행동(ENOENT 해소)은
+  여전히 옳다 — 크래시한 계약 검사기는 **fail-closed 계약을 아무것도 검증하지 않는다**(Constraint 3).
+  ★**한계**: ubuntu·coverage 의 green 은 **로컬에서 못 보인다**(리눅스 러너 없음) — 보인 것은 «기전»이고 판정은 CI 다.
 - 2026-09-16: **조각 D 게이트② 반려 처분 — 「동작 회귀」는 «없었다» + 두 번째 호스트를 세웠다**
   (`wie-p3-slice-d-merge-upstream-main-as-base-fix2`) — 정본 `docs/report/0118--….md`.
   ★★**제품 회귀 0.** 직전 회차가 영구 기록 **4곳**에 박은 「실제 동작 회귀(후보 = WIPI 키코드 매핑)」는

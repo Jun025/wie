@@ -1,0 +1,60 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-16",
+  "task": "wie-p3-slice-d-merge-upstream-main-as-base-fix3",
+  "title": "착지하면 main 이 빨개진다 — 안 쓰는 데스크톱 크레이트를 workspace 에서 뺐다",
+  "summary": "base swap 이 들여온 upstream Tauri 셸 wie-app 이 GTK/WebKit2GTK/libsoup3 의 유일한 뿌리이고 우리 Linux CI 는 그것을 깔지 않는다 ⇒ rust_ci(ubuntu × stable·beta)·coverage 3검사 fail. swap 전 head 는 둘 다 success 이고 main 최근 5회도 전건 success 라 이것은 구조적 red 이 아니라 회귀 red 다. 처방 ⒜(members 제거 + exclude 선언)를 골랐다 — 채택 참조가 0이고, 그 크레이트를 빌드하는 유일한 파이프라인은 직전 회차가 이미 주차했다.",
+  "changes": [
+    "Cargo.toml — wie-app 을 workspace members 에서 제거하고 exclude = [\"wie-app\"] 로 선언(사유 주석 포함 · cargo 자신이 요구하는 형태)",
+    "Cargo.lock — tauri 트리가 빠져 2,281줄 감소(80 삽입 · 2,361 삭제). 의도된 산출",
+    "docs/report/0119--…md 신설 — 처방 선택 근거 4축 · 대조군 표 · 잃는 것 · 정정 2건",
+    "docs/report/0118 — 「contract 는 main 의 required status check」 정정(문서 인용이었고 실측과 어긋난다)",
+    "STATE.md 완료 항 · docs/upstream-realign-p3-slices.md §D 처분 항"
+  ],
+  "verification": [
+    "red 재측(대전제 ⓐ): ci-presence Jun025/wie 161 8e870e95… → rc=1 CI_RED 'failure coverage,failure Rust CI' (2026-09-16 14:42:36 KST · 원격 조회 head)",
+    "실패 정체 실인용: rust_ci ubuntu stable·beta = glib-sys v0.18.1 빌드 실패(pkg-config exited with status code 1 · The system library `glib-2.0` required by crate `glib-sys` was not found) · coverage = soup3-sys(libsoup-3.0 not found)",
+    "귀속 ⑴: git cat-file -e origin/main:wie-app/Cargo.toml → ABSENT · upstream/main → EXISTS · members 도입 커밋 49db5171(upstream 'Rename workspace crates')",
+    "귀속 ⑵: rust.yml:96 = libasound2-dev 하나 · coverage.yml:48 = libgtk-3-dev libasound2-dev(gtk3 는 libsoup2) · ★두 파일 다 git diff origin/main 0줄",
+    "귀속 ⑶ 대조군: 7dd70da5(swap 전) Rust CI success·coverage success ↔ f533ba54 coverage failure ↔ d35c2902·8e870e95 둘 다 failure ↔ main 최근 5회 전건 success",
+    "뿌리 유일성: glib-sys ← atk-sys ← atk ← gtk ← muda ← tauri 2.11.5 ← wie-app (workspace 안 소비자 1건) ※검수자의 2.10.2 는 요구 범위이고 lock 해소값은 2.11.5",
+    "대전제 ⓑ(채택 0): wie-app|wie_app 참조 전수 — 우리 것은 Cargo.toml members 한 줄뿐 · 나머지는 이미 주차된 upstream release.yaml+scripts/release/*.sh · 우리 분석 문서 3건 · 오탐 1건(wie-web/src/ts/app_library_store.ts:14 = indexedDB.open(\"wie_app_library\"))",
+    "판정식(= coverage.yml 실제 invocation) cargo tree --workspace --all-features -i <c> --target x86_64-unknown-linux-gnu: glib-sys·soup3-sys·webkit2gtk-sys·gtk-sys·tauri 전건 'did not match any packages'",
+    "개악 양방향: wie-app 을 members 로 되돌리면 그 3크레이트 전건 PRESENT · 복원하면 전건 GONE · 복원 후 Cargo.toml 바이트 동일 · HEAD 불변",
+    "4게이트: fmt rc=0 · clippy --all rc=0 · wasm clippy rc=0 · beta clippy rc=0",
+    "cargo test --all: 384 passed · 0 failed rc=0 — ★조치 전후 불변(wie-app 은 시험 0) ⇒ 커버리지를 줄여서 산 green 이 아니다",
+    "npm run build:wasm rc=0 · check-engine-contract rc=0(107 pass · 0 violation) · audit / worklog-json / worklog-coverage / docs-report-serial(--selftest·bare) / doc-liveness-parity / parity-lock-wired / engine-runner-fixtures 전건 rc=0",
+    "5픽스처: draw_j2me PASS(1/content) · helloworld_ktf PASS(0) · helloworld_lgt PASS(0) · keydraw_ktf PASS(55/content/rc0) · keydraw_lgt PASS(55/content/rc0)",
+    "필수 3 실측: gh api branches/main/protection → 404 'Branch not protected' · rulesets → [] · mergeStateStatus → UNSTABLE(BLOCKED 아님) ⇒ GitHub 강제 required check 0개",
+    "잃는 것 실측: 조치 전 cd wie-app && cargo check 성공(2m33s · 격리 워크트리) → 조치 후 error inheriting `edition` from workspace root manifest"
+  ],
+  "limits": [
+    "ubuntu·coverage 의 green 을 로컬에서 보일 수 없다 — 리눅스 러너가 없다. 보인 것은 기전(그 3검사가 죽던 의존이 workspace 그래프에서 사라졌다)이고 판정은 CI 가 낸다",
+    "wie-app 단독 빌드가 깨진다 — version/edition/license.workspace = true 상속 링크가 exclude 로 끊긴다. 살리려면 upstream 매니페스트를 리터럴로 고쳐야 하고 그것은 당김마다 영구 충돌이라 더 싼 쪽을 택했다. 되돌리기는 members 한 줄",
+    "다음 upstream 당김이 Cargo.toml members 를 되살릴 수 있다 — 조각 B 가 분류한 «폐기» 계급과 같은 성질이고, 그때 이 exclude 줄과 주석이 근거로 남는다",
+    "npm run frontend(tsc -b · vite build)·contract-roundtrip.mjs 는 이번에도 돌리지 않았다(직전 회차 한계 그대로 · CI 몫)",
+    "이 회차는 «main 을 고치지» 않았다 — main 은 지금 green 이고 이 회차가 막은 것은 «빨개지는 것»이다"
+  ],
+  "proposals": [
+    {
+      "title": "upstream 당김이 workspace members 에 «우리가 안 쓰는 크레이트»를 다시 넣는 것을 검사로 잡는다",
+      "plainSummary": "이번 병합은 우리가 쓰지 않는 데스크톱 앱 하나를 빌드 목록에 조용히 끼워 넣었고, 그 때문에 리눅스 검사 세 개가 죽었습니다. 다음 병합에서 같은 일이 또 일어날 수 있으니, 빌드 목록이 늘어나면 PR 에서 바로 보이게 합니다.",
+      "userBenefit": "다음 upstream 당김이 main 을 빨갛게 만드는 것을 «착지 전»에 잡는다 — 이번에는 게이트② 검수자가 사람 눈으로 잡았다.",
+      "why": "wie-app 은 members 한 줄로 들어와 GTK/WebKit/soup3 전체를 끌고 왔고, 로컬 4게이트는 전부 green 이었다(macOS 는 그 의존을 컴파일하지 않는다). 즉 «로컬 green 이 구조적으로 눈먼» 축이고, 그 축을 오늘 지키는 기계는 0이다.",
+      "tradeoff": "members 화이트리스트를 검사로 박으면 정당한 크레이트 신설마다 그 목록을 함께 고쳐야 한다(검사기와 매니페스트가 두 벌의 진실이 되는 형태 — 이 저장소가 dod_ci_parity 에서 이미 감수한 종류의 비용). 대안은 «리눅스 레그를 한 번 도는 것»인데 그건 CI 시간을 사는 쪽이고 이 제안보다 느리다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "문서가 주장하는 «required status check» 와 실제 브랜치 보호를 한 번 맞춘다",
+      "plainSummary": "저장소 문서는 어떤 검사가 «필수»라고 적어 두었지만, 실제 설정에는 필수 검사가 하나도 없습니다. 둘 중 하나로 맞춰야 다음 사람이 문서를 믿고 잘못 판단하지 않습니다.",
+      "userBenefit": "「이 검사는 필수라 red 면 머지가 안 된다」는 잘못된 안심이 사라진다 — 실제로는 red 여도 머지 버튼이 열린다.",
+      "why": "engine-contract.yml:22 헤더와 AGENTS.md 사건 대장이 contract 를 required status check 로 적는데 실측은 branches/main/protection 404 'Branch not protected' · rulesets [] 다. 직전 회차가 그 문서를 근거로 인용했고 게이트②가 반려했다.",
+      "tradeoff": "⒜실제로 브랜치 보호를 켜면 문서가 참이 되지만, paths-filter 교착(사건 대장의 그 사고)을 다시 초대할 수 있어 required 로 올릴 검사를 신중히 골라야 한다. ⒝문서를 «의도»로 다시 쓰면 공짜지만 기계 강제는 여전히 0이다. 어느 쪽인지가 이 제안의 판단 대상이고, 운영자·총괄 결정이 필요할 수 있다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}

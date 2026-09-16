@@ -88,10 +88,18 @@ git log --all --oneline -- wie-ktf/tests/test_key_reach.rs → 36df9c31 «한 �
 ```
 node scripts/check-engine-contract.mjs → ENOENT  wie_midp/src/classes/net/wie/event_queue.rs
 ```
-⒜`contract` 는 ★**`main` 의 required status check** 다(`engine-contract.yml` 헤더·사건 대장 양쪽이 명시).
-⒝내 diff 는 `**/*.rs` 를 건드리므로 그 job 의 `engine` 필터가 **발화한다**.
-⇒ ★**그 크래시를 두면 이 PR 은 «게이트③이 머지할 수 없는» 상태로 제출된다**(직전 회차에서 안 보였던 이유는
-#161 이 `CONFLICTING` 이라 `pull_request` 워크플로가 **애초에 안 돌았기** 때문이다 — 조각 E 의 F3).
+★★**[정정 2026-09-16 게이트② · `-fix3`] 이 문단의 ⒜는 «문서를 인용한 것»이고 실측과 어긋난다.**
+원문: 「⒜`contract` 는 ★**`main` 의 required status check** 다(`engine-contract.yml` 헤더·사건 대장 양쪽이 명시)」.
+실측: `gh api repos/Jun025/wie/branches/main/protection` → ★**404 `Branch not protected`** ·
+`rulesets` → ★**`[]`** · `gh pr view 161 --json mergeStateStatus` → ★**`UNSTABLE`(`BLOCKED` 이 «아니다»)**.
+⇒ ★**GitHub 강제 required check 는 «0개»이고 `contract` 가 red 여도 머지 버튼은 열린다.**
+★**문서와 실측이 어긋날 때는 실측이 이긴다** — `engine-contract.yml:22` 헤더는 «설계 의도»를 적은 것이고
+브랜치 보호의 «현재 상태»가 아니다.
+★**그래서 «행동»은 그대로 옳다 — 근거만 갈아치운다**: 크래시한 계약 검사기는
+★**fail-closed 계약을 «아무것도 검증하지 않는다»**(Constraint 3) ⇒ 강제 여부와 무관하게 결함이다.
+⒝내 diff 는 `**/*.rs` 를 건드리므로 그 job 의 `engine` 필터가 **발화한다**(불변).
+※직전 회차에서 안 보였던 이유는 #161 이 `CONFLICTING` 이라 `pull_request` 워크플로가 **애초에 안 돌았기**
+때문이다(조각 E 의 F3).
 
 ★**전수 census 로 세 곳을 찾았다**(E 의 F4 는 「낡음 2」로 셌는데 ★**셋이다** — 세 번째는 **스크립트가 아니라
 계약 JSON 안**에 있어 문자열 grep 에 안 걸린다):
