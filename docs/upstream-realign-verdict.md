@@ -463,13 +463,23 @@ upstream 이 낫다는 것과 **우리 기준선을 upstream 이 통과한다는
 ### P4 — ② 를 upstream 에 PR · size **M** · risk **low** · P3 와 병행 가능
 ★**IP 방침 선 안쪽만**(#1239 · 2026-06-29 「공개 문서 기반으로만 구현 · 펌웨어 리버스 계획 없음」).
 
-**선 안쪽 (보낼 수 있다)**
-- `wie_wipi_java` 우리만 있는 클래스 **10종**: `java/io/{InterruptedIOException,UnsupportedEncodingException}` ·
-  `java/lang/{OutOfMemoryError,VirtualMachineError}` · `msp/lcdui/InputMethodListener` ·
+**선 안쪽 (보낼 수 있다)** — ★**2026-09-16 base swap(PR #161) 이후로 재측한 값이다.**
+경로는 전부 **하이픈 크레이트**(`wie-wipi-java` 등)다 — 그 PR 이 `wie_x` → `wie-x` 로 개명했다.
+재측 명령은 **`git diff --stat 44fbf265 origin/main -- <경로>`**(`44fbf265` = 그 머지의 upstream 쪽 부모).
+
+- `wie-wipi-java` 우리만 있는 클래스 ★**6종**: `msp/lcdui/InputMethodListener` ·
   `msp/lwc/{ActionListener,FormComponent,GrabKeyListener,LabelComponent}` · `msp/media/MediaUnsupportedException`.
   ★전부 **WIPI 공개 API 스텁**이다.
-- `wie_backend/src/canvas.rs` 의 **+149줄 = 전부 단위테스트 9개**(구현 아님 — 실측). ★테스트는 IP 축과 무관.
-- `wie_midp/.../font.rs` 의 메서드 1건(우리 10 ↔ upstream 9).
+  ★★**종전 문안의 「10종」은 «낡았다»** — `java/io/{InterruptedIOException,UnsupportedEncodingException}` ·
+  `java/lang/{OutOfMemoryError,VirtualMachineError}` **4종은 폐기됐다**(PR **#159** `0b33edfd` · 핀
+  `dlunch/RustJava@5b84dd1` 의 `loader.rs` 가 같은 FQCN 을 등록하고 클래스패스가 `RT_RUSTJAR` 를 먼저 둔다).
+  ⇒ ★**보내 봐야 중복이다.** `git diff --name-only 44fbf265 origin/main -- wie-wipi-java/src/classes/` 로 재측한다.
+- `wie-backend/src/canvas.rs` — ★**보낼 것이 «한 줄»이다**(종전 문안 「+149줄 = 전부 단위테스트 9개」는 **두 겹으로 낡았다**).
+  ⒜그 +149 는 base swap 이 **흡수**했다 — 오늘 upstream 대비 델타는 **1 insertion · 1 deletion** 이다.
+  ⒝남은 그 한 줄은 «테스트»가 아니라 ★**경계 검사**다: `decode_image` 의 LBMP 매직 판정에 `data.len() >= 4` 가 붙는다
+  (4바이트 미만 입력에서 인덱스 패닉을 막는다). ★**테스트가 아니므로 IP 축과 무관하다는 종전 근거도 갈아타야 한다** —
+  이것은 «공개 포맷 파서의 방어 코드»라 선 안쪽이다.
+- `wie-midp/.../lcdui/font.rs` 의 메서드 1건 — ★**여전히 참이다**(재측: upstream **9** ↔ ours **10** · 델타 +45줄).
 
 **선 바깥 (fork 에 남긴다)**
 - `docs/lgt_abi.md` 1,482줄 · `docs/lgt_native_classes.md` 228줄 · `docs/reference/` 7건

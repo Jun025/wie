@@ -1,0 +1,49 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-16",
+  "task": "wie-p3-adopted-proposals-triage-after-base-swap-r2",
+  "title": "채택 제안 9건 재측 — base swap 이후 8건이 낡았고, 정본 한 곳만 살아 있었다",
+  "summary": "운영자가 tower 에서 채택한 wie P3 제안 9건을 PR #161(37734e74) 착지 이후 기준으로 다시 쟀다. ⒜집행 1 · ⒝발권초안 1 · ⒞무효 7. 집행분은 docs/upstream-realign-verdict.md §6-P4 의 「선 안쪽」 세 항목 갱신(10종→6종 · canvas.rs +149줄/테스트 9개 → 1줄/경계검사 · font.rs 1건은 그대로 참). 제품 코드 0줄.",
+  "changes": [
+    "docs/upstream-realign-verdict.md §6-P4 「선 안쪽(보낼 수 있다)」 3항목 재측 갱신 (+15 / -5)",
+    "docs/report/0121--2026-09-16--wie-p3-adopted-proposals-triage-after-base-swap-r2.md 신규",
+    "STATE.md 완료 항목 1건"
+  ],
+  "verification": [
+    "양방향(문안 갱신): 고치기 전 `grep -cF '- `wie_wipi_java` 우리만 있는 클래스 **10종**'` = 1 · `'- `wie_backend/src/canvas.rs` 의 **+149줄'` = 1 ⇒ 고친 뒤 둘 다 0. 폐기 문안은 «인용»으로만 1건 남긴다(왜 틀렸는지가 남아야 다음 사람이 되돌리지 않는다)",
+    "git diff --numstat docs/upstream-realign-verdict.md → 15 5 (삭제행 0 이 아니다 = 치환이 실제로 일어났다)",
+    "그룹 B 재측: cargo check --all 통과 (조각 C 가 측정한 컴파일 오류 10건이 머지로 해소됐다)",
+    "그룹 C 재측: 18개 메서드 전건 실재 + ImageObserver 등록 실재 ⇒ 손실 0",
+    "6종 재측: git diff --name-only 44fbf265 origin/main -- wie-wipi-java/src/classes/ → 신규 클래스 6",
+    "canvas.rs 재측: git diff --stat 44fbf265 origin/main -- wie-backend/src/canvas.rs → 1 insertion · 1 deletion",
+    "font.rs 재측: upstream 9 ↔ ours 10 (JavaMethodProto::new 계수)",
+    "코퍼스 분할 재측: scripts/smoke_gate_baseline.tsv → ktf 190 · lgt 52 · skt 50 = 292"
+  ],
+  "limits": [
+    "★이 회차는 «재측»이고 제품 코드를 고치지 않았다 — 그룹 B/C 의 «동작» 동등은 cargo check 와 심볼 실재까지만 봤고, 게스트 수준 동등은 292 코퍼스 부재로 여전히 미측정이다.",
+    "★⒞로 닫은 7건 중 둘(p3-slice-c#p0·#p1)은 «결과»가 달성됐을 뿐 «기록»은 남지 않았다 — 조각 D 의 티켓·회신 5파일 전건에 「그룹 B」·「그룹 C」·「폐기 21행」 문자열이 0건이다. 우연이 설계를 대신했다.",
+    "★새 base 의 고아 5파일(wie_j2me·wie_jvm_support·wie_midp·wie_wipi_java 의 tests/)은 이 티켓의 범위 밖(무접촉)이다 — 조각 E 소관. 그중 preload_classes_come_from_the_runtime.rs 는 PR #159 가 세운 개악 대조인데 지금 «컴파일되지 않는다»."
+  ],
+  "adoptedProposals": [
+    "2026-09-16-p3-slice-b-engine-overlay-triage#p0",
+    "2026-09-16-p3-slice-b-engine-overlay-triage#p2",
+    "2026-09-16-p3-slice-b-engine-overlay-triage#p3",
+    "2026-09-16-p3-slice-c-drop-already-upstream#p0",
+    "2026-09-16-p3-slice-c-drop-already-upstream#p1",
+    "2026-09-16-p3-slice-c-drop-already-upstream#p2",
+    "2026-09-16-slice-a-lgt-graphics-abi-family#p0",
+    "2026-09-16-slice-a-lgt-graphics-abi-family#p1",
+    "2026-09-16-slice-a-lgt-graphics-abi-family#p2"
+  ],
+  "proposals": [
+    {
+      "title": "코퍼스 human-step 카드에 «첫 질문»을 덧붙인다 — LGT 52건으로 좁힌 단 하나의 물음",
+      "plainSummary": "게임 아카이브를 놓아 달라는 기존 요청 카드에, 「파일이 도착하면 제일 먼저 무엇을 확인할 것인가」 한 줄을 추가하자는 제안입니다. 292개 전부가 아니라 LGT 52개만으로 답이 나옵니다.",
+      "userBenefit": "아카이브가 도착했을 때 무엇부터 볼지가 이미 정해져 있으므로, 받아 놓고 몇 회차를 헤매는 일이 없어집니다. 그리고 요청량이 292 → 52 로 줄어 운영자가 응하기 쉬워집니다.",
+      "why": "카드(humansteps/wie-p2-corpus-placement.md)는 2026-09-16 에 이미 발권돼 status: open 이지만, «무엇을 물을 것인가»가 그 안에 없습니다. 조각 A 가 남긴 유일한 미판정은 「실제 clet 이 GetScreenFrameBuffer 반환값을 WIPICFramebuffer 로 직접 읽는가, 아니면 ptr_graphics → view.ptr_backing 을 걷는가」 하나이고, 그 답이 조각 D 의 graphics 27줄 결정을 그대로 정합니다. 실측한 코퍼스 분할은 ktf 190 · lgt 52 · skt 50 이고, ktf/skt 는 이 질문에 답하지 않습니다.",
+      "tradeoff": "카드 문안이 길어집니다. 그리고 52건조차 이 머신에 없으면 여전히 미판정으로 남습니다 — 이 제안은 «질문을 준비»할 뿐 «답»을 만들지 않습니다.",
+      "effort": "S",
+      "target": "orchestrator"
+    }
+  ]
+}
