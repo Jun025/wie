@@ -483,6 +483,12 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 > 폰트 = `assets/neodgm.ttf` `include_bytes!` — ★**JS 생성자 인자를 더하지 않는다**(계약 export 표면 불변).
 > ★**어댑터는 «두 벌»로 둔다**(공통화하면 upstream 이 트레이트를 또 바꿀 때 한 번에 둘 다 깨진다).
 >
+> ★**[정정 2026-09-17 · `wie-adopt-slice-d-base-swap-fix3-p1`]** 아래 「`contract` 는 `main` 의 **required check**」는
+> ★**거짓이다** — 실측 `branches/main/protection` **404** · `rulesets` **[]** · `protected=false` ⇒ ★**강제 required check 0개**.
+> ⇒ 그 ENOENT 크래시가 «착지를 막았다»는 것은 ★**GitHub 이 막았다는 뜻이 아니라 «게이트③ 회차가 red 를 보고 멈췄다»는 뜻**이다.
+> ★**막은 주체가 «플랫폼»이 아니라 «사람과 절차»였다** — 그 구분이 이 문서 다른 곳의 인용에도 걸린다.
+> 보호 설정은 준비돼 있으나 **미적용 human-step** 이다(`~/orchestrator/reports/wie-main-branch-protection.done.md` §C).
+>
 > ★★**착지를 막던 둘**(티켓 밖 · ★이 회차 base swap 의 개명 잔재): `contract` 는 `main` 의 **required check** 인데
 > `check-engine-contract.mjs` 가 ENOENT 크래시했다 — 로케이터 2 + ★**계약 JSON 의 `file` 핀 2**(조각 E 는 「낡음 2」로
 > 셌으나 **셋**이다 · 세 번째는 스크립트가 아니라 JSON 안이라 문자열 grep 에 안 걸린다) ⇒ 해소 후

@@ -638,11 +638,31 @@ next person who finds it inconvenient. Do not compress them into the table above
 **Self-merge, five times.** The cause behind §Git Workflow: five landed changes bypassed the
 review gate this exact way. The rule is not "merging is discouraged".
 
-**A paths-filtered required check deadlocks the merge forever.** `contract` is a required status
-check on `main`. A required check whose triggers carry a `paths:` filter never reports on a PR
-that misses those paths — GitHub shows "Expected — Waiting for status" indefinitely and the merge
-button never unlocks. That is why `engine-contract.yml` filters *inside* the job instead. Adding a
-`paths:` filter to it looks like an obvious optimization and is the outage.
+**A paths-filtered required check deadlocks the merge forever.** A required check whose triggers
+carry a `paths:` filter never reports on a PR that misses those paths — GitHub shows "Expected —
+Waiting for status" indefinitely and the merge button never unlocks. That is why
+`engine-contract.yml` filters *inside* the job instead. Adding a `paths:` filter to it looks like
+an obvious optimization and is the outage.
+
+**`contract` is the job that would be required — but nothing is required today, and this entry used
+to say otherwise.** Measured 2026-09-16 (and again 2026-09-17): `gh api
+repos/Jun025/wie/branches/main/protection` → **404 "Branch not protected"**, `…/rulesets` → **[]**,
+`…/branches/main` → `protected=false`. **GitHub-enforced required checks: zero.** So a red
+`contract` does *not* hold the merge button, and no check here does.
+
+**Read that as "the rule above is unenforced", NOT as "the rule above is optional".** The
+always-run shape is what makes `contract` *eligible* to be required, and it was built for exactly
+that (`docs/report/0003--2026-07-22--wie-main-branch-protection.md`). Paths-filtering it now would
+cost nothing today and deadlock every merge on the day protection is switched on — and the switch
+is a one-shot operator action that can land at any time. Keep the wrapper.
+
+**Why it is still off is known, and it is not a decision anyone has to re-make.** That 2026-07-22
+round did the code half and left the settings half as an explicit human-step — *"★human-step (워커
+적용 금지 · repo 설정 변경)"*, ruleset JSON included, PR-before-merge + required checks with review
+approval deliberately excluded (a sole-owner repo deadlocks the moment approvals are required). It
+has never been applied: report `0005` recorded it unapplied on 2026-08-02, and the API still says
+so. The whole of it lives in `~/orchestrator/reports/wie-main-branch-protection.done.md` §C —
+outside this repo, and outside what any round here can execute.
 
 **`paths-filter` reads paths, not content** (measured in otterpebble's `free-tier.md`, re-confirmed
 here 2026-08-05). A comment-only or docs-only edit to a filtered path still fires the workflow.
