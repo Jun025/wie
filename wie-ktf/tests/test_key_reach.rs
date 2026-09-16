@@ -30,7 +30,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
-use test_utils::{TestPlatform, TestPlatformEvent};
+use test_utils::{TestPlatform, TestPlatformEvent, guest_line_complete};
 use wie_backend::{Emulator, Event, KeyCode, Options, extract_zip};
 use wie_ktf::KtfEmulator;
 use wie_util::Result;
@@ -71,12 +71,10 @@ pub fn key_press_reaches_the_ktf_guest() -> Result<()> {
         emulator.tick()?;
         seen = String::from_utf8_lossy(&stdout.lock().unwrap().clone()).into_owned();
         // `contains("key:")` is NOT enough, and getting this wrong reads as an
-        // engine regression: the guest writes the prefix and the digits in
-        // separate writes, so that predicate is already true while the buffer
-        // holds only `"res:9:602\nkey:"` — breaking there asserts on a truncated
-        // line and fails with the value still in flight. Wait for the newline
-        // that terminates the value.
-        if seen.split("key:").nth(1).is_some_and(|t| t.contains('\n')) {
+        // engine regression rather than a test bug. Why, and what it cost twice:
+        // `guest_line_complete`'s doc comment — one copy, because this is the
+        // line both stdout-polling tests got wrong independently.
+        if guest_line_complete(&seen, "key:") {
             break;
         }
     }
