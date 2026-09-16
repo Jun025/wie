@@ -192,6 +192,22 @@ jobs:
       - name: Linux CI can still build the graph (docs/worklog/2026-09-16-slice-d-base-swap-fix3.json #p0)
         run: node scripts/check-linux-system-deps.mjs
 
+      # Seventh always-run step. Two upstream workflows (release.yaml, web.yaml)
+      # arrived with the base swap and were decided against, not adopted; the
+      # decision lives as "triggers reduced to workflow_dispatch" inside files we
+      # otherwise keep verbatim. That parking is a LOCAL edit to an UPSTREAM file,
+      # so a future `git merge upstream/main` can restore the originals —
+      # including release.yaml's nightly cron, which deploys to Cloudflare with
+      # our token and cuts releases publish-artifact.yml already owns.
+      #
+      # ALWAYS-RUN for the same reason as the always-run steps above: the diff that
+      # re-arms them is an upstream merge touching only `.github/**`, which every
+      # engine-keyed paths filter skips — exactly the PR that needed the check.
+      #
+      # Cost: node reading two files. No network, no node_modules.
+      - name: Parked upstream workflows stay dispatch-only (scripts/check-parked-workflows.mjs)
+        run: node scripts/check-parked-workflows.mjs
+
       # ── Deliberately non-blocking, and that is the whole point of the flag ───
       # This job is the one INTENDED to be a required status check on main, so a
       # hard-failing step here is a required check by placement — nobody would

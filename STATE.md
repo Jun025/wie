@@ -123,6 +123,27 @@
   술어가 **공개 API** 가 됐다(의도된 비용 — «세 번째»를 받는 것이 목적이다).
   회귀 0(전건 합산 · `tail` 아님): fmt/clippy/wasm/beta rc=0 · `cargo test --all --no-fail-fast`
   **42 스위트 384 passed · 0 failed**(`origin/main` 과 동수) · `npm run audit` rc=0.
+- 2026-09-16: **upstream 워크플로 둘 — «채택하지 않는다»로 «결정»했고, 그 결정을 기계로 잠갔다**
+  (`wie-adopt-slice-d-base-swap-fix2-p3` · 채택 `2026-09-16-slice-d-base-swap-fix2#p3`) —
+  정본 `docs/report/0126--….md`. ★**제품 동작 0줄** · 두 워크플로의 동작도 **이전과 동일**(여전히 `workflow_dispatch` 전용).
+  ★**결정**: `release.yaml`·`web.yaml` **둘 다 채택 안 함**. 근거 — ⑴`release.yaml` 은 Tauri 로
+  **windows·linux·macos·android·ios 5타깃**을 만드는데 ★`AGENTS.md` Goal 이 우리 호스트를
+  **`wie_cli`·`wie_featurephone` «둘»** 로 못박는다 ⑵무장하려면 `Cargo.toml` 이 **방금 `exclude` 한 `wie-app`** 을
+  워크스페이스로 되돌려야 한다(그 크레이트가 **gtk/webkit2gtk/libsoup3 의 유일한 루트**라 Linux CI 를 죽였다 —
+  ★**제안이 몰랐던 축**) ⑶릴리스 발행자 이중화(`publish-artifact.yml` 이 이미 소유 · 소비자 가시 위험) ·
+  Pages 프로젝트명 `wie`/`wie-dev` ↔ 우리 `wie-web` 이 **우리 토큰으로** 돈다 ⑷`web.yaml` 은 **우리 `web.yml` 의 중복**이고
+  트리거 면이 같으며 `build:dev` 가 없다.
+  ★**삭제가 아니라 «주차 유지»** — 삭제는 **upstream 동기마다 재발**하고, 바로 옆 `Cargo.toml` 이 `wie-app` 에 대해
+  「지우지 말고 · 무력화하고 · 이유를 적는다」는 **같은 트레이드**를 이미 택했다.
+  ★★**이 회차가 새로 잰 것**: 주차는 ★**upstream 파일에 가한 «우리 로컬 편집»**이라 다음 `git merge upstream/main` 이
+  원본 트리거를 되돌릴 수 있는데 ★**그것을 보는 축이 «0»이었다**(원본 = `schedule: cron "17 0 * * *"` + `push(tags)`
+  ⇒ 되살아나면 **매일 밤** 우리 `CLOUDFLARE_API_TOKEN` 으로 `pages deploy` + **이중 릴리스 발행**).
+  오늘 막는 것은 `build:prod` 부재뿐이고 주차 회차 자신이 ★**「That is luck, not a guard」**라고 적었다.
+  ⇒ **`scripts/check-parked-workflows.mjs` 신설 + `engine-contract.yml` always-run 배선**
+  (★재무장 diff 는 **`.github/` 만 만지는 upstream 머지**라 엔진 keyed 필터가 **그 PR 을 건너뛴다**).
+  ★**개악 대조 4종 전건 rc=1 ↔ 정상 rc=0**(원본 트리거 복원 2 · ★**흐름열 `on: [push]`** · 파일 삭제 fail-closed).
+  ★**흐름열 케이스는 «내가 직전 회차에서 실제로 밟은 함정»**이라 일부러 넣었다 — 블록 매핑만 보는 술어가
+  `coverage.yml` 의 `on: [push]` 를 놓쳤다. ⇒ 두 형식을 다 파싱하고 ★**파싱 0건은 «주차»가 아니라 «위반»**으로 접는다.
 - 2026-09-16: **코퍼스 카드에 «첫 질문»을 넣었다 — 그 자리가 본문이면 안 되는 이유**
   (`wie-adopt-p3-adopted-proposals-triage-r2-p0`) — 정본 `docs/report/0122--….md`.
   채택 제안 `2026-09-16-p3-adopted-proposals-triage-r2#p0` 집행. **wie 제품 코드 0줄**(이 저장소 변경은 원장 3파일).
