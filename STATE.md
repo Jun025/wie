@@ -60,6 +60,26 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-17: **「required status check」를 실측에 맞췄다 — 그리고 «왜 안 켜져 있었나»가 진짜 답이었다**
+  (`wie-adopt-slice-d-base-swap-fix3-p1` · 채택 `2026-09-16-slice-d-base-swap-fix3#p1`) —
+  정본 `docs/report/0127--….md`. ★**제품 코드 0줄 · 워크플로 «동작» 0줄 · 저장소 설정 무접촉.**
+  ★**실측**: `branches/main/protection` **404 Branch not protected** · `rulesets` **[]** · `protected=false`
+  ⇒ ★**강제 required check «0개»** — 문서 **5곳**이 「`contract` 는 `main` 의 required status check **다**」로
+  단언하고 있었다. ⇒ 전부 **실측에 맞춰 정정**(`AGENTS.md` 사건 대장 · `engine-contract.yml` **2곳** ·
+  `web.yml` · `p3-slices.md`). ★**규칙은 약화시키지 않았다** — 「`paths:` 를 붙이지 마라」는 그대로이고,
+  근거를 **강화**했다(스위치는 한 번의 운영자 행동으로 «언제든» 켜지고 그날 그 잡은 즉시 blocking 이 된다).
+  ★★**ⓑ 가 처방을 바꿨다** — 제안은 ⒜(보호를 켠다)/⒝(문서를 고친다)를 «새로 고르라»고 했는데
+  실측은 ★**「이미 골랐다」**였다: `docs/report/0003`(2026-07-22)이 `contract` 를 **always-run 래퍼**로 만들어
+  required 로 걸어도 교착하지 않게 해 두고, 보호 설정은 ★**「human-step (워커 적용 금지 · repo 설정 변경)」**
+  으로 분리해 **ruleset JSON 까지** 써 두었다(정본 `~/orchestrator/reports/wie-main-branch-protection.done.md` §C ·
+  ★리뷰 승인 필수는 **의도적 제외** — 단독 소유자 교착 방지).
+  ⇒ ★**⒜ 는 «미결정»이 아니라 «준비됐는데 미적용»이고, 약 8주째다**(`report/0005` 가 2026-08-02 에 이미 미적용 기록 ↔ 오늘 API 동일).
+  ★★**근인도 쟀다**: `~/orchestrator/humansteps/` 에 이 건의 **카드가 0개** ⇒ 운영자 화면(`bin/humanstep-scan`)이
+  읽는 자리에 없다 — human-step 이 **done 리포트 «본문 안»에만** 있다. ★**아무도 거부하지 않았다. 아무도 «보지» 못했다.**
+  ⇒ ⒜ 는 **집행하지 않고 에스컬레이션**(권한 밖 · 카드 신설은 `~/orchestrator` 소관이라 ⓒ 범위 밖).
+  ★**한계를 숨기지 않는다**: 기계 강제는 **여전히 0**이고, ★**보호를 켜는 순간 이 정정이 «반대 방향»으로 낡는다** —
+  그 회귀 축을 **만들지 못했다**(`…/branches/main/protection` 이 **admin 권한**을 요구해 `github.token` 으로 읽히는지
+  이 회차가 확인 못 했고, ★**검증 못 한 검사를 넣지 않았다**). 후속 제안 2건 발행.
 - 2026-09-16: **«완성된 줄» 술어를 한 곳으로 모았다 — 제안이 미룬 근거가 실측으로 없었다**
   (`wie-adopt-slice-d-base-swap-fix2-p0`) — 정본 `docs/report/0123--….md`.
   채택 제안 `2026-09-16-slice-d-base-swap-fix2#p0` 집행. **제품 코드 0줄**(시험 지원 크레이트 + 통합 시험 2개 ·
