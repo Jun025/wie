@@ -17,9 +17,30 @@
 # (.github/scripts/release/*.sh, wie-app, the favicon), so adding one
 # package.json script would arm the whole chain.
 #
-# Reduced to workflow_dispatch; the file is kept intact so the adoption decision
-# stays open (`git show upstream/main:.github/workflows/release.yaml` is the
-# original, and restoring the two triggers below is the whole revert).
+# ── DECIDED 2026-09-16: NOT ADOPTED (wie-adopt-slice-d-base-swap-fix2-p3) ────
+# The adoption question this file was parked pending is now answered: we do not
+# adopt it. Reasons, in the order that decides it:
+#   * it builds Windows/Linux/macOS/Android/iOS via Tauri. AGENTS.md's Goal names
+#     exactly TWO hosts we ship — wie_cli (native) and wie_featurephone (browser
+#     WASM, consumed by otterpebble). Those five are not ours to maintain;
+#   * arming it needs `wie-app` back in the workspace, which Cargo.toml just
+#     EXCLUDED because it is the sole root of gtk/webkit2gtk/libsoup3 and killed
+#     `cargo clippy --all` + tarpaulin on Linux CI while macOS/Windows stayed
+#     green. Adopting means re-taking that breakage on purpose;
+#   * the release-ownership and Pages-project collisions listed above are not
+#     configuration mismatches to fix, they are two systems doing one job.
+# NOT DELETED, deliberately: deletion recurs on every upstream sync, and the file
+# is the reference for what upstream does. Same trade Cargo.toml took with
+# `exclude = ["wie-app"]` — keep it, neutralize it, say why.
+# ENFORCED by scripts/check-parked-workflows.mjs (always-run in
+# engine-contract.yml): this parking is a local edit to an upstream file, so an
+# upstream merge can restore the triggers below and nothing else would notice.
+# REOPEN if we decide to ship a desktop/mobile host — that is the same moment
+# Cargo.toml's `exclude = ["wie-app"]` comes out, and it is a product decision,
+# not a CI cleanup. Un-parking also means settling the Pages project name,
+# release ownership vs publish-artifact.yml, and the absent `build:prod` script.
+# `git show upstream/main:.github/workflows/release.yaml` is the original, and
+# restoring the two triggers below is the whole revert.
 # See docs/upstream-realign-p3-slices.md §D.
 name: Release
 
