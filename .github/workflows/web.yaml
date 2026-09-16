@@ -6,13 +6,25 @@
 # on PR #161 the moment the merge conflict cleared and pull_request workflows
 # could run for the first time.
 #
-# The triggers are reduced to workflow_dispatch instead of deleting the file,
-# because "which upstream workflows do we adopt?" is a decision the P3 realign
-# plan never made, and this round is not the place to make it. Nothing is lost:
-# `git show upstream/main:.github/workflows/web.yaml` is the original, and
-# restoring the two triggers below is the whole revert.
+# The triggers are reduced to workflow_dispatch instead of deleting the file.
+# Nothing is lost: `git show upstream/main:.github/workflows/web.yaml` is the
+# original, and restoring the two triggers below is the whole revert.
 #
 # Our equivalent is web.yml (job `build-web`, Pages project `wie-web`).
+#
+# ── DECIDED 2026-09-16: NOT ADOPTED (wie-adopt-slice-d-base-swap-fix2-p3) ────
+# "Which upstream workflows do we adopt?" — the question the parking round left
+# open — is answered for this file: we do not. It is a DUPLICATE of web.yml on
+# the same trigger surface (push main + pull_request), one branch-name set older
+# (no feat/* preview branches), and it builds with a script we do not have. There
+# is no version of adopting it that is not "run two web CIs, one of which is
+# broken". Deleting it recurs on every upstream sync, so it is kept and
+# neutralized instead — the same trade as release.yaml beside it.
+# ENFORCED by scripts/check-parked-workflows.mjs (always-run in
+# engine-contract.yml), because this parking is a local edit to an upstream file
+# and an upstream merge can restore the triggers below unnoticed.
+# REOPEN if web.yml is ever retired in favour of upstream's — then this file is
+# the starting point, and `build:dev` has to exist first.
 # See docs/upstream-realign-p3-slices.md §D.
 on:
   workflow_dispatch:
