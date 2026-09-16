@@ -70,7 +70,13 @@ pub fn key_press_reaches_the_ktf_guest() -> Result<()> {
     for _ in 0..DELIVER_TICKS {
         emulator.tick()?;
         seen = String::from_utf8_lossy(&stdout.lock().unwrap().clone()).into_owned();
-        if seen.contains("key:") {
+        // `contains("key:")` is NOT enough, and getting this wrong reads as an
+        // engine regression: the guest writes the prefix and the digits in
+        // separate writes, so that predicate is already true while the buffer
+        // holds only `"res:9:602\nkey:"` — breaking there asserts on a truncated
+        // line and fails with the value still in flight. Wait for the newline
+        // that terminates the value.
+        if seen.split("key:").nth(1).is_some_and(|t| t.contains('\n')) {
             break;
         }
     }
