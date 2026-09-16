@@ -475,6 +475,45 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 
 ### E — `wie-p3-post-swap-web-contract-and-artifact`
 
+> ★★★**[돌았다 2026-09-16 · `wie-p3-slice-e-verify-web-contract-on-new-base` · 정본 `docs/report/0116--….md`]
+> 답: 이름 계약은 «온전»하고, 대신 ★**웹 표면이 통째로 서 있지 않다**.**
+> ★**피검체 = `f533ba54`**(조각 D 의 PR #161 head · ★**미착지** · `CONFLICTING`) · **대조군 = `origin/main d70b93f8`**.
+>
+> ★**F1 [차단]**: `wie_featurephone` 이 **컴파일되지 않는다** — `npm run build:wasm` ★**rc=101 · 12오류 · 4파일**
+> (`Platform::font` · `Screen::resize` · `AudioSink` **send 미구현 + 5건이 트레이트 멤버 아님** ·
+> `DatabaseRepository` **usage 미구현 + open/exists/delete 인자 4↔3**).
+> ★**조각 A 검수자가 `wie_cli` 에서 이미 잰 «그 21줄 어댑터»와 같은 축**이고, ★**D 가 `wie_cli` 만 맞췄다.**
+> ⇒ 아티팩트 **부재** · 계약검사·브라우저 왕복 **돌릴 수 없다** · `npm run frontend` **rc=101**.
+> ★**대조군은 전건 green**(build rc=0 · `check-engine-contract` **107 pass/0 violation** · 왕복 **A~F 전건**)
+> ⇒ ★**툴체인이 아니라 «새 base» 의 결함이다.**
+>
+> ★★**F2 [게이트 사각 — 이 회차의 실제 산출]**: 그 상태에서 wasm 게이트가 ★**rc=0 «green»** 이다.
+> `cargo clippy --target wasm32-unknown-unknown -- -D warnings` 는 `--all` 이 없어 **`default-members`** 를 고른다 —
+> 새 base `["."]`(upstream 루트 패키지 `wie`) · 구 base `["wie_cli"]` ⇒ ★**두 base 어느 쪽도 `wie_featurephone` 을 린트하지 않는다.**
+> ★**사각은 upstream 이 만든 것이 아니라 «원래 있었고», 새 base 가 그 안에 실제 결함을 넣었다.**
+> ※네이티브 `clippy --all` 은 그 크레이트를 보지만 비-wasm 에서 **빈 라이브러리**(Constraint 7)라 볼 것이 없다.
+>
+> ★**F3 [미측정]**: `f533ba54` 에서 발화한 run 은 ★**`coverage · push` 1건뿐** — `pull_request` 워크플로 **0건**
+> (`CONFLICTING` 이라 머지 ref 미계산). `web.yml` 의 `Build frontend` 는 `if:` 가 없어 **PR 에서도 도는 축**인데
+> ⇒ ★**그 run 자체가 생기지 않았다. 웹 축은 red 도 green 도 아니고 «재 본 적이 없다».**
+>
+> ★**F4**: `check-engine-contract.mjs` 가 옛 경로 **2줄**(`:111 wie_midp/…` · `:146 wie_wipi_java/…`)을 박아 두어
+> 새 base 에서 **ENOENT 크래시**(fail-closed 는 지켜지나 «검사기 고장»으로 읽힌다) · 정상 로케이터 2줄.
+> ★★**F5 [정정 2026-09-16 게이트②]**: 초판은 「고아 `wie_midp/` **1건**」이라 적었으나 ★**전수는 4디렉터리·5파일**이고
+> ★**성격은 «남겨진 파일»이 아니라 «커버리지 삭제»다.** 술어 = 「새 base top-level `wie*` 중 **members 밖 + `Cargo.toml` 없음**」:
+> `wie_j2me`(1 · `tests/test_boot.rs`) · `wie_jvm_support`(2 · `absent_string_buffer_insert`·`absent_timer_schedule`) ·
+> `wie_midp`(1 · `create_image_missing_name_message`) · `wie_wipi_java`(1 · `preload_classes_come_from_the_runtime`).
+> ★**넷 다 구 base 에서 우리 크레이트였다**(추적 **4·9·40·59** · 전건 `Cargo.toml` · 셋은 명시 members · `wie_midp` 는 path 의존 = 암묵 member)
+> ⇒ ★**base 교체가 넷을 «동시에» 고아로 만들었다.** ★**5건 전건이 구 base `cargo test --all` 에서 «실제로 돌았다»**(`Running tests/…` 로그) ·
+> 새 base 트리에 **정확히 1회씩**만 존재 ⇒ 하이픈 후속이 **이어받지 않았다**.
+> ★★**시한**: 조각 D `-fix2` 착지와 **동시에** 그 5건이 `main` 스위트에서 빠진다.
+>
+> ★★**깨지지 «않은» 것 — 이 칸이 1차로 물은 축**: `--out-name wie_web` **그대로**(사유 주석 포함) ·
+> 계약 JSON `files=[wie_web.js, wie_web_bg.wasm]`·`glueFetchesWasmByName=wie_web_bg.wasm` **그대로** ·
+> `WASM_IN` 은 `wie_featurephone.wasm` ⇒ **크레이트명↔아티팩트명 분리 유지** · upstream `wie-web` 과 **공존**(충돌 0).
+> ⇒ ★**otterpebble 리시버의 «이름으로 받는» 축은 안전하다 — 교차 repo 조율은 필요 없고, 필요한 것은 wie 안의 어댑터 이식이다.**
+> ★**고치지 않았다**(이 칸의 Contract 3) — 처분은 후속 제안 4건(worklog)이 진다.
+
 - **⒜ 범위**: 새 base 에서 **웹 표면**이 계약을 지키는가. `web/`·`scripts/build-wasm.sh`·
   `docs/contracts/featurephone-engine-contract.json`. ★**계약이 바뀌면 같은 PR 에서 갱신**(Constraint 3).
   ★**산출물 이름 `wie_web.js`/`wie_web_bg.wasm` 은 «바꾸지 마라»** — 그것은 upstream 충돌이 아니라
