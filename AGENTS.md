@@ -389,6 +389,17 @@ than let it be ignored — a periodically-red check that people scroll past is w
   holds a duplicate — **it does not renumber anything, and neither should you renumber a landed
   file**; move the side that has not landed yet.
 
+  **That answer goes stale while you work, so the same check also compares your serial against the
+  *other* open PRs and reddens before anything lands** (2026-09-17). `--next-serial` is true at the
+  moment you ask, and the file is committed at the end of the round: measured twice, #164/#165 both
+  took `0122` eight minutes apart, and #176/#177 both took `0134` five minutes apart. Widening the
+  claim query to pushed-but-unopened branches would not have caught either — the commit→PR gap is
+  **p50 28s, max 70s** over 32 PRs, while the gap that bites is ask→commit, i.e. the length of your
+  round. So the bare mode now also asks: *does another open PR already hold a serial I added?* If
+  yes it exits 1 and names both sides and the move rule — **the higher PR number moves**, and if
+  your side is not a PR yet, yours moves. It costs nothing on a `main` push (nothing added → no
+  API call) and, like `--next-serial`, a network or git failure warns rather than blocks.
+
   **`-H` is load-bearing, not cosmetic.** It prefixes the path, so `sort -r` keys on the *sequence number*; `-h` keys on the title text, which is the date, and this repo lands up to six rounds a day. Measured over 54 files: the `-h` form is **52 lines out of place**, the `-H` form is **0**. Sort by the **sequence number, not the date** — the ledger's date-monotonicity is a coincidence, not a guarantee. `REPORT.md` explains the rest; `docs/report-migration-revert.md` reverts it.
 
   **What actually conflicts is a *shared insertion point*, not a "top".** Measured 2026-09-08 on the

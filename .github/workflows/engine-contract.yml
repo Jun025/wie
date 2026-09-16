@@ -47,6 +47,11 @@ on:
 
 permissions:
   contents: read
+  # Read-only, and only the serial check uses it: it asks which serials the OTHER
+  # open PRs already claim, so a duplicate reddens while both are open instead of
+  # after one lands. Without this scope `gh` 404s on the pulls API and that axis
+  # silently degrades to a warning — a check that exists but cannot run.
+  pull-requests: read
 
 concurrency:
   group: engine-contract-${{ github.ref }}
@@ -167,7 +172,14 @@ jobs:
       # three places (docs-gate.yml, ci.yml, gate-checks.txt); wie has one
       # always-run PR gate and no local gate-checks chain, so one place is the
       # whole surface.
+      # GH_TOKEN is what makes the "other open PRs" half of the bare mode actually
+      # run here (2026-09-17). `gh` reads no other env, and the script treats an
+      # auth/network failure as a warning, so the step keeps working if it is ever
+      # removed — it just stops seeing cross-PR collisions, which is the state this
+      # line exists to end. A main push adds no serials and makes no API call.
       - name: docs/report serials are unique (docs/worklog/2026-09-07-docs-report-serial-uniqueness.json)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           node scripts/check-docs-report-serial.mjs --selftest
           node scripts/check-docs-report-serial.mjs
