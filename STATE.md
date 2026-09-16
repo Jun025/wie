@@ -60,6 +60,23 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-16: **채택 제안 9건 재측 — 8건이 낡았고 정본 한 곳만 살아 있었다**
+  (`wie-p3-adopted-proposals-triage-after-base-swap-r2`) — 정본 `docs/report/0121--….md`.
+  base swap(PR #161 · `37734e74`) **이후 기준**으로 다시 재어 ⒜집행 **1** · ⒝발권초안 **1** · ⒞무효 **7**.
+  ★**제품 코드 0줄** — 고친 것은 `docs/upstream-realign-verdict.md` §6-P4 「선 안쪽(보낼 수 있다)」 뿐이다(+15/−5).
+  ⑴클래스 **10종 → 6종**(`java/io/{InterruptedIOException,UnsupportedEncodingException}` ·
+  `java/lang/{OutOfMemoryError,VirtualMachineError}` 4종은 PR #159 로 폐기 — 런타임이 이미 준다)
+  ⑵★**`canvas.rs` 는 «수»만 틀린 게 아니라 «근거»가 틀렸다** — `+149줄 = 전부 단위테스트 9개` → 오늘 델타는
+  **1 insertion · 1 deletion** 이고 그 한 줄은 테스트가 아니라 **경계 검사**(`decode_image` 의 `data.len() >= 4`)다.
+  ⇒ 「테스트라서 IP 축과 무관」이라는 정당화가 통째로 갈아타야 했다 ⑶`font.rs` 1건은 **그대로 참**(upstream 9 ↔ ours 10).
+  ★**재측 명령을 문서에 박았다**: `git diff --stat 44fbf265 origin/main -- <경로>`(`44fbf265` = #161 머지의 upstream 쪽 부모).
+  ★**⒞ 7건의 대부분은 「조각 D 에 …를 넣어라」인데 그 자리가 이미 지나갔다** — 그리고 결과는 «맞아떨어졌다»:
+  그룹 B 5행은 새 base 에서 `cargo check --all` **통과**(조각 C 가 잰 컴파일 오류 10건이 머지로 해소) ·
+  그룹 C 9행의 **Java 가시 메서드 18개 + `ImageObserver` 등록이 전건 실재**(손실 0).
+  ★★**그러나 설계가 아니라 «운»이었다 — 조각 D 의 티켓·회신 5파일 전건에 「그룹 B」·「그룹 C」·「폐기 21행」
+  문자열이 «0건»이다.** 제안 `p3-slice-c#p0`·`#p1` 이 요구한 리터럴 항목은 전달되지 않았고 결과만 같았다.
+  ※`slice-a#p2`(코퍼스 첫 질문을 LGT **52**건으로 — 실측 ktf 190 · lgt 52 · skt 50)만 ⒝로 남겼다 —
+  카드 `humansteps/wie-p2-corpus-placement.md` 는 **이미 있고**(status open) 거기에 질문 한 줄을 덧붙이는 일이다.
 - 2026-09-16: **조각 D 착지 — upstream/main 을 base 로 삼는다 (게이트③ · PR #161)**
   (`wie-p3-slice-d-merge-upstream-main-as-base-fix3-merge`) — 정본 `docs/report/0120--….md`.
   ★★**`--merge`(parents=2)로 착지했다 — `--squash` 는 금지였다.** 스쿼시하면 부모 2개가 1개로 접혀
