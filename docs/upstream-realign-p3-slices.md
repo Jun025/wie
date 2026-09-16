@@ -531,7 +531,21 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 > ★**대가 — 축소하지 않는다**: 제안의 benefit 「LGT 전용 그래픽 0→1,095줄」은 ★**«철회»가 아니라 «연기»**다 —
 > 그 1,095줄은 **트리에 있고**(`git diff upstream/main` **0줄** = 바이트 동일) ★**배선되지 않았다.**
 > ⇒ dead code 라 모듈 «선언»에 `#[allow(dead_code)]` 를 달았다(파일 무접촉).
-> ★★**그리고 그 경로는 이 회차 뒤로 «아무 테스트도 밟지 않는다» — 썩어도 우리 게이트는 조용하다.**
+> ★★**[정정 2026-09-16 · `wie-adopt-slice-d-base-swap-executed-p1` · 정본 `docs/report/0128--….md`]
+> 종전 문안 「그 경로는 이 회차 뒤로 «아무 테스트도 밟지 않는다» — 썩어도 우리 게이트는 조용하다」는
+> ★**두 겹으로 «거짓»이다.** 제안 `#p1` 이 그 문장을 «기록으로 남기라»고 했는데, ★재 보니 문장 자체가 틀렸다.**
+> ⒜★**«배선을 끊었다»는 graphics SVC 27개에만 걸린다** — 모듈은 **다른 두 곳**에서 여전히 들어온다:
+> `wipi_c.rs` 의 `clet_register` → `graphics::{init_process_state, set_use_annunciator}` ·
+> `init.rs` 의 `InitSvcId::SetDisplayProperty` → `graphics::set_display_property`.
+> ⇒ ★**`panic!` 프로브 실측**: `init_process_state`(`:70-98`) 또는 `set_use_annunciator`(`:152-157`)에 넣으면
+> ★**`keydraw_lgt`·`helloworld_lgt` 가 FAIL·paints 0** 으로 뒤집힌다(정상 = PASS·paints 55/0·rc=0) ⇒
+> ★**그 35줄은 «모든 LGT 부팅마다» 실제로 돈다.** 반면 `set_display_property`(`:121-150`)는 같은 프로브에도
+> **양쪽 PASS** — 도달 가능하나 ★**어느 픽스처도 그 SVC 를 켜지 않는다.**
+> ⒝★**«게이트가 조용하다»도 틀렸다** — `#[allow(dead_code)]` 는 **린트만** 끄지 컴파일을 끄지 않는다.
+> ⇒ ★**1,095줄 전건이 4게이트에서 타입검사된다**(upstream API 가 밑에서 바뀌면 **빌드가 붉어진다**).
+> ★**진짜로 안 잡히는 것은 «동작»뿐**이고, 그 범위는 ★**죽은 45개 항목**이다(살아 있는 12개가 아니다) —
+> `#[allow]` 를 떼면 나오는 경고가 정확히 **45건 · 전건 `graphics.rs`**(57개 최상위 항목 중).
+> ⇒ ★**되돌리는 회차가 안고 시작할 사실은 「전부 썩었을 수 있다」가 아니라 「컴파일은 지켜졌고 동작만 안 지켜졌다」이다.**
 >
 > ★**되돌리는 조건·비용(리터럴)**: ⑴**292 코퍼스(LGT 52건)** 또는 ⑵**upstream SDK 가 `framebuffer.rs` 에
 > LGT 분기를 넣으면** ⇒ ★**배선 27줄을 되돌려 재판정한다**(비용 = 그 27줄, 역방향).

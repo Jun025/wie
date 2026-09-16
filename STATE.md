@@ -140,6 +140,19 @@
   ★**부채를 숨기지 않는다**: 그 문안은 PR #161·1,095줄이 움직이면 **썩는데** `HUMANSTEP_ANSWER_STALE` 은
   날짜만 보고 내용을 못 본다. 그리고 본문 미소비는 이 카드만이 아니다 — **99장 중 57장 · 2,254줄**(세기만 했다 · 후속 제안).
   회귀 0(전건 합산 · `tail` 아님): fmt/clippy/wasm/beta OK · `cargo test --all` **42 스위트 384 passed · 0 failed**.
+- 2026-09-16: **제안 `#p1` 채택 — 기록하려던 «사실»이 틀렸다. LGT graphics 는 죽지 않았고 게이트도 조용하지 않다**
+  (`wie-adopt-slice-d-base-swap-executed-p1` · 채택 `2026-09-16-slice-d-base-swap-executed#p1`) —
+  정본 `docs/report/0128--….md`. ★**제품 동작 0줄**(주석·문서만) · `graphics.rs` **무접촉**(upstream 바이트 동일).
+  제안은 「1,095줄이 «아무 테스트도 밟지 않는» 상태를 기록하라」였는데 ★**적기 전에 쟀더니 그 전제가 «거짓»이었다.**
+  ⒜★**«배선 끊음»은 graphics SVC 27개에만 걸린다** — `clet_register` 와 `init.rs` 가 여전히 모듈로 들어간다.
+  `panic!` 프로브 실측: `init_process_state`(`:70-98`)·`set_use_annunciator`(`:152-157`) 에 넣으면
+  `keydraw_lgt`·`helloworld_lgt` 가 **FAIL·paints 0**(정상 = PASS·paints 55/0·rc=0) ⇒ ★**모든 LGT 부팅마다 35줄이 돈다.**
+  `set_display_property`(`:121-150`)는 같은 프로브에도 **양쪽 PASS** = 도달 가능하나 **미실행**(후속 제안으로 뺐다).
+  ⒝★**`#[allow(dead_code)]` 는 린트만 끈다** ⇒ **1,095줄 전건이 4게이트에서 타입검사된다.** 안 잡히는 것은
+  ★**«동작»뿐이고 범위는 죽은 45개 항목**(`allow` 제거 시 경고 **45건 · 전건 `graphics.rs`** · 57개 최상위 항목 중).
+  ⇒ 그 거짓 문장이 복사돼 있던 **4곳**(`wipi_c.rs` 주석 · `p3-slices` §D · `STATE.md` · `report/0117`)을 정정했다.
+  ★**측정 중 «거짓 0» 2건을 폐기했다**(숨기지 않는다): `-p wie_lgt`(밑줄)은 `did not match any packages` 로 죽어
+  0건을 냈고, `eprintln!` 마커는 `no_std` 라 컴파일 실패해 ★**`grep` 이 컴파일러가 되울린 소스 줄을 세고 있었다.**
 - 2026-09-16: **채택 제안 9건 재측 — 8건이 낡았고 정본 한 곳만 살아 있었다**
   (`wie-p3-adopted-proposals-triage-after-base-swap-r2`) — 정본 `docs/report/0121--….md`.
   base swap(PR #161 · `37734e74`) **이후 기준**으로 다시 재어 ⒜집행 **1** · ⒝발권초안 **1** · ⒞무효 **7**.
@@ -240,7 +253,13 @@
   역치환의 자기 numstat 이 정확히 `27 27` 이라 그 수가 여기 잘못 옮겨졌다).
   ★**대가는 «연기»이지 «취소»가 아니다** — upstream LGT 전용 `graphics.rs` **1,095줄**은 **트리에 남았고**
   (`git diff upstream/main` **0줄** = 바이트 동일) **배선만 끊었다**. dead code 라 모듈 «선언»에 `#[allow(dead_code)]`.
-  ★★**그 경로는 이제 «아무 테스트도 밟지 않는다» — 썩어도 게이트가 조용하다.**
+  ★★**[정정 2026-09-16 · `wie-adopt-slice-d-base-swap-executed-p1`] 종전 문안 「그 경로는 이제 «아무
+  테스트도 밟지 않는다» — 썩어도 게이트가 조용하다」는 «거짓»이다**(정본 `docs/report/0128--….md`).
+  ⒜«배선 끊음»은 **graphics SVC 27개에만** 걸린다 — `clet_register` 와 `init.rs` 가 여전히 모듈로 들어간다.
+  `panic!` 프로브 실측: `init_process_state`·`set_use_annunciator` 에 넣으면 `keydraw_lgt`·`helloworld_lgt` 가
+  **FAIL·paints 0** ⇒ ★**그 35줄은 모든 LGT 부팅마다 돈다**(`set_display_property` 는 양쪽 PASS = 미실행).
+  ⒝`#[allow(dead_code)]` 는 **린트만** 끈다 ⇒ ★**1,095줄 전건이 4게이트에서 타입검사된다**. 안 지켜지는 것은
+  ★**«동작»뿐이고 범위는 죽은 45개 항목**이다(`allow` 제거 시 경고 **45건 · 전건 `graphics.rs`** · 57개 중).
   ★**되돌림 조건·비용**: ⑴292 코퍼스(LGT 52건) 또는 ⑵upstream SDK 의 `framebuffer.rs` LGT 분기 ⇒ **27줄 역치환**.
   ★**개악 대조**: 되돌리면 `keydraw_lgt` **FAIL·paints 0·rc=1** ↔ 정상 **PASS·paints 51·rc=0**(sha 불변).
   ★**게이트**: fmt·clippy·beta·wasm **0** · 5픽스처 **전건 PASS**(`keydraw_lgt` rc=0 ← 결정 ⒝ 의 목적).

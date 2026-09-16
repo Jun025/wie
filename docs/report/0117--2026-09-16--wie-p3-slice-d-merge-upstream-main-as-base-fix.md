@@ -34,6 +34,15 @@
 1,095줄이 트리에 있으나 `#[allow(dead_code)]` 아래에 있고, 우리 5픽스처·`cargo test --all` 어느 것도 그 코드를
 **한 줄도 실행하지 않는다**. ⇒ ★**그 코드가 썩어도 우리 게이트는 조용하다.** 되돌리는 회차는 그 사실을 안고 시작하라.
 
+> ★★**[정정 2026-09-16 · `wie-adopt-slice-d-base-swap-executed-p1` · 정본 `docs/report/0128--….md`]
+> 바로 위 두 줄은 «거짓»이다 — 인용하지 마라.** 이 회차가 낸 제안 `#p1` 이 그 문장을 «기록으로 남기라»고
+> 했고, 채택 회차가 재 보니 **문장 자체가 틀렸다.** ⒜«배선 끊음»은 **graphics SVC 27개에만** 걸린다 —
+> `clet_register` → `graphics::{init_process_state, set_use_annunciator}` 와 `init.rs` 의
+> `InitSvcId::SetDisplayProperty` 가 **여전히 모듈로 들어간다**. `panic!` 프로브 실측으로 앞 둘은
+> `keydraw_lgt`·`helloworld_lgt` 를 **FAIL·paints 0** 으로 뒤집는다 ⇒ ★**모든 LGT 부팅마다 35줄이 돈다.**
+> ⒝`#[allow(dead_code)]` 는 **린트만** 끄므로 ★**1,095줄 전건이 4게이트에서 타입검사된다** — 안 지켜지는
+> 것은 ★**«동작»뿐이고 그 범위는 죽은 45개 항목**이다(`allow` 제거 시 경고 45건 · 57개 최상위 항목 중).
+
 ### ★양방향 — 개악 대조 (Acceptance)
 
 | 형상 | `keydraw_lgt --inject --expect-last-frame` |
