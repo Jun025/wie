@@ -288,10 +288,12 @@ design** — do not "fix" that by wiring it:
   > the deploy is bad.
 
   **That owner rule presumes the round already ran this script once, and measurement says it often
-  did not — so here is the instruction, not the assumption.** This paragraph used to assert the
-  round "is already running the same script against production for merge-contract 4-C". Measured
-  2026-09-17 over all 131 `wie-*merge*.done.md` replies: **33 record a Cloudflare Pages deploy, and
-  of those only 15 cite `WIE_BASE` — 18 do not** (45%). Five of the eighteen are one lane on
+  did not.** This paragraph used to assert the round "is already running the same script against
+  production for merge-contract 4-C" — that claim was false and is gone. **The command itself was
+  never missing from this file** (the last bullet of this section has carried it all along); what was
+  missing is a *verdict* — which output lines count as a pass — and that is what the blockquote below
+  adds. Measured 2026-09-17 over all 131 `wie-*merge*.done.md` replies: **33 record a Cloudflare Pages
+  deploy, and of those only 15 (45%) cite `WIE_BASE` — 18 (55%) do not**. Five of the eighteen are one lane on
   2026-09-16/17; the other thirteen predate it, so this is a standing gap, not one round's lapse.
   Every one of the eighteen still *reported* a self-verify — by quoting the in-CI step's conclusion
   and curling the alias — which passes "운영 URL" but **not** the "콘솔 0에러" half of merge-contract
@@ -304,8 +306,14 @@ design** — do not "fix" that by wiring it:
   > on its schedule. Fencing it would add a duplicate obligation, and fencing it *inside a blockquote*
   > would dodge the checker only because its fence regex is `^\s*` (a `>` is not whitespace) — a trap
   > for whoever un-indents it later.
-  > Pass is `NO-LEAK AUDIT: ✅` with `off-origin requests: 0` and `requests whose body contains the
-  > game header bytes: 0`. `nonBlack: 0` is **also** a pass here (below). Quoting the workflow's own
+  > Pass is **rc=0**, printed as `NO-LEAK AUDIT: ✅` with `off-origin requests: 0`, `requests whose
+  > body contains the game header bytes: 0`, and **`console errors (console.error + pageerror): 0`**.
+  > `nonBlack: 0` is **also** a pass here (below). That third line is the "콘솔 0에러" half of 4-C and
+  > is exactly the half the measurement above found unmet — so as of 2026-09-17 it is not a line to
+  > read but a line the script *judges*: `verify-browser.mjs` exits **3** on a non-zero console-error
+  > count, next to **2** for `NO-LEAK AUDIT: ❌ POSSIBLE LEAK`. Rewired rather than left as prose
+  > because prose here is unenforced discipline, and the change cost nothing: the last 10 deploy runs
+  > and the by-hand alias run all report 0, so no previously-green deploy turns red. Quoting the workflow's own
   > step is necessary but not sufficient: that step reads the **per-deploy** URL, so it cannot see an
   > alias that never swung over — which is the entire reason this by-hand run exists.
 
@@ -329,9 +337,11 @@ design** — do not "fix" that by wiring it:
 
   **Two things it does not tell you.** It reads the per-deploy URL, not the `wie-web.pages.dev`
   alias, whose swing-over delay nothing here measures — so keep running it by hand against
-  production after a deploy, which is a *different* assertion: `WIE_BASE=https://wie-web.pages.dev
-  node scripts/verify-browser.mjs test_data/helloworld_ktf.zip`. And `rc=0` does not mean the screen
-  rendered — it exits non-zero on a leak (2) and on the flow not completing, but `nonBlack: 0` is a
+  production after a deploy, which is a *different* assertion; **the blockquote above holds that
+  command and its pass criteria, and is the one copy** (this bullet used to repeat the command, which
+  is the same two-sources-of-truth trap §Constraints names). And `rc=0` does not mean the screen
+  rendered — it exits non-zero on a leak (2), on a console error (3), and on the flow not
+  completing, but `nonBlack: 0` is a
   pass, which for the helloworld fixtures is correct since they are expected to end blank. Read it
   as "booted, took a file, leaked nothing". It needs no game file (its default argument is the
   committed `test_data/helloworld_ktf.zip`).
