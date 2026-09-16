@@ -60,6 +60,20 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-16: **조각 D — base swap 집행 + LGT graphics 배선 27줄 공용 복귀**
+  (`wie-p3-slice-d-merge-upstream-main-as-base-fix` · 채택 `2026-09-16-p3-remaining-slices-plan#p3`)
+  ★★**DoD 리터럴 충족 — `git merge-base HEAD upstream/main` = `44fbf265`(≠ `fa641a8a`).**
+  총괄이 ⒝(공용 복귀)를 명시로 골랐고 같은 회차에서 집행했다. 미해결 **67** 전건 해소(#159 착지로 74→67) ·
+  배선 **27건** 치환(`git diff --numstat upstream/main` = **`27 27`**).
+  ★**대가는 «연기»이지 «취소»가 아니다** — upstream LGT 전용 `graphics.rs` **1,095줄**은 **트리에 남았고**
+  (`git diff upstream/main` **0줄** = 바이트 동일) **배선만 끊었다**. dead code 라 모듈 «선언»에 `#[allow(dead_code)]`.
+  ★★**그 경로는 이제 «아무 테스트도 밟지 않는다» — 썩어도 게이트가 조용하다.**
+  ★**되돌림 조건·비용**: ⑴292 코퍼스(LGT 52건) 또는 ⑵upstream SDK 의 `framebuffer.rs` LGT 분기 ⇒ **27줄 역치환**.
+  ★**개악 대조**: 되돌리면 `keydraw_lgt` **FAIL·paints 0·rc=1** ↔ 정상 **PASS·paints 51·rc=0**(sha 불변).
+  ★**게이트**: fmt·clippy·beta·wasm **0** · `cargo test --all` **201 passed · ★1 failed**.
+  5픽스처 **전건 PASS**(`keydraw_lgt` rc=0 ← 결정 ⒝ 의 목적).
+  ★★**남은 1건 = `wie-ktf` `test_key_reach`** — 경로가 아니라 **동작 회귀**(`keydraw_ktf` 는 PASS 라 키는 닿는다
+  ⇒ 후보 = **WIPI 키코드 매핑**). ★**이 회차가 규명하지 못했다.** 정본 = `docs/report/0115--….md`.
 - 2026-09-16: **조각 C — 이미 upstream 에 있는 엔진 hunk 삭제: 7행 착지 · 14행이 «왜 아닌지»를 수로 보였다**
   (`wie-p3-slice-c-drop-hunks-already-upstream`) — 측정 기록 정본
   `docs/upstream-realign-p3-slice-c-deletability.md`.

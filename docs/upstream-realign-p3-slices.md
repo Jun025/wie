@@ -396,6 +396,26 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 
 ### D — `wie-p3-base-swap-merge`
 
+> ★★★**[집행됐다 2026-09-16 · `wie-p3-slice-d-merge-upstream-main-as-base-fix` · 정본 `docs/report/0115--….md`]
+> 총괄이 ⒝(공용 구현 복귀)를 «명시로» 골랐고 이 회차가 base swap 과 함께 집행했다.**
+> ★**DoD 리터럴 충족**: `git merge-base HEAD upstream/main` = **`44fbf265`**(≠ `fa641a8a`).
+> 미해결 **67** 전건 해소(#159 착지로 74→67) · 배선 **27건** 치환(`git diff --numstat upstream/main` = **`27 27`**).
+>
+> ★**대가 — 축소하지 않는다**: 제안의 benefit 「LGT 전용 그래픽 0→1,095줄」은 ★**«철회»가 아니라 «연기»**다 —
+> 그 1,095줄은 **트리에 있고**(`git diff upstream/main` **0줄** = 바이트 동일) ★**배선되지 않았다.**
+> ⇒ dead code 라 모듈 «선언»에 `#[allow(dead_code)]` 를 달았다(파일 무접촉).
+> ★★**그리고 그 경로는 이 회차 뒤로 «아무 테스트도 밟지 않는다» — 썩어도 우리 게이트는 조용하다.**
+>
+> ★**되돌리는 조건·비용(리터럴)**: ⑴**292 코퍼스(LGT 52건)** 또는 ⑵**upstream SDK 가 `framebuffer.rs` 에
+> LGT 분기를 넣으면** ⇒ ★**배선 27줄을 되돌려 재판정한다**(비용 = 그 27줄, 역방향).
+> ★**`keydraw_lgt` 가 지키는 것** = LGT clet 이 `MC_grpGetScreenFrameBuffer` 레코드에서 픽셀 포인터를
+> **직접 읽어** 그리는 경로 — ★**이 결정의 «유일한» 검증이다.**
+>
+> ★**개악 대조**: 27줄 되돌림 → **FAIL · paints 0 · rc=1** ↔ 정상 → **PASS · paints 51 · rc=0**(sha 불변).
+> ★**남은 1건**: `wie-ktf` `test_key_reach` — 경로가 아니라 **동작 회귀**(후보 = WIPI 키코드 매핑).
+> `keydraw_ktf` 는 PASS 라 키 자체는 닿는다.
+
+
 > ★★★**[시도했고 «멈췄다» 2026-09-16 · `wie-p3-slice-d-merge-upstream-main-as-base` · 정본 `docs/report/0114--….md`]
 > 머지 «0». 막은 것은 «크기»가 아니라 «결정»이다 — 다음 회차는 여기서부터 읽어라.**
 >
