@@ -1,0 +1,44 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-16",
+  "task": "wie-adopt-slice-d-base-swap-fix2-p1",
+  "title": "아티팩트 다운로드 예산을 계약에 핀했다 — 상한을 넘는 두 사건이 «같은 창»에 들어왔다",
+  "summary": "featurephone-engine-contract.json 에 artifacts.maxBytes 상한을 넣고 check-engine-contract.mjs 의 기존 아티팩트 루프가 집행하게 했다(107 → 109 pass). 제안이 «내용»이라고 한 선택(절대 바이트 vs 증가율)을 실측으로 골랐다: web/.gitignore 가 src/wasm/ 를 무시해 아티팩트가 git 에 없으므로 «전 커밋 대비 증가율»은 두 번 빌드(1회 5분 55초)하거나 기준 수를 저장해야 하는데 후자가 곧 절대 핀이다 ⇒ 증가율 축은 성립하지 않는다. 그리고 제안이 «약점»으로 적은 wasm-opt 흔들림은 반대로 «잡아야 할 것»이었다 — build-wasm.sh 의 폴백이 25,591,056B(최적화본의 1.66배)를 내고 publish-artifact.yml 이 같은 스크립트를 부르므로 폴백판이 그대로 릴리스된다. 상한 20,000,000 은 오늘치(15,425,955) 위 29.7% · 폴백판 아래 21.8% 인 «창»이다. 제품 동작 0줄.",
+  "changes": [
+    "docs/contracts/featurephone-engine-contract.json — artifacts.maxBytes(2파일) + maxBytesNote + maxBytesMeasured(측정 근거·툴체인·여유) 신설",
+    "scripts/check-engine-contract.mjs — 기존 §1 아티팩트 루프를 access → stat 으로 바꿔 예산 집행(새 패스 추가 아님) · 무예산 파일은 fail-closed 위반(Constraint 3)",
+    "docs/report/0129--2026-09-16--wie-adopt-slice-d-base-swap-fix2-p1.md 신설 · STATE.md 완료 항 1건"
+  ],
+  "verification": [
+    "정상: node scripts/check-engine-contract.mjs = 109 pass · 0 violation · rc=0 (종전 107 = +2 예산 검사)",
+    "★개악 대조(제품 경로 실주행 · 상수 대 상수 아님): PATH 앞에 실패하는 wasm-opt 를 놓아 build-wasm.sh 의 폴백 분기를 실제로 태웠다('==> wasm-opt failed (old binaryen?) — shipping unoptimized wasm' 실출력) ⇒ 아티팩트 25,591,056B ⇒ 검사기 1 violation · rc=1 ('over budget … 128.0%')",
+    "복원: 15,425,955B ⇒ 109 pass · 0 violation · rc=0",
+    "fail-closed 분기: maxBytes 에서 wie_web_bg.wasm 키 제거 ⇒ 1 violation ('no size budget pinned') · 복원 후 rc=0",
+    "실측 근거: 최적화 15,425,955B(wasm-bindgen 0.2.108 + wasm-opt -Oz binaryen 130) ↔ 미최적화 25,591,056B = 1.66배(+65.9%) — 제안이 쫓는 base swap 사건(+67.6%)과 같은 크기",
+    "ⓑ 기존 축 부재 실측: scripts/*.{mjs,sh} + 워크플로 8종에서 아티팩트 크기를 재는 곳 0(stat·byteLength·du 일치 4건은 픽스처 HTTP 전달·게스트 r.size() 로 무관)",
+    "4게이트: fmt OK · clippy 0 · wasm clippy 0 · beta clippy 0",
+    "cargo test --all: 42 타깃 전건 합산 384 passed · 0 failed · 0 ignored (| tail 미사용)",
+    "5픽스처 전건 PASS: draw_j2me(1/content) · helloworld_ktf(0/blank 규격대로) · helloworld_lgt(0/blank) · keydraw_ktf(55/content/rc0) · keydraw_lgt(55/content/rc0)",
+    "npm run audit / check-worklog-json / check-docs-report-serial / check-doc-liveness-parity / check-worklog-coverage 전건 rc=0"
+  ],
+  "limits": [
+    "★수는 «로컬 binaryen 130» 으로 쟀고 CI 는 119 핀이다 — 여유 29.7% 가 그 차이를 덮는다고 «가정»했을 뿐 CI 값은 이 회차가 못 쟀다. 이 PR 의 engine-contract 잡이 그것을 처음 실측한다. red 면 상한이 아니라 그 가정이 틀린 것이다",
+    "★여유 «아래»의 야금야금한 성장(15.4MB → 19.9MB)은 조용하다 — 이 상한은 «계단 탐지기»이지 «추세 추적기»가 아니다. 추세를 원하면 증가율 축인데 그것은 아티팩트가 git 에 없어 성립하지 않는다",
+    "★CI 에서 도는 조건이 좁다 — 이 검사기는 engine-contract.yml 의 engine paths-filter 안에서만 돈다. 엔진을 안 건드리는 PR 은 예산을 재지 않는다(그런 PR 은 아티팩트도 안 바꾸니 손실은 작지만 0 은 아니다)",
+    "contract-roundtrip.mjs(Playwright)·npm run frontend 미측정 — AGENTS.md 가 CI 몫으로 둔 축이다",
+    "web/dist 번들 총량은 여전히 아무도 안 잰다 — 이 상한은 web/src/wasm 의 두 파일만 본다"
+  ],
+  "proposals": [
+    {
+      "title": "연번 중복이 «8분» 만에 생겼다 — --next-serial 의 열린 PR claim 조회에 시간 창이 있다",
+      "plainSummary": "보고서 번호를 자동으로 받아 쓰는데, 거의 동시에 작업한 두 사람이 같은 번호를 받았습니다. 도구가 «이미 열린 다른 작업»을 보고 번호를 고르는데, 그 다른 작업이 아직 올라오기 전이면 보이지 않습니다.",
+      "userBenefit": "두 작업이 나중에 합쳐질 때 번호가 겹쳐 검사가 빨개지는 일을 막는다. 지금은 합치는 사람이 손으로 고친다.",
+      "why": "2026-09-16 실측: PR #164(14:05:49Z)와 #165(14:13:32Z)가 «둘 다» 0122 를 claim 했다. #165 회차가 착수 시점에 --next-serial 을 돌렸을 때 도구는 [0116(#162)] 만 보고 0122 를 줬다 — #164 는 그때 아직 PR 이 아니었다. 도구 자신의 경고문(「오늘 그 수가 두 시간 만에 낡았다」)이 이번엔 8분이었다. 검사기는 착지 «후에» 빨개지므로 두 PR 어느 쪽도 지금은 green 이다 = 무증상이다.",
+      "tradeoff": "완전한 해결은 번호를 착지 시점에 정하는 것인데(파일명이 곧 번호라) 그러려면 머지 회차가 파일을 개명해야 하고, 그것은 게이트③에 코드 변경을 넣는 일이라 이 저장소가 피해 온 형태다. 값싼 절반은 «claim 조회에 draft·방금 push 된 브랜치까지 포함»하거나, 충돌 시 무엇을 옮길지 규칙을 도구가 «출력»하는 것이다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": ["2026-09-16-slice-d-base-swap-fix2#p1"],
+  "declinedProposals": []
+}

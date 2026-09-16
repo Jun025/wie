@@ -14,7 +14,7 @@
 //
 // Usage: node scripts/check-engine-contract.mjs   (after scripts/build-wasm.sh)
 
-import { readFile, access } from "node:fs/promises";
+import { readFile, access, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -26,15 +26,38 @@ const passes = [];
 const ok = (msg) => passes.push(msg);
 const bad = (msg) => violations.push(msg);
 
-// ── 1. Artifact pair exists under the pinned names ───────────────────────────
+// ── 1. Artifact pair exists under the pinned names, and fits its size budget ─
+// The budget is a CEILING, not a pin: normal growth passes, a step change does
+// not. It exists because the surface checks below are blind to bytes — the
+// 2026-09-16 base swap moved wie_web_bg.wasm +67.6% with all 107 checks green.
+// It also catches build-wasm.sh's wasm-opt fallback (unoptimized = 1.66x
+// measured), which publish-artifact.yml would otherwise ship to the consumer.
 const wasmDir = path.join(root, contract.artifacts.dir);
+const budgets = contract.artifacts.maxBytes ?? {};
 for (const f of contract.artifacts.files) {
+  let bytes = null;
   try {
-    await access(path.join(wasmDir, f));
+    bytes = (await stat(path.join(wasmDir, f))).size;
     ok(`artifact exists: ${contract.artifacts.dir}/${f}`);
   } catch {
     bad(`artifact missing: ${contract.artifacts.dir}/${f} — run scripts/build-wasm.sh first, or the build output names drifted`);
   }
+  if (bytes === null) continue;
+  // fail-closed: an unbudgeted artifact is a hole, not a pass.
+  if (!Object.hasOwn(budgets, f)) {
+    bad(`no size budget pinned for ${f} — add artifacts.maxBytes["${f}"] to the contract`);
+    continue;
+  }
+  const max = budgets[f];
+  const pct = ((bytes / max) * 100).toFixed(1);
+  if (bytes <= max) ok(`artifact within budget: ${f} ${bytes} B / ${max} B (${pct}%)`);
+  else
+    bad(
+      `artifact over budget: ${f} is ${bytes} B, budget ${max} B (${pct}%) — ` +
+        `the consumer downloads this on first load. If the growth is INTENTIONAL, raise ` +
+        `artifacts.maxBytes["${f}"] in the contract (that diff is the point). If it is not, ` +
+        `check that wasm-opt actually ran — build-wasm.sh ships unoptimized wasm when binaryen is missing or too old.`,
+    );
 }
 
 // ── 2. Glue module surface (import the real build output in Node) ────────────
