@@ -1,0 +1,58 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-17",
+  "task": "wie-adopt-slice-d-base-swap-fix3-p1",
+  "title": "「required status check」를 실측에 맞췄다 — 그리고 «왜 안 켜져 있었나»가 진짜 답이었다",
+  "summary": "문서가 사실로 주장하던 「contract 는 main 의 required status check」를 실측에 맞춰 5곳 정정했다(protection → 404 Branch not protected · rulesets → [] · protected=false ⇒ 강제 required check 0개). 제품 동작 0줄 · 워크플로 동작 0줄 · 저장소 설정 무접촉. ★ⓑ가 처방을 바꿨다: 제안은 ⒜(보호를 켠다)/⒝(문서를 고친다)를 «새로 고르라»고 했는데, 실측은 「이미 골랐다」였다 — 2026-07-22 회차(docs/report/0003)가 contract 를 always-run 래퍼로 만들어 required 로 걸어도 교착하지 않게 해 두고, 보호 설정은 「★human-step (워커 적용 금지 · repo 설정 변경)」으로 분리해 ruleset JSON 까지 써 두었다. 그것이 약 8주간 미적용이다(report/0005 가 2026-08-02 에 이미 미적용으로 기록 · 오늘 API 도 같은 답). 근인도 쟀다: ~/orchestrator/humansteps/ 에 이 건의 카드가 0개라 운영자 화면에 «뜨지 않는다» — 아무도 거부하지 않았고 아무도 보지 못했다. ⇒ ⒜는 집행하지 않고 에스컬레이션, ⒝만 집행했다.",
+  "changes": [
+    "AGENTS.md 사건 대장 — 「contract is a required status check on main」 제거. 규칙(paths: 금지)은 그대로 두고 사실만 분리 + 실측 + 「규칙이 «선택»이 된 것이 아니라 «미집행»이다」 + 미적용 human-step 포인터",
+    ".github/workflows/engine-contract.yml 헤더 — 「registered as a required status check」 → 「intended for registration · NOT registered today」 + 실측 + 「그래도 래퍼는 유지하라」",
+    ".github/workflows/engine-contract.yml continue-on-error 절 — 「This job is a REQUIRED status check」 → 「intended to be」 + 오늘은 아무것도 막지 않는다 + 그래서 플래그가 더 필요하다(스위치는 이 스텝을 안 보고 켜진다)",
+    ".github/workflows/web.yml 배포 판단 주석 — 「Once main is protected … CI-green by construction · Residual risk is closed」의 «Once» 가 오지 않았음을 명시. 오늘 red 를 막는 것은 3게이트(사람·절차)이고 두 잔여 위험은 살아 있다",
+    "docs/upstream-realign-p3-slices.md:486 — 정정 블록(「착지를 막았다」는 «GitHub 이 막았다»가 아니라 «게이트③ 회차가 red 를 보고 멈췄다»)",
+    "docs/report/0127--2026-09-17--wie-adopt-slice-d-base-swap-fix3-p1.md 신설 · STATE.md 완료 항 1건"
+  ],
+  "verification": [
+    "ⓐ 재측(2026-09-17): gh api branches/main/protection → 404 'Branch not protected' · rulesets → [] · branches/main .protected → false ⇒ 강제 required check 0개 · 제안 발행 이후 무변화",
+    "ⓑ 선행 축 실측: docs/report/0003--2026-07-22--wie-main-branch-protection.md 가 ①always-run 래퍼 착지 ②web.yml 판단 주석 ③보호 설정을 «human-step(워커 적용 금지 · repo 설정 변경)»으로 분리 — ruleset JSON 은 ~/orchestrator/reports/wie-main-branch-protection.done.md §C 에 실재(리뷰 승인 필수는 의도적 제외 — 단독 소유자 교착 방지)",
+    "★미적용 기간 실측: report/0005(2026-08-02)가 「human-step 미적용 상태」로 기록 ↔ 오늘 API 동일 ⇒ 약 8주",
+    "★근인 실측: ~/orchestrator/humansteps/ 에 branch/protect 일치 카드 0개 ⇒ 운영자 화면(bin/humanstep-scan)이 읽는 자리에 없다. human-step 은 2026-07-22 done 리포트 «본문 안»에만 있다",
+    "정정 전수 확인: AGENTS.md · .github/ · docs/upstream-realign-p3-slices.md 에서 「is a required status check」류 단언 잔존 0건(정정 블록과 그것이 인용하는 원문 제외)",
+    "★Constraint 4 무접촉 확인: engine-contract.yml 의 on.push / on.pull_request 둘 다 paths 없음(YAML 파싱으로 확인) — 주석만 고쳤고 트리거는 안 건드렸다",
+    "YAML 파싱: engine-contract.yml · web.yml 둘 다 on=['push','pull_request'] 정상",
+    "4게이트: fmt OK · clippy 0 · wasm clippy 0 · beta clippy 0",
+    "cargo test --all: 42 타깃 전건 합산 384 passed · 0 failed · 0 ignored · FAILED/panicked 행 0 (| tail 미사용)",
+    "검사기 5종 rc=0: check-doc-liveness-parity(25줄) · npm run audit · check-worklog-json(105) · check-docs-report-serial(120·중복 0) · check-worklog-coverage",
+    "★check-parked-workflows.mjs 는 rc=1 이나 «이 브랜치에 그 파일이 없어서»다(PR #170 미머지) — 회귀가 아님을 ls + 브랜치 대조로 확인했다"
+  ],
+  "limits": [
+    "★Acceptance ⑴ 의 개악 대조를 «하지 못했다» — 산출물이 산문의 참/거짓이라 되돌릴 제품 호출부가 없다. CI 검사를 만들려면 branches/main/protection 을 물어야 하는데 그 엔드포인트는 admin 권한을 요구해 github.token 으로 되는지 이 회차가 확인할 수 없었다 ⇒ 검증 못 한 검사를 넣지 않았다. 어휘 린트도 기각했다(「문구를 바꾸면 빠져나가고 넓히면 무관한 것을 문다」는 이 저장소 자기 규율). 대신 양방향 «실측»을 증거로 냈다",
+    "★기계 강제는 여전히 0이다 — ⒝의 대가이고, ⒜는 내 권한 밖이라 치르기로 한 것이다",
+    "★문서가 «반대 방향»으로 낡을 수 있다 — 운영자가 human-step 을 적용하는 순간 이 회차가 쓴 다섯 문단이 거짓이 된다. 그것을 잡을 축을 만들지 못했다(후속 제안)",
+    "★보호는 여전히 꺼져 있다. 이 회차는 켜지 않았고 켤 권한도 없다",
+    "★humansteps/ 카드 신설은 ~/orchestrator 소관이라 이 티켓의 ⓒ(wie-2 만 수정) 밖이다 ⇒ 총괄 에스컬레이션",
+    "★「required 0개」는 오늘의 값이다 — 상수로 인용하지 마라(이 정정 자신이 그 교훈의 산물이다)"
+  ],
+  "proposals": [
+    {
+      "title": "미적용 human-step 이 done 리포트 «본문»에만 살면 아무도 보지 못한다 — 카드로 올려야 한다",
+      "plainSummary": "「사람이 한 번 해야 하는 일」이 예전 작업 보고서 본문에만 적혀 있어서, 운영자 화면에 뜨지 않은 채 약 두 달 방치됐습니다. 그 일을 화면이 읽는 자리로 옮겨야 합니다.",
+      "userBenefit": "브랜치 보호처럼 «준비는 끝났는데 스위치만 남은» 일이 몇 달씩 잊히지 않는다. 지금은 문서가 그 효과를 사실처럼 적어 두는 2차 피해까지 났다.",
+      "why": "이 회차 실측: ~/orchestrator/humansteps/ 에 branch-protection 카드가 0개인데, 그 human-step 은 2026-07-22 done 리포트 §C 에 ruleset JSON 까지 완비돼 있다. 운영자 화면은 bin/humanstep-scan → humansteps/*.md 를 읽으므로 그 일은 «존재하지만 보이지 않는다». report/0005 가 2026-08-02 에 미적용을 기록했고 오늘도 미적용이다 ⇒ 약 8주. 그리고 그 공백이 문서 5곳에 「required check 다」라는 거짓 단언을 낳아 게이트② 반려까지 갔다.",
+      "tradeoff": "카드 1장 신설은 값싸지만 근본 처방은 아니다 — 같은 형태(done 본문에만 있는 human-step)가 몇 건이나 더 있는지는 이 회차가 세지 않았다. 전수 조사부터 하면 비용이 커지고, 카드 1장만 만들면 다음 건에서 재발한다. 그리고 소관이 ~/orchestrator 라 제품 repo 회차가 고칠 수 없다.",
+      "effort": "S",
+      "target": "orchestrator"
+    },
+    {
+      "title": "문서의 «required check» 주장과 실제 브랜치 보호가 다시 갈리는 것을 아무도 보지 않는다",
+      "plainSummary": "이번에 문서를 실제 설정에 맞췄지만, 나중에 설정을 켜면 이번엔 문서가 반대 방향으로 틀리게 됩니다. 둘이 갈리는 것을 알려주는 장치가 없습니다.",
+      "userBenefit": "「이 검사는 필수다/아니다」를 문서만 보고 잘못 판단하는 일이 재발하지 않는다 — 이번에 그 오판이 게이트② 반려 1건을 냈다.",
+      "why": "이 회차는 5곳을 실측에 맞췄지만 회귀 방지 축을 만들지 못했다. 운영자가 준비된 human-step 을 적용하는 순간 그 다섯 문단이 즉시 거짓이 된다(방향만 반대인 같은 결함). 이 회차가 검사를 넣지 않은 이유는 명시적이다 — GET /repos/{o}/{r}/branches/{b}/protection 이 admin 권한을 요구해 Actions 의 github.token 으로 읽히는지 확인하지 못했고, 검증 못 한 검사를 넣는 것이 더 나쁘다.",
+      "tradeoff": "먼저 확인할 것은 «github.token 에 permissions: administration: read 를 주면 그 엔드포인트가 읽히는가» 한 가지이고, 안 되면 PAT 가 필요해져 비용 계급이 달라진다(시크릿 관리). 읽힌다면 주 1회 doc-liveness.yml 스케줄에 얹는 것이 새 배관 0이다 — PR 마다 돌릴 일은 아니다(설정은 분 단위로 바뀌지 않는다).",
+      "effort": "S",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": ["2026-09-16-slice-d-base-swap-fix3#p1"],
+  "declinedProposals": []
+}

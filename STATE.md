@@ -60,6 +60,144 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-16: **리눅스가 못 빌드하는 의존이 되돌아오면 PR 에서 빨개진다 — `members` 가 아니라 `Cargo.lock` 을 본다**
+  (`wie-adopt-slice-d-base-swap-fix3-p0`) — 정본 `docs/report/0125--….md`.
+  채택 제안 `2026-09-16-slice-d-base-swap-fix3#p0` 집행. **제품 코드 0줄**.
+  `scripts/check-linux-system-deps.mjs` 신설(`glib-sys`·`soup3-sys`·`gtk-sys`·`webkit2gtk-sys`·`tauri` 가
+  lock 에 있으면 rc=1) + `engine-contract.yml` **상시 스텝**(여섯째)으로 배선.
+  ★★**제안이 적은 처방(`members` 화이트리스트)을 쓰지 «않았다»** — 그 `tradeoff` 가 스스로 우려한 비용
+  (「검사기와 매니페스트가 **두 벌의 진실**」)이 실재하고, ★그 축은 **기존 member 가 GTK 의존을 새로 얻는
+  경로를 못 본다**(대리 신호이기 때문). ⇒ 술어를 **해악 자체**(= 리눅스가 못 빌드하는 크레이트가 해결된
+  그래프에 있는가)로 바꿨고, 그 정본은 **커밋된 `Cargo.lock`** 이다. ★**정당한 크레이트 신설 비용 0.**
+  ★**락이 «대리»가 아니라 «증인»임을 쟀다**: 현재 감시 5종 **전건 0** ↔ `wie-app` 을 `members` 로 되돌리면
+  **전건 1**(격리 worktree · `cargo metadata`). 복원하면 다시 0.
+  ★**개악 대조는 upstream 당김이 하는 그대로**다(members 한 줄 + `exclude` 비우기): 정상 rc=0 → 개악 **FAIL 5종
+  전건** → 복원 rc=0. 종료코드는 따로 못박았다(크래프트 lock rc=0 ↔ `[[package]] name = "tauri"` 추가 rc=1).
+  ★**위양성 1종을 닫고 그것도 쟀다**: `dependencies = [ "glib-sys" ]` 줄이 있어도 **rc=0**(앵커 `^name = "…"$`).
+  ★**왜 상시 스텝인가** — `Cargo.lock`·`**/Cargo.toml` 은 이미 필터 «안»이지만, **이 가드를 침묵시키려면
+  지울 것이 «스크립트»이고 그 경로는 필터에 없다** ⇒ 그 PR 은 필터 내 전부를 건너뛰고 green 을 낸다.
+  `parity-lock-wired`·`audit-no-leak`·`docs-report-serial` 이 **같은 이유로** 상시다.
+  ★**AGENTS.md 무접촉** — 같은 계급 선례 `check-parity-lock-wired` 의 AGENTS.md 언급이 **0건**이고,
+  새 fenced `sh` 줄을 안 만들었으므로 **doc-liveness 패리티 의무도 발생하지 않는다**.
+  ★**천장을 숨기지 않는다**(매 실행 출력): 이미 덴 계열만 안다 · 러너 apt 가 늘면 «틀린 게 아니라 보수적»이 된다 ·
+  lock 은 타깃 독립이다 · ★**리눅스 레그를 돈 것이 아니라 «기전»을 보인 것**이다(green 판정은 CI 몫).
+  회귀 0(전건 합산 · `tail` 아님): fmt/clippy/wasm/beta rc=0 · `cargo test --all --no-fail-fast`
+  **42 스위트 384 passed · 0 failed** · `npm run audit` rc=0 · 노드 검사기 **7종 전건 rc=0**.
+- 2026-09-17: **「required status check」를 실측에 맞췄다 — 그리고 «왜 안 켜져 있었나»가 진짜 답이었다**
+  (`wie-adopt-slice-d-base-swap-fix3-p1` · 채택 `2026-09-16-slice-d-base-swap-fix3#p1`) —
+  정본 `docs/report/0127--….md`. ★**제품 코드 0줄 · 워크플로 «동작» 0줄 · 저장소 설정 무접촉.**
+  ★**실측**: `branches/main/protection` **404 Branch not protected** · `rulesets` **[]** · `protected=false`
+  ⇒ ★**강제 required check «0개»** — 문서 **5곳**이 「`contract` 는 `main` 의 required status check **다**」로
+  단언하고 있었다. ⇒ 전부 **실측에 맞춰 정정**(`AGENTS.md` 사건 대장 · `engine-contract.yml` **2곳** ·
+  `web.yml` · `p3-slices.md`). ★**규칙은 약화시키지 않았다** — 「`paths:` 를 붙이지 마라」는 그대로이고,
+  근거를 **강화**했다(스위치는 한 번의 운영자 행동으로 «언제든» 켜지고 그날 그 잡은 즉시 blocking 이 된다).
+  ★★**ⓑ 가 처방을 바꿨다** — 제안은 ⒜(보호를 켠다)/⒝(문서를 고친다)를 «새로 고르라»고 했는데
+  실측은 ★**「이미 골랐다」**였다: `docs/report/0003`(2026-07-22)이 `contract` 를 **always-run 래퍼**로 만들어
+  required 로 걸어도 교착하지 않게 해 두고, 보호 설정은 ★**「human-step (워커 적용 금지 · repo 설정 변경)」**
+  으로 분리해 **ruleset JSON 까지** 써 두었다(정본 `~/orchestrator/reports/wie-main-branch-protection.done.md` §C ·
+  ★리뷰 승인 필수는 **의도적 제외** — 단독 소유자 교착 방지).
+  ⇒ ★**⒜ 는 «미결정»이 아니라 «준비됐는데 미적용»이고, 약 8주째다**(`report/0005` 가 2026-08-02 에 이미 미적용 기록 ↔ 오늘 API 동일).
+  ★★**근인도 쟀다**: `~/orchestrator/humansteps/` 에 이 건의 **카드가 0개** ⇒ 운영자 화면(`bin/humanstep-scan`)이
+  읽는 자리에 없다 — human-step 이 **done 리포트 «본문 안»에만** 있다. ★**아무도 거부하지 않았다. 아무도 «보지» 못했다.**
+  ⇒ ⒜ 는 **집행하지 않고 에스컬레이션**(권한 밖 · 카드 신설은 `~/orchestrator` 소관이라 ⓒ 범위 밖).
+  ★**한계를 숨기지 않는다**: 기계 강제는 **여전히 0**이고, ★**보호를 켜는 순간 이 정정이 «반대 방향»으로 낡는다** —
+  그 회귀 축을 **만들지 못했다**(`…/branches/main/protection` 이 **admin 권한**을 요구해 `github.token` 으로 읽히는지
+  이 회차가 확인 못 했고, ★**검증 못 한 검사를 넣지 않았다**). 후속 제안 2건 발행.
+- 2026-09-16: **브라우저 부팅 축 — 별 회차는 불요 · 그러나 `resize`·`font` 는 «어느 쪽으로도» 검증되지 않는다**
+  (`wie-adopt-slice-d-base-swap-fix2-p2`) — 정본 `docs/report/0124--….md`.
+  채택 제안 `2026-09-16-slice-d-base-swap-fix2#p2` 는 **판단을 요구했다**(자기 tradeoff: 「별 회차냐, 이 PR 의
+  CI 를 읽는 것으로 족하냐 — 어느 쪽인지가 이 제안의 판단 대상이다」). **코드 0줄** · 판단 둘.
+  ★**⑴ 별 회차 불요** — 부팅 축은 CI 가 이미 답했다. ★「검사가 success」가 아니라 **스텝 단위**로 확인했다
+  (AGENTS.md 의 「Reporting success without rebuilding」 배제): PR **#161** head `f6fe7839` 의 `contract` 잡에서
+  「No engine-relevant changes — skipping」이 ★**skipped** · 「**Contract check — browser boot round-trip**」이
+  ★**success**(08:23~08:30Z). 오늘 PR #166 head `5af3df8c` 에서도 **동일** ⇒ `.rs` 를 만지는 PR 마다 자동으로 돈다.
+  ★★**⑵ 그런데 제안의 `userBenefit` 은 거짓이다** — 「이식한 `Screen::resize`·`Platform::font` 가 실화면에서
+  처음 검증된다」는 **두 선택지 어느 쪽으로도** 달성되지 않는다. 공백이 **호스트가 아니라 «픽스처»** 에 있다:
+  `Screen::resize` 호출부는 **2곳뿐**이고 하나는 PR #161 이 **배선을 끊었으며**(LGT 27줄), 남은
+  `wie-ktf/src/emulator.rs:71` 은 `adf.display_size` 가 `Some` 일 때만 돌고 ★**`Err` 를 `tracing::warn` 으로 삼킨다**.
+  ★**커밋된 두 KTF 픽스처에 `DisplaySize:` 줄이 없다** — 양방향 프로브로 확인했다(커밋 픽스처 **0회** ↔
+  `DisplaySize:176*220` **한 줄만** 넣은 사본 **1회 `176x220`**) ⇒ **0 은 «못 잰 0»이 아니다**.
+  `Platform::font()` 는 프로브도 필요 없다 — `wie_validate` 의 그것이 **`unimplemented!()`** 라 닿으면 패닉하는데
+  **러너 5픽스처 전건 통과**(`not implemented` 0건)다. ★단 **구성은 덮인다**(`WebPlatform::new` 가
+  `Font::try_from_static(...)?` 를 즉시 평가 ⇒ 자산이 깨지면 부팅 실패) — ★**「적재는 검증되고 사용은 안 된다」**.
+  ⇒ 그 사실을 **시나리오 목록 옆**(`scripts/contract-roundtrip.mjs` 머리 · +27)에 박았다.
+  ★**AGENTS.md 에 두 번 적지 않았다**(「같은 사실을 두 곳에 적으면 한쪽이 낡는다」).
+  ★**막은 것**: 다음 회차가 chromium 을 받아 라운드트립을 돌린 뒤 「초록이니 resize·font 가 검증됐다」로 적는 것.
+  ★**안 한 것**: 커버리지는 **1비트도 늘지 않았다** — resize 시나리오는 「크기를 요구하는 픽스처」가 필요하고
+  기존 것을 고치면 Scenario E/F 의 정확 픽셀 단언이 함께 깨진다 ⇒ effort **M** 별 티켓(후속 제안).
+  회귀 0(전건 합산 · `tail` 아님): fmt/clippy/wasm/beta rc=0 · `cargo test --all --no-fail-fast`
+  **42 스위트 384 passed · 0 failed** · `npm run audit` rc=0 · 러너 5픽스처 전건 PASS.
+- 2026-09-16: **«완성된 줄» 술어를 한 곳으로 모았다 — 제안이 미룬 근거가 실측으로 없었다**
+  (`wie-adopt-slice-d-base-swap-fix2-p0`) — 정본 `docs/report/0123--….md`.
+  채택 제안 `2026-09-16-slice-d-base-swap-fix2#p0` 집행. **제품 코드 0줄**(시험 지원 크레이트 + 통합 시험 2개 ·
+  4파일 **+41/−17**). `test_utils::guest_line_complete(seen, prefix)` 신설 → `test_key_reach`·`test_resource_reach`
+  두 호출부가 그것을 쓴다.
+  ★★**제안이 스스로 미룬 근거를 반증했다** — 「지금 만들면 `#[path]` 또는 `tests/common/mod.rs` 라는
+  **새 구조가 생긴다**」는 **거짓**이다: `test-utils` 는 이미 workspace 크레이트(`Cargo.toml:117`)이고
+  `wie-ktf` `[dev-dependencies]` 이며 ★**두 시험이 이미 `use` 하고 있었다** ⇒ 새 구조 **0**.
+  ★**개악 대조가 이 회차의 산출물이다**: 공유 구현 **1곳**을 종전의 순진한 `contains(prefix)` 로 되돌리면
+  ★**소비자 2건이 동시에 FAILED** · 복원하면 둘 다 ok. ★★**`--no-fail-fast` 없이는 그 표를 못 만든다** —
+  cargo 가 첫 실패 타깃에서 멈춰 **두 번째가 보이지도 않는다**(조각 D `-fix2` 의 `201·202` 부분 계수와 같은 함정).
+  ★**새 실측**: 제안이 「구 base 에서 잠복」이라 적은 `test_resource_reach` 는 **오늘 잠복이 아니다**
+  (이 base 에서 순진한 술어로 실제 FAILED) ⇒ 둘 다 **활성 경쟁 상태**였다.
+  ★**세 번째 소비자는 없다**(Stdout 사용 6파일 전수): helloworld 3케이스는 `while !exited` 라 경쟁이 없고
+  `wie_j2me/tests/test_boot.rs` 는 paints 폴링 + **고아**(member 는 `wie-j2me`) — 무접촉.
+  ★**대가를 적는다**: n=2 에 **간접이 생겼고**(포인터 주석으로 줄였을 뿐), `test-utils` 의 소임이 조금 번졌으며
+  (호스트 대역 크레이트에 문자열 술어 — `TestPlatformEvent::Stdout` 옆에 두고 새 파일 0 으로 완화),
+  술어가 **공개 API** 가 됐다(의도된 비용 — «세 번째»를 받는 것이 목적이다).
+  회귀 0(전건 합산 · `tail` 아님): fmt/clippy/wasm/beta rc=0 · `cargo test --all --no-fail-fast`
+  **42 스위트 384 passed · 0 failed**(`origin/main` 과 동수) · `npm run audit` rc=0.
+- 2026-09-16: **upstream 워크플로 둘 — «채택하지 않는다»로 «결정»했고, 그 결정을 기계로 잠갔다**
+  (`wie-adopt-slice-d-base-swap-fix2-p3` · 채택 `2026-09-16-slice-d-base-swap-fix2#p3`) —
+  정본 `docs/report/0126--….md`. ★**제품 동작 0줄** · 두 워크플로의 동작도 **이전과 동일**(여전히 `workflow_dispatch` 전용).
+  ★**결정**: `release.yaml`·`web.yaml` **둘 다 채택 안 함**. 근거 — ⑴`release.yaml` 은 Tauri 로
+  **windows·linux·macos·android·ios 5타깃**을 만드는데 ★`AGENTS.md` Goal 이 우리 호스트를
+  **`wie_cli`·`wie_featurephone` «둘»** 로 못박는다 ⑵무장하려면 `Cargo.toml` 이 **방금 `exclude` 한 `wie-app`** 을
+  워크스페이스로 되돌려야 한다(그 크레이트가 **gtk/webkit2gtk/libsoup3 의 유일한 루트**라 Linux CI 를 죽였다 —
+  ★**제안이 몰랐던 축**) ⑶릴리스 발행자 이중화(`publish-artifact.yml` 이 이미 소유 · 소비자 가시 위험) ·
+  Pages 프로젝트명 `wie`/`wie-dev` ↔ 우리 `wie-web` 이 **우리 토큰으로** 돈다 ⑷`web.yaml` 은 **우리 `web.yml` 의 중복**이고
+  트리거 면이 같으며 `build:dev` 가 없다.
+  ★**삭제가 아니라 «주차 유지»** — 삭제는 **upstream 동기마다 재발**하고, 바로 옆 `Cargo.toml` 이 `wie-app` 에 대해
+  「지우지 말고 · 무력화하고 · 이유를 적는다」는 **같은 트레이드**를 이미 택했다.
+  ★★**이 회차가 새로 잰 것**: 주차는 ★**upstream 파일에 가한 «우리 로컬 편집»**이라 다음 `git merge upstream/main` 이
+  원본 트리거를 되돌릴 수 있는데 ★**그것을 보는 축이 «0»이었다**(원본 = `schedule: cron "17 0 * * *"` + `push(tags)`
+  ⇒ 되살아나면 **매일 밤** 우리 `CLOUDFLARE_API_TOKEN` 으로 `pages deploy` + **이중 릴리스 발행**).
+  오늘 막는 것은 `build:prod` 부재뿐이고 주차 회차 자신이 ★**「That is luck, not a guard」**라고 적었다.
+  ⇒ **`scripts/check-parked-workflows.mjs` 신설 + `engine-contract.yml` always-run 배선**
+  (★재무장 diff 는 **`.github/` 만 만지는 upstream 머지**라 엔진 keyed 필터가 **그 PR 을 건너뛴다**).
+  ★**개악 대조 4종 전건 rc=1 ↔ 정상 rc=0**(원본 트리거 복원 2 · ★**흐름열 `on: [push]`** · 파일 삭제 fail-closed).
+  ★**흐름열 케이스는 «내가 직전 회차에서 실제로 밟은 함정»**이라 일부러 넣었다 — 블록 매핑만 보는 술어가
+  `coverage.yml` 의 `on: [push]` 를 놓쳤다. ⇒ 두 형식을 다 파싱하고 ★**파싱 0건은 «주차»가 아니라 «위반»**으로 접는다.
+- 2026-09-16: **코퍼스 카드에 «첫 질문»을 넣었다 — 그 자리가 본문이면 안 되는 이유**
+  (`wie-adopt-p3-adopted-proposals-triage-r2-p0`) — 정본 `docs/report/0122--….md`.
+  채택 제안 `2026-09-16-p3-adopted-proposals-triage-r2#p0` 집행. **wie 제품 코드 0줄**(이 저장소 변경은 원장 3파일).
+  고친 것은 `~/orchestrator/humansteps/wie-p2-corpus-placement.md` 하나 — `what:` 에 「`lgt/` **52건**이 먼저」 ·
+  `how:` 에 「첫 질문 + 답을 내는 명령 `PLATFORM_FILTER=lgt scripts/smoke_gate.sh` + 통과/실패의 뜻」.
+  ★★**자리 선택이 이 회차의 실측이다** — 카드의 markdown **본문은 운영자 화면에 닿지 않는다**
+  (`bin/humanstep-scan` 에 문자열 `body` **0건** · `--json` 방출 키 15종에 본문 없음 ⇒ `pipeline-feed` 의
+  `human_steps` 에도 없다). 제안대로 본문에 적었으면 **명목상 집행 · 실효 0** 이었고, 개악 대조 ①이 그 형태를
+  **RED** 로 재현한다(`how:` → 본문 이동 = `markers-in-how` 2→0).
+  ★**제안 3축 중 둘은 그대로 참**(카드에 「첫 질문」 0건 · 분할 ktf 190 · lgt 52 · skt 50 = 292),
+  ★**하나는 낡았다** — 「조각 D 의 27줄 결정을 정한다」는 이미 지나갔다(⒝ 집행 · PR #161 · 오늘 `wipi_c.rs` 는
+  공용 27 / LGT 전용 0). 그러나 **질문은 죽지 않았다**: upstream LGT 전용 `graphics.rs` **1,095줄**이 배선만 끊긴 채
+  트리에 남아 있고 조각 D 자신이 「⒜/⒝ 중 실게임에 옳은 쪽은 못 잰다」를 남겼다 ⇒ 문면을
+  **「무엇을 고를까」 → 「고른 것이 맞았나」** 로 갈아타 적었다.
+  ★**부채를 숨기지 않는다**: 그 문안은 PR #161·1,095줄이 움직이면 **썩는데** `HUMANSTEP_ANSWER_STALE` 은
+  날짜만 보고 내용을 못 본다. 그리고 본문 미소비는 이 카드만이 아니다 — **99장 중 57장 · 2,254줄**(세기만 했다 · 후속 제안).
+  회귀 0(전건 합산 · `tail` 아님): fmt/clippy/wasm/beta OK · `cargo test --all` **42 스위트 384 passed · 0 failed**.
+- 2026-09-16: **제안 `#p1` 채택 — 기록하려던 «사실»이 틀렸다. LGT graphics 는 죽지 않았고 게이트도 조용하지 않다**
+  (`wie-adopt-slice-d-base-swap-executed-p1` · 채택 `2026-09-16-slice-d-base-swap-executed#p1`) —
+  정본 `docs/report/0128--….md`. ★**제품 동작 0줄**(주석·문서만) · `graphics.rs` **무접촉**(upstream 바이트 동일).
+  제안은 「1,095줄이 «아무 테스트도 밟지 않는» 상태를 기록하라」였는데 ★**적기 전에 쟀더니 그 전제가 «거짓»이었다.**
+  ⒜★**«배선 끊음»은 graphics SVC 27개에만 걸린다** — `clet_register` 와 `init.rs` 가 여전히 모듈로 들어간다.
+  `panic!` 프로브 실측: `init_process_state`(`:70-98`)·`set_use_annunciator`(`:152-157`) 에 넣으면
+  `keydraw_lgt`·`helloworld_lgt` 가 **FAIL·paints 0**(정상 = PASS·paints 55/0·rc=0) ⇒ ★**모든 LGT 부팅마다 35줄이 돈다.**
+  `set_display_property`(`:121-150`)는 같은 프로브에도 **양쪽 PASS** = 도달 가능하나 **미실행**(후속 제안으로 뺐다).
+  ⒝★**`#[allow(dead_code)]` 는 린트만 끈다** ⇒ **1,095줄 전건이 4게이트에서 타입검사된다.** 안 잡히는 것은
+  ★**«동작»뿐이고 범위는 죽은 45개 항목**(`allow` 제거 시 경고 **45건 · 전건 `graphics.rs`** · 57개 최상위 항목 중).
+  ⇒ 그 거짓 문장이 복사돼 있던 **4곳**(`wipi_c.rs` 주석 · `p3-slices` §D · `STATE.md` · `report/0117`)을 정정했다.
+  ★**측정 중 «거짓 0» 2건을 폐기했다**(숨기지 않는다): `-p wie_lgt`(밑줄)은 `did not match any packages` 로 죽어
+  0건을 냈고, `eprintln!` 마커는 `no_std` 라 컴파일 실패해 ★**`grep` 이 컴파일러가 되울린 소스 줄을 세고 있었다.**
 - 2026-09-16: **아티팩트 다운로드 예산을 계약에 핀했다 — 상한을 넘는 두 사건이 «같은 창»에 들어왔다**
   (`wie-adopt-slice-d-base-swap-fix2-p1` · 채택 `2026-09-16-slice-d-base-swap-fix2#p1`) —
   정본 `docs/report/0129--….md`. ★**제품 동작 0줄**(계약 데이터 + 검사기만) · 계약 검사 **107 → 109 pass**.
@@ -174,7 +312,13 @@
   역치환의 자기 numstat 이 정확히 `27 27` 이라 그 수가 여기 잘못 옮겨졌다).
   ★**대가는 «연기»이지 «취소»가 아니다** — upstream LGT 전용 `graphics.rs` **1,095줄**은 **트리에 남았고**
   (`git diff upstream/main` **0줄** = 바이트 동일) **배선만 끊었다**. dead code 라 모듈 «선언»에 `#[allow(dead_code)]`.
-  ★★**그 경로는 이제 «아무 테스트도 밟지 않는다» — 썩어도 게이트가 조용하다.**
+  ★★**[정정 2026-09-16 · `wie-adopt-slice-d-base-swap-executed-p1`] 종전 문안 「그 경로는 이제 «아무
+  테스트도 밟지 않는다» — 썩어도 게이트가 조용하다」는 «거짓»이다**(정본 `docs/report/0128--….md`).
+  ⒜«배선 끊음»은 **graphics SVC 27개에만** 걸린다 — `clet_register` 와 `init.rs` 가 여전히 모듈로 들어간다.
+  `panic!` 프로브 실측: `init_process_state`·`set_use_annunciator` 에 넣으면 `keydraw_lgt`·`helloworld_lgt` 가
+  **FAIL·paints 0** ⇒ ★**그 35줄은 모든 LGT 부팅마다 돈다**(`set_display_property` 는 양쪽 PASS = 미실행).
+  ⒝`#[allow(dead_code)]` 는 **린트만** 끈다 ⇒ ★**1,095줄 전건이 4게이트에서 타입검사된다**. 안 지켜지는 것은
+  ★**«동작»뿐이고 범위는 죽은 45개 항목**이다(`allow` 제거 시 경고 **45건 · 전건 `graphics.rs`** · 57개 중).
   ★**되돌림 조건·비용**: ⑴292 코퍼스(LGT 52건) 또는 ⑵upstream SDK 의 `framebuffer.rs` LGT 분기 ⇒ **27줄 역치환**.
   ★**개악 대조**: 되돌리면 `keydraw_lgt` **FAIL·paints 0·rc=1** ↔ 정상 **PASS·paints 51·rc=0**(sha 불변).
   ★**게이트**: fmt·clippy·beta·wasm **0** · 5픽스처 **전건 PASS**(`keydraw_lgt` rc=0 ← 결정 ⒝ 의 목적).
