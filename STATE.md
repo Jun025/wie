@@ -60,6 +60,27 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-16: **graphics 27줄 ⒜/⒝ 결정은 «이미 났다» — 채택된 순간 이미 지난 제안이었다**
+  (`wie-adopt-slice-d-blocked-on-lgt-abi-decision-p0`) — 정본 `docs/report/0130--….md`.
+  채택 제안 `2026-09-16-slice-d-blocked-on-lgt-abi-decision#p0`(「⒜/⒝ 를 운영자·총괄이 «명시로» 고른다」) 집행.
+  ★**제품 코드 0줄** — 결정은 **이미 났고 집행까지 끝나 있었다**: 총괄이 **⒝(공용 구현 복귀)** 를 명시로 골랐고
+  **PR #161** 이 **08:35Z** 에 착지시켰는데, 이 제안의 채택 주입은 **13:06Z** 다 ⇒ ★**채택 시점에 이미 지난 제안**.
+  ★**네 축을 «전부» 실측했다**(문서 신뢰 아님): ⒜배선 `=> wie_wipi_c::api::graphics::` **27** · `=> graphics::` **0**
+  ⒝「총괄이 **«명시로»** 골랐고」 기록 실재(§D) ⒞tradeoff 가 요구한 **대가 기록**도 이행돼 있다
+  (「benefit 「LGT 전용 그래픽 0→1,095줄」은 **«철회»가 아니라 «연기»**」 + 되돌림 조건·비용)
+  ⒟그 대가가 **지금도 참**(`graphics.rs` 1,095줄 · `git diff --numstat upstream/main` **출력 0** = 바이트 동일 ·
+  `#[allow(dead_code)]` + 「This is a DEFERRAL, not a rejection」 실재 · 참조 파일 1).
+  ★★**「읽었다」로 끝내지 않고 개악 대조로 못박았다**(격리 worktree · 제품 호출부 27줄 역치환):
+  정상 ⒝ → **PASS · paints 55 · content true · rc=0** ↔ 개악 ⒜ → ★**FAIL · paints 0 · content false · rc=1**
+  ⇒ ★**결정은 «산문»이 아니라 «제품에서 무는» 상태다**(조각 A 의 원 관측을 독립 재현).
+  ※`paints 55` ↔ 조각 D 기록 `51` 은 **회귀가 아니다** — AGENTS.md 가 그 수를 **바닥**으로 못박았고
+  판정축 `result`·`content`·`rc` 셋은 동일하다.
+  ★**진짜 산출물은 worklog 의 `adoptedProposals` 한 줄**이다 — 이 제안은 **집행이 끝난 뒤에도 패널에 남아
+  그 상태로 채택됐고**, 그 기록만이 **내일 또 채택되는 것**을 막는다.
+  ★**안 한 것**: 결정 재수행 **0** · `docs/upstream-realign-p3-slices.md` 접촉 **0**(§D 기록이 이미 정확하고,
+  §5 의 같은 수는 **P2 갈래 비교표**라 이 결정의 benefit 줄이 아니다) · ⒜/⒝ 중 실게임 정답은 **여전히 미측정**(코퍼스 부재).
+  회귀 0(전건 합산 · `tail` 아님): fmt/clippy/wasm/beta rc=0 · `cargo test --all --no-fail-fast`
+  **42 스위트 384 passed · 0 failed** · `npm run audit` rc=0 · 노드 검사기 **7종 전건 rc=0**.
 - 2026-09-16: **리눅스가 못 빌드하는 의존이 되돌아오면 PR 에서 빨개진다 — `members` 가 아니라 `Cargo.lock` 을 본다**
   (`wie-adopt-slice-d-base-swap-fix3-p0`) — 정본 `docs/report/0125--….md`.
   채택 제안 `2026-09-16-slice-d-base-swap-fix3#p0` 집행. **제품 코드 0줄**.
