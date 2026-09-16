@@ -388,6 +388,36 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 
 ### D — `wie-p3-base-swap-merge`
 
+> ★★★**[시도했고 «멈췄다» 2026-09-16 · `wie-p3-slice-d-merge-upstream-main-as-base` · 정본 `docs/report/0114--….md`]
+> 머지 «0». 막은 것은 «크기»가 아니라 «결정»이다 — 다음 회차는 여기서부터 읽어라.**
+>
+> ★**⑴ 중심 결정이 «양쪽 다 검증 불가»다**(조각 A 가 좁힌 graphics **27줄 배선**):
+> ⒜upstream LGT 전용 유지 ⇒ 제안의 **headline benefit**(LGT 전용 그래픽 0→1,095줄)을 얻지만
+> ★**`keydraw_lgt` FAIL**(조각 A 3/3) · ⒝공용 복귀 ⇒ `keydraw_lgt` PASS(2/2)이지만 ★**그 1,095줄을 버려
+> benefit 을 스스로 취소**한다. ★**어느 쪽도 코퍼스 없이 «옳다»를 증명할 수 없다.**
+>
+> ★★**이 회차가 «새로» 쟀다 — ⒜ 를 고르면 그 테스트를 «다시 만들 수도 없다»**:
+> 게스트 SDK(`dlunch/wipi`)에 `lgt` feature 와 `wipic-sys/src/lgt/graphics.rs` 가 **있는데**
+> ★**`wipi/src/framebuffer.rs` 의 `lgt` 분기는 «0건»** 이다(`ledger-grep -c -i lgt` → **0**) —
+> 고수준 `Framebuffer` 가 `width/height/bpl/bpp/buf` 를 **feature 무관하게** 공용 배치로 직접 읽는다.
+> ⇒ `--features lgt` 로 다시 빌드해도 `LgtFramebuffer` 와 **여전히 안 맞는다.**
+>
+> ★**부수로 조각 A 의 미판정 1건을 «닫았다»**: upstream `get_framebuffer_pointer` 가
+> `resolve_framebuffer(handle).framebuffer.0.buf.0` 를 **실제로 준다** ⇒ ★**upstream ABI 는 자기완결적**이다.
+> ★**그래도 결정은 안 풀린다** — 우리 SDK 게스트는 그 접근자를 **부르지 않는다**(레코드를 직접 읽는다).
+>
+> ★**⑵ 선행 둘이 done 인데 «미착지»다**(조각 A **#160** · 조각 C **#159**). 오늘 `main`(`28fb4364`) 기준
+> 미해결 **74** 인데 ★**그중 8건이 정확히 #159 가 지우는 `wie-wipi-java/…` 파일**이다 ⇒ 지금 머지하면
+> 조각 C 가 이미 «재서» 내린 결정을 손으로 다시 내리고 그 뒤 **같은 8파일에서 충돌**한다.
+> ★**이 항은 «정확성»이 아니라 «중복·충돌» 블로커다 — ⑴과 계급이 다르다.**
+>
+> ★**규모(참고 · 블로커 아님)**: `UU` 35파일에 **충돌 헝크 75** + `UD`+`AU`+`AA` **39파일** = **114 결정**.
+> ★티켓이 `size: L`·`risk: high`·180분으로 **알고 발권했다** ⇒ 크기를 사유로 쓰지 않았다.
+>
+> ★★**재개 조건 — 하나가 서면 돈다**: ⑴**292 코퍼스(LGT 52건)** — 가장 곧다 ⑵**운영자·총괄이 ⒜/⒝ 를 명시로 고른다**
+> (⒜면 `keydraw_lgt` 를 **기대 실패로 재분류**, ⒝면 benefit 한 줄을 **철회**해야 한다) ⑶**upstream SDK 가
+> `framebuffer.rs` 에 LGT 분기를 넣는다**. ★**순서는 셋 중 무엇이든 #159 착지 «뒤»다.**
+
 - **⒜ 범위**: ★**⑵ 그 자체.** `git merge upstream/main` 한 커밋 + 해소. ★**리터럴 작업 목록**:
   ⑴미해결 잔여 전건 해소 ⑵★**`wie_cli` 매니페스트·bin 타깃 화해**(`UD wie_cli/Cargo.toml` **1건** · §3-2 —
   ★**`wie_validate.rs` 자체는 머지가 손대지 않는다.** 위험은 «소스 소실»이 아니라 «러너 빌드 불가»다:

@@ -1,0 +1,56 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-16",
+  "task": "wie-p3-slice-d-merge-upstream-main-as-base",
+  "title": "조각 D — base swap 을 하지 않았다: 중심 결정이 도구로 닫히지 않는다",
+  "summary": "머지 0. 조각 A 가 좁힌 graphics 27줄 배선의 두 선택지가 «둘 다 지금 검증 불가»임을 재측했고, 새로 하나를 더 쟀다 — 게스트 SDK 의 framebuffer.rs 에 lgt 분기가 0건이라 ⒜(upstream LGT 유지)를 고르면 우리의 유일한 LGT 그리기 픽스처를 잃고 가용 도구로 대체품을 만들 수 없다. 부수로 조각 A 의 미판정 하나를 닫았다(upstream 은 get_framebuffer_pointer 로 픽셀을 실제로 내준다 — ABI 는 자기완결적이다). 선행 A·C 가 done 이나 둘 다 미착지이고, 74 충돌 중 8건이 #159 가 지우는 파일과 같다. 제품 코드 0줄.",
+  "changes": [
+    "docs/report/0114--2026-09-16--…md 신설",
+    "docs/upstream-realign-p3-slices.md 조각 D 칸에 «막힌 사유 + 재개 조건» 반영",
+    "STATE.md ## 다음 의 조각 D 항 갱신"
+  ],
+  "verification": [
+    "오늘 main(28fb4364) 기준 머지 예행: rc=1 · 미해결 74 (A 167 · R 146 · D 104 · UU 35 · AU 19 · UD 17 · AA 3) · --abort 후 worktree 제거",
+    "규모: UU 35파일에 충돌 헝크 75개 + UD/AU/AA 39파일 = 114 결정",
+    "#159 교집합: 74 충돌 중 8건이 그 PR 이 지우는 wie-wipi-java/… 파일과 동일(정규화 비교)",
+    "SDK 공백 실측: ledger-grep -c -i 'lgt' <sdk>/wipi/src/framebuffer.rs → 0 (lgt feature 는 있으나 framebuffer 층에 안 닿는다)",
+    "조각 A 미판정 1건 해소: upstream get_framebuffer_pointer 가 resolve_framebuffer(handle).framebuffer.0.buf.0 를 반환 — 픽셀 포인터 경로가 실재한다",
+    "연번 충돌: check-docs-report-serial --next-serial 이 '열린 PR claim [0113(#159) 0113(#160)]' 를 출력"
+  ],
+  "limits": [
+    "⒜/⒝ 중 무엇이 옳은지는 여전히 못 잰다 — 실제 LGT 타이틀이 레코드를 직접 읽는지 접근자를 쓰는지가 코퍼스 문제다",
+    "'upstream 도 SDK 게스트로 LGT 그래픽을 시험한 적이 없어 보인다'는 추정이다 — 무는 것이 없다",
+    "머지를 실제로 완주했을 때의 빌드 성패는 안 쟀다 — 중심 결정이 서기 전에는 그 측정이 무의미하다"
+  ],
+  "proposals": [
+    {
+      "title": "graphics 27줄 배선의 ⒜/⒝ 를 운영자·총괄이 «명시로» 고른다",
+      "plainSummary": "본가 엔진으로 갈아탈 때 LGT 그래픽을 본가 것으로 쓸지 우리 것으로 쓸지를 사람이 정해 준다.",
+      "userBenefit": "이 결정 하나가 서면 엔진 갈아타기가 즉시 진행된다. 지금은 그것 하나 때문에 멈춰 있다.",
+      "why": "두 선택지의 대가가 전부 측정됐다 — ⒜는 keydraw_lgt FAIL(3/3)이고 그 테스트를 다시 만들 수도 없다(SDK framebuffer.rs 에 lgt 분기 0건), ⒝는 제안이 명시한 headline benefit(LGT 전용 그래픽 1,095줄)을 스스로 취소한다. 어느 쪽도 코퍼스 없이는 «옳다»를 증명할 수 없으므로 이것은 측정이 아니라 판단이다.",
+      "tradeoff": "검증 불가를 «알고 받는» 결정이 된다. ⒜면 keydraw_lgt 를 기대 실패로 재분류해야 하고, ⒝면 제안의 benefit 한 줄을 철회해야 한다 — 어느 쪽이든 문서에 그 대가를 적어야 한다.",
+      "effort": "S",
+      "target": "orchestrator"
+    },
+    {
+      "title": "연번 0113 을 두 열린 PR 이 함께 claim 한 것을 푼다",
+      "plainSummary": "두 개의 열린 변경이 같은 보고서 번호를 쓰고 있다. 둘 다 합쳐지면 오류가 난다.",
+      "userBenefit": "합치는 시점에 갑자기 빨간불이 뜨는 일을 미리 막는다.",
+      "why": "check-docs-report-serial --next-serial 이 '열린 PR claim [0113(#159) 0113(#160)]' 를 출력한다. 착지 전이라 검사기는 아직 OK 를 내지만(머지된 트리만 본다) 둘 다 착지하면 main 이 red 가 된다. AGENTS.md 규율은 '착지하지 않은 쪽을 옮겨라' 인데 지금은 둘 다 미착지다.",
+      "tradeoff": "남의 PR 을 고치는 일이라 이 회차가 직접 하지 않았다. 옮기는 쪽은 파일명 하나를 바꾸면 되고, 이 리포트가 0114 를 쓰므로 그 회차는 0115 를 잡아야 한다.",
+      "effort": "S",
+      "target": "orchestrator"
+    },
+    {
+      "title": "조각 D 재발권은 #159 착지 «뒤»로 잡는다",
+      "plainSummary": "중복 작업을 피하려면 먼저 합쳐야 할 변경이 있다.",
+      "userBenefit": "같은 파일을 두 번 손으로 화해시키는 낭비가 사라진다.",
+      "why": "74 충돌 중 8건이 #159 가 지우는 파일과 같다. 지금 머지하면 조각 C 가 이미 측정해서 내린 결정을 손으로 다시 내리고, 그 뒤 #159 와 같은 8파일에서 충돌한다. 조각 C 자신이 '그 8건은 D 가 upstream 쪽을 고르면 해소된다'고 적었으므로 결정은 이미 있다 — 문제는 중복이지 정확성이 아니다.",
+      "tradeoff": "순서를 기다리는 만큼 D 가 늦어진다. 다만 이 축은 위 ⒜/⒝ 결정보다 가벼우므로, 그 결정이 먼저 서면 착지 순서만 맞추면 된다.",
+      "effort": "S",
+      "target": "orchestrator"
+    }
+  ],
+  "adoptedProposals": ["2026-09-16-p3-remaining-slices-plan#p3"],
+  "declinedProposals": []
+}
