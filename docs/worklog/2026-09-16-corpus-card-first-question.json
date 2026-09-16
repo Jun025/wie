@@ -1,0 +1,42 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-16",
+  "task": "wie-adopt-p3-adopted-proposals-triage-r2-p0",
+  "title": "코퍼스 human-step 카드에 «첫 질문»을 넣었다 — 그리고 그것이 왜 본문이 아니라 how: 여야 하는지",
+  "summary": "채택 제안 2026-09-16-p3-adopted-proposals-triage-r2#p0 을 집행했다. humansteps/wie-p2-corpus-placement.md 의 what:/how: 에 「lgt 52건이 먼저 · 도착하면 제일 먼저 확인할 첫 질문은 하나」를 넣었다. ★자리 선택이 이 회차의 실측이다 — 카드의 markdown 본문은 bin/humanstep-scan 이 «읽지 않으므로»(문자열 body 0건) 운영자 화면에 닿지 않는다. 제안이 말한 '한 줄'을 본문에 적었으면 집행은 명목상 끝나고 실효는 0이었다. wie 제품 코드 0줄 · wie 트리 변경은 원장 3파일뿐이다.",
+  "changes": [
+    "~/orchestrator/humansteps/wie-p2-corpus-placement.md — what: 에 «lgt 52건 먼저» 한 절 · how: 에 «첫 질문» 블록 8줄 (원장 파일 · orchestrator-ops 에 untracked)",
+    "docs/report/0122--2026-09-16--wie-adopt-p3-adopted-proposals-triage-r2-p0.md 신규",
+    "STATE.md 완료 항목 1건"
+  ],
+  "verification": [
+    "양방향(소비자 경유): 술어 = `ORCH_OPS=$S bin/humanstep-scan --json` 의 해당 카드 how 필드에 마커 2종(PLATFORM_FILTER=lgt · 첫 질문) 실재. 수정 전 0/0 (RED) → 수정 후 2 (GREEN) → 개악①(추가 블록을 how: 에서 markdown 본문으로 이동) 0 (RED) → 원상 2 (GREEN). 격리 사본에서 돌렸고 라이브 카드는 무접촉",
+    "★개악이 «상수 대 상수»가 아니다 — 단언이 tower 로 나가는 payload 생산자(bin/humanstep-scan --json, bin/pipeline-feed 가 human_steps 로 싣는 그것)를 실제로 통과한다",
+    "본문 미소비 실측: grep -c 'body' bin/humanstep-scan → 0 · --json 방출 키 15종(id,title,why,how,blocks,origin,status,cost,since,whereLabel,what,readiness,blocked_by,age_days,verify)에 본문 없음",
+    "카드 스키마 무회귀: humanstep-scan rc=0 · status open · blocked_by decision 불변 · 이 카드에 대한 WARN 0(유일한 WARN 은 무관한 macos-27-major-upgrade-decision)",
+    "코퍼스 분할 재측: scripts/smoke_gate_baseline.tsv → ktf 190 · lgt 52 · skt 50 = 292 (제안 수치 그대로 참)",
+    "질문 유효성 재측: origin/main 의 wie-lgt/src/runtime/wipi_c.rs 는 '=> wie_wipi_c::api::graphics::' 27 · '=> graphics::' 0 ⇒ ⒝ 집행 완료 · wie-lgt/src/runtime/wipi_c/graphics.rs 1,095줄은 배선 끊긴 채 트리에 실재",
+    "제안이 준 답 명령 실재: scripts/smoke_gate.sh 가 PLATFORM_FILTER 를 지원한다(헤더 usage · 기본 all)",
+    "전 스위트: cargo fmt --check OK · cargo clippy --all -D warnings OK · wasm clippy OK · cargo +beta clippy OK · RUST_MIN_STACK=4194304 cargo test --all 42 스위트 «전건 합산» 384 passed · 0 failed · 0 ignored (tail 아님 — 'test result:' 42줄 전부를 awk 로 합산)"
+  ],
+  "limits": [
+    "★이 제안은 «질문을 준비»할 뿐 «답»을 만들지 않는다 — lgt 52건이 이 머신에 오기 전에는 ⒜/⒝ 판정은 그대로 미측정이다(카드 status 는 open 유지).",
+    "★카드 본문(markdown)이 소비자에 안 닿는다는 사실은 이 카드 한 장으로 끝나지 않는다 — 99장 중 57장이 본문 3줄 이상을 갖고 있고 합 2,254줄이다. 이 회차는 그것을 «세기»만 했고 고치지 않았다(제안 #p0).",
+    "★카드는 orchestrator-ops 에 untracked 라 PR·머지 대상이 아니다 — 되돌리기는 파일 편집이고, 이 회차의 wie PR 을 되돌려도 카드는 되돌아가지 않는다."
+  ],
+  "adoptedProposals": [
+    "2026-09-16-p3-adopted-proposals-triage-r2#p0"
+  ],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "human-step 카드의 markdown 본문이 운영자에게 안 닿는다는 사실을 카드 스키마에 적는다",
+      "plainSummary": "요청 카드의 본문에 적은 설명은 화면에 표시되지 않습니다. 그 사실을 카드 작성 규약에 명시하자는 제안입니다.",
+      "userBenefit": "중요한 설명을 적었는데 운영자 화면에 안 보이는 일이 없어집니다. 지금은 57장의 카드에 2,254줄이 그렇게 적혀 있습니다.",
+      "why": "bin/humanstep-scan 은 카드의 frontmatter 만 파싱하고 본문을 아예 읽지 않는다(문자열 body 0건 · --json 방출 키 15종에 본문 없음). 그 payload 를 bin/pipeline-feed 가 human_steps 로 그대로 싣는다. 이 회차가 그 사실을 모르고 «한 줄을 덧붙이라」는 제안을 본문에 집행했다면 결과는 무증상 무효였다 — 실제로 개악 대조에서 그 형태가 RED 로 재현됐다.",
+      "tradeoff": "규약에 한 줄이 늘어난다. 그리고 그 줄은 «본문을 쓰지 마라»가 아니다 — 본문은 사람이 파일을 열었을 때의 서사로 여전히 값한다. 잘못 읽으면 기존 57장의 서사를 지우는 회차가 나올 수 있으므로 문안이 그 구분을 명시해야 한다.",
+      "effort": "S",
+      "target": "orchestrator"
+    }
+  ]
+}

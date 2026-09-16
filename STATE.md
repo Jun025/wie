@@ -60,6 +60,23 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-16: **코퍼스 카드에 «첫 질문»을 넣었다 — 그 자리가 본문이면 안 되는 이유**
+  (`wie-adopt-p3-adopted-proposals-triage-r2-p0`) — 정본 `docs/report/0122--….md`.
+  채택 제안 `2026-09-16-p3-adopted-proposals-triage-r2#p0` 집행. **wie 제품 코드 0줄**(이 저장소 변경은 원장 3파일).
+  고친 것은 `~/orchestrator/humansteps/wie-p2-corpus-placement.md` 하나 — `what:` 에 「`lgt/` **52건**이 먼저」 ·
+  `how:` 에 「첫 질문 + 답을 내는 명령 `PLATFORM_FILTER=lgt scripts/smoke_gate.sh` + 통과/실패의 뜻」.
+  ★★**자리 선택이 이 회차의 실측이다** — 카드의 markdown **본문은 운영자 화면에 닿지 않는다**
+  (`bin/humanstep-scan` 에 문자열 `body` **0건** · `--json` 방출 키 15종에 본문 없음 ⇒ `pipeline-feed` 의
+  `human_steps` 에도 없다). 제안대로 본문에 적었으면 **명목상 집행 · 실효 0** 이었고, 개악 대조 ①이 그 형태를
+  **RED** 로 재현한다(`how:` → 본문 이동 = `markers-in-how` 2→0).
+  ★**제안 3축 중 둘은 그대로 참**(카드에 「첫 질문」 0건 · 분할 ktf 190 · lgt 52 · skt 50 = 292),
+  ★**하나는 낡았다** — 「조각 D 의 27줄 결정을 정한다」는 이미 지나갔다(⒝ 집행 · PR #161 · 오늘 `wipi_c.rs` 는
+  공용 27 / LGT 전용 0). 그러나 **질문은 죽지 않았다**: upstream LGT 전용 `graphics.rs` **1,095줄**이 배선만 끊긴 채
+  트리에 남아 있고 조각 D 자신이 「⒜/⒝ 중 실게임에 옳은 쪽은 못 잰다」를 남겼다 ⇒ 문면을
+  **「무엇을 고를까」 → 「고른 것이 맞았나」** 로 갈아타 적었다.
+  ★**부채를 숨기지 않는다**: 그 문안은 PR #161·1,095줄이 움직이면 **썩는데** `HUMANSTEP_ANSWER_STALE` 은
+  날짜만 보고 내용을 못 본다. 그리고 본문 미소비는 이 카드만이 아니다 — **99장 중 57장 · 2,254줄**(세기만 했다 · 후속 제안).
+  회귀 0(전건 합산 · `tail` 아님): fmt/clippy/wasm/beta OK · `cargo test --all` **42 스위트 384 passed · 0 failed**.
 - 2026-09-16: **채택 제안 9건 재측 — 8건이 낡았고 정본 한 곳만 살아 있었다**
   (`wie-p3-adopted-proposals-triage-after-base-swap-r2`) — 정본 `docs/report/0121--….md`.
   base swap(PR #161 · `37734e74`) **이후 기준**으로 다시 재어 ⒜집행 **1** · ⒝발권초안 **1** · ⒞무효 **7**.
