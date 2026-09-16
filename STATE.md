@@ -60,6 +60,29 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-16: **리눅스가 못 빌드하는 의존이 되돌아오면 PR 에서 빨개진다 — `members` 가 아니라 `Cargo.lock` 을 본다**
+  (`wie-adopt-slice-d-base-swap-fix3-p0`) — 정본 `docs/report/0125--….md`.
+  채택 제안 `2026-09-16-slice-d-base-swap-fix3#p0` 집행. **제품 코드 0줄**.
+  `scripts/check-linux-system-deps.mjs` 신설(`glib-sys`·`soup3-sys`·`gtk-sys`·`webkit2gtk-sys`·`tauri` 가
+  lock 에 있으면 rc=1) + `engine-contract.yml` **상시 스텝**(여섯째)으로 배선.
+  ★★**제안이 적은 처방(`members` 화이트리스트)을 쓰지 «않았다»** — 그 `tradeoff` 가 스스로 우려한 비용
+  (「검사기와 매니페스트가 **두 벌의 진실**」)이 실재하고, ★그 축은 **기존 member 가 GTK 의존을 새로 얻는
+  경로를 못 본다**(대리 신호이기 때문). ⇒ 술어를 **해악 자체**(= 리눅스가 못 빌드하는 크레이트가 해결된
+  그래프에 있는가)로 바꿨고, 그 정본은 **커밋된 `Cargo.lock`** 이다. ★**정당한 크레이트 신설 비용 0.**
+  ★**락이 «대리»가 아니라 «증인»임을 쟀다**: 현재 감시 5종 **전건 0** ↔ `wie-app` 을 `members` 로 되돌리면
+  **전건 1**(격리 worktree · `cargo metadata`). 복원하면 다시 0.
+  ★**개악 대조는 upstream 당김이 하는 그대로**다(members 한 줄 + `exclude` 비우기): 정상 rc=0 → 개악 **FAIL 5종
+  전건** → 복원 rc=0. 종료코드는 따로 못박았다(크래프트 lock rc=0 ↔ `[[package]] name = "tauri"` 추가 rc=1).
+  ★**위양성 1종을 닫고 그것도 쟀다**: `dependencies = [ "glib-sys" ]` 줄이 있어도 **rc=0**(앵커 `^name = "…"$`).
+  ★**왜 상시 스텝인가** — `Cargo.lock`·`**/Cargo.toml` 은 이미 필터 «안»이지만, **이 가드를 침묵시키려면
+  지울 것이 «스크립트»이고 그 경로는 필터에 없다** ⇒ 그 PR 은 필터 내 전부를 건너뛰고 green 을 낸다.
+  `parity-lock-wired`·`audit-no-leak`·`docs-report-serial` 이 **같은 이유로** 상시다.
+  ★**AGENTS.md 무접촉** — 같은 계급 선례 `check-parity-lock-wired` 의 AGENTS.md 언급이 **0건**이고,
+  새 fenced `sh` 줄을 안 만들었으므로 **doc-liveness 패리티 의무도 발생하지 않는다**.
+  ★**천장을 숨기지 않는다**(매 실행 출력): 이미 덴 계열만 안다 · 러너 apt 가 늘면 «틀린 게 아니라 보수적»이 된다 ·
+  lock 은 타깃 독립이다 · ★**리눅스 레그를 돈 것이 아니라 «기전»을 보인 것**이다(green 판정은 CI 몫).
+  회귀 0(전건 합산 · `tail` 아님): fmt/clippy/wasm/beta rc=0 · `cargo test --all --no-fail-fast`
+  **42 스위트 384 passed · 0 failed** · `npm run audit` rc=0 · 노드 검사기 **7종 전건 rc=0**.
 - 2026-09-16: **«완성된 줄» 술어를 한 곳으로 모았다 — 제안이 미룬 근거가 실측으로 없었다**
   (`wie-adopt-slice-d-base-swap-fix2-p0`) — 정본 `docs/report/0123--….md`.
   채택 제안 `2026-09-16-slice-d-base-swap-fix2#p0` 집행. **제품 코드 0줄**(시험 지원 크레이트 + 통합 시험 2개 ·
