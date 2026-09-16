@@ -95,6 +95,31 @@
   ★**한계**: 그룹 C 의 18개 메서드를 실제로 부르는 타이틀 수는 **292 코퍼스 없이 못 잰다** ·
   그룹 A 가 원 커밋의 「5 KTF 타이틀」에 무해한가도 코퍼스로는 못 재고 대체 증거는 위 `InstantiationError` 뿐 ·
   **67·59 는 «예행» 수이지 D 의 착지 수가 아니다**.
+- 2026-09-16: **조각 B — ② 엔진 오버레이 51건을 「폐기 / 재적용 / upstream 발신」으로 분류**
+  (`wie-p3-slice-b-classify-51-engine-overlays`) — 제품 코드 **0줄** ·
+  정본 `docs/upstream-realign-p3-slice-b-triage.md` · **폐기 21 · 재적용 24 · 발신 6 = 51 · 미분류 0**.
+  측정 트리 `origin/main c77998ad ↔ upstream/main 44fbf265 ↔ merge-base fa641a8a` · 머지 예행은 격리
+  워크트리에서 돌고 `--abort` + `worktree remove --force` 로 제거.
+  ★**「51」의 정확한 구성은 «② 50 + ③f 1»** — 계획 §1 은 `③f = wie_cli/` 를 별 갈래로 선언하는데 §3 의
+  갈래별 표에 그 칸이 없어 접혔다. **총계 74 는 양쪽이 같고 틀린 것은 분해뿐**이라 51행 전건을 분류했다
+  (`UD 13` 리터럴은 2곳 전건 정정 · 전수 계수 **잔여 0**).
+  ★★**폐기 21 중 7건은 «upstream 이 가졌다»가 아니라 «우리 의존이 이미 가졌다»다** —
+  `wie_wipi_java/src/classes/java/**` 는 `rustjava@5b84dd1 java_runtime/src/loader.rs:26/36/80/96` 이
+  같은 FQCN 을 등록하고 `wie_jvm_support/src/lib.rs` 가 클래스패스를 `RT_RUSTJAR : WIE_RUSTJAR : <jar>`
+  순으로 세우므로 **오늘 이미 그림자에 있다**. 원 커밋 `5603a7f9` 는 **2026-07-02**(구 포크 핀)이고 핀이
+  `5b84dd1` 로 간 것은 **2026-09-04**(`1762a32c`) ⇒ ★파일 주석의 「Not provided by the bundled
+  java_runtime」가 그 사이에 낡았다.
+  ★**verdict §6-P4 의 「선 안쪽 10종」은 오늘 «6종»이다**(위 4종이 폐기로 빠진다 — 보내 봐야 중복).
+  ★**「`canvas.rs` +149줄은 전부 단위테스트 9개이고 구현이 아니다」는 두 곳이 틀렸다**: `+149` 는 맞으나
+  ⑴9는 **총** 수이고 base 가 1개를 가져 **더한 것은 8개** ⑵**구현 hunk 가 둘 있다** — `Rgb332Pixel` u8
+  오버플로 교정(★upstream 에 **이미 있다** ⇒ 폐기 몫) · `decode_image` 의 `data.len() >= 4` 가드
+  (★upstream **0건** ⇒ 재적용 몫). 시험 이름 교집합은 base 것 1개뿐이다(ours 9 · upstream 28).
+  ★**심볼 계수만으로 닫지 않았다 — 양방향으로 틀린다**: `runtime.rs` 는 `inUp=1 notUp=0` 인데 실제 델타가
+  `hardening::harden` 이고 upstream 에 0건 · `wipi_c/context.rs` 는 `added=0` 인데 행 전체가 폐기다.
+  ⇒ `added=0` 17행과 `inUp>0` 전건을 **열어서** 봤고 폐기 21행은 전건 `git show upstream/main:<path>` 확인.
+  ★**한계**: 분류는 Java 가시 시그니처까지만 본다(본문 의미 미비교) · upstream 의 `rustjava-runtime ^0.1.1`
+  은 crates.io 판이라 **못 쟀다**(폐기 판정 자체는 우리 핀 실측만으로 성립) · 폐기 #5~#8 이 걸린 「5 KTF
+  타이틀」은 292 코퍼스 부재로 **재현 불가** · `skt` 는 이 표에 **한 행도 없다**(② 미해결에 `wie_skt/` 0건).
 - 2026-09-16: **P3 남은 조각(⑵⑶⑷) 회차 분할 + 조각별 «이 머신에서의» 검증식**
   (`wie-p3-remaining-slices-split-and-verifiability-plan`) — 제품 코드 **0줄** ·
   정본 `docs/upstream-realign-p3-slices.md` · 조각 **A~E**(각 ⒜범위 ⒝size/risk ⒞선행 ⒟명령+기대출력 ·
@@ -1325,13 +1350,18 @@
     못 재는 이유는 구조가 아니라 ★**그냥 코퍼스가 여기 없다**는 것이다(`find ~ -maxdepth 4 -name game_lab` **0건** 재확인)
     ⇒ ★**human-step 후보**(`game_lab/working/{ktf,lgt,skt}` 292타이틀 배치 · 카드 발권은 총괄 몫).
   - **조각 A~E**(상세·검증식은 정본 문서): **A** LGT keydraw 회귀 규명(M·low·선행없음 · ★D 의 게이트) →
+    ★~~**B** ② 51건 hunk 분류~~ **끝났다(2026-09-16 `wie-p3-slice-b-classify-51-engine-overlays`)** —
+    정본 `docs/upstream-realign-p3-slice-b-triage.md` · **폐기 21 · 재적용 24 · 발신 6 = 51 · 미분류 0** ·
+    ★「51」의 구성은 **② 50 + ③f 1**(아래 §3 표에 `③f` 칸이 없어 접혔다) → **C** 이미 upstream 에 있는 것 삭제(M·med · 선행 B ·
+    ★**C 의 기대값은 «미해결 74 → 53» 이 «아니라» `53 ≤ N < 74` 다** — 폐기 21 중 `UU` 5행은 파일이 남고 델타만 사라진다 ·
     **B** ② 51건 hunk 분류(M·low · 제품코드 0 · ★**2026-09-16 끝났다** — PR #158 ·
     `docs/upstream-realign-p3-slice-b-triage.md` · 폐기 21 · 재적용 24 · 발신 6) →
     ★~~**C** 이미 upstream 에 있는 것 삭제~~ **부분 착지(2026-09-16 `wie-p3-slice-c-drop-hunks-already-upstream`)** —
     정본 `docs/upstream-realign-p3-slice-c-deletability.md` · ★**폐기 21행이 «세 계급»으로 갈렸다**:
     **A 7행 지웠다**(머지 예행 **74 → 67**) · ★**B 5행 «구조적 불가»**(되돌리면 `cargo check` 오류 10건 ·
     beta clippy red · `draw_j2me` FAIL) · ★**C 9행 보류**(검증이 공허 — 운영자 판정).
-    ⇒ ★**그룹 B·C 는 조각 D 안에서 처분된다 — 조각 C 를 다시 발권하지 마라.** 종전 문안(M·med · 선행 B ·
+    ⇒ ★**그룹 B·C 는 조각 D 안에서 처분된다 — 조각 C 를 다시 발권하지 마라.**
+    ★**착지 «전» 기대값 「`53 ≤ N < 74`」는 «실측이 대체했다» — 실제 **74 → 67**(그 기대값 문장은 위에 그대로 남겨 두었다).
     ★**우리 base 위라 5게이트가 전부 산다**) → **D** base swap 머지(L·★**high** · 선행 A·C) →
     **E** 웹 계약·아티팩트(M·med · 선행 D).
     ★★**D 의 ⒟ 는 «충돌 0» 이 아니라 «빌드 게이트»다 — 근거는 「★«미해결 0» 이 «컴파일된다»를 뜻하지 않는다」이고,

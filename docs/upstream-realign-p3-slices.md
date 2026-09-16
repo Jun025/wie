@@ -139,7 +139,7 @@ git merge --abort && cd - && git worktree remove --force /tmp/probe
 | 갈래 | 미해결 | 내역 |
 |---|---:|---|
 | ① `wie_lgt` | **12** | UU 5 · UD 4 · AU 3 |
-| ② 엔진 | **51** | UU 21 · AU 16 · UD 13 · AA 1 |
+| ② 엔진 | **51** | UU 21 · AU 16 · **UD 12 + ③f UD 1** · AA 1 ★정정 2026-09-16 조각 B |
 | ③ 스캐폴딩·설정 | **11** | UU 9(`.github/*`×3 · `AGENTS.md` · `Cargo.toml` · `Cargo.lock` · `.gitignore` · `README.md` · `docs/lgt.md`) · AA 2(`package.json`·`package-lock.json`) |
 
 ★★**③ 오버레이의 «본체»는 충돌하지 않는다** — 머지된 워크트리에서 실측:
@@ -340,7 +340,11 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 
 ### B — `wie-p3-engine-overlay-hunk-triage`
 
-- **⒜ 범위**: 제품 코드 **0줄**. ② 미해결 **51건**(UU 21 · AU 16 · UD 13 · AA 1)을 파일 단위로
+> ★**[완료 2026-09-16 · `wie-p3-slice-b-classify-51-engine-overlays`] 산출물 = `docs/upstream-realign-p3-slice-b-triage.md`.**
+> 결과: **폐기 21 · 재적용 24 · 발신 6 = 51 · 미분류 0.** ★그 문서 §1 이 아래 「51」의 정확한 구성
+> (**② 50 + ③f 1**)을 적는다 — 이 절의 `③f` 를 §3 표가 갖고 있지 않아 생긴 차이다.
+
+- **⒜ 범위**: 제품 코드 **0줄**. ② 미해결 **51건**(UU 21 · AU 16 · **UD 12 + ③f UD 1** · AA 1)을 파일 단위로
   **{폐기 — upstream 이 이미 가졌다 / 재적용 — 우리만 있다 / upstream 으로 보낸다(P4)}** 로 분류한 표 1장.
   ★verdict §6-P4 의 「선 안쪽 10종 + `canvas.rs` 테스트 9개」를 **오늘 값으로 재측**해 그 표에 합친다.
 - **⒝** size **M** · risk **low**
