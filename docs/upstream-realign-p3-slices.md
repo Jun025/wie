@@ -310,6 +310,53 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 
 ### A — `wie-p3-lgt-keydraw-upstream-regression-triage`
 
+> ★★★**[돌았다 2026-09-16 · `wie-p3-slice-a-keydraw-lgt-breaks-on-upstream-base` · 정본 `docs/report/0115--….md`]
+> 원인이 «이름»으로 나왔다 — 이 칸의 ⒜~⒟ 는 그 회차가 실제로 따른 것이고, 아래가 그 답이다.**
+>
+> ★**원인**: upstream 이 graphics SVC **27개**를 LGT 전용 구현(`wie-lgt/src/runtime/wipi_c/graphics.rs` ·
+> **1,095줄**)으로 보내고, 그 구현이 게스트에게 **다른 레코드 ABI** 를 준다 —
+> `LgtFramebuffer{owned_image,ptr_graphics,ptr_image,screen_kind}` **16B**(★`buf` 필드 **없음**) ↔
+> 공용 `WIPICFramebuffer{width,height,bpl,bpp,**buf**}` **20B**(픽셀 포인터 **+16**).
+> 게스트 SDK(`dlunch/wipi` 의 `wipi/src/framebuffer.rs`)가 ★**스스로 패닉**한다
+> (게스트 printk 전문: `panicked at wipi/src/framebuffer.rs : 149 : 18 : null reference produced`).
+> 그 뒤 주소 0 으로 분기해 `Undefined instruction`(PC=0x0)이 난다 ⇒ ★**`CletWrapperCard.paint` 스택은 증상이다.**
+> ★★**[정정 2026-09-16 게이트②] 그 패닉 자리는 «핸들 자신»의 역참조(`:149` `read_fb` — 파일 전체에서 `&*` 는
+> 그 한 자리뿐)이고 `fb.buf`(+16) 읽기가 «아니다»** — +16 을 읽는 `:153` `buffer_ptr` 는 **raw 포인터를
+> 돌려주므로** 이 문구를 낼 수 없다(널이면 `set_pixel` 의 `*pixel_ptr` 에서 와일드 쓰기다).
+> ⇒ ★**「+16 을 읽어 레코드 끝 너머에서 0 을 얻는다」는 «추론»이고 측정되지 않았다** — 측정된 것은
+> ⒜레이아웃이 다르다 ⒝`149:18` 에서 널 참조로 패닉한다 ⒞27줄 치환으로 PASS 다, 셋뿐이고 결정은 그 셋으로 선다.
+> ★**「레코드만 20B 로 맞춘다」는 선택지가 아니다** — 202 단일 치환이 FAIL 불변(계열 전체)이고, 검수자가
+> 진짜 20B 백킹을 돌려줘도 같은 `149:18` 에서 FAIL 이었다(※그 실험은 결정적이지 않다 — **미지지**이지 반증이 아니다).
+> ★**도입 커밋 = `9a88423b`(2026-08-23) `Fix LGT graphics and runtime compatibility (#1368)`** —
+> ★**⑸ 엔트리포인트를 바꾼 그 PR 과 «같다».**
+>
+> ★**무는 것(결정 실험)**: `wie-lgt/src/runtime/wipi_c.rs` 의 `=> graphics::` **27건**을
+> `=> wie_wipi_c::api::graphics::` 로 치환 → ★**PASS · paints 55**(2/2). 원본은 FAIL · paints 0(3/3).
+>
+> ★**배제된 가설 4종**(전부 실행): 포인터 등록(양쪽 `0x25619` 동일 · `paint` 본체 바이트 동일) ·
+> `init_process_state`/`set_use_annunciator` 2줄(꺼도 FAIL) · **202 단일 치환**(FAIL 불변) ·
+> 공용 구현 자체(두 트리 diff **0**).
+> ★**범위**: `keydraw_ktf` upstream **PASS**(upstream 도 공용 경로) · `helloworld_lgt` upstream **PASS**
+> ⇒ ★**LGT «그리기» 경로 한정**이다.
+>
+> ★★**⇒ 조각 D 로 넘어간 «결정 항목»**: base swap 시 그 **27줄을 어느 쪽으로 두는가**.
+> ⒜upstream LGT 전용 유지 ⇒ **SDK 기반 게스트(우리 픽스처)가 깨진다** ·
+> ⒝공용으로 되돌림 ⇒ **upstream 의 LGT 리버스 1,095줄을 버린다**.
+> ★**이 결정은 코퍼스 없이 «안전하게» 내릴 수 없다** — 아래 「못 재는 것 ⑵」가 그 이유이고,
+> 그 축은 이 회차가 **좁혔지만 닫지 못했다**(`docs/lgt_abi.md:930` 이 실제 clet 타이틀 놈ZERO 에서
+> 「`GetScreenFrameBuffer` 가 준 포인터에 **직접** 픽셀을 쓴다」를 관측했다 ⇒ 우리 픽스처와 **같은 모양**.
+> ★그러나 실제 clet 이 **upstream 의 간접 체인을 걷을** 가능성은 배제되지 않았다).
+>
+> ★★**[정정 2026-09-16 게이트②] 그 «한 겹 아래»의 주소가 틀렸다 — 화면 FB 에 `ptr_image` 경로는 «없다».**
+> upstream `graphics.rs` 실측: 화면 FB 는 ★**`ptr_image: 0`**(`:374-381`) · 오프스크린의 `ptr_image = ptr_backing`
+> 이 가리키는 것은 **`WIPICFramebuffer`**(`create_backing` `:243-252`)이지 `LgtImage` 가 아니다
+> (`LgtImage` **8B** 는 이미지 디코드 `:915-927` 에만 쓰인다).
+> ★**실제 간접은 «두 겹»이다**: `핸들 → LgtFramebuffer.ptr_graphics → LgtGraphicsView.ptr_backing`(`create_view` `:255-266`)
+> `→ WIPICFramebuffer.buf → 픽셀`.
+> ⇒ ★★**코퍼스가 생기면 물을 질문은 이것이다**: **「실제 clet 이 `GetScreenFrameBuffer` 반환값을
+> `WIPICFramebuffer` 로 «직접» 읽나, 아니면 `ptr_graphics → view.ptr_backing` 을 걷나」.**
+> ★「게임이 `ptr_image` 를 보나」는 **틀린 질문**이다(그 필드는 화면 경로에서 0 이다).
+
 - **⒜ 범위**: 제품 코드 **0줄**. 격리 워크트리 조사만. 대상 = upstream `wie-lgt` 의 clet paint 경로
   (`net/wie/CletWrapperCard.paint` → ARM `Undefined instruction`) ↔ 우리 `wie_lgt/src/runtime/`.
   산출물 = `docs/report/` 1장 + (필요시) upstream 이슈 **초안**(★**발신하지 마라** — §7).
