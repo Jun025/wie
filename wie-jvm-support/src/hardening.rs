@@ -13,22 +13,21 @@
 //! `RuntimeClassProto` from `java_runtime` and hands it to the JVM itself, so wie can
 //! wrap a method body on the way past. That is all this module does.
 //!
-//! It also re-adds two *absent methods*. The P1 round left those out on the grounds that a
-//! missing method fails loudly while a missing null guard kills the host — true, but it also
-//! assumed nobody had measured whether guests call them. They had: the fork's own commit log
-//! names the title that hit each one (`Timer.schedule` → 소울카드마스터2, `StringBuffer.insert`
-//! → 미니고치, both "trace-specified as method-not-found"). Those are corpus observations from
-//! when the corpus still existed, and no probe run here can replace them.
-//!
-//! **What is still missing, and when to revisit it.** The pin's `StringBuffer` declares no
-//! `insert` at all while the WIPI platform library games compile against
-//! (`docs/reference/AromaWIPI_classes.zip`) declares **nine** overloads; its `Timer` declares
-//! four `schedule` forms plus `cancel`, of which the pin has two and we add a third. So this
-//! module closes **1 of 9** and **3 of 5**. Only the two with a named title behind them were
-//! ported — adding the rest on spec alone would be guessing at which one a game calls.
+//! It used to also re-add two *absent methods* — `Timer.schedule` (소울카드마스터2 hit it) and
+//! `StringBuffer.insert` (미니고치) — both named in the old fork's commit log as
+//! "trace-specified as method-not-found". **Slice D (2026-09-16) dropped both wie-side copies,
+//! and this module now re-adds nothing**: measured against the pin's own source
+//! (`rustjava-runtime-0.1.1`), `java/util/Timer` declares all **four** `schedule` forms plus
+//! `cancel` (`timer.rs:23`) and `java/lang/StringBuffer` declares **twelve** `insert` overloads
+//! (`string_buffer.rs:116`) — more than the **nine** in the WIPI platform library games compile
+//! against (`docs/reference/AromaWIPI_classes.zip`). So the method axis is **5 of 5** and
+//! **9 of 9**, closed by the pin rather than by us. The `add()` helper below is kept with no
+//! caller on purpose, because the next absent overload is a `add()` call and not a redesign.
 //! **Resume condition, as a number rather than "later": one (1) observed guest failure naming a
 //! missing overload.** `wie_validate` reports it as a resolution error carrying the descriptor,
 //! so a single trace is enough to pick the next one.
+//!
+//! What remains here is therefore **only the null guards** — the half that panics the host.
 //!
 //! Deliberately NOT covered (measured, not overlooked):
 //! - Pending-thread GC roots need no port at all. The 13-row probe that produced the "six
@@ -140,7 +139,10 @@ pub fn harden(proto: &mut RuntimeClassProto) -> usize {
         // `append([CII)` still attaches and is still the reachable half.
         "java/lang/StringBuffer" => guard(proto, "append", "([CII)Ljava/lang/StringBuffer;", &[1], "str is null") as usize,
 
-        // One-shot `schedule` is absent from the pin (소울카드마스터2 hit it).
+        // No `java/util/Timer` arm any more: slice D removed it because the pin declares all
+        // four `schedule` forms itself (see the module header). The comment that used to sit
+        // here still claimed one-shot `schedule` was absent — the opposite of the measurement
+        // that deleted the arm.
         _ => 0,
     }
 }
@@ -161,7 +163,9 @@ mod tests {
     /// changes, this fails instead of the hardening quietly vanishing.
     #[test]
     fn every_guard_is_actually_applied() {
-        // StringBuffer carries two: one wrapped guard and one added method.
+        // One wrapped guard per class, and no added methods at all — slice D dropped both
+        // wie-side copies because the pin declares them (module header). This said
+        // "StringBuffer carries two" while asserting 1 on the line below it.
         for (name, expected) in [
             ("java/lang/System", 1),
             ("java/io/ByteArrayInputStream", 1),
