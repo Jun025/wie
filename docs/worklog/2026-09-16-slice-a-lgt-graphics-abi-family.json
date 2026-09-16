@@ -5,7 +5,7 @@
   "title": "조각 A — upstream base 에서 keydraw_lgt 가 깨지는 원인 규명",
   "summary": "원인은 upstream 이 graphics SVC 27개를 LGT 전용 구현(wie-lgt/src/runtime/wipi_c/graphics.rs · 1,095줄)으로 보내고 그 구현이 게스트에게 다른 레코드 ABI(LgtFramebuffer 16B · buf 필드 없음)를 주는 것이다. 게스트 SDK 는 스스로 패닉한다(wipi/src/framebuffer.rs:149:18 null reference produced). 정정 2026-09-16: 그 자리는 핸들 자신의 역참조이고 fb.buf(+16) 읽기가 아니다 — +16 을 읽는 :153 은 raw 포인터를 돌려주므로 이 문구를 못 낸다. '+16 에서 0 을 얻는다'는 추론이고 측정되지 않았다. 도입 커밋 9a88423b (2026-08-23 · PR #1368). 27줄을 공용 구현으로 돌리면 PASS(paints 55)로 되돌아온다. 제품 코드 0줄.",
   "changes": [
-    "docs/report/0113--2026-09-16--…md 신설",
+    "docs/report/0115--2026-09-16--…md 신설",
     "docs/upstream-realign-p3-slices.md 조각 A 칸에 «닫혔다 + 무엇을 D 에 넘기나» 반영",
     "STATE.md ## 다음 의 조각 A 항 갱신"
   ],

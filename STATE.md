@@ -71,7 +71,7 @@
   `:153` 은 raw 포인터를 돌려주므로 이 문구를 못 낸다) ⇒ ★**「+16 에서 0 을 얻는다」는 추론이고 측정되지 않았다.**
   ★**무는 것**: 27줄을 공용으로 치환 → **PASS · paints 55**(2/2) ↔ 원본 **FAIL · paints 0**(3/3) ↔ ours **PASS**(3/3).
   ★**배제 4종 전부 실행으로**(포인터 등록 · init 2줄 · 202 단일 치환 · 공용 구현 자체).
-  ★**범위 = LGT 그리기 한정**(`keydraw_ktf`·`helloworld_lgt` upstream PASS). 정본 = `docs/report/0113--….md`.
+  ★**범위 = LGT 그리기 한정**(`keydraw_ktf`·`helloworld_lgt` upstream PASS). 정본 = `docs/report/0115--….md`.
 - 2026-09-16: **조각 C — 이미 upstream 에 있는 엔진 hunk 삭제: 7행 착지 · 14행이 «왜 아닌지»를 수로 보였다**
   (`wie-p3-slice-c-drop-hunks-already-upstream`) — 측정 기록 정본
   `docs/upstream-realign-p3-slice-c-deletability.md`.
@@ -1348,7 +1348,7 @@
     그 뒤(2026-09-06) 커밋된 **그리는 픽스처**(`keydraw_*`)는 upstream 에 대고 돌려진 적이 없었다.
     ⇒ ★★**「upstream LGT 는 우리의 진부분집합」(§3-1)은 «구현 개수» 축에서 참이고 «동작» 축에서 거짓이다.**
     ★**base swap 전에 이것부터 규명하라** — 조각 **A** 가 조각 **D** 의 게이트다.
-  - ★★★**[조각 A 돌았다 2026-09-16 · `wie-p3-slice-a-keydraw-lgt-breaks-on-upstream-base` · 정본 `docs/report/0113--….md`]
+  - ★★★**[조각 A 돌았다 2026-09-16 · `wie-p3-slice-a-keydraw-lgt-breaks-on-upstream-base` · 정본 `docs/report/0115--….md`]
     원인이 «이름»으로 나왔다 — 「LGT 가 왜인지 깨진다」가 «27줄 배선»으로 좁혀졌다.**
     ★**원인**: upstream 이 graphics SVC **27개**를 LGT 전용 구현(`wie-lgt/src/runtime/wipi_c/graphics.rs` · **1,095줄**)으로
     보내고 그 구현이 게스트에게 **다른 레코드 ABI** 를 준다 — `LgtFramebuffer` **16B**(★`buf` 필드 **없음**) ↔

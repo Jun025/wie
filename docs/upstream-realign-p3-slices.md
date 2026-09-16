@@ -310,7 +310,7 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 
 ### A — `wie-p3-lgt-keydraw-upstream-regression-triage`
 
-> ★★★**[돌았다 2026-09-16 · `wie-p3-slice-a-keydraw-lgt-breaks-on-upstream-base` · 정본 `docs/report/0113--….md`]
+> ★★★**[돌았다 2026-09-16 · `wie-p3-slice-a-keydraw-lgt-breaks-on-upstream-base` · 정본 `docs/report/0115--….md`]
 > 원인이 «이름»으로 나왔다 — 이 칸의 ⒜~⒟ 는 그 회차가 실제로 따른 것이고, 아래가 그 답이다.**
 >
 > ★**원인**: upstream 이 graphics SVC **27개**를 LGT 전용 구현(`wie-lgt/src/runtime/wipi_c/graphics.rs` ·
