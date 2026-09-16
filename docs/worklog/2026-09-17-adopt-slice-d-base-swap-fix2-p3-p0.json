@@ -1,0 +1,42 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-17",
+  "task": "wie-adopt-slice-d-base-swap-fix2-p3-p0",
+  "title": "제안 #p0 채택 — upstream 이 «새» 워크플로를 들고 오는 것을 기계가 본다(손으로 관리하는 목록 없이)",
+  "summary": "제안은 「upstream 이 새 워크플로를 들고 와도 아무도 안 본다 · 술어는 origin/main 과 upstream/main 의 .github/workflows/ 파일 집합 차분이면 된다 · doc-liveness.yml 의 주간 스케줄에 얹으면 새 배관 0」이었다. 전제를 재측해 여전히 참임을 확인하고(upstream 워크플로 집합을 비교하는 축 0건 · check-parked-workflows.mjs 의 PARKED 는 리터럴 2원소 그대로 · 오늘 차분 0) 제안의 처방을 그대로 집행했다. scripts/check-upstream-new-workflows.mjs 신설 + doc-liveness.yml 의 «마지막» 스텝으로 배선. 차분식이라 손으로 관리하는 인벤토리가 «없다» — upstream 워크플로의 처분 전건(채택·주차)이 파일을 우리 트리에 남기므로 차분은 스스로 비어 있는 상태로 돌아온다. 예외는 「의도적 삭제·개명」 하나뿐이고 그것만 빈 KNOWN_ABSENT 배열에 선언한다. 제품 동작 0줄 · Rust 0줄.",
+  "changes": [
+    "scripts/check-upstream-new-workflows.mjs 신설 — upstream/main 의 .github/workflows/ 파일 집합 − 우리 트리 − KNOWN_ABSENT 가 비어 있는지 검사(내용 미독 · ref 미해결·0건 파싱은 fail-closed)",
+    ".github/workflows/doc-liveness.yml — 마지막 스텝으로 배선(upstream 리모트 add+fetch 포함) + 파일 머리에 「문서 명령이 아닌 rider」 절 신설(왜 여기에 · 왜 마지막인가)",
+    "docs/report/0135--2026-09-17--wie-adopt-slice-d-base-swap-fix2-p3-p0.md 신설 · STATE.md 완료 1건"
+  ],
+  "verification": [
+    "전제 재측(ⓐ): scripts/·.github/ 전수에서 upstream 워크플로 집합 비교 축 0건 · check-parked-workflows.mjs:41 PARKED 는 리터럴 2원소 그대로 · 실측 차분 upstream 6 / ours 10 / upstream−ours = 0 ⇒ 제안 유효하고 green 에서 출발",
+    "정상: node scripts/check-upstream-new-workflows.mjs = upstream 6, ours 10, declared-absent 0, new 0 · rc=0",
+    "★개악 대조(양방향 · 제품 호출부 = 실제 트리와 실제 upstream/main · 상수 대 상수 아님): ⑴.github/workflows/coverage.yml 를 트리에서 제거(= upstream 이 새 파일을 들고 온 것과 집합적으로 동일) → rc=1 'ships 1 workflow(s) ... coverage.yml' ⑵같은 상태 + KNOWN_ABSENT=[\"coverage.yml\"] → rc=0 declared-absent 1(탈출구 실작동) ⑶UPSTREAM_REF 를 없는 ref 로 → rc=1 'cannot resolve' + 복구 명령 2줄(fail-open 아님) ⑷전부 복원 → rc=0 재현",
+    "배선 실측: python yaml 파싱으로 doc-liveness.yml 스텝 14개 · 마지막 = 이 가드 · on = [schedule, workflow_dispatch, pull_request] 불변 · git fetch upstream main:refs/remotes/upstream/main 형태 rc=0 로 확인(CI 는 --depth=1 만 추가)",
+    "★스텝 이름 따옴표: 무따옴표 YAML 스칼라에서 ' #p0' 가 주석으로 먹혀 이름이 잘렸다 — 파싱으로 잡고 인용부호로 고쳤다(파싱 재확인)",
+    "4게이트: cargo fmt --all -- --check OK · clippy --all -D warnings rc=0 · clippy --target wasm32-unknown-unknown --all -D warnings rc=0 · cargo +beta clippy --all -D warnings rc=0",
+    "cargo test --all: 전건 합산 384 passed · 0 failed(result 줄 42개 · FAILED 0 · panicked at 0 · | tail 미사용)",
+    "형제 검사기 전건 rc=0: check-doc-liveness-parity(OK 25줄 — 가드 스텝은 DOC-COPY 밖이라 parity 대상이 아니다) · check-parked-workflows · check-worklog-json · check-docs-report-serial · npm run audit"
+  ],
+  "limits": [
+    "★이 가드는 «자기 배선의 삭제»를 못 본다 — doc-liveness.yml 에서 스텝을 지우면 조용하다(check-doc-liveness-parity 는 DOC-COPY 구간만 본다). 후속 제안으로 뺐다",
+    "★upstream 의 «수정»은 의도적으로 안 본다(제안의 트레이드 — 주간 소음이 된다). 그 축은 check-parked-workflows.mjs 가 트리거 면으로 이미 잡는다",
+    "★워크플로 «본문»을 한 글자도 읽지 않는다 — 새 파일의 위험도는 사람이 판정한다",
+    "★upstream 이 워크플로를 «개명»하면 옛 이름이 새것으로 보인다(오탐). 출구는 KNOWN_ABSENT 이고 오늘은 비어 있다",
+    "★탐지 지연은 최대 1주다 — upstream 동기 머지는 사람이 하는 드문 행위라 그 창을 감수한 값이지, 못 줄여서가 아니다"
+  ],
+  "proposals": [
+    {
+      "title": "새 가드가 doc-liveness.yml 에 배선돼 있는지 보는 축이 없다",
+      "plainSummary": "감시 장치를 자동화 설정에서 지워 버리면, 지웠다는 사실을 알려 줄 것이 아무것도 없습니다.",
+      "userBenefit": "「검사기 파일은 그대로 있는데 아무 데서도 안 돌아서 조용히 죽는」 형태를 막는다. 이 저장소가 이미 한 번 겪은 병이다.",
+      "why": "check-upstream-new-workflows.mjs 는 doc-liveness.yml 의 스텝 하나로만 돈다. 그 스텝을 지워도 파일은 남고 어떤 검사기도 울지 않는다 — check-doc-liveness-parity.mjs 는 DOC-COPY 구간만 비교하므로 그 밖의 스텝은 «보지도 않는다»(설계상 그래야 한다). 같은 병의 처방이 이 저장소에 이미 있다: check-parity-lock-wired.mjs 가 「파일은 있는데 아무것도 배선하지 않는다」를 잡으려고 존재하고, 그 헤더가 「지워진 것은 rm 만이 아니다」라고 적고 있다. 같은 술어를 이 가드에도 적용하면 된다(워크플로 파일이 스크립트 경로를 이름으로 부르는가).",
+      "tradeoff": "가드를 지키는 가드가 하나 더 늘어난다 — 그 자신은 또 누가 지키는가 라는 무한퇴행이 있고, 실제 답은 「engine-contract.yml 의 always-run 스텝에 얹어 PR 마다 돌린다」이다(그 자리는 이미 여러 검사기를 들고 있고 삭제하면 PR 이 red 다). 그리고 이 축은 «배선 문자열»을 보는 것이라 워크플로를 정당하게 리팩터하면 오탐이 난다 — check-parity-lock-wired 가 2026-09-06 에 정확히 그 오탐으로 한 번 실패했고, 그 회차가 술어를 «스펠링»에서 «경로»로 낮춰 해결했다. 그 교훈을 그대로 가져와야 한다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": ["2026-09-16-adopt-slice-d-base-swap-fix2-p3#p0"],
+  "declinedProposals": []
+}

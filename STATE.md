@@ -60,6 +60,20 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-17: **upstream 이 «새» 워크플로를 들고 오면 이제 기계가 본다 — 손으로 관리하는 목록 «없이»**
+  (`wie-adopt-slice-d-base-swap-fix2-p3-p0` · 채택 `2026-09-16-adopt-slice-d-base-swap-fix2-p3#p0`) —
+  정본 `docs/report/0135--….md`. ★**제품 동작 0줄 · Rust 0줄**.
+  `scripts/check-upstream-new-workflows.mjs` 신설 = `upstream/main` 의 `.github/workflows/` **파일 집합**
+  − 우리 트리 − `KNOWN_ABSENT`(빈 배열)가 비어 있는가. `doc-liveness.yml` 의 ★**마지막 스텝**(주간)으로 배선.
+  ★**손 관리 인벤토리가 «없는» 이유**: upstream 워크플로의 처분 전건(채택·주차)이 파일을 우리 트리에
+  남기므로 차분이 **스스로** 비어 있는 상태로 돌아온다. 예외는 「의도적 삭제·개명」뿐이고 그것만 선언한다.
+  ★**왜 PR 이 아니라 주간인가**: 신호는 upstream 이 움직일 때 바뀐다 — PR 마다 돌리면 upstream 이 파일
+  하나를 올린 날 **열린 PR 전건이 동시에 red** 다(2026-09-07 `check-worklog-coverage` 가 그 형태였다).
+  ★**red 의 주인은 새로 만들지 않았다** — 같은 job 이라 `doc-liveness.yml` 의 「첫 gate③ 회차」 규칙을 상속한다.
+  ★**개악 대조 양방향**: 우리 트리에서 `coverage.yml` 제거(= upstream 이 새 파일을 들고 온 것과 집합적으로
+  동일) → **rc=1 new 1** · `KNOWN_ABSENT` 선언 시 **rc=0**(탈출구 실작동) · ref 미해결 → **rc=1**(fail-open 아님) · 복원 **rc=0**.
+  ★**못 보는 것**: 자기 배선의 삭제(후속 제안) · upstream 의 «수정»(의도적 · 형제 검사기 몫) · 워크플로 본문.
+  ★오늘 실측 차분 **0**(upstream 6 · ours 10) ⇒ green 에서 출발했다.
 - 2026-09-17: **연번 0113 이중 claim — «이미 해소됐다»를 «처분 기록»으로 남긴다**
   (`wie-adopt-slice-d-blocked-on-lgt-abi-decision-p1-fix` · 채택 `2026-09-16-slice-d-blocked-on-lgt-abi-decision#p1`) —
   정본 `docs/report/0132--….md`. ★**제품 코드 0줄** · 사실 판정 **불변** · ★**PR 1건 close(비가역 아님)**.
