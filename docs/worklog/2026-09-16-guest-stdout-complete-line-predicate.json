@@ -1,0 +1,36 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-16",
+  "task": "wie-adopt-slice-d-base-swap-fix2-p0",
+  "title": "«완성된 줄» 술어를 test-utils 로 모았다 — 제안이 미룬 근거가 실측으로 없었다",
+  "summary": "채택 제안 2026-09-16-slice-d-base-swap-fix2#p0 집행. 두 stdout 폴링 시험이 독립으로 틀렸던 한 줄을 test_utils::guest_line_complete 하나로 모으고 호출부 2곳을 그것으로 바꿨다. ★제안 자신이 미룬 근거(「지금 만들면 #[path] 또는 tests/common/mod.rs 라는 새 구조가 생긴다」)는 실측으로 «거짓»이다 — test-utils 는 이미 workspace 크레이트이고 두 시험이 «이미» 그것을 import 한다(wie-ktf dev-dependencies). 새 구조 0. 제품 코드 0줄(시험 지원 크레이트 + 시험 2개).",
+  "changes": [
+    "test-utils/src/platform.rs — pub fn guest_line_complete(seen, prefix) 신설 + 두 시험이 왜 틀렸는지의 서사를 «한 부»로 이전 (+29)",
+    "test-utils/src/lib.rs — 재수출 1행",
+    "wie-ktf/tests/test_key_reach.rs — 인라인 술어 + 6줄 주석 → 호출 1줄 + 포인터 4줄 (+5 / −7)",
+    "wie-ktf/tests/test_resource_reach.rs — 인라인 술어 + 7줄 주석 → 호출 1줄 + 포인터 4줄 (+6 / −9)"
+  ],
+  "verification": [
+    "★개악 대조(양방향 · 공유 구현 «1곳» 변경 → 소비자 «2곳» 판정): guest_line_complete 본문을 종전의 순진한 형태 seen.contains(prefix) 로 되돌림 → --no-fail-fast 로 key_press_reaches_the_ktf_guest FAILED · bundled_resource_reaches_the_ktf_guest FAILED (2/2 RED) ⇒ 복원 → 둘 다 ok (2/2 GREEN). 잔여 개악 0(grep -c 'seen.contains(prefix)' = 0)",
+    "★상수 대 상수가 아니다 — 개악은 «시험 파일»이 아니라 두 시험이 공유하는 «구현 한 곳»에 넣었고, 판정은 게스트 실물 stdout 이다(키 축 'res:9:602\\nkey:53\\n' · 자원 축 'res:9:602')",
+    "★--no-fail-fast 가 필수다: 붙이지 않으면 cargo 가 첫 실패 타깃에서 멈춰 두 번째 소비자가 «보이지 않는다»(1건만 RED 로 세어진다 — 실측)",
+    "★새 실측 1건 — 제안의 「test_resource_reach 는 구 base 에서 잠복」은 오늘 «잠복이 아니다»: 이 base 에서 순진한 술어로 그 시험이 실제로 FAILED 다(둘 다 활성 경쟁 상태)",
+    "회귀 0(전건 합산 · tail 아님): RUST_MIN_STACK=4194304 cargo test --all --no-fail-fast → 42 스위트 384 passed · 0 failed · 0 ignored (origin/main 과 동수)",
+    "4게이트 + beta: cargo fmt --check rc=0 · clippy --all -D warnings rc=0 · wasm clippy rc=0 · cargo +beta clippy rc=0",
+    "npm run audit rc=0 · check-worklog-json / check-doc-liveness-parity / check-worklog-coverage 전건 rc=0",
+    "치환 확인: git diff --stat = 4파일 +41 / −17 (★삭제행 0 이 아니다 = 인라인 치환이 실제로 일어났다)",
+    "중복 소비자 조사: TestPlatformEvent::Stdout 를 쓰는 파일 6건 중 «접두사 폴링» 형상은 이 둘뿐 — helloworld 3건은 while !exited(픽스처가 종료하므로 경쟁 없음) · wie_j2me/tests/test_boot.rs 는 paints 폴링이고 «고아»(workspace member 는 wie-j2me)"
+  ],
+  "limits": [
+    "★잃은 것: n=2 에 간접이 생겼다 — test_key_reach.rs 를 읽는 사람이 술어 «식»을 그 자리에서 못 본다(포인터 주석으로 줄였을 뿐 없애지 못했다).",
+    "★test-utils 의 소임이 조금 번졌다 — 그 크레이트는 호스트 대역(platform·filesystem·jvm)인데 문자열 술어가 하나 붙었다. TestPlatformEvent::Stdout 옆에 둔 것이 그 완화이고, 파일을 새로 만들지 않은 이유다.",
+    "★공개 API 가 되었다 — 앞으로 이 술어를 고치면 wie-ktf 밖 소비자까지 함께 움직인다(오늘은 0이지만 그것이 이 제안의 목적이다).",
+    "유닛 시험을 따로 넣지 않았다 — 두 통합 시험이 「접두사 있음+개행 없음」과 「접두사 없음」 두 경로를 모두 밟고, 개악 대조가 그것을 RED 로 보인다. n=1 유닛 단언은 상수 대 상수라 이 회차의 증거로도 못 쓴다.",
+    "형제 #p1(아티팩트 크기 예산) · #p2(브라우저 실부팅) · #p3(upstream 워크플로 채택)은 손대지 않았다 — 각자 별 티켓이다."
+  ],
+  "adoptedProposals": [
+    "2026-09-16-slice-d-base-swap-fix2#p0"
+  ],
+  "declinedProposals": [],
+  "proposals": []
+}
