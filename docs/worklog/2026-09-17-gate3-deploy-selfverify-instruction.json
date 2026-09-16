@@ -1,0 +1,43 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-17",
+  "task": "wie-adopt-slice-d-gate3-merge-p0",
+  "title": "배포 수반 착지의 self-verify — 「이미 하고 있다」를 실측으로 갈아 «지시»로 바꿨다",
+  "summary": "제안은 「머지 티켓 템플릿의 self-verify 의무가 한 줄뿐이고 무엇을 어떻게 재는지가 없다」였다. ⓑ 를 재니 축은 이미 있었다 — AGENTS.md 가 명령(WIE_BASE=… verify-browser.mjs)을 이미 적고 있고 53개 회신이 그것을 인용한다. 진짜 결함은 «없다»가 아니라 «AGENTS.md 가 그 실행을 사실로 단언한다»였다: 배포를 수반한 게이트③ 회신 33건 중 WIE_BASE 인용은 15건뿐이고 18건이 없다(45%). 그 18건 중 5건이 2026-09-16/17 한 레인(나)이고 13건은 그보다 앞선다 ⇒ 한 회차의 실수가 아니라 상시 간극이다. ⇒ 그 단언을 실측으로 교체하고, 소유자 규칙 옆에 «명령과 합격 판정»을 인라인으로 박았다. 템플릿 자체는 orchestrator 소관이라 손대지 않았다(에스컬레이션). 제품 코드 0줄.",
+  "changes": [
+    "AGENTS.md §verify-browser — 「it is already running the same script against production for merge-contract 4-C」 단언 제거(실측 15/33 로 교체)",
+    "AGENTS.md — 소유자 규칙 옆에 «게이트③이 배포를 착지시키면 이것을 돌리고 인용한다» + 합격 판정(NO-LEAK AUDIT ✅ · off-origin 0 · game header bytes 0 · nonBlack 0 도 합격) 추가",
+    "AGENTS.md — 그 명령을 ★인라인으로 적은 이유 명시(펜스로 적으면 doc-liveness parity 의 중복 의무가 생기고, 블록인용 안에 펜스를 두면 정규식 ^\\s* 을 우회해 «나중에 들여쓰기를 푸는 사람»에게 트랩이 된다)",
+    "AGENTS.md — 템플릿 §4-C 가 repo 밖이라 여기서 고칠 수 없다는 사실과 참조 방향(복사 금지 · 이 절을 가리켜라) 명시",
+    "docs/report/0133--2026-09-17--wie-adopt-slice-d-gate3-merge-p0.md 신규 · STATE.md 완료 항 1건"
+  ],
+  "verification": [
+    "ⓑ 축 실재 실측: AGENTS.md 가 WIE_BASE=… 명령을 이미 보유(1곳) · reports/ 의 wie-*merge*.done.md 131건 중 53건이 WIE_BASE 인용 ⇒ 「무엇을 어떻게 재는지가 없다」는 «템플릿 한정»으로 참이고 repo 쪽은 이미 완비",
+    "★진짜 간극 실측: 'Deploy to Cloudflare Pages' 를 인용한 배포 수반 회신 33건 ∩ WIE_BASE 15건 ⇒ 미실행 18건(45% 만 실행). 그 18건 목록을 전수 출력해 5건(2026-09-16/17 내 회차) vs 13건(그 이전)으로 갈랐다",
+    "★내가 건너뛴 검증을 이 회차에서 «실제로» 실행해 discharge: WIE_BASE=https://wie-web.pages.dev node scripts/verify-browser.mjs test_data/helloworld_ktf.zip → NO-LEAK AUDIT ✅ · off-origin requests 0 · game header bytes 0 · nonBlack 0(helloworld 규격대로 합격)",
+    "★개악 대조(양방향 · 제품 호출부 = AGENTS.md 의 그 줄): 인라인 → check-doc-liveness-parity rc=0(25 documented lines) ↔ ★펜스(```sh)로 바꾸면 rc=1('+ WIE_BASE=…' · 'add the line to a DOC-COPY region…') ↔ 복원 rc=0",
+    "★트랩 실증: parity 추출 정규식은 scripts/check-doc-liveness-parity.mjs 의 /^\\s*```(\\S*)\\s*$/ 라 블록인용(`> `)이 앞에 있으면 «보이지 않는다» ⇒ 블록인용 안 펜스는 오늘 통과하지만 들여쓰기를 푸는 순간 red 가 된다",
+    "검사기 7종 rc=0: doc-liveness-parity(25줄) · docs-report-serial(128건·중복 0) · worklog-json(113) · linux-system-deps · parity-lock-wired · parked-workflows · worklog-coverage",
+    "4게이트: fmt OK · clippy 0 · wasm clippy 0 · beta clippy 0 · cargo test --all 42 타깃 전건 합산 384 passed · 0 failed",
+    "연번: --next-serial 을 «작성 직전» 재조회 → 0133"
+  ],
+  "limits": [
+    "★템플릿(~/orchestrator/templates/merge-ticket.tpl §4-C)은 손대지 않았다 — repo 밖이고 제안 자신이 target: orchestrator 라 적었다. 이 회차가 한 것은 «그 한 줄이 가리킬 자리»를 repo 안에 정확히 만든 것이다",
+    "★기계 강제는 없다 — 게이트③ 회차가 이 명령을 돌렸는지 검사하는 축은 없다. 문서가 지시로 바뀌었을 뿐이고, 45% 라는 수가 그 한계를 그대로 보여 준다",
+    "★45% 는 «오늘의 수»다 — 상수로 인용하지 마라. 술어는 wie-*merge*.done.md 에서 'Deploy to Cloudflare Pages' ∩ 'WIE_BASE' 이고 문구가 바뀌면 다시 재야 한다",
+    "★이 술어는 «회신에 적었는가»를 세지 «실제로 돌렸는가»를 세지 않는다 — 돌리고 안 적은 회차는 미실행으로 계상된다(그 경우도 증빙 부재라 계약 미충족이지만, 원인은 다르다)"
+  ],
+  "adoptedProposals": ["2026-09-16-slice-d-gate3-merge#p0"],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "게이트③이 배포 self-verify 를 «실제로 돌렸는지»를 아무도 검사하지 않는다",
+      "plainSummary": "배포가 있는 착지에서 브라우저 확인을 돌리라는 지시는 생겼지만, 돌렸는지 확인하는 장치는 없습니다. 지금은 회신에 적혀 있는지로만 알 수 있습니다.",
+      "userBenefit": "배포가 깨졌는데 아무도 모르는 구간이 사라진다 — 지금은 배포 수반 착지의 55%가 그 확인 없이 지나갔다.",
+      "why": "이 회차가 문서를 «단언»에서 «지시»로 바꿨지만 기계 강제는 0이다. 실측: 배포를 수반한 게이트③ 회신 33건 중 WIE_BASE 인용 15건(45%). 문서만으로 고쳐지는 비율이 얼마인지는 다음 33건이 말해 줄 것이고, 안 고쳐지면 검사가 필요하다는 증거가 된다.",
+      "tradeoff": "검사할 주체가 애매하다 — 회신은 ~/orchestrator 트리에 있고 제품 repo CI 가 볼 수 없다. bin/done-lint 에 「pr 이 있고 배포 수반이면 WIE_BASE 인용 필수」를 넣는 것이 가장 값싸지만, 「배포 수반」을 회신 문구로 판정하는 순간 어휘 술어가 되어 이 저장소가 반복해 규탄한 형태가 된다. 먼저 «문서만으로 얼마나 고쳐지는지»를 다음 33건으로 재는 편이 싸다.",
+      "effort": "S",
+      "target": "orchestrator"
+    }
+  ]
+}

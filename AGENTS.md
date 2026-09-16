@@ -283,9 +283,39 @@ design** — do not "fix" that by wiring it:
   immutable per-deploy URL, live when the action returns. It is **not** a deploy gate: it runs after
   the bytes are up, so it reports a bad deploy rather than blocking one.
 
-  > **If that step goes red, the gate③ round that landed the merge owns it** — it is already running
-  > the same script against production for merge-contract 4-C, so it re-runs it against the URL the
-  > failed step printed and either files a ticket or records in its reply that the deploy is bad.
+  > **If that step goes red, the gate③ round that landed the merge owns it** — it re-runs the script
+  > against the URL the failed step printed and either files a ticket or records in its reply that
+  > the deploy is bad.
+
+  **That owner rule presumes the round already ran this script once, and measurement says it often
+  did not — so here is the instruction, not the assumption.** This paragraph used to assert the
+  round "is already running the same script against production for merge-contract 4-C". Measured
+  2026-09-17 over all 131 `wie-*merge*.done.md` replies: **33 record a Cloudflare Pages deploy, and
+  of those only 15 cite `WIE_BASE` — 18 do not** (45%). Five of the eighteen are one lane on
+  2026-09-16/17; the other thirteen predate it, so this is a standing gap, not one round's lapse.
+  Every one of the eighteen still *reported* a self-verify — by quoting the in-CI step's conclusion
+  and curling the alias — which passes "운영 URL" but **not** the "콘솔 0에러" half of merge-contract
+  4-C, because console errors and off-origin requests need the browser run.
+
+  > **So, concretely — a gate③ round that lands a deploy runs this and quotes it:**
+  > `WIE_BASE=https://wie-web.pages.dev node scripts/verify-browser.mjs test_data/helloworld_ktf.zip`
+  > — deliberately *inline*, not a fenced `sh` block: fenced blocks in this file are parity-checked
+  > against `doc-liveness.yml`, and this line is the alias variant of a command that job already runs
+  > on its schedule. Fencing it would add a duplicate obligation, and fencing it *inside a blockquote*
+  > would dodge the checker only because its fence regex is `^\s*` (a `>` is not whitespace) — a trap
+  > for whoever un-indents it later.
+  > Pass is `NO-LEAK AUDIT: ✅` with `off-origin requests: 0` and `requests whose body contains the
+  > game header bytes: 0`. `nonBlack: 0` is **also** a pass here (below). Quoting the workflow's own
+  > step is necessary but not sufficient: that step reads the **per-deploy** URL, so it cannot see an
+  > alias that never swung over — which is the entire reason this by-hand run exists.
+
+  **Why this is written here and not in the merge ticket.** The gate③ obligation lives in
+  `~/orchestrator/templates/merge-ticket.tpl` §4-C, which says only "main 자동배포 수반 시
+  self-verify(운영 URL·콘솔 0에러) 증빙" — one line, no command, and it is **outside this repo**, so
+  no round here can edit it. The *how* is repo-specific and therefore belongs in this file; the
+  template's line resolves to this block. Do not duplicate the command into the template's wording
+  from here — point at this section instead (§Constraints' "An external contract is referenced,
+  never copied").
 
   That owner is not a formality: this repo has already had a check go red with nobody named
   (`check-worklog-coverage`, 2026-09-07), and that one blocked every open PR. This one cannot —
