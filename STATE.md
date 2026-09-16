@@ -60,6 +60,66 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-16: **리눅스가 못 빌드하는 의존이 되돌아오면 PR 에서 빨개진다 — `members` 가 아니라 `Cargo.lock` 을 본다**
+  (`wie-adopt-slice-d-base-swap-fix3-p0`) — 정본 `docs/report/0125--….md`.
+  채택 제안 `2026-09-16-slice-d-base-swap-fix3#p0` 집행. **제품 코드 0줄**.
+  `scripts/check-linux-system-deps.mjs` 신설(`glib-sys`·`soup3-sys`·`gtk-sys`·`webkit2gtk-sys`·`tauri` 가
+  lock 에 있으면 rc=1) + `engine-contract.yml` **상시 스텝**(여섯째)으로 배선.
+  ★★**제안이 적은 처방(`members` 화이트리스트)을 쓰지 «않았다»** — 그 `tradeoff` 가 스스로 우려한 비용
+  (「검사기와 매니페스트가 **두 벌의 진실**」)이 실재하고, ★그 축은 **기존 member 가 GTK 의존을 새로 얻는
+  경로를 못 본다**(대리 신호이기 때문). ⇒ 술어를 **해악 자체**(= 리눅스가 못 빌드하는 크레이트가 해결된
+  그래프에 있는가)로 바꿨고, 그 정본은 **커밋된 `Cargo.lock`** 이다. ★**정당한 크레이트 신설 비용 0.**
+  ★**락이 «대리»가 아니라 «증인»임을 쟀다**: 현재 감시 5종 **전건 0** ↔ `wie-app` 을 `members` 로 되돌리면
+  **전건 1**(격리 worktree · `cargo metadata`). 복원하면 다시 0.
+  ★**개악 대조는 upstream 당김이 하는 그대로**다(members 한 줄 + `exclude` 비우기): 정상 rc=0 → 개악 **FAIL 5종
+  전건** → 복원 rc=0. 종료코드는 따로 못박았다(크래프트 lock rc=0 ↔ `[[package]] name = "tauri"` 추가 rc=1).
+  ★**위양성 1종을 닫고 그것도 쟀다**: `dependencies = [ "glib-sys" ]` 줄이 있어도 **rc=0**(앵커 `^name = "…"$`).
+  ★**왜 상시 스텝인가** — `Cargo.lock`·`**/Cargo.toml` 은 이미 필터 «안»이지만, **이 가드를 침묵시키려면
+  지울 것이 «스크립트»이고 그 경로는 필터에 없다** ⇒ 그 PR 은 필터 내 전부를 건너뛰고 green 을 낸다.
+  `parity-lock-wired`·`audit-no-leak`·`docs-report-serial` 이 **같은 이유로** 상시다.
+  ★**AGENTS.md 무접촉** — 같은 계급 선례 `check-parity-lock-wired` 의 AGENTS.md 언급이 **0건**이고,
+  새 fenced `sh` 줄을 안 만들었으므로 **doc-liveness 패리티 의무도 발생하지 않는다**.
+  ★**천장을 숨기지 않는다**(매 실행 출력): 이미 덴 계열만 안다 · 러너 apt 가 늘면 «틀린 게 아니라 보수적»이 된다 ·
+  lock 은 타깃 독립이다 · ★**리눅스 레그를 돈 것이 아니라 «기전»을 보인 것**이다(green 판정은 CI 몫).
+  회귀 0(전건 합산 · `tail` 아님): fmt/clippy/wasm/beta rc=0 · `cargo test --all --no-fail-fast`
+  **42 스위트 384 passed · 0 failed** · `npm run audit` rc=0 · 노드 검사기 **7종 전건 rc=0**.
+- 2026-09-16: **«완성된 줄» 술어를 한 곳으로 모았다 — 제안이 미룬 근거가 실측으로 없었다**
+  (`wie-adopt-slice-d-base-swap-fix2-p0`) — 정본 `docs/report/0123--….md`.
+  채택 제안 `2026-09-16-slice-d-base-swap-fix2#p0` 집행. **제품 코드 0줄**(시험 지원 크레이트 + 통합 시험 2개 ·
+  4파일 **+41/−17**). `test_utils::guest_line_complete(seen, prefix)` 신설 → `test_key_reach`·`test_resource_reach`
+  두 호출부가 그것을 쓴다.
+  ★★**제안이 스스로 미룬 근거를 반증했다** — 「지금 만들면 `#[path]` 또는 `tests/common/mod.rs` 라는
+  **새 구조가 생긴다**」는 **거짓**이다: `test-utils` 는 이미 workspace 크레이트(`Cargo.toml:117`)이고
+  `wie-ktf` `[dev-dependencies]` 이며 ★**두 시험이 이미 `use` 하고 있었다** ⇒ 새 구조 **0**.
+  ★**개악 대조가 이 회차의 산출물이다**: 공유 구현 **1곳**을 종전의 순진한 `contains(prefix)` 로 되돌리면
+  ★**소비자 2건이 동시에 FAILED** · 복원하면 둘 다 ok. ★★**`--no-fail-fast` 없이는 그 표를 못 만든다** —
+  cargo 가 첫 실패 타깃에서 멈춰 **두 번째가 보이지도 않는다**(조각 D `-fix2` 의 `201·202` 부분 계수와 같은 함정).
+  ★**새 실측**: 제안이 「구 base 에서 잠복」이라 적은 `test_resource_reach` 는 **오늘 잠복이 아니다**
+  (이 base 에서 순진한 술어로 실제 FAILED) ⇒ 둘 다 **활성 경쟁 상태**였다.
+  ★**세 번째 소비자는 없다**(Stdout 사용 6파일 전수): helloworld 3케이스는 `while !exited` 라 경쟁이 없고
+  `wie_j2me/tests/test_boot.rs` 는 paints 폴링 + **고아**(member 는 `wie-j2me`) — 무접촉.
+  ★**대가를 적는다**: n=2 에 **간접이 생겼고**(포인터 주석으로 줄였을 뿐), `test-utils` 의 소임이 조금 번졌으며
+  (호스트 대역 크레이트에 문자열 술어 — `TestPlatformEvent::Stdout` 옆에 두고 새 파일 0 으로 완화),
+  술어가 **공개 API** 가 됐다(의도된 비용 — «세 번째»를 받는 것이 목적이다).
+  회귀 0(전건 합산 · `tail` 아님): fmt/clippy/wasm/beta rc=0 · `cargo test --all --no-fail-fast`
+  **42 스위트 384 passed · 0 failed**(`origin/main` 과 동수) · `npm run audit` rc=0.
+- 2026-09-16: **코퍼스 카드에 «첫 질문»을 넣었다 — 그 자리가 본문이면 안 되는 이유**
+  (`wie-adopt-p3-adopted-proposals-triage-r2-p0`) — 정본 `docs/report/0122--….md`.
+  채택 제안 `2026-09-16-p3-adopted-proposals-triage-r2#p0` 집행. **wie 제품 코드 0줄**(이 저장소 변경은 원장 3파일).
+  고친 것은 `~/orchestrator/humansteps/wie-p2-corpus-placement.md` 하나 — `what:` 에 「`lgt/` **52건**이 먼저」 ·
+  `how:` 에 「첫 질문 + 답을 내는 명령 `PLATFORM_FILTER=lgt scripts/smoke_gate.sh` + 통과/실패의 뜻」.
+  ★★**자리 선택이 이 회차의 실측이다** — 카드의 markdown **본문은 운영자 화면에 닿지 않는다**
+  (`bin/humanstep-scan` 에 문자열 `body` **0건** · `--json` 방출 키 15종에 본문 없음 ⇒ `pipeline-feed` 의
+  `human_steps` 에도 없다). 제안대로 본문에 적었으면 **명목상 집행 · 실효 0** 이었고, 개악 대조 ①이 그 형태를
+  **RED** 로 재현한다(`how:` → 본문 이동 = `markers-in-how` 2→0).
+  ★**제안 3축 중 둘은 그대로 참**(카드에 「첫 질문」 0건 · 분할 ktf 190 · lgt 52 · skt 50 = 292),
+  ★**하나는 낡았다** — 「조각 D 의 27줄 결정을 정한다」는 이미 지나갔다(⒝ 집행 · PR #161 · 오늘 `wipi_c.rs` 는
+  공용 27 / LGT 전용 0). 그러나 **질문은 죽지 않았다**: upstream LGT 전용 `graphics.rs` **1,095줄**이 배선만 끊긴 채
+  트리에 남아 있고 조각 D 자신이 「⒜/⒝ 중 실게임에 옳은 쪽은 못 잰다」를 남겼다 ⇒ 문면을
+  **「무엇을 고를까」 → 「고른 것이 맞았나」** 로 갈아타 적었다.
+  ★**부채를 숨기지 않는다**: 그 문안은 PR #161·1,095줄이 움직이면 **썩는데** `HUMANSTEP_ANSWER_STALE` 은
+  날짜만 보고 내용을 못 본다. 그리고 본문 미소비는 이 카드만이 아니다 — **99장 중 57장 · 2,254줄**(세기만 했다 · 후속 제안).
+  회귀 0(전건 합산 · `tail` 아님): fmt/clippy/wasm/beta OK · `cargo test --all` **42 스위트 384 passed · 0 failed**.
 - 2026-09-16: **제안 `#p1` 채택 — 기록하려던 «사실»이 틀렸다. LGT graphics 는 죽지 않았고 게이트도 조용하지 않다**
   (`wie-adopt-slice-d-base-swap-executed-p1` · 채택 `2026-09-16-slice-d-base-swap-executed#p1`) —
   정본 `docs/report/0128--….md`. ★**제품 동작 0줄**(주석·문서만) · `graphics.rs` **무접촉**(upstream 바이트 동일).
