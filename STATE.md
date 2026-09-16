@@ -62,7 +62,7 @@
 ## 완료 (최근)
 - 2026-09-16: **제안 `#p1` 채택 — 기록하려던 «사실»이 틀렸다. LGT graphics 는 죽지 않았고 게이트도 조용하지 않다**
   (`wie-adopt-slice-d-base-swap-executed-p1` · 채택 `2026-09-16-slice-d-base-swap-executed#p1`) —
-  정본 `docs/report/0122--….md`. ★**제품 동작 0줄**(주석·문서만) · `graphics.rs` **무접촉**(upstream 바이트 동일).
+  정본 `docs/report/0128--….md`. ★**제품 동작 0줄**(주석·문서만) · `graphics.rs` **무접촉**(upstream 바이트 동일).
   제안은 「1,095줄이 «아무 테스트도 밟지 않는» 상태를 기록하라」였는데 ★**적기 전에 쟀더니 그 전제가 «거짓»이었다.**
   ⒜★**«배선 끊음»은 graphics SVC 27개에만 걸린다** — `clet_register` 와 `init.rs` 가 여전히 모듈로 들어간다.
   `panic!` 프로브 실측: `init_process_state`(`:70-98`)·`set_use_annunciator`(`:152-157`) 에 넣으면
@@ -174,7 +174,7 @@
   ★**대가는 «연기»이지 «취소»가 아니다** — upstream LGT 전용 `graphics.rs` **1,095줄**은 **트리에 남았고**
   (`git diff upstream/main` **0줄** = 바이트 동일) **배선만 끊었다**. dead code 라 모듈 «선언»에 `#[allow(dead_code)]`.
   ★★**[정정 2026-09-16 · `wie-adopt-slice-d-base-swap-executed-p1`] 종전 문안 「그 경로는 이제 «아무
-  테스트도 밟지 않는다» — 썩어도 게이트가 조용하다」는 «거짓»이다**(정본 `docs/report/0122--….md`).
+  테스트도 밟지 않는다» — 썩어도 게이트가 조용하다」는 «거짓»이다**(정본 `docs/report/0128--….md`).
   ⒜«배선 끊음»은 **graphics SVC 27개에만** 걸린다 — `clet_register` 와 `init.rs` 가 여전히 모듈로 들어간다.
   `panic!` 프로브 실측: `init_process_state`·`set_use_annunciator` 에 넣으면 `keydraw_lgt`·`helloworld_lgt` 가
   **FAIL·paints 0** ⇒ ★**그 35줄은 모든 LGT 부팅마다 돈다**(`set_display_property` 는 양쪽 PASS = 미실행).

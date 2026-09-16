@@ -525,7 +525,7 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 > ★**대가 — 축소하지 않는다**: 제안의 benefit 「LGT 전용 그래픽 0→1,095줄」은 ★**«철회»가 아니라 «연기»**다 —
 > 그 1,095줄은 **트리에 있고**(`git diff upstream/main` **0줄** = 바이트 동일) ★**배선되지 않았다.**
 > ⇒ dead code 라 모듈 «선언»에 `#[allow(dead_code)]` 를 달았다(파일 무접촉).
-> ★★**[정정 2026-09-16 · `wie-adopt-slice-d-base-swap-executed-p1` · 정본 `docs/report/0122--….md`]
+> ★★**[정정 2026-09-16 · `wie-adopt-slice-d-base-swap-executed-p1` · 정본 `docs/report/0128--….md`]
 > 종전 문안 「그 경로는 이 회차 뒤로 «아무 테스트도 밟지 않는다» — 썩어도 우리 게이트는 조용하다」는
 > ★**두 겹으로 «거짓»이다.** 제안 `#p1` 이 그 문장을 «기록으로 남기라»고 했는데, ★재 보니 문장 자체가 틀렸다.**
 > ⒜★**«배선을 끊었다»는 graphics SVC 27개에만 걸린다** — 모듈은 **다른 두 곳**에서 여전히 들어온다:

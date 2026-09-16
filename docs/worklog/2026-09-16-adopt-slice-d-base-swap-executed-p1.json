@@ -9,7 +9,7 @@
     "docs/upstream-realign-p3-slices.md §D — 「아무 테스트도 밟지 않는다 · 게이트가 조용하다」에 정정 블록",
     "STATE.md — 같은 문장에 정정 블록 + 완료 항목 1건",
     "docs/report/0117--….md — 같은 문장에 정정 포인터(§D 가 «정본»으로 가리키는 파일)",
-    "docs/report/0122--2026-09-16--wie-adopt-slice-d-base-swap-executed-p1.md 신설"
+    "docs/report/0128--2026-09-16--wie-adopt-slice-d-base-swap-executed-p1.md 신설"
   ],
   "verification": [
     "정상(기준선): keydraw_lgt --inject --expect-last-frame = PASS · paints 55 · content true · rc=0 / helloworld_lgt --inject = PASS · paints 0(clean exit)",

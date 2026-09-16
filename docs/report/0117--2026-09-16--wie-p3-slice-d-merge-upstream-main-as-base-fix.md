@@ -34,7 +34,7 @@
 1,095줄이 트리에 있으나 `#[allow(dead_code)]` 아래에 있고, 우리 5픽스처·`cargo test --all` 어느 것도 그 코드를
 **한 줄도 실행하지 않는다**. ⇒ ★**그 코드가 썩어도 우리 게이트는 조용하다.** 되돌리는 회차는 그 사실을 안고 시작하라.
 
-> ★★**[정정 2026-09-16 · `wie-adopt-slice-d-base-swap-executed-p1` · 정본 `docs/report/0122--….md`]
+> ★★**[정정 2026-09-16 · `wie-adopt-slice-d-base-swap-executed-p1` · 정본 `docs/report/0128--….md`]
 > 바로 위 두 줄은 «거짓»이다 — 인용하지 마라.** 이 회차가 낸 제안 `#p1` 이 그 문장을 «기록으로 남기라»고
 > 했고, 채택 회차가 재 보니 **문장 자체가 틀렸다.** ⒜«배선 끊음»은 **graphics SVC 27개에만** 걸린다 —
 > `clet_register` → `graphics::{init_process_state, set_use_annunciator}` 와 `init.rs` 의
