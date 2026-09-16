@@ -19,8 +19,18 @@ name: Engine contract (featurephone consumer)
 # gate, so even a break that lands on main cannot reach featurephone.
 #
 # ── Always-run wrapper (required-check safe) ──────────────────────────────────
-# The `contract` job is the STABLE name registered as a required status check on
-# `main`. It has NO paths: filter on its triggers, so it ALWAYS runs and ALWAYS
+# `contract` is the STABLE job name intended for registration as a required
+# status check on `main`. It is NOT registered today: measured 2026-09-17,
+# branches/main/protection → 404 "Branch not protected", rulesets → [], so
+# GitHub-enforced required checks number ZERO and a red here does not hold the
+# merge button. Enabling it is a prepared, never-applied operator human-step
+# (~/orchestrator/reports/wie-main-branch-protection.done.md §C, marked
+# "워커 적용 금지 · repo 설정 변경"); this job was reshaped into the wrapper below
+# by that same round so the switch would be safe to throw.
+#
+# Keep the wrapper anyway — it costs nothing now and is the difference between a
+# working merge queue and a dead one on the day the switch IS thrown.
+# It has NO paths: filter on its triggers, so it ALWAYS runs and ALWAYS
 # reports a status. A required check that is instead paths-filtered would sit at
 # "Expected — Waiting for status" forever on any PR that doesn't touch the
 # filtered paths, deadlocking the merge. Path relevance is detected INSIDE the
@@ -183,10 +193,18 @@ jobs:
         run: node scripts/check-linux-system-deps.mjs
 
       # ── Deliberately non-blocking, and that is the whole point of the flag ───
-      # This job is a REQUIRED status check on main, so a hard-failing step here
-      # is a required check by placement — nobody has to touch branch protection
-      # for the first false positive to stop a merge. The round that added this
-      # check was told not to make that call, so `continue-on-error` is the
+      # This job is the one INTENDED to be a required status check on main, so a
+      # hard-failing step here is a required check by placement — nobody would
+      # have to touch branch protection for the first false positive to stop a
+      # merge. Precision, because this comment used to overstate it: nothing is
+      # required today (protection → 404, rulesets → [], measured 2026-09-17), so
+      # today a hard failure here blocks nothing. That does NOT weaken the flag —
+      # it sharpens it. Enabling protection is a one-shot operator action that
+      # lands without revisiting this step, and on that day every step in this
+      # job becomes blocking at once. `continue-on-error` is what keeps this one
+      # from being promoted by someone else's unrelated switch-throw.
+      # The round that added this check was told not to make that call, so
+      # `continue-on-error` is the
       # "measured but not promoted" state: the step still prints ::error:: and
       # still shows as failed in the run, it just does not fail the job.
       #
