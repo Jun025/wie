@@ -7,7 +7,7 @@
   "changes": [
     "docs/contracts/featurephone-engine-contract.json — artifacts.maxBytes(2파일) + maxBytesNote + maxBytesMeasured(측정 근거·툴체인·여유) 신설",
     "scripts/check-engine-contract.mjs — 기존 §1 아티팩트 루프를 access → stat 으로 바꿔 예산 집행(새 패스 추가 아님) · 무예산 파일은 fail-closed 위반(Constraint 3)",
-    "docs/report/0123--2026-09-16--wie-adopt-slice-d-base-swap-fix2-p1.md 신설 · STATE.md 완료 항 1건"
+    "docs/report/0129--2026-09-16--wie-adopt-slice-d-base-swap-fix2-p1.md 신설 · STATE.md 완료 항 1건"
   ],
   "verification": [
     "정상: node scripts/check-engine-contract.mjs = 109 pass · 0 violation · rc=0 (종전 107 = +2 예산 검사)",
