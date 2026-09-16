@@ -25,6 +25,7 @@
     "새 base 의 계약검사·브라우저 왕복은 «실행되지 않았다» — 아티팩트가 없어서 돌릴 수 없다. 그 두 축은 F1 이 풀린 뒤에야 판정 가능하고, 이 회차는 그것을 green 이라고도 red 라고도 적지 않는다",
     "otterpebble 셸이 실제로 그 아티팩트를 먹는가는 교차 repo라 못 잰다(계획 §E 가 이미 «못 재는 것»으로 적은 그 축)",
     "피검체 f533ba54 는 미착지 브랜치다 — 그 브랜치가 갱신되면 이 회차의 수는 그 sha 에 대해서만 참이다",
+    "정정 2026-09-16 게이트②: 이 회차가 적은 cargo test --all 179 passed 는 구 base 수치라 F5 의 커버리지 삭제를 보지 못한다. 그 179 에는 F5 의 5개 시험이 포함돼 있고(같은 로그의 Running tests/… 로 확인) 새 base 에서는 그만큼 줄어든다. 새 base 에서 그 수를 재지 않았다 — 「기존 축 전건 green」이 무해의 증거가 아니라 무지의 증거인 자리다",
     "F1 의 12오류가 «전부»인지는 첫 크레이트에서 멈춘 값이다 — wie_featurephone 이 컴파일된 뒤 하류(web/ tsc·vite)에 또 있을 수 있다"
   ],
   "proposals": [
@@ -56,12 +57,12 @@
       "target": "wie"
     },
     {
-      "title": "새 base 의 고아 wie_midp/ 를 정리한다",
-      "plainSummary": "어느 크레이트에도 속하지 않아 영원히 실행되지 않는 시험 파일 하나가 남아 있다.",
-      "userBenefit": "«있는데 안 도는 시험»이 사라진다 — 그런 파일은 다음 사람에게 «검증되고 있다»는 거짓 신호를 준다.",
-      "why": "실측: 새 base workspace members 에 wie_midp 가 없는데(upstream 하이픈 wie-midp 가 들어왔다) 디렉터리는 남아 추적 파일이 정확히 1개다 — wie_midp/tests/create_image_missing_name_message.rs.",
-      "tradeoff": "그 시험이 검증하던 동작이 upstream wie-midp 쪽에 대응 시험을 갖는지 먼저 확인해야 한다 — 없으면 삭제가 아니라 이식이다.",
-      "effort": "S",
+      "title": "base 교체로 스위트에서 빠진 시험 5건(4디렉터리)을 처분한다 — 이식이냐 폐기냐를 그 회차가 정한다",
+      "plainSummary": "엔진을 갈아타면서 우리 시험 5개가 조용히 실행 대상에서 빠진다. wie_j2me/tests/test_boot.rs · wie_jvm_support/tests/absent_string_buffer_insert.rs · wie_jvm_support/tests/absent_timer_schedule.rs · wie_midp/tests/create_image_missing_name_message.rs · wie_wipi_java/tests/preload_classes_come_from_the_runtime.rs — 이 다섯을 새 구조로 옮기거나, 버릴 이유를 적는다.",
+      "userBenefit": "«돌고 있다고 믿는 시험»이 실제로 돈다. 다섯 중 둘은 하드닝 회귀(StringBuffer.insert · Timer.schedule)를 잡는 잠금이고 하나는 런타임 선적재 클래스를 잡는 잠금이라, 조용히 빠지면 그 회귀를 아무도 못 본다.",
+      "why": "실측(선별 술어 = 새 base top-level wie* 중 members 밖 + Cargo.toml 없음): 4디렉터리 5파일. 넷 다 구 base d70b93f8 에서 우리 크레이트였다 — 추적 파일 4·9·40·59 · 전건 Cargo.toml · 셋은 명시 members 이고 wie_midp 는 path 의존(암묵 member). 5건 전건이 구 base cargo test --all 에서 실제로 돌았다(Running tests/… 로그로 확인). 새 base 트리에는 각 파일이 정확히 1회씩만 있어 하이픈 후속 크레이트가 이어받지 않았다. ⇒ upstream 이 남긴 잔재가 아니라 base 교체가 만든 커버리지 삭제다.",
+      "tradeoff": "범위가 1디렉터리에서 4디렉터리 5파일로 커져 채택이 늦어질 수 있다. 그리고 각 파일마다 판단이 다르다 — 대응 시험이 하이픈 후속에 있으면 폐기이고 없으면 이식이며, 이식은 크레이트 경로·의존을 새 구조에 맞춰야 한다. ★시한이 있다: 조각 D -fix2(PR #161)가 착지하는 그 순간 이 5건이 main 의 스위트에서 빠지므로, 늦으면 «빠진 채로» 시간이 흐른다. 문서 정정으로는 막을 수 없다.",
+      "effort": "M",
       "target": "wie"
     }
   ],

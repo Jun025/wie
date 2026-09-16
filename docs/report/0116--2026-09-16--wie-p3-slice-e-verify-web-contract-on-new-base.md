@@ -81,7 +81,9 @@ coverage · push · completed failure          ← ★이 «한 줄»이 전부�
 ```
 ⇒ ★**`pull_request` 워크플로가 «0건»이다**(web.yml·rust.yml·engine-contract 전건 부재).
 근인 = **#161 이 `CONFLICTING`** 이라 머지 ref 가 계산되지 않아 `pull_request` 가 애초에 발화하지 못한다.
-⇒ ★★**새 base 의 웹 축은 «CI 가 한 번도 재지 않았다».** 조각 D 회신의 `CI_RED … coverage` 는 «돌아간 것»에 대해
+⇒ ★★**새 base 의 웹 축은 «이 형상에서 측정되지 않았다».** ★**구조적 부재가 아니다** — 볼 수 있는 축(`web.yml Build frontend`)이
+실재하고 `pull_request` 에서 도는데, #161 이 `CONFLICTING` 이라 **그 run 자체가 생기지 않았을 뿐**이다.
+조각 D 회신의 `CI_RED … coverage` 는 «돌아간 것»에 대해
 정확하지만, ★**웹 축은 red 도 green 도 아니고 «미측정»이다.**
 
 ### ★F4 [검사기가 낡았다] — `check-engine-contract.mjs` 가 옛 레이아웃 경로를 박아 둔다
@@ -102,12 +104,35 @@ ENOENT … /base/wie_midp/src/classes/net/wie/event_queue.rs
 **스택 트레이스**라, 읽는 사람이 「계약 위반」이 아니라 「검사기 고장」으로 읽는다.
 ★**이것은 F1 과 «독립»이다** — F1 을 고쳐 아티팩트가 생겨도 이 두 줄은 그대로 크래시한다.
 
-### ★F5 [고아] — `wie_midp/` 가 파일 «하나»로 살아남았다
+### ★F5 [커버리지 삭제] — 구 base 에서 «돌던» 시험 **5건**이 스위트에서 빠졌다 (4디렉터리)
 
-새 base 의 workspace `members` 에 `wie_midp` 는 **없다**(upstream 하이픈 `wie-midp` 가 들어왔다).
-그런데 디렉터리는 남아 있고 추적 파일이 **정확히 1개**다:
-`wie_midp/tests/create_image_missing_name_message.rs` ⇒ ★**어느 크레이트에도 속하지 않아 «영원히 돌지 않는» 시험**이다.
-※그 파일은 `AGENTS.md` 가 「`STATE.md:<줄>` 이 아니라 회차 파일을 인용하라」의 실례로 지목한 바로 그 시험이다.
+> ★**[정정 2026-09-16 게이트②]** 초판은 이 절을 「고아 `wie_midp/` **1건**」으로 적고 절 제목에 **「전수 계수」**를 달았다.
+> ★**전수가 아니었다 — 5건 중 1건(20%)** 이다. 그리고 ★**귀속이 뒤집혀 있었다**: 초판은 이것을 **upstream 쪽에서 비롯한 것**처럼
+> 적었으나, 실제로는 ★**구 base 에서 «우리 것»이었고 base 교체로 넷이 «동시에» 고아가 됐다.**
+
+★**선별 술어를 먼저 적는다**(이것이 없으면 다음 회차가 또 세고 또 틀린다):
+> **새 base `f533ba54` 의 top-level `wie*` 중 ⑴workspace `members` 밖이고 ⑵`Cargo.toml` 이 없는 디렉터리** = 전수.
+
+| 디렉터리 | 새 base 추적 파일 | ★**구 base `d70b93f8`** |
+|---|---|---|
+| `wie_j2me` | **1** — `tests/test_boot.rs` | 추적 **4** · `Cargo.toml` · ★members **등재** |
+| `wie_jvm_support` | **2** — `tests/absent_string_buffer_insert.rs` · `tests/absent_timer_schedule.rs` | 추적 **9** · `Cargo.toml` · ★members **등재** |
+| `wie_midp` | **1** — `tests/create_image_missing_name_message.rs` | 추적 **40** · `Cargo.toml` · ★**암묵 member**(아래 ※) |
+| `wie_wipi_java` | **1** — `tests/preload_classes_come_from_the_runtime.rs` | 추적 **59** · `Cargo.toml` · ★members **등재** |
+| **계** | ★**4디렉터리 · 5파일** | — |
+
+★**성격 = «남겨진 파일»이 아니라 «커버리지 삭제»다.** 그 5개는 구 base 에서 **실제로 돌던 통합 시험**이고,
+★**로그로 확인했다** — 구 base `cargo test --all` 이 다섯 바이너리를 전건 `Running tests/…` 로 띄운다
+(`test_boot` · `absent_string_buffer_insert` · `absent_timer_schedule` · `create_image_missing_name_message` ·
+`preload_classes_come_from_the_runtime`). 새 base 의 `cargo test --all` 은 **더는 포함하지 않는다.**
+
+★**이어받아지지도 않았다** — 5파일 전건이 새 base 트리에 **정확히 1회씩** 나타난다
+(`git ls-tree -r --name-only f533ba54 | ledger-grep -cE <이름>` → **1·1·1·1·1**) ⇒ 하이픈 후속 크레이트가 같은 시험을 갖지 않는다.
+
+※★**「members 등재」를 한 칸 더 정확히 적는다**: 구 base 의 명시 `members` 목록에 있는 것은 **셋**(`wie_j2me`·`wie_jvm_support`·`wie_wipi_java`)이고
+`wie_midp` 는 **`[workspace.dependencies]` 의 path 의존**이다 — cargo 는 워크스페이스 디렉터리 안의 path 의존을 **암묵 member** 로 넣으므로
+★**넷 다 `cargo test --all` 의 대상이었고, 위 실행 로그가 그 증거다**(「명시 등재」가 아니라 「실제로 돌았다」가 결정적 근거다).
+※`wie_midp` 의 그 시험은 `AGENTS.md` 가 「`STATE.md:<줄>` 이 아니라 회차 파일을 인용하라」의 실례로 지목한 바로 그 파일이다.
 
 ### ★깨지지 «않은» 것 — 이 티켓이 실제로 물은 축
 
@@ -133,5 +158,8 @@ ENOENT … /base/wie_midp/src/classes/net/wie/event_queue.rs
 
 ⑴★**어댑터 이식**(`wie_featurephone` 4파일) — 별 회차. ★**여기서 고치지 않았다**(Contract 3 · 「조사면 「없더라」도 산출물」).
 ⑵★**게이트가 브라우저 호스트를 보게 하라**(F2) — 이것을 먼저 하면 ⑴의 재발을 «기계»가 잡는다.
-⑶`check-engine-contract.mjs` 로케이터 2줄(F4) · ⑷고아 `wie_midp/`(F5).
+⑶`check-engine-contract.mjs` 로케이터 2줄(F4) · ⑷★**커버리지 삭제 5건 처분**(F5 · 4디렉터리 —
+`wie_j2me`·`wie_jvm_support`·`wie_midp`·`wie_wipi_java`). ★**이식할지 버릴지는 그 회차가 정한다** — 이 회차는 정하지 않았다.
+★★**⑷는 시한이 있다**: 조각 D `-fix2`(PR #161)가 착지하는 **그 순간** 그 5건이 `main` 의 스위트에서 빠진다.
+★**문서 정정으로는 막을 수 없다** — 막으려면 `-fix2` 안에서 처분되거나 그 직후 회차가 받아야 한다.
 ★**⑴~⑷ 전부 «새 base 위»의 일이다** — `main` 에서는 오늘 할 일이 아니다.

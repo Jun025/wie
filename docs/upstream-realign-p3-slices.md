@@ -499,7 +499,14 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 >
 > ★**F4**: `check-engine-contract.mjs` 가 옛 경로 **2줄**(`:111 wie_midp/…` · `:146 wie_wipi_java/…`)을 박아 두어
 > 새 base 에서 **ENOENT 크래시**(fail-closed 는 지켜지나 «검사기 고장»으로 읽힌다) · 정상 로케이터 2줄.
-> ★**F5**: `wie_midp/` 가 members 에서 빠졌는데 추적 파일 **1개**(`tests/create_image_missing_name_message.rs`)로 남아 **영원히 안 도는 시험**이 됐다.
+> ★★**F5 [정정 2026-09-16 게이트②]**: 초판은 「고아 `wie_midp/` **1건**」이라 적었으나 ★**전수는 4디렉터리·5파일**이고
+> ★**성격은 «남겨진 파일»이 아니라 «커버리지 삭제»다.** 술어 = 「새 base top-level `wie*` 중 **members 밖 + `Cargo.toml` 없음**」:
+> `wie_j2me`(1 · `tests/test_boot.rs`) · `wie_jvm_support`(2 · `absent_string_buffer_insert`·`absent_timer_schedule`) ·
+> `wie_midp`(1 · `create_image_missing_name_message`) · `wie_wipi_java`(1 · `preload_classes_come_from_the_runtime`).
+> ★**넷 다 구 base 에서 우리 크레이트였다**(추적 **4·9·40·59** · 전건 `Cargo.toml` · 셋은 명시 members · `wie_midp` 는 path 의존 = 암묵 member)
+> ⇒ ★**base 교체가 넷을 «동시에» 고아로 만들었다.** ★**5건 전건이 구 base `cargo test --all` 에서 «실제로 돌았다»**(`Running tests/…` 로그) ·
+> 새 base 트리에 **정확히 1회씩**만 존재 ⇒ 하이픈 후속이 **이어받지 않았다**.
+> ★★**시한**: 조각 D `-fix2` 착지와 **동시에** 그 5건이 `main` 스위트에서 빠진다.
 >
 > ★★**깨지지 «않은» 것 — 이 칸이 1차로 물은 축**: `--out-name wie_web` **그대로**(사유 주석 포함) ·
 > 계약 JSON `files=[wie_web.js, wie_web_bg.wasm]`·`glueFetchesWasmByName=wie_web_bg.wasm` **그대로** ·

@@ -73,7 +73,12 @@
   `default-members` 를 고르고(새 base `["."]` · 구 base `["wie_cli"]`) ★**두 base 어느 쪽도 그 크레이트를 린트하지 않는다.**
   ★**F3** `f533ba54` 에서 발화한 run 은 `coverage · push` **1건뿐**(`CONFLICTING` ⇒ `pull_request` **0건**)
   ⇒ ★**웹 축은 CI 가 «한 번도 재지 않았다»**(그것을 볼 수 있는 `web.yml Build frontend` 는 PR 에서도 도는 축인데 run 자체가 없다).
-  ★**F4** `check-engine-contract.mjs` 가 옛 경로 2줄로 **ENOENT 크래시** · **F5** 고아 `wie_midp/`(추적 1파일).
+  ★**F4** `check-engine-contract.mjs` 가 옛 경로 2줄로 **ENOENT 크래시**.
+  ★★**F5 [정정 2026-09-16 게이트②]** 초판의 「고아 `wie_midp/` 1건」은 ★**전수가 아니었다 — 4디렉터리·5파일**이고
+  성격도 「남겨진 파일」이 아니라 ★**«커버리지 삭제»**다. 술어 = 「새 base top-level `wie*` 중 **members 밖 + `Cargo.toml` 없음**」 ⇒
+  `wie_j2me`·`wie_jvm_support`·`wie_midp`·`wie_wipi_java`. ★**넷 다 구 base 에서 «우리 크레이트»였고**(추적 **4·9·40·59**)
+  ★**5건 전건이 구 base `cargo test --all` 에서 실제로 돌았다** ⇒ ★**base 교체가 넷을 동시에 고아로 만들었다.**
+  ★**시한**: 조각 D `-fix2` 착지와 **동시에** 그 5건이 `main` 스위트에서 빠진다.
   정본 = `docs/report/0116--….md`.
 - 2026-09-16: **조각 A — upstream base 에서 `keydraw_lgt` 가 깨지는 «원인 규명»**
   (`wie-p3-slice-a-keydraw-lgt-breaks-on-upstream-base` · 채택 `2026-09-16-p3-remaining-slices-plan#p0`)
