@@ -124,6 +124,30 @@
   ★**한계를 숨기지 않는다**: 기계 강제는 **여전히 0**이고, ★**보호를 켜는 순간 이 정정이 «반대 방향»으로 낡는다** —
   그 회귀 축을 **만들지 못했다**(`…/branches/main/protection` 이 **admin 권한**을 요구해 `github.token` 으로 읽히는지
   이 회차가 확인 못 했고, ★**검증 못 한 검사를 넣지 않았다**). 후속 제안 2건 발행.
+- 2026-09-16: **브라우저 부팅 축 — 별 회차는 불요 · 그러나 `resize`·`font` 는 «어느 쪽으로도» 검증되지 않는다**
+  (`wie-adopt-slice-d-base-swap-fix2-p2`) — 정본 `docs/report/0124--….md`.
+  채택 제안 `2026-09-16-slice-d-base-swap-fix2#p2` 는 **판단을 요구했다**(자기 tradeoff: 「별 회차냐, 이 PR 의
+  CI 를 읽는 것으로 족하냐 — 어느 쪽인지가 이 제안의 판단 대상이다」). **코드 0줄** · 판단 둘.
+  ★**⑴ 별 회차 불요** — 부팅 축은 CI 가 이미 답했다. ★「검사가 success」가 아니라 **스텝 단위**로 확인했다
+  (AGENTS.md 의 「Reporting success without rebuilding」 배제): PR **#161** head `f6fe7839` 의 `contract` 잡에서
+  「No engine-relevant changes — skipping」이 ★**skipped** · 「**Contract check — browser boot round-trip**」이
+  ★**success**(08:23~08:30Z). 오늘 PR #166 head `5af3df8c` 에서도 **동일** ⇒ `.rs` 를 만지는 PR 마다 자동으로 돈다.
+  ★★**⑵ 그런데 제안의 `userBenefit` 은 거짓이다** — 「이식한 `Screen::resize`·`Platform::font` 가 실화면에서
+  처음 검증된다」는 **두 선택지 어느 쪽으로도** 달성되지 않는다. 공백이 **호스트가 아니라 «픽스처»** 에 있다:
+  `Screen::resize` 호출부는 **2곳뿐**이고 하나는 PR #161 이 **배선을 끊었으며**(LGT 27줄), 남은
+  `wie-ktf/src/emulator.rs:71` 은 `adf.display_size` 가 `Some` 일 때만 돌고 ★**`Err` 를 `tracing::warn` 으로 삼킨다**.
+  ★**커밋된 두 KTF 픽스처에 `DisplaySize:` 줄이 없다** — 양방향 프로브로 확인했다(커밋 픽스처 **0회** ↔
+  `DisplaySize:176*220` **한 줄만** 넣은 사본 **1회 `176x220`**) ⇒ **0 은 «못 잰 0»이 아니다**.
+  `Platform::font()` 는 프로브도 필요 없다 — `wie_validate` 의 그것이 **`unimplemented!()`** 라 닿으면 패닉하는데
+  **러너 5픽스처 전건 통과**(`not implemented` 0건)다. ★단 **구성은 덮인다**(`WebPlatform::new` 가
+  `Font::try_from_static(...)?` 를 즉시 평가 ⇒ 자산이 깨지면 부팅 실패) — ★**「적재는 검증되고 사용은 안 된다」**.
+  ⇒ 그 사실을 **시나리오 목록 옆**(`scripts/contract-roundtrip.mjs` 머리 · +27)에 박았다.
+  ★**AGENTS.md 에 두 번 적지 않았다**(「같은 사실을 두 곳에 적으면 한쪽이 낡는다」).
+  ★**막은 것**: 다음 회차가 chromium 을 받아 라운드트립을 돌린 뒤 「초록이니 resize·font 가 검증됐다」로 적는 것.
+  ★**안 한 것**: 커버리지는 **1비트도 늘지 않았다** — resize 시나리오는 「크기를 요구하는 픽스처」가 필요하고
+  기존 것을 고치면 Scenario E/F 의 정확 픽셀 단언이 함께 깨진다 ⇒ effort **M** 별 티켓(후속 제안).
+  회귀 0(전건 합산 · `tail` 아님): fmt/clippy/wasm/beta rc=0 · `cargo test --all --no-fail-fast`
+  **42 스위트 384 passed · 0 failed** · `npm run audit` rc=0 · 러너 5픽스처 전건 PASS.
 - 2026-09-16: **«완성된 줄» 술어를 한 곳으로 모았다 — 제안이 미룬 근거가 실측으로 없었다**
   (`wie-adopt-slice-d-base-swap-fix2-p0`) — 정본 `docs/report/0123--….md`.
   채택 제안 `2026-09-16-slice-d-base-swap-fix2#p0` 집행. **제품 코드 0줄**(시험 지원 크레이트 + 통합 시험 2개 ·
