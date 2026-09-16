@@ -157,6 +157,34 @@
 //   sticky ANY-frame predicate and never inspects the LAST frame). Root cause and
 //   the 2026-09-06 fix are recorded at the scenario itself.
 //
+// ── What NO scenario here reaches: `Screen::resize` and `Platform::font()` ──
+// Measured 2026-09-16, because a proposal asked for "boot the browser host once
+// so the newly ported resize/font are verified on a real screen" and the honest
+// answer is that RUNNING THIS SCRIPT DOES NOT VERIFY THEM — the gap is the
+// fixtures, not the host, so a local run buys exactly what CI already buys.
+//
+//   `Screen::resize` — the engine has two callers. `wie_ktf/src/emulator.rs`
+//   calls it at boot only `if let Some((width, height)) = adf.display_size`, and
+//   NEITHER committed KTF fixture declares `DisplaySize:` (checked: the `__adf__`
+//   of `keydraw_ktf.zip` and `helloworld_ktf.zip` carry AID/PID/MClass only). The
+//   other is `wie_lgt/.../wipi_c/graphics.rs`, whose 27-line wiring was cut when
+//   PR #161 routed LGT graphics back to the shared implementation. Probed on the
+//   native host: 0 calls on the committed fixture, 1 call (`176x220`) after
+//   appending one `DisplaySize:176*220` line to a throwaway copy — so the zero is
+//   a measurement, not a silent instrument. A resize scenario therefore needs a
+//   fixture that asks for a size, which is a different change: the committed
+//   fixtures are binaries, and Scenario E/F assert exact pixel counts against the
+//   current geometry.
+//
+//   `Platform::font()` — every engine caller is in `wie_midp` (lcdui text), and
+//   none of these fixtures draws a string. `wie_validate`'s own `font()` is
+//   `unimplemented!()`, so it panics if anything reaches it; all five runner
+//   fixtures pass, which prices that at zero calls without needing a probe.
+//   What IS covered is the font's CONSTRUCTION: `WebPlatform::new` eagerly does
+//   `Font::try_from_static(include_bytes!(...assets/neodgm.ttf))?`, so a missing
+//   or unparseable asset fails boot and Scenario A goes red. Loading it is
+//   verified; using it is not.
+//
 // Usage: node scripts/contract-roundtrip.mjs        (after scripts/build-wasm.sh)
 //   WIE_CHROME_CHANNEL=chrome  — use a system Chrome instead of the playwright
 //                                bundled chromium (local dev convenience).
