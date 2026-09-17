@@ -1,0 +1,40 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-17",
+  "task": "wie-adopt-resize-fixture-scenario-g-p0",
+  "title": "resize 의 «뒤 버퍼»를 앞 캔버스로 읽어냈다 — 디버그 게터도, 새 게스트도 없이",
+  "summary": "채택 제안(2026-09-17-resize-fixture-scenario-g#p0)은 「Scenario G 가 HTMLCanvasElement.width/height 만 단언하고 WebScreen 의 back_canvas 는 wasm 안에서 생성돼 JS 가 못 읽는다 ⇒ 뒤 버퍼만 옛 크기로 남아도 두 단언을 통과한다」였다. 전제를 재서 «지금도 참»임을 확인하고(back canvas 는 document.create_element 로 만들어 DOM 에 붙지 않는다), 제안의 tradeoff 가 제시한 두 길(새 게스트 빌드 / 계약 표면에 디버그 게터)을 «둘 다 쓰지 않고» 닫았다. 열쇠는 두 가지다 — ⑴리사이즈를 «키우면» 옛 크기 바깥이 아무것도 안 복사되고 ⑵WebScreen::paint 가 알파를 강제로 불투명하게 칠하는데 set_width 직후 캔버스는 투명이다 ⇒ 판별자는 «색»이 아니라 «알파»이고, 게스트가 거기에 아무것도 그리지 않아도 성립한다. 새 픽스처는 커밋된 keydraw_ktf.zip 에 ADF 한 줄을 덧붙인 파생물이라 새 생성기·nightly·네트워크가 «전혀» 필요 없었다.",
+  "changes": [
+    "scripts/make-resize-fixture.mjs — 파생 로직을 deriveResizeZip(srcFixture, adfLine) 으로 빼고 두 번째 산출물 추가: resize_draw_ktf.zip = keydraw_ktf.zip + DisplaySize:320*400(★키우는 방향). 기존 resize_ktf.zip 은 바이트 불변(md5 재생성 대조)",
+    "test_data/resize_draw_ktf.zip 신설(31,387B · 바이트 안정 · 게임 파일 아님 — 커밋된 테스트 게스트의 파생)",
+    "scripts/contract-roundtrip.mjs — Scenario G2 4검사 추가(캔버스 크기 · 그려짐 · ★옛 경계 바깥 픽셀의 알파 · free). G 는 한 글자도 안 고쳤다",
+    "AGENTS.md 엔진 러너 블록 — NOT-RUN: test_data/resize_draw_ktf.zip 선언(★check-engine-runner-fixtures 가 커밋 시 실제로 rc=1 로 요구했다)"
+  ],
+  "verification": [
+    "★개악 대조(양방향 · ★제품 호출부): wie_featurephone/src/screen.rs 의 WebScreen::resize 에서 back_canvas.set_width/set_height 두 줄을 제거 → npm run build:wasm → 라운드트립 ★52/53 · G2 알파 검사 red(rgba(0,0,0,0) at (241,321)) · rc=1. 복원 → 재빌드 → ★53/53 · rc=0 · rgba(0,0,0,255). ★상수 대 상수가 아니라 «브라우저가 실제로 그린 캔버스 픽셀»을 읽는다",
+    "★★그 개악에서 Scenario G 는 3검사 «전부 green» 이었다 — 제안이 말한 사각을 그대로 재현한 것이고, G2 가 그 자리를 덮는다는 직접 증거다",
+    "정상 라운드트립 53/53 · rc=0 (G2: 320x400 리사이즈 · 280px 그림 · 알파 불투명 · free)",
+    "바이트 안정성: make-resize-fixture.mjs 2회 실행 md5 동일(62b2b84d… / f465fccb…) · 기존 resize_ktf.zip 은 git status 에 안 뜬다(불변)",
+    "검사기: check-engine-runner-fixtures rc=0(선언 «전» rc=1 로 막는 것을 확인한 뒤 선언) · check-engine-contract rc=0(내보내기 표면 무변경) · check-doc-liveness-parity rc=0 · check-docs-report-serial rc=0 · check-worklog-json rc=0 · check-parked-workflows rc=0"
+  ],
+  "limits": [
+    "★G2 가 단언하는 것은 «옛 경계 바깥이 칠해졌다» 이지 «뒤 버퍼의 width 값» 자체가 아니다 — 여전히 JS 는 그 캔버스를 못 읽는다. 즉 이것은 «직접 관측»이 아니라 «관측 가능한 귀결»이고, 같은 귀결을 내는 다른 구현(예: 앞 캔버스에 직접 그리기)으로 바꾸면 이 검사는 통과한다",
+    "★이 축은 «키우는» 방향에서만 산다. 줄이는 리사이즈에서 뒤 버퍼가 낡으면 원리적으로 안 보인다(큰 back 을 작은 front 에 drawImage 하면 잘려도 복사되는 좌상단이 정확히 프레임이다) — 그래서 기존 resize_ktf.zip(줄이는 쪽)을 «남겨 두고» 별 픽스처를 더했다",
+    "★알파 판별자는 WebScreen::paint 의 «알파 강제 불투명»에 의존한다. 그 정책이 바뀌면(예: 알파 보존) 이 검사는 조용히 무의미해진다 — 그때 red 가 아니라 «항상 green» 이 될 수 있다",
+    "★KTF 경로만 덮는다(G 와 같다). LGT·SKT·J2ME 의 resize 는 여전히 픽스처가 없다",
+    "★브라우저 라운드트립은 engine-contract.yml 의 dorny/paths-filter engine 게이트 뒤에 있다 — engine 경로를 안 건드리는 diff 에서는 이 검사가 돌지 않는다(이 회차 자신은 scripts/·test_data/ 를 건드리므로 돈다)"
+  ],
+  "proposals": [
+    {
+      "title": "resize 픽스처가 KTF 하나뿐이다 — LGT·SKT 의 Screen::resize 는 여전히 0회 실행된다",
+      "plainSummary": "화면 크기 변경을 확인하는 테스트 게임이 통신사 한 곳(KTF)용만 있습니다. 나머지 두 곳은 그 경로가 한 번도 실행되지 않습니다.",
+      "userBenefit": "LGT·SKT 게임에서 화면 크기가 바뀔 때 생기는 회귀를 게이트가 잡는다. 지금은 그 경로에 어떤 테스트도 닿지 않아, 깨져도 아무것도 빨개지지 않는다.",
+      "why": "Scenario G·G2 는 둘 다 KTF 픽스처다(resize_ktf.zip·resize_draw_ktf.zip, 둘 다 __adf__ 의 DisplaySize: 로 들어간다). 그 진입점은 wie-ktf/src/emulator.rs 의 adf.display_size 한 곳이고, LGT·SKT 는 각자 다른 메타데이터 경로를 쓴다. 이 회차가 확인한 것처럼 resize 실패는 throw 가 아니라 «조용한 클리핑»으로 나타나므로, 실행되지 않는 경로는 깨져도 증상이 없다. 그리고 keydraw_lgt.zip 이 이미 커밋돼 있어 KTF 와 같은 파생 수법(ADF/메타 한 줄 + 같은 바이트 안정 zip 헬퍼)이 쓸 수 있는지부터 재면 된다.",
+      "tradeoff": "LGT·SKT 가 화면 크기를 어디서 읽는지가 KTF 의 __adf__ 처럼 «한 줄 덧붙이기»로 끝나지 않을 수 있다 — binary.mod·.msd 쪽이면 파생이 아니라 게스트 재빌드가 되고, 그때는 이 회차가 피한 비용(새 생성기·툴체인)이 실제로 든다. 그래서 먼저 «파생으로 되는가»를 재는 것이 첫 단계이고, 안 되면 그 사실 자체가 결론이다. 또 G2 와 같은 알파 판별자를 쓰려면 그 호스트의 paint 도 알파를 불투명으로 강제해야 한다 — WebScreen 은 공유되므로 아마 성립하지만 확인 없이 가정하면 «항상 green» 검사가 된다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": ["2026-09-17-resize-fixture-scenario-g#p0"],
+  "declinedProposals": []
+}

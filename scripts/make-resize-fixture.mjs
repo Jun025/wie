@@ -42,6 +42,38 @@ export const RESIZE_W = 176;
 export const RESIZE_H = 220;
 export const ADF_LINE = `DisplaySize:${RESIZE_W}*${RESIZE_H}`;
 
+// ── The second fixture: the one that can see the BACK buffer ─────────────────
+// `resize_ktf.zip` above asserts the front canvas only, which is all JS can read:
+// `WebScreen`'s back canvas is `document.create_element`'d inside wasm and never
+// attached to the DOM, so no selector reaches it. A back buffer left at the old
+// size clips the blit instead of throwing, so Scenario G passes either way.
+//
+// This pair closes that by making the miss OBSERVABLE ON THE FRONT CANVAS, with
+// no debug getter and no widening of `featurephone-engine-contract.json`:
+//
+//   * it GROWS (the one above shrinks). On a shrink a stale back buffer is
+//     invisible by construction — `drawImage` of an oversized back canvas is
+//     clipped by the front one, and the top-left region it copies is exactly the
+//     frame. Growing inverts that: the region past the OLD size is copied from
+//     nothing.
+//   * the source is the DRAWING guest, not helloworld. `WebScreen::paint` forces
+//     alpha opaque over the whole guest frame, and a canvas is transparent black
+//     immediately after `set_width`. So "did the back buffer grow too?" reads off
+//     the FRONT canvas as `alpha !== 0` at a pixel past the old bounds — even
+//     where the guest itself draws nothing, because the discriminator is the
+//     forced-opaque background, not the guest's rect. helloworld cannot serve
+//     here: it never paints, so nothing is blitted at all.
+//
+// No new guest is built: this is the committed `keydraw_ktf.zip` jar with one ADF
+// line appended, through the same byte-stable derivation. The proposal that asked
+// for this expected a new generator needing nightly + network; it is not needed,
+// and that is recorded in the round's report rather than silently skipped.
+export const DRAW_SRC_FIXTURE = "keydraw_ktf.zip";
+export const RESIZE_DRAW_FIXTURE = "resize_draw_ktf.zip";
+export const DRAW_RESIZE_W = 320;
+export const DRAW_RESIZE_H = 400;
+export const DRAW_ADF_LINE = `DisplaySize:${DRAW_RESIZE_W}*${DRAW_RESIZE_H}`;
+
 /** Read a STORED/DEFLATE zip by walking local headers. Enough for our own fixtures
  *  (flags=0, no data descriptors — checked), and it keeps this script dependency-free. */
 function readEntries(buf) {
@@ -64,21 +96,36 @@ function readEntries(buf) {
   return out;
 }
 
-export function resizeFixtureZip() {
-  const src = readFileSync(path.join(root, "test_data", SRC_FIXTURE));
+/** Derive a `DisplaySize:`-carrying copy of a committed KTF fixture. Same guest,
+ *  one extra ADF line — the source's AID/PID/MClass are never rewritten. */
+function deriveResizeZip(srcFixture, adfLine) {
+  const src = readFileSync(path.join(root, "test_data", srcFixture));
   const entries = readEntries(src);
   const adf = entries.find(([n]) => n === "__adf__");
-  if (!adf) throw new Error(`${SRC_FIXTURE} has no __adf__ — KTF archives must carry one`);
-  if (adf[1].includes(ADF_LINE)) throw new Error(`${SRC_FIXTURE} already declares ${ADF_LINE} — the source fixture changed`);
+  if (!adf) throw new Error(`${srcFixture} has no __adf__ — KTF archives must carry one`);
+  if (adf[1].includes(adfLine)) throw new Error(`${srcFixture} already declares ${adfLine} — the source fixture changed`);
   // Append, never rewrite: AID/PID/MClass decide the jar name and main class, and
   // this fixture must stay the same guest as its source.
-  adf[1] = Buffer.concat([adf[1], Buffer.from(`${ADF_LINE}\n`, "utf8")]);
+  adf[1] = Buffer.concat([adf[1], Buffer.from(`${adfLine}\n`, "utf8")]);
   return zip(entries);
 }
 
+export function resizeFixtureZip() {
+  return deriveResizeZip(SRC_FIXTURE, ADF_LINE);
+}
+
+export function resizeDrawFixtureZip() {
+  return deriveResizeZip(DRAW_SRC_FIXTURE, DRAW_ADF_LINE);
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const out = path.join(root, "test_data", RESIZE_FIXTURE);
-  const bytes = resizeFixtureZip();
-  writeFileSync(out, bytes);
-  console.log(`wrote ${path.relative(root, out)} — ${bytes.length} bytes, ${ADF_LINE}`);
+  for (const [name, build, line] of [
+    [RESIZE_FIXTURE, resizeFixtureZip, ADF_LINE],
+    [RESIZE_DRAW_FIXTURE, resizeDrawFixtureZip, DRAW_ADF_LINE],
+  ]) {
+    const out = path.join(root, "test_data", name);
+    const bytes = build();
+    writeFileSync(out, bytes);
+    console.log(`wrote ${path.relative(root, out)} — ${bytes.length} bytes, ${line}`);
+  }
 }
