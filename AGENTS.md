@@ -134,13 +134,26 @@ done
 `NOT-RUN: test_data/<name> — <why>` inside this marked region. That keeps the classification in the
 same document as the list instead of in the checker, which is the one thing the proposal behind this
 check warned about: a checker that knows which fixtures are "runner fixtures" becomes a second source
-of truth and drifts from this block. There is exactly one today:
+of truth and drifts from this block. There are exactly two today, and they are the same exclusion
+for the same reason — `wie_validate` has no real screen to resize:
 
 NOT-RUN: test_data/resize_ktf.zip — it exists to prove `Screen::resize` reaches a real screen, and
 `wie_validate`'s own `resize` is a no-op that returns `Ok(())`, so running it here would assert
 nothing. Its assertion lives in the browser round-trip (Scenario G), where the canvas is real.
 Built by `node scripts/make-resize-fixture.mjs` — the same guest as `helloworld_ktf.zip` plus one
 `DisplaySize:` line, byte-stable on regeneration.
+
+NOT-RUN: test_data/resize_draw_ktf.zip — same exclusion, same generator, and the pair to the one
+above: that fixture SHRINKS and this one GROWS. The growth is what makes the back buffer visible.
+`WebScreen`'s back canvas is created inside wasm and never enters the DOM, so Scenario G — which can
+only read `HTMLCanvasElement.width/height` — passes whether or not it moved; a stale back buffer
+clips the blit rather than throwing. On a shrink that miss is invisible by construction (an
+oversized back canvas is clipped by the front one, and the region copied is exactly the frame), so
+only growing exposes it: the area past the OLD size is copied from nothing. Its assertion is
+Scenario G2, which samples ALPHA there — `WebScreen::paint` forces alpha opaque across the guest
+frame while a freshly sized canvas is transparent, so the probe holds even where the guest draws
+nothing. That is also why this one derives from `keydraw_ktf.zip` rather than `helloworld_ktf.zip`:
+helloworld never paints, so nothing would be blitted and both branches would read alpha 0.
 
 <!-- ENGINE-RUNNER:END -->
 
