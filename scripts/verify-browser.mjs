@@ -9,8 +9,12 @@
 // The game file is read from a path OUTSIDE dist/ and is never committed nor
 // uploaded to any server by the app.
 //
-// This exits non-zero on a leak (2) and on the flow not completing — a missing
-// selector throws. It does NOT assert that anything was drawn: `nonBlack: 0` is
+// This exits non-zero on a leak (2), on a console error (3), and on the flow not
+// completing — a missing selector throws. The console axis is the "콘솔 0에러"
+// half of merge-contract 4-C: those lines were always captured and printed, but
+// until 2026-09-17 they were not part of the verdict, so a round could quote
+// "NO-LEAK AUDIT: ✅" over a page that was throwing.
+// It does NOT assert that anything was drawn: `nonBlack: 0` is
 // a pass, and for the helloworld fixtures that is correct (AGENTS.md: they are
 // expected to end blank). Read "rc=0" as "the app booted, took a file, and
 // leaked nothing", never as "the screen rendered".
@@ -91,8 +95,11 @@ console.log("\noff-origin requests:", offOrigin.length);
 console.log("POST/PUT requests:", apiPosts.map((r) => r.url).join(", ") || "(none)");
 console.log("requests whose body contains the game header bytes:", bodyCarryingGame.length);
 
+const consoleErrors = logs.filter((l) => l.startsWith("[console.error]") || l.startsWith("[pageerror]"));
+
 const leak = offOrigin.length > 0 || bodyCarryingGame.length > 0;
 console.log("\nNO-LEAK AUDIT:", leak ? "❌ POSSIBLE LEAK" : "✅ no game bytes left the browser, no off-origin requests");
+console.log("console errors (console.error + pageerror):", consoleErrors.length);
 
 await browser.close();
-process.exit(leak ? 2 : 0);
+process.exit(leak ? 2 : consoleErrors.length > 0 ? 3 : 0);
