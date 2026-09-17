@@ -3,7 +3,7 @@
   "date": "2026-09-17",
   "task": "wie-count-checkers-with-only-one-caller",
   "title": "검사기 ↔ 호출자 전수 계수 — 38개 중 호출자 0이 7 · 1이 15 (★2026-09-18 -fix 재측 · 초판 37/0=4/결함0 은 틀렸다)",
-  "summary": "「이건 어디서 도나?」를 파일마다 손 grep 하던 것을 scripts/checker-census.mjs 가 센다. 모집단은 이름 규칙이 아니라 위치+확장자이고, 호출자는 배선(워크플로 run: · package.json scripts · 소스의 실행 형태)에서 역방향으로 센다. 주석과 «데이터로서의 경로»는 호출자가 아니다(안 걸렀으면 7행이 틀린 버킷에 앉는다). ★★[2026-09-18 -fix] 글롭 호출자의 «커버리지»는 규칙이 아니라 cargo metadata --no-deps 에 «묻는다» — 초판은 경로 정규식으로 추측했고 그 때문에 Cargo.toml 이 없는 고아 디렉터리 3곳의 4파일에 호출자를 붙여 2+ 버킷에 감췄고, 루트 패키지의 실재 타깃 tests/font.rs 는 모집단에서 빠뜨렸다. 재측: base f7a1d022 37(0=8·1=14·2+=15) / 현 base origin/main 37(0=7·1=14·2+=16) / head 38(0=7·1=15·2+=16) · 글롭 4 call site → 8 artifact. ★0버킷이 8→7 로 준 것은 내 변경이 아니라 형제 회차 #193(docs/report/0153)이 고아 test_boot.rs 를 되살렸기 때문이다 — 이 수는 상수가 아니다. cargo 부재·offline 은 UNMEASURABLE + rc=2 로 내고 «0 호출자»로 뭉개지 않는다(빼면 0버킷이 8→15 로 과대해진다).",
+  "summary": "「이건 어디서 도나?」를 파일마다 손 grep 하던 것을 scripts/checker-census.mjs 가 센다. 모집단은 이름 규칙이 아니라 위치+확장자이고, 호출자는 배선(워크플로 run: · package.json scripts · 소스의 실행 형태)에서 역방향으로 센다. 주석과 «데이터로서의 경로»는 호출자가 아니다(안 걸렀으면 7행이 틀린 버킷에 앉는다). ★★[2026-09-18 -fix] 글롭 호출자의 «커버리지»는 규칙이 아니라 cargo metadata --no-deps 에 «묻는다» — 초판은 경로 정규식으로 추측했고 그 때문에 Cargo.toml 이 없는 고아 디렉터리 3곳의 4파일에 호출자를 붙여 2+ 버킷에 감췄고, 루트 패키지의 실재 타깃 tests/font.rs 는 모집단에서 빠뜨렸다. 재측: base f7a1d022 37(0=8·1=14·2+=15) / 현 base origin/main 37(0=7·1=14·2+=16) / head 38(0=7·1=15·2+=16) · 글롭 4 call site → 8 artifact. ★0버킷이 8→7 로 준 것은 내 변경이 아니라 형제 회차 #193(docs/report/0153)이 고아 test_boot.rs 를 되살렸기 때문이다 — 이 수는 상수가 아니다. cargo 부재·offline 은 UNMEASURABLE + rc=2 로 내고 «0 호출자»로 뭉개지 않는다(빼면 0버킷이 ★head 에서 7→15 로 과대해진다 — 「8→15」는 base f7a1d022 값이다).",
   "changes": [
     "scripts/checker-census.mjs 신설 — 판정 없는 목록 도구(rc 0 / 2 만 · rc=1 없음)",
     ".github/workflows/engine-contract.yml 에 상시 스텝 1개(continue-on-error: true ⇒ rc 변경 0)",
@@ -11,7 +11,7 @@
     "docs/report/0155--2026-09-17--wie-count-checkers-with-only-one-caller.md 신설"
   ],
   "verification": [
-    "양방향: 격리 워크트리에서 배선 3개를 끊자 1→0, 2+→1, 2+→1 로 이동했고 요약이 0=7·1=15·2+=16 → 0=8·1=16·2+=14 로 움직였다(★2026-09-18 «고친 도구»로 재측 · 커밋 0 · 워크트리 제거). ★[2026-09-18 -fix] 모집단 양방향도 쟀다: 루트 tests/*.rs 를 «추가»하면 38→39(+1) · 실재 루트 타깃 tests/font.rs 를 «제거»하면 38→37(−1). ★그리고 cargo 실패를 주입(PATH 에서 감춤)하면 rc=2 · ★UNMEASURABLE 이고 0버킷이 8→15 로 «과대»하게 나온다고 스스로 경고한다 — 「0 호출자」로 뭉개지 않는다.",
+    "양방향: 격리 워크트리에서 배선 3개를 끊자 1→0, 2+→1, 2+→1 로 이동했고 요약이 0=7·1=15·2+=16 → 0=8·1=16·2+=14 로 움직였다(★2026-09-18 «고친 도구»로 재측 · 커밋 0 · 워크트리 제거). ★[2026-09-18 -fix] 모집단 양방향도 쟀다: 루트 tests/*.rs 를 «추가»하면 38→39(+1) · 실재 루트 타깃 tests/font.rs 를 «제거»하면 38→37(−1). ★그리고 cargo 실패를 주입(PATH 에서 감춤)하면 rc=2 · ★UNMEASURABLE 이고 0버킷이 ★head 에서 7→15 로 «과대»하게 나온다고 스스로 경고한다(「8→15」는 base f7a1d022 값) — 「0 호출자」로 뭉개지 않는다.",
     "노드 검사기 8종 rc=0 · check-doc-liveness-parity 의 documented line 수 25 불변.",
     "scripts/check-*.mjs 13개 중 단일 호출자 9 · 0 호출자 1 · 2+ 3 (이 수는 -fix 재측에서도 불변 — 글롭 규칙은 .rs 타깃에만 걸리므로 .mjs 축은 영향받지 않는다).",
     "★[2026-09-18 -fix] cargo metadata --no-deps 의 integration-test 타깃은 8건이고 그중 tests/font.rs 는 루트 패키지(wie) 소유다. 잔존 고아 3파일(wie_jvm_support/tests/absent_{string_buffer_insert,timer_schedule}.rs · wie_midp/tests/create_image_missing_name_message.rs)은 그 목록에 없고 그 두 디렉터리에 Cargo.toml 이 없다(전수 확인). ★형제 회차 #193(docs/report/0153)이 같은 술어(cargo metadata 소유자)에 독립으로 닿아 고아 4건을 세고 1건(test_boot)을 되살렸으며 나머지 3건은 되살리면 red(E0061 등)임을 실측했다 — 내 0버킷 잔여 3건과 정확히 일치한다."

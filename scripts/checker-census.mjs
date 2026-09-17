@@ -371,7 +371,12 @@ const w = Math.max(...rows.map((r) => r.path.length));
 console.log(
   `checker-census: ${rows.length} executable artifacts · callers 0 = ${groups[0].length} · 1 = ${groups[1].length} · 2+ = ${groups["2+"].length}`,
 );
-console.log(`  population: scripts/*.{sh,mjs,js} · .github/scripts/**.{sh,mjs,js} · */tests/**.rs`);
+// `[crate/]tests/**.rs`, with the crate segment OPTIONAL — the repo root is itself a package, so
+// `tests/font.rs` is in the population. This line used to read `*/tests/**.rs`, which describes the
+// regex the -fix round REPLACED (it dropped the root target); the regex was corrected and the
+// sentence describing it was not. Same defect class as the numbers this round is correcting, so it
+// is corrected here rather than left for a reader to trip over.
+console.log(`  population: scripts/*.{sh,mjs,js} · .github/scripts/**.{sh,mjs,js} · [crate/]tests/**.rs (crate segment optional — the root is a package)`);
 console.log(`  surfaces:   ${surfaces.filter((s) => s.kind === "workflow").length} workflows · ${surfaces.filter((s) => s.kind === "npm").length} package.json · ${surfaces.filter((s) => s.kind === "source").length} source files (comments stripped)`);
 for (const g of GLOB_CALLERS) {
   const n = globHits.filter((h) => h.rule === g.label).length;
