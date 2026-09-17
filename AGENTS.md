@@ -380,6 +380,15 @@ design** — do not "fix" that by wiring it:
   pass, which for the helloworld fixtures is correct since they are expected to end blank. Read it
   as "booted, took a file, leaked nothing". It needs no game file (its default argument is the
   committed `test_data/helloworld_ktf.zip`).
+
+  **It writes two screenshots into the repo root, and you do not commit them**:
+  `verify_<label>_screen.png` and `verify_<label>_page.png`, where `<label>` defaults to the game
+  file's basename — so the default run leaves `verify_helloworld_ktf.zip_screen.png` and
+  `verify_helloworld_ktf.zip_page.png` beside `Cargo.toml`. `.gitignore`'s `/verify_*.png` already
+  covers them, so `git status` stays clean and nothing can reach a PR by accident; they are
+  transient debugging output, overwritten on the next run. Screenshots meant to be *kept* live in
+  `docs/verification/`. This is said here because the surprise is real: a gate② reviewer hit it,
+  deleted the two files by hand, and filed it — the script had never announced the side effect.
 - **`scripts/smoke_gate.sh` — local only, and structurally so.** It regresses the working game
   catalog against `scripts/smoke_gate_baseline.tsv`, reading titles from `WORKING_DIR`
   (default `game_lab/working`). `game_lab/` is git-ignored and holds real game bytes, which
