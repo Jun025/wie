@@ -60,6 +60,23 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-17: **「required check 는 0개」가 «2시간» 만에 거짓이 됐다 — 이제 기계가 본다**
+  (`wie-adopt-slice-d-base-swap-fix3-p1-p1` · 채택 `2026-09-17-adopt-slice-d-base-swap-fix3-p1#p1`) —
+  정본 `docs/report/0144--….md`. ★**제품 코드 0줄.**
+  ★★**제안이 예고한 회귀가 «이미» 일어나 있었다**: repo ruleset **「main protection」**(`enforcement: active`)이
+  **같은 날 10:17:54** 에 적용돼 required check 가 ★**5개**(`contract`·`build-web`·`rust_ci` stable ×3)인데
+  문서 5곳은 **「강제 0개」**라고 말하고 있었다.
+  ★★**급소 — ruleset 은 «직전 회차가 인용한 두 신호»에 안 보인다**: `branches/main/protection` 은 **오늘도 404**(classic 전용) ·
+  `protection.enabled` 도 **false** 그대로다. 보이는 축은 ★**`protected: true` 와 `rulesets`** 뿐이다
+  ⇒ 그 회차는 «틀린» 게 아니라 ★**«덜 물었다».**
+  ⇒ `AGENTS.md` 에 **`REQUIRED-CHECKS` 표시 영역**(기존 `ENGINE-RUNNER` 관용구와 **같은 형태**)을 두고
+  `scripts/check-branch-protection-claim.mjs` 가 **classic ∪ 활성 ruleset** 과 **양방향** 대조 · `doc-liveness.yml`(주 1회)에 **rider 1스텝**.
+  ★★**개악 대조 4방향**: 과소 주장 **rc=1** · 과대 주장 **rc=1** · 마커 훼손 ★**rc=2(비교 불가)** ·
+  토큰이 못 읽는 형상 ★**rc=2(COULD NOT MEASURE)** ↔ 복원 **rc=0**. ★**«못 읽음»을 «강제 없음»으로 읽지 않는다** —
+  그것이 직전 회차가 진 형태 그대로다.
+  ★거짓이 된 문서 **4곳**(AGENTS.md·engine-contract.yml·web.yml·docs/upstream-realign-p3-slices.md)을 실측으로 갈고
+  **목록은 restate 하지 않고 표시 영역을 가리키게** 했다.
+  ★**부수 관측**: required 5개가 **전부 paths 필터 없는 트리거**에서 나온다 ⇒ 사건 대장의 「paths 필터된 required check 교착」 조합은 **현재 0**.
 - 2026-09-17: **upstream 이 «새» 워크플로를 들고 오면 이제 기계가 본다 — 손으로 관리하는 목록 «없이»**
   (`wie-adopt-slice-d-base-swap-fix2-p3-p0` · 채택 `2026-09-16-adopt-slice-d-base-swap-fix2-p3#p0`) —
   정본 `docs/report/0135--….md`. ★**제품 동작 0줄 · Rust 0줄**.

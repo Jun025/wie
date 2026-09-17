@@ -59,6 +59,11 @@ on:
 
 permissions:
   contents: read
+  # ★Only the branch-protection claim guard needs this, and it needs it to be HONEST:
+  # `GET /rulesets` is what sees a ruleset (the classic protection endpoint does not),
+  # and without the scope the guard exits 2 "COULD NOT MEASURE" rather than reporting
+  # "nothing is enforced". Read-only; nothing here writes settings.
+  administration: read
 
 jobs:
   doc-liveness:
@@ -183,3 +188,15 @@ jobs:
           git remote add upstream https://github.com/dlunch/wie.git 2>/dev/null || true
           git fetch --depth=1 upstream main:refs/remotes/upstream/main
           node scripts/check-upstream-new-workflows.mjs
+
+      # ★Second rider, same reasoning as the first (weekly cadence + a red with an
+      # owner), OUTSIDE every DOC-COPY region. Its signal moves when REPO SETTINGS
+      # move, not when we do — per-PR it would redden every open PR at once for
+      # something none of them touched. Weekly is also the right resolution: branch
+      # protection does not change by the minute, and the drift it catches went
+      # unnoticed for ~2 hours in one direction and ~8 weeks in the other.
+      # See docs/worklog/2026-09-17-adopt-slice-d-base-swap-fix3-p1.json #p1.
+      - name: "Documented required checks match GitHub (docs/worklog/2026-09-17-adopt-slice-d-base-swap-fix3-p1.json #p1)"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/check-branch-protection-claim.mjs
