@@ -97,13 +97,27 @@ export function myAddedNames(disk) {
   }
 }
 
+/** 이 트리가 서 있는 PR 의 head 브랜치. CI(PR 빌드)는 detached HEAD 라 `GITHUB_HEAD_REF` 가 정본이다. */
+export function selfHeadRef() {
+  if (process.env.GITHUB_HEAD_REF) return process.env.GITHUB_HEAD_REF;
+  try {
+    const b = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+    return b === "HEAD" ? "" : b; // detached & no env ⇒ 모른다
+  } catch {
+    return "";
+  }
+}
+
 /**
  * ★내가 더한 연번을 **다른** 열린 PR 이 이미 들고 있는가.
- * ★**«같은 파일명»은 내 PR 자신이다** — 그것으로 자기 자신을 거른다(자기 PR 번호를 알 필요가 없다).
- *   두 회차가 같은 번호를 잡으면 슬러그가 달라 파일명이 반드시 갈린다.
+ * ★**자기 제외는 «브랜치»가 1차, «파일명 동일성»이 2차다.**
+ *   파일명만으로 걸러면 ★**연번을 그대로 두고 슬러그만 바꾼 순간 자기 PR 과 충돌한다**(게이트² F2 실측:
+ *   `0136--…-p1-p0.md` → `0136--…-renamed.md` 로 고치면 상대가 «자기 자신»인데 「PR 번호가 큰 쪽이 옮긴다」는
+ *   **적용 불능 규칙**이 찍힌다). 브랜치가 같으면 그 claim 은 정의상 내 PR 이므로 이름과 무관하게 제외된다.
+ *   ★브랜치를 모르는 형상(detached + env 없음)에서는 2차 축만 남는다 — 그때도 «덜 걸러질» 뿐 오답은 아니다.
  * ★순수 함수 — 판별력 축이 이것을 직접 부른다.
  */
-export function crossPrCollisions(mine, prClaims) {
+export function crossPrCollisions(mine, prClaims, selfRef = "") {
   const bySerial = new Map();
   for (const n of mine) {
     const m = SERIAL_RE.exec(n);
@@ -112,7 +126,8 @@ export function crossPrCollisions(mine, prClaims) {
   const mineSet = new Set(mine);
   const out = [];
   for (const c of prClaims) {
-    if (mineSet.has(c.name)) continue; // ★내 PR 자신
+    if (selfRef && c.headRefName === selfRef) continue; // ★1차: 내 PR(브랜치 동일)
+    if (mineSet.has(c.name)) continue; // ★2차: 같은 파일명 = 내 PR 자신
     const s = SERIAL_RE.exec(c.name)?.[1];
     if (s && bySerial.has(s)) out.push({ serial: s, mine: bySerial.get(s), theirs: c.name, pr: c.pr });
   }
@@ -131,11 +146,11 @@ export function openPrAddedNames() {
   const gh = (args) => execFileSync("gh", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   try {
     const slug = gh(["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]).trim();
-    const nums = gh(["pr", "list", "--state", "open", "--limit", "200", "--json", "number", "-q", ".[].number"])
-      .split("\n")
-      .filter(Boolean);
+    // ★jq 템플릿을 쓰지 «않는다» — JS 문자열 안의 `\(`/`\t` 는 자바스크립트가 «먼저» 먹어 버려
+    //   jq 가 상수 문자열을 받는다(이 회차가 그 함정을 실제로 밟았고, 대조군 ⑵ 가 잡았다). JSON 을 그대로 파싱한다.
+    const prs = JSON.parse(gh(["pr", "list", "--state", "open", "--limit", "200", "--json", "number,headRefName"]));
     const out = [];
-    for (const n of nums) {
+    for (const { number: n, headRefName } of prs) {
       const files = gh([
         "api",
         `repos/${slug}/pulls/${n}/files`,
@@ -145,7 +160,7 @@ export function openPrAddedNames() {
       ])
         .split("\n")
         .filter(Boolean);
-      for (const f of files) if (f.startsWith(`${REPORT_DIR}/`)) out.push({ pr: n, name: path.basename(f) });
+      for (const f of files) if (f.startsWith(`${REPORT_DIR}/`)) out.push({ pr: n, headRefName, name: path.basename(f) });
     }
     return { ok: true, out };
   } catch (e) {
@@ -229,7 +244,41 @@ function selftest() {
         const MARK = "\n// ── 제품 호출부 ──\n";
         if (src.split(MARK).length !== 2) return false;
         const body = src.slice(src.indexOf(MARK) + MARK.length);
-        return /crossPrCollisions\(mine\.out, claims\.out\)/.test(body) && /if \(crossBad\) process\.exit\(1\);/.test(body);
+        return /crossPrCollisions\(mine\.out, claims\.out, selfHeadRef\(\)\)/.test(body) && /if \(crossBad\) process\.exit\(1\);/.test(body);
+      })(),
+    ],
+    // ── 게이트² F2: 자기 제외는 «브랜치»가 1차 ──
+    [
+      "★★연번을 그대로 두고 슬러그만 바꿔도 «내 PR» 은 안 문다(브랜치 축)",
+      crossPrCollisions(["0136--2026-09-17--a-renamed.md"], [{ pr: "179", headRefName: "feat/x", name: "0136--2026-09-17--a.md" }], "feat/x")
+        .length === 0,
+    ],
+    [
+      "★그 축이 «남의 PR» 까지 눈멀게 하지는 않는다(오탐 0 의 반대 방향)",
+      crossPrCollisions(["0136--a.md"], [{ pr: "177", headRefName: "other/y", name: "0136--b.md" }], "feat/x").length === 1,
+    ],
+    [
+      "★브랜치를 모르면(detached + env 없음) 2차 축(파일명)만 남는다 — 덜 걸러질 뿐 오답이 아니다",
+      (() => {
+        const claims = [{ pr: "179", headRefName: "feat/x", name: "0136--a.md" }];
+        return crossPrCollisions(["0136--a.md"], claims, "").length === 0 && crossPrCollisions(["0136--a-renamed.md"], claims, "").length === 1;
+      })(),
+    ],
+    // ── 게이트² F1: «건너뜀» 과 «충돌 0» 이 stdout 에서 갈리는가(호출부 슬라이스 판정) ──
+    [
+      "★★성공 줄이 «미대조» 를 «충돌 0» 으로 적지 않는다",
+      (() => {
+        const src = readFileSync(fileURLToPath(import.meta.url), "utf8");
+        const MARK = "\n// ── 제품 호출부 ──\n";
+        if (src.split(MARK).length !== 2) return false;
+        const body = src.slice(src.indexOf(MARK) + MARK.length);
+        // 두 강등 갈래가 각자 crossNote 를 세우고, «충돌 0» 은 claims.ok 인 갈래 안에서만 세워진다.
+        return (
+          /crossNote = " · ★열린 PR 대조 «건너뜀»/.test(body) &&
+          /crossNote = ` · ★내가 더한 \$\{mine\.out\.length\}건은 «미대조»/.test(body) &&
+          /if \(!crossBad\) crossNote = ` · 내가 더한 \$\{mine\.out\.length\}건 ↔ 열린 PR claim 충돌 0`;/.test(body) &&
+          /\$\{crossNote\}`\);/.test(body)
+        );
       })(),
     ],
   ];
@@ -273,25 +322,29 @@ if (dups.length) process.exit(1);
 // ★착지 «전» 축 — 내가 더한 번호를 다른 열린 PR 이 이미 들고 있는가.
 // ★**내가 더한 것이 0 이면 네트워크를 아예 안 친다**(main push 빌드가 그 형상이다 — 비용 0).
 // ★네트워크·git 실패는 «경고»다 — 이 파일의 기존 원칙(작성을 못 하게 만드는 쪽이 중복 하나보다 비싸다) 그대로.
+// ★★**«건너뛰었다»를 «대조했고 0이다»로 적지 마라** — 아래 `crossNote` 가 그 구분을 stdout 까지 나른다.
+//   그 구분이 없으면 이 축은 **자기 실패 모드에서만** 무력해진다(경고는 stderr 에 있는데 성공 줄은 「충돌 0」이라 말한다).
+//   ★같은 관용을 `--next-serial` 이 이미 쓴다(「디스크만 보고 답한다 — 다른 PR 이 같은 번호를 들고 있을 수 있다」).
 const mine = myAddedNames(diskNames());
 let crossBad = 0;
+let crossNote = "";
 if (!mine.ok) {
   console.error(`::warning title=내가 더한 연번을 못 물었다(막지 않는다)::${mine.why} — 열린 PR 대조를 건너뛴다.`);
+  crossNote = " · ★열린 PR 대조 «건너뜀»(내가 더한 연번을 못 물었다 — 위 경고)";
 } else if (mine.out.length) {
   const claims = openPrAddedNames();
   if (!claims.ok) {
     console.error(`::warning title=열린 PR 을 못 물었다(막지 않는다)::${claims.why} — 열린 PR 대조를 건너뛴다.`);
+    crossNote = ` · ★내가 더한 ${mine.out.length}건은 «미대조»(열린 PR 을 못 물었다 — 위 경고)`;
   } else {
-    const hits = crossPrCollisions(mine.out, claims.out);
+    const hits = crossPrCollisions(mine.out, claims.out, selfHeadRef());
     for (const h of hits)
       console.error(
-        `::error title=열린 PR 이 같은 연번을 들고 있다::${h.serial} — 내 \`${h.mine}\` ↔ **#${h.pr}** 의 \`${h.theirs}\`. 착지하면 위 «중복» 축이 red 가 된다(지금은 둘 다 green 이라 무증상이다). ⇒ ★규칙: **PR 번호가 큰 쪽(= 나중에 연 쪽)이 옮긴다**; 내 쪽이 아직 PR 이 아니면 **내가 옮긴다**. 옮길 번호는 \`node scripts/check-docs-report-serial.mjs --next-serial\` 이 준다 — \`git mv\` 로 이름만 바꾸고 내용은 고치지 마라.`,
+        `::error title=열린 PR 이 같은 연번을 들고 있다::${h.serial} — 내 \`${h.mine}\` ↔ **#${h.pr}** 의 \`${h.theirs}\`. 둘 다 착지하면 위 «중복» 축이 red 가 된다. ⇒ ★규칙: **나중에 claim 한 쪽이 옮긴다**(= 대개 지금 이 red 를 «먼저» 보는 쪽이다 — 체크런은 커밋에 묶여 있어 늦게 claim 한 쪽이 먼저 빨개지고, 먼저 claim 한 쪽은 **자기 CI 가 다시 돌기 전까지 모른다**). 내 쪽이 나중이면 **내가** \`node scripts/check-docs-report-serial.mjs --next-serial\` 이 주는 번호로 \`git mv\` 하라(이름만 · 내용은 고치지 마라). 내 쪽이 «먼저» claim 했다면 옮길 쪽은 **#${h.pr}** 이니 그 PR 에 알려라.`,
       );
     crossBad = hits.length;
+    if (!crossBad) crossNote = ` · 내가 더한 ${mine.out.length}건 ↔ 열린 PR claim 충돌 0`;
   }
 }
 if (crossBad) process.exit(1);
-console.log(
-  `check-docs-report-serial: OK — ${REPORT_DIR} ${diskNames().length}건 중 중복 연번 0` +
-    (mine.ok && mine.out.length ? ` · 내가 더한 ${mine.out.length}건 ↔ 열린 PR claim 충돌 0` : ""),
-);
+console.log(`check-docs-report-serial: OK — ${REPORT_DIR} ${diskNames().length}건 중 중복 연번 0${crossNote}`);

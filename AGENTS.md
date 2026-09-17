@@ -436,9 +436,15 @@ than let it be ignored — a periodically-red check that people scroll past is w
   claim query to pushed-but-unopened branches would not have caught either — the commit→PR gap is
   **p50 28s, max 70s** over 32 PRs, while the gap that bites is ask→commit, i.e. the length of your
   round. So the bare mode now also asks: *does another open PR already hold a serial I added?* If
-  yes it exits 1 and names both sides and the move rule — **the higher PR number moves**, and if
-  your side is not a PR yet, yours moves. It costs nothing on a `main` push (nothing added → no
-  API call) and, like `--next-serial`, a network or git failure warns rather than blocks.
+  yes it exits 1 and names both sides and the move rule — **the side that claimed later moves**. That
+  axis is not cosmetic: check runs are pinned to commits, so the later claimer goes red on its *next*
+  run while the earlier one **does not know until its own CI runs again**. Keying the rule to the PR
+  number instead would tell the side that is already red to sit still and the side that cannot see it
+  to act — and the two axes genuinely disagree (2026-09-17: #177 claimed `0134` first, yet #176 is the
+  lower number; gate③ moved #176, i.e. the later claimer). Read a red here as "you are probably the
+  later claimer — move"; if you know you claimed first, tell the PR the message names. It costs
+  nothing on a `main` push (nothing added → no API call) and, like `--next-serial`, a network or git
+  failure **says so in the success line** rather than reporting a comparison it never made.
 
   **`-H` is load-bearing, not cosmetic.** It prefixes the path, so `sort -r` keys on the *sequence number*; `-h` keys on the title text, which is the date, and this repo lands up to six rounds a day. Measured over 54 files: the `-h` form is **52 lines out of place**, the `-H` form is **0**. Sort by the **sequence number, not the date** — the ledger's date-monotonicity is a coincidence, not a guarantee. `REPORT.md` explains the rest; `docs/report-migration-revert.md` reverts it.
 

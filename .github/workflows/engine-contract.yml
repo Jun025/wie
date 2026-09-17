@@ -174,9 +174,17 @@ jobs:
       # whole surface.
       # GH_TOKEN is what makes the "other open PRs" half of the bare mode actually
       # run here (2026-09-17). `gh` reads no other env, and the script treats an
-      # auth/network failure as a warning, so the step keeps working if it is ever
-      # removed — it just stops seeing cross-PR collisions, which is the state this
-      # line exists to end. A main push adds no serials and makes no API call.
+      # auth/network failure as a warning — and SAYS SO in its success line, so a
+      # skipped comparison cannot read as a clean one. A main push adds no serials
+      # and makes no API call.
+      #
+      # It also needs `origin/main` as a remote-tracking ref: the cross-PR half
+      # compares "serials this tree added" = disk MINUS `git ls-tree origin/main`.
+      # `fetch-depth: 0` above supplies it, and the coverage step earlier in this
+      # job fetches it explicitly for its own reason. Neither is this step's to
+      # rely on silently — if both ever go, the ref is missing and the step
+      # degrades to "미대조" (a warning, not a red), which is the honest failure
+      # but also a check that stopped checking. Keep one of the two.
       - name: docs/report serials are unique (docs/worklog/2026-09-07-docs-report-serial-uniqueness.json)
         env:
           GH_TOKEN: ${{ github.token }}
