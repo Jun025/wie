@@ -745,24 +745,54 @@ Waiting for status" indefinitely and the merge button never unlocks. That is why
 `engine-contract.yml` filters *inside* the job instead. Adding a `paths:` filter to it looks like
 an obvious optimization and is the outage.
 
-**`contract` is the job that would be required — but nothing is required today, and this entry used
-to say otherwise.** Measured 2026-09-16 (and again 2026-09-17): `gh api
-repos/Jun025/wie/branches/main/protection` → **404 "Branch not protected"**, `…/rulesets` → **[]**,
-`…/branches/main` → `protected=false`. **GitHub-enforced required checks: zero.** So a red
-`contract` does *not* hold the merge button, and no check here does.
+**`contract` IS a required check — the switch was thrown on 2026-09-17, and this entry has now been
+wrong in both directions.** It said "required" while nothing was; it then said "nothing is required"
+for about two hours after a ruleset made five checks required. The list below is the one copy, and
+`node scripts/check-branch-protection-claim.mjs` diffs it against the live API both ways.
 
-**Read that as "the rule above is unenforced", NOT as "the rule above is optional".** The
-always-run shape is what makes `contract` *eligible* to be required, and it was built for exactly
-that (`docs/report/0003--2026-07-22--wie-main-branch-protection.md`). Paths-filtering it now would
-cost nothing today and deadlock every merge on the day protection is switched on — and the switch
-is a one-shot operator action that can land at any time. Keep the wrapper.
+**Run that guard by hand — CI cannot, and the reason is measured, not assumed.** In Actions the
+`github.token` gets **403 "Resource not accessible by integration"** on the branch-protection and
+rulesets endpoints (run `35181122022`; the guard exited **2 = COULD NOT MEASURE** rather than reading
+a 403 as "nothing enforced"), and `permissions: administration: read` does not help because that key
+is not grantable — GitHub rejects the workflow at parse time (run `35180786771`, startup_failure).
+Wiring it would need a PAT, a different cost class. So it runs where `gh` is the owner: **when you
+edit the block below, and when a merge behaves unlike what this section says.**
 
-**Why it is still off is known, and it is not a decision anyone has to re-make.** That 2026-07-22
-round did the code half and left the settings half as an explicit human-step — *"★human-step (워커
-적용 금지 · repo 설정 변경)"*, ruleset JSON included, PR-before-merge + required checks with review
-approval deliberately excluded (a sole-owner repo deadlocks the moment approvals are required). It
-has never been applied: report `0005` recorded it unapplied on 2026-08-02, and the API still says
-so. The whole of it lives in `~/orchestrator/reports/wie-main-branch-protection.done.md` §C —
+<!-- REQUIRED-CHECKS:BEGIN — scripts/check-branch-protection-claim.mjs diffs this list against
+     classic protection ∪ active branch rulesets, both directions. Edit this block, not the prose
+     around it; other files point here rather than restating (§Constraints). -->
+
+Required on `main` (repo ruleset **"main protection"**, `enforcement: active`, `~DEFAULT_BRANCH`,
+created 2026-09-17T10:17:54+09:00 — rules `deletion`, `non_fast_forward`, `pull_request`,
+`required_status_checks`; `bypass_actors: []`; `required_approving_review_count: 0`):
+
+- `contract`
+- `build-web`
+- `rust_ci (ubuntu-latest, stable)`
+- `rust_ci (macos-latest, stable)`
+- `rust_ci (windows-latest, stable)`
+
+<!-- REQUIRED-CHECKS:END -->
+
+**The three signals disagree, and the disagreement is the trap.** Measured 2026-09-17 12:4x:
+`branches/main/protection` still answers **404 "Branch not protected"** and `branches/main` reports
+`protection.enabled: false` — because **both report classic protection only, and this is a ruleset**.
+`protected: true` and `rulesets` → **1 active** are the signals that see it. An earlier round quoted
+the first two and concluded "GitHub-enforced required checks: zero" while five were enforced; ask all
+three or do not answer the question.
+
+**This is why the always-run wrapper was worth keeping.** Paths-filtering `contract` now deadlocks
+every PR that misses the filter — no longer a hypothetical cost on a future switch-on day. The other
+four required contexts are safe for the same reason: `rust.yml` and `web.yml` carry **no `paths:`
+filter** on their `pull_request` triggers (measured), so all five always report. **Never make
+`doc-liveness` required** — it is paths-scoped by design.
+
+**The rollout that got applied.** The 2026-07-22 round did the code half and left the settings half
+as an explicit human-step — *"★human-step (워커 적용 금지 · repo 설정 변경)"*, ruleset JSON included,
+PR-before-merge + required checks with review approval deliberately excluded (a sole-owner repo
+deadlocks the moment approvals are required, which is why the live ruleset requires **0** approvals).
+Report `0005` recorded it unapplied on 2026-08-02; it sat about eight weeks and was applied
+2026-09-17. The whole of it lives in `~/orchestrator/reports/wie-main-branch-protection.done.md` §C —
 outside this repo, and outside what any round here can execute.
 
 **`paths-filter` reads paths, not content** (measured in otterpebble's `free-tier.md`, re-confirmed

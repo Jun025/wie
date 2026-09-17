@@ -16,18 +16,18 @@ name: Web (wasm build + Pages deploy)
 # (default-branch context, ref/secret handling) and could halt deploys for
 # marginal benefit, so it is intentionally avoided.
 #
-# ★ THAT "ONCE" HAS NOT HAPPENED, and this comment used to read as though it had.
-# Measured 2026-09-17: branches/main/protection → 404 "Branch not protected",
-# rulesets → [], protected=false ⇒ GitHub-enforced required checks ZERO. So the
-# "CI-green by construction" clause above is a DESCRIPTION OF THE INTENDED END
-# STATE, not of today. Today what actually keeps a red commit off main is the
-# 3-gate process (review approval + a gate3 merge round reading the PR's checks)
-# — people and procedure, not the platform. Both residual risks named here are
-# therefore live, not closed: a direct push to main bypassing PRs, and a merge
-# performed while a check is red. Enabling protection is a prepared but
-# never-applied operator human-step — ~/orchestrator/reports/
-# wie-main-branch-protection.done.md §C, "워커 적용 금지 · repo 설정 변경".
-# Nothing in this workflow changes on the day it lands; only this paragraph does.
+# ★ THAT "ONCE" HAPPENED on 2026-09-17: a repo ruleset now requires `build-web`,
+# `contract` and the three stable `rust_ci` legs, with PRs required and 0 approvals.
+# So the "CI-green by construction" clause above describes today. ★Do not restate
+# the required list here — AGENTS.md's REQUIRED-CHECKS block is the one copy and
+# scripts/check-branch-protection-claim.mjs diffs it against the API — BY HAND,
+# not on a schedule. No CI job can run that guard (Actions token 403s on the
+# protection/rulesets endpoints; `administration: read` is not grantable — runs
+# 35181122022 / 35180786771), so nothing machine-watches this paragraph. This
+# paragraph has now been wrong in both directions (it claimed protection before it
+# existed, then claimed its absence for ~2h after it did), which is why it points.
+# Residual risk that remains: a PR merged while a NON-required check is red — the
+# ruleset lists five contexts, not every job here.
 
 on:
   push:
