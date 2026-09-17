@@ -10,7 +10,7 @@
 `check-upstream-guard-wired.mjs` 2026-09-17), `AGENTS.md` 는 세 번째를 **산문**으로 답한다
 (「Measured 2026-09-06 across all 8 workflow files」) — 워크플로가 움직이는 순간 낡는 측정이다.
 
-**사용자 영향**: 없다(제품 0줄). PR 마다 **~2.8초** node 스텝 1개.
+**사용자 영향**: 없다(제품 0줄). PR 마다 node 스텝 1개 — ★**러너 실측 0.6초**(로컬 2.6~2.9초).
 
 ---
 
@@ -148,5 +148,11 @@
 노드 검사기 **8종 전건 rc=0**(`check-doc-liveness-parity`·`check-parked-workflows`·
 `check-linux-system-deps`·`check-worklog-json`·`check-upstream-guard-wired`·`check-parity-lock-wired`·
 `check-engine-runner-fixtures`·`check-worklog-coverage` **10/10=100% · 착지 120 · 최근 기록 114 ⇒ 미도래**).
+★★**배선은 «CI 에서 도는 것을 봤다» — 로컬 신뢰가 아니다**: PR #195 의 `contract` 잡
+(run `35234613184`)에서 그 스텝이 실제로 실행돼 ★**로컬과 «같은 수»**(`37 · 0=4 · 1=15 · 2+=18`)를 찍었고,
+소요는 **0.6초**(14:35:59.44 → 14:36:00.03)였다 — ★로컬 2.6~2.9초의 **1/4** 이다. ⇒ ★**CI 비용은 러너 수를,
+로컬 명령 비용은 로컬 수를 인용하라.** 같은 run 에서 PR 검사 **10건 전건 통과**(`contract`·`build-web`·
+`coverage`·`rust_ci` 6다리 · `dependabot` skipping).
+
 ★`AGENTS.md` 편집은 **fenced `sh` 블록을 늘리지 않았다** ⇒ `check-doc-liveness-parity` 의 의무
 (문서↔`doc-liveness.yml` 복사 상등)가 늘지 않는다 — 실측 `25 documented line(s)` 불변.

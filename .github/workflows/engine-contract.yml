@@ -275,8 +275,10 @@ jobs:
       #
       # ALWAYS-RUN, same reason as the steps above: what it reads is the wiring
       # itself, and the diff that breaks wiring is frequently one that touches no
-      # engine path. Cost: node reading the tracked text files, ~2.8 s, no network,
-      # no node_modules.
+      # engine path. Cost: node reading the tracked text files, no network, no
+      # node_modules — **0.6 s measured on this runner** (PR #195, run 35234613184),
+      # against 2.6-2.9 s on a warm dev Mac. Quote the runner figure for CI cost and
+      # the local one for the local command; they are a factor of four apart.
       #
       # `continue-on-error` because this job is a required check and the round that
       # added the census was scoped to COUNTING — turning a caller count into a red
