@@ -153,6 +153,37 @@ export const IMG_H = 8;
 export const IMG_BAR_Y = 48; // below the key bar (32..40), so no rect ever overlaps another
 export const IMG_RECT_PX = IMG_W * IMG_H;
 
+// ── The text draw (the font path) ────────────────────────────────────────────
+// A SECOND jar — test_data/text_j2me.jar — whose canvas also calls
+// Graphics.drawString. That one call is the only thing in this repo's fixture
+// set that reaches `Platform::font()`, and reaching it is the point:
+// `wie_validate`'s HeadlessPlatform shipped for two months with
+// `fn font(&self) -> &Font { unimplemented!() }`, so every guest that drew a
+// string panicked the VALIDATOR and `classify.sh` filed it as the game's fault.
+// It was the largest failure signature in `game_lab/broken/` and nothing here
+// caught it — measured, `drawString` appeared in 0 of the 6 committed fixtures
+// and 0 of the 3 generators.
+//
+// ★Why a SECOND jar and not one more call inside draw_j2me: measured, not
+//   assumed. scripts/contract-roundtrip.mjs asserts EXACT non-black pixel counts
+//   derived from this file's exports. Adding the call to draw_j2me moved
+//   `distinct_colors` 2 → 3 and `nondominant_pct` 1.5 → 1.7, i.e. it DOES add
+//   ink — even drawn in the background colour. The added amount depends on glyph
+//   rasterisation, which this generator cannot know and therefore cannot export,
+//   so those assertions could not be kept honest. Keeping the text in its own jar
+//   leaves `drawFixtureJar()` byte-identical and every existing count intact.
+// ★What text_j2me asserts is "the guest reached the text path and the host
+//   survived it, and something was painted" — `wie_validate` reports
+//   `content: true`. The proof that the path is live is the mutation: revert
+//   `font()` and this fixture goes FAIL (rc=1, panicking at that very line),
+//   while the other five runner fixtures stay PASS. Re-run that pair if the
+//   renderer changes — it is the only thing that can tell you the guard is armed.
+export const TEXT_STRING = "wie";
+export const TEXT_X = 0;
+export const TEXT_Y = 64; // below every rect (base 0..32, key 32..40, img 48..56)
+export const TEXT_ANCHOR = 20; // Graphics.TOP(16) | Graphics.LEFT(4)
+export const TEXT_COLOR = 0x00ff00; // visible — this jar has no exact-count consumer
+
 // Total non-black pixels once the image bar is up and one key of `midpCode` has
 // been delivered. Exported so the expectation lives in ONE place — the fixture
 // that draws it (scripts/contract-roundtrip.mjs imports this, never restates it).
@@ -196,12 +227,18 @@ const IMAGE = "javax/microedition/lcdui/Image";
 // bar painted so far. Scenario D therefore presses its keys in ASCENDING code
 // order — then union == widest == current, and the assertion is exact whether or
 // not the host clears the framebuffer between frames.
-const drawCanvas = () => {
+const drawCanvas = (withText = false) => {
   const cp = new ConstantPool();
   const superInit = cp.method(CANVAS, "<init>", "()V");
   const color = cp.integer(0x00ff00);
   const setColor = cp.method(GRAPHICS, "setColor", "(I)V");
   const fillRect = cp.method(GRAPHICS, "fillRect", "(IIII)V");
+  // ★Added to the constant pool ONLY for the text jar. Interning them
+  //   unconditionally changes draw_j2me.jar's bytes (measured: md5 moved), and
+  //   that jar has an exact-count contract with the browser round-trip.
+  const textColor = withText ? cp.integer(TEXT_COLOR) : 0;
+  const textStr = withText ? cp.string(TEXT_STRING) : 0;
+  const drawString = withText ? cp.method(GRAPHICS, "drawString", "(Ljava/lang/String;III)V") : 0;
   const keyHit = cp.field("DrawCanvas", "keyHit", "I");
   const imgW = cp.field("DrawCanvas", "imgW", "I");
   const imgH = cp.field("DrawCanvas", "imgH", "I");
@@ -234,6 +271,26 @@ const drawCanvas = () => {
     Buffer.from([0xb6]),
     u2(fillRect),
   ]);
+  // g.setColor(TEXT_COLOR); g.drawString("wie", x, y, anchor) — empty unless this
+  // is the text jar, so draw_j2me's bytes do not move.
+  const textDraw = withText
+    ? Buffer.concat([
+        Buffer.from([0x2b]), // aload_1 (Graphics)
+        Buffer.from([0x13]),
+        u2(textColor), // ldc_w TEXT_COLOR
+        Buffer.from([0xb6]),
+        u2(setColor), // invokevirtual setColor(I)V
+        Buffer.from([0x2b]), // aload_1 (Graphics)
+        Buffer.from([0x13]),
+        u2(textStr), // ldc_w TEXT_STRING
+        Buffer.from([0x10, TEXT_X]), // bipush x
+        Buffer.from([0x10, TEXT_Y]), // bipush y
+        Buffer.from([0x10, TEXT_ANCHOR]), // bipush anchor
+        Buffer.from([0xb6]),
+        u2(drawString), // invokevirtual drawString(Ljava/lang/String;III)V
+      ])
+    : Buffer.alloc(0);
+
   const paint = Buffer.concat([
     Buffer.from([0x2b]), // aload_1 (Graphics)
     Buffer.from([0x13]),
@@ -254,6 +311,7 @@ const drawCanvas = () => {
     Buffer.from([0x99]),
     u2(3 + imgBar.length), // ifeq → skip the image bar (still 0 if startApp has not stored yet)
     imgBar,
+    textDraw,
     Buffer.from([0xb1]), // return
   ]);
 
@@ -488,11 +546,15 @@ export const zip = (entries) => {
 // The jar is BUILT, never committed: `.jar` is git-ignored and
 // scripts/audit-no-leak.sh fails on any tracked *.jar (Constraint 9). The
 // round-trip imports `drawFixtureJar()` and serves the bytes from memory.
-export const drawFixtureJar = () =>
+// `withText` is threaded through so ONE generator emits both jars: the classes
+// are identical except for the drawString in paint(). Default false ⇒
+// drawFixtureJar() (what contract-roundtrip.mjs imports) is byte-for-byte what
+// it was before the text fixture existed.
+export const drawFixtureJar = (withText = false) =>
   zip([
     ["META-INF/MANIFEST.MF", Buffer.from(MANIFEST, "utf8")],
     ["DrawMIDlet.class", drawMidlet()],
-    ["DrawCanvas.class", drawCanvas()],
+    ["DrawCanvas.class", drawCanvas(withText)],
     // The resource startApp() opens by name. Entry name has no leading slash;
     // the jar branch of URLClassLoader::findResource trims the one the guest
     // passes (`name_str.trim_start_matches('/')` at the pinned rev).
@@ -505,9 +567,20 @@ export const drawFixtureJar = () =>
     [IMG_BROKEN_NAME.replace(/^\//, ""), Buffer.from("not an image", "utf8")],
   ]);
 
-// Run directly to drop the jar on disk (handy for `wie_validate <jar>`).
+// The text jar. Same classes, one extra call. Named separately so a reader of
+// the runner block can see WHY there are two — and so `draw_j2me.jar` keeps its
+// exact-count contract with the browser round-trip.
+export const textFixtureJar = () => drawFixtureJar(true);
+
+// Run directly to drop BOTH jars on disk (handy for `wie_validate <jar>`).
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const out = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "test_data", "draw_j2me.jar");
-  writeFileSync(out, drawFixtureJar());
-  console.log(`wrote ${out}`);
+  const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "test_data");
+  for (const [name, bytes] of [
+    ["draw_j2me.jar", drawFixtureJar()],
+    ["text_j2me.jar", textFixtureJar()],
+  ]) {
+    const out = path.join(dir, name);
+    writeFileSync(out, bytes);
+    console.log(`wrote ${out}`);
+  }
 }
