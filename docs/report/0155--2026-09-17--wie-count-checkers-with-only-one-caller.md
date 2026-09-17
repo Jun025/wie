@@ -1,4 +1,4 @@
-## [2026-09-17] 「이 검사기는 어디서 도나」를 기계가 센다 — 38개 중 호출자 0이 8 · 1이 15 (wie-count-checkers-with-only-one-caller)
+## [2026-09-17] 「이 검사기는 어디서 도나」를 기계가 센다 — 38개 중 호출자 0이 7 · 1이 15 (wie-count-checkers-with-only-one-caller)
 
 **무엇을**: 채택 제안 `2026-09-17-upstream-guard-wired#p0` 의 이행. `scripts/checker-census.mjs` 신설 +
 `engine-contract.yml` 의 **상시 스텝**으로 배선(★`continue-on-error: true` — **판정을 만들지 않는다**) +
@@ -18,8 +18,9 @@
 
 | 트리 | N | 호출자 **0 = a** | 호출자 **1 = b** | 2+ |
 |---|---|---|---|---|
-| base `f7a1d022`(이 회차 «전») | **37** | **8** | **14** | **15** |
-| 이 회차 후 | **38** | **8** | **15** | **15** |
+| base `f7a1d022`(이 회차가 처음 잰 자리) | **37** | **8** | **14** | **15** |
+| ★**현 base `origin/main`**(2026-09-18) | **37** | ★**7** | **14** | **16** |
+| ★**head**(이 회차 후) | **38** | ★**7** | **15** | **16** |
 
 ★★**이 표는 2026-09-18 `-fix` 재측값이다 — 초판(`36·4·14·18` / `37·4·15·18`)은 «전부 틀렸다».** 사유는 맨 아래 정정 절.
 
@@ -88,8 +89,8 @@
 
 **★글롭 호출자는 «누가 부르는지»만 규칙이고 «무엇에 닿는지»는 ★측정한다** — `invokes`(어떤 명령이
 workspace 전체 cargo 런을 시작하는가)는 선언이지만 `covers` 는 ★**`cargo metadata --no-deps` 가 보고하는
-integration-test 타깃 집합**이다(이 트리 **7건**). 실측: 그 규칙을 빼면 **호출자 0이 8 → 15**, 즉 규칙 하나가
-**38행 중 7행**을 지탱한다. 도구가 이 수를 **기본 출력에 항상 찍는다**.
+integration-test 타깃 집합**이다(현 트리 **8건**). 실측: 그 규칙을 빼면 **호출자 0이 7 → 15**, 즉 규칙 하나가
+**38행 중 8행**을 지탱한다. 도구가 이 수를 **기본 출력에 항상 찍는다**.
 ★★**초판은 이 자리를 «경로 정규식»으로 추측했고 그것이 이 회차의 반려 사유다** — 맨 아래 정정 절.
 
 **★천장 — 무엇을 «못 보는가»**
@@ -140,18 +141,20 @@ integration-test 타깃 집합**이다(이 트리 **7건**). 실측: 그 규칙�
 |---|---|---|---|---|
 | base `f7a1d022` | **37** | **8** | 14 | 15 |
 | base `2024dfee`(검수 base) | **37** | **8** | 14 | 15 |
-| head | **38** | **8** | 15 | 15 |
+| ★**현 base `origin/main`** | **37** | ★**7** | 14 | 16 |
+| ★**head** | **38** | ★**7** | 15 | 16 |
 
-글롭 규칙 = **4 call site → 7 artifact**(= `cargo metadata` 의 integration-test 타깃 7건과 정확히 같다).
+글롭 규칙 = **4 call site → 8 artifact**(= `cargo metadata` 의 integration-test 타깃 수와 정확히 같다).
+★★**0버킷이 8 → 7 로, 타깃이 7 → 8 로 움직인 것은 «내 변경»이 아니라 «형제 착지»다** — 아래 교차참조 절.
 
-### ★★새로 드러난 4행의 처분 — **전부 「결함」이다**(0버킷이 늘 「질문」인 것이 아니다)
+### ★★새로 드러난 4행의 처분 — **전부 「결함」이고, 그중 1건은 «이미 처분됐다»**
 
-| 파일 | 판정 |
-|---|---|
-| `wie_j2me/tests/test_boot.rs` | ★**결함** — 고아 디렉터리라 컴파일되지 않는다 |
-| `wie_jvm_support/tests/absent_string_buffer_insert.rs` | ★**결함** — 동상 |
-| `wie_jvm_support/tests/absent_timer_schedule.rs` | ★**결함** — 동상 |
-| `wie_midp/tests/create_image_missing_name_message.rs` | ★**결함** — 동상 |
+| 파일 | 판정 | 처분 |
+|---|---|---|
+| ~~`wie_j2me/tests/test_boot.rs`~~ | ★**결함이었다** | ★**해소됨** — 형제 회차 `#193` 이 `wie-j2me/` 로 되살렸다(**green · 2 passed**). 내 census 도 이제 **2+** 로 센다 |
+| `wie_jvm_support/tests/absent_string_buffer_insert.rs` | ★**결함** | 잔존 — 되살리면 ★**red `E0061`**(#193 실측) |
+| `wie_jvm_support/tests/absent_timer_schedule.rs` | ★**결함** | 잔존 — 동상 |
+| `wie_midp/tests/create_image_missing_name_message.rs` | ★**결함** | 잔존 — 동상 |
 
 ★**왜 「질문」이 아니라 「결함」인가** — 0버킷의 다른 4행(`check-branch-protection-claim`·`smoke_gate.sh`·
 `lgt_render_probe.sh`·`make-wipi-keydraw-fixture.sh`)은 «안 돌아도 되는 사유가 적혀 있다». 이 4행은 다르다:
@@ -159,12 +162,16 @@ integration-test 타깃 집합**이다(이 트리 **7건**). 실측: 그 규칙�
 ★**자기지시적 증거 하나**: `wie_midp/…/create_image_missing_name_message.rs:4` 는 `wie_j2me/tests/test_boot.rs` 를
 「이미 TYPE 을 잠근다」는 **근거로 인용**하는데 ★**그 근거 파일이 한 번도 돌지 않는다.**
 
-★★**교차참조 — 열린 제안 `docs/worklog/2026-09-17-revive-orphaned-preload-guard.json#p0`**:
-그 제안은 「base swap 이 남긴 **고아 5파일**」을 지목하고 「그중 «검사» 하나를 살렸다」고 적는다.
-★**그 하나가 `wie-wipi-java/tests/preload_classes_come_from_the_runtime.rs`** — 커밋 `3303eb5f` 가
-언더바 판(`wie_wipi_java/tests/`)에서 하이픈 member 로 옮겼다(직접 확인) ⇒ ★**5 − 1 = 4 이고 그 잔여가 정확히 위 4행이다.**
-그 세 고아 디렉터리에는 **다른 파일이 없다**(`git ls-files` 전수) ⇒ 목록이 닫힌다.
-⇒ ★**그 제안의 축과 이 census 가 이제 «같은 4건»을 가리킨다.** 처분은 그 제안 몫이고 이 회차는 **세는 것까지**다.
+★★**교차참조 — 그 축은 «열린 제안»이 아니라 이미 «착지한 형제 회차»다**:
+`wie-adopt-orphaned-files-after-base-swap-census`(PR **#193** · 커밋 `fc19da20` · 정본 `docs/report/0153`)가
+제안 `2026-09-17-revive-orphaned-preload-guard#p0` 을 이행해 **고아를 전수로 셌다**.
+★★**그 회차가 «내가 고른 것과 같은 술어»에 독립으로 닿았다** — 「제안이 준 「member 아닌 디렉터리」 술어를
+그대로 쓰되 **두 군데를 고쳐야 했다**: 소유자를 `cargo metadata --no-deps` 의 manifest 디렉터리로 잡아야
+루트 패키지 **7건**과 의도적 예외 `wie-app/` **3건**이 «고아 아님»으로 빠진다」 ⇒ member 밖 14 − 7 − 3 = ★**진짜 고아 4**.
+★**이것이 위 「⑵ 갈래 선택」의 독립 확증이다** — 두 회차가 서로 모르고 같은 보정에 닿았다.
+⇒ 그 회차가 **1건을 되살리고**(green) **나머지 3건은 되살리면 red** 임을 실측했다.
+★**그래서 내 census 의 0버킷 잔여가 «4 → 3» 이고, 그 3이 #193 의 「되살리면 red」 3과 정확히 같다.**
+★이 회차는 **세는 것까지**이고 남은 3건의 처분은 그 리니지 몫이다.
 
 ### ★「결함 0건」 철회
 
@@ -182,7 +189,7 @@ integration-test 타깃 집합**이다(이 트리 **7건**). 실측: 그 규칙�
 | `scripts/audit-no-leak.sh` | `engine-contract.yml` run 줄(둘 중 하나) | 버킷 **2+** | ★**버킷 1** |
 | `scripts/verify-browser.mjs` | `package.json` 의 `verify` 별칭 | 버킷 **2+** | ★**버킷 1** |
 
-요약 줄도 함께 움직였다 — ★**2026-09-18 «고친 도구»로 재측**: `0 = 8 · 1 = 15 · 2+ = 15` → ★**`0 = 9 · 1 = 16 · 2+ = 13`**.
+요약 줄도 함께 움직였다 — ★**2026-09-18 «고친 도구»로 재측**: `0 = 7 · 1 = 15 · 2+ = 16` → ★**`0 = 8 · 1 = 16 · 2+ = 14`**.
 ★워크트리는 `git worktree remove --force` 로 제거 · 본 트리 `git status` 클린.
 ★**«red 축»은 없다** — 이 회차는 차단을 만들지 않으므로 억지로 만들지 않았다(티켓 지시 그대로).
 

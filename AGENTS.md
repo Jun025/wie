@@ -328,7 +328,10 @@ question and not a defect (this repo ships two checkers that are correctly uncal
 `continue-on-error` on its step makes that mechanical rather than promised. And it is **not a
 replacement for the paragraph below**: it counts call sites, it does not know which of them
 matter. Baseline at adoption (`f7a1d022`, re-measured 2026-09-18): **37 artifacts — 8 with no
-caller, 14 with exactly one, 15 with two or more**, and it costs **0.6 s** in the `contract` job
+caller, 14 with exactly one, 15 with two or more**. **That is a reading of one commit, not a
+constant** — by `origin/main` of 2026-09-18 the no-caller bucket is already **7**, because a sibling
+round revived one orphaned test (`docs/report/0153`). Re-run it rather than quoting this line. It
+costs **0.6 s** in the `contract` job
 (measured on the runner, PR #195; a warm dev Mac takes 2.6-2.9 s, plus one `cargo metadata`).
 **The first published figures — 36/4/14/18 — were wrong and are recorded here as wrong**, because
 the census asked a path regex which files `cargo test --all` reaches instead of asking cargo: it
