@@ -1,0 +1,41 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-18",
+  "task": "wie-game-lab-add-a-text-drawing-fixture-and-wire-it-to-ci",
+  "title": "글자를 그리는 픽스처를 만들어 러너에 얹었다 — font() 결손을 무는 것이 처음 생겼다",
+  "summary": "wie_validate 의 HeadlessPlatform::font() 가 두 달간 unimplemented!() 였고, 그동안 러너 블록은 내내 green 이었다 — drawString 이 커밋된 픽스처 6개 중 0개·생성기 3종 중 0개에 있었기 때문이다. 유일한 감시자 game_lab/ 는 Constraint 9 로 CI 에 못 들어간다. ⇒ 코퍼스가 아니라 픽스처 하나로 답했다: make-draw-fixture.mjs 를 withText 로 파라미터화해 test_data/text_j2me.jar 를 추가 배출하고 AGENTS.md 러너 블록 + doc-liveness DOC-COPY 에 한 줄씩 얹었다.",
+  "changes": [
+    "scripts/make-draw-fixture.mjs — drawCanvas(withText)/drawFixtureJar(withText) 파라미터화 + textFixtureJar() · CLI 가 두 jar 를 배출",
+    "test_data/text_j2me.zip 신설(draw_j2me.zip 과 같은 관용 = jar 를 담은 zip · *.jar 는 gitignore)",
+    "AGENTS.md — 러너 블록 1줄(--timeout 5) + 왜 둘째 jar 이고 왜 5초인지 1문단",
+    ".github/workflows/doc-liveness.yml — DOC-COPY 에 같은 1줄(parity 25 → 26)"
+  ],
+  "verification": [
+    "★red/green 쌍: font() 를 192cd17a^ 로 되돌린 트리에서 기존 러너 5종은 전건 PASS·rc=0 인데 text_j2me.jar 만 FAIL·rc=1·content=false(wie_validate.rs:359 패닉) · 정상 트리에서는 6종 전건 PASS·rc=0·content=true. ⇒ 새 픽스처가 유일하게 물고, 남의 축은 안 깨진다.",
+    "★개악은 trap 으로 자동 원복하게 만들었고 끝난 뒤 git diff --exit-code 로 wie_validate.rs 가 HEAD 와 바이트 동일임을 확인했다(커밋 0).",
+    "★draw_j2me.jar 바이트 동일: md5 0bc2f48448a4a62336282a9b800f0da6 = HEAD 생성기 산출물과 일치 ⇒ contract-roundtrip 의 정확-픽셀 계약 무접촉. 상수풀 항목을 무조건 넣었을 때는 md5 가 afdc1f22 로 움직였고 그래서 withText 조건부로 바꿨다.",
+    "★수행 시간 예산: paint 는 약 1초에 앉는다(--timeout 1 은 1/3 FAIL · 2·3·5 는 3/3 PASS). 채택 5 = 5.04~5.19s(기본 20 이면 20.8~21.7s). 전부 loadavg 123~125 에서 측정.",
+    "★텍스트가 실제로 래스터화된다: text_j2me 의 distinct_colors 24(글리프 가장자리) ↔ draw_j2me 2.",
+    "check-doc-liveness-parity rc=0(26줄) · check-engine-runner-fixtures rc=0 · npm run audit rc=0(추적 게임 바이트 0)"
+  ],
+  "limits": [
+    "★단언은 「텍스트 경로를 지나 호스트가 살아남았다 + content:true」이지 「글자가 읽힌다」가 아니다 — 글리프 모양을 재면 6다리 매트릭스에서 폰트 래스터화에 CI 를 묶게 된다",
+    "★per-PR 이 아니다: .github/ 의 어느 워크플로도 wie_validate 를 부르지 않는다(실측 0건). 이 픽스처를 도는 것은 로컬 러너(즉시)와 doc-liveness(주간)뿐이고, per-PR 승격은 AGENTS.md 가 2026-09-07 에 비용으로 기각한 그 축이다 ⇒ 탐지 지연 최대 1주",
+    "★가드가 조용히 무장해제되는 경로 하나 — 렌더러가 «같은 색 draw» 를 건너뛰게 바뀌면 통과하면서 아무것도 안 잡는다. 렌더러가 바뀌면 red/green 쌍을 다시 돌려라(그것만이 무장 여부를 말한다)",
+    "★STATE.md 를 만지지 않았다(티켓 계약) — 열린 PR 대부분이 거기서 CONFLICTING 이라 착지가 형제를 무효화한다. 대가는 관례상 §완료 항목이 빠지는 것이고, docs/report/0164 와 이 파일이 기록을 진다",
+    "★수리 캠페인 0건 — 187 서명 중 어느 것도 고치지 않았다(계약 3). 이 회차는 «증명할 자»를 만드는 것까지다"
+  ],
+  "proposals": [
+    {
+      "title": "글자 픽스처를 per-PR 로 올릴지 — «싼 층»과 «넓은 층»을 갈라서 정하라",
+      "plainSummary": "글자 그리기 고장을 지금은 개발자가 직접 돌릴 때와 주 1회만 잡습니다. 매 PR 마다 잡게 할 수 있지만 그만큼 모든 PR 이 느려집니다.",
+      "userBenefit": "이번에 두 달 걸린 종류의 결손이 최대 1주가 아니라 PR 단위로 드러난다.",
+      "why": "이 회차가 만든 text_j2me 는 로컬 러너와 doc-liveness(주간)에서만 돈다 — .github/ 의 어느 워크플로도 wie_validate 를 부르지 않기 때문이다(실측 0건). 층이 둘 있고 비용이 다르다: ⒜wie_validate.rs 안 #[cfg(test)] 로 HeadlessPlatform::font() 를 한 번 부르는 시험 = cargo test --all 이 6다리에서 잡고 새 픽스처·러너 줄 0 · 추가 시간 거의 0. ⒝러너 줄 자체를 per-PR 잡으로 올리기 = node 전용 contract 잡에 cargo 빌드를 새로 넣거나 rust.yml 6다리에 중복 6회. ⒜는 「그 한 줄」만 지키고 ⒝는 텍스트 경로 전체를 지킨다.",
+      "tradeoff": "★AGENTS.md 가 2026-09-07 에 ⒝ 와 «같은 비용»으로 --expect-last-frame 승격을 이미 기각했고 그 결정문은 여전히 유효하다 — 뒤집으려면 그 문단이 요구한 재개 조건(그 창에서 실제 회귀가 착지)을 먼저 들어야 한다. ⒜ 는 싸지만 «한 줄 가드»라 이 회차가 만든 픽스처를 대체하지 못한다(층이지 대체가 아니다). ⇒ 성급히 둘 다 하면 같은 것을 세 곳에서 지키게 된다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}

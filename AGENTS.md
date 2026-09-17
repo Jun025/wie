@@ -128,7 +128,27 @@ done
 for f in test_data/keydraw_ktf.zip test_data/keydraw_lgt.zip; do      # key-driven — --inject is REQUIRED
   cargo run -q -p wie_cli --bin wie_validate -- --inject --expect-last-frame "$f"   # PASS *and* rc=0
 done
+cargo run -q -p wie_cli --bin wie_validate -- --timeout 5 test_data/text_j2me.jar   # the ONLY fixture that draws text
 ```
+
+**`text_j2me.jar` is the one fixture that reaches `Platform::font()`, and it exists because nothing
+did.** `wie_validate`'s `HeadlessPlatform` shipped for two months with `font()` as `unimplemented!()`:
+every guest that drew a string panicked the *validator*, and `classify.sh` recorded that as the
+game's fault — the largest failure signature in `game_lab/broken/`. The whole runner block stayed
+green through all of it, because `drawString` appeared in **0 of the 6 committed fixtures and 0 of
+the 3 generators** (measured). The corpus that did catch it is `game_lab/`, which is git-ignored
+under Constraint 9 and can never be in CI. So the guard had to be a fixture, and this is it.
+
+**Why it is a separate jar rather than one more call inside `draw_j2me`, and why `--timeout 5`** —
+both measured, neither a preference. Adding the `drawString` to `draw_j2me` moved its pixel stats
+(`distinct_colors` 2 → 3, `nondominant_pct` 1.5 → 1.7), and `contract-roundtrip.mjs` asserts *exact*
+non-black counts derived from `make-draw-fixture.mjs`'s exports — an amount of glyph ink the
+generator cannot predict and so cannot export. A second jar keeps `drawFixtureJar()` byte-identical
+(verified by md5) and every existing count intact. The timeout is a budget, not a guess: the paint
+lands in about a second, `--timeout 1` is flaky (1/3 FAIL) and 2, 3 and 5 all passed 3/3 at loadavg
+124, so 5 is ~5× the observed paint time. Left at the default it would cost **~21 s**; at 5 it costs
+**~5.1 s**. Read a FAIL here the way §The four gates says to read any FAIL — re-run before blaming
+your diff.
 
 **A fixture that this runner deliberately does not touch is named here, not omitted** — write
 `NOT-RUN: test_data/<name> — <why>` inside this marked region. That keeps the classification in the
