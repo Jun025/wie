@@ -80,6 +80,24 @@
   «부팅의 증거»로 인용하면 안 된다.** ★노브와 실부하는 **같은 경주**를 민다(기본 0.6 도 부하만으로 PASS↔FAIL).
   ⇒ 「다른 실패」도 **내렸다**(가르는 필드는 `ms` 뿐이고 그것은 deadline 식의 함수라 순환이다).
   ⇒ `AGENTS.md` 의 「fragility is **carrier-specific**」을 철회했다 — ★**실무 조언(⑴~⑷·교차비교 금지)은 그대로 두었고 근거만 바꿨다**(그 조언은 오히려 **강해진다**).
+- 2026-09-17: **헤드리스 검증기가 «글자를 그리는 순간» 스스로 패닉했다 — `broken/` «표본» 최대 서명이 게임 버그가 아니었다**
+  (`wie-game-lab-broken-187-failure-signature-triage`) — 정본 `docs/report/0151--….md`. ★**1파일 +16/−3 · 엔진 로직 0줄**.
+  `wie_validate` 의 `HeadlessPlatform::font()` 가 `unimplemented!()` 라 게스트가 텍스트를 그리면 ★**게임이 아니라 «검증기»가 패닉**하고
+  `classify.sh` 가 그것을 그 게임의 `broken/` 분류로 적었다. 브라우저 호스트가 쓰는 `assets/neodgm.ttf` 를 같은 방식으로 실었다.
+  ★★**A/B 실측**(같은 3게임 × 3런 · 직렬): `panic … : not implemented` **8/9런 → 0/9런** · PASS **1/9 → 8/9**.
+  ★**판정 축을 «서명»으로 잡았다** — 되돌림 대조에서 두 게임이 **수정 없이도 PASS** 했다(부하 의존 verdict 뒤집힘 재현)
+  ⇒ 「고쳤더니 PASS」는 안전한 주장이 아니고 「그 패닉이 사라졌다」는 안전하다.
+  ★**서명 표 = 186 분류 + 리포트 결손 1 = 187**(1위 `NoSuchMethod` 37 · `panic-unwrap` 37 · `java-exception` 21 …) — **2위 이하는 고치지 않고 표로 남겼다**(군집당 티켓 1장).
+  ★**한계**: 기존 `reports/` 1,312건은 `rustjava rev c66f08d` 시절 것이라 **오늘 트리를 설명하지 않는다**(base swap 후 crates.io `^0.1.1`) — 전수 재census 는 안 했다.
+  ★★**[게이트② 반려 승계 2026-09-18 · `-fix`] 이 회차에는 «자동 회귀 가드»가 없다.** `font()` 를 `unimplemented!()` 로 되돌린 트리에서
+  ★**러너 블록 5종이 전건 PASS·rc=0**(keydraw 둘 다 `content true`·`last true`·paints 55)인데 같은 트리에서 game_lab 게임 하나는
+  **2/2런 `not implemented`** 로 죽는다 ⇒ 개악은 살아 있었고 **러너가 못 본 것**이다. 근인 둘: ⒜커밋된 픽스처 **6개 중 문자열을 그리는 것이 0개**
+  (`drawString` 원문·전개 양쪽 **0/6** · 생성기 3종 0건) ⒝`cargo test --all` 의 `TestPlatform` 은 **이미 진짜 폰트를 든다**
+  (`test-utils/src/platform.rs:139`)라 다른 impl 인 `HeadlessPlatform` 의 결손과 **구조적으로 만나지 않는다**. ⇒ 감시자는 `.gitignore` 된 `game_lab/` 뿐이고 CI 에 없다.
+  ★**그리고 「남은 `unimplemented!()`」 목록이 틀렸었다** — 재측: «살아 있는 생산 경로»는 **여섯 자리**이고
+  그중 다섯이 **인자를 가진 `unimplemented!("…")`**(`event_queue.rs:60` · `lcdui/image.rs:211,225` · `graphics/framebuffer.rs:89,105`),
+  나머지 하나는 `todo!()`(`core.rs:465`)다. 종전 목록이 지목한 네 파일은 **`#[cfg(test)]` 스텁 7 + 주석 2** 였다.
+  ★**근인은 검색어**다 — «빈 괄호 리터럴»(`unimplemented!()`/`todo!()`)로 찾으면 정확히 그 넷이 나오고, 진짜 위험한 다섯은 **원리적으로 안 걸린다**.
 - 2026-09-17: **base swap 이 남긴 «고아 파일»을 전수로 셌다 — 4건이고, 3건은 되살리면 red 다(추정 아님)**
   (`wie-adopt-orphaned-files-after-base-swap-census` · 채택 `2026-09-17-revive-orphaned-preload-guard#p0`) —
   정본 `docs/report/0153--….md`. ★**제품 코드 0줄** · `git mv` **1건** · 삭제 0 · 경로 재배치 0 · 새 검사기 0.

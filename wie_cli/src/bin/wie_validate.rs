@@ -87,7 +87,7 @@ use std::{
 use clap::Parser;
 
 use wie_backend::{
-    AudioSink, Database, DatabaseRepository, Emulator, Event, Filesystem, Instant, KeyCode, Options, Platform, RecordId, Screen, canvas::Image,
+    AudioSink, Database, DatabaseRepository, Emulator, Event, Filesystem, Font, Instant, KeyCode, Options, Platform, RecordId, Screen, canvas::Image,
     extract_zip,
 };
 use wie_j2me::J2MEEmulator;
@@ -343,11 +343,20 @@ struct HeadlessPlatform {
     db: MemDbRepository,
     stdout: Arc<Mutex<Vec<u8>>>,
     exited: Arc<AtomicBool>,
+    font: Font,
 }
 
 impl Platform for HeadlessPlatform {
-    fn font(&self) -> &wie_backend::Font {
-        unimplemented!()
+    // Carries a real font, for the same reason `wie_featurephone`'s `WebPlatform` does: any guest
+    // that draws text reaches this, and an `unimplemented!()` here panics the *validator* rather
+    // than the game. That is not a theoretical distinction — it was the single largest failure
+    // signature in `game_lab/broken/`: games that booted and painted dozens of frames were filed
+    // as broken the moment they drew their first string. Measured 2026-09-17 over a stratified
+    // 15-game re-run, `panic … : not implemented` was 6/15, and 4 of those 6 had already painted
+    // 31–135 frames. The bytes are the same `assets/neodgm.ttf` the browser host embeds, so the
+    // two hosts lay text out identically; keep them in sync.
+    fn font(&self) -> &Font {
+        &self.font
     }
 
     fn screen(&self) -> &dyn Screen {
@@ -600,6 +609,10 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
         db: MemDbRepository::default(),
         stdout: stdout.clone(),
         exited: exited.clone(),
+        // `.expect` and not `?`: `run` returns `Outcome`, and these bytes are a compile-time
+        // constant, so a failure here means the committed asset is corrupt — a build-wide fault,
+        // not a per-game one. `wie-backend`'s own `text_layout.rs` unwraps the same bytes.
+        font: Font::try_from_static(include_bytes!("../../../assets/neodgm.ttf")).expect("assets/neodgm.ttf failed to parse"),
     });
 
     // ── load & route (mirrors wie_cli/src/main.rs) ──────────────────────────
