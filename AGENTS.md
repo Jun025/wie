@@ -159,10 +159,40 @@ spread above it is tick overrun under load) — so concurrent work pulls the cou
 Measured 2026-09-13 on `keydraw_lgt`: **48–55 idle**, **38–41** with twelve concurrent runs, **28–36**
 with thirty (n=30). Across all 42 of those runs the verdict never moved once — **42/42 `PASS` ·
 `content true` · rc=0** — and that invariance, not the count, is why the floor is the rule. A lower
-count is therefore not by itself a regression; a `FAIL`, a blank last frame, or a non-zero rc is. The
+count is therefore not by itself a regression; a `FAIL`, a blank last frame, or a non-zero rc is —
+**but that invariance has a ceiling, and past it the verdict flips too. Do not trust your own `FAIL`
+until you have run the four steps below.** The
 same command reported **45 on both carriers** earlier that day, right after `cargo test --all` and
 `cargo +beta clippy`: that sits inside the measured range, which is consistent with load and is not,
 on its own, evidence of anything in the engine.
+
+**Past that ceiling the verdict is not invariant — measured 2026-09-17 on an untouched `origin/main`
+(`75ca3451`), with the documented command and no flags: `keydraw_ktf` **FAILED 4 of 6** runs
+(`paints` 11–33) while `keydraw_lgt` passed **6 of 6** (44–55), at load 121–150.** Nothing was
+changed, so there was nothing to regress. The 42/42 above was measured at **thirty** concurrent
+runs; this is several times that, and it is outside what that sample can speak to.
+
+**The mechanism, so you can reason about it instead of memorising a number.** `paints` counts the
+ticks that fit a *fixed wall-clock* budget, so load cuts ticks-per-second while the deadline stays
+put. Enough load and the **last key's paint never lands before the deadline** — `last_frame_content`
+goes false and `--expect-last-frame` exits 1. Count and verdict are therefore **not independent**:
+the floor rule holds only while enough ticks still fit. You can starve the same budget from the
+other side with no load at all — `--action-secs 0.02` on an idle-ish tree gave **5/5 FAIL** on
+`keydraw_lgt` (`paints` 4–11), and `0.01` passed again, so it is a **race, not a threshold**. That
+is also the cheap way to reproduce this class without slowing the machine down for everyone else.
+
+> **So when your run says `FAIL`, do these four before touching your diff:**
+> ⑴ **Re-run it several times** — a starved run is not reproducible, a real regression is.
+> ⑵ **Compare `paints` to the idle range** (48–55 for `keydraw_lgt`). A `FAIL` at 11 was starved; a
+>   `FAIL` at a *healthy* count is the dangerous one — the 2026-09-05 LGT regression had `paints`
+>   going **up** (55 → 83) with a blank frame.
+> ⑶ **Reproduce on an untouched tree.** This is the only conclusive step.
+> ⑷ **Read the load** (`uptime`) — and per §Host performance, read `idle`/`sys`, not the load figure alone.
+
+**One heuristic that looks right and is not: "the other carrier passed, so it is a real bug."** The
+fragility is **carrier-specific** — in the measurement above LGT was clean 6/6 in the same minutes
+that KTF failed 4/6. One carrier failing alone is the *ordinary* starvation signature here, not
+evidence against it. Use ⑴–⑷, not the cross-carrier comparison.
 
 **`--expect-last-frame` is on the `keydraw_*` line and deliberately NOT on the one above it.** It
 turns `last_frame_content` from a reported field into an exit code, which is the only thing that
