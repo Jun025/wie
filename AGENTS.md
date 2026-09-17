@@ -226,10 +226,13 @@ left both fixtures at 0/5 until 0.05, where both collapse together (ktf 5/5, lgt
 **Boot is not what runs out, and it cannot be.** The deadline is *defined* as
 `boot_secs + 0.3 + 27 × action_secs + 1.0` (`wie_validate.rs`, the `--inject` schedule), so the slack
 left after boot is `27 × action_secs + 1.0` — `boot_secs` cancels. At `--action-secs 0.05` that is
-**+2.35 s no matter what `--boot-secs` says**, which is why a 2×2 over
-`boot {2.5, 0.3} × action {0.05, 0.6}`, order-balanced, never once had `--boot-secs` change a verdict
-(48 runs, 2026-09-18). An earlier revision of this paragraph said the budget "no longer covers boot";
-that was not off by a margin, it was the wrong category.
+**+2.35 s no matter what `--boot-secs` says**. An earlier revision of this paragraph said the budget
+"no longer covers boot"; that was not off by a margin, it was the wrong category. The algebra is what
+settles it, and it had better be — a 2×2 over `boot {2.5, 0.3} × action {0.05, 0.6}`, order-balanced,
+**cannot** settle it either way: 48 runs at loadavg 13–95 had *every* cell pass, and a second pass of
+the same design at loadavg 105–148 had every cell fail part of the time, the documented `0.6`
+**included (2/6)**. A null result and a noise floor; neither attributes anything to boot. Do not cite
+that experiment as evidence about `--boot-secs`. Cite it for what it does show, below.
 
 **And the sweep does not show a *different* failure from the load one — it may well be the same one.**
 The signature matches on every field the validator reports: same `reason` string, same blank last
