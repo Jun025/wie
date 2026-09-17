@@ -276,10 +276,13 @@ jobs:
       # ALWAYS-RUN, same reason as the steps above: what it reads is the wiring
       # itself, and the diff that breaks wiring is frequently one that touches no
       # engine path. Cost: node reading the tracked text files, no network and no
-      # node_modules, PLUS one `cargo metadata --no-deps` subprocess — **1.5-2.0 s
-      # measured on this runner** across two runs of the same code (PR #195: run
-      # 35257783718 at 8a5e9ab5 = 2.04 s, run 35268371028 at 5256998a = 1.49 s;
-      # the census output was identical, so the spread is runner load, not code).
+      # node_modules, PLUS one `cargo metadata --no-deps` subprocess — **0.6-2.0 s
+      # measured on this runner**, and that spread is the point: three runs of
+      # byte-identical code and output gave 2.04 / 1.49 / 0.64 s (PR #195, runs
+      # 35257783718 / 35268371028 / 35270887798). Do not quote one reading here,
+      # and do not derive a ratio from two — the pre-cargo 0.6 s this comment used
+      # to carry sits INSIDE that band, so the runner figure cannot even tell the
+      # two versions of this script apart.
       # **The 0.6 s this comment used to quote was run 35234613184, a revision of
       # the script that did not shell out to cargo at all** — 3.4x, and the stale
       # figure came with a stale cost model ("no network, no node_modules"), which

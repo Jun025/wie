@@ -331,13 +331,14 @@ matter. Baseline at adoption (`f7a1d022`, re-measured 2026-09-18): **37 artifact
 caller, 14 with exactly one, 15 with two or more**. **That is a reading of one commit, not a
 constant** — by `origin/main` of 2026-09-18 the no-caller bucket is already **7**, because a sibling
 round revived one orphaned test (`docs/report/0153`). Re-run it rather than quoting this line. It
-costs **1.5-2.0 s** in the `contract` job — two runs of the same code, PR #195: `35257783718`
-(`8a5e9ab5`) **2.04 s** and `35268371028` (`5256998a`) **1.49 s**. **Quote the range, not one
-reading**: the census output was byte-identical across those two, so the spread is runner load.
-A dev Mac under load takes 0.9-1.3 s, i.e. the runner is no longer reliably the cheaper of the
-two. **The 0.6 s an earlier revision of this paragraph quoted was measured on a version of the
-script that never called cargo** (run `35234613184`). Quote a cost figure with the commit it was
-read at.
+costs **0.6-2.0 s** in the `contract` job. **Three runs of byte-identical code and output** (PR
+#195: `35257783718` **2.04 s**, `35268371028` **1.49 s**, `35270887798` **0.64 s**) — a 3.2x
+spread that is runner load, not code. **So do not quote one reading, and do not derive a ratio
+from two.** An earlier revision of this paragraph said 0.6 s, then 2.04 s, then 1.5-2.0 s; each
+was a true reading and each was wrong as a claim. In particular the 0.6 s predates the
+`cargo metadata` subprocess this script now runs — yet it sits *inside* the post-cargo spread, so
+the runner figure cannot separate the two versions at all. A dev Mac under load takes 0.9-1.3 s,
+which is inside the same band. If you need the cost of the cargo call, measure that call.
 **The first published figures — 36/4/14/18 — were wrong and are recorded here as wrong**, because
 the census asked a path regex which files `cargo test --all` reaches instead of asking cargo: it
 credited four `tests/*.rs` files under directories that carry no `Cargo.toml` (orphans of the base
