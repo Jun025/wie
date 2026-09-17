@@ -183,3 +183,16 @@ jobs:
           git remote add upstream https://github.com/dlunch/wie.git 2>/dev/null || true
           git fetch --depth=1 upstream main:refs/remotes/upstream/main
           node scripts/check-upstream-new-workflows.mjs
+
+      # ★A second rider was BUILT for this job and then NOT wired — the measurement
+      # said no, and the measurement is recorded rather than the intention:
+      # scripts/check-branch-protection-claim.mjs needs the branch-protection /
+      # rulesets endpoints, and in Actions `github.token` gets 403 "Resource not
+      # accessible by integration" on them (measured 2026-09-17, run 35181122022,
+      # step exited 2 = COULD NOT MEASURE — correctly refusing to read 403 as "nothing
+      # enforced"). `permissions: administration: read` does not fix it: that key is
+      # not grantable and GitHub rejects the workflow at parse time (run 35180786771,
+      # startup_failure). Wiring it would mean a PAT — a different cost class (secret
+      # management), which the adopting proposal itself named as the stop line.
+      # ⇒ The guard runs LOCALLY, where `gh` is the owner (AGENTS.md, REQUIRED-CHECKS
+      # block). Do not re-add a step here without a token that can actually read.

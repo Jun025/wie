@@ -1,0 +1,41 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-17",
+  "task": "wie-adopt-orphaned-files-after-base-swap-census",
+  "title": "base swap 이 남긴 고아 파일을 전수로 셌다 — 4건이고, 3건은 되살리면 red 다(실측)",
+  "summary": "채택 제안 2026-09-17-revive-orphaned-preload-guard#p0 의 이행. 제안의 술어(workspace member 가 아닌 디렉터리의 .rs)를 그대로 쓰되 ★두 가지를 고쳐야 했다: ⑴루트 패키지 `wie`(src/*.rs 7건 + tests/font.rs)가 member 목록에 «.» 로 들어 있어 단순 술어가 그것을 고아로 오분류한다 ⑵wie-app 3건은 Cargo.toml 이 명시적으로 exclude 한 «의도된 예외»다. 그 둘을 뺀 ★진짜 고아 = 4건이고 전부 개명 잔재(wie_j2me·wie_jvm_support×2·wie_midp)이며 ★cargo 타깃 0건으로 «있는데 안 돈다»가 기계로 확정됐다. 계약대로 1건만 되살렸다 — wie_j2me/tests/test_boot.rs → wie-j2me/tests/test_boot.rs(git mv · 내용 0줄 수정). ★나머지 3건은 «추정»이 아니라 실제로 프로브해 red 를 쟀다: E0061 2건(invoke_virtual 인자 드리프트) · E0432 1건(java_class_proto 의존 미선언). 삭제 0 · 경로 재배치 0 · 새 검사기 0.",
+  "changes": [
+    "git mv wie_j2me/tests/test_boot.rs → wie-j2me/tests/test_boot.rs — ★파일 내용 0줄 수정(include_bytes! 의 ../../test_data/… 상대 깊이가 같아 그대로 해결된다)",
+    "docs/report/0153--2026-09-17--wie-adopt-orphaned-files-after-base-swap-census.md 신규 · STATE.md 완료 항 1건"
+  ],
+  "verification": [
+    "★술어(회신에 전문): cargo metadata --no-deps 의 패키지 manifest 디렉터리 집합을 «소유자»로 두고 git ls-files 의 .rs 를 귀속. 모집단 추적 .rs 316건 · member 소유 302 · member 밖 14",
+    "★member 밖 14건의 분해 — 루트 패키지 `wie` 소유 7(src/* 6 + tests/font.rs · ★cargo 가 lib/bin/test 타깃으로 «본다» = 고아 아님) · wie-app 3(Cargo.toml 이 exclude 를 주석으로 정당화 = 의도된 예외) · ★진짜 고아 4",
+    "★★「있는데 안 돈다」를 기계로 확정: 고아 4건 각각의 파일명으로 cargo metadata 의 test 타깃을 조회 → ★전건 0건. 부활 후 test_boot 타깃 1건 · 통합테스트 타깃 총 7→8",
+    "★★부활 1건이 «돈다»: cargo test -p wie-j2me --test test_boot → j2me_guest_boots_and_paints ok · j2me_createimage_failure_branches_report_expected_exceptions ok · 2 passed / 0 failed",
+    "★★그리고 «잡는다»(개악 대조 양방향 · 제품 호출부): wie-j2me/src/emulator.rs 의 `fn tick(){ self.system.tick() }` → `Ok(())`(프레임 0장 합성) ⇒ ★2 passed → ★2 FAILED(rc=101 · tests/test_boot.rs:74 · :134 패닉) ↔ 복원 후 다시 2 passed. 복원본은 git show HEAD:… 와 ★바이트 동일. ★이 개악은 그 파일 머리주석이 지목한 그 갈래다 — 「아무것도 안 던졌다」는 여전히 참인데 «프레임이 한 장도 안 나온» 형상(2026-09-04 사고의 모양)",
+    "★나머지 3건의 red 를 «추정하지 않고» 쟀다(각각 제 하이픈 크레이트로 복사해 실행 후 제거 · 커밋 0): absent_string_buffer_insert **E0061**(this method takes 5 arguments but 4 were supplied) · absent_timer_schedule **E0432**(unresolved import `java_class_proto`) · create_image_missing_name_message **E0061** ⇒ ★4건 중 3건이 red = 「전부 되살리면 red 폭풍」이 실측으로 참",
+    "회귀 0(전건 합산 · tail 미사용): cargo fmt --all --check rc=0 · clippy --all -D warnings rc=0 · wasm clippy rc=0 · cargo +beta clippy rc=0 · RUST_MIN_STACK=4194304 cargo test --all rc=0 (^test result: 전수 합산 = ★44타깃 · 388 passed · 0 failed · 0 ignored — 부활 전 43/386 대비 +1 타깃 · +2 테스트) · node 검사기 8종 rc=0 · npm run audit PASSED"
+  ],
+  "limits": [
+    "★이 회차는 «세고 하나 살렸다»까지다(계약 3) — 남은 3건은 각각 «코드 수정»이 필요하고 그것은 별 회차다. 삭제 0 · 경로 재배치 0",
+    "★검사기를 만들지 «않았다» — 제안이 tradeoff 에 적은 「고아의 정의가 애매하면 오탐」이 이 회차에서 실제로 났다(루트 패키지 7건 · wie-app 3건이 단순 술어에 걸린다). 예외를 어디에 선언할지가 먼저이고, 그 결정 없이 검사기를 만들면 오탐이 굳는다",
+    "★술어는 «.rs» 만 본다 — 개명 잔재가 .rs 가 아닌 형태(스크립트·픽스처·설정)로 남았으면 이 census 는 못 본다. 다만 이번 3개 언더바 디렉터리에는 .rs 외 추적 파일이 0건이라 «이번에는» 빈틈이 없었다",
+    "★부활한 test_boot 는 wie-j2me 크레이트에 들어갔으므로 이제 6다리 CI 전부에서 돈다 — 그 자체가 비용이다(측정 0.76s · 무시 가능하지만 0 은 아니다)"
+  ],
+  "adoptedProposals": [
+    "2026-09-17-revive-orphaned-preload-guard#p0"
+  ],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "남은 고아 3건은 각각 «다른 이유»로 깨져 있다 — 한 티켓으로 묶지 마라",
+      "plainSummary": "예전 위치에 남은 검사 3개를 되살리려면 각각 다른 수정이 필요합니다. 한꺼번에 하면 무엇이 무엇을 고쳤는지 알 수 없게 됩니다.",
+      "userBenefit": "「검사가 있는데 안 돈다」가 3건 더 닫힌다 — 그리고 각 건의 red 가 무엇이었는지가 기록으로 남는다.",
+      "why": "이 회차가 셋을 각각 프로브해 원인을 갈랐다: absent_string_buffer_insert 와 create_image_missing_name_message 는 **E0061**(invoke_virtual 이 «해석 클래스» 인자를 얻은 상류 변화 — 방금 착지한 preload 가드가 정확히 같은 한 줄로 고쳐졌다) · absent_timer_schedule 은 **E0432**(java_class_proto 의존이 wie-jvm-support 의 dev-dependencies 에 없다 = 빌드 배선 문제이지 API 드리프트가 아니다). ⇒ 앞 둘은 «같은 처방 1줄»이고 뒤 하나는 «다른 처방»이다.",
+      "tradeoff": "★묶으면 싸 보이지만 이 저장소가 반복해 규탄한 형태가 된다 — 한 PR 에서 세 파일이 동시에 red→green 이면 어느 수정이 어느 red 를 닫았는지 개악 대조가 성립하지 않는다. 반대로 셋으로 쪼개면 회차 3개 값을 치른다. ⇒ ★타협안은 «E0061 둘을 한 회차로, E0432 하나를 별 회차로»이고, 그 근거는 «처방이 같은가»이지 «파일 수»가 아니다. 그리고 셋 다 살리기 전에 먼저 물을 것이 있다: 이 검사들이 지키던 hardening 축이 오늘도 유효한가(코퍼스가 사라진 뒤 trace-specified 라고만 적힌 것이 둘이다).",
+      "effort": "M",
+      "target": "wie"
+    }
+  ]
+}
