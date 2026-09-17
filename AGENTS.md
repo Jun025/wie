@@ -631,6 +631,28 @@ than let it be ignored — a periodically-red check that people scroll past is w
   round loses an entry for real — the silent failure stops being hypothetical and the 1/1 rate makes
   it a matter of time. Absent those, the union edit is cheaper than the migration.
 
+  **★Trigger two has now fired twice, and the blocker is gone — do not re-derive the "7".** PR #140
+  (2026-09-08) backfilled 5 and reported the residual as 0; **that 0 was incomplete**, because its
+  sweep assumed one §완료 line is one round and the 2026-07-22 line bundles **four** (PRs #36·#39·#42·#43).
+  Re-measured 2026-09-18 over **144 entries / 148 report files**: the true residual was **3**
+  (`wie-contract-gate-paths-key-mapping`, plus #140's own entry and the same-day
+  `wie-main-red-worklog-coverage-overdue-73`), and this round backfilled all three ⇒ **0**. The gap
+  also does **not** regenerate: of the **69** entries landed since 2026-09-08, only those 2 same-day
+  in-flight ones lacked a file — **67/67 since 09-09 have one**. So "backfill, then it silently
+  refills" is not a live objection; what remains is only the migration itself, which is a separate
+  round because it too collides with every open PR (landing order is the operator's call).
+
+  **★And do not propose `.gitattributes` `STATE.md merge=union` as the cheap way out — it was tried
+  and measured on 2026-09-18, and it does not fix the reported symptom.** The symptom is
+  `mergeable: CONFLICTING` / `merge-tree` rc=1 on every open PR, and union reaches **neither**: with
+  the attribute committed on *both* branches, `git merge-tree --write-tree` still returns **rc=1**
+  and GitHub's own server-side merge (`POST /repos/:owner/:repo/merges`) returns **HTTP 409 Merge
+  conflict**. It works only in a worktree `git merge`, which buys a cheaper hand-resolution during a
+  base pull, not an unblocked PR. Its costs are real too: two differing edits to the *same* line both
+  survive **silently** (measured — one `- 열린 형제 PR:` line became two contradictory ones, rc=0, no
+  warning), the surviving order is ours-before-theirs rather than the by-authoring-time order this
+  ledger's union rule requires, and the merge that *introduces* the attribute still conflicts once.
+
   **One measured wrinkle worth knowing before you cite `STATE.md` by line.** Top-insert moves every
   line below it, so line-number citations into §완료 rot. `wie_midp/tests/create_image_missing_name_message.rs`
   cites `STATE.md:349`; that line now holds an unrelated entry and the content it meant is at 510.
