@@ -29,6 +29,17 @@
 # ★Execution order differs from doc order only where the doc itself states the
 #   dependency (build:wasm before the contract check — "build it first"); the parity
 #   check compares sets, not order.
+#
+# ── One rider that is NOT a documented command ───────────────────────────────
+# ★The LAST step runs scripts/check-upstream-new-workflows.mjs. It is a guard, not a
+#   doc command, so it lives OUTSIDE every DOC-COPY region and the parity checker
+#   neither sees it nor should. It rides here because it needs this job's two
+#   properties and nothing else has both: a WEEKLY cadence (its signal moves when
+#   UPSTREAM moves, not when we do — per-PR it would redden every open PR at once for
+#   something none of them touched, the check-worklog-coverage outage of 2026-09-07),
+#   and a red with an OWNER (the gate③ rule above applies verbatim, since a red step
+#   reddens this run). It is last so every documented command has already executed
+#   when it fires. See docs/worklog/2026-09-16-adopt-slice-d-base-swap-fix2-p3.json #p0.
 
 name: doc-liveness
 
@@ -163,3 +174,12 @@ jobs:
           #  is committed — the liveness question is "does the documented command run".)
           # NOT-RUN: gh pr checks <n> -R Jun025/wie — <n> is a placeholder; a scheduled run has no PR to ask about
           # NOT-RUN: $EDITOR docs/report/$N--$(date +%F)--<ticket-id>.md — interactive editor + <ticket-id> placeholder; cannot run unattended
+
+      # ★Not a documented command — the rider declared in this file's header. Last on
+      # purpose. `actions/checkout` gives us `origin` only, so the remote is added here;
+      # the checker refuses to run rather than fail-open if the ref is absent.
+      - name: "Upstream ships no untriaged workflow (docs/worklog/2026-09-16-adopt-slice-d-base-swap-fix2-p3.json #p0)"
+        run: |
+          git remote add upstream https://github.com/dlunch/wie.git 2>/dev/null || true
+          git fetch --depth=1 upstream main:refs/remotes/upstream/main
+          node scripts/check-upstream-new-workflows.mjs
