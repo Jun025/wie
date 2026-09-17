@@ -74,6 +74,21 @@
   대신 **4단계 반증 절차**를 넣었다: ⑴여러 번 재실행 ⑵★`paints` ↔ 유휴 범위 대조(★**«건강한 수»에서의 FAIL 이 위험한 쪽** —
   2026-09-05 회귀는 paints 가 **55→83 으로 올라가며** 화면이 비었다) ⑶**무변경 트리 재현**(유일한 결정적 단계) ⑷`idle`·`sys`.
   ★**위험을 숨기지 않는다**: 「부하 탓」이 진짜 회귀의 변명이 될 수 있다 — ⑵⑶이 막지만 **완전히는 못 막는다**.
+- 2026-09-17: **#159 의 개악 대조가 «존재하지만 돌지 않았다» — 살렸다**
+  (`wie-adopt-slice-d-reissue-order-was-honored-p0` · 채택 `2026-09-16-slice-d-reissue-order-was-honored#p0`) —
+  정본 `docs/report/0141--….md`. ★**제품 코드 0줄**(개악 대조 3회 전부 복원).
+  ★**제안 4주장 전건 참**: 파일 **3,136B** 실재 · workspace member 는 `wie-wipi-java`(하이픈)라 언더바 디렉터리는 **member 가 아니다** ·
+  이 base 의 `cargo test --all` 에 그 이름 **0회** · 옮기면 **E0061 1건**.
+  ★★**제안이 말하지 않은 축이 결정적이었다** — `wie-wipi-java/src/lib.rs` 주석이 ★**「Locked by `tests/preload_…rs`」라고 «단언»**하고 있었다.
+  ⇒ 소스가 «잠겼다»고 적은 잠금이 **한 번도 돌지 않았다**(「검사가 있다 ≠ 검사가 돈다」) — 옮기는 순간 그 문장이 **참**이 된다.
+  ★**⒜살리기를 고른 근거 = 제안이 정한 그 축**(「오늘도 회귀 가능한가」): #159 당시 런타임은 **git `rev` 핀**이었는데
+  지금은 ★**crates.io 세버 범위 `rustjava-runtime ^0.1.1`** 이라 **호환 범프가 등록 클래스를 바꿔도 다른 축이 보지 않는다**
+  ⇒ ★**오늘이 «더» 회귀 가능하다.** 되살리는 비용은 실측 **한 줄**(`invoke_virtual` 이 «해석 클래스» 인자를 얻었다 — `java/lang/Throwable`).
+  ★★**개악 대조 — 제품 호출부 2곳이 물었다**: 런타임이 `InterruptedIOException` 을 안 주면 **FAILED**(`NoClassDefFoundError`) ·
+  **판별자** `VirtualMachineError` 를 안 주면 **FAILED** ↔ 복원 **ok**.
+  ★**음성도 적는다**: `java.class.path` 에서 `RT_RUSTJAR` 를 빼는 개악은 ★**안 물었다** ⇒ 무는 자리는 클래스패스 문자열이 아니라
+  `find_rustjar_class` 의 **RT 분기**다(다음 회차가 헛다리를 짚지 않게).
+  ★회귀: 같은 base baseline **42타깃/385 passed** ↔ **43/386** = 정확히 **+1 타깃 · +1 테스트**.
 - 2026-09-17: **8주째 보이지 않던 human-step 을 화면이 읽는 자리로 올렸다 — 검사 목록은 «오늘로» 다시 쟀다**
   (`wie-adopt-slice-d-base-swap-fix3-p1-p0` · 채택 `2026-09-17-adopt-slice-d-base-swap-fix3-p1#p0`) —
   정본 `docs/report/0143--….md`. ★**wie 제품 코드 0줄 · wie diff 는 원장 3파일**.
