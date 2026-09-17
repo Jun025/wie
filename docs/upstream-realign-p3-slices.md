@@ -487,7 +487,13 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 > ⑴원문의 「`contract` 는 required check」 → 그 시점엔 **거짓**이었고 ⑵직전 정정의 「강제 required check **0개**」 →
 > ★**같은 날 10:17 에 ruleset 「main protection」 이 적용돼 «다섯»이 됐다**(`contract`·`build-web`·`rust_ci` stable 3).
 > ⇒ ★**여기에 목록을 다시 적지 않는다** — 정본은 `AGENTS.md` 의 `REQUIRED-CHECKS` 블록이고
-> `scripts/check-branch-protection-claim.mjs` 가 주 1회 API 와 대조한다(이 문단이 또 낡으면 그쪽이 운다).
+> `scripts/check-branch-protection-claim.mjs` 가 **손으로 돌릴 때** API 와 양방향 대조한다.
+> ★★**«그쪽이 운다»고 읽지 마라 — 우는 기계는 «없다».** 그 검사기를 부르는 CI 는 **0개**이고,
+> 그것은 게을러서가 아니라 **실측이 막았다**: Actions 토큰은 protection·rulesets 엔드포인트에서 **403**
+> 이고(run `35181122022` · 검사기는 rc=2 「못 쟀다」로 정확히 멈췄다) `administration: read` 는
+> ★**줄 수 없는 키**라 워크플로가 파싱 단계에서 거부된다(run `35180786771`). PAT 는 별 비용 계급이라 미결이다.
+> ⇒ ★**이 문단이 또 낡으면 그것을 잡는 것은 «사람»이다** — `AGENTS.md` 의 그 블록을 고치는 회차가
+> 그 자리에서 검사기를 한 번 돌리는 것이 유일한 축이다.
 > ★**함정 기록**: ruleset 은 `branches/main/protection`(**404 유지**)·`protection.enabled`(**false 유지**)에 **안 보인다** —
 > 직전 정정이 바로 그 두 신호만 읽고 「0개」로 판정했다. ⇒ `rulesets` 와 `protected` 를 **함께** 물어야 한다.
 > ※그 ENOENT 크래시를 «막은 주체»는 그때 기준으로는 «사람과 절차»가 맞다(당시엔 강제가 없었다).

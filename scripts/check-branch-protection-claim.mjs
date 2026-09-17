@@ -39,8 +39,20 @@
 //      "absence is not a pass" is this repo's oldest lesson, and a protection
 //      endpoint that 403s must never read as "nothing is enforced".
 //
+// ── Who runs it: you, by hand. Nothing in CI does, and that is measured ─────
+// In Actions `github.token` gets 403 "Resource not accessible by integration" on
+// both the protection and the rulesets endpoint (run 35181122022 — this guard
+// exited 2, correctly refusing to read 403 as "nothing enforced"), and
+// `permissions: administration: read` does not fix it: that key is not grantable,
+// so GitHub rejects the workflow at parse time (run 35180786771, startup_failure).
+// Wiring it would need a PAT — a different cost class, not yet decided.
+// ★So there is NO scheduled caller. AGENTS.md §Incident ledger names the two
+// moments to run it: when you edit its REQUIRED-CHECKS block, and when a merge
+// behaves unlike what that section says.
+//
 // Usage: node scripts/check-branch-protection-claim.mjs
-// Needs `gh` with `administration: read` for /rulesets (the weekly job grants it).
+// Needs a `gh` that can read /branches/main/protection and /rulesets — an
+// authenticated local `gh` with admin on the repo, or a PAT carrying that scope.
 
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -138,7 +150,7 @@ if (claimed === null) {
 const measured = enforcedContexts(slug, "main");
 if (!measured.ok) {
   console.log(`::error::COULD NOT MEASURE — ${measured.why}. ${measured.notes.join(" · ")}`);
-  console.log("A token that cannot read protection must never read as 'nothing is enforced' — grant `administration: read`, or run this where `gh` is authenticated.");
+  console.log("A token that cannot read protection must never read as 'nothing is enforced' — run this locally with a `gh` that has admin on the repo, or supply a PAT that can read protection/rulesets. `permissions: administration: read` is NOT an option: that key is not grantable and the workflow is rejected at parse time (run 35180786771).");
   process.exit(2);
 }
 

@@ -11,7 +11,8 @@
     ".github/workflows/engine-contract.yml(머리 + :233 주석) · web.yml · docs/upstream-realign-p3-slices.md — 이미 거짓이 된 「required check 0개」 서술을 실측으로 교정하고 목록은 restate 하지 않고 표시 영역을 가리키게",
     "docs/worklog-coverage-remeasures.json — 착수 시 OVERDUE(114−104=10) 였고 contract 가 required 라 모든 PR 머지가 막히므로 --record 결과 1파일을 동봉(멱등 · 검사기 문안이 ledger file 로 허용)",
     "docs/report/0144--2026-09-17--wie-adopt-slice-d-base-swap-fix3-p1-p1.md 신규 · STATE.md 완료 항 1건",
-    "AGENTS.md — 그 가드를 «언제 손으로 돌리는가»(표시 영역 수정 시 · 머지가 문서와 다르게 굴 때)와 «CI 가 못 하는 이유»(런 번호 2개)를 명시"
+    "AGENTS.md — 그 가드를 «언제 손으로 돌리는가»(표시 영역 수정 시 · 머지가 문서와 다르게 굴 때)와 «CI 가 못 하는 이유»(런 번호 2개)를 명시",
+    "★[-fix 회차 · 게이트② request-changes 승계] 커밋 1 이 뿌린 «주 1회» 서술 4곳 + 전수 조회가 찾은 5번째(이 worklog 자신의 limits[2]·limits[3]·#p0.tradeoff)를 «손으로 돌린다 · CI 는 못 읽는다(run 35181122022 · 35180786771)»로 정정 — scripts/check-branch-protection-claim.mjs 머리 + rc=2 출력, engine-contract.yml, web.yml, docs/upstream-realign-p3-slices.md. 도구 로직·CI 배선 무접촉이고 전/후 실행 결과가 글자 단위 동일(claims 5 · enforces 5 · rc=0)"
   ],
   "verification": [
     "★제안이 지금도 참인가: 참을 넘어 이미 발생. 실측 rulesets 1건 active(「main protection」 created_at 2026-09-17T10:17:54+09:00 · rules deletion/non_fast_forward/pull_request/required_status_checks · bypass_actors []) · required 5개 · branches/main protected=true 인데 protection 엔드포인트는 여전히 404 이고 protection.enabled=false",
@@ -23,8 +24,8 @@
   "limits": [
     "★주기 실행이 «없다» — 이 축은 지금 사람이 돌려야 돈다. 제안이 원한 「아무도 안 보는 상태의 종료」는 절반(도구 + 단일 사본)만 달성됐고, 나머지 절반은 PAT 결정에 달렸다",
     "★검사기가 403 을 만나면 rc=2 로 멈춘다 — 그것이 설계이고 CI 에서 실제로 그렇게 동작했다(«강제 0개»로 읽지 않았다)",
-    "★이 검사기는 «required check 목록»만 본다 — pull_request 규칙·bypass_actors·deletion 등 다른 ruleset 규칙이 바뀌어도 침묵한다. 그 축을 넓히면 주 1회 잡이 설정 감사기로 변질된다",
-    "★rc=2 는 사람이 읽어야 한다 — 주 1회 잡의 red 소유자 규칙(AGENTS.md §Documented-command liveness)이 그대로 적용된다"
+    "★이 검사기는 «required check 목록»만 본다 — pull_request 규칙·bypass_actors·deletion 등 다른 ruleset 규칙이 바뀌어도 침묵한다. 그 축을 넓히면 손으로 도는 이 검사기가 설정 감사기로 변질된다",
+    "★rc=2 는 사람이 읽어야 한다 — 그리고 ★그 «사람»에게 rc 를 가져다줄 잡이 «없다»(주기 호출자 0 · limits[0]). AGENTS.md §Documented-command liveness 의 red 소유자 규칙은 doc-liveness 잡의 것이고 이 검사기에는 붙지 «않는다» — 붙는 축은 「REQUIRED-CHECKS 블록을 고칠 때 그 회차가 한 번 돌린다」뿐이다"
   ],
   "adoptedProposals": [
     "2026-09-17-adopt-slice-d-base-swap-fix3-p1#p1"
@@ -36,7 +37,7 @@
       "plainSummary": "이번에 「어떤 검사가 필수인가」는 기계가 보게 됐지만, 같은 설정의 다른 항목(승인 수, 우회 허용자, 삭제 금지 등)이 바뀌는 것은 여전히 아무도 보지 않습니다.",
       "userBenefit": "「승인 0개」나 「우회 허용자 없음」 같은 전제가 조용히 바뀌어도 3게이트가 그 전제 위에서 계속 돌지 않는다.",
       "why": "이번 회차가 실측한 ruleset 「main protection」에는 required_status_checks 말고도 pull_request(required_approving_review_count: 0 · allowed_merge_methods)·deletion·non_fast_forward 가 있고 bypass_actors 는 []다. 이 저장소의 절차는 그 값들 위에 서 있다 — 예컨대 승인 수가 1이 되면 단일 소유자 repo 는 교착하고(2026-07-22 회차가 그래서 일부러 뺐다), bypass_actors 가 생기면 3게이트를 우회할 경로가 열린다. 그런데 새 검사기는 목록 하나만 본다.",
-      "tradeoff": "축을 넓히면 주 1회 잡이 «설정 감사기»가 되고, 운영자가 의도적으로 바꾼 값마다 red 가 난다(오탐이 아니라 소음). 값이 있으려면 «무엇이 전제인가»를 먼저 문서로 고정해야 하고, 그 목록을 유지하는 비용이 이번 한 줄짜리 축보다 크다. 그래서 이번에는 의도적으로 좁게 뒀다.",
+      "tradeoff": "축을 넓히면 이 검사기가 «설정 감사기»가 되고, 운영자가 의도적으로 바꾼 값마다 red 가 난다(오탐이 아니라 소음). 값이 있으려면 «무엇이 전제인가»를 먼저 문서로 고정해야 하고, 그 목록을 유지하는 비용이 이번 한 줄짜리 축보다 크다. 그래서 이번에는 의도적으로 좁게 뒀다.",
       "effort": "M",
       "target": "wie"
     },

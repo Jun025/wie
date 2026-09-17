@@ -20,7 +20,10 @@ name: Web (wasm build + Pages deploy)
 # `contract` and the three stable `rust_ci` legs, with PRs required and 0 approvals.
 # So the "CI-green by construction" clause above describes today. ★Do not restate
 # the required list here — AGENTS.md's REQUIRED-CHECKS block is the one copy and
-# scripts/check-branch-protection-claim.mjs diffs it against the API weekly. This
+# scripts/check-branch-protection-claim.mjs diffs it against the API — BY HAND,
+# not on a schedule. No CI job can run that guard (Actions token 403s on the
+# protection/rulesets endpoints; `administration: read` is not grantable — runs
+# 35181122022 / 35180786771), so nothing machine-watches this paragraph. This
 # paragraph has now been wrong in both directions (it claimed protection before it
 # existed, then claimed its absence for ~2h after it did), which is why it points.
 # Residual risk that remains: a PR merged while a NON-required check is red — the

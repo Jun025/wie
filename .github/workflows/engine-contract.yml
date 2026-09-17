@@ -23,8 +23,11 @@ name: Engine contract (featurephone consumer)
 # `main` — the switch was thrown 2026-09-17 (repo ruleset "main protection").
 # ★Do not restate the required list here: AGENTS.md's REQUIRED-CHECKS:BEGIN block
 # is the one copy and scripts/check-branch-protection-claim.mjs diffs it against
-# the API weekly. This comment used to carry its own measurement and was wrong in
-# BOTH directions within two months — that is why it now points instead.
+# the API — BY HAND, not on a schedule. Nothing in CI can run that guard (the
+# Actions token 403s on the protection/rulesets endpoints and `administration:
+# read` is not grantable — runs 35181122022 / 35180786771), so a stale claim here
+# is caught by a person, not a job. This comment used to carry its own measurement
+# and was wrong in BOTH directions within two months — that is why it now points.
 #
 # Keep the wrapper: a red here now holds the merge button, so paths-filtering this
 # job would deadlock every PR that misses the filter (Incident ledger).
