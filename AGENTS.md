@@ -189,10 +189,28 @@ is also the cheap way to reproduce this class without slowing the machine down f
 > ⑶ **Reproduce on an untouched tree.** This is the only conclusive step.
 > ⑷ **Read the load** (`uptime`) — and per §Host performance, read `idle`/`sys`, not the load figure alone.
 
-**One heuristic that looks right and is not: "the other carrier passed, so it is a real bug."** The
-fragility is **carrier-specific** — in the measurement above LGT was clean 6/6 in the same minutes
-that KTF failed 4/6. One carrier failing alone is the *ordinary* starvation signature here, not
-evidence against it. Use ⑴–⑷, not the cross-carrier comparison.
+**One heuristic that looks right and is not: "the other carrier passed, so it is a real bug."** One
+carrier failing alone is the *ordinary* starvation signature here, not evidence against it. Use
+⑴–⑷, not the cross-carrier comparison.
+
+**That advice is unchanged, but the reason first given for it was wrong, and the correction is the
+more useful fact.** This paragraph used to say the fragility is *carrier-specific*, on the strength
+of the 4/6-vs-0/6 split above. Re-measured 2026-09-17 with the two fixtures **alternating inside one
+loop**, so both see the same load minute: `keydraw_ktf` **5/18 FAIL**, `keydraw_lgt` **5/18 FAIL** —
+identical, across three load levels (0/6 and 0/6 unloaded, then 2/6 vs 3/6 and 3/6 vs 2/6). A
+carrier-specific effect of the original size would have put ktf near 12/18 and lgt near 0/18, so
+that magnitude is excluded; a small difference is not, at this n. **So a lone-carrier failure is
+sampling noise, not a property of the carrier** — which makes the heuristic *more* wrong, not less.
+The original split is best explained by unpaired sampling: the background load on this machine moves
+far more than any knob here, measured swinging between loadavg 50 and 201 *between* legs of one run.
+
+**Two corollaries worth keeping, because both cost a round to learn.** `ticks` is not a throughput
+measure — it counts executor spins while the guest is blocked, and across five identical
+`keydraw_lgt` runs it read 9,630,471 / 912,303 / 36 / 103,786 / 35. Do not derive "this carrier is
+N× slower" from it. And `--action-secs` is not a stand-in for real load: sweeping it 0.60 → 0.05
+left both fixtures at 0/5 until 0.05, where the budget no longer covers **boot** and both collapse
+together (ktf 5/5, lgt 4/5) — a different failure than the one being chased. Boot is not the axis
+either: at `--boot-secs 0.3` both still pass 3/3 with 55 paints.
 
 **`--expect-last-frame` is on the `keydraw_*` line and deliberately NOT on the one above it.** It
 turns `last_frame_content` from a reported field into an exit code, which is the only thing that
