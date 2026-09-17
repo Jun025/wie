@@ -1,0 +1,52 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-18",
+  "task": "wie-game-lab-census-is-from-a-different-jvm",
+  "title": "game_lab/broken 187 census 를 오늘 트리로 다시 떴다 — 40%가 서명을 바꿨고 최대 군집이 «새것»이다",
+  "summary": "채택 제안 2026-09-17-game-lab-broken-187-signature-triage#p0 의 이행. ⓐ 먼저 표본으로 «갈리는가»를 쟀다 — 시드 고정 8건 중 비교 가능 7건에서 4건이 갈렸고, 그 4건을 3런씩 재실행해 12/12 PASS 안정(부하 flake 가 아니다)이었으며 그중 둘은 7월에 NoSuchMethod 서명이었다 ⇒ 전수 재측을 돌렸다. ★분류 규칙이 어디에도 기록돼 있지 않아 7월 공표표(37/37/15/6/4/87=186)를 재현할 때까지 역산해 복원했고, 그 규칙을 7월 데이터에 적용해 6/6 정확 일치를 확인한 뒤 «같은 규칙»으로 오늘 데이터를 채굴했다. 결과(FAIL 만): NoSuchMethod 37→8 · panic-unwrap 37→15 · unimpl-stub 15→6 · unknown-stdlib-import 6→2 · panic-unreachable 4→0 · UNCLASSIFIED 80→99 · FAIL 179→130 · PASS 7→57. 짝지은 186건 중 75건(40%)이 버킷을 바꿨다. ★오늘의 최대 군집은 «no frame rendered» 32 로 7월에는 1건이었고, 부하 인공물이 아님을 갈랐다(20초 예산 완전 소진 · ms 중앙 21,232 · paints 0 · 재실행 틱 4,875만/2,901만). ★혼입 변인을 숨기지 않는다 — PASS 급증의 상당 부분은 같은 날 착지한 폰트 수정이고 JVM base swap 과 가르지 않았다.",
+  "changes": [
+    "docs/report/0165--… 신규 — 두 표 병기 + ★복원한 분류 규칙을 문서에 박았다(다음 census 가 재역산 없이 같은 축으로 뜨도록)",
+    "STATE.md — 완료 항 1건 추가 + 기존 7월 표 인용 항목에 «7월 기준» 명시(항목 «안» 편집 · 새 삽입점 0)",
+    "수리 0건 · classify.sh 0줄 · 분류 규칙 무접촉(복원만) · 제품 코드 0줄 · 새 검사기·새 잡 0 · 코퍼스 바이트·파일명 repo 유입 0"
+  ],
+  "verification": [
+    "★ⓒ 모집단 — broken/**/*.zip 187(distinct stem 184 · 중복 3) · working 294 · reports/ json 452·log 470·md 66·tsv 3·png 6,389. ★reports mtime 은 2026-06 181 · 2026-07 271 · 08 이후 0 ⇒ 「낡았다」는 참. ★「1,312」은 어떤 조합으로도 재현되지 않는다(json+log 922 · +md+tsv 991 · 전 zip 483) — 이 티켓의 모집단은 187 이고 그중 186 이 7월 리포트를 갖는다(공표표의 합 186 이 그 수다)",
+    "★★ⓓ 분류 규칙 복원·증명 — 규칙이 선행 리포트·worklog·classify.sh 어디에도 없어 역산했다: NoSuchMethod = NoSuchMethodError|Method .*? not found · panic-unwrap = unwrap\\(\\) · unimpl-stub = WieError: Unimplemented · unknown-stdlib-import = Unknown lgt stdlib import · panic-unreachable = unreachable code. ★7월 데이터에 적용 → 37/37/15/6/4/87 = 186 «6/6 정확 일치» ⇒ 「같은 규칙, 다른 입력」이 증명됐다. 첫 시도(not implemented·NoClassDefFoundError 류 상식 술어)는 21/37/7/3/4/114 로 어긋났고, 급소는 Method …@N not found(16) 와 Unknown lgt stdlib import(6) 가 WieError: Fatal error 안에 숨어 있던 것이다",
+    "★ⓐ 표본이 «갈린다»고 답했다 — 시드 고정 8건(비교 가능 7) 중 4건 갈림. ★그 4건 3런씩 = 12/12 PASS 안정 ⇒ 부하 flake 아님(그중 둘은 7월 NoSuchMethod 서명 — 서명 소멸은 부하로 설명되지 않는다)",
+    "★★전수 재측(187/187 · 04:55→05:39) — FAIL 만: NoSuchMethod 37→8 · panic-unwrap 37→15 · unimpl-stub 15→6 · unknown-stdlib-import 6→2 · panic-unreachable 4→0 · UNCLASSIFIED 80→99 · FAIL 179→130 · PASS 7→57. 짝지은 186 중 75(40%) 버킷 변경(NoSuchMethod→UNCLASSIFIED 29 · panic-unwrap→ 27 · unimpl-stub→ 9 · unknown-stdlib→ 4 · panic-unreachable→panic-unwrap 3 · UNCLASSIFIED→panic-unwrap 2 · 불변 111)",
+    "★★오늘 최대 군집 no frame rendered 32(7월 1) 가 부하 인공물이 아님을 갈랐다 — 측정 중 CPU idle 0.0% 였음에도 그 32건은 20초 예산을 전부 태우고(ms 중앙 21,232) paints 최대 0 이며, 3건 재실행에서 틱이 48,751,357 / 29,017,341 이었다. 기아면 ms·ticks 가 작아야 한다. ※동질적이지 않다 — 같은 3건 중 하나는 ticks=20 이라 단일 틱 행에 가깝다",
+    "★ⓑ 비용 실측 — 표본 8건 111초 ⇒ 추정 43분 · 실제 45분. 측정 중 load 98~135 · ★CPU idle 0.0% · vm_pressure 1(normal). 그 45분간 열린 PR 5건이 self-hosted 러너를 기다렸다. 병렬화는 하지 않았다(부하가 verdict 를 뒤집는다는 이 저장소의 기록 때문 — 대신 nice -n 15 로 양보하고 판정 축을 서명으로 유지)",
+    "★7월 표 인용 문서 전수 — 수치를 싣는 파일은 STATE.md «하나»뿐이다(docs/report/0151·worklog 는 표를 수로 싣지 않는다)"
+  ],
+  "limits": [
+    "★★혼입 변인 — PASS 7→57 의 상당 부분은 «다른 JVM»이 아니라 같은 날 착지한 폰트 수정(HeadlessPlatform::font())이다. 선행 회차가 A/B 로 panic … not implemented 8/9→0/9 를 이미 쟀다. ⇒ 오늘 표의 «7월 대비 차»는 «JVM base swap + 폰트 수정»의 합이고 둘을 가르지 않았다(가르려면 두 트리에서 각각 전수 = 비용 2배). ★제안의 문면(「다른 JVM 의 기록」)은 절반만 맞다",
+    "★이 표도 «오늘»에 묶인다 — reports/ 가 6~7월에 멈춰 두 달 만에 낡았듯 base 가 다시 움직이면 이 표도 낡는다. 그래서 복원한 규칙을 리포트에 박아 다음 census 가 재역산 없이 같은 축으로 뜨게 했다",
+    "★UNCLASSIFIED 가 오늘 99 로 늘어 보이지만 그 대부분은 «새 실패»가 아니라 이름 없는 군집이다 — no frame rendered 32 를 빼면 67 이고, 그 안을 다시 가르는 것은 이 회차의 범위가 아니다(수리 캠페인의 입력으로 남겼다)",
+    "★7월 리포트 결손 1건(187 중 186 만 보유)이라 짝 비교의 분모는 186 이다. 그리고 distinct stem 이 184 라 중복 stem 3건은 같은 7월 리포트를 공유한다 — 파일 단위로 셌다(공표표와 같은 셈법)",
+    "★docs/report/0151 을 고치지 않았다 — 날짜 박힌 회차 기록을 사후에 고쳐 쓰지 않는다는 판정이다. 대신 STATE.md 의 그 항목에 「7월 기준」과 포인터를 붙였다. ⇒ 0151 만 읽는 사람은 여전히 7월 표를 본다(그 항목이 스스로 「7월 데이터의 표」라고 적고 있다)"
+  ],
+  "adoptedProposals": [
+    "2026-09-17-game-lab-broken-187-signature-triage#p0"
+  ],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "오늘 최대 군집 «no frame rendered 32» 를 수리 캠페인 1순위로 연다 — 돌지만 안 그린다",
+      "plainSummary": "게임 32개가 실행은 되는데 화면을 한 번도 그리지 않는다. 왜 안 그리는지 갈라서 고치는 작업이다.",
+      "userBenefit": "broken 으로 묶인 187개 중 가장 큰 덩어리다. 풀리면 실제로 플레이 가능한 게임 수가 가장 많이 는다.",
+      "why": "오늘 census 에서 처음 드러난 군집이고(7월 1 → 오늘 32) 부하 인공물이 아님을 갈랐다 — 20초 예산을 전부 태우고 틱을 수천만 돌리면서 paints 가 0 이다. 즉 «부팅 실패»가 아니라 «그리기 경로»의 문제라 원인이 좁다. 나머지 버킷(NoSuchMethod 8 · panic-unwrap 15 · unimpl-stub 6)은 이제 훨씬 작다.",
+      "tradeoff": "★동질적이지 않다 — 표본 3건 중 하나는 ticks=20 으로 «단일 틱 행»에 가까웠다. 먼저 그 안을 ticks 규모로 갈라야 하고, 그 분류 자체가 한 회차다. 그리고 이 코퍼스는 .gitignore 라 CI 가 못 보므로 수리의 회귀 가드는 별도로 만들어야 한다(형제 제안 #p3 축).",
+      "effort": "M",
+      "target": "game_lab 수리 캠페인 · wie_backend/wie_wipi_c 그리기 경로"
+    },
+    {
+      "title": "census 를 «규칙과 함께» 재현 가능하게 만든다 — 복원에 한 회차를 썼다",
+      "plainSummary": "실패 분류 기준을 파일로 저장해 둔다. 지금은 사람이 매번 역산해야 한다.",
+      "userBenefit": "다음에 같은 표를 뜰 때 반나절이 아니라 바로 뜬다. 그리고 두 표를 비교할 때 «규칙이 같았는가»를 의심하지 않아도 된다.",
+      "why": "이 회차가 실제로 그 비용을 치렀다 — 7월 공표표의 분류 규칙이 리포트·worklog·classify.sh 어디에도 없어 역산으로 복원했고, 상식적인 술어로는 21/37/7/3/4/114 가 나와 «다른 규칙»이 될 뻔했다. 급소 두 개(Method …@N not found · Unknown lgt stdlib import)가 WieError: Fatal error 안에 숨어 있어 눈으로는 안 보인다. 규칙이 파일로 있으면 이 회차가 한 역산이 다음 회차에 필요 없다.",
+      "tradeoff": "★거처가 문제다 — game_lab/ 은 .gitignore 라 거기 두면 repo 밖이고, repo 안에 두면 «코퍼스 도구가 repo 에 들어온다». 그리고 규칙을 파일로 굳히면 «규칙을 고치는 것»이 표를 조용히 갈라놓을 수 있어, 바꿀 때 두 입력에 모두 재적용해 보는 규율이 함께 필요하다. 이 회차는 리포트 본문에 박는 것으로 그쳤다(가장 싼 형태).",
+      "effort": "S",
+      "target": "game_lab/ 도구 또는 scripts/"
+    }
+  ]
+}
