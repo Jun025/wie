@@ -60,6 +60,21 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-17: **#159 의 개악 대조가 «존재하지만 돌지 않았다» — 살렸다**
+  (`wie-adopt-slice-d-reissue-order-was-honored-p0` · 채택 `2026-09-16-slice-d-reissue-order-was-honored#p0`) —
+  정본 `docs/report/0141--….md`. ★**제품 코드 0줄**(개악 대조 3회 전부 복원).
+  ★**제안 4주장 전건 참**: 파일 **3,136B** 실재 · workspace member 는 `wie-wipi-java`(하이픈)라 언더바 디렉터리는 **member 가 아니다** ·
+  이 base 의 `cargo test --all` 에 그 이름 **0회** · 옮기면 **E0061 1건**.
+  ★★**제안이 말하지 않은 축이 결정적이었다** — `wie-wipi-java/src/lib.rs` 주석이 ★**「Locked by `tests/preload_…rs`」라고 «단언»**하고 있었다.
+  ⇒ 소스가 «잠겼다»고 적은 잠금이 **한 번도 돌지 않았다**(「검사가 있다 ≠ 검사가 돈다」) — 옮기는 순간 그 문장이 **참**이 된다.
+  ★**⒜살리기를 고른 근거 = 제안이 정한 그 축**(「오늘도 회귀 가능한가」): #159 당시 런타임은 **git `rev` 핀**이었는데
+  지금은 ★**crates.io 세버 범위 `rustjava-runtime ^0.1.1`** 이라 **호환 범프가 등록 클래스를 바꿔도 다른 축이 보지 않는다**
+  ⇒ ★**오늘이 «더» 회귀 가능하다.** 되살리는 비용은 실측 **한 줄**(`invoke_virtual` 이 «해석 클래스» 인자를 얻었다 — `java/lang/Throwable`).
+  ★★**개악 대조 — 제품 호출부 2곳이 물었다**: 런타임이 `InterruptedIOException` 을 안 주면 **FAILED**(`NoClassDefFoundError`) ·
+  **판별자** `VirtualMachineError` 를 안 주면 **FAILED** ↔ 복원 **ok**.
+  ★**음성도 적는다**: `java.class.path` 에서 `RT_RUSTJAR` 를 빼는 개악은 ★**안 물었다** ⇒ 무는 자리는 클래스패스 문자열이 아니라
+  `find_rustjar_class` 의 **RT 분기**다(다음 회차가 헛다리를 짚지 않게).
+  ★회귀: 같은 base baseline **42타깃/385 passed** ↔ **43/386** = 정확히 **+1 타깃 · +1 테스트**.
 - 2026-09-17: **upstream 이 «새» 워크플로를 들고 오면 이제 기계가 본다 — 손으로 관리하는 목록 «없이»**
   (`wie-adopt-slice-d-base-swap-fix2-p3-p0` · 채택 `2026-09-16-adopt-slice-d-base-swap-fix2-p3#p0`) —
   정본 `docs/report/0135--….md`. ★**제품 동작 0줄 · Rust 0줄**.
