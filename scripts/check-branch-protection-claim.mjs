@@ -97,8 +97,21 @@ const gh = (args) => execFileSync("gh", args, { encoding: "utf8", stdio: ["ignor
 //
 // ★So this axis does not enumerate fields. Enumerating is how the next field
 // added by GitHub slips through, and this repo has named that failure often
-// enough. It fingerprints the normalized OBJECT: any field, present or future,
-// moves the fingerprint.
+// enough. It fingerprints the normalized OBJECT, so a field added at the TOP
+// level of a rule's `parameters` moves the fingerprint without anyone listing it.
+//
+// ★That is NOT the same as "any field, present or future" — an earlier revision
+// of this comment said that, and it was false. Measured 2026-09-18 (gate② C1):
+// adding `integration_id: 15368` to a `required_status_checks[]` entry left rc=0.
+// The reason is one layer down, in `sortRules`: array elements are projected
+// through `x.context ?? x`, so for an array OF OBJECTS every key except `context`
+// is dropped. Live exposure today is zero (each entry is `{context}` and nothing
+// else), which is why this is recorded rather than patched here — the successor
+// ticket that noticed it is scoped to output and is forbidden from touching the
+// fingerprint predicate. ★The one-line fix is known and was verified by the
+// reviewer: sort via `JSON.stringify` round-trip, the way `bypass_actors` already
+// does. Doing it also means RESEEDING the baseline in the same PR, because the
+// stored `required_status_checks` goes from strings to `{context: …}` objects.
 //
 // ★The fingerprint is stored as READABLE JSON, not a hash. A hash answers "it
 // changed" and stops there; the expected file is its own diff, so the failure can
@@ -106,7 +119,10 @@ const gh = (args) => execFileSync("gh", args, { encoding: "utf8", stdio: ["ignor
 //
 // ★WHAT NORMALIZATION DISCARDS, stated because a guard whose blind spot is
 // undocumented gets trusted past its limits: `id`, `node_id`, `created_at`,
-// `updated_at`, `source`, `source_type`, `current_user_can_bypass`. Consequences:
+// `updated_at`, `source`, `source_type`, `current_user_can_bypass`, `_links`, and
+// ★every key except `context` on an object inside a rule-parameter ARRAY (today
+// that is `required_status_checks[]`, whose `integration_id` is therefore not
+// compared — see the paragraph above). Consequences:
 // deleting the ruleset and recreating it with identical content is INVISIBLE here
 // (new id, same content), and "can *I* bypass right now" is not compared — it is a
 // property of the caller, not of the repo, so comparing it would make the answer
@@ -190,6 +206,25 @@ function enforcedContexts(slug, branch) {
   return { ok: true, out: [...out].sort(), notes, shapes };
 }
 
+// ── `--print-current`: the material the drift message tells you to paste ─────
+// The drift path used to say "copy the LIVE shape" while printing only the lines
+// that differ, so the person told to update the baseline had nothing to copy. The
+// full shape WAS printed, but only on the rc=2 (no baseline) path — reachable only
+// by deleting the file first.
+//
+// ★Chosen over "always print the whole shape on drift" because the drift message
+// is the thing a human actually reads, and burying a 55-line object in it is how
+// people stop reading it; and over "write an artifact file" because that ties the
+// material to CI artifact lifetime, while this tool has no CI caller at all (it is
+// run by hand). ★Its cost, stated: one more `gh api` round trip, and the live
+// shape may have MOVED between the run that failed and this one — so re-run the
+// plain check after reseeding. That re-run is the verification anyway.
+//
+// In this mode stdout carries ONLY the JSON, so `> .github/branch-protection-
+// expected.json` is safe; the informational lines go to stderr.
+const PRINT_CURRENT = process.argv.includes("--print-current");
+const say = (...a) => (PRINT_CURRENT ? console.error(...a) : console.log(...a));
+
 const slug = (() => {
   try {
     return gh(["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]).trim();
@@ -198,21 +233,30 @@ const slug = (() => {
   }
 })();
 if (!slug) {
-  console.log("::error::cannot resolve the repo slug (`gh repo view`) — COULD NOT MEASURE, and that is not a pass.");
+  say("::error::cannot resolve the repo slug (`gh repo view`) — COULD NOT MEASURE, and that is not a pass.");
   process.exit(2);
 }
 
-const claimed = claimedContexts(readFileSync(path.join(root, "AGENTS.md"), "utf8"));
+// In --print-current mode the AGENTS.md claim is irrelevant: you are asking for the
+// live shape, and a missing marker block must not stand between you and it.
+const claimed = PRINT_CURRENT ? [] : claimedContexts(readFileSync(path.join(root, "AGENTS.md"), "utf8"));
 if (claimed === null) {
-  console.log(`::error file=AGENTS.md::${BEGIN}/${END} markers missing or reversed — the claim cannot be read, so nothing can be compared.`);
+  say(`::error file=AGENTS.md::${BEGIN}/${END} markers missing or reversed — the claim cannot be read, so nothing can be compared.`);
   process.exit(2);
 }
 
 const measured = enforcedContexts(slug, "main");
 if (!measured.ok) {
-  console.log(`::error::COULD NOT MEASURE — ${measured.why}. ${measured.notes.join(" · ")}`);
-  console.log("A token that cannot read protection must never read as 'nothing is enforced' — run this locally with a `gh` that has admin on the repo, or supply a PAT that can read protection/rulesets. `permissions: administration: read` is NOT an option: that key is not grantable and the workflow is rejected at parse time (run 35180786771).");
+  say(`::error::COULD NOT MEASURE — ${measured.why}. ${measured.notes.join(" · ")}`);
+  say("A token that cannot read protection must never read as 'nothing is enforced' — run this locally with a `gh` that has admin on the repo, or supply a PAT that can read protection/rulesets. `permissions: administration: read` is NOT an option: that key is not grantable and the workflow is rejected at parse time (run 35180786771).");
   process.exit(2);
+}
+
+if (PRINT_CURRENT) {
+  console.error(`live ruleset shape: ${measured.shapes.length} active ruleset(s) on the default branch · ${measured.notes.join(" · ")}`);
+  console.error(`  ⇒ review this before saving it — you are declaring this state correct.`);
+  process.stdout.write(`${JSON.stringify({ rulesets: measured.shapes }, null, 2)}\n`);
+  process.exit(0);
 }
 
 const d = drift(claimed, measured.out);
@@ -225,9 +269,13 @@ for (const c of d.enforcedNotClaimed)
 for (const c of d.claimedNotEnforced)
   console.log(`::error file=AGENTS.md::\`${c}\` is listed in the ${BEGIN} block but GitHub does not require it — the docs overstate the gate.`);
 
+// ★Axis ⑴ records its verdict instead of exiting, so a round whose required-check
+//   list drifted still gets told about a ruleset-shape drift in the same run. The
+//   predicate is unchanged; only the moment of exit moved (gate② C4).
+let failed = false;
 if (d.enforcedNotClaimed.length || d.claimedNotEnforced.length) {
   console.log("Update the marked region in AGENTS.md to the measured list (that block is the one copy; prose elsewhere points at it).");
-  process.exit(1);
+  failed = true;
 }
 // ── Axis ⑵ — whole-ruleset fingerprint (see the block above normalizeRuleset) ──
 const expPath = path.join(root, RULESET_EXPECTED);
@@ -239,7 +287,8 @@ try {
   console.log(`::error file=${RULESET_EXPECTED}::cannot read the expected ruleset shape — ${String(e.message).split("\n")[0]}. COULD NOT MEASURE, and that is not a pass.`);
   // Seeding it by hand would re-type the normalization and drift from it, so the
   // live shape is printed here instead: review it, then save it as that file.
-  console.log(`  ⇒ Seed it from the live shape below (review before saving — this is the state you are declaring correct):`);
+  console.log(`  ⇒ Seed it: node ${path.relative(process.cwd(), fileURLToPath(import.meta.url))} --print-current > ${RULESET_EXPECTED}`);
+  console.log(`  ⇒ …or copy the live shape below (review before saving — this is the state you are declaring correct):`);
   console.log(JSON.stringify({ rulesets: measured.shapes }, null, 2));
   process.exit(2);
 }
@@ -250,14 +299,27 @@ if (liveShape !== wantShape) {
   const a = wantShape.split("\n");
   const b = liveShape.split("\n");
   console.log(`::error file=${RULESET_EXPECTED}::branch-protection ruleset DRIFTED — a field outside the required-check list changed on GitHub.`);
+  // ★The pairing below is POSITIONAL, so an inserted or removed field shifts every
+  //   line after it and each pair then reads as a substitution rather than as the
+  //   insert/delete it is (gate② C3 — a removed `non_fast_forward` rule reported as
+  //   `non_fast_forward ↔ pull_request`). Say so when the line counts differ, which
+  //   is exactly when that misreading is possible; the reseed command below is the
+  //   escape hatch that does not depend on reading this diff correctly at all.
+  if (a.length !== b.length)
+    console.log(
+      `    ★fields were ADDED or REMOVED (baseline ${a.length} lines ↔ live ${b.length}) — the pairing below is positional, so everything after the first shift reads as a substitution. Diff the reseeded file instead of trusting these pairs.`,
+    );
   for (let i = 0; i < Math.max(a.length, b.length); i++) {
     if (a[i] !== b[i]) console.log(`    line ${i + 1}:  expected ${a[i] ?? "(absent)"}   ↔   live ${b[i] ?? "(absent)"}`);
   }
-  console.log(`  ⇒ If the operator meant it: copy the LIVE shape into ${RULESET_EXPECTED} in the same PR and say why in the round's report.`);
+  console.log(`  ⇒ If the operator meant it, reseed in the same PR and say why in the round's report:`);
+  console.log(`       node ${path.relative(process.cwd(), fileURLToPath(import.meta.url))} --print-current > ${RULESET_EXPECTED}`);
+  console.log(`       git diff -- ${RULESET_EXPECTED}   # ← read THIS as the change, then re-run this check (it must print OK)`);
   console.log("  ⇒ If nobody meant it: the repo's merge gate rests on these values (bypass_actors, approval count, allowed merge methods) — escalate before touching anything.");
   console.log("  ⇒ This tool never writes the ruleset; it only reads. Changing GitHub is an operator step.");
-  process.exit(1);
+  failed = true;
 }
 
+if (failed) process.exit(1);
 console.log("OK — the documented required-check list matches what GitHub enforces, and the ruleset shape matches its baseline.");
 process.exit(0);

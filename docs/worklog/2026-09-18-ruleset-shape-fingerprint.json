@@ -21,7 +21,10 @@
     "회귀 0(전건 합산): cargo fmt --all --check rc=0 · clippy --all -D warnings rc=0 · wasm clippy rc=0 · cargo +beta clippy rc=0 · RUST_MIN_STACK=4194304 cargo test --all rc=0 (44타깃 · 388 passed · 0 failed) · npm run audit PASSED · node 검사기 13개 중 11개 rc=0(rc=1 2개는 ★선재 — 회신 참조)"
   ],
   "limits": [
-    "★Acceptance ⑶ 정규화가 버리는 것 — id · node_id · created_at · updated_at · source · source_type · current_user_can_bypass. ⇒ ★ruleset 을 지우고 «같은 내용»으로 다시 만들면 이 가드는 보지 못한다(id 만 바뀐다). current_user_can_bypass 는 «누가 돌렸는가»에 따라 달라져 비교하면 답이 호출자에 의존하므로 버렸다 — bypass_actors «목록»은 비교한다",
+    "★Acceptance ⑶ 정규화가 버리는 것 — id · node_id · created_at · updated_at · source · source_type · current_user_can_bypass · _links. ⇒ ★ruleset 을 지우고 «같은 내용»으로 다시 만들면 이 가드는 보지 못한다(id 만 바뀐다). current_user_can_bypass 는 «누가 돌렸는가»에 따라 달라져 비교하면 답이 호출자에 의존하므로 버렸다 — bypass_actors «목록»은 비교한다",
+    "★★[승계 -fix 정정 · 게이트② C1] 이 목록은 «불완전했고», 함께 적혀 있던 「어떤 필드든, 지금 것이든 앞으로 생길 것이든 지문을 움직인다」는 ★거짓이었다. sortRules 가 배열 원소를 `x.context ?? x` 로 접으므로 ★«객체 배열»에서는 context 외 모든 키가 조용히 버려진다 — required_status_checks[] 에 integration_id 를 넣어도 rc=0(검수자 실측). ★오늘 실노출 0(항목이 {context} 뿐)이고, 지문 술어 변경은 승계 티켓의 명시적 범위 밖이라 ★«선언»으로 닫고 코드 처방은 제안으로 올렸다(#p0)",
+    "★[-fix] --print-current 의 대가 — 실패한 run 과 재시딩 run 사이에 라이브 형상이 «움직일 수 있다». 그래서 실패 메시지가 재시딩 «다음»에 평문 재실행을 요구한다(그 재실행이 곧 검증이다). 전문을 항상 찍는 안은 기각했다: 사람이 실제로 읽는 것이 실패 메시지인데 55줄 객체를 거기 묻으면 안 읽게 된다",
+    "★[-fix] C3 은 «완전히» 고치지 않았다 — 줄 짝짓기는 여전히 «위치 기반»이고, 바뀐 것은 «줄 수가 다르면 그 사실을 말한다»는 것뿐이다. 진짜 diff(LCS)를 넣는 대신 재시딩 후 git diff 를 읽게 안내했다 — 그쪽이 사람이 이미 쓰는 도구다",
     "★배열을 정렬한다 — required-check 순서·allowed_merge_methods 순서 같은 «무해한 재배열»을 드리프트로 읽지 않으려는 것이고, 그 대가로 «순서 자체가 의미를 갖는 필드»가 생기면 못 본다(오늘 그런 필드는 없다)",
     "★classic branch protection 은 지문 축에 «없다» — 오늘 404(부재)라 비교할 객체가 없다. 켜지는 날 이 가드는 required-check 축으로만 그것을 보고, 형상 축은 ruleset 만 본다",
     "★여전히 «사람이 손으로» 돌려야 한다 — CI 토큰이 못 읽는다(위 0/27). 주기 호출자는 PAT 결정(#p1) 전까지 0이고, 그것은 이 티켓의 범위 밖이다(계약 3⒜)",
@@ -31,5 +34,15 @@
     "2026-09-17-branch-protection-claim-guard#p0"
   ],
   "declinedProposals": [],
-  "proposals": []
+  "proposals": [
+    {
+      "title": "지문 정규화가 «객체 배열»의 context 외 키를 버리는 것을 코드로 닫는다 (1줄 + 베이스라인 재시딩)",
+      "plainSummary": "브랜치 보호 설정을 감시하는 도구가 목록 항목 안의 일부 값을 비교하지 않는다. 그 비교를 켜는 한 줄짜리 수정이다.",
+      "userBenefit": "「어느 앱의 검사가 이 필수 체크를 만족시키는가」 같은 값이 몰래 바뀌어도 잡힌다. 지금은 그 자리에서 바뀌어도 도구가 OK 를 찍는다.",
+      "why": "게이트② 가 실측으로 잡았다 — required_status_checks[] 항목에 integration_id 를 넣어도 rc=0 이다(sortRules 가 `x.context ?? x` 로 접는다). 처방은 이미 검증돼 있다: bypass_actors 가 쓰는 JSON.stringify 왕복 정렬을 같은 자리에 쓰면 되고, 검수자가 직접 패치해 11축을 재실행해 «닫힌다 + 음성 대조군 전건 유지»를 확인했다. 승계 회차는 지문 술어 무접촉이 계약이라 선언으로만 닫았으므로 코드 축이 남아 있다.",
+      "tradeoff": "★같은 PR 에서 베이스라인을 반드시 재시딩해야 한다 — 저장되는 required_status_checks 가 문자열 배열에서 {context: …} 객체 배열로 바뀌기 때문이다(안 하면 그 회차가 바로 드리프트로 운다). 그리고 오늘 실노출은 0 이라 이 수정이 «지금» 막는 사고는 없다 — 값은 「선언과 실제를 다시 일치시키는 것」이다.",
+      "effort": "S",
+      "target": "scripts/check-branch-protection-claim.mjs · .github/branch-protection-expected.json"
+    }
+  ]
 }

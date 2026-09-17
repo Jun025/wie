@@ -830,9 +830,14 @@ and prints the differing line. Measured 2026-09-18: **27 compared leaf fields, 2
 watched before**. It is deliberately *not* an enumerated field list — a list is how the next field
 GitHub adds slips through (verified: injecting a `required_signatures` rule that does not exist today
 still fires). **If the operator changed the ruleset on purpose, update that JSON in the same PR and
-say why**; the guard never writes GitHub, it only reads. What the normalization drops is stated at the
+say why** — reseed it rather than hand-editing, with
+`node scripts/check-branch-protection-claim.mjs --print-current > .github/branch-protection-expected.json`,
+then `git diff` that file and re-run the plain check until it prints OK. The guard never writes GitHub,
+it only reads. What the normalization drops is stated at the
 top of the script — chiefly `id`/timestamps, so **deleting and recreating the ruleset with identical
-content is invisible here**.
+content is invisible here**; **it also drops every key but `context` inside a rule-parameter array**, so
+a `required_status_checks[]` entry gaining an `integration_id` is not compared (exposure today: zero,
+each entry carries `context` alone).
 
 <!-- REQUIRED-CHECKS:BEGIN — scripts/check-branch-protection-claim.mjs diffs this list against
      classic protection ∪ active branch rulesets, both directions. Edit this block, not the prose
