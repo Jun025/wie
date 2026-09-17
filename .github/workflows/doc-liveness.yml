@@ -59,11 +59,11 @@ on:
 
 permissions:
   contents: read
-  # ★Only the branch-protection claim guard needs this, and it needs it to be HONEST:
-  # `GET /rulesets` is what sees a ruleset (the classic protection endpoint does not),
-  # and without the scope the guard exits 2 "COULD NOT MEASURE" rather than reporting
-  # "nothing is enforced". Read-only; nothing here writes settings.
-  administration: read
+  # ★NOT `administration: read` — measured 2026-09-17: GitHub rejects that key at
+  # workflow parse time (startup_failure, "workflow file issue", run 35180786771).
+  # `administration` is not a grantable GITHUB_TOKEN scope, so the branch-protection
+  # guard below runs on `contents: read` alone and reports rc=2 "COULD NOT MEASURE"
+  # if that is not enough — it never reads an unreadable endpoint as "nothing enforced".
 
 jobs:
   doc-liveness:
