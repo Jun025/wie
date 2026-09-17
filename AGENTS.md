@@ -331,11 +331,13 @@ matter. Baseline at adoption (`f7a1d022`, re-measured 2026-09-18): **37 artifact
 caller, 14 with exactly one, 15 with two or more**. **That is a reading of one commit, not a
 constant** — by `origin/main` of 2026-09-18 the no-caller bucket is already **7**, because a sibling
 round revived one orphaned test (`docs/report/0153`). Re-run it rather than quoting this line. It
-costs **2.04 s** in the `contract` job (measured on the runner at `8a5e9ab5`, PR #195 run
-`35257783718`; a dev Mac under load takes 0.9-1.3 s). **The 0.6 s an earlier revision of this
-paragraph quoted was measured on a version of the script that never called cargo** (run
-`35234613184`) — 3.4x, and the runner is no longer the cheaper of the two. Quote a cost figure
-with the commit it was read at.
+costs **1.5-2.0 s** in the `contract` job — two runs of the same code, PR #195: `35257783718`
+(`8a5e9ab5`) **2.04 s** and `35268371028` (`5256998a`) **1.49 s**. **Quote the range, not one
+reading**: the census output was byte-identical across those two, so the spread is runner load.
+A dev Mac under load takes 0.9-1.3 s, i.e. the runner is no longer reliably the cheaper of the
+two. **The 0.6 s an earlier revision of this paragraph quoted was measured on a version of the
+script that never called cargo** (run `35234613184`). Quote a cost figure with the commit it was
+read at.
 **The first published figures — 36/4/14/18 — were wrong and are recorded here as wrong**, because
 the census asked a path regex which files `cargo test --all` reaches instead of asking cargo: it
 credited four `tests/*.rs` files under directories that carry no `Cargo.toml` (orphans of the base
