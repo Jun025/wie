@@ -136,6 +136,7 @@ jobs:
           for f in test_data/keydraw_ktf.zip test_data/keydraw_lgt.zip; do
             cargo run -q -p wie_cli --bin wie_validate -- --inject --expect-last-frame "$f"
           done
+          cargo run -q -p wie_cli --bin wie_validate -- --timeout 5 test_data/text_j2me.jar
           # DOC-COPY END
 
       - name: Web-surface commands (AGENTS.md §Web-surface commands)
