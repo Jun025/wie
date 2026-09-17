@@ -134,8 +134,13 @@ done
 `NOT-RUN: test_data/<name> — <why>` inside this marked region. That keeps the classification in the
 same document as the list instead of in the checker, which is the one thing the proposal behind this
 check warned about: a checker that knows which fixtures are "runner fixtures" becomes a second source
-of truth and drifts from this block. **There are none today** (the diff is 0 in both directions), so
-this paragraph is the syntax, not a list.
+of truth and drifts from this block. There is exactly one today:
+
+NOT-RUN: test_data/resize_ktf.zip — it exists to prove `Screen::resize` reaches a real screen, and
+`wie_validate`'s own `resize` is a no-op that returns `Ok(())`, so running it here would assert
+nothing. Its assertion lives in the browser round-trip (Scenario G), where the canvas is real.
+Built by `node scripts/make-resize-fixture.mjs` — the same guest as `helloworld_ktf.zip` plus one
+`DisplaySize:` line, byte-stable on regeneration.
 
 <!-- ENGINE-RUNNER:END -->
 
