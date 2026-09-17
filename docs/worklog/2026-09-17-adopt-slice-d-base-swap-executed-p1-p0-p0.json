@@ -1,0 +1,44 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-17",
+  "task": "wie-adopt-slice-d-base-swap-executed-p1-p0-p0",
+  "title": "「부하에서 verdict 가 뒤집힌다」를 일화에서 «측정»으로 올렸다 — 무변경 트리에서 keydraw_ktf 4/6 FAIL",
+  "summary": "제안(내가 앞 회차에 낸 것)은 「AGENTS.md 의 keydraw floor 블록이 «극단 부하에서 verdict 가 뒤집힌다»를 모른다」였고 근거는 1회 일화(load 160.84)였다. 이 회차가 그것을 반복 측정으로 바꿨다: 무변경 origin/main(75ca3451)에서 문서가 적은 그 명령을 플래그 추가 없이 돌리니 load 121~150 구간에서 keydraw_ktf 가 6회 중 4회 FAIL(paints 11~33) · keydraw_lgt 는 6/6 PASS(44~55). 고친 것이 없으므로 회귀할 것도 없었다. 기전도 찾았다 — paints 는 «고정 벽시계 예산» 안의 tick 을 세므로 부하가 초당 tick 을 깎으면 마지막 키의 paint 가 마감 전에 도달하지 못하고 last_frame_content 가 false 가 된다. 그리고 같은 예산을 반대편에서 굶기면(--action-secs 0.02) 부하 없이 5/5 FAIL 로 재현되고 0.01 에서는 다시 PASS 라 «임계가 아니라 레이스»다 — 이것이 제안이 적은 tradeoff(부하 재현 비용)를 해소한다. ★제안 자신이 제시한 반증 휴리스틱(「다른 캐리어도 함께 FAIL 인가」)은 측정이 기각했다: 같은 몇 분에 LGT 6/6 클린 ↔ KTF 4/6 실패. 그래서 그 문장을 넣지 않고 4단계 절차로 대체했다. 제품 코드 0줄.",
+  "changes": [
+    "AGENTS.md floor 블록 — 「a FAIL … is [a regression]」 뒤에 «불변식의 천장» 명시 + 무변경 트리 실측표(ktf 2/4 · lgt 6/0 · load 121~150)",
+    "AGENTS.md — 기전 한 절: paints 는 고정 벽시계 예산 안의 tick · 부하는 초당 tick 을 깎고 마감은 그대로 ⇒ 마지막 키의 paint 미도달 ⇒ count 와 verdict 는 독립이 아니다",
+    "AGENTS.md — 부하 없는 재현법(--action-secs 0.02 → 5/5 FAIL · 0.01 → PASS = 레이스) ★제안의 tradeoff(머신 전체를 느리게 만든다) 해소",
+    "AGENTS.md — 블록인용 4단계 반증 절차(재실행 · paints ↔ 유휴 범위 대조 · 무변경 트리 재현 · idle/sys 읽기) + ★틀린 휴리스틱 1건 명시 정정(캐리어 교차 비교)",
+    "docs/report/0144--2026-09-17--wie-adopt-slice-d-base-swap-executed-p1-p0-p0.md 신설 · STATE.md 완료 1건"
+  ],
+  "verification": [
+    "ⓐ 전제 재측: AGENTS.md 의 그 문장이 그대로 무조건으로 읽힌다(「A lower count is therefore not by itself a regression; a FAIL, a blank last frame, or a non-zero rc is」) ⇒ 제안 유효",
+    "★반증 측정(이 회차의 핵심 · 무변경 트리 origin/main 75ca3451 · git status clean · 문서가 적은 명령 그대로 · 플래그 추가 0): load 121~150 에서 keydraw_ktf = PASS 2 / ★FAIL 4 (paints 11 18 15 17 33 23) · keydraw_lgt = PASS 6 / FAIL 0 (55 55 44 55 55 55)",
+    "★부하 없는 재현(제안 tradeoff 해소): --action-secs 0.02 → keydraw_lgt 5/5 FAIL(paints 4~11) · keydraw_ktf 3회 중 2 FAIL 1 PASS · --action-secs 0.01 → PASS(paints 12) · 0.05 → PASS(32) ⇒ ★임계가 아니라 레이스",
+    "★기전 확인: paints 는 고정 ~20s 예산(AGENTS.md 가 이미 유도해 둔 값) 안의 tick 수 ⇒ 노브(--action-secs)로 예산을 줄이거나 부하로 초당 tick 을 줄이면 «같은 기아»가 된다. 유휴에서는 --boot-secs 0.3·--action-secs 0.3~0.1 까지 내려도 PASS 55~49 로 버틴다(CPU 가 놀면 guest 가 따라잡는다) ⇒ 노브와 부하는 «같은 축의 양끝»이지 동일물이 아니다",
+    "★제안의 휴리스틱 기각: 「다른 캐리어도 함께 FAIL 인가」 — 같은 측정 창에서 LGT 6/6 PASS ↔ KTF 4/6 FAIL ⇒ 한쪽만 실패하는 것이 기아의 평범한 서명이다. 그 문장을 문서에 넣지 않고 4단계로 대체했다",
+    "★개악 대조(양방향): 전건 인라인 → check-doc-liveness-parity rc=0 ↔ 재현 명령을 ```sh 펜스로 추가하면 ★rc=1 ↔ 복원 rc=0. ★단 이 쌍이 무는 것은 «펜스 불변식»이고 내가 적은 측정·기전·절차에는 기계 소비자가 없다(그 축은 못 쟀다) — 대신 주장 자체를 예산 정상 PASS ↔ 기아 FAIL ↔ 완화 PASS 로 양방향 실증했다",
+    "4게이트: fmt OK · clippy --all -D warnings rc=0 · wasm clippy rc=0 · cargo +beta clippy rc=0 · RUST_MIN_STACK=4194304 cargo test --all 전건 합산 385 passed / 0 failed(result 줄 42 · FAILED 0 · panicked at 0 · | tail 미사용)",
+    "검사기 전건 rc=0: doc-liveness-parity · docs-report-serial(137건·중복 0·열린 PR claim 충돌 0) · worklog-json · parked-workflows · upstream-new-workflows · worklog-coverage · parity-lock-wired · linux-system-deps · engine-runner-fixtures · npm run audit"
+  ],
+  "limits": [
+    "★기계 강제 0 — 「부하에서 난 FAIL」을 자동으로 가르는 축은 만들지 않았다. 그 판정은 4단계의 ⑶(무변경 트리 재현) 없이는 원리적으로 불가능하고, 그것은 사람이 하는 일이다",
+    "★오용 위험이 실재한다 — 「부하 탓」이 진짜 회귀의 변명이 될 수 있다. ⑵(healthy count 에서의 FAIL 이 위험한 쪽)과 ⑶이 그것을 막지만 완전히는 못 막는다",
+    "★KTF 가 왜 LGT 보다 취약한지는 «세지 않았다» — 관측만 했다. 그 비대칭의 원인(부팅 비용 · 페인트 경로 차이 등)은 이 회차의 범위가 아니다",
+    "★수(4/6 · 5/5 · 121~150)는 «오늘 이 머신»의 값이다 — 상수로 인용하지 마라. 그래서 문서에는 수보다 기전과 절차를 넣었다",
+    "★--action-secs 0.02 가 «언제나» FAIL 인 것도 아니다(KTF 3회 중 1회 PASS) — 레이스라고 적은 이유이고, 재현 레시피로 쓸 때도 여러 번 돌려야 한다"
+  ],
+  "proposals": [
+    {
+      "title": "keydraw_ktf 가 keydraw_lgt 보다 부하에 취약한 이유를 아무도 모른다",
+      "plainSummary": "같은 조건에서 한쪽 시험만 자꾸 실패하는데, 왜 그 쪽만 약한지는 확인된 적이 없습니다.",
+      "userBenefit": "「어느 픽스처의 FAIL 을 얼마나 의심해야 하는가」가 감이 아니라 수가 된다. 지금은 회차마다 다시 감으로 판단한다.",
+      "why": "이 회차가 같은 몇 분 안에 무변경 트리에서 keydraw_ktf 4/6 FAIL ↔ keydraw_lgt 0/6 FAIL 을 쟀다. 두 픽스처는 같은 주입 스케줄·같은 예산을 쓰는데 결과가 갈린다 ⇒ 차이는 게스트 쪽(부팅 비용·paint 경로·캐리어 런타임)에 있다. 값싼 첫 삽은 두 픽스처의 «부팅까지 걸리는 tick 수»와 «키당 paint 지연»을 wie_validate 가 이미 들고 있는 값으로 비교하는 것이다(새 계측 0일 수 있다).",
+      "tradeoff": "원인을 알아도 «고칠» 대상이 아닐 수 있다 — KTF 게스트가 원래 무거운 것이면 그것은 사실이지 결함이 아니다. 그러면 산출물은 수정이 아니라 «픽스처별 유휴 범위 표»가 되고, 그 표는 낡는다(머신이 바뀌면 다시 재야 한다). 그리고 부하를 재현해 재는 측정이라 그 자체로 머신을 느리게 만든다 — 노브(--action-secs) 쪽으로 대체할 수 있는지 먼저 보는 편이 싸다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": ["2026-09-17-adopt-slice-d-base-swap-executed-p1-p0#p0"],
+  "declinedProposals": []
+}

@@ -134,8 +134,13 @@ done
 `NOT-RUN: test_data/<name> — <why>` inside this marked region. That keeps the classification in the
 same document as the list instead of in the checker, which is the one thing the proposal behind this
 check warned about: a checker that knows which fixtures are "runner fixtures" becomes a second source
-of truth and drifts from this block. **There are none today** (the diff is 0 in both directions), so
-this paragraph is the syntax, not a list.
+of truth and drifts from this block. There is exactly one today:
+
+NOT-RUN: test_data/resize_ktf.zip — it exists to prove `Screen::resize` reaches a real screen, and
+`wie_validate`'s own `resize` is a no-op that returns `Ok(())`, so running it here would assert
+nothing. Its assertion lives in the browser round-trip (Scenario G), where the canvas is real.
+Built by `node scripts/make-resize-fixture.mjs` — the same guest as `helloworld_ktf.zip` plus one
+`DisplaySize:` line, byte-stable on regeneration.
 
 <!-- ENGINE-RUNNER:END -->
 
@@ -154,10 +159,40 @@ spread above it is tick overrun under load) — so concurrent work pulls the cou
 Measured 2026-09-13 on `keydraw_lgt`: **48–55 idle**, **38–41** with twelve concurrent runs, **28–36**
 with thirty (n=30). Across all 42 of those runs the verdict never moved once — **42/42 `PASS` ·
 `content true` · rc=0** — and that invariance, not the count, is why the floor is the rule. A lower
-count is therefore not by itself a regression; a `FAIL`, a blank last frame, or a non-zero rc is. The
+count is therefore not by itself a regression; a `FAIL`, a blank last frame, or a non-zero rc is —
+**but that invariance has a ceiling, and past it the verdict flips too. Do not trust your own `FAIL`
+until you have run the four steps below.** The
 same command reported **45 on both carriers** earlier that day, right after `cargo test --all` and
 `cargo +beta clippy`: that sits inside the measured range, which is consistent with load and is not,
 on its own, evidence of anything in the engine.
+
+**Past that ceiling the verdict is not invariant — measured 2026-09-17 on an untouched `origin/main`
+(`75ca3451`), with the documented command and no flags: `keydraw_ktf` **FAILED 4 of 6** runs
+(`paints` 11–33) while `keydraw_lgt` passed **6 of 6** (44–55), at load 121–150.** Nothing was
+changed, so there was nothing to regress. The 42/42 above was measured at **thirty** concurrent
+runs; this is several times that, and it is outside what that sample can speak to.
+
+**The mechanism, so you can reason about it instead of memorising a number.** `paints` counts the
+ticks that fit a *fixed wall-clock* budget, so load cuts ticks-per-second while the deadline stays
+put. Enough load and the **last key's paint never lands before the deadline** — `last_frame_content`
+goes false and `--expect-last-frame` exits 1. Count and verdict are therefore **not independent**:
+the floor rule holds only while enough ticks still fit. You can starve the same budget from the
+other side with no load at all — `--action-secs 0.02` on an idle-ish tree gave **5/5 FAIL** on
+`keydraw_lgt` (`paints` 4–11), and `0.01` passed again, so it is a **race, not a threshold**. That
+is also the cheap way to reproduce this class without slowing the machine down for everyone else.
+
+> **So when your run says `FAIL`, do these four before touching your diff:**
+> ⑴ **Re-run it several times** — a starved run is not reproducible, a real regression is.
+> ⑵ **Compare `paints` to the idle range** (48–55 for `keydraw_lgt`). A `FAIL` at 11 was starved; a
+>   `FAIL` at a *healthy* count is the dangerous one — the 2026-09-05 LGT regression had `paints`
+>   going **up** (55 → 83) with a blank frame.
+> ⑶ **Reproduce on an untouched tree.** This is the only conclusive step.
+> ⑷ **Read the load** (`uptime`) — and per §Host performance, read `idle`/`sys`, not the load figure alone.
+
+**One heuristic that looks right and is not: "the other carrier passed, so it is a real bug."** The
+fragility is **carrier-specific** — in the measurement above LGT was clean 6/6 in the same minutes
+that KTF failed 4/6. One carrier failing alone is the *ordinary* starvation signature here, not
+evidence against it. Use ⑴–⑷, not the cross-carrier comparison.
 
 **`--expect-last-frame` is on the `keydraw_*` line and deliberately NOT on the one above it.** It
 turns `last_frame_content` from a reported field into an exit code, which is the only thing that
@@ -478,6 +513,23 @@ than let it be ignored — a periodically-red check that people scroll past is w
   blocking you. The post-hoc half runs in CI (`engine-contract.yml`) and reddens a tree that already
   holds a duplicate — **it does not renumber anything, and neither should you renumber a landed
   file**; move the side that has not landed yet.
+
+  **That answer goes stale while you work, so the same check also compares your serial against the
+  *other* open PRs and reddens before anything lands** (2026-09-17). `--next-serial` is true at the
+  moment you ask, and the file is committed at the end of the round: measured twice, #164/#165 both
+  took `0122` eight minutes apart, and #176/#177 both took `0134` five minutes apart. Widening the
+  claim query to pushed-but-unopened branches would not have caught either — the commit→PR gap is
+  **p50 28s, max 70s** over 32 PRs, while the gap that bites is ask→commit, i.e. the length of your
+  round. So the bare mode now also asks: *does another open PR already hold a serial I added?* If
+  yes it exits 1 and names both sides and the move rule — **the side that claimed later moves**. That
+  axis is not cosmetic: check runs are pinned to commits, so the later claimer goes red on its *next*
+  run while the earlier one **does not know until its own CI runs again**. Keying the rule to the PR
+  number instead would tell the side that is already red to sit still and the side that cannot see it
+  to act — and the two axes genuinely disagree (2026-09-17: #177 claimed `0134` first, yet #176 is the
+  lower number; gate③ moved #176, i.e. the later claimer). Read a red here as "you are probably the
+  later claimer — move"; if you know you claimed first, tell the PR the message names. It costs
+  nothing on a `main` push (nothing added → no API call) and, like `--next-serial`, a network or git
+  failure **says so in the success line** rather than reporting a comparison it never made.
 
   **`-H` is load-bearing, not cosmetic.** It prefixes the path, so `sort -r` keys on the *sequence number*; `-h` keys on the title text, which is the date, and this repo lands up to six rounds a day. Measured over 54 files: the `-h` form is **52 lines out of place**, the `-H` form is **0**. Sort by the **sequence number, not the date** — the ledger's date-monotonicity is a coincidence, not a guarantee. `REPORT.md` explains the rest; `docs/report-migration-revert.md` reverts it.
 

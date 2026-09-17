@@ -157,24 +157,37 @@
 //   sticky ANY-frame predicate and never inspects the LAST frame). Root cause and
 //   the 2026-09-06 fix are recorded at the scenario itself.
 //
-// ── What NO scenario here reaches: `Screen::resize` and `Platform::font()` ──
+// Scenario G (resize fixture — `Screen::resize`, ASSERTED):
+//   The one input in the repo that asks the host to change the screen size. Until
+//   2026-09-17 nothing did: the engine's only live caller is
+//   `wie-ktf/src/emulator.rs`, `if let Some((width, height)) = adf.display_size`,
+//   and NEITHER committed KTF fixture declared `DisplaySize:` (both `__adf__`s were
+//   AID/PID/MClass only — probed on the native host: 0 calls on the committed
+//   fixture, 1 call after appending one line to a throwaway copy, so the zero was a
+//   measurement and not a silent instrument). `scripts/make-resize-fixture.mjs`
+//   makes that copy permanent — same guest jar, one extra ADF line — and this
+//   scenario asserts the canvas actually moved to it.
+//   Why that matters here rather than in `cargo test`: the call site swallows `Err`
+//   into `tracing::warn!`, so a host whose resize fails boots on and every native
+//   gate stays green. The browser is also where the failure is user-visible, and
+//   `wie_validate`'s own `resize` is a no-op — running the fixture there asserts
+//   nothing.
+//   What it does NOT cover, deliberately: `WebScreen::resize` moves the visible
+//   canvas AND the internal back buffer, and the back buffer is created inside the
+//   wasm module, so JS cannot read its size. This asserts the visible canvas and
+//   that the resized instance still ticks; a back buffer left behind would clip a
+//   frame without throwing, and nothing here would see it.
+//
+// ── What NO scenario here reaches: `Platform::font()` ──
 // Measured 2026-09-16, because a proposal asked for "boot the browser host once
 // so the newly ported resize/font are verified on a real screen" and the honest
-// answer is that RUNNING THIS SCRIPT DOES NOT VERIFY THEM — the gap is the
-// fixtures, not the host, so a local run buys exactly what CI already buys.
+// answer was that RUNNING THIS SCRIPT DID NOT VERIFY THEM — the gap was the
+// fixtures, not the host. Scenario G closed the resize half on 2026-09-17; the
+// font half is still open, and the reason is unchanged:
 //
-//   `Screen::resize` — the engine has two callers. `wie_ktf/src/emulator.rs`
-//   calls it at boot only `if let Some((width, height)) = adf.display_size`, and
-//   NEITHER committed KTF fixture declares `DisplaySize:` (checked: the `__adf__`
-//   of `keydraw_ktf.zip` and `helloworld_ktf.zip` carry AID/PID/MClass only). The
-//   other is `wie_lgt/.../wipi_c/graphics.rs`, whose 27-line wiring was cut when
-//   PR #161 routed LGT graphics back to the shared implementation. Probed on the
-//   native host: 0 calls on the committed fixture, 1 call (`176x220`) after
-//   appending one `DisplaySize:176*220` line to a throwaway copy — so the zero is
-//   a measurement, not a silent instrument. A resize scenario therefore needs a
-//   fixture that asks for a size, which is a different change: the committed
-//   fixtures are binaries, and Scenario E/F assert exact pixel counts against the
-//   current geometry.
+//   `Screen::resize`'s OTHER caller stays uncovered — `wie_lgt/.../wipi_c/graphics.rs`,
+//   whose 27-line wiring was cut when PR #161 routed LGT graphics back to the shared
+//   implementation. Scenario G covers the KTF boot path only.
 //
 //   `Platform::font()` — the callers are NOT all MIDP, and that matters for how
 //   you would cover this. Measured with `git grep -n "\.font()" -- '*.rs'`
@@ -209,6 +222,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { BASE_RECT_PX, IMG_ERR_BROKEN, IMG_ERR_MISSING, IMG_H, IMG_RECT_PX, IMG_W, drawFixtureJar, keyBarPixels } from "./make-draw-fixture.mjs";
+import { RESIZE_FIXTURE, RESIZE_H, RESIZE_W } from "./make-resize-fixture.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const contract = JSON.parse(await readFile(path.join(root, "docs/contracts/featurephone-engine-contract.json"), "utf8"));
@@ -278,6 +292,12 @@ const resLine = `res:${resBytes.length}:${resBytes.reduce((a, b) => a + b, 0)}`;
 // import is Node-side only.
 const IMG = { base: BASE_RECT_PX, px: IMG_RECT_PX, w: IMG_W, h: IMG_H, errMissing: IMG_ERR_MISSING, errBroken: IMG_ERR_BROKEN };
 
+// Scenario G's numbers, DERIVED from the fixture's own generator — the same rule
+// as the Scenario E constants above. `make-resize-fixture.mjs` writes the ADF
+// line and exports the pair, so restating "176x220" here could drift from the
+// bytes actually served.
+const RESIZE = { fixture: RESIZE_FIXTURE, w: RESIZE_W, h: RESIZE_H };
+
 // One representative per positive band, mirroring Scenario D's three.
 const KTF_KEYS = ["HASH", "STAR", "NUM5"].map((code) => ({
   code,
@@ -327,7 +347,7 @@ page.on("pageerror", (e) => consoleLog.push(`[pageerror] ${e.message}`));
 await page.goto(base + "/");
 page.setDefaultTimeout(120_000);
 
-const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys, img, resLine }) => {
+const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys, img, resLine, resize }) => {
   const steps = [];
   // wie_featurephone 은 게스트 stdout 을 console.log 로 낸다(Platform::write_stdout ->
   // web_sys::console::log_1). 원 함수를 그대로 호출하므로 Node 쪽 진단 수집은
@@ -611,11 +631,29 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
 
     f.emu.free();
     check("F: free() (no throw)", true);
+
+    // ── Scenario G: does a `DisplaySize:` ADF actually resize the canvas? ─────
+    // The boot size handed to the constructor is the contract's; the fixture asks
+    // for a different one on BOTH axes, so a half-applied resize cannot read as a
+    // pass. See this file's header for what this does and does not cover.
+    const g = await bootFixture(mod, resize.fixture);
+    check(
+      `G: DisplaySize ADF resizes the canvas ${contract.screen.width}x${contract.screen.height} -> ${resize.w}x${resize.h}`,
+      g.canvas.width === resize.w && g.canvas.height === resize.h,
+      `${g.canvas.width}x${g.canvas.height}`,
+    );
+    // The resized instance must still run: `WebScreen::paint` sizes its ImageData
+    // from the guest frame and blits the back buffer, so a surface pair left
+    // inconsistent shows up as a throw here rather than as a wrong number above.
+    const runG = await tickLoop(g.emu, g.canvas, 5_000);
+    check("G: resized instance ticks without throwing", runG.threw === null, runG.threw ?? `${runG.frames} frames`);
+    g.emu.free();
+    check("G: free() (no throw)", true);
   } catch (e) {
     check("scenario aborted by exception", false, (e && e.stack) || String(e));
   }
   return steps;
-}, { contract, representativeKeys: REPRESENTATIVE_KEYS, ktfKeys: KTF_KEYS, img: IMG, resLine });
+}, { contract, representativeKeys: REPRESENTATIVE_KEYS, ktfKeys: KTF_KEYS, img: IMG, resLine, resize: RESIZE });
 
 await browser.close();
 server.close();
