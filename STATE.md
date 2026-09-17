@@ -60,6 +60,20 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-17: **verify-browser 가 repo 루트에 스크린샷 2장을 쓴다 — 그 부작용을 문서가 «말하게» 했다**
+  (`wie-adopt-gate3-selfverify-console-axis-p0` · 채택 `2026-09-17-gate3-selfverify-console-axis#p0`) —
+  정본 `docs/report/0147--….md`. ★**제품 코드 0줄 · 스크립트 0줄 · CI 0줄** — 접촉은 `AGENTS.md` **한 문단**뿐.
+  ★**결함이 아니라 문서 결손이다** — `.gitignore:35 /verify_*.png` 가 이미 덮어 새는 것은 없고,
+  새는 것은 **사람의 시간**이다(손으로 돌린 회차가 매번 「커밋해야 하나」를 다시 확인한다).
+  ★**이 회차 자신이 증거다** — 오늘 게이트③ 회차가 그 2장을 **손으로 지웠다**.
+  ★★**개악 대조 양방향 — 「내 문장을 검사하는 테스트」를 만들지 않고 «주장의 주인 파일»을 무너뜨렸다**:
+  ⒜`verify-browser.mjs:60-61` 의 `path.join(root,…)` 를 임시 디렉터리로 → repo 루트 **2장 → 0장**(문단이 거짓이 된다) ·
+  ⒝`.gitignore:35` 를 주석 처리 → `git status -uall` 의 `verify_` 줄 **0 → 2(`??`)** ⇒ 「깨끗하다」가 거짓.
+  복원 후 스크립트는 `HEAD` 와 **바이트 동일** · git 판정 **0** 으로 복귀.
+  ★**펜스 블록은 건드리지 않았다** — `check-doc-liveness-parity.mjs` 가 그 25줄을 `doc-liveness.yml` 사본과 대조한다.
+  ★회귀 0(전건 합산): `cargo test --all` **43타깃 · 386 passed · 0 failed** · 4게이트 + beta **rc=0** · 검사기 8/8 · audit PASSED.
+  ★**남긴 한계**: 이 문단을 **기계가 지키지 않는다**(파일명이 바뀌면 조용히 낡는다) — 후속 제안으로 냈고,
+  ★그 제안의 tradeoff 에 「채택 전에 «그 이름이 실제로 움직인 적이 있는가»를 먼저 세라 · 0이면 만들지 마라」를 못박았다.
 - 2026-09-17: **가드는 옳게 섰는데 그 가드가 «자기 가동 방식»을 거짓으로 말했다 — 「주 1회」를 걷어냈다**
   (`wie-adopt-slice-d-base-swap-fix3-p1-p1-fix` · 게이트② `request-changes` 승계) —
   정본 `docs/report/0146--….md`. ★**제품 코드 0줄 · 도구 로직 0줄 · CI 배선 0줄**(검수자가 통과시킨 §1~§3 무접촉).
@@ -76,6 +90,20 @@
   ★**반증도 내가 다시 쟀다**: 이 검사기 언급 10건 **전부 주석** · `package.json` 미등재 ·
   schedule 보유 워크플로 2개 어느 쪽도 부르지 않는다 ⇒ **검수자가 옳다**.
   ★회귀 없음 증명 = **수치 동일**: 전/후 같은 명령이 `claims 5 · enforces 5 · rulesets 1` **rc=0** 로 글자 단위 동일.
+- 2026-09-17: **「부하에서 verdict 가 뒤집힌다」를 «일화»에서 «측정»으로 올렸다 — 무변경 트리에서 4/6 FAIL**
+  (`wie-adopt-slice-d-base-swap-executed-p1-p0-p0` · 채택 `2026-09-17-adopt-slice-d-base-swap-executed-p1-p0#p0`) —
+  정본 `docs/report/0145--….md`. ★**제품 코드 0줄** · 접촉 = `AGENTS.md` 1곳(+31/−1).
+  ★★**핵심 실측 — 무변경 `origin/main`(`75ca3451`) · 문서가 적은 그 명령 · 플래그 추가 0 · load 121~150**:
+  `keydraw_ktf` **PASS 2 / FAIL 4**(paints 11~33) ↔ `keydraw_lgt` **6/6 PASS**(44~55).
+  ★**고친 것이 없으므로 회귀할 것도 없었다** — 그 블록의 42/42 는 **동시 30**에서 잰 값이고 이 구간은 그 몇 배다.
+  ★**기전**: `paints` 는 ★**고정 벽시계 예산** 안의 tick 수 ⇒ 부하는 «초당 tick»을 깎고 마감은 그대로 ⇒
+  **마지막 키의 paint 가 마감 전에 도달하지 못한다** ⇒ ★**count 와 verdict 는 «독립이 아니다»**.
+  ★★**부하 없이 재현된다**(제안의 tradeoff 해소): `--action-secs 0.02` → LGT **5/5 FAIL** · `0.01` → **PASS**
+  ⇒ ★**임계가 아니라 «레이스»**.
+  ★★**내 제안의 휴리스틱을 기각했다** — 「다른 캐리어도 함께 FAIL 인가」는 **틀렸다**(같은 몇 분에 LGT 6/6 클린 ↔ KTF 4/6 실패).
+  대신 **4단계 반증 절차**를 넣었다: ⑴여러 번 재실행 ⑵★`paints` ↔ 유휴 범위 대조(★**«건강한 수»에서의 FAIL 이 위험한 쪽** —
+  2026-09-05 회귀는 paints 가 **55→83 으로 올라가며** 화면이 비었다) ⑶**무변경 트리 재현**(유일한 결정적 단계) ⑷`idle`·`sys`.
+  ★**위험을 숨기지 않는다**: 「부하 탓」이 진짜 회귀의 변명이 될 수 있다 — ⑵⑶이 막지만 **완전히는 못 막는다**.
 - 2026-09-17: **「required check 는 0개」가 «2시간» 만에 거짓이 됐다 — 이제 기계가 본다**
   (`wie-adopt-slice-d-base-swap-fix3-p1-p1` · 채택 `2026-09-17-adopt-slice-d-base-swap-fix3-p1#p1`) —
   정본 `docs/report/0144--….md`. ★**제품 코드 0줄.**
@@ -97,6 +125,38 @@
   ★거짓이 된 문서 **4곳**(AGENTS.md·engine-contract.yml·web.yml·docs/upstream-realign-p3-slices.md)을 실측으로 갈고
   **목록은 restate 하지 않고 표시 영역을 가리키게** 했다.
   ★**부수 관측**: required 5개가 **전부 paths 필터 없는 트리거**에서 나온다 ⇒ 사건 대장의 「paths 필터된 required check 교착」 조합은 **현재 0**.
+- 2026-09-17: **#159 의 개악 대조가 «존재하지만 돌지 않았다» — 살렸다**
+  (`wie-adopt-slice-d-reissue-order-was-honored-p0` · 채택 `2026-09-16-slice-d-reissue-order-was-honored#p0`) —
+  정본 `docs/report/0141--….md`. ★**제품 코드 0줄**(개악 대조 3회 전부 복원).
+  ★**제안 4주장 전건 참**: 파일 **3,136B** 실재 · workspace member 는 `wie-wipi-java`(하이픈)라 언더바 디렉터리는 **member 가 아니다** ·
+  이 base 의 `cargo test --all` 에 그 이름 **0회** · 옮기면 **E0061 1건**.
+  ★★**제안이 말하지 않은 축이 결정적이었다** — `wie-wipi-java/src/lib.rs` 주석이 ★**「Locked by `tests/preload_…rs`」라고 «단언»**하고 있었다.
+  ⇒ 소스가 «잠겼다»고 적은 잠금이 **한 번도 돌지 않았다**(「검사가 있다 ≠ 검사가 돈다」) — 옮기는 순간 그 문장이 **참**이 된다.
+  ★**⒜살리기를 고른 근거 = 제안이 정한 그 축**(「오늘도 회귀 가능한가」): #159 당시 런타임은 **git `rev` 핀**이었는데
+  지금은 ★**crates.io 세버 범위 `rustjava-runtime ^0.1.1`** 이라 **호환 범프가 등록 클래스를 바꿔도 다른 축이 보지 않는다**
+  ⇒ ★**오늘이 «더» 회귀 가능하다.** 되살리는 비용은 실측 **한 줄**(`invoke_virtual` 이 «해석 클래스» 인자를 얻었다 — `java/lang/Throwable`).
+  ★★**개악 대조 — 제품 호출부 2곳이 물었다**: 런타임이 `InterruptedIOException` 을 안 주면 **FAILED**(`NoClassDefFoundError`) ·
+  **판별자** `VirtualMachineError` 를 안 주면 **FAILED** ↔ 복원 **ok**.
+  ★**음성도 적는다**: `java.class.path` 에서 `RT_RUSTJAR` 를 빼는 개악은 ★**안 물었다** ⇒ 무는 자리는 클래스패스 문자열이 아니라
+  `find_rustjar_class` 의 **RT 분기**다(다음 회차가 헛다리를 짚지 않게).
+  ★회귀: 같은 base baseline **42타깃/385 passed** ↔ **43/386** = 정확히 **+1 타깃 · +1 테스트**.
+- 2026-09-17: **8주째 보이지 않던 human-step 을 화면이 읽는 자리로 올렸다 — 검사 목록은 «오늘로» 다시 쟀다**
+  (`wie-adopt-slice-d-base-swap-fix3-p1-p0` · 채택 `2026-09-17-adopt-slice-d-base-swap-fix3-p1#p0`) —
+  정본 `docs/report/0143--….md`. ★**wie 제품 코드 0줄 · wie diff 는 원장 3파일**.
+  산출물 = `~/orchestrator/humansteps/wie-main-branch-protection.md` **카드 1장**(원장 파일 · untracked).
+  ★**전제 재측 전건 참**: 그 카드 **0장** · `branches/main/protection` **404** · `rulesets` **0** ·
+  `.protected` **false** ⇒ **강제 required check 0개**. 카드 신설 후 `humanstep-scan` 이 `age_days` **57** 을 찍는다.
+  ★★**§C 를 그대로 베끼지 않았다** — 실제 PR 의 check 이름을 전수 조회해 5종(`contract`·`build-web`·
+  `rust_ci (ubuntu/macos/windows-latest, stable)`)이 **전부 유효**(PR 트리거 · `paths` 필터 0)함을 확인하고,
+  ★**2026-09-10 에 생긴 `doc-liveness (weekly)` 가 `paths` 필터를 가져 required 에 넣으면 «모든 PR 영구 교착»**임을
+  카드에 리터럴로 박았다(그 워크플로 자신의 「NEVER become a required check」와 사건 대장의 그 교착).
+  ★**wie 레인이 `~/orchestrator` 카드를 만든 선**: 「그 편집이 **다른 레인·estate 가 의존하는 계약**을
+  리뷰 없이 바꾸는가」 — `humansteps/README.md`(99장·estate 3곳)는 **YES 라 거부**했고(같은 날 다른 회차),
+  이 카드는 **wie 한 건짜리 leaf · 추가·가역**이라 **NO**. 선례도 그 선 위에 있다(`wie-p2-corpus-placement.md`).
+  ★**개악 대조 양방향**(소비자 `humanstep-scan --json` 경유 · 격리 사본 · 라이브 무접촉):
+  기준선 `how_ruleset_marker=true` **GREEN** → `how:` 를 markdown **본문**으로 옮기면 **false RED** →
+  카드 제거 **ABSENT RED** → 복원 **GREEN**.
+  ★**한계**: 같은 형태(done 본문에만 있는 human-step)가 **몇 건 더 있는지 세지 않았다** · **보호는 여전히 꺼져 있다**.
 - 2026-09-17: **upstream 이 «새» 워크플로를 들고 오면 이제 기계가 본다 — 손으로 관리하는 목록 «없이»**
   (`wie-adopt-slice-d-base-swap-fix2-p3-p0` · 채택 `2026-09-16-adopt-slice-d-base-swap-fix2-p3#p0`) —
   정본 `docs/report/0135--….md`. ★**제품 동작 0줄 · Rust 0줄**.
