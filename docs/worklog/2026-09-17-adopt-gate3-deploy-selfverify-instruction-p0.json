@@ -1,0 +1,41 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-17",
+  "task": "wie-adopt-gate3-deploy-selfverify-instruction-p0",
+  "title": "제안이 시킨 대로 «먼저 쟀다» — 그리고 그 계측기가 틀렸다(검사기를 만들지 않은 것이 산출물이다)",
+  "summary": "제안은 「게이트③이 배포 self-verify 를 실제로 돌렸는지 아무도 검사하지 않는다」였고, tradeoff 에서 스스로 「먼저 «문서만으로 얼마나 고쳐지는지»를 다음 33건으로 재는 편이 싸다」고 처방했다. 그 측정을 실제로 했고 결과가 처방을 뒤집었다: 그 측정에 쓰라던 술어('Deploy to Cloudflare Pages' ∩ 'WIE_BASE')가 두 방향으로 틀렸다. ⑴오늘 #177·#178 을 착지시킨 게이트③ 두 회차는 브라우저 검증을 실제로 돌렸고 WIE_BASE 를 인용하는데 그 문구를 안 써서 분자·분모에서 «둘 다» 빠진다 ⇒ 준수가 올라도 비가 안 움직인다. ⑵web.yml 의 push 트리거에 paths 필터가 없어 이 repo 에는 «배포 없는 착지»가 아예 없다(최근 12건 merged sha 에 Web 런 12/12) ⇒ 「107 착지 중 36 만 배포 수반」은 구성상 거짓이다. ⇒ 검사기를 만들지 않고(제안 target 은 orchestrator 이기도 하다) AGENTS.md 의 수·조건절을 고쳐 다음 사람이 틀린 술어 위에 검사기를 세우지 않게 했다. 제품 코드 0줄 · 기계 강제 0줄 신설.",
+  "changes": [
+    "AGENTS.md §verify-browser — 「131건 중 33 배포 수반 · 15(45%)」 단일 문장을 2행 표로 교체(어휘 분모 36/18=50% ↔ ★사실 분모 107/57=53%) + 「2행을 읽어라」 + 실패 두 축 명시",
+    "AGENTS.md — 조건절 제거: 「a gate③ round that lands a deploy runs this」 → ★「every gate③ round that lands runs this」(이 repo 엔 배포 없는 착지가 없다)",
+    "AGENTS.md — 검사기를 만들 사람에게 축 명시: key it off the merged: sha and GitHub's run list, never off reply wording",
+    "docs/report/0142--2026-09-17--wie-adopt-gate3-deploy-selfverify-instruction-p0.md 신설 · STATE.md 완료 1건"
+  ],
+  "verification": [
+    "ⓐ 재측(2026-09-17 · 회신 137건): 어휘 술어 분모 36 · 분자 18 = 50%(제안 기재 33/15=45% 의 오늘 값) ↔ ★사실 술어(merged: 가 sha = 실제 착지) 분모 107 · 분자 57 = 53%",
+    "★반증 ⑴(어휘 술어가 보상한 회차를 떨어뜨린다): wie-adopt-slice-d-base-swap-executed-p1-p0-merge.done.md 와 …-fix2-p3-p0-merge.done.md 는 'WIE_BASE'=1 인데 'Deploy to Cloudflare Pages'=0 ⇒ 분자·분모 동시 탈락. 두 회차 모두 verify-browser rc=0 · console errors 0 으로 실제 실행했다",
+    "★반증 ⑵(분모 자체가 틀렸다): .github/workflows/web.yml 의 push 트리거를 YAML 파싱 → branches=['main','feat/cf-web-service','feat/ux-redesign'] · ★paths=None ⇒ main 착지는 전건 배포. 실증으로 최근 머지 회신 12건의 merged: sha 마다 actions/runs 에 Web 런 존재를 조회 → ★12/12",
+    "★개악 대조(양방향 · 제품 호출부 = AGENTS.md 의 그 줄): 인라인 → check-doc-liveness-parity rc=0(25 documented lines) ↔ ```sh 펜스로 바꾸면 ★rc=1('DOC ONLY — … + WIE_BASE=…') ↔ 복원 rc=0. ★단 이 쌍이 무는 것은 «인라인 불변식»(직전 회차가 세운 것)이고 증명하는 것은 내 편집(±27/8)이 그것을 깨지 않았다는 것이다 — 내가 고친 «수와 조건절»에는 기계 소비자가 없어 그 축은 못 쟀다(사유는 report 0142)",
+    "4게이트: fmt OK · clippy --all -D warnings rc=0 · wasm clippy rc=0 · cargo +beta clippy rc=0 · RUST_MIN_STACK=4194304 cargo test --all 전건 합산 385 passed / 0 failed(result 줄 42 · FAILED 0 · panicked at 0 · | tail 미사용)",
+    "검사기 9종 전건 rc=0: doc-liveness-parity · docs-report-serial(134건·중복 0) · worklog-json · parked-workflows · ★upstream-new-workflows(어제 착지분) · worklog-coverage · parity-lock-wired · linux-system-deps · npm run audit"
+  ],
+  "limits": [
+    "★검사기는 «만들지 않았다» — 제안 target 이 orchestrator 이고(회신은 ~/orchestrator 트리라 제품 repo CI 가 못 본다) 제안 자신이 「먼저 재라」로 처방했다. 이 회차가 한 것은 그 측정과, 그 측정 도구가 틀렸다는 증명이다",
+    "★두 수(50% · 53%)도 «오늘의 수»다 — 상수로 인용하지 마라. 그래서 표에 «고르는 축»을 함께 적었다",
+    "★의무가 넓어진 대가가 실재한다 — 「배포 수반이면」이 「착지하면 언제나」가 됐다. 게이트③ 회차마다 브라우저 실행 1회(배포 완료 대기 포함)가 무조건 붙는다",
+    "★사실 분모(107)도 «회신이 남았고 merged: 를 sha 로 적은 것»에 기댄다 — merged: 를 true 로 적은 옛 회신은 여기서도 빠진다(그 결함은 머지 템플릿이 이미 지목한 별 축이다)",
+    "★어휘 술어 'Deploy to Cloudflare Pages' 를 쓰는 다른 자리가 있는지는 세지 않았다 — 이 파일 밖은 범위 밖이다"
+  ],
+  "proposals": [
+    {
+      "title": "「merged: 가 sha 가 아닌」 옛 게이트③ 회신이 착지 통계에서 조용히 빠진다",
+      "plainSummary": "완료 보고서에 착지 증거를 숫자 대신 «했음»이라고 적은 옛 기록들이, 통계를 낼 때 통째로 빠집니다.",
+      "userBenefit": "「몇 건 중 몇 건이 규율을 지켰나」류의 수가 실제보다 작은 모집단에서 계산되는 일이 없어진다. 이번 회차가 쓴 분모(107/137)가 정확히 그 형태다.",
+      "why": "이 회차가 사실 술어(merged: 가 7~40자 hex)로 모집단을 세니 wie 머지 회신 137건 중 107건만 걸렸다. 나머지 30건은 머지를 «안» 한 blocked 회신도 있지만, 머지 템플릿이 이미 실측으로 기록한 형태 — status: done 인데 merged: 가 true/yes/n/a 인 회신 37건(최근 200건 표본) — 도 섞여 있다. 그 37건은 착지했는데 착지 통계에서 빠진다. 템플릿이 그 칸을 «sha 증거»로 못박은 것이 2026-08-22 이므로, 그보다 앞선 회신이 그 형태일 가능성이 높다.",
+      "tradeoff": "소급 수정은 «지난 회신을 고쳐 쓰는 것»이라 이 저장소가 금지한 위조와 경계가 가깝다 — 고칠 게 아니라 «세는 쪽»이 그 형태를 알아보고 «판정 불가»로 따로 세야 한다(0 으로 접지 말 것). 그리고 이 축은 제품 repo 가 아니라 ~/orchestrator 의 회신 규약·bin/done-lint 소관이라 wie 회차가 고칠 수 없다. 값은 「수를 인용하는 회차가 분모를 정직하게 적게 되는 것」 하나다.",
+      "effort": "S",
+      "target": "orchestrator"
+    }
+  ],
+  "adoptedProposals": ["2026-09-17-gate3-deploy-selfverify-instruction#p0"],
+  "declinedProposals": []
+}

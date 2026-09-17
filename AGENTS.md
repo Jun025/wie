@@ -292,14 +292,33 @@ design** — do not "fix" that by wiring it:
   production for merge-contract 4-C" — that claim was false and is gone. **The command itself was
   never missing from this file** (the last bullet of this section has carried it all along); what was
   missing is a *verdict* — which output lines count as a pass — and that is what the blockquote below
-  adds. Measured 2026-09-17 over all 131 `wie-*merge*.done.md` replies: **33 record a Cloudflare Pages
-  deploy, and of those only 15 (45%) cite `WIE_BASE` — 18 (55%) do not**. Five of the eighteen are one lane on
-  2026-09-16/17; the other thirteen predate it, so this is a standing gap, not one round's lapse.
-  Every one of the eighteen still *reported* a self-verify — by quoting the in-CI step's conclusion
-  and curling the alias — which passes "운영 URL" but **not** the "콘솔 0에러" half of merge-contract
-  4-C, because console errors and off-origin requests need the browser run.
+  adds. **Compliance is roughly half, and the first measurement of it used the wrong denominator —
+  read the second row, not the first.** Re-measured 2026-09-17 (later the same day, 137 replies):
 
-  > **So, concretely — a gate③ round that lands a deploy runs this and quotes it:**
+  | denominator | how it is chosen | n | cite `WIE_BASE` |
+  |---|---|---|---|
+  | replies containing the literal `Deploy to Cloudflare Pages` | **wording** | 36 | 18 (50%) |
+  | replies that **actually landed** (`merged:` is a sha) | **fact** | **107** | **57 (53%)** |
+
+  **The first row is the original 45%-of-33 measurement, and it cannot answer the question it was
+  built for.** Two failures, both measured: ⑴ the two gate③ rounds of 2026-09-17 that landed `#177`
+  and `#178` **did** run the browser verify and **do** cite `WIE_BASE`, yet neither writes that exact
+  phrase — so the predicate drops them from numerator *and* denominator, and compliance can improve
+  without the ratio moving. ⑵ `web.yml`'s `push` trigger on `main` carries **no `paths` filter**
+  (verified by parsing it), so **every** landing here deploys — confirmed 12/12 on the most recent
+  merge replies by asking GitHub whether a `Web` run exists for each reply's `merged:` sha. There is
+  no "deploy-bearing" subset in this repo, so a denominator of 36 out of 107 landings is wrong by
+  construction.
+
+  **So the obligation is unconditional: every gate③ landing here owes the browser run.** The ~47%
+  that did not do it still *reported* a self-verify — by quoting the in-CI step's conclusion and
+  curling the alias — which passes "운영 URL" but **not** the "콘솔 0에러" half of merge-contract 4-C,
+  because console errors and off-origin requests need the browser run. **If a checker is ever built
+  for this, key it off the `merged:` sha and GitHub's run list, never off reply wording** — row one is
+  what wording-based predicates do.
+
+  > **So, concretely — every gate③ round that lands runs this and quotes it** (there is no
+  > deploy-less landing here — see the table above):
   > `WIE_BASE=https://wie-web.pages.dev node scripts/verify-browser.mjs test_data/helloworld_ktf.zip`
   > — deliberately *inline*, not a fenced `sh` block: fenced blocks in this file are parity-checked
   > against `doc-liveness.yml`, and this line is the alias variant of a command that job already runs
