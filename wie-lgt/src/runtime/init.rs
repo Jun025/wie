@@ -18,7 +18,7 @@ use super::{
     wipi_c::register_wipic_svc_handler,
 };
 
-fn register_init_svc_handler(core: &mut ArmCore, ptr_jar_path: u32) -> Result<()> {
+pub(crate) fn register_init_svc_handler(core: &mut ArmCore, ptr_jar_path: u32) -> Result<()> {
     core.register_svc_handler(SVC_CATEGORY_INIT, handle_init_svc, &ptr_jar_path)
 }
 
@@ -94,7 +94,7 @@ async fn get_import_table(_core: &mut ArmCore, _: &mut (), import_table: u32) ->
     Ok(import_table)
 }
 
-async fn get_import_function(core: &mut ArmCore, import_table: u32, function_index: u32) -> Result<u32> {
+pub(crate) async fn get_import_function(core: &mut ArmCore, import_table: u32, function_index: u32) -> Result<u32> {
     tracing::debug!("get_import_function({import_table:#x}, {function_index})");
 
     if import_table == 0x1fb {

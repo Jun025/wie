@@ -425,7 +425,7 @@ const MANIFEST = ["Manifest-Version: 1.0", "MIDlet-Name: DrawFixture", "MIDlet-1
 const l2 = (v) => Buffer.from([v & 0xff, (v >> 8) & 0xff]);
 const l4 = (v) => Buffer.from([v & 0xff, (v >>> 8) & 0xff, (v >>> 16) & 0xff, (v >>> 24) & 0xff]);
 
-const zip = (entries) => {
+export const zip = (entries) => {
   const locals = [];
   const central = [];
   let offset = 0;

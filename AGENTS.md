@@ -134,8 +134,13 @@ done
 `NOT-RUN: test_data/<name> — <why>` inside this marked region. That keeps the classification in the
 same document as the list instead of in the checker, which is the one thing the proposal behind this
 check warned about: a checker that knows which fixtures are "runner fixtures" becomes a second source
-of truth and drifts from this block. **There are none today** (the diff is 0 in both directions), so
-this paragraph is the syntax, not a list.
+of truth and drifts from this block. There is exactly one today:
+
+NOT-RUN: test_data/resize_ktf.zip — it exists to prove `Screen::resize` reaches a real screen, and
+`wie_validate`'s own `resize` is a no-op that returns `Ok(())`, so running it here would assert
+nothing. Its assertion lives in the browser round-trip (Scenario G), where the canvas is real.
+Built by `node scripts/make-resize-fixture.mjs` — the same guest as `helloworld_ktf.zip` plus one
+`DisplaySize:` line, byte-stable on regeneration.
 
 <!-- ENGINE-RUNNER:END -->
 
@@ -283,9 +288,47 @@ design** — do not "fix" that by wiring it:
   immutable per-deploy URL, live when the action returns. It is **not** a deploy gate: it runs after
   the bytes are up, so it reports a bad deploy rather than blocking one.
 
-  > **If that step goes red, the gate③ round that landed the merge owns it** — it is already running
-  > the same script against production for merge-contract 4-C, so it re-runs it against the URL the
-  > failed step printed and either files a ticket or records in its reply that the deploy is bad.
+  > **If that step goes red, the gate③ round that landed the merge owns it** — it re-runs the script
+  > against the URL the failed step printed and either files a ticket or records in its reply that
+  > the deploy is bad.
+
+  **That owner rule presumes the round already ran this script once, and measurement says it often
+  did not.** This paragraph used to assert the round "is already running the same script against
+  production for merge-contract 4-C" — that claim was false and is gone. **The command itself was
+  never missing from this file** (the last bullet of this section has carried it all along); what was
+  missing is a *verdict* — which output lines count as a pass — and that is what the blockquote below
+  adds. Measured 2026-09-17 over all 131 `wie-*merge*.done.md` replies: **33 record a Cloudflare Pages
+  deploy, and of those only 15 (45%) cite `WIE_BASE` — 18 (55%) do not**. Five of the eighteen are one lane on
+  2026-09-16/17; the other thirteen predate it, so this is a standing gap, not one round's lapse.
+  Every one of the eighteen still *reported* a self-verify — by quoting the in-CI step's conclusion
+  and curling the alias — which passes "운영 URL" but **not** the "콘솔 0에러" half of merge-contract
+  4-C, because console errors and off-origin requests need the browser run.
+
+  > **So, concretely — a gate③ round that lands a deploy runs this and quotes it:**
+  > `WIE_BASE=https://wie-web.pages.dev node scripts/verify-browser.mjs test_data/helloworld_ktf.zip`
+  > — deliberately *inline*, not a fenced `sh` block: fenced blocks in this file are parity-checked
+  > against `doc-liveness.yml`, and this line is the alias variant of a command that job already runs
+  > on its schedule. Fencing it would add a duplicate obligation, and fencing it *inside a blockquote*
+  > would dodge the checker only because its fence regex is `^\s*` (a `>` is not whitespace) — a trap
+  > for whoever un-indents it later.
+  > Pass is **rc=0**, printed as `NO-LEAK AUDIT: ✅` with `off-origin requests: 0`, `requests whose
+  > body contains the game header bytes: 0`, and **`console errors (console.error + pageerror): 0`**.
+  > `nonBlack: 0` is **also** a pass here (below). That third line is the "콘솔 0에러" half of 4-C and
+  > is exactly the half the measurement above found unmet — so as of 2026-09-17 it is not a line to
+  > read but a line the script *judges*: `verify-browser.mjs` exits **3** on a non-zero console-error
+  > count, next to **2** for `NO-LEAK AUDIT: ❌ POSSIBLE LEAK`. Rewired rather than left as prose
+  > because prose here is unenforced discipline, and the change cost nothing: the last 10 deploy runs
+  > and the by-hand alias run all report 0, so no previously-green deploy turns red. Quoting the workflow's own
+  > step is necessary but not sufficient: that step reads the **per-deploy** URL, so it cannot see an
+  > alias that never swung over — which is the entire reason this by-hand run exists.
+
+  **Why this is written here and not in the merge ticket.** The gate③ obligation lives in
+  `~/orchestrator/templates/merge-ticket.tpl` §4-C, which says only "main 자동배포 수반 시
+  self-verify(운영 URL·콘솔 0에러) 증빙" — one line, no command, and it is **outside this repo**, so
+  no round here can edit it. The *how* is repo-specific and therefore belongs in this file; the
+  template's line resolves to this block. Do not duplicate the command into the template's wording
+  from here — point at this section instead (§Constraints' "An external contract is referenced,
+  never copied").
 
   That owner is not a formality: this repo has already had a check go red with nobody named
   (`check-worklog-coverage`, 2026-09-07), and that one blocked every open PR. This one cannot —
@@ -299,9 +342,11 @@ design** — do not "fix" that by wiring it:
 
   **Two things it does not tell you.** It reads the per-deploy URL, not the `wie-web.pages.dev`
   alias, whose swing-over delay nothing here measures — so keep running it by hand against
-  production after a deploy, which is a *different* assertion: `WIE_BASE=https://wie-web.pages.dev
-  node scripts/verify-browser.mjs test_data/helloworld_ktf.zip`. And `rc=0` does not mean the screen
-  rendered — it exits non-zero on a leak (2) and on the flow not completing, but `nonBlack: 0` is a
+  production after a deploy, which is a *different* assertion; **the blockquote above holds that
+  command and its pass criteria, and is the one copy** (this bullet used to repeat the command, which
+  is the same two-sources-of-truth trap §Constraints names). And `rc=0` does not mean the screen
+  rendered — it exits non-zero on a leak (2), on a console error (3), and on the flow not
+  completing, but `nonBlack: 0` is a
   pass, which for the helloworld fixtures is correct since they are expected to end blank. Read it
   as "booted, took a file, leaked nothing". It needs no game file (its default argument is the
   committed `test_data/helloworld_ktf.zip`).

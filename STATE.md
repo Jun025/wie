@@ -62,7 +62,7 @@
 ## 완료 (최근)
 - 2026-09-17: **8주째 보이지 않던 human-step 을 화면이 읽는 자리로 올렸다 — 검사 목록은 «오늘로» 다시 쟀다**
   (`wie-adopt-slice-d-base-swap-fix3-p1-p0` · 채택 `2026-09-17-adopt-slice-d-base-swap-fix3-p1#p0`) —
-  정본 `docs/report/0139--….md`. ★**wie 제품 코드 0줄 · wie diff 는 원장 3파일**.
+  정본 `docs/report/0143--….md`. ★**wie 제품 코드 0줄 · wie diff 는 원장 3파일**.
   산출물 = `~/orchestrator/humansteps/wie-main-branch-protection.md` **카드 1장**(원장 파일 · untracked).
   ★**전제 재측 전건 참**: 그 카드 **0장** · `branches/main/protection` **404** · `rulesets` **0** ·
   `.protected` **false** ⇒ **강제 required check 0개**. 카드 신설 후 `humanstep-scan` 이 `age_days` **57** 을 찍는다.
@@ -77,6 +77,82 @@
   기준선 `how_ruleset_marker=true` **GREEN** → `how:` 를 markdown **본문**으로 옮기면 **false RED** →
   카드 제거 **ABSENT RED** → 복원 **GREEN**.
   ★**한계**: 같은 형태(done 본문에만 있는 human-step)가 **몇 건 더 있는지 세지 않았다** · **보호는 여전히 꺼져 있다**.
+- 2026-09-17: **upstream 이 «새» 워크플로를 들고 오면 이제 기계가 본다 — 손으로 관리하는 목록 «없이»**
+  (`wie-adopt-slice-d-base-swap-fix2-p3-p0` · 채택 `2026-09-16-adopt-slice-d-base-swap-fix2-p3#p0`) —
+  정본 `docs/report/0135--….md`. ★**제품 동작 0줄 · Rust 0줄**.
+  `scripts/check-upstream-new-workflows.mjs` 신설 = `upstream/main` 의 `.github/workflows/` **파일 집합**
+  − 우리 트리 − `KNOWN_ABSENT`(빈 배열)가 비어 있는가. `doc-liveness.yml` 의 ★**마지막 스텝**(주간)으로 배선.
+  ★**손 관리 인벤토리가 «없는» 이유**: upstream 워크플로의 처분 전건(채택·주차)이 파일을 우리 트리에
+  남기므로 차분이 **스스로** 비어 있는 상태로 돌아온다. 예외는 「의도적 삭제·개명」뿐이고 그것만 선언한다.
+  ★**왜 PR 이 아니라 주간인가**: 신호는 upstream 이 움직일 때 바뀐다 — PR 마다 돌리면 upstream 이 파일
+  하나를 올린 날 **열린 PR 전건이 동시에 red** 다(2026-09-07 `check-worklog-coverage` 가 그 형태였다).
+  ★**red 의 주인은 새로 만들지 않았다** — 같은 job 이라 `doc-liveness.yml` 의 「첫 gate③ 회차」 규칙을 상속한다.
+  ★**개악 대조 양방향**: 우리 트리에서 `coverage.yml` 제거(= upstream 이 새 파일을 들고 온 것과 집합적으로
+  동일) → **rc=1 new 1** · `KNOWN_ABSENT` 선언 시 **rc=0**(탈출구 실작동) · ref 미해결 → **rc=1**(fail-open 아님) · 복원 **rc=0**.
+  ★**못 보는 것**: 자기 배선의 삭제(후속 제안) · upstream 의 «수정»(의도적 · 형제 검사기 몫) · 워크플로 본문.
+  ★오늘 실측 차분 **0**(upstream 6 · ours 10) ⇒ green 에서 출발했다.
+- 2026-09-17: **합격 판정식에 «콘솔 0에러»가 없었다 — 읽는 줄이 아니라 «판정하는 줄»로 바꿨다**
+  (`wie-adopt-slice-d-gate3-merge-p0-fix` · 게이트② major 반려 승계) — 정본 `docs/report/0139--….md`
+  (★게이트③이 `0134 → 0139` 로 옮겼다 — 작성 시점엔 63초 뒤에 열린 #177 이 0134 를 먼저 들고 있었다).
+  ★**제품 코드 0줄**(접촉 = `AGENTS.md` + `scripts/verify-browser.mjs` 판정 4줄).
+  ★**반려 요지**: 직전 회차 판정식이 「운영 URL + 누출」만 담고 ★**그 문단 자신의 논거인 «콘솔 0에러»를 한 항목도
+  담지 않았다** ⇒ `NO-LEAK AUDIT: ✅` 인용이 **4-C 충족의 «문서적 근거»**가 되어 «조용한 통과»가 체크리스트로 재생산된다.
+  ★★**문서만 고치지 않고 `rc` 로 옮겼다 — 근거는 «실측된 대가 0»**: `web.yml` push 런 **최근 10건**의 검증 스텝 로그
+  전수 + 손 실행에서 `[console.error]`·`[pageerror]` ★**전건 0** ⇒ 소급 red **0**. ⇒ ⑴(문서만)의 유일한 이점(무접촉)이
+  값을 잃었고, ⑴은 이 원장의 확정 교훈(「주석으로는 안 지켜진다」)에 걸린다.
+  ⇒ `verify-browser.mjs` 종료코드 = 누출 **2**(종전) · ★**콘솔 에러 3**(신설) · 그 밖 0. ★**관측부는 무접촉** —
+  이미 잡아서 «출력만» 하던 줄을 판정에 넣었다(새 기계 0 · 의존 0).
+  ★★**양방향 실증**: 콘솔 에러 1건 주입 → ★**rc=3** ↔ 복원 → **rc=0**. ★그 MUT 에서도 `NO-LEAK AUDIT: ✅` 는
+  **그대로 찍혔다** = 반려가 지목한 형상 그 자체이고, 새 판정식으로 읽으면 **불합격**이다.
+  함께 `(45%)` 귀속 교정(15/33=45% · 18/33=**55%**) · 실패측 문자열을 같은 블록에 · 같은 명령의 **두 벌 중복 제거**.
+  ★**대가**: 앞으로 프로덕션이 콘솔 에러를 내면 **배포 후 CI 스텝이 red** 가 된다(의도 · 소유자는 착지시킨 게이트③ 회차).
+- 2026-09-17: **SetDisplayProperty SVC 의 «배선»을 유닛 테스트가 잡게 했다 — 픽스처는 여전히 0**
+  (`wie-adopt-slice-d-base-swap-executed-p1-p0`) — 정본 `docs/report/0134--….md`.
+  채택 제안 `2026-09-16-adopt-slice-d-base-swap-executed-p1#p0`. ★**제품 동작 0줄**(`init.rs` 두 함수
+  `pub(crate)` 가 제품 코드 변경의 전부).
+  ★**전제 재측으로 «여전히 참»**: `set_display_property`(:121) 머리에 `panic!` 1줄(numstat `1 0`)을 넣어도
+  `helloworld_lgt` PASS/paints 0 · `keydraw_lgt --inject --expect-last-frame` PASS/paints 55/content true
+  ⇒ 어느 픽스처도 이 SVC 를 켜지 않는다.
+  ★**「게이트가 조용하다」를 두 축으로 갈랐다** — ⒜함수 «본문»은 이미 잡혀 있었고
+  (`display_properties_update_physical_display_state`) ⒝**배선**(import table `(0x1f8, 0x16)` + `handle_init_svc`
+  의 `SetDisplayProperty` 갈래)은 **아무것도 잡고 있지 않았다**. ⒝만 닫았다 — 게스트 SDK 없이 닫히기 때문이다.
+  ★**개악 대조 양방향**(둘 다 제품 호출부 · numstat `3 3`): `(0x1f8,0x16)`→`(0x1f8,0x15)` **FAILED** ·
+  디스패치 갈래 → `get_import_table` **FAILED** · 복원 `2 2` **ok**.
+  ★**열린 채로 둔다**: 「실제 LGT 타이틀이 이 SVC 를 쓰는가」는 292 코퍼스가 있어야 하고 이 회차 범위 밖이다.
+- 2026-09-17: **`Screen::resize` 가 «한 번도» 불린 적 없었다 — 크기를 요구하는 픽스처로 처음 덮었다**
+  (`wie-adopt-browser-boot-axis-decision-p0` · 채택 `2026-09-16-browser-boot-axis-decision#p0`) —
+  정본 `docs/report/0138--….md`. ★**제품 동작 변경 0**(개악 대조 2회는 복원).
+  ★**제안 5주장 전건 재측 = 참**: 커밋된 두 KTF `__adf__` 는 **38바이트로 동일**하고 `DisplaySize` 줄이 **없다**
+  ⇒ 엔진의 유일한 산 호출부(`wie-ktf/src/emulator.rs:70` · 상류 base swap 으로 경로만 바뀜)와 그 아래
+  **모든 `Screen::resize` 구현이 0회** 실행이었다. ★**그 호출부는 `Err` 를 `warn!` 으로 삼킨다** — 실패해도 부팅이 계속된다.
+  ★**「검사가 없다」가 아니라 «입력이 없었다»**: `test-utils` TestScreen 은 resize 를 저장하는데 **읽는 단언 0** ·
+  `wie_validate` 의 resize 는 **`Ok(())` no-op** ⇒ 계측기는 있는데 그 코드로 들어가는 입력이 저장소에 없었다.
+  ⇒ `test_data/resize_ktf.zip`(1,627B · **같은 게스트 jar** + `DisplaySize:176*220` 한 줄) + 레시피
+  `scripts/make-resize-fixture.mjs`(★**STORED·타임스탬프 0 ⇒ 재생성해도 바이트 동일** · 수는 **export/import** 로 넘겨 restate 0) +
+  **Scenario G**(브라우저 캔버스 `240x320 → 176x220` 단언). ★**두 축 모두** 다르게 골라 반쪽 resize 가 pass 로 안 읽히게 했다.
+  ★★**개악 대조 — 제품 호출부 «두 곳»을 각각 물었다**(각 회차 wasm 재빌드 · 실브라우저):
+  정상 **49/49** ↔ **MUT1**(엔진이 안 부른다) **48/49** ↔ **MUT2**(호스트가 캔버스를 안 바꾼다) **48/49** ↔ 복원 **49/49**.
+  ★**러너 픽스처 검사기가 새 파일을 실제로 잡아 red 를 냈고**(rc=1) 설계대로 `AGENTS.md` **`NOT-RUN` 1줄**로 해소했다
+  (그 기구의 **첫 사용자** — 종전 excused 0건).
+  ★**덮지 못하는 것**: 뒤 버퍼(wasm 안이라 JS 가 크기를 못 읽는다 · clip 은 throw 가 아니다) · **LGT 호출부**(PR #161 이 끊은 27줄) · 네이티브 창.
+- 2026-09-17: **배포 수반 착지의 self-verify — 「이미 하고 있다」를 실측으로 갈아 «지시»로 바꿨다**
+  (`wie-adopt-slice-d-gate3-merge-p0` · 채택 `2026-09-16-slice-d-gate3-merge#p0`) —
+  정본 `docs/report/0133--….md`. ★**제품 코드 0줄** · ★**머지 티켓 템플릿 무접촉**(repo 밖 · `target: orchestrator`).
+  ★★**ⓑ 가 처방을 바꿨다** — 축은 **이미 있었다**(`AGENTS.md` 가 `WIE_BASE=… verify-browser.mjs` 를 보유 ·
+  회신 **53건**이 인용). 진짜 결함은 ★**`AGENTS.md` 가 그 실행을 «사실»로 단언한 것**이다:
+  배포 수반 회신 **33건 중 `WIE_BASE` 인용 15건**(★**45%** · 미인용 **18**). 그 18 중 **5건이 내 회차**,
+  **13건은 그보다 앞선다** ⇒ ★**상시 간극이지 한 회차의 실수가 아니다.**
+  ★**18건도 보고는 했다** — CI 스텝 인용 + 별칭 `curl` ⇒ 4-C 의 「운영 URL」은 충족하나
+  ★**「콘솔 0에러」가 빠진다**(콘솔·off-origin 은 브라우저 실행이라야 보인다).
+  ⇒ 단언을 실측으로 갈고 **소유자 규칙 옆에 명령 + 합격 판정**(`NO-LEAK AUDIT ✅` · off-origin 0 ·
+  game header bytes 0 · ★`nonBlack 0` 도 합격)을 붙였다. ★**CI 스텝 인용만으론 부족한 이유**도 적었다 —
+  그 스텝은 **per-deploy URL** 을 읽어 ★**«별칭 미전환»을 원리적으로 못 본다.**
+  ★★**명령을 «인라인»으로 적은 것 자체가 판단이다**: 펜스로 적으면 `doc-liveness` parity 가 **중복 의무**를 만들고,
+  ★**블록인용 안 펜스는 추출 정규식 `^\s*` 를 우회해 «들여쓰기를 푸는 다음 사람»에게 트랩**이 된다.
+  개악 대조로 실증 — 인라인 **rc=0** ↔ 펜스화 ★**rc=1** ↔ 복원 **rc=0**.
+  ★★**그리고 내가 건너뛴 검증을 이 회차에서 «실제로» 돌렸다**(프로덕션 · 04:55) — `NO-LEAK AUDIT ✅` ·
+  off-origin **0** · game header bytes **0** ⇒ #167 착지분이 별칭에서 부팅되고 게임 바이트가 새지 않음을 확인.
+  ★**한계**: 기계 강제는 여전히 **0**(후속 제안) · **45%** 는 «오늘의 수»이고 술어가 문구 기반이다.
 - 2026-09-17: **연번 0113 이중 claim — «이미 해소됐다»를 «처분 기록»으로 남긴다**
   (`wie-adopt-slice-d-blocked-on-lgt-abi-decision-p1-fix` · 채택 `2026-09-16-slice-d-blocked-on-lgt-abi-decision#p1`) —
   정본 `docs/report/0132--….md`. ★**제품 코드 0줄** · 사실 판정 **불변** · ★**PR 1건 close(비가역 아님)**.

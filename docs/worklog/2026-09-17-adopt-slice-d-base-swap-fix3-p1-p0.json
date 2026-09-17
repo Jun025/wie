@@ -6,7 +6,7 @@
   "summary": "제안 #p0 채택. 2026-07-22 회차가 done 리포트 §C 본문 안에만 남긴 human-step(main 브랜치 보호 ruleset 적용)을 ~/orchestrator/humansteps/wie-main-branch-protection.md 카드 1장으로 올렸다. 전제 재측 전건 참: humansteps/ 에 그 카드 0장 · protection 404 · rulesets 0 · protected false ⇒ 강제 required check 0개. 카드 신설 후 humanstep-scan 이 age_days 57 을 찍는다(제안의 「약 두 달」이 기계가 세는 수가 됐다). ★§C 를 그대로 베끼지 않았다 — 실제 PR 의 check 이름을 전수 조회해 5종이 전부 유효(PR 트리거 · paths 필터 없음)함을 확인하고, 2026-09-10 에 새로 생긴 doc-liveness (weekly) 가 paths 필터를 갖고 있어 required 에 넣으면 모든 PR 이 영구 교착함을 카드에 리터럴로 박았다. wie 제품 코드 0줄 · wie diff 는 원장 3파일.",
   "changes": [
     "~/orchestrator/humansteps/wie-main-branch-protection.md 신설(원장 파일 · orchestrator-ops 에 untracked) — front-matter 에 what/why/how/verify · how 에 §C 의 ruleset JSON 그대로 + ★「넣으면 안 되는 검사」 절(doc-liveness·coverage·dependabot·beta 3종) + 되돌리기",
-    "docs/report/0139--2026-09-17--wie-adopt-slice-d-base-swap-fix3-p1-p0.md 신설",
+    "docs/report/0143--2026-09-17--wie-adopt-slice-d-base-swap-fix3-p1-p0.md 신설",
     "STATE.md 완료 1건"
   ],
   "verification": [
