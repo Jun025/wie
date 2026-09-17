@@ -60,6 +60,20 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-18: **ruleset 의 «나머지 21개 필드»를 보게 했다 — 목록이 아니라 «객체 지문»으로**
+  (`wie-branch-protection-ruleset-drift-beyond-required-checks` · 채택 `2026-09-17-branch-protection-claim-guard#p0`) —
+  정본 `docs/report/0157--….md`. ★**제품 0줄 · 새 검사기 0 · 새 CI 스텝 0 · PAT 0 · ruleset 무접촉**(계약 3 전건).
+  ★**병**: 기존 가드가 `if (r.type !== "required_status_checks") continue;` 로 ★**네 rule 중 셋을 건너뛴다** —
+  `bypass_actors`·승인 수·허용 머지 방식·삭제 금지가 바뀌어도 **OK 를 찍는데**, 3게이트가 그 값들 «위»에 서 있다.
+  ★**처방은 «항목 추가»가 아니라 «객체 지문»**(계약 1) — 정규화한 ruleset 전체를 `.github/branch-protection-expected.json` 과 대조한다.
+  ★**해시가 아니라 «읽을 수 있는 JSON»** 이라 실패가 **어느 줄이 움직였는지**를 말한다(= 「운영자가 의도했다 ↔ 드리프트다」를 가르는 정보).
+  ★**베이스라인을 손으로 쓰지 않았다** — 파일이 없으면 가드가 **rc=2(fail-closed)** 로 멈추며 라이브 형상을 찍어 준다(정규화를 두 벌로 만들지 않으려고). 그 rc=2 를 이 회차가 실제로 받았다.
+  ★★**양방향 4종 전건 발화**(가짜 `gh` 로 «라이브 쪽» 개악 · 실 ruleset 무접촉 — 사후 승인 수 0·bypass 0·rules 4 불변):
+  승인 수 0→2 · `bypass_actors` 채움 · ★**오늘 «없는» rule type `required_signatures` 추가** · `deletion` 제거 ⇒ 전부 **rc=1** ↔ 무개악 **rc=0**.
+  ★**`futurefield` 가 설계의 증거다** — 열거식이었으면 통과했을 것이다.
+  ★**수**: 비교 잎 필드 **27**(종전 축 6 · ★**새로 보는 21**) · 로컬 admin `gh` **27/27** ↔ ★**CI 토큰 0/27**(403 · run 35181122022 · `administration:read` 는 줄 수 없는 키 · run 35180786771) — ★이것이 **#p1 PAT 결정의 입력**이다.
+  ★**정규화가 버리는 것**: `id`·`node_id`·타임스탬프·`source*`·`current_user_can_bypass` ⇒ ★**지우고 «같은 내용»으로 재생성하면 못 본다**.
+  ★회귀 0: `cargo test --all` **44타깃 · 388 passed · 0 failed** · 4게이트 + beta rc=0 · 검사기 11/13 rc=0(rc=1 2건은 **선재**).
 - 2026-09-17: **base swap 이 남긴 «고아 파일»을 전수로 셌다 — 4건이고, 3건은 되살리면 red 다(추정 아님)**
   (`wie-adopt-orphaned-files-after-base-swap-census` · 채택 `2026-09-17-revive-orphaned-preload-guard#p0`) —
   정본 `docs/report/0153--….md`. ★**제품 코드 0줄** · `git mv` **1건** · 삭제 0 · 경로 재배치 0 · 새 검사기 0.

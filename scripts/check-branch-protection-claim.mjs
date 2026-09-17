@@ -88,10 +88,70 @@ export function drift(claimed, actual) {
 
 const gh = (args) => execFileSync("gh", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 
+// ── Axis ⑵: the WHOLE ruleset, not one rule inside it ───────────────────────
+// The axis above compares ONE thing: the required-check list. Everything else the
+// same ruleset carries — `bypass_actors`, `required_approving_review_count`,
+// `allowed_merge_methods`, `deletion`, `non_fast_forward`, which refs it targets —
+// could change and this file would still print OK. Measured 2026-09-18: the live
+// ruleset has FOUR rules and the loop below `continue`s past three of them.
+//
+// ★So this axis does not enumerate fields. Enumerating is how the next field
+// added by GitHub slips through, and this repo has named that failure often
+// enough. It fingerprints the normalized OBJECT: any field, present or future,
+// moves the fingerprint.
+//
+// ★The fingerprint is stored as READABLE JSON, not a hash. A hash answers "it
+// changed" and stops there; the expected file is its own diff, so the failure can
+// say WHICH line moved — which is what decides "operator meant this" vs "drift".
+//
+// ★WHAT NORMALIZATION DISCARDS, stated because a guard whose blind spot is
+// undocumented gets trusted past its limits: `id`, `node_id`, `created_at`,
+// `updated_at`, `source`, `source_type`, `current_user_can_bypass`. Consequences:
+// deleting the ruleset and recreating it with identical content is INVISIBLE here
+// (new id, same content), and "can *I* bypass right now" is not compared — it is a
+// property of the caller, not of the repo, so comparing it would make the answer
+// depend on who ran the tool. The `bypass_actors` LIST is compared; only the
+// caller-relative view is dropped.
+const RULESET_EXPECTED = ".github/branch-protection-expected.json";
+
+const sortRules = (rules) =>
+  [...(rules ?? [])]
+    .map((r) => {
+      const p = r.parameters;
+      if (!p) return { type: r.type };
+      const q = {};
+      for (const k of Object.keys(p).sort()) {
+        const v = p[k];
+        // Required-check contexts arrive in operator order; sort so a cosmetic
+        // reorder in the GitHub UI does not read as drift.
+        q[k] = Array.isArray(v) ? [...v].map((x) => (x && typeof x === "object" ? x.context ?? x : x)).sort() : v;
+      }
+      return { type: r.type, parameters: q };
+    })
+    .sort((a, b) => a.type.localeCompare(b.type));
+
+/** The comparable shape of one ruleset — see the block above for what is dropped. */
+export function normalizeRuleset(full) {
+  return {
+    name: full.name,
+    target: full.target,
+    enforcement: full.enforcement,
+    conditions: {
+      ref_name: {
+        include: [...(full.conditions?.ref_name?.include ?? [])].sort(),
+        exclude: [...(full.conditions?.ref_name?.exclude ?? [])].sort(),
+      },
+    },
+    bypass_actors: [...(full.bypass_actors ?? [])].map((a) => JSON.stringify(a)).sort().map((s) => JSON.parse(s)),
+    rules: sortRules(full.rules),
+  };
+}
+
 /** Enforced contexts = classic branch protection ∪ every ACTIVE branch ruleset on the default branch. */
 function enforcedContexts(slug, branch) {
   const out = new Set();
   const notes = [];
+  const shapes = [];
 
   // ⑴ classic protection — 404 means "no classic protection", which is NOT "nothing enforced".
   try {
@@ -114,6 +174,7 @@ function enforcedContexts(slug, branch) {
       const include = full.conditions?.ref_name?.include ?? [];
       const hitsDefault = include.includes("~DEFAULT_BRANCH") || include.includes(`refs/heads/${branch}`);
       if (!hitsDefault) continue;
+      shapes.push(normalizeRuleset(full));
       for (const r of full.rules ?? []) {
         if (r.type !== "required_status_checks") continue;
         for (const c of r.parameters?.required_status_checks ?? []) out.add(c.context);
@@ -126,7 +187,7 @@ function enforcedContexts(slug, branch) {
     return { ok: false, why: `rulesets unreadable — ${String(e.stderr || e.message || e).split("\n")[0]}`, notes };
   }
 
-  return { ok: true, out: [...out].sort(), notes };
+  return { ok: true, out: [...out].sort(), notes, shapes };
 }
 
 const slug = (() => {
@@ -168,5 +229,35 @@ if (d.enforcedNotClaimed.length || d.claimedNotEnforced.length) {
   console.log("Update the marked region in AGENTS.md to the measured list (that block is the one copy; prose elsewhere points at it).");
   process.exit(1);
 }
-console.log("OK — the documented required-check list matches what GitHub enforces.");
+// ── Axis ⑵ — whole-ruleset fingerprint (see the block above normalizeRuleset) ──
+const expPath = path.join(root, RULESET_EXPECTED);
+let expected;
+try {
+  expected = JSON.parse(readFileSync(expPath, "utf8"));
+} catch (e) {
+  // FAIL CLOSED: no baseline means "cannot judge", and "cannot judge" is not a pass.
+  console.log(`::error file=${RULESET_EXPECTED}::cannot read the expected ruleset shape — ${String(e.message).split("\n")[0]}. COULD NOT MEASURE, and that is not a pass.`);
+  // Seeding it by hand would re-type the normalization and drift from it, so the
+  // live shape is printed here instead: review it, then save it as that file.
+  console.log(`  ⇒ Seed it from the live shape below (review before saving — this is the state you are declaring correct):`);
+  console.log(JSON.stringify({ rulesets: measured.shapes }, null, 2));
+  process.exit(2);
+}
+const liveShape = JSON.stringify(measured.shapes, null, 2);
+const wantShape = JSON.stringify(expected.rulesets ?? expected, null, 2);
+console.log(`ruleset shape: ${measured.shapes.length} active ruleset(s) on the default branch · baseline ${RULESET_EXPECTED}`);
+if (liveShape !== wantShape) {
+  const a = wantShape.split("\n");
+  const b = liveShape.split("\n");
+  console.log(`::error file=${RULESET_EXPECTED}::branch-protection ruleset DRIFTED — a field outside the required-check list changed on GitHub.`);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if (a[i] !== b[i]) console.log(`    line ${i + 1}:  expected ${a[i] ?? "(absent)"}   ↔   live ${b[i] ?? "(absent)"}`);
+  }
+  console.log(`  ⇒ If the operator meant it: copy the LIVE shape into ${RULESET_EXPECTED} in the same PR and say why in the round's report.`);
+  console.log("  ⇒ If nobody meant it: the repo's merge gate rests on these values (bypass_actors, approval count, allowed merge methods) — escalate before touching anything.");
+  console.log("  ⇒ This tool never writes the ruleset; it only reads. Changing GitHub is an operator step.");
+  process.exit(1);
+}
+
+console.log("OK — the documented required-check list matches what GitHub enforces, and the ruleset shape matches its baseline.");
 process.exit(0);
