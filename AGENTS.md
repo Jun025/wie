@@ -208,9 +208,24 @@ far more than any knob here, measured swinging between loadavg 50 and 201 *betwe
 measure — it counts executor spins while the guest is blocked, and across five identical
 `keydraw_lgt` runs it read 9,630,471 / 912,303 / 36 / 103,786 / 35. Do not derive "this carrier is
 N× slower" from it. And `--action-secs` is not a stand-in for real load: sweeping it 0.60 → 0.05
-left both fixtures at 0/5 until 0.05, where the budget no longer covers **boot** and both collapse
-together (ktf 5/5, lgt 4/5) — a different failure than the one being chased. Boot is not the axis
-either: at `--boot-secs 0.3` both still pass 3/3 with 55 paints.
+left both fixtures at 0/5 until 0.05, where both collapse together (ktf 5/5, lgt 4/5).
+
+**Boot is not what runs out, and it cannot be.** The deadline is *defined* as
+`boot_secs + 0.3 + 27 × action_secs + 1.0` (`wie_validate.rs`, the `--inject` schedule), so the slack
+left after boot is `27 × action_secs + 1.0` — `boot_secs` cancels. At `--action-secs 0.05` that is
+**+2.35 s no matter what `--boot-secs` says**, which is why a 2×2 over
+`boot {2.5, 0.3} × action {0.05, 0.6}`, order-balanced, never once had `--boot-secs` change a verdict
+(48 runs, 2026-09-18). An earlier revision of this paragraph said the budget "no longer covers boot";
+that was not off by a margin, it was the wrong category.
+
+**And the sweep does not show a *different* failure from the load one — it may well be the same one.**
+The signature matches on every field the validator reports: same `reason` string, same blank last
+frame, overlapping `paints`. What settles it is that *one* configuration produces both outcomes with
+only the machine changing under it: measured 2026-09-18, `--action-secs` 0.01–0.05 passed **48/48 at
+loadavg 13–95**, while at loadavg 105–148 even the documented `0.6` failed **2/6**. So the knob and
+real load push on the same race. That is still a reason not to use the knob as a stand-in — a better
+one than "different failure", because it says what the knob actually does: it moves the odds along
+the axis you were already on, so a green sweep buys you nothing about the loaded regime.
 
 **`--expect-last-frame` is on the `keydraw_*` line and deliberately NOT on the one above it.** It
 turns `last_frame_content` from a reported field into an exit code, which is the only thing that
