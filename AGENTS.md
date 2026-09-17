@@ -293,12 +293,43 @@ design** — do not "fix" that by wiring it:
   never missing from this file** (the last bullet of this section has carried it all along); what was
   missing is a *verdict* — which output lines count as a pass — and that is what the blockquote below
   adds. **Compliance is roughly half, and the first measurement of it used the wrong denominator —
-  read the second row, not the first.** Re-measured 2026-09-17 (later the same day, 137 replies):
+  read the second row, not the first.** Measured **2026-09-17T08:25Z** over 142 `wie-*merge*.done.md`
+  replies — **a snapshot, not a constant; the trigger and owner for redoing it are below the table**:
 
   | denominator | how it is chosen | n | cite `WIE_BASE` |
   |---|---|---|---|
-  | replies containing the literal `Deploy to Cloudflare Pages` | **wording** | 36 | 18 (50%) |
-  | replies that **actually landed** (`merged:` is a sha) | **fact** | **107** | **57 (53%)** |
+  | replies containing the literal `Deploy to Cloudflare Pages` | **wording** | 40 | 22 (55%) |
+  | replies that **actually landed** (`merged:` is a sha) | **fact** | **112** | **62 (55%)** |
+
+  **Every one of those cells has already been shown to rot — the same predicates, run by three
+  different rounds inside one day, moved all of them.** First: 137 · 36/18 (50%) · 107/57 (53%);
+  ~9 h later: 138 · 37/19 (51%) · 108/58 (54%); ~6 h after that: the row above. So the trigger is
+  keyed to a cadence this file already runs, rather than a new one:
+
+  > **Trigger — two, and the cheap one is unconditional. ⑴ Re-measure before you cite either row
+  > anywhere.** ⑵ **Independently, when the worklog-coverage re-measure comes due — the same
+  > ten-landing cadence — these two rows are due with it.** Both denominators are one pass over
+  > `~/orchestrator/reports/wie-*merge*.done.md`: *wording* is the replies containing the literal
+  > `Deploy to Cloudflare Pages`; *fact* is those whose **first 12 lines** carry a `merged:` matching
+  > `^[0-9a-fA-F]{7,40}$`; each numerator is the subset that also contains `WIE_BASE`. Overwrite the
+  > table and the timestamp — there is no append-only record for this one, by choice.
+  >
+  > **Owner — deliberately *not* the gate③ round, unlike the cadence it borrows.** That round owns
+  > `--record` because `docs/worklog-coverage-remeasures.json` is a ledger file; this table is in
+  > `AGENTS.md`, which the merge contract does **not** put in the set a merge round may touch, so
+  > naming gate③ here would name someone who is not allowed to do it. The gate③ round that trips the
+  > cadence is the **noticer** — it says so in its reply, and the orchestrator tickets a wie round to
+  > do the edit. Trigger ⑴ needs no owner at all: the round citing the number is the one re-measuring.
+
+  **Both triggers are prose, and neither is checked. That gap is the cost of writing it this way.**
+  The ten landings are enforced by `check-worklog-coverage.mjs` for a *different* metric; nothing
+  reads these two rows, so a round can discharge that obligation, leave these cells untouched, and
+  nothing reddens. The failure mode is silent and is precisely the one this paragraph exists to name.
+  It is left that way on purpose: a checker keyed to reply wording would rebuild row one, and one
+  keyed to the `merged:` sha belongs to `orchestrator`, not here — so that axis is carried as a
+  proposal instead of only in this prose
+  (`docs/worklog/2026-09-17-adopt-gate3-deploy-selfverify-instruction-p0.json`, `target:
+  orchestrator`), which is what keeps it on the recommendations panel.
 
   **The first row is the original 45%-of-33 measurement, and it cannot answer the question it was
   built for.** Two failures, both measured: ⑴ the two gate③ rounds of 2026-09-17 that landed `#177`
@@ -307,10 +338,10 @@ design** — do not "fix" that by wiring it:
   without the ratio moving. ⑵ `web.yml`'s `push` trigger on `main` carries **no `paths` filter**
   (verified by parsing it), so **every** landing here deploys — confirmed 12/12 on the most recent
   merge replies by asking GitHub whether a `Web` run exists for each reply's `merged:` sha. There is
-  no "deploy-bearing" subset in this repo, so a denominator of 36 out of 107 landings is wrong by
+  no "deploy-bearing" subset in this repo, so a denominator of 40 out of 112 landings is wrong by
   construction.
 
-  **So the obligation is unconditional: every gate③ landing here owes the browser run.** The ~47%
+  **So the obligation is unconditional: every gate③ landing here owes the browser run.** The ~45%
   that did not do it still *reported* a self-verify — by quoting the in-CI step's conclusion and
   curling the alias — which passes "운영 URL" but **not** the "콘솔 0에러" half of merge-contract 4-C,
   because console errors and off-origin requests need the browser run. **If a checker is ever built
