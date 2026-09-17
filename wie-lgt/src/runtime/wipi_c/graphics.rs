@@ -959,6 +959,8 @@ mod tests {
     };
     use wie_backend::canvas::{ArgbPixel, Image, PixelType, VecImageBuffer};
 
+    use crate::runtime::init::{get_import_function, register_init_svc_handler};
+
     #[test]
     fn process_state_initializes_once_for_the_clet_lifecycle() -> Result<()> {
         let mut core = ArmCore::new(false, None)?;
@@ -995,6 +997,44 @@ mod tests {
         let state: LgtGraphicsState = read_generic(&core, ptr_state)?;
         assert_eq!(state.physical_width, 240);
         assert_eq!(state.physical_height, 320);
+
+        Ok(())
+    }
+
+    // The test above calls `set_display_property` directly; this one reaches it the way a
+    // guest does — resolve `(0x1f8, 0x16)` through the import table, then execute the SVC
+    // stub it hands back. That covers the two wiring hops no fixture touches: measured
+    // 2026-09-17, a `panic!` at the top of `set_display_property` leaves `keydraw_lgt` and
+    // `helloworld_lgt` both PASS, so nothing else in this repo executes this path.
+    #[test]
+    fn display_property_svc_reaches_graphics_through_the_import_table() -> Result<()> {
+        let mut core = ArmCore::new(false, None)?;
+        Allocator::init(&mut core)?;
+        let mut context = core.save_context();
+        let stack = Allocator::alloc(&mut core, 0x100)?;
+        context.sp = stack + 0x100;
+        core.restore_context(&context);
+
+        register_init_svc_handler(&mut core, 0)?;
+        let set_property = get_import_function(&mut core, 0x1f8, 0x16).now_or_never().unwrap()?;
+
+        // (ptr_display, property, value, size) — `size` must be 0 or the call is a no-op.
+        let _: u32 = core.run_function(set_property, &[0, 0x64, 176, 0]).now_or_never().unwrap()?;
+        let _: u32 = core.run_function(set_property, &[0, 0x65, 220, 0]).now_or_never().unwrap()?;
+        let _: u32 = core.run_function(set_property, &[0, 0x7f, 1, 0]).now_or_never().unwrap()?;
+
+        let properties: LgtDisplayProperties = read_generic(&core, DISPLAY_PROPERTIES_ROOT)?;
+        assert_eq!(properties.physical_width, 176);
+        assert_eq!(properties.physical_height, 220);
+        assert_eq!(properties.use_annunciator, 1);
+
+        // And the guest-visible effect: the properties seed the process state.
+        init_process_state(&mut core, 240, 320)?;
+        let ptr_state: u32 = read_generic(&core, GRAPHICS_STATE_ROOT)?;
+        let state: LgtGraphicsState = read_generic(&core, ptr_state)?;
+        assert_eq!(state.physical_width, 176);
+        assert_eq!(state.physical_height, 220);
+        assert_eq!(state.use_annunciator, 1);
 
         Ok(())
     }

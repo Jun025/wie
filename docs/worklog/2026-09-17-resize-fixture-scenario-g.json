@@ -1,0 +1,42 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-17",
+  "task": "wie-adopt-browser-boot-axis-decision-p0",
+  "title": "Screen::resize 가 «한 번도» 불린 적 없었다 — 크기를 요구하는 픽스처로 처음 덮었다",
+  "summary": "채택 제안은 「DisplaySize 를 선언하는 KTF 픽스처를 하나 만들어 Screen::resize 를 처음으로 덮어라」였고, 다섯 주장을 전부 다시 재서 전건 참임을 확인했다(경로만 상류 base swap 으로 wie-ktf/ 로 바뀌었다). 커밋된 두 KTF 픽스처의 __adf__ 는 38바이트로 동일하고 DisplaySize 줄이 없어, 엔진의 유일한 산 호출부와 그 아래 모든 Screen::resize 구현이 0회 실행이었다. 게다가 그 호출부는 Err 를 tracing::warn! 으로 삼켜 실패해도 부팅이 계속된다. ⇒ helloworld_ktf 에서 파생한 별 픽스처(resize_ktf.zip · 같은 게스트 jar + DisplaySize:176*220 한 줄)와 그 레시피 스크립트를 만들고, 브라우저 라운드트립에 Scenario G 를 붙여 캔버스가 실제로 176x220 으로 바뀌는지를 단언한다. 제품 코드 0줄.",
+  "changes": [
+    "test_data/resize_ktf.zip 신규(1,627B) — helloworld_ktf.zip 과 같은 게스트 jar + __adf__ 에 DisplaySize:176*220 한 줄",
+    "scripts/make-resize-fixture.mjs 신규 — 그 파생의 레시피. RESIZE_W/RESIZE_H/RESIZE_FIXTURE 를 export 해 시나리오가 수를 restate 하지 않게 한다. STORED+타임스탬프 0 이라 재생성해도 바이트 동일",
+    "scripts/make-draw-fixture.mjs — 내부 zip() 헬퍼를 export (한 단어). 두 번째 zip 구현을 만들지 않기 위해서다",
+    "scripts/contract-roundtrip.mjs — Scenario G 추가(캔버스 크기 단언 + 리사이즈된 인스턴스가 여전히 tick 하는가 + free) · 헤더의 「어떤 시나리오도 Screen::resize 에 닿지 않는다」 절을 «닫힌 절반 / 남은 절반»으로 갱신",
+    "AGENTS.md — 엔진 러너 영역에 NOT-RUN: test_data/resize_ktf.zip 1줄(wie_validate 의 resize 는 no-op 이라 거기서 돌리면 아무것도 단언하지 못한다) · 「오늘은 없다」 문장 교정",
+    "docs/report/0138--2026-09-17--wie-adopt-browser-boot-axis-decision-p0.md 신규 · STATE.md 완료 항 1건"
+  ],
+  "verification": [
+    "★제안 재측(전건 참): 두 KTF 픽스처의 __adf__ 전문 = 'AID:00000000\\nPID:PD000000\\nMClass:Clet\\n'(38B, 동일) · 호출부 wie-ktf/src/emulator.rs:70 의 조건과 warn! 삼킴 실재 · test-utils TestScreen 은 resize 를 저장만 하고 읽는 단언 0 · wie_cli/src/bin/wie_validate.rs 의 resize 는 Ok(()) no-op",
+    "★★개악 대조(양방향 · 제품 호출부 2곳 · 실브라우저 · 각 회차 wasm 재빌드): 정상 rc=0 49/49 ↔ MUT1(엔진: adf.display_size 를 None 으로) rc=1 48/49 '✗ G: … — 240x320' ↔ MUT2(호스트: WebScreen::resize 의 front.set_width/height 제거) rc=1 48/49 같은 실패 ↔ 복원 rc=0 49/49",
+    "★새 픽스처가 실제로 부팅한다: cargo run -p wie_cli --bin wie_validate -- test_data/resize_ktf.zip → \"result\":\"PASS\"",
+    "★바이트 안정: 생성기를 두 번 돌려 cmp 동일",
+    "★검사기가 새 픽스처를 «잡았다»: check-engine-runner-fixtures.mjs 가 rc=1 로 red(‘committed but neither runs nor excuses it’) → AGENTS.md NOT-RUN 1줄로 rc=0(6 tracked · 1 excused). 그 기구의 첫 사용자다",
+    "회귀 0: fmt/clippy --all -D warnings/wasm clippy/+beta clippy 전건 rc=0 · RUST_MIN_STACK=4194304 cargo test --all rc=0 (test result: ok 42줄 · 합산 384 passed · 0 failed) · npm run audit PASSED · engine-contract 109 pass 0 violation · doc-liveness-parity 25줄 · worklog-json/worklog-coverage/parked-workflows/docs-report-serial/parity-lock-wired/linux-system-deps 전건 rc=0"
+  ],
+  "limits": [
+    "★뒤 버퍼(back canvas)는 못 본다 — WebScreen::resize 는 앞뒤를 같이 옮기는데 뒤 캔버스는 wasm 안에서 만들어져 JS 가 크기를 못 읽는다. 뒤 버퍼만 옛 크기로 남는 회귀는 clip 을 낼 뿐 throw 가 아니라 이 시나리오를 통과한다",
+    "★LGT 쪽 Screen::resize 배선(PR #161 이 끊은 27줄)과 네이티브 창(wie_cli WindowHandle)은 여전히 미덮음이다 — 이 회차는 KTF 부팅 경로 하나만 덮는다",
+    "★커밋 바이너리 1개(1,627B)와 유지 대상 1개(생성기)가 늘었다 — 제안이 예고한 대가이고, 레시피가 있어 재생성 가능하다는 점으로만 상쇄된다",
+    "★176x220 은 «픽스처가 소유한 수»다 — 시나리오는 그것을 import 한다. 문서·회신에 그 수를 상수로 옮겨 적지 마라"
+  ],
+  "adoptedProposals": ["2026-09-16-browser-boot-axis-decision#p0"],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "resize 는 앞 캔버스만 검증된다 — 뒤 버퍼 크기를 브라우저에서 읽을 방법이 없다",
+      "plainSummary": "화면 크기가 바뀔 때 눈에 보이는 캔버스는 확인되지만, 내부 버퍼도 같이 바뀌었는지는 확인하지 못합니다. 둘이 어긋나면 화면 일부가 잘릴 수 있습니다.",
+      "userBenefit": "리사이즈 후 화면이 잘리는 회귀를 게이트가 잡는다 — 지금은 잘려도 예외가 나지 않아 아무도 모른다.",
+      "why": "Scenario G 가 단언하는 것은 HTMLCanvasElement.width/height 뿐이다. WebScreen::resize 는 back_canvas 도 함께 옮기는데 그 캔버스는 wasm 안에서 생성돼 JS 가 접근할 수 없다. 뒤 버퍼만 옛 크기로 남으면 drawImage 가 프레임을 자르되 throw 하지 않으므로 G 의 두 단언을 모두 통과한다.",
+      "tradeoff": "가장 싼 축은 리사이즈 «후»에 실제로 그리는 게스트 픽스처를 써서 픽셀 수를 세는 것이다(helloworld 게스트는 아무것도 안 그린다) — 그러면 keydraw 계열처럼 게스트를 새로 빌드해야 하고 nightly+네트워크가 필요한 생성기가 하나 더 는다. 대안으로 wasm 쪽에 디버그용 게터를 여는 길이 있는데, 그것은 계약 표면(featurephone-engine-contract.json)을 검증 목적으로 넓히는 일이라 더 비싸다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ]
+}

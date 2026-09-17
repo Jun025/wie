@@ -60,6 +60,20 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-17: **upstream 이 «새» 워크플로를 들고 오면 이제 기계가 본다 — 손으로 관리하는 목록 «없이»**
+  (`wie-adopt-slice-d-base-swap-fix2-p3-p0` · 채택 `2026-09-16-adopt-slice-d-base-swap-fix2-p3#p0`) —
+  정본 `docs/report/0135--….md`. ★**제품 동작 0줄 · Rust 0줄**.
+  `scripts/check-upstream-new-workflows.mjs` 신설 = `upstream/main` 의 `.github/workflows/` **파일 집합**
+  − 우리 트리 − `KNOWN_ABSENT`(빈 배열)가 비어 있는가. `doc-liveness.yml` 의 ★**마지막 스텝**(주간)으로 배선.
+  ★**손 관리 인벤토리가 «없는» 이유**: upstream 워크플로의 처분 전건(채택·주차)이 파일을 우리 트리에
+  남기므로 차분이 **스스로** 비어 있는 상태로 돌아온다. 예외는 「의도적 삭제·개명」뿐이고 그것만 선언한다.
+  ★**왜 PR 이 아니라 주간인가**: 신호는 upstream 이 움직일 때 바뀐다 — PR 마다 돌리면 upstream 이 파일
+  하나를 올린 날 **열린 PR 전건이 동시에 red** 다(2026-09-07 `check-worklog-coverage` 가 그 형태였다).
+  ★**red 의 주인은 새로 만들지 않았다** — 같은 job 이라 `doc-liveness.yml` 의 「첫 gate③ 회차」 규칙을 상속한다.
+  ★**개악 대조 양방향**: 우리 트리에서 `coverage.yml` 제거(= upstream 이 새 파일을 들고 온 것과 집합적으로
+  동일) → **rc=1 new 1** · `KNOWN_ABSENT` 선언 시 **rc=0**(탈출구 실작동) · ref 미해결 → **rc=1**(fail-open 아님) · 복원 **rc=0**.
+  ★**못 보는 것**: 자기 배선의 삭제(후속 제안) · upstream 의 «수정»(의도적 · 형제 검사기 몫) · 워크플로 본문.
+  ★오늘 실측 차분 **0**(upstream 6 · ours 10) ⇒ green 에서 출발했다.
 - 2026-09-17: **「대조 안 했음」이 「대조했고 깨끗함」으로 읽혔다 — 강등을 «성공 줄»이 말하게 했다**
   (`wie-adopt-slice-d-base-swap-fix2-p1-p0-fix` · 게이트② 반려 승계 F1~F4) — 정본 `docs/report/0140--….md`.
   ★**F1(블로킹)**: 열린 PR 조회가 **실패**했는데 성공 줄이 「충돌 0」이라 **단언**했다(조건이 `claims.ok` 를 안 봤다)
@@ -106,6 +120,35 @@
   **그대로 찍혔다** = 반려가 지목한 형상 그 자체이고, 새 판정식으로 읽으면 **불합격**이다.
   함께 `(45%)` 귀속 교정(15/33=45% · 18/33=**55%**) · 실패측 문자열을 같은 블록에 · 같은 명령의 **두 벌 중복 제거**.
   ★**대가**: 앞으로 프로덕션이 콘솔 에러를 내면 **배포 후 CI 스텝이 red** 가 된다(의도 · 소유자는 착지시킨 게이트③ 회차).
+- 2026-09-17: **SetDisplayProperty SVC 의 «배선»을 유닛 테스트가 잡게 했다 — 픽스처는 여전히 0**
+  (`wie-adopt-slice-d-base-swap-executed-p1-p0`) — 정본 `docs/report/0134--….md`.
+  채택 제안 `2026-09-16-adopt-slice-d-base-swap-executed-p1#p0`. ★**제품 동작 0줄**(`init.rs` 두 함수
+  `pub(crate)` 가 제품 코드 변경의 전부).
+  ★**전제 재측으로 «여전히 참»**: `set_display_property`(:121) 머리에 `panic!` 1줄(numstat `1 0`)을 넣어도
+  `helloworld_lgt` PASS/paints 0 · `keydraw_lgt --inject --expect-last-frame` PASS/paints 55/content true
+  ⇒ 어느 픽스처도 이 SVC 를 켜지 않는다.
+  ★**「게이트가 조용하다」를 두 축으로 갈랐다** — ⒜함수 «본문»은 이미 잡혀 있었고
+  (`display_properties_update_physical_display_state`) ⒝**배선**(import table `(0x1f8, 0x16)` + `handle_init_svc`
+  의 `SetDisplayProperty` 갈래)은 **아무것도 잡고 있지 않았다**. ⒝만 닫았다 — 게스트 SDK 없이 닫히기 때문이다.
+  ★**개악 대조 양방향**(둘 다 제품 호출부 · numstat `3 3`): `(0x1f8,0x16)`→`(0x1f8,0x15)` **FAILED** ·
+  디스패치 갈래 → `get_import_table` **FAILED** · 복원 `2 2` **ok**.
+  ★**열린 채로 둔다**: 「실제 LGT 타이틀이 이 SVC 를 쓰는가」는 292 코퍼스가 있어야 하고 이 회차 범위 밖이다.
+- 2026-09-17: **`Screen::resize` 가 «한 번도» 불린 적 없었다 — 크기를 요구하는 픽스처로 처음 덮었다**
+  (`wie-adopt-browser-boot-axis-decision-p0` · 채택 `2026-09-16-browser-boot-axis-decision#p0`) —
+  정본 `docs/report/0138--….md`. ★**제품 동작 변경 0**(개악 대조 2회는 복원).
+  ★**제안 5주장 전건 재측 = 참**: 커밋된 두 KTF `__adf__` 는 **38바이트로 동일**하고 `DisplaySize` 줄이 **없다**
+  ⇒ 엔진의 유일한 산 호출부(`wie-ktf/src/emulator.rs:70` · 상류 base swap 으로 경로만 바뀜)와 그 아래
+  **모든 `Screen::resize` 구현이 0회** 실행이었다. ★**그 호출부는 `Err` 를 `warn!` 으로 삼킨다** — 실패해도 부팅이 계속된다.
+  ★**「검사가 없다」가 아니라 «입력이 없었다»**: `test-utils` TestScreen 은 resize 를 저장하는데 **읽는 단언 0** ·
+  `wie_validate` 의 resize 는 **`Ok(())` no-op** ⇒ 계측기는 있는데 그 코드로 들어가는 입력이 저장소에 없었다.
+  ⇒ `test_data/resize_ktf.zip`(1,627B · **같은 게스트 jar** + `DisplaySize:176*220` 한 줄) + 레시피
+  `scripts/make-resize-fixture.mjs`(★**STORED·타임스탬프 0 ⇒ 재생성해도 바이트 동일** · 수는 **export/import** 로 넘겨 restate 0) +
+  **Scenario G**(브라우저 캔버스 `240x320 → 176x220` 단언). ★**두 축 모두** 다르게 골라 반쪽 resize 가 pass 로 안 읽히게 했다.
+  ★★**개악 대조 — 제품 호출부 «두 곳»을 각각 물었다**(각 회차 wasm 재빌드 · 실브라우저):
+  정상 **49/49** ↔ **MUT1**(엔진이 안 부른다) **48/49** ↔ **MUT2**(호스트가 캔버스를 안 바꾼다) **48/49** ↔ 복원 **49/49**.
+  ★**러너 픽스처 검사기가 새 파일을 실제로 잡아 red 를 냈고**(rc=1) 설계대로 `AGENTS.md` **`NOT-RUN` 1줄**로 해소했다
+  (그 기구의 **첫 사용자** — 종전 excused 0건).
+  ★**덮지 못하는 것**: 뒤 버퍼(wasm 안이라 JS 가 크기를 못 읽는다 · clip 은 throw 가 아니다) · **LGT 호출부**(PR #161 이 끊은 27줄) · 네이티브 창.
 - 2026-09-17: **배포 수반 착지의 self-verify — 「이미 하고 있다」를 실측으로 갈아 «지시»로 바꿨다**
   (`wie-adopt-slice-d-gate3-merge-p0` · 채택 `2026-09-16-slice-d-gate3-merge#p0`) —
   정본 `docs/report/0133--….md`. ★**제품 코드 0줄** · ★**머지 티켓 템플릿 무접촉**(repo 밖 · `target: orchestrator`).
