@@ -708,9 +708,16 @@ an obvious optimization and is the outage.
 
 **`contract` IS a required check — the switch was thrown on 2026-09-17, and this entry has now been
 wrong in both directions.** It said "required" while nothing was; it then said "nothing is required"
-for about two hours after a ruleset made five checks required. The list below is the one copy; the
-guard that keeps it honest is `scripts/check-branch-protection-claim.mjs`, run weekly by
-`doc-liveness.yml`.
+for about two hours after a ruleset made five checks required. The list below is the one copy, and
+`node scripts/check-branch-protection-claim.mjs` diffs it against the live API both ways.
+
+**Run that guard by hand — CI cannot, and the reason is measured, not assumed.** In Actions the
+`github.token` gets **403 "Resource not accessible by integration"** on the branch-protection and
+rulesets endpoints (run `35181122022`; the guard exited **2 = COULD NOT MEASURE** rather than reading
+a 403 as "nothing enforced"), and `permissions: administration: read` does not help because that key
+is not grantable — GitHub rejects the workflow at parse time (run `35180786771`, startup_failure).
+Wiring it would need a PAT, a different cost class. So it runs where `gh` is the owner: **when you
+edit the block below, and when a merge behaves unlike what this section says.**
 
 <!-- REQUIRED-CHECKS:BEGIN — scripts/check-branch-protection-claim.mjs diffs this list against
      classic protection ∪ active branch rulesets, both directions. Edit this block, not the prose

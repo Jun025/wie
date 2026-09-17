@@ -70,7 +70,11 @@
   `protection.enabled` 도 **false** 그대로다. 보이는 축은 ★**`protected: true` 와 `rulesets`** 뿐이다
   ⇒ 그 회차는 «틀린» 게 아니라 ★**«덜 물었다».**
   ⇒ `AGENTS.md` 에 **`REQUIRED-CHECKS` 표시 영역**(기존 `ENGINE-RUNNER` 관용구와 **같은 형태**)을 두고
-  `scripts/check-branch-protection-claim.mjs` 가 **classic ∪ 활성 ruleset** 과 **양방향** 대조 · `doc-liveness.yml`(주 1회)에 **rider 1스텝**.
+  `scripts/check-branch-protection-claim.mjs` 가 **classic ∪ 활성 ruleset** 과 **양방향** 대조.
+  ★★**CI(주 1회) 배선은 «시도했고 실측이 막았다»**: `administration: read` 는 ★**줄 수 없는 스코프**라 워크플로가
+  **파싱 단계에서 거부**됐고(run `35180786771` startup_failure), `contents: read` 만으로는 ★**403** 이라 검사기가
+  **rc=2 「못 쟀다」**로 멈췄다(run `35181122022`). ⇒ 제안이 적은 「안 되면 PAT — 비용 계급이 다르다」 갈래가 성립
+  ⇒ ★**배선을 되돌리고**(상시 red 금지) «왜 안 얹었는지»를 런 번호와 함께 주석으로 남겼다. ★**지금은 손으로 도는 도구다.**
   ★★**개악 대조 4방향**: 과소 주장 **rc=1** · 과대 주장 **rc=1** · 마커 훼손 ★**rc=2(비교 불가)** ·
   토큰이 못 읽는 형상 ★**rc=2(COULD NOT MEASURE)** ↔ 복원 **rc=0**. ★**«못 읽음»을 «강제 없음»으로 읽지 않는다** —
   그것이 직전 회차가 진 형태 그대로다.

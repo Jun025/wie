@@ -1,7 +1,7 @@
-## [2026-09-17] 「required check 는 0개」가 **2시간 만에** 거짓이 됐다 — 이제 기계가 본다 (wie-adopt-slice-d-base-swap-fix3-p1-p1)
+## [2026-09-17] 「required check 는 0개」가 **2시간 만에** 거짓이 됐다 — 대조 도구를 세웠고, CI 배선은 실측이 막았다 (wie-adopt-slice-d-base-swap-fix3-p1-p1)
 
 **무엇을**: `scripts/check-branch-protection-claim.mjs` 신설 — `AGENTS.md` 의 **`REQUIRED-CHECKS` 표시 영역**과
-**GitHub 이 실제로 강제하는 목록**을 양방향으로 대조한다. `doc-liveness.yml`(주 1회)에 **rider 1스텝**으로 얹었다.
+**GitHub 이 실제로 강제하는 목록**을 양방향으로 대조한다. ★**CI 에 얹으려 했고, 실측이 «안 된다»고 답해 손으로 도는 도구로 남겼다**(ⓒ).
 함께 **이미 거짓이 된 문서 4곳**을 실측으로 갈았다. ★**제품 코드 0줄.**
 
 **왜**: 채택 제안 `2026-09-17-adopt-slice-d-base-swap-fix3-p1#p1` — 「문서를 실측에 맞췄지만,
@@ -29,13 +29,21 @@ ruleset **「main protection」** `created_at` = **2026-09-17T10:17:54+09:00** �
 ⇒ 직전 회차는 **하필 안 보이는 두 축만 읽고** 「0개」로 판정했다. **틀린 것이 아니라 «덜 물었다».**
 ⇒ 그래서 이 검사기는 **세 축을 다 묻고**, 못 읽으면 ★**「없다」가 아니라 「못 쟀다」(rc=2)** 로 끝낸다.
 
-## ⓒ 제안의 «선행 확인»에 답했다 — 그리고 **답이 필요 없게** 설계했다
+## ⓒ ★제안의 «선행 확인» — **실제로 돌려서 답을 받았고, 답은 «안 된다»였다**
 제안: 「먼저 확인할 것은 **`administration: read` 로 그 엔드포인트가 읽히는가** 하나이고, 안 되면 PAT 라 비용 계급이 달라진다」.
-- ⒜ **권한은 선언했다** — `doc-liveness.yml` 에 `administration: read`(읽기 전용) 1줄.
-- ⒝ ★**그 답이 «아니오»여도 이 회차는 안전하다** — 못 읽으면 검사기가 **rc=2 로 「못 쟀다」**를 외치지
-  ★**«강제 0개»로 읽지 않는다.** 즉 **PAT 없이도 «틀린 green» 은 안 난다**(못 잰다는 사실이 보일 뿐).
-- ⒞ ★**실증은 이 PR 의 CI 가 낸다** — `doc-liveness.yml` 은 자기 파일을 고치는 PR 에서 **self-test** 로 한 번 돈다.
-  ⇒ 「Actions 토큰이 `/rulesets` 를 읽는가」는 **이 PR 런의 그 스텝**이 답한다(회신에 rc 를 인용한다).
+**두 번 측정했고 둘 다 CI 런이 증거다**:
+
+| 시도 | 결과 |
+|---|---|
+| `permissions: administration: read` 선언 | ★**GitHub 이 워크플로를 «파싱 단계»에서 거부**(run `35180786771` · `startup_failure` · "workflow file issue") ⇒ **그 스코프는 줄 수 없다** |
+| `contents: read` 만으로 rider 실행 | ★**403 `Resource not accessible by integration`** — 검사기가 **rc=2 「COULD NOT MEASURE」**로 종료(run `35181122022` 스텝 16) |
+
+⇒ ★**제안이 말한 «안 되면» 갈래가 성립했다** — CI 배선은 **PAT 없이는 불가**이고 PAT 는 비용 계급이 다르다(시크릿 관리).
+⇒ ★**배선을 되돌렸다**(주 1회 스텝 제거). ★**영구 red 를 남기지 않는다** — 이 저장소에서 «상시 빨간 검사»는 죽은 검사다.
+★**대신 두 가지를 남겼다**: ⑴`doc-liveness.yml` 에 «왜 안 얹었는지»를 **런 번호와 함께** 주석으로 박았다(다음 사람이 다시 시도하지 않게)
+⑵`AGENTS.md` 가 **언제 손으로 돌리는지**를 지시한다(표시 영역을 고칠 때 · 머지가 문서와 다르게 굴 때).
+★★**그리고 «설계가 값을 했다»**: 403 을 만난 순간 검사기는 ★**«강제 0개»가 아니라 «못 쟀다»**로 멈췄다 —
+직전 회차가 진 형태(덜 물어 보고 0개로 단정)를 **그 자리에서 재현하지 않았다**.
 
 ## ⓓ 산출물 — 「표시 영역 ↔ API」 양방향 diff(산문 파싱 0)
 - `AGENTS.md` 에 **`REQUIRED-CHECKS:BEGIN/END`** 표시 영역 **1곳**(목록 + ruleset 메타). ★**이 저장소의 기존 관용구**다
@@ -59,6 +67,10 @@ ruleset **「main protection」** `created_at` = **2026-09-17T10:17:54+09:00** �
 `.github/workflows/web.yml`(「THAT ONCE HAS NOT HAPPENED」 → 「HAPPENED」) · `docs/upstream-realign-p3-slices.md`(재정정).
 ★**전부 «목록을 옮겨 적지» 않고 표시 영역을 가리키게** 바꿨다 — 그래야 다음 변화 때 **한 곳만** 고친다.
 
+## ⓕ-2 ★«주 1회 CI» 를 못 쓰게 된 대가 — 숨기지 않는다
+★**지금 이 축은 «사람이 돌려야 도는» 축이다.** 제안이 원한 「아무도 안 보는 상태의 종료」는 **절반만** 달성됐다 —
+도구와 **단일 사본(표시 영역)** 은 생겼지만 **주기 실행이 없다**. ⇒ PAT 도입 여부를 결정해야 그 절반이 닫힌다(후속 제안 1건).
+
 ## ⓖ 부수 관측(고치지 않았다 · 기록만)
 - ★**required 5개가 전부 «paths 필터 없음»이다** — `rust.yml`·`web.yml` 의 `pull_request` 트리거에 `paths:` 가 **없고**
   `contract` 는 상시 실행 래퍼다 ⇒ ★**사건 대장의 「paths 필터된 required check 는 머지를 영구 교착시킨다」에 걸리는 조합이 «현재 0»** 이다.
@@ -71,7 +83,7 @@ ruleset **「main protection」** `created_at` = **2026-09-17T10:17:54+09:00** �
 ## ⓗ 검증
 검사기 **9종 rc=0**(신규 포함 · `worklog-coverage` 는 `--record` 후 rc=0) · `fmt`·`clippy --all -D warnings`·wasm·**`+beta`** rc=0 ·
 `RUST_MIN_STACK=4194304 cargo test --all` **rc=0**(42타깃 · **385 passed · 0 failed**) · `npm run audit` **PASSED** ·
-`doc-liveness` parity **rc=0**(rider 는 DOC-COPY 밖 — 기존 upstream rider 와 같은 자리).
+`doc-liveness` parity **rc=0**.
 
-**사용자 영향**: 「이 검사가 필수인가」를 문서만 보고 잘못 판단하는 일이 **주 1회 기계로** 걸린다.
-오늘 그 오판은 **2시간**이었고, 반대 방향으로는 **8주**였다.
+**사용자 영향**: 「이 검사가 필수인가」를 문서만 보고 잘못 판단하면 **한 명령이 그 자리에서 양방향으로 말해 준다** —
+오늘 그 오판은 한쪽으로 **2시간**, 반대쪽으로 **8주**였다. ★**자동 주기 실행은 아직 없다**(PAT 결정이 남았다).

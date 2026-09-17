@@ -59,11 +59,6 @@ on:
 
 permissions:
   contents: read
-  # ★NOT `administration: read` — measured 2026-09-17: GitHub rejects that key at
-  # workflow parse time (startup_failure, "workflow file issue", run 35180786771).
-  # `administration` is not a grantable GITHUB_TOKEN scope, so the branch-protection
-  # guard below runs on `contents: read` alone and reports rc=2 "COULD NOT MEASURE"
-  # if that is not enough — it never reads an unreadable endpoint as "nothing enforced".
 
 jobs:
   doc-liveness:
@@ -189,14 +184,15 @@ jobs:
           git fetch --depth=1 upstream main:refs/remotes/upstream/main
           node scripts/check-upstream-new-workflows.mjs
 
-      # ★Second rider, same reasoning as the first (weekly cadence + a red with an
-      # owner), OUTSIDE every DOC-COPY region. Its signal moves when REPO SETTINGS
-      # move, not when we do — per-PR it would redden every open PR at once for
-      # something none of them touched. Weekly is also the right resolution: branch
-      # protection does not change by the minute, and the drift it catches went
-      # unnoticed for ~2 hours in one direction and ~8 weeks in the other.
-      # See docs/worklog/2026-09-17-adopt-slice-d-base-swap-fix3-p1.json #p1.
-      - name: "Documented required checks match GitHub (docs/worklog/2026-09-17-adopt-slice-d-base-swap-fix3-p1.json #p1)"
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/check-branch-protection-claim.mjs
+      # ★A second rider was BUILT for this job and then NOT wired — the measurement
+      # said no, and the measurement is recorded rather than the intention:
+      # scripts/check-branch-protection-claim.mjs needs the branch-protection /
+      # rulesets endpoints, and in Actions `github.token` gets 403 "Resource not
+      # accessible by integration" on them (measured 2026-09-17, run 35181122022,
+      # step exited 2 = COULD NOT MEASURE — correctly refusing to read 403 as "nothing
+      # enforced"). `permissions: administration: read` does not fix it: that key is
+      # not grantable and GitHub rejects the workflow at parse time (run 35180786771,
+      # startup_failure). Wiring it would mean a PAT — a different cost class (secret
+      # management), which the adopting proposal itself named as the stop line.
+      # ⇒ The guard runs LOCALLY, where `gh` is the owner (AGENTS.md, REQUIRED-CHECKS
+      # block). Do not re-add a step here without a token that can actually read.
