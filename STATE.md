@@ -60,6 +60,20 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-17: **verify-browser 가 repo 루트에 스크린샷 2장을 쓴다 — 그 부작용을 문서가 «말하게» 했다**
+  (`wie-adopt-gate3-selfverify-console-axis-p0` · 채택 `2026-09-17-gate3-selfverify-console-axis#p0`) —
+  정본 `docs/report/0147--….md`. ★**제품 코드 0줄 · 스크립트 0줄 · CI 0줄** — 접촉은 `AGENTS.md` **한 문단**뿐.
+  ★**결함이 아니라 문서 결손이다** — `.gitignore:35 /verify_*.png` 가 이미 덮어 새는 것은 없고,
+  새는 것은 **사람의 시간**이다(손으로 돌린 회차가 매번 「커밋해야 하나」를 다시 확인한다).
+  ★**이 회차 자신이 증거다** — 오늘 게이트③ 회차가 그 2장을 **손으로 지웠다**.
+  ★★**개악 대조 양방향 — 「내 문장을 검사하는 테스트」를 만들지 않고 «주장의 주인 파일»을 무너뜨렸다**:
+  ⒜`verify-browser.mjs:60-61` 의 `path.join(root,…)` 를 임시 디렉터리로 → repo 루트 **2장 → 0장**(문단이 거짓이 된다) ·
+  ⒝`.gitignore:35` 를 주석 처리 → `git status -uall` 의 `verify_` 줄 **0 → 2(`??`)** ⇒ 「깨끗하다」가 거짓.
+  복원 후 스크립트는 `HEAD` 와 **바이트 동일** · git 판정 **0** 으로 복귀.
+  ★**펜스 블록은 건드리지 않았다** — `check-doc-liveness-parity.mjs` 가 그 25줄을 `doc-liveness.yml` 사본과 대조한다.
+  ★회귀 0(전건 합산): `cargo test --all` **43타깃 · 386 passed · 0 failed** · 4게이트 + beta **rc=0** · 검사기 8/8 · audit PASSED.
+  ★**남긴 한계**: 이 문단을 **기계가 지키지 않는다**(파일명이 바뀌면 조용히 낡는다) — 후속 제안으로 냈고,
+  ★그 제안의 tradeoff 에 「채택 전에 «그 이름이 실제로 움직인 적이 있는가»를 먼저 세라 · 0이면 만들지 마라」를 못박았다.
 - 2026-09-17: **「부하에서 verdict 가 뒤집힌다」를 «일화»에서 «측정»으로 올렸다 — 무변경 트리에서 4/6 FAIL**
   (`wie-adopt-slice-d-base-swap-executed-p1-p0-p0` · 채택 `2026-09-17-adopt-slice-d-base-swap-executed-p1-p0#p0`) —
   정본 `docs/report/0145--….md`. ★**제품 코드 0줄** · 접촉 = `AGENTS.md` 1곳(+31/−1).

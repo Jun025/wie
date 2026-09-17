@@ -1,0 +1,37 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-17",
+  "task": "wie-adopt-gate3-selfverify-console-axis-p0",
+  "title": "verify-browser 가 repo 루트에 스크린샷 2장을 쓴다 — 그 부작용을 문서가 말하게 했다",
+  "summary": "채택 제안 2026-09-17-gate3-selfverify-console-axis#p0 의 이행. scripts/verify-browser.mjs 는 repo 루트에 verify_<label>_screen.png · verify_<label>_page.png 를 쓰는데 AGENTS.md 의 npm run verify 불릿이 그 부작용을 한 줄도 말하지 않았다. 코드는 고치지 않았다 — .gitignore:35 /verify_*.png 가 이미 덮으므로 결함이 아니라 문서 결손이다. 그 불릿 끝에 문단 하나를 더해 ⑴파일 두 개의 «정확한 이름»과 위치 ⑵커밋하지 않는다(무시 목록이 덮는다 · 다음 실행에 덮어쓰인다) ⑶보존용 스크린샷은 docs/verification/ 에 산다 ⑷왜 여기 적는가(게이트② 검수자가 실제로 놀라 손으로 지우고 신고했다)를 적었다. 제품 코드 0줄.",
+  "changes": [
+    "AGENTS.md §Web-surface commands 의 `npm run verify` 불릿 끝 — 부작용 문단 1개 추가(파일명 2개 · .gitignore 커버 · docs/verification/ 대비 · 계기)"
+  ],
+  "verification": [
+    "★제안이 «지금도» 참인가(대전제 ⓐ): 참. origin/main edfe108e 기준 scripts/verify-browser.mjs:60-61 이 path.join(root, …) 로 두 png 를 쓰고, AGENTS.md·docs/ 어디에도 그 부작용 서술 0건(git grep -e 'verify_\\*' -e 'verify_.*png' -e screenshot 전수 → .gitignore 2줄 · 스크립트 2줄 · 무관 3줄 · 제안 자신 2줄뿐)",
+    "★대전제 ⓑ(이미 같은 축이 있나): .gitignore:35 /verify_*.png 는 «무시»만 하지 «고지»하지 않는다. 같은 불릿을 만지는 열린 PR #184 의 AGENTS.md 헝크(@@ -292,14 +292,33 @@)를 전문 확인 — 부작용 서술 0건 ⇒ 중복 아님",
+    "★★개악 대조 A축(제품 호출부 = scripts/verify-browser.mjs:60-61): 정상 실행 → repo 루트 verify_*.png ★2장(verify_helloworld_ktf.zip_{screen,page}.png · rc=0) ↔ path.join(root,…) 를 임시 디렉터리로 바꾼 개악 실행 → repo 루트 ★0장(파일은 그 임시 디렉터리로 갔다) ⇒ 문서 문장이 거짓이 된다. 복원 후 git show HEAD:… 와 diff ★바이트 동일",
+    "★★개악 대조 B축(제품 파일 = .gitignore:35): 정상 → git status --porcelain -uall 의 verify_ 줄 ★0 · git check-ignore -v 가 .gitignore:35 를 두 파일 모두에 지목 ↔ 그 줄을 #MUT 로 주석 처리 → ★2줄(?? verify_…_page.png · ?? verify_…_screen.png) ⇒ 「git status 가 깨끗하다」가 거짓이 된다. 복원 후 다시 0",
+    "회귀 0(전건 합산 · tail 미사용): cargo fmt --all --check rc=0 · cargo clippy --all -D warnings rc=0 · wasm clippy rc=0 · RUST_MIN_STACK=4194304 cargo test --all rc=0 (test result 행 전수 합산 = 43타깃 · 386 passed · 0 failed) · cargo +beta clippy --all -D warnings rc=0 · node 검사기 8종 rc=0 · npm run audit PASSED"
+  ],
+  "limits": [
+    "★문서만 고쳤다 — 부작용 자체는 그대로다. 「스크린샷을 --out 으로 옮길 수 있게 하라」는 제안 범위 밖이고(계약 1: 넓히지 마라) 오늘 그럴 이유도 없다(무시 목록이 덮는다)",
+    "★이 문단을 «기계가 지키지 않는다» — 파일명이 바뀌면 문서가 조용히 낡는다. 그 축을 세우려면 검사기 1개가 필요하고, 그것은 이 제안이 요구한 «한 줄»보다 크다(아래 제안 #p0)",
+    "★label 기본값이 게임 파일 basename 이라 다른 픽스처로 돌리면 파일명이 달라진다 — 문단은 그 규칙(<label>)과 기본 실행의 실제 이름을 «둘 다» 적어 그 함정을 덮었다"
+  ],
+  "adoptedProposals": [
+    "2026-09-17-gate3-selfverify-console-axis#p0"
+  ],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "문서가 말하는 verify_*.png 파일명을 아무도 검사하지 않는다",
+      "plainSummary": "확인 스크립트가 만드는 파일 이름이 문서에 적혔지만, 코드에서 그 이름이 바뀌어도 문서는 조용히 낡습니다.",
+      "userBenefit": "「문서에 적힌 파일을 지웠는데 다른 이름의 파일이 남아 있다」는 다음 회차의 혼란이 생기지 않는다.",
+      "why": "이번 회차가 AGENTS.md 에 verify_<label>_screen.png · verify_<label>_page.png 와 .gitignore 의 /verify_*.png 커버를 적었는데, 셋 중 어느 것이 바뀌어도 red 를 내는 축이 0 이다. 이 저장소엔 이미 같은 형태의 관용구가 있다 — check-engine-runner-fixtures.mjs 가 AGENTS.md 의 표시 영역과 test_data/ 를 대조하고, check-doc-liveness-parity.mjs 가 문서 펜스와 워크플로 사본을 대조한다. 같은 모양으로 「문서가 적은 파일명 ↔ 스크립트가 쓰는 경로 ↔ .gitignore 패턴」 3자를 대조할 수 있다.",
+      "tradeoff": "★값이 의심스럽다 — 그 이름은 2026-07 이후 한 번도 바뀌지 않았고, 바뀌어도 피해는 «다음 사람이 잠깐 헷갈린다»이지 착지된 코드가 아니다. 검사기 하나는 영구 유지 비용이고 이 저장소는 「닫히지 않은 규율을 기계화하면 오탐이 굳는다」를 반복해 규탄했다. ⇒ 채택 전에 «이 이름이 실제로 움직인 적이 있는가»를 먼저 세라. 0이면 만들지 않는 것이 옳다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}
