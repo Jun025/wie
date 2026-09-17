@@ -314,9 +314,14 @@ deliberately not. It is **not a check** — it has no failing state, a zero call
 question and not a defect (this repo ships two checkers that are correctly uncalled, below), and
 `continue-on-error` on its step makes that mechanical rather than promised. And it is **not a
 replacement for the paragraph below**: it counts call sites, it does not know which of them
-matter. Baseline at adoption (`f7a1d022`, 2026-09-17): **36 artifacts — 4 with no caller, 14 with
-exactly one, 18 with two or more**, and it costs **0.6 s** in the `contract` job (measured on
-the runner, PR #195; a warm dev Mac takes 2.6-2.9 s); the per-row disposition is
+matter. Baseline at adoption (`f7a1d022`, re-measured 2026-09-18): **37 artifacts — 8 with no
+caller, 14 with exactly one, 15 with two or more**, and it costs **0.6 s** in the `contract` job
+(measured on the runner, PR #195; a warm dev Mac takes 2.6-2.9 s, plus one `cargo metadata`).
+**The first published figures — 36/4/14/18 — were wrong and are recorded here as wrong**, because
+the census asked a path regex which files `cargo test --all` reaches instead of asking cargo: it
+credited four `tests/*.rs` files under directories that carry no `Cargo.toml` (orphans of the base
+swap, so cargo compiles none of them) and it dropped `tests/font.rs`, which is a real target of the
+root package. The 0-caller bucket was therefore understated by exactly half. The per-row disposition is
 `docs/report/0155--2026-09-17--wie-count-checkers-with-only-one-caller.md`, which is also where
 its four measured blind spots are written down. Prefer it over a fresh `git grep` when you need
 to know where something runs — a hand grep counts prose and comments as wiring, which is how the
