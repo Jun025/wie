@@ -1,0 +1,46 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-17",
+  "task": "wie-adopt-slice-d-base-swap-fix3-p1-p0",
+  "title": "8주째 보이지 않던 human-step 을 화면이 읽는 자리로 올렸다 — 그리고 required 검사 목록을 «오늘로» 다시 쟀다",
+  "summary": "제안 #p0 채택. 2026-07-22 회차가 done 리포트 §C 본문 안에만 남긴 human-step(main 브랜치 보호 ruleset 적용)을 ~/orchestrator/humansteps/wie-main-branch-protection.md 카드 1장으로 올렸다. 전제 재측 전건 참: humansteps/ 에 그 카드 0장 · protection 404 · rulesets 0 · protected false ⇒ 강제 required check 0개. 카드 신설 후 humanstep-scan 이 age_days 57 을 찍는다(제안의 「약 두 달」이 기계가 세는 수가 됐다). ★§C 를 그대로 베끼지 않았다 — 실제 PR 의 check 이름을 전수 조회해 5종이 전부 유효(PR 트리거 · paths 필터 없음)함을 확인하고, 2026-09-10 에 새로 생긴 doc-liveness (weekly) 가 paths 필터를 갖고 있어 required 에 넣으면 모든 PR 이 영구 교착함을 카드에 리터럴로 박았다. wie 제품 코드 0줄 · wie diff 는 원장 3파일.",
+  "changes": [
+    "~/orchestrator/humansteps/wie-main-branch-protection.md 신설(원장 파일 · orchestrator-ops 에 untracked) — front-matter 에 what/why/how/verify · how 에 §C 의 ruleset JSON 그대로 + ★「넣으면 안 되는 검사」 절(doc-liveness·coverage·dependabot·beta 3종) + 되돌리기",
+    "docs/report/0143--2026-09-17--wie-adopt-slice-d-base-swap-fix3-p1-p0.md 신설",
+    "STATE.md 완료 1건"
+  ],
+  "verification": [
+    "ⓐ 전제 재측(전건 참 · 무변화): humansteps/ 에 branch-protection 카드 0장 · gh api branches/main/protection → 404 'Branch not protected' · rulesets → 0 · branches/main .protected → false ⇒ 강제 required check 0개",
+    "★검사 목록 재측(§C 를 베끼지 않은 이유): PR #180 head 의 actions/runs + check-runs 전수 조회 — contract · build-web · rust_ci (ubuntu/macos/windows-latest, stable) 5종 이름 그대로 실재하고 workflow YAML 파싱상 pull_request 트리거에 paths 필터 0 ⇒ required 안전. ★doc-liveness (weekly) 는 paths: ['.github/workflows/doc-liveness.yml'] 를 가져 넣으면 모든 PR 영구 교착 · coverage 는 pull_request 트리거가 아예 없음 · dependabot 은 일반 PR 에서 skipped · rust_ci beta 3종은 상류 lint 회귀가 머지를 막아 제외",
+    "★개악 대조(양방향 · 제품 소비자 경유 · 격리 ORCH_OPS 사본 · 라이브 무접촉): 술어 = ORCH_OPS=$S bin/humanstep-scan --json(= pipeline-feed 가 human_steps 로 싣는 생산자). 기준선 entries=1 how_ruleset_marker=true status=open GREEN → M1(how: 의 운영자 지시를 markdown 본문으로 이동 = 이 리니지가 이름 붙인 실패형) how_ruleset_marker=false RED → M2(카드 파일 제거) ABSENT RED → 복원 GREEN",
+    "라이브 소비자 검증: humanstep-scan --json rc=0 · 이 카드 WARN 0 · 전체 WARN 0 · age_days 57 · blocks [] · status open · --verify → 'wie-main-branch-protection OPEN — verify 미통과'(참 — 보호는 아직 꺼져 있다). ★단 이 확인은 «불완전»했다 — 아래 항 참조",
+    "★★내 검증이 놓친 축 1건(숨기지 않는다): 카드 신설 직후 09:33:56 에 bin/humanstep-scan 이 HUMANSTEP_BLOCKED_BY_UNDECLARED 를 냈고 총괄이 09:40 에 blocked_by: decision 을 선언해 닫았다(그 편집은 그대로 두었다). 왜 못 봤나 — 그 축은 stderr 로 나가지 않고 events/inbox.log 에 쓰고 events/.blockedby-<id> 로 dedup 한다(실측: --json·--audit·--alert·--check·--verify 전 모드에서 그 문자열 0건 · 격리 사본에서 blocked_by 를 지우고 다시 돌려도 0건 = 출력 채널이 다르다). ⇒ 규율: 카드 신설 시 --json WARN 만 보지 말고 events/inbox.log 의 HUMANSTEP_* 를 확인하라",
+    "verify 술어 양방향 실측: 오늘 rc=1(OPEN) · 참이 되는 형태 rc=0(RESOLVED) · ruleset·classic 둘 다 수용 · 파이프 끝 grep -q 미사용(README 가 SIGPIPE 오판으로 금지한 관용구). ★rules/branch/main 은 이 토큰으로 404 라 실측으로 기각했다",
+    "★인접 관측(이 회차 산출물 아님): PR #177 은 mergeable=CONFLICTING(DIRTY)이고 그 head 의 workflow run 이 coverage(push) 1건뿐 — pull_request 이벤트 워크플로 4종이 하나도 돌지 않았다(충돌 PR 은 병합 ref 가 없어 PR 이벤트 검사가 생성되지 않는다). 그 PR 을 「CI 대기」로 읽으면 영원히 기다린다. 대조군 PR #180 은 run 5종 · check 10개 전건 success",
+    "전 스위트: cargo fmt --all -- --check OK · clippy --all -D warnings rc=0 · clippy --target wasm32-unknown-unknown --all -D warnings rc=0 · cargo +beta clippy --all -D warnings rc=0 · RUST_MIN_STACK=4194304 cargo test --all 전건 합산 384 passed / 0 failed(result 줄 42개 · FAILED 0 · panicked at 0 · | tail 미사용)",
+    "검사기 6종 rc=0: check-worklog-json · check-docs-report-serial · check-doc-liveness-parity · check-parked-workflows · npm run audit · check-worklog-coverage"
+  ],
+  "limits": [
+    "★카드의 blocked_by: decision 과 그 사유 절은 «총괄이» 09:40 에 더한 것이다 — 이 회차의 산출물이 아니고, 되돌리지 않았다. 켜는 시점 판단(게이트③ 머지 큐가 빈 때)은 그 절에 있다",
+    "★근본 처방이 아니다 — 「done 리포트 본문에만 있는 human-step」이 몇 건 더 있는지는 이 회차가 «세지 않았다»(제안 자신의 tradeoff 그대로 · 전수 조사는 S 범위 밖이고 넓히면 다른 티켓이다). 후속 제안으로 뺐다",
+    "★보호는 «여전히 꺼져 있다» — 이 회차는 카드를 올렸을 뿐 켜지 않았고 켤 권한도 없다. 실제 해소는 운영자의 명령 1회다",
+    "★카드가 반대 방향으로 낡을 수 있다 — 운영자가 적용하면 why 의 실측표가 즉시 거짓이 된다. 막는 것은 verify 이고 통과하는 순간 status 가 done 으로 바뀐다(그 축은 기계가 진다)",
+    "★검사 5종·paths 필터는 «오늘의 값»이다. 워크플로가 움직이면 바뀐다 — 상수로 인용하지 마라(이 회차가 §C 를 재측한 이유가 정확히 그것이다)",
+    "★카드는 orchestrator-ops 에 untracked 라 PR·머지 대상이 아니다 — 이 wie PR 을 되돌려도 카드는 되돌아가지 않는다(되돌리기 = 파일 1개 삭제)"
+  ],
+  "proposals": [
+    {
+      "title": "done 리포트 본문에만 사는 human-step 이 몇 건 더 있는지 아무도 세지 않았다",
+      "plainSummary": "「사람이 한 번 해야 하는 일」이 옛 보고서 본문에만 적혀 화면에 안 뜨는 경우가, 이번 한 건 말고 몇 건 더 있는지 모릅니다.",
+      "userBenefit": "이번처럼 «준비는 끝났는데 스위치만 남은» 일이 몇 달씩 잊히는 것을 한 번에 끝낸다. 지금은 한 건만 건졌고 나머지는 세어 본 적이 없다.",
+      "why": "이 회차는 카드 1장을 올렸지만, 같은 형태가 몇 건인지는 세지 않았다 — 제안 원문이 그 한계를 미리 적었고(「전수 조사부터 하면 비용이 커지고, 카드 1장만 만들면 다음 건에서 재발한다」) 이 회차도 그대로 남겼다. 값싼 술어가 있다: ~/orchestrator/reports/*.done.md 본문에서 «human-step» 을 선언한 리포트를 걷고, 그 id 에 대응하는 humansteps/ 카드가 있는지 대조하면 된다. 이번 건은 그 대조에서 정확히 드러났을 것이다(리포트 §C 에 human-step 선언 · 카드 0장 · 57일 경과).",
+      "tradeoff": "어휘로 «human-step 선언»을 찾는 술어는 이 저장소가 반복해 규탄한 형태다 — 문구를 바꾸면 빠져나가고 넓히면 무관한 리포트를 문다. 그래서 결과를 «자동 카드 생성»으로 쓰면 안 되고 «사람이 훑을 목록»으로만 내야 한다(오탐의 대가가 낮은 쪽으로). 그리고 done 리포트에는 «이미 해소된» human-step 도 많아, 미해소만 고르려면 각 건의 verify 를 사람이 판단해야 한다 — 그것이 이 조사의 실제 비용이다. 소관은 ~/orchestrator 다.",
+      "effort": "M",
+      "target": "orchestrator"
+    }
+  ],
+  "adoptedProposals": [
+    "2026-09-17-adopt-slice-d-base-swap-fix3-p1#p0"
+  ],
+  "declinedProposals": []
+}
