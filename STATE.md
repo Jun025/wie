@@ -75,6 +75,23 @@
   ★**음성도 적는다**: `java.class.path` 에서 `RT_RUSTJAR` 를 빼는 개악은 ★**안 물었다** ⇒ 무는 자리는 클래스패스 문자열이 아니라
   `find_rustjar_class` 의 **RT 분기**다(다음 회차가 헛다리를 짚지 않게).
   ★회귀: 같은 base baseline **42타깃/385 passed** ↔ **43/386** = 정확히 **+1 타깃 · +1 테스트**.
+- 2026-09-17: **8주째 보이지 않던 human-step 을 화면이 읽는 자리로 올렸다 — 검사 목록은 «오늘로» 다시 쟀다**
+  (`wie-adopt-slice-d-base-swap-fix3-p1-p0` · 채택 `2026-09-17-adopt-slice-d-base-swap-fix3-p1#p0`) —
+  정본 `docs/report/0143--….md`. ★**wie 제품 코드 0줄 · wie diff 는 원장 3파일**.
+  산출물 = `~/orchestrator/humansteps/wie-main-branch-protection.md` **카드 1장**(원장 파일 · untracked).
+  ★**전제 재측 전건 참**: 그 카드 **0장** · `branches/main/protection` **404** · `rulesets` **0** ·
+  `.protected` **false** ⇒ **강제 required check 0개**. 카드 신설 후 `humanstep-scan` 이 `age_days` **57** 을 찍는다.
+  ★★**§C 를 그대로 베끼지 않았다** — 실제 PR 의 check 이름을 전수 조회해 5종(`contract`·`build-web`·
+  `rust_ci (ubuntu/macos/windows-latest, stable)`)이 **전부 유효**(PR 트리거 · `paths` 필터 0)함을 확인하고,
+  ★**2026-09-10 에 생긴 `doc-liveness (weekly)` 가 `paths` 필터를 가져 required 에 넣으면 «모든 PR 영구 교착»**임을
+  카드에 리터럴로 박았다(그 워크플로 자신의 「NEVER become a required check」와 사건 대장의 그 교착).
+  ★**wie 레인이 `~/orchestrator` 카드를 만든 선**: 「그 편집이 **다른 레인·estate 가 의존하는 계약**을
+  리뷰 없이 바꾸는가」 — `humansteps/README.md`(99장·estate 3곳)는 **YES 라 거부**했고(같은 날 다른 회차),
+  이 카드는 **wie 한 건짜리 leaf · 추가·가역**이라 **NO**. 선례도 그 선 위에 있다(`wie-p2-corpus-placement.md`).
+  ★**개악 대조 양방향**(소비자 `humanstep-scan --json` 경유 · 격리 사본 · 라이브 무접촉):
+  기준선 `how_ruleset_marker=true` **GREEN** → `how:` 를 markdown **본문**으로 옮기면 **false RED** →
+  카드 제거 **ABSENT RED** → 복원 **GREEN**.
+  ★**한계**: 같은 형태(done 본문에만 있는 human-step)가 **몇 건 더 있는지 세지 않았다** · **보호는 여전히 꺼져 있다**.
 - 2026-09-17: **upstream 이 «새» 워크플로를 들고 오면 이제 기계가 본다 — 손으로 관리하는 목록 «없이»**
   (`wie-adopt-slice-d-base-swap-fix2-p3-p0` · 채택 `2026-09-16-adopt-slice-d-base-swap-fix2-p3#p0`) —
   정본 `docs/report/0135--….md`. ★**제품 동작 0줄 · Rust 0줄**.
