@@ -1,0 +1,39 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-17",
+  "task": "wie-adopt-slice-d-reissue-order-was-honored-p0",
+  "title": "#159 의 개악 대조가 «존재하지만 돌지 않았다» — 살렸다",
+  "summary": "채택 제안은 「#159 가 세운 개악 대조가 고아가 되어 돌지 않는다 — 살리거나, 죽었다고 선언하거나」였고 네 주장이 전건 참이었다(파일 3,136B 실재 · workspace member 아님 · cargo test --all 에 이름 0회 · 옮기면 컴파일 실패). 제안이 정한 판단 축(그 preload 경로가 오늘도 회귀 가능한가)으로 ⒜살리기를 골랐다: #159 당시 런타임은 git rev 핀이었는데 지금은 crates.io 세버 범위(rustjava-runtime ^0.1.1)라 semver 범프가 등록 클래스를 바꿔도 다른 축이 보지 않는다 — 오늘이 더 회귀 가능하다. 되살리는 비용은 실측 «한 줄»(invoke_virtual 이 해석 클래스 인자를 얻었다). 제품 코드 0줄.",
+  "changes": [
+    "wie_wipi_java/tests/preload_classes_come_from_the_runtime.rs → wie-wipi-java/tests/ 로 이동(git mv) · 빈 wie_wipi_java/ 디렉터리 제거",
+    "그 테스트의 invoke_virtual 호출에 해석 클래스 인자 추가: \"java/lang/Throwable\" — 원 주석이 적은 단언(같은 이름의 비-throwable 이면 안 된다)을 그대로 표현한다",
+    "그 테스트의 머리 주석 갱신: 왜 고아가 됐는지(base swap 의 디렉터리 개명) · 한 줄만 고쳤다는 사실 · ★런타임 핀이 git rev 에서 crates.io ^0.1.1 로 바뀌어 이 가드가 더 load-bearing 해졌다는 것",
+    "docs/report/0141--2026-09-17--wie-adopt-slice-d-reissue-order-was-honored-p0.md 신규 · STATE.md 완료 항 1건"
+  ],
+  "verification": [
+    "★제안 재측(전건 참): 파일 3,136B 실재 · Cargo.toml members 는 wie-wipi-java(하이픈)이고 wie_wipi_java 0건 · 이 base(eab1d567) baseline cargo test --all 에 그 이름 0회 · 옮겨 빌드하면 E0061 1건",
+    "★제안이 말하지 않은 축: wie-wipi-java/src/lib.rs 주석이 「Locked by tests/preload_classes_come_from_the_runtime.rs」라고 단언하고 있었다 ⇒ 소스가 «잠겼다»고 적은 잠금이 한 번도 돌지 않았다. 옮기는 순간 그 문장이 참이 된다",
+    "★★개악 대조(제품 파일 wie-jvm-support/src/runtime.rs · 양방향): MUT2(런타임이 java/io/InterruptedIOException 을 안 준다) → FAILED(NoClassDefFoundError) · MUT3(판별자 java/lang/VirtualMachineError 를 안 준다) → FAILED(예외 클래스 단언 붕괴) · 복원 → ok 1 passed",
+    "★음성 결과도 적는다: MUT1(java.class.path 에서 RT_RUSTJAR 제거)은 이 가드를 «물지 않았다» ⇒ 무는 자리는 클래스패스 문자열이 아니라 find_rustjar_class 의 RT 분기다. 왜 그런지는 범위 밖이라 판정하지 않았다",
+    "회귀 0: 같은 base 에서 baseline 42타깃/385 passed ↔ 이 회차 43타깃/386 passed(정확히 +1 타깃 · +1 테스트) · fmt/clippy --all -D warnings/wasm clippy/+beta clippy 전건 rc=0 · npm run audit PASSED · 검사기 8종 rc=0"
+  ],
+  "limits": [
+    "★이 가드는 rustjava-runtime 의 «현재 동작»에 묶인다 — 상류가 의도적으로 바꾸면 우리 PR 이 red 로 알게 되고, 그때 할 일은 파일을 지우는 것이 아니라 기대·핀을 갱신하는 것이다",
+    "★MUT1 이 음성이었다는 것은 «클래스패스 순서 축은 이 테스트가 안 본다»는 뜻이다 — 순서 회귀는 여전히 미덮음이다",
+    "★고아였던 다른 파일들은 손대지 않았다(조각 D 회신이 고아 5파일을 지목했고 이 제안은 그중 하나까지다)",
+    "★이 회차는 #159 의 보증을 «되살린» 것이지 그 보증이 옳은지를 다시 판정하지 않았다"
+  ],
+  "adoptedProposals": ["2026-09-16-slice-d-reissue-order-was-honored#p0"],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "base swap 이 남긴 «고아 파일»을 아무 축도 세지 않는다",
+      "plainSummary": "폴더 이름이 바뀌면서 예전 위치에 남은 파일들이 있습니다. 그중 하나가 검사였고 조용히 멈춰 있었습니다. 나머지도 같은 상태인지 아무도 세지 않습니다.",
+      "userBenefit": "「있는데 안 도는」 검사·코드가 다시 생겨도 다음 PR 에서 드러난다.",
+      "why": "2026-09-16 base swap 이 크레이트 디렉터리를 하이픈 이름으로 개명하면서 언더바 디렉터리가 남았고, 조각 D 회신이 고아 5파일을 지목했다. 이 회차가 그중 «검사» 하나를 살렸지만, 남은 것들과 앞으로 생길 것들을 세는 축은 여전히 0이다. 실측 가능한 형태가 있다: workspace member 가 아닌 디렉터리에 있는 .rs 파일을 세면 된다.",
+      "tradeoff": "검사기 하나가 는다. 그리고 «고아»의 정의가 애매하면 오탐이 난다 — 의도적으로 member 밖에 두는 파일(wie-app 이 그렇다)이 실재하므로, 그 예외를 어디에 선언할지(AGENTS.md NOT-RUN 관용을 그대로 쓸 수 있다)를 함께 정해야 한다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}
