@@ -1,0 +1,41 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-17",
+  "task": "wie-adopt-slice-d-gate3-merge-p0-fix",
+  "title": "합격 판정식에 «콘솔 0에러»가 없었다 — 읽는 줄이 아니라 «판정하는 줄»로 바꿨다",
+  "summary": "게이트② major 반려: 직전 회차가 세운 self-verify 합격 판정식이 «운영 URL + 누출»만 담고, 정작 그 문단의 논거였던 «콘솔 0에러»를 한 항목도 담지 않았다 — 지시대로 완주한 회차가 NO-LEAK AUDIT ✅ 를 인용하며 «조용한 통과»에 문서적 근거를 갖는 형상. 관측은 이미 되고 있었으므로(page.on console/pageerror) 새 기계 없이 그 출력을 판정에 넣어 닫았다. 문서만 고치는 길과 rc 까지 고치는 길 중 후자를 골랐고, 근거는 실측된 대가 0이다(최근 10개 배포 런과 손 실행 전건 콘솔 에러 0 ⇒ 소급 red 0). 함께 (45%) 귀속 오류, 실패측 문자열 부재, 같은 명령의 두 벌 중복을 고쳤다. 제품 코드 0줄.",
+  "changes": [
+    "scripts/verify-browser.mjs — consoleErrors(= [console.error] ∪ [pageerror]) 집계 + 출력 1줄 + 종료코드 신설: leak → rc=2(종전 그대로) · 콘솔 에러 > 0 → ★rc=3 · 그 밖 rc=0. 관측부(:34-35)·nonBlack·누출 축 무접촉",
+    "AGENTS.md — 합격 판정식에 «console errors (console.error + pageerror): 0» 추가 + 합격의 정본을 rc=0 으로 명시 + 실패측(rc=2 ❌ POSSIBLE LEAK · rc=3) 같은 블록에 기재",
+    "AGENTS.md — `only 15 cite WIE_BASE — 18 do not (45%)` → `only 15 (45%) cite … — 18 (55%) do not`(45% 는 인용률이고 18/33 은 55%)",
+    "AGENTS.md — 「관찰 → 지시」 서술을 「거짓 단언 제거 + 판정식 신설」로 교정(명령은 애초에 이 파일에 있었다) · 같은 명령의 두 번째 사본을 제거하고 블록인용을 가리키게(reference, never copy)",
+    "docs/report/0134--2026-09-17--wie-adopt-slice-d-gate3-merge-p0-fix.md 신규 · STATE.md 완료 항 1건"
+  ],
+  "verification": [
+    "★대가 실측(rc 반영을 고른 근거): web.yml push 런 최근 10건의 'Verify the deployed app in a browser' 스텝 로그 전수 → [console.error]+[pageerror] 전건 0 · NO-LEAK AUDIT ✅ 10/10 ⇒ 소급 red 0. 손 별칭 실행도 0",
+    "★양방향 개악 대조(같은 프로덕션 URL · 3회 실행): 현재 rc=0(console errors 0) ↔ MUT(page.addInitScript 로 console.error 1건 주입) ★rc=3(console errors 1) ↔ 복원 rc=0. ★MUT 에서도 NO-LEAK AUDIT ✅ 는 그대로 찍혔다 = 반려가 지목한 «조용한 통과» 형상 재현이고, 새 판정식으로 읽으면 불합격이다",
+    "MUT 복원 검증: 백업과 diff -q identical · git status 에 잔재 0 · verify_*.png 부산물 삭제",
+    "검사기 rc=0: doc-liveness-parity(25 documented lines · nothing extra) · worklog-json(114) · docs-report-serial(130건 중복 0) · worklog-coverage(10/10) · parked-workflows",
+    "연번: base(origin/main f85b362f) 당긴 트리에서 그 자리에서 --next-serial 재조회 → 디스크 0134 · 열린 PR claim [0116(#162) 0133(#176)] ⇒ 0134",
+    "삽입 명령 재실행: WIE_BASE=https://wie-web.pages.dev node scripts/verify-browser.mjs test_data/helloworld_ktf.zip → rc=0"
+  ],
+  "limits": [
+    "★rc=3 은 «프로덕션 페이지가 콘솔 에러를 내면 배포 후 CI 스텝이 red 가 된다»는 뜻이다 — 의도한 대가이고, 소유자는 AGENTS.md 가 이미 정한 대로 착지시킨 게이트③ 회차다",
+    "★대가 0 은 «최근 10건»의 수다 — 상수로 인용하지 마라. 표본 밖의 옛 배포는 재지 않았다",
+    "★여전히 기계가 «회차가 그 명령을 돌렸는지»는 검사하지 않는다 — 직전 회차의 후속 제안(2026-09-17-gate3-deploy-selfverify-instruction#p0)이 그 축이고 이 회차가 닫지 않았다",
+    "★MUT 는 주입한 콘솔 에러이지 실제 앱 결함이 아니다 — 판정 경로를 증명할 뿐 프로덕션 건강을 증명하지 않는다"
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "verify-browser 가 repo 루트에 verify_*.png 2장을 쓰는 것이 문서에 없다",
+      "plainSummary": "배포 확인 스크립트를 돌리면 저장소 폴더에 스크린샷 2장이 생깁니다. 무시 목록에 있어 해롭지는 않지만, 어디에도 적혀 있지 않아 처음 돌린 사람이 놀랍니다.",
+      "userBenefit": "손으로 돌린 회차가 «이 파일들 커밋해야 하나»를 매번 다시 확인하지 않아도 된다.",
+      "why": "게이트② 검수자가 자기 실행에서 발견해 신고했다(그 2장을 손으로 지웠다). .gitignore:35 /verify_*.png 가 이미 무시하므로 결함은 아니고 «문서 결손»이다. AGENTS.md 의 그 불릿이 스크립트의 부작용을 한 줄도 말하지 않는다.",
+      "tradeoff": "한 줄이면 끝나지만, 이 회차의 계약이 판정식 축으로 좁혀져 있어 여기서 넓히면 반려 범위와 섞인다. 다음 회차가 같은 불릿을 만질 때 함께 적는 것이 싸다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}

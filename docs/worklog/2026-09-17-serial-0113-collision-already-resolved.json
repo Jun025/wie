@@ -1,0 +1,26 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-17",
+  "task": "wie-adopt-slice-d-blocked-on-lgt-abi-decision-p1-fix",
+  "title": "연번 0113 이중 claim — «이미 해소됐다»를 처분 기록으로 남긴다",
+  "summary": "제안 2026-09-16-slice-d-blocked-on-lgt-abi-decision#p1(「연번 0113 을 두 열린 PR 이 함께 claim 한 것을 푼다」)은 이미 해소됐다 — #159 가 0113 을 갖고 먼저 착지하자 #160 의 -fix 회차가 커밋 39ffb2ef 로 자기 번호를 0113 → 0115 로 옮겼다(AGENTS.md 의 「착지하지 않은 쪽을 옮겨라」 그대로). 지금 main 의 0113 은 1개 · 열린 PR 중 claim 0건 · check-docs-report-serial rc=0. ★그런데 직전 회차(p1)는 그 사실만 적고 «처분 기록»을 남기지 않았다 — 그래서 그 ref 가 추천 패널에 열린 채 남았고 게이트②가 critical 로 반려했다. 이 회차의 산출물은 그 한 줄이다. 제품 코드 0줄.",
+  "changes": [
+    "docs/report/0132--2026-09-17--wie-adopt-slice-d-blocked-on-lgt-abi-decision-p1-fix.md 신규",
+    "STATE.md 완료 항목 1건"
+  ],
+  "verification": [
+    "제안 전제 재확인(검수자가 «전건 참»으로 확인한 것 — 다시 조사하지 않았다): main 의 docs/report/0113--… 1개 · 열린 PR 중 0113 claim 0건 · --next-serial claim 목록에 0113 없음 · check-docs-report-serial rc=0",
+    "해소 주체: 커밋 39ffb2ef [wie-p3-slice-a-keydraw-lgt-breaks-on-upstream-base-fix] 「연번 0113 → 0115 — 조각 C 가 0113 을 가지고 착지했다」 · #159 merged 01:20:39Z(0113) ↔ #160 merged 02:04:45Z(0115)",
+    "★형상 복제 확인: 형제 #p0 의 worklog(2026-09-16-lgt-abi-decision-already-made.json · origin/main 착지분)가 adoptedProposals 1건 + proposals [] 이고, 이 파일은 그 형상을 그대로 따랐다(발명 0)",
+    "연번: --next-serial 을 «작성 직전»에 재조회 → 0132(디스크 0132 · 열린 PR claim [0116(#162)])"
+  ],
+  "limits": [
+    "★이 회차는 «사실»을 새로 조사하지 않았다 — 게이트②가 직전 회차의 사실 주장을 «전건 참»으로 확인했고, 티켓이 재조사를 금지했다. 바뀐 것은 «결론»이 아니라 «처분을 기록했는가» 하나다",
+    "★0113 연번 축은 손대지 않았다 — 이미 풀렸고 그 판정은 참이다. 착지분(0113·0115)은 AGENTS.md 가 재번호를 금지한다",
+    "★PR #174 는 되살리지 않았다 — 그 파일의 소유자는 총괄이 -p0-merge·-p2-merge 에 명시한 게이트③ 회차다",
+    "★이 기록이 막는 것은 «같은 제안의 재채택»뿐이다 — 연번 충돌 자체를 막는 기계 축은 별개이고 이미 제안으로 발행돼 있다(--next-serial 의 열린 PR claim 조회 시간 창)"
+  ],
+  "adoptedProposals": ["2026-09-16-slice-d-blocked-on-lgt-abi-decision#p1"],
+  "declinedProposals": [],
+  "proposals": []
+}
