@@ -18,7 +18,12 @@ mod context;
 // three live fns, two RUN on every LGT boot — a `panic!` in `init_process_state`
 // (:70-98) or `set_use_annunciator` (:152-157) turns `keydraw_lgt` and `helloworld_lgt`
 // into FAIL/paints 0; the same probe in `set_display_property` (:121-150) leaves both
-// PASS, so that SVC is reachable but no fixture triggers it.
+// PASS, so that SVC is reachable but no fixture triggers it. Re-measured 2026-09-17:
+// still true of the fixtures — the gap is now held by a unit test instead
+// (`display_property_svc_reaches_graphics_through_the_import_table`), which resolves
+// `(0x1f8, 0x16)` through the import table and executes the SVC stub, so both wiring
+// hops go red if either is changed. A guest fixture would still add what that cannot:
+// evidence that a real LGT title calls this SVC at all.
 //
 // What the gates DO hold: `allow(dead_code)` silences a lint, not compilation, so all
 // 1,095 lines are type-checked by all four gates — this cannot rot into a build error

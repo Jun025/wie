@@ -75,6 +75,19 @@
   **그대로 찍혔다** = 반려가 지목한 형상 그 자체이고, 새 판정식으로 읽으면 **불합격**이다.
   함께 `(45%)` 귀속 교정(15/33=45% · 18/33=**55%**) · 실패측 문자열을 같은 블록에 · 같은 명령의 **두 벌 중복 제거**.
   ★**대가**: 앞으로 프로덕션이 콘솔 에러를 내면 **배포 후 CI 스텝이 red** 가 된다(의도 · 소유자는 착지시킨 게이트③ 회차).
+- 2026-09-17: **SetDisplayProperty SVC 의 «배선»을 유닛 테스트가 잡게 했다 — 픽스처는 여전히 0**
+  (`wie-adopt-slice-d-base-swap-executed-p1-p0`) — 정본 `docs/report/0134--….md`.
+  채택 제안 `2026-09-16-adopt-slice-d-base-swap-executed-p1#p0`. ★**제품 동작 0줄**(`init.rs` 두 함수
+  `pub(crate)` 가 제품 코드 변경의 전부).
+  ★**전제 재측으로 «여전히 참»**: `set_display_property`(:121) 머리에 `panic!` 1줄(numstat `1 0`)을 넣어도
+  `helloworld_lgt` PASS/paints 0 · `keydraw_lgt --inject --expect-last-frame` PASS/paints 55/content true
+  ⇒ 어느 픽스처도 이 SVC 를 켜지 않는다.
+  ★**「게이트가 조용하다」를 두 축으로 갈랐다** — ⒜함수 «본문»은 이미 잡혀 있었고
+  (`display_properties_update_physical_display_state`) ⒝**배선**(import table `(0x1f8, 0x16)` + `handle_init_svc`
+  의 `SetDisplayProperty` 갈래)은 **아무것도 잡고 있지 않았다**. ⒝만 닫았다 — 게스트 SDK 없이 닫히기 때문이다.
+  ★**개악 대조 양방향**(둘 다 제품 호출부 · numstat `3 3`): `(0x1f8,0x16)`→`(0x1f8,0x15)` **FAILED** ·
+  디스패치 갈래 → `get_import_table` **FAILED** · 복원 `2 2` **ok**.
+  ★**열린 채로 둔다**: 「실제 LGT 타이틀이 이 SVC 를 쓰는가」는 292 코퍼스가 있어야 하고 이 회차 범위 밖이다.
 - 2026-09-17: **배포 수반 착지의 self-verify — 「이미 하고 있다」를 실측으로 갈아 «지시»로 바꿨다**
   (`wie-adopt-slice-d-gate3-merge-p0` · 채택 `2026-09-16-slice-d-gate3-merge#p0`) —
   정본 `docs/report/0133--….md`. ★**제품 코드 0줄** · ★**머지 티켓 템플릿 무접촉**(repo 밖 · `target: orchestrator`).
