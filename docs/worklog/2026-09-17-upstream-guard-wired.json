@@ -1,0 +1,39 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-17",
+  "task": "wie-adopt-slice-d-base-swap-fix2-p3-p0-p0",
+  "title": "upstream 감시 가드를 «지웠는데 green» 이 되지 않게 했다 — 그리고 순진한 술어는 공허했다",
+  "summary": "채택 제안 2026-09-17-adopt-slice-d-base-swap-fix2-p3-p0#p0 의 이행. scripts/check-upstream-new-workflows.mjs 는 doc-liveness.yml 의 스텝 «하나»로만 돌고, 그 스텝을 지우면 파일은 남은 채 아무도 울지 않았다(참조 전수 6건 중 실행 줄은 1건 · 나머지는 주석·산문). 제안의 처방대로 check-parity-lock-wired.mjs 와 같은 형태의 외부 참조를 세웠다: scripts/check-upstream-guard-wired.mjs 신설 + engine-contract.yml 의 상시(always-run) 스텝으로 배선. ★설계 급소는 「순진한 포함 검사가 공허하다」는 것이다 — doc-liveness.yml 머리 주석이 그 경로 문자열을 그대로 들고 있어 호출 줄을 지워도 grep 은 통과한다(실측). 그래서 «주석 아닌 줄»에서만 센다. 그리고 제안이 물려준 2026-09-06 교훈(스펠링이 아니라 경로)을 적용해 «어느 워크플로인지»는 요구하지 않고 보고만 한다 — 정당한 이동에 red 를 내지 않기 위해서다. 제품 동작 0줄 · Rust 0줄.",
+  "changes": [
+    "scripts/check-upstream-guard-wired.mjs 신설 — .github/workflows/ 전수에서 scripts/check-upstream-new-workflows.mjs 를 «주석 아닌 줄»로 부르는 곳이 ≥1 인가 + 그 가드 파일 실재. 워크플로 디렉터리를 못 읽으면 fail-closed(판정 불가 = 실패)",
+    ".github/workflows/engine-contract.yml — 상시 스텝 1개 추가(paths 필터 «밖» · check-parity-lock-wired 바로 뒤 · 왜 그 자리인지 주석 11줄)"
+  ],
+  "verification": [
+    "★제안이 «지금도» 참인가(대전제 ⓐ): 참. origin/main edfe108e 기준 git grep check-upstream-new-workflows 전수 6건 = doc-liveness.yml 주석 1 + doc-liveness.yml 실행 줄 1 + STATE.md·report·worklog 산문 3 + 그 스크립트 자신의 Usage 1 ⇒ ★실행 참조는 «하나»뿐",
+    "★대전제 ⓑ(이미 같은 축이 있나): 없다. check-doc-liveness-parity.mjs 는 DOC-COPY 구간만 집합 대조하고 라이더는 그 밖에 «일부러» 있다(doc-liveness.yml 머리주석이 그렇게 선언). check-parity-lock-wired.mjs 는 LOCK 상수로 Rust 파리티 락에만 묶여 있다",
+    "★★개악 M1(제품 호출부 = doc-liveness.yml:185 «호출 줄만» 삭제 · 머리 주석은 남김): 내 검사기 ★rc=1 「어떤 워크플로도 «주석 아닌 줄»에서 부르지 않는다(★주석 언급은 2개 파일에 남아 있다)」 ↔ ★순진한 술어 grep -q 'check-upstream-new-workflows' 는 ★통과 = 공허 ⇒ «주석 아닌 줄» 규칙이 load-bearing 임을 실측으로 확정. 복원 후 doc-liveness.yml 은 HEAD 와 ★바이트 동일 · rc=0",
+    "★★개악 M2(가드 스크립트 자신 이동): rc=1 「scripts/check-upstream-new-workflows.mjs 가 없다 — 가드 «자신»이 사라졌다」 ↔ 복원 rc=0",
+    "★★M3 오탐 방지축(★제안이 물려준 2026-09-06 교훈): 호출을 doc-liveness.yml → rust-audit.yaml 로 «이동»(정당한 리팩터) → ★rc=0 GREEN 이고 보고 줄이 `rust-audit.yaml:115` 로 따라간다 ⇒ 워크플로 이름을 박지 않은 것이 실제로 값을 한다. 복원 후 두 파일 porcelain 잔재 0",
+    "회귀 0(전건 합산 · tail 미사용): cargo fmt --all --check rc=0 · clippy --all -D warnings rc=0 · wasm clippy rc=0 · cargo +beta clippy rc=0 · RUST_MIN_STACK=4194304 cargo test --all rc=0 (^test result: 전수 합산 = 43타깃 · 386 passed · 0 failed · 0 ignored) · node 검사기 9종 rc=0 · npm run audit PASSED · engine-contract.yml·doc-liveness.yml YAML 파싱 OK"
+  ],
+  "limits": [
+    "★배선을 보지 «주기»를 보지 않는다 — 라이더를 per-PR 트리거로 옮기면 이 검사기는 통과하고, 그것은 다른 이유로 회귀다(upstream 신호를 PR 마다 울리면 아무도 안 만진 것으로 열린 PR 전건이 red — 2026-09-07 check-worklog-coverage 사고의 형태). 그 축은 diff 리뷰이지 이 스크립트가 아니다",
+    "★무한퇴행이 «남는다» — 이 가드 자신은 engine-contract.yml 스텝이 잡고, 그 스텝까지 지우면 diff 로만 보인다. 이것은 check-parity-lock-wired 가 이미 자기 천장으로 적은 것과 «같은 자리»이고, 한 층을 더 쌓는 대신 그 유한한 퇴행을 받아들였다",
+    "★「어느 워크플로인가」를 요구하지 않는다 — 정당한 이동을 통과시키려고 일부러 느슨하게 뒀다. 대가는 「스케줄 잡에서 PR 잡으로 옮겨도 green」이고, 그것이 바로 위 첫 천장이다"
+  ],
+  "adoptedProposals": [
+    "2026-09-17-adopt-slice-d-base-swap-fix2-p3-p0#p0"
+  ],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "「호출자가 하나뿐인 검사기」가 몇 개인지 아무도 세지 않는다",
+      "plainSummary": "감시 장치가 늘어날수록 「이건 어디서 도나?」를 사람이 하나씩 손으로 확인해야 합니다. 그 목록을 기계가 세면 됩니다.",
+      "userBenefit": "이번처럼 «한 군데서만 도는 검사기»가 새로 생길 때마다 별도 티켓으로 가드를 하나씩 세우지 않아도 된다.",
+      "why": "이 저장소는 같은 병에 이미 가드를 «두 개» 세웠다 — check-parity-lock-wired.mjs(2026-09-05)와 이번 check-upstream-guard-wired.mjs. 둘 다 술어가 사실상 같다: 「이 파일을 주석 아닌 줄에서 부르는 곳이 있는가」. scripts/check-*.mjs 는 현재 10개이고 계속 는다. 한 검사기가 (스크립트 → 기대 호출자) 표를 걷으면 세 번째 가드를 만들 이유가 없어진다.",
+      "tradeoff": "★단순 일반화는 «틀린다» — 이 저장소에는 «일부러» CI 에서 안 도는 검사기가 실재한다(scripts/check-branch-protection-claim.mjs 는 Actions 토큰이 403 이라 손으로만 돈다 · 2026-09-17 실측). 전수 술어로 만들면 그것이 즉시 오탐이 되고, 오탐이 굳으면 이 저장소가 반복해 규탄한 「아무도 안 보는 red」가 된다. ⇒ 선언 목록(의도적 비배선을 명시)이 필요해지고, 그 순간 「손으로 관리하는 인벤토리 없이」라는 원 제안의 장점이 사라진다. ★채택 전에 «오늘 검사기 10개 중 단일 호출자가 몇 개인가»를 먼저 세라 — 2~3개면 지금 형태(개별 가드)가 더 싸다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ]
+}

@@ -483,11 +483,20 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 > 폰트 = `assets/neodgm.ttf` `include_bytes!` — ★**JS 생성자 인자를 더하지 않는다**(계약 export 표면 불변).
 > ★**어댑터는 «두 벌»로 둔다**(공통화하면 upstream 이 트레이트를 또 바꿀 때 한 번에 둘 다 깨진다).
 >
-> ★**[정정 2026-09-17 · `wie-adopt-slice-d-base-swap-fix3-p1`]** 아래 「`contract` 는 `main` 의 **required check**」는
-> ★**거짓이다** — 실측 `branches/main/protection` **404** · `rulesets` **[]** · `protected=false` ⇒ ★**강제 required check 0개**.
-> ⇒ 그 ENOENT 크래시가 «착지를 막았다»는 것은 ★**GitHub 이 막았다는 뜻이 아니라 «게이트③ 회차가 red 를 보고 멈췄다»는 뜻**이다.
-> ★**막은 주체가 «플랫폼»이 아니라 «사람과 절차»였다** — 그 구분이 이 문서 다른 곳의 인용에도 걸린다.
-> 보호 설정은 준비돼 있으나 **미적용 human-step** 이다(`~/orchestrator/reports/wie-main-branch-protection.done.md` §C).
+> ★**[재정정 2026-09-17 · `wie-adopt-slice-d-base-swap-fix3-p1-p1`]** 이 자리는 ★**두 번 틀렸다**.
+> ⑴원문의 「`contract` 는 required check」 → 그 시점엔 **거짓**이었고 ⑵직전 정정의 「강제 required check **0개**」 →
+> ★**같은 날 10:17 에 ruleset 「main protection」 이 적용돼 «다섯»이 됐다**(`contract`·`build-web`·`rust_ci` stable 3).
+> ⇒ ★**여기에 목록을 다시 적지 않는다** — 정본은 `AGENTS.md` 의 `REQUIRED-CHECKS` 블록이고
+> `scripts/check-branch-protection-claim.mjs` 가 **손으로 돌릴 때** API 와 양방향 대조한다.
+> ★★**«그쪽이 운다»고 읽지 마라 — 우는 기계는 «없다».** 그 검사기를 부르는 CI 는 **0개**이고,
+> 그것은 게을러서가 아니라 **실측이 막았다**: Actions 토큰은 protection·rulesets 엔드포인트에서 **403**
+> 이고(run `35181122022` · 검사기는 rc=2 「못 쟀다」로 정확히 멈췄다) `administration: read` 는
+> ★**줄 수 없는 키**라 워크플로가 파싱 단계에서 거부된다(run `35180786771`). PAT 는 별 비용 계급이라 미결이다.
+> ⇒ ★**이 문단이 또 낡으면 그것을 잡는 것은 «사람»이다** — `AGENTS.md` 의 그 블록을 고치는 회차가
+> 그 자리에서 검사기를 한 번 돌리는 것이 유일한 축이다.
+> ★**함정 기록**: ruleset 은 `branches/main/protection`(**404 유지**)·`protection.enabled`(**false 유지**)에 **안 보인다** —
+> 직전 정정이 바로 그 두 신호만 읽고 「0개」로 판정했다. ⇒ `rulesets` 와 `protected` 를 **함께** 물어야 한다.
+> ※그 ENOENT 크래시를 «막은 주체»는 그때 기준으로는 «사람과 절차»가 맞다(당시엔 강제가 없었다).
 >
 > ★★**착지를 막던 둘**(티켓 밖 · ★이 회차 base swap 의 개명 잔재): `contract` 는 `main` 의 **required check** 인데
 > `check-engine-contract.mjs` 가 ENOENT 크래시했다 — 로케이터 2 + ★**계약 JSON 의 `file` 핀 2**(조각 E 는 「낡음 2」로
