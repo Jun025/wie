@@ -1,0 +1,54 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-17",
+  "task": "wie-count-checkers-with-only-one-caller",
+  "title": "검사기 ↔ 호출자 전수 계수 — 37개 중 호출자 0이 4 · 1이 15, 결함은 0",
+  "summary": "「이건 어디서 도나?」를 파일마다 손 grep 하던 것을 scripts/checker-census.mjs 가 센다. 모집단은 이름 규칙이 아니라 위치+확장자이고, 호출자는 배선(워크플로 run: · package.json scripts · 소스의 실행 형태)에서 역방향으로 센다. 주석과 «데이터로서의 경로»는 호출자가 아니며(안 걸렀으면 7행이 틀린 버킷에 앉는다), cargo test --all 같은 글롭 호출자는 규칙으로 선언한다(빼면 호출자 0이 4→14).",
+  "changes": [
+    "scripts/checker-census.mjs 신설 — 판정 없는 목록 도구(rc 0 / 2 만 · rc=1 없음)",
+    ".github/workflows/engine-contract.yml 에 상시 스텝 1개(continue-on-error: true ⇒ rc 변경 0)",
+    "AGENTS.md §Web-surface commands 에 진입점 1문단(fenced sh 블록 아님 ⇒ doc-liveness 복사 의무 불변)",
+    "docs/report/0155--2026-09-17--wie-count-checkers-with-only-one-caller.md 신설"
+  ],
+  "verification": [
+    "양방향: 격리 워크트리에서 배선 3개를 끊자 1→0, 2+→1, 2+→1 로 이동하고 요약이 0=4·1=15·2+=18 → 0=5·1=16·2+=16 으로 움직였다(커밋 0 · 워크트리 제거).",
+    "노드 검사기 8종 rc=0 · check-doc-liveness-parity 의 documented line 수 25 불변.",
+    "scripts/check-*.mjs 13개 중 단일 호출자 9 · 0 호출자 1 · 2+ 3."
+  ],
+  "limits": [
+    "워크플로 인라인 검사(cargo fmt/clippy/test/tarpaulin/audit · 6종 12호출처)는 파일이 아니라 모집단 밖 — 정의가 곧 호출처라 언제나 「호출자 1」이고 세어도 정보가 없다.",
+    "소스 안의 #[cfg(test)] mod tests 는 모듈 단위라 파일 술어로 못 센다 — 실측 .rs 101파일(그중 */src/ 96).",
+    "cadence 표기는 워크플로 전체의 on: 이고 스텝 if: 나 paths 스코프를 읽지 않는다 ⇒ 「이보다 자주 돌지는 않는다」는 상한으로만 읽어야 한다.",
+    "uses:/with: 의 액션 입력(dorny/paths-filter 의 트리거 경로)은 실행이 아니므로 named-not-run 열로 낸다. 재사용 워크플로·composite action 은 이 트리에 0건."
+  ],
+  "adoptedProposals": ["2026-09-17-upstream-guard-wired#p0"],
+  "proposals": [
+    {
+      "title": "세 번째 «배선 가드»를 만든다면 술어는 «호출자 수»가 아니라 «지워도 green 인가»여야 한다",
+      "plainSummary": "감시 장치가 한 군데서만 돈다는 사실만으로는 문제가 아닙니다. 문제는 그 한 군데를 지웠을 때 아무도 모른다는 것입니다.",
+      "userBenefit": "검사기가 새로 생길 때마다 전용 가드를 하나씩 세우는 일을 멈추되, 오탐 9건짜리 red 를 새로 만들지도 않는다.",
+      "why": "이 회차의 실측: scripts/check-*.mjs 13개 중 단일 호출자가 9개다(제안이 스스로 건 임계 「2~3개면 개별 가드가 더 싸다」를 수로는 넘었다). 그런데 호출자 0·1 인 19행을 전수 분류하니 «고쳐야 할 것»이 0건이었다 — PR 게이트는 호출처가 하나인 것이 설계이고, 0 호출자 2건은 둘 다 사유가 적힌 정상이다(403 으로 못 재는 branch-protection · 게임 바이트라 CI 불가인 smoke_gate). 반면 기존 가드 둘(check-parity-lock-wired · check-upstream-guard-wired)의 실제 술어는 「호출자가 1인가」가 아니라 「그 하나를 지워도 아무것도 red 가 되지 않는가」다. 그 축은 별 회차 wie-count-deletable-checks-that-stay-green-repo-wide(PR #94)가 이미 세었다(A=9 · B=23 · 차집합 14). ⇒ 두 수를 곱해야 가드 판단이 되고, 어느 한쪽만으로는 안 된다.",
+      "tradeoff": "★비싸다 — 「지워도 green 인가」는 정적으로 못 읽는다. #94 는 그것을 «실제로 지우고 cargo test 를 돌려» 확인했다(쿨 빌드 1회/대상). 전수로 자동화하면 CI 시간이 대상 수만큼 곱해지고, 그것이 #94 가 「8건에 가드를 달지 마라」로 끝난 이유다. ⇒ 값하는 형태는 «전수 자동 가드»가 아니라 «새 검사기가 들어올 때 1건만 재는 것»일 수 있다. ★그리고 오늘 결함이 0건이므로 급하지 않다 — 다음에 «배선 없이 착지한 검사기»가 실제로 나온 뒤 다시 값을 매겨라(그때는 사례가 있다).",
+      "effort": "L",
+      "target": "wie"
+    },
+    {
+      "title": "keydraw 픽스처 생성기는 «한 번도 실행되지 않는다» — 커밋된 zip 과의 드리프트를 직접 재는 곳이 없다",
+      "plainSummary": "테스트용 파일을 만드는 스크립트가 있는데, 아무도 그것을 다시 돌려 보지 않습니다. 그래서 스크립트와 실제 파일이 어긋나도 바로 드러나지 않습니다.",
+      "userBenefit": "에뮬레이터 키 입력 시험이 «생성기가 말하는 것»과 «실제로 시험하는 바이트»가 같다는 보장을 얻는다.",
+      "why": "census 실측: scripts/make-wipi-keydraw-fixture.sh 의 실행 호출처가 0이다. 커밋된 test_data/keydraw_{ktf,lgt}.zip 이 그 산출물인데 CI 도 로컬 러너도 그것을 다시 만들지 않는다. 형제 생성기는 다르다 — make-draw-fixture.mjs 는 doc-liveness 주간 잡이 실제로 돌리고, make-resize-fixture.mjs 는 contract-roundtrip 이 import 한다. 지금 결합을 지탱하는 것은 contract-roundtrip.mjs 가 그 .sh 를 «텍스트로 파싱»해 BAR_H·KeyCode 표·res.bin payload 를 읽고 불일치면 throw 하는 간접 경로뿐이고(그래서 완전히 무방비는 아니다), 그 파싱이 보는 것은 «생성기의 상수»이지 «zip 안의 바이트»가 아니다.",
+      "tradeoff": "★재생성이 byte-stable 한지 먼저 재라 — AGENTS.md 는 make-resize-fixture 에 대해서만 「byte-stable on regeneration」을 주장하고, .sh 쪽은 아무도 주장한 적이 없다. 안정적이지 않으면 CI 에서 재생성-비교는 상시 red 가 되고, 그 red 는 끄게 된다. 그리고 이 생성기는 러너 블록이 아니라 로컬 전용일 이유가 있을 수 있다(빌드 도구 의존). ⇒ 배선 전에 ⑴로컬 2회 재생성이 바이트 동일한지 ⑵필요한 도구가 ubuntu-latest 에 있는지를 재고 «없으면 declare»(AGENTS.md 의 NOT-RUN 선례)로 끝내는 것도 정답이다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "census 의 cadence 열은 «상한»이다 — 스텝 if: 와 paths 스코프를 읽지 않는다",
+      "plainSummary": "「이 검사는 언제 도나」를 보여 주는 칸이 실제보다 넓게 나옵니다. 워크플로 전체의 조건만 보고, 개별 단계의 조건은 보지 않기 때문입니다.",
+      "userBenefit": "「PR 마다 돈다」와 「사람이 누를 때만 돈다」를 헷갈리지 않는다 — 이 회차가 실제로 발견한 것이 그 차이다(release.yaml 은 dispatch 전용이라 그 아래 3스크립트는 자동으로는 안 돈다).",
+      "why": "지금 표기는 워크플로 최상위 on: 의 키를 그대로 낸다. 그래서 doc-liveness.yml 이 [schedule,workflow_dispatch,pull_request] 로 보이는데 그 pull_request 는 «자기 파일에만» 걸린 paths 필터이고, 같은 잡의 npm run verify 는 github.event_name == 'schedule' 로 더 좁다. 읽는 사람이 「PR 마다 돈다」로 오독할 수 있다.",
+      "tradeoff": "★이득이 작을 수 있다 — 오독을 막는 값은 「상한이다」라는 한 줄로도 대부분 얻어지고(이미 도구 주석과 report 에 적혀 있다), 정확히 만들려면 스텝 if: 의 표현식과 on.<event>.paths 를 해석해야 한다. 그것은 YAML 파서가 아니라 «GitHub 표현식 평가기»에 가까워지고, 이 저장소는 같은 이유로 Rust 파서 도입을 이미 기각한 적이 있다(check-parity-lock-wired 의 천장 기록). ⇒ 올바른 형태는 전면 해석이 아니라 «paths 필터가 걸린 이벤트에 * 를 붙이는» 정도의 얕은 보정일 수 있다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}
