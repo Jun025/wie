@@ -60,6 +60,21 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-17: **resize 의 «뒤 버퍼»를 앞 캔버스로 읽어냈다 — 디버그 게터도, 새 게스트도 없이**
+  (`wie-adopt-resize-fixture-scenario-g-p0` · 채택 `2026-09-17-resize-fixture-scenario-g#p0`) —
+  정본 `docs/report/0152--….md`. ★**Rust 0줄 · 계약 표면 무변경** · Scenario **G 는 한 글자도 안 고쳤다**.
+  전제 재측: `back_canvas` 는 `lib.rs:94` 에서 `document.create_element` 로 만들어 **DOM 에 안 붙는다**(`appendChild` 0)
+  ⇒ JS 가 못 읽고, 낡으면 `drawImage` 가 **throw 없이 자른다** ⇒ G 의 두 단언을 다 통과한다. **제안은 지금도 참.**
+  ★★**제안의 두 길(새 게스트 빌드 / 디버그 게터)을 «둘 다» 안 썼다** — 열쇠는 ⑴**키우는** 리사이즈(줄이면 원리적으로
+  안 보인다 — 잘려도 복사되는 좌상단이 정확히 프레임이다) ⑵★**판별자가 «색»이 아니라 «알파»**(`paint` 는 알파를
+  강제 불투명으로 칠하고 `set_width` 직후 캔버스는 투명) ⇒ 게스트가 거기 **아무것도 안 그려도** 성립한다.
+  ⇒ 새 픽스처 = 커밋된 `keydraw_ktf.zip` + ADF 한 줄(`DisplaySize:320*400`) **파생**(nightly·네트워크 **0**).
+  ★**helloworld 로는 안 된다** — 한 번도 paint 하지 않아 blit 자체가 없다(양쪽 알파 0).
+  ★★**개악 대조(제품 호출부 `WebScreen::resize` 에서 `back_canvas.set_*` 2줄 제거 → wasm 재빌드)**:
+  정상 **53/53 rc=0**(`rgba(0,0,0,255)`) ↔ 개악 **52/53 rc=1**(★`rgba(0,0,0,0)`) ↔ 복원 **53/53**.
+  ★**그 개악에서 Scenario G 는 3검사 전부 green** — 제안이 말한 사각의 직접 재현이다.
+  ★**한계**: 「뒤 버퍼 width」가 아니라 «관측 가능한 귀결»이다 · **줄이는 방향은 여전히 못 본다** ·
+  알파 정책이 바뀌면 red 가 아니라 ★«항상 green» 으로 조용히 죽는다 · **KTF 경로만**(LGT·SKT 는 픽스처 0 — 후속 제안).
 - 2026-09-17: **verify-browser 가 repo 루트에 스크린샷 2장을 쓴다 — 그 부작용을 문서가 «말하게» 했다**
   (`wie-adopt-gate3-selfverify-console-axis-p0` · 채택 `2026-09-17-gate3-selfverify-console-axis#p0`) —
   정본 `docs/report/0147--….md`. ★**제품 코드 0줄 · 스크립트 0줄 · CI 0줄** — 접촉은 `AGENTS.md` **한 문단**뿐.

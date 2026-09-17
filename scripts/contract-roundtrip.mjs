@@ -222,7 +222,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { BASE_RECT_PX, IMG_ERR_BROKEN, IMG_ERR_MISSING, IMG_H, IMG_RECT_PX, IMG_W, drawFixtureJar, keyBarPixels } from "./make-draw-fixture.mjs";
-import { RESIZE_FIXTURE, RESIZE_H, RESIZE_W } from "./make-resize-fixture.mjs";
+import { DRAW_RESIZE_H, DRAW_RESIZE_W, RESIZE_DRAW_FIXTURE, RESIZE_FIXTURE, RESIZE_H, RESIZE_W } from "./make-resize-fixture.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const contract = JSON.parse(await readFile(path.join(root, "docs/contracts/featurephone-engine-contract.json"), "utf8"));
@@ -296,7 +296,7 @@ const IMG = { base: BASE_RECT_PX, px: IMG_RECT_PX, w: IMG_W, h: IMG_H, errMissin
 // as the Scenario E constants above. `make-resize-fixture.mjs` writes the ADF
 // line and exports the pair, so restating "176x220" here could drift from the
 // bytes actually served.
-const RESIZE = { fixture: RESIZE_FIXTURE, w: RESIZE_W, h: RESIZE_H };
+const RESIZE = { fixture: RESIZE_FIXTURE, w: RESIZE_W, h: RESIZE_H, drawFixture: RESIZE_DRAW_FIXTURE, dw: DRAW_RESIZE_W, dh: DRAW_RESIZE_H };
 
 // One representative per positive band, mirroring Scenario D's three.
 const KTF_KEYS = ["HASH", "STAR", "NUM5"].map((code) => ({
@@ -649,6 +649,47 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     check("G: resized instance ticks without throwing", runG.threw === null, runG.threw ?? `${runG.frames} frames`);
     g.emu.free();
     check("G: free() (no throw)", true);
+
+    // ── Scenario G2: did the BACK buffer resize too? ─────────────────────────
+    // G above can only read `HTMLCanvasElement.width/height` — the front surface.
+    // `WebScreen`'s back canvas is created by `document.create_element` inside
+    // wasm and never attached to the DOM, so no selector reaches it, and a back
+    // buffer left at the old size CLIPS the blit instead of throwing: both of G's
+    // checks pass while the frame is silently cropped.
+    //
+    // This reads that miss off the FRONT canvas, using two properties of the pair:
+    //   * the fixture GROWS (G's shrinks). On a shrink an oversized back canvas is
+    //     clipped by the front one and the copied top-left region is exactly the
+    //     frame — invisible by construction. Growing makes the region past the OLD
+    //     size come from nothing.
+    //   * `WebScreen::paint` forces alpha opaque across the whole guest frame,
+    //     while a canvas is transparent black right after `set_width`. So the
+    //     probe is ALPHA, not colour: it holds even where the guest draws nothing,
+    //     which is why the sample point is a corner rather than the guest's rect.
+    // Hence the source is the DRAWING guest — helloworld never paints, so nothing
+    // would be blitted and both branches would read alpha 0.
+    const g2 = await bootFixture(mod2, resize.drawFixture);
+    check(
+      `G2: drawing fixture resizes the canvas ${contract.screen.width}x${contract.screen.height} -> ${resize.dw}x${resize.dh}`,
+      g2.canvas.width === resize.dw && g2.canvas.height === resize.dh,
+      `${g2.canvas.width}x${g2.canvas.height}`,
+    );
+    // Make the guest paint at least once; it draws on key, like Scenario E.
+    g2.emu.key_down(ktfKeys[0].code);
+    const runG2 = await tickLoop(g2.emu, g2.canvas, 15_000, (px) => px > 0);
+    g2.emu.key_up(ktfKeys[0].code);
+    check("G2: resized drawing instance paints without throwing", runG2.threw === null && runG2.pixels > 0, runG2.threw ?? `${runG2.pixels} px after ${runG2.frames} frames`);
+    // Sample PAST the old bounds on both axes. Opaque => the back canvas grew with
+    // the front one. Transparent => `drawImage` copied an old-sized back buffer and
+    // this corner was never written.
+    const probe = g2.canvas.getContext("2d").getImageData(contract.screen.width + 1, contract.screen.height + 1, 1, 1).data;
+    check(
+      `G2: back buffer grew too — pixel past ${contract.screen.width}x${contract.screen.height} is opaque`,
+      probe[3] !== 0,
+      `rgba(${probe[0]},${probe[1]},${probe[2]},${probe[3]}) at (${contract.screen.width + 1},${contract.screen.height + 1})`,
+    );
+    g2.emu.free();
+    check("G2: free() (no throw)", true);
   } catch (e) {
     check("scenario aborted by exception", false, (e && e.stack) || String(e));
   }
