@@ -128,7 +128,27 @@ done
 for f in test_data/keydraw_ktf.zip test_data/keydraw_lgt.zip; do      # key-driven — --inject is REQUIRED
   cargo run -q -p wie_cli --bin wie_validate -- --inject --expect-last-frame "$f"   # PASS *and* rc=0
 done
+cargo run -q -p wie_cli --bin wie_validate -- --timeout 5 test_data/text_j2me.jar   # the ONLY fixture that draws text
 ```
+
+**`text_j2me.jar` is the one fixture that reaches `Platform::font()`, and it exists because nothing
+did.** `wie_validate`'s `HeadlessPlatform` shipped for two months with `font()` as `unimplemented!()`:
+every guest that drew a string panicked the *validator*, and `classify.sh` recorded that as the
+game's fault — the largest failure signature in `game_lab/broken/`. The whole runner block stayed
+green through all of it, because `drawString` appeared in **0 of the 6 committed fixtures and 0 of
+the 3 generators** (measured). The corpus that did catch it is `game_lab/`, which is git-ignored
+under Constraint 9 and can never be in CI. So the guard had to be a fixture, and this is it.
+
+**Why it is a separate jar rather than one more call inside `draw_j2me`, and why `--timeout 5`** —
+both measured, neither a preference. Adding the `drawString` to `draw_j2me` moved its pixel stats
+(`distinct_colors` 2 → 3, `nondominant_pct` 1.5 → 1.7), and `contract-roundtrip.mjs` asserts *exact*
+non-black counts derived from `make-draw-fixture.mjs`'s exports — an amount of glyph ink the
+generator cannot predict and so cannot export. A second jar keeps `drawFixtureJar()` byte-identical
+(verified by md5) and every existing count intact. The timeout is a budget, not a guess: the paint
+lands in about a second, `--timeout 1` is flaky (1/3 FAIL) and 2, 3 and 5 all passed 3/3 at loadavg
+124, so 5 is ~5× the observed paint time. Left at the default it would cost **~21 s**; at 5 it costs
+**~5.1 s**. Read a FAIL here the way §The four gates says to read any FAIL — re-run before blaming
+your diff.
 
 **A fixture that this runner deliberately does not touch is named here, not omitted** — write
 `NOT-RUN: test_data/<name> — <why>` inside this marked region. That keeps the classification in the
@@ -202,10 +222,55 @@ is also the cheap way to reproduce this class without slowing the machine down f
 > ⑶ **Reproduce on an untouched tree.** This is the only conclusive step.
 > ⑷ **Read the load** (`uptime`) — and per §Host performance, read `idle`/`sys`, not the load figure alone.
 
-**One heuristic that looks right and is not: "the other carrier passed, so it is a real bug."** The
-fragility is **carrier-specific** — in the measurement above LGT was clean 6/6 in the same minutes
-that KTF failed 4/6. One carrier failing alone is the *ordinary* starvation signature here, not
-evidence against it. Use ⑴–⑷, not the cross-carrier comparison.
+**One heuristic that looks right and is not: "the other carrier passed, so it is a real bug."** One
+carrier failing alone is the *ordinary* starvation signature here, not evidence against it. Use
+⑴–⑷, not the cross-carrier comparison.
+
+**That advice is unchanged, but the reason first given for it was wrong, and the correction is the
+more useful fact.** This paragraph used to say the fragility is *carrier-specific*, on the strength
+of the 4/6-vs-0/6 split above. Re-measured 2026-09-17 with the two fixtures **alternating inside one
+loop**, so both see the same load minute: `keydraw_ktf` **5/18 FAIL**, `keydraw_lgt` **5/18 FAIL** —
+identical, across three load levels (0/6 and 0/6 unloaded, then 2/6 vs 3/6 and 3/6 vs 2/6). A
+carrier-specific effect of the original size would have put ktf near 12/18 and lgt near 0/18, so
+that magnitude is excluded; a small difference is not, at this n. **So a lone-carrier failure is
+sampling noise, not a property of the carrier** — which makes the heuristic *more* wrong, not less.
+The original split is best explained by unpaired sampling: the background load on this machine moves
+far more than any knob here, measured swinging between loadavg 50 and 201 *between* legs of one run.
+
+**Two corollaries worth keeping, because both cost a round to learn.** `ticks` is not a throughput
+measure — it counts executor spins while the guest is blocked, and across five identical
+`keydraw_lgt` runs it read 9,630,471 / 912,303 / 36 / 103,786 / 35. Do not derive "this carrier is
+N× slower" from it. And `--action-secs` is not a stand-in for real load: sweeping it 0.60 → 0.05
+left both fixtures at 0/5 until 0.05, where both collapse together (ktf 5/5, lgt 4/5).
+
+**Boot is not what runs out, and it cannot be.** The deadline is *defined* as
+`min(boot_secs + 0.3 + 27 × action_secs + 1.0, 120)` (`wie_validate.rs`, the `--inject` schedule), so
+the slack left after boot is `27 × action_secs + 1.0` — `boot_secs` cancels. (The 120 s cap is a
+runaway guard; the cancellation holds while the sum is under it, which every knob setting in this
+file is. `27` is the length of that schedule's key array — it is transcribed here, not derived, so
+re-count it with the method recorded in `docs/worklog/2026-09-17-keydraw-ktf-load-fragility-refuted.json`
+before trusting it if the array has moved.) At `--action-secs 0.05` that is
+**+2.35 s no matter what `--boot-secs` says**. An earlier revision of this paragraph said the budget
+"no longer covers boot"; that was not off by a margin, it was the wrong category. The algebra is what
+settles it, and it had better be — a 2×2 over `boot {2.5, 0.3} × action {0.05, 0.6}`, order-balanced,
+**cannot** settle it either way: 48 runs at loadavg 13–95 had *every* cell pass, and a second pass of
+the same design at loadavg 105–148 had every cell fail part of the time, the documented `0.6`
+**included (2/6)**. A null result and a noise floor; neither attributes anything to boot. Do not cite
+that experiment as evidence about `--boot-secs`. Cite it for what it does show, below.
+
+**And the sweep does not show a *different* failure from the load one — it may well be the same one.**
+The signature matches on every field the validator reports: same `reason` string, same blank last
+frame, overlapping `paints`. What settles it is that *one* configuration produces both outcomes with
+only the machine changing under it: measured 2026-09-18, the runs at `--action-secs` **0.05 and below
+passed 32/32 at loadavg 13–95** (the 2×2's two low-`action` cells, 12 + 12, plus 8 more at 0.02/0.01),
+while at loadavg 105–148 even the documented `0.6` failed **2/6**. *(An earlier revision of this
+sentence said 48/48 — that is the 2×2's **whole** run count, and half of it is at `0.6`. The sentence
+narrows the population to `≤0.05` but reached for the experiment's headline total; if you cite a
+subset, count the subset. The composition is spelled out above so the next reader can check it
+against the table in `docs/report/0154`.)* So the knob and
+real load push on the same race. That is still a reason not to use the knob as a stand-in — a better
+one than "different failure", because it says what the knob actually does: it moves the odds along
+the axis you were already on, so a green sweep buys you nothing about the loaded regime.
 
 **`--expect-last-frame` is on the `keydraw_*` line and deliberately NOT on the one above it.** It
 turns `last_frame_content` from a reported field into an exit code, which is the only thing that
