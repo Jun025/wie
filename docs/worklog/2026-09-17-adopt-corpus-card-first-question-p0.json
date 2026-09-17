@@ -1,0 +1,40 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-17",
+  "task": "wie-adopt-corpus-card-first-question-p0",
+  "title": "제안 #p0 은 «참»인데 «이 보드의 일이 아니다» — 카드 스키마는 orchestrator 소유라 집행하지 않고 문안을 넘긴다",
+  "summary": "제안은 「human-step 카드의 markdown 본문이 운영자에게 안 닿는다는 사실을 카드 스키마에 적는다」였다. 전제를 재측해 여전히 참임을 확인했다(humanstep-scan 의 문자열 body 0건 · 본문 3줄 이상 57장 · 합 2,269줄 · 카드 99장). 그러나 고칠 자리가 ~/orchestrator/humansteps/README.md 로 wie 밖이고, ⑴제안 스스로 target: orchestrator 라 적고 있으며 ⑵wie 트리의 humanstep 참조는 4건 전부 원장이고 ⑶그 파일은 estate 3곳 99장을 지배하는 전역 계약이며 ⑷결정적으로 그 파일은 orchestrator-ops 에 untracked 라(humansteps/ 101파일 중 tracked 5) 거기 손대면 PR·게이트②·revert 경로가 «전부» 없다. wie 안에 사본을 두는 우회로는 wie 자신의 AGENTS.md:39 「An external contract is referenced, never copied」가 금지한다. ⇒ 집행하지 않고, 그 자리에 그대로 붙일 문안 초안 + 라우팅 결함 1건을 산출물로 냈다. wie 제품 코드 0줄 · ~/orchestrator 파일 0줄 변경.",
+  "changes": [
+    "docs/report/0137--2026-09-17--wie-adopt-corpus-card-first-question-p0.md 신설 — 재측 표 · 미집행 근거 4축 · ★~/orchestrator/humansteps/README.md 에 그대로 붙일 문안 초안 · 라우팅 결함",
+    "STATE.md 완료 1건",
+    "★~/orchestrator 파일은 «한 줄도» 고치지 않았다 — 그것이 이 회차의 판단이다"
+  ],
+  "verification": [
+    "ⓐ 전제 재측(전건 참): grep -c 'body' ~/orchestrator/bin/humanstep-scan = 0 · 카드 99장(README.md·sample-* 제외) · 본문 3줄 이상 57장 · 본문 비어있지 않은 줄 합계 2,269(제안 기재 2,254 대비 +15 = 그 사이 새 서사) · humansteps/README.md 의 해당 줄은 '(본문은 선택 — 배경·주의사항)' 그대로",
+    "ⓑ 소유 실측: humansteps/README.md 는 orchestrator-ops 에 UNTRACKED(git ls-files --error-unmatch 실패) · humansteps/ 101파일 중 tracked 5 ⇒ PR·게이트②·revert 경로 전무",
+    "ⓑ wie 표면 실측: wie 트리에서 'humanstep' 문자열 보유 파일 4건 = STATE.md + worklog 3 + report 3(전부 원장) · 제품·scripts·.github 0건",
+    "★라우팅 결함(새 실측): 제안 원문의 target 은 'orchestrator' 인데 주입 지시문은 제목·쉬운 설명·노력도만 찍고 target 을 찍지 않으며 repo 를 worklog 위치로 정한다('(repo: wie)' · '배송: main 채널'). cockpitd.js:2727·:3095 는 target 을 payload 에 싣기는 한다 ⇒ 필드는 있는데 라우팅이 안 본다",
+    "★개악 대조 ⑴ 은 «못 쟀다 — 대상이 없다»: 이 회차 diff 는 원장 2파일이라 제품 호출부 0. 그리고 제안이 요구하는 변경 자체가 순수 문서라 어느 repo 에서 집행해도 ⑴은 구조적으로 불가하다(기계 소비자 0). 물게 하려면 코드 축(본문 3줄 이상이면 humanstep-scan WARN)이 필요하고 그것은 Contract 3 이 금지한 «넓히기»다 — 후속 제안으로 뺐다",
+    "전 스위트(문서 전용 diff 도 면제 아님): cargo fmt --all -- --check OK · clippy --all -D warnings rc=0 · clippy --target wasm32-unknown-unknown --all -D warnings rc=0 · cargo +beta clippy --all -D warnings rc=0 · RUST_MIN_STACK=4194304 cargo test --all 전건 합산 384 passed / 0 failed(result 줄 42개 · FAILED 0 · panicked at 0 · | tail 미사용)",
+    "검사기 rc=0: check-worklog-json · check-docs-report-serial · check-doc-liveness-parity · check-parked-workflows · npm run audit"
+  ],
+  "limits": [
+    "★제안은 «집행되지 않았다» — 총괄이 orch-* 로 재발권해야 실제 문안이 들어간다. 그때까지 57장 2,269줄은 화면 밖이고 새 카드가 계속 같은 형태로 쓰인다(오늘 +15줄이 그 증거다)",
+    "★declinedProposals 에 넣은 것은 «제안이 틀렸다»가 아니라 «이 보드가 집행할 수 없다»는 뜻이다 — 그 구분을 놓치면 재발권이 영영 안 난다. 문안 초안은 report 0137 에 전문이 있다",
+    "★문안은 «초안»이다 — 적용도 검증도 하지 않았다. 적용 주체(orchestrator 레인)가 자기 99장을 보고 다듬어야 한다",
+    "★'57장 2,269줄' 은 오늘의 수다. 상수로 인용하지 마라"
+  ],
+  "proposals": [
+    {
+      "title": "제안의 target 필드를 라우팅이 보지 않는다 — 어느 보드가 집행할지가 worklog 위치로 정해진다",
+      "plainSummary": "제안서에 「이건 저쪽 담당」이라고 적어도, 실제로는 그 글이 저장된 폴더를 보고 담당이 정해집니다.",
+      "userBenefit": "집행할 수 없는 보드로 일이 배달돼 왕복 1회를 버리는 일이 없어진다. 이번 회차가 정확히 그 왕복이다.",
+      "why": "이 회차가 실측했다 — 제안 원문은 \"target\": \"orchestrator\" 이고, cockpit 은 그 필드를 패널 payload 에 싣는다(~/tower/bin/cockpitd.js:2727·:3095 의 target: p.target || ''). 그런데 주입 지시문(directives/processed/20260916T220412Z-cockpit-…-p0.md)은 제목·쉬운 설명·노력도만 찍고 target 을 «찍지 않으며», repo 를 worklog 파일이 놓인 위치로 정한다('(repo: wie)'). 그 결과 wie 보드가 ~/orchestrator 의 전역 계약을 고치라는 티켓을 받았고, 그 파일은 orchestrator-ops 에 untracked 라 wie 가 손대면 게이트②를 통째로 우회한다.",
+      "tradeoff": "target 을 그대로 라우팅에 쓰면 «제안자가 남의 보드에 일을 밀어 넣는» 경로가 열린다 — 그래서 자동 라우팅이 아니라 «지시문에 target 을 찍어 총괄이 보게 하는 것»이 최소 처방이다(한 줄). 그리고 target 은 자유 문자열이라 오타·존재하지 않는 보드가 올 수 있으니, 찍되 boards.conf 와 대조해 모르는 값이면 그렇게 표시해야 한다. 이 축은 wie repo 밖이다 — target: orchestrator.",
+      "effort": "S",
+      "target": "orchestrator"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": ["2026-09-16-corpus-card-first-question#p0"]
+}
