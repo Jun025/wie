@@ -224,8 +224,12 @@ N× slower" from it. And `--action-secs` is not a stand-in for real load: sweepi
 left both fixtures at 0/5 until 0.05, where both collapse together (ktf 5/5, lgt 4/5).
 
 **Boot is not what runs out, and it cannot be.** The deadline is *defined* as
-`boot_secs + 0.3 + 27 × action_secs + 1.0` (`wie_validate.rs`, the `--inject` schedule), so the slack
-left after boot is `27 × action_secs + 1.0` — `boot_secs` cancels. At `--action-secs 0.05` that is
+`min(boot_secs + 0.3 + 27 × action_secs + 1.0, 120)` (`wie_validate.rs`, the `--inject` schedule), so
+the slack left after boot is `27 × action_secs + 1.0` — `boot_secs` cancels. (The 120 s cap is a
+runaway guard; the cancellation holds while the sum is under it, which every knob setting in this
+file is. `27` is the length of that schedule's key array — it is transcribed here, not derived, so
+re-count it with the method recorded in `docs/worklog/2026-09-17-keydraw-ktf-load-fragility-refuted.json`
+before trusting it if the array has moved.) At `--action-secs 0.05` that is
 **+2.35 s no matter what `--boot-secs` says**. An earlier revision of this paragraph said the budget
 "no longer covers boot"; that was not off by a margin, it was the wrong category. The algebra is what
 settles it, and it had better be — a 2×2 over `boot {2.5, 0.3} × action {0.05, 0.6}`, order-balanced,
@@ -237,8 +241,13 @@ that experiment as evidence about `--boot-secs`. Cite it for what it does show, 
 **And the sweep does not show a *different* failure from the load one — it may well be the same one.**
 The signature matches on every field the validator reports: same `reason` string, same blank last
 frame, overlapping `paints`. What settles it is that *one* configuration produces both outcomes with
-only the machine changing under it: measured 2026-09-18, `--action-secs` 0.01–0.05 passed **48/48 at
-loadavg 13–95**, while at loadavg 105–148 even the documented `0.6` failed **2/6**. So the knob and
+only the machine changing under it: measured 2026-09-18, the runs at `--action-secs` **0.05 and below
+passed 32/32 at loadavg 13–95** (the 2×2's two low-`action` cells, 12 + 12, plus 8 more at 0.02/0.01),
+while at loadavg 105–148 even the documented `0.6` failed **2/6**. *(An earlier revision of this
+sentence said 48/48 — that is the 2×2's **whole** run count, and half of it is at `0.6`. The sentence
+narrows the population to `≤0.05` but reached for the experiment's headline total; if you cite a
+subset, count the subset. The composition is spelled out above so the next reader can check it
+against the table in `docs/report/0154`.)* So the knob and
 real load push on the same race. That is still a reason not to use the knob as a stand-in — a better
 one than "different failure", because it says what the knob actually does: it moves the odds along
 the axis you were already on, so a green sweep buys you nothing about the loaded regime.
