@@ -306,6 +306,21 @@ The contract check needs the WASM artifact already in `web/src/wasm/` — build 
 local build, else it fails with missing-artifact violations (CI order: `engine-contract.yml:116`
 then `:125`). The rest need a toolchain fetch — run them only when the artifact or UI changes.
 
+**That question is now answered mechanically for the whole tree, so stop grepping it out by
+hand: `node scripts/checker-census.mjs`.** It lists every executable artifact in `scripts/`,
+`.github/scripts/` and `*/tests/` next to the places that actually run it and the triggers those
+places fire on, and the always-run `contract` job prints it on every PR. Two things it is
+deliberately not. It is **not a check** — it has no failing state, a zero caller count is a
+question and not a defect (this repo ships two checkers that are correctly uncalled, below), and
+`continue-on-error` on its step makes that mechanical rather than promised. And it is **not a
+replacement for the paragraph below**: it counts call sites, it does not know which of them
+matter. Baseline at adoption (`f7a1d022`, 2026-09-17): **36 artifacts — 4 with no caller, 14 with
+exactly one, 18 with two or more**; the per-row disposition is
+`docs/report/0155--2026-09-17--wie-count-checkers-with-only-one-caller.md`, which is also where
+its four measured blind spots are written down. Prefer it over a fresh `git grep` when you need
+to know where something runs — a hand grep counts prose and comments as wiring, which is how the
+count below went stale.
+
 **Which of these CI actually runs — "the check exists" is not "the check runs".** Measured
 2026-09-06 across all 8 workflow files: `check-engine-contract.mjs` and `contract-roundtrip.mjs`
 run in `engine-contract.yml`; `build-wasm.sh` and the frontend build run in `web.yml`; **`npm run
