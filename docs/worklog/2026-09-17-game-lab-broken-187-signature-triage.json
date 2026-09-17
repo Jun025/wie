@@ -2,7 +2,7 @@
   "schema": "wie-worklog/1",
   "date": "2026-09-17",
   "task": "wie-game-lab-broken-187-failure-signature-triage",
-  "title": "헤드리스 검증기가 글자를 그리는 순간 스스로 패닉했다 — broken/ 최대 서명이 게임 버그가 아니라 하니스 결손",
+  "title": "헤드리스 검증기가 글자를 그리는 순간 스스로 패닉했다 — broken/ «표본» 최대 서명이 게임 버그가 아니라 하니스 결손",
   "summary": "game_lab/broken 187 을 실패 서명으로 군집화했고, 1위 군집이 게임 결함이 아니라 wie_validate 의 HeadlessPlatform::font()=unimplemented!() 였다. 게스트가 텍스트를 그리면 검증기가 패닉하고 classify.sh 가 그 게임을 broken 으로 분류한다. 브라우저 호스트가 이미 쓰는 assets/neodgm.ttf 를 같은 방식으로 실어 고쳤다. A/B(3게임×3런 직렬): 'panic … not implemented' 8/9 → 0/9 · PASS 1/9 → 8/9. ★판정 축을 PASS/FAIL 이 아니라 «서명»으로 잡았다 — 되돌림 대조에서 두 게임이 수정 없이도 PASS 해, 이 저장소가 이미 기록한 부하 의존 verdict 뒤집힘이 재현됐기 때문이다.",
   "changes": [
     "wie_cli/src/bin/wie_validate.rs — HeadlessPlatform 에 font 필드 추가 · font() 의 unimplemented!() 제거 · Font::try_from_static(include_bytes!(assets/neodgm.ttf)) (+16/−3 · 제품 엔진 로직 0줄)",
@@ -21,7 +21,8 @@
     "★오늘 기준 187 전수 재census 는 «하지 않았다» — 직렬 재실행 비용(부하가 verdict 를 뒤집으므로 병렬 금지). 오늘 기준 분포는 15게임 층화 표본뿐이다",
     "★6타이틀 PASS 는 «검증기가 더 멀리 간다»는 뜻이지 «게임이 플레이된다»가 아니다 — 이 도구는 스스로 visual correctness NOT checked 라고 적는다",
     "★2위 이하 14버킷은 고치지 않았다(계약) — 표로만 남겼다",
-    "★1건은 리포트 자체가 없다(lgt/크로이센.zip) ⇒ 서명 분류 186 + 결손 1 = 187"
+    "★1건은 리포트 자체가 없다(lgt/크로이센.zip) ⇒ 서명 분류 186 + 결손 1 = 187",
+    "★이 수정에는 «자동 회귀 가드»가 없다 — font() 를 unimplemented!() 로 되돌린 트리에서 AGENTS.md 러너 블록 5종이 전건 PASS·rc=0 이다(2026-09-18 독립 재현 · keydraw 둘 다 content true·last true·paints 55). ★그 트리에서 game_lab (KTF)투스워즈 는 2/2런 'panic during boot: not implemented' 였다 ⇒ 개악은 살아 있었고 러너가 못 본 것이다. 근인 둘: ⒜커밋된 픽스처 6개 중 «문자열을 그리는» 것이 0개다(zip 원문·전개 양쪽에서 drawString 0/6 · 생성기 3종 0건) ⒝cargo test --all 이 쓰는 TestPlatform 은 «이미 진짜 폰트를 든다»(test-utils/src/platform.rs:139)라 다른 impl 인 HeadlessPlatform 의 결손을 구조적으로 못 본다. 유일한 감시자는 .gitignore 된 game_lab/ 이고 CI 에 없다 ⇒ 이 결손이 두 달 산 이유가 그것이다. 진짜 처방은 아래 제안 카드로 넘겼다."
   ],
   "proposals": [
     {
@@ -37,7 +38,7 @@
       "title": "classify.sh 가 «게임 실패»와 «하니스 실패»를 같은 칸에 적는다 — 가르지 않으면 같은 오분류가 반복된다",
       "plainSummary": "검증 도구 자신이 고장 나서 멈춘 경우와, 게임이 정말 고장 난 경우가 같은 «실패»로 기록됩니다. 그래서 멀쩡한 게임이 불량으로 분류됐습니다.",
       "userBenefit": "도구 결손이 게임 탓으로 기록되지 않는다. 이번 회차가 찾은 것이 정확히 그 오분류였고, 그것 하나로 broken 목록의 최대 군집이 만들어져 있었다.",
-      "why": "wie_validate 는 게스트 오류(tick error)와 자기 자신의 패닉(catch_unwind 로 잡히는 unimplemented!/unwrap)을 둘 다 result: FAIL 로 낸다. classify.sh 는 그 FAIL 만 보고 게임을 broken/ 으로 옮긴다. 이번에 font() 가 그 경로로 최대 군집을 만들었고, 되돌림 A/B 로 8/9런 재현했다. 남은 unimplemented!() 는 wie-backend/src/system/file_system.rs · wie-core-arm/src/core.rs · wie-wipi-c/src/api/graphics.rs · wie-wipi-c/src/context.rs 에 아직 있어 같은 형태가 또 날 수 있다.",
+      "why": "wie_validate 는 게스트 오류(tick error)와 자기 자신의 패닉(catch_unwind 로 잡히는 unimplemented!/unwrap)을 둘 다 result: FAIL 로 낸다. classify.sh 는 그 FAIL 만 보고 게임을 broken/ 으로 옮긴다. 이번에 font() 가 그 경로로 최대 군집을 만들었고, 되돌림 A/B 로 8/9런 재현했다. ★같은 형태가 또 날 수 있는 «살아 있는 생산 경로»는 2026-09-18 재측으로 여섯 자리다 — unimplemented!(\"…\") 다섯(wie-backend/src/system/event_queue.rs:60 'Unknown key' · wie-midp/src/classes/javax/microedition/lcdui/image.rs:211,225 'Unsupported pixel format' · wie-wipi-c/src/api/graphics/framebuffer.rs:89,105 동상)과 todo!() 하나(wie-core-arm/src/core.rs:465). 술어: 주석·문자열 리터럴을 지운 뒤에도 매크로가 남고, test 를 언급하는 #[cfg(...)] 항목의 중괄호 범위 «밖»일 것. ★종전 문면이 지목한 네 파일은 «재지 않은 포인터»였다 — file_system.rs 넷과 context.rs 셋은 #[cfg(test)] 스텁이고(각각 :160-417 · :82-198), graphics.rs 둘은 주석 처리된 죽은 줄이며, 살아 있는 core.rs:465 조차 매크로가 todo!() 다. ★근인은 검색어가 «빈 괄호 리터럴»이었다는 것이다: 'unimplemented!()|todo!()' 로 찾으면 정확히 그 네 파일이 나오고, 진짜 위험한 다섯은 전부 인자를 가진 unimplemented!(\"…\") 라 그 검색에 원리적으로 걸리지 않는다.",
       "tradeoff": "JSON 에 필드를 하나 더하는 것(예: fault_origin: guest|harness)은 싸지만, 그 판정을 «패닉 메시지 문구»로 하면 이 저장소가 반복해 규탄한 어휘 술어가 된다 — 문구가 바뀌면 샌다. 옳은 축은 catch_unwind 가 잡은 패닉인지(=하니스) 게스트 tick 이 Err 를 돌려준 것인지(=게임)로, 그 구분은 코드에 이미 있으므로 «분류»만 내보내면 된다. 다만 하니스 패닉을 broken 에서 빼면 그 게임은 «미판정»이 되고, 미판정 칸을 아무도 안 보면 조용히 사라진다 ⇒ 세 번째 디렉터리(unjudged/)가 함께 필요하다.",
       "effort": "M",
       "target": "wie"
@@ -48,6 +49,15 @@
       "userBenefit": "500여 개 게임을 사람 손 없이 반복 검수할 수 있고, 회귀가 생기면 다음 회차가 같은 명령으로 재현한다. 창 모드로는 게임당 사람이 붙어야 해서 코퍼스 규모에서 성립하지 않는다.",
       "why": "README 가 「현재 CLI 는 winit 창 모드라 배치 자동화 불가」라고 적었고, 그래서 wie_validate 가 만들어졌다. 그 도구에는 --inject 가 이미 있고 27스텝 입력 스케줄을 돌린다(boot-secs + action-secs 로 예산이 정해진다). 이번 회차의 관측이 그 경로가 실제로 게임을 «진행시킨다»는 증거다 — 입력 단계 08_OK·20_OK·26_OK 에서 죽었다는 것은 거기까지 갔다는 뜻이고, 수정 후 144~192 프레임까지 그렸다. ⇒ 없는 것을 새로 만들 필요가 없고, 넓힐 축은 ⑴스텝 스케줄을 게임별로 줄 수 있게 ⑵마지막 프레임 PNG 를 reports/ 에 남겨 사람이 사후에 보게 하는 것이다(--screenshot·--shotdir 이 이미 있다).",
       "tradeoff": "헤드리스 입력은 «화면이 맞는가»를 판정하지 못한다 — 이 도구가 스스로 visual correctness NOT checked 라고 적는다. 즉 이 경로는 「죽지 않고 진행한다」까지만 보장하고, 실제 플레이 가능성은 사람이 스크린샷을 보는 단계가 남는다. 창 모드를 고르면 그 판정은 얻지만 자동화를 잃는다. 두 개를 다 하려면 비용이 두 배이므로, 자동은 헤드리스로 상시 돌리고 창 모드는 «헤드리스가 PASS 한 것 중 표본»에만 쓰는 2단 구성이 현실적이다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "러너 픽스처 중 «문자열을 그리는» 것이 0개다 — 이번 결손을 잡는 자동 가드가 없다",
+      "plainSummary": "글자를 화면에 그리는 검사용 파일이 하나도 없어서, 글자 그리기가 고장 나도 모든 검사가 통과합니다.",
+      "userBenefit": "이번에 고친 종류의 결손(호스트가 글자를 그리다 스스로 죽는다)이 다음에는 두 달이 아니라 한 회차 만에 드러난다.",
+      "why": "2026-09-18 실측: font() 를 unimplemented!() 로 되돌린 트리에서 러너 5종이 전건 PASS·rc=0 이고, 같은 트리에서 game_lab 게임 하나는 2/2런 'not implemented' 로 죽는다. 커밋된 픽스처 6개 전부 drawString 을 담지 않고(원문·전개 양쪽 0/6), 생성기 3종(make-draw-fixture.mjs · make-resize-fixture.mjs · make-wipi-keydraw-fixture.sh)에도 텍스트 API 가 0건이다. cargo test --all 도 못 잡는다 — TestPlatform 이 이미 진짜 폰트를 들기 때문에 HeadlessPlatform 의 결손과 만나지 않는다.",
+      "tradeoff": "★픽스처는 «싼 쪽»이 아니다: ⑴새 생성기 + 커밋 픽스처는 check-engine-runner-fixtures.mjs 에 등재하거나 면제를 선언해야 하고 ⑵러너 블록에 줄을 더하면 AGENTS.md fenced sh ↔ doc-liveness.yml 복사 의무(check-doc-liveness-parity)가 함께 는다 ⑶단언을 «픽셀»로 잡으면 6다리 매트릭스에서 폰트 래스터화 차이로 흔들린다 ⇒ 단언은 «패닉하지 않는다 + content true» 여야 한다. ★그리고 더 싼 대안이 실재한다 — wie_validate.rs 안에 #[cfg(test)] 로 HeadlessPlatform::font() 를 한 번 부르는 시험이면 cargo test --all 이 여섯 다리에서 잡고 픽스처도 러너 줄도 늘지 않는다. 다만 그것은 «그 한 줄»만 지키고 «텍스트를 그리는 경로 전체»는 지키지 못한다 ⇒ 둘은 대체가 아니라 층이고, 어느 층을 살지부터 정해야 한다.",
       "effort": "M",
       "target": "wie"
     }

@@ -1,4 +1,4 @@
-## [2026-09-17] 헤드리스 검증기가 글자를 그리는 순간 스스로 패닉했다 — `broken/` 최대 서명이 게임 버그가 아니었다 (wie-game-lab-broken-187-failure-signature-triage)
+## [2026-09-17] 헤드리스 검증기가 글자를 그리는 순간 스스로 패닉했다 — `broken/` «표본» 최대 서명이 게임 버그가 아니었다 (wie-game-lab-broken-187-failure-signature-triage)
 
 ### 무엇을
 
@@ -41,3 +41,35 @@
 - ★`working/` 표본 5건 중 LGT **2건이 FAIL** 했는데, 되돌림 대조에서 **수정 없이도 같은 FAIL** 이거나
   (`레이카르나`) **수정 없이 PASS**(`일지매영웅전기2`)였다 ⇒ **이 변경이 만든 회귀가 아니다**(부하 flake + 오늘 base 의 LGT 상태).
 - ★남은 14개 버킷은 **표로만** 남겼다 — 군집당 티켓 1장이 다음 입력이다.
+
+### ★[게이트② 반려 승계 · 2026-09-18 `-fix`] 고친 두 문면
+
+- ★★**이 수정에는 «자동 회귀 가드»가 없다 — 그것이 정직한 값이고, 적지 않은 것이 결손이었다.**
+  `font()` 를 `unimplemented!()` 로 되돌린 트리에서 **러너 블록 5종이 전건 PASS·rc=0** 이다
+  (`draw_j2me`·`helloworld_ktf`·`helloworld_lgt`·`keydraw_ktf`·`keydraw_lgt` · 뒤 둘은 `content true`·`last true`·paints 55).
+  ★**그 트리가 «고장나 있었다»는 증거는 따로 있다** — 같은 빌드로 `game_lab/broken/ktf/(KTF)투스워즈` 는
+  **2/2런 `panic during 'boot': not implemented`** 였고, 복원 후 같은 게임은 PASS 다. ⇒ 개악은 살아 있었고 **러너가 못 본 것**이다.
+  ★**근인 둘**: ⒜커밋된 픽스처 **6개 중 «문자열을 그리는» 것이 0개**(zip 원문·전개 양쪽 `drawString` **0/6** ·
+  생성기 3종 `make-draw-fixture.mjs`·`make-resize-fixture.mjs`·`make-wipi-keydraw-fixture.sh` 텍스트 API **0건**)
+  ⒝`cargo test --all` 이 쓰는 `TestPlatform` 은 ★**이미 진짜 폰트를 든다**(`test-utils/src/platform.rs:139`)
+  ⇒ 다른 impl 인 `HeadlessPlatform` 의 결손과 **구조적으로 만나지 않는다**. 유일한 감시자는 `.gitignore` 된 `game_lab/` 이고 **CI 에 없다**
+  ⇒ ★**이 결손이 두 달을 산 이유가 그것이다.** 진짜 처방(문자열을 그리는 픽스처 1개)은 **제안 카드**로 넘겼다.
+- ★★**worklog `proposals[1].why` 의 「남은 `unimplemented!()`」 목록이 틀렸었다 — 재측해 교체했다.**
+  술어를 먼저 적는다: ★**주석·문자열 리터럴을 지운 뒤에도 매크로가 남고, `test` 를 언급하는 `#[cfg(...)]` 항목의
+  «중괄호 범위 밖»일 것.**(파일의 `cfg(test)` 줄 «위»라는 근사는 모듈이 여럿이면 깨진다. 중괄호는 ★**리터럴을 지운 사본**에서 세야 한다 —
+  `unimplemented!("Unsupported pixel format: {bpp}")` 가 정확히 그 함정이다.)
+
+  | 자리 | 매크로 | 판정 |
+  |---|---|---|
+  | `wie-backend/src/system/event_queue.rs:60` | `unimplemented!("…")` | ★**생산 경로** |
+  | `wie-midp/src/classes/javax/microedition/lcdui/image.rs:211,225` | `unimplemented!("…")` | ★**생산 경로** |
+  | `wie-wipi-c/src/api/graphics/framebuffer.rs:89,105` | `unimplemented!("…")` | ★**생산 경로** |
+  | `wie-core-arm/src/core.rs:465` | ★`todo!()` | **생산 경로**(`cfg(test)` 는 `:677`) |
+  | `wie-backend/src/system/file_system.rs:233,236,242,248` | `unimplemented!()` | ✕ `#[cfg(test)]` **:160-417** |
+  | `wie-wipi-c/src/context.rs:155,163,179` | ★`todo!()` | ✕ `#[cfg(test)]` **:82-198** |
+  | `wie-wipi-c/src/api/graphics.rs:77,78` | `todo!()` | ✕ **주석 처리된 죽은 줄** |
+
+  ⇒ 전수 **13 = 생산 6(`unimplemented!` 5 + `todo!` 1) · test 게이트 7 · 주석뿐 3**(세 번째는 `wie_validate.rs:351` 산문 포함).
+  ★★**근인은 «검색어»다** — `unimplemented!()`/`todo!()` 라는 **빈 괄호 리터럴**로 찾으면 종전 목록의 네 파일이 **정확히** 나오고,
+  ★진짜 위험한 다섯은 전부 **인자를 가진** `unimplemented!("…")` 라 그 검색에 **원리적으로 걸리지 않는다**.
+  ⇒ 한 줄의 검색어가 ⑴매크로 이름을 섞고 ⑵`cfg(test)` 를 못 보고 ⑶가장 위험한 형태를 통째로 놓쳤다.
