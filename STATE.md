@@ -60,6 +60,15 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
+- 2026-09-17: **헤드리스 검증기가 «글자를 그리는 순간» 스스로 패닉했다 — `broken/` 최대 서명이 게임 버그가 아니었다**
+  (`wie-game-lab-broken-187-failure-signature-triage`) — 정본 `docs/report/0151--….md`. ★**1파일 +16/−3 · 엔진 로직 0줄**.
+  `wie_validate` 의 `HeadlessPlatform::font()` 가 `unimplemented!()` 라 게스트가 텍스트를 그리면 ★**게임이 아니라 «검증기»가 패닉**하고
+  `classify.sh` 가 그것을 그 게임의 `broken/` 분류로 적었다. 브라우저 호스트가 쓰는 `assets/neodgm.ttf` 를 같은 방식으로 실었다.
+  ★★**A/B 실측**(같은 3게임 × 3런 · 직렬): `panic … : not implemented` **8/9런 → 0/9런** · PASS **1/9 → 8/9**.
+  ★**판정 축을 «서명»으로 잡았다** — 되돌림 대조에서 두 게임이 **수정 없이도 PASS** 했다(부하 의존 verdict 뒤집힘 재현)
+  ⇒ 「고쳤더니 PASS」는 안전한 주장이 아니고 「그 패닉이 사라졌다」는 안전하다.
+  ★**서명 표 = 186 분류 + 리포트 결손 1 = 187**(1위 `NoSuchMethod` 37 · `panic-unwrap` 37 · `java-exception` 21 …) — **2위 이하는 고치지 않고 표로 남겼다**(군집당 티켓 1장).
+  ★**한계**: 기존 `reports/` 1,312건은 `rustjava rev c66f08d` 시절 것이라 **오늘 트리를 설명하지 않는다**(base swap 후 crates.io `^0.1.1`) — 전수 재census 는 안 했다.
 - 2026-09-17: **verify-browser 가 repo 루트에 스크린샷 2장을 쓴다 — 그 부작용을 문서가 «말하게» 했다**
   (`wie-adopt-gate3-selfverify-console-axis-p0` · 채택 `2026-09-17-gate3-selfverify-console-axis#p0`) —
   정본 `docs/report/0147--….md`. ★**제품 코드 0줄 · 스크립트 0줄 · CI 0줄** — 접촉은 `AGENTS.md` **한 문단**뿐.
