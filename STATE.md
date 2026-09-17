@@ -102,6 +102,22 @@
   ★**개악 대조 양방향**(둘 다 제품 호출부 · numstat `3 3`): `(0x1f8,0x16)`→`(0x1f8,0x15)` **FAILED** ·
   디스패치 갈래 → `get_import_table` **FAILED** · 복원 `2 2` **ok**.
   ★**열린 채로 둔다**: 「실제 LGT 타이틀이 이 SVC 를 쓰는가」는 292 코퍼스가 있어야 하고 이 회차 범위 밖이다.
+- 2026-09-17: **`Screen::resize` 가 «한 번도» 불린 적 없었다 — 크기를 요구하는 픽스처로 처음 덮었다**
+  (`wie-adopt-browser-boot-axis-decision-p0` · 채택 `2026-09-16-browser-boot-axis-decision#p0`) —
+  정본 `docs/report/0138--….md`. ★**제품 동작 변경 0**(개악 대조 2회는 복원).
+  ★**제안 5주장 전건 재측 = 참**: 커밋된 두 KTF `__adf__` 는 **38바이트로 동일**하고 `DisplaySize` 줄이 **없다**
+  ⇒ 엔진의 유일한 산 호출부(`wie-ktf/src/emulator.rs:70` · 상류 base swap 으로 경로만 바뀜)와 그 아래
+  **모든 `Screen::resize` 구현이 0회** 실행이었다. ★**그 호출부는 `Err` 를 `warn!` 으로 삼킨다** — 실패해도 부팅이 계속된다.
+  ★**「검사가 없다」가 아니라 «입력이 없었다»**: `test-utils` TestScreen 은 resize 를 저장하는데 **읽는 단언 0** ·
+  `wie_validate` 의 resize 는 **`Ok(())` no-op** ⇒ 계측기는 있는데 그 코드로 들어가는 입력이 저장소에 없었다.
+  ⇒ `test_data/resize_ktf.zip`(1,627B · **같은 게스트 jar** + `DisplaySize:176*220` 한 줄) + 레시피
+  `scripts/make-resize-fixture.mjs`(★**STORED·타임스탬프 0 ⇒ 재생성해도 바이트 동일** · 수는 **export/import** 로 넘겨 restate 0) +
+  **Scenario G**(브라우저 캔버스 `240x320 → 176x220` 단언). ★**두 축 모두** 다르게 골라 반쪽 resize 가 pass 로 안 읽히게 했다.
+  ★★**개악 대조 — 제품 호출부 «두 곳»을 각각 물었다**(각 회차 wasm 재빌드 · 실브라우저):
+  정상 **49/49** ↔ **MUT1**(엔진이 안 부른다) **48/49** ↔ **MUT2**(호스트가 캔버스를 안 바꾼다) **48/49** ↔ 복원 **49/49**.
+  ★**러너 픽스처 검사기가 새 파일을 실제로 잡아 red 를 냈고**(rc=1) 설계대로 `AGENTS.md` **`NOT-RUN` 1줄**로 해소했다
+  (그 기구의 **첫 사용자** — 종전 excused 0건).
+  ★**덮지 못하는 것**: 뒤 버퍼(wasm 안이라 JS 가 크기를 못 읽는다 · clip 은 throw 가 아니다) · **LGT 호출부**(PR #161 이 끊은 27줄) · 네이티브 창.
 - 2026-09-17: **배포 수반 착지의 self-verify — 「이미 하고 있다」를 실측으로 갈아 «지시»로 바꿨다**
   (`wie-adopt-slice-d-gate3-merge-p0` · 채택 `2026-09-16-slice-d-gate3-merge#p0`) —
   정본 `docs/report/0133--….md`. ★**제품 코드 0줄** · ★**머지 티켓 템플릿 무접촉**(repo 밖 · `target: orchestrator`).
