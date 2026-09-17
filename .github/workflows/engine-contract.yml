@@ -284,12 +284,14 @@ jobs:
       # to carry sits INSIDE that band, so the runner figure cannot even tell the
       # two versions of this script apart.
       # **The 0.6 s this comment used to quote was run 35234613184, a revision of
-      # the script that did not shell out to cargo at all** — 3.4x, and the stale
-      # figure came with a stale cost model ("no network, no node_modules"), which
-      # is how you can tell it predates the subprocess. Quote a runner figure WITH
-      # the commit it was read at; it is not a constant, and it is no longer
-      # reliably cheaper than the local run either (that tree measures 0.9-1.3 s on
-      # a dev Mac under load, i.e. the old "factor of four" inequality inverted).
+      # the script that did not shell out to cargo at all** — and it came with a
+      # stale cost model ("no network, no node_modules"), which is how you can tell
+      # it predates the subprocess. Quote a runner figure WITH the commit it was
+      # read at; it is not a constant. **Do not turn the two into a ratio, and do
+      # not rank the runner against a local run** (a dev Mac under load measures
+      # 0.9-1.3 s — inside the same band). This comment has carried "4x cheaper",
+      # then "3.4x more expensive"; both were arithmetic on numbers this runner
+      # cannot resolve. If you need the cost of the cargo call, measure that call.
       #
       # `continue-on-error` because this job is a required check and the round that
       # added the census was scoped to COUNTING — turning a caller count into a red
