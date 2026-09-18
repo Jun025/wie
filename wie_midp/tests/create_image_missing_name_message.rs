@@ -12,11 +12,16 @@
 //! The two are not the same kind of string, which is the whole finding:
 //!
 //!   * `format!("Resource not found: {name}")` INTERPOLATES the resource name. That name is the
-//!     one datum that makes the error actionable, and it has three times been the diagnostic that
-//!     told a human what broke — `docs/upstream-realign-verdict.md:796`, `STATE.md:349`, and the E1
-//!     probe in `docs/report/0047--2026-09-06--wie-system-class-loader-createimage-fixture.md` all
-//!     identify a regression by reading `/wie-img.png` out of this message. Dropping `{name}` would
-//!     keep the type lock green while silently deleting that. Hence this test.
+//!     one datum that makes the error actionable, and it is the diagnostic that told a human what
+//!     broke — `docs/upstream-realign-verdict.md:796` and the E1 probe in
+//!     `docs/report/0047--2026-09-06--wie-system-class-loader-createimage-fixture.md` both identify
+//!     a regression by reading `/wie-img.png` out of this message. Dropping `{name}` would keep the
+//!     type lock green while silently deleting that. Hence this test.
+//!     (This used to cite `STATE.md:349` as a third record. Two corrections, both measured: that
+//!     line number had already rotted — top-insert moved the content to 510 — and on 2026-09-18
+//!     §완료 became a fixed pointer to `docs/report/`, so the entry it meant now lives only in the
+//!     0047 file already cited above. It was never an independent third record; it was the ledger
+//!     copy of the same round. Cite the per-round file, not `STATE.md:<line>`.)
 //!   * `"Failed to decode image"` is a constant that restates its own exception type, so locking it
 //!     could only ever fire on a wording edit — cost with no benefit, given the type is already
 //!     locked. DELIBERATELY NOT LOCKED. If you came here to ask "should we lock that one too", the
