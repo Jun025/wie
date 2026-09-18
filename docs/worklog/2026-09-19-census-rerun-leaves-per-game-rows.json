@@ -1,0 +1,63 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-19",
+  "task": "2026-09-18-census-per-game-mapping-generator-p0",
+  "title": "재실행이 per-game 행을 스스로 남기게 했다 — 그런데 원문이 지목한 «재실행 경로»는 repo 밖이었다",
+  "summary": "채택 제안 2026-09-18-census-per-game-mapping-generator#p0 의 이행. 신규 scripts/game-lab-recensus.sh 253행이 분류가 끝난 코퍼스를 읽기 전용으로 재측하고 per-game JSON 을 game_lab/reports-YYYY-MM-DD/ 에 남긴다 — 그러면 형제 생성기(game-lab-census-map.mjs --reports)가 45분 전수 재실행 없이 그 자리에서 매핑을 낸다. ★원문의 목적은 채택하고 수단은 기각했다: 원문 why 가 지목한 classify.sh 는 ⑴.gitignore:23 이 /game_lab/ 를 통째로 막아 git ls-files game_lab 이 0 이라 거기 고친 것은 CI·리뷰·다른 체크아웃 어디에도 안 보이고 ⑵ingest 경로라 파일을 mv 하며 ⑶2026-09-18 인구조사는 그것을 부르지도 않았다(검증기를 손으로 mktemp 에 돌렸다) ⇒ 고칠 «커밋된 재실행 경로»가 애초에 없었다. classify.sh 무접촉. ★원문 tradeoff 가 제안한 날짜별 디렉터리는 그대로 채택했고, 7월 기준선 game_lab/reports/ 로의 --out 은 경고가 아니라 rc=3 거절이다(제자리 덮어쓰기가 유일한 불가역 동작이라 fail-closed). ★양방향 개악 2축이 제품 호출부에서 green→red→green. ★부수 실측: 같은 게임 3건을 두 번 돌렸더니 엔진 무변경인데 버킷이 갈렸다(load 170→202) — AGENTS.md 가 이름 붙인 짝짓지 않은 표집 그대로이고, 그래서 --shots 가 판정을 움직이는지는 «재지 못했다»고 적었다.",
+  "changes": [
+    "scripts/game-lab-recensus.sh 신설 253행 — --corpus/--out/--timeout/--kill/--nice/--limit/--resume/--shots/--dry-run/--from-stdin. 검증기 인자는 기준선을 만든 classify.sh 와 동일(--inject --timeout N). 코퍼스 쓰기 0 · --out 이 기준선이거나 코퍼스 안이면 rc=3",
+    "AGENTS.md §Web-surface 의 «local only» 목록에 재측 러너 + 매핑 생성기 쌍을 등재 (+12/-0) — fenced sh 블록은 더하지 않았다(그러면 doc-liveness.yml 동기 의무가 붙는데 이 명령들은 코퍼스가 필요해 주 러너가 돌릴 수 없다)",
+    "docs/report/0173 신설 — 원문 대조 · 변경 수 · 양방향 개악 2축 · 대가 6항 · 부수 실측 2건",
+    "제품 Rust 0줄 · classify.sh 0줄 · .gitignore 무접촉 · STATE.md 무접촉 · 새 검사기·새 워크플로 0 · 게임 파일명 유입 0(고유 stem 184 NFC 전수 대조 실측)"
+  ],
+  "verification": [
+    "★모집단 일치 — 스크립트가 세는 코퍼스는 파일 187 · 중복 stem 3 으로 인구조사·생성기의 실측(187/184/3)과 정확히 같다",
+    "★왕복 — 재측 3건 → reports-ab-noshots/ 에 json 3 → game-lab-census-map.mjs --reports <그 디렉터리> → 「corpus files 187 · reports matched 3」 + 매핑 3행(경로·버킷). 인구조사가 잃은 자료를 명령 하나로 낸다",
+    "★★개악 1(가드) — 원형 --out game_lab/reports --dry-run rc=3(거절) ↔ 가드 분기를 if false 로 바꾸면 rc=0(덮으러 간다) ↔ 원복 rc=3",
+    "★★개악 2(내구성) — 원형 --limit 1 후 남은 .json 1 · 생성기 「reports matched 1」 ↔ OUT 을 mktemp -d + trap rm 으로 되돌리면(2026-09-18 의 그 형태) 남은 .json 0 · 생성기 rc=2 「does not exist」 ↔ 원복 1",
+    "★가드 보조 실측 — --out game_lab/reports/ (꼬리 슬래시)도 rc=3 · --out game_lab/broken/x(코퍼스 내부)도 rc=3",
+    "★bash -n rc=0 · 네 게이트 + beta clippy 를 diff 에 Rust 0줄임에도 전부 돌렸다(AGENTS.md 「무엇을 바꿨든 넷 다」)"
+  ],
+  "limits": [
+    "★45분을 싸게 만들지 않는다 — 전수 재측은 여전히 전수 재측이고 이 맥은 self-hosted 러너를 겸한다. 바뀐 것은 «한 번만 치른다»뿐이다",
+    "★CI 가 못 본다 — 코퍼스가 실제 게임 바이트라 Constraint 9 상 어떤 검사도 이 경로를 돌릴 수 없다 ⇒ 이 스크립트가 썩어도 red 가 나지 않는다(smoke_gate.sh 와 같은 계급 · checker-census 의 «호출자 0» 바구니가 하나 는다)",
+    "★★stem 충돌은 여전히 자료를 잃는다 — per-game JSON 은 생성기가 찾는 키가 stem 이라 <stem>.json 이고 같은 제목이 두 캐리어에 있으면 나중 실행이 덮는다(실측 3건). 없애지 못했고 시끄럽게만 만들었다(시작 시 계수 출력 + summary.tsv 는 경로 키)",
+    "★디스크 — 기준선 shot 디렉터리는 286 MB / 6,069 PNG 이고 그것이 한 회차분이다. 그래서 --shots 는 opt-in 인데, 그러면 기준선과 인자가 달라진다(그 차이가 판정을 움직이는지는 재지 못했다)",
+    "★날짜 디렉터리가 스스로 쌓인다 — 회수·회전 장치를 넣지 않았다",
+    "★classify.sh 는 여전히 game_lab/reports/ 에 쓴다 — 새 게임을 ingest 하면 기준선 디렉터리에 행이 는다. 기존 187행은 불변이라 7/7 재현은 안전하지만 「기준선은 불변」은 아니다",
+    "★생성기 헤더의 reports mtime range 는 UTC(toISOString)인데 디렉터리 이름은 로컬 날짜다 — 실측으로 하루 어긋났다(05:26 KST 에 쓴 reports-2026-09-19 를 2026-09-18 로 표시). 형제 파일의 출력 포맷이라 이 회차에서 고치지 않고 제안으로 남긴다"
+  ],
+  "adoptedProposals": [
+    "2026-09-18-census-per-game-mapping-generator#p0"
+  ],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "매핑을 stem 이 아니라 «경로»로 읽게 하라 — 같은 제목이 두 캐리어에 있으면 지금도 한 벌이 사라진다",
+      "plainSummary": "같은 이름의 게임이 통신사 두 곳에 있으면, 결과 파일이 이름으로 저장돼서 한쪽이 다른 쪽을 덮어씁니다. 경로로 저장하면 사라지지 않습니다.",
+      "userBenefit": "「이 판정이 어느 파일의 것인가」가 처음으로 전건에서 참이 된다 — 지금은 3건이 조용히 남의 판정을 물려받는다.",
+      "why": "코퍼스는 파일 187 · 고유 stem 184 라 3건이 두 캐리어에 겹친다. 재측 러너는 생성기가 찾는 키에 맞추려고 <stem>.json 을 쓰므로 나중 실행이 앞엣것을 덮고, 생성기는 그 하나를 두 파일에 똑같이 붙인다. 이 회차는 그 손실을 없애지 못하고 «시끄럽게»만 만들었다(시작 시 계수 + 경로 키 summary.tsv). 진짜 처방은 러너가 이미 쓰고 있는 경로 키 summary.tsv 를 생성기가 1순위 입력으로 읽고 <stem>.json 을 폴백으로 두는 것이다 — 그러면 7월 기준선(경로 키가 없다)도 계속 읽힌다.",
+      "tradeoff": "★입력이 둘이 되면 «어느 쪽이 이겼나»를 사람이 다시 물어야 한다 — 생성기 헤더가 그것을 출력해야 한다. 그리고 7월 열은 여전히 stem 키라 그 3건의 과거 판정은 복원되지 않는다(되돌릴 자료가 없다) ⇒ 고쳐지는 것은 «앞으로»뿐이고, 두 열을 비교할 때 그 3행은 비대칭으로 남는다.",
+      "effort": "S",
+      "target": "scripts/game-lab-census-map.mjs · scripts/game-lab-recensus.sh"
+    },
+    {
+      "title": "생성기가 찍는 «측정 날짜»가 UTC 라 하루 어긋난다 — 그 줄은 「이것이 판정의 날짜다」라고 스스로 말한다",
+      "plainSummary": "결과표 맨 위에 적히는 날짜가 한국 시간이 아니라 세계 표준시라, 새벽에 잰 표가 전날 것처럼 보입니다.",
+      "userBenefit": "이 저장소가 반복해 겪은 「낡은 수를 오늘 수로 인용한다」의 반대 방향 — 오늘 잰 표를 어제 것으로 오독하는 일이 없어진다.",
+      "why": "game-lab-census-map.mjs 의 헤더는 statSync(...).mtime.toISOString() 을 쓰고 그 줄에 「★THIS is the date of the verdicts below」라고 적혀 있다. 실측: 2026-09-19 05:26 KST 에 쓴 디렉터리를 2026-09-18 로 표시한다. 디렉터리 이름(재측 러너가 date +%F 로 만든다)은 로컬 날짜라 둘이 정면으로 어긋나고, 하필 그 줄이 낡음 방어의 전부다.",
+      "tradeoff": "★기존에 생성된 모든 TSV 의 그 줄이 같이 바뀐다 — 두 열을 나란히 비교하던 회차가 헤더 날짜만 보고 「입력이 달라졌다」로 오독할 수 있다. 그리고 로컬 시간대로 찍으면 다른 기계에서 잰 표와 비교할 때 다시 어긋난다 ⇒ 오프셋을 함께 찍는 편이 맞을 수 있고(예: 2026-09-19+09:00), 그러면 줄이 길어진다.",
+      "effort": "S",
+      "target": "scripts/game-lab-census-map.mjs"
+    },
+    {
+      "title": "«no frame rendered» 를 한산한 기계에서 짝지어 재라 — 이 회차가 그 재측을 처음으로 «가능»하게 만들었다",
+      "plainSummary": "화면을 한 번도 안 그린 게임들이 진짜 고장인지, 컴퓨터가 바빠서 그렇게 보인 것인지 아직 모릅니다. 이제 그 게임들만 골라 다시 돌릴 수 있습니다.",
+      "userBenefit": "수리 대상이 몇 개인지가 처음으로 확정된다 — 지금은 «고칠 것이 없는 게임»을 쫓을 위험이 있다.",
+      "why": "게이트②가 요구한 저부하 재측이 구조적으로 불가능했던 이유는 per-game 매핑이 없어 «그 32건»을 고를 수 없었기 때문이다. 이 회차의 러너가 --from-stdin 을 받고 생성기가 --bucket 으로 경로를 내므로 이제 한 줄로 부분 재측이 된다. 그리고 재측이 필요하다는 증거는 이 회차 안에 있다: 같은 게임 3건을 두 번 돌렸더니 엔진 무변경인데 버킷이 UNCLASSIFIED×3 → only-blank/panic-unwrap/no-frame 으로 갈렸다(load 170→202 · ticks 2~3 ↔ 3~39).",
+      "tradeoff": "★«한산한 기계»가 조건인데 이 맥은 self-hosted 러너를 겸해 한산한 창이 드물다 — 재측을 언제 돌릴지가 곧 다른 PR 을 얼마나 세울지다. 그리고 짝짓기를 하려면 두 팔을 «같은 분»에 번갈아 돌려야 하므로(AGENTS.md 의 keydraw 선례) 비용이 단순 2배가 아니다. 결과가 「부하 인공물이었다」로 나오면 수리 캠페인의 모집단이 줄어드는 것이 아니라 «몰랐다»가 확정될 뿐이라는 점도 미리 알아야 한다.",
+      "effort": "M",
+      "target": "game_lab 수리 캠페인 · wie_cli/src/bin/wie_validate.rs"
+    }
+  ]
+}
