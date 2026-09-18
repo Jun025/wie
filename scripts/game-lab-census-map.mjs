@@ -52,6 +52,26 @@
 // mapping cannot be detected by any check. The mitigation is that regenerating is
 // one command, not that staleness is impossible. Do not read this as safety.
 //
+// ── Staleness: what this tool now says, and what it still cannot reach ───────
+// Because no check can ever run here, the only remaining lever is that the tool
+// itself gets loud. It does, on three surfaces: a bounded stderr block, a stdout
+// line, and two lines in the written TSV (one near the top, one immediately above
+// the data). The verdict is CURRENT / STALE / UNMEASURED, and the axis is engine
+// commits after the newest report — see the ENGINE_PATHS block below for why that
+// replaced a day threshold.
+//
+// ★It deliberately does NOT change the exit code. Regenerating a map from an OLD
+// reports directory is a legitimate, documented use — it is exactly how the two
+// columns of a census get compared (`--reports`, below) — and a non-zero rc would
+// break that caller to warn it about something it already knows.
+//
+// ★★The hole that remains, stated rather than papered over: a reader who queries
+// the TSV with `awk -F'\t' '$6 ~ /…/'` never sees a comment line, so none of the
+// three surfaces reaches them. Closing that would mean putting the marker in the
+// ROWS, which corrupts the data for every consumer to warn about one. The honest
+// position is that this covers the reader who opens the file and the caller who
+// runs the tool, and not the reader who greps past the header.
+//
 // ── Usage ────────────────────────────────────────────────────────────────────
 //   node scripts/game-lab-census-map.mjs                       # write the TSV, print totals
 //   node scripts/game-lab-census-map.mjs --bucket unimpl-stub  # file paths, one per line
@@ -81,7 +101,45 @@
 // only thing mechanised here is that doing it correctly costs one extra flag.
 
 import { readdirSync, readFileSync, writeFileSync, existsSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
+
+// ── Staleness is measured against the ENGINE, not against a calendar ─────────
+// The proposal that asked for this left the threshold open ("a reason for N is
+// needed separately"). Measured on 2026-09-19 over the last 90 days: commits
+// touching these paths land on 65 of 90 days (304 commits), and the gaps between
+// consecutive engine-active days are p50 1 day, p90 2, MAX 4. So any N of 5 days
+// or more is crossed by an engine change first, and any N below 5 is "the engine
+// moved" with extra steps. ★The calendar is the wrong axis: the question a reader
+// actually has is "could the verdicts below have changed since they were taken",
+// and that is answered exactly by counting engine commits after the newest report.
+// For the July baseline the answer is not a threshold call — it is 263 commits.
+//
+// Wall-clock age is still printed, because it is what a human recognises and
+// because it is the only thing left when git cannot answer.
+const ENGINE_PATHS = ["wie_*", "wie-*", "Cargo.toml", "Cargo.lock", "data"];
+
+const localDay = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+// ★Returns {ok:false} rather than 0 when git cannot answer. "Could not measure"
+// must never render as "current" — that is the failure shape this whole lineage
+// keeps naming, and it is why the caller prints UNMEASURED and not CURRENT.
+function engineCommitsSince(epochMs) {
+  const opts = { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] };
+  try {
+    const count = execFileSync(
+      "git",
+      ["rev-list", "--count", `--since=${new Date(epochMs).toISOString()}`, "HEAD", "--", ...ENGINE_PATHS],
+      opts,
+    ).trim();
+    const last = execFileSync("git", ["log", "-1", "--format=%h %cs", "--", ...ENGINE_PATHS], opts).trim();
+    if (!/^\d+$/.test(count)) return { ok: false };
+    return { ok: true, commits: Number(count), last };
+  } catch {
+    return { ok: false };
+  }
+}
 
 // The classification predicate. PROVENANCE: reverse-engineered from the July
 // published table by `wie-game-lab-census-is-from-a-different-jvm`, and the
@@ -185,28 +243,77 @@ for (const { file, stem } of corpus) {
   rows.push({ file, stem, carrier, result: r.result, bucket: bucketOf(r), excerpt });
 }
 
+// ── The staleness verdict, computed BEFORE --bucket exits ───────────────────
+// It is computed here and not next to the header because `--bucket` is the mode
+// that feeds paths straight into a re-run: emitting a verdict only on the
+// table-writing path would leave the machine-consumed path silent, which is the
+// louder half of the problem.
+//
+// ★Dates are LOCAL, not `toISOString()`. The line this replaces said it was "THE
+// date of the verdicts" while printing UTC, so a directory written at 05:26 KST
+// reported the previous day — measured 2026-09-19, `reports-2026-09-19` printed as
+// `2026-09-18`. A staleness defence that is itself a day out is worse than none.
+const reportMtimes = readdirSync(reportsDir)
+  .filter((f) => f.endsWith(".json"))
+  .map((f) => statSync(path.join(reportsDir, f)).mtime.getTime())
+  .sort((a, b) => a - b);
+
+// An empty reports dir is a real state (a partial re-census in progress), and the
+// previous code rendered it as `undefined .. undefined`.
+const haveMtimes = reportMtimes.length > 0;
+const newestMs = haveMtimes ? reportMtimes[reportMtimes.length - 1] : null;
+const rangeStr = haveMtimes
+  ? `${localDay(new Date(reportMtimes[0]))} .. ${localDay(new Date(newestMs))}`
+  : "(no reports in that directory)";
+const ageDays = haveMtimes ? (Date.now() - newestMs) / 86_400_000 : null;
+const engine = haveMtimes ? engineCommitsSince(newestMs) : { ok: false };
+
+const verdict = !haveMtimes || !engine.ok ? "UNMEASURED" : engine.commits > 0 ? "STALE" : "CURRENT";
+const verdictLine =
+  verdict === "STALE"
+    ? `★★ STALE — the engine moved ${engine.commits} commit(s) after these verdicts were taken (newest report ${ageDays.toFixed(1)} days old; last engine commit ${engine.last})`
+    : verdict === "CURRENT"
+      ? `CURRENT — no engine commit after the newest report (${ageDays.toFixed(1)} days old)`
+      : `★★ UNMEASURED — could not compare against the engine${haveMtimes ? " (git did not answer)" : " (no reports to date)"}. Do NOT read this as current.`;
+
+// stderr, loud and bounded, on both paths. Silent on CURRENT so that the one
+// noisy case stays legible; a warning that fires every time gets scrolled past.
+if (verdict !== "CURRENT") {
+  console.error(`\n  ┌─ game-lab-census-map: ${verdict}`);
+  console.error(`  │ ${verdictLine}`);
+  console.error(`  │ reports=${reportsDir}  range(local)=${rangeStr}`);
+  // ★No file is named here on purpose: the re-census runner lands in a SIBLING
+  // round, and a warning that points at a path this tree may not have is worse
+  // than one that describes the action.
+  console.error(`  │ These buckets describe THAT run, not today. Re-validate the corpus and`);
+  console.error(`  │ point --reports at the fresh directory.`);
+  console.error(`  └─ (this does not change the exit code — comparing an OLD column against a`);
+  console.error(`     new one is a legitimate use, so staleness warns and never blocks)\n`);
+}
+
 if (onlyBucket) {
   const hits = rows.filter((x) => x.bucket === onlyBucket);
   // Paths, not stems: this output is meant to be fed straight to wie_validate.
   for (const h of hits) console.log(h.file);
-  console.error(`# ${hits.length} file(s) in bucket ${JSON.stringify(onlyBucket)} (input: ${reportsDir})`);
+  console.error(`# ${hits.length} file(s) in bucket ${JSON.stringify(onlyBucket)} (input: ${reportsDir}) — ${verdict}`);
   process.exit(0);
 }
-
-const mtimes = readdirSync(reportsDir)
-  .filter((f) => f.endsWith(".json"))
-  .map((f) => statSync(path.join(reportsDir, f)).mtime.toISOString().slice(0, 10))
-  .sort();
 
 const header =
   `# game_lab census map — regenerate with: node scripts/game-lab-census-map.mjs\n` +
   `# corpus=${corpusDir}  reports=${reportsDir}\n` +
-  `# ★reports mtime range: ${mtimes[0]} .. ${mtimes[mtimes.length - 1]}  ← THIS is the date of the verdicts below\n` +
+  `# ${verdictLine}\n` +
+  `# ★reports mtime range (LOCAL): ${rangeStr}  ← THIS is the date of the verdicts below\n` +
   `# files=${corpus.length}  stems=${new Set(corpus.map((c) => c.stem)).size}  reports=${reports.size}\n` +
   `# ★col 6 is the reason's FIRST line, cut at 120 chars — not a search index.\n` +
   `#   Measured 2026-09-18: one excerpt value covers 99/187 rows across several buckets,\n` +
   `#   164/452 reasons are multi-line, 4 first lines exceed 120 chars. A signature that\n` +
   `#   sits on line 2 cannot be grepped here; re-read the report JSON for those.\n` +
+  // ★Repeated immediately above the data, because that is the last line a reader
+  // sees before the rows start. It does NOT reach a reader who greps column 6 —
+  // `awk -F'\t' '$6 ~ /…/'` never matches a comment line. That hole is real and is
+  // named in the block at the top of this file rather than papered over here.
+  `# ★${verdict}${verdict === "STALE" ? ` — ${engine.commits} engine commit(s) newer than this table` : ""}\n` +
   `file\tstem\tcarrier\tresult\tbucket\tfirst_line_of_reason\n`;
 writeFileSync(outFile, header + rows.map((r) => `${r.file}\t${r.stem}\t${r.carrier}\t${r.result}\t${r.bucket}\t${r.excerpt}`).join("\n") + "\n");
 
@@ -214,5 +321,6 @@ const totals = {};
 for (const r of rows) totals[r.bucket] = (totals[r.bucket] || 0) + 1;
 console.log(`game-lab-census-map: ${rows.length} files -> ${outFile}`);
 console.log(`  corpus files ${corpus.length} · stems ${new Set(corpus.map((c) => c.stem)).size} · reports matched ${rows.filter((r) => r.result !== "NO-REPORT").length}`);
-console.log(`  ★reports mtime range ${mtimes[0]} .. ${mtimes[mtimes.length - 1]} — the buckets below describe THAT run, not today`);
+console.log(`  ${verdictLine}`);
+console.log(`  ★reports mtime range (local) ${rangeStr}`);
 for (const [k, v] of Object.entries(totals).sort((a, b) => b[1] - a[1])) console.log(`  ${String(v).padStart(4)}  ${k}`);
