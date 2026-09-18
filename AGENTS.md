@@ -572,6 +572,46 @@ design** — do not "fix" that by wiring it:
   transient debugging output, overwritten on the next run. Screenshots meant to be *kept* live in
   `docs/verification/`. This is said here because the surprise is real: a gate② reviewer hit it,
   deleted the two files by hand, and filed it — the script had never announced the side effect.
+- **`scripts/make-wipi-keydraw-fixture.sh` — local only, and it must never be wired as a
+  regenerate-and-compare check.** It rebuilds `test_data/keydraw_{ktf,lgt}.zip` by cloning
+  `dlunch/wipi@068312d`, injecting a guest, and building it with nightly + `rust-src` +
+  `-Zbuild-std`. **Execution call sites: 0, on purpose.** Three measurements, in the order that
+  matters:
+
+  **⑴ The output cannot be byte-reproduced anywhere, least of all on a runner.** The script's own
+  header has said so since it landed ("the output is not byte-reproducible (the build embeds
+  paths)... Verify a regeneration by re-running the tests, not by diffing the zips"), and the
+  mechanism is visible in the committed artifact: `strings` over the ARM binaries inside those zips
+  finds **41 path-shaped strings in `keydraw_ktf.zip` and 39 in `keydraw_lgt.zip`**, including
+  `/Users/<dev>/.rustup/toolchains/nightly-aarch64-apple-darwin/lib/rustlib/src`. A `ubuntu-latest`
+  runner embeds `/home/runner/...` instead, so a regenerate-and-compare step is not flaky — it is
+  **red by construction, forever**. A permanently red check gets switched off, and then the repo is
+  worse off than with no check.
+
+  **⑵ Byte comparison is the wrong question anyway, and the right one is already asked.** What the
+  fixture owes is *behaviour*, and both zips are booted and asserted against exact integers:
+  `wie-ktf/tests/test_key_reach.rs` and `test_resource_reach.rs` `include_bytes!` the KTF zip
+  (so `cargo test --all` reads its bytes on all six matrix legs), and `contract-roundtrip.mjs`
+  serves **both** over HTTP and boots them — Scenario E/E-res for KTF, **F/F-res for LGT**.
+
+  **⑶ The generator's constants are fail-closed against the contract.** `contract-roundtrip.mjs`
+  parses `BAR_H`, the `KeyCode::X => N` table and the `res.bin` payload back out of this script and
+  throws on drift. Verified by mutation, 2026-09-18: renaming `BAR_H` → rc=1 "cannot read `const
+  BAR_H: i32 = N;`"; setting `KeyCode::Key1 => 999` → rc=1 "paints 999 ... but
+  `contract.keyWipiCodes` is N". That is the live defence, and it is the one to keep working.
+
+  **What none of this catches — say it plainly rather than calling the declaration safety.** The
+  guarded property is behaviour, so a regeneration that changes the bytes *without* changing what
+  the guest prints or paints is invisible, by design. And one carrier is thinner than the other:
+  **`keydraw_lgt.zip` has no `cargo test` coverage at all.** `b52ed661` created
+  `wie_lgt/tests/test_key_reach.rs` alongside the KTF one, and the 2026-09-16 crate rename
+  (`wie_lgt` → `wie-lgt`) did not carry it over — `wie-lgt/tests/` holds only `test_helloworld.rs`,
+  and the two `keydraw_lgt` hits under `wie-lgt/src/` are comments. So LGT's zip is covered by
+  Scenario F and the local runner, both of which sit behind a paths filter or a weekly schedule,
+  and by nothing that runs unconditionally. **Restoring that test is a separate round** (it is a
+  new test file, not a declaration), and this bullet exists so the gap is written down rather than
+  rediscovered.
+
 - **`scripts/smoke_gate.sh` — local only, and structurally so.** It regresses the working game
   catalog against `scripts/smoke_gate_baseline.tsv`, reading titles from `WORKING_DIR`
   (default `game_lab/working`). `game_lab/` is git-ignored and holds real game bytes, which

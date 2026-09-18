@@ -1,0 +1,39 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-18",
+  "task": "wie-keydraw-fixture-generator-is-never-run-against-its-committed-zip",
+  "title": "keydraw 생성기 호출처 0 — declare(NOT-RUN) 로 닫았다. 재생성-비교는 «비싸서»가 아니라 «러너가 그 바이트를 만들 수 없어서» 탈락했다",
+  "summary": "scripts/make-wipi-keydraw-fixture.sh 의 실행 호출처는 0 이고 그것이 test_data/keydraw_{ktf,lgt}.zip 을 만든다. 세 갈래(⒜재생성-비교 배선 · ⒝declare · ⒞간접 축 강화) 중 ⒝ 를 골랐다. ★급소는 byte-stable 이었고 «주장»을 인용하는 데서 멈추지 않았다: zip → jar → ARM 바이너리를 풀어 strings 로 세니 경로형 문자열이 ktf 41건·lgt 39건이고 그중 /Users/<dev>/.rustup/toolchains/nightly-aarch64-apple-darwin/lib/rustlib/src 가 있다 ⇒ ubuntu-latest 는 /home/runner/... 를 박으므로 재생성-비교는 flaky 가 아니라 구조적 영구 red 다. ★그리고 티켓 전제(「드리프트가 바로 드러나지 않는다」)는 절반만 참이다 — 두 zip 다 부팅되고 정확한 정수로 단언된다(ktf 는 cargo test 6다리, 둘 다 contract-roundtrip Scenario E/F·E-res/F-res). ★★함께 발견한 진짜 결손: keydraw_lgt.zip 은 cargo test 커버리지가 0 이다 — b52ed661 이 ktf·lgt 시험을 둘 다 만들었는데 2026-09-16 크레이트 개명(wie_lgt → wie-lgt)에서 lgt 쪽이 따라오지 않았다.",
+  "changes": [
+    "AGENTS.md §Web-surface commands — make-wipi-keydraw-fixture.sh 의 NOT-RUN 선언 1블록(smoke_gate.sh 선례와 같은 형식: local only and structurally so + 이유 + 대신 무엇이 지키는가 + 무엇을 못 잡는가)",
+    "docs/report/0168 — 회차 기록"
+  ],
+  "verification": [
+    "★ⓐ 호출처 재측: 추적 파일 전수에서 .github/ 히트 1건 = engine-contract.yml:330 의 «관련성 필터 경로»이고 실행이 아니다 ⇒ 실행 호출처 0 은 참.",
+    "★ⓑ byte-stable 기전을 커밋된 산출물에서 직접 확인: strings 로 경로형 문자열 ktf 41 · lgt 39 건, /Users/<dev>/.rustup/toolchains/nightly-aarch64-apple-darwin/lib/rustlib/src 포함. 스크립트 머리주석·2026-09-05 워크로그의 선행 주장과 일치하고, 무거운 재생성 없이 같은 결론에 닿았다.",
+    "★ⓒ 도구: 워크플로 5개 전건 dtolnay/rust-toolchain@stable(nightly 0). 스크립트는 네트워크 클론 + nightly + rust-src + -Zbuild-std 를 요구한다.",
+    "★ⓓ 간접 축이 «무는다»: wie-ktf/tests/test_key_reach.rs·test_resource_reach.rs 가 include_bytes! 후 부팅(cargo test 6다리) · contract-roundtrip.mjs 가 두 zip 을 HTTP 로 서빙해 부팅(Scenario E/E-res = ktf · F/F-res = lgt · :553-610). 단언은 정확한 정수(key:<code> · res:<size>:<sum>)다.",
+    "★개악 대조 2칸(백업+trap 자동 원복 · 커밋 0): BAR_H → BAR_H_RENAMED ⇒ rc=1 「cannot read const BAR_H」 · KeyCode::Key1 => 999 ⇒ rc=1 「paints 999 … contract disagree」. 원복 후 git diff --stat 공집합 ⇒ 남은 방어선이 공허하지 않다.",
+    "★러너 6종: 첫 실행에서 keydraw 둘이 FAIL(paints 22·20 · idle 범위 48~55의 절반 이하 · loadavg 180)이었고 AGENTS.md 4단계를 적용했다 — 무변경 트리(origin/main · diff 0파일)에서 4/4 PASS(paints 39~51) · 내 트리에서도 4/4 PASS(paints 38~54) ⇒ 기아이고 회귀가 아니다.",
+    "노드 검사기 rc=0(check-doc-liveness-parity 26 documented line(s) 불변 · check-engine-runner-fixtures 8 tracked/6 named/2 excused · check-docs-report-serial 162건 중복 0)"
+  ],
+  "limits": [
+    "★declare 는 «안전»이 아니다 — 바이트가 바뀌었는데 게스트의 출력·픽셀이 안 바뀌면 아무도 모른다. 그것은 설계(행동을 지키는 축)이지만 「선언했으니 안전」이 아니다",
+    "★keydraw_lgt.zip 은 «무조건 도는» 축이 0 이다 — Scenario F 는 paths 필터 뒤이고 로컬 러너·doc-liveness 는 주간이다. 2026-09-16 개명에서 유실된 wie_lgt/tests/test_key_reach.rs 를 되살리는 것은 «시험 파일 신설»이라 declare 가 아니고 별 회차다",
+    "★선언은 기계가 아니다 — check-engine-runner-fixtures 는 러너 «픽스처»를 보고 이 «생성기»는 보지 않는다. 이 블록이 낡으면 아무도 울지 않는다(선례 smoke_gate.sh 도 같은 성질)",
+    "★재생성을 «실제로» 돌려 2회 cmp 하지는 않았다 — 네트워크 클론 + nightly 빌드가 필요하고, 경로 박힘을 산출물에서 직접 확인해 같은 결론에 닿았기 때문이다. 그 실행을 원하면 별 축이다"
+  ],
+  "proposals": [
+    {
+      "title": "keydraw_lgt 의 키·리소스 도달 시험을 되살려라 — 2026-09-16 개명에서 유실됐다",
+      "plainSummary": "LGT 쪽 게임 경로를 무조건 검사하던 시험 두 개가 크레이트 이름을 바꾸는 과정에서 사라졌습니다. 지금은 조건이 맞을 때만 검사됩니다.",
+      "userBenefit": "LGT 카캐리어의 키 입력·리소스 읽기 회귀가 조건 없이 매 PR 에서 드러난다 — 지금은 paths 필터를 통과하는 PR 에서만 잡힌다.",
+      "why": "b52ed661 이 wie_ktf/tests/test_key_reach.rs 와 wie_lgt/tests/test_key_reach.rs 를 둘 다 만들었고 그 회차 회신이 「두 경로 다 … 부분 완료가 아니라 전건」이라 적었다. 2026-09-16 크레이트 개명(wie_lgt → wie-lgt)에서 ktf 쪽은 따라왔고 lgt 쪽은 오지 않았다 — 현 wie-lgt/tests/ 는 test_helloworld.rs 뿐이고 cargo metadata 시험 타깃 전수에도 없다. ⇒ keydraw_lgt.zip 을 무조건 읽는 축이 0 이다(Scenario F 는 engine paths 필터 뒤 · 로컬 러너·doc-liveness 는 주간). test_resource_reach 도 같은 형상이다.",
+      "tradeoff": "★먼저 «되살릴 수 있는가»를 재라 — 그 시험은 wie_lgt 이름과 그 시절 API 를 쓰므로 base swap 이후 그대로 붙지 않을 수 있다(census 회차가 고아 tests/*.rs 3건이 «되살리면 red»임을 이미 실측했다). ⇒ ⑴git show c0f48c66:wie_lgt/tests/test_key_reach.rs 로 원문을 꺼내 ⑵wie-lgt 에 붙여 컴파일되는지 먼저 보고 ⑶red 면 그 사유가 산출물이다(되살리지 못하는 이유도 값이다). 그리고 cargo test --all 이 6다리에서 도므로 수행 시간이 6배로 붙는다 — 재어서 적어라.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": ["2026-09-17-checker-caller-census#p1"],
+  "declinedProposals": []
+}
