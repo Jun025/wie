@@ -174,57 +174,84 @@ pub async fn list_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
 /// KTF WIPI-C **Database slot 8**. The standard WIPI header calls this
 /// `MC_dbSortRecords`; **this code does not claim to know what KTF puts there.**
 ///
-/// ── What was measured, and what it overturned ────────────────────────────────
+/// ── The arity is 2, and it is disassembled rather than inferred ──────────────
 /// The first version of this function implemented the header's signature —
-/// `(fd, M_Int32 *buf, M_Int32 len, compare, filter)` — wrote the record ids into
-/// `buf` when both callbacks were null, and reported the callback addresses
-/// otherwise. Running the two guests that reach this slot (2026-09-18) showed
-/// every part of that reading to be wrong:
+/// `(fd, M_Int32 *buf, M_Int32 len, compare, filter)` — and wrote record ids into
+/// what it took to be `buf`. The second withdrew the 4th and 5th and kept three.
+/// Both were reading registers the caller never loaded with an argument.
+///
+/// The client images load verbatim at `IMAGE_BASE = 0x100000`
+/// (`wie_ktf::emulator`), so a guest address minus `0x100000` is a file offset in
+/// `client.bin<bss>` and the call site can be read statically. Both guests that
+/// reach this slot use the *same* four instructions — `0103451A.jar` at
+/// `0x10571a` and `01031C0A.jar` at `0x1243c8`:
 ///
 /// ```text
-/// slot 8 called with r0=0x13184c  r1=0x1  r2=0x4a854000  r3=0x71004401  stack0=0x134ac8
+///   ldr  r2, [r3]           ; r2 = &WIPICDatabaseInterface
+///   movs r1, #1             ; arg1 — an immediate, at every site
+///   ldr  r0, [r3]           ; arg0 — a pointer read out of a guest global
+///   ldr  r3, [r2, #0x20]    ; r3 = table[8] = this function's own SVC stub
+///   bl   __call_via_r3      ; ARM ADS veneer whose whole body is `bx r3`
 /// ```
 ///
-/// * **`r3` is not an argument.** `RUST_LOG=wie_core_arm=trace` decodes it:
-///   `Register SVC stub at 0x71004400, category=3, id=458760`, and
-///   `458760 = 0x70008 = (WIPICTableId::Database << 16) | 8` — it is the SVC stub
-///   for *this very function*. A caller doing `ldr r3,[table]; blx r3` leaves the
-///   callee's own address there, so reading a 4th parameter invents one. The
-///   earlier round published that value as "a platform-provided comparator"; it
-///   is nothing of the sort, and the 5th (`stack0`) is read past the call's end.
-/// * **The remaining three do not fit the header either.** `r1 = 0x1` cannot be
-///   an `M_Int32 *buf`, and `r2` sits in the same heap range as the addresses in
-///   the guest's own stack dump — i.e. the pointer and the length are, at best,
-///   not in the header's order. `r0 = 0x13184c` is 0x1c bytes past the name
-///   pointer `MC_dbOpenDataBase` was handed moments earlier, so it looks like
-///   another *name* pointer rather than a handle.
+/// * **`r3` is call machinery.** `sort_records` is the 9th `u32` of
+///   `WIPICDatabaseInterface`, i.e. `+0x20`, so `bx r3` enters *this* entry point
+///   and the register still holds its address when the SVC fires. The guests'
+///   register dumps agree twice: `IP = 0x70008` is the id `SvcId::get` reads,
+///   `(WIPICTableId::Database << 16) | 8`, and `R3 = 0x71001781` is the thumb
+///   entry of the stub whose `svc` is at `PC = 0x7100178a`. A 4th parameter
+///   invents one.
+/// * **`r2` is call machinery too — this is the register the previous revision
+///   stopped one short of.** It holds the table the callee address was loaded
+///   from, and nothing rewrites it before the `bl`. The cross-guest test the
+///   earlier reading applied to `r3` applies here identically: `R2` is
+///   byte-identical in both dumps (`0x4a855780`) while `R0`, which is guest data,
+///   differs (`0x13184c` vs `0x135ae4`).
+/// * **The 5th "argument" is the caller's saved `r10`.** `read_param(4)` resolves
+///   to `[SP+0]`, and `[SP+0] == SL` in both dumps (`0x134ac8` / `0x13e878`).
+///
+/// So the call is `f(r0, r1)` with `r1 == 1`, and the header's five-parameter
+/// shape fits none of it.
+///
+/// **What `r0` points at**, since "another name pointer" was as far as the
+/// previous revision got: in both images the address lands on a tail-merged
+/// string literal inside the title's own resource-path pool — `0x13184c` is
+/// `"res"` (the tail of `"res/anidata.res"`) and `0x135ae4` is `"ga"` (the tail
+/// of `"/ga/per.ga"`). Short NUL-terminated ASCII tokens, and in particular not
+/// handles: `open_database` returns an `alloc_raw` pointer, which lives in the
+/// emulator heap, not in the guest image. What the guest *means* by the token is
+/// not settled here.
 ///
 /// None of that is surprising for this table: `select_record_ktf` and
 /// `stat_by_name_ktf` below already carry the note that KTF's slots diverge from
 /// the header, and the struct comment at the top of this file records that the
 /// original field names were "a pre-disassembly guess". Slot 8 is the same shape,
-/// and the first version of this function repeated that guess.
+/// and the first two versions of this function repeated that guess.
 ///
 /// ── So it refuses, and it refuses LOUDLY ─────────────────────────────────────
-/// It takes three arguments because `r3` is accounted for above and a 4th cannot
-/// be read without knowing the arity; it names them `arg0..2` because naming them
-/// `db_id`/`buf_ptr`/`buf_len` would assert the header layout the measurement just
-/// refuted. **It never writes to guest memory** — the withdrawn write loop would
-/// have written record ids starting at `0x1`, which is precisely the "corrupts the
-/// guest's heap silently" this doc comment used to warn about while doing it.
-/// `sort_records_never_writes_to_guest_memory_test` pins that.
+/// It takes the two arguments the disassembly accounts for, and names them
+/// `arg0`/`arg1` because naming them `db_id`/`buf_ptr` would assert the header
+/// layout the measurement refuted. Reading fewer registers costs nothing *here* —
+/// the function always fails, so a dropped argument cannot change behaviour,
+/// while a register that was never an argument turns into a published coordinate
+/// that sends the next round somewhere that does not exist. That is exactly what
+/// happened to `r3`. **It never writes to guest memory** — the withdrawn write
+/// loop would have written record ids starting at `0x1`, which is precisely the
+/// "corrupts the guest's heap silently" this doc comment used to warn about while
+/// doing it. `sort_records_never_writes_to_guest_memory_test` pins that.
 ///
-/// To identify the slot, read the three arguments out of a real guest and compare
-/// against `docs/reference/WIPIHeader.h`'s database block — the decode recipe
-/// above (`RUST_LOG=wie_core_arm=trace`, or the 4 bytes at `stub - 1 + 12`, which
-/// hold `(table << 16) | function`) is the tool, and it needs no code change.
-pub async fn sort_records(context: &mut dyn WIPICContext, arg0: WIPICWord, arg1: WIPICWord, arg2: WIPICWord) -> Result<i32> {
+/// The next round starts from `f(ptr_to_short_ascii_token, 1)` — not from "find
+/// the comparator", which was a ghost. The tools are static: disassemble the two
+/// call sites above, and decode any SVC stub from the 4 bytes at `stub - 1 + 12`,
+/// which hold `(table << 16) | function`. Neither needs a code change.
+pub async fn sort_records(context: &mut dyn WIPICContext, arg0: WIPICWord, arg1: WIPICWord) -> Result<i32> {
     let _ = context;
-    tracing::debug!("KTF database slot 8 (header name: MC_dbSortRecords)({arg0:#x}, {arg1:#x}, {arg2:#x})");
+    tracing::debug!("KTF database slot 8 (header name: MC_dbSortRecords)({arg0:#x}, {arg1:#x})");
 
     Err(WieError::Unimplemented(format!(
         "8: KTF database slot 8 (header name MC_dbSortRecords) — argument layout unknown, \
-         measured r0={arg0:#x} r1={arg1:#x} r2={arg2:#x}; the header's (fd, buf, len, compare, filter) does not fit"
+         measured r0={arg0:#x} r1={arg1:#x} (arity 2: r2 holds the interface table, r3 the callee address); \
+         the header's (fd, buf, len, compare, filter) does not fit"
     )))
 }
 
@@ -728,7 +755,7 @@ mod tests {
     /// a caller-supplied buffer. Measured against the two guests that reach the
     /// slot, that "buffer" argument is `0x1` — so the write loop would have started
     /// at guest address 1. This pins the property the rewrite bought: whatever the
-    /// three arguments turn out to mean, nothing is written until somebody knows.
+    /// two arguments turn out to mean, nothing is written until somebody knows.
     ///
     /// The sentinel spans the low addresses the old loop would have hit *and* the
     /// heap-range value the guest actually passes, so a regression that reinstates
@@ -744,8 +771,8 @@ mod tests {
         // The arguments a real guest passed (2026-09-18), plus a run with the
         // header's null-callback shape, which the withdrawn code treated as
         // "write everything".
-        for args in [(0x13184cu32, 0x1u32, 0x4a854000u32), (0x1000, 0x0, 0x0)] {
-            let err = sort_records(&mut context, args.0, args.1, args.2).await.unwrap_err();
+        for args in [(0x13184cu32, 0x1u32), (0x1000, 0x0)] {
+            let err = sort_records(&mut context, args.0, args.1).await.unwrap_err();
             assert!(
                 matches!(err, wie_util::WieError::Unimplemented(ref m) if m.contains("argument layout unknown")),
                 "slot 8 must refuse rather than act on a guessed layout, got {err:?}"
