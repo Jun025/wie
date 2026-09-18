@@ -23,6 +23,25 @@ fn gen_stub(id: WIPICWord, name: &'static str) -> WIPICMethodBody {
     body.into_body()
 }
 
+/// Same as `gen_stub`, for the tables nobody has identified yet — it carries the
+/// **function id** as well as the table id.
+///
+/// `gen_stub(4, "stub")` was used for all 64 slots of an unnamed table, so every
+/// one of them reported the single string `4: stub`. Measured 2026-09-18 over
+/// `game_lab/broken`: that is the largest remaining `unimpl-stub` signature
+/// (3 of 7), and it is the only one a reader cannot act on — it does not say
+/// which function the guest called, so there is nothing to look up or implement.
+/// The table id alone is not a lead; the pair is.
+fn gen_unnamed_table_stub(table_id: WIPICWord, function_id: u16) -> WIPICMethodBody {
+    let body = move |_: &mut dyn WIPICContext| async move {
+        Err::<(), _>(WieError::Unimplemented(format!(
+            "{table_id}: unnamed WIPI-C table {table_id}, function {function_id}"
+        )))
+    };
+
+    body.into_body()
+}
+
 pub fn get_kernel_interface(core: &mut ArmCore) -> Result<WIPICKnlInterface> {
     let table_id = WIPICTableId::Kernel;
 
@@ -495,14 +514,14 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
         WIPICTableId::Interface3 => get_unk3_method_table().into_iter().nth(function_id as usize),
         WIPICTableId::Interface4 => {
             if function_id < 64 {
-                Some(gen_stub(4, "stub"))
+                Some(gen_unnamed_table_stub(4, function_id))
             } else {
                 None
             }
         }
         WIPICTableId::Interface5 => {
             if function_id < 64 {
-                Some(gen_stub(5, "stub"))
+                Some(gen_unnamed_table_stub(5, function_id))
             } else {
                 None
             }
@@ -516,7 +535,7 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
             WIPICDatabaseMethodId::UpdateRecord => Some(database::stat_by_name_ktf.into_body()),
             WIPICDatabaseMethodId::DeleteRecord => Some(database::delete_record_ktf.into_body()),
             WIPICDatabaseMethodId::ListRecord => Some(database::list_record.into_body()),
-            WIPICDatabaseMethodId::SortRecords => Some(gen_stub(8, "MC_dbSortRecords")),
+            WIPICDatabaseMethodId::SortRecords => Some(database::sort_records.into_body()),
             WIPICDatabaseMethodId::GetAccessMode => Some(gen_stub(9, "MC_dbGetAccessMode")),
             WIPICDatabaseMethodId::GetNumberOfRecords => Some(database::get_number_of_records.into_body()),
             WIPICDatabaseMethodId::GetRecordSize => Some(gen_stub(11, "MC_dbGetRecordSize")),
@@ -528,7 +547,7 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
         },
         WIPICTableId::Interface7 => {
             if function_id < 64 {
-                Some(gen_stub(7, "stub"))
+                Some(gen_unnamed_table_stub(7, function_id))
             } else {
                 None
             }

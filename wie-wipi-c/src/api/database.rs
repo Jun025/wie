@@ -1,4 +1,4 @@
-use alloc::{borrow::ToOwned, boxed::Box, str, string::String, vec, vec::Vec};
+use alloc::{borrow::ToOwned, boxed::Box, format, str, string::String, vec, vec::Vec};
 use core::mem::size_of;
 
 use bytemuck::{Pod, Zeroable};
@@ -6,7 +6,7 @@ use bytemuck::{Pod, Zeroable};
 use wipi_types::wipic::WIPICWord;
 
 use wie_backend::Database;
-use wie_util::{Result, read_generic, read_null_terminated_string_bytes, write_generic};
+use wie_util::{Result, WieError, read_generic, read_null_terminated_string_bytes, write_generic};
 
 use crate::context::WIPICContext;
 
@@ -169,6 +169,60 @@ pub async fn list_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
     }
 
     Ok(ids.len() as _)
+}
+
+/// `MC_dbSortRecords(dbID, buf, len, compare, filter)` — the record-id list, in
+/// the order the two guest callbacks impose.
+///
+/// **The callbacks are the whole difficulty, so this implements exactly the half
+/// that is defined and refuses the other half by name.** `WIPIHeader.h:1579`
+/// types them `M_Int32 (*compare)(const void *, const void *)` and
+/// `M_Int32 (*filter)(const void *)` — they take *record payload* pointers, not
+/// ids, so honouring them means materialising every record into guest memory and
+/// calling back in (`WIPICContext::call_function`, which the timer and socket
+/// paths already use). What the header does not say is who owns that memory or
+/// how long it lives, and guessing it wrong corrupts the guest's heap silently.
+///
+/// So: **both callbacks null** is the case the header fully determines — no
+/// filter, no reordering — and that is `MC_dbListRecords` with a stable order.
+/// **Either callback non-null** returns `WieError::Unimplemented` *naming which
+/// one was passed*, which is strictly more than the blanket stub it replaces:
+/// the next round learns whether real guests use them at all, instead of
+/// learning only that slot 8 was called.
+pub async fn sort_records(
+    context: &mut dyn WIPICContext,
+    db_id: i32,
+    buf_ptr: WIPICWord,
+    buf_len: WIPICWord,
+    compare: WIPICWord,
+    filter: WIPICWord,
+) -> Result<i32> {
+    tracing::debug!("MC_dbSortRecords({db_id:#x}, {buf_ptr:#x}, {buf_len}, compare={compare:#x}, filter={filter:#x})");
+
+    if compare != 0 || filter != 0 {
+        return Err(WieError::Unimplemented(format!(
+            "8: MC_dbSortRecords with guest callbacks (compare={compare:#x}, filter={filter:#x}) — the null-callback case is implemented; \
+             these take record-payload pointers whose ownership the WIPI header does not specify"
+        )));
+    }
+
+    let Some(db) = get_database_from_db_id(context, db_id).await? else {
+        return Ok(-25); // M_E_INVALIDHANDLE
+    };
+    let ids = db.get_record_ids().await;
+
+    // `len` is the caller's capacity in entries — writing past it is a guest heap
+    // overrun, so clamp and report what was written (the header returns a count).
+    let capacity = buf_len as usize;
+    let mut cursor = 0;
+    let mut written = 0usize;
+    for &id in ids.iter().take(capacity) {
+        write_generic(context, buf_ptr + cursor, id)?;
+        cursor += size_of::<WIPICWord>() as u32;
+        written += 1;
+    }
+
+    Ok(written as _)
 }
 
 /// `MC_dbGetNumberOfRecords(dbID)` — number of records in the database, or the
