@@ -1,0 +1,28 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-18",
+  "task": "wie-text-drawing-fixture-cheap-tier-vs-broad-tier-decision",
+  "title": "글자 픽스처의 CI 층 결정 — 싼 층 ⒜ 채택(60ms) · 넓은 층 ⒝ 기각(17분/PR)",
+  "summary": "직전 회차가 text_j2me 픽스처를 착지시켰으나 그것은 로컬 러너와 주간 doc-liveness 에서만 돈다 ⇒ per-PR 에 「고쳤다」를 증명할 자가 없었다. 두 층을 재서 ⒜(wie_validate.rs 안 #[cfg(test)] 로 Platform::font() 를 text_layout::minimum_width 까지 태우는 시험)를 골랐다. ★급소는 「⒜ 가 정말 무는가」였고 red/green 으로 답했다 — font() 를 unimplemented!() 로 되돌리면 FAILED(10 passed/1 failed · not implemented), 정상 트리에서 ok(11 passed/0 failed). 떨어지는 것은 내 시험 하나뿐이라 남의 축도 무사하다. ★티켓 전제 ⓐ「.github/ 의 wie_validate 0건」은 틀렸다 — 실측 3건(전부 doc-liveness.yml)이고 그 워크플로의 pull_request 는 자기 파일에만 걸려 있어 «per-PR 로는 안 돈다»만 참이다. 그 문장은 2026-09-07 에 쓰였고 2026-09-10 에 거짓이 됐다(8일) — AGENTS.md 를 고쳤다.",
+  "changes": [
+    "wie_cli/src/bin/wie_validate.rs — headless_platform_font_measures_text_test 신설(Platform::font() → text_layout::minimum_width · 빈 문자열 0 대조로 공허성 배제)",
+    "AGENTS.md — 「0 hits」 정정 + 채택 층·기각 층·비용표·재개 조건 기록",
+    "docs/report/0166 — 회차 기록"
+  ],
+  "verification": [
+    "★red/green: font() → unimplemented!() 로 되돌린 트리에서 FAILED(10 passed/1 failed · panicked at wie_validate.rs:359 not implemented) ↔ 정상 트리 ok(11 passed/0 failed). 개악은 trap 으로 자동 원복하고 git diff 로 font() 가 &self.font 임을 확인(커밋 0).",
+    "★단언 공허성 배제: 같은 호출이 빈 문자열에서 0 을 낸다(assert_eq! 통과) ⇒ > 0 이 판별력을 갖는다. 「패닉 안 함」에서 멈추지 않고 게스트 drawString 이 실제로 지나는 text_layout 을 탄다.",
+    "★비용 실측: ⒜ = 시험 실행 0.03s → 0.04s(10→11건) ≈ 10ms · ×6다리 ≈ 60ms · 새 의존 0. ⒝-2 = 러너 블록 168.1s(웜 · loadavg 180) × 6다리 ≈ 17분/PR(self-hosted 러너 1대 · 형제 PR 이 기다린다). ⒝-1 = contract 잡 툴체인이 if: engine=='true' 이고 wasm32 타깃·wasm 캐시라 네이티브 빌드를 새로 넣어야 하고, 필터 안이면 docs-only PR 을 못 보고 밖이면 모든 PR 이 문다(그 잡은 doc-only diff 에서 12s).",
+    "★전제 ⓐ 재측: grep -rn 'wie_validate' .github/ → 3건(doc-liveness.yml:134·137·139) · 그 워크플로 pull_request paths 는 자기 파일 한정 ⇒ 다른 PR 에서 0. 거짓이 된 시점 추적: 문장 0673e3e3(09-07 12:57) ↔ 러너 블록 4e39dfaa(09-10 09:41).",
+    "노드 검사기 rc=0(check-doc-liveness-parity 26 documented line(s) 불변 · check-docs-report-serial 156건 중복 0)"
+  ],
+  "limits": [
+    "★⒜ 는 «한 메서드»만 지킨다 — drawString 과 화면 사이의 다른 회귀는 여전히 주간(최대 1주)이다. 이것이 이 선택의 대가이고 「잃는 것이 없다」가 아니다",
+    "★수리 캠페인의 회신을 이 층이 검증하는 것은 «부분적»이다 — font() 결손의 재발만 막고, 개별 게임의 PASS 는 game_lab/ 코퍼스가 증명하는데 그것은 Constraint 9 로 CI 에 못 들어간다(별 축)",
+    "★시험이 HeadlessPlatform 구성을 run() 과 따로 적는다 ⇒ 구조체 필드가 늘면 컴파일 에러로 갈린다. 조용한 드리프트가 아니라 눈에 띄는 실패라 그대로 두었다",
+    "★재개 조건은 하나다 — font() «밖»의 텍스트 경로에서 회귀가 착지하고 그것을 잡은 것이 «주간 잡»일 때. 그 미만은 이 교환을 뒤집는 증거가 아니다"
+  ],
+  "proposals": [],
+  "adoptedProposals": ["2026-09-18-text-drawing-fixture#p0"],
+  "declinedProposals": []
+}
