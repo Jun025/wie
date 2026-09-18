@@ -182,36 +182,59 @@ pub async fn list_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
 ///
 /// The client images load verbatim at `IMAGE_BASE = 0x100000`
 /// (`wie_ktf::emulator`), so a guest address minus `0x100000` is a file offset in
-/// `client.bin<bss>` and the call site can be read statically. Both guests that
-/// reach this slot use the *same* four instructions — `0103451A.jar` at
-/// `0x10571a` and `01031C0A.jar` at `0x1243c8`:
+/// `client.bin<bss>` and the call site can be read statically. The slot-8 call
+/// sites — **three**, see the scan note below — all have this shape
+/// (`0103451A.jar` at `0x10571a`; `01031C0A.jar` at `0x1243c8` and `0x128f3a`):
 ///
 /// ```text
-///   ldr  r2, [r3]           ; r2 = &WIPICDatabaseInterface
-///   movs r1, #1             ; arg1 — an immediate, at every site
-///   ldr  r0, [r3]           ; arg0 — a pointer read out of a guest global
+///   ldr  r3, [pc, #k1]      ; k1 and k2 are DIFFERENT literal-pool entries:
+///   add  r3, sl             ; r3 is reloaded between the two uses below, so
+///   ldr  r3, [r3]           ; r2 and r0 come from different globals
+///   ldr  r2, [r3]           ; r2 = &WIPICDatabaseInterface  (global slot: see below)
+///   ldr  r3, [pc, #k2]      ; <-- the reload
+///   add  r3, sl
+///   movs r1, #1             ; arg1 — an immediate at all three slot-8 sites
+///   ldr  r0, [r3]           ; arg0 — a pointer read out of a different guest global
 ///   ldr  r3, [r2, #0x20]    ; r3 = table[8] = this function's own SVC stub
 ///   bl   __call_via_r3      ; ARM ADS veneer whose whole body is `bx r3`
 /// ```
 ///
-/// * **`r3` is call machinery.** `sort_records` is the 9th `u32` of
-///   `WIPICDatabaseInterface`, i.e. `+0x20`, so `bx r3` enters *this* entry point
-///   and the register still holds its address when the SVC fires. The guests'
-///   register dumps agree twice: `IP = 0x70008` is the id `SvcId::get` reads,
-///   `(WIPICTableId::Database << 16) | 8`, and `R3 = 0x71001781` is the thumb
-///   entry of the stub whose `svc` is at `PC = 0x7100178a`. A 4th parameter
-///   invents one.
-/// * **`r2` is call machinery too — this is the register the previous revision
-///   stopped one short of.** It holds the table the callee address was loaded
-///   from, and nothing rewrites it before the `bl`. The cross-guest test the
-///   earlier reading applied to `r3` applies here identically: `R2` is
-///   byte-identical in both dumps (`0x4a855780`) while `R0`, which is guest data,
-///   differs (`0x13184c` vs `0x135ae4`).
+/// * **`r3` is call machinery.** `sort_records` is the 9th `TargetPtr` of
+///   `WIPICDatabaseInterface`. `TargetPtr` is `u32` in the build this engine
+///   ships, so that is `8 × 4 = +0x20` — under the `simulation` feature it is
+///   `usize` and the offset would be `+0x40`, which is worth knowing before
+///   redoing the arithmetic but does not change the conclusion, because the
+///   conclusion does not rest on it (next bullet). `bx r3` therefore enters
+///   *this* entry point and the register still holds its address when the SVC
+///   fires. A 4th parameter invents one.
+/// * **`r2` is call machinery too, and the register dump proves it directly.**
+///   At the fault `R3 = 0x71001781` **is** `[R2 + 0x20]`, and that value is the
+///   SortRecords SVC stub: `PC = 0x7100178a` is inside it and `IP = 0x70008` is
+///   the id `SvcId::get` reads, `(WIPICTableId::Database << 16) | 8`. So `R2`
+///   *is* the database interface — no arithmetic, no heuristic. (The weaker
+///   argument this comment used to make — "`R2` is identical in both dumps
+///   while `R0` differs" — is not wrong but proves little: a constant argument
+///   would also be identical in both dumps.)
 /// * **The 5th "argument" is the caller's saved `r10`.** `read_param(4)` resolves
 ///   to `[SP+0]`, and `[SP+0] == SL` in both dumps (`0x134ac8` / `0x13e878`).
 ///
 /// So the call is `f(r0, r1)` with `r1 == 1`, and the header's five-parameter
 /// shape fits none of it.
+///
+/// **How "three sites" was counted, and what identifies them.** A decoder-driven
+/// sweep of both images finds every `ldr rT,[rN,#0x20]` whose `rT` is then called
+/// (`blx rT`, or `bl` into a `bx rT` veneer) — **15 hits in `0103451A`, 18 in
+/// `01031C0A`**. Most of those are *other* tables: the discriminator is not which
+/// register holds the base (allocation is arbitrary; `01031C0A` reaches three
+/// different interfaces through `r2` alone) but **which global the table pointer
+/// was loaded from**. Back-tracking each hit to that global leaves
+/// `0103451A: 0x134c38` and `01031C0A: 0x13eb30` as the interface the dump above
+/// identifies, and exactly three hits resolve to those. The remaining ones land
+/// on other globals (`0x068b80`/`0x068b40`, `0x13eb2c`, `0x13eb54`, `0x073e40`,
+/// `0x073e00`) and pass different shapes — `0x13eb54`'s two sites push a stack
+/// argument, so that table's slot 8 takes at least five. **What the sweep cannot
+/// see** is written down with it, next to the scanner itself, in
+/// `~/orchestrator/reports/evidence/wie-game-lab-repair-campaign-pilot-unimpl-stub-fix3/`.
 ///
 /// **What `r0` points at**, since "another name pointer" was as far as the
 /// previous revision got: in both images the address lands on a tail-merged
@@ -241,9 +264,10 @@ pub async fn list_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
 /// doing it. `sort_records_never_writes_to_guest_memory_test` pins that.
 ///
 /// The next round starts from `f(ptr_to_short_ascii_token, 1)` — not from "find
-/// the comparator", which was a ghost. The tools are static: disassemble the two
-/// call sites above, and decode any SVC stub from the 4 bytes at `stub - 1 + 12`,
-/// which hold `(table << 16) | function`. Neither needs a code change.
+/// the comparator", which was a ghost. The tools are static: disassemble the
+/// three call sites above, and decode any SVC stub from the 4 bytes at
+/// `stub - 1 + 12`, which hold `(table << 16) | function`. Neither needs a code
+/// change.
 pub async fn sort_records(context: &mut dyn WIPICContext, arg0: WIPICWord, arg1: WIPICWord) -> Result<i32> {
     let _ = context;
     tracing::debug!("KTF database slot 8 (header name: MC_dbSortRecords)({arg0:#x}, {arg1:#x})");
@@ -757,9 +781,16 @@ mod tests {
     /// at guest address 1. This pins the property the rewrite bought: whatever the
     /// two arguments turn out to mean, nothing is written until somebody knows.
     ///
-    /// The sentinel spans the low addresses the old loop would have hit *and* the
-    /// heap-range value the guest actually passes, so a regression that reinstates
-    /// either reading fails here rather than in a guest.
+    /// The sentinel sits at `0x0` and at `0x1000`: the first covers the address
+    /// the old loop would have started writing at, and the second is passed in as
+    /// `arg0` by the second case below, so a regression that writes *through an
+    /// argument* fails here rather than in a guest. (It no longer spans a
+    /// heap-range address — dropping `r2` took the only heap-range value out of
+    /// the inputs, and that value was never an argument in the first place.)
+    ///
+    /// It also pins the **error message**, because that string is this round's
+    /// actual product: the coordinate the next round starts from. Dropping
+    /// `r1={arg1:#x}` from it is otherwise a silent green.
     #[futures_test::test]
     async fn sort_records_never_writes_to_guest_memory_test() {
         let mut context = database_test_context();
@@ -774,8 +805,12 @@ mod tests {
         for args in [(0x13184cu32, 0x1u32), (0x1000, 0x0)] {
             let err = sort_records(&mut context, args.0, args.1).await.unwrap_err();
             assert!(
-                matches!(err, wie_util::WieError::Unimplemented(ref m) if m.contains("argument layout unknown")),
-                "slot 8 must refuse rather than act on a guessed layout, got {err:?}"
+                matches!(err, wie_util::WieError::Unimplemented(ref m)
+                    if m.contains("argument layout unknown")
+                        && m.contains(&alloc::format!("measured r0={:#x}", args.0))
+                        && m.contains(&alloc::format!("r1={:#x}", args.1))),
+                "slot 8 must refuse rather than act on a guessed layout, and must report both \
+                 measured arguments (that string is the next round's starting coordinate), got {err:?}"
             );
         }
 
