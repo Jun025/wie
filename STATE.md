@@ -60,7 +60,7 @@
 > ★**되돌리는 법**: 이 인용 블록을 지우고 회차 항목을 다시 손으로 적으면 된다(코드·검사기 0).
 
 ## 완료 (최근)
-- 2026-09-18: **`game_lab/broken` 187 census 를 «오늘 트리»로 다시 떴다 — 40%가 서명을 바꿨고 1위 군집이 «새것»이다**
+- 2026-09-18: **`game_lab/broken` 187 census 를 «오늘 트리»로 다시 떴다 — 40%가 서명을 바꿨다(1위 군집의 «새것» 주장은 철회)**
   (PR 개설 · `wie-game-lab-census-is-from-a-different-jvm` · 채택 `2026-09-17-game-lab-broken-187-signature-triage#p0`)
   — 정본 `docs/report/0165--….md`. ★**수리 0 · `classify.sh` 0줄 · 분류 규칙 무접촉 · 제품 코드 0줄 · 코퍼스 바이트 repo 유입 0**.
   ★**두 표(FAIL 만 · 5버킷)**: `NoSuchMethod` **37→8** · `panic-unwrap` **37→15** · `unimpl-stub` **15→6** · `unknown-stdlib` **6→2** ·
