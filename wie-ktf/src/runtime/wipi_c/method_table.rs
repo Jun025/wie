@@ -24,18 +24,24 @@ fn gen_stub(id: WIPICWord, name: &'static str) -> WIPICMethodBody {
 }
 
 /// Same as `gen_stub`, for the tables nobody has identified yet — it carries the
-/// **function id** as well as the table id.
+/// **function id** and the **SVC selector**, which is what makes the message a
+/// coordinate somebody outside this file can use.
 ///
 /// `gen_stub(4, "stub")` was used for all 64 slots of an unnamed table, so every
 /// one of them reported the single string `4: stub`. Measured 2026-09-18 over
-/// `game_lab/broken`: that is the largest remaining `unimpl-stub` signature
-/// (3 of 7), and it is the only one a reader cannot act on — it does not say
-/// which function the guest called, so there is nothing to look up or implement.
-/// The table id alone is not a lead; the pair is.
-fn gen_unnamed_table_stub(table_id: WIPICWord, function_id: u16) -> WIPICMethodBody {
+/// `game_lab/broken`: three games hit one such table, and until the function id
+/// was carried it was impossible to tell whether that was three different
+/// problems or one (it was one — function 0).
+///
+/// ★**The number matters, and the obvious one is wrong.** The literal `4` in
+/// `gen_stub(4, …)` came from the *struct slot* name `Interface4`, whose enum
+/// discriminant is **5** (`svc_ids.rs`: `Interface4 = 5`) — and 5 is what the
+/// guest actually sends as `id >> 16`. A reader taking "table 4" to the SVC
+/// dispatch would land on `Interface3`. So both are printed, labelled.
+fn gen_unnamed_table_stub(selector: WIPICWord, slot_name: &'static str, function_id: u16) -> WIPICMethodBody {
     let body = move |_: &mut dyn WIPICContext| async move {
         Err::<(), _>(WieError::Unimplemented(format!(
-            "{table_id}: unnamed WIPI-C table {table_id}, function {function_id}"
+            "{selector}: unidentified WIPI-C table — SVC selector {selector} (struct slot {slot_name}), function {function_id}"
         )))
     };
 
@@ -514,14 +520,14 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
         WIPICTableId::Interface3 => get_unk3_method_table().into_iter().nth(function_id as usize),
         WIPICTableId::Interface4 => {
             if function_id < 64 {
-                Some(gen_unnamed_table_stub(4, function_id))
+                Some(gen_unnamed_table_stub(5, "Interface4", function_id))
             } else {
                 None
             }
         }
         WIPICTableId::Interface5 => {
             if function_id < 64 {
-                Some(gen_unnamed_table_stub(5, function_id))
+                Some(gen_unnamed_table_stub(6, "Interface5", function_id))
             } else {
                 None
             }
@@ -547,7 +553,7 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
         },
         WIPICTableId::Interface7 => {
             if function_id < 64 {
-                Some(gen_unnamed_table_stub(7, function_id))
+                Some(gen_unnamed_table_stub(8, "Interface7", function_id))
             } else {
                 None
             }
@@ -557,7 +563,7 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
         WIPICTableId::Net => get_net_method_table().into_iter().nth(function_id as usize),
         WIPICTableId::Interface11 => {
             if function_id < 64 {
-                Some(gen_stub(11, "stub"))
+                Some(gen_unnamed_table_stub(12, "Interface11", function_id))
             } else {
                 None
             }
@@ -565,28 +571,28 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
         WIPICTableId::Interface12 => get_unk12_method_table().into_iter().nth(function_id as usize),
         WIPICTableId::Interface13 => {
             if function_id < 64 {
-                Some(gen_stub(13, "stub"))
+                Some(gen_unnamed_table_stub(14, "Interface13", function_id))
             } else {
                 None
             }
         }
         WIPICTableId::Interface14 => {
             if function_id < 64 {
-                Some(gen_stub(14, "stub"))
+                Some(gen_unnamed_table_stub(15, "Interface14", function_id))
             } else {
                 None
             }
         }
         WIPICTableId::Interface15 => {
             if function_id < 64 {
-                Some(gen_stub(15, "stub"))
+                Some(gen_unnamed_table_stub(16, "Interface15", function_id))
             } else {
                 None
             }
         }
         WIPICTableId::Interface16 => {
             if function_id < 64 {
-                Some(gen_stub(16, "stub"))
+                Some(gen_unnamed_table_stub(17, "Interface16", function_id))
             } else {
                 None
             }

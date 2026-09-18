@@ -171,58 +171,61 @@ pub async fn list_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
     Ok(ids.len() as _)
 }
 
-/// `MC_dbSortRecords(dbID, buf, len, compare, filter)` — the record-id list, in
-/// the order the two guest callbacks impose.
+/// KTF WIPI-C **Database slot 8**. The standard WIPI header calls this
+/// `MC_dbSortRecords`; **this code does not claim to know what KTF puts there.**
 ///
-/// **The callbacks are the whole difficulty, so this implements exactly the half
-/// that is defined and refuses the other half by name.** `WIPIHeader.h:1579`
-/// types them `M_Int32 (*compare)(const void *, const void *)` and
-/// `M_Int32 (*filter)(const void *)` — they take *record payload* pointers, not
-/// ids, so honouring them means materialising every record into guest memory and
-/// calling back in (`WIPICContext::call_function`, which the timer and socket
-/// paths already use). What the header does not say is who owns that memory or
-/// how long it lives, and guessing it wrong corrupts the guest's heap silently.
+/// ── What was measured, and what it overturned ────────────────────────────────
+/// The first version of this function implemented the header's signature —
+/// `(fd, M_Int32 *buf, M_Int32 len, compare, filter)` — wrote the record ids into
+/// `buf` when both callbacks were null, and reported the callback addresses
+/// otherwise. Running the two guests that reach this slot (2026-09-18) showed
+/// every part of that reading to be wrong:
 ///
-/// So: **both callbacks null** is the case the header fully determines — no
-/// filter, no reordering — and that is `MC_dbListRecords` with a stable order.
-/// **Either callback non-null** returns `WieError::Unimplemented` *naming which
-/// one was passed*, which is strictly more than the blanket stub it replaces:
-/// the next round learns whether real guests use them at all, instead of
-/// learning only that slot 8 was called.
-pub async fn sort_records(
-    context: &mut dyn WIPICContext,
-    db_id: i32,
-    buf_ptr: WIPICWord,
-    buf_len: WIPICWord,
-    compare: WIPICWord,
-    filter: WIPICWord,
-) -> Result<i32> {
-    tracing::debug!("MC_dbSortRecords({db_id:#x}, {buf_ptr:#x}, {buf_len}, compare={compare:#x}, filter={filter:#x})");
+/// ```text
+/// slot 8 called with r0=0x13184c  r1=0x1  r2=0x4a854000  r3=0x71004401  stack0=0x134ac8
+/// ```
+///
+/// * **`r3` is not an argument.** `RUST_LOG=wie_core_arm=trace` decodes it:
+///   `Register SVC stub at 0x71004400, category=3, id=458760`, and
+///   `458760 = 0x70008 = (WIPICTableId::Database << 16) | 8` — it is the SVC stub
+///   for *this very function*. A caller doing `ldr r3,[table]; blx r3` leaves the
+///   callee's own address there, so reading a 4th parameter invents one. The
+///   earlier round published that value as "a platform-provided comparator"; it
+///   is nothing of the sort, and the 5th (`stack0`) is read past the call's end.
+/// * **The remaining three do not fit the header either.** `r1 = 0x1` cannot be
+///   an `M_Int32 *buf`, and `r2` sits in the same heap range as the addresses in
+///   the guest's own stack dump — i.e. the pointer and the length are, at best,
+///   not in the header's order. `r0 = 0x13184c` is 0x1c bytes past the name
+///   pointer `MC_dbOpenDataBase` was handed moments earlier, so it looks like
+///   another *name* pointer rather than a handle.
+///
+/// None of that is surprising for this table: `select_record_ktf` and
+/// `stat_by_name_ktf` below already carry the note that KTF's slots diverge from
+/// the header, and the struct comment at the top of this file records that the
+/// original field names were "a pre-disassembly guess". Slot 8 is the same shape,
+/// and the first version of this function repeated that guess.
+///
+/// ── So it refuses, and it refuses LOUDLY ─────────────────────────────────────
+/// It takes three arguments because `r3` is accounted for above and a 4th cannot
+/// be read without knowing the arity; it names them `arg0..2` because naming them
+/// `db_id`/`buf_ptr`/`buf_len` would assert the header layout the measurement just
+/// refuted. **It never writes to guest memory** — the withdrawn write loop would
+/// have written record ids starting at `0x1`, which is precisely the "corrupts the
+/// guest's heap silently" this doc comment used to warn about while doing it.
+/// `sort_records_never_writes_to_guest_memory_test` pins that.
+///
+/// To identify the slot, read the three arguments out of a real guest and compare
+/// against `docs/reference/WIPIHeader.h`'s database block — the decode recipe
+/// above (`RUST_LOG=wie_core_arm=trace`, or the 4 bytes at `stub - 1 + 12`, which
+/// hold `(table << 16) | function`) is the tool, and it needs no code change.
+pub async fn sort_records(context: &mut dyn WIPICContext, arg0: WIPICWord, arg1: WIPICWord, arg2: WIPICWord) -> Result<i32> {
+    let _ = context;
+    tracing::debug!("KTF database slot 8 (header name: MC_dbSortRecords)({arg0:#x}, {arg1:#x}, {arg2:#x})");
 
-    if compare != 0 || filter != 0 {
-        return Err(WieError::Unimplemented(format!(
-            "8: MC_dbSortRecords with guest callbacks (compare={compare:#x}, filter={filter:#x}) — the null-callback case is implemented; \
-             these take record-payload pointers whose ownership the WIPI header does not specify"
-        )));
-    }
-
-    let Some(db) = get_database_from_db_id(context, db_id).await? else {
-        return Ok(-25); // M_E_INVALIDHANDLE
-    };
-    let ids = db.get_record_ids().await;
-
-    // `len` is the caller's capacity in entries — writing past it is a guest heap
-    // overrun, so clamp and report what was written (the header returns a count).
-    let capacity = buf_len as usize;
-    let mut cursor = 0;
-    let mut written = 0usize;
-    for &id in ids.iter().take(capacity) {
-        write_generic(context, buf_ptr + cursor, id)?;
-        cursor += size_of::<WIPICWord>() as u32;
-        written += 1;
-    }
-
-    Ok(written as _)
+    Err(WieError::Unimplemented(format!(
+        "8: KTF database slot 8 (header name MC_dbSortRecords) — argument layout unknown, \
+         measured r0={arg0:#x} r1={arg1:#x} r2={arg2:#x}; the header's (fd, buf, len, compare, filter) does not fit"
+    )))
 }
 
 /// `MC_dbGetNumberOfRecords(dbID)` — number of records in the database, or the
@@ -715,9 +718,46 @@ mod tests {
     use crate::context::test::TestContext;
 
     use super::{
-        KTF_DATABASE_STORAGE_LIMIT, delete_database, exists_database, list_databases, list_record_info, open_database, select_record, stream_read,
-        stream_write, update_record,
+        KTF_DATABASE_STORAGE_LIMIT, delete_database, exists_database, list_databases, list_record_info, open_database, select_record, sort_records,
+        stream_read, stream_write, update_record,
     };
+
+    /// KTF database slot 8 refuses, and refuses **without touching guest memory**.
+    ///
+    /// The first version of `sort_records` wrote record ids into what it took to be
+    /// a caller-supplied buffer. Measured against the two guests that reach the
+    /// slot, that "buffer" argument is `0x1` — so the write loop would have started
+    /// at guest address 1. This pins the property the rewrite bought: whatever the
+    /// three arguments turn out to mean, nothing is written until somebody knows.
+    ///
+    /// The sentinel spans the low addresses the old loop would have hit *and* the
+    /// heap-range value the guest actually passes, so a regression that reinstates
+    /// either reading fails here rather than in a guest.
+    #[futures_test::test]
+    async fn sort_records_never_writes_to_guest_memory_test() {
+        let mut context = database_test_context();
+        const SENTINEL: [u8; 16] = [0xAB; 16];
+        for base in [0x0u32, 0x1000] {
+            context.write_bytes(base, &SENTINEL).unwrap();
+        }
+
+        // The arguments a real guest passed (2026-09-18), plus a run with the
+        // header's null-callback shape, which the withdrawn code treated as
+        // "write everything".
+        for args in [(0x13184cu32, 0x1u32, 0x4a854000u32), (0x1000, 0x0, 0x0)] {
+            let err = sort_records(&mut context, args.0, args.1, args.2).await.unwrap_err();
+            assert!(
+                matches!(err, wie_util::WieError::Unimplemented(ref m) if m.contains("argument layout unknown")),
+                "slot 8 must refuse rather than act on a guessed layout, got {err:?}"
+            );
+        }
+
+        for base in [0x0u32, 0x1000] {
+            let mut seen = [0u8; 16];
+            context.read_bytes(base, &mut seen).unwrap();
+            assert_eq!(seen, SENTINEL, "slot 8 wrote to guest memory at {base:#x}");
+        }
+    }
 
     #[futures_test::test]
     async fn ktf_available_database_storage_tracks_app_usage() {

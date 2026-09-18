@@ -2,8 +2,8 @@
   "schema": "wie-worklog/1",
   "date": "2026-09-18",
   "task": "wie-game-lab-repair-campaign-pilot-unimpl-stub",
-  "title": "수리 캠페인 파일럿 unimpl-stub — PASS 0건이고 그 «0» 이 산출물이다(쉬운 멤버는 이미 고쳐졌고 남은 7은 미상·예약·콜백·인코더)",
-  "summary": "두 관문(증명 수단 db711659 · 기준선 623a7722)이 착지해 캠페인의 첫 버킷을 열었다. ★계수부터 인구조사와 갈렸다: game_lab/reports/*.json 은 «7월» 데이터이고(내 계수 FAIL 176 · PASS 7 · unimpl-stub 15 가 인구조사의 7월 열과 정확히 일치) 인구조사의 «오늘» 값은 mktemp 스크래치에 쓰고 지웠다. ⇒ 오늘을 내가 다시 쟀다: 15 = 이미 배선 8(media set_volume · graphics get_context · db list_databases) + 여전히 스텁 7, 그 7건을 실제로 돌리니 전건 같은 서명으로 FAIL ⇒ 내 오늘 계수는 7(인구조사 6과 1 차이). ★ⓑ 단건 증명은 «안 됐다» — MC_dbSortRecords 의 명세가 정하는 절반(콜백 NULL)만 구현했는데 두 게임 다 비-NULL 을 넘긴다. ★그러나 그 실패가 좌표를 냈다: compare=0x71004401 이 두 게임에서 동일하고 FUNCTIONS_BASE=0x71000000 범위라 «우리가 건네준 SVC 스텁»이다 ⇒ 플랫폼 제공 비교자다. ★그리고 4: stub ×3 을 진단 가능하게 만들자 세 게임이 «table 4 function 0» 하나에 막혀 있음이 드러났다.",
+  "title": "수리 캠페인 파일럿 unimpl-stub — PASS 0건이고, ★승계 회차가 이 회차의 «좌표»가 틀렸음을 디코드로 밝혔다(미상 4·예약 0)",
+  "summary": "두 관문(증명 수단 db711659 · 기준선 623a7722)이 착지해 캠페인의 첫 버킷을 열었다. ★계수부터 인구조사와 갈렸다: game_lab/reports/*.json 은 «7월» 데이터이고(내 계수 FAIL 176 · PASS 7 · unimpl-stub 15 가 인구조사의 7월 열과 정확히 일치) 인구조사의 «오늘» 값은 mktemp 스크래치에 쓰고 지웠다. ⇒ 오늘을 내가 다시 쟀다: 15 = 이미 배선 8(media set_volume · graphics get_context · db list_databases) + 여전히 스텁 7, 그 7건을 실제로 돌리니 전건 같은 서명으로 FAIL ⇒ 내 오늘 계수는 7(인구조사 6과 1 차이). ★ⓑ 단건 증명은 «안 됐다» — MC_dbSortRecords 의 명세가 정하는 절반(콜백 NULL)만 구현했는데 두 게임 다 비-NULL 을 넘긴다. ★그러나 그 실패가 좌표를 냈다: compare=0x71004401 이 두 게임에서 동일하고 FUNCTIONS_BASE=0x71000000 범위라 «우리가 건네준 SVC 스텁»이다 ⇒ 플랫폼 제공 비교자다. ★그리고 4: stub ×3 을 진단 가능하게 만들자 세 게임이 «table 4 function 0» 하나에 막혀 있음이 드러났다. ★★[게이트② 반려 승계 -fix · 2026-09-18] 이 회차의 두 결론이 «틀렸다»: ⑴「명세상 예약 1」 — WIPIHeader.h 전수에 Reserved 0건이라 Reserved1..13 은 이 저장소 자신의 작명이다 ⇒ 미상 4·예약 0. ⑵「compare 는 플랫폼 제공 비교자」 — core.rs:376 의 기존 trace 로 디코드하니 category=3(WIPIC)·id=458760=(7<<16)|8 = Database 테이블의 SortRecords, 즉 «호출되고 있는 이 함수 자신»의 스텁이다. ldr r3,[table]; blx r3 가 r3 에 남긴 피호출자 주소를 넷째 인자로 읽은 것이고, 다섯째는 호출 끝 너머의 스택이다 ⇒ sort_records 를 철회하고 인자 3개·게스트 메모리 쓰기 0 으로 다시 썼다(종전 NULL 경로는 0x1 부터 썼을 것이다). 그리고 unnamed 테이블 배선을 3곳 → 전수 8곳으로 넓히고 메시지가 SVC selector 와 구조체 슬롯 이름을 둘 다 싣게 했다(종전 「table 4」는 selector 5 와 달라 오도한다).",
   "changes": [
     "wie-wipi-c/src/api/database.rs — sort_records 신설: 콜백 둘 다 NULL 이면 listRecords(명세가 완전히 정하는 절반) · 비-NULL 이면 어느 콜백인지 주소까지 대며 Unimplemented. 추측 0",
     "wie-ktf/src/runtime/wipi_c/method_table.rs — SortRecords 를 그 구현에 배선 + gen_unnamed_table_stub(table_id, function_id) 신설해 이름 없는 테이블 3곳(4·5·7)에 배선"
@@ -20,35 +20,35 @@
   "limits": [
     "★PASS 0건이다 — 파일럿의 전제(「고치면 PASS 가 된다」)는 이 버킷의 «남은» 멤버에 대해 거짓이다. 쉬운 8건은 7월~오늘 사이에 이미 고쳐졌고 남은 7은 미상 3 · 명세상 예약 1 · 게스트 콜백 2 · 인코더 1 이다",
     "★「진단 가능해졌다」는 «고쳤다»가 아니다 — 3건은 여전히 FAIL 이고 바뀐 것은 다음 회차의 비용이다",
-    "★sort_records 의 NULL 경로는 실사용 증거가 없다 — 두 게임 다 비-NULL 이었다. 그 절반은 명세로만 정당하다",
+    "★[-fix 정정] sort_records 의 NULL 경로는 «실사용 증거가 없다»가 아니라 «틀린 레이아웃 위에 서 있었다» — 철회했다. 지금은 인자 3개를 원시값 그대로 싣고 실패하며 게스트 메모리에 쓰지 않는다(시험이 그것을 잠근다).",
     "★전 코퍼스(183건) 재실행 0 — 인구조사가 「병렬화하지 않았다」를 규율로 적었고 직렬 재실행은 이 회차 예산 밖이다. ⇒ ⒝(남의 버킷 불변)는 표본 2건 + diff 범위로만 뒷받침되고, PASS 총수(57 → M)는 «주장하지 않았다»",
     "★캠페인이 길어진다 — 남은 4축은 각각 별 회차다. 무리해서 다 하지 않았다(계약 1⑵의 그 선택)"
   ],
   "proposals": [
     {
-      "title": "MC_dbSortRecords 의 compare 콜백을 특정하라 — 그것은 «우리가 건네준» SVC 스텁이다",
+      "title": "KTF database slot 8 의 «인자 배치»를 역공학하라 — 「비교자 특정」이 아니다",
       "plainSummary": "게임이 정렬을 요청할 때 넘기는 «비교 함수»가 게임 코드가 아니라 우리가 제공한 플랫폼 함수임을 알아냈습니다. 어느 함수인지 특정하면 정렬을 구현할 수 있습니다.",
       "userBenefit": "티어즈오브메탈·겟앰프드 2건이 막혀 있는 자리이고, 같은 방식으로 다른 콜백 API(정렬·필터·열거)도 풀린다.",
-      "why": "이 회차 실측: 두 게임이 넘기는 compare 주소가 0x71004401 로 «동일»하고 FUNCTIONS_BASE=0x71000000 범위다(wie-core-arm/src/core.rs:19) ⇒ 게스트 코드가 아니라 make_svc_stub 이 만든 우리 스텁이다. 즉 게스트는 플랫폼 비교자를 되돌려 주고 있고, 그것이 무엇인지 알면 호스트 측에서 직접 비교할 수 있어 call_function 왕복조차 불필요할 수 있다. filter(0x134ac8·0x13e878)만 진짜 게스트 코드다.",
-      "tradeoff": "★주소는 next_stub_address 순차 할당이라 정적 디코드가 «안 된다» — make_svc_stub 에 로깅을 넣어 (category, id) ↔ 주소 대응을 뽑아야 하고, 그것은 실행 시 로깅이라 회차마다 재현해야 한다. 그리고 특정한 뒤에도 filter 쪽 record payload 의 «소유·수명»은 여전히 명세에 없다(이 회차가 거부한 이유) ⇒ 그 반쪽은 별개 판단이 필요하다. ★이 회차의 sort_records 를 «고치는» 것이지 새로 쓰는 것이 아니다.",
+      "why": "★[-fix 정정] 선행 회차는 compare=0x71004401 을 «플랫폼 제공 비교자»로 읽었으나 디코드하면 category=3·id=(7<<16)|8 = 이 함수 자신의 SVC 스텁이다(r3 = blx 호출 매개). ⇒ 넷째·다섯째 인자는 «없다». 남은 셋(r0=0x13184c r1=0x1 r2=0x4a854000)도 명세와 맞지 않는다 — r1 은 버퍼일 수 없고 r0 은 직전 open 이 받은 이름 포인터에서 0x1c 뒤다. 같은 파일의 select_record_ktf·stat_by_name_ktf 가 이미 「KTF 슬롯은 표준 시그니처가 아니다」를 기록했다.",
+      "tradeoff": "★디코드 도구는 «이미 있다» — core.rs:376 의 trace(RUST_LOG=wie_core_arm=trace · 코드 변경 0) 또는 스텁의 +12 오프셋 4바이트((table<<16)|function). ★그러나 «인자 배치»는 그 도구로 안 나온다 — 게스트 디스어셈블이나 인자 조합을 바꿔 가며 거동을 관찰하는 수밖에 없고, 후자는 추측을 다시 들이는 길이라 위험하다. ★그리고 배치를 알아도 명세의 record payload 소유·수명 문제는 그대로 남는다.",
       "effort": "M",
       "target": "wie"
     },
     {
-      "title": "이름 없는 WIPI-C 테이블 4 의 function 0 을 특정하라 — 3게임이 «그 하나»에 막혀 있다",
+      "title": "SVC selector 5(struct slot Interface4) function 0 을 역공학하라 — 3게임이 그 하나에 막혀 있다",
       "plainSummary": "정체불명 테이블의 함수 하나 때문에 게임 3개가 멈춥니다. 그 하나만 알아내면 3개가 함께 풀릴 수 있습니다.",
       "userBenefit": "unimpl-stub 잔여 7건 중 3건(43%)이 그 하나다 — 이 버킷에서 가장 큰 단일 표적이다.",
-      "why": "이 회차가 스텁에 function id 를 실은 결과, 마법상점타이쿤2·sega미니게임6·컴투스포춘골프3D 셋이 전부 「table 4, function 0」 이었다 — 종전 「4: stub」 으로는 서로 다른 세 가지인지 하나인지조차 알 수 없었다. 명세 docs/reference/WIPIHeader.h 에는 그 테이블이 없고 svc_ids.rs 는 Interface4 = 5 로 «인덱스로만» 부른다.",
+      "why": "이 회차가 스텁에 function id 를 실은 결과, 마법상점타이쿤2·sega미니게임6·컴투스포춘골프3D 셋이 전부 「SVC selector 5(struct slot Interface4), function 0」 이었다 — 종전 「4: stub」 으로는 서로 다른 세 가지인지 하나인지조차 알 수 없었다. 명세 docs/reference/WIPIHeader.h 에는 그 테이블이 없고 svc_ids.rs 는 Interface4 = 5 로 «인덱스로만» 부른다.",
       "tradeoff": "★명세가 없으므로 «역공학»이다 — 호출 시 인자·복귀값을 로깅해 세 게임의 사용 패턴을 맞춰 보는 수밖에 없다(그 셋이 같은 함수라는 것이 그 대조를 가능하게 한다). ★그리고 «0 을 돌려주면 지나간다»는 유혹이 있는데 그것은 추측이고, 이 회차가 sort_records 에서 거부한 형태와 같다 — 조용히 틀린 동작이 나올 수 있다. 판정은 로깅 증거 위에서 하라.",
       "effort": "M",
       "target": "wie"
     },
     {
-      "title": "MC_knlReserved4 류 «명세상 예약» 슬롯은 수리 대상이 아님을 문서화하라",
+      "title": "MC_knlReserved4 는 «예약»이 아니라 «미상»이다 — 문서화가 아니라 역공학 대상",
       "plainSummary": "일부 실패는 고칠 대상이 아니라 «원래 정의가 없는 자리»입니다. 그 사실을 적어 두면 다음 사람이 또 집지 않습니다.",
       "userBenefit": "캠페인이 고칠 수 없는 항목에 회차를 쓰지 않는다.",
-      "why": "MC_knlReserved4(id 36)·Reserved2·3·5~13 은 WIPI 명세의 «예약» 슬롯이고 의미가 정의돼 있지 않다 ⇒ 구현이 아니라 문서화가 답이다. 이 회차가 그 판정은 냈지만 «어디에 적을지»는 정하지 않았다(AGENTS.md 의 NOT-RUN 선례가 그 형식의 후보다).",
-      "tradeoff": "★적을 자리를 잘못 고르면 낡는다 — AGENTS.md 는 러너·명령 축이고 이것은 «WIPI API 축»이라 맞지 않을 수 있다. docs/ 아래 WIPI 관련 문서(예: 명세 헤더 옆)나 svc_ids.rs 의 주석이 더 맞을 수 있으니 «어느 파일이 이 사실을 필요할 때 읽히는가»로 고르라. 그리고 그것은 기계가 아니라 산문이라 낡아도 아무도 울지 않는다.",
+      "why": "★[-fix 정정] 선행 회차는 이것을 「명세상 예약」으로 분류해 «문서화»를 처방했으나, WIPIHeader.h 전수에 Reserved 가 0건이다(대소문자 무시 1건은 무관한 구조체 필드) ⇒ Reserved1..13 은 wie-ktf/src/runtime/svc_ids.rs:119-144 의 «우리 작명»이고 명세가 비워 둔 슬롯이 아니다. ⇒ SVC selector 5 fn 0 과 같은 부류이고 같은 역공학이 답이다.",
+      "tradeoff": "★역공학 비용이 「문서화 한 줄」보다 훨씬 크다 — 그래서 선행 회차의 오분류가 «싸 보이는» 처방을 냈다. ★그리고 표적이 1게임뿐이라 우선순위는 낮다(selector 5 fn 0 은 3게임). ★단 «문서화하라»로 남겨 두면 다음 사람이 고칠 수 있는 것을 고칠 수 없다고 적고 지나간다 — 그것이 이 정정의 요지다.",
       "effort": "S",
       "target": "wie"
     }
