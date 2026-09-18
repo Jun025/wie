@@ -128,19 +128,52 @@ done
 for f in test_data/keydraw_ktf.zip test_data/keydraw_lgt.zip; do      # key-driven — --inject is REQUIRED
   cargo run -q -p wie_cli --bin wie_validate -- --inject --expect-last-frame "$f"   # PASS *and* rc=0
 done
+cargo run -q -p wie_cli --bin wie_validate -- --timeout 5 test_data/text_j2me.jar   # the ONLY fixture that draws text
 ```
+
+**`text_j2me.jar` is the one fixture that reaches `Platform::font()`, and it exists because nothing
+did.** `wie_validate`'s `HeadlessPlatform` shipped for two months with `font()` as `unimplemented!()`:
+every guest that drew a string panicked the *validator*, and `classify.sh` recorded that as the
+game's fault — the largest failure signature in `game_lab/broken/`. The whole runner block stayed
+green through all of it, because `drawString` appeared in **0 of the 6 committed fixtures and 0 of
+the 3 generators** (measured). The corpus that did catch it is `game_lab/`, which is git-ignored
+under Constraint 9 and can never be in CI. So the guard had to be a fixture, and this is it.
+
+**Why it is a separate jar rather than one more call inside `draw_j2me`, and why `--timeout 5`** —
+both measured, neither a preference. Adding the `drawString` to `draw_j2me` moved its pixel stats
+(`distinct_colors` 2 → 3, `nondominant_pct` 1.5 → 1.7), and `contract-roundtrip.mjs` asserts *exact*
+non-black counts derived from `make-draw-fixture.mjs`'s exports — an amount of glyph ink the
+generator cannot predict and so cannot export. A second jar keeps `drawFixtureJar()` byte-identical
+(verified by md5) and every existing count intact. The timeout is a budget, not a guess: the paint
+lands in about a second, `--timeout 1` is flaky (1/3 FAIL) and 2, 3 and 5 all passed 3/3 at loadavg
+124, so 5 is ~5× the observed paint time. Left at the default it would cost **~21 s**; at 5 it costs
+**~5.1 s**. Read a FAIL here the way §The four gates says to read any FAIL — re-run before blaming
+your diff.
 
 **A fixture that this runner deliberately does not touch is named here, not omitted** — write
 `NOT-RUN: test_data/<name> — <why>` inside this marked region. That keeps the classification in the
 same document as the list instead of in the checker, which is the one thing the proposal behind this
 check warned about: a checker that knows which fixtures are "runner fixtures" becomes a second source
-of truth and drifts from this block. There is exactly one today:
+of truth and drifts from this block. There are exactly two today, and they are the same exclusion
+for the same reason — `wie_validate` has no real screen to resize:
 
 NOT-RUN: test_data/resize_ktf.zip — it exists to prove `Screen::resize` reaches a real screen, and
 `wie_validate`'s own `resize` is a no-op that returns `Ok(())`, so running it here would assert
 nothing. Its assertion lives in the browser round-trip (Scenario G), where the canvas is real.
 Built by `node scripts/make-resize-fixture.mjs` — the same guest as `helloworld_ktf.zip` plus one
 `DisplaySize:` line, byte-stable on regeneration.
+
+NOT-RUN: test_data/resize_draw_ktf.zip — same exclusion, same generator, and the pair to the one
+above: that fixture SHRINKS and this one GROWS. The growth is what makes the back buffer visible.
+`WebScreen`'s back canvas is created inside wasm and never enters the DOM, so Scenario G — which can
+only read `HTMLCanvasElement.width/height` — passes whether or not it moved; a stale back buffer
+clips the blit rather than throwing. On a shrink that miss is invisible by construction (an
+oversized back canvas is clipped by the front one, and the region copied is exactly the frame), so
+only growing exposes it: the area past the OLD size is copied from nothing. Its assertion is
+Scenario G2, which samples ALPHA there — `WebScreen::paint` forces alpha opaque across the guest
+frame while a freshly sized canvas is transparent, so the probe holds even where the guest draws
+nothing. That is also why this one derives from `keydraw_ktf.zip` rather than `helloworld_ktf.zip`:
+helloworld never paints, so nothing would be blitted and both branches would read alpha 0.
 
 <!-- ENGINE-RUNNER:END -->
 
@@ -189,10 +222,55 @@ is also the cheap way to reproduce this class without slowing the machine down f
 > ⑶ **Reproduce on an untouched tree.** This is the only conclusive step.
 > ⑷ **Read the load** (`uptime`) — and per §Host performance, read `idle`/`sys`, not the load figure alone.
 
-**One heuristic that looks right and is not: "the other carrier passed, so it is a real bug."** The
-fragility is **carrier-specific** — in the measurement above LGT was clean 6/6 in the same minutes
-that KTF failed 4/6. One carrier failing alone is the *ordinary* starvation signature here, not
-evidence against it. Use ⑴–⑷, not the cross-carrier comparison.
+**One heuristic that looks right and is not: "the other carrier passed, so it is a real bug."** One
+carrier failing alone is the *ordinary* starvation signature here, not evidence against it. Use
+⑴–⑷, not the cross-carrier comparison.
+
+**That advice is unchanged, but the reason first given for it was wrong, and the correction is the
+more useful fact.** This paragraph used to say the fragility is *carrier-specific*, on the strength
+of the 4/6-vs-0/6 split above. Re-measured 2026-09-17 with the two fixtures **alternating inside one
+loop**, so both see the same load minute: `keydraw_ktf` **5/18 FAIL**, `keydraw_lgt` **5/18 FAIL** —
+identical, across three load levels (0/6 and 0/6 unloaded, then 2/6 vs 3/6 and 3/6 vs 2/6). A
+carrier-specific effect of the original size would have put ktf near 12/18 and lgt near 0/18, so
+that magnitude is excluded; a small difference is not, at this n. **So a lone-carrier failure is
+sampling noise, not a property of the carrier** — which makes the heuristic *more* wrong, not less.
+The original split is best explained by unpaired sampling: the background load on this machine moves
+far more than any knob here, measured swinging between loadavg 50 and 201 *between* legs of one run.
+
+**Two corollaries worth keeping, because both cost a round to learn.** `ticks` is not a throughput
+measure — it counts executor spins while the guest is blocked, and across five identical
+`keydraw_lgt` runs it read 9,630,471 / 912,303 / 36 / 103,786 / 35. Do not derive "this carrier is
+N× slower" from it. And `--action-secs` is not a stand-in for real load: sweeping it 0.60 → 0.05
+left both fixtures at 0/5 until 0.05, where both collapse together (ktf 5/5, lgt 4/5).
+
+**Boot is not what runs out, and it cannot be.** The deadline is *defined* as
+`min(boot_secs + 0.3 + 27 × action_secs + 1.0, 120)` (`wie_validate.rs`, the `--inject` schedule), so
+the slack left after boot is `27 × action_secs + 1.0` — `boot_secs` cancels. (The 120 s cap is a
+runaway guard; the cancellation holds while the sum is under it, which every knob setting in this
+file is. `27` is the length of that schedule's key array — it is transcribed here, not derived, so
+re-count it with the method recorded in `docs/worklog/2026-09-17-keydraw-ktf-load-fragility-refuted.json`
+before trusting it if the array has moved.) At `--action-secs 0.05` that is
+**+2.35 s no matter what `--boot-secs` says**. An earlier revision of this paragraph said the budget
+"no longer covers boot"; that was not off by a margin, it was the wrong category. The algebra is what
+settles it, and it had better be — a 2×2 over `boot {2.5, 0.3} × action {0.05, 0.6}`, order-balanced,
+**cannot** settle it either way: 48 runs at loadavg 13–95 had *every* cell pass, and a second pass of
+the same design at loadavg 105–148 had every cell fail part of the time, the documented `0.6`
+**included (2/6)**. A null result and a noise floor; neither attributes anything to boot. Do not cite
+that experiment as evidence about `--boot-secs`. Cite it for what it does show, below.
+
+**And the sweep does not show a *different* failure from the load one — it may well be the same one.**
+The signature matches on every field the validator reports: same `reason` string, same blank last
+frame, overlapping `paints`. What settles it is that *one* configuration produces both outcomes with
+only the machine changing under it: measured 2026-09-18, the runs at `--action-secs` **0.05 and below
+passed 32/32 at loadavg 13–95** (the 2×2's two low-`action` cells, 12 + 12, plus 8 more at 0.02/0.01),
+while at loadavg 105–148 even the documented `0.6` failed **2/6**. *(An earlier revision of this
+sentence said 48/48 — that is the 2×2's **whole** run count, and half of it is at `0.6`. The sentence
+narrows the population to `≤0.05` but reached for the experiment's headline total; if you cite a
+subset, count the subset. The composition is spelled out above so the next reader can check it
+against the table in `docs/report/0154`.)* So the knob and
+real load push on the same race. That is still a reason not to use the knob as a stand-in — a better
+one than "different failure", because it says what the knob actually does: it moves the odds along
+the axis you were already on, so a green sweep buys you nothing about the loaded regime.
 
 **`--expect-last-frame` is on the `keydraw_*` line and deliberately NOT on the one above it.** It
 turns `last_frame_content` from a reported field into an exit code, which is the only thing that
@@ -211,8 +289,33 @@ line — see `wie_validate.rs`'s header for that reasoning (its table covers `he
 failure in CI; this line makes the same class visible in ~20 s with no wasm build, before you push.
 Scenario F is not unconditional either — it sits behind `engine-contract.yml`'s `dorny/paths-filter`
 `engine` gate, so a diff that touches no engine path reports "Reporting success without rebuilding"
-and never runs it. Do not read this line as CI enforcement — nothing in `.github/` runs
-`wie_validate` (measured: 0 hits across all workflow files).
+and never runs it. Do not read this line as CI enforcement — **no PR-triggered workflow runs
+`wie_validate`**. The `.github/` hits are 3, all of them in `doc-liveness.yml`, whose `pull_request`
+trigger is `paths`-scoped to that workflow file: on every other PR it is zero. (This paragraph said
+"0 hits across all workflow files" for eight days; it was written 2026-09-07 and `4e39dfaa` put the
+runner block into `doc-liveness.yml` on 2026-09-10. Count with `grep -rn 'wie_validate' .github/`,
+and read the triggers — the number alone answers the wrong question.)
+
+**One method out of this path IS covered per-PR, and only one.** `HeadlessPlatform::font()` — the
+`unimplemented!()` that caused all of the above — is asserted by
+`headless_platform_font_measures_text_test` in `wie_validate.rs`, so `cargo test --all` reddens on
+all six matrix legs if it is re-broken. **That test guards one method, not the text path**: it goes
+through `Platform::font()` and `text_layout::minimum_width` (the call a guest's `drawString`
+actually makes) and no further. A regression anywhere else between `drawString` and the screen is
+still weekly-only.
+
+**Promoting the runner line itself to per-PR was priced and declined on 2026-09-18**
+(`wie-text-drawing-fixture-cheap-tier-vs-broad-tier-decision`), on the same axis as the
+2026-09-07 decision below. Two ways to do it, both measured here:
+
+| how | what it costs |
+|---|---|
+| runner block in `rust.yml`'s legs | the block is **168 s** warm (measured, loadavg 180) × **6 legs** ≈ 17 min of runner time *per PR*, on a self-hosted runner siblings queue behind |
+| runner block in `contract` | that job's toolchain is `if: engine == 'true'` and targets **wasm32** with a wasm-keyed cache, so this needs a *native* build. Inside the filter it misses docs-only PRs (the diffs that break wiring); outside it, every PR pays a native cargo build in a job that currently finishes in 12 s on a doc-only diff |
+
+versus the test above: **~10 ms** in an already-compiled target, no new dependency, no new workflow.
+**Reopen if** a regression lands in the text path *outside* `font()` and the weekly job is the thing
+that catches it — that is the evidence this trade is wrong, and nothing short of it is.
 
 **And it stays that way: promoting `--expect-last-frame` into CI was decided against on 2026-09-07,
 measured rather than assumed.** The question is not "is it in CI" but "is the class caught", and it
@@ -306,6 +409,36 @@ The contract check needs the WASM artifact already in `web/src/wasm/` — build 
 local build, else it fails with missing-artifact violations (CI order: `engine-contract.yml:116`
 then `:125`). The rest need a toolchain fetch — run them only when the artifact or UI changes.
 
+**That question is now answered mechanically for the whole tree, so stop grepping it out by
+hand: `node scripts/checker-census.mjs`.** It lists every executable artifact in `scripts/`,
+`.github/scripts/` and `*/tests/` next to the places that actually run it and the triggers those
+places fire on, and the always-run `contract` job prints it on every PR. Two things it is
+deliberately not. It is **not a check** — it has no failing state, a zero caller count is a
+question and not a defect (this repo ships two checkers that are correctly uncalled, below), and
+`continue-on-error` on its step makes that mechanical rather than promised. And it is **not a
+replacement for the paragraph below**: it counts call sites, it does not know which of them
+matter. Baseline at adoption (`f7a1d022`, re-measured 2026-09-18): **37 artifacts — 8 with no
+caller, 14 with exactly one, 15 with two or more**. **That is a reading of one commit, not a
+constant** — by `origin/main` of 2026-09-18 the no-caller bucket is already **7**, because a sibling
+round revived one orphaned test (`docs/report/0153`). Re-run it rather than quoting this line. It
+costs **0.6-2.0 s** in the `contract` job. **Three runs of byte-identical code and output** (PR
+#195: `35257783718` **2.04 s**, `35268371028` **1.49 s**, `35270887798` **0.64 s**) — a 3.2x
+spread that is runner load, not code. **So do not quote one reading, and do not derive a ratio
+from two.** An earlier revision of this paragraph said 0.6 s, then 2.04 s, then 1.5-2.0 s; each
+was a true reading and each was wrong as a claim. In particular the 0.6 s predates the
+`cargo metadata` subprocess this script now runs — yet it sits *inside* the post-cargo spread, so
+the runner figure cannot separate the two versions at all. A dev Mac under load takes 0.9-1.3 s,
+which is inside the same band. If you need the cost of the cargo call, measure that call.
+**The first published figures — 36/4/14/18 — were wrong and are recorded here as wrong**, because
+the census asked a path regex which files `cargo test --all` reaches instead of asking cargo: it
+credited four `tests/*.rs` files under directories that carry no `Cargo.toml` (orphans of the base
+swap, so cargo compiles none of them) and it dropped `tests/font.rs`, which is a real target of the
+root package. The 0-caller bucket was therefore understated by exactly half. The per-row disposition is
+`docs/report/0155--2026-09-17--wie-count-checkers-with-only-one-caller.md`, which is also where
+its four measured blind spots are written down. Prefer it over a fresh `git grep` when you need
+to know where something runs — a hand grep counts prose and comments as wiring, which is how the
+count below went stale.
+
 **Which of these CI actually runs — "the check exists" is not "the check runs".** Measured
 2026-09-06 across all 8 workflow files: `check-engine-contract.mjs` and `contract-roundtrip.mjs`
 run in `engine-contract.yml`; `build-wasm.sh` and the frontend build run in `web.yml`; **`npm run
@@ -327,14 +460,64 @@ design** — do not "fix" that by wiring it:
   production for merge-contract 4-C" — that claim was false and is gone. **The command itself was
   never missing from this file** (the last bullet of this section has carried it all along); what was
   missing is a *verdict* — which output lines count as a pass — and that is what the blockquote below
-  adds. Measured 2026-09-17 over all 131 `wie-*merge*.done.md` replies: **33 record a Cloudflare Pages
-  deploy, and of those only 15 (45%) cite `WIE_BASE` — 18 (55%) do not**. Five of the eighteen are one lane on
-  2026-09-16/17; the other thirteen predate it, so this is a standing gap, not one round's lapse.
-  Every one of the eighteen still *reported* a self-verify — by quoting the in-CI step's conclusion
-  and curling the alias — which passes "운영 URL" but **not** the "콘솔 0에러" half of merge-contract
-  4-C, because console errors and off-origin requests need the browser run.
+  adds. **Compliance is roughly half, and the first measurement of it used the wrong denominator —
+  read the second row, not the first.** Measured **2026-09-17T08:25Z** over 142 `wie-*merge*.done.md`
+  replies — **a snapshot, not a constant; the trigger and owner for redoing it are below the table**:
 
-  > **So, concretely — a gate③ round that lands a deploy runs this and quotes it:**
+  | denominator | how it is chosen | n | cite `WIE_BASE` |
+  |---|---|---|---|
+  | replies containing the literal `Deploy to Cloudflare Pages` | **wording** | 40 | 22 (55%) |
+  | replies that **actually landed** (`merged:` is a sha) | **fact** | **112** | **62 (55%)** |
+
+  **Every one of those cells has already been shown to rot — the same predicates, run by three
+  different rounds inside one day, moved all of them.** First: 137 · 36/18 (50%) · 107/57 (53%);
+  ~9 h later: 138 · 37/19 (51%) · 108/58 (54%); ~6 h after that: the row above. So the trigger is
+  keyed to a cadence this file already runs, rather than a new one:
+
+  > **Trigger — two, and the cheap one is unconditional. ⑴ Re-measure before you cite either row
+  > anywhere.** ⑵ **Independently, when the worklog-coverage re-measure comes due — the same
+  > ten-landing cadence — these two rows are due with it.** Both denominators are one pass over
+  > `~/orchestrator/reports/wie-*merge*.done.md`: *wording* is the replies containing the literal
+  > `Deploy to Cloudflare Pages`; *fact* is those whose **first 12 lines** carry a `merged:` matching
+  > `^[0-9a-fA-F]{7,40}$`; each numerator is the subset that also contains `WIE_BASE`. Overwrite the
+  > table and the timestamp — there is no append-only record for this one, by choice.
+  >
+  > **Owner — deliberately *not* the gate③ round, unlike the cadence it borrows.** That round owns
+  > `--record` because `docs/worklog-coverage-remeasures.json` is a ledger file; this table is in
+  > `AGENTS.md`, which the merge contract does **not** put in the set a merge round may touch, so
+  > naming gate③ here would name someone who is not allowed to do it. The gate③ round that trips the
+  > cadence is the **noticer** — it says so in its reply, and the orchestrator tickets a wie round to
+  > do the edit. Trigger ⑴ needs no owner at all: the round citing the number is the one re-measuring.
+
+  **Both triggers are prose, and neither is checked. That gap is the cost of writing it this way.**
+  The ten landings are enforced by `check-worklog-coverage.mjs` for a *different* metric; nothing
+  reads these two rows, so a round can discharge that obligation, leave these cells untouched, and
+  nothing reddens. The failure mode is silent and is precisely the one this paragraph exists to name.
+  It is left that way on purpose: a checker keyed to reply wording would rebuild row one, and one
+  keyed to the `merged:` sha belongs to `orchestrator`, not here — so that axis is carried as a
+  proposal instead of only in this prose
+  (`docs/worklog/2026-09-17-adopt-gate3-deploy-selfverify-instruction-p0.json`, `target:
+  orchestrator`), which is what keeps it on the recommendations panel.
+
+  **The first row is the original 45%-of-33 measurement, and it cannot answer the question it was
+  built for.** Two failures, both measured: ⑴ the two gate③ rounds of 2026-09-17 that landed `#177`
+  and `#178` **did** run the browser verify and **do** cite `WIE_BASE`, yet neither writes that exact
+  phrase — so the predicate drops them from numerator *and* denominator, and compliance can improve
+  without the ratio moving. ⑵ `web.yml`'s `push` trigger on `main` carries **no `paths` filter**
+  (verified by parsing it), so **every** landing here deploys — confirmed 12/12 on the most recent
+  merge replies by asking GitHub whether a `Web` run exists for each reply's `merged:` sha. There is
+  no "deploy-bearing" subset in this repo, so a denominator of 40 out of 112 landings is wrong by
+  construction.
+
+  **So the obligation is unconditional: every gate③ landing here owes the browser run.** The ~45%
+  that did not do it still *reported* a self-verify — by quoting the in-CI step's conclusion and
+  curling the alias — which passes "운영 URL" but **not** the "콘솔 0에러" half of merge-contract 4-C,
+  because console errors and off-origin requests need the browser run. **If a checker is ever built
+  for this, key it off the `merged:` sha and GitHub's run list, never off reply wording** — row one is
+  what wording-based predicates do.
+
+  > **So, concretely — every gate③ round that lands runs this and quotes it** (there is no
+  > deploy-less landing here — see the table above):
   > `WIE_BASE=https://wie-web.pages.dev node scripts/verify-browser.mjs test_data/helloworld_ktf.zip`
   > — deliberately *inline*, not a fenced `sh` block: fenced blocks in this file are parity-checked
   > against `doc-liveness.yml`, and this line is the alias variant of a command that job already runs
@@ -568,6 +751,45 @@ than let it be ignored — a periodically-red check that people scroll past is w
   round loses an entry for real — the silent failure stops being hypothetical and the 1/1 rate makes
   it a matter of time. Absent those, the union edit is cheaper than the migration.
 
+  **★Trigger two has now fired twice, and the blocker is gone — do not re-derive the "7".** PR #140
+  (2026-09-08) backfilled 5 and reported the residual as 0; **that 0 was incomplete**, because its
+  sweep assumed one §완료 line is one round and the 2026-07-22 line bundles **four** (PRs #36·#39·#42·#43).
+  Re-measured 2026-09-18 over **144 entries / 148 report files**: the true residual was **3**
+  (`wie-contract-gate-paths-key-mapping`, plus #140's own entry and the same-day
+  `wie-main-red-worklog-coverage-overdue-73`), and this round backfilled all three ⇒ **0**. The gap
+  also does **not** regenerate: of the **69** entries landed since 2026-09-08, only those 2 same-day
+  in-flight ones lacked a file — **67/67 since 09-09 have one**. So "backfill, then it silently
+  refills" is not a live objection; what remains is only the migration itself, which is a separate
+  round because it too collides with every open PR (landing order is the operator's call).
+
+  **★And do not propose `.gitattributes` `STATE.md merge=union` as the cheap way out — it was tried
+  and measured on 2026-09-18, and it does not fix the reported symptom.** The symptom is
+  `mergeable: CONFLICTING`, and that is decided by **GitHub's server-side merge, which ignores the
+  attribute**: with `.gitattributes` committed on the merge base *and* inherited by both sides — the
+  exact state you would be in after landing it — `POST /repos/:owner/:repo/merges` still answers
+  **HTTP 409 Merge conflict** (measured twice, 2026-09-17 and again 2026-09-18 in that base-inherited
+  shape). Git itself resolves that same pair cleanly, which is the point: the capability exists and
+  the server does not use it.
+
+  > **Do not read a `git merge-tree` exit code as evidence either way — it does not know about the
+  > branches' attributes.** It reads them from **your working tree** (or `--attr-source`), so the
+  > same pair flips on whether a file you are not even merging is sitting on disk. Measured on
+  > `origin/main` × PR #196: no `.gitattributes` in the worktree → **rc=1**; drop an **untracked**
+  > one-line `.gitattributes` there, absent from both merged commits → **rc=0**; delete it → **rc=1**
+  > again. An earlier revision of this block cited "`merge-tree` rc=1 with the attribute committed on
+  > both branches" as a second proof that union is ignored; that was a measurement error — the rc
+  > reported the worktree, not the branches — and it is struck.
+
+  It works in a worktree `git merge`, which buys a cheaper hand-resolution during a base pull, not an
+  unblocked PR. Its costs are real too: two differing edits to the *same* line both
+  survive **silently** (measured — one `- 열린 형제 PR:` line became two contradictory ones, rc=0, no
+  warning), the surviving order is ours-before-theirs rather than the by-authoring-time order this
+  ledger's union rule requires, and the merge that *introduces* the attribute still conflicts once.
+
+  **★When you quote open-PR mergeability, re-fetch the PR refs in the same command that builds the
+  table** — `git fetch origin '+refs/pull/*/head:refs/remotes/origin/pr/*'`. A cached ref is how the
+  first version of this block reported a PR as conflicting that had been clean for 15 minutes.
+
   **One measured wrinkle worth knowing before you cite `STATE.md` by line.** Top-insert moves every
   line below it, so line-number citations into §완료 rot. `wie_midp/tests/create_image_missing_name_message.rs`
   cites `STATE.md:349`; that line now holds an unrelated entry and the content it meant is at 510.
@@ -757,6 +979,24 @@ a 403 as "nothing enforced"), and `permissions: administration: read` does not h
 is not grantable — GitHub rejects the workflow at parse time (run `35180786771`, startup_failure).
 Wiring it would need a PAT, a different cost class. So it runs where `gh` is the owner: **when you
 edit the block below, and when a merge behaves unlike what this section says.**
+
+**That guard now checks two things, and the second one is not a list.** The block below is one rule
+*inside* a ruleset that carries four; the other three — `deletion`, `non_fast_forward`, and
+`pull_request` (which holds `required_approving_review_count`, `allowed_merge_methods`, …) — plus
+`bypass_actors` and the ref condition could all change while this section stayed true. So the guard
+also fingerprints the **whole normalized ruleset** against `.github/branch-protection-expected.json`
+and prints the differing line. Measured 2026-09-18: **27 compared leaf fields, 21 of which nothing
+watched before**. It is deliberately *not* an enumerated field list — a list is how the next field
+GitHub adds slips through (verified: injecting a `required_signatures` rule that does not exist today
+still fires). **If the operator changed the ruleset on purpose, update that JSON in the same PR and
+say why** — reseed it rather than hand-editing, with
+`node scripts/check-branch-protection-claim.mjs --print-current > .github/branch-protection-expected.json`,
+then `git diff` that file and re-run the plain check until it prints OK. The guard never writes GitHub,
+it only reads. What the normalization drops is stated at the
+top of the script — chiefly `id`/timestamps, so **deleting and recreating the ruleset with identical
+content is invisible here**; **it also drops every key but `context` inside a rule-parameter array**, so
+a `required_status_checks[]` entry gaining an `integration_id` is not compared (exposure today: zero,
+each entry carries `context` alone).
 
 <!-- REQUIRED-CHECKS:BEGIN — scripts/check-branch-protection-claim.mjs diffs this list against
      classic protection ∪ active branch rulesets, both directions. Edit this block, not the prose

@@ -1,0 +1,48 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-18",
+  "task": "wie-branch-protection-ruleset-drift-beyond-required-checks",
+  "title": "ruleset 의 «나머지 21개 필드»를 보게 했다 — 목록이 아니라 «객체 지문»으로",
+  "summary": "채택 제안 2026-09-17-branch-protection-claim-guard#p0 의 이행. ⓐ 주장을 먼저 확인했다: check-branch-protection-claim.mjs 가 `if (r.type !== \"required_status_checks\") continue;` 로 ★네 rule 중 셋을 건너뛴다 ⇒ 재현됨. ⓒ 제안은 가정법이라 재현 입력이 없어 픽스처를 만들었다(가짜 gh 로 «라이브 쪽»을 개악 · 실 ruleset 무접촉). 계약 1 대로 «항목을 하나씩 더하는» 처방을 쓰지 않고 ★정규화된 ruleset 객체 전체를 지문으로 잡았다 — 다만 해시가 아니라 «읽을 수 있는 JSON»(.github/branch-protection-expected.json)으로 저장해 실패가 «어느 줄이 움직였는지»를 말하게 했다. 새 파일 1 + 기존 검사기 확장(새 검사기 0 · 새 CI 스텝 0 · PAT 0 · ruleset 무접촉). 비교 잎 필드 27개 중 ★21개가 종전에 아무도 안 보던 것이다.",
+  "changes": [
+    "scripts/check-branch-protection-claim.mjs — 축 ⑵ 추가: normalizeRuleset() + 베이스라인 대조 + 차이 줄 출력. 기존 rc 의미(0 ok / 1 drift / 2 못 쟀다) 재사용 · 기존 fetch 재사용(중복 0)",
+    ".github/branch-protection-expected.json 신설 — 정규화된 라이브 ruleset 스냅샷. ★손으로 쓰지 않았다: 베이스라인이 없으면 검사기가 rc=2(fail-closed)로 멈추면서 «라이브 형상»을 찍어 주고, 그것을 검토해 저장했다(정규화를 두 벌로 만들지 않으려고)",
+    "AGENTS.md — 그 가드가 «둘»을 본다는 것과 정규화가 버리는 것을 명시(§Incident ledger 의 그 절)",
+    "docs/report/0157--…md 신규 · STATE.md 완료 항 1건"
+  ],
+  "verification": [
+    "★ⓐ 주장 재현 — scripts/check-branch-protection-claim.mjs 의 rulesets 루프가 `if (r.type !== \"required_status_checks\") continue;` 다. 라이브 ruleset 실측: rules 4개(deletion · non_fast_forward · pull_request · required_status_checks) ⇒ ★셋은 보지 않는다. 참",
+    "★ⓑ 리니지 조회 — tasks/ 에 wie-branch-protection-drift-watch-pat-decision(#p1 · PAT 결정 · ★계약 3⒜ 가 범위 밖으로 못박은 그것) · wie-main-branch-protection(설정 적용) 실재. 이 축(ruleset 드리프트 탐지)의 중복 0건 ⇒ 새로 만들지 않고 «기존 검사기에 얹었다»",
+    "★ⓒ 가정법 ⇒ 픽스처를 내가 만들었다 — 가짜 gh 를 PATH 에 끼워 `api …/rulesets/<id>` 응답만 가로채 개악(★읽기 경로만 · 실 ruleset 무접촉: 사후 실측 승인 수=0 · bypass_actors=0 · rules=4 불변)",
+    "★★양방향(Acceptance ⑴) — ⒜무개악 rc=0 «조용함» ↔ ⒝required-check «가 아닌» 항목 개악 4종 전건 ★rc=1: approval(승인 수 0→2 · line 34 지목) · bypass(bypass_actors 채움 · line 14) · ★futurefield(오늘 «없는» rule type `required_signatures` 추가 · line 40) · dropdeletion(deletion rule 제거 · line 17). 복원 후 rc=0",
+    "★★futurefield 가 이 설계의 증거다 — 「항목을 손으로 열거하지 마라」(계약 1)를 지켰음을 «오늘 존재하지 않는 필드»로 확인했다. 열거식이었으면 통과했을 것이다",
+    "★fail-closed 실증 — 베이스라인 파일이 없을 때 rc=2(「COULD NOT MEASURE, and that is not a pass」)로 멈춘다. 이 회차가 실제로 그 rc=2 를 받아 시드했다",
+    "★Acceptance ⑵ PAT 없이 보이는 범위 — 잎 필드 27개 중 required_status_checks 축 6 · ★나머지 21 이 새로 감시에 들어왔다. ⇒ «로컬 admin gh» 로는 27/27 이 보이고 ★«CI(github.token)» 로는 0/27 이다(그 토큰은 두 엔드포인트에서 403 · run 35181122022 · administration:read 는 줄 수 없는 키 · run 35180786771) — 이 수가 #p1(PAT 결정)의 입력이다",
+    "회귀 0(전건 합산): cargo fmt --all --check rc=0 · clippy --all -D warnings rc=0 · wasm clippy rc=0 · cargo +beta clippy rc=0 · RUST_MIN_STACK=4194304 cargo test --all rc=0 (44타깃 · 388 passed · 0 failed) · npm run audit PASSED · node 검사기 13개 중 11개 rc=0(rc=1 2개는 ★선재 — 회신 참조)"
+  ],
+  "limits": [
+    "★Acceptance ⑶ 정규화가 버리는 것 — id · node_id · created_at · updated_at · source · source_type · current_user_can_bypass · _links. ⇒ ★ruleset 을 지우고 «같은 내용»으로 다시 만들면 이 가드는 보지 못한다(id 만 바뀐다). current_user_can_bypass 는 «누가 돌렸는가»에 따라 달라져 비교하면 답이 호출자에 의존하므로 버렸다 — bypass_actors «목록»은 비교한다",
+    "★★[승계 -fix 정정 · 게이트② C1] 이 목록은 «불완전했고», 함께 적혀 있던 「어떤 필드든, 지금 것이든 앞으로 생길 것이든 지문을 움직인다」는 ★거짓이었다. sortRules 가 배열 원소를 `x.context ?? x` 로 접으므로 ★«객체 배열»에서는 context 외 모든 키가 조용히 버려진다 — required_status_checks[] 에 integration_id 를 넣어도 rc=0(검수자 실측). ★오늘 실노출 0(항목이 {context} 뿐)이고, 지문 술어 변경은 승계 티켓의 명시적 범위 밖이라 ★«선언»으로 닫고 코드 처방은 제안으로 올렸다(#p0)",
+    "★[-fix] --print-current 의 대가 — 실패한 run 과 재시딩 run 사이에 라이브 형상이 «움직일 수 있다». 그래서 실패 메시지가 재시딩 «다음»에 평문 재실행을 요구한다(그 재실행이 곧 검증이다). 전문을 항상 찍는 안은 기각했다: 사람이 실제로 읽는 것이 실패 메시지인데 55줄 객체를 거기 묻으면 안 읽게 된다",
+    "★[-fix] C3 은 «완전히» 고치지 않았다 — 줄 짝짓기는 여전히 «위치 기반»이고, 바뀐 것은 «줄 수가 다르면 그 사실을 말한다»는 것뿐이다. 진짜 diff(LCS)를 넣는 대신 재시딩 후 git diff 를 읽게 안내했다 — 그쪽이 사람이 이미 쓰는 도구다",
+    "★배열을 정렬한다 — required-check 순서·allowed_merge_methods 순서 같은 «무해한 재배열»을 드리프트로 읽지 않으려는 것이고, 그 대가로 «순서 자체가 의미를 갖는 필드»가 생기면 못 본다(오늘 그런 필드는 없다)",
+    "★classic branch protection 은 지문 축에 «없다» — 오늘 404(부재)라 비교할 객체가 없다. 켜지는 날 이 가드는 required-check 축으로만 그것을 보고, 형상 축은 ruleset 만 본다",
+    "★여전히 «사람이 손으로» 돌려야 한다 — CI 토큰이 못 읽는다(위 0/27). 주기 호출자는 PAT 결정(#p1) 전까지 0이고, 그것은 이 티켓의 범위 밖이다(계약 3⒜)",
+    "★활성 branch ruleset 이 여럿이면 배열로 비교한다 — 오늘 1개라 «여러 개일 때의 정렬»은 실측되지 않았다(이름 순 정렬을 넣지 않았다 · 필요해지는 날 픽스처를 먼저 만들어라)"
+  ],
+  "adoptedProposals": [
+    "2026-09-17-branch-protection-claim-guard#p0"
+  ],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "지문 정규화가 «객체 배열»의 context 외 키를 버리는 것을 코드로 닫는다 (1줄 + 베이스라인 재시딩)",
+      "plainSummary": "브랜치 보호 설정을 감시하는 도구가 목록 항목 안의 일부 값을 비교하지 않는다. 그 비교를 켜는 한 줄짜리 수정이다.",
+      "userBenefit": "「어느 앱의 검사가 이 필수 체크를 만족시키는가」 같은 값이 몰래 바뀌어도 잡힌다. 지금은 그 자리에서 바뀌어도 도구가 OK 를 찍는다.",
+      "why": "게이트② 가 실측으로 잡았다 — required_status_checks[] 항목에 integration_id 를 넣어도 rc=0 이다(sortRules 가 `x.context ?? x` 로 접는다). 처방은 이미 검증돼 있다: bypass_actors 가 쓰는 JSON.stringify 왕복 정렬을 같은 자리에 쓰면 되고, 검수자가 직접 패치해 11축을 재실행해 «닫힌다 + 음성 대조군 전건 유지»를 확인했다. 승계 회차는 지문 술어 무접촉이 계약이라 선언으로만 닫았으므로 코드 축이 남아 있다.",
+      "tradeoff": "★같은 PR 에서 베이스라인을 반드시 재시딩해야 한다 — 저장되는 required_status_checks 가 문자열 배열에서 {context: …} 객체 배열로 바뀌기 때문이다(안 하면 그 회차가 바로 드리프트로 운다). 그리고 오늘 실노출은 0 이라 이 수정이 «지금» 막는 사고는 없다 — 값은 「선언과 실제를 다시 일치시키는 것」이다.",
+      "effort": "S",
+      "target": "scripts/check-branch-protection-claim.mjs · .github/branch-protection-expected.json"
+    }
+  ]
+}
