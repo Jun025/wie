@@ -968,7 +968,68 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
 
 #[cfg(test)]
 mod tests {
-    use super::{GUEST_STDOUT_MAX_BYTES, RICHNESS_COLOR_CAP, frame_richness, guest_stdout_field, has_content, json_escape, last_frame_gate_fails};
+    use super::{
+        GUEST_STDOUT_MAX_BYTES, HeadlessPlatform, HeadlessScreen, RICHNESS_COLOR_CAP, SCREEN_H, SCREEN_W, frame_richness, guest_stdout_field,
+        has_content, json_escape, last_frame_gate_fails,
+    };
+    use std::sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicU64},
+    };
+    use test_utils::MemoryFilesystem;
+    use wie_backend::Platform;
+
+    /// `HeadlessPlatform::font()` shipped for two months as `unimplemented!()`, so every guest that
+    /// drew a string panicked the *validator* and `classify.sh` recorded that as the game's fault —
+    /// the largest failure signature in `game_lab/broken/`. Nothing in this workspace caught it:
+    /// `cargo test --all` never reached `font()`, and the AGENTS.md runner block was green
+    /// throughout because `drawString` appeared in 0 of the 6 committed fixtures.
+    ///
+    /// `test_data/text_j2me.jar` closed that hole for the *runner*, but the runner is local-only —
+    /// it runs from a developer's shell and, once a week, from `doc-liveness.yml`. This test is the
+    /// per-PR half: `cargo test --all` runs it on all six matrix legs, so re-breaking this one
+    /// method reddens the next PR instead of waiting for the weekly job.
+    ///
+    /// **It guards one method, not the text path.** A regression anywhere else between
+    /// `Graphics.drawString` and the screen is invisible here — that breadth is what the fixture
+    /// and the runner line buy, and this test deliberately does not duplicate them.
+    ///
+    /// The assertion goes *through* `text_layout`, which is the path a guest's `drawString`
+    /// actually takes, rather than stopping at "the call returned": a font that is present but
+    /// carries no usable metrics measures every string at 0, and that would pass a
+    /// did-not-panic check while still drawing nothing.
+    #[test]
+    fn headless_platform_font_measures_text_test() {
+        let screen = Arc::new(HeadlessScreen {
+            width: SCREEN_W,
+            height: SCREEN_H,
+            paints: AtomicU64::new(0),
+            redraw_requested: AtomicBool::new(false),
+            last_frame: Mutex::new(None),
+            saw_content: AtomicBool::new(false),
+            max_magenta_px: AtomicU64::new(0),
+            max_distinct_colors: AtomicU64::new(0),
+            max_nondominant_bp: AtomicU64::new(0),
+            max_center_nonuniform_bp: AtomicU64::new(0),
+        });
+        let platform = HeadlessPlatform {
+            screen,
+            fs: MemoryFilesystem::new(),
+            db: Default::default(),
+            stdout: Arc::new(Mutex::new(Vec::new())),
+            exited: Arc::new(AtomicBool::new(false)),
+            font: wie_backend::Font::try_from_static(include_bytes!("../../../assets/neodgm.ttf")).expect("assets/neodgm.ttf failed to parse"),
+        };
+
+        // Through the trait, not the field: the defect was in the `Platform` impl.
+        let font = Platform::font(&platform);
+        // Not vacuous: the same call on an empty string measures 0, so `> 0` discriminates.
+        assert_eq!(wie_backend::text_layout::minimum_width(font, "", 12.0), 0);
+        for text in ["wie", "가"] {
+            let width = wie_backend::text_layout::minimum_width(font, text, 12.0);
+            assert!(width > 0, "minimum_width({text:?}) = {width} — the font carries no usable metrics");
+        }
+    }
 
     /// The payload is the one part of the JSON line the guest controls, and both
     /// in-tree parsers `grep -o` over the whole line and take `tail -1`. So a guest

@@ -289,8 +289,33 @@ line — see `wie_validate.rs`'s header for that reasoning (its table covers `he
 failure in CI; this line makes the same class visible in ~20 s with no wasm build, before you push.
 Scenario F is not unconditional either — it sits behind `engine-contract.yml`'s `dorny/paths-filter`
 `engine` gate, so a diff that touches no engine path reports "Reporting success without rebuilding"
-and never runs it. Do not read this line as CI enforcement — nothing in `.github/` runs
-`wie_validate` (measured: 0 hits across all workflow files).
+and never runs it. Do not read this line as CI enforcement — **no PR-triggered workflow runs
+`wie_validate`**. The `.github/` hits are 3, all of them in `doc-liveness.yml`, whose `pull_request`
+trigger is `paths`-scoped to that workflow file: on every other PR it is zero. (This paragraph said
+"0 hits across all workflow files" for eight days; it was written 2026-09-07 and `4e39dfaa` put the
+runner block into `doc-liveness.yml` on 2026-09-10. Count with `grep -rn 'wie_validate' .github/`,
+and read the triggers — the number alone answers the wrong question.)
+
+**One method out of this path IS covered per-PR, and only one.** `HeadlessPlatform::font()` — the
+`unimplemented!()` that caused all of the above — is asserted by
+`headless_platform_font_measures_text_test` in `wie_validate.rs`, so `cargo test --all` reddens on
+all six matrix legs if it is re-broken. **That test guards one method, not the text path**: it goes
+through `Platform::font()` and `text_layout::minimum_width` (the call a guest's `drawString`
+actually makes) and no further. A regression anywhere else between `drawString` and the screen is
+still weekly-only.
+
+**Promoting the runner line itself to per-PR was priced and declined on 2026-09-18**
+(`wie-text-drawing-fixture-cheap-tier-vs-broad-tier-decision`), on the same axis as the
+2026-09-07 decision below. Two ways to do it, both measured here:
+
+| how | what it costs |
+|---|---|
+| runner block in `rust.yml`'s legs | the block is **168 s** warm (measured, loadavg 180) × **6 legs** ≈ 17 min of runner time *per PR*, on a self-hosted runner siblings queue behind |
+| runner block in `contract` | that job's toolchain is `if: engine == 'true'` and targets **wasm32** with a wasm-keyed cache, so this needs a *native* build. Inside the filter it misses docs-only PRs (the diffs that break wiring); outside it, every PR pays a native cargo build in a job that currently finishes in 12 s on a doc-only diff |
+
+versus the test above: **~10 ms** in an already-compiled target, no new dependency, no new workflow.
+**Reopen if** a regression lands in the text path *outside* `font()` and the weekly job is the thing
+that catches it — that is the evidence this trade is wrong, and nothing short of it is.
 
 **And it stays that way: promoting `--expect-last-frame` into CI was decided against on 2026-09-07,
 measured rather than assumed.** The question is not "is it in CI" but "is the class caught", and it
