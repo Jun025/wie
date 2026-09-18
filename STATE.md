@@ -102,6 +102,26 @@
   ★**대가**: 술어 «밖»의 경우(조직 이전 없이 PAT 가 필요해지는 등)는 이 조건이 안 잡는다 ⇒ **그때는 다시 판정한다**.
   ★**그날의 최소 권한 명세도 미리 적었다**(다시 파생시키지 않도록): **fine-grained · 단일 repo · `Administration: Read-only` 하나** ·
   repo secret · 소비자는 **기존 주간 잡** · 만료 ≤1년 · 발급은 **human-step 별건**(이 회차는 발권도 안 했다).
+- 2026-09-18: **ruleset 의 «나머지 21개 필드»를 보게 했다 — 목록이 아니라 «객체 지문»으로**
+  (`wie-branch-protection-ruleset-drift-beyond-required-checks` · 채택 `2026-09-17-branch-protection-claim-guard#p0`) —
+  정본 `docs/report/0157--….md`. ★**제품 0줄 · 새 검사기 0 · 새 CI 스텝 0 · PAT 0 · ruleset 무접촉**(계약 3 전건).
+  ★**병**: 기존 가드가 `if (r.type !== "required_status_checks") continue;` 로 ★**네 rule 중 셋을 건너뛴다** —
+  `bypass_actors`·승인 수·허용 머지 방식·삭제 금지가 바뀌어도 **OK 를 찍는데**, 3게이트가 그 값들 «위»에 서 있다.
+  ★**처방은 «항목 추가»가 아니라 «객체 지문»**(계약 1) — 정규화한 ruleset 전체를 `.github/branch-protection-expected.json` 과 대조한다.
+  ★**해시가 아니라 «읽을 수 있는 JSON»** 이라 실패가 **어느 줄이 움직였는지**를 말한다(= 「운영자가 의도했다 ↔ 드리프트다」를 가르는 정보).
+  ★**베이스라인을 손으로 쓰지 않았다** — 파일이 없으면 가드가 **rc=2(fail-closed)** 로 멈추며 라이브 형상을 찍어 준다(정규화를 두 벌로 만들지 않으려고). 그 rc=2 를 이 회차가 실제로 받았다.
+  ★★**양방향 4종 전건 발화**(가짜 `gh` 로 «라이브 쪽» 개악 · 실 ruleset 무접촉 — 사후 승인 수 0·bypass 0·rules 4 불변):
+  승인 수 0→2 · `bypass_actors` 채움 · ★**오늘 «없는» rule type `required_signatures` 추가** · `deletion` 제거 ⇒ 전부 **rc=1** ↔ 무개악 **rc=0**.
+  ★**`futurefield` 가 설계의 증거다** — 열거식이었으면 통과했을 것이다.
+  ★**수**: 비교 잎 필드 **27**(종전 축 6 · ★**새로 보는 21**) · 로컬 admin `gh` **27/27** ↔ ★**CI 토큰 0/27**(403 · run 35181122022 · `administration:read` 는 줄 수 없는 키 · run 35180786771) — ★이것이 **#p1 PAT 결정의 입력**이다.
+  ★**정규화가 버리는 것**: `id`·`node_id`·타임스탬프·`source*`·`current_user_can_bypass`·`_links` ⇒ ★**지우고 «같은 내용»으로 재생성하면 못 본다**.
+  ★★**[승계 `-fix` 정정] 「어떤 필드든 지문을 움직인다」는 «거짓»이었다**(게이트② C1): `sortRules` 가 배열 원소를 `x.context ?? x` 로 접어
+  ★**객체 배열에서는 `context` 외 모든 키가 버려진다**(`required_status_checks[]` 에 `integration_id` 를 넣어도 **rc=0**).
+  ★오늘 실노출 **0**(항목이 `{context}` 뿐) · 처방 1줄은 알려져 있으나 **지문 술어는 이 회차 범위 밖**이라 **선언으로 닫고** 후속으로 올렸다.
+  ★**그리고 드리프트 경로가 「라이브 형상을 복사해 넣어라」면서 그것을 «안 찍었다»**(C2) ⇒ **`--print-current`** 를 더했다 —
+  실패 메시지가 **재시딩 명령 한 줄**을 주고, 그 한 줄로 실제 재시딩·재실행이 **OK** 로 닫히는 것을 확인했다.
+  ★C3(줄 밀림 오도 — 줄 수 불일치 경고) · C4(축⑴ 이 축⑵ 를 가리던 조기 exit 제거)도 같이 닫았다.
+  ★회귀 0: `cargo test --all` **44타깃 · 388 passed · 0 failed** · 4게이트 + beta rc=0 · 검사기 11/13 rc=0(rc=1 2건은 **선재**).
 - 2026-09-18: **`verify_*.png` 파일명 계약 — 검사를 «만들지 않기로» 했다(측정으로 기각 · 코드 0줄)**
   (`wie-verify-screenshot-filename-contract-unchecked` · 채택 `2026-09-17-verify-browser-screenshot-side-effect#p0`) —
   정본 `docs/report/0156--….md`. ★**검사기 0개 · 코드 0줄 · 제품 스크립트 무접촉** — 산출물은 «측정과 결정»이다.

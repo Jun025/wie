@@ -925,6 +925,24 @@ is not grantable — GitHub rejects the workflow at parse time (run `35180786771
 Wiring it would need a PAT, a different cost class. So it runs where `gh` is the owner: **when you
 edit the block below, and when a merge behaves unlike what this section says.**
 
+**That guard now checks two things, and the second one is not a list.** The block below is one rule
+*inside* a ruleset that carries four; the other three — `deletion`, `non_fast_forward`, and
+`pull_request` (which holds `required_approving_review_count`, `allowed_merge_methods`, …) — plus
+`bypass_actors` and the ref condition could all change while this section stayed true. So the guard
+also fingerprints the **whole normalized ruleset** against `.github/branch-protection-expected.json`
+and prints the differing line. Measured 2026-09-18: **27 compared leaf fields, 21 of which nothing
+watched before**. It is deliberately *not* an enumerated field list — a list is how the next field
+GitHub adds slips through (verified: injecting a `required_signatures` rule that does not exist today
+still fires). **If the operator changed the ruleset on purpose, update that JSON in the same PR and
+say why** — reseed it rather than hand-editing, with
+`node scripts/check-branch-protection-claim.mjs --print-current > .github/branch-protection-expected.json`,
+then `git diff` that file and re-run the plain check until it prints OK. The guard never writes GitHub,
+it only reads. What the normalization drops is stated at the
+top of the script — chiefly `id`/timestamps, so **deleting and recreating the ruleset with identical
+content is invisible here**; **it also drops every key but `context` inside a rule-parameter array**, so
+a `required_status_checks[]` entry gaining an `integration_id` is not compared (exposure today: zero,
+each entry carries `context` alone).
+
 <!-- REQUIRED-CHECKS:BEGIN — scripts/check-branch-protection-claim.mjs diffs this list against
      classic protection ∪ active branch rulesets, both directions. Edit this block, not the prose
      around it; other files point here rather than restating (§Constraints). -->
