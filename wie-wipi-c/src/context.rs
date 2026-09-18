@@ -180,9 +180,28 @@ pub mod test {
         }
     }
 
+    /// An out-of-range access is an ERROR here, not a panic.
+    ///
+    /// The real backend (`ArmCore`) returns `WieError::InvalidMemoryAccess` for
+    /// an address it cannot map, so a double that indexes the slice directly
+    /// diverges from production exactly on the error path — which makes the
+    /// fail-soft branches of this crate (every `read_null_terminated_string_bytes`
+    /// whose failure is *meant* to be recoverable) untestable, and turns a guest
+    /// pointer outside `TEST_MEMORY_SIZE` into a harness crash. Measured
+    /// 2026-09-19: `sort_records`'s own test passes `0x13184c` — a real address
+    /// from a register dump, and ~9.5x this double's memory.
+    fn range(address: u32, len: usize) -> wie_util::Result<core::ops::Range<usize>> {
+        let start = address as usize;
+        let end = start.checked_add(len).ok_or(wie_util::WieError::InvalidMemoryAccess(address))?;
+        if end > TEST_MEMORY_SIZE {
+            return Err(wie_util::WieError::InvalidMemoryAccess(address));
+        }
+        Ok(start..end)
+    }
+
     impl ByteWrite for TestContext {
         fn write_bytes(&mut self, address: u32, data: &[u8]) -> wie_util::Result<()> {
-            self.memory[address as usize..(address + data.len() as u32) as usize].copy_from_slice(data);
+            self.memory[range(address, data.len())?].copy_from_slice(data);
 
             Ok(())
         }
@@ -190,7 +209,7 @@ pub mod test {
 
     impl ByteRead for TestContext {
         fn read_bytes(&self, address: u32, result: &mut [u8]) -> wie_util::Result<usize> {
-            result.copy_from_slice(&self.memory[address as usize..(address as usize + result.len())]);
+            result.copy_from_slice(&self.memory[range(address, result.len())?]);
 
             Ok(result.len())
         }

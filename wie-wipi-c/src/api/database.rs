@@ -263,20 +263,98 @@ pub async fn list_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
 /// "corrupts the guest's heap silently" this doc comment used to warn about while
 /// doing it. `sort_records_never_writes_to_guest_memory_test` pins that.
 ///
-/// The next round starts from `f(ptr_to_short_ascii_token, 1)` — not from "find
-/// the comparator", which was a ghost. The tools are static: disassemble the
-/// three call sites above, and decode any SVC stub from the 4 bytes at
-/// `stub - 1 + 12`, which hold `(table << 16) | function`. Neither needs a code
-/// change.
+/// **What `r0` actually is (2026-09-19), and how much that narrows it.** The
+/// previous revision left it at "a short ASCII token". It is more specific than
+/// that, and the extra facts came from reading the *other* calls through the same
+/// interface rather than from staring harder at this one:
+///
+/// * **The token is the title's own file EXTENSION.** `0x13184c` is `"res"`, the
+///   tail of `"res/anidata.res"`; `0x135ae4` is `"ga"`, the tail of
+///   `"/ga/per.ga"`. Both are tail-merged literals, and both images carry a
+///   string-pointer table whose entries point at exactly such tails (path, and
+///   path + k for the basename and the extension) — so the "token" is a member
+///   of that table, not an ad-hoc string.
+/// * **The names these titles actually open are NOT that token.** Sweeping every
+///   indirect call through the same database global finds slot 0 called with
+///   `"res/save.sav"` (`0103451A`) and `"/ga/aysis.dat"` (`01031C0A`). So slot 8
+///   is being handed something categorically different from a database name.
+/// * **The return value is discarded at all three call sites.** Nothing tests
+///   `r0` afterwards — `0x10571c` falls into an unrelated global load, `0x1243ca`
+///   into a run of `bl`s, `0x128f3c` into the `Open` below. Whatever slot 8 is,
+///   these titles do not read its answer.
+/// * **Its neighbours in the call sequence pin the shape.** At `01031C0A`
+///   `0x128f08` the order is `slot16("/ga/aysis.dat", 1)` → *if non-zero* →
+///   `slot8("ga", 1)` → `slot0("/ga/aysis.dat", 8, 1)` → store the fd. Slot 16 is
+///   `Exists` in this table and takes `(name, type)`; slot 8 takes the **same
+///   two-argument shape** with the same constant `1`.
+///
+/// **What that does NOT settle, and this lineage has been wrong twice already:**
+/// which operation it is. "Register the app's file extension", "delete by
+/// pattern", "list databases of this type" all fit `f(ext, 1)` with an ignored
+/// result, and nothing above separates them. A name is not written here until
+/// something does.
+///
+/// **Part of the slot numbering is now guest-confirmed, which none of it was
+/// before.** At `0103451A:0x117f70` the sweep sees slot 0 return a value that is
+/// then threaded as the first argument into slot 2 and slot 3 — `Open` →
+/// `StreamWrite` → `Close`, the order this file already assumed from the KTF
+/// header. That is evidence for **slots 0, 2 and 3**. Slot 1 is observed through
+/// the same object (six sites) but its argument threading was not checked, and
+/// slots 4-7 and 9-15 were not observed at all in these two images: this
+/// confirms part of the table, not the table.
+///
+/// **Two method notes worth keeping, because both cost time to rediscover.** The
+/// interface is reached as `table = *(*global)` — the global holds an object
+/// whose *first word* is the table, so a sweep that stops after one dereference
+/// misses these call sites. And the sl-relative pointer table is **relocated at
+/// load by a delta that is not `IMAGE_BASE`** (measured `+0xE40` for `0103451A`,
+/// `+0x1330` for `01031C0A`): read a static word, add that delta, and the string
+/// lands exactly. The delta is checkable rather than fitted — for `0103451A` it
+/// predicts `*(sl+0x150) == 0x14a940`, which is what the register dump's `R5`
+/// holds.
+///
+/// So the diagnostic below now quotes the token itself. That is deliberately the
+/// only behaviour change: the next title to reach this slot names its own
+/// extension in the failure instead of costing somebody a disassembly.
 pub async fn sort_records(context: &mut dyn WIPICContext, arg0: WIPICWord, arg1: WIPICWord) -> Result<i32> {
-    let _ = context;
-    tracing::debug!("KTF database slot 8 (header name: MC_dbSortRecords)({arg0:#x}, {arg1:#x})");
+    let token = slot8_token(context, arg0);
+    tracing::debug!("KTF database slot 8 (header name: MC_dbSortRecords)({arg0:#x}, {arg1:#x}) token={token:?}");
+
+    let quoted = match &token {
+        Some(t) => format!(" ({t:?})"),
+        None => String::new(),
+    };
 
     Err(WieError::Unimplemented(format!(
         "8: KTF database slot 8 (header name MC_dbSortRecords) — argument layout unknown, \
-         measured r0={arg0:#x} r1={arg1:#x} (arity 2: r2 holds the interface table, r3 the callee address); \
+         measured r0={arg0:#x}{quoted} r1={arg1:#x} (arity 2: r2 holds the interface table, r3 the callee address); \
          the header's (fd, buf, len, compare, filter) does not fit"
     )))
+}
+
+/// Longest token `sort_records` will quote back from guest memory.
+///
+/// Bounded and printable-only on purpose. `arg0` is a guest pointer and nothing
+/// here can prove it is not a path — `wie_validate`'s `--guest-stdout` flag is
+/// opt-in for exactly that reason, and AGENTS.md's smoke-gate note draws the same
+/// line ("identifiers and expected status only, never paths or bytes"). The two
+/// tokens measured in the field are 3 and 2 bytes; 16 leaves room without turning
+/// this into a general string dump. Anything longer, anything non-printable, and
+/// anything unreadable is simply not quoted — the raw pointer is still reported,
+/// so the diagnostic never gets *worse* than it was.
+const SLOT8_TOKEN_MAX: usize = 16;
+
+fn slot8_token(context: &mut dyn WIPICContext, ptr: WIPICWord) -> Option<String> {
+    if ptr == 0 {
+        return None;
+    }
+    // Failure-tolerant by construction: a bad pointer must yield "no token", not
+    // an error that replaces the Unimplemented this function exists to raise.
+    let bytes = read_null_terminated_string_bytes(context, ptr).ok()?;
+    if bytes.is_empty() || bytes.len() > SLOT8_TOKEN_MAX || !bytes.iter().all(|b| (0x20..0x7f).contains(b)) {
+        return None;
+    }
+    str::from_utf8(&bytes).ok().map(ToOwned::to_owned)
 }
 
 /// `MC_dbGetNumberOfRecords(dbID)` — number of records in the database, or the
@@ -769,8 +847,8 @@ mod tests {
     use crate::context::test::TestContext;
 
     use super::{
-        KTF_DATABASE_STORAGE_LIMIT, delete_database, exists_database, list_databases, list_record_info, open_database, select_record, sort_records,
-        stream_read, stream_write, update_record,
+        KTF_DATABASE_STORAGE_LIMIT, SLOT8_TOKEN_MAX, delete_database, exists_database, list_databases, list_record_info, open_database,
+        select_record, sort_records, stream_read, stream_write, update_record,
     };
 
     /// KTF database slot 8 refuses, and refuses **without touching guest memory**.
@@ -818,6 +896,61 @@ mod tests {
             let mut seen = [0u8; 16];
             context.read_bytes(base, &mut seen).unwrap();
             assert_eq!(seen, SENTINEL, "slot 8 wrote to guest memory at {base:#x}");
+        }
+    }
+
+    /// Slot 8 quotes the token `r0` points at — and quotes **only** a short,
+    /// printable, readable one.
+    ///
+    /// The point of the quote is that the next title to reach this slot names its
+    /// own extension in the failure instead of costing somebody a disassembly:
+    /// the two measured tokens, `"res"` and `"ga"`, took a synchronised Thumb
+    /// sweep of two images to recover. The point of the *bounds* is that `r0` is
+    /// a guest pointer and nothing here can prove it is not a path — so the
+    /// three negative cases below are as load-bearing as the positive one, and a
+    /// change that widens the filter fails here rather than in someone's log.
+    ///
+    /// Every case still asserts the raw `r0=` is present, because the quote is an
+    /// addition: a regression that loses the token must not also lose the
+    /// coordinate that was already there.
+    #[futures_test::test]
+    async fn sort_records_quotes_only_a_short_printable_token_test() {
+        let mut context = database_test_context();
+
+        // The two tokens real guests passed, measured 2026-09-19 by resolving the
+        // sl-relative pointer table in `0103451A` / `01031C0A`.
+        for (addr, token) in [(0x2000u32, &b"res\0"[..]), (0x2100, &b"ga\0"[..])] {
+            context.write_bytes(addr, token).unwrap();
+            let err = sort_records(&mut context, addr, 1).await.unwrap_err();
+            let wie_util::WieError::Unimplemented(m) = err else {
+                panic!("slot 8 must stay Unimplemented")
+            };
+            let want = alloc::format!("{:?}", str::from_utf8(&token[..token.len() - 1]).unwrap());
+            assert!(
+                m.contains(&want) && m.contains(&alloc::format!("measured r0={addr:#x}")),
+                "slot 8 must quote the token AND keep the raw pointer, got {m}"
+            );
+        }
+
+        // Not quoted: too long, non-printable, unreadable, null. The message keeps
+        // the raw pointer in every one of them.
+        let long = [b'a'; SLOT8_TOKEN_MAX + 1];
+        context.write_bytes(0x2200, &long).unwrap();
+        context.write_bytes(0x2300, b"ab\x01cd\0").unwrap();
+        for (addr, why) in [
+            (0x2200u32, "longer than SLOT8_TOKEN_MAX"),
+            (0x2300, "contains a control byte"),
+            (0xFFFF_0000, "unreadable"),
+            (0x0, "null"),
+        ] {
+            let err = sort_records(&mut context, addr, 1).await.unwrap_err();
+            let wie_util::WieError::Unimplemented(m) = err else {
+                panic!("slot 8 must stay Unimplemented")
+            };
+            assert!(
+                !m.contains(" (\"") && m.contains(&alloc::format!("measured r0={addr:#x}")),
+                "slot 8 must not quote a token that is {why}, and must still report r0, got {m}"
+            );
         }
     }
 
