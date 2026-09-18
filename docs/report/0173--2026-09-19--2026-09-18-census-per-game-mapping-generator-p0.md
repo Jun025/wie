@@ -54,6 +54,14 @@
 원복                                      → rc=3
 ```
 
+> ★★**[게이트② 반려 승계 `-fix` · 2026-09-19] 이 개악은 «틀린 것을 쟀다» — 그리고 가드도 «fail-closed 가
+> 아니었다». 둘 다 철회한다.** 이 개악은 분기를 `if false` 로 바꿔 **«분기가 도달하는가»** 를 쟀을 뿐,
+> ★**«가드가 지키려는 속성을 지키는가»는 재지 않았다**(이 저장소가 반복해 이름 붙인 「구현을 쟀지 속성을
+> 안 쟀다」 그대로다). 실제로 검수자가 잰 결과 `./game_lab/reports` · `game_lab/./reports` ·
+> `game_lab/reports/../reports` · **절대경로** 가 전부 **rc=0 통과**였고, 같은 구멍이 **코퍼스 가드에도**
+> 있었다(`./game_lab/broken/x` 통과). ⇒ ★**「유일한 불가역 동작을 막았다」가 «점 하나»로 뚫렸다.**
+> 처방과 «속성을 재는» 새 개악은 아래 **§`-fix`** 에 있다.
+
 **개악 2 — 내구성: 행이 살아남는가**(`mutation-2-durability.txt`). 개악은 2026-09-18 의 «그 형태»다
 — 출력 디렉터리를 `mktemp -d` + `trap rm -rf` 로 되돌린다.
 
@@ -120,3 +128,56 @@
 코퍼스 **쓰기 0**(스크립트는 코퍼스 디렉터리에 절대 쓰지 않고, `--out` 이 코퍼스 안이면 rc=3).
 ★**게임 파일명 유입 0** — 이번에 손댄 4파일(신규 3 + `AGENTS.md`)을 코퍼스 고유 stem **184**개와 NFC 완전일치로 전수 대조해 **0건**을 실측했다
 (형제 회차가 「0」을 잘못 주장한 자리라 세어서 적는다).
+
+
+---
+
+## §`-fix`(2026-09-19) — ★가드를 «문자열 비교»에서 «해석된 경로 비교»로
+
+**변경 = 제품 1파일 + 문서 1.** `scripts/game-lab-recensus.sh` 의 `norm()`(1줄)을 `canon()` 으로 바꾸고
+★**두 가드가 «같은 술어»를 쓴다** — 술어 2벌 금지(한쪽만 고치면 다른 쪽이 남는다는 것이 반려 사유의 절반이었다).
+`AGENTS.md` 의 그 문장도 **같은 PR 에서** 넓혔다(검수자가 「문서가 코드보다 넓게 약속한다」로 지목한 줄).
+
+**⒜ 심링크 — «따라간다»(`cd -P`/`pwd -P`).** 이 가드가 지키는 것은 기준선의 **바이트**이므로 그 바이트에
+닿는 심링크는 같이 거절돼야 한다. ★대가도 적는다: **다른** 디렉터리를 가리키는 별칭을 일부러 쓰는 호출자는
+«친 문자열»이 아니라 «가리키는 곳»으로 판정된다. 실측 — 기준선을 가리키는 심링크 **rc=3** ·
+딴 곳을 가리키는 심링크 **rc=0**.
+
+**⒝ 아직 없는 경로 — «정규화된다».** 출력 디렉터리는 나중에 `mkdir -p` 로 생기므로 «존재해야 하는» 가드는
+여기서 쓸모가 없고 `realpath`/`fs.realpath` 는 부재 경로에서 실패한다. ⇒ **①어휘 정규화**(`//`·`.`·`..` 를
+접는다 — 만들어진 적 없는 꼬리에서도 된다) → **②존재하는 최장 접두만 물리 해석** → 남은 꼬리를 붙인다.
+분할 중 글로브가 도는 것은 `set -f` 로 막았다.
+
+**측정 — ★양쪽 다 낸다**(한쪽만이면 그냥 다 막은 것이다) · 증적 `evidence/…-p0-fix/guard-normalization-after.txt`:
+
+| 거절돼야 하는 것 | rc | 허용돼야 하는 것 | rc |
+|---|---|---|---|
+| `game_lab/reports` | **3** | `game_lab/reports-2026-09-19` | **0** |
+| `game_lab/reports/` | **3** | `./game_lab/reports-2026-09-19` | **0** |
+| `./game_lab/reports` | **3** | `<abs>/game_lab/reports-2026-09-19` | **0** |
+| `game_lab/./reports` | **3** | `game_lab/./reports-ab` | **0** |
+| `game_lab/reports/../reports` | **3** | `game_lab/reports2` | **0** |
+| `<abs>/game_lab/reports` | **3** | `game_lab/reportsX/../reportsX` | **0** |
+| `game_lab/broken/x` | **3** | `game_lab/broken2/x` | **0** |
+| `./game_lab/broken/x` | **3** | `<scratch>/out` | **0** |
+| `game_lab/broken/../broken/x` | **3** | `<scratch>/link-to-elsewhere` | **0** |
+| `<abs>/game_lab/broken/deep/x` | **3** | `game_lab/reports-mut/sub/deep` | **0** |
+| `<scratch>/link-to-baseline`(심링크) | **3** | | |
+
+★**`reports2`·`broken2`·`reportsX` 를 일부러 넣었다** — 접두 비교로 대충 막으면 그 셋이 함께 걸린다.
+
+**양방향 개악 — ★이번에는 «속성»을 잰다**(`evidence/…/mutation-normalisation.txt`):
+```
+원형   ./game_lab/reports · game_lab/./reports · …/../reports · 절대경로 · ./game_lab/broken/x  → 전건 rc=3
+개악   canon() 첫 줄에 `printf '%s' "${1%/}"; return 0`(= 정규화 제거)                          → 전건 rc=0  ★red
+원복                                                                                            → 전건 rc=3
+대조군 정규 철자(`game_lab/reports`·`game_lab/broken/x`)는 세 상태 «모두» rc=3
+```
+
+**남는 구멍 — 적어 둔다.** 기준선 가드는 여전히 **«같음»** 이지 **«안쪽»** 이 아니다
+(`--out game_lab/reports/sub` 는 통과한다). ★그것이 옳다고 판단했다 — 러너가 쓰는 것은 `$OUT/<stem>.json`
+이라 **하위 디렉터리는 기준선의 판정 파일을 덮지 않는다**. 다만 그 디렉터리 «안에 새 하위 트리»가 생기는 것은
+사실이고, 그래서 여기 적는다.
+
+**끝에서 끝까지 확인**: 고친 뒤 `--limit 1 --out game_lab/reports-fixsmoke` 가 정상 동작해 **json 1건**이
+남고 생성기가 「reports matched 1」을 낸다 ⇒ ★**가드를 조이면서 정상 경로를 막지 않았다.**

@@ -2,21 +2,23 @@
   "schema": "wie-worklog/1",
   "date": "2026-09-19",
   "task": "2026-09-18-census-per-game-mapping-generator-p0",
-  "title": "재실행이 per-game 행을 스스로 남기게 했다 — 그런데 원문이 지목한 «재실행 경로»는 repo 밖이었다",
+  "title": "재실행이 per-game 행을 스스로 남기게 했다 — 그런데 원문이 지목한 «재실행 경로»는 repo 밖이었다 [게이트² 반려 승계 -fix: 가드가 «문자열 비교»라 같은 디렉터리의 네 철자가 통과했다 — 철회·수정]",
   "summary": "채택 제안 2026-09-18-census-per-game-mapping-generator#p0 의 이행. 신규 scripts/game-lab-recensus.sh 253행이 분류가 끝난 코퍼스를 읽기 전용으로 재측하고 per-game JSON 을 game_lab/reports-YYYY-MM-DD/ 에 남긴다 — 그러면 형제 생성기(game-lab-census-map.mjs --reports)가 45분 전수 재실행 없이 그 자리에서 매핑을 낸다. ★원문의 목적은 채택하고 수단은 기각했다: 원문 why 가 지목한 classify.sh 는 ⑴.gitignore:23 이 /game_lab/ 를 통째로 막아 git ls-files game_lab 이 0 이라 거기 고친 것은 CI·리뷰·다른 체크아웃 어디에도 안 보이고 ⑵ingest 경로라 파일을 mv 하며 ⑶2026-09-18 인구조사는 그것을 부르지도 않았다(검증기를 손으로 mktemp 에 돌렸다) ⇒ 고칠 «커밋된 재실행 경로»가 애초에 없었다. classify.sh 무접촉. ★원문 tradeoff 가 제안한 날짜별 디렉터리는 그대로 채택했고, 7월 기준선 game_lab/reports/ 로의 --out 은 경고가 아니라 rc=3 거절이다(제자리 덮어쓰기가 유일한 불가역 동작이라 fail-closed). ★양방향 개악 2축이 제품 호출부에서 green→red→green. ★부수 실측: 같은 게임 3건을 두 번 돌렸더니 엔진 무변경인데 버킷이 갈렸다(load 170→202) — AGENTS.md 가 이름 붙인 짝짓지 않은 표집 그대로이고, 그래서 --shots 가 판정을 움직이는지는 «재지 못했다»고 적었다.",
   "changes": [
     "scripts/game-lab-recensus.sh 신설 253행 — --corpus/--out/--timeout/--kill/--nice/--limit/--resume/--shots/--dry-run/--from-stdin. 검증기 인자는 기준선을 만든 classify.sh 와 동일(--inject --timeout N). 코퍼스 쓰기 0 · --out 이 기준선이거나 코퍼스 안이면 rc=3",
     "AGENTS.md §Web-surface 의 «local only» 목록에 재측 러너 + 매핑 생성기 쌍을 등재 (+12/-0) — fenced sh 블록은 더하지 않았다(그러면 doc-liveness.yml 동기 의무가 붙는데 이 명령들은 코퍼스가 필요해 주 러너가 돌릴 수 없다)",
     "docs/report/0173 신설 — 원문 대조 · 변경 수 · 양방향 개악 2축 · 대가 6항 · 부수 실측 2건",
-    "제품 Rust 0줄 · classify.sh 0줄 · .gitignore 무접촉 · STATE.md 무접촉 · 새 검사기·새 워크플로 0 · 게임 파일명 유입 0(고유 stem 184 NFC 전수 대조 실측)"
+    "제품 Rust 0줄 · classify.sh 0줄 · .gitignore 무접촉 · STATE.md 무접촉 · 새 검사기·새 워크플로 0 · 게임 파일명 유입 0(고유 stem 184 NFC 전수 대조 실측)",
+    "★[-fix] scripts/game-lab-recensus.sh 의 norm()(1줄)을 canon() 으로 교체 — 두 가드(기준선·코퍼스)가 «같은 술어»를 쓴다(술어 2벌 금지). 어휘 정규화(//·.·..) 후 존재하는 최장 접두만 물리 해석(cd -P/pwd -P) ⇒ 심링크는 따라가고, 아직 없는 경로도 정규화된다. AGENTS.md 의 그 문장도 같은 PR 에서 넓혔다"
   ],
   "verification": [
     "★모집단 일치 — 스크립트가 세는 코퍼스는 파일 187 · 중복 stem 3 으로 인구조사·생성기의 실측(187/184/3)과 정확히 같다",
     "★왕복 — 재측 3건 → reports-ab-noshots/ 에 json 3 → game-lab-census-map.mjs --reports <그 디렉터리> → 「corpus files 187 · reports matched 3」 + 매핑 3행(경로·버킷). 인구조사가 잃은 자료를 명령 하나로 낸다",
-    "★★개악 1(가드) — 원형 --out game_lab/reports --dry-run rc=3(거절) ↔ 가드 분기를 if false 로 바꾸면 rc=0(덮으러 간다) ↔ 원복 rc=3",
+    "★★[-fix 정정] 개악 1 은 «틀린 것을 쟀다» — 가드 분기를 if false 로 바꿔 «분기가 도달하는가»만 쟀고 «가드가 지키려는 속성»은 재지 않았다. 새 개악은 속성을 잰다: 원형 ./game_lab/reports·game_lab/./reports·…/../reports·절대경로·./game_lab/broken/x 전건 rc=3 ↔ canon() 에서 정규화를 제거하면 전건 rc=0 ★red ↔ 원복 전건 rc=3. 대조군(정규 철자)은 세 상태 모두 rc=3",
     "★★개악 2(내구성) — 원형 --limit 1 후 남은 .json 1 · 생성기 「reports matched 1」 ↔ OUT 을 mktemp -d + trap rm 으로 되돌리면(2026-09-18 의 그 형태) 남은 .json 0 · 생성기 rc=2 「does not exist」 ↔ 원복 1",
-    "★가드 보조 실측 — --out game_lab/reports/ (꼬리 슬래시)도 rc=3 · --out game_lab/broken/x(코퍼스 내부)도 rc=3",
-    "★bash -n rc=0 · 네 게이트 + beta clippy 를 diff 에 Rust 0줄임에도 전부 돌렸다(AGENTS.md 「무엇을 바꿨든 넷 다」)"
+    "★★[-fix 정정] 종전 「꼬리 슬래시도 코퍼스 내부도 거절한다」는 «쟀던 두 철자»에만 참이었다. 검수자 실측: ./game_lab/reports · game_lab/./reports · game_lab/reports/../reports · 절대경로가 전부 rc=0 통과 · 코퍼스 가드도 ./game_lab/broken/x 통과. 수정 후 재측 — 거절 11행(심링크 포함) / 허용 10행(reports2·broken2·reportsX 를 일부러 넣어 접두 오탐도 배제) 전건 기대대로",
+    "★bash -n rc=0 · 네 게이트 + beta clippy 를 diff 에 Rust 0줄임에도 전부 돌렸다(AGENTS.md 「무엇을 바꿨든 넷 다」)",
+    "★[-fix] 끝에서 끝까지 — 고친 뒤 --limit 1 --out game_lab/reports-fixsmoke 가 정상 동작해 json 1건이 남고 생성기가 「reports matched 1」 ⇒ 가드를 조이면서 정상 경로를 막지 않았다"
   ],
   "limits": [
     "★45분을 싸게 만들지 않는다 — 전수 재측은 여전히 전수 재측이고 이 맥은 self-hosted 러너를 겸한다. 바뀐 것은 «한 번만 치른다»뿐이다",
@@ -25,7 +27,9 @@
     "★디스크 — 기준선 shot 디렉터리는 286 MB / 6,069 PNG 이고 그것이 한 회차분이다. 그래서 --shots 는 opt-in 인데, 그러면 기준선과 인자가 달라진다(그 차이가 판정을 움직이는지는 재지 못했다)",
     "★날짜 디렉터리가 스스로 쌓인다 — 회수·회전 장치를 넣지 않았다",
     "★classify.sh 는 여전히 game_lab/reports/ 에 쓴다 — 새 게임을 ingest 하면 기준선 디렉터리에 행이 는다. 기존 187행은 불변이라 7/7 재현은 안전하지만 「기준선은 불변」은 아니다",
-    "★생성기 헤더의 reports mtime range 는 UTC(toISOString)인데 디렉터리 이름은 로컬 날짜다 — 실측으로 하루 어긋났다(05:26 KST 에 쓴 reports-2026-09-19 를 2026-09-18 로 표시). 형제 파일의 출력 포맷이라 이 회차에서 고치지 않고 제안으로 남긴다"
+    "★생성기 헤더의 reports mtime range 는 UTC(toISOString)인데 디렉터리 이름은 로컬 날짜다 — 실측으로 하루 어긋났다(05:26 KST 에 쓴 reports-2026-09-19 를 2026-09-18 로 표시). 형제 파일의 출력 포맷이라 이 회차에서 고치지 않고 제안으로 남긴다",
+    "★[-fix] 기준선 가드는 여전히 «같음»이지 «안쪽»이 아니다 — --out game_lab/reports/sub 는 통과한다. 러너가 쓰는 것은 $OUT/<stem>.json 이라 하위 디렉터리는 기준선의 판정 파일을 덮지 않아 그것이 옳다고 판단했지만, 그 디렉터리 안에 새 하위 트리가 생기는 것은 사실이다",
+    "★[-fix] 심링크를 «따라가는» 선택의 대가 — 다른 디렉터리를 가리키는 별칭을 일부러 쓰는 호출자는 «친 문자열»이 아니라 «가리키는 곳»으로 판정된다"
   ],
   "adoptedProposals": [
     "2026-09-18-census-per-game-mapping-generator#p0"

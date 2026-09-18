@@ -624,9 +624,14 @@ design** — do not "fix" that by wiring it:
   file, unlike the ingest path `game_lab/classify.sh` — which is itself inside the ignored tree, so
   `git ls-files game_lab` is 0 and nothing there is reviewable) and leaves one JSON per game in
   `game_lab/reports-YYYY-MM-DD/`; the generator turns that directory into a per-game bucket map via
-  `--reports`. **Pointing the runner's `--out` at `game_lab/reports/` is refused (exit 3)** — that is
-  the July baseline the census's 7/7 reconciliation is checked against, and overwriting it in place is
-  the one irreversible thing here. They exist because the 2026-09-18 census wrote its per-game rows to
+  `--reports`. **Pointing the runner's `--out` at `game_lab/reports/` is refused (exit 3) — in any
+  spelling**, because the guard compares resolved paths (symlinks followed) rather than strings; that
+  is the July baseline the census's 7/7 reconciliation is checked against, and overwriting it in place
+  is the one irreversible thing here. *This sentence used to promise only what the first version
+  delivered: gate 2 measured `./game_lab/reports`, `game_lab/./reports`,
+  `game_lab/reports/../reports` and the absolute path all sailing past it. The line was true of one
+  spelling out of four while reading as if it covered them all — if you widen a claim here, widen the
+  predicate in the same PR.* They exist because the 2026-09-18 census wrote its per-game rows to
   a `mktemp -d` it then deleted, which cost the next round an hour and made a low-load re-measure
   impossible; `docs/report/0173` has the numbers. Start it as `bash scripts/game-lab-recensus.sh
   --dry-run` to see what a full run would cost before spending 45 minutes of the self-hosted runner.

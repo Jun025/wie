@@ -92,22 +92,74 @@ while [ $# -gt 0 ]; do
 done
 
 # ── Fail-closed: the baseline column is not an output directory ──────────────
-# Compared after normalising a trailing slash, so `--out game_lab/reports/` is
-# refused too. This runs before anything is built or executed.
-norm() { printf '%s' "${1%/}"; }
-if [ "$(norm "$OUT")" = "$(norm "$BASELINE")" ]; then
+# ★Compared as RESOLVED PATHS, not as strings. The first version of this guard
+# stripped a trailing slash and compared the two spellings with `[ a = b ]`, and
+# gate 2 measured what that buys: `game_lab/reports` and `game_lab/reports/` were
+# refused while `./game_lab/reports`, `game_lab/./reports`,
+# `game_lab/reports/../reports` and the absolute path all sailed through and
+# would have overwritten the baseline's `<stem>.json` in place. A guard that
+# stands on one spelling of four is not fail-closed; it is a spelling test.
+#
+# `canon` is the ONE predicate both guards use — deliberately, because the same
+# hole existed in the corpus guard and fixing one would have left the other.
+#
+# ⒜ SYMLINKS ARE FOLLOWED (`cd -P` / `pwd -P`). What this guard protects is the
+#    baseline's *bytes*, so a symlink that lands on them must be refused too;
+#    resolving is the only way to see that. The cost is stated rather than
+#    hidden: a caller who deliberately keeps a symlinked alias to a *different*
+#    directory is judged by where it points, not by what they typed.
+# ⒝ A PATH THAT DOES NOT EXIST YET STILL NORMALISES. The dated output directory
+#    is created later by `mkdir -p`, so a guard that needed the target to exist
+#    would be useless here — and `realpath`/`fs.realpath` fail on absent paths,
+#    which is why this resolves the longest EXISTING prefix physically and
+#    appends the (already lexically normalised) remainder.
+canon() {
+  local p="$1" out="" comp head rest=""
+  case "$p" in /*) ;; *) p="$PWD/$p" ;; esac
+  # Lexical pass first: collapses `//`, `.` and `..` even inside a tail that has
+  # never been created. Globbing is off for the split so a literal `*` in a path
+  # component cannot expand into something else.
+  set -f
+  local IFS=/
+  for comp in $p; do
+    case "$comp" in
+      '' | .) ;;
+      ..) out="${out%/*}" ;;
+      *) out="$out/$comp" ;;
+    esac
+  done
+  set +f
+  unset IFS
+  [ -n "$out" ] || out=/
+  # Physical pass: resolve symlinks as far as the path actually exists.
+  head="$out"
+  while [ ! -e "$head" ] && [ "$head" != "/" ]; do
+    rest="${head##*/}${rest:+/$rest}"
+    head="${head%/*}"
+    [ -n "$head" ] || head=/
+  done
+  if [ -d "$head" ]; then
+    head="$(cd -P -- "$head" 2>/dev/null && pwd -P)" || head="$out"
+  fi
+  printf '%s' "${head%/}${rest:+/$rest}"
+}
+
+_out_c="$(canon "$OUT")"
+if [ "$_out_c" = "$(canon "$BASELINE")" ]; then
   echo "game-lab-recensus: refusing --out $OUT — that is the July baseline column" >&2
+  echo "  (resolves to $_out_c)" >&2
   echo "  It is the only input the census's 7/7 reconciliation can be checked against;" >&2
   echo "  a re-run would overwrite it in place with no way back. Use a dated directory" >&2
   echo "  (the default is $ROOT/reports-$(date +%F)) and compare with the generator's" >&2
   echo "  --reports flag instead." >&2
   exit 3
 fi
-_out_n="$(norm "$OUT")/"; _corpus_n="$(norm "$CORPUS")/"
-case "$_out_n" in
-  "$_corpus_n"*)
+_corpus_c="$(canon "$CORPUS")/"
+case "$_out_c/" in
+  "$_corpus_c"*)
     echo "game-lab-recensus: refusing --out $OUT — it is inside the corpus $CORPUS" >&2
-    exit 3;;
+    echo "  (resolves to $_out_c, inside ${_corpus_c%/})" >&2
+    exit 3 ;;
 esac
 
 [ -d "$CORPUS" ] || { echo "game-lab-recensus: no corpus at $CORPUS (it is git-ignored and local-only)" >&2; exit 2; }
