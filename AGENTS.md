@@ -384,6 +384,36 @@ The contract check needs the WASM artifact already in `web/src/wasm/` — build 
 local build, else it fails with missing-artifact violations (CI order: `engine-contract.yml:116`
 then `:125`). The rest need a toolchain fetch — run them only when the artifact or UI changes.
 
+**That question is now answered mechanically for the whole tree, so stop grepping it out by
+hand: `node scripts/checker-census.mjs`.** It lists every executable artifact in `scripts/`,
+`.github/scripts/` and `*/tests/` next to the places that actually run it and the triggers those
+places fire on, and the always-run `contract` job prints it on every PR. Two things it is
+deliberately not. It is **not a check** — it has no failing state, a zero caller count is a
+question and not a defect (this repo ships two checkers that are correctly uncalled, below), and
+`continue-on-error` on its step makes that mechanical rather than promised. And it is **not a
+replacement for the paragraph below**: it counts call sites, it does not know which of them
+matter. Baseline at adoption (`f7a1d022`, re-measured 2026-09-18): **37 artifacts — 8 with no
+caller, 14 with exactly one, 15 with two or more**. **That is a reading of one commit, not a
+constant** — by `origin/main` of 2026-09-18 the no-caller bucket is already **7**, because a sibling
+round revived one orphaned test (`docs/report/0153`). Re-run it rather than quoting this line. It
+costs **0.6-2.0 s** in the `contract` job. **Three runs of byte-identical code and output** (PR
+#195: `35257783718` **2.04 s**, `35268371028` **1.49 s**, `35270887798` **0.64 s**) — a 3.2x
+spread that is runner load, not code. **So do not quote one reading, and do not derive a ratio
+from two.** An earlier revision of this paragraph said 0.6 s, then 2.04 s, then 1.5-2.0 s; each
+was a true reading and each was wrong as a claim. In particular the 0.6 s predates the
+`cargo metadata` subprocess this script now runs — yet it sits *inside* the post-cargo spread, so
+the runner figure cannot separate the two versions at all. A dev Mac under load takes 0.9-1.3 s,
+which is inside the same band. If you need the cost of the cargo call, measure that call.
+**The first published figures — 36/4/14/18 — were wrong and are recorded here as wrong**, because
+the census asked a path regex which files `cargo test --all` reaches instead of asking cargo: it
+credited four `tests/*.rs` files under directories that carry no `Cargo.toml` (orphans of the base
+swap, so cargo compiles none of them) and it dropped `tests/font.rs`, which is a real target of the
+root package. The 0-caller bucket was therefore understated by exactly half. The per-row disposition is
+`docs/report/0155--2026-09-17--wie-count-checkers-with-only-one-caller.md`, which is also where
+its four measured blind spots are written down. Prefer it over a fresh `git grep` when you need
+to know where something runs — a hand grep counts prose and comments as wiring, which is how the
+count below went stale.
+
 **Which of these CI actually runs — "the check exists" is not "the check runs".** Measured
 2026-09-06 across all 8 workflow files: `check-engine-contract.mjs` and `contract-roundtrip.mjs`
 run in `engine-contract.yml`; `build-wasm.sh` and the frontend build run in `web.yml`; **`npm run
