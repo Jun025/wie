@@ -638,7 +638,7 @@ than let it be ignored — a periodically-red check that people scroll past is w
 
 ### Landing paperwork
 
-- **`STATE.md` and `docs/report/` are tracked files, not scratch**: keep `STATE.md`'s 완료/다음 current as a task lands, and write a dated 무엇을·왜·사용자 영향 entry when it lands. **Do not write a 진행중 entry** — that section became a fixed pointer to `gh pr list` on 2026-09-08, for the reason below. **Round entries go in a new `docs/report/NNNN--YYYY-MM-DD--<ticket-id>.md` — do not append to `REPORT.md`**, which is now a fixed pointer (2026-09-07; every round appending to one file's top made every open PR conflict — 5/5 at migration time, 4 of them on the ledger files *only*). `NNNN` is the global sequence, largest + 1:
+- **`STATE.md` and `docs/report/` are tracked files, not scratch**: keep `STATE.md`'s 다음 current as a task lands, and write a dated 무엇을·왜·사용자 영향 entry when it lands. **Do not write a 진행중 entry** — that section became a fixed pointer to `gh pr list` on 2026-09-08, for the reason below. **Do not write a 완료 entry either** — §완료 became a fixed pointer to `docs/report/` on 2026-09-18 (ticket `wie-remove-state-md-completed-insertion-point`), so the round file below *is* the landing record and `STATE.md` is no longer touched by an ordinary landing at all. That is the whole point: a landing that touches no shared line cannot invalidate a sibling PR. **Round entries go in a new `docs/report/NNNN--YYYY-MM-DD--<ticket-id>.md` — do not append to `REPORT.md`**, which is now a fixed pointer (2026-09-07; every round appending to one file's top made every open PR conflict — 5/5 at migration time, 4 of them on the ledger files *only*). `NNNN` is the global sequence, largest + 1:
 
   ```sh
   N=$(node scripts/check-docs-report-serial.mjs --next-serial)   # ask the tool, not the directory
@@ -706,7 +706,17 @@ than let it be ignored — a periodically-red check that people scroll past is w
   the bottom. Keying the position off the PR number does not save it either, because sibling rounds
   here carry **consecutive** numbers (#120–#133 measured), which puts their slots back-to-back. The
   only thing that removes the collision is removing the point, which is what the pointer does.
-  §완료 still has one, and that is the measured **3/10 residual** — recorded, not fixed here.
+  §완료 had one too, and that was the measured **3/10 residual** — **removed on 2026-09-18**; see the
+  superseded-decision banner below.
+
+  > **★SUPERSEDED 2026-09-18 — §완료 is now a pointer too** (ticket
+  > `wie-remove-state-md-completed-insertion-point`). The block that follows is kept as the
+  > measurement record, not as live instruction: its numbers are still how the collision was priced,
+  > but its *verdict* ("keep the insertion point") no longer holds. **What changed is exactly the one
+  > thing it named as the blocker** — `docs/report/` was not a superset of §완료, and now it is:
+  > re-measured 2026-09-18 over **149 §완료 entries**, every one has a `docs/report/` copy
+  > (**사본 없음 0**; the 3 id-less legacy lines are quoted verbatim inside `0092`, `0094`, `0159`).
+  > Read the rest for *why* the collision costs what it costs; do not read it as "leave §완료 alone".
 
   **§완료 keeps its shared insertion point on purpose. That is a decision, not an oversight**
   (2026-09-08, ticket `wie-state-completed-top-insert-residual-three`, adopting
@@ -762,6 +772,16 @@ than let it be ignored — a periodically-red check that people scroll past is w
   refills" is not a live objection; what remains is only the migration itself, which is a separate
   round because it too collides with every open PR (landing order is the operator's call).
 
+  **★That migration landed 2026-09-18** (`wie-remove-state-md-completed-insertion-point`). It paid
+  exactly the price named above — one final invalidation of every open PR that touches `STATE.md` —
+  and in exchange an ordinary landing now touches `STATE.md` **not at all**. Two numbers to inherit
+  rather than re-derive: **149/149** §완료 entries had a `docs/report/` copy at migration time
+  (so the "drop 7 entries" objection was fully retired, not waived), and the machine-consumer count
+  was **still 0** — the single `STATE.md` mention in a code file
+  (`wie_midp/tests/create_image_missing_name_message.rs`, a doc comment citing `STATE.md:349`) was
+  repointed at `docs/report/0047--…` in the same commit, because a line citation into a section that
+  no longer exists is worse than a stale one.
+
   **★And do not propose `.gitattributes` `STATE.md merge=union` as the cheap way out — it was tried
   and measured on 2026-09-18, and it does not fix the reported symptom.** The symptom is
   `mergeable: CONFLICTING`, and that is decided by **GitHub's server-side merge, which ignores the
@@ -792,9 +812,11 @@ than let it be ignored — a periodically-red check that people scroll past is w
 
   **One measured wrinkle worth knowing before you cite `STATE.md` by line.** Top-insert moves every
   line below it, so line-number citations into §완료 rot. `wie_midp/tests/create_image_missing_name_message.rs`
-  cites `STATE.md:349`; that line now holds an unrelated entry and the content it meant is at 510.
-  The same comment also cites `docs/report/0047--…`, which is stable — **cite the per-round file, not
-  `STATE.md:<line>`.**
+  cited `STATE.md:349`; by 2026-09-08 that line held an unrelated entry and the content it meant had
+  moved to 510. **2026-09-18 that citation stopped resolving at all** — §완료 became a pointer and the
+  entry it meant lives only in `docs/report/0047--…`, which the same comment already cited, so the
+  round that migrated §완료 repointed it there. The rule is unchanged and now unavoidable: **cite the
+  per-round file, not `STATE.md:<line>`.**
 - **The ledger files of this repo are `STATE.md`, `REPORT.md`, `docs/report/**`, `docs/worklog/**`,
   and `docs/worklog-coverage-remeasures.json`.**
   Resolve a merge conflict in any of them by **union** — keep both sides' entries, ordered by the
