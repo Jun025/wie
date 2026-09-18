@@ -1,0 +1,39 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-18",
+  "task": "wie-restore-lgt-key-and-resource-reach-tests-lost-in-rename",
+  "title": "개명에서 유실된 LGT 도달 시험 2개 복원 — 개악 2칸으로 «문다»를 보였고, 진짜 사각은 Windows·macOS 였다",
+  "summary": "b52ed661 이 ktf·lgt 도달 시험을 둘 다 만들었는데 2026-09-16 base swap 이 ktf 만 데려왔다. ★결손을 내가 쟀다: cargo metadata 시험 타깃 8건에 lgt 도달 0 · 삭제 커밋 없음(트리 교체) · base swap 회차들이 ktf 두 시험을 이름 대어 고치고 lgt 는 언급 0 · 뒤이은 고아 인구조사(0153)의 고아 4건에도 없다 ⇒ 「고의」 증거 0, 「누락」 증거 3. ★★ⓑ 를 티켓보다 좁게 고쳐 적었다 — Scenario F 의 paths 필터 첫 항목이 **/*.rs 라 Rust 를 건드리는 PR 은 전부 F 를 돈다 ⇒ 진짜 사각은 「비-Rust diff」다. ★그러나 더 큰 비대칭이 따로 있었다: Scenario F 는 ubuntu-latest 하나에서만 돌고 되살린 시험은 6다리(macos·ubuntu·windows × stable·beta)에서 무조건 돈다 ⇒ LGT 키·리소스 도달은 Windows·macOS 에서 «한 번도» 검사된 적이 없었다.",
+  "changes": [
+    "wie-lgt/tests/test_key_reach.rs 신설 — ktf 현행판을 본떠(b52ed661 원본이 아니라) 틱 상한 400_000 · guest_line_complete 탈출 · assert seen.contains(\"key:53\")",
+    "wie-lgt/tests/test_resource_reach.rs 신설 — res:err 와 res:9:602 를 따로 단언(「실패했다」와 「일어나지 않았다」를 가른다)"
+  ],
+  "verification": [
+    "★타깃이 됐다: cargo metadata --no-deps 에 wie-lgt → test_key_reach.rs · test_resource_reach.rs 가 나타난다(파일을 놨다 ≠ 돈다).",
+    "★정상 green: key_press_reaches_the_lgt_guest ok(4.41s) · bundled_resource_reaches_the_lgt_guest ok(3.68s).",
+    "★개악 ⒜-1: wie-lgt/.../wipi_c/context.rs 의 get_resource_size 가 1 크게 답하면 FAILED — guest stdout was \"res:10:602\". 메시지가 어느 사이트인지 이름 댄다.",
+    "★개악 ⒜-2: wie-lgt/.../net/wie/clet_wrapper_card.rs 의 key_notify 가 key+1 을 건네면 FAILED — guest stdout was \"res:9:602\\nkey:54\". 두 개악이 서로 다른 LGT 고유 경로다.",
+    "★원복 후 둘 다 ok · git status 에 소스 변경 0(백업+trap · 커밋 0).",
+    "★⒞ 부하 대조: 주변 부하 178 에서 ok(1.15s/1.58s) · 인위적 스피너 16개로 193 까지 올려도 ok(2.72s/2.27s) ⇒ 느려지되 뒤집히지 않는다. 같은 부하대에서 wie_validate --inject 경로는 FAIL 한다(원 회차 실측 paints 12~22 ↔ idle 48~55).",
+    "★부하 생성기 잔여 0 확인(ps -Ao comm= | grep -c '^yes$' → 0)."
+  ],
+  "limits": [
+    "★모든 PR 이 느려진다 — 두 시험 약 8.1초/다리 × 6다리. self-hosted 러너 1대라 형제 PR 이 그만큼 기다린다",
+    "★부하 상한을 «찾은» 것이 아니다 — loadavg 193 까지 green 임을 보였을 뿐이고 더 높은 부하에서의 거동은 모른다. 무조건 축이라 flaky 가 되면 모든 PR 을 막는다",
+    "★Scenario F 를 무조건으로 바꾸지 않았다(범위 밖 · 그쪽은 wasm 빌드+playwright 라 훨씬 비싸다)",
+    "★ⓑ 의 정정을 흐리지 않는다 — 「LGT 무방비」는 과장이었다. Rust diff 는 종전에도 F 가 덮었고, 이 회차가 실제로 산 것은 «비-Rust diff»와 «Windows·macOS» 두 칸이다"
+  ],
+  "proposals": [
+    {
+      "title": "형제 크레이트에도 같은 결손이 있는지 «기계로» 물어라 — 개명이 조용히 떨어뜨린 시험이 더 있을 수 있다",
+      "plainSummary": "이번에 되살린 두 파일은 사람이 눈으로 찾아낸 것입니다. 같은 방식으로 사라진 시험이 더 있는지 기계가 확인하게 하면 좋겠습니다.",
+      "userBenefit": "「개명이 떨어뜨린 시험」이라는 결손 유형이 다시 생겨도 다음 사람이 눈으로 찾을 필요가 없다.",
+      "why": "이 결손은 삭제 커밋을 남기지 않았다(base swap 이 트리를 통째로 갈았다) ⇒ git 이력 조회로는 안 잡힌다. 고아 인구조사(0153)도 «있는데 안 도는» 파일만 세므로 «아예 없어진» 것은 범위 밖이었다. 실제로 이 두 파일은 두 인구조사를 모두 통과해 살아남았고, 파일럿 회차가 다른 일을 하다 우연히 발견했다. ⇒ 「과거 커밋에 존재했으나 현 트리의 cargo 타깃에 없는 tests/*.rs」를 세는 한 줄이 그 축이다.",
+      "tradeoff": "★오탐이 많을 수 있다 — 일부러 지운 시험, upstream 에서 온 시험, 개명으로 «경로만» 바뀐 시험이 전부 걸린다. ⇒ 검사기로 만들면 «아무도 못 끄는 상시 경보»가 되기 쉽다(이 저장소가 반복해 규탄한 형태). ★먼저 «한 번 세어» 규모를 보고, 0~2건이면 그 자리에서 처분하고 검사기를 만들지 마라. 그리고 이 회차의 lgt 둘처럼 «되살리면 red» 인 것이 섞이므로(0153 이 4건 중 3건을 그렇게 실측했다) 계수와 처분은 별개다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": ["2026-09-18-keydraw-generator-not-run-declare#p0"],
+  "declinedProposals": []
+}
