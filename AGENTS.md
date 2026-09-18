@@ -289,8 +289,33 @@ line — see `wie_validate.rs`'s header for that reasoning (its table covers `he
 failure in CI; this line makes the same class visible in ~20 s with no wasm build, before you push.
 Scenario F is not unconditional either — it sits behind `engine-contract.yml`'s `dorny/paths-filter`
 `engine` gate, so a diff that touches no engine path reports "Reporting success without rebuilding"
-and never runs it. Do not read this line as CI enforcement — nothing in `.github/` runs
-`wie_validate` (measured: 0 hits across all workflow files).
+and never runs it. Do not read this line as CI enforcement — **no PR-triggered workflow runs
+`wie_validate`**. The `.github/` hits are 3, all of them in `doc-liveness.yml`, whose `pull_request`
+trigger is `paths`-scoped to that workflow file: on every other PR it is zero. (This paragraph said
+"0 hits across all workflow files" for eight days; it was written 2026-09-07 and `4e39dfaa` put the
+runner block into `doc-liveness.yml` on 2026-09-10. Count with `grep -rn 'wie_validate' .github/`,
+and read the triggers — the number alone answers the wrong question.)
+
+**One method out of this path IS covered per-PR, and only one.** `HeadlessPlatform::font()` — the
+`unimplemented!()` that caused all of the above — is asserted by
+`headless_platform_font_measures_text_test` in `wie_validate.rs`, so `cargo test --all` reddens on
+all six matrix legs if it is re-broken. **That test guards one method, not the text path**: it goes
+through `Platform::font()` and `text_layout::minimum_width` (the call a guest's `drawString`
+actually makes) and no further. A regression anywhere else between `drawString` and the screen is
+still weekly-only.
+
+**Promoting the runner line itself to per-PR was priced and declined on 2026-09-18**
+(`wie-text-drawing-fixture-cheap-tier-vs-broad-tier-decision`), on the same axis as the
+2026-09-07 decision below. Two ways to do it, both measured here:
+
+| how | what it costs |
+|---|---|
+| runner block in `rust.yml`'s legs | the block is **168 s** warm (measured, loadavg 180) × **6 legs** ≈ 17 min of runner time *per PR*, on a self-hosted runner siblings queue behind |
+| runner block in `contract` | that job's toolchain is `if: engine == 'true'` and targets **wasm32** with a wasm-keyed cache, so this needs a *native* build. Inside the filter it misses docs-only PRs (the diffs that break wiring); outside it, every PR pays a native cargo build in a job that currently finishes in 12 s on a doc-only diff |
+
+versus the test above: **~10 ms** in an already-compiled target, no new dependency, no new workflow.
+**Reopen if** a regression lands in the text path *outside* `font()` and the weekly job is the thing
+that catches it — that is the evidence this trade is wrong, and nothing short of it is.
 
 **And it stays that way: promoting `--expect-last-frame` into CI was decided against on 2026-09-07,
 measured rather than assumed.** The question is not "is it in CI" but "is the class caught", and it
@@ -383,6 +408,36 @@ The first two are the cheap offline pre-push check for any `functions/` or `web/
 The contract check needs the WASM artifact already in `web/src/wasm/` — build it first or reuse a
 local build, else it fails with missing-artifact violations (CI order: `engine-contract.yml:116`
 then `:125`). The rest need a toolchain fetch — run them only when the artifact or UI changes.
+
+**That question is now answered mechanically for the whole tree, so stop grepping it out by
+hand: `node scripts/checker-census.mjs`.** It lists every executable artifact in `scripts/`,
+`.github/scripts/` and `*/tests/` next to the places that actually run it and the triggers those
+places fire on, and the always-run `contract` job prints it on every PR. Two things it is
+deliberately not. It is **not a check** — it has no failing state, a zero caller count is a
+question and not a defect (this repo ships two checkers that are correctly uncalled, below), and
+`continue-on-error` on its step makes that mechanical rather than promised. And it is **not a
+replacement for the paragraph below**: it counts call sites, it does not know which of them
+matter. Baseline at adoption (`f7a1d022`, re-measured 2026-09-18): **37 artifacts — 8 with no
+caller, 14 with exactly one, 15 with two or more**. **That is a reading of one commit, not a
+constant** — by `origin/main` of 2026-09-18 the no-caller bucket is already **7**, because a sibling
+round revived one orphaned test (`docs/report/0153`). Re-run it rather than quoting this line. It
+costs **0.6-2.0 s** in the `contract` job. **Three runs of byte-identical code and output** (PR
+#195: `35257783718` **2.04 s**, `35268371028` **1.49 s**, `35270887798` **0.64 s**) — a 3.2x
+spread that is runner load, not code. **So do not quote one reading, and do not derive a ratio
+from two.** An earlier revision of this paragraph said 0.6 s, then 2.04 s, then 1.5-2.0 s; each
+was a true reading and each was wrong as a claim. In particular the 0.6 s predates the
+`cargo metadata` subprocess this script now runs — yet it sits *inside* the post-cargo spread, so
+the runner figure cannot separate the two versions at all. A dev Mac under load takes 0.9-1.3 s,
+which is inside the same band. If you need the cost of the cargo call, measure that call.
+**The first published figures — 36/4/14/18 — were wrong and are recorded here as wrong**, because
+the census asked a path regex which files `cargo test --all` reaches instead of asking cargo: it
+credited four `tests/*.rs` files under directories that carry no `Cargo.toml` (orphans of the base
+swap, so cargo compiles none of them) and it dropped `tests/font.rs`, which is a real target of the
+root package. The 0-caller bucket was therefore understated by exactly half. The per-row disposition is
+`docs/report/0155--2026-09-17--wie-count-checkers-with-only-one-caller.md`, which is also where
+its four measured blind spots are written down. Prefer it over a fresh `git grep` when you need
+to know where something runs — a hand grep counts prose and comments as wiring, which is how the
+count below went stale.
 
 **Which of these CI actually runs — "the check exists" is not "the check runs".** Measured
 2026-09-06 across all 8 workflow files: `check-engine-contract.mjs` and `contract-roundtrip.mjs`
@@ -583,7 +638,7 @@ than let it be ignored — a periodically-red check that people scroll past is w
 
 ### Landing paperwork
 
-- **`STATE.md` and `docs/report/` are tracked files, not scratch**: keep `STATE.md`'s 완료/다음 current as a task lands, and write a dated 무엇을·왜·사용자 영향 entry when it lands. **Do not write a 진행중 entry** — that section became a fixed pointer to `gh pr list` on 2026-09-08, for the reason below. **Round entries go in a new `docs/report/NNNN--YYYY-MM-DD--<ticket-id>.md` — do not append to `REPORT.md`**, which is now a fixed pointer (2026-09-07; every round appending to one file's top made every open PR conflict — 5/5 at migration time, 4 of them on the ledger files *only*). `NNNN` is the global sequence, largest + 1:
+- **`STATE.md` and `docs/report/` are tracked files, not scratch**: keep `STATE.md`'s 다음 current as a task lands, and write a dated 무엇을·왜·사용자 영향 entry when it lands. **Do not write a 진행중 entry** — that section became a fixed pointer to `gh pr list` on 2026-09-08, for the reason below. **Do not write a 완료 entry either** — §완료 became a fixed pointer to `docs/report/` on 2026-09-18 (ticket `wie-remove-state-md-completed-insertion-point`), so the round file below *is* the landing record and `STATE.md` is no longer touched by an ordinary landing at all. That is the whole point: a landing that touches no shared line cannot invalidate a sibling PR. **Round entries go in a new `docs/report/NNNN--YYYY-MM-DD--<ticket-id>.md` — do not append to `REPORT.md`**, which is now a fixed pointer (2026-09-07; every round appending to one file's top made every open PR conflict — 5/5 at migration time, 4 of them on the ledger files *only*). `NNNN` is the global sequence, largest + 1:
 
   ```sh
   N=$(node scripts/check-docs-report-serial.mjs --next-serial)   # ask the tool, not the directory
@@ -651,7 +706,17 @@ than let it be ignored — a periodically-red check that people scroll past is w
   the bottom. Keying the position off the PR number does not save it either, because sibling rounds
   here carry **consecutive** numbers (#120–#133 measured), which puts their slots back-to-back. The
   only thing that removes the collision is removing the point, which is what the pointer does.
-  §완료 still has one, and that is the measured **3/10 residual** — recorded, not fixed here.
+  §완료 had one too, and that was the measured **3/10 residual** — **removed on 2026-09-18**; see the
+  superseded-decision banner below.
+
+  > **★SUPERSEDED 2026-09-18 — §완료 is now a pointer too** (ticket
+  > `wie-remove-state-md-completed-insertion-point`). The block that follows is kept as the
+  > measurement record, not as live instruction: its numbers are still how the collision was priced,
+  > but its *verdict* ("keep the insertion point") no longer holds. **What changed is exactly the one
+  > thing it named as the blocker** — `docs/report/` was not a superset of §완료, and now it is:
+  > re-measured 2026-09-18 over **149 §완료 entries**, every one has a `docs/report/` copy
+  > (**사본 없음 0**; the 3 id-less legacy lines are quoted verbatim inside `0092`, `0094`, `0159`).
+  > Read the rest for *why* the collision costs what it costs; do not read it as "leave §완료 alone".
 
   **§완료 keeps its shared insertion point on purpose. That is a decision, not an oversight**
   (2026-09-08, ticket `wie-state-completed-top-insert-residual-three`, adopting
@@ -707,6 +772,16 @@ than let it be ignored — a periodically-red check that people scroll past is w
   refills" is not a live objection; what remains is only the migration itself, which is a separate
   round because it too collides with every open PR (landing order is the operator's call).
 
+  **★That migration landed 2026-09-18** (`wie-remove-state-md-completed-insertion-point`). It paid
+  exactly the price named above — one final invalidation of every open PR that touches `STATE.md` —
+  and in exchange an ordinary landing now touches `STATE.md` **not at all**. Two numbers to inherit
+  rather than re-derive: **149/149** §완료 entries had a `docs/report/` copy at migration time
+  (so the "drop 7 entries" objection was fully retired, not waived), and the machine-consumer count
+  was **still 0** — the single `STATE.md` mention in a code file
+  (`wie_midp/tests/create_image_missing_name_message.rs`, a doc comment citing `STATE.md:349`) was
+  repointed at `docs/report/0047--…` in the same commit, because a line citation into a section that
+  no longer exists is worse than a stale one.
+
   **★And do not propose `.gitattributes` `STATE.md merge=union` as the cheap way out — it was tried
   and measured on 2026-09-18, and it does not fix the reported symptom.** The symptom is
   `mergeable: CONFLICTING`, and that is decided by **GitHub's server-side merge, which ignores the
@@ -737,9 +812,11 @@ than let it be ignored — a periodically-red check that people scroll past is w
 
   **One measured wrinkle worth knowing before you cite `STATE.md` by line.** Top-insert moves every
   line below it, so line-number citations into §완료 rot. `wie_midp/tests/create_image_missing_name_message.rs`
-  cites `STATE.md:349`; that line now holds an unrelated entry and the content it meant is at 510.
-  The same comment also cites `docs/report/0047--…`, which is stable — **cite the per-round file, not
-  `STATE.md:<line>`.**
+  cited `STATE.md:349`; by 2026-09-08 that line held an unrelated entry and the content it meant had
+  moved to 510. **2026-09-18 that citation stopped resolving at all** — §완료 became a pointer and the
+  entry it meant lives only in `docs/report/0047--…`, which the same comment already cited, so the
+  round that migrated §완료 repointed it there. The rule is unchanged and now unavoidable: **cite the
+  per-round file, not `STATE.md:<line>`.**
 - **The ledger files of this repo are `STATE.md`, `REPORT.md`, `docs/report/**`, `docs/worklog/**`,
   and `docs/worklog-coverage-remeasures.json`.**
   Resolve a merge conflict in any of them by **union** — keep both sides' entries, ordered by the

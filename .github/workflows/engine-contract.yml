@@ -265,6 +265,45 @@ jobs:
         continue-on-error: true
         run: node scripts/check-engine-runner-fixtures.mjs
 
+      # ── A census, not a check. It has no failing state at all ────────────────
+      # Prints every executable artifact in scripts/, .github/scripts/ and */tests/
+      # next to the places that actually run it, and on which triggers. It exists
+      # because "where does this one run?" was a by-hand grep per file, and the
+      # count of checkers here only goes up — AGENTS.md §Web-surface commands had
+      # to answer it in prose ("Measured 2026-09-06 across all 8 workflow files"),
+      # which is a measurement that rots the moment a workflow moves.
+      #
+      # ALWAYS-RUN, same reason as the steps above: what it reads is the wiring
+      # itself, and the diff that breaks wiring is frequently one that touches no
+      # engine path. Cost: node reading the tracked text files, no network and no
+      # node_modules, PLUS one `cargo metadata --no-deps` subprocess — **0.6-2.0 s
+      # measured on this runner**, and that spread is the point: three runs of
+      # byte-identical code and output gave 2.04 / 1.49 / 0.64 s (PR #195, runs
+      # 35257783718 / 35268371028 / 35270887798). Do not quote one reading here,
+      # and do not derive a ratio from two — the pre-cargo 0.6 s this comment used
+      # to carry sits INSIDE that band, so the runner figure cannot even tell the
+      # two versions of this script apart.
+      # **The 0.6 s this comment used to quote was run 35234613184, a revision of
+      # the script that did not shell out to cargo at all** — and it came with a
+      # stale cost model ("no network, no node_modules"), which is how you can tell
+      # it predates the subprocess. Quote a runner figure WITH the commit it was
+      # read at; it is not a constant. **Do not turn the two into a ratio, and do
+      # not rank the runner against a local run** (a dev Mac under load measures
+      # 0.9-1.3 s — inside the same band). This comment has carried "4x cheaper",
+      # then "3.4x more expensive"; both were arithmetic on numbers this runner
+      # cannot resolve. If you need the cost of the cargo call, measure that call.
+      #
+      # `continue-on-error` because this job is a required check and the round that
+      # added the census was scoped to COUNTING — turning a caller count into a red
+      # is a judgement (some checkers correctly have one caller, or none: see the
+      # script's header), and that judgement belongs to a separate ticket with the
+      # list in hand. The script itself never exits 1; the flag covers its rc=2
+      # "could not measure", which must stay loud in the log without blocking a
+      # merge on it. Promotion, if it is ever earned, is deleting this one line.
+      - name: Checker ↔ caller census (scripts/checker-census.mjs — list only, never a verdict)
+        continue-on-error: true
+        run: node scripts/checker-census.mjs
+
       # Detect whether this diff touches anything that can change the built
       # artifact or the pinned surface. If not, the job short-circuits to success
       # (see the wrapper note in the header). Same list as publish-artifact.yml.
