@@ -17,9 +17,9 @@
     "",
     "To update: run the checker; it prints the exact entry to add or the exact line to delete."
   ],
-  "measured": "2026-09-06T22:24Z",
+  "measured": "2026-09-19T10:36Z",
   "expected": [
     { "package": "ttf-parser", "version": "0.25.1", "kind": "unmaintained", "advisory": "RUSTSEC-2026-0192" },
-    { "package": "chacha20", "version": "0.10.0", "kind": "yanked", "advisory": null }
+    { "package": "chacha20", "version": "0.10.1", "kind": "yanked", "advisory": null }
   ]
 }
