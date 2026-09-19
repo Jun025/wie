@@ -1,0 +1,50 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-20",
+  "task": "wie-base-swap-must-not-silently-revert-ledger-section-c",
+  "title": "§C 의 「판정 유효 범위」를 고쳤다 — 검사기는 만들지 않았다(기계가 이미 잡는 것을 재어서 확인했다)",
+  "summary": "채택 제안 2026-09-19-security-audit-schedule-red-three-days#p0 의 이행. ★제안의 세 전제를 다시 재서 전부 참임을 확인했다: 36df9c31 이 rtrb 0.3.5→0.3.4 · event-listener 5.4.2→5.4.1 로 내렸고, §C 의 C-1·C-2 가 정확히 그 버전을 해소분으로 적으며, 「판정 유효 범위」 칸의 문면은 「의존성을 올리면 다시 재야 한다」로 «올린다»만 가리킨다. ★갈래는 ⒝(기계 0)를 골랐고 그 이유는 «싸다»가 아니라 «이미 있다»이다 — 브리프의 판정 축 4개에 ⑸「그 결함이 이미 기계에 잡히는가」를 더해 실측했다: M1 rtrb 0.3.5→0.3.4 는 cargo audit rc=1, M2 event-listener 5.4.2→5.4.1 은 cargo audit rc=0 이나 check-audit-warnings rc=1(§A 집합 동등성). ⇒ 게이팅·비게이팅 두 계급 모두 이미 red 로 말하므로 §C↔lockfile 검사기는 «두 벌»이다. 3일간 안 보인 것은 «탐지»가 아니라 «자리»다(schedule 전용이라 PR 단계에 안 떴다) — 그쪽은 형제 #p1 의 몫이고 이 회차의 Non-goal 이다. ★필수 수리인 문면 교정은 했다: 「올리면」→「움직이면」 + 이 칸이 겨누는 사건 셋(상향 · lockfile 통째 교체 · 판정 전제 변화) + 「base 를 갈아끼우는 회차는 C 행을 전건 재확인하라」 + 「기계가 이미 잡는 것을 다시 만들지 마라」와 그 실측.",
+  "changes": [
+    "docs/project-kb/02_status.md §C 머리 +16/-1 — 「의존성을 올리면」→「의존성이 움직이면」 · 겨누는 사건 셋 명시(상향 / lockfile·매니페스트 통째 교체 / 판정 전제 변화) · base swap 회차의 C 행 전건 재확인 지시 · 「기계가 이미 잡는 것을 여기서 다시 만들지 마라」 + M1·M2 실측",
+    "docs/report/0186 신설 — 실측 3개 · 갈래표(판정 축 5개) · 선례(check-audit-warnings 의 fail-closed) 인용 · 고친 문면 전/후 · ⒝의 대가 명시",
+    "★새 검사기 0 · §A 와 check-audit-warnings.mjs 무접촉(읽기만) · §C 판정 내용 변경 0 · 의존성 상향 0 · --ignore 0"
+  ],
+  "verification": [
+    "★⒜ 36df9c31^ ↔ 36df9c31 직접 대조 — rtrb 0.3.5→0.3.4 · event-listener 5.4.2→5.4.1(제안과 일치)",
+    "★⒝ §C 축자 — C-1 「cargo update -p rtrb 0.3.3 → 0.3.5」 · C-2 「5.4.1 → 5.4.2 = 권고 patched=[>=5.4.2] 경계 도달」 ⇒ swap 이 되돌린 그 버전이 맞다",
+    "★⒞ §C 머리 축자 — 「의존성을 올리면 다시 재야 한다」 ⇒ «되돌린다/교체된다» 방향을 안 가리킨다(제안과 일치)",
+    "★⑸축 실측(현 origin/main) — M1 rtrb 0.3.5→0.3.4: cargo audit rc=1 · M2 event-listener 5.4.2→5.4.1: cargo audit rc=0 / check-audit-warnings rc=1 · 대조군 원형 둘 다 rc=0 · Cargo.lock 원복 확인(numstat 0)",
+    "★문서 변경이 §A 파서를 건드리지 않음을 실행으로 확인 — check-audit-warnings.mjs rc=0",
+    "★선례 확인 — check-audit-warnings.mjs 는 §A 표를 `| **A-<n>** |` 줄머리로만 잡고 행 0건·미파싱 시 failed=true 로 «못 쟀다»를 운다(fail-closed). 복제하지 않고 읽었다",
+    "★repo 표준 게이트 — fmt · clippy --all -D warnings · wasm clippy · RUST_MIN_STACK=4194304 cargo test --all · cargo +beta clippy 전건 rc=0(AGENTS.md 「무엇을 바꿨든 넷 다」 · 이 diff 에 Rust 0줄)"
+  ],
+  "limits": [
+    "★기계는 «0»이다 — 이 회차가 더한 강제력은 없고 남긴 것은 산문 규율 한 문단이다. 그것이 낡으면 아무도 말해 주지 않는다. 그럼에도 고른 이유는 결과가 red 로는 드러나기 때문이고(M1·M2), 드러나는 «시간»을 줄이는 것은 형제 #p1 이다",
+    "★브리프가 말한 「base swap 티켓 템플릿의 체크 항목」은 ~/orchestrator/templates/ 에 있어 이 repo 회차가 고칠 수 없다(경계 ⒞). repo 안에서 base swap 회차가 읽는 자리(§C 머리)에 넣었다. 실측상 base swap 전용 템플릿은 아직 없다(work-ticket.tpl 이 범용)",
+    "★M1·M2 가 덮지 못하는 갈래 하나 — C 행의 «전제»가 버전 변화 없이 깨지는 경우(C-3 의 feature 조합 · [patch] 핀). 그것은 어떤 검사기도 보지 않으며, 이번 문면 교정의 ⑶ 항이 사람에게 그 사실을 알리는 것이 전부다",
+    "★「되돌아간 버전이 advisory 에도 yanked 에도 안 걸리는」 갈래는 두 검사기 다 침묵한다 — 다만 그 경우 보안 신호 자체가 없으므로 §C 가 보존하는 «노출 판정»이 무효가 되지도 않는다(측정으로는 확인 불가한 null)"
+  ],
+  "adoptedProposals": [
+    "2026-09-19-security-audit-schedule-red-three-days#p0"
+  ],
+  "proposals": [
+    {
+      "title": "§C 의 「판정 유효 범위」 칸이 빈 행을 기계가 막게 하라 — 표 전체 파싱은 하지 말고",
+      "plainSummary": "보안 판단을 기록하는 표에 「이 판단이 언제까지 유효한가」 칸이 비어 있으면, 낡은 판단이 그대로 인용됩니다. 그 칸이 비었는지만 기계가 보게 하자는 제안입니다.",
+      "userBenefit": "오래된 보안 판단이 근거처럼 인용되는 일이 줄어듭니다.",
+      "why": "§C 머리가 이미 「그 칸이 빈 행을 만들지 마라 — 유효 범위 없는 판정은 낡은 채로 권위 있게 인용된다」고 적어 두었는데 그것을 보는 기계가 0 이다. 이번 회차는 «표 전체를 lockfile 과 대조하는» 검사기를 두 벌이라는 이유로 기각했지만, «칸이 비었는가»는 그 논거에 걸리지 않는다 — 중복 탐지가 아니라 서식 검사이고, cargo audit 도 check-audit-warnings 도 그것은 보지 않는다.",
+      "tradeoff": "§C 는 산문 칸이 많아 파서가 깨지기 쉽고, check-audit-warnings.mjs 가 §A 에서 그 대가를 fail-closed 로 치르고 있다(서식을 바꾸면 red). §C 에 같은 것을 붙이면 그 대가를 두 번 치른다. 그리고 「빈 칸」 판정은 행 분리가 정확해야 성립하는데 C 행은 `<br>` 과 구 ID 병기가 들어 있어 단순 split 이 흔들린다. 값이 작으니 파서도 작아야 하고, 작은 파서는 틀리기 쉽다 — 그래서 이 제안은 «하지 않기»가 정답일 수 있다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "base swap 회차의 체크 항목을 orchestrator 쪽 티켓 템플릿에도 넣을지 정하라",
+      "plainSummary": "의존성 목록을 통째로 갈아끼우는 작업에서 확인해야 할 항목을, 작업 지시서 자체에 넣을지 결정하자는 제안입니다.",
+      "userBenefit": "같은 종류의 작업을 맡은 사람이 매번 같은 확인을 빠뜨리지 않게 됩니다.",
+      "why": "이번 회차는 그 항목을 repo 안(§C 머리)에만 넣었다 — ~/orchestrator/templates/ 는 이 repo 밖이라 wie 회차가 고칠 수 없기 때문이다(AGENTS.md 「An external contract is referenced, never copied」). 실측상 base swap 전용 템플릿은 아직 없고 work-ticket.tpl 이 범용이다.",
+      "tradeoff": "범용 템플릿에 repo 특화 항목을 넣으면 그 항목이 무관한 회차 전부에 실린다 — 이 저장소가 merge-ticket.tpl 에서 「repo 별 주기 의무 스텝을 넣지 않는다」로 이미 기각한 형태와 같은 계급이다. 그리고 §C 머리에 이미 있으므로 실효는 «두 벌»에 가깝다. 넣지 않는 편이 맞을 수 있고, 그 경우 이 제안의 결론은 「repo 안에 두는 것으로 충분하다」를 기록으로 남기는 것이다.",
+      "effort": "S",
+      "target": "orchestrator"
+    }
+  ]
+}
