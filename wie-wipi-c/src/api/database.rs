@@ -268,12 +268,30 @@ pub async fn list_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
 /// that, and the extra facts came from reading the *other* calls through the same
 /// interface rather than from staring harder at this one:
 ///
-/// * **The token is the title's own file EXTENSION.** `0x13184c` is `"res"`, the
-///   tail of `"res/anidata.res"`; `0x135ae4` is `"ga"`, the tail of
-///   `"/ga/per.ga"`. Both are tail-merged literals, and both images carry a
-///   string-pointer table whose entries point at exactly such tails (path, and
-///   path + k for the basename and the extension) — so the "token" is a member
-///   of that table, not an ad-hoc string.
+/// * **The token is `"res"` (`0103451A`) and `"ga"` (`01031C0A`). That string is
+///   this title's resource DIRECTORY, and it is also the extension of other
+///   resource files in the same image — which of the two it means is NOT
+///   settled.** `0x13184c` sits at the tail of `"res/anidata.res"` and `0x135ae4`
+///   at the tail of `"/ga/per.ga"`, but tail position carries no meaning on its
+///   own: the linker tail-merges, so any short literal lands inside some longer
+///   one. Read as a directory it is the stronger fit at both call sites — the
+///   path slot 0/16 receives in the *same* window is `"res/save.sav"` and
+///   `"/ga/aysis.dat"`, whose directory component is exactly the token while
+///   their extensions (`sav`, `dat`) are not. Measured on the packages: 51 of
+///   `0103451A`'s 53 entries live under `res/` while only 2 end in `.res`, and
+///   both titles' persistent files ship under a directory named by the token
+///   (`P/res/`, `P/ga/`). None of that is proof, which is why the sentence above
+///   stops where it does.
+/// * **What the sl-relative pointer table holds, measured rather than assumed.**
+///   It has an entry for the full path and an entry for the bare token, and for
+///   nothing in between: sweeping `sl+0x000..+0x900` in both images finds
+///   entries for `"res/save.sav"`, `"res/anidata.res"`, `"res"`, `"/ga/per.ga"`
+///   and `"ga"`, and **zero** for `".sav"`, `"anidata.res"`, `"per.ga"` or
+///   `".ga"`. An earlier revision of this comment called it a "path + basename +
+///   extension" table and quoted `0x135254` as the example; both were wrong. That
+///   address decodes to a level-name array (`"NONE"`, `"Lv2.Antony"` … `"Lv15.mano"`,
+///   `"[Arena]"`) once the relocation delta below is applied, and the path-like
+///   reading only appears if the delta is dropped.
 /// * **The names these titles actually open are NOT that token.** Sweeping every
 ///   indirect call through the same database global finds slot 0 called with
 ///   `"res/save.sav"` (`0103451A`) and `"/ga/aysis.dat"` (`01031C0A`). So slot 8
@@ -288,11 +306,18 @@ pub async fn list_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
 ///   `Exists` in this table and takes `(name, type)`; slot 8 takes the **same
 ///   two-argument shape** with the same constant `1`.
 ///
-/// **What that does NOT settle, and this lineage has been wrong twice already:**
-/// which operation it is. "Register the app's file extension", "delete by
-/// pattern", "list databases of this type" all fit `f(ext, 1)` with an ignored
-/// result, and nothing above separates them. A name is not written here until
-/// something does.
+/// **What that does NOT settle, and this lineage has now been wrong three
+/// times:** which operation it is. Four candidates fit `f(token, 1)` with an
+/// ignored result, and nothing above separates them — "register the app's file
+/// extension", "delete by pattern", "list databases of this type", and
+/// **"select/ensure the directory (namespace) the following calls resolve
+/// against"**. The fourth was missing when this list was first written, because
+/// the three that were here all assumed the extension reading — that omission is
+/// the third of the three wrong turns, and it was caught in review rather than
+/// by the author. A name is not written here until something separates them, and
+/// two of the four cannot be separated with the two images that reach this slot
+/// at all: both of their tokens are *simultaneously* a directory and an
+/// extension, so nothing in the corpus tells the readings apart.
 ///
 /// **Part of the slot numbering is now guest-confirmed, which none of it was
 /// before.** At `0103451A:0x117f70` the sweep sees slot 0 return a value that is
@@ -314,8 +339,8 @@ pub async fn list_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
 /// holds.
 ///
 /// So the diagnostic below now quotes the token itself. That is deliberately the
-/// only behaviour change: the next title to reach this slot names its own
-/// extension in the failure instead of costing somebody a disassembly.
+/// only behaviour change: the next title to reach this slot names its own token
+/// in the failure instead of costing somebody a disassembly.
 pub async fn sort_records(context: &mut dyn WIPICContext, arg0: WIPICWord, arg1: WIPICWord) -> Result<i32> {
     let token = slot8_token(context, arg0);
     tracing::debug!("KTF database slot 8 (header name: MC_dbSortRecords)({arg0:#x}, {arg1:#x}) token={token:?}");
@@ -342,6 +367,18 @@ pub async fn sort_records(context: &mut dyn WIPICContext, arg0: WIPICWord, arg1:
 /// this into a general string dump. Anything longer, anything non-printable, and
 /// anything unreadable is simply not quoted — the raw pointer is still reported,
 /// so the diagnostic never gets *worse* than it was.
+///
+/// **It is a bound on what gets QUOTED, not a bound on what gets READ.**
+/// `read_null_terminated_string_bytes` builds the whole string first and this
+/// constant rejects it afterwards, so a pointer into a mapping with no NUL is
+/// read to the end of that mapping before being discarded. That is bounded by
+/// the mapping and happens once, on a path that is already failing, which is why
+/// it is left alone — but do not describe this constant as a read limit, and do
+/// not rely on it if this ever moves onto a hot path.
+///
+/// `sort_records_quotes_only_a_short_printable_token_test` asserts this value.
+/// Changing it means changing that assertion, which is the point: it is the only
+/// thing bounding what reaches a log.
 const SLOT8_TOKEN_MAX: usize = 16;
 
 fn slot8_token(context: &mut dyn WIPICContext, ptr: WIPICWord) -> Option<String> {
@@ -903,12 +940,22 @@ mod tests {
     /// printable, readable one.
     ///
     /// The point of the quote is that the next title to reach this slot names its
-    /// own extension in the failure instead of costing somebody a disassembly:
-    /// the two measured tokens, `"res"` and `"ga"`, took a synchronised Thumb
-    /// sweep of two images to recover. The point of the *bounds* is that `r0` is
-    /// a guest pointer and nothing here can prove it is not a path — so the
-    /// three negative cases below are as load-bearing as the positive one, and a
-    /// change that widens the filter fails here rather than in someone's log.
+    /// own token in the failure instead of costing somebody a disassembly: the
+    /// two measured tokens, `"res"` and `"ga"`, took a synchronised Thumb sweep
+    /// of two images to recover. The point of the *bounds* is that `r0` is a
+    /// guest pointer and nothing here can prove it is not a path — so the four
+    /// negative cases below (too long, non-printable, unreadable, null) are as
+    /// load-bearing as the two positive ones. (The first revision said "three"
+    /// and there were already four.)
+    ///
+    /// **The over-long input is a literal `[b'a'; 17]`, and `SLOT8_TOKEN_MAX` is
+    /// asserted to be 16, because deriving the input from the constant made this
+    /// test a tautology.** The first revision wrote `[b'a'; SLOT8_TOKEN_MAX + 1]`
+    /// and claimed in this comment that "a change that widens the filter fails
+    /// here" — the gate-2 reviewer measured `16 → 64` and got **green**, because
+    /// widening the constant widened the input with it. Both forms below pin the
+    /// value now: the `assert_eq!` names it directly, and the literal keeps the
+    /// negative case negative even if that assertion is ever deleted.
     ///
     /// Every case still asserts the raw `r0=` is present, because the quote is an
     /// addition: a regression that loses the token must not also lose the
@@ -934,7 +981,15 @@ mod tests {
 
         // Not quoted: too long, non-printable, unreadable, null. The message keeps
         // the raw pointer in every one of them.
-        let long = [b'a'; SLOT8_TOKEN_MAX + 1];
+        //
+        // 17 is a literal on purpose — see this test's doc comment. Widening
+        // `SLOT8_TOKEN_MAX` must redden here, and the assertion below is the
+        // direct statement of that.
+        assert_eq!(
+            SLOT8_TOKEN_MAX, 16,
+            "SLOT8_TOKEN_MAX is the only thing bounding what leaks into a log; widening it is a decision, not an edit"
+        );
+        let long = [b'a'; 17];
         context.write_bytes(0x2200, &long).unwrap();
         context.write_bytes(0x2300, b"ab\x01cd\0").unwrap();
         for (addr, why) in [
