@@ -8,7 +8,7 @@
     "scripts/game-lab-recensus.sh 신설 253행 — --corpus/--out/--timeout/--kill/--nice/--limit/--resume/--shots/--dry-run/--from-stdin. 검증기 인자는 기준선을 만든 classify.sh 와 동일(--inject --timeout N). 코퍼스 쓰기 0 · --out 이 기준선이거나 코퍼스 안이면 rc=3",
     "AGENTS.md §Web-surface 의 «local only» 목록에 재측 러너 + 매핑 생성기 쌍을 등재 (+12/-0) — fenced sh 블록은 더하지 않았다(그러면 doc-liveness.yml 동기 의무가 붙는데 이 명령들은 코퍼스가 필요해 주 러너가 돌릴 수 없다)",
     "docs/report/0173 신설 — 원문 대조 · 변경 수 · 양방향 개악 2축 · 대가 6항 · 부수 실측 2건",
-    "제품 Rust 0줄 · classify.sh 0줄 · .gitignore 무접촉 · STATE.md 무접촉 · 새 검사기·새 워크플로 0 · 게임 파일명 유입 0(고유 stem 184 NFC 전수 대조 실측)",
+    "제품 Rust 0줄 · classify.sh 0줄 · .gitignore 무접촉 · STATE.md 무접촉 · 새 검사기·새 워크플로 0 · 게임 파일명 유입 0(고유 stem 184 NFC 전수 대조 실측) · ★[2026-09-20 추가] 이 수를 손으로 재유도하지 마라 — node scripts/corpus-name-inflow.mjs 로 다시 잰다(docs/report/0187 이 이 산문의 술어를 실행 가능하게 옮겼다 · 그 도구는 단어 경계로 세 갈래로 가르므로 부분문자열로 센 수와 어긋날 수 있다)",
     "★[-fix] scripts/game-lab-recensus.sh 의 norm()(1줄)을 canon() 으로 교체 — 두 가드(기준선·코퍼스)가 «같은 술어»를 쓴다(술어 2벌 금지). 어휘 정규화(//·.·..) 후 존재하는 최장 접두만 물리 해석(cd -P/pwd -P) ⇒ 심링크는 따라가고, 아직 없는 경로도 정규화된다. AGENTS.md 의 그 문장도 같은 PR 에서 넓혔다"
   ],
   "verification": [

@@ -636,6 +636,20 @@ design** — do not "fix" that by wiring it:
   impossible; `docs/report/0173` has the numbers. Start it as `bash scripts/game-lab-recensus.sh
   --dry-run` to see what a full run would cost before spending 45 minutes of the self-hosted runner.
 
+- **`scripts/corpus-name-inflow.mjs` — local only (same reason), and ★every round in this lineage
+  that reports a "게임 파일명 유입" number RUNS IT rather than re-deriving the predicate.** Call it
+  as `node scripts/corpus-name-inflow.mjs` (defaults to the files this branch changed against
+  `origin/main`; pass paths, or `--all-tracked`, to widen) and quote its three buckets. **The number
+  to report is `BOUNDED`, and it is not reportable alone** — `SUFFIX-ATTACHED` must be quoted beside
+  it, because that bucket provably mixes a longer *different* title (`<stem>2`, `<stem>1.04`) with a
+  real mention carrying a Korean particle (`<stem>의 …`), and nothing in the shape separates them.
+  ★**Writing "유입 0" while that bucket is non-empty is the exact claim this lineage was rejected
+  for.** It exists because the predicate lived only in prose — `docs/report/0173` says "코퍼스 고유
+  stem 184개와 NFC 완전일치로 전수 대조", `0170` and `0174` say it in their own words, and nothing
+  executed any of them; a plain substring test is what produced 35 hits for a one-syllable stem that
+  merely sits inside `인스턴스` and `패턴`. Measured 2026-09-19 over 838 tracked text files: 392
+  occurrences split **328 / 48 / 16**. `docs/report/0187` has the split and the false-negative audit.
+
 ### Documented-command liveness — one weekly scheduled job, decided 2026-09-10
 
 **Where "the commands this file names still run" gets checked was decided on 2026-09-10: a weekly
