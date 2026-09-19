@@ -18,7 +18,7 @@
     "★★스윕 요약 열의 «반례»를 실증했다 — 0x128f4a 에서 요약 열은 r0=[glob 0x13ef54](=\"ga\")라 답하지만, 손으로 읽으면 0x128f1e 의 r5=*(sl+0x6d8)=\"/ga/aysis.dat\" 를 0x128f42 의 adds r0,r5,#0 가 싣는다. 선행 회차의 손 읽기가 옳았고 그 회차가 limits 에 적은 「요약 열은 정황으로만」이 값을 했다",
     "★개악 양방향 — ★해당 없음. 이 회차는 검사기·가드를 «넣지 않았다»(제품 동작 0줄 · 문서주석뿐)이므로 깨서 red 를 낼 대상이 없다. 공허한 축을 만들지 않았다",
     "★repo 표준 게이트 — fmt · clippy --all -D warnings · wasm clippy · RUST_MIN_STACK=4194304 cargo test --all · cargo +beta clippy 전건 rc=0(AGENTS.md 「무엇을 바꿨든 넷 다 + beta」)",
-    "★게임 파일명 유입 — scripts/corpus-name-inflow.mjs 를 «실행해서» 적었다(재유도 0). 수는 report 0188 과 이 파일의 BOUNDED/SUFFIX 를 함께 인용한다"
+    "★게임 파일명 유입 — scripts/corpus-name-inflow.mjs 를 «실행해서» 적었다(재유도 0 · AGENTS.md 규율). origin/main...HEAD 3파일 대상: ★BOUNDED 0회/0쌍 · PREFIX-EMBEDDED 3회/2쌍(제외) · ★SUFFIX-ATTACHED 0회/0쌍. ⇒ SUFFIX 바구니가 «비어 있으므로» 「유입 0건」이 그 도구의 규칙대로 주장 가능하다. ★0 이 된 이유는 우연이 아니라 서술 선택이다 — 두 타이틀을 이름이 아니라 이미지 id(0103451A·01031C0A)로만 불렀다"
   ],
   "limits": [
     "★★하나로 좁혀지지 «않았다» — 제안이 미리 적은 「넷 다 살아남는 결말도 정직하다」에 가깝고, 실제로 떨어진 것은 하나의 «반쪽»(H4a)이다. 그리고 그 반쪽이 떨어진 것은 새 데이터가 아니라 «가설을 쪼갠» 덕이다",
