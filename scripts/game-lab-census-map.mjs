@@ -67,14 +67,57 @@
 //
 // ★★The hole that remains, stated rather than papered over: a reader who queries
 // the TSV with `awk -F'\t' '$6 ~ /…/'` never sees a comment line, so none of the
-// three surfaces reaches them. Closing that would mean putting the marker in the
-// ROWS, which corrupts the data for every consumer to warn about one. The honest
-// position is that this covers the reader who opens the file and the caller who
-// runs the tool, and not the reader who greps past the header.
+// four surfaces reaches them. Closing that would mean putting the marker in the
+// ROWS, which corrupts the data for every consumer to warn about one.
+//
+// ★What changed 2026-09-19 is that the query itself now has a home inside the
+// tool — `--signature <regex>`, which greps the same column and prints the same
+// verdict block that `--bucket` does. That does not shrink the hole for someone
+// who still runs the awk (nothing can, short of corrupting the rows); it means
+// the documented path is no longer the silent one. The honest position is
+// unchanged for raw-awk readers and improved for everyone who asks the tool.
+//
+// ── Where a verdict comes from: summary.tsv first, <stem>.json second ────────
+// ★The `<stem>.json` layer LOSES DATA and always has. Measured 2026-09-19 (and
+// again by this round): the corpus is 187 files over 184 stems — `놈3`,
+// `다크슬레이어2` and `이노티아연대기2` each exist under two carriers. The
+// re-census runner writes `<stem>.json` because that is the key this generator
+// used to look up, so the second carrier's run OVERWRITES the first's, and this
+// generator then attributed the surviving verdict to BOTH files. Three rows of
+// every map were a copy of another row rather than a measurement.
+//
+// The runner already writes the lossless thing next to it: `summary.tsv`, one row
+// per FILE keyed by PATH. So the fix is precedence, not a new artifact — read
+// `summary.tsv` when it is there, fall back to `<stem>.json` when it is not.
+//
+// ★The fallback is NOT vestigial and must not be deleted. The proposal behind
+// this change said the July baseline `game_lab/reports/` has no path key; measured
+// 2026-09-19 that is wrong in letter and right in effect — the directory DOES hold
+// a `summary.tsv` (73 rows, written 2026-07-01), but its `file` column is bare
+// BASENAMES, so it cannot be joined to a corpus path and is not accepted as one.
+// All 187 July verdicts therefore come from `<stem>.json`, and deleting that layer
+// would make the column this whole lineage compares against unreadable.
+//
+// ★Because the two inputs can disagree, WHICH ONE WON is printed rather than left
+// to be re-derived: per row in column 7, and as a total in the header, on stdout,
+// and on the `--bucket` / `--signature` stderr line.
+//
+// ★What this does NOT repair: the July column is still stem-keyed, so those three
+// stems carry one verdict across two files THERE, for good — the losing run was
+// never written down and cannot be recovered. Comparing July against a fresh
+// column therefore leaves exactly those rows asymmetric, and the header says so
+// when the corpus contains colliding stems. Fixing the future is all this can do.
+//
+// ★And column 6 does not mean quite the same thing on both paths. The runner
+// flattens newlines to spaces before it writes `summary.tsv`, so a summary-sourced
+// excerpt is the first 120 chars of the WHOLE reason, while a json-sourced one is
+// the first 120 chars of the FIRST LINE. Identical for a single-line reason;
+// different — and, for signature search, more inclusive — for a multi-line one.
 //
 // ── Usage ────────────────────────────────────────────────────────────────────
 //   node scripts/game-lab-census-map.mjs                       # write the TSV, print totals
 //   node scripts/game-lab-census-map.mjs --bucket unimpl-stub  # file paths, one per line
+//   node scripts/game-lab-census-map.mjs --signature 'no frame rendered'   # ditto, by col 6
 //   node scripts/game-lab-census-map.mjs --reports <dir> --corpus <dir> --out <file>
 //
 // ★`--bucket` takes a BUCKET, and the buckets are exactly the left column of
@@ -82,17 +125,36 @@
 // failure *signature* like `no frame rendered` lives INSIDE `UNCLASSIFIED`, so
 // asking for it returns `# 0 file(s)` with rc=0 — no error, no warning. An
 // earlier revision of this block advertised exactly that, which is the "absence
-// reads as a pass" shape this repo keeps naming. To query by signature, grep the
-// TSV's 6th column instead — that is the working path, and it is one command:
+// reads as a pass" shape this repo keeps naming.
+//
+// ★That is what `--signature <regex>` is for, and it exists because the documented
+// alternative bypassed every warning this tool emits. The one-liner this block
+// used to send readers to —
 //
 //   awk -F'\t' '$6 ~ /no frame rendered/ {print $1}' game_lab/census-map.tsv
 //
+// — is still correct awk, but measured 2026-09-19 it prints 1 path and ZERO of
+// the four staleness surfaces, because all four are comment lines and `$6 ~ /…/`
+// cannot match a comment. The likeliest query was the one path that saw none of
+// the warnings. Putting the marker in the ROWS was priced and rejected (it
+// corrupts the data for every consumer to warn about one), so the remaining move
+// was to bring the query inside the tool, where `--bucket` already demonstrates
+// that a query and its warnings travel together.
+//
+// ★The cost, stated rather than discovered later: this makes a classifier into a
+// query tool, so its answers now carry the tool's authority. Column 6 does not
+// deserve that authority — see below — which is why `--signature` prints the
+// limitation on every call instead of only in this comment. The scope stops here:
+// one regex against one column, no joins, no second index.
+//
 // ★Column 6 is the reason's FIRST LINE truncated to 120 chars, and that is not a
-// general search index: measured 2026-09-18, a single excerpt value
-// (`tick error during 'boot': Fatal error: `) covers 99 of 187 rows and spans
-// several buckets, 164 of 452 reports have a multi-line reason, and 4 first lines
-// exceed 120 chars. So a signature that sits on line 2 is invisible to that grep.
-// It works for `no frame rendered` because that reason is a single 36-char line.
+// general search index: measured 2026-09-18 and re-measured 2026-09-19 (identical
+// on all three), a single excerpt value (`tick error during 'boot': Fatal error: `)
+// covers 99 of 187 rows and spans several buckets, 164 of 452 reports have a
+// multi-line reason, and 4 first lines exceed 120 chars. So a signature that sits
+// on line 2 is invisible to that grep. It works for `no frame rendered` because
+// that reason is a single 36-char line. ★`--signature` recomputes those three
+// numbers against the input it was actually given rather than quoting these.
 //
 // ★The `--reports` flag is the whole point of the re-application discipline below:
 // changing RULES means running this against BOTH inputs (the old reports and the
@@ -258,6 +320,15 @@ const corpusDir = flag("corpus", "game_lab/broken");
 const reportsDir = flag("reports", "game_lab/reports");
 const outFile = flag("out", "game_lab/census-map.tsv");
 const onlyBucket = flag("bucket", null);
+const signature = flag("signature", null);
+
+// ★Refused rather than silently ordered. Both are filters over the same rows, so a
+// caller passing both has a question this tool cannot answer without guessing which
+// one they meant — and guessing would return a subset that looks like an answer.
+if (onlyBucket && signature) {
+  console.error(`game-lab-census-map: --bucket and --signature are both filters — pass one. (got --bucket ${JSON.stringify(onlyBucket)} --signature ${JSON.stringify(signature)})`);
+  process.exit(2);
+}
 
 for (const d of [corpusDir, reportsDir]) {
   if (!existsSync(d)) {
@@ -300,6 +371,55 @@ for (const f of readdirSync(reportsDir)) {
   }
 }
 
+// ── The path-keyed input, which is the one that does not lose rows ───────────
+// `summary.tsv` is written by `scripts/game-lab-recensus.sh`, one row per file:
+//   result \t platform \t file \t reason \t ticks \t paints \t ms
+// Only `result` and `file` and `reason` are read here — the rest is the runner's
+// telemetry and this tool has no use for it.
+//
+// ★TWO keys per row, and the second one is not decoration. The exact key is the
+// resolved absolute path, which matches when the runner and this tool were told
+// the same corpus. They often are not: the runner defaults to `game_lab/broken`
+// relative to the repo root while an analyst points this tool at an absolute path
+// (that is exactly how this round measured it), and a bare `resolve()` against a
+// different cwd then misses every row and falls back to the stem layer — i.e. the
+// bug would look fixed while doing nothing. The second key is `<carrier>/<file>`,
+// the last two components, which uniquely identifies all 187 files precisely
+// BECAUSE the colliding stems sit under different carriers.
+//
+// ★The false-join it could cause is named rather than hidden: two corpora that
+// share a carrier name and a filename would join across them. That needs someone
+// to point `--reports` at one corpus's run and `--corpus` at another's, which is
+// already a mis-use; the exact key is tried first, so the tail only ever answers
+// when the exact key did not.
+//
+// ★Resolved LEXICALLY (`path.resolve`), never `realpathSync`: two corpus entries
+// may legitimately be links onto the same bytes, and collapsing them would merge
+// two rows that this whole change exists to keep apart.
+const pathKey = (p) => nfc(path.resolve(p));
+const tailKey = (p) => nfc(`${path.basename(path.dirname(p))}/${path.basename(p)}`);
+const summaryFile = path.join(reportsDir, "summary.tsv");
+const byPath = new Map();
+const byTail = new Map();
+let summaryRows = 0;
+if (existsSync(summaryFile)) {
+  for (const line of readFileSync(summaryFile, "utf8").split("\n")) {
+    if (!line || line.startsWith("result\t")) continue;
+    const cols = line.split("\t");
+    if (cols.length < 4) continue;
+    const [result, , file, reason] = cols;
+    if (!file) continue;
+    const rec = { result, reason };
+    byPath.set(pathKey(file), rec);
+    // First writer wins on the tail key: if two rows collapse onto one tail, the
+    // exact key is the only correct answer for both and this ambiguous fallback
+    // must not pick a side by ordering.
+    const t = tailKey(file);
+    byTail.set(t, byTail.has(t) ? null : rec);
+    summaryRows++;
+  }
+}
+
 const bucketOf = (r) => {
   if (r.result === "PASS") return "PASS";
   const reason = r.reason || "";
@@ -307,17 +427,72 @@ const bucketOf = (r) => {
   return "UNCLASSIFIED";
 };
 
+const SRC_SUMMARY = "summary.tsv";
+const SRC_JSON = "stem.json";
+const SRC_NONE = "none";
+
+// Precedence, in one place so it can be read and changed as one thing.
+// ★`byTail` can hold `null` for an ambiguous tail; `??` treats that as "no answer"
+// and falls through to the stem layer, which is the intended behaviour.
+const lookup = (file, stem) => {
+  const exact = byPath.get(pathKey(file));
+  if (exact) return { r: exact, source: SRC_SUMMARY };
+  const tail = byTail.get(tailKey(file));
+  if (tail) return { r: tail, source: SRC_SUMMARY };
+  const js = reports.get(stem);
+  if (js) return { r: js, source: SRC_JSON };
+  return { r: null, source: SRC_NONE };
+};
+
 const rows = [];
 for (const { file, stem } of corpus) {
-  const r = reports.get(stem);
+  const { r, source } = lookup(file, stem);
   const carrier = path.basename(path.dirname(file));
   if (!r) {
-    rows.push({ file, stem, carrier, result: "NO-REPORT", bucket: "NO-REPORT", excerpt: "" });
+    rows.push({ file, stem, carrier, result: "NO-REPORT", bucket: "NO-REPORT", excerpt: "", source });
     continue;
   }
   const excerpt = (r.reason || "").split("\n")[0].slice(0, 120).replace(/\t/g, " ");
-  rows.push({ file, stem, carrier, result: r.result, bucket: bucketOf(r), excerpt });
+  rows.push({ file, stem, carrier, result: r.result, bucket: bucketOf(r), excerpt, source });
 }
+
+const sourceTotals = {};
+for (const r of rows) sourceTotals[r.source] = (sourceTotals[r.source] || 0) + 1;
+// ★A summary.tsv whose rows match NOTHING is announced, not left to be inferred
+// from a total. Measured 2026-09-19: the July baseline DOES contain a
+// `summary.tsv` (73 rows) — the proposal behind this change assumed it did not —
+// but its `file` column holds BARE BASENAMES (`(SKT) 교실이데아.zip`), so no row
+// joins and all 187 verdicts correctly come from the stem layer. That is the
+// right outcome and it must not be silent: "I read an input and used none of it"
+// is indistinguishable from "the input was absent" unless the tool says so.
+//
+// ★Basenames are deliberately NOT accepted as a third key. A basename cannot tell
+// the colliding stems apart either, so honouring it would relabel a lossy row as
+// `summary.tsv` — and it would re-bucket 73 rows of the July column, which is a
+// retroactive change to the baseline this lineage compares against.
+const summaryUsed = sourceTotals[SRC_SUMMARY] || 0;
+const sourceLine =
+  `inputs: ` +
+  [SRC_SUMMARY, SRC_JSON, SRC_NONE]
+    .filter((k) => sourceTotals[k])
+    .map((k) => `${k}=${sourceTotals[k]}`)
+    .join(" · ") +
+  (!summaryRows
+    ? ` (no summary.tsv in ${reportsDir} — stem-keyed fallback only)`
+    : summaryUsed
+      ? ` (summary.tsv had ${summaryRows} row(s))`
+      : ` ★(summary.tsv has ${summaryRows} row(s) and NONE of them matched a corpus file — its 'file' column is not corpus-relative; the July baseline stores bare basenames. Falling back to the stem layer, which loses one verdict per colliding stem.)`);
+
+// ── The asymmetry this cannot repair, printed only when it applies ───────────
+// Stem collisions are a property of the CORPUS, so they are computed here and not
+// from the inputs: the warning is about what a stem-keyed column can express, and
+// that is true whether or not today's run happens to have a summary.tsv.
+const stemCounts = new Map();
+for (const c of corpus) stemCounts.set(c.stem, (stemCounts.get(c.stem) || 0) + 1);
+const collidingStems = [...stemCounts].filter(([, n]) => n > 1).map(([s]) => s).sort();
+const asymmetryLine = collidingStems.length
+  ? `★${collidingStems.length} stem(s) exist under 2+ carriers (${collidingStems.length * 2 <= 8 ? collidingStems.join(", ") : `${collidingStems.slice(0, 3).join(", ")}, …`}). A stem-keyed column gives every copy ONE verdict; only the summary.tsv path tells them apart. Rows from a stem-keyed input are therefore not comparable 1:1 with rows from a path-keyed one — and the July baseline is stem-keyed here (its summary.tsv is basename-keyed, which cannot tell them apart either), so that asymmetry is permanent for it.`
+  : null;
 
 // ── The staleness verdict, computed BEFORE --bucket exits ───────────────────
 // It is computed here and not next to the header because `--bucket` is the mode
@@ -367,11 +542,59 @@ if (verdict !== "CURRENT") {
   console.error(`     new one is a legitimate use, so staleness warns and never blocks)\n`);
 }
 
+// ── What column 6 can and cannot answer, measured on THIS input ─────────────
+// ★Recomputed per run rather than quoting the numbers in the header block: the
+// point of printing a limitation next to an answer is that it describes the
+// answer, and a frozen number stops doing that the first time the corpus moves.
+// The multi-line and over-120 counts are properties of the JSON reports, so they
+// are reported as unmeasurable when the input has none — which is exactly the
+// case a summary.tsv-only directory presents, and saying "0" there would be a lie
+// in the direction this file forbids.
+function columnSixLimits() {
+  const counts = new Map();
+  for (const r of rows) if (r.excerpt) counts.set(r.excerpt, (counts.get(r.excerpt) || 0) + 1);
+  let topN = 0;
+  for (const n of counts.values()) if (n > topN) topN = n;
+
+  let multi = 0;
+  let over = 0;
+  for (const r of reports.values()) {
+    const reason = r.reason || "";
+    if (reason.replace(/\n+$/, "").includes("\n")) multi++;
+    if (reason.split("\n")[0].length > 120) over++;
+  }
+  const jsonPart = reports.size
+    ? `${multi}/${reports.size} json reason(s) are multi-line · ${over} first line(s) exceed 120 chars`
+    : `multi-line and >120 counts unmeasurable here (0 json report(s) in this input)`;
+  return `# ★LIMIT col 6 is one truncated line, not a search index — measured on THIS input: top excerpt covers ${topN}/${rows.length} row(s) · ${jsonPart}. A signature on line 2 cannot match; re-read the report JSON for those.`;
+}
+
 if (onlyBucket) {
   const hits = rows.filter((x) => x.bucket === onlyBucket);
   // Paths, not stems: this output is meant to be fed straight to wie_validate.
   for (const h of hits) console.log(h.file);
   console.error(`# ${hits.length} file(s) in bucket ${JSON.stringify(onlyBucket)} (input: ${reportsDir}) — ${verdict}`);
+  console.error(`# ${sourceLine}`);
+  process.exit(0);
+}
+
+if (signature) {
+  // ★Invalid regex is an exit-2, not a literal-string fallback. Falling back would
+  // answer a different question than the one asked and look like it worked.
+  let re;
+  try {
+    re = new RegExp(signature);
+  } catch (e) {
+    console.error(`game-lab-census-map: --signature ${JSON.stringify(signature)} is not a valid regex (${e.message})`);
+    process.exit(2);
+  }
+  const hits = rows.filter((x) => re.test(x.excerpt));
+  // Same shape as --bucket: paths on stdout, everything else on stderr, rc=0 even
+  // for zero hits — "no file matches" is an answer, not an error.
+  for (const h of hits) console.log(h.file);
+  console.error(`# ${hits.length} file(s) whose col 6 matches /${signature}/ (input: ${reportsDir}) — ${verdict}`);
+  console.error(`# ${sourceLine}`);
+  console.error(columnSixLimits());
   process.exit(0);
 }
 
@@ -385,17 +608,35 @@ const header =
   // reports moved" when diffing an old column against a new one.
   `# ★reports mtime range (local, with UTC offset): ${rangeStr}  ← THIS is the date of the verdicts below\n` +
   `# files=${corpus.length}  stems=${new Set(corpus.map((c) => c.stem)).size}  reports=${reports.size}\n` +
+  // ★Which input each verdict came from, in total here and per row in column 7.
+  // summary.tsv is path-keyed and lossless; <stem>.json gives one verdict to every
+  // file sharing a stem. A column built from the second is not row-comparable with
+  // one built from the first — see the next line when it is present.
+  `# ★${sourceLine}\n` +
+  (asymmetryLine ? `# ${asymmetryLine}\n` : "") +
   `# ★col 6 is the reason's FIRST line, cut at 120 chars — not a search index.\n` +
-  `#   Measured 2026-09-18: one excerpt value covers 99/187 rows across several buckets,\n` +
-  `#   164/452 reasons are multi-line, 4 first lines exceed 120 chars. A signature that\n` +
-  `#   sits on line 2 cannot be grepped here; re-read the report JSON for those.\n` +
+  `#   Measured 2026-09-18, re-measured 2026-09-19 (identical): one excerpt value covers\n` +
+  `#   99/187 rows across several buckets, 164/452 reasons are multi-line, 4 first lines\n` +
+  `#   exceed 120 chars. A signature that sits on line 2 cannot be grepped here; re-read\n` +
+  `#   the report JSON for those. ★\`--signature <regex>\` runs that query inside this tool\n` +
+  `#   and recomputes those numbers for the input it was given.\n` +
+  `#   ★On summary.tsv-sourced rows col 6 is the first 120 chars of the WHOLE reason: the\n` +
+  `#   runner flattens newlines before writing that file, so "first line" is a json-path\n` +
+  `#   property only. Identical for single-line reasons.\n` +
   // ★Repeated immediately above the data, because that is the last line a reader
   // sees before the rows start. It does NOT reach a reader who greps column 6 —
   // `awk -F'\t' '$6 ~ /…/'` never matches a comment line. That hole is real and is
   // named in the block at the top of this file rather than papered over here.
   `# ★${verdict}${verdict === "STALE" ? ` — ${engine.commits} engine commit(s) newer than this table` : ""}\n` +
-  `file\tstem\tcarrier\tresult\tbucket\tfirst_line_of_reason\n`;
-writeFileSync(outFile, header + rows.map((r) => `${r.file}\t${r.stem}\t${r.carrier}\t${r.result}\t${r.bucket}\t${r.excerpt}`).join("\n") + "\n");
+  // ★`source` is APPENDED as column 7. The documented query is `$6 ~ /…/` and
+  // `$1` is the path, so columns 1..6 keep their meaning and every existing
+  // reader keeps working; a column inserted in the middle would silently
+  // re-point both.
+  `file\tstem\tcarrier\tresult\tbucket\tfirst_line_of_reason\tsource\n`;
+writeFileSync(
+  outFile,
+  header + rows.map((r) => `${r.file}\t${r.stem}\t${r.carrier}\t${r.result}\t${r.bucket}\t${r.excerpt}\t${r.source}`).join("\n") + "\n",
+);
 
 const totals = {};
 for (const r of rows) totals[r.bucket] = (totals[r.bucket] || 0) + 1;
@@ -403,4 +644,6 @@ console.log(`game-lab-census-map: ${rows.length} files -> ${outFile}`);
 console.log(`  corpus files ${corpus.length} · stems ${new Set(corpus.map((c) => c.stem)).size} · reports matched ${rows.filter((r) => r.result !== "NO-REPORT").length}`);
 console.log(`  ${verdictLine}`);
 console.log(`  ★reports mtime range (local, with UTC offset) ${rangeStr}`);
+console.log(`  ★${sourceLine}`);
+if (asymmetryLine) console.log(`  ${asymmetryLine}`);
 for (const [k, v] of Object.entries(totals).sort((a, b) => b[1] - a[1])) console.log(`  ${String(v).padStart(4)}  ${k}`);
