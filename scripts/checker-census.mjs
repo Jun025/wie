@@ -60,6 +60,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { cargoMetadata, workspaceRelative } from "./cargo-metadata.mjs";
 
 function die(msg) {
   console.error(`checker-census: ${msg}`);
@@ -119,30 +120,25 @@ try {
 // ★MUST come after `root` — an earlier revision put this above it and the TDZ throw was
 //   swallowed by the try/catch, so the tool reported `covers 0 artifacts` as if measured.
 //   That is the same fail-open this rewrite exists to remove; hence the guard below.
+// ★The invocation and its failure semantics moved to `scripts/cargo-metadata.mjs`
+// (2026-09-19) because `game-lab-census-map.mjs` needs the same two decisions — how to
+// ask cargo, and what "it did not answer" returns. The PROJECTION stays here: that file
+// deliberately holds no path, name or kind, because the two callers want different
+// things out of the same JSON and a helper that guessed would be the other kind of
+// duplication. What must not be duplicated is `null`-on-failure: a second hand-written
+// try/catch is one edit away from returning `[]`, and `[]` looks measured.
 const cargoTestTargets = (() => {
-  let raw;
-  try {
-    raw = execFileSync("cargo", ["metadata", "--no-deps", "--format-version", "1"], {
-      cwd: root,
-      encoding: "utf8",
-      maxBuffer: 64 * 1024 * 1024,
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-  } catch {
-    return null; // absent / offline / refused — reported, never folded into a count
-  }
-  try {
-    const meta = JSON.parse(raw);
-    const prefix = meta.workspace_root.endsWith("/") ? meta.workspace_root : meta.workspace_root + "/";
-    const out = new Set();
-    for (const pkg of meta.packages ?? [])
-      for (const t of pkg.targets ?? [])
-        if ((t.kind ?? []).includes("test") && typeof t.src_path === "string" && t.src_path.startsWith(prefix))
-          out.add(t.src_path.slice(prefix.length));
-    return out.size ? out : null; // an empty set here means the shape changed, not "no tests"
-  } catch {
-    return null;
-  }
+  const meta = cargoMetadata(root);
+  if (!meta) return null; // absent / offline / refused — reported, never folded into a count
+  const rel = workspaceRelative(meta);
+  const out = new Set();
+  for (const pkg of meta.packages ?? [])
+    for (const t of pkg.targets ?? []) {
+      if (!(t.kind ?? []).includes("test")) continue;
+      const p = rel(t.src_path);
+      if (p !== null) out.add(p);
+    }
+  return out.size ? out : null; // an empty set here means the shape changed, not "no tests"
 })();
 
 const population = tracked.filter((f) => POPULATION.some((re) => re.test(f))).sort();
@@ -234,13 +230,27 @@ function sourceSurface(f, text) {
         line = line.slice(end + 2);
         inBlock = false;
       }
+      // ★The line-comment test runs BEFORE the `/*` scan, and the order is the whole
+      // fix. A `//` line cannot open a block comment — everything after `//` is already
+      // comment — but this scanned for `/*` first, so a full-line comment MENTIONING a
+      // glob flipped `inBlock` and swallowed the file until the next `*/`. Measured
+      // 2026-09-19 on `scripts/game-lab-census-map.mjs`: line 20 says
+      // `game_lab/broken/**` and the only `*/` in the file is line 299, so lines 20-299
+      // — including every `import` — were invisible, and that file was credited as a
+      // caller of NOTHING. A census whose blind spot is silent is the failure this file
+      // exists to remove, so it is fixed here rather than noted.
+      // ★What is NOT fixed: a MIXED line (`foo(); // see /*`) still flips the state,
+      // because separating those needs a tokeniser and this needs three lines. That
+      // case is rarer by construction — the trailing text is a comment about code, not
+      // a whole paragraph — and it fails in the same direction (under-reporting), which
+      // this file already declares is not a verdict.
+      const t = line.trim();
+      if (t.startsWith("//") || t.startsWith("*")) return;
       const open = line.indexOf("/*");
       if (open !== -1 && line.indexOf("*/", open) === -1) {
         inBlock = true;
         line = line.slice(0, open);
       }
-      const t = line.trim();
-      if (t.startsWith("//") || t.startsWith("*")) return;
     } else if (line.trim().startsWith("#")) {
       return;
     }

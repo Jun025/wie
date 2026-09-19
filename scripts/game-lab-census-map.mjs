@@ -57,8 +57,8 @@
 // itself gets loud. It does, on three surfaces: a bounded stderr block, a stdout
 // line, and two lines in the written TSV (one near the top, one immediately above
 // the data). The verdict is CURRENT / STALE / UNMEASURED, and the axis is engine
-// commits after the newest report — see the ENGINE_PATHS block below for why that
-// replaced a day threshold.
+// commits after the newest report — see the engine-paths block below for why that
+// replaced a day threshold, and how the path set is measured rather than listed.
 //
 // ★It deliberately does NOT change the exit code. Regenerating a map from an OLD
 // reports directory is a legitimate, documented use — it is exactly how the two
@@ -103,41 +103,117 @@
 import { readdirSync, readFileSync, writeFileSync, existsSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
+import { cargoMetadata, workspaceRelative } from "./cargo-metadata.mjs";
 
 // ── Staleness is measured against the ENGINE, not against a calendar ─────────
 // The proposal that asked for this left the threshold open ("a reason for N is
-// needed separately"). Measured on 2026-09-19 over the last 90 days: commits
-// touching these paths land on 65 of 90 days (304 commits), and the gaps between
-// consecutive engine-active days are p50 1 day, p90 2, MAX 4. So any N of 5 days
-// or more is crossed by an engine change first, and any N below 5 is "the engine
-// moved" with extra steps. ★The calendar is the wrong axis: the question a reader
-// actually has is "could the verdicts below have changed since they were taken",
-// and that is answered exactly by counting engine commits after the newest report.
-// For the July baseline the answer is not a threshold call — it is 263 commits.
+// needed separately"). Measured on 2026-09-19 over the last 90 days, against the
+// path set cargo reports (below): commits touching it land on 56 of 90 days (165
+// commits), and the gaps between consecutive engine-active days are p50 1 day,
+// p90 3, MAX 6. ★The calendar is the wrong axis: the question a reader actually
+// has is "could the verdicts below have changed since they were taken", and that
+// is answered exactly by counting engine commits after the newest report.
+// For the July baseline the answer is not a threshold call — it is 147 commits.
+//
+// ★Those four numbers REPLACED a set measured against the old literal globs
+// (65/90 days, 304 commits, p50 1 / p90 2 / MAX 4, July 263) and they are lower
+// on purpose: the literal also matched PRE-RENAME directory names (`wie_lgt/`,
+// `wie_wipi_java/`, …) and two base-swap orphans, so 43 of 116 commits in one
+// sampled window — 37% — came from paths cargo does not build. Asking cargo means
+// asking about TODAY's layout, and today's layout cannot see history filed under
+// yesterday's names. ★The cost is depth, not safety: a rename commit is recorded
+// at the NEW path too (verified on `a56e72f4`, the `wie_web -> wie_featurephone`
+// rename — it is counted by `wie_featurephone` as well as by `wie_web`), so a
+// report older than a rename still sees at least that commit and can never read
+// CURRENT because of it. What is lost is how far back the count reaches, which is
+// informational; the verdict is not.
 //
 // Wall-clock age is still printed, because it is what a human recognises and
-// because it is the only thing left when git cannot answer.
-const ENGINE_PATHS = ["wie_*", "wie-*", "Cargo.toml", "Cargo.lock", "data"];
+// because it is the only thing left when git or cargo cannot answer.
+// ★The crate list is ASKED OF CARGO, not written down here. It used to be the literal
+// `["wie_*", "wie-*", …]`, and the two globs are themselves the scar: this tree renamed
+// `wie_web/ -> wie_featurephone/` (`a56e72f4`) and moved crates to hyphenated names, so a
+// second glob had to be bolted on. Measured 2026-09-19 against `cargo metadata --no-deps`,
+// the literal missed FOUR real source locations — `src` and `tests` (the ROOT is itself a
+// package, `[package] name = "wie"`), `test-utils/Cargo.toml` and `test-utils/src` — i.e.
+// 1 of 18 workspace members plus the root package's own sources. `checker-census.mjs` was
+// bitten by exactly the same path-guess and reached the same answer: ask cargo.
+//
+// ★The leak has NOT yet produced a wrong verdict, and saying so is the honest grade: over
+// the last 90 days, 9 commits touched those four paths and ALL 9 also touched a path the
+// literal covered, so the count never went silent. This is prevention, not a live bug — and
+// it is free, because widening to the measured set changes 0 of those 90 days' verdicts.
+//
+// ★When cargo cannot answer, this returns null and the verdict becomes UNMEASURED. It does
+// NOT fall back to a literal list: a fallback list is a second copy of the truth, and the
+// day it drifts it drifts SILENTLY toward "CURRENT" — the one direction this whole file
+// exists to forbid. Frequency, measured rather than assumed: this generator has 0 callers
+// (`checker-census.mjs`) and 0 references in `.github/` — it only runs by hand, on a machine
+// that holds the git-ignored `game_lab/` corpus, i.e. a checkout of this Rust workspace. The
+// environment where cargo is missing and this script is running is not one we could find.
+// `Cargo.lock` and `data/` stay literal because cargo cannot report them: neither is a
+// workspace member, and both are fixed repo-level paths that no rename touches.
+const REPO_LEVEL_ENGINE_PATHS = ["Cargo.lock", "data"];
 
+function enginePathsFromCargo() {
+  const meta = cargoMetadata(process.cwd());
+  if (!meta) return null;
+  const rel = workspaceRelative(meta);
+  const out = new Set(REPO_LEVEL_ENGINE_PATHS);
+  for (const pkg of meta.packages) {
+    const manifest = rel(pkg.manifest_path);
+    if (manifest) out.add(manifest);
+    for (const t of pkg.targets ?? []) {
+      const src = rel(t.src_path);
+      // ★Target source DIRECTORIES, not the package directory. The root package's directory
+      // is the repo root, and passing "." to `git rev-list -- <paths>` would count EVERY
+      // commit as an engine commit — a staleness check that always says STALE is a staleness
+      // check nobody reads.
+      if (src) out.add(path.dirname(src));
+    }
+  }
+  out.delete(".");
+  return out.size > REPO_LEVEL_ENGINE_PATHS.length ? [...out].sort() : null;
+}
+
+// ★A bare local date is ambiguous the moment the table leaves this machine: the SAME instant
+// renders as three different days under three timezones (measured 2026-09-19 on one report
+// file — `Asia/Seoul` 2026-09-19, `UTC` 2026-09-18, `America/Los_Angeles` 2026-09-18), and
+// the header says only "LOCAL", so a reader comparing two columns cannot tell whether the
+// input moved or the machine did. Printing the offset makes the label verifiable instead of
+// merely asserted. ★The previous failure here was the opposite one and is already fixed
+// (`3b73c63c` replaced `mtime.toISOString()`, which printed UTC under a LOCAL label); this
+// closes the half that fix left open rather than re-fixing it.
+const tzOffset = (d) => {
+  const mins = -d.getTimezoneOffset(); // minutes EAST of UTC; per-date, so DST is handled
+  const sign = mins < 0 ? "-" : "+";
+  const abs = Math.abs(mins);
+  return `${sign}${String(Math.floor(abs / 60)).padStart(2, "0")}:${String(abs % 60).padStart(2, "0")}`;
+};
 const localDay = (d) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}${tzOffset(d)}`;
 
-// ★Returns {ok:false} rather than 0 when git cannot answer. "Could not measure"
-// must never render as "current" — that is the failure shape this whole lineage
-// keeps naming, and it is why the caller prints UNMEASURED and not CURRENT.
+// ★Returns {ok:false} rather than 0 when git OR cargo cannot answer. "Could not
+// measure" must never render as "current" — that is the failure shape this whole
+// lineage keeps naming, and it is why the caller prints UNMEASURED and not CURRENT.
+// ★`why` is carried out so the warning can name the tool that went missing: "could not
+// measure" with no cause is a message a reader cannot act on, and the two causes have
+// different fixes (run inside the repo vs install the toolchain).
 function engineCommitsSince(epochMs) {
+  const enginePaths = enginePathsFromCargo();
+  if (!enginePaths) return { ok: false, why: "cargo did not answer" };
   const opts = { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] };
   try {
     const count = execFileSync(
       "git",
-      ["rev-list", "--count", `--since=${new Date(epochMs).toISOString()}`, "HEAD", "--", ...ENGINE_PATHS],
+      ["rev-list", "--count", `--since=${new Date(epochMs).toISOString()}`, "HEAD", "--", ...enginePaths],
       opts,
     ).trim();
-    const last = execFileSync("git", ["log", "-1", "--format=%h %cs", "--", ...ENGINE_PATHS], opts).trim();
-    if (!/^\d+$/.test(count)) return { ok: false };
-    return { ok: true, commits: Number(count), last };
+    const last = execFileSync("git", ["log", "-1", "--format=%h %cs", "--", ...enginePaths], opts).trim();
+    if (!/^\d+$/.test(count)) return { ok: false, why: "git did not answer" };
+    return { ok: true, commits: Number(count), last, paths: enginePaths.length };
   } catch {
-    return { ok: false };
+    return { ok: false, why: "git did not answer" };
   }
 }
 
@@ -274,7 +350,7 @@ const verdictLine =
     ? `★★ STALE — the engine moved ${engine.commits} commit(s) after these verdicts were taken (newest report ${ageDays.toFixed(1)} days old; last engine commit ${engine.last})`
     : verdict === "CURRENT"
       ? `CURRENT — no engine commit after the newest report (${ageDays.toFixed(1)} days old)`
-      : `★★ UNMEASURED — could not compare against the engine${haveMtimes ? " (git did not answer)" : " (no reports to date)"}. Do NOT read this as current.`;
+      : `★★ UNMEASURED — could not compare against the engine${haveMtimes ? ` (${engine.why ?? "no answer"})` : " (no reports to date)"}. Do NOT read this as current.`;
 
 // stderr, loud and bounded, on both paths. Silent on CURRENT so that the one
 // noisy case stays legible; a warning that fires every time gets scrolled past.
@@ -303,7 +379,11 @@ const header =
   `# game_lab census map — regenerate with: node scripts/game-lab-census-map.mjs\n` +
   `# corpus=${corpusDir}  reports=${reportsDir}\n` +
   `# ${verdictLine}\n` +
-  `# ★reports mtime range (LOCAL): ${rangeStr}  ← THIS is the date of the verdicts below\n` +
+  // ★The UTC offset is part of the value, not decoration — see the `tzOffset` block. A
+  // table written before 2026-09-19 carries a BARE date on this line; that is the older
+  // format, not a different input. Do not read `2026-09-18` vs `2026-09-18+09:00` as "the
+  // reports moved" when diffing an old column against a new one.
+  `# ★reports mtime range (local, with UTC offset): ${rangeStr}  ← THIS is the date of the verdicts below\n` +
   `# files=${corpus.length}  stems=${new Set(corpus.map((c) => c.stem)).size}  reports=${reports.size}\n` +
   `# ★col 6 is the reason's FIRST line, cut at 120 chars — not a search index.\n` +
   `#   Measured 2026-09-18: one excerpt value covers 99/187 rows across several buckets,\n` +
@@ -322,5 +402,5 @@ for (const r of rows) totals[r.bucket] = (totals[r.bucket] || 0) + 1;
 console.log(`game-lab-census-map: ${rows.length} files -> ${outFile}`);
 console.log(`  corpus files ${corpus.length} · stems ${new Set(corpus.map((c) => c.stem)).size} · reports matched ${rows.filter((r) => r.result !== "NO-REPORT").length}`);
 console.log(`  ${verdictLine}`);
-console.log(`  ★reports mtime range (local) ${rangeStr}`);
+console.log(`  ★reports mtime range (local, with UTC offset) ${rangeStr}`);
 for (const [k, v] of Object.entries(totals).sort((a, b) => b[1] - a[1])) console.log(`  ${String(v).padStart(4)}  ${k}`);
