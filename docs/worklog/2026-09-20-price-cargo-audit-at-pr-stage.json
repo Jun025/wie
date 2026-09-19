@@ -1,0 +1,57 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-20",
+  "task": "wie-price-cargo-audit-at-pr-stage-recommend-only",
+  "title": "cargo audit 을 PR 단계에서도 돌릴까 — 가격을 쟀다. 권고 = 채택하되 «비게이팅 + lockfile 변경 시에만»",
+  "summary": "채택 제안 2026-09-19-security-audit-schedule-red-three-days#p1 의 이행. ★구현이 아니라 판정 회차다 — .github/workflows/** 변경 0 · 의존성 0 · --ignore 추가 0. ★대전제를 먼저 쟀고 두 곳이 어긋났다: ⑴「push CI 4종」은 실측 «5종»이다(coverage.yml 이 on:[push] 형식이라 빠진 듯 · cargo audit 0개는 참 — 워크플로 10개 전수에서 rust-audit.yaml 한 곳뿐이고 트리거는 schedule+workflow_dispatch) ⑵★★브리프가 물려준 「러너 1대 병목」은 wie 에 «해당하지 않는다» — 워크플로 10개의 runs-on 이 전건 GitHub 호스티드이고 실제 잡의 runner_group_name 이 GitHub Actions 이며 .github/ 이력에 self-hosted 0건, repo 는 public(분 과금 0), 큐 대기 p50 2s·p90 7s(잡 50개). ⇒ AGENTS.md 2026-09-18 표의 «on a self-hosted runner siblings queue behind» 는 이 저장소 CI 를 서술하지 않는다(그 문장이 참인 곳은 local Mac estate 다). ★가격 4축: ⒜cargo audit 자체 = CI 스텝 5s(콜드 advisory-db 포함) · 로컬 5.4~6.8s(증분) · 콜드 28.7s ⒝그 job 에 «붙는» 비용 = 잡 전체 p50 17s·max 49s 이고 ★install-action 0s · Rust 툴체인 설치 스텝 없음(cargo audit 은 Cargo.lock 만 읽고 컴파일 0) ⇒ 제안이 걱정한 «툴체인이 붙는다»가 측정으로 반증됐다(2026-09-18 기각이 잰 168s×6legs≈17min 과 60배 차) ⒞최근 PR 60건 전수 — docs-only 36.7%(22건) · Cargo.lock/Cargo.toml 을 만진 PR 3.3%(2건 · #217·#161) · PR당 push 2.27회 ⇒ 무조건 돌리면 38.6분/60PR(그중 헛돈 14.2분), paths 필터면 1.3분(헛돈 0) ⒟임계경로 +0s(coverage p50 677s·rust p50 575s 와 병렬). ★--ignore 압력을 «수»로 쟀다 — schedule 런 87회를 걸어 red 를 원인별로 갈랐다: 2026-06-25~07-22 28일은 인프라(fork Issues), 09-02~06 5일은 ★새 자문(rtrb RUSTSEC-2026-0274 · 실패 런 로그 직접 확인 · 의존성 불변), 09-17~19 3일은 우리 lockfile 교체(base swap 36df9c31 = PR #161) ⇒ 워크플로 수리 후 red 8일 중 5일(62.5%)이 «PR 의 잘못이 아니다». ★권고: 채택하되 ⒜required 컨텍스트에 넣지 않는 비게이팅(★continue-on-error 는 Constraint 5 가 금지하므로 «배선»으로 비게이팅한다) ⒝pull_request 에서 paths:['**/Cargo.toml','Cargo.lock'] 로만 발화. ★선행 두 기각과 근거가 «다르다» — 그쪽은 「비싸고 잡은 적이 없다」(168s×6 · zero incidents observed)이고 이쪽은 「싸고(17s·1leg·컴파일 0) 이미 한 번 잡혔어야 했다」(#161).",
+  "changes": [
+    "docs/report/0184 신설 — 대전제 재측 4건(그중 2건 정정) · 가격 4축 · --ignore 압력 실측 · 권고 + 선행 두 기각과의 근거 대조 · 한계 5항",
+    "★.github/workflows/** 변경 0 · Cargo.toml/Cargo.lock 무접촉 · AGENTS.md 무접촉 · schedule 워크플로 무접촉 · 형제 #p0(§C 되돌림 탐지) 무접촉"
+  ],
+  "verification": [
+    "★push CI 전수 — 워크플로 10개의 on: 블록을 걸어 main push 로 도는 것이 5종(coverage·engine-contract·publish-artifact·rust·web)임을 확인했고, PR #211 착지 커밋의 실제 run 목록이 정확히 그 5개다. cargo audit 은 rust-audit.yaml 한 곳(schedule+workflow_dispatch)뿐 ⇒ push 0 · pull_request 0",
+    "★★러너 축 — runs-on 전수 GitHub 호스티드 · 실제 잡의 runner_group_name=GitHub Actions(rust-audit·rust_ci·contract·coverage) · git log -S'self-hosted' -- .github/ 0건 · repo private=false · 큐 대기 p50 2s·p90 7s·max 38s(잡 50개 · ≤2s가 62%)",
+    "★cargo audit 소요 — CI 스텝 5s(n=2) · 로컬 real 6.82s(CPU 0.83s ⇒ 거의 전부 네트워크) · 3회 6.8/6.4/5.4s · 콜드 advisory-db 28.7s(47MB) → 재사용 7.3s",
+    "★잡 전체 소요 — rust-audit.yaml schedule 런 n=30 p50 17s · max 49s. 스텝별: install-action 0s · cargo audit 5s · node 대조 2s · 나머지 스캐폴딩 ~10s. ★Rust 툴체인 설치 스텝이 아예 없다",
+    "★PR 표본 60건 전수(API 로 파일 목록 수집·분류) — docs-only 22(36.7%) · Cargo.lock/toml 2(3.3% · #217·#161) · .rs 16(26.7%) · .github/ 12(20.0%)",
+    "★PR당 push 2.27회 — engine-contract pull_request 런 100회 ÷ 브랜치 44개(2026-09-17~19)",
+    "★임계경로 — coverage p50 677s(max 1354) · rust p50 575s(max 892) · web 301s · engine-contract 299s · doc-liveness 990s ↔ rust-audit p50 17s ⇒ 병렬이라 +0s",
+    "★「항상 도는 래퍼」 대안 가격 — contract 잡 n=10 중 최솟값 13s(docs-only diff · p50 303s)로 AGENTS.md 의 「12 s on a doc-only diff」와 정합",
+    "★★--ignore 압력 — schedule 런 87회(2026-06-25~09-19) 결론 분포 success 51 · failure 36. 실패 클러스터 3개를 원인별로 갈랐고, 09-02 실패 런 로그를 직접 내려받아 'error: 1 vulnerability found!' 와 rtrb RUSTSEC-2026-0274 를 확인했다",
+    "★Constraint 5 의 지목 자리(rust-audit.yaml:39-54) 실물 확인 — 실제 내용은 「두 계급을 종료코드로 가른다(경고는 exit 0 · 취약점만 fail) · continue-on-error 로 뭉개지 않는다」이고, 그래서 «새 경고»는 PR 을 빨갛게 만들지 못한다",
+    "★required 컨텍스트 5개 실물 확인(AGENTS.md) — contract · build-web · rust_ci (ubuntu|macos|windows-latest, stable) ⇒ 새 컨텍스트는 자동으로 required 가 되지 않는다 = 배선만으로 비게이팅이 성립한다",
+    "★워크플로 변경 0 증명 — git diff --name-status origin/main...HEAD 에 .github/ 0건"
+  ],
+  "limits": [
+    "★권고이지 구현이 아니다 — 「paths 필터 + 비-required」가 실제로 그렇게 도는지는 구현 회차가 실측해야 한다",
+    "★표본 60 PR·87 schedule 런은 «이 시간창»의 값이다. docs-only 36.7%·lockfile 3.3% 는 이 저장소의 현재 작업 성격(문서·판정 회차가 많다)을 반영하므로 인용하지 말고 다시 재라",
+    "★「새 자문 62.5%」는 red «일수» 기준이지 «자문 건수»가 아니다 — 클러스터가 2개(5일·3일)뿐이라 사실상 n=2 의 비율이고, 그것이 이 수의 가장 큰 약점이다",
+    "★paths 필터는 «lockfile 을 안 바꾸고 취약해지는» 갈래를 못 본다(예: [patch]/git rev 핀이 같은 ref 에서 내용만 바뀜) — 그 갈래는 일일 잡이 계속 진다. 일일 잡을 없애자는 권고가 «아니다»",
+    "★AGENTS.md 2026-09-18 표의 「self-hosted runner」 서술이 wie CI 에 대해 틀렸다는 것을 쟀지만 «고치지 않았다» — 이 티켓의 AGENTS.md 무접촉 경계가 우선한다. 별 회차 몫이다",
+    "★선행 두 기각(2026-09-07·09-18)을 뒤집지 않았다 — 그쪽의 수(168s×6legs)는 지금도 참이고 이 회차는 그 결정을 건드리지 않는다. 다른 것은 «이 축의» 가격이다"
+  ],
+  "adoptedProposals": [
+    "2026-09-19-security-audit-schedule-red-three-days#p1"
+  ],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "권고대로 PR 단계 cargo audit 을 배선하라 — paths 필터 + 비-required, 그리고 「required 로 올리지 마라」를 문서에 못박아라",
+      "plainSummary": "보안 검사를 PR 때도 한 번 돌리되, 의존성 잠금 파일이 바뀐 PR 에서만 돌고 머지를 막지는 않게 합니다. 문서·코드만 고친 PR 은 전혀 영향을 받지 않습니다.",
+      "userBenefit": "의존성을 되돌린 변경이 그 PR 에서 바로 빨개진다 — 이번처럼 3일 뒤에 발견해 경계 이분 탐색으로 범인을 찾는 일이 사라진다.",
+      "why": "이 회차의 실측: 잡 전체 p50 17s(툴체인 설치 0 · 컴파일 0) · 임계경로 +0s · 공개 repo 라 분 과금 0 · 큐 p50 2s. paths 필터를 붙이면 최근 60 PR 중 2건(3.3%)만 발화하고 docs-only 22건은 0초를 문다. ★그 2건 중 하나가 정확히 이번 사고(PR #161 의 base swap)다. ★비게이팅은 continue-on-error 가 아니라 «required 컨텍스트에 넣지 않는 것»으로 만든다 — Constraint 5 가 continue-on-error 를 금지하기 때문이고, 현행 required 5개(contract·build-web·rust_ci×3 stable)에 새 컨텍스트가 자동으로 들어가지 않으므로 배선만으로 성립한다.",
+      "tradeoff": "★paths 필터가 붙은 체크를 나중에 required 로 올리면 그 경로를 안 건드린 PR 이 영원히 «Expected — Waiting for status» 로 교착한다(AGENTS.md Incident ledger 의 그 사고 · doc-liveness 가 같은 이유로 never-required 다) ⇒ 그 한 줄을 워크플로 머리주석과 AGENTS.md 에 «함께» 박지 않으면 이 제안이 다음 사고의 원인이 된다. ★그리고 비게이팅 red 는 «아무도 안 봐도 되는 red» 라 신호를 마모시킨다 — 그 대가를 받아들이는 근거는 «일일 schedule 잡이 여전히 경보 채널이고 PR 단계는 귀속(attribution)일 뿐»이라는 것이다. ★lockfile 을 안 바꾸고 취약해지는 갈래([patch]/git rev 핀)는 이 필터가 못 본다.",
+      "effort": "S",
+      "target": ".github/workflows/ · AGENTS.md"
+    },
+    {
+      "title": "AGENTS.md 2026-09-18 결정표의 «self-hosted runner» 서술을 고쳐라 — wie 의 CI 는 전건 GitHub 호스티드다",
+      "plainSummary": "저장소 규약 문서가 CI 를 «자체 서버 한 대»라고 적고 있는데, 실제로는 GitHub 이 제공하는 서버에서 돌고 있습니다. 그 한 줄이 이후 판단의 전제로 계속 인용됩니다.",
+      "userBenefit": "「러너가 희소하다」를 근거로 한 기각이 앞으로도 반복될 텐데, 그 전제가 틀린 채로 남아 있으면 «쌀 수도 있는» 검사가 계속 기각된다.",
+      "why": "이 회차 실측: 워크플로 10개의 runs-on 이 전건 ubuntu/macos/windows-latest · 실제 잡의 runner_group_name=GitHub Actions · .github/ 이력에 self-hosted 문자열 0건 · repo public(분 과금 0) · 큐 대기 p50 2s. 그런데 AGENTS.md 2026-09-18 표는 「on a self-hosted runner siblings queue behind」라고 적는다. ★그 문장이 참인 곳은 local Mac estate(otterpebble·orchestrator)이고 wie 의 CI 는 거기 있지 않다. ★그 표의 «수»(168s×6legs)는 참이므로 결정 자체는 건드릴 필요가 없다 — 고칠 것은 자원 서술 한 줄이다.",
+      "tradeoff": "★AGENTS.md 의 결정 블록은 «왜 그렇게 정했는가»를 담은 자리라, 한 줄만 고쳐도 그 결정이 재론된 것처럼 읽힐 수 있다 ⇒ 「결정은 그대로 · 자원 서술만 정정」을 명시해야 한다. ★그리고 이 저장소는 로컬 게이트(사람이 손으로 돌리는 네 게이트)도 있어 «러너»라는 말이 두 가지를 가리킨다 — 정정문이 그 둘을 갈라 적지 않으면 다음 사람이 반대로 읽는다.",
+      "effort": "S",
+      "target": "AGENTS.md"
+    }
+  ]
+}
