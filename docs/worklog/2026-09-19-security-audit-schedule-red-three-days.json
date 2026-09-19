@@ -1,0 +1,51 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-19",
+  "task": "wie-security-audit-schedule-red-three-days-unattended",
+  "title": "Security audit 3일 red — base swap 이 우리가 올려 둔 판본을 되돌렸다",
+  "summary": "2026-09-17·18·19 연속 red 의 원인은 새 자문이 아니라 base swap 36df9c31 이 Cargo.lock 을 통째로 갈아(+2,193/-795) 대장 C-1(rtrb 0.3.5→0.3.4 · RUSTSEC-2026-0274)과 C-2(event-listener 5.4.2→5.4.1 · RUSTSEC-2026-0221)의 해소분을 되돌린 것이다. 같은 swap 이 sentry→ureq→rustls 0.23.44 를 들여와 RUSTSEC-2026-0285(2026-09-14)가 새로 붙었다. push CI 가 green 이었던 이유는 rust.yml·coverage·Web·Engine contract 중 cargo audit 을 도는 것이 하나도 없기 때문이다. 처방은 cargo update --precise 3건(Cargo.lock +6/-7 · Cargo.toml 무접촉)이고 억제(--ignore·audit.toml)는 쓰지 않았다 — 세 대상 전부 패치본이 실재한다. ★부수 산출물: cargo audit 이 exit 1 로 죽어 다음 step(check-audit-warnings)이 아예 돌지 않았고, 취약점을 고치자 그 step 이 red 를 냈다 — 취약점 red 가 목록 red 를 가리고 있었다. 기대 목록과 대장 §A 의 chacha20 설치 버전 표기(0.10.0→0.10.1)도 함께 고쳤다.",
+  "changes": [
+    "Cargo.lock +6/-7 — rtrb 0.3.4→0.3.5 · rustls 0.23.44→0.23.45 · event-listener 5.4.1→5.4.2. 전부 cargo update --precise 이고 Cargo.toml 무접촉",
+    ".github/rust-audit-expected-warnings.json — chacha20 설치 버전 0.10.0→0.10.1 · measured 갱신(2026-09-19T10:36Z)",
+    "docs/project-kb/02_status.md §A — 실측 기준(advisory-db 1,251 · Cargo.lock 557 패키지 · 2026-09-19 재측) · A-4 설치 버전 0.10.0→0.10.1 + 판정 불변 사유 · 절 머리에 «되살아난 해소분» 사건 기록",
+    "docs/project-kb/02_status.md §C — C-4(RUSTSEC-2026-0285 rustls) 신설 + C-1·C-2 가 되살아났다가 복원된 사실 명기",
+    "docs/report/0181 신설 — 로그 전문 · 경계 판정표 · 처방 갈래 4종 · 개악 5축 · 안 한 것",
+    "제품 Rust 0줄 · 워크플로 파일 0줄(끄지 않았다 · continue-on-error 0) · chacha20 상향 0(대장 A-4 의 별건 처분 존중)"
+  ],
+  "verification": [
+    "cargo audit rc=0 · vulnerabilities 0 (직전 rc=1 · 2건)",
+    "node scripts/check-audit-warnings.mjs rc=0 — 기대 2건 == 실제 2건 · §A 행 2건 == 경고 2건 · 절 머리 선언 2건",
+    "개악 양방향 5축 전건 red: M1 rtrb→0.3.4 rc=1 · M2 rustls→0.23.44 rc=1 · M3 event-listener→5.4.1 검사기 rc=1 · M4 기대목록만 되돌림 rc=1 · M5 대장 §A 만 되돌림 rc=1 · 원형 복귀 후 둘 다 rc=0",
+    "네 게이트 전건 rc=0 — cargo fmt --all --check · cargo clippy --all -D warnings · cargo clippy --target wasm32-unknown-unknown -D warnings · RUST_MIN_STACK=4194304 cargo test --all",
+    "cargo +beta clippy --all -D warnings rc=0",
+    "경계 실측 — 36df9c31^ ↔ 36df9c31 에서 rtrb 0.3.5→0.3.4 · event-listener 5.4.2→5.4.1 · rustls 부재→0.23.44 · spin 0.12.2→0.12.3(전진) · chacha20 0.10.0→0.10.1",
+    "rustls 범위 실측 — cargo tree -p wie_featurephone --target wasm32-unknown-unknown -i rustls → did not match any packages(대조군 wie-backend 는 정상 출력)",
+    "형제 대조 — 열린 PR 중 Cargo.lock·.cargo/·.github/workflows/ 를 쥔 것 0건(gh pr list --limit 200 전수)"
+  ],
+  "limits": [
+    "★rustls 의 도달성 판정은 하지 않았다 — 버전축으로만 닫았다. 잰 것은 «WASM 아티팩트에 없다» 하나뿐이고, 네이티브 호스트가 TLS 핸드셰이크 경로를 타는지는 재지 않았다. C-4 에 그렇게 적었다",
+    "★재발 방지가 «산문»이다 — 대장에 「base 를 갈아끼우는 회차는 §C 행을 전건 재확인하라」를 적었을 뿐 기계가 강제하지 않는다. 표본 1건으로 검사기를 만들면 오탐이 굳는다는 이 저장소의 규율을 따랐다",
+    "★chacha20 은 여전히 yanked(0.10.1) — 대장 A-4 의 «별건 발권» 처분을 그대로 뒀다",
+    "★schedule 전용 워크플로라 이 PR 의 check 목록에는 Security audit 이 뜨지 않는다 — 검증은 workflow_dispatch 로 브랜치를 겨눠 받았다"
+  ],
+  "proposals": [
+    {
+      "title": "base swap 회차가 대장 §C 의 해소분을 되돌렸는지 기계가 대조하게 하라",
+      "plainSummary": "의존성 목록을 통째로 갈아끼우는 작업이 예전에 고쳐 둔 보안 패치를 조용히 되돌리는 일이 실제로 일어났습니다. 그 되돌림을 사람이 아니라 검사기가 잡게 하자는 제안입니다.",
+      "userBenefit": "이미 고친 보안 문제가 되살아나도 3일 동안 아무도 모르는 일이 사라집니다.",
+      "why": "2026-09-19 실측: base swap 36df9c31 이 rtrb 0.3.5→0.3.4 · event-listener 5.4.2→5.4.1 로 대장 C-1·C-2 의 해소분을 되돌렸고, schedule 전용 워크플로라 PR 단계에서는 보이지 않아 3일(09-17·18·19) 연속 red 로 방치됐다. §C 의 «판정 유효 범위» 칸은 «의존성이 올라갈 때»를 겨눴는데 실제로 문 것은 «lockfile 이 통째로 교체될 때»다.",
+      "tradeoff": "새 검사기는 이 저장소가 경계하는 축이다 — 표본이 1건이라 지금 굳히면 오탐이 굳는다. 그리고 §C 표를 파싱해야 하는데 그 표는 산문 칸이 많아 파서가 깨지기 쉽다(check-audit-warnings.mjs 가 §A 에서 이미 fail-closed 로 다루는 문제와 같은 계급). 대안은 검사기가 아니라 «base swap 티켓 템플릿의 체크 항목»이다 — 그쪽이 싸다.",
+      "effort": "S~M",
+      "target": "wie"
+    },
+    {
+      "title": "cargo audit 을 PR 단계에서도 한 번 돌릴지 가격을 재라",
+      "plainSummary": "보안 검사가 하루 한 번만 돌아서, 문제를 들여온 변경과 빨개진 시점 사이에 시차가 생깁니다. PR 때도 돌릴 가치가 있는지 따져 보자는 제안입니다.",
+      "userBenefit": "보안 문제를 들여온 바로 그 변경에서 알 수 있어, 원인을 되짚는 시간이 사라집니다.",
+      "why": "이번 red 의 근인(base swap 의 lockfile 교체)은 PR 단계에서 보이지 않았다 — push CI 4종 중 cargo audit 을 도는 것이 0개다. 원인 규명에 경계 이분 탐색이 필요했던 이유가 그것이다.",
+      "tradeoff": "이 저장소는 «PR 마다 도는 검사»를 반복해서 기각해 왔다(AGENTS.md 의 2026-09-07·09-18 결정 둘 다 러너 시간을 근거로 기각). cargo audit 자체는 advisory-db fetch 포함 수 초이나, 그 job 에 cargo 툴체인과 install-action 이 붙으면 docs-only PR 도 그 값을 문다. 그리고 새 자문이 뜨면 «무관한 PR» 이 빨개져 --ignore 압력이 생기는데, 그것은 Constraint 5 가 금지하는 방향이다 — 그래서 «돌리되 막지 않는»(비게이팅) 형태가 아니면 채택하면 안 된다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}
