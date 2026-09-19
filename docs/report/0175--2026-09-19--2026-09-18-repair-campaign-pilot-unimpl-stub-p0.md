@@ -167,7 +167,8 @@ slot 4~7·9~15 는 이 두 이미지에서 관측되지 않았다 — **표의 �
 |---|---|---|---|
 | 1 | `wie-wipi-c/src/api/database.rs` 문서주석 1번째 bullet | 「The token is the title's own file EXTENSION … both images carry a string-pointer table whose entries point at exactly such tails (path, and path + k for the basename and the extension)」 | 토큰 값만 남기고 **표 주장 삭제** · 새 bullet 「**What the sl-relative pointer table holds, measured rather than assumed**」로 «전체 경로 + 맨 토큰뿐 · 그 사이 0건»을 적고, `0x135254` 가 **레벨 이름 배열**임을 명시 |
 | 2 | `docs/report/0175` ⒝⑴ | 「두 이미지 모두 «경로 / 경로+k(베이스네임·확장자)»를 담는 문자열 포인터 표를 갖고 있다 … 예: 표 `0x135254..` = `"res/save.sav"`·`".sav"`·`"anidata.res"`·`"res"`」 | ⑴ 을 디렉터리/확장자 미확정 문안으로 교체 + **⑴-b 신설**(엔트리 실측) · `0x135254` 예시 **삭제** |
-| 3 | `docs/worklog/2026-09-19-…json` `summary` | 같은 문장(「그 토큰은 그 표의 멤버다」) | 같은 취지로 교체 + **초판이 틀렸다는 사실 자체를 기록** |
+| 3 | `docs/worklog/…json` `summary` | 같은 문장(「그 토큰은 그 표의 멤버다」) | 같은 취지로 교체 + **초판이 틀렸다는 사실 자체를 기록** |
+| ★4 | 그 worklog 의 **파일명** | `2026-09-19-ktf-db-slot8-token-**is-the-file-extension**.json` | `2026-09-19-ktf-db-slot8-token-**dir-or-extension-unsettled**.json` — ★소비자가 제안 `ref` 를 `<basename>#p<idx>` 로 파생하므로 **아직 아무도 인용하지 않은 지금이 옮길 수 있는 유일한 시점**이었다 |
 
 ★**남긴 참인 사실**은 검수자가 축자로 준 그것 하나다 — 「**sl 표는 «전체 경로»와 «맨 토큰» 각각에
 엔트리를 갖는다**」. 그 이상은 적지 않았다.
