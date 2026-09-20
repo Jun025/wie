@@ -1,0 +1,50 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-20",
+  "task": "wie-census-input-precedence-and-signature-lookup-p0",
+  "title": "러너가 겹치는 stem 을 <bucket>__<stem> 으로 쓰게 했다 — 손실은 .json 하나가 아니라 다섯 자리였다",
+  "summary": "채택 제안 2026-09-19-census-input-precedence-and-signature-lookup#p0 의 이행. ★제안이 시킨 «먼저 세기»를 했다: 충돌은 코퍼스 187파일/184 stem 중 3건(놈3 lgt+ktf · 다크슬레이어2 skt+ktf · 이노티아연대기2 unknown+ktf). 「사람이 실제로 여는가」의 정직한 답은 둘이다 — 기계(생성기 폴백)는 매 실행마다 읽고, 7월 열에서는 그것이 유일한 소스다(실측 inputs: stem.json=186 · none=1); 사람은 그 3건을 추적 파일 7~8건에서 인용하지만 전부 «충돌 자체를 논하는 메타»이지 진단이 아니다. ⇒ 값은 «급한 불»이 아니라 «다음 열이 대칭이 되는 것»이다. ★★제안이 놓친 것: 손실은 .json 하나가 아니라 다섯 자리였다 — $stem 이 .json · ★.log(검증기 stderr = 「왜 실패했나」를 볼 때 실제로 읽는 것) · .png · .out · --resume 건너뜀 판정을 전부 키로 쓰고 있었다. 그래서 파일명마다 고치지 않고 키 변수 하나(key)를 넣어 다섯 자리를 한 번에 옮겼고, 키는 basename(dirname(f))에서 뽑았다(detected 는 unzip 이 필요하고 --resume 검사보다 뒤에 계산된다). ★「항상」이 아니라 「충돌할 때만」을 골랐다 — 겹치지 않는 181 stem 은 이름이 바이트 동일하게 유지돼 기존 디렉터리·생성기 폴백이 하나도 안 깨진다. 「항상」을 고르면 비대칭이 «디렉터리 사이»로 커진다. ★생성기는 summary.tsv → <bucket>__<stem>.json → <stem>.json 삼단으로 읽고, bucket 한정 히트에는 별도 소스 라벨을 줬다(그 도구가 «손실 있는 입력에서 온 행 수»를 세므로 stem.json 으로 접으면 손실을 과대계상한다). ★두 반쪽은 함께 착지해야 한다 — 러너만 고치면 폴백 경로에서 생성기가 6행 전부 NO-REPORT 로 답한다(실측).",
+  "changes": [
+    "scripts/game-lab-recensus.sh — 키 변수 key 도입(겹치는 stem 만 <bucket>__<stem>). $stem 이 키였던 다섯 자리(.json · .log · .png · .out · --resume 검사)를 전부 $key 로 옮겼다. 충돌 계산을 dupstems 목록으로 바꿔 재사용하고, 안내 문구가 이제 «덮어쓴다»가 아니라 «둘 다 보존한다»를 말하며 겹치는 stem 을 나열한다. 머리 주석에 손실이 다섯 자리였다는 것과 기존 디렉터리를 소급 수정하지 않는 이유를 적었다",
+    "scripts/game-lab-census-map.mjs — lookup 에 carrier 인자를 더해 summary.tsv → <bucket>__<stem>.json → <stem>.json 삼단 우선순위로 만들고, 중간 층에 별도 소스 라벨(bucket__stem.json)을 줬다. 헤더 블록과 소스 합계 출력 순서도 함께 갱신",
+    "★낡은 문장 정정 — 충돌 경고가 「only the summary.tsv path tells them apart」라 적고 있었고 이 회차 뒤로 그것은 거짓이다. 「summary.tsv path key AND <bucket>__<stem>.json name … both tell them apart」로 고쳤다(7월 열이 여전히 비대칭이라는 부분은 지금도 참이라 그대로 뒀다)",
+    "★기존 디렉터리 소급 수정 0 · 제품 코드 0줄 · 전 코퍼스 재실행 0 · 형제 제안 #p1 무접촉"
+  ],
+  "verification": [
+    "★★개악 양방향 ① 러너(합성 코퍼스 3 stem × 2 캐리어 = 6파일 · 실제 러너를 --from-stdin --kill 2 --timeout 2 로 끝까지 실행 · 에뮬레이터 부하 없음) — ⒝대조군(origin/main 러너): json 3 · log 3 ⇒ 6파일 중 3건 소실(문서화된 손실을 재현). ⒜실험군(고친 러너): json 6 · log 6 ⇒ 소실 0(ktf__놈3 · lgt__놈3 · ktf__다크슬레이어2 · skt__다크슬레이어2 · ktf__이노티아연대기2 · unknown__이노티아연대기2). 두 경우 모두 summary.tsv 는 6행(무손실 층은 원래 옳았다)",
+    "★★개악 양방향 ② 생성기 — summary.tsv 가 있을 때: 고친 쪽도 대조군도 inputs: summary.tsv=6 ⇒ 우선순위 불변. summary.tsv 를 지웠을 때: ⒜고친 생성기 inputs: bucket__stem.json=6 ↔ ⒝대조군 inputs: none=6(전건 NO-REPORT). ⇒ 두 반쪽이 함께 착지해야 한다는 것의 실측",
+    "★★7월 열 회귀 — 옛/새 생성기를 --reports game_lab/reports 로 나란히 돌려 TSV 대조: 205행 바이트 동일(stdout 도 출력 경로 한 줄만 차이). 헤더 산문 한 줄을 의도적으로 갱신한 뒤 다시 대조하니 그 한 줄 «밖»은 여전히 바이트 동일",
+    "★충돌 전수(내 계측) — game_lab/broken 187파일 · 고유 stem 184 · 겹치는 stem 3(놈3 lgt+ktf · 다크슬레이어2 skt+ktf · 이노티아연대기2 unknown+ktf)",
+    "★「사람이 여는가」계측 — 그 3 stem 은 추적 파일 7~8건에서 인용된다(docs/report/0165·0170·0183 · worklog 3 · scripts/game-lab-census-map.mjs). 전부 충돌 자체를 논하는 메타이고 «이 게임이 왜 실패했나»를 묻는 인용은 0. 기계 쪽은 7월 열에서 stem.json 이 유일 소스라 매 실행마다 읽는다(inputs: stem.json=186 · none=1)",
+    "★문법 — bash -n scripts/game-lab-recensus.sh rc=0 · node --check scripts/game-lab-census-map.mjs rc=0. ※그 --check 가 값을 했다: 경고 문안을 고치며 백틱을 JS 템플릿 리터럴 «안»에 넣어 파일을 한 번 깨뜨렸고 SyntaxError 로 잡혔다(백틱을 빼고 다시 했다)",
+    "★잔존 확인 — $OUT/${stem} 형태의 경로 사용 0건(전수 grep), $OUT/${key} 6곳",
+    "★repo 표준 게이트 — fmt · clippy --all -D warnings · wasm clippy · RUST_MIN_STACK=4194304 cargo test --all · cargo +beta clippy 전건 rc=0(AGENTS.md 「무엇을 바꿨든 넷 다 + beta」 · 이 diff 의 Rust 줄은 0)",
+    "★check-worklog-json · check-docs-report-serial(--next-serial 0190 — 열린 PR #224 의 0188 과 #225 의 0189 claim 을 세어서 준다) · check-doc-liveness-parity · checker-census 전건 rc=0",
+    "★게임 파일명 유입 — scripts/corpus-name-inflow.mjs 를 커밋 «후»에 실행해서 적는다(커밋 전에 재면 대상이 0파일이라 언제나 0 이다 — 직전 회차가 그 함정을 밟았다)",
+    "★게이트에서 «가짜 red» 1건을 만났고 원인을 확정했다 — cargo test --all 초회 FAIL. 이 diff 의 Rust 줄은 0(git diff --stat -- '*.rs' Cargo.toml Cargo.lock 빈 출력)인데 wie_cli/tests/dod_ci_parity.rs 11건이 전부 죽었고, 문면은 /private/var/folders/…/tmp.6MxmGnpDkS/wt/AGENTS.md 를 읽지 못했다였다. ★그 경로는 실재하지 않고, 그 시험의 repo_root() 는 env!(\"CARGO_MANIFEST_DIR\") = 컴파일 시점에 박히는 값이다 ⇒ 어떤 회차가 mktemp -d 워크트리 «안»에서 빌드한 산출물이 이 맥의 공유 target/ 에 캐시돼 남았고, 그 워크트리가 지워진 뒤 재실행되면 없는 경로를 읽으려다 죽는다. 확정: touch 로 강제 재컴파일 → 11 passed/0 failed → 전수 cargo test --all rc=0 · ok 바이너리 46 · FAILED 0. ★이 문면은 저장소 결함처럼 보이지만 아니다 — 경로가 /var/folders/… 이면 처방은 재컴파일이고 diff 는 무관하다(git worktree list 실측상 이 맥은 상시 워크트리를 들고 있어 재발한다)",
+    "★내 오측 1건 — 첫 조사에서 cargo test --all | grep | head -30 으로 보고 «test result: ok 30줄»만 나와 통과로 읽었다. head -30 이 실패 줄 «전»에서 잘랐다. 직전 회차가 파이프 뒤 rc 를 읽어 틀린 것과 같은 계급이고 이번엔 출력 절단이었다 ⇒ 진단은 head 로 자르지 말고 파일로 받아 grep -c 로 세라(이 회차의 뒤 측정은 전부 그 형태다)"
+  ],
+  "limits": [
+    "★7월 열의 3 stem 은 영구히 한 판정을 공유한다 — 지는 쪽 실행이 애초에 기록되지 않았으므로 복구 불가이지 미수선이 아니다. 제안의 「소급해 고치지는 마라」를 그대로 지켰다",
+    "★한 디렉터리 안에 두 규약이 섞인다 — 제안 tradeoff 가 예고한 비대칭이다. 완화는 생성기가 두 이름을 다 찾는 것이고, 그래서 바레 stem 폴백을 지우면 안 된다고 소스에 못박았다. ★「항상 bucket 이름」을 골랐다면 비대칭이 «디렉터리 사이»로 커졌을 뿐 사라지지 않는다",
+    "★--resume 의미가 겹치는 stem 에서 바뀐다 — 옛 규약 디렉터리에 --resume 을 걸면 그 3 stem 은 다시 돈다(찾는 이름이 달라졌다). 나머지 181 은 그대로 skip. 옛 <stem>.json 은 «어느 캐리어의 것인지 모르는» 파일이라 skip 근거가 될 수 없으므로 이것은 옳은 방향이지만, 그 3건을 다시 도는 비용은 실재한다",
+    "★--from-stdin 으로 임의 경로를 먹이면 이론상 key 가 또 겹칠 수 있다(같은 이름의 디렉터리 두 개). 그때는 종전과 같은 last-wins 이고 더 나빠지지는 않지만, 이 회차가 그 경우를 막지는 않았다",
+    "★전 코퍼스 재실행 0 — 러너를 고쳤지 새 열을 만들지 않았다. 새 열이 실제로 대칭인지는 45분짜리 실행이 한 번 돌아야 확정된다(이 회차는 6파일 합성 코퍼스로만 보였다)",
+    "★합성 코퍼스의 게임 파일은 junk 바이트다 — 검증기가 실제로 무엇을 내는지가 아니라 «러너가 어느 이름으로 쓰는가»만 exercise 했다. 판정 내용의 정확성은 이 실험의 대상이 아니다",
+    "★「사람이 그 3건을 여는지」는 «추적 파일의 인용»으로만 셌다 — 사람이 에디터로 연 횟수는 이 저장소가 기록하지 않으므로 원리적으로 못 잰다. 0 이라 적지 않고 «진단 목적 인용 0 · 메타 인용 7~8»로 적었다"
+  ],
+  "adoptedProposals": [
+    "2026-09-19-census-input-precedence-and-signature-lookup#p0"
+  ],
+  "proposals": [
+    {
+      "title": "새 규약으로 전 코퍼스를 한 번 돌려 «대칭인 열»을 실제로 만들어라 — 지금은 6파일 합성으로만 보였다",
+      "plainSummary": "게임별 결과가 더 이상 덮어써지지 않도록 고쳤지만, 실제로 187개를 다 돌려 본 것은 아닙니다. 한산할 때 한 번 돌리면 비교할 수 있는 새 열이 생깁니다.",
+      "userBenefit": "7월 열과 1:1로 비교할 수 있는 «대칭» 열이 처음 생긴다 — 지금은 비교하면 3행이 구조적으로 어긋난다.",
+      "why": "이 회차는 러너와 생성기를 고치고 6파일 합성 코퍼스로 양방향을 보였지만, 187파일 전수를 돌리지는 않았다(45분 · 이 맥은 self-hosted CI 러너를 겸한다). ⇒ 「새 열은 대칭이다」는 설계상 참이고 합성으로 실증됐으나 «실물 열»로는 아직 없다. 한 번 돌리면 그 뒤로는 --reports 두 번으로 두 열을 비교할 수 있고, 겹치는 3 stem 도 처음으로 각자 판정을 갖는다.",
+      "tradeoff": "★45분이 든다 — 그리고 이 맥이 CI 러너를 겸하므로 그 시간 동안 열린 PR 들이 밀린다(선행 회차가 그 비용을 실측해 적었다: 5 PR 대기). ★부하가 높으면 판정 자체가 흔들린다(AGENTS.md 의 FAIL 판정 네 단계) — 한산할 때가 아니면 «새 열»이 비교 가능한 열이 아니라 노이즈가 된다. ★그리고 새 열이 생겨도 7월과의 3행 비대칭은 남는다(복구 불가) — 이 제안이 사는 것은 «앞으로의 두 열» 비교이지 7월 수선이 아니다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ]
+}
