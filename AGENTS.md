@@ -643,12 +643,45 @@ design** — do not "fix" that by wiring it:
   to report is `BOUNDED`, and it is not reportable alone** — `SUFFIX-ATTACHED` must be quoted beside
   it, because that bucket provably mixes a longer *different* title (`<stem>2`, `<stem>1.04`) with a
   real mention carrying a Korean particle (`<stem>의 …`), and nothing in the shape separates them.
+
+  **Nothing checks that you ran it, and building that checker was priced and declined on 2026-09-20**
+  (`wie-corpus-name-inflow-token-boundary-p1`, `docs/report/0195`). Two measurements decided it.
+  First, **running a script leaves no trace** — this tool writes **0 files** — so "did this round call
+  it" is not observable after the fact; any check must proxy through wording or invent a new artifact.
+  Second, the obvious proxy is **wrong where it was tested**: requiring the literal string
+  `corpus-name-inflow` flags **3 of the 12** round-doc files that report a number since the tool
+  landed, and **all 3 ran it** and said so in their own words ("도구를 실행해서 적었다"). Zero true
+  positives. The disease it targets has **never been observed**: 3 of 3 rounds that reported a number
+  ran the tool. What *has* been observed, 4 times out of 4, is the **other** failure — the number was
+  measured and then invalidated by later edits — and every one was caught before landing (3 by a
+  gate② `-fix`, 1 by a self re-measure). That is a different proposal with its own ticket; do not
+  solve it here. **Reopen when a round that is NOT in this lineage reports an inflow number** — the
+  compliance above is all from the rounds that built the tool, which is the weakest possible sample —
+  **or when any round is found to have hand-derived one.** ★This trigger is prose and nothing
+  enforces it, the same unchecked-obligation shape the `WIE_BASE` rows above carry; that is the cost
+  of not building the checker, and mechanizing the trigger would rebuild the same wording proxy one
+  level up.
+
   ★**Writing "유입 0" while that bucket is non-empty is the exact claim this lineage was rejected
   for.** It exists because the predicate lived only in prose — `docs/report/0173` says "코퍼스 고유
   stem 184개와 NFC 완전일치로 전수 대조", `0170` and `0174` say it in their own words, and nothing
   executed any of them; a plain substring test is what produced 35 hits for a one-syllable stem that
   merely sits inside `인스턴스` and `패턴`. Measured 2026-09-19 over 838 tracked text files: 392
   occurrences split **328 / 48 / 16**. `docs/report/0187` has the split and the false-negative audit.
+
+  **The population is the WHOLE corpus, not `game_lab/broken` — widened 2026-09-20, and that number
+  above is from before the widening.** It read `broken/` only, so 266 of the 451 game stems were
+  invisible and the honest answer to "is this name in the corpus" was wrong for 59% of it. Not
+  hypothetical: `0187`'s own hand-split dismissed 엑스맨3 · 크로이센1.04 · 하이브리드2 ·
+  일지매영웅전기2 · 붕어빵타이쿤3작은화면 as "a longer *different* title, measured not to be a corpus
+  stem", and **all five are archives in `game_lab/working/`**. **The cost that argued against
+  widening was measured at zero where it would be paid**: over the 25 most recent landed rounds, in
+  the default mode, `SUFFIX-ATTACHED` — the bucket a human splits by hand — is **identical under
+  both populations in all 25**; `BOUNDED` grows by a median of 1 pair (mean 1.44), which is printed
+  lines, not work. `vendor_sdk/` is the one excluded bucket, because it is emulator/SDK jars rather
+  than games and its stem `agent` is an ordinary word here — it alone adds 21 false
+  `SUFFIX-ATTACHED` pairs, more than all of `broken/` produces. The tool prints what it excluded.
+  `docs/report/0194` has the per-round table.
 
 - **`scripts/ktf-image-sweep.py` — local only (it needs a KTF client image, which comes out of the
   git-ignored corpus), and it is the only Python in `scripts/`.** Three sweeps behind one entry
