@@ -1,0 +1,56 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-20",
+  "task": "wie-corpus-name-inflow-token-boundary-p0",
+  "title": "유입 모집단을 코퍼스 전체로 넓혔다 — 제안이 두려워한 대가를 «지불되는 자리»에서 재니 0이었다",
+  "summary": "채택 제안 2026-09-20-corpus-name-inflow-token-boundary#p0 의 이행. ★제안은 「정하라」였고 자기 추정 결론은 「넓히지 않는 편이 맞을 수 있다」였는데, 실측이 그것을 뒤집었다. ⒜근거는 가설이 아니라 직전 회차다 — docs/report/0187 이 SUFFIX-ATTACHED 를 손으로 가르며 「코퍼스 stem 이 아님을 실측」이라고 떨어낸 11건 중 «다섯»이 game_lab/working 의 아카이브다(엑스맨3·크로이센1.04·하이브리드2·일지매영웅전기2·붕어빵타이쿤3작은화면). ★단 그 다섯은 전부 scripts/smoke_gate_baseline.tsv 에 이미 합법적으로 커밋돼 있어 «유출»이 아니다 — 고친 것은 «그 이름은 코퍼스에 없다»는 틀린 문장이지 정책이 아니다. ⒝제안의 tradeoff 둘(SUFFIX 바구니가 커진다 · baseline 283 stem 이 매번 잡힌다)은 --all-tracked 에서는 참이고 «회차가 실제로 쓰는 기본 모드»에서는 거짓이다: 최근 착지 25회차를 각자의 diff 로 재니 ★SUFFIX-ATTACHED 쌍이 25회차 전건 동일(Δ=0)이고 BOUNDED 는 중앙값 +1쌍(평균 +2.5)뿐이며 ★smoke_gate_baseline.tsv 와 docs/lgt_abi.md 는 0/25 회차가 접촉했다. ⒞vendor_sdk 만 뺐다 — 게임이 아니라 에뮬·SDK 아카이브이고 stem `agent` 가 AGENTS.md 저장소에서 평범한 단어라 그 한 버킷만으로 거짓 SUFFIX 21쌍(broken 전체 26쌍보다 많다)을 만든다.",
+  "changes": [
+    "scripts/corpus-name-inflow.mjs — 기본 모집단 game_lab/broken → game_lab(전체) · EXCLUDED_BUCKETS={vendor_sdk} 신설 · ★뺀 하위 버킷을 머리에 찍는다(조용히 빼지 않는다는 이 도구의 설계 그대로) · 제외는 «내려간» 디렉터리에만 적용해 --corpus game_lab/vendor_sdk 는 여전히 동작",
+    "scripts/corpus-name-inflow.mjs 머리주석 — 넓힌 근거(0187 의 다섯 이름)·25회차 실측·vendor_sdk 제외 근거를 «수와 함께» 기록 · ★종전 「184 stem」 문단은 «사료»로 표시하고 수를 고치지 않았다(그 문단은 부분문자열 문제의 기록이지 현재 판독이 아니다)",
+    "AGENTS.md §Web-surface «local only» 의 corpus-name-inflow 항목(+15행) — 「모집단은 코퍼스 전체다 · 328/48/16 은 넓히기 «이전» 수다」 · 넓힌 근거와 재측된 대가 · vendor_sdk 제외",
+    "docs/report/0194 신설 — 결정·근거표(다섯 이름의 실제 경로)·25회차 per-round 표·vendor_sdk 실측·개악 양방향·한계 4",
+    "★검사기(CI red) 신설 0 · 코퍼스 파일 변경 0 · Rust 0줄 · 형제 제안 #p1·#p2 무접촉"
+  ],
+  "verification": [
+    "★모집단 — broken 184 stem · working 285 stem(겹침 19) · 합집합 450 · +_nongame 1 = ★451. vendor_sdk 45 는 뺐다. 종전 모집단은 전체의 40.8% 였다(184/451)",
+    "★0187 의 오분류 실증 — 「코퍼스 stem 이 아님을 실측」이라 적힌 11건 중 5건이 game_lab/working 의 아카이브(NFC 정규화 후 전수 대조). ★macOS 파일명은 NFD 라 find -iname 으로는 «0건»이 나온다 — 이 대조는 NFC 정규화 후에만 성립한다",
+    "★대가 재측(pristine origin/main 워크트리에서 쟀다 — 이 PR 의 편집이 섞이지 않게) — 최근 착지 25회차 × 각자의 변경 파일: ★SUFFIX-ATTACHED 쌍 25/25 회차 «동일»(Δ=0) · BOUNDED 쌍 합 211 → 273(+62 · 회차당 평균 +2.5 · 중앙값 +1 · 최대 +13 · Δ=0 인 회차 8)",
+    "★비용이 몰린 자리 — working 285 stem 중 244(85.6%)는 추적 트리에서 scripts/smoke_gate_baseline.tsv «한 파일에만» 나온다. 그 파일 접촉 0/25 회차(전체 first-parent 이력 22커밋) · docs/lgt_abi.md 접촉 0/25 회차(전체 24커밋)",
+    "★vendor_sdk 배제 근거 — 그 버킷만을 모집단으로 --all-tracked: BOUNDED 13회/8쌍(agent 9 · KEmulator-mmpp 4) · ★SUFFIX-ATTACHED 34회/21쌍으로 broken 전체(26쌍)보다 많고 전건 거짓",
+    "★개악 양방향(계약 2) — 원문을 sed 로 고쳐 «실제로» 돌렸다. ⒜정상: 모집단 451 · agent BOUNDED 0 · SUFFIX 40쌍. ⒝EXCLUDED_BUCKETS 를 비우면: 모집단 496 · agent BOUNDED 11 · SUFFIX 61쌍. ★검사기는 만들지 않았으므로 「CI red/green」은 해당 없음 — 이 도구는 코퍼스가 필요해 CI 가 돌릴 수 없다(Constraint 9)",
+    "★자기 적용 — ★수를 «마지막에» 쟀다(0187 이 틀린 순서가 그 반대였다: 수를 먼저 재고 그 뒤 근거 목록을 써 넣었다). 커밋 후 기본 모드 실측: ★BOUNDED 45회/26쌍 · PREFIX-EMBEDDED 4회/2쌍 · ★SUFFIX-ATTACHED 36회/21쌍. ★SUFFIX 21쌍이 «비어 있지 않으므로» 유입 0 이라 쓰지 않는다 — 전건 눈 분류: 20쌍은 이 PR 이 근거로 인용한 다섯 이름이 짧은 stem(엑스맨·하이브리드·크로이센·일지매영웅전기·붕어빵타이쿤3)의 오른쪽에 붙어 잡힌 «더 긴 다른 제목»이고, 그 긴 제목 자신도 이제 모집단이라 BOUNDED 로 «따로» 잡혀 있다(이 회차가 한계로 적은 이중 계수). ★나머지 1쌍은 다르다 — 이 worklog 가 제안 본문에서 인용한 「겟앰프드의 …」로, 조사가 붙은 «진짜 언급» 쪽이다. ★초안은 이 바구니를 「전건 더 긴 다른 제목」이라 적었고 그것은 «틀렸다» — 도구 출력을 줄 단위로 읽어서 잡았다. 0187 이 같은 바구니에서 같은 방향으로 틀린 자리다",
+    "★수 안정성 — 문안을 확정한 «뒤» 다시 재서 붙였다. ★«쌍»은 파일×stem 이라 같은 파일에 이미 있는 이름을 더 써도 안 변하고, «회»는 변한다 ⇒ 마지막 보정은 «숫자만» 고치는 편집으로 했다(숫자는 이름을 늘리지 않는다). 그 편집 뒤 재측에서 45/26 · 4/2 · 36/21 가 그대로 나왔다",
+    "★checker-census rc=0 · doc-liveness parity rc=0(펜스 sh 블록을 더하지 않았다) · check-worklog-json rc=0 · check-docs-report-serial rc=0(0194)",
+    "★repo 표준 게이트 — fmt · clippy --all -D warnings · wasm clippy · RUST_MIN_STACK=4194304 cargo test --all · cargo +beta clippy 전건 rc=0(AGENTS.md 「무엇을 바꿨든 넷 다」 · 이 diff 에 Rust 0줄)"
+  ],
+  "limits": [
+    "★--all-tracked 기준으로는 확실히 비싸졌다 — BOUNDED 161쌍 → 491쌍. 진단 모드이지 보고 모드가 아니지만, 그 모드를 쓰는 회차는 이 수를 그대로 만난다",
+    "★겹치는 stem 을 두 번 센다 — `엑스맨3` 한 번 출현이 stem `엑스맨3`(BOUNDED)과 stem `엑스맨`(SUFFIX-ATTACHED)으로 «함께» 잡힌다. 넓힐수록 이 겹침이 늘고, 합치는 규칙은 이 회차가 정하지 않았다",
+    "★기계는 「그 이름은 이미 저장소가 합법적으로 커밋한 자산이다」를 여전히 모른다 — smoke_gate_baseline.tsv 의 283 stem 을 표시하는 넷째 갈래는 만들지 않았다(이 제안이 물은 것이 아니고, 표본 1건에 굳히면 오탐이 굳는다)",
+    "★vendor_sdk 제외는 디렉터리 이름 하드코드다 — 버킷 이름이 바뀌면 조용히 다시 들어온다. 다만 도구가 «뺀 버킷»을 매번 찍으므로 「없음」으로 화면에 드러난다",
+    "★25회차 표는 «현재 트리의 파일 내용»으로 쟀다 — 각 회차 시점의 내용이 아니다. 회차의 파일 «목록»은 그 시점 것이고 내용은 오늘 것이므로, 규모 추정이지 재현이 아니다"
+  ],
+  "adoptedProposals": [
+    "2026-09-20-corpus-name-inflow-token-boundary#p0"
+  ],
+  "proposals": [
+    {
+      "title": "이미 커밋된 게임 이름(283 stem)을 넷째 갈래로 표시할지 정하라",
+      "plainSummary": "게임 이름 점검 결과에 «이미 저장소가 정식으로 갖고 있던 이름»과 «이번에 새로 들어온 이름»이 섞여 나옵니다. 둘을 나눠 보여줄지 정하자는 제안입니다.",
+      "userBenefit": "「새로 들어온 이름」만 골라 볼 수 있어 점검이 빨라집니다.",
+      "why": "이 회차가 모집단을 넓히며 들어온 stem 중 244개(85.6%)는 추적 트리에서 scripts/smoke_gate_baseline.tsv «한 파일에만» 나온다 — AGENTS.md 가 축복한 기존 자산이다. 그 파일을 건드리는 회차는 드물어서(0/25) 오늘은 비용이 없지만, 건드리는 순간 288회 분량이 한꺼번에 BOUNDED 로 쏟아진다. 「기존 자산」 갈래가 있으면 그 회차가 수를 읽을 수 있다.",
+      "tradeoff": "이 도구의 설계 원칙은 «조용히 빼지 않는다»이므로 넷째 갈래는 «제외»가 아니라 «표시»여야 하고, 그러면 출력이 또 한 단 길어진다. 그리고 기준이 smoke_gate_baseline.tsv 한 파일이라 그 파일이 곧 제2의 진실원이 된다 — 이 리니지가 없애려던 형태다. 표본이 1건(아직 아무도 그 파일을 안 건드렸다)이라 지금 굳히면 오탐이 굳는다는 이 저장소의 규율도 그대로 적용된다. 아무것도 하지 않고 한계로 남기는 편이 맞을 수 있다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "겹치는 stem 의 이중 계수를 어떻게 합칠지 정하라",
+      "plainSummary": "「엑스맨3」이라는 이름 하나가 「엑스맨」과 「엑스맨3」 둘로 세어져 두 번 보고됩니다.",
+      "userBenefit": "같은 한 번의 언급이 두 건으로 세어지지 않아 수를 그대로 믿을 수 있습니다.",
+      "why": "모집단이 넓어지며 짧은 stem 과 그것을 접두로 갖는 긴 stem 이 같은 모집단에 함께 들어왔다(엑스맨/엑스맨3 · 하이브리드/하이브리드2 · 붕어빵타이쿤3/붕어빵타이쿤3작은화면 …). 본문에 긴 이름이 한 번 나오면 긴 stem 으로 BOUNDED 1쌍, 짧은 stem 으로 SUFFIX-ATTACHED 1쌍이 함께 잡힌다. ★이 회차 자신의 SUFFIX-ATTACHED 21쌍 중 20쌍이 그 형태였다 — 즉 사람이 매번 가르는 바구니의 «대부분»은 기계가 이미 아는 사실이다(더 긴 stem 이 같은 위치에서 BOUNDED 로 잡혀 있다). ★나머지 1쌍(조사가 붙은 진짜 언급)이 정확히 자동화를 막는 잔여다.",
+      "tradeoff": "「같은 위치에서 더 긴 stem 이 BOUNDED 로 잡혔으면 짧은 쪽 SUFFIX 는 접는다」는 규칙은 자동화가 가능해 보이지만, 그것이 참이 아닌 경우가 남는다 — 「겟앰프드의 …」처럼 조사가 붙은 진짜 언급은 더 긴 stem 이 «없는데도» SUFFIX 에 있다. 그 둘을 위치로 가르는 코드는 지금의 단순한 indexOf 루프보다 복잡해지고, 이 도구가 일부러 고른 「기계가 못 가르는 것을 가른 척하지 않는다」를 침식할 위험이 있다. 그리고 실해가 작다 — 늘어나는 것은 사람이 읽는 줄 수뿐이다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}

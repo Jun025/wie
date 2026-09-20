@@ -650,6 +650,20 @@ design** — do not "fix" that by wiring it:
   merely sits inside `인스턴스` and `패턴`. Measured 2026-09-19 over 838 tracked text files: 392
   occurrences split **328 / 48 / 16**. `docs/report/0187` has the split and the false-negative audit.
 
+  **The population is the WHOLE corpus, not `game_lab/broken` — widened 2026-09-20, and that number
+  above is from before the widening.** It read `broken/` only, so 266 of the 451 game stems were
+  invisible and the honest answer to "is this name in the corpus" was wrong for 59% of it. Not
+  hypothetical: `0187`'s own hand-split dismissed 엑스맨3 · 크로이센1.04 · 하이브리드2 ·
+  일지매영웅전기2 · 붕어빵타이쿤3작은화면 as "a longer *different* title, measured not to be a corpus
+  stem", and **all five are archives in `game_lab/working/`**. **The cost that argued against
+  widening was measured at zero where it would be paid**: over the 25 most recent landed rounds, in
+  the default mode, `SUFFIX-ATTACHED` — the bucket a human splits by hand — is **identical under
+  both populations in all 25**; `BOUNDED` grows by a median of 1 pair (mean 2.5), which is printed
+  lines, not work. `vendor_sdk/` is the one excluded bucket, because it is emulator/SDK jars rather
+  than games and its stem `agent` is an ordinary word here — it alone adds 21 false
+  `SUFFIX-ATTACHED` pairs, more than all of `broken/` produces. The tool prints what it excluded.
+  `docs/report/0194` has the per-round table.
+
 - **`scripts/ktf-image-sweep.py` — local only (it needs a KTF client image, which comes out of the
   git-ignored corpus), and it is the only Python in `scripts/`.** Three sweeps behind one entry
   point: `slots` (every indirect call through an interface table, all slot offsets, with the global
