@@ -14,7 +14,7 @@
   "verification": [
     "★모집단 — broken 184 stem · working 285 stem(겹침 19) · 합집합 450 · +_nongame 1 = ★451. vendor_sdk 45 는 뺐다. 종전 모집단은 전체의 40.8% 였다(184/451)",
     "★0187 의 오분류 실증 — 「코퍼스 stem 이 아님을 실측」이라 적힌 11건 중 5건이 game_lab/working 의 아카이브(NFC 정규화 후 전수 대조). ★macOS 파일명은 NFD 라 find -iname 으로는 «0건»이 나온다 — 이 대조는 NFC 정규화 후에만 성립한다",
-    "★대가 재측(pristine origin/main 워크트리에서 쟀다 — 이 PR 의 편집이 섞이지 않게) — 최근 착지 25회차 × 각자의 변경 파일: ★SUFFIX-ATTACHED 쌍 25/25 회차 «동일»(Δ=0) · BOUNDED 쌍 합 211 → 273(+62 · 회차당 평균 +2.5 · 중앙값 +1 · 최대 +13 · Δ=0 인 회차 8)",
+    "★대가 재측(pristine origin/main 워크트리에서 쟀다 — 이 PR 의 편집이 섞이지 않게) — 최근 착지 25회차 × 각자의 변경 파일: ★SUFFIX-ATTACHED 쌍 25/25 회차 «동일»(Δ=0) · BOUNDED 쌍 합 114 → 150(+36 · 회차당 평균 +1.44 · 중앙값 +1 · 최대 +11 · Δ=0 인 회차 10). ★★[정정] 초판은 211 → 273(+62 · 평균 2.5 · 최대 13 · Δ=0 8회차)이라 적었고 그것은 «파일 목록을 세 배로 뽑은» 수다 — git diff-tree -r --no-commit-id --name-only -m --first-parent <c> 는 --first-parent 가 붙어도 «두 부모 모두»와의 diff 를 내놓는다(4acb1631 실측 진짜 4파일 ↔ 그 명령 12파일). 올바른 물음은 git diff --name-only <c>^1 <c> 이고 전 25행을 재측했다. ★결론 불변 — SUFFIX 쌍 25/25 동일(Δ=0) · 중앙값 +1 그대로",
     "★비용이 몰린 자리 — working 285 stem 중 244(85.6%)는 추적 트리에서 scripts/smoke_gate_baseline.tsv «한 파일에만» 나온다. 그 파일 접촉 0/25 회차(전체 first-parent 이력 22커밋) · docs/lgt_abi.md 접촉 0/25 회차(전체 24커밋)",
     "★vendor_sdk 배제 근거 — 그 버킷만을 모집단으로 --all-tracked: BOUNDED 13회/8쌍(agent 9 · KEmulator-mmpp 4) · ★SUFFIX-ATTACHED 34회/21쌍으로 broken 전체(26쌍)보다 많고 전건 거짓",
     "★개악 양방향(계약 2) — 원문을 sed 로 고쳐 «실제로» 돌렸다. ⒜정상: 모집단 451 · agent BOUNDED 0 · SUFFIX 40쌍. ⒝EXCLUDED_BUCKETS 를 비우면: 모집단 496 · agent BOUNDED 11 · SUFFIX 61쌍. ★검사기는 만들지 않았으므로 「CI red/green」은 해당 없음 — 이 도구는 코퍼스가 필요해 CI 가 돌릴 수 없다(Constraint 9)",

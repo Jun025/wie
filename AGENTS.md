@@ -658,7 +658,7 @@ design** — do not "fix" that by wiring it:
   stem", and **all five are archives in `game_lab/working/`**. **The cost that argued against
   widening was measured at zero where it would be paid**: over the 25 most recent landed rounds, in
   the default mode, `SUFFIX-ATTACHED` — the bucket a human splits by hand — is **identical under
-  both populations in all 25**; `BOUNDED` grows by a median of 1 pair (mean 2.5), which is printed
+  both populations in all 25**; `BOUNDED` grows by a median of 1 pair (mean 1.44), which is printed
   lines, not work. `vendor_sdk/` is the one excluded bucket, because it is emulator/SDK jars rather
   than games and its stem `agent` is an ordinary word here — it alone adds 21 false
   `SUFFIX-ATTACHED` pairs, more than all of `broken/` produces. The tool prints what it excluded.
