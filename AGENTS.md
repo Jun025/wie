@@ -643,6 +643,25 @@ design** — do not "fix" that by wiring it:
   to report is `BOUNDED`, and it is not reportable alone** — `SUFFIX-ATTACHED` must be quoted beside
   it, because that bucket provably mixes a longer *different* title (`<stem>2`, `<stem>1.04`) with a
   real mention carrying a Korean particle (`<stem>의 …`), and nothing in the shape separates them.
+
+  **Nothing checks that you ran it, and building that checker was priced and declined on 2026-09-20**
+  (`wie-corpus-name-inflow-token-boundary-p1`, `docs/report/0195`). Two measurements decided it.
+  First, **running a script leaves no trace** — this tool writes **0 files** — so "did this round call
+  it" is not observable after the fact; any check must proxy through wording or invent a new artifact.
+  Second, the obvious proxy is **wrong where it was tested**: requiring the literal string
+  `corpus-name-inflow` flags **3 of the 12** round-doc files that report a number since the tool
+  landed, and **all 3 ran it** and said so in their own words ("도구를 실행해서 적었다"). Zero true
+  positives. The disease it targets has **never been observed**: 3 of 3 rounds that reported a number
+  ran the tool. What *has* been observed, 4 times out of 4, is the **other** failure — the number was
+  measured and then invalidated by later edits — and every one was caught before landing (3 by a
+  gate② `-fix`, 1 by a self re-measure). That is a different proposal with its own ticket; do not
+  solve it here. **Reopen when a round that is NOT in this lineage reports an inflow number** — the
+  compliance above is all from the rounds that built the tool, which is the weakest possible sample —
+  **or when any round is found to have hand-derived one.** ★This trigger is prose and nothing
+  enforces it, the same unchecked-obligation shape the `WIE_BASE` rows above carry; that is the cost
+  of not building the checker, and mechanizing the trigger would rebuild the same wording proxy one
+  level up.
+
   ★**Writing "유입 0" while that bucket is non-empty is the exact claim this lineage was rejected
   for.** It exists because the predicate lived only in prose — `docs/report/0173` says "코퍼스 고유
   stem 184개와 NFC 완전일치로 전수 대조", `0170` and `0174` say it in their own words, and nothing
