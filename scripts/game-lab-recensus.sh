@@ -184,16 +184,58 @@ if [ "$LIMIT" -gt 0 ] && [ "$LIMIT" -lt ${#files[@]} ]; then
   files=("${files[@]:0:$LIMIT}")
 fi
 
-# ── Stem collisions are announced, not discovered later ──────────────────────
-# The per-game JSON is `<stem>.json` because that is what the generator looks up.
-# When two carriers hold the same title the LAST run wins and the map attributes
-# that verdict to both copies. That is a real loss and it is why `summary.tsv`
-# below is keyed by PATH — the file-level truth survives even where the JSON layer
-# cannot. Saying so here is the difference between a known cost and a silent one.
-collisions=$(printf '%s\n' "${files[@]}" | sed 's#.*/##; s#\.[^.]*$##' | sort | uniq -d | wc -l | tr -d ' ')
+# ── Stem collisions: announced, and now SURVIVED ─────────────────────────────
+# The per-game artefacts used to be keyed by `<stem>` alone, so when two carriers
+# held the same title the LAST run won and overwrote the first. `summary.tsv` was
+# the only lossless layer (it is keyed by PATH), and it still is — but the layer a
+# human actually opens is the per-game file, and that one was losing data.
+#
+# ★The loss was WIDER than the per-game JSON. `<stem>` keyed five paths: `.json`,
+# `.log` (the validator's stderr — the first thing anyone reads to answer "why did
+# this fail"), `.png`, the `.out` scratch, and the `--resume` skip test. All of them
+# were overwritten, not just the verdict.
+#
+# ⇒ A colliding stem is now written as `<bucket>__<stem>`, where `<bucket>` is the
+# directory the file came from (`broken/ktf/놈3.zip` -> `ktf__놈3`). Non-colliding
+# stems are UNCHANGED, so an existing directory and the 181 uncontested games keep
+# byte-identical names; only the games that were actually losing data move.
+# ★Existing directories are NOT rewritten — the July column keeps its own names
+# (that is the proposal's "기존 디렉터리를 소급해 고치지는 마라"), and the generator
+# keeps reading them, because it still tries the bare `<stem>` key as a fallback.
+#
+# ★★TWO PLACES THIS KEY DOES NOT REACH. Neither is a defect being hidden; both are
+# stated because a claim of safety that is wider than the mechanism is worse than
+# no claim at all.
+#
+# ⑴ `--shots`. `--screenshot "$OUT/${key}.png"` IS key-qualified, but `--shotdir`
+#    hands the validator ONE SHARED DIRECTORY and the per-step PNGs inside it are
+#    named by the validator, not here: `wie_validate.rs` takes `file_stem()` off the
+#    input path and writes `{stem}__{label}.png` — a BARE stem. So with `--shots` on,
+#    the step images of a colliding title still overwrite each other. Fixing that is
+#    a change to the validator, which is a separate axis and deliberately not done
+#    here; what this script owes is to stop saying otherwise.
+#
+# ⑵ A PARTIAL run cannot see the collision at all. `dupstems` below is derived from
+#    `files[]` — i.e. from THIS RUN's list, after `--limit` truncation and exactly as
+#    given by `--from-stdin` — not from the corpus. Feed one carrier's copy into an
+#    empty `--out` and the stem looks unique, so it is written BARE; feed the other
+#    carrier in afterwards and it overwrites the first, which is the pre-fix loss
+#    reproduced in full (measured 2026-09-20 on a synthetic corpus with a stub
+#    validator: two sequential one-carrier runs left ONE bare `.json` against TWO
+#    `summary.tsv` rows). ⇒ ★For a re-run that must be collision-safe, hand this
+#    script BOTH copies in the same invocation, or run the whole corpus.
+#    Making `dupstems` corpus-derived is NOT a one-line fix — `--from-stdin` paths
+#    need not live under `$CORPUS`, so the population that defines a collision is a
+#    design question. It is carried as a follow-up proposal, not silently.
+dupstems=$(printf '%s\n' "${files[@]}" | sed 's#.*/##; s#\.[^.]*$##' | sort | uniq -d)
+collisions=$(printf '%s' "$dupstems" | grep -c . || true)
 
 echo "game-lab-recensus: ${#files[@]} game(s) · corpus=$CORPUS · out=$OUT · timeout=${TIMEOUT}s kill=${KILL}s nice=$NICE"
-[ "$collisions" -gt 0 ] && echo "  ★ $collisions stem(s) appear under more than one carrier — the stem-keyed JSON keeps only the last; summary.tsv keeps every file"
+[ "$collisions" -gt 0 ] && {
+  echo "  ★ $collisions stem(s) appear under more than one carrier — those are written as <bucket>__<stem>.{json,log,png} so neither copy is overwritten"
+  echo "      ★except per-step PNGs under shots/ with --shots: the validator names those itself, from a BARE stem. And this list comes from THIS run's files, so a partial run cannot see a collision at all."
+  printf '%s\n' "$dupstems" | sed 's/^/      /'
+}
 
 if [ "$DRYRUN" -eq 1 ]; then
   echo "  --dry-run: writing nothing. Files that would run:"
@@ -219,7 +261,14 @@ pass=0; fail=0; skipped=0
 for f in "${files[@]}"; do
   base="$(basename "$f")"
   stem="${base%.*}"
-  if [ "$RESUME" -eq 1 ] && [ -s "$OUT/${stem}.json" ]; then
+  # ★The artefact key. `<stem>` unless two carriers share it, in which case the
+  # source directory disambiguates. Derived from the PATH, not from `detected`
+  # below, so it is available before the resume test and needs no unzip.
+  key="$stem"
+  if [ -n "$dupstems" ] && printf '%s\n' "$dupstems" | grep -qxF -- "$stem"; then
+    key="$(basename "$(dirname "$f")")__${stem}"
+  fi
+  if [ "$RESUME" -eq 1 ] && [ -s "$OUT/${key}.json" ]; then
     skipped=$((skipped+1)); continue
   fi
 
@@ -249,14 +298,18 @@ for f in "${files[@]}"; do
   # sampling trap AGENTS.md names — the two arms differ on `--shots` AND on the load
   # minute, and the load moves far more. Settling it needs an idle machine and pairing.
   # Pass `--shots` when you need a run comparable to the baseline on that axis.
+  # ★And when you do, know what it does NOT key: `--screenshot` below follows `$key`,
+  # but `--shotdir` is one shared directory whose per-step PNGs the VALIDATOR names
+  # `{bare stem}__{label}.png`. A colliding title loses its step images there even
+  # though its `.json`/`.log`/`.png` survive. See ⑴ in the key block above.
   shotargs=()
-  [ "$SHOTS" -eq 1 ] && shotargs=(--shotdir "$OUT/shots" --screenshot "$OUT/${stem}.png")
+  [ "$SHOTS" -eq 1 ] && shotargs=(--shotdir "$OUT/shots" --screenshot "$OUT/${key}.png")
 
   # macOS has no `timeout`, and SIGALRM can be masked by heavy ARM emulation, so a
   # background `kill -9` is the only reliable bound on a hung tick(). Lifted from
   # classify.sh, which has run this for the whole corpus.
   nice -n "$NICE" "$BIN" "$f" --inject --timeout "$TIMEOUT" "${shotargs[@]}" \
-    >"$OUT/${stem}.out" 2>"$OUT/${stem}.log" &
+    >"$OUT/${key}.out" 2>"$OUT/${key}.log" &
   vpid=$!
   i=0
   while kill -0 "$vpid" 2>/dev/null; do
@@ -266,12 +319,12 @@ for f in "${files[@]}"; do
   done
   wait "$vpid" 2>/dev/null || true
 
-  json="$(cat "$OUT/${stem}.out" 2>/dev/null || true)"
-  rm -f "$OUT/${stem}.out"
+  json="$(cat "$OUT/${key}.out" 2>/dev/null || true)"
+  rm -f "$OUT/${key}.out"
   if [ -z "$json" ]; then
     json='{"result":"FAIL","platform":"'"$detected"'","reason":"hang: SIGKILLed after '"$KILL"'s (infinite tick loop)","ticks":0,"paints":0,"content":false,"ms":0}'
   fi
-  printf '%s\n' "$json" > "$OUT/${stem}.json"
+  printf '%s\n' "$json" > "$OUT/${key}.json"
 
   IFS=$'\t' read -r result platform reason ticks paints content ms < <(
     python3 - "$json" <<'PY'
