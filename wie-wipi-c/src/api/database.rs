@@ -319,6 +319,48 @@ pub async fn list_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
 /// at all: both of their tokens are *simultaneously* a directory and an
 /// extension, so nothing in the corpus tells the readings apart.
 ///
+/// **2026-09-20: the fourth candidate splits in two, and one half is refuted —
+/// statically, without running either title.** "Select **or** ensure the
+/// directory" was written as one line above; it is two operations with different
+/// observable signatures, and separating them is what let a measurement bite.
+///
+/// * **Slot 8 does not dominate the opens.** `0103451A` has exactly **one**
+///   slot-8 site (`0x10571c`) against **seven** slot-0 sites, and the function
+///   holding that slot-8 call reaches an open *before* it: `0x1056e8` is
+///   `bl 0x105cfc`, `0x105cfc` is a function entry (`push {r4,r5,r6,lr}`) whose
+///   body calls `slot0("res/save.sav", 1, 1)` at `0x105d1c`, and there is no
+///   `pop`/`bx lr` between that `bl` and `0x10571c`. Reachability is not assumed:
+///   the fault dump this file already cites reads `R5` at `0x1056d8`, so that
+///   function ran. A *selection* the following calls resolve against has to
+///   dominate them; this one is dominated by one instead. ⇒ **the "select a
+///   namespace" reading is refuted for this image.**
+/// * **A selection would be a no-op anyway.** Every statically resolvable slot-0
+///   argument in both images already carries the token as its leading path
+///   component — `"res/save.sav"`, `"res/savem.sav"`, `"/ga/aysis.dat"`,
+///   `"/ga/data.dat"`. Nothing is left for a namespace to supply.
+/// * **The "ensure it exists" reading survives dominance but sits on the wrong
+///   branch.** At `01031C0A:0x128f2c` the `cmp r0,#0; beq` skips when `Exists`
+///   returned zero, so slot 8 runs on the branch where the file is **already
+///   there**. A guard that creates a missing directory belongs on the other
+///   branch. That weakens it; it does not kill it.
+///
+/// ⇒ the candidate list is narrowed for the first time in this lineage, and it is
+/// narrowed by one *half* of one entry. The two the corpus provably cannot
+/// separate — extension registration and listing by type — are untouched by all
+/// of the above. **Still no name.**
+///
+/// **"Delete by pattern" is the one left that a run could settle, and what blocks
+/// that run is a MISSING BASELINE, not a busy machine.** Say it in that order,
+/// because the other order is a trap this lineage already named and then walked
+/// into: `AGENTS.md`'s four-step rule for reading a FAIL requires comparing
+/// against the fixture's *idle range*, and those ranges exist only for the
+/// committed fixtures — a `game_lab/` title's failure signature has none, so
+/// "it broke differently" has nothing to be different *from*. That hole does not
+/// close on a quiet machine. Load is a second-order factor and it is not a
+/// constant either: measured 149 → 125 → 53 inside the single round that wrote
+/// this block (2026-09-20), so quoting one reading as if it were the reason sends
+/// the next round to wait for a quiet hour and fall into the same hole.
+///
 /// **Part of the slot numbering is now guest-confirmed, which none of it was
 /// before.** At `0103451A:0x117f70` the sweep sees slot 0 return a value that is
 /// then threaded as the first argument into slot 2 and slot 3 — `Open` →
