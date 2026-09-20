@@ -62,10 +62,19 @@
 //   node scripts/corpus-name-inflow.mjs --all-tracked    # every tracked text file
 //   [--corpus <dir>]   default game_lab  (★the WHOLE corpus, minus `vendor_sdk/` — below)
 // Exit: 0 = measured (whatever the counts) · 2 = could not measure.
+//
+// ── The freshness marker (2026-09-20, docs/report/0196) ─────────────────────
+// In the default mode this also prints ONE line to paste into the round's doc. It carries the
+// three counts and a digest of the content they were measured over, and
+// `scripts/check-inflow-marker.mjs` reddens the PR when that content has moved since — the
+// failure this lineage actually had, 4 times out of 4 ("measured, then wrote more prose, never
+// re-measured"). ★It proves FRESHNESS, not truth: re-deriving the counts needs the corpus,
+// which no runner has (Constraint 9). See scripts/lib/inflow-marker.mjs.
 
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import path from "node:path";
+import { formatMarker, treeDigest } from "./lib/inflow-marker.mjs";
 
 const nfc = (s) => s.normalize("NFC");
 const argv = process.argv.slice(2);
@@ -243,3 +252,32 @@ if (B["SUFFIX-ATTACHED"].length) {
 
 console.log(`\n  ⇒ 보고할 때: 「유입 ${uniq(B.BOUNDED)}건(BOUNDED)」 + 「판단 필요 ${uniq(B["SUFFIX-ATTACHED"])}건(SUFFIX-ATTACHED)」 을 ★함께 적어라.`);
 console.log(`     ★«0건» 이라고 쓰려면 SUFFIX-ATTACHED 도 0 이어야 한다 — 그 바구니를 비우지 않은 0 은 이 리니지가 반려됐던 그 0 이다.`);
+
+// ── The freshness marker ────────────────────────────────────────────────────
+// ★Only in the default (this-round's-diff) mode, because only there does "the number" mean
+// "this round's number" — which is the claim a round writes down. `--all-tracked` measures the
+// whole repo and explicit paths measure whatever you typed; a marker over either would assert
+// something no checker can re-derive from the PR. Not emitting it is SAID, never silent.
+const isDefaultMode = !paths.length && !has("all-tracked");
+if (!isDefaultMode) {
+  console.log(`\n  (표식 없음 — 기본 모드가 아니다. 표식은 «이 회차의 diff»를 잰 수에만 붙는다)`);
+} else if (subjects.length === 0) {
+  // ★This is 0189's failure verbatim: it measured before committing, got 0 subjects, and read
+  // the resulting 0 as "no inflow". The counter's own design rule is that a 0 nobody could
+  // have earned must not be printed quietly, so it is shouted here instead of marked.
+  console.log(`\n  ★★대상이 «0파일»이다 — 이 수는 「유입이 없다」가 아니라 「아직 커밋하지 않았다」는 뜻이다.`);
+  console.log(`     커밋한 «뒤» 다시 재라. 표식은 붙이지 않았다(0 을 굳히지 않는다).`);
+} else {
+  const digest = treeDigest(texts);
+  console.log(`\n  ★아래 한 줄을 회차 문서(docs/report/… 또는 docs/worklog/…)에 ★«문장을 다 쓴 뒤 마지막에» 붙여라.`);
+  console.log(`     그 뒤 본문을 한 글자라도 고치면 check-inflow-marker 가 red 로 말한다 — 그것이 이 표식의 전부다.`);
+  console.log(
+    `\n${formatMarker({
+      subjects: texts.size,
+      digest,
+      b: `${B.BOUNDED.length}/${uniq(B.BOUNDED)}`,
+      p: `${B["PREFIX-EMBEDDED"].length}/${uniq(B["PREFIX-EMBEDDED"])}`,
+      s: `${B["SUFFIX-ATTACHED"].length}/${uniq(B["SUFFIX-ATTACHED"])}`,
+    })}\n`,
+  );
+}

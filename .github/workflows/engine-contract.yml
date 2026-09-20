@@ -304,6 +304,16 @@ jobs:
         continue-on-error: true
         run: node scripts/checker-census.mjs
 
+      # The 유입 number a round writes down goes stale when the round keeps editing after
+      # measuring — 4 observations out of 4, 3 of which cost a gate② reject (docs/report/0196).
+      # This is a real gate, NOT `continue-on-error`, and it can be one because it verifies
+      # FRESHNESS (a content digest), not truth: no corpus, no game bytes, nothing that needs
+      # `game_lab/`. A round with no marker passes and says so — the marker is opt-in, because
+      # making it mandatory re-opens "did the round run the tool", which was measured and
+      # declined (docs/report/0195). `origin/main` comes from fetch-depth: 0 above.
+      - name: Inflow marker is still fresh (docs/report/0196)
+        run: node scripts/check-inflow-marker.mjs
+
       # Detect whether this diff touches anything that can change the built
       # artifact or the pinned surface. If not, the job short-circuits to success
       # (see the wrapper note in the header). Same list as publish-artifact.yml.
