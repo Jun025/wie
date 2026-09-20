@@ -265,6 +265,18 @@ def sub_slots(argv):
         return out
 
     hits = []
+    # ── ★The global filter must not swallow "could not measure" ─────────────
+    # `g is None` means `resolve_global` walked off the end of its straight-line model,
+    # NOT that the table came from a different global. Dropping those under a filter turns
+    # "unmeasured" into "absent", which is the one thing this repo keeps having to relearn.
+    # ★It already cost a real finding: 2026-09-20, `01031C0A`'s Open at `0x128f78` vanished
+    # under `filter=0x13eb30` and only came back with the filter off, where it reads
+    # `via global UNRESOLVED`. A gate② reviewer found it by hand.
+    # ★The two reasons are counted SEPARATELY on purpose — one is a verdict, the other is a
+    # gap — and neither is mixed into `hits`, so anything parsing the `slot +…` lines is
+    # untouched (`docs/report/0204`).
+    dropped_other = 0
+    dropped_unresolved = 0
     for a in range(IMAGE_BASE, END - 1, 2):
         h = u16(a)
         if h is None or (h & 0xF800) != 0x6800:
@@ -296,10 +308,25 @@ def sub_slots(argv):
             continue
         g = resolve_global(win[:-1], f"r{rn}")
         if GFILTER is not None and g != GFILTER:
+            if g is None:
+                dropped_unresolved += 1
+            else:
+                dropped_other += 1
             continue
         hits.append((a, called, imm5 * 4, rn, rt, g, arg_notes(win[:-1])))
 
     print(f"# {argv[0]}  SL={SL:#x}  veneers={len(veneers) // 2}  hits={len(hits)}  filter={GFILTER and hex(GFILTER)}")
+    if GFILTER is not None:
+        print(f"#   filter dropped: {dropped_other} with a DIFFERENT global · {dropped_unresolved} UNRESOLVED")
+        if dropped_unresolved:
+            # ★Said, not swallowed — and with the one command that gets them back. The count
+            # alone is the whole prescription: 331 of 501 hits are UNRESOLVED on this image
+            # (279/364 on the other), so printing them all would bury the filtered list under
+            # the noise the filter exists to remove.
+            print(
+                f"#   ★those {dropped_unresolved} are NOT 'a different global' — they are 'could not resolve'."
+                f"  Re-run with '-' as the filter and grep UNRESOLVED to see them."
+            )
     for a, called, off, rn, rt, g, notes in sorted(hits, key=lambda x: (x[5] or 0, x[2], x[0])):
         gs = f"{g:#x}" if g is not None else "UNRESOLVED"
         args = "  ".join(f"{k}={v}" for k, v in sorted(notes.items()))
