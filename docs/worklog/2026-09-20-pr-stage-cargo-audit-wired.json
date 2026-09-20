@@ -22,7 +22,7 @@
     "★개악 ⒜red — `cargo update -p rtrb --precise 0.3.4`(= RUSTSEC-2026-0274 · §C 의 C-1 이 해소한 판본으로 되돌림 · base swap 36df9c31 이 실제로 한 그 되돌림): ★rc=1 · 「error: 1 vulnerability found!」. ★가상의 결함이 아니라 이 배선이 존재하는 이유가 된 사건으로 쟀다 — 티켓이 허용한 «--deny 류 대체»가 필요 없었다",
     "★개악 후 원복 — Cargo.lock 을 백업에서 복원하고 rtrb = 0.3.5 확인 · git status 청결(커밋 0). ★그 개악은 Cargo.lock 을 건드리므로 paths 필터에도 걸린다(두 축이 같은 사건에서 맞물린다)",
     "★check-worklog-json rc=0 · check-doc-liveness-parity rc=0(펜스 sh 블록 0) · checker-census rc=0 · check-docs-report-serial rc=0(0198) · check-worklog-coverage rc=0",
-    "★게임 파일명 유입 — 도구를 «문장을 다 쓴 뒤 마지막에» 실행했다: BOUNDED 0회/0쌍 · PREFIX-EMBEDDED 0회/0쌍 · SUFFIX-ATTACHED 0회/0쌍 ⇒ SUFFIX 가 비었으므로 「유입 0건」 주장 가능. 모집단은 game_lab/broken 184 stem(넓힌 기본값은 형제 PR #230 · 미착지)",
+    "★게임 파일명 유입 — 도구를 «문장을 다 쓴 뒤 마지막에» 실행했다: BOUNDED 0회/0쌍 · PREFIX-EMBEDDED 2회/1쌍(제외) · SUFFIX-ATTACHED 0회/0쌍 ⇒ SUFFIX 가 비었으므로 「유입 0건」 주장 가능. 모집단은 game_lab/broken 184 stem(넓힌 기본값은 형제 PR #230 · 미착지)",
     "★repo 표준 게이트 — fmt · clippy --all -D warnings · wasm clippy · RUST_MIN_STACK=4194304 cargo test --all · cargo +beta clippy 전건 rc=0(AGENTS.md 「무엇을 바꿨든 넷 다」 · 이 diff 에 Rust 0줄)"
   ],
   "limits": [
