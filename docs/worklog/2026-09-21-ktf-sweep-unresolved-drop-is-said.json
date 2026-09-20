@@ -24,7 +24,7 @@
     "★자기정합 산술 — 60 + 110 + 331 = 501(필터 없는 총계) ✓ · 0 + 170 + 331 = 501 ✓ ⇒ 아무것도 잃거나 두 번 세지 않는다",
     "★python 구문 — ast.parse rc=0",
     "★check-worklog-json rc=0(네 출력으로) · check-docs-report-serial rc=0(0204) · checker-census rc=0 · check-doc-liveness-parity rc=0 · check-worklog-coverage rc=0",
-    "★게임 파일명 유입 — 도구를 «문장을 다 쓴 뒤 마지막에» 실행했다. 수는 회신에 적었다",
+    "★게임 파일명 유입 — 도구를 «문장을 다 쓴 뒤 마지막에» 실행했다(재유도 0 · 대상 3파일): BOUNDED 4회/3쌍 · PREFIX-EMBEDDED 5회/2쌍(제외) · ★SUFFIX-ATTACHED 0회/0쌍. ★SUFFIX 가 비었으므로 그 축의 규칙은 충족되나 ★BOUNDED 가 0 이 아니므로 「유입 0건」이라 쓰지 «않는다». ★3쌍은 실험 대상 두 이미지를 지목하는 자리다(재현을 검증 가능하게 하려면 경로가 필요하다). ★초판이 2회/2쌍이라 적었고 이 줄을 «쓰는 것» 자체가 한 쌍을 늘렸다 — 재측해 고쳤다. ★그 둘은 origin/main 추적 파일에 이미 각각 6개·5개 있다 ⇒ ★새 이름 유입 0. ★모집단은 game_lab/broken 184 stem(넓힌 기본값은 형제 PR #230 · 미착지)",
     "★repo 표준 게이트 — fmt · clippy --all -D warnings · wasm clippy · RUST_MIN_STACK=4194304 cargo test --all · cargo +beta clippy 전건 rc=0(AGENTS.md 「무엇을 바꿨든 넷 다」 · 이 diff 에 Rust 0줄)"
   ],
   "limits": [
