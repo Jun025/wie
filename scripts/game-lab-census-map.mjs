@@ -5,8 +5,10 @@
 // The 2026-09-18 census published bucket TOTALS and wrote its per-game rows to a
 // `mktemp -d` scratch that it then deleted. So the totals survived and the
 // mapping did not, and "which games are the 32 `no frame rendered` ones" became
-// unanswerable — the only way back was re-running all 187 games (~45 min of a
-// self-hosted runner). One round's scratch directory cost the next round an hour.
+// unanswerable — the only way back was re-running all 187 games (~45 min of THIS
+// MACHINE; the corpus is local-only, so it never runs on CI at all — this repo's CI
+// is entirely GitHub-hosted, AGENTS.md §Definition of Done has the measurement).
+// One round's scratch directory cost the next round an hour.
 //
 // ── Why the predicate lives HERE and not in the ledger ───────────────────────
 // It used to live only in `~/orchestrator/reports/wie-game-lab-census-*.done.md`,

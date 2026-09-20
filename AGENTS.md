@@ -310,12 +310,28 @@ still weekly-only.
 
 | how | what it costs |
 |---|---|
-| runner block in `rust.yml`'s legs | the block is **168 s** warm (measured, loadavg 180) × **6 legs** ≈ 17 min of runner time *per PR*, on a self-hosted runner siblings queue behind |
+| runner block in `rust.yml`'s legs | the block is **168 s** warm (measured, loadavg 180) × **6 legs** ≈ 17 min of runner time *per PR* |
 | runner block in `contract` | that job's toolchain is `if: engine == 'true'` and targets **wasm32** with a wasm-keyed cache, so this needs a *native* build. Inside the filter it misses docs-only PRs (the diffs that break wiring); outside it, every PR pays a native cargo build in a job that currently finishes in 12 s on a doc-only diff |
 
 versus the test above: **~10 ms** in an already-compiled target, no new dependency, no new workflow.
 **Reopen if** a regression lands in the text path *outside* `font()` and the weekly job is the thing
 that catches it — that is the evidence this trade is wrong, and nothing short of it is.
+
+> **★This repo's CI runs on GitHub-hosted runners — all of it, and it always has.** Measured
+> 2026-09-20 over every workflow: **18 `runs-on:` values**, all `ubuntu-latest` / `macos-latest` /
+> `windows-latest` (`rust.yml`'s `${{ matrix.os }}` is those three), **`self-hosted` 0**, and
+> `git log -S'self-hosted' -- .github/` is **empty across the entire history** — it was never true
+> here, not once. The row above used to end "on a self-hosted runner siblings queue behind"; ★**the
+> decision it supports is unchanged and so is its number (168 s × 6 legs ≈ 17 min) — only the
+> resource clause was wrong.** It came from the sibling repo, which genuinely does run self-hosted
+> (measured the same day: otterpebble has `self-hosted` in 6 workflow files and 37 jobs behind a
+> `vars.CI_RUNS_ON` switch), and a sentence true there was copied into a repo where it is not.
+> ★**Two different things are called "the runner" around here — keep them apart.** ⑴ **CI runners**:
+> GitHub's, one fresh VM per job, so a long job here does *not* make a sibling PR wait. ⑵ **This
+> Mac**: where §The four gates and every `local only` script above are run *by hand*, and which
+> *is* a self-hosted runner — for the sibling repos. Saturating it costs you and them; it does not
+> queue this repo's PRs. Cost arguments that say "siblings queue behind us" are about ⑵ and must
+> not be written as if they were about ⑴.
 
 **And it stays that way: promoting `--expect-last-frame` into CI was decided against on 2026-09-07,
 measured rather than assumed.** The question is not "is it in CI" but "is the class caught", and it
@@ -634,7 +650,9 @@ design** — do not "fix" that by wiring it:
   predicate in the same PR.* They exist because the 2026-09-18 census wrote its per-game rows to
   a `mktemp -d` it then deleted, which cost the next round an hour and made a low-load re-measure
   impossible; `docs/report/0173` has the numbers. Start it as `bash scripts/game-lab-recensus.sh
-  --dry-run` to see what a full run would cost before spending 45 minutes of the self-hosted runner.
+  --dry-run` to see what a full run would cost before spending 45 minutes **of this Mac** — which is
+  where it runs, not a CI runner (this repo's CI is entirely GitHub-hosted; see the note under
+  §Definition of Done's cost table).
 
 - **`scripts/corpus-name-inflow.mjs` — local only (same reason), and ★every round in this lineage
   that reports a "게임 파일명 유입" number RUNS IT rather than re-deriving the predicate.** Call it
