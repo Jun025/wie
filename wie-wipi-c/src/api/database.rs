@@ -347,8 +347,19 @@ pub async fn list_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
 /// ⇒ the candidate list is narrowed for the first time in this lineage, and it is
 /// narrowed by one *half* of one entry. The two the corpus provably cannot
 /// separate — extension registration and listing by type — are untouched by all
-/// of the above, and "delete by pattern" needs a run this machine could not give
-/// a trustworthy verdict on (load 149 at the time of measuring). **Still no name.**
+/// of the above. **Still no name.**
+///
+/// **"Delete by pattern" is the one left that a run could settle, and what blocks
+/// that run is a MISSING BASELINE, not a busy machine.** Say it in that order,
+/// because the other order is a trap this lineage already named and then walked
+/// into: `AGENTS.md`'s four-step rule for reading a FAIL requires comparing
+/// against the fixture's *idle range*, and those ranges exist only for the
+/// committed fixtures — a `game_lab/` title's failure signature has none, so
+/// "it broke differently" has nothing to be different *from*. That hole does not
+/// close on a quiet machine. Load is a second-order factor and it is not a
+/// constant either: measured 149 → 125 → 53 inside the single round that wrote
+/// this block (2026-09-20), so quoting one reading as if it were the reason sends
+/// the next round to wait for a quiet hour and fall into the same hole.
 ///
 /// **Part of the slot numbering is now guest-confirmed, which none of it was
 /// before.** At `0103451A:0x117f70` the sweep sees slot 0 return a value that is
