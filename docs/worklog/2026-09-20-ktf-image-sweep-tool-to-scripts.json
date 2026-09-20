@@ -21,8 +21,8 @@
     "★check-doc-liveness-parity rc=0 — 26 documented line(s) 불변(펜스 sh 블록을 더하지 않았음을 기계가 확인)",
     "★check-worklog-json OK(156 file(s)) rc=0 · check-docs-report-serial --next-serial 0189(★열린 PR #224 의 0188 claim 을 세어서 준다) · checker-census rc=0",
     "★repo 표준 게이트 — fmt · clippy --all -D warnings · wasm clippy · RUST_MIN_STACK=4194304 cargo test --all · cargo +beta clippy 전건 rc=0(AGENTS.md 「무엇을 바꿨든 넷 다 + beta」 · 이 diff 의 Rust 줄은 0)",
-    "★게임 파일명 유입 — 도구를 실행해서 적었다: BOUNDED 0회/0쌍 · PREFIX-EMBEDDED 0회/0쌍 · SUFFIX-ATTACHED 0회/0쌍 ⇒ SUFFIX 가 비었으므로 「유입 0건」 주장 가능",
-    "★모드 변경 0 — git diff --cached origin/main --summary 가 신규 2파일의 create mode 100644 만 낸다(old mode/new mode 0건). 파일 모드 644 는 제안이 선례로 지목한 scripts/game-lab-census-map.mjs 와 같다"
+    "★모드 변경 0 — git diff --cached origin/main --summary 가 신규 2파일의 create mode 100644 만 낸다(old mode/new mode 0건). 파일 모드 644 는 제안이 선례로 지목한 scripts/game-lab-census-map.mjs 와 같다",
+    "★게임 파일명 유입 — 도구를 실행해서 적었다(커밋 «후» · origin/main...HEAD 5파일): BOUNDED 0회/0쌍 · PREFIX-EMBEDDED 4회/3쌍(제외) · SUFFIX-ATTACHED 0회/0쌍 ⇒ SUFFIX 가 비었으므로 「유입 0건」 주장 가능. ★★초판은 「3파일 · PREFIX 0회/0쌍」이라 적었고 틀렸다 — 커밋 «전»에 쟀고 그때 도구의 대상은 0파일이었다. 이 리니지가 반려됐던 형태(재고 나서 문장을 더한 뒤 다시 재지 않는다)를 같은 회차 안에서 밟았고 재측으로 고쳤다. ★이 도구의 기본 대상은 «커밋된 diff» 라 커밋 전에 재면 언제나 0 이다"
   ],
   "limits": [
     "★세 번째 이미지에서 깨질 여지는 «그대로»다 — 베니어 탐지·table=*(*global) 이중 역참조·sl 상대 역추적이 전부 두 이미지(0103451A·01031C0A)에서 읽은 패턴이고, 실패 양식은 크래시가 아니라 «그럴듯한 오답»이다. 제안이 요구한 대로 머리주석에 적었지만, 적는 것이 고치는 것은 아니다",
