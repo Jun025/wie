@@ -87,6 +87,28 @@ const POPULATION = [
 
 // Files read for caller evidence. Workflows and package.json are parsed structurally
 // (below); the rest are read as comment-stripped source.
+//
+// ★**Why `py` is counted but not read — decided 2026-09-20, `docs/report/0201`.**
+// The asymmetry with POPULATION above is deliberate, and three measurements chose it:
+//   ⑴ **Adding it buys nothing today.** There is exactly one `.py` artifact, it has zero
+//     callers, and putting `py` here leaves the verdict line byte-identical: measured,
+//     `45 artifacts · 0 = 11 · 1 = 15 · 2+ = 19` before and after. The only change is three
+//     extra `named-not-run` rows from that file's docstring cross-references.
+//   ⑵ ★**It would make `.py` the ONLY population language whose prose is read as code.**
+//     `hash` below is `/\.(?:sh|toml)$/`, so a `.py` file gets C-style stripping — which
+//     strips neither Python's `#` comments nor its `"""` docstrings. Measured: a bare
+//     `node scripts/check-worklog-json.mjs` line planted **inside the docstring** was
+//     counted as a real caller and moved the buckets (`1 = 15 → 14`, `2+ = 19 → 20`).
+//     Fixing that first is a stripper change, which is a bigger job than this asymmetry.
+//   ⑶ ★**A wrong zero here is not a wrong red.** This file has no failing state (its step
+//     carries `continue-on-error`, and its own header says a zero caller count is a
+//     question, not a defect), so the usual "a false red causes a false action" argument
+//     does not apply — the cost of a missed caller is a question posed wrongly, which is
+//     the state this census already declares itself to be in.
+// ⇒ Left as is, and **said out loud instead**: the `★py 비대칭` line in the output prints
+//   only while this asymmetry exists, with live counts. Add `py` here and that line
+//   retires itself; land a second `.py` and its number moves. The re-open condition is
+//   therefore mechanical rather than a promise.
 const SOURCE_EXT = /\.(?:sh|mjs|js|rs|ts|tsx|toml)$/;
 const WORKFLOW = /^\.github\/workflows\/.+\.(?:yml|yaml)$/;
 const PKG_JSON = /^(?:[^/]+\/)?package\.json$/;
@@ -393,6 +415,21 @@ console.log(
 // is corrected here rather than left for a reader to trip over.
 console.log(`  population: scripts/*.{sh,mjs,js,py} · .github/scripts/**.{sh,mjs,js,py} · [crate/]tests/**.rs (crate segment optional — the root is a package)`);
 console.log(`  surfaces:   ${surfaces.filter((s) => s.kind === "workflow").length} workflows · ${surfaces.filter((s) => s.kind === "npm").length} package.json · ${surfaces.filter((s) => s.kind === "source").length} source files (comments stripped)`);
+// ── The population/surface extension asymmetry, SAID rather than left in a comment ──
+// `py` is in POPULATION and deliberately NOT in SOURCE_EXT. This prints only while that is
+// true, so it is a live reading and not a claim: add `py` to SOURCE_EXT and the line goes
+// away by itself. The numbers are computed, so the re-open condition below is mechanical
+// rather than a promise — see the header note "★Why `py` is counted but not read".
+{
+  const pyPop = population.filter((f) => f.endsWith(".py"));
+  if (pyPop.length && !SOURCE_EXT.test("x.py")) {
+    const pyZero = rows.filter((r) => r.path.endsWith(".py") && r.hits.length === 0).length;
+    console.log(
+      `  ★py 비대칭: 모집단에 .py ${pyPop.length}개(그중 호출자 0 = ${pyZero}) · ★«호출자 증거»로는 읽지 «않는다»(SOURCE_EXT 밖).` +
+        ` 2026-09-20 실측 차이 0 — 넣어도 계수가 안 바뀌었다. ★재검토: .py 가 2개 이상이 되거나 .py 가 다른 artifact 를 부를 때.`,
+    );
+  }
+}
 for (const g of GLOB_CALLERS) {
   const n = globHits.filter((h) => h.rule === g.label).length;
   console.log(`  glob rule:  ${g.label}`);
