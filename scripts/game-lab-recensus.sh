@@ -202,12 +202,38 @@ fi
 # ★Existing directories are NOT rewritten — the July column keeps its own names
 # (that is the proposal's "기존 디렉터리를 소급해 고치지는 마라"), and the generator
 # keeps reading them, because it still tries the bare `<stem>` key as a fallback.
+#
+# ★★TWO PLACES THIS KEY DOES NOT REACH. Neither is a defect being hidden; both are
+# stated because a claim of safety that is wider than the mechanism is worse than
+# no claim at all.
+#
+# ⑴ `--shots`. `--screenshot "$OUT/${key}.png"` IS key-qualified, but `--shotdir`
+#    hands the validator ONE SHARED DIRECTORY and the per-step PNGs inside it are
+#    named by the validator, not here: `wie_validate.rs` takes `file_stem()` off the
+#    input path and writes `{stem}__{label}.png` — a BARE stem. So with `--shots` on,
+#    the step images of a colliding title still overwrite each other. Fixing that is
+#    a change to the validator, which is a separate axis and deliberately not done
+#    here; what this script owes is to stop saying otherwise.
+#
+# ⑵ A PARTIAL run cannot see the collision at all. `dupstems` below is derived from
+#    `files[]` — i.e. from THIS RUN's list, after `--limit` truncation and exactly as
+#    given by `--from-stdin` — not from the corpus. Feed one carrier's copy into an
+#    empty `--out` and the stem looks unique, so it is written BARE; feed the other
+#    carrier in afterwards and it overwrites the first, which is the pre-fix loss
+#    reproduced in full (measured 2026-09-20 on a synthetic corpus with a stub
+#    validator: two sequential one-carrier runs left ONE bare `.json` against TWO
+#    `summary.tsv` rows). ⇒ ★For a re-run that must be collision-safe, hand this
+#    script BOTH copies in the same invocation, or run the whole corpus.
+#    Making `dupstems` corpus-derived is NOT a one-line fix — `--from-stdin` paths
+#    need not live under `$CORPUS`, so the population that defines a collision is a
+#    design question. It is carried as a follow-up proposal, not silently.
 dupstems=$(printf '%s\n' "${files[@]}" | sed 's#.*/##; s#\.[^.]*$##' | sort | uniq -d)
 collisions=$(printf '%s' "$dupstems" | grep -c . || true)
 
 echo "game-lab-recensus: ${#files[@]} game(s) · corpus=$CORPUS · out=$OUT · timeout=${TIMEOUT}s kill=${KILL}s nice=$NICE"
 [ "$collisions" -gt 0 ] && {
   echo "  ★ $collisions stem(s) appear under more than one carrier — those are written as <bucket>__<stem>.{json,log,png} so neither copy is overwritten"
+  echo "      ★except per-step PNGs under shots/ with --shots: the validator names those itself, from a BARE stem. And this list comes from THIS run's files, so a partial run cannot see a collision at all."
   printf '%s\n' "$dupstems" | sed 's/^/      /'
 }
 
@@ -272,6 +298,10 @@ for f in "${files[@]}"; do
   # sampling trap AGENTS.md names — the two arms differ on `--shots` AND on the load
   # minute, and the load moves far more. Settling it needs an idle machine and pairing.
   # Pass `--shots` when you need a run comparable to the baseline on that axis.
+  # ★And when you do, know what it does NOT key: `--screenshot` below follows `$key`,
+  # but `--shotdir` is one shared directory whose per-step PNGs the VALIDATOR names
+  # `{bare stem}__{label}.png`. A colliding title loses its step images there even
+  # though its `.json`/`.log`/`.png` survive. See ⑴ in the key block above.
   shotargs=()
   [ "$SHOTS" -eq 1 ] && shotargs=(--shotdir "$OUT/shots" --screenshot "$OUT/${key}.png")
 
