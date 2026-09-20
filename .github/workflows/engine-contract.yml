@@ -300,6 +300,15 @@ jobs:
       # list in hand. The script itself never exits 1; the flag covers its rc=2
       # "could not measure", which must stay loud in the log without blocking a
       # merge on it. Promotion, if it is ever earned, is deleting this one line.
+      # §C of the supply-chain ledger preserves EXPOSURE VERDICTS, and those expire — the last
+      # column records when. Its header has commanded "그 칸이 빈 행을 만들지 마라" in prose since
+      # it was written and nothing read it. Node-only and ~10ms, so it lives here rather than in
+      # rust-audit.yaml: that workflow is schedule-only (a PR's mistake would redden a day later,
+      # in the daily job this lineage measured sitting red for three days — docs/report/0181) and
+      # its checker calls `cargo audit` at module top level, which a format check must not need.
+      - name: §C verdicts still say how long they hold (docs/report/0197)
+        run: node scripts/check-ledger-c-validity-scope.mjs
+
       - name: Checker ↔ caller census (scripts/checker-census.mjs — list only, never a verdict)
         continue-on-error: true
         run: node scripts/checker-census.mjs
