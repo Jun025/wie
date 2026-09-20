@@ -74,9 +74,14 @@ function die(msg) {
 // `tests/support/` stay in the population on purpose: they are not targets themselves,
 // and the by-name pass shows how they are reached (`#[path]`), which is the useful answer.
 // Data files (smoke_gate_baseline.tsv) are out: they are inputs, not things that run.
+// ★`py` is in the list because 2026-09-20 put one there (`ktf-image-sweep.py`) and
+// without it the file sat in `scripts/` *invisible to this census* — in the repo, yet
+// missing from the repo's own answer to "what is in scripts/ and who runs it". That is
+// a worse outcome than being counted with zero callers, which is the honest answer and
+// is what it now gets. Measured at adoption: 44 → 45 artifacts, 0-caller 10 → 11.
 const POPULATION = [
-  /^scripts\/[^/]+\.(?:sh|mjs|js)$/,
-  /^\.github\/scripts\/.+\.(?:sh|mjs|js)$/,
+  /^scripts\/[^/]+\.(?:sh|mjs|js|py)$/,
+  /^\.github\/scripts\/.+\.(?:sh|mjs|js|py)$/,
   /^(?:[^/]+\/)?tests\/.+\.rs$/,
 ];
 
@@ -386,7 +391,7 @@ console.log(
 // regex the -fix round REPLACED (it dropped the root target); the regex was corrected and the
 // sentence describing it was not. Same defect class as the numbers this round is correcting, so it
 // is corrected here rather than left for a reader to trip over.
-console.log(`  population: scripts/*.{sh,mjs,js} · .github/scripts/**.{sh,mjs,js} · [crate/]tests/**.rs (crate segment optional — the root is a package)`);
+console.log(`  population: scripts/*.{sh,mjs,js,py} · .github/scripts/**.{sh,mjs,js,py} · [crate/]tests/**.rs (crate segment optional — the root is a package)`);
 console.log(`  surfaces:   ${surfaces.filter((s) => s.kind === "workflow").length} workflows · ${surfaces.filter((s) => s.kind === "npm").length} package.json · ${surfaces.filter((s) => s.kind === "source").length} source files (comments stripped)`);
 for (const g of GLOB_CALLERS) {
   const n = globHits.filter((h) => h.rule === g.label).length;

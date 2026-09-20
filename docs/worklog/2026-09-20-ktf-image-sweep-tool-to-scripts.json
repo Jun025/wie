@@ -1,0 +1,49 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-20",
+  "task": "wie-ktf-image-sweep-tool-lives-only-in-evidence",
+  "title": "KTF 이미지 스윕 도구를 repo 로 옮겼다 — 세 벌을 한 벌로 합치고 «바이트 동일»로 그것을 증명했다",
+  "summary": "채택 제안 2026-09-19-ktf-db-slot8-token-dir-or-extension-unsettled#p1 의 이행. ★미해소 확인(수): 추적 .py 파일 0건 · 그 ref 채택 worklog 0건 · capstone/veneer 를 아는 추적 파일은 database.rs 산문 하나. ★왜 지금인가는 가설이 아니라 실측이다 — 형제 제안 #p0 을 이행한 직전 회차가 증적 디렉터리를 «찾았고» slots.py 를 복사해 쓰면서도 trace.py 가 거기 있는 줄 모르고 그 기능을 처음부터 다시 구현했다(임시 win_dump.py). 한 회차에 도구 하나를 다시 만들었다. ★세 벌이 아니라 «한 벌»로 옮겼다 — 제안 tradeoff 가 바구니는 「또 하나」 는다고 단수로 적고, 세 파일이 같은 전문(capstone 디코더·u16/u32/cstr·preceding)을 세 번 갖기 때문이다. ★합치면서 «바꾸지 않는 것»이 난점이었다: 세 원본의 cstr 이 bytes/str/raw 로 다르고 NUL 부재 처리도 다르며 preceding 의 기본 back 도 40/30/인자로 다르다 ⇒ 헬퍼를 하나로 뭉개면 출력이 조용히 바뀐다. 완전히 같은 것만 공유하고 문자열 규칙은 cstr_raw(a,n,pad) 한 겹 위에서 각자 유지했다. ★검증은 주장이 아니라 실행이다 — 세 서브명령 전건이 원본과 «바이트 동일»이다(slots 는 선행 회차 증적 출력과, window 는 trace.py 와 두 창에서, refs 는 refs2.py 와). ★그리고 제안의 tradeoff 한 줄이 틀렸다: checker-census 의 모집단이 scripts/*.{sh,mjs,js} 라 .py 를 아예 보지 않는다 ⇒ 그대로 뒀으면 도구가 scripts/ 에 있으면서 repo 자신의 인벤토리에는 «보이지 않는» 상태가 됐다(0-caller 로 세어지는 것보다 나쁘다). 모집단 정규식 2개 + 하드코딩 라벨 1줄을 고쳐 44→45 · 0-caller 10→11 이 됐고, 그래서 제안의 예측이 «이제» 참이다.",
+  "changes": [
+    "scripts/ktf-image-sweep.py 신설 — 서브명령 3개(slots · refs · window)로 합친 KTF 이미지 스윕. 원장 증적의 slots.py(200줄)·refs2.py(89줄)·trace.py(60줄)를 로직 무변경으로 옮겼다. 머리주석에 제안이 요구한 한계 전부를 적었다: 동기화 Thumb 디코드가 왜 필수인지 · slots 인자 요약 열의 «주소를 가진» 반례(01031C0A:0x128f4a) · 두 이미지에서만 돌려 봤다는 것 · 재배치 델타는 이 도구가 모르며 이미지마다 유도·교차검증해야 한다는 것 · CI 가 못 돌린다는 것(Constraint 9 · smoke_gate.sh 와 같은 계급)",
+    "scripts/ktf-image-sweep.py — capstone 미설치 시 rc=2 + 처방 한 줄(uv run --with capstone python3 …). 이 맥의 python3 전건이 import 실패임을 실측했고, 이 저장소 관용대로 exit 2 는 «못 쟀다»이지 «없다»가 아니다",
+    "scripts/checker-census.mjs — 모집단 정규식 2곳에 py 추가 + 출력 라벨 1줄 동기. ★라벨은 정규식과 별개의 하드코딩 문자열이라 안 고치면 모집단을 거짓으로 광고한다",
+    "AGENTS.md §Web-surface «local only» 목록에 등재(+17행) — ★펜스 sh 블록으로 넣지 않았다(코퍼스가 필요해 주 러너가 못 돌린다 · 0173·0187 과 같은 선택). check-doc-liveness-parity 26 documented line(s) 불변",
+    "docs/report/0189 신설 — 미해소 실측 · 왜 지금인가(직전 회차의 재구현) · 헬퍼 차이표 · 바이트 동일 대조표 · census 양방향 · rc 전수 · 안 한 것",
+    "★repro.py 는 옮기지 않았다(그 회차의 독립 재현이지 재사용 도구가 아니다) · 제품 코드 0줄 · 에뮬레이터 실행 0 · game_lab/ 쓰기 0"
+  ],
+  "verification": [
+    "★★행동 보존을 «바이트 동일»로 보였다 — slots: 선행 회차 증적(slots-tears.txt·slots-getamped.txt)과 본문 바이트 동일, 머리 수치도 veneers=87 hits=19 / veneers=74 hits=60 으로 일치. window: trace.py 와 두 창(01031C0A 0x128f60 back48 · 0103451A 0x105730 back40)에서 바이트 동일(45줄·34줄). refs: refs2.py 와 본문 바이트 동일 · 229 reference(s)",
+    "★★checker-census 양방향(★이 도구는 실패 상태가 없어 red/green 축이 없다 ⇒ «보이는가/안 보이는가»로 보였다) — ⒝대조군(py 미포함=현행 main): 44 artifacts · callers 0 = 10 · ktf-image-sweep 등장 0회. ⒜실험군(py 포함): 45 artifacts · callers 0 = 11 · callers 0 바구니에 실재. ⇒ 제안이 예측한 「또 하나 늘고」가 이제 참이다",
+    "★rc 전수(★파이프 없이 실측) — capstone 없음 2 · 알 수 없는 서브명령 2 · 없는 이미지 2 · 인자 부족 2 · --help 0 · 정상 실행 0. ※첫 측정은 `| tail -1` 뒤의 $? 를 읽어 전부 0 으로 보였다(파이프 마지막 명령의 상태). 파이프 없이 다시 재서 고쳤고, 그 오측을 report 에 적었다",
+    "★capstone 부재 실측 — /opt/homebrew/bin/python3 와 /usr/bin/python3 전건 import 실패. 그래서 도구가 그 사실과 처방을 스스로 말한다",
+    "★미해소 확인 — git ls-files '*.py' 0건 · 그 ref 를 adoptedProposals 로 가진 worklog 0건 · capstone|__call_via|veneer 를 아는 추적 파일은 wie-wipi-c/src/api/database.rs 하나(산문)",
+    "★check-doc-liveness-parity rc=0 — 26 documented line(s) 불변(펜스 sh 블록을 더하지 않았음을 기계가 확인)",
+    "★check-worklog-json OK(156 file(s)) rc=0 · check-docs-report-serial --next-serial 0189(★열린 PR #224 의 0188 claim 을 세어서 준다) · checker-census rc=0",
+    "★repo 표준 게이트 — fmt · clippy --all -D warnings · wasm clippy · RUST_MIN_STACK=4194304 cargo test --all · cargo +beta clippy 전건 rc=0(AGENTS.md 「무엇을 바꿨든 넷 다 + beta」 · 이 diff 의 Rust 줄은 0)",
+    "★게임 파일명 유입 — 도구를 실행해서 적었다: BOUNDED 0회/0쌍 · PREFIX-EMBEDDED 0회/0쌍 · SUFFIX-ATTACHED 0회/0쌍 ⇒ SUFFIX 가 비었으므로 「유입 0건」 주장 가능",
+    "★모드 변경 0 — git diff --cached origin/main --summary 가 신규 2파일의 create mode 100644 만 낸다(old mode/new mode 0건). 파일 모드 644 는 제안이 선례로 지목한 scripts/game-lab-census-map.mjs 와 같다"
+  ],
+  "limits": [
+    "★세 번째 이미지에서 깨질 여지는 «그대로»다 — 베니어 탐지·table=*(*global) 이중 역참조·sl 상대 역추적이 전부 두 이미지(0103451A·01031C0A)에서 읽은 패턴이고, 실패 양식은 크래시가 아니라 «그럴듯한 오답»이다. 제안이 요구한 대로 머리주석에 적었지만, 적는 것이 고치는 것은 아니다",
+    "★★slots 의 인자 요약 열은 여전히 틀린다 — 고치지 않았다. 이 회차는 «옮기는» 회차이고 로직을 한 줄도 바꾸지 않았다(바이트 동일이 그 증거다). 머리주석이 주소를 가진 반례(01031C0A:0x128f4a)로 그것을 경고할 뿐이다",
+    "★CI 가 이 도구를 못 돌린다 — 코퍼스가 git-ignored 실게임 바이트다(Constraint 9). 썩어도 red 가 나지 않고, checker-census 의 0-caller 바구니에 영구히 앉는다. 그것이 이 이동의 대가이고 제안이 미리 적은 그대로다",
+    "★파이썬+capstone 의존이 이 저장소에 «처음» 생겼다 — scripts/ 는 지금까지 node 와 셸뿐이었다. capstone 이 설치돼 있지 않아 uv 경유가 사실상 유일한 실행 경로이고, uv 가 사라지면 그 한 줄도 낡는다",
+    "★checker-census 모집단 확대의 부작용은 재지 않았다 — SOURCE_EXT(호출자 증거로 읽는 확장자)에는 py 를 더하지 «않았다». 오늘 .py 호출자가 0 이라 차이가 없지만, 앞으로 .py 가 다른 artifact 를 부르면 그 호출은 세어지지 않는다. 그때 더하는 것이 맞다(지금 더하면 자기참조 처리를 재지 않은 채 굳는다)",
+    "★도구가 «돈다»는 것과 «옳다»는 것은 다르다 — 이 회차가 보인 것은 «원본과 같다»이지 «원본이 옳다»가 아니다. 원본의 정확성은 선행 회차들이 손 읽기로 교차검증한 범위까지만 선다"
+  ],
+  "adoptedProposals": [
+    "2026-09-19-ktf-db-slot8-token-dir-or-extension-unsettled#p1"
+  ],
+  "proposals": [
+    {
+      "title": "checker-census 의 «호출자 증거» 확장자에도 py 를 넣을지 정하라 — 지금은 모집단에만 넣었다",
+      "plainSummary": "저장소 안에 무엇이 있고 누가 그것을 실행하는지 세는 도구가 있습니다. 이번에 파이썬 파일을 «세는 대상»에는 넣었지만 «부르는 쪽»으로는 아직 안 봅니다.",
+      "userBenefit": "앞으로 파이썬 스크립트가 다른 스크립트를 부르면 그 호출이 집계에 잡힙니다 — 지금은 조용히 빠집니다.",
+      "why": "이 회차는 checker-census 의 POPULATION 에 py 를 더해 scripts/ktf-image-sweep.py 가 보이게 했지만, SOURCE_EXT(호출자 증거로 읽는 확장자)에는 더하지 않았다. ★오늘은 차이가 0 이다 — .py 는 한 개뿐이고 그것이 다른 artifact 를 부르지 않는다. 그러나 비대칭이 남아 있고, 다음에 .py 가 하나 더 생겨 무언가를 부르면 그 호출은 «세어지지 않은 채» 0-caller 로 오보된다.",
+      "tradeoff": "★지금 더하면 «자기참조»를 재지 않은 채 굳힌다 — ktf-image-sweep.py 는 머리주석에서 자기 경로를 문자열로 언급하므로, 그 census 가 자기 자신을 호출자로 세지 않는지 먼저 확인해야 한다(이 회차는 그것을 재지 않았다). ★그리고 표본이 1 이다 — 이 저장소가 반복해 적은 「표본 하나로 굳히면 오탐이 굳는다」가 그대로 적용된다. 아무것도 하지 않고 «비대칭이 있다»를 기록으로 남기는 편이 맞을 수 있고, 이 항목이 그 기록이다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}

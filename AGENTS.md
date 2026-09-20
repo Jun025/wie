@@ -650,6 +650,23 @@ design** — do not "fix" that by wiring it:
   merely sits inside `인스턴스` and `패턴`. Measured 2026-09-19 over 838 tracked text files: 392
   occurrences split **328 / 48 / 16**. `docs/report/0187` has the split and the false-negative audit.
 
+- **`scripts/ktf-image-sweep.py` — local only (it needs a KTF client image, which comes out of the
+  git-ignored corpus), and it is the only Python in `scripts/`.** Three sweeps behind one entry
+  point: `slots` (every indirect call through an interface table, all slot offsets, with the global
+  the table came from), `refs` (who reads/writes given sl-relative globals), `window` (a
+  *synchronised* Thumb window ending at an address, literals resolved). Run it as
+  `uv run --with capstone python3 scripts/ktf-image-sweep.py <sub> …` — ★`capstone` is **not
+  installed** for any `python3` on this machine (measured 2026-09-20), so the bare invocation exits
+  **2** and prints that line for you rather than dying at the import. Exit 2 is "could not measure",
+  never "found nothing"; there is no failing state on findings, so it is the same class as
+  `smoke_gate.sh` above and shows up in `checker-census` with zero callers on purpose.
+  ★**Read the header before quoting the `slots` argument column**: it is a straight-line model with
+  no register liveness and there is a *measured* counterexample in it (`01031C0A:0x128f4a`, where the
+  column names the token and the real argument is the path). Confirm anything load-bearing with
+  `window`. It exists because these sweeps lived only under `~/orchestrator/reports/evidence/…` until
+  2026-09-20, which is the shape this lineage was once rejected for — and the round that moved them
+  had itself re-implemented one of the three from scratch a round earlier without noticing it existed.
+
 ### Documented-command liveness — one weekly scheduled job, decided 2026-09-10
 
 **Where "the commands this file names still run" gets checked was decided on 2026-09-10: a weekly
