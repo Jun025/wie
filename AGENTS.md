@@ -905,6 +905,25 @@ than let it be ignored — a periodically-red check that people scroll past is w
   entry it meant lives only in `docs/report/0047--…`, which the same comment already cited, so the
   round that migrated §완료 repointed it there. The rule is unchanged and now unavoidable: **cite the
   per-round file, not `STATE.md:<line>`.**
+- **If you write a 유입 number into a round doc, paste the tool's marker line LAST — and if you
+  edit afterwards, re-run and repaste.** `scripts/corpus-name-inflow.mjs` ends its default-mode
+  output with one HTML comment carrying the three counts and a digest of the content they were
+  measured over; `scripts/check-inflow-marker.mjs` re-computes that digest in the always-run
+  `contract` job and **reddens the PR when the content has moved since**. It needs no corpus, so
+  it is a real gate rather than a "could not measure" one.
+
+  **The marker is optional and a round without one passes** — that is deliberate, not a hole.
+  Requiring it would re-open "did this round run the tool at all", which was measured and declined
+  on 2026-09-20 (`docs/report/0195`: the only available predicate was a wording proxy, and it
+  flagged 3 compliant rounds and 0 offenders). **What it does buy is measured too**: the failure
+  this lineage actually had is staleness — *measured, then wrote more prose, never re-measured* —
+  **4 times out of 4, and 3 of those cost a gate② reject and a `-fix` round**
+  (`docs/report/0196` has the per-incident table, including the one it would **not** have caught).
+  ★It proves **freshness, not truth**: a number hand-typed into a marker over unchanged content
+  passes, because re-deriving the counts needs the git-ignored corpus. And **measuring before you
+  commit is not measuring** — the subject set is `origin/main...HEAD`, so an uncommitted round has
+  0 subjects; the tool now shouts that and refuses to emit a marker rather than minting a 0.
+
 - **The ledger files of this repo are `STATE.md`, `REPORT.md`, `docs/report/**`, `docs/worklog/**`,
   and `docs/worklog-coverage-remeasures.json`.**
   Resolve a merge conflict in any of them by **union** — keep both sides' entries, ordered by the
