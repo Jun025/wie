@@ -20,9 +20,9 @@
     "★잔존 확인 — $OUT/${stem} 형태의 경로 사용 0건(전수 grep), $OUT/${key} 6곳",
     "★repo 표준 게이트 — fmt · clippy --all -D warnings · wasm clippy · RUST_MIN_STACK=4194304 cargo test --all · cargo +beta clippy 전건 rc=0(AGENTS.md 「무엇을 바꿨든 넷 다 + beta」 · 이 diff 의 Rust 줄은 0)",
     "★check-worklog-json · check-docs-report-serial(--next-serial 0190 — 열린 PR #224 의 0188 과 #225 의 0189 claim 을 세어서 준다) · check-doc-liveness-parity · checker-census 전건 rc=0",
-    "★게임 파일명 유입 — scripts/corpus-name-inflow.mjs 를 커밋 «후»에 실행해서 적는다(커밋 전에 재면 대상이 0파일이라 언제나 0 이다 — 직전 회차가 그 함정을 밟았다)",
     "★게이트에서 «가짜 red» 1건을 만났고 원인을 확정했다 — cargo test --all 초회 FAIL. 이 diff 의 Rust 줄은 0(git diff --stat -- '*.rs' Cargo.toml Cargo.lock 빈 출력)인데 wie_cli/tests/dod_ci_parity.rs 11건이 전부 죽었고, 문면은 /private/var/folders/…/tmp.6MxmGnpDkS/wt/AGENTS.md 를 읽지 못했다였다. ★그 경로는 실재하지 않고, 그 시험의 repo_root() 는 env!(\"CARGO_MANIFEST_DIR\") = 컴파일 시점에 박히는 값이다 ⇒ 어떤 회차가 mktemp -d 워크트리 «안»에서 빌드한 산출물이 이 맥의 공유 target/ 에 캐시돼 남았고, 그 워크트리가 지워진 뒤 재실행되면 없는 경로를 읽으려다 죽는다. 확정: touch 로 강제 재컴파일 → 11 passed/0 failed → 전수 cargo test --all rc=0 · ok 바이너리 46 · FAILED 0. ★이 문면은 저장소 결함처럼 보이지만 아니다 — 경로가 /var/folders/… 이면 처방은 재컴파일이고 diff 는 무관하다(git worktree list 실측상 이 맥은 상시 워크트리를 들고 있어 재발한다)",
-    "★내 오측 1건 — 첫 조사에서 cargo test --all | grep | head -30 으로 보고 «test result: ok 30줄»만 나와 통과로 읽었다. head -30 이 실패 줄 «전»에서 잘랐다. 직전 회차가 파이프 뒤 rc 를 읽어 틀린 것과 같은 계급이고 이번엔 출력 절단이었다 ⇒ 진단은 head 로 자르지 말고 파일로 받아 grep -c 로 세라(이 회차의 뒤 측정은 전부 그 형태다)"
+    "★내 오측 1건 — 첫 조사에서 cargo test --all | grep | head -30 으로 보고 «test result: ok 30줄»만 나와 통과로 읽었다. head -30 이 실패 줄 «전»에서 잘랐다. 직전 회차가 파이프 뒤 rc 를 읽어 틀린 것과 같은 계급이고 이번엔 출력 절단이었다 ⇒ 진단은 head 로 자르지 말고 파일로 받아 grep -c 로 세라(이 회차의 뒤 측정은 전부 그 형태다)",
+    "★게임 파일명 유입 — 도구를 커밋 «후»에 실행했다(origin/main...HEAD 4파일): ★BOUNDED 29회/10쌍 · PREFIX-EMBEDDED 0회/0쌍 · SUFFIX-ATTACHED 0회/0쌍 ⇒ 보고값은 「유입 10건(BOUNDED)」+「판단 필요 0건」이다. ★0 이 아닌 이유는 이 회차의 주제가 «겹치는 세 이름»이라 리포트·worklog·러너 안내가 그것을 반복 인용하기 때문이고, 그 셋은 smoke_gate_baseline.tsv 와 선행 리포트 0165·0170·0183 에 이미 추적 파일로 있다(새 이름 유입 0). Constraint 9 는 bytes 이지 names 가 아니다(0170). ※커밋 전에 재면 대상이 0파일이라 언제나 0 이다 — 직전 회차가 그 함정을 밟았다"
   ],
   "limits": [
     "★7월 열의 3 stem 은 영구히 한 판정을 공유한다 — 지는 쪽 실행이 애초에 기록되지 않았으므로 복구 불가이지 미수선이 아니다. 제안의 「소급해 고치지는 마라」를 그대로 지켰다",
