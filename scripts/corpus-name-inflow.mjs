@@ -105,13 +105,13 @@ if (!existsSync(corpusDir)) die(`${corpusDir} does not exist — this needs the 
 // most recent landed rounds, in the default (this-round's-diff) mode, the SUFFIX-ATTACHED bucket
 // — the one a human must split by hand — is IDENTICAL under both populations in all 25. BOUNDED
 // grows by a median of 1 pair (mean 1.44), and those are printed lines, not work. The "283 blessed
-// stems in smoke_gate_baseline.tsv would drown it" objection does not materialise either: 234 of
+// stems in smoke_gate_baseline.tsv would drown it" objection does not materialise either: 235 of
 // the 266 added stems occur nowhere but that file, and 0 of those 25 rounds touched it.
-// ★That 234 is re-measurable only if the ruler comes with it, which is the whole point of this
+// ★That 235 is re-measurable only if the ruler comes with it, which is the whole point of this
 // file: the population is the 266 stems `working/` adds that `broken/` did not already have; an
 // "occurrence" is any hit this tool PRINTS (BOUNDED ∪ SUFFIX-ATTACHED — for this population
 // PREFIX-EMBEDDED is 0, verified, so nothing is hidden by not printing it); and the tree is this
-// PR's branch (905 tracked / 852 text). Counting BOUNDED alone gives 237 over the same tree —
+// PR's branch (905 tracked / 852 text). Counting BOUNDED alone gives 238 over the same tree —
 // quote the ruler or the number means nothing.
 //
 // ★`vendor_sdk/` is excluded, and it is the one exclusion because it is not games — it holds
