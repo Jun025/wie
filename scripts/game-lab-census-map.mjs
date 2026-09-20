@@ -98,6 +98,12 @@
 // All 187 July verdicts therefore come from `<stem>.json`, and deleting that layer
 // would make the column this whole lineage compares against unreadable.
 //
+// ★Whether to make those 73 rows readable ANYWAY was asked as its own question and
+// answered 2026-09-20: no — and NOT because it is impossible. It is possible, it
+// was measured, and it would make the map WORSE: that file's reason column is
+// truncated where `<stem>.json` is not. The refusal, its numbers and the trigger
+// to reopen it live at "The third key, refused" below, re-measured on each run.
+//
 // ★Because the two inputs can disagree, WHICH ONE WON is printed rather than left
 // to be re-derived: per row in column 7, and as a total in the header, on stdout,
 // and on the `--bucket` / `--signature` stderr line.
@@ -401,16 +407,25 @@ const tailKey = (p) => nfc(`${path.basename(path.dirname(p))}/${path.basename(p)
 const summaryFile = path.join(reportsDir, "summary.tsv");
 const byPath = new Map();
 const byTail = new Map();
+// ★NOT a lookup key. `byCarrier` indexes each summary row by
+// `<platform column>/<basename>` for one purpose only: so the refusal to accept
+// that key can be RE-MEASURED on every run instead of asserted once in a
+// comment. Nothing reads it in `lookup()`; see the decision block below.
+const byCarrier = new Map();
+const summaryPlatforms = new Set();
 let summaryRows = 0;
 if (existsSync(summaryFile)) {
   for (const line of readFileSync(summaryFile, "utf8").split("\n")) {
     if (!line || line.startsWith("result\t")) continue;
     const cols = line.split("\t");
     if (cols.length < 4) continue;
-    const [result, , file, reason] = cols;
+    const [result, platform, file, reason] = cols;
     if (!file) continue;
     const rec = { result, reason };
     byPath.set(pathKey(file), rec);
+    summaryPlatforms.add(platform);
+    const ct = nfc(`${platform}/${path.basename(file)}`);
+    byCarrier.set(ct, byCarrier.has(ct) ? null : rec);
     // First writer wins on the tail key: if two rows collapse onto one tail, the
     // exact key is the only correct answer for both and this ambiguous fallback
     // must not pick a side by ordering.
@@ -466,10 +481,77 @@ for (const r of rows) sourceTotals[r.source] = (sourceTotals[r.source] || 0) + 1
 // right outcome and it must not be silent: "I read an input and used none of it"
 // is indistinguishable from "the input was absent" unless the tool says so.
 //
-// ★Basenames are deliberately NOT accepted as a third key. A basename cannot tell
-// the colliding stems apart either, so honouring it would relabel a lossy row as
-// `summary.tsv` — and it would re-bucket 73 rows of the July column, which is a
-// retroactive change to the baseline this lineage compares against.
+// ── The third key, refused — and the refusal re-measured on every run ────────
+// ★A BARE basename is not accepted as a key: it cannot tell the colliding stems
+// apart. But `summary.tsv` carries the carrier in COLUMN 2, and
+// `<platform>/<basename>` is exactly the shape of `tailKey` above — so a third
+// key IS available and the ambiguity objection does not survive contact with the
+// file. Measured 2026-09-20 on the July baseline, that key would join 31 of its
+// 73 rows, including the one colliding stem among them, with 0 false joins.
+//
+// ★It is refused anyway, and NOT for the reason the earlier revision of this
+// block gave (basenames are ambiguous) nor for the one this round expected
+// (nothing would change). Measured: 16 of those 31 would land in a DIFFERENT
+// bucket, and all 16 are the SAME move — `NoSuchMethod` → `UNCLASSIFIED`. Not one
+// is a correction; every one is a classification falling off. The cause is that
+// THIS file's `reason` column is truncated: the July writer cut the reason at its
+// first newline, so on 23 of the 31 the summary's reason is a strict PREFIX of the
+// `<stem>.json` one (50 chars against 249 on average) and `RULES` would be matched
+// against less text than the fallback already has.
+//
+// ★That is the exact reverse of the direction documented above for TODAY's runner,
+// where the summary holds the WHOLE flattened reason and the json is read
+// first-line-only. Both statements are true of their own artifact, and neither
+// generalises — which is why the choice below is re-measured rather than settled.
+//
+// ★Two further facts about that file, both measured, both arguing the same way:
+// its 73 rows are ONE platform against 452 `.json` reports, so it is the residue
+// of a single carrier's run and not an index of the July column; and 42 of the 73
+// name files that have since left this corpus, so they are out of population
+// whatever the key is.
+//
+// ★So the numbers below are computed, not quoted, and the trigger is stated in
+// them: a non-zero `would-change` is NOT by itself a reason to reopen while
+// `truncated` is also non-zero — that combination is this file, and it is what
+// refusal is for. Reopen when `truncated` reaches 0 and `would-change` does not:
+// a summary that is no lossier than the fallback and still disagrees with it is
+// carrying a correction, and refusing that would be losing data rather than
+// declining a relabel. A comment could not have noticed either case.
+//
+// ★What the third key would equate, said plainly: the runner's DETECTED platform
+// with the corpus's DIRECTORY name. `classify.sh` files by the same detection, so
+// they normally agree; where they do not, the key misses (falls through to the
+// stem layer) rather than joining the wrong row. A false join needs two corpora
+// sharing a carrier name and a filename — the same mis-use `tailKey` already
+// names.
+let cfJoin = 0;
+let cfChange = 0;
+let cfTruncated = 0;
+const cfMatched = new Set();
+if (summaryRows) {
+  for (const r of rows) {
+    const k = tailKey(r.file);
+    const rec = byCarrier.get(k);
+    if (!rec) continue; // absent, or `null` for an ambiguous key — both "no answer"
+    cfMatched.add(k);
+    if (r.source === SRC_SUMMARY) continue; // already joined by a real key
+    cfJoin++;
+    if (rec.result !== r.result || bucketOf(rec) !== r.bucket) cfChange++;
+    // ★Lossiness, measured per row rather than assumed from which file it is.
+    // The runner flattens newlines to spaces on its way into `summary.tsv`, so the
+    // comparable form of the fallback's reason is the flattened one; if the
+    // summary's is a STRICT PREFIX of that, this input dropped text the fallback
+    // still holds, and joining it would classify on less evidence.
+    const fb = lookup(r.file, r.stem).r;
+    const flat = (fb?.reason || "").replace(/[\n\t]/g, " ").trimEnd();
+    const sum = (rec.reason || "").trimEnd();
+    if (sum && flat.length > sum.length && flat.startsWith(sum)) cfTruncated++;
+  }
+}
+// ★Counted in KEYS, not rows: two rows sharing a key are one question, and with a
+// duplicated key `byCarrier` holds `null`, so a row-based subtraction would report
+// a row that does name a file here as if it named none.
+const cfUnmatched = byCarrier.size - cfMatched.size;
 const summaryUsed = sourceTotals[SRC_SUMMARY] || 0;
 const sourceLine =
   `inputs: ` +
@@ -481,7 +563,7 @@ const sourceLine =
     ? ` (no summary.tsv in ${reportsDir} — stem-keyed fallback only)`
     : summaryUsed
       ? ` (summary.tsv had ${summaryRows} row(s))`
-      : ` ★(summary.tsv has ${summaryRows} row(s) and NONE of them matched a corpus file — its 'file' column is not corpus-relative; the July baseline stores bare basenames. Falling back to the stem layer, which loses one verdict per colliding stem.)`);
+      : ` ★(summary.tsv has ${summaryRows} row(s) over ${summaryPlatforms.size} platform(s) and NONE of them joined — its 'file' column is not corpus-relative; the July baseline stores bare basenames. ★Refusing '<platform>/<file>' as a third key is a DECISION, re-measured here every run: would-join=${cfJoin} · would-change=${cfChange} · truncated=${cfTruncated} · key-names-no-file-here=${cfUnmatched}. 'truncated' counts joinable rows whose reason is a strict prefix of the fallback's, i.e. rows where this input carries LESS text than the stem layer and would re-bucket downward; while it is non-zero the refusal stands. ★Reopen when truncated=0 and would-change is still non-zero — that is a correction rather than a relabel. Falling back to the stem layer, which loses one verdict per colliding stem.)`);
 
 // ── The asymmetry this cannot repair, printed only when it applies ───────────
 // Stem collisions are a property of the CORPUS, so they are computed here and not
@@ -491,7 +573,7 @@ const stemCounts = new Map();
 for (const c of corpus) stemCounts.set(c.stem, (stemCounts.get(c.stem) || 0) + 1);
 const collidingStems = [...stemCounts].filter(([, n]) => n > 1).map(([s]) => s).sort();
 const asymmetryLine = collidingStems.length
-  ? `★${collidingStems.length} stem(s) exist under 2+ carriers (${collidingStems.length * 2 <= 8 ? collidingStems.join(", ") : `${collidingStems.slice(0, 3).join(", ")}, …`}). A stem-keyed column gives every copy ONE verdict; only the summary.tsv path tells them apart. Rows from a stem-keyed input are therefore not comparable 1:1 with rows from a path-keyed one — and the July baseline is stem-keyed here (its summary.tsv is basename-keyed, which cannot tell them apart either), so that asymmetry is permanent for it.`
+  ? `★${collidingStems.length} stem(s) exist under 2+ carriers (${collidingStems.length * 2 <= 8 ? collidingStems.join(", ") : `${collidingStems.slice(0, 3).join(", ")}, …`}). A stem-keyed column gives every copy ONE verdict; only the summary.tsv path tells them apart. Rows from a stem-keyed input are therefore not comparable 1:1 with rows from a path-keyed one — and the July baseline is stem-keyed here (its summary.tsv is basename-keyed; column 2 COULD tell them apart, and joining on it was measured and refused — see the inputs line), so that asymmetry is permanent for it.`
   : null;
 
 // ── The staleness verdict, computed BEFORE --bucket exits ───────────────────
