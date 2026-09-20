@@ -187,26 +187,64 @@ import { cargoMetadata, workspaceRelative } from "./cargo-metadata.mjs";
 
 // ── Staleness is measured against the ENGINE, not against a calendar ─────────
 // The proposal that asked for this left the threshold open ("a reason for N is
-// needed separately"). Measured on 2026-09-19 over the last 90 days, against the
-// path set cargo reports (below): commits touching it land on 56 of 90 days (165
-// commits), and the gaps between consecutive engine-active days are p50 1 day,
-// p90 3, MAX 6. ★The calendar is the wrong axis: the question a reader actually
-// has is "could the verdicts below have changed since they were taken", and that
-// is answered exactly by counting engine commits after the newest report.
-// For the July baseline the answer is not a threshold call — it is 147 commits.
+// needed separately"). Measured on 2026-09-20 over the last 90 days, against the
+// path set this file counts (cargo's, PLUS the pre-rename names derived below):
+// commits touching it land on 65 of 90 days (294 commits), and the gaps between
+// consecutive engine-active days are p50 1 day, p90 2, MAX 4. ★The calendar is
+// the wrong axis: the question a reader actually has is "could the verdicts below
+// have changed since they were taken", and that is answered exactly by counting
+// engine commits after the newest report. For the July baseline the answer is not
+// a threshold call — it is 259 commits.
 //
-// ★Those four numbers REPLACED a set measured against the old literal globs
-// (65/90 days, 304 commits, p50 1 / p90 2 / MAX 4, July 263) and they are lower
-// on purpose: the literal also matched PRE-RENAME directory names (`wie_lgt/`,
-// `wie_wipi_java/`, …) and two base-swap orphans, so 43 of 116 commits in one
-// sampled window — 37% — came from paths cargo does not build. Asking cargo means
-// asking about TODAY's layout, and today's layout cannot see history filed under
-// yesterday's names. ★The cost is depth, not safety: a rename commit is recorded
-// at the NEW path too (verified on `a56e72f4`, the `wie_web -> wie_featurephone`
-// rename — it is counted by `wie_featurephone` as well as by `wie_web`), so a
-// report older than a rename still sees at least that commit and can never read
-// CURRENT because of it. What is lost is how far back the count reaches, which is
-// informational; the verdict is not.
+// ★Those numbers have now moved TWICE, in opposite directions, and both moves are
+// worth keeping because the second one repairs the cost the first one accepted.
+//
+//   literal globs (until 2026-09-19)   65/90 days · 304 commits · p50 1 / p90 2 / MAX 4 · July 269
+//   cargo only    (2026-09-19)         56/90 days · 168 commits · p50 1 / p90 3 / MAX 6 · July 153
+//   cargo + derived historic (here)    65/90 days · 294 commits · p50 1 / p90 2 / MAX 4 · July 259
+//
+// (All three rows are re-measured on today's HEAD, so the first two sit a little above
+// what `docs/report/0182` published on 2026-09-19 — July 269 vs its 263 and 153 vs its
+// 147 are six days of landings. Its 90-day cells are 304 and 165/168. Do not read the
+// drift between the two documents as a disagreement; re-measure instead.)
+//
+// The middle row dropped the literal because it also matched PRE-RENAME directory
+// names (`wie_lgt/`, `wie_wipi_java/`, …) and dead base-swap orphans, so 43 of 116
+// commits in one sampled window — 37% — came from paths cargo does not build. That
+// was right. What it also threw away was every commit filed under a name this tree
+// has since renamed, and the price was measured and accepted as "depth, not safety":
+// a rename commit is recorded at the NEW path too (verified on `a56e72f4`, the
+// `wie_web -> wie_featurephone` rename), so a report older than a rename still sees
+// at least that commit and can never read CURRENT because of it.
+//
+// ★The third row buys the depth back WITHOUT the literal, because git records the
+// renames itself — see `historicEnginePaths` below. The proposal that asked for this
+// (`2026-09-19-census-map-provenance-offset-and-engine-paths#p1`) predicted the
+// opposite ("adding the old names IS the literal coming back, and git cannot --follow
+// several paths, so tracking them automatically is not cheap either"); measured, both
+// halves are false. Asking git for its own rename records is a second DERIVATION, not
+// a second copy — nobody types a crate name — and it costs one `git log` pass.
+//
+// ★The recovered set is a strict SUBSET of what the literal caught. Measured over the
+// last 90 days: literal 304, this 294, commits this counts that the literal did not
+// **0**, commits the literal counted that this does not **10**. Those 10 were read one
+// by one rather than characterised in bulk, and they are four things, not one:
+//
+//   4  `wie-web/src`'s TypeScript/CSS/HTML half — `0182` limits[]: cargo reports only
+//      `src/rust`, and narrowing to it was that round's decision
+//   4  `wie_jvm_support/tests`, `wie_midp/tests` — the base-swap orphans `0182` named as
+//      what the literal WRONGLY bit; 3 files under directories with no `Cargo.toml`
+//   1  `wie_tauri` — `0182` limits[]: `wie_app` is held out of the workspace by `7a439bd0`
+//   1  ★`bfa1ef2f`, and this one is NOT a narrowing — it is a MERGE, and `git rev-list`
+//      drops a merge that is TREESAME to a parent for the given paths. The coarse glob
+//      `wie_*` is not TREESAME there and `wie_cli/src/bin` is, so the difference is
+//      pathspec granularity on merge simplification, not coverage. Nobody predicted this
+//      one; it is written down because "all 10 are deliberate exclusions" was the
+//      tempting summary and it would have been false.
+//
+// ★"Strict subset" is the claim to re-run if this changes — a NON-zero "counts that the
+// literal did not" is the signal that this has started biting something new, and it is
+// the cheap check (`git rev-list` both sets, `comm`).
 //
 // Wall-clock age is still printed, because it is what a human recognises and
 // because it is the only thing left when git or cargo cannot answer.
@@ -256,6 +294,113 @@ function enginePathsFromCargo() {
   return out.size > REPO_LEVEL_ENGINE_PATHS.length ? [...out].sort() : null;
 }
 
+// ★The names this tree used to file the engine under, ASKED OF GIT rather than written
+// down. `git log --diff-filter=R -M` is git's own record of every rename it detected; a
+// pair whose DESTINATION is inside the cargo-derived set names a path that WAS the engine.
+// Run to a fixed point, because this tree has renamed the same crate more than once
+// (`crates/wie_vendor_ktf` → `wie_ktf` → `wie-ktf`) — measured, it converges in 2 passes over
+// 998 pairs and reaches 285 candidates, 280 of which survive the HEAD filter below. They span
+// four naming eras (`crates/wie_*`, `wie_impl_*`/`wie_vendor_*`, `wie_*`, today's `wie-*`).
+// No list of that shape would have been written by hand, and none of it is typed here.
+//
+// ★A `--diff-filter=R` scan is possible only WITHOUT a pathspec. With one, git filters the
+// diff before rename detection can pair the halves, so a rename from outside the pathspec
+// into it reads as an add: asking `git log --diff-filter=R -- <the 45 cargo paths>` returns
+// 6 pairs and misses `wie_web -> wie_featurephone` entirely (measured). That is the same
+// trap as `--follow`, and it is why this scans everything and filters afterwards.
+//
+// ★A candidate that STILL EXISTS at HEAD is dropped, and that rule is the whole reason this
+// does not re-open what `0182` closed. A surviving name is not history — it is a live path
+// that cargo deliberately does not build, which is exactly the class the literal was removed
+// for biting. Measured: 5 of 285 candidates survive (`src`, `wie_cli/src` — already cargo
+// paths, so dropping them changes nothing — plus `test_data`, `wie_jvm_support`, `wie_midp`),
+// and the three real drops cost 11 commits of July depth, 270 → 259.
+//
+// ★It is a PATH test, not a directory-name test, and the difference is load-bearing:
+// `wie_jvm_support/` survives only as 3 orphaned `tests/*.rs` files, while
+// `wie_jvm_support/src/` is genuinely gone — so the source half is counted as history and the
+// surviving test half is not. Judging the whole directory by any surviving descendant would
+// throw away 11 commits that really are pre-rename engine work.
+//
+// ★It cannot flip a verdict on a fresh table: every path here is gone from HEAD, so a commit
+// can only touch one by predating the rename that removed it. Measured against the cargo-only
+// count — since 2026-09-18 delta 0, 09-16 0, 09-15 +1, 09-10 +3, 09-01 +34, 08-01 +55,
+// 07-01 +105. The correction grows with how far back the table reaches, which is what "depth"
+// means. ★Stated as a measurement and not as a proof, because the same "renames are behind
+// us" reasoning is what the `--since` note below records as having been measured FALSE.
+//
+// ★Returns null when git will not answer, and the caller says so. Degrading silently to the
+// cargo-only count would make the number SMALLER, i.e. bias toward CURRENT, and that is the
+// one direction this file exists to forbid.
+function historicEnginePaths(current) {
+  const opts = { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 1 << 28 };
+  const under = (p, set) => set.some((e) => p === e || p.startsWith(e + "/"));
+  let raw;
+  try {
+    // ★The scan is UNBOUNDED, and the obvious optimisation was tried and measured wrong.
+    // Passing the count's own `--since` looks exactly equivalent — a path renamed away before
+    // the window opened should hold no commit inside it — and it is several times cheaper
+    // (5 runs each at loadavg ~75: unbounded 0.35–1.15 s, bounded to July 0.06–0.19 s; the
+    // same pair at loadavg ~205 read 2.7–5.0 s and 0.9–1.5 s, so read the RATIO, not the
+    // seconds). It is not equivalent: measured against the cargo-only count, the correction
+    // it recovers falls from +3 to +1 (since 2026-09-10) and from +34 to +2 (since
+    // 2026-09-01), while the two older windows are unaffected. The reasoning fails because
+    // history here is not linear — this tree took an upstream base swap, so a commit
+    // reachable from HEAD can carry a commit-date INSIDE the window while sitting on a
+    // lineage where the rename had not happened. `--since` filters by date; ancestry does not
+    // follow. Do not re-apply that bound without re-running those two deltas.
+    raw = execFileSync("git", ["log", "--diff-filter=R", "-M", "--name-status", "--format=", "HEAD"], opts);
+  } catch {
+    return null;
+  }
+  const pairs = [];
+  for (const line of raw.split("\n")) {
+    if (!line.startsWith("R")) continue;
+    const f = line.split("\t");
+    if (f.length >= 3) pairs.push([f[1], f[2]]);
+  }
+  // ★Fixed point over rename chains, and the ONLY test against the growing set is on the
+  // destination. That is what makes the answer independent of the order git printed the pairs
+  // in: adding a path can only ever enable more pairs, never disable one, so the loop has a
+  // least fixed point and reaches it from any order. It is not a style point — the first
+  // version of this also skipped pairs whose SOURCE was already in the set, which is not
+  // monotone, and it measurably gave two different answers on one repo: newest-first (git's
+  // default) 35 paths / 248 commits, oldest-first 78 / 259. Both orders now give 280 / 259.
+  //
+  // The 10 is a guard against a cycle in the pair list, not a tuning knob — the loop exits on
+  // the first pass that adds nothing.
+  //
+  // ★Read the COMMIT count, not the path count. The path count is an implementation figure
+  // and it moves without the answer moving: capping this loop at one pass leaves it at 280 on
+  // git's own ordering, drops it to 125 on the reversed one, and the commit count is 259 in
+  // all three — the paths it loses are sub-paths of paths it keeps. The loop is what makes the
+  // SET reproducible; it is not what makes the number right.
+  const set = [...current];
+  const found = new Set();
+  for (let i = 0; i < 10; i++) {
+    let grew = false;
+    for (const [from, to] of pairs) {
+      if (!under(to, set)) continue;
+      const dir = path.dirname(from);
+      if (dir === "." || found.has(dir)) continue;
+      found.add(dir);
+      set.push(dir);
+      grew = true;
+    }
+    if (!grew) break;
+  }
+  if (found.size === 0) return [];
+  // One `ls-tree`, not one `cat-file` per candidate: this runs on every invocation.
+  let live = "";
+  try {
+    live = execFileSync("git", ["ls-tree", "-r", "--name-only", "HEAD", "--", ...found], opts);
+  } catch {
+    return null;
+  }
+  const surviving = live.split("\n").filter(Boolean);
+  return [...found].filter((p) => !surviving.some((f) => f === p || f.startsWith(p + "/"))).sort();
+}
+
 // ★A bare local date is ambiguous the moment the table leaves this machine: the SAME instant
 // renders as three different days under three timezones (measured 2026-09-19 on one report
 // file — `Asia/Seoul` 2026-09-19, `UTC` 2026-09-18, `America/Los_Angeles` 2026-09-18), and
@@ -282,16 +427,31 @@ const localDay = (d) =>
 function engineCommitsSince(epochMs) {
   const enginePaths = enginePathsFromCargo();
   if (!enginePaths) return { ok: false, why: "cargo did not answer" };
+  // ★The historic names are an ENRICHMENT of the count, not a precondition for it: losing
+  // them costs depth, losing cargo costs the set itself. So a null here is carried into the
+  // verdict line as "depth unmeasured" rather than collapsing the whole answer to UNMEASURED.
+  const historic = historicEnginePaths(enginePaths);
+  const countPaths = historic ? [...enginePaths, ...historic] : enginePaths;
   const opts = { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] };
   try {
-    const count = execFileSync(
-      "git",
-      ["rev-list", "--count", `--since=${new Date(epochMs).toISOString()}`, "HEAD", "--", ...enginePaths],
-      opts,
-    ).trim();
+    const since = `--since=${new Date(epochMs).toISOString()}`;
+    const count = execFileSync("git", ["rev-list", "--count", since, "HEAD", "--", ...countPaths], opts).trim();
+    // ★The CURRENT paths only. `last` answers "when did the engine last move", and a dead
+    // pre-rename path can only ever answer that with a date before its own rename.
     const last = execFileSync("git", ["log", "-1", "--format=%h %cs", "--", ...enginePaths], opts).trim();
     if (!/^\d+$/.test(count)) return { ok: false, why: "git did not answer" };
-    return { ok: true, commits: Number(count), last, paths: enginePaths.length };
+    // ★Split out rather than folded in, because the two halves answer different questions:
+    // `commits` is how much the engine moved, `viaHistoric` is how much of that this table
+    // would have MISSED before 2026-09-20 — i.e. how far past a rename boundary it reaches.
+    const nowOnly = execFileSync("git", ["rev-list", "--count", since, "HEAD", "--", ...enginePaths], opts).trim();
+    return {
+      ok: true,
+      commits: Number(count),
+      last,
+      paths: countPaths.length,
+      viaHistoric: historic && /^\d+$/.test(nowOnly) ? Number(count) - Number(nowOnly) : null,
+      historicPaths: historic ? historic.length : null,
+    };
   } catch {
     return { ok: false, why: "git did not answer" };
   }
@@ -634,11 +794,34 @@ const ageDays = haveMtimes ? (Date.now() - newestMs) / 86_400_000 : null;
 const engine = haveMtimes ? engineCommitsSince(newestMs) : { ok: false };
 
 const verdict = !haveMtimes || !engine.ok ? "UNMEASURED" : engine.commits > 0 ? "STALE" : "CURRENT";
+// ★What the count's DEPTH is worth, said next to the count. A number that silently stops at
+// the last rename reads as an equality when it is a floor, and the reader has no way to tell
+// the two apart — which is the whole of the proposal this answers. Three states, never
+// silence: `viaHistoric` non-zero names how much of the count lives past a rename boundary,
+// zero says no commit in this window touches one, and null says git would not hand over its
+// rename records, so the count IS a floor.
+//
+// ★The zero branch says "none of them touch", NOT "this table is newer than every rename".
+// The second is an inference the measurement does not carry — what was measured is that no
+// commit inside THIS window touched a pre-rename path, which is weaker and is the thing a
+// reader can check.
+const depthNote =
+  !engine.ok || engine.historicPaths === null
+    ? " · ★depth UNMEASURED — git did not hand over its rename records, so this count stops at the newest rename and is a FLOOR"
+    : engine.viaHistoric
+      ? ` · ${engine.viaHistoric} of them found under ${engine.historicPaths} pre-rename path(s) this tree no longer uses`
+      : ` · none of them touch any of the ${engine.historicPaths} pre-rename path(s) checked`;
 const verdictLine =
   verdict === "STALE"
-    ? `★★ STALE — the engine moved ${engine.commits} commit(s) after these verdicts were taken (newest report ${ageDays.toFixed(1)} days old; last engine commit ${engine.last})`
+    ? `★★ STALE — the engine moved ${engine.commits} commit(s) after these verdicts were taken (newest report ${ageDays.toFixed(1)} days old; last engine commit ${engine.last})${depthNote}`
     : verdict === "CURRENT"
-      ? `CURRENT — no engine commit after the newest report (${ageDays.toFixed(1)} days old)`
+      ? // ★On CURRENT the depth note is attached ONLY when depth could not be measured. A
+        // CURRENT that reaches every path says nothing interesting about renames (there are
+        // no commits to attribute), but a CURRENT computed from a count that is a FLOOR is a
+        // claim the floor cannot support, and that has to be visible.
+        `CURRENT — no engine commit after the newest report (${ageDays.toFixed(1)} days old)${
+          engine.historicPaths === null ? depthNote : ""
+        }`
       : `★★ UNMEASURED — could not compare against the engine${haveMtimes ? ` (${engine.why ?? "no answer"})` : " (no reports to date)"}. Do NOT read this as current.`;
 
 // stderr, loud and bounded, on both paths. Silent on CURRENT so that the one
