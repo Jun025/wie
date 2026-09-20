@@ -77,7 +77,7 @@
 // the documented path is no longer the silent one. The honest position is
 // unchanged for raw-awk readers and improved for everyone who asks the tool.
 //
-// ── Where a verdict comes from: summary.tsv first, <stem>.json second ────────
+// ── Where a verdict comes from: summary.tsv, then <bucket>__<stem>, then <stem> ─
 // ★The `<stem>.json` layer LOSES DATA and always has. Measured 2026-09-19 (and
 // again by this round): the corpus is 187 files over 184 stems — `놈3`,
 // `다크슬레이어2` and `이노티아연대기2` each exist under two carriers. The
@@ -87,8 +87,16 @@
 // every map were a copy of another row rather than a measurement.
 //
 // The runner already writes the lossless thing next to it: `summary.tsv`, one row
-// per FILE keyed by PATH. So the fix is precedence, not a new artifact — read
+// per FILE keyed by PATH. So the first fix was precedence, not a new artifact — read
 // `summary.tsv` when it is there, fall back to `<stem>.json` when it is not.
+//
+// ★2026-09-20 closed the other half, at the WRITER. Precedence fixed the TABLE, but
+// the file a human opens is the per-game one, and that was still being overwritten —
+// and not only the `.json`: the runner keyed `.log` (the validator's stderr, i.e. the
+// actual answer to "why did this fail"), `.png` and the `--resume` test off the same
+// bare stem. `scripts/game-lab-recensus.sh` now writes `<bucket>__<stem>` for stems
+// that collide, so nothing is lost; this generator reads that name as a MIDDLE layer,
+// above the bare stem and below `summary.tsv`.
 //
 // ★The fallback is NOT vestigial and must not be deleted. The proposal behind
 // this change said the July baseline `game_lab/reports/` has no path key; measured
@@ -106,7 +114,11 @@
 // stems carry one verdict across two files THERE, for good — the losing run was
 // never written down and cannot be recovered. Comparing July against a fresh
 // column therefore leaves exactly those rows asymmetric, and the header says so
-// when the corpus contains colliding stems. Fixing the future is all this can do.
+// when the corpus contains colliding stems. Fixing the future is all this can do —
+// ★and as of 2026-09-20 the future IS fixed: a directory written by today's runner
+// keeps both copies, so a fresh-vs-fresh comparison is symmetric. It is only
+// July-vs-anything that stays asymmetric, and that is unrecoverable rather than
+// unfixed — the losing July run was never written down.
 //
 // ★And column 6 does not mean quite the same thing on both paths. The runner
 // flattens newlines to spaces before it writes `summary.tsv`, so a summary-sourced
@@ -428,17 +440,31 @@ const bucketOf = (r) => {
 };
 
 const SRC_SUMMARY = "summary.tsv";
+const SRC_CARRIER_JSON = "bucket__stem.json";
 const SRC_JSON = "stem.json";
 const SRC_NONE = "none";
 
 // Precedence, in one place so it can be read and changed as one thing.
 // ★`byTail` can hold `null` for an ambiguous tail; `??` treats that as "no answer"
 // and falls through to the stem layer, which is the intended behaviour.
-const lookup = (file, stem) => {
+//
+// ★`bucket__stem.json` sits ABOVE the bare stem and BELOW summary.tsv, and it is a
+// DIFFERENT source label on purpose. The bare stem layer is lossy by construction —
+// one file per stem, so a colliding stem carries one carrier's verdict for both — and
+// the accounting below exists to say how many rows came from a lossy input. A
+// bucket-qualified hit is NOT lossy, so folding it into `stem.json` would overstate
+// the loss; giving it its own name keeps that count honest.
+// ★It is a FALLBACK, not a replacement: `scripts/game-lab-recensus.sh` writes this
+// name only for stems that actually collide, and existing directories (the July
+// column) have none of them. Those still resolve through the bare-stem branch below,
+// which is why that branch must not be deleted.
+const lookup = (file, stem, carrier) => {
   const exact = byPath.get(pathKey(file));
   if (exact) return { r: exact, source: SRC_SUMMARY };
   const tail = byTail.get(tailKey(file));
   if (tail) return { r: tail, source: SRC_SUMMARY };
+  const q = reports.get(nfc(`${carrier}__${stem}`));
+  if (q) return { r: q, source: SRC_CARRIER_JSON };
   const js = reports.get(stem);
   if (js) return { r: js, source: SRC_JSON };
   return { r: null, source: SRC_NONE };
@@ -446,8 +472,8 @@ const lookup = (file, stem) => {
 
 const rows = [];
 for (const { file, stem } of corpus) {
-  const { r, source } = lookup(file, stem);
   const carrier = path.basename(path.dirname(file));
+  const { r, source } = lookup(file, stem, carrier);
   if (!r) {
     rows.push({ file, stem, carrier, result: "NO-REPORT", bucket: "NO-REPORT", excerpt: "", source });
     continue;
@@ -473,7 +499,7 @@ for (const r of rows) sourceTotals[r.source] = (sourceTotals[r.source] || 0) + 1
 const summaryUsed = sourceTotals[SRC_SUMMARY] || 0;
 const sourceLine =
   `inputs: ` +
-  [SRC_SUMMARY, SRC_JSON, SRC_NONE]
+  [SRC_SUMMARY, SRC_CARRIER_JSON, SRC_JSON, SRC_NONE]
     .filter((k) => sourceTotals[k])
     .map((k) => `${k}=${sourceTotals[k]}`)
     .join(" · ") +
@@ -491,7 +517,7 @@ const stemCounts = new Map();
 for (const c of corpus) stemCounts.set(c.stem, (stemCounts.get(c.stem) || 0) + 1);
 const collidingStems = [...stemCounts].filter(([, n]) => n > 1).map(([s]) => s).sort();
 const asymmetryLine = collidingStems.length
-  ? `★${collidingStems.length} stem(s) exist under 2+ carriers (${collidingStems.length * 2 <= 8 ? collidingStems.join(", ") : `${collidingStems.slice(0, 3).join(", ")}, …`}). A stem-keyed column gives every copy ONE verdict; only the summary.tsv path tells them apart. Rows from a stem-keyed input are therefore not comparable 1:1 with rows from a path-keyed one — and the July baseline is stem-keyed here (its summary.tsv is basename-keyed, which cannot tell them apart either), so that asymmetry is permanent for it.`
+  ? `★${collidingStems.length} stem(s) exist under 2+ carriers (${collidingStems.length * 2 <= 8 ? collidingStems.join(", ") : `${collidingStems.slice(0, 3).join(", ")}, …`}). A BARE-stem-keyed column gives every copy ONE verdict; the summary.tsv path key and the <bucket>__<stem>.json name (written by scripts/game-lab-recensus.sh since 2026-09-20, for colliding stems only) both tell them apart. Rows from a stem-keyed input are therefore not comparable 1:1 with rows from a path-keyed one — and the July baseline is stem-keyed here (its summary.tsv is basename-keyed, which cannot tell them apart either), so that asymmetry is permanent for it.`
   : null;
 
 // ── The staleness verdict, computed BEFORE --bucket exits ───────────────────
