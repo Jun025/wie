@@ -371,3 +371,37 @@ impl From<StdlibSvcId> for u32 {
         value as u32
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use wie_core_arm::SvcId;
+
+    use super::WIPICSvcId;
+
+    /// SVC `0x581` resolves, and an id that is genuinely unmapped still errors.
+    ///
+    /// `handle_wipic_svc` branches on exactly this conversion, so an id missing
+    /// from the table is what produced "Unknown LGT WIPIC SVC id 1409" for one
+    /// title (upstream `dlunch/wie#1260`). The second half is the half that keeps
+    /// mattering: the table has to stay **fail-closed**, because a catch-all that
+    /// resolved unknown ids would turn "we have never seen this call" into a
+    /// silent pass — the shape this repo keeps having to name.
+    ///
+    /// ── Why this test is being re-added rather than written ──────────────────
+    /// It existed (`4e37e9e4`), and the crate rename `wie_lgt` → `wie-lgt`
+    /// dropped it along with the file it lived in; a machine audit found it by
+    /// diffing *function names* across the swap. Before restoring it, both halves
+    /// were re-measured against HEAD rather than assumed, because the audit's own
+    /// note warned that a sibling case (`misc_unk9`) was unrestorable — its target
+    /// function no longer exists. Here the target does: `Unk16 = 0x581` is still
+    /// declared, `0x581 => Self::Unk16` is still in `try_from`, and `0x582` still
+    /// appears nowhere in this file, so the old body applies unchanged.
+    #[test]
+    fn wipic_svc_0x581_maps_and_table_stays_fail_closed() {
+        let id = WIPICSvcId::try_from(SvcId(0x581)).expect("SVC 0x581 (misc index 9) must be in the table");
+        assert_eq!(u32::from(id), 0x581);
+
+        // ...and ids that really are unmapped still error rather than silently resolving.
+        assert!(WIPICSvcId::try_from(SvcId(0x582)).is_err());
+    }
+}
