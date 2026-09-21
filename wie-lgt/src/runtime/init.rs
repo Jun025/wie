@@ -80,6 +80,14 @@ pub async fn load_native(core: &mut ArmCore, system: &mut System, jvm: &Jvm, jar
     let init_param_1: InitParam1 = read_generic(core, ptr_init_param_1)?;
 
     tracing::debug!("InitStruct: {:#x?}", init_param_1.ptr_init_struct);
+    // We seed `ptr_init_struct` with 0 and the entrypoint is expected to publish its init struct
+    // there. SD한국전쟁 returns without doing so, and the unchecked read below then reported the
+    // failure as "Invalid memory access; address: 0" with no indication of which field was null.
+    if init_param_1.ptr_init_struct == 0 {
+        return Err(WieError::FatalError(
+            "LGT entrypoint returned without publishing an init struct (ptr_init_struct is null)".into(),
+        ));
+    }
     let init_struct: InitStruct = read_generic(core, init_param_1.ptr_init_struct)?;
 
     tracing::debug!("Calling initializer at {:#x}", init_struct.fn_init);

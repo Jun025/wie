@@ -1026,6 +1026,45 @@ mod tests {
     }
 
     #[test]
+    fn unplaceable_virtual_methods_still_occupy_vtable_slots() -> Result<()> {
+        // `java/lang/Runtime` has no `data/lgt_java_abi.toml` row, so none of its four virtual
+        // methods can be placed at a known index. Dropping them left a 10-entry table while
+        // 배틀몬스터·학교가는길·체스마스터 all dispatch on index 13: the guest read one word past
+        // the allocation, found 0 and branched to address 0 ("Invalid memory access; address: 0").
+        // Reserving a slot per unplaceable method keeps the read in range, where a missing entry
+        // is a stub that names itself.
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, core, _) = init_jvm(&system_clone).await?;
+            let class = jvm.resolve_class("java/lang/Runtime").await.unwrap();
+            let definition = class.definition.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap().clone();
+
+            let vtable_count = definition.descriptor()?.vtable_count as usize;
+            assert!(
+                vtable_count > 13,
+                "java/lang/Runtime vtable is {vtable_count} entries, does not cover index 13"
+            );
+            for index in 0..vtable_count {
+                let target: u32 = read_generic(&core, definition.ptr_vtable()? + ((index + 1) * size_of::<u32>()) as u32)?;
+                assert_ne!(target, 0, "vtable entry {index} is a null target");
+            }
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn generated_class_exposes_compiler_vtable_methods_to_jvm() -> Result<()> {
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
         let done = Arc::new(AtomicBool::new(false));

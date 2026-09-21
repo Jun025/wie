@@ -133,6 +133,7 @@ impl JavaVtable {
             methods.resize(minimum_size, JavaVtableEntry { target: 0, method: None });
         }
 
+        let mut unplaced = 0;
         for method in declared_methods {
             let flags = method.access_flags();
             if flags.intersects(MethodAccessFlags::STATIC | MethodAccessFlags::PRIVATE) || method.name().starts_with('<') {
@@ -171,6 +172,13 @@ impl JavaVtable {
             } else if let Some(index) = inherited_index {
                 index
             } else {
+                // We do not know this method's fixed LGT index (no `data/lgt_java_abi.toml` row),
+                // so it cannot be placed — but it still occupies a slot in the guest's table, and
+                // dropping it leaves the table shorter than the index the guest dispatches on.
+                // Reserve the slot: `write` turns a 0 target into a missing-entry stub, so the
+                // guest gets "<class> vtable index N" instead of reading past the allocation,
+                // finding 0 there and branching to address 0.
+                unplaced += 1;
                 continue;
             };
 
@@ -179,6 +187,7 @@ impl JavaVtable {
                 method: Some(method.clone()),
             };
         }
+        methods.resize(methods.len() + unplaced, JavaVtableEntry { target: 0, method: None });
 
         Ok(methods)
     }
