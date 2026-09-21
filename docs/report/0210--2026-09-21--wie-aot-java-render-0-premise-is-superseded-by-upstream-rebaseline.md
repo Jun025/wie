@@ -202,9 +202,15 @@ access` 이지 `AbstractMethodError paint`·`NoSuchMethodError` 가 아니다)�
 
 ### 한계 — 숨기지 않는다
 
-- ★**전수 3회가 기준이고 PASS 후보만 7회다.** 15종의 FAIL 은 전부 **명시적 fatal error**(기아 신호인
-  `no frame rendered` 가 아니다)라 3회로 충분하다고 봤다. `일지매영웅전기` 만 그 예외라 별도로 5회 돌렸다.
-- ★**loadavg 72~130 에서 쟀다.** AGENTS.md 의 4단계를 따라 `놈3` 의 FAIL 2건을 「기아」로 판정했고,
+- ★**전수 3회가 기준이고 PASS 후보만 6~7회다.** 15종의 FAIL 은 전부 **명시적 fatal error**(기아 신호인
+  `no frame rendered` 가 아니다)라 3회로 충분하다고 봤다. `일지매영웅전기` 만 그 예외라 별도로 4회 돌렸다
+  (50초 3회 + 113초 1회 = 위 표의 `+0/4 큰예산`).
+  ※★**세 수는 2026-09-21 에 정정됐다** — 이 절이 「7회」·「5회」·「loadavg 72~130」으로 적어 **회신
+  (`reports/wie-aot-java-render-0-premise-is-superseded-by-upstream-rebaseline.done.md`)과 어긋났고**,
+  앞의 둘은 **이 리포트 자신의 전수표와도** 어긋났다(현영맞고 6/6 · 메이플 6기본+1추적 · 놈3 7 · 일지매 `+0/4`).
+  판정·표·결론은 건드리지 않았다 — 고친 것은 이 세 수의 «전사»뿐이다(티켓
+  `wie-lgt-docs-cite-load-dependent-trace-counts-as-absolutes` ⑷).
+- ★**loadavg 47~130 에서 쟀다.** AGENTS.md 의 4단계를 따라 `놈3` 의 FAIL 2건을 「기아」로 판정했고,
   큰 예산 재실행으로 교차 확인했다. ★**그 판정이 틀렸다면 「놈3 은 렌더하지 않는다」가 되지만,
   113초 PASS 가 그것을 배제한다.**
 - ★**`--inject` 의 27키 시퀀스는 «메뉴를 타는» 스크립트가 아니다.** 3종이 «어디까지» 갈 수 있는지의
