@@ -538,7 +538,10 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 > `#[allow(dead_code)]`+7줄 사유 주석 · ★**재배선 자체는 27/27** 이고 역치환의 자기 numstat 이 그 수다).
 >
 > ★**대가 — 축소하지 않는다**: 제안의 benefit 「LGT 전용 그래픽 0→1,095줄」은 ★**«철회»가 아니라 «연기»**다 —
-> 그 1,095줄은 **트리에 있고**(`git diff upstream/main` **0줄** = 바이트 동일) ★**배선되지 않았다.**
+> 그 1,095줄은 **트리에 있고** ★**배선되지 않았다.**
+> ★**[정정 2026-09-21] 종전 「`git diff upstream/main` 0줄 = 바이트 동일」은 «낡았다»** — 2026-09-17 에
+> `#[test] display_property_svc_reaches_graphics_through_the_import_table` **40줄**이 들어갔다
+> (실측 `git diff --numstat 3e203809 origin/main -- …/graphics.rs` = `40 0` · 1,095 → **1,135줄**). ★삭제는 여전히 **0**이다.
 > ⇒ dead code 라 모듈 «선언»에 `#[allow(dead_code)]` 를 달았다(파일 무접촉).
 > ★★**[정정 2026-09-16 · `wie-adopt-slice-d-base-swap-executed-p1` · 정본 `docs/report/0128--….md`]
 > 종전 문안 「그 경로는 이 회차 뒤로 «아무 테스트도 밟지 않는다» — 썩어도 우리 게이트는 조용하다」는
