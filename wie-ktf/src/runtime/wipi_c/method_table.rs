@@ -1,4 +1,4 @@
-use alloc::{format, vec, vec::Vec};
+use alloc::{borrow::ToOwned, format, str, string::String, vec, vec::Vec};
 
 use wipi_types::{
     ktf::wipic::{WIPICDatabaseInterface, WIPICGraphicsInterface, WIPICKnlInterface},
@@ -6,7 +6,7 @@ use wipi_types::{
 };
 
 use wie_core_arm::ArmCore;
-use wie_util::{Result, WieError};
+use wie_util::{Result, WieError, read_null_terminated_string_bytes};
 use wie_wipi_c::{
     MethodImpl, WIPICContext, WIPICMethodBody,
     api::{database, graphics, kernel, media, misc, net, uic, util},
@@ -38,14 +38,106 @@ fn gen_stub(id: WIPICWord, name: &'static str) -> WIPICMethodBody {
 /// discriminant is **5** (`svc_ids.rs`: `Interface4 = 5`) — and 5 is what the
 /// guest actually sends as `id >> 16`. A reader taking "table 4" to the SVC
 /// dispatch would land on `Interface3`. So both are printed, labelled.
+///
+/// ── Why it also prints `r0`-`r3` and quotes `r0` (2026-09-19) ────────────────
+/// Carrying the function id turned "three problems or one?" into "one: function
+/// 0". The next question — *what does it do* — then cost a session of static
+/// disassembly across three images, and the whole answer came out of four
+/// registers plus the string `r0` points at. So the stub reports them.
+///
+/// Measured at the three faults that reach `selector 5, function 0`:
+/// `f("SaveData", 0xeec, 0, 1)`, `f("FG_102", 0x80, 0, 1)` and
+/// `f(<caller's r0>, 0x80, 1, 1)` — a name, a size, a flag, and a constant `1`.
+/// With this message the next title to reach *any* unidentified table hands that
+/// over for free.
+///
+/// ★**The four registers are NOT an arity claim, and the message says so.** This
+/// one function is arity 4 (disassembled: `r0`-`r3` are all set immediately
+/// before the call and the callee lives in `r4`), but this stub backs **64 slots
+/// × 8 unnamed tables** whose arities nobody knows. Printing four registers means
+/// "here is what the SVC saw", not "this takes four arguments" — two earlier
+/// rounds in this lineage were reverted for reading registers as arguments, and
+/// that is the mistake this wording exists not to repeat.
 fn gen_unnamed_table_stub(selector: WIPICWord, slot_name: &'static str, function_id: u16) -> WIPICMethodBody {
-    let body = move |_: &mut dyn WIPICContext| async move {
-        Err::<(), _>(WieError::Unimplemented(format!(
-            "{selector}: unidentified WIPI-C table — SVC selector {selector} (struct slot {slot_name}), function {function_id}"
-        )))
+    let body = move |context: &mut dyn WIPICContext, a0: WIPICWord, a1: WIPICWord, a2: WIPICWord, a3: WIPICWord| {
+        // ★Read the token BEFORE the future is built. An `async move` block that
+        // holds `context` would borrow it for the future's whole life, which the
+        // method-body signature does not allow; doing the read synchronously ends
+        // the borrow here and keeps the future self-contained.
+        let quoted = match unnamed_table_token(context, a0) {
+            Some(t) => format!(" ({t:?})"),
+            None => String::new(),
+        };
+
+        async move {
+            Err::<(), _>(WieError::Unimplemented(unnamed_table_message(
+                selector,
+                slot_name,
+                function_id,
+                &quoted,
+                [a0, a1, a2, a3],
+            )))
+        }
     };
 
     body.into_body()
+}
+
+/// Longest token an unidentified-table stub will quote out of guest memory.
+///
+/// Bounded and printable-only on purpose: `r0` is whatever the guest left in that
+/// register and nothing here can prove it is not a path. `wie_validate`'s
+/// `--guest-stdout` is opt-in for exactly that reason, and AGENTS.md's smoke-gate
+/// note draws the same line ("identifiers and expected status only, never paths
+/// or bytes"). The names measured in the field are 6 and 8 bytes; 16 leaves room
+/// without turning a stub into a string dump. Anything longer, non-printable or
+/// unreadable is simply not quoted — the raw register is still reported, so the
+/// diagnostic never gets *worse* than it was.
+const UNNAMED_TABLE_TOKEN_MAX: usize = 16;
+
+/// ★Same predicate as `wie_wipi_c::api::database`'s `slot8_token`, duplicated on
+/// purpose rather than shared: that one lives in a different **open** PR of this
+/// lineage, so unifying now would make each unmergeable without the other. Fold
+/// them together once both have landed.
+fn unnamed_table_token(context: &mut dyn WIPICContext, ptr: WIPICWord) -> Option<String> {
+    if ptr == 0 {
+        return None;
+    }
+    // Failure-tolerant by construction: a bad pointer must yield "no token", not
+    // an error that replaces the Unimplemented this stub exists to raise.
+    let bytes = read_null_terminated_string_bytes(context, ptr).ok()?;
+    token_from_bytes(&bytes)
+}
+
+/// The decision half of `unnamed_table_token`, split out so it can be tested.
+///
+/// `wie-wipi-c`'s `TestContext` is `#[cfg(test)]`-private to that crate, so there
+/// is no guest memory to point at from here; keeping the *bounds* pure is what
+/// makes them assertable at all. What stays untested by construction is the read
+/// itself, and that is covered end-to-end instead — the three titles in
+/// `game_lab/broken` that reach this stub print their names.
+fn token_from_bytes(bytes: &[u8]) -> Option<String> {
+    if bytes.is_empty() || bytes.len() > UNNAMED_TABLE_TOKEN_MAX || !bytes.iter().all(|b| (0x20..0x7f).contains(b)) {
+        return None;
+    }
+    str::from_utf8(bytes).ok().map(ToOwned::to_owned)
+}
+
+/// The message half, likewise split so the thing this round actually shipped —
+/// the coordinate a later reader starts from — is pinned by a test rather than
+/// by eyeballing a guest run.
+fn unnamed_table_message(selector: WIPICWord, slot_name: &str, function_id: u16, quoted: &str, regs: [WIPICWord; 4]) -> String {
+    // ★An ARRAY, not four named parameters. The shape is the point: these are
+    // `r0`-`r3` as the SVC found them, which is not the same statement as "this
+    // function takes four arguments" — and a signature naming them `a0..a3`
+    // quietly makes the second claim. (clippy's `too_many_arguments` forced the
+    // edit; the result says what was meant, so it stayed.)
+    let [a0, a1, a2, a3] = regs;
+    format!(
+        "{selector}: unidentified WIPI-C table — SVC selector {selector} (struct slot {slot_name}), function {function_id}; \
+         entry registers r0={a0:#x}{quoted} r1={a1:#x} r2={a2:#x} r3={a3:#x} \
+         (registers as the SVC saw them — NOT a claim that this function takes four arguments)"
+    )
 }
 
 pub fn get_kernel_interface(core: &mut ArmCore) -> Result<WIPICKnlInterface> {
@@ -622,5 +714,75 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
                 None
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{UNNAMED_TABLE_TOKEN_MAX, token_from_bytes, unnamed_table_message};
+
+    /// The stub quotes a short printable token — and **only** that.
+    ///
+    /// The quote is the product of this round: the three titles that reach
+    /// `selector 5, function 0` pass `"SaveData"`, `"SPORTS"` and `"FG_102"`, and
+    /// recovering those names cost a session of static disassembly across three
+    /// images. The *bounds* matter as much as the quote: `r0` is whatever the
+    /// guest left in that register and nothing here can prove it is not a path,
+    /// so a change that widens the filter fails here rather than in someone's log.
+    #[test]
+    fn token_from_bytes_quotes_only_short_printable_names() {
+        for name in [&b"SaveData"[..], b"SPORTS", b"FG_102"] {
+            assert_eq!(
+                token_from_bytes(name).as_deref(),
+                Some(core::str::from_utf8(name).unwrap()),
+                "the names real guests pass must be quoted"
+            );
+        }
+
+        let too_long = [b'a'; UNNAMED_TABLE_TOKEN_MAX + 1];
+        assert_eq!(token_from_bytes(&too_long), None, "longer than the cap must not be quoted");
+        assert_eq!(
+            token_from_bytes(&[b'a'; UNNAMED_TABLE_TOKEN_MAX]),
+            Some("a".repeat(UNNAMED_TABLE_TOKEN_MAX)),
+            "the cap itself is allowed"
+        );
+        assert_eq!(token_from_bytes(b"ab\x01cd"), None, "a control byte must not be quoted");
+        assert_eq!(token_from_bytes(b"ab\xffcd"), None, "a non-ASCII byte must not be quoted");
+        assert_eq!(token_from_bytes(b""), None, "an empty string must not be quoted");
+    }
+
+    /// The message carries the coordinate the next round starts from.
+    ///
+    /// Every field here was load-bearing in this round: the selector (5, *not*
+    /// the struct-slot 4), the function id, all four entry registers, the quoted
+    /// name, and the sentence saying four registers is not an arity claim — this
+    /// stub backs 64 slots across 8 tables whose arities nobody knows, and two
+    /// earlier rounds in this lineage were reverted for reading registers as
+    /// arguments.
+    #[test]
+    fn unnamed_table_message_carries_the_whole_coordinate() {
+        let m = unnamed_table_message(5, "Interface4", 0, " (\"SaveData\")", [0x146568, 0xeec, 0, 1]);
+
+        for needle in [
+            "SVC selector 5",
+            "struct slot Interface4",
+            "function 0",
+            "r0=0x146568",
+            "\"SaveData\"",
+            "r1=0xeec",
+            "r2=0x0",
+            "r3=0x1",
+            "NOT a claim that this function takes four arguments",
+        ] {
+            assert!(m.contains(needle), "message lost {needle:?}: {m}");
+        }
+
+        // With no token the raw register is still reported — the quote is an
+        // addition, and losing it must not cost the coordinate that was there.
+        let bare = unnamed_table_message(5, "Interface4", 0, "", [0x146568, 0xeec, 0, 1]);
+        assert!(
+            bare.contains("r0=0x146568") && !bare.contains('"'),
+            "bare form must keep r0 and quote nothing: {bare}"
+        );
     }
 }
