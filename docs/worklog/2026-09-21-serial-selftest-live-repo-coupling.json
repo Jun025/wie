@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "date": "2026-09-21",
+  "task": "wie-docs-report-serial-selftest-couples-to-live-repo-exempt-count",
+  "title": "selftest 가 «실 저장소에 결함이 남아 있을 것»을 요구했다 — 결합을 끊고 단언을 픽스처로 옮겼다",
+  "summary": "check-docs-report-serial.mjs 의 selftest 한 칸이 실 저장소의 «없는 연번 인용»이 1건 이상일 것을 단언했다. 그 인용을 없애는 것이 정상 진행이라, 연번 0184 를 든 PR 이 착지하는 행위 자체가 main 을 red 로 만들었다. 단언을 합성 픽스처로 옮기고, 실 저장소 축은 값을 출력하는 관측으로 낮췄다(판정은 counted 만).",
+  "changes": [
+    "docs/report/0213 신설 — 회차 기록",
+    "scripts/check-docs-report-serial.mjs — 순수 함수 exclusionCounts(rawTexts, have) 신설(픽스처 축과 관측 축이 같은 구현을 쓰게)",
+    "scripts/check-docs-report-serial.mjs — 실-저장소 결합 selftest 1칸을 픽스처 축(단언) + 관측 축(비-단언) 2칸으로 치환. 제외 로직(citedSerials·CITE_RE·diskNames) 무접촉"
+  ],
+  "verification": [
+    "회귀 @origin/main(a56137e0): --selftest 28/28 PASS · 관측 exempt=1 counted=0",
+    "★결합 해제 @PR#220 병합 head(3d9ef2c1): before rc=1 FAIL(27케이스 중 1건) ↔ after rc=0 28/28 PASS(관측 exempt=0 counted=0)",
+    "개악 M1(픽스처 have→빈 집합): FAIL 1건 · 개악 M2(proposals 제외 제거): FAIL 3건 · 대조군 원문: PASS",
+    "관측 축이 꺼지지 않았음 — M3(샌드박스에 proposals 밖 없는-연번 인용 1건 주입): counted=1 rc=1 red 유지 · M3-b(같은 인용을 proposals 안으로): counted=0 PASS",
+    "네 게이트 + beta clippy 전건 · 문서 검사기 13종 rc=0 · npm run audit PASSED",
+    "M3/M3-b 는 샌드박스 사본에서만 수행 — 실 docs/worklog·docs/report 무접촉"
+  ],
+  "limits": [
+    "관측 축을 비-실패로 낮췄으므로 「제외가 실 데이터에서 일을 한다」를 더는 강제하지 못한다. 그 강제력은 픽스처 축이 대신 진다.",
+    "이 회차는 PR #220 에 대해 아무것도 하지 않았다 — 그 PR 의 처분은 별 회차 몫이다(브랜치 무접촉·별 PR)."
+  ],
+  "proposals": [
+    {
+      "title": "관측 축의 counted red 와 제품 호출부의 warning-only 가 어긋난다 — 둘 중 하나로 정하라",
+      "plainSummary": "'없는 번호를 가리키는 기록'을 발견했을 때, 제품 경로는 경고만 하고 넘어가는데 자체시험은 빨간불을 켠다. 기준이 둘이라 한쪽으로 들어온 문제가 다른 쪽을 멈춰 세울 수 있다.",
+      "userBenefit": "개발 파이프라인이 «경고만 받고 착지한 것» 때문에 나중에 전면 정지하는 일을 막는다.",
+      "why": "제품 호출부는 danglingCitations 결과를 ::warning 으로만 내고 exit 를 올리지 않는다(그 자체가 측정된 오탐 때문에 의도된 것이다). 그래서 없는-연번 인용은 «경고만 받고» 착지할 수 있다. 그런데 이 회차가 남긴 관측 축은 counted!==0 이면 red 이고, 그 모집단은 «내 PR 파일»이 아니라 «디스크의 worklog 전건»이다 ⇒ 한 번 착지한 그런 인용 하나가 이후 모든 PR 의 contract 를 red 로 만든다. 지금은 counted=0 이라 무증상이지만 착지 한 번 거리다. 축이 둘로 갈린 것이 문제이지 어느 쪽이 옳은지는 결정이 필요하다.",
+      "tradeoff": "관측 축도 완전 비-단언으로 낮추면 «진짜 결함»을 아무도 막지 않게 된다(경고는 사람이 스크롤로 넘긴다). 반대로 제품 호출부를 red 로 올리면 이 저장소가 이미 측정한 오탐 1건이 되살아난다. 그래서 값싼 절충은 모집단을 맞추는 것이다 — 관측 축도 «이 PR 이 더하거나 고친 worklog»로 좁히면 두 축의 의미가 같아진다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "「selftest 가 저장소의 «결함»에 결합했는가」를 리뷰 체크 한 줄로 못박아라",
+      "plainSummary": "자체시험이 '저장소가 올바르다'에 기대는 것은 정상이고, '저장소에 흠이 남아 있다'에 기대면 정상적인 수정이 시험을 깨뜨린다. 그 구분을 규칙으로 적어 두자는 제안이다.",
+      "userBenefit": "같은 종류의 자책골이 세 번째로 반복되는 것을 막는다.",
+      "why": "이 병은 같은 파일에서 두 번 났다 — 초판은 상수(exempt===1)로, 두 번째는 부등식(exempt>counted)으로 났고 둘 다 «실 저장소에 없는-연번 인용이 남아 있을 것»을 요구했다. 수리는 매번 사후였고 계기는 둘 다 «정당한 PR 이 막힌 것»이었다. 구분선은 짧게 적을 수 있다: 저장소가 «옳다»에 결합 = 정상(duplicateSerials 0 · nextSerial = 최대+1 · myAddedNames ⊆ disk 가 전부 이쪽) · 저장소에 «흠·우연이 있다»에 결합 = 결함.",
+      "tradeoff": "산문 규칙이라 기계가 강제하지 않는다 — 이 저장소가 반복해 지적한 «검사되지 않는 의무»의 모양이다. 기계화하려면 selftest 케이스가 실 저장소를 읽는지 정적으로 판별해야 하는데, 이 파일만 해도 정당한 실-저장소 케이스가 4곳이라 술어가 «읽는가»로는 갈리지 않는다(갈리는 것은 «무엇을 단언하는가»이고 그것은 정적으로 못 읽는다).",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}

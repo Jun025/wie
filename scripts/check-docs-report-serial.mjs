@@ -177,6 +177,33 @@ export function citedSerials(json) {
   return [...out].sort();
 }
 
+/**
+ * worklog 원문 집합에서 «없는 연번» 인용을 **두 번** 센다 — `proposals[]` 제외를 **적용한 것(`counted`)** 과
+ * **걷어 낸 것(`exempt`)**. 그 둘의 차이가 곧 「제외가 일을 한다」의 측정값이다.
+ *
+ * ★**순수 함수로 뺀 이유**: 판별력 축(합성 픽스처)과 관측 축(실 저장소)이 ★**같은 구현**을 쓰게 하려는 것이다.
+ *   두 벌로 두면 픽스처가 통과해도 실 저장소 쪽이 다른 술어를 돌릴 수 있다(이 저장소가 반복해 규탄한 「문법 2벌」).
+ */
+export function exclusionCounts(rawTexts, have) {
+  let counted = 0;
+  let exempt = 0;
+  for (const raw of rawTexts) {
+    let j;
+    try {
+      j = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    for (const s of citedSerials(j)) if (!have.has(s)) counted++;
+    CITE_RE.lastIndex = 0;
+    const seen = new Set();
+    let m;
+    while ((m = CITE_RE.exec(raw))) seen.add(m[1]);
+    for (const s of seen) if (!have.has(s)) exempt++;
+  }
+  return { counted, exempt };
+}
+
 /** 인용 중 «이 PR 이 더한 연번»에도 «origin/main 에 있는 연번»에도 없는 것. 순수 함수(판별력 축이 부른다). */
 export function danglingCitations({ cited, mineSerials, baseSerials }) {
   const known = new Set([...mineSerials, ...baseSerials]);
@@ -375,34 +402,50 @@ function selftest() {
         );
       })(),
     ],
+    // ── 「제외가 «일을 한다»」 축 — ★단언은 «픽스처»에, 실 저장소는 «관측»으로 ──
+    //
+    // ★★**같은 병을 두 번 앓고 고친 자리다. 되돌리지 마라.**
+    //   ⑴초판은 `exempt === 1` 로 **수를 박았다** → 같은 회차가 제안에서 형제 PR 의 연번을 인용하자마자
+    //     2가 되어 스스로 red. ⑵그래서 부등식(`exempt > counted`)으로 바꿨는데, ★**여전히 «실 저장소에
+    //     없는-연번 인용이 적어도 하나 있을 것»을 요구**했다 — 그리고 ★**그것을 없애는 것이 이 repo 의
+    //     «정상 진행»이다**: PR #220 이 연번 `0184` 를 착지시키면 그 인용이 충족되어 `exempt` 가 0 이 되고
+    //     부등식이 깨진다. 실측(2026-09-21 · 교차): `origin/main` **27/27 PASS** ↔ #220 병합 head
+    //     (`3d9ef2c1`) **1/27 FAIL**. ⇒ ★**정당한 PR 이 착지하는 «행위 자체»가 `main` 을 red 로 만들었다.**
+    //   ⇒ 상수를 뺀 것만으로는 부족했다. ★**이번엔 «실 저장소 데이터에 대한 결합» 자체를 끊는다.**
+    //
+    // ★★**대가를 숨기지 않는다 — 공짜가 아니다.** 아래 관측 축을 «비-실패»로 낮추면
+    //   ★**「제외가 «실 데이터»에서 일을 한다」를 더는 «강제»하지 못한다**(실 저장소의 `exempt` 가 0 이 되어도
+    //   selftest 는 통과한다). 그 강제력을 바로 아래 **픽스처 축**이 대신 지며, 그쪽은 ★**저장소가 어떻게
+    //   변하든 같은 답을 낸다**. 잃은 것은 「실 데이터에도 마침 그런 인용이 있다」는 부수 확인 하나뿐이고,
+    //   그것은 ★**애초에 가드가 아니라 «저장소의 우연»이었다**(그 우연이 깨진 것이 이 수리의 계기다).
     [
-      // ★수를 박지 «않는다». 초판이 `exempt === 1` 로 고정했다가, 같은 회차가 제안에서 «아직 안 착지한»
-      //   형제 PR 의 연번을 인용하자마자 2가 되어 스스로 red 가 됐다 — 정당한 내용이 가드를 깨는 그 형태다.
-      //   지키려던 뜻은 「제외가 «일을 한다»」이고, 그것은 부등식으로 충분하다.
-      "★★★실 저장소: 제외를 적용하면 «없는 연번» 0 · 걷어 내면 1건 이상 남는다(제외가 «일을 한다»)",
+      "★★★제외가 «일을 한다» — 합성 픽스처(★저장소 상태와 무관): 제외 적용 = 0 · 걷어 내면 ≥ 1",
       (() => {
-        const all = readdirSync(path.join(ROOT, WORKLOG_DIR)).filter((f) => f.endsWith(".json"));
-        const have = new Set(diskNames().map((n) => SERIAL_RE.exec(n)?.[1]).filter(Boolean));
-        let exempt = 0;
-        let counted = 0;
-        for (const f of all) {
-          let j;
-          try {
-            j = JSON.parse(readFileSync(path.join(ROOT, WORKLOG_DIR, f), "utf8"));
-          } catch {
-            continue;
-          }
-          for (const s of citedSerials(j)) if (!have.has(s)) counted++;
-          const raw = readFileSync(path.join(ROOT, WORKLOG_DIR, f), "utf8");
-          let m;
-          CITE_RE.lastIndex = 0;
-          const seen = new Set();
-          while ((m = CITE_RE.exec(raw))) seen.add(m[1]);
-          for (const s of seen) if (!have.has(s)) exempt++;
-        }
-        return counted === 0 && exempt > counted; // ★제외 적용 = 0 · 미적용 = 1건 이상
+        // 없는 연번(`0184`)을 «`proposals[]` 안에서만» 인용한다 = 측정된 유일한 오탐의 모양 그대로.
+        // ⇒ 제외를 적용하면 0(정당한 인용이므로) · 걷어 내면 1(원문에는 분명히 있으므로).
+        const have = new Set(["0100"]);
+        const raws = [
+          JSON.stringify({ changes: ["docs/report/0100 신설"], proposals: [{ why: "docs/report/0184 를 rename 했다" }] }),
+        ];
+        const { counted, exempt } = exclusionCounts(raws, have);
+        return counted === 0 && exempt > counted;
       })(),
     ],
+    (() => {
+      // ★**관측 축** — 실 저장소의 두 수를 «화면에 올리되», `exempt` 로는 **red 를 내지 않는다**.
+      //   ★`exempt === 0` 은 «정상 진행»이다(없는-연번 인용이 하나도 없는 깨끗한 트리).
+      //   ★반대로 `counted !== 0` 은 ★**진짜 결함**이다 — 제외를 적용하고도 «없는 연번»을 세고 있다는 뜻이라
+      //     그쪽은 그대로 red 로 남긴다(그 축을 «끈» 것이 아니다).
+      const have = new Set(diskNames().map((n) => SERIAL_RE.exec(n)?.[1]).filter(Boolean));
+      const raws = readdirSync(path.join(ROOT, WORKLOG_DIR))
+        .filter((f) => f.endsWith(".json"))
+        .map((f) => readFileSync(path.join(ROOT, WORKLOG_DIR, f), "utf8"));
+      const { counted, exempt } = exclusionCounts(raws, have);
+      return [
+        `★★실 저장소 «관측» — exempt=${exempt} · counted=${counted} (★판정은 counted 만: 0 이어야 한다 · exempt 는 red 를 내지 않는다)`,
+        counted === 0,
+      ];
+    })(),
     // ── 게이트² F2: 자기 제외는 «브랜치»가 1차 ──
     [
       "★★연번을 그대로 두고 슬러그만 바꿔도 «내 PR» 은 안 문다(브랜치 축)",
