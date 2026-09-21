@@ -18,21 +18,40 @@
 #      against the landing that brought the base swap in (`37734e74`, #161), a
 #      per-PR axis E would have printed **22 names in one go** — every one the
 #      audit later found, plus two that a human had already restored by eye. So
-#      detection was never the scarce thing. Of the 20 this script reports today,
-#      **1 has been restored**, **1 turned out to be a false positive** (the name
-#      moved *into* another test), **1 is inapplicable** (its target function is
-#      gone), and the rest — the 8 `canvas` assertions above all — are still
-#      undecided. ★Adding a second detector while the first one's output sits
-#      unprocessed buys nothing.
+#      detection was never the scarce thing; ADJUDICATION is. Of the 20 this
+#      script reports (re-measured 2026-09-21 against `origin/main`):
+#
+#        9  submitted in an OPEN pull request — the 8 `canvas` assertions in
+#           **#213** and `wipic_svc_0x581_…` in **#215**. ★"Submitted" is the
+#           whole claim: NEITHER PR HAS LANDED, so against `origin/main` all 9
+#           names are still missing and this script still prints them. Read the
+#           bucket as "someone has proposed an answer", never as "restored".
+#        1  false positive — the name moved *into* another test (#215 measured it)
+#        1  inapplicable — its target function no longer exists at HEAD
+#        9  ★NOBODY HAS ASKED YET — the genuinely undecided remainder
+#
+#      ★Adding a second detector while 9 of the first one's 20 have not been
+#      looked at once buys nothing. ★Do not read this as 17 undecided: an
+#      earlier revision of this header said so, counting #213's 8 as untouched
+#      while that PR had already been open for two hours. The number that
+#      carries the decision is **9/20**, not 17/20.
 #   ⒞ Cost is NOT the reason. The whole script runs in ~1s and a single name-set
 #      build is 0.2-0.5s. Anyone re-proposing this should not argue about speed.
 #
-# ── When to reopen ───────────────────────────────────────────────────────────
-#   * the canvas backlog is adjudicated (worklog `…machine-audit#p0`) AND nothing
-#     from the 20 is left undecided — then the "second detector" objection is
-#     spent; or
-#   * a second mass rename lands and the loss is found **by eye again** rather
-#     than by re-running this — that is the counterfactual failing in the open.
+# ── When to reopen — both conditions are OBSERVABLE, so check them, do not
+#    re-argue them ──────────────────────────────────────────────────────────────
+#   ⑴ **#213 and #215 land, AND the remaining 9 are then adjudicated.** Landing
+#      those two does NOT spend the objection — it moves 9 names out of the
+#      "submitted" bucket and leaves the 9 nobody has asked about. Adjudicating
+#      those 9 (restore, or measure them to be false positives the way #215 did)
+#      is what spends it, because then no output of this script sits unprocessed.
+#      ★How to check rather than assume: re-run axis E against `origin/main`.
+#      Today it prints 20; after both PRs land it should print 11, and when the
+#      remaining 9 are adjudicated the bucket this decision rests on is empty.
+#      ★That is days away, not quarters — write the re-check into the round that
+#      lands the last of them. ⇒ or
+#   ⑵ a second mass rename lands and the loss is found **by eye again** rather
+#      than by re-running this — that is the counterfactual failing in the open.
 # ★If it is reopened, build the **per-PR merge-base** form and make it
 # **report-only** (`continue-on-error`, like `checker-census`). A blocking gate
 # would have stopped the base-swap PR on 22 legitimate items, and a fixed
@@ -54,6 +73,20 @@
 # `test_helloworld_jar_named_application` 은 이름만 사라졌고 그 단언은 `test_helloworld`
 # 안에 살아 있다(개악으로 확인: 옛 이름 기반 탐색으로 되돌리면 지금 시험이 red 다).
 # ⇒ ★이 스크립트의 출력은 «결손 목록»이 아니라 «조사 대상 목록»이다.
+#
+# ── ★옮겨 오며 «고치지 않은» 선재 결함 2건 — 값은 맞는데 «죽은 가지»가 있다 ──────
+# 이 술어는 원장 증적에서 **한 글자도 안 고치고** 옮겼다. 그래서 원본의 결함도 같이 왔다.
+# ★**여기 적는 이유**: 다음 사람이 이 파일을 «정본»으로 읽는데, 둘 다 **조용하다**.
+#   ⑴ ★**축 C 의 주경로는 «항상» 실패한다** — 이 맥의 `/usr/bin/grep` 은 **BSD grep 2.6.0**
+#      이고 `-P` 가 **없다**(실측 `printf 'abc\n' | /usr/bin/grep -P 'a'` → **rc=2**
+#      `invalid option -- P`). `2>/dev/null` 이 그 메시지를 삼키고, `set -uo pipefail` 이
+#      pipeline rc 를 살려 `||` 뒤의 **awk 폴백**이 탄다. ⇒ 결과는 맞지만 **`-P` 가지는
+#      단 한 번도 돈 적이 없다.** 처방은 그 가지를 지우고 awk 한 줄만 남기는 것 —
+#      ★**코드 변경이라 이 회차(문면 전용)에서 하지 않았다.** worklog 제안으로 넘겼다.
+#   ⑵ ★**축 A 는 fail-open 이다** — `cargo metadata` 가 죽으면 stderr 가 버려지고 python
+#      `json.load` 가 죽어 **빈 목록**이 되며, `comm -23` 이 **디스크의 시험파일 전건**을
+#      `DEAD` 로 고발한다. report-only 도구라 계급은 낮지만, 「재실행이 한 줄」이 완화책인
+#      도구가 **조용히 거짓 경보를 내는 모양**은 알고 써라. 같은 제안에 묶었다.
 #
 # 사용: scripts/audit-missing-tests.sh [repo 경로]   (기본 = cwd)
 #   SWAP=<sha> 로 기준 커밋을 바꾼다(기본 = 36df9c31, 2026-09-16 base swap).
