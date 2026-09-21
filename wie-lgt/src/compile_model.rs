@@ -12,8 +12,27 @@
 //! clet, matching the known AOT-Java count, zero ambiguous).
 //!
 //! This is the same static signal the §7 investigation used to identify the 24
-//! AOT-Java titles offline; it executes nothing and renders nothing (§7 render
-//! stays frozen). It only reads the app's own import thunks.
+//! AOT-Java titles offline; it executes nothing and renders nothing. It only
+//! reads the app's own import thunks.
+//!
+//! # Corpus: what this classification does NOT tell you (re-baselined 2026-09-21)
+//!
+//! The paragraph above used to end "(§7 render stays frozen)", carrying the
+//! 2026-07 conclusion that the whole `AotJava` set renders nothing. Upstream
+//! `cc652b1d` (2026-08-04, "Implement LGT Java AOT runtime") superseded that
+//! premise, and a re-run of the same corpus with the same binary found:
+//!
+//! - `메이플스토리2007` — PASS 5/6 runs at the default budget, up to 121 paints / 512 distinct colours;
+//!   screenshots show its title screen with sprites and an in-game intro scene.
+//! - `현영맞고2006` — PASS 6/6, up to 154 paints / 512 colours, title screen.
+//! - `놈3` — PASS 5/7 (the 2 FAILs are `paints: 0` load starvation), splash logo.
+//! - The other 15 unique titles — **0 paints, all dying at boot** on
+//!   `NoClassDefFoundError` or `Invalid memory access` (ticks 0–3), i.e. at walls
+//!   *upstream* of any render path.
+//!
+//! So `AotJava` is not a "does not render" predicate, and `Clet` is not a "does
+//! render" one either (`broken/lgt` holds 22 clets that fail). Do not use this
+//! enum as a runnability gate; it answers a static question only.
 
 use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
@@ -27,8 +46,12 @@ use wie_backend::extract_zip;
 pub enum LgtCompileModel {
     /// WIPI-C clet (imports through table `0x1fb`). wie has a working render path.
     Clet,
-    /// AOT-compiled Java app (imports through table `0x64`). Boots but does not
-    /// yet render (the §7 wall).
+    /// AOT-compiled Java app (imports through table `0x64`).
+    ///
+    /// This variant says how the app was compiled and **nothing about whether it
+    /// renders** — an earlier revision of this line said "boots but does not yet
+    /// render (the §7 wall)", which a 2026-09-21 re-baseline falsified: 3 of the
+    /// corpus's 18 unique AOT-Java titles render (module header, §Corpus).
     AotJava,
 }
 

@@ -73,12 +73,45 @@ LGT-specific: provides C standard library functions (memcpy, strlen, etc.) that 
 - **ARM execution**: Same `wie_core_arm::ArmCore` as KTF.
 - **ELF loading**: Uses the `elf` crate to parse sections and load them at their specified addresses.
 - **Import table**: Rust callbacks map `(table_id, function_index)` pairs to registered function addresses for WIPI C, Java interface, and stdlib functions.
-- **JVM**: Clets run on `RustJavaJvmImplementation` (pure Rust JVM). **AOT-Java apps** run on the LGT
-  native-JVM bridge (`runtime/java/native_jvm.rs`): class/method metadata is parsed from `binary.mod`
-  `.data`, methods dispatch to ARM bodies via `core.run_function`, and `new`→`<init>` binds the guest
-  object block to a JVM instance (`alloc_native_object`/`bind_pending`).
+- **JVM**: Clets run on `RustJavaJvmImplementation` (pure Rust JVM). **AOT-Java apps** are loaded
+  into that same JVM by `net/wie/LgtClassLoader` (`runtime/java/classes/net/wie/lgt_class_loader.rs`),
+  a real `java.lang.ClassLoader` subclass: it reads the class/method metadata out of `binary.mod`
+  `.data` and hands back ordinary JVM classes whose methods dispatch to ARM bodies via
+  `core.run_function` (`runtime/java/jvm_support/`).
+  *(★Corrected 2026-09-21. This bullet described `runtime/java/native_jvm.rs` and an
+  `alloc_native_object`/`bind_pending` guest-object binding; that file does not exist in this tree —
+  upstream `cc652b1d` replaced the bridge. The difference is not cosmetic: the old model is what the
+  §7 section below reasons from, which is why that section now carries a superseded banner.)*
 
-## The §7 wall: AOT-Java per-frame render driver (open)
+## The §7 wall: AOT-Java per-frame render driver (SUPERSEDED — see the banner)
+
+> **★SUPERSEDED 2026-09-21 by upstream `cc652b1d` (2026-08-04, "Implement LGT Java AOT runtime").
+> Everything below is the fork-engine record as of 2026-07; it was true then and its *conclusion* is
+> not true now.** Read it for the reverse-engineering trail, not for what wie does today.
+>
+> **What changed.** This section's model is that the app self-dispatches off a `TIMER_EVENT(21)`
+> that wie never posts, so nothing ever paints. That model describes an engine that no longer
+> exists: `native_jvm.rs` was replaced by `runtime/java/jvm_support/` + `net/wie/LgtClassLoader`,
+> which loads the AOT app's classes into the real RustJava JVM as ordinary JVM classes. The string
+> `TIMER_EVENT` now appears **0 times** in the tree.
+>
+> **What is measured today** (2026-09-21, `--inject`, release `wie_validate` at `394fde8b`; full
+> table in `docs/report/0210`). Three of the corpus's 18 unique AOT-Java titles render:
+> `메이플스토리2007` (up to 121 paints / 512 distinct colours — title screen *with sprites*, then an
+> in-game intro scene), `현영맞고2006` (154 paints / 512 colours), `놈3` (69 paints / 93 colours).
+> A `RUST_LOG=debug` trace of `메이플스토리2007` shows the loop the section says is blocked actually
+> running: `net.wie.EventQueue::getNextEvent` **73×**, `dispatchEvent` **73×**,
+> `net.wie.CardCanvas::paint` **21×**, `Graphics::drawImage` **193×**, `Image::createImage` **44×** —
+> driven by wie's `RepaintEvent(41)`, not by a TIMER 21 the app self-dispatches. The trace also shows
+> `org.kwis.msp.lcdui.Display::pushCard` **1×**, which directly falsifies the cp48 bullet below
+> ("never `Display.pushCard`, so the card-vector stays empty").
+>
+> **What is NOT claimed.** The other 15 unique titles still render nothing — but they die at *boot*
+> (ticks 0–3, `NoClassDefFoundError` / `Invalid memory access`), which is **upstream of** this wall,
+> exactly as cp43 said. Nothing reaches §7 to test it, so "§7 is fixed" is not measured and is not
+> asserted here. **배틀몬스터 in particular is no longer "the one title reaching this wall"** — it
+> stops at boot tick 2 on `net.wie.WieError: Invalid memory access; address: 0`, so whether §7 would
+> still block it is **unknown**. The cp-numbered record below is kept verbatim; none of it is deleted.
 
 KTF AOT-Java titles render because the **app** spawns its own game-loop thread (`Thread.run`)
 that does logic + `repaint()` each frame; wie drives it via the cooperative scheduler. LGT ez-i
@@ -94,7 +127,8 @@ routing TIMER 21 → a card-update call) and by experiment: posting `[21,…]` a
 loop (159 per-frame iterations, `paint()` ran each frame). So the per-frame driver **is**
 implementable in wie (LGT-AOT-gated `TIMER_EVENT` cadence) — it is *not* proprietary.
 
-Measured consequences (배틀몬스터, the one title reaching this wall):
+Measured consequences (배틀몬스터, the one title reaching this wall — ★as of 2026-07; it now stops
+at boot tick 2, see the banner):
 - The app sets its displayable via native `import 0x21`, never `Display.pushCard`, so the MSP
   `CardCanvas` card-vector stays empty and `CardCanvas.paint` draws nothing (cp48).
 - The draw gate `o.g` is set only by the card's **update** method (`i.b`), which the MSP `paint`
