@@ -3,8 +3,12 @@
 #
 # ── Why this exists ──────────────────────────────────────────────────────────
 # The 2026-09-18 census re-ran all 187 games in `game_lab/broken/` (45 minutes of
-# this machine, which doubles as the self-hosted CI runner — 5 open PRs waited on
-# it), published the bucket TOTALS, and wrote its per-game rows to a `mktemp -d`
+# this machine — and it runs HERE, never on CI: the corpus is git-ignored game bytes.
+# ★That round wrote "5 open PRs waited on it"; measured 2026-09-20, they did not.
+# This Mac is a self-hosted runner for the SIBLING repos, and this repo's CI is
+# entirely GitHub-hosted — 18 `runs-on:`, `self-hosted` 0, never once in its history.
+# What 45 minutes of this machine actually costs is you, and the siblings' CI),
+# published the bucket TOTALS, and wrote its per-game rows to a `mktemp -d`
 # scratch that it then deleted. Deleting the scratch was correct discipline; the
 # problem is that the scratch was the only place the per-game data ever lived. So
 # "which games are the 32 `no frame rendered` ones" became unanswerable, the

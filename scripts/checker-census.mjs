@@ -87,6 +87,28 @@ const POPULATION = [
 
 // Files read for caller evidence. Workflows and package.json are parsed structurally
 // (below); the rest are read as comment-stripped source.
+//
+// ★**Why `py` is counted but not read — decided 2026-09-20, `docs/report/0201`.**
+// The asymmetry with POPULATION above is deliberate, and three measurements chose it:
+//   ⑴ **Adding it buys nothing today.** There is exactly one `.py` artifact, it has zero
+//     callers, and putting `py` here leaves the verdict line byte-identical: measured,
+//     `45 artifacts · 0 = 11 · 1 = 15 · 2+ = 19` before and after. The only change is three
+//     extra `named-not-run` rows from that file's docstring cross-references.
+//   ⑵ ★**It would make `.py` the ONLY population language whose prose is read as code.**
+//     `hash` below is `/\.(?:sh|toml)$/`, so a `.py` file gets C-style stripping — which
+//     strips neither Python's `#` comments nor its `"""` docstrings. Measured: a bare
+//     `node scripts/check-worklog-json.mjs` line planted **inside the docstring** was
+//     counted as a real caller and moved the buckets (`1 = 15 → 14`, `2+ = 19 → 20`).
+//     Fixing that first is a stripper change, which is a bigger job than this asymmetry.
+//   ⑶ ★**A wrong zero here is not a wrong red.** This file has no failing state (its step
+//     carries `continue-on-error`, and its own header says a zero caller count is a
+//     question, not a defect), so the usual "a false red causes a false action" argument
+//     does not apply — the cost of a missed caller is a question posed wrongly, which is
+//     the state this census already declares itself to be in.
+// ⇒ Left as is, and **said out loud instead**: the `★py 비대칭` line in the output prints
+//   only while this asymmetry exists, with live counts. Add `py` here and that line
+//   retires itself; land a second `.py` and its number moves. The re-open condition is
+//   therefore mechanical rather than a promise.
 const SOURCE_EXT = /\.(?:sh|mjs|js|rs|ts|tsx|toml)$/;
 const WORKFLOW = /^\.github\/workflows\/.+\.(?:yml|yaml)$/;
 const PKG_JSON = /^(?:[^/]+\/)?package\.json$/;
@@ -222,49 +244,113 @@ function pkgSurface(f, text) {
 // `//` is dropped on purpose: a trailing `//` may be part of a URL or a string, and
 // blanking it would hide a real call — undercounting is the worse error here, because it
 // reports "orphan" for something that runs.
+//
+// ★Which `/*` opens a block is decided by WALKING the line, not by `indexOf`. The
+//   previous version asked `line.indexOf("/*")` and every `/*` looked like an opener,
+//   including the ones inside a string, a template or a trailing `//` comment. On this
+//   tree that was not hypothetical: THIS file's own output section prints
+//   `scripts/*.{sh,mjs,js,py}` inside a template literal, so the census opened a block
+//   comment there, found no `*/` before EOF, and read its last 30 lines — the whole
+//   Output section — as comment. It could not see itself. A census whose blind spot is
+//   silent is the failure this file exists to remove, so the earlier fix's declared
+//   remainder (`foo(); // see /*`) is closed here rather than carried again.
+// ★Measured 2026-09-20 over the 400 source files this reads: 17 block-state flips, 16 of
+//   them genuine; 1 spurious, the one above. The declared mixed-line case had 0 live
+//   instances — the shape that actually bit was its sibling, a `/*` inside a literal.
+//   Walking the line covers both, so it is what is written rather than a `//`-only patch.
+// ★What the walk knows: `//`, `/* */`, and "" '' `` literals with their escapes. What it
+//   does NOT know: regex literals, NESTED block comments, and quoted strings spanning
+//   lines. Measured on this tree: 0, 0 and 0 instances carrying a `/*`. Each is declared
+//   instead of guessed at, and the EOF check below makes any future one LOUD.
+// ★String content is preserved verbatim — only comment text is removed — so this changes
+//   what the stripper BELIEVES, never the text a surviving line contributes.
+const scanLine = (line, st) => {
+  let out = "";
+  for (let i = 0; i < line.length; ) {
+    const c = line[i],
+      d = line[i + 1];
+    if (st.block) {
+      if (c === "*" && d === "/") {
+        st.block = false;
+        i += 2;
+      } else i++;
+      continue;
+    }
+    if (st.tmpl) {
+      out += c;
+      if (c === "\\") {
+        out += d ?? "";
+        i += 2;
+        continue;
+      }
+      if (c === "`") st.tmpl = false;
+      i++;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      let j = i + 1;
+      while (j < line.length && line[j] !== c) j += line[j] === "\\" ? 2 : 1;
+      out += line.slice(i, j + 1);
+      i = j + 1;
+      continue;
+    }
+    if (c === "`") {
+      st.tmpl = true;
+      out += c;
+      i++;
+      continue;
+    }
+    if (c === "/" && d === "/") {
+      out += line.slice(i); // kept on purpose — see this block's opening paragraph
+      break;
+    }
+    if (c === "/" && d === "*") {
+      st.block = true;
+      i += 2;
+      continue;
+    }
+    out += c;
+    i++;
+  }
+  return out;
+};
+
 function sourceSurface(f, text) {
   const hash = /\.(?:sh|toml)$/.test(f);
   const out = [];
-  let inBlock = false;
+  // ★The block comment is the ONLY state carried across lines. A backtick can be a regex
+  //   body — `check-doc-liveness-parity.mjs` matches a markdown fence — so carrying
+  //   template state lets one unrecognised regex swallow everything after it, which is
+  //   the same failure this change removes, merely moved. Resetting per line bounds every
+  //   mis-scan to one line. Measured both ways on this tree: identical census output, and
+  //   resetting is also what correctly strips the three one-line `/** … */` comments in
+  //   check-branch-protection-claim.mjs that carrying would have read as executable.
+  const st = { block: false, tmpl: false };
   text.split("\n").forEach((raw, i) => {
     let line = raw;
     if (!hash) {
-      if (inBlock) {
-        const end = line.indexOf("*/");
-        if (end === -1) return;
-        line = line.slice(end + 2);
-        inBlock = false;
-      }
-      // ★The line-comment test runs BEFORE the `/*` scan, and the order is the whole
-      // fix. A `//` line cannot open a block comment — everything after `//` is already
-      // comment — but this scanned for `/*` first, so a full-line comment MENTIONING a
-      // glob flipped `inBlock` and swallowed the file until the next `*/`. Measured
-      // 2026-09-19 on `scripts/game-lab-census-map.mjs`: line 20 says
-      // `game_lab/broken/**` and the only `*/` in the file is line 299, so lines 20-299
-      // — including every `import` — were invisible, and that file was credited as a
-      // caller of NOTHING. A census whose blind spot is silent is the failure this file
-      // exists to remove, so it is fixed here rather than noted.
-      // ★What is NOT fixed: a MIXED line (`foo(); // see /*`) still flips the state,
-      // because separating those needs a tokeniser and this needs three lines. That
-      // case is rarer by construction — the trailing text is a comment about code, not
-      // a whole paragraph — and it fails in the same direction (under-reporting), which
-      // this file already declares is not a verdict.
-      const t = line.trim();
-      if (t.startsWith("//") || t.startsWith("*")) return;
-      const open = line.indexOf("/*");
-      if (open !== -1 && line.indexOf("*/", open) === -1) {
-        inBlock = true;
-        line = line.slice(0, open);
-      }
+      line = scanLine(line, st);
+      st.tmpl = false;
+      // ★Tested on the SCANNED line, not the raw one: `// */ code();` inside a block is
+      //   code, and reading the raw line would drop it. The `*` continuation heuristic
+      //   this used to carry is gone — the walk knows block state now, and that guess
+      //   silently dropped 31 Rust deref statements (`*self.x = …`) across 15 files.
+      if (line.trim().startsWith("//")) return;
     } else if (line.trim().startsWith("#")) {
       return;
     }
     if (line.trim() !== "") out.push({ line: i + 1, text: line });
   });
+  // Source cannot END inside a block comment — it would not compile. So this can only
+  // mean the walk misread the file, and it is reported rather than swallowed: it is
+  // exactly the state this file was in before this change, and the only mechanical
+  // signal that the blind spot is back.
+  if (st.block) misScanned.push(f);
   return out;
 }
 
 const unreadable = [];
+const misScanned = [];
 const surfaces = [];
 for (const f of tracked) {
   if (!(WORKFLOW.test(f) || PKG_JSON.test(f) || SOURCE_EXT.test(f))) continue;
@@ -393,6 +479,21 @@ console.log(
 // is corrected here rather than left for a reader to trip over.
 console.log(`  population: scripts/*.{sh,mjs,js,py} · .github/scripts/**.{sh,mjs,js,py} · [crate/]tests/**.rs (crate segment optional — the root is a package)`);
 console.log(`  surfaces:   ${surfaces.filter((s) => s.kind === "workflow").length} workflows · ${surfaces.filter((s) => s.kind === "npm").length} package.json · ${surfaces.filter((s) => s.kind === "source").length} source files (comments stripped)`);
+// ── The population/surface extension asymmetry, SAID rather than left in a comment ──
+// `py` is in POPULATION and deliberately NOT in SOURCE_EXT. This prints only while that is
+// true, so it is a live reading and not a claim: add `py` to SOURCE_EXT and the line goes
+// away by itself. The numbers are computed, so the re-open condition below is mechanical
+// rather than a promise — see the header note "★Why `py` is counted but not read".
+{
+  const pyPop = population.filter((f) => f.endsWith(".py"));
+  if (pyPop.length && !SOURCE_EXT.test("x.py")) {
+    const pyZero = rows.filter((r) => r.path.endsWith(".py") && r.hits.length === 0).length;
+    console.log(
+      `  ★py 비대칭: 모집단에 .py ${pyPop.length}개(그중 호출자 0 = ${pyZero}) · ★«호출자 증거»로는 읽지 «않는다»(SOURCE_EXT 밖).` +
+        ` 2026-09-20 실측 차이 0 — 넣어도 계수가 안 바뀌었다. ★재검토: .py 가 2개 이상이 되거나 .py 가 다른 artifact 를 부를 때.`,
+    );
+  }
+}
 for (const g of GLOB_CALLERS) {
   const n = globHits.filter((h) => h.rule === g.label).length;
   console.log(`  glob rule:  ${g.label}`);
@@ -406,6 +507,12 @@ for (const g of GLOB_CALLERS) {
   }
 }
 if (unreadable.length) console.log(`  ★UNREAD:    ${unreadable.length} surface(s) could not be read — the counts below are a floor: ${unreadable.join(", ")}`);
+// ★Printed, never exited on: a census has no failing state (see this file's header), and
+//   a mis-scan makes its own counts doubtful rather than the tree wrong.
+if (misScanned.length)
+  console.log(
+    `  ★MIS-SCAN:  ${misScanned.length} source file(s) end inside an unclosed /* … */ — the comment stripper misread them (a construct it does not parse), so every line after that point is invisible and the counts below are a floor: ${misScanned.join(", ")}`,
+  );
 
 for (const b of ["0", "1", "2+"]) {
   console.log(`\n── callers ${b} ── ${groups[b].length} ────────────────────────────────`);

@@ -136,6 +136,87 @@ export function crossPrCollisions(mine, prClaims, selfRef = "") {
 
 const diskNames = () => readdirSync(path.join(ROOT, REPORT_DIR)).filter((f) => f.endsWith(".md"));
 
+// ── ★이 축과 `check-worklog-json` «사이»의 빈칸 ──────────────────────────────────
+// 이 파일은 «파일명»(중복 연번 · 열린 PR claim)을, `check-worklog-json.mjs` 는 «스키마»(키·타입)를 본다.
+// ⇒ ★«그 worklog 가 «산문으로» 가리키는 연번이 이 PR 이 실제로 더한 연번인가»는 **어느 축도 아니다.**
+// 각자 정상 동작하면서 생긴 빈칸이고, 2026-09-20 에 실제로 났다: 직전 회차가 연번 충돌을 피해
+// report 를 rename 했는데 같은 PR 의 worklog `changes[0]` 은 «옛 번호»를 가리킨 채 남았다 — 그 번호는
+// 다른 열린 PR 의 것이었다. ★두 검사기 모두 rc=0 이었고, 잡은 것은 게이트② 검수자의 «눈»이다.
+//
+// ★왜 이 파일에 얹는가(형제 후보는 `check-worklog-json.mjs`): 측정으로 골랐다. 이 파일은
+// `execFileSync` 를 **이미 4곳**에서 쓰고 `myAddedNames()` 가 **바로 그 집합**(이 브랜치가 더한 report)을
+// 이미 만든다. `check-worklog-json.mjs` 는 `child_process` 사용이 **0** 이라 거기 얹으면 «스키마 검사기가
+// git 을 읽는» 더 큰 경계 파괴가 된다. 새 스크립트·새 잡은 만들지 않았다.
+//
+// ★★**rc 를 올리지 않는다 — 경고다.** 측정된 오탐이 «있기» 때문이다(티켓 계약 3):
+// 살아 있는 트리 전수(worklog 159 · report 인용 123회)에서 «존재하지 않는 연번» 인용은 **1건**이고,
+// 그 1건은 ★**제안 자신이 결함을 «서술하려고» 옛 번호를 인용한 것**이다 — 정당하다. 즉 이 술어의
+// 실적은 **진탐 1(그때 사람이 잡은 것) · 오탐 1** 이고, 표본 1건에 rc 를 거는 것은 이 저장소가 반복해
+// 규탄한 형태다. 값은 «막는 것»이 아니라 ★**사람의 눈보다 먼저 화면에 올리는 것**이다.
+const WORKLOG_DIR = "docs/worklog";
+/** 산문 속 `docs/report/NNNN` 인용. 파일명 전체가 아니라 «연번»만 본다(rename 이 바꾸는 것이 뒤쪽이라). */
+const CITE_RE = /docs\/report\/(\d{4})/g;
+
+/**
+ * ★`proposals[]` 는 «대상이 아니다» — 구조적 제외이고, 그 한 줄이 이 술어의 어려운 전부다.
+ * 제안은 «다른 회차·앞으로 할 일»을 이야기하는 자리라 남의 번호(때로는 사라진 번호)를 «정당하게» 가리킨다.
+ * 실측: 살아 있는 유일한 오탐 2회가 전부 `proposals[2].why` / `proposals[2].tradeoff` 에 있었다.
+ * ⇒ 그 가지만 걷어 내면 같은 파일의 «진짜» 결함(`changes[0]`)은 그대로 남는다.
+ */
+export function citedSerials(json) {
+  const out = new Set();
+  const walk = (v) => {
+    if (typeof v === "string") {
+      let m;
+      CITE_RE.lastIndex = 0;
+      while ((m = CITE_RE.exec(v))) out.add(m[1]);
+    } else if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === "object") for (const k of Object.keys(v)) if (k !== "proposals") walk(v[k]);
+  };
+  walk(json);
+  return [...out].sort();
+}
+
+/** 인용 중 «이 PR 이 더한 연번»에도 «origin/main 에 있는 연번»에도 없는 것. 순수 함수(판별력 축이 부른다). */
+export function danglingCitations({ cited, mineSerials, baseSerials }) {
+  const known = new Set([...mineSerials, ...baseSerials]);
+  return cited.filter((s) => !known.has(s));
+}
+
+/** 이 브랜치가 «더하거나 고친» worklog 파일. ★`M` 을 포함한다 — 옛 번호는 고친 파일에도 남는다. */
+export function myWorklogFiles() {
+  try {
+    const out = execFileSync("git", ["diff", "--name-only", "--diff-filter=AM", "origin/main...HEAD", "--", WORKLOG_DIR], {
+      cwd: ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    })
+      .split("\n")
+      .filter((f) => f.endsWith(".json"));
+    return { ok: true, out };
+  } catch (e) {
+    return { ok: false, out: [], why: String(e.message || e).split("\n")[0] };
+  }
+}
+
+/** `origin/main` 에 있는 report 연번. 정당한 교차인용(남의 «존재하는» 보고서)을 통과시키는 축이다. */
+export function baseSerials() {
+  try {
+    const names = execFileSync("git", ["ls-tree", "-r", "origin/main", "--name-only", "--", REPORT_DIR], {
+      cwd: ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    })
+      .split("\n")
+      .filter(Boolean)
+      .map((f) => SERIAL_RE.exec(path.basename(f))?.[1])
+      .filter(Boolean);
+    return { ok: true, out: new Set(names) };
+  } catch (e) {
+    return { ok: false, out: new Set(), why: String(e.message || e).split("\n")[0] };
+  }
+}
+
 /**
  * ★열린 PR 이 «추가한» `docs/report` 파일명 — `--next-serial` 전용.
  * ★**네트워크 의존이라 실패해도 «막지 않는다»**: 경고만 내고 빈 목록을 돌려준다.
@@ -247,6 +328,81 @@ function selftest() {
         return /crossPrCollisions\(mine\.out, claims\.out, selfHeadRef\(\)\)/.test(body) && /if \(crossBad\) process\.exit\(1\);/.test(body);
       })(),
     ],
+    // ── worklog↔report 인용 축(★경고 전용) — 양방향 ──
+    [
+      "★worklog 가 «내가 더한» 번호를 가리키면 통과",
+      danglingCitations({ cited: ["0200"], mineSerials: ["0200"], baseSerials: new Set(["0001"]) }).length === 0,
+    ],
+    [
+      "★worklog 가 origin/main 의 «존재하는» 남의 번호를 가리키면 통과(정당한 교차인용)",
+      danglingCitations({ cited: ["0109"], mineSerials: ["0200"], baseSerials: new Set(["0109"]) }).length === 0,
+    ],
+    [
+      "★★어디에도 없는 번호를 가리키면 잡는다(= 2026-09-20 에 난 그 결함)",
+      (() => {
+        const d = danglingCitations({ cited: ["0184"], mineSerials: ["0185"], baseSerials: new Set(["0183"]) });
+        return d.length === 1 && d[0] === "0184";
+      })(),
+    ],
+    ["★인용이 없으면 아무 일도 하지 않는다", danglingCitations({ cited: [], mineSerials: [], baseSerials: new Set() }).length === 0],
+    [
+      "★★`proposals[]` 안의 인용은 «대상이 아니다»(측정된 유일한 오탐의 모양)",
+      (() => {
+        const j = { changes: ["docs/report/0200 신설"], proposals: [{ why: "docs/report/0184 를 rename 했다" }] };
+        const c = citedSerials(j);
+        return c.length === 1 && c[0] === "0200";
+      })(),
+    ],
+    [
+      "★★중첩된 배열·객체 안의 산문도 읽는다(얕게 훑고 놓치지 않는다)",
+      (() => {
+        const j = { verification: [{ a: ["보라 docs/report/0042 를"] }] };
+        return citedSerials(j).join() === "0042";
+      })(),
+    ],
+    [
+      "★★★이 축은 «경고»다 — 본체가 `::warning` 을 내고 exit 를 «올리지 않는다»(호출부 슬라이스 판정)",
+      (() => {
+        const src = readFileSync(fileURLToPath(import.meta.url), "utf8");
+        const MARK = "\n// ── 제품 호출부 ──\n";
+        if (src.split(MARK).length !== 2) return false;
+        const body = src.slice(src.indexOf(MARK) + MARK.length);
+        const tail = body.slice(body.indexOf("if (crossBad) process.exit(1);"));
+        return (
+          /danglingCitations\(\{ cited, mineSerials, baseSerials: base\.out \}\)/.test(tail) &&
+          /::warning title=worklog 가 «없는» 연번을 가리킨다/.test(tail) &&
+          !/process\.exit\(1\)/.test(tail.slice(tail.indexOf("const wl = myWorklogFiles();")))
+        );
+      })(),
+    ],
+    [
+      // ★수를 박지 «않는다». 초판이 `exempt === 1` 로 고정했다가, 같은 회차가 제안에서 «아직 안 착지한»
+      //   형제 PR 의 연번을 인용하자마자 2가 되어 스스로 red 가 됐다 — 정당한 내용이 가드를 깨는 그 형태다.
+      //   지키려던 뜻은 「제외가 «일을 한다»」이고, 그것은 부등식으로 충분하다.
+      "★★★실 저장소: 제외를 적용하면 «없는 연번» 0 · 걷어 내면 1건 이상 남는다(제외가 «일을 한다»)",
+      (() => {
+        const all = readdirSync(path.join(ROOT, WORKLOG_DIR)).filter((f) => f.endsWith(".json"));
+        const have = new Set(diskNames().map((n) => SERIAL_RE.exec(n)?.[1]).filter(Boolean));
+        let exempt = 0;
+        let counted = 0;
+        for (const f of all) {
+          let j;
+          try {
+            j = JSON.parse(readFileSync(path.join(ROOT, WORKLOG_DIR, f), "utf8"));
+          } catch {
+            continue;
+          }
+          for (const s of citedSerials(j)) if (!have.has(s)) counted++;
+          const raw = readFileSync(path.join(ROOT, WORKLOG_DIR, f), "utf8");
+          let m;
+          CITE_RE.lastIndex = 0;
+          const seen = new Set();
+          while ((m = CITE_RE.exec(raw))) seen.add(m[1]);
+          for (const s of seen) if (!have.has(s)) exempt++;
+        }
+        return counted === 0 && exempt > counted; // ★제외 적용 = 0 · 미적용 = 1건 이상
+      })(),
+    ],
     // ── 게이트² F2: 자기 제외는 «브랜치»가 1차 ──
     [
       "★★연번을 그대로 두고 슬러그만 바꿔도 «내 PR» 은 안 문다(브랜치 축)",
@@ -277,7 +433,11 @@ function selftest() {
           /crossNote = " · ★열린 PR 대조 «건너뜀»/.test(body) &&
           /crossNote = ` · ★내가 더한 \$\{mine\.out\.length\}건은 «미대조»/.test(body) &&
           /if \(!crossBad\) crossNote = ` · 내가 더한 \$\{mine\.out\.length\}건 ↔ 열린 PR claim 충돌 0`;/.test(body) &&
-          /\$\{crossNote\}`\);/.test(body)
+          // ★2026-09-20: 성공 줄 «끝»을 고정하던 `${crossNote}`);` 를 «성공 줄 안에 있는가»로 풀었다.
+          //   worklog 인용 축이 그 뒤에 `${citeNote}` 를 붙이는데, 끝 고정이면 «옳은 추가»가 red 가 된다
+          //   (이 저장소가 check-parity-lock-wired 에서 치른 값). 지키려던 뜻 — crossNote 가 성공 줄에
+          //   «도달한다» — 는 그대로다.
+          /console\.log\(`check-docs-report-serial: OK[^`]*\$\{crossNote\}/.test(body)
         );
       })(),
     ],
@@ -347,4 +507,45 @@ if (!mine.ok) {
   }
 }
 if (crossBad) process.exit(1);
-console.log(`check-docs-report-serial: OK — ${REPORT_DIR} ${diskNames().length}건 중 중복 연번 0${crossNote}`);
+
+// ── worklog 가 가리키는 연번 ↔ 이 PR 이 실제로 더한 연번 (★경고 전용 · rc 불변) ──────
+// 못 물으면 «조용히 넘어가지 않는다» — 이 저장소가 반복해 적은 그대로, 건너뛴 사실을 찍는다.
+let citeNote = "";
+{
+  const wl = myWorklogFiles();
+  if (!wl.ok) {
+    console.error(`::warning title=내 worklog 를 못 물었다(막지 않는다)::${wl.why} — worklog↔report 인용 대조를 건너뛴다.`);
+  } else if (wl.out.length) {
+    const base = baseSerials();
+    if (!base.ok) {
+      console.error(`::warning title=origin/main 연번을 못 물었다(막지 않는다)::${base.why} — worklog↔report 인용 대조를 건너뛴다.`);
+    } else {
+      const mineSerials = (mine.ok ? mine.out : []).map((n) => SERIAL_RE.exec(n)?.[1]).filter(Boolean);
+      const bad = [];
+      let cites = 0;
+      for (const f of wl.out) {
+        let json;
+        try {
+          json = JSON.parse(readFileSync(path.join(ROOT, f), "utf8"));
+        } catch {
+          continue; // ★스키마·파싱은 check-worklog-json.mjs 의 축이다. 여기서 두 번 울지 않는다.
+        }
+        const cited = citedSerials(json);
+        cites += cited.length;
+        for (const s of danglingCitations({ cited, mineSerials, baseSerials: base.out })) bad.push({ f, s });
+      }
+      if (bad.length) {
+        console.error(
+          `::warning title=worklog 가 «없는» 연번을 가리킨다(막지 않는다)::` +
+            bad.map(({ f, s }) => `${f} -> docs/report/${s}`).join(" · ") +
+            ` — 이 PR 이 더한 연번[${mineSerials.join(",") || "없음"}] 에도 origin/main 에도 없다. ` +
+            `rename 뒤 옛 번호가 남았거나 오타다. ★정당한 경우도 있다(사라진 번호를 «서술»하는 문장) — 그래서 red 가 아니다.`,
+        );
+        citeNote = ` · ★worklog 인용 ${cites}건 중 «없는 연번» ${bad.length}건(경고)`;
+      } else {
+        citeNote = ` · worklog ${wl.out.length}파일의 report 인용 ${cites}건 전건 실재`;
+      }
+    }
+  }
+}
+console.log(`check-docs-report-serial: OK — ${REPORT_DIR} ${diskNames().length}건 중 중복 연번 0${crossNote}${citeNote}`);

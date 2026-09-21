@@ -1,0 +1,62 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-20",
+  "task": "wie-serial-guard-and-worklog-json-leave-a-gap-p2",
+  "title": "연번 가드와 스키마 검사기 «사이»의 빈칸을 메웠다 — 기존 검사기에 얹었고, 오탐이 실재해 «경고»로 두었다",
+  "summary": "채택 제안 2026-09-20-price-cargo-audit-at-pr-stage#p2 의 이행. ⒝ 빈칸을 내 출력으로 실증했다 — 개악 상태(이 PR 이 report 0200 을 더하면서 worklog 가 어디에도 없는 번호를 가리킴)에서 두 검사기가 «둘 다» rc=0 이다. ⒞ live 전수(worklog 159 · 인용 123회)에서 존재하지 않는 연번 인용은 «1개 연번(2회)»이고 ★그 둘 다 제안의 proposals 안, 즉 결함을 «서술하려고» 사라진 번호를 인용한 정당한 경우다 — 제안 자신이 미리 적은 자기지시 함정 그대로다. ⒟ 형제 otterpebble 에는 포팅할 답이 없다(그 검사기는 wie 가 이미 포팅한 파일명 유일성 축이고 worklog 문자열 0건). ★계약 1(어디에 얹을지)은 측정으로 골랐다 — check-docs-report-serial 은 child_process 를 이미 4곳에서 쓰고 «이 브랜치가 더한 report» 집합을 이미 만드는데, check-worklog-json 은 child_process 0 이라 거기 얹으면 git 을 0에서 도입해야 한다. 새 스크립트·새 잡 0. ★계약 3: 오탐이 실측 1건이라 rc 를 올리지 않고 경고로 두었고, 그 위에 구조적 좁힘(proposals[] 는 대상이 아니다)을 더했다 — 실측된 유일한 오탐 2회가 전부 그 가지 안이었기 때문이다.",
+  "changes": [
+    "scripts/check-docs-report-serial.mjs — 순수 함수 2개(citedSerials · danglingCitations)와 git 축 2개(myWorklogFiles · baseSerials) 추가. ★proposals[] 가지는 읽지 않는다(구조적 제외)",
+    "★제품 호출부에 «경고 전용» 블록 추가 — 이 브랜치가 더하거나 고친 docs/worklog/*.json 의 docs/report/NNNN 인용이 «내가 더한 연번»에도 «origin/main»에도 없으면 ::warning. ★rc 는 올리지 않는다",
+    "★못 물으면 조용히 넘어가지 않는다 — worklog 목록·origin/main 연번을 못 물은 경우 각각 건너뛴 사실을 찍는다(이 저장소의 「조용한 0 을 만들지 않는다」 규율)",
+    "★--selftest 에 8케이스 추가(전 27케이스 전건 일치) — 양방향 4 + proposals 제외 + 중첩 탐색 + ★「본체가 warning 을 내고 exit 를 올리지 않는다」 호출부 슬라이스 단언 + ★「제외 적용 = 0 · 걷어 내면 1건 이상」(공허하지 않음 · ★수를 박지 않는다 — 초판이 `exempt === 1` 로 고정했다가 이 회차 자신이 제안에서 «아직 안 착지한» 형제 연번을 인용하자마자 2가 되어 스스로 red 가 됐다. 정당한 내용이 가드를 깨는 그 형태라 부등식으로 풀었다)",
+    "★형제 단언 1개 수정 — 기존 「성공 줄이 «미대조»를 «충돌 0»으로 적지 않는다」가 성공 줄의 «끝»을 고정하고 있어 옳은 추가가 red 가 됐다. 「끝 고정」을 「성공 줄 안에 있는가」로 풀고 이유를 그 자리에 적었다(뜻은 불변)",
+    "docs/report/0200 신설 — ⒝⒞⒟ 실측 · 얹을 축 선택표 · 개악 4행 · 오탐 판단 · 한계 5",
+    "★새 스크립트 0 · 새 CI 잡 0 · check-worklog-json.mjs 무접촉 · 연번 «할당» 규칙 무접촉(티켓 경계) · 형제 제안 #p0(PR #234)·#p1(PR #235) 무접촉"
+  ],
+  "verification": [
+    "★⒝ 빈칸 실증(수정 «전» 판) — 개악 상태에서 check-docs-report-serial rc=0(「중복 연번 0 · claim 충돌 0」) · check-worklog-json rc=0(「OK 160 file(s)」) ⇒ ★둘 다 통과. 제안의 전제는 참이다",
+    "★⒞ live 전수 — docs/worklog/*.json 159개 중 report 를 인용하는 85개 · 인용 출현 123회 · ★존재하지 않는 연번을 가리키는 인용 «1개 연번(2회 출현)». 자리는 2026-09-20-price-cargo-audit-at-pr-stage.json 의 proposals[2].why · proposals[2].tradeoff ⇒ ★정당한 서술이고 오탐이다",
+    "★⒞ 판단의 근거 — 이 술어의 실적은 «진탐 1»(2026-09-20 에 난 changes[0] · 사람이 잡았다) · «오탐 1». 표본이 그것뿐이다",
+    "★⒟ 형제 — otterpebble/scripts/docs-report-serial-check.mjs(140줄)에 worklog 문자열 0건. 리니지 3건(allocation-races · disk-only-answer-on-timeout · guidance-still-points-at-disk-only-recipe)도 할당·조회·타임아웃 축 ⇒ 포팅할 답 없음",
+    "★계약 1 근거 실측 — check-docs-report-serial 의 child_process 사용 4곳 · myAddedNames() 가 이미 «이 브랜치가 더한 report» 를 만든다 ↔ check-worklog-json 의 child_process 사용 0 · docs/report 참조 0. ⇒ 경계를 «덜 넘는 쪽»을 골랐다",
+    "★개악 ⒜ — worklog 가 어디에도 없는 번호를 가리킴: ::warning 출력 + 성공 줄에 「★worklog 인용 1건 중 «없는 연번» 1건(경고)」 · rc=0(설계상)",
+    "★개악 ⒝ — 같은 파일이 «내가 더한» 번호를 가리킴: green · 「worklog 1파일의 report 인용 1건 전건 실재」",
+    "★개악 ⒝′ — «존재하는 남의» 번호 2개를 교차인용: green · 「인용 3건 전건 실재」 ⇒ 정당한 교차인용을 물지 않는다",
+    "★개악 ⒞ — 같은 번호가 proposals[] 안: green ⇒ 실측된 오탐 모양이 통과한다",
+    "★판별력 고정 — node scripts/check-docs-report-serial.mjs --selftest: 27케이스 전건 일치(rc=0). 기본 모드도 rc=0",
+    "★checker-census rc=0 · check-worklog-json rc=0(네 출력으로) · check-doc-liveness-parity rc=0 · check-docs-report-serial rc=0(0200) · check-worklog-coverage rc=0",
+    "★게임 파일명 유입 — 도구를 «문장을 다 쓴 뒤 마지막에» 실행했다: BOUNDED 0회/0쌍 · PREFIX-EMBEDDED 0회/0쌍 · SUFFIX-ATTACHED 0회/0쌍 ⇒ SUFFIX 가 비었으므로 「유입 0건」 주장 가능. 모집단은 game_lab/broken 184 stem(넓힌 기본값은 형제 PR #230 · 미착지)",
+    "★repo 표준 게이트 — fmt · clippy --all -D warnings · wasm clippy · RUST_MIN_STACK=4194304 cargo test --all · cargo +beta clippy 전건 rc=0(AGENTS.md 「무엇을 바꿨든 넷 다」 · 이 diff 에 Rust 0줄)"
+  ],
+  "limits": [
+    "★경고다. 막지 않는다 — 아무도 안 보면 값이 0 이다(check-worklog-coverage 가 2026-09-07 에 보인 형태). rc 로 올리는 것은 표본이 더 쌓인 뒤의 결정이다",
+    "★proposals[] 제외는 구조적이라 그 안의 «진짜» 오타를 놓친다 — 오탐 1건과 맞바꾼 값이고, 되돌리려면 표본이 필요하다",
+    "★docs/report/NNNN 꼴 인용만 본다 — 「보고서 0184」처럼 경로 없이 쓰면 안 보인다. 넓히면 임의의 네 자리 수를 문다",
+    "★«존재하는가»만 본다. «맞는 보고서인가»는 못 본다 — 인용한 번호의 내용이 정말 그것인지는 사람이 본다",
+    "★연번 «할당» 규칙은 건드리지 않았다(티켓 경계) — 이 회차는 «대조»를 더한 것이다",
+    "★발화 빈도가 낮다 — rename 이 일어나는 회차에서만 값한다. 제안이 「먼저 수로 내고 착수할지 정하는 편이 낫다」고 적은 그 축이고, 이 회차가 낸 수는 «진탐 1 · 오탐 1»이다"
+  ],
+  "adoptedProposals": [
+    "2026-09-20-price-cargo-audit-at-pr-stage#p2"
+  ],
+  "proposals": [
+    {
+      "title": "이 경고가 «값을 했는지»를 N회차 뒤에 재고 rc 로 올릴지 정하라",
+      "plainSummary": "새로 넣은 알림은 지금은 막지 않고 알려주기만 합니다. 몇 회차 뒤에 실제로 도움이 됐는지 보고 «막는 검사»로 올릴지 정하자는 제안입니다.",
+      "userBenefit": "쓸모가 증명되면 더 확실히 막고, 아니면 군더더기를 지울 수 있습니다.",
+      "why": "이 회차는 오탐 1건이 실측돼 rc 를 올리지 않았다 — 표본이 «진탐 1 · 오탐 1» 뿐이기 때문이다. 그런데 경고는 아무도 안 보면 값이 0 이고, 이 저장소는 그 형태를 이미 겪었다(check-worklog-coverage, 2026-09-07 · 3일 방치된 schedule red, docs/report/0181). ⇒ 재는 축이 필요하다: 착지한 회차 N건에서 ⑴이 경고가 몇 번 떴나 ⑵그중 몇 건이 실제 결함이었나(= 그 회차가 고쳤나) ⑶오탐은 어떤 모양이었나. 진탐이 쌓이고 오탐이 proposals 제외로 계속 0이면 rc 로 올린다. 반대로 한 번도 안 뜨면 «rename 이 드물다»는 것이 증명된 것이고, 그때는 지우는 것이 정직하다.",
+      "tradeoff": "★재측 자체가 사람 일이다 — 경고는 CI 로그에 묻히므로 세려면 각 PR 의 contract 잡 로그를 긁어야 하고, 그 수집기를 만들면 «검사를 감시하는 검사»가 하나 더 는다(이 저장소가 반복해 경계한 형태). 그리고 N 을 정하는 근거가 없다 — rename 빈도를 모르기 때문에 이 회차도 그 수를 못 냈다. 아무것도 하지 않고 다음에 이 경고를 실제로 만난 회차가 회신에 한 줄 적게 두는 편이 맞을 수 있다 — 그러면 수집기 없이 표본이 쌓인다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "«경로 없는» 연번 인용(「보고서 0184」)까지 볼지 정하라",
+      "plainSummary": "기록이 번호만 적고 경로를 안 쓰면 이번 검사가 놓칩니다. 그것까지 볼지 정하자는 제안입니다.",
+      "userBenefit": "번호를 적는 방식이 달라도 같은 오류가 잡힙니다.",
+      "why": "이 회차의 술어는 `docs/report/NNNN` 꼴만 읽는다. 그런데 회차 문서는 「0184 가 이미 쟀다」처럼 경로 없이 쓰는 일이 흔하고, 그 형태의 오타는 이 검사가 보지 못한다 — 한계 ⑶으로 적었다. 형태: worklog 안의 네 자리 수 중 «연번 문맥»(앞뒤에 report·보고서·리포트 같은 낱말이 있는 경우)만 골라 같은 대조를 한다.",
+      "tradeoff": "★넓히면 임의의 네 자리 수를 문다 — 회차 문서에는 연도(2026)·바이트 수·밀리초·PR 번호가 널려 있고, 「앞뒤 낱말」로 좁히는 것은 곧 문구 검사다(같은 날 docs/report/0195 가 오탐 3·진탐 0 으로 기각한 그 축). 그리고 실관측이 0건이다 — 경로 없는 인용이 «틀린» 사례는 아직 없다. 이 회차의 술어가 진탐을 내기 시작한 «뒤»에 넓히는 것이 순서일 수 있고, 아무것도 하지 않는 편이 맞을 수 있다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}
