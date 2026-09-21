@@ -499,3 +499,95 @@ impl TryFrom<u32> for WIPICTableId {
         })
     }
 }
+
+/// The message KTF's *unidentified kernel extension* slots report.
+///
+/// ── Why the name `MC_knlReservedN` had to stop being the whole message ───────
+/// Those thirteen variants above (`Reserved1`-`Reserved13`, ids 33-43 and 57-58)
+/// are **this repo's placeholders**, not slots the WIPI specification set aside.
+/// Measured 2026-09-19 against `docs/reference/WIPIHeader.h`: the string
+/// `Reserved` appears **0 times** (the single case-insensitive hit is
+/// `int m_reserved;`, an unrelated struct field), and the spec's kernel section
+/// simply **ends** at `E_MC_knlGetResource` — the next field is
+/// `E_MC_grpGetImageProperty`. So the spec has no kernel slot at index 33 or
+/// beyond; everything up there is KTF's own extension space. This file already
+/// knows that for ids 44+, which it labels `OEMC_knl…` ("OEM C"). The
+/// `Reserved*` block is the same territory wearing the wrong label.
+///
+/// That mislabel had a cost: a triage round classified the resulting failure as
+/// "a slot the spec left blank, so it cannot be touched" and prescribed
+/// *documentation*. It is not untouchable — it is un-reverse-engineered, which
+/// is a different verdict with a different price.
+///
+/// ── What id 36 actually does, since this round went and looked ───────────────
+/// One title reaches it. Disassembled at its call site (and cross-checked twice:
+/// the fault's `IP` is `0x24` = 36, and the guest loads the entry from
+/// `knl_interface + 0x90` = field index 36):
+///
+/// ```text
+/// f(r0 = "MXUserMemInterf", r1 = -1, r2 = -1, r3 = 0, [sp+0] = 0)   // arity 5
+/// -> the caller stores the result in a global, then immediately calls
+///    result->slot0(buffer, 0x14400)                                  // 82,944 bytes
+/// ```
+///
+/// So it takes an **interface name** and hands back an **interface pointer**
+/// whose first entry is then initialised with a memory pool. That is a named
+/// extension-interface lookup, and it is very likely the door through which the
+/// `Interface3`-`Interface16` tables below are reached. ★**That last sentence is
+/// a hypothesis, not a measurement** — nothing here traced a returned pointer to
+/// one of those tables. The arity and the two argument shapes are measured; the
+/// *name* of the function is not, and this round deliberately did not invent one.
+pub fn ktf_kernel_extension_message(id: u16, placeholder: &str) -> alloc::string::String {
+    alloc::format!(
+        "unidentified KTF kernel extension — `{placeholder}` is this repo's placeholder name for slot {id}, \
+         NOT a slot reserved by the WIPI specification (docs/reference/WIPIHeader.h has no kernel entry at \
+         this index; its kernel section ends at MC_knlGetResource). It is un-reverse-engineered, not untouchable"
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{WIPICKernelMethodId, ktf_kernel_extension_message};
+
+    /// The message must carry the correction, not just a name.
+    ///
+    /// The point of this round is that `MC_knlReserved4` reads as "the spec left
+    /// this blank", which sent a previous triage round to *document* a failure
+    /// that is in fact reverse-engineerable. So the string has to keep three
+    /// things: the slot number, the placeholder it used to be called, and the
+    /// statement that the specification has no such slot. Dropping any one of
+    /// them puts the old reading back.
+    #[test]
+    fn ktf_kernel_extension_message_says_it_is_ours_not_the_spec_s() {
+        let m = ktf_kernel_extension_message(36, "MC_knlReserved4");
+
+        for needle in [
+            "slot 36",
+            "MC_knlReserved4",
+            "placeholder",
+            "NOT a slot reserved by the WIPI specification",
+        ] {
+            assert!(m.contains(needle), "message lost {needle:?}: {m}");
+        }
+        assert!(
+            !m.contains("reserved slot") && !m.contains("Reserved slot"),
+            "the message must not re-assert the classification it exists to correct: {m}"
+        );
+    }
+
+    /// The ids this round reasoned about are the ids the enum actually has.
+    ///
+    /// `Reserved4 = 36` is what the faulting guest's `IP` (`0x24`) decodes to and
+    /// what `knl_interface + 0x90` (field index 36) points at — two independent
+    /// confirmations that the slot under discussion is this variant. A renumber
+    /// would silently detach the measurement in the doc comment above from the
+    /// code it describes.
+    #[test]
+    fn reserved_block_ids_match_what_was_measured() {
+        assert_eq!(WIPICKernelMethodId::Reserved4 as u16, 36);
+        assert_eq!(WIPICKernelMethodId::Reserved1 as u16, 33);
+        assert_eq!(WIPICKernelMethodId::Reserved11 as u16, 43);
+        assert_eq!(WIPICKernelMethodId::Reserved12 as u16, 57);
+        assert_eq!(WIPICKernelMethodId::Reserved13 as u16, 58);
+    }
+}

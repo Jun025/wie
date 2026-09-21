@@ -384,6 +384,31 @@ pub fn get_stub_method_table(interface: WIPICWord) -> Vec<WIPICMethodBody> {
     (0..64).map(|_| gen_stub(interface, "stub")).collect::<Vec<_>>()
 }
 
+/// The thirteen `Reserved*` kernel slots, which are **not** reserved.
+///
+/// They used to report `gen_stub(36, "MC_knlReserved4")` — literally the name
+/// this repo invented — and that name reads as a statement about the spec. It is
+/// not one: `docs/reference/WIPIHeader.h` contains `Reserved` **0 times** and its
+/// kernel section ends at `E_MC_knlGetResource`, so there is no specified slot at
+/// index 33 or beyond. Ids 44+ in the same table are already labelled `OEMC_knl…`
+/// ("OEM C"); this block is the same vendor territory wearing the wrong label.
+///
+/// The cost of the wrong label is recorded because it was paid: a triage round
+/// read it as "the spec left this blank, so it cannot be touched" and prescribed
+/// documentation for something that turned out to be ordinary reverse
+/// engineering. `svc_ids::ktf_kernel_extension_message` carries the correction,
+/// and what slot 36 actually does is written down next to it.
+fn gen_ktf_kernel_extension_stub(id: WIPICWord, placeholder: &'static str) -> WIPICMethodBody {
+    let body = move |_: &mut dyn WIPICContext| async move {
+        Err::<(), _>(WieError::Unimplemented(format!(
+            "{id}: {}",
+            crate::runtime::svc_ids::ktf_kernel_extension_message(id as u16, placeholder)
+        )))
+    };
+
+    body.into_body()
+}
+
 pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPICMethodBody> {
     match table_id {
         WIPICTableId::Kernel => match WIPICKernelMethodId::try_from(function_id).ok()? {
@@ -421,16 +446,16 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
             WIPICKernelMethodId::GetResourceId => Some(kernel::get_resource_id.into_body()),
             WIPICKernelMethodId::GetResource => Some(kernel::get_resource.into_body()),
             WIPICKernelMethodId::Reserved1 => None,
-            WIPICKernelMethodId::Reserved2 => Some(gen_stub(34, "MC_knlReserved2")),
-            WIPICKernelMethodId::Reserved3 => Some(gen_stub(35, "MC_knlReserved3")),
-            WIPICKernelMethodId::Reserved4 => Some(gen_stub(36, "MC_knlReserved4")),
-            WIPICKernelMethodId::Reserved5 => Some(gen_stub(37, "MC_knlReserved5")),
-            WIPICKernelMethodId::Reserved6 => Some(gen_stub(38, "MC_knlReserved6")),
-            WIPICKernelMethodId::Reserved7 => Some(gen_stub(39, "MC_knlReserved7")),
-            WIPICKernelMethodId::Reserved8 => Some(gen_stub(40, "MC_knlReserved8")),
-            WIPICKernelMethodId::Reserved9 => Some(gen_stub(41, "MC_knlReserved9")),
-            WIPICKernelMethodId::Reserved10 => Some(gen_stub(42, "MC_knlReserved10")),
-            WIPICKernelMethodId::Reserved11 => Some(gen_stub(43, "MC_knlReserved11")),
+            WIPICKernelMethodId::Reserved2 => Some(gen_ktf_kernel_extension_stub(34, "MC_knlReserved2")),
+            WIPICKernelMethodId::Reserved3 => Some(gen_ktf_kernel_extension_stub(35, "MC_knlReserved3")),
+            WIPICKernelMethodId::Reserved4 => Some(gen_ktf_kernel_extension_stub(36, "MC_knlReserved4")),
+            WIPICKernelMethodId::Reserved5 => Some(gen_ktf_kernel_extension_stub(37, "MC_knlReserved5")),
+            WIPICKernelMethodId::Reserved6 => Some(gen_ktf_kernel_extension_stub(38, "MC_knlReserved6")),
+            WIPICKernelMethodId::Reserved7 => Some(gen_ktf_kernel_extension_stub(39, "MC_knlReserved7")),
+            WIPICKernelMethodId::Reserved8 => Some(gen_ktf_kernel_extension_stub(40, "MC_knlReserved8")),
+            WIPICKernelMethodId::Reserved9 => Some(gen_ktf_kernel_extension_stub(41, "MC_knlReserved9")),
+            WIPICKernelMethodId::Reserved10 => Some(gen_ktf_kernel_extension_stub(42, "MC_knlReserved10")),
+            WIPICKernelMethodId::Reserved11 => Some(gen_ktf_kernel_extension_stub(43, "MC_knlReserved11")),
             WIPICKernelMethodId::SendMessage => Some(gen_stub(44, "OEMC_knlSendMessage")),
             WIPICKernelMethodId::SetTimerEx => Some(gen_stub(45, "OEMC_knlSetTimerEx")),
             WIPICKernelMethodId::GetSystemState => Some(gen_stub(46, "OEMC_knlGetSystemState")),
@@ -444,8 +469,8 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
             WIPICKernelMethodId::DestroySysMessageBox => Some(gen_stub(54, "OEMC_knlDestroySysMessageBox")),
             WIPICKernelMethodId::GetProgramIdList => Some(gen_stub(55, "OEMC_knlGetProgramIDList")),
             WIPICKernelMethodId::GetProgramInfo2 => Some(gen_stub(56, "OEMC_knlGetProgramInfo")),
-            WIPICKernelMethodId::Reserved12 => Some(gen_stub(57, "MC_knlReserved12")),
-            WIPICKernelMethodId::Reserved13 => Some(gen_stub(58, "MC_knlReserved13")),
+            WIPICKernelMethodId::Reserved12 => Some(gen_ktf_kernel_extension_stub(57, "MC_knlReserved12")),
+            WIPICKernelMethodId::Reserved13 => Some(gen_ktf_kernel_extension_stub(58, "MC_knlReserved13")),
             WIPICKernelMethodId::CreateAppPrivateArea => Some(gen_stub(59, "OEMC_knlCreateAppPrivateArea")),
             WIPICKernelMethodId::GetAppPrivateArea => Some(gen_stub(60, "OEMC_knlGetAppPrivateArea")),
             WIPICKernelMethodId::CreateLibPrivateArea => Some(gen_stub(61, "OEMC_knlCreateLibPrivateArea")),
