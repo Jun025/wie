@@ -1189,6 +1189,19 @@ four required contexts are safe for the same reason: `rust.yml` and `web.yml` ca
 filter** on their `pull_request` triggers (measured), so all five always report. **Never make
 `doc-liveness` required** — it is paths-scoped by design.
 
+**★Never make `pr-audit` required either, and it carries a second reason `doc-liveness` does not.**
+`.github/workflows/pr-audit.yml` runs `cargo audit` on PRs that move `Cargo.toml`/`Cargo.lock`
+(wired 2026-09-20, `docs/report/0198`; priced in `0185`: p50 17s, and only 2 of the last 60 PRs
+would have fired it). It is paths-filtered, so promoting it deadlocks every PR that misses the
+filter — that is reason one, the same as above. **Reason two is specific to this check: `cargo
+audit` goes red when a NEW ADVISORY IS PUBLISHED, with no change to this repo at all.** A gating
+check a stranger can trip overnight is one people route around, and Constraint 5 has already
+closed the usual exits (`--ignore`, `continue-on-error`). ★Non-gating here means **"not in the
+required list above"**, not `continue-on-error`: the job's exit code stays honest, it simply does
+not hold the merge button. The daily `rust-audit.yaml` remains the alarm channel; the PR job only
+buys **attribution** — and it cannot see a dependency that turns vulnerable without `Cargo.lock`
+moving (a `[patch]` entry or a git `rev` whose content shifts under the same ref).
+
 **The rollout that got applied.** The 2026-07-22 round did the code half and left the settings half
 as an explicit human-step — *"★human-step (워커 적용 금지 · repo 설정 변경)"*, ruleset JSON included,
 PR-before-merge + required checks with review approval deliberately excluded (a sole-owner repo
