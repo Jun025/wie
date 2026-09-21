@@ -24,6 +24,15 @@ impl TextComponent {
             ],
             fields: vec![
                 JavaFieldProto::new("m_cPos", "I", FieldAccessFlags::PROTECTED),
+                // Read directly by 레전드오브마스터 and 훼밀리마트타이쿤; the LGT linker reports it as
+                // `TextComponent.iModeI`, which is where the descriptor comes from. Nothing in
+                // wie writes it -- imHandler owns the mode -- so it stays at its default.
+                JavaFieldProto::new("iMode", "I", FieldAccessFlags::PROTECTED),
+                // Same story as iMode: read directly by 서든어택포켓 (`maxLength I`) and
+                // 훼밀리마트타이쿤 (`m_td [C`). setMaxLength is a no-op stub, so neither is
+                // written here; m_td stays null until something in wie owns the text buffer.
+                JavaFieldProto::new("maxLength", "I", FieldAccessFlags::PROTECTED),
+                JavaFieldProto::new("m_td", "[C", FieldAccessFlags::PROTECTED),
                 JavaFieldProto::new("imHandler", "Lorg/kwis/msp/lcdui/InputMethodHandler;", FieldAccessFlags::PROTECTED),
             ],
             access_flags: ClassAccessFlags::PUBLIC | ClassAccessFlags::ABSTRACT,

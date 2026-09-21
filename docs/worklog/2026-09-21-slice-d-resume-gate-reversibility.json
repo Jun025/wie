@@ -1,0 +1,54 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-21",
+  "task": "wie-p3-slice-d-resume-gate-is-a-decision-and-the-next-section-carries-two-dead-items",
+  "title": "조각 D 의 재개 게이트는 «결정»이다 — 죽은 항목 둘 처분 + ⒜/⒝ 를 «가역성»으로 측정",
+  "summary": "STATE.md `## 다음` 이 이미 닫힌 일 둘을 이고 있었다(연번 0113 이중 claim = 2026-09-17 해소 · A~E 요약에서 A·D 가 미착수로 읽힘). 둘 다 처분했고, 「#159 착지 뒤」 순서 선행이 2026-09-16 01:20 에 충족됐음을 재개 조건 옆에 적었다. 그리고 남은 재개 조건 ⑵(⒜/⒝ 선택)를 «정확성이 아니라 되돌리는 비용» 축으로 쟀다 — 코드 축은 27줄/1파일로 «대칭»이라 비기지만 게이트 축이 «일방적»이라 권고는 ⒝ 다. 부수로 STATE.md 의 전제 「⒝ 는 1,095줄을 버린다」가 «과장»임을 실측으로 정정했다(진입점 3개가 살아 파일이 트리에 남는다 — 버리는 게 아니라 «주차»다). 제품 코드 0줄.",
+  "changes": [
+    "STATE.md — 연번 0113 항목을 «총괄 판단 대기» → «해소»로 개정(근거: #159/#160 머지 시각 · 0113/0114/0115 경로 · 처분 worklog 파일명)",
+    "STATE.md — A~E 요약 줄을 같은 절의 「조각 A 돌았다」·「조각 D 시도 → 멈췄다」 항목과 정합(A=돌았다 · D=시도했고 멈췄다 · E=미착수 명시). 부수로 B 중복 서술과 11줄 뒤에서 닫히던 괄호 파손을 폈다(사실 추가 0 · 분량 감소). ★줄번호로 인용하지 않았다 — AGENTS.md 가 그 부식을 경고하고, 이 회차 편집만으로도 재개 조건 블록이 211 → 218행으로 밀렸다",
+    "STATE.md — 재개 조건 옆에 «#159 착지 뒤» 순서 선행 충족(2026-09-16T01:20:39Z) 명기 + 권고 포인터",
+    "STATE.md — 조각 D ⑴ 의 「⒝ 는 1,095줄을 버려 benefit 을 스스로 취소한다」를 실측으로 정정",
+    "docs/report/0206--2026-09-21--wie-p3-slice-d-resume-gate-is-a-decision-and-the-next-section-carries-two-dead-items.md 신규"
+  ],
+  "verification": [
+    "총괄 실측을 독립 재확인: gh pr view → #159 MERGED 2026-09-16T01:20:39Z(3744f84e) · #160 MERGED 02:04:45Z(d70b93f8) · git ls-tree origin/main 에 0113/0114/0115 + 처분 worklog 실재 · check-docs-report-serial rc=0(194건 중 중복 연번 0)",
+    "배선 표면을 «두 ref» 에서 측정: 44fbf265(조각 A 의 ref)와 upstream/main(3e203809 · 2026-09-20) 둘 다 '=> graphics::' 27건 · graphics.rs 1,095줄 ⇒ 결정 표면이 닷새간 드리프트하지 않았다",
+    "27줄 치환 diff --numstat = 27 added / 27 removed / 1 file ⇒ ⒜↔⒝ 코드 축 대칭",
+    "⒝ 에서 살아남는 진입점 3개 실측: wipi_c.rs:199 init_process_state · :200 set_use_annunciator · init.rs:32 set_display_property ⇒ 모듈이 고아가 되지 않고 파일이 트리에 남는다",
+    "pub fn 계수: graphics.rs 정의 30 · ⒜ 참조 30(27 팔 + 위 3개 · 슬랙 0) · ⒝ 참조 3 · 미참조 27(comm 으로 계산). mod runtime 은 lib.rs:5 에서 비공개",
+    "★dead_code 기전을 «추론이 아니라 실측»으로: 같은 형상(사설 모듈 사슬 · 미참조 pub fn)의 최소 재현 크레이트를 실제 빌드 → warning: never used, RUSTFLAGS=-D warnings 에서 error 로 컴파일 실패",
+    "★[게이트② 정정] 린트 «범위»는 pub fn 27 이 아니라 57개 최상위 항목 중 45건이다(pub fn 은 부분집합 — 비공개 fn·struct·const 도 함께 죽는다). 최소재현이 아니라 트리에서 인용: git show origin/main:wie-lgt/src/runtime/wipi_c.rs 의 :16-17 주석 · :32 의 #[allow(dead_code)] 실재 · ef3767df · docs/report/0128--….md:47. ⇒ 27개 삭제는 성립하지 않는 대안이고, allow 1줄은 이미 지불돼 있다",
+    "keydraw_lgt 실행 소비자 전수: Scenario F 가 정확 픽셀 수(키 3개)를 단언하고 contract 는 main 의 required check ⇒ ⒜ 에서 확실히 깨진다. LGT cargo test 둘은 픽셀이 아니라 stdout 축이라 미측정으로 적었다",
+    "★grep 은 /usr/bin/grep 사용 — 에이전트 셸의 ugrep 그림자가 -E 패턴에서 실제로 실패했다(헌장이 경고한 그 함정)"
+  ],
+  "limits": [
+    "★⒜ 에서 LGT cargo test 둘(stdout 축)이 깨지는지는 «재지 않았다» — base swap 실행이 필요하고 티켓이 그것을 금지한다. ⇒ ⒜ 의 게이트 비용은 «하한»만 적었고 상한은 열려 있다",
+    "★이 회차는 «어느 쪽이 옳은가»를 주장하지 않는다 — 「코퍼스 없이 어느 쪽도 옳다를 증명 못 한다」는 STATE.md 판정은 유효하고 건드리지 않았다. 잰 축은 가역성 하나뿐이다",
+    "★코퍼스가 생기면 LGT 52건이 이 권고를 뒤집을 수 있고, 뒤집어야 한다",
+    "★권고이지 집행이 아니다 — 조각 D 는 돌리지 않았고 제품 코드 diff 는 0 이다",
+    "★AGENTS.md 의 「keydraw_lgt 에 cargo test 커버리지가 전혀 없다」는 서술이 낡았음을 발견했으나 고치지 않았다(범위 밖 · 아래 제안으로 올린다)"
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "조각 D 의 ⒜/⒝ 를 «가역성 권고 ⒝» 위에서 확정한다",
+      "plainSummary": "업스트림 재정렬의 마지막 큰 결정이 닷새째 «결정 대기»로 멈춰 있습니다. 어느 쪽이 기술적으로 옳은지는 게임 코퍼스 없이 증명할 수 없지만, «나중에 마음을 바꾸는 비용»은 지금 잴 수 있고 이미 쟀습니다. 그 축에서는 한쪽이 분명히 쌉니다.",
+      "userBenefit": "멈춰 있던 base swap 이 다시 움직입니다. 그리고 지금 고르는 쪽이 틀린 것으로 드러나도 27줄이면 반대쪽으로 갈 수 있어, 잘못된 결정에 갇히지 않습니다.",
+      "why": "재개 조건 3종 중 ⑴코퍼스·⑶upstream SDK 는 이 레인 밖이라 이 레인이 움직일 수 있는 것은 ⑵ 하나다. 그리고 ⑵ 의 순서 선행(#159 착지)은 2026-09-16 01:20 에 이미 열렸다. 측정: 코드 축은 27줄/1파일로 대칭(비김)이나 게이트 축이 일방적이다 — ⒜ 는 main 의 required check(Scenario F 의 정확 픽셀 단언 3건)를 약화시켜야 서고 그 신호는 복원 경로가 없다(게스트 SDK 에 lgt 분기 0건). ⒝ 의 게이트 비용은 0 이고, 1,095줄은 버려지지 않고 트리에 «주차»된다(진입점 3개 생존 실측).",
+      "tradeoff": "⒝ 를 고르면 upstream 의 LGT 리버스 1,095줄이 당분간 dead_code 로 주차된다 — 비용은 #[allow(dead_code)] 1줄뿐이고 ★그 1줄은 우리 origin/main 에 이미 달려 있다(ef3767df(2026-09-16)는 그 형상을 «측정·기록»한 커밋이고 allow 자체는 그보다 앞선다 — ef3767df^ 에 이미 있다). ★닷새째 ⒝ 형상으로 돌며 Rust CI(= -D warnings 축) 전건 green 이다(창 main · createdAt≥2026-09-16 · Rust CI failure 0/76런). ※「전 게이트 green」은 거짓이다 — 같은 창에 red 13건(Engine contract 9 · Security audit 3 · doc-liveness 1)이 있으나 전부 -D warnings 축 밖의 문서·계약·감사 게이트다. ※「27 fn 을 대신 삭제한다」는 대안이 아니다 — 죽는 항목은 57개 중 45건이라 27개를 지워도 18건이 남아 -D warnings red 다. 그리고 이 권고는 «가역성» 축만 재었지 «정확성» 축을 재지 않았다 — 실제 clet 코퍼스가 생기면 뒤집힐 수 있다. 또한 ⒜ 의 게이트 비용은 하한만 측정됐다(LGT cargo test 둘은 stdout 축이라 미측정).",
+      "effort": "S (결정 자체) · 집행은 조각 D 안에서 L",
+      "target": "orchestrator"
+    },
+    {
+      "title": "AGENTS.md 의 「keydraw_lgt 에 cargo test 커버리지가 없다」 서술이 낡았다",
+      "plainSummary": "개발 안내 문서가 「LGT 픽스처에는 자동 테스트가 전혀 없다」고 적고 있는데, 실제로는 그 테스트가 복원되어 지금 돌아가고 있습니다. 문서만 그 사실을 모릅니다.",
+      "userBenefit": "다음 회차가 «없는 줄 알고» 이미 있는 테스트를 다시 만들거나, 반대로 커버리지가 없다고 믿고 위험한 변경을 그냥 통과시키는 일을 막습니다.",
+      "why": "AGENTS.md 는 「keydraw_lgt.zip has no cargo test coverage at all … wie-lgt/tests/ holds only test_helloworld.rs」라고 적는다. 실측: origin/main 에 wie-lgt/tests/test_key_reach.rs(keydraw_lgt 3회)와 test_resource_reach.rs(1회)가 실재하고, 전자의 머리주석이 「Why this file had to be written twice」로 복원 경위를 스스로 적는다. ⇒ 그 문단이 서술하는 «구멍»은 이미 메워졌다.",
+      "tradeoff": "문서만 바뀌므로 게이트 영향 0. 다만 그 문단은 «왜 그 구멍이 생겼나»(크레이트 개명이 LGT 쌍을 안 옮겼다)를 기록하고 있어 통째로 지우면 사료를 잃는다 — 지우지 말고 «복원됨»으로 고쳐 써야 한다.",
+      "effort": "XS",
+      "target": "wie"
+    }
+  ]
+}

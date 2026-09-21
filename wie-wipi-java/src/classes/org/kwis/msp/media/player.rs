@@ -60,6 +60,12 @@ impl Player {
                     Self::stop_clip,
                     MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
                 ),
+                JavaMethodProto::new(
+                    "resume",
+                    "(Lorg/kwis/msp/media/Clip;)Z",
+                    Self::resume_clip,
+                    MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+                ),
             ],
             fields: vec![],
             access_flags: ClassAccessFlags::PUBLIC,
@@ -117,6 +123,25 @@ impl Player {
 
         if !player.is_null() {
             let _: () = jvm.invoke_virtual(&player, "javax/microedition/media/Player", "stop", "()V", ()).await?;
+
+            return Ok(true);
+        }
+
+        Ok(false)
+    }
+
+    // MIDP has no pause/resume pair: `Player.stop()` halts playback while retaining the media
+    // time, and `Player.start()` resumes from it, so WIPI's resume maps onto `start()`. The
+    // target is the `javax/microedition/media/Player` interface rather than `net/wie/SmafPlayer`
+    // for the same reason `stop_clip` uses it — the interface declares `start()V`. Only the
+    // repeat-taking `start(Z)V` that `play_clip` needs is absent there and concrete to SmafPlayer.
+    async fn resume_clip(jvm: &Jvm, _: &mut WieJvmContext, clip: ClassInstanceRef<Clip>) -> JvmResult<bool> {
+        tracing::debug!("org.kwis.msp.media.Player::resume({clip:?})");
+
+        let player = Clip::player(jvm, &clip).await?;
+
+        if !player.is_null() {
+            let _: () = jvm.invoke_virtual(&player, "javax/microedition/media/Player", "start", "()V", ()).await?;
 
             return Ok(true);
         }
@@ -194,6 +219,50 @@ mod test {
 
             assert!(played);
             assert!(stopped);
+
+            Ok(())
+        })
+    }
+
+    // The Clip overload is the one 배틀몬스터 calls; the BaseClip overload above it is a bare
+    // stub, so asserting only that one would pass with the Clip signature still unregistered.
+    #[test]
+    fn test_clip_resume_delegates_to_backing_player() -> Result<()> {
+        run_jvm_test(Box::new([wie_midp::get_protos().into(), get_protos().into()]), |jvm| async move {
+            let r#type: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, "audio/test").await?.into();
+            let data = jvm.instantiate_array("B", 0).await?;
+            let clip: ClassInstanceRef<Clip> = jvm
+                .new_class("org/kwis/msp/media/Clip", "(Ljava/lang/String;[B)V", (r#type, data))
+                .await?
+                .into();
+
+            let stopped: bool = jvm
+                .invoke_static("org/kwis/msp/media/Player", "stop", "(Lorg/kwis/msp/media/Clip;)Z", (clip.clone(),))
+                .await?;
+            let resumed: bool = jvm
+                .invoke_static("org/kwis/msp/media/Player", "resume", "(Lorg/kwis/msp/media/Clip;)Z", (clip,))
+                .await?;
+
+            assert!(stopped);
+            assert!(resumed);
+
+            Ok(())
+        })
+    }
+
+    // A Clip with no backing player must report failure rather than panic on the null deref --
+    // the same contract play_clip/stop_clip hold, and the branch resume_clip shares with them.
+    #[test]
+    fn test_clip_resume_without_player_reports_failure() -> Result<()> {
+        run_jvm_test(Box::new([wie_midp::get_protos().into(), get_protos().into()]), |jvm| async move {
+            let r#type: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, "audio/test").await?.into();
+            let clip: ClassInstanceRef<Clip> = jvm.new_class("org/kwis/msp/media/Clip", "(Ljava/lang/String;)V", (r#type,)).await?.into();
+
+            let resumed: bool = jvm
+                .invoke_static("org/kwis/msp/media/Player", "resume", "(Lorg/kwis/msp/media/Clip;)Z", (clip,))
+                .await?;
+
+            assert!(!resumed);
 
             Ok(())
         })
