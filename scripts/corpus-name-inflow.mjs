@@ -17,6 +17,10 @@
 // is the 1-syllable stem that sits inside `인스턴스` (20 hits) and `패턴` (~15) — ordinary
 // prose, nothing to do with any game. A round reading "35 files already contain this name"
 // cannot use that number, and the round that hit it had to split the list by hand.
+// ★That "184" is the population as it stood on 2026-09-19 and is NOT what this file measures
+// now — the default widened to the whole corpus on 2026-09-20 (451 stems today). The paragraph
+// is kept at its original numbers because it is the record of the substring problem, not a
+// current reading; the population block below has the live one.
 //
 // ── The three buckets, and why the third one is NOT auto-excluded ────────────
 // ★This is the whole design, and it is asymmetric on purpose.
@@ -56,12 +60,21 @@
 //   node scripts/corpus-name-inflow.mjs --base <ref>     # …vs another ref
 //   node scripts/corpus-name-inflow.mjs <path> [path…]   # exactly these files
 //   node scripts/corpus-name-inflow.mjs --all-tracked    # every tracked text file
-//   [--corpus <dir>]   default game_lab/broken
+//   [--corpus <dir>]   default game_lab  (★the WHOLE corpus, minus `vendor_sdk/` — below)
 // Exit: 0 = measured (whatever the counts) · 2 = could not measure.
+//
+// ── The freshness marker (2026-09-20, docs/report/0196) ─────────────────────
+// In the default mode this also prints ONE line to paste into the round's doc. It carries the
+// three counts and a digest of the content they were measured over, and
+// `scripts/check-inflow-marker.mjs` reddens the PR when that content has moved since — the
+// failure this lineage actually had, 4 times out of 4 ("measured, then wrote more prose, never
+// re-measured"). ★It proves FRESHNESS, not truth: re-deriving the counts needs the corpus,
+// which no runner has (Constraint 9). See scripts/lib/inflow-marker.mjs.
 
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import path from "node:path";
+import { formatMarker, treeDigest } from "./lib/inflow-marker.mjs";
 
 const nfc = (s) => s.normalize("NFC");
 const argv = process.argv.slice(2);
@@ -70,7 +83,7 @@ const flag = (n, d) => {
   return i >= 0 && argv[i + 1] ? argv[i + 1] : d;
 };
 const has = (n) => argv.includes(`--${n}`);
-const corpusDir = flag("corpus", "game_lab/broken");
+const corpusDir = flag("corpus", "game_lab");
 const base = flag("base", "origin/main");
 const paths = argv.filter((a) => !a.startsWith("--") && a !== corpusDir && a !== base);
 
@@ -88,10 +101,48 @@ try {
 if (!existsSync(corpusDir)) die(`${corpusDir} does not exist — this needs the corpus, which is git-ignored and local-only`);
 
 // ── Population: unique NFC stems of the archives under the corpus dir ────────
+// ★The default is the WHOLE corpus, not `broken/`, and that was decided by measurement on
+// 2026-09-20 (`docs/report/0194`). The first version read `game_lab/broken` only — 184 of the
+// 450 game stems — so a round asking "is this name in the corpus" got "no" for the other 266.
+// That is not hypothetical: `docs/report/0187`'s own hand-split of SUFFIX-ATTACHED dismissed
+// 엑스맨3 · 크로이센1.04 · 하이브리드2 · 일지매영웅전기2 · 붕어빵타이쿤3작은화면 as "a longer
+// DIFFERENT title, measured not to be a corpus stem" — and all five are archives in
+// `game_lab/working/`. The narrow population produced a wrong sentence in the very round that
+// built this tool.
+//
+// ★The cost feared when widening was measured and is ZERO where it would be paid. Over the 25
+// most recent landed rounds, in the default (this-round's-diff) mode, the SUFFIX-ATTACHED bucket
+// — the one a human must split by hand — is IDENTICAL under both populations in all 25. BOUNDED
+// grows by a median of 1 pair (mean 1.44), and those are printed lines, not work. The "283 blessed
+// stems in smoke_gate_baseline.tsv would drown it" objection does not materialise either: 235 of
+// the 266 added stems occur nowhere but that file, and 0 of those 25 rounds touched it.
+// ★That 235 is re-measurable only if the ruler comes with it, which is the whole point of this
+// file: the population is the 266 stems `working/` adds that `broken/` did not already have; an
+// "occurrence" is any hit this tool PRINTS (BOUNDED ∪ SUFFIX-ATTACHED — for this population
+// PREFIX-EMBEDDED is 0, verified, so nothing is hidden by not printing it); and the tree is this
+// PR's branch (905 tracked / 852 text). Counting BOUNDED alone gives 238 over the same tree —
+// quote the ruler or the number means nothing.
+//
+// ★`vendor_sdk/` is excluded, and it is the one exclusion because it is not games — it holds
+// emulator/SDK jars (`agent.jar`, `KEmulator-mmpp.jar`, `lwjgl-glfw-natives-linux.jar`). Its stem
+// `agent` is an ordinary English word in a repo whose instructions live in `AGENTS.md`: measured,
+// that one directory adds 21 SUFFIX-ATTACHED pairs across the tracked tree — MORE hand-splitting
+// than the entire `broken/` population produces (26) — and every one of them is false. The
+// exclusion is applied to DESCENDED directories only, so `--corpus game_lab/vendor_sdk` still
+// works if you ever want to look at it on purpose.
+const EXCLUDED_BUCKETS = new Set(["vendor_sdk"]);
+const excludedSeen = [];
 const walk = (d) =>
   readdirSync(d, { withFileTypes: true }).flatMap((e) => {
     const p = path.join(d, e.name);
-    return e.isDirectory() ? walk(p) : [p];
+    if (e.isDirectory()) {
+      if (EXCLUDED_BUCKETS.has(e.name)) {
+        excludedSeen.push(p);
+        return [];
+      }
+      return walk(p);
+    }
+    return [p];
   });
 const stems = [...new Set(walk(corpusDir).filter((p) => /\.(zip|jar|kdp)$/i.test(p)).map((p) => nfc(path.basename(p).replace(/\.[^.]+$/, ""))))].sort();
 if (stems.length === 0) die(`no archives under ${corpusDir} — an empty population would report 0 for everything`);
@@ -179,6 +230,10 @@ console.log("corpus-name-inflow  — 코퍼스 게임명이 이 변경으로 rep
 console.log(`  술어: 코퍼스 고유 stem(NFC) × 대상 파일 본문(NFC) 부분문자열 일치 후, ★«단어 경계»로 세 갈래로 가른다.`);
 console.log(`        단어문자 = 한글 음절 ∪ [0-9A-Za-z] · 경계 판정은 stem 의 «그 쪽 끝»이 단어문자일 때만 적용한다.`);
 console.log(`  모집단: ${corpusDir} 의 고유 stem ${stems.length}개 · 대상: ${subjectLabel} (텍스트 ${texts.size} · 건너뜀 ${skipped.length})`);
+console.log(
+  `  ★모집단에서 «뺀» 하위 버킷: ${excludedSeen.length ? excludedSeen.join(" · ") : "없음"}` +
+    ` (제외 대상 = ${[...EXCLUDED_BUCKETS].join(" · ")} — 게임이 아니라 에뮬·SDK 아카이브라서다. 조용히 빼지 않는다)`,
+);
 for (const [f, why] of skipped) console.log(`    · 건너뜀 ${f} (${why})`);
 
 console.log(`\n  ★BOUNDED          ${String(B.BOUNDED.length).padStart(4)}회 / ${uniq(B.BOUNDED)}쌍 — 양쪽 경계 성립 ⇒ ★**이것이 «유입» 수다**`);
@@ -197,3 +252,32 @@ if (B["SUFFIX-ATTACHED"].length) {
 
 console.log(`\n  ⇒ 보고할 때: 「유입 ${uniq(B.BOUNDED)}건(BOUNDED)」 + 「판단 필요 ${uniq(B["SUFFIX-ATTACHED"])}건(SUFFIX-ATTACHED)」 을 ★함께 적어라.`);
 console.log(`     ★«0건» 이라고 쓰려면 SUFFIX-ATTACHED 도 0 이어야 한다 — 그 바구니를 비우지 않은 0 은 이 리니지가 반려됐던 그 0 이다.`);
+
+// ── The freshness marker ────────────────────────────────────────────────────
+// ★Only in the default (this-round's-diff) mode, because only there does "the number" mean
+// "this round's number" — which is the claim a round writes down. `--all-tracked` measures the
+// whole repo and explicit paths measure whatever you typed; a marker over either would assert
+// something no checker can re-derive from the PR. Not emitting it is SAID, never silent.
+const isDefaultMode = !paths.length && !has("all-tracked");
+if (!isDefaultMode) {
+  console.log(`\n  (표식 없음 — 기본 모드가 아니다. 표식은 «이 회차의 diff»를 잰 수에만 붙는다)`);
+} else if (subjects.length === 0) {
+  // ★This is 0189's failure verbatim: it measured before committing, got 0 subjects, and read
+  // the resulting 0 as "no inflow". The counter's own design rule is that a 0 nobody could
+  // have earned must not be printed quietly, so it is shouted here instead of marked.
+  console.log(`\n  ★★대상이 «0파일»이다 — 이 수는 「유입이 없다」가 아니라 「아직 커밋하지 않았다」는 뜻이다.`);
+  console.log(`     커밋한 «뒤» 다시 재라. 표식은 붙이지 않았다(0 을 굳히지 않는다).`);
+} else {
+  const digest = treeDigest(texts);
+  console.log(`\n  ★아래 한 줄을 회차 문서(docs/report/… 또는 docs/worklog/…)에 ★«문장을 다 쓴 뒤 마지막에» 붙여라.`);
+  console.log(`     그 뒤 본문을 한 글자라도 고치면 check-inflow-marker 가 red 로 말한다 — 그것이 이 표식의 전부다.`);
+  console.log(
+    `\n${formatMarker({
+      subjects: texts.size,
+      digest,
+      b: `${B.BOUNDED.length}/${uniq(B.BOUNDED)}`,
+      p: `${B["PREFIX-EMBEDDED"].length}/${uniq(B["PREFIX-EMBEDDED"])}`,
+      s: `${B["SUFFIX-ATTACHED"].length}/${uniq(B["SUFFIX-ATTACHED"])}`,
+    })}\n`,
+  );
+}

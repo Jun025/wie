@@ -310,12 +310,28 @@ still weekly-only.
 
 | how | what it costs |
 |---|---|
-| runner block in `rust.yml`'s legs | the block is **168 s** warm (measured, loadavg 180) × **6 legs** ≈ 17 min of runner time *per PR*, on a self-hosted runner siblings queue behind |
+| runner block in `rust.yml`'s legs | the block is **168 s** warm (measured, loadavg 180) × **6 legs** ≈ 17 min of runner time *per PR* |
 | runner block in `contract` | that job's toolchain is `if: engine == 'true'` and targets **wasm32** with a wasm-keyed cache, so this needs a *native* build. Inside the filter it misses docs-only PRs (the diffs that break wiring); outside it, every PR pays a native cargo build in a job that currently finishes in 12 s on a doc-only diff |
 
 versus the test above: **~10 ms** in an already-compiled target, no new dependency, no new workflow.
 **Reopen if** a regression lands in the text path *outside* `font()` and the weekly job is the thing
 that catches it — that is the evidence this trade is wrong, and nothing short of it is.
+
+> **★This repo's CI runs on GitHub-hosted runners — all of it, and it always has.** Measured
+> 2026-09-20 over every workflow: **18 `runs-on:` values**, all `ubuntu-latest` / `macos-latest` /
+> `windows-latest` (`rust.yml`'s `${{ matrix.os }}` is those three), **`self-hosted` 0**, and
+> `git log -S'self-hosted' -- .github/` is **empty across the entire history** — it was never true
+> here, not once. The row above used to end "on a self-hosted runner siblings queue behind"; ★**the
+> decision it supports is unchanged and so is its number (168 s × 6 legs ≈ 17 min) — only the
+> resource clause was wrong.** It came from the sibling repo, which genuinely does run self-hosted
+> (measured the same day: otterpebble has `self-hosted` in 6 workflow files and 37 jobs behind a
+> `vars.CI_RUNS_ON` switch), and a sentence true there was copied into a repo where it is not.
+> ★**Two different things are called "the runner" around here — keep them apart.** ⑴ **CI runners**:
+> GitHub's, one fresh VM per job, so a long job here does *not* make a sibling PR wait. ⑵ **This
+> Mac**: where §The four gates and every `local only` script above are run *by hand*, and which
+> *is* a self-hosted runner — for the sibling repos. Saturating it costs you and them; it does not
+> queue this repo's PRs. Cost arguments that say "siblings queue behind us" are about ⑵ and must
+> not be written as if they were about ⑴.
 
 **And it stays that way: promoting `--expect-last-frame` into CI was decided against on 2026-09-07,
 measured rather than assumed.** The question is not "is it in CI" but "is the class caught", and it
@@ -634,7 +650,9 @@ design** — do not "fix" that by wiring it:
   predicate in the same PR.* They exist because the 2026-09-18 census wrote its per-game rows to
   a `mktemp -d` it then deleted, which cost the next round an hour and made a low-load re-measure
   impossible; `docs/report/0173` has the numbers. Start it as `bash scripts/game-lab-recensus.sh
-  --dry-run` to see what a full run would cost before spending 45 minutes of the self-hosted runner.
+  --dry-run` to see what a full run would cost before spending 45 minutes **of this Mac** — which is
+  where it runs, not a CI runner (this repo's CI is entirely GitHub-hosted; see the note under
+  §Definition of Done's cost table).
 
 - **`scripts/corpus-name-inflow.mjs` — local only (same reason), and ★every round in this lineage
   that reports a "게임 파일명 유입" number RUNS IT rather than re-deriving the predicate.** Call it
@@ -643,12 +661,45 @@ design** — do not "fix" that by wiring it:
   to report is `BOUNDED`, and it is not reportable alone** — `SUFFIX-ATTACHED` must be quoted beside
   it, because that bucket provably mixes a longer *different* title (`<stem>2`, `<stem>1.04`) with a
   real mention carrying a Korean particle (`<stem>의 …`), and nothing in the shape separates them.
+
+  **Nothing checks that you ran it, and building that checker was priced and declined on 2026-09-20**
+  (`wie-corpus-name-inflow-token-boundary-p1`, `docs/report/0195`). Two measurements decided it.
+  First, **running a script leaves no trace** — this tool writes **0 files** — so "did this round call
+  it" is not observable after the fact; any check must proxy through wording or invent a new artifact.
+  Second, the obvious proxy is **wrong where it was tested**: requiring the literal string
+  `corpus-name-inflow` flags **3 of the 12** round-doc files that report a number since the tool
+  landed, and **all 3 ran it** and said so in their own words ("도구를 실행해서 적었다"). Zero true
+  positives. The disease it targets has **never been observed**: 3 of 3 rounds that reported a number
+  ran the tool. What *has* been observed, 4 times out of 4, is the **other** failure — the number was
+  measured and then invalidated by later edits — and every one was caught before landing (3 by a
+  gate② `-fix`, 1 by a self re-measure). That is a different proposal with its own ticket; do not
+  solve it here. **Reopen when a round that is NOT in this lineage reports an inflow number** — the
+  compliance above is all from the rounds that built the tool, which is the weakest possible sample —
+  **or when any round is found to have hand-derived one.** ★This trigger is prose and nothing
+  enforces it, the same unchecked-obligation shape the `WIE_BASE` rows above carry; that is the cost
+  of not building the checker, and mechanizing the trigger would rebuild the same wording proxy one
+  level up.
+
   ★**Writing "유입 0" while that bucket is non-empty is the exact claim this lineage was rejected
   for.** It exists because the predicate lived only in prose — `docs/report/0173` says "코퍼스 고유
   stem 184개와 NFC 완전일치로 전수 대조", `0170` and `0174` say it in their own words, and nothing
   executed any of them; a plain substring test is what produced 35 hits for a one-syllable stem that
   merely sits inside `인스턴스` and `패턴`. Measured 2026-09-19 over 838 tracked text files: 392
   occurrences split **328 / 48 / 16**. `docs/report/0187` has the split and the false-negative audit.
+
+  **The population is the WHOLE corpus, not `game_lab/broken` — widened 2026-09-20, and that number
+  above is from before the widening.** It read `broken/` only, so 266 of the 451 game stems were
+  invisible and the honest answer to "is this name in the corpus" was wrong for 59% of it. Not
+  hypothetical: `0187`'s own hand-split dismissed 엑스맨3 · 크로이센1.04 · 하이브리드2 ·
+  일지매영웅전기2 · 붕어빵타이쿤3작은화면 as "a longer *different* title, measured not to be a corpus
+  stem", and **all five are archives in `game_lab/working/`**. **The cost that argued against
+  widening was measured at zero where it would be paid**: over the 25 most recent landed rounds, in
+  the default mode, `SUFFIX-ATTACHED` — the bucket a human splits by hand — is **identical under
+  both populations in all 25**; `BOUNDED` grows by a median of 1 pair (mean 1.44), which is printed
+  lines, not work. `vendor_sdk/` is the one excluded bucket, because it is emulator/SDK jars rather
+  than games and its stem `agent` is an ordinary word here — it alone adds 21 false
+  `SUFFIX-ATTACHED` pairs, more than all of `broken/` produces. The tool prints what it excluded.
+  `docs/report/0194` has the per-round table.
 
 - **`scripts/ktf-image-sweep.py` — local only (it needs a KTF client image, which comes out of the
   git-ignored corpus), and it is the only Python in `scripts/`.** Three sweeps behind one entry
@@ -905,6 +956,25 @@ than let it be ignored — a periodically-red check that people scroll past is w
   entry it meant lives only in `docs/report/0047--…`, which the same comment already cited, so the
   round that migrated §완료 repointed it there. The rule is unchanged and now unavoidable: **cite the
   per-round file, not `STATE.md:<line>`.**
+- **If you write a 유입 number into a round doc, paste the tool's marker line LAST — and if you
+  edit afterwards, re-run and repaste.** `scripts/corpus-name-inflow.mjs` ends its default-mode
+  output with one HTML comment carrying the three counts and a digest of the content they were
+  measured over; `scripts/check-inflow-marker.mjs` re-computes that digest in the always-run
+  `contract` job and **reddens the PR when the content has moved since**. It needs no corpus, so
+  it is a real gate rather than a "could not measure" one.
+
+  **The marker is optional and a round without one passes** — that is deliberate, not a hole.
+  Requiring it would re-open "did this round run the tool at all", which was measured and declined
+  on 2026-09-20 (`docs/report/0195`: the only available predicate was a wording proxy, and it
+  flagged 3 compliant rounds and 0 offenders). **What it does buy is measured too**: the failure
+  this lineage actually had is staleness — *measured, then wrote more prose, never re-measured* —
+  **4 times out of 4, and 3 of those cost a gate② reject and a `-fix` round**
+  (`docs/report/0196` has the per-incident table, including the one it would **not** have caught).
+  ★It proves **freshness, not truth**: a number hand-typed into a marker over unchanged content
+  passes, because re-deriving the counts needs the git-ignored corpus. And **measuring before you
+  commit is not measuring** — the subject set is `origin/main...HEAD`, so an uncommitted round has
+  0 subjects; the tool now shouts that and refuses to emit a marker rather than minting a 0.
+
 - **The ledger files of this repo are `STATE.md`, `REPORT.md`, `docs/report/**`, `docs/worklog/**`,
   and `docs/worklog-coverage-remeasures.json`.**
   Resolve a merge conflict in any of them by **union** — keep both sides' entries, ordered by the
@@ -1136,6 +1206,19 @@ every PR that misses the filter — no longer a hypothetical cost on a future sw
 four required contexts are safe for the same reason: `rust.yml` and `web.yml` carry **no `paths:`
 filter** on their `pull_request` triggers (measured), so all five always report. **Never make
 `doc-liveness` required** — it is paths-scoped by design.
+
+**★Never make `pr-audit` required either, and it carries a second reason `doc-liveness` does not.**
+`.github/workflows/pr-audit.yml` runs `cargo audit` on PRs that move `Cargo.toml`/`Cargo.lock`
+(wired 2026-09-20, `docs/report/0198`; priced in `0185`: p50 17s, and only 2 of the last 60 PRs
+would have fired it). It is paths-filtered, so promoting it deadlocks every PR that misses the
+filter — that is reason one, the same as above. **Reason two is specific to this check: `cargo
+audit` goes red when a NEW ADVISORY IS PUBLISHED, with no change to this repo at all.** A gating
+check a stranger can trip overnight is one people route around, and Constraint 5 has already
+closed the usual exits (`--ignore`, `continue-on-error`). ★Non-gating here means **"not in the
+required list above"**, not `continue-on-error`: the job's exit code stays honest, it simply does
+not hold the merge button. The daily `rust-audit.yaml` remains the alarm channel; the PR job only
+buys **attribution** — and it cannot see a dependency that turns vulnerable without `Cargo.lock`
+moving (a `[patch]` entry or a git `rev` whose content shifts under the same ref).
 
 **The rollout that got applied.** The 2026-07-22 round did the code half and left the settings half
 as an explicit human-step — *"★human-step (워커 적용 금지 · repo 설정 변경)"*, ruleset JSON included,
