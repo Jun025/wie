@@ -132,3 +132,13 @@ node 검사기: `check-worklog-json` **rc=0**(174) · `check-docs-report-serial`
 
 ★**한 곳에서 어긋나고, `AGENTS.md` 가 이긴다.** 브리프는 판별축을 「오류 동일성·트랩 사이트」로 정하며 `AGENTS.md` §Definition of Done 의 **FAIL 4단계(`paints` 를 idle 범위와 대조)** 를 «적용 대상 아님»으로 뒀다. ★**그 4단계는 «부하로 굶은 `keydraw` 픽스처»를 위한 절차**라 `ticks 0·paints 0` 으로 즉사하는 `game_lab` 타이틀에는 비교할 범위가 없다 — ⇒ ★**충돌이 아니라 «적용 범위 밖»이다**(그 절 문안은 **고치지 않았다** — 계약 5 가 금한다).
 그 밖에 「네 게이트는 무엇을 고쳤든 커밋 전에 전부 돈다」·「upstream 동기 repo 라 squash 금지」·「Constraint 9」는 전부 그대로 지켰다.
+
+### 게임 파일명 유입 — ★**도구를 «실행해서» 적는다**
+
+`node scripts/corpus-name-inflow.mjs`(기본 모드 · 모집단 = 코퍼스 고유 stem **451** · 대상 = `origin/main...HEAD` 추가·수정 **2파일**):
+★**BOUNDED 0회/0쌍** · PREFIX-EMBEDDED 0회/0쌍 · ★**SUFFIX-ATTACHED 0회/0쌍**.
+⇒ ★**유입 0건 · 판단 필요 0건** — 두 수를 함께 적는다(SUFFIX 바구니를 비우지 않은 0 은 이 리니지가 반려됐던 그 0 이다).
+★**0 이 된 것은 우연이 아니라 서술 선택이다** — 이 회차도 `0188` 의 관용대로 타이틀을 **이미지 id(`01031C0A`)로만** 불렀고, 부팅에 쓴 사본도 그 중립 이름으로 스크래치에 뒀다.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=2b9c9132260288e6 B=0/0 P=0/0 S=0/0 -->
+
