@@ -183,14 +183,22 @@ access` 이지 `AbstractMethodError paint`·`NoSuchMethodError` 가 아니다)�
 저장소 검사기: `check-worklog-json` OK(182개) · `check-docs-report-serial` OK(중복 0 · 열린 PR 충돌 0) ·
 `check-doc-liveness-parity` OK(26줄).
 
-★★**`check-worklog-coverage` 는 «OVERDUE» 로 rc=1 이다 — 내 변경 때문이 아니다.**
-비율 자체는 **10/10 = 100%** 이고, 밀린 것은 «기록»이다(`landedRounds 175` ↔ `last recorded 165`).
-★**내 수정분을 stash 하고 깨끗한 base 에서 돌려도 같은 OVERDUE** 가 난다 ⇒ **선재 상태**다.
-AGENTS.md §Landing paperwork 가 그 소유자를 **gate③ 회차**로 못박았으므로(「A gate③ round that sees
-`check-worklog-coverage` overdue runs `--record` and bundles that one file into the PR before
-merging」) ★**이 회차는 기록하지 않았다.** ⇒ **이 PR 의 CI 는 그 이유로 red 로 뜬다**(overdue 동안
-열린 PR 전건이 그렇다). 머지 회차가 `node scripts/check-worklog-coverage.mjs --record` 를 이 PR 에
-번들해야 한다. 그 도구는 멱등이다.
+### ★PR CI — 전건 green (10/10 · `contract`·`coverage`·`build-web`·`rust_ci` 6레그 전부)
+
+★★**그리고 여기서 내가 한 예측이 «틀렸다» — 적어 둔다.**
+작업 중 `check-worklog-coverage` 가 로컬에서 **OVERDUE(rc=1)** 였다(`landedRounds 175` ↔
+`last recorded 165`). 비율 자체는 **10/10 = 100%** 였고 밀린 것은 «기록»뿐이며, 내 수정분을 stash 한
+깨끗한 base 에서도 같은 OVERDUE 가 나 **선재 상태**임을 확인했다. AGENTS.md §Landing paperwork 가
+소유자를 **gate③ 회차**로 못박았으므로 이 회차는 기록하지 않았고 — ★**그러면서 「이 PR 의 CI 는 그
+이유로 red 로 뜬다」고 적었다. 실제로는 green 이다.**
+
+★**왜 틀렸나(이게 쓸모 있는 부분이다)**: 그 검사기는 **`origin/main` 을 기준으로** 기한을 잰다
+(「The obligation is keyed to `origin/main`」). CI 는 매 실행마다 `git fetch --no-tags origin main` 을
+먼저 돌리므로 **그때의** origin/main 을 본다. 내가 로컬에서 잰 뒤 **다른 회차가 `--record` 를 착지**시켰고
+(`last recorded` 165 → **175**), CI 는 이미 해소된 상태를 봤다. ⇒ ★**내 워킹트리의 기준선이 낡았던 것**이고,
+그것은 report 0208 이 연번에서 밟은 것과 **같은 형태**다(「도구는 내 트리가 낡은 것을 모른다」).
+⇒ ★**교훈: 이 검사기의 OVERDUE 를 보면 «fetch 후 다시 재라». 그 rc 는 내 트리가 아니라 origin 의 상태다.**
+⇒ 결과적으로 **머지 회차가 `--record` 를 번들할 필요는 없다**(그 시점에 다시 재는 것은 여전히 옳다).
 
 ### 한계 — 숨기지 않는다
 
