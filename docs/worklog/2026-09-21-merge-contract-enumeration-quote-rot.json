@@ -1,0 +1,26 @@
+{
+  "date": "2026-09-21",
+  "task": "wie-agents-md-quotes-a-merge-contract-enumeration-that-has-since-gained-two-entries",
+  "title": "머지계약 열거 인용이 2주간 거짓인 채 초록이었다 — 탐지 축은 정본 쪽에 있다",
+  "summary": "AGENTS.md 가 ~/orchestrator/templates/merge-ticket.tpl §2-c⒜ 의 원장 파일 열거를 인용하는데, 정본이 2026-09-07 과 2026-09-21 에 각각 한 항목씩 늘어 인용의 결론('does not name docs/report/**', 'cannot find it there')이 거짓이 돼 있었다. 이 회차가 문면을 맞췄다.",
+  "verification": [
+    "git show origin/main:AGENTS.md | /usr/bin/grep -c 'does not name' → 1 (before) / 0 (after)",
+    "git show origin/main:templates/merge-ticket.tpl (orchestrator-ops) :204 = 7항목 열거 실측",
+    "scripts/ 실행 산출물 중 orchestrator·merge-ticket 참조 0건 — 기존 탐지 축 부재"
+  ],
+  "limits": [
+    "이 repo 에서 검사기를 만들 수 없다 — 인용 대상이 다른 repo 의 파일이고 CI 는 ~/orchestrator 를 보지 못한다(§Constraints).",
+    "고친 것은 문면이고 재발 방지는 아니다. 다음에 정본이 또 움직이면 같은 방식으로 조용히 낡는다."
+  ],
+  "proposals": [
+    {
+      "title": "머지계약의 원장 파일 열거가 바뀌면 그것을 인용하는 제품 repo 에 통지한다",
+      "plainSummary": "머지 티켓 템플릿의 '원장 파일' 목록을 고치는 회차가, 그 목록을 문서에 베껴 둔 저장소들에 한 줄 통지를 남기게 한다.",
+      "userBenefit": "각 저장소의 문서가 '계약이 허락하지 않는다'고 잘못 가르치는 기간이 사라진다. 이번 건은 그 상태로 2주(docs/report/**는 두 번 더 길게) 있었고 아무 검사도 울지 않았다.",
+      "why": "wie 의 AGENTS.md 는 그 열거를 인용하고 결론까지 얹는다. 정본이 늘었을 때 그 결론이 거짓이 되는데, 인용 쪽 CI 는 ~/orchestrator 를 볼 수 없어 구조적으로 탐지할 수 없다(§Constraints 'An external contract is referenced, never copied'). 즉 탐지 가능한 유일한 쪽은 '바꾸는 쪽'이다. 이번 회차의 발견 경로 자체가 그 증거다 — 기계가 아니라 orchestrator-ops 게이트② 검수 소견(F7)이 눈으로 잡았다.",
+      "tradeoff": "통지 대상 목록을 어딘가에 유지해야 하고, 그 목록이 낡으면 같은 병이 한 단계 위로 옮겨간다. 대안(제품 repo 에 검사기)은 외부 트리 의존을 만들어 더 나쁘다 — 그래서 이 회차가 거부했다.",
+      "effort": "S",
+      "target": "orchestrator"
+    }
+  ]
+}
