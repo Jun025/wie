@@ -984,21 +984,32 @@ than let it be ignored — a periodically-red check that people scroll past is w
   **`docs/report/**` is on that list because the round entries moved there** on 2026-09-07 (merge
   `a5091df6`, ticket `wie-report-md-per-round-files-port-from-otterpebble`). `REPORT.md` stays on it
   too — the file still exists as the fixed pointer, and a round that edits the pointer is editing a
-  ledger file. **The merge contract's own enumeration (`STATE`·`REPORT`·`docs/worklog/**`·`reports/`·
-  `tasks/`) predates that move and does not name `docs/report/**`** — it is rendered from
-  `~/orchestrator/templates/merge-ticket.tpl`, outside this repo, so a round that needs the authority
-  cannot find it there. This line records the judgement already made rather than making each round
-  re-derive it: 2026-09-07 a merge round reasoned it out and chose to *move* the entry (appending to
-  `REPORT.md` knowingly breaks a convention that landed 20 minutes earlier; dropping the entry loses
-  it), which is the answer — but nothing guaranteed the next round would reach it.
+  ledger file. **The merge contract's own enumeration has since caught up and now names both, so a
+  round that needs the authority *can* find it there.** Measured 2026-09-21 at
+  `~/orchestrator/templates/merge-ticket.tpl` §2-c⒜ — outside this repo, which is why this is a
+  quote with a date on it and not a check — it reads `STATE`·`REPORT`·`docs/report/**`·
+  `docs/worklog/**`·`docs/worklog-coverage-remeasures.json`·`reports/`·`tasks/`.
+
+  **It did not when this paragraph was written, and the dates are the point.** `docs/report/**`
+  arrived 2026-09-07 (`orch-merge-template-ledger-path-list-lacks-docs-report`, adopting a proposal
+  this repo raised) and `docs/worklog-coverage-remeasures.json` only on 2026-09-21
+  (orchestrator-ops PR #1087, merge `74fac0820`). Through that gap this line was the only written
+  authority, and it records a judgement already made rather than making each round re-derive it:
+  2026-09-07 a merge round reasoned it out and chose to *move* the entry (appending to `REPORT.md`
+  knowingly breaks a convention that landed 20 minutes earlier; dropping the entry loses it), which
+  is the answer — but nothing guaranteed the next round would reach it. **Keep the date when you
+  re-read the canon**: nothing here can detect that it moved (§Constraints — CI never sees
+  `~/orchestrator`), so this quote was false for two weeks and stayed green the whole time.
 
   **`docs/worklog-coverage-remeasures.json` is on that list for the same reason, plus one of its
   own.** It is append-only evidence, so union is the only correct resolution — taking one side drops
   a recorded measurement, and the checker reads `measurements.at(-1)`, so order is load-bearing too.
-  The other reason is authority: the merge contract's enumeration names `docs/worklog/**`, and this
-  file is a *sibling* of that directory, not inside it. Without this line a gate③ round that must
-  discharge an overdue re-measure (see below) has no rule saying it may touch the file, which is
-  exactly the gap that left `main` red on 2026-09-07.
+  The other reason *was* authority: until 2026-09-21 the merge contract's enumeration named
+  `docs/worklog/**`, and this file is a *sibling* of that directory, not inside it — so a gate③
+  round that had to discharge an overdue re-measure (see below) had no rule there saying it may
+  touch the file, which is exactly the gap that left `main` red on 2026-09-07. **That half is
+  closed**: the enumeration quoted above now names this file itself. The union reason is not, and
+  it is why the line stays.
 - **Follow-up proposals go in a `docs/worklog/*.json`, or they do not exist.** When a task leaves
   follow-up recommendations (or adopts/declines earlier ones), write
   `docs/worklog/YYYY-MM-DD-<slug>.json` in the same PR. The cockpit 「후속 작업 추천」 panel reads
