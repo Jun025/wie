@@ -1,0 +1,59 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-21",
+  "task": "wie-ktf-slot8-h2-noop-arm-first-then-three",
+  "title": "H2 런타임(O4) — no-op 팔 1회 + 절단 배제 1회로 «중단 관문»이 걸렸다. 검정 구간에 도달하지 못한다",
+  "summary": "slot 8 을 비-치명 no-op 으로 둔 판본으로 01031C0A 를 2회 부팅했다. 슬롯8 호출은 1회뿐이고 그것은 첫째 자리(0x1243c8)이며, 둘째 자리(0x128f3a)와 그 앞의 0x128f2c 창에는 도달하지 못한다 — 그 창이 무는 이름 \"/ga/aysis.dat\" 가 런타임에 한 번도 나타나지 않는다(관측된 Exists 는 /ga/cf.ga · /ga/ga.ga · /ga/sch.ga 셋). 티켓 계약 ⒝ 대로 delete 팔과 나머지 반복을 쓰지 않고 닫았다 — 설계상 4회 중 2회만 썼다. H2 는 미결이고 0188 의 «셋 반» 판정표는 한 칸도 움직이지 않았다.",
+  "changes": [
+    "docs/report/0206--2026-09-21--wie-ktf-slot8-h2-noop-arm-first-then-three.md 신설",
+    "docs/worklog/2026-09-21-ktf-slot8-h2-noop-arm-reach-gate.json 신설",
+    "제품 코드 변경 0줄 — 두 팔의 스텁은 작업트리에만 두고 회차 종료 전 git checkout -- 으로 되돌렸다"
+  ],
+  "verification": [
+    "A1 한산 선행: idle 55.50% (문턱 40% 충족) · load 44.40/35.10/44.57 · pressure level 1(normal) · swap 0.00M · cc-* 레인 39 · 프로세스 1027",
+    "판별축 정적 확정: ktf-image-sweep.py window 로 0x128f28=slot16(Exists)·0x128f2c=cmp·0x128f2e=beq·0x128f3a=slot8 을 읽고, *(sl+0x6d8)=0x365f8+0x101330=0x137928 -> \"/ga/aysis.dat\" · *(sl+0x6dc)=0x347b4+0x101330=0x135ae4 -> \"ga\" 로 두 전역을 풀었다",
+    "델타 검산: 0x135ae4 가 런타임 로그의 슬롯8 r0 와 정확히 일치 ⇒ 같은 자로 읽은 0x137928 도 신뢰된다",
+    "no-op 팔 run1 (--timeout 20): FAIL · ticks 10 · paints 0 · ms 18424 · 트랩 사이트 '5: unidentified WIPI-C table — SVC selector 5 (struct slot Interface4), function 0' · SLOT8ARM 1회 · Exists 3회(aysis 0건)",
+    "no-op 팔 run2 (--timeout 60 · 절단 배제): FAIL · ticks 8 · paints 0 · ms 4701(예산의 8%) · 트랩 사이트·슬롯8 계수·Exists 이름 셋 전부 run1 과 동일 ⇒ 시계가 아니라 오류가 끝냈다",
+    "패키지 리소스 갈래 기각: jar 279 엔트리에 aysis 0건 · cf.ga/ga.ga/sch.ga 각 0건 ⇒ Exists 0 은 정당하다",
+    "A5 경계: find game_lab -newermt <착수시각> 0건 · 부팅한 타이틀은 01031C0A 하나(2회) · 스텁 되돌린 뒤 git status --porcelain 0행"
+  ],
+  "limits": [
+    "«도달 못 했다»는 이 엔진·이 harness·차가운 DB 조건부다 — 조건이 바뀌면 답이 달라질 수 있다",
+    "n=2 이고 둘 다 같은 판본·같은 호스트다. 3축(트랩 사이트·슬롯8 계수·Exists 이름)이 2/2 동일하나 통제된 반복으로는 얕다",
+    "새 벽(selector 5 / Interface4 / function 0)을 해석하지 않았다 — 계약 5 범위 밖이고, 적은 것은 «거기서 죽는다» 하나다",
+    "0x1243c8 의 인자 전역은 정적으로 풀지 못했다(지역 sl 이 add sl,pc 로 만들어져 스윕 도구의 단일 SL 과 안 맞는다) — 그 자리 식별은 전역이 아니라 «호출 순서»로 했다",
+    "delete 팔은 한 번도 관측되지 않았다 — 관문이 절약한 것은 비용이지 지식이 아니다"
+  ],
+  "proposals": [
+    {
+      "title": "slot 8 뒤에 드러난 «새 벽»(SVC selector 5 / Interface4 / function 0)을 식별할지 정하라 — 이 타이틀의 O4 는 그 뒤에 있다",
+      "plainSummary": "문제의 함수를 무해하게 바꿔 놓고 게임을 켜 보니, 이제는 그 함수가 아니라 «다른 미구현 기능»에서 멈춥니다. 그 새 지점이 무엇인지 아직 아무도 모릅니다.",
+      "userBenefit": "이 타이틀이 실행되지 않는 진짜 이유가 한 칸 더 앞으로 옮겨진 상태다. 그것을 알아야 이 게임이 실제로 동작하는 데까지 몇 걸음이 남았는지 말할 수 있다.",
+      "why": "이번 회차가 slot 8 을 비-치명으로 두자 부팅이 ticks 0 → 8~10 으로 전진하고 죽는 자리가 'Unimplemented: 5: unidentified WIPI-C table — SVC selector 5 (struct slot Interface4), function 0' 으로 옮겨갔다(n=2 동일). 그 벽이 0x128f2c 창보다 앞에 있어 H2 검정 구간을 가린다 ⇒ 이 타이틀로 O4 를 다시 시도하려면 먼저 이 벽을 넘어야 한다.",
+      "tradeoff": "새 인터페이스 테이블을 식별하는 일은 디스어셈블 + 호출 형상 관측이 필요해 O4 자체보다 크다. 그리고 넘어도 아래 #p1 이 안 풀리면 0x128f3a 는 여전히 안 열린다 — 두 개를 다 사야 H2 가 검정 가능해진다. 값이 안 나오면 이 타이틀을 H2 검정에서 빼는 것이 정직한 선택일 수 있다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "wie_validate 에 «따뜻한 DB» 옵션을 줄지 정하라 — 0x128f3a 는 Exists==true 분기에 있어 차가운 부팅으로는 구조적으로 안 열린다",
+      "plainSummary": "검증 도구는 매번 저장 데이터를 빈 상태로 시작합니다. 그런데 우리가 보려는 코드는 «저장 데이터가 이미 있을 때만» 실행되는 쪽에 있어서, 지금 방식으로는 영원히 그 길로 가지 않습니다.",
+      "userBenefit": "«저장 데이터가 있는 두 번째 실행»에서만 나타나는 버그를 이 도구로 볼 수 있게 된다. 지금은 그 계급의 동작이 전부 사각이다.",
+      "why": "0188 의 O3 가 0x128f3a 를 «파일이 이미 있는» 분기로 못박았고, 이번 회차가 그 분기 조건이 Exists(\"/ga/aysis.dat\") 임을 전역 해석으로 확정했다. 그런데 그 이름은 jar 의 패키지 리소스가 아니고(실측 279 엔트리 중 0건), wie_validate 의 DB 저장소는 MemDbRepository 로 프로세스마다 새것이라 회차 간에 상태가 넘어가지 않는다 ⇒ 차가운 부팅에서는 Exists 가 언제나 0 이다.",
+      "tradeoff": "상태를 디스크에 남기면 Constraint 9 의 경계가 바로 옆이다 — 게임이 쓴 바이트가 호스트에 남고, 그것을 어디에 두며 언제 지우는지가 새 규율이 된다. 그리고 «따뜻한» 실행은 재현성을 떨어뜨린다(회차마다 다른 상태). 옵트인 플래그 + 스크래치 경로가 최소 형태일 것이나, 그 결정 자체가 이 제안의 내용이다.",
+      "effort": "M",
+      "target": "wie_cli/src/bin/wie_validate.rs"
+    },
+    {
+      "title": "slot 16(exists_database_ktf)이 패키지 리소스를 «안 보는» 비대칭을 고칠지 정하라 — 이번 타이틀에서는 안 물렸지만 실재한다",
+      "plainSummary": "«이 저장 파일이 있나요?»를 묻는 두 창구가 서로 다른 답을 합니다. 한쪽은 게임 안에 들어 있는 파일도 «있다»고 세는데, 다른 쪽은 세지 않습니다.",
+      "userBenefit": "게임이 «있는데 없다고 들어서» 엉뚱한 초기화 경로로 가는 계급의 오동작을 막는다. 이 코드를 읽는 다음 사람이 두 창구의 답이 왜 다른지 다시 조사하지 않아도 된다.",
+      "why": "exists_database 는 read_packaged_database(...).is_some() 을 먼저 보고 0(있음)을 돌려주는데, exists_database_ktf 는 database_repository().exists() 만 본다. 두 함수의 반환 극성도 반대다(전자 0=있음/-12=없음 · 후자 1=있음/0=없음). 이번 회차가 이 비대칭을 «0x128f3a 가 안 열리는 이유»로 의심했다가 실측으로 기각했다 — 이 타이틀에는 해당 파일이 없었다. 즉 비대칭은 남아 있고 다른 타이틀에서 물릴 수 있다.",
+      "tradeoff": "고치면 지금 0 을 받고 «새로 시작» 경로로 가던 타이틀이 1 을 받아 «불러오기» 경로로 간다 ⇒ 기존에 통과하던 게임의 거동이 바뀔 수 있고, 회귀를 볼 코퍼스 실행은 game_lab 전수라 비싸다. 그리고 exists_database_ktf 의 주석은 «무조건 1 을 돌려주면 없는 상태를 불러오려다 넘어진다»는 실측 위에 서 있어, 반대 방향의 과교정 위험도 이미 기록돼 있다.",
+      "effort": "S",
+      "target": "wie-wipi-c/src/api/database.rs"
+    }
+  ],
+  "adoptedProposals": ["2026-09-21-ktf-slot8-h2-baseline-degenerate#p0"],
+  "declinedProposals": []
+}
