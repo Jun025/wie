@@ -760,6 +760,25 @@ the other AOT-Java titles that reach this same gate) stay at **0 draw calls**.
 
 ## 7b. AOT-Java title sweep (cp43)
 
+> **★SUPERSEDED 2026-09-21 — the "0 render" verdict of this section no longer holds.** It was taken
+> in 2026-07 against the fork engine; upstream `cc652b1d` (2026-08-04, "Implement LGT Java AOT
+> runtime") replaced the AOT execution model afterwards, and nobody re-ran the sweep until now.
+> Re-baselined with `--inject` against `394fde8b` (full table: `docs/report/0210`):
+> **3 of 18 unique AOT-Java titles render** — `메이플스토리2007`, `현영맞고2006`, `놈3`.
+>
+> Two of them are named in this section's own buckets, and both bucket *labels* are now wrong:
+> `현영맞고2006` is listed under **[X-paint]** and `메이플스토리2007`/`놈3` under **[X-vtable]**, yet
+> all three now boot past those errors and paint (메이플스토리2007 reaches an in-game intro scene).
+> The remaining 15 still render nothing, but their blockers have moved too — today they are
+> `NoClassDefFoundError` (`org/kwis/msp/lwc/DialogComponent`, `wec/SYSTheme`, `org/kwis/msf/io/Message`)
+> and `Invalid memory access; address: 0`, not the `AbstractMethodError`/`NoSuchMethodError` pairings
+> tabulated below.
+>
+> **What survives:** the *shape* of the finding — that the AOT set is dominated by walls **upstream
+> of §7**, so a title's failure here says nothing about §7. That is still exactly what is measured
+> (15/18 die at ticks 0–3, at boot). The counts, the bucket membership and the "0 render" conclusion
+> do not survive. Nothing below is deleted; it is the cp43 record.
+
 Headless `wie_validate` sweep of all 39 `broken/lgt` titles to map the LGT-Java (AOT) set
 beyond 배틀몬스터 and bucket each by its blocker. AOT-Java = the app registers native class
 descriptors (`registered N app classes` > 0); the rest are WIPI-C clets. **17 AOT-Java titles**
@@ -1440,6 +1459,13 @@ side). Doc + harness + comment; no game behavior changes.
 
 ## 8. Current reach
 
+> **★Read the cp-numbered rows as dated records, not as current state.** Every row up to cp59 was
+> measured against the fork engine in 2026-06/07. Upstream `cc652b1d` (2026-08-04) reimplemented the
+> LGT Java AOT runtime afterwards, and the 2026-09-21 re-baseline found **3 AOT-Java titles
+> rendering** — so any row asserting "0 render" / "0 draw" for the AOT set (cp43, cp45/46, cp48) is
+> superseded as a statement about today. The two rows that assert it most directly are marked inline
+> below; the rest are left verbatim, because they are the RE trail and were correct when taken.
+
 | stage | state |
 |---|---|
 | app classes registered, methods run as real ARM | ✅ |
@@ -1462,10 +1488,11 @@ side). Doc + harness + comment; no game behavior changes.
 | ~~`getInstance(a)`≠`currentJlet` (cp40)~~ | identity split is **true but irrelevant** (cp41): `field[0x5c]` is never read by `a.run`. Recorded for the record only. |
 | **CORRECTION: `a.run` is one-shot; `field[0x5c]` is dead code (cp41)** | ⛔ CFG + live: `a.run` body takes the `new`-succeeds path (`0x55/0x56/0x57/0x21`, one each) → returns at `0x2108`; the `field[0x5c]` check (`0x20e8`) is on the unreached `new`-failed branch. Reverts the wall to §7/cp37: per-frame driver = ez-i runtime invoking the `0x21`-registered object (`0x48840550`) — platform-ABI, absent from `binary.mod` |
 | `0x21` objects are BARE handles → §7 wall confirmed empirically (cp42) | ⛔ all 10 `0x21`-registered objects = GLOBAL vtable, no JVM class, `pending_new` (live classifier). No `invoke_virtual` possible; global-vtable slots no-op on a classless `this` (cp14). The per-frame entry is platform-runtime ABI not in `binary.mod`. **App-side exhausted (cp37→42); external escalation: obtain LGT/ez-i platform ABI** |
-| AOT-Java title sweep: 17 titles, 0 render (cp43) | ⛔ 1 at §7 (battle), 7 [X-paint] `AbstractMethodError paint`, 8 [X-vtable] misrouted `NoSuchMethod`, 1 [X-class] `NoClassDef`. All boot walls upstream of §7 |
+| ~~AOT-Java title sweep: 17 titles, 0 render (cp43)~~ | **SUPERSEDED 2026-09-21** — was: ⛔ 1 at §7 (battle), 7 [X-paint] `AbstractMethodError paint`, 8 [X-vtable] misrouted `NoSuchMethod`, 1 [X-class] `NoClassDef`. All boot walls upstream of §7. See the re-baseline row below |
+| ★AOT-Java re-baseline: 18 unique titles, **3 render** (2026-09-21) | ◑ `메이플스토리2007` (121 paints / 512 colours / in-game intro), `현영맞고2006` (154 / 512), `놈3` (69 / 93). The other 15 die at **boot**, ticks 0–3 — `NoClassDefFoundError` or `Invalid memory access; address: 0`. Cause of the change: upstream `cc652b1d` (2026-08-04) reimplemented the LGT Java AOT runtime after cp43/45/48 were taken. Table: `docs/report/0210` |
 | [X-paint]+[X-vtable-`Card`] = card-binding; cascade not §7 (cp44) | ◑ measured: app card `new`+platform `Card.<init>` binds to `Card`, losing app subclass (paint/A/d fail). Unique-subclass bind-redirect **advances** titles but hits a **cascade** of further boot walls. (cp44's "clet regression" was host load, not the fix — see cp45) |
 | clet-safe card-binding fix + runaway alloc guard, **pushed** (cp45/cp46) | ✅ `bind_pending` redirects a `new`+platform-`Card.<init>` object to the unique app subclass; map empty for clets ⇒ inert on clet path. Regression 0 (제노니아1 d=9 no hang, all renderers identical, `test --workspace` green). Measures 턴/레전드오브마스터/서든어택포켓/현영맞고2006 to §7; 5 others to deeper walls. **0 new render** (still §7/next-wall) |
-| **per-frame render driver** | ⛔ blocked on ez-i render-tick ABI (§7) — **0 draw calls** (AOT-Java path) |
+| **per-frame render driver** | ★**SUPERSEDED 2026-09-21** — was: ⛔ blocked on ez-i render-tick ABI (§7), **0 draw calls** (AOT-Java path). A `RUST_LOG=debug` trace of `메이플스토리2007` shows the loop running: `net.wie.EventQueue::getNextEvent` 73×, `dispatchEvent` 73×, `net.wie.CardCanvas::paint` 21×, `Graphics::drawImage` **193×**, `Display::pushCard` 1×. Driven by `RepaintEvent(41)`; `TIMER_EVENT` appears **0×** in the tree. ★**Not a claim that §7 is solved for the other 15** — they die at boot, upstream of it, so nothing reaches §7 to test |
 | 놈ZERO (clet) renders; "garbage size" not a wie bug (cp47) | ✅ boots, 153 paints, menus+text+textured `.pzx` bg, survives full inject. `calloc(0x01010101)`/"ster" = game loader reading byte-correct `cur_figure.dat` (offset+4 = `01 01 01 01` in the jar; verified). Size ≠ pixel root; FB path RGB565-consistent. Open: `.pzx`/`.ft2` fidelity (external spec / watchpoint-gated) |
 | live re-baseline + §7 free-MSP option exhausted (cp48) | ⛔ AOT 0/17 draw (cp43 buckets hold); 배틀몬스터 at §7 blank. App sets displayable via native `import 0x21` (no-op in wie), never `Display.pushCard`; even wired, draw-gate `o.g` is set by card update `i.b` (cp38), which MSP `card.paint` never calls ⇒ 0 draws without forcing. Missing ez-i fact: which registered obj / which method+slot / which args / which cadence the runtime ticks. **External: ez-i native runtime / Xceed VM / device trace.** Code 0. (Pre-existing clet issues noted: 하이브리드 blank+null-OK, 제노니아1 inject spin) |
 | KTF model contrast + STEP3 probe: §7 not the sole gate (cp49) | ⛔ KTF AOT renders via app self-loop (`Thread.run`); LGT `a.run` one-shot registrar ⇒ no KTF "registered→tick" precedent. 배틀몬스터 card IS bound (getInstance), update invocable — bare-handle not the blocker. Probe (reverted): driving `Game.b()V`@`0x1484` per-frame → `Ok(0)` idempotent, **0 draws, blank** (paint undispatched + scene-state gated). With cp28 (force→bg fills only) + FOLLOWUP (`field[0x74]` wall): render needs full ez-i protocol (update+paint+scene-advance). Code 0; probe reverted |
