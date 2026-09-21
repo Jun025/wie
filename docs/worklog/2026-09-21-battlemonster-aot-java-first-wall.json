@@ -1,0 +1,48 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-21",
+  "task": "wie-battlemonster-aot-java-first-wall-player-resume-clip",
+  "title": "배틀몬스터 첫 벽 Player.resume(Clip)Z + 같은 계급 10건",
+  "summary": "LGT AOT-Java 7종의 «미해결 메서드/필드» 벽 10개를 닫았다. 7종 전부 다른 계급의 벽으로 옮겨 갔고, 남은 것은 메모리 접근 위반 5 · 미정의 클래스 2 로 갈린다. paints 는 7종 전건 0 → 0 으로 렌더는 아직 켜지지 않았다.",
+  "changes": [
+    "org/kwis/msp/media/Player: resume(Lorg/kwis/msp/media/Clip;)Z (+시험 2)",
+    "org/kwis/msp/lcdui/InputMethodHandler: getCurrentMode()I · hideSymbolCard()V · 필드 mode",
+    "org/kwis/msp/lwc/Component: getWidth()I · serviceRepaints()V · hasFocus()Z · repaint(IIII)V",
+    "org/kwis/msp/lwc/TextComponent: 필드 iMode I · maxLength I · m_td [C",
+    "org/kwis/msp/lwc/TextBoxComponent: <init>(Ljava/lang/String;II)V"
+  ],
+  "verification": [
+    "broken/lgt 46종 before/after 전수 스윕 — PASS→non-PASS 회귀 0건",
+    "변이 시험: resume 프로토 등재를 지우면 신규 시험 2건 FAILED · 기존 2건 ok",
+    "compile_model 독립 재현 — aot-java 24 / clet 22 (compile_model.rs 머리주석과 일치)",
+    "4 게이트 + beta clippy 전부 통과 (wasm 은 영향 크레이트 상위집합으로 별도 실행)"
+  ],
+  "limits": [
+    "메모리 접근 위반 · 미정의 클래스는 계급이 달라 손대지 않았다 (원인 조사도 안 했다)",
+    "Component.getWidth()I 만은 관측된 벽이 아니라 참조 풀 근거로 넣었다",
+    "TextComponent.m_td 는 필드만 있고 null 이다 — 버퍼 소유자를 정하지 않았다",
+    "TextBoxComponent 3인자 <init> 의 두 int 순서는 오늘 관측 불가 (양쪽 도착지가 스텁)"
+  ],
+  "proposals": [
+    {
+      "title": "LGT AOT-Java 의 지배적 잔여 벽 — Invalid memory access; address: 0",
+      "plainSummary": "이번에 스텁 벽을 걷어낸 타이틀 5종이 모두 같은 자리로 모였습니다. 부팅 몇 tick 만에 0번지를 건드리며 죽는데, 스텁을 하나 더 넣어서 풀리는 종류가 아닙니다.",
+      "userBenefit": "배틀몬스터를 포함해 최소 5개 타이틀이 이 벽 하나에 걸려 있어, 여기가 풀리면 «화면이 뜨는» 단계로 한꺼번에 넘어갈 수 있습니다.",
+      "why": "실측: 배틀몬스터·훼밀리마트타이쿤·학교가는길·레전드오브마스터·서든어택포켓이 스텁 결손을 닫자 전부 net.wie.WieError: Invalid memory access; address: 0 으로 이동했다. 서든어택포켓은 net/wie/LgtClassLoader.findClass 프레임을 물고 죽어 클래스 로딩 경로가 의심된다. 티켓이 「계급이 다르다」로 범위 밖에 둔 벽이므로 별도 회차가 필요하다.",
+      "tradeoff": "스텁 추가와 달리 ez-i AOT 디스패처/클래스로더 내부를 읽어야 해서 조사 비용이 크고, 한 회차에 안 끝날 수 있다. 반대로 이걸 미루면 aot-java 쪽 스텁 작업은 더 해도 paints 가 0 에서 안 올라간다.",
+      "effort": "L",
+      "target": "wie"
+    },
+    {
+      "title": "org/kwis/msp/lwc/DialogComponent 미구현 — 2종이 여기서 멈춘다",
+      "plainSummary": "붕어빵타이쿤3 등이 대화상자 클래스를 찾다가 «그런 클래스 없음»으로 죽습니다. 이건 위의 메모리 문제와 달리 클래스를 하나 만들어 주면 되는 종류입니다.",
+      "userBenefit": "붕어빵타이쿤3·당신은골프왕·슈퍼액션히어로가 다음 단계로 넘어갑니다.",
+      "why": "실측: 붕어빵타이쿤3 이 TextBoxComponent 3인자 <init> 를 통과한 뒤 java.lang.NoClassDefFoundError: org/kwis/msp/lwc/DialogComponent 로 이동했다. 붕어빵타이쿤3 의 참조 풀에는 DialogComponent.<init>(Lorg/kwis/msp/lwc/Component;Ljava/lang/String;I)V 와 doModal 이 실재한다 — 즉 필요한 서명이 게임 쪽에 명시돼 있어 추측 없이 만들 수 있다. 티켓의 미정의 클래스 목록(당신은골프왕·슈퍼액션히어로)과 같은 클래스다.",
+      "tradeoff": "doModal 은 모달 루프라 스텁으로 만들면 즉시 반환하게 되고, 대화상자를 기다리는 게임은 그 값에 따라 엉뚱한 분기를 탈 수 있다. 반환값을 무엇으로 둘지는 게임별 관측이 필요하다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}

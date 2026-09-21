@@ -60,6 +60,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { cargoMetadata, workspaceRelative } from "./cargo-metadata.mjs";
 
 function die(msg) {
   console.error(`checker-census: ${msg}`);
@@ -73,14 +74,41 @@ function die(msg) {
 // `tests/support/` stay in the population on purpose: they are not targets themselves,
 // and the by-name pass shows how they are reached (`#[path]`), which is the useful answer.
 // Data files (smoke_gate_baseline.tsv) are out: they are inputs, not things that run.
+// ★`py` is in the list because 2026-09-20 put one there (`ktf-image-sweep.py`) and
+// without it the file sat in `scripts/` *invisible to this census* — in the repo, yet
+// missing from the repo's own answer to "what is in scripts/ and who runs it". That is
+// a worse outcome than being counted with zero callers, which is the honest answer and
+// is what it now gets. Measured at adoption: 44 → 45 artifacts, 0-caller 10 → 11.
 const POPULATION = [
-  /^scripts\/[^/]+\.(?:sh|mjs|js)$/,
-  /^\.github\/scripts\/.+\.(?:sh|mjs|js)$/,
+  /^scripts\/[^/]+\.(?:sh|mjs|js|py)$/,
+  /^\.github\/scripts\/.+\.(?:sh|mjs|js|py)$/,
   /^(?:[^/]+\/)?tests\/.+\.rs$/,
 ];
 
 // Files read for caller evidence. Workflows and package.json are parsed structurally
 // (below); the rest are read as comment-stripped source.
+//
+// ★**Why `py` is counted but not read — decided 2026-09-20, `docs/report/0201`.**
+// The asymmetry with POPULATION above is deliberate, and three measurements chose it:
+//   ⑴ **Adding it buys nothing today.** There is exactly one `.py` artifact, it has zero
+//     callers, and putting `py` here leaves the verdict line byte-identical: measured,
+//     `45 artifacts · 0 = 11 · 1 = 15 · 2+ = 19` before and after. The only change is three
+//     extra `named-not-run` rows from that file's docstring cross-references.
+//   ⑵ ★**It would make `.py` the ONLY population language whose prose is read as code.**
+//     `hash` below is `/\.(?:sh|toml)$/`, so a `.py` file gets C-style stripping — which
+//     strips neither Python's `#` comments nor its `"""` docstrings. Measured: a bare
+//     `node scripts/check-worklog-json.mjs` line planted **inside the docstring** was
+//     counted as a real caller and moved the buckets (`1 = 15 → 14`, `2+ = 19 → 20`).
+//     Fixing that first is a stripper change, which is a bigger job than this asymmetry.
+//   ⑶ ★**A wrong zero here is not a wrong red.** This file has no failing state (its step
+//     carries `continue-on-error`, and its own header says a zero caller count is a
+//     question, not a defect), so the usual "a false red causes a false action" argument
+//     does not apply — the cost of a missed caller is a question posed wrongly, which is
+//     the state this census already declares itself to be in.
+// ⇒ Left as is, and **said out loud instead**: the `★py 비대칭` line in the output prints
+//   only while this asymmetry exists, with live counts. Add `py` here and that line
+//   retires itself; land a second `.py` and its number moves. The re-open condition is
+//   therefore mechanical rather than a promise.
 const SOURCE_EXT = /\.(?:sh|mjs|js|rs|ts|tsx|toml)$/;
 const WORKFLOW = /^\.github\/workflows\/.+\.(?:yml|yaml)$/;
 const PKG_JSON = /^(?:[^/]+\/)?package\.json$/;
@@ -119,30 +147,25 @@ try {
 // ★MUST come after `root` — an earlier revision put this above it and the TDZ throw was
 //   swallowed by the try/catch, so the tool reported `covers 0 artifacts` as if measured.
 //   That is the same fail-open this rewrite exists to remove; hence the guard below.
+// ★The invocation and its failure semantics moved to `scripts/cargo-metadata.mjs`
+// (2026-09-19) because `game-lab-census-map.mjs` needs the same two decisions — how to
+// ask cargo, and what "it did not answer" returns. The PROJECTION stays here: that file
+// deliberately holds no path, name or kind, because the two callers want different
+// things out of the same JSON and a helper that guessed would be the other kind of
+// duplication. What must not be duplicated is `null`-on-failure: a second hand-written
+// try/catch is one edit away from returning `[]`, and `[]` looks measured.
 const cargoTestTargets = (() => {
-  let raw;
-  try {
-    raw = execFileSync("cargo", ["metadata", "--no-deps", "--format-version", "1"], {
-      cwd: root,
-      encoding: "utf8",
-      maxBuffer: 64 * 1024 * 1024,
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-  } catch {
-    return null; // absent / offline / refused — reported, never folded into a count
-  }
-  try {
-    const meta = JSON.parse(raw);
-    const prefix = meta.workspace_root.endsWith("/") ? meta.workspace_root : meta.workspace_root + "/";
-    const out = new Set();
-    for (const pkg of meta.packages ?? [])
-      for (const t of pkg.targets ?? [])
-        if ((t.kind ?? []).includes("test") && typeof t.src_path === "string" && t.src_path.startsWith(prefix))
-          out.add(t.src_path.slice(prefix.length));
-    return out.size ? out : null; // an empty set here means the shape changed, not "no tests"
-  } catch {
-    return null;
-  }
+  const meta = cargoMetadata(root);
+  if (!meta) return null; // absent / offline / refused — reported, never folded into a count
+  const rel = workspaceRelative(meta);
+  const out = new Set();
+  for (const pkg of meta.packages ?? [])
+    for (const t of pkg.targets ?? []) {
+      if (!(t.kind ?? []).includes("test")) continue;
+      const p = rel(t.src_path);
+      if (p !== null) out.add(p);
+    }
+  return out.size ? out : null; // an empty set here means the shape changed, not "no tests"
 })();
 
 const population = tracked.filter((f) => POPULATION.some((re) => re.test(f))).sort();
@@ -221,35 +244,113 @@ function pkgSurface(f, text) {
 // `//` is dropped on purpose: a trailing `//` may be part of a URL or a string, and
 // blanking it would hide a real call — undercounting is the worse error here, because it
 // reports "orphan" for something that runs.
+//
+// ★Which `/*` opens a block is decided by WALKING the line, not by `indexOf`. The
+//   previous version asked `line.indexOf("/*")` and every `/*` looked like an opener,
+//   including the ones inside a string, a template or a trailing `//` comment. On this
+//   tree that was not hypothetical: THIS file's own output section prints
+//   `scripts/*.{sh,mjs,js,py}` inside a template literal, so the census opened a block
+//   comment there, found no `*/` before EOF, and read its last 30 lines — the whole
+//   Output section — as comment. It could not see itself. A census whose blind spot is
+//   silent is the failure this file exists to remove, so the earlier fix's declared
+//   remainder (`foo(); // see /*`) is closed here rather than carried again.
+// ★Measured 2026-09-20 over the 400 source files this reads: 17 block-state flips, 16 of
+//   them genuine; 1 spurious, the one above. The declared mixed-line case had 0 live
+//   instances — the shape that actually bit was its sibling, a `/*` inside a literal.
+//   Walking the line covers both, so it is what is written rather than a `//`-only patch.
+// ★What the walk knows: `//`, `/* */`, and "" '' `` literals with their escapes. What it
+//   does NOT know: regex literals, NESTED block comments, and quoted strings spanning
+//   lines. Measured on this tree: 0, 0 and 0 instances carrying a `/*`. Each is declared
+//   instead of guessed at, and the EOF check below makes any future one LOUD.
+// ★String content is preserved verbatim — only comment text is removed — so this changes
+//   what the stripper BELIEVES, never the text a surviving line contributes.
+const scanLine = (line, st) => {
+  let out = "";
+  for (let i = 0; i < line.length; ) {
+    const c = line[i],
+      d = line[i + 1];
+    if (st.block) {
+      if (c === "*" && d === "/") {
+        st.block = false;
+        i += 2;
+      } else i++;
+      continue;
+    }
+    if (st.tmpl) {
+      out += c;
+      if (c === "\\") {
+        out += d ?? "";
+        i += 2;
+        continue;
+      }
+      if (c === "`") st.tmpl = false;
+      i++;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      let j = i + 1;
+      while (j < line.length && line[j] !== c) j += line[j] === "\\" ? 2 : 1;
+      out += line.slice(i, j + 1);
+      i = j + 1;
+      continue;
+    }
+    if (c === "`") {
+      st.tmpl = true;
+      out += c;
+      i++;
+      continue;
+    }
+    if (c === "/" && d === "/") {
+      out += line.slice(i); // kept on purpose — see this block's opening paragraph
+      break;
+    }
+    if (c === "/" && d === "*") {
+      st.block = true;
+      i += 2;
+      continue;
+    }
+    out += c;
+    i++;
+  }
+  return out;
+};
+
 function sourceSurface(f, text) {
   const hash = /\.(?:sh|toml)$/.test(f);
   const out = [];
-  let inBlock = false;
+  // ★The block comment is the ONLY state carried across lines. A backtick can be a regex
+  //   body — `check-doc-liveness-parity.mjs` matches a markdown fence — so carrying
+  //   template state lets one unrecognised regex swallow everything after it, which is
+  //   the same failure this change removes, merely moved. Resetting per line bounds every
+  //   mis-scan to one line. Measured both ways on this tree: identical census output, and
+  //   resetting is also what correctly strips the three one-line `/** … */` comments in
+  //   check-branch-protection-claim.mjs that carrying would have read as executable.
+  const st = { block: false, tmpl: false };
   text.split("\n").forEach((raw, i) => {
     let line = raw;
     if (!hash) {
-      if (inBlock) {
-        const end = line.indexOf("*/");
-        if (end === -1) return;
-        line = line.slice(end + 2);
-        inBlock = false;
-      }
-      const open = line.indexOf("/*");
-      if (open !== -1 && line.indexOf("*/", open) === -1) {
-        inBlock = true;
-        line = line.slice(0, open);
-      }
-      const t = line.trim();
-      if (t.startsWith("//") || t.startsWith("*")) return;
+      line = scanLine(line, st);
+      st.tmpl = false;
+      // ★Tested on the SCANNED line, not the raw one: `// */ code();` inside a block is
+      //   code, and reading the raw line would drop it. The `*` continuation heuristic
+      //   this used to carry is gone — the walk knows block state now, and that guess
+      //   silently dropped 31 Rust deref statements (`*self.x = …`) across 15 files.
+      if (line.trim().startsWith("//")) return;
     } else if (line.trim().startsWith("#")) {
       return;
     }
     if (line.trim() !== "") out.push({ line: i + 1, text: line });
   });
+  // Source cannot END inside a block comment — it would not compile. So this can only
+  // mean the walk misread the file, and it is reported rather than swallowed: it is
+  // exactly the state this file was in before this change, and the only mechanical
+  // signal that the blind spot is back.
+  if (st.block) misScanned.push(f);
   return out;
 }
 
 const unreadable = [];
+const misScanned = [];
 const surfaces = [];
 for (const f of tracked) {
   if (!(WORKFLOW.test(f) || PKG_JSON.test(f) || SOURCE_EXT.test(f))) continue;
@@ -376,8 +477,23 @@ console.log(
 // regex the -fix round REPLACED (it dropped the root target); the regex was corrected and the
 // sentence describing it was not. Same defect class as the numbers this round is correcting, so it
 // is corrected here rather than left for a reader to trip over.
-console.log(`  population: scripts/*.{sh,mjs,js} · .github/scripts/**.{sh,mjs,js} · [crate/]tests/**.rs (crate segment optional — the root is a package)`);
+console.log(`  population: scripts/*.{sh,mjs,js,py} · .github/scripts/**.{sh,mjs,js,py} · [crate/]tests/**.rs (crate segment optional — the root is a package)`);
 console.log(`  surfaces:   ${surfaces.filter((s) => s.kind === "workflow").length} workflows · ${surfaces.filter((s) => s.kind === "npm").length} package.json · ${surfaces.filter((s) => s.kind === "source").length} source files (comments stripped)`);
+// ── The population/surface extension asymmetry, SAID rather than left in a comment ──
+// `py` is in POPULATION and deliberately NOT in SOURCE_EXT. This prints only while that is
+// true, so it is a live reading and not a claim: add `py` to SOURCE_EXT and the line goes
+// away by itself. The numbers are computed, so the re-open condition below is mechanical
+// rather than a promise — see the header note "★Why `py` is counted but not read".
+{
+  const pyPop = population.filter((f) => f.endsWith(".py"));
+  if (pyPop.length && !SOURCE_EXT.test("x.py")) {
+    const pyZero = rows.filter((r) => r.path.endsWith(".py") && r.hits.length === 0).length;
+    console.log(
+      `  ★py 비대칭: 모집단에 .py ${pyPop.length}개(그중 호출자 0 = ${pyZero}) · ★«호출자 증거»로는 읽지 «않는다»(SOURCE_EXT 밖).` +
+        ` 2026-09-20 실측 차이 0 — 넣어도 계수가 안 바뀌었다. ★재검토: .py 가 2개 이상이 되거나 .py 가 다른 artifact 를 부를 때.`,
+    );
+  }
+}
 for (const g of GLOB_CALLERS) {
   const n = globHits.filter((h) => h.rule === g.label).length;
   console.log(`  glob rule:  ${g.label}`);
@@ -391,6 +507,12 @@ for (const g of GLOB_CALLERS) {
   }
 }
 if (unreadable.length) console.log(`  ★UNREAD:    ${unreadable.length} surface(s) could not be read — the counts below are a floor: ${unreadable.join(", ")}`);
+// ★Printed, never exited on: a census has no failing state (see this file's header), and
+//   a mis-scan makes its own counts doubtful rather than the tree wrong.
+if (misScanned.length)
+  console.log(
+    `  ★MIS-SCAN:  ${misScanned.length} source file(s) end inside an unclosed /* … */ — the comment stripper misread them (a construct it does not parse), so every line after that point is invisible and the counts below are a floor: ${misScanned.join(", ")}`,
+  );
 
 for (const b of ["0", "1", "2+"]) {
   console.log(`\n── callers ${b} ── ${groups[b].length} ────────────────────────────────`);

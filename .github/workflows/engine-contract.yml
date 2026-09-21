@@ -300,9 +300,28 @@ jobs:
       # list in hand. The script itself never exits 1; the flag covers its rc=2
       # "could not measure", which must stay loud in the log without blocking a
       # merge on it. Promotion, if it is ever earned, is deleting this one line.
+      # §C of the supply-chain ledger preserves EXPOSURE VERDICTS, and those expire — the last
+      # column records when. Its header has commanded "그 칸이 빈 행을 만들지 마라" in prose since
+      # it was written and nothing read it. Node-only and ~10ms, so it lives here rather than in
+      # rust-audit.yaml: that workflow is schedule-only (a PR's mistake would redden a day later,
+      # in the daily job this lineage measured sitting red for three days — docs/report/0181) and
+      # its checker calls `cargo audit` at module top level, which a format check must not need.
+      - name: §C verdicts still say how long they hold (docs/report/0197)
+        run: node scripts/check-ledger-c-validity-scope.mjs
+
       - name: Checker ↔ caller census (scripts/checker-census.mjs — list only, never a verdict)
         continue-on-error: true
         run: node scripts/checker-census.mjs
+
+      # The 유입 number a round writes down goes stale when the round keeps editing after
+      # measuring — 4 observations out of 4, 3 of which cost a gate② reject (docs/report/0196).
+      # This is a real gate, NOT `continue-on-error`, and it can be one because it verifies
+      # FRESHNESS (a content digest), not truth: no corpus, no game bytes, nothing that needs
+      # `game_lab/`. A round with no marker passes and says so — the marker is opt-in, because
+      # making it mandatory re-opens "did the round run the tool", which was measured and
+      # declined (docs/report/0195). `origin/main` comes from fetch-depth: 0 above.
+      - name: Inflow marker is still fresh (docs/report/0196)
+        run: node scripts/check-inflow-marker.mjs
 
       # Detect whether this diff touches anything that can change the built
       # artifact or the pinned surface. If not, the job short-circuits to success

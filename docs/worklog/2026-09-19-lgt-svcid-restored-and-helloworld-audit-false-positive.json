@@ -1,0 +1,52 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-19",
+  "task": "2026-09-18-sibling-crates-missing-tests-machine-audit-p1",
+  "title": "LGT 값싼 2건 — 하나는 되살렸고, 다른 하나는 «이미 살아 있었다»(감사의 오탐 1건). 대신 «진짜로 없던» 케이스를 넣었다",
+  "summary": "채택 제안 2026-09-18-sibling-crates-missing-tests-machine-audit#p1 의 이행. ★원문 tradeoff 가 요구한 두 사전확인을 둘 다 했고 서로 다른 결론이 나왔다. ⑴svc_ids: 번호 체계가 «안 바뀌었다» — Unk16=0x581 선언·0x581=>Self::Unk16 매핑·0x582 미매핑(0건)·From<WIPICSvcId> for u32 전부 HEAD 에 그대로라 옛 본문(4e37e9e4)을 한 글자도 안 고치고 복원했다. ★★⑵test_helloworld: 픽스처가 문제가 아니라 «그 단언이 이미 있는지»가 문제였다 — test_helloworld_jar_named_application 의 본문은 사라지지 않았고 지금의 test_helloworld 안에 있다(픽스처의 00000000.jar 를 application.jar 로 바꿔 넣고 부팅한다). 주장이 아니라 개악으로 물었다: 탐색을 옛 이름 기반 format!(\"{aid}.jar\") 로 되돌리면 그 두 시험이 «둘 다» red 다 ⇒ 세 번째 케이스를 더할 필요가 없다. ★감사가 놓친 이유는 축 E 가 «함수 이름 집합»을 비교하기 때문이다 — 이름은 다른 시험 «안으로» 사라질 수 있다. 원문이 A~D(파일 축)의 한계를 스스로 적었는데 E 에도 대칭의 한계가 있다 ⇒ 감사의 10건 중 최소 1건은 오탐이고 나머지 9건은 재검하지 않았다. ★★그런데 «진짜로 없던» 케이스가 있었다: 옛 설계는 일부러 비대칭인 쌍이었고(AID 이름 = 못 본다 / 개명 = 본다) 오늘은 두 시험이 둘 다 jar 를 옮긴다 ⇒ 출하 형상(손대지 않은 00000000.jar)을 부팅하는 시험이 하나도 없었다. 그 baseline 을 넣었고, 고유 검출력을 개악으로 확인했다(AID 이름 jar 를 건너뛰는 규칙에서 새 시험만 red).",
+  "changes": [
+    "wie-lgt/src/runtime/svc_ids.rs +34/-0 — wipic_svc_0x581_maps_and_table_stays_fail_closed 복원(그 파일의 시험 0 → 1). 옛 본문 그대로이고, 복원 전에 네 축(선언·매핑·0x582 미매핑·u32 변환)을 HEAD 에서 재측했다",
+    "wie-lgt/tests/test_helloworld.rs +68/-0 — test_helloworld_unmodified_archive 신설(2 → 3) + ★파일 머리에 «오탐 정정» 기록(test_helloworld_jar_named_application 의 단언이 어디로 갔는지, 그리고 실제로 없던 것이 무엇인지)",
+    "★제품 코드 0줄 — 이 회차가 사는 것은 회귀 방지선뿐이고 게임은 하나도 더 통과하지 않는다",
+    "game_lab/·.gitignore·STATE.md·AGENTS.md 무접촉 · 새 검사기·새 워크플로 0"
+  ],
+  "verification": [
+    "★★표적 2 의 오탐 판정을 «개악으로» 했다 — 탐색을 옛 format!(\"{aid}.jar\") 로 되돌리면 원형 2 passed → 2 failed → 원복 2 passed. 지금의 test_helloworld 가 그 회귀를 잡는다",
+    "★표적 1 의 사전확인 4축 — Unk16=0x581 선언 있음(:229) · 0x581=>Self::Unk16 있음(:335) · 0x582 매핑 0건 · From<WIPICSvcId> for u32 있음. 원문이 경고한 「번호 체계가 바뀌었을 수 있다」는 이 경우 참이 아니었다",
+    "★★개악 A1(«맵된다» 절반) — 원형 21 passed ↔ try_from 에서 0x581 arm 제거 시 1 FAILED ↔ 원복 21 passed",
+    "★★개악 A2(«fail-closed» 절반) — 원형 21 passed ↔ catch-all 이 Unk16 을 돌려주게 하면 1 FAILED ↔ 원복 21 passed. ★두 절반을 따로 잰 이유는 하나만 재면 다른 하나가 사문이 되기 때문이다",
+    "★★★개악 B(새 baseline 의 «고유» 검출력) — AID 이름 jar 를 건너뛰는 탐색 규칙에서 test_helloworld ok · test_helloworld_jar_under_p_prefix ok · ★test_helloworld_unmodified_archive 만 FAILED ⇒ 혼자 선다. ★«red 가 나는가»가 아니라 «혼자 red 가 나는가»를 쟀다 — 같이 red 면 고유 검출력이 0이다",
+    "★cargo test -p wie-lgt --lib 21건 · --test test_helloworld 3건 전건 통과"
+  ],
+  "limits": [
+    "★새 baseline 의 검출력은 좁다 — 내용 기반 탐색에서는 다른 둘과 함께 green/red 인 경우가 대부분이고, 혼자 서는 것은 «건드리지 않은 경로»를 겨냥한 회귀뿐이다. 그 한계를 파일 머리에 적었다. 그리고 LGT 게스트를 한 번 더 부팅하므로 그만큼 느려진다",
+    "★★감사의 «10건»이라는 수가 흔들린다 — 최소 1건이 오탐이다. 나머지 9건은 재검하지 않았다 ⇒ 그 수를 인용하는 문서는 지금 낡았을 수 있다",
+    "★복원한 svc_ids 시험은 옛 본문 그대로다 — 오늘 관점에서 더 나은 단언(예: 표 전체 왕복)을 쓰지 않았다. 복원의 목적이 «그때 지켜지던 것을 다시 지키는 것»이라 그렇게 했지만, 더 나은 시험을 안 쓴 것도 사실이다",
+    "★표적이 LGT 두 곳뿐이다 — 감사가 센 10건 중 canvas 8건은 손대지 않았다(그것은 #p0 소관이고 원문이 「먼저 재서 정하라」고 한 자리다)",
+    "★제품 코드 0줄 ⇒ 게임은 하나도 더 통과하지 않는다"
+  ],
+  "adoptedProposals": [
+    "2026-09-18-sibling-crates-missing-tests-machine-audit#p1"
+  ],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "감사의 «함수 이름 축»을 «단언 축»으로 다시 재라 — 10건 중 최소 1건이 오탐이었다",
+      "plainSummary": "사라진 시험을 찾을 때 이름만 비교하면, 다른 시험 안으로 합쳐진 것도 «사라졌다»로 세어집니다. 실제로 그런 게 하나 나왔습니다.",
+      "userBenefit": "「되살릴 것이 몇 개인가」가 처음으로 믿을 수 있는 수가 된다 — 지금 그 수를 인용하면 과장이다.",
+      "why": "이 회차가 개악으로 확인했다: test_helloworld_jar_named_application 은 «이름»이 사라졌을 뿐 «단언»은 test_helloworld 안에 있다(옛 이름 기반 탐색으로 되돌리면 지금 시험이 red 다). 감사의 축 E 는 함수 이름 집합을 비교하므로 이 형태에 구조적으로 눈먼다 — 원문이 A~D(파일 축)의 한계를 스스로 적은 것과 대칭이다. ⇒ 남은 9건 각각에 대해 «그 단언이 다른 시험 안에 있는가»를 물어야 하고, 그 물음의 기계적 형태는 이 회차가 쓴 것과 같다: 대상 코드를 개악해 보고 지금 트리가 red 가 되는지 본다.",
+      "tradeoff": "★그 재검은 «건당 개악 1회»라 이름 비교보다 훨씬 비싸다(9건 × 빌드·시험 왕복). ★그리고 개악을 설계하려면 그 시험이 무엇을 지켰는지 먼저 읽어야 하므로 자동화가 어렵다 — 축 E 처럼 한 번에 돌릴 수 있는 술어가 아니다. ★결과가 「9건 다 진짜였다」로 나올 수도 있고, 그러면 비용만 쓴 셈이다. 다만 그때는 «10» 이 확정되므로 그것도 산출이다.",
+      "effort": "M",
+      "target": "docs/worklog/2026-09-18-sibling-crates-missing-tests-machine-audit.json 의 목록 · wie-backend canvas"
+    },
+    {
+      "title": "LGT 엔트리포인트 탐색의 «세 형상»을 한 표로 묶어라 — 지금은 시험 셋이 각자 부팅한다",
+      "plainSummary": "같은 것을 확인하는 시험 셋이 각각 게임을 처음부터 돌립니다. 표로 묶으면 빨라지고, 빠진 형상도 눈에 띕니다.",
+      "userBenefit": "형상이 하나 더 생겼을 때 «빠졌는지»가 표에서 바로 보인다 — 이번에 빠진 것을 사람이 옛 커밋을 읽어서야 찾았다.",
+      "why": "지금 wie-lgt/tests/test_helloworld.rs 는 세 시험이 각각 LGT 게스트를 부팅한다(손대지 않음 · application.jar 개명 · P/ 접두). 본문은 아카이브를 어떻게 바꾸느냐만 다르고 나머지는 동일하다 — 옛 회차가 run_to_exit 헬퍼로 묶었던 형태가 그 증거다(cbb9ba0b). ★표로 묶으면 ⑴새 형상을 한 줄로 더하게 되고 ⑵«어떤 형상이 없는가»가 표의 빈칸으로 보인다. 이번에 빠진 baseline 을 찾는 데 옛 커밋 고고학이 필요했던 이유가 그 표가 없어서다.",
+      "tradeoff": "★표로 묶으면 «어느 케이스가 깨졌는가»가 한 줄 덜 선명해진다 — 지금은 시험 이름이 그대로 형상 이름이라 CI 로그에서 바로 읽힌다. 표 기반은 assert 메시지에 형상을 실어야 하고, 그걸 빠뜨리면 진단이 나빠진다. ★그리고 부팅 비용은 줄지 않는다(형상마다 한 번은 돌려야 한다) — 줄어드는 것은 중복 코드지 시간이 아니다. ★기존 세 시험의 이름이 바뀌면 이 리니지의 «이름 축» 감사가 또 «사라졌다»고 셀 수 있다(이 회차가 방금 겪은 그 형태다).",
+      "effort": "S",
+      "target": "wie-lgt/tests/test_helloworld.rs"
+    }
+  ]
+}
