@@ -140,5 +140,5 @@ node 검사기: `check-worklog-json` **rc=0**(174) · `check-docs-report-serial`
 ⇒ ★**유입 0건 · 판단 필요 0건** — 두 수를 함께 적는다(SUFFIX 바구니를 비우지 않은 0 은 이 리니지가 반려됐던 그 0 이다).
 ★**0 이 된 것은 우연이 아니라 서술 선택이다** — 이 회차도 `0188` 의 관용대로 타이틀을 **이미지 id(`01031C0A`)로만** 불렀고, 부팅에 쓴 사본도 그 중립 이름으로 스크래치에 뒀다.
 
-<!-- corpus-name-inflow v1 subjects=2 tree=2b9c9132260288e6 B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=2 tree=a2983e57df0b4d0b B=0/0 P=0/0 S=0/0 -->
 
