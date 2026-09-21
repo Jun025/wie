@@ -98,13 +98,24 @@ LGT-specific: provides C standard library functions (memcpy, strlen, etc.) that 
 > **What is measured today** (2026-09-21, `--inject`, release `wie_validate` at `394fde8b`; full
 > table in `docs/report/0210`). Three of the corpus's 18 unique AOT-Java titles render:
 > `메이플스토리2007` (up to 121 paints / 512 distinct colours — title screen *with sprites*, then an
-> in-game intro scene), `현영맞고2006` (154 paints / 512 colours), `놈3` (69 paints / 93 colours).
+> in-game intro scene), `현영맞고2006` (154 paints / 512 colours), `놈3` (69 paints / 93 colours —
+> **splash only, and shallow**: it holds on the 「시보구게임연구실」 logo plus a green sprite and does
+> not reach a menu inside the budget).
 > A `RUST_LOG=debug` trace of `메이플스토리2007` shows the loop the section says is blocked actually
-> running: `net.wie.EventQueue::getNextEvent` **73×**, `dispatchEvent` **73×**,
-> `net.wie.CardCanvas::paint` **21×**, `Graphics::drawImage` **193×**, `Image::createImage` **44×** —
+> running: `net.wie.EventQueue::getNextEvent` **73×**, `dispatchEvent` **73×**, `net.wie.CardCanvas::paint` **21×**, `Graphics::drawImage` **193×**, `Image::createImage` **44×** (★one run — release `wie_validate` at `394fde8b`, `--inject --action-secs 0.3`, `RUST_LOG=debug`, 2026-09-21, loadavg 47–130; **load-dependent — do not re-cite as absolutes**, see below) —
 > driven by wie's `RepaintEvent(41)`, not by a TIMER 21 the app self-dispatches. The trace also shows
-> `org.kwis.msp.lcdui.Display::pushCard` **1×**, which directly falsifies the cp48 bullet below
+> `org.kwis.msp.lcdui.Display::pushCard` **1×** (same run, same caveat; here the claim is presence, ≥1),
+> which directly falsifies the cp48 bullet below
 > ("never `Display.pushCard`, so the card-vector stays empty").
+>
+> **Why the caveat, and what the numbers are for.** A gate② re-trace of the same binary at the same
+> commit, under its own load, read `184×` / `184×` / `130×` / `3,584×` / `187×` — **up to 18× higher**.
+> Neither reading is the error: the `--inject` deadline is a *fixed wall-clock* budget (`AGENTS.md`
+> §Definition of Done), so the counts scale with how many ticks fit inside it, and **that 18× spread
+> between two honest measurements is itself the fact to carry.** What is load-invariant — and all
+> this paragraph claims — is that every one of them is **non-zero**. `docs/report/0210` states the
+> same rule for `distinct_colors`/`ticks` (2 ↔ 93 on one binary); it was not applied to these trace
+> counts when they were written, and this is that correction.
 >
 > **What is NOT claimed.** The other 15 unique titles still render nothing — but they die at *boot*
 > (ticks 0–3, `NoClassDefFoundError` / `Invalid memory access`), which is **upstream of** this wall,
