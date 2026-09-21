@@ -7,7 +7,12 @@
 // counts against it; an upstream-sync merge lands as one round with no worklog
 // at all). Failing CI on the ratio would gate PRs on a *conditional* obligation
 // — exactly the mandate 2026-09-01 declined. Being overdue, by contrast, is not
-// a judgment: it is a fact, and it has no false positives.
+// a judgment: it is a fact.
+//
+// That sentence used to end "and it has no false positives", and it was wrong —
+// measured 2026-09-21, a branch with an old base reported an overdue that did not
+// exist on main. The claim is true again only because of the union read below; it
+// is stated as a consequence there, not as a property of the idea.
 //
 // So this script fails on two things only:
 //   OVERDUE            — 10+ landed rounds since the last recorded measurement
@@ -54,6 +59,30 @@
 // nothing else. It also makes BELOW-UNANSWERED stricter rather than looser — that
 // check reads the same row, so a later-appended *older* entry can no longer mask a
 // sub-threshold measurement.
+//
+// ── Which COPY of the record — the union of `head`'s and this tree's ────────
+// The landed count comes from `head` (origin/main). The record used to come from
+// the working tree ALONE, and that pairing is what the header above got wrong when
+// it called OVERDUE "a fact, with no false positives": landed moves with main, the
+// tree's copy does not, so a branch whose base is 10+ landings old reports an
+// overdue that does not exist on main. Measured 2026-09-21 on PR #233 (`cb53573d`,
+// base `4acb1631`): landed 159 · tree's copy 145 · `✗ OVERDUE` — while a real merge
+// with the then-current main read 155 and `OK`.
+//
+// It is not a second design axis to be argued about: this file is a union-merged
+// ledger file (AGENTS.md §Landing paperwork — "Never take one side wholesale"), so
+// the record that will exist on main once this branch lands is BOTH copies. Reading
+// the tree alone models a take-ours merge that same rule forbids. So `last` is the
+// highest `landedRounds` across the two copies.
+//
+// What that costs, because it is not free: a branch that DELETES rows from its copy
+// no longer reads as overdue — `head`'s copy restores the number and the check goes
+// green. That regression is invisible here by construction, and this is the one
+// place it used to be visible.
+//
+// Both copies are still read, rather than just `head`'s, because `--record` writes
+// the working tree: a round that has just discharged the obligation must read as
+// current before it lands, or it could never discharge it at all.
 //
 // Ties (two rows with the same `landedRounds`) resolve to the later-appended one:
 // same number, so the newer statement about that round wins. That case is real —
@@ -113,10 +142,36 @@ const recordPath = "docs/worklog-coverage-remeasures.json";
 const record = JSON.parse(await readFile(path.join(root, recordPath), "utf8"));
 // Highest `landedRounds`, ties to the later-appended row — see the header for why
 // this is not `at(-1)` and what it does and does not change.
-const last = record.measurements.reduce((a, b) => (b.landedRounds >= a.landedRounds ? b : a));
+const highest = (measurements) => measurements.reduce((a, b) => (b.landedRounds >= a.landedRounds ? b : a));
+const lastHere = highest(record.measurements);
+
+// `head`'s copy, unioned with the tree's — see the header. A failure here is not
+// fatal: fall back to the tree alone, and SAY so, because that fallback is the old
+// behaviour and can still read a stale base as overdue.
+let lastCanon = null;
+try {
+  lastCanon = highest(JSON.parse(git("show", `${head}:${recordPath}`)).measurements);
+} catch {
+  lastCanon = null;
+}
+// Only `origin/main` is a cross-check. In the `HEAD` fallback above there is no
+// independent copy to compare against — `git show HEAD:` is this same branch.
+const crossChecked = head === "origin/main" && lastCanon !== null;
+const last = lastCanon && lastCanon.landedRounds > lastHere.landedRounds ? lastCanon : lastHere;
+const behind = lastCanon !== null && lastCanon.landedRounds > lastHere.landedRounds;
 
 console.log(`worklog coverage: ${num}/${den} = ${pct.toFixed(1)}% over the last ${den} landed round(s)`);
-console.log(`  window ${oldest}..${newest} · landed rounds since ${SINCE}: ${landed} · last recorded at: ${last.landedRounds}`);
+console.log(
+  `  window ${oldest}..${newest} · landed rounds since ${SINCE}: ${landed} · last recorded at: ${last.landedRounds}` +
+    (behind ? ` (from ${head}; this working tree's copy stops at ${lastHere.landedRounds} — its base is behind)` : ""),
+);
+if (!crossChecked) {
+  console.log(
+    `  NOTE: ${recordPath} was not cross-checked against origin/main (` +
+      (lastCanon === null ? `it could not be read from \`${head}\`` : `the landed count came from \`${head}\`, not origin/main`) +
+      `), so an old base can still read as OVERDUE when main is current.`,
+  );
+}
 // Hoisted so --record writes the SAME object the check prints — one source, so
 // the printed line and the appended row cannot drift.
 const entry = {
@@ -148,6 +203,14 @@ if (RECORD) {
     console.log(`  --record: landedRounds ${landed} is already recorded (window ${already.window}) — nothing to do.`);
   } else if (!due) {
     console.log(`  --record: not due (${landed - last.landedRounds} landed since ${last.landedRounds}, cadence ${WINDOW}) — nothing to do.`);
+  } else if (behind) {
+    // Guard 3: due, but this tree's copy is older than `head`'s. Appending here
+    // writes a file that is missing `head`'s rows, and landing it needs the union
+    // resolution to put them back. Pull base instead — that is one command.
+    console.log(
+      `  --record: this working tree's ${recordPath} stops at ${lastHere.landedRounds} but ${head} is at ` +
+        `${lastCanon.landedRounds} — pull base first; appending here writes a copy missing ${head}'s rows.`,
+    );
   } else {
     const decisionArg = process.argv[process.argv.indexOf("--decision") + 1];
     record.measurements.push({
@@ -165,12 +228,23 @@ if (RECORD) {
 
 const problems = [];
 if (due && !(RECORD && record.measurements.some((m) => m.landedRounds === landed))) {
+  // The OWNER instruction is conditional on this reading being cross-checked against
+  // origin/main. Uncross-checked, "run --record and bundle it" is the wrong thing to
+  // do — it records a deadline that has not arrived, which is the same pollution the
+  // "do NOT hand-append" sentence exists to prevent.
+  const lead = `OVERDUE: ${landed - last.landedRounds} landed rounds since the last recorded measurement (cadence is ${WINDOW}). `;
   problems.push(
-    `OVERDUE: ${landed - last.landedRounds} landed rounds since the last recorded measurement (cadence is ${WINDOW}). ` +
-      `Run \`node scripts/check-worklog-coverage.mjs --record\` — it appends the entry printed above, idempotently. ` +
-      `Do NOT hand-append: every round that pulls base gets this same rc=1, and hand-appending produced three identical rows on 2026-09-06. ` +
-      `OWNER: the gate3 round — bundle that one file into the PR before merging (AGENTS.md §Landing paperwork). ` +
-      `It is a ledger file, so touching it here is authorized; nothing else in the round changes.`,
+    crossChecked
+      ? lead +
+          `Run \`node scripts/check-worklog-coverage.mjs --record\` — it appends the entry printed above, idempotently. ` +
+          `Do NOT hand-append: every round that pulls base gets this same rc=1, and hand-appending produced three identical rows on 2026-09-06. ` +
+          `OWNER: the gate3 round — bundle that one file into the PR before merging (AGENTS.md §Landing paperwork). ` +
+          `It is a ledger file, so touching it here is authorized; nothing else in the round changes.`
+      : lead +
+          `But the landed count came from \`${head}\` and ${recordPath} was not cross-checked against origin/main, so this rc=1 may be ` +
+          `an artifact of an old base rather than a real overdue. Re-measure on a REAL merge of current \`main\` into this branch — ` +
+          `NOT on \`refs/pull/N/merge\`, whose cached base goes stale (measured 2026-09-21: PR #233's merge ref carried base \`4acb1631\`, ` +
+          `14 landings behind). Do NOT run \`--record\` on this reading; no owner is named because there may be nothing to own.`,
   );
 }
 if (last.pct < THRESHOLD && last.reopened !== true) {

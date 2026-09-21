@@ -263,20 +263,177 @@ pub async fn list_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
 /// "corrupts the guest's heap silently" this doc comment used to warn about while
 /// doing it. `sort_records_never_writes_to_guest_memory_test` pins that.
 ///
-/// The next round starts from `f(ptr_to_short_ascii_token, 1)` — not from "find
-/// the comparator", which was a ghost. The tools are static: disassemble the
-/// three call sites above, and decode any SVC stub from the 4 bytes at
-/// `stub - 1 + 12`, which hold `(table << 16) | function`. Neither needs a code
-/// change.
+/// **What `r0` actually is (2026-09-19), and how much that narrows it.** The
+/// previous revision left it at "a short ASCII token". It is more specific than
+/// that, and the extra facts came from reading the *other* calls through the same
+/// interface rather than from staring harder at this one:
+///
+/// * **The token is `"res"` (`0103451A`) and `"ga"` (`01031C0A`). That string is
+///   this title's resource DIRECTORY, and it is also the extension of other
+///   resource files in the same image — which of the two it means is NOT
+///   settled.** `0x13184c` sits at the tail of `"res/anidata.res"` and `0x135ae4`
+///   at the tail of `"/ga/per.ga"`, but tail position carries no meaning on its
+///   own: the linker tail-merges, so any short literal lands inside some longer
+///   one. Read as a directory it is the stronger fit at both call sites — the
+///   path slot 0/16 receives in the *same* window is `"res/save.sav"` and
+///   `"/ga/aysis.dat"`, whose directory component is exactly the token while
+///   their extensions (`sav`, `dat`) are not. Measured on the packages: 51 of
+///   `0103451A`'s 53 entries live under `res/` while only 2 end in `.res`, and
+///   both titles' persistent files ship under a directory named by the token
+///   (`P/res/`, `P/ga/`). None of that is proof, which is why the sentence above
+///   stops where it does.
+/// * **What the sl-relative pointer table holds, measured rather than assumed.**
+///   It has an entry for the full path and an entry for the bare token, and for
+///   nothing in between: sweeping `sl+0x000..+0x900` in both images finds
+///   entries for `"res/save.sav"`, `"res/anidata.res"`, `"res"`, `"/ga/per.ga"`
+///   and `"ga"`, and **zero** for `".sav"`, `"anidata.res"`, `"per.ga"` or
+///   `".ga"`. An earlier revision of this comment called it a "path + basename +
+///   extension" table and quoted `0x135254` as the example; both were wrong. That
+///   address decodes to a level-name array (`"NONE"`, `"Lv2.Antony"` … `"Lv15.mano"`,
+///   `"[Arena]"`) once the relocation delta below is applied, and the path-like
+///   reading only appears if the delta is dropped.
+/// * **The names these titles actually open are NOT that token.** Sweeping every
+///   indirect call through the same database global finds slot 0 called with
+///   `"res/save.sav"` (`0103451A`) and `"/ga/aysis.dat"` (`01031C0A`). So slot 8
+///   is being handed something categorically different from a database name.
+/// * **The return value is discarded at all three call sites.** Nothing tests
+///   `r0` afterwards — `0x10571c` falls into an unrelated global load, `0x1243ca`
+///   into a run of `bl`s, `0x128f3c` into the `Open` below. Whatever slot 8 is,
+///   these titles do not read its answer.
+/// * **Its neighbours in the call sequence pin the shape.** At `01031C0A`
+///   `0x128f08` the order is `slot16("/ga/aysis.dat", 1)` → *if non-zero* →
+///   `slot8("ga", 1)` → `slot0("/ga/aysis.dat", 8, 1)` → store the fd. Slot 16 is
+///   `Exists` in this table and takes `(name, type)`; slot 8 takes the **same
+///   two-argument shape** with the same constant `1`.
+///
+/// **What that does NOT settle, and this lineage has now been wrong three
+/// times:** which operation it is. Four candidates fit `f(token, 1)` with an
+/// ignored result, and nothing above separates them — "register the app's file
+/// extension", "delete by pattern", "list databases of this type", and
+/// **"select/ensure the directory (namespace) the following calls resolve
+/// against"**. The fourth was missing when this list was first written, because
+/// the three that were here all assumed the extension reading — that omission is
+/// the third of the three wrong turns, and it was caught in review rather than
+/// by the author. A name is not written here until something separates them, and
+/// two of the four cannot be separated with the two images that reach this slot
+/// at all: both of their tokens are *simultaneously* a directory and an
+/// extension, so nothing in the corpus tells the readings apart.
+///
+/// **2026-09-20: the fourth candidate splits in two, and one half is refuted —
+/// statically, without running either title.** "Select **or** ensure the
+/// directory" was written as one line above; it is two operations with different
+/// observable signatures, and separating them is what let a measurement bite.
+///
+/// * **Slot 8 does not dominate the opens.** `0103451A` has exactly **one**
+///   slot-8 site (`0x10571c`) against **seven** slot-0 sites, and the function
+///   holding that slot-8 call reaches an open *before* it: `0x1056e8` is
+///   `bl 0x105cfc`, `0x105cfc` is a function entry (`push {r4,r5,r6,lr}`) whose
+///   body calls `slot0("res/save.sav", 1, 1)` at `0x105d1c`, and there is no
+///   `pop`/`bx lr` between that `bl` and `0x10571c`. Reachability is not assumed:
+///   the fault dump this file already cites reads `R5` at `0x1056d8`, so that
+///   function ran. A *selection* the following calls resolve against has to
+///   dominate them; this one is dominated by one instead. ⇒ **the "select a
+///   namespace" reading is refuted for this image.**
+/// * **A selection would be a no-op anyway.** Every statically resolvable slot-0
+///   argument in both images already carries the token as its leading path
+///   component — `"res/save.sav"`, `"res/savem.sav"`, `"/ga/aysis.dat"`,
+///   `"/ga/data.dat"`. Nothing is left for a namespace to supply.
+/// * **The "ensure it exists" reading survives dominance but sits on the wrong
+///   branch.** At `01031C0A:0x128f2c` the `cmp r0,#0; beq` skips when `Exists`
+///   returned zero, so slot 8 runs on the branch where the file is **already
+///   there**. A guard that creates a missing directory belongs on the other
+///   branch. That weakens it; it does not kill it.
+///
+/// ⇒ the candidate list is narrowed for the first time in this lineage, and it is
+/// narrowed by one *half* of one entry. The two the corpus provably cannot
+/// separate — extension registration and listing by type — are untouched by all
+/// of the above. **Still no name.**
+///
+/// **"Delete by pattern" is the one left that a run could settle, and what blocks
+/// that run is a MISSING BASELINE, not a busy machine.** Say it in that order,
+/// because the other order is a trap this lineage already named and then walked
+/// into: `AGENTS.md`'s four-step rule for reading a FAIL requires comparing
+/// against the fixture's *idle range*, and those ranges exist only for the
+/// committed fixtures — a `game_lab/` title's failure signature has none, so
+/// "it broke differently" has nothing to be different *from*. That hole does not
+/// close on a quiet machine. Load is a second-order factor and it is not a
+/// constant either: measured 149 → 125 → 53 inside the single round that wrote
+/// this block (2026-09-20), so quoting one reading as if it were the reason sends
+/// the next round to wait for a quiet hour and fall into the same hole.
+///
+/// **Part of the slot numbering is now guest-confirmed, which none of it was
+/// before.** At `0103451A:0x117f70` the sweep sees slot 0 return a value that is
+/// then threaded as the first argument into slot 2 and slot 3 — `Open` →
+/// `StreamWrite` → `Close`, the order this file already assumed from the KTF
+/// header. That is evidence for **slots 0, 2 and 3**. Slot 1 is observed through
+/// the same object (six sites) but its argument threading was not checked, and
+/// slots 4-7 and 9-15 were not observed at all in these two images: this
+/// confirms part of the table, not the table.
+///
+/// **Two method notes worth keeping, because both cost time to rediscover.** The
+/// interface is reached as `table = *(*global)` — the global holds an object
+/// whose *first word* is the table, so a sweep that stops after one dereference
+/// misses these call sites. And the sl-relative pointer table is **relocated at
+/// load by a delta that is not `IMAGE_BASE`** (measured `+0xE40` for `0103451A`,
+/// `+0x1330` for `01031C0A`): read a static word, add that delta, and the string
+/// lands exactly. The delta is checkable rather than fitted — for `0103451A` it
+/// predicts `*(sl+0x150) == 0x14a940`, which is what the register dump's `R5`
+/// holds.
+///
+/// So the diagnostic below now quotes the token itself. That is deliberately the
+/// only behaviour change: the next title to reach this slot names its own token
+/// in the failure instead of costing somebody a disassembly.
 pub async fn sort_records(context: &mut dyn WIPICContext, arg0: WIPICWord, arg1: WIPICWord) -> Result<i32> {
-    let _ = context;
-    tracing::debug!("KTF database slot 8 (header name: MC_dbSortRecords)({arg0:#x}, {arg1:#x})");
+    let token = slot8_token(context, arg0);
+    tracing::debug!("KTF database slot 8 (header name: MC_dbSortRecords)({arg0:#x}, {arg1:#x}) token={token:?}");
+
+    let quoted = match &token {
+        Some(t) => format!(" ({t:?})"),
+        None => String::new(),
+    };
 
     Err(WieError::Unimplemented(format!(
         "8: KTF database slot 8 (header name MC_dbSortRecords) — argument layout unknown, \
-         measured r0={arg0:#x} r1={arg1:#x} (arity 2: r2 holds the interface table, r3 the callee address); \
+         measured r0={arg0:#x}{quoted} r1={arg1:#x} (arity 2: r2 holds the interface table, r3 the callee address); \
          the header's (fd, buf, len, compare, filter) does not fit"
     )))
+}
+
+/// Longest token `sort_records` will quote back from guest memory.
+///
+/// Bounded and printable-only on purpose. `arg0` is a guest pointer and nothing
+/// here can prove it is not a path — `wie_validate`'s `--guest-stdout` flag is
+/// opt-in for exactly that reason, and AGENTS.md's smoke-gate note draws the same
+/// line ("identifiers and expected status only, never paths or bytes"). The two
+/// tokens measured in the field are 3 and 2 bytes; 16 leaves room without turning
+/// this into a general string dump. Anything longer, anything non-printable, and
+/// anything unreadable is simply not quoted — the raw pointer is still reported,
+/// so the diagnostic never gets *worse* than it was.
+///
+/// **It is a bound on what gets QUOTED, not a bound on what gets READ.**
+/// `read_null_terminated_string_bytes` builds the whole string first and this
+/// constant rejects it afterwards, so a pointer into a mapping with no NUL is
+/// read to the end of that mapping before being discarded. That is bounded by
+/// the mapping and happens once, on a path that is already failing, which is why
+/// it is left alone — but do not describe this constant as a read limit, and do
+/// not rely on it if this ever moves onto a hot path.
+///
+/// `sort_records_quotes_only_a_short_printable_token_test` asserts this value.
+/// Changing it means changing that assertion, which is the point: it is the only
+/// thing bounding what reaches a log.
+const SLOT8_TOKEN_MAX: usize = 16;
+
+fn slot8_token(context: &mut dyn WIPICContext, ptr: WIPICWord) -> Option<String> {
+    if ptr == 0 {
+        return None;
+    }
+    // Failure-tolerant by construction: a bad pointer must yield "no token", not
+    // an error that replaces the Unimplemented this function exists to raise.
+    let bytes = read_null_terminated_string_bytes(context, ptr).ok()?;
+    if bytes.is_empty() || bytes.len() > SLOT8_TOKEN_MAX || !bytes.iter().all(|b| (0x20..0x7f).contains(b)) {
+        return None;
+    }
+    str::from_utf8(&bytes).ok().map(ToOwned::to_owned)
 }
 
 /// `MC_dbGetNumberOfRecords(dbID)` — number of records in the database, or the
@@ -769,8 +926,8 @@ mod tests {
     use crate::context::test::TestContext;
 
     use super::{
-        KTF_DATABASE_STORAGE_LIMIT, delete_database, exists_database, list_databases, list_record_info, open_database, select_record, sort_records,
-        stream_read, stream_write, update_record,
+        KTF_DATABASE_STORAGE_LIMIT, SLOT8_TOKEN_MAX, delete_database, exists_database, list_databases, list_record_info, open_database,
+        select_record, sort_records, stream_read, stream_write, update_record,
     };
 
     /// KTF database slot 8 refuses, and refuses **without touching guest memory**.
@@ -818,6 +975,79 @@ mod tests {
             let mut seen = [0u8; 16];
             context.read_bytes(base, &mut seen).unwrap();
             assert_eq!(seen, SENTINEL, "slot 8 wrote to guest memory at {base:#x}");
+        }
+    }
+
+    /// Slot 8 quotes the token `r0` points at — and quotes **only** a short,
+    /// printable, readable one.
+    ///
+    /// The point of the quote is that the next title to reach this slot names its
+    /// own token in the failure instead of costing somebody a disassembly: the
+    /// two measured tokens, `"res"` and `"ga"`, took a synchronised Thumb sweep
+    /// of two images to recover. The point of the *bounds* is that `r0` is a
+    /// guest pointer and nothing here can prove it is not a path — so the four
+    /// negative cases below (too long, non-printable, unreadable, null) are as
+    /// load-bearing as the two positive ones. (The first revision said "three"
+    /// and there were already four.)
+    ///
+    /// **The over-long input is a literal `[b'a'; 17]`, and `SLOT8_TOKEN_MAX` is
+    /// asserted to be 16, because deriving the input from the constant made this
+    /// test a tautology.** The first revision wrote `[b'a'; SLOT8_TOKEN_MAX + 1]`
+    /// and claimed in this comment that "a change that widens the filter fails
+    /// here" — the gate-2 reviewer measured `16 → 64` and got **green**, because
+    /// widening the constant widened the input with it. Both forms below pin the
+    /// value now: the `assert_eq!` names it directly, and the literal keeps the
+    /// negative case negative even if that assertion is ever deleted.
+    ///
+    /// Every case still asserts the raw `r0=` is present, because the quote is an
+    /// addition: a regression that loses the token must not also lose the
+    /// coordinate that was already there.
+    #[futures_test::test]
+    async fn sort_records_quotes_only_a_short_printable_token_test() {
+        let mut context = database_test_context();
+
+        // The two tokens real guests passed, measured 2026-09-19 by resolving the
+        // sl-relative pointer table in `0103451A` / `01031C0A`.
+        for (addr, token) in [(0x2000u32, &b"res\0"[..]), (0x2100, &b"ga\0"[..])] {
+            context.write_bytes(addr, token).unwrap();
+            let err = sort_records(&mut context, addr, 1).await.unwrap_err();
+            let wie_util::WieError::Unimplemented(m) = err else {
+                panic!("slot 8 must stay Unimplemented")
+            };
+            let want = alloc::format!("{:?}", str::from_utf8(&token[..token.len() - 1]).unwrap());
+            assert!(
+                m.contains(&want) && m.contains(&alloc::format!("measured r0={addr:#x}")),
+                "slot 8 must quote the token AND keep the raw pointer, got {m}"
+            );
+        }
+
+        // Not quoted: too long, non-printable, unreadable, null. The message keeps
+        // the raw pointer in every one of them.
+        //
+        // 17 is a literal on purpose — see this test's doc comment. Widening
+        // `SLOT8_TOKEN_MAX` must redden here, and the assertion below is the
+        // direct statement of that.
+        assert_eq!(
+            SLOT8_TOKEN_MAX, 16,
+            "SLOT8_TOKEN_MAX is the only thing bounding what leaks into a log; widening it is a decision, not an edit"
+        );
+        let long = [b'a'; 17];
+        context.write_bytes(0x2200, &long).unwrap();
+        context.write_bytes(0x2300, b"ab\x01cd\0").unwrap();
+        for (addr, why) in [
+            (0x2200u32, "longer than SLOT8_TOKEN_MAX"),
+            (0x2300, "contains a control byte"),
+            (0xFFFF_0000, "unreadable"),
+            (0x0, "null"),
+        ] {
+            let err = sort_records(&mut context, addr, 1).await.unwrap_err();
+            let wie_util::WieError::Unimplemented(m) = err else {
+                panic!("slot 8 must stay Unimplemented")
+            };
+            assert!(
+                !m.contains(" (\"") && m.contains(&alloc::format!("measured r0={addr:#x}")),
+                "slot 8 must not quote a token that is {why}, and must still report r0, got {m}"
+            );
         }
     }
 

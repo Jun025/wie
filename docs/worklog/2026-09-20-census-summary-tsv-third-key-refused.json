@@ -1,0 +1,47 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-20",
+  "task": "wie-census-input-precedence-and-signature-lookup-p1",
+  "title": "7월 summary.tsv 73행 — 쓰지 않기로 «결정»했다. 모호해서가 아니라 폴백보다 덜 담고 있어서다",
+  "summary": "채택 제안 1건(#p1)은 구현이 아니라 «결정»을 요구했고, 그 판별식도 스스로 지정했다(73행이 187행 중 어느 부분집합인가). 그래서 셌다. ★제안의 전제 둘이 모두 틀렸다: ⑴'베이스네임이라 겹치는 stem 을 못 가른다' — summary.tsv 는 2열에 platform 을 들고 있고 <platform>/<basename> 은 이 파일이 이미 가진 tailKey 와 같은 모양이라 73행 중 31행이 오조인 0 으로 조인된다(겹치는 stem 1건 포함, 그것도 가려진다) ⑵'값이 같은데 라벨만 바뀐다' — 이 회차가 처음 기대한 근거이고 역시 틀렸다: 16행의 bucket 이 실제로 바뀌며 ★전건 같은 전이(NoSuchMethod → UNCLASSIFIED)다. 원인은 7월 작성기가 reason 을 첫 줄에서 끊었다는 것 — 조인 가능한 31행 중 23행에서 summary 의 reason 이 stem.json 의 진부분 접두사이고 평균 50자 ↔ 249자다. ★즉 교정이 하나도 없고 전부 손실이라 거절이 옳고, 이는 이 파일이 오늘의 러너에 대해 문서화한 방향의 정반대다. 그래서 결정을 주석에 굳히지 않고 매 실행 재게 했다: would-join/would-change/truncated/key-names-no-file-here 4수를 기존 입력 고지 줄에 싣고, 되돌릴 조건을 수로 못박았다(truncated=0 인데 would-change 가 남으면 그것은 교정이다 ⇒ 그때 다시 열어라). lookup() 우선순위는 무접촉이라 데이터 행은 바이트 동일(cmp IDENTICAL · 188줄)이고 버킷 분포도 불변이다. 영속 주석의 거짓 1건('basename-keyed, which cannot tell them apart either')도 고쳤다.",
+  "changes": [
+    "scripts/game-lab-census-map.mjs — ⑴byCarrier 인덱스 신설(★조회 키가 아니다 · 거절을 매 실행 재기 위한 용도) ⑵반사실 4수 계산(would-join · would-change · truncated · key-names-no-file-here) ⑶입력 고지 줄에 그 4수와 되돌릴 조건을 실음(헤더·stdout·--bucket/--signature stderr 네 면 그대로) ⑷머리주석에 결정·근거·되돌릴 조건 ⑸비대칭 고지 줄의 거짓 문면 교정",
+    "docs/report/0191 신설 — 전제 2건 반증 · 부분집합 계수 · 16행 전이 방향 · 절단 실측(23/31 · 50자↔249자) · 회귀 cmp · 개악 3종 · 한계 5건 · 부수 발견",
+    "lookup() 우선순위 무접촉 · game_lab/ 쓰기 0 · 러너 무접촉 · 7월 열 소급 재분류 0 · 새 검사기 0"
+  ],
+  "verification": [
+    "★부분집합 계수(제안이 지정한 판별식) — summary 73행 · 고유 베이스네임 73 · platform 열 1종. <platform>/<basename> 로 broken/ 에 조인되는 행 31(오조인 0 · 겹치는 stem 1건 포함) · 이 코퍼스에 없는 행 42(전건 game_lab/working/ 로 이동 · 미발견 0)",
+    "★★조인 시 변화 방향 — result 차이 0 · bucket 차이 16 · ★16건 전부 동일 전이 NoSuchMethod → UNCLASSIFIED · 반대 방향 0. 교정은 하나도 없다",
+    "★★절단 실측 — 조인 가능한 31행 중 23행에서 summary reason 이 stem.json reason(평탄화)의 진부분 접두사. 평균 50자 ↔ 249자. json 이 여러 줄인 행이 23 으로 일치",
+    "★회귀 없음 — origin/main 판본과 같은 입력에 돌려 주석 아닌 행 188줄 cmp IDENTICAL · 달라진 주석 2줄 · source 집계 stem.json=186·none=1 불변 · 버킷 80·37·37·15·7·6·4·1 불변",
+    "★★개악 양방향 ⒜ 합성 입력(게임 바이트·게임명 0) — lossy(첫 줄 절단)는 truncated=2·would-change=2 로 «거절 유지», clean(잃은 텍스트 없이 다르게 말함)은 truncated=0·would-change=1 로 «되돌릴 조건 발화». 기구가 두 경우를 실제로 가른다",
+    "★★개악 A — 절단 술어를 false 로 무력화하면 실제 7월 입력에서 truncated 23 → 0 이 되어 출력이 «되돌려라»로 읽힌다(정반대 조치). 원복 후 출력 동일",
+    "★★개악 B — 거절한 키를 실제로 lookup() 에 넣으면 데이터 행 31개가 달라지고 버킷이 NoSuchMethod 37→21 · UNCLASSIFIED 80→96 으로 이동(=16행, 예측과 일치). 원복 후 cmp 동일",
+    "★부수 발견 실측(합성) — 같은 경로 행이 2번 적히면 꼬리 키가 null 로 무효화돼 summary.tsv=1 이 stem.json=1 로 떨어진다. 러너는 --resume 없이 재실행하면 실제로 덧붙인다(RESUME=0 기본)",
+    "★게임명 유입 — node scripts/corpus-name-inflow.mjs → BOUNDED 6회/3쌍 · SUFFIX-ATTACHED 0회/0쌍(판단 필요 0). ★그 6회는 전건 origin/main 에 이미 있다(도구가 «변경된 파일의 본문 전체»를 재므로 내가 고친 game-lab-census-map.mjs 머리주석의 기존 3 stem 이 계수된다). 분리 계측: origin/main 판본 단독 6회/3쌍 · 이 커밋이 더한 줄만 0회/0쌍 · 새 파일 2개 0회/0쌍 ⇒ 보고 수는 6이고 이 회차가 더한 유입은 0이다. ★세 수 전부 «건너뜀 0» 에서 나왔다 — 첫 분리 계측은 절대경로를 써서 «부재»로 건너뛴 0 이었고(도구는 말했고 내가 안 읽었다), 그것은 재지 않은 0 이다",
+    "★repo 표준 게이트 — cargo fmt rc=0 · clippy --all -D warnings rc=0 · wasm clippy rc=0 · +beta clippy rc=0 · RUST_MIN_STACK=4194304 cargo test --all rc=0 · check-worklog-json rc=0 · check-docs-report-serial rc=0 · check-worklog-coverage rc=0 · npm run audit rc=0"
+  ],
+  "limits": [
+    "★7월 열은 복원되지 않는다 — 이 회차의 산출은 «쓰지 않는다»를 근거와 함께 기록한 것이지 과거 판정을 고친 것이 아니다. 겹치는 3 stem 의 비대칭은 그대로이고, 그 중 이 파일에 존재하는 것은 1건뿐이다(나머지 캐리어의 행이 아예 없다)",
+    "★truncated 술어는 «진부분 접두사»만 잡는다 — 중간을 잘라내거나 철자가 바뀐 손실은 would-change 로만 보이고 truncated=0 이라 ★되돌릴 신호로 오독될 수 있다. 더 강한 술어(토큰 포함 관계 등)는 값에 비해 비싸다고 판단해 넣지 않았다",
+    "★이 결정을 무는 검사는 없다 — game_lab/ 은 Constraint 9 로 CI 에 영원히 들어갈 수 없고 checker-census 기준 이 파일은 호출자 0 바구니다. 새 검사기를 만들지 않은 것은 판단이며(호출자 0 바구니를 하나 더 늘릴 뿐), 그 대가는 이 결정이 «도구 출력로만» 서 있다는 것이다 — 그래서 red/green 대신 합성 입력 2종으로 판별력을 실증했다",
+    "★세 번째 키는 러너의 «탐지된 platform» 과 코퍼스의 «디렉터리 이름» 을 등치시킨다 — 어긋나면 미스(폴백)이지 오조인이 아니고, 오조인은 두 코퍼스를 섞어 부르는 오용이 필요하다. 거절했으므로 오늘은 어느 쪽도 실현되지 않는다",
+    "★전 코퍼스 재실행 0 — game_lab/ 쓰기 0 · 러너 무접촉. 대조는 기존 7월 산출물과 스크래치 합성 입력뿐이다",
+    "★형제 제안 #p0(러너가 경로 키 JSON 도 쓰게 하라)은 손대지 않았다 — 각자 티켓이 있다"
+  ],
+  "adoptedProposals": [
+    "2026-09-19-census-input-precedence-and-signature-lookup#p1"
+  ],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "러너를 두 번 돌리면 손실 회피 경로가 조용히 꺼진다 — 중복 행이 꼬리 키를 null 로 만든다",
+      "plainSummary": "같은 폴더에 검사를 두 번 돌리면 표에 같은 줄이 두 번 적히고, 그러면 도구가 그 줄을 «애매하다»며 버려 예전의 손실 많은 자료로 되돌아갑니다. 판정이 조용히 나빠집니다.",
+      "userBenefit": "재실행은 흔한 조작인데(중단된 회차 이어 돌리기 · 일부만 다시 보기) 그 뒤 표의 판정이 소리 없이 열화된다. 고치면 «두 번 돌렸다»가 판정을 바꾸지 않는다.",
+      "why": "실측(합성 입력 · 게임명 0): summary.tsv 에 같은 경로 행이 1개면 source=summary.tsv, ★같은 행을 2개 적으면 source=stem.json 으로 떨어진다. 원인은 두 쪽에 있다 — 러너는 RESUME=0 이 기본이라 같은 --out 에 재실행하면 행을 덧붙이고(헤더만 부재 시 1회 작성), 생성기의 byTail 은 중복 키를 null(모호)로 무효화한다. ★«같은 파일의 같은 판정»이 두 번 적힌 것뿐인데 모호로 취급되는 것이 급소다. 처방은 작다: 꼬리 키 중복을 무효화하기 전에 두 레코드가 실제로 다른지 보고, 같으면 모호가 아니다. 또는 러너가 같은 경로 행을 덧쓰지 말고 갱신하게 한다. ★정확 키(byPath)는 이 함정에 걸리지 않으므로 피해는 «코퍼스 경로 표기가 달라 꼬리로 조인되는» 경우에 한정된다 — 먼저 그 경우가 실제로 얼마나 나는지 세는 것이 옳다.",
+      "tradeoff": "★«같으면 모호가 아니다»를 넣으면 비교 술어가 하나 는다(무엇을 같다고 볼 것인가 — result 만인가 reason 까지인가). 러너 쪽을 고치면 append 의 단순함(크래시해도 앞 행이 남는다)을 잃는다. ★그리고 이 손실은 조용하므로 «지금 안 아프다»가 «안전하다»의 증거가 아니다 — 그 점이 값을 재기 어렵게 만든다.",
+      "effort": "S",
+      "target": "scripts/game-lab-census-map.mjs · scripts/game-lab-recensus.sh"
+    }
+  ]
+}

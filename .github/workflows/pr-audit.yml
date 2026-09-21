@@ -1,0 +1,100 @@
+name: PR dependency audit
+
+# `cargo audit` on the PR that moves a dependency, so a regression is attributed to the change
+# that caused it instead of surfacing in tomorrow's scheduled run.
+#
+# ── Why this exists, measured ───────────────────────────────────────────────
+# 2026-09-19: base swap `36df9c31` silently reverted `rtrb` 0.3.5 -> 0.3.4 (RUSTSEC-2026-0274)
+# and `event-listener` 5.4.2 -> 5.4.1. `rust-audit.yaml` caught it — three days later, on the
+# daily cron, with no PR attached, and finding the culprit took a bisect over the boundary
+# (`docs/report/0181`). The price of catching it on the PR itself was measured in
+# `docs/report/0185`: the audit job is p50 17s (no toolchain install, no compile), the repo is
+# public so minutes are free, and with the paths filter below only 2 of the last 60 PRs (3.3%)
+# would have fired it — one of which is exactly that base swap.
+#
+# ★★NEVER MAKE THIS A REQUIRED CHECK. Two independent reasons, both already paid for here:
+#   ⑴ It is paths-filtered. A required check whose triggers carry `paths:` never reports on a PR
+#     that misses them, and GitHub then shows "Expected — Waiting for status" forever and the
+#     merge button never unlocks. That outage is in AGENTS.md's Incident ledger, and it is why
+#     `doc-liveness.yml` carries the same line and why `engine-contract.yml` filters INSIDE the
+#     job instead of on its triggers.
+#   ⑵ `cargo audit` turns red on a NEW ADVISORY BEING PUBLISHED — with no change to this repo at
+#     all. A gating check that a stranger can trip overnight stops being a signal and becomes a
+#     thing people route around; Constraint 5 already forbids the usual escape hatches
+#     (`--ignore`, `continue-on-error`).
+# ★Non-gating here means "not in the required list", NOT `continue-on-error`. The job's exit code
+# stays honest and visible; it simply does not hold the merge button. As of 2026-09-20 the
+# required contexts are `contract`, `build-web` and `rust_ci (…, stable)` x3 — a new context is
+# not added to that ruleset by existing, so wiring alone is sufficient and nothing here needs to
+# opt out.
+#
+# ── Why a separate workflow and not a `pull_request` trigger on rust-audit.yaml ──
+# Adding one there would also put `scripts/check-audit-warnings.mjs` on every matching PR, and
+# that file's own step comment records a deliberate decision against exactly that: "NOT a
+# required check and cannot become one by accident: this workflow has no `pull_request` / `push`
+# trigger ... Promoting it is a deliberate act — do it after the ledger check has a track record,
+# not before." That decision is not this round's to overturn, so this workflow runs `cargo audit`
+# and nothing else. The daily job keeps both steps and stays the alarm channel.
+#
+# ── What this does NOT see ─────────────────────────────────────────────────
+# ★A dependency can become vulnerable without `Cargo.lock` moving — a `[patch]` entry or a git
+# `rev` pin whose content changes under the same ref. The filter below cannot see that, by
+# construction. `rust-audit.yaml`'s daily run still owns that class; this is attribution, not a
+# replacement for it.
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "**/Cargo.toml"
+      # Self-test: a PR that edits this job runs it once before landing. Same reason
+      # doc-liveness.yml carries one — GitHub refuses `workflow_dispatch` for a workflow not yet
+      # on the default branch, so a job edit would otherwise land untested. Every other PR pays
+      # zero.
+      - ".github/workflows/pr-audit.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr_audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cache cargo registry
+        uses: actions/cache@v5
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v5
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+      # No `submodules:` — this repo has no `.gitmodules` (verified), so the daily job's
+      # `submodules: recursive` is a no-op there and is left out here rather than copied.
+      - uses: actions/checkout@v6
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      # No ignores, no `--deny warnings`, no `continue-on-error` — identical semantics to the
+      # daily job's audit step on purpose, so the two can never disagree about what counts as a
+      # failure. Vulnerabilities exit non-zero; informational warnings (unmaintained / yanked)
+      # print and exit 0. The allowed-warning list and the ledger comparison are NOT run here;
+      # they stay in rust-audit.yaml (see the header).
+      #
+      # WHEN THIS GOES RED: read docs/project-kb/02_status.md — section A is what is still open,
+      # section C holds the exposure verdicts we already reached and the dependency version each
+      # was measured against.
+      - name: cargo audit
+        run: cargo audit

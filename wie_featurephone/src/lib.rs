@@ -149,16 +149,26 @@ impl WieEmulator {
     }
 
     /// For an LGT title, the statically-detected compile model — `"clet"`
-    /// (WIPI-C, wie renders it) or `"aot-java"` (AOT-compiled Java, boots but
-    /// does not yet render — the §7 wall). Returns `null` for every non-LGT
-    /// platform (KTF / SKT / J2ME), where the notion does not apply.
+    /// (WIPI-C) or `"aot-java"` (AOT-compiled Java). Returns `null` for every
+    /// non-LGT platform (KTF / SKT / J2ME), where the notion does not apply.
     ///
     /// Detected once at construction from the app's own import thunks (read-only,
     /// no execution) and never changes for this instance. Because it is set in
     /// the constructor it is valid immediately — a shell can call it right after
-    /// `new WieEmulator(...)` succeeds, before the first `tick()`, to decide
-    /// whether to run the title. Recommended use: block `"aot-java"` at upload
-    /// with a "not yet supported" notice and run only `"clet"`.
+    /// `new WieEmulator(...)` succeeds, before the first `tick()`.
+    ///
+    /// **This getter reports how the app was compiled. It does not report whether
+    /// wie can render it, and it never could** — an earlier revision of this doc
+    /// said `"aot-java"` "boots but does not yet render (the §7 wall)" and
+    /// recommended blocking the whole model at upload. That recommendation rested
+    /// on a 2026-07 sweep whose premise upstream `cc652b1d` (2026-08-04, "Implement
+    /// LGT Java AOT runtime") superseded. Re-measured 2026-09-21 over the local
+    /// corpus's 24 AOT-Java files (18 unique): **3 render** — `메이플스토리2007`
+    /// reaches its title screen and in-game intro, `현영맞고2006` its title screen,
+    /// `놈3` its splash — while the other 15 die at *boot*, before anything a
+    /// render path could reach. So the model is not a rendering predicate in
+    /// either direction. A shell that wants a runnability denylist owns it
+    /// per-title; see `docs/lgt.md` §7 and `docs/project-kb/02_status.md`.
     pub fn lgt_compile_model(&self) -> Option<String> {
         self.lgt_compile_model.map(str::to_owned)
     }

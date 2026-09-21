@@ -23,7 +23,11 @@ impl Component {
                 JavaMethodProto::new("configure", "(IIIII)V", Self::configure, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("setFocus", "()V", Self::set_focus, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getHeight", "()I", Self::get_height, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getWidth", "()I", Self::get_width, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("repaint", "()V", Self::repaint, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("repaint", "(IIII)V", Self::repaint_region, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("serviceRepaints", "()V", Self::service_repaints, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("hasFocus", "()Z", Self::has_focus, MethodAccessFlags::PUBLIC),
             ],
             fields: vec![],
             access_flags: ClassAccessFlags::PUBLIC | ClassAccessFlags::ABSTRACT,
@@ -75,11 +79,53 @@ impl Component {
         Ok(0)
     }
 
+    // Paired with getHeight, which has returned 0 since this layer landed: the lwc widgets are
+    // never laid out here, so there is no measured width to report and inventing one would be a
+    // guess a game could lay out against.
+    async fn get_width(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::getWidth({this:?})");
+
+        Ok(0)
+    }
+
     // The lwc widget layer has no paint plumbing in wie (all peers here are logged
     // stubs); repaint follows the same contract. Games draw through Card/Canvas.
     async fn repaint(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::warn!("stub org.kwis.msp.lwc.Component::repaint({this:?})");
 
         Ok(())
+    }
+
+    // The region-bounded repaint 학교가는길 calls. It defers to the whole-component form rather
+    // than logging separately, so the two stay one contract if that ever grows real plumbing.
+    async fn repaint_region(
+        jvm: &Jvm,
+        _: &mut WieJvmContext,
+        this: ClassInstanceRef<Self>,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+    ) -> JvmResult<()> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::repaint({this:?}, {x}, {y}, {width}, {height})");
+
+        jvm.invoke_virtual(&this, "org/kwis/msp/lwc/Component", "repaint", "()V", ()).await
+    }
+
+    // serviceRepaints blocks until pending paints flush; with repaint a no-op there is nothing
+    // outstanding to wait for, so returning immediately is the honest equivalent.
+    async fn service_repaints(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::serviceRepaints({this:?})");
+
+        Ok(())
+    }
+
+    // Reported as false rather than tracked: setFocus and focusNotify are both stubs that keep
+    // no state, so a stored flag would claim a focus this layer never actually grants. Games
+    // that see false keep handling keys themselves, which is what the other lwc stubs assume.
+    async fn has_focus(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<bool> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::hasFocus({this:?})");
+
+        Ok(false)
     }
 }

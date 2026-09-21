@@ -1,0 +1,58 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-20",
+  "task": "wie-price-cargo-audit-at-pr-stage-wire-it-p0",
+  "title": "PR 단계 cargo audit 을 배선했다 — paths 필터 + 비-required · 「required 로 올리지 마라」를 두 곳에 못박았다",
+  "summary": "채택 제안 2026-09-20-price-cargo-audit-at-pr-stage#p0 의 이행. 선행 리니지는 가격만 재고 권고로 끝났고(그 회신이 스스로 「권고가 채택되면 구현 티켓」이라 적었다) 이 회차가 그것을 집행한다. ⒞ 미해소 확인 — 워크플로 10개 전수에서 cargo audit 은 rust-audit.yaml 한 곳뿐이고 그 트리거는 schedule + workflow_dispatch 다(pull_request 0). ⒝ 선행 회차가 미룬 이유는 «기술 장애»가 아니라 «산출물 경계»였다(한계 ⑴: 권고이지 구현이 아니다 · 구현 회차가 실측해야 한다) ⇒ 막는 전제 없음. ★★가장 중요한 발견: 가장 싼 배선(rust-audit.yaml 에 pull_request 한 줄)은 «하면 안 된다» — 그 파일 자신이 :106-109 에 「Promoting it is a deliberate act — do it after the ledger check has a track record, not before」라고 적어 두었고, 붙이면 cargo audit 만이 아니라 대장 §A 검사기까지 PR 에 올라간다. ⇒ 별 워크플로 .github/workflows/pr-audit.yml 로 짓고 그 안에서 cargo audit «만» 돌린다. ★비-게이팅은 continue-on-error 가 아니라 «required 목록에 안 넣는 것»으로 만들었다(Constraint 5). ★개악은 가상의 것이 아니라 이 배선이 존재하는 이유가 된 그 되돌림(rtrb 0.3.5 → 0.3.4 = RUSTSEC-2026-0274)으로 쟀다.",
+  "changes": [
+    ".github/workflows/pr-audit.yml 신설 — pull_request(types: opened·synchronize) + paths 4항목(Cargo.toml · Cargo.lock · **/Cargo.toml · ★자기 파일) · 잡 pr_audit · 단계는 캐시 2 + checkout + cargo-audit 설치 + `cargo audit` 하나",
+    "★머리주석에 「NEVER MAKE THIS A REQUIRED CHECK」 + 이유 «둘» — ⑴paths 필터 + required = 교착(Incident ledger) ⑵★이 검사에만 있는 이유: 새 자문 «공개»만으로 repo 변경 0 인 채 red 가 된다",
+    "★AGENTS.md §Incident ledger — 「Never make doc-liveness required」 바로 뒤에 pr-audit 항목(+13행). ★doc-liveness 가 갖지 않은 둘째 이유를 명시하고, 비-게이팅의 뜻이 «required 목록에 없음»이지 continue-on-error 가 아님을 박았다",
+    "★자기 시험 경로 — paths 에 이 워크플로 파일 자신을 넣었다(doc-liveness 선례). GitHub 이 기본 브랜치에 없는 워크플로의 workflow_dispatch 를 거부하므로(404 실측) 그것이 없으면 «시험되지 않은 채 착지»한다",
+    "docs/report/0198 신설 — ⒞⒝ 실측 · rust-audit.yaml 반대 결정 인용 · required 금지 경로 2곳 표 · paths 실측 · 개악 양방향 · 한계 4",
+    "★rust-audit.yaml 무접촉 · check-audit-warnings.mjs 무접촉 · ★AGENTS.md 의 «2026-09-18 결정표»(형제 #p1 몫)와 연번·worklog 스키마 축(형제 #p2 몫) 무접촉"
+  ],
+  "verification": [
+    "★⒞ 이미 도나 — 워크플로 10개 전수 계수: cargo audit 문자열은 rust-audit.yaml 5회뿐 · 나머지 9개 0회. 그 워크플로 트리거 = schedule, workflow_dispatch(pull_request 0) ⇒ PR 단계 감사 부재",
+    "★⒝ 선행 회차가 미룬 이유 — …-recommend-only.done.md 한계 ⑴ 「권고이지 구현이 아니다 — 구현 회차가 실측해야 한다」 · :172 「권고가 채택되면 구현 티켓」. ⇒ 범위 문제였고 지금 서 있지 않다. 그 회차가 기각한 대안 ⑵⑶은 뒤집지 않았다",
+    "★★rust-audit.yaml 에 붙이지 않은 근거 — 그 파일 :106-109 축자: 「NOT a required check and cannot become one by accident ... Promoting it is a deliberate act — do it after the ledger check has a track record, not before」. 붙이면 §A 검사기까지 PR 에 올라간다 ⇒ 별 워크플로로 지었다",
+    "★워크플로 YAML 파싱 실측(pyyaml) — 트리거 [pull_request] · types [opened, synchronize] · paths ['Cargo.toml','Cargo.lock','**/Cargo.toml','.github/workflows/pr-audit.yml'] · job pr_audit · steps 5 · ★continue-on-error 키가 잡·스텝 «전건 None»",
+    "★required 목록 실측 — AGENTS.md 정본 블록의 5개(contract · build-web · rust_ci ×3 stable)에 새 컨텍스트 없음 ⇒ 배선만으로 비-게이팅이 성립한다",
+    "★개악 ⒝green — 손대지 않은 트리에서 `cargo audit`: rc=0 · 「2 allowed warnings found」(ttf-parser unmaintained · chacha20 yanked)",
+    "★개악 ⒜red — `cargo update -p rtrb --precise 0.3.4`(= RUSTSEC-2026-0274 · §C 의 C-1 이 해소한 판본으로 되돌림 · base swap 36df9c31 이 실제로 한 그 되돌림): ★rc=1 · 「error: 1 vulnerability found!」. ★가상의 결함이 아니라 이 배선이 존재하는 이유가 된 사건으로 쟀다 — 티켓이 허용한 «--deny 류 대체»가 필요 없었다",
+    "★개악 후 원복 — Cargo.lock 을 백업에서 복원하고 rtrb = 0.3.5 확인 · git status 청결(커밋 0). ★그 개악은 Cargo.lock 을 건드리므로 paths 필터에도 걸린다(두 축이 같은 사건에서 맞물린다)",
+    "★check-worklog-json rc=0 · check-doc-liveness-parity rc=0(펜스 sh 블록 0) · checker-census rc=0 · check-docs-report-serial rc=0(0198) · check-worklog-coverage rc=0",
+    "★게임 파일명 유입 — 도구를 «문장을 다 쓴 뒤 마지막에» 실행했다: BOUNDED 0회/0쌍 · PREFIX-EMBEDDED 2회/1쌍(제외) · SUFFIX-ATTACHED 0회/0쌍 ⇒ SUFFIX 가 비었으므로 「유입 0건」 주장 가능. 모집단은 game_lab/broken 184 stem(넓힌 기본값은 형제 PR #230 · 미착지)",
+    "★repo 표준 게이트 — fmt · clippy --all -D warnings · wasm clippy · RUST_MIN_STACK=4194304 cargo test --all · cargo +beta clippy 전건 rc=0(AGENTS.md 「무엇을 바꿨든 넷 다」 · 이 diff 에 Rust 0줄)"
+  ],
+  "limits": [
+    "★Cargo.lock 을 안 바꾸고 취약해지는 갈래는 못 본다 — [patch] 항목이나 git rev 핀의 내용이 같은 ref 아래서 바뀌는 경우. 일일 잡이 그 갈래를 계속 진다. ★이것은 대체가 아니라 «귀속»이다",
+    "★대장 §A 검사기(check-audit-warnings.mjs)는 PR 에 올리지 않았다 — 그 단계 자신의 결정 문면을 존중했다. 승격은 별 회차의 몫이다",
+    "★CI 에서 이 잡이 도는 것을 «이 PR 에서 처음» 본다 — 자기 시험 경로가 그것을 보장하지만 착지 전 관측은 한 번뿐이다",
+    "★비-required 는 «지금의 ruleset»에 의존한다 — 누가 이 컨텍스트를 required 로 올리면 교착이 즉시 난다. 막는 것은 두 문서의 문장이고 ★기계가 아니다(check-branch-protection-claim.mjs 는 드리프트를 잡지만 사람이 손으로 돌리는 가드다)",
+    "★p50 17s·60 PR 중 2건 발화는 «선행 회차(docs/report/0185)의 실측»을 인용한 것이지 이 회차가 다시 잰 값이 아니다 — 티켓이 「재측·재설계 불요」로 좁혔고 그 수는 그 회차의 기록이다"
+  ],
+  "adoptedProposals": [
+    "2026-09-20-price-cargo-audit-at-pr-stage#p0"
+  ],
+  "proposals": [
+    {
+      "title": "「required 로 올리지 마라」를 기계가 지키게 할지 정하라",
+      "plainSummary": "이 검사를 «머지를 막는 검사»로 올리면 안 된다고 문서 두 곳에 적었지만, 실제로 올려도 아무도 막지 않습니다.",
+      "userBenefit": "PR 이 영원히 «검사 대기» 상태로 멈추는 사고를 미리 막습니다.",
+      "why": "이 회차가 붙인 금지는 산문 두 줄(워크플로 머리주석 · AGENTS.md)이고 그것이 전부다. 올리는 순간의 대가는 이 저장소가 이미 겪은 사고다 — paths 필터가 붙은 required 검사는 그 경로를 안 건드린 PR 을 「Expected — Waiting for status」로 영원히 세운다(Incident ledger). ★그런데 막을 기계는 이미 절반 있다: scripts/check-branch-protection-claim.mjs 가 ruleset 전체를 .github/branch-protection-expected.json 과 지문 대조한다 ⇒ pr-audit 이 required 에 «들어오면» 그 지문이 달라져 잡힌다. 빈 곳은 그 가드가 «사람이 손으로 돌리는» 것이라는 점뿐이다(CI 토큰이 protection/rulesets 엔드포인트에서 403 이라 자동화가 막혀 있다 — 그 파일이 실측으로 적어 두었다).",
+      "tradeoff": "★자동화하려면 PAT 가 필요하고, 그것은 «비용 계급이 다른» 변경이다(그 스크립트 머리주석이 그렇게 적었다). 그리고 지금도 «올린 사람이 그 자리에서 교착을 본다» — 탐지가 늦는 것이 아니라 즉시 아프다. ⇒ 값이 작을 수 있다. 대안은 아무것도 하지 않고 두 문장을 한계로 두는 것이고, 실제로 이 회차가 그렇게 적었다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "`[patch]`/git rev 핀이 lockfile 없이 바뀌는 갈래를 PR 단계에서도 볼지 정하라",
+      "plainSummary": "일부 의존성은 잠금 파일을 바꾸지 않고도 내용이 바뀔 수 있어, 이번 검사가 그 변화를 보지 못합니다.",
+      "userBenefit": "의존성이 바뀌는 모든 경로에서 같은 시점에 경고를 받습니다.",
+      "why": "이 회차의 paths 필터는 Cargo.toml/Cargo.lock 이 움직일 때만 발화한다. 그런데 이 저장소는 RustJava 를 git rev 로 핀하고 있고(AGENTS.md 가 그 핀의 이동을 «설계 작업»이라 부른다), 그런 핀은 같은 ref 아래서 내용이 바뀌어도 lockfile 이 그대로일 수 있다 — 제안 원문이 이미 한계로 적은 갈래이고 이 회차가 그대로 물려받았다. 형태: rev 핀 목록을 뽑아 해시를 기록하고 그것이 움직이면 발화한다.",
+      "tradeoff": "★이 갈래는 «일일 잡이 이미 진다» — 하루 늦을 뿐 놓치지 않는다. 그리고 rev 핀 해시를 추적하는 기구는 새 산출물(기록 파일)과 새 갱신 의무를 만들고, 이 저장소가 반복해 규탄한 «두 벌»과 «검사되지 않는 의무»를 한꺼번에 더할 위험이 있다. 실관측도 0건이다(lockfile 없이 취약해진 사례가 아직 없다). 아무것도 하지 않고 한계로 두는 편이 맞을 수 있다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ]
+}

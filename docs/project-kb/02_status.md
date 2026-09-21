@@ -22,7 +22,7 @@
 - **오디오**: JS 가 사용자 제스처에서 만든 `AudioContext`+`GainNode` 를 주입, PCM 은 WebAudio 로 갭리스 스케줄, MIDI 는 무음 스텁.
 - **세이브**: `has_saves()` / `export_saves()`(불투명 `WIESAV01` 블롭: RMS+FS) / `import_saves(blob)` / `export_fs`·`import_fs`. 해제는 `free()`.
 - **로더**: `.zip`→KTF→LGT→SKT 순 판별, `.jar`→KTF→LGT→SKT→J2ME 폴백, `.jad` 는 거부(.jar 요구). `platform_kind()` 가 `"KTF"|"LGT"|"SKT"|"J2ME"` 반환.
-- **LGT 컴파일모델**: `lgt_compile_model(): string | null` — **additive getter(2026-07-13, featurephone 옵션1 확정·셸소유 계약변경)**. LGT 타이틀이면 `"clet"`(WIPI-C, wie 렌더 가능) 또는 `"aot-java"`(AOT-Java, 부팅되나 §7 벽으로 미렌더), **비-LGT(KTF/SKT/J2ME)는 `null`**(개념 부적용 — wasm-bindgen `Option<String>`→JS null, 셸이 `=== "aot-java"` 한 줄로 차단 판정·나머지는 falsy 통과라 구분 최단). 판별근거=앱 자신의 import thunk 정적 스캔(`binary.mod` ELF 실행섹션에서 `bl`+`.word 0x64` java-interface thunk 유무; 0x64⇒aot-java, 부재⇒clet). **생성자에서 1회 산정, 인스턴스 수명 내 불변 — 첫 `tick()` 전 즉시 유효**(로드 성공 직후 호출 가능). read-only 조회, 런타임 무영향. 코퍼스 실측: working/lgt 54 전부 clet, broken/lgt 24 aot-java(deep-assets 알려진 24종과 정확 일치)+22 clet, ambiguous 0. `platform_kind()` 등 기존 표면 전부 무변경 순수 additive. 권고 셸 패턴: `"aot-java"` 업로드 시점 실행 차단+"준비 중" 안내, `"clet"`만 실행.
+- **LGT 컴파일모델**: `lgt_compile_model(): string | null` — **additive getter(2026-07-13, featurephone 옵션1 확정·셸소유 계약변경)**. LGT 타이틀이면 `"clet"`(WIPI-C) 또는 `"aot-java"`(AOT 컴파일된 Java), **비-LGT(KTF/SKT/J2ME)는 `null`**(개념 부적용 — wasm-bindgen `Option<String>`→JS null, 셸이 `=== "aot-java"` 한 줄로 차단 판정·나머지는 falsy 통과라 구분 최단). 판별근거=앱 자신의 import thunk 정적 스캔(`binary.mod` ELF 실행섹션에서 `bl`+`.word 0x64` java-interface thunk 유무; 0x64⇒aot-java, 부재⇒clet). **생성자에서 1회 산정, 인스턴스 수명 내 불변 — 첫 `tick()` 전 즉시 유효**(로드 성공 직후 호출 가능). read-only 조회, 런타임 무영향. 코퍼스 실측: working/lgt 54 전부 clet, broken/lgt 24 aot-java(deep-assets 알려진 24종과 정확 일치)+22 clet, ambiguous 0. `platform_kind()` 등 기존 표면 전부 무변경 순수 additive. ★★**종전 「권고 셸 패턴: `"aot-java"` 업로드 시점 실행 차단+"준비 중" 안내, `"clet"`만 실행」은 «철회»한다**(2026-09-21) — 그 권고는 「aot-java = 렌더 0」이라는 **지금은 거짓인 전제** 위에 서 있었다. ⇒ ★**이 getter 는 «어떻게 컴파일됐나»를 답하지 «렌더되나»를 답하지 않는다.** 실측: aot-java 고유 18종 중 **3종 렌더**(`메이플스토리2007`·`현영맞고2006`·`놈3` — 트랙② 절) · 반대로 `broken/lgt` 의 clet 22종은 렌더하지 «못한다». ⇒ 어느 방향으로도 렌더 술어가 아니다. 차단 목록이 필요하면 **타이틀 단위**로 셸이 소유한다(그 축은 otterpebble repo 소관).
 
 ## CI 현황
 
@@ -223,8 +223,28 @@ x86_64 에서도 돈다. **그 축들이 좁히는 것은 «AVX2 없는 x86» �
 > ★**「우리가 그 결함 «경로»를 타는가」**다. 그 판정은 손으로 여러 축을 재야 나오는데, 남기지 않으면
 > **다음 자문 때 처음부터 다시 판다.**
 > ★★**그리고 그 판정에는 «유효기간»이 있다** — 대개 «그때 그 판본의 소스»를 읽어 낸 결론이라
-> **의존성을 올리면 다시 재야 한다.** 그래서 아래 표에 **판정 유효 범위** 칸이 있다.
+> **의존성이 움직이면 다시 재야 한다.** 그래서 아래 표에 **판정 유효 범위** 칸이 있다.
+> ★★**«움직인다»는 «올라간다»가 아니다 — 이 칸의 초판이 «올리면»이라고만 적어 3일 red 를 놓쳤다**
+> (2026-09-19 `wie-base-swap-must-not-silently-revert-ledger-section-c`). 실제로 문 것은 ★**lockfile 이
+> «통째로 교체»될 때**다: base swap `36df9c31` 이 `rtrb` **0.3.5 → 0.3.4**(C-1 이 해소한 판본) ·
+> `event-listener` **5.4.2 → 5.4.1**(C-2 가 해소한 판본)로 **되돌렸고**, 그 방향은 이 칸의 문면이 가리키지 않았다.
+> ⇒ ★**이 칸이 겨누는 사건은 셋이다**: ⑴의존성 **상향** ⑵★**lockfile·매니페스트의 통째 교체**(base swap ·
+> upstream 병합 · `cargo update` 전량) ⑶**판정의 전제가 바뀜**(feature 조합 · `[patch]` 핀 — 버전이 그대로여도 무효가 된다).
+> ★**그러므로 base 를 갈아끼우는 회차는 이 표의 C 행을 «전건» 재확인하라.**
 > ★**그 칸이 빈 행을 만들지 마라** — 유효 범위 없는 판정은 낡은 채로 권위 있게 인용된다.
+> ★★**[2026-09-20] 이제 그 한 문장을 «기계»가 본다** — `scripts/check-ledger-c-validity-scope.mjs`
+> (PR 마다 도는 `contract` 잡 · node 전용 ~10ms). ★**보는 것은 «비었는가»뿐이다** — 내용의 진위도,
+> lockfile 과의 대조도 아니다(아래 「두 벌을 만들지 마라」 절이 그 둘을 기각한 그대로다).
+> ★**표를 옮기거나 그 칸을 마지막에서 밀어내면 검사기는 «통과»가 아니라 «못 쟀다(rc=2)»로 운다** —
+> 그때는 이 표와 함께 그 검사기도 옮겨라. 근거·실측 = `docs/report/0197`.
+>
+> ★★**단 «기계가 이미 잡는 것»을 여기서 다시 만들지 마라 — 실측으로 확인했다**(같은 회차 · 현 `origin/main` 기준):
+> ⒜**게이팅 계급**(C-1 형) `rtrb` 0.3.5→0.3.4 ⇒ **`cargo audit` rc=1**
+> ⒝**비게이팅 계급**(C-2 형) `event-listener` 5.4.2→5.4.1 ⇒ `cargo audit` rc=0 이나
+>   **`scripts/check-audit-warnings.mjs` rc=1**(§A 집합 동등성이 문다)
+> ⇒ ★**두 계급 다 이미 red 로 말한다.** 이 표를 lockfile 과 대조하는 «새 검사기»는 **같은 것을 두 번 잡는 기구**이고,
+> 그것이 이 저장소가 반복해 규탄한 «두 벌»이다. ★**남은 결함은 «탐지»가 아니라 «그 red 를 언제·어디서 보는가»**이고
+> (schedule 전용이라 PR 단계에서 안 보였다) 그쪽은 **별 회차**의 몫이다.
 
 | # | 자문 | 대상 | 처분 | 노출 판정 | ★**판정 유효 범위** |
 |---|---|---|---|---|---|
@@ -267,10 +287,14 @@ rodio 요구가 `^0.3.2` 라 **rodio 를 건드리지 않고** 패치판으로 �
 - **제외 2건(등재 금지)**: `lgt/놈ZERO` = 기지의 per-game FAIL(누락 blit SVC 아님, 게임별 near-blank). `lgt/하이브리드` = 선재 핀 이슈(널점프 inject runaway) **PENDING·미접촉** — 승격/수정 금지.
 - **d7b5b024(sec/audit-green 머지) 게이트 소급 확정(2026-07-10)**: 코퍼스 복귀 후 2-run 실측 — 두 런 모두 **베이스라인 261 전수 회귀-0**(294 중 292 PASS, FAIL 2건은 두 런 동일한 비-베이스라인 LGT 타이틀 놈ZERO·하이브리드). crossbeam-epoch 0.9.20 등 lockfile 패치 상향의 회귀-블라인드 해소. ② has_exited getter 변경은 wasm32 전용 `wie_web` 한정 — 네이티브 `wie_validate` 바이너리 sha256 동일 실증(재컴파일 미발생, wie_cli 의존트리 무관)으로 동일 2-run 이 변경 후 트리에도 유효.
 - 최근 리듬(git log): WIPI-Java/MIDP 메서드 보강 · RustJava 포크 핀 상승(트랙2 클러스터 다수 귀속: readUnsignedByte·TimeZone·Byte 등) · 결정적 실행기(BTreeMap 폴링·스레드 스케줄링 = 구 트랙1 반영)로 232→261.
-- dispatch 의 `confirmedPlatforms` 는 **KTF·SKT·LGT**(2026-07-14 LGT 승격). SKT 는 코퍼스 50종 전량 베이스라인 등재. **LGT 는 clet 52종 confirmed** — 셸이 `lgt_compile_model()==="aot-java"` 로 AOT-Java 24종을 사전 제외하므로 confirmed 는 **clet 서브셋 정식 지원**을 의미(AOT 24종은 §7 동결·"준비 중", 렌더 가능 승격 아님). J2ME 는 웹 로더 폴백 지원.
+- dispatch 의 `confirmedPlatforms` 는 **KTF·SKT·LGT**(2026-07-14 LGT 승격). SKT 는 코퍼스 50종 전량 베이스라인 등재. **LGT 는 clet 52종 confirmed** — 셸이 `lgt_compile_model()==="aot-java"` 로 AOT-Java 24종을 사전 제외하므로 confirmed 는 **clet 서브셋 정식 지원**을 의미. ★**단 그 괄호에 있던 「AOT 24종은 §7 동결·"준비 중", 렌더 가능 승격 아님」은 2026-09-21 재기준선으로 낡았다** — 그중 3종은 렌더한다(트랙② 절). 차단이 계속 옳은지는 **otterpebble 셸의 판단**이고 이 문서가 정하지 않는다. J2ME 는 웹 로더 폴백 지원.
 
-**트랙 ② §7 벽 — LGT AOT-Java 렌더(모드 B — 외부 산출물 대기)**
-- LGT AOT-Java 24종은 렌더 0 유지. 바이너리-측 조사는 cp59 로 완결: per-frame 구동은 TIMER_EVENT(21) 모델로 확정(구현 가능), 유일 블로커는 **0x64 ordinal→native 등록표**. 오프라인 획득 소진 증명(AromaWIPI 비공번호 — `docs/reference/lgt_0x64_ordinal_table.md`) → **실기 트레이스 필요**. 도착 시 4단계 즉시 활성화 스캐폴드 커밋됨(기본 비활성·회귀 0). 요약: `10_deep-assets.md`, 원문: `docs/lgt_abi.md` §7·§8.
+**트랙 ② §7 벽 — LGT AOT-Java 렌더 (★2026-09-21 재기준선으로 전제 교체됨)**
+- ★★**「LGT AOT-Java 24종은 렌더 0 유지」는 «폐기»다 — 실측 3종이 렌더한다.** 그 결론은 **2026-07 포크 엔진**의 사실이었고, 그 뒤 **upstream `cc652b1d`(2026-08-04 「Implement LGT Java AOT runtime」)** 이 AOT 실행 모델을 갈아치웠다. 아무도 재측정하지 않아 그 한 줄이 **약 7주** 동안 현재형으로 남아 있었다.
+- **재기준선(2026-09-21 · `--inject` · release `wie_validate` @`394fde8b` · 고유 18종 전건)**: `메이플스토리2007` **PASS 5/6**(기본 예산 기준 · 최대 121 paints · 512색 · 스프라이트가 있는 타이틀 화면 → 인게임 인트로 장면) · `현영맞고2006` **PASS 6/6**(154 paints · 512색) · `놈3` **PASS 5/7**(69 paints · 93색 · 스플래시. FAIL 2건은 `paints:0` = 부하 기아). **나머지 15종은 렌더 0** 이나 전부 **부팅에서** 죽는다(ticks 0~3 · `NoClassDefFoundError` 또는 `Invalid memory access; address: 0`) — §7 «앞»의 벽이다. 전수표: `docs/report/0210`.
+- ★**「§7 이 풀렸다」고 읽지 마라 — 그건 측정되지 않았다.** 15종이 §7 에 **도달하지 못하므로** §7 이 아직 그들을 막는지는 알 수 없다. 측정된 것은 ⑴3종이 렌더한다 ⑵`메이플스토리2007` 추적에서 §7 이 「영구 블록」이라 한 루프가 실제로 돈다(`net.wie.EventQueue::getNextEvent` 73회 · `CardCanvas::paint` 21회 · `Graphics::drawImage` 193회 · `Display::pushCard` 1회 — cp48 의 「never `Display.pushCard`」를 직접 반증) ⑶`TIMER_EVENT` 문자열은 트리에 **0건**이고 구동은 `RepaintEvent(41)` 이다.
+- ★**배틀몬스터는 더 이상 「§7 에 도달하는 유일한 타이틀」이 아니다** — 부팅 tick 2 에서 `Invalid memory access; address: 0` 으로 죽는다(§7 «앞»). ⇒ **그 뒤에 §7 이 있는지는 «모른다».**
+- ※**정정하지 «않은» 것**: 「유일 블로커 = `0x64` ordinal→native 등록표 / 실기 트레이스 필요」는 **이 회차가 측정하지 않았다.** 렌더가 나온 이상 「유일 블로커」라는 말은 최소한 3종에 대해서는 참일 수 없지만, 그 표가 **다른 용도로** 여전히 필요한지는 재지 않았다. 원문 기록은 `docs/lgt_abi.md` §7·§8 · 요약은 `10_deep-assets.md`(둘 다 같은 취지의 정정 블록을 얹었다).
 
 **LGT confirmed 승격 선결조건 = AOT-Java graceful 제외 신호 (2026-07-13 조사, 미구현)**
 - **Q1 실패모드 실측**(배틀몬스터 2빌드, wie_validate=웹과 동일 `LgtEmulator::from_archive` 경로): 진짜 AOT-Java 는 **silent blank(throw 없음)** — paints=1·content=false·max_ticks(5천만) 완주, `run_err` 미발생(reason="only blank/uniform frames"). 부팅은 성공(`registered 20 app classes` + import table `0x64` 다수)하나 §7 렌더 드라이버 부재로 조용히 검은화면. **최악 케이스**: 셸의 현행 실패감지(tick() throw / has_exited)로 감지 불가. ※ 대조: broken/lgt 의 clet 미완성분(영웅서기4=WIPIC SVC 111, 붉은보석=stdlib 0x3f7)은 **throw** 하고, 제노니아2 는 이제 PASS — 즉 broken 폴더는 AOT 전용 아님, 실패모드는 서브셋별로 갈림.
