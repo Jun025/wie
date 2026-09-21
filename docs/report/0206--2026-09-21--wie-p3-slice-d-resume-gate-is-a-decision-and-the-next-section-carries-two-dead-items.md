@@ -105,10 +105,26 @@ STATE.md 는 ⒝ 를 「그 1,095줄을 **버려** benefit 을 스스로 취소�
 ★**45/57 을 «상수»로 인용하지 마라** — `0128` 자신이 「`upstream/main` 이 움직이면 45/57 도 바뀐다」고 적는다.
 
 ★★**그리고 이 가격표의 기준선을 적는다 — 그 1줄은 «이미 지불돼 있다».**
-위 값은 **base swap 이후 upstream 형상** 기준이고, 우리 `origin/main` 은 **2026-09-16(`ef3767df`)부터 이미
-⒝ 형상**이다(27팔이 공용으로 가 있고 `wipi_c.rs:32` 에 `#[allow(dead_code)]` 가 달려 있다).
-⇒ ★**우리는 닷새째 ⒝ 로 돌고 있고 그동안 5게이트·CI 전건 green 이다** — 트리 자신이 그 형상을
+위 값은 **base swap 이후 upstream 형상** 기준이고, 우리 `origin/main` 은 **이미 ⒝ 형상**이다
+(27팔이 공용으로 가 있고 `wipi_c.rs:32` 에 `#[allow(dead_code)]` 가 달려 있다) — 트리 자신이 그 형상을
 `slice D (orchestrator decision ⒝, 2026-09-16)` 으로 적는다.
+★**귀속을 정확히 적는다**: `ef3767df`(2026-09-16)는 그 형상을 **측정·기록**한 커밋이고, `allow` 자체는
+**그보다 앞선다** — `git show ef3767df^:wie-lgt/src/runtime/wipi_c.rs` 의 `:11` 이 이미 그 속성이다
+(그 커밋이 `wipi_c.rs` 에 더한 것은 45/57 을 적은 **주석 16줄**뿐 · `@@ -8,6 +8,22`).
+⇒ 오차 방향은 **보수적**이다(실제 ⒝ 형상은 더 오래됐다).
+
+⇒ ★**우리는 닷새째 ⒝ 로 돌고 있고 그동안 `Rust CI`(= `-D warnings` 축) 전건 green 이다** —
+창 `main` · `createdAt ≥ 2026-09-16`(327런)에서 `Rust CI` **failure 0건**(76런 · 1런만 leg 하나 `cancelled`).
+★★**이것을 「전 게이트 green」으로 넓혀 읽지 마라 — 그 문장은 «거짓»이다.** 같은 창의 red 는 **13건**이다
+(`Engine contract` 9 · `Security audit` 3 · `doc-liveness` 1).
+★**그런데도 이 가격표의 논거는 약해지지 않는다 — 붉은 축이 `-D warnings` 축이 «아니기» 때문이다.**
+그 플래그를 돌리는 워크플로는 `rust.yml`·`doc-liveness.yml` 둘뿐이고(`grep -rn 'D warnings' .github/workflows/`),
+그 `doc-liveness` red 1건조차 실패 스텝은 「Upstream ships no untriaged workflow …」이며
+「The four gates + the beta axis」 스텝은 **success** 였다(런 35473367963 · 스텝 10/15).
+붉은 근인 표본은 `check-worklog-coverage.mjs` 의 **재측정 주기 게이트**다(게이트② 가 실패 런
+35552118736·35556483145 로그로 확인) — 이 형상과 무관한 **문서·계약·감사** 게이트다.
+※★**13 은 게이트② 가 적은 6 보다 크다** — 그쪽은 `gh run list` 기본 건수에 창이 잘렸다. ★**판정은 같은 방향으로만
+움직인다**(「전건 green」은 red 가 하나라도 있으면 거짓이다).
 
 ★**기전 자체는 «추론»으로 두지 않고 «실측»으로 확인했다** — 같은 형상(사설 모듈 사슬 · 미참조 `pub fn`)의
 최소 재현을 만들어 돌렸다: `warning: function ... is never used` → `RUSTFLAGS=-D warnings` 에서

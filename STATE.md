@@ -208,8 +208,16 @@
     (`wie-lgt/src/runtime/wipi_c.rs:16-17` · `ef3767df` · `docs/report/0128--….md:47`) — 비공개 fn·struct·const 도 함께 죽는다.
     ⇒ ★**「그 27개 삭제」는 대안이 «아니다» — 지워도 18건이 남아 `-D warnings` red 다.** 추가 비용은 `#[allow(dead_code)]` **1줄**뿐.
     ★★**그리고 그 1줄은 «이미 지불돼 있다»** — 이 가격표는 **base swap 이후 upstream 형상** 기준이고,
-    우리 `origin/main` 은 **2026-09-16(`ef3767df`)부터 이미 ⒝ 형상**(`wipi_c.rs:32` 에 `allow` 실재)이라
-    ★**닷새째 ⒝ 로 돌며 5게이트·CI 전건 green** 이다.
+    우리 `origin/main` 은 **이미 ⒝ 형상**이다(`wipi_c.rs:32` 에 `allow` 실재). ★`ef3767df`(2026-09-16)는
+    그 형상을 **측정·기록**한 커밋이고 `allow` 자체는 **그보다 앞선다**(`ef3767df^` 에 이미 있다 · 그 커밋이
+    `wipi_c.rs` 에 더한 것은 45/57 을 적은 **주석 16줄**뿐이다).
+    ⇒ ★**닷새째 ⒝ 로 돌며 `Rust CI`(= `-D warnings` 축) 전건 green** 이다 — 같은 창(`main` · `createdAt ≥ 2026-09-16` ·
+    327런)의 `Rust CI` **failure 0건**(76런 · 1런만 leg 하나 `cancelled`).
+    ★★**「전 게이트 green」으로 넓혀 읽지 마라 — 그것은 거짓이다**: 같은 창에 red **13건**이 있다
+    (`Engine contract` 9 · `Security audit` 3 · `doc-liveness` 1). ★**그러나 이 형상과는 무관하다** —
+    `-D warnings` 를 돌리는 워크플로는 `rust.yml`·`doc-liveness.yml` 둘뿐인데, 그 `doc-liveness` red 1건조차
+    실패 스텝은 별건이고 「The four gates + the beta axis」 스텝은 **success** 였다(런 35473367963).
+    붉은 근인 표본은 `check-worklog-coverage.mjs` 의 **재측정 주기 게이트**다(게이트② 가 실패 런 2건 로그로 확인).
     ⇒ ★**정확한 문장은 「버린다」가 아니라 「«주차»한다」이고, ⒜ 로 되돌리는 값은 그 27줄이다.** 근거 수 = `docs/report/0206--….md`.
     ★★**새 실측 — ⒜ 를 고르면 그 테스트를 «다시 만들 수도 없다»**: 게스트 SDK 에 `lgt` feature 와
     `wipic-sys/src/lgt/graphics.rs` 가 **있는데** ★**`wipi/src/framebuffer.rs` 의 `lgt` 분기가 «0건»**
