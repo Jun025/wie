@@ -202,8 +202,14 @@
     ⒝ 에서 그 파일은 트리에 «남는다».** 27줄은 `match` 팔이고, 그 밖에 **진입점 3개가 계속 살아 있다**
     (`wipi_c.rs:199-200` 의 `init_process_state`·`set_use_annunciator` · `init.rs:32` 의 `set_display_property`)
     ⇒ 모듈이 통째로 고아가 되지 않는다. ★**단 공짜도 아니다**: `graphics.rs` 의 `pub fn` **30개 중 27개**가
-    미참조가 되고 `mod runtime` 이 크레이트 루트에서 **비공개**라 그 27개는 `dead_code` 다 ⇒ `-D warnings` 에서
-    ★**`#![allow(dead_code)]` 1줄이거나 그 27개 삭제**다(최소재현으로 확인 — 사설 모듈 사슬의 미참조 `pub fn` 은 실제로 에러가 된다).
+    미참조가 되고 `mod runtime` 이 크레이트 루트에서 **비공개**라 그 27개는 `dead_code` 다(최소재현으로 확인 —
+    사설 모듈 사슬의 미참조 `pub fn` 은 `-D warnings` 에서 실제로 에러가 된다).
+    ★★**그 27 은 «부분집합»이다** — 트리가 **실제 크레이트에서 `allow` 를 떼고 잰 값**은 ★**57개 최상위 항목 중 45건**
+    (`wie-lgt/src/runtime/wipi_c.rs:16-17` · `ef3767df` · `docs/report/0128--….md:47`) — 비공개 fn·struct·const 도 함께 죽는다.
+    ⇒ ★**「그 27개 삭제」는 대안이 «아니다» — 지워도 18건이 남아 `-D warnings` red 다.** 추가 비용은 `#[allow(dead_code)]` **1줄**뿐.
+    ★★**그리고 그 1줄은 «이미 지불돼 있다»** — 이 가격표는 **base swap 이후 upstream 형상** 기준이고,
+    우리 `origin/main` 은 **2026-09-16(`ef3767df`)부터 이미 ⒝ 형상**(`wipi_c.rs:32` 에 `allow` 실재)이라
+    ★**닷새째 ⒝ 로 돌며 5게이트·CI 전건 green** 이다.
     ⇒ ★**정확한 문장은 「버린다」가 아니라 「«주차»한다」이고, ⒜ 로 되돌리는 값은 그 27줄이다.** 근거 수 = `docs/report/0206--….md`.
     ★★**새 실측 — ⒜ 를 고르면 그 테스트를 «다시 만들 수도 없다»**: 게스트 SDK 에 `lgt` feature 와
     `wipic-sys/src/lgt/graphics.rs` 가 **있는데** ★**`wipi/src/framebuffer.rs` 의 `lgt` 분기가 «0건»**

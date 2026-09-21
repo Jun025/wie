@@ -17,7 +17,8 @@
     "27줄 치환 diff --numstat = 27 added / 27 removed / 1 file ⇒ ⒜↔⒝ 코드 축 대칭",
     "⒝ 에서 살아남는 진입점 3개 실측: wipi_c.rs:199 init_process_state · :200 set_use_annunciator · init.rs:32 set_display_property ⇒ 모듈이 고아가 되지 않고 파일이 트리에 남는다",
     "pub fn 계수: graphics.rs 정의 30 · ⒜ 참조 30(27 팔 + 위 3개 · 슬랙 0) · ⒝ 참조 3 · 미참조 27(comm 으로 계산). mod runtime 은 lib.rs:5 에서 비공개",
-    "★dead_code 를 «추론이 아니라 실측»으로: 같은 형상(사설 모듈 사슬 · 미참조 pub fn)의 최소 재현 크레이트를 실제 빌드 → warning: never used, RUSTFLAGS=-D warnings 에서 error 로 컴파일 실패",
+    "★dead_code 기전을 «추론이 아니라 실측»으로: 같은 형상(사설 모듈 사슬 · 미참조 pub fn)의 최소 재현 크레이트를 실제 빌드 → warning: never used, RUSTFLAGS=-D warnings 에서 error 로 컴파일 실패",
+    "★[게이트② 정정] 린트 «범위»는 pub fn 27 이 아니라 57개 최상위 항목 중 45건이다(pub fn 은 부분집합 — 비공개 fn·struct·const 도 함께 죽는다). 최소재현이 아니라 트리에서 인용: git show origin/main:wie-lgt/src/runtime/wipi_c.rs 의 :16-17 주석 · :32 의 #[allow(dead_code)] 실재 · ef3767df · docs/report/0128--….md:47. ⇒ 27개 삭제는 성립하지 않는 대안이고, allow 1줄은 이미 지불돼 있다",
     "keydraw_lgt 실행 소비자 전수: Scenario F 가 정확 픽셀 수(키 3개)를 단언하고 contract 는 main 의 required check ⇒ ⒜ 에서 확실히 깨진다. LGT cargo test 둘은 픽셀이 아니라 stdout 축이라 미측정으로 적었다",
     "★grep 은 /usr/bin/grep 사용 — 에이전트 셸의 ugrep 그림자가 -E 패턴에서 실제로 실패했다(헌장이 경고한 그 함정)"
   ],
@@ -36,7 +37,7 @@
       "plainSummary": "업스트림 재정렬의 마지막 큰 결정이 닷새째 «결정 대기»로 멈춰 있습니다. 어느 쪽이 기술적으로 옳은지는 게임 코퍼스 없이 증명할 수 없지만, «나중에 마음을 바꾸는 비용»은 지금 잴 수 있고 이미 쟀습니다. 그 축에서는 한쪽이 분명히 쌉니다.",
       "userBenefit": "멈춰 있던 base swap 이 다시 움직입니다. 그리고 지금 고르는 쪽이 틀린 것으로 드러나도 27줄이면 반대쪽으로 갈 수 있어, 잘못된 결정에 갇히지 않습니다.",
       "why": "재개 조건 3종 중 ⑴코퍼스·⑶upstream SDK 는 이 레인 밖이라 이 레인이 움직일 수 있는 것은 ⑵ 하나다. 그리고 ⑵ 의 순서 선행(#159 착지)은 2026-09-16 01:20 에 이미 열렸다. 측정: 코드 축은 27줄/1파일로 대칭(비김)이나 게이트 축이 일방적이다 — ⒜ 는 main 의 required check(Scenario F 의 정확 픽셀 단언 3건)를 약화시켜야 서고 그 신호는 복원 경로가 없다(게스트 SDK 에 lgt 분기 0건). ⒝ 의 게이트 비용은 0 이고, 1,095줄은 버려지지 않고 트리에 «주차»된다(진입점 3개 생존 실측).",
-      "tradeoff": "⒝ 를 고르면 upstream 의 LGT 리버스 1,095줄이 당분간 dead_code 로 주차된다(#![allow(dead_code)] 1줄 또는 27 fn 삭제). 그리고 이 권고는 «가역성» 축만 재었지 «정확성» 축을 재지 않았다 — 실제 clet 코퍼스가 생기면 뒤집힐 수 있다. 또한 ⒜ 의 게이트 비용은 하한만 측정됐다(LGT cargo test 둘은 stdout 축이라 미측정).",
+      "tradeoff": "⒝ 를 고르면 upstream 의 LGT 리버스 1,095줄이 당분간 dead_code 로 주차된다 — 비용은 #[allow(dead_code)] 1줄뿐이고 ★그 1줄은 우리 origin/main 에 2026-09-16(ef3767df)부터 이미 달려 있다(닷새째 ⒝ 형상으로 5게이트·CI 전건 green). ※「27 fn 을 대신 삭제한다」는 대안이 아니다 — 죽는 항목은 57개 중 45건이라 27개를 지워도 18건이 남아 -D warnings red 다. 그리고 이 권고는 «가역성» 축만 재었지 «정확성» 축을 재지 않았다 — 실제 clet 코퍼스가 생기면 뒤집힐 수 있다. 또한 ⒜ 의 게이트 비용은 하한만 측정됐다(LGT cargo test 둘은 stdout 축이라 미측정).",
       "effort": "S (결정 자체) · 집행은 조각 D 안에서 L",
       "target": "orchestrator"
     },

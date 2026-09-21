@@ -95,10 +95,26 @@ STATE.md 는 ⒝ 를 「그 1,095줄을 **버려** benefit 을 스스로 취소�
 (⒜ 에서는 30/30 이 참조된다 — 27 팔 + 위 3개, 슬랙 0). 그리고 `mod runtime;` 이 크레이트 루트에서
 **비공개**이므로(`wie-lgt/src/lib.rs:5`) 그 27개는 `dead_code` 다.
 
-★★**이것을 «추론»으로 두지 않고 «실측»으로 바꿨다** — 같은 형상(사설 모듈 사슬 · 미참조 `pub fn`)의
+★★**단 그 27 은 «부분집합»이다 — 린트가 실제로 잡는 범위는 더 넓다**(게이트② 지적).
+트리가 **실제 크레이트에서 `allow` 를 떼고 잰 값**은 ★**57개 최상위 항목 중 45건**이다 —
+출처는 `wie-lgt/src/runtime/wipi_c.rs:16-17` 머리주석(「removing it yields exactly those 45 warnings」) ·
+커밋 **`ef3767df`**(2026-09-16) · 정본 `docs/report/0128--2026-09-16--wie-adopt-slice-d-base-swap-executed-p1.md:47`.
+`pub fn` 만이 아니라 **그 팔에서만 불리던 비공개 fn·struct·const 도 함께** 죽기 때문이다.
+⇒ ★★**그러므로 「그 27개를 삭제한다」는 대안은 «성립하지 않는다» — 지워도 나머지 18건이 그대로 경고를 내
+`-D warnings` 에서 red 다.** ⒝ 의 추가 비용은 ★**`#[allow(dead_code)]` 1줄, 그 하나뿐**이다.
+★**45/57 을 «상수»로 인용하지 마라** — `0128` 자신이 「`upstream/main` 이 움직이면 45/57 도 바뀐다」고 적는다.
+
+★★**그리고 이 가격표의 기준선을 적는다 — 그 1줄은 «이미 지불돼 있다».**
+위 값은 **base swap 이후 upstream 형상** 기준이고, 우리 `origin/main` 은 **2026-09-16(`ef3767df`)부터 이미
+⒝ 형상**이다(27팔이 공용으로 가 있고 `wipi_c.rs:32` 에 `#[allow(dead_code)]` 가 달려 있다).
+⇒ ★**우리는 닷새째 ⒝ 로 돌고 있고 그동안 5게이트·CI 전건 green 이다** — 트리 자신이 그 형상을
+`slice D (orchestrator decision ⒝, 2026-09-16)` 으로 적는다.
+
+★**기전 자체는 «추론»으로 두지 않고 «실측»으로 확인했다** — 같은 형상(사설 모듈 사슬 · 미참조 `pub fn`)의
 최소 재현을 만들어 돌렸다: `warning: function ... is never used` → `RUSTFLAGS=-D warnings` 에서
-★**`error: ... is never used` · 컴파일 실패**. ⇒ ⒝ 의 추가 비용은 **`#![allow(dead_code)]` 1줄**
-또는 **그 27개 삭제**다.
+★**`error: ... is never used` · 컴파일 실패**.
+★★**다만 «값»은 최소재현이 아니라 트리가 이미 답하고 있었다** — 분석 대상 `pub(super) mod graphics;` 의
+**여섯 줄 위**에 그 45/57 이 적혀 있었고, 실운영 5일이 최소재현 크레이트보다 **강한 증거**다.
 
 ⇒ ★**정확한 문장은 「버린다」가 아니라 「«주차»한다」이고, ⒜ 로 되돌리는 값은 27줄이다.**
 
@@ -136,7 +152,7 @@ coverage at all … `wie-lgt/tests/` holds only `test_helloworld.rs`」라고 �
 | 축 | ⒜ upstream LGT 유지 | ⒝ 공용 복귀 |
 |---|---|---|
 | 반대쪽으로 넘어가는 diff | **27줄 / 1파일** | **27줄 / 1파일** ⇒ ★**비김** |
-| 1,095줄의 운명 | 사용 중 | ★**트리에 남는다**(+ `allow(dead_code)` 1줄 또는 27 fn 삭제) |
+| 1,095줄의 운명 | 사용 중 | ★**트리에 남는다**(+ `allow(dead_code)` **1줄** — ★`origin/main` 에 **이미 달려 있다**) |
 | 착지에 드는 게이트 변경 | ★**required check 약화**(최소 Scenario F 3단언 · 상한 미측정) | ★**0** |
 | 약화한 신호의 복원 가능성 | ★**없다**(SDK 에 `lgt` 분기 0건) | 해당 없음 |
 
@@ -160,6 +176,8 @@ coverage at all … `wie-lgt/tests/` holds only `test_helloworld.rs`」라고 �
 - 27줄 치환 diff `--numstat` = 27/27 · 치환 후 잔존 `graphics::` 참조 2건(+`init.rs` 1건) 실측
 - `pub fn` 30 / ⒜ 참조 30 / ⒝ 참조 3 / 미참조 **27** — `comm` 으로 계산
 - `dead_code` + `-D warnings` = **최소 재현 크레이트를 실제로 빌드**해 확인(추론 아님)
+- ★**린트 «범위»의 값은 최소재현이 아니라 트리에서 인용했다** — 45/57 · `allow` 실재는
+  `git show origin/main:wie-lgt/src/runtime/wipi_c.rs`(`:16-17` 주석 · `:32` `#[allow(dead_code)]`)로 직접 확인
 - ★`grep` 은 `/usr/bin/grep` 사용(에이전트 셸의 `ugrep` 그림자가 `-E` 에서 실제로 실패했다)
 
 ## 한계
