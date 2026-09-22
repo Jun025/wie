@@ -38,11 +38,58 @@ vtable = [
     { name = "close", descriptor = "()V", index = 18 },
 ]
 
+# 배틀몬스터 dispatches on index 25 and 훼밀리마트타이쿤 · 서든어택포켓 on index 28, all four titles
+# after they are already through boot, so these rows decide whether a title ever paints rather
+# than whether it starts (measured 2026-09-22: one swallowed `Unimplemented:
+# java/io/DataInputStream vtable index N` each, then paints 0 for the rest of the budget).
+# 서든어택포켓 then asked for 20 with 28 filled, so it is here for the same reason and on the same
+# evidence — every index in this class was named by the runtime before it was written, never
+# filled ahead of a dispatch that asked for it.
+#
+# readByte()B = 23 is measured, and it is what fixes the whole run — including a correction to
+# the rule block below, which lists only the six InputStream methods it needed. Those six cannot
+# be all of them: if DataInputStream's own methods started at 16, its first five (readFully([B)
+# readFully([BII) skipBytes(I) readBoolean() readByte()) would put readByte at 20, not 23. The
+# measurement forces three more inherited slots, and CLDC 1.1 InputStream supplies exactly three
+# after close() — mark(I) reset() markSupported() at 16 17 18 — so DataInputStream's own run
+# starts at 19 and reads
+#
+#   19 readFully([B)  20 readFully([BII)  21 skipBytes(I)  22 readBoolean()  23 readByte()
+#   24 readUnsignedByte()  25 readShort()  26 readUnsignedShort()  27 readChar()  28 readInt()
+#
+# with read()/read([BII)/close()/available() reusing the parent's indexes as overrides. 25 and 28
+# sit 2 and 5 slots past a measured anchor inside one contiguous run, which is the shortest span
+# any derived row in this file rests on.
+#
+# Getting one wrong is not free — unlike the argument-free Runtime/Thread reads below, these
+# return different widths off the same stream, so a misplaced row would hand the guest a
+# plausible wrong number instead of a named failure. That is the cost the anchor above buys down.
 [[class]]
 name = "java/io/DataInputStream"
 vtable = [
+    { name = "readFully", descriptor = "([BII)V", index = 20 },
     { name = "readByte", descriptor = "()B", index = 23 },
+    { name = "readShort", descriptor = "()S", index = 25 },
+    { name = "readInt", descriptor = "()I", index = 28 },
 ]
+
+# 턴 dispatches on java/io/DataOutputStream index 19 and this file deliberately leaves it empty,
+# the same way java/lang/Runtime index 10 is left empty below: the missing-entry stub names the
+# slot, and a wrong row here would not.
+#
+# The output side has no anchor of its own, and the one nearby measurement contradicts the plain
+# derivation instead of confirming it. CLDC OutputStream declares write(I) write([B) write([BII)
+# flush() close(), so a subclass's own methods should start at 15 — which puts DataOutputStream at
+# 15 writeBoolean, 16 writeByte, 17 writeShort, 18 writeChar, 19 writeInt. But PrintStream above
+# has println(Ljava/lang/String;)V = 34, and that same start-at-15 count reaches only 32 across
+# PrintStream's 18 preceding print/println declarations. Two slots are unaccounted for, and if
+# they belong to OutputStream then DataOutputStream's run starts at 17 and index 19 is
+# writeShort(I)V, not writeInt(I)V.
+#
+# Both candidates write to the guest's own stream at different widths, so standing in for the
+# other corrupts what the title later reads back — silently, and after the run looks fine.
+# Resolving it needs either the LGT ordinal table or a measured DataOutputStream row; until then
+# 턴 stops at a slot that says its own name, which is the better of the two failures.
 
 # The rows in this file were measured a title at a time, but they agree on one rule, and the rule
 # is what lets a row be written for a class no title has pinned down yet:
