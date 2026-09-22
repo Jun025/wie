@@ -44,12 +44,34 @@ vtable = [
     { name = "readByte", descriptor = "()B", index = 23 },
 ]
 
+# The rows in this file were measured a title at a time, but they agree on one rule, and the rule
+# is what lets a row be written for a class no title has pinned down yet:
+#
+#   a subclass's own methods take consecutive indexes from 10 (java/lang/Object is 10 entries),
+#   in the declaration order of the CLDC library source, with overrides of an inherited method
+#   reusing the parent's index instead of taking a new one, and static methods taking none.
+#
+# Two classes test the rule end to end rather than at a single point. java/io/InputStream above:
+# CLDC declares read() read([B) read([BII) skip(J) available() close(), so the rule predicts
+# 10 11 12 13 14 15 — and the measured 10/11/12/14/15 land exactly where it says, with the gap at
+# 13 being `skip`, which no title has called. java/lang/String below: the rule has to span 13
+# unmeasured slots between getBytes()=14 and substring(II)=28 and it arrives on the nose, then
+# again at trim()=33 and toCharArray()=34 across four more. A guessed order would not survive that.
+#
+# It is still a derivation. The LGT ordinal table that would confirm any of it is out of reach, so
+# a row written from the rule alone is a best safe guess, not a measurement — say which one you
+# are looking at before building on it.
 [[class]]
 name = "java/lang/String"
 vtable = [
     { name = "length", descriptor = "()I", index = 10 },
     { name = "charAt", descriptor = "(I)C", index = 11 },
     { name = "getBytes", descriptor = "()[B", index = 14 },
+    # 훼밀리마트타이쿤's wall. Derived, not observed: the run of 15..28 the rule fixes is
+    # equalsIgnoreCase compareTo regionMatches startsWith(S,I) startsWith(S) endsWith indexOf(I)
+    # indexOf(I,I) lastIndexOf(I) lastIndexOf(I,I) indexOf(S) indexOf(S,I) substring(I), which is
+    # exactly 13 long and so leaves no slack to absorb an error.
+    { name = "startsWith", descriptor = "(Ljava/lang/String;)Z", index = 19 },
     { name = "substring", descriptor = "(II)Ljava/lang/String;", index = 28 },
     { name = "trim", descriptor = "()Ljava/lang/String;", index = 33 },
     { name = "toCharArray", descriptor = "()[C", index = 34 },
@@ -70,10 +92,41 @@ vtable = [
     { name = "println", descriptor = "(Ljava/lang/String;)V", index = 34 },
 ]
 
+# 배틀몬스터 · 학교가는길 · 체스마스터 all dispatch on index 13 here, and none of them got a row
+# until now. CLDC declares getRuntime() (static, no slot), the constructor, then exit(I)V
+# freeMemory()J totalMemory()J gc()V — so the rule puts them at 10 11 12 13.
+#
+# Which of the four is at 13 is NOT settled by that, because the rule is a derivation and the
+# ordinal table that would confirm it is out of reach. What IS settled is that guessing wrong
+# cannot hurt: the JVM this runs on has no Runtime.exit at all, so there is nothing destructive
+# for a misplaced dispatch to land on, and the other three are argument-free reads that report a
+# fixed heap size or run a collection. A wrong guess costs a wrong long or a spurious collection,
+# never a terminated game. exit(I)V is left unimplemented on purpose: it is the one method here
+# whose entire contract is to end the process, so a silent no-op standing in for it would be worse
+# than the stub naming itself.
+[[class]]
+name = "java/lang/Runtime"
+vtable = [
+    { name = "freeMemory", descriptor = "()J", index = 11 },
+    { name = "totalMemory", descriptor = "()J", index = 12 },
+    { name = "gc", descriptor = "()V", index = 13 },
+]
+
+# 메이플스토리2007 dispatches on index 13 after it is already rendering, so this row decides how
+# far an otherwise-working title gets rather than whether it starts.
+#
+# Index 13 is not a free choice here: setPriority=14 was measured, and the rule only reaches 14
+# if exactly two slots sit between run() and it. CLDC 1.1 supplies exactly two in that span,
+# interrupt() then isAlive() (CLDC 1.0 has neither, which would put setPriority at 12 and
+# contradict the measurement), so 12 and 13 are forced. Both candidates are argument-free, so
+# either is safe to stand in for the other; isAlive() is the one declaration order puts at 13,
+# and it is also the side-effect-free one of the two. The call site was NOT disassembled — the
+# argument is the setPriority anchor, not an observation of 메이플스토리2007.
 [[class]]
 name = "java/lang/Thread"
 vtable = [
     { name = "start", descriptor = "()V", index = 10 },
+    { name = "isAlive", descriptor = "()Z", index = 13 },
     { name = "setPriority", descriptor = "(I)V", index = 14 },
 ]
 

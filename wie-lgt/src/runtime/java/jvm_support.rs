@@ -1027,12 +1027,13 @@ mod tests {
 
     #[test]
     fn unplaceable_virtual_methods_still_occupy_vtable_slots() -> Result<()> {
-        // `java/lang/Runtime` has no `data/lgt_java_abi.toml` row, so none of its four virtual
-        // methods can be placed at a known index. Dropping them left a 10-entry table while
-        // 배틀몬스터·학교가는길·체스마스터 all dispatch on index 13: the guest read one word past
-        // the allocation, found 0 and branched to address 0 ("Invalid memory access; address: 0").
+        // A virtual method that `data/lgt_java_abi.toml` cannot place still occupies a slot in the
+        // guest's table, and dropping it left the table shorter than the index the guest dispatches
+        // on: 배틀몬스터·학교가는길·체스마스터 all read one word past `java/lang/Runtime`'s
+        // allocation, found 0 and branched to address 0 ("Invalid memory access; address: 0").
         // Reserving a slot per unplaceable method keeps the read in range, where a missing entry
-        // is a stub that names itself.
+        // is a stub that names itself. Runtime now has a row, but its table is still padded out by
+        // the eight java/lang/Object methods no row places, which is what this walks.
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
         let done = Arc::new(AtomicBool::new(false));
         let done_clone = done.clone();
@@ -1051,6 +1052,49 @@ mod tests {
             for index in 0..vtable_count {
                 let target: u32 = read_generic(&core, definition.ptr_vtable()? + ((index + 1) * size_of::<u32>()) as u32)?;
                 assert_ne!(target, 0, "vtable entry {index} is a null target");
+            }
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn abi_rows_cover_the_indexes_titles_actually_dispatch_on() -> Result<()> {
+        // One shape behind five titles: 배틀몬스터·학교가는길·체스마스터 dispatch java/lang/Runtime
+        // index 13, 훼밀리마트타이쿤 java/lang/String index 19, 메이플스토리2007 java/lang/Thread
+        // index 13. Unlike the rows around them, these were derived from CLDC declaration order
+        // rather than read off a guest — see the comments in `data/lgt_java_abi.toml` — so a
+        // reordered row does not fail to parse, it silently calls the wrong method. Pin it.
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, _, _) = init_jvm(&system_clone).await?;
+            for (class_name, index, name, descriptor) in [
+                ("java/lang/Runtime", 11, "freeMemory", "()J"),
+                ("java/lang/Runtime", 12, "totalMemory", "()J"),
+                ("java/lang/Runtime", 13, "gc", "()V"),
+                ("java/lang/Thread", 13, "isAlive", "()Z"),
+                ("java/lang/String", 19, "startsWith", "(Ljava/lang/String;)Z"),
+            ] {
+                let class = jvm.resolve_class(class_name).await.unwrap();
+                let definition = class.definition.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap().clone();
+                let methods = definition.vtable_entries(&jvm).await?;
+
+                let method = methods
+                    .get(index)
+                    .and_then(|entry| entry.method.as_ref())
+                    .unwrap_or_else(|| panic!("{class_name} vtable index {index} is empty, so the guest gets a missing-entry stub"));
+                assert_eq!((method.name().as_str(), method.descriptor().as_str()), (name, descriptor));
             }
 
             done_clone.store(true, Ordering::Relaxed);
