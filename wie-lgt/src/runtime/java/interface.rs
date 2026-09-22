@@ -151,7 +151,7 @@ async fn java_unk55(_core: &mut ArmCore, _: &mut ()) -> Result<()> {
 }
 
 async fn java_monitor_enter(core: &mut ArmCore, jvm: &mut Jvm, ptr_instance: u32) -> Result<u32> {
-    let instance = LgtJvmSupport::class_instance_from_raw(core, ptr_instance);
+    let instance = LgtJvmSupport::class_instance_from_raw(core, ptr_instance)?;
     jvm.monitor_enter(&*instance)
         .await
         .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))?;
@@ -159,7 +159,7 @@ async fn java_monitor_enter(core: &mut ArmCore, jvm: &mut Jvm, ptr_instance: u32
 }
 
 async fn java_monitor_exit(core: &mut ArmCore, jvm: &mut Jvm, ptr_instance: u32) -> Result<u32> {
-    let instance = LgtJvmSupport::class_instance_from_raw(core, ptr_instance);
+    let instance = LgtJvmSupport::class_instance_from_raw(core, ptr_instance)?;
     jvm.monitor_exit(&*instance)
         .await
         .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))?;
@@ -246,8 +246,10 @@ async fn java_store_reference_array_unchecked(core: &mut ArmCore, _: &mut (), pt
 }
 
 async fn java_store_reference_array(core: &mut ArmCore, jvm: &mut Jvm, ptr_array: u32, index: u32, ptr_value: u32) -> Result<()> {
-    let mut array = LgtJvmSupport::class_instance_from_raw(core, ptr_array);
-    let value = (ptr_value != 0).then(|| LgtJvmSupport::class_instance_from_raw(core, ptr_value));
+    let mut array = LgtJvmSupport::class_instance_from_raw(core, ptr_array)?;
+    let value = (ptr_value != 0)
+        .then(|| LgtJvmSupport::class_instance_from_raw(core, ptr_value))
+        .transpose()?;
     if let Some(value) = &value
         && !jvm.array_store_allowed(&*array, &**value)
     {
@@ -331,7 +333,7 @@ async fn java_resolve_class(core: &mut ArmCore, jvm: &mut Jvm, ptr_class: u32, _
 }
 
 async fn java_initialize_class(core: &mut ArmCore, jvm: &mut Jvm, ptr_class_object: u32, callback: u32) -> Result<()> {
-    let mut class_object = LgtJvmSupport::class_instance_from_raw(core, ptr_class_object);
+    let mut class_object = LgtJvmSupport::class_instance_from_raw(core, ptr_class_object)?;
     let ready: i32 = jvm
         .get_field(&class_object, CLASS_INITIALIZATION_STATE_FIELD, WORD_FIELD_DESCRIPTOR)
         .await
@@ -382,7 +384,7 @@ async fn java_get_array_type(core: &mut ArmCore, jvm: &mut Jvm, rank: u32, ptr_c
 }
 
 async fn java_instantiate(core: &mut ArmCore, jvm: &mut Jvm, ptr_class_object: u32) -> Result<u32> {
-    let class_object = LgtJvmSupport::class_instance_from_raw(core, ptr_class_object);
+    let class_object = LgtJvmSupport::class_instance_from_raw(core, ptr_class_object)?;
     let definition = JavaLangClass::to_rust_class(jvm, &class_object)
         .await
         .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))?;
@@ -423,7 +425,7 @@ async fn java_instantiate(core: &mut ArmCore, jvm: &mut Jvm, ptr_class_object: u
 }
 
 async fn java_instantiate_array(core: &mut ArmCore, jvm: &mut Jvm, ptr_class_object: u32, length: u32) -> Result<u32> {
-    let class_object = LgtJvmSupport::class_instance_from_raw(core, ptr_class_object);
+    let class_object = LgtJvmSupport::class_instance_from_raw(core, ptr_class_object)?;
     let name = JavaLangClass::name(jvm, &class_object)
         .await
         .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))?;
@@ -439,7 +441,7 @@ async fn java_instantiate_array(core: &mut ArmCore, jvm: &mut Jvm, ptr_class_obj
 }
 
 async fn java_instantiate_multi_array(core: &mut ArmCore, jvm: &mut Jvm, ptr_class_object: u32, ptr_dimensions: u32, rank: u32) -> Result<u32> {
-    let class_object = LgtJvmSupport::class_instance_from_raw(core, ptr_class_object);
+    let class_object = LgtJvmSupport::class_instance_from_raw(core, ptr_class_object)?;
     let name = JavaLangClass::name(jvm, &class_object)
         .await
         .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))?;
@@ -585,7 +587,7 @@ async fn java_link_public_class(
 ) -> Result<()> {
     let non_virtual_method_targets = core.read_param(11)?;
     let link: RawJavaClassLink = read_generic(core, ptr_link)?;
-    let class_object = LgtJvmSupport::class_instance_from_raw(core, ptr_class_object);
+    let class_object = LgtJvmSupport::class_instance_from_raw(core, ptr_class_object)?;
     let class_name = JavaLangClass::name(jvm, &class_object)
         .await
         .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))?;

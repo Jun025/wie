@@ -3,7 +3,16 @@ use alloc::{boxed::Box, vec::Vec};
 use jvm::{ClassInstance, JavaType, JavaValue};
 
 pub trait NativeJavaValueCodec {
-    fn object_from_raw(&self, raw: u32) -> Box<dyn ClassInstance>;
+    /// Turns a guest word into a JVM object, or `None` when the word does not denote a live one.
+    ///
+    /// Deciding that needs a guest-memory read (the instance header and its dispatch-table
+    /// pointer), so it can fail — and this is the only frame where the failure still has anywhere
+    /// to go. Above it sit the `jvm` traits: `ClassInstance::class_definition` returns no `Result`
+    /// at all, and the ones that do return `jvm::Result`, whose single variant carries a *Java
+    /// exception object* that cannot be built without an async `&Jvm`. `jvm`'s garbage collector
+    /// then unwraps those `Result`s anyway (`find_reachable_objects` returns `()`), so a host
+    /// error raised above this point can only become a panic. Refuse here instead.
+    fn object_from_raw(&self, raw: u32) -> Option<Box<dyn ClassInstance>>;
     fn object_to_raw(&self, object: &dyn ClassInstance) -> u32;
 
     fn decode_word(&self, raw: u32, r#type: &JavaType) -> JavaValue {
@@ -15,7 +24,10 @@ pub trait NativeJavaValueCodec {
             JavaType::Int => JavaValue::Int(raw as i32),
             JavaType::Float => JavaValue::Float(f32::from_bits(raw)),
             JavaType::Char => JavaValue::Char(raw as u16),
-            JavaType::Class(_) | JavaType::Array(_) => JavaValue::Object((raw != 0).then(|| self.object_from_raw(raw))),
+            // A word that is not a live object reads as null, the same as the word 0 already does.
+            // The guest then sees an NPE, which is catchable Java behaviour, instead of the host
+            // dying — and the codec logs the word it rejected so the real cause stays findable.
+            JavaType::Class(_) | JavaType::Array(_) => JavaValue::Object((raw != 0).then(|| self.object_from_raw(raw)).flatten()),
             JavaType::Long | JavaType::Double | JavaType::Method(_, _) => unreachable!(),
         }
     }

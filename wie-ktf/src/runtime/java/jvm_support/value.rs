@@ -19,12 +19,18 @@ impl JavaValueCodec {
 }
 
 impl NativeJavaValueCodec for JavaValueCodec {
-    fn object_from_raw(&self, raw: u32) -> Box<dyn ClassInstance> {
+    fn object_from_raw(&self, raw: u32) -> Option<Box<dyn ClassInstance>> {
         let instance = JavaClassInstance::from_raw(raw, &self.core);
-        if instance.class().unwrap().is_array().unwrap() {
-            Box::new(JavaArrayClassInstance::from_raw(raw, &self.core))
-        } else {
-            Box::new(instance)
+        // Same gate as LGT: reading the class is the liveness check, and the last frame where the
+        // failure still has somewhere to go. No KTF title is known to reach it — this carrier is
+        // kept in step because the codec trait is shared, not on its own evidence.
+        match instance.class().and_then(|class| class.is_array()) {
+            Ok(true) => Some(Box::new(JavaArrayClassInstance::from_raw(raw, &self.core))),
+            Ok(false) => Some(Box::new(instance)),
+            Err(error) => {
+                tracing::warn!("KTF object reference {raw:#x} does not point at a live instance: {error}");
+                None
+            }
         }
     }
 

@@ -71,8 +71,13 @@ impl LgtJvmSupport {
         JavaClassDefinition::from_raw(ptr_class, core)
     }
 
-    pub fn class_instance_from_raw(core: &ArmCore, ptr_instance: u32) -> Box<dyn ClassInstance> {
-        JavaValueCodec::new(core).object_from_raw(ptr_instance)
+    /// Unlike the codec's null-on-invalid decode, this reports an error: the callers are SVC
+    /// handlers whose guest explicitly named this object to operate on, and they all return
+    /// `wie_util::Result`, so a bad pointer can become a tick error instead of a silent null.
+    pub fn class_instance_from_raw(core: &ArmCore, ptr_instance: u32) -> Result<Box<dyn ClassInstance>> {
+        JavaValueCodec::new(core)
+            .object_from_raw(ptr_instance)
+            .ok_or_else(|| WieError::FatalError(format!("LGT object reference {ptr_instance:#x} does not point at a live instance")))
     }
 
     pub fn class_instance_raw(instance: &dyn ClassInstance) -> u32 {

@@ -161,7 +161,15 @@ impl Method for JavaMethod {
             }
         }) {
             Ok(value) => Ok(value),
-            Err(WieError::JavaException(ptr_raw)) => Err(JavaError::JavaException(JavaValueCodec::new(&self.core).object_from_raw(ptr_raw))),
+            Err(WieError::JavaException(ptr_raw)) => match JavaValueCodec::new(&self.core).object_from_raw(ptr_raw) {
+                Some(exception) => Err(JavaError::JavaException(exception)),
+                // The guest raised an exception but its pointer is not a live instance; report
+                // that rather than panicking while reporting a failure.
+                None => {
+                    let message = format!("LGT exception reference {ptr_raw:#x} does not point at a live instance");
+                    Err(jvm.exception("net/wie/WieError", &message).await)
+                }
+            },
             Err(error) => {
                 let message = format!("{error}{}", self.core.dump_reg_stack(0x1000));
                 Err(jvm.exception("net/wie/WieError", &message).await)
@@ -458,7 +466,7 @@ mod tests {
                 .run_function(wrapper + 1, &[LgtJvmSupport::class_instance_raw(&*database), 0])
                 .await?;
             assert_eq!(result, 2);
-            let pending = LgtJvmSupport::class_instance_from_raw(&core, exception::pending(&core)?);
+            let pending = LgtJvmSupport::class_instance_from_raw(&core, exception::pending(&core)?)?;
             assert!(jvm.is_instance(&*pending, "org/kwis/msp/db/DataBaseRecordException"));
             assert_eq!(core.save_context().sp, context.sp);
             exception::pop(&mut core)?;
