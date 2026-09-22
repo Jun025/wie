@@ -478,14 +478,25 @@ async fn java_instantiate_multi_array(core: &mut ArmCore, jvm: &mut Jvm, ptr_cla
     Ok(LgtJvmSupport::class_instance_raw(&*arrays.remove(0)))
 }
 
-fn read_member_name_and_descriptor(core: &ArmCore, table: u32, index: u16) -> Result<(String, String)> {
+/// Reads one import-table slot, or `None` when the slot is empty.
+///
+/// A slot whose name *and* descriptor pointers are both null is a hole the LGT compiler left in
+/// the table — the count covers the hole, so the linker walks over it. Reading it unconditionally
+/// dereferenced address 0 and killed the VM at boot ("Invalid memory access; address: 0"), which
+/// is how five AOT-Java titles died inside `LgtClassLoader.findClass`. Holes appear mid-range, not
+/// past the end: 서든어택포켓 index 6 of 5..14, 스파이더맨3 index 2 of 0..75, 훼밀리마트타이쿤 8 of
+/// 4..25, 레전드오브마스터 51 of 1..413, 턴 10 of 2..14 — every one in the instance-field table.
+fn read_member_name_and_descriptor(core: &ArmCore, table: u32, index: u16) -> Result<Option<(String, String)>> {
     let ptr_name: u32 = read_generic(core, table + index as u32 * 2 * size_of::<u32>() as u32)?;
     let ptr_descriptor: u32 = read_generic(core, table + (index as u32 * 2 + 1) * size_of::<u32>() as u32)?;
+    if ptr_name == 0 && ptr_descriptor == 0 {
+        return Ok(None);
+    }
     let name = String::from_utf8(read_null_terminated_string_bytes(core, ptr_name)?)
         .map_err(|error| WieError::FatalError(format!("Invalid LGT member name: {error}")))?;
     let descriptor = String::from_utf8(read_null_terminated_string_bytes(core, ptr_descriptor)?)
         .map_err(|error| WieError::FatalError(format!("Invalid LGT member descriptor: {error}")))?;
-    Ok((name, descriptor))
+    Ok(Some((name, descriptor)))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -506,25 +517,33 @@ async fn link_class_members(
     non_virtual_method_targets: u32,
 ) -> Result<()> {
     for index in link.instance_field_offset..link.instance_field_offset + link.instance_field_count {
-        let (name, descriptor) = read_member_name_and_descriptor(core, instance_field_imports, index)?;
+        let Some((name, descriptor)) = read_member_name_and_descriptor(core, instance_field_imports, index)? else {
+            continue;
+        };
         let word_index = LgtJvmSupport::field_word_index(jvm, class_name, &name, &descriptor, false)?;
         write_generic(core, instance_field_word_indices + index as u32 * size_of::<u16>() as u32, word_index)?;
     }
 
     for index in link.static_field_offset..link.static_field_offset + link.static_field_count {
-        let (name, descriptor) = read_member_name_and_descriptor(core, static_field_imports, index)?;
+        let Some((name, descriptor)) = read_member_name_and_descriptor(core, static_field_imports, index)? else {
+            continue;
+        };
         let word_index = LgtJvmSupport::field_word_index(jvm, class_name, &name, &descriptor, true)?;
         write_generic(core, static_field_word_indices + index as u32 * size_of::<u16>() as u32, word_index)?;
     }
 
     for index in link.virtual_method_offset..link.virtual_method_offset + link.virtual_method_count {
-        let (name, descriptor) = read_member_name_and_descriptor(core, virtual_method_imports, index)?;
+        let Some((name, descriptor)) = read_member_name_and_descriptor(core, virtual_method_imports, index)? else {
+            continue;
+        };
         let method_index = LgtJvmSupport::virtual_method_index(jvm, class_name, &name, &descriptor).await?;
         write_generic(core, virtual_method_indices + index as u32 * size_of::<u16>() as u32, method_index)?;
     }
 
     for index in link.interface_method_offset..link.interface_method_offset + link.interface_method_count {
-        let (name, descriptor) = read_member_name_and_descriptor(core, interface_method_imports, index)?;
+        let Some((name, descriptor)) = read_member_name_and_descriptor(core, interface_method_imports, index)? else {
+            continue;
+        };
         let method_index = LgtJvmSupport::virtual_method_index(jvm, class_name, &name, &descriptor).await?;
         write_generic(core, interface_method_indices + index as u32 * size_of::<u16>() as u32, method_index)?;
     }
@@ -536,7 +555,9 @@ async fn link_class_members(
             0 => initialized_class_getter,
             1 => class_getter,
             _ => {
-                let (name, descriptor) = read_member_name_and_descriptor(core, non_virtual_method_imports, index)?;
+                let Some((name, descriptor)) = read_member_name_and_descriptor(core, non_virtual_method_imports, index)? else {
+                    continue;
+                };
                 LgtJvmSupport::non_virtual_method_target(jvm, class_name, &name, &descriptor)?
             }
         };
@@ -626,8 +647,9 @@ async fn java_link_imported_classes(
         );
         for local_index in 2..link.non_virtual_method_count {
             let member_index = link.non_virtual_method_offset + local_index;
-            let (name, descriptor) = read_member_name_and_descriptor(core, non_virtual_method_imports, member_index)?;
-            tracing::debug!("Imported direct method {class_name}.{name}{descriptor}");
+            if let Some((name, descriptor)) = read_member_name_and_descriptor(core, non_virtual_method_imports, member_index)? {
+                tracing::debug!("Imported direct method {class_name}.{name}{descriptor}");
+            }
         }
         jvm.resolve_class(&class_name)
             .await
@@ -731,7 +753,34 @@ mod tests {
     use wie_core_arm::{Allocator, ArmCore};
     use wie_util::{ByteWrite, Result, read_generic, write_generic, write_null_terminated_string_bytes};
 
-    use super::{LgtJvmSupport, java_link_imported_classes};
+    use super::{LgtJvmSupport, java_link_imported_classes, read_member_name_and_descriptor};
+
+    #[test]
+    fn empty_import_slot_reads_as_none() -> Result<()> {
+        // The LGT compiler leaves holes in an import table and counts them in the range, so the
+        // linker walks over slots whose name and descriptor pointers are both null. Dereferencing
+        // one killed the VM at boot with "Invalid memory access; address: 0" (five AOT-Java
+        // titles, all in the instance-field table).
+        let mut core = ArmCore::new(false, None)?;
+        Allocator::init(&mut core)?;
+
+        let ptr_name = Allocator::alloc(&mut core, 5)?;
+        write_null_terminated_string_bytes(&mut core, ptr_name, b"used")?;
+        let ptr_descriptor = Allocator::alloc(&mut core, 2)?;
+        write_null_terminated_string_bytes(&mut core, ptr_descriptor, b"I")?;
+
+        let table = Allocator::alloc(&mut core, 3 * 2 * size_of::<u32>() as u32)?;
+        core.write_bytes(table, &[0; 3 * 2 * size_of::<u32>()])?;
+        for index in [0u32, 2] {
+            write_generic(&mut core, table + index * 2 * size_of::<u32>() as u32, ptr_name)?;
+            write_generic(&mut core, table + (index * 2 + 1) * size_of::<u32>() as u32, ptr_descriptor)?;
+        }
+
+        assert!(read_member_name_and_descriptor(&core, table, 0)?.is_some());
+        assert_eq!(read_member_name_and_descriptor(&core, table, 1)?, None);
+        assert!(read_member_name_and_descriptor(&core, table, 2)?.is_some());
+        Ok(())
+    }
 
     #[test]
     fn test_imported_member_link_outputs() -> Result<()> {

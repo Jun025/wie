@@ -1,0 +1,70 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-22",
+  "task": "wie-aot-java-invalid-memory-access-address-zero-cluster",
+  "title": "Invalid memory access; address: 0 는 세 개의 벽이었다 — 둘을 근원에서 닫고 배틀몬스터의 것은 이름을 붙였다",
+  "summary": "LGT AOT-Java 9종이 공유하던 address: 0 문면을 소스 위치까지 갈랐다. ⑴게스트가 vtable 끝 너머에서 읽은 함수 포인터(배틀몬스터·학교가는길·체스마스터) ⑵임포트 표의 빈 슬롯 멤버 이름(5종) ⑶InitParam1.ptr_init_struct(SD한국전쟁). ⑵⑶은 근원에서 닫았고 ⑴은 예약 슬롯 + 미구현 스텁으로 이름을 붙였다.",
+  "changes": [
+    "wie-lgt/src/runtime/java/jvm_support/vtable.rs — build_methods 가 배치 불가한 선언 가상 메서드마다 vtable 슬롯을 예약한다",
+    "wie-lgt/src/runtime/java/interface.rs — read_member_name_and_descriptor 가 빈 임포트 슬롯에 None 을 돌려주고 다섯 링크 루프가 건너뛴다",
+    "wie-lgt/src/runtime/init.rs — 게스트 진입점이 init 구조체를 안 내놓은 경우를 이름 붙여 보고한다"
+  ],
+  "verification": [
+    "4게이트 + beta clippy 전건 rc=0",
+    "러너 블록 6픽스처 PASS · keydraw 양쪽 rc=0 · paints 55",
+    "game_lab/broken/lgt 46파일 before/after 짝지어 실행 — 판정·벽 유지 36 · 변경 10 · PASS→non-PASS 1(재현 안 됨, 26쌍 재측에서 before 26/26 · after 25/26)",
+    "시험 2건 모두 개악 대조로 FAIL 하는 것을 확인"
+  ],
+  "limits": [
+    "배틀몬스터의 ticks·paints 는 2·0 으로 불변 — 이 회차가 산 것은 진척이 아니라 벽의 이름이다",
+    "java/lang/Runtime vtable index 13 이 어느 메서드인지는 LGT ordinal 표가 필요해 채우지 않았다 (exit(I)V 만 인자 미세팅으로 배제)",
+    "스파이더맨3·레전드오브마스터가 옛 벽을 지난 뒤 impl ClassInstance 의 unwrap() 무리에서 패닉한다 — 도달 가능해진 선재 결함이고 관측 손실은 없다"
+  ],
+  "proposals": [
+    {
+      "title": "java/lang/Runtime 의 LGT vtable ordinal 을 확정해 index 13 을 채운다",
+      "plainSummary": "배틀몬스터·학교가는길·체스마스터 세 게임이 지금 똑같이 'java/lang/Runtime vtable index 13' 에서 멈춘다. 그 칸에 어떤 메서드가 들어가야 하는지만 확정하면 세 게임이 동시에 다음 단계로 간다.",
+      "userBenefit": "운영자 목표(배틀몬스터 플레이)의 현재 단일 블로커다. 한 칸을 채우면 세 타이틀이 함께 풀린다.",
+      "why": "wie 의 data/lgt_java_abi.toml 에 java/lang/Runtime 행이 없어 그 클래스의 가상 메서드 4개(totalMemory/freeMemory/gc/exit)가 어느 인덱스인지 모른다. 이번 회차는 자리를 예약해 벽에 이름을 붙였을 뿐 값을 채우지는 않았다. 게스트 코드 실측으로 exit(I)V 는 배제된다(인자 레지스터를 세팅하지 않는다) — 남은 후보는 셋이고, 그 호출은 결과를 그대로 반환하는 꼬리 호출이다.",
+      "tradeoff": "순서를 추측해 채우면 최악의 경우 exit(I)V 를 호출해 앱을 조용히 종료시킨다. 그래서 근거 없이 채우면 안 되고, 다른 타이틀이 같은 클래스의 다른 인덱스에서 멈추는 것을 모아 삼각측량하거나 ordinal 표가 필요하다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "java/lang/String vtable index 19 를 확정한다 (훼밀리마트타이쿤)",
+      "plainSummary": "훼밀리마트타이쿤이 이제 'java/lang/String vtable index 19' 라는 이름 붙은 벽에서 멈춘다. 위 Runtime 건과 완전히 같은 형태다.",
+      "userBenefit": "AOT-Java 한 종이 더 부팅을 통과한다.",
+      "why": "lgt_java_abi.toml 의 java/lang/String 행은 10·11·14·28·33·34 만 덮고 19 가 없다. 같은 근인(ABI 행 결손)이라 Runtime 건을 푸는 방법이 그대로 적용된다.",
+      "tradeoff": "Runtime 건과 같은 추측 위험. 둘을 한 회차로 묶으면 ordinal 규칙 자체를 한 번에 세울 수 있다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "impl ClassInstance 의 unwrap() 무리가 복구 가능한 WieError 를 패닉으로 바꾼다",
+      "plainSummary": "잘못된 객체 참조를 만나면 에뮬레이터가 오류를 내는 대신 통째로 죽는다. 스파이더맨3과 레전드오브마스터가 이번에 그 자리에 닿았다.",
+      "userBenefit": "게임이 죽는 방식이 '이유를 말하는 실패' 가 되어 다음 원인 추적이 가능해진다.",
+      "why": "value.rs 의 object_from_raw 와 class_instance.rs 의 class_definition 은 jvm 트레이트에 오류 통로가 없어 unwrap() 한다. 이번 회차가 object_from_raw 의 unwrap 만 제거해 봤더니 패닉이 한 프레임 이동했을 뿐이라 그 변경은 버렸다 — 무리 전체를 한꺼번에 봐야 한다.",
+      "tradeoff": "통로 없는 트레이트 메서드에서 무엇을 돌려줄지가 설계 결정이다. 가려도 참조 자체가 쓰레기(0xC5F3_…)면 다음 줄에서 죽으므로, 진짜 값은 '그 쓰레기 참조가 어디서 왔는가' 를 같이 보는 데 있다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "부팅을 통과한 서든어택포켓·턴이 한 프레임도 그리지 않는다",
+      "plainSummary": "두 게임이 이제 부팅을 지나 수백 틱을 돌지만 화면은 검은 채로 남는다.",
+      "userBenefit": "AOT-Java 렌더 경로의 다음 벽을 실제 표본 위에서 볼 수 있다.",
+      "why": "이번 수정 전에는 tick 1 에서 죽어 이 질문 자체가 불가능했다. 지금은 t116~t924 를 돌고 'no frame rendered' 로 끝난다. 이미 렌더하는 3종(메이플스토리2007·현영맞고2006·놈3)과 이 둘의 차이를 RUST_LOG=debug 호출 계수로 대조하면 좁혀진다.",
+      "tradeoff": "이 축은 docs/lgt.md §7 의 per-frame 모델과 겹쳐 보이지만, 형제 회차가 그 모델이 현 엔진을 서술하지 않음을 확정했으므로 그 문서에서 출발하면 안 된다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "SD한국전쟁의 LGT 진입점이 init 구조체를 내놓지 않는다",
+      "plainSummary": "이 게임은 부팅 첫 단계에서 에뮬레이터가 기대하는 초기화 정보를 전혀 돌려주지 않는다. 이제 그 사실이 이름으로 보고된다.",
+      "userBenefit": "'주소 0' 이라는 무의미한 문면 대신 무엇이 비었는지가 보인다.",
+      "why": "load_native 가 ptr_init_struct 를 0 으로 심어 두고 게스트가 채우기를 기대하는데 이 타이틀만 채우지 않는다. 진입점이 조용히 실패했는지, 다른 초기화 규약을 쓰는지는 아직 모른다.",
+      "tradeoff": "단일 타이틀이라 우선순위는 낮다. 다만 24종 중 유일하게 tick 0 에서 죽는 형태라 다른 계급일 가능성이 높다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}
