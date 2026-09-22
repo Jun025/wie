@@ -215,6 +215,23 @@ anything. No threshold is defined here on purpose」). ★**이제 그 임계를
 - AGENTS.md 러너 블록 전건 실행 — fenced `sh` 블록 **추가 0** 이므로
   `check-doc-liveness-parity.mjs` 대상 변화 없음.
 
+### 게임 파일명 유입 — 도구를 «실행해서» 적는다
+
+`node scripts/corpus-name-inflow.mjs --corpus <이 머신의 game_lab>` (모집단 451 stem · 대상 4파일):
+
+**BOUNDED 17회 / 10쌍** · SUFFIX-ATTACHED **5회 / 5쌍** · PREFIX-EMBEDDED 2회/1쌍.
+★**두 수를 함께 적는 것이 규약이라 함께 적는다.**
+
+★**갈라 적는다 — 10쌍 중 이 회차가 «새로 들인» 것은 4쌍이다**:
+- ★**새 유입 4쌍 / 11회** — `놈3` · `체스마스터` 각각 이 회차의 round doc 과 worklog 에.
+  ⒸConstraint 9 는 **바이트**를 금하고 이름은 이미 `docs/report/0216` · `docs/lgt.md` ·
+  `docs/project-kb/02_status.md` 가 쓰는 축이다. 실패율을 **분수로** 적으라는 것이 계약 4 이므로
+  타이틀을 지목하지 않고는 그 수를 적을 수 없다.
+- **선재 6쌍 / 6회** — 내가 «고친» 파일 안의 **기존 본문**이다(도구는 수정 파일의 전문을 센다):
+  `AGENTS.md` 5쌍은 이 도구 자신을 설명하는 문단의 예시어이고, `wie_validate.rs` 1쌍(`놈ZERO`)은
+  기존 시험 주석이다. ★**내 diff 가 더한 줄에는 하나도 없다.**
+- **SUFFIX-ATTACHED 5쌍은 «전건 선재»** — 다섯 다 `AGENTS.md` 의 그 같은 문단이다. ★내 몫의 판단 대상 0.
+
 ### 사용자 영향
 
 없다(엔진 무접촉). 도구 판정만 바뀐다 — 다만 ★**`--inject` 를 쓰는 회차는 이제
