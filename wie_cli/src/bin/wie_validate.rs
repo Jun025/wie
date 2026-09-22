@@ -4,16 +4,44 @@
 //! number of ticks (faithfully replaying the request_redraw -> Redraw flow the
 //! windowed CLI relies on), and classifies the result:
 //!
-//!   PASS  -> emulator exited cleanly, or rendered at least one frame, with no
-//!            error or panic within the time/tick budget.
-//!   FAIL  -> tick returned an error, the emulator panicked, or the budget was
-//!            exhausted without a clean exit or any rendered frame (hang/black).
+//!   PASS       -> emulator exited cleanly, or rendered at least one frame, with no
+//!                 error or panic within the time/tick budget.
+//!   FAIL       -> tick returned an error, the emulator panicked, or the budget was
+//!                 exhausted without a clean exit or any rendered frame (hang/black).
+//!   UNMEASURED -> the run ended before the thing being asked about was exercised at
+//!                 all. Today that is exactly one case: `--inject` delivered ZERO
+//!                 input steps (see the `--inject` section below).
 //!
-//! Emits one JSON line on stdout and exits 0 (PASS) / 1 (FAIL). Optionally
-//! writes a PNG of the last rendered frame for visual spot-checks.
+//! Emits one JSON line on stdout and exits 0 (PASS) / 1 (FAIL) / 2 (UNMEASURED).
+//! Optionally writes a PNG of the last rendered frame for visual spot-checks.
 //!
 //! This is a triage tool, not a correctness oracle: a headless run cannot prove
 //! a game is visually correct or audible. It catches crashes/hangs/black boots.
+//!
+//! ── Why UNMEASURED is a third verdict and not just FAIL ──────────────────────
+//! The two errors are not the same size. FAIL means "the game broke"; on this axis
+//! that claim, made about a title that was never given an input, is as wrong as the
+//! PASS it replaces — it would block a healthy title from registration just as the
+//! PASS registered an unproven one. UNMEASURED says the only true thing: the run did
+//! not get far enough to have an opinion. Exit 2 for it is this tree's existing
+//! convention for that state (AGENTS.md, `ktf-image-sweep.py`: "Exit 2 is 'could not
+//! measure', never 'found nothing'"), and it is fail-closed on BOTH axes a caller
+//! might read: the exit code is non-zero, and `result` is not the string `PASS` that
+//! all three in-tree callers grep for.
+//!
+//! ── `--inject`: the input axis is only measured if inputs actually ran ───────
+//! The drive loop stops at whichever of four things comes first — a clean guest exit,
+//! the `--max-ticks` backstop, the wall-clock deadline, or an error. The injection
+//! SCHEDULE is wall-clock, so a fast title can burn the TICK backstop before the
+//! first key is due and end with the whole script unfired. That used to report
+//! `PASS ... survived input sequence` over zero delivered keys and zero `--shotdir`
+//! frames — measured 2026-09-22 on a real title, and nearly used as registration
+//! evidence. Raising the backstop's default does not close it: the next title that
+//! is faster reopens it, which is the shape of the defect rather than its size.
+//!
+//! So the run reports what it did instead of what it was asked to do: `input_steps`
+//! / `input_steps_total` count the keys actually delivered, `stop` names which of the
+//! four ended the run, and a PASS with `input_steps: 0` becomes UNMEASURED.
 //!
 //! ── Two content axes, same predicate, different scope ────────────────────────
 //! `content`            — `has_content` ORed over EVERY painted frame ("did the game
@@ -517,15 +545,20 @@ fn main() {
 
     // Emit a single JSON line for the batch wrapper to parse.
     let json = format!(
-        "{{\"file\":{:?},\"platform\":{:?},\"result\":{:?},\"reason\":{:?},\"ticks\":{},\"paints\":{},\"content\":{},\
+        "{{\"file\":{:?},\"platform\":{:?},\"result\":{:?},\"reason\":{:?},\"stop\":{:?},\
+         \"input_steps\":{},\"input_steps_total\":{},\
+         \"ticks\":{},\"paints\":{},\"content\":{},\
          \"last_frame_content\":{},\
          \"distinct_colors\":{},\"nondominant_pct\":{:.1},\"center_nonuniform_pct\":{:.1},\
          \"last_frame_distinct_colors\":{},\"last_frame_nondominant_pct\":{:.1},\"last_frame_center_nonuniform_pct\":{:.1},\
          \"ms\":{}}}",
         args.filename,
         result.platform,
-        if result.passed { "PASS" } else { "FAIL" },
+        result.verdict(),
         result.reason,
+        result.stop,
+        result.input_steps,
+        result.input_steps_total,
         result.ticks,
         result.paints,
         result.content,
@@ -558,13 +591,28 @@ fn main() {
     };
     println!("{json}");
 
-    std::process::exit(if result.passed { 0 } else { 1 });
+    std::process::exit(result.exit_code());
 }
 
 struct Outcome {
     platform: String,
     passed: bool,
+    /// The run never exercised the axis it was asked about, so neither PASS nor FAIL
+    /// is true of it. Takes precedence over `passed` in both the JSON and the exit
+    /// code — and `passed` is forced false alongside it, so a later reader of that
+    /// field alone cannot mistake this for a pass. See the module header.
+    unmeasured: bool,
     reason: String,
+    /// Which of the four loop terminators ended the run: `clean exit`, `max-ticks`,
+    /// `deadline`, `error`. Reported on EVERY run, not just failing ones — "it ended
+    /// early" and "it ran to the end of the schedule" were previously indistinguishable
+    /// in the output, which is what let a backstop-truncated run look complete.
+    stop: &'static str,
+    /// Input steps actually delivered to the guest, out of the scripted total. Both are
+    /// 0 without `--inject`. A number, not a boolean, because the round that needed it
+    /// needed to write down "28 steps ran" — a flag cannot say that.
+    input_steps: u64,
+    input_steps_total: u64,
     ticks: u64,
     paints: u64,
     content: bool,
@@ -586,6 +634,26 @@ struct Outcome {
     last_frame_distinct_colors: u64,
     last_frame_nondominant_bp: u64,
     last_frame_center_nonuniform_bp: u64,
+}
+
+impl Outcome {
+    fn verdict(&self) -> &'static str {
+        if self.unmeasured {
+            "UNMEASURED"
+        } else if self.passed {
+            "PASS"
+        } else {
+            "FAIL"
+        }
+    }
+
+    fn exit_code(&self) -> i32 {
+        match self.verdict() {
+            "PASS" => 0,
+            "UNMEASURED" => 2,
+            _ => 1,
+        }
+    }
 }
 
 fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
@@ -637,6 +705,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
 
     let mut schedule: Vec<(f64, ScheduledEv)> = Vec::new();
     let mut deadline_secs = args.timeout as f64;
+    let mut input_steps_total = 0u64;
     if args.inject {
         // Confirm keys (OK/soft-key/keypad-5) interleaved with directional
         // navigation + select — covers single-button and two-button menus.
@@ -669,6 +738,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
             (KeyCode::OK, "OK"),
             (KeyCode::OK, "OK"),
         ];
+        input_steps_total = script.len() as u64;
         schedule.push((args.boot_secs, ScheduledEv::Shot("00_boot".into())));
         let mut t = args.boot_secs + 0.3;
         for (i, (kc, name)) in script.iter().enumerate() {
@@ -688,6 +758,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     let mut run_err: Option<String> = None;
     let mut phase = String::from("boot");
     let mut sched_idx = 0usize;
+    let mut input_steps = 0u64;
 
     while !exited.load(Ordering::SeqCst) {
         let elapsed = loop_start.elapsed();
@@ -700,6 +771,12 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
             match &schedule[sched_idx].1 {
                 ScheduledEv::Key(kc, down, label) => {
                     phase = label.clone();
+                    // Counted on the DOWN half (one per scripted step) and BEFORE dispatch:
+                    // a step that panics the guest was still delivered, and `input_steps` has
+                    // to agree with the `panic on input '06_OK'` reason naming step 6.
+                    if *down {
+                        input_steps += 1;
+                    }
                     let ev = if *down { Event::Keydown(*kc) } else { Event::Keyup(*kc) };
                     if let Err(p) = catch_unwind(AssertUnwindSafe(|| emulator.handle_event(ev))) {
                         run_err = Some(format!("panic on input '{label}': {}", panic_message(&p)));
@@ -746,6 +823,10 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
 
     let paints = screen.paints.load(Ordering::SeqCst);
     let content = screen.saw_content.load(Ordering::SeqCst);
+    // Derived from the loop's own exit state rather than set at each `break`: the two budget
+    // breaks share one condition, so a flag would just restate `ticks >= args.max_ticks` and
+    // could drift from it.
+    let stop = stop_cause(run_err.is_some(), exited.load(Ordering::SeqCst), ticks, args.max_ticks);
 
     // ── final screenshot (back-compat single frame) ───────────────────────────
     if let Some(path) = &args.screenshot
@@ -828,7 +909,25 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     outcome.nondominant_bp = screen.max_nondominant_bp.load(Ordering::SeqCst);
     outcome.center_nonuniform_bp = screen.max_center_nonuniform_bp.load(Ordering::SeqCst);
 
-    if last_frame_gate_fails(args.expect_last_frame, outcome.passed, outcome.last_frame_content) {
+    // Same rule as the richness trios: recorded before anything judges. These three are what
+    // the gate below reads, so here the order is not merely conventional.
+    outcome.stop = stop;
+    outcome.input_steps = input_steps;
+    outcome.input_steps_total = input_steps_total;
+
+    // `else if`, not a second `if`: a run that injected nothing has no last frame worth
+    // gating either, and "last frame blank" would be a narrower, more misleading reason
+    // than "the input never ran". UNMEASURED therefore wins over --expect-last-frame.
+    if inject_unmeasured(args.inject, outcome.passed, outcome.input_steps) {
+        outcome.unmeasured = true;
+        // Forced false alongside `unmeasured` so no reader of `passed` alone can mistake
+        // this for a pass — the same fail-closed reflex as the exit code.
+        outcome.passed = false;
+        outcome.reason = format!(
+            "--inject delivered 0/{} input steps (run ended: {}) — input survival NOT measured (otherwise: {})",
+            outcome.input_steps_total, outcome.stop, outcome.reason
+        );
+    } else if last_frame_gate_fails(args.expect_last_frame, outcome.passed, outcome.last_frame_content) {
         outcome.passed = false;
         outcome.reason = format!("last frame blank, but --expect-last-frame was given (otherwise: {})", outcome.reason);
     }
@@ -930,10 +1029,55 @@ fn last_frame_gate_fails(expect_last_frame: bool, passed: bool, last_frame_conte
     expect_last_frame && passed && !last_frame_content
 }
 
+/// Does this `--inject` run have no input verdict to report?
+///
+/// ONE-DIRECTIONAL for the same reason `last_frame_gate_fails` is: it only demotes a
+/// PASS. A FAIL already knows something — the guest errored, panicked, or never drew —
+/// and relabelling that as "not measured" would lose a real finding. Zero steps plus a
+/// PASS is the only combination where the verdict is about an axis the run never touched.
+///
+/// The count is what makes this work, and the reason it is a count and not a
+/// `saw_any_input` flag: `0` vs `27` is the number the reporting round has to write down.
+/// Extracted from `run` so `cargo test --all` asserts the invariant instead of a reader
+/// of the call site — the failure that matters here is folding `0` back into PASS, which
+/// leaves every name and field in place and only changes the answer.
+fn inject_unmeasured(inject: bool, passed: bool, input_steps: u64) -> bool {
+    inject && passed && input_steps == 0
+}
+
+/// Which of the drive loop's four terminators ended the run.
+///
+/// Precedence is the loop's own: an error breaks out immediately, a clean guest exit ends
+/// the `while`, and the two budget breaks share one condition — so when both budgets are
+/// spent the TICK backstop is named, because it is the one a caller can misread as a
+/// completed run. `deadline` is the fall-through: under `--inject` that deadline is derived
+/// from the schedule, so it means "the script ran out", which `input_steps` disambiguates.
+fn stop_cause(errored: bool, exited: bool, ticks: u64, max_ticks: u64) -> &'static str {
+    if errored {
+        "error"
+    } else if exited {
+        "clean exit"
+    } else if ticks >= max_ticks {
+        "max-ticks"
+    } else {
+        "deadline"
+    }
+}
+
+/// `stop` starts as `error` in both constructors, and `run` overwrites it for every run
+/// that reached the drive loop. The only outcomes that keep this value are the three
+/// pre-loop `fail()` returns — a read error, a load error, a load panic — for which
+/// `error` is the right answer.
+const STOP_BEFORE_LOOP: &str = "error";
+
 fn pass(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) -> Outcome {
     Outcome {
         platform: platform.to_string(),
         passed: true,
+        unmeasured: false,
+        stop: STOP_BEFORE_LOOP,
+        input_steps: 0,
+        input_steps_total: 0,
         reason,
         ticks,
         paints,
@@ -952,6 +1096,10 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
     Outcome {
         platform: platform.to_string(),
         passed: false,
+        unmeasured: false,
+        stop: STOP_BEFORE_LOOP,
+        input_steps: 0,
+        input_steps_total: 0,
         reason,
         ticks,
         paints,
@@ -970,7 +1118,7 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
 mod tests {
     use super::{
         GUEST_STDOUT_MAX_BYTES, HeadlessPlatform, HeadlessScreen, RICHNESS_COLOR_CAP, SCREEN_H, SCREEN_W, frame_richness, guest_stdout_field,
-        has_content, json_escape, last_frame_gate_fails,
+        has_content, inject_unmeasured, json_escape, last_frame_gate_fails, stop_cause,
     };
     use std::sync::{
         Arc, Mutex,
@@ -1096,6 +1244,91 @@ mod tests {
         // left to the reader of the call site.
         assert!(!last_frame_gate_fails(true, false, false));
         assert!(!last_frame_gate_fails(true, false, true));
+    }
+
+    /// A `--inject` run that delivered ZERO keys has no input verdict, and used to report one:
+    /// `PASS ... survived input sequence` over 0 delivered steps and 0 `--shotdir` frames,
+    /// because the `--max-ticks` backstop ended the run before the wall-clock schedule was due.
+    ///
+    /// The mutation this is aimed at is the quiet one: keep the counter, keep the field, keep
+    /// the name — and fold `0` back into PASS. Every row below fails under that edit, and the
+    /// two `passed: false` rows pin the other direction, where a sign flip would relabel a real
+    /// crash as "not measured" and lose it.
+    #[test]
+    fn zero_injected_steps_is_not_a_pass_test() {
+        // Without --inject there is no input axis to be unmeasured about, at any count.
+        for passed in [true, false] {
+            for steps in [0, 1, 27] {
+                assert!(!inject_unmeasured(false, passed, steps), "flag off must never fire: {passed} {steps}");
+            }
+        }
+        // The defect, exactly: injection asked for, nothing delivered, and it "passed".
+        assert!(inject_unmeasured(true, true, 0));
+        // One key got through — the axis was exercised, however briefly. Not this gate's business.
+        assert!(!inject_unmeasured(true, true, 1));
+        assert!(!inject_unmeasured(true, true, 27));
+        // Already failing -> silent in BOTH directions. A FAIL at 0 steps is a boot-time crash,
+        // which is a real finding; demoting it to "not measured" would throw that away.
+        assert!(!inject_unmeasured(true, false, 0));
+        assert!(!inject_unmeasured(true, false, 27));
+    }
+
+    /// The gate must be handed the DELIVERED count, not the scripted total.
+    ///
+    /// Measured, not hypothetical: swapping `outcome.input_steps` for
+    /// `outcome.input_steps_total` at that one call site restores the whole defect — the
+    /// binary printed `input_steps: 0` and `result: PASS`, rc 0 — and the predicate test
+    /// above stayed green, because the predicate is still perfect and only its ARGUMENT is
+    /// wrong. `run` needs a real emulator, so no behavioural test in this file can reach the
+    /// call site; this reads the source instead, exactly as
+    /// `richness_is_recorded_before_the_gate_judges_test` does and for the same reason.
+    ///
+    /// Split with `concat!` so this test's own source is not a second match — the count
+    /// assertion is what makes that safe.
+    #[test]
+    fn the_gate_is_handed_the_delivered_count_test() {
+        let src = include_str!("wie_validate.rs");
+        let call = concat!("inject_unmeasured(args.inject, outcome.passed, outcome.input", "_steps)");
+        assert_eq!(
+            src.matches(call).count(),
+            1,
+            "the gate call site is not unique (or no longer reads `outcome.input_steps`) — \
+             a gate fed `input_steps_total` never fires: that field is 27 on every --inject run"
+        );
+    }
+
+    /// The three verdicts must map onto three distinct exit codes, and `unmeasured` must beat
+    /// `passed` in both. Asserted rather than read off the two `match`es because they are the
+    /// whole of the tool's machine-readable contract: a caller keys on one or the other.
+    #[test]
+    fn unmeasured_outranks_passed_in_both_readings_test() {
+        let mut o = super::fail("lgt", String::new(), 0, 0, false);
+        assert_eq!((o.verdict(), o.exit_code()), ("FAIL", 1));
+        o.passed = true;
+        assert_eq!((o.verdict(), o.exit_code()), ("PASS", 0));
+        // `run` forces `passed` false alongside this; set it true here anyway, because the
+        // precedence is what is being pinned, not run's housekeeping.
+        o.unmeasured = true;
+        assert_eq!((o.verdict(), o.exit_code()), ("UNMEASURED", 2));
+        // Not the string every in-tree caller greps for — the second fail-closed axis.
+        assert_ne!(o.verdict(), "PASS");
+    }
+
+    /// `stop` answers "why did the run end", and the answer a caller can misread is
+    /// `max-ticks`: it looks like a completed run in every other field.
+    #[test]
+    fn stop_cause_names_the_terminator_test() {
+        // Error outranks everything — it is the only one that says the guest misbehaved.
+        assert_eq!(stop_cause(true, true, 50, 50), "error");
+        assert_eq!(stop_cause(true, false, 0, 50), "error");
+        // A clean guest exit outranks the budgets: the loop's `while` condition ends first.
+        assert_eq!(stop_cause(false, true, 50, 50), "clean exit");
+        // Budget breaks share one condition in the loop, so when both are spent the tick
+        // backstop is named — it is the one that silently truncates a wall-clock schedule.
+        assert_eq!(stop_cause(false, false, 50, 50), "max-ticks");
+        assert_eq!(stop_cause(false, false, 51, 50), "max-ticks");
+        // Under budget and still stopped: the wall-clock deadline ran out.
+        assert_eq!(stop_cause(false, false, 49, 50), "deadline");
     }
 
     /// Both richness trios — `last_frame_*` and the whole-run `max_*` — must be filled BEFORE

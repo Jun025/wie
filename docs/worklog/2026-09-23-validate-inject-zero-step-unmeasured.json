@@ -1,0 +1,40 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-23",
+  "task": "wie-validate-inject-can-pass-without-injecting-anything",
+  "title": "`--inject` 가 키를 0회 주고 PASS 를 찍던 자리를 닫았다 — 「못 쟀다」를 세 번째 판정으로",
+  "summary": "wie_validate 의 판정을 PASS/FAIL/UNMEASURED 셋으로 늘렸다. --inject 런이 입력 스텝을 한 번도 실행하지 못하면 UNMEASURED(rc 2) 다. 출력에 input_steps / input_steps_total / stop 세 필드를 더해 '몇 스텝 돌았나' 와 '무엇이 런을 끝냈나'(clean exit · max-ticks · deadline · error)를 전 런에 찍는다. 엔진 무접촉.",
+  "verification": "체스마스터(broken/lgt)로 공허한 PASS 를 기본 백스톱에서 재현(rc 0 · shots 0 · ms 43,460 ≪ boot 600s) 후 같은 명령이 UNMEASURED rc 2 를 내는 것을 확인. 개악 2건 각각 red. 7월 --inject 전수 센서스 236건으로 하위호환 대조. 4게이트 + beta clippy + 러너 블록.",
+  "limits": "0스텝만 닫았다. 같은 센서스에서 21건이 기본 백스톱에 닿아 일정을 다 못 돌고도 'survived input sequence' 를 받았는데(약 18~25/27 스텝), 그 수는 이제 보이지만 판정은 그대로다 — '몇 스텝부터 쟀다로 칠지' 의 임계를 지어내지 않았다. 재현 자체가 머신 속도 의존이다: 출처 회차는 8.0M tick/s 에서 6.2초에 백스톱을 태웠고 이 회차 머신은 load 60~81 에서 0.46M tick/s 라 같은 명령이 재현되지 않아, 백스톱은 기본값으로 두고 부팅 창을 넓혀 같은 비를 만들었다. 체스마스터 0/12 는 게이트②의 stack overflow 1/3 을 반증하지 않는다 — 그 모드는 catch_unwind 로 못 잡는 프로세스 abort 라 JSON 이 아예 안 나온다.",
+  "adoptedProposals": [],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "놈3 `--inject` 간헐 panic — 스텝은 넷인데 주소는 «하나»다 (`0x104C02B4` · 5/16)",
+      "plainSummary": "놈3 는 키 입력을 주면 네 번에 한 번꼴로 같은 자리에서 죽습니다. 죽는 시점은 매번 다른데 죽는 주소는 늘 똑같습니다.",
+      "userBenefit": "재현율이 25% 라 조사에 표본이 싸게 모인다. 그리고 주소가 하나로 모이므로 '타이밍 따라 다른 버그 넷' 이 아니라 '하나' 를 쫓으면 된다 — 다음 회차가 조사를 네 번 사지 않는다.",
+      "why": "이 회차 실측(고친 release 도구 · --inject 기본 예산 · 12회): FAIL 3/12. 스텝은 11_LEFT · 09_UP · 09_UP 이고 문면은 전건 `panic during '<step>': called Result::unwrap() on an Err value: InvalidMemoryAccess(273416884)` = 0x104C02B4. 게이트② 관측 2건(06_OK · 18_DOWN)도 같은 주소라 합산 5/16 이고 서로 다른 네 스텝이 한 주소로 모인다. 부팅 축은 안정 PASS 이므로 입력 경로 전용 결함이다. docs/report/0216 이 그 문면을 내는 소스 자리를 다섯으로 갈라 두었으니 거기서 출발하면 된다.",
+      "tradeoff": "타이밍 의존이라 고친 뒤 '안 난다' 를 증명하기 어렵다 — n 을 정해 놓고 재야 한다(이 회차가 12회를 썼다). 엔진 수정이라 회귀 표면이 넓다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "「일정을 다 못 돌았다」의 임계를 «데이터에서» 고를 수 있게 됐다 — 센서스 236건 중 21건",
+      "plainSummary": "입력 27번 중 20번만 주고 끝난 검사도 지금은 '입력을 견뎠다' 고 나옵니다. 몇 번부터 인정할지 정할 근거가 이제 생겼습니다.",
+      "userBenefit": "0스텝은 닫혔지만 부분 실행은 그대로 통과한다. 등재 근거로 쓰이는 출력이므로 '27 중 몇 부터 쟀다로 치는가' 는 언젠가 답해야 하고, 답을 지어내지 않으려면 분포가 필요하다.",
+      "why": "7월 --inject 전수 센서스(game_lab/reports/ 452 JSON) 실측: --inject 모드 236건 중 21건이 기본 백스톱 50,000,000 에 닿았고 전건 ms 13.2~17.5초(데드라인 20.0초)라 대략 18~25/27 스텝에서 잘렸다. 이 회차가 input_steps 를 찍게 만들었으므로 다음 전수 센서스는 그 수를 그대로 모을 수 있다. wie_validate.rs 가 richness 지표에 대해 이미 세운 규율('a number needs a threshold to fail anything. No threshold is defined here on purpose — the point is to make one CHOOSABLE from data instead of invented')이 이 축에도 그대로 적용된다.",
+      "tradeoff": "임계를 세우면 그 아래를 전부 강등하게 되므로 코퍼스 전체의 PASS 집계가 움직인다. 먼저 새 센서스 1회로 분포를 봐야 하고, 그 자체가 코퍼스 전수 실행(약 45분)이다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "`smoke_gate.sh` 의 입력 권고 줄이 UNMEASURED 를 FAIL 로 접는다",
+      "plainSummary": "입력 검사를 아예 못 한 경우와 입력에 죽은 경우가 권고 줄에서 똑같이 'FAIL' 로 보입니다.",
+      "userBenefit": "이 회차가 도구에서 갈라 놓은 두 상태가 소비자에서 다시 합쳐진다. 권고 줄을 읽고 타이틀을 판단하는 사람이 '이 게임 입력에 죽는구나' 로 오독한다.",
+      "why": "코드 실측: run_one() 의 마지막 줄이 `[ \"$res\" = \"PASS\" ] && echo PASS || echo FAIL` 이라 3값을 2값으로 접는다. 게이트 판정에는 닿지 않는다 — 게이트는 --inject 없이 돌고, INJECT=1 줄은 비-게이팅 권고다. 그래서 이 회차 범위 밖으로 두었다. game-lab-recensus.sh 도 같은 형태로 result != PASS 를 fail 로 센다(그쪽은 JSON 원문을 SUMMARY 에 보존하므로 손실은 집계뿐이다).",
+      "tradeoff": "셸 2곳을 3값으로 고치는 일이라 작지만, 두 스크립트 다 local-only 이고 game_lab/ 를 읽으므로 CI 로는 검증할 수 없다(Constraint 9). 값이 '오독 방지' 하나라 P3 이다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}

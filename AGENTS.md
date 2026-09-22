@@ -184,6 +184,16 @@ and the validator is right to say so. Measured 2026-09-06 on both carriers: with
 misread is not hypothetical — a round chasing an unrelated change stopped on exactly this, took the
 FAIL for its own regression, and only cleared it by reproducing the same FAIL on an untouched tree.
 
+**There is a third verdict, and on this line you should never see it: `UNMEASURED` · rc=2.** It
+means `--inject` delivered **zero** keys, so the run has no opinion about input survival — the
+`input_steps` / `input_steps_total` fields on every JSON line say how many actually landed, and
+`stop` says which of four things ended the run (`clean exit`, `max-ticks`, `deadline`, `error`).
+The case that produced it was a title fast enough to burn the `--max-ticks` backstop before the
+first key was due, which reported `PASS ... survived input sequence` over 0 keys and 0 `--shotdir`
+frames (2026-09-22, nearly used as registration evidence). If you see it here, read `stop`: on
+`max-ticks` raise `--max-ticks`; on `clean exit` the guest quit during boot and `--inject` has
+nothing to say about it. **Do not read it as a FAIL** — it is not a claim about the title.
+
 **Read the count as a floor, not an equality: the verdict is `PASS` · `content true` · rc=0, never
 the number.** What the 1-vs-dozens gap proves is that the flag reached the guest — that gap is the
 signal, and it is enormous. There is no exact upper figure, because `paints` counts the ticks that
