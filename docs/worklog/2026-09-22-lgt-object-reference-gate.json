@@ -1,0 +1,55 @@
+{
+  "schema": "wie-worklog-v1",
+  "date": "2026-09-22",
+  "task": "wie-lgt-jvm-trait-has-no-error-channel-so-recoverable-wieerror-panics",
+  "title": "죽은 객체 참조를 게이트에서 null 로 거부한다 — 레전드오브마스터 2파일 panic → PASS",
+  "summary": "RUST_BACKTRACE 로 잰 실제 패닉 프레임은 ClassInstance::get_field (sync) 이고, 그 위에는 호스트 오류를 넣을 자리가 두 겹으로 없다: JavaError 의 변종이 JavaException 하나뿐이고, jvm 의 GC 순회(find_reachable_objects)는 반환형이 () 라 올린 오류를 다시 unwrap 한다. 그래서 오류를 올리는 대신 우리 트레이트인 NativeJavaValueCodec::object_from_raw 를 Option 으로 바꿔 게이트에서 거부했다 — jvm 트레이트 무접촉.",
+  "changes": [
+    "wie-jvm-support/src/native.rs — object_from_raw -> Option<Box<dyn ClassInstance>>, decode_word 가 None 을 워드 0 과 동일하게 null 로 읽는다",
+    "wie-lgt|wie-ktf .../jvm_support/value.rs — class() 실패 시 warn 후 None (거부한 워드를 로그에 남긴다)",
+    "wie-lgt/.../jvm_support.rs — class_instance_from_raw 는 null 이 아니라 WieError (SVC 호출부 9곳이 전부 wie_util::Result 를 반환한다)",
+    "wie-lgt/.../value.rs — a_reference_to_a_dead_instance_decodes_to_null (양방향 · M1/M2 개악 대조로 진다)"
+  ],
+  "verification": [
+    "짝지어 실측: 레전드오브마스터 2파일 FAIL(panic) -> PASS t50M p2 dc33 lf=true · 스파이더맨3 t1 -> t50M p1 (벽이 boot panic -> no frame rendered 로 이동)",
+    "game_lab/broken/lgt 46파일 전건 before/after: JSON 44쌍 중 판정+벽 유지 41 · 변경 3(전부 의도) · PASS->non-PASS 0 · NO-JSON 2쌍은 양쪽 동일(선재)",
+    "렌더 3종 유지: 놈3 dc99 PASS · 메이플스토리2007 같은 벽(Thread vtable 13) · 현영맞고2006 dc512 PASS",
+    "4게이트 + cargo +beta clippy 전건 rc=0 · 러너 블록 6픽스처 PASS(keydraw 양쪽 content true · rc=0 · paints 55)"
+  ],
+  "limits": [
+    "스파이더맨3 의 근인(Card.canvas 워드에 밀리초 시계값)은 이 회차가 고치지 않았다 — 필드 레이아웃 축이고 별 소관이다",
+    "깨진 참조가 조용한 null 이 되므로 게스트는 NPE 를 본다(catch 가능). 거부한 워드는 tracing::warn! 로만 남는다",
+    "impl ClassInstance 의 나머지 unwrap 무리는 그대로다 — upstream 변종 없이 지우면 패닉이 한 프레임 옮겨가기만 한다(직전 회차가 실측한 실패형)"
+  ],
+  "proposals": [
+    {
+      "title": "JavaError 에 비-Java(호스트) 변종을 주고, GC 도달성 순회가 Result 를 전파하게 한다 — 인접 제안 2건과 합친 하나의 요청",
+      "plainSummary": "에뮬레이터가 '이건 자바 예외가 아니라 호스트 쪽 실패다'라고 말할 수 있는 통로를 RustJava 에 하나 만들어 달라는 제안입니다. 지금은 그 말을 할 방법이 없어서 프로그램이 통째로 죽습니다.",
+      "userBenefit": "게스트가 잘못된 데이터를 넘겼을 때 그 게임만 오류로 멈추고, 에뮬레이터 자체는 살아 있게 된다 — 지금은 엔진 인스턴스가 함께 죽는다.",
+      "why": "이 회차가 실측한 프레임은 ClassInstance::get_field (sync) 이고, 그 오류형 jvm::Result 는 JavaError 단일 변종 JavaException(Box<dyn ClassInstance>) 뿐이다. 그 인스턴스는 async Jvm::exception 으로만 만들 수 있어 sync 트레이트 impl 에서는 만들 수 없다. 둘째 반도 필요하다: jvm::garbage_collector::find_reachable_objects 는 반환형이 () 이고 get_field/load/get_static_field 를 전부 .unwrap() 하므로, 변종만 생겨도 GC 경로에서는 다시 패닉이 된다(Jvm::collect_garbage 는 이미 Result<usize> 라 전파할 자리는 있다). ClassInstance::class_definition 이 Result 를 갖지 않는 것도 같은 축이다. ★인접 제안 2건이 독립으로 같은 문장에 닿아 있고 그중 하나는 '두 건을 함께 결정하는 편이 낫다'고 스스로 적었다: 2026-09-20-string-array-hiding-overflows-stack#p0 (Jvm::exception 재귀 바닥) · 2026-09-20-name-the-missing-bootstrap-class#p0 (Jvm::new 가 패닉해도 되나). ★이 회차가 보태는 것은 게스트에게 보이는 대가다 — 앞의 둘은 자기 진단 축이지만 여기서는 실제 타이틀 2건(레전드오브마스터·스파이더맨3)이 호스트를 죽였다.",
+      "tradeoff": "공개 enum 을 넓히는 변경이라 지금은 싸고 되돌리기는 비싸다. 그리고 이제 jvm 은 crates.io 0.1.1 로 소비되므로(이 저장소의 [patch] 표는 2026-09-04 삭제) 착지 후 릴리스까지 기다려야 한다 — 그래서 이 회차는 기다리지 않고 게이트에서 닫았고, 이 제안은 그 게이트의 None 을 나중에 호스트 오류로 승격하기 위한 것이다. 변종을 추가하면 모든 match 지점이 non-exhaustive 가 되므로 upstream 측 파열 범위를 함께 재야 한다.",
+      "effort": "M",
+      "target": "RustJava — jvm/src/error.rs, jvm/src/garbage_collector.rs, jvm/src/class_instance.rs"
+    },
+    {
+      "title": "스파이더맨3: Card.canvas 필드 워드에 밀리초 시계값이 들어 있다 — Card 인스턴스 필드 레이아웃 불일치",
+      "plainSummary": "스파이더맨3 이 화면을 못 그리는 이유를 좁혔습니다. 객체를 가리켜야 할 자리에 시간 값이 들어 있어서, 엔진과 게임이 같은 객체 구조를 서로 다르게 세고 있다는 뜻입니다.",
+      "userBenefit": "스파이더맨3 이 첫 프레임 뒤에 멈추는 현재 벽이 풀릴 수 있다. 같은 레이아웃 계산을 공유하는 다른 LGT 타이틀에도 함께 걸린다.",
+      "why": "이 회차가 잰 것: Card::repaint_with_area 의 jvm.get_field(this, \"canvas\", \"Ljavax/microedition/lcdui/Canvas;\") 가 읽는 워드가 객체가 아니다. 그 값은 벽시계와 1:1 로 전진한다 — 같은 바이너리로 62초 간격 두 번 돌려 3332581741 -> 3332644028(+62287)을 실측했고, 4회 관측 전건 다른 값이었다. ★따라서 '쓰레기 포인터'가 아니라 '다른 필드의 값'이고, wie 가 정의한 Card(canvas·display·x·y·w·h·transparent)의 워드 인덱스와 게스트 AOT 코드가 가정하는 배치가 어긋난다는 뜻이다. 게이트가 그 워드를 null 로 거부한 뒤 스파이더맨3 은 부팅을 통과하고 1프레임을 그린다(t1 -> t50M · p0 -> p1).",
+      "tradeoff": "필드 워드 인덱스는 LgtJvmSupport::field_word_index 와 instance_field_word_count 가 함께 정하므로, 고치면 LGT 전 타이틀의 필드 접근이 움직인다 — 46파일 짝지어 회귀가 필수다. 그리고 게이트가 이미 패닉을 막고 있어 급하지 않다(P1 이 아니다).",
+      "effort": "M",
+      "target": "wie-lgt/src/runtime/java/jvm_support.rs, wie-lgt/src/runtime/java/jvm_support/class_definition.rs"
+    },
+    {
+      "title": "레전드오브마스터의 죽은 헤더가 «어디서 왔는가» — GC 가 도달한 참조의 소유자를 찾는다",
+      "plainSummary": "레전드오브마스터는 이제 통과하지만, 애초에 왜 죽은 객체를 가리키는 참조가 남아 있었는지는 아직 모릅니다. 그걸 찾으면 원인을 없앨 수 있습니다.",
+      "userBenefit": "지금은 증상을 무해하게 만든 상태다. 원인을 없애면 그 타이틀이 더 멀리 갈 가능성이 있고, 같은 형태를 공유하는 타이틀이 함께 풀린다.",
+      "why": "실측 프레임은 Jvm::collect_garbage -> find_reachable_objects -> ClassInstance::get_field 이고, 실패한 값은 ptr_raw != 0 인데 인스턴스 헤더의 ptr_dispatch_table 이 0 인 것이다(주소 0 을 낼 수 있는 읽기는 JavaClassInstance::class() 의 둘째 read_generic 뿐이다). 후보는 둘이다: (a) JavaClassInstance::destroy 가 헤더를 해제했는데 그것을 가리키는 필드가 남아 있다 (b) 할당 직후 헤더가 채워지기 전의 인스턴스가 필드에 먼저 저장된다. 게이트가 남기는 tracing::warn! 의 raw 값을 Allocator 의 할당·해제 로그와 대조하면 갈린다.",
+      "tradeoff": "게이트가 이미 패닉을 막았으므로 이것은 정확성 축이지 가용성 축이 아니다. 그리고 GC 는 반환형이 () 라 진단을 붙일 자리가 좁다 — RUST_LOG 대조가 사실상 유일한 수단이고 그 출력은 크다.",
+      "effort": "S",
+      "target": "wie-lgt/src/runtime/java/jvm_support/class_instance.rs"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}
