@@ -98,12 +98,22 @@ vtable = [
 #
 # Which of the four is at 13 is NOT settled by that, because the rule is a derivation and the
 # ordinal table that would confirm it is out of reach. What IS settled is that guessing wrong
-# cannot hurt: the JVM this runs on has no Runtime.exit at all, so there is nothing destructive
-# for a misplaced dispatch to land on, and the other three are argument-free reads that report a
-# fixed heap size or run a collection. A wrong guess costs a wrong long or a spurious collection,
-# never a terminated game. exit(I)V is left unimplemented on purpose: it is the one method here
-# whose entire contract is to end the process, so a silent no-op standing in for it would be worse
-# than the stub naming itself.
+# cannot hurt — but NOT for the reason the first revision of this comment gave, which said this
+# JVM has no Runtime.exit. It has one: rustjava-runtime 0.1.1 (crates.io, resolved by Cargo.lock)
+# declares exit(I)V PUBLIC, and wie-jvm-support/src/runtime.rs routes it to platform().exit(),
+# the same shutdown path WIPI MC_knlExit takes. The mechanism that makes a wrong guess harmless
+# is placement, not absence: a virtual method with no row in this file is never assigned an
+# index at all — jvm_support/vtable.rs counts it as `unplaced` and then grows the table by that
+# many `target: 0` entries at the TAIL, so a guest dispatch on 10..13 cannot land on exit
+# whichever of the four sits where. The other three are argument-free reads that report a fixed
+# heap size or run a collection, so a wrong guess costs a wrong long or a spurious collection,
+# never a terminated game.
+#
+# Read that before filling index 10, because it is what makes filling it NOT free: adding a row
+# moves a method out of the unreachable tail and gives the guest a callable target. If the
+# derivation is right that 10 is exit, that target ends the game — and a silent no-op standing in
+# for it would be worse still, leaving a title that asked to quit running with nobody the wiser.
+# The missing-entry stub names itself instead, which is why 10 is left empty on purpose.
 [[class]]
 name = "java/lang/Runtime"
 vtable = [

@@ -3,9 +3,9 @@
   "date": "2026-09-22",
   "task": "wie-unplaced-vtable-index-family-runtime-thread-string",
   "title": "미배치 vtable 인덱스 셋(Runtime 13 · Thread 13 · String 19)을 CLDC 선언 순서로 채웠다",
-  "summary": "lgt_java_abi.toml 에 행 3개. 체스마스터가 non-PASS → PASS(렌더 12프레임) 로 올라왔고, 배틀몬스터·훼밀리마트타이쿤은 tick 2 에서 약 1,000배 전진한 뒤 '부팅은 통과하나 한 프레임도 안 그리는' 다른 계급의 벽으로 옮겨 갔다. 46파일 짝지은 회귀에서 PASS → non-PASS 0건.",
+  "summary": "lgt_java_abi.toml 에 vtable 행 5개(3 클래스 — Runtime 11·12·13 · Thread 13 · String 19). 체스마스터가 non-PASS → PASS(렌더 12프레임) 로 올라왔고, 배틀몬스터·훼밀리마트타이쿤은 tick 2 에서 약 1,000배 전진한 뒤 '부팅은 통과하나 한 프레임도 안 그리는' 다른 계급의 벽으로 옮겨 갔다. 46파일 짝지은 회귀에서 PASS → non-PASS 0건.",
   "verification": "release wie_validate --inject · game_lab/broken/lgt 46파일 before/after 교대 실행 · 4게이트 + beta clippy + 러너 블록",
-  "limits": "인덱스 배치는 LGT ordinal 표로 확정한 것이 아니라 CLDC 선언 순서에서 도출한 것이다. Runtime 행만은 교차검증 앵커가 없다(기존 측정치가 없던 클래스).",
+  "limits": "인덱스 배치는 LGT ordinal 표로 확정한 것이 아니라 CLDC 선언 순서에서 도출한 것이다. Runtime 행만은 교차검증 앵커가 없다(기존 측정치가 없던 클래스). 정정(게이트②): 초판이 적은 '이 JVM 에 Runtime.exit 가 없다' 는 거짓이다 — rustjava-runtime 0.1.1 이 exit(I)V 를 PUBLIC 으로 선언하고 wie-jvm-support 가 platform().exit() 로 실제 종료 경로를 탄다. 잘못 착지해도 안전한 이유는 '없어서' 가 아니라 '행이 없는 가상 메서드는 vtable.rs 가 target 0 인 꼬리 칸으로만 예약해 게스트 디스패치가 닿을 수 없어서' 다. 그러므로 index 10 을 채우는 것은 공짜가 아니다 — 행을 넣는 순간 도달 가능한 target 이 된다.",
   "adoptedProposals": [
     "2026-09-21-aot-java-render-rebaseline#p2"
   ],
@@ -39,10 +39,10 @@
       "target": "wie"
     },
     {
-      "title": "이 회차가 도출한 네 인덱스를 호출부 관측으로 반증해 보라",
+      "title": "이 회차가 도출한 다섯 인덱스를 호출부 관측으로 반증해 보라",
       "plainSummary": "새로 넣은 자리들이 정말 맞는지, 게임이 그 메서드를 어떻게 부르는지 보고 확인하자는 제안입니다.",
       "userBenefit": "맞으면 '도출'이 '측정'으로 승격되고, 틀리면 조용히 잘못된 메서드를 부르고 있다는 사실이 드러난다. 지금은 둘 다 모른다.",
-      "why": "이 회차의 행 4개(Runtime 11·12·13 · Thread 13 · String 19)는 CLDC 선언 순서에서 도출했고 표가 파싱 오류를 내지 않으므로 틀려도 조용하다. 직전 회차가 쓴 기법(분기 직전 인자 레지스터 세팅 여부 · 반환값 사용 여부)이면 무인자/유인자와 void/non-void 를 가를 수 있다 — 예컨대 Thread 13 의 두 후보 interrupt()V ↔ isAlive()Z 는 반환값 사용 여부로 갈린다. ordinal 표 획득 없이 되는 관측이다.",
+      "why": "이 회차의 행 5개(Runtime 11·12·13 · Thread 13 · String 19)는 CLDC 선언 순서에서 도출했고 표가 파싱 오류를 내지 않으므로 틀려도 조용하다. 직전 회차가 쓴 기법(분기 직전 인자 레지스터 세팅 여부 · 반환값 사용 여부)이면 무인자/유인자와 void/non-void 를 가를 수 있다 — 예컨대 Thread 13 의 두 후보 interrupt()V ↔ isAlive()Z 는 반환값 사용 여부로 갈린다. ordinal 표 획득 없이 되는 관측이다.",
       "tradeoff": "관측이 좁혀 주는 것은 '후보를 절반으로' 정도이고 확정은 아니다. 그리고 ordinal 표 없이 확정에 닿는 경로는 여전히 없다.",
       "effort": "M",
       "target": "wie"
