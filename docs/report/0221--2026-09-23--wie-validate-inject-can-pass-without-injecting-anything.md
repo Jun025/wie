@@ -222,9 +222,8 @@ anything. No threshold is defined here on purpose」). ★**이제 그 임계를
 최종 수는 **문단 끝 표식이 정본**이다. `B=<회>/<쌍>` · `S=` · `P=` 를 그대로 읽어라.
 ★**BOUNDED 와 SUFFIX-ATTACHED 를 함께 적는 것이 규약이라 함께 적는다** — 둘 다 표식에 있다.
 
-★**갈라 적는다 — BOUNDED 11쌍의 출처**:
-- ★**이 회차가 새로 들인 것: 5쌍** — §⑸ 가 지목한 **두 타이틀** × (이 round doc · 이 worklog) = 4쌍,
-  그리고 아래 선재 주석어 1종이 이 round doc 에도 인용되며 생긴 1쌍.
+★**갈라 적는다 — BOUNDED 10쌍의 출처**:
+- ★**이 회차가 새로 들인 것: 4쌍** — §⑸ 가 지목한 **두 타이틀** × (이 round doc · 이 worklog).
   ⒸConstraint 9 가 금하는 것은 **바이트**이고, 이름은 이미 `docs/report/0216` · `docs/lgt.md` ·
   `docs/project-kb/02_status.md` 가 쓰는 축이다. 그리고 계약 4 가 실패율을 **분수로** 적으라고 한 이상
   타이틀을 지목하지 않고는 그 수를 적을 수 없다.
