@@ -241,3 +241,5 @@ anything. No threshold is defined here on purpose」). ★**이제 그 임계를
 없다(엔진 무접촉). 도구 판정만 바뀐다 — 다만 ★**`--inject` 를 쓰는 회차는 이제
 `input_steps` 를 읽고 「몇 스텝 돌았는지」를 리포트에 적을 수 있다**. 종전에는 그 수가 없어서
 출처 회차가 「28스텝 전건 실행」을 적으려고 `--shotdir` 장수를 세야 했다.
+
+<!-- corpus-name-inflow v1 subjects=4 tree=3f19ba7e229f4003 B=17/10 P=2/1 S=5/5 -->
