@@ -1283,8 +1283,23 @@ mod tests {
     /// call site; this reads the source instead, exactly as
     /// `richness_is_recorded_before_the_gate_judges_test` does and for the same reason.
     ///
+    /// **Two lines produce that argument, and pinning only the call site left the other one
+    /// open.** Measured 2026-09-23, by a gate② reviewer and reproduced here: putting the same
+    /// swap on the RECORD line three lines above the gate — `outcome.input_steps =
+    /// input_steps_total;` — left this file at `15 passed; 0 failed`, and the effect is the
+    /// original defect restored *and worse*: the gate eats 27 and can never fire, while the
+    /// JSON prints `input_steps: 27/27` on a run that delivered none, so a human reading it
+    /// sees "it all ran". Hence the second assertion.
+    ///
+    /// **Scope, stated rather than implied**: these two assertions pin the two lines that
+    /// hand the gate its argument. They do NOT pin how the local `input_steps` is counted —
+    /// its `= 0u64` init and its `+= 1` in the dispatch loop are both still free to lie
+    /// (checked: mutating the init to `input_steps_total` is green under both assertions).
+    /// That half is held by `zero_injected_steps_is_not_a_pass_test`'s predicate rows and by
+    /// the two `--inject` fixtures in the AGENTS.md runner block, not by string matching.
+    ///
     /// Split with `concat!` so this test's own source is not a second match — the count
-    /// assertion is what makes that safe.
+    /// assertions are what make that safe.
     #[test]
     fn the_gate_is_handed_the_delivered_count_test() {
         let src = include_str!("wie_validate.rs");
@@ -1294,6 +1309,13 @@ mod tests {
             1,
             "the gate call site is not unique (or no longer reads `outcome.input_steps`) — \
              a gate fed `input_steps_total` never fires: that field is 27 on every --inject run"
+        );
+        let record = concat!("outcome.input_steps = input", "_steps;");
+        assert_eq!(
+            src.matches(record).count(),
+            1,
+            "the delivered count is no longer what feeds the gate — the record line three \
+             lines above the gate must assign `input_steps`, not `input_steps_total`"
         );
     }
 

@@ -5,7 +5,7 @@
   "title": "`--inject` 가 키를 0회 주고 PASS 를 찍던 자리를 닫았다 — 「못 쟀다」를 세 번째 판정으로",
   "summary": "wie_validate 의 판정을 PASS/FAIL/UNMEASURED 셋으로 늘렸다. --inject 런이 입력 스텝을 한 번도 실행하지 못하면 UNMEASURED(rc 2) 다. 출력에 input_steps / input_steps_total / stop 세 필드를 더해 '몇 스텝 돌았나' 와 '무엇이 런을 끝냈나'(clean exit · max-ticks · deadline · error)를 전 런에 찍는다. 엔진 무접촉.",
   "verification": "체스마스터(broken/lgt)로 공허한 PASS 를 기본 백스톱에서 재현(rc 0 · shots 0 · ms 43,460 ≪ boot 600s) 후 같은 명령이 UNMEASURED rc 2 를 내는 것을 확인. 개악 2건 각각 red. 7월 --inject 전수 센서스 236건으로 하위호환 대조. 4게이트 + beta clippy + 러너 블록.",
-  "limits": "0스텝만 닫았다. 같은 센서스에서 21건이 기본 백스톱에 닿아 일정을 다 못 돌고도 'survived input sequence' 를 받았는데(약 18~25/27 스텝), 그 수는 이제 보이지만 판정은 그대로다 — '몇 스텝부터 쟀다로 칠지' 의 임계를 지어내지 않았다. 재현 자체가 머신 속도 의존이다: 출처 회차는 8.0M tick/s 에서 6.2초에 백스톱을 태웠고 이 회차 머신은 load 60~81 에서 0.46M tick/s 라 같은 명령이 재현되지 않아, 백스톱은 기본값으로 두고 부팅 창을 넓혀 같은 비를 만들었다. 체스마스터 0/12 는 게이트②의 stack overflow 1/3 을 반증하지 않는다 — 그 모드는 catch_unwind 로 못 잡는 프로세스 abort 라 JSON 이 아예 안 나온다.",
+  "limits": "0스텝만 닫았다. 같은 센서스에서 21건이 기본 백스톱에 닿았고 그중 14건이 일정을 다 못 돌고도 'survived input sequence' 를 받았는데(18~26/27 스텝 · 상한), 그 수는 이제 보이지만 판정은 그대로다 — '몇 스텝부터 쟀다로 칠지' 의 임계를 지어내지 않았다. 재현 자체가 머신 속도 의존이다: 출처 회차는 8.0M tick/s 에서 6.2초에 백스톱을 태웠고 이 회차 머신은 load 60~81 에서 0.46M tick/s 라 같은 명령이 재현되지 않아, 백스톱은 기본값으로 두고 부팅 창을 넓혀 같은 비를 만들었다. 체스마스터 0/12 는 게이트②의 stack overflow 1/3 을 반증하지 않는다 — 그 모드는 catch_unwind 로 못 잡는 프로세스 abort 라 JSON 이 아예 안 나온다.",
   "adoptedProposals": [],
   "declinedProposals": [],
   "proposals": [
@@ -19,10 +19,10 @@
       "target": "wie"
     },
     {
-      "title": "「일정을 다 못 돌았다」의 임계를 «데이터에서» 고를 수 있게 됐다 — 센서스 236건 중 21건",
+      "title": "「일정을 다 못 돌았다」의 임계를 «데이터에서» 고를 수 있게 됐다 — 백스톱에 닿은 21건 중 14건이 절단",
       "plainSummary": "입력 27번 중 20번만 주고 끝난 검사도 지금은 '입력을 견뎠다' 고 나옵니다. 몇 번부터 인정할지 정할 근거가 이제 생겼습니다.",
       "userBenefit": "0스텝은 닫혔지만 부분 실행은 그대로 통과한다. 등재 근거로 쓰이는 출력이므로 '27 중 몇 부터 쟀다로 치는가' 는 언젠가 답해야 하고, 답을 지어내지 않으려면 분포가 필요하다.",
-      "why": "7월 --inject 전수 센서스(game_lab/reports/ 452 JSON) 실측: --inject 모드 236건 중 21건이 기본 백스톱 50,000,000 에 닿았고 전건 ms 13.2~17.5초(데드라인 20.0초)라 대략 18~25/27 스텝에서 잘렸다. 이 회차가 input_steps 를 찍게 만들었으므로 다음 전수 센서스는 그 수를 그대로 모을 수 있다. wie_validate.rs 가 richness 지표에 대해 이미 세운 규율('a number needs a threshold to fail anything. No threshold is defined here on purpose — the point is to make one CHOOSABLE from data instead of invented')이 이 축에도 그대로 적용된다.",
+      "why": "7월 --inject 전수 센서스(game_lab/reports/ 452 JSON)를 «게이트② R1 승계 회차가 다시 쟀다» — 판별자 result==PASS ∧ ticks==50,000,000 → 21건(표본 축소 0). ms 13.176~19.892초이고, 기본 일정은 첫 키 2.5+0.3 이후 0.6×27 이라 마지막 키 18.4초 · 데드라인 20.0초 ⇒ ★ms≥18.4s 인 7건은 27스텝 전건 전달이고 절단이 아니다. 실제로 잘린 것은 14/21 이고 범위는 18~26/27 스텝이다. ★그 스텝 수는 «상한»이다 — ms 는 run() 전체(zip 읽기·build_emulator·후처리 포함)를 재므로 구동 루프 벽시계는 그보다 짧다. ※초판은 이 자리를 「21건 전건 ms 13.2~17.5초 ⇒ 약 18~25 스텝」으로 적었고 그것이 반려 사유(R1)였다 — 이 제안이 그 표를 «입력»으로 받기 때문이다. 이 회차가 input_steps 를 찍게 만들었으므로 다음 전수 센서스는 그 수를 추정이 아니라 그대로 모을 수 있다. wie_validate.rs 가 richness 지표에 대해 이미 세운 규율('a number needs a threshold to fail anything. No threshold is defined here on purpose — the point is to make one CHOOSABLE from data instead of invented')이 이 축에도 그대로 적용된다.",
       "tradeoff": "임계를 세우면 그 아래를 전부 강등하게 되므로 코퍼스 전체의 PASS 집계가 움직인다. 먼저 새 센서스 1회로 분포를 봐야 하고, 그 자체가 코퍼스 전수 실행(약 45분)이다.",
       "effort": "M",
       "target": "wie"
