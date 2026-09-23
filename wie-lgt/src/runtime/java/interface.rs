@@ -1,5 +1,8 @@
 use alloc::{boxed::Box, format, string::String, string::ToString, vec::Vec};
-use core::mem::size_of;
+use core::{
+    mem::size_of,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use jvm::{
     ClassDefinition, ClassInstance, ClassInstanceRef, JavaError, JavaType, Jvm,
@@ -217,7 +220,30 @@ async fn java_pending_exception(core: &mut ArmCore, _: &mut ()) -> Result<u32> {
 async fn java_is_class_assignable(core: &mut ArmCore, jvm: &Jvm, ptr_class: u32, ptr_class_name: u32, _ptr_fields: u32) -> Result<u32> {
     let class_name = String::from_utf8(read_null_terminated_string_bytes(core, ptr_class_name)?)
         .map_err(|error| WieError::FatalError(format!("Invalid LGT class name: {error}")))?;
-    let source_class_name = LgtJvmSupport::class_from_raw(core, ptr_class).name();
+    // Both pointers arrive in guest registers, so both get the same trust. `ptr_class` is the
+    // class word the guest read out of the reference it threw, and a guest that throws a
+    // not-yet-initialised static hands us one that points nowhere (measured on 놈3: an `athrow`
+    // of `.bss+0xa9c`, whose class word reads `0x104c02b4`). Answering "not assignable" is what
+    // this runtime can honestly say about a class it cannot read, and it leaves the guest's own
+    // handler search running — the alternative killed the emulator for every title in the process.
+    let source_class_name = match LgtJvmSupport::class_from_raw(core, ptr_class).try_name() {
+        Ok(name) => name,
+        Err(error) => {
+            // A title that hits this once tends to hit it every tick (79,739 lines in one 20 s 놈3
+            // run), and on the web build every ERROR line is a browser `console.error`. So only the
+            // first occurrence is an error; the rest drop to `trace!`.
+            // ponytail: process-wide flag, not per-title — one wasm instance / validator run is one title.
+            static REPORTED: AtomicBool = AtomicBool::new(false);
+            if REPORTED.swap(true, Ordering::Relaxed) {
+                tracing::trace!("Unreadable thrown class {ptr_class:#x} tested against {class_name}: {error} — reporting not-assignable");
+            } else {
+                tracing::error!(
+                    "Unreadable thrown class {ptr_class:#x} tested against {class_name}: {error} — reporting not-assignable (further occurrences at trace level)"
+                );
+            }
+            return Ok(0);
+        }
+    };
 
     Ok(u32::from(jvm.is_type_assignable(
         &JavaType::from_class_name(&source_class_name),

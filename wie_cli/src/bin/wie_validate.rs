@@ -8,9 +8,9 @@
 //!                 error or panic within the time/tick budget.
 //!   FAIL       -> tick returned an error, the emulator panicked, or the budget was
 //!                 exhausted without a clean exit or any rendered frame (hang/black).
-//!   UNMEASURED -> the run ended before the thing being asked about was exercised at
-//!                 all. Today that is exactly one case: `--inject` delivered ZERO
-//!                 input steps (see the `--inject` section below).
+//!   UNMEASURED -> the run ended before the thing being asked about was fully exercised.
+//!                 Today that is exactly one case: `--inject` delivered FEWER input steps
+//!                 than the script holds (see the `--inject` section below).
 //!
 //! Emits one JSON line on stdout and exits 0 (PASS) / 1 (FAIL) / 2 (UNMEASURED).
 //! Optionally writes a PNG of the last rendered frame for visual spot-checks.
@@ -41,7 +41,12 @@
 //!
 //! So the run reports what it did instead of what it was asked to do: `input_steps`
 //! / `input_steps_total` count the keys actually delivered, `stop` names which of the
-//! four ended the run, and a PASS with `input_steps: 0` becomes UNMEASURED.
+//! four ended the run, and a PASS that delivered fewer than all of them becomes UNMEASURED.
+//!
+//! That gate reads `input_steps < input_steps_total`, not `== 0`, since 2026-09-23. A run cut
+//! off at 10 of 27 keys measured ten keys; calling it `survived input sequence` is the same
+//! overclaim as calling zero that, only smaller. The corpus measurement behind the widening,
+//! and the two titles it costs, are recorded on `inject_unmeasured` itself.
 //!
 //! ── Two content axes, same predicate, different scope ────────────────────────
 //! `content`            — `has_content` ORed over EVERY painted frame ("did the game
@@ -918,14 +923,14 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     // `else if`, not a second `if`: a run that injected nothing has no last frame worth
     // gating either, and "last frame blank" would be a narrower, more misleading reason
     // than "the input never ran". UNMEASURED therefore wins over --expect-last-frame.
-    if inject_unmeasured(args.inject, outcome.passed, outcome.input_steps) {
+    if inject_unmeasured(args.inject, outcome.passed, outcome.input_steps, outcome.input_steps_total) {
         outcome.unmeasured = true;
         // Forced false alongside `unmeasured` so no reader of `passed` alone can mistake
         // this for a pass — the same fail-closed reflex as the exit code.
         outcome.passed = false;
         outcome.reason = format!(
-            "--inject delivered 0/{} input steps (run ended: {}) — input survival NOT measured (otherwise: {})",
-            outcome.input_steps_total, outcome.stop, outcome.reason
+            "--inject delivered {}/{} input steps (run ended: {}) — input survival NOT measured (otherwise: {})",
+            outcome.input_steps, outcome.input_steps_total, outcome.stop, outcome.reason
         );
     } else if last_frame_gate_fails(args.expect_last_frame, outcome.passed, outcome.last_frame_content) {
         outcome.passed = false;
@@ -1037,12 +1042,24 @@ fn last_frame_gate_fails(expect_last_frame: bool, passed: bool, last_frame_conte
 /// PASS is the only combination where the verdict is about an axis the run never touched.
 ///
 /// The count is what makes this work, and the reason it is a count and not a
-/// `saw_any_input` flag: `0` vs `27` is the number the reporting round has to write down.
+/// `saw_any_input` flag: `10/27` vs `27/27` is the number the reporting round has to write down.
 /// Extracted from `run` so `cargo test --all` asserts the invariant instead of a reader
-/// of the call site — the failure that matters here is folding `0` back into PASS, which
+/// of the call site — the failure that matters here is folding a shortfall back into PASS, which
 /// leaves every name and field in place and only changes the answer.
-fn inject_unmeasured(inject: bool, passed: bool, input_steps: u64) -> bool {
-    inject && passed && input_steps == 0
+///
+/// The comparison is `<`, not `== 0`, and the corpus is why. Measured 2026-09-23 over the 175
+/// titles that had ever reported `survived input sequence` (loadavg 77-98, i.e. the condition
+/// most likely to truncate a run): the three UNMEASURED verdicts were all `0/27` **under
+/// `clean exit`**, and the only partial deliveries — `10/27` and `2/27` — were `clean exit`
+/// too, and were reported as PASS. So the old `== 0` line called the same terminator, with
+/// the same "only part of the script ran" story, unmeasured at zero and a pass at ten. That
+/// is the inconsistency, not a missing case: partial injection IS partial measurement however
+/// the run ended. Widening costs exactly those two titles, PASS -> UNMEASURED, never -> FAIL.
+/// No partial ever arrived carrying the `survived input sequence` claim, so this buys nothing
+/// on today's corpus; it is kept because the backstop shape that produced the original defect
+/// truncates by tick count, which no title here is currently fast enough to hit mid-script.
+fn inject_unmeasured(inject: bool, passed: bool, input_steps: u64, input_steps_total: u64) -> bool {
+    inject && passed && input_steps < input_steps_total
 }
 
 /// Which of the drive loop's four terminators ended the run.
@@ -1259,18 +1276,25 @@ mod tests {
         // Without --inject there is no input axis to be unmeasured about, at any count.
         for passed in [true, false] {
             for steps in [0, 1, 27] {
-                assert!(!inject_unmeasured(false, passed, steps), "flag off must never fire: {passed} {steps}");
+                assert!(!inject_unmeasured(false, passed, steps, 27), "flag off must never fire: {passed} {steps}");
             }
         }
         // The defect, exactly: injection asked for, nothing delivered, and it "passed".
-        assert!(inject_unmeasured(true, true, 0));
-        // One key got through — the axis was exercised, however briefly. Not this gate's business.
-        assert!(!inject_unmeasured(true, true, 1));
-        assert!(!inject_unmeasured(true, true, 27));
+        assert!(inject_unmeasured(true, true, 0, 27));
+        // A SHORTFALL is the same claim at a different size — one key or twenty-six, the run
+        // measured part of the script and the verdict may only speak about that part. These two
+        // rows are the widening; under the old `== 0` predicate both were PASS.
+        assert!(inject_unmeasured(true, true, 1, 27));
+        assert!(inject_unmeasured(true, true, 26, 27));
+        // The whole script ran -> the axis has a real verdict and this gate is silent.
+        assert!(!inject_unmeasured(true, true, 27, 27));
         // Already failing -> silent in BOTH directions. A FAIL at 0 steps is a boot-time crash,
         // which is a real finding; demoting it to "not measured" would throw that away.
-        assert!(!inject_unmeasured(true, false, 0));
-        assert!(!inject_unmeasured(true, false, 27));
+        assert!(!inject_unmeasured(true, false, 0, 27));
+        assert!(!inject_unmeasured(true, false, 27, 27));
+        // Total 0 cannot be a shortfall. `>` here would fire on every non-injecting shape that
+        // still reaches the gate, which is the sign error a `<`/`!=` swap would introduce.
+        assert!(!inject_unmeasured(true, true, 0, 0));
     }
 
     /// The gate must be handed the DELIVERED count, not the scripted total.
@@ -1303,7 +1327,10 @@ mod tests {
     #[test]
     fn the_gate_is_handed_the_delivered_count_test() {
         let src = include_str!("wie_validate.rs");
-        let call = concat!("inject_unmeasured(args.inject, outcome.passed, outcome.input", "_steps)");
+        let call = concat!(
+            "inject_unmeasured(args.inject, outcome.passed, outcome.input",
+            "_steps, outcome.input_steps_total)"
+        );
         assert_eq!(
             src.matches(call).count(),
             1,
