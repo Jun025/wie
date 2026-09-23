@@ -1,0 +1,31 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-24",
+  "task": "wie-2026-09-23-aot-java-dataoutputstream-and-gregoriancalendar-anchors-adopt-p3",
+  "title": "도출 ABI 행 5개(Runtime 11·12·13 · Thread 13 · String 19)를 호출부 관측으로 재판정 — 반증 0 · 주석만 갱신",
+  "summary": "5행을 빼고 missing-entry 스텁에 일회용 계측(lr·r0..r3·호출부 코드·호출자 프레임)을 달아 LGT 100개를 --inject 로 훑었다. Runtime 11(당신은골프왕): 무인자·반환값 사용(÷1024 후 저장) ⇒ freeMemory|totalMemory. Runtime 13(배틀몬스터·학교가는길·체스마스터): 무인자·반환값을 호출부와 래퍼의 호출자 10곳 어디서도 소비 안 함 ⇒ void 모양 = gc. Runtime 12(배틀몬스터): 무인자 · 반환값은 첫 명령에서 r0 를 덮어쓰는 함수로 흘러가 판별 불가. String 19(훼밀리마트타이쿤): r1 만 객체로 세팅(r2=1 은 중간 호출 잔여)·반환값 저장 ⇒ 1객체인자 non-void 후보 15 16 19 20, startsWith(S,I)=18 배제. Thread 13: 100개 중 디스패치 0 ⇒ 미관측. 게스트 vtable_count 축은 Runtime·String(final)·Thread 12↔13 순서를 말하지 못한다(서브클래스 부재/순서 무관). 반증 0 ⇒ 행 변경 0, toml 주석에 관측·미결을 적었다. 부산물: 일지매영웅전기 split 루프가 String 21=indexOf(I)I(형제 #267 이 행으로 착지) · 27=substring(I) 을 규칙 위치 그대로 디스패치.",
+  "adoptedProposals": [
+    "2026-09-23-aot-java-dataoutputstream-and-gregoriancalendar-anchors#p3",
+    "2026-09-22-lgt-vtable-index-family-runtime-thread-string#p3"
+  ],
+  "proposals": [
+    {
+      "title": "String 27 substring(I) 행을 관측 근거로 넣고 일지매영웅전기 전/후를 재라",
+      "plainSummary": "게임 하나가 문자열을 '|' 로 자르는 루프에서 부르는 메서드 중 21번은 형제 회차가 넣었고, 27번이 남았다.",
+      "userBenefit": "21 을 넣은 뒤에도 그 루프가 27 에서 멈춘다면 그 벽이 사라진다. 아니어도 String 행 하나가 측정으로 선다.",
+      "why": "2026-09-24 계측 실행에서 27 은 r1=pos+1(int 1개)·결과를 루프 문자열에 재대입(객체)으로 24회 관측됐다 — 같은 루프의 21=indexOf(I)I 는 #267 이 행으로 넣었고 28=substring(II) 은 측정 행이다. 21 없이 돈 원본 실행은 FAIL · paints 0 · 로그 원인 없음이었으므로, 21 착지 후 이 타이틀이 27 에서 이름을 대는지부터 재라.",
+      "tradeoff": "벽이 27 이 아니면 결과는 안 바뀐다 — 전/후 측정과 양방향 변이 검사가 필요하다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "Runtime 12 · Thread 13 은 관측으로 닫히지 않는다 — 디스패치하는 타이틀이 나올 때 재측정",
+      "plainSummary": "두 칸은 이번 방법으로 답이 안 나왔다. 그 칸을 쓰는 게임 장면에 닿으면 다시 보자.",
+      "userBenefit": "틀린 칸이 조용히 남을 위험을 기록으로 남긴다.",
+      "why": "Runtime 12 의 반환값은 다음 함수가 첫 명령으로 덮어 판별 불가, Thread 13 은 100타이틀 --inject 에서 0회 디스패치였다(메이플스토리2007 도 예산 내 미도달).",
+      "tradeoff": "지금 할 일은 없다 — 트리거는 새 디스패치 관측이다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}
