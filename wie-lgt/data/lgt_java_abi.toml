@@ -2,6 +2,42 @@
 # vtable_size counts method entries, including unknown entries.
 # Field indexes address 32-bit words in instance field storage.
 
+# 배틀몬스터 dispatches on index 5, and this is the one row in the file whose every entry is
+# INHERITED BY EVERY CLASS — get it wrong and the blast radius is the whole corpus, not one title.
+#
+# Read `vtable_size = 10` against the rule block below and the row is already half-forced: the rule
+# says a subclass's own methods start at 10 because Object is 10 entries, and CLDC 1.1's Object
+# declares exactly NINE virtual methods — getClass hashCode equals toString notify notifyAll
+# wait(J) wait(JI) wait(). Nine into ten leaves one slot over, and the measured anchors say which:
+# getClass=1 equals=3 toString=4 only line up if the run starts at 1, i.e. index 0 is not one of
+# them. So 0 is left empty on purpose and the declaration order fixes the rest:
+#
+#   1 getClass  2 hashCode  3 equals  4 toString  5 notify()  6 notifyAll()
+#   7 wait(J)  8 wait(JI)  9 wait()
+#
+# rustjava-runtime 0.1.1 declares ELEVEN virtual methods here, not nine — it adds clone() and
+# finalize(), which CLDC 1.1 does not have. That is why the derivation drops two rather than one:
+# neither is in this ABI, and both stay unplaced.
+#
+# Index 5 is the only one filled, and it is filled on a MEASUREMENT, not on the order alone
+# (measured 2026-09-23, 배틀몬스터, both copies):
+#
+#   PROBE_MONITOR enter 0x488453d0          <- monitorenter, java-interface import 0x56
+#   PROBE_VTABLE class=Game index=5 r0=0x488453d0 r1=... r2=... r3=...
+#
+# The dispatch lands on the object whose monitor the guest acquired ten microseconds earlier, which
+# is the `synchronized (o) { o.???(); }` shape and so puts index 5 in the monitor family; and the
+# argument registers hold a heap pointer, -1 and another heap pointer — caller leftovers, not a
+# `long`, which rules out wait(J) and wait(JI) (AAPCS would put the timeout in r2:r3). That leaves
+# notify() notifyAll() wait(), the declaration order picks notify(), and notify() is also the safe
+# one of the three to be wrong about: standing in for notifyAll() wakes one waiter instead of all,
+# and standing in for wait() returns early. The reverse — installing a wait() where the guest meant
+# notify() — parks the thread forever, which is the silent hang this lineage has been fighting, so
+# 7 8 9 stay empty until a title names one.
+#
+# 2 6 7 8 9 are therefore derived but NOT written, for the reason java/lang/Runtime index 10 below
+# is not written: a missing entry says its own name, and a wrong one does not. Filling 2 would hand
+# the guest a plausible wrong int; filling 7 8 9 would hand it a hang.
 [[class]]
 name = "java/lang/Object"
 vtable_size = 10
@@ -9,6 +45,7 @@ vtable = [
     { name = "getClass", descriptor = "()Ljava/lang/Class;", index = 1 },
     { name = "equals", descriptor = "(Ljava/lang/Object;)Z", index = 3 },
     { name = "toString", descriptor = "()Ljava/lang/String;", index = 4 },
+    { name = "notify", descriptor = "()V", index = 5 },
 ]
 
 [[class]]
