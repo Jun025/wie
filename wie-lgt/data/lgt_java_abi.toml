@@ -268,9 +268,9 @@ vtable = [
     # Call sites observed 2026-09-24 (derived, not measured — nothing below refutes the row):
     # at 19 the caller sets only r1, to an object, and stores the result, which leaves the
     # one-object-argument non-void candidates 15 16 19 20 and rules out startsWith(S,I) at 18.
-    # 일지매영웅전기's split loop also dispatches 21 as indexOf('|') (int argument, result
-    # compared `< 0`) and 27 as substring(pos+1) (result reassigned to the string) — both where
-    # the rule puts them, so the run is observed-consistent to two slots past 19.
+    # The same split loop that measures 21 below also dispatches 27 as substring(pos+1) (one int
+    # argument, result reassigned to the string), again where the rule puts it — so the run is
+    # observed-consistent to 21 (two slots past 19) and 27, with 19's own slot still inferred.
     { name = "startsWith", descriptor = "(Ljava/lang/String;)Z", index = 19 },
     # 일지매영웅전기's wall. The rule puts indexOf(I)I here, and the call site agrees (measured
     # 2026-09-24): r1 = 0x7c ('|') with r2 left holding a stale heap pointer, i.e. ONE int

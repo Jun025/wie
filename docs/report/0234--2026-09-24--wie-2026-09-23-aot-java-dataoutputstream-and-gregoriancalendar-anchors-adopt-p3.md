@@ -10,7 +10,7 @@
 | Thread 13 isAlive()Z | 도출(setPriority=14 앵커) | 디스패치 0회 | 미결(미관측) |
 | String 19 startsWith(S)Z | 도출 | 훼밀리마트타이쿤 1회: r1 만 객체 · 결과 필드 저장 | 정합(15 16 19 20 중 · 18 배제) · 미결 |
 
-부수 관측: 일지매영웅전기 split 루프가 String 21=indexOf(I)I · 27=substring(I) 를 규칙 위치 그대로 디스패치(각 24회).
+부수 관측: 일지매영웅전기 split 루프가 String 21=indexOf(I)I(형제 #267 이 같은 근거로 행 착지) · 27=substring(I) 를 규칙 위치 그대로 디스패치(각 24회). 연번은 #267 이 0232 를 먼저 착지해 0234 로 옮겼다.
 
 **왜**: 표는 틀려도 파싱 오류를 내지 않는다. 게스트 vtable_count 축은 이 5행에 말하지 못한다 — Runtime 서브클래스 없음, String 은 final, Thread 크기(18)는 12↔13 순서를 가르지 못한다.
 
