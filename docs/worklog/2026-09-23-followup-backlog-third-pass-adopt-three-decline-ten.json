@@ -1,0 +1,68 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-23",
+  "task": "wie-prune-and-adopt-followup-proposals-2026-09-23",
+  "title": "추천 후속작업 3차 정리 — adopted 3 · declined 10 (★게임 호환 제안 23건은 «남겼다»)",
+  "summary": "2026-09-21~23 운영자 지시(「주요도가 낮은 작업들은 추천 작업 목록에서 삭제해 정리 · 배틀몬스터에 집중」)의 3차 이행. 2차(wie-prune-and-adopt-followup-proposals-2026-09-22 · 머지됨)가 34 → 10 으로 줄였는데 그 뒤 회차들이 새 제안을 냈다(정상 동작). ★이번엔 성격이 다르다 — 늘어난 것의 대부분이 «실제 게임 호환 작업»(배틀몬스터 리니지의 후속)이고 그것은 옳은 내용이다. ⇒ 이 회차가 닫는 것은 «이미 착지한 것 3» + «메타 도구 4» + «다른 플랫폼(KTF) 6» 뿐이고, 게임 호환 23건은 그대로 열어 둔다. ★두 선언의 뜻이 반대다 — adoptedProposals 3건은 «그 일이 이미 PR 로 착지했다»는 뜻이라 열어 두면 다른 레인이 같은 일을 다시 발권한다(중복 발권 방지 규율이 경계하는 형태). declinedProposals 10건은 «지금 안 한다»는 기록이다. ★«삭제»가 아니라 «선언»이다 — proposals 배열의 원소는 하나도 지우지 않았다(ref 는 0-기반 순서 키라 원소를 지우면 뒤 원소의 #pN 이 밀려 이미 인용된 ref 가 조용히 다른 것을 가리킨다). ★되살리는 법: 이 파일의 adoptedProposals·declinedProposals 에서 그 ref 한 줄을 빼면 다음 /api/proposals 파생에서 다시 열린다(open = 전체 − adopted − declined − injected − dismissed).",
+  "changes": [
+    "docs/worklog/2026-09-23-followup-backlog-third-pass-adopt-three-decline-ten.json 신설 — adoptedProposals 3 + declinedProposals 10 + dispositionNotes(ref별 사유 · kept-open)",
+    "★기존 워크로그 197파일 무접촉 — 제안 본문(title·why·userBenefit)도, proposals 배열의 원소도 고치지 않았다. 이 repo 의 관용구가 «판정하는 회차의 워크로그가 남의 ref 를 선언한다»이고(선례 5건, 1·2차 정리 포함) 그것을 따랐다",
+    "docs/report/0225 신설 — 기준선·집행·검증 수",
+    "★새 proposals 원소 0 · 검사기·CI·워크플로 신설 0 · 제품 코드 0줄 · 다른 repo·tower·원장 무접촉"
+  ],
+  "verification": [
+    "★기준선 실측(origin/main 의 docs/worklog 197파일 · tower cockpitd.js 의 scanRepoSimple + collectProposals.settle 을 재현 · injected.json/dismissed.json 은 ~/tower/data 의 실파일을 읽었다) — wie 전체 proposals 313 · adopted 177 · declined 53 · injected(pending) 52 · dismissed 0 ⇒ ★열린 제안 36. 티켓이 인용한 36 과 정확히 일치한다",
+    "★티켓의 13 ref 가 «아직 열려 있는가»를 선언 «전»에 전건 확인 — 13/13 열려 있었다(형제 티켓이 먼저 닫은 것 0). 건너뛴 ref 0",
+    "★세 목록이 실측 집합을 «정확히 분할»하는지 기계로 확인 — adopted 3 ∪ declined 10 ∪ 남길 23 == 열린 36(True) · 목록 간 겹침 0 · 목록 내 중복 0 · 목록에만 있고 실재하지 않는 ref 0 · 열려 있는데 세 목록 어디에도 없는 것 0",
+    "★집행 후 재측(워킹트리) — 열린 제안 36 → ★23. adopted 와 declined 를 «따로» 셌다: adopted 3 중 open 잔존 0 · declined 10 중 open 잔존 0",
+    "★남긴 23건이 «그대로 열려 있는지»도 셌다(23/23) — 닫는 쪽만 세면 과잉 차단이 안 보인다",
+    "★형제 티켓과의 중복 선언 0 을 실측 — wie-nom3-live-title-inject-panic-and-partial-inject-pass 가 채택하는 2건(validate-inject-zero-step-unmeasured#p0 · validate-max-ticks-backstop-inject-axis-already-closed#p0)은 이 파일이 선언하지 않는다. 그 티켓 자신이 같은 워크로그의 #p1·#p2 를 «이번 정리에서 기각」으로 넘겼다고 적어 두어 두 회차의 경계가 일치한다",
+    "★adopted 3건의 «이미 착지했다»를 문서가 아니라 GitHub 에 물었다 — PR #255 state=MERGED",
+    "★워크로그 스키마 검사기 — node scripts/check-worklog-json.mjs rc=0(engine-contract.yml 이 매 PR 실행)",
+    "★ref 인덱스 불변 — proposals 배열 원소를 하나도 지우지 않았으므로 기존 #pN 이 움직이지 않는다(기존 워크로그 197파일 diff 0 으로 확인)",
+    "★네 관문 전수(문서 전용 diff 라도 예외가 아니다 — AGENTS.md §Definition of Done) + cargo +beta clippy · check-doc-liveness-parity · check-docs-report-serial · check-worklog-coverage · check-inflow-marker 전부 rc=0"
+  ],
+  "limits": [
+    "★«닫힘»은 착지해야 보인다 — tower 는 origin/main 아카이브 캐시를 읽는다(cockpitd.js 의 worklogDirOf). 이 PR 이 열려 있는 동안 화면의 36 은 그대로다",
+    "★declined 10 중 `2026-09-23-lgt-corpus-decides-graphics-wiring#p0` 은 «메타 도구»로 분류됐지만 내용은 «실측된 은폐 결함»이다 — smoke_gate 의 baseline 대조가 유니코드 정규형 불일치로 0건을 검사하고 OK 를 찍었고, 그 아래에 baseline PASS 12건의 하드 실패가 숨어 있었다(원문 겹침 0 ↔ NFC 후 52/52). ★기각의 뜻은 «틀렸다»가 아니라 «지금 배틀몬스터보다 앞이 아니다»이고, 그 12건이 무엇인지는 이 회차가 열어 보지 않았다. ⇒ 코퍼스 회귀 판정을 다시 믿어야 하는 회차가 오면 이 한 줄을 먼저 되돌려라",
+    "★KTF 6건의 기각은 «1차 정리의 판단을 뒤집은 것»이다 — 09-21 회차가 그 6건을 «에뮬레이터 실행 능력»이라며 남겼고, 이번에 지시를 좁게 읽어 닫는다(배틀몬스터는 LGT 다). ★그 6건은 09-19~21 이후 아무도 손대지 않았다. KTF 타이틀을 다시 여는 회차가 생기면 그 줄들을 declinedProposals 에서 빼는 것으로 되살아난다",
+    "★adopted 3건은 «발권됐다»가 아니라 «착지했다»는 뜻이다(PR #255 MERGED · wie-lgt-jvm-trait-has-no-error-channel… 머지). 2차 정리의 adopted 5건과 뜻이 다르므로 같은 열로 읽지 마라",
+    "★이 회차는 «판단을 기록»했을 뿐 13건의 내용을 재검토하지 않았다 — 선별의 책임은 총괄에 있고, 이 파일은 그 사실을 추적 가능하게 적어 둔 것이다. 확인한 것은 «그 ref 가 열려 있는가»와 «착지했다는 주장이 참인가»뿐이다",
+    "★injected(pending) 52건은 이 회차가 건드리지 않았다 — 이미 지시로 나간 것이라 «추천 목록»이 아니다",
+    "★다른 repo 의 메타 제안(qts·sns·otterpebble·RustJava)은 범위 밖이라 무접촉이다 — 티켓이 «이번엔 두었다»로 명시했고 이 회차가 그 판단을 넓히지 않았다",
+    "★제품 코드 0줄 ⇒ 에뮬레이터가 더 돌게 되지 않는다. 이 회차가 사는 것은 «무엇을 안 할지»와 «무엇이 이미 착지했는지»의 기록뿐이다"
+  ],
+  "adoptedProposals": [
+    "2026-09-22-lgt-vtable-index-family-runtime-thread-string#p0",
+    "2026-09-22-aot-java-address-zero-cluster#p3",
+    "2026-09-22-aot-java-address-zero-cluster#p2"
+  ],
+  "declinedProposals": [
+    "2026-09-23-validate-inject-zero-step-unmeasured#p1",
+    "2026-09-23-validate-inject-zero-step-unmeasured#p2",
+    "2026-09-23-lgt-corpus-decides-graphics-wiring#p3",
+    "2026-09-23-lgt-corpus-decides-graphics-wiring#p0",
+    "2026-09-21-ktf-slot8-third-image-search#p0",
+    "2026-09-21-ktf-slot8-h2-noop-arm-reach-gate#p0",
+    "2026-09-21-ktf-slot8-h2-noop-arm-reach-gate#p1",
+    "2026-09-21-ktf-slot8-h2-noop-arm-reach-gate#p2",
+    "2026-09-19-svc-selector5-function0-is-a-named-sized-open#p0",
+    "2026-09-19-knl-reserved-is-ktf-extension-space#p0"
+  ],
+  "dispositionNotes": {
+    "2026-09-22-lgt-vtable-index-family-runtime-thread-string#p0": "adopted — 2026-09-23 운영자 지시 — 배틀몬스터 플레이 집중 우선순위 정리(3차). ★기각이 아니라 채택이다: 「배틀몬스터가 부팅은 통과하는데 한 프레임도 안 그린다 — 4종이 같은 벽을 공유한다」는 축을 PR #255(wie-aot-java-boots-but-never-paints-hang-cluster · state=MERGED 실측)가 «삼켜진 java/io 스트림 예외» 한 병으로 닫았다. 열어 두면 다른 레인이 같은 벽을 다시 발권한다.",
+    "2026-09-22-aot-java-address-zero-cluster#p3": "adopted — 2026-09-23 운영자 지시 — 배틀몬스터 플레이 집중 우선순위 정리(3차). ★위 vtable-index-family#p0 과 «같은 벽»이다(서든어택포켓·턴의 'no frame rendered' — 그 제안이 4종으로 묶은 바로 그 집합) ⇒ 같은 PR #255 가 진다. 두 제안이 한 PR 로 묶였으므로 둘 다 닫는다.",
+    "2026-09-22-aot-java-address-zero-cluster#p2": "adopted — 2026-09-23 운영자 지시 — 배틀몬스터 플레이 집중 우선순위 정리(3차). ★`impl ClassInstance` 의 `unwrap()` 무리가 복구 가능한 WieError 를 패닉으로 바꾸는 축 — wie-lgt-jvm-trait-has-no-error-channel-so-recoverable-wieerror-panics 가 «무리 전체»를 한꺼번에 보고 머지됐다. 제안이 요구한 모양(한 자리만 고치면 패닉이 한 프레임 이동할 뿐)을 그대로 이행한 회차다.",
+    "2026-09-23-validate-inject-zero-step-unmeasured#p1": "declined — 2026-09-23 운영자 지시 — 배틀몬스터 플레이 집중 우선순위 정리(3차). ★분류 ⒜(메타 도구): 「일정을 다 못 돌았다」의 임계를 7월 센서스 21건에서 데이터로 고르는 일 — 검증기 판정 기준의 정밀화다. ★값이 없다는 뜻이 아니라, 지금 그것이 목표(배틀몬스터 플레이)보다 앞서 있는 것이 문제라는 뜻이다. ★같은 워크로그의 #p0(놈3 입력 panic)은 «남겼다» — 그쪽은 형제 티켓 wie-nom3-live-title-inject-panic-and-partial-inject-pass 가 채택한다.",
+    "2026-09-23-validate-inject-zero-step-unmeasured#p2": "declined — 2026-09-23 운영자 지시 — 배틀몬스터 플레이 집중 우선순위 정리(3차). ★분류 ⒜(메타 도구): `smoke_gate.sh` 의 입력 권고 줄이 UNMEASURED 를 FAIL 로 접는 것을 고치는 일. ★그 제안 자신이 「게이트 판정에는 닿지 않는다 — 게이트는 --inject 없이 돌고 INJECT=1 줄은 비-게이팅 권고다」라고 적었다 ⇒ 타이틀을 돌리는 능력에 닿지 않는다. 형제 티켓도 이 두 줄을 「이번 정리에서 기각 — 하지 마라」로 넘겼다.",
+    "2026-09-23-lgt-corpus-decides-graphics-wiring#p3": "declined — 2026-09-23 운영자 지시 — 배틀몬스터 플레이 집중 우선순위 정리(3차). ★분류 ⒜(메타 도구): ktf 190 · skt 50 을 baseline 과 대조하는 일 — ★대상이 «다른 플랫폼»이기도 해서 ⒝(KTF)와 같은 이유로도 닫힌다. 배틀몬스터는 LGT 다.",
+    "2026-09-23-lgt-corpus-decides-graphics-wiring#p0": "declined — 2026-09-23 운영자 지시 — 배틀몬스터 플레이 집중 우선순위 정리(3차). ★분류 ⒜(메타 도구): `smoke_gate` 의 baseline 대조가 유니코드 정규형 불일치로 0건을 검사하고 OK 를 찍는 결함(원문 겹침 0 ↔ NFC 후 52/52). ★이것은 «실측된 은폐»이지 문서 다듬기가 아니고, 그 아래에 baseline PASS 12건의 하드 실패가 숨어 있다 — limits 에 한 줄로 적어 두었다. 기각의 뜻은 «틀렸다»가 아니라 «지금 배틀몬스터보다 앞이 아니다»이며, ★코퍼스 회귀 판정을 다시 믿어야 하는 회차가 오면 이 줄을 먼저 되돌려라. ★같은 파일의 #p1·#p2(그래픽 배선을 코퍼스가 정한다)는 «남겼다» — 그쪽은 LGT 타이틀이 실제로 그려지는가에 직접 닿는다.",
+    "2026-09-21-ktf-slot8-third-image-search#p0": "declined — 2026-09-23 운영자 지시 — 배틀몬스터 플레이 집중 우선순위 정리(3차). ★분류 ⒝(KTF slot 8 계열): 후보 12 를 디스어셈블로 걸러 «Database slot 8» 인지 확정하는 일. ★★총괄 자인 — 1차 정리(09-21)가 이 6건을 «에뮬레이터 실행 능력»이라며 남겼고 그 판단을 이번에 뒤집는다. 운영자의 불만은 「배틀몬스터에 몰입하지 않고 다른 일에 퍼져 있다」였고 그 시점에 실제로 돌던 것이 KTF slot 8 이었다. ★배틀몬스터는 LGT 다 ⇒ KTF 를 «능력»으로 남긴 것은 지시보다 넓게 읽은 것이었다. 이 6건은 09-19~21 이후 아무도 손대지 않았다.",
+    "2026-09-21-ktf-slot8-h2-noop-arm-reach-gate#p0": "declined — 2026-09-23 운영자 지시 — 배틀몬스터 플레이 집중 우선순위 정리(3차). ★분류 ⒝(KTF slot 8 계열): slot 8 뒤에 드러난 새 벽(SVC selector 5 / Interface4 / function 0)을 식별하는 일. 다른 플랫폼·다른 게임이다.",
+    "2026-09-21-ktf-slot8-h2-noop-arm-reach-gate#p1": "declined — 2026-09-23 운영자 지시 — 배틀몬스터 플레이 집중 우선순위 정리(3차). ★분류 ⒝(KTF slot 8 계열): wie_validate 에 «따뜻한 DB» 옵션을 줄지 정하는 일 — KTF 0x128f3a 의 Exists==true 분기를 열기 위한 검증기 기능이다. ★검증기를 건드리지만 동기가 KTF 조사라 같은 열로 닫는다.",
+    "2026-09-21-ktf-slot8-h2-noop-arm-reach-gate#p2": "declined — 2026-09-23 운영자 지시 — 배틀몬스터 플레이 집중 우선순위 정리(3차). ★분류 ⒝(KTF slot 8 계열): slot 16(exists_database_ktf)이 패키지 리소스를 안 보는 비대칭. ★그 제안 자신이 「이번 타이틀에서는 안 물렸다 — 실측으로 기각했다」고 적었다 ⇒ 실재하지만 지금 아무 타이틀도 막고 있지 않다.",
+    "2026-09-19-svc-selector5-function0-is-a-named-sized-open#p0": "declined — 2026-09-23 운영자 지시 — 배틀몬스터 플레이 집중 우선순위 정리(3차). ★분류 ⒝(KTF slot 8 계열): 표 5 가 DB(표 7)와 다른 저장소인가를 가르는 관측. ★2차 정리(09-22)가 이 ref 를 «타이틀을 돌리는 능력에 직접 닿는다»며 남겼다 — 그 판단도 같은 이유로 뒤집는다(KTF 는 배틀몬스터가 아니다). 같은 파일의 #p1 은 2차에서 이미 기각됐다.",
+    "2026-09-19-knl-reserved-is-ktf-extension-space#p0": "declined — 2026-09-23 운영자 지시 — 배틀몬스터 플레이 집중 우선순위 정리(3차). ★분류 ⒝(KTF slot 8 계열): 반환된 인터페이스가 어느 표인지 추적해 Interface3~16 의 정체를 한꺼번에 여는 일. ★2차 정리가 «남겼다»고 명시한 ref 이고, 위 svc-selector5#p0 과 같은 이유로 이번에 닫는다. 같은 파일의 #p1(이름 바꾸기)은 2차에서 이미 기각됐다.",
+    "kept-open": "★닫지 않은 23건 — 전부 «에뮬레이터가 이 타이틀(LGT·배틀몬스터 계열)을 실제로 돌 수 있는가» 또는 «측정이 오판을 만드는가»에 직접 닿는다. ⒜형제 티켓이 채택하는 2건 — `2026-09-23-validate-inject-zero-step-unmeasured#p0`(놈3 입력 panic) · `2026-09-23-validate-max-ticks-backstop-inject-axis-already-closed#p0`(부분 주입 PASS) ⇒ ★여기서 선언하지 않는다(중복 선언 금지 · 그 티켓이 자기 두 파일에 적는다). ⒝형제 P0·P1 이 채택하는 6건 — `2026-09-22-aot-java-swallowed-io-stream-exception#p0`·`#p2`·`#p3`·`#p4`·`#p5` · `2026-09-22-lgt-vtable-index-family-runtime-thread-string#p2` ⇒ ★손대지 않았다. ⒞게임 호환·측정 진실 15건 — `2026-09-23-lgt-corpus-decides-graphics-wiring#p1`·`#p2` · `2026-09-22-lgt-object-reference-gate#p0`·`#p1`·`#p2` · `2026-09-22-aot-java-missing-platform-classes#p0`·`#p1`·`#p2` · `2026-09-22-aot-java-address-zero-cluster#p4` · `2026-09-21-aot-java-render-rebaseline#p3`·`#p4` · `2026-09-20-no-frame-paired-remeasure-window-infeasible#p0`(부하 둔감화 — ★메타가 아니다: 부하가 실제로 오판을 두 번 만들었다) · `2026-09-22-lgt-vtable-index-family-runtime-thread-string#p1`·`#p3` · `2026-09-22-aot-java-swallowed-io-stream-exception#p1`. ★이 회차는 이 열을 건드리지 않았고, 닫는 쪽만 세면 과잉 차단이 안 보이므로 남는 쪽도 실측으로 셌다(23/23 그대로 열려 있다)."
+  }
+}
