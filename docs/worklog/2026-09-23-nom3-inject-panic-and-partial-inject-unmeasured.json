@@ -13,7 +13,9 @@
     "★계측 코드 최종 diff 0(PROBE 전수 0건) · lgt_java_abi.toml 무접촉 · 게임 바이트 0 · 새 검사기·CI 0"
   ],
   "verification": [
-    "★놈3 전/후 — 전: origin/main 무수정 release 로 ★FAIL 2/8(죽은 스텝 11_LEFT·10_OK 로 서로 다른데 주소는 전건 0x104C02B4) + 선행 회차 5/16 ⇒ 합산 7/24 ≈ 29%. 후: ★16/16 PASS · 27/27 스텝 · FAIL 0(재현율 25% 에서 우연 확률 약 1%)",
+    "★놈3 panic 전/후 — 전: 분기 base(25d0ae69) 무수정 release ★2/8 + 선행 회차 5/16 + ★대조군 현행 origin/main(24a920c4 · 내 수정«만» 뺀 것) ★3/16 ⇒ 합산 ★10/40 = 25.0%. 후: 분기 base 0/16 + 병합 base 재측 0/28 ⇒ ★합산 0/44(25% 에서 우연 확률 0.75^44 ≈ 0)",
+    "★base 가 분기 뒤 3커밋 전진했고(#259·#260·#261) 그중 #261 은 java/lang/Object index 5 = notify() 와 모니터 소유권을 바꾼 엔진 변경이라 ★내 측정의 전제를 건드린다(놈3 의 뜨거운 고리가 정확히 wait/InterruptedException). ⇒ 병합 후 전부 재측했고, 대조군을 «직접 빌드해» 갈랐다 — panic 은 현행 main 에 살아 있고(3/16) 이 수정은 여전히 필요하다",
+    "★«내 것이 아닌» 실패 하나를 대조군으로 갈랐다 — no frame rendered(p0)가 내 브랜치 2/28 · ★대조군 origin/main 1/16(7.1% vs 6.3% · 구별 불가) ⇒ 이 diff 가 만든 것이 아니다. AGENTS.md 4단 절차의 ⑶「손대지 않은 트리에서 재현」을 이 축에서는 실제로 밟았다",
     "★이름을 다섯 걸음 실측으로 세웠다 — ⑴SVC 0x19 의 R0=0x1500a9c ⑵RUST_LOG 의 Section 줄로 .bss@0x1500000 확인 ⇒ .bss+0xa9c ⑶그 8워드가 전부 0x7100xxxx = FUNCTIONS_BASE 스텁 ⑷게스트가 얻은 클래스 워드 0x104C02B4 ⑸그 주소는 이미지 3섹션·힙(0x40000000–0x50000000)·전역(0x7fff0000) 어디에도 없다",
     "★게스트 호출 자리도 잡았다 — LR 0x31315 ⇒ <Base>+0x30310 ← <Base>+0x17760 · IP=0x19 · R1/R2 가 직후 IsClassAssignable 의 ptr_class_name/ptr_fields 와 동일",
     "★jvm-trait 회차와의 관계 = ⒜(그 회차가 덮지 않은 자리) — 그쪽은 NativeJavaValueCodec::object_from_raw 를 게이트했고 실측 프레임이 object_from_raw ← JavaClassInstance::get_field 였다. 이번 자리는 ClassDefinition::name → descriptor() → raw() 로 다른 트레이트·다른 사슬이고 그 프레임에 등장하지 않는다",
@@ -33,7 +35,9 @@
     "★코퍼스 스윗은 175/177 이다 — 정무문2·헬로우닌자 2종이 동시 실행 중 유실됐다(재시도하지 않았다). 그 2종이 둘 다 부분 주입이었더라도 결론(자기모순 해소)은 바뀌지 않는다",
     "★코퍼스 수는 부하 의존이다 — 케로로미니게임은 고부하에서 10/27 이었고 저부하 재실행에서 27/27 PASS 였다. ⇒ 이 표를 «상수»로 인용하지 마라. 그리고 그 부하 의존성이 ②가 값하는 이유다(고부하에서 10/27 을 «전량 통과»로 적던 것이 종전 동작이다)",
     "★스레드 교차 가설은 실측으로 기각됐다 — SUPPORT_CONTEXT_BASE 의 예외 프레임 스택이 전 게스트 스레드 공유인 것은 사실이나, 실패 순간 frame_sp == cur_sp 라 이 결함의 원인이 아니다. 공유 자체는 아래 제안으로 남긴다",
-    "★시각적 정합은 보지 않았다 — 놈3 가 «죽지 않는다»를 쟀지 «옳게 그린다»를 재지 않았다. paints·distinct_colors 절대값은 부하 의존이라 개선 근거로 쓰지 않았다"
+    "★시각적 정합은 보지 않았다 — 놈3 가 «죽지 않는다»를 쟀지 «옳게 그린다»를 재지 않았다. paints·distinct_colors 절대값은 부하 의존이라 개선 근거로 쓰지 않았다",
+    "★no frame rendered(p0)는 «남은 결함»이다 — 대조군에도 나므로 이 회차의 책임은 아니지만 고쳐지지도 않았다. ticks 는 판정 근거로 쓸 수 없고(AGENTS.md: ticks 는 처리량 지표가 아니다) 부하와 얽혀 있어 별도 관측이 필요하다. 아래 제안으로 남긴다",
+    "★러너 블록의 keydraw_ktf FAIL 은 ⑶단계를 밟지 «못했다» — 놈3 축은 대조군을 빌드해 갈랐지만 그쪽은 구조적 논거(엔진 수정이 wie-lgt 전용인데 그 고정물은 KTF · input_steps 전 실행 27/27)와 재실행 4/5 PASS 까지다"
   ],
   "adoptedProposals": [
     "2026-09-23-validate-inject-zero-step-unmeasured#p0",
@@ -71,6 +75,15 @@
       "tradeoff": "전부 try_ 판으로 바꾸면 호출부마다 «무엇을 답할 것인가» 결정이 필요하고, 답이 없는 자리에서는 지금의 패닉이 오히려 정직하다. 그래서 «세기»까지가 한 회차이고 «고치기»는 그 결과를 보고 정한다.",
       "effort": "S",
       "target": "wie-lgt/src/runtime/java/jvm_support/class_definition.rs"
+    },
+    {
+      "title": "놈3 가 «한 프레임도 안 그리는» 판이 16회에 1회 난다 — 부하와 갈라라",
+      "plainSummary": "입력 중 죽는 문제는 닫혔는데, 그와 별개로 가끔 화면이 아예 안 그려진 채 끝나는 판이 남아 있다.",
+      "userBenefit": "사용자가 놈3 를 켰을 때 검은 화면으로 시작하는 경우가 사라진다.",
+      "why": "이 회차 실측: 내 브랜치 2/28 · ★대조군 origin/main 1/16 ⇒ 이 회차의 수정과 무관하게 «원래 있던» 결함이다(그래서 여기서 고치지 않았다). paints 0 · reason 'no frame rendered (hang/black screen)' 이고 input_steps 는 27/27 이라 입력 축은 정상이다. ★ticks 로 판정하지 마라 — 같은 PASS 판들이 t60~t360,471 로 흩어진다(AGENTS.md 가 이미 «ticks 는 처리량 지표가 아니다»로 못박았다).",
+      "tradeoff": "부하 의존일 가능성이 높고(이 회차 loadavg 38~102), 그러면 «고칠 것»이 엔진이 아니라 측정 조건이다. 그래서 먼저 저부하에서 n 을 키워 재현율이 남는지부터 봐야 하고, 남지 않으면 닫는 것이 맞다.",
+      "effort": "S",
+      "target": "wie-lgt · wie_cli/src/bin/wie_validate.rs"
     }
   ]
 }
