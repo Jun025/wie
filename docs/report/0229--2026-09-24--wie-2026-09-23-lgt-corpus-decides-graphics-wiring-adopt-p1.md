@@ -89,3 +89,11 @@ B(행 2줄), C(LGT 전용 스텁 복원), D(graphics 배선 한 행), E(`unk4` �
 - 판정 축은 boot+render 뿐이다. 되찾은 메탈슬러그가 무엇을 그리는지는 대조하지 않았다.
 - 6건(§1 ⒝)은 이 부하에서 교체 전에도 실패해 회귀 여부를 가르지 못했다. `놈ZERO` 의 `docs/lgt_abi.md` cp47
   「PASS · 153 paints」는 교체 전 트리에서도 이번에 blank(paints 14/20)였다.
+
+## 게임 파일명 유입 (도구를 실행해 적는다)
+
+`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab` 결과(이 절을 쓰기 전):
+**BOUNDED 28쌍** · PREFIX-EMBEDDED 0 · **SUFFIX-ATTACHED 6쌍**. 수는 아래 표식이 최종이다.
+SUFFIX 는 손으로 갈랐다. `일지매영웅전기2`·`하이브리드2` 는 코퍼스의 **별개 실제 타이틀**이다. 나머지
+(`게임빌2010슈퍼사커도`·`데몬헌터가`·`바이오크로니클이`·`하이브리드가`)는 조사가 붙은 **진짜 언급**이다. ⇒ 판단이 더 필요한 것 0.
+유입된 이름은 전부 분류 표의 식별자다. 게임 바이트 유입 0 · 경로 유입 0.
