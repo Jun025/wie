@@ -1,0 +1,53 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-24",
+  "task": "wie-2026-09-23-aot-java-dataoutputstream-and-gregoriancalendar-anchors-adopt-p0",
+  "title": "ByteArrayOutputStream 16 = toByteArray()[B · String 21 = indexOf(I)I — 턴·서든어택포켓·일지매영웅전기가 한 칸씩 더 간다",
+  "summary": "lgt_java_abi.toml 에 두 줄. 둘 다 호출부의 반환값 사용으로 이름을 강제했다 — BAOS 16 의 반환은 null 검사 뒤 ptr_fields→길이 워드로 두 번 역참조된다(b.length) · String 21 은 r1='|' 한 개의 int 인자를 받고 반환을 <0 검사 뒤 substring(0,i) 의 끝으로 쓴다.",
+  "changes": [
+    "wie-lgt/data/lgt_java_abi.toml — java/io/ByteArrayOutputStream 신설(toByteArray ()[B = 16) · java/lang/String 에 indexOf (I)I = 21 (+ 호출부 관측 주석)",
+    "wie-lgt/src/runtime/java/jvm_support.rs — abi_rows_cover_the_indexes_titles_actually_dispatch_on 에 두 행 고정"
+  ],
+  "verification": [
+    "RUST_LOG=info wie_validate --timeout 90: 턴×2·서든어택포켓×2 BAOS 16 → DataOutputStream 14 · 일지매영웅전기 String 21 → String 27",
+    "변이: BAOS 16=size()I → 턴 5 tick 만에 host panic(LGT object reference 0x9) · String 21=lastIndexOf(I)I → 다음 호출 인자 r1 0x2→0xe",
+    "working/lgt 54종 --timeout 30 전/후 PASS 비교 · 4게이트 + cargo +beta clippy"
+  ],
+  "limits": [
+    "서든어택포켓은 size()I 변이에서도 다음 벽까지 결과가 같았다 — 이 칸의 판별은 턴 호출부 하나가 진다.",
+    "훼밀리마트타이쿤은 BAOS 16 에 수렴하지 않았다(벽 = StringBuffer 22) — 아래 제안으로 남겼다."
+  ],
+  "adoptedProposals": [
+    "2026-09-23-aot-java-dataoutputstream-and-gregoriancalendar-anchors#p0",
+    "2026-09-23-aot-java-dataoutputstream-and-gregoriancalendar-anchors#p2"
+  ],
+  "proposals": [
+    {
+      "title": "java/io/OutputStream index 14 = close()V — 턴·서든어택포켓 세이브의 마지막 칸",
+      "plainSummary": "턴과 서든어택포켓이 세이브 버퍼를 꺼낸 직후 스트림을 닫는 곳에서 멈춘다.",
+      "userBenefit": "이 칸이 열리면 두 타이틀의 세이브 쓰기 구간이 끝까지 돈다.",
+      "why": "이번 칸을 연 뒤 4파일 전부 `Unimplemented: java/io/DataOutputStream vtable index 14`. 턴 호출부는 toByteArray 직후 `mov r0, r6 ; ldr ip, [r3, #0x3c]` 를 두 스트림에 연달아 부른다(r0 만 세팅 · r1 은 잔여값) = dos.close(); baos.close(). OutputStream 은 10..14 가 측정됐고 CLDC 선언 순서에서 14 는 close() 다.",
+      "tradeoff": "인자 없는 void 라 flush()V(13)와 모양이 같다 — 판별은 위치와 «두 스트림 연속 호출 뒤 참조 없음»이 진다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "java/lang/String index 27 = substring(I) — 일지매영웅전기의 다음 칸",
+      "plainSummary": "일지매영웅전기가 '|' 로 문자열을 자르다가 나머지 부분을 꺼내는 곳에서 멈춘다.",
+      "userBenefit": "한 타이틀이 데이터 파싱을 한 단계 더 넘어간다.",
+      "why": "indexOf(I)=21 을 연 뒤 벽이 `java/lang/String vtable index 27` 로 옮겨졌다. 호출부 r1=0x2(= 앞서 찾은 '|' 위치 + 1), 인자 1개. 규칙상 27 은 substring(I) 이고 28(substring(II))이 이번에 (0,i) 호출로 함께 관측됐다.",
+      "tradeoff": "String 15..28 run 은 여유가 없다 — 반환이 String 으로 쓰이는지 호출부에서 확인하고 채워야 한다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "java/lang/StringBuffer index 22 — 훼밀리마트타이쿤의 실제 벽(append(C) 후보)",
+      "plainSummary": "훼밀리마트타이쿤은 세이브 버퍼 칸이 아니라 문자열 만들기 한 칸에서 멈춰 있다.",
+      "userBenefit": "훼밀리마트타이쿤이 벽 하나를 더 넘는다.",
+      "why": "재측정(2026-09-24): 훼밀리마트타이쿤은 BAOS 16 이 아니라 `Unimplemented: java/lang/StringBuffer vtable index 22` 에서 멈춘다(원 제안의 «3타이틀 수렴»은 턴·서든어택포켓 둘뿐). 호출부 r1=0x30('0') · r2=0x2. 이 파일의 StringBuffer 측정값 17(append(Object))·18(append(String))·23(append(I)) 사이에서 CLDC 순서는 19 append([C) · 20 append([CII) · 21 append(Z) · 22 append(C) 이고 인자가 문자 '0' 이다.",
+      "tradeoff": "append(C) 와 append(Z) 는 둘 다 한 워드 — r1 이 0/1 이 아닌 '0' 이라는 관측이 판별 근거다. 여러 호출의 r1 분포를 확인하고 채워라.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}
