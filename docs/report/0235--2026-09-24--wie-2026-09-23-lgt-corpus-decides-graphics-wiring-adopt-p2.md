@@ -79,7 +79,7 @@ cost 쪽(`0222`)도 benefit 쪽(이 회차)도 코퍼스 전체(working 54 + bro
 ## 게임 파일명 유입 — 도구를 «실행해서» 적는다
 
 `node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab`(코퍼스는 이 워크트리 밖이다):
-★**BOUNDED 3회 / 2쌍** · PREFIX-EMBEDDED 0 · ★**SUFFIX-ATTACHED 0**.
-새로 들어온 이름은 **1개**(2회) — 뒤집힌 타이틀(결과가 곧 그 타이틀이라 이름 없이 적으면 다음 회차가 다시 재야 한다).
+★**BOUNDED 2회 / 2쌍** · PREFIX-EMBEDDED 0 · ★**SUFFIX-ATTACHED 0**.
+새로 들어온 이름은 **1개** — 뒤집힌 타이틀(결과가 곧 그 타이틀이라 이름 없이 적으면 다음 회차가 다시 재야 한다).
 나머지 1쌍은 §D 문서가 **이미 담고 있던** 이름이다(도구는 수정된 파일 전체를 읽는다). 모집단 37건의 목록은 repo 밖 회신에만 적었다.
 게임 바이트 유입 0 · 경로 유입 0.
