@@ -217,7 +217,19 @@ async fn java_pending_exception(core: &mut ArmCore, _: &mut ()) -> Result<u32> {
 async fn java_is_class_assignable(core: &mut ArmCore, jvm: &Jvm, ptr_class: u32, ptr_class_name: u32, _ptr_fields: u32) -> Result<u32> {
     let class_name = String::from_utf8(read_null_terminated_string_bytes(core, ptr_class_name)?)
         .map_err(|error| WieError::FatalError(format!("Invalid LGT class name: {error}")))?;
-    let source_class_name = LgtJvmSupport::class_from_raw(core, ptr_class).name();
+    // Both pointers arrive in guest registers, so both get the same trust. `ptr_class` is the
+    // class word the guest read out of the reference it threw, and a guest that throws a
+    // not-yet-initialised static hands us one that points nowhere (measured on 놈3: an `athrow`
+    // of `.bss+0xa9c`, whose class word reads `0x104c02b4`). Answering "not assignable" is what
+    // this runtime can honestly say about a class it cannot read, and it leaves the guest's own
+    // handler search running — the alternative killed the emulator for every title in the process.
+    let source_class_name = match LgtJvmSupport::class_from_raw(core, ptr_class).try_name() {
+        Ok(name) => name,
+        Err(error) => {
+            tracing::error!("Unreadable thrown class {ptr_class:#x} tested against {class_name}: {error} — reporting not-assignable");
+            return Ok(0);
+        }
+    };
 
     Ok(u32::from(jvm.is_type_assignable(
         &JavaType::from_class_name(&source_class_name),

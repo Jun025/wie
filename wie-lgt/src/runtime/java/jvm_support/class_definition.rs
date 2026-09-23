@@ -335,6 +335,20 @@ impl JavaClassDefinition {
         read_generic(&self.core, self.raw()?.ptr_descriptor)
     }
 
+    /// `ClassDefinition::name` without the panic.
+    ///
+    /// The trait method cannot fail — `jvm`'s `name()` returns `String` — so it unwraps three
+    /// host reads of guest memory. That is fine for a class this runtime itself registered, and
+    /// wrong for a pointer that arrived in a guest register: `java_is_class_assignable` takes the
+    /// thrown object's class word straight from the guest, so an unreadable one killed the whole
+    /// emulator instead of the one guest thread. Callers standing on a guest boundary use this
+    /// and decide; everything else keeps the infallible trait method.
+    pub fn try_name(&self) -> Result<String> {
+        let ptr_name = self.descriptor()?.ptr_name;
+        String::from_utf8(read_null_terminated_string_bytes(&self.core, ptr_name)?)
+            .map_err(|error| WieError::FatalError(format!("Invalid LGT class name: {error}")))
+    }
+
     pub fn methods(&self) -> Result<Vec<JavaMethod>> {
         let ptr_methods = self.descriptor()?.ptr_methods;
         if ptr_methods == 0 {
@@ -780,7 +794,7 @@ impl EmulatedFunction<(), u32, ()> for JavaClassGetterProxy {
 #[async_trait::async_trait]
 impl ClassDefinition for JavaClassDefinition {
     fn name(&self) -> String {
-        String::from_utf8(read_null_terminated_string_bytes(&self.core, self.descriptor().unwrap().ptr_name).unwrap()).unwrap()
+        self.try_name().unwrap()
     }
 
     fn super_class_name(&self) -> Option<String> {
@@ -944,5 +958,34 @@ impl Debug for JavaClassDefinition {
             .field("name", &ClassDefinition::name(self))
             .field("ptr_raw", &self.ptr_raw)
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use wie_core_arm::ArmCore;
+    use wie_util::{Result, WieError};
+
+    use super::JavaClassDefinition;
+
+    /// The guest-boundary accessor must REPORT an unreadable class, not panic on it.
+    ///
+    /// The address is the one 놈3 produced (2026-09-23): the guest executed `athrow` on
+    /// `.bss+0xa9c` — a table of SVC stubs, not an object — and the class word read out of it
+    /// was `0x104c02b4`, which no LGT region maps. `java_is_class_assignable` handed that
+    /// straight to `name()`, whose three unwraps killed the process for every title sharing it.
+    /// A regression here is silent in the ordinary way: `name()` still works for every class
+    /// this runtime registered itself, so only a guest-supplied pointer sees the difference.
+    #[test]
+    fn try_name_reports_an_unreadable_class_instead_of_panicking() -> Result<()> {
+        let core = ArmCore::new(false, None)?;
+
+        let class = JavaClassDefinition::from_raw(0x104c_02b4, &core);
+
+        assert!(
+            matches!(class.try_name(), Err(WieError::InvalidMemoryAccess(0x104c_02b4))),
+            "an unmapped class pointer must come back as an error carrying its own address"
+        );
+        Ok(())
     }
 }

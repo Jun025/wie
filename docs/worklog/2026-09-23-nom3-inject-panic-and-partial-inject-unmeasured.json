@@ -1,0 +1,76 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-23",
+  "task": "wie-nom3-live-title-inject-panic-and-partial-inject-pass",
+  "title": "놈3 입력 panic 의 이름 — 게스트가 «자기 SVC 스텁 표»를 athrow 한다 · 부분 주입은 UNMEASURED",
+  "summary": "라이브 타이틀 놈3(featurephone.otterpebble.com 등재 · sha256 b475b639… 배포 번들 일치 실측)가 키 입력에 약 25% 확률로 죽던 것을 닫았다. 사슬 전체가 실측이다: 게스트가 SVC 0x19(ThrowException)를 R0=0x1500a9c 로 실행하고, 그 주소는 .bss+0xa9c(.text@0x1000 · .data@0x1400000 · .bss@0x1500000)이며, 거기 8워드가 전부 0x7100xxxx = FUNCTIONS_BASE 의 SVC 스텁이다 ⇒ ★던져진 것은 객체가 아니라 «함수 포인터표»다. 게스트가 그것을 예외 인스턴스로 읽어 얻은 클래스 워드가 0x104C02B4 이고, 그 주소는 LGT 어느 영역에도 매핑돼 있지 않다. java_is_class_assignable 이 그 포인터를 ClassDefinition::name() 의 unwrap 세 겹에 그대로 넘겨 ★호스트 프로세스 전체를 죽였다. 처방은 unwrap→? 가 아니라 «자바 의미론상 옳은 답»이다 — 읽을 수 없는 클래스는 catch 절에 «일치하지 않는다»(0)고 답하고 게스트의 핸들러 탐색을 계속 돌린다. ★같은 함수 안에서 ptr_class_name 은 ? 로 전파하는데 ptr_class 는 패닉이던 비대칭이 결함의 형태였다. 둘째 축: --inject 의 UNMEASURED 술어를 input_steps == 0 → input_steps < input_steps_total 로 넓혔다 — 코퍼스 실측이 기존 술어의 «자기모순»을 보여줬기 때문이다(같은 clean exit 에 대해 0/27 은 미측정, 10/27 은 PASS).",
+  "changes": [
+    "wie-lgt/src/runtime/java/jvm_support/class_definition.rs — JavaClassDefinition::try_name() 신설(ClassDefinition::name 과 같은 읽기의 Result 판). name() 은 self.try_name().unwrap() 로 남겨 ★기존 호출부 동작 무변경",
+    "wie-lgt/src/runtime/java/interface.rs — java_is_class_assignable 이 try_name() 을 쓰고, 읽지 못하면 tracing::error! 후 0(not assignable) 반환. 게스트 경계의 두 포인터에 같은 신뢰 등급을 적용한다",
+    "wie_cli/src/bin/wie_validate.rs — inject_unmeasured 가 input_steps_total 을 받아 `input_steps < input_steps_total` 로 판정. reason 이 0 대신 실제 전달 수를 적는다. 모듈 헤더 2곳 + 술어 주석에 코퍼스 실측과 «대가 2종»을 기록",
+    "시험 2종 — try_name_reports_an_unreadable_class_instead_of_panicking(놈3 가 실제로 낸 0x104c02b4 를 그대로 사용) · zero_injected_steps_is_not_a_pass_test 에 부분 주입 행 추가 + 총계 0 행(부호 오류 잡이)",
+    "docs/report/0229 신설 — 사슬 5걸음 · 코퍼스 표 · 개악 대조 3종 · 부하 기록",
+    "★계측 코드 최종 diff 0(PROBE 전수 0건) · lgt_java_abi.toml 무접촉 · 게임 바이트 0 · 새 검사기·CI 0"
+  ],
+  "verification": [
+    "★놈3 전/후 — 전: origin/main 무수정 release 로 ★FAIL 2/8(죽은 스텝 11_LEFT·10_OK 로 서로 다른데 주소는 전건 0x104C02B4) + 선행 회차 5/16 ⇒ 합산 7/24 ≈ 29%. 후: ★16/16 PASS · 27/27 스텝 · FAIL 0(재현율 25% 에서 우연 확률 약 1%)",
+    "★이름을 다섯 걸음 실측으로 세웠다 — ⑴SVC 0x19 의 R0=0x1500a9c ⑵RUST_LOG 의 Section 줄로 .bss@0x1500000 확인 ⇒ .bss+0xa9c ⑶그 8워드가 전부 0x7100xxxx = FUNCTIONS_BASE 스텁 ⑷게스트가 얻은 클래스 워드 0x104C02B4 ⑸그 주소는 이미지 3섹션·힙(0x40000000–0x50000000)·전역(0x7fff0000) 어디에도 없다",
+    "★게스트 호출 자리도 잡았다 — LR 0x31315 ⇒ <Base>+0x30310 ← <Base>+0x17760 · IP=0x19 · R1/R2 가 직후 IsClassAssignable 의 ptr_class_name/ptr_fields 와 동일",
+    "★jvm-trait 회차와의 관계 = ⒜(그 회차가 덮지 않은 자리) — 그쪽은 NativeJavaValueCodec::object_from_raw 를 게이트했고 실측 프레임이 object_from_raw ← JavaClassInstance::get_field 였다. 이번 자리는 ClassDefinition::name → descriptor() → raw() 로 다른 트레이트·다른 사슬이고 그 프레임에 등장하지 않는다",
+    "★코퍼스 실측(175/177 실행 · loadavg 77–98 = 절단이 가장 잘 나는 조건) — PASS 145 · 그중 «survived input sequence» 주장 143 은 ★전건 27/27 · ★부분이면서 주장까지 한 것 0 · 0스텝 주장 0 · 기존 술어가 잡은 UNMEASURED 3 은 ★전건 0/27 이고 stop=clean exit · 부분 주입 PASS 2(케로로미니게임 10/27 · 삼국지연의2 2/27)도 ★둘 다 clean exit",
+    "★그 표가 설계를 정했다 — 기존 술어는 같은 clean exit 에 대해 0/27 을 «미측정», 10/27 을 «PASS» 라고 말한다(자기모순). 「총계 미달 전건」을 골랐고, ★!exited 로 한정하는 안은 기존 UNMEASURED 3종을 전부 풀어 버려서 기각했다",
+    "★실동작 — 삼국지연의2 → UNMEASURED 2/27 · rc=2 · reason 이 실제 전달 수를 적는다. 대조로 전량 주입 타이틀은 PASS 27/27 유지",
+    "★라이브 4종 회귀 — 부팅 축 4/4 PASS(lf=true) · 주입 축 4/4 PASS ★27/27. 놈3 는 고치는 대상이면서 회귀 대상이고 부팅 축 PASS 유지",
+    "★개악 대조 3종 전건 진다 — M1 술어를 옛 ==0 으로 → zero_injected_steps_is_not_a_pass_test FAILED · M2 호출부가 total 을 받게 → the_gate_is_handed_the_delivered_count_test FAILED · M3 try_name 을 옛 unwrap 판으로 → 신설 시험 FAILED. 원문 복구 후 전건 ok",
+    "★4관문 + cargo +beta clippy 전건 rc=0(cargo test --all 46 suites · 실패 0) · 엔진을 만졌으므로 러너 블록 전건(draw_j2me·helloworld_ktf·helloworld_lgt·text_j2me PASS · keydraw_lgt --expect-last-frame PASS 27/27 · git status test_data/ clean) · clet 회귀 test_helloworld ok · 문서 검사기 7종 rc=0"
+  ],
+  "limits": [
+    "★«왜 게스트가 자기 함수표를 throw 하는가»는 못 밝혔다 — AOT 컴파일된 게스트 코드(<Base>+0x30310) 안이고 이 회차의 범위를 넘는다. 티켓이 허용한 «이름 + 최소재현»까지가 산출물이다",
+    "★고쳐서 사라진 것과 살아남게 된 것을 구별하라 — 게스트의 잘못된 athrow 는 «그대로 난다»(한 판에서 46,222회 관측됐고 그래도 PASS 27/27). 종전 25% 는 «발생률»이 아니라 «그 상태에 들어가는 비율»이었고, 첫 1회가 곧 프로세스 사망이라 판당 1회로 보였을 뿐이다",
+    "★②의 오늘 이득은 0 이다 — 부분 주입이 «주장»과 함께 온 사례가 이 코퍼스에 없다. 남긴 이유는 ⒜자기모순 해소 ⒝원 결함의 형태(백스톱은 틱으로 절단)이고 지금 코퍼스에 스크립트 중간에 백스톱을 태울 만큼 빠른 타이틀이 없을 뿐이라는 것",
+    "★②의 대가는 정확히 2종이고 PASS → UNMEASURED 다(FAIL 로 뒤집은 것 0). 기존 UNMEASURED 3종은 그대로다 — 좁히지 않았다",
+    "★keydraw_ktf 가 러너 블록에서 1회 FAIL 했다 — paints 20(무부하 48–55) · loadavg 96 · 4단 절차대로 재실행 5회에 4 PASS(p39–52). 구조적으로도 이 diff 가 닿지 않는다(엔진 수정은 wie-lgt 전용인데 그 고정물은 KTF 이고 input_steps 는 전 실행 27/27 이라 ②가 발화한 적 없다). ★단 origin/main 재빌드로 ⑶단계를 밟지는 않았다(이 부하에서 릴리스 빌드 1회가 26–41분)",
+    "★코퍼스 스윗은 175/177 이다 — 정무문2·헬로우닌자 2종이 동시 실행 중 유실됐다(재시도하지 않았다). 그 2종이 둘 다 부분 주입이었더라도 결론(자기모순 해소)은 바뀌지 않는다",
+    "★코퍼스 수는 부하 의존이다 — 케로로미니게임은 고부하에서 10/27 이었고 저부하 재실행에서 27/27 PASS 였다. ⇒ 이 표를 «상수»로 인용하지 마라. 그리고 그 부하 의존성이 ②가 값하는 이유다(고부하에서 10/27 을 «전량 통과»로 적던 것이 종전 동작이다)",
+    "★스레드 교차 가설은 실측으로 기각됐다 — SUPPORT_CONTEXT_BASE 의 예외 프레임 스택이 전 게스트 스레드 공유인 것은 사실이나, 실패 순간 frame_sp == cur_sp 라 이 결함의 원인이 아니다. 공유 자체는 아래 제안으로 남긴다",
+    "★시각적 정합은 보지 않았다 — 놈3 가 «죽지 않는다»를 쟀지 «옳게 그린다»를 재지 않았다. paints·distinct_colors 절대값은 부하 의존이라 개선 근거로 쓰지 않았다"
+  ],
+  "adoptedProposals": [
+    "2026-09-23-validate-inject-zero-step-unmeasured#p0",
+    "2026-09-23-validate-max-ticks-backstop-inject-axis-already-closed#p0"
+  ],
+  "dispositionNotes": {
+    "2026-09-23-validate-inject-zero-step-unmeasured#p0": "adopted — 놈3 의 입력 경로 panic. 이 회차가 근인을 이름까지 세우고(게스트가 .bss+0xa9c 의 SVC 스텁 표를 athrow · 클래스 워드 0x104C02B4 미매핑) java_is_class_assignable 의 게스트 경계에서 닫았다. 실측 16/16 PASS · FAIL 0.",
+    "2026-09-23-validate-max-ticks-backstop-inject-axis-already-closed#p0": "adopted — 검증기가 «부분 입력»을 PASS 로 적던 축. 코퍼스 175종 실측으로 기존 술어의 자기모순(같은 clean exit 에 0/27 은 미측정 · 10/27 은 PASS)을 확인하고 input_steps < input_steps_total 로 닫았다. 대가는 2종 PASS → UNMEASURED 이고 FAIL 로 뒤집은 것은 0.",
+    "note-on-declaration-site": "★티켓 §부수 처리는 「각자 다른 워크로그 파일이다 ⇒ 두 파일에 adoptedProposals 를 선언하라」고 적었다. 이 회차는 그것을 «두 ref 를 모두 선언하라»로 읽고 ★이 파일 한 장에 둘 다 적었다 — ⑴소비자(cockpitd.js 의 scanRepoSimple)는 adopted 를 워크로그 전체의 합집합으로 모으므로 선언 위치와 무관하게 효과가 같고 ⑵이 repo 의 기존 관용구가 «판정하는 회차의 워크로그가 남의 ref 를 선언한다»(선례 5건)이며 ⑶남의 파일 2장을 고치면 열린 형제 PR 과의 충돌면만 는다. 총괄이 원본 파일에 적기를 원하면 한 줄 이동이다."
+  },
+  "proposals": [
+    {
+      "title": "놈3 가 «왜» 자기 SVC 스텁 표를 athrow 하는지 — 게스트 코드 <Base>+0x30310 을 읽어라",
+      "plainSummary": "이번에 막은 것은 «그 때문에 에뮬레이터가 죽는 것»이고, 게임이 잘못된 예외를 던지는 것 자체는 그대로 남아 있다. 그 자리는 게임의 컴파일된 코드 안이고 주소까지 좁혀져 있다.",
+      "userBenefit": "놈3 가 입력 중 내부적으로 예외 처리를 헛돌리는 구간이 사라지면, 그 구간에서 떨어지던 프레임이 돌아온다.",
+      "why": "이 회차 실측: 게스트가 SVC 0x19 를 R0=0x1500a9c(= .bss+0xa9c)로 실행하고 그 8워드는 전부 FUNCTIONS_BASE 스텁이다 — 객체가 아니라 함수표다. 호출 자리는 LR 0x31315 ⇒ <Base>+0x30310 ← <Base>+0x17760 이고, 한 판에 46,222회 난다. 저장소에 동기화된 Thumb 디코더가 이미 있다(scripts/ktf-image-sweep.py 의 window). ★출발점이 전부 손에 있다.",
+      "tradeoff": "게스트 디스어셈블은 비싸고, 답이 «게임 자체의 버그»로 끝날 수 있다(그러면 고칠 것이 없고 지금 처방이 최종이다). 그래서 먼저 «그 코드가 무엇을 하려던 것인가»만 읽고 멈추는 것이 맞다.",
+      "effort": "M",
+      "target": "wie-lgt · scripts/ktf-image-sweep.py window 서브커맨드"
+    },
+    {
+      "title": "LGT 예외 프레임 스택이 전 게스트 스레드 «공유»다 — KTF 는 스레드별인데",
+      "plainSummary": "게임 안의 여러 실행 흐름이 예외 처리 상태를 한 칸에 같이 쓴다. 이번 결함의 원인은 아니었지만, 구조 자체는 그대로다.",
+      "userBenefit": "여러 흐름이 동시에 try/catch 를 쓰는 게임에서 설명 안 되는 정지·오동작이 줄어들 여지가 있다.",
+      "why": "wie-lgt/src/runtime/java/exception.rs 의 SUPPORT_CONTEXT_BASE(0x7fff0000)는 자기 주석이 «shared by the LGT Java SVC handlers» 라고 적어 두었고, push/pop 이 그 한 칸의 연결 리스트를 민다. ArmCore 는 threads 맵으로 스레드별 레지스터 문맥을 이미 갖고 있고, ★KTF 는 ptr_current_jvm_thread_context 로 스레드별을 «이미 모델링한다». 이 구조는 게스트가 읽지 않는 호스트 쪽 장부라 게스트 ABI 를 건드리지 않고 스레드별로 옮길 수 있다.",
+      "tradeoff": "이번 실측에서 실패 순간 frame_sp == cur_sp 라 «이 결함»의 원인은 아니었다 ⇒ 관측된 피해가 0 인 상태에서 고치는 일이고, 우선순위가 낮다. 먼저 교차가 실제로 나는 타이틀을 찾는 관측이 앞서야 한다.",
+      "effort": "M",
+      "target": "wie-lgt/src/runtime/java/exception.rs"
+    },
+    {
+      "title": "`ClassDefinition::name` 의 unwrap 세 겹이 남은 «다른» 게스트 경계를 세어라",
+      "plainSummary": "이번에 한 자리를 막았는데, 같은 모양의 자리가 더 있는지 세어 본 적이 없다.",
+      "userBenefit": "같은 형태로 에뮬레이터 전체를 죽이는 자리가 남아 있다면, 다음 타이틀이 그것을 밟기 전에 닫힌다.",
+      "why": "name()·super_class_name()·interface_names() 가 모두 descriptor().unwrap() 으로 시작하고, jvm 트레이트라 오류 통로가 없다. 이번 자리는 java_is_class_assignable 이었지만 «게스트 레지스터에서 온 포인터로 JavaClassDefinition::from_raw 를 부르는» 호출부가 몇 개인지는 세지 않았다. 세는 것 자체는 grep 한 번이고, 각 자리가 «답할 수 있는 정직한 값»을 갖는지는 자리마다 다르다.",
+      "tradeoff": "전부 try_ 판으로 바꾸면 호출부마다 «무엇을 답할 것인가» 결정이 필요하고, 답이 없는 자리에서는 지금의 패닉이 오히려 정직하다. 그래서 «세기»까지가 한 회차이고 «고치기»는 그 결과를 보고 정한다.",
+      "effort": "S",
+      "target": "wie-lgt/src/runtime/java/jvm_support/class_definition.rs"
+    }
+  ]
+}
