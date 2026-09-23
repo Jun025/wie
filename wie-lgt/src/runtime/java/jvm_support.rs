@@ -1072,8 +1072,9 @@ mod tests {
 
     #[test]
     fn abi_rows_cover_the_indexes_titles_actually_dispatch_on() -> Result<()> {
-        // One shape behind five titles: 배틀몬스터 dispatches java/lang/Object index 5,
-        // 배틀몬스터·학교가는길·체스마스터 java/lang/Runtime index 13, 훼밀리마트타이쿤
+        // One shape behind five titles: 배틀몬스터 dispatches java/lang/Object index 5 and
+        // java/io/ByteArrayInputStream index 13, 배틀몬스터·학교가는길·체스마스터
+        // java/lang/Runtime index 13, 훼밀리마트타이쿤
         // java/lang/String index 19, 메이플스토리2007 java/lang/Thread
         // index 13. Unlike the rows around them, these were derived from CLDC declaration order
         // rather than read off a guest — see the comments in `data/lgt_java_abi.toml` — so a
@@ -1087,6 +1088,7 @@ mod tests {
             let (jvm, _, _) = init_jvm(&system_clone).await?;
             for (class_name, index, name, descriptor) in [
                 ("java/lang/Object", 5, "notify", "()V"),
+                ("java/io/ByteArrayInputStream", 13, "skip", "(J)J"),
                 ("java/lang/Runtime", 11, "freeMemory", "()J"),
                 ("java/lang/Runtime", 12, "totalMemory", "()J"),
                 ("java/lang/Runtime", 13, "gc", "()V"),

@@ -1,0 +1,32 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-23",
+  "task": "wie-battlemonster-past-splash-bytearrayinputstream-skip-slot",
+  "title": "java/io/InputStream index 13 = skip(J)J — 배틀몬스터가 스플래시 뒤 흰 화면을 넘어 마을 화면까지 간다",
+  "summary": "lgt_java_abi.toml 의 java/io/InputStream 행에 skip(J)J = 13 한 줄. 12·14 가 측정값이고 CLDC 1.1 에서 그 사이는 skip 하나뿐이며, 호출부가 int 를 r1:r2 로 부호확장해 넘기고 반환을 버린다(in.skip(n);). 배틀몬스터는 타이틀·메뉴·스토리·월드맵·마을까지 그리고, 마을 직후 Invalid memory access; address: 0 로 스레드가 죽는다.",
+  "changes": [
+    "wie-lgt/data/lgt_java_abi.toml — java/io/InputStream 에 skip(J)J = 13 (+ 도출·호출부 근거 주석)",
+    "wie-lgt/src/runtime/java/jvm_support.rs — abi_rows_cover_the_indexes_titles_actually_dispatch_on 에 (java/io/ByteArrayInputStream, 13, skip, (J)J)"
+  ],
+  "verification": [
+    "배틀몬스터 --inject --action-secs 2: before 흰 화면 22장 동일 · paints 36 → after 타이틀/메뉴/스토리/월드맵 · paints 222 · ERROR 0",
+    "--action-secs 4: 마을 화면(플레이어 캐릭터) 도달 후 Invalid memory access; address: 0",
+    "라이브 4종 + 배틀몬스터 2파일 짝지은 실행 — 놈3 의 p0 는 손대지 않은 쪽에서도 재현(부하/기존 flake)",
+    "4게이트 + cargo +beta clippy"
+  ],
+  "limits": [
+    "게임 화면에서 입력 반응은 관측하지 못했다 — 마을 도달 직후 스레드가 죽는다.",
+    "InputStream 의 mark/reset/markSupported(16~18)는 도출되지만 아무도 부르지 않아 비워 뒀다."
+  ],
+  "proposals": [
+    {
+      "title": "배틀몬스터 마을 진입 직후 `Invalid memory access; address: 0` — 다음 벽",
+      "plainSummary": "배틀몬스터가 이제 마을 화면까지 가지만, 거기서 게임 로직 스레드가 죽어 화면이 멈춥니다.",
+      "userBenefit": "이 벽을 넘으면 처음으로 «입력에 반응하는 게임 화면» — 운영자 목표인 플레이 가능 — 을 판정할 수 있다.",
+      "why": "--inject --boot-secs 6 --action-secs 4 실행에서 step 21 에 마을·플레이어 캐릭터가 그려진 뒤, 리소스 로더와 같은 스레드(1622147107)가 Invalid memory access; address: 0 로 죽고 마지막 5장이 동일하다. 레지스터 덤프가 FP·SP 포함 거의 전부 0 이라 표시된 call stack 은 스택 워크 잡음이다 — 실제 호출부부터 잡아야 한다.",
+      "tradeoff": "action-secs 2 실행은 이 지점에 닿지 않는다(월드맵 팬에서 끝남) — 재현에 ~2분 · 고부하에서 더 걸린다. 벽 원인이 또 한 칸짜리 ABI 행일지, 런타임 결함일지는 미지수다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ]
+}
