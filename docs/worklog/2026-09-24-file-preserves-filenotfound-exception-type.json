@@ -1,0 +1,45 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-24",
+  "task": "wie-2026-09-23-aot-java-dataoutputstream-and-gregoriancalendar-anchors-adopt-p1",
+  "title": "org.kwis.msp.io.File 이 FileNotFoundException 을 덮지 않는다",
+  "summary": "RandomAccessFile 실패를 종류와 무관하게 IOException(\"Invalid filename\") 으로 덮던 경로를 원인 그대로 전파로 바꿨다. 제안이 「확인이 먼저」라고 적은 tradeoff 는 이 경우 성립하지 않는다 — AromaWIPI javadoc 이 생성자를 throws IOException 으로 선언하고 FileNotFoundException 은 그 하위형이라, catch (IOException) 게스트는 그대로 잡는다. 서든어택포켓 짝지은 before/after 에서 게스트가 받는 예외는 IOException/Invalid filename → FileNotFoundException/File not found 로 바뀌었으나 벽은 움직이지 않았다(쓰기 재오픈 0 · 세이브 생성 0) — 제안의 편익 문장은 이 타이틀에서 관측되지 않았다.",
+  "changes": [
+    "wie-wipi-java/src/classes/org/kwis/msp/io/file.rs — 재라벨 블록(+ `// TODO check exception type`) 제거, `.await?` 로 전파. 새 테스트 test_missing_file_keeps_file_not_found_exception_type 가 IOException 하위형 + FileNotFoundException 을 둘 다 단언."
+  ],
+  "verification": [
+    "양방향 변이: 재라벨 복원 시 새 테스트 red(3중 1 failed · 기존 2건 green), 원상태 green(3 passed)",
+    "짝지은 before/after 라이브 2파일(서든어택포켓 · lgt 서든어택 포켓) — probe 로 원인 예외를 직접 읽었다. 벽·init 호출 수 동일, 전달 예외만 변경",
+    "cargo fmt/clippy(-D warnings)/wasm clippy/+beta clippy 전건 rc=0 · RUST_MIN_STACK cargo test --all 421 passed 0 failed",
+    "cargo clippy --workspace --all-targets rc=0 · 경고 16 전건 기존 · 변경 파일 귀속 0",
+    "AGENTS.md 러너 블록 6종 — keydraw_ktf 첫 회 FAIL(paints 23 · loadavg 98~105)은 재실행 3/3 PASS 로 부하 기아 판정, 나머지 전건 PASS"
+  ],
+  "limits": [
+    "제안의 편익(첫 실행 세이브 생성)은 이 타이틀에서 관측되지 않았다 — 게스트는 예외 종류가 바뀌어도 쓰기 모드로 다시 열지 않는다. 두 파일 모두 여전히 paints 0 으로 데드라인에 닿는다.",
+    "같은 함수의 두 번째 규격 불일치(잘못된 mode 는 IllegalArgumentException 이어야 하는데 IOException 을 던진다)는 범위 밖으로 두었다 — 그쪽은 상하위형 관계가 없어 진짜 tradeoff 가 있다.",
+    "AGENTS.md 러너 ⑶(untouched tree 재현)은 돌리지 않았다. ⑴재실행이 이미 갈랐고, keydraw_* 는 이 변경이 닿는 파일시스템 경로를 쓰지 않는다."
+  ],
+  "adoptedProposals": [
+    "2026-09-23-aot-java-dataoutputstream-and-gregoriancalendar-anchors#p1"
+  ],
+  "proposals": [
+    {
+      "title": "잘못된 mode 는 IllegalArgumentException 이어야 한다 — 같은 함수의 두 번째 규격 불일치",
+      "plainSummary": "게임이 지원하지 않는 방식으로 파일을 열려고 할 때, 규격이 정한 것과 다른 종류의 오류를 돌려준다.",
+      "userBenefit": "오류 종류로 분기하는 게스트가 「모드가 틀렸다」와 「파일을 못 열었다」를 구별할 수 있게 된다 — 이번 회차가 연 것과 같은 축이다.",
+      "why": "AromaWIPI javadoc(org/kwis/msp/io/File.html) 생성자 상세가 「위 모드외에 다른 모드로 열고자 하면 IllegalArgumentException을 발생킵니다」라고 적는데, wie-wipi-java/src/classes/org/kwis/msp/io/file.rs 는 IOException(\"Invalid mode\") 를 던진다. 이번 회차와 같은 파일·같은 함수이고, 규격 근거도 같은 문서 한 곳에 있다.",
+      "tradeoff": "★이번 건과 달리 진짜 tradeoff 가 있다 — IllegalArgumentException 은 IOException 의 하위형이 «아니므로», 지금 catch (IOException) 으로 잡던 게스트가 못 잡게 되어 예외가 게스트 밖으로 나간다. 그 모드로 여는 타이틀이 코퍼스에 실재하는지(= 지금 이 갈래에 닿는 게스트가 있는지)를 먼저 세는 것이 순서다. 0건이면 규격대로 고치는 비용이 0이고, 1건이라도 있으면 그 타이틀의 before/after 가 필요하다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "서든어택포켓의 세이브 미생성은 예외 종류가 아니라 그 «앞»에서 막혀 있다",
+      "plainSummary": "저장 파일이 안 만들어지는 원인으로 지목됐던 곳을 고쳤는데, 게임은 여전히 첫 화면조차 그리지 못한다. 진짜 막힌 곳은 더 앞이다.",
+      "userBenefit": "원인을 잘못 짚은 채로 다음 라운드가 같은 자리를 다시 파는 것을 막는다.",
+      "why": "이번 회차의 짝지은 측정: 예외가 FileNotFoundException 으로 바르게 전달된 뒤에도 게스트는 쓰기 모드로 재오픈하지 않고(File::<init> 1회 · mode=1 뿐), 두 파일 모두 paints 0 · stop=deadline 으로 끝난다. 즉 저장 분기에 도달하기 전에 멈춘다. 직전 회차(docs/report/0224)가 기록한 java/io/ByteArrayOutputStream vtable index 16 벽이 이 60초 예산 안에서는 아예 나타나지도 않았다 — 부팅 경로가 그보다 앞에서 도는 것으로 보인다.",
+      "tradeoff": "60초 예산 안의 관측이라, 「더 앞에서 막혔다」와 「부하 기아로 못 갔다」가 아직 갈리지 않았다. 예산을 늘린 재측이 먼저이고, AGENTS.md 가 이름 붙인 짝짓지 않은 표본 함정을 그대로 밟을 수 있는 자리다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}
