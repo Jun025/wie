@@ -21,6 +21,25 @@ field = [
     { name = "initializationState", descriptor = "I", index = 4 },
 ]
 
+# The comment above java/lang/String below explains the placement rule these rows follow. That
+# rule now has two end-to-end measurements of its own, taken off guest compiler-generated vtables
+# rather than off a dispatch, and they are what the output-side rows further down rest on:
+#
+#   놈3 has an AOT class `f extends java/io/InputStream` whose descriptor declares vtable_count=19
+#   with its own non-zero targets at 10 12 13 14 15 16 17 18 — nine consecutive slots from 10, one
+#   of them (11, read([B)) left inherited, and nothing past 18. So InputStream occupies exactly 19
+#   slots, which is 10 + its nine CLDC instance methods, and a subclass's own run starts at 19.
+#   That is independently where readByte()B=23 below puts DataInputStream's run.
+#
+#   스파이더맨3 has an AOT class `c extends java/lang/Thread`, vtable_count=21, own slots
+#   11 18 19 20: 11 is its run() override and 18..20 are three new methods, so Thread occupies 18
+#   slots = 10 + its eight CLDC instance methods. That is independently where setPriority=14 below
+#   puts things (start=10, run=11, interrupt=12, isAlive=13, setPriority=14).
+#
+# Two classes, two counts, both landing on "10 + the CLDC instance-method count, in declaration
+# order". java/io/OutputStream declares five (write(I) write([B) write([BII) flush() close()), so
+# it occupies 15 — which is what the DataOutputStream block below needs, and what the register
+# measurement there confirms independently.
 [[class]]
 name = "java/io/InputStream"
 vtable = [
@@ -29,6 +48,17 @@ vtable = [
     { name = "read", descriptor = "([BII)I", index = 12 },
     { name = "available", descriptor = "()I", index = 14 },
     { name = "close", descriptor = "()V", index = 15 },
+]
+
+# 서든어택포켓 dispatches index 11 nine times, always with one argument, and that argument's class
+# reads back as `[B` off the guest heap every time. The only method in this hierarchy taking a
+# single byte[] is write([B)V — write([BII)V takes three words, and the register beside the array
+# holds the same stale value (0x9b) across nine calls with nine different arrays, so it is a live
+# register rather than an offset. Measured, not derived.
+[[class]]
+name = "java/io/OutputStream"
+vtable = [
+    { name = "write", descriptor = "([B)V", index = 11 },
 ]
 
 [[class]]
@@ -73,23 +103,73 @@ vtable = [
     { name = "readInt", descriptor = "()I", index = 28 },
 ]
 
-# 턴 dispatches on java/io/DataOutputStream index 19 and this file deliberately leaves it empty,
-# the same way java/lang/Runtime index 10 is left empty below: the missing-entry stub names the
-# slot, and a wrong row here would not.
+# 턴 and 서든어택포켓 dispatch index 19 and 훼밀리마트타이쿤 dispatches 15 16 17 19 20. This block
+# used to be empty on purpose, because index 19 is writeInt(I)V if DataOutputStream's own run
+# starts at 15 and writeShort(I)V if it starts at 17, and those write different byte counts to the
+# guest's own stream — the wrong one corrupts what the title reads back later, silently, after a
+# run that looks fine. The reason for leaving it empty is now gone, in two parts.
 #
-# The output side has no anchor of its own, and the one nearby measurement contradicts the plain
-# derivation instead of confirming it. CLDC OutputStream declares write(I) write([B) write([BII)
-# flush() close(), so a subclass's own methods should start at 15 — which puts DataOutputStream at
-# 15 writeBoolean, 16 writeByte, 17 writeShort, 18 writeChar, 19 writeInt. But PrintStream above
-# has println(Ljava/lang/String;)V = 34, and that same start-at-15 count reaches only 32 across
-# PrintStream's 18 preceding print/println declarations. Two slots are unaccounted for, and if
-# they belong to OutputStream then DataOutputStream's run starts at 17 and index 19 is
-# writeShort(I)V, not writeInt(I)V.
+# FIRST, THE MEASUREMENT THAT SETTLES IT. The LGT compiler inlines a fixed index for java.* calls
+# (they never appear in the import table the linker walks), but it still has to obey the ABI's
+# calling convention, and a two-word argument is visible from the missing-entry stub. In one
+# contiguous region of 훼밀리마트타이쿤's save writer, on one stream object, consecutive calls:
 #
-# Both candidates write to the guest's own stream at different widths, so standing in for the
-# other corrupts what the title later reads back — silently, and after the run looks fine.
-# Resolving it needs either the LGT ordinal table or a measured DataOutputStream row; until then
-# 턴 stops at a slot that says its own name, which is the better of the two failures.
+#   index 16 ×13   r2 = 0x490503c0, c1, c2 ... cb     (a string cursor the guest is incrementing)
+#   index 19 ×1    r2 = 0x490503cb                    (untouched — r2 is not an argument)
+#   index 20 ×5    r2 = 0x0                           (cleared — r2 IS the second argument word)
+#
+# Over the whole run r2 is never once zero at 15 (230 calls, 114 distinct), 16 (151/58), 17
+# (69/34) or 19 (24/7), and is zero at every one of the 10 calls to 20. So index 20 takes 64 bits
+# and 15..19 take 32. In the DataOutputStream declaration order — writeBoolean writeByte
+# writeShort writeChar writeInt writeLong writeFloat writeDouble writeBytes writeChars writeUTF,
+# the same source order the measured DataInputStream run above follows — writeLong is the FIRST
+# two-word entry, at offset 5. Index 20 being it forces the run to start at 15, and every other
+# start is refuted by the same data: 11/12/14/16/17/18 each put a two-word method on a slot
+# measured to be one-word, and 13 would leave OutputStream three slots for five declared methods.
+# Start-at-15 is the only survivor, so index 19 is writeInt(I)V.
+#
+# SECOND, THE CONTRADICTION THAT MOTIVATED THE EMPTINESS WAS A MISCOUNT. The old note said
+# PrintStream's println(Ljava/lang/String;)V = 34 leaves "two slots unaccounted for" against a
+# start at 15, and reasoned those two might belong to OutputStream. They belong to PrintStream:
+# the count walked its 18 preceding print/println declarations and missed checkError()Z and
+# setError()V, which the CLDC source declares ahead of the print block (rustjava declares both).
+# Counting from 15 with them: checkError 15, setError 16, print ×9 at 17..25, println() 26,
+# println ×7 at 27..33, println(String) 34 — on the nose. That measurement now CONFIRMS the start
+# at 15 rather than contradicting it.
+#
+# Index 18 (writeChar) is left empty because no title has dispatched it — same discipline as
+# skip(J) at 13 above. The run is measured now, so filling it is a one-line change when one does.
+[[class]]
+name = "java/io/DataOutputStream"
+vtable = [
+    { name = "writeBoolean", descriptor = "(Z)V", index = 15 },
+    { name = "writeByte", descriptor = "(I)V", index = 16 },
+    { name = "writeShort", descriptor = "(I)V", index = 17 },
+    { name = "writeInt", descriptor = "(I)V", index = 19 },
+    { name = "writeLong", descriptor = "(J)V", index = 20 },
+]
+
+# 훼밀리마트타이쿤 is the only title to reach these, and it names both of them itself rather than
+# leaving them to the placement rule — which matters here, because nothing anchors java/util/
+# Calendar's size and so nothing would have fixed a derived index.
+#
+# Index 19 is called six times in a row, right after Calendar.getInstance(), with arguments
+# 1 2 5 11 12 13 — Calendar.YEAR MONTH DAY_OF_MONTH HOUR_OF_DAY MINUTE SECOND, in that order. No
+# other method in this hierarchy takes that sequence; it is get(I)I reading a timestamp apart.
+#
+# Index 29 is the single call immediately before them, and its one argument's class reads back off
+# the guest heap as java/util/Date. setTime(Ljava/util/Date;)V is the only method here taking a
+# Date, so the slot is named by its argument type and not by its position.
+#
+# Both are declared on Calendar rather than GregorianCalendar, so the rows go on the parent, where
+# the ancestor walk in vtable.rs picks them up for every subclass. GregorianCalendar's own
+# computeTime/computeFields stay unplaced; no title has asked for them.
+[[class]]
+name = "java/util/Calendar"
+vtable = [
+    { name = "get", descriptor = "(I)I", index = 19 },
+    { name = "setTime", descriptor = "(Ljava/util/Date;)V", index = 29 },
+]
 
 # The rows in this file were measured a title at a time, but they agree on one rule, and the rule
 # is what lets a row be written for a class no title has pinned down yet:
