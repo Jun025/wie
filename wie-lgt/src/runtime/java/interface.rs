@@ -1,5 +1,8 @@
 use alloc::{boxed::Box, format, string::String, string::ToString, vec::Vec};
-use core::mem::size_of;
+use core::{
+    mem::size_of,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use jvm::{
     ClassDefinition, ClassInstance, ClassInstanceRef, JavaError, JavaType, Jvm,
@@ -226,7 +229,18 @@ async fn java_is_class_assignable(core: &mut ArmCore, jvm: &Jvm, ptr_class: u32,
     let source_class_name = match LgtJvmSupport::class_from_raw(core, ptr_class).try_name() {
         Ok(name) => name,
         Err(error) => {
-            tracing::error!("Unreadable thrown class {ptr_class:#x} tested against {class_name}: {error} — reporting not-assignable");
+            // A title that hits this once tends to hit it every tick (79,739 lines in one 20 s 놈3
+            // run), and on the web build every ERROR line is a browser `console.error`. So only the
+            // first occurrence is an error; the rest drop to `trace!`.
+            // ponytail: process-wide flag, not per-title — one wasm instance / validator run is one title.
+            static REPORTED: AtomicBool = AtomicBool::new(false);
+            if REPORTED.swap(true, Ordering::Relaxed) {
+                tracing::trace!("Unreadable thrown class {ptr_class:#x} tested against {class_name}: {error} — reporting not-assignable");
+            } else {
+                tracing::error!(
+                    "Unreadable thrown class {ptr_class:#x} tested against {class_name}: {error} — reporting not-assignable (further occurrences at trace level)"
+                );
+            }
             return Ok(0);
         }
     };

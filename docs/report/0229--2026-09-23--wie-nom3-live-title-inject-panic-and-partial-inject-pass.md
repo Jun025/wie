@@ -29,6 +29,8 @@ sha256 `b475b639…` = 티켓이 인용한 배포 번들 해시와 일치), 방�
 ⇒ ★**이름**: 「게스트가 `.bss+0xa9c` 의 **자기 SVC 스텁 표**를 예외 참조로 `athrow` 하고, 그 첫 워드를
 클래스 헤더로 읽은 값이 `0x104C02B4` 다」. ★**쓰레기 포인터가 아니라 «잘못된 종류의 객체»다.**
 
+※**번호 체계**: 이 절의 `0x19`/`0x18` 은 **`JavaSystemSvcId` 판별값**(`svc_ids.rs` `ThrowException = 25` · `IsClassAssignable = 24` — 스텁이 IP 에 싣는 값)이다. `interface.rs` 임포트 표의 인덱스로는 같은 두 함수가 `0x21`·`0x12` 다 — 서로 다른 번호다.
+
 ★**게스트 호출 자리도 잡았다**: `LR 0x31315` ⇒ `<Base>+0x30310` ← `<Base>+0x17760`,
 `IP=0x19`(스텁이 싣는 SVC 번호), `R1/R2`(`0x4904d960`/`0x4904d940`) = 바로 뒤 `IsClassAssignable` 의
 `ptr_class_name`/`ptr_fields` 와 **동일**.
@@ -149,7 +151,11 @@ sha256 `b475b639…` = 티켓이 인용한 배포 번들 해시와 일치), 방�
 
 ⇒ ⑴★**panic 은 현행 main 에 «살아 있다»**(3/16) — 이 수정은 여전히 필요하다.
 ⑵★**`p0`(무렌더)는 대조군에도 난다**(1/16 ↔ 내 쪽 2/28 = 7.1% vs 6.3% · 구별 불가)
-⇒ ★**이 diff 가 만든 것이 아니다.** AGENTS.md §The four gates 의 4단 절차 중 ★**⑶「손대지 않은 트리에서 재현」을
+⇒ ★**«집계로는» 이 diff 가 만든 것이 아니다.** ★**그러나 «경로별로» 보면 일부는 이 diff 의 경로다**(게이트② 실측 · 아래 「반려 보정」 절):
+새 경로(`Unreadable thrown class … reporting not-assignable`)를 탄 실행 **5건 중 2건이 no-frame** 으로 끝났다 ⇒
+★**잘못된 `athrow` 가 첫 프레임 «전»에 나면, 종전의 panic 이 «검은 화면 정지»로 바뀐다.** 판정은 **FAIL→FAIL 불변**(퇴행 아님)이지만
+「놈3 가 이제 안 죽는다」는 «항상 그린다»가 아니다. 나머지 no-frame 은 새 경로 로그 0줄이라 이 diff 와 무관하다.
+AGENTS.md §The four gates 의 4단 절차 중 ★**⑶「손대지 않은 트리에서 재현」을
 이 축에서는 «실제로 밟았다»**(`keydraw_ktf` 쪽은 밟지 못했고, 그 한계는 아래 게이트 절에 따로 적었다).
 ⑶`p0` 자체는 **이 회차가 고치지 않은 남은 결함**이다 — `ticks` 는 판정 근거로 쓸 수 없고(AGENTS.md:
 「`ticks` 는 처리량 지표가 아니다」) 부하와 얽혀 있어, 별도 관측이 필요하다.
@@ -197,3 +203,30 @@ AGENTS.md §The four gates 의 4단 절차대로 **재실행 5회 → 4 PASS**(`
 
 `lgt_java_abi.toml` **무접촉**(형제 P0·P1 소관) · 배틀몬스터 무접촉 · `smoke_gate.sh` 무접촉 ·
 `otterpebble`·`tower`·원장 무접촉 · 게임 바이트 커밋 0 · `game_lab/` 커밋 0 · 새 검사기·CI 스텝 0.
+
+## 게이트② 반려 보정 (`wie-nom3-live-title-inject-panic-and-partial-inject-pass-fix`)
+
+★**M1 — 새 `error!` 의 범람을 막았다.** `interface.rs` `java_is_class_assignable` 의
+`Unreadable thrown class … reporting not-assignable` 은 이제 ★**프로세스당 첫 1회만 `error!`**, 이후는 `trace!` 다
+(`static AtomicBool` · 동작 — `Ok(0)` = not-assignable — 은 무변경). 웹 빌드는 `LevelFilter::INFO` 라 반복분이
+브라우저 `console.error` 로 가지 않는다.
+
+실측 — 릴리스 `wie_validate --inject` 놈3 **48회**(병렬 4 · load1 **38→66**) ·
+`RUST_LOG=error,wie_lgt::runtime::java::interface=trace` 로 «전 발생»과 «ERROR 줄»을 한 실행에서 함께 셌다:
+
+| 새 경로 발화 실행 | 전 발생(= 종전이면 ERROR 줄) | ERROR 줄(이 회차) | 결말 |
+|---|---|---|---|
+| #206 | 4,986 | **1** | PASS 27/27 |
+| #209 | 3,740 | **1** | PASS 27/27 |
+| #217 | 13,922 | **1** | ★FAIL no frame |
+| #232 | 620 | **1** | ★FAIL no frame |
+
+- panic **0/48** 유지 · no-frame **7/48**(그중 새 경로 **2** · 나머지 5 는 새 경로 로그 0줄).
+- ★M2 의 «첫 프레임 전 `athrow` ⇒ 검은 화면 정지»가 **이 표본에서도 재현**됐다(새 경로 4건 중 2건). 판정 FAIL→FAIL 불변.
+- ★«N 번 넣어 ERROR 1줄» 단위 시험은 두지 않았다 — 그 분기에 닿으려면 `ArmCore`+`Jvm` 이 필요하고,
+  위 실측(한 실행 안에서 620~13,922 회 발생 → ERROR 1줄)이 같은 것을 더 직접 보인다.
+  ★`Ok(0)` 계약 자체를 잠그는 시험도 여전히 없다(검수 m2 · 후속 몫).
+- ceiling: 플래그가 «프로세스 전역»이라 한 프로세스에서 여러 타이틀을 돌리면 둘째 타이틀의 첫 발생도 `trace!` 로 간다
+  — wasm 인스턴스 1개·`wie_validate` 1회 = 1타이틀이라 오늘은 해당 없음.
+
+※정정: 직전 회신의 「PR CI 10/10 green」은 ★**SUCCESS 9 · SKIPPED 1** 이 정확하다.
