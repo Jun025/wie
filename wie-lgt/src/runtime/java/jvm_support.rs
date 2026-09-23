@@ -1072,10 +1072,12 @@ mod tests {
 
     #[test]
     fn abi_rows_cover_the_indexes_titles_actually_dispatch_on() -> Result<()> {
-        // One shape behind five titles: 배틀몬스터 dispatches java/lang/Object index 5,
-        // 배틀몬스터·학교가는길·체스마스터 java/lang/Runtime index 13, 훼밀리마트타이쿤
+        // One shape behind five titles: 배틀몬스터 dispatches java/lang/Object index 5 and
+        // java/io/ByteArrayInputStream index 13, 배틀몬스터·학교가는길·체스마스터
+        // java/lang/Runtime index 13, 훼밀리마트타이쿤
         // java/lang/String index 19, 메이플스토리2007 java/lang/Thread
-        // index 13. Unlike the rows around them, these were derived from CLDC declaration order
+        // index 13, 턴·서든어택포켓 java/io/ByteArrayOutputStream index 16, 일지매영웅전기
+        // java/lang/String index 21. Unlike the rows around them, these were derived from CLDC declaration order
         // rather than read off a guest — see the comments in `data/lgt_java_abi.toml` — so a
         // reordered row does not fail to parse, it silently calls the wrong method. Pin it.
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
@@ -1087,11 +1089,14 @@ mod tests {
             let (jvm, _, _) = init_jvm(&system_clone).await?;
             for (class_name, index, name, descriptor) in [
                 ("java/lang/Object", 5, "notify", "()V"),
+                ("java/io/ByteArrayInputStream", 13, "skip", "(J)J"),
+                ("java/io/ByteArrayOutputStream", 16, "toByteArray", "()[B"),
                 ("java/lang/Runtime", 11, "freeMemory", "()J"),
                 ("java/lang/Runtime", 12, "totalMemory", "()J"),
                 ("java/lang/Runtime", 13, "gc", "()V"),
                 ("java/lang/Thread", 13, "isAlive", "()Z"),
                 ("java/lang/String", 19, "startsWith", "(Ljava/lang/String;)Z"),
+                ("java/lang/String", 21, "indexOf", "(I)I"),
             ] {
                 let class = jvm.resolve_class(class_name).await.unwrap();
                 let definition = class.definition.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap().clone();

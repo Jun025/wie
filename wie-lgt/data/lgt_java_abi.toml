@@ -83,6 +83,13 @@ vtable = [
     { name = "read", descriptor = "()I", index = 10 },
     { name = "read", descriptor = "([B)I", index = 11 },
     { name = "read", descriptor = "([BII)I", index = 12 },
+    # 배틀몬스터 dispatches index 13 on a ByteArrayInputStream right after its splash, and the
+    # one uncaught `Unimplemented` kills the thread that loads the title (measured 2026-09-23).
+    # 12 and 14 are both measured, and CLDC 1.1 declares exactly one method between
+    # read([BII) and available(): skip(J). The call site agrees — it sign-extends an int into
+    # r1:r2 (`asr r3, n, #31`), the long argument in this runtime's sequential word order,
+    # and discards the long it gets back, i.e. `in.skip(n);`.
+    { name = "skip", descriptor = "(J)J", index = 13 },
     { name = "available", descriptor = "()I", index = 14 },
     { name = "close", descriptor = "()V", index = 15 },
 ]
@@ -96,6 +103,29 @@ vtable = [
 name = "java/io/OutputStream"
 vtable = [
     { name = "write", descriptor = "([B)V", index = 11 },
+]
+
+# 턴 and 서든어택포켓 (both copies of each) dispatch index 16 on a ByteArrayOutputStream as the
+# last step of writing a save — the DataOutputStream block below wraps it. OutputStream is 15 slots
+# (the rule-block measurement above), so this class's own run starts at 15, and CLDC 1.1 declares
+# reset() toByteArray() size() there, in that order (write(I)/write([BII)/close() are overrides and
+# toString() is Object's). Order says 16 is toByteArray; what fixes it is the RETURN VALUE, because
+# toByteArray()[B and size()I both take no argument and a swap would hand the guest a length where
+# it wants an array — silently. Measured 2026-09-24, 턴, one call, r0 = this and nothing else:
+#
+#   bx ip                      ; index 16 (ldr ip, [r3, #0x44])
+#   str r0, [fp, #-0x28]
+#   ldr r2, [fp, #-0x28] ; cmp r2, #0 ; moveq r0, #0 ; beq ...   ; null check
+#   ldr r3, [r2, #8]           ; instance->ptr_fields
+#   ldr r2, [r3]               ; the array's length word, i.e. `b.length`
+#
+# The result is null-checked and then dereferenced twice to reach an array length; an int from
+# size() would be read as a pointer. So 16 is toByteArray()[B. 15 (reset) and 17 (size) stay empty:
+# no title has asked for them, and the reason 17 is not written is exactly this row's tradeoff.
+[[class]]
+name = "java/io/ByteArrayOutputStream"
+vtable = [
+    { name = "toByteArray", descriptor = "()[B", index = 16 },
 ]
 
 [[class]]
@@ -236,6 +266,13 @@ vtable = [
     # indexOf(I,I) lastIndexOf(I) lastIndexOf(I,I) indexOf(S) indexOf(S,I) substring(I), which is
     # exactly 13 long and so leaves no slack to absorb an error.
     { name = "startsWith", descriptor = "(Ljava/lang/String;)Z", index = 19 },
+    # 일지매영웅전기's wall. The rule puts indexOf(I)I here, and the call site agrees (measured
+    # 2026-09-24): r1 = 0x7c ('|') with r2 left holding a stale heap pointer, i.e. ONE int
+    # argument; the result is tested `cmp r0, #0 ; blt` and then passed as the end index of
+    # index 28, `substring(0, i)` — a split on '|'. That rules out every String/two-argument
+    # neighbour in the run; lastIndexOf(I)I has the same shape, and it is the position (23)
+    # that separates the two.
+    { name = "indexOf", descriptor = "(I)I", index = 21 },
     { name = "substring", descriptor = "(II)Ljava/lang/String;", index = 28 },
     { name = "trim", descriptor = "()Ljava/lang/String;", index = 33 },
     { name = "toCharArray", descriptor = "()[C", index = 34 },

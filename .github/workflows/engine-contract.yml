@@ -238,7 +238,7 @@ jobs:
       # re-arms them is an upstream merge touching only `.github/**`, which every
       # engine-keyed paths filter skips — exactly the PR that needed the check.
       #
-      # Cost: node reading two files. No network, no node_modules.
+      # Cost: node reading three files (tag-release.yaml joined 2026-09-23). No network, no node_modules.
       - name: Parked upstream workflows stay dispatch-only (scripts/check-parked-workflows.mjs)
         run: node scripts/check-parked-workflows.mjs
 

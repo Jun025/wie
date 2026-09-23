@@ -39,6 +39,14 @@ impl WIPICContext for LgtWIPICContext {
     }
 
     fn free(&mut self, memory: WIPICIndirectPtr) -> Result<()> {
+        // Freeing a null handle is a defined no-op (C `free(NULL)` / `MC_knlFree(NULL)`).
+        // 메탈슬러그 서바이벌 calls `MC_grpDestroyOffScreenFrameBuffer(0)` at boot; without this the
+        // `- 4` below underflows and panics the host. Pre-swap `0942b0fb` had this guard; the upstream
+        // base swap (#161) replaced the file and dropped it.
+        if memory.0 == 0 {
+            return Ok(());
+        }
+
         let base_address = memory.0 - size_of::<WIPICWord>() as WIPICWord;
 
         let size: WIPICWord = read_generic(&self.core, base_address)?;

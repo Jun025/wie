@@ -129,19 +129,16 @@ impl File {
 
         let file = jvm.new_class("java/io/File", "(Ljava/lang/String;)V", (filename,)).await?;
 
+        // propagate the cause as-is: the spec declares `throws IOException` and
+        // `FileNotFoundException` is one, so relabelling only hides "file does not exist yet"
+        // from guests that branch on the exception type.
         let raf = jvm
             .new_class(
                 "java/io/RandomAccessFile",
                 "(Ljava/io/File;Ljava/lang/String;)V",
                 (file.clone(), mode_string),
             )
-            .await;
-
-        if raf.is_err() {
-            // TODO check exception type
-            return Err(jvm.exception("java/io/IOException", "Invalid filename").await);
-        }
-        let raf = raf.unwrap();
+            .await?;
 
         if mode == Mode::WRITE_TRUNC {
             let _: () = jvm.invoke_virtual(&raf, "java/io/RandomAccessFile", "setLength", "(J)V", (0i64,)).await?;
@@ -471,6 +468,28 @@ mod test {
                 assert_eq!(read, 3);
                 assert_eq!(jvm.load_array::<i8>(&bytes, 0, 3).await?, [-2i8, -85, -51]);
                 let _: () = jvm.invoke_virtual(&file, "org/kwis/msp/io/File", "close", "()V", ()).await?;
+
+                Ok(())
+            },
+        )
+    }
+
+    #[test]
+    fn test_missing_file_keeps_file_not_found_exception_type() -> Result<()> {
+        run_jvm_test(
+            Box::new([get_protos().into(), [WIPIFileOutputStream::as_proto()].into()]),
+            |jvm| async move {
+                let filename: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, "never-created.bin").await?.into();
+                let opened: JvmResult<Box<dyn jvm::ClassInstance>> = jvm
+                    .new_class("org/kwis/msp/io/File", "(Ljava/lang/String;I)V", (filename, Mode::READ_ONLY as i32))
+                    .await;
+
+                let Err(JavaError::JavaException(exception)) = opened else {
+                    panic!("opening a file that does not exist succeeded");
+                };
+                // subtype of IOException, so `catch (IOException)` guests still catch it
+                assert!(jvm.is_instance(&*exception, "java/io/IOException"));
+                assert!(jvm.is_instance(&*exception, "java/io/FileNotFoundException"));
 
                 Ok(())
             },

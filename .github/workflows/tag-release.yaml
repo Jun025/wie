@@ -1,0 +1,73 @@
+# ── PARKED by wie-upstream-tag-release-workflow-untriaged-doc-liveness-red (2026-09-23) ──
+# UPSTREAM's release TAGGER (dlunch/wie ead444fb, #1434, 2026-09-18), carried here
+# verbatim so scripts/check-upstream-new-workflows.mjs stops reporting it as
+# untriaged. NOT ADOPTED — it is the front half of the release pipeline
+# release.yaml parks (read that file's header first):
+#   * dispatched on main it runs .github/scripts/release/tag-version.sh, which
+#     `cargo set-version`s the whole workspace, pushes a `v*` tag plus a
+#     `release/v*` branch, opens a version-bump PR, and then
+#     `gh workflow run release.yaml` — the parked Tauri release pipeline, whose
+#     only live trigger IS workflow_dispatch. So this file is the one path that
+#     can still start release.yaml here;
+#   * its next-version read is `select(.name == "wie-app")`, the crate Cargo.toml
+#     EXCLUDES from the workspace; and version bumps touch **/Cargo.toml, which
+#     is publish-artifact.yml's release trigger once that PR lands.
+# Its triggers are unchanged from upstream — upstream already ships it
+# dispatch-only — so parking here means: the decision is written down, and
+# scripts/check-parked-workflows.mjs (PARKED) reddens if an upstream merge ever
+# adds a push/schedule/tag trigger to it. Today a dispatch also fails at the
+# script step: tag-version.sh is not in our tree until the next upstream merge.
+# DO NOT DISPATCH. REOPEN with release.yaml, never alone — same product decision.
+# `git show upstream/main:.github/workflows/tag-release.yaml` is the original.
+name: Tag release
+run-name: Tag v${{ inputs.version }} and start the next development version
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version (X.Y.Z, without v)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tag-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install required packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libasound2-dev
+
+      - name: Install cargo-edit
+        run: cargo install cargo-edit --locked --no-default-features --features set-version
+
+      - name: Tag release and prepare next version
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          bash .github/scripts/release/tag-version.sh
