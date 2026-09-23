@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "date": "2026-09-23",
+  "task": "wie-validate-max-ticks-backstop-silently-voids-inject-axis",
+  "title": "`--max-ticks` 백스톱이 `--inject` 축을 무효화하는 결함 — 조건은 재현됐고 결함은 이미 닫혀 있었다",
+  "summary": "채택 제안 2026-09-23--featurephone-register-chessmaster-aot-java#p0 이 지목한 결함을 재측정했다. 제안이 쓴 명령을 글자 그대로 그 타이틀(sha256 4ece6eee…e276)에 돌리니 조건은 100% 재현된다 — 기본 --max-ticks 5,000만이 6.7초에 소진되고 --boot-secs 15 가 끝나기 전에 런이 끝나 키 0/27, shotdir 0장. 그러나 판정은 PASS 가 아니라 UNMEASURED rc=2 였다. 처방이 약 5시간 먼저 착지해 있었다(PR #256 · 머지 cb2e6dca · 07:39 KST). 고침 전 트리(6e194590)를 별 worktree 로 빌드해 같은 명령을 돌려 PASS rc=0 를 실제로 받아 전/후를 못박았다. 티켓 계약 1⒝이 정한 분기대로 코드는 고치지 않았고, 계약 3 의 개악 4종은 «착지한 처방이 그 합격선을 넘는지»의 검증으로 돌렸다(M1: 0스텝을 PASS 로 되접기 → zero_injected_steps_is_not_a_pass_test FAILED · M2: 게이트에 총계를 먹이기 → the_gate_is_handed_the_delivered_count_test FAILED · 둘 다 총계 15 유지 = 단언 실패 red). 계약 4 도 실측으로 확인 — scripts/·.github/ 에 --max-ticks 상향 우회 0건.",
+  "changes": [
+    "docs/report/0223: 재현 실측(전/후 JSON 원문 · 기본값 50000000 · 6.7초/0장) · 기존 「못 쟀다」 관용 5곳 인용 · 「먼저」 판정 방식 · 개악 4종 원문 · 부분 주입 경계를 명시적으로 범위 밖으로",
+    "docs/worklog: 이 파일 — 채택 제안 disposition 기록 + 후속 제안 1건"
+  ],
+  "verification": "네 게이트 전건 rc=0(cargo fmt --all --check · cargo clippy --all -D warnings · cargo clippy --target wasm32-unknown-unknown -D warnings · RUST_MIN_STACK=4194304 cargo test --all) + beta lint gate rc=0(cargo +beta clippy --all -D warnings). AGENTS.md 러너 블록 전건 PASS(draw_j2me · helloworld_ktf · helloworld_lgt · text_j2me --timeout 5). keydraw 두 카드 --inject --expect-last-frame rc=0 · 27/27 · paints 55(유휴 범위 48~55 안 · host load1 34.6 · idle 17.9%). 개악 복원 후 git diff 0줄(sha16 98527cf0116e5ae2) · cargo test -p wie_cli --bin wie_validate rc=0 15 passed. 실측은 전부 release 빌드(고침 전은 6e194590 별 worktree · 별 CARGO_TARGET_DIR · 측정 후 worktree·target 삭제).",
+  "limits": "부분 주입(1~26스텝 + 백스톱 선착)은 여전히 PASS 「survived input sequence」다 — 착지한 처방이 0스텝만 판정 대상으로 의도해 적어 둔 경계이고, 이 티켓의 합격선(3⒜)도 0스텝이라 넓히지 않았다. 아래 제안이 그 축이다. 그리고 이 회차의 adoptedProposals ref 는 otterpebble repo 의 worklog 를 가리키므로 «기록»이고, 그 카드의 화면 제거는 repo 별로 ref 를 푸는 cockpit·tower 쪽 몫이다(otterpebble 트리 무접촉).",
+  "proposals": [
+    {
+      "title": "wie_validate: 백스톱이 «주입 도중»에 걸려도 PASS 「survived input sequence」다 — 0스텝만 막혀 있다",
+      "plainSummary": "검사 도구가 버튼을 27번 눌러보기로 하고 5번만 누른 채 끝나도 「전부 눌러봤고 괜찮다」고 답합니다.",
+      "userBenefit": "지금은 27스텝 중 5스텝만 실행된 타이틀도 「입력 확인됨」으로 등재될 수 있어요. 고치면 «부분만 쟀다»가 구별돼서, 확인 안 된 타이틀이 확인된 것처럼 등재되는 마지막 틈이 닫힙니다. 안 고치면 0스텝만 막힌 반쪽 가드가 남습니다.",
+      "why": "착지한 처방(PR #256)의 술어는 `inject && passed && input_steps == 0` 이라 0스텝만 UNMEASURED 로 돌린다. 백스톱이 «몇 개 쏜 뒤» 걸리면 `input_steps: 5/27` 인데 판정은 PASS 이고 reason 은 27/27 실주입과 바이트 동일하다(실측: reason 문자열이 keydraw_ktf 27/27 회차와 같다). 수는 JSON 에 정직하게 나오므로 침묵은 아니지만 «판정에 반영되지 않는다». 잴 것은 ⑴실제 코퍼스에서 부분 주입이 몇 건 나는가 ⑵막을 선을 「0 초과 & 총계 미달」로 둘지 「총계 미달 전건」으로 둘지다.",
+      "tradeoff": "합격선을 총계 미달 전건으로 두면 부하가 높은 머신에서 마지막 키가 데드라인에 못 닿는 정상 회차까지 UNMEASURED 가 된다(AGENTS.md 가 적은 그 기아 현상 — load 121~150 에서 keydraw_ktf 가 4/6 FAIL 했다). 그래서 «부분 = 미성립» 은 값보다 비쌀 수 있고, 먼저 코퍼스에서 빈도를 재야 한다. 그 측정 없이 술어를 넓히면 유휴 판정을 흔든다.",
+      "effort": "S",
+      "target": "repo"
+    }
+  ],
+  "adoptedProposals": ["2026-09-23--featurephone-register-chessmaster-aot-java#p0"],
+  "declinedProposals": [],
+  "resolvedIssues": [],
+  "issues": []
+}
