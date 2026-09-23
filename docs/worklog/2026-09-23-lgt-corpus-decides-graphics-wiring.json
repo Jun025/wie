@@ -1,0 +1,58 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-23",
+  "task": "wie-p3-next-slice-after-slice-a-abi-finding",
+  "title": "코퍼스가 조각 D 의 ⒜/⒝ 결정을 쟀다 — 실제 LGT 54건에 차이 0",
+  "summary": "game_lab/working/lgt 54건을 upstream LGT 전용 graphics 배선(⒜)과 공용 배선(⒝)에 같은 명령으로 먹여 boot+render 판정을 대조했다. 52건 동일, 다른 2건은 md5 가 같은 중복 사본이 반대 방향으로 뒤집힌 잡음. panic 프로브로 39/40 이 upstream get_screen_framebuffer 를 실제로 지난다는 것을 확인해 대조가 공허하지 않음을 보였다. 부수로 smoke_gate 의 baseline 대조가 NFC/NFD 불일치로 0건을 검사하며 OK 를 찍고 있었고, 정규화 후 baseline PASS 12건이 지금 하드 실패한다.",
+  "verification": [
+    "두 배선 풀패스 각 54건 (13m00s / 12m33s) · per-title join 대조",
+    "개악 대조쌍 keydraw_lgt: ⒝ PASS paints 55 rc=0 ↔ ⒜ FAIL paints 0 rc=1",
+    "프로브 panic!: get_screen_framebuffer HIT 39/40 · get_framebuffer_pointer HIT 27/39",
+    "실패 14건 각 2회 재측 (12건 하드 에러 2/2 · 1종은 데드라인 잡음)"
+  ],
+  "limits": [
+    "판정 축은 boot+render 뿐 — 픽셀 대조 없음",
+    "broken/lgt 46건 미측정",
+    "§4 의 12건이 언제부터 실패했는지는 미측정(이분 필요)"
+  ],
+  "proposals": [
+    {
+      "title": "smoke_gate 의 baseline 대조가 0건을 검사하고 OK 를 찍는다 — 유니코드 정규화 복원",
+      "plainSummary": "로컬 회귀 게이트 scripts/smoke_gate.sh 가 커밋된 baseline(NFC 한글)과 코퍼스 파일명(APFS NFD)을 바이트로 대조해 단 한 건도 붙지 않는다. 출력이 'checked 0 baseline titles … OK: no regressions' 로 끝나므로 회귀가 있어도 조용히 통과한다. 양쪽을 같은 정규형으로 접어 대조를 복원한다.",
+      "userBenefit": "LGT/KTF/SKT 타이틀이 부팅·렌더를 잃었을 때 로컬 게이트가 실제로 잡아낸다 — 지금은 잡을 수 없다.",
+      "why": "2026-09-23 실측: 원문 대조 겹침 0 ↔ NFC 정규화 후 겹침 52/52. 두 번의 풀패스 모두 'checked 0 … OK' 로 끝났고, 그 아래에 baseline PASS 12건의 하드 실패가 숨어 있었다.",
+      "tradeoff": "복원하면 그 게이트는 즉시 빨개진다(12건). 그 빨강을 baseline 갱신으로 닫을지 12건 수리로 닫을지는 별 결정이고, 이 제안은 '대조가 실제로 돈다'까지만 산다. macOS 전용 도구(iconv UTF-8-MAC)를 쓰면 이식성이 준다 — 다만 이 스크립트는 이미 local-only 로 선언돼 있다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "LGT 하드 실패 12+2건 분류 — 배선이 원인이 아니다",
+      "plainSummary": "working/lgt 54건 중 14건이 boot+render 에서 결정적으로(2/2) 실패한다. 사유는 panic 'attempt to subtract with overflow' 2건, net.wie.WieError 11건, 렌더 데드라인 잡음 1건. ⒜·⒝ 두 배선에서 같은 집합이므로 graphics 배선이 원인이 아니다.",
+      "userBenefit": "실제 LGT 타이틀 12종이 다시 부팅·렌더한다. 그중 놈ZERO 는 이 repo 문서(docs/lgt_abi.md cp47)가 'PASS · 153 paints' 로 기록해 둔 타이틀이라 문서와 제품의 어긋남도 함께 닫힌다.",
+      "why": "2026-09-23 실측: NFC 정규화 후 baseline PASS 52건 중 12건이 FAIL, 코퍼스에만 있는 2건도 FAIL. 각 2회 재측해 전건 2/2 이고 paints 는 전건 0 이다.",
+      "tradeoff": "근인이 한 덩어리가 아닐 수 있다(panic 축과 WieError 축은 다른 병으로 보인다) — 한 회차로 다 닫으려 하면 커진다. 언제부터 실패했는지는 이분이 필요하고 그 자체가 비용이다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "broken/lgt 46건을 ⒜ 배선으로 — 결정의 반대쪽 절반",
+      "plainSummary": "이번 회차는 '⒜ 가 지금 되는 것을 깨뜨리나'만 쟀다(답: 아니다). 남은 질문은 'upstream 의 LGT 전용 구현이 우리가 못 여는 46건 중 무엇을 여나'이고, 그것은 broken/lgt 를 두 배선으로 돌려야 답이 나온다.",
+      "userBenefit": "upstream 1,095줄을 배선해서 얻을 것이 실제로 있는지가 수로 나온다 — 지금은 benefit 이 '있다'고도 '없다'고도 측정되지 않았다.",
+      "why": "docs/upstream-realign-p3-slices.md §D 의 결정은 benefit(LGT 전용 그래픽)과 cost(픽스처 파손)를 저울질하는데, 이번 측정은 cost 쪽만 코퍼스로 닫았다.",
+      "tradeoff": "broken/ 은 전건 FAIL 이라 RETRY 가 매 타이틀 3회로 불어 패스당 약 35~40분이고 두 배선이면 한 회차의 상한에 닿는다. RETRY=0 으로 줄이면 싸지지만 PASS 로 뒤집힌 건의 신뢰도가 떨어진다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "ktf 190 · skt 50 을 baseline 과 대조",
+      "plainSummary": "이번에 드러난 NFC/NFD 침묵은 LGT 만의 것이 아니다. 대조가 복원되면 ktf 190 · skt 50 에도 같은 질문을 물어야 한다.",
+      "userBenefit": "가장 큰 갈래(ktf 190)의 회귀가 보이게 된다.",
+      "why": "baseline 292행 전체가 같은 정규형 문제를 공유한다 — 이번 실측에서 292건 전건이 'absent' 로 집계됐다.",
+      "tradeoff": "제안 1이 착지하기 전에는 의미가 없다(대조 자체가 무효). 그리고 실패가 많이 나오면 그 처분이 다시 별 회차가 된다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}

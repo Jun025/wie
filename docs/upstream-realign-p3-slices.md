@@ -310,6 +310,22 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 
 ### A — `wie-p3-lgt-keydraw-upstream-regression-triage`
 
+> ★★★**[코퍼스로 닫았다 2026-09-23 · `wie-p3-next-slice-after-slice-a-abi-finding` · 정본 `docs/report/0222--….md`]
+> 이 절의 「못 재는 것 ⑴⑵」와 §D 의 재개 조건 ⑴ 은 «같은 입력» 하나를 기다리고 있었고, 그 입력이 왔다.**
+> ★**코퍼스 실재**(`find ~ -maxdepth 4 -name game_lab` → `~/work/otterpebble/wie/game_lab` ·
+> `working/` ktf **190** · lgt **54** · skt **50**) ⇒ ★**아래 「있으면 잴 수 있는 것」이 전부 «잴 수 있는 것»이 됐다.**
+>
+> ★**⑴ 「이 FAIL 이 실제 LGT 타이틀 몇 건에 닿는가」 = ★«0건»이다.** `working/lgt` 54건을 ⒜/⒝ 두 배선에
+> 같은 명령으로 먹여 **양쪽 40 PASS / 14 FAIL · 타이틀 단위 52건 동일**. 다른 2건은 ★**md5 가 같은 중복 사본**이
+> **반대 방향**으로 뒤집힌 **데드라인 잡음**이다(재측 각 3/3 PASS).
+> ★**⑵ 「`keydraw_lgt` 가 대표적인가」 = ★«아니다» — 그리고 그 비대표성의 «이름»이 나왔다.**
+> ⒜ 형상의 `graphics::get_screen_framebuffer` 에 `panic!` 프로브를 넣으면 ⒜-PASS 40건 중 **39건 HIT**
+> (1건은 그 잡음 타이틀 = **못 쟀다**) · `get_framebuffer_pointer` 는 **27/39 HIT** ⇒
+> ★★**실제 clet 은 그 SVC 를 «지나면서도» 레코드 모양에 의존하지 않는다**(16B·20B 판정 동일).
+> 레코드를 게스트 코드에서 **직접 역참조**하는 것은 ★**SDK 로 빌드한 우리 픽스처 하나뿐**이다.
+> ⇒ ★**위 「물을 질문」(직접 읽나 / `ptr_graphics → view.ptr_backing` 을 걷나)의 답: 이 코퍼스에서 «직접 읽는» 타이틀은 없다.**
+> ★**한계**: boot+render 축뿐(픽셀 대조 0) · ★**`broken/lgt` 46건 미측정** — 「upstream 구현이 우리가 못 여는 것을 여나」는 **열려 있다**.
+
 > ★★★**[돌았다 2026-09-16 · `wie-p3-slice-a-keydraw-lgt-breaks-on-upstream-base` · 정본 `docs/report/0115--….md`]
 > 원인이 «이름»으로 나왔다 — 이 칸의 ⒜~⒟ 는 그 회차가 실제로 따른 것이고, 아래가 그 답이다.**
 >
@@ -442,6 +458,17 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
   `grep -rn '<심볼>' wie_* web/ functions/` 로 **우리 안의 호출자 0건**을 먼저 보이고, 0건이 아니면 지우지 마라.
 
 ### D — `wie-p3-base-swap-merge`
+
+> ★★★**[재개 조건 ⑴ «해소» 2026-09-23 · `wie-p3-next-slice-after-slice-a-abi-finding` · 정본 `docs/report/0222--….md`]
+> 아래 「재개 조건 ⑴ = 292 코퍼스(LGT 52건)」를 실제로 돌렸다 — ★그리고 «결정을 뒤집지 않는다».**
+> `working/lgt` **54건** × 두 배선 = ★**차이 0**(양쪽 40 PASS / 14 FAIL · 타이틀 52건 동일 · 나머지 2건은 중복 사본 잡음).
+> 프로브로 **39/40 이 문제의 SVC 를 실제로 지난다**를 확인했으므로 이 「차이 0」은 «공허한 green» 이 아니다.
+> ⇒ ★**`0206` 의 권고 ⒝ 유지** — 근거가 「가역성」에서 ★**「가역성 + 코퍼스 증거」**로 올라간다.
+> ★**동시에 benefit 도 축소된다**: ⒜ 가 사겠다던 것(LGT 전용 그래픽)이 이 코퍼스에서 **측정되지 않는다.**
+> ★**남은 절반**: `broken/lgt` **46건**을 ⒜ 로 돌려 「upstream 구현이 우리가 못 여는 것을 여나」를 재는 일 —
+> **미측정**이고, 그것이 benefit 을 수로 만드는 유일한 축이다(후속 제안 ⑶).
+> ★**착지 사실 재확인**: 이 조각은 `-fix3`(**PR #161** MERGED `2026-09-16T08:35:30Z` · 머지 `37734e74`)로 **착지했다** ·
+> `git merge-base origin/main upstream/main` = **`44fbf265`** · behind **1,140 → 15**(2026-09-23 실측).
 
 > ★★★**[게이트② 반려 처분 ② 2026-09-16 · `wie-p3-slice-d-merge-upstream-main-as-base-fix3` · 정본 `docs/report/0119--….md`]
 > 착지하면 `main` 이 빨개진다 — 안 쓰는 데스크톱 크레이트를 workspace 에서 뺐다.**
@@ -633,6 +660,13 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
   ★있으면 잴 수 있는 것 = 사람이 창을 띄워 한 번 보는 것 — 자동화 없음.
 
 ### E — `wie-p3-post-swap-web-contract-and-artifact`
+
+> ★★**[돌았다 · «미착지» 2026-09-16 · `wie-p3-slice-e-verify-web-contract-on-new-base`(+`-fix`)]
+> 이 절에는 배너가 없었고, 그래서 `STATE.md` 가 이 조각을 «미착수»로 적고 있었다**(2026-09-23 정정).
+> **PR #162 OPEN**(개설 `2026-09-16T03:27:17Z` · 2026-09-23 재확인) — 회신 정본은
+> `~/orchestrator/reports/wie-p3-slice-e-verify-web-contract-on-new-base-fix.done.md` 다.
+> ★**선행 D 는 이미 착지했다**(PR **#161** MERGED `2026-09-16T08:35:30Z` · `merge-base` = `44fbf265`) —
+> ★**「선행 D 가 멈춰 있다」를 이유로 이 조각을 미루지 마라.**
 
 - **⒜ 범위**: 새 base 에서 **웹 표면**이 계약을 지키는가. `web/`·`scripts/build-wasm.sh`·
   `docs/contracts/featurephone-engine-contract.json`. ★**계약이 바뀌면 같은 PR 에서 갱신**(Constraint 3).

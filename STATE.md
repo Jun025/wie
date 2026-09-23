@@ -265,6 +265,36 @@
     `AGENTS.md` 가 그 배치를 스스로 「local only, and structurally so」로 설계라고 적는다.
     못 재는 이유는 구조가 아니라 ★**그냥 코퍼스가 여기 없다**는 것이다(`find ~ -maxdepth 4 -name game_lab` **0건** 재확인)
     ⇒ ★**human-step 후보**(`game_lab/working/{ktf,lgt,skt}` 292타이틀 배치 · 카드 발권은 총괄 몫).
+    ★★**[해소 2026-09-23 · 같은 술어를 그대로 다시 쳤다] 코퍼스는 «있다» — 위 「0건」은 낡았다.**
+    `find ~ -maxdepth 4 -name game_lab` → **`~/work/otterpebble/wie/game_lab`** ·
+    `working/` = ★**ktf 190 · lgt 54 · skt 50**(j2me 0) · `broken/` = ktf 104 · lgt 46 · skt 34.
+    ⇒ ★**「코퍼스가 없어서 못 잰다」로 닫힌 축은 «전부 다시 열렸다»**(조각 A·B·C·D 의 「못 재는 것」 칸 전건).
+    ★**그 human-step 을 다시 발권하지 마라 — 이미 놓여 있다.**
+  - ★★★**[재개 조건 ⑴ 집행 2026-09-23 · `wie-p3-next-slice-after-slice-a-abi-finding` · 정본 `docs/report/0222--….md`]
+    「코퍼스가 생기면 LGT 52건을 먼저 돌려라」를 돌렸다 — ★**차이가 «0» 이다.**
+    `working/lgt` **54건**을 ⒜(upstream LGT 전용 27줄 배선)와 ⒝(공용 · 현행)에 같은 명령으로 먹였다
+    (`PLATFORM_FILTER=lgt scripts/smoke_gate.sh` · boot+render): ★**양쪽 40 PASS / 14 FAIL** ·
+    타이틀 단위 ★**52건 동일**. 다른 2건은 ★**md5 가 같은 중복 사본**(`e17b76dc…`)이 **반대 방향**으로 뒤집힌
+    것이라 배선 효과가 아니라 **렌더 데드라인 잡음**이다(재측 각 3/3 PASS).
+    ★**대조가 공허하지 않음을 프로브로 못박았다**: ⒜ 형상의 `graphics::get_screen_framebuffer` 에 `panic!` 을
+    넣으면 ⒜-PASS 40건 중 ★**39건이 HIT**(1건은 그 잡음 타이틀 = 못 쟀다) · `get_framebuffer_pointer` 는 **27/39 HIT**.
+    ⇒ ★★**실제 clet 은 레코드 «모양»에 의존하지 않는다 — 16B(⒜)든 20B(⒝)든 같은 판정이다.**
+    깨지는 유일한 소비자는 **우리가 SDK 로 만든 `keydraw_lgt` 픽스처**이고, 그것이 레코드를 게스트 코드에서
+    직접 역참조하기 때문이다. ⇒ ★**`0206` 의 권고 ⒝ 는 유지되고, 근거가 「가역성」에서 「가역성 + 코퍼스」로 올라간다.**
+    ★**대가도 같이 줄었다** — ⒜ 가 사겠다던 benefit 도 이 코퍼스에서는 **측정되지 않는다**(PASS 수 동일).
+    ★**한계**: 판정 축은 **boot+render 뿐**(픽셀 대조 없음) · ★**`broken/lgt` 46건은 안 돌렸다**
+    (= 결정의 «반대쪽 절반» — 「upstream 구현이 우리가 못 여는 것을 여나」는 **여전히 미측정**이다).
+  - ★★**[부수 2026-09-23 · 같은 회차] 로컬 회귀 게이트가 «0건을 검사하고 OK 를 찍는다».**
+    두 패스 다 `== smoke_gate: checked 0 baseline titles, 292 absent, 0 regressions == / OK: no regressions`.
+    근인 = **유니코드 정규화**: 커밋된 `scripts/smoke_gate_baseline.tsv` 는 **NFC**, APFS 코퍼스 파일명은 **NFD**,
+    대조는 `awk '$1==t'` **바이트 일치** ⇒ ★**한 건도 안 붙는다**(원문 겹침 **0** ↔ NFC 정규화 후 **52/52**).
+    ★**정규화 후 드러나는 것**: baseline PASS **12건이 지금 FAIL**(+ baseline 에 없는 2건도 FAIL) ·
+    ★**각 2회 재측 2/2 · paints 전건 0 · 사유는 하드 에러**(`panic: attempt to subtract with overflow` 2 ·
+    `net.wie.WieError` 11 · 데드라인 잡음 1). ★**그중 `놈ZERO` 는 `docs/lgt_abi.md` cp47 이 「PASS · 153 paints」로
+    적어 둔 타이틀**이다 ⇒ 문서와 제품이 어긋났고 그것을 말할 게이트가 자기가 0건을 재는 줄 몰랐다.
+    ★**이 회차는 고치지 않았다**(한 조각 규율 · 복원하면 즉시 12건 빨강이고 그 처분이 별 결정이다 ·
+    `smoke_gate` 는 로컬 전용이라 CI 는 무영향) ⇒ 후속 제안 = `docs/worklog/2026-09-23-lgt-corpus-decides-graphics-wiring.json`
+    (⑴정규화 복원 S · ⑵하드 실패 12+2건 분류 M · ⑶`broken/lgt` 46건을 ⒜ 로 M · ⑷ktf·skt 대조 M).
   - **조각 A~E**(상세·검증식은 정본 문서. ★**표시는 위 「조각 A 돌았다」·「조각 D 시도 → 멈췄다」 항목과 정합시킨
     것이다** — 종전에는 B·C 에만 취소선이 그어져 ★**이미 돌아간 A 와 이미 시도된 D 가 «미착수»로 읽혔다**):
     ★~~**A** LGT keydraw 회귀 규명(M·low·선행없음 · ★D 의 게이트)~~ **돌았다(2026-09-16
@@ -281,8 +311,15 @@
     ★**C 의 착지 «전» 기대값 「`53 ≤ N < 74`」**(폐기 21 중 `UU` 5행은 파일이 남고 델타만 사라지므로 74→53 이 «아니다»)
     **는 «실측이 대체했다» — 실제 74 → 67** · ★**우리 base 위라 5게이트가 전부 산다** →
     ★~~**D** base swap 머지(L·★**high** · 선행 A·C)~~ **시도했고 «멈췄다»(2026-09-16 `wie-p3-slice-d-merge-upstream-main-as-base`)** —
-    머지 **0** · ★막은 것은 «크기»가 아니라 «결정»이다(상세와 **재개 조건 3종**은 위 「조각 D 시도 → 멈췄다」 항목) →
-    **E** 웹 계약·아티팩트(M·med · 선행 D) — ★**미착수**(선행 D 가 멈춰 있다).
+    머지 **0** · ★막은 것은 «크기»가 아니라 «결정»이다(상세와 **재개 조건 3종**은 위 「조각 D 시도 → 멈췄다」 항목).
+    ★★**[정정 2026-09-23 · 실측] 그 「멈췄다」는 «낡았다» — 조각 D 는 «착지했다».** 승계 회차 `-fix3` 가
+    **PR #161** 로 들어갔다(**MERGED `2026-09-16T08:35:30Z`** · 머지 `37734e74`) ⇒
+    `git merge-base origin/main upstream/main` = ★**`44fbf265`**(≠ `fa641a8a` · P3 DoD 리터럴 충족) · behind **1,140 → 15**.
+    ★**그러므로 「선행 D 가 멈춰 있다」를 근거로 후속을 미루지 마라 — 그 전제는 2026-09-16 에 사라졌다.** →
+    ★~~**E** 웹 계약·아티팩트(M·med · 선행 D)~~ **돌았다 · ★«미착지»**(2026-09-16
+    `wie-p3-slice-e-verify-web-contract-on-new-base` + `-fix`) — **PR #162 OPEN**(개설 `2026-09-16T03:27:17Z` ·
+    2026-09-23 재확인). ★**종전 「미착수」는 거짓이다.** 회신 정본 =
+    `~/orchestrator/reports/wie-p3-slice-e-verify-web-contract-on-new-base-fix.done.md`.
     ★★**D 의 ⒟ 는 «충돌 0» 이 아니라 «빌드 게이트»다 — 근거는 「★«미해결 0» 이 «컴파일된다»를 뜻하지 않는다」이고,
     ★그 근거는 «참»이다.** 아래 둘은 **충돌 74 «안»에 `UD` 로 있고**, 그 항목을 「한쪽 고르고 끝」으로 풀면 빌드가 깨진다:
     ⑴★**`UD wie_cli/Cargo.toml`**(1건) — upstream 이 네이티브 호스트를 루트 패키지로 옮겼다
