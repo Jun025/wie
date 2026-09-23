@@ -1,0 +1,62 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-24",
+  "task": "wie-2026-09-23-lgt-corpus-decides-graphics-wiring-adopt-p1",
+  "title": "LGT 하드 실패 14건 — 근인 하나(#161 이 우리 LGT 수리분을 떨궜다) · 축 여섯 · free(NULL) 축만 닫았다",
+  "summary": "main 24a920c4 에서 14건 28/28 FAIL 재확인. 기반 교체 직전 d70b93f8 을 빌드해 돌리니 8건이 2/2 PASS — 회귀 경계는 인접 first-parent 두 커밋(d70b93f8 → 37734e74 #161)이고, 그 사이 Memmove 0x415 · GetContext 0xcf · ListDatabases 0x19c 행과 free(NULL) 가드가 전부 사라졌다. 가장 싼 축(free NULL 가드 7줄)을 복원해 메탈슬러그 서바이벌 2종이 6/6 FAIL(panic) → 6/6 PASS. working/lgt 54 짝지은 측정 25 → 29 PASS · 회귀 0.",
+  "changes": [
+    "wie-lgt/src/runtime/wipi_c/context.rs: LgtWIPICContext::free 가 NULL 핸들을 no-op 으로 (교체 전 0942b0fb 복원)",
+    "docs/report/0229: 분류 표 · 회귀 경계 · 전/후 · 54 짝지은 측정"
+  ],
+  "verification": "네 게이트 rc=0 (test --all 46 suites 420 passed) · beta clippy rc=0 · 러너 블록 전건 PASS · keydraw 2종 rc=0 · 메탈 2종 main/fix 각 3회 교차 · 54 짝지은 측정(재시도 2).",
+  "limits": "판정 축은 boot+render 뿐. 6건은 교체 전 트리도 이 부하(load ~100)에서 FAIL 이라 회귀 여부 미판정. 절대 PASS 수는 부하에 따라 움직인다(0222 는 load 6~20 에서 40).",
+  "proposals": [
+    {
+      "title": "LGT stdlib 0x415(memmove) 행 복원 — 알바타이쿤2 · 데몬헌터",
+      "plainSummary": "기반 교체 때 LGT 의 memmove 연결 한 줄이 빠져서, 교체 전엔 켜지던 게임 2개가 켜지자마자 멈춘다.",
+      "userBenefit": "(LGT)알바타이쿤2 · 데몬헌터가 교체 전처럼 다시 부팅·렌더할 가능성이 높다 — 교체 전 트리에서 둘 다 2/2 PASS 였다.",
+      "why": "d70b93f8 의 StdlibSvcId::Memmove = 0x415 가 37734e74(#161)에서 사라졌다. 구현 wie-core-arm::stdlib::memmove 는 지금도 있어 enum 1줄 + match 1줄이다.",
+      "tradeoff": "고친 뒤 다음 소실 행에 걸릴 수 있다(E 축의 게임빌이 그랬다) — 행 추가만으로 PASS 가 보장되지 않는다. 확인은 그 2건 재측 한 번.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "LGT WIPIC 412(MC_dbListDataBase) — LGT 전용 「DB 없음」 스텁 복원",
+      "plainSummary": "리듬페스티발 2종 · 하이브리드가 저장 데이터 목록 기능을 부르다 멈춘다. 공용 구현은 KTF 의미라 그대로 붙이면 틀린 값을 준다.",
+      "userBenefit": "리듬페스티발 2종이 교체 전처럼 PASS 로 돌아올 가능성이 높다(교체 전 2/2 PASS). 게임빌2010슈퍼사커도 E 축을 넘으면 여기에 걸린다.",
+      "why": "교체 전 wie_lgt 는 0x19c 를 LGT 로컬 스텁(0 반환 = DB 없음)으로 처리했다. 공용 wie-wipi-c list_databases 는 인자 없이 남은 저장 바이트를 돌려준다 — LGT 게임은 이를 '찾은 DB 개수'로 읽을 것이다.",
+      "tradeoff": "LGT 전용 함수를 다시 두면 업스트림과 갈라지는 줄이 늘어난다. 공용 쪽을 캐리어별로 가르면 KTF 호출자를 건드린다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "LGT WIPIC 207(GetContext) 행 복원 — 바이오크로니클",
+      "plainSummary": "그래픽 상태를 읽는 함수 연결 한 줄이 빠져 바이오크로니클이 첫 이벤트에서 멈춘다.",
+      "userBenefit": "바이오크로니클 복귀(교체 전 2/2 PASS).",
+      "why": "공용 wie_wipi_c::api::graphics::get_context 는 있고 InitContext/SetContext 는 이미 공용으로 배선돼 있다.",
+      "tradeoff": "graphics 배선은 조각 D ⒜/⒝ 결정 구역이다 — 27줄 목록에 한 줄을 더하는 셈이라 docs/upstream-realign-p3-slices.md §D 문면도 함께 고쳐야 한다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "LGT stdlib strstr(NULL) — 5건이 WIPIC unk4 스텁의 0 을 그대로 넘긴다",
+      "plainSummary": "제노니아1·2 · 하이브리드2 · 놈ZERO · 게임빌이 아직 정체를 모르는 함수(unk4)가 돌려준 빈 값을 문자열 검색에 넣어 멈춘다.",
+      "userBenefit": "NULL 가드만으로는 PASS 회복 0 이었다(측정): 4건은 교체 전과 같은 hang/blank 로, 게임빌은 다음 축(412)으로. 진짜 이득은 unk4(WIPIC 0x12d)의 정체를 밝혀 올바른 값을 주는 쪽이다.",
+      "why": "5/5 추적에서 'stub unk4(0x0,…)' 직후 'strstr(0x0,…)' 가 찍힌다. 교체 전 0x410 은 no-op unk5 로 r0=0 을 남겼다. 가드 패치(1줄 + 테스트)는 이 회차가 실제로 빌드해 쟀다.",
+      "tradeoff": "가드만 넣으면 오류가 hang 으로 바뀔 뿐이라 '고쳤다'로 읽히기 쉽다. unk4 정체 규명은 역공학 비용이다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "#161 이 떨군 LGT 수리분 전수 감사 — d70b93f8 ↔ 현 wie-lgt",
+      "plainSummary": "이번 14건의 근인은 하나다: 기반 교체가 우리가 쌓아온 LGT 수리분을 통째로 버렸다. 한 번에 세면 아직 안 돌려본 게임의 같은 병도 미리 찾는다.",
+      "userBenefit": "broken/lgt 46건 등 아직 재지 않은 타이틀에서 같은 원인의 실패를 코퍼스 실행 없이 목록으로 먼저 얻는다.",
+      "why": "이번에 확인된 소실만 4종(0x415 · 0xcf · 0x19c · free 가드)이고, 교체 전 stdlib 0x32(native new) 도 현 표에 없다. 교체 전 가드 0942b0fb 는 테스트가 없어 조용히 사라졌다.",
+      "tradeoff": "SVC 표·가드를 기계적으로 대조하는 것은 싸지만, 복원할지는 행마다 업스트림 의미와 대조해야 한다(412 처럼 공용 구현이 다른 의미를 가진 경우).",
+      "effort": "M",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": ["2026-09-23-lgt-corpus-decides-graphics-wiring#p1"],
+  "declinedProposals": []
+}
