@@ -7,6 +7,9 @@
 // rather than deleted — deleting them recurs on every upstream sync, and the
 // originals are the reference for what upstream does — so the decision lives as
 // "triggers reduced to workflow_dispatch". Each file's header says why.
+// A third, tag-release.yaml, arrived upstream on 2026-09-18 already dispatch-only
+// and was parked 2026-09-23 as release.yaml's front half — for it the entry
+// guards against upstream ADDING a trigger, since it has none to restore.
 //
 // THAT is what this script guards, and the reason it exists at all: the parking
 // is a LOCAL edit to an UPSTREAM file. The next `git merge upstream/main` can
@@ -38,7 +41,7 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 // The decision record for each entry is the file's own header comment.
-const PARKED = [".github/workflows/release.yaml", ".github/workflows/web.yaml"];
+const PARKED = [".github/workflows/release.yaml", ".github/workflows/tag-release.yaml", ".github/workflows/web.yaml"];
 const ALLOWED = "workflow_dispatch";
 
 const violations = [];
