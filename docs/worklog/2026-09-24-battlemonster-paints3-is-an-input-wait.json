@@ -1,0 +1,33 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-24",
+  "task": "wie-2026-09-23-object-notify-slot-and-monitor-ownership-adopt-p2",
+  "title": "배틀몬스터의 paints 3 은 «이용안내 · 아무키나 누르세요!!» 입력 대기 — 키 1개로 타이틀, 2개로 메뉴",
+  "summary": "코드 변경 없음. 무주입 60 s 는 이용안내 화면 12장 동일(paints 3 · ERROR 0), 같은 예산에 OK 1회를 주면 main 은 타이틀 후 ByteArrayInputStream index 13 흰 화면(#263 이 고치는 벽), #263 head 는 paints 165 로 타이틀 애니메이션이 이어진다. OK 2회면 메인 메뉴. 입력 전달 경로 결함 없음.",
+  "changes": [
+    "docs/report/0233 — 측정 기록(명령 원문 · 짝지은 표 · 판정)"
+  ],
+  "verification": [
+    "main 7e40b2f4 기본 명령: 두 파일 PASS · paints 3 · ~20 s(한쪽 max-ticks, 한쪽 deadline) · ERROR 0",
+    "스크래치 계측 빌드(WIE_INJECT_N/WIE_KEEP_TIMEOUT/WIE_SHOT_EVERY · 미커밋) · --inject --boot-secs 20 --timeout 60 · 4실행 동시 기동: N=0 paints 3 ↔ N=1 main 36(흰 화면·ERROR 1) / #263 165(ERROR 0)",
+    "#263 head N=3: 메인 메뉴 도달 · lgt 배틀몬스터 N=1 paints 205"
+  ],
+  "limits": [
+    "게임 화면(마을)에서 입력 반응은 이 회차 범위 밖이다 — #263 착지 후 마을 직후 Invalid memory access 벽이 먼저 있다.",
+    "키 N개 주입·고정 시각 스크린샷은 스크래치 패치로만 가능했다(아래 제안)."
+  ],
+  "adoptedProposals": [
+    "2026-09-23-object-notify-slot-and-monitor-ownership#p2"
+  ],
+  "proposals": [
+    {
+      "title": "wie_validate 에 «키 N개만 주입»·«고정 시각 스크린샷»·«데드라인 유지» 플래그를 정식으로",
+      "plainSummary": "게임이 키 입력에 반응하는지 재려면 지금은 검증기를 임시로 고쳐서 빌드해야 합니다. 그 세 가지를 옵션으로 넣자는 제안입니다.",
+      "userBenefit": "«입력 없이 3장»이 대기인지 벽인지를 다음 타이틀에서도 명령 한 줄로 가를 수 있다. 이번 회차는 그 판정에 스크래치 패치와 release 재링크 약 20분(고부하)을 썼다.",
+      "why": "--inject 는 27키 스크립트 전체와 그 스케줄로 계산한 데드라인을 강제한다. 그래서 무주입 기준과 같은 예산으로 짝지을 수 없다(AGENTS.md가 이미 적은 tradeoff). 이번 판정은 WIE_INJECT_N·WIE_KEEP_TIMEOUT·WIE_SHOT_EVERY 13줄 스크래치 패치로만 가능했다. 원문은 docs/report/0233 이 가리키는 evidence 경로에 있다.",
+      "tradeoff": "플래그 3개가 늘면 wie_validate 헤더 표·AGENTS.md 러너 블록 설명과 맞춰야 한다. 러너 줄의 기본 동작이 바뀌지 않게 기본값은 현행 그대로(전체 스크립트·스케줄 데드라인·샷 없음)여야 한다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}
