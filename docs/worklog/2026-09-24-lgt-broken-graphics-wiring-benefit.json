@@ -1,0 +1,26 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-24",
+  "task": "wie-2026-09-23-lgt-corpus-decides-graphics-wiring-adopt-p2",
+  "title": "broken/lgt 도 ⒜/⒝ 차이 0 — 조각 D 의 benefit 절반은 «0»",
+  "summary": "game_lab/broken/lgt 46건(서로 다른 37건 + sha256 동일 사본 9건)을 upstream LGT 전용 graphics 배선(⒜)과 공용 배선(⒝)으로 짝지어 돌렸다. 8 PASS · 28 FAIL 동일, 뒤집힘 1건은 15초 데드라인 잡음(--timeout 40 에서 양쪽 2/2 PASS). ⒜ 가 새로 여는 타이틀 0 ⇒ §D 권고 ⒝ 유지.",
+  "changes": [
+    "docs/report/0235: 측정 방법 · 37×2 결과 · 뒤집힘 재측 · 한계",
+    "docs/upstream-realign-p3-slices.md §D: benefit 절반 측정 배너"
+  ],
+  "verification": "짝지은 패스 37건 74회(15m01s · load1 26→44) · 뒤집힘 1건 재측 --timeout 15 3+3 / --timeout 40 2+2 · 개악 대조쌍 keydraw_lgt ⒝ PASS ↔ ⒜ FAIL · 소스 복원 status --porcelain 빈 출력.",
+  "limits": "판정 축은 boot+render 뿐. FAIL 28 중 19건은 부팅 중 오류라 graphics SVC 에 닿기 전일 수 있다(프로브 미측정).",
+  "adoptedProposals": ["2026-09-23-lgt-corpus-decides-graphics-wiring#p2"],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "LGT 소실 행 복원 뒤 broken/lgt 부팅 실패 19건에 ⒜/⒝ 를 한 번 더",
+      "plainSummary": "지금 broken/lgt 에서 두 그래픽 배선은 차이가 없지만, 19건은 그림을 그리기 전에 죽어서 배선이 차이를 낼 기회 자체가 없었다. 기반 교체 때 빠진 LGT 연결들이 복원되면 그중 일부가 그리기 단계까지 가므로 그때 다시 재야 답이 끝난다.",
+      "userBenefit": "upstream 의 LGT 전용 그래픽 1,095줄을 배선할 이유가 정말 없는지가 «닿은 타이틀» 기준으로 확정된다 — 지금 답은 닿지 못한 19건을 포함한 답이다.",
+      "why": "docs/report/0235: 부팅 중 오류 19건(⒝) · 0230 이 main 의 LGT 부팅 실패 근인을 #161 이 떨군 stdlib/context 행으로 규명했다.",
+      "tradeoff": "소실 행 복원 회차들이 먼저 착지해야 의미가 있다. 한 패스 약 15분 × 짝지은 두 배선이고, 새로 닿은 타이틀에만 프로브(get_screen_framebuffer panic 1줄)를 박으면 비용이 준다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}
