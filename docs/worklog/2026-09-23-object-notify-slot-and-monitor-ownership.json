@@ -1,0 +1,58 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-23",
+  "task": "wie-battlemonster-object-notify-slot-and-monitor-ownership",
+  "title": "java/lang/Object index 5 = notify()V — 배틀몬스터가 렌더 대열에 합류했고 IllegalMonitorStateException 288건은 그 결과였다",
+  "summary": "lgt_java_abi.toml 의 java/lang/Object 행에 notify()V = 5 한 줄을 넣었다. 배틀몬스터 두 파일이 FAIL → PASS(paints 3 · content true) 이고 288건의 IllegalMonitorStateException 은 0 이 됐다. 계측으로 확인한 것: 게스트가 모니터를 잡은 바로 그 객체에 index 5 를 걸고(모니터 계열 확정), 인자 레지스터는 long 이 아니며(wait(J)/wait(JI) 배제), 288건은 전부 Jvm::monitor_exit 의 NotOwner 다(enter 4 ↔ exit 292).",
+  "changes": [
+    "wie-lgt/data/lgt_java_abi.toml — java/lang/Object 에 notify()V = 5 (+ CLDC 9메서드 도출과 호출부 측정 근거 주석, 2·6·7·8·9 를 비워 둔 이유)",
+    "wie-lgt/src/runtime/java/jvm_support.rs — abi_rows_cover_the_indexes_titles_actually_dispatch_on 에 (java/lang/Object, 5, notify, ()V)"
+  ],
+  "verification": [
+    "배틀몬스터.zip / lgt 배틀몬스터.zip: FAIL p0 → PASS p3 content true (stop: max-ticks)",
+    "던져진 java 예외 289 → 0",
+    "라이브 4종(놈3·메이플스토리2007·현영맞고2006·체스마스터) 짝지어 양쪽 PASS",
+    "LGT 코퍼스 46파일 짝지은 스윕: PASS → non-PASS 0건 · PASS 11 → 12",
+    "영웅서기4 PASS→FAIL 은 부하(저부하 6/6 vs 6/6 · 고부하 before 1/6 · after 0/6) · 당구마스터2010 은 스윕의 before 가 부하 산물",
+    "4게이트 + cargo +beta clippy + 러너 블록 전건 rc=0"
+  ],
+  "limits": [
+    "index 5 의 잔여 후보는 notifyAll()V · wait()V 다. 셋 다 무인자·void 라 인자 축으로는 더 못 가른다 — 확정하려면 lr=0x2308 주변 디스어셈블이 필요하다.",
+    "java/lang/Object 의 2·6·7·8·9 는 도출되지만 비워 뒀다(어느 타이틀도 부르지 않았다). clone()·finalize() 는 CLDC 1.1 에 없어 이 ABI 에 자리가 없다."
+  ],
+  "proposals": [
+    {
+      "title": "「<class> vtable index N」 의 N 은 게스트의 ABI 인덱스가 아니라 «우리 표의 위치»다 — 문면에 그렇게 적어라",
+      "plainSummary": "오류 메시지의 숫자가 우리 쪽 사정으로 바뀔 수 있는데, 읽는 사람은 게임이 요구한 번호로 읽습니다.",
+      "userBenefit": "티켓과 리포트가 인용한 숫자가 조용히 낡는 것을 막는다. 이번에 실제로 낡았다.",
+      "why": "실측: java/lang/Object 에 한 행을 넣자 학교가는길의 벽 문면이 `ax vtable index 30` → `29` 로 바뀌었다(양쪽 결정론적 3/3). 부모의 미배치 꼬리가 8 → 7 로 줄어 그 아래 표가 한 칸 당겨졌을 뿐, 게스트도 클래스도 자리도 그대로다. 그런데 형제 티켓은 그 숫자를 식별자로 인용하고 있다.",
+      "tradeoff": "메시지에 표 길이·미배치 수를 덧붙이면 문면이 길어지고, 이 문면을 문자열로 grep 하는 기존 리포트·티켓이 어긋난다. 대안은 고치지 않고 이 사실을 lgt_java_abi.toml 주석에만 남기는 것인데, 그러면 다음 사람이 같은 자리에서 또 속는다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "index 5 의 잔여 두 후보(notifyAll·wait())를 lr 주변 디스어셈블로 닫아라",
+      "plainSummary": "지금 채운 자리가 정확히 맞는지, 게임 코드를 직접 읽어 확인하는 일입니다.",
+      "userBenefit": "맞으면 근거가 도출에서 관측으로 올라가고, 틀리면 배틀몬스터가 '안 기다리고 지나가는' 상태로 도는 것을 지금 잡는다.",
+      "why": "호출부 관측은 후보를 다섯에서 셋(notify·notifyAll·wait())으로만 줄였다 — 셋 다 무인자·void 라 레지스터로는 더 못 가른다. 남은 축은 호출 «주변»이다: lr=0x2308 이 실측돼 있고, wait() 는 통상 `while (!cond)` 루프 안에 있고 notify() 는 직선 코드다. scripts/ktf-image-sweep.py 의 window 서브커맨드가 같은 일(동기화된 Thumb 창 + 리터럴 해석)을 이미 한다.",
+      "tradeoff": "LGT AOT 이미지는 KTF 클라이언트 이미지와 형식이 달라 그 도구를 그대로 쓸 수 없을 수 있다(capstone 도 이 머신에 미설치 — 그 스크립트가 exit 2 로 말한다). 그리고 지금 선택(notify)은 셋 중 «틀려도 가장 싼» 쪽이라 급하지 않다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "배틀몬스터의 다음 축은 «입력에 반응하는가» — paints 3 에서 멈춘다",
+      "plainSummary": "화면은 나오는데 3장에서 멈춥니다. 실제로 플레이가 되는지는 아직 모릅니다.",
+      "userBenefit": "운영자 목표는 '플레이 가능'이다. 렌더는 필요조건일 뿐이고, 여기서 멈추면 등재해도 첫 화면만 보인다.",
+      "why": "실측: after 는 PASS·content true 인데 paints 3 이고 stop 은 max-ticks(tick 5,000만) 다 — 즉 굶은 게 아니라 «그릴 것이 더 없어서» 3장이다. 같은 계급인 체스마스터는 paints 1~12 로 비슷한 자리에 있고, 렌더 대열의 놈3(288)·현영맞고(131)와는 두 자릿수 차이다.",
+      "tradeoff": "--inject 를 붙이면 예산이 주입 스케줄로 덮이므로(AGENTS.md) 이 측정과 짝지어 읽기 어렵고, 축을 잘못 잡으면 §7 per-frame ABI 벽(docs/lgt_abi.md cp53~58, 외부 RE 필요)으로 굴러떨어진다 — 거기는 이 저장소가 여러 번 소진 판정한 자리다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": [
+    "2026-09-22-aot-java-swallowed-io-stream-exception#p4",
+    "2026-09-22-aot-java-swallowed-io-stream-exception#p2",
+    "2026-09-22-lgt-vtable-index-family-runtime-thread-string#p2"
+  ],
+  "declinedProposals": []
+}
