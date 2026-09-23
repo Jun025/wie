@@ -4,7 +4,7 @@
   "task": "wie-2026-09-21-aot-java-render-rebaseline-adopt-p4",
   "title": "game_lab/broken/lgt sha256 중복 9쌍 — 태그 붙은 쪽을 game_lab/_dup/ 로 이동",
   "summary": "제안 6쌍을 재측하니 9쌍. 태그 붙은 이름 9개를 game_lab/_dup/broken/lgt/ 로 옮겼다(삭제 0). broken/lgt 46→37 파일, 고유 37 불변. baseline 참조 0.",
-  "changes": ["docs/report/0234--2026-09-24--wie-2026-09-21-aot-java-render-rebaseline-adopt-p4.md", "로컬(git-ignored): game_lab/_dup/broken/lgt/ 9파일 + README.md, census-map.tsv 재생성"],
+  "changes": ["docs/report/0235--2026-09-24--wie-2026-09-21-aot-java-render-rebaseline-adopt-p4.md", "로컬(git-ignored): game_lab/_dup/broken/lgt/ 9파일 + README.md, census-map.tsv 재생성"],
   "verification": ["sha256 전수 전/후", "recensus --dry-run 187→178", "census-map 188→179행", "NFC 정규화 참조 재측: 실행 명령 깨짐 0"],
   "limits": ["broken/ktf 의 8쌍은 범위 밖", "game_lab/ 은 CI 가 볼 수 없다 — 이 처분은 로컬에만 존재한다"],
   "proposals": [
