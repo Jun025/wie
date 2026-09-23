@@ -99,4 +99,4 @@ worklog 본문에서 제목 뒤에 조사(도·가·이)가 붙은 **진짜 언�
 유입된 이름은 전부 분류 표의 식별자다. 게임 바이트 유입 0 · 경로 유입 0.
 
 
-<!-- corpus-name-inflow v1 subjects=3 tree=50b1be44fd2a0dac B=49/28 P=0/0 S=11/6 -->
+<!-- corpus-name-inflow v1 subjects=4 tree=f4ec50d787fb925b B=49/28 P=0/0 S=11/6 -->
