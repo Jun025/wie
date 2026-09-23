@@ -94,8 +94,7 @@ B(행 2줄), C(LGT 전용 스텁 복원), D(graphics 배선 한 행), E(`unk4` �
 
 `node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab` 결과(이 절을 쓰기 전):
 **BOUNDED 28쌍** · PREFIX-EMBEDDED 0 · **SUFFIX-ATTACHED 6쌍**. 수는 아래 표식이 최종이다.
-SUFFIX 는 손으로 갈랐다. `일지매영웅전기2`·`하이브리드2` 는 코퍼스의 **별개 실제 타이틀**이다. 나머지
-(`게임빌2010슈퍼사커도`·`데몬헌터가`·`바이오크로니클이`·`하이브리드가`)는 조사가 붙은 **진짜 언급**이다. ⇒ 판단이 더 필요한 것 0.
+SUFFIX 는 손으로 갈랐다. 2쌍(`일지매영웅전기2`·`하이브리드2`)은 코퍼스의 **별개 실제 타이틀**이고, 나머지 4쌍은
+worklog 본문에서 제목 뒤에 조사(도·가·이)가 붙은 **진짜 언급**이다. ⇒ 판단이 더 필요한 것 0.
 유입된 이름은 전부 분류 표의 식별자다. 게임 바이트 유입 0 · 경로 유입 0.
 
-<!-- corpus-name-inflow v1 subjects=3 tree=7a90f88eeb6a7de6 B=49/28 P=0/0 S=15/9 -->

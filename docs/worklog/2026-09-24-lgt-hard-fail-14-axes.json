@@ -6,7 +6,7 @@
   "summary": "main 24a920c4 에서 14건 28/28 FAIL 재확인. 기반 교체 직전 d70b93f8 을 빌드해 돌리니 8건이 2/2 PASS — 회귀 경계는 인접 first-parent 두 커밋(d70b93f8 → 37734e74 #161)이고, 그 사이 Memmove 0x415 · GetContext 0xcf · ListDatabases 0x19c 행과 free(NULL) 가드가 전부 사라졌다. 가장 싼 축(free NULL 가드 7줄)을 복원해 메탈슬러그 서바이벌 2종이 6/6 FAIL(panic) → 6/6 PASS. working/lgt 54 짝지은 측정 25 → 29 PASS · 회귀 0.",
   "changes": [
     "wie-lgt/src/runtime/wipi_c/context.rs: LgtWIPICContext::free 가 NULL 핸들을 no-op 으로 (교체 전 0942b0fb 복원)",
-    "docs/report/0229: 분류 표 · 회귀 경계 · 전/후 · 54 짝지은 측정"
+    "docs/report/0230: 분류 표 · 회귀 경계 · 전/후 · 54 짝지은 측정"
   ],
   "verification": "네 게이트 rc=0 (test --all 46 suites 420 passed) · beta clippy rc=0 · 러너 블록 전건 PASS · keydraw 2종 rc=0 · 메탈 2종 main/fix 각 3회 교차 · 54 짝지은 측정(재시도 2).",
   "limits": "판정 축은 boot+render 뿐. 6건은 교체 전 트리도 이 부하(load ~100)에서 FAIL 이라 회귀 여부 미판정. 절대 PASS 수는 부하에 따라 움직인다(0222 는 load 6~20 에서 40).",
