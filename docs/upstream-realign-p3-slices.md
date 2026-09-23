@@ -467,7 +467,7 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 > ★**동시에 benefit 도 축소된다**: ⒜ 가 사겠다던 것(LGT 전용 그래픽)이 이 코퍼스에서 **측정되지 않는다.**
 > ★**남은 절반**: `broken/lgt` **46건**을 ⒜ 로 돌려 「upstream 구현이 우리가 못 여는 것을 여나」를 재는 일 —
 > **미측정**이고, 그것이 benefit 을 수로 만드는 유일한 축이다(후속 제안 ⑶).
-> ★★**[benefit 절반 측정 2026-09-24 · `…-lgt-corpus-decides-graphics-wiring-adopt-p2` · 정본 `docs/report/0235--….md`]
+> ★★**[benefit 절반 측정 2026-09-24 · `…-lgt-corpus-decides-graphics-wiring-adopt-p2` · 정본 `docs/report/0236--….md`]
 > 위 「남은 절반」을 쟀다 — ★benefit 도 «0» 이다.** `broken/lgt` 46건(= 서로 다른 37건 + sha256 동일 사본 9건 ·
 > 사본은 2026-09-24 `_dup/` 로 이동) × 두 배선을 짝지어 돌렸다: ⒝·⒜ **8 PASS · 28 FAIL 동일**, 뒤집힘 **1건**은
 > 15초 데드라인 잡음(재측 `--timeout 15` 양쪽 0/3 · `--timeout 40` 양쪽 2/2 PASS).
