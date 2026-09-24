@@ -1,0 +1,23 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-24",
+  "task": "wie-2026-09-23-object-notify-slot-and-monitor-ownership-adopt-p1",
+  "title": "java/lang/Object index 5 — 디스어셈블로 wait() 배제, notify 유지 · wait()=9 관측",
+  "summary": "배틀몬스터 binary.mod 의 lr=0x2308 은 직선 코드(필드 세팅 뒤 index 5 호출)이고, 같은 필드를 도는 while 루프 안에 이미지의 유일한 index-9 호출이 있다. wait() 는 9 이므로 5 가 될 수 없다. 값 무변경 · 주석 승격 · F1(r1:r2) 정정.",
+  "changes": ["wie-lgt/data/lgt_java_abi.toml — java/lang/Object 근거 주석만"],
+  "verification": ["배틀몬스터 두 파일 PASS p3 content true stop deadline", "4게이트 + beta clippy 전건 rc=0 · cargo test --all 431 passed"],
+  "limits": ["notify vs notifyAll 은 코드 모양으로 못 가른다 — 선언 순서만이 근거"],
+  "proposals": [
+    {
+      "title": "java/lang/Object index 9 = wait()V 행을 넣을지 — 관측은 됐고 도달은 아직이다",
+      "plainSummary": "게임 코드에서 wait() 자리가 9번으로 보였지만, 실행 중에 그 자리까지 간 적은 아직 없습니다.",
+      "userBenefit": "배틀몬스터가 대기 루프에 들어가는 순간 «vtable index 9» 벽에서 멈추는 대신 제대로 기다린다.",
+      "why": "binary.mod 0x2018 에서 `while (this.f != 0) this.<9>();` 를 관측했다(같은 필드를 쓰는 신호 쪽이 index 5). 현재 두 파일 모두 `vtable index` 벽 0건이라 런타임에서는 아직 도달하지 않는다.",
+      "tradeoff": "도달한 적 없는 행은 테스트가 동작을 잡지 못한다. 행이 틀리면 이 계보가 싸워 온 조용한 hang 이 된다. 반대로 두면, 도달하는 날 이름을 대는 벽으로 멈춘다(안전하게 실패한다).",
+      "effort": "S",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": ["2026-09-23-object-notify-slot-and-monitor-ownership#p1"],
+  "declinedProposals": []
+}
