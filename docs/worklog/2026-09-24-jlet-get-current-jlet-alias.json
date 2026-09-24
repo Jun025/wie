@@ -6,7 +6,7 @@
   "summary": "코퍼스 안 유일한 바이트코드 구현체(KEmulator Jlet.class)에서 getCurrentJlet 은 public static 이고 본문이 getActiveJlet 과 바이트 동일하다. 등재 1건으로 간호사타이쿤2 의 tick 2 해결 실패 벽을 넘겼고 다음 벽은 no-frame 이다.",
   "changes": [
     "wie-wipi-java/src/classes/org/kwis/msp/lcdui/jlet.rs — getCurrentJlet 등재 + 테스트",
-    "docs/report/0240"
+    "docs/report/0241"
   ],
   "verification": [
     "간호사타이쿤2 before: FAIL error ticks 2 · after ×2: FAIL deadline ticks 1014/1120 paints 0",
