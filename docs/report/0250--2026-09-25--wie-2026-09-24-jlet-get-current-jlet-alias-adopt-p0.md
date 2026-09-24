@@ -58,6 +58,6 @@ ticks 는 부하에 따라 흔들린다. 스레드가 죽은 뒤 도는 틱이�
 ### 게임 파일명 유입
 
 `node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab` 의 대상은 이 브랜치가 바꾼 4파일이다.
-결과는 **BOUNDED 23쌍 · SUFFIX-ATTACHED 6쌍 · PREFIX 0** 이다.
+결과는 **BOUNDED 27쌍 · SUFFIX-ATTACHED 7쌍 · PREFIX 0** 이다(이 절 자신이 적은 이름 포함).
 - BOUNDED 중 이 회차가 새로 쓴 이름은 대상 타이틀 `간호사타이쿤2` 하나다. 이 이름은 0241 이 이미 main 에 적은 것이다. 나머지 쌍은 `lgt_java_abi.toml` 에 원래 있던 주석 속 타이틀 이름이다(배틀몬스터·서든어택포켓 등). 도구가 파일 전체를 세기 때문에 잡혔다.
 - SUFFIX-ATTACHED 는 손으로 갈랐다. 전부 stem `간호사타이쿤`·`서든어택` 뒤에 `2`·`포켓` 이 붙은 형태다. 즉 «더 긴 다른 제목»이고, 그 제목들은 위 BOUNDED 에 이미 있다. 새 이름은 0이다.
