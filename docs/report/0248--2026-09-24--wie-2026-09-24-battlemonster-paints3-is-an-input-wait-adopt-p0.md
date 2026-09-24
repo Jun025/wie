@@ -26,3 +26,4 @@ release 재링크 약 20분을 썼다.
 ### 한계
 `--inject-keys 0` 은 `input_steps_total 0` 이라 UNMEASURED 게이트(`input_steps < input_steps_total`)에 걸리지 않고 PASS 로 나온다 —
 0키 실행의 판정은 입력에 대해 아무것도 말하지 않는다(AGENTS.md 에 적음).
+판별은 **release 빌드**로만 선다 — debug 는 같은 60 s 안에 판별에 필요한 게스트 진행에 닿지 못한다(게이트② 실측: debug N=0·N=1 둘 다 paints 3 · `--timeout 180` 에도 동일 ↔ release 3 vs 82). AGENTS.md 문단에 release 명령을 적었다.
