@@ -1,0 +1,23 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-24",
+  "task": "wie-2026-09-21-aot-java-render-rebaseline-adopt-p4",
+  "title": "game_lab/broken/lgt sha256 중복 9쌍 — 태그 붙은 쪽을 game_lab/_dup/ 로 이동",
+  "summary": "제안 6쌍을 재측하니 9쌍. 태그 붙은 이름 9개를 game_lab/_dup/broken/lgt/ 로 옮겼다(삭제 0). broken/lgt 46→37 파일, 고유 37 불변. baseline 참조 0.",
+  "changes": ["docs/report/0235--2026-09-24--wie-2026-09-21-aot-java-render-rebaseline-adopt-p4.md", "로컬(git-ignored): game_lab/_dup/broken/lgt/ 9파일 + README.md, census-map.tsv 재생성"],
+  "verification": ["sha256 전수 전/후", "recensus --dry-run 187→178", "census-map 188→179행", "NFC 정규화 참조 재측: 실행 명령 깨짐 0"],
+  "limits": ["broken/ktf 의 8쌍은 범위 밖", "game_lab/ 은 CI 가 볼 수 없다 — 이 처분은 로컬에만 존재한다"],
+  "proposals": [
+    {
+      "title": "`game_lab/broken/ktf` 의 sha256 중복 8쌍도 `_dup/` 로 옮긴다",
+      "plainSummary": "lgt 와 같은 모양으로 KTF 폴더에도 같은 게임 파일이 두 이름으로 8쌍 들어 있습니다.",
+      "userBenefit": "broken 전체가 178파일인데 실제로는 170종입니다. 이것까지 옮기면 센서스가 세는 수가 실제 종 수와 같아집니다.",
+      "why": "2026-09-24 sha256 전수: 윈더즈 영웅의길·생과일타이쿤파이널·메이플스토리 궁수편·미니러비·삼국지 영걸전·2006월드올림픽·아스팔트4·물가에돌튕기기2 — 각각 태그 붙은 이름과 태그 없는 이름이 같은 바이트다.",
+      "tradeoff": "`원더즈_-_영웅의길` ↔ `kt 윈더즈 영웅의길`, `(KTF)삼국지 영걸전` ↔ `코에이 삼국지 영걸전` 두 쌍은 «태그 없는 쪽»이 자명하지 않다 — 남길 이름을 참조로 먼저 재야 한다. 로컬 코퍼스 위생이라 CI 가 잡지 못한다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": ["2026-09-21-aot-java-render-rebaseline#p4"],
+  "declinedProposals": []
+}
