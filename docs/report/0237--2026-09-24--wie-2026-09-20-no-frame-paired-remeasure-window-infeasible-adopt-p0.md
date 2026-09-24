@@ -22,4 +22,4 @@
 
 **사용자 영향**: 없음(코드 변경 0).
 
-**유입**(`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 3건 + SUFFIX-ATTACHED 1건. 전부 측정 대상 타이틀을 이름으로 적은 것이다(일지매영웅전기 · 놈3 — 티켓과 원 제안이 이미 이름으로 적었다). SUFFIX 1건은 「일지매영웅전기처럼」의 조사 결합이다.
+**유입**(`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 3건 + SUFFIX-ATTACHED 1건. 전부 측정 대상 두 타이틀을 이름으로 적은 것이고, 티켓과 원 제안도 같은 이름을 적었다. SUFFIX 1건은 worklog userBenefit 의 조사 결합(«…처럼»)이다. 다른 제목이 아니다.
