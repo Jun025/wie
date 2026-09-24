@@ -5202,6 +5202,7 @@ dependencies = [
  "fast_image_resize",
  "getrandom 0.4.3",
  "hqx",
+ "jvm",
  "midir",
  "png 0.17.16",
  "rodio",

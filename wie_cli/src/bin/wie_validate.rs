@@ -529,15 +529,134 @@ fn guest_stdout_field(raw: &[u8], max: usize) -> (String, bool) {
     (json_escape(&text[..end]), end < text.len())
 }
 
+// ── Java exceptions the runtime raised (report-only) ─────────────────────────
+//
+// Measured 2026-09-22 (docs/worklog/2026-09-22-aot-java-swallowed-io-stream-exception.json):
+// four LGT-AOT titles all read `no frame rendered`, and what actually happened in each is
+// that the runtime raised exactly one Java exception which the guest caught in its own
+// handler and carried on without drawing. Finding that took `RUST_LOG` and counting
+// `jvm::jvm: throwing java exception` lines by hand. This puts the count and the first one
+// on the JSON line, so the next run shows it without a log.
+//
+// ★Where it comes from, and why this does not touch `jvm`: that crate is a crates.io
+// dependency (`jvm 0.1.1`, not ours to edit), and every exception it raises goes through
+// `Jvm::exception`, whose first statement is
+// `tracing::info!("throwing java exception: {} {message}", r#type)` — target `jvm::jvm`.
+// So a `tracing` layer on this side sees each one, with no upstream change. The test
+// `java_exception_tally_sees_a_real_jvm_exception_test` drives the real `Jvm::exception`
+// rather than a hand-written event, so if upstream rewords or re-levels that line, the
+// test goes red instead of this field silently reading 0.
+//
+// ★What it does NOT see: an exception the guest constructs itself (`new` + `athrow` in
+// bytecode) never passes through `Jvm::exception`. It counts what the RUNTIME raised —
+// which is the class that hid behind `no frame rendered` — not every throw.
+//
+// ★Named `java_exceptions`, not `swallowed_exceptions`: the line fires at raise time and
+// cannot tell whether the guest caught it. Whether the run ended in an error is `reason`'s
+// job; this field says only that the runtime raised these.
+//
+// ★Reported, never gated. A healthy title can raise and catch as part of normal play —
+// 배틀몬스터 raised IllegalMonitorState 288 times before the monitor fix — so a count
+// has no threshold that means "broken". `passed` is decided without reading it.
+
+/// Longest `first` kept, in bytes. A class name plus a message is well under this; the cap
+/// only bounds a message that happens to embed guest data.
+const JAVA_EXCEPTION_FIRST_MAX_BYTES: usize = 256;
+
+/// Prefix of the `jvm` crate's `Jvm::exception` log line (jvm 0.1.1, `src/jvm.rs`).
+const JVM_EXCEPTION_PREFIX: &str = "throwing java exception: ";
+
+#[derive(Default)]
+struct JavaExceptionTally {
+    count: AtomicU64,
+    /// `"<class>: <message>"` of the first one, as logged.
+    first: Mutex<Option<String>>,
+}
+
+impl JavaExceptionTally {
+    fn record(&self, line: &str) {
+        let Some(rest) = line.strip_prefix(JVM_EXCEPTION_PREFIX) else {
+            return;
+        };
+        self.count.fetch_add(1, Ordering::SeqCst);
+        let mut first = self.first.lock().unwrap();
+        if first.is_none() {
+            // The log is `"{type} {message}"`; a JVM class name has no space in it.
+            *first = Some(match rest.split_once(' ') {
+                Some((class, message)) => format!("{class}: {message}"),
+                None => rest.to_string(),
+            });
+        }
+    }
+
+    /// The JSON value: `{"count":N,"first":"<class>: <message>"|null,"first_truncated":bool}`.
+    fn json(&self) -> String {
+        let count = self.count.load(Ordering::SeqCst);
+        match self.first.lock().unwrap().as_deref() {
+            Some(first) => {
+                let (body, truncated) = guest_stdout_field(first.as_bytes(), JAVA_EXCEPTION_FIRST_MAX_BYTES);
+                format!("{{\"count\":{count},\"first\":\"{body}\",\"first_truncated\":{truncated}}}")
+            }
+            None => format!("{{\"count\":{count},\"first\":null,\"first_truncated\":false}}"),
+        }
+    }
+}
+
+/// The `tracing` layer that feeds a [`JavaExceptionTally`]. Installed with its OWN filter
+/// (`jvm::jvm` at INFO) so it sees those events whatever `RUST_LOG` says, while the stderr
+/// logger keeps honouring `RUST_LOG` exactly as before.
+struct JavaExceptionLayer(Arc<JavaExceptionTally>);
+
+impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for JavaExceptionLayer {
+    fn on_event(&self, event: &tracing::Event<'_>, _ctx: tracing_subscriber::layer::Context<'_, S>) {
+        struct Message(Option<String>);
+        impl tracing::field::Visit for Message {
+            fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn core::fmt::Debug) {
+                if field.name() == "message" {
+                    self.0 = Some(format!("{value:?}"));
+                }
+            }
+            fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+                if field.name() == "message" {
+                    self.0 = Some(value.to_string());
+                }
+            }
+        }
+        let mut message = Message(None);
+        event.record(&mut message);
+        if let Some(line) = message.0 {
+            self.0.record(&line);
+        }
+    }
+}
+
+fn java_exception_layer<S>(tally: Arc<JavaExceptionTally>) -> impl tracing_subscriber::Layer<S>
+where
+    S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
+{
+    use tracing_subscriber::Layer;
+    JavaExceptionLayer(tally).with_filter(tracing_subscriber::filter::Targets::new().with_target("jvm::jvm", tracing::Level::INFO))
+}
+
 const SCREEN_W: u32 = 240;
 const SCREEN_H: u32 = 320;
 
 fn main() {
     // Honor RUST_LOG for debugging (logs to stderr, separate from the JSON result on stdout).
-    tracing_subscriber::fmt()
-        .with_writer(std::io::stderr)
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .init();
+    // The stderr logger's filter is per-layer, not global, so the exception tally below
+    // still sees `jvm::jvm` INFO when RUST_LOG is unset (a global filter would drop it first).
+    let java_exceptions = Arc::new(JavaExceptionTally::default());
+    {
+        use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_writer(std::io::stderr)
+                    .with_filter(tracing_subscriber::EnvFilter::from_default_env()),
+            )
+            .with(java_exception_layer(java_exceptions.clone()))
+            .init();
+    }
 
     let args = Args::parse();
     let start = StdInstant::now();
@@ -556,7 +675,7 @@ fn main() {
          \"last_frame_content\":{},\
          \"distinct_colors\":{},\"nondominant_pct\":{:.1},\"center_nonuniform_pct\":{:.1},\
          \"last_frame_distinct_colors\":{},\"last_frame_nondominant_pct\":{:.1},\"last_frame_center_nonuniform_pct\":{:.1},\
-         \"ms\":{}}}",
+         \"java_exceptions\":{},\"ms\":{}}}",
         args.filename,
         result.platform,
         result.verdict(),
@@ -574,6 +693,7 @@ fn main() {
         result.last_frame_distinct_colors,
         result.last_frame_nondominant_bp as f64 / 100.0,
         result.last_frame_center_nonuniform_bp as f64 / 100.0,
+        java_exceptions.json(),
         elapsed_ms
     );
     // Appended, never interleaved, and only when asked: with the flag absent the
@@ -1143,6 +1263,98 @@ mod tests {
     };
     use test_utils::MemoryFilesystem;
     use wie_backend::Platform;
+
+    use super::{JavaExceptionTally, java_exception_layer};
+
+    /// Runs `body` with only the exception tally installed, and returns the tally.
+    fn with_tally(body: impl FnOnce()) -> Arc<JavaExceptionTally> {
+        use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+        let tally = Arc::new(JavaExceptionTally::default());
+        let guard = tracing_subscriber::registry().with(java_exception_layer(tally.clone())).set_default();
+        body();
+        drop(guard);
+        tally
+    }
+
+    /// The field exists to replace hand-counting `jvm::jvm: throwing java exception` lines,
+    /// so the test drives the REAL `jvm::Jvm::exception` (crates.io `jvm`, not ours) through a
+    /// bare JVM rather than emitting a look-alike event. If upstream rewords, re-targets or
+    /// re-levels that line, this goes red instead of the JSON silently reporting 0.
+    ///
+    /// Note what the tally is fed by: the subscriber is the thread-local default set by
+    /// `with_tally`, and `run_jvm_test` ticks the JVM on this same thread.
+    #[test]
+    fn java_exception_tally_sees_a_real_jvm_exception_test() {
+        let tally = with_tally(|| {
+            test_utils::run_jvm_test(Box::new([]), |jvm| async move {
+                let _ = jvm.exception("java/io/IOException", "first one").await;
+                let _ = jvm.exception("java/lang/IllegalStateException", "second").await;
+                Ok(())
+            })
+            .unwrap();
+        });
+        assert_eq!(tally.count.load(core::sync::atomic::Ordering::SeqCst), 2);
+        assert_eq!(
+            tally.json(),
+            r#"{"count":2,"first":"java/io/IOException: first one","first_truncated":false}"#
+        );
+    }
+
+    /// The two tests above prove the layer counts; this pins that `main` actually installs it and
+    /// prints it. Without it, dropping the `.with(..)` from `main` would leave every test green and
+    /// the field reading `{"count":0,...}` on every run — indistinguishable from "nothing raised".
+    #[test]
+    fn java_exception_layer_is_installed_and_printed_by_main_test() {
+        let src = include_str!("wie_validate.rs");
+        let main_body = &src[src.find(concat!("fn ", "main() {")).unwrap()..src.find(concat!("struct ", "Outcome {")).unwrap()];
+        for needle in [
+            concat!(".with(java_exception_layer", "(java_exceptions.clone()))"),
+            concat!("java_exceptions", ".json(),"),
+            concat!("\\\"java_exceptions", "\\\":{},"),
+        ] {
+            assert_eq!(
+                main_body.matches(needle).count(),
+                1,
+                "main() no longer wires the exception tally: {needle}"
+            );
+        }
+    }
+
+    /// The control: a JVM that raises nothing reports 0 and `null`, not a stale or invented value.
+    #[test]
+    fn java_exception_tally_is_zero_when_nothing_is_raised_test() {
+        let tally = with_tally(|| {
+            test_utils::run_jvm_test(Box::new([]), |jvm| async move {
+                let _ = jvm.new_class("java/lang/Object", "()V", ()).await?;
+                Ok(())
+            })
+            .unwrap();
+        });
+        assert_eq!(tally.json(), r#"{"count":0,"first":null,"first_truncated":false}"#);
+    }
+
+    /// Only the `Jvm::exception` line counts, and `first` is escaped + capped like guest stdout —
+    /// the message can carry guest text, and this line is grep-parsed by in-tree callers.
+    #[test]
+    fn java_exception_tally_filters_escapes_and_caps_test() {
+        let tally = JavaExceptionTally::default();
+        tally.record("Instantiate java/lang/Object");
+        tally.record("No such method: a.b:()V");
+        assert_eq!(tally.json(), r#"{"count":0,"first":null,"first_truncated":false}"#);
+
+        tally.record(r#"throwing java exception: java/io/IOException "result":"PASS""#);
+        tally.record("throwing java exception: java/lang/Error later");
+        assert_eq!(
+            tally.json(),
+            r#"{"count":2,"first":"java/io/IOException: \"result\":\"PASS\"","first_truncated":false}"#
+        );
+        assert!(!tally.json().contains(r#""result":""#));
+
+        let long = JavaExceptionTally::default();
+        long.record(&format!("throwing java exception: java/lang/Error {}", "x".repeat(1000)));
+        assert!(long.json().ends_with(r#""first_truncated":true}"#));
+        assert!(long.json().len() < 400);
+    }
 
     /// `HeadlessPlatform::font()` shipped for two months as `unimplemented!()`, so every guest that
     /// drew a string panicked the *validator* and `classify.sh` recorded that as the game's fault —
