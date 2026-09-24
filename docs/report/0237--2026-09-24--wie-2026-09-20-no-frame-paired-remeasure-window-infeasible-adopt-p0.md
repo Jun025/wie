@@ -21,3 +21,5 @@
 **판정**: 전제 ⒝ 는 성립한다(파생값이 이미 있다). 목표 축(부하 둔감 · 느림↔멈춤)은 **이 계기로는 만들 수 없다** ⇒ 티켓 규정대로 반증을 적고 멈춘다. 게이트 판정 변경 0 · 기존 버킷 정의 무접촉이다(⑶ 전/후 불변은 변경이 없으므로 자명하다). 필요한 것은 «진행» 계기이고, 후속 제안으로 넘긴다(worklog `2026-09-24-no-frame-tick-cost-axis-falsified.json`).
 
 **사용자 영향**: 없음(코드 변경 0).
+
+**유입**(`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 3건 + SUFFIX-ATTACHED 1건. 전부 측정 대상 타이틀을 이름으로 적은 것이다(일지매영웅전기 · 놈3 — 티켓과 원 제안이 이미 이름으로 적었다). SUFFIX 1건은 「일지매영웅전기처럼」의 조사 결합이다.
