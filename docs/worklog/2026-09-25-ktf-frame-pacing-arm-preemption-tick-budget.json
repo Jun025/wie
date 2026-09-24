@@ -1,0 +1,30 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-25",
+  "task": "wie-ktf-frame-pacing-regression-eventqueue-sleep-after-base-swap",
+  "title": "KTF 영웅서기4 프레임 절반 — ARM 선점 × 8ms tick 예산 · 고정 sleep(16) 을 고쳐 약 35fps 로 복귀",
+  "summary": "원인은 티켓 후보 ⒜⒝가 아니라 upstream ARM 선점이 8ms tick 예산과 만난 것이었다. 예산 14ms와 타이머 기한 대기로 영웅서기4 17→35fps, 라이브 4종 불변, 배틀몬스터·영웅서기3 개선.",
+  "changes": ["wie-backend/src/executor.rs — TICK_BUDGET_MS 14", "wie-midp/src/classes/net/wie/event_queue.rs — 빈 큐 대기를 다음 타이머까지(콜백 대기 시 16ms 유지)", "docs/report/0255"],
+  "verification": ["원인 짝: ⒜ 3짝·⒝ 4짝 불변, 선점 끔 4짝 17→33fps", "수정 전/후 영웅서기4 3짝 17.7~18.1 → 34.8~35.8fps", "변이 2종 각각 해당 시험 FAILED"],
+  "limits": ["최대 간격 꼬리 231~270ms 잔존 — 한 프레임 약 290ms 계산(비선점 구간)", "바쁘게 도는 게스트는 호스트 프레임 CPU 점유가 약 48%→84%"],
+  "proposals": [
+    {
+      "title": "영웅서기4 키 입력 직후 약 290ms 한 프레임의 정체 규명",
+      "plainSummary": "속도는 돌아왔지만 가끔 한 번씩 0.3초 멈칫하는 순간이 남아 있다. 무엇이 그 한 프레임을 그렇게 오래 붙잡는지 찾는다.",
+      "userBenefit": "「버벅임」의 남은 부분(최대 간격 231~270ms · 기준선 117ms)을 없앨 수 있다.",
+      "why": "계측 추적상 그 구간의 tick 하나가 49~72ms로 예산을 넘는다. ARM 선점이 닿지 않는 구간이라는 뜻이고, 선점을 끈 빌드에서도 max가 302~317ms였다. 대기 방식 수정으로는 줄지 않는다.",
+      "tradeoff": "원인이 게스트 자체 작업량이면 줄일 수 없다. 규명만 하고 끝날 수 있다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "tick 예산을 호스트 프레임 간격에서 정하기(고정 14ms 대신)",
+      "plainSummary": "지금은 모든 기기에서 한 번에 14ms씩 에뮬레이터를 돌린다. 화면 주사율에 맞춰 호스트가 예산을 정하게 한다.",
+      "userBenefit": "120Hz 기기에서 rAF 간격(8.3ms)을 넘기지 않고, 바쁘게 도는 타이틀의 CPU·배터리 소모를 줄일 수 있다.",
+      "why": "놈3·영웅전설4·영웅서기 제로는 fps는 그대로인데 프레임당 CPU가 늘었다(f/cpu 5.8→3.6~3.9 등). 예산이 고정이라 쉬지 않는 게스트가 늘어난 몫을 모두 쓴다.",
+      "tradeoff": "Emulator::tick 시그니처 변경은 upstream 3개 호스트(wie_featurephone·wie-web·wie_validate)에 닿는다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ]
+}

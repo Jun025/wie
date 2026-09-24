@@ -13,6 +13,13 @@ use crate::time::Instant;
 
 type Task = Pin<Box<dyn Future<Output = Result<()>> + Send>>;
 
+// Wall-clock slice one `tick` may spend polling tasks. Hosts call `tick` once per display frame
+// (the browser shell once per `requestAnimationFrame`, ~16.7ms at 60Hz), and the ARM core yields
+// every `INSTRUCTIONS_PER_YIELD` instructions, so a CPU-bound guest gets exactly this share of
+// each frame. At 8ms a guest frame costing 8-16ms of emulation spilled into a second host frame
+// and ran at half its native rate; 14ms leaves ~2.7ms of a 60Hz frame to the host.
+const TICK_BUDGET_MS: u64 = 14;
+
 pub struct ExecutorInner {
     current_task_id: Option<usize>,
     // BTreeMap, not HashMap: task ids are monotonic, so iteration follows spawn
@@ -110,7 +117,7 @@ impl Executor {
     where
         T: Fn() -> Instant,
     {
-        let end = now() + 8; // TODO hardcoded
+        let end = now() + TICK_BUDGET_MS;
         loop {
             let now = now();
 
@@ -216,13 +223,13 @@ mod tests {
         cell::Cell,
         future::Future,
         pin::Pin,
-        sync::atomic::{AtomicBool, Ordering},
+        sync::atomic::{AtomicBool, AtomicU64, Ordering},
         task::{Context, Poll},
     };
 
     use wie_util::WieError;
 
-    use super::Executor;
+    use super::{Executor, TICK_BUDGET_MS};
     use crate::time::Instant;
 
     struct YieldOnce(bool);
@@ -247,6 +254,26 @@ mod tests {
             time.set(now + 1);
             Instant::from_epoch_millis(now)
         }
+    }
+
+    #[test]
+    fn test_tick_gives_a_yielding_task_most_of_a_60hz_frame() {
+        let mut executor = Executor::new();
+
+        let polls = Arc::new(AtomicU64::new(0));
+        let polls_clone = polls.clone();
+        executor.spawn(move || async move {
+            // Far more work than one slice can hold.
+            for _ in 0..1000 {
+                polls_clone.fetch_add(1, Ordering::Relaxed);
+                YieldOnce(false).await;
+            }
+        });
+
+        // The clock advances 1ms per read and the executor reads it once per step, so the task is
+        // polled once per millisecond of the slice.
+        executor.tick(advancing_clock(0)).unwrap();
+        assert_eq!(polls.load(Ordering::Relaxed), TICK_BUDGET_MS);
     }
 
     #[test]
