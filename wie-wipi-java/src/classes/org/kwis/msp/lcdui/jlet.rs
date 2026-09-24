@@ -27,6 +27,13 @@ impl Jlet {
                     Self::get_active_jlet,
                     MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
                 ),
+                // KEmulator's Jlet: getCurrentJlet is public static and its body is byte-identical to getActiveJlet
+                JavaMethodProto::new(
+                    "getCurrentJlet",
+                    "()Lorg/kwis/msp/lcdui/Jlet;",
+                    Self::get_active_jlet,
+                    MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+                ),
                 JavaMethodProto::new(
                     "getEventQueue",
                     "()Lorg/kwis/msp/lcdui/EventQueue;",
@@ -168,5 +175,41 @@ impl Jlet {
 
     pub async fn display(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<Display>> {
         jvm.get_field(this, "dis", "Lorg/kwis/msp/lcdui/Display;").await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::boxed::Box;
+
+    use jvm::ClassInstanceRef;
+
+    use test_utils::run_jvm_test;
+    use wie_util::Result;
+
+    use crate::get_protos;
+
+    use super::Jlet;
+
+    // 간호사타이쿤2 resolves getCurrentJlet as a static; it must hand back what getActiveJlet does.
+    #[test]
+    fn get_current_jlet_is_get_active_jlet() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            let jlet = jvm.new_class("java/lang/Object", "()V", ()).await?;
+            jvm.put_static_field("org/kwis/msp/lcdui/Jlet", "currentJlet", "Lorg/kwis/msp/lcdui/Jlet;", jlet.clone())
+                .await?;
+
+            let active: ClassInstanceRef<Jlet> = jvm
+                .invoke_static("org/kwis/msp/lcdui/Jlet", "getActiveJlet", "()Lorg/kwis/msp/lcdui/Jlet;", ())
+                .await?;
+            let current: ClassInstanceRef<Jlet> = jvm
+                .invoke_static("org/kwis/msp/lcdui/Jlet", "getCurrentJlet", "()Lorg/kwis/msp/lcdui/Jlet;", ())
+                .await?;
+
+            assert!(jlet.equals(&**current)?);
+            assert!(active.equals(&**current)?);
+
+            Ok(())
+        })
     }
 }
