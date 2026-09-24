@@ -397,6 +397,16 @@ paints (`--boot-secs 1.0` → 18.7 s, paints 55 → 37), i.e. it buys time by se
 time over six runs each: KTF **20.1–26.1 s**, LGT **20.2–21.4 s** — the spread above 20.0 is tick
 overrun under load, not budget starvation.
 
+**To pair a keyed run against an unkeyed one on the same budget, use the three opt-in flags — not
+`--timeout` alone.** `--inject-keys N` injects only the first N keys of the script, `--keep-timeout`
+ends at `--timeout` instead of the schedule-derived deadline, and `--shot-every SECS` adds a
+`--shotdir` frame every SECS (`<stem>__tNNN.N.png`). Answering "is a 3-paint title waiting for a
+key, or stuck?" is `--inject --keep-timeout --timeout 60 --shotdir <dir> --shot-every 5` run twice,
+with `--inject-keys 0` and `--inject-keys 1`: only the key differs. That question used to need an
+uncommitted 13-line patch and a release relink (`docs/report/0233`). All three are off by default,
+so the runner lines above are unchanged; `--inject-keys 0` has nothing to deliver, so it reports
+`input_steps_total 0` and the verdict says nothing about input.
+
 `cargo test --all` boots KTF and LGT but **nothing in it boots a J2ME guest**. 2026-09-04 shipped a
 RustJava pin bump whose four gates were all green while `draw_j2me.jar` failed with
 `NoClassDefFoundError` on the first tick — one `wie_validate` line reproduced it locally, and the

@@ -48,6 +48,16 @@
 //! overclaim as calling zero that, only smaller. The corpus measurement behind the widening,
 //! and the two titles it costs, are recorded on `inject_unmeasured` itself.
 //!
+//! Three opt-in flags change the schedule; with none given it is byte-for-byte the old one
+//! (`plan_schedule_defaults_unchanged_test`):
+//!
+//!   --inject-keys N   inject only the first N script keys (input_steps_total = N)
+//!   --keep-timeout    end at --timeout, not the schedule-derived deadline
+//!   --shot-every S    extra --shotdir frame every S seconds, labelled `tNNN.N`
+//!
+//! They exist to pair a keyed run with an unkeyed one on the SAME budget — "is a title that
+//! paints 3 frames waiting for a key, or stuck?" (docs/report/0233 needed a scratch patch).
+//!
 //! ── Two content axes, same predicate, different scope ────────────────────────
 //! `content`            — `has_content` ORed over EVERY painted frame ("did the game
 //!                         ever draw something?"). This is what PASS/FAIL uses.
@@ -460,6 +470,19 @@ struct Args {
     /// Seconds per injected input step (press, then settle + screenshot).
     #[arg(long, default_value_t = 0.6)]
     action_secs: f64,
+    /// Inject only the first N keys of the script (default: all of them). With
+    /// `--keep-timeout` this pairs a keyed run against an unkeyed baseline on the
+    /// same budget — `--inject-keys 0` vs `1` is "is it waiting for a key?".
+    #[arg(long, requires = "inject")]
+    inject_keys: Option<usize>,
+    /// Under `--inject`, end at `--timeout` instead of the deadline derived from
+    /// the key schedule, so runs injecting different key counts get the same budget.
+    #[arg(long, default_value_t = false, requires = "inject")]
+    keep_timeout: bool,
+    /// Also write a `--shotdir` frame every SECS of wall time (`<stem>__tNNN.N.png`),
+    /// independent of key steps — the way to see whether the screen still moves.
+    #[arg(long, requires = "shotdir", value_parser = positive_secs)]
+    shot_every: Option<f64>,
     /// Require the LAST painted frame to be non-blank, i.e. gate on
     /// `last_frame_content`. OFF by default so existing verdicts are unchanged;
     /// pass it for the fixture+mode combinations where a blank final screen is a
@@ -828,53 +851,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
         .unwrap_or("game")
         .to_string();
 
-    let mut schedule: Vec<(f64, ScheduledEv)> = Vec::new();
-    let mut deadline_secs = args.timeout as f64;
-    let mut input_steps_total = 0u64;
-    if args.inject {
-        // Confirm keys (OK/soft-key/keypad-5) interleaved with directional
-        // navigation + select — covers single-button and two-button menus.
-        let script: &[(KeyCode, &str)] = &[
-            (KeyCode::OK, "OK"),
-            (KeyCode::OK, "OK"),
-            (KeyCode::LEFT_SOFT_KEY, "LSOFT"),
-            (KeyCode::NUM5, "NUM5"),
-            (KeyCode::DOWN, "DOWN"),
-            (KeyCode::OK, "OK"),
-            (KeyCode::DOWN, "DOWN"),
-            (KeyCode::OK, "OK"),
-            (KeyCode::UP, "UP"),
-            (KeyCode::OK, "OK"),
-            (KeyCode::LEFT, "LEFT"),
-            (KeyCode::OK, "OK"),
-            (KeyCode::RIGHT, "RIGHT"),
-            (KeyCode::OK, "OK"),
-            (KeyCode::NUM5, "NUM5"),
-            (KeyCode::LEFT_SOFT_KEY, "LSOFT"),
-            (KeyCode::RIGHT_SOFT_KEY, "RSOFT"),
-            (KeyCode::DOWN, "DOWN"),
-            (KeyCode::DOWN, "DOWN"),
-            (KeyCode::OK, "OK"),
-            (KeyCode::UP, "UP"),
-            (KeyCode::OK, "OK"),
-            (KeyCode::STAR, "STAR"),
-            (KeyCode::HASH, "HASH"),
-            (KeyCode::NUM1, "NUM1"),
-            (KeyCode::OK, "OK"),
-            (KeyCode::OK, "OK"),
-        ];
-        input_steps_total = script.len() as u64;
-        schedule.push((args.boot_secs, ScheduledEv::Shot("00_boot".into())));
-        let mut t = args.boot_secs + 0.3;
-        for (i, (kc, name)) in script.iter().enumerate() {
-            let label = format!("{:02}_{name}", i + 1);
-            schedule.push((t, ScheduledEv::Key(*kc, true, label.clone())));
-            schedule.push((t + 0.15, ScheduledEv::Key(*kc, false, label.clone())));
-            schedule.push((t + args.action_secs - 0.05, ScheduledEv::Shot(label)));
-            t += args.action_secs;
-        }
-        deadline_secs = (t + 1.0).min(120.0); // hard cap against runaway
-    }
+    let (schedule, deadline_secs, input_steps_total) = plan_schedule(args);
     let deadline = Duration::from_secs_f64(deadline_secs.max(1.0));
 
     // ── drive ───────────────────────────────────────────────────────────────
@@ -1058,6 +1035,80 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     }
 
     outcome
+}
+
+/// The `--inject` key script plus any `--shot-every` frames, as a time-sorted schedule,
+/// with the run's deadline and the number of keys it will try to deliver. With none of
+/// `--inject-keys`/`--keep-timeout`/`--shot-every` given this is the historical
+/// schedule unchanged (asserted by `plan_schedule_defaults_unchanged_test`).
+fn plan_schedule(args: &Args) -> (Vec<(f64, ScheduledEv)>, f64, u64) {
+    let mut schedule: Vec<(f64, ScheduledEv)> = Vec::new();
+    let mut deadline_secs = args.timeout as f64;
+    let mut input_steps_total = 0u64;
+    if args.inject {
+        // Confirm keys (OK/soft-key/keypad-5) interleaved with directional
+        // navigation + select — covers single-button and two-button menus.
+        let script: &[(KeyCode, &str)] = &[
+            (KeyCode::OK, "OK"),
+            (KeyCode::OK, "OK"),
+            (KeyCode::LEFT_SOFT_KEY, "LSOFT"),
+            (KeyCode::NUM5, "NUM5"),
+            (KeyCode::DOWN, "DOWN"),
+            (KeyCode::OK, "OK"),
+            (KeyCode::DOWN, "DOWN"),
+            (KeyCode::OK, "OK"),
+            (KeyCode::UP, "UP"),
+            (KeyCode::OK, "OK"),
+            (KeyCode::LEFT, "LEFT"),
+            (KeyCode::OK, "OK"),
+            (KeyCode::RIGHT, "RIGHT"),
+            (KeyCode::OK, "OK"),
+            (KeyCode::NUM5, "NUM5"),
+            (KeyCode::LEFT_SOFT_KEY, "LSOFT"),
+            (KeyCode::RIGHT_SOFT_KEY, "RSOFT"),
+            (KeyCode::DOWN, "DOWN"),
+            (KeyCode::DOWN, "DOWN"),
+            (KeyCode::OK, "OK"),
+            (KeyCode::UP, "UP"),
+            (KeyCode::OK, "OK"),
+            (KeyCode::STAR, "STAR"),
+            (KeyCode::HASH, "HASH"),
+            (KeyCode::NUM1, "NUM1"),
+            (KeyCode::OK, "OK"),
+            (KeyCode::OK, "OK"),
+        ];
+        let script = &script[..args.inject_keys.map_or(script.len(), |n| n.min(script.len()))];
+        input_steps_total = script.len() as u64;
+        schedule.push((args.boot_secs, ScheduledEv::Shot("00_boot".into())));
+        let mut t = args.boot_secs + 0.3;
+        for (i, (kc, name)) in script.iter().enumerate() {
+            let label = format!("{:02}_{name}", i + 1);
+            schedule.push((t, ScheduledEv::Key(*kc, true, label.clone())));
+            schedule.push((t + 0.15, ScheduledEv::Key(*kc, false, label.clone())));
+            schedule.push((t + args.action_secs - 0.05, ScheduledEv::Shot(label)));
+            t += args.action_secs;
+        }
+        if !args.keep_timeout {
+            deadline_secs = (t + 1.0).min(120.0); // hard cap against runaway
+        }
+    }
+    if let Some(every) = args.shot_every {
+        let mut k = every;
+        while k < deadline_secs {
+            schedule.push((k, ScheduledEv::Shot(format!("t{k:05.1}"))));
+            k += every;
+        }
+        // Stable sort: same-instant events keep their scripted order.
+        schedule.sort_by(|a, b| a.0.total_cmp(&b.0));
+    }
+    (schedule, deadline_secs, input_steps_total)
+}
+
+fn positive_secs(s: &str) -> std::result::Result<f64, String> {
+    match s.parse::<f64>() {
+        Ok(v) if v > 0.0 && v.is_finite() => Ok(v),
+        _ => Err(format!("expected a positive number of seconds, got {s:?}")),
+    }
 }
 
 enum ScheduledEv {
@@ -1719,5 +1770,75 @@ mod tests {
         assert_eq!(distinct as usize, RICHNESS_COLOR_CAP, "rich frame should hit the color cap");
         assert!(nondominant > 5000, "rich frame: most pixels non-dominant, got {nondominant}bp");
         assert!(center > 5000, "rich frame: center is non-uniform, got {center}bp");
+    }
+
+    fn plan(argv: &[&str]) -> (Vec<(f64, super::ScheduledEv)>, f64, u64) {
+        use clap::Parser;
+        let args = super::Args::try_parse_from(["wie_validate"].iter().chain(argv).chain(&["g.zip"])).unwrap();
+        super::plan_schedule(&args)
+    }
+
+    fn shots(schedule: &[(f64, super::ScheduledEv)]) -> Vec<String> {
+        schedule
+            .iter()
+            .filter_map(|(_, e)| match e {
+                super::ScheduledEv::Shot(l) => Some(l.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn plan_schedule_defaults_unchanged_test() {
+        // No --inject: nothing scheduled, deadline = --timeout.
+        let (s, d, n) = plan(&[]);
+        assert!(s.is_empty());
+        assert_eq!((d, n), (20.0, 0));
+        // --inject alone: 27 keys (down+up+shot each) + boot shot, schedule-derived 20.0 s.
+        let (s, d, n) = plan(&["--inject"]);
+        assert_eq!((s.len(), n), (27 * 3 + 1, 27));
+        assert!((d - 20.0).abs() < 1e-9, "deadline {d}");
+    }
+
+    #[test]
+    fn plan_schedule_new_flags_test() {
+        // One key, budget pinned to --timeout.
+        let (s, d, n) = plan(&["--inject", "--inject-keys", "1", "--keep-timeout", "--timeout", "60"]);
+        assert_eq!((s.len(), d, n), (1 + 3, 60.0, 1));
+        // Zero keys on the same budget is the unkeyed baseline.
+        let (s, d, n) = plan(&["--inject", "--inject-keys", "0", "--keep-timeout", "--timeout", "60"]);
+        assert_eq!((s.len(), d, n), (1, 60.0, 0));
+        // More than the script holds clamps rather than panics.
+        assert_eq!(plan(&["--inject", "--inject-keys", "99"]).2, 27);
+        // Fixed-time shots, time-sorted in among the key events.
+        let (s, _, _) = plan(&[
+            "--inject",
+            "--inject-keys",
+            "1",
+            "--keep-timeout",
+            "--timeout",
+            "12",
+            "--shotdir",
+            "x",
+            "--shot-every",
+            "5",
+        ]);
+        assert_eq!(shots(&s), ["00_boot", "01_OK", "t005.0", "t010.0"].map(String::from));
+        assert!(s.windows(2).all(|w| w[0].0 <= w[1].0), "schedule not time-sorted");
+        // Without --inject, shots run to --timeout.
+        assert_eq!(shots(&plan(&["--shotdir", "x", "--shot-every", "10"]).0), ["t010.0"].map(String::from));
+    }
+
+    #[test]
+    fn new_flags_require_their_partner_test() {
+        use clap::Parser;
+        for argv in [
+            &["wie_validate", "--inject-keys", "1", "g"][..],
+            &["wie_validate", "--keep-timeout", "g"],
+            &["wie_validate", "--shot-every", "5", "g"],
+            &["wie_validate", "--shotdir", "x", "--shot-every", "0", "g"],
+        ] {
+            assert!(super::Args::try_parse_from(argv).is_err(), "{argv:?} should be rejected");
+        }
     }
 }
