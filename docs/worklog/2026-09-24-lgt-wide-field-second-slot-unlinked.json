@@ -4,7 +4,7 @@
   "task": "wie-2026-09-22-lgt-object-reference-gate-adopt-p1",
   "title": "스파이더맨3 Card.canvas 시계값 — 원인은 Card 레이아웃이 아니라 wide 필드 둘째 슬롯 미링크",
   "summary": "게스트는 long/double 인스턴스 필드를 필드 인덱스 표 슬롯 두 개(k, k+1)로 쓰는데, import 표의 k+1 항목은 (0,0)이라 link_class_members 가 건너뛰고 그 슬롯이 0 으로 남는다. 그래서 long 의 한쪽 워드가 인스턴스 word 0(Card 자손에서는 canvas)에 쓰인다. LGT 91파일 중 9타이틀 · 36슬롯. 링커 공통 규칙이라 티켓 §⒝ 에 따라 판정만 남기고 멈췄다.",
-  "changes": ["docs/report/0242--2026-09-24--wie-2026-09-22-lgt-object-reference-gate-adopt-p1.md", "docs/worklog/2026-09-24-lgt-wide-field-second-slot-unlinked.json"],
+  "changes": ["docs/report/0243--2026-09-24--wie-2026-09-22-lgt-object-reference-gate-adopt-p1.md", "docs/worklog/2026-09-24-lgt-wide-field-second-slot-unlinked.json"],
   "verification": "워치포인트(임시)로 word 0 쓰기 지점 pc=0x6fc4·0x7228 특정 · 디스어셈블 · DIAG-NULL 계측 · 91파일 전수 · 임시 수정 빌드로 시계값 187 → 0",
   "limits": "working/ 0건은 15초 안에 링크된 클래스 범위만. 게스트의 k=상위·k+1=하위 워드 순서가 호스트 decode_wide(k=하위)와 다르다 — 호스트가 읽는 wide 필드가 있으면 따로 재야 한다.",
   "proposals": [
