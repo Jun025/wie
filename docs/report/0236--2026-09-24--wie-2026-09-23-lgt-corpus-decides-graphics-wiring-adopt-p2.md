@@ -121,4 +121,4 @@ load1 최대가 **40 이상이면 그 쌍은 무효** → 재측. 무효 **3쌍*
 게임 바이트 유입 0 · 경로 유입 0.
 
 
-<!-- corpus-name-inflow v1 subjects=3 tree=360f25a1a96435d7 B=3/3 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=4 tree=ebb6caa00ccf3ca7 B=3/3 P=0/0 S=0/0 -->
