@@ -1,0 +1,42 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-24",
+  "task": "wie-2026-09-22-lgt-object-reference-gate-adopt-p2",
+  "title": "LGT long/double 인스턴스 필드의 둘째 워드 구멍을 링크했다 — 레전드오브마스터의 «헤더 없는 참조»는 덮어쓴 Card.canvas 였다",
+  "summary": "게이트 raw 가 힙 주소가 아니라 0x2/0x3 이어서 해제(a)·미초기화(b) 후보가 모두 탈락했다. 쓰기 감시와 디스어셈블로, long 필드가 색인표 두 칸을 쓰는데 둘째 칸(import 표의 구멍)이 0 으로 남아 게스트가 하위 워드를 word 0(Card.canvas)에 쓴 것을 확정했다. 91타이틀의 구멍 36개가 전부 J/D 바로 뒤다.",
+  "changes": [
+    "wie-lgt/src/runtime/java/interface.rs — link_class_members 가 J/D 뒤 구멍에 word_index+1 을 쓴다 + 테스트",
+    "docs/report/0244"
+  ],
+  "verification": [
+    "레전드오브마스터 base ×2 warn 68/80 paints 2/2 → fix ×2 warn 0/0 paints 85/83",
+    "LGT 91타이틀 PASS 55 · FAIL 35 양쪽 동일 · 벽 변화 1(스파이더맨3 전진)",
+    "변이 M1(채우기 제거)·M2(모든 구멍 채우기) 둘 다 테스트 FAILED"
+  ],
+  "limits": [
+    "정적 필드 표의 구멍은 관측되지 않아 건드리지 않았다",
+    "wie 쪽 decode_wide 는 word n 을 하위로 읽지만 게스트는 상위를 먼저 쓴다 — 호스트가 AOT 클래스의 long 필드를 읽으면 반쪽이 뒤바뀐다(이 회차에서 재지 않음)",
+    "게이트(value.rs)는 그대로 둔다 — 이 원인 말고 다른 경로의 비포인터 값에 대한 방어다"
+  ],
+  "adoptedProposals": ["2026-09-22-lgt-object-reference-gate#p2"],
+  "proposals": [
+    {
+      "title": "LGT AOT 클래스의 long/double 필드 — 호스트 읽기·쓰기의 워드 순서",
+      "plainSummary": "게임은 64비트 값의 윗부분을 앞 칸에 저장하는데, wie 가 같은 필드를 읽을 때는 앞 칸을 아랫부분으로 읽습니다. 호스트가 게임의 long 필드를 만지면 값이 뒤바뀝니다.",
+      "userBenefit": "호스트(플랫폼 클래스)가 게임 객체의 시간·점수 같은 long 필드를 읽거나 쓸 때 틀린 값이 되는 잠재 결함을 막습니다.",
+      "why": "레전드오브마스터 0x91f30/0x91f34 는 currentTimeMillis 의 r1(상위)을 이름 붙은 칸에, r0(하위)을 다음 칸에 쓴다. #275 도 long[] 저장을 high first 로 확정했다. 반면 class_instance.rs get_field 는 address 를 low, address+4 를 high 로 decode_wide 한다.",
+      "tradeoff": "지금 호스트가 AOT 클래스의 long 필드를 읽는 경로가 실제로 있는지부터 재야 한다 — 없으면 순서만 맞추는 일이고, wie 쪽 Rust 클래스 필드와 AOT 필드가 같은 코드를 지나므로 한쪽만 뒤집으면 다른 쪽이 깨질 수 있다.",
+      "effort": "S",
+      "target": "wie-lgt/src/runtime/java/jvm_support/class_instance.rs"
+    },
+    {
+      "title": "스파이더맨3(LGT) — `java/io/DataInputStream vtable index 27` 미구현 벽",
+      "plainSummary": "필드 링크를 고치자 스파이더맨3 가 흑화면에서 한 걸음 더 가서, 데이터 읽기 클래스의 하드코딩 슬롯 27 에서 멈춥니다.",
+      "userBenefit": "이 타이틀이 흑화면을 벗어날 다음 한 걸음입니다.",
+      "why": "fix 바이너리에서 재현: tick error during boot · ticks 약 27만~33만 · Font 초기화 11회 뒤. base 는 같은 자리까지 못 가고 흑화면(max-ticks)이었다.",
+      "tradeoff": "vtable 슬롯 번호를 호출부 하나로 정하면 추정이 된다 — docs/lgt_abi.md 의 java/io 물리 슬롯 표와 두 번째 호출부 교차가 필요하다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}
