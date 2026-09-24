@@ -38,3 +38,9 @@ method 0x9  getJletFromPID (I)Lorg/kwis/msp/lcdui/Jlet;  getstatic activeJlet; a
 
 단위 테스트 `get_current_jlet_is_get_active_jlet`: 원본 ok · 등재 제거 시 `NoSuchMethodError` 로 FAILED.
 after 에서 게임은 `DataBase.openDataBase`·`RecordStore`·LWC 컴포넌트까지 가고 한 프레임도 그리지 않는다 — 다음 벽은 no-frame 계급이다(이 회차 범위 밖).
+
+### 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab`(모집단 stem 451 · 대상 3파일):
+**BOUNDED 7회/3쌍 · SUFFIX-ATTACHED 7회/3쌍 · PREFIX 0**. BOUNDED 는 전부 대상 타이틀 이름 `간호사타이쿤2` 자체(0238 이 월드장기체스를 적은 것과 같은 계급 — 이름이지 바이트가 아니다).
+SUFFIX-ATTACHED 7건은 손으로 갈랐다: 전부 stem `간호사타이쿤` 뒤에 `2` 가 붙은 같은 7곳 = «더 긴 다른 제목»이고 그 제목이 위 BOUNDED 다 — 새 이름 0.
