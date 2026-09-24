@@ -42,6 +42,7 @@ pub(crate) struct ArmCoreInner {
     last_thread_id: ThreadId,
     svc_handlers: BTreeMap<u32, Arc<Box<dyn RegisteredFunction>>>,
     next_stub_address: u32,
+    shared_stubs: BTreeMap<(u32, u32), u32>,
     profile: Option<ProfileState>,
 }
 
@@ -92,6 +93,7 @@ impl ArmCore {
             last_thread_id: 0,
             svc_handlers: BTreeMap::new(),
             next_stub_address: FUNCTIONS_BASE,
+            shared_stubs: BTreeMap::new(),
             profile,
         };
 
@@ -338,6 +340,24 @@ impl ArmCore {
             .insert(category, Arc::new(Box::new(RegisteredFunctionHolder::new(handler, context))));
 
         Ok(())
+    }
+
+    /// Like [`Self::make_svc_stub`], but hands back the same stub for the same `(category, id)`.
+    ///
+    /// A stub is a pure function of those two values, so callers that only need "something
+    /// that raises SVC `category` with `id`" can share one. The stub space holds 4,096 stubs in
+    /// total, and a caller that fills tables with placeholder stubs would otherwise spend one per
+    /// slot per table per rewrite.
+    pub fn make_shared_svc_stub(&mut self, category: u32, id: impl Into<u32>) -> Result<u32> {
+        let id = id.into();
+        if let Some(address) = self.inner.lock().shared_stubs.get(&(category, id)) {
+            return Ok(*address);
+        }
+
+        let address = self.make_svc_stub(category, id)?;
+        self.inner.lock().shared_stubs.insert((category, id), address);
+
+        Ok(address)
     }
 
     pub fn make_svc_stub(&mut self, category: u32, id: impl Into<u32>) -> Result<u32> {
