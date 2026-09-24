@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "date": "2026-09-24",
+  "task": "wie-2026-09-22-lgt-object-reference-gate-adopt-p1",
+  "title": "스파이더맨3 Card.canvas 시계값 — 원인은 Card 레이아웃이 아니라 wide 필드 둘째 슬롯 미링크",
+  "summary": "게스트는 long/double 인스턴스 필드를 필드 인덱스 표 슬롯 두 개(k, k+1)로 쓰는데, import 표의 k+1 항목은 (0,0)이라 link_class_members 가 건너뛰고 그 슬롯이 0 으로 남는다. 그래서 long 의 한쪽 워드가 인스턴스 word 0(Card 자손에서는 canvas)에 쓰인다. LGT 91파일 중 9타이틀 · 36슬롯. 링커 공통 규칙이라 티켓 §⒝ 에 따라 판정만 남기고 멈췄다.",
+  "changes": ["docs/report/0243--2026-09-24--wie-2026-09-22-lgt-object-reference-gate-adopt-p1.md", "docs/worklog/2026-09-24-lgt-wide-field-second-slot-unlinked.json"],
+  "verification": "워치포인트(임시)로 word 0 쓰기 지점 pc=0x6fc4·0x7228 특정 · 디스어셈블 · DIAG-NULL 계측 · 91파일 전수 · 임시 수정 빌드로 시계값 187 → 0",
+  "limits": "working/ 0건은 15초 안에 링크된 클래스 범위만. 게스트의 k=상위·k+1=하위 워드 순서가 호스트 decode_wide(k=하위)와 다르다 — 호스트가 읽는 wide 필드가 있으면 따로 재야 한다.",
+  "proposals": [
+    {
+      "title": "LGT 링커: long/double 필드의 둘째 워드 슬롯(k+1)을 채운다",
+      "plainSummary": "LGT 게임이 64비트 값을 저장할 때 절반이 엉뚱한 자리(객체의 첫 칸)에 써지고 있습니다. 링커가 그 절반의 자리를 비워 두기 때문입니다.",
+      "userBenefit": "스파이더맨3 의 현재 벽이 풀리고(실측: 다음 벽 DataInputStream vtable 27 로 이동), 같은 형태가 있는 LGT 9타이틀의 객체 첫 필드 오염이 사라진다.",
+      "why": "link_class_members(wie-lgt/src/runtime/java/interface.rs:570)가 import 항목 (0,0) 을 continue 로 건너뛰어 그 u16 슬롯이 0 으로 남는다. 36개 빈 슬롯 전건의 앞 항목이 J/D 다. 앞 슬롯+1 을 쓰는 임시 수정으로 스파이더맨3 의 시계값 참조 187 → 0 을 실측했다.",
+      "tradeoff": "링커 공통 함수라 LGT 전 타이틀이 움직인다 — 91파일 짝 회귀가 필요하다. 그리고 게스트가 k 에 상위 워드를 쓰므로, 호스트도 읽는 wide 필드가 있으면 decode_wide 순서와 맞는지 먼저 재야 한다.",
+      "effort": "S",
+      "target": "wie-lgt/src/runtime/java/interface.rs (link_class_members)"
+    }
+  ],
+  "adoptedProposals": ["2026-09-22-lgt-object-reference-gate#p1"],
+  "declinedProposals": []
+}
