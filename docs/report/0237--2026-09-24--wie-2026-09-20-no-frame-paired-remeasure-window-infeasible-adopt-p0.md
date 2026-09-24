@@ -23,3 +23,5 @@
 **사용자 영향**: 없음(코드 변경 0).
 
 **유입**(`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 3건 + SUFFIX-ATTACHED 1건. 전부 측정 대상 두 타이틀을 이름으로 적은 것이고, 티켓과 원 제안도 같은 이름을 적었다. SUFFIX 1건은 worklog userBenefit 의 조사 결합(«…처럼»)이다. 다른 제목이 아니다.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=09a649adca6c19a5 B=7/3 P=0/0 S=1/1 -->
