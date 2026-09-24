@@ -25,3 +25,6 @@
 **사용자 영향**: SD한국전쟁이 부팅해서 화면을 그린다. 다른 LGT 타이틀은 진입점 값이 같으므로 실행이 바뀌지 않는다.
 
 **유입**(`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 와 SUFFIX-ATTACHED 를 아래 표식에 함께 적었다. 전부 이 회차가 측정하거나 근거로 든 타이틀(SD한국전쟁 · 대조군 검은방2 · 와일드프론티어 · 짝 회귀 4건)을 이름으로 적은 것이다. SUFFIX 는 모두 조사가 붙은 언급(«…은/을/는/이»)이고 다른 제목이 아니다. `init.rs` 주석의 타이틀명은 main 에 이미 있던 주석을 이은 것이다.
+
+
+<!-- corpus-name-inflow v1 subjects=3 tree=4c4c986ba93362b9 B=14/9 P=0/0 S=6/4 -->
