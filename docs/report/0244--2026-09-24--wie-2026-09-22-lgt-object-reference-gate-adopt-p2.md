@@ -74,3 +74,10 @@ fix 는 warn 0 · Font 초기화 7→11 로 더 가서 **새 벽** `java/io/Data
 
 fmt · clippy `--all -D warnings` · wasm · beta clippy 전부 OK. `RUST_MIN_STACK=4194304 cargo test --all` **431 passed / 0 failed**.
 `cargo clippy --workspace --all-targets` 경고는 base 16 ↔ fix 16 이다. 러너 블록은 전건 PASS(keydraw ktf/lgt paints 55 · rc=0).
+
+### 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab`(대상 3파일)를 이 절을 쓰기 전에 돌렸다. 결과: **BOUNDED 21회/14쌍 · SUFFIX-ATTACHED 3회/3쌍 · PREFIX 4회/2쌍**.
+BOUNDED 는 이 회차가 다룬 타이틀 이름이다. `interface.rs` 의 놈3·서든어택포켓·슈퍼액션히어로·턴·훼밀리마트타이쿤은 **기존 주석**이다(도구는 바뀐 파일 전체를 센다). 이름이지 바이트가 아니다.
+SUFFIX 3건은 손으로 갈랐다: `레전드오브마스터의` 2건은 조사 붙은 진짜 언급이고, `서든어택`+`포켓` 1건은 더 긴 다른 제목(기존 주석)이다.
+이 절 자신의 언급으로 수가 늘어난 값은 아래 표식이 갖는다.
