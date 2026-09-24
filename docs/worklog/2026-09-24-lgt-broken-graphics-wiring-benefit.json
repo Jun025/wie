@@ -2,15 +2,17 @@
   "schema": "wie-worklog/1",
   "date": "2026-09-24",
   "task": "wie-2026-09-23-lgt-corpus-decides-graphics-wiring-adopt-p2",
-  "title": "broken/lgt 도 ⒜/⒝ 차이 0 — 조각 D 의 benefit 절반은 «0»",
-  "summary": "game_lab/broken/lgt 46건(서로 다른 37건 + sha256 동일 사본 9건)을 upstream LGT 전용 graphics 배선(⒜)과 공용 배선(⒝)으로 짝지어 돌렸다. 8 PASS · 28 FAIL 동일, 뒤집힘 1건은 15초 데드라인 잡음(--timeout 40 에서 양쪽 2/2 PASS). ⒜ 가 새로 여는 타이틀 0 ⇒ §D 권고 ⒝ 유지.",
+  "title": "broken/lgt ⒜/⒝ — 조각 D 의 benefit 절반은 «1»(40초 재측) · §D 결정 ⒝ 유지",
+  "summary": "game_lab/broken/lgt 46건(서로 다른 37건 + sha256 동일 사본 9건)을 upstream LGT 전용 graphics 배선(⒜)과 공용 배선(⒝)으로 짝지어 돌렸다. 15초 패스는 차이 0 이었으나 데드라인이 판정축을 가렸다: «no frame»·«blank» FAIL/FAIL 9건을 --timeout 40 짝지은 2쌍(load1<40)으로 재측하자 1건이 ⒜ PASS ↔ ⒝ 단색(흰 화면)으로 뒤집혔다(양쪽 PASS 1 · 양쪽 단색 2 · 판정 불가 5). 저울 = benefit 1 ↔ ⒜ 의 keydraw_lgt(Scenario F) 파손 ⇒ ⒝ 유지, 근거는 «⒝ 의 텍스트/그리기 결손 하나를 공용 쪽에서 메우는 편이 좁다».",
   "changes": [
-    "docs/report/0236: 측정 방법 · 37×2 결과 · 뒤집힘 재측 · 한계",
-    "docs/upstream-realign-p3-slices.md §D: benefit 절반 측정 배너"
+    "docs/report/0236: 측정 방법 · 37×2 결과 · 15초 뒤집힘 재측 · 40초 짝지은 재측 9건 · §D 저울 · 한계",
+    "docs/upstream-realign-p3-slices.md §D: benefit 절반 측정 배너(benefit 1 · 결정 ⒝ 유지 · 근거 교체)"
   ],
-  "verification": "짝지은 패스 37건 74회(15m01s · load1 26→44) · 뒤집힘 1건 재측 --timeout 15 3+3 / --timeout 40 2+2 · 개악 대조쌍 keydraw_lgt ⒝ PASS ↔ ⒜ FAIL · 소스 복원 status --porcelain 빈 출력.",
-  "limits": "판정 축은 boot+render 뿐. FAIL 28 중 19건은 부팅 중 오류라 graphics SVC 에 닿기 전일 수 있다(프로브 미측정).",
-  "adoptedProposals": ["2026-09-23-lgt-corpus-decides-graphics-wiring#p2"],
+  "verification": "15초 짝지은 패스 37건 74회 · 뒤집힘 1건 재측 · (-fix) 9건 × --timeout 40 짝지은 2쌍(유효 18 + 무효 재측 3, 쌍별 최대 load1 14~38) · 뒤집힘 --screenshot 양쪽 · 개악 대조쌍 keydraw_lgt ⒝ PASS ↔ ⒜ FAIL · 소스 복원 status --porcelain 빈 출력.",
+  "limits": "판정 축은 boot+render 뿐. 15초 데드라인은 판정축을 가린다 — 40초로도 5건은 판정 불가. FAIL 28 중 19건은 부팅 중 오류라 graphics SVC 에 닿기 전일 수 있다(프로브 미측정). PASS 절대 수는 부하 조건부.",
+  "adoptedProposals": [
+    "2026-09-23-lgt-corpus-decides-graphics-wiring#p2"
+  ],
   "declinedProposals": [],
   "proposals": [
     {
@@ -20,6 +22,15 @@
       "why": "docs/report/0236: 부팅 중 오류 19건(⒝) · 0230 이 main 의 LGT 부팅 실패 근인을 #161 이 떨군 stdlib/context 행으로 규명했다.",
       "tradeoff": "소실 행 복원 회차들이 먼저 착지해야 의미가 있다. 한 패스 약 15분 × 짝지은 두 배선이고, 새로 닿은 타이틀에만 프로브(get_screen_framebuffer panic 1줄)를 박으면 비용이 준다.",
       "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "공용 graphics(⒝)가 LGT 이용안내 화면에서 글자를 못 그리는 원인 찾기",
+      "plainSummary": "broken/lgt 한 타이틀이 upstream LGT 전용 그래픽(⒜)에서는 안내문 글자를 그리는데, 지금 쓰는 공용 그래픽(⒝)에서는 흰 화면만 나온다. 공용 쪽에서 무엇이 빠지는지(글꼴·텍스트 SVC 로 추정, 미확인)를 찾아 메우면 ⒜ 로 통째로 바꾸지 않고도 그 타이틀을 연다.",
+      "userBenefit": "그 타이틀이 첫 화면을 보여 주게 된다. 같은 «아무키나 누르세요» 계급의 다른 LGT 타이틀도 함께 열릴 수 있다. ⒜ 전면 교체가 깨는 keydraw_lgt(required check)는 건드리지 않는다.",
+      "why": "docs/report/0236 §2-2: 40초 짝지은 2/2(게이트② 4/4) — ⒜ PASS distinct_colors 2 ↔ ⒝ 단색 distinct_colors 1, 두 배선 모두 수백 번 페인트한 뒤의 판정.",
+      "tradeoff": "원인이 SVC 하나인지 여러 개인지 모른다. 먼저 두 배선의 27팔 중 이 화면이 부르는 SVC 를 찍는 1회 프로브가 필요하다. 공용 쪽 수정은 working/lgt 54건 회귀(0222 방법)를 다시 재야 한다.",
+      "effort": "M",
       "target": "wie"
     }
   ]
