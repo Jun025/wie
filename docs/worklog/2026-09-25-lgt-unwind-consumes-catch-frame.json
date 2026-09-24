@@ -1,0 +1,50 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-25",
+  "task": "wie-2026-09-23-bytearrayinputstream-skip-slot-adopt-p0",
+  "title": "배틀몬스터 마을 이후 `Invalid memory access; address: 0` — 원인은 unwind 가 catch 프레임을 소비하지 않는 런타임 결함 · 같은 스레드의 StringBuffer 10/13/22 행",
+  "summary": "address 0 은 게스트가 이미 반환한 함수의 예외 프레임으로 unwind 해, 남의 데이터로 덮인 저장 레지스터를 ldm 으로 복원한 결과(fp = sp = lr = pc = 0)다. 배틀몬스터의 컴파일된 catch 블록은 자기 프레임을 pop 하지 않는다(51/51) ⇒ unwind 가 그 프레임을 체인에서 떼어야 한다. 같은 스레드(a.run)가 번갈아 부딪히던 StringBuffer 누락 칸 10·13·22 는 호출부 실측으로 행을 채웠다.",
+  "changes": [
+    "wie-lgt/src/runtime/java/exception.rs — unwind 가 들어가는 프레임을 체인에서 떼고 해제 · 시험 1 신설(rethrow 가 바깥 프레임으로) · 기존 시험 1 갱신",
+    "wie-lgt/src/runtime/java/jvm_support/method.rs — 기존 DB 예외 시험: catch 뒤 pop 은 이제 빈 체인(Err)",
+    "wie-lgt/data/lgt_java_abi.toml — java/lang/StringBuffer length()I = 10 · setLength(I)V = 13 · append(C) = 22 (+ 호출부 근거 주석)",
+    "wie-lgt/src/runtime/java/jvm_support.rs — abi_rows_cover_the_indexes_titles_actually_dispatch_on 에 3행",
+    "docs/report/0254"
+  ],
+  "verification": [
+    "링 프로브(커밋 안 함): 마지막 unwind frame_sp=0x400fff04 < 그 뒤 같은 구간을 다른 함수들이 덮어씀 ⇒ ldm 복원값 r4=0x1400df4 r5=0x48845aa0 r6=0x400fff40 r7=0x2a fp=sp=lr=0 이 폴트 레지스터와 전건 일치",
+    "binary.mod 전수: PushExceptionFrame 57곳 중 파싱된 catch 블록 51/51 에 PopExceptionFrame 없음 · 함수 0x7ac84 는 push 1 · pop 0",
+    "변이: unwind 의 두 줄을 되돌리면 시험 3건 red · 원상 green",
+    "짝지은 실행(같은 키 경로·같은 로그 설정): before 1/2 가 address 0 · after 0/2 — 대신 after 1/2 가 그 순간 ArithmeticException: / by zero 를 정직하게 드러냄",
+    "최종 트리 2회: 미처리 예외 0 · 누락 vtable 칸 0 · paints 409/411(이전 173~184) · 숲 장면 대화창까지",
+    "4게이트 + beta clippy green · cargo test --all 434 passed · 러너 keydraw 는 릴리스 교대 main 6/6 · 수정본 6/6"
+  ],
+  "limits": [
+    "티켓 명령 그대로(기본 27키 · --action-secs 4)는 loadavg 110~200 에서 마을에 닿지 못했다 — 경로 재현은 임시(커밋 안 함) 키 스크립트로 했다",
+    "address 0 은 타이밍 의존이다 — 같은 바이너리·같은 명령의 짝(b1/b2)에서 1/2. 한 스레드가 어느 경로(StringBuffer 루프 / 마을)로 먼저 가느냐에 따라 앞선 벽이 달라진다",
+    "#287(스레드별 예외 체인)과 같은 파일·같은 함수를 고친다 — 둘은 서로 다른 결함이고 둘 다 필요하다. 늦게 착지하는 쪽이 상대 변경을 옮겨 실어야 한다"
+  ],
+  "adoptedProposals": [
+    "2026-09-23-bytearrayinputstream-skip-slot#p0"
+  ],
+  "proposals": [
+    {
+      "title": "배틀몬스터 마을 직후 `ArithmeticException: / by zero` — 0 인 나눗수가 어디서 오는가",
+      "plainSummary": "죽은 예외 처리 구간으로 튀던 문제를 고치자, 그 자리에서 원래 나던 «0으로 나누기» 오류가 드러났습니다. 그 0 이 에뮬레이터가 돌려준 잘못된 값인지 찾는 일입니다.",
+      "userBenefit": "배틀몬스터가 마을에서 멈추지 않고 게임 화면에서 입력을 받는지 판정할 수 있게 된다 — 운영자 목표(플레이 가능)의 바로 다음 벽이다.",
+      "why": "짝지은 실행에서 수정본 1/2 가 a.run 스레드에서 java.lang.ArithmeticException: / by zero 로 끝났다. 프로브 실행들에서 게임은 이 직전에 import (0x64, 0x25) = RaiseArithmeticException 을 처음 해석했다(스텁 0x71008fe0). 실기에서 게임이 0 으로 나누며 멈추지는 않았을 것이므로 나눗수는 에뮬레이션 값일 가능성이 크다 — 후보는 스텁으로 돌아가는 Font::getDefaultFont(메트릭 0) 등.",
+      "tradeoff": "재현에 7분 · 부하에 따라 경로가 갈린다(수정본 4회 중 1회 — 최종 트리 2회에서는 안 나왔다). 호출부 LR 을 잡으려면 RaiseArithmeticException 핸들러에 임시 계측이 필요하다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "wie_validate 에 키 스크립트 지정(--keys) — 특정 화면까지의 경로를 부하와 무관하게 재현",
+      "plainSummary": "검증 도구가 정해진 27개 키만 누를 수 있어, 서버가 바쁘면 게임이 다른 메뉴로 빠져 원하는 화면에 닿지 못합니다. 누를 키 순서를 지정할 수 있게 하는 일입니다.",
+      "userBenefit": "«마을까지 가서 멈추는가» 같은 판정을 매번 같은 경로로 잴 수 있다.",
+      "why": "이 회차에서 티켓 명령 그대로는 loadavg 110~200 에서 마을에 닿지 못했다(도움말 화면으로 빠짐). 임시 패치(환경변수 키 목록 + 120초 상한 해제)로만 경로를 고정할 수 있었다. 형제 #283 의 --inject-keys 는 기본 스크립트의 앞 N개만 고른다.",
+      "tradeoff": "검증 도구의 표면이 한 칸 늘어난다. 기본 동작은 바꾸지 않는다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}
