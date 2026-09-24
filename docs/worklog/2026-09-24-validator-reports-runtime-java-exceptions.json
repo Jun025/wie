@@ -1,0 +1,46 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-24",
+  "task": "wie-2026-09-22-aot-java-swallowed-io-stream-exception-adopt-p1",
+  "title": "wie_validate JSON 에 런타임이 던진 Java 예외의 계수·첫 문면(java_exceptions)을 싣는다 — 보고 축, 게이트 0",
+  "summary": "jvm 0.1.1 의 Jvm::exception 이 찍는 tracing 이벤트(target jvm::jvm · INFO)를 wie 쪽 레이어가 센다 — upstream 무접촉. RUST_LOG 없이도 세지고 stderr 는 불변. 게스트 자체 athrow 는 보지 못한다.",
+  "changes": [
+    "wie_cli/src/bin/wie_validate.rs — JavaExceptionTally · 레이어 · main 구독 재구성 · 테스트 4",
+    "wie_cli/Cargo.toml — dev-dependency jvm(테스트가 실제 Jvm::exception 을 호출)",
+    "docs/report/0242"
+  ],
+  "verification": [
+    "훼밀리마트타이쿤 FAIL · count 1(손 계수 1) ↔ 체스마스터 PASS · count 0",
+    "draw_j2me/text_j2me PASS · count 2 — 정상 픽스처도 예외를 던지고 잡는다",
+    "양방향 변이: on_event 절단 red · 필터 WARN red · 원상 green",
+    "runner block 7줄 before/after result·rc 동일 · cargo test --all 428 passed · clippy --all-targets 16=16"
+  ],
+  "limits": [
+    "게스트가 바이트코드로 직접 만든 예외(new+athrow)는 Jvm::exception 을 거치지 않아 세지 않는다",
+    "upstream 이 로그 문면·레벨을 바꾸면 테스트가 red 가 된다(의도) — 그때는 접두어 상수를 갱신한다"
+  ],
+  "proposals": [
+    {
+      "title": "서든어택포켓(lgt) — `no frame rendered` 인데 런타임 예외 0건: 무엇이 막는지 다시 잰다",
+      "plainSummary": "이 게임은 예전에는 오류를 삼켜서 멈췄지만, 지금은 오류 없이 화면을 그리지 않습니다. 어디서 멈추는지 새로 찾는 일입니다.",
+      "userBenefit": "서든어택포켓의 부팅을 막는 실제 벽을 다음 회차가 바로 겨냥할 수 있습니다.",
+      "why": "2026-09-22 회차에는 DataOutputStream 19 에서 예외를 삼켰는데, 이 회차 java_exceptions 는 count 0 · FAIL no frame rendered · stop deadline 이다. 벽이 예외 계급에서 다른 계급(대기·게스트 athrow 등)으로 옮겨 갔다.",
+      "tradeoff": "게스트 자체 athrow 는 이 필드로 안 보인다 — 먼저 그 가능성을 RUST_LOG trace 로 배제해야 한다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "훼밀리마트타이쿤(lgt) — `java/lang/StringBuffer vtable index 22` 미구현 벽",
+      "plainSummary": "훼밀리마트타이쿤이 이제 StringBuffer 의 한 슬롯이 비어 있어서 멈춥니다. 그 슬롯이 어떤 메서드인지 찾아 채우는 일입니다.",
+      "userBenefit": "훼밀리마트타이쿤이 화면을 그리는 데 한 걸음 가까워집니다.",
+      "why": "java_exceptions.first 가 `net/wie/WieError: Unimplemented: java/lang/StringBuffer vtable index 22` 1건이고 결과는 no frame rendered 다 — 2026-09-22 회차가 적은 GregorianCalendar 29 다음의 벽이다.",
+      "tradeoff": "슬롯 번호를 호출부 1곳만으로 정하면 추정이 된다 — docs/lgt_abi.md 가 요구하는 두 번째 호출부 교차가 필요하다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": [
+    "2026-09-22-aot-java-swallowed-io-stream-exception#p1"
+  ],
+  "declinedProposals": []
+}
