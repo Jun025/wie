@@ -1,0 +1,13 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-25",
+  "task": "wie-2026-09-24-lgt-broken-sha-dup-pairs-moved-adopt-p0",
+  "title": "game_lab/broken/ktf sha256 중복 8쌍 — 태그 붙은 쪽을 game_lab/_dup/ 로 이동",
+  "summary": "재측 8쌍 그대로. 태그 붙은 이름 8개를 game_lab/_dup/broken/ktf/ 로 옮겼다(삭제 0). broken 178→170 파일 = 고유 170. 모호한 2쌍은 참조 수로 골랐고 그 결과가 태그 규칙과 같았다.",
+  "changes": ["docs/report/0253--2026-09-25--wie-2026-09-24-lgt-broken-sha-dup-pairs-moved-adopt-p0.md", "로컬(git-ignored): game_lab/_dup/broken/ktf/ 8파일 + README.md 추기, census-map.tsv 재생성"],
+  "verification": ["sha256 전수 전/후 (중복 그룹 8→0)", "recensus --dry-run 178→170", "census-map 179→171행", "NFC 정규화 참조 재측: 경로 인용 깨짐 0"],
+  "limits": ["game_lab/ 은 CI 가 볼 수 없다 — 이 처분은 로컬에만 존재한다"],
+  "proposals": [],
+  "adoptedProposals": ["2026-09-24-lgt-broken-sha-dup-pairs-moved#p0"],
+  "declinedProposals": []
+}
