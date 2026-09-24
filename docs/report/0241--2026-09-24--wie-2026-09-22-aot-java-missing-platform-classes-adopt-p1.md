@@ -45,4 +45,4 @@ after 에서 게임은 `DataBase.openDataBase`·`RecordStore`·LWC 컴포넌트�
 **BOUNDED 9회/4쌍 · SUFFIX-ATTACHED 9회/4쌍 · PREFIX 0**(이 절 자신의 언급 2회 포함). BOUNDED 는 전부 대상 타이틀 이름 `간호사타이쿤2` 자체(0238 이 월드장기체스를 적은 것과 같은 계급 — 이름이지 바이트가 아니다).
 SUFFIX-ATTACHED 9건은 손으로 갈랐다: 전부 stem `간호사타이쿤` 뒤에 `2` 가 붙은 같은 9곳 = «더 긴 다른 제목»이고 그 제목이 위 BOUNDED 다 — 새 이름 0.
 
-<!-- corpus-name-inflow v1 subjects=3 tree=151173856796a172 B=9/4 P=0/0 S=9/4 -->
+<!-- corpus-name-inflow v1 subjects=3 tree=d1fc01a8b396b631 B=9/4 P=0/0 S=9/4 -->
