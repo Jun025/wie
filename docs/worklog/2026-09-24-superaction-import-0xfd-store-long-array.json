@@ -1,0 +1,27 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-24",
+  "task": "wie-2026-09-22-aot-java-missing-platform-classes-adopt-p2",
+  "title": "슈퍼액션히어로 균일색 = 게임 스레드가 import 0xfd 에서 죽어 그리기 호출 0 — 0xfd 를 long[] 원소 저장으로 등재",
+  "summary": "놈3 대비 그리기 호출 계수가 0(drawImage·fillRect·drawLine·setColor 전부)이라 화면 층이 아니다. 게임 Thread.run() 이 첫 동작으로 import (0x64, 0xfd) 에서 죽는다. binary.mod 호출부 6곳 디스어셈블로 0xfd = (array, index, high, low) long[] 원소 저장으로 판정해 등재했다. 벽은 DataInputStream vtable index 32 로 옮겨 갔고 화면은 아직 균일색이다.",
+  "changes": [
+    "wie-lgt/src/runtime/java/interface.rs: 0xfd → JavaSystemSvcId::StoreLongArray · java_store_long_array(null → NPE, 범위 → AIOOBE) · 단위 테스트",
+    "wie-lgt/src/runtime/svc_ids.rs: StoreLongArray = 35 · try_from 행 · 전 id 왕복 테스트",
+    "wie-lgt/src/runtime/java/jvm_support.rs: 테스트 도우미 init_jvm 을 pub(crate) 로(테스트 전용)"
+  ],
+  "verification": "before/after 3회씩, 변이 3종 양방향, 4게이트 + beta, runner 블록, broken/lgt 37파일 전후 대조 — docs/report/0240",
+  "limits": "화면은 여전히 distinct_colors 1. after 는 tick 상한에 먼저 닿아 입력 7~11/27. 원소 타입(long[])은 저장되는 값으로 판정했고 클래스 메타데이터로 확인하지 않았다.",
+  "proposals": [
+    {
+      "title": "슈퍼액션히어로 — 다음 벽 DataInputStream vtable index 32 를 풀어라",
+      "plainSummary": "이 게임의 멈춤 지점이 하나 뒤로 옮겨 갔습니다. 이제 데이터 파일을 읽는 함수 하나가 없어서 멈춥니다.",
+      "userBenefit": "이 벽을 넘으면 게임 스레드가 그리기 루프까지 갈 수 있고, LGT AOT-Java 렌더 타이틀이 하나 늘 수 있습니다.",
+      "why": "0xfd 를 닫은 뒤 게임 스레드가 3/3 `Unimplemented: java/io/DataInputStream vtable index 32` 로 죽는다(ByteArrayInputStream→DataInputStream 생성 직후). 그리기 호출은 여전히 0이다.",
+      "tradeoff": "index 32 가 어떤 메서드인지 이 회차는 재지 않았다. LGT vtable ABI 표(0220 의 index 25 와 같은 축)를 넓히는 일이라 다른 타이틀의 vtable 에도 닿는다. 그 뒤에도 벽이 더 있을 수 있다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": ["2026-09-22-aot-java-missing-platform-classes#p2"],
+  "declinedProposals": []
+}

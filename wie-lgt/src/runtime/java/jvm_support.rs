@@ -279,7 +279,7 @@ impl LgtJvmSupport {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use alloc::{boxed::Box, string::String as RustString, sync::Arc, vec, vec::Vec};
     use core::{
         mem::{offset_of, size_of},
@@ -339,7 +339,7 @@ mod tests {
         Ok(())
     }
 
-    async fn init_jvm(system: &System) -> Result<(Jvm, ArmCore, LgtJvmImplementation)> {
+    pub(crate) async fn init_jvm(system: &System) -> Result<(Jvm, ArmCore, LgtJvmImplementation)> {
         let mut core = ArmCore::new(false, None)?;
         Allocator::init(&mut core)?;
 

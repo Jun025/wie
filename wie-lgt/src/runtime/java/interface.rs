@@ -57,6 +57,7 @@ pub fn get_java_interface_method(core: &mut ArmCore, function_index: u32) -> Res
         0xe1 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::GetStringClass)?,
         0xe2 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::GetStringArrayClass)?,
         0xfa => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::StoreReferenceArrayUnchecked)?,
+        0xfd => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::StoreLongArray)?,
         _ => return Err(WieError::FatalError(format!("Unknown lgt java import: {function_index:#x}"))),
     })
 }
@@ -101,6 +102,7 @@ async fn handle_java_system_svc(core: &mut ArmCore, (jvm, ptr_jar_path): &mut (J
             JavaSystemSvcId::StoreReferenceArrayUnchecked => EmulatedFunction::call(&java_store_reference_array_unchecked, core, &mut ())
                 .await?
                 .write(core, lr),
+            JavaSystemSvcId::StoreLongArray => EmulatedFunction::call(&java_store_long_array, core, jvm).await?.write(core, lr),
             JavaSystemSvcId::LinkPublicClass => EmulatedFunction::call(&java_link_public_class, core, jvm).await?.write(core, lr),
             JavaSystemSvcId::IsClassAssignable => java_is_class_assignable(core, jvm, core.read_param(0)?, core.read_param(1)?, core.read_param(2)?)
                 .await?
@@ -283,6 +285,26 @@ async fn java_store_reference_array(core: &mut ArmCore, jvm: &mut Jvm, ptr_array
         return Err(WieError::JavaException(LgtJvmSupport::class_instance_raw(&*exception)));
     }
     jvm.store_array(&mut array, index as usize, [jvm::JavaValue::Object(value)])
+        .await
+        .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))
+}
+
+// `lastore`. Nothing documents import 0xfd; this is read off the one title that imports it
+// (슈퍼액션히어로, LGT, 6 call sites). Every site passes a static array field in r0 — long[] by what
+// is stored into it (a sign-extended int, the constant -1L, a 64-bit native return value; the
+// element type is not read from class metadata) — an index in r1 (0, 1, or a loop counter) and the
+// value in r2:r3, HIGH word first: one site builds the value as
+// `r2 = x >> 31; r3 = x` from an int, so r2 can only be the sign word. That is the reverse of the
+// low-first order `decode_method_arguments` uses for Java methods, so do not route this through it.
+// No site null- or bounds-checks the array before calling, while the same code checks a byte[]
+// inline right after, so the checks belong here.
+async fn java_store_long_array(core: &mut ArmCore, jvm: &mut Jvm, ptr_array: u32, index: u32, high: u32, low: u32) -> Result<()> {
+    if ptr_array == 0 {
+        return java_raise_null_pointer_exception(core, jvm).await;
+    }
+    let mut array = LgtJvmSupport::class_instance_from_raw(core, ptr_array)?;
+    let value = (((high as u64) << 32) | low as u64) as i64;
+    jvm.store_array(&mut array, index as usize, [value])
         .await
         .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))
 }
@@ -768,7 +790,7 @@ async fn java_destroy_runtime_context(_core: &mut ArmCore, _: &mut (), runtime_c
 
 #[cfg(test)]
 mod tests {
-    use alloc::{boxed::Box, sync::Arc, vec::Vec};
+    use alloc::{boxed::Box, sync::Arc, vec, vec::Vec};
     use core::{
         mem::size_of,
         sync::atomic::{AtomicBool, Ordering},
@@ -781,7 +803,50 @@ mod tests {
     use wie_core_arm::{Allocator, ArmCore};
     use wie_util::{ByteWrite, Result, read_generic, write_generic, write_null_terminated_string_bytes};
 
-    use super::{LgtJvmSupport, java_link_imported_classes, read_member_name_and_descriptor};
+    use wie_util::WieError;
+
+    use super::{LgtJvmSupport, java_link_imported_classes, java_store_long_array, read_member_name_and_descriptor};
+    use crate::runtime::java::jvm_support::tests::init_jvm;
+
+    #[test]
+    fn store_long_array_takes_high_word_first_and_checks_its_array() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (mut jvm, mut core, _) = init_jvm(&system_clone).await?;
+            let longs = jvm.instantiate_array("J", 3).await.unwrap();
+            let ptr_longs = LgtJvmSupport::class_instance_raw(&*longs);
+
+            // r2 = high, r3 = low: the halves differ so a swapped order stores a different value.
+            java_store_long_array(&mut core, &mut jvm, ptr_longs, 1, 0x1234_5678, 0x9abc_def0).await?;
+            assert_eq!(jvm.load_array::<i64>(&longs, 0, 3).await.unwrap(), vec![0, 0x1234_5678_9abc_def0, 0]);
+
+            // The sign-extension shape the title actually emits: (long)-2 as (x >> 31, x).
+            java_store_long_array(&mut core, &mut jvm, ptr_longs, 2, u32::MAX, (-2i32) as u32).await?;
+            assert_eq!(jvm.load_array::<i64>(&longs, 2, 1).await.unwrap(), vec![-2]);
+
+            for (ptr_array, index) in [(ptr_longs, 3), (ptr_longs, u32::MAX), (0, 0)] {
+                let result = java_store_long_array(&mut core, &mut jvm, ptr_array, index, 0, 1).await;
+                assert!(
+                    matches!(result, Err(WieError::JavaException(_))),
+                    "{ptr_array:#x}[{index}] must throw into the guest"
+                );
+            }
+            assert_eq!(jvm.load_array::<i64>(&longs, 0, 3).await.unwrap(), vec![0, 0x1234_5678_9abc_def0, -2]);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
 
     #[test]
     fn empty_import_slot_reads_as_none() -> Result<()> {

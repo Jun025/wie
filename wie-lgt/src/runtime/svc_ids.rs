@@ -61,6 +61,7 @@ pub enum JavaSystemSvcId {
     GetInterfaceDispatchTable = 32,
     MonitorEnter = 33,
     MonitorExit = 34,
+    StoreLongArray = 35,
 }
 
 impl TryFrom<SvcId> for JavaSystemSvcId {
@@ -103,6 +104,7 @@ impl TryFrom<SvcId> for JavaSystemSvcId {
             32 => Self::GetInterfaceDispatchTable,
             33 => Self::MonitorEnter,
             34 => Self::MonitorExit,
+            35 => Self::StoreLongArray,
             _ => {
                 return Err(wie_util::WieError::FatalError(alloc::format!(
                     "Unknown LGT Java system SVC id {}",
@@ -376,7 +378,21 @@ impl From<StdlibSvcId> for u32 {
 mod tests {
     use wie_core_arm::SvcId;
 
-    use super::WIPICSvcId;
+    use super::{JavaSystemSvcId, WIPICSvcId};
+
+    /// The Java-system ids are dense, and the `try_from` table is written by hand next to the enum,
+    /// so adding a variant without a table row compiles and only fails when a guest reaches it:
+    /// `StoreLongArray` (import 0xfd) did exactly that, and its handler's own unit test stayed green
+    /// because it calls the handler directly. Every declared id must come back as itself.
+    #[test]
+    fn java_system_svc_ids_round_trip_and_table_stays_fail_closed() {
+        let last = JavaSystemSvcId::StoreLongArray as u32;
+        for id in 0..=last {
+            let variant = JavaSystemSvcId::try_from(SvcId(id)).unwrap_or_else(|_| panic!("Java system SVC id {id} has no try_from row"));
+            assert_eq!(u32::from(variant), id);
+        }
+        assert!(JavaSystemSvcId::try_from(SvcId(last + 1)).is_err());
+    }
 
     /// SVC `0x581` resolves, and an id that is genuinely unmapped still errors.
     ///
