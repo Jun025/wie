@@ -1,0 +1,13 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-24",
+  "task": "wie-2026-09-24-lgt-abi-derived-rows-call-site-verdict-adopt-p0",
+  "title": "java/lang/String 27 = substring(I) 행 — 일지매영웅전기 FAIL(paints 0) → PASS · Runtime 12 · Thread 13 은 미확정 기록만",
+  "summary": "현 main 에서 일지매영웅전기 --inject 가 `java/lang/String vtable index 27` 에서 멈추는 것을 확인했다. 임시 계측으로 호출부를 직접 디스어셈블: split 루프가 `s = s.<27>(i + 1)` 로 int 1개를 넘기고, 결과를 루프 문자열 슬롯에 저장해 루프 머리에서 다음 String 디스패치(21)의 수신자로 쓴다 ⇒ 객체 반환 · 15..28 run 에서 그 모양은 substring(I) 뿐. 행 추가 후 FAIL/paints 0 → PASS(paints 43·2 · last_frame_content true), 행 제거 변이로 index 27 벽 재현. Runtime 12 · Thread 13 옆에 재측정 트리거 주석 1줄씩(ABI 값 무변경).",
+  "adoptedProposals": [
+    "2026-09-24-lgt-abi-derived-rows-call-site-verdict#p0",
+    "2026-09-24-baos-tobytearray-and-string-indexof-slots#p1",
+    "2026-09-24-lgt-abi-derived-rows-call-site-verdict#p1"
+  ],
+  "proposals": []
+}
