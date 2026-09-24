@@ -114,9 +114,9 @@ load1 최대가 **40 이상이면 그 쌍은 무효** → 재측. 무효 **3쌍*
 ## 게임 파일명 유입 — 도구를 «실행해서» 적는다
 
 `node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab`(코퍼스는 이 워크트리 밖이다):
-★**BOUNDED 2회 / 2쌍** · PREFIX-EMBEDDED 0 · ★**SUFFIX-ATTACHED 0**.
-새로 들어온 이름은 **1개** — 뒤집힌 타이틀(결과가 곧 그 타이틀이라 이름 없이 적으면 다음 회차가 다시 재야 한다).
+★**BOUNDED 3회 / 3쌍** · PREFIX-EMBEDDED 0 · ★**SUFFIX-ATTACHED 0**(`-fix` 커밋 뒤 재실행).
+새로 들어온 이름은 **2개** — 15초 뒤집힘 타이틀(§2-1)과 40초 뒤집힘 타이틀(§2-2). 결과가 곧 그 타이틀이라 이름 없이 적으면
+다음 회차가 다시 재야 한다. §2-2 의 나머지 8건은 이름 없이 수로만 적었다.
 나머지 1쌍은 §D 문서가 **이미 담고 있던** 이름이다(도구는 수정된 파일 전체를 읽는다). 모집단 37건의 목록은 repo 밖 회신에만 적었다.
 게임 바이트 유입 0 · 경로 유입 0.
 
-<!-- corpus-name-inflow v1 subjects=3 tree=1188871ffb719deb B=2/2 P=0/0 S=0/0 -->
