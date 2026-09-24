@@ -29,3 +29,5 @@
 
 **게임 파일명 유입**(`node scripts/corpus-name-inflow.mjs --corpus <game_lab>` 실행값): BOUNDED **13건** · SUFFIX-ATTACHED **3쌍(7회)** — 손으로 가른 결과 3쌍 모두 «조사가 붙은 진짜 언급»이다(`배틀몬스터가`·`배틀몬스터 …`는 이 회차 대상 타이틀, `서든어택포켓`은 이 TOML 에 이미 있던 기존 행 주석). «더 긴 다른 제목»은 0.
 
+
+<!-- corpus-name-inflow v1 subjects=3 tree=6708ab49ea2c8aee B=37/14 P=0/0 S=9/4 -->
