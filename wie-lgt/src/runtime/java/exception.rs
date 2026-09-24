@@ -78,8 +78,15 @@ pub fn unwind(core: &mut ArmCore, ptr_exception: u32) -> Result<Option<u32>> {
 
     let ptr_frame = support_context.ptr_current_exception_frame;
     let frame: [u32; FRAME_WORDS as usize] = read_generic(core, ptr_frame)?;
+    // Entering a catch consumes its frame: compiled catch blocks never pop their own (51 of 51
+    // in 배틀몬스터 — they return or rethrow straight from the pending-exception test). Left on
+    // the chain, a rethrow lands on the same frame again, and once the function returns the
+    // frame outlives its stack: the next unrelated throw resumes into a dead frame whose saved
+    // registers are other calls' data (fp = sp = pc = 0).
+    support_context.ptr_current_exception_frame = frame[0];
     support_context.ptr_pending_exception = ptr_exception;
     write_generic(core, SUPPORT_CONTEXT_BASE, support_context)?;
+    Allocator::free(core, ptr_frame, FRAME_WORDS * size_of::<u32>() as u32)?;
 
     let context = ArmCoreContext {
         r0: frame[1],
@@ -111,7 +118,7 @@ mod tests {
     use wie_core_arm::{Allocator, ArmCore};
     use wie_util::Result;
 
-    use super::{init, pending, pop, push, unwind};
+    use super::{init, pending, push, unwind};
 
     #[test]
     fn exception_frame_restores_guest_context() -> Result<()> {
@@ -137,10 +144,38 @@ mod tests {
         assert_eq!(restored.pc, 0x4000);
         assert_eq!(pending(&core)?, 0x1234);
 
-        pop(&mut core)?;
-        assert_eq!(pending(&core)?, 0);
+        // The catch consumed the frame, so a later throw has nowhere stale to land.
         assert_eq!(unwind(&mut core, 0x5678)?, None);
-        assert_eq!(pending(&core)?, 0);
+        assert_eq!(pending(&core)?, 0x1234);
+
+        Ok(())
+    }
+
+    #[test]
+    fn rethrow_from_catch_reaches_the_enclosing_frame() -> Result<()> {
+        let mut core = ArmCore::new(false, None)?;
+        Allocator::init(&mut core)?;
+        init(&mut core)?;
+
+        let mut context = core.save_context();
+        context.sp = 0x12000;
+        context.lr = 0x4001;
+        core.restore_context(&context);
+        push(&mut core)?;
+
+        context.sp = 0x11f00;
+        context.lr = 0x5001;
+        core.restore_context(&context);
+        push(&mut core)?;
+
+        context.lr = 0;
+        core.restore_context(&context);
+        assert_eq!(unwind(&mut core, 0x1234)?, Some(0x5001));
+        // The inner catch does not match and rethrows: it must reach the outer frame, not
+        // land back in its own.
+        assert_eq!(unwind(&mut core, 0x1234)?, Some(0x4001));
+        assert_eq!(core.save_context().sp, 0x12000);
+        assert_eq!(unwind(&mut core, 0x1234)?, None);
 
         Ok(())
     }

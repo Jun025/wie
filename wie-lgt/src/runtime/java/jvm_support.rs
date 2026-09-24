@@ -1077,7 +1077,8 @@ pub(crate) mod tests {
         // java/lang/Runtime index 13, 훼밀리마트타이쿤
         // java/lang/String index 19, 메이플스토리2007 java/lang/Thread
         // index 13, 턴·서든어택포켓 java/io/ByteArrayOutputStream index 16, 일지매영웅전기
-        // java/lang/String index 21 and then 27. Unlike the rows around them, these were derived from CLDC declaration order
+        // java/lang/String index 21 and then 27, 배틀몬스터 again java/lang/StringBuffer indexes 10, 13
+        // and 22. Unlike the rows around them, these were derived from CLDC declaration order
         // rather than read off a guest — see the comments in `data/lgt_java_abi.toml` — so a
         // reordered row does not fail to parse, it silently calls the wrong method. Pin it.
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
@@ -1098,6 +1099,9 @@ pub(crate) mod tests {
                 ("java/lang/String", 19, "startsWith", "(Ljava/lang/String;)Z"),
                 ("java/lang/String", 21, "indexOf", "(I)I"),
                 ("java/lang/String", 27, "substring", "(I)Ljava/lang/String;"),
+                ("java/lang/StringBuffer", 10, "length", "()I"),
+                ("java/lang/StringBuffer", 13, "setLength", "(I)V"),
+                ("java/lang/StringBuffer", 22, "append", "(C)Ljava/lang/StringBuffer;"),
             ] {
                 let class = jvm.resolve_class(class_name).await.unwrap();
                 let definition = class.definition.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap().clone();
