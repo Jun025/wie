@@ -26,3 +26,5 @@
 **사용자 영향**: 없음(값 무변경). 배틀몬스터 두 파일 모두 PASS · paints 3 · content true · stop deadline · java 예외 0 · `vtable index` 벽 0.
 
 **잠금**: `abi_rows_cover_the_indexes_titles_actually_dispatch_on`(`wie-lgt/src/runtime/java/jvm_support.rs:1091`)이 `("java/lang/Object", 5, "notify", "()V")` 를 잠근다.
+
+**게임 파일명 유입**(`node scripts/corpus-name-inflow.mjs --corpus <game_lab>` 실행값): BOUNDED **13건** · SUFFIX-ATTACHED **3쌍(7회)** — 손으로 가른 결과 3쌍 모두 «조사가 붙은 진짜 언급»이다(`배틀몬스터가`·`배틀몬스터 …`는 이 회차 대상 타이틀, `서든어택포켓`은 이 TOML 에 이미 있던 기존 행 주석). «더 긴 다른 제목»은 0.
