@@ -9,7 +9,7 @@
     "wie-lgt/src/runtime/java/jvm_support/method.rs — 기존 DB 예외 시험: catch 뒤 pop 은 이제 빈 체인(Err)",
     "wie-lgt/data/lgt_java_abi.toml — java/lang/StringBuffer length()I = 10 · setLength(I)V = 13 · append(C) = 22 (+ 호출부 근거 주석)",
     "wie-lgt/src/runtime/java/jvm_support.rs — abi_rows_cover_the_indexes_titles_actually_dispatch_on 에 3행",
-    "docs/report/0254"
+    "docs/report/0256"
   ],
   "verification": [
     "링 프로브(커밋 안 함): 마지막 unwind frame_sp=0x400fff04 < 그 뒤 같은 구간을 다른 함수들이 덮어씀 ⇒ ldm 복원값 r4=0x1400df4 r5=0x48845aa0 r6=0x400fff40 r7=0x2a fp=sp=lr=0 이 폴트 레지스터와 전건 일치",
