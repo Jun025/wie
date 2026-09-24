@@ -81,8 +81,8 @@ pub async fn load_native(core: &mut ArmCore, system: &mut System, jvm: &Jvm, jar
 
     tracing::debug!("InitStruct: {:#x?}", init_param_1.ptr_init_struct);
     // We seed `ptr_init_struct` with 0 and the entrypoint is expected to publish its init struct
-    // there. SD한국전쟁 returns without doing so, and the unchecked read below then reported the
-    // failure as "Invalid memory access; address: 0" with no indication of which field was null.
+    // there. An entrypoint that returns without doing so (SD한국전쟁, before `.raptor` was read)
+    // made the unchecked read below report "Invalid memory access; address: 0" with no field named.
     if init_param_1.ptr_init_struct == 0 {
         return Err(WieError::FatalError(
             "LGT entrypoint returned without publishing an init struct (ptr_init_struct is null)".into(),
@@ -148,10 +148,23 @@ fn load_executable(core: &mut ArmCore, data: &[u8]) -> Result<u32> {
     let shdrs = shdrs_opt.ok_or_else(|| WieError::FatalError("ELF is missing section headers".into()))?;
     let strtab = strtab_opt.ok_or_else(|| WieError::FatalError("ELF is missing section name string table".into()))?;
 
+    let mut code_base = None;
+    let mut raptor_entry = None;
     for shdr in shdrs {
         let section_name = strtab
             .get(shdr.sh_name as usize)
             .map_err(|x| WieError::FatalError(format!("Invalid ELF section name index {}: {x}", shdr.sh_name)))?;
+
+        if section_name == ".raptor" {
+            let data = elf
+                .section_data(&shdr)
+                .map_err(|x| WieError::FatalError(format!("Failed to read ELF section {section_name}: {x}")))?
+                .0;
+            raptor_entry = data.get(12..16).map(|x| u32::from_le_bytes([x[0], x[1], x[2], x[3]]));
+        }
+        if code_base.is_none() && shdr.sh_addr != 0 && shdr.sh_flags & u64::from(elf::abi::SHF_EXECINSTR) != 0 {
+            code_base = Some(shdr.sh_addr as u32);
+        }
 
         if shdr.sh_addr != 0 {
             tracing::debug!("Section {section_name} at {:x}", shdr.sh_addr);
@@ -165,9 +178,21 @@ fn load_executable(core: &mut ArmCore, data: &[u8]) -> Result<u32> {
         }
     }
 
-    tracing::debug!("Entrypoint: {:#x}", elf.ehdr.e_entry);
+    let entrypoint = choose_entrypoint(raptor_entry, code_base, elf.ehdr.e_entry as u32);
+    tracing::debug!("Entrypoint: {entrypoint:#x} (e_entry {:#x})", elf.ehdr.e_entry);
 
-    Ok(elf.ehdr.e_entry as u32)
+    Ok(entrypoint)
+}
+
+// The `.raptor` header records the entrypoint as an offset from the code section. In 89 of the
+// 90 LGT binaries in the corpus it equals `e_entry`; SD한국전쟁's `e_entry` instead points at a
+// class-registry routine that never publishes the init struct, while `.raptor` points at the
+// standard init stub. Prefer the header's value when it is present.
+fn choose_entrypoint(raptor_entry: Option<u32>, code_base: Option<u32>, e_entry: u32) -> u32 {
+    match (raptor_entry, code_base) {
+        (Some(offset), Some(base)) => base.wrapping_add(offset) & !1,
+        _ => e_entry,
+    }
 }
 
 async fn get_application_jar_path(core: &mut ArmCore, ptr_jar_path: &mut u32, _a0: u32, _capacity: u32, path_output: u32) -> Result<u32> {
@@ -192,8 +217,17 @@ mod tests {
     use wie_core_arm::{Allocator, ArmCore};
     use wie_util::{Result, read_generic, write_generic};
 
-    use super::{get_java_interface_method, register_init_svc_handler};
+    use super::{choose_entrypoint, get_java_interface_method, register_init_svc_handler};
     use crate::runtime::{LgtJvmSupport, java::register_java_system_svc_handler};
+
+    #[test]
+    fn entrypoint_follows_raptor_header() {
+        // SD한국전쟁: e_entry 0x1000, .raptor offset 0x3aaed (Thumb bit set) from .text at 0x1000.
+        assert_eq!(choose_entrypoint(Some(0x3aaed), Some(0x1000), 0x1000), 0x3baec);
+        // 검은방2: the two agree, as in 89 of 90 corpus binaries.
+        assert_eq!(choose_entrypoint(Some(0x2c8c4), Some(0x1000), 0x2d8c4), 0x2d8c4);
+        assert_eq!(choose_entrypoint(None, Some(0x1000), 0x2d8c4), 0x2d8c4);
+    }
 
     #[test]
     fn compiler_array_helpers_build_guest_arrays() -> Result<()> {
