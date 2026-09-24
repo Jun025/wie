@@ -1,0 +1,22 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-24",
+  "task": "wie-2026-09-23-object-notify-slot-and-monitor-ownership-adopt-p0",
+  "title": "「<class> vtable index N」 의 N 은 게스트가 디스패치한 슬롯 그 자체다 — 제안 전제(슬롯 불변·숫자만 이동) 반증, 문면 무변경",
+  "summary": "제안은 Object 에 한 행을 넣자 학교가는길 벽 문면이 30 → 29 로 바뀐 것을 «게스트·자리는 그대로, 우리 표 위치만 당겨졌다»로 읽고 문면에 «our table slot» 을 적자고 했다. 기전을 코드와 선행 회차(PR #281) 실측으로 가르니 전제가 반증된다: 그 벽의 메서드(Component.getWidth()I)는 ABI 행이 없어 링크 때 virtual_method_index 의 폴백이 Component 표 끝에 덧붙이고 그 길이(methods.len())를 반환하며, link_class 가 그 반환값을 게스트의 virtual_method_indices 에 그대로 써 넣는다. 따라서 게스트가 디스패치하는 슬롯과 문면 N 은 언제나 같은 값이고, Object 의 미배치 꼬리가 한 칸 줄자 둘이 함께 30 → 29 로 움직였다. 숫자가 흔들린 원인은 문면이 아니라 링크 시점 덧붙이기(표 계산)이며 그 결함은 PR #281 이 고친다. 티켓 규약대로 문면·ABI toml 은 건드리지 않았다.",
+  "changes": [
+    "이 worklog 1파일만 추가. 코드·문면·data/lgt_java_abi.toml 무변경."
+  ],
+  "verification": [
+    "코드: wie-lgt/src/runtime/java/interface.rs 의 link 루프가 LgtJvmSupport::virtual_method_index 반환값을 virtual_method_indices 에 기록 → 게스트 디스패치 인덱스. 같은 함수(jvm_support.rs)의 폴백은 index = methods.len() 로 덧붙인다. 빈 칸 스텁 id 는 표 위치(vtable.rs write) 이고 handle_missing_java_vtable_entry(java.rs) 가 그 id 를 문면 N 으로 낸다 ⇒ N ≡ 게스트 디스패치 슬롯.",
+    "선행 회신(wie-2026-09-22-lgt-vtable-index-family-runtime-thread-string-adopt-p1, PR #281 approve): 링크 로그 VTLINK APPEND org/kwis/msp/lwc/Component.getWidth()I -> 29, ax 는 ptr_vtable == 0.",
+    "⒜ 현 main 2e356dfc, release wie_validate 3회: 3/3 FAIL · ticks 3 · paints 0 · 「Unimplemented: ax vtable index 29」(at School.startApp) — 29 는 PR #261 이후 값 그대로."
+  ],
+  "limits": [
+    "⒝(25d0ae69 / 24a920c4 에서 게스트 디스패치 인자 직접 계측)는 티켓 조항 「선행 회신이 기전을 확정했으면 재측은 ⒜만」에 따라 하지 않았다. 30/29 의 결정론성은 PR #261 검수의 3/3 실측을 인용한다.",
+    "N 이 ABI 확정 행(lgt_java_abi.toml)의 칸이면 N 은 ABI 인덱스와 같다. 덧붙인 칸이면 N 은 런타임이 그 순간 고른 번호다. 어느 쪽이든 게스트가 디스패치한 슬롯이므로 «our table slot (guest ABI index unknown)» 문면은 전자에서 틀린 말이 된다 — 이것도 문면 무변경의 이유다."
+  ],
+  "proposals": [],
+  "adoptedProposals": ["2026-09-23-object-notify-slot-and-monitor-ownership#p0"],
+  "declinedProposals": []
+}

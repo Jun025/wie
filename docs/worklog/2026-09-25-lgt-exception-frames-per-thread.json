@@ -1,0 +1,35 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-25",
+  "task": "wie-2026-09-23-nom3-inject-panic-and-partial-inject-unmeasured-adopt-p1",
+  "title": "LGT 예외 프레임 스택을 스레드별로 — 교차 관측 2/91 타이틀(놈3 49·현영맞고2006 2) 후 이전",
+  "summary": "스크래치 프로브로 LGT 91 타이틀에서 스레드 교차를 먼저 쟀다: 놈3 교차 push 49·교차 pop 6, 현영맞고2006 교차 push 2. 교차 pop 은 남의 프레임 해제라 실손상 ⇒ 계약 2단계로 스레드별 기록으로 옮겼다. 게스트 ABI 무접촉.",
+  "changes": [
+    "wie-core-arm/src/core.rs — ArmCore::current_thread_id() · ThreadContextGuard 가 진입/복원 · 시험 1",
+    "wie-lgt/src/runtime/java/exception.rs — 0x7fff0000 = 스레드별 ThreadExceptionState 목록 머리 · 시험 1",
+    "docs/report/0251"
+  ],
+  "verification": [
+    "변이: 스레드 키 상수 0(옛 공유 체인) → exception_frames_are_per_thread red(Some(4097) ≠ None) · 원상 green",
+    "교대 5회 before/after(프레임 사용 13 타이틀): PASS 5 ↔ 5, 타이틀별 동일 — loadavg 150~167 로 굶은 판정",
+    "cargo test --all 434 passed 0 failed · clippy --all-targets 경고 16 = 16(접촉 파일 0)"
+  ],
+  "limits": [
+    "교차는 관측됐지만 두 타이틀의 현재 벽(no frame rendered)은 이 결함 밖이라 판정 개선은 0",
+    "try 안에서 끝난 스레드의 기록·프레임은 남는다(tid 재사용 없음 ⇒ 오동작 없음)"
+  ],
+  "adoptedProposals": [
+    "2026-09-23-nom3-inject-panic-and-partial-inject-unmeasured#p1"
+  ],
+  "proposals": [
+    {
+      "title": "놈3 — 두 스레드가 try 안에서 번갈아 도는데 화면이 안 나온다: 그 대기가 무엇인지 잰다",
+      "plainSummary": "놈3 은 예외 처리 상태가 섞이던 문제를 고친 뒤에도 첫 화면을 못 그립니다. 두 실행 흐름이 무엇을 기다리는지 찾는 일입니다.",
+      "userBenefit": "놈3 의 부팅을 막는 실제 벽을 다음 회차가 바로 겨냥할 수 있습니다.",
+      "why": "이 회차 프로브에서 놈3 은 213 push/210 pop 으로 두 스레드가 try 를 활발히 드나드는데 paints 0 · stop deadline 이다. 교차 손상을 없앤 뒤에도 교대 5회 0/5 로 그대로다.",
+      "tradeoff": "loadavg 150+ 에서는 판정이 굶는다 — 한산한 시간대의 재측이 먼저다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ]
+}
