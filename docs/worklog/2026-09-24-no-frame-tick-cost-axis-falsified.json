@@ -1,0 +1,27 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-24",
+  "task": "wie-2026-09-20-no-frame-paired-remeasure-window-infeasible-adopt-p0",
+  "title": "«틱당 벽시계»(ms/ticks)는 느림↔멈춤을 가르지 못한다 — 반증, 코드 변경 0",
+  "summary": "ticks·ms 는 이미 JSON 에 있어서 파생값은 나눗셈 한 번이다. 그런데 Executor::tick 은 모든 태스크가 잠들면 즉시 반환하는 8ms 슬라이스라, ms/tick 은 «바쁨/한가»를 재고 «진행»은 재지 못한다. 실측: 이번 회차에서는 일지매 24 ms/tick, 놈3 ≤0.25 로 갈렸지만, 2026-09-21 rel3 에서는 놈3 가 370 ms/tick 으로 PASS 했다.",
+  "changes": [
+    "docs/report/0237: 반증 근거와 표"
+  ],
+  "verification": "main e7ef1eda release wie_validate --inject 로 3타이틀 ×4 동시 실행(load 35→48), 2026-09-21 rebaseline jsonl 3회분과 대조.",
+  "limits": "진행 계기(아래 제안)는 설계만 했고 측정하지 않았다. 표본은 LGT 두 타이틀과 픽스처 하나다.",
+  "adoptedProposals": [
+    "2026-09-20-no-frame-paired-remeasure-window-infeasible#p0",
+    "2026-09-21-aot-java-render-rebaseline#p3"
+  ],
+  "proposals": [
+    {
+      "title": "«멈춤» 판별은 틱이 아니라 «게스트 진행» 계기로 — 마감 시점 상태 한 줄",
+      "plainSummary": "지금 계기(틱 수·시간)로는 게임이 느린 건지 멈춘 건지 구별하지 못한다는 것이 확인됐습니다. 마감 순간 게스트가 무엇을 하고 있었는지를 한 줄 더 적으면 구별할 수 있습니다.",
+      "userBenefit": "일지매영웅전기처럼 조용히 아무것도 안 그리는 타이틀을 볼 때마다 예산을 늘려 같은 실험을 되풀이하지 않아도 됩니다.",
+      "why": "ms/tick 은 executor 가 바쁜지만 잰다(docs/report/0237). 멈춤은 두 종류다. ⑴돌면서 멈춤: 같은 PC 구간을 반복하고 호스트 API 호출이 늘지 않는다. ⑵기다리며 멈춤: 모든 태스크가 sleeping/pending 이고 깨울 이벤트가 없다. 둘 다 부하와 상관없는 관측이다. 예: 마감 시점의 runnable/sleeping 태스크 수, 마지막 1초 동안의 호스트 API 호출 수.",
+      "tradeoff": "executor·코어에 계측 훅이 필요해서 wie_validate 한 파일로 끝나지 않는다(wie-backend 가 공개 API 를 하나 늘린다). 호출 수 임계는 여전히 표본으로 정해야 한다. 기존 버킷은 남기고 진단 필드만 더해야 7월·9월 열 비교가 유지된다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ]
+}
