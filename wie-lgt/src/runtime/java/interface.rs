@@ -531,7 +531,8 @@ async fn java_instantiate_multi_array(core: &mut ArmCore, jvm: &mut Jvm, ptr_cla
 /// Reads one import-table slot, or `None` when the slot is empty.
 ///
 /// A slot whose name *and* descriptor pointers are both null is a hole the LGT compiler left in
-/// the table — the count covers the hole, so the linker walks over it. Reading it unconditionally
+/// the table — the count covers the hole. In the instance-field table a hole right after a
+/// `long`/`double` is that field's second word, and `link_class_members` fills it. Reading it unconditionally
 /// dereferenced address 0 and killed the VM at boot ("Invalid memory access; address: 0"), which
 /// is how five AOT-Java titles died inside `LgtClassLoader.findClass`. Holes appear mid-range, not
 /// past the end: 서든어택포켓 index 6 of 5..14, 스파이더맨3 index 2 of 0..75, 훼밀리마트타이쿤 8 of
@@ -566,12 +567,19 @@ async fn link_class_members(
     interface_method_indices: u32,
     non_virtual_method_targets: u32,
 ) -> Result<()> {
+    // A `long`/`double` takes two slots: the named one, then a hole the guest indexes for the
+    // other word. Left unwritten, that hole reads word 0 — the first inherited field.
+    let mut wide_word_index = None;
     for index in link.instance_field_offset..link.instance_field_offset + link.instance_field_count {
         let Some((name, descriptor)) = read_member_name_and_descriptor(core, instance_field_imports, index)? else {
+            if let Some(word_index) = wide_word_index.take() {
+                write_generic(core, instance_field_word_indices + index as u32 * size_of::<u16>() as u32, word_index + 1)?;
+            }
             continue;
         };
         let word_index = LgtJvmSupport::field_word_index(jvm, class_name, &name, &descriptor, false)?;
         write_generic(core, instance_field_word_indices + index as u32 * size_of::<u16>() as u32, word_index)?;
+        wide_word_index = matches!(descriptor.as_str(), "J" | "D").then_some(word_index);
     }
 
     for index in link.static_field_offset..link.static_field_offset + link.static_field_count {
@@ -796,11 +804,14 @@ mod tests {
         sync::atomic::{AtomicBool, Ordering},
     };
 
+    use jvm_class_proto::{JavaClassProto, JavaFieldProto};
+    use jvm_types::{ClassAccessFlags, FieldAccessFlags};
     use wipi_types::lgt::java::{LgtJavaClass as RawJavaClass, LgtJavaClassLink as RawJavaClassLink};
 
     use test_utils::TestPlatform;
     use wie_backend::{DefaultTaskRunner, System};
     use wie_core_arm::{Allocator, ArmCore};
+    use wie_jvm_support::JvmImplementation;
     use wie_util::{ByteWrite, Result, read_generic, write_generic, write_null_terminated_string_bytes};
 
     use wie_util::WieError;
@@ -1004,6 +1015,108 @@ mod tests {
             );
             assert_eq!(read_generic::<u32, _>(&core, non_virtual_method_targets + 12)?, 0xe5e5_e5e5);
             assert_eq!(read_generic::<u32, _>(&core, interface_method_indices)?, 0xd4d4_d4d4);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    // 레전드오브마스터: a `long` field's second word is a hole in the import table. Left at 0 it
+    // pointed the guest's `long` stores at word 0 — an inherited `Card.canvas` — and the GC then
+    // chased the stored millisecond count as an object reference.
+    #[test]
+    fn hole_after_wide_field_links_to_its_second_word() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (mut jvm, mut core, implementation) = init_jvm(&system_clone).await?;
+            let class_name = "net/wie/test/Wide";
+            let class = implementation
+                .define_class_rust(
+                    &jvm,
+                    JavaClassProto::<()> {
+                        name: class_name,
+                        parent_class: Some("java/lang/Object"),
+                        interfaces: vec![],
+                        methods: vec![],
+                        fields: vec![
+                            JavaFieldProto::new("a", "J", FieldAccessFlags::PRIVATE),
+                            JavaFieldProto::new("b", "I", FieldAccessFlags::PRIVATE),
+                        ],
+                        access_flags: ClassAccessFlags::PUBLIC,
+                    },
+                    Box::new(()),
+                )
+                .await
+                .unwrap();
+            jvm.register_class(class, None).await.unwrap();
+
+            let mut strings = Vec::new();
+            for value in [class_name, "a", "J", "b", "I"] {
+                let address = Allocator::alloc(&mut core, (value.len() + 1) as u32)?;
+                write_null_terminated_string_bytes(&mut core, address, value.as_bytes())?;
+                strings.push(address);
+            }
+
+            // a:J · hole · b:I · hole — only the hole after the wide field is its second word.
+            let imported_classes = Allocator::alloc(&mut core, (size_of::<u32>() + size_of::<RawJavaClassLink>()) as u32)?;
+            write_generic(&mut core, imported_classes, 1u32)?;
+            write_generic(
+                &mut core,
+                imported_classes + size_of::<u32>() as u32,
+                RawJavaClassLink {
+                    ptr_name: strings[0],
+                    instance_field_offset: 0,
+                    instance_field_count: 4,
+                    static_field_offset: 0,
+                    static_field_count: 0,
+                    virtual_method_offset: 0,
+                    virtual_method_count: 0,
+                    interface_method_offset: 0,
+                    interface_method_count: 0,
+                    non_virtual_method_offset: 0,
+                    non_virtual_method_count: 0,
+                },
+            )?;
+            let instance_field_imports = Allocator::alloc(&mut core, 4 * 2 * size_of::<u32>() as u32)?;
+            core.write_bytes(instance_field_imports, &[0; 4 * 2 * size_of::<u32>()])?;
+            for (slot, name, descriptor) in [(0u32, strings[1], strings[2]), (2, strings[3], strings[4])] {
+                write_generic(&mut core, instance_field_imports + slot * 2 * size_of::<u32>() as u32, name)?;
+                write_generic(&mut core, instance_field_imports + (slot * 2 + 1) * size_of::<u32>() as u32, descriptor)?;
+            }
+            let instance_field_word_indices = Allocator::alloc(&mut core, 4 * size_of::<u16>() as u32)?;
+            core.write_bytes(instance_field_word_indices, &[0xee; 4 * size_of::<u16>()])?;
+
+            java_link_imported_classes(
+                &mut core,
+                &mut jvm,
+                imported_classes,
+                instance_field_imports,
+                0,
+                0,
+                0,
+                0,
+                instance_field_word_indices,
+                0,
+                0,
+                0,
+                0,
+            )
+            .await?;
+
+            let a = LgtJvmSupport::field_word_index(&jvm, class_name, "a", "J", false)?;
+            let b = LgtJvmSupport::field_word_index(&jvm, class_name, "b", "I", false)?;
+            let linked: [u16; 4] = read_generic(&core, instance_field_word_indices)?;
+            assert_eq!(linked, [a, a + 1, b, 0xeeee]);
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
