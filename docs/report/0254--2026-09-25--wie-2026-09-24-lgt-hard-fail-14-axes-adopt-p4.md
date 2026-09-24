@@ -167,3 +167,9 @@ GUARD MOVED? wie_wipi_c/src/api/kernel.rs::sprintf guards=2
 - `cargo clippy --workspace --all-targets` **rc=0** · 경고 12줄은 전부 기존 것이다(`wie-backend` 테스트 11 · `wie-jvm-support` 테스트 1). 이 회차의 diff 는 `docs/` 뿐이다 ⇒ **경고 증가 0**.
 - 네 게이트 중 fmt/wasm clippy 는 Rust 무변경이라 결과가 main 과 같다. 수치는 PR CI 가 진다.
 
+
+## 게임 파일명 유입 (도구를 실행해 적는다)
+
+`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab` 를 이 절을 쓰기 전에 돌렸다. 결과는 **BOUNDED 31쌍** · PREFIX-EMBEDDED 0 · **SUFFIX-ATTACHED 3쌍**이고, 최종 수는 아래 표식이 정한다.
+SUFFIX 3쌍은 손으로 갈랐다. 1쌍은 코퍼스의 **별개 실제 타이틀**(stem 뒤에 숫자 `2`)이다. 나머지 2쌍은 제목 뒤에 조사(도·가·처럼)가 붙은 **진짜 언급**이다. ⇒ 판단이 더 필요한 것은 0이다.
+유입된 이름은 전부 표·후보 목록의 식별자다. 게임 바이트 유입 0 · 경로 유입 0.
