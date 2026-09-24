@@ -173,3 +173,6 @@ GUARD MOVED? wie_wipi_c/src/api/kernel.rs::sprintf guards=2
 `node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab` 를 이 절을 쓰기 전에 돌렸다. 결과는 **BOUNDED 31쌍** · PREFIX-EMBEDDED 0 · **SUFFIX-ATTACHED 3쌍**이고, 최종 수는 아래 표식이 정한다.
 SUFFIX 3쌍은 손으로 갈랐다. 1쌍은 코퍼스의 **별개 실제 타이틀**(stem 뒤에 숫자 `2`)이다. 나머지 2쌍은 제목 뒤에 조사(도·가·처럼)가 붙은 **진짜 언급**이다. ⇒ 판단이 더 필요한 것은 0이다.
 유입된 이름은 전부 표·후보 목록의 식별자다. 게임 바이트 유입 0 · 경로 유입 0.
+
+
+<!-- corpus-name-inflow v1 subjects=2 tree=ffd8ae2166b6257f B=38/31 P=0/0 S=4/3 -->
