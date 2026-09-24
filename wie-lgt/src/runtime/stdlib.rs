@@ -27,6 +27,7 @@ pub fn register_stdlib_svc_handler(core: &mut ArmCore, system: &System) -> Resul
             x if x == StdlibSvcId::Strstr as u32 => EmulatedFunction::call(&strstr, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Strlen as u32 => EmulatedFunction::call(&stdlib::strlen, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Memcpy as u32 => EmulatedFunction::call(&stdlib::memcpy, core, &mut ()).await?.write(core, lr),
+            x if x == StdlibSvcId::Memmove as u32 => EmulatedFunction::call(&stdlib::memmove, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Memset as u32 => EmulatedFunction::call(&stdlib::memset, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Time as u32 => EmulatedFunction::call(&time, core, system).await?.write(core, lr),
             x if x == StdlibSvcId::Localtime as u32 => EmulatedFunction::call(&localtime, core, &mut ()).await?.write(core, lr),
@@ -186,16 +187,18 @@ async fn strstr(core: &mut ArmCore, _: &mut (), ptr_haystack: u32, ptr_needle: u
 
 #[cfg(test)]
 mod tests {
-    use alloc::boxed::Box;
+    use alloc::{boxed::Box, sync::Arc};
+    use core::sync::atomic::{AtomicBool, Ordering};
 
     use futures::FutureExt;
 
     use test_utils::TestPlatform;
     use wie_backend::{DefaultTaskRunner, System};
-    use wie_core_arm::ArmCore;
-    use wie_util::Result;
+    use wie_core_arm::{Allocator, ArmCore};
+    use wie_util::{ByteRead, ByteWrite, Result};
 
-    use super::{rand, srand};
+    use super::{rand, register_stdlib_svc_handler, srand};
+    use crate::runtime::{SVC_CATEGORY_STDLIB, svc_ids::StdlibSvcId};
 
     #[test]
     fn random_state_is_shared_by_system_clones_and_process_local() -> Result<()> {
@@ -212,6 +215,50 @@ mod tests {
         assert_eq!(rand(&mut second, &mut second_system).now_or_never().unwrap()?, 16_838);
         srand(&mut second, &mut second_system, 7).now_or_never().unwrap()?;
         assert_eq!(rand(&mut first, &mut first_system).now_or_never().unwrap()?, 5_758);
+
+        Ok(())
+    }
+
+    /// Import `0x415` reaches `memmove` through the stdlib table, and an overlapping copy comes out right.
+    ///
+    /// The row existed before the base swap (`d70b93f8`) and #161 dropped it without a trace: the
+    /// implementation in `wie-core-arm` stayed, only the dispatch line went, and nothing failed until
+    /// (LGT)알바타이쿤2 and 데몬헌터 died on `Unknown lgt stdlib import: 0x415`. A test that calls
+    /// `memmove` directly would have stayed green through that, so this one goes through the SVC stub.
+    /// The overlap is the part that separates memmove from memcpy: dst = src + 2 over the same buffer.
+    #[test]
+    fn stdlib_import_0x415_is_memmove_through_the_svc_table() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let mut core = ArmCore::new(false, None)?;
+            Allocator::init(&mut core)?;
+            let stack = Allocator::alloc(&mut core, 0x1000)?;
+            let mut context = core.save_context();
+            context.sp = stack + 0x1000;
+            core.restore_context(&context);
+            register_stdlib_svc_handler(&mut core, &system_clone)?;
+            let stub = core.make_svc_stub(SVC_CATEGORY_STDLIB, StdlibSvcId::Memmove)?;
+            assert_eq!(StdlibSvcId::Memmove as u32, 0x415);
+
+            let buffer = Allocator::alloc(&mut core, 16)?;
+            core.write_bytes(buffer, b"abcdefgh")?;
+            let _: () = core.run_function(stub, &[buffer + 2, buffer, 6]).await?;
+
+            let mut out = [0u8; 8];
+            core.read_bytes(buffer, &mut out)?;
+            assert_eq!(&out, b"ababcdef");
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
 
         Ok(())
     }
