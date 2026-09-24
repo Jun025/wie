@@ -8,7 +8,7 @@
     "wie-wipi-java/src/classes/wec/oem_device.rs (신규)",
     "wie-wipi-java/src/classes/wec/sys_theme.rs (신규)",
     "wie-wipi-java/src/classes/wec.rs · classes.rs · lib.rs — get_protos 51 → 53",
-    "docs/report/0237"
+    "docs/report/0238"
   ],
   "verification": [
     "코퍼스 7,647파일 · 227,445엔트리 바이트 검색 — 두 정적 필드 참조는 월드장기체스뿐",
