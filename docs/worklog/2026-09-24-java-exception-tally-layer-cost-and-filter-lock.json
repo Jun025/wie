@@ -1,0 +1,29 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-24",
+  "task": "wie-java-exception-tally-layer-cost-and-filter-lock",
+  "title": "java_exceptions 레이어 — keydraw_lgt UNMEASURED 는 부하 잡음(레이어 비용 아님) · 전역 필터 퇴행을 시험으로 잠금",
+  "summary": "짝지은 교차 순서 재측(유효 35짝)에서 max-ticks 정지는 head 3 · 레이어 뺀 대조 2 — 대조도 같은 UNMEASURED 를 내고 전부 저부하에서 난다. main 구독자 조립을 validator_subscriber 로 뽑아 RUST_LOG 미설정 필터로 계수를 단언하는 시험을 더했다(M4 red · 원상 green).",
+  "changes": [
+    "wie_cli/src/bin/wie_validate.rs — validator_subscriber 추출 · 시험 1 추가 · source-shape needle 갱신 · doc 주석 정정",
+    "docs/report/0247"
+  ],
+  "verification": [
+    "F2: 유효 35짝 head max-ticks 3(UNMEAS 2) ↔ nolayer 2(UNMEAS 2) · FAIL 0 · 전부 load1 11–30",
+    "F1: M4 변이 → 1/5 FAILED · 원상 5/5 green · 실바이너리 draw_j2me count 2"
+  ],
+  "limits": [
+    "35짝은 3 대 2 를 가를 검정력이 없다 — 판정 근거는 수가 아니라 대조도 같은 정지를 낸다는 것과 기제(저부하 틱 과속)다"
+  ],
+  "proposals": [
+    {
+      "title": "AGENTS.md runner 의 keydraw_* 줄이 저부하에서 max-ticks 로 UNMEASURED 를 낸다 — 문서는 «이 줄에선 보면 안 된다»고 한다",
+      "plainSummary": "로컬 점검 명령 하나가, 컴퓨터가 한가할 때 오히려 «측정 못 함»으로 끝나는 경우가 있습니다. 문서는 그런 일이 없다고 적고 있어 다음 작업자가 자기 변경 탓으로 오해할 수 있습니다.",
+      "userBenefit": "점검 결과를 잘못 읽어 헛수고하는 회차가 줄어듭니다.",
+      "why": "이 회차 재측 70회 중 5회(7%)가 기본 --max-ticks 5,000만을 16–18초에 소진해 22–25/27 에서 멈췄다(load1 11–30). 레이어를 뺀 대조 바이너리도 같다. AGENTS.md 는 «on this line you should never see it»이라 적는다.",
+      "tradeoff": "runner 줄에 --max-ticks 를 올리면 백스톱 의미가 흐려지고 DOC-COPY 패리티도 함께 고쳐야 한다. 기본값을 올리면 무한루프 게임의 실행 시간이 늘어난다. 문서만 고치는 안도 있다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}
