@@ -40,6 +40,7 @@ pub(crate) struct ArmCoreInner {
     pub(crate) engine: Box<dyn ArmEngine>,
     instructions_remaining: u32,
     last_thread_id: ThreadId,
+    current_thread_id: Option<ThreadId>,
     svc_handlers: BTreeMap<u32, Arc<Box<dyn RegisteredFunction>>>,
     next_stub_address: u32,
     profile: Option<ProfileState>,
@@ -90,6 +91,7 @@ impl ArmCore {
             engine,
             instructions_remaining: INSTRUCTIONS_PER_YIELD,
             last_thread_id: 0,
+            current_thread_id: None,
             svc_handlers: BTreeMap::new(),
             next_stub_address: FUNCTIONS_BASE,
             profile,
@@ -169,6 +171,12 @@ impl ArmCore {
 
     pub fn write_thread_context(&mut self, thread_id: ThreadId, context: &ArmCoreContext) {
         self.threads.lock().get_mut(&thread_id).unwrap().context = context.clone();
+    }
+
+    /// The emulated thread whose context is currently entered, or `None` when host code runs guest
+    /// code outside any `run_in_thread` thread (boot, tests).
+    pub fn current_thread_id(&self) -> Option<ThreadId> {
+        self.inner.lock().current_thread_id
     }
 
     pub fn get_thread_ids(&self) -> Vec<ThreadId> {
@@ -647,18 +655,24 @@ impl RunFunctionResult<()> for () {
 pub struct ThreadContextGuard {
     core: ArmCore,
     thread_id: ThreadId,
+    previous_thread_id: Option<ThreadId>,
 }
 
 impl ThreadContextGuard {
     pub fn new(mut core: ArmCore, thread_id: ThreadId) -> Self {
         let context = core.threads.lock().get(&thread_id).unwrap().context.clone();
         core.restore_context(&context);
+        let previous_thread_id = core.inner.lock().current_thread_id.replace(thread_id);
 
         if let Some(debug) = core.debug_inner() {
             debug.on_thread_entered(thread_id);
         }
 
-        Self { core, thread_id }
+        Self {
+            core,
+            thread_id,
+            previous_thread_id,
+        }
     }
 }
 
@@ -667,6 +681,7 @@ impl Drop for ThreadContextGuard {
         let context = self.core.save_context();
 
         self.core.threads.lock().get_mut(&self.thread_id).unwrap().context = context;
+        self.core.inner.lock().current_thread_id = self.previous_thread_id;
 
         if let Some(debug) = self.core.debug_inner() {
             debug.on_thread_exited(self.thread_id);
@@ -685,6 +700,27 @@ mod tests {
     use crate::function::JumpTo;
 
     use super::*;
+
+    #[test]
+    fn current_thread_id_follows_the_entered_context() -> Result<()> {
+        let mut core = ArmCore::new(false, None)?;
+        crate::Allocator::init(&mut core)?;
+        let _thread1 = core.run_in_thread(|| async { Ok(()) })?;
+        let _thread2 = core.run_in_thread(|| async { Ok(()) })?;
+        assert_eq!(core.current_thread_id(), None);
+        {
+            let _outer = core.enter_thread_context(1);
+            assert_eq!(core.current_thread_id(), Some(1));
+            {
+                let _inner = core.enter_thread_context(2);
+                assert_eq!(core.current_thread_id(), Some(2));
+            }
+            assert_eq!(core.current_thread_id(), Some(1));
+        }
+        assert_eq!(core.current_thread_id(), None);
+
+        Ok(())
+    }
 
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
