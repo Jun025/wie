@@ -27,7 +27,6 @@
 
 **잠금**: `abi_rows_cover_the_indexes_titles_actually_dispatch_on`(`wie-lgt/src/runtime/java/jvm_support.rs:1091`)이 `("java/lang/Object", 5, "notify", "()V")` 를 잠근다.
 
-**게임 파일명 유입**(`node scripts/corpus-name-inflow.mjs --corpus <game_lab>` 실행값): BOUNDED **13건** · SUFFIX-ATTACHED **3쌍(7회)** — 손으로 가른 결과 3쌍 모두 «조사가 붙은 진짜 언급»이다(`배틀몬스터가`·`배틀몬스터 …`는 이 회차 대상 타이틀, `서든어택포켓`은 이 TOML 에 이미 있던 기존 행 주석). «더 긴 다른 제목»은 0.
+**게임 파일명 유입**(`node scripts/corpus-name-inflow.mjs --corpus <game_lab>` 실행값): BOUNDED **15건** · SUFFIX-ATTACHED **4쌍(9회)** — 이 절 자신의 언급을 포함한 수다. 손으로 가르면: `배틀몬스터` 2쌍(보고서·worklog)은 «조사가 붙은 진짜 언급»(이 회차 대상 타이틀), `서든어택` 2쌍(보고서·TOML)은 «더 긴 다른 제목» `서든어택포켓`(코퍼스에 `broken/lgt/서든어택포켓.zip` 로 따로 있다 · TOML 쪽은 이 회차 이전부터 있던 행 주석)이다.
 
-
-<!-- corpus-name-inflow v1 subjects=3 tree=6708ab49ea2c8aee B=37/14 P=0/0 S=9/4 -->
+<!-- corpus-name-inflow v1 subjects=3 tree=82e809a3ef84c903 B=39/15 P=0/0 S=9/4 -->
