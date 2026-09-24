@@ -28,16 +28,33 @@
 # The dispatch lands on the object whose monitor the guest acquired ten microseconds earlier, which
 # is the `synchronized (o) { o.???(); }` shape and so puts index 5 in the monitor family; and the
 # argument registers hold a heap pointer, -1 and another heap pointer — caller leftovers, not a
-# `long`, which rules out wait(J) and wait(JI) (AAPCS would put the timeout in r2:r3). That leaves
-# notify() notifyAll() wait(), the declaration order picks notify(), and notify() is also the safe
-# one of the three to be wrong about: standing in for notifyAll() wakes one waiter instead of all,
-# and standing in for wait() returns early. The reverse — installing a wait() where the guest meant
-# notify() — parks the thread forever, which is the silent hang this lineage has been fighting, so
-# 7 8 9 stay empty until a title names one.
+# `long`, which rules out wait(J) and wait(JI). (This runtime packs argument words in order with no
+# pair alignment — wie-lgt/src/runtime/java/jvm_support/method.rs, `parameter_types.insert(0, …)`
+# and the `0..parameter_word_count` read — so wait(J)'s timeout would sit in r1:r2, not AAPCS's
+# r2:r3. r1 is a heap pointer either way, so the exclusion stands.)
 #
-# 2 6 7 8 9 are therefore derived but NOT written, for the reason java/lang/Runtime index 10 below
-# is not written: a missing entry says its own name, and a wrong one does not. Filling 2 would hand
-# the guest a plausible wrong int; filling 7 8 9 would hand it a hang.
+# wait() is then excluded by READING THE GAME CODE (binary.mod, measured 2026-09-24; ARM mode,
+# .text at 0x1000, stock `objdump --triple=armv5te`, no capstone needed). The dispatch returning to
+# lr=0x2308 is `ldr r3,[r0]; ldr r12,[r3,#0x18]; mov lr,pc; bx r12` at 0x22f4..0x2304 (word 6 =
+# index 5), inside a function at 0x2200 that stores r1, r2 and a call result into three fields of
+# `this` (field key 0x12a among them) and then dispatches index 5: straight-line, no back edge.
+# Its sibling at 0x1f10 holds the image's ONE index-9 dispatch (`ldr r12,[r3,#0x28]` at 0x2018),
+# and that one sits in `while (this.<field 0x12a> != 0) this.<9>();` — 0x2024 reloads the same
+# field key 0x12a, 0x2048 `bne 0x2000` branches back. So the image carries both halves of a
+# handshake on one field: the waiter loops on index 9, the setter signals on index 5. That puts
+# wait() at 9, where the declaration order already put it, and wait() is final — one slot — so it
+# cannot also be 5. Two anchors now bracket the run (1 3 4 and 9, all where the order says).
+#
+# What is left is notify() vs notifyAll(), and no code shape separates them: both are straight-line
+# signals. The order picks notify(), and notify() is also the safe one to be wrong about: standing
+# in for notifyAll() wakes one waiter instead of all. Installing a wait() where the guest meant a
+# notify parks the thread forever — the silent hang this lineage has been fighting — which is why
+# 7 8 stay empty. 9 is observed as wait() but not written: no run has reached it (0 `vtable index`
+# walls on either copy), so it is a row nothing yet exercises.
+#
+# 2 6 7 8 (derived) and 9 (observed) are therefore NOT written, for the reason java/lang/Runtime index 10
+# below is not: a missing entry says its own name, and a wrong one does not. Filling 2 would hand
+# the guest a plausible wrong int; filling 7 8 on the order alone would risk a hang.
 [[class]]
 name = "java/lang/Object"
 vtable_size = 10
