@@ -23,3 +23,5 @@
 **게이트**: fmt·clippy `-D warnings`·wasm clippy·beta clippy 전건 rc=0 · `cargo test --all` 423 passed / 0 failed(46 suites) · `clippy --workspace --all-targets` 경고 16줄, 전부 무접촉 크레이트(`wie-backend`·`wie-jvm-support`·`wie_cli` 테스트 타깃) ⇒ 증가 0. 러너 블록 6픽스처 PASS. keydraw 양쪽 before/after 모두 `PASS` · rc=0 · 27/27 · paints 55(loadavg 10). 부하 40대에서 한 차례 `UNMEASURED` 가 나왔지만 재측에서 해소됐다.
 
 **사용자 영향**: SD한국전쟁이 부팅해서 화면을 그린다. 다른 LGT 타이틀은 진입점 값이 같으므로 실행이 바뀌지 않는다.
+
+**유입**(`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 와 SUFFIX-ATTACHED 를 아래 표식에 함께 적었다. 전부 이 회차가 측정하거나 근거로 든 타이틀(SD한국전쟁 · 대조군 검은방2 · 와일드프론티어 · 짝 회귀 4건)을 이름으로 적은 것이다. SUFFIX 는 모두 조사가 붙은 언급(«…은/을/는/이»)이고 다른 제목이 아니다. `init.rs` 주석의 타이틀명은 main 에 이미 있던 주석을 이은 것이다.
