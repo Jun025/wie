@@ -1,0 +1,32 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-24",
+  "task": "wie-2026-09-22-aot-java-missing-platform-classes-adopt-p1",
+  "title": "Jlet.getCurrentJlet — KEmulator 바이트코드로 getActiveJlet 의 별명임을 세우고 위임했다",
+  "summary": "코퍼스 안 유일한 바이트코드 구현체(KEmulator Jlet.class)에서 getCurrentJlet 은 public static 이고 본문이 getActiveJlet 과 바이트 동일하다. 등재 1건으로 간호사타이쿤2 의 tick 2 해결 실패 벽을 넘겼고 다음 벽은 no-frame 이다.",
+  "changes": [
+    "wie-wipi-java/src/classes/org/kwis/msp/lcdui/jlet.rs — getCurrentJlet 등재 + 테스트",
+    "docs/report/0241"
+  ],
+  "verification": [
+    "간호사타이쿤2 before: FAIL error ticks 2 · after ×2: FAIL deadline ticks 1014/1120 paints 0",
+    "양방향 변이: 등재 제거 시 단위 테스트 NoSuchMethodError · 게임은 원래 벽(ticks 2) 재현"
+  ],
+  "limits": [
+    "근거 출처는 KEmulator 1개(두 jar 의 Jlet.class 가 md5 동일) — 실기 ez-i 구현은 보지 못했다",
+    "getJletFromPID 는 부르는 게임을 보지 못해 넣지 않았다",
+    "간호사타이쿤2 는 여전히 paints 0"
+  ],
+  "adoptedProposals": ["2026-09-22-aot-java-missing-platform-classes#p1"],
+  "proposals": [
+    {
+      "title": "간호사타이쿤2(LGT) — getCurrentJlet 뒤 no-frame 벽",
+      "plainSummary": "간호사타이쿤2 가 이제 부팅을 넘어 저장소·화면 부품까지 만들지만 한 프레임도 그리지 않습니다. 무엇을 기다리며 멈췄는지 찾는 일입니다.",
+      "userBenefit": "이 타이틀이 처음으로 화면을 그릴 수 있는 다음 한 걸음입니다.",
+      "why": "after 2/2 동일하게 deadline 까지 ticks 1014~1120 을 돌고 paints 0. 마지막 경고는 DataBase.openDataBase·RecordStore.closeRecordStore·AnnunciatorComponent 스텁이다.",
+      "tradeoff": "no-frame 은 원인 축이 여럿(대기 루프·스텁 반환값·이벤트 미전달)이라 한 회차에 원인을 못 특정할 수 있다 — 먼저 어디서 도는지부터 재야 한다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ]
+}
