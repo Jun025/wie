@@ -229,7 +229,7 @@ mod tests {
 
     use wie_util::WieError;
 
-    use super::{Executor, TICK_BUDGET_MS};
+    use super::Executor;
     use crate::time::Instant;
 
     struct YieldOnce(bool);
@@ -271,9 +271,11 @@ mod tests {
         });
 
         // The clock advances 1ms per read and the executor reads it once per step, so the task is
-        // polled once per millisecond of the slice.
+        // polled once per millisecond of the slice. A literal, not `TICK_BUDGET_MS`: comparing the
+        // constant to itself passes at any value, and a merge that restores the old 8ms budget
+        // (17→35fps on KTF 영웅서기4) must turn this red.
         executor.tick(advancing_clock(0)).unwrap();
-        assert_eq!(polls.load(Ordering::Relaxed), TICK_BUDGET_MS);
+        assert_eq!(polls.load(Ordering::Relaxed), 14);
     }
 
     #[test]

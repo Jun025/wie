@@ -51,6 +51,7 @@
 ### 시험
 
 - `executor::tests::test_tick_gives_a_yielding_task_most_of_a_60hz_frame` — 예산이 반 프레임(8ms)으로 되돌아가면 red.
+  ★**첫 판은 이 줄이 거짓이었다**(게이트② 반려): 단언이 `assert_eq!(polls, TICK_BUDGET_MS)` 라 상수 자신과 비교했고 예산 8 변이에서도 green(검수자 4/4). `-fix` 회차가 리터럴 `14` 로 고쳤다 — 무변이 4/4 ok · `TICK_BUDGET_MS = 8` 변이 → `left: 8 right: 14` FAILED(`mut.log`).
 - `event_queue::test::timer_due_mid_slice_fires_without_waiting_for_the_whole_slice` — 변이(고정 16ms 복원) 시 **FAILED** 확인.
 - `event_queue::test::recurring_callback_keeps_the_slice_when_a_timer_is_pending` — 변이(콜백 가드 제거) 시 **FAILED** 확인.
 - 입력 밀림: `12e451cc` 의 `input_precedes_recurring_callbacks_and_pending_paint` · `recurring_callback_waits_while_the_backend_queue_is_empty`
