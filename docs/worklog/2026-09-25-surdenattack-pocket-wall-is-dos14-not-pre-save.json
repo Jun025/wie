@@ -5,7 +5,7 @@
   "title": "서든어택포켓(lgt)의 count 0 은 30초 기아 — 실제 정지는 DataOutputStream 14 미구현이 여는 같은-처리기 되던지기 무한 루프(LGT hang 5종 공통)",
   "summary": "코드 변경 0. --timeout 30 은 부팅 공백(29~39초)을 못 넘어 count 0 을 낸다. 60·240초에서는 count 2 · FileNotFoundException → Unimplemented DataOutputStream 14. probe: catch(Exception) 처리기가 WieError 를 못 잡고 되던지는데 exception::unwind 가 같은 프레임으로 돌려보내 133,498회 반복. LGT 91파일 측정에서 FAIL hang 5종(간호사타이쿤2·서든어택포켓·턴·훼밀리마트타이쿤·학교가는길)이 같은 루프(60초에 50만~62만 회). unwind 가 pop 하는 수리는 게스트 자신의 pop 11회와 충돌해 틀리다 — JVM 의미론(처리기 진입 프레임 건너뛰기)이 맞는 모양이고 후속으로 넘겼다.",
   "changes": [
-    "docs/report/0259 — 판정 · 예산별 표 · 형제 조건 대조"
+    "docs/report/0260 — 판정 · 예산별 표 · 형제 조건 대조"
   ],
   "verification": [
     "30s: ticks 2 · count 0 (0242 재현) ↔ 60s: ticks 179/187 · count 2 ↔ 240s: ticks 1470/1477 · count 2 · 벽 문면 동일",
