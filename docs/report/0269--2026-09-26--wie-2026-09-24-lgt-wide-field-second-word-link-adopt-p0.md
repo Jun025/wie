@@ -68,3 +68,4 @@ paints·ticks 는 부하로 흔들리고 방향도 섞였다(ticks 는 처리량
 나머지는 `jvm_support.rs` 에 원래 있던 줄이다(이 도구는 바뀐 파일의 «본문 전체»를 센다). SUFFIX 2건(`간호사타이쿤2`·`서든어택포켓`)도
 원래 있던 줄에서 나왔고, 둘 다 조사가 아니라 «더 긴 다른 제목»이다.
 
+<!-- corpus-name-inflow v1 subjects=4 tree=d6c50acbd9a0e7c4 B=23/14 P=8/2 S=4/4 -->
