@@ -154,6 +154,9 @@ pub fn unwind(core: &mut ArmCore, ptr_exception: u32) -> Result<Option<u32>> {
     // 현영맞고2006 and 놈3 (Thumb) do pop from the catch, at the frame's sp. consumed_frame_sp
     // turns that pop into a no-op instead of letting it free the enclosing try's frame. A pop at
     // any other sp, or a push, settles it: that pop belongs to a frame still on the chain.
+    // ponytail: sp is the only discriminator — an ARM function with nested tries at one sp whose
+    // inner catch returns into the outer try would no-op the outer pop (main leaked the same frame
+    // there too); widen the key (e.g. with the pop's return address) if a title shows that shape.
     state.ptr_current_exception_frame = frame[0];
     state.ptr_pending_exception = ptr_exception;
     state.consumed_frame_sp = frame[14];
