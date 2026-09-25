@@ -93,4 +93,9 @@ LGT 컨텍스트(`LgtGraphicsContext` 56B)만 어댑터로 주고 프레임버�
 
 ## 게임 파일명 유입
 
-이 회차는 타이틀 이름을 쓰지 않았다(«그 타이틀» · `0236` §2-2 참조). 게임 바이트 유입 0 · 경로 유입 0.
+`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab` 결과는 ★**BOUNDED 11회 / 6쌍** · PREFIX-EMBEDDED 0 · ★**SUFFIX-ATTACHED 0** 이다.
+6쌍은 전부 `wie-lgt/src/runtime/wipi_c.rs` 에 **원래 있던** 주석 속 이름이다. 도구는 바뀐 파일 전체를 센다. 이 회차가 그 파일에 더한 6줄에는 이름이 없다.
+이 문서와 worklog 도 타이틀 이름 대신 «그 타이틀»(`0236` §2-2)로 적었다. ⇒ 이 회차가 새로 들인 이름은 0 이다. 게임 바이트 유입 0 · 경로 유입 0.
+
+
+<!-- corpus-name-inflow v1 subjects=3 tree=f868868d201759cc B=11/6 P=0/0 S=0/0 -->
