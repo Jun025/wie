@@ -816,6 +816,8 @@ fn main() {
 
     {
         let filename = args.filename.clone();
+        // The exhaustion line carries no `guest_stdout` even under `--guest-stdout`: the guest's
+        // buffer lives in `main` and the hook runs mid-run, so this line's schema is the default one.
         let _ = tallies.on_svc_stub_exhausted.set(Box::new(move |tallies: &Tallies| {
             use std::io::Write;
             let line = result_line(&filename, &svc_stub_exhausted_outcome(), tallies, start.elapsed().as_millis());
@@ -834,7 +836,8 @@ fn main() {
     // Emit a single JSON line for the batch wrapper to parse.
     let json = result_line(&args.filename, &result, &tallies, elapsed_ms);
     // Appended, never interleaved, and only when asked: with the flag absent the
-    // line above is byte-identical to what every existing caller already parses.
+    // line above keeps every pre-existing key in the same order with the same value
+    // (`stub_hits`/`svc_stub_slots` are new keys, inserted just before `ms`).
     // Both in-tree parsers read this line with `grep -o` over the WHOLE line
     // (smoke_gate.sh's `"result":"[^"]*"`, lgt_render_probe.sh's `"<key>":[0-9a-z.]*`)
     // plus `tail -1`, so a guest that printed `"result":"PASS"` would otherwise win

@@ -42,7 +42,7 @@ INFO 는 `jvm::jvm` 이 이미 켜는 레벨이라 §2 의 비용이 없다.
 ## 4. 소비 지점 시험 · 개악
 
 `wie_cli/tests/validate_stub_hits.rs` — 바이너리를 실행해 JSON 줄을 읽는다(커밋된 픽스처만):
-`helloworld_ktf.zip` → `stub_hits.count ≥ 1` · `Font::<init>` 이름 · `used ≥ 1` · `capacity 4096` / `draw_j2me.jar` → `capacity: null` / `draw_j2me.zip`(로드 실패) → 전부 0.
+`helloworld_ktf.zip` → `stub_hits.count ≥ 1` · `Font::<init>` 이름 · `used ≥ 1` · `capacity 4096` / `draw_j2me.jar`(★-fix: `draw_j2me.zip` 에서 시험 안에 추출 — 트리에는 jar 가 없고, 개발 트리의 것은 `make-draw-fixture.mjs` 가 남긴 git-ignored 사본이라 초판 대조군은 CI·깨끗한 체크아웃에서 읽기 오류로 «아무것도 안 돌았다». 이제 J2ME 가 실제로 돌아 `stub_hits.count ≥ 1` 을 내고) → `capacity: null` / `draw_j2me.zip`(로드 실패) → 전부 0.
 
 - 개악 ① `stub_hits.record` 끄기 → `a KTF boot hits the Font stubs: {"count":0,…}` **red**
 - 개악 ② `SVC_STUBS_HIGH_WATER.fetch_max` 끄기 → `KTF binds SVC stubs: {"used":0,"capacity":null}` **red**
