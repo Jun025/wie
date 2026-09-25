@@ -175,6 +175,16 @@ vtable = [
 # sit 2 and 5 slots past a measured anchor inside one contiguous run, which is the shortest span
 # any derived row in this file rests on.
 #
+# readBoolean()Z = 22 is the same derivation — one slot before the measured readByte anchor — and
+# 간호사타이쿤2 is the title that asked for it (measured 2026-09-24: `Unimplemented:
+# java/io/DataInputStream vtable index 22` right after its save record loads, then paints 0). Two
+# call-site facts back the row rather than just fail to refute it. The dispatch sets up no argument
+# (`mov r0, r5; ldr ip, [r3, #0x5c]; bx ip`), which rules out 19 20 21. And with the row in, the
+# title's reader is a type-for-type mirror of its own writer: 819 reads against 819 writes, with
+# every writeBoolean answered by a readBoolean at the same position, and the reads consume exactly
+# the 2673-byte record the writer stored. The limit: writeBoolean only ever writes 0 or 1, so this
+# cannot tell readBoolean from readUnsignedByte by value — only the slot order separates them.
+#
 # Getting one wrong is not free — unlike the argument-free Runtime/Thread reads below, these
 # return different widths off the same stream, so a misplaced row would hand the guest a
 # plausible wrong number instead of a named failure. That is the cost the anchor above buys down.
@@ -182,6 +192,7 @@ vtable = [
 name = "java/io/DataInputStream"
 vtable = [
     { name = "readFully", descriptor = "([BII)V", index = 20 },
+    { name = "readBoolean", descriptor = "()Z", index = 22 },
     { name = "readByte", descriptor = "()B", index = 23 },
     { name = "readShort", descriptor = "()S", index = 25 },
     { name = "readInt", descriptor = "()I", index = 28 },
