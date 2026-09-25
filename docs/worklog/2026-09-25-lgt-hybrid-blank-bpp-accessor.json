@@ -9,7 +9,7 @@
     "wie-lgt/src/runtime/wipi_c.rs — GetFramebufferBpp → graphics::get_framebuffer_bpp · 모듈 주석(예외 1줄 · dead 45 → 42) · 시험 wipic_framebuffer_bpp_ignores_its_argument",
     "wie-lgt/src/runtime/java.rs — cfg(test) init_jvm 재수출",
     "docs/upstream-realign-p3-slices.md §D — 공용 배선 28 → 27",
-    "docs/report/0265"
+    "docs/report/0266"
   ],
   "verification": [
     "짝지은 교대 4회(release · 60s · load1 41~99): C PASS ×2 · main FAIL 단색 ×2",
