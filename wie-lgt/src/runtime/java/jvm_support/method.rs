@@ -469,7 +469,8 @@ mod tests {
             let pending = LgtJvmSupport::class_instance_from_raw(&core, exception::pending(&core)?)?;
             assert!(jvm.is_instance(&*pending, "org/kwis/msp/db/DataBaseRecordException"));
             assert_eq!(core.save_context().sp, context.sp);
-            // The catch consumed the frame; there is nothing left for it to pop.
+            // The unwind consumed the frame, and this pop comes after the wrapper returned (sp
+            // is the caller's, not the frame's), so it is not the catch's own: nothing to pop.
             assert!(exception::pop(&mut core).is_err());
 
             done_clone.store(true, Ordering::Relaxed);

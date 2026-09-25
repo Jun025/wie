@@ -573,6 +573,7 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 > 미해결 **67** 전건 해소(#159 착지로 74→67) · 배선 **27건** 치환 —
 > ★**`git diff --numstat upstream/main` = `35 27`**(종전 `27 27` 은 재지 않은 인용 · 늘어난 8줄은
 > `#[allow(dead_code)]`+7줄 사유 주석 · ★**재배선 자체는 27/27** 이고 역치환의 자기 numstat 이 그 수다).
+> ★**[추가 2026-09-25 · `wie-2026-09-24-lgt-hard-fail-14-axes-adopt-p0`] 공용 배선이 «28줄»이 됐다** — #161 이 떨군 `GetContext`(207 = `0xcf`)를 `InitContext`/`SetContext` 와 같은 공용 `wie_wipi_c::api::graphics::get_context` 로 복원했다(교체 전 `d70b93f8` 과 같은 대상 · upstream 은 이 행이 없다). ⒝ 결정의 연장이고 ⒜ 로 되돌릴 때 이 줄도 함께 센다.
 >
 > ★**대가 — 축소하지 않는다**: 제안의 benefit 「LGT 전용 그래픽 0→1,095줄」은 ★**«철회»가 아니라 «연기»**다 —
 > 그 1,095줄은 **트리에 있고** ★**배선되지 않았다.**
