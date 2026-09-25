@@ -43,3 +43,5 @@ worklog `2026-09-25-lgt-unwind-consumes-catch-frame#p1`(키 스크립트 지정)
 조용히 빠지던 잠복 결함이 막혔다 — 배틀몬스터의 `address: 0` 수리는 그대로 유지된다.
 
 **게임 파일명 유입**(`corpus-name-inflow --corpus` · 브랜치 전체 7파일): BOUNDED 29 · SUFFIX-ATTACHED 5 — 전부 주석·문서 속 타이틀명(계측 근거 인용) · 게임 바이트 0.
+
+<!-- corpus-name-inflow v1 subjects=7 tree=cdefd7c0dd6385a0 B=72/29 P=1/1 S=12/5 -->
