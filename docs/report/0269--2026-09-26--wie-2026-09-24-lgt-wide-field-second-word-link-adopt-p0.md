@@ -60,3 +60,10 @@ paints·ticks 는 부하로 흔들리고 방향도 섞였다(ticks 는 처리량
 - 정적 필드(`get_static_field`/`put_static_field`)는 무접촉. 게스트의 정적 long 저장 순서를 재지 않았고, 그 순서를 고정하는 `jvm_support.rs` 시험은
   업스트림(#1337)에서 왔다 — 게스트 근거가 없다. 후속 제안 `2026-09-26-lgt-wide-field-host-word-order#p0`.
 - KTF `class_instance.rs` 는 범위 밖.
+
+## 6. 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs --corpus <코퍼스>` 결과는 BOUNDED **20회/12쌍** · SUFFIX-ATTACHED **2회/2쌍**이다.
+이번 diff 가 새로 넣은 것은 `레전드오브마스터`(이 문서·worklog·시험 주석)뿐이고, 그 이름은 이미 `0244` 에 있었다.
+나머지는 `jvm_support.rs` 에 원래 있던 줄이다(이 도구는 바뀐 파일의 «본문 전체»를 센다). SUFFIX 2건(`간호사타이쿤2`·`서든어택포켓`)도
+원래 있던 줄에서 나왔고, 둘 다 조사가 아니라 «더 긴 다른 제목»이다.
