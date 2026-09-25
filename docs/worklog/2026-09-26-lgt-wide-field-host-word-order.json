@@ -1,0 +1,33 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-26",
+  "task": "wie-2026-09-24-lgt-wide-field-second-word-link-adopt-p0",
+  "title": "LGT long/double 인스턴스 필드 — 호스트 읽기·쓰기를 게스트와 같은 high-first 로 맞췄다",
+  "summary": "호스트가 AOT 클래스의 J/D 인스턴스 필드를 get/put 하는 호출부는 0 이다 — 그래서 이 회차는 «순서만 맞추는 일»이다. Rust 클래스의 J/D 필드는 전부 이 한 쌍(get_field/put_field)으로만 오가므로 순서를 뒤집어도 왕복이 대칭이고, 두 계급을 가를 필요가 없다.",
+  "changes": [
+    "wie-lgt/src/runtime/java/jvm_support/class_instance.rs — get_field/put_field 가 word n = 상위, n+1 = 하위",
+    "wie-lgt/src/runtime/java/jvm_support.rs — 테스트 wide_instance_field_is_stored_high_word_first",
+    "docs/report/0269"
+  ],
+  "verification": [
+    "테스트: 순서 되돌림 → FAILED(left 0x89abcdef · right 0x01234567) · 복원 → ok",
+    "cargo test --all 448 passed · 0 failed",
+    "레전드오브마스터 base/fix 짝 — docs/report/0269 §3"
+  ],
+  "limits": [
+    "정적 필드(get_static_field/put_static_field)는 무접촉 — 게스트의 정적 long 저장 순서를 재지 않았고, 업스트림 시험이 low-first 를 고정한다",
+    "KTF 쪽 class_instance.rs 는 범위 밖"
+  ],
+  "adoptedProposals": ["2026-09-24-lgt-wide-field-second-word-link#p0"],
+  "proposals": [
+    {
+      "title": "LGT 정적 long/double 필드의 워드 순서 — 게스트 저장 순서 실측",
+      "plainSummary": "인스턴스 필드는 윗부분을 앞 칸에 두는 게임 방식에 맞췄지만, 클래스 정적 필드는 아직 옛 순서(아랫부분 앞)입니다. 게임이 정적 long 을 어떤 순서로 쓰는지 한 번 재야 합니다.",
+      "userBenefit": "게임과 호스트가 같은 정적 long 필드(예: 공개 상수)를 주고받을 때 값이 뒤바뀌는 잠재 결함을 확인하거나 배제합니다.",
+      "why": "인스턴스 필드는 레전드오브마스터 0x91f30/0x91f34 로 high-first 가 확정됐고 long[] 도 high-first(#275)다. 정적 필드는 get_static_field/put_static_field 가 여전히 low-first 이고, 그 순서를 고정하는 jvm_support.rs 시험은 업스트림(#1337)에서 온 것이라 게스트 근거가 없다.",
+      "tradeoff": "호스트가 AOT 클래스의 정적 J/D 를 읽는 호출부가 0 이면 이것도 순서만 맞추는 일이다 — 게스트의 정적 long 저장 명령 하나를 디스어셈블로 확인한 뒤에만 뒤집어야 한다.",
+      "effort": "S",
+      "target": "wie-lgt/src/runtime/java/jvm_support/class_definition.rs"
+    }
+  ]
+}
