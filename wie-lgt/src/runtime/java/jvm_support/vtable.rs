@@ -51,7 +51,9 @@ impl JavaVtable {
         write_generic(core, ptr_vtable, ptr_class)?;
         for (index, entry) in entries.iter().enumerate() {
             let target = if entry.target == 0 {
-                core.make_svc_stub(SVC_CATEGORY_MISSING_JAVA_VTABLE_ENTRY, index as u32)?
+                // Shared: the handler names the class from the instance, so the stub for an
+                // index is the same in every table.
+                core.make_shared_svc_stub(SVC_CATEGORY_MISSING_JAVA_VTABLE_ENTRY, index as u32)?
             } else {
                 entry.target
             };
@@ -68,7 +70,7 @@ impl JavaVtable {
         parent_methods: &[JavaVtableEntry],
         declared_methods: &[JavaMethod],
     ) -> Result<Vec<JavaVtableEntry>> {
-        (0..entry_count)
+        let mut entries = (0..entry_count)
             .map(|index| {
                 let target = read_generic(core, ptr_vtable + ((index + 1) * size_of::<u32>()) as u32)?;
                 if target == 0 {
@@ -82,7 +84,14 @@ impl JavaVtable {
                     .cloned();
                 Ok(JavaVtableEntry { target, method })
             })
-            .collect()
+            .collect::<Result<Vec<_>>>()?;
+        // The parent's table can be longer than the compiled count: slots the runtime appended
+        // when a guest linked a parent method by name live past it, and a guest may dispatch
+        // them on this class's instances. Inherit them rather than cut them off.
+        if parent_methods.len() > entries.len() {
+            entries.extend_from_slice(&parent_methods[entries.len()..]);
+        }
+        Ok(entries)
     }
 
     pub fn build_interface_methods(declared_methods: &[JavaMethod]) -> Result<Vec<JavaVtableEntry>> {

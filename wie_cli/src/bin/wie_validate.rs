@@ -661,24 +661,28 @@ where
     JavaExceptionLayer(tally).with_filter(tracing_subscriber::filter::Targets::new().with_target("jvm::jvm", tracing::Level::INFO))
 }
 
+/// The process subscriber `main` installs: the stderr logger under `stderr_filter` (`RUST_LOG`)
+/// plus the exception tally. The logger's filter is per-layer, not global, so the tally still
+/// sees `jvm::jvm` INFO when `RUST_LOG` is unset — a global filter would drop it first.
+fn validator_subscriber(
+    stderr_filter: tracing_subscriber::EnvFilter,
+    tally: Arc<JavaExceptionTally>,
+) -> impl tracing::Subscriber + Send + Sync + 'static {
+    use tracing_subscriber::{Layer, layer::SubscriberExt};
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr).with_filter(stderr_filter))
+        .with(java_exception_layer(tally))
+}
+
 const SCREEN_W: u32 = 240;
 const SCREEN_H: u32 = 320;
 
 fn main() {
     // Honor RUST_LOG for debugging (logs to stderr, separate from the JSON result on stdout).
-    // The stderr logger's filter is per-layer, not global, so the exception tally below
-    // still sees `jvm::jvm` INFO when RUST_LOG is unset (a global filter would drop it first).
     let java_exceptions = Arc::new(JavaExceptionTally::default());
     {
-        use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
-        tracing_subscriber::registry()
-            .with(
-                tracing_subscriber::fmt::layer()
-                    .with_writer(std::io::stderr)
-                    .with_filter(tracing_subscriber::EnvFilter::from_default_env()),
-            )
-            .with(java_exception_layer(java_exceptions.clone()))
-            .init();
+        use tracing_subscriber::util::SubscriberInitExt;
+        validator_subscriber(tracing_subscriber::EnvFilter::from_default_env(), java_exceptions.clone()).init();
     }
 
     let args = Args::parse();
@@ -1315,7 +1319,7 @@ mod tests {
     use test_utils::MemoryFilesystem;
     use wie_backend::Platform;
 
-    use super::{JavaExceptionTally, java_exception_layer};
+    use super::{JavaExceptionTally, java_exception_layer, validator_subscriber};
 
     /// Runs `body` with only the exception tally installed, and returns the tally.
     fn with_tally(body: impl FnOnce()) -> Arc<JavaExceptionTally> {
@@ -1351,15 +1355,18 @@ mod tests {
         );
     }
 
-    /// The two tests above prove the layer counts; this pins that `main` actually installs it and
-    /// prints it. Without it, dropping the `.with(..)` from `main` would leave every test green and
+    /// The tests around this one prove the layer counts; this pins that `main` actually installs it
+    /// and prints it. Without it, dropping the subscriber from `main` would leave every test green and
     /// the field reading `{"count":0,...}` on every run — indistinguishable from "nothing raised".
     #[test]
     fn java_exception_layer_is_installed_and_printed_by_main_test() {
         let src = include_str!("wie_validate.rs");
         let main_body = &src[src.find(concat!("fn ", "main() {")).unwrap()..src.find(concat!("struct ", "Outcome {")).unwrap()];
         for needle in [
-            concat!(".with(java_exception_layer", "(java_exceptions.clone()))"),
+            concat!(
+                "validator_subscriber(tracing_subscriber::EnvFilter::from_default_env()",
+                ", java_exceptions.clone())"
+            ),
             concat!("java_exceptions", ".json(),"),
             concat!("\\\"java_exceptions", "\\\":{},"),
         ] {
@@ -1369,6 +1376,23 @@ mod tests {
                 "main() no longer wires the exception tally: {needle}"
             );
         }
+    }
+
+    /// `main`'s whole subscriber, with the stderr filter `RUST_LOG` unset gives. The tally must still
+    /// count: turning the logger's per-layer filter back into a global `EnvFilter` drops `jvm::jvm`
+    /// INFO before any layer sees it, and every other test here stays green on that regression.
+    #[test]
+    fn java_exception_tally_counts_under_main_subscriber_with_rust_log_unset_test() {
+        use tracing_subscriber::util::SubscriberInitExt;
+        let tally = Arc::new(JavaExceptionTally::default());
+        let guard = validator_subscriber(tracing_subscriber::EnvFilter::new(""), tally.clone()).set_default();
+        test_utils::run_jvm_test(Box::new([]), |jvm| async move {
+            let _ = jvm.exception("java/io/IOException", "unset").await;
+            Ok(())
+        })
+        .unwrap();
+        drop(guard);
+        assert_eq!(tally.count.load(core::sync::atomic::Ordering::SeqCst), 1);
     }
 
     /// The control: a JVM that raises nothing reports 0 and `null`, not a stale or invented value.

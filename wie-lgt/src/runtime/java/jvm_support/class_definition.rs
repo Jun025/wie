@@ -331,6 +331,10 @@ impl JavaClassDefinition {
         read_generic(&self.core, self.ptr_raw)
     }
 
+    pub fn core(&self) -> &ArmCore {
+        &self.core
+    }
+
     pub fn descriptor(&self) -> Result<RawJavaClassDescriptor> {
         read_generic(&self.core, self.raw()?.ptr_descriptor)
     }

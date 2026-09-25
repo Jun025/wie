@@ -8,7 +8,13 @@ mod method;
 mod value;
 mod vtable;
 
-use alloc::{boxed::Box, format, string::String};
+use alloc::{
+    boxed::Box,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::mem::size_of;
 
 use jvm::{ClassDefinition, ClassInstance, JavaError, Jvm, Method};
 
@@ -16,8 +22,9 @@ use wie_backend::System;
 use wie_core_arm::ArmCore;
 use wie_jvm_support::{JvmImplementation, JvmSupport, native::NativeJavaValueCodec};
 use wie_midp::get_protos as get_midp_protos;
-use wie_util::{Result, WieError};
+use wie_util::{Result, WieError, read_generic, read_null_terminated_string_bytes};
 use wie_wipi_java::get_protos as get_wipi_java_protos;
+use wipi_types::lgt::java::{LGT_JAVA_CLASS_SUPER_CLASS_IS_NAME, LgtJavaClass as RawJavaClass, LgtJavaClassDescriptor as RawJavaClassDescriptor};
 
 use super::classes::net::wie::{CletWrapper, CletWrapperCard, CletWrapperContext, LgtClassLoader};
 
@@ -143,17 +150,66 @@ impl LgtJvmSupport {
         }
 
         // TODO Remove this fallback once data/lgt_java_abi.toml covers every linked virtual method.
+        let method = Self::find_virtual_method(jvm, class_name, name, descriptor)?;
+
+        // The new slot is appended to `class_name`'s table, but every subclass already linked
+        // holds its OWN copy of the parent table, taken when it was built. A guest that linked
+        // `Component.getWidth` gets this index and then dispatches it on an instance of a
+        // subclass — so the slot has to exist there too, or the subclass answers with whatever
+        // it reserved at that index (학교가는길: `ax vtable index 29` was `Component.getWidth()I`,
+        // appended to Component after ShellComponent → an → aa → ax had been built).
+        //
+        // The index must also be free in every one of those subclasses: appending at the
+        // parent's own length would land on a slot a subclass already uses for something else,
+        // and the guest would silently call that instead. So it is placed past the longest
+        // table among them, and past the compiled `vtable_count` of every generated subclass not
+        // loaded yet, because a compiled class loaded later keeps its own indices below that
+        // count and inherits only what lies past it.
+        let subclasses = Self::loaded_subclasses(jvm, &definition, class_name).await?;
+        let mut subclass_entries = Vec::with_capacity(subclasses.len());
+        let mut index = methods
+            .len()
+            .max(Self::unloaded_compiled_subclass_vtable_bound(jvm, &definition, class_name).await?);
+        for subclass in &subclasses {
+            let entries = subclass.vtable_entries(jvm).await?;
+            index = index.max(entries.len());
+            subclass_entries.push(entries);
+        }
+
+        methods.resize(index, JavaVtableEntry { target: 0, method: None });
+        methods.push(JavaVtableEntry {
+            target: method.target()?,
+            method: Some(method),
+        });
+        definition.set_vtable_entries(&methods)?;
+
+        for (subclass, mut entries) in subclasses.into_iter().zip(subclass_entries) {
+            // An override in the subclass (or anywhere between it and `class_name`) wins.
+            let method = Self::find_virtual_method(jvm, &ClassDefinition::name(&subclass), name, descriptor)?;
+            entries.resize(index, JavaVtableEntry { target: 0, method: None });
+            entries.push(JavaVtableEntry {
+                target: method.target()?,
+                method: Some(method),
+            });
+            subclass.set_vtable_entries(&entries)?;
+        }
+
+        u16::try_from(index)
+            .map_err(|_| WieError::FatalError(format!("Virtual method index does not fit LGT ABI for {class_name}.{name}{descriptor}")))
+    }
+
+    fn find_virtual_method(jvm: &Jvm, class_name: &str, name: &str, descriptor: &str) -> Result<JavaMethod> {
         let mut current_name = String::from(class_name);
-        let method = loop {
+        loop {
             let class = jvm
                 .get_class(&current_name)
                 .ok_or_else(|| WieError::FatalError(format!("Class not loaded while linking virtual method: {current_name}")))?;
             if let Some(method) = class.definition.method(name, descriptor, false) {
-                break method
+                return Ok(method
                     .as_any()
                     .downcast_ref::<JavaMethod>()
                     .ok_or_else(|| WieError::FatalError(format!("Unsupported method implementation for {current_name}.{name}{descriptor}")))?
-                    .clone();
+                    .clone());
             }
 
             let Some(parent_name) = class.definition.super_class_name() else {
@@ -162,17 +218,130 @@ impl LgtJvmSupport {
                 )));
             };
             current_name = parent_name;
+        }
+    }
+
+    /// Every loaded LGT class that has `class_name` as a strict superclass: the registered
+    /// generated (guest) classes, plus the platform classes this crate defines. Interfaces are
+    /// not followed — they do not share the vtable.
+    async fn loaded_subclasses(jvm: &Jvm, definition: &JavaClassDefinition, class_name: &str) -> Result<Vec<JavaClassDefinition>> {
+        let mut names = get_wipi_java_protos().iter().map(|proto| proto.name.to_string()).collect::<Vec<_>>();
+        names.extend(get_midp_protos().iter().map(|proto| proto.name.to_string()));
+        for ptr_class in Self::generated_class_pointers(jvm, definition).await? {
+            names.push(ClassDefinition::name(&JavaClassDefinition::from_raw(ptr_class, definition.core())));
+        }
+        names.sort();
+        names.dedup();
+
+        let mut subclasses = Vec::new();
+        for candidate in names {
+            let Some(class) = jvm.get_class(&candidate) else {
+                continue;
+            };
+            let Some(candidate_definition) = class.definition.as_any().downcast_ref::<JavaClassDefinition>() else {
+                continue;
+            };
+            let mut ancestor = class.definition.super_class_name();
+            while let Some(ancestor_name) = ancestor {
+                if ancestor_name == class_name {
+                    subclasses.push(candidate_definition.clone());
+                    break;
+                }
+                ancestor = jvm.get_class(&ancestor_name).and_then(|class| class.definition.super_class_name());
+            }
+        }
+
+        Ok(subclasses)
+    }
+
+    /// The largest compiled `vtable_count` among generated subclasses of `class_name` that are
+    /// not registered yet and carry a compiler-built table (`ptr_vtable != 0`). Registered ones
+    /// are covered by [`Self::loaded_subclasses`]; ones without a compiled table are built from
+    /// their parent when they load and inherit the slot wherever it is.
+    async fn unloaded_compiled_subclass_vtable_bound(jvm: &Jvm, definition: &JavaClassDefinition, class_name: &str) -> Result<usize> {
+        let core = definition.core();
+        let generated = Self::generated_class_pointers(jvm, definition).await?;
+        let names = generated
+            .iter()
+            .map(|ptr_class| Ok((*ptr_class, ClassDefinition::name(&JavaClassDefinition::from_raw(*ptr_class, core)))))
+            .collect::<Result<Vec<_>>>()?;
+
+        let mut bound = 0;
+        for (ptr_class, name) in &names {
+            let descriptor = JavaClassDefinition::from_raw(*ptr_class, core).descriptor()?;
+            if descriptor.ptr_vtable == 0 || jvm.has_class(name) {
+                continue;
+            }
+
+            let mut ancestor = Self::raw_super_class_name(core, *ptr_class)?;
+            let mut steps = 0;
+            while let Some(ancestor_name) = ancestor {
+                if ancestor_name == class_name {
+                    bound = bound.max(descriptor.vtable_count as usize);
+                    break;
+                }
+                steps += 1;
+                if steps > names.len() + 64 {
+                    break;
+                }
+                ancestor = if let Some(class) = jvm.get_class(&ancestor_name) {
+                    class.definition.super_class_name()
+                } else if let Some((ptr_ancestor, _)) = names.iter().find(|(_, name)| *name == ancestor_name) {
+                    Self::raw_super_class_name(core, *ptr_ancestor)?
+                } else {
+                    None
+                };
+            }
+        }
+        Ok(bound)
+    }
+
+    fn raw_super_class_name(core: &ArmCore, ptr_class: u32) -> Result<Option<String>> {
+        let descriptor = JavaClassDefinition::from_raw(ptr_class, core).descriptor()?;
+        if descriptor.ptr_super_class == 0 {
+            return Ok(None);
+        }
+        let ptr_name = if descriptor.flags & LGT_JAVA_CLASS_SUPER_CLASS_IS_NAME != 0 {
+            descriptor.ptr_super_class
+        } else {
+            JavaClassDefinition::from_raw(descriptor.ptr_super_class, core).descriptor()?.ptr_name
         };
+        String::from_utf8(read_null_terminated_string_bytes(core, ptr_name)?)
+            .map(Some)
+            .map_err(|error| WieError::FatalError(format!("Invalid LGT class name: {error}")))
+    }
 
-        let index = methods.len();
-        methods.push(JavaVtableEntry {
-            target: method.target()?,
-            method: Some(method),
-        });
-        definition.set_vtable_entries(&methods)?;
+    async fn generated_class_pointers(jvm: &Jvm, definition: &JavaClassDefinition) -> Result<Vec<u32>> {
+        // Before the app's class loader exists there are no generated classes yet.
+        if !jvm.has_class("net/wie/LgtClassLoader") {
+            return Ok(Vec::new());
+        }
+        let loader: Option<Box<dyn ClassInstance>> = jvm
+            .get_static_field("net/wie/LgtClassLoader", "instance", "Lnet/wie/LgtClassLoader;")
+            .await
+            .map_err(|JavaError::JavaException(instance)| WieError::JavaException(Self::class_instance_raw(&*instance)))?;
+        let Some(loader) = loader else {
+            return Ok(Vec::new());
+        };
+        let generated_classes: i32 = jvm
+            .get_field(&loader, "generatedClasses", "I")
+            .await
+            .map_err(|JavaError::JavaException(instance)| WieError::JavaException(Self::class_instance_raw(&*instance)))?;
 
-        u16::try_from(index)
-            .map_err(|_| WieError::FatalError(format!("Virtual method index does not fit LGT ABI for {class_name}.{name}{descriptor}")))
+        let core = definition.core();
+        let generated_classes = generated_classes as u32;
+        let mut pointers = Vec::new();
+        let last_bucket: u32 = read_generic(core, generated_classes)?;
+        for bucket in 0..=last_bucket {
+            let mut ptr_class: u32 = read_generic(core, generated_classes + size_of::<u32>() as u32 + bucket * size_of::<u32>() as u32)?;
+            while ptr_class != 0 {
+                pointers.push(ptr_class);
+                let raw: RawJavaClass = read_generic(core, ptr_class)?;
+                let descriptor: RawJavaClassDescriptor = read_generic(core, raw.ptr_descriptor)?;
+                ptr_class = descriptor.ptr_next_class;
+            }
+        }
+        Ok(pointers)
     }
 
     pub async fn interface_dispatch_table(jvm: &mut Jvm, class_name: &str) -> Result<u32> {
@@ -357,6 +526,67 @@ pub(crate) mod tests {
             .unwrap();
         jvm.register_class(loader_class, None).await.unwrap();
         Ok((jvm, core, implementation))
+    }
+
+    #[test]
+    fn virtual_method_appended_to_a_parent_reaches_subclasses_built_before_it() -> Result<()> {
+        // 학교가는길: the guest links `Component.getWidth()I` after ShellComponent (and the
+        // app classes under it) have taken their copy of Component's table, then dispatches
+        // the returned index on a subclass instance. Before this, only Component got the slot,
+        // so the subclass answered with the stub it had reserved there.
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, core, _) = init_jvm(&system_clone).await?;
+            let parent = "org/kwis/msp/lwc/Component";
+            let child = "org/kwis/msp/lwc/ShellComponent";
+            jvm.resolve_class(child).await.unwrap();
+            let definition = |name: &str| {
+                jvm.get_class(name)
+                    .unwrap()
+                    .definition
+                    .as_any()
+                    .downcast_ref::<super::JavaClassDefinition>()
+                    .unwrap()
+                    .clone()
+            };
+            let child_before = definition(child).vtable_entries(&jvm).await?;
+
+            let index = LgtJvmSupport::virtual_method_index(&jvm, parent, "getWidth", "()I").await? as usize;
+            let expected = LgtJvmSupport::non_virtual_method_target(&jvm, parent, "getWidth", "()I")?;
+
+            // Not on a slot the subclass already uses — that would silently call something else.
+            assert!(
+                index >= child_before.len(),
+                "index {index} collides with the subclass's {} slots",
+                child_before.len()
+            );
+            for name in [parent, child] {
+                let class = definition(name);
+                let raw_class: RawJavaClass = read_generic(&core, class.ptr_raw)?;
+                let target: u32 = read_generic(&core, raw_class.unk1 + ((index + 1) * size_of::<u32>()) as u32)?;
+                assert_eq!(target, expected, "{name} vtable index {index}");
+            }
+            // The subclass's existing slots are untouched.
+            let child_after = definition(child).vtable_entries(&jvm).await?;
+            for (slot, (before, after)) in child_before.iter().zip(&child_after).enumerate() {
+                assert_eq!(before.target, after.target, "{child} slot {slot} moved");
+            }
+            // Linking the same method through the subclass finds the propagated slot.
+            assert_eq!(LgtJvmSupport::virtual_method_index(&jvm, child, "getWidth", "()I").await? as usize, index);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
     }
 
     #[test]
@@ -1077,7 +1307,7 @@ pub(crate) mod tests {
         // java/lang/Runtime index 13, 훼밀리마트타이쿤
         // java/lang/String index 19, 메이플스토리2007 java/lang/Thread
         // index 13, 턴·서든어택포켓 java/io/ByteArrayOutputStream index 16, 일지매영웅전기
-        // java/lang/String index 21. Unlike the rows around them, these were derived from CLDC declaration order
+        // java/lang/String index 21 and then 27. Unlike the rows around them, these were derived from CLDC declaration order
         // rather than read off a guest — see the comments in `data/lgt_java_abi.toml` — so a
         // reordered row does not fail to parse, it silently calls the wrong method. Pin it.
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
@@ -1097,6 +1327,7 @@ pub(crate) mod tests {
                 ("java/lang/Thread", 13, "isAlive", "()Z"),
                 ("java/lang/String", 19, "startsWith", "(Ljava/lang/String;)Z"),
                 ("java/lang/String", 21, "indexOf", "(I)I"),
+                ("java/lang/String", 27, "substring", "(I)Ljava/lang/String;"),
             ] {
                 let class = jvm.resolve_class(class_name).await.unwrap();
                 let definition = class.definition.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap().clone();

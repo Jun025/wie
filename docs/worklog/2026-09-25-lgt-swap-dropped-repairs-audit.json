@@ -1,0 +1,45 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-25",
+  "task": "wie-2026-09-24-lgt-hard-fail-14-axes-adopt-p4",
+  "title": "#161 이 떨군 LGT 수리분 전수 감사 — SVC 행 소실 5 · 의미 변경 3 · 가드 소실 0(복원분 제외)",
+  "summary": "d70b93f8(교체 직전) ↔ origin/main 의 wie-lgt SVC 표와 dispatch 를 git show 만으로 기계 대조했다. 소실 행은 stdlib 0x415 · WIPIC 207 · 412 · 604 · 605 다(604/605 소켓 쓰기/읽기는 이번에 처음 드러났다). stdlib 0x32 는 소실이 아니라 재해석이다(get_import_function 이 JavaSystem PendingException 으로 먼저 가로챈다). broken/lgt 37건 실행에서 교체 소실이 직접 원인인 후보는 8건: 412 1건 · 0x410(unk4→strstr NULL) 7건. 가드 축은 free(NULL) 하나였고 이미 #265 가 복원했다. 공용 wie-wipi-c 로 옮겨진 우리 수리분(null 프레임버퍼 · OOM NULL · EUC-KR · -18 · GetNumberOfRecords)은 전부 살아 있다.",
+  "changes": [
+    "docs/report/0254: 소실 행·가드 전수 표 · 재현 명령(감사 스크립트 전문) · broken/lgt 같은 원인 후보"
+  ],
+  "verification": "감사 스크립트의 자기 검증: d70b93f8 ↔ 37734e74(#161) 에서는 context.rs::free 가드 소실을 잡고, ↔ origin/main 에서는 잡지 않는다(#265 복원). 회귀 게이트 수치는 docs/report/0254 §검증.",
+  "limits": "LGT Java 런타임(native_jvm → jvm_support)은 구조째 재작성돼 함수 이름 대조가 의미 없다 — 그쪽 가드 8함수는 범위 밖으로 표기만 했다. InitSvcId 표도 같은 이유로 대조하지 않았다. 가드 축은 정규식(== 0 · is_null · < 0 · checked_sub · is_none)이라 다른 모양의 가드는 못 본다.",
+  "proposals": [
+    {
+      "title": "LGT WIPIC 604/605(MC_netSocketWrite/Read) 행 복원 — -1 스텁",
+      "plainSummary": "기반 교체 때 LGT 의 소켓 쓰기·읽기 연결 두 줄이 빠졌다. 온라인 접속을 시도하는 게임은 오프라인으로 넘어가지 못하고 멈춘다.",
+      "userBenefit": "테라-영원의혼돈처럼 네트워크 연결을 시도하는 LGT 게임이 교체 전처럼 '연결 실패(-1)'를 받고 오프라인 플레이로 넘어갈 수 있다.",
+      "why": "교체 전 02ad8b5c 가 0x25c/0x25d 를 LGT 로컬 -1 스텁으로 두었다. 현 wie-lgt 에 행이 없고, 공용 wie-wipi-c net 에는 socket_write/read 가 아예 없어 공용 배선으로 대체할 수도 없다.",
+      "tradeoff": "LGT 전용 함수 두 개가 다시 업스트림과 갈라진다. 헤드리스 부팅은 네트워크 경로에 닿지 않아 효과는 부팅 판정으로 확인되지 않는다 — 시험은 try_from 행 단언이 전부다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "LGT free(NULL) 가드에 시험 1건 — 두 번째로 조용히 사라지지 않게",
+      "plainSummary": "메탈슬러그를 살린 '빈 핸들 해제는 무시' 가드는 시험이 없어서 기반 교체 때 소리 없이 사라졌었다. 지금 복원된 판본도 여전히 시험이 없다.",
+      "userBenefit": "다음 기반 교체·리팩터링에서 메탈슬러그 서바이벌 2종이 다시 panic 으로 돌아가는 것을 CI 가 먼저 잡는다.",
+      "why": "0942b0fb 도, 그것을 되살린 #265(cd3b17c2)도 시험이 없다. 0230 은 LgtWIPICContext 가 완전한 Jvm 을 요구해 단위 시험을 못 만든다고 적었다 — 가드를 순수 함수로 빼거나 기존 LGT 통합 시험 하네스(test_helloworld)에서 SVC 0x77 을 0 인자로 부르는 방식이 후보다.",
+      "tradeoff": "가드 7줄을 지키려고 시험 인프라를 새로 세우면 배보다 배꼽이 커질 수 있다. 하네스 재사용이 안 되면 접는 것이 맞다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "LGT WIPIC 0x581 — 교체 전 '큰 소리 실패'가 업스트림 '조용한 0'으로 바뀐 것을 관측으로 판정",
+      "plainSummary": "정체 모를 misc 함수 하나가 예전엔 명확한 오류로 멈췄는데 지금은 0 을 돌려주고 지나간다. 좋아졌는지 나빠졌는지는 그 함수를 부르는 게임을 돌려봐야 안다.",
+      "userBenefit": "영웅서기5 LGT 등 이 함수를 부르는 타이틀이 '조용히 틀린 값으로 진행'하는 상태인지 가려, 숨은 오동작을 미리 막는다.",
+      "why": "d70b93f8 은 misc_unk9 를 Err(모듈·인덱스·인자 명시)로 두어 fail-loud 였고 그 문구를 시험(6f9dbae7)으로 잠갔다. 현 wie-lgt 는 unk16 = warn + Ok(0) 다. 행은 살아 있어 이번 SVC 표 대조에서는 '의미 변경'으로만 잡힌다.",
+      "tradeoff": "해당 타이틀이 로컬 코퍼스에 없으면 판정 근거가 없다. 그 경우는 현 상태 유지가 기본값이다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": [
+    "2026-09-24-lgt-hard-fail-14-axes#p4"
+  ],
+  "declinedProposals": []
+}
