@@ -66,4 +66,5 @@ assertion `left == right` failed: currentTimeMillis, call_native
 
 ## 게임 파일명 유입
 
-회차 문서·worklog 가 티켓이 부르는 타이틀 이름 하나를 쓴다 — 아래 표식이 도구 출력이다.
+`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab`: ★**BOUNDED 4회 / 4쌍** · PREFIX-EMBEDDED 0 · ★**SUFFIX-ATTACHED 0**.
+들어온 이름은 티켓이 부르는 타이틀 하나(커밋 헤드라인·이 문서·worklog)다 — 이름 없이는 어느 벽인지가 서지 않는다. 게임 바이트 유입 0 · 경로 유입 0.
