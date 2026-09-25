@@ -76,3 +76,10 @@ ticks 는 부하(150~210)에 따라 흔들려서 판정에 쓰지 않았다. 판
 - `RUST_MIN_STACK=4194304 cargo test --all` rc=0 · 46 스위트 · **436 passed · 0 failed**.
 - `cargo clippy --workspace --all-targets`: 경고 16건은 전부 `wie-backend`·`wie-jvm-support`·`wie_cli` 테스트 코드에서 나왔다. `wie-lgt` 는 0건 ⇒ 경고 증가 0.
 - 형제 #288(`…-adopt-p3`, 같은 두 파일의 `0x12c~0x130` 행)과 `git merge-tree` rc=0 이다. 겹치는 행은 없다.
+
+### 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab` 의 대상은 이 브랜치가 바꾼 6파일이다.
+결과는 **BOUNDED 19쌍 · SUFFIX-ATTACHED 1쌍 · PREFIX 0** 이다.
+- BOUNDED 는 전부 이 회차가 잰 타이틀 이름이다(대상 6건 + 게이트에서 뒤집힌 3건). 예외 하나는 §D 문서에 원래 있던 주석 속 이름이다. 이름일 뿐 바이트는 0이다.
+- SUFFIX-ATTACHED 1쌍은 손으로 갈랐다. worklog 의 두 곳에서 stem 에 조사(가·는)가 붙은 «진짜 언급»이다. 더 긴 다른 제목이 아니고, 같은 이름이 BOUNDED 에도 있다 ⇒ 새 이름은 0이다.
