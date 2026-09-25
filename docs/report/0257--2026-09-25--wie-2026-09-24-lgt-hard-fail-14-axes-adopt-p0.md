@@ -77,7 +77,7 @@ ticks 는 부하(150~210)에 따라 흔들려서 판정에 쓰지 않았다. 판
 ### 검증
 
 - `cargo fmt --check` rc=0 · `cargo clippy --all -D warnings` rc=0 · wasm clippy rc=0 · `cargo +beta clippy --all -D warnings` rc=0.
-- `RUST_MIN_STACK=4194304 cargo test --all` rc=0 · 46 스위트 · **436 passed · 0 failed**.
+- `RUST_MIN_STACK=4194304 cargo test --all` rc=0 · 46 스위트 · **439 passed · 0 failed**(리베이스 후 트리 · 리베이스 전 436).
 - `cargo clippy --workspace --all-targets`: 경고 16건은 전부 `wie-backend`·`wie-jvm-support`·`wie_cli` 테스트 코드에서 나왔다. `wie-lgt` 는 0건 ⇒ 경고 증가 0.
 - 형제 #288(`…-adopt-p3`, 같은 두 파일의 `0x12c~0x130` 행)과 `git merge-tree` rc=0 이다. 겹치는 행은 없다.
 - ★**리베이스**: 작업 중 형제 #288(`…-adopt-p3` · 같은 두 파일의 `0x12c~0x130` 행)과 #290(감사) 이 착지했다(ⓕ·ⓖ). 푸시 전이라 그 위로 리베이스했고 충돌은 0이다. 위 네 게이트는 리베이스된 트리에서 다시 돌렸다. ⑴·⑵ 의 타이틀 측정은 리베이스 전 바이너리로 쟀다. 추가 표본만 리베이스 후 바이너리로 쟀다.
@@ -89,4 +89,3 @@ ticks 는 부하(150~210)에 따라 흔들려서 판정에 쓰지 않았다. 판
 - BOUNDED 는 전부 이 회차가 잰 타이틀 이름이다(대상 6건 · 게이트에서 뒤집힌 3건 · 0254 권고 추가 표본). 예외 하나는 §D 문서에 원래 있던 주석 속 이름이다. 이름일 뿐 바이트는 0이다.
 - SUFFIX-ATTACHED 2쌍은 손으로 갈랐다. worklog 두 곳은 stem 에 조사(가·는)가 붙은 «진짜 언급»이다. 회차 문서 한 곳은 stem 뒤에 `2` 가 붙은 «더 긴 다른 제목»이고, 그 제목은 추가 표본으로 BOUNDED 에 있다 ⇒ 새 이름은 0이다.
 
-<!-- corpus-name-inflow v1 subjects=6 tree=5db0d29f71d2789e B=53/27 P=0/0 S=3/2 -->
