@@ -1309,11 +1309,11 @@ fn build_emulator(platform: Box<dyn Platform>, filename: &str, buf: Vec<u8>) -> 
     } else if filename.ends_with("jad") {
         let jar_filename = filename.replace(".jad", ".jar");
         let jar = fs::read(&jar_filename).map_err(|e| ("j2me".to_string(), format!("jar read: {e}")))?;
-        let jar_name = jar_filename[jar_filename.rfind('/').unwrap_or(0) + 1..].to_owned();
+        let jar_name = base_name(&jar_filename);
         let e = J2MEEmulator::from_jad_jar(platform, buf, jar_name, jar).map_err(|e| ("j2me".to_string(), format!("{e}")))?;
         Ok((Box::new(e), "j2me".into()))
     } else if filename.ends_with("jar") {
-        let name = filename[filename.rfind('/').unwrap_or(0) + 1..].to_owned();
+        let name = base_name(filename);
         let stem = name.trim_end_matches(".jar");
         if KtfEmulator::loadable_jar(&buf) {
             let e = KtfEmulator::from_jar(platform, &name, buf, stem, stem, None, options).map_err(|e| ("ktf".to_string(), format!("{e}")))?;
@@ -1331,6 +1331,15 @@ fn build_emulator(platform: Box<dyn Platform>, filename: &str, buf: Vec<u8>) -> 
     } else {
         Err(("unknown".to_string(), "unknown file extension".to_string()))
     }
+}
+
+/// The file name without its directories. Was `path[path.rfind('/').unwrap_or(0) + 1..]`, which on
+/// Windows (`C:\…\x.jar`, no `/`) kept the whole path minus its first character — the J2ME boot then
+/// panicked on that name — and dropped the first letter of any bare name (`x.jar` → `.jar`).
+fn base_name(path: &str) -> String {
+    std::path::Path::new(path)
+        .file_name()
+        .map_or_else(|| path.to_owned(), |n| n.to_string_lossy().into_owned())
 }
 
 fn save_png(path: &PathBuf, frame: &[u32], width: u32, height: u32) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -1472,8 +1481,8 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
 #[cfg(test)]
 mod tests {
     use super::{
-        GUEST_STDOUT_MAX_BYTES, HeadlessPlatform, HeadlessScreen, RICHNESS_COLOR_CAP, SCREEN_H, SCREEN_W, frame_richness, guest_stdout_field,
-        has_content, inject_unmeasured, json_escape, last_frame_gate_fails, stop_cause,
+        GUEST_STDOUT_MAX_BYTES, HeadlessPlatform, HeadlessScreen, RICHNESS_COLOR_CAP, SCREEN_H, SCREEN_W, base_name, frame_richness,
+        guest_stdout_field, has_content, inject_unmeasured, json_escape, last_frame_gate_fails, stop_cause,
     };
     use std::sync::{
         Arc, Mutex,
@@ -1720,6 +1729,15 @@ mod tests {
         assert_eq!(json_escape("\u{1}"), "\\u0001");
         // Non-ASCII passes through as UTF-8; JSON does not require escaping it.
         assert_eq!(json_escape("한"), "한");
+    }
+
+    /// The name handed to the emulators is the file name alone, on every host.
+    #[test]
+    fn base_name_strips_directories_and_keeps_bare_names_whole_test() {
+        assert_eq!(base_name("test_data/draw_j2me.jar"), "draw_j2me.jar");
+        assert_eq!(base_name("draw_j2me.jar"), "draw_j2me.jar");
+        #[cfg(windows)]
+        assert_eq!(base_name(r"C:\Temp\x\draw_j2me.jar"), "draw_j2me.jar");
     }
 
     #[test]
