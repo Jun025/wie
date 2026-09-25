@@ -79,8 +79,17 @@ jobs:
       # `.json` is silent everywhere else (the cockpit proposals panel just shows
       # zero cards). Node-only, no build, ~1s — it cannot slow or gate the engine
       # checks, and the job stays the always-run wrapper described in the header.
+      #
+      # Since 2026-09-26 it also caps proposals on worklogs this PR adds (or grows)
+      # — measured against the merge-base with origin/main, hence the fetch (the
+      # coverage step below explains why checkout leaves that ref absent). Without
+      # it the cap is skipped and the success line says "NOT measured".
+      # `--selftest` runs first so a broken rule reddens instead of passing silently.
       - name: Worklog .json contract (AGENTS.md §Landing paperwork)
-        run: node scripts/check-worklog-json.mjs
+        run: |
+          git fetch --no-tags --quiet origin main
+          node scripts/check-worklog-json.mjs --selftest
+          node scripts/check-worklog-json.mjs
 
       # Same reasoning as the step above (always-run, node-only, ~1s), for the
       # OTHER half of §Landing paperwork: the promise to re-measure worklog

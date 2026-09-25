@@ -574,6 +574,7 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 > ★**`git diff --numstat upstream/main` = `35 27`**(종전 `27 27` 은 재지 않은 인용 · 늘어난 8줄은
 > `#[allow(dead_code)]`+7줄 사유 주석 · ★**재배선 자체는 27/27** 이고 역치환의 자기 numstat 이 그 수다).
 > ★**[추가 2026-09-25 · `wie-2026-09-24-lgt-hard-fail-14-axes-adopt-p0`] 공용 배선이 «28줄»이 됐다** — #161 이 떨군 `GetContext`(207 = `0xcf`)를 `InitContext`/`SetContext` 와 같은 공용 `wie_wipi_c::api::graphics::get_context` 로 복원했다(교체 전 `d70b93f8` 과 같은 대상 · upstream 은 이 행이 없다). ⒝ 결정의 연장이고 ⒜ 로 되돌릴 때 이 줄도 함께 센다.
+> ★**[추가 2026-09-25 · `wie-lgt-hybrid-blank-after-412`] 공용 배선이 «27줄»로 돌아왔다 — `GetFramebufferBpp` 한 줄을 LGT 쪽으로 옮겼기 때문이다.** 그 SVC 의 인자는 framebuffer 핸들이 아니다(네이티브 접근자가 무시하고 LGT 구현도 무시한다 · 하이브리드는 매 프레임 `0x4904dbe5` 를 넘긴다). 공용 구현은 그 값을 `WIPICFramebuffer` 로 읽어 쓰레기 bpp 를 돌려줬고 타이틀은 단색 프레임만 그렸다. 이 줄은 fixture SDK 가 읽는 레코드를 건드리지 않는다(`keydraw_lgt` 27/27 키 PASS · 양쪽 동일). ⒜ 로 되돌릴 때 옮길 줄은 그만큼 **하나 준다**.
 >
 > ★**대가 — 축소하지 않는다**: 제안의 benefit 「LGT 전용 그래픽 0→1,095줄」은 ★**«철회»가 아니라 «연기»**다 —
 > 그 1,095줄은 **트리에 있고** ★**배선되지 않았다.**

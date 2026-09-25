@@ -1129,10 +1129,28 @@ the next task.
 | `proposals[]` | array of objects | one array element = one card. Its `ref` is derived as `<basename>#p<0-based index>` |
 | `proposals[].title` `plainSummary` `userBenefit` `why` `tradeoff` `effort` `target` | string | the card body — fill **all seven**; an empty one renders as an empty field |
 | `adoptedProposals[]` / `declinedProposals[]` | array of `ref` strings | removes that `ref` from the open recommendations (disposition record) |
+| `proposals[].kind` | `"product"` \| `"meta"` (optional) | not read by the consumer; classifies the card. `product` = something a user sees changes; `meta` = checker, guard, census, self-test, ratchet, ledger/doc rule, CI wiring. Omitted = unclassified — **do not backfill past worklogs** |
 
 Locked by `scripts/check-worklog-json.mjs` (run it directly; `engine-contract.yml` runs it on every
 PR). It validates every `.json` in `docs/worklog/` and nothing else — **existing worklogs are not
 retroactively converted**, and no `.md` sibling is required (wie's worklogs are `.json`-only).
+
+#### Proposal threshold (2026-09-26)
+
+Measured 09-14~24: every adopted proposal spawned **1.40** new ones (highest of 5 repos; above 1 the
+chain grows by itself), and 38 of 123 merged PRs did nothing but adopt/decline proposals.
+
+- **0 proposals is the normal value.** Before listing one, answer otterpebble's three questions
+  (`otterpebble/.claude/rules/autonomy.md` §제안 등재 문턱): *observed* this round, not a question;
+  *actionable now*, not waiting on another landing or a policy call; *not a duplicate* of an open one.
+  Any "no" → one line in the done reply, not a card.
+- **At most 2 per worklog; census/audit worklogs at most 1** — the rest of the list stays in that
+  round's own doc. The 2 is enforced (`check-worklog-json.mjs`, on files a PR adds or grows).
+- **A `meta` proposal defaults to 0** unless it changes how battlemonster/KTF/LGT titles run, and
+  none at the third generation of a meta chain or later.
+- **A proposal a sibling PR already resolved is closed by the round that notices**, in
+  `declinedProposals` — keep the ref bare (the consumer matches it verbatim) and put the reason in the
+  free-form `"declinedReasons": { "<ref>": "resolved-by #<PR>" }`.
 
 ### Git Workflow
 

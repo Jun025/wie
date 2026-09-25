@@ -1,0 +1,20 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-25",
+  "task": "wie-validate-reports-silent-stub-hits",
+  "title": "wie_validate JSON 에 stub_hits · svc_stub_slots — 스텁 위의 PASS 와 SVC 스텁 공간 사용량을 보고 축으로",
+  "summary": "결과 줄에 stub_hits(스텁 경고 적중 수·이름)와 svc_stub_slots(SVC 스텁 사용량/4,096)를 더했다. 스텁 공간 고갈 시에는 abort 전에 결과 줄을 먼저 쓴다. 판정 로직과 기존 키 순서·값은 바뀌지 않았다.",
+  "changes": [
+    "wie_cli/src/bin/wie_validate.rs: stub_hits · svc_stub_slots 필드 · 고갈 훅",
+    "wie-core-arm: svc_stub_high_water() · SVC_STUB_CAPACITY",
+    "wie_cli/tests/validate_stub_hits.rs: 바이너리 실행 → JSON 파싱 시험 3건",
+    "docs/report/0259"
+  ],
+  "verification": "개악 ①(계수 끄기) ②(high-water 끄기) 각각 red. -fix: J2ME 대조군이 트리에 없는 경로를 읽어 공허했던 것을 zip 안의 jar 추출로 바꿨다 — 옛 경로로 되돌리면 red.",
+  "limits": "코퍼스 수치(PASS 57/57 stub>0 · 최대 used 3,071)는 코퍼스가 있는 머신에서만 재현된다. 고갈 경로는 훅 단위 시험만 있고 바이너리 수준 시험은 없다.",
+  "proposals": [],
+  "adoptedProposals": [
+    "2026-09-24-lgt-link-appended-vtable-slot-propagation#p1"
+  ],
+  "declinedProposals": []
+}
