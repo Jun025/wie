@@ -124,3 +124,8 @@ release(`lto = true`) `wie_validate --inject`, `game_lab/working/lgt` 54건 + `b
 
 `cargo fmt --check` OK · `cargo clippy --all -D warnings` rc 0 · wasm32 clippy rc 0 · `+beta` clippy rc 0 · `RUST_MIN_STACK=4194304 cargo test --all` rc 0(448 passed · 0 failed).
 러너 블록: `draw_j2me` · `helloworld_ktf` · `helloworld_lgt` PASS · `keydraw_ktf` PASS paints 47 rc 0 · `keydraw_lgt` PASS paints 37 rc 0 · `text_j2me` PASS.
+
+### 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab` 를 돌렸다. 대상은 이 브랜치가 바꾼 4파일이다.
+BOUNDED 와 SUFFIX-ATTACHED 는 아래 표식 줄의 값 그대로다. SUFFIX-ATTACHED 는 손으로 갈랐다. 전부 stem 뒤에 숫자나 `포켓` 이 붙은 «더 긴 다른 제목»이고, 그 제목들은 코퍼스에 있는 파일 이름이다. 이 회차가 새로 쓴 이름은 대상 타이틀과 코퍼스 짝 회귀 표의 제목들이다. 모두 `game_lab/working/lgt`·`broken/lgt` 의 파일 이름이다. 게임 바이트·경로는 쓰지 않았다.
