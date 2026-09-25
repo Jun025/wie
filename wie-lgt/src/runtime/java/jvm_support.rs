@@ -1172,6 +1172,75 @@ pub(crate) mod tests {
         Ok(())
     }
 
+    // 레전드오브마스터 0x91f30/0x91f34: AOT code stores a `long` field's high word in the named
+    // slot and the low word in the next one. The host must use the same order.
+    #[test]
+    fn wide_instance_field_is_stored_high_word_first() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, implementation) = init_jvm(&system_clone).await?;
+            let class = implementation
+                .define_class_rust(
+                    &jvm,
+                    JavaClassProto::<()> {
+                        name: "net/wie/test/WideOrder",
+                        parent_class: Some("java/lang/Object"),
+                        interfaces: vec![],
+                        methods: vec![],
+                        fields: vec![
+                            JavaFieldProto::new("j", "J", FieldAccessFlags::PRIVATE),
+                            JavaFieldProto::new("d", "D", FieldAccessFlags::PRIVATE),
+                        ],
+                        access_flags: ClassAccessFlags::PUBLIC,
+                    },
+                    Box::new(()),
+                )
+                .await
+                .unwrap();
+            let definition = class.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap().clone();
+            let word = |name: &str, descriptor: &str| {
+                let field = ClassDefinition::field(&definition, name, descriptor, false).unwrap();
+                field.as_any().downcast_ref::<super::JavaField>().unwrap().word_index().unwrap()
+            };
+            let (j, d) = (word("j", "J"), word("d", "D"));
+            let mut instance: Box<dyn ClassInstance> = Box::new(JavaClassInstance::new(&mut core, &definition)?);
+            let ptr_fields = instance.as_any().downcast_ref::<JavaClassInstance>().unwrap().ptr_fields()?;
+            let slot = |index: u32| ptr_fields + index * size_of::<u32>() as u32;
+
+            // Host write → guest view.
+            jvm.put_field(&mut instance, "j", "J", 0x0123_4567_89ab_cdefi64).await.unwrap();
+            assert_eq!(read_generic::<u32, _>(&core, slot(j))?, 0x0123_4567);
+            assert_eq!(read_generic::<u32, _>(&core, slot(j + 1))?, 0x89ab_cdef);
+            jvm.put_field(&mut instance, "d", "D", 1.5f64).await.unwrap();
+            assert_eq!(read_generic::<u32, _>(&core, slot(d))?, (1.5f64.to_bits() >> 32) as u32);
+            assert_eq!(read_generic::<u32, _>(&core, slot(d + 1))?, 1.5f64.to_bits() as u32);
+
+            // Guest write (high, then low) → host view.
+            write_generic(&mut core, slot(j), 0x7654_3210u32)?;
+            write_generic(&mut core, slot(j + 1), 0xfedc_ba98u32)?;
+            let value: i64 = jvm.get_field(&instance, "j", "J").await.unwrap();
+            assert_eq!(value as u64, 0x7654_3210_fedc_ba98);
+
+            // Host round trip, as every Rust-declared field is used.
+            jvm.put_field(&mut instance, "d", "D", -2.25f64).await.unwrap();
+            let value: f64 = jvm.get_field(&instance, "d", "D").await.unwrap();
+            assert_eq!(value, -2.25);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
     #[test]
     fn test_generated_jlet_wrapper_overrides_use_confirmed_indices() -> Result<()> {
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
