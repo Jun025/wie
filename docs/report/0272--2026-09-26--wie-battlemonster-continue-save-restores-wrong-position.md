@@ -83,3 +83,5 @@
 - 코드 변경 0 — 네 게이트 결과는 회신에 적는다.
 - 증거(저장소 밖 · 게임 바이트 0): `~/orchestrator/reports/evidence/wie-battlemonster-continue-save-restores-wrong-position/`
   — 저장 전·후·이어하기·이동 스크린샷 · `master.sav` A/B 머리 hexdump · `cmp -l` · 패닉 줄 · 스크래치 패치(디스크 FS · 대화형 키 · 커밋 안 함).
+
+게임 이름 유입(`scripts/corpus-name-inflow.mjs`): BOUNDED 8회/4쌍 — 전부 `배틀몬스터`(이 회차의 대상 · 등재 리니지가 이미 이름을 적은 타이틀)와 `메이플스토리2007`(라이브 타이틀 · 0265 등이 이미 적음) · SUFFIX-ATTACHED 2회/1쌍 — 둘 다 `배틀몬스터를`(조사 «를» · 진짜 언급).
