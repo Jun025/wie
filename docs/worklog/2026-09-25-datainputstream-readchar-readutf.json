@@ -6,7 +6,7 @@
   "summary": "두 빈 칸을 호출부 디스어셈블로 판정해 표에 더했다. 27 은 인자 없이 16비트 값으로 쓰이고, 32 는 인자 없이 돌려받은 객체에 String.getBytes() 를 부른다. 두 타이틀 모두 다음 벽으로 옮겨 갔고 아직 그리지는 못한다.",
   "changes": [
     "wie-lgt/data/lgt_java_abi.toml — DataInputStream readChar()C 27 · readUTF()Ljava/lang/String; 32 + 근거 주석",
-    "docs/report/0263"
+    "docs/report/0264"
   ],
   "verification": [
     "before(2efea821 release ×3): 슈퍼액션히어로 DataInputStream 32 3/3 · 스파이더맨3 DataInputStream 27 3/3",
