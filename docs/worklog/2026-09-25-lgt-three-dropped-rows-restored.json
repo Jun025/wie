@@ -9,7 +9,7 @@
     "wie-lgt/src/runtime/stdlib.rs — 0x415 dispatch + SVC 경유 memmove 시험",
     "wie-lgt/src/runtime/wipi_c.rs — ListDatabases → database::list_databases · GetContext → graphics::get_context",
     "docs/upstream-realign-p3-slices.md §D — 공용 graphics 배선 27 → 28",
-    "docs/report/0257"
+    "docs/report/0258"
   ],
   "verification": [
     "before(main 1b4944de): 알바타이쿤2·데몬헌터 0x415 · 리듬페스티발 ×2·하이브리드 412 · 바이오크로니클 207",

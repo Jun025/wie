@@ -90,4 +90,3 @@ ticks 는 부하(150~210)에 따라 흔들려서 판정에 쓰지 않았다. 판
 - SUFFIX-ATTACHED 2쌍은 손으로 갈랐다. worklog 두 곳은 stem 에 조사(가·는)가 붙은 «진짜 언급»이다. 회차 문서 한 곳은 stem 뒤에 `2` 가 붙은 «더 긴 다른 제목»이고, 그 제목은 추가 표본으로 BOUNDED 에 있다 ⇒ 새 이름은 0이다.
 
 
-<!-- corpus-name-inflow v1 subjects=6 tree=2eb6023d1c19ed46 B=53/27 P=0/0 S=3/2 -->
