@@ -85,6 +85,6 @@ ticks 는 부하(150~210)에 따라 흔들려서 판정에 쓰지 않았다. 판
 ### 게임 파일명 유입
 
 `node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab` 의 대상은 이 브랜치가 바꾼 6파일이다.
-결과는 **BOUNDED 19쌍 · SUFFIX-ATTACHED 1쌍 · PREFIX 0** 이다.
-- BOUNDED 는 전부 이 회차가 잰 타이틀 이름이다(대상 6건 + 게이트에서 뒤집힌 3건). 예외 하나는 §D 문서에 원래 있던 주석 속 이름이다. 이름일 뿐 바이트는 0이다.
-- SUFFIX-ATTACHED 1쌍은 손으로 갈랐다. worklog 의 두 곳에서 stem 에 조사(가·는)가 붙은 «진짜 언급»이다. 더 긴 다른 제목이 아니고, 같은 이름이 BOUNDED 에도 있다 ⇒ 새 이름은 0이다.
+결과는 **BOUNDED 27쌍 · SUFFIX-ATTACHED 2쌍 · PREFIX 0** 이다.
+- BOUNDED 는 전부 이 회차가 잰 타이틀 이름이다(대상 6건 · 게이트에서 뒤집힌 3건 · 0254 권고 추가 표본). 예외 하나는 §D 문서에 원래 있던 주석 속 이름이다. 이름일 뿐 바이트는 0이다.
+- SUFFIX-ATTACHED 2쌍은 손으로 갈랐다. worklog 두 곳은 stem 에 조사(가·는)가 붙은 «진짜 언급»이다. 회차 문서 한 곳은 stem 뒤에 `2` 가 붙은 «더 긴 다른 제목»이고, 그 제목은 추가 표본으로 BOUNDED 에 있다 ⇒ 새 이름은 0이다.
