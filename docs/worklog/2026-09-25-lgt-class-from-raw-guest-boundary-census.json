@@ -1,0 +1,53 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-25",
+  "task": "wie-2026-09-23-nom3-inject-panic-and-partial-inject-unmeasured-adopt-p2",
+  "title": "LGT JavaClassDefinition::from_raw 의 게스트 경계 전수 — 5곳 중 막힌 1 · 남은 정직한 답 3(그중 1곳은 패닉 실측)",
+  "summary": "게스트 메모리/레지스터에서 온 포인터로 JavaClassDefinition 을 만들고 패닉하는 trait 메서드(name·super_class_name·interface_names)에 닿는 LGT 호출부를 셌다. 코드 변경 0. 가장 큰 구멍은 #264 가 막은 자리가 아니라 값 코덱 JavaValueCodec::object_from_raw(value.rs:33)다 — class() 로 «인스턴스 헤더·디스패치 워드가 읽힌다»까지만 확인하고 그 클래스 워드가 가리키는 곳은 확인하지 않은 채 ClassDefinition::name 을 부른다. 스크래치 테스트(미커밋)로 디스패치 표 첫 워드를 놈3 의 0x104c02b4 로 두고 decode_word 를 부르면 class_definition.rs:797 에서 InvalidMemoryAccess(273416884) 로 패닉함을 실측했다. 게스트가 넘기는 모든 Class/Array 인자(wie-jvm-support native.rs:30)·예외 디코드(method.rs:164)·class_instance_from_raw 가 이 길을 탄다. 상세 표는 docs/report/0257.",
+  "census": {
+    "commands": [
+      "git grep -n 'JavaClassDefinition::from_raw' -- 'wie-lgt/*.rs'",
+      "git grep -n 'class_from_raw' -- wie-lgt",
+      "git grep -nE '\\.class\\(\\)' -- wie-lgt",
+      "git grep -n 'object_from_raw' -- '*.rs'",
+      "git grep -n 'register_generated_class' -- wie-lgt"
+    ],
+    "measuredAt": "origin/main 7e97a7db",
+    "lgtGuestBoundaries": 5,
+    "closed": 1,
+    "openWithHonestAnswer": 3,
+    "guardedUpstream": 1,
+    "panicReproduced": "wie-lgt/src/runtime/java/jvm_support/value.rs:33 (scratch test, not committed)"
+  },
+  "adoptedProposals": ["2026-09-23-nom3-inject-panic-and-partial-inject-unmeasured#p2"],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "값 코덱 object_from_raw 의 ClassDefinition::name 을 try_name 으로 — 읽을 수 없는 클래스는 null",
+      "plainSummary": "게스트가 넘긴 객체의 클래스 포인터가 엉뚱한 곳을 가리키면, 지금은 에뮬레이터 전체가 죽는다(실측). 이미 «죽은 객체는 null» 로 답하는 함수라 같은 답을 주면 된다.",
+      "userBenefit": "놈3 과 같은 모양(읽을 수 없는 클래스 워드)이 예외 경로가 아닌 일반 인자 경로로 들어와도 탭 전체가 멈추지 않는다.",
+      "why": "value.rs:26 은 class() 실패를 None+warn 으로 이미 처리하는데, 바로 아래 :33 은 class() 가 성공한 뒤 그 클래스 워드를 역참조하는 name() 을 패닉 판으로 부른다 — #264 가 java_is_class_assignable 에서 고친 것과 같은 비대칭이다. 스크래치 테스트로 decode_word(live, Class) 가 class_definition.rs:797 InvalidMemoryAccess(0x104c02b4) 패닉임을 실측했다. 정직한 답은 이미 함수 계약(null-on-invalid)에 있다.",
+      "tradeoff": "null 로 접으면 게스트의 NullPointerException 으로 바뀌어 원인이 한 층 가려진다 — 첫 1회 warn 과 주소를 남겨 상쇄한다(#264 의 1회 error·이후 trace 패턴 재사용 가능).",
+      "effort": "S",
+      "target": "wie-lgt/src/runtime/java/jvm_support/value.rs"
+    },
+    {
+      "title": "register_generated_class·java_resolve_class 의 ClassDefinition::name 을 try_name()? 로",
+      "plainSummary": "게스트가 등록을 요청한 클래스의 이름 문자열을 못 읽으면 지금은 패닉이다. 두 함수 모두 오류를 돌려줄 수 있어서 그냥 오류로 올리면 된다.",
+      "userBenefit": "깨진 클래스 등록 요청이 에뮬레이터 전체가 아니라 그 게스트 호출 하나의 오류로 끝난다.",
+      "why": "java_register_class(interface.rs:354)는 descriptor()? 로 클래스·디스크립터 두 홉은 오류로 올리지만, 이어지는 register_generated_class(jvm_support.rs:240)의 name() 은 셋째 홉(ptr_name 문자열·UTF-8)을 패닉 판으로 읽는다. 둘 다 wie_util::Result 를 돌려주므로 ? 가 정직한 답이다. 로더 경로(lgt_class_loader.rs:105)는 find_raw_class 가 같은 세 홉을 ? 로 먼저 읽어 이미 안전하다. interface.rs:375 는 직전 등록이 같은 이름을 읽은 뒤라 실질 도달 불가지만 같은 줄 교체로 함께 닫힌다.",
+      "tradeoff": "도달이 코퍼스에서 관측된 적 없다(코드 판독). 비용은 두 줄이라 관측을 기다릴 이유가 약하다.",
+      "effort": "S",
+      "target": "wie-lgt/src/runtime/java/jvm_support.rs"
+    },
+    {
+      "title": "KTF 의 JavaClassDefinition::from_raw 11곳도 같은 표로 세어라",
+      "plainSummary": "KTF 도 같은 이름의 클래스 래퍼가 있고 trait name() 이 unwrap 한다. 이번 회차는 LGT 만 셌다.",
+      "userBenefit": "KTF 타이틀에서 같은 모양의 호스트 패닉이 남아 있는지 다음 타이틀이 밟기 전에 안다.",
+      "why": "wie-ktf/src/runtime/java/jvm_support/class_definition.rs:289-290 의 trait name() 도 self.name().unwrap() 이고, git grep 계수로 KTF from_raw 는 11곳(interface.rs 1 · jvm_support.rs 3 · array_class_definition.rs 1 · class_definition.rs 3 · class_instance.rs 1 · ktf_class_loader.rs 1 · method.rs 1)이다. 구현이 별개라 LGT 표를 옮길 수 없다.",
+      "tradeoff": "KTF 는 이번 제안의 target 밖이라 범위를 지켰다. 세기만 하는 S 회차다.",
+      "effort": "S",
+      "target": "wie-ktf/src/runtime/java/jvm_support/class_definition.rs"
+    }
+  ]
+}
