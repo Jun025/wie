@@ -1031,6 +1031,15 @@ pub(crate) mod tests {
                     .word_index()?,
                 4
             );
+            // Guest static-field accessors test word 0's low halfword for 0x2000 and, when set, take
+            // the statics base from `[[word 2]+8]+0x4c` (lgt_java_abi.toml, java/lang/Class). RustJava's
+            // own Class fields must therefore stay off word 0, which stays zero.
+            let block_word_0: u32 = read_generic(&core, java_class_instance.ptr_fields()?)?;
+            assert_eq!(block_word_0, 0);
+            for (name, descriptor, word_index) in [("classLoader", "Ljava/lang/ClassLoader;", 1), ("nameBytes", "[B", 3)] {
+                let field = ClassDefinition::field(&*class_definition, name, descriptor, false).unwrap();
+                assert_eq!(field.as_any().downcast_ref::<super::JavaField>().unwrap().word_index()?, word_index);
+            }
             let class_object_again: u32 = core.run_function(descriptor.fn_get_class, &[]).await?;
             assert_eq!(class_object_again, class_object);
             let initialization_state: i32 = jvm
