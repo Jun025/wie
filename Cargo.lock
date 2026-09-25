@@ -5212,6 +5212,7 @@ dependencies = [
  "tracing-subscriber",
  "web-sys",
  "wie-backend",
+ "wie-core-arm",
  "wie-j2me",
  "wie-ktf",
  "wie-lgt",
