@@ -1,0 +1,11 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-26",
+  "task": "wie-worklog-proposal-threshold-and-kind",
+  "title": "후속 제안 입구 좁히기 — 문턱·kind·상한 2",
+  "summary": "AGENTS.md 에 제안 문턱을 두고, check-worklog-json 이 kind 값과 새/증가 worklog 의 제안 3개 이상을 red 로 만든다.",
+  "changes": ["AGENTS.md §Proposal threshold + kind 행", "scripts/check-worklog-json.mjs ⒜kind ⒝cap ⒞--selftest", "engine-contract.yml 기존 스텝에 fetch + selftest"],
+  "verification": ["--selftest 7/7", "변이 2종 각 2건 FAIL", "bare 실행 OK · 235 files"],
+  "limits": ["3문·meta 기본값 0·체인 3대째 규칙은 기계 강제 없음(자기 준수)"],
+  "proposals": []
+}
