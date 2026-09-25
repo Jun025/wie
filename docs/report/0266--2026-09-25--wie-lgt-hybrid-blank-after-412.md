@@ -107,4 +107,4 @@ SUFFIX-ATTACHED 는 손으로 갈랐다. `하이브리드2` 는 코퍼스의 **�
 유입된 것은 이름뿐이다. 게임 바이트 유입 0 · 경로 유입 0.
 
 
-<!-- corpus-name-inflow v1 subjects=5 tree=3ea99070c3ace41e B=36/18 P=0/0 S=6/3 -->
+<!-- corpus-name-inflow v1 subjects=5 tree=7f3fe6803ce8b36a B=36/18 P=0/0 S=6/3 -->
