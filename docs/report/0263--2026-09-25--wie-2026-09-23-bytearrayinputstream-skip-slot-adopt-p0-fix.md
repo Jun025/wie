@@ -32,16 +32,22 @@ no-op 이 «다른 sp» 로 기억을 지운 경우(POP-SETTLE) 0회. 배틀몬�
 아니다 ⇒ 빈 체인 Err 유지. **변이**(`exception` 시험 5건):
 M1 no-op 제거(=`0256` 원판) → 3 red · M2 sp 판별 제거(무조건 no-op) → 1 red · M3 소비 제거(=main 원판) → 2 red · 원상 5/5.
 
-**게이트**: fmt · clippy `--all -D warnings` · wasm clippy · `+beta` clippy 전부 rc0 · `RUST_MIN_STACK=4194304 cargo test --all` **445 passed / 0 failed**.
+**게이트**: fmt · clippy `--all -D warnings` · wasm clippy · `+beta` clippy 전부 rc0 · `RUST_MIN_STACK=4194304 cargo test --all` **447 passed / 0 failed**(main 재병합 뒤 · 병합 전 445/0).
 
-**티켓 ⒝ 재현 경로**: `0256` 회차의 임시 키 스크립트는 **보존되지 않았다**(환경변수 패치 · 커밋·증적 모두 없음) — 복원 불가를
-그대로 적는다. 대신 위 표의 배틀몬스터 행이 **티켓 명령 그대로**로 `address: 0` 의 전제(죽은 프레임 잔존 여부)를 잰다.
-명령·계측 패치 = 증적 디렉터리 `repro.sh` · `scratch_trace_instrumentation.patch`. 벽 자체(93초 뒤 폴트)까지 고정하려면
-worklog `2026-09-25-lgt-unwind-consumes-catch-frame#p1`(키 스크립트 지정)이 먼저다.
+**티켓 ⒝ 독립 재현 — 키 스크립트 없이, 티켓 명령 그대로**(`--inject --boot-secs 6 --action-secs 2 --max-ticks 2000000000 --timeout 300`,
+release 계측 빌드 · loadavg 36~60):
+
+| 바이너리 | 실행 | 0x7acb4 unwind | 다음 PUSH 의 prev | `address: 0` |
+|---|---|---|---|---|
+| main `1d562b34` 이전(#287 착지분) | 3 | 2/3 | 그 프레임(0x4a85d400) — 이후 `cur_sp=0x400ffeac` 로 **같은 죽은 프레임에 재unwind** | **2/3**(unwind 난 2회 전부) |
+| 수정본 | 3 | 3/3 | **0x0** | **0/3** |
+
+덤프는 원 회차와 같다(`SP 0x40100004 · PC 0x7100026a`). 검수자의 0회는 unwind 자체가 나지 않은 실행이다(main 1/3 도 그랬다).
+★`address: 0` 이 난 main 실행도 `"result":"PASS"` 였다 — 미처리 스레드 예외는 판정에 들어가지 않는다(형제 #296 의 축).
+`0256` 회차의 임시 키 스크립트는 보존되지 않았다(복원 불가) — 위 명령이 그 대체다.
+명령·계측 패치 = 증적 디렉터리 `repro.sh` · `scratch_trace_instrumentation.patch`.
 
 **사용자 영향**: catch 에서 예외 프레임을 치우는 LGT 게임(현영맞고2006·놈3 등)에서, 잡힌 예외 뒤 바깥 try 가 체인에서
 조용히 빠지던 잠복 결함이 막혔다 — 배틀몬스터의 `address: 0` 수리는 그대로 유지된다.
 
 **게임 파일명 유입**(`corpus-name-inflow --corpus` · 브랜치 전체 7파일): BOUNDED 29 · SUFFIX-ATTACHED 5 — 전부 주석·문서 속 타이틀명(계측 근거 인용) · 게임 바이트 0.
-
-<!-- corpus-name-inflow v1 subjects=7 tree=cdefd7c0dd6385a0 B=72/29 P=1/1 S=12/5 -->
