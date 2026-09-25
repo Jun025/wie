@@ -1,0 +1,39 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-25",
+  "task": "wie-lgt-hybrid-blank-after-412",
+  "merge_strategy": "merge",
+  "title": "하이브리드 단색 벽 = MC_GRP_GET_FRAME_BUFFER_BPP 가 인자를 핸들로 읽는다 — LGT 접근자로 한 줄 옮겨 PASS",
+  "summary": "하이브리드는 매 프레임 BPP 를 약 90번 부르는데, 인자가 framebuffer 핸들이 아니다(홀수 주소 · 리소스 버퍼 주소). 공용 접근자는 그 값을 레코드로 읽어 쓰레기 bpp 를 돌려줬고 타이틀은 흰 단색만 그렸다. 트리에 있던 LGT 접근자(네이티브처럼 인자 무시 · 16)로 한 줄 옮기자 이용안내 화면이 그려진다. working/lgt 54 짝지은 게이트에서 같은 벽의 타이틀 4건(하이브리드·놈ZERO·제노니아1·제노니아2)이 열렸고 회귀는 0이다. #298 의 타이틀도 같은 첫 층이지만 글자색은 컨텍스트 레코드(둘째 층) 때문에 아직 거의 흰색이다.",
+  "changes": [
+    "wie-lgt/src/runtime/wipi_c.rs — GetFramebufferBpp → graphics::get_framebuffer_bpp · 모듈 주석(예외 1줄 · dead 45 → 42) · 시험 wipic_framebuffer_bpp_ignores_its_argument",
+    "wie-lgt/src/runtime/java.rs — cfg(test) init_jvm 재수출",
+    "docs/upstream-realign-p3-slices.md §D — 공용 배선 28 → 27",
+    "docs/report/0266"
+  ],
+  "verification": [
+    "짝지은 교대 4회(release · 60s · load1 41~99): C PASS ×2 · main FAIL 단색 ×2",
+    "keydraw_lgt --inject --expect-last-frame: 양쪽 PASS 27/27 키",
+    "working/lgt 54 짝지은 게이트(15s · load1 12~99): main 49 → 52 PASS · 어긋난 5건 40s 2쌍 재측 — FAIL→PASS 4 · 잡음 1(회귀 0)",
+    "변이: 배선을 공용으로 되돌리면 시험 FAILED(0 ≠ 16)",
+    "cargo test --all 445 passed · 0 failed"
+  ],
+  "limits": [
+    "공용 접근자가 실제로 돌려준 bpp 값은 관측하지 않았다",
+    "판정 축은 boot+render — 이용안내 뒤 화면은 재지 않았다"
+  ],
+  "adoptedProposals": [
+    "2026-09-25-lgt-three-dropped-rows-restored#p0"
+  ],
+  "proposals": [
+    {
+      "title": "LGT 컨텍스트 레코드(둘째 층) — BPP 뒤에도 글자가 거의 흰색인 타이틀",
+      "plainSummary": "#298 의 타이틀은 이번 수정으로 글자를 그리기 시작했지만 글자색이 바탕과 거의 같아 보이지 않습니다. 글자색을 읽는 자리를 맞추는 일입니다.",
+      "userBenefit": "그 타이틀의 이용안내 글자가 실제로 읽히게 됩니다.",
+      "why": "C 바이너리에서 그 타이틀은 validator PASS(2색)지만 글자 픽셀이 #fffbff(흰 바탕 위 2,125 px)다. #298 §3 의 컨텍스트 어댑터는 BPP 가 공용이던 트리에서 쟀기 때문에 이 층을 따로 볼 수 없었다. BPP + 컨텍스트 두 층을 함께 재면 된다.",
+      "tradeoff": "#298 이 잰 대로 컨텍스트 레코드만 LGT 형식으로 바꾸면 keydraw_lgt 가 깨진다 — 게스트마다 레코드를 고르는 설계 결정이 필요할 수 있다. #298 착지를 기다려 그 리니지로 잇는 것이 맞다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ]
+}
