@@ -1,0 +1,33 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-25",
+  "task": "wie-2026-09-24-jlet-get-current-jlet-alias-adopt-p0",
+  "title": "간호사타이쿤2 no-frame 벽 = DataInputStream index 22 빈 칸 — readBoolean()Z 등재",
+  "summary": "no-frame 은 대기가 아니었다. 부팅 스레드가 세이브를 읽다 DataInputStream vtable index 22 에서 Unimplemented 로 죽었다. 파일의 기존 파생값 readBoolean()Z 를 등재했다. 게스트의 읽기 819회가 자기 쓰기와 타입까지 거울이고, 레코드 2673바이트를 정확히 다 읽는다. 다음 벽은 게스트 NPE → invalid memory access 다.",
+  "changes": [
+    "wie-lgt/data/lgt_java_abi.toml — DataInputStream readBoolean ()Z index 22 + 근거 주석",
+    "wie-lgt/src/runtime/java/jvm_support.rs — abi_rows_cover… 시험에 1행",
+    "docs/report/0250"
+  ],
+  "verification": [
+    "before(main 852143b7): FAIL deadline ticks 332 paints 0 · Unimplemented: java/io/DataInputStream vtable index 22",
+    "after ×2: FAIL deadline ticks 710/570 paints 0 · NullPointerException → Invalid memory access 0x706f6e50",
+    "변이(행 제거): 단위 시험 FAILED(index 22 is empty) · 게임은 원래 벽(Unimplemented index 22) 재현"
+  ],
+  "limits": [
+    "writeBoolean 은 0/1 만 써서 readBoolean 과 readUnsignedByte 를 값으로 가를 수 없다 — 슬롯 순서만이 가른다",
+    "간호사타이쿤2 는 여전히 paints 0"
+  ],
+  "adoptedProposals": ["2026-09-24-jlet-get-current-jlet-alias#p0"],
+  "proposals": [
+    {
+      "title": "간호사타이쿤2(LGT) — 세이브 로드 직후 게스트 NPE 와 invalid memory access",
+      "plainSummary": "간호사타이쿤2 가 이제 세이브를 끝까지 읽지만, 바로 뒤에 게임 코드 스스로 '빈 값' 오류를 내고 이어서 잘못된 메모리를 읽고 멈춥니다. 무엇이 비어 있었는지 찾는 일입니다.",
+      "userBenefit": "이 타이틀이 첫 화면을 그리기 전 마지막으로 보이는 장애물입니다.",
+      "why": "after 2/2 동일: 읽기 819회 완료 → import 0x64/34(RaiseNullPointerException) lr=0x297f0 → WieError Invalid memory access 0x706f6e50(ASCII 바이트). 0229 의 athrow 계급과 모양이 닮았지만 확인하지 않았다.",
+      "tradeoff": "게스트 코드 안의 예외 재던지기 경로라 null 의 출처를 따라가려면 디스어셈블이 길다 — 원인이 우리 스텁이 아니라 예외 전달 기구일 수 있다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ]
+}
