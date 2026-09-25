@@ -11,6 +11,31 @@ use wie_core_arm::{Allocator, ArmCore};
 use wie_util::{ByteRead, ByteWrite, Result, WieError, read_generic, write_generic};
 use wie_wipi_c::{WIPICContext, WIPICMethodBody};
 
+// `alloc`/`free` live outside the impl so the free(NULL) guard can be tested with a bare
+// `ArmCore` — building an `LgtWIPICContext` needs a full `Jvm`, which is why the guard went
+// untested (and silently vanished in the base swap #161) the first time.
+fn alloc_indirect(core: &mut ArmCore, size: WIPICWord) -> Result<WIPICIndirectPtr> {
+    let address = Allocator::alloc(core, size + size_of::<WIPICWord>() as WIPICWord)?;
+    write_generic(core, address, size)?;
+
+    Ok(WIPICIndirectPtr(address + size_of::<WIPICWord>() as WIPICWord))
+}
+
+fn free_indirect(core: &mut ArmCore, memory: WIPICIndirectPtr) -> Result<()> {
+    // Freeing a null handle is a defined no-op (C `free(NULL)` / `MC_knlFree(NULL)`).
+    // 메탈슬러그 서바이벌 calls `MC_grpDestroyOffScreenFrameBuffer(0)` at boot; without this the
+    // `- 4` below underflows and panics the host. Pre-swap `0942b0fb` had this guard; the upstream
+    // base swap (#161) replaced the file and dropped it.
+    if memory.0 == 0 {
+        return Ok(());
+    }
+
+    let base_address = memory.0 - size_of::<WIPICWord>() as WIPICWord;
+
+    let size: WIPICWord = read_generic(core, base_address)?;
+    Allocator::free(core, base_address, size + size_of::<WIPICWord>() as WIPICWord)
+}
+
 // mostly same as ktf's one, can we merge those?
 #[derive(Clone)]
 pub struct LgtWIPICContext {
@@ -32,25 +57,11 @@ impl WIPICContext for LgtWIPICContext {
     }
 
     fn alloc(&mut self, size: WIPICWord) -> Result<WIPICIndirectPtr> {
-        let address = Allocator::alloc(&mut self.core, size + size_of::<WIPICWord>() as WIPICWord)?;
-        write_generic(&mut self.core, address, size)?;
-
-        Ok(WIPICIndirectPtr(address + size_of::<WIPICWord>() as WIPICWord))
+        alloc_indirect(&mut self.core, size)
     }
 
     fn free(&mut self, memory: WIPICIndirectPtr) -> Result<()> {
-        // Freeing a null handle is a defined no-op (C `free(NULL)` / `MC_knlFree(NULL)`).
-        // 메탈슬러그 서바이벌 calls `MC_grpDestroyOffScreenFrameBuffer(0)` at boot; without this the
-        // `- 4` below underflows and panics the host. Pre-swap `0942b0fb` had this guard; the upstream
-        // base swap (#161) replaced the file and dropped it.
-        if memory.0 == 0 {
-            return Ok(());
-        }
-
-        let base_address = memory.0 - size_of::<WIPICWord>() as WIPICWord;
-
-        let size: WIPICWord = read_generic(&self.core, base_address)?;
-        Allocator::free(&mut self.core, base_address, size + size_of::<WIPICWord>() as WIPICWord)
+        free_indirect(&mut self.core, memory)
     }
 
     fn free_raw(&mut self, address: WIPICWord, size: WIPICWord) -> Result<()> {
@@ -155,5 +166,36 @@ impl ByteRead for LgtWIPICContext {
 impl ByteWrite for LgtWIPICContext {
     fn write_bytes(&mut self, address: WIPICWord, data: &[u8]) -> wie_util::Result<()> {
         self.core.write_bytes(address, data)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use wipi_types::wipic::WIPICIndirectPtr;
+
+    use wie_core_arm::{Allocator, ArmCore};
+    use wie_util::Result;
+
+    use super::{alloc_indirect, free_indirect};
+
+    /// `free(NULL)` is a no-op, and a real handle still frees.
+    ///
+    /// The guard is what keeps 메탈슬러그 서바이벌 booting (`MC_grpDestroyOffScreenFrameBuffer(0)`).
+    /// It had no test, so the base swap (#161) dropped it without a single red; #265 restored it,
+    /// still untested. Removing the guard makes `0 - 4` underflow, which panics this test.
+    #[test]
+    fn free_null_handle_is_a_no_op_and_real_handle_still_frees() -> Result<()> {
+        let mut core = ArmCore::new(false, None)?;
+        Allocator::init(&mut core)?;
+
+        free_indirect(&mut core, WIPICIndirectPtr(0))?;
+
+        // The non-null path is unchanged: alloc → free → the same block is handed out again.
+        let first = alloc_indirect(&mut core, 16)?;
+        free_indirect(&mut core, first)?;
+        let again = alloc_indirect(&mut core, 16)?;
+        assert_eq!(again.0, first.0);
+
+        Ok(())
     }
 }
