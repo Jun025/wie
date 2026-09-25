@@ -6,7 +6,8 @@ use wie_core_arm::{Allocator, ArmCore, ArmCoreContext, RUN_FUNCTION_LR};
 use wie_util::{Result, WieError, read_generic, write_generic};
 
 const SUPPORT_CONTEXT_BASE: u32 = 0x7fff0000;
-const FRAME_WORDS: u32 = 18;
+const FRAME_WORDS: u32 = 19;
+const CONSUMED_CAP: usize = 16;
 
 // Host-side ledger for the LGT Java SVC handlers; the guest never reads it. The fixed word holds
 // the head of a list with one record per emulated thread, because a try block on one thread must
@@ -25,8 +26,11 @@ struct ThreadExceptionState {
     ptr_current_exception_frame: u32,
     ptr_pending_exception: u32,
     ptr_next: u32,
-    // sp of the frame the last unwind consumed, until a push or pop settles it; 0 = none.
-    consumed_frame_sp: u32,
+    // sps of frames unwind consumed whose catch may still pop them (see unwind). Entries below
+    // consumed_base belong to catches suspended by a later push; the frame restores the base.
+    consumed_len: u32,
+    consumed_base: u32,
+    consumed_sp: [u32; CONSUMED_CAP],
 }
 
 pub fn init(core: &mut ArmCore) -> Result<()> {
@@ -94,28 +98,26 @@ pub fn push(core: &mut ArmCore) -> Result<()> {
         context.lr,
         context.pc,
         context.cpsr,
+        state.consumed_base,
     ];
     let ptr_frame = Allocator::alloc(core, FRAME_WORDS * size_of::<u32>() as u32)?;
     write_generic(core, ptr_frame, frame)?;
     state.ptr_current_exception_frame = ptr_frame;
     state.ptr_pending_exception = 0;
-    state.consumed_frame_sp = 0;
+    state.consumed_base = state.consumed_len;
     write_generic(core, ptr_state, state)
 }
 
 pub fn pop(core: &mut ArmCore) -> Result<()> {
     let sp = core.save_context().sp;
     if let Some((ptr_state, mut state)) = find_thread_state(core)?
-        && state.consumed_frame_sp != 0
+        && state.consumed_len > state.consumed_base
+        && state.consumed_sp[state.consumed_len as usize - 1] == sp
     {
-        let consumed_here = state.consumed_frame_sp == sp;
-        state.consumed_frame_sp = 0;
-        if consumed_here {
-            // The catch pops the frame unwind already consumed (the Thumb titles' convention).
-            state.ptr_pending_exception = 0;
-            return write_generic(core, ptr_state, state);
-        }
-        write_generic(core, ptr_state, state)?;
+        // The catch pops the frame unwind already consumed (the Thumb titles' convention).
+        state.consumed_len -= 1;
+        state.ptr_pending_exception = 0;
+        return write_generic(core, ptr_state, state);
     }
 
     let (ptr_state, mut state) = find_thread_state(core)?
@@ -125,6 +127,8 @@ pub fn pop(core: &mut ArmCore) -> Result<()> {
     let frame: [u32; FRAME_WORDS as usize] = read_generic(core, ptr_frame)?;
     state.ptr_current_exception_frame = frame[0];
     state.ptr_pending_exception = 0;
+    state.consumed_len = state.consumed_base;
+    state.consumed_base = frame[18];
     write_generic(core, ptr_state, state)?;
     Allocator::free(core, ptr_frame, FRAME_WORDS * size_of::<u32>() as u32)
 }
@@ -151,15 +155,25 @@ pub fn unwind(core: &mut ArmCore, ptr_exception: u32) -> Result<Option<u32>> {
     // Entering a catch consumes its frame. Two compiled conventions are measured, and both need
     // it: 배틀몬스터 (ARM, 51 of 51 catch blocks) never pops from a catch, so a frame left on the
     // chain outlives its stack and a later throw resumes into dead registers (fp = sp = pc = 0);
-    // 현영맞고2006 and 놈3 (Thumb) do pop from the catch, at the frame's sp. consumed_frame_sp
-    // turns that pop into a no-op instead of letting it free the enclosing try's frame. A pop at
-    // any other sp, or a push, settles it: that pop belongs to a frame still on the chain.
+    // 현영맞고2006 and 놈3 (Thumb) do pop from the catch, at the frame's sp. The consumed sp turns
+    // that pop into a no-op instead of letting it free the enclosing try's frame. It is a stack
+    // saved and restored in push/pop pairs, so a catch that first calls code with its own try
+    // (a method, a nested try at the same sp, recursion) still finds its entry when it pops.
+    // Entries left by catches that never pop (ARM) are discarded by the enclosing frame's pop or
+    // unwind; with no enclosing frame they stay, which at worst fills the stack (see below).
     // ponytail: sp is the only discriminator — an ARM function with nested tries at one sp whose
     // inner catch returns into the outer try would no-op the outer pop (main leaked the same frame
     // there too); widen the key (e.g. with the pop's return address) if a title shows that shape.
+    // Past CONSUMED_CAP entries a new one is not recorded, so that catch's pop frees the enclosing
+    // frame as main did; raise the cap if a title nests pending catches that deep.
     state.ptr_current_exception_frame = frame[0];
     state.ptr_pending_exception = ptr_exception;
-    state.consumed_frame_sp = frame[14];
+    state.consumed_len = state.consumed_base;
+    state.consumed_base = frame[18];
+    if (state.consumed_len as usize) < CONSUMED_CAP {
+        state.consumed_sp[state.consumed_len as usize] = frame[14];
+        state.consumed_len += 1;
+    }
     write_generic(core, ptr_state, state)?;
     Allocator::free(core, ptr_frame, FRAME_WORDS * size_of::<u32>() as u32)?;
 
@@ -303,6 +317,83 @@ mod tests {
         assert_eq!(throw_at(&mut core, 0x11f00, 0x1234)?, Some(0x4001));
         assert_eq!(core.save_context().sp, 0x12000);
         assert_eq!(throw_at(&mut core, 0x12000, 0x1234)?, None);
+
+        Ok(())
+    }
+
+    // The next three are gate② R2's counterexamples: the outer and inner try share an sp, as the
+    // 현영맞고2006 trace shows (0x400fff4c), and the catch runs a push/pop pair before its own pop.
+    // A single consumed sp cleared by push let that own pop free the outer frame (None below).
+    fn enter_catch_of_same_sp_inner_try(core: &mut ArmCore) -> Result<()> {
+        push_at(core, 0x12000, 0x7cb7)?;
+        push_at(core, 0x12000, 0x7ccb)?;
+        assert_eq!(throw_at(core, 0x11e00, 0x1234)?, Some(0x7ccb));
+        Ok(())
+    }
+
+    fn set_sp(core: &mut ArmCore, sp: u32) {
+        let mut context = core.save_context();
+        context.sp = sp;
+        core.restore_context(&context);
+    }
+
+    #[test]
+    fn cx_thumb_catch_calls_function_with_try() -> Result<()> {
+        let mut core = ArmCore::new(false, None)?;
+        Allocator::init(&mut core)?;
+        init(&mut core)?;
+
+        enter_catch_of_same_sp_inner_try(&mut core)?;
+        push_at(&mut core, 0x11f00, 0x9001)?;
+        pop(&mut core)?;
+        set_sp(&mut core, 0x12000);
+        pop(&mut core)?;
+        assert_eq!(throw_at(&mut core, 0x12000, 0x5678)?, Some(0x7cb7));
+
+        Ok(())
+    }
+
+    #[test]
+    fn cx_thumb_catch_with_nested_try_same_sp() -> Result<()> {
+        let mut core = ArmCore::new(false, None)?;
+        Allocator::init(&mut core)?;
+        init(&mut core)?;
+
+        enter_catch_of_same_sp_inner_try(&mut core)?;
+        push_at(&mut core, 0x12000, 0x9001)?;
+        pop(&mut core)?;
+        pop(&mut core)?;
+        assert_eq!(throw_at(&mut core, 0x12000, 0x5678)?, Some(0x7cb7));
+
+        // Same again, but the nested try throws too: two pending catches at one sp, each popping.
+        pop(&mut core)?;
+        enter_catch_of_same_sp_inner_try(&mut core)?;
+        push_at(&mut core, 0x12000, 0x9001)?;
+        assert_eq!(throw_at(&mut core, 0x11e00, 0x1234)?, Some(0x9001));
+        pop(&mut core)?;
+        pop(&mut core)?;
+        assert_eq!(throw_at(&mut core, 0x12000, 0x5678)?, Some(0x7cb7));
+
+        Ok(())
+    }
+
+    #[test]
+    fn cx_thumb_catch_recurses() -> Result<()> {
+        let mut core = ArmCore::new(false, None)?;
+        Allocator::init(&mut core)?;
+        init(&mut core)?;
+
+        enter_catch_of_same_sp_inner_try(&mut core)?;
+        // The catch calls the same function: its tries at a deeper sp throw and catch, and that
+        // catch pops its own frame before returning.
+        push_at(&mut core, 0x11f00, 0x7cb7)?;
+        push_at(&mut core, 0x11f00, 0x7ccb)?;
+        assert_eq!(throw_at(&mut core, 0x11d00, 0x1234)?, Some(0x7ccb));
+        pop(&mut core)?;
+        pop(&mut core)?;
+        set_sp(&mut core, 0x12000);
+        pop(&mut core)?;
+        assert_eq!(throw_at(&mut core, 0x12000, 0x5678)?, Some(0x7cb7));
 
         Ok(())
     }
