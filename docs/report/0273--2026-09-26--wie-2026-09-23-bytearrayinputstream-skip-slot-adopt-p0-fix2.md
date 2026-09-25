@@ -39,5 +39,3 @@
 미처리로 새거나 `FatalError` 로 죽지 않는다. 배틀몬스터의 `address: 0` 수정은 그대로 유지.
 
 **게임 파일명 유입**(`corpus-name-inflow --corpus` · 브랜치 전체 8파일): BOUNDED 34 · SUFFIX-ATTACHED 8 — 전부 주석·문서 속 타이틀명(계측 근거 인용) · 게임 바이트 0. `0263` 의 표식은 이 회차의 코드 변경으로 낡아 떼고 이 파일로 옮겼다.
-
-<!-- corpus-name-inflow v1 subjects=8 tree=91d9e08fb36c1584 B=80/34 P=1/1 S=15/8 -->
