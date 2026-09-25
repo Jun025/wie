@@ -211,6 +211,9 @@ pub enum WIPICSvcId {
     Unk8 = 0x1a0,
     Connect = 0x258,
     Close = 0x259,
+    // net base 0x258 + index: idx4 SocketWrite, idx5 SocketRead, idx6 SocketClose.
+    SocketWrite = 0x25c,
+    SocketRead = 0x25d,
     SocketClose = 0x25e,
     ClipCreate = 0x4b0,
     ClipFree = 0x4b1,
@@ -318,6 +321,8 @@ impl TryFrom<SvcId> for WIPICSvcId {
             0x1a0 => Self::Unk8,
             0x258 => Self::Connect,
             0x259 => Self::Close,
+            0x25c => Self::SocketWrite,
+            0x25d => Self::SocketRead,
             0x25e => Self::SocketClose,
             0x4b0 => Self::ClipCreate,
             0x4b1 => Self::ClipFree,
@@ -394,6 +399,23 @@ mod tests {
             assert_eq!(u32::from(variant), id);
         }
         assert!(JavaSystemSvcId::try_from(SvcId(last + 1)).is_err());
+    }
+
+    /// `MC_netSocketWrite` (`0x25c`) and `MC_netSocketRead` (`0x25d`) are in the table.
+    ///
+    /// `02ad8b5c` added both rows so 테라-영원의혼돈 gets `-1` and falls back to offline play instead of
+    /// dying on `Unknown LGT WIPIC SVC id 604`; the base swap (#161) dropped them and nothing noticed,
+    /// because no fixture reaches the network path. Shared `wie_wipi_c::api::net` has no socket
+    /// write/read, so these cannot be re-wired to it — they are LGT-local `-1` stubs again.
+    #[test]
+    fn wipic_svc_604_605_socket_write_read_are_in_the_table() {
+        let write = WIPICSvcId::try_from(SvcId(604)).expect("SVC 604 (MC_netSocketWrite) must be in the table");
+        assert!(matches!(write, WIPICSvcId::SocketWrite));
+        assert_eq!(u32::from(write), 0x25c);
+
+        let read = WIPICSvcId::try_from(SvcId(605)).expect("SVC 605 (MC_netSocketRead) must be in the table");
+        assert!(matches!(read, WIPICSvcId::SocketRead));
+        assert_eq!(u32::from(read), 0x25d);
     }
 
     /// SVC `0x581` resolves, and an id that is genuinely unmapped still errors.

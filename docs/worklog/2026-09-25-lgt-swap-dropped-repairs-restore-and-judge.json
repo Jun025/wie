@@ -1,0 +1,22 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-25",
+  "task": "wie-lgt-swap-dropped-repairs-restore-and-judge",
+  "title": "#161 이 떨군 LGT 수리분 3건 처분 — 604/605 복원 · free(NULL) 시험 · 0x581 유지",
+  "summary": "604/605 행을 02ad8b5c 모양(-1 스텁)으로 복원하고 try_from 단언을 붙였다. free(NULL) 가드는 alloc/free 본문을 ArmCore 만 받는 함수로 빼서 Jvm 없이 시험했다. 0x581 은 LGT 코퍼스 91건 전수에서 호출 0 이라 현 상태를 유지했다.",
+  "changes": [
+    "wie-lgt/src/runtime/svc_ids.rs: SocketWrite/SocketRead 행 + 시험",
+    "wie-lgt/src/runtime/wipi_c.rs: 디스패치 2행 + net_socket_write/read",
+    "wie-lgt/src/runtime/wipi_c/context.rs: alloc_indirect/free_indirect 추출 + 시험",
+    "docs/report: 회차 보고"
+  ],
+  "verification": "두 시험 모두 개악(행 삭제 · 가드 무력화)에서 FAILED. 4게이트 통과. 0x581 스캔 91/91 실행 · 다른 스텁 11종 로그로 채널 생존 확인.",
+  "limits": "604/605 의 오프라인 폴백 효과는 헤드리스로 재지 못한다. 0x581 판정은 --inject 20초 예산 안의 도달 범위다.",
+  "proposals": [],
+  "adoptedProposals": [
+    "2026-09-25-lgt-swap-dropped-repairs-audit#p0",
+    "2026-09-25-lgt-swap-dropped-repairs-audit#p1",
+    "2026-09-25-lgt-swap-dropped-repairs-audit#p2"
+  ],
+  "declinedProposals": []
+}
