@@ -1,0 +1,45 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-25",
+  "task": "wie-2026-09-24-superaction-import-0xfd-store-long-array-adopt-p0",
+  "title": "DataInputStream 27 = readChar()C · 32 = readUTF()String — 스파이더맨3·슈퍼액션히어로 벽 한 칸씩",
+  "summary": "두 빈 칸을 호출부 디스어셈블로 판정해 표에 더했다. 27 은 인자 없이 16비트 값으로 쓰이고, 32 는 인자 없이 돌려받은 객체에 String.getBytes() 를 부른다. 두 타이틀 모두 다음 벽으로 옮겨 갔고 아직 그리지는 못한다.",
+  "changes": [
+    "wie-lgt/data/lgt_java_abi.toml — DataInputStream readChar()C 27 · readUTF()Ljava/lang/String; 32 + 근거 주석",
+    "docs/report/0263"
+  ],
+  "verification": [
+    "before(2efea821 release ×3): 슈퍼액션히어로 DataInputStream 32 3/3 · 스파이더맨3 DataInputStream 27 3/3",
+    "after(release ×3): 슈퍼액션히어로 java/util/Random 10 3/3 · 스파이더맨3 DataInputStream 19 3/3",
+    "debug 로그: 스파이더맨3 readChar 3·readByte 1·readShort 1(디스어셈블 호출 순서와 개수 일치) · 슈퍼액션히어로 readUTF 196(호출 루프 196회와 일치 · UTFDataFormatException 0)",
+    "행 제거 변이: 27 제거 → 스파이더맨3 27 재현 · 32 제거 → 슈퍼액션히어로 32 재현 · 다른 타이틀 무영향"
+  ],
+  "limits": [
+    "27: readUnsignedShort()I(26)와 값으로 구별되지 않는다 — 슬롯 순서만 가른다(게스트가 받는 수는 같다)",
+    "두 타이틀 모두 여전히 균일색 — 판정 축은 벽 문면이다"
+  ],
+  "adoptedProposals": [
+    "2026-09-24-superaction-import-0xfd-store-long-array#p0",
+    "2026-09-24-lgt-wide-field-second-word-link#p1"
+  ],
+  "proposals": [
+    {
+      "title": "스파이더맨3(LGT) — 다음 벽 DataInputStream vtable index 19",
+      "plainSummary": "데이터 읽기 함수 하나를 더 채우자 스파이더맨3 가 같은 파일 읽기의 다음 함수에서 멈춥니다.",
+      "userBenefit": "첫 리소스 읽기를 끝까지 통과하면 이 타이틀이 흑화면을 벗어날 수 있습니다.",
+      "why": "27 을 채운 뒤 3/3 `Unimplemented: java/io/DataInputStream vtable index 19`. 같은 함수 0x1b82 가 #0x50 을 r1 = 방금 할당한 byte[] 하나로 부른다 — readFully([B)V 의 규칙 자리와 맞는다.",
+      "tradeoff": "호출부 하나(같은 함수)만 봤다 — 두 번째 호출부 교차가 필요하다. 그 뒤에도 벽이 더 있을 수 있다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "슈퍼액션히어로(LGT) — 다음 벽 java/util/Random vtable index 10",
+      "plainSummary": "데이터 파일 196개 문자열을 다 읽은 뒤, 이번에는 난수 함수 하나가 없어서 멈춥니다.",
+      "userBenefit": "이 벽을 넘으면 게임 스레드가 그리기 루프에 한 걸음 더 다가갑니다.",
+      "why": "32 를 채운 뒤 3/3 `Unimplemented: java/util/Random vtable index 10`(readUTF 196회 뒤). 그리기 호출은 여전히 없다(paints 3 · colors 1).",
+      "tradeoff": "이 회차는 index 10 의 호출부를 재지 않았다. 표의 Random 블록은 nextInt()I = 12 하나뿐이고, 규칙대로면 10 은 setSeed(J)V(두 워드 인자)다 — 인자 워드로 확인해야 한다. 다른 타이틀의 Random 호출에도 닿는다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ]
+}
