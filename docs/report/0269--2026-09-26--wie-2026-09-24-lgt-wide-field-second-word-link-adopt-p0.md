@@ -63,9 +63,7 @@ paints·ticks 는 부하로 흔들리고 방향도 섞였다(ticks 는 처리량
 
 ## 6. 게임 파일명 유입
 
-`node scripts/corpus-name-inflow.mjs --corpus <코퍼스>` 결과는 BOUNDED **20회/12쌍** · SUFFIX-ATTACHED **2회/2쌍**이다.
-이번 diff 가 새로 넣은 것은 `레전드오브마스터`(이 문서·worklog·시험 주석)뿐이고, 그 이름은 이미 `0244` 에 있었다.
-나머지는 `jvm_support.rs` 에 원래 있던 줄이다(이 도구는 바뀐 파일의 «본문 전체»를 센다). SUFFIX 2건(`간호사타이쿤2`·`서든어택포켓`)도
-원래 있던 줄에서 나왔고, 둘 다 조사가 아니라 «더 긴 다른 제목»이다.
-
-<!-- corpus-name-inflow v1 subjects=4 tree=d6c50acbd9a0e7c4 B=23/14 P=8/2 S=4/4 -->
+`node scripts/corpus-name-inflow.mjs --corpus <코퍼스>`(아래 표식) — BOUNDED **20회/12쌍** · SUFFIX-ATTACHED **2회/2쌍**.
+이번 diff 가 새로 넣은 이름은 §3 의 타이틀 하나이고(이 문서·worklog·시험 주석), 그 이름은 이미 `0244` 에 있다.
+나머지는 `jvm_support.rs` 에 원래 있던 줄이다(도구는 바뀐 파일의 «본문 전체»를 센다). SUFFIX 2건도 원래 있던 줄이고, 손으로 갈라 보니
+둘 다 조사가 아니라 «더 긴 다른 제목»이다.
