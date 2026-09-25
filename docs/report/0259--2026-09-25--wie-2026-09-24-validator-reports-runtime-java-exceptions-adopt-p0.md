@@ -109,6 +109,12 @@ unwind 가 pop 하면 앞의 11회가 **이중 pop**(바깥 프레임 해제)이
 
 ### 검증
 
-GATES_PLACEHOLDER
+최종 diff 는 문서 2파일뿐(probe 는 non-LTO 별 target 에서만 빌드 · 원상 복구 후 `git diff -- wie-lgt` 0줄).
+`cargo fmt --all -- --check` rc=0 · `cargo clippy --all -- -D warnings` rc=0 ·
+`cargo clippy --target wasm32-unknown-unknown -- -D warnings` rc=0 · `cargo +beta clippy --all -- -D warnings` rc=0 ·
+`RUST_MIN_STACK=4194304 cargo test --all` rc=0 · **436 passed / 0 failed** ·
+`cargo clippy --workspace --all-targets` rc=0 · 경고 **16**(0231·0242 와 같은 수 · 전건 기존 test 타깃) ⇒ 증가 0.
+AGENTS.md 러너 블록은 돌리지 않았다 — 엔진 코드 무변경.
 
-**게임 파일명 유입** INFLOW_PLACEHOLDER
+**게임 파일명 유입**(`node scripts/corpus-name-inflow.mjs --corpus <game_lab>` 실행값): BOUNDED·SUFFIX-ATTACHED 는
+아래 표식 그대로다. 전건 이 회차의 측정 대상 타이틀 이름(표·판정 문장)이고 파일 바이트·경로 밖 유입은 없다.
