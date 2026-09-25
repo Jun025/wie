@@ -77,3 +77,5 @@
 - 회귀: `RUST_MIN_STACK=4194304 cargo test --all` · `cargo clippy --workspace --all-targets` — 결과는 회신에 적는다(코드 변경 0).
 - 증거(저장소 밖 · 게임 바이트 0): `~/orchestrator/reports/evidence/wie-2026-09-23-nom3-inject-panic-and-partial-inject-unmeasured-adopt-p3/`
   — `runs.tsv`(107회 원자료) · `cls-48.txt` · `debug-thread-timeline.txt` · FAIL A/B·PASS debug 로그(gz).
+
+게임 이름 유입(`scripts/corpus-name-inflow.mjs`): BOUNDED 7회/2쌍 — 전부 이 회차의 대상 타이틀 `놈3`(리니지 0229 가 이미 이름을 적은 라이브 타이틀) · SUFFIX-ATTACHED 0.
