@@ -1,0 +1,45 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-25",
+  "task": "wie-2026-09-24-validator-reports-runtime-java-exceptions-adopt-p0",
+  "title": "서든어택포켓(lgt)의 count 0 은 30초 기아 — 실제 정지는 DataOutputStream 14 미구현이 여는 같은-처리기 되던지기 무한 루프(LGT hang 5종 공통)",
+  "summary": "코드 변경 0. --timeout 30 은 부팅 공백(29~39초)을 못 넘어 count 0 을 낸다. 60·240초에서는 count 2 · FileNotFoundException → Unimplemented DataOutputStream 14. probe: catch(Exception) 처리기가 WieError 를 못 잡고 되던지는데 exception::unwind 가 같은 프레임으로 돌려보내 133,498회 반복. LGT 91파일 측정에서 FAIL hang 5종(간호사타이쿤2·서든어택포켓·턴·훼밀리마트타이쿤·학교가는길)이 같은 루프(60초에 50만~62만 회). unwind 가 pop 하는 수리는 게스트 자신의 pop 11회와 충돌해 틀리다 — JVM 의미론(처리기 진입 프레임 건너뛰기)이 맞는 모양이고 후속으로 넘겼다.",
+  "changes": [
+    "docs/report/0259 — 판정 · 예산별 표 · 형제 조건 대조"
+  ],
+  "verification": [
+    "30s: ticks 2 · count 0 (0242 재현) ↔ 60s: ticks 179/187 · count 2 ↔ 240s: ticks 1470/1477 · count 2 · 벽 문면 동일",
+    "probe(최종 diff 0줄): guest athrow 133,498회 · 같은 객체·같은 lr · unwind 같은 프레임 · assignable WieError→Exception=false",
+    "LGT 91파일 probe: unwind 발생 9종 · 같은 프레임 재진입 = FAIL 5종 전부(499,011~621,042) · PASS 4종 0 · unwind 직후 첫 사건 = 게스트 pop 11 · 새 push 4"
+  ],
+  "limits": [
+    "공백 29~39초의 정체(연산인지 시간 폴링인지)는 판정하지 않았다 — 벽의 원인이 아니고 예산만 먹는다",
+    "0231 이 60초에서 BAOS 16 을 못 본 이유는 원문이 없어 판정 보류",
+    "probe 의 LAST_UNWOUND 는 전역 1칸(스레드 무구분) — 교차 스레드 unwind 가 끼면 분류가 흐를 수 있다"
+  ],
+  "proposals": [
+    {
+      "title": "LGT 예외 unwind 가 «처리기에 진입한 프레임»으로 다시 들어가 무한 되던지기 — hang 5종 공통",
+      "plainSummary": "게임이 처리하지 못한 오류를 다시 던지면, 에뮬레이터가 그 오류를 같은 처리 코드로 돌려보내 영원히 반복합니다. 그래서 진짜 원인(빈 칸 하나)이 «검은 화면»으로 가려집니다.",
+      "userBenefit": "LGT 5개 게임이 멈춘 진짜 이유가 화면 대신 오류 문장으로 드러나고, 멈춘 동안 CPU 를 태우지 않습니다.",
+      "why": "probe 실측: catch(Exception) 처리기가 WieError 를 못 잡고 athrow 하면 exception::unwind 가 현재 프레임(=그 처리기의 프레임)으로 복귀시켜 60초에 50만~62만 회 반복한다(간호사타이쿤2·서든어택포켓·턴·훼밀리마트타이쿤·학교가는길 — FAIL hang 전부). upstream 도 같은 코드다.",
+      "tradeoff": "unwind 에서 단순 pop 하면 틀린다 — unwind 직후 게스트가 스스로 같은 프레임을 pop 하는 경우가 11회(PASS 4종 포함) 있어 이중 pop 이 된다. 프레임에 «처리기 진입» 표시를 두고 다음 unwind 가 그 프레임을 건너뛰게 해야 하며, 91파일 짝 회귀가 필요하다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "서든어택포켓 부팅의 30초 무양보 구간 — 무엇을 도는지 잰다",
+      "plainSummary": "이 게임은 첫 화면 전에 30초 넘게 한 번도 쉬지 않고 무언가를 계산합니다. 그게 무엇인지 알면 부팅이 빨라지고 검증도 짧은 시간으로 가능해집니다.",
+      "userBenefit": "서든어택포켓이 켜지기까지 기다리는 시간이 줄 수 있고, 검증 예산 30초로도 벽까지 닿게 됩니다.",
+      "why": "AnnunciatorComponent::show() 와 Display::getDisplay 사이 29.2~38.9초 동안 ticks 가 1~2 밖에 오르지 않는다 — 한 tick(8ms 상한) 안에서 게스트가 양보 없이 돈다. 이 때문에 --timeout 30 측정(0242)이 count 0 을 냈고 벽 위치를 오독했다.",
+      "tradeoff": "원인이 게스트 자체의 정상 연산(리소스 해제 등)이면 고칠 것이 없다 — 먼저 trace 로 그 구간에 불리는 호출을 세어야 한다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": [
+    "2026-09-24-validator-reports-runtime-java-exceptions#p0",
+    "2026-09-24-file-preserves-filenotfound-exception-type#p1"
+  ],
+  "declinedProposals": []
+}
