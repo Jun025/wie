@@ -92,3 +92,10 @@ Java(Jlet) 타이틀이라 lcdui 경로로 그린다 ⇒ 이 배선과 무관하
 
 - release 바이너리 넷 빌드 · 이 타이틀 ⒜ 1 · ⒝ 3 · E1 1 · F 2(짝지은) · `keydraw_lgt` ⒜/⒝/F · 배틀몬스터 ⒜/⒝ · SVC 계수 로그 ⒜/⒝
 - 소스 복원: 매 실험 뒤 `git checkout --` · 신규 파일 삭제 → `git status --porcelain` 빈 출력
+
+## 게임 파일명 유입 — 도구를 «실행해서» 적는다
+
+`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab`: ★**BOUNDED 4회 / 2쌍** · PREFIX-EMBEDDED 0 ·
+★**SUFFIX-ATTACHED 0**. 들어온 이름은 **1개**(배틀몬스터 — 이 문서와 worklog 각 1쌍)이고 티켓 자신이 그 이름으로 «같은 계급인지»를
+물었기 때문에 이름 없이 적으면 답이 되지 않는다. `0236` §2-2 의 뒤집힘 타이틀은 이름 대신 «그 타이틀»로만 적었다.
+게임 바이트 유입 0 · 경로 유입 0.
