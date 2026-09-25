@@ -39,7 +39,7 @@ use wipi_types::wipic::WIPICIndirectPtr;
 use wie_backend::System;
 use wie_core_arm::{ArmCore, EmulatedFunction, EmulatedFunctionParam, ResultWriter, SvcId};
 use wie_jvm_support::JvmSupport;
-use wie_util::{Result, read_generic, write_generic, write_null_terminated_string_bytes};
+use wie_util::{Result, read_generic, write_generic, write_null_terminated_string_bytes, write_null_terminated_table};
 use wie_wipi_c::{
     MethodImpl, WIPICContext, WIPICMethodBody, WIPICResult,
     api::{database, graphics as shared_graphics, kernel, media, misc, net},
@@ -110,6 +110,7 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::CreateOffscreenFramebuffer => wie_wipi_c::api::graphics::create_offscreen_framebuffer.into_body(),
         WIPICSvcId::InitContext => wie_wipi_c::api::graphics::init_context.into_body(),
         WIPICSvcId::SetContext => wie_wipi_c::api::graphics::set_context.into_body(),
+        WIPICSvcId::GetContext => wie_wipi_c::api::graphics::get_context.into_body(),
         WIPICSvcId::PutPixel => wie_wipi_c::api::graphics::put_pixel.into_body(),
         WIPICSvcId::DrawLine => wie_wipi_c::api::graphics::draw_line.into_body(),
         WIPICSvcId::DrawRect => wie_wipi_c::api::graphics::draw_rect.into_body(),
@@ -135,10 +136,11 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::CreateImage => wie_wipi_c::api::graphics::create_image.into_body(),
         WIPICSvcId::Unk0 => unk0.into_body(),
         WIPICSvcId::Unk11 => unk11.into_body(),
-        WIPICSvcId::Unk3 => unk3.into_body(),
-        WIPICSvcId::Unk4 => unk4.into_body(),
+        WIPICSvcId::ImGetSupportModeCount => im_get_support_mode_count.into_body(),
+        WIPICSvcId::ImGetSupportedModes => im_get_supported_modes.into_body(),
         WIPICSvcId::Unk7 => unk7.into_body(),
         WIPICSvcId::Unk6 => unk6.into_body(),
+        WIPICSvcId::ImHandleInput => im_handle_input.into_body(),
         WIPICSvcId::TimeNow => time_now.into_body(),
         WIPICSvcId::TimeComponent => time_component.into_body(),
         WIPICSvcId::TimeConvert => time_convert.into_body(),
@@ -154,6 +156,7 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::ListRecord => database::list_record.into_body(),
         WIPICSvcId::UpdateRecord => database::update_record.into_body(),
         WIPICSvcId::SelectRecord => database::select_record.into_body(),
+        WIPICSvcId::ListDatabases => database::list_databases.into_body(),
         WIPICSvcId::Unk8 => database::exists_database.into_body(),
         WIPICSvcId::Connect => net::connect.into_body(),
         WIPICSvcId::Close => net::close.into_body(),
@@ -288,14 +291,39 @@ async fn unk2(context: &mut dyn WIPICContext) -> Result<u32> {
     Ok(result)
 }
 
-async fn unk3(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
-    tracing::warn!("stub unk3({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x})");
+// 0x12c..0x130 is the input-method group: `MC_imGetSurpportModeCount`, `MC_imGetSupportedModes`,
+// `MC_imSetCurrentMode`, `MC_imGetCurrentMode`, `MC_imHandleInput` (docs/reference/WIPIHeader.h:1442-1446,
+// same order). Established from guest call sites, not from the header alone: 아니마 loops
+// `i < 0x12c()` over `0x12d()[i]`, matches each name and passes `i` to `0x12e`; 제노니아1 reads
+// `0x12d()[0]` straight into `strstr` — returning NULL there is the `address: 0` wall.
+// Names are the vocabulary LGT guests search for (KO, EN/L, EN/S, N123 — 33 binaries in the corpus).
+// ponytail: the ORDER is 아니마's own enum (0 EN/S, 1 EN/L, 2 KO, 3 N123), not a measured device order.
+const IM_MODES: [&str; 4] = ["EN/S", "EN/L", "KO", "N123"];
 
-    Ok(0)
+async fn im_get_support_mode_count(_context: &mut dyn WIPICContext) -> Result<u32> {
+    Ok(IM_MODES.len() as u32)
 }
 
-async fn unk4(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
-    tracing::warn!("stub unk4({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x})");
+async fn im_get_supported_modes(context: &mut dyn WIPICContext) -> Result<u32> {
+    let mut names = vec![];
+    for mode in IM_MODES {
+        let name = context.alloc_raw(mode.len() as u32 + 1)?;
+        write_null_terminated_string_bytes(context, name, mode.as_bytes())?;
+        names.push(name);
+    }
+    let table = context.alloc_raw((names.len() as u32 + 1) * 4)?;
+    write_null_terminated_table(context, table, &names)?;
+
+    Ok(table)
+}
+
+// `(key, type, buf1, *size1, buf2, *size2)` — the header's shape, and what 그랜드체이스/놈ZERO pass.
+// At the sites read (그랜드체이스 2/2, 놈ZERO 3/7) callers zero-fill both buffers, preset the sizes and
+// ignore the return. Registering it matters once 0x12c reports modes: 그랜드체이스 goes on to
+// call it and dies on `Unknown LGT WIPIC SVC id 304` without this row.
+// ponytail: no IME — input is not composed; implement when a title needs typed text.
+async fn im_handle_input(_context: &mut dyn WIPICContext, key: u32, r#type: u32) -> Result<u32> {
+    tracing::warn!("stub MC_imHandleInput({key:#x}, {:#x})", r#type);
 
     Ok(0)
 }
