@@ -85,7 +85,7 @@ probe 로 LGT 91파일(`working/lgt`+`broken/lgt` · `--timeout 30` · 6병렬)�
 | 붕어빵타이쿤3 · 놈3 · 일지매영웅전기 · 현영맞고2006 | PASS | 0 | — |
 
 (재진입 수는 `MARK unwind` 줄 수 — 첫 unwind 1~2회를 포함한 근사다.)
-⇒ ★**이 5종의 `no frame rendered (hang/black screen)` 는 «미구현 칸» 한 개씩을 13만~60만 회 되던지기로 가린 것이다.**
+⇒ ★**이 5종의 `no frame rendered (hang/black screen)` 는 «미구현 칸» 한 개씩을 60초에 50만~62만 회 되던지기로 가린 것이다.**
 
 ★**그런데 «unwind 가 프레임을 pop 하면 된다»는 틀린 수리다** — 같은 측정에서 unwind 직후 첫 사건이
 **게스트 자신의 `pop`(같은 프레임) 11회**(PASS 4종 포함) · **pop 없이 새 `push` 4회**로 갈렸다.
