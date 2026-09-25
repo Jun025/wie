@@ -119,4 +119,3 @@ AGENTS.md 러너 블록은 돌리지 않았다 — 엔진 코드 무변경.
 **게임 파일명 유입**(`node scripts/corpus-name-inflow.mjs --corpus <game_lab>` 실행값): BOUNDED·SUFFIX-ATTACHED 는
 아래 표식 그대로다. 전건 이 회차의 측정 대상 타이틀 이름(표·판정 문장)이고 파일 바이트·경로 밖 유입은 없다.
 
-<!-- corpus-name-inflow v1 subjects=2 tree=af131330ececcd2a B=32/16 P=0/0 S=15/5 -->
