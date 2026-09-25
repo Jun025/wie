@@ -316,7 +316,7 @@ mod test {
     use wie_midp::classes::javax::microedition::{lcdui::Display as MidpDisplay, midlet::MIDlet};
     use wie_util::{Result, WieError, read_generic, write_generic};
 
-    use crate::runtime::java::{JavaSvcFunctions, handle_java_svc};
+    use crate::runtime::java::{JavaSvcFunctions, handle_java_svc, interface};
 
     use super::{
         ClassLoaderContext, JavaArrayClassInstance, JavaClassDefinition, JavaClassInstance, JavaMethod, KtfClassLoader, KtfJvmSupport,
@@ -731,6 +731,18 @@ mod test {
                         assert_eq!(jvm.load_array::<i32>(&destination, 0, 4).await.unwrap(), vec![22, 33, 0, 0]);
                     }
                 }
+
+                // The JB interface `call_native` slot writes the result back into the argument
+                // container; a `J` caller reads both words from it (귀신사냥2007 KTF).
+                let codec = JavaValueCodec::new(&core);
+                let words = encode_method_arguments(&codec, &args);
+                let container = Allocator::alloc(&mut core, (words.len().max(2) * 4) as u32)?;
+                for (i, word) in words.iter().enumerate() {
+                    write_generic(&mut core, container + (i * 4) as u32, *word)?;
+                }
+                let _ = interface::call_native(&mut core, &mut (), raw.fn_body_native_or_exception_table, container).await?;
+                let slot: [u32; 2] = [read_generic(&core, container)?, read_generic(&core, container + 4)?];
+                assert_eq!(slot[..expected.len()], expected[..], "{name}, call_native");
             }
 
             done_clone.store(true, Ordering::Relaxed);
