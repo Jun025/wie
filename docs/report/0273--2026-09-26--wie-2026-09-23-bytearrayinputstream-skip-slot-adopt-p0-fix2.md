@@ -29,10 +29,11 @@
 |---|---|
 | 현영맞고2006 | UNWIND 3 (resume 0x7ccb·0x82b3·0x8a07) → **POP-NOOP 3/3**(lr 0x7cfb·0x82e5·0x8a39) · 다음 PUSH prev = 바깥 프레임 · PASS rc0 |
 | 놈3 | UNWIND 1 (0x1c937) → **POP-NOOP 1/1**(lr 0x1c96f) · PASS rc0 |
-| 배틀몬스터(티켓 ⒝ 명령 · 6회) | `address: 0` **0/6** · 0x7acb4 unwind 1/6(run6) → 다음 PUSH **prev=0x0** · PASS rc0 전건 |
+| 배틀몬스터(티켓 ⒝ 명령 · 유효 4회) | `address: 0` **0/4** · 0x7acb4 unwind 1/4(run6) → 다음 PUSH **prev=0x0** · PASS rc0 전건 |
 
 배틀몬스터 run6 은 새 설계의 ARM 쪽을 실게임에서 밟았다: pop 하지 않는 catch 뒤 **같은 sp(0x400fff04)** 에 새 try 가 push 되고
-(`consumed_len=1`) 그 pop 은 기준 1 로 항목이 가려져 **정상 pop**(no-op 아님)이다. unwind 0/5 실행은 그 경로에 닿지 않은 것이다(`0263`·검수자와 같은 관측).
+(`consumed_len=1`) 그 pop 은 기준 1 로 항목이 가려져 **정상 pop**(no-op 아님)이다. unwind 0/3 실행은 그 경로에 닿지 않은 것이다(`0263`·검수자와 같은 관측).
+★첫 3회(`fix2_trace.txt`)는 결과 줄(stdout)만 나오고 stderr 줄(계측·`address: 0` 모두)이 **0줄**이었다 — 원인 미규명. 같은 바이너리·같은 명령을 `tee` 로 다시 돌린 run7 은 1016줄이다. stderr 가 비어 있으면 `address: 0` 도 보일 수 없으므로 그 3회는 **수에서 뺐다**.
 ★run6 의 unwind 뒤 스레드에서 `ArithmeticException: / by zero` 미처리 — 형제 회차 `wie-battlemonster-field-input-and-div-by-zero-after-unwind-fix` 의 대상이며 이 회차 범위 밖.
 
 **사용자 영향**: 현영맞고2006·놈3 류(Thumb) 게임에서 catch 가 메서드를 부르거나 try 를 중첩해도 바깥 try 가 살아 있어, 다음 예외가
@@ -42,4 +43,4 @@
 
 **병합**: `origin/main 5434ab0a` 를 merge commit 으로 흡수(리베이스·force 0). 충돌 1곳 `jvm_support.rs` ABI 고정 시험 주석 — 합집합(StringBuffer 10/13/22 + 월드장기체스 String 16). 연번 `0272` 는 #307 이 먼저 착지해 `0273` 으로 옮겼다. 병합 뒤 게이트: fmt · clippy · wasm clippy · `+beta` clippy rc0 · `cargo test --all` **460 passed / 0 failed**.
 
-<!-- corpus-name-inflow v1 subjects=8 tree=4ec9d02f5097722f B=83/37 P=1/1 S=15/8 -->
+<!-- corpus-name-inflow v1 subjects=8 tree=7f38baff91e4b75c B=83/37 P=1/1 S=15/8 -->
