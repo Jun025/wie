@@ -98,4 +98,4 @@ LGT 컨텍스트(`LgtGraphicsContext` 56B)만 어댑터로 주고 프레임버�
 이 문서와 worklog 도 타이틀 이름 대신 «그 타이틀»(`0236` §2-2)로 적었다. ⇒ 이 회차가 새로 들인 이름은 0 이다. 게임 바이트 유입 0 · 경로 유입 0.
 
 
-<!-- corpus-name-inflow v1 subjects=3 tree=f868868d201759cc B=11/6 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=3 tree=30dbbdf12e064f03 B=11/6 P=0/0 S=0/0 -->
