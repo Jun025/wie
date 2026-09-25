@@ -163,6 +163,7 @@ pub enum WIPICSvcId {
     CreateOffscreenFramebuffer = 0xcc,
     InitContext = 0xcd,
     SetContext = 0xce,
+    GetContext = 0xcf,
     PutPixel = 0xd0,
     DrawLine = 0xd1,
     DrawRect = 0xd2,
@@ -208,6 +209,7 @@ pub enum WIPICSvcId {
     ListRecord = 0x197,
     UpdateRecord = 0x198,
     SelectRecord = 0x199,
+    ListDatabases = 0x19c,
     Unk8 = 0x1a0,
     Connect = 0x258,
     Close = 0x259,
@@ -270,6 +272,7 @@ impl TryFrom<SvcId> for WIPICSvcId {
             0xcc => Self::CreateOffscreenFramebuffer,
             0xcd => Self::InitContext,
             0xce => Self::SetContext,
+            0xcf => Self::GetContext,
             0xd0 => Self::PutPixel,
             0xd1 => Self::DrawLine,
             0xd2 => Self::DrawRect,
@@ -315,6 +318,7 @@ impl TryFrom<SvcId> for WIPICSvcId {
             0x197 => Self::ListRecord,
             0x198 => Self::UpdateRecord,
             0x199 => Self::SelectRecord,
+            0x19c => Self::ListDatabases,
             0x1a0 => Self::Unk8,
             0x258 => Self::Connect,
             0x259 => Self::Close,
@@ -364,6 +368,7 @@ pub enum StdlibSvcId {
     Strstr = 0x410,
     Strlen = 0x411,
     Memcpy = 0x414,
+    Memmove = 0x415,
     Memset = 0x418,
     Time = 0x41a,
     Localtime = 0x420,
@@ -421,5 +426,27 @@ mod tests {
 
         // ...and ids that really are unmapped still error rather than silently resolving.
         assert!(WIPICSvcId::try_from(SvcId(0x582)).is_err());
+    }
+
+    /// `MC_dbListDataBase` (412 = `0x19c`) is in the table.
+    ///
+    /// The row was in the pre-swap tree (`d70b93f8`) and #161 dropped it; 리듬페스티발 ×2 and 하이브리드 then
+    /// died on `Unknown LGT WIPIC SVC id 412` during boot. It came back as upstream `3e203809`'s mapping.
+    #[test]
+    fn wipic_svc_412_list_databases_is_in_the_table() {
+        let id = WIPICSvcId::try_from(SvcId(0x19c)).expect("SVC 412 (MC_dbListDataBase) must be in the table");
+        assert!(matches!(id, WIPICSvcId::ListDatabases));
+        assert_eq!(u32::from(id), 412);
+    }
+
+    /// `MC_grpGetContext` (207 = `0xcf`) is in the table, between its two neighbours.
+    ///
+    /// Same shape as 412 above: present in `d70b93f8`, dropped by #161, and 바이오크로니클 died on
+    /// `Unknown LGT WIPIC SVC id 207`. `InitContext`/`SetContext` never left, so only the getter was missing.
+    #[test]
+    fn wipic_svc_207_get_context_is_in_the_table() {
+        let id = WIPICSvcId::try_from(SvcId(0xcf)).expect("SVC 207 (MC_grpGetContext) must be in the table");
+        assert!(matches!(id, WIPICSvcId::GetContext));
+        assert_eq!(u32::from(id), 207);
     }
 }

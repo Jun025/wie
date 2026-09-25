@@ -1,0 +1,40 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-25",
+  "task": "wie-2026-09-24-lgt-hard-fail-14-axes-adopt-p0",
+  "title": "#161 이 떨군 LGT 행 3개 복원 — 0x415 memmove · 412(upstream 3e203809) · 207 GetContext",
+  "summary": "현 main 에서 6 타이틀이 각각 0x415·412·207 에서 멈추는 것을 확인했다. 세 행을 복원하자 5건이 PASS 로 돌아왔다. 412 는 LGT 로컬 0 스텁 대신 upstream 이 2026-09-20 에 넣은 공용 매핑을 가져왔다 — 짝지은 측정에서 두 의미가 같은 결과였고, upstream 과 갈라지는 줄이 0 이 된다. 하이브리드는 blank 벽이 남는다.",
+  "changes": [
+    "wie-lgt/src/runtime/svc_ids.rs — Memmove 0x415 · ListDatabases 0x19c · GetContext 0xcf + 표 시험 2개",
+    "wie-lgt/src/runtime/stdlib.rs — 0x415 dispatch + SVC 경유 memmove 시험",
+    "wie-lgt/src/runtime/wipi_c.rs — ListDatabases → database::list_databases · GetContext → graphics::get_context",
+    "docs/upstream-realign-p3-slices.md §D — 공용 graphics 배선 27 → 28",
+    "docs/report/0258"
+  ],
+  "verification": [
+    "before(main 1b4944de): 알바타이쿤2·데몬헌터 0x415 · 리듬페스티발 ×2·하이브리드 412 · 바이오크로니클 207",
+    "after: 알바타이쿤2 PASS · 데몬헌터 PASS ×2 · 리듬페스티발 ×2 PASS ×2 · 바이오크로니클 PASS ×2 · 하이브리드 FAIL(blank)",
+    "행 제거 변이 3종: 7 실행 전부 원래 벽 문면 재현",
+    "412 두 의미(upstream 매핑 ↔ 0 스텁) 짝지은 측정: 결과 동일"
+  ],
+  "limits": [
+    "412: 저장 공간 크기로 분기하는 LGT 타이틀이 있으면 두 의미가 갈린다 — 이 3건에서는 보지 못했다",
+    "판정 축은 boot+render 뿐이다"
+  ],
+  "adoptedProposals": [
+    "2026-09-24-lgt-hard-fail-14-axes#p0",
+    "2026-09-24-lgt-hard-fail-14-axes#p1",
+    "2026-09-24-lgt-hard-fail-14-axes#p2"
+  ],
+  "proposals": [
+    {
+      "title": "하이브리드(LGT) — 412 뒤 blank 화면",
+      "plainSummary": "하이브리드가 이제 저장소 확인을 넘어 화면을 30번 넘게 그리지만, 전부 한 가지 색입니다. 무엇을 못 그리는지 찾는 일입니다.",
+      "userBenefit": "이 타이틀이 처음으로 내용 있는 화면을 보여 줄 수 있습니다.",
+      "why": "행 복원 뒤 2 변종(upstream 매핑 · 0 스텁) 모두 FAIL · only blank/uniform frames · paints 29~30. 0230 은 교체 전 트리에서도 같은 blank 로 적었다 — #161 과 무관한 원래 벽이다.",
+      "tradeoff": "교체 전에도 못 열던 타이틀이라 되돌릴 기준 동작이 없다 — 원인 축(그리기 API 결손 · 입력 대기 · 리소스)부터 재야 한다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ]
+}
