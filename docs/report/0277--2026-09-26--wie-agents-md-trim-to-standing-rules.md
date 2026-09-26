@@ -55,6 +55,14 @@ inflow 표식 19줄 · worklog-coverage 76줄 · branch-protection 가드/rulese
 상한 단계 양방향(워크플로의 `run:` 본문을 파일에서 뽑아 실행): 그대로 rc=0 · 851줄 rc=1(`::error`) · 되돌림 rc=0 · 정확히 850 rc=0.
 `check-doc-liveness-parity` · `check-engine-runner-fixtures` · `check-branch-protection-claim` rc=0.
 
+### 재기반 (2026-09-26 · wie-agents-md-trim-to-standing-rules-rebase)
+
+#319(`wie-meta-gates-trim-after-0921-audit`)가 먼저 착지해 `git merge origin/main`(rebase 아님)으로 해소했다.
+- `engine-contract.yml`: #319 의 worklog-coverage 스텝 «제거»를 수용 · 상한 스텝만 남김 · 「coverage 스텝 앞에 둔다」 주석은 근거가 사라져 지웠다.
+- `AGENTS.md`: verify-browser 준수 측정 절은 트림본(§D 포인터) 유지 — #319 의 문면 변경(`enforced`→`tracked`)은 그 옮긴 원문 쪽 문장이라 AGENTS.md 에 남을 자리가 없다.
+  표식 절은 #319 가 inflow 절로 통합·삭제한 판을 따르고 트림본의 「Cite the per-round file」 한 줄만 남겼다. 나머지 #319 축약(inflow 절 · worklog-coverage 절 · owner 문장)은 자동 병합됐다.
+- 해소 후 **752줄**(상한 850 유지 — 위 「두 회차가 착지하면 상한을 낮춘다」는 형제 wie-4 회차 착지 후).
+
 ---
 
 ### 옮긴 원문 (verbatim · AGENTS.md@5434ab0a)
