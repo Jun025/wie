@@ -133,6 +133,66 @@ pub fn pop(core: &mut ArmCore) -> Result<()> {
     Allocator::free(core, ptr_frame, FRAME_WORDS * size_of::<u32>() as u32)
 }
 
+// This thread's ledger as it stood before Rust ran a guest function; see release_to.
+#[derive(Clone, Copy)]
+pub struct Mark {
+    thread_key: u32,
+    ptr_frame: u32,
+    consumed_len: u32,
+    consumed_base: u32,
+}
+
+pub fn mark(core: &ArmCore) -> Result<Mark> {
+    let thread_key = current_thread_key(core);
+    Ok(match find_thread_state(core)? {
+        Some((_, state)) => Mark {
+            thread_key,
+            ptr_frame: state.ptr_current_exception_frame,
+            consumed_len: state.consumed_len,
+            consumed_base: state.consumed_base,
+        },
+        None => Mark {
+            thread_key,
+            ptr_frame: 0,
+            consumed_len: 0,
+            consumed_base: 0,
+        },
+    })
+}
+
+// A guest function Rust called has returned — normally, by an exception escaping to Rust, or
+// aborted by a host error — so every frame pushed since the mark belongs to a dead stack. 놈3:
+// paint hit an unimplemented vtable slot three calls deep, those calls' frames stayed on the chain,
+// and the WieError that surfaced in paint's caller unwound into them, resuming catches on a
+// stack that no longer existed. Nothing is freed unless the mark is still on the chain.
+pub fn release_to(core: &mut ArmCore, mark: Mark) -> Result<()> {
+    if current_thread_key(core) != mark.thread_key {
+        return Ok(());
+    }
+    let Some((ptr_state, mut state)) = find_thread_state(core)? else {
+        return Ok(());
+    };
+
+    let mut ptr_frame = state.ptr_current_exception_frame;
+    while ptr_frame != mark.ptr_frame {
+        if ptr_frame == 0 {
+            return Ok(());
+        }
+        ptr_frame = read_generic(core, ptr_frame)?;
+    }
+
+    let mut ptr_frame = state.ptr_current_exception_frame;
+    while ptr_frame != mark.ptr_frame {
+        let ptr_next = read_generic(core, ptr_frame)?;
+        Allocator::free(core, ptr_frame, FRAME_WORDS * size_of::<u32>() as u32)?;
+        ptr_frame = ptr_next;
+    }
+    state.ptr_current_exception_frame = mark.ptr_frame;
+    state.consumed_len = mark.consumed_len;
+    state.consumed_base = mark.consumed_base;
+    write_generic(core, ptr_state, state)
+}
+
 pub fn pending(core: &ArmCore) -> Result<u32> {
     Ok(find_thread_state(core)?.map_or(0, |(_, state)| state.ptr_pending_exception))
 }
@@ -160,12 +220,16 @@ pub fn unwind(core: &mut ArmCore, ptr_exception: u32) -> Result<Option<u32>> {
     // saved and restored in push/pop pairs, so a catch that first calls code with its own try
     // (a method, a nested try at the same sp, recursion) still finds its entry when it pops.
     // Entries left by catches that never pop (ARM) are discarded by the enclosing frame's pop or
-    // unwind; with no enclosing frame they stay, which at worst fills the stack (see below).
+    // unwind; with no enclosing frame they stay (see the retry loop below for the worst case).
     // ponytail: sp is the only discriminator — an ARM function with nested tries at one sp whose
     // inner catch returns into the outer try would no-op the outer pop (main leaked the same frame
     // there too); widen the key (e.g. with the pop's return address) if a title shows that shape.
-    // Past CONSUMED_CAP entries a new one is not recorded, so that catch's pop frees the enclosing
-    // frame as main did; raise the cap if a title nests pending catches that deep.
+    // A catch that never pops and re-enters the same try (a retry loop) adds one entry per round,
+    // because each push shields the entries below it. Past CONSUMED_CAP entries a new one is not
+    // recorded, so a later Thumb catch's own pop frees the enclosing frame as main did — or, with
+    // no enclosing frame, fails as a pop without a pushed frame. The enclosing frame's pop or
+    // unwind clears them all; left as is because the only measured instance (놈3's paint retry,
+    // 39,992 rounds) was itself a symptom and is gone with release_to and the String slot 26 row.
     state.ptr_current_exception_frame = frame[0];
     state.ptr_pending_exception = ptr_exception;
     state.consumed_len = state.consumed_base;
@@ -207,7 +271,7 @@ mod tests {
     use wie_core_arm::{Allocator, ArmCore};
     use wie_util::Result;
 
-    use super::{init, pending, pop, push, unwind};
+    use super::{find_thread_state, init, mark, pending, pop, push, release_to, unwind};
 
     #[test]
     fn exception_frame_restores_guest_context() -> Result<()> {
@@ -394,6 +458,97 @@ mod tests {
         set_sp(&mut core, 0x12000);
         pop(&mut core)?;
         assert_eq!(throw_at(&mut core, 0x12000, 0x5678)?, Some(0x7cb7));
+
+        Ok(())
+    }
+
+    // A nested try at the catch's sp finishes normally, then the catch throws before its own pop:
+    // the throw must reach the outer try. If the nested try's pop were allowed to consume the
+    // entry below its base, the nested frame would stay on the chain and catch the throw.
+    #[test]
+    fn cx_thumb_catch_throws_after_nested_try_before_own_pop() -> Result<()> {
+        let mut core = ArmCore::new(false, None)?;
+        Allocator::init(&mut core)?;
+        init(&mut core)?;
+
+        enter_catch_of_same_sp_inner_try(&mut core)?;
+        push_at(&mut core, 0x12000, 0x9001)?;
+        pop(&mut core)?;
+        assert_eq!(throw_at(&mut core, 0x12000, 0x5678)?, Some(0x7cb7));
+
+        Ok(())
+    }
+
+    fn consumed_len(core: &ArmCore) -> Result<u32> {
+        Ok(find_thread_state(core)?.map_or(0, |(_, state)| state.consumed_len))
+    }
+
+    // ARM catches never pop, so their entries are left behind; the enclosing frame's pop or
+    // unwind discards them rather than letting them pile up for a later pop at that sp to match.
+    #[test]
+    fn enclosing_frame_discards_entries_of_catches_that_never_pop() -> Result<()> {
+        let mut core = ArmCore::new(false, None)?;
+        Allocator::init(&mut core)?;
+        init(&mut core)?;
+
+        push_at(&mut core, 0x12000, 0x4001)?;
+        push_at(&mut core, 0x11f00, 0x5001)?;
+        assert_eq!(throw_at(&mut core, 0x11e00, 0x1234)?, Some(0x5001));
+        assert_eq!(consumed_len(&core)?, 1);
+        set_sp(&mut core, 0x12000);
+        pop(&mut core)?;
+        assert_eq!(consumed_len(&core)?, 0);
+
+        push_at(&mut core, 0x12000, 0x4001)?;
+        push_at(&mut core, 0x11f00, 0x5001)?;
+        assert_eq!(throw_at(&mut core, 0x11e00, 0x1234)?, Some(0x5001));
+        // The outer unwind drops the inner catch's entry and records only its own.
+        assert_eq!(throw_at(&mut core, 0x11f00, 0x5678)?, Some(0x4001));
+        assert_eq!(consumed_len(&core)?, 1);
+
+        Ok(())
+    }
+
+    // 놈3: Rust ran paint, three calls deep pushed frames and then a host error aborted the run.
+    // The throw that follows in paint's caller must reach the caller's own frame, not a dead one.
+    #[test]
+    fn release_to_drops_frames_a_rust_invoked_guest_call_left_behind() -> Result<()> {
+        let mut core = ArmCore::new(false, None)?;
+        Allocator::init(&mut core)?;
+        init(&mut core)?;
+
+        push_at(&mut core, 0x12000, 0x4001)?;
+        let mark = mark(&core)?;
+        push_at(&mut core, 0x11d84, 0x21a07)?;
+        push_at(&mut core, 0x11d44, 0x20b87)?;
+        // An ARM catch inside the call left an entry behind, too.
+        push_at(&mut core, 0x11d0c, 0x1f867)?;
+        assert_eq!(throw_at(&mut core, 0x11c00, 0x1234)?, Some(0x1f867));
+        assert_eq!(consumed_len(&core)?, 1);
+
+        release_to(&mut core, mark)?;
+        assert_eq!(consumed_len(&core)?, 0);
+        assert_eq!(throw_at(&mut core, 0x12000, 0x5678)?, Some(0x4001));
+        assert_eq!(throw_at(&mut core, 0x12000, 0x5678)?, None);
+
+        Ok(())
+    }
+
+    // A call that popped below the mark (unbalanced guest code) leaves nothing that is provably
+    // its own, so release_to frees nothing rather than walking into the enclosing frames.
+    #[test]
+    fn release_to_frees_nothing_when_the_mark_left_the_chain() -> Result<()> {
+        let mut core = ArmCore::new(false, None)?;
+        Allocator::init(&mut core)?;
+        init(&mut core)?;
+
+        push_at(&mut core, 0x12000, 0x4001)?;
+        push_at(&mut core, 0x11f00, 0x5001)?;
+        let mark = mark(&core)?;
+        pop(&mut core)?;
+
+        release_to(&mut core, mark)?;
+        assert_eq!(throw_at(&mut core, 0x12000, 0x5678)?, Some(0x4001));
 
         Ok(())
     }
