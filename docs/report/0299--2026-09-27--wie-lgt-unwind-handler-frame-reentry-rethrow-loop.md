@@ -32,3 +32,5 @@
 
 - 네 게이트 + beta clippy — 결과는 회신에 적는다(코드 변경 0 · 이 문서와 worklog 만).
 - 증거(저장소 밖 · 게임 바이트 0): `~/orchestrator/reports/evidence/wie-lgt-unwind-handler-frame-reentry-rethrow-loop/` — 두 트리의 unwind 계수 표.
+
+게임 이름 유입(`scripts/corpus-name-inflow.mjs --corpus <game_lab>`): 수는 아래 표식의 B·S 다 — ★S 도 0 이 아니다(조사가 붙은 타이틀 표기). 이름은 전부 제안이 이미 적은 hang 5종이다.
