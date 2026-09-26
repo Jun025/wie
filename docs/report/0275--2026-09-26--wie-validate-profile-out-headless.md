@@ -50,3 +50,5 @@
 - 네 게이트 + beta clippy · `RUST_MIN_STACK=4194304 cargo test --all` 48 스위트 전부 0 failed(회신에 원문).
 - 증거(저장소 밖 · 게임 바이트 0): `~/orchestrator/reports/evidence/wie-validate-profile-out-headless/` —
   `runs.tsv`(25회) · `o25.json` · `p25.folded.gz`(FAIL) · `p3.folded.gz`(PASS 대조) · `loop.sh`.
+
+게임 이름 유입(`scripts/corpus-name-inflow.mjs --corpus <game_lab>`): BOUNDED 9회/4쌍 — `놈3` 8회(이 회차의 대상 · 리니지 0229·0265 가 이미 적은 라이브 타이틀) · `놈ZERO` 1회(`wie_validate.rs` 의 기존 주석 — 이 회차가 쓴 줄 아님) · SUFFIX-ATTACHED 0.
