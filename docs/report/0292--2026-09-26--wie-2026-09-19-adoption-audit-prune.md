@@ -15,3 +15,7 @@
 **수치** — 코드(`.rs`·`.mjs`) +98 / −637, **순감 539줄**. 문서는 +257(이전분).
 **게이트** — fmt · clippy `-D warnings` · wasm clippy · `+beta` clippy · `RUST_MIN_STACK=4194304 cargo test --all` 전건 rc=0.
 **건드리지 않은 것** — `audit-missing-tests.sh` · `check-inflow-marker`(형제 티켓 소관) · `wie-lgt/data/lgt_java_abi.toml` · 게임 호환 활성 티켓들.
+
+**게임명 유입** — 이 diff 가 더한 줄에는 **0**(BOUNDED·SUFFIX 전 stem 을 추가 줄에 대조). 도구는 변경 파일 본문 전체를 재므로 아래 표식의 B/S 는 `origin/main` 기존분이다.
+
+<!-- corpus-name-inflow v1 subjects=10 tree=bfdb4b76edb21b82 B=16/10 P=3/1 S=1/1 -->
