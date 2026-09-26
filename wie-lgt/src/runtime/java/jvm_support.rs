@@ -328,19 +328,11 @@ impl LgtJvmSupport {
             .await
             .map_err(|JavaError::JavaException(instance)| WieError::JavaException(Self::class_instance_raw(&*instance)))?;
 
-        let core = definition.core();
-        let generated_classes = generated_classes as u32;
         let mut pointers = Vec::new();
-        let last_bucket: u32 = read_generic(core, generated_classes)?;
-        for bucket in 0..=last_bucket {
-            let mut ptr_class: u32 = read_generic(core, generated_classes + size_of::<u32>() as u32 + bucket * size_of::<u32>() as u32)?;
-            while ptr_class != 0 {
-                pointers.push(ptr_class);
-                let raw: RawJavaClass = read_generic(core, ptr_class)?;
-                let descriptor: RawJavaClassDescriptor = read_generic(core, raw.ptr_descriptor)?;
-                ptr_class = descriptor.ptr_next_class;
-            }
-        }
+        find_generated_class(definition.core(), generated_classes as u32, |ptr_class| {
+            pointers.push(ptr_class);
+            Ok(false)
+        })?;
         Ok(pointers)
     }
 
@@ -445,6 +437,26 @@ impl LgtJvmSupport {
 
         Ok(java_class)
     }
+}
+
+/// Walks the guest's `generatedClasses` table — a last-bucket index followed by one chain head per
+/// bucket, each chain linked through `ptr_next_class` — and returns the first class `predicate`
+/// accepts. The one copy of this layout: the class loader, interface linking and the vtable
+/// fallback all walk it.
+pub(crate) fn find_generated_class(core: &ArmCore, generated_classes: u32, mut predicate: impl FnMut(u32) -> Result<bool>) -> Result<Option<u32>> {
+    let last_bucket: u32 = read_generic(core, generated_classes)?;
+    for bucket in 0..=last_bucket {
+        let mut ptr_class: u32 = read_generic(core, generated_classes + size_of::<u32>() as u32 + bucket * size_of::<u32>() as u32)?;
+        while ptr_class != 0 {
+            if predicate(ptr_class)? {
+                return Ok(Some(ptr_class));
+            }
+            let raw: RawJavaClass = read_generic(core, ptr_class)?;
+            let descriptor: RawJavaClassDescriptor = read_generic(core, raw.ptr_descriptor)?;
+            ptr_class = descriptor.ptr_next_class;
+        }
+    }
+    Ok(None)
 }
 
 #[cfg(test)]
