@@ -32,3 +32,5 @@
 
 **게임 파일명 유입** — `corpus-name-inflow --corpus`: BOUNDED 4쌍 · SUFFIX-ATTACHED 0쌍. 새로 든 것은 타이틀명(식별자) 2곳
 (`docs/keys/battlemonster-village.keys` 머리 주석 · worklog 요약) · `wie_validate.rs` 의 2쌍은 main 에 이미 있던 주석 줄. 게임 바이트·경로 0.
+
+
