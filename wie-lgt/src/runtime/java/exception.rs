@@ -17,7 +17,12 @@ const CONSUMED_CAP: usize = 16;
 #[derive(Clone, Copy, Pod, Zeroable)]
 struct JavaSupportContext {
     ptr_first_thread_state: u32,
+    host_error: u32,
 }
+
+const HOST_ERROR_IDLE: u32 = 0;
+const HOST_ERROR_BUILDING: u32 = 1;
+const HOST_ERROR_UNBUILDABLE: u32 = 2;
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -35,6 +40,34 @@ struct ThreadExceptionState {
 
 pub fn init(core: &mut ArmCore) -> Result<()> {
     write_generic(core, SUPPORT_CONTEXT_BASE, JavaSupportContext::zeroed())
+}
+
+// Called before the JVM glue builds an error to throw; false means building one raised another.
+// Building allocates (a message string, the error object), so when the error is for a failed
+// allocation on an exhausted heap it fails the same way, and each failure built another error:
+// 놈3 ran Jvm::exception ↔ instantiate_array until the host stack overflowed (6,036 failed
+// allocations first). The state stays set — the run cannot go on, and unwind turns the next
+// exception into a host error.
+pub fn begin_host_error(core: &mut ArmCore) -> Result<bool> {
+    let mut support_context: JavaSupportContext = read_generic(core, SUPPORT_CONTEXT_BASE)?;
+    let entered = support_context.host_error == HOST_ERROR_IDLE;
+    support_context.host_error = if entered { HOST_ERROR_BUILDING } else { HOST_ERROR_UNBUILDABLE };
+    write_generic(core, SUPPORT_CONTEXT_BASE, support_context)?;
+    Ok(entered)
+}
+
+pub fn end_host_error(core: &mut ArmCore) -> Result<()> {
+    let mut support_context: JavaSupportContext = read_generic(core, SUPPORT_CONTEXT_BASE)?;
+    if support_context.host_error == HOST_ERROR_BUILDING {
+        support_context.host_error = HOST_ERROR_IDLE;
+        write_generic(core, SUPPORT_CONTEXT_BASE, support_context)?;
+    }
+    Ok(())
+}
+
+pub fn host_error_unbuildable(core: &ArmCore) -> Result<bool> {
+    let support_context: JavaSupportContext = read_generic(core, SUPPORT_CONTEXT_BASE)?;
+    Ok(support_context.host_error == HOST_ERROR_UNBUILDABLE)
 }
 
 // 0 is guest code run outside any emulated thread; thread ids start at 1.
@@ -198,6 +231,12 @@ pub fn pending(core: &ArmCore) -> Result<u32> {
 }
 
 pub fn unwind(core: &mut ArmCore, ptr_exception: u32) -> Result<Option<u32>> {
+    if host_error_unbuildable(core)? {
+        return Err(WieError::FatalError(
+            "LGT host error unbuildable: building it raised another (guest heap exhausted)".into(),
+        ));
+    }
+
     // Rust callers must handle the exception before an enclosing guest catch can run.
     if core.read_pc_lr()?.1 == RUN_FUNCTION_LR {
         return Ok(None);
