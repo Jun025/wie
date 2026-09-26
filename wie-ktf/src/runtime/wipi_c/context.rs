@@ -1,4 +1,6 @@
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::Vec};
+
+use spin::Mutex;
 
 use jvm::{
     Jvm,
@@ -17,11 +19,65 @@ pub struct KtfWIPICContext {
     core: ArmCore,
     system: System,
     jvm: Jvm, // We need jvm to access resource in jvm. TODO is there better way to do this?
+    resources: ResourceCache,
 }
 
+/// Resource bytes by name, shared by every context of one WIPI-C runtime.
+///
+/// Reading a resource through the JVM leaves its stream and byte array as guest-heap garbage,
+/// so each read ends in a full `collect_garbage` — about 5.4ms natively on 영웅서기4 (KTF), and
+/// titles call `MC_knlGetResourceID` + `MC_knlGetResource` for the same name back to back and
+/// again on every screen change. Uncached, a menu transition spent 58-65% of its frame in those
+/// collections, inside one SVC where ARM preemption cannot split it
+/// (docs/report/ for wie-ktf-hero4-290ms-frame-after-key-input). Resources are read-only archive
+/// entries, so each is read — and collected after — once. Missing names are not cached.
+pub type ResourceCache = Arc<Mutex<BTreeMap<String, Vec<u8>>>>;
+
 impl KtfWIPICContext {
-    pub fn new(core: ArmCore, system: System, jvm: Jvm) -> Self {
-        Self { core, system, jvm }
+    pub fn new(core: ArmCore, system: System, jvm: Jvm, resources: ResourceCache) -> Self {
+        Self {
+            core,
+            system,
+            jvm,
+            resources,
+        }
+    }
+
+    async fn resource(&self, name: &str) -> Result<Option<Vec<u8>>> {
+        if let Some(data) = self.resources.lock().get(name) {
+            return Ok(Some(data.clone()));
+        }
+
+        let class_loader = JavaLangClassLoader::get_system_class_loader(&self.jvm)
+            .await
+            .map_err(|err| WieError::FatalError(alloc::format!("Failed to get class loader for resource {name:?}: {err:?}")))?;
+        let stream = match JavaLangClassLoader::get_resource_as_stream(&self.jvm, &class_loader, name).await {
+            Ok(stream) => stream,
+            Err(err) => {
+                tracing::error!("Java exception while opening resource: name={name:?}, error={err:?}");
+                return Err(JvmSupport::to_wie_err(&self.jvm, err).await);
+            }
+        };
+
+        let data = match stream {
+            Some(stream) => match JavaIoInputStream::read_until_end(&self.jvm, &stream).await {
+                Ok(data) => Some(data),
+                Err(err) => {
+                    tracing::error!("Java exception while reading resource: name={name:?}, error={err:?}");
+                    return Err(JvmSupport::to_wie_err(&self.jvm, err).await);
+                }
+            },
+            None => None,
+        };
+        if let Err(err) = self.jvm.collect_garbage() {
+            return Err(JvmSupport::to_wie_err(&self.jvm, err).await);
+        }
+
+        if let Some(data) = &data {
+            self.resources.lock().insert(name.into(), data.clone());
+        }
+
+        Ok(data)
     }
 }
 
@@ -91,62 +147,13 @@ impl WIPICContext for KtfWIPICContext {
     }
 
     async fn get_resource_size(&self, name: &str) -> Result<Option<usize>> {
-        let class_loader = JavaLangClassLoader::get_system_class_loader(&self.jvm)
-            .await
-            .map_err(|err| WieError::FatalError(alloc::format!("Failed to get class loader for resource {name:?}: {err:?}")))?;
-        let stream = match JavaLangClassLoader::get_resource_as_stream(&self.jvm, &class_loader, name).await {
-            Ok(stream) => stream,
-            Err(err) => {
-                tracing::error!("Java exception while opening resource for size query: name={name:?}, error={err:?}");
-                return Err(JvmSupport::to_wie_err(&self.jvm, err).await);
-            }
-        };
-
-        let result = match stream {
-            Some(stream) => {
-                let available: i32 = match self.jvm.invoke_virtual(&stream, "java/io/InputStream", "available", "()I", ()).await {
-                    Ok(available) => available,
-                    Err(err) => return Err(JvmSupport::to_wie_err(&self.jvm, err).await),
-                };
-                drop(stream);
-                Some(available as usize)
-            }
-            None => None,
-        };
-        match self.jvm.collect_garbage() {
-            Ok(_) => {}
-            Err(err) => return Err(JvmSupport::to_wie_err(&self.jvm, err).await),
-        }
-
-        Ok(result)
+        Ok(self.resource(name).await?.map(|data| data.len()))
     }
 
     async fn read_resource(&self, name: &str) -> Result<Vec<u8>> {
-        let class_loader = JavaLangClassLoader::get_system_class_loader(&self.jvm)
-            .await
-            .map_err(|err| WieError::FatalError(alloc::format!("Failed to get class loader for resource {name:?}: {err:?}")))?;
-        let stream = match JavaLangClassLoader::get_resource_as_stream(&self.jvm, &class_loader, name).await {
-            Ok(Some(stream)) => stream,
-            Ok(None) => return Err(WieError::FatalError(alloc::format!("Resource disappeared before read: {name:?}"))),
-            Err(err) => {
-                tracing::error!("Java exception while opening resource for read: name={name:?}, error={err:?}");
-                return Err(JvmSupport::to_wie_err(&self.jvm, err).await);
-            }
-        };
-
-        let data = match JavaIoInputStream::read_until_end(&self.jvm, &stream).await {
-            Ok(data) => data,
-            Err(err) => {
-                tracing::error!("Java exception while reading resource: name={name:?}, error={err:?}");
-                return Err(JvmSupport::to_wie_err(&self.jvm, err).await);
-            }
-        };
-        drop(stream);
-        match self.jvm.collect_garbage() {
-            Ok(_) => {}
-            Err(err) => return Err(JvmSupport::to_wie_err(&self.jvm, err).await),
-        }
-        Ok(data)
+        self.resource(name)
+            .await?
+            .ok_or_else(|| WieError::FatalError(alloc::format!("Resource disappeared before read: {name:?}")))
     }
 
     fn set_timer(&mut self, due: Instant, callback: WIPICMethodBody) {
