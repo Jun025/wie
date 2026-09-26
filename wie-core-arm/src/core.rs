@@ -688,6 +688,13 @@ impl RunFunctionResult<u32> for u32 {
     }
 }
 
+// r0:r1 — a 64-bit (`J`/`D`) return, low word first.
+impl RunFunctionResult<(u32, u32)> for (u32, u32) {
+    fn get(core: &ArmCore) -> (u32, u32) {
+        (core.read_param(0).unwrap(), core.read_param(1).unwrap())
+    }
+}
+
 impl RunFunctionResult<()> for () {
     fn get(_: &ArmCore) {}
 }

@@ -6,7 +6,7 @@ use bytemuck::{Pod, Zeroable};
 use wipi_types::wipic::WIPICWord;
 
 use wie_backend::Database;
-use wie_util::{Result, WieError, read_generic, read_null_terminated_string_bytes, write_generic};
+use wie_util::{Result, WieError, read_generic, read_null_terminated_string_bytes, read_quotable_token, write_generic};
 
 use crate::context::WIPICContext;
 
@@ -171,220 +171,14 @@ pub async fn list_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
     Ok(ids.len() as _)
 }
 
-/// KTF WIPI-C **Database slot 8**. The standard WIPI header calls this
-/// `MC_dbSortRecords`; **this code does not claim to know what KTF puts there.**
+/// KTF WIPI-C **Database slot 8** (header name `MC_dbSortRecords`; KTF's meaning is unknown).
 ///
-/// ── The arity is 2, and it is disassembled rather than inferred ──────────────
-/// The first version of this function implemented the header's signature —
-/// `(fd, M_Int32 *buf, M_Int32 len, compare, filter)` — and wrote record ids into
-/// what it took to be `buf`. The second withdrew the 4th and 5th and kept three.
-/// Both were reading registers the caller never loaded with an argument.
-///
-/// The client images load verbatim at `IMAGE_BASE = 0x100000`
-/// (`wie_ktf::emulator`), so a guest address minus `0x100000` is a file offset in
-/// `client.bin<bss>` and the call site can be read statically. The slot-8 call
-/// sites — **three**, see the scan note below — all have this shape
-/// (`0103451A.jar` at `0x10571a`; `01031C0A.jar` at `0x1243c8` and `0x128f3a`):
-///
-/// ```text
-///   ldr  r3, [pc, #k1]      ; k1 and k2 are DIFFERENT literal-pool entries:
-///   add  r3, sl             ; r3 is reloaded between the two uses below, so
-///   ldr  r3, [r3]           ; r2 and r0 come from different globals
-///   ldr  r2, [r3]           ; r2 = &WIPICDatabaseInterface  (global slot: see below)
-///   ldr  r3, [pc, #k2]      ; <-- the reload
-///   add  r3, sl
-///   movs r1, #1             ; arg1 — an immediate at all three slot-8 sites
-///   ldr  r0, [r3]           ; arg0 — a pointer read out of a different guest global
-///   ldr  r3, [r2, #0x20]    ; r3 = table[8] = this function's own SVC stub
-///   bl   __call_via_r3      ; ARM ADS veneer whose whole body is `bx r3`
-/// ```
-///
-/// * **`r3` is call machinery.** `sort_records` is the 9th `TargetPtr` of
-///   `WIPICDatabaseInterface`. `TargetPtr` is `u32` in the build this engine
-///   ships, so that is `8 × 4 = +0x20` — under the `simulation` feature it is
-///   `usize` and the offset would be `+0x40`, which is worth knowing before
-///   redoing the arithmetic but does not change the conclusion, because the
-///   conclusion does not rest on it (next bullet). `bx r3` therefore enters
-///   *this* entry point and the register still holds its address when the SVC
-///   fires. A 4th parameter invents one.
-/// * **`r2` is call machinery too, and the register dump proves it directly.**
-///   At the fault `R3 = 0x71001781` **is** `[R2 + 0x20]`, and that value is the
-///   SortRecords SVC stub: `PC = 0x7100178a` is inside it and `IP = 0x70008` is
-///   the id `SvcId::get` reads, `(WIPICTableId::Database << 16) | 8`. So `R2`
-///   *is* the database interface — no arithmetic, no heuristic. (The weaker
-///   argument this comment used to make — "`R2` is identical in both dumps
-///   while `R0` differs" — is not wrong but proves little: a constant argument
-///   would also be identical in both dumps.)
-/// * **The 5th "argument" is the caller's saved `r10`.** `read_param(4)` resolves
-///   to `[SP+0]`, and `[SP+0] == SL` in both dumps (`0x134ac8` / `0x13e878`).
-///
-/// So the call is `f(r0, r1)` with `r1 == 1`, and the header's five-parameter
-/// shape fits none of it.
-///
-/// **How "three sites" was counted, and what identifies them.** A decoder-driven
-/// sweep of both images finds every `ldr rT,[rN,#0x20]` whose `rT` is then called
-/// (`blx rT`, or `bl` into a `bx rT` veneer) — **15 hits in `0103451A`, 18 in
-/// `01031C0A`**. Most of those are *other* tables: the discriminator is not which
-/// register holds the base (allocation is arbitrary; `01031C0A` reaches three
-/// different interfaces through `r2` alone) but **which global the table pointer
-/// was loaded from**. Back-tracking each hit to that global leaves
-/// `0103451A: 0x134c38` and `01031C0A: 0x13eb30` as the interface the dump above
-/// identifies, and exactly three hits resolve to those. The remaining ones land
-/// on other globals (`0x068b80`/`0x068b40`, `0x13eb2c`, `0x13eb54`, `0x073e40`,
-/// `0x073e00`) and pass different shapes — `0x13eb54`'s two sites push a stack
-/// argument, so that table's slot 8 takes at least five. **What the sweep cannot
-/// see** is written down with it, next to the scanner itself, in
-/// `~/orchestrator/reports/evidence/wie-game-lab-repair-campaign-pilot-unimpl-stub-fix3/`.
-///
-/// **What `r0` points at**, since "another name pointer" was as far as the
-/// previous revision got: in both images the address lands on a tail-merged
-/// string literal inside the title's own resource-path pool — `0x13184c` is
-/// `"res"` (the tail of `"res/anidata.res"`) and `0x135ae4` is `"ga"` (the tail
-/// of `"/ga/per.ga"`). Short NUL-terminated ASCII tokens, and in particular not
-/// handles: `open_database` returns an `alloc_raw` pointer, which lives in the
-/// emulator heap, not in the guest image. What the guest *means* by the token is
-/// not settled here.
-///
-/// None of that is surprising for this table: `select_record_ktf` and
-/// `stat_by_name_ktf` below already carry the note that KTF's slots diverge from
-/// the header, and the struct comment at the top of this file records that the
-/// original field names were "a pre-disassembly guess". Slot 8 is the same shape,
-/// and the first two versions of this function repeated that guess.
-///
-/// ── So it refuses, and it refuses LOUDLY ─────────────────────────────────────
-/// It takes the two arguments the disassembly accounts for, and names them
-/// `arg0`/`arg1` because naming them `db_id`/`buf_ptr` would assert the header
-/// layout the measurement refuted. Reading fewer registers costs nothing *here* —
-/// the function always fails, so a dropped argument cannot change behaviour,
-/// while a register that was never an argument turns into a published coordinate
-/// that sends the next round somewhere that does not exist. That is exactly what
-/// happened to `r3`. **It never writes to guest memory** — the withdrawn write
-/// loop would have written record ids starting at `0x1`, which is precisely the
-/// "corrupts the guest's heap silently" this doc comment used to warn about while
-/// doing it. `sort_records_never_writes_to_guest_memory_test` pins that.
-///
-/// **What `r0` actually is (2026-09-19), and how much that narrows it.** The
-/// previous revision left it at "a short ASCII token". It is more specific than
-/// that, and the extra facts came from reading the *other* calls through the same
-/// interface rather than from staring harder at this one:
-///
-/// * **The token is `"res"` (`0103451A`) and `"ga"` (`01031C0A`). That string is
-///   this title's resource DIRECTORY, and it is also the extension of other
-///   resource files in the same image — which of the two it means is NOT
-///   settled.** `0x13184c` sits at the tail of `"res/anidata.res"` and `0x135ae4`
-///   at the tail of `"/ga/per.ga"`, but tail position carries no meaning on its
-///   own: the linker tail-merges, so any short literal lands inside some longer
-///   one. Read as a directory it is the stronger fit at both call sites — the
-///   path slot 0/16 receives in the *same* window is `"res/save.sav"` and
-///   `"/ga/aysis.dat"`, whose directory component is exactly the token while
-///   their extensions (`sav`, `dat`) are not. Measured on the packages: 51 of
-///   `0103451A`'s 53 entries live under `res/` while only 2 end in `.res`, and
-///   both titles' persistent files ship under a directory named by the token
-///   (`P/res/`, `P/ga/`). None of that is proof, which is why the sentence above
-///   stops where it does.
-/// * **What the sl-relative pointer table holds, measured rather than assumed.**
-///   It has an entry for the full path and an entry for the bare token, and for
-///   nothing in between: sweeping `sl+0x000..+0x900` in both images finds
-///   entries for `"res/save.sav"`, `"res/anidata.res"`, `"res"`, `"/ga/per.ga"`
-///   and `"ga"`, and **zero** for `".sav"`, `"anidata.res"`, `"per.ga"` or
-///   `".ga"`. An earlier revision of this comment called it a "path + basename +
-///   extension" table and quoted `0x135254` as the example; both were wrong. That
-///   address decodes to a level-name array (`"NONE"`, `"Lv2.Antony"` … `"Lv15.mano"`,
-///   `"[Arena]"`) once the relocation delta below is applied, and the path-like
-///   reading only appears if the delta is dropped.
-/// * **The names these titles actually open are NOT that token.** Sweeping every
-///   indirect call through the same database global finds slot 0 called with
-///   `"res/save.sav"` (`0103451A`) and `"/ga/aysis.dat"` (`01031C0A`). So slot 8
-///   is being handed something categorically different from a database name.
-/// * **The return value is discarded at all three call sites.** Nothing tests
-///   `r0` afterwards — `0x10571c` falls into an unrelated global load, `0x1243ca`
-///   into a run of `bl`s, `0x128f3c` into the `Open` below. Whatever slot 8 is,
-///   these titles do not read its answer.
-/// * **Its neighbours in the call sequence pin the shape.** At `01031C0A`
-///   `0x128f08` the order is `slot16("/ga/aysis.dat", 1)` → *if non-zero* →
-///   `slot8("ga", 1)` → `slot0("/ga/aysis.dat", 8, 1)` → store the fd. Slot 16 is
-///   `Exists` in this table and takes `(name, type)`; slot 8 takes the **same
-///   two-argument shape** with the same constant `1`.
-///
-/// **What that does NOT settle, and this lineage has now been wrong three
-/// times:** which operation it is. Four candidates fit `f(token, 1)` with an
-/// ignored result, and nothing above separates them — "register the app's file
-/// extension", "delete by pattern", "list databases of this type", and
-/// **"select/ensure the directory (namespace) the following calls resolve
-/// against"**. The fourth was missing when this list was first written, because
-/// the three that were here all assumed the extension reading — that omission is
-/// the third of the three wrong turns, and it was caught in review rather than
-/// by the author. A name is not written here until something separates them, and
-/// two of the four cannot be separated with the two images that reach this slot
-/// at all: both of their tokens are *simultaneously* a directory and an
-/// extension, so nothing in the corpus tells the readings apart.
-///
-/// **2026-09-20: the fourth candidate splits in two, and one half is refuted —
-/// statically, without running either title.** "Select **or** ensure the
-/// directory" was written as one line above; it is two operations with different
-/// observable signatures, and separating them is what let a measurement bite.
-///
-/// * **Slot 8 does not dominate the opens.** `0103451A` has exactly **one**
-///   slot-8 site (`0x10571c`) against **seven** slot-0 sites, and the function
-///   holding that slot-8 call reaches an open *before* it: `0x1056e8` is
-///   `bl 0x105cfc`, `0x105cfc` is a function entry (`push {r4,r5,r6,lr}`) whose
-///   body calls `slot0("res/save.sav", 1, 1)` at `0x105d1c`, and there is no
-///   `pop`/`bx lr` between that `bl` and `0x10571c`. Reachability is not assumed:
-///   the fault dump this file already cites reads `R5` at `0x1056d8`, so that
-///   function ran. A *selection* the following calls resolve against has to
-///   dominate them; this one is dominated by one instead. ⇒ **the "select a
-///   namespace" reading is refuted for this image.**
-/// * **A selection would be a no-op anyway.** Every statically resolvable slot-0
-///   argument in both images already carries the token as its leading path
-///   component — `"res/save.sav"`, `"res/savem.sav"`, `"/ga/aysis.dat"`,
-///   `"/ga/data.dat"`. Nothing is left for a namespace to supply.
-/// * **The "ensure it exists" reading survives dominance but sits on the wrong
-///   branch.** At `01031C0A:0x128f2c` the `cmp r0,#0; beq` skips when `Exists`
-///   returned zero, so slot 8 runs on the branch where the file is **already
-///   there**. A guard that creates a missing directory belongs on the other
-///   branch. That weakens it; it does not kill it.
-///
-/// ⇒ the candidate list is narrowed for the first time in this lineage, and it is
-/// narrowed by one *half* of one entry. The two the corpus provably cannot
-/// separate — extension registration and listing by type — are untouched by all
-/// of the above. **Still no name.**
-///
-/// **"Delete by pattern" is the one left that a run could settle, and what blocks
-/// that run is a MISSING BASELINE, not a busy machine.** Say it in that order,
-/// because the other order is a trap this lineage already named and then walked
-/// into: `AGENTS.md`'s four-step rule for reading a FAIL requires comparing
-/// against the fixture's *idle range*, and those ranges exist only for the
-/// committed fixtures — a `game_lab/` title's failure signature has none, so
-/// "it broke differently" has nothing to be different *from*. That hole does not
-/// close on a quiet machine. Load is a second-order factor and it is not a
-/// constant either: measured 149 → 125 → 53 inside the single round that wrote
-/// this block (2026-09-20), so quoting one reading as if it were the reason sends
-/// the next round to wait for a quiet hour and fall into the same hole.
-///
-/// **Part of the slot numbering is now guest-confirmed, which none of it was
-/// before.** At `0103451A:0x117f70` the sweep sees slot 0 return a value that is
-/// then threaded as the first argument into slot 2 and slot 3 — `Open` →
-/// `StreamWrite` → `Close`, the order this file already assumed from the KTF
-/// header. That is evidence for **slots 0, 2 and 3**. Slot 1 is observed through
-/// the same object (six sites) but its argument threading was not checked, and
-/// slots 4-7 and 9-15 were not observed at all in these two images: this
-/// confirms part of the table, not the table.
-///
-/// **Two method notes worth keeping, because both cost time to rediscover.** The
-/// interface is reached as `table = *(*global)` — the global holds an object
-/// whose *first word* is the table, so a sweep that stops after one dereference
-/// misses these call sites. And the sl-relative pointer table is **relocated at
-/// load by a delta that is not `IMAGE_BASE`** (measured `+0xE40` for `0103451A`,
-/// `+0x1330` for `01031C0A`): read a static word, add that delta, and the string
-/// lands exactly. The delta is checkable rather than fitted — for `0103451A` it
-/// predicts `*(sl+0x150) == 0x14a940`, which is what the register dump's `R5`
-/// holds.
-///
-/// So the diagnostic below now quotes the token itself. That is deliberately the
-/// only behaviour change: the next title to reach this slot names its own token
-/// in the failure instead of costing somebody a disassembly.
+/// Disassembled arity is 2 — `f(r0 = pointer to a short ASCII token, r1 = 1)`; `r2`/`r3` are call
+/// machinery. So it refuses with `Unimplemented`, quotes the token, and never writes guest memory.
+/// Reverse-engineering notes (call sites, token, candidate operations):
+/// `docs/report/0175--2026-09-19--2026-09-18-repair-campaign-pilot-unimpl-stub-p0.md` §부록.
 pub async fn sort_records(context: &mut dyn WIPICContext, arg0: WIPICWord, arg1: WIPICWord) -> Result<i32> {
-    let token = slot8_token(context, arg0);
+    let token = read_quotable_token(context, arg0);
     tracing::debug!("KTF database slot 8 (header name: MC_dbSortRecords)({arg0:#x}, {arg1:#x}) token={token:?}");
 
     let quoted = match &token {
@@ -397,43 +191,6 @@ pub async fn sort_records(context: &mut dyn WIPICContext, arg0: WIPICWord, arg1:
          measured r0={arg0:#x}{quoted} r1={arg1:#x} (arity 2: r2 holds the interface table, r3 the callee address); \
          the header's (fd, buf, len, compare, filter) does not fit"
     )))
-}
-
-/// Longest token `sort_records` will quote back from guest memory.
-///
-/// Bounded and printable-only on purpose. `arg0` is a guest pointer and nothing
-/// here can prove it is not a path — `wie_validate`'s `--guest-stdout` flag is
-/// opt-in for exactly that reason, and AGENTS.md's smoke-gate note draws the same
-/// line ("identifiers and expected status only, never paths or bytes"). The two
-/// tokens measured in the field are 3 and 2 bytes; 16 leaves room without turning
-/// this into a general string dump. Anything longer, anything non-printable, and
-/// anything unreadable is simply not quoted — the raw pointer is still reported,
-/// so the diagnostic never gets *worse* than it was.
-///
-/// **It is a bound on what gets QUOTED, not a bound on what gets READ.**
-/// `read_null_terminated_string_bytes` builds the whole string first and this
-/// constant rejects it afterwards, so a pointer into a mapping with no NUL is
-/// read to the end of that mapping before being discarded. That is bounded by
-/// the mapping and happens once, on a path that is already failing, which is why
-/// it is left alone — but do not describe this constant as a read limit, and do
-/// not rely on it if this ever moves onto a hot path.
-///
-/// `sort_records_quotes_only_a_short_printable_token_test` asserts this value.
-/// Changing it means changing that assertion, which is the point: it is the only
-/// thing bounding what reaches a log.
-const SLOT8_TOKEN_MAX: usize = 16;
-
-fn slot8_token(context: &mut dyn WIPICContext, ptr: WIPICWord) -> Option<String> {
-    if ptr == 0 {
-        return None;
-    }
-    // Failure-tolerant by construction: a bad pointer must yield "no token", not
-    // an error that replaces the Unimplemented this function exists to raise.
-    let bytes = read_null_terminated_string_bytes(context, ptr).ok()?;
-    if bytes.is_empty() || bytes.len() > SLOT8_TOKEN_MAX || !bytes.iter().all(|b| (0x20..0x7f).contains(b)) {
-        return None;
-    }
-    str::from_utf8(&bytes).ok().map(ToOwned::to_owned)
 }
 
 /// `MC_dbGetNumberOfRecords(dbID)` — number of records in the database, or the
@@ -926,8 +683,8 @@ mod tests {
     use crate::context::test::TestContext;
 
     use super::{
-        KTF_DATABASE_STORAGE_LIMIT, SLOT8_TOKEN_MAX, delete_database, exists_database, list_databases, list_record_info, open_database,
-        select_record, sort_records, stream_read, stream_write, update_record,
+        KTF_DATABASE_STORAGE_LIMIT, delete_database, exists_database, list_databases, list_record_info, open_database, select_record, sort_records,
+        stream_read, stream_write, update_record,
     };
 
     /// KTF database slot 8 refuses, and refuses **without touching guest memory**.
@@ -990,14 +747,7 @@ mod tests {
     /// load-bearing as the two positive ones. (The first revision said "three"
     /// and there were already four.)
     ///
-    /// **The over-long input is a literal `[b'a'; 17]`, and `SLOT8_TOKEN_MAX` is
-    /// asserted to be 16, because deriving the input from the constant made this
-    /// test a tautology.** The first revision wrote `[b'a'; SLOT8_TOKEN_MAX + 1]`
-    /// and claimed in this comment that "a change that widens the filter fails
-    /// here" — the gate-2 reviewer measured `16 → 64` and got **green**, because
-    /// widening the constant widened the input with it. Both forms below pin the
-    /// value now: the `assert_eq!` names it directly, and the literal keeps the
-    /// negative case negative even if that assertion is ever deleted.
+    /// The bounds themselves are pinned in `wie_util::quotable_token`'s test.
     ///
     /// Every case still asserts the raw `r0=` is present, because the quote is an
     /// addition: a regression that loses the token must not also lose the
@@ -1024,18 +774,11 @@ mod tests {
         // Not quoted: too long, non-printable, unreadable, null. The message keeps
         // the raw pointer in every one of them.
         //
-        // 17 is a literal on purpose — see this test's doc comment. Widening
-        // `SLOT8_TOKEN_MAX` must redden here, and the assertion below is the
-        // direct statement of that.
-        assert_eq!(
-            SLOT8_TOKEN_MAX, 16,
-            "SLOT8_TOKEN_MAX is the only thing bounding what leaks into a log; widening it is a decision, not an edit"
-        );
         let long = [b'a'; 17];
         context.write_bytes(0x2200, &long).unwrap();
         context.write_bytes(0x2300, b"ab\x01cd\0").unwrap();
         for (addr, why) in [
-            (0x2200u32, "longer than SLOT8_TOKEN_MAX"),
+            (0x2200u32, "longer than QUOTABLE_TOKEN_MAX"),
             (0x2300, "contains a control byte"),
             (0xFFFF_0000, "unreadable"),
             (0x0, "null"),

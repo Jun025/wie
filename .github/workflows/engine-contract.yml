@@ -90,6 +90,16 @@ jobs:
           node scripts/check-worklog-json.mjs --selftest
           node scripts/check-worklog-json.mjs
 
+      # AGENTS.md is loaded by every wie session, so it holds standing rules only; a round's findings go
+      # to docs/report/ with a one-line pointer (docs/report/0277). Cap = 842 lines at the 2026-09-26 trim
+      # + 8 headroom; #319 (wie-meta-gates-trim-after-0921-audit) then took the merged file to 752, and
+      # the cap was left at 850 — lower it when the frozen meta sections shrink again.
+      - name: AGENTS.md stays within its line cap (docs/report/0277)
+        run: |
+          n=$(wc -l < AGENTS.md); cap=850
+          if [ "$n" -gt "$cap" ]; then echo "::error file=AGENTS.md::AGENTS.md is $n lines (cap $cap) — move the round's history to docs/report/ and leave a one-line pointer"; exit 1; fi
+          echo "AGENTS.md: $n lines (cap $cap)"
+
       # Third always-run node step, same reasoning as the two above (~50ms, no
       # build) and OUTSIDE the paths filter ON PURPOSE: the thing it guards —
       # wie_cli/tests/dod_ci_parity.rs and its checker — is NOT in that filter, so a

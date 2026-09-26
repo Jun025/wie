@@ -1,0 +1,12 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-26",
+  "task": "wie-lgt-vtable-late-loaded-subclass-defense-tests",
+  "title": "LGT vtable 나중 로드 하위 방어 시험 + ABI 고정 칸 전수 대조",
+  "summary": "#281 검수 F1(M3·M4 무잠금)을 시험 2개로 잠그고, lgt_java_abi.toml 전 행이 링크 index·raw 표 target 과 일치하는지 단언하는 시험을 더했다. generatedClasses 순회 사본 3곳을 헬퍼 1개로 합쳤다.",
+  "followUpOf": "~/orchestrator/reports/wie-2026-09-22-lgt-vtable-index-family-runtime-thread-string-adopt-p1.review.md (F1 · F3 · F4)",
+  "changes": ["jvm_support.rs 시험 3개 + find_generated_class 헬퍼", "lgt_class_loader.rs·class_definition.rs 순회를 헬퍼로"],
+  "verification": ["M3 red(1) · M4 red(2) · A1 red(1) · 원복 green", "어긋난 ABI 행 0 · 인터페이스 행 Runnable 1건은 비교 축이 달라 명시 제외"],
+  "limits": ["ABI 시험은 행 적용 일관성만 잰다 — 행의 참/거짓은 실측 몫", "F4 폴백 링크당 할당·순회 증가는 코드 변경 없음"],
+  "proposals": []
+}

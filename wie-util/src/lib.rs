@@ -111,6 +111,33 @@ where
     Ok(result)
 }
 
+/// Longest guest string a diagnostic will quote back into a log.
+///
+/// `ptr` is a guest pointer and nothing proves it is not a path, so only a short
+/// printable token is quoted; anything else yields `None` and the caller still
+/// reports the raw pointer. Bounds what is QUOTED, not what is read.
+pub const QUOTABLE_TOKEN_MAX: usize = 16;
+
+/// `Some(token)` iff `bytes` is 1..=`QUOTABLE_TOKEN_MAX` printable ASCII bytes.
+pub fn quotable_token(bytes: &[u8]) -> Option<String> {
+    if bytes.is_empty() || bytes.len() > QUOTABLE_TOKEN_MAX || !bytes.iter().all(|b| (0x20..0x7f).contains(b)) {
+        return None;
+    }
+    core::str::from_utf8(bytes).ok().map(String::from)
+}
+
+/// Reads the NUL-terminated string at `ptr` and quotes it via `quotable_token`.
+/// Failure-tolerant: a null or unreadable pointer is "no token", never an error.
+pub fn read_quotable_token<R>(reader: &R, ptr: u32) -> Option<String>
+where
+    R: ?Sized + ByteRead,
+{
+    if ptr == 0 {
+        return None;
+    }
+    quotable_token(&read_null_terminated_string_bytes(reader, ptr).ok()?)
+}
+
 pub fn write_null_terminated_string_bytes<W>(writer: &mut W, address: u32, bytes: &[u8]) -> Result<()>
 where
     W: ?Sized + ByteWrite,
@@ -274,5 +301,20 @@ mod tests {
             read_null_terminated_string_bytes(&FailingReader(false), 1),
             Err(WieError::AllocationFailure)
         ));
+    }
+
+    #[test]
+    fn quotable_token_quotes_only_short_printable_names() {
+        // Tokens real guests pass: KTF database slot 8 and the unidentified-table stubs.
+        for name in [&b"res"[..], b"ga", b"SaveData", b"SPORTS", b"FG_102"] {
+            assert_eq!(quotable_token(name).as_deref(), Some(core::str::from_utf8(name).unwrap()));
+        }
+        // A literal 17, not `MAX + 1`: widening the constant must redden here.
+        assert_eq!(QUOTABLE_TOKEN_MAX, 16);
+        assert_eq!(quotable_token(&[b'a'; 17]), None);
+        assert_eq!(quotable_token(&[b'a'; 16]).as_deref(), Some("aaaaaaaaaaaaaaaa"));
+        assert_eq!(quotable_token(b"ab\x01cd"), None);
+        assert_eq!(quotable_token(b"ab\xffcd"), None);
+        assert_eq!(quotable_token(b""), None);
     }
 }

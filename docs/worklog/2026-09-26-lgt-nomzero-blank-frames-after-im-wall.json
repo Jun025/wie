@@ -1,0 +1,14 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-26",
+  "task": "wie-lgt-nomzero-blank-frames-after-im-wall",
+  "title": "놈ZERO 빈 화면 = #301(BPP 접근자)이 이미 닫음 · 0x130 무관 · 코드 변경 0",
+  "summary": "origin/main 5434ab0a release 재측: --timeout 60 PASS ×2(paints 174/156 · 3색) · --inject PASS rc=0(27/27 · 20색). MC_imHandleInput 은 실행마다 부팅 중 1회뿐이고 키와 무관하다. 제안 근거(FAIL 178/205)는 #301 이전 관측이다.",
+  "changes": ["docs/report/0288 — 재측 표 · 처분"],
+  "verification": "release wie_validate 3회(위 수치) · imHandleInput 호출 계수 1/1/1",
+  "limits": "0x130 정적 호출부 7곳은 판독하지 않았다 — 실행 경로에서 1회만 도달. IME 는 여전히 없다.",
+  "proposals": [],
+  "adoptedProposals": ["2026-09-24-lgt-wipic-im-group-supported-modes#p0"],
+  "adoptedNotes": { "2026-09-24-lgt-wipic-im-group-supported-modes#p0": "resolved-by #301" },
+  "declinedProposals": []
+}

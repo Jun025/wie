@@ -3,7 +3,6 @@ use alloc::{
     string::{String as RustString, ToString},
     vec,
 };
-use core::mem::size_of;
 
 use jvm::{ClassInstance, ClassInstanceRef, JavaError, Jvm, Result as JvmResult, runtime::JavaLangString};
 use jvm_class_proto::{JavaClassProto, JavaFieldProto, JavaMethodProto};
@@ -17,7 +16,7 @@ use wipi_types::lgt::java::{LgtJavaClass as RawJavaClass, LgtJavaClassDescriptor
 use wie_core_arm::ArmCore;
 use wie_util::{Result, read_generic, read_null_terminated_string_bytes};
 
-use crate::runtime::java::jvm_support::LgtJvmSupport;
+use crate::runtime::java::jvm_support::{LgtJvmSupport, find_generated_class};
 
 type ClassLoaderProto = JavaClassProto<ArmCore>;
 
@@ -70,21 +69,13 @@ impl LgtClassLoader {
     }
 
     fn find_raw_class(core: &ArmCore, generated_classes: u32, name: &str) -> Result<Option<u32>> {
-        let last_bucket: u32 = read_generic(core, generated_classes)?;
-        for bucket in 0..=last_bucket {
-            let mut ptr_class: u32 = read_generic(core, generated_classes + size_of::<u32>() as u32 + bucket * size_of::<u32>() as u32)?;
-            while ptr_class != 0 {
-                let raw: RawJavaClass = read_generic(core, ptr_class)?;
-                let descriptor: RawJavaClassDescriptor = read_generic(core, raw.ptr_descriptor)?;
-                let class_name = RustString::from_utf8(read_null_terminated_string_bytes(core, descriptor.ptr_name)?)
-                    .map_err(|error| wie_util::WieError::FatalError(alloc::format!("Invalid LGT class name: {error}")))?;
-                if class_name == name {
-                    return Ok(Some(ptr_class));
-                }
-                ptr_class = descriptor.ptr_next_class;
-            }
-        }
-        Ok(None)
+        find_generated_class(core, generated_classes, |ptr_class| {
+            let raw: RawJavaClass = read_generic(core, ptr_class)?;
+            let descriptor: RawJavaClassDescriptor = read_generic(core, raw.ptr_descriptor)?;
+            let class_name = RustString::from_utf8(read_null_terminated_string_bytes(core, descriptor.ptr_name)?)
+                .map_err(|error| wie_util::WieError::FatalError(alloc::format!("Invalid LGT class name: {error}")))?;
+            Ok(class_name == name)
+        })
     }
 
     async fn find_class(

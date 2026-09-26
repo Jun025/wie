@@ -1,0 +1,14 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-26",
+  "task": "wie-lgt-class-name-unwrap-guest-boundary-close",
+  "title": "LGT ClassDefinition::name 패닉 게스트 경계 2곳 닫기(값 코덱 null · 등록/해석 Err) + KTF from_raw 11곳 계수",
+  "summary": "value.rs object_from_raw 의 name() 을 try_name 으로 바꿔 읽을 수 없는 클래스 워드는 null + 첫 1회 warn 으로 처리했다. register_generated_class·java_resolve_class 는 try_name()? 로 오류를 전파한다. 개악 대조(unwrap 복원) 시 새 시험 2건 모두 class_definition.rs:801 에서 패닉한다. KTF from_raw 11곳 표는 docs/report/0282 에 있다(코드 변경 0 · 가드 없는 게스트 경계 2곳 + UTF-8 unwrap, 모두 미관측이라 카드로 올리지 않았다).",
+  "adoptedProposals": [
+    "2026-09-25-lgt-class-from-raw-guest-boundary-census#p0",
+    "2026-09-25-lgt-class-from-raw-guest-boundary-census#p1",
+    "2026-09-25-lgt-class-from-raw-guest-boundary-census#p2"
+  ],
+  "declinedProposals": [],
+  "proposals": []
+}

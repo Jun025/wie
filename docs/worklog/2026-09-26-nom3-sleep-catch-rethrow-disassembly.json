@@ -1,0 +1,23 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-26",
+  "task": "wie-2026-09-23-nom3-inject-panic-and-partial-inject-unmeasured-adopt-p0",
+  "title": "놈3 <Base>+0x30310 = try { Thread.sleep(100L) } catch (InterruptedException) — 되던진 0x1500a9c 는 sleep 임포트 슬롯 · 에뮬레이터 결함(공유 예외 프레임 체인) · p1 로 이미 닫힘",
+  "summary": "게스트 코드는 정상 자바다. 핸들러가 PendingException 을 되던지고, 그 값 0x1500a9c 는 try 본문이 r4 에 남기는 Thread.sleep(J)V 슬롯 주소다. 현 main 0/96 · 스레드 키만 0 으로 되돌린 대조 4/48(0229-fix 의 p1 이전 값과 일치).",
+  "changes": [
+    "wie-lgt/src/runtime/java/interface.rs — java_is_class_assignable 주석의 틀린 원인(초기화 안 된 static) 정정 · 동작 무변경",
+    "docs/report/0278"
+  ],
+  "verification": [
+    "디스어셈블 0x312d0–0x3133e + 호출부 0x1875a — capstone Thumb · 임포트 썽크 (0x64,0x1f/0x20/0x21/0x12/0x54) · (1,0x32)=PendingException",
+    "슬롯 이름 실측(링크 프로브): 0x15009cc=InterruptedException 게터 · 0x1500a94=Thread 게터 · 0x1500a9c=Thread.sleep(J)V",
+    "Unreadable thrown class 발화: 현 main 0/96 · current_thread_key=0 변이 4/48 · panic 0"
+  ],
+  "limits": [
+    "pending 이 0x1500a9c 가 되는 정확한 쓰기는 못 잡았다(프로브 40줄 상한) — 기전은 공유 체인으로 좁혔고 씨앗 줄은 미측정"
+  ],
+  "adoptedProposals": [
+    "2026-09-23-nom3-inject-panic-and-partial-inject-unmeasured#p0"
+  ],
+  "proposals": []
+}
