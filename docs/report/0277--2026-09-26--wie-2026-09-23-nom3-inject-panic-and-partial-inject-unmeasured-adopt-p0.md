@@ -71,3 +71,5 @@ RUST_LOG=warn,wie_lgt::runtime::java::interface=trace target/release/wie_validat
 
 **게임 파일명 유입**: `node scripts/corpus-name-inflow.mjs --corpus <코퍼스>` ⇒ BOUNDED 13회/9쌍(전부 관측 대상 타이틀명 놈3) · SUFFIX-ATTACHED 1회/1쌍 — `interface.rs` 에 **이미 있던** 「서든어택포켓」(= 다른 제목, 이 회차가 쓰지 않았다). 게임 바이트 0.
 
+
+<!-- corpus-name-inflow v1 subjects=3 tree=00c824949fdc5267 B=15/10 P=0/0 S=2/2 -->
