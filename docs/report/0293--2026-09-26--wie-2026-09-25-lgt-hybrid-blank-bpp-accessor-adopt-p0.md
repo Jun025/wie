@@ -97,3 +97,10 @@ release · `--timeout 60`:
 - `RUST_MIN_STACK=4194304 cargo test --all` rc=0 · 47 스위트 · **458 passed · 0 failed**.
 - 러너: `draw_j2me`·`helloworld_ktf`·`helloworld_lgt`·`text_j2me` PASS · keydraw 두 개는 위 한계 참조.
 - `docs/upstream-realign-p3-slices.md` §D: 공용 배선 27 → **25**줄.
+
+## 게임 파일명 유입 — 도구를 «실행해서» 적는다
+
+`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab` 의 대상은 이 브랜치가 바꾼 파일이다. 수는 아래 표식이 최종이다.
+BOUNDED 는 §4 게이트에서 스크린샷을 뜬 타이틀 이름과 `wipi_c.rs`·`graphics.rs` 에 원래 있던 주석 속 이름이다. 대상 타이틀은 이름 대신 «`0236` §2-2 의 타이틀»로 적었다.
+SUFFIX-ATTACHED 1쌍은 `docs/upstream-realign-p3-slices.md` 에 원래 있던 「하이브리드는」(조사 붙은 진짜 언급)이다 ⇒ 판단이 더 필요한 것 0.
+게임 바이트 유입 0 · 경로 유입 0.
