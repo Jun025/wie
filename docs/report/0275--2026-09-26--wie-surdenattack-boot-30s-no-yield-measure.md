@@ -93,3 +93,6 @@ AGENTS.md 러너 블록(엔진 변경) — `draw_j2me`·`helloworld_ktf`·`hello
 **게임 파일명 유입**(`node scripts/corpus-name-inflow.mjs --corpus <game_lab>` 실행값): BOUNDED·SUFFIX-ATTACHED 는
 아래 표식 그대로다. 전건 이 회차 측정 대상 타이틀 이름(표·판정 문장·코드 주석 1곳)이고 SUFFIX-ATTACHED 는
 「서든어택」⊂「서든어택포켓」 과 「서든어택포켓의」(조사) — 파일 바이트·경로 유입은 없다.
+
+
+<!-- corpus-name-inflow v1 subjects=3 tree=5f600c389532a2cf B=12/8 P=0/0 S=8/4 -->
