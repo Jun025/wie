@@ -16,7 +16,7 @@ use alloc::{
 };
 use core::mem::size_of;
 
-use jvm::{ClassDefinition, ClassInstance, JavaError, Jvm, Method};
+use jvm::{ClassDefinition, ClassInstance, JavaError, Jvm, Method, runtime::JavaLangString};
 
 use wie_backend::System;
 use wie_core_arm::ArmCore;
@@ -438,6 +438,38 @@ impl LgtJvmSupport {
         }
 
         Ok(java_class)
+    }
+}
+
+/// `Jvm::exception`, built fallibly for errors the JVM glue raises. Building allocates, so on an
+/// exhausted heap it fails too; `Jvm::exception` would then unwrap that failure or — through
+/// `instantiate`/`instantiate_array` — build another error for it, without end. The second attempt
+/// stops the chain instead (see `exception::begin_host_error`).
+// ponytail: one state per core, not per thread — an emulated thread switch while an error is being
+// built would read another thread's build as a failure; key it by thread if a title shows that.
+pub(crate) async fn host_error(jvm: &Jvm, core: &ArmCore, r#type: &str, message: &str) -> JavaError {
+    let mut core = core.clone();
+    match super::exception::begin_host_error(&mut core) {
+        Ok(true) => {}
+        Ok(false) => {
+            tracing::error!("LGT host error unbuildable, dropped: {type} {message}");
+            // Stands in for the error that could not be built. No guest catch sees it: unwind
+            // raises a host error first, because the state begin_host_error left stays set.
+            return JavaError::JavaException(Box::new(JavaClassInstance::from_raw(0, &core)));
+        }
+        Err(_) => return jvm.exception(r#type, message).await,
+    }
+
+    let result = async {
+        let message = JavaLangString::from_rust_string(jvm, message).await?;
+        jvm.new_class(r#type, "(Ljava/lang/String;)V", (message,)).await
+    }
+    .await;
+    let _ = super::exception::end_host_error(&mut core);
+
+    match result {
+        Ok(instance) => JavaError::JavaException(instance),
+        Err(error) => error,
     }
 }
 

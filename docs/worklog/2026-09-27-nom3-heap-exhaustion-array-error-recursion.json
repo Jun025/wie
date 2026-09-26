@@ -1,0 +1,17 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-27",
+  "task": "wie-2026-09-26-nom3-heap-exhaustion-array-error-recursion-adopt-p0",
+  "title": "게스트 힙 고갈 시 오류 생성 무한 재귀 → 호스트 오류로 종료",
+  "summary": "할당 실패를 알리는 오류 생성이 다시 할당에 실패하면 재진입 표지(JavaSupportContext.host_error)가 사슬을 1회에서 끊고, unwind 가 FatalError 로 끝낸다. to_wie_err 도 힙 고갈에서 패닉 대신 FatalError.",
+  "verification": [
+    "합성 시험: main 스택 넘침 SIGABRT → 수정 PASS · 개악 2종 red",
+    "cargo test --all 484 passed / 0 failed · clippy stable/wasm/beta rc0"
+  ],
+  "limits": [
+    "interface.rs·classes/net/wie 의 Jvm::exception 11곳은 그대로(힙 고갈 중엔 업스트림 unwrap 패닉)",
+    "놈3 실측 없음 — 바이너리 부재"
+  ],
+  "proposals": [],
+  "adoptedProposals": ["2026-09-26-nom3-overflow-is-dead-frames-after-host-error#p0"]
+}

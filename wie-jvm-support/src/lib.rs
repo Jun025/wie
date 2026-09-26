@@ -78,26 +78,27 @@ impl JvmSupport {
     }
 
     pub async fn to_wie_err(jvm: &Jvm, err: JavaError) -> WieError {
-        match err {
-            JavaError::JavaException(x) => {
-                let string_writer = jvm.new_class("java/io/StringWriter", "()V", ()).await.unwrap();
-                let print_writer = jvm
-                    .new_class("java/io/PrintWriter", "(Ljava/io/Writer;)V", (string_writer.clone(),))
-                    .await
-                    .unwrap();
+        let JavaError::JavaException(x) = err;
+        // Formatting the trace allocates, so it fails where the heap is exhausted — an exception
+        // that reached the host must still become an error there, not a panic.
+        let trace = async {
+            let string_writer = jvm.new_class("java/io/StringWriter", "()V", ()).await?;
+            let print_writer = jvm
+                .new_class("java/io/PrintWriter", "(Ljava/io/Writer;)V", (string_writer.clone(),))
+                .await?;
+            let _: () = jvm
+                .invoke_virtual(&x, "java/lang/Throwable", "printStackTrace", "(Ljava/io/PrintWriter;)V", (print_writer,))
+                .await?;
+            let trace = jvm
+                .invoke_virtual(&string_writer, "java/io/StringWriter", "toString", "()Ljava/lang/String;", [])
+                .await?;
+            JavaLangString::to_rust_string(jvm, &trace).await
+        }
+        .await;
 
-                let _: () = jvm
-                    .invoke_virtual(&x, "java/lang/Throwable", "printStackTrace", "(Ljava/io/PrintWriter;)V", (print_writer,))
-                    .await
-                    .unwrap();
-
-                let trace = jvm
-                    .invoke_virtual(&string_writer, "java/io/StringWriter", "toString", "()Ljava/lang/String;", [])
-                    .await
-                    .unwrap();
-
-                WieError::FatalError(format!("\n{}", JavaLangString::to_rust_string(jvm, &trace).await.unwrap()))
-            }
+        match trace {
+            Ok(trace) => WieError::FatalError(format!("\n{trace}")),
+            Err(error) => WieError::FatalError(format!("Java exception {x:?}; formatting its stack trace failed: {error}")),
         }
     }
 }

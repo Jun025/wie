@@ -1,0 +1,8 @@
+{
+  "date": "2026-09-27",
+  "task": "wie-lgt-unwind-handler-frame-reentry-rethrow-loop",
+  "title": "LGT 되던지기 무한 루프(hang 5종)는 #292 가 이미 닫았다 — 코드 변경 0",
+  "summary": "#292 직전(81818e84) 5종 모두 60초에 unwind 495만~739만 회(한 복귀 주소) · paints 0. 현 main(4aee5055) 은 unwind 0~2 회 — 각자의 미구현 칸(Object 9 · DataOutputStream 14 · Timer 12)에서 이름으로 멈춘다. #292 의 rethrow_from_catch_reaches_the_enclosing_frame 가 개악(프레임 소비 제거)에 red.",
+  "adoptedProposals": ["2026-09-25-surdenattack-pocket-wall-is-dos14-not-pre-save#p0"],
+  "proposals": []
+}

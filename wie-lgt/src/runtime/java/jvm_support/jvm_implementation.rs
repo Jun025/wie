@@ -46,7 +46,7 @@ impl JvmImplementation for LgtJvmImplementation {
         Box::pin(async move {
             match JavaClassDefinition::new(&mut self.core.clone(), jvm, proto, context, self.functions.clone()).await {
                 Ok(class) => Ok(Box::new(class) as Box<_>),
-                Err(error) => Err(jvm.exception("net/wie/WieError", &error.to_string()).await),
+                Err(error) => Err(super::host_error(jvm, &self.core, "net/wie/WieError", &error.to_string()).await),
             }
         })
     }
@@ -54,7 +54,7 @@ impl JvmImplementation for LgtJvmImplementation {
     async fn define_array_class(&self, jvm: &Jvm, element_type_name: &str) -> JvmResult<Box<dyn ClassDefinition>> {
         match JavaArrayClassDefinition::new(&mut self.core.clone(), jvm, element_type_name, self.functions.clone()).await {
             Ok(class) => Ok(Box::new(class)),
-            Err(error) => Err(jvm.exception("net/wie/WieError", &error.to_string()).await),
+            Err(error) => Err(super::host_error(jvm, &self.core, "net/wie/WieError", &error.to_string()).await),
         }
     }
 }
