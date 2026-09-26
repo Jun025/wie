@@ -123,14 +123,16 @@ impl ClassInstance for JavaClassInstance {
             field.as_any().downcast_ref::<JavaReferenceField>().unwrap().word_index
         };
         let address = self.field_address(word_index).unwrap();
-        let low = read_generic(&self.core, address).unwrap();
+        let first = read_generic(&self.core, address).unwrap();
         let codec = JavaValueCodec::new(&self.core);
 
+        // High word first: that is how AOT code stores a `long` field (report 0244), and a
+        // Rust-declared field is only ever reached through this pair, so one order serves both.
         Ok(if matches!(field_type, JavaType::Long | JavaType::Double) {
-            let high = read_generic(&self.core, address + 4).unwrap();
-            codec.decode_wide(low, high, &field_type)
+            let low = read_generic(&self.core, address + 4).unwrap();
+            codec.decode_wide(low, first, &field_type)
         } else {
-            codec.decode_word(low, &field_type)
+            codec.decode_word(first, &field_type)
         })
     }
 
@@ -146,8 +148,8 @@ impl ClassInstance for JavaClassInstance {
 
         if matches!(value, JavaValue::Long(_) | JavaValue::Double(_)) {
             let (low, high) = codec.encode_wide(&value);
-            write_generic(&mut self.core, address, low).unwrap();
-            write_generic(&mut self.core, address + 4, high).unwrap();
+            write_generic(&mut self.core, address, high).unwrap();
+            write_generic(&mut self.core, address + 4, low).unwrap();
         } else {
             write_generic(&mut self.core, address, codec.encode_word(&value)).unwrap();
         }
