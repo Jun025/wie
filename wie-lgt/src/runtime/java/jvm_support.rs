@@ -398,7 +398,9 @@ impl LgtJvmSupport {
         loader: Box<dyn ClassInstance>,
     ) -> Result<Box<dyn ClassInstance>> {
         let mut definition = JavaClassDefinition::from_raw(ptr_class, core);
-        let class_name = ClassDefinition::name(&definition);
+        // `ptr_class` comes from the guest (`java_register_class`'s SVC argument), and the name is
+        // the third hop through guest memory — so it is read fallibly and the error goes to the caller.
+        let class_name = definition.try_name()?;
         if let Some(existing) = jvm.get_class(&class_name) {
             if existing
                 .definition
@@ -1365,6 +1367,59 @@ pub(crate) mod tests {
             write_generic(&mut core, ptr_fields + 7 * size_of::<u32>() as u32, 0x7654_3210u32)?;
             let own1: i32 = jvm.get_field(&field_child_instance, "own1", "I").await.unwrap();
             assert_eq!(own1, 0x7654_3210);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    /// A guest class whose name string cannot be read must come back as an error, not a panic.
+    ///
+    /// `register_generated_class` is reached from `java_register_class` with a class pointer
+    /// taken from an SVC argument. That function reads the class and its descriptor with `?`,
+    /// but the third hop — the descriptor's `ptr_name` — went through the infallible
+    /// `ClassDefinition::name`, so an unreadable name killed the host. The address is the one
+    /// 놈3 produced (unmapped in every LGT region). Not observed in the corpus; this pins the
+    /// contract the function's `Result` already promised. Restoring `name()` turns it into a panic.
+    #[test]
+    fn register_generated_class_reports_an_unreadable_class_name() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, _) = init_jvm(&system_clone).await?;
+
+            let ptr_descriptor = Allocator::alloc(&mut core, size_of::<RawJavaClassDescriptor>() as u32)?;
+            core.write_bytes(ptr_descriptor, &[0; size_of::<RawJavaClassDescriptor>()])?;
+            write_generic(
+                &mut core,
+                ptr_descriptor + offset_of!(RawJavaClassDescriptor, ptr_name) as u32,
+                0x104c_02b4u32,
+            )?;
+            let ptr_class = Allocator::alloc(&mut core, size_of::<RawJavaClass>() as u32)?;
+            core.write_bytes(ptr_class, &[0; size_of::<RawJavaClass>()])?;
+            write_generic(&mut core, ptr_class + offset_of!(RawJavaClass, ptr_descriptor) as u32, ptr_descriptor)?;
+
+            let loader: Box<dyn ClassInstance> = jvm
+                .invoke_static("java/lang/ClassLoader", "getSystemClassLoader", "()Ljava/lang/ClassLoader;", ())
+                .await
+                .unwrap();
+            let generated_classes = Allocator::alloc(&mut core, size_of::<u32>() as u32)?;
+            write_generic(&mut core, generated_classes, 0u32)?;
+
+            let result = LgtJvmSupport::register_generated_class(&mut core, &jvm, ptr_class, generated_classes, loader).await;
+            assert!(
+                matches!(result, Err(WieError::InvalidMemoryAccess(0x104c_02b4))),
+                "an unreadable guest class name must be an error carrying its address"
+            );
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
