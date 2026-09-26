@@ -1,0 +1,40 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-26",
+  "task": "wie-battlemonster-continue-save-restores-wrong-position",
+  "title": "배틀몬스터 «이어하기» 비정상 위치 = zip 에 든 고아 저장 플래그 · 엔진 저장/복원은 정상",
+  "summary": "코드 변경 0. 배틀몬스터 zip 은 원래 폰 덤프라 mastercom.sav(byte[3]=01 «저장 있음»)를 싣지만 진행 데이터 master.sav 는 없다. 엔진은 zip 전 파일을 가상층에 올리므로 게임은 저장이 있다고 믿고, 이어하기 → master.sav FileNotFoundException → 0 상태 마을(RIGHT 3/3 불동). 깨끗한 저장소에서는 대화상자가 안 뜨고, 새로하기 → 저장하기 → 새 프로세스 이어하기가 저장 지점 그대로 복원되며 주인공이 움직인다(main·#292 둘 다). 저장본 A/B cmp 로 X·Y·플레이시간 필드를 확인 — 빅엔디언 제자리.",
+  "changes": [
+    "docs/report/0272 — H1/H2/H3 판정 · 원인 계급 · 대조 표"
+  ],
+  "verification": [
+    "스크래치 디스크 Filesystem + 대화형 키 제어로 새로하기 → 저장 → 종료 → 이어하기(#292 3c316f7f) · 복원은 main 1ad81359 에서도",
+    "zip 원본 이어하기 3/3 RIGHT 변화 0–377 화소 ↔ 자체 저장본 이어하기 42,233–65,155 화소 · 무입력 대조 946",
+    "저장본 A/B cmp -l = 3바이트(플레이시간 분·초, X +120) · 깨끗한 저장소에서 mastercom.sav 기본값 byte[3]=00 → 저장 뒤 01"
+  ],
+  "limits": [
+    "셸(otterpebble)에서는 재현하지 않았다 — 웹 호스트도 zip 전체를 from_archive 에 넘긴다는 코드 판정뿐",
+    "저장 생성은 #292 빌드에서만 가능했다(main 은 숲에서 장면 스레드 사망)",
+    "필드 이동 패닉은 1/2 로 한 번 잡았을 뿐 원인은 보지 않았다"
+  ],
+  "proposals": [
+    {
+      "title": "배틀몬스터를 실행할 때 zip 에 든 mastercom.sav 를 엔진에 넘기지 않는다",
+      "plainSummary": "배틀몬스터 파일에는 원래 주인의 «저장 있음» 표시만 남아 있고 실제 저장 내용은 없다. 그래서 처음 해도 이어하기가 뜨고, 누르면 캐릭터가 멈춘 채로 시작된다. 이 표시 파일을 빼고 실행하면 처음 사용자는 새로하기부터 시작한다.",
+      "userBenefit": "처음 켠 사람이 가짜 이어하기에 빠져 «움직이지 않는 게임»으로 오해하는 일이 사라진다. 한 번 저장한 뒤의 이어하기는 이미 정상이다.",
+      "why": "wie 0272: zip 사본의 mastercom.sav byte[3]=01(저장 있음)인데 master.sav 없음 → 이어하기 FileNotFoundException → 0 상태, RIGHT 3/3 불동. mastercom.sav 만 뺀 사본은 새로하기 대화상자가 «게임을 새로 시작합니다»이고 저장 → 이어하기가 정상 복원. 웹 호스트는 받은 zip 전체를 LgtEmulator::from_archive 에 넘긴다(wie_featurephone/src/lib.rs).",
+      "tradeoff": "타이틀별 예외 목록이 하나 생긴다(등재 해시에 묶는다). 엔진 일괄 규칙은 택하지 않았다 — 라이브 메이플스토리2007 은 zip 에 완전한 저장본을 싣고 있어 일괄로 빼면 그 동작이 바뀐다. 이미 IndexedDB 에 자기 저장이 있는 사용자는 영향 없다(플랫폼 FS 가 가상층보다 먼저 읽힌다).",
+      "effort": "S",
+      "target": "otterpebble"
+    },
+    {
+      "title": "필드 이동 중 JavaClassDefinition::name() 의 unwrap 패닉(InvalidMemoryAccess 0)을 잡는다",
+      "plainSummary": "배틀몬스터 마을에서 걸어 다니다가 가끔 에뮬레이터가 통째로 죽는다. 게임 오류가 아니라 에뮬레이터 안의 한 줄이 잘못된 주소를 그대로 믿어서다.",
+      "userBenefit": "마을·필드 이동 중 갑자기 멈추는 일이 줄어 배틀몬스터를 이어서 플레이할 수 있다.",
+      "why": "이 회차 #292 빌드 대화형 세션에서 RIGHT → UP 도중 class_definition.rs:801:25 try_name().unwrap() → InvalidMemoryAccess(0) 패닉 1/2(다른 세션은 같은 경로로 집에 들어감). #306 검수자도 main 에서 같은 줄을 한 번 봤다. 증거 = evidence/…/panic_class_definition_801.txt.",
+      "tradeoff": "간헐이라 재현에 여러 판이 든다. unwrap 을 에러 전파로 바꾸는 것만으로는 원인(디스크립터 0 인 클래스 객체가 어디서 오는가)을 숨길 수 있어, 먼저 호출부를 잡아야 한다.",
+      "effort": "M",
+      "target": "wie-lgt/src/runtime/java/jvm_support/class_definition.rs"
+    }
+  ]
+}
