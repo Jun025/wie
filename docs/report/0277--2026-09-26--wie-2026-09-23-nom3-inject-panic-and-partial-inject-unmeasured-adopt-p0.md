@@ -69,4 +69,4 @@ RUST_LOG=warn,wie_lgt::runtime::java::interface=trace target/release/wie_validat
 
 **게이트**(2026-09-26, loadavg 70~150): fmt rc0 · clippy `--all -D warnings` rc0 · wasm clippy rc0 · `cargo +beta clippy` rc0 · `RUST_MIN_STACK=4194304 cargo test --all` **454 passed / 0 failed**(47 suites) · `clippy --workspace --all-targets` 경고 **16**(= 0251 기준 16). 엔진 동작 diff 0(주석뿐)이라 러너 블록은 돌리지 않았다.
 
-**게임 파일명 유입**: `node scripts/corpus-name-inflow.mjs --corpus <코퍼스>` ⇒ BOUNDED @B@ — 이 회차가 쓴 것은 관측 대상 타이틀명 1종(@OWN@회)뿐이고 나머지는 `interface.rs` 에 **이미 있던** 줄(주석을 고쳐 파일 전체가 대상이 됐다) · SUFFIX-ATTACHED @S@ — `interface.rs` 기존 줄의 «더 긴 다른 제목» 1건. 게임 바이트 0.
+**게임 파일명 유입**: `node scripts/corpus-name-inflow.mjs --corpus <코퍼스>` ⇒ BOUNDED 13회/9쌍 — 이 회차가 쓴 것은 관측 대상 타이틀명 1종(4 — 문서 3 · worklog 1; `interface.rs` 의 2회는 기존 줄회)뿐이고 나머지는 `interface.rs` 에 **이미 있던** 줄(주석을 고쳐 파일 전체가 대상이 됐다) · SUFFIX-ATTACHED 1회/1쌍 — `interface.rs` 기존 줄의 «더 긴 다른 제목» 1건. 게임 바이트 0.
