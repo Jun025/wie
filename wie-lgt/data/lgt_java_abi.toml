@@ -65,13 +65,23 @@ vtable = [
     { name = "notify", descriptor = "()V", index = 5 },
 ]
 
+# Word 0 of a class object's field block is NOT free: guest static-field accessors read its low
+# halfword as flags, and with 0x2000 set they fetch the statics base from `[[word 2]+8]+0x4c`
+# instead of `block+0x14` (310 `tst #0x2000` sites in 간호사타이쿤2 alone, e.g. <clinit> 0x1462ac).
+# Left unpinned, RustJava's first Class field `nameBytes` landed there, so the branch followed
+# `nativeClassName` into ASCII whenever that array's address had bit 13 set — WorldMap's did
+# (0x48842140), GameCanvas's and SoundManager's did not. Pin RustJava's two fields onto the words
+# the guest was not seen to read (1 and 3), so word 0 stays 0. Pinning only nameBytes would let
+# classLoader fall through to word 4, on top of initializationState.
 [[class]]
 name = "java/lang/Class"
 vtable = [
     { name = "getResourceAsStream", descriptor = "(Ljava/lang/String;)Ljava/io/InputStream;", index = 16 },
 ]
 field = [
+    { name = "classLoader", descriptor = "Ljava/lang/ClassLoader;", index = 1 },
     { name = "nativeClassName", descriptor = "I", index = 2 },
+    { name = "nameBytes", descriptor = "[B", index = 3 },
     { name = "initializationState", descriptor = "I", index = 4 },
 ]
 
