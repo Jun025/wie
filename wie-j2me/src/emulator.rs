@@ -168,8 +168,8 @@ impl Emulator for J2MEEmulator {
         self.system.event_queue().push(event)
     }
 
-    fn tick(&mut self) -> Result<()> {
-        self.system.tick()
+    fn tick_for(&mut self, budget_ms: u64) -> Result<()> {
+        self.system.tick_for(budget_ms)
     }
 }
 

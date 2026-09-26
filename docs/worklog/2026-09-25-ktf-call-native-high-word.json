@@ -1,0 +1,8 @@
+{
+  "date": "2026-09-25",
+  "task": "wie-2026-09-24-wec-systheme-oemdevice-no-branch-minimal-stub-adopt-p1",
+  "title": "귀신사냥2007 SIOOBE — 단말 문자열이 아니라 KTF call_native 가 long 상위 워드를 버린 것",
+  "summary": "길이 10 문자열은 \"\" + System.currentTimeMillis() 였고 값 3636375554 는 epoch ms 의 하위 32비트였다. JB 인터페이스 슬롯 0x30(call_native)이 결과 칸 상위 워드에 0 을 써 왔다. r0:r1 을 그대로 쓰도록 고쳤다.",
+  "adoptedProposals": ["2026-09-24-wec-systheme-oemdevice-no-branch-minimal-stub#p1"],
+  "proposals": []
+}
