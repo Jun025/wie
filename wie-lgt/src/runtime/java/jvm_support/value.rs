@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
+use core::sync::atomic::{AtomicU32, Ordering};
 
-use jvm::{ClassDefinition, ClassInstance};
+use jvm::ClassInstance;
 
 use wie_core_arm::ArmCore;
 use wie_jvm_support::native::NativeJavaValueCodec;
@@ -30,7 +31,18 @@ impl NativeJavaValueCodec for JavaValueCodec {
                 return None;
             }
         };
-        if ClassDefinition::name(&class).starts_with('[') {
+        // A readable dispatch table only proves the instance header is live; the class word it
+        // holds can still point nowhere (measured: a word of `0x104c02b4` panicked the host inside
+        // the infallible `ClassDefinition::name`). This function already answers null for an
+        // object it cannot read, so an unreadable class gets the same answer.
+        let name = match class.try_name() {
+            Ok(name) => name,
+            Err(error) => {
+                report_unreadable_class(raw, class.ptr_raw, &error);
+                return None;
+            }
+        };
+        if name.starts_with('[') {
             Some(Box::new(JavaArrayClassInstance::from_raw(raw, &self.core)))
         } else {
             Some(Box::new(instance))
@@ -46,10 +58,29 @@ impl NativeJavaValueCodec for JavaValueCodec {
     }
 }
 
+/// How many references `object_from_raw` has folded to null because their class was unreadable.
+/// Only the first is a `warn!` — a title that hits this tends to hit it every tick, and on the web
+/// build every warning is a console line (the same trade `java_is_class_assignable` made).
+/// ponytail: process-wide, not per-title — one wasm instance / validator run is one title.
+static UNREADABLE_CLASS_REFERENCES: AtomicU32 = AtomicU32::new(0);
+
+fn report_unreadable_class(raw: u32, ptr_class: u32, error: &wie_util::WieError) {
+    if UNREADABLE_CLASS_REFERENCES.fetch_add(1, Ordering::Relaxed) == 0 {
+        tracing::warn!(
+            "LGT object reference {raw:#x} has an unreadable class {ptr_class:#x}: {error} — decoding as null (further occurrences at trace level)"
+        );
+    } else {
+        tracing::trace!("LGT object reference {raw:#x} has an unreadable class {ptr_class:#x}: {error} — decoding as null");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::string::String;
-    use core::mem::{offset_of, size_of};
+    use core::{
+        mem::{offset_of, size_of},
+        sync::atomic::Ordering,
+    };
 
     use jvm::{JavaType, JavaValue};
     use wipi_types::lgt::java::{
@@ -58,9 +89,9 @@ mod tests {
 
     use wie_core_arm::{Allocator, ArmCore};
     use wie_jvm_support::native::NativeJavaValueCodec;
-    use wie_util::{ByteWrite, Result, write_generic, write_null_terminated_string_bytes};
+    use wie_util::{ByteWrite, Result, read_generic, write_generic, write_null_terminated_string_bytes};
 
-    use super::JavaValueCodec;
+    use super::{JavaValueCodec, UNREADABLE_CLASS_REFERENCES};
 
     /// Writes a minimal live instance and returns its pointer.
     fn live_instance(core: &mut ArmCore, name: &[u8]) -> Result<u32> {
@@ -115,6 +146,35 @@ mod tests {
 
         // And a word that is not even an address still reads as null, not a panic.
         assert!(matches!(codec.decode_word(0xdead_beef, &r#type), JavaValue::Object(None)));
+
+        Ok(())
+    }
+
+    /// A live instance whose dispatch table holds an unreadable class word must decode to null.
+    ///
+    /// This is the half the test above does not reach: `class()` succeeds here — the header and
+    /// the dispatch table both read — and it is the class word *inside* the table that points
+    /// nowhere. `0x104c02b4` is the word 놈3 produced (2026-09-23). Before this, `object_from_raw`
+    /// called the infallible `ClassDefinition::name` on it and the host panicked at
+    /// `class_definition.rs` `try_name().unwrap()` with `InvalidMemoryAccess(0x104c02b4)`.
+    /// Restoring that call turns this test into that panic.
+    #[test]
+    fn a_reference_whose_class_word_is_unreadable_decodes_to_null() -> Result<()> {
+        let mut core = ArmCore::new(false, None)?;
+        Allocator::init(&mut core)?;
+        let codec = JavaValueCodec::new(&core);
+        let r#type = JavaType::Class(String::from("java/lang/Object"));
+
+        let live = live_instance(&mut core, b"java/lang/Object")?;
+        assert!(matches!(codec.decode_word(live, &r#type), JavaValue::Object(Some(_))));
+
+        let before = UNREADABLE_CLASS_REFERENCES.load(Ordering::Relaxed);
+        let instance: RawJavaClassInstance = read_generic(&core, live)?;
+        write_generic(&mut core, instance.ptr_dispatch_table, 0x104c_02b4u32)?;
+        assert!(matches!(codec.decode_word(live, &r#type), JavaValue::Object(None)));
+        assert!(matches!(codec.decode_word(live, &r#type), JavaValue::Object(None)));
+        // Both occurrences are counted; only the one that moves the counter off zero warns.
+        assert_eq!(UNREADABLE_CLASS_REFERENCES.load(Ordering::Relaxed) - before, 2);
 
         Ok(())
     }

@@ -5,7 +5,7 @@ use core::{
 };
 
 use jvm::{
-    ClassDefinition, ClassInstance, ClassInstanceRef, JavaError, JavaType, Jvm,
+    ClassInstance, ClassInstanceRef, JavaError, JavaType, Jvm,
     runtime::{JavaLangClass, JavaLangClassLoader, JavaLangString},
 };
 use rustjava_runtime::classes::java::util::Vector;
@@ -223,9 +223,11 @@ async fn java_is_class_assignable(core: &mut ArmCore, jvm: &Jvm, ptr_class: u32,
     let class_name = String::from_utf8(read_null_terminated_string_bytes(core, ptr_class_name)?)
         .map_err(|error| WieError::FatalError(format!("Invalid LGT class name: {error}")))?;
     // Both pointers arrive in guest registers, so both get the same trust. `ptr_class` is the
-    // class word the guest read out of the reference it threw, and a guest that throws a
-    // not-yet-initialised static hands us one that points nowhere (measured on 놈3: an `athrow`
-    // of `.bss+0xa9c`, whose class word reads `0x104c02b4`). Answering "not assignable" is what
+    // class word the guest read out of the reference it threw, and a corrupted pending exception
+    // hands us one that points nowhere (measured on 놈3: its `catch (InterruptedException)` around
+    // `Thread.sleep` rethrew `.bss+0xa9c` — the `sleep` import slot, not an object — whose class
+    // word reads `0x104c02b4`; the pending value came from the shared cross-thread frame chain and
+    // stopped once frames went per-thread, docs/report/0278). Answering "not assignable" is what
     // this runtime can honestly say about a class it cannot read, and it leaves the guest's own
     // handler search running — the alternative killed the emulator for every title in the process.
     let source_class_name = match LgtJvmSupport::class_from_raw(core, ptr_class).try_name() {
@@ -372,7 +374,7 @@ async fn java_register_class(core: &mut ArmCore, jvm: &mut Jvm, ptr_class: u32) 
 async fn java_resolve_class(core: &mut ArmCore, jvm: &mut Jvm, ptr_class: u32, _runtime_context: u32) -> Result<u32> {
     java_register_class(core, jvm, ptr_class).await?;
 
-    let name = ClassDefinition::name(&LgtJvmSupport::class_from_raw(core, ptr_class));
+    let name = LgtJvmSupport::class_from_raw(core, ptr_class).try_name()?;
     let class = jvm
         .get_class(&name)
         .ok_or_else(|| WieError::FatalError(format!("LGT generated class not resolved: {name}")))?;

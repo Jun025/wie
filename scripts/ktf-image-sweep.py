@@ -21,9 +21,7 @@ was already there. One round, one tool re-derived. That is the whole argument.
 needs a KTF client image, and those come out of `game_lab/`, which is git-ignored
 real game bytes (Constraint 9). Same class as `scripts/smoke_gate.sh` and
 `scripts/game-lab-recensus.sh` — local-only and structurally so, and therefore
-expected to show up in `scripts/checker-census.mjs` with **zero callers**. A zero
-there is a question, not a defect, and for this file the answer is this
-paragraph.
+has **zero callers** on purpose.
 ★Exit 2 means "could not measure" (no capstone, unreadable image), never
 "found nothing".
 

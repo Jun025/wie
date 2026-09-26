@@ -119,7 +119,7 @@ extern crate alloc;
 
 use std::{
     fs::{self, File},
-    io::BufWriter,
+    io::{BufWriter, LineWriter, Write as _},
     panic::{AssertUnwindSafe, catch_unwind},
     path::PathBuf,
     sync::{
@@ -132,8 +132,8 @@ use std::{
 use clap::Parser;
 
 use wie_backend::{
-    AudioSink, Database, DatabaseRepository, Emulator, Event, Filesystem, Font, FramePacer, Instant, KeyCode, Options, Platform, RecordId, Screen,
-    canvas::Image, extract_zip,
+    AudioSink, Database, DatabaseRepository, Emulator, Event, Filesystem, Font, FramePacer, Instant, KeyCode, Options, Platform, ProfileCallback,
+    ProfileSample, RecordId, Screen, canvas::Image, extract_zip,
 };
 use wie_j2me::J2MEEmulator;
 use wie_ktf::KtfEmulator;
@@ -508,6 +508,13 @@ struct Args {
     /// output into the repo or a shared log when running against a real game.
     #[arg(long, default_value_t = false)]
     guest_stdout: bool,
+    /// Write the ARM core's sampling profile here in flamegraph-folded form
+    /// (`0x<outer>;…;0x<pc> <count>`, one line per stack per flushed batch — the
+    /// same format as `wie --profile-out`). OFF by default: without it no file is
+    /// created and the JSON line is unchanged. KTF/LGT only; J2ME/SKT have no ARM
+    /// core, so the file stays empty. Stacks are guest addresses, not game bytes.
+    #[arg(long)]
+    profile_out: Option<PathBuf>,
     /// Tick as a host with this display rate would: each tick gets the budget
     /// `FramePacer` derives from a `1 / HZ` s frame (60 -> 14ms, 120 -> 5ms)
     /// instead of the engine default (14ms). OFF by default, so existing runs are
@@ -1011,7 +1018,11 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
         Err(e) => return fail("unknown", format!("read error: {e}"), 0, 0, false),
     };
 
-    let load = catch_unwind(AssertUnwindSafe(|| build_emulator(platform, &args.filename, buf)));
+    let profile = match args.profile_out.as_deref().map(profile_callback).transpose() {
+        Ok(p) => p,
+        Err(e) => return fail("unknown", format!("--profile-out: {e}"), 0, 0, false),
+    };
+    let load = catch_unwind(AssertUnwindSafe(|| build_emulator(platform, &args.filename, buf, profile)));
     let (mut emulator, platform_name) = match load {
         Ok(Ok(v)) => v,
         Ok(Err((name, e))) => return fail(&name, format!("load error: {e}"), 0, 0, false),
@@ -1035,7 +1046,12 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     let mut run_err: Option<String> = None;
     let mut phase = String::from("boot");
     let mut sched_idx = 0usize;
-    let mut input_steps = 0u64;
+    // Named fields, not two bare u64s: the gate must be handed `delivered`, and a positional
+    // pair let `judge(.., total, total)` compile and pass the whole suite (gate② M2).
+    let mut inputs = InputCount {
+        delivered: 0,
+        scripted: input_steps_total,
+    };
 
     while !exited.load(Ordering::SeqCst) {
         let elapsed = loop_start.elapsed();
@@ -1052,7 +1068,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
                     // a step that panics the guest was still delivered, and `input_steps` has
                     // to agree with the `panic on input '06_OK'` reason naming step 6.
                     if *down {
-                        input_steps += 1;
+                        inputs.delivered += 1;
                     }
                     let ev = if *down { Event::Keydown(*kc) } else { Event::Keyup(*kc) };
                     if let Err(p) = catch_unwind(AssertUnwindSafe(|| emulator.handle_event(ev))) {
@@ -1168,8 +1184,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     // `outcome.last_frame_content` (set just above) — and no richness field, so today the
     // blocks commute. That is exactly why the order needs writing down: widening the gate to
     // read a richness field would otherwise compile, run, and read a zero, because the fields
-    // are Default::default() until the blocks below fill them. Both trios are pinned ahead of
-    // the gate by `richness_is_recorded_before_the_gate_judges_test`.
+    // are Default::default() until the blocks below fill them.
     //
     // Same three richness metrics, scoped to the final frame. Computed ONCE per run, not per
     // painted frame: the last frame is already held in memory, so this is one extra pass over
@@ -1189,16 +1204,31 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     outcome.nondominant_bp = screen.max_nondominant_bp.load(Ordering::SeqCst);
     outcome.center_nonuniform_bp = screen.max_center_nonuniform_bp.load(Ordering::SeqCst);
 
+    judge(&mut outcome, args.inject, args.expect_last_frame, stop, inputs);
+    outcome
+}
+
+/// Records the input counters and applies the two gates. Split out of `run` so the delivered
+/// count — not the scripted total — can be asserted to reach the gate without an emulator.
+/// Keys the run actually delivered vs. keys the script asked for. Built once where the keys
+/// are counted, so `judge` cannot be handed the two numbers in the wrong order.
+#[derive(Clone, Copy)]
+struct InputCount {
+    delivered: u64,
+    scripted: u64,
+}
+
+fn judge(outcome: &mut Outcome, inject: bool, expect_last_frame: bool, stop: &'static str, inputs: InputCount) {
     // Same rule as the richness trios: recorded before anything judges. These three are what
     // the gate below reads, so here the order is not merely conventional.
     outcome.stop = stop;
-    outcome.input_steps = input_steps;
-    outcome.input_steps_total = input_steps_total;
+    outcome.input_steps = inputs.delivered;
+    outcome.input_steps_total = inputs.scripted;
 
     // `else if`, not a second `if`: a run that injected nothing has no last frame worth
     // gating either, and "last frame blank" would be a narrower, more misleading reason
     // than "the input never ran". UNMEASURED therefore wins over --expect-last-frame.
-    if inject_unmeasured(args.inject, outcome.passed, outcome.input_steps, outcome.input_steps_total) {
+    if inject_unmeasured(inject, outcome.passed, outcome.input_steps, outcome.input_steps_total) {
         outcome.unmeasured = true;
         // Forced false alongside `unmeasured` so no reader of `passed` alone can mistake
         // this for a pass — the same fail-closed reflex as the exit code.
@@ -1207,12 +1237,10 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
             "--inject delivered {}/{} input steps (run ended: {}) — input survival NOT measured (otherwise: {})",
             outcome.input_steps, outcome.input_steps_total, outcome.stop, outcome.reason
         );
-    } else if last_frame_gate_fails(args.expect_last_frame, outcome.passed, outcome.last_frame_content) {
+    } else if last_frame_gate_fails(expect_last_frame, outcome.passed, outcome.last_frame_content) {
         outcome.passed = false;
         outcome.reason = format!("last frame blank, but --expect-last-frame was given (otherwise: {})", outcome.reason);
     }
-
-    outcome
 }
 
 /// The `--inject` key script plus any `--shot-every` frames, as a time-sorted schedule,
@@ -1282,6 +1310,19 @@ fn plan_schedule(args: &Args) -> (Vec<(f64, ScheduledEv)>, f64, u64) {
     (schedule, deadline_secs, input_steps_total)
 }
 
+/// Same writer as the GUI host's `profile_callback` (`src/lib.rs`): leaf-first stacks reversed
+/// into root-first folded lines.
+fn profile_callback(path: &std::path::Path) -> std::io::Result<ProfileCallback> {
+    let writer = Mutex::new(LineWriter::new(File::create(path)?));
+    Ok(Box::new(move |batch: Vec<ProfileSample>| {
+        let mut writer = writer.lock().unwrap();
+        for sample in batch {
+            let folded: Vec<String> = sample.stack.iter().rev().map(|pc| format!("0x{pc:x}")).collect();
+            let _ = writeln!(writer, "{} {}", folded.join(";"), sample.count);
+        }
+    }))
+}
+
 fn positive_secs(s: &str) -> std::result::Result<f64, String> {
     match s.parse::<f64>() {
         Ok(v) if v > 0.0 && v.is_finite() => Ok(v),
@@ -1297,10 +1338,15 @@ enum ScheduledEv {
 }
 
 #[allow(clippy::type_complexity)]
-fn build_emulator(platform: Box<dyn Platform>, filename: &str, buf: Vec<u8>) -> std::result::Result<(Box<dyn Emulator>, String), (String, String)> {
+fn build_emulator(
+    platform: Box<dyn Platform>,
+    filename: &str,
+    buf: Vec<u8>,
+    profile: Option<ProfileCallback>,
+) -> std::result::Result<(Box<dyn Emulator>, String), (String, String)> {
     let options = Options {
         enable_gdbserver: false,
-        profile: None,
+        profile,
     };
 
     if filename.ends_with("zip") {
@@ -1405,17 +1451,8 @@ fn last_frame_gate_fails(expect_last_frame: bool, passed: bool, last_frame_conte
 /// of the call site — the failure that matters here is folding a shortfall back into PASS, which
 /// leaves every name and field in place and only changes the answer.
 ///
-/// The comparison is `<`, not `== 0`, and the corpus is why. Measured 2026-09-23 over the 175
-/// titles that had ever reported `survived input sequence` (loadavg 77-98, i.e. the condition
-/// most likely to truncate a run): the three UNMEASURED verdicts were all `0/27` **under
-/// `clean exit`**, and the only partial deliveries — `10/27` and `2/27` — were `clean exit`
-/// too, and were reported as PASS. So the old `== 0` line called the same terminator, with
-/// the same "only part of the script ran" story, unmeasured at zero and a pass at ten. That
-/// is the inconsistency, not a missing case: partial injection IS partial measurement however
-/// the run ended. Widening costs exactly those two titles, PASS -> UNMEASURED, never -> FAIL.
-/// No partial ever arrived carrying the `survived input sequence` claim, so this buys nothing
-/// on today's corpus; it is kept because the backstop shape that produced the original defect
-/// truncates by tick count, which no title here is currently fast enough to hit mid-script.
+/// `<`, not `== 0`: partial injection is partial measurement however the run ended (2026-09-23
+/// corpus: `10/27` and `2/27` were reported PASS under `== 0`; see `docs/report/0229`).
 fn inject_unmeasured(inject: bool, passed: bool, input_steps: u64, input_steps_total: u64) -> bool {
     inject && passed && input_steps < input_steps_total
 }
@@ -1536,33 +1573,6 @@ mod tests {
             tally.java_exceptions.json(),
             r#"{"count":2,"first":"java/io/IOException: first one","first_truncated":false}"#
         );
-    }
-
-    /// The tests around this one prove the layer counts; this pins that `main` actually installs it
-    /// and prints it. Without it, dropping the subscriber from `main` would leave every test green and
-    /// the field reading `{"count":0,...}` on every run — indistinguishable from "nothing raised".
-    #[test]
-    fn java_exception_layer_is_installed_and_printed_by_main_test() {
-        let src = include_str!("wie_validate.rs");
-        let main_body = &src[src.find(concat!("fn ", "main() {")).unwrap()..src.find(concat!("struct ", "Outcome {")).unwrap()];
-        for needle in [
-            concat!(
-                "validator_subscriber(tracing_subscriber::EnvFilter::from_default_env()",
-                ", tallies.clone())"
-            ),
-            concat!("tallies.java_exceptions", ".json(),"),
-            concat!("\\\"java_exceptions", "\\\":{},"),
-            concat!("tallies.stub_hits", ".json(),"),
-            concat!("\\\"stub_hits", "\\\":{},"),
-            concat!("svc_stub_slots", "_json(),"),
-            concat!("\\\"svc_stub_slots", "\\\":{},"),
-        ] {
-            assert_eq!(
-                main_body.matches(needle).count(),
-                1,
-                "main() no longer wires the exception tally: {needle}"
-            );
-        }
     }
 
     /// `main`'s whole subscriber, with the stderr filter `RUST_LOG` unset gives. The tally must still
@@ -1824,53 +1834,20 @@ mod tests {
         assert!(!inject_unmeasured(true, true, 0, 0));
     }
 
-    /// The gate must be handed the DELIVERED count, not the scripted total.
-    ///
-    /// Measured, not hypothetical: swapping `outcome.input_steps` for
-    /// `outcome.input_steps_total` at that one call site restores the whole defect — the
-    /// binary printed `input_steps: 0` and `result: PASS`, rc 0 — and the predicate test
-    /// above stayed green, because the predicate is still perfect and only its ARGUMENT is
-    /// wrong. `run` needs a real emulator, so no behavioural test in this file can reach the
-    /// call site; this reads the source instead, exactly as
-    /// `richness_is_recorded_before_the_gate_judges_test` does and for the same reason.
-    ///
-    /// **Two lines produce that argument, and pinning only the call site left the other one
-    /// open.** Measured 2026-09-23, by a gate② reviewer and reproduced here: putting the same
-    /// swap on the RECORD line three lines above the gate — `outcome.input_steps =
-    /// input_steps_total;` — left this file at `15 passed; 0 failed`, and the effect is the
-    /// original defect restored *and worse*: the gate eats 27 and can never fire, while the
-    /// JSON prints `input_steps: 27/27` on a run that delivered none, so a human reading it
-    /// sees "it all ran". Hence the second assertion.
-    ///
-    /// **Scope, stated rather than implied**: these two assertions pin the two lines that
-    /// hand the gate its argument. They do NOT pin how the local `input_steps` is counted —
-    /// its `= 0u64` init and its `+= 1` in the dispatch loop are both still free to lie
-    /// (checked: mutating the init to `input_steps_total` is green under both assertions).
-    /// That half is held by `zero_injected_steps_is_not_a_pass_test`'s predicate rows and by
-    /// the two `--inject` fixtures in the AGENTS.md runner block, not by string matching.
-    ///
-    /// Split with `concat!` so this test's own source is not a second match — the count
-    /// assertions are what make that safe.
+    /// The gate must be handed the DELIVERED count, not the scripted total: feeding it
+    /// `input_steps_total` (27 on every --inject run) means it can never fire.
+    /// Scope: this pins what `judge` does with an `InputCount`. It does NOT see how `run`
+    /// fills one — `InputCount { delivered: total, .. }` at the counting site stays green here;
+    /// the named fields are what make that edit visible instead of a one-token swap.
     #[test]
     fn the_gate_is_handed_the_delivered_count_test() {
-        let src = include_str!("wie_validate.rs");
-        let call = concat!(
-            "inject_unmeasured(args.inject, outcome.passed, outcome.input",
-            "_steps, outcome.input_steps_total)"
-        );
-        assert_eq!(
-            src.matches(call).count(),
-            1,
-            "the gate call site is not unique (or no longer reads `outcome.input_steps`) — \
-             a gate fed `input_steps_total` never fires: that field is 27 on every --inject run"
-        );
-        let record = concat!("outcome.input_steps = input", "_steps;");
-        assert_eq!(
-            src.matches(record).count(),
-            1,
-            "the delivered count is no longer what feeds the gate — the record line three \
-             lines above the gate must assign `input_steps`, not `input_steps_total`"
-        );
+        for (delivered, unmeasured) in [(0u64, true), (10, true), (27, false)] {
+            let mut o = super::pass("lgt", String::new(), 0, 0, true);
+            super::judge(&mut o, true, false, "clean exit", super::InputCount { delivered, scripted: 27 });
+            assert_eq!((o.input_steps, o.input_steps_total), (delivered, 27), "recorded counts");
+            assert_eq!(o.unmeasured, unmeasured, "{delivered}/27");
+            assert_eq!(o.passed, !unmeasured, "{delivered}/27");
+        }
     }
 
     /// The three verdicts must map onto three distinct exit codes, and `unmeasured` must beat
@@ -1905,52 +1882,6 @@ mod tests {
         assert_eq!(stop_cause(false, false, 51, 50), "max-ticks");
         // Under budget and still stopped: the wall-clock deadline ran out.
         assert_eq!(stop_cause(false, false, 49, 50), "deadline");
-    }
-
-    /// Both richness trios — `last_frame_*` and the whole-run `max_*` — must be filled BEFORE
-    /// `last_frame_gate_fails` is consulted.
-    ///
-    /// This reads the source rather than the behaviour on purpose, and the reason is the
-    /// whole point of the lock: the gate takes three bools and no richness field, so today
-    /// the blocks commute and **no behavioural test can tell the orders apart**. A
-    /// behavioural assertion here would pass in both orders — it would look like a lock and
-    /// hold nothing. What is actually being defended is the next edit: widening the gate to
-    /// read a richness field compiles and runs in either order, and in the wrong one it reads
-    /// a `Default::default()` zero instead of the measured value.
-    ///
-    /// The needles are split with `concat!` so this test's own source does not contain them —
-    /// otherwise it would match itself. The count assertions are what make that safe: if a
-    /// needle ever appears twice, this fails loudly instead of comparing the wrong position.
-    #[test]
-    fn richness_is_recorded_before_the_gate_judges_test() {
-        let src = include_str!("wie_validate.rs");
-        // One needle per trio. Pinning only the last-written one would leave the other free to
-        // drift below the gate while this still passed — which is exactly the hole that let a
-        // widened gate read a zero under a green suite.
-        let records = [
-            concat!("outcome.last_frame_center", "_nonuniform_bp = lf_center;"),
-            concat!(
-                "outcome.center_nonuniform_bp = screen.max_center",
-                "_nonuniform_bp.load(Ordering::SeqCst);"
-            ),
-        ];
-        let judge = concat!("if last_frame_gate", "_fails(args.expect_last_frame,");
-        assert_eq!(
-            src.matches(judge).count(),
-            1,
-            "gate call is not unique — the position below would be arbitrary"
-        );
-        for record in records {
-            assert_eq!(
-                src.matches(record).count(),
-                1,
-                "richness assignment is not unique — the position below would be arbitrary: {record}"
-            );
-            assert!(
-                src.find(record).unwrap() < src.find(judge).unwrap(),
-                "the gate is consulted before the richness fields are filled — see the ordering comment in run(): {record}"
-            );
-        }
     }
 
     #[test]

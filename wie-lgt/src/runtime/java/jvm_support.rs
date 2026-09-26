@@ -328,19 +328,11 @@ impl LgtJvmSupport {
             .await
             .map_err(|JavaError::JavaException(instance)| WieError::JavaException(Self::class_instance_raw(&*instance)))?;
 
-        let core = definition.core();
-        let generated_classes = generated_classes as u32;
         let mut pointers = Vec::new();
-        let last_bucket: u32 = read_generic(core, generated_classes)?;
-        for bucket in 0..=last_bucket {
-            let mut ptr_class: u32 = read_generic(core, generated_classes + size_of::<u32>() as u32 + bucket * size_of::<u32>() as u32)?;
-            while ptr_class != 0 {
-                pointers.push(ptr_class);
-                let raw: RawJavaClass = read_generic(core, ptr_class)?;
-                let descriptor: RawJavaClassDescriptor = read_generic(core, raw.ptr_descriptor)?;
-                ptr_class = descriptor.ptr_next_class;
-            }
-        }
+        find_generated_class(definition.core(), generated_classes as u32, |ptr_class| {
+            pointers.push(ptr_class);
+            Ok(false)
+        })?;
         Ok(pointers)
     }
 
@@ -406,7 +398,9 @@ impl LgtJvmSupport {
         loader: Box<dyn ClassInstance>,
     ) -> Result<Box<dyn ClassInstance>> {
         let mut definition = JavaClassDefinition::from_raw(ptr_class, core);
-        let class_name = ClassDefinition::name(&definition);
+        // `ptr_class` comes from the guest (`java_register_class`'s SVC argument), and the name is
+        // the third hop through guest memory — so it is read fallibly and the error goes to the caller.
+        let class_name = definition.try_name()?;
         if let Some(existing) = jvm.get_class(&class_name) {
             if existing
                 .definition
@@ -447,6 +441,26 @@ impl LgtJvmSupport {
     }
 }
 
+/// Walks the guest's `generatedClasses` table — a last-bucket index followed by one chain head per
+/// bucket, each chain linked through `ptr_next_class` — and returns the first class `predicate`
+/// accepts. The one copy of this layout: the class loader, interface linking and the vtable
+/// fallback all walk it.
+pub(crate) fn find_generated_class(core: &ArmCore, generated_classes: u32, mut predicate: impl FnMut(u32) -> Result<bool>) -> Result<Option<u32>> {
+    let last_bucket: u32 = read_generic(core, generated_classes)?;
+    for bucket in 0..=last_bucket {
+        let mut ptr_class: u32 = read_generic(core, generated_classes + size_of::<u32>() as u32 + bucket * size_of::<u32>() as u32)?;
+        while ptr_class != 0 {
+            if predicate(ptr_class)? {
+                return Ok(Some(ptr_class));
+            }
+            let raw: RawJavaClass = read_generic(core, ptr_class)?;
+            let descriptor: RawJavaClassDescriptor = read_generic(core, raw.ptr_descriptor)?;
+            ptr_class = descriptor.ptr_next_class;
+        }
+    }
+    Ok(None)
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use alloc::{boxed::Box, string::String as RustString, sync::Arc, vec, vec::Vec};
@@ -471,7 +485,7 @@ pub(crate) mod tests {
     use wie_jvm_support::{JvmImplementation, JvmSupport};
     use wie_util::{ByteRead, ByteWrite, Result, WieError, read_generic, write_generic, write_null_terminated_string_bytes};
 
-    use crate::runtime::java::abi::{CLASS_INITIALIZATION_STATE_FIELD, CLASS_NATIVE_NAME_FIELD, WORD_FIELD_DESCRIPTOR};
+    use crate::runtime::java::abi::{CLASS_INITIALIZATION_STATE_FIELD, CLASS_NATIVE_NAME_FIELD, JAVA_ABI, WORD_FIELD_DESCRIPTOR};
 
     use super::{JavaClassInstance, LgtClassLoader, LgtJvmImplementation, LgtJvmSupport, get_midp_protos, get_wipi_java_protos};
 
@@ -577,6 +591,190 @@ pub(crate) mod tests {
             }
             // Linking the same method through the subclass finds the propagated slot.
             assert_eq!(LgtJvmSupport::virtual_method_index(&jvm, child, "getWidth", "()I").await? as usize, index);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    /// A generated (guest) class `name` extending `parent`, carrying a compiler-built table of
+    /// `vtable_count` entries and sitting in a real `LgtClassLoader`'s `generatedClasses` bucket
+    /// — but NOT registered with the JVM yet, which is what a guest class the app has not touched
+    /// looks like. Every compiled slot is 0 (= inherit the parent's) except `own_slot`, which
+    /// holds the class's own `ownValue()I`. Returns the class pointer, the bucket, the loader and
+    /// the `ownValue` target.
+    async fn seed_unloaded_compiled_subclass(
+        jvm: &Jvm,
+        core: &mut ArmCore,
+        implementation: &LgtJvmImplementation,
+        name: &'static str,
+        parent: &'static str,
+        vtable_count: usize,
+        own_slot: Option<usize>,
+    ) -> Result<(u32, u32, Box<dyn ClassInstance>, u32)> {
+        let class = implementation
+            .define_class_rust(
+                jvm,
+                JavaClassProto {
+                    name,
+                    parent_class: Some(parent),
+                    interfaces: vec![],
+                    methods: vec![JavaMethodProto::new("ownValue", "()I", child_value, MethodAccessFlags::PUBLIC)],
+                    fields: vec![],
+                    access_flags: ClassAccessFlags::PUBLIC,
+                },
+                Box::new(()),
+            )
+            .await
+            .unwrap();
+        let ptr_class = class.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap().ptr_raw;
+        let raw_class: RawJavaClass = read_generic(core, ptr_class)?;
+        let mut descriptor: RawJavaClassDescriptor = read_generic(core, raw_class.ptr_descriptor)?;
+        let own_method: RawJavaMethod = read_generic(core, descriptor.ptr_methods + size_of::<u32>() as u32)?;
+
+        let ptr_vtable = Allocator::alloc(core, ((vtable_count + 1) * size_of::<u32>()) as u32)?;
+        core.write_bytes(ptr_vtable, &vec![0; (vtable_count + 1) * size_of::<u32>()])?;
+        write_generic(core, ptr_vtable, ptr_class)?;
+        if let Some(slot) = own_slot {
+            write_generic(core, ptr_vtable + ((slot + 1) * size_of::<u32>()) as u32, own_method.ptr_method)?;
+        }
+
+        let ptr_parent_name = Allocator::alloc(core, parent.len() as u32 + 1)?;
+        write_null_terminated_string_bytes(core, ptr_parent_name, parent.as_bytes())?;
+        descriptor.ptr_super_class = ptr_parent_name;
+        descriptor.flags |= LGT_JAVA_CLASS_SUPER_CLASS_IS_NAME;
+        descriptor.ptr_vtable = ptr_vtable;
+        descriptor.vtable_count = vtable_count as u16;
+        write_generic(core, raw_class.ptr_descriptor, descriptor)?;
+
+        let generated_classes = Allocator::alloc(core, 2 * size_of::<u32>() as u32)?;
+        write_generic(core, generated_classes, 0u32)?;
+        write_generic(core, generated_classes + size_of::<u32>() as u32, ptr_class)?;
+        let system_loader: Box<dyn ClassInstance> = jvm
+            .invoke_static("java/lang/ClassLoader", "getSystemClassLoader", "()Ljava/lang/ClassLoader;", ())
+            .await
+            .unwrap();
+        let loader: Box<dyn ClassInstance> = jvm
+            .new_class(
+                "net/wie/LgtClassLoader",
+                "(Ljava/lang/ClassLoader;I)V",
+                (system_loader, generated_classes as i32),
+            )
+            .await
+            .unwrap();
+        assert!(!jvm.has_class(name), "{name} must still be unloaded when the parent method is linked");
+
+        Ok((ptr_class, generated_classes, loader, own_method.ptr_method))
+    }
+
+    fn raw_vtable_target(core: &ArmCore, ptr_class: u32, index: usize) -> Result<u32> {
+        let raw_class: RawJavaClass = read_generic(core, ptr_class)?;
+        read_generic(core, raw_class.unk1 + ((index + 1) * size_of::<u32>()) as u32)
+    }
+
+    #[test]
+    fn virtual_method_appended_to_a_parent_skips_slots_an_unloaded_compiled_subclass_owns() -> Result<()> {
+        // #281's other half: a guest class that is compiled against its parent but not loaded yet
+        // keeps ITS OWN indices below its compiled `vtable_count`. If the runtime appends a parent
+        // method at the parent's current length, and that length falls inside the subclass's
+        // compiled range, the subclass later loads with its own method on that slot — and a
+        // guest dispatching the parent method there silently calls the subclass's method.
+        // `unloaded_compiled_subclass_vtable_bound` is what moves the index past that range.
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, implementation) = init_jvm(&system_clone).await?;
+            let parent = "org/kwis/msp/lwc/Component";
+            let child = "net/wie/test/LateCompiledComponent";
+            let parent_class = jvm.resolve_class(parent).await.unwrap();
+            let parent_definition = parent_class
+                .definition
+                .as_any()
+                .downcast_ref::<super::JavaClassDefinition>()
+                .unwrap()
+                .clone();
+            let parent_len = parent_definition.vtable_entries(&jvm).await?.len();
+
+            // The child's own method sits exactly where a naive append would land.
+            let compiled_count = parent_len + 4;
+            let (ptr_child, generated_classes, loader, own_target) =
+                seed_unloaded_compiled_subclass(&jvm, &mut core, &implementation, child, parent, compiled_count, Some(parent_len)).await?;
+
+            let index = LgtJvmSupport::virtual_method_index(&jvm, parent, "getWidth", "()I").await? as usize;
+            assert!(
+                index >= compiled_count,
+                "index {index} lands inside {child}'s compiled range 0..{compiled_count}"
+            );
+
+            LgtJvmSupport::register_generated_class(&mut core, &jvm, ptr_child, generated_classes, loader).await?;
+            let expected = LgtJvmSupport::non_virtual_method_target(&jvm, parent, "getWidth", "()I")?;
+            assert_eq!(
+                raw_vtable_target(&core, ptr_child, parent_len)?,
+                own_target,
+                "{child} slot {parent_len} lost its own method"
+            );
+            assert_eq!(raw_vtable_target(&core, ptr_child, index)?, expected, "{child} vtable index {index}");
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn compiled_subclass_loaded_after_a_parent_append_inherits_the_appended_slot() -> Result<()> {
+        // The index a parent-method link returns lies past every compiled subclass's
+        // `vtable_count` — so a compiled subclass loaded AFTER the link has no compiled slot there.
+        // `build_from_compiler_vtable` must carry the parent's tail over, or the guest dispatching
+        // that index on the subclass reads past its table.
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, implementation) = init_jvm(&system_clone).await?;
+            let parent = "org/kwis/msp/lwc/Component";
+            let child = "net/wie/test/LateCompiledComponent";
+            let parent_class = jvm.resolve_class(parent).await.unwrap();
+            let parent_definition = parent_class
+                .definition
+                .as_any()
+                .downcast_ref::<super::JavaClassDefinition>()
+                .unwrap()
+                .clone();
+            let parent_len = parent_definition.vtable_entries(&jvm).await?.len();
+
+            let (ptr_child, generated_classes, loader, _) =
+                seed_unloaded_compiled_subclass(&jvm, &mut core, &implementation, child, parent, parent_len, None).await?;
+
+            let index = LgtJvmSupport::virtual_method_index(&jvm, parent, "getWidth", "()I").await? as usize;
+            assert!(index >= parent_len, "index {index} is not an appended slot");
+
+            LgtJvmSupport::register_generated_class(&mut core, &jvm, ptr_child, generated_classes, loader).await?;
+            let child_class = jvm.get_class(child).unwrap();
+            let child_definition = child_class.definition.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap();
+            let child_len = child_definition.descriptor()?.vtable_count as usize;
+            assert!(
+                child_len > index,
+                "{child} was built with {child_len} slots; index {index} is past its table"
+            );
+            let expected = LgtJvmSupport::non_virtual_method_target(&jvm, parent, "getWidth", "()I")?;
+            assert_eq!(raw_vtable_target(&core, ptr_child, index)?, expected, "{child} vtable index {index}");
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
@@ -1031,6 +1229,15 @@ pub(crate) mod tests {
                     .word_index()?,
                 4
             );
+            // Guest static-field accessors test word 0's low halfword for 0x2000 and, when set, take
+            // the statics base from `[[word 2]+8]+0x4c` (lgt_java_abi.toml, java/lang/Class). RustJava's
+            // own Class fields must therefore stay off word 0, which stays zero.
+            let block_word_0: u32 = read_generic(&core, java_class_instance.ptr_fields()?)?;
+            assert_eq!(block_word_0, 0);
+            for (name, descriptor, word_index) in [("classLoader", "Ljava/lang/ClassLoader;", 1), ("nameBytes", "[B", 3)] {
+                let field = ClassDefinition::field(&*class_definition, name, descriptor, false).unwrap();
+                assert_eq!(field.as_any().downcast_ref::<super::JavaField>().unwrap().word_index()?, word_index);
+            }
             let class_object_again: u32 = core.run_function(descriptor.fn_get_class, &[]).await?;
             assert_eq!(class_object_again, class_object);
             let initialization_state: i32 = jvm
@@ -1241,6 +1448,59 @@ pub(crate) mod tests {
         Ok(())
     }
 
+    /// A guest class whose name string cannot be read must come back as an error, not a panic.
+    ///
+    /// `register_generated_class` is reached from `java_register_class` with a class pointer
+    /// taken from an SVC argument. That function reads the class and its descriptor with `?`,
+    /// but the third hop — the descriptor's `ptr_name` — went through the infallible
+    /// `ClassDefinition::name`, so an unreadable name killed the host. The address is the one
+    /// 놈3 produced (unmapped in every LGT region). Not observed in the corpus; this pins the
+    /// contract the function's `Result` already promised. Restoring `name()` turns it into a panic.
+    #[test]
+    fn register_generated_class_reports_an_unreadable_class_name() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, _) = init_jvm(&system_clone).await?;
+
+            let ptr_descriptor = Allocator::alloc(&mut core, size_of::<RawJavaClassDescriptor>() as u32)?;
+            core.write_bytes(ptr_descriptor, &[0; size_of::<RawJavaClassDescriptor>()])?;
+            write_generic(
+                &mut core,
+                ptr_descriptor + offset_of!(RawJavaClassDescriptor, ptr_name) as u32,
+                0x104c_02b4u32,
+            )?;
+            let ptr_class = Allocator::alloc(&mut core, size_of::<RawJavaClass>() as u32)?;
+            core.write_bytes(ptr_class, &[0; size_of::<RawJavaClass>()])?;
+            write_generic(&mut core, ptr_class + offset_of!(RawJavaClass, ptr_descriptor) as u32, ptr_descriptor)?;
+
+            let loader: Box<dyn ClassInstance> = jvm
+                .invoke_static("java/lang/ClassLoader", "getSystemClassLoader", "()Ljava/lang/ClassLoader;", ())
+                .await
+                .unwrap();
+            let generated_classes = Allocator::alloc(&mut core, size_of::<u32>() as u32)?;
+            write_generic(&mut core, generated_classes, 0u32)?;
+
+            let result = LgtJvmSupport::register_generated_class(&mut core, &jvm, ptr_class, generated_classes, loader).await;
+            assert!(
+                matches!(result, Err(WieError::InvalidMemoryAccess(0x104c_02b4))),
+                "an unreadable guest class name must be an error carrying its address"
+            );
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
     #[test]
     fn test_generated_jlet_wrapper_overrides_use_confirmed_indices() -> Result<()> {
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
@@ -1371,16 +1631,11 @@ pub(crate) mod tests {
 
     #[test]
     fn abi_rows_cover_the_indexes_titles_actually_dispatch_on() -> Result<()> {
-        // One shape behind five titles: 배틀몬스터 dispatches java/lang/Object index 5 and
-        // java/io/ByteArrayInputStream index 13, 배틀몬스터·학교가는길·체스마스터
-        // java/lang/Runtime index 13, 훼밀리마트타이쿤
-        // java/lang/String index 19, 메이플스토리2007 java/lang/Thread
-        // index 13, 턴·서든어택포켓 java/io/ByteArrayOutputStream index 16, 일지매영웅전기
-        // java/lang/String index 21 and then 27, 놈3 java/lang/String index 26, 배틀몬스터 again java/lang/StringBuffer indexes 10, 13
-        // and 22, 월드장기체스 java/lang/String index 16, 간호사타이쿤2 java/io/DataInputStream index 22,
-        // 스파이더맨3 java/io/DataInputStream index 27, 슈퍼액션히어로 java/io/DataInputStream index 32.
-        // Unlike the rows around them, these were derived from CLDC declaration order
-        // rather than read off a guest — see the comments in `data/lgt_java_abi.toml` — so a
+        // One shape behind many titles: each row below carries, on its own line, the title
+        // that dispatches it — add a title by adding its row, never by editing this comment
+        // (a shared sentence here was a merge-conflict hotspot for every sibling ABI PR).
+        // Unlike the rows around them in `data/lgt_java_abi.toml`, these were derived from CLDC
+        // declaration order rather than read off a guest — see the comments there — so a
         // reordered row does not fail to parse, it silently calls the wrong method. Pin it.
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
         let done = Arc::new(AtomicBool::new(false));
@@ -1390,24 +1645,42 @@ pub(crate) mod tests {
         system.spawn(async move || {
             let (jvm, _, _) = init_jvm(&system_clone).await?;
             for (class_name, index, name, descriptor) in [
+                // 배틀몬스터
                 ("java/lang/Object", 5, "notify", "()V"),
+                // 배틀몬스터
                 ("java/io/ByteArrayInputStream", 13, "skip", "(J)J"),
+                // 턴·서든어택포켓
                 ("java/io/ByteArrayOutputStream", 16, "toByteArray", "()[B"),
                 ("java/lang/Runtime", 11, "freeMemory", "()J"),
                 ("java/lang/Runtime", 12, "totalMemory", "()J"),
+                // 배틀몬스터·학교가는길·체스마스터
                 ("java/lang/Runtime", 13, "gc", "()V"),
+                // 메이플스토리2007
                 ("java/lang/Thread", 13, "isAlive", "()Z"),
+                // 월드장기체스
                 ("java/lang/String", 16, "compareTo", "(Ljava/lang/String;)I"),
+                // 훼밀리마트타이쿤
                 ("java/lang/String", 19, "startsWith", "(Ljava/lang/String;)Z"),
+                // 일지매영웅전기
                 ("java/lang/String", 21, "indexOf", "(I)I"),
+                // 놈3
                 ("java/lang/String", 26, "indexOf", "(Ljava/lang/String;I)I"),
+                // 일지매영웅전기 (after 21)
                 ("java/lang/String", 27, "substring", "(I)Ljava/lang/String;"),
+                // 배틀몬스터
                 ("java/lang/StringBuffer", 10, "length", "()I"),
+                // 배틀몬스터
                 ("java/lang/StringBuffer", 13, "setLength", "(I)V"),
+                // 배틀몬스터
                 ("java/lang/StringBuffer", 22, "append", "(C)Ljava/lang/StringBuffer;"),
+                // 간호사타이쿤2
                 ("java/io/DataInputStream", 22, "readBoolean", "()Z"),
+                // 스파이더맨3
                 ("java/io/DataInputStream", 27, "readChar", "()C"),
+                // 슈퍼액션히어로
                 ("java/io/DataInputStream", 32, "readUTF", "()Ljava/lang/String;"),
+                // 월드장기체스
+                ("java/util/Random", 10, "setSeed", "(J)V"),
             ] {
                 let class = jvm.resolve_class(class_name).await.unwrap();
                 let definition = class.definition.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap().clone();
@@ -1419,6 +1692,77 @@ pub(crate) mod tests {
                     .unwrap_or_else(|| panic!("{class_name} vtable index {index} is empty, so the guest gets a missing-entry stub"));
                 assert_eq!((method.name().as_str(), method.descriptor().as_str()), (name, descriptor));
             }
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn every_abi_vtable_row_is_the_slot_linking_resolves_to() -> Result<()> {
+        // Every fixed row in `data/lgt_java_abi.toml` against what the guest actually gets: the
+        // index `virtual_method_index` hands back when the method is linked by name, and the
+        // target the class's raw table holds at that index. #281 showed slots move with link
+        // order (ax 30 → 29) while rows kept being added; a row that drifts does not fail to
+        // parse, it makes the guest silently call a different method. Unlike
+        // `abi_rows_cover_the_indexes_titles_actually_dispatch_on`, this walks the whole file,
+        // so a new row is covered the moment it lands.
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, core, _) = init_jvm(&system_clone).await?;
+            let mut mismatches = Vec::new();
+            let mut checked = 0;
+            let mut skipped_interfaces = Vec::new();
+            for class in &JAVA_ABI.class {
+                if class.vtable.is_empty() {
+                    continue;
+                }
+                let resolved = jvm.resolve_class(&class.name).await.unwrap();
+                // An interface row (java/lang/Runnable) names the slot in an IMPLEMENTER's
+                // compiled table, not in the interface's own table — `prepare_generated` reads it
+                // only to name a compiled slot. There is no link-time index to compare it with;
+                // `generated_class_exposes_compiler_vtable_methods_to_jvm` covers that path.
+                if resolved.definition.access_flags().contains(ClassAccessFlags::INTERFACE) {
+                    skipped_interfaces.push(class.name.as_str());
+                    continue;
+                }
+                let definition = resolved.definition.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap().clone();
+                for row in &class.vtable {
+                    checked += 1;
+                    let linked = LgtJvmSupport::virtual_method_index(&jvm, &class.name, &row.name, &row.descriptor).await? as usize;
+                    let entries = definition.vtable_entries(&jvm).await?;
+                    let dispatched = match entries.get(row.index).and_then(|entry| entry.method.as_ref()) {
+                        Some(method) if raw_vtable_target(&core, definition.ptr_raw, row.index)? == method.target()? => {
+                            alloc::format!("{}{}", method.name(), method.descriptor())
+                        }
+                        Some(method) => alloc::format!("{}{} (raw target differs)", method.name(), method.descriptor()),
+                        None => RustString::from("<empty>"),
+                    };
+                    if linked != row.index || dispatched != alloc::format!("{}{}", row.name, row.descriptor) {
+                        mismatches.push(alloc::format!(
+                            "{} {}{}: row index {} · linked {linked} · slot {} holds {dispatched}",
+                            class.name,
+                            row.name,
+                            row.descriptor,
+                            row.index,
+                            row.index
+                        ));
+                    }
+                }
+            }
+            assert!(checked > 0, "no vtable rows were read from data/lgt_java_abi.toml");
+            assert_eq!(skipped_interfaces, ["java/lang/Runnable"], "a new interface row needs its own check");
+            assert!(mismatches.is_empty(), "ABI rows that do not match dispatch:\n{}", mismatches.join("\n"));
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
