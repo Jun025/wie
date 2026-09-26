@@ -48,4 +48,4 @@
 `메이플스토리2007`(대조 타이틀 · 0272·0208 이 이미 적음) · `영웅서기4`(`emulator.rs` 의 기존 테스트 줄 — 이 회차가 쓰지 않았다) ·
 SUFFIX-ATTACHED 3회/2쌍 — 셋 다 `배틀몬스터는`(조사 «는» · 진짜 언급).
 
-<!-- corpus-name-inflow v1 subjects=5 tree=b5b8e8024fc5ddf6 B=10/7 P=0/0 S=3/2 -->
+<!-- corpus-name-inflow v1 subjects=5 tree=7ecdd592d26e93c6 B=10/7 P=0/0 S=3/2 -->
