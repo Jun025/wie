@@ -4,7 +4,7 @@
   "task": "wie-2026-09-25-superaction-random-10-after-wec-verify-adopt-p1",
   "title": "슈퍼액션히어로 Random 10 — #320 착지로 이미 넘어감 · 다음 벽 LGT import 0x5b",
   "summary": "코드 변경 0. #320 전(4aee5055) 3/3 Random 10 → 후(a741291f) 3/3 Unknown lgt java import 0x5b. 월드장기체스는 Vector 31 그대로.",
-  "changes": ["docs/report/0300 — 전/후 측정"],
+  "changes": ["docs/report/0301 — 전/후 측정"],
   "verification": ["release wie_validate 슈퍼액션히어로 --inject ×3 · 월드장기체스 --timeout 20 ×3, 전/후 트리 각각"],
   "limits": ["칸 10 호출부 인자 워드는 슈퍼액션 쪽에서 재지 않았다(오류 소멸로 판정)."],
   "adoptedProposals": ["2026-09-25-datainputstream-readchar-readutf#p1"],
