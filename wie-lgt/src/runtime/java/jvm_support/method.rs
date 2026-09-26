@@ -177,12 +177,12 @@ impl Method for JavaMethod {
                 // that rather than panicking while reporting a failure.
                 None => {
                     let message = format!("LGT exception reference {ptr_raw:#x} does not point at a live instance");
-                    Err(jvm.exception("net/wie/WieError", &message).await)
+                    Err(super::host_error(jvm, &self.core, "net/wie/WieError", &message).await)
                 }
             },
             Err(error) => {
                 let message = format!("{error}{}", self.core.dump_reg_stack(0x1000));
-                Err(jvm.exception("net/wie/WieError", &message).await)
+                Err(super::host_error(jvm, &self.core, "net/wie/WieError", &message).await)
             }
         }
     }
