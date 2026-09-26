@@ -227,7 +227,7 @@ async fn java_is_class_assignable(core: &mut ArmCore, jvm: &Jvm, ptr_class: u32,
     // hands us one that points nowhere (measured on 놈3: its `catch (InterruptedException)` around
     // `Thread.sleep` rethrew `.bss+0xa9c` — the `sleep` import slot, not an object — whose class
     // word reads `0x104c02b4`; the pending value came from the shared cross-thread frame chain and
-    // stopped once frames went per-thread, docs/report/0277). Answering "not assignable" is what
+    // stopped once frames went per-thread, docs/report/0278). Answering "not assignable" is what
     // this runtime can honestly say about a class it cannot read, and it leaves the guest's own
     // handler search running — the alternative killed the emulator for every title in the process.
     let source_class_name = match LgtJvmSupport::class_from_raw(core, ptr_class).try_name() {

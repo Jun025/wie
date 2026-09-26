@@ -6,7 +6,7 @@
   "summary": "게스트 코드는 정상 자바다. 핸들러가 PendingException 을 되던지고, 그 값 0x1500a9c 는 try 본문이 r4 에 남기는 Thread.sleep(J)V 슬롯 주소다. 현 main 0/96 · 스레드 키만 0 으로 되돌린 대조 4/48(0229-fix 의 p1 이전 값과 일치).",
   "changes": [
     "wie-lgt/src/runtime/java/interface.rs — java_is_class_assignable 주석의 틀린 원인(초기화 안 된 static) 정정 · 동작 무변경",
-    "docs/report/0277"
+    "docs/report/0278"
   ],
   "verification": [
     "디스어셈블 0x312d0–0x3133e + 호출부 0x1875a — capstone Thumb · 임포트 썽크 (0x64,0x1f/0x20/0x21/0x12/0x54) · (1,0x32)=PendingException",
