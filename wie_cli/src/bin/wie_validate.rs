@@ -63,7 +63,7 @@
 //! `--keys` exists because the fixed script reaches a DIFFERENT screen under load: a menu that
 //! wants a key 10 s in gets whatever the 0.6 s grid has queued by then. Three battlemonster
 //! rounds each carried the same uncommitted `WIE_KEYS` patch to pin a path to the village;
-//! `docs/examples/keys/battlemonster-village.keys` is that path. Under `--keys` the 120 s cap
+//! `docs/keys/battlemonster-village.keys` is that path. Under `--keys` the 120 s cap
 //! on the schedule-derived deadline is lifted — the script's length IS the requested budget.
 //!
 //! ── Two content axes, same predicate, different scope ────────────────────────
@@ -488,6 +488,9 @@ struct Args {
     /// key (`OK UP DOWN LEFT RIGHT LSOFT RSOFT CLR STAR HASH NUM0`..`NUM9`) or `WAIT`
     /// (no key, still a shot). GAP = seconds until the next step (default --action-secs),
     /// HOLD = seconds the key stays down (default 0.15). Lifts the 120 s deadline cap.
+    /// Unchecked: keep HOLD < GAP (else the next key goes down before this one is up) and
+    /// GAP >= 0.05 (the step's shot is taken 0.05 s before the next step, so less lands it
+    /// before the press).
     #[arg(long, requires = "inject", value_parser = parse_keys)]
     keys: Option<KeyScript>,
     /// Under `--inject`, end at `--timeout` instead of the deadline derived from
@@ -2269,8 +2272,8 @@ mod tests {
         );
         let example = concat!(env!("CARGO_MANIFEST_DIR"), "/../docs/keys/battlemonster-village.keys");
         let (s, _, n) = plan(&["--inject", "--keys", example]);
-        assert_eq!(n, 97);
-        assert_eq!(shots(&s)[95], "95_OK");
+        assert_eq!(n, 99);
+        assert_eq!(shots(&s)[97], "97_OK");
     }
 
     #[test]
