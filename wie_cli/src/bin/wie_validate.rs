@@ -132,8 +132,8 @@ use std::{
 use clap::Parser;
 
 use wie_backend::{
-    AudioSink, Database, DatabaseRepository, Emulator, Event, Filesystem, Font, Instant, KeyCode, Options, Platform, RecordId, Screen, canvas::Image,
-    extract_zip,
+    AudioSink, Database, DatabaseRepository, Emulator, Event, Filesystem, Font, FramePacer, Instant, KeyCode, Options, Platform, RecordId, Screen,
+    canvas::Image, extract_zip,
 };
 use wie_j2me::J2MEEmulator;
 use wie_ktf::KtfEmulator;
@@ -508,6 +508,13 @@ struct Args {
     /// output into the repo or a shared log when running against a real game.
     #[arg(long, default_value_t = false)]
     guest_stdout: bool,
+    /// Tick as a host with this display rate would: each tick gets the budget
+    /// `FramePacer` derives from a `1 / HZ` s frame (60 -> 14ms, 120 -> 5ms)
+    /// instead of the engine default (14ms). OFF by default, so existing runs are
+    /// unchanged; this loop never sleeps, so it changes how finely a tick slices
+    /// the guest, not how often ticks come.
+    #[arg(long, value_parser = clap::value_parser!(u32).range(1..=1000))]
+    frame_hz: Option<u32>,
 }
 
 /// Cap on the `guest_stdout` field, in bytes of the lossy-decoded text.
@@ -1024,6 +1031,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     // ── drive ───────────────────────────────────────────────────────────────
     let loop_start = StdInstant::now();
     let mut ticks = 0u64;
+    let tick_budget = args.frame_hz.map(|hz| FramePacer::budget_for_period_us(1_000_000 / u64::from(hz)));
     let mut run_err: Option<String> = None;
     let mut phase = String::from("boot");
     let mut sched_idx = 0usize;
@@ -1067,7 +1075,10 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
         }
 
         let step = catch_unwind(AssertUnwindSafe(|| {
-            emulator.tick()?;
+            match tick_budget {
+                Some(budget) => emulator.tick_for(budget)?,
+                None => emulator.tick()?,
+            }
             // Faithfully reproduce the windowed flow: the emulator paints in
             // response to the Redraw event it requested via request_redraw.
             if screen.redraw_requested.swap(false, Ordering::SeqCst) {

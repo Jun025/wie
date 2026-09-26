@@ -1,0 +1,26 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-26",
+  "task": "wie-ktf-tick-budget-from-host-frame-interval",
+  "title": "tick 예산을 호스트 프레임 간격에서 — Emulator::tick_for · FramePacer · 60Hz 불변",
+  "summary": "Emulator::tick_for(budget) 를 두고 tick() 은 14ms 기본 구현으로 남겼다. 브라우저 호스트 2곳은 FramePacer 가 rAF 간격에서 예산을 정하고(상한 14), wie_validate 는 --frame-hz 로 고른다. 60Hz 3타이틀 불변, 모사 120Hz 에서 바쁜 게스트의 프레임 넘김 87~100% → 8~37%.",
+  "changes": [
+    "wie-backend: Executor/System::tick_for · Emulator::tick_for(필수)+tick(기본 구현) · frame_pacer.rs 신규",
+    "wie-ktf/lgt/skt/j2me emulator.rs — tick → tick_for(budget)",
+    "wie_featurephone · wie-web — FramePacer 배선(JS 수출면 무변경)",
+    "wie_validate — --frame-hz (기본 off)",
+    "docs/architecture.md 1문장 · docs/report/0284"
+  ],
+  "verification": [
+    "브라우저 교대 짝 2회 × 3타이틀 × {rAF 60, 모사 120} — docs/report/0284 표",
+    "디버그 빌드 예산 분포: 60Hz 에서 14 가 99.2~99.4%",
+    "개악 10종 각각 해당 시험 FAILED"
+  ],
+  "limits": [
+    "실기 120Hz 는 재지 않았다 — 모사 격자는 부하 아래 늦게 깨어 탐침이 주기를 약 9.5ms 로 읽는다",
+    "영웅서기4 는 120Hz 에서 43.5 → 37.9~39.4fps(넘김으로 받던 몫을 돌려줌 · 자기 60Hz 속도보다 약간 위)",
+    "60Hz 에서 약 2초마다 4ms tick 1회(스팟 탐침 · tick 의 0.6~0.8%)"
+  ],
+  "adoptedProposals": ["2026-09-25-ktf-frame-pacing-arm-preemption-tick-budget#p1"],
+  "proposals": []
+}

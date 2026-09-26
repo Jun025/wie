@@ -221,8 +221,8 @@ impl Emulator for LgtEmulator {
         self.system.event_queue().push(event)
     }
 
-    fn tick(&mut self) -> Result<()> {
-        self.system.tick().map_err(|x| {
+    fn tick_for(&mut self, budget_ms: u64) -> Result<()> {
+        self.system.tick_for(budget_ms).map_err(|x| {
             let reg_stack = self.core.dump_reg_stack(0x1000); // TODO: hardcode
             match x {
                 WieError::FatalError(msg) => WieError::FatalError(format!("{msg}\n{reg_stack}")),
