@@ -105,3 +105,6 @@ BOUNDED 는 §4 게이트에서 스크린샷을 뜬 타이틀 이름과 `wipi_c.
 SUFFIX-ATTACHED 2쌍은 `docs/upstream-realign-p3-slices.md` 에 원래 있던 조사 붙은 언급 1개와, 이 절이 그것을 인용한 1개다 ⇒ 둘 다 진짜 언급 · 판단이 더 필요한 것 0.
 게임 바이트 유입 0 · 경로 유입 0.
 
+
+
+<!-- corpus-name-inflow v1 subjects=6 tree=cf89a34227ffc49e B=21/16 P=0/0 S=1/1 -->
