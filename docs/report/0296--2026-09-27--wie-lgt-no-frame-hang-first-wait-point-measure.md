@@ -78,4 +78,4 @@
 
 게임 이름 유입(`scripts/corpus-name-inflow.mjs --corpus <game_lab>`): 수는 아래 표식의 B(BOUNDED)·S(SUFFIX-ATTACHED) 다 — ★S 도 0 이 아니다. 대상이 `lgt_java_abi.toml` «파일 전체»라 기존 주석의 타이틀(배틀몬스터·서든어택포켓·스파이더맨3 등, 리니지가 이미 적은 라이브 타이틀)이 함께 세어진다. 이 회차가 새로 쓴 이름은 `학교가는길`·`놈3`(이 회차의 대상)과 `배틀몬스터`(비교 군집 이름)뿐이다.
 
-<!-- corpus-name-inflow v1 subjects=3 tree=497a2d7e664fd3e2 B=71/22 P=4/2 S=12/6 -->
+<!-- corpus-name-inflow v1 subjects=3 tree=e26bf5f0618e1d8f B=71/22 P=4/2 S=12/6 -->
