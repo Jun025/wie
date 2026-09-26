@@ -1,0 +1,12 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-26",
+  "task": "wie-2026-09-26-class-definition-801-unwrap-panic-adopt-p1",
+  "title": "배틀몬스터 class_definition.rs:801 패닉 — 재현 0/27 · GC 해제 후 사용 가설 반증 · 패닉 문구에 포인터 체인",
+  "summary": "main+#317 숲 경로 10판, #292 필드 경로 11판, #292 대화형 ctl 경로 6판 모두 패닉 0. Runtime.gc() 가 게스트가 쥔 객체를 해제한다는 가설은 destroy 추적·독살로 5판(destroy 1.3만~5.3만/판) 해제 후 사용 0 으로 기각했다. 원인을 모르므로 에러 전파로 봉합하지 않았고, name() 패닉 문구가 class·descriptor 포인터를 담도록만 바꿨다. 세부는 docs/report/0291.",
+  "adoptedProposals": [
+    "2026-09-26-battlemonster-continue-orphan-save-flag#p1"
+  ],
+  "declinedProposals": [],
+  "proposals": []
+}
