@@ -747,3 +747,6 @@ commands from ⒜), relies on unforced discipline, and still leaves the alias 6 
   knowingly breaks a convention that landed 20 minutes earlier; dropping the entry loses it), which
   is the answer — but nothing guaranteed the next round would reach it. **Keep the date when you
 
+
+**게임 파일명 유입**(`node scripts/corpus-name-inflow.mjs --corpus <game_lab>` 실행값): BOUNDED·SUFFIX-ATTACHED 는 아래 표식 그대로다.
+전건 `AGENTS.md@5434ab0a` 에 이미 있던 문장이 «옮긴 원문»으로 이 파일에 들어온 것이다 — 새 이름·파일 바이트·경로 유입은 없다.
