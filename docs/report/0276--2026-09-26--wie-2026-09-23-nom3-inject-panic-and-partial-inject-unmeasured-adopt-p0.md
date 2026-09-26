@@ -67,6 +67,6 @@ RUST_LOG=warn,wie_lgt::runtime::java::interface=trace target/release/wie_validat
 
 `interface.rs` `java_is_class_assignable` 주석이 원인을 「초기화 안 된 static 을 던진다」로 적고 있었다 — 틀렸다. 동작 무변경(`Ok(0)` 가드 유지 — 다른 오염 경로에 대한 방어로 여전히 값한다).
 
-**게이트**: 회신에 수치.
+**게이트**(2026-09-26, loadavg 70~150): fmt rc0 · clippy `--all -D warnings` rc0 · wasm clippy rc0 · `cargo +beta clippy` rc0 · `RUST_MIN_STACK=4194304 cargo test --all` **454 passed / 0 failed**(47 suites) · `clippy --workspace --all-targets` 경고 **16**(= 0251 기준 16). 엔진 동작 diff 0(주석뿐)이라 러너 블록은 돌리지 않았다.
 
-**게임 파일명 유입**: 회신·PR 에 도구 출력.
+**게임 파일명 유입**: `node scripts/corpus-name-inflow.mjs --corpus <코퍼스>` ⇒ BOUNDED 13회/9쌍(전부 관측 대상 타이틀명 놈3) · SUFFIX-ATTACHED 1회/1쌍 — `interface.rs` 에 **이미 있던** 「서든어택포켓」(= 다른 제목, 이 회차가 쓰지 않았다). 게임 바이트 0.
