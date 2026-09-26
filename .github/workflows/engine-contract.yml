@@ -91,6 +91,16 @@ jobs:
           node scripts/check-worklog-json.mjs --selftest
           node scripts/check-worklog-json.mjs
 
+      # AGENTS.md is loaded by every wie session, so it holds standing rules only; a round's findings go
+      # to docs/report/ with a one-line pointer (docs/report/0277). Cap = 842 lines at the 2026-09-26 trim
+      # + 8 headroom — lower it when the frozen meta sections (219 lines) shrink. Placed before the
+      # coverage step because a red step skips every step after it.
+      - name: AGENTS.md stays within its line cap (docs/report/0277)
+        run: |
+          n=$(wc -l < AGENTS.md); cap=850
+          if [ "$n" -gt "$cap" ]; then echo "::error file=AGENTS.md::AGENTS.md is $n lines (cap $cap) — move the round's history to docs/report/ and leave a one-line pointer"; exit 1; fi
+          echo "AGENTS.md: $n lines (cap $cap)"
+
       # Same reasoning as the step above (always-run, node-only, ~1s), for the
       # OTHER half of §Landing paperwork: the promise to re-measure worklog
       # coverage every 10 landed rounds. This does NOT gate on the ratio — that
