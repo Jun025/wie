@@ -130,6 +130,14 @@ vtable = [
 name = "java/io/OutputStream"
 vtable = [
     { name = "write", descriptor = "([B)V", index = 11 },
+    # 턴 (4 sites) and 서든어택포켓 (5 sites — a separate binary) end every save the same way:
+    # toByteArray (16) on the BAOS, then index 14 on the DataOutputStream wrapping it and index 14
+    # on the BAOS itself, r0 only, return ignored, and neither stream is touched again before the
+    # function returns — `dos.close(); baos.close();`, outer first. 14 is close() by declaration
+    # order; flush() (13) has the same ()V shape, but a flush AFTER toByteArray could not change
+    # the array already taken, so position rules it out. Measured 2026-09-26 (턴 0xada0/0xadb8,
+    # 서든어택포켓 0x1444/0x145c).
+    { name = "close", descriptor = "()V", index = 14 },
 ]
 
 # 턴 and 서든어택포켓 (both copies of each) dispatch index 16 on a ByteArrayOutputStream as the
