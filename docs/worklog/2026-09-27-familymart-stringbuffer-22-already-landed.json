@@ -1,0 +1,16 @@
+{
+  "date": "2026-09-27",
+  "task": "wie-2026-09-24-baos-tobytearray-and-string-indexof-slots-adopt-p2",
+  "title": "훼밀리마트타이쿤 StringBuffer 22 — 이미 main 에 있다 · 벽은 DataOutputStream 14",
+  "summary": "StringBuffer 22 = append(C) 행은 a42e6867(2026-09-25)이 이미 넣었다. 현 main 에서 훼밀리마트타이쿤 벽은 DataOutputStream 14 이고, 행을 빼면 StringBuffer 22 벽이 되돌아온다. PR #328 파일로는 벽 없이 max-ticks·1 paint·검은 화면.",
+  "verification": [
+    "main 7eb58422: DataOutputStream vtable index 14 · ticks 16 · paints 0 (2/2)",
+    "main - 22 행: StringBuffer vtable index 22 · ticks 11/10 · paints 0 (2/2)",
+    "PR #328 toml (59718034): stop max-ticks · ticks 50000000 · paints 1 · last_frame_content false (2/2)"
+  ],
+  "adoptedProposals": [
+    "2026-09-24-baos-tobytearray-and-string-indexof-slots#p2",
+    "2026-09-24-validator-reports-runtime-java-exceptions#p1"
+  ],
+  "proposals": []
+}
