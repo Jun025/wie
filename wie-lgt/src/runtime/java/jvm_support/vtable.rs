@@ -1,4 +1,4 @@
-use alloc::{format, string::String, vec::Vec};
+use alloc::{collections::BTreeMap, format, string::String, vec::Vec};
 use core::mem::size_of;
 
 use jvm::{ClassDefinition, Jvm, Method};
@@ -25,23 +25,30 @@ impl JavaVtable {
     }
 
     pub fn read(core: &ArmCore, ptr_vtable: u32, entry_count: usize, known_classes: &[(String, Vec<JavaMethod>)]) -> Result<Vec<JavaVtableEntry>> {
+        // `target()` reads the method struct out of guest memory, so matching each entry by a
+        // linear scan cost entries × methods reads per call — and linking calls this once per
+        // imported virtual method. That product was ~90% of a multi-second, never-yielding boot
+        // tick (서든어택포켓, docs/report/0275). Index once, keeping the FIRST method per target so the
+        // result is the one the scan would have found.
+        let mut by_target = BTreeMap::new();
+        for method in known_classes.iter().flat_map(|(_, methods)| methods) {
+            if let Ok(target) = method.target() {
+                by_target.entry(target).or_insert(method);
+            }
+        }
+
         (0..entry_count)
             .map(|index| {
                 let target = read_generic(core, ptr_vtable + ((index + 1) * size_of::<u32>()) as u32)?;
-                let method = known_classes
-                    .iter()
-                    .flat_map(|(_, methods)| methods)
-                    .find(|method| method.target().is_ok_and(|method_target| method_target == target))
-                    .cloned()
-                    .or_else(|| {
-                        known_classes.iter().find_map(|(class_name, methods)| {
-                            let entry = JAVA_ABI.class(class_name)?.vtable.iter().find(|entry| entry.index == index)?;
-                            methods
-                                .iter()
-                                .find(|method| method.name() == entry.name && method.descriptor() == entry.descriptor)
-                                .cloned()
-                        })
-                    });
+                let method = by_target.get(&target).copied().cloned().or_else(|| {
+                    known_classes.iter().find_map(|(class_name, methods)| {
+                        let entry = JAVA_ABI.class(class_name)?.vtable.iter().find(|entry| entry.index == index)?;
+                        methods
+                            .iter()
+                            .find(|method| method.name() == entry.name && method.descriptor() == entry.descriptor)
+                            .cloned()
+                    })
+                });
                 Ok(JavaVtableEntry { target, method })
             })
             .collect()

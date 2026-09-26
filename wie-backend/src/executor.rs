@@ -18,7 +18,9 @@ type Task = Pin<Box<dyn Future<Output = Result<()>> + Send>>;
 // every `INSTRUCTIONS_PER_YIELD` instructions, so a CPU-bound guest gets exactly this share of
 // each frame. At 8ms a guest frame costing 8-16ms of emulation spilled into a second host frame
 // and ran at half its native rate; 14ms leaves ~2.7ms of a 60Hz frame to the host.
-const TICK_BUDGET_MS: u64 = 14;
+// This is the default for hosts that do not know their frame interval; a host that does passes
+// its own budget to `tick_for` (see `FramePacer`, which derives it and never exceeds this value).
+pub const TICK_BUDGET_MS: u64 = 14;
 
 pub struct ExecutorInner {
     current_task_id: Option<usize>,
@@ -117,7 +119,15 @@ impl Executor {
     where
         T: Fn() -> Instant,
     {
-        let end = now() + TICK_BUDGET_MS;
+        self.tick_for(now, TICK_BUDGET_MS)
+    }
+
+    /// `tick` with a host-chosen wall-clock budget in milliseconds instead of `TICK_BUDGET_MS`.
+    pub fn tick_for<T>(&mut self, now: T, budget_ms: u64) -> Result<()>
+    where
+        T: Fn() -> Instant,
+    {
+        let end = now() + budget_ms;
         loop {
             let now = now();
 
@@ -276,6 +286,25 @@ mod tests {
         // (17→35fps on KTF 영웅서기4) must turn this red.
         executor.tick(advancing_clock(0)).unwrap();
         assert_eq!(polls.load(Ordering::Relaxed), 14);
+    }
+
+    #[test]
+    fn test_tick_for_spends_the_host_budget_not_the_default() {
+        let mut executor = Executor::new();
+
+        let polls = Arc::new(AtomicU64::new(0));
+        let polls_clone = polls.clone();
+        executor.spawn(move || async move {
+            for _ in 0..1000 {
+                polls_clone.fetch_add(1, Ordering::Relaxed);
+                YieldOnce(false).await;
+            }
+        });
+
+        // A 120Hz host's budget (`FramePacer::budget_for_period_us(8_333)`); ignoring it and
+        // spending the 14ms default is exactly the overrun of an 8.3ms frame this API exists to prevent.
+        executor.tick_for(advancing_clock(0), 5).unwrap();
+        assert_eq!(polls.load(Ordering::Relaxed), 5);
     }
 
     #[test]

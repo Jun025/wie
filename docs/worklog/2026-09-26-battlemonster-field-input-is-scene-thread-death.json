@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-26",
+  "task": "wie-battlemonster-field-input-and-div-by-zero-after-unwind-fix",
+  "title": "배틀몬스터 필드 무반응 = 장면 스레드 사망(StringBuffer 22) · #292 가 푼다 · / by zero 재현 0",
+  "summary": "코드 변경 없음. 필드 입력 무반응은 main 에서 장면 스레드 a.run() 이 StringBuffer vtable 22 미구현으로 죽은 결과였다(main 2/2 ↔ #292 0/2). #292 위에서 튜토리얼 전투와 마을 자유 이동까지 확인. / by zero 는 #292 바이너리 27회에서 0회. 대신 #292 가 놈3 을 특정 주입 일정에서 스택 넘침으로 죽인다.",
+  "adoptedProposals": ["2026-09-25-lgt-unwind-consumes-catch-frame#p0"],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "#292 위에서 놈3 이 main 스레드 스택 넘침으로 죽는다(--boot-secs 15 --action-secs 1.2)",
+      "plainSummary": "unwind 수리(#292)를 얹으면 놈3 이 특정 키 타이밍에서 같은 예외 프레임을 4만 번 되풀이한 끝에 프로그램째 죽는다. main 은 같은 명령에서 통과한다.",
+      "userBenefit": "#292 착지 뒤 놈3 이 셸에서 갑자기 꺼지는 회귀를 막는다.",
+      "why": "깨끗한 4646c3d8(LTO) 2/2 · main+4646c3d8 2/2 overflow ↔ main 2/2 PASS. trace: 프레임 0x4a85e500 이 lr 0x1c7d9 로 push 되자마자 같은 프레임으로 unwind(resume 0x1c7d9) 40,078회. 기본 일정에서는 둘 다 PASS 라 -fix 회차의 측정에 안 걸렸다.",
+      "tradeoff": "unwind 규칙을 또 건드리면 배틀몬스터(ARM)·현영맞고(Thumb) 시퀀스 시험을 다시 지켜야 한다.",
+      "effort": "M — 재현 명령·trace 가 증적에 있다(evidence/wie-battlemonster-field-input-and-div-by-zero-after-unwind-fix/nom3_*).",
+      "target": "wie"
+    }
+  ]
+}

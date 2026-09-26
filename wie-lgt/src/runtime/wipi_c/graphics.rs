@@ -4,7 +4,7 @@ use core::mem::size_of;
 use bytemuck::{Pod, Zeroable};
 use wipi_types::{
     lgt::wipic::{LgtFramebuffer, LgtGraphicsContext, LgtGraphicsView, LgtImage},
-    wipic::{WIPICDisplayInfo, WIPICFramebuffer, WIPICIndirectPtr, WIPICWord},
+    wipic::{WIPICDisplayInfo, WIPICFramebuffer, WIPICGraphicsContext, WIPICIndirectPtr, WIPICWord},
 };
 
 use wie_backend::canvas::{ArgbPixel, Clip, Color, Image, PixelType, VecImageBuffer};
@@ -12,7 +12,7 @@ use wie_core_arm::{Allocator, ArmCore};
 use wie_util::{Result, WieError, read_generic, write_generic};
 use wie_wipi_c::{
     WIPICContext,
-    api::graphics::{FrameBuffer, decode_image_framebuffer, primitives},
+    api::graphics::{self as shared_graphics, FrameBuffer, WIPICGraphicsContextIdx, decode_image_framebuffer, primitives},
 };
 
 const GRAPHICS_STATE_ROOT: u32 = 0x7fff1008;
@@ -460,6 +460,49 @@ pub async fn get_framebuffer_bpp(context: &mut dyn WIPICContext, _handle: WIPICI
         return Err(WieError::FatalError("Invalid LGT display dimensions".into()));
     }
     Ok(FRAMEBUFFER_DEPTH as i32)
+}
+
+// The graphics context record the SVCs actually hand out is the SHARED one
+// (`WIPICGraphicsContext`, 52B), because the `keydraw_lgt` SDK embeds exactly that
+// struct, writes `fgpxl` (+12) itself and never calls SetContext — the native 56B record
+// overruns it (0262 §3: `Undefined instruction` in `CletWrapperCard.paint`). Real LGT
+// titles, though, read three fields of it DIRECTLY at the native offsets: foreground
+// +16, background +20, alpha +24. Measured on 0236 §2-2's title (docs/report/0293): with the shared
+// record its glyphs are `#fffbff` (alpha 0 blends them away); put a sentinel in the
+// shared `bgpxl` (+16) with alpha 255 and all 2,125 glyph pixels take the sentinel.
+// Those three slots are `bgpxl`/`transpxl`/`alpha` in the shared layout, and no shared
+// reader draws with them, so both ABIs fit in one record: shared fields where the host
+// reads, native fields where the title reads.
+// ponytail: only fg/bg/alpha are overlaid. Native `pixel_param`/`font`/`xor_enabled`/
+// `offset` still alias shared fields (+32..+52), and GetContext(bg) answers the fg —
+// widen this when a title is seen reading one of those.
+const NATIVE_FOREGROUND: u32 = core::mem::offset_of!(LgtGraphicsContext, foreground) as u32;
+const NATIVE_BACKGROUND: u32 = core::mem::offset_of!(LgtGraphicsContext, background) as u32;
+
+pub async fn init_shared_context(context: &mut dyn WIPICContext, ptr_context: WIPICWord) -> Result<()> {
+    shared_graphics::init_context(context, ptr_context).await?;
+    // Shared `alpha` sits at the native offset already; native init makes it opaque.
+    const _: () = assert!(core::mem::offset_of!(LgtGraphicsContext, alpha) == core::mem::offset_of!(WIPICGraphicsContext, alpha));
+    write_generic(context, ptr_context + core::mem::offset_of!(WIPICGraphicsContext, alpha) as u32, 255u32)
+}
+
+pub async fn set_shared_context(
+    context: &mut dyn WIPICContext,
+    ptr_context: WIPICWord,
+    operation: WIPICGraphicsContextIdx,
+    value: WIPICWord,
+) -> Result<()> {
+    match operation {
+        // Shared writes bg to +16 — the native foreground — so it would recolour the text.
+        WIPICGraphicsContextIdx::BgPixelIdx => write_generic(context, ptr_context + NATIVE_BACKGROUND, value),
+        // Shared writes trans to +20 — the native background; native ignores this op.
+        WIPICGraphicsContextIdx::TransPixelIdx => Ok(()),
+        WIPICGraphicsContextIdx::FgPixelIdx => {
+            shared_graphics::set_context(context, ptr_context, operation, value).await?;
+            write_generic(context, ptr_context + NATIVE_FOREGROUND, value)
+        }
+        _ => shared_graphics::set_context(context, ptr_context, operation, value).await,
+    }
 }
 
 pub async fn init_context(context: &mut dyn WIPICContext, ptr_context: WIPICWord) -> Result<()> {
