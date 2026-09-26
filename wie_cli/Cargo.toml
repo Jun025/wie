@@ -23,6 +23,7 @@ png = "^0.17"
 wie-backend = { workspace = true }
 wie-util = { workspace = true }
 
+wie-core-arm = { workspace = true } # wie_validate reads the SVC stub high-water mark
 wie-j2me = { workspace = true }
 wie-ktf = { workspace = true }
 wie-lgt = { workspace = true }

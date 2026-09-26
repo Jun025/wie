@@ -1,0 +1,35 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-25",
+  "task": "wie-2026-09-24-wec-systheme-oemdevice-no-branch-minimal-stub-adopt-p0",
+  "title": "월드장기체스 — java/lang/String 16 = compareTo(Ljava/lang/String;)I (호출부 디스어셈블)",
+  "summary": "CCC.<init> 이 문자열 하나를 상수 문자열 넷과 차례로 비교해 결과가 0 이면 같은 플래그를 세우는 사슬을 두 번 돈다. 인자는 힙에서 java/lang/String 으로 읽히고 결과는 0 과만 비교된다. 규칙 위치와 사슬 의미가 모두 compareTo 를 가리킨다. 벽이 String 16 에서 java/util/Random 10 으로 옮겨 갔다.",
+  "changes": [
+    "wie-lgt/data/lgt_java_abi.toml — String 블록 16 행 1줄 + 근거 주석",
+    "wie-lgt/src/runtime/java/jvm_support.rs — ABI 핀 테스트에 16 행 1줄",
+    "docs/report/0267"
+  ],
+  "verification": [
+    "전: 3/3 FAIL · ticks 1 · paints 0 · String vtable index 16",
+    "후: 3/3 FAIL · ticks 2 · paints 0 · java/util/Random vtable index 10",
+    "변이: 16 행만 제거 → String vtable index 16 재현 (ticks 1)"
+  ],
+  "limits": [
+    "호출부는 한 타이틀(월드장기체스) 안의 두 사슬·8곳 — 다른 타이틀의 두 번째 호출부 교차는 아직 없다",
+    "paints 0 그대로 — 렌더를 켜지 않았다"
+  ],
+  "adoptedProposals": [
+    "2026-09-24-wec-systheme-oemdevice-no-branch-minimal-stub#p0"
+  ],
+  "proposals": [
+    {
+      "title": "월드장기체스 — `java/util/Random vtable index 10` 미구현 벽",
+      "plainSummary": "String 16 을 채우자 월드장기체스가 한 tick 더 가서 Random 의 첫 가상 슬롯(10)에서 멈춥니다. 그 슬롯이 어떤 메서드인지 호출부로 확인해 등재하는 일입니다.",
+      "userBenefit": "월드장기체스 부팅이 다음 벽을 넘는 한 걸음입니다.",
+      "why": "이 회차 후 3/3 동일하게 `Unimplemented: java/util/Random vtable index 10`. 규칙(10 + CLDC 선언 순서)이면 Random 의 첫 인스턴스 메서드 setSeed(J)V 이지만 lgt_java_abi.toml 에 Random 블록이 아직 없다.",
+      "tradeoff": "규칙만으로 적으면 추정이다 — 이번처럼 호출부 인자·반환 사용을 디스어셈블해 교차해야 한다(setSeed(J) 는 long 인자라 r1:r2 모양으로 가를 수 있다).",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}
