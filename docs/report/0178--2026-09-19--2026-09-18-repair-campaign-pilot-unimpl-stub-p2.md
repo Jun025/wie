@@ -125,3 +125,43 @@
 ★**게임 파일명 유입** — 이 diff 의 추가 줄에 코퍼스 stem **0건**(NFC 완전일치 대조).
 ★**게임 «내부»의 문자열**(`"MXUserMemInterf"`)은 코드 주석·이 기록에 들어갔다 — **이미지 안의 리터럴**이고
 게임 **바이트는 0**이다(Constraint 9 는 bytes 다).
+
+### 부록 — `wie-ktf/src/runtime/svc_ids.rs` `ktf_kernel_extension_message` doc 주석 이전분 (2026-09-26 · wie-2026-09-19-adoption-audit-prune)
+
+소스 doc 주석에 있던 노트를 원문 그대로 옮겼다. 소스에는 요약 3줄 + 이 절 링크만 남는다.
+
+── Why the name `MC_knlReservedN` had to stop being the whole message ───────
+Those thirteen variants above (`Reserved1`-`Reserved13`, ids 33-43 and 57-58)
+are **this repo's placeholders**, not slots the WIPI specification set aside.
+Measured 2026-09-19 against `docs/reference/WIPIHeader.h`: the string
+`Reserved` appears **0 times** (the single case-insensitive hit is
+`int m_reserved;`, an unrelated struct field), and the spec's kernel section
+simply **ends** at `E_MC_knlGetResource` — the next field is
+`E_MC_grpGetImageProperty`. So the spec has no kernel slot at index 33 or
+beyond; everything up there is KTF's own extension space. This file already
+knows that for ids 44+, which it labels `OEMC_knl…` ("OEM C"). The
+`Reserved*` block is the same territory wearing the wrong label.
+
+That mislabel had a cost: a triage round classified the resulting failure as
+"a slot the spec left blank, so it cannot be touched" and prescribed
+*documentation*. It is not untouchable — it is un-reverse-engineered, which
+is a different verdict with a different price.
+
+── What id 36 actually does, since this round went and looked ───────────────
+One title reaches it. Disassembled at its call site (and cross-checked twice:
+the fault's `IP` is `0x24` = 36, and the guest loads the entry from
+`knl_interface + 0x90` = field index 36):
+
+```text
+f(r0 = "MXUserMemInterf", r1 = -1, r2 = -1, r3 = 0, [sp+0] = 0)   // arity 5
+-> the caller stores the result in a global, then immediately calls
+   result->slot0(buffer, 0x14400)                                  // 82,944 bytes
+```
+
+So it takes an **interface name** and hands back an **interface pointer**
+whose first entry is then initialised with a memory pool. That is a named
+extension-interface lookup, and it is very likely the door through which the
+`Interface3`-`Interface16` tables below are reached. ★**That last sentence is
+a hypothesis, not a measurement** — nothing here traced a returned pointer to
+one of those tables. The arity and the two argument shapes are measured; the
+*name* of the function is not, and this round deliberately did not invent one.
