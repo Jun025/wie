@@ -273,7 +273,17 @@ impl EventQueue {
                     })
                     .min()
                     .filter(|_| !callbacks_pending);
-                context.system().sleep(next_timer.map_or(16, |x| x.clamp(1, 16))).await; // TODO we need to wait for events
+                // Re-check the backend queue every millisecond of the wait: a Redraw handed over
+                // mid-wait otherwise sits until the wait ends, and 배틀몬스터's game thread spins until
+                // its paint lands (measured 16.4ms of a 50ms frame). Callbacks and timers still run
+                // once per wait, as before.
+                let deadline = now + next_timer.map_or(16, |x| x.clamp(1, 16));
+                while context.system().platform().now() < deadline {
+                    context.system().sleep(1).await;
+                    if !context.system().event_queue().is_empty() {
+                        break;
+                    }
+                }
 
                 for event in pending_timer_events.drain(..) {
                     context.system().event_queue().push(event);
@@ -601,6 +611,43 @@ mod test {
         };
         let (_, at_5ms) = get_next_event_with_timer_due_at_5ms(4, vec![callback_proto], Some("net/wie/IdleCallback"))?;
         assert!(!at_5ms, "with recurring callbacks pending the timer waits for the 16ms slice");
+        Ok(())
+    }
+
+    #[test]
+    fn event_queued_mid_wait_returns_without_waiting_for_the_whole_slice() -> Result<()> {
+        let clock = TestClock::new();
+        let mut system = System::new(Box::new(TestPlatform::with_clock(clock.clone())), "", "", DefaultTaskRunner);
+        let completed = Arc::new(AtomicBool::new(false));
+        let completed_task = completed.clone();
+        let system_task = system.clone();
+        let clock_task = clock.clone();
+        system.spawn(async move || {
+            let jvm = JvmSupport::new_jvm(&system_task, None, Box::new([get_protos().into()]), &[], RustJavaJvmImplementation).await?;
+            let queue = jvm
+                .invoke_static("net/wie/EventQueue", "getEventQueue", "()Lnet/wie/EventQueue;", ())
+                .await
+                .unwrap();
+            let event = jvm.instantiate_array("I", 4).await.unwrap();
+            let _: () = jvm
+                .invoke_virtual(&queue, "net/wie/EventQueue", "getNextEvent", "([I)V", (event,))
+                .await
+                .unwrap();
+            completed_task.store(true, Ordering::SeqCst);
+            clock_task.advance(100);
+            Ok(())
+        });
+
+        system.tick()?;
+        assert!(!completed.load(Ordering::SeqCst), "the queue is empty, so the call must wait");
+        clock.set(3);
+        system.event_queue().push(Event::Redraw);
+        clock.set(4);
+        system.tick()?;
+        assert!(
+            completed.load(Ordering::SeqCst),
+            "an event queued mid-wait must be returned within a millisecond"
+        );
         Ok(())
     }
 

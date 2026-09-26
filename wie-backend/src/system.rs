@@ -3,14 +3,15 @@ mod event_queue;
 mod file_system;
 
 use alloc::{borrow::ToOwned, boxed::Box, string::String, sync::Arc};
+use core::sync::atomic::{AtomicBool, Ordering};
 
-use spin::{RwLock, RwLockWriteGuard};
+use spin::{Mutex, RwLock, RwLockWriteGuard};
 
 use wie_util::Result;
 
 use crate::{
     AsyncCallable,
-    executor::Executor,
+    executor::{Executor, TICK_BUDGET_MS},
     platform::Platform,
     task::{SleepFuture, YieldFuture},
     task_runner::TaskRunner,
@@ -34,6 +35,9 @@ pub struct System {
     audio: Arc<RwLock<Audio>>,
     task_runner: Arc<dyn TaskRunner>,
     random_state: Arc<RwLock<u32>>,
+    redraw_pending: Arc<AtomicBool>,
+    // (task, yields since that task last slept)
+    yield_streak: Arc<Mutex<(u64, u32)>>,
 }
 
 impl System {
@@ -54,17 +58,56 @@ impl System {
             audio: Arc::new(RwLock::new(Audio::new(audio_sink))),
             task_runner: Arc::new(task_runner),
             random_state: Arc::new(RwLock::new(1)),
+            redraw_pending: Arc::new(AtomicBool::new(false)),
+            yield_streak: Arc::new(Mutex::new((0, 0))),
         }
     }
 
     pub fn tick(&mut self) -> Result<()> {
-        let platform = self.platform.clone();
-        self.executor.tick(move || platform.now())
+        self.tick_for(TICK_BUDGET_MS)
     }
 
     pub fn tick_for(&mut self, budget_ms: u64) -> Result<()> {
         let platform = self.platform.clone();
-        self.executor.tick_for(move || platform.now(), budget_ms)
+        let result = self.executor.tick_for(move || platform.now(), budget_ms);
+        self.flush_redraw();
+        result
+    }
+
+    /// A guest repaint. Its Redraw reaches the event queue at the end of the tick — when the host
+    /// used to deliver it — unless a guest thread is spinning on Thread.yield first: a second yield
+    /// from one thread with no sleep of its own between is a thread waiting for something, and
+    /// 배틀몬스터's game thread waits for its paint that way (the tick end cost it a host frame per
+    /// game frame: 13.9 -> 20fps of its 20). A single yield is left alone — 메이플스토리2007 yields
+    /// once between repaint and sleep, and a paint started there delayed its sleep past a host frame.
+    pub fn request_redraw(&self) {
+        self.redraw_pending.store(true, Ordering::Release);
+    }
+
+    pub fn guest_yielded(&self) {
+        let task = self.current_task_id();
+        let spinning = {
+            let mut streak = self.yield_streak.lock();
+            *streak = if streak.0 == task { (task, streak.1 + 1) } else { (task, 1) };
+            streak.1 >= 2
+        };
+        if spinning {
+            self.flush_redraw();
+        }
+    }
+
+    pub fn guest_slept(&self) {
+        let task = self.current_task_id();
+        let mut streak = self.yield_streak.lock();
+        if streak.0 == task {
+            streak.1 = 0;
+        }
+    }
+
+    pub fn flush_redraw(&self) {
+        if self.redraw_pending.swap(false, Ordering::AcqRel) {
+            self.event_queue().push(Event::Redraw);
+        }
     }
 
     pub fn spawn<C>(&self, callable: C)
