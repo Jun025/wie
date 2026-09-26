@@ -78,4 +78,4 @@
 
 게임 이름 유입(`scripts/corpus-name-inflow.mjs --corpus <game_lab>`): BOUNDED 3쌍 — `놈3`(이 회차의 대상 · 리니지 0265·0276·0296 이 이미 적은 타이틀) · `(KTF)아포칼립스`(⑶의 크래시 재현 대상 — 이름 없이는 재현 명령이 성립하지 않는다) · SUFFIX-ATTACHED 0.
 
-<!-- corpus-name-inflow v1 subjects=2 tree=619f1d2b488327ce B=15/3 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=2 tree=ca71daa193645462 B=15/3 P=0/0 S=0/0 -->
