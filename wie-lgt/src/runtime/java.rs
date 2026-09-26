@@ -18,6 +18,8 @@ mod jvm_support;
 
 pub use interface::{get_java_interface_method, register_java_system_svc_handler};
 pub use jvm_support::LgtJvmSupport;
+#[cfg(test)]
+pub(crate) use jvm_support::tests::init_jvm;
 
 pub type JavaSvcFunctions = Arc<Mutex<BTreeMap<u32, Arc<Box<dyn RegisteredFunction>>>>>;
 
