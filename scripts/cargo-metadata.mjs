@@ -1,15 +1,10 @@
 // One way to ask cargo what is in this workspace, and one meaning for "it did not answer".
 //
-// WHY THIS IS SHARED AND NOT COPIED. Two scripts need the workspace shape from cargo
-// rather than from a path guess: `checker-census.mjs` (which integration-test files does
-// `cargo test --all` actually compile) and `game-lab-census-map.mjs` (which paths count as
-// "the engine moved"). Both had to make the same three decisions — how to invoke cargo, how
-// big a buffer, and what a failure returns — and the third is the one that matters: this
-// repo's standing rule is that "could not measure" must never render as a confident number.
-// `checker-census.mjs` already states it ("reported as UNMEASURABLE, never folded into
-// '0 callers' ... fail toward a confident wrong number"). A second hand-written copy of that
-// try/catch is one edit away from returning `[]` instead of `null`, and `[]` is exactly the
-// fail-open both callers exist to remove — silently, because an empty list looks measured.
+// WHY THIS IS A FILE. `game-lab-census-map.mjs` needs the workspace shape from cargo (which
+// paths count as "the engine moved") rather than from a path guess. It was shared with
+// `checker-census.mjs` until that was removed (2026-09-26). The part that matters is the
+// failure semantics: "could not measure" must never render as a confident number, so a
+// failure returns `null`, never `[]` — an empty list looks measured.
 //
 // ★So what is shared is the FAILURE SEMANTICS, not a list. No path, crate name or glob lives
 // here: each caller projects the metadata itself, because they want different things out of
