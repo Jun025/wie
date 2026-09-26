@@ -29,3 +29,6 @@
 **한계** — 키 스크립트는 기록한 엔진에 묶인다: 게임을 더 진행시키는 수리가 착지하면 경로가 밀린다(이번에 실제로 밀렸다).
 
 **사용자 영향** — 없음(검증 도구 · 기본 동작 불변).
+
+**게임 파일명 유입** — `corpus-name-inflow --corpus`: BOUNDED 4쌍 · SUFFIX-ATTACHED 0쌍. 새로 든 것은 타이틀명(식별자) 2곳
+(`docs/keys/battlemonster-village.keys` 머리 주석 · worklog 요약) · `wie_validate.rs` 의 2쌍은 main 에 이미 있던 주석 줄. 게임 바이트·경로 0.
