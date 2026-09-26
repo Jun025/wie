@@ -119,7 +119,7 @@ extern crate alloc;
 
 use std::{
     fs::{self, File},
-    io::BufWriter,
+    io::{BufWriter, LineWriter, Write as _},
     panic::{AssertUnwindSafe, catch_unwind},
     path::PathBuf,
     sync::{
@@ -132,8 +132,8 @@ use std::{
 use clap::Parser;
 
 use wie_backend::{
-    AudioSink, Database, DatabaseRepository, Emulator, Event, Filesystem, Font, FramePacer, Instant, KeyCode, Options, Platform, RecordId, Screen,
-    canvas::Image, extract_zip,
+    AudioSink, Database, DatabaseRepository, Emulator, Event, Filesystem, Font, FramePacer, Instant, KeyCode, Options, Platform, ProfileCallback,
+    ProfileSample, RecordId, Screen, canvas::Image, extract_zip,
 };
 use wie_j2me::J2MEEmulator;
 use wie_ktf::KtfEmulator;
@@ -508,6 +508,13 @@ struct Args {
     /// output into the repo or a shared log when running against a real game.
     #[arg(long, default_value_t = false)]
     guest_stdout: bool,
+    /// Write the ARM core's sampling profile here in flamegraph-folded form
+    /// (`0x<outer>;…;0x<pc> <count>`, one line per stack per flushed batch — the
+    /// same format as `wie --profile-out`). OFF by default: without it no file is
+    /// created and the JSON line is unchanged. KTF/LGT only; J2ME/SKT have no ARM
+    /// core, so the file stays empty. Stacks are guest addresses, not game bytes.
+    #[arg(long)]
+    profile_out: Option<PathBuf>,
     /// Tick as a host with this display rate would: each tick gets the budget
     /// `FramePacer` derives from a `1 / HZ` s frame (60 -> 14ms, 120 -> 5ms)
     /// instead of the engine default (14ms). OFF by default, so existing runs are
@@ -1011,7 +1018,11 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
         Err(e) => return fail("unknown", format!("read error: {e}"), 0, 0, false),
     };
 
-    let load = catch_unwind(AssertUnwindSafe(|| build_emulator(platform, &args.filename, buf)));
+    let profile = match args.profile_out.as_deref().map(profile_callback).transpose() {
+        Ok(p) => p,
+        Err(e) => return fail("unknown", format!("--profile-out: {e}"), 0, 0, false),
+    };
+    let load = catch_unwind(AssertUnwindSafe(|| build_emulator(platform, &args.filename, buf, profile)));
     let (mut emulator, platform_name) = match load {
         Ok(Ok(v)) => v,
         Ok(Err((name, e))) => return fail(&name, format!("load error: {e}"), 0, 0, false),
@@ -1282,6 +1293,19 @@ fn plan_schedule(args: &Args) -> (Vec<(f64, ScheduledEv)>, f64, u64) {
     (schedule, deadline_secs, input_steps_total)
 }
 
+/// Same writer as the GUI host's `profile_callback` (`src/lib.rs`): leaf-first stacks reversed
+/// into root-first folded lines.
+fn profile_callback(path: &std::path::Path) -> std::io::Result<ProfileCallback> {
+    let writer = Mutex::new(LineWriter::new(File::create(path)?));
+    Ok(Box::new(move |batch: Vec<ProfileSample>| {
+        let mut writer = writer.lock().unwrap();
+        for sample in batch {
+            let folded: Vec<String> = sample.stack.iter().rev().map(|pc| format!("0x{pc:x}")).collect();
+            let _ = writeln!(writer, "{} {}", folded.join(";"), sample.count);
+        }
+    }))
+}
+
 fn positive_secs(s: &str) -> std::result::Result<f64, String> {
     match s.parse::<f64>() {
         Ok(v) if v > 0.0 && v.is_finite() => Ok(v),
@@ -1297,10 +1321,15 @@ enum ScheduledEv {
 }
 
 #[allow(clippy::type_complexity)]
-fn build_emulator(platform: Box<dyn Platform>, filename: &str, buf: Vec<u8>) -> std::result::Result<(Box<dyn Emulator>, String), (String, String)> {
+fn build_emulator(
+    platform: Box<dyn Platform>,
+    filename: &str,
+    buf: Vec<u8>,
+    profile: Option<ProfileCallback>,
+) -> std::result::Result<(Box<dyn Emulator>, String), (String, String)> {
     let options = Options {
         enable_gdbserver: false,
-        profile: None,
+        profile,
     };
 
     if filename.ends_with("zip") {
