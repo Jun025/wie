@@ -130,4 +130,4 @@ release(`lto = true`) `wie_validate --inject`, `game_lab/working/lgt` 54건 + `b
 `node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab` 를 돌렸다. 대상은 이 브랜치가 바꾼 4파일이다.
 BOUNDED 와 SUFFIX-ATTACHED 는 아래 표식 줄의 값 그대로다. SUFFIX-ATTACHED 는 손으로 갈랐다. 전부 stem 뒤에 숫자나 `포켓` 이 붙은 «더 긴 다른 제목»이고, 그 제목들은 코퍼스에 있는 파일 이름이다. 이 회차가 새로 쓴 이름은 대상 타이틀과 코퍼스 짝 회귀 표의 제목들이다. 모두 `game_lab/working/lgt`·`broken/lgt` 의 파일 이름이다. 게임 바이트·경로는 쓰지 않았다.
 
-<!-- corpus-name-inflow v1 subjects=4 tree=1112af23f28fe333 B=74/36 P=1/1 S=17/7 -->
+<!-- corpus-name-inflow v1 subjects=4 tree=d9071cde9e94d308 B=76/38 P=1/1 S=17/7 -->
