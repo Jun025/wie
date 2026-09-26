@@ -104,3 +104,6 @@ release · `--timeout 60`:
 BOUNDED 는 §4 게이트에서 스크린샷을 뜬 타이틀 이름과 `wipi_c.rs`·`graphics.rs` 에 원래 있던 주석 속 이름이다. 대상 타이틀은 이름 대신 «`0236` §2-2 의 타이틀»로 적었다.
 SUFFIX-ATTACHED 1쌍은 `docs/upstream-realign-p3-slices.md` 에 원래 있던 「하이브리드는」(조사 붙은 진짜 언급)이다 ⇒ 판단이 더 필요한 것 0.
 게임 바이트 유입 0 · 경로 유입 0.
+
+
+<!-- corpus-name-inflow v1 subjects=6 tree=36ecef623faed8d1 B=21/16 P=0/0 S=2/2 -->
