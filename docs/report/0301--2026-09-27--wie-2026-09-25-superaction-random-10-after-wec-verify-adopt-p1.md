@@ -20,3 +20,5 @@
 - 0x5b 는 `wie-lgt/src/runtime/java/interface.rs` `get_java_interface_method` 표에 없다(인접 등재: 0x57 MonitorExit · 0x61 StoreReferenceArray).
 - 부수 관측: `java_exceptions` 3건 `InvalidRecordIDException: Record not found`(3/3, 전후 동일 — RMS 첫 실행 경로로 보임, 미판정).
 - 게임 파일명 유입: 4건(BOUNDED) + 판단 필요 3건(SUFFIX-ATTACHED) — 전부 이미 앞 회차(0264·0287)가 적은 두 타이틀명.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=aa8f3b35e7aa8d07 B=9/4 P=0/0 S=4/3 -->
