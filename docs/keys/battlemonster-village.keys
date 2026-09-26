@@ -1,0 +1,26 @@
+# wie_validate --keys: 배틀몬스터 (LGT) 새로하기 → 포획 튜토리얼 → 마을 → 집 안.
+# Grammar and cap rule: `parse_keys` in wie_cli/src/bin/wie_validate.rs.
+#
+#   cargo run -q --release -p wie_cli --bin wie_validate -- --inject --boot-secs 6 \
+#     --max-ticks 100000000000 --keys docs/keys/battlemonster-village.keys --shotdir <dir> <game>
+#
+# Step 95 (`95_OK`) is the village — reached 7/7 at load1 11-129 (docs/report/0298).
+# Step 102 (`102_UP`) is inside the house only at low load (3/3 at <=55, 0/4 when
+# load climbed to 65-129 on the last steps): a held key walks per tick, not per
+# second, so the tail after the village is not load-proof. Target the village.
+# The tutorial asks for STAR (43), CLR (47) and HASH (49) by name; its yes/no
+# prompt (step 23) cannot be declined with NUM2. The gaps are wide on purpose:
+# the fixed 27-key script feeds a 0.6 s grid, and under load the keys meant
+# for later screens land on the help screen instead. Key names only — no game bytes.
+# A script is tied to the engine it was recorded on: a fix that lets the game
+# go further moves the path (the pre-#306 version of this path skipped the tutorial).
+OK:15 OK:15 NUM1:10 NUM1:50 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6
+OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6
+OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6
+OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 STAR:6 OK:6 OK:6 OK:6 CLR:6 OK:6
+HASH:8 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 HASH:8
+OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7
+OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7
+OK:7 WAIT:5 OK:5 WAIT:5 OK:5 WAIT:5 WAIT:5 NUM5:5 OK:5 OK:5 OK:5 OK:5
+WAIT:4 WAIT:4 UP:4:1 WAIT:4 WAIT:4 UP:4:2 WAIT:4 RIGHT:4:2 WAIT:4 LEFT:4:2 WAIT:4 UP:4:3
+WAIT:4
