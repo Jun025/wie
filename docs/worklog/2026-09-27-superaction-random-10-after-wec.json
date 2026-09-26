@@ -1,0 +1,23 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-27",
+  "task": "wie-2026-09-25-superaction-random-10-after-wec-verify-adopt-p1",
+  "title": "슈퍼액션히어로 Random 10 — #320 착지로 이미 넘어감 · 다음 벽 LGT import 0x5b",
+  "summary": "코드 변경 0. #320 전(4aee5055) 3/3 Random 10 → 후(a741291f) 3/3 Unknown lgt java import 0x5b. 월드장기체스는 Vector 31 그대로.",
+  "changes": ["docs/report/0301 — 전/후 측정"],
+  "verification": ["release wie_validate 슈퍼액션히어로 --inject ×3 · 월드장기체스 --timeout 20 ×3, 전/후 트리 각각"],
+  "limits": ["칸 10 호출부 인자 워드는 슈퍼액션 쪽에서 재지 않았다(오류 소멸로 판정)."],
+  "adoptedProposals": ["2026-09-25-datainputstream-readchar-readutf#p1"],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "슈퍼액션히어로(LGT) — 다음 벽 Unknown lgt java import 0x5b",
+      "plainSummary": "난수 함수 문제는 해결됐고, 이제 에뮬레이터가 모르는 시스템 호출 번호 하나(0x5b)에서 게임 스레드가 멈춥니다.",
+      "userBenefit": "이 호출을 채우면 게임 스레드가 그리기 루프에 한 걸음 더 다가갑니다.",
+      "why": "#320 착지 main a741291f 에서 3/3 `Fatal error: Unknown lgt java import: 0x5b`(i.run()V). interface.rs 표에 0x5b 가 없다(0x57 MonitorExit · 0x61 StoreReferenceArray 사이).",
+      "tradeoff": "0x5b 의 의미를 호출부 디스어셈블로 판정해야 한다(0xfd StoreLongArray 회차와 같은 방식). 잘못 짚으면 조용한 오작동이 된다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ]
+}
