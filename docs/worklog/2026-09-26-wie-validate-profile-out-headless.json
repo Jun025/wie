@@ -7,7 +7,7 @@
   "changes": [
     "wie_cli/src/bin/wie_validate.rs — --profile-out · build_emulator 가 profile 을 받는다",
     "wie_cli/tests/validate_profile_out.rs — 켜면 생성·형식 · 끄면 무생성 · JSON 필드 수 동일",
-    "docs/report/0275"
+    "docs/report/0276"
   ],
   "verification": [
     "네 게이트 + cargo +beta clippy 통과 · cargo test --all 48 스위트 0 failed",
