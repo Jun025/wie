@@ -195,6 +195,26 @@ vtable = [
 # the 2673-byte record the writer stored. The limit: writeBoolean only ever writes 0 or 1, so this
 # cannot tell readBoolean from readUnsignedByte by value — only the slot order separates them.
 #
+# readChar()C = 27 and readUTF()Ljava/lang/String; = 32 are the rule again, each asked for by a
+# title (measured 2026-09-25, one `Unimplemented: java/io/DataInputStream vtable index N` each):
+# 스파이더맨3 at 27 during its first resource load, 슈퍼액션히어로 at 32 as the first thing its game
+# thread does. Past readInt the CLDC 1.1 run continues readLong 29, readFloat 30, readDouble 31,
+# readUTF 32 — the 1.1 order the Thread count above already fixes (1.0 has no readFloat or
+# readDouble, which would put readUTF at 30). Physical offsets are 4 × (index + 1).
+#
+#   27 — 스파이더맨3's reader dispatches `ldr r3, [r3, #0x70]` with r0 = the stream and nothing else,
+#        three times, beside `#0x60` (readByte 23), `#0x68` (readShort 25, its result sizes a
+#        byte[]) and `#0x50` (readFully([B) 19, into that byte[]) on the same stream. One result
+#        is then walked bit by bit for exactly 16 iterations (`i <= 15`), i.e. a 16-bit value.
+#        What this cannot separate: readUnsignedShort()I at 26 reads the same two bytes and
+#        returns the same unsigned value, so only the slot order decides between the two — and
+#        both would hand the guest the same number.
+#   32 — 슈퍼액션히어로 dispatches `adds r3, #0x84; ldr r3, [r3]` with r0 = the stream and no other
+#        argument, null-checks the result, and calls String's getBytes()[B (index 14, `#0x3c`)
+#        on it, copying the bytes into a byte[length + 1]. It returns an object that answers
+#        getBytes — a String — and readUTF() is the only no-argument DataInputStream method that
+#        returns one.
+#
 # Getting one wrong is not free — unlike the argument-free Runtime/Thread reads below, these
 # return different widths off the same stream, so a misplaced row would hand the guest a
 # plausible wrong number instead of a named failure. That is the cost the anchor above buys down.
@@ -205,7 +225,9 @@ vtable = [
     { name = "readBoolean", descriptor = "()Z", index = 22 },
     { name = "readByte", descriptor = "()B", index = 23 },
     { name = "readShort", descriptor = "()S", index = 25 },
+    { name = "readChar", descriptor = "()C", index = 27 },
     { name = "readInt", descriptor = "()I", index = 28 },
+    { name = "readUTF", descriptor = "()Ljava/lang/String;", index = 32 },
 ]
 
 # 턴 and 서든어택포켓 dispatch index 19 and 훼밀리마트타이쿤 dispatches 15 16 17 19 20. This block
