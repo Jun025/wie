@@ -12,7 +12,7 @@
       "title": "LGT 호스트 TimerTask 가 폰 배치(6단어)보다 커서 게스트 TimerTask 하위 클래스 필드를 덮는다 — 학교가는길 게임 루프 사망",
       "plainSummary": "학교가는길은 이제 부팅을 넘지만, 화면을 그리는 타이머 작업이 첫 번에 메모리 오류로 죽어 빈 화면에 머뭅니다.",
       "userBenefit": "고치면 학교가는길이 실제 게임 화면을 그리기 시작할 수 있고, 타이머를 쓰는 다른 LGT 게임도 같은 벽을 피합니다.",
-      "why": "죽은 주소 0xde07b454 가 직전에 호스트가 쓴 c.lastScheduledExecutionTime(0x1a0_de07b454)의 하위 단어다. 게스트 c 서술자는 total=7 · 자기 필드 메타 0 이라 폰 TimerTask 는 6단어이고 word 6 은 c 의 숨은 필드인데, rustjava-runtime 0.1.1 TimerTask 는 lastScheduledExecutionTime J 를 더해 8단어라 매 틱 그 칸을 덮고 인스턴스 밖 1단어에 쓴다(docs/report/0294 ⑴-c).",
+      "why": "죽은 주소 0xde07b454 가 직전에 호스트가 쓴 c.lastScheduledExecutionTime(0x1a0_de07b454)의 하위 단어다. 게스트 c 서술자는 total=7 · 자기 필드 메타 0 이라 폰 TimerTask 는 6단어이고 word 6 은 c 의 숨은 필드인데, rustjava-runtime 0.1.1 TimerTask 는 lastScheduledExecutionTime J 를 더해 8단어라 매 틱 그 칸을 덮고 인스턴스 밖 1단어에 쓴다(docs/report/0296 ⑴-c).",
       "tradeoff": "ABI 파일 고정 칸으로는 6단어에 못 넣는다 — lastScheduledExecutionTime 을 인스턴스 밖(호스트 쪽 표)으로 옮기거나 hardening 에서 TimerTask 필드를 6단어로 줄이는 설계 결정이 필요하다. scheduledExecutionTime() 의미를 지켜야 한다.",
       "effort": "M",
       "target": "wie",
