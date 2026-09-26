@@ -471,7 +471,7 @@ pub(crate) mod tests {
     use wie_jvm_support::{JvmImplementation, JvmSupport};
     use wie_util::{ByteRead, ByteWrite, Result, WieError, read_generic, write_generic, write_null_terminated_string_bytes};
 
-    use crate::runtime::java::abi::{CLASS_INITIALIZATION_STATE_FIELD, CLASS_NATIVE_NAME_FIELD, WORD_FIELD_DESCRIPTOR};
+    use crate::runtime::java::abi::{CLASS_INITIALIZATION_STATE_FIELD, CLASS_NATIVE_NAME_FIELD, JAVA_ABI, WORD_FIELD_DESCRIPTOR};
 
     use super::{JavaClassInstance, LgtClassLoader, LgtJvmImplementation, LgtJvmSupport, get_midp_protos, get_wipi_java_protos};
 
@@ -577,6 +577,190 @@ pub(crate) mod tests {
             }
             // Linking the same method through the subclass finds the propagated slot.
             assert_eq!(LgtJvmSupport::virtual_method_index(&jvm, child, "getWidth", "()I").await? as usize, index);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    /// A generated (guest) class `name` extending `parent`, carrying a compiler-built table of
+    /// `vtable_count` entries and sitting in a real `LgtClassLoader`'s `generatedClasses` bucket
+    /// — but NOT registered with the JVM yet, which is what a guest class the app has not touched
+    /// looks like. Every compiled slot is 0 (= inherit the parent's) except `own_slot`, which
+    /// holds the class's own `ownValue()I`. Returns the class pointer, the bucket, the loader and
+    /// the `ownValue` target.
+    async fn seed_unloaded_compiled_subclass(
+        jvm: &Jvm,
+        core: &mut ArmCore,
+        implementation: &LgtJvmImplementation,
+        name: &'static str,
+        parent: &'static str,
+        vtable_count: usize,
+        own_slot: Option<usize>,
+    ) -> Result<(u32, u32, Box<dyn ClassInstance>, u32)> {
+        let class = implementation
+            .define_class_rust(
+                jvm,
+                JavaClassProto {
+                    name,
+                    parent_class: Some(parent),
+                    interfaces: vec![],
+                    methods: vec![JavaMethodProto::new("ownValue", "()I", child_value, MethodAccessFlags::PUBLIC)],
+                    fields: vec![],
+                    access_flags: ClassAccessFlags::PUBLIC,
+                },
+                Box::new(()),
+            )
+            .await
+            .unwrap();
+        let ptr_class = class.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap().ptr_raw;
+        let raw_class: RawJavaClass = read_generic(core, ptr_class)?;
+        let mut descriptor: RawJavaClassDescriptor = read_generic(core, raw_class.ptr_descriptor)?;
+        let own_method: RawJavaMethod = read_generic(core, descriptor.ptr_methods + size_of::<u32>() as u32)?;
+
+        let ptr_vtable = Allocator::alloc(core, ((vtable_count + 1) * size_of::<u32>()) as u32)?;
+        core.write_bytes(ptr_vtable, &vec![0; (vtable_count + 1) * size_of::<u32>()])?;
+        write_generic(core, ptr_vtable, ptr_class)?;
+        if let Some(slot) = own_slot {
+            write_generic(core, ptr_vtable + ((slot + 1) * size_of::<u32>()) as u32, own_method.ptr_method)?;
+        }
+
+        let ptr_parent_name = Allocator::alloc(core, parent.len() as u32 + 1)?;
+        write_null_terminated_string_bytes(core, ptr_parent_name, parent.as_bytes())?;
+        descriptor.ptr_super_class = ptr_parent_name;
+        descriptor.flags |= LGT_JAVA_CLASS_SUPER_CLASS_IS_NAME;
+        descriptor.ptr_vtable = ptr_vtable;
+        descriptor.vtable_count = vtable_count as u16;
+        write_generic(core, raw_class.ptr_descriptor, descriptor)?;
+
+        let generated_classes = Allocator::alloc(core, 2 * size_of::<u32>() as u32)?;
+        write_generic(core, generated_classes, 0u32)?;
+        write_generic(core, generated_classes + size_of::<u32>() as u32, ptr_class)?;
+        let system_loader: Box<dyn ClassInstance> = jvm
+            .invoke_static("java/lang/ClassLoader", "getSystemClassLoader", "()Ljava/lang/ClassLoader;", ())
+            .await
+            .unwrap();
+        let loader: Box<dyn ClassInstance> = jvm
+            .new_class(
+                "net/wie/LgtClassLoader",
+                "(Ljava/lang/ClassLoader;I)V",
+                (system_loader, generated_classes as i32),
+            )
+            .await
+            .unwrap();
+        assert!(!jvm.has_class(name), "{name} must still be unloaded when the parent method is linked");
+
+        Ok((ptr_class, generated_classes, loader, own_method.ptr_method))
+    }
+
+    fn raw_vtable_target(core: &ArmCore, ptr_class: u32, index: usize) -> Result<u32> {
+        let raw_class: RawJavaClass = read_generic(core, ptr_class)?;
+        read_generic(core, raw_class.unk1 + ((index + 1) * size_of::<u32>()) as u32)
+    }
+
+    #[test]
+    fn virtual_method_appended_to_a_parent_skips_slots_an_unloaded_compiled_subclass_owns() -> Result<()> {
+        // #281's other half: a guest class that is compiled against its parent but not loaded yet
+        // keeps ITS OWN indices below its compiled `vtable_count`. If the runtime appends a parent
+        // method at the parent's current length, and that length falls inside the subclass's
+        // compiled range, the subclass later loads with its own method on that slot — and a
+        // guest dispatching the parent method there silently calls the subclass's method.
+        // `unloaded_compiled_subclass_vtable_bound` is what moves the index past that range.
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, implementation) = init_jvm(&system_clone).await?;
+            let parent = "org/kwis/msp/lwc/Component";
+            let child = "net/wie/test/LateCompiledComponent";
+            let parent_class = jvm.resolve_class(parent).await.unwrap();
+            let parent_definition = parent_class
+                .definition
+                .as_any()
+                .downcast_ref::<super::JavaClassDefinition>()
+                .unwrap()
+                .clone();
+            let parent_len = parent_definition.vtable_entries(&jvm).await?.len();
+
+            // The child's own method sits exactly where a naive append would land.
+            let compiled_count = parent_len + 4;
+            let (ptr_child, generated_classes, loader, own_target) =
+                seed_unloaded_compiled_subclass(&jvm, &mut core, &implementation, child, parent, compiled_count, Some(parent_len)).await?;
+
+            let index = LgtJvmSupport::virtual_method_index(&jvm, parent, "getWidth", "()I").await? as usize;
+            assert!(
+                index >= compiled_count,
+                "index {index} lands inside {child}'s compiled range 0..{compiled_count}"
+            );
+
+            LgtJvmSupport::register_generated_class(&mut core, &jvm, ptr_child, generated_classes, loader).await?;
+            let expected = LgtJvmSupport::non_virtual_method_target(&jvm, parent, "getWidth", "()I")?;
+            assert_eq!(
+                raw_vtable_target(&core, ptr_child, parent_len)?,
+                own_target,
+                "{child} slot {parent_len} lost its own method"
+            );
+            assert_eq!(raw_vtable_target(&core, ptr_child, index)?, expected, "{child} vtable index {index}");
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn compiled_subclass_loaded_after_a_parent_append_inherits_the_appended_slot() -> Result<()> {
+        // The index a parent-method link returns lies past every compiled subclass's
+        // `vtable_count` — so a compiled subclass loaded AFTER the link has no compiled slot there.
+        // `build_from_compiler_vtable` must carry the parent's tail over, or the guest dispatching
+        // that index on the subclass reads past its table.
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, implementation) = init_jvm(&system_clone).await?;
+            let parent = "org/kwis/msp/lwc/Component";
+            let child = "net/wie/test/LateCompiledComponent";
+            let parent_class = jvm.resolve_class(parent).await.unwrap();
+            let parent_definition = parent_class
+                .definition
+                .as_any()
+                .downcast_ref::<super::JavaClassDefinition>()
+                .unwrap()
+                .clone();
+            let parent_len = parent_definition.vtable_entries(&jvm).await?.len();
+
+            let (ptr_child, generated_classes, loader, _) =
+                seed_unloaded_compiled_subclass(&jvm, &mut core, &implementation, child, parent, parent_len, None).await?;
+
+            let index = LgtJvmSupport::virtual_method_index(&jvm, parent, "getWidth", "()I").await? as usize;
+            assert!(index >= parent_len, "index {index} is not an appended slot");
+
+            LgtJvmSupport::register_generated_class(&mut core, &jvm, ptr_child, generated_classes, loader).await?;
+            let child_class = jvm.get_class(child).unwrap();
+            let child_definition = child_class.definition.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap();
+            let child_len = child_definition.descriptor()?.vtable_count as usize;
+            assert!(
+                child_len > index,
+                "{child} was built with {child_len} slots; index {index} is past its table"
+            );
+            let expected = LgtJvmSupport::non_virtual_method_target(&jvm, parent, "getWidth", "()I")?;
+            assert_eq!(raw_vtable_target(&core, ptr_child, index)?, expected, "{child} vtable index {index}");
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
@@ -1341,6 +1525,77 @@ pub(crate) mod tests {
                     .unwrap_or_else(|| panic!("{class_name} vtable index {index} is empty, so the guest gets a missing-entry stub"));
                 assert_eq!((method.name().as_str(), method.descriptor().as_str()), (name, descriptor));
             }
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn every_abi_vtable_row_is_the_slot_linking_resolves_to() -> Result<()> {
+        // Every fixed row in `data/lgt_java_abi.toml` against what the guest actually gets: the
+        // index `virtual_method_index` hands back when the method is linked by name, and the
+        // target the class's raw table holds at that index. #281 showed slots move with link
+        // order (ax 30 → 29) while rows kept being added; a row that drifts does not fail to
+        // parse, it makes the guest silently call a different method. Unlike
+        // `abi_rows_cover_the_indexes_titles_actually_dispatch_on`, this walks the whole file,
+        // so a new row is covered the moment it lands.
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, core, _) = init_jvm(&system_clone).await?;
+            let mut mismatches = Vec::new();
+            let mut checked = 0;
+            let mut skipped_interfaces = Vec::new();
+            for class in &JAVA_ABI.class {
+                if class.vtable.is_empty() {
+                    continue;
+                }
+                let resolved = jvm.resolve_class(&class.name).await.unwrap();
+                // An interface row (java/lang/Runnable) names the slot in an IMPLEMENTER's
+                // compiled table, not in the interface's own table — `prepare_generated` reads it
+                // only to name a compiled slot. There is no link-time index to compare it with;
+                // `generated_class_exposes_compiler_vtable_methods_to_jvm` covers that path.
+                if resolved.definition.access_flags().contains(ClassAccessFlags::INTERFACE) {
+                    skipped_interfaces.push(class.name.as_str());
+                    continue;
+                }
+                let definition = resolved.definition.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap().clone();
+                for row in &class.vtable {
+                    checked += 1;
+                    let linked = LgtJvmSupport::virtual_method_index(&jvm, &class.name, &row.name, &row.descriptor).await? as usize;
+                    let entries = definition.vtable_entries(&jvm).await?;
+                    let dispatched = match entries.get(row.index).and_then(|entry| entry.method.as_ref()) {
+                        Some(method) if raw_vtable_target(&core, definition.ptr_raw, row.index)? == method.target()? => {
+                            alloc::format!("{}{}", method.name(), method.descriptor())
+                        }
+                        Some(method) => alloc::format!("{}{} (raw target differs)", method.name(), method.descriptor()),
+                        None => RustString::from("<empty>"),
+                    };
+                    if linked != row.index || dispatched != alloc::format!("{}{}", row.name, row.descriptor) {
+                        mismatches.push(alloc::format!(
+                            "{} {}{}: row index {} · linked {linked} · slot {} holds {dispatched}",
+                            class.name,
+                            row.name,
+                            row.descriptor,
+                            row.index,
+                            row.index
+                        ));
+                    }
+                }
+            }
+            assert!(checked > 0, "no vtable rows were read from data/lgt_java_abi.toml");
+            assert_eq!(skipped_interfaces, ["java/lang/Runnable"], "a new interface row needs its own check");
+            assert!(mismatches.is_empty(), "ABI rows that do not match dispatch:\n{}", mismatches.join("\n"));
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
