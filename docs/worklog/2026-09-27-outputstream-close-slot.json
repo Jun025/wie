@@ -1,0 +1,19 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-27",
+  "task": "wie-2026-09-24-baos-tobytearray-and-string-indexof-slots-adopt-p0",
+  "title": "OutputStream 14 = close()V — 서든어택포켓 부팅 통과 · 턴은 class_definition.rs:801 panic 으로 이동",
+  "summary": "lgt_java_abi.toml OutputStream 블록에 close()V = 14 한 줄. 두 바이너리(턴 4곳 · 서든어택포켓 5곳)가 toByteArray(16) 직후 dos·baos 에 14 를 연달아 부르고 둘 다 다시 쓰지 않는다. flush(13)는 toByteArray 뒤에서 의미가 없어 위치로 배제.",
+  "changes": ["wie-lgt/data/lgt_java_abi.toml — java/io/OutputStream 에 close ()V = 14 (+ 호출부 주석)"],
+  "verification": [
+    "RUST_LOG=info wie_validate --timeout 90 (무주입): 서든어택포켓×2 DataOutputStream 14 → PASS paints 112/118 · 턴×2 DataOutputStream 14 → host panic class_definition.rs:801 InvalidMemoryAccess(0)",
+    "변이: 행 제거 · index 13 이동 둘 다 턴·서든어택포켓 모두 원래 벽 재현",
+    "4게이트 + cargo +beta clippy · cargo test --all 478/0 · --all-targets clippy 17 = main 17 · 러너 블록 전건 PASS"
+  ],
+  "limits": [
+    "close/flush 는 모양이 같아 런타임 변이로는 이름을 가를 수 없다(두 no-op) — 판별은 호출 위치 하나가 진다.",
+    "턴의 다음 벽(class_definition.rs:801)은 별건이다 — wie-lgt-class-name-unwrap-guest-boundary-close(#317) 계열 소관."
+  ],
+  "adoptedProposals": ["2026-09-24-baos-tobytearray-and-string-indexof-slots#p0"],
+  "proposals": []
+}
