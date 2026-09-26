@@ -1,0 +1,37 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-26",
+  "task": "wie-2026-09-23-bytearrayinputstream-skip-slot-adopt-p0-fix3",
+  "title": "놈3 스택 넘침 — Rust 가 부른 paint 가 호스트 오류로 중단되며 남긴 예외 프레임 · String 26 = indexOf(S,I)",
+  "summary": "Rust 가 부른 게스트 paint 가 세 단 깊이에서 String vtable 26 누락으로 중단되면 그 호출들의 try 프레임이 체인에 남고, 호출자에서 던져진 WieError 가 그 죽은 프레임으로 간다. main 은 거기서 무한 반복(livelock), #292 는 죽은 catch 를 실행한 뒤 재시도 고리에서 게스트 힙을 소진해 배열 할당 오류 경로가 호스트 재귀로 넘친다. JavaMethod::run 이 호출 뒤 그 프레임을 해제하고, 26 행을 채웠다.",
+  "changes": [
+    "wie-lgt/src/runtime/java/exception.rs — mark/release_to · 시험 4건(검수 생존 변이 B·D·F 포함) · 재시도 고리 누적 주석",
+    "wie-lgt/src/runtime/java/jvm_support/method.rs — JavaMethod::run 이 run_function 전후로 mark/release_to",
+    "wie-lgt/data/lgt_java_abi.toml — java/lang/String indexOf(Ljava/lang/String;I)I = 26 (+ 호출부 근거)",
+    "wie-lgt/src/runtime/java/jvm_support.rs — abi_rows_cover_the_indexes_titles_actually_dispatch_on 에 1행",
+    "docs/worklog-coverage-remeasures.json — 235 재측 기록",
+    "docs/report/0281"
+  ],
+  "verification": [
+    "놈3 4종 일정 · Interactive 잡 교대 3짝: main PASS 3/3 · head 스택 넘침 3/3 · fix PASS 3/3(paints 693~695)",
+    "진단 변형 release_to 만: PASS 2/2 · paints 599",
+    "다른 LGT 4종 head/fix 교대 2회 16/16 PASS",
+    "cargo test --all 464 passed / 0 failed · 4게이트 + beta clippy rc0"
+  ],
+  "limits": [
+    "release_to 는 JavaMethod::run 에만 걸었다 — run_function 을 부르는 다른 Rust 호출부는 그대로다",
+    "레인 셸(CPU 클램프)에서는 head 도 넘치지 않는다 — 판정은 Interactive 잡 결과만 썼다"
+  ],
+  "proposals": [
+    {
+      "title": "게스트 힙이 바닥나면 배열 할당 오류 경로가 무한 재귀 — 호스트 abort 대신 오류로 끝내기",
+      "plainSummary": "게임 안 메모리가 다 차면 에뮬레이터가 오류 메시지를 만들려다 또 메모리를 요청하고, 그게 또 실패해 같은 일을 끝없이 반복하다 프로그램이 통째로 죽는다.",
+      "userBenefit": "같은 상황이 오면 게임 창이 이유 없이 사라지는 대신 «메모리 부족» 한 줄로 멈춰, 원인을 바로 알 수 있다.",
+      "why": "이번 회차에 실측했다: 놈3 에서 ARRAYERR len=47 Allocation failure 6,036회 뒤 충돌 보고 상위 프레임이 Jvm::exception ↔ JavaArrayClassDefinition::instantiate_array 교대로 스택을 다 썼다. 이번 수정은 그 경로에 닿는 원인만 막았다.",
+      "tradeoff": "JavaError 에 예외 말고 다른 변형이 없어 재진입 표지(재진입 시 FatalError 로 빠지는 길)를 wie-lgt 쪽에 둬야 한다 — 작은 상태가 하나 는다.",
+      "effort": "S",
+      "target": "wie",
+      "kind": "product"
+    }
+  ]
+}

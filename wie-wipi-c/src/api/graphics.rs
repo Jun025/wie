@@ -4,6 +4,7 @@ mod image;
 pub mod primitives;
 
 pub use framebuffer::FrameBuffer;
+pub use grp_context::WIPICGraphicsContextIdx;
 pub use image::decode_image_framebuffer;
 
 use core::mem::size_of;
@@ -18,7 +19,7 @@ use wipi_types::wipic::{WIPICDisplayInfo, WIPICFramebuffer, WIPICGraphicsContext
 
 use crate::context::WIPICContext;
 
-use self::{grp_context::WIPICGraphicsContextIdx, image::create_wipi_image};
+use self::image::create_wipi_image;
 
 const FRAMEBUFFER_DEPTH: u32 = 16; // XXX hardcode to 16bpp as some game requires 16bpp framebuffer
 const SCREEN_FRAMEBUFFER_PTR: u32 = 0x7fff1000;

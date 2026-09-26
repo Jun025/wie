@@ -300,7 +300,7 @@ async fn monitor_exit(core: &mut ArmCore, jvm: &mut Jvm, ptr_raw: u32) -> Result
     Ok(0)
 }
 
-async fn call_native(core: &mut ArmCore, _: &mut (), address: u32, ptr_data: u32) -> Result<JavaMethodResult> {
+pub(super) async fn call_native(core: &mut ArmCore, _: &mut (), address: u32, ptr_data: u32) -> Result<JavaMethodResult> {
     tracing::trace!("java_jump_native({address:#x}, {ptr_data:#x})");
 
     if address == 0 {
@@ -309,7 +309,10 @@ async fn call_native(core: &mut ArmCore, _: &mut (), address: u32, ptr_data: u32
 
     // TODO correctly figure out parameter
     let caller_sp = core.save_context().sp;
-    let result = match core.run_function::<u32>(address, &[ptr_data, ptr_data]).await {
+    // Both return words go to the slot: the caller reads a `J`/`D` result back as
+    // `ldr r1, [r0, #4]; ldr r0, [r0]` (귀신사냥2007 KTF, 0x143060), and a word caller reads [r0]
+    // only. Zeroing the high word cut `System.currentTimeMillis()` to its low 32 bits.
+    let (result, result_high) = match core.run_function::<(u32, u32)>(address, &[ptr_data, ptr_data]).await {
         Ok(result) => result,
         Err(WieError::JavaExceptionUnwind {
             context_base,
@@ -320,7 +323,7 @@ async fn call_native(core: &mut ArmCore, _: &mut (), address: u32, ptr_data: u32
     };
 
     write_generic(core, ptr_data, result)?;
-    write_generic(core, ptr_data + 4, 0u32)?;
+    write_generic(core, ptr_data + 4, result_high)?;
 
     Ok(JavaMethodResult::new(vec![ptr_data], None))
 }

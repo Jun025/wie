@@ -26,7 +26,7 @@ use crate::runtime::{
 };
 
 use super::{
-    JavaClassInstance, JavaField, JavaMethod, JavaReferenceField, JavaStaticReferenceField, LgtJvmWord,
+    JavaClassInstance, JavaField, JavaMethod, JavaReferenceField, JavaStaticReferenceField, LgtJvmWord, find_generated_class,
     value::JavaValueCodec,
     vtable::{JavaVtable, JavaVtableEntry},
 };
@@ -452,23 +452,8 @@ impl JavaClassDefinition {
                     descriptor.ptr_interface_references + size_of::<RawJavaInterfaceReferences>() as u32 + (index * size_of::<u32>()) as u32,
                 )?;
                 let mut reference: RawJavaInterfaceReference = read_generic(core, ptr_reference)?;
-                let mut ptr_generated_interface = 0;
-                let last_bucket: u32 = read_generic(core, generated_classes)?;
-                for bucket in 0..=last_bucket {
-                    let mut ptr_class = read_generic(core, generated_classes + size_of::<u32>() as u32 + bucket * size_of::<u32>() as u32)?;
-                    while ptr_class != 0 {
-                        if ptr_class == reference.ptr_class_or_name {
-                            ptr_generated_interface = ptr_class;
-                            break;
-                        }
-                        let class: RawJavaClass = read_generic(core, ptr_class)?;
-                        let class_descriptor: RawJavaClassDescriptor = read_generic(core, class.ptr_descriptor)?;
-                        ptr_class = class_descriptor.ptr_next_class;
-                    }
-                    if ptr_generated_interface != 0 {
-                        break;
-                    }
-                }
+                let ptr_generated_interface =
+                    find_generated_class(core, generated_classes, |ptr_class| Ok(ptr_class == reference.ptr_class_or_name))?.unwrap_or(0);
                 if ptr_generated_interface == self.ptr_raw {
                     continue;
                 }

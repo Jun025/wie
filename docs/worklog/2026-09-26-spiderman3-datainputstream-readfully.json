@@ -1,0 +1,17 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-26",
+  "task": "wie-2026-09-25-spiderman3-datainputstream-19-adopt-p0",
+  "title": "DataInputStream 19 = readFully([B)V — 스파이더맨3(LGT) 첫 렌더 PASS",
+  "summary": "호출부 인자가 게스트 힙에서 [B(길이 30)로 읽혀 readFully([B)V 로 판정했다. 두 번째 호출부는 로컬 LGT 91종 정적·동적 교차에서 없었다. 스파이더맨3 가 처음으로 화면을 그리고 입력 27/27 을 버틴다.",
+  "changes": ["wie-lgt/data/lgt_java_abi.toml — DataInputStream readFully([B)V 19 + 근거 주석", "docs/report/0290"],
+  "verification": [
+    "before(e5fa2af3 release ×3): DataInputStream 19 3/3",
+    "after(release ×3): PASS·UNMEASURED(max-ticks)·PASS · paints 227~237 · content true · java_exceptions 0 · --max-ticks 상향 재실행 PASS",
+    "무회귀 짝: 슈퍼액션히어로·간호사타이쿤2 판정 동일 · 배틀몬스터 PASS 유지",
+    "cargo test --all 454/0"
+  ],
+  "limits": ["두 번째 호출부 없음 — 호출부 1곳 + 규칙 자리 + 인자 타입", "Font 폭 스텁 — 시각 정확성 미확인"],
+  "adoptedProposals": ["2026-09-25-datainputstream-readchar-readutf#p0"],
+  "proposals": []
+}

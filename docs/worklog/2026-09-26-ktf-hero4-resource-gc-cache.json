@@ -1,0 +1,12 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-26",
+  "task": "wie-ktf-hero4-290ms-frame-after-key-input",
+  "title": "영웅서기4(KTF) 키 입력 직후 긴 프레임 — 리소스 읽기마다 돌던 전체 GC 를 이름별 캐시로 제거",
+  "summary": "선점이 닿지 않던 긴 tick 의 58%가 MC_knlGetResourceID/GetResource 안의 collect_garbage 였다(같은 이름 재요청이 64%). 이름별 바이트 캐시로 재요청 GC 가 49·34회 → 4·4회.",
+  "changes": ["wie-ktf/src/runtime/wipi_c/context.rs — ResourceCache · resource()", "wie-ktf/src/runtime/wipi_c.rs — SVC 핸들러 상태에 캐시", "docs/report/0289"],
+  "verification": ["계측 추적: 30ms 넘는 tick 661ms 중 GC 382ms", "교대 짝 4회 모두 PASS · 입력 27/27", "test_resource_reach(크기·바이트 합)"],
+  "limits": ["처음 읽는 이름의 GC(이름당 1회)는 남는다", "load1 110 이상에서는 최장 프레임 비교가 결론을 주지 못한다 — 남은 최장 프레임은 선점되는 게스트 ARM 계산", "캐시 효과를 잡는 시험은 없다"],
+  "adoptedProposals": ["2026-09-25-ktf-frame-pacing-arm-preemption-tick-budget#p0"],
+  "proposals": []
+}

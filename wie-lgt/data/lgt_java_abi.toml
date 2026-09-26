@@ -65,13 +65,23 @@ vtable = [
     { name = "notify", descriptor = "()V", index = 5 },
 ]
 
+# Word 0 of a class object's field block is NOT free: guest static-field accessors read its low
+# halfword as flags, and with 0x2000 set they fetch the statics base from `[[word 2]+8]+0x4c`
+# instead of `block+0x14` (310 `tst #0x2000` sites in 간호사타이쿤2 alone, e.g. <clinit> 0x1462ac).
+# Left unpinned, RustJava's first Class field `nameBytes` landed there, so the branch followed
+# `nativeClassName` into ASCII whenever that array's address had bit 13 set — WorldMap's did
+# (0x48842140), GameCanvas's and SoundManager's did not. Pin RustJava's two fields onto the words
+# the guest was not seen to read (1 and 3), so word 0 stays 0. Pinning only nameBytes would let
+# classLoader fall through to word 4, on top of initializationState.
 [[class]]
 name = "java/lang/Class"
 vtable = [
     { name = "getResourceAsStream", descriptor = "(Ljava/lang/String;)Ljava/io/InputStream;", index = 16 },
 ]
 field = [
+    { name = "classLoader", descriptor = "Ljava/lang/ClassLoader;", index = 1 },
     { name = "nativeClassName", descriptor = "I", index = 2 },
+    { name = "nameBytes", descriptor = "[B", index = 3 },
     { name = "initializationState", descriptor = "I", index = 4 },
 ]
 
@@ -185,17 +195,54 @@ vtable = [
 # the 2673-byte record the writer stored. The limit: writeBoolean only ever writes 0 or 1, so this
 # cannot tell readBoolean from readUnsignedByte by value — only the slot order separates them.
 #
+# readChar()C = 27 and readUTF()Ljava/lang/String; = 32 are the rule again, each asked for by a
+# title (measured 2026-09-25, one `Unimplemented: java/io/DataInputStream vtable index N` each):
+# 스파이더맨3 at 27 during its first resource load, 슈퍼액션히어로 at 32 as the first thing its game
+# thread does. Past readInt the CLDC 1.1 run continues readLong 29, readFloat 30, readDouble 31,
+# readUTF 32 — the 1.1 order the Thread count above already fixes (1.0 has no readFloat or
+# readDouble, which would put readUTF at 30). Physical offsets are 4 × (index + 1).
+#
+#   27 — 스파이더맨3's reader dispatches `ldr r3, [r3, #0x70]` with r0 = the stream and nothing else,
+#        three times, beside `#0x60` (readByte 23), `#0x68` (readShort 25, its result sizes a
+#        byte[]) and `#0x50` (readFully([B) 19, into that byte[]) on the same stream. One result
+#        is then walked bit by bit for exactly 16 iterations (`i <= 15`), i.e. a 16-bit value.
+#        What this cannot separate: readUnsignedShort()I at 26 reads the same two bytes and
+#        returns the same unsigned value, so only the slot order decides between the two — and
+#        both would hand the guest the same number.
+#   32 — 슈퍼액션히어로 dispatches `adds r3, #0x84; ldr r3, [r3]` with r0 = the stream and no other
+#        argument, null-checks the result, and calls String's getBytes()[B (index 14, `#0x3c`)
+#        on it, copying the bytes into a byte[length + 1]. It returns an object that answers
+#        getBytes — a String — and readUTF() is the only no-argument DataInputStream method that
+#        returns one.
+#
+# readFully([B)V = 19 is the rule's first own slot, one before the readFully([BII)V row at 20,
+# and 스파이더맨3 asked for it next (measured 2026-09-26: `Unimplemented: java/io/DataInputStream
+# vtable index 19` 3/3, right after the 27 row above let its reader go on).
+#
+#   19 — the same reader dispatches `ldr r3, [r3, #0x50]` (LR 0x1b8b) with r0 = the stream and
+#        r1 = the byte[] it just allocated with length readShort() − 4, and nothing else set up
+#        for it (r2 holds a stale 8 from the allocation). Read off the guest heap at the trap,
+#        that argument is class `[B` with length 30, 3/3 — a single byte[], which rules out
+#        20 and 21, and the result is discarded. readFully([B)V is the only DataInputStream
+#        method of that shape.
+#        What this does not have: a second call site. A sweep of the 91 LGT titles in the local
+#        corpus finds no other `#0x50` dispatch on a DataInputStream, and a 20-second run of each
+#        reaches index 19 only in 스파이더맨3 — so the row rests on one site plus the slot rule.
+#
 # Getting one wrong is not free — unlike the argument-free Runtime/Thread reads below, these
 # return different widths off the same stream, so a misplaced row would hand the guest a
 # plausible wrong number instead of a named failure. That is the cost the anchor above buys down.
 [[class]]
 name = "java/io/DataInputStream"
 vtable = [
+    { name = "readFully", descriptor = "([B)V", index = 19 },
     { name = "readFully", descriptor = "([BII)V", index = 20 },
     { name = "readBoolean", descriptor = "()Z", index = 22 },
     { name = "readByte", descriptor = "()B", index = 23 },
     { name = "readShort", descriptor = "()S", index = 25 },
+    { name = "readChar", descriptor = "()C", index = 27 },
     { name = "readInt", descriptor = "()I", index = 28 },
+    { name = "readUTF", descriptor = "()Ljava/lang/String;", index = 32 },
 ]
 
 # 턴 and 서든어택포켓 dispatch index 19 and 훼밀리마트타이쿤 dispatches 15 16 17 19 20. This block
@@ -322,6 +369,12 @@ vtable = [
     # the loop head reloads as the RECEIVER of the next String dispatch (21). So 27 returns an
     # object, and substring(I) is the only one-int, object-returning method in the 15..28 run
     # (indexOf(I) and lastIndexOf(I) return int). Its position is the rule's, too.
+    # 놈3, inside a paint; the rule puts indexOf(S,I) here. Call site measured 2026-09-26 (.text
+    # 0x1f8ce, a split(s, delim) loop): r0 = s, r1 = delim, r2 = from; the result is tested
+    # `cmp r0, #0 ; blt`, passed as the end index of 28 (`substring(from, i)`), and then
+    # `from = i + delim.length()`, where length() is dispatched on r1 through String's slot 10 —
+    # so r1 is a String and r2 an int, which leaves indexOf(S,I) alone among the rule's neighbours.
+    { name = "indexOf", descriptor = "(Ljava/lang/String;I)I", index = 26 },
     { name = "substring", descriptor = "(I)Ljava/lang/String;", index = 27 },
     { name = "substring", descriptor = "(II)Ljava/lang/String;", index = 28 },
     { name = "trim", descriptor = "()Ljava/lang/String;", index = 33 },
@@ -331,8 +384,29 @@ vtable = [
 [[class]]
 name = "java/lang/StringBuffer"
 vtable = [
+    # 배틀몬스터, the next dispatch on the same loop as 22 below. CLDC 1.1 declares length()
+    # capacity() ensureCapacity(I) setLength(I) charAt(I) getChars setCharAt then append(Object) —
+    # seven methods ahead of the measured 17, so 10..16, the same base String's length() sits on.
+    # Call site measured 2026-09-25 (binary.mod file 0xf008..0xf018, LR 0xffe8): only r0 = the
+    # StringBuffer is set (r1 is a stale 0x21), the result goes straight to `cmp r0, #0 ; ble`, and
+    # the taken path dispatches index 4 (toString) on the same object: `if (sb.length() > 0)`.
+    { name = "length", descriptor = "()I", index = 10 },
+    # Same derivation (setLength is the fourth of the seven), and the same loop's next dispatch
+    # once 10 and 22 resolve. Call site measured 2026-09-25 (binary.mod file 0x10020..0x10038,
+    # LR 0x1003c): `mov r1, #0` — a literal zero — then `ldr ip, [r3, #0x38]` on the
+    # StringBuffer, right after its toString() was handed off; nothing reads r0 afterwards.
+    # `sb.setLength(0)`, the reset that reuses one buffer per line.
+    { name = "setLength", descriptor = "(I)V", index = 13 },
     { name = "append", descriptor = "(Ljava/lang/Object;)Ljava/lang/StringBuffer;", index = 17 },
     { name = "append", descriptor = "(Ljava/lang/String;)Ljava/lang/StringBuffer;", index = 18 },
+    # 배틀몬스터's wall past the village. CLDC 1.1 declares, after append(String), append([C)
+    # append([CII) append(Z) append(C) append(I) append(J) append(F) append(D) delete(II) — which
+    # puts append(C) at 22 and lands exactly on the two measured anchors 23 and 27, so the run
+    # 18..27 has no slack. Call site measured 2026-09-25 (binary.mod file 0xefb4..0xefcc, LR 0xff9c):
+    # `ldrh r1, [r3, #4]` — a 16-bit array element, r1 = 0xc624 at the stub — after an explicit
+    # bounds check against the array length, then `ldr ip, [r3, #0x5c]` on the StringBuffer and
+    # the result discarded: `sb.append(chars[i]);` in a counting loop.
+    { name = "append", descriptor = "(C)Ljava/lang/StringBuffer;", index = 22 },
     { name = "append", descriptor = "(I)Ljava/lang/StringBuffer;", index = 23 },
     { name = "delete", descriptor = "(II)Ljava/lang/StringBuffer;", index = 27 },
 ]
@@ -421,6 +495,14 @@ vtable = [
 [[class]]
 name = "java/util/Random"
 vtable = [
+    # 월드장기체스's wall after String 16 (measured 2026-09-26, call site disassembled). The caller
+    # loads a Random from a field, calls two native helpers, moves the second one's r0:r1 into
+    # r1:r2 and dispatches `ldr ip,[r3,#0x2c]` (= 4 + 4*10); the call is followed directly by the
+    # epilogue, so nothing reads a return value. The r1:r2 pair read back as 0x1a0:0xdcc55a04 =
+    # 1790410316292 ms = the run's own wall-clock time. A long argument and a void result is
+    # setSeed(J)V, which is also where the rule puts it (first CLDC Random method); none of the
+    # other CLDC Random methods takes a long.
+    { name = "setSeed", descriptor = "(J)V", index = 10 },
     { name = "nextInt", descriptor = "()I", index = 12 },
 ]
 

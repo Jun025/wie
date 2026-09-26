@@ -27,7 +27,7 @@ use tracing_web::MakeConsoleWriter;
 use wasm_bindgen::{JsError, prelude::*};
 use web_sys::HtmlCanvasElement;
 
-use wie_backend::{Emulator, Event, Font, Instant, KeyCode, Options, Platform, Screen, extract_zip};
+use wie_backend::{Emulator, Event, Font, FramePacer, Instant, KeyCode, Options, Platform, Screen, extract_zip};
 use wie_j2me::J2MEEmulator;
 use wie_ktf::KtfEmulator;
 use wie_lgt::LgtEmulator;
@@ -159,6 +159,7 @@ pub struct WieWeb {
     audio_player: AudioPlayer,
     should_redraw: Arc<AtomicBool>,
     key_events: HashMap<KeyCode, f64>,
+    pacer: FramePacer,
 }
 
 impl Drop for WieWeb {
@@ -287,6 +288,7 @@ impl WieWeb {
                 audio_player: audio_player.clone(),
                 should_redraw,
                 key_events: HashMap::new(),
+                pacer: FramePacer::new(),
             })
         })();
         if result.is_err() {
@@ -311,7 +313,10 @@ impl WieWeb {
             }
         }
 
-        self.emulator.tick().map_err(|e| JsError::new(&e.to_string()))
+        let budget = self.pacer.begin(millis as u64);
+        let result = self.emulator.tick_for(budget);
+        self.pacer.end(js_sys::Date::new_0().value_of() as u64);
+        result.map_err(|e| JsError::new(&e.to_string()))
     }
 
     pub fn key_down(&mut self, key: String) -> Result<(), JsError> {

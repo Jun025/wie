@@ -1,0 +1,36 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-26",
+  "task": "wie-lgt-nurse-tycoon2-npe-after-save-load",
+  "title": "간호사타이쿤2 NPE 는 게스트 자신의 재귀 · invalid memory access = java/lang/Class 필드 블록 word 0 오염",
+  "summary": "로드 직후 NPE 는 catch 본문의 자기 재귀가 static 스트림을 지운 뒤 바깥 finally 가 close() 한 결과이고 게스트가 스스로 삼킨다. 벽은 WorldMap <clinit> 의 static 기준 계산이다 — 게스트가 클래스 객체 필드 블록 word 0 을 플래그(0x2000)로 읽는데 거기 RustJava nameBytes 포인터가 있었다. classLoader=1 · nameBytes=3 고정으로 word 0 을 비웠다.",
+  "changes": [
+    "wie-lgt/data/lgt_java_abi.toml — java/lang/Class field 2행 + 근거 주석",
+    "wie-lgt/src/runtime/java/jvm_support.rs — test_native_jvm_runtime 에 word 0 == 0 · 두 필드 인덱스 단언",
+    "docs/report/0285"
+  ],
+  "verification": [
+    "before(origin/main ed36be98): FAIL paints 0 · WieError Invalid memory access 0x706f6e50 (WorldMap <clinit> 0x1462d4)",
+    "after: WorldMap 외 7개 <clinit> 완료 · 다음 벽 java/lang/Object vtable index 9 · paints 0",
+    "코퍼스 91건 짝 회귀: 뒤집힘 6건은 재측 3회에서 양 바이너리 모두 양쪽 판정 → 귀속 변화 0",
+    "변이(두 행 제거): test_native_jvm_runtime FAILED at word 0 단언"
+  ],
+  "limits": [
+    "word 0 의 실기 플래그 의미 전체는 모른다 — 0x2000 의 분기만 확인",
+    "다른 제목에서 폴트 없이 static 이 잘못 쓰였던 경우는 재지 않았다",
+    "간호사타이쿤2 는 여전히 paints 0"
+  ],
+  "adoptedProposals": ["2026-09-25-datainputstream-readboolean-slot#p0"],
+  "proposals": [
+    {
+      "title": "간호사타이쿤2(LGT) — java/lang/Object vtable index 9 빈 칸",
+      "plainSummary": "간호사타이쿤2 가 이제 게임 클래스 초기화를 끝내고 한 단계 더 가지만, 스레드 하나가 Object 의 9번 칸(기다리기 계열 메서드로 추정)을 불러 멈춥니다. 그 칸에 무엇이 들어가야 하는지 호출부로 확정하는 일입니다.",
+      "userBenefit": "이 타이틀이 첫 화면 전에 만나는 다음 장애물입니다.",
+      "why": "after 재현: thread 3 에서 WieError Unimplemented: java/lang/Object vtable index 9. lgt_java_abi.toml 은 9 를 wait() 로 관측했지만 도달한 실행이 없어 비워 두었다 — 이제 도달하는 실행이 있다.",
+      "tradeoff": "wait 류를 잘못 넣으면 영구 대기(조용한 hang)가 된다 — 표 주석이 7·8 을 비워 둔 이유와 같아서 호출부 인자 모양으로 확정해야 한다.",
+      "effort": "S",
+      "target": "wie",
+      "kind": "product"
+    }
+  ]
+}

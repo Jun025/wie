@@ -1,0 +1,35 @@
+{
+  "date": "2026-09-26",
+  "task": "wie-2026-09-19-adoption-audit-prune",
+  "title": "09-19 채택분 감사 정리 — 토큰 판정 통합 · 역공학 노트 이전 · 문구/자기소스 grep 테스트 완화 · census 반사실 재측정 제거",
+  "summary": "제품 동작 변경 0. 두 벌이던 토큰 인용 판정을 wie_util::quotable_token 한 곳으로, database.rs·svc_ids.rs doc 주석 속 역공학 노트를 docs/report/0175·0178 부록으로 옮겼다. wie_validate 의 include_str! 자기소스 grep 테스트 3종 중 1종은 judge() 추출 후 행동 단언으로 바꾸고 2종은 삭제. census 생성기의 7월 summary.tsv 반사실 재측정 블록을 걷었다(데이터 행 동일). census·검사기 다듬기 계열 열린 제안 12건을 declined 로 접는다.",
+  "proposals": [],
+  "declinedProposals": [
+    "2026-09-06-deletable-checks-census#p1",
+    "2026-09-07-createimage-message-lock#p0",
+    "2026-09-07-docs-report-serial-uniqueness#p0",
+    "2026-09-07-docs-report-serial-uniqueness#p1",
+    "2026-09-07-engine-runner-fixture-drift#p0",
+    "2026-09-17-checker-caller-census#p0",
+    "2026-09-17-checker-caller-census#p2",
+    "2026-09-17-orphaned-files-after-base-swap-census#p0",
+    "2026-09-18-game-lab-census-today#p0",
+    "2026-09-18-ruleset-shape-fingerprint#p0",
+    "2026-09-18-branch-protection-pat-decision#p0",
+    "2026-09-18-verify-screenshot-filename-contract-decision#p0"
+  ],
+  "declinedReasons": {
+    "2026-09-06-deletable-checks-census#p1": "checker-polish chain folded (09-19 adoption audit: PASS 0 from meta rounds)",
+    "2026-09-07-createimage-message-lock#p0": "opposite direction — this round relaxes message-sentence locks to value asserts",
+    "2026-09-07-docs-report-serial-uniqueness#p0": "resolved long ago (PR #112 landed/closed); stale",
+    "2026-09-07-docs-report-serial-uniqueness#p1": "checker-polish chain folded",
+    "2026-09-07-engine-runner-fixture-drift#p0": "checker-polish chain folded",
+    "2026-09-17-checker-caller-census#p0": "census/checker-polish chain folded",
+    "2026-09-17-checker-caller-census#p2": "census/checker-polish chain folded",
+    "2026-09-17-orphaned-files-after-base-swap-census#p0": "census chain folded",
+    "2026-09-18-game-lab-census-today#p0": "census chain folded; no-frame work continues via game-specific tickets",
+    "2026-09-18-ruleset-shape-fingerprint#p0": "checker-polish chain folded",
+    "2026-09-18-branch-protection-pat-decision#p0": "checker-polish chain folded",
+    "2026-09-18-verify-screenshot-filename-contract-decision#p0": "checker-polish chain folded"
+  }
+}

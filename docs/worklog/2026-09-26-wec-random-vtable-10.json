@@ -1,0 +1,36 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-26",
+  "task": "wie-2026-09-25-wec-random-vtable-10-adopt-p0",
+  "title": "월드장기체스 — java/util/Random 10 = setSeed(J)V (호출부 디스어셈블)",
+  "summary": "호출부가 Random 필드에 현재 시각(long, r1:r2)을 넘기고 반환값을 버린다. long 인자 + void 는 setSeed(J)V 이고 규칙 위치와도 같다. 벽이 Random 10 에서 java/util/Vector 31 로 옮겨 갔다.",
+  "changes": [
+    "wie-lgt/data/lgt_java_abi.toml — Random 블록 10 행 1줄 + 근거 주석",
+    "wie-lgt/src/runtime/java/jvm_support.rs — ABI 핀 테스트에 10 행 1줄",
+    "docs/report/0287"
+  ],
+  "verification": [
+    "전: 3/3 FAIL · paints 0 · java/util/Random vtable index 10",
+    "후: 3/3 FAIL · ticks 3748~44119 · paints 0 · java/util/Vector vtable index 31",
+    "변이: setSeed 행만 제거 → Random vtable index 10 재현 (ticks 2)"
+  ],
+  "limits": [
+    "호출부 1곳 — 다른 타이틀 교차 없음",
+    "paints 0 그대로"
+  ],
+  "adoptedProposals": [
+    "2026-09-25-wec-string-16-compareto#p0"
+  ],
+  "proposals": [
+    {
+      "title": "월드장기체스 — `java/util/Vector vtable index 31` 미구현 벽",
+      "plainSummary": "Random 10 을 채우자 월드장기체스가 수천 tick 더 가서 Vector 의 31 번 칸에서 멈춥니다. 그 칸이 어떤 메서드인지 호출부로 확인해 등재하는 일입니다.",
+      "userBenefit": "월드장기체스 부팅이 다음 벽을 넘는 한 걸음입니다.",
+      "why": "이 회차 후 3/3 동일하게 `Unimplemented: java/util/Vector vtable index 31`. Vector 블록은 15·23·27·28 만 있다.",
+      "tradeoff": "규칙만으로 적으면 추정이다 — 호출부 인자·반환 사용을 디스어셈블해 교차해야 한다.",
+      "effort": "S",
+      "target": "wie",
+      "kind": "product"
+    }
+  ]
+}

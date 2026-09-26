@@ -1,0 +1,26 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-26",
+  "task": "wie-surdenattack-boot-30s-no-yield-measure",
+  "title": "서든어택포켓 부팅 무양보 구간 = 우리 링커(JavaVtable::read 의 O(항목×메서드) 게스트 읽기) — 색인으로 그 tick 5.4~10.6배 단축",
+  "summary": "sample 표본의 90.3% 가 link_class_members → virtual_method_index → JavaVtable::read. 항목마다 모든 메서드를 훑으며 target() 이 게스트 메모리를 읽었다. target→method 색인(첫 일치 우선)으로 바꿨다. LGT 91파일 짝 회귀 PASS→FAIL 0.",
+  "changes": [
+    "wie-lgt/src/runtime/java/jvm_support/vtable.rs — JavaVtable::read 를 target 색인으로",
+    "docs/report/0275 — 측정 · 판정 · A/B · 코퍼스 짝"
+  ],
+  "verification": [
+    "LTO release: 공백 2.6 s · --timeout 30 4/4 count 2 · --max-ticks 2 ms 3,849",
+    "non-LTO A/B 교대 6쌍: base 5,436~45,483 ms ↔ fix 998~5,196 ms (5.4~10.6배)",
+    "LGT 91파일 짝 --timeout 30: PASS→PASS 70 · FAIL→FAIL 19 · FAIL→PASS 1(놈3, 60 s 짝 둘 다 PASS) · PASS→FAIL 0 · 크로이센 둘 다 stack overflow",
+    "4 게이트 rc=0 · cargo test 454/0 · 러너 블록 전건 PASS"
+  ],
+  "limits": [
+    "0260 의 29~39 s 가 LTO release 에서 2.4~7.0 s 로 줄어 있던 이유는 빌드 프로필로 추정할 뿐 귀속 보류",
+    "fix 뒤 남은 1~5 s 둘째 tick 은 더 쪼개지 않았다"
+  ],
+  "proposals": [],
+  "adoptedProposals": [
+    "2026-09-25-surdenattack-pocket-wall-is-dos14-not-pre-save#p1"
+  ],
+  "declinedProposals": []
+}
