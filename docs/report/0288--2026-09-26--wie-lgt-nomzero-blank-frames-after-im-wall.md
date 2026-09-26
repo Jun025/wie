@@ -23,3 +23,5 @@
 
 - 같은 처방: #301(merged)이다. 티켓 규약(「같은 처방 PR 이 있으면 회신에 적고 끝낸다」)과 AGENTS.md(「형제 PR 이 이미 푼 제안은 알아챈 회차가 닫는다」)에 따라 worklog 로 카드를 닫는다.
 - 후속 제안 0.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=82b130d28498d0a7 B=5/2 P=0/0 S=0/0 -->
