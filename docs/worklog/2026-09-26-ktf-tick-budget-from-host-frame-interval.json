@@ -9,10 +9,10 @@
     "wie-ktf/lgt/skt/j2me emulator.rs — tick → tick_for(budget)",
     "wie_featurephone · wie-web — FramePacer 배선(JS 수출면 무변경)",
     "wie_validate — --frame-hz (기본 off)",
-    "docs/architecture.md 1문장 · docs/report/0281"
+    "docs/architecture.md 1문장 · docs/report/0284"
   ],
   "verification": [
-    "브라우저 교대 짝 2회 × 3타이틀 × {rAF 60, 모사 120} — docs/report/0281 표",
+    "브라우저 교대 짝 2회 × 3타이틀 × {rAF 60, 모사 120} — docs/report/0284 표",
     "디버그 빌드 예산 분포: 60Hz 에서 14 가 99.2~99.4%",
     "개악 10종 각각 해당 시험 FAILED"
   ],
