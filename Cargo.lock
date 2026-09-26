@@ -5048,6 +5048,7 @@ dependencies = [
  "jvm-class-proto",
  "jvm-types",
  "lazy_static",
+ "md5",
  "rustjava-runtime",
  "serde",
  "spin",
