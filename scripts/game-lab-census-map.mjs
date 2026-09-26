@@ -256,8 +256,8 @@ import { cargoMetadata, workspaceRelative } from "./cargo-metadata.mjs";
 // second glob had to be bolted on. Measured 2026-09-19 against `cargo metadata --no-deps`,
 // the literal missed FOUR real source locations — `src` and `tests` (the ROOT is itself a
 // package, `[package] name = "wie"`), `test-utils/Cargo.toml` and `test-utils/src` — i.e.
-// 1 of 18 workspace members plus the root package's own sources. `checker-census.mjs` was
-// bitten by exactly the same path-guess and reached the same answer: ask cargo.
+// 1 of 18 workspace members plus the root package's own sources. The (since removed)
+// `checker-census.mjs` was bitten by exactly the same path-guess and reached the same answer.
 //
 // ★The leak has NOT yet produced a wrong verdict, and saying so is the honest grade: over
 // the last 90 days, 9 commits touched those four paths and ALL 9 also touched a path the
@@ -268,7 +268,7 @@ import { cargoMetadata, workspaceRelative } from "./cargo-metadata.mjs";
 // NOT fall back to a literal list: a fallback list is a second copy of the truth, and the
 // day it drifts it drifts SILENTLY toward "CURRENT" — the one direction this whole file
 // exists to forbid. Frequency, measured rather than assumed: this generator has 0 callers
-// (`checker-census.mjs`) and 0 references in `.github/` — it only runs by hand, on a machine
+// and 0 references in `.github/` — it only runs by hand, on a machine
 // that holds the git-ignored `game_lab/` corpus, i.e. a checkout of this Rust workspace. The
 // environment where cargo is missing and this script is running is not one we could find.
 // `Cargo.lock` and `data/` stay literal because cargo cannot report them: neither is a
