@@ -205,12 +205,27 @@ vtable = [
 #        getBytes — a String — and readUTF() is the only no-argument DataInputStream method that
 #        returns one.
 #
+# readFully([B)V = 19 is the rule's first own slot, one before the readFully([BII)V row at 20,
+# and 스파이더맨3 asked for it next (measured 2026-09-26: `Unimplemented: java/io/DataInputStream
+# vtable index 19` 3/3, right after the 27 row above let its reader go on).
+#
+#   19 — the same reader dispatches `ldr r3, [r3, #0x50]` (LR 0x1b8b) with r0 = the stream and
+#        r1 = the byte[] it just allocated with length readShort() − 4, and nothing else set up
+#        for it (r2 holds a stale 8 from the allocation). Read off the guest heap at the trap,
+#        that argument is class `[B` with length 30, 3/3 — a single byte[], which rules out
+#        20 and 21, and the result is discarded. readFully([B)V is the only DataInputStream
+#        method of that shape.
+#        What this does not have: a second call site. A sweep of the 91 LGT titles in the local
+#        corpus finds no other `#0x50` dispatch on a DataInputStream, and a 20-second run of each
+#        reaches index 19 only in 스파이더맨3 — so the row rests on one site plus the slot rule.
+#
 # Getting one wrong is not free — unlike the argument-free Runtime/Thread reads below, these
 # return different widths off the same stream, so a misplaced row would hand the guest a
 # plausible wrong number instead of a named failure. That is the cost the anchor above buys down.
 [[class]]
 name = "java/io/DataInputStream"
 vtable = [
+    { name = "readFully", descriptor = "([B)V", index = 19 },
     { name = "readFully", descriptor = "([BII)V", index = 20 },
     { name = "readBoolean", descriptor = "()Z", index = 22 },
     { name = "readByte", descriptor = "()B", index = 23 },
