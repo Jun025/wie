@@ -299,6 +299,15 @@ vtable = [
     { name = "length", descriptor = "()I", index = 10 },
     { name = "charAt", descriptor = "(I)C", index = 11 },
     { name = "getBytes", descriptor = "()[B", index = 14 },
+    # 월드장기체스's wall (measured 2026-09-25, call site disassembled). CCC.<init> checks one
+    # String against constant-pool Strings in a chain: `if (s.<16>(c) == 0) flag = 1`, four
+    # constants in turn, every one branching to the same flag store, then a second chain of the
+    # same shape against other constants. r1 reads back off the guest heap as java/lang/String,
+    # the receiver is null-checked first, and the result is only ever compared with 0. The rule
+    # puts compareTo(String)I here, and the chain rules out its String-argument neighbours:
+    # equalsIgnoreCase (15) returns 0 on a MISMATCH, so "any zero sets the flag" would set it
+    # for every string; startsWith/endsWith/indexOf sit at 19/20/25.
+    { name = "compareTo", descriptor = "(Ljava/lang/String;)I", index = 16 },
     # 훼밀리마트타이쿤's wall. Derived, not observed: the run of 15..28 the rule fixes is
     # equalsIgnoreCase compareTo regionMatches startsWith(S,I) startsWith(S) endsWith indexOf(I)
     # indexOf(I,I) lastIndexOf(I) lastIndexOf(I,I) indexOf(S) indexOf(S,I) substring(I), which is
