@@ -1,0 +1,22 @@
+{
+  "date": "2026-09-27",
+  "task": "wie-lgt-no-frame-hang-first-wait-point-measure",
+  "title": "학교가는길 · 놈3 첫 대기 지점 — 둘 다 입력 대기 아님 · Timer 12 · Stack 32 등재",
+  "summary": "학교가는길: main 에서 hang 이 아니라 부트 하드 실패(Timer 12 → Stack 32). 두 칸 등재 후 게임 루프 TimerTask 가 첫 틱에 죽는다 — 호스트 TimerTask(8단어)가 폰 배치(6단어)를 넘어 게스트 하위 클래스 필드를 덮는다. 놈3: 스레드 3(A→B)과 이벤트 스레드 4(B→A)의 모니터 교착 — FAIL 3/3 같은 순서. 둘 다 배틀몬스터 입력 대기 군집과 별 원인.",
+  "adoptedProposals": [
+    "2026-09-24-lgt-link-appended-vtable-slot-propagation#p0",
+    "2026-09-25-lgt-exception-frames-per-thread#p0"
+  ],
+  "proposals": [
+    {
+      "title": "LGT 호스트 TimerTask 가 폰 배치(6단어)보다 커서 게스트 TimerTask 하위 클래스 필드를 덮는다 — 학교가는길 게임 루프 사망",
+      "plainSummary": "학교가는길은 이제 부팅을 넘지만, 화면을 그리는 타이머 작업이 첫 번에 메모리 오류로 죽어 빈 화면에 머뭅니다.",
+      "userBenefit": "고치면 학교가는길이 실제 게임 화면을 그리기 시작할 수 있고, 타이머를 쓰는 다른 LGT 게임도 같은 벽을 피합니다.",
+      "why": "죽은 주소 0xde07b454 가 직전에 호스트가 쓴 c.lastScheduledExecutionTime(0x1a0_de07b454)의 하위 단어다. 게스트 c 서술자는 total=7 · 자기 필드 메타 0 이라 폰 TimerTask 는 6단어이고 word 6 은 c 의 숨은 필드인데, rustjava-runtime 0.1.1 TimerTask 는 lastScheduledExecutionTime J 를 더해 8단어라 매 틱 그 칸을 덮고 인스턴스 밖 1단어에 쓴다(docs/report/0296 ⑴-c).",
+      "tradeoff": "ABI 파일 고정 칸으로는 6단어에 못 넣는다 — lastScheduledExecutionTime 을 인스턴스 밖(호스트 쪽 표)으로 옮기거나 hardening 에서 TimerTask 필드를 6단어로 줄이는 설계 결정이 필요하다. scheduledExecutionTime() 의미를 지켜야 한다.",
+      "effort": "M",
+      "target": "wie",
+      "kind": "product"
+    }
+  ]
+}

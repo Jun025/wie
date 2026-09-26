@@ -494,6 +494,35 @@ vtable = [
     { name = "insertElementAt", descriptor = "(Ljava/lang/Object;I)V", index = 28 },
 ]
 
+# 학교가는길 dispatches index 12 on a java/util/Timer as the first thing it does, 3/3, and the one
+# uncaught `Unimplemented` ends the boot (measured 2026-09-26 on origin/main 3d912985 — before
+# #292's unwind fix the same miss was swallowed into a no-frame hang). Timer extends Object, so its
+# own run starts at 10, and CLDC 1.1 declares schedule(TimerTask,J) schedule(TimerTask,Date)
+# schedule(TimerTask,JJ) schedule(TimerTask,Date,J) scheduleAtFixedRate(TimerTask,JJ)
+# scheduleAtFixedRate(TimerTask,Date,J) cancel() there, in that order. Order says 12 is schedule(TimerTask,JJ)V; the call site agrees on shape
+# (lr 0x25c0, 3/3): r0 = the Timer, r1 = an instance of the guest's class `c`, r2:r3 = 0 and two
+# stack words 0x64 0 — one object and two longs, delay 0 and period 100.
+# What this cannot separate: scheduleAtFixedRate(TimerTask,JJ)V at 14 has the same shape, so only
+# the order decides between them. Being wrong costs fixed-delay vs fixed-rate pacing of a 100 ms
+# tick, not a missed or hung task.
+[[class]]
+name = "java/util/Timer"
+vtable = [
+    { name = "schedule", descriptor = "(Ljava/util/TimerTask;JJ)V", index = 12 },
+]
+
+# 학교가는길 then dispatches index 32 on a java/util/Stack, 3/3 (measured 2026-09-26, with the Timer
+# row above in). Stack extends Vector, and the four Vector rows above (size 15, elementAt 23,
+# removeElementAt 27, insertElementAt 28) all sit where CLDC 1.1's Vector order puts them — 22
+# instance methods, copyInto at 10 through removeAllElements at 31 — so Stack's own run starts at
+# 32 with push(Object) pop() peek() empty() search(Object). The call site has the one-argument
+# shape push needs (lr 0x138f24, r1 = a heap pointer); pop/peek/empty take none.
+[[class]]
+name = "java/util/Stack"
+vtable = [
+    { name = "push", descriptor = "(Ljava/lang/Object;)Ljava/lang/Object;", index = 32 },
+]
+
 [[class]]
 name = "java/lang/Runnable"
 vtable = [
