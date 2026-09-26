@@ -39,8 +39,7 @@
 **사용자 영향**: 현영맞고2006·놈3 류(Thumb) 게임에서 catch 가 메서드를 부르거나 try 를 중첩해도 바깥 try 가 살아 있어, 다음 예외가
 미처리로 새거나 `FatalError` 로 죽지 않는다. 배틀몬스터의 `address: 0` 수정은 그대로 유지.
 
-**게임 파일명 유입**(`corpus-name-inflow --corpus` · 브랜치 전체 8파일): BOUNDED 37 · SUFFIX-ATTACHED 8(main 재병합 뒤 · `jvm_support.rs` 주석 합집합 +2 · 아래 병합 절 자신의 언급 +1) — 전부 주석·문서 속 타이틀명(계측 근거 인용) · 게임 바이트 0. `0263` 의 표식은 이 회차의 코드 변경으로 낡아 떼고 이 파일로 옮겼다.
+**게임 파일명 유입**(`corpus-name-inflow --corpus` · 브랜치 전체 8파일): BOUNDED 37 · SUFFIX-ATTACHED 8(main 재병합 뒤 · `jvm_support.rs` 주석 합집합 +2 · 아래 병합 절 자신의 언급 +1) — 전부 주석·문서 속 타이틀명(계측 근거 인용) · 게임 바이트 0. `0263` 의 표식은 이 회차의 코드 변경으로 낡아 떼고 이 파일로 옮겼다. (이 회차의 표식도 `0281` 이 브랜치에 파일을 더해 낡아 `0281` 로 옮겼다.)
 
 **병합**: `origin/main 5434ab0a` 를 merge commit 으로 흡수(리베이스·force 0). 충돌 1곳 `jvm_support.rs` ABI 고정 시험 주석 — 합집합(StringBuffer 10/13/22 + 월드장기체스 String 16). 연번 `0272` 는 #307 이 먼저 착지해 `0273` 으로 옮겼다. 병합 뒤 게이트: fmt · clippy · wasm clippy · `+beta` clippy rc0 · `cargo test --all` **460 passed / 0 failed**.
 
-<!-- corpus-name-inflow v1 subjects=8 tree=7f38baff91e4b75c B=83/37 P=1/1 S=15/8 -->
