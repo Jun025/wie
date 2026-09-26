@@ -220,6 +220,10 @@ them buys time by seeing less.
 `--inject-keys 0` and once with `--inject-keys 1`, **on a release build** — a debug run reads an input
 wait as a wall (`docs/report/0233`, PR #283; the flags: `wie_validate.rs` header).
 
+**To reach a specific screen, write the path as `--keys <file|list>` — do not carry a scratch patch.**
+The fixed 27-key script lands on a different screen under load; three rounds each re-applied the same
+uncommitted `WIE_KEYS` patch before the flag existed. Example: `docs/keys/battlemonster-village.keys`.
+
 `cargo test --all` boots KTF and LGT but **nothing in it boots a J2ME guest**. 2026-09-04 shipped a
 RustJava pin bump whose four gates were all green while `draw_j2me.jar` failed with
 `NoClassDefFoundError` on the first tick — one `wie_validate` line reproduced it locally, and the

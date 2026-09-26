@@ -1,0 +1,34 @@
+# wie_validate --keys: 배틀몬스터 (LGT) 새로하기 → 포획 튜토리얼 → 마을 → 집 안.
+# Grammar and cap rule: `--keys` help / `parse_keys` in wie_cli/src/bin/wie_validate.rs.
+#
+#   mkdir -p <dir>   # --shotdir does not create it; a missing dir silently yields 0 shots
+#   cargo run -q --release -p wie_cli --bin wie_validate -- --inject --boot-secs 6 \
+#     --max-ticks 100000000000 --keys docs/keys/battlemonster-village.keys --shotdir <dir> <game>
+#
+# Step 97 (`97_OK`) is the village. Step 104 (`104_UP`) is inside the house only at
+# low load: a held key walks per tick, not per second, so the tail after the village
+# is not load-proof (docs/report/0298: 0/4 once load climbed to 65-129). Target the village.
+# The tutorial asks for STAR (43), CLR (47) and HASH (50, 62) by name; its yes/no
+# prompt (step 23) cannot be declined with NUM2. The gaps are wide on purpose:
+# the fixed 27-key script feeds a 0.6 s grid, and under load the keys meant
+# for later screens land on the help screen instead. Key names only — no game bytes.
+# Each HASH is preceded by one spare OK. How many OKs a dialogue takes varies between
+# runs of the same build and command (10 before the second HASH in this round's runs,
+# 11 in the review's; the cause is not pinned), and a HASH pressed one screen early
+# is dropped — after which every OK hits the "#키를 눌러봐" screen, where OK does
+# nothing, and the run ends in the tutorial (PR #331 review: 0/2, both stuck there).
+# The spare OK is safe because of that same fact: on the HASH prompt an OK is a no-op
+# (same frame before and after, measured). Not the save state — the validator's
+# filesystem and database are in-memory, so every run starts from no save.
+# A script is tied to the engine it was recorded on: a fix that lets the game
+# go further moves the path (the pre-#306 version of this path skipped the tutorial).
+OK:15 OK:15 NUM1:10 NUM1:50 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6
+OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6
+OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 OK:6
+OK:6 OK:6 OK:6 OK:6 OK:6 OK:6 STAR:6 OK:6 OK:6 OK:6 CLR:6 OK:6
+OK:6 HASH:8 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7
+OK:7 HASH:8 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7
+OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7 OK:7
+OK:7 OK:7 OK:7 WAIT:5 OK:5 WAIT:5 OK:5 WAIT:5 WAIT:5 NUM5:5 OK:5 OK:5
+OK:5 OK:5 WAIT:4 WAIT:4 UP:4:1 WAIT:4 WAIT:4 UP:4:2 WAIT:4 RIGHT:4:2 WAIT:4 LEFT:4:2
+WAIT:4 UP:4:3 WAIT:4

@@ -50,15 +50,21 @@
 //! overclaim as calling zero that, only smaller. The corpus measurement behind the widening,
 //! and the two titles it costs, are recorded on `inject_unmeasured` itself.
 //!
-//! Three opt-in flags change the schedule; with none given it is byte-for-byte the old one
+//! Four opt-in flags change the schedule; with none given it is byte-for-byte the old one
 //! (`plan_schedule_defaults_unchanged_test`):
 //!
+//!   --keys SCRIPT     replace the 27-key script (file path or inline list; grammar on `parse_keys`)
 //!   --inject-keys N   inject only the first N script keys (input_steps_total = N)
 //!   --keep-timeout    end at --timeout, not the schedule-derived deadline
 //!   --shot-every S    extra --shotdir frame every S seconds, labelled `tNNN.N`
 //!
 //! They exist to pair a keyed run with an unkeyed one on the SAME budget — "is a title that
 //! paints 3 frames waiting for a key, or stuck?" (docs/report/0233 needed a scratch patch).
+//! `--keys` exists because the fixed script reaches a DIFFERENT screen under load: a menu that
+//! wants a key 10 s in gets whatever the 0.6 s grid has queued by then. Three battlemonster
+//! rounds each carried the same uncommitted `WIE_KEYS` patch to pin a path to the village;
+//! `docs/keys/battlemonster-village.keys` is that path. Under `--keys` the 120 s cap
+//! on the schedule-derived deadline is lifted — the script's length IS the requested budget.
 //!
 //! ── Two content axes, same predicate, different scope ────────────────────────
 //! `content`            — `has_content` ORed over EVERY painted frame ("did the game
@@ -477,6 +483,16 @@ struct Args {
     /// same budget — `--inject-keys 0` vs `1` is "is it waiting for a key?".
     #[arg(long, requires = "inject")]
     inject_keys: Option<usize>,
+    /// Key script replacing the built-in 27 keys: a file path, or the script inline.
+    /// Whitespace-separated `NAME[:GAP[:HOLD]]` steps, `#` starts a comment; NAME is a
+    /// key (`OK UP DOWN LEFT RIGHT LSOFT RSOFT CLR STAR HASH NUM0`..`NUM9`) or `WAIT`
+    /// (no key, still a shot). GAP = seconds until the next step (default --action-secs),
+    /// HOLD = seconds the key stays down (default 0.15). Lifts the 120 s deadline cap.
+    /// Unchecked: keep HOLD < GAP (else the next key goes down before this one is up) and
+    /// GAP >= 0.05 (the step's shot is taken 0.05 s before the next step, so less lands it
+    /// before the press).
+    #[arg(long, requires = "inject", value_parser = parse_keys)]
+    keys: Option<KeyScript>,
     /// Under `--inject`, end at `--timeout` instead of the deadline derived from
     /// the key schedule, so runs injecting different key counts get the same budget.
     #[arg(long, default_value_t = false, requires = "inject")]
@@ -1283,19 +1299,33 @@ fn plan_schedule(args: &Args) -> (Vec<(f64, ScheduledEv)>, f64, u64) {
             (KeyCode::OK, "OK"),
             (KeyCode::OK, "OK"),
         ];
+        let default: Vec<KeyStep> = script
+            .iter()
+            .map(|&(key, name)| KeyStep {
+                key: Some(key),
+                name: name.into(),
+                gap: None,
+                hold: None,
+            })
+            .collect();
+        let script = args.keys.as_ref().map_or(&default[..], |k| &k.0[..]);
         let script = &script[..args.inject_keys.map_or(script.len(), |n| n.min(script.len()))];
-        input_steps_total = script.len() as u64;
+        input_steps_total = script.iter().filter(|s| s.key.is_some()).count() as u64;
         schedule.push((args.boot_secs, ScheduledEv::Shot("00_boot".into())));
         let mut t = args.boot_secs + 0.3;
-        for (i, (kc, name)) in script.iter().enumerate() {
-            let label = format!("{:02}_{name}", i + 1);
-            schedule.push((t, ScheduledEv::Key(*kc, true, label.clone())));
-            schedule.push((t + 0.15, ScheduledEv::Key(*kc, false, label.clone())));
-            schedule.push((t + args.action_secs - 0.05, ScheduledEv::Shot(label)));
-            t += args.action_secs;
+        for (i, step) in script.iter().enumerate() {
+            let label = format!("{:02}_{}", i + 1, step.name);
+            let gap = step.gap.unwrap_or(args.action_secs);
+            if let Some(kc) = step.key {
+                schedule.push((t, ScheduledEv::Key(kc, true, label.clone())));
+                schedule.push((t + step.hold.unwrap_or(0.15), ScheduledEv::Key(kc, false, label.clone())));
+            }
+            schedule.push((t + gap - 0.05, ScheduledEv::Shot(label)));
+            t += gap;
         }
         if !args.keep_timeout {
-            deadline_secs = (t + 1.0).min(120.0); // hard cap against runaway
+            // Hard cap against runaway — but not on a caller-written script, whose length is the budget asked for.
+            deadline_secs = if args.keys.is_some() { t + 1.0 } else { (t + 1.0).min(120.0) };
         }
     }
     if let Some(every) = args.shot_every {
@@ -1321,6 +1351,72 @@ fn profile_callback(path: &std::path::Path) -> std::io::Result<ProfileCallback> 
             let _ = writeln!(writer, "{} {}", folded.join(";"), sample.count);
         }
     }))
+}
+
+/// One `--inject` step. `key: None` is `WAIT`; `gap`/`hold` `None` = the defaults.
+#[derive(Clone)]
+struct KeyStep {
+    key: Option<KeyCode>,
+    name: String,
+    gap: Option<f64>,
+    hold: Option<f64>,
+}
+
+#[derive(Clone)]
+struct KeyScript(Vec<KeyStep>);
+
+/// `--keys`: a readable file is the script; anything else is the script inline.
+/// Fail-closed on an unknown name — a typo silently becoming a no-op is a different path.
+fn parse_keys(v: &str) -> std::result::Result<KeyScript, String> {
+    let text = if std::path::Path::new(v).is_file() {
+        std::fs::read_to_string(v).map_err(|e| format!("{v}: {e}"))?
+    } else {
+        v.to_owned()
+    };
+    let mut steps = Vec::new();
+    for tok in text.lines().flat_map(|l| l.split('#').next().unwrap_or("").split_whitespace()) {
+        let mut it = tok.split(':');
+        let name = it.next().unwrap_or("");
+        let key = match name {
+            "WAIT" => None,
+            "OK" => Some(KeyCode::OK),
+            "UP" => Some(KeyCode::UP),
+            "DOWN" => Some(KeyCode::DOWN),
+            "LEFT" => Some(KeyCode::LEFT),
+            "RIGHT" => Some(KeyCode::RIGHT),
+            "LSOFT" => Some(KeyCode::LEFT_SOFT_KEY),
+            "RSOFT" => Some(KeyCode::RIGHT_SOFT_KEY),
+            "CLR" => Some(KeyCode::CLEAR),
+            "STAR" => Some(KeyCode::STAR),
+            "HASH" => Some(KeyCode::HASH),
+            "NUM0" => Some(KeyCode::NUM0),
+            "NUM1" => Some(KeyCode::NUM1),
+            "NUM2" => Some(KeyCode::NUM2),
+            "NUM3" => Some(KeyCode::NUM3),
+            "NUM4" => Some(KeyCode::NUM4),
+            "NUM5" => Some(KeyCode::NUM5),
+            "NUM6" => Some(KeyCode::NUM6),
+            "NUM7" => Some(KeyCode::NUM7),
+            "NUM8" => Some(KeyCode::NUM8),
+            "NUM9" => Some(KeyCode::NUM9),
+            _ => return Err(format!("unknown key {name:?} in {tok:?}")),
+        };
+        let gap = it.next().map(positive_secs).transpose()?;
+        let hold = it.next().map(positive_secs).transpose()?;
+        if it.next().is_some() {
+            return Err(format!("{tok:?}: expected NAME[:GAP[:HOLD]]"));
+        }
+        steps.push(KeyStep {
+            key,
+            name: name.into(),
+            gap,
+            hold,
+        });
+    }
+    if steps.is_empty() {
+        return Err("empty key script".into());
+    }
+    Ok(KeyScript(steps))
 }
 
 fn positive_secs(s: &str) -> std::result::Result<f64, String> {
@@ -2022,6 +2118,64 @@ mod tests {
         assert!(s.windows(2).all(|w| w[0].0 <= w[1].0), "schedule not time-sorted");
         // Without --inject, shots run to --timeout.
         assert_eq!(shots(&plan(&["--shotdir", "x", "--shot-every", "10"]).0), ["t010.0"].map(String::from));
+    }
+
+    fn keys(schedule: &[(f64, super::ScheduledEv)]) -> Vec<(f64, bool, String)> {
+        schedule
+            .iter()
+            .filter_map(|(t, e)| match e {
+                super::ScheduledEv::Key(_, d, l) => Some((*t, *d, l.clone())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn keys_flag_replaces_the_script_test() {
+        // Ignoring --keys would schedule the 27 defaults — every assertion here would go red.
+        let (s, d, n) = plan(&["--inject", "--keys", "UP:2 WAIT:3 # comment\nNUM5:1:0.5"]);
+        assert_eq!(n, 2, "WAIT is not an input step");
+        assert_eq!(shots(&s), ["00_boot", "01_UP", "02_WAIT", "03_NUM5"].map(String::from));
+        let k = keys(&s);
+        assert_eq!(
+            k.iter().map(|x| (x.1, x.2.as_str())).collect::<Vec<_>>(),
+            [(true, "01_UP"), (false, "01_UP"), (true, "03_NUM5"), (false, "03_NUM5")]
+        );
+        // boot 2.5 + 0.3, then gaps 2 + 3 before NUM5, held 0.5; deadline = end + 1.
+        assert!((k[2].0 - 7.8).abs() < 1e-9 && (k[3].0 - 8.3).abs() < 1e-9, "{k:?}");
+        assert!((d - 9.8).abs() < 1e-9, "deadline {d}");
+        // A written script is its own budget: no 120 s cap. The default path keeps it.
+        assert!((plan(&["--inject", "--keys", "OK:200"]).1 - 203.8).abs() < 1e-9);
+        assert_eq!(plan(&["--inject", "--action-secs", "10"]).1, 120.0);
+        // --inject-keys still takes a prefix.
+        assert_eq!(plan(&["--inject", "--keys", "OK UP DOWN", "--inject-keys", "2"]).2, 2);
+    }
+
+    #[test]
+    fn keys_flag_spelling_the_defaults_is_the_default_schedule_test() {
+        let names = "OK OK LSOFT NUM5 DOWN OK DOWN OK UP OK LEFT OK RIGHT OK NUM5 LSOFT RSOFT DOWN DOWN OK UP OK STAR HASH NUM1 OK OK";
+        let (a, _, an) = plan(&["--inject"]);
+        let (b, _, bn) = plan(&["--inject", "--keys", names]);
+        assert_eq!((keys(&a), shots(&a), an), (keys(&b), shots(&b), bn));
+    }
+
+    #[test]
+    fn keys_flag_rejects_bad_scripts_and_reads_files_test() {
+        use clap::Parser;
+        for bad in ["OKK", "OK:0", "OK:1:2:3", "", "# only a comment"] {
+            assert!(
+                super::Args::try_parse_from(["wie_validate", "--inject", "--keys", bad, "g"]).is_err(),
+                "{bad:?} should be rejected"
+            );
+        }
+        assert!(
+            super::Args::try_parse_from(["wie_validate", "--keys", "OK", "g"]).is_err(),
+            "--keys requires --inject"
+        );
+        let example = concat!(env!("CARGO_MANIFEST_DIR"), "/../docs/keys/battlemonster-village.keys");
+        let (s, _, n) = plan(&["--inject", "--keys", example]);
+        assert_eq!(n, 99);
+        assert_eq!(shots(&s)[97], "97_OK");
     }
 
     #[test]
