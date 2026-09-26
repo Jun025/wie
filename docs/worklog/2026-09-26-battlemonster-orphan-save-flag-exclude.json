@@ -4,7 +4,7 @@
   "task": "wie-2026-09-26-battlemonster-orphan-save-flag-exclude-adopt-p0",
   "title": "배틀몬스터 zip 의 고아 저장 플래그 mastercom.sav 를 적재하지 않는다",
   "summary": "LgtEmulator::from_archive 에 jar MD5 로 묶은 타이틀별 제외 목록. 처음 실행 = 새로하기, 자기 저장 이어하기 정상, 메이플스토리2007 무변경.",
-  "changes": ["wie-lgt/src/emulator.rs ORPHAN_ENTRIES + drop_orphan_entries + 단위 테스트 3", "docs/report/0280"],
+  "changes": ["wie-lgt/src/emulator.rs ORPHAN_ENTRIES + drop_orphan_entries + 단위 테스트 3", "docs/report/0283"],
   "verification": ["헤드리스 대화형: 수정 빌드 첫 실행 «게임을 새로 시작합니다» · 자기 저장 이어하기 master.sav 1,900 B 읽음 · RIGHT 42,330 px", "main 빌드 첫 실행 «저장된 데이타가 있습니다»(재현)", "MD5 오기 빌드 = 음성 대조(드롭 0)"],
   "limits": ["셸 실브라우저 미측정", "배틀몬스터는 셸 aot-java 게이트에 여전히 막혀 있다"],
   "adoptedProposals": ["2026-09-26-battlemonster-continue-orphan-save-flag#p0"],
