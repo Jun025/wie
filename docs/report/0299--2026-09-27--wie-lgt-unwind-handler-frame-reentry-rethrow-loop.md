@@ -34,3 +34,5 @@
 - 증거(저장소 밖 · 게임 바이트 0): `~/orchestrator/reports/evidence/wie-lgt-unwind-handler-frame-reentry-rethrow-loop/` — 두 트리의 unwind 계수 표.
 
 게임 이름 유입(`scripts/corpus-name-inflow.mjs --corpus <game_lab>`): 수는 아래 표식의 B·S 다 — ★S 도 0 이 아니다(조사가 붙은 타이틀 표기). 이름은 전부 제안이 이미 적은 hang 5종이다.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=9d623e402bbe8dee B=12/5 P=0/0 S=6/2 -->
