@@ -91,7 +91,7 @@ In this repository, the observable startup flow is:
 1. `wie` reads the input file and identifies the archive format.
 2. It constructs the matching platform emulator (`KtfEmulator`, `LgtEmulator`, `SktEmulator`, or `J2MEEmulator`).
 3. The selected emulator builds a `wie_backend::System`, injects the host `Platform`, and starts the platform-specific boot sequence.
-4. The main loop repeatedly calls `Emulator::tick()` and forwards host events into the emulator.
+4. The main loop repeatedly calls `Emulator::tick()` and forwards host events into the emulator. `tick()` runs for the default 14ms budget; a host that knows its frame interval calls `Emulator::tick_for(budget_ms)` instead — the browser hosts derive the budget with `wie_backend::FramePacer` so a 120Hz display is not handed a 60Hz frame's worth of emulation per frame.
 
 This means `wie` is mostly a development-oriented host adapter and format dispatcher; the real platform behavior lives in the platform crates, and the same backend abstractions are intended to be driven by the web frontend as well.
 

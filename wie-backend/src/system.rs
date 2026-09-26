@@ -62,6 +62,11 @@ impl System {
         self.executor.tick(move || platform.now())
     }
 
+    pub fn tick_for(&mut self, budget_ms: u64) -> Result<()> {
+        let platform = self.platform.clone();
+        self.executor.tick_for(move || platform.now(), budget_ms)
+    }
+
     pub fn spawn<C>(&self, callable: C)
     where
         C: AsyncCallable<Result<()>> + 'static + Send,
