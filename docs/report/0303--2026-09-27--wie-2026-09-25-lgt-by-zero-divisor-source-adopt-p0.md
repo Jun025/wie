@@ -41,3 +41,5 @@
 게임 이름 유입(`scripts/corpus-name-inflow.mjs --corpus <game_lab>`): BOUNDED 4쌍 · SUFFIX-ATTACHED 0쌍.
 - 이름은 둘이다: 제안이 든 타이틀과 양성 대조 타이틀.
 - 둘 다 이전 회차 문서에 이미 있다.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=399e1af7135e7736 B=4/4 P=0/0 S=0/0 -->
