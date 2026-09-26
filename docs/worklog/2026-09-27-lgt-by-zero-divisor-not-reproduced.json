@@ -1,0 +1,13 @@
+{
+  "date": "2026-09-27",
+  "task": "wie-2026-09-25-lgt-by-zero-divisor-source-adopt-p0",
+  "title": "배틀몬스터 `/ by zero` — 현 main 60회 재현 0 · 조건부 종결",
+  "summary": "RaiseArithmeticException 훅(양성 대조 7회 발화)을 건 현 main 에서 기본 27키 56회(load1 15-114) + 마을 경로 4회 모두 훅 0 · 미처리 / by zero 0. 나눗수 출처는 판정하지 않았다. 재현되면 증거의 훅으로 LR 을 잡는다.",
+  "verification": [
+    "positive control 붕어빵타이쿤3: TEMP-DIV0 7",
+    "default schedule x56: PASS 56/56, hook 0",
+    "village --keys + WAIT:60 x4: PASS 4/4 97/97 steps, hook 0"
+  ],
+  "adoptedProposals": ["2026-09-25-lgt-unwind-consumes-catch-frame#p0"],
+  "proposals": []
+}
