@@ -15,6 +15,11 @@ mod context;
 // drew 500 uniform frames. It touches no record the fixture SDK reads (`keydraw_lgt` PASS
 // 27/27 keys either way). Held by `wipic_framebuffer_bpp_ignores_its_argument`.
 //
+// `InitContext`/`SetContext` (2026-09-26) are not exceptions to the record choice: they
+// still hand out the shared record, and only add the three native fields a title reads
+// directly (foreground/background/alpha) in slots no shared reader draws with — see
+// `graphics::init_shared_context`. Held by `wipic_context_keeps_native_foreground_and_alpha`.
+//
 // "NOT WIRED" scopes to those 27 SVCs ONLY — the module is still entered from two other
 // places, so do not read it as unreachable: `clet_register` below calls
 // `graphics::{init_process_state, set_use_annunciator}`, and `init.rs` routes
@@ -115,8 +120,8 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::GetScreenFramebuffer => wie_wipi_c::api::graphics::get_screen_framebuffer.into_body(),
         WIPICSvcId::DestroyOffscreenFramebuffer => wie_wipi_c::api::graphics::destroy_offscreen_framebuffer.into_body(),
         WIPICSvcId::CreateOffscreenFramebuffer => wie_wipi_c::api::graphics::create_offscreen_framebuffer.into_body(),
-        WIPICSvcId::InitContext => wie_wipi_c::api::graphics::init_context.into_body(),
-        WIPICSvcId::SetContext => wie_wipi_c::api::graphics::set_context.into_body(),
+        WIPICSvcId::InitContext => graphics::init_shared_context.into_body(),
+        WIPICSvcId::SetContext => graphics::set_shared_context.into_body(),
         WIPICSvcId::GetContext => wie_wipi_c::api::graphics::get_context.into_body(),
         WIPICSvcId::PutPixel => wie_wipi_c::api::graphics::put_pixel.into_body(),
         WIPICSvcId::DrawLine => wie_wipi_c::api::graphics::draw_line.into_body(),
@@ -506,7 +511,7 @@ mod tests {
     use test_utils::TestPlatform;
     use wie_backend::{DefaultTaskRunner, System};
     use wie_core_arm::Allocator;
-    use wie_util::{ByteWrite, Result};
+    use wie_util::{ByteWrite, Result, read_generic};
 
     use super::{graphics, register_wipic_svc_handler};
     use crate::runtime::{SVC_CATEGORY_WIPIC, java::init_jvm, svc_ids::WIPICSvcId};
@@ -537,6 +542,46 @@ mod tests {
             core.write_bytes(not_a_handle, &[0; 0x20])?;
             let bpp: u32 = core.run_function(stub, &[not_a_handle]).await?;
             assert_eq!(bpp, 16);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    /// `MC_grpInitContext`/`MC_grpSetContext` leave the text colour where LGT titles read it.
+    ///
+    /// The record stays the shared 52B layout (`keydraw_lgt` embeds that struct), but the
+    /// native offsets a title reads directly — foreground +16, alpha +24 — must hold the
+    /// native values. With the shared SVCs +16 stays 0 and alpha 0, and 0236 §2-2's title
+    /// drew its 2,125 glyph pixels as `#fffbff` on white.
+    #[test]
+    fn wipic_context_keeps_native_foreground_and_alpha() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, _) = init_jvm(&system_clone).await?;
+            register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
+            let init = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::InitContext)?;
+            let set = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::SetContext)?;
+
+            let record = Allocator::alloc(&mut core, 52)?;
+            let _: u32 = core.run_function(init, &[record]).await?;
+            let _: u32 = core.run_function(set, &[record, 1, 0xf800]).await?; // fg
+            let _: u32 = core.run_function(set, &[record, 2, 0x1234]).await?; // bg
+            let word = |offset: u32| read_generic::<u32, _>(&core, record + offset);
+            assert_eq!(word(12)?, 0xf800, "shared fgpxl, read by the host");
+            assert_eq!(word(16)?, 0xf800, "native foreground, read by the title");
+            assert_eq!(word(20)?, 0x1234, "native background");
+            assert_eq!(word(24)?, 255, "native alpha");
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
