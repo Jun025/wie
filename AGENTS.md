@@ -531,7 +531,7 @@ design** — do not "fix" that by wiring it:
   > do the edit. Trigger ⑴ needs no owner at all: the round citing the number is the one re-measuring.
 
   **Both triggers are prose, and neither is checked. That gap is the cost of writing it this way.**
-  The ten landings are enforced by `check-worklog-coverage.mjs` for a *different* metric; nothing
+  The ten landings are tracked by `check-worklog-coverage.mjs` for a *different* metric; nothing
   reads these two rows, so a round can discharge that obligation, leave these cells untouched, and
   nothing reddens. The failure mode is silent and is precisely the one this paragraph exists to name.
   It is left that way on purpose: a checker keyed to reply wording would rebuild row one, and one
@@ -679,52 +679,16 @@ design** — do not "fix" that by wiring it:
   where it runs, not a CI runner (this repo's CI is entirely GitHub-hosted; see the note under
   §Definition of Done's cost table).
 
-- **`scripts/corpus-name-inflow.mjs` — local only (same reason), and ★every round in this lineage
-  that reports a "게임 파일명 유입" number RUNS IT rather than re-deriving the predicate.** Call it
-  as `node scripts/corpus-name-inflow.mjs` (defaults to the files this branch changed against
-  `origin/main`; pass paths, or `--all-tracked`, to widen) and quote its three buckets. **The number
-  to report is `BOUNDED`, and it is not reportable alone** — `SUFFIX-ATTACHED` must be quoted beside
-  it, because that bucket provably mixes a longer *different* title (`<stem>2`, `<stem>1.04`) with a
-  real mention carrying a Korean particle (`<stem>의 …`), and nothing in the shape separates them.
-
-  **Nothing checks that you ran it, and building that checker was priced and declined on 2026-09-20**
-  (`wie-corpus-name-inflow-token-boundary-p1`, `docs/report/0195`). Two measurements decided it.
-  First, **running a script leaves no trace** — this tool writes **0 files** — so "did this round call
-  it" is not observable after the fact; any check must proxy through wording or invent a new artifact.
-  Second, the obvious proxy is **wrong where it was tested**: requiring the literal string
-  `corpus-name-inflow` flags **3 of the 12** round-doc files that report a number since the tool
-  landed, and **all 3 ran it** and said so in their own words ("도구를 실행해서 적었다"). Zero true
-  positives. The disease it targets has **never been observed**: 3 of 3 rounds that reported a number
-  ran the tool. What *has* been observed, 4 times out of 4, is the **other** failure — the number was
-  measured and then invalidated by later edits — and every one was caught before landing (3 by a
-  gate② `-fix`, 1 by a self re-measure). That is a different proposal with its own ticket; do not
-  solve it here. **Reopen when a round that is NOT in this lineage reports an inflow number** — the
-  compliance above is all from the rounds that built the tool, which is the weakest possible sample —
-  **or when any round is found to have hand-derived one.** ★This trigger is prose and nothing
-  enforces it, the same unchecked-obligation shape the `WIE_BASE` rows above carry; that is the cost
-  of not building the checker, and mechanizing the trigger would rebuild the same wording proxy one
-  level up.
-
-  ★**Writing "유입 0" while that bucket is non-empty is the exact claim this lineage was rejected
-  for.** It exists because the predicate lived only in prose — `docs/report/0173` says "코퍼스 고유
-  stem 184개와 NFC 완전일치로 전수 대조", `0170` and `0174` say it in their own words, and nothing
-  executed any of them; a plain substring test is what produced 35 hits for a one-syllable stem that
-  merely sits inside `인스턴스` and `패턴`. Measured 2026-09-19 over 838 tracked text files: 392
-  occurrences split **328 / 48 / 16**. `docs/report/0187` has the split and the false-negative audit.
-
-  **The population is the WHOLE corpus, not `game_lab/broken` — widened 2026-09-20, and that number
-  above is from before the widening.** It read `broken/` only, so 266 of the 451 game stems were
-  invisible and the honest answer to "is this name in the corpus" was wrong for 59% of it. Not
-  hypothetical: `0187`'s own hand-split dismissed 엑스맨3 · 크로이센1.04 · 하이브리드2 ·
-  일지매영웅전기2 · 붕어빵타이쿤3작은화면 as "a longer *different* title, measured not to be a corpus
-  stem", and **all five are archives in `game_lab/working/`**. **The cost that argued against
-  widening was measured at zero where it would be paid**: over the 25 most recent landed rounds, in
-  the default mode, `SUFFIX-ATTACHED` — the bucket a human splits by hand — is **identical under
-  both populations in all 25**; `BOUNDED` grows by a median of 1 pair (mean 1.44), which is printed
-  lines, not work. `vendor_sdk/` is the one excluded bucket, because it is emulator/SDK jars rather
-  than games and its stem `agent` is an ordinary word here — it alone adds 21 false
-  `SUFFIX-ATTACHED` pairs, more than all of `broken/` produces. The tool prints what it excluded.
-  `docs/report/0194` has the per-round table.
+- **`scripts/corpus-name-inflow.mjs` — local only (same reason); a round that reports a "게임
+  파일명 유입" number RUNS IT rather than re-deriving the predicate.** `node
+  scripts/corpus-name-inflow.mjs` (defaults to this branch's changes against `origin/main`; pass
+  paths or `--all-tracked` to widen) reads the whole corpus except `vendor_sdk/` and prints three
+  buckets. Report `BOUNDED` **with** `SUFFIX-ATTACHED` beside it — that bucket mixes longer
+  *different* titles with real mentions carrying a particle, so "유입 0" while it is non-empty is
+  wrong. Commit first (an uncommitted round has 0 subjects), then paste the tool's trailing marker
+  line LAST and repaste after any later edit: `scripts/check-inflow-marker.mjs` re-checks its digest
+  in `contract` as an **advisory** step (`continue-on-error`, since 2026-09-26) — it proves
+  freshness, not truth, and a round without a marker passes. History: `docs/report/0195`–`0196`.
 
 - **`scripts/ktf-image-sweep.py` — local only (it needs a KTF client image, which comes out of the
   git-ignored corpus), and it is the only Python in `scripts/`.** Three sweeps behind one entry
@@ -791,8 +755,7 @@ commands from ⒜), relies on unforced discipline, and still leaves the alias 6 
 red weekly run owns it** — read the latest scheduled run alongside the PR's checks
 (`gh run list --workflow=doc-liveness.yml -L1`); if red, file a ticket
 naming the failing command — do not fix inline, merge tickets do not change code. Same shape as the
-two owner rules nearby (verify-browser red → the landing gate③; worklog-coverage overdue → the next
-gate③): the owner is the role already there. A scheduled red with no owner is how a check dies
+owner rule nearby (verify-browser red → the landing gate③): the owner is the role already there. A scheduled red with no owner is how a check dies
 (2026-09-07, `check-worklog-coverage`).
 
 **Move off this placement if**: runner-block or alias rot lands and burns a round before the weekly
@@ -981,25 +944,6 @@ than let it be ignored — a periodically-red check that people scroll past is w
   entry it meant lives only in `docs/report/0047--…`, which the same comment already cited, so the
   round that migrated §완료 repointed it there. The rule is unchanged and now unavoidable: **cite the
   per-round file, not `STATE.md:<line>`.**
-- **If you write a 유입 number into a round doc, paste the tool's marker line LAST — and if you
-  edit afterwards, re-run and repaste.** `scripts/corpus-name-inflow.mjs` ends its default-mode
-  output with one HTML comment carrying the three counts and a digest of the content they were
-  measured over; `scripts/check-inflow-marker.mjs` re-computes that digest in the always-run
-  `contract` job and **reddens the PR when the content has moved since**. It needs no corpus, so
-  it is a real gate rather than a "could not measure" one.
-
-  **The marker is optional and a round without one passes** — that is deliberate, not a hole.
-  Requiring it would re-open "did this round run the tool at all", which was measured and declined
-  on 2026-09-20 (`docs/report/0195`: the only available predicate was a wording proxy, and it
-  flagged 3 compliant rounds and 0 offenders). **What it does buy is measured too**: the failure
-  this lineage actually had is staleness — *measured, then wrote more prose, never re-measured* —
-  **4 times out of 4, and 3 of those cost a gate② reject and a `-fix` round**
-  (`docs/report/0196` has the per-incident table, including the one it would **not** have caught).
-  ★It proves **freshness, not truth**: a number hand-typed into a marker over unchanged content
-  passes, because re-deriving the counts needs the git-ignored corpus. And **measuring before you
-  commit is not measuring** — the subject set is `origin/main...HEAD`, so an uncommitted round has
-  0 subjects; the tool now shouts that and refuses to emit a marker rather than minting a 0.
-
 - **The ledger files of this repo are `STATE.md`, `REPORT.md`, `docs/report/**`, `docs/worklog/**`,
   and `docs/worklog-coverage-remeasures.json`.**
   Resolve a merge conflict in any of them by **union** — keep both sides' entries, ordered by the
@@ -1048,52 +992,18 @@ than let it be ignored — a periodically-red check that people scroll past is w
   > re-open the mandate decision.** A landed round is one **first-parent** commit on `main`.
 
   ```sh
-  node scripts/check-worklog-coverage.mjs            # prints the numbers; fails if the promise is overdue
+  node scripts/check-worklog-coverage.mjs            # prints the numbers; warns if the promise is overdue
   node scripts/check-worklog-coverage.mjs --record   # discharges it — idempotent, never off-schedule
   ```
 
-  **The commands live in that script, not here** — a second copy would drift from the one CI runs.
-  It also mechanizes the *promise*, not the ratio: `engine-contract.yml` fails when 10+ rounds have
-  landed with no recorded re-measure, or when a recorded measurement is under the line and nobody
-  answered it. It deliberately does **not** fail on the ratio itself, because that obligation is
-  conditional — gating PRs on it would rebuild the per-round mandate 2026-09-01 declined. The
-  record of each re-measure is `docs/worklog-coverage-remeasures.json`; appending the entry the
-  script prints *is* the re-measurement — but **append it with `--record`, not by hand.** The
-  obligation is keyed to `origin/main`, so once the cadence is crossed *every* round that pulls base
-  gets the same failure and every one of them discharges it honestly: measured 2026-09-06, three
-  rounds wrote the same entry (six fields identical, only `decision` differed) and a human stopped
-  two of them by hand. `--record` scans the whole record for that `landedRounds` and writes nothing
-  if it is already there, so running it twice — or on a base that already carries it — is a no-op.
-
-  **The overdue re-measure belongs to the gate③ round, and "every round handles it honestly" is not
-  an owner.** Idempotent `--record` landed on 2026-09-07 (`be37ca7d`) and closed the *duplicate* side
-  of this; the same day the other side arrived — landing #53 crossed the cadence, nobody recorded it,
-  and `main` went red. Both workflows checkout at `fetch-depth: 0`, so `origin/main` is present in
-  `pull_request` runs too: while overdue, **every open PR is red as well**, not just main's badge. So
-  the rule is:
-
-  > **A gate③ round that sees `check-worklog-coverage` overdue runs `--record` and bundles that one
-  > file into the PR before merging.** Nothing else in the round changes.
-
-  Gate③ is the owner because it is the only role that is *already there* at the moment the obligation
-  fires — the crossing round is a landing, and the next thing to touch the repo is another gate③,
-  which is also the role the red blocks. It costs one conditional step, once per ten landings, and
-  needs no new machinery: the tool exists and is idempotent, so two gate③ rounds racing produce one
-  row. **The cost of the alternatives is what rules them out.** A scheduled workflow opening a
-  recording PR (⒝) adds an automated PR that itself needs CI and its own gate③ round — more
-  machinery for a slower answer. Writing at landing time (⒞) is the only option that closes the
-  window completely, and it requires pushing to `main`, which this repo forbids; routed through a PR
-  instead it collapses into ⒝.
-
-  **The hole in this choice, in numbers, because it is real.** Gate③ can only act when a gate③ runs,
-  so the red persists from the crossing landing until the next one. Measured 2026-09-07 over the 53
-  landings since `92c25276`: the cadence of ten took **9h 18m** (#43 04:17 → #53 13:36 KST), the gap
-  between consecutive landings is **70.5m median** (34.1m over the last 15) — but the **maximum gap is
-  115.2h**. So on a quiet stretch `main` can stay red for days. That is accepted rather than fixed,
-  on one observation: the check only goes overdue *by landing*, and the only thing it blocks is
-  landing, so during a quiet stretch nothing is waiting on it — and the first round back is the owner.
-  If that stops being true (a quiet stretch that blocks something real), the answer is ⒝, not a
-  wider tolerance in the checker.
+  **The commands live in that script, not here** — a second copy would drift. It tracks the
+  *promise*, not the ratio, and since 2026-09-26 **overdue is a warning, not a red**: the step left
+  the required `contract` job (`wie-meta-gates-trim-after-0921-audit`) after it reddened `main` 8
+  times from 09-20 for a deadline no PR had caused. It now runs only in the weekly, non-required
+  `doc-liveness.yml`, where overdue prints a `::warning` and an unanswered sub-70% measurement is
+  still rc=1. The record is `docs/worklog-coverage-remeasures.json`; **append with `--record`, never
+  by hand** — it is idempotent (three hand-appended duplicate rows on 2026-09-06 are why), refuses
+  off-schedule rows, and any round may bundle it since the file is a ledger file.
 
   **`--first-parent` is load-bearing in every one of the script's three counts, and the definition says "first-parent", not
   "squash".** This repo is registered as an upstream-sync fork and must *not* squash-merge, so
