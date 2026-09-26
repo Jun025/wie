@@ -44,6 +44,6 @@
 
 증거(저장소 밖 · 게임 바이트 0): `~/orchestrator/reports/evidence/wie-2026-09-26-battlemonster-orphan-save-flag-exclude-adopt-p0/`.
 
-게임 이름 유입(`scripts/corpus-name-inflow.mjs --corpus <로컬 코퍼스>`): BOUNDED 쌍 — 전부 `배틀몬스터`(이 회차 대상 · 0272 가 이미 적음) ·
+게임 이름 유입(`scripts/corpus-name-inflow.mjs --corpus <로컬 코퍼스>`): BOUNDED 10회/7쌍 — 전부 `배틀몬스터`(이 회차 대상 · 0272 가 이미 적음) ·
 `메이플스토리2007`(대조 타이틀 · 0272·0208 이 이미 적음) · `영웅서기4`(`emulator.rs` 의 기존 테스트 줄 — 이 회차가 쓰지 않았다) ·
-SUFFIX-ATTACHED 2회/2쌍 — 둘 다 `배틀몬스터는`(조사 «는» · 진짜 언급).
+SUFFIX-ATTACHED 3회/2쌍 — 셋 다 `배틀몬스터는`(조사 «는» · 진짜 언급).
