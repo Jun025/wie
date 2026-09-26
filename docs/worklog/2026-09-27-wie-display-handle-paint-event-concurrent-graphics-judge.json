@@ -1,0 +1,35 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-27",
+  "task": "wie-display-handle-paint-event-concurrent-graphics-judge",
+  "title": "handlePaintEvent 동시 진입 — 놈3 no-frame 원인 아님 · 같은 스레드 재진입이 아포칼립스를 호스트 abort 로 죽인다",
+  "summary": "코드 변경 0. 스크래치 프로브로 294타이틀 스윕 + 놈3 --inject 6판. 교차 진입은 놈3 6/6 판 전부 · KTF 20/190 타이틀에서 난다(흔한 경로) ⇒ no-frame 원인 아님(원인은 0296 의 모니터 교착). 교차 진입은 뒤 paint 의 reset() 이 앞 paint 의 색을 지운다(놈3 235/242) — 화면 영향은 안 쟀다. 같은 task 재진입은 guest paint 안 serviceRepaints 로 무한 재귀 ⇒ 아포칼립스 origin/main 3/3 rc=134 stack overflow.",
+  "changes": [
+    "docs/report/0302 — 판정 · 측정 표 · 재귀 경로"
+  ],
+  "verification": [
+    "프로브 바이너리(origin/main a741291f + probe.diff) 스윕 294 · 겹친 20 재실행(task id) · 놈3 6판",
+    "프로브 없는 origin/main 바이너리로 아포칼립스 3/3 rc=134 stack overflow 재현"
+  ],
+  "limits": [
+    "교차 진입의 색 되돌리기가 화면에 보이는지는 픽셀 대조를 안 해 모른다",
+    "font·xorMode 되돌리기는 읽지 않았다",
+    "놈3 FAIL 은 이 회차에서 다시 잡지 않았다(원인 판정은 0296)"
+  ],
+  "merge_strategy": "merge",
+  "adoptedProposals": [
+    "2026-09-25-nom3-no-frame-low-load-split#p1"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "Display::serviceRepaints 가 자기 paint 안에서 불리면 다시 그리지 않고 돌아온다 — 아포칼립스 호스트 abort 제거",
+      "plainSummary": "아포칼립스는 화면을 그리는 도중에 «지금 다시 그려라»를 부르고, 에뮬레이터가 그걸 곧이곧대로 받아 그리기 안에서 또 그리기를 끝없이 반복하다 프로그램 전체가 죽는다. 그리는 중에는 그 요청을 다음 차례로 미루게 하자는 것이다.",
+      "userBenefit": "아포칼립스가 시작하자마자 에뮬레이터째 죽지 않고 게임이 돈다. 같은 방식으로 그리는 다른 타이틀도 함께 보호된다.",
+      "why": "이 회차 실측: origin/main 3/3 rc=134 stack overflow · JSON 없음. 경로 guest Card.paint → Card::serviceRepaints → Canvas::serviceRepaints → Display::serviceRepaints → handlePaintEvent → CardCanvas::paint → guest Card.paint. service_repaints 는 repaintPending 만 보고 재진입을 막지 않는다(display.rs service_repaints).",
+      "tradeoff": "같은 task 재진입만 막으면 교차 진입(흔한 경로)은 그대로라 동작 변화가 작다. 막는 조건을 «어느 task 든 paint 중»으로 넓히면 교차 진입까지 바뀌어 코퍼스 짝 회귀가 필요하다. repaintPending 은 남으므로 다음 사이클에 그려진다.",
+      "effort": "S",
+      "target": "wie-midp/src/classes/javax/microedition/lcdui/display.rs"
+    }
+  ]
+}
