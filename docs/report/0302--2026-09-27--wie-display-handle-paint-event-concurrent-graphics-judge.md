@@ -14,7 +14,7 @@
 |---|---|---|
 | 놈3 «한 프레임도 안 그리는» 판의 원인인가 | ★**아니다** | 교차 진입이 놈3 `--inject` **6/6 판 전부**에서 판당 29–46회 난다 ⇒ 흔한 경로이고 FAIL 과 PASS 를 가르지 못한다. 원인은 0296 이 이미 쟀다: 게스트 모니터 교착(스레드 3 A→B · 스레드 4 B→A, FAIL 3/3 같은 모양) |
 | 교차 진입이 해를 끼치나 | **상태는 바뀐다 · 화면 영향은 안 쟀다** | 뒤에 들어온 paint 의 `Graphics.reset()` 이 **guest paint 안에 있는 다른 paint** 의 색을 0 으로 되돌린다(⑵) |
-| 같은 스레드 재진입 | ★**크래시다** | guest `paint` 안의 `serviceRepaints` 가 `handlePaintEvent` 로 다시 들어가 끝없이 재귀한다 ⇒ 호스트 스택 넘침 abort(⑶) |
+| 같은 스레드 재진입 | ★**크래시다** | guest `paint` 안의 `serviceRepaints` 를 `Canvas::serviceRepaints` 가 `Display::handlePaintEvent` 로 **무조건** 넘겨 끝없이 재귀한다 ⇒ 호스트 스택 넘침 abort(⑶) |
 
 ### ⑴ 프로브와 측정 (커밋 안 함)
 
@@ -32,6 +32,7 @@
 - 겹친 20타이틀을 task id 프로브로 다시 돌렸다(겹침은 판마다 달라 15타이틀에서 재현): **교차 13** · 같은 task 1회 중첩 1(유계) ·
   ★**같은 task 무한 중첩 1**(⑶).
 - 놈3(`game_lab/broken/lgt` · sha256 `b475b639…` · `--inject`) 6판: 교차 29/38/39/45/45/46 · 중첩 0.
+  ★6판 전부 `UNMEASURED · max-ticks` 다 — PASS/FAIL 짝 비교가 아니다. «흔한 경로라 가르지 못한다»의 근거는 부모 wie#300 의 PASS 판 관측과 0296 의 교착 원인이다.
 
 ### ⑵ 교차 진입이 바꾸는 것
 
@@ -47,10 +48,18 @@
 - 프로브 판: `depth_before` 가 0 → 424 까지 한 task 에서 오른 뒤 `thread 'main' has overflowed its stack` · JSON 줄 없음.
 - ★**프로브 없는 origin/main 바이너리 3/3 같은 결과**: `rc=134` · `fatal runtime error: stack overflow, aborting` · JSON 0바이트.
 - 경로(`RUST_LOG=wie_midp=debug,wie_wipi_java=debug`, 마지막 반복):
-  guest `Card.paint` → `org.kwis…Card::serviceRepaints` → `Canvas::serviceRepaints` → `Display::serviceRepaints`
-  → `Display::handlePaintEvent` → `Canvas::handlePaintEvent` → `net.wie.CardCanvas::paint` → guest `Card.paint` → …
-- `service_repaints` 는 `repaintPending` 이 참이면 무조건 `handlePaintEvent` 를 부른다. `handlePaintEvent` 는 진입 때 그 값을 거짓으로
-  만들지만, guest 가 paint 안에서 `repaint()` 를 다시 부르면 참이 되어 다음 `serviceRepaints` 가 또 들어간다. 재진입을 막는 것이 없다.
+  `Display::handlePaintEvent` → `Canvas::handlePaintEvent` → `net.wie.CardCanvas::paint` → guest `Card.paint`
+  → `org.kwis…Card::serviceRepaints` → `Canvas::serviceRepaints` → `Display::handlePaintEvent` → …
+- 계수(프로브 없는 origin/main `bb13b293` release · 같은 명령 · rc=134): `Display::handlePaintEvent` **425** · `Canvas::handlePaintEvent` 425 ·
+  `Canvas::serviceRepaints` **424** · `Card::serviceRepaints` 424 · ★`Display::serviceRepaints` **0** · repaint 계열 **3**.
+- 메커니즘: `Canvas::serviceRepaints`(`wie-midp/.../lcdui/canvas.rs` `service_repaints`)가 `getDisplay()` 뒤
+  **`repaintPending`·진행 중 paint 여부를 보지 않고** `Display::handlePaintEvent` 를 직접 부른다. `repaintPending` 을 보는
+  `Display::serviceRepaints` 는 이 경로에서 한 번도 불리지 않는다 — 424회 재귀 동안 repaint 는 3회뿐이다.
+  ※이 절의 초판은 경로에 `Display::serviceRepaints` 를 넣고 원인을 `repaintPending` 재설정으로 적었다 — 게이트② 실측으로 틀렸다.
+- 스크래치 확인(커밋 안 함 · 제안 `#p0` 의 효과 근거): `canvas.rs` `service_repaints` 의 호출 대상을 `handlePaintEvent` → `Display::serviceRepaints`
+  로 한 줄 바꾼 release 바이너리에서 아포칼립스 `--timeout 10` **3/3 rc=0 · `PASS` · `content true`**(paints 505/549/570 · stop=deadline).
+  같은 바이너리로 러너 줄: `draw_j2me`·`helloworld_ktf`·`helloworld_lgt`·`text_j2me` PASS · `keydraw_*` `--inject` 는 `UNMEASURED · max-ticks`
+  — 가드 없는 main release 도 같은 결과(load1 ≈ 50)라 가드와 무관하다.
 
 ### 하지 않은 것
 
