@@ -52,3 +52,5 @@
   `runs.tsv`(25회) · `o25.json` · `p25.folded.gz`(FAIL) · `p3.folded.gz`(PASS 대조) · `loop.sh`.
 
 게임 이름 유입(`scripts/corpus-name-inflow.mjs --corpus <game_lab>`): BOUNDED 11회/5쌍 — `놈3` 9회(이 회차의 대상 · 리니지 0229·0265 가 이미 적은 라이브 타이틀) · `놈ZERO` 2회(`wie_validate.rs` 의 기존 주석 1 — 이 회차가 쓴 줄 아님 · 이 문장 1) · SUFFIX-ATTACHED 0.
+
+<!-- corpus-name-inflow v1 subjects=4 tree=bca470ef94480180 B=11/5 P=0/0 S=0/0 -->
