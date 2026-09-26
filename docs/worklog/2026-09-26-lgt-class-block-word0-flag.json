@@ -7,7 +7,7 @@
   "changes": [
     "wie-lgt/data/lgt_java_abi.toml — java/lang/Class field 2행 + 근거 주석",
     "wie-lgt/src/runtime/java/jvm_support.rs — test_native_jvm_runtime 에 word 0 == 0 · 두 필드 인덱스 단언",
-    "docs/report/0284"
+    "docs/report/0285"
   ],
   "verification": [
     "before(origin/main ed36be98): FAIL paints 0 · WieError Invalid memory access 0x706f6e50 (WorldMap <clinit> 0x1462d4)",
