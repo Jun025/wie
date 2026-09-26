@@ -37,3 +37,7 @@
   - 그 실행에 증거의 스크래치 훅을 얹으면 호출부 LR 이 바로 나온다.
 - 증적(게임 바이트 0): `~/orchestrator/reports/evidence/wie-2026-09-25-lgt-by-zero-divisor-source-adopt-p0/`
   - 두 묶음 요약 · 양성 대조 덤프 · 훅 패치 · 실행 스크립트
+
+게임 이름 유입(`scripts/corpus-name-inflow.mjs --corpus <game_lab>`): BOUNDED 4쌍 · SUFFIX-ATTACHED 0쌍.
+- 이름은 둘이다: 제안이 든 타이틀과 양성 대조 타이틀.
+- 둘 다 이전 회차 문서에 이미 있다.
