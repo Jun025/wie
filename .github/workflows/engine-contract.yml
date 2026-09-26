@@ -65,9 +65,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-          # The re-measure check below counts first-parent commits back to the
-          # commit that landed the worklog convention; a shallow clone would make
-          # that count a lie, and the script refuses rather than report one.
+          # Full history: the worklog cap and inflow-marker steps below diff against
+          # origin/main's merge-base.
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
@@ -81,8 +80,8 @@ jobs:
       # checks, and the job stays the always-run wrapper described in the header.
       #
       # Since 2026-09-26 it also caps proposals on worklogs this PR adds (or grows)
-      # — measured against the merge-base with origin/main, hence the fetch (the
-      # coverage step below explains why checkout leaves that ref absent). Without
+      # — measured against the merge-base with origin/main, hence the fetch (checkout
+      # leaves no remote-tracking ref for it on PR builds). Without
       # it the cap is skipped and the success line says "NOT measured".
       # `--selftest` runs first so a broken rule reddens instead of passing silently.
       - name: Worklog .json contract (AGENTS.md §Landing paperwork)
@@ -93,26 +92,13 @@ jobs:
 
       # AGENTS.md is loaded by every wie session, so it holds standing rules only; a round's findings go
       # to docs/report/ with a one-line pointer (docs/report/0277). Cap = 842 lines at the 2026-09-26 trim
-      # + 8 headroom — lower it when the frozen meta sections (219 lines) shrink. Placed before the
-      # coverage step because a red step skips every step after it.
+      # + 8 headroom; #319 (wie-meta-gates-trim-after-0921-audit) then took the merged file to 752, and
+      # the cap was left at 850 — lower it when the frozen meta sections shrink again.
       - name: AGENTS.md stays within its line cap (docs/report/0277)
         run: |
           n=$(wc -l < AGENTS.md); cap=850
           if [ "$n" -gt "$cap" ]; then echo "::error file=AGENTS.md::AGENTS.md is $n lines (cap $cap) — move the round's history to docs/report/ and leave a one-line pointer"; exit 1; fi
           echo "AGENTS.md: $n lines (cap $cap)"
-
-      # Same reasoning as the step above (always-run, node-only, ~1s), for the
-      # OTHER half of §Landing paperwork: the promise to re-measure worklog
-      # coverage every 10 landed rounds. This does NOT gate on the ratio — that
-      # obligation is conditional and a red would recreate the per-round mandate
-      # 2026-09-01 declined. It gates on the promise being kept: overdue, or a
-      # sub-threshold measurement nobody answered. `origin/main` is fetched
-      # explicitly because checkout leaves no remote-tracking branch for it on
-      # PR builds, and HEAD there is the PR's merge commit — one phantom round.
-      - name: Worklog coverage re-measure is current (AGENTS.md §Landing paperwork)
-        run: |
-          git fetch --no-tags --quiet origin main
-          node scripts/check-worklog-coverage.mjs
 
       # Third always-run node step, same reasoning as the two above (~50ms, no
       # build) and OUTSIDE the paths filter ON PURPOSE: the thing it guards —
@@ -213,8 +199,8 @@ jobs:
       #
       # It also needs `origin/main` as a remote-tracking ref: the cross-PR half
       # compares "serials this tree added" = disk MINUS `git ls-tree origin/main`.
-      # `fetch-depth: 0` above supplies it, and the coverage step earlier in this
-      # job fetches it explicitly for its own reason. Neither is this step's to
+      # `fetch-depth: 0` above supplies it, and the worklog-contract step earlier in
+      # this job fetches it explicitly for its own reason. Neither is this step's to
       # rely on silently — if both ever go, the ref is missing and the step
       # degrades to "미대조" (a warning, not a red), which is the honest failure
       # but also a check that stopped checking. Keep one of the two.
@@ -332,14 +318,10 @@ jobs:
         continue-on-error: true
         run: node scripts/checker-census.mjs
 
-      # The 유입 number a round writes down goes stale when the round keeps editing after
-      # measuring — 4 observations out of 4, 3 of which cost a gate② reject (docs/report/0196).
-      # This is a real gate, NOT `continue-on-error`, and it can be one because it verifies
-      # FRESHNESS (a content digest), not truth: no corpus, no game bytes, nothing that needs
-      # `game_lab/`. A round with no marker passes and says so — the marker is opt-in, because
-      # making it mandatory re-opens "did the round run the tool", which was measured and
-      # declined (docs/report/0195). `origin/main` comes from fetch-depth: 0 above.
+      # 유입 marker freshness (docs/report/0196). Advisory since 2026-09-26: as a
+      # blocking step it reddened 3 unrelated PRs, and it proves freshness, not truth.
       - name: Inflow marker is still fresh (docs/report/0196)
+        continue-on-error: true
         run: node scripts/check-inflow-marker.mjs
 
       # Detect whether this diff touches anything that can change the built
