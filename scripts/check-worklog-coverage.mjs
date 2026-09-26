@@ -14,11 +14,17 @@
 // exist on main. The claim is true again only because of the union read below; it
 // is stated as a consequence there, not as a property of the idea.
 //
-// So this script fails on two things only:
+// So this script flags two things only:
 //   OVERDUE            — 10+ landed rounds since the last recorded measurement
+//                        (★a WARNING since 2026-09-26, rc stays 0 — see below)
 //   BELOW-UNANSWERED   — the last recorded measurement is under the threshold
-//                        and nobody has recorded that the decision was reopened
+//                        and nobody has recorded that the decision was reopened (rc=1)
 // and otherwise prints today's numbers so recording one is a copy-paste.
+//
+// ★OVERDUE warns instead of failing (2026-09-26, wie-meta-gates-trim-after-0921-audit):
+// as a step of the required `contract` job it reddened main 8 times after 09-20 for a
+// bookkeeping deadline no PR had caused. It now runs only in doc-liveness.yml (weekly,
+// not required), and there it prints a `::warning` annotation rather than a red.
 //
 // The record lives in docs/worklog-coverage-remeasures.json. Clearing OVERDUE
 // means appending the entry this script prints — that IS the re-measurement.
@@ -227,21 +233,21 @@ if (RECORD) {
 }
 
 const problems = [];
+const warnings = [];
 if (due && !(RECORD && record.measurements.some((m) => m.landedRounds === landed))) {
   // The OWNER instruction is conditional on this reading being cross-checked against
   // origin/main. Uncross-checked, "run --record and bundle it" is the wrong thing to
   // do — it records a deadline that has not arrived, which is the same pollution the
   // "do NOT hand-append" sentence exists to prevent.
   const lead = `OVERDUE: ${landed - last.landedRounds} landed rounds since the last recorded measurement (cadence is ${WINDOW}). `;
-  problems.push(
+  warnings.push(
     crossChecked
       ? lead +
           `Run \`node scripts/check-worklog-coverage.mjs --record\` — it appends the entry printed above, idempotently. ` +
-          `Do NOT hand-append: every round that pulls base gets this same rc=1, and hand-appending produced three identical rows on 2026-09-06. ` +
-          `OWNER: the gate3 round — bundle that one file into the PR before merging (AGENTS.md §Landing paperwork). ` +
-          `It is a ledger file, so touching it here is authorized; nothing else in the round changes.`
+          `Do NOT hand-append: hand-appending produced three identical rows on 2026-09-06. ` +
+          `It is a ledger file, so any round may bundle it (AGENTS.md §Landing paperwork).`
       : lead +
-          `But the landed count came from \`${head}\` and ${recordPath} was not cross-checked against origin/main, so this rc=1 may be ` +
+          `But the landed count came from \`${head}\` and ${recordPath} was not cross-checked against origin/main, so this warning may be ` +
           `an artifact of an old base rather than a real overdue. Re-measure on a REAL merge of current \`main\` into this branch — ` +
           `NOT on \`refs/pull/N/merge\`, whose cached base goes stale (measured 2026-09-21: PR #233's merge ref carried base \`4acb1631\`, ` +
           `14 landings behind). Do NOT run \`--record\` on this reading; no owner is named because there may be nothing to own.`,
@@ -254,8 +260,9 @@ if (last.pct < THRESHOLD && last.reopened !== true) {
   );
 }
 
+for (const w of warnings) console.log(`::warning title=worklog coverage re-measure overdue (not blocking)::${w}`);
 if (problems.length > 0) {
   for (const p of problems) console.log(`  ✗ ${p}`);
   process.exit(1);
 }
-console.log("OK — the re-measure promise is current.");
+console.log(warnings.length ? "OK (with warning) — see the OVERDUE line above." : "OK — the re-measure promise is current.");

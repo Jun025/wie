@@ -1,0 +1,32 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-26",
+  "task": "wie-2026-09-25-lgt-hybrid-blank-bpp-accessor-adopt-p0",
+  "merge_strategy": "merge",
+  "title": "LGT 글자색은 네이티브 +16 에서 읽힌다 — 공용 컨텍스트 레코드 위에 네이티브 세 칸(전경·배경·알파)을 겹쳐 연다",
+  "summary": "0236 §2-2 의 타이틀은 BPP 수정 뒤에도 글자가 #fffbff 였다. 센티넬 실험으로 게스트가 글자색을 +16(공용 bgpxl = 네이티브 foreground)에서, 알파를 +24 에서 읽는 것을 특정했다. 공용 호스트 판독자는 그 칸들로 그리지 않으므로, 레코드는 공용 52B 로 두고 InitContext/SetContext 만 LGT 겹침으로 옮겼다. 글자가 #ff0000 2,125 px 로 보이고, keydraw_lgt·helloworld_lgt 는 그대로 PASS 다.",
+  "changes": [
+    "wie-lgt/src/runtime/wipi_c/graphics.rs — init_shared_context · set_shared_context",
+    "wie-lgt/src/runtime/wipi_c.rs — InitContext/SetContext 배선 · 머리 주석 · 시험 wipic_context_keeps_native_foreground_and_alpha",
+    "wie-wipi-c/src/api/graphics.rs — WIPICGraphicsContextIdx 재수출",
+    "docs/upstream-realign-p3-slices.md §D — 공용 배선 27 → 25",
+    "docs/report/0293"
+  ],
+  "verification": [
+    "전제: origin/main 978c7b3d 글자 #fffbff 2,125",
+    "센티넬(bgpxl=파랑 · alpha 255): 글자 #0000ff 2,125",
+    "이 브랜치: 글자 #ff0000 2,125 · distinct 2",
+    "keydraw_lgt --inject --expect-last-frame(release): 양쪽 PASS 27/27 · paints 55 · rc=0 · helloworld_lgt 양쪽 PASS",
+    "working/lgt 54 짝지은 게이트(15s · load1 28~99): main 54 · 이 브랜치 54 PASS · 회귀 0",
+    "변이: 배선을 공용으로 되돌리면 시험 FAILED(0x1234 ≠ 0xf800)",
+    "cargo test --all 458 passed · 0 failed"
+  ],
+  "limits": [
+    "네이티브 pixel_param·font·xor_enabled·offset 은 여전히 공용 필드와 겹친다 · GetContext(bg) 는 전경을 돌려준다",
+    "게스트 글리프 루틴의 디스어셈블리는 뜨지 않았다 — 칸 특정은 센티넬 실험이다"
+  ],
+  "adoptedProposals": [
+    "2026-09-25-lgt-hybrid-blank-bpp-accessor#p0"
+  ],
+  "proposals": []
+}

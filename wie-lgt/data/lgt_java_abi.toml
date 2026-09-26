@@ -185,17 +185,54 @@ vtable = [
 # the 2673-byte record the writer stored. The limit: writeBoolean only ever writes 0 or 1, so this
 # cannot tell readBoolean from readUnsignedByte by value — only the slot order separates them.
 #
+# readChar()C = 27 and readUTF()Ljava/lang/String; = 32 are the rule again, each asked for by a
+# title (measured 2026-09-25, one `Unimplemented: java/io/DataInputStream vtable index N` each):
+# 스파이더맨3 at 27 during its first resource load, 슈퍼액션히어로 at 32 as the first thing its game
+# thread does. Past readInt the CLDC 1.1 run continues readLong 29, readFloat 30, readDouble 31,
+# readUTF 32 — the 1.1 order the Thread count above already fixes (1.0 has no readFloat or
+# readDouble, which would put readUTF at 30). Physical offsets are 4 × (index + 1).
+#
+#   27 — 스파이더맨3's reader dispatches `ldr r3, [r3, #0x70]` with r0 = the stream and nothing else,
+#        three times, beside `#0x60` (readByte 23), `#0x68` (readShort 25, its result sizes a
+#        byte[]) and `#0x50` (readFully([B) 19, into that byte[]) on the same stream. One result
+#        is then walked bit by bit for exactly 16 iterations (`i <= 15`), i.e. a 16-bit value.
+#        What this cannot separate: readUnsignedShort()I at 26 reads the same two bytes and
+#        returns the same unsigned value, so only the slot order decides between the two — and
+#        both would hand the guest the same number.
+#   32 — 슈퍼액션히어로 dispatches `adds r3, #0x84; ldr r3, [r3]` with r0 = the stream and no other
+#        argument, null-checks the result, and calls String's getBytes()[B (index 14, `#0x3c`)
+#        on it, copying the bytes into a byte[length + 1]. It returns an object that answers
+#        getBytes — a String — and readUTF() is the only no-argument DataInputStream method that
+#        returns one.
+#
+# readFully([B)V = 19 is the rule's first own slot, one before the readFully([BII)V row at 20,
+# and 스파이더맨3 asked for it next (measured 2026-09-26: `Unimplemented: java/io/DataInputStream
+# vtable index 19` 3/3, right after the 27 row above let its reader go on).
+#
+#   19 — the same reader dispatches `ldr r3, [r3, #0x50]` (LR 0x1b8b) with r0 = the stream and
+#        r1 = the byte[] it just allocated with length readShort() − 4, and nothing else set up
+#        for it (r2 holds a stale 8 from the allocation). Read off the guest heap at the trap,
+#        that argument is class `[B` with length 30, 3/3 — a single byte[], which rules out
+#        20 and 21, and the result is discarded. readFully([B)V is the only DataInputStream
+#        method of that shape.
+#        What this does not have: a second call site. A sweep of the 91 LGT titles in the local
+#        corpus finds no other `#0x50` dispatch on a DataInputStream, and a 20-second run of each
+#        reaches index 19 only in 스파이더맨3 — so the row rests on one site plus the slot rule.
+#
 # Getting one wrong is not free — unlike the argument-free Runtime/Thread reads below, these
 # return different widths off the same stream, so a misplaced row would hand the guest a
 # plausible wrong number instead of a named failure. That is the cost the anchor above buys down.
 [[class]]
 name = "java/io/DataInputStream"
 vtable = [
+    { name = "readFully", descriptor = "([B)V", index = 19 },
     { name = "readFully", descriptor = "([BII)V", index = 20 },
     { name = "readBoolean", descriptor = "()Z", index = 22 },
     { name = "readByte", descriptor = "()B", index = 23 },
     { name = "readShort", descriptor = "()S", index = 25 },
+    { name = "readChar", descriptor = "()C", index = 27 },
     { name = "readInt", descriptor = "()I", index = 28 },
+    { name = "readUTF", descriptor = "()Ljava/lang/String;", index = 32 },
 ]
 
 # 턴 and 서든어택포켓 dispatch index 19 and 훼밀리마트타이쿤 dispatches 15 16 17 19 20. This block
@@ -289,6 +326,15 @@ vtable = [
     { name = "length", descriptor = "()I", index = 10 },
     { name = "charAt", descriptor = "(I)C", index = 11 },
     { name = "getBytes", descriptor = "()[B", index = 14 },
+    # 월드장기체스's wall (measured 2026-09-25, call site disassembled). CCC.<init> checks one
+    # String against constant-pool Strings in a chain: `if (s.<16>(c) == 0) flag = 1`, four
+    # constants in turn, every one branching to the same flag store, then a second chain of the
+    # same shape against other constants. r1 reads back off the guest heap as java/lang/String,
+    # the receiver is null-checked first, and the result is only ever compared with 0. The rule
+    # puts compareTo(String)I here, and the chain rules out its String-argument neighbours:
+    # equalsIgnoreCase (15) returns 0 on a MISMATCH, so "any zero sets the flag" would set it
+    # for every string; startsWith/endsWith/indexOf sit at 19/20/25.
+    { name = "compareTo", descriptor = "(Ljava/lang/String;)I", index = 16 },
     # 훼밀리마트타이쿤's wall. Derived, not observed: the run of 15..28 the rule fixes is
     # equalsIgnoreCase compareTo regionMatches startsWith(S,I) startsWith(S) endsWith indexOf(I)
     # indexOf(I,I) lastIndexOf(I) lastIndexOf(I,I) indexOf(S) indexOf(S,I) substring(I), which is
@@ -313,6 +359,12 @@ vtable = [
     # the loop head reloads as the RECEIVER of the next String dispatch (21). So 27 returns an
     # object, and substring(I) is the only one-int, object-returning method in the 15..28 run
     # (indexOf(I) and lastIndexOf(I) return int). Its position is the rule's, too.
+    # 놈3, inside a paint; the rule puts indexOf(S,I) here. Call site measured 2026-09-26 (.text
+    # 0x1f8ce, a split(s, delim) loop): r0 = s, r1 = delim, r2 = from; the result is tested
+    # `cmp r0, #0 ; blt`, passed as the end index of 28 (`substring(from, i)`), and then
+    # `from = i + delim.length()`, where length() is dispatched on r1 through String's slot 10 —
+    # so r1 is a String and r2 an int, which leaves indexOf(S,I) alone among the rule's neighbours.
+    { name = "indexOf", descriptor = "(Ljava/lang/String;I)I", index = 26 },
     { name = "substring", descriptor = "(I)Ljava/lang/String;", index = 27 },
     { name = "substring", descriptor = "(II)Ljava/lang/String;", index = 28 },
     { name = "trim", descriptor = "()Ljava/lang/String;", index = 33 },

@@ -1,0 +1,36 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-25",
+  "task": "wie-2026-09-24-lgt-broken-graphics-wiring-benefit-adopt-p1",
+  "title": "⒝ 흰 화면 — 빠진 SVC 는 없다 · 컨텍스트 레코드 수리는 타이틀을 못 열고 keydraw_lgt 를 깬다",
+  "summary": "broken/lgt 한 타이틀의 ⒜ PASS ↔ ⒝ 흰 화면을 SVC 계수로 쟀다: ⒝ 는 ⒜ 의 상위집합(FillRect 1개 더)이고 글자는 두 배선 모두 게스트가 프레임버퍼 포인터로 직접 쓴다. LGT 컨텍스트 레코드를 ⒜ 형식으로 두는 어댑터를 빌드해 보니 타이틀은 여전히 흰 화면이고 keydraw_lgt 는 ⒜ 와 같은 서명으로 깨졌다 — 원복. 제품 코드 0줄.",
+  "changes": [
+    "docs/report/0262: 재현 · SVC 표 ⒜/⒝ · 컨텍스트 가설 두 시도(E1·F)와 양방향 반증 · 배틀몬스터 비동계급 · 한계"
+  ],
+  "verification": "release 바이너리 4종(⒝·⒜·E1·F) · 이 타이틀 짝지은 2쌍(F↔⒝) · keydraw_lgt ⒜ FAIL/⒝ PASS/F FAIL · 배틀몬스터 ⒜=⒝ · 소스 복원 status --porcelain 빈 출력.",
+  "limits": "게스트의 자기 경로/SVC 분기 조건은 미관측(추론으로 좁힘). 프레임버퍼 레코드 원인은 미측정. 표본 1타이틀 · 짝 2쌍. working/lgt 54 회귀는 수리가 없어 미실행.",
+  "adoptedProposals": [
+    "2026-09-24-lgt-broken-graphics-wiring-benefit#p1"
+  ],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "LGT 타이틀이 «자기가 그릴지 · SVC 에 맡길지»를 무엇으로 고르는지 직접 관측",
+      "plainSummary": "흰 화면 타이틀은 공용 그래픽에서 배경을 SVC 로 맡기고, 자기 손으로 쓴 글자는 보이지 않는다. 게스트 코드가 어떤 메모리 값을 보고 그렇게 고르는지를 디스어셈블리나 주소 읽기 감시로 한 번 확인하면, 원인이 프레임버퍼 레코드인지 다른 것인지 추측 없이 정해진다.",
+      "userBenefit": "고칠 곳이 정확히 정해진다. 지금은 두 후보 중 컨텍스트만 반증됐고 나머지는 추론이다.",
+      "why": "docs/report/0262 §2·§3: ⒝ 는 ⒜ 보다 SVC 가 하나 많고(FillRect), 컨텍스트 레코드를 LGT 형식으로 줘도 흰 화면 그대로였다.",
+      "tradeoff": "게스트 ARM 코드 분석이 필요하다. 원인이 프레임버퍼 레코드로 확정되면 keydraw_lgt SDK 와 같은 레코드를 다르게 읽는 것이라 공용 수리 하나로는 안 되고, 게스트별 레코드 ABI 선택이라는 설계 결정으로 넘어간다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "wipi_c.rs 의 «⒜ 가 keydraw_lgt 를 깨는 이유» 주석에 컨텍스트 레코드 축 추가",
+      "plainSummary": "지금 주석은 ⒜ 배선이 keydraw_lgt 를 깨는 이유를 프레임버퍼 레코드 하나로만 적는다. 이번 측정에서 컨텍스트 레코드만 바꿔도 똑같이 깨졌으므로, 다음에 ⒜ 를 다시 검토하는 사람이 원인을 하나로 오해하지 않게 적어 둔다.",
+      "userBenefit": "⒜ 재배선 비용 판단이 실제보다 싸 보이지 않는다.",
+      "why": "docs/report/0262 §3: 어댑터 F(컨텍스트만 LGT)에서 keydraw_lgt FAIL — ⒜ 와 같은 Undefined instruction in CletWrapperCard.paint.",
+      "tradeoff": "주석 몇 줄. 코드 변화 없음.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}

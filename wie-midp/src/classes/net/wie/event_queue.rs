@@ -259,7 +259,21 @@ impl EventQueue {
                     }
                 }
                 Self::dispatch_callbacks(jvm, context, this.clone()).await?;
-                context.system().sleep(16).await; // TODO we need to wait for events
+
+                // Wake for the earliest pending timer instead of sleeping a whole slice: a timer
+                // that falls due mid-slice otherwise waits for the next one, which costs a
+                // timer-paced guest (a KTF clet's game loop) one extra host frame per game frame.
+                // Recurring callSerially work keeps the 16ms slice it is paced by.
+                let callbacks_pending = jvm.invoke_virtual::<_, i32>(&events, "java/util/Vector", "size", "()I", ()).await? > 0;
+                let next_timer = pending_timer_events
+                    .iter()
+                    .filter_map(|x| match x {
+                        Event::Timer { due, .. } => Some(due.raw().saturating_sub(now.raw())),
+                        _ => None,
+                    })
+                    .min()
+                    .filter(|_| !callbacks_pending);
+                context.system().sleep(next_timer.map_or(16, |x| x.clamp(1, 16))).await; // TODO we need to wait for events
 
                 for event in pending_timer_events.drain(..) {
                     context.system().event_queue().push(event);
@@ -396,7 +410,7 @@ impl EventQueue {
 
 #[cfg(test)]
 mod test {
-    use alloc::{boxed::Box, sync::Arc, vec};
+    use alloc::{boxed::Box, sync::Arc, vec, vec::Vec};
     use core::sync::atomic::{AtomicBool, Ordering};
 
     use jvm::{Array, ClassInstanceRef, Jvm, Result as JvmResult};
@@ -404,7 +418,7 @@ mod test {
     use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 
     use test_utils::{TestClock, TestPlatform, run_jvm_test_with_system};
-    use wie_backend::{DefaultTaskRunner, Event, KeyCode, System};
+    use wie_backend::{DefaultTaskRunner, Event, Instant, KeyCode, System};
     use wie_jvm_support::{JvmSupport, RustJavaJvmImplementation, WieJavaClassProto, WieJvmContext};
     use wie_util::Result;
 
@@ -499,6 +513,94 @@ mod test {
         clock.set(32);
         system.tick()?;
         assert!(completed.load(Ordering::SeqCst));
+        Ok(())
+    }
+
+    // Runs `getNextEvent` once on a fresh JVM whose backend queue holds a timer due at 5ms, with
+    // the clock held at `before` and then at 5. Returns whether the call returned at each point.
+    fn get_next_event_with_timer_due_at_5ms(
+        before: u64,
+        extra_protos: Vec<WieJavaClassProto>,
+        recurring_callback: Option<&'static str>,
+    ) -> Result<(bool, bool)> {
+        let clock = TestClock::new();
+        let mut system = System::new(Box::new(TestPlatform::with_clock(clock.clone())), "", "", DefaultTaskRunner);
+        let timer_system = system.clone();
+        system.event_queue().push(Event::timer(Instant::from_epoch_millis(5), move || async move {
+            // The key is what makes getNextEvent return; the timer itself is consumed internally.
+            timer_system.event_queue().push(Event::Keydown(KeyCode::NUM1));
+            Ok(())
+        }));
+        let completed = Arc::new(AtomicBool::new(false));
+        let completed_task = completed.clone();
+        let system_task = system.clone();
+        let clock_task = clock.clone();
+        system.spawn(async move || {
+            let jvm = JvmSupport::new_jvm(
+                &system_task,
+                None,
+                Box::new([get_protos().into(), extra_protos.into()]),
+                &[],
+                RustJavaJvmImplementation,
+            )
+            .await?;
+            let queue = jvm
+                .invoke_static("net/wie/EventQueue", "getEventQueue", "()Lnet/wie/EventQueue;", ())
+                .await
+                .unwrap();
+            if let Some(class) = recurring_callback {
+                let callback = jvm.instantiate_class(class).await.unwrap();
+                let _: () = jvm
+                    .invoke_virtual(&queue, "net/wie/EventQueue", "callSerially", "(Ljava/lang/Runnable;)V", (callback,))
+                    .await
+                    .unwrap();
+            }
+            let event = jvm.instantiate_array("I", 4).await.unwrap();
+            let _: () = jvm
+                .invoke_virtual(&queue, "net/wie/EventQueue", "getNextEvent", "([I)V", (event,))
+                .await
+                .unwrap();
+            completed_task.store(true, Ordering::SeqCst);
+            clock_task.advance(100);
+            Ok(())
+        });
+
+        system.tick()?;
+        clock.set(before);
+        system.tick()?;
+        let at_before = completed.load(Ordering::SeqCst);
+        clock.set(5);
+        system.tick()?;
+        Ok((at_before, completed.load(Ordering::SeqCst)))
+    }
+
+    #[test]
+    fn timer_due_mid_slice_fires_without_waiting_for_the_whole_slice() -> Result<()> {
+        // A KTF clet paces its game loop with MC_knlSetTimer. With a flat 16ms sleep a timer due
+        // at 5ms fired at 16ms, one host frame late on every game frame — half the frame rate.
+        let (at_4ms, at_5ms) = get_next_event_with_timer_due_at_5ms(4, vec![], None)?;
+        assert!(!at_4ms, "the timer must not fire early");
+        assert!(at_5ms, "a timer due mid-slice must fire when it falls due");
+        Ok(())
+    }
+
+    #[test]
+    fn recurring_callback_keeps_the_slice_when_a_timer_is_pending() -> Result<()> {
+        // IdleCallback asserts ≥16ms between its runs; waking early for the timer must not
+        // re-run recurring callSerially work at the timer's cadence.
+        let callback_proto = WieJavaClassProto {
+            name: "net/wie/IdleCallback",
+            parent_class: Some("java/lang/Object"),
+            interfaces: vec!["java/lang/Runnable"],
+            methods: vec![JavaMethodProto::new("run", "()V", IdleCallback::run, MethodAccessFlags::PUBLIC)],
+            fields: vec![
+                JavaFieldProto::new("count", "I", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("lastRun", "J", FieldAccessFlags::PRIVATE),
+            ],
+            access_flags: ClassAccessFlags::PUBLIC,
+        };
+        let (_, at_5ms) = get_next_event_with_timer_due_at_5ms(4, vec![callback_proto], Some("net/wie/IdleCallback"))?;
+        assert!(!at_5ms, "with recurring callbacks pending the timer waits for the 16ms slice");
         Ok(())
     }
 

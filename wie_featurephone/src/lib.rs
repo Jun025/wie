@@ -26,7 +26,7 @@ use js_sys::{Object, Reflect, Uint8Array};
 use wasm_bindgen::prelude::*;
 use web_sys::{AudioContext, GainNode, HtmlCanvasElement};
 
-use wie_backend::{Emulator, Event, KeyCode, Options, extract_zip};
+use wie_backend::{Emulator, Event, FramePacer, KeyCode, Options, extract_zip};
 use wie_j2me::J2MEEmulator;
 use wie_ktf::KtfEmulator;
 use wie_lgt::{LgtEmulator, detect_compile_model};
@@ -56,6 +56,9 @@ pub struct WieEmulator {
     // a normal shutdown (the "[wie] emulator requested exit" path).
     exited: Arc<AtomicBool>,
     platform_kind: &'static str,
+    // Turns the interval between `tick` calls (one per `requestAnimationFrame`) into the tick
+    // budget, so a 120Hz display does not get a 60Hz frame's worth of emulation per frame.
+    pacer: FramePacer,
     // For LGT titles, the statically-detected compile model ("clet"/"aot-java");
     // `None` for non-LGT platforms. Set once at construction, never changes.
     lgt_compile_model: Option<&'static str>,
@@ -139,6 +142,7 @@ impl WieEmulator {
             exited,
             platform_kind,
             lgt_compile_model,
+            pacer: FramePacer::new(),
         })
     }
 
@@ -187,7 +191,11 @@ impl WieEmulator {
         if self.exited.load(Ordering::Acquire) {
             return Ok(());
         }
-        self.inner.tick().map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
+        // `Date.now()` is the clock the platform's `now()` — and so the executor's budget — reads.
+        let budget = self.pacer.begin(js_sys::Date::now() as u64);
+        let result = self.inner.tick_for(budget);
+        self.pacer.end(js_sys::Date::now() as u64);
+        result.map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
         if self.redraw.swap(false, Ordering::AcqRel) {
             self.inner.handle_event(Event::Redraw);
         }

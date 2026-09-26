@@ -1,5 +1,8 @@
 use alloc::{borrow::ToOwned, boxed::Box, collections::BTreeMap, format, string::String, sync::Arc, vec, vec::Vec};
-use core::mem::size_of;
+use core::{
+    mem::size_of,
+    sync::atomic::{AtomicU32, Ordering},
+};
 
 use spin::Mutex;
 
@@ -19,6 +22,19 @@ const GLOBAL_DATA_BASE: u32 = 0x7fff0000;
 const FUNCTIONS_BASE: u32 = 0x71000000;
 const FUNCTIONS_SIZE: usize = 0x10000;
 const SVC_STUB_SIZE: u32 = 16;
+/// How many SVC stubs fit in the stub region — `make_svc_stub` fails past this.
+pub const SVC_STUB_CAPACITY: u32 = FUNCTIONS_SIZE as u32 / SVC_STUB_SIZE;
+
+/// Most SVC stubs any `ArmCore` in this process has bound. Process-wide on purpose: it is read
+/// by `wie_validate` (one emulator per process) for its `svc_stub_slots` field, which has no
+/// handle on the core. A counter rather than a trace event because enabling TRACE on any target
+/// raises `tracing`'s global level hint, and that alone halved keydraw paints (measured).
+static SVC_STUBS_HIGH_WATER: AtomicU32 = AtomicU32::new(0);
+
+/// See [`SVC_STUBS_HIGH_WATER`].
+pub fn svc_stub_high_water() -> u32 {
+    SVC_STUBS_HIGH_WATER.load(Ordering::Relaxed)
+}
 const INSTRUCTIONS_PER_YIELD: u32 = 10_000;
 pub const RUN_FUNCTION_LR: u32 = 0x7f000000;
 pub const HEAP_BASE: u32 = 0x40000000;
@@ -378,9 +394,13 @@ impl ArmCore {
 
         let address = inner.next_stub_address;
         if address + SVC_STUB_SIZE > FUNCTIONS_BASE + FUNCTIONS_SIZE as u32 {
+            // Read by `wie_validate`, which writes its result line here: on some runtimes this
+            // error ends in a stack-overflow abort that no later code survives to report.
+            tracing::info!("SVC stub space exhausted");
             return Err(WieError::FatalError("SVC stub space exhausted".into()));
         }
         inner.next_stub_address += SVC_STUB_SIZE;
+        SVC_STUBS_HIGH_WATER.fetch_max((inner.next_stub_address - FUNCTIONS_BASE) / SVC_STUB_SIZE, Ordering::Relaxed);
 
         let stub = [
             0x10,
@@ -665,6 +685,13 @@ pub trait RunFunctionResult<R> {
 impl RunFunctionResult<u32> for u32 {
     fn get(core: &ArmCore) -> u32 {
         core.read_param(0).unwrap()
+    }
+}
+
+// r0:r1 — a 64-bit (`J`/`D`) return, low word first.
+impl RunFunctionResult<(u32, u32)> for (u32, u32) {
+    fn get(core: &ArmCore) -> (u32, u32) {
+        (core.read_param(0).unwrap(), core.read_param(1).unwrap())
     }
 }
 

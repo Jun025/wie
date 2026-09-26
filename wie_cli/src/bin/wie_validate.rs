@@ -13,6 +13,8 @@
 //!                 than the script holds (see the `--inject` section below).
 //!
 //! Emits one JSON line on stdout and exits 0 (PASS) / 1 (FAIL) / 2 (UNMEASURED).
+//! When the SVC stub space runs out that line (a FAIL) is written at that moment, because
+//! the process may then abort — see `SVC_STUB_EXHAUSTED_MESSAGE`.
 //! Optionally writes a PNG of the last rendered frame for visual spot-checks.
 //!
 //! This is a triage tool, not a correctness oracle: a headless run cannot prove
@@ -130,8 +132,8 @@ use std::{
 use clap::Parser;
 
 use wie_backend::{
-    AudioSink, Database, DatabaseRepository, Emulator, Event, Filesystem, Font, Instant, KeyCode, Options, Platform, RecordId, Screen, canvas::Image,
-    extract_zip,
+    AudioSink, Database, DatabaseRepository, Emulator, Event, Filesystem, Font, FramePacer, Instant, KeyCode, Options, Platform, RecordId, Screen,
+    canvas::Image, extract_zip,
 };
 use wie_j2me::J2MEEmulator;
 use wie_ktf::KtfEmulator;
@@ -506,6 +508,13 @@ struct Args {
     /// output into the repo or a shared log when running against a real game.
     #[arg(long, default_value_t = false)]
     guest_stdout: bool,
+    /// Tick as a host with this display rate would: each tick gets the budget
+    /// `FramePacer` derives from a `1 / HZ` s frame (60 -> 14ms, 120 -> 5ms)
+    /// instead of the engine default (14ms). OFF by default, so existing runs are
+    /// unchanged; this loop never sleeps, so it changes how finely a tick slices
+    /// the guest, not how often ticks come.
+    #[arg(long, value_parser = clap::value_parser!(u32).range(1..=1000))]
+    frame_hz: Option<u32>,
 }
 
 /// Cap on the `guest_stdout` field, in bytes of the lossy-decoded text.
@@ -625,12 +634,119 @@ impl JavaExceptionTally {
     }
 }
 
-/// The `tracing` layer that feeds a [`JavaExceptionTally`]. Installed with its OWN filter
-/// (`jvm::jvm` at INFO) so it sees those events whatever `RUST_LOG` says, while the stderr
-/// logger keeps honouring `RUST_LOG` exactly as before.
-struct JavaExceptionLayer(Arc<JavaExceptionTally>);
+// ── Stub hits and SVC stub space (report-only) ───────────────────────────────
+//
+// Several 2026-09-24 PASSes stand on minimal stubs that log a warning and hand back a default
+// (`wec.SYSTheme::saveItem` warns and returns 0), and a default of 0 has already walked titles
+// into a NULL dereference further on. Without a count, "PASS" and "PASS because a stub said 0"
+// read the same. So the line carries how many stubs the run hit, and which.
+//
+// ★What counts as a stub is the convention the tree already has, not a new one: a WARN event
+// whose message starts with `stub ` (any target). That is 278 of the 343 `warn!` sites. Not
+// counted, on purpose: the 8 `debug!("stub …")` lwc/lcdui constructors (demoted because they
+// are expected), and warnings that do not say `stub` (LGT `unk2/3/4` in `stdlib.rs`, skvm's
+// `unsupported com.xce.io.XFile::…`, KTF's `Unknown {name}`). Rewording one of those to `stub …`
+// is how it joins the count; the name is the text after `stub ` up to `(` or whitespace.
+//
+// ★SVC stub space: `ArmCore::make_svc_stub` carves 16-byte trampolines out of a fixed 64 KiB
+// region, 4,096 of them, and fails when it runs out. `wie_core_arm::svc_stub_high_water()` is
+// read at line-writing time — a counter, not a per-stub trace event: an earlier draft enabled
+// TRACE on `wie_core_arm::core` for this, which raises `tracing`'s global level hint and halved
+// `keydraw_lgt` paints (51/34/48 without it vs 10/10/15 with, same load, 2026-09-25). The one
+// event the layer does listen for — exhaustion — is INFO, a level `jvm::jvm` already enables.
+//
+// ★Reported, never gated — like `java_exceptions`, `passed` is decided without reading these.
 
-impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for JavaExceptionLayer {
+/// How many distinct stubs `stub_hits.first` lists.
+const STUB_HITS_TOP: usize = 5;
+/// Longest stub name kept, in bytes.
+const STUB_NAME_MAX_BYTES: usize = 128;
+/// The existing stub warning convention (`tracing::warn!("stub …")`).
+const STUB_PREFIX: &str = "stub ";
+
+#[derive(Default)]
+struct StubHitTally {
+    count: AtomicU64,
+    by_name: Mutex<std::collections::BTreeMap<String, u64>>,
+}
+
+impl StubHitTally {
+    fn record(&self, line: &str) {
+        let Some(rest) = line.strip_prefix(STUB_PREFIX) else {
+            return;
+        };
+        let name = &rest[..rest.find(|c: char| c == '(' || c.is_whitespace()).unwrap_or(rest.len())];
+        self.count.fetch_add(1, Ordering::SeqCst);
+        *self.by_name.lock().unwrap().entry(name.to_string()).or_default() += 1;
+    }
+
+    /// `{"count":N,"distinct":D,"first":[{"name":"…","count":n}, …]}` — `first` is the top
+    /// `STUB_HITS_TOP` by hits, ties broken by name so the line is deterministic.
+    fn json(&self) -> String {
+        let by_name = self.by_name.lock().unwrap();
+        let mut top: Vec<(&String, &u64)> = by_name.iter().collect();
+        top.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
+        let first = top
+            .iter()
+            .take(STUB_HITS_TOP)
+            .map(|(name, count)| {
+                format!(
+                    "{{\"name\":\"{}\",\"count\":{count}}}",
+                    guest_stdout_field(name.as_bytes(), STUB_NAME_MAX_BYTES).0
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+        format!(
+            "{{\"count\":{},\"distinct\":{},\"first\":[{first}]}}",
+            self.count.load(Ordering::SeqCst),
+            by_name.len()
+        )
+    }
+}
+
+/// `{"used":U,"capacity":C|null}` off `wie_core_arm`'s process-wide high-water mark. `capacity`
+/// is `null` when no ARM core bound a stub (J2ME) — there was no stub space to measure.
+fn svc_stub_slots_json() -> String {
+    match wie_core_arm::svc_stub_high_water() {
+        0 => "{\"used\":0,\"capacity\":null}".to_string(),
+        used => format!("{{\"used\":{used},\"capacity\":{}}}", wie_core_arm::SVC_STUB_CAPACITY),
+    }
+}
+
+/// Everything the validator's `tracing` layer counts for the JSON line.
+#[derive(Default)]
+struct Tallies {
+    java_exceptions: JavaExceptionTally,
+    stub_hits: StubHitTally,
+    /// Set once the SVC stub space ran out and `on_svc_stub_exhausted` has run.
+    svc_stub_exhausted: AtomicBool,
+    /// Writes the result line at the moment of exhaustion — see `SVC_STUB_EXHAUSTED_MESSAGE`.
+    on_svc_stub_exhausted: std::sync::OnceLock<ExhaustedHook>,
+}
+
+type ExhaustedHook = Box<dyn Fn(&Tallies) + Send + Sync>;
+
+/// Message of `ArmCore::make_svc_stub`'s exhaustion trace.
+///
+/// ★Why the line is written from inside the layer: measured 2026-09-25 with the space capped at
+/// 1,000 stubs, KTF hits an `unwrap()` on the error and the run ends as an ordinary FAIL, but
+/// LGT recurses until `fatal runtime error: stack overflow, aborting` (rc 134) and `main` never
+/// prints — a stack overflow cannot be caught. So the line goes out when the space runs out, and
+/// the abort stays. Exactly one line either way: `main` stays silent afterwards unless its own
+/// verdict would differ (not observed), in which case both print and the in-tree parsers'
+/// "매치 N건(기대 1)" warning fires instead of a verdict changing silently.
+const SVC_STUB_EXHAUSTED_MESSAGE: &str = "SVC stub space exhausted";
+
+/// Target of `ArmCore::make_svc_stub`'s trace line.
+const SVC_STUB_TARGET: &str = "wie_core_arm::core";
+
+/// The `tracing` layer that feeds [`Tallies`]. Installed with its OWN filter (`jvm::jvm` and the
+/// SVC stub target at INFO, WARN everywhere else — never TRACE/DEBUG, see the stub-hits header) so it sees those events whatever
+/// `RUST_LOG` says, while the stderr logger keeps honouring `RUST_LOG` exactly as before.
+struct TallyLayer(Arc<Tallies>);
+
+impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for TallyLayer {
     fn on_event(&self, event: &tracing::Event<'_>, _ctx: tracing_subscriber::layer::Context<'_, S>) {
         struct Message(Option<String>);
         impl tracing::field::Visit for Message {
@@ -647,31 +763,48 @@ impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for JavaExceptionLayer
         }
         let mut message = Message(None);
         event.record(&mut message);
-        if let Some(line) = message.0 {
-            self.0.record(&line);
+        let Some(line) = message.0 else {
+            return;
+        };
+        let (target, level) = (event.metadata().target(), *event.metadata().level());
+        if level == tracing::Level::INFO && target == "jvm::jvm" {
+            self.0.java_exceptions.record(&line);
+        }
+        if level == tracing::Level::WARN {
+            self.0.stub_hits.record(&line);
+        }
+        if level == tracing::Level::INFO
+            && target == SVC_STUB_TARGET
+            && line == SVC_STUB_EXHAUSTED_MESSAGE
+            && !self.0.svc_stub_exhausted.swap(true, Ordering::SeqCst)
+            && let Some(write_line) = self.0.on_svc_stub_exhausted.get()
+        {
+            write_line(&self.0);
         }
     }
 }
 
-fn java_exception_layer<S>(tally: Arc<JavaExceptionTally>) -> impl tracing_subscriber::Layer<S>
+fn tally_layer<S>(tallies: Arc<Tallies>) -> impl tracing_subscriber::Layer<S>
 where
     S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
 {
     use tracing_subscriber::Layer;
-    JavaExceptionLayer(tally).with_filter(tracing_subscriber::filter::Targets::new().with_target("jvm::jvm", tracing::Level::INFO))
+    TallyLayer(tallies).with_filter(
+        tracing_subscriber::filter::Targets::new()
+            .with_target("jvm::jvm", tracing::Level::INFO)
+            .with_target(SVC_STUB_TARGET, tracing::Level::INFO)
+            .with_default(tracing::Level::WARN),
+    )
 }
 
 /// The process subscriber `main` installs: the stderr logger under `stderr_filter` (`RUST_LOG`)
-/// plus the exception tally. The logger's filter is per-layer, not global, so the tally still
-/// sees `jvm::jvm` INFO when `RUST_LOG` is unset — a global filter would drop it first.
-fn validator_subscriber(
-    stderr_filter: tracing_subscriber::EnvFilter,
-    tally: Arc<JavaExceptionTally>,
-) -> impl tracing::Subscriber + Send + Sync + 'static {
+/// plus the tallies. The logger's filter is per-layer, not global, so the tallies still see
+/// their events when `RUST_LOG` is unset — a global filter would drop them first.
+fn validator_subscriber(stderr_filter: tracing_subscriber::EnvFilter, tallies: Arc<Tallies>) -> impl tracing::Subscriber + Send + Sync + 'static {
     use tracing_subscriber::{Layer, layer::SubscriberExt};
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr).with_filter(stderr_filter))
-        .with(java_exception_layer(tally))
+        .with(tally_layer(tallies))
 }
 
 const SCREEN_W: u32 = 240;
@@ -679,14 +812,27 @@ const SCREEN_H: u32 = 320;
 
 fn main() {
     // Honor RUST_LOG for debugging (logs to stderr, separate from the JSON result on stdout).
-    let java_exceptions = Arc::new(JavaExceptionTally::default());
+    let tallies = Arc::new(Tallies::default());
     {
         use tracing_subscriber::util::SubscriberInitExt;
-        validator_subscriber(tracing_subscriber::EnvFilter::from_default_env(), java_exceptions.clone()).init();
+        validator_subscriber(tracing_subscriber::EnvFilter::from_default_env(), tallies.clone()).init();
     }
 
     let args = Args::parse();
     let start = StdInstant::now();
+
+    {
+        let filename = args.filename.clone();
+        // The exhaustion line carries no `guest_stdout` even under `--guest-stdout`: the guest's
+        // buffer lives in `main` and the hook runs mid-run, so this line's schema is the default one.
+        let _ = tallies.on_svc_stub_exhausted.set(Box::new(move |tallies: &Tallies| {
+            use std::io::Write;
+            let line = result_line(&filename, &svc_stub_exhausted_outcome(), tallies, start.elapsed().as_millis());
+            let mut stdout = std::io::stdout().lock();
+            let _ = writeln!(stdout, "{line}");
+            let _ = stdout.flush();
+        }));
+    }
 
     // Hoisted so main can read what the guest printed after `run` returns; `run`
     // hands the same handle to HeadlessPlatform::write_stdout.
@@ -695,36 +841,10 @@ fn main() {
     let elapsed_ms = start.elapsed().as_millis();
 
     // Emit a single JSON line for the batch wrapper to parse.
-    let json = format!(
-        "{{\"file\":{:?},\"platform\":{:?},\"result\":{:?},\"reason\":{:?},\"stop\":{:?},\
-         \"input_steps\":{},\"input_steps_total\":{},\
-         \"ticks\":{},\"paints\":{},\"content\":{},\
-         \"last_frame_content\":{},\
-         \"distinct_colors\":{},\"nondominant_pct\":{:.1},\"center_nonuniform_pct\":{:.1},\
-         \"last_frame_distinct_colors\":{},\"last_frame_nondominant_pct\":{:.1},\"last_frame_center_nonuniform_pct\":{:.1},\
-         \"java_exceptions\":{},\"ms\":{}}}",
-        args.filename,
-        result.platform,
-        result.verdict(),
-        result.reason,
-        result.stop,
-        result.input_steps,
-        result.input_steps_total,
-        result.ticks,
-        result.paints,
-        result.content,
-        result.last_frame_content,
-        result.distinct_colors,
-        result.nondominant_bp as f64 / 100.0,
-        result.center_nonuniform_bp as f64 / 100.0,
-        result.last_frame_distinct_colors,
-        result.last_frame_nondominant_bp as f64 / 100.0,
-        result.last_frame_center_nonuniform_bp as f64 / 100.0,
-        java_exceptions.json(),
-        elapsed_ms
-    );
+    let json = result_line(&args.filename, &result, &tallies, elapsed_ms);
     // Appended, never interleaved, and only when asked: with the flag absent the
-    // line above is byte-identical to what every existing caller already parses.
+    // line above keeps every pre-existing key in the same order with the same value
+    // (`stub_hits`/`svc_stub_slots` are new keys, inserted just before `ms`).
     // Both in-tree parsers read this line with `grep -o` over the WHOLE line
     // (smoke_gate.sh's `"result":"[^"]*"`, lgt_render_probe.sh's `"<key>":[0-9a-z.]*`)
     // plus `tail -1`, so a guest that printed `"result":"PASS"` would otherwise win
@@ -741,9 +861,59 @@ fn main() {
     } else {
         json
     };
-    println!("{json}");
+    if tallies.svc_stub_exhausted.load(Ordering::SeqCst) && result.verdict() == svc_stub_exhausted_outcome().verdict() {
+        eprintln!("wie_validate: result line already written when the SVC stub space ran out; not writing a second one");
+    } else {
+        println!("{json}");
+    }
 
     std::process::exit(result.exit_code());
+}
+
+/// What the line written at SVC stub exhaustion says. `platform` is not known to the layer.
+fn svc_stub_exhausted_outcome() -> Outcome {
+    fail(
+        "unknown",
+        format!("{SVC_STUB_EXHAUSTED_MESSAGE} (line written at exhaustion; see stderr)"),
+        0,
+        0,
+        false,
+    )
+}
+
+/// The one JSON result line. `main` writes it at the end of a run; the SVC-stub-exhaustion hook
+/// writes it early, because on that path the process may abort before `main` gets there.
+fn result_line(file: &str, result: &Outcome, tallies: &Tallies, elapsed_ms: u128) -> String {
+    format!(
+        "{{\"file\":{:?},\"platform\":{:?},\"result\":{:?},\"reason\":{:?},\"stop\":{:?},\
+         \"input_steps\":{},\"input_steps_total\":{},\
+         \"ticks\":{},\"paints\":{},\"content\":{},\
+         \"last_frame_content\":{},\
+         \"distinct_colors\":{},\"nondominant_pct\":{:.1},\"center_nonuniform_pct\":{:.1},\
+         \"last_frame_distinct_colors\":{},\"last_frame_nondominant_pct\":{:.1},\"last_frame_center_nonuniform_pct\":{:.1},\
+         \"java_exceptions\":{},\"stub_hits\":{},\"svc_stub_slots\":{},\"ms\":{}}}",
+        file,
+        result.platform,
+        result.verdict(),
+        result.reason,
+        result.stop,
+        result.input_steps,
+        result.input_steps_total,
+        result.ticks,
+        result.paints,
+        result.content,
+        result.last_frame_content,
+        result.distinct_colors,
+        result.nondominant_bp as f64 / 100.0,
+        result.center_nonuniform_bp as f64 / 100.0,
+        result.last_frame_distinct_colors,
+        result.last_frame_nondominant_bp as f64 / 100.0,
+        result.last_frame_center_nonuniform_bp as f64 / 100.0,
+        tallies.java_exceptions.json(),
+        tallies.stub_hits.json(),
+        svc_stub_slots_json(),
+        elapsed_ms
+    )
 }
 
 struct Outcome {
@@ -861,6 +1031,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     // ── drive ───────────────────────────────────────────────────────────────
     let loop_start = StdInstant::now();
     let mut ticks = 0u64;
+    let tick_budget = args.frame_hz.map(|hz| FramePacer::budget_for_period_us(1_000_000 / u64::from(hz)));
     let mut run_err: Option<String> = None;
     let mut phase = String::from("boot");
     let mut sched_idx = 0usize;
@@ -904,7 +1075,10 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
         }
 
         let step = catch_unwind(AssertUnwindSafe(|| {
-            emulator.tick()?;
+            match tick_budget {
+                Some(budget) => emulator.tick_for(budget)?,
+                None => emulator.tick()?,
+            }
             // Faithfully reproduce the windowed flow: the emulator paints in
             // response to the Redraw event it requested via request_redraw.
             if screen.redraw_requested.swap(false, Ordering::SeqCst) {
@@ -1146,11 +1320,11 @@ fn build_emulator(platform: Box<dyn Platform>, filename: &str, buf: Vec<u8>) -> 
     } else if filename.ends_with("jad") {
         let jar_filename = filename.replace(".jad", ".jar");
         let jar = fs::read(&jar_filename).map_err(|e| ("j2me".to_string(), format!("jar read: {e}")))?;
-        let jar_name = jar_filename[jar_filename.rfind('/').unwrap_or(0) + 1..].to_owned();
+        let jar_name = base_name(&jar_filename);
         let e = J2MEEmulator::from_jad_jar(platform, buf, jar_name, jar).map_err(|e| ("j2me".to_string(), format!("{e}")))?;
         Ok((Box::new(e), "j2me".into()))
     } else if filename.ends_with("jar") {
-        let name = filename[filename.rfind('/').unwrap_or(0) + 1..].to_owned();
+        let name = base_name(filename);
         let stem = name.trim_end_matches(".jar");
         if KtfEmulator::loadable_jar(&buf) {
             let e = KtfEmulator::from_jar(platform, &name, buf, stem, stem, None, options).map_err(|e| ("ktf".to_string(), format!("{e}")))?;
@@ -1168,6 +1342,15 @@ fn build_emulator(platform: Box<dyn Platform>, filename: &str, buf: Vec<u8>) -> 
     } else {
         Err(("unknown".to_string(), "unknown file extension".to_string()))
     }
+}
+
+/// The file name without its directories. Was `path[path.rfind('/').unwrap_or(0) + 1..]`, which on
+/// Windows (`C:\…\x.jar`, no `/`) kept the whole path minus its first character — the J2ME boot then
+/// panicked on that name — and dropped the first letter of any bare name (`x.jar` → `.jar`).
+fn base_name(path: &str) -> String {
+    std::path::Path::new(path)
+        .file_name()
+        .map_or_else(|| path.to_owned(), |n| n.to_string_lossy().into_owned())
 }
 
 fn save_png(path: &PathBuf, frame: &[u32], width: u32, height: u32) -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -1309,8 +1492,8 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
 #[cfg(test)]
 mod tests {
     use super::{
-        GUEST_STDOUT_MAX_BYTES, HeadlessPlatform, HeadlessScreen, RICHNESS_COLOR_CAP, SCREEN_H, SCREEN_W, frame_richness, guest_stdout_field,
-        has_content, inject_unmeasured, json_escape, last_frame_gate_fails, stop_cause,
+        GUEST_STDOUT_MAX_BYTES, HeadlessPlatform, HeadlessScreen, RICHNESS_COLOR_CAP, SCREEN_H, SCREEN_W, base_name, frame_richness,
+        guest_stdout_field, has_content, inject_unmeasured, json_escape, last_frame_gate_fails, stop_cause,
     };
     use std::sync::{
         Arc, Mutex,
@@ -1319,13 +1502,13 @@ mod tests {
     use test_utils::MemoryFilesystem;
     use wie_backend::Platform;
 
-    use super::{JavaExceptionTally, java_exception_layer, validator_subscriber};
+    use super::{JavaExceptionTally, StubHitTally, Tallies, tally_layer, validator_subscriber};
 
-    /// Runs `body` with only the exception tally installed, and returns the tally.
-    fn with_tally(body: impl FnOnce()) -> Arc<JavaExceptionTally> {
+    /// Runs `body` with only the tally layer installed, and returns the tallies.
+    fn with_tally(body: impl FnOnce()) -> Arc<Tallies> {
         use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-        let tally = Arc::new(JavaExceptionTally::default());
-        let guard = tracing_subscriber::registry().with(java_exception_layer(tally.clone())).set_default();
+        let tally = Arc::new(Tallies::default());
+        let guard = tracing_subscriber::registry().with(tally_layer(tally.clone())).set_default();
         body();
         drop(guard);
         tally
@@ -1348,9 +1531,9 @@ mod tests {
             })
             .unwrap();
         });
-        assert_eq!(tally.count.load(core::sync::atomic::Ordering::SeqCst), 2);
+        assert_eq!(tally.java_exceptions.count.load(core::sync::atomic::Ordering::SeqCst), 2);
         assert_eq!(
-            tally.json(),
+            tally.java_exceptions.json(),
             r#"{"count":2,"first":"java/io/IOException: first one","first_truncated":false}"#
         );
     }
@@ -1365,10 +1548,14 @@ mod tests {
         for needle in [
             concat!(
                 "validator_subscriber(tracing_subscriber::EnvFilter::from_default_env()",
-                ", java_exceptions.clone())"
+                ", tallies.clone())"
             ),
-            concat!("java_exceptions", ".json(),"),
+            concat!("tallies.java_exceptions", ".json(),"),
             concat!("\\\"java_exceptions", "\\\":{},"),
+            concat!("tallies.stub_hits", ".json(),"),
+            concat!("\\\"stub_hits", "\\\":{},"),
+            concat!("svc_stub_slots", "_json(),"),
+            concat!("\\\"svc_stub_slots", "\\\":{},"),
         ] {
             assert_eq!(
                 main_body.matches(needle).count(),
@@ -1384,7 +1571,7 @@ mod tests {
     #[test]
     fn java_exception_tally_counts_under_main_subscriber_with_rust_log_unset_test() {
         use tracing_subscriber::util::SubscriberInitExt;
-        let tally = Arc::new(JavaExceptionTally::default());
+        let tally = Arc::new(Tallies::default());
         let guard = validator_subscriber(tracing_subscriber::EnvFilter::new(""), tally.clone()).set_default();
         test_utils::run_jvm_test(Box::new([]), |jvm| async move {
             let _ = jvm.exception("java/io/IOException", "unset").await;
@@ -1392,7 +1579,7 @@ mod tests {
         })
         .unwrap();
         drop(guard);
-        assert_eq!(tally.count.load(core::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(tally.java_exceptions.count.load(core::sync::atomic::Ordering::SeqCst), 1);
     }
 
     /// The control: a JVM that raises nothing reports 0 and `null`, not a stale or invented value.
@@ -1405,7 +1592,7 @@ mod tests {
             })
             .unwrap();
         });
-        assert_eq!(tally.json(), r#"{"count":0,"first":null,"first_truncated":false}"#);
+        assert_eq!(tally.java_exceptions.json(), r#"{"count":0,"first":null,"first_truncated":false}"#);
     }
 
     /// Only the `Jvm::exception` line counts, and `first` is escaped + capped like guest stdout —
@@ -1429,6 +1616,50 @@ mod tests {
         long.record(&format!("throwing java exception: java/lang/Error {}", "x".repeat(1000)));
         assert!(long.json().ends_with(r#""first_truncated":true}"#));
         assert!(long.json().len() < 400);
+    }
+
+    /// Only WARN `stub …` lines count — any target — and `first` is the top 5 by hits, escaped.
+    /// The `debug!("stub …")` constructors and non-`stub` warnings stay out.
+    #[test]
+    fn stub_hit_tally_counts_warn_stub_lines_only_test() {
+        let tally = with_tally(|| {
+            tracing::warn!(target: "wie_wipi_java::x", "stub wec.SYSTheme::saveItem({:?})", 1);
+            tracing::warn!("stub wec.SYSTheme::saveItem(2)");
+            tracing::warn!("stub unk7(0x1, 0x2)");
+            tracing::warn!("stub unk2");
+            tracing::warn!("stub unk3-12");
+            tracing::warn!("stub a\"b(1)");
+            tracing::warn!("stub z()");
+            tracing::debug!("stub org.kwis.msp.lwc.Component::<init>()");
+            tracing::error!("stub not-a-warning()");
+            tracing::warn!("unk4(0x0, 0x0, 0x0, 0x0)");
+        });
+        assert_eq!(
+            tally.stub_hits.json(),
+            r#"{"count":7,"distinct":6,"first":[{"name":"wec.SYSTheme::saveItem","count":2},{"name":"a\"b","count":1},{"name":"unk2","count":1},{"name":"unk3-12","count":1},{"name":"unk7","count":1}]}"#
+        );
+        assert_eq!(StubHitTally::default().json(), r#"{"count":0,"distinct":0,"first":[]}"#);
+    }
+
+    /// The exhaustion event (only from the core's target) makes the hook run exactly once, however many times the runtime retries
+    /// (LGT recurses on it until the stack overflows), and records the slots as full.
+    #[test]
+    fn svc_stub_exhaustion_runs_the_line_hook_once_test() {
+        use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+        let tally = Arc::new(Tallies::default());
+        let calls = Arc::new(AtomicU64::new(0));
+        let hook_calls = calls.clone();
+        let _ = tally.on_svc_stub_exhausted.set(Box::new(move |_: &Tallies| {
+            hook_calls.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
+        }));
+        let guard = tracing_subscriber::registry().with(tally_layer(tally.clone())).set_default();
+        for _ in 0..3 {
+            tracing::info!(target: "wie_core_arm::core", "SVC stub space exhausted");
+            tracing::info!(target: "elsewhere", "SVC stub space exhausted");
+        }
+        drop(guard);
+        assert_eq!(calls.load(core::sync::atomic::Ordering::SeqCst), 1);
+        assert!(tally.svc_stub_exhausted.load(core::sync::atomic::Ordering::SeqCst));
     }
 
     /// `HeadlessPlatform::font()` shipped for two months as `unimplemented!()`, so every guest that
@@ -1509,6 +1740,15 @@ mod tests {
         assert_eq!(json_escape("\u{1}"), "\\u0001");
         // Non-ASCII passes through as UTF-8; JSON does not require escaping it.
         assert_eq!(json_escape("한"), "한");
+    }
+
+    /// The name handed to the emulators is the file name alone, on every host.
+    #[test]
+    fn base_name_strips_directories_and_keeps_bare_names_whole_test() {
+        assert_eq!(base_name("test_data/draw_j2me.jar"), "draw_j2me.jar");
+        assert_eq!(base_name("draw_j2me.jar"), "draw_j2me.jar");
+        #[cfg(windows)]
+        assert_eq!(base_name(r"C:\Temp\x\draw_j2me.jar"), "draw_j2me.jar");
     }
 
     #[test]

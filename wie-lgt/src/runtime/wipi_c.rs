@@ -3,18 +3,36 @@ use alloc::{boxed::Box, string::ToString, vec};
 mod context;
 // ★slice D (orchestrator decision ⒝, 2026-09-16): upstream's LGT-specific graphics
 // implementation (1,095 lines) is KEPT IN THE TREE but NOT WIRED — every graphics SVC
-// below routes to the shared `wie_wipi_c::api::graphics` instead. Wiring it makes
+// below but one routes to the shared `wie_wipi_c::api::graphics` instead. Wiring it makes
 // `keydraw_lgt` FAIL (measured 3/3, slice A) because it hands the guest a different
 // record ABI (`LgtFramebuffer`, 16B, no `buf`) than the guest SDK reads
 // (`WIPICFramebuffer`, 20B, pixel pointer at +16). This is a DEFERRAL, not a rejection:
 // re-wiring is the same 27 lines, in reverse. See docs/upstream-realign-p3-slices.md §D.
+// The framebuffer record is not the only one: the graphics CONTEXT record is a second
+// axis. Handing the guest only the LGT context (`LgtGraphicsContext`, 56B, via an adapter
+// on `InitContext`/`SetContext`) while keeping the shared framebuffer also fails
+// `keydraw_lgt` with the same `Undefined instruction` in `CletWrapperCard.paint`
+// (docs/report/0262 §3) — the fixture SDK reads the shared 48B context layout directly.
+// So re-wiring swaps two record ABIs, not one.
+//
+// The one exception is `GetFramebufferBpp` (2026-09-25): its argument is not a
+// framebuffer handle — the native accessor ignores it and the local one does too — so the
+// shared accessor, which reads it as a `WIPICFramebuffer`, answered garbage and 하이브리드
+// drew 500 uniform frames. It touches no record the fixture SDK reads (`keydraw_lgt` PASS
+// 27/27 keys either way). Held by `wipic_framebuffer_bpp_ignores_its_argument`.
+//
+// `InitContext`/`SetContext` (2026-09-26) are not exceptions to the record choice: they
+// still hand out the shared record, and only add the three native fields a title reads
+// directly (foreground/background/alpha) in slots no shared reader draws with — see
+// `graphics::init_shared_context`. Held by `wipic_context_keeps_native_foreground_and_alpha`.
 //
 // "NOT WIRED" scopes to those 27 SVCs ONLY — the module is still entered from two other
 // places, so do not read it as unreachable: `clet_register` below calls
 // `graphics::{init_process_state, set_use_annunciator}`, and `init.rs` routes
 // `InitSvcId::SetDisplayProperty` to `graphics::set_display_property`. Measured
 // 2026-09-16: 45 of the 57 top-level items are dead (that is what the `allow` below
-// suppresses; removing it yields exactly those 45 warnings) and 12 are live. Of the
+// suppresses; removing it yields exactly those 45 warnings) and 12 are live — 42 and 15
+// since the BPP row above (`get_framebuffer_bpp`, `state`, `FRAMEBUFFER_DEPTH`). Of the
 // three live fns, two RUN on every LGT boot — a `panic!` in `init_process_state`
 // (:70-98) or `set_use_annunciator` (:152-157) turns `keydraw_lgt` and `helloworld_lgt`
 // into FAIL/paints 0; the same probe in `set_display_property` (:121-150) leaves both
@@ -27,7 +45,7 @@ mod context;
 //
 // What the gates DO hold: `allow(dead_code)` silences a lint, not compilation, so all
 // 1,095 lines are type-checked by all four gates — this cannot rot into a build error
-// unnoticed. What they do NOT hold is BEHAVIOUR: the 45 dead items are executed by
+// unnoticed. What they do NOT hold is BEHAVIOUR: the 42 dead items are executed by
 // nothing, so a semantic drift in them is silent until the 27 lines are re-wired.
 #[allow(dead_code)]
 pub(super) mod graphics;
@@ -82,7 +100,7 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::GetFramebufferWidth => wie_wipi_c::api::graphics::get_framebuffer_width.into_body(),
         WIPICSvcId::GetFramebufferHeight => wie_wipi_c::api::graphics::get_framebuffer_height.into_body(),
         WIPICSvcId::GetFramebufferBpl => wie_wipi_c::api::graphics::get_framebuffer_bpl.into_body(),
-        WIPICSvcId::GetFramebufferBpp => wie_wipi_c::api::graphics::get_framebuffer_bpp.into_body(),
+        WIPICSvcId::GetFramebufferBpp => graphics::get_framebuffer_bpp.into_body(),
         WIPICSvcId::Printk => kernel::printk.into_body(),
         WIPICSvcId::Sprintk => kernel::sprintk.into_body(),
         WIPICSvcId::Unk13 => unk13.into_body(),
@@ -108,8 +126,8 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::GetScreenFramebuffer => wie_wipi_c::api::graphics::get_screen_framebuffer.into_body(),
         WIPICSvcId::DestroyOffscreenFramebuffer => wie_wipi_c::api::graphics::destroy_offscreen_framebuffer.into_body(),
         WIPICSvcId::CreateOffscreenFramebuffer => wie_wipi_c::api::graphics::create_offscreen_framebuffer.into_body(),
-        WIPICSvcId::InitContext => wie_wipi_c::api::graphics::init_context.into_body(),
-        WIPICSvcId::SetContext => wie_wipi_c::api::graphics::set_context.into_body(),
+        WIPICSvcId::InitContext => graphics::init_shared_context.into_body(),
+        WIPICSvcId::SetContext => graphics::set_shared_context.into_body(),
         WIPICSvcId::GetContext => wie_wipi_c::api::graphics::get_context.into_body(),
         WIPICSvcId::PutPixel => wie_wipi_c::api::graphics::put_pixel.into_body(),
         WIPICSvcId::DrawLine => wie_wipi_c::api::graphics::draw_line.into_body(),
@@ -489,4 +507,96 @@ async fn unk16(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u
     // misc
 
     Ok(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::{boxed::Box, sync::Arc};
+    use core::sync::atomic::{AtomicBool, Ordering};
+
+    use test_utils::TestPlatform;
+    use wie_backend::{DefaultTaskRunner, System};
+    use wie_core_arm::Allocator;
+    use wie_util::{ByteWrite, Result, read_generic};
+
+    use super::{graphics, register_wipic_svc_handler};
+    use crate::runtime::{SVC_CATEGORY_WIPIC, java::init_jvm, svc_ids::WIPICSvcId};
+
+    /// `MC_GRP_GET_FRAME_BUFFER_BPP` answers the display depth whatever its argument is.
+    ///
+    /// LGT titles pass a value that is not a framebuffer handle here (하이브리드 passes
+    /// `0x4904dbe5`, an odd address, every frame). The shared accessor read that as a
+    /// `WIPICFramebuffer` record and returned whatever sat at +12, and the title then drew
+    /// nothing visible: 500 uniform frames. Routed to the LGT accessor, which ignores its
+    /// argument the way the native one does, the same title draws its first screen.
+    /// The argument below points at zeroed memory, so the shared accessor answers 0.
+    #[test]
+    fn wipic_framebuffer_bpp_ignores_its_argument() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, _) = init_jvm(&system_clone).await?;
+            register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
+            graphics::init_process_state(&mut core, 240, 320)?;
+            let stub = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::GetFramebufferBpp)?;
+            assert_eq!(WIPICSvcId::GetFramebufferBpp as u32, 0x36);
+
+            let not_a_handle = Allocator::alloc(&mut core, 0x20)?;
+            core.write_bytes(not_a_handle, &[0; 0x20])?;
+            let bpp: u32 = core.run_function(stub, &[not_a_handle]).await?;
+            assert_eq!(bpp, 16);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    /// `MC_grpInitContext`/`MC_grpSetContext` leave the text colour where LGT titles read it.
+    ///
+    /// The record stays the shared 52B layout (`keydraw_lgt` embeds that struct), but the
+    /// native offsets a title reads directly — foreground +16, alpha +24 — must hold the
+    /// native values. With the shared SVCs +16 stays 0 and alpha 0, and 0236 §2-2's title
+    /// drew its 2,125 glyph pixels as `#fffbff` on white.
+    #[test]
+    fn wipic_context_keeps_native_foreground_and_alpha() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, _) = init_jvm(&system_clone).await?;
+            register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
+            let init = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::InitContext)?;
+            let set = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::SetContext)?;
+
+            let record = Allocator::alloc(&mut core, 52)?;
+            let _: u32 = core.run_function(init, &[record]).await?;
+            let _: u32 = core.run_function(set, &[record, 1, 0xf800]).await?; // fg
+            let _: u32 = core.run_function(set, &[record, 2, 0x1234]).await?; // bg
+            let word = |offset: u32| read_generic::<u32, _>(&core, record + offset);
+            assert_eq!(word(12)?, 0xf800, "shared fgpxl, read by the host");
+            assert_eq!(word(16)?, 0xf800, "native foreground, read by the title");
+            assert_eq!(word(20)?, 0x1234, "native background");
+            assert_eq!(word(24)?, 255, "native alpha");
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
 }

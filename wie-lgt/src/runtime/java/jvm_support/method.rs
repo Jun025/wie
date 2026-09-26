@@ -12,7 +12,10 @@ use wie_core_arm::{
 use wie_jvm_support::native::{NativeJavaValueCodec, decode_method_arguments, encode_method_arguments, method_argument_word_count};
 use wie_util::{Result, WieError, read_generic, read_null_terminated_string_bytes, write_generic, write_null_terminated_string_bytes};
 
-use crate::runtime::{SVC_CATEGORY_JAVA, java::JavaSvcFunctions};
+use crate::runtime::{
+    SVC_CATEGORY_JAVA,
+    java::{JavaSvcFunctions, exception},
+};
 
 use super::value::JavaValueCodec;
 
@@ -152,7 +155,14 @@ impl Method for JavaMethod {
         let return_type = JavaType::parse(&self.descriptor()).as_method().1.clone();
         let codec = JavaValueCodec::new(&self.core);
         let raw_args = encode_method_arguments(&codec, &args);
-        let result: Result<JavaMethodRunResult> = self.core.clone().run_function(self.target().unwrap(), &raw_args).await;
+        let mut core = self.core.clone();
+        let result: Result<JavaMethodRunResult> = match exception::mark(&core) {
+            Ok(mark) => {
+                let result = core.run_function(self.target().unwrap(), &raw_args).await;
+                exception::release_to(&mut core, mark).and(result)
+            }
+            Err(error) => Err(error),
+        };
         match result.map(|result| {
             if matches!(return_type, JavaType::Double | JavaType::Long) {
                 codec.decode_wide(result.low, result.high, &return_type)

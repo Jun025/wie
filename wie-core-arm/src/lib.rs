@@ -18,6 +18,6 @@ pub use self::{
     allocator::Allocator,
     binary_patches::install_binary_patches,
     context::ArmCoreContext,
-    core::{ArmCore, RUN_FUNCTION_LR, RunFunctionResult},
+    core::{ArmCore, RUN_FUNCTION_LR, RunFunctionResult, SVC_STUB_CAPACITY, svc_stub_high_water},
     function::{EmulatedFunction, EmulatedFunctionParam, JumpTo, RegisteredFunction, RegisteredFunctionHolder, ResultWriter, SvcId},
 };
