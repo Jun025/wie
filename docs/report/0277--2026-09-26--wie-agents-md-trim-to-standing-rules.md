@@ -760,4 +760,4 @@ commands from ⒜), relies on unforced discipline, and still leaves the alias 6 
 전건 `AGENTS.md@5434ab0a` 에 이미 있던 문장이 «옮긴 원문»으로 이 파일에 들어온 것이다 — 새 이름·파일 바이트·경로 유입은 없다.
 
 
-<!-- corpus-name-inflow v1 subjects=3 tree=e8f6dcbb684abd6b B=6/6 P=2/1 S=5/5 -->
+<!-- corpus-name-inflow v1 subjects=3 tree=a20e5483089b46b9 B=1/1 P=0/0 S=0/0 -->
