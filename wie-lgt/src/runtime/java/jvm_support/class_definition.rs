@@ -798,7 +798,16 @@ impl EmulatedFunction<(), u32, ()> for JavaClassGetterProxy {
 #[async_trait::async_trait]
 impl ClassDefinition for JavaClassDefinition {
     fn name(&self) -> String {
-        self.try_name().unwrap()
+        // Still a panic — a bad pointer here has no safe answer — but one that names which link
+        // of class → descriptor → name broke. `InvalidMemoryAccess(0)` alone could not tell a
+        // null class from a null descriptor or a null name (배틀몬스터, 2026-09-25).
+        self.try_name().unwrap_or_else(|error| {
+            let ptr_descriptor = self.raw().map(|raw| raw.ptr_descriptor);
+            panic!(
+                "LGT class {:#x} (descriptor {ptr_descriptor:x?}) has no readable name: {error:?}",
+                self.ptr_raw
+            )
+        })
     }
 
     fn super_class_name(&self) -> Option<String> {
@@ -991,5 +1000,14 @@ mod tests {
             "an unmapped class pointer must come back as an error carrying its own address"
         );
         Ok(())
+    }
+
+    /// The infallible `name()` still panics, but its message must carry the class pointer and
+    /// the descriptor read, so the next occurrence says which link was null.
+    #[test]
+    #[should_panic(expected = "LGT class 0x0 (descriptor Err(InvalidMemoryAccess(0))) has no readable name: InvalidMemoryAccess(0)")]
+    fn name_panic_names_the_broken_link() {
+        let core = ArmCore::new(false, None).unwrap();
+        jvm::ClassDefinition::name(&JavaClassDefinition::from_raw(0, &core));
     }
 }
