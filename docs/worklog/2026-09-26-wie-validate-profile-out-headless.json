@@ -1,0 +1,24 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-26",
+  "task": "wie-validate-profile-out-headless",
+  "title": "wie_validate --profile-out — 놈3 no-frame 1건: 게스트 공회전이 아니다",
+  "summary": "wie_validate 에 --profile-out(기본 꺼짐)을 열었다 — GUI wie 와 같은 folded 형식. 놈3 릴리스 25회에서 FAIL 1(#25 · paints 0). 그 판의 guest PC 샘플은 57,000 중 80(마지막 ¼ 14)뿐이라 그리던 스레드는 guest 루프를 돌고 있지 않다 — 서 있다.",
+  "changes": [
+    "wie_cli/src/bin/wie_validate.rs — --profile-out · build_emulator 가 profile 을 받는다",
+    "wie_cli/tests/validate_profile_out.rs — 켜면 생성·형식 · 끄면 무생성 · JSON 필드 수 동일",
+    "docs/report/0275"
+  ],
+  "verification": [
+    "네 게이트 + cargo +beta clippy 통과 · cargo test --all 48 스위트 0 failed",
+    "놈3 sha256 b475b639… · 릴리스 사본 · 순차 25회 · load1 43.6–121.2"
+  ],
+  "limits": [
+    "샘플에 스레드 구분이 없다 — 무엇을 기다리는지는 못 잰다",
+    "FAIL n=1 · A/B 모양은 가르지 않았다(스레드 로그 없이 돌렸다)"
+  ],
+  "adoptedProposals": [
+    "2026-09-25-nom3-no-frame-low-load-split#p0"
+  ],
+  "proposals": []
+}
