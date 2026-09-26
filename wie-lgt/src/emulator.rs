@@ -33,13 +33,57 @@ impl TaskRunner for LgtTaskRunner {
     }
 }
 
+/// Per-title archive entries that are NOT mounted, because the archive is a dump of a previous
+/// owner's phone and the entry is a save *flag* whose save *data* the dump does not carry.
+///
+/// Keyed by the MD5 of the application jar, not by the archive: `from_archive` never sees the
+/// archive bytes, and the jar is what identifies the title build (the same idiom as
+/// `wie-core-arm`'s binary patch table). Deliberately a list, never a rule — other titles ship
+/// complete saves beside the jar (`P/maplesave1.do` …), so "hide every save-looking file" would
+/// change a live title. `unless_present` keeps the entry whenever the data it flags is really there.
+struct OrphanEntry {
+    jar_md5: [u8; 16],
+    drop: &'static str,
+    unless_present: &'static str,
+}
+
+const ORPHAN_ENTRIES: &[OrphanEntry] = &[
+    // 배틀몬스터 (AID 00025C2B · archive sha256 a30bbe008b5e5704…, the otterpebble registration key).
+    // `mastercom.sav` byte[3]=01 says "a save exists", `master.sav` is absent, so 이어하기 opens
+    // nothing and drops the player into a zero-state village that ignores input (docs/report/0272).
+    OrphanEntry {
+        jar_md5: [
+            0x06, 0xde, 0x2f, 0x8c, 0x4c, 0xf6, 0x32, 0xe0, 0x78, 0x4f, 0x95, 0x03, 0xb5, 0xb4, 0x20, 0x23,
+        ],
+        drop: "mastercom.sav",
+        unless_present: "master.sav",
+    },
+];
+
+/// Remove the entries `table` names for this jar. A file is looked up both bare and under `P/`,
+/// because `load` mounts both spellings at the same path.
+fn drop_orphan_entries(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8], table: &[OrphanEntry]) {
+    let hash = md5::compute(jar).0;
+    let has = |files: &BTreeMap<String, Vec<u8>>, name: &str| files.contains_key(name) || files.contains_key(&format!("P/{name}"));
+    for entry in table.iter().filter(|e| e.jar_md5 == hash) {
+        if has(files, entry.unless_present) {
+            continue;
+        }
+        for key in [entry.drop.to_owned(), format!("P/{}", entry.drop)] {
+            if files.remove(&key).is_some() {
+                tracing::info!("Not mounting orphan save flag {key} (no {})", entry.unless_present);
+            }
+        }
+    }
+}
+
 pub struct LgtEmulator {
     core: ArmCore,
     system: System,
 }
 
 impl LgtEmulator {
-    pub fn from_archive(platform: Box<dyn Platform>, files: BTreeMap<String, Vec<u8>>, options: Options) -> Result<Self> {
+    pub fn from_archive(platform: Box<dyn Platform>, mut files: BTreeMap<String, Vec<u8>>, options: Options) -> Result<Self> {
         let app_info = files
             .get("app_info")
             .ok_or_else(|| WieError::FatalError("Missing app_info in LGT archive".into()))?;
@@ -50,11 +94,14 @@ impl LgtEmulator {
         let jar_filename = files
             .iter()
             .find_map(|(filename, data)| (filename.ends_with(".jar") && Self::loadable_jar(data)).then_some(filename))
-            .ok_or_else(|| WieError::FatalError("Missing LGT application JAR containing binary.mod".into()))?;
+            .ok_or_else(|| WieError::FatalError("Missing LGT application JAR containing binary.mod".into()))?
+            .clone();
+        let jar = files[&jar_filename].clone();
+        drop_orphan_entries(&mut files, &jar, ORPHAN_ENTRIES);
 
         Self::load(
             platform,
-            jar_filename,
+            &jar_filename,
             &app_info.pid,
             &app_info.aid,
             Some(app_info.mclass),
@@ -220,7 +267,50 @@ impl LgtAppInfo {
 
 #[cfg(test)]
 mod tests {
-    use super::LgtAppInfo;
+    use alloc::{borrow::ToOwned, collections::BTreeMap, string::String, vec, vec::Vec};
+
+    use super::{LgtAppInfo, OrphanEntry, drop_orphan_entries};
+
+    fn table(jar: &[u8]) -> [OrphanEntry; 1] {
+        [OrphanEntry {
+            jar_md5: md5::compute(jar).0,
+            drop: "mastercom.sav",
+            unless_present: "master.sav",
+        }]
+    }
+
+    fn archive(names: &[&str]) -> BTreeMap<String, Vec<u8>> {
+        names.iter().map(|n| ((*n).to_owned(), vec![1])).collect()
+    }
+
+    #[test]
+    fn orphan_flag_dropped_for_listed_jar_only() {
+        let mut files = archive(&["app.jar", "app_info", "mastercom.sav"]);
+        drop_orphan_entries(&mut files, b"listed", &table(b"listed"));
+        assert!(!files.contains_key("mastercom.sav"));
+        assert!(files.contains_key("app_info"));
+
+        // Any other jar — every other title — mounts exactly what it shipped.
+        let mut files = archive(&["app.jar", "mastercom.sav", "P/maplesave1.do"]);
+        drop_orphan_entries(&mut files, b"other", &table(b"listed"));
+        assert_eq!(files.len(), 3);
+    }
+
+    #[test]
+    fn orphan_flag_kept_when_its_data_is_present() {
+        for data in ["master.sav", "P/master.sav"] {
+            let mut files = archive(&["mastercom.sav", data]);
+            drop_orphan_entries(&mut files, b"listed", &table(b"listed"));
+            assert!(files.contains_key("mastercom.sav"), "{data}");
+        }
+    }
+
+    #[test]
+    fn orphan_flag_dropped_under_p_prefix() {
+        let mut files = archive(&["P/mastercom.sav"]);
+        drop_orphan_entries(&mut files, b"listed", &table(b"listed"));
+        assert!(files.is_empty());
+    }
 
     #[test]
     fn parse_app_info_name() {
