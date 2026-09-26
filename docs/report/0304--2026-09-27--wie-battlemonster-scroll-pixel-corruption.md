@@ -60,3 +60,5 @@
 - 네 게이트 + beta clippy 는 회신에 원문.
 
 게임 이름 유입(`scripts/corpus-name-inflow.mjs --corpus <game_lab>`): BOUNDED 2회/2쌍 — `배틀몬스터`(이 회차의 대상 · 리니지 0271·0272·0303 이 이미 적은 타이틀) · SUFFIX-ATTACHED 1회/1쌍(`배틀몬스터처럼` · 조사 · 같은 타이틀).
+
+<!-- corpus-name-inflow v1 subjects=2 tree=dc26e7039c897d4b B=3/2 P=0/0 S=2/2 -->
