@@ -5,7 +5,7 @@ use core::{
 };
 
 use jvm::{
-    ClassDefinition, ClassInstance, ClassInstanceRef, JavaError, JavaType, Jvm,
+    ClassInstance, ClassInstanceRef, JavaError, JavaType, Jvm,
     runtime::{JavaLangClass, JavaLangClassLoader, JavaLangString},
 };
 use rustjava_runtime::classes::java::util::Vector;
@@ -372,7 +372,7 @@ async fn java_register_class(core: &mut ArmCore, jvm: &mut Jvm, ptr_class: u32) 
 async fn java_resolve_class(core: &mut ArmCore, jvm: &mut Jvm, ptr_class: u32, _runtime_context: u32) -> Result<u32> {
     java_register_class(core, jvm, ptr_class).await?;
 
-    let name = ClassDefinition::name(&LgtJvmSupport::class_from_raw(core, ptr_class));
+    let name = LgtJvmSupport::class_from_raw(core, ptr_class).try_name()?;
     let class = jvm
         .get_class(&name)
         .ok_or_else(|| WieError::FatalError(format!("LGT generated class not resolved: {name}")))?;
