@@ -1027,7 +1027,12 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     let mut run_err: Option<String> = None;
     let mut phase = String::from("boot");
     let mut sched_idx = 0usize;
-    let mut input_steps = 0u64;
+    // Named fields, not two bare u64s: the gate must be handed `delivered`, and a positional
+    // pair let `judge(.., total, total)` compile and pass the whole suite (gate② M2).
+    let mut inputs = InputCount {
+        delivered: 0,
+        scripted: input_steps_total,
+    };
 
     while !exited.load(Ordering::SeqCst) {
         let elapsed = loop_start.elapsed();
@@ -1044,7 +1049,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
                     // a step that panics the guest was still delivered, and `input_steps` has
                     // to agree with the `panic on input '06_OK'` reason naming step 6.
                     if *down {
-                        input_steps += 1;
+                        inputs.delivered += 1;
                     }
                     let ev = if *down { Event::Keydown(*kc) } else { Event::Keyup(*kc) };
                     if let Err(p) = catch_unwind(AssertUnwindSafe(|| emulator.handle_event(ev))) {
@@ -1177,18 +1182,26 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     outcome.nondominant_bp = screen.max_nondominant_bp.load(Ordering::SeqCst);
     outcome.center_nonuniform_bp = screen.max_center_nonuniform_bp.load(Ordering::SeqCst);
 
-    judge(&mut outcome, args.inject, args.expect_last_frame, stop, input_steps, input_steps_total);
+    judge(&mut outcome, args.inject, args.expect_last_frame, stop, inputs);
     outcome
 }
 
 /// Records the input counters and applies the two gates. Split out of `run` so the delivered
 /// count — not the scripted total — can be asserted to reach the gate without an emulator.
-fn judge(outcome: &mut Outcome, inject: bool, expect_last_frame: bool, stop: &'static str, input_steps: u64, input_steps_total: u64) {
+/// Keys the run actually delivered vs. keys the script asked for. Built once where the keys
+/// are counted, so `judge` cannot be handed the two numbers in the wrong order.
+#[derive(Clone, Copy)]
+struct InputCount {
+    delivered: u64,
+    scripted: u64,
+}
+
+fn judge(outcome: &mut Outcome, inject: bool, expect_last_frame: bool, stop: &'static str, inputs: InputCount) {
     // Same rule as the richness trios: recorded before anything judges. These three are what
     // the gate below reads, so here the order is not merely conventional.
     outcome.stop = stop;
-    outcome.input_steps = input_steps;
-    outcome.input_steps_total = input_steps_total;
+    outcome.input_steps = inputs.delivered;
+    outcome.input_steps_total = inputs.scripted;
 
     // `else if`, not a second `if`: a run that injected nothing has no last frame worth
     // gating either, and "last frame blank" would be a narrower, more misleading reason
@@ -1783,11 +1796,14 @@ mod tests {
 
     /// The gate must be handed the DELIVERED count, not the scripted total: feeding it
     /// `input_steps_total` (27 on every --inject run) means it can never fire.
+    /// Scope: this pins what `judge` does with an `InputCount`. It does NOT see how `run`
+    /// fills one — `InputCount { delivered: total, .. }` at the counting site stays green here;
+    /// the named fields are what make that edit visible instead of a one-token swap.
     #[test]
     fn the_gate_is_handed_the_delivered_count_test() {
         for (delivered, unmeasured) in [(0u64, true), (10, true), (27, false)] {
             let mut o = super::pass("lgt", String::new(), 0, 0, true);
-            super::judge(&mut o, true, false, "clean exit", delivered, 27);
+            super::judge(&mut o, true, false, "clean exit", super::InputCount { delivered, scripted: 27 });
             assert_eq!((o.input_steps, o.input_steps_total), (delivered, 27), "recorded counts");
             assert_eq!(o.unmeasured, unmeasured, "{delivered}/27");
             assert_eq!(o.passed, !unmeasured, "{delivered}/27");
