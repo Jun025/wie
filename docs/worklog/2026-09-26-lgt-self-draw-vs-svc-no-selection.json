@@ -1,0 +1,19 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-26",
+  "task": "wie-lgt-self-draw-vs-svc-selection-observe",
+  "title": "LGT «자기 그리기 vs SVC» 분기는 없다 — 0262 의 ⒜ FillRect 0 은 LGT 그리기 함수의 로그 공백",
+  "summary": "SVC 디스패치 층에 임시 탐침을 달고 ⒜(LGT graphics) 바이너리를 빌드해, main 과 같은 타이틀을 쟀다. 두 배선 모두 FillRect 를 프레임당 1회 부르고 호출 순서도 같다. 0262 가 본 «⒜ FillRect 0» 은 LGT 그리기 함수 15개에 debug 로그가 없어서 생긴 공백이었다. 글자 픽셀 2,125 개는 두 배선에서 같은 자리에 쓰이고 색만 다르다(⒜ #ff0000 ↔ main #fffbff). 그래서 남은 층은 프레임버퍼 레코드가 아니라 컨텍스트 레코드의 글자색이다. 그 층은 이미 발권된 인접 티켓이 맡는다. 주석 6줄을 더했고 동작 코드는 0줄이다.",
+  "changes": [
+    "wie-lgt/src/runtime/wipi_c.rs: ⒜ 가 keydraw_lgt 를 깨는 이유에 컨텍스트 레코드 축 6줄(주석만)",
+    "docs/report/0274: 디스패치 층 SVC 계수 main/⒜ · 글자 픽셀 색 계수 · 0262 §2·§4 정정"
+  ],
+  "verification": "release main·⒜+probe 각 1회(--timeout 60) · 스크린샷 색 계수 · keydraw_lgt ⒜ FAIL(Undefined instruction)/main PASS 55 · 탐침 소스 git checkout -- 로 복원.",
+  "limits": "표본 1타이틀 · 바이너리당 1회. ⒜+probe 는 0262 ⒜ 와 배선이 다르다(BPP LGT · GetContext 공용). 글자색 필드 오프셋은 미측정(인접 티켓 wie-2026-09-25-lgt-hybrid-blank-bpp-accessor-adopt-p0 소관).",
+  "adoptedProposals": [
+    "2026-09-25-lgt-graphics-context-record-refuted#p0",
+    "2026-09-25-lgt-graphics-context-record-refuted#p1"
+  ],
+  "declinedProposals": [],
+  "proposals": []
+}

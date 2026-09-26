@@ -8,6 +8,12 @@ mod context;
 // record ABI (`LgtFramebuffer`, 16B, no `buf`) than the guest SDK reads
 // (`WIPICFramebuffer`, 20B, pixel pointer at +16). This is a DEFERRAL, not a rejection:
 // re-wiring is the same 27 lines, in reverse. See docs/upstream-realign-p3-slices.md §D.
+// The framebuffer record is not the only one: the graphics CONTEXT record is a second
+// axis. Handing the guest only the LGT context (`LgtGraphicsContext`, 56B, via an adapter
+// on `InitContext`/`SetContext`) while keeping the shared framebuffer also fails
+// `keydraw_lgt` with the same `Undefined instruction` in `CletWrapperCard.paint`
+// (docs/report/0262 §3) — the fixture SDK reads the shared 48B context layout directly.
+// So re-wiring swaps two record ABIs, not one.
 //
 // The one exception is `GetFramebufferBpp` (2026-09-25): its argument is not a
 // framebuffer handle — the native accessor ignores it and the local one does too — so the
