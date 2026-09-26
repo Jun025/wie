@@ -89,3 +89,7 @@ LGT 타이틀에 붙으므로 권고는 타이틀 무관하다.
 AGENTS.md 러너 블록(엔진 변경) — `draw_j2me`·`helloworld_ktf`·`helloworld_lgt` PASS · `keydraw_ktf`·`keydraw_lgt`
 `--inject --expect-last-frame` PASS rc=0 · `text_j2me --timeout 5` PASS.
 ★이 변경을 잠그는 시험은 없다 — 의미 불변 성능 변경이라 등가성 근거는 위 91파일 짝이다.
+
+**게임 파일명 유입**(`node scripts/corpus-name-inflow.mjs --corpus <game_lab>` 실행값): BOUNDED·SUFFIX-ATTACHED 는
+아래 표식 그대로다. 전건 이 회차 측정 대상 타이틀 이름(표·판정 문장·코드 주석 1곳)이고 SUFFIX-ATTACHED 는
+「서든어택」⊂「서든어택포켓」 과 「서든어택포켓의」(조사) — 파일 바이트·경로 유입은 없다.
