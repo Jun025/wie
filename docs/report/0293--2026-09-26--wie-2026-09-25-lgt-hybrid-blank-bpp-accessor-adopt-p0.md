@@ -102,9 +102,7 @@ release · `--timeout 60`:
 
 `node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab` 의 대상은 이 브랜치가 바꾼 파일이다. 수는 아래 표식이 최종이다.
 BOUNDED 는 §4 게이트에서 스크린샷을 뜬 타이틀 이름과 `wipi_c.rs`·`graphics.rs` 에 원래 있던 주석 속 이름이다. 대상 타이틀은 이름 대신 «`0236` §2-2 의 타이틀»로 적었다.
-SUFFIX-ATTACHED 2쌍은 `docs/upstream-realign-p3-slices.md` 에 원래 있던 조사 붙은 언급 1개와, 이 절이 그것을 인용한 1개다 ⇒ 둘 다 진짜 언급 · 판단이 더 필요한 것 0.
+SUFFIX-ATTACHED 1쌍은 `docs/upstream-realign-p3-slices.md` 에 원래 있던 조사 붙은 진짜 언급이다 ⇒ 판단이 더 필요한 것 0.
 게임 바이트 유입 0 · 경로 유입 0.
 
 
-
-<!-- corpus-name-inflow v1 subjects=6 tree=cf89a34227ffc49e B=21/16 P=0/0 S=1/1 -->
