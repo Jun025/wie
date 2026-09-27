@@ -1,0 +1,16 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-27",
+  "task": "wie-2026-09-27-sleep-wake-exact-within-tick-budget-adopt-p0",
+  "title": "고정 sleep 깸을 tick 예산 안에서 정확히 — 메이플 루프 66.7 → 60.0ms",
+  "summary": "실행기가 모든 task 가 잠들어도, 1ms 보다 긴 sleep 의 깸이 예산 안이면 그 시각까지 기다린다. 1ms sleep(영웅서기4 MC_knlSetTimer(1) · 이벤트 스레드 큐 확인)은 폴링으로 보고 기다리지 않는다. 멈춘 시계면 tick 을 끝낸다.",
+  "changes": ["wie-backend Executor::tick_for — 예산 안 깸 대기 · POLL_SLEEP_MS · FROZEN_CLOCK_READS", "docs/report/0310"],
+  "verification": [
+    "교대 2짝: 메이플 루프 p50 66.7 → 60.0 · 페인트 13.65 → 14.80/s · 영웅서기4 36.2~36.8 → 36.8~36.9 · 숲 20 → 20",
+    "정지 화면 tick 점유 1.9 → 6.0% (제안 그대로면 81%)",
+    "cargo test --all 499/0 · clippy stable/wasm/beta rc0 · 변이 4종 red · runner 블록 PASS"
+  ],
+  "limits": ["sleep(1) 을 박자로 쓰는 게임은 여전히 프레임 격자에 붙는다"],
+  "proposals": [],
+  "adoptedProposals": ["2026-09-27-battlemonster-overall-game-speed#p0"]
+}
