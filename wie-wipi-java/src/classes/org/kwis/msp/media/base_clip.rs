@@ -48,6 +48,9 @@ impl BaseClip {
         Ok(10000000 as _)
     }
 
+    // A game's own `putData` replaces whatever `setBuffer` (or the `Clip(type, byte[])`
+    // constructor, which calls it) registered: the clip stops watching that array, or a later
+    // rewrite of it would make `refresh` reload the old array over the sound the game just put.
     async fn put_data(
         jvm: &Jvm,
         _: &mut WieJvmContext,
@@ -58,6 +61,11 @@ impl BaseClip {
     ) -> JvmResult<i32> {
         tracing::debug!("org.kwis.msp.media.Clip::putData({this:?}, {buffer:?}, {offset}, {length})");
 
+        jvm.put_field(&mut this, "buffer", "[B", None).await?;
+        Self::load(jvm, &mut this, buffer, offset, length).await
+    }
+
+    async fn load(jvm: &Jvm, this: &mut ClassInstanceRef<Self>, buffer: ClassInstanceRef<Array<i8>>, offset: i32, length: i32) -> JvmResult<i32> {
         let input_stream = jvm.new_class("java/io/ByteArrayInputStream", "([BII)V", (buffer, offset, length)).await?;
         let r#type = JavaLangString::from_rust_string(jvm, "application/vnd.smaf").await?;
 
@@ -70,7 +78,7 @@ impl BaseClip {
             )
             .await?;
 
-        jvm.put_field(&mut this, "player", "Ljavax/microedition/media/Player;", player).await?;
+        jvm.put_field(this, "player", "Ljavax/microedition/media/Player;", player).await?;
 
         Ok(length)
     }
@@ -104,18 +112,16 @@ impl BaseClip {
     ) -> JvmResult<bool> {
         tracing::debug!("org.kwis.msp.media.BaseClip::setBuffer({this:?}, {buffer:?}, {size})");
 
-        jvm.put_field(&mut this, "buffer", "[B", buffer.clone()).await?;
+        let written = Self::load(jvm, &mut this, buffer.clone(), 0, size).await?;
+        jvm.put_field(&mut this, "buffer", "[B", buffer).await?;
         jvm.put_field(&mut this, "bufferSize", "I", size).await?;
-        let written: i32 = jvm
-            .invoke_virtual(&this, "org/kwis/msp/media/BaseClip", "putData", "([BII)I", (buffer, 0, size))
-            .await?;
         let hash = Self::buffer_hash(jvm, &this).await?;
         jvm.put_field(&mut this, "bufferHash", "I", hash).await?;
 
         Ok(written == size)
     }
 
-    /// Reloads the `setBuffer` array if the game rewrote it since it was last loaded.
+    /// Reloads the `setBuffer` (or `Clip(type, byte[])`) array if the game rewrote it since it was last loaded.
     pub async fn refresh(jvm: &Jvm, this: &mut ClassInstanceRef<Self>) -> JvmResult<()> {
         if this.is_null() {
             return Ok(());
@@ -135,9 +141,7 @@ impl BaseClip {
             let _: () = jvm.invoke_virtual(&player, "javax/microedition/media/Player", "close", "()V", ()).await?;
         }
         let size: i32 = jvm.get_field(this, "bufferSize", "I").await?;
-        let _: i32 = jvm
-            .invoke_virtual(this, "org/kwis/msp/media/BaseClip", "putData", "([BII)I", (buffer, 0, size))
-            .await?;
+        Self::load(jvm, this, buffer, 0, size).await?;
         jvm.put_field(this, "bufferHash", "I", hash).await
     }
 

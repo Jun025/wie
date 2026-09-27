@@ -293,6 +293,59 @@ mod test {
         Ok(())
     }
 
+    // `putData` replaces the array the constructor registered: the game reusing that array
+    // afterwards must not make a play reload it over the sound `putData` loaded (gate② #359).
+    #[test]
+    fn test_put_data_releases_the_constructor_array() -> Result<()> {
+        let platform = TestPlatform::new();
+        let log = platform.audio_log();
+
+        run_jvm_test_with_system(
+            Box::new([wie_midp::get_protos().into(), get_protos().into()]),
+            Box::new(platform),
+            |jvm, _system| async move {
+                let r#type: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, "audio/test").await?.into();
+                let mut registered = jvm.instantiate_array("B", 4).await?;
+                let clip: ClassInstanceRef<Clip> = jvm
+                    .new_class("org/kwis/msp/media/Clip", "(Ljava/lang/String;[B)V", (r#type, registered.clone()))
+                    .await?
+                    .into();
+                let mut put = jvm.instantiate_array("B", 4).await?;
+                jvm.store_array(&mut put, 0, [5i8, 6, 7, 8]).await?;
+                let _: i32 = jvm
+                    .invoke_virtual(&clip, "org/kwis/msp/media/BaseClip", "putData", "([BII)I", (put, 0, 4))
+                    .await?;
+
+                for _ in 0..2 {
+                    let _: bool = jvm
+                        .invoke_static(
+                            "org/kwis/msp/media/Player",
+                            "play",
+                            "(Lorg/kwis/msp/media/Clip;Z)Z",
+                            (clip.clone(), false),
+                        )
+                        .await?;
+                    jvm.store_array(&mut registered, 0, [1i8, 2, 3, 4]).await?;
+                }
+
+                Ok(())
+            },
+        )?;
+
+        let handles: Vec<u32> = log
+            .lock()
+            .iter()
+            .filter_map(|command| match command {
+                AudioCommand::Play { handle, .. } => Some(*handle),
+                AudioCommand::Stop { .. } => None,
+            })
+            .collect();
+        assert_eq!(handles.len(), 2);
+        assert_eq!(handles[0], handles[1]);
+
+        Ok(())
+    }
+
     // A Clip handed over as its BaseClip supertype sounds: the BaseClip overloads were stubs,
     // and the titles compiled against them were silent.
     #[test]

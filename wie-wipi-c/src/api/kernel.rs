@@ -52,7 +52,7 @@ pub async fn get_system_property(context: &mut dyn WIPICContext, ptr_id: WIPICWo
         "DS_LOCK" => "0",
         // Titles look for "Yamaha_MA3" here — the SMAF chip, the one format `clip_put_data`
         // plays — and create no clip without it: M_E_INVALID left 3 LGT titles silent
-        // (2026-09-27 silent-104 census, 0 → 2..5 plays in 90 s).
+        // (2026-09-27 silent-104 census, 0 → 2..8 plays in 90 s).
         "MEDIADEVICES" => "Yamaha_MA3",
         _ => {
             tracing::warn!("unknown system property id: {id}");
