@@ -51,6 +51,7 @@ pub fn get_java_interface_method(core: &mut ArmCore, function_index: u32) -> Res
         0x55 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::Unk55)?,
         0x56 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::MonitorEnter)?,
         0x57 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::MonitorExit)?,
+        0x5b => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::LoadLongArray)?,
         0x61 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::StoreReferenceArray)?,
         0x82 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::SetJarPath)?,
         0x83 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::StartApplication)?,
@@ -103,6 +104,7 @@ async fn handle_java_system_svc(core: &mut ArmCore, (jvm, ptr_jar_path): &mut (J
                 .await?
                 .write(core, lr),
             JavaSystemSvcId::StoreLongArray => EmulatedFunction::call(&java_store_long_array, core, jvm).await?.write(core, lr),
+            JavaSystemSvcId::LoadLongArray => EmulatedFunction::call(&java_load_long_array, core, jvm).await?.write(core, lr),
             JavaSystemSvcId::LinkPublicClass => EmulatedFunction::call(&java_link_public_class, core, jvm).await?.write(core, lr),
             JavaSystemSvcId::IsClassAssignable => java_is_class_assignable(core, jvm, core.read_param(0)?, core.read_param(1)?, core.read_param(2)?)
                 .await?
@@ -309,6 +311,36 @@ async fn java_store_long_array(core: &mut ArmCore, jvm: &mut Jvm, ptr_array: u32
     jvm.store_array(&mut array, index as usize, [value])
         .await
         .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))
+}
+
+// `laload`, the read half of 0xfd above. Same title (슈퍼액션히어로), 3 call sites, all
+// `(array, index) -> long`: 0x883c/0x88b4 index a static long[] with a loop counter, and 0x987c is
+// a CRC-32 step — `table[(crc ^ b) & 0xff] ^ (crc >>> 8)` over the static field that 0x97f2 fills
+// through 0xfd. The result comes back LOW in r0, HIGH in r1, the ordinary AAPCS pair: at 0x987c r0
+// is xored with the low word of `crc >>> 8` (the word the index is taken from) and r1 with the high
+// one; at 0x8842 the r1 word is the one compared signed first. So this is NOT the high-first order
+// 0xfd takes its value in — the two imports disagree, and both are read off the same binary.
+// No site null- or bounds-checks the long[] before calling, so the checks belong here, as for 0xfd.
+async fn java_load_long_array(core: &mut ArmCore, jvm: &mut Jvm, ptr_array: u32, index: u32) -> Result<LongReturn> {
+    if ptr_array == 0 {
+        java_raise_null_pointer_exception(core, jvm).await?;
+    }
+    let array = LgtJvmSupport::class_instance_from_raw(core, ptr_array)?;
+    let values: Vec<i64> = jvm
+        .load_array(&array, index as usize, 1)
+        .await
+        .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))?;
+    Ok(LongReturn(values[0]))
+}
+
+/// A `long` returned in r0 (low) : r1 (high).
+struct LongReturn(i64);
+
+impl ResultWriter<LongReturn> for LongReturn {
+    fn write(self, core: &mut ArmCore, next_pc: u32) -> Result<()> {
+        core.write_return_value(&[self.0 as u32, (self.0 as u64 >> 32) as u32])?;
+        core.set_next_pc(next_pc)
+    }
 }
 
 async fn java_get_string_class(_core: &mut ArmCore, jvm: &mut Jvm) -> Result<u32> {
@@ -812,13 +844,16 @@ mod tests {
 
     use test_utils::TestPlatform;
     use wie_backend::{DefaultTaskRunner, System};
-    use wie_core_arm::{Allocator, ArmCore};
+    use wie_core_arm::{Allocator, ArmCore, ResultWriter};
     use wie_jvm_support::JvmImplementation;
     use wie_util::{ByteWrite, Result, read_generic, write_generic, write_null_terminated_string_bytes};
 
     use wie_util::WieError;
 
-    use super::{LgtJvmSupport, java_link_imported_classes, java_store_long_array, read_member_name_and_descriptor};
+    use super::{
+        LgtJvmSupport, get_java_interface_method, java_link_imported_classes, java_load_long_array, java_store_long_array,
+        read_member_name_and_descriptor, register_java_system_svc_handler,
+    };
     use crate::runtime::java::jvm_support::tests::init_jvm;
 
     #[test]
@@ -849,6 +884,46 @@ mod tests {
                 );
             }
             assert_eq!(jvm.load_array::<i64>(&longs, 0, 3).await.unwrap(), vec![0, 0x1234_5678_9abc_def0, -2]);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    // 0x5b reads back what 0xfd stored (the title's CRC table round-trips through the pair), and
+    // hands it over low word in r0, high in r1 — the opposite of 0xfd's argument order.
+    #[test]
+    fn load_long_array_returns_low_word_in_r0_and_checks_its_array() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (mut jvm, mut core, _) = init_jvm(&system_clone).await?;
+            // The import the title resolves; it died here with "Unknown lgt java import: 0x5b".
+            register_java_system_svc_handler(&mut core, &jvm, 0)?;
+            get_java_interface_method(&mut core, 0x5b)?;
+            let longs = jvm.instantiate_array("J", 2).await.unwrap();
+            let ptr_longs = LgtJvmSupport::class_instance_raw(&*longs);
+            java_store_long_array(&mut core, &mut jvm, ptr_longs, 1, 0x1234_5678, 0x9abc_def0).await?;
+
+            java_load_long_array(&mut core, &mut jvm, ptr_longs, 1).await?.write(&mut core, 0x1000)?;
+            assert_eq!((core.read_param(0)?, core.read_param(1)?), (0x9abc_def0, 0x1234_5678));
+
+            for (ptr_array, index) in [(ptr_longs, 2), (ptr_longs, u32::MAX), (0, 0)] {
+                let result = java_load_long_array(&mut core, &mut jvm, ptr_array, index).await;
+                assert!(
+                    matches!(result, Err(WieError::JavaException(_))),
+                    "{ptr_array:#x}[{index}] must throw into the guest"
+                );
+            }
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())

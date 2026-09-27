@@ -1,0 +1,8 @@
+{
+  "date": "2026-09-27",
+  "task": "wie-2026-09-27-superaction-lgt-import-0x5b-adopt-p0",
+  "title": "LGT import 0x5b = long[] 읽기(laload) — 슈퍼액션히어로 첫 게임 화면 · --inject 27/27 PASS",
+  "summary": "binary.mod 호출부 3곳(CRC-32 테이블 조회 포함)으로 0x5b 를 (array, index) -> long, r0 하위·r1 상위로 판정해 등재. 슈퍼액션히어로 3/3 PASS · content true.",
+  "adoptedProposals": ["2026-09-27-superaction-random-10-after-wec#p0"],
+  "proposals": []
+}
