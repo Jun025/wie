@@ -108,6 +108,10 @@ impl EventQueue {
         self.events.push_back(event);
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.input_events.is_empty() && self.events.is_empty()
+    }
+
     /// Keyboard input takes priority; events at the same priority remain FIFO.
     pub fn pop(&mut self) -> Option<Event> {
         self.input_events.pop_front().or_else(|| self.events.pop_front())

@@ -19,6 +19,9 @@ const TITLE_VERTICAL_PADDING: i32 = 2;
 const TICKER_HEIGHT: i32 = 16;
 const TICKER_INTERVAL_MS: u64 = 100;
 const SOFTKEY_HEIGHT: i32 = 18;
+// Full mark-and-sweep cost ~10ms per paint on 배틀몬스터's heap, a fifth of its frame budget.
+// Garbage now lives up to this long; before upstream `95555afe` it lived until the guest called gc().
+const GC_INTERVAL_MS: i64 = 1000;
 
 const TITLE_BACKGROUND: i32 = 0x263746;
 const WHITE: i32 = 0xffffff;
@@ -123,6 +126,7 @@ impl Display {
                 JavaFieldProto::new("height", "I", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("paintDisabled", "Z", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("repaintPending", "Z", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("lastGcMillis", "J", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("alertGeneration", "I", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("tickerGeneration", "I", FieldAccessFlags::PRIVATE),
             ],
@@ -719,9 +723,7 @@ impl Display {
         tracing::debug!("javax.microedition.lcdui.Display::repaint({this:?}, {x}, {y}, {width}, {height})");
 
         jvm.put_field(&mut this, "repaintPending", "Z", true).await?;
-        let platform = context.system().platform();
-        let screen = platform.screen();
-        screen.request_redraw().unwrap();
+        context.system().request_redraw();
 
         Ok(())
     }
@@ -904,7 +906,12 @@ impl Display {
 
             screen.paint(&*image);
         }
-        jvm.collect_garbage()?;
+        let now = context.system().platform().now().raw() as i64;
+        let last_gc: i64 = jvm.get_field(&this, "lastGcMillis", "J").await?;
+        if now - last_gc >= GC_INTERVAL_MS {
+            jvm.put_field(&mut this, "lastGcMillis", "J", now).await?;
+            jvm.collect_garbage()?;
+        }
 
         Ok(())
     }
@@ -1096,13 +1103,16 @@ impl Display {
 
 #[cfg(test)]
 mod test {
+    use alloc::sync::Arc;
     use alloc::{boxed::Box, vec};
+    use core::sync::atomic::{AtomicBool, Ordering};
 
     use jvm::{ClassInstanceRef, JavaValue, Jvm, Result as JvmResult, runtime::JavaLangString};
     use jvm_class_proto::{JavaClassProto, JavaFieldProto, JavaMethodProto};
     use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 
-    use test_utils::run_jvm_test;
+    use test_utils::{TestClock, TestPlatform, run_jvm_test, run_jvm_test_with_system};
+    use wie_backend::{DefaultTaskRunner, Event, System};
     use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
     use wie_util::Result;
 
@@ -1537,6 +1547,137 @@ mod test {
 
             Ok(())
         })
+    }
+
+    async fn paint_at(jvm: &Jvm, clock: &TestClock, display: &ClassInstanceRef<Display>, millis: u64) -> JvmResult<()> {
+        clock.set(millis);
+        jvm.invoke_virtual(display, "javax/microedition/lcdui/Display", "handlePaintEvent", "()V", ())
+            .await
+    }
+
+    #[test]
+    fn repaint_reaches_the_event_queue_when_the_guest_spins_on_yield() -> Result<()> {
+        // The clock never moves, so the tick cannot end — and flush at its end — before the checks.
+        let clock = TestClock::new();
+        let platform = TestPlatform::with_clock(clock.clone());
+        let host_redraw = platform.redraw_flag();
+        run_jvm_test_with_system(test_protos(), Box::new(platform), move |jvm, system| async move {
+            let display: ClassInstanceRef<Display> = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?.into();
+            let _: () = jvm
+                .invoke_virtual(&display, "javax/microedition/lcdui/Display", "repaint", "(IIII)V", (0, 0, 1, 1))
+                .await?;
+            assert!(system.event_queue().pop().is_none(), "the repainting thread has not blocked yet");
+
+            let _: () = jvm.invoke_static("java/lang/Thread", "yield", "()V", ()).await?;
+            assert!(system.event_queue().pop().is_none(), "one yield is not a wait");
+            let _: () = jvm.invoke_static("java/lang/Thread", "yield", "()V", ()).await?;
+            assert!(
+                matches!(system.event_queue().pop(), Some(Event::Redraw)),
+                "a second one hands the paint over"
+            );
+            assert!(system.event_queue().pop().is_none());
+            assert!(!host_redraw.load(Ordering::SeqCst), "the host is not asked for a second Redraw");
+            clock.advance(100);
+            Ok(())
+        })
+    }
+
+    // Runs `a` and `b` as two tasks; `b` is polled between `a`'s two halves. The clock stands still
+    // until `a` is done, so the tick cannot end (and flush) in between.
+    fn in_two_tasks(a: impl FnOnce(System) -> bool + Send + 'static, b: impl FnOnce(System) + Send + 'static) -> bool {
+        let clock = TestClock::new();
+        let mut system = System::new(Box::new(TestPlatform::with_clock(clock.clone())), "", "", DefaultTaskRunner);
+        let seen = Arc::new(AtomicBool::new(false));
+        let (seen_a, system_a, system_b) = (seen.clone(), system.clone(), system.clone());
+        system.spawn(async move || {
+            system_a.request_redraw();
+            system_a.guest_yielded();
+            system_a.yield_now().await;
+            seen_a.store(a(system_a), Ordering::SeqCst);
+            clock.advance(100);
+            Ok(())
+        });
+        system.spawn(async move || {
+            b(system_b);
+            Ok(())
+        });
+        system.tick().unwrap();
+        seen.load(Ordering::SeqCst)
+    }
+
+    #[test]
+    fn another_threads_sleep_does_not_break_a_yield_spin() {
+        // 배틀몬스터 has a thread that sleeps while its game thread spins on yield.
+        let queued = in_two_tasks(
+            |system| {
+                system.guest_yielded();
+                matches!(system.event_queue().pop(), Some(Event::Redraw))
+            },
+            |system| system.guest_slept(),
+        );
+        assert!(queued, "the second yield must hand the paint over");
+    }
+
+    #[test]
+    fn a_sleep_between_yields_is_not_a_spin() -> Result<()> {
+        // 메이플스토리2007: repaint, one yield, sleep — its paint keeps waiting for the tick end.
+        let clock = TestClock::new();
+        run_jvm_test_with_system(
+            test_protos(),
+            Box::new(TestPlatform::with_clock(clock.clone())),
+            move |jvm, system| async move {
+                let display: ClassInstanceRef<Display> = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?.into();
+                let _: () = jvm
+                    .invoke_virtual(&display, "javax/microedition/lcdui/Display", "repaint", "(IIII)V", (0, 0, 1, 1))
+                    .await?;
+                let _: () = jvm.invoke_static("java/lang/Thread", "yield", "()V", ()).await?;
+                let _: () = jvm.invoke_static("java/lang/Thread", "sleep", "(J)V", (0i64,)).await?;
+                let _: () = jvm.invoke_static("java/lang/Thread", "yield", "()V", ()).await?;
+                assert!(system.event_queue().pop().is_none(), "the sleep ended the first streak");
+                let _: () = jvm.invoke_static("java/lang/Thread", "yield", "()V", ()).await?;
+                assert!(matches!(system.event_queue().pop(), Some(Event::Redraw)));
+                clock.advance(100);
+                Ok(())
+            },
+        )
+    }
+
+    #[test]
+    fn tick_end_delivers_a_repaint_no_thread_blocked_after() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        system.request_redraw();
+        assert!(system.event_queue().pop().is_none());
+        system.tick()?;
+        assert!(matches!(system.event_queue().pop(), Some(Event::Redraw)));
+        Ok(())
+    }
+
+    #[test]
+    fn paint_collects_garbage_at_most_once_per_interval() -> Result<()> {
+        let clock = TestClock::new();
+        run_jvm_test_with_system(
+            test_protos(),
+            Box::new(TestPlatform::with_clock(clock.clone())),
+            move |jvm, _| async move {
+                let display: ClassInstanceRef<Display> = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?.into();
+                let garbage = async || -> JvmResult<()> {
+                    jvm.push_native_frame();
+                    let _ = JavaLangString::from_rust_string(&jvm, "garbage").await?;
+                    jvm.pop_frame();
+                    Ok(())
+                };
+                paint_at(&jvm, &clock, &display, 1000).await?;
+
+                garbage().await?;
+                paint_at(&jvm, &clock, &display, 1999).await?;
+                assert!(jvm.collect_garbage()? > 0, "a paint 999ms after the last collection must not collect");
+
+                garbage().await?;
+                paint_at(&jvm, &clock, &display, 2000).await?;
+                assert_eq!(jvm.collect_garbage()?, 0, "a paint 1000ms after it must");
+                Ok(())
+            },
+        )
     }
 
     #[test]
