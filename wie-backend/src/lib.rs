@@ -94,7 +94,34 @@ pub fn extract_zip(zip: &[u8]) -> Result<BTreeMap<String, Vec<u8>>> {
         })
         .collect::<Result<_>>()?;
 
-    Ok(strip_common_wrapper_dir(files))
+    Ok(strip_common_wrapper_dir(reroot_at_marker(files)))
+}
+
+/// A game archive's marker (`__adf__`, `app_info`, `*.msd`) sits at the root. When none does but
+/// exactly one directory holds one, that directory IS the game: re-root there and drop what lies
+/// outside it. Measured 2026-09-27: 3 KTF titles nest the game two or three levels deep, two of
+/// them next to a stray screenshot at the root, which the single-wrapper strip below cannot reach.
+fn reroot_at_marker(files: BTreeMap<String, Vec<u8>>) -> BTreeMap<String, Vec<u8>> {
+    let is_marker = |path: &str| {
+        let name = path.rsplit('/').next().unwrap_or(path);
+        name == "__adf__" || name == "app_info" || name.ends_with(".msd")
+    };
+    if files.keys().any(|k| !k.contains('/') && is_marker(k)) {
+        return files;
+    }
+
+    let mut dirs = files.keys().filter(|k| is_marker(k)).map(|k| &k[..=k.rfind('/').unwrap()]);
+    let Some(dir) = dirs.next().map(str::to_string) else {
+        return files;
+    };
+    if dirs.any(|d| d != dir) {
+        return files;
+    }
+
+    files
+        .into_iter()
+        .filter_map(|(path, data)| path.strip_prefix(&dir).map(|p| (p.to_string(), data)))
+        .collect()
 }
 
 /// Some archives wrap every game file inside a single top-level directory (e.g.
@@ -134,6 +161,30 @@ mod tests {
 
     fn map(entries: &[&str]) -> BTreeMap<String, Vec<u8>> {
         entries.iter().map(|p| ((*p).to_string(), Vec::new())).collect()
+    }
+
+    #[test]
+    fn reroots_at_the_one_nested_marker_dir() {
+        let out = reroot_at_marker(map(&["W/apps/x/__adf__", "W/apps/x/x.jar", "shot.png"]));
+        assert_eq!(out.keys().collect::<Vec<_>>(), ["__adf__", "x.jar"]);
+        // Root marker, or two candidate games: unchanged.
+        assert!(reroot_at_marker(map(&["__adf__", "d/app_info"])).contains_key("d/app_info"));
+        assert!(reroot_at_marker(map(&["a/__adf__", "b/__adf__"])).contains_key("a/__adf__"));
+    }
+
+    #[test]
+    fn extract_zip_reroots_a_nested_game() {
+        extern crate std;
+        use std::io::{Cursor, Write};
+
+        let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        let stored = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        for name in ["shot.png", "g/g-wipi1.2/__adf__", "g/g-wipi1.2/g.jar"] {
+            zip.start_file(name, stored).unwrap();
+            zip.write_all(b"x").unwrap();
+        }
+        let files = extract_zip(&zip.finish().unwrap().into_inner()).unwrap();
+        assert!(files.contains_key("__adf__") && files.contains_key("g.jar"));
     }
 
     #[test]
