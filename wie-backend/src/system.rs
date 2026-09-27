@@ -5,13 +5,14 @@ mod file_system;
 use alloc::{borrow::ToOwned, boxed::Box, string::String, sync::Arc};
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use spin::{Mutex, RwLock, RwLockWriteGuard};
+use spin::{Mutex, MutexGuard, RwLock, RwLockWriteGuard};
 
 use wie_util::Result;
 
 use crate::{
     AsyncCallable,
     executor::{Executor, TICK_BUDGET_MS},
+    pacing::Pacing,
     platform::Platform,
     task::{SleepFuture, YieldFuture},
     task_runner::TaskRunner,
@@ -38,6 +39,7 @@ pub struct System {
     redraw_pending: Arc<AtomicBool>,
     // (task, yields since that task last slept)
     yield_streak: Arc<Mutex<(u64, u32)>>,
+    pacing: Arc<Mutex<Pacing>>,
 }
 
 impl System {
@@ -60,6 +62,7 @@ impl System {
             random_state: Arc::new(RwLock::new(1)),
             redraw_pending: Arc::new(AtomicBool::new(false)),
             yield_streak: Arc::new(Mutex::new((0, 0))),
+            pacing: Arc::new(Mutex::new(Pacing::default())),
         }
     }
 
@@ -71,6 +74,7 @@ impl System {
         let platform = self.platform.clone();
         let result = self.executor.tick_for(move || platform.now(), budget_ms);
         self.flush_redraw();
+        self.pacing.lock().tick_ended();
         result
     }
 
@@ -85,6 +89,7 @@ impl System {
     }
 
     pub fn guest_yielded(&self) {
+        self.pacing.lock().guest_yielded();
         let task = self.current_task_id();
         let spinning = {
             let mut streak = self.yield_streak.lock();
@@ -108,6 +113,19 @@ impl System {
         if self.redraw_pending.swap(false, Ordering::AcqRel) {
             self.event_queue().push(Event::Redraw);
         }
+    }
+
+    /// A guest `Thread.sleep`: records how late it woke (`Pacing`).
+    pub async fn guest_sleep(&self, timeout: u64) {
+        self.guest_slept();
+        let due = self.platform.now() + timeout;
+        self.sleep(timeout).await;
+        let late = self.platform.now().raw().saturating_sub(due.raw());
+        self.pacing.lock().guest_slept(timeout, late);
+    }
+
+    pub fn pacing(&self) -> MutexGuard<'_, Pacing> {
+        self.pacing.lock()
     }
 
     pub fn spawn<C>(&self, callable: C)

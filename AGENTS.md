@@ -125,7 +125,7 @@ your diff.
 `NOT-RUN: test_data/<name> — <why>` inside this marked region. That keeps the classification in the
 same document as the list instead of in the checker, which is the one thing the proposal behind this
 check warned about: a checker that knows which fixtures are "runner fixtures" becomes a second source
-of truth and drifts from this block. There are exactly two today, and they are the same exclusion
+of truth and drifts from this block. There are three today; the first two are the same exclusion
 for the same reason — `wie_validate` has no real screen to resize:
 
 NOT-RUN: test_data/resize_ktf.zip — it exists to prove `Screen::resize` reaches a real screen, and
@@ -145,6 +145,12 @@ Scenario G2, which samples ALPHA there — `WebScreen::paint` forces alpha opaqu
 frame while a freshly sized canvas is transparent, so the probe holds even where the guest draws
 nothing. That is also why this one derives from `keydraw_ktf.zip` rather than `helloworld_ktf.zip`:
 helloworld never paints, so nothing would be blitted and both branches would read alpha 0.
+
+NOT-RUN: test_data/pace_j2me.zip — its claim is a pacing number (frame period, repaint→paint across
+host ticks, GCs per paint), and `wie_validate` runs on the wall clock, where load moves it.
+`wie-j2me/tests/test_pacing.rs` runs it inside `cargo test --all` on a clock that steps 1ms per read,
+so every CI leg gets the same numbers — an upstream-sync PR included, which is how #291's regression
+arrived. Built by `node scripts/make-pace-fixture.mjs`, byte-stable on regeneration.
 
 <!-- ENGINE-RUNNER:END -->
 
