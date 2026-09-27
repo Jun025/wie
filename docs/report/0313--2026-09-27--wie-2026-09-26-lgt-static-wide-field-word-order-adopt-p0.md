@@ -67,3 +67,10 @@ fmt · `cargo clippy --all -- -D warnings` · wasm clippy · `cargo +beta clippy
 ## 6. 한계
 
 - KTF 쪽 정적 필드는 범위 밖.
+
+## 7. 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab`(대상 4파일) — BOUNDED **47회/23쌍** · SUFFIX-ATTACHED **2회/2쌍** · PREFIX 1회/1쌍.
+이번 diff 가 새로 넣은 이름은 §1·§4 의 타이틀 넷(놈3·체스마스터·배틀몬스터·스파이더맨3)과 시험 주석의 놈3 이고, 이름이지 바이트가 아니다.
+나머지는 `jvm_support.rs` 에 원래 있던 줄이다(도구는 바뀐 파일의 본문 전체를 센다). SUFFIX 2건(`간호사타이쿤2` · `서든어택포켓`)도 원래 있던 주석이고,
+손으로 갈라 보니 둘 다 조사가 아니라 «더 긴 다른 제목»이다.
