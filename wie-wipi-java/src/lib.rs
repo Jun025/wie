@@ -16,7 +16,7 @@ use wie_jvm_support::WieJavaClassProto;
 // Measured, not reasoned: with them still registered, `new java/lang/VirtualMachineError()`
 // already threw `InstantiationError`, which only the runtime's ABSTRACT definition does.
 // Locked by `tests/preload_classes_come_from_the_runtime.rs`.
-pub fn get_protos() -> [WieJavaClassProto; 54] {
+pub fn get_protos() -> [WieJavaClassProto; 55] {
     [
         crate::classes::org::kwis::msp::lcdui::ImageObserver::as_proto(),
         crate::classes::org::kwis::msp::lcdui::InputMethodListener::as_proto(),
@@ -37,6 +37,7 @@ pub fn get_protos() -> [WieJavaClassProto; 54] {
         crate::classes::org::kwis::msp::db::DataBaseRecordException::as_proto(),
         crate::classes::org::kwis::msp::handset::BackLight::as_proto(),
         crate::classes::org::kwis::msp::handset::HandsetProperty::as_proto(),
+        crate::classes::org::kwis::msp::handset::LED::as_proto(),
         crate::classes::org::kwis::msp::io::File::as_proto(),
         crate::classes::org::kwis::msp::io::FileSystem::as_proto(),
         crate::classes::org::kwis::msp::lcdui::Card::as_proto(),
