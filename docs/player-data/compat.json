@@ -4,25 +4,6 @@
  "enginePin": "19effc06d4b8436b08f884d25d5f8c94c832b522",
  "entries": [
   {
-   "sha256": "7218e8720f8c839e28d666e96b85205b7c5d02b83aab9448bbe09f9b70597cb7",
-   "platform": "KTF",
-   "model": null,
-   "title": "[큰화]페이블오브나이트",
-   "status": "playable",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "ok",
-    "sound": "no",
-    "speed": "ok"
-   },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
-   "changes": []
-  },
-  {
    "sha256": "6e5a1f88f0c0eedc6991293085060c811e487a701073a9c0e7fb1ed559065924",
    "platform": "KTF",
    "model": null,
@@ -37,7 +18,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "2006독일축구"
   },
   {
    "sha256": "a7d1f26af3e12a4d13638994465e0d1e81630a547d647bb36cfed8c71a9e242d",
@@ -56,7 +38,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "2006영혼낚시"
   },
   {
    "sha256": "bc94ba53677b04f720906559f8779c33dd87d7b4750d4de3099366e09e07646a",
@@ -75,7 +58,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "2006월드올림픽"
   },
   {
    "sha256": "e538cbb4e6873843c357c6becefab933b483dbfdd52c9e2de4dceb21dd1e8dae",
@@ -92,7 +76,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "2007루노베이스볼"
   },
   {
    "sha256": "3185174d21218cec9ca7c3ac1a99aa933e822073c11226712d708aab6ae0f70b",
@@ -109,7 +94,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "간호사타이쿤"
   },
   {
    "sha256": "5a0fa312a793aee59d7a9cbda9f9671046e950e7b99e0c77b12f941fac28ef6e",
@@ -126,7 +112,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "강철의 연금술사"
   },
   {
    "sha256": "de00506611a5cd00d94210927ec49df4d8e087aed0437588c6e62de3e78ef1b2",
@@ -143,7 +130,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "강철의 연금술사2"
   },
   {
    "sha256": "f07cbc7828280b886fdef164b7a1fe16fff107ea60e4086a4167b61a551aef87",
@@ -162,7 +150,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "강호동맞고2"
   },
   {
    "sha256": "070daa5b552ca43e4ae7d062320b3086e5d9401e647a83787087ea2137b2ce1f",
@@ -179,13 +168,14 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "거상"
   },
   {
    "sha256": "0e6cd188729ed48823ea4d6d7638e0f74e6754fea5c21ae4eb0295c0bb67cd6b",
    "platform": "KTF",
    "model": null,
-   "title": "거상",
+   "title": "거상 (2)",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -196,7 +186,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "거상"
   },
   {
    "sha256": "1065985081fce35d72b0ab137bf9c43118ea5a6ec344813695dc6f052108b831",
@@ -213,7 +204,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "건담시드"
   },
   {
    "sha256": "9e8bc87708dc7b110a3d4763425f188ea168330f20e04aca4431e6bda6d6b473",
@@ -232,7 +224,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "게임빌프로야구2006"
   },
   {
    "sha256": "ab3d0020d7bcc23ef31ff17145efe70425b29f740d99fe235343d1c57e5cfd11",
@@ -251,7 +244,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "게임팩25"
   },
   {
    "sha256": "e085e193211d048f4906f801f79f7dd3ee6ef91e5405d179569c43e98460edc8",
@@ -270,7 +264,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "겟앰프드"
   },
   {
    "sha256": "cb7c7f87f9e65cb754d5e79df9e8a46eae28e72a1227280bb4586eedc3ae46b6",
@@ -287,7 +282,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "고촌치킨"
   },
   {
    "sha256": "aa3fcba4598b4998386ff9a683c0db617ce2bd5fcfd5065a3ef965a218dade44",
@@ -304,7 +300,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "광란의수족관!"
   },
   {
    "sha256": "55aadf368b8e71ccbc98b68f9d228f0f45968fbb8114576f04995cc04848f752",
@@ -323,7 +320,8 @@
    "knownIssues_ko": [
     "키를 눌러도 화면이 바뀌지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "광수의 똥! 생각"
   },
   {
    "sha256": "cf067c5fd95282c6de331e39e89ba626119ac647c7245aad3eac5009abaf976f",
@@ -340,7 +338,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "괴도키리"
   },
   {
    "sha256": "74bfbf3dd0ab2834e59bd7b9288a4d976b55ae2ac6fb7770f0a0cd3e61b4bb4e",
@@ -357,7 +356,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "군주모바일"
   },
   {
    "sha256": "4c6cd28b6c1ac09b6962344e5a8c44ec4384ddfea18d1ba49eb15f2e3cbf00c4",
@@ -374,7 +374,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "궁맞고!"
   },
   {
    "sha256": "7521052a0aa43fa7b932c153a24ab3e9ace279f7b86a3a090e9babca32f2a489",
@@ -393,7 +394,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "귀신사냥2007"
   },
   {
    "sha256": "a540945188caf6050c881dd11421f06cbb145ed144f4f9cbf5d78303ef6e294c",
@@ -412,7 +414,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "귀혼무사편"
   },
   {
    "sha256": "4bcd17980c059ab5058688e723a771a3d9541018eda799f2c21f7fc7aa1fe2bc",
@@ -429,7 +432,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "금광을찾아서"
   },
   {
    "sha256": "232122cdfb92bfce20f454fbd41c20ef20721d93fdbd289f95415caa5c4878e1",
@@ -448,7 +452,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "길거리농구3"
   },
   {
    "sha256": "023c935aea8e5e542506da5f8fa3141d17660f18dbfb50393cfc1d592454dfeb",
@@ -465,7 +470,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "낚시왕강태공"
   },
   {
    "sha256": "65ef7052f528ec5f0ecac23dbcdf88ad1d33f4da8a049ff41861d2cacc88a2c2",
@@ -482,7 +488,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "논스톱 액션 고고씽"
   },
   {
    "sha256": "8ac1d682de08419bc5410f1a3d17df9fce7d21f0740a746f46e23d1130bd48ec",
@@ -501,7 +508,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "놈2"
   },
   {
    "sha256": "8c8b11508cf5b47b7d449ca3a1cdde8b74d06421f7c81d3f3e2c7a69dfb7947e",
@@ -518,7 +526,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "놈3"
   },
   {
    "sha256": "513d4b49c0be8cfb04476e6fd8ec7d5c1e26763d72597fb00c2286becfc3e112",
@@ -535,7 +544,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "다마고치M"
   },
   {
    "sha256": "75f002ba70e3045c3127e0ef81f6590fb653f20ca77d1ce9cb58d1adf99f109c",
@@ -554,7 +564,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "다이어트타이쿤"
   },
   {
    "sha256": "3d238165796019d0d861835597d61d9a113bbfcff3e336b9e5153ff0d21087d9",
@@ -573,7 +584,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "다이하드4"
   },
   {
    "sha256": "f4c57c4a70600ff72b4191180f27776c175e76c3ace0897047565fb9cdbcebcc",
@@ -590,7 +602,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "다크사이드스토리m"
   },
   {
    "sha256": "44c292be4e4cc417021de29fa7d91b0bc9756a067854fdbb5a23c0a707a81b41",
@@ -607,7 +620,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "다크슬레이어2"
   },
   {
    "sha256": "dbd078113b977dd15a7a9847d0561834c2dcf40473529ffdfddb00b8790ee4fa",
@@ -624,7 +638,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "대물낚시광2"
   },
   {
    "sha256": "135d1291501f3dec3765412a057c77fe77cad8a2745ac75c5809387fea7db7d7",
@@ -641,7 +656,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "대박투어타이쿤"
   },
   {
    "sha256": "b22a7fcfb406dc5b8399fe517dffaedf74990e21263a23d2b7532da36cbbdbfa",
@@ -658,7 +674,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "대통령타이쿤"
   },
   {
    "sha256": "8c71be3ad26df1ecda6129a58b7344a2abc60a4f6aad8b480ffb401ed6d4c164",
@@ -677,7 +694,8 @@
    "knownIssues_ko": [
     "키를 눌러도 화면이 바뀌지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "더팜1"
   },
   {
    "sha256": "5891a0c5d595b006b68631212b8a09dc75be8b00b7f42df3b46923a2ce4815b4",
@@ -694,7 +712,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "더팜2"
   },
   {
    "sha256": "4120f27288abc27eb5ff318a2daf79f07823b5781af94f22fa5c0d1905e29295",
@@ -713,7 +732,8 @@
    "knownIssues_ko": [
     "화면이 한 가지 색으로만 보여요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "던전앤파이터 격투가"
   },
   {
    "sha256": "8b01d4ae6af4e61306a32288577f503f33ba47b4b84200df73258d065f0b2a23",
@@ -732,7 +752,29 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "던전앤파이터 귀검사"
+  },
+  {
+   "sha256": "c7f543c73b9103d57b5e9e5b825e6bdb595de812fbccf81b718db8d2e94fa756",
+   "platform": "KTF",
+   "model": null,
+   "title": "던전앤히어로",
+   "status": "limited",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "no",
+    "sound": "no",
+    "speed": "unknown"
+   },
+   "knownIssues_ko": [
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
+    "소리가 나지 않을 수 있어요."
+   ],
+   "changes": [],
+   "fileTitle": "kt 던전앤히어로"
   },
   {
    "sha256": "d4188f8ef8c48cc08c1b08972f463255fb7e156a5de477e537972826e63bb6cf",
@@ -751,13 +793,14 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "던파거너편"
   },
   {
    "sha256": "ed6ad7318ac935407de7beba1d5947e7e067e8760b8092531a3d59f8224f68c4",
    "platform": "KTF",
    "model": null,
-   "title": "던파거너편",
+   "title": "던파거너편 (2)",
    "status": "not-yet",
    "axes": {
     "boot": "no",
@@ -770,7 +813,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "던파거너편"
   },
   {
    "sha256": "739c7657c1f2fb9ade708d7552f58779e1b0666b5feb5e80713e4ace9d06b637",
@@ -789,7 +833,8 @@
    "knownIssues_ko": [
     "화면이 한 가지 색으로만 보여요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "던파격투가편"
   },
   {
    "sha256": "d60c34ffc9f60077839f0f2fc04bcdf89b27f82f82840fdb921a4f100175e1a1",
@@ -808,7 +853,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "던파귀검사2006"
   },
   {
    "sha256": "155972cac6641e918c62b9c18cc859a74bc5cbab48bb42cbb4068e31a95485ad",
@@ -829,7 +875,8 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "데몬헌터"
   },
   {
    "sha256": "5d3ba49eccf756d4d20d4d4289eca36a8927e12775eb94a08b2ae97a6f8e2b3d",
@@ -846,7 +893,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "데빌헌터"
   },
   {
    "sha256": "dd36286b56924c5219113e2d4cbe3fa142e964b3d38f8b98ee0b9c3911a90dee",
@@ -863,7 +911,29 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "도신노홍철맞고"
+  },
+  {
+   "sha256": "229291e20b130082b378a70a474ad27b10d2cb8eb64d71132d75886b06cfc49e",
+   "platform": "KTF",
+   "model": null,
+   "title": "동전쌓기 에볼루션",
+   "status": "limited",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "no",
+    "longplay": "unknown",
+    "sound": "no",
+    "speed": "unknown"
+   },
+   "knownIssues_ko": [
+    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
+    "소리가 나지 않을 수 있어요."
+   ],
+   "changes": [],
+   "fileTitle": "kt 동전쌓기 에볼루션"
   },
   {
    "sha256": "0a6f495f0b35c424786f1ef4a23a841554c7f97a11b7a420af7a502f9ad1c466",
@@ -880,7 +950,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "동전쌓기2006"
   },
   {
    "sha256": "33f3e7669599951c998dcd65f460820ad4777330937464227a87ea12987899a0",
@@ -899,7 +970,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "두뇌게임q"
   },
   {
    "sha256": "c94d6477792690f014853bb4bec0a9f8b19bb238a070095b5766488ee15fe780",
@@ -918,7 +990,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "드래곤나이트 ex"
   },
   {
    "sha256": "4a7e489bf6abdc13b375df637d0c93084a1cb4dcefad08b03df11d3a2457247a",
@@ -937,7 +1010,28 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "드래곤나이트2"
+  },
+  {
+   "sha256": "e9fac881e602dad311ee9422a127d31aa07e4dc6ca3e1a1e54e90b42276282d0",
+   "platform": "KTF",
+   "model": null,
+   "title": "드래곤나이트EX",
+   "status": "limited",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "no",
+    "sound": "ok",
+    "speed": "ok"
+   },
+   "knownIssues_ko": [
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
+   ],
+   "changes": [],
+   "fileTitle": "KT 드래곤나이트EX"
   },
   {
    "sha256": "4b8c8f5ff7d61e1964eb8784d60997bcf977050a9df96cf853a9643109fec7ce",
@@ -957,7 +1051,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "드래곤로드"
   },
   {
    "sha256": "f44271803135267e090b569c515e8cd1ec35b04833443036966687c7b8030ced",
@@ -976,7 +1071,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "드래곤아이즈2"
   },
   {
    "sha256": "859aa864797b0b2cfd0d247230351a58bdf6300c3c747ec5d526fe45a92721f4",
@@ -993,7 +1089,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "떡볶이타이쿤3"
   },
   {
    "sha256": "ab601085dc04af7124f90b947822818336f8c2295dcd434df97f4a9181d4fbc3",
@@ -1010,7 +1107,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "라이덴3"
   },
   {
    "sha256": "6eb93824daf8ddceeed806689bae63cb5619d6201842615eb2f5b37271080248",
@@ -1027,7 +1125,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "라피스라줄리"
   },
   {
    "sha256": "7e2247bdf5659154cc56a6ddb1350f3ca365a120255e91b1f8076d1a98562379",
@@ -1046,7 +1145,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "랩업만이살길"
   },
   {
    "sha256": "46b2238f87a68eec351881550a8117b924fe5b998d1eac974ff46bd7c54f3cd1",
@@ -1063,7 +1163,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "럭키당구"
   },
   {
    "sha256": "cc23019696ba5cddcf96bdab9c0ce7d77e8d6bb68c968dbb3ecaf4b874c09521",
@@ -1080,7 +1181,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "레드망고타이쿤"
   },
   {
    "sha256": "6442cbc55be1b645e6b0a78d5f886a8128f4364be7adddc4b3ad54010a245133",
@@ -1097,7 +1199,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "렛츠골프2005"
   },
   {
    "sha256": "e2eda9e90ea155583961db191d19fc0ecdc42cff83c35a7d2791b48dd39e5f39",
@@ -1114,7 +1217,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "로스트 아일랜드"
   },
   {
    "sha256": "c3057f46c59bfb5d18962123767e4d0b9212b5c12b42892a79330715e4874c0f",
@@ -1133,7 +1237,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "루빅스큐브"
   },
   {
    "sha256": "7d007391e4a11164c2279b96a9ab544ae4c078f1df6ba14bcd53a67115e504db",
@@ -1152,7 +1257,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "리듬스타1"
   },
   {
    "sha256": "3be2a19f5d3fc7c3dced7d7d4ca04c354d4b63f70d314e211bdbfec79622cc9a",
@@ -1169,13 +1275,14 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "리얼비트"
   },
   {
    "sha256": "c01e041fa78243bd697f9303745e6257ebc8ecf4645c85930dc043bae2573357",
    "platform": "KTF",
    "model": null,
-   "title": "리얼비트",
+   "title": "리얼비트 (2)",
    "status": "limited",
    "axes": {
     "boot": "ok",
@@ -1188,7 +1295,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "리얼비트"
   },
   {
    "sha256": "d9afc4db742cf67b1151745add87f99862044a035df3c39f98d5cd48c79e0988",
@@ -1208,7 +1316,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "리얼사커2007"
   },
   {
    "sha256": "1cf2e6076079e31e1229748870531f82de96aa3cff470b2c180f0f38ec14a855",
@@ -1227,13 +1336,14 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "리얼싸커2009"
   },
   {
    "sha256": "5028b8a5d19f9cb393927b93f84fcd8f918b2cc7b03bb0bfa347a3ee75e3de38",
    "platform": "KTF",
    "model": null,
-   "title": "리얼싸커2009",
+   "title": "리얼싸커2009 (2)",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -1246,7 +1356,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "리얼싸커2009"
   },
   {
    "sha256": "3b82763edba8b87063e88c2a8df8fb9e8a1ef6e2a04581307a0fa257986c5702",
@@ -1263,7 +1374,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "리얼타짜맞고"
   },
   {
    "sha256": "4b1c1947950ee6e279807a6c8b10e04d548ce06e6b16e7a5fa83545cf02ac194",
@@ -1280,13 +1392,14 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "마린블루스"
   },
   {
    "sha256": "eda7ecb85ae3c1a5568a9d0f982cf464c7d7d44df3a7db05849ffbdcf583311c",
    "platform": "KTF",
    "model": null,
-   "title": "마린블루스",
+   "title": "마린블루스 (2)",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -1297,7 +1410,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "마린블루스"
   },
   {
    "sha256": "6af589a88cf9eb8d35d4275666b96169efe13a2a8aece805f3d0ecf658f4bcfc",
@@ -1316,13 +1430,14 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "마법상점타이쿤2"
   },
   {
    "sha256": "ca7fa8ade8ad0843fda042649771bfdfb95119bae03baa6f53ad12b1c23d89ec",
    "platform": "KTF",
    "model": null,
-   "title": "마스터오브소드2-작은화면",
+   "title": "마스터오브소드2 (작은화면)",
    "status": "not-yet",
    "axes": {
     "boot": "ok",
@@ -1337,13 +1452,14 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "마스터오브소드2-작은화면"
   },
   {
    "sha256": "c95bf2740c699c644d279940eb1b77e99b7bb0d392ab90d25a0e5e9b26c98ee7",
    "platform": "KTF",
    "model": null,
-   "title": "마스터오브소드2-큰화면",
+   "title": "마스터오브소드2 (큰화면)",
    "status": "limited",
    "axes": {
     "boot": "ok",
@@ -1356,7 +1472,8 @@
    "knownIssues_ko": [
     "키를 눌러도 화면이 바뀌지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "마스터오브소드2-큰화면"
   },
   {
    "sha256": "33801c1ba14f436fcbe0cf6d7231429ebe73b828b893197ca3553b0e02240ec3",
@@ -1375,7 +1492,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "마스터오브소드3"
   },
   {
    "sha256": "41466fc7f709c43a7b110d795c86e3e4eda25226b54c87c51576ffd15def3b78",
@@ -1396,13 +1514,14 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "마이프린세스2"
   },
   {
    "sha256": "52f1f32e3f726b87301b47ec3ee863a69c1d1fe8119222244b662fcb462db2df",
    "platform": "KTF",
    "model": null,
-   "title": "마이프린세스2",
+   "title": "마이프린세스2 (2)",
    "status": "not-yet",
    "axes": {
     "boot": "ok",
@@ -1417,7 +1536,8 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "마이프린세스2"
   },
   {
    "sha256": "1793f87924d42c156d93f5571a4ea34b3266231a6f57b5d5e358fe56d4e44617",
@@ -1436,7 +1556,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "만귀토벌전"
   },
   {
    "sha256": "5267badf20b3ee99b0f45b4d9732507d76727bab233d6d90e994413abba570f0",
@@ -1455,7 +1576,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "맞고삼국대전"
   },
   {
    "sha256": "e4916b4a5688583f07b3c5e85d09bca3dd441b8d52e12c87a02efd8c83ce6687",
@@ -1472,13 +1594,14 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "멋지다김밥군"
   },
   {
    "sha256": "8d2828ab8a3f7670d1e61a595eb4abcd98178529cf297ddaa301cc8d432bd277",
    "platform": "KTF",
    "model": null,
-   "title": "메르헨전기 KTF",
+   "title": "메르헨전기",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -1489,7 +1612,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "메르헨전기 KTF"
   },
   {
    "sha256": "1cdea1985955460922ffda7a4729417b015d30b15a3db5c504a26ced37be7054",
@@ -1508,13 +1632,14 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "메이플스토리"
   },
   {
    "sha256": "3b5b98afa8906135aeb0f9881417a4580d1a1a005fb806e62a2c619793369e43",
    "platform": "KTF",
    "model": null,
-   "title": "메이플스토리",
+   "title": "메이플스토리 (2)",
    "status": "limited",
    "axes": {
     "boot": "ok",
@@ -1527,7 +1652,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "메이플스토리"
   },
   {
    "sha256": "89c214dbd15dd6c12f7c7a0f6d6fa023ff43a6769be5fdbfced46f4c7b7a243c",
@@ -1548,7 +1674,8 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "메이플스토리 궁수편"
   },
   {
    "sha256": "db8ef04a6504d9b011a89b032bbfcb585ab17eaa6a34a275603bc64e67f516c5",
@@ -1565,7 +1692,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "메이플스토리 도적편"
   },
   {
    "sha256": "c16d6e6ab5c39ab1427c8a3e3d672ec718f1de75f66e6c6a43b3e45ef01f67dc",
@@ -1582,7 +1710,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "메이플스토리2007"
   },
   {
    "sha256": "c181cae84146ada72083370ea24fa746ab2e9ec28f64839cba1911f66d617520",
@@ -1599,7 +1728,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "모바일크래프트2"
   },
   {
    "sha256": "32c3c91305f712de6cfe2885033ac15734a3bd9ade95d213fbb11a8b7fc89944",
@@ -1618,13 +1748,14 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "무한의통통"
   },
   {
    "sha256": "f981d228b7577afaa5e02fc682f2bb1ad08835e21d539c5e852f3e5a931c0cab",
    "platform": "KTF",
    "model": null,
-   "title": "물가에+돌튕기기",
+   "title": "물가에 돌튕기기",
    "status": "limited",
    "axes": {
     "boot": "ok",
@@ -1639,7 +1770,8 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "물가에+돌튕기기"
   },
   {
    "sha256": "6c96c5050b2bd85a29d470ece66296ad32ebfac42148ccd4bfc43b35f221ade1",
@@ -1658,7 +1790,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "물가에돌튕기기2"
   },
   {
    "sha256": "4a4d2ac046f7c3dfdb94fe771cfc9ebc326a4705779e8ad014d52093669ad7f9",
@@ -1679,7 +1812,8 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "물가에돌튕기기3"
   },
   {
    "sha256": "ae749cc5a777a94977a8fb132345ff3b9a788390716e4492ec1c672b9efd3cfa",
@@ -1698,7 +1832,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "뮤 흑기사편"
   },
   {
    "sha256": "61ba00511b84482b0c85962ff0f4fe3d2a877fd6b3e4be8d2786bf6572451f35",
@@ -1717,7 +1852,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "미궁미술관살인사건"
   },
   {
    "sha256": "8cff5587290d69796629450a39dbd6b751d3ea0f8cbc16b4428c06d074e18ba7",
@@ -1734,7 +1870,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "미니게임레드맨"
   },
   {
    "sha256": "17ed9c29ae4d256e5cf57a53d51860c52bcf77a56bf3616f5a4413159f2f6cb8",
@@ -1751,7 +1888,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "미니게임씨네마"
   },
   {
    "sha256": "6103e87874c693c7dc04a95dd33056d5c43470090448ffac2c8c98e361704807",
@@ -1772,7 +1910,8 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "미니게임의달인"
   },
   {
    "sha256": "f80ca6d2cb48217eb0bb5df030d7bc705e33fef07b2d7db39d5d557b6c7e02a4",
@@ -1789,7 +1928,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "미니게임천국1"
   },
   {
    "sha256": "7eb95dc3b02cc2934685aaec4910f28a68b86f4b651954b684ad2f054be19eac",
@@ -1806,7 +1946,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "미니게임천국2"
   },
   {
    "sha256": "468a0d52e618ddcb3515aca0717db91b577ad3899c65cb0b7fcd7437c0feeec7",
@@ -1823,7 +1964,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "미니게임천국4"
   },
   {
    "sha256": "2e0ce612fe406903a2524a441caaea8adca29709b4326ff26d5d59503bd482d8",
@@ -1840,7 +1982,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "미니게임파티"
   },
   {
    "sha256": "bfa8ec3524518147e1383ecb44560fb3b9fba72fdc3aa30e4c2fdc035e7cbfa9",
@@ -1859,7 +2002,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "미니게임패밀리"
   },
   {
    "sha256": "0c67145b11dff72242c85d83fb07f77216c71fdc16fc63a332e1830355e56d2a",
@@ -1878,7 +2022,8 @@
    "knownIssues_ko": [
     "키를 눌러도 화면이 바뀌지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "미니고치"
   },
   {
    "sha256": "d448aee681574bffb97907e5ed5cdcf6676825e49711633ebe8ee675a76c4cb9",
@@ -1895,7 +2040,26 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "미니러비"
+  },
+  {
+   "sha256": "4df05a4dc45278ebb1ee06cf919df073122650a1d7e12b820a7099b39838bbb6",
+   "platform": "KTF",
+   "model": null,
+   "title": "미니미니오락실",
+   "status": "playable",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "unknown"
+   },
+   "knownIssues_ko": [],
+   "changes": [],
+   "fileTitle": "KTF 미니미니오락실"
   },
   {
    "sha256": "6d63b4025bef5daa073bf4376aee9bb70e2981362c578f782cb9313dc94169d2",
@@ -1912,7 +2076,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "미니햄스터키우기"
   },
   {
    "sha256": "6b51d12b4be679888af06ae3815208a0d7589b51f3c6e9a5b4d4462af79dc7af",
@@ -1929,7 +2094,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "박명수호통맞고"
   },
   {
    "sha256": "d552e095ddcfd388fcfea591275cfc768fd70facabfdac451880a45516ed372d",
@@ -1948,7 +2114,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "박정석 영웅탄생"
   },
   {
    "sha256": "8d8c24b7c198276bc8238a640f85cf2999bb96abc8a9230c9e82418f9774ba69",
@@ -1965,7 +2132,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "방탈출"
   },
   {
    "sha256": "c654601e389f5444fadbbec558675e2da54093bedb6eb5080b268c2e5121d6ed",
@@ -1984,7 +2152,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "배틀동전판치기"
   },
   {
    "sha256": "d647131cdc8d97a7ff353a4476ca117690067b33704f89016ed353c6b36c08b7",
@@ -2001,7 +2170,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "배틀오목"
   },
   {
    "sha256": "9d52de42e7f94093c240d5bd4440f574bf2e07e4d0182ec7e492db110f41da24",
@@ -2018,7 +2188,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "버닝스톰"
   },
   {
    "sha256": "2d68eabc01fef9d7828558fe477d232c8b242f88e14fab215438450abd18d00c",
@@ -2035,7 +2206,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "보글보글"
   },
   {
    "sha256": "fd3bf717db21906a640fef65a940dd1dee3b42f79cc91facff0727e03e667378",
@@ -2052,7 +2224,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "보글보글2"
   },
   {
    "sha256": "d1e0badfce82ff692b93fd305bedf98a60dfb42df8ec74267fe2ae081cf90c0c",
@@ -2069,7 +2242,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "부루마불2007"
   },
   {
    "sha256": "34ab350dc98a40b5c26a8b05f0c03cb67008fe25014c35926344c50112fadd17",
@@ -2089,7 +2263,8 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "북천항해기2"
   },
   {
    "sha256": "ab64a56b2b4479712fac3b1d4bb0d4a58b9468dd950ab680e1329e245d989ec5",
@@ -2106,13 +2281,14 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "붕어빵타이쿤3"
   },
   {
    "sha256": "17423775854221e0c46348367e0834e823f62cccbfdae4510e202cc8ea4fec7f",
    "platform": "KTF",
    "model": null,
-   "title": "붕어빵타이쿤3작은화면",
+   "title": "붕어빵타이쿤3 (작은화면)",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -2123,13 +2299,14 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "붕어빵타이쿤3작은화면"
   },
   {
    "sha256": "5bfe10a82849eb02bd49db9ed264139f7a5b5eb04bdf2083cca227bb3ba73ec6",
    "platform": "KTF",
    "model": null,
-   "title": "붕어빵타이쿤3큰화면",
+   "title": "붕어빵타이쿤3 (큰화면)",
    "status": "limited",
    "axes": {
     "boot": "ok",
@@ -2143,7 +2320,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "붕어빵타이쿤3큰화면"
   },
   {
    "sha256": "5aa438fbdc872c31ef4415ba859905b5dbed4c9a4de878da835d90713375a70a",
@@ -2162,7 +2340,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "블레이드마스터2"
   },
   {
    "sha256": "37326ecc6a092d5fcbc3dd9553f0b880f4622630ed4afd9af28beed918f52992",
@@ -2179,7 +2358,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "사이버포뮬러2"
   },
   {
    "sha256": "7f73422ba19be64c2ce680418237318903af0f3616ce64b50d17933f9602f4bf",
@@ -2196,7 +2376,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "삼국장군전"
   },
   {
    "sha256": "30c7bd6fb01bf5c6be831cdb482d35e7713128e89b53accb1153a3d51e366869",
@@ -2216,7 +2397,8 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "삼국쟁패2"
   },
   {
    "sha256": "5e53e490c6f1b5845d79f12d204f4642fc283370085c036eb394de0b928c2fc1",
@@ -2233,7 +2415,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "삼국축구대전"
   },
   {
    "sha256": "ae212f5390ce5362afce49fe01b3c4dabd9ca2a1e4bd91fe8c42317fe8d72e6a",
@@ -2252,7 +2435,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "생과일타이쿤3"
   },
   {
    "sha256": "fe481fc815ab38865e8a33e45e63783c154fdff4126e3dadba558f2e93440698",
@@ -2269,7 +2453,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "생과일타이쿤파이널"
   },
   {
    "sha256": "d607a2622126003e69fc7a13a38bda91b8332ff58c1f49f28a5d612d444fb419",
@@ -2286,7 +2471,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "생존일기"
   },
   {
    "sha256": "0cc4ef7ede374a3579357cf13b48b6f6f3a9211a9b93355df2db188f91911391",
@@ -2305,7 +2491,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "서든어택"
   },
   {
    "sha256": "9789fec50f39febc2d75f48ecbb2f8e30dcdfbb7221241af99d0aa559218e299",
@@ -2322,7 +2509,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "서울타이쿤2"
   },
   {
    "sha256": "afad6fce6d66a88aaf7a9940ddb02b88dac54337a8b1ec65e9f3c9bd9c53b4a9",
@@ -2339,7 +2527,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "세븐스소드"
   },
   {
    "sha256": "3c658a46bbfbd67568e322289888180f4b46eac3bd27485681b85f1fd65d4d38",
@@ -2358,7 +2547,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "셔터-영혼의울림"
   },
   {
    "sha256": "eb1614abed708f41237181e7d80547c941faa989dcef50e9338c6f71dbb61c01",
@@ -2378,7 +2568,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "소울카드마스터2"
   },
   {
    "sha256": "2cbd63e4427a87748f53adecfb633a50874d0ed6dfa3ecd56292d9ef65169bb8",
@@ -2398,7 +2589,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "슈렉3"
   },
   {
    "sha256": "155586ece7f8e46bd49b402d3b5620d570d7fc9237ef5c7ee1498e33fe27c8e3",
@@ -2417,7 +2609,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "슈퍼로봇 택틱스 r"
   },
   {
    "sha256": "2b1ed0c8d061be349f7b8c95d836ee8e10732e0bf49e292b5d62e3b25d563748",
@@ -2436,7 +2629,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "슈퍼리얼 테니스"
   },
   {
    "sha256": "e70c0c1c282ca39d962c64c3610f932e8a95a69b2a8fcac0c2f504f0836be91d",
@@ -2453,7 +2647,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "슈퍼액션히어로"
   },
   {
    "sha256": "484108f6c8ded36582246d0183a10fd69f5efa5475b25b47e03dfbf7b574c7dc",
@@ -2470,7 +2665,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "스노우브라더스2"
   },
   {
    "sha256": "4451036a7fb65261ec498f7146530475f7e965f35a445cce987731a0349b2980",
@@ -2489,7 +2685,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "스도쿠"
   },
   {
    "sha256": "833b910c818416a97d015dcfd41a3289f8a5c8d7adb5963f9d9e4fe1ced7e522",
@@ -2506,7 +2703,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "스맥vs로우"
   },
   {
    "sha256": "8c6821fab9693b480d3dbfcc261c588dfddc715c9901e97a298ee88c66c68b9c",
@@ -2523,7 +2721,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "스파이더맨3"
   },
   {
    "sha256": "96dc32e781d39c44cae4e07ebd32b57ad3c31362885a5f9a441975fff834451f",
@@ -2542,7 +2741,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "시네마타이쿤"
   },
   {
    "sha256": "49f2734f17d8420efa36e518d2d22d68aeb63ba916d74557e1c981dbe61cc7cf",
@@ -2559,13 +2759,14 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "신시티2"
   },
   {
    "sha256": "6c9f969f089ff922e99a51212a95390673fa5f96fbf330526f3a239c535690b7",
    "platform": "KTF",
    "model": null,
-   "title": "심시티 2억에디트1",
+   "title": "심시티",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -2578,7 +2779,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "심시티 2억에디트1"
   },
   {
    "sha256": "689c491586b91ed8afde488d092c777da0874b29250f0724d7a6c9ee1e690ba8",
@@ -2597,7 +2799,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "아르덴전기"
   },
   {
    "sha256": "1b3b4868d46e2ffa5a64466f523ac591265840ebde220d035b2563a2e7f478de",
@@ -2616,7 +2819,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "아스팔트4"
   },
   {
    "sha256": "9babd9789bae476aa3c340544220340b1e1feff0bc440ca707cbb491d94d2786",
@@ -2635,7 +2839,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "아포칼립스"
   },
   {
    "sha256": "0eb19d9bbe7aec635ef047cbf0d2fb1793cdb40d8dec5576587a6910ec8e3138",
@@ -2654,7 +2859,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "알바 전설 편의점2"
   },
   {
    "sha256": "79d9bc10be823a1a7119598bd6f7791583ae2af97c366cf338e5d55262c9f3ba",
@@ -2671,7 +2877,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "액션퍼즐패밀리"
   },
   {
    "sha256": "3151fdc167b609f10d9cee498283b3471bd88e24b87332a9ca5952a5c5cda48b",
@@ -2690,7 +2897,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "액션히어로3D"
   },
   {
    "sha256": "9c1c446a36e2e730ac2080b417e01c0faa43fba9401202327d798d5dc5badb1e",
@@ -2707,7 +2915,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "어스토니시아ep1"
   },
   {
    "sha256": "65bace1623a7ff4e2ebb0cad652ad61ac8125da22e136531ad03f6741e81d5a8",
@@ -2724,7 +2933,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "어스토니시아ep2"
   },
   {
    "sha256": "2c2ba3b84b98fb7e414254245d51ac5dc48f791da3355dc3f3bd49fa30a1fd9f",
@@ -2741,7 +2951,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "어스토니시아ep3"
   },
   {
    "sha256": "8801ab57a0ee0362a1fbf437fafaa239a2fcfd569060ae6c631edd0b86eab58d",
@@ -2758,7 +2969,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "얼음낚시"
   },
   {
    "sha256": "a20c2044305cbe61ddc5f7f1f08e81bc6b47e4e3c8678f389e1ef1f3a590c9da",
@@ -2775,7 +2987,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "에픽크로니클2"
   },
   {
    "sha256": "4decaeed58b1d07547ff55edbd816392ca51c6f77e35783c55babae5f120e7cb",
@@ -2794,7 +3007,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "에픽크로니클PE"
   },
   {
    "sha256": "cb4217efd669a9c57651499c92a9eba6f71ffb6e935b58952fb8214889242ee7",
@@ -2811,7 +3025,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "엑스맨3"
   },
   {
    "sha256": "444821c513acdb1452559bf43ffd53c8565cebc8c25a1364e0cbe21da2ebb866",
@@ -2828,7 +3043,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "엘즈웨어"
   },
   {
    "sha256": "f7752f9124e88259020d7b6f75a9faa51434c2ca015a698b7b47c34621ac2ef3",
@@ -2847,7 +3063,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "열혈교사전설2"
   },
   {
    "sha256": "603dd685d3868822008e6b90a9e69b6449f8d842d0d2db5b8db1c4c004e0c437",
@@ -2864,13 +3081,14 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "영어뇌습격"
   },
   {
    "sha256": "d5a86e344611f102beedb438e1753aa32a99fd91284e5fea7f5b5a1397e5ad92",
    "platform": "KTF",
    "model": null,
-   "title": "영어뇌습격 1[1].2 큰화",
+   "title": "영어뇌습격 (큰화면)",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -2881,7 +3099,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "영어뇌습격 1[1].2 큰화"
   },
   {
    "sha256": "ead25bc6ffa7777862328ba6fa057911645d69ad47c2e8d922a1d545a1728d2d",
@@ -2898,7 +3117,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "영웅서기 1"
   },
   {
    "sha256": "60704ad61a47ca3de85fc33fff9314dd6a7239755395c61a3a977f50755cd6d7",
@@ -2915,7 +3135,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "영웅서기 제로"
   },
   {
    "sha256": "0f9e1026724df5521f87bbbacb2fb5f87a5c226ee86c847b0016cceac7079be1",
@@ -2932,7 +3153,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "영웅서기2"
   },
   {
    "sha256": "503d5d2f196b378c3ce38c12fccf62b718c4169e84f6fe1b62eaabcfd2fcc133",
@@ -2951,7 +3173,8 @@
    "knownIssues_ko": [
     "키를 눌러도 화면이 바뀌지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "영웅서기3"
   },
   {
    "sha256": "49ade89578c59befbcc12945fa38070e0e31b625d9eff9975b5b5916d7055c42",
@@ -2968,7 +3191,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "영웅서기4"
   },
   {
    "sha256": "d1fba7ad5d1fcc11cb9d4daded9c117d4569cf8282903c57cdf14404bdb90c91",
@@ -2989,7 +3213,8 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "영웅전설3"
   },
   {
    "sha256": "b907b0faf483d99a13c0abf9ed8b3dbcb1a6ab7a0ef7a2b7a7a00f3da4b59bba",
@@ -3008,7 +3233,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "영웅전설3 하얀마녀"
   },
   {
    "sha256": "182fa44210dc07ab275906a6a5e1ff1c0467017ff6f71492a0db7a73c1db8e61",
@@ -3029,13 +3255,14 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "영웅전설4 주홍물방울"
   },
   {
    "sha256": "91c02913e1eaf810796fbb554f4501581b70b772009050408f690733527bd16f",
    "platform": "KTF",
    "model": null,
-   "title": "영웅전설4 주홍물방울",
+   "title": "영웅전설4 주홍물방울 (2)",
    "status": "limited",
    "axes": {
     "boot": "ok",
@@ -3050,7 +3277,8 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "영웅전설4 주홍물방울"
   },
   {
    "sha256": "aa4542c94ce41362da10be965935bacac245eea0fd222aab060bc3ae183302e1",
@@ -3071,7 +3299,8 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "요구르팅"
   },
   {
    "sha256": "4d6f8e78cf9225a37dbc2b19a3af4d56e201d0d8317e4983d02c8f048ecea47e",
@@ -3088,7 +3317,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "우당탕탕헤어샵2"
   },
   {
    "sha256": "75e6050fe2721607c950c0b9ce5f2da6df11e5dd5c1b3baac8af51570c307c20",
@@ -3105,7 +3335,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "웃찾사맞고"
   },
   {
    "sha256": "afa64c89eeccd0962197eea9554e2e3d387b4912478b6944920ad33137df6895",
@@ -3122,7 +3353,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "원더즈 - 영웅의길"
   },
   {
    "sha256": "6a885f89343c49b2d78b5db148d334bd1569979ec64c358d92bfc9875349c515",
@@ -3139,7 +3371,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "월드크래프트"
   },
   {
    "sha256": "93d5b6b8ceb5cf4ce15784e369a7af9cd8ef7a49d6f15816d665aedadc487a4a",
@@ -3156,13 +3389,14 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "이노티아1"
   },
   {
    "sha256": "94a34abdea2133a890888bfe1ddde381923dabbde3dd83bb73d08279fa1b3e5e",
    "platform": "KTF",
    "model": null,
-   "title": "이노티아1",
+   "title": "이노티아1 (2)",
    "status": "not-yet",
    "axes": {
     "boot": "no",
@@ -3175,7 +3409,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "이노티아1"
   },
   {
    "sha256": "974e0df9ab1e51751efdef21a0fe324ad79917f41cd049fcfaf7c46c14f9e324",
@@ -3195,13 +3430,14 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "이노티아연대기2"
   },
   {
    "sha256": "f770b15f887644a0cf8099b1328c4e70df10337c0ca4b9e83cfeea72a5e78893",
    "platform": "KTF",
    "model": null,
-   "title": "이노티아연대기2",
+   "title": "이노티아연대기2 (2)",
    "status": "not-yet",
    "axes": {
     "boot": "no",
@@ -3214,7 +3450,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "이노티아연대기2"
   },
   {
    "sha256": "d5e996a531183929161da88c311dded208208dabb871b74a007c2dd9ffa415da",
@@ -3231,7 +3468,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "이누야샤"
   },
   {
    "sha256": "edd11ce9b8d7fee95d0b682ebea8eee5591bc1f66e5369c9566145a8dcd43d99",
@@ -3248,7 +3486,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "이니셜k"
   },
   {
    "sha256": "01e2715ba07a4ac6be046e30a54634fefbb3cb7b2a98adb9c1454dcb3a0c1e51",
@@ -3267,7 +3506,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "이터널사가2"
   },
   {
    "sha256": "cbf36fee9f634628cfd42bd6a8cc088f2d8e5f195c4cc83bf9ee9555fd07907b",
@@ -3284,7 +3524,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "인형뽑기타이쿤"
   },
   {
    "sha256": "3412d851f78c22f1b4e57a805e59536c9f38e5d2e909dfb072cd72b305fe9cd6",
@@ -3303,7 +3544,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "일지매 영웅전기"
   },
   {
    "sha256": "e8aee49516f1facdca1dc1eb3a488511154c886c267d752a0ce987025e7f5eae",
@@ -3320,7 +3562,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "자백"
   },
   {
    "sha256": "db5f655665c1b2f654e344b213fd5fc1cf563fa7e318cb7fbbd71f14fb3d7d49",
@@ -3337,7 +3580,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "장금이의 꿈"
   },
   {
    "sha256": "0865be217bde0dbef60bcc336f287eba3994d04c5b38e2985bb92952e0e9ea05",
@@ -3356,7 +3600,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "전국호텔왕plus"
   },
   {
    "sha256": "888702965551622a01cbff78cfbf030146990c22c691adf189aaa625b53ced54",
@@ -3375,13 +3620,14 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "전설의 마법학교2"
   },
   {
    "sha256": "85e94babc24759be78f3e25025b1b1e4a59b67c972fb426dd0b534f7c285701d",
    "platform": "KTF",
    "model": null,
-   "title": "절묘한타이밍 01.00.01",
+   "title": "절묘한타이밍 (01.00.01)",
    "status": "limited",
    "axes": {
     "boot": "ok",
@@ -3394,13 +3640,14 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "절묘한타이밍 01.00.01"
   },
   {
    "sha256": "dab2d537f3ef93e4675454eb1fb808daef2a728cc31ac9d1ef8df0b943f9ec30",
    "platform": "KTF",
    "model": null,
-   "title": "절묘한타이밍 01.00.05",
+   "title": "절묘한타이밍 (01.00.05)",
    "status": "not-yet",
    "axes": {
     "boot": "no",
@@ -3413,7 +3660,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "절묘한타이밍 01.00.05"
   },
   {
    "sha256": "36b82cb677238bda62f0a6a96b020a1689b27f39fb082f7c780939613e319374",
@@ -3432,7 +3680,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "점핑펭"
   },
   {
    "sha256": "e3089e5e94267f284e4848b465db188e66397961360597bc9e4c3dfe2e78e748",
@@ -3449,7 +3698,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "정무문2"
   },
   {
    "sha256": "3d394002573428f1627d2c843b47ea0ac5461eb5f4a856e529e5b936dc8f5ed8",
@@ -3466,7 +3716,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "정무문3"
   },
   {
    "sha256": "60bd6cbc5936626ae38e71bccab46cf8896ac5144e7b2f40b6176e53179ded3a",
@@ -3485,7 +3736,26 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "정통맞고2007"
+  },
+  {
+   "sha256": "fe184f834bc7d842f680d1320cef0fcb6eb97e16517ff9712aed058a229f8c3a",
+   "platform": "KTF",
+   "model": null,
+   "title": "졸라맨액션학원",
+   "status": "playable",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "unknown"
+   },
+   "knownIssues_ko": [],
+   "changes": [],
+   "fileTitle": "kt 졸라맨액션학원"
   },
   {
    "sha256": "8b899f410f5d3788763643219d1393bd0d1bbfb86acbd57d5e78dcf06686d26d",
@@ -3505,7 +3775,8 @@
     "화면이 한 가지 색으로만 보여요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "주타이쿤2"
   },
   {
    "sha256": "e09aca27c132c96752c1b8acaab9aacfc81297b2714d3815d8310b020ff37ee9",
@@ -3522,10 +3793,11 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "지상렬신맞고"
   },
   {
-   "sha256": "8bfd08fe4370f63efff69c97e65faf5ec19840d8445bae6e46f4815a91a141c2",
+   "sha256": "704839f1a6c88dc8d4c8d15e26a3047d9109a3187a2a274ddfdc383be8dfcb93",
    "platform": "KTF",
    "model": null,
    "title": "지크",
@@ -3541,13 +3813,14 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "지크 kt"
   },
   {
-   "sha256": "704839f1a6c88dc8d4c8d15e26a3047d9109a3187a2a274ddfdc383be8dfcb93",
+   "sha256": "8bfd08fe4370f63efff69c97e65faf5ec19840d8445bae6e46f4815a91a141c2",
    "platform": "KTF",
    "model": null,
-   "title": "지크 kt",
+   "title": "지크 (2)",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -3560,7 +3833,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "지크"
   },
   {
    "sha256": "306dcdb03842e63cdf414755e2adccb840ef36b54cd6c636199fc53cd301f95d",
@@ -3579,13 +3853,14 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "질주쾌감 스케쳐"
   },
   {
    "sha256": "e159b9727dbdbfab7d69bea44df52ffc822db0c291a670faa9e5024eddbc09a7",
    "platform": "KTF",
    "model": null,
-   "title": "질주쾌감 스케쳐",
+   "title": "질주쾌감 스케쳐 (2)",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -3596,7 +3871,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "질주쾌감 스케쳐"
   },
   {
    "sha256": "04159045a7eaf257328ac1b2fb9e83fc5aadf5fbc2aba19cabaf24438a390c3c",
@@ -3616,7 +3892,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "질주쾌감스케쳐2"
   },
   {
    "sha256": "4577b56082afe86018af9b556d4a3718f81e78d9eafea7bb7eef3e596f055ae8",
@@ -3633,7 +3910,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "질풍노도17대1"
   },
   {
    "sha256": "951830e5fb387363349ed78d9a5f995cfcfc4cdcf361cd123164ad1c2062b51d",
@@ -3650,7 +3928,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "짜요짜요타이쿤"
   },
   {
    "sha256": "f5bd7a91a107d3a8d73c019c403431ec5e6f6160b6d9f625aca9e31208157715",
@@ -3667,7 +3946,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "짜요짜요타이쿤2"
   },
   {
    "sha256": "362c57e2b2b7c9c6de2b51c91df8094383f1acee512bf07a87ec055a71e4cf2e",
@@ -3686,7 +3966,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "짜요짜요타이쿤3"
   },
   {
    "sha256": "c36cbe78011f1a794341e4a250aeb1a2d23466c0b9dfdb68e802aa5ee96a5a7e",
@@ -3706,7 +3987,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "짜요짜요타이쿤4"
   },
   {
    "sha256": "ea35907b22a4b36d841bf355a8c0f8a8b125ad11c2c6dbfd9364bb39a9b052d3",
@@ -3723,7 +4005,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "창세기전 CROW2"
   },
   {
    "sha256": "88ba9a9f66ef9a72fbb562f414ad3a88016cbcb1b42b0610a7ca8bdb32944a13",
@@ -3740,7 +4023,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "체스마스터"
   },
   {
    "sha256": "0a8a31b3c0185da9edc701f40b793042fb53cfdbf864abdb106ca3fe6b6be362",
@@ -3757,7 +4041,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "초밥의달인3"
   },
   {
    "sha256": "3d38a46becd98bed1fb47e9fdea8affd2ebf6ab80f83b610fec6ca597191e921",
@@ -3774,13 +4059,14 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "추억의달고나"
   },
   {
    "sha256": "44a4228cca51f131adef6cf2a430e4abfc54797948f4a6676b617d5d292326f6",
    "platform": "KTF",
    "model": null,
-   "title": "추억의달고나",
+   "title": "추억의달고나 (2)",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -3791,7 +4077,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "추억의달고나"
   },
   {
    "sha256": "1e43e2e0055f83bc05bfa08c76ff27c2460d6fc8ab0e4ec190fb9e7252af7aef",
@@ -3810,7 +4097,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "치킨타이쿤"
   },
   {
    "sha256": "51011b242bb5485dde836fed1af8c5dff41a1994e3eb35fc26fc01198d697add",
@@ -3829,7 +4117,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "카우스블레이드"
   },
   {
    "sha256": "4fcd4b74020eabff3c35dac914babd7722783a2995a5c21811186c7d1b2739d5",
@@ -3846,7 +4135,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "컴삼촉"
   },
   {
    "sha256": "f2280c6699a0d98b5f482bdaf0258aba85cc41935f7e67e04376ea5c3a41d9ef",
@@ -3863,7 +4153,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "컴투스 맞고 2006"
   },
   {
    "sha256": "dbc45612d9101de250b4a11473b3c495566c72279858b85fcb4801d9bbe2daba",
@@ -3880,7 +4171,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "컴투스 바이러스"
   },
   {
    "sha256": "2bafbffeb742499a5475bdc33ee77ed11c6146b629954b96084766ec5ff15736",
@@ -3897,7 +4189,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "컴투스사커2006 한글명단"
   },
   {
    "sha256": "7da00ecd48040a097a4168c5c60e156b74f7259e04f82a504a2a6fe8149e4c57",
@@ -3916,7 +4209,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "컴투스포춘골프3D"
   },
   {
    "sha256": "0c603a84f16208e1569fd8223328642ff5bf8857e3ac811b32bb63481ac4aafb",
@@ -3933,7 +4227,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "케로로미니게임"
   },
   {
    "sha256": "c4b90400f9fe231a62685d00f439542682efd2b3468688033833d7b1da3748e0",
@@ -3952,7 +4247,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "코에이 삼국지 영걸전"
   },
   {
    "sha256": "2fc792485d91fb4b7ce6092bd921feb4eda308ae9867bbd13b840eceb93f7d07",
@@ -3969,7 +4265,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "코에이삼국지2"
   },
   {
    "sha256": "965eee81e44282457b30826ecfce62f9d2333b321e1c0ddba961a9f9b06a7655",
@@ -3986,7 +4283,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "쿠키하우스"
   },
   {
    "sha256": "d9384b388ea5bcc3f48c4096a183bac0f9b739f3072e1e80ce8173d613e0565d",
@@ -4003,7 +4301,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "크로노스 윙"
   },
   {
    "sha256": "1fe6c1c897d708dbb587a083dc450727c12de152de5e9e6458af75294a3061bb",
@@ -4020,7 +4319,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "크로노스윙"
   },
   {
    "sha256": "e56253df12f384cc63351a730ea8ec5b533624f175112a6173010bd289607c22",
@@ -4037,13 +4337,14 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "크로스워드"
   },
   {
    "sha256": "23919eb33365180e40a234caebc4293a97a01f48008cd3ec78c92b9c52056bb9",
    "platform": "KTF",
    "model": null,
-   "title": "크로이센1.04",
+   "title": "크로이센",
    "status": "limited",
    "axes": {
     "boot": "ok",
@@ -4057,7 +4358,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "크로이센1.04"
   },
   {
    "sha256": "0392263fbb85b30951a7317603d8b3bfcf9e78b002e5190ccf304bb8b380b46f",
@@ -4076,7 +4378,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "크림슨블레이드"
   },
   {
    "sha256": "3ccc6cf147d2d537a27b60e151732c2bed0144127bd1b93944591b0e4169373b",
@@ -4093,13 +4396,14 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "크아bnb2007"
   },
   {
    "sha256": "4288d8c1c6acc1531dc2b1c1e033101ff5623907977dc5059cf7ea700d6373d4",
    "platform": "KTF",
    "model": null,
-   "title": "크아bnb2007",
+   "title": "크아bnb2007 (2)",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -4110,13 +4414,14 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "크아bnb2007"
   },
   {
    "sha256": "339130e1eb47e2acc79abaaf4e55621a2c15c915951b672b157812a73a37b5ab",
    "platform": "KTF",
    "model": null,
-   "title": "타운스토리+신대륙편",
+   "title": "타운스토리 신대륙편",
    "status": "not-yet",
    "axes": {
     "boot": "no",
@@ -4129,7 +4434,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "타운스토리+신대륙편"
   },
   {
    "sha256": "36acdf213c33600e525fa9ca6d89d1b9ac96d677850e5171f7075c54050abacd",
@@ -4146,7 +4452,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "타워크래프트"
   },
   {
    "sha256": "4b6eaa69e0569097632f32dc51673753f691049dbc8da0538bdbc512c0dc21bb",
@@ -4163,7 +4470,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "탁재훈신맞고2007"
   },
   {
    "sha256": "83fc429f9cbec89c4ce169d5e6c2917c850ba9525f7eb6c983cb77af948b5200",
@@ -4182,7 +4490,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "테일즈판타지"
   },
   {
    "sha256": "7ec716a0cec985f80c3b59cdb02fb4d6d23752a8952090c28f27cbafaa5cacfc",
@@ -4201,7 +4510,8 @@
    "knownIssues_ko": [
     "키를 눌러도 화면이 바뀌지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "테트리스2006"
   },
   {
    "sha256": "1d5831e42a8a41d4c875b81e2606e779c5559b051f536686a0bd08e20ac9e71e",
@@ -4220,7 +4530,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "텐가이"
   },
   {
    "sha256": "1d18b7cc06d1fa7ca435c33106c51efb6f199ab32a100a4326db6609eb28ba03",
@@ -4239,13 +4550,14 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "투스워즈"
   },
   {
    "sha256": "a5651a180b7a92e70fff055cf34a47a734450de659ac577d1ffd18e052d826a3",
    "platform": "KTF",
    "model": null,
-   "title": "투스워즈",
+   "title": "투스워즈 (2)",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -4258,7 +4570,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "투스워즈"
   },
   {
    "sha256": "77c2d0bcd435059cf89308218541da6f95d59bc486449901f65e6df83a050942",
@@ -4275,7 +4588,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "트랜스포머"
   },
   {
    "sha256": "59263295de749f2b5f44d5aeb5ceedf06bffb60d888cfe26afdf4432b6082bef",
@@ -4294,13 +4608,14 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "티어즈오브메탈"
   },
   {
    "sha256": "74cb49013d6441f7eb0c719aa358ff55d82cf4577b22f2532b6574e278744078",
    "platform": "KTF",
    "model": null,
-   "title": "파랜드택틱스 kt",
+   "title": "파랜드택틱스",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -4313,7 +4628,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "파랜드택틱스 kt"
   },
   {
    "sha256": "0e72b6bc12bbe832d7dc89a59c06d1293a75c76db7213d29647a17b8015cfe5d",
@@ -4332,7 +4648,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "판타지포에버2"
   },
   {
    "sha256": "09a6a300994d20da4c6c4bc425787ae8e18d28ec90e5e8140c8553515f381c98",
@@ -4349,7 +4666,46 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "팝픈뮤직"
+  },
+  {
+   "sha256": "a603436b4ec45d4402dea0aa7476e1a2d34cddcc569b23cd3ce072d02d3aea52",
+   "platform": "KTF",
+   "model": null,
+   "title": "페노아전기2",
+   "status": "playable",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
+   },
+   "knownIssues_ko": [],
+   "changes": [],
+   "fileTitle": "kt 페노아전기2"
+  },
+  {
+   "sha256": "7218e8720f8c839e28d666e96b85205b7c5d02b83aab9448bbe09f9b70597cb7",
+   "platform": "KTF",
+   "model": null,
+   "title": "페이블오브나이트",
+   "status": "playable",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "no",
+    "speed": "ok"
+   },
+   "knownIssues_ko": [
+    "소리가 나지 않을 수 있어요."
+   ],
+   "changes": [],
+   "fileTitle": "[큰화]페이블오브나이트"
   },
   {
    "sha256": "568c339a8c0761896f6f1991fc8f2bbebd7ff6ae64e9a4ba0f35c6a60f1cb7d2",
@@ -4368,7 +4724,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "폴라폴리2007"
   },
   {
    "sha256": "86132b2ed76fa9130a79e90b55ad90e9f710bca530ca50ae89c4edf4fa72d42f",
@@ -4387,7 +4744,8 @@
    "knownIssues_ko": [
     "키를 눌러도 화면이 바뀌지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "푸시푸시삼국지"
   },
   {
    "sha256": "d234152636c8691d5b9897304048f7681b5d1d4e0346687ab7a6742f28e66f1a",
@@ -4404,7 +4762,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "프리스타일 어택"
   },
   {
    "sha256": "69e516bb2ffa3983f68114320917403fd542c2362095693e57f6156260d8737a",
@@ -4421,13 +4780,14 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "프린세스메이커4"
   },
   {
    "sha256": "b129770bae26d64476237766e2e2fefdb48ede8c0cb636f457bf264728f45fbb",
    "platform": "KTF",
    "model": null,
-   "title": "프린세스메이커4 작은화면",
+   "title": "프린세스메이커4 (작은화면)",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -4438,7 +4798,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "프린세스메이커4 작은화면"
   },
   {
    "sha256": "b1ec149b354c1838a512aba773fc38bf74cfc9cace61984f138394507b054ede",
@@ -4458,7 +4819,8 @@
     "화면이 한 가지 색으로만 보여요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "피자타이쿤"
   },
   {
    "sha256": "97c4d85924b959360a9190522444a925d517b832685212cf8157688699e3226a",
@@ -4475,7 +4837,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "피자타이쿤2"
   },
   {
    "sha256": "cbe4cfe098c68b634407507da415eb4d0aa1857dfa1f718217c5a53c3bcd8c5f",
@@ -4494,7 +4857,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "피파7"
   },
   {
    "sha256": "249e655147a173c767d9b3ab2b848e935e273364e019cce2ee93dbf4fc75afbf",
@@ -4513,7 +4877,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "하베스트타이쿤"
   },
   {
    "sha256": "e5bafab72b171ed9b26644d4fdf46bf45798f92f5441a11c5d21542839bb3790",
@@ -4530,7 +4895,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "한게임신맞고1"
   },
   {
    "sha256": "a10a1f02b41b12f453ede2870945fc0ca93c828c7fa01701dc96a885610444d7",
@@ -4549,7 +4915,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "해적왕2007"
   },
   {
    "sha256": "e88154bf5de2d64a9e8ee37a045cdac686503327a977cfa1a52d05f9fc030e6f",
@@ -4566,7 +4933,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "헬로우닌자"
   },
   {
    "sha256": "5a59f62d1f1a026e1c4a0c754ad2f8703216fd50af3d4891ce1071c14bf6cda5",
@@ -4585,7 +4953,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "헬싱"
   },
   {
    "sha256": "f12d97040c3333a09540024e13d4474a121a37e53aef6dff0c85ea71a6e23104",
@@ -4602,7 +4971,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "현영맞고 2006"
   },
   {
    "sha256": "9e16cc54d0ab1ea818aad8bed198acd371aacc80d4ba70ffed703101df97ce4e",
@@ -4622,7 +4992,26 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "화산제일검2"
+  },
+  {
+   "sha256": "8a33aafc06a21742b8f681a22e44cce74bc30c4bbfab06a2c0000108b2df3b72",
+   "platform": "KTF",
+   "model": null,
+   "title": "화장빨인생",
+   "status": "playable",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "unknown"
+   },
+   "knownIssues_ko": [],
+   "changes": [],
+   "fileTitle": "kt 화장빨인생"
   },
   {
    "sha256": "08b8688093668f31a484322ac5738cee2511508b5ab02b56cdb51a2810432b3f",
@@ -4639,7 +5028,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "K1 WGP뉴챌린저"
   },
   {
    "sha256": "cdd3eb5f914270423b5687710c9aa2d9d2b12a198b5dfb4b623bea59f3ebc322",
@@ -4659,7 +5049,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "kbo 프로야구 2009"
   },
   {
    "sha256": "4892a1abc0f8714d12f137fc568398977e00d75983587ad503b74ecc9a7cd327",
@@ -4679,134 +5070,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
-  },
-  {
-   "sha256": "c7f543c73b9103d57b5e9e5b825e6bdb595de812fbccf81b718db8d2e94fa756",
-   "platform": "KTF",
-   "model": null,
-   "title": "kt 던전앤히어로",
-   "status": "limited",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "no",
-    "sound": "no",
-    "speed": "unknown"
-   },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
-   "changes": []
-  },
-  {
-   "sha256": "229291e20b130082b378a70a474ad27b10d2cb8eb64d71132d75886b06cfc49e",
-   "platform": "KTF",
-   "model": null,
-   "title": "kt 동전쌓기 에볼루션",
-   "status": "limited",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
-    "speed": "unknown"
-   },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
-   "changes": []
-  },
-  {
-   "sha256": "e9fac881e602dad311ee9422a127d31aa07e4dc6ca3e1a1e54e90b42276282d0",
-   "platform": "KTF",
-   "model": null,
-   "title": "KT 드래곤나이트EX",
-   "status": "limited",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "no",
-    "sound": "ok",
-    "speed": "ok"
-   },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
-   "changes": []
-  },
-  {
-   "sha256": "fe184f834bc7d842f680d1320cef0fcb6eb97e16517ff9712aed058a229f8c3a",
-   "platform": "KTF",
-   "model": null,
-   "title": "kt 졸라맨액션학원",
-   "status": "playable",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "ok",
-    "sound": "ok",
-    "speed": "unknown"
-   },
-   "knownIssues_ko": [],
-   "changes": []
-  },
-  {
-   "sha256": "a603436b4ec45d4402dea0aa7476e1a2d34cddcc569b23cd3ce072d02d3aea52",
-   "platform": "KTF",
-   "model": null,
-   "title": "kt 페노아전기2",
-   "status": "playable",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "ok",
-    "sound": "ok",
-    "speed": "ok"
-   },
-   "knownIssues_ko": [],
-   "changes": []
-  },
-  {
-   "sha256": "8a33aafc06a21742b8f681a22e44cce74bc30c4bbfab06a2c0000108b2df3b72",
-   "platform": "KTF",
-   "model": null,
-   "title": "kt 화장빨인생",
-   "status": "playable",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "ok",
-    "sound": "ok",
-    "speed": "unknown"
-   },
-   "knownIssues_ko": [],
-   "changes": []
-  },
-  {
-   "sha256": "4df05a4dc45278ebb1ee06cf919df073122650a1d7e12b820a7099b39838bbb6",
-   "platform": "KTF",
-   "model": null,
-   "title": "KTF 미니미니오락실",
-   "status": "playable",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "ok",
-    "sound": "ok",
-    "speed": "unknown"
-   },
-   "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "kbo프로야구 2009"
   },
   {
    "sha256": "c5b3f6835d0044eca80fef8898c32c880b1d2c91cafe10306b48e19decda26d6",
@@ -4823,7 +5088,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "MR.때밀이왕"
   },
   {
    "sha256": "5bff8d2168f7df2f94acfaa17935fd920d725068fb042f6b2646d6cdd0cad218",
@@ -4840,7 +5106,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "SBS포트리스2"
   },
   {
    "sha256": "4166acd8fc62e470dace534fa7c6110d2605c45fba63262a3fb82361a47a30ba",
@@ -4861,7 +5128,8 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "sega미니게임6"
   },
   {
    "sha256": "145f760b2f4a4ea54692d07fd791259fa58c923290069c2f3f40d13fcc532cd3",
@@ -4878,7 +5146,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "SIM헤어디자이너"
   },
   {
    "sha256": "8f7758fa43b6beca7b1ddf5d1b58bdf3e8caa52d39fdc6fb52c1e1f34a3b2910",
@@ -4897,7 +5166,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "2008베이징올림픽"
   },
   {
    "sha256": "1cd151222bdea0367757304cde2c537374517d60e1f5708a6359bbad4d05faf5",
@@ -4917,7 +5187,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "2010밴쿠버올림픽"
   },
   {
    "sha256": "5d0ba9495592a5543987fe5b95ab3629fd7a9f57eee8fa5f6ad2909828ed6cd1",
@@ -4934,7 +5205,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "간호사타이쿤2"
   },
   {
    "sha256": "af7d82e5e2393867ee2d7031fc4e4637a9d21d5ccb0a3c8098ddd9d425537e23",
@@ -4951,7 +5223,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "검은방2"
   },
   {
    "sha256": "580a66c32fff91cfd16b89ebd641dd003164ff73a4afa5009ed162db75683ec2",
@@ -4970,7 +5243,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "검은방3"
   },
   {
    "sha256": "c9b287e3edcf5647e530b706723c720f6210629c8369067bc5f3d49599c406de",
@@ -4987,7 +5261,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "게임빌2010슈퍼사커"
   },
   {
    "sha256": "01f05f8231f4e4b288a4ad5ac461840d7af28f9993877bd42ce083b24cafa62f",
@@ -5006,7 +5281,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "게임빌2010프로야구"
   },
   {
    "sha256": "236c7da689f6bbb3b99f1e4a9271f24a68c84ae19e0ed39ad5d39abd4e7b5616",
@@ -5023,7 +5299,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "그랜드체이스"
   },
   {
    "sha256": "c1718bcdf8a904a27a6f252dac6b9cc2801e8303639126a944bf9785d23764ce",
@@ -5042,7 +5319,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "나는마왕이다2"
   },
   {
    "sha256": "caf9d76ffd13e6eb2f580261d6ccd865fe6b7c42cc2b1462b5fa2f7e0457847d",
@@ -5061,7 +5339,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "냐옹타이쿤2"
   },
   {
    "sha256": "b475b63996844c2b4108224ec6ddb15f31ba8ac336dffcbebc4985d29009e930",
@@ -5078,7 +5357,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "놈3"
   },
   {
    "sha256": "2a8a3dcd07eb3fe804707b0fe50cca42f4efdefcb8f8233a54c22f98521f2d3c",
@@ -5097,7 +5377,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "놈ZERO"
   },
   {
    "sha256": "2dbde9acca995133e5e3de476c739b2016a85ef25757aa9b420f17b18ea242ed",
@@ -5116,7 +5397,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "당구마스터2010"
   },
   {
    "sha256": "b2da04c55cd44cfddc627729e734b5b852dfbfe2e62e04aa1666b190bab1a150",
@@ -5135,7 +5417,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "당신은골프왕"
   },
   {
    "sha256": "21ffd1c61ebdea00e477fc9241daf85212e3c3149823d3462c26f71f5df9c083",
@@ -5154,7 +5437,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "당신은야구감독"
   },
   {
    "sha256": "63a4859013be9a8a6959f9ee01aa84ae92c4300c9ef0274713699d22621734c2",
@@ -5171,7 +5455,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "대박맞고-왕후의길"
   },
   {
    "sha256": "870cd071b4dcfb3123f6909bc8829b4d27df6f8b906bd043bd2706673028fb0f",
@@ -5190,7 +5475,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "던전앤파이터귀검사"
   },
   {
    "sha256": "9acb5e0387ebd09b1f65ed8f43db45f01e52045a502df00358e5b23a9beb5055",
@@ -5207,7 +5493,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "데몬헌터"
   },
   {
    "sha256": "40b9537968de481661b3ee07ee85d6e2f02cd89994de40285250d6fd1488ea0f",
@@ -5227,7 +5514,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "라그나로크 바이올렛"
   },
   {
    "sha256": "595a443e1c16f368d020e95f9f4dca5709bd46da6bc4712636284db6b8c28862",
@@ -5244,7 +5532,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "라켓스타"
   },
   {
    "sha256": "53d8ce5a8ef077bb6216d665c64fd4d355046da6b193a3d7688b95b94e02a292",
@@ -5261,7 +5550,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "라테일"
   },
   {
    "sha256": "619d98bc8f64c3d4b4e7d975c922ab2e6f0daaa3e26352030f02a864074ba790",
@@ -5281,7 +5571,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "레이카르나"
   },
   {
    "sha256": "735a579d82ac53bb205b04250ce44586c6d9375e64c2d6f3324796b3ae24d031",
@@ -5298,7 +5589,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "레전드오브마스터"
   },
   {
    "sha256": "5dc5d7091c017d3801e32d62814706ccdf4a9f6e4e9cc92bd00ea525da7202a4",
@@ -5315,7 +5607,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "리듬스타1"
   },
   {
    "sha256": "0093012b8c367dbf9354ae8f8225cbd69ac93c5a7738539e06c7156a465591e0",
@@ -5334,7 +5627,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "리듬스타2"
   },
   {
    "sha256": "863b8ab6a21df2c05e0d9ad085a5068fdf37433940093efe289b6459b7c1e7e9",
@@ -5354,7 +5648,8 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "리듬페스티발"
   },
   {
    "sha256": "b7699c10dfd1992814d26294e32c1376820802532eb5f70ba959a71ebd31ea45",
@@ -5373,7 +5668,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "리얼사커매니저2009"
   },
   {
    "sha256": "1eaa92092bee50e2dc2d7649f9d9e60812f22a67371fdec905215bf7e5d38f20",
@@ -5392,7 +5688,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "메이플스토리 도적편"
   },
   {
    "sha256": "13d7e3c21856081483448364a7b4d3db3cb5e67e710e9d86db1d0f68c127304c",
@@ -5409,7 +5706,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "메이플스토리2007"
   },
   {
    "sha256": "0606d43702e7d3197afefc8d5cd5f075adb8cf06b599a59748345be3115391d7",
@@ -5426,7 +5724,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "메탈슬러그 서바이벌"
   },
   {
    "sha256": "b9bfcaf427222a62a7c904c9561fca706725adf5782e1f4a57328bbe7dd349ab",
@@ -5443,7 +5742,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "몬스터마스터"
   },
   {
    "sha256": "0baceb1dfe9c388d08e9225fabdf68ee82f289fa42fdfec9cfab77c78f553288",
@@ -5460,7 +5760,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "무한신맞고2009"
   },
   {
    "sha256": "87b04639cdfef6ccd65a34c71f20ee9e6321a551cad6c67de5545dabbb3da15a",
@@ -5479,7 +5780,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "뮤직팩토리"
   },
   {
    "sha256": "fd8f52f3abf7bdff7f3d9270c5884f02344790f12b789b16433ef60b32260533",
@@ -5496,7 +5798,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "미니게임천국4"
   },
   {
    "sha256": "63332c51d5143c79c5266d4d0d6706ddfe063b0850af4ccaa7b5a3f46ae6f224",
@@ -5516,7 +5819,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "바이오크로니클"
   },
   {
    "sha256": "a30bbe008b5e570456b37c53dc849b73c9f6325050279f9da2ba35385ed10e67",
@@ -5533,7 +5837,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "배틀몬스터"
   },
   {
    "sha256": "dddac90779620a9721cfd5a8f5cf1c1aded09857361fdb7638157d71f96ecc88",
@@ -5550,7 +5855,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "부루마블2009"
   },
   {
    "sha256": "2520654be6deeccfc9408fba0bc4154ab94f883d3de2fa902a505772258eb0e3",
@@ -5570,7 +5876,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "붉은보석"
   },
   {
    "sha256": "1a69522a7d43df3ac1720d4eabc00af6e4c5b31d6e1974c0a9fa8d18ac7bccda",
@@ -5587,7 +5894,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "붕어빵타이쿤3"
   },
   {
    "sha256": "34c48bbae783f11b95baf7fd7cecca483c10ec3391f7043109da3db94866d57d",
@@ -5607,7 +5915,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "블레이드마스터3"
   },
   {
    "sha256": "6b515884dbc13ed8d1c01ce4e3bac2f38e78fd41d1196b47a90b0b0fbc597794",
@@ -5627,7 +5936,8 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "블레이드마스터4"
   },
   {
    "sha256": "517ed32c92d60a0c26a14ea913160901bfd5e6da68464b6a12c9c13e2d8f08d2",
@@ -5647,7 +5957,8 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "서든어택포켓"
   },
   {
    "sha256": "c046d43d429b3671b316655b77e0e8d760c866e63017f0c85448be8291fa49bf",
@@ -5664,7 +5975,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "슈퍼액션히어로"
   },
   {
    "sha256": "2d5cada030045cfad14c9f29f0007ad79d1f4da7447658846f7bdbedc224130b",
@@ -5683,7 +5995,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "슈퍼액션히어로3"
   },
   {
    "sha256": "d01275d61fa9f0bac4d9b20f0b4b9d0b578e67bd2a21754f9e5d618c5126b235",
@@ -5700,7 +6013,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "스파이더맨3"
   },
   {
    "sha256": "3ff5948e235e86e9e6f490666b0389c05a5171aefd36729b73639be138875206",
@@ -5720,7 +6034,8 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "아니마"
   },
   {
    "sha256": "fe76e641bb3df380b5a2cbd61b978c83c0cbead3ea3c13b6cf38b07571e74c5a",
@@ -5740,7 +6055,29 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "알바타이쿤2"
+  },
+  {
+   "sha256": "287af341dac8f421b9f599826fe68ff3d649cf9fa9467ceaddc139423a82f7b7",
+   "platform": "LGT",
+   "model": "clet",
+   "title": "얍",
+   "status": "limited",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "no",
+    "longplay": "unknown",
+    "sound": "no",
+    "speed": "ok"
+   },
+   "knownIssues_ko": [
+    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
+    "소리가 나지 않을 수 있어요."
+   ],
+   "changes": [],
+   "fileTitle": "LGT 얍"
   },
   {
    "sha256": "b44b5fbe29e616264f40ee3091fad71c5769333ad49afbd40ab69cd3fa3389cb",
@@ -5760,7 +6097,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "에바스토-천공의렙소디"
   },
   {
    "sha256": "0bc9cc28c05a32157af06cd41a60c626b2510126b01ca0f7ba392a72d5c31880",
@@ -5777,7 +6115,26 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "영웅서기3"
+  },
+  {
+   "sha256": "6f170f692586ec03cdda87df45699ea4151866fde36c988f4f2e331f8f68851e",
+   "platform": "LGT",
+   "model": "clet",
+   "title": "영웅서기3 (2)",
+   "status": "playable",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "unknown"
+   },
+   "knownIssues_ko": [],
+   "changes": [],
+   "fileTitle": "LGT 영웅서기3"
   },
   {
    "sha256": "ddd885583b154ea900048106bd5507ee63defc974af41a6b4f93fd67a5558823",
@@ -5794,7 +6151,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "영웅서기4"
   },
   {
    "sha256": "393d359d081593e3927d2c7d84a5df26863ecd4d476c869778af9a06f0009787",
@@ -5811,7 +6169,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "와일드프론티어"
   },
   {
    "sha256": "70d709c40e10541fe54a43501a5859045a0e6c454706500e6665c74c7c8fd52f",
@@ -5830,7 +6189,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "월드장기체스"
   },
   {
    "sha256": "0266ca417880ec41d38d2c49b46102275e3d4835ff6f29a958182395cc813ded",
@@ -5847,7 +6207,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "이노티아연대기"
   },
   {
    "sha256": "1352b27a789842e799729b6c147f76d0a58337a5b1f4129a116b28c0f3124bc1",
@@ -5867,7 +6228,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "이터널사가3"
   },
   {
    "sha256": "acf6863fc84ce512f30917ab9a9bb0760db8d4b628153844ab99d1ac0ec1f6ac",
@@ -5887,7 +6249,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "이터니티-천상의화원"
   },
   {
    "sha256": "2a57e33133b5c5d6889cb6db63e0fd35b40137e5b7ece1f079ab9a3b0595f5c6",
@@ -5906,7 +6269,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "일지매영웅전기"
   },
   {
    "sha256": "01eef742dd0a89f1429f929182fecec3009341d3f2c0f3e1adc566a9bf03742d",
@@ -5923,7 +6287,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "일지매영웅전기2"
   },
   {
    "sha256": "4fdbd64c9fbdfbf6d335847a01054dea5a2feb3efdb2a1e6aa5b288d77fda5de",
@@ -5942,7 +6307,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "정통맞고2009"
   },
   {
    "sha256": "3cc7a9b4cb15818cdd5a66f7e520c7b9b36f1df8d2df096aafa961b1cb2b682c",
@@ -5959,7 +6325,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "제노니아1"
   },
   {
    "sha256": "601556233e719a97860d38f6d413673c2996b1a7010438504663c98b86ec776c",
@@ -5979,7 +6346,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "제노니아2"
   },
   {
    "sha256": "6bc7f65e30221d9fed18723929a89ba765e83079f6e8f5ef6546a89b35544f99",
@@ -5996,7 +6364,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "창세기전3ep1"
   },
   {
    "sha256": "4ece6eeeaa04955153005b2e14ddefdfd202443388b434dc4a6e9dda1b77e276",
@@ -6013,7 +6382,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "체스마스터"
   },
   {
    "sha256": "a23f3c9fc2cb84e931da79898c64651a7d0d21f578343cf87ca35baa74de440e",
@@ -6032,7 +6402,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "크로이센"
   },
   {
    "sha256": "a16f08d025ebe57af3b6655217b167b505d4ddf19acbcfe609a14630183b1432",
@@ -6053,7 +6424,26 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "턴"
+  },
+  {
+   "sha256": "0fdf45ec169ff0b1edd7434303201c6f418703137210a6c7780d750bcd9f1849",
+   "platform": "LGT",
+   "model": "clet",
+   "title": "테라 영원의 혼돈",
+   "status": "playable",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
+   },
+   "knownIssues_ko": [],
+   "changes": [],
+   "fileTitle": "lgt 테라 영원의 혼돈"
   },
   {
    "sha256": "f5e21001612d95d72f20277f9c42d19f6c2ee07c0dc93151ecccc257f95217b6",
@@ -6070,7 +6460,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "테일즈위버 막시민편"
   },
   {
    "sha256": "1045007289d80420f2f11808f6312e57e9d287f21da0186d57cdded92363e984",
@@ -6089,7 +6480,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "테일즈위버 이스핀편"
   },
   {
    "sha256": "5814101b801021a63b423e809f408d24a4ac476ed5bb1c6e3137c8d3de69bf3d",
@@ -6109,7 +6501,26 @@
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "판타지포에버3"
+  },
+  {
+   "sha256": "ecb1bf8d2079eed2b49b639697c8fda0c47d52cd9e7b6be39f3798bdbe9a5f71",
+   "platform": "LGT",
+   "model": "clet",
+   "title": "하얀섬",
+   "status": "playable",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
+   },
+   "knownIssues_ko": [],
+   "changes": [],
+   "fileTitle": "lgt 하얀섬"
   },
   {
    "sha256": "e68b1c8aef85c584dc6e5e225f0c226641b23f6c523bf0f59eb662151f9cf954",
@@ -6126,7 +6537,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "하이브리드"
   },
   {
    "sha256": "320a5360a0f314d096a9ad3f219114b47d2e4e5a36a30f07c36841f797fbf20a",
@@ -6145,7 +6557,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "하이브리드2"
   },
   {
    "sha256": "be08d047cbaef52f458ccdf4739ea5314b73e7ec9f5eb3ee0537c7b34f815e96",
@@ -6165,7 +6578,8 @@
     "화면이 한 가지 색으로만 보여요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "학교가는길"
   },
   {
    "sha256": "1b107b96bf4ed7d2634d778fb45c9c3e3a887f37f35c1b73359ff44c0acb3674",
@@ -6182,7 +6596,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "현영맞고2006"
   },
   {
    "sha256": "73f3a21e981c7edbf3e54f767800653da764f8b91828068cc3daf35952e90bdc",
@@ -6202,7 +6617,8 @@
     "화면이 한 가지 색으로만 보여요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "훼밀리마트타이쿤"
   },
   {
    "sha256": "acc4215b7ec0cdbb6bbc260ff9f9d304301e4f38031497e013a328e6ddd00340",
@@ -6221,78 +6637,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
-  },
-  {
-   "sha256": "287af341dac8f421b9f599826fe68ff3d649cf9fa9467ceaddc139423a82f7b7",
-   "platform": "LGT",
-   "model": "clet",
-   "title": "LGT 얍",
-   "status": "limited",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
-    "speed": "ok"
-   },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
-   "changes": []
-  },
-  {
-   "sha256": "6f170f692586ec03cdda87df45699ea4151866fde36c988f4f2e331f8f68851e",
-   "platform": "LGT",
-   "model": "clet",
-   "title": "LGT 영웅서기3",
-   "status": "playable",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "ok",
-    "sound": "ok",
-    "speed": "unknown"
-   },
-   "knownIssues_ko": [],
-   "changes": []
-  },
-  {
-   "sha256": "0fdf45ec169ff0b1edd7434303201c6f418703137210a6c7780d750bcd9f1849",
-   "platform": "LGT",
-   "model": "clet",
-   "title": "lgt 테라 영원의 혼돈",
-   "status": "playable",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "ok",
-    "sound": "ok",
-    "speed": "ok"
-   },
-   "knownIssues_ko": [],
-   "changes": []
-  },
-  {
-   "sha256": "ecb1bf8d2079eed2b49b639697c8fda0c47d52cd9e7b6be39f3798bdbe9a5f71",
-   "platform": "LGT",
-   "model": "clet",
-   "title": "lgt 하얀섬",
-   "status": "playable",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "ok",
-    "sound": "ok",
-    "speed": "ok"
-   },
-   "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "KBO프로야구2009"
   },
   {
    "sha256": "61ed69520fd34679be0a72029d4bbee25d10799e6c7dfeb9cefd8960a24bcb80",
@@ -6311,85 +6657,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
-  },
-  {
-   "sha256": "d2957348ddf4869062a6595efa04b43122975837f2cd5385b7bcc638fd10bfc2",
-   "platform": "SKT",
-   "model": null,
-   "title": "[SKT]테일즈 오브 히어로즈",
-   "status": "not-yet",
-   "axes": {
-    "boot": "ok",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "no",
-    "speed": "unknown"
-   },
-   "knownIssues_ko": [
-    "화면이 한 가지 색으로만 보여요.",
-    "소리가 나지 않을 수 있어요."
-   ],
-   "changes": []
-  },
-  {
-   "sha256": "f78334f270beb365476221224fe26cb7c594f873d922734d6cfe0658a36b0721",
-   "platform": "SKT",
-   "model": null,
-   "title": "[SKVM]바운티블루스",
-   "status": "not-yet",
-   "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
-    "speed": "unknown"
-   },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
-   "changes": []
-  },
-  {
-   "sha256": "38277d63b0ba2803076c82ff36f5bc1435d227d0401e4e9eedc455d56da5a68a",
-   "platform": "SKT",
-   "model": null,
-   "title": "[SKVM]얼라이브",
-   "status": "limited",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
-    "speed": "unknown"
-   },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
-   "changes": []
-  },
-  {
-   "sha256": "f2ae515201f27ba30ad4c2324a40cf236fdd64c3b6dbd9510a6634644b2f0168",
-   "platform": "SKT",
-   "model": null,
-   "title": "[SKVM]택티컬퀘스트",
-   "status": "not-yet",
-   "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
-    "speed": "unknown"
-   },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "SD한국전쟁"
   },
   {
    "sha256": "ccdd9295c5c4242c17d04c7016e11c2e11ac05363d368f807f5a15c15d11e9c6",
@@ -6406,24 +6675,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
-  },
-  {
-   "sha256": "1367261bc3ee3b7f0afa102a52a7559204d94da60c543969773d47a09c051e79",
-   "platform": "SKT",
-   "model": null,
-   "title": "3523930101-고래사냥2",
-   "status": "playable",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "ok",
-    "sound": "ok",
-    "speed": "unknown"
-   },
-   "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "2006 독일축구"
   },
   {
    "sha256": "47fe675bfffd64161141e2d9c4815be3c441164e15a12098e925a944febd94b5",
@@ -6440,7 +6693,26 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "강호동맞고2"
+  },
+  {
+   "sha256": "1367261bc3ee3b7f0afa102a52a7559204d94da60c543969773d47a09c051e79",
+   "platform": "SKT",
+   "model": null,
+   "title": "고래사냥2",
+   "status": "playable",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "unknown"
+   },
+   "knownIssues_ko": [],
+   "changes": [],
+   "fileTitle": "3523930101-고래사냥2"
   },
   {
    "sha256": "c107462e5f8a6c1612a7232ed30388dbc48935e5fa2d6650d1e2ba1221217a73",
@@ -6459,7 +6731,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "교실이데아"
   },
   {
    "sha256": "cf5249e75df3140f8e6ce14a7ef068a9d57b71c88eb8b70cb7a59ab8302281ea",
@@ -6476,7 +6749,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "나이트메이커"
   },
   {
    "sha256": "c33090c12755710fc599957a16a19b27babe161de34c8bb743d5e1557d089e70",
@@ -6496,7 +6770,26 @@
     "게임 화면이 아직 나오지 않아요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "노리맥스영웅전"
+  },
+  {
+   "sha256": "a0436eb1ddbb0501ac3fe43a55c073b75b8344ffa2c1f297beeb2d204de44cae",
+   "platform": "SKT",
+   "model": null,
+   "title": "노리타이쿤",
+   "status": "playable",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
+   },
+   "knownIssues_ko": [],
+   "changes": [],
+   "fileTitle": "skt 노리타이쿤"
   },
   {
    "sha256": "fb80e97cbc57454f9b0a21c3fc4f60db40bb8a71c75f316ee545e21ccc442072",
@@ -6515,7 +6808,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "다크슬레이어2"
   },
   {
    "sha256": "9aa31965cd1042844c47cdd6267a09eeb6477b674a00710571674114b4eac053",
@@ -6534,7 +6828,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "닥터k"
   },
   {
    "sha256": "2f84b8cc870d574091fde110288751931400105d7fdf0045cc6165731e90aaaf",
@@ -6551,7 +6846,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "당골왕"
   },
   {
    "sha256": "9e2307e4fa88b6ceba9ab387aea325d7011ea895eab12cba4d818f3e5711f1a9",
@@ -6568,7 +6864,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "당신은골프왕"
   },
   {
    "sha256": "3bafa1f1eed27d6819cefe6b6e2612a9373cabd81fec3f6db335ea641951a19c",
@@ -6587,7 +6884,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "대해적시대"
   },
   {
    "sha256": "14a62a8521a0d434f8fffc7b85c1d2427335dac5d81e9f6b966f12d42ce5abce",
@@ -6607,7 +6905,26 @@
     "화면이 한 가지 색으로만 보여요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "댄스배틀오디션"
+  },
+  {
+   "sha256": "b42e4242866b6908bda35d93a703bdac7e1be6c69e42c58ded1ffbbc478e7b23",
+   "platform": "SKT",
+   "model": null,
+   "title": "더팜1",
+   "status": "playable",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "unknown"
+   },
+   "knownIssues_ko": [],
+   "changes": [],
+   "fileTitle": "skt 더팜1"
   },
   {
    "sha256": "f807137021115b6aeb4d05a4e7d5fdd17297e315e454e7df3b13248de18bcde6",
@@ -6624,7 +6941,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "더팜2"
   },
   {
    "sha256": "78bd51675574314c33f6bf6202752f6fd65df14fc69f94cfef417b4d8045a172",
@@ -6641,7 +6959,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "드래곤나이트EX"
   },
   {
    "sha256": "66959afab216988e9e1df19811004026643bb1a6e1a96f02df6de1754a85d295",
@@ -6660,7 +6979,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "드래곤아이즈"
   },
   {
    "sha256": "d1dce4a3614196a6255c898bcdf121a7c4dd656e25925bdd9f8be8768a2ce6d0",
@@ -6679,7 +6999,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "디지몬 RPG II"
   },
   {
    "sha256": "ec2f8f2e02a2d62570222322b5cacaaf39cdabf3d1d8b45ed859ea27a8e54123",
@@ -6696,7 +7017,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "러브다이어리"
   },
   {
    "sha256": "c361632541a74bcd52103cbed5fb0e925ca4211df50c23fe28c389359db3b880",
@@ -6715,7 +7037,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "레스토랑타이쿤2006"
   },
   {
    "sha256": "d3e3b16cefd000fa8fd26eefeee32660d59429cbcf46870aa2007e5a5121f9b6",
@@ -6732,7 +7055,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "로디아전기"
   },
   {
    "sha256": "bf54c05e58a9fe84ea7629c2d9868128a763f2fa8762f245e26c8d927f9c7623",
@@ -6749,7 +7073,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "로맨스소드"
   },
   {
    "sha256": "9a2cf5ffc9d30641bb482f952b03cb7e9daf46d7012a69a2ad83db62599a53ac",
@@ -6768,7 +7093,8 @@
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "매지컬프린세스"
   },
   {
    "sha256": "916aea39fa36e3bec08e11a3ee0e0dbf89f54c094a6a131d59562db27f71354a",
@@ -6787,7 +7113,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "매직히어로 슐"
   },
   {
    "sha256": "2b6d785677955bb74adb52a791d545bf4f846fcee3b53d80bbf961e1924ad227",
@@ -6806,7 +7133,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "메르헨전기"
   },
   {
    "sha256": "976141a9525b6decebee8bdcf2cf94da0efe7b53e4a99303aba661068c2f19d7",
@@ -6823,7 +7151,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "메이플스토리-궁수편"
   },
   {
    "sha256": "52edc54e2b231384001c5dbcb9a3334ee14b73bd2f10bef1d633003ecfd1dfc2",
@@ -6840,7 +7169,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "메이플스토리-법사편"
   },
   {
    "sha256": "02bc66e85cf47d985ad80fdac686c84f12a85d267f4176535d8716dd0149a036",
@@ -6857,7 +7187,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "메이플스토리-전사편"
   },
   {
    "sha256": "c6cadf75c454638e2c14f7549a2062e7c37680c1eaf9536ec0d4bfb20acfe3c2",
@@ -6876,7 +7207,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "몬스터보이"
   },
   {
    "sha256": "4b44b31e81075ed4acf3fc52620ae9898b9715f4fe3942ce4c16c6b773ff873c",
@@ -6893,7 +7225,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "물가에돌튕기기IQ"
   },
   {
    "sha256": "f81658d4ad1a00848c21fcf737f3b176f1bb9787051fb74f489e066602957a88",
@@ -6912,7 +7245,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "미니게임츄리닝"
   },
   {
    "sha256": "85f03ca7389e4800221687ed73b1fd0fb0c43d3aa152dae23781fd80f8aa5f42",
@@ -6929,7 +7263,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "미니고치"
   },
   {
    "sha256": "8fec741a782d73ccd415890cffa3634f48e26483256c7ce8f8bbab19fdd0269c",
@@ -6946,7 +7281,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "미니동화TING"
   },
   {
    "sha256": "ae877a276f592e5fc325c32b2c28706f165f52994102ad6f5c2b89da756194ca",
@@ -6963,7 +7299,28 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "미니스포츠클럽"
+  },
+  {
+   "sha256": "f78334f270beb365476221224fe26cb7c594f873d922734d6cfe0658a36b0721",
+   "platform": "SKT",
+   "model": null,
+   "title": "바운티블루스",
+   "status": "not-yet",
+   "axes": {
+    "boot": "no",
+    "render": "no",
+    "input": "unknown",
+    "longplay": "unknown",
+    "sound": "unknown",
+    "speed": "unknown"
+   },
+   "knownIssues_ko": [
+    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
+   ],
+   "changes": [],
+   "fileTitle": "[SKVM]바운티블루스"
   },
   {
    "sha256": "e9b262f8f297877b88b97a3f6bf93a9713b1bfda301ceda140d1b0a443b0518a",
@@ -6980,7 +7337,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "부루마블2005"
   },
   {
    "sha256": "fba094100d13c8caa0ce4f29f01cba28fcc082ae8fa98990900be78a98d44468",
@@ -6999,7 +7357,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "불멸의용병"
   },
   {
    "sha256": "3fa46bfa50d7870314be9905909084283e5fbe6e6b73d4101a8835486e55a9d5",
@@ -7016,7 +7375,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "사고뭉치트윈스"
   },
   {
    "sha256": "2f5246006bd86d43e3ea85901208082b8eae8b47ca8831d28879d74301e15392",
@@ -7035,7 +7395,8 @@
    "knownIssues_ko": [
     "키를 눌러도 화면이 바뀌지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "삼국쟁패 패왕전기"
   },
   {
    "sha256": "2d66945008c1be8a749abd91d54e98c622268ab3c53e2a7c07cbe108a4d5780d",
@@ -7052,13 +7413,14 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "삼국쟁패2열왕전기"
   },
   {
    "sha256": "f6fe2adc8cce3a76bc19130b426483a66f7402cd4b7fe5f56c5c72be847238ba",
    "platform": "SKT",
    "model": null,
-   "title": "삼국지연의 SKVM",
+   "title": "삼국지연의",
    "status": "not-yet",
    "axes": {
     "boot": "no",
@@ -7071,7 +7433,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "삼국지연의 SKVM"
   },
   {
    "sha256": "a42f77f4495565e57a0a1592dc92ac3ce44c8c462657f69df5984933cf4ecdfa",
@@ -7091,7 +7454,8 @@
     "게임 화면이 아직 나오지 않아요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "삼국지연의2"
   },
   {
    "sha256": "4f99be2762e2bd85c5882d81d598fffd0e42ca109ecd52dee6cf9fa15c2b998a",
@@ -7108,7 +7472,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "생과일타이쿤2"
   },
   {
    "sha256": "7f40060723fc66500e0f103c63bc459711531822b63205a8392e41a0f2e08102",
@@ -7125,7 +7490,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "생존일기"
   },
   {
    "sha256": "36c859b7df28c3eda8b62643d5528a060725e4aff63aecc29e0d294b625654b1",
@@ -7142,7 +7508,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "서울타이쿤"
   },
   {
    "sha256": "6e9991f0865084a70de9dfca224d8a2b0746fb519e2492ce8e3d0a114f81b389",
@@ -7161,7 +7528,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "센티멘탈러브"
   },
   {
    "sha256": "44b6356d13f87b7f513abb462baf37e6c3ddf17b19195d3f9a331c1fe7320515",
@@ -7178,7 +7546,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "스페셜포스"
   },
   {
    "sha256": "e9ea67541b01c7215b211e67d948358db5eb7e3718f405f3966b1c6264747bdb",
@@ -7195,7 +7564,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "신시티"
   },
   {
    "sha256": "ca1132f2e7bce1df47453808648e18569b0bef9336d0d125dce41e3101e5223f",
@@ -7214,7 +7584,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "썸머스케치"
   },
   {
    "sha256": "69c4a48cc7f0f1f9f206874bcb6969afc146248df35c1d85e2a6096ab0d1b98a",
@@ -7231,7 +7602,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "아슬아슬타워쿤"
   },
   {
    "sha256": "090877d7a3e0c27a14f7160cd97f0ff61eca0ed6c650f2a0e716e682fcdcb90c",
@@ -7248,7 +7620,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "어스토니시아ep1"
   },
   {
    "sha256": "08aa799c11b0d97d4f3b03fc1c2ce7fb28136009227ae6442e0d5ca105fe6ede",
@@ -7267,7 +7640,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "어스토니시아ep2"
   },
   {
    "sha256": "7089dec0e8df587940953cd05213bc13c73e2be149ae270d483acb20d58f2fef",
@@ -7286,7 +7660,29 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "어스토니시아ep3"
+  },
+  {
+   "sha256": "38277d63b0ba2803076c82ff36f5bc1435d227d0401e4e9eedc455d56da5a68a",
+   "platform": "SKT",
+   "model": null,
+   "title": "얼라이브",
+   "status": "limited",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "no",
+    "longplay": "unknown",
+    "sound": "no",
+    "speed": "unknown"
+   },
+   "knownIssues_ko": [
+    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
+    "소리가 나지 않을 수 있어요."
+   ],
+   "changes": [],
+   "fileTitle": "[SKVM]얼라이브"
   },
   {
    "sha256": "abc0c5789259a66ce69e8d23b37eeb2b5c59c752217d684b9814c984f0e0c2a8",
@@ -7305,7 +7701,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "에이지오브엠파이어2"
   },
   {
    "sha256": "f483ba078c14a2ea0e19a0cbe28ce36ffe7e16b6afc6847aa67f4a54f66feb72",
@@ -7324,7 +7721,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "엑스맨"
   },
   {
    "sha256": "0262a4fe3389fc957b2597e92f71a1c17db91e0728b656042b8a14f7f345c2af",
@@ -7343,13 +7741,14 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "엑스피드스노보드"
   },
   {
    "sha256": "31c90441f639a24db739306b2f7de6e02238f25f2b7bf2546458cdb08695c4fe",
    "platform": "SKT",
    "model": null,
-   "title": "영웅모바일귀령천마 skt",
+   "title": "영웅모바일귀령천마",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -7360,13 +7759,14 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "영웅모바일귀령천마 skt"
   },
   {
    "sha256": "1f0d7e81336a8db3a8fa33aeb6e5a696f65e85885f1431efcdbb37f93da106ae",
    "platform": "SKT",
    "model": null,
-   "title": "영웅서기-추가다운완료",
+   "title": "영웅서기",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -7377,7 +7777,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "영웅서기-추가다운완료"
   },
   {
    "sha256": "3de4bcb4f5e269fa2fc37786efe41cdd8e05548e772e18f31435300e6ae335ec",
@@ -7396,7 +7797,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "영웅서기2"
   },
   {
    "sha256": "97506b6246e29fb0b822efface70fe7c7fc831d68b6c24889be5b3fa6c7a3233",
@@ -7413,7 +7815,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "우뇌♥트레이닝"
   },
   {
    "sha256": "d1b55085bddc0829201fbad43bd6072f5b0fb9b7dd805eca147422867f1a35b2",
@@ -7430,13 +7833,14 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "웰루시아"
   },
   {
    "sha256": "d6abd6258d08284eb8c39b8ee92c883d36f5f9d034349662b2a1907ac643e08e",
    "platform": "SKT",
    "model": null,
-   "title": "웰루시아",
+   "title": "웰루시아 (2)",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -7447,7 +7851,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "웰루시아"
   },
   {
    "sha256": "40f1a71972122f150a57f58671a7cbe719f183d5a9d0eda090dce6f42ff6b4a9",
@@ -7464,7 +7869,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "이터널사가"
   },
   {
    "sha256": "d1234e0ddb75fe4251471a57c72da5f2f2b99ad306c2b4b6277c67e247e10845",
@@ -7481,13 +7887,14 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "카트라이더-그랑프리"
   },
   {
    "sha256": "dae153ad28ba421d24b6e4af6a55f68b607a1f9d6384e8abbaddc0332bbbf18f",
    "platform": "SKT",
    "model": null,
-   "title": "컴투스프로야구2SKT",
+   "title": "컴투스프로야구2",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -7498,7 +7905,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "컴투스프로야구2SKT"
   },
   {
    "sha256": "6e93f26fa2f52fab812f9663863cdb803333f1ad5b2fe856b39681ad7099e7a5",
@@ -7517,7 +7925,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "코인마스터"
   },
   {
    "sha256": "71d1d8235bd1cbad0911d53af22d00ab7d1c23ad27e99defa58f9c9c15cc44a7",
@@ -7536,7 +7945,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "크레이지버스"
   },
   {
    "sha256": "688a87e210d82ac74c5dcfcafb6c8d85c549d0fa5da4772d67e5892fcece5cd6",
@@ -7553,7 +7963,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "크리스탈보더"
   },
   {
    "sha256": "f12984cd0d37c48c4af7044430173ec1281a5e698662fd41859ee957fd7ec81c",
@@ -7572,13 +7983,55 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "킹덤언더파이어"
+  },
+  {
+   "sha256": "f2ae515201f27ba30ad4c2324a40cf236fdd64c3b6dbd9510a6634644b2f0168",
+   "platform": "SKT",
+   "model": null,
+   "title": "택티컬퀘스트",
+   "status": "not-yet",
+   "axes": {
+    "boot": "no",
+    "render": "no",
+    "input": "unknown",
+    "longplay": "unknown",
+    "sound": "unknown",
+    "speed": "unknown"
+   },
+   "knownIssues_ko": [
+    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
+   ],
+   "changes": [],
+   "fileTitle": "[SKVM]택티컬퀘스트"
+  },
+  {
+   "sha256": "d2957348ddf4869062a6595efa04b43122975837f2cd5385b7bcc638fd10bfc2",
+   "platform": "SKT",
+   "model": null,
+   "title": "테일즈 오브 히어로즈",
+   "status": "not-yet",
+   "axes": {
+    "boot": "ok",
+    "render": "no",
+    "input": "unknown",
+    "longplay": "unknown",
+    "sound": "no",
+    "speed": "unknown"
+   },
+   "knownIssues_ko": [
+    "화면이 한 가지 색으로만 보여요.",
+    "소리가 나지 않을 수 있어요."
+   ],
+   "changes": [],
+   "fileTitle": "[SKT]테일즈 오브 히어로즈"
   },
   {
    "sha256": "0ed66634d3dce7eeb05ec9ca95488f507574a1c8b62f3446018cecbd5c4d2415",
    "platform": "SKT",
    "model": null,
-   "title": "테일즈판타지 SKVM",
+   "title": "테일즈판타지",
    "status": "not-yet",
    "axes": {
     "boot": "ok",
@@ -7592,7 +8045,8 @@
     "게임 화면이 아직 나오지 않아요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "테일즈판타지 SKVM"
   },
   {
    "sha256": "3eb73c20bbaea90fa348d1b61d82cf2378590ab5754848c448602328ffcd908e",
@@ -7612,7 +8066,8 @@
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "파파라치타이쿤"
   },
   {
    "sha256": "e3276ce8557c1d26198580e7895d1b1af8028a59c532a4e933f18f0ba87645fc",
@@ -7631,7 +8086,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "포켓올림픽"
   },
   {
    "sha256": "990ae27f67e679a3bef9e2371237a1c6ac5abc03e0b249c2e8f809b01790a730",
@@ -7650,7 +8106,8 @@
    "knownIssues_ko": [
     "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "포트리스"
   },
   {
    "sha256": "4503f7e3a82532e2faa0785184c68a3eec229ca75c3e9f8f47843242804a6646",
@@ -7667,13 +8124,14 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "프리스톤테일"
   },
   {
    "sha256": "640428a9cf9ede0b5b92b5b549b8a0e95d620a63ea084f848a4b2a54b0c01a38",
    "platform": "SKT",
    "model": null,
-   "title": "프린세스메이커4 작은화면",
+   "title": "프린세스메이커4 (작은화면)",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -7686,13 +8144,14 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "프린세스메이커4 작은화면"
   },
   {
    "sha256": "ccb45e6b8d809e459fa32d4ec8d8d16d457c938430dd40318dd462ef45887512",
    "platform": "SKT",
    "model": null,
-   "title": "프린세스메이커4 큰화면",
+   "title": "프린세스메이커4 (큰화면)",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -7705,7 +8164,8 @@
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "프린세스메이커4 큰화면"
   },
   {
    "sha256": "eefc947d83374af5785201f34941e0e1d51cb12115d8d00edfd942179e8afe53",
@@ -7725,7 +8185,8 @@
     "게임 화면이 아직 나오지 않아요.",
     "소리가 나지 않을 수 있어요."
    ],
-   "changes": []
+   "changes": [],
+   "fileTitle": "Chaos블레이드"
   },
   {
    "sha256": "55c453b46254460145e7c9754f88af88aca3695928b0a98f47ce97a432842c24",
@@ -7742,41 +8203,8 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [],
-   "changes": []
-  },
-  {
-   "sha256": "a0436eb1ddbb0501ac3fe43a55c073b75b8344ffa2c1f297beeb2d204de44cae",
-   "platform": "SKT",
-   "model": null,
-   "title": "skt 노리타이쿤",
-   "status": "playable",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "ok",
-    "sound": "ok",
-    "speed": "ok"
-   },
-   "knownIssues_ko": [],
-   "changes": []
-  },
-  {
-   "sha256": "b42e4242866b6908bda35d93a703bdac7e1be6c69e42c58ded1ffbbc478e7b23",
-   "platform": "SKT",
-   "model": null,
-   "title": "skt 더팜1",
-   "status": "playable",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "ok",
-    "sound": "ok",
-    "speed": "unknown"
-   },
-   "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "MBC무한도전"
   },
   {
    "sha256": "fb7a86ce425b5e309e151926e8e233a7cdb15740f2772a4a6b6ee234304fb0ac",
@@ -7793,7 +8221,8 @@
     "speed": "ok"
    },
    "knownIssues_ko": [],
-   "changes": []
+   "changes": [],
+   "fileTitle": "STRIKERS1999"
   }
  ]
 }

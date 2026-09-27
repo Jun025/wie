@@ -14,7 +14,7 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
 ```
 { schema: 1, generatedAt: "YYYY-MM-DD…", enginePin: <측정한 wie 커밋 40hex>,
   entries: [{ sha256: <64hex>, platform: "KTF"|"SKT"|"LGT"|"J2ME", model: "clet"|"aot-java"|null,
-              title: <표시 이름>, status: "playable"|"limited"|"not-yet",
+              title: <표시 이름>, fileTitle: <파일에서 온 원 이름(검색·추적용)>, status: "playable"|"limited"|"not-yet",
               axes: { boot, render, input, longplay, sound, speed: "ok"|"partial"|"no"|"unknown" },
               knownIssues_ko: [쉬운 한국어 문장],
               changes: [{ date, enginePin, summary_ko, kind, pr }] }] }
@@ -29,7 +29,12 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
 | `api` | `platform` + `model` | 전수 조사가 재는 값이 이것이다. `api`(WIPI-C/Java)는 측정 안 한 값이라 넣지 않았다 |
 | `verifiedAt`·`verifiedWieHead` 항목별 | 최상위 `generatedAt`·`enginePin` | 한 회차가 전건을 같은 핀으로 잰다 |
 
-`changes` 의 `kind`·`pr` 은 셸 가져오기가 요구하지 않는 **추가 필드**다(모르는 키는 무시된다).
+★**표시 이름 규칙**(`stripMarkers`·`retitle` · 검사기가 «표식 잔존 0»과 «통신사 안 이름 중복 0»을 거부로 잡는다):
+파일 표식 — 대괄호 태그·재다운로드 `[1]`·통신사 표기(`kt`·`KTF`·`lgt`·`skt`·`SKVM` — 통신사는 `platform` 이 따로 말한다)·
+`에디트`/`수정판`/`추가다운완료`·파일 판 번호(`1.04`·`01.00.05`)·숫자 id 접두 — 는 `title` 에서 빼고(`+` 는 띄어쓰기로) 원 이름은 `fileTitle` 에 둔다.
+**뺀 뒤 같은 통신사 안에서 겹칠 때만** 구별 표기를 붙인다: 뺀 표식 하나(화면 크기가 있으면 그것, 없으면 판 번호)가 그 묶음에서 유일하면 ` (작은화면)`처럼, 아니면 ` (2)`·` (3)`(표식 짧은 순 → sha256 순).
+
+`changes` 의 `kind`·`pr` 과 `fileTitle` 은 셸 가져오기가 요구하지 않는 **추가 필드**다(모르는 키는 무시된다).
 
 ### 등급 술어 — 무엇을 봤으면 그 등급인가
 
