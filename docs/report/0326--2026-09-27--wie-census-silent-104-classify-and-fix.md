@@ -196,3 +196,5 @@
 | 1 | `f44271803135` — `MC_mdaClipSetVolume(0x0, 0)`(클립 없음) · `VOLUMELEVEL` 미등재 · KTF `unk12-1` 4,407회 루프. `VOLUMELEVEL="3"` 은 무반응 | S |
 
 게임 파일명 유입(`corpus-name-inflow --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 4회/2쌍 · SUFFIX-ATTACHED 0회/0쌍. BOUNDED 4회는 전부 수정 파일의 기존 줄이다(`kernel.rs` 1 · `player.rs` 3 — 이 회차의 추가 줄 중 일치 0).
+
+<!-- corpus-name-inflow v1 subjects=7 tree=f2ec1d2a00bad1b0 B=4/2 P=1/1 S=0/0 -->
