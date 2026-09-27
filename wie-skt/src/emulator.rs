@@ -22,15 +22,17 @@ pub struct SktEmulator {
     system: System,
 }
 
-// `m.MODEL` is read by 59 of the corpus's 84 SKT titles; two call `.equals` on it unchecked and
-// died at boot on null (2026-09-27 census). The value matches no real handset, so a title that
-// branches on the model takes the same default path a null-checking one already takes.
-const SYSTEM_PROPERTIES: [(&str, &str); 8] = [
+// `m.MODEL` (read by 59 of the corpus's 84 SKT titles) and `m.EXT_SW` (7) were null; a title that
+// calls `.equals` on either unchecked died at boot (2026-09-27 census, one each). The values match
+// no real handset or extension, so a title that branches on them takes the default path a
+// null-checking one already takes.
+const SYSTEM_PROPERTIES: [(&str, &str); 9] = [
     ("MIN", "01000000000"),
     ("m.MIN", "01000000000"),
     ("m.COLOR", "7"),
     ("m.VENDER", "vender"),
     ("m.MODEL", "wie"),
+    ("m.EXT_SW", "0"),
     ("m.CARRIER", "SKT"),
     ("m.SK_VM", "10"),
     ("com.xce.wipi.version", ""),
@@ -287,7 +289,9 @@ mod tests {
     }
 
     #[test]
-    fn model_property_is_set() {
-        assert!(super::SYSTEM_PROPERTIES.iter().any(|(k, v)| *k == "m.MODEL" && !v.is_empty()));
+    fn model_and_ext_sw_properties_are_set() {
+        for key in ["m.MODEL", "m.EXT_SW"] {
+            assert!(super::SYSTEM_PROPERTIES.iter().any(|(k, v)| *k == key && !v.is_empty()), "{key}");
+        }
     }
 }
