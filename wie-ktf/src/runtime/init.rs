@@ -9,7 +9,7 @@ use wie_util::{Result, WieError, read_generic, read_null_terminated_string_bytes
 use wipi_types::ktf::{ExeInterface, ExeInterfaceFunctions, InitParam0, InitParam3, InitParam4, WipiExe};
 
 use crate::{
-    adf::parse_bss_size,
+    adf::{is_relocation_prefixed, parse_bss_size},
     emulator::IMAGE_BASE,
     runtime::{
         SVC_CATEGORY_INIT,
@@ -47,6 +47,11 @@ pub async fn load_native(
     ptr_current_jvm_thread_context: u32,
 ) -> Result<u32> {
     let bss_size = parse_bss_size(filename)?;
+    if is_relocation_prefixed(data, bss_size) {
+        return Err(WieError::FatalError(format!(
+            "Unsupported KTF client.bin layout: {filename} starts with a relocation table, not the WIPI_exe entry stub"
+        )));
+    }
 
     core.load(data, IMAGE_BASE, data.len() + bss_size as usize)?;
 

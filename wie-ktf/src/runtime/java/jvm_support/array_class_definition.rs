@@ -1,6 +1,5 @@
 use alloc::{
     boxed::Box,
-    format,
     string::{String, ToString},
 };
 use core::{
@@ -108,12 +107,10 @@ impl ArrayClassDefinition for JavaArrayClassDefinition {
     }
 
     async fn instantiate_array(&self, jvm: &Jvm, length: usize) -> JvmResult<Box<dyn ClassInstance>> {
-        Ok(Box::new(match JavaArrayClassInstance::new(&mut self.core.clone(), self, length) {
-            Ok(x) => x,
-            Err(x) => {
-                return Err(jvm.exception("net/wie/WieError", &format!("Failed to instantiate array: {x}")).await);
-            }
-        }))
+        match JavaArrayClassInstance::new(&mut self.core.clone(), self, length) {
+            Ok(x) => Ok(Box::new(x)),
+            Err(x) => Err(KtfJvmSupport::instantiation_error(jvm, x, "array").await),
+        }
     }
 }
 

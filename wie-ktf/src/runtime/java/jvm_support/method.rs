@@ -346,11 +346,9 @@ impl Method for JavaMethod {
                 Err(match x {
                     WieError::JavaException(x) => JavaError::JavaException(Box::new(JavaClassInstance::from_raw(x, &self.core))),
                     WieError::JavaExceptionUnwind { .. } => {
-                        jvm_clone
-                            .exception("net/wie/WieError", "Java exception unwind crossed into JVM caller")
-                            .await
+                        KtfJvmSupport::wie_error(&jvm_clone, "Java exception unwind crossed into JVM caller").await
                     }
-                    _ => jvm_clone.exception("net/wie/WieError", &x.to_string()).await,
+                    _ => KtfJvmSupport::wie_error(&jvm_clone, &x.to_string()).await,
                 })
             })
             .await
