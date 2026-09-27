@@ -11,7 +11,7 @@
     "wie-wipi-java Player.resume → getState 판정",
     "wie_validate audio 키 loop_overlaps · handles",
     "scripts/check-audio-worklet.mjs 7 → 9",
-    "docs/report/0316"
+    "docs/report/0320"
   ],
   "verification": [
     "SKT 50타이틀 loop_overlaps 합 1 → 0 · 나이트메이커 plays 86,770 → 2 · 소리 난 타이틀 37 → 37",
