@@ -82,13 +82,80 @@ impl MIDlet {
             .await
     }
 
-    async fn notify_destroyed(_jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
-        tracing::warn!("stub javax.microedition.midlet.MIDlet::notifyDestroyed({this:?})");
+    // The MIDlet is done: stop the way `MC_knlExit` and `System.exit` do. As a no-op stub, titles
+    // that quit through here kept running and re-called it until the host stack overflowed
+    // (2026-09-27 census, 10-minute runs).
+    async fn notify_destroyed(_jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+        tracing::debug!("javax.microedition.midlet.MIDlet::notifyDestroyed({this:?})");
+
+        context.system().platform().exit();
 
         Ok(())
     }
 
     pub async fn display(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<Display>> {
         jvm.get_field(this, "display", "Ljavax/microedition/lcdui/Display;").await
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use alloc::{boxed::Box, sync::Arc};
+    use core::sync::atomic::{AtomicBool, Ordering};
+
+    use alloc::vec;
+
+    use jvm::{ClassInstanceRef, Jvm, Result as JvmResult};
+    use jvm_class_proto::JavaMethodProto;
+    use jvm_types::{ClassAccessFlags, MethodAccessFlags};
+    use test_utils::{TestPlatform, TestPlatformEvent, run_jvm_test_with_system};
+    use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
+    use wie_util::Result;
+
+    use super::MIDlet;
+
+    struct TestMIDlet;
+
+    impl TestMIDlet {
+        fn as_proto() -> WieJavaClassProto {
+            WieJavaClassProto {
+                name: "TestMIDlet",
+                parent_class: Some("javax/microedition/midlet/MIDlet"),
+                interfaces: vec![],
+                methods: vec![JavaMethodProto::new("<init>", "()V", Self::init, MethodAccessFlags::PUBLIC)],
+                fields: vec![],
+                access_flags: ClassAccessFlags::PUBLIC,
+            }
+        }
+
+        async fn init(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            jvm.invoke_special(&this, "javax/microedition/midlet/MIDlet", "<init>", "()V", ()).await
+        }
+    }
+
+    #[test]
+    fn notify_destroyed_exits() -> Result<()> {
+        let exited = Arc::new(AtomicBool::new(false));
+        let flag = exited.clone();
+        let platform = TestPlatform::with_event_handler(move |event| {
+            if matches!(event, TestPlatformEvent::Exit) {
+                flag.store(true, Ordering::SeqCst);
+            }
+        });
+
+        run_jvm_test_with_system(
+            Box::new([crate::get_protos().into(), [TestMIDlet::as_proto()].into()]),
+            Box::new(platform),
+            |jvm, _system| async move {
+                let midlet: ClassInstanceRef<MIDlet> = jvm.new_class("TestMIDlet", "()V", ()).await?.into();
+                let _: () = jvm
+                    .invoke_virtual(&midlet, "javax/microedition/midlet/MIDlet", "notifyDestroyed", "()V", ())
+                    .await?;
+                Ok(())
+            },
+        )?;
+
+        assert!(exited.load(Ordering::SeqCst));
+        Ok(())
     }
 }

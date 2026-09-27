@@ -41,6 +41,9 @@ impl HandsetProperty {
 
         let value = match name.as_ref() {
             "VIBRATORLEVEL" => "0",
+            // Parsed with Integer.parseInt at startApp: "" threw NumberFormatException in 5 KTF
+            // titles (2026-09-27 census). Mid-range of the handset's volume steps.
+            "VOLUMELEVEL" => "3",
             _ => "",
         };
 
@@ -81,6 +84,25 @@ mod test {
                 .await?;
 
             assert!(!result);
+            Ok(())
+        })
+    }
+
+    // KTF titles `Integer.parseInt` this at startApp; "" threw NumberFormatException.
+    #[test]
+    fn test_volume_level_is_a_number() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            let name: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, "VOLUMELEVEL").await?.into();
+            let value: ClassInstanceRef<String> = jvm
+                .invoke_static(
+                    "org/kwis/msp/handset/HandsetProperty",
+                    "getSystemProperty",
+                    "(Ljava/lang/String;)Ljava/lang/String;",
+                    (name,),
+                )
+                .await?;
+
+            assert!(JavaLangString::to_rust_string(&jvm, &value).await?.parse::<i32>().is_ok());
             Ok(())
         })
     }
