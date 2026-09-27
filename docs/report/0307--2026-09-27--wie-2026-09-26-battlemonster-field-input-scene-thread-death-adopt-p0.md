@@ -28,3 +28,5 @@ fmt rc0 · clippy `-D warnings` stable/wasm32/beta rc0 · `RUST_MIN_STACK=419430
 
 ### 게임 파일명 유입
 `scripts/corpus-name-inflow.mjs` 실행값: 유입 4쌍(BOUNDED — 놈3·배틀몬스터, 이 리니지가 이미 제목·시험 주석에 쓰는 이름) · 판단 필요 0건(SUFFIX-ATTACHED). 게임 바이트·키 스크립트 커밋 0.
+
+<!-- corpus-name-inflow v1 subjects=3 tree=1c2afdc3cd296d6b B=11/4 P=0/0 S=0/0 -->
