@@ -52,3 +52,4 @@
 - `scripts/build-wasm.sh` rc=0 · `check-engine-contract.mjs` 109 pass / 0 violation · `npm run audit` PASSED.
 - 게임 파일명 유입: 이 회차가 **더한 줄**에는 0건이다(`git diff origin/main` 의 `+` 줄 기준).
 - 도구 표기는 BOUNDED 4회/2쌍 · SUFFIX-ATTACHED 1회/1쌍이다. 모두 이 회차가 손댄 파일에 **이미 있던** 주석 3곳이다(`jlet.rs` 1 · `player.rs` 3).
+<!-- corpus-name-inflow v1 subjects=10 tree=7c561a90d6206dd9 B=4/2 P=0/0 S=1/1 -->
