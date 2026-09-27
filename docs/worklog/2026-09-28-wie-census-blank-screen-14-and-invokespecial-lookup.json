@@ -10,7 +10,7 @@
     "wie-midp — RecordStoreNotFoundException · openRecordStore create 반영 · 시험 1 · Canvas getWidth/getHeight 재선언 삭제",
     "wie-wipi-java — KTF DataBase.openDataBase 는 항상 create(종전 동작 유지)",
     "wie-lgt/data/lgt_java_abi.toml — DataInputStream 24 = readUnsignedByte()I · 시험 행 1",
-    "docs/report/0332"
+    "docs/report/0334"
   ],
   "verification": [
     "같은 시각 짝(프로브 A/B) — 14a62a8521a0·73f3a21e981c uniform→ok/ok/ok · 라이브 LGT 5 + 가드 2 퇴행 0",

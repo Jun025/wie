@@ -60,6 +60,12 @@ impl JvmImplementation for RustJavaJvmImplementation {
 /// hierarchy, and answering here would synchronize an inherited `static synchronized` method on
 /// the wrong class), not `private`.
 ///
+/// Error class differs from JVMS on malformed bytecode only: §5.4.3.3 finds a superclass's
+/// `private`/`static` method and then fails with IllegalAccessError/IncompatibleClassChangeError;
+/// here it is not found, so NoSuchMethodError. javac output never reaches that case.
+///
+/// KTF and LGT do not get this: they define classes through their own `JvmImplementation`.
+///
 /// ponytail: virtual dispatch now finds an inherited method at the subclass, so its frame names
 /// the subclass rather than the declaring class — cosmetic in stack traces, and the class loader
 /// derived from that frame is the subclass's, which delegates to the one it replaces. Drop this
