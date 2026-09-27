@@ -15,6 +15,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const COMPAT = join(ROOT, 'docs/player-data/compat.json');
@@ -33,6 +34,51 @@ const PR = /^https:\/\/github\.com\/Jun025\/wie\/pull\/\d+$/;
 const FILE = /^(\d{4}-\d{2}-\d{2})-[a-z0-9][a-z0-9-]*\.json$/;
 const str = (v) => typeof v === 'string' && v.trim() !== '';
 
+// Display names come from file names, which carry file markers: bracket tags ([큰화], [SKVM], the
+// «[1]» of a re-download), carrier labels (platform is its own field), edit/patch tags, file version
+// numbers, a numeric id prefix. stripMarkers() drops them and returns what it dropped as `label`:
+// the screen-size variant if there was one, else the version — the shortest marker that can tell
+// two files apart. Only a name that collides after stripping gets that label, else « (2)» (§1).
+const SCREEN = /[\s-]*(작은화면|큰화면|큰화)$/;
+const VERSION = /[\s-]*v?(\d+(?:\.\d+)+)$/i;
+export function stripMarkers(raw) {
+  let t = raw.replace(/\+/g, ' ');
+  let screen = '';
+  t = t.replace(/\[(작은화면|큰화면|큰화)\]/g, (_, m) => ((screen = m), ' '));
+  t = t.replace(/\[[^\]]*\]/g, (m) => (/^\[\d+\]$/.test(m) ? '' : ' ')); // 1[1].2 -> 1.2
+  t = t.replace(/^\d{6,}-/, '');
+  t = t.replace(/(^|\s)(ktf|kt|lgt|skt|skvm)(?=\s|$)/gi, ' ').replace(/(?<=[0-9가-힣])(KTF|LGT|SKT)$/, '');
+  t = t.replace(/[\s-]*[^\s-]*(에디트|수정판|추가다운완료)[^\s-]*/g, '');
+  let version = '';
+  for (let changed = true; changed; ) {
+    t = t.replace(/\s+/g, ' ').trim();
+    const before = t;
+    t = t.replace(SCREEN, (_, m) => ((screen = m), '')).replace(VERSION, (_, m) => ((version = m), ''));
+    changed = t !== before;
+  }
+  const label = screen ? (screen === '큰화' ? '큰화면' : screen) : version;
+  return { title: t.replace(/\s+/g, ' ').trim(), label };
+}
+
+/** Sets `fileTitle` (kept for search/tracing) and a marker-free, per-platform-unique `title`. */
+export function retitle(entries) {
+  const out = entries.map((x) => ({ ...x, fileTitle: x.fileTitle ?? x.title, ...stripMarkers(x.fileTitle ?? x.title) }));
+  const groups = Map.groupBy(out, (x) => `${x.platform}\t${x.title}`);
+  for (const g of groups.values()) {
+    if (g.length < 2) continue;
+    g.sort((a, b) => a.label.length - b.label.length || a.label.localeCompare(b.label) || a.sha256.localeCompare(b.sha256));
+    const taken = new Set();
+    g.forEach((x, i) => {
+      let t = x.label && !g.some((y) => y !== x && y.label === x.label) ? `${x.title} (${x.label})` : x.title;
+      for (let n = 2; taken.has(t); n++) t = `${x.title} (${n})`;
+      taken.add(t);
+      x.title = t;
+    });
+  }
+  return sortEntries(out.map(({ label, ...x }) => x));
+}
+const DISAMBIGUATOR = / \((\d+|작은화면|큰화면|v?\d+(?:\.\d+)+)\)$/;
+
 export function validateCompat(d) {
   const e = [];
   if (!d || typeof d !== 'object') return ['compat: not an object'];
@@ -41,6 +87,7 @@ export function validateCompat(d) {
   if (!HEX40.test(d.enginePin ?? '')) e.push('compat: enginePin must be 40 lowercase hex');
   if (!Array.isArray(d.entries)) return [...e, 'compat: entries must be an array'];
   const seen = new Set();
+  const names = new Set();
   d.entries.forEach((x, i) => {
     const at = `compat.entries[${i}]`;
     if (!x || typeof x !== 'object') return e.push(`${at}: not an object`);
@@ -50,6 +97,13 @@ export function validateCompat(d) {
     if (!PLATFORMS.includes(x.platform)) e.push(`${at}: platform not in ${PLATFORMS}`);
     if (!(x.model === null || str(x.model))) e.push(`${at}: model must be a string or null`);
     if (!str(x.title)) e.push(`${at}: empty title`);
+    else {
+      const base = x.title.replace(DISAMBIGUATOR, '');
+      if (stripMarkers(base).title !== base) e.push(`${at}: title carries a file marker — ${JSON.stringify(x.title)}`);
+      if (names.has(`${x.platform}\t${x.title}`)) e.push(`${at}: title ${JSON.stringify(x.title)} repeats within ${x.platform}`);
+      names.add(`${x.platform}\t${x.title}`);
+    }
+    if (!str(x.fileTitle)) e.push(`${at}: empty fileTitle (the file-derived name, kept for search)`);
     if (!STATUSES.includes(x.status)) e.push(`${at}: status not in ${STATUSES}`);
     for (const a of AXES) if (!AXIS_VALUES.includes(x.axes?.[a])) e.push(`${at}: axes.${a} not in ${AXIS_VALUES}`);
     if (!Array.isArray(x.knownIssues_ko) || !x.knownIssues_ko.every(str)) e.push(`${at}: knownIssues_ko must be non-empty strings`);
@@ -87,11 +141,11 @@ const AXIS_MAP = { ok: 'ok', 'n/a': 'unknown', fail: 'no', none: 'no', uniform: 
 export function fromCensus(c) {
   const entries = c.entries.map((x) => ({
     ...x,
-    title: x.title.replace(/_+/g, ' ').replace(/\s+/g, ' ').trim(), // census titles are file names
+    fileTitle: x.title.replace(/_+/g, ' ').replace(/\s+/g, ' ').trim(), // census titles are file names
     axes: Object.fromEntries(AXES.map((a) => [a, AXIS_MAP[x.axes?.[a]] ?? `?${x.axes?.[a]}`])),
     changes: [],
   }));
-  return { schema: 1, generatedAt: c.generatedAt, enginePin: c.enginePin, entries: sortEntries(entries) };
+  return { schema: 1, generatedAt: c.generatedAt, enginePin: c.enginePin, entries: retitle(entries) };
 }
 const sortEntries = (es) => [...es].sort((a, b) => a.platform.localeCompare(b.platform) || a.title.localeCompare(b.title, 'ko') || a.sha256.localeCompare(b.sha256));
 
@@ -131,7 +185,7 @@ function selftest() {
     schema: 1,
     generatedAt: '2026-09-27',
     enginePin: 'b'.repeat(40),
-    entries: [{ sha256: sha, platform: 'KTF', model: null, title: 't', status: 'playable', axes: Object.fromEntries(AXES.map((a) => [a, 'ok'])), knownIssues_ko: [], changes: [] }],
+    entries: [{ sha256: sha, platform: 'KTF', model: null, title: 't', fileTitle: '[큰화]t', status: 'playable', axes: Object.fromEntries(AXES.map((a) => [a, 'ok'])), knownIssues_ko: [], changes: [] }],
   };
   const upd = { date: '2026-09-27', kind: 'fix', titles: [sha], summary_ko: '고쳤어요.', pr: 'https://github.com/Jun025/wie/pull/1' };
   const cases = [
@@ -140,6 +194,12 @@ function selftest() {
     ['census axis value leaks through', { ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, boot: 'fail' } }] }, null],
     ['duplicate sha', { ...good, entries: [good.entries[0], good.entries[0]] }, null],
     ['short enginePin', { ...good, enginePin: 'abc' }, null],
+    ['title keeps a bracket tag', { ...good, entries: [{ ...good.entries[0], title: '[큰화]t' }] }, null],
+    ['title keeps a carrier label', { ...good, entries: [{ ...good.entries[0], title: 't kt' }] }, null],
+    ['title keeps a file version', { ...good, entries: [{ ...good.entries[0], title: 't 01.00.05' }] }, null],
+    ['title keeps an edit tag', { ...good, entries: [{ ...good.entries[0], title: 't 2억에디트1' }] }, null],
+    ['same title twice on one platform', { ...good, entries: [good.entries[0], { ...good.entries[0], sha256: 'c'.repeat(64) }] }, null],
+    ['fileTitle dropped', { ...good, entries: [{ ...good.entries[0], fileTitle: undefined }] }, null],
     ['update: title not in compat', good, [['2026-09-27-x.json', { ...upd, titles: ['c'.repeat(64)] }]]],
     ['update: date differs from name', good, [['2026-09-26-x.json', upd]]],
     ['update: bad kind', good, [['2026-09-27-x.json', { ...upd, kind: 'misc' }]]],
@@ -160,7 +220,8 @@ function selftest() {
 }
 
 const [cmd, ...args] = process.argv.slice(2);
-if (cmd === '--selftest') selftest();
+if (import.meta.url !== pathToFileURL(process.argv[1] ?? '').href);
+else if (cmd === '--selftest') selftest();
 else if (cmd === 'import') {
   const c = fromCensus(JSON.parse(readFileSync(args[0], 'utf8')));
   const e = validateCompat(c);
