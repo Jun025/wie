@@ -126,9 +126,12 @@ impl Canvas {
                 (),
             )
             .await?;
+        // Through Display::serviceRepaints, which paints only when a repaint is pending. Calling
+        // handlePaintEvent directly painted unconditionally, so a paint() that calls serviceRepaints
+        // (아포칼립스's Card) recursed until the host stack overflowed.
         if !display.is_null() {
             let _: () = jvm
-                .invoke_virtual(&display, "javax/microedition/lcdui/Display", "handlePaintEvent", "()V", ())
+                .invoke_virtual(&display, "javax/microedition/lcdui/Display", "serviceRepaints", "()V", ())
                 .await?;
         }
 
@@ -251,6 +254,89 @@ mod test {
 
     struct RecordingCanvas;
     struct RecordingGameCanvas;
+    struct ServicingCanvas;
+
+    // A paint() that calls serviceRepaints, the shape of 아포칼립스's Card.
+    impl ServicingCanvas {
+        fn as_proto() -> WieJavaClassProto {
+            JavaClassProto {
+                name: "javax/microedition/lcdui/TestServicingCanvas",
+                parent_class: Some("javax/microedition/lcdui/Canvas"),
+                interfaces: vec![],
+                methods: vec![
+                    JavaMethodProto::new("<init>", "()V", Self::init, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new(
+                        "paint",
+                        "(Ljavax/microedition/lcdui/Graphics;)V",
+                        Self::paint,
+                        MethodAccessFlags::PROTECTED,
+                    ),
+                ],
+                fields: vec![JavaFieldProto::new("paints", "I", FieldAccessFlags::PUBLIC)],
+                access_flags: ClassAccessFlags::PUBLIC,
+            }
+        }
+
+        async fn init(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            jvm.invoke_special(&this, "javax/microedition/lcdui/Canvas", "<init>", "()V", ()).await
+        }
+
+        async fn paint(
+            jvm: &Jvm,
+            _context: &mut WieJvmContext,
+            mut this: ClassInstanceRef<Self>,
+            _graphics: ClassInstanceRef<Graphics>,
+        ) -> JvmResult<()> {
+            let paints: i32 = jvm.get_field(&this, "paints", "I").await?;
+            jvm.put_field(&mut this, "paints", "I", paints + 1).await?;
+            // Stop a recursion here rather than overflow the test thread; the count shows it.
+            if paints < 8 {
+                let _: () = jvm
+                    .invoke_virtual(&this, "javax/microedition/lcdui/Canvas", "serviceRepaints", "()V", ())
+                    .await?;
+            }
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn service_repaints_paints_only_a_pending_repaint() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into(), [ServicingCanvas::as_proto()].into()]), |jvm| async move {
+            let display: ClassInstanceRef<Display> = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?.into();
+            let canvas: ClassInstanceRef<Canvas> = jvm.new_class("javax/microedition/lcdui/TestServicingCanvas", "()V", ()).await?.into();
+            let _: () = jvm
+                .invoke_virtual(
+                    &display,
+                    "javax/microedition/lcdui/Display",
+                    "setCurrent",
+                    "(Ljavax/microedition/lcdui/Displayable;)V",
+                    (canvas.clone(),),
+                )
+                .await?;
+            let paints = || async { jvm.get_field::<i32>(&canvas, "paints", "I").await };
+            let base = paints().await?;
+
+            // serviceRepaints inside paint: nothing is pending, so it must not paint again.
+            let _: () = jvm
+                .invoke_virtual(&display, "javax/microedition/lcdui/Display", "handlePaintEvent", "()V", ())
+                .await?;
+            assert_eq!(paints().await? - base, 1, "serviceRepaints inside paint re-entered paint");
+
+            // Outside paint: nothing pending paints nothing; a pending repaint paints once.
+            let _: () = jvm
+                .invoke_virtual(&canvas, "javax/microedition/lcdui/Canvas", "serviceRepaints", "()V", ())
+                .await?;
+            assert_eq!(paints().await? - base, 1);
+            let _: () = jvm
+                .invoke_virtual(&canvas, "javax/microedition/lcdui/Canvas", "repaint", "()V", ())
+                .await?;
+            let _: () = jvm
+                .invoke_virtual(&canvas, "javax/microedition/lcdui/Canvas", "serviceRepaints", "()V", ())
+                .await?;
+            assert_eq!(paints().await? - base, 2);
+            Ok(())
+        })
+    }
 
     impl RecordingCanvas {
         fn as_proto() -> WieJavaClassProto {
