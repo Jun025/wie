@@ -6,7 +6,7 @@ use bytemuck::Zeroable;
 use futures::future::poll_fn;
 use jvm::{ClassInstance, Result as JvmResult, runtime::JavaLangString};
 
-use wie_backend::{Emulator, Event, Options, Platform, System, TaskRunner};
+use wie_backend::{Emulator, Event, Options, Pacing, Platform, System, TaskRunner};
 use wie_core_arm::{Allocator, ArmCore};
 use wie_jvm_support::JvmSupport;
 use wie_util::{Result, WieError, write_generic};
@@ -189,6 +189,10 @@ impl KtfEmulator {
 impl Emulator for KtfEmulator {
     fn handle_event(&mut self, event: Event) {
         self.system.event_queue().push(event)
+    }
+
+    fn take_pacing(&mut self) -> Pacing {
+        self.system.pacing().take()
     }
 
     fn tick_for(&mut self, budget_ms: u64) -> Result<()> {

@@ -723,6 +723,10 @@ impl Display {
         tracing::debug!("javax.microedition.lcdui.Display::repaint({this:?}, {x}, {y}, {width}, {height})");
 
         jvm.put_field(&mut this, "repaintPending", "Z", true).await?;
+        // Timed from the guest's call, not from how the engine hands it on, so the latency stays
+        // visible whichever path delivers the paint.
+        let now = context.system().platform().now();
+        context.system().pacing().redraw_requested(now);
         context.system().request_redraw();
 
         Ok(())
@@ -803,6 +807,8 @@ impl Display {
 
     async fn handle_paint_event(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("javax.microedition.lcdui.Display::handlePaintEvent({this:?})");
+        let now = context.system().platform().now();
+        context.system().pacing().paint_started(now);
 
         // Repaints requested during painting belong to the next cycle.
         jvm.put_field(&mut this, "repaintPending", "Z", false).await?;
@@ -911,6 +917,8 @@ impl Display {
         if now - last_gc >= GC_INTERVAL_MS {
             jvm.put_field(&mut this, "lastGcMillis", "J", now).await?;
             jvm.collect_garbage()?;
+            let gc_ms = (context.system().platform().now().raw() as i64 - now).max(0) as u64;
+            context.system().pacing().collected_garbage(gc_ms);
         }
 
         Ok(())

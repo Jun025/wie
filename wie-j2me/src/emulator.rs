@@ -12,7 +12,7 @@ use jvm::{
     runtime::{JavaIoInputStream, JavaLangString},
 };
 
-use wie_backend::{DefaultTaskRunner, Emulator, Event, Platform, System, extract_zip};
+use wie_backend::{DefaultTaskRunner, Emulator, Event, Pacing, Platform, System, extract_zip};
 use wie_jvm_support::{JvmSupport, RustJavaJvmImplementation};
 use wie_util::{Result, WieError};
 
@@ -166,6 +166,10 @@ impl J2MEEmulator {
 impl Emulator for J2MEEmulator {
     fn handle_event(&mut self, event: Event) {
         self.system.event_queue().push(event)
+    }
+
+    fn take_pacing(&mut self) -> Pacing {
+        self.system.pacing().take()
     }
 
     fn tick_for(&mut self, budget_ms: u64) -> Result<()> {

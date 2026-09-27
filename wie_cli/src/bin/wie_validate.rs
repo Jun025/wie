@@ -538,6 +538,19 @@ struct Args {
     /// the guest, not how often ticks come.
     #[arg(long, value_parser = clap::value_parser!(u32).range(1..=1000))]
     frame_hz: Option<u32>,
+    /// Add the engine's pacing counters to the JSON line as `pacing` (`wie_backend::Pacing`):
+    /// guest sleep/timer wake lateness, repaint -> paint latency and how many of those paints
+    /// crossed a host tick, paints and GCs. The window opens SECS into the run (default 0) so a
+    /// boot can be left out. OFF by default; with it absent the line is unchanged.
+    #[arg(long, value_name = "SECS", num_args = 0..=1, default_missing_value = "0", value_parser = positive_or_zero_secs)]
+    pacing: Option<f64>,
+}
+
+fn positive_or_zero_secs(s: &str) -> Result<f64, String> {
+    match s.parse::<f64>() {
+        Ok(v) if v.is_finite() && v >= 0.0 => Ok(v),
+        _ => Err(format!("expected seconds >= 0, got {s:?}")),
+    }
 }
 
 /// Cap on the `guest_stdout` field, in bytes of the lossy-decoded text.
@@ -884,6 +897,10 @@ fn main() {
     } else {
         json
     };
+    let json = match &result.pacing {
+        Some(pacing) => format!("{},\"pacing\":{pacing}}}", &json[..json.len() - 1]),
+        None => json,
+    };
     if tallies.svc_stub_exhausted.load(Ordering::SeqCst) && result.verdict() == svc_stub_exhausted_outcome().verdict() {
         eprintln!("wie_validate: result line already written when the SVC stub space ran out; not writing a second one");
     } else {
@@ -979,6 +996,8 @@ struct Outcome {
     last_frame_distinct_colors: u64,
     last_frame_nondominant_bp: u64,
     last_frame_center_nonuniform_bp: u64,
+    /// `--pacing` only: `Pacing::summary_json` over the window.
+    pacing: Option<String>,
 }
 
 impl Outcome {
@@ -1069,10 +1088,15 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
         scripted: input_steps_total,
     };
 
+    let mut pacing_open = args.pacing == Some(0.0);
     while !exited.load(Ordering::SeqCst) {
         let elapsed = loop_start.elapsed();
         if elapsed > deadline || ticks >= args.max_ticks {
             break;
+        }
+        if !pacing_open && args.pacing.is_some_and(|secs| elapsed.as_secs_f64() >= secs) {
+            pacing_open = true;
+            emulator.take_pacing();
         }
 
         // Fire any scheduled input/screenshot events that are now due.
@@ -1133,6 +1157,8 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
         ticks += 1;
     }
 
+    // A window that never opened (the run ended first) reports nothing rather than the boot.
+    let pacing = pacing_open.then(|| emulator.take_pacing().summary_json());
     let paints = screen.paints.load(Ordering::SeqCst);
     let content = screen.saw_content.load(Ordering::SeqCst);
     // Derived from the loop's own exit state rather than set at each `break`: the two budget
@@ -1220,6 +1246,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     outcome.nondominant_bp = screen.max_nondominant_bp.load(Ordering::SeqCst);
     outcome.center_nonuniform_bp = screen.max_center_nonuniform_bp.load(Ordering::SeqCst);
 
+    outcome.pacing = pacing;
     judge(&mut outcome, args.inject, args.expect_last_frame, stop, inputs);
     outcome
 }
@@ -1597,6 +1624,7 @@ fn pass(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         last_frame_distinct_colors: 0,
         last_frame_nondominant_bp: 0,
         last_frame_center_nonuniform_bp: 0,
+        pacing: None,
     }
 }
 
@@ -1619,6 +1647,7 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         last_frame_distinct_colors: 0,
         last_frame_nondominant_bp: 0,
         last_frame_center_nonuniform_bp: 0,
+        pacing: None,
     }
 }
 

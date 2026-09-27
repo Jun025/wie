@@ -146,8 +146,7 @@ where
     T: JvmImplementation + Sync + Send + 'static,
 {
     async fn sleep(&self, duration: Duration) {
-        self.system.guest_slept();
-        self.system.sleep(duration.as_millis() as _).await;
+        self.system.guest_sleep(duration.as_millis() as _).await;
     }
 
     async fn r#yield(&self) {
