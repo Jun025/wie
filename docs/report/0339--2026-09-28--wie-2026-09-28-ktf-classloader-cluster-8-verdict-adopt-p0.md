@@ -23,3 +23,5 @@
 
 ### 게임 파일명 유입
 `corpus-name-inflow`: BOUNDED 3회/2쌍 · SUFFIX-ATTACHED 0 — 셋 다 `hardening.rs` 의 **기존** 줄(모듈 머리·주석, `origin/main` 에 이미 있음)이다. 이 회차가 더한 줄의 유입은 0.
+
+<!-- corpus-name-inflow v1 subjects=4 tree=bac2a3c46e3d8141 B=3/2 P=0/0 S=0/0 -->
