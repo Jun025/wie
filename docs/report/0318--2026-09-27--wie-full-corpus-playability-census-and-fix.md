@@ -46,3 +46,9 @@
 | m.MODEL · m.EXT_SW | `wie-skt emulator model_and_ext_sw_properties_are_set` | 행 제거 → FAILED |
 | notifyDestroyed | `wie-midp midlet::notify_destroyed_exits` · `wie-wipi-java jlet::notify_destroyed_exits_without_destroy_app` | exit 제거 / destroyApp 복원 → FAILED |
 | 재루팅 | `wie-backend extract_zip_reroots_a_nested_game` | 호출 제거 → FAILED |
+
+### 게이트 · 유입
+- `cargo fmt --check` · `clippy --all -D warnings`(stable · beta) · `clippy --target wasm32 -D warnings` · `RUST_MIN_STACK=4194304 cargo test --all` 전부 rc=0.
+- `scripts/build-wasm.sh` rc=0 · `check-engine-contract.mjs` 109 pass / 0 violation · `npm run audit` PASSED.
+- 게임 파일명 유입: 이 회차가 **더한 줄**에는 0건이다(`git diff origin/main` 의 `+` 줄 기준).
+- 도구 표기는 BOUNDED 4회/2쌍 · SUFFIX-ATTACHED 1회/1쌍이다. 모두 이 회차가 손댄 파일에 **이미 있던** 주석 3곳이다(`jlet.rs` 1 · `player.rs` 3).
