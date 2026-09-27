@@ -110,3 +110,7 @@ main·수정 **둘 다** UNMEASURED(stop=max-ticks · 4/27 · 약 5초 · load1 
   그때도 결과는 «대기 중인 repaint 가 tick 끝보다 먼저 전달»뿐이다.
 - 현영맞고2006 의 fps 칸은 3ms 병합 때문에 낮게 보인다: 마커 계수로 페인트 3.7/s · 게임 루프 sleep 9.6/s 가 main 과 같다
   (GC 가 빠져 두 페인트(serviceRepaints + 이벤트)가 3ms 안에 붙어 1프레임으로 세어진다). blit/s ÷ 2 칸으로 읽어라.
+
+- 게임 파일명 유입(`scripts/corpus-name-inflow.mjs --corpus <로컬 코퍼스>`): BOUNDED 16건(원장에 이미 쓰인 제목들) + SUFFIX-ATTACHED 1건(`배틀몬스터가` — 조사가 붙은 진짜 언급, 다른 제목 아님).
+
+<!-- corpus-name-inflow v1 subjects=7 tree=86f99020e931b345 B=29/16 P=0/0 S=2/1 -->
