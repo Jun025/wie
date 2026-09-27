@@ -25,3 +25,6 @@
 fmt rc0 · clippy `-D warnings` stable/wasm32/beta rc0 · `RUST_MIN_STACK=4194304 cargo test --all` **496 passed / 0 failed**(배틀몬스터 ARM·현영맞고/놈3 Thumb 시퀀스 시험 `catch_that_*`·`cx_thumb_*`·`rethrow_*`·`release_to_*` 포함 green). unwind 규칙은 건드리지 않았다.
 
 증적: `~/orchestrator/reports/evidence/wie-2026-09-26-battlemonster-field-input-scene-thread-death-adopt-p0/`(README 에 빌드 대응표).
+
+### 게임 파일명 유입
+`scripts/corpus-name-inflow.mjs` 실행값: 유입 4쌍(BOUNDED — 놈3·배틀몬스터, 이 리니지가 이미 제목·시험 주석에 쓰는 이름) · 판단 필요 0건(SUFFIX-ATTACHED). 게임 바이트·키 스크립트 커밋 0.
