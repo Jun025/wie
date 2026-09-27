@@ -8,10 +8,10 @@
     "wie-ktf/src/runtime/java/jvm_support/classes/net/wie/ktf_class_loader.rs — loadClass 재정의 · outOfMemoryError 예약",
     "wie-ktf/src/runtime/java/jvm_support.rs — jar .class 목록 · instantiation_error · wie_error · 시험 2",
     "wie-ktf/src/runtime/java/jvm_support/{class_definition,array_class_definition,method}.rs — 호출부",
-    "docs/report/0330"
+    "docs/report/0331"
   ],
   "verification": [
-    "전/후 표 10종 + 퇴행(LGT 5 · 가드 2 · KTF playable 표본 10) — docs/report/0330",
+    "전/후 표 10종 + 퇴행(LGT 5 · 가드 2 · KTF playable 표본 10) — docs/report/0331",
     "변이 2건 각각 red"
   ],
   "limits": [
