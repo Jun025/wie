@@ -279,6 +279,14 @@ jobs:
       - name: §C verdicts still say how long they hold (docs/report/0197)
         run: node scripts/check-ledger-c-validity-scope.mjs
 
+      # Player-facing data the shell shows (docs/contracts/featurephone-public-data.md): schema of
+      # compat.json + every docs/player-updates/*.json, and each update's titles exist in compat.json.
+      # Node only, no build — so every PR, not behind the engine filter.
+      - name: featurephone public data (docs/contracts/featurephone-public-data.md)
+        run: |
+          node scripts/player-data.mjs --selftest
+          node scripts/player-data.mjs
+
       # 유입 marker freshness (docs/report/0196). Advisory since 2026-09-26: as a
       # blocking step it reddened 3 unrelated PRs, and it proves freshness, not truth.
       - name: Inflow marker is still fresh (docs/report/0196)

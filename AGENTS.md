@@ -452,6 +452,12 @@ than let it be ignored — a periodically-red check that people scroll past is w
   touch the file, which is exactly the gap that left `main` red on 2026-09-07. **That half is
   closed**: the enumeration quoted above now names this file itself. The union reason is not, and
   it is why the line stays.
+- **A PR that changes how a title plays adds one `docs/player-updates/<YYYY-MM-DD>-<slug>.json`.**
+  That directory is the players' 「업데이트 소식」 and each title's change history on the featurephone
+  site — a fix with no entry is invisible to them. One file per change, so siblings never conflict;
+  plain Korean, no game names in the sentence (the title is referenced by its `compat.json` sha256).
+  Omit `enginePin` — the release fills in the merge. Schema and checker:
+  `docs/contracts/featurephone-public-data.md`, `node scripts/player-data.mjs` (`contract` job).
 - **Follow-up proposals go in a `docs/worklog/*.json`, or they do not exist.** When a task leaves
   follow-up recommendations (or adopts/declines earlier ones), write
   `docs/worklog/YYYY-MM-DD-<slug>.json` in the same PR. The cockpit 「후속 작업 추천」 panel reads

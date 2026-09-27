@@ -49,6 +49,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          # Full history: player-data.mjs pins each update file to the merge that added it.
+          fetch-depth: 0
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -120,7 +122,19 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "built version=$VERSION head=$WIE_HEAD wasm=$WASM_SHA glue=$GLUE_SHA"
 
-      - name: Publish GitHub Release (assets = wasm + glue)
+      # Public data (docs/contracts/featurephone-public-data.md): the player-facing title list and
+      # change feed ride the same release, so they reach the shell with the same pin bump.
+      - name: Build public data (compat.json · updates.json)
+        id: pdata
+        run: |
+          set -euo pipefail
+          node scripts/player-data.mjs build --out public-data
+          {
+            echo "compat_sha=$(sha256sum public-data/compat.json | cut -d' ' -f1)"
+            echo "updates_sha=$(sha256sum public-data/updates.json | cut -d' ' -f1)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release (assets = wasm + glue + public data)
         id: release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -130,17 +144,18 @@ jobs:
           # Idempotent: a re-run on the same commit (same tag) reuses the release.
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "release $TAG exists — uploading/overwriting assets"
-            gh release upload "$TAG" web/src/wasm/wie_web_bg.wasm web/src/wasm/wie_web.js --clobber
+            gh release upload "$TAG" web/src/wasm/wie_web_bg.wasm web/src/wasm/wie_web.js public-data/compat.json public-data/updates.json --clobber
           else
             gh release create "$TAG" \
               --title "wie engine $TAG" \
               --notes "Fresh wie_featurephone WASM (${{ steps.meta.outputs.wie_head }}). Auto-published for otterpebble/featurephone propagation." \
-              web/src/wasm/wie_web_bg.wasm web/src/wasm/wie_web.js
+              web/src/wasm/wie_web_bg.wasm web/src/wasm/wie_web.js public-data/compat.json public-data/updates.json
           fi
           BASE="${{ github.server_url }}/${{ github.repository }}/releases/download/$TAG"
           {
             echo "wasm_url=$BASE/wie_web_bg.wasm"
             echo "glue_url=$BASE/wie_web.js"
+            echo "base=$BASE"
           } >> "$GITHUB_OUTPUT"
 
       # Signal otterpebble. Token-gated: skips (dormant) when the secret is absent.
@@ -158,11 +173,16 @@ jobs:
             --arg glueUrl    "${{ steps.release.outputs.glue_url }}" \
             --arg wasmSha256 "${{ steps.meta.outputs.wasm_sha }}" \
             --arg glueSha256 "${{ steps.meta.outputs.glue_sha }}" \
+            --arg base       "${{ steps.release.outputs.base }}" \
+            --arg compatSha256  "${{ steps.pdata.outputs.compat_sha }}" \
+            --arg updatesSha256 "${{ steps.pdata.outputs.updates_sha }}" \
             '{event_type:"wie-artifact-published",
               client_payload:{version:$version, wieHead:$wieHead,
                 wasmUrl:$wasmUrl, glueUrl:$glueUrl,
                 wasmSha256:$wasmSha256, glueSha256:$glueSha256,
-                confirmedPlatforms:["KTF","SKT","LGT"]}}')
+                confirmedPlatforms:["KTF","SKT","LGT"],
+                publicData:{compatUrl:($base+"/compat.json"), compatSha256:$compatSha256,
+                  updatesUrl:($base+"/updates.json"), updatesSha256:$updatesSha256}}}')
           echo "$payload" | gh api "repos/$OTTERPEBBLE_REPO/dispatches" --input -
           echo "::notice title=dispatched::wie-artifact-published → $OTTERPEBBLE_REPO ($TAG)"
 

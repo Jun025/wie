@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-27",
+  "kind": "fix",
+  "titles": [
+    "5d0ba9495592a5543987fe5b95ab3629fd7a9f57eee8fa5f6ad2909828ed6cd1"
+  ],
+  "summary_ko": "게임 도중 멈추던 문제를 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/341",
+  "enginePin": "aeb09129aab7de0791c53a1289e0980a9e9caabc"
+}

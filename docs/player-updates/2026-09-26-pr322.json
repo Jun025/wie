@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-26",
+  "kind": "speed",
+  "titles": [
+    "49ade89578c59befbcc12945fa38070e0e31b625d9eff9975b5b5916d7055c42"
+  ],
+  "summary_ko": "키를 누른 직후 잠깐 멈칫하던 문제를 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/322",
+  "enginePin": "d81d878f6bff5ed3ecdc6e68058e1ccf1e42eef9"
+}

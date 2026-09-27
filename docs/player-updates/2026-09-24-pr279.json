@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-24",
+  "kind": "fix",
+  "titles": [
+    "735a579d82ac53bb205b04250ce44586c6d9375e64c2d6f3324796b3ae24d031"
+  ],
+  "summary_ko": "게임 화면 정보가 엉뚱한 값으로 덮이던 문제를 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/279",
+  "enginePin": "ef65adb0321d2fdb3d4adc1db882b632a021a8bb"
+}

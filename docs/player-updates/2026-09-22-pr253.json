@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-22",
+  "kind": "fix",
+  "titles": [
+    "735a579d82ac53bb205b04250ce44586c6d9375e64c2d6f3324796b3ae24d031"
+  ],
+  "summary_ko": "실행 도중 꺼지던 문제를 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/253",
+  "enginePin": "ad6571caf3f2aee235aeb9044a226431d3e45f29"
+}
