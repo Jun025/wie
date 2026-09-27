@@ -285,6 +285,12 @@ jobs:
         continue-on-error: true
         run: node scripts/check-inflow-marker.mjs
 
+      # The featurephone host's synth (wie_featurephone/src/audio_worklet.js) under node with stub
+      # AudioWorkletGlobalScope globals: MIDI sounds, Stop silences, repeat loops, PCM mixes.
+      # Node only, ~0.5 s, no build — so it runs on every PR, not behind the engine filter.
+      - name: Audio worklet behaviour (docs/worklog/2026-09-27-featurephone-audio-midi-bgm.json)
+        run: node scripts/check-audio-worklet.mjs
+
       # Detect whether this diff touches anything that can change the built
       # artifact or the pinned surface. If not, the job short-circuits to success
       # (see the wrapper note in the header). Same list as publish-artifact.yml.

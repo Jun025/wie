@@ -293,12 +293,76 @@ impl Screen for HeadlessScreen {
     }
 }
 
-// ── no-op audio (never panics, unlike test_utils' TestAudioSink) ─────────────
+// ── audio: counted for the result line, never played ─────────────────────────
 
 struct HeadlessAudioSink;
 
 impl AudioSink for HeadlessAudioSink {
-    fn send(&self, _command: wie_backend::AudioCommand) {}
+    fn send(&self, command: wie_backend::AudioCommand) {
+        AUDIO_TALLY.record(&command);
+    }
+}
+
+/// What reached the audio sink, for the `audio` key of the JSON line. Reported, never gated.
+///
+/// ★It answers the one question a browser run cannot: when a title is silent, did the engine
+/// never send anything (the fault is in the guest-facing API — a stub, an unwired import) or did
+/// it send commands the host dropped? `wie_featurephone`'s sink played only `Wave` events until
+/// 2026-09-27, so a title whose line shows `midi_events > 0` was silent in the browser there and
+/// only there. Process-wide, like `svc_stub_slots`: one validator run is one guest.
+struct AudioTally {
+    plays: AtomicU64,
+    repeat_plays: AtomicU64,
+    stops: AtomicU64,
+    wave_events: AtomicU64,
+    midi_events: AtomicU64,
+    empty_plays: AtomicU64,
+}
+
+static AUDIO_TALLY: AudioTally = AudioTally {
+    plays: AtomicU64::new(0),
+    repeat_plays: AtomicU64::new(0),
+    stops: AtomicU64::new(0),
+    wave_events: AtomicU64::new(0),
+    midi_events: AtomicU64::new(0),
+    empty_plays: AtomicU64::new(0),
+};
+
+impl AudioTally {
+    fn record(&self, command: &wie_backend::AudioCommand) {
+        match command {
+            wie_backend::AudioCommand::Play { sequence, repeat, .. } => {
+                self.plays.fetch_add(1, Ordering::SeqCst);
+                if *repeat {
+                    self.repeat_plays.fetch_add(1, Ordering::SeqCst);
+                }
+                if sequence.events.is_empty() {
+                    self.empty_plays.fetch_add(1, Ordering::SeqCst);
+                }
+                for event in &sequence.events {
+                    match event.data {
+                        wie_backend::AudioEventData::Wave { .. } => self.wave_events.fetch_add(1, Ordering::SeqCst),
+                        wie_backend::AudioEventData::Midi(_) => self.midi_events.fetch_add(1, Ordering::SeqCst),
+                    };
+                }
+            }
+            wie_backend::AudioCommand::Stop { .. } => {
+                self.stops.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+    }
+
+    fn json(&self) -> String {
+        format!(
+            "{{\"plays\":{},\"repeat_plays\":{},\"stops\":{},\"wave_events\":{},\"midi_events\":{},\"empty_plays\":{}}}",
+            self.plays.load(Ordering::SeqCst),
+            self.repeat_plays.load(Ordering::SeqCst),
+            self.stops.load(Ordering::SeqCst),
+            self.wave_events.load(Ordering::SeqCst),
+            self.midi_events.load(Ordering::SeqCst),
+            self.empty_plays.load(Ordering::SeqCst),
+        )
+    }
 }
 
 // ── in-memory database ───────────────────────────────────────────────────────
@@ -914,7 +978,7 @@ fn result_line(file: &str, result: &Outcome, tallies: &Tallies, elapsed_ms: u128
          \"last_frame_content\":{},\
          \"distinct_colors\":{},\"nondominant_pct\":{:.1},\"center_nonuniform_pct\":{:.1},\
          \"last_frame_distinct_colors\":{},\"last_frame_nondominant_pct\":{:.1},\"last_frame_center_nonuniform_pct\":{:.1},\
-         \"java_exceptions\":{},\"stub_hits\":{},\"svc_stub_slots\":{},\"ms\":{}}}",
+         \"java_exceptions\":{},\"stub_hits\":{},\"svc_stub_slots\":{},\"audio\":{},\"ms\":{}}}",
         file,
         result.platform,
         result.verdict(),
@@ -935,6 +999,7 @@ fn result_line(file: &str, result: &Outcome, tallies: &Tallies, elapsed_ms: u128
         tallies.java_exceptions.json(),
         tallies.stub_hits.json(),
         svc_stub_slots_json(),
+        AUDIO_TALLY.json(),
         elapsed_ms
     )
 }
@@ -1624,6 +1689,60 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn audio_tally_counts_what_reached_the_sink() {
+        use std::sync::Arc;
+
+        use wie_backend::{AudioCommand, AudioEventData, AudioSequence, TimedAudioEvent};
+
+        let tally = super::AudioTally {
+            plays: Default::default(),
+            repeat_plays: Default::default(),
+            stops: Default::default(),
+            wave_events: Default::default(),
+            midi_events: Default::default(),
+            empty_plays: Default::default(),
+        };
+        let sequence = Arc::new(AudioSequence {
+            duration: 10,
+            events: vec![
+                TimedAudioEvent {
+                    time: 0,
+                    data: AudioEventData::Midi(vec![0x90, 60, 100]),
+                },
+                TimedAudioEvent {
+                    time: 5,
+                    data: AudioEventData::Midi(vec![0x80, 60, 0]),
+                },
+                TimedAudioEvent {
+                    time: 0,
+                    data: AudioEventData::Wave {
+                        channels: 1,
+                        sampling_rate: 8000,
+                        samples: vec![0; 4],
+                    },
+                },
+            ],
+        });
+        let empty = Arc::new(AudioSequence { duration: 0, events: vec![] });
+        tally.record(&AudioCommand::Play {
+            handle: 0,
+            sequence,
+            repeat: true,
+        });
+        tally.record(&AudioCommand::Play {
+            handle: 1,
+            sequence: empty,
+            repeat: false,
+        });
+        tally.record(&AudioCommand::Stop { handle: 0 });
+
+        assert_eq!(
+            tally.json(),
+            r#"{"plays":2,"repeat_plays":1,"stops":1,"wave_events":1,"midi_events":2,"empty_plays":1}"#
+        );
+    }
+
     use super::{
         GUEST_STDOUT_MAX_BYTES, HeadlessPlatform, HeadlessScreen, RICHNESS_COLOR_CAP, SCREEN_H, SCREEN_W, base_name, frame_richness,
         guest_stdout_field, has_content, inject_unmeasured, json_escape, last_frame_gate_fails, stop_cause,

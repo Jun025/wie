@@ -66,7 +66,14 @@ impl SmafPlayer {
                     MethodAccessFlags::PUBLIC,
                 ),
             ],
-            fields: vec![JavaFieldProto::new("audioHandle", "I", FieldAccessFlags::PRIVATE)],
+            // `repeat`: the loop mode `start()` resumes with — MIDP's `start()` carries none, so
+            // it is whatever `start(Z)`/`setLoopCount` last set. `started`: between a start and a
+            // stop; WIPI's `Player.resume` reads it (see that method).
+            fields: vec![
+                JavaFieldProto::new("audioHandle", "I", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("repeat", "Z", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("started", "Z", FieldAccessFlags::PRIVATE),
+            ],
             access_flags: ClassAccessFlags::PUBLIC,
         }
     }
@@ -84,24 +91,33 @@ impl SmafPlayer {
         Ok(())
     }
 
+    // `start()` keeps the loop mode instead of forcing a one-shot: 배틀몬스터 starts its field
+    // music with `Player.play(clip, true)` and immediately calls `Player.resume(clip)`, which maps
+    // here — and until 2026-09-27 that replayed the music with `repeat = false`, so it never
+    // looped (measured in the browser: `play R` → `stop` → `play` in the same instant).
     async fn start(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> Result<()> {
-        Self::start_with_repeat(jvm, context, this, false).await
+        let repeat: bool = jvm.get_field(&this, "repeat", "Z").await?;
+
+        Self::start_with_repeat(jvm, context, this, repeat).await
     }
 
-    async fn start_with_repeat(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>, repeat: bool) -> Result<()> {
+    async fn start_with_repeat(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, repeat: bool) -> Result<()> {
         tracing::debug!("net.wie.SmafPlayer::start({this:?}, {repeat})");
 
         let audio_handle: i32 = jvm.get_field(&this, "audioHandle", "I").await?;
+        jvm.put_field(&mut this, "repeat", "Z", repeat).await?;
+        jvm.put_field(&mut this, "started", "Z", true).await?;
 
         context.system().audio().play(audio_handle as u32, repeat).unwrap();
 
         Ok(())
     }
 
-    async fn stop(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> Result<()> {
+    async fn stop(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> Result<()> {
         tracing::debug!("net.wie.SmafPlayer::stop({this:?})");
 
         let audio_handle: i32 = jvm.get_field(&this, "audioHandle", "I").await?;
+        jvm.put_field(&mut this, "started", "Z", false).await?;
 
         let system = context.system();
 
@@ -170,12 +186,14 @@ impl SmafPlayer {
         Ok(JavaLangString::from_rust_string(jvm, "application/vnd.smaf").await?.into())
     }
 
-    async fn set_loop_count(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>, count: i32) -> Result<()> {
-        tracing::warn!("stub net.wie.SmafPlayer::setLoopCount({this:?}, {count})");
+    // The sink has "once" and "forever" only, so any count other than 1 loops.
+    async fn set_loop_count(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, count: i32) -> Result<()> {
+        tracing::debug!("net.wie.SmafPlayer::setLoopCount({this:?}, {count})");
 
         if count == 0 || count < -1 {
             return Err(jvm.exception("java/lang/IllegalArgumentException", "Invalid loop count").await);
         }
+        jvm.put_field(&mut this, "repeat", "Z", count != 1).await?;
 
         Ok(())
     }

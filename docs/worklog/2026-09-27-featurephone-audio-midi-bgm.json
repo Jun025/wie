@@ -1,0 +1,50 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-27",
+  "task": "wie-featurephone-audio-midi-bgm-and-most-sfx-silent",
+  "title": "featurephone 소리 — MIDI 합성 워클릿 · repeat · Stop · SKT 클립 배선 · 배틀몬스터 BGM 루프",
+  "summary": "호스트가 MIDI·repeat·Stop 을 버렸고(①), SKT 클립은 전부 스텁이었고(②), WIPI Player.resume 이 루프 BGM 을 1회 재생으로 바꿨다(③). 셋 다 고쳐 KTF·LGT·SKT 배경음악과 MIDI 효과음이 난다. 산출물 2파일 계약·셸 코드 변경 없음.",
+  "changes": [
+    "wie_featurephone/src/audio.rs · audio_worklet.js — 워클릿 합성/스케줄 · PCM 폴백",
+    "wie-skvm net.wie.WieAudioClip — load_smaf/play/loop/stop 배선 · close 는 소리 유지",
+    "wie-midp SmafPlayer — start() 루프 모드 유지 · setLoopCount",
+    "wie-wipi-java Player.resume — 재생 중 클립 재시작 금지",
+    "wie_validate — audio 키 · test-utils TestPlatform::audio_log",
+    "scripts/check-audio-worklet.mjs + engine-contract.yml 상시 단계",
+    "docs/report/0315"
+  ],
+  "verification": [
+    "배틀몬스터 브라우저 후반 RMS 0.000 → 0.060(×2 교대) · 마을 경로 700s BGM 연속 · 루프 · 장면 전환 Stop 18",
+    "KTF 간호사타이쿤 0.000 → 0.067 · SKT 더팜1 0.000 → 0.06(+효과음 0.11)",
+    "fps 교대: 배틀몬스터 11.56/11.56 → 11.52/11.56 · 영웅서기4 초당 동일",
+    "cargo test --all 499/0 · contract 109/0 · check-audio-worklet 7/7"
+  ],
+  "limits": [
+    "음색은 자체 FM 근사 — 사운드폰트 아님",
+    "볼륨 API 스텁 · pause/resume 위치 없음",
+    "iOS 실기 미측정 · J2ME 타이틀 로컬 0"
+  ],
+  "adoptedProposals": [],
+  "proposals": [
+    {
+      "title": "featurephone 음질 — upstream 사운드폰트 경로(spessasynth + GeneralUser GS) 도입 여부",
+      "plainSummary": "지금 소리는 엔진 안의 간단한 합성기가 냅니다. upstream 처럼 실제 악기 샘플(사운드폰트)을 쓰면 더 풍부하게 들리지만, 셸이 파일 3개(약 10.6MB 포함)를 더 내려줘야 합니다.",
+      "userBenefit": "배경음악이 원래 휴대폰 느낌에 더 가깝고 악기 구분이 선명해집니다.",
+      "why": "이번 회차는 산출물 2파일 계약 안에서 끝내려고 자체 합성기를 썼다. GeneralUser GS 2.0.1(10,580,436 B)은 INFO 라이선스상 재배포 가능, spessasynth_lib 라이선스는 이번에 로컬 확인 못 함.",
+      "tradeoff": "첫 실행 다운로드 +10.6MB(지연 로드 필요) · 엔진 계약에 자산 3종 추가 = wie+otterpebble 동시 변경 · SMAF 원음(FM)과의 거리는 오히려 멀어질 수 있다.",
+      "effort": "M",
+      "target": "wie",
+      "kind": "product"
+    },
+    {
+      "title": "게임이 정한 음량 반영 — Clip/AudioSystem/MC_mda 볼륨 API 스텁 해소",
+      "plainSummary": "게임 안 설정에서 소리 크기를 바꿔도 지금은 반영되지 않습니다. 볼륨 명령을 소리 출력까지 전달하는 일입니다.",
+      "userBenefit": "게임 설정의 음량·음소거가 실제로 먹습니다.",
+      "why": "org.kwis.msp.media.Clip::setVolume · com.skt.m.AudioSystem::setVolume · MC_mdaSetVolume 이 스텁(이번 계측에서 SKT 전 타이틀이 setVolume 호출). AudioCommand 에 볼륨이 없다.",
+      "tradeoff": "wie-backend AudioCommand 확장 = upstream 공유 타입 변경(동기 충돌 가능) · 워클릿 게인만 바꾸면 되는 쪽이 싸다.",
+      "effort": "S",
+      "target": "wie",
+      "kind": "product"
+    }
+  ]
+}

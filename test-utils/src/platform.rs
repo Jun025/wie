@@ -8,7 +8,7 @@ use core::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering
 
 use hashbrown::HashMap;
 use spin::Mutex;
-use wie_backend::{AudioSink, Database, DatabaseRepository, Filesystem, Font, Instant, Platform, RecordId, Screen, canvas::Image};
+use wie_backend::{AudioCommand, AudioSink, Database, DatabaseRepository, Filesystem, Font, Instant, Platform, RecordId, Screen, canvas::Image};
 use wie_util::Result;
 
 use crate::filesystem::MemoryFilesystem;
@@ -75,6 +75,7 @@ pub struct TestPlatform {
     db: Arc<MemoryDatabaseRepository>,
     font: Font,
     clock: Option<TestClock>,
+    audio_log: Arc<Mutex<Vec<AudioCommand>>>,
 }
 
 impl Default for TestPlatform {
@@ -92,6 +93,7 @@ impl TestPlatform {
             db: Arc::new(MemoryDatabaseRepository::default()),
             font: Font::try_from_static(include_bytes!("../../assets/neodgm.ttf")).unwrap(),
             clock: None,
+            audio_log: Arc::default(),
         }
     }
 
@@ -106,6 +108,7 @@ impl TestPlatform {
             db: Arc::new(MemoryDatabaseRepository::default()),
             font: Font::try_from_static(include_bytes!("../../assets/neodgm.ttf")).unwrap(),
             clock: None,
+            audio_log: Arc::default(),
         }
     }
 
@@ -117,11 +120,19 @@ impl TestPlatform {
             db: Arc::new(MemoryDatabaseRepository::default()),
             font: Font::try_from_static(include_bytes!("../../assets/neodgm.ttf")).unwrap(),
             clock: Some(clock),
+            audio_log: Arc::default(),
         }
     }
 }
 
 impl TestPlatform {
+    /// Every command the guest sent the audio sink, in order. Take this BEFORE boxing the
+    /// platform, like [`Self::paint_counter`] — it is how a test asserts that a guest-facing
+    /// audio API actually reaches the sink rather than returning quietly.
+    pub fn audio_log(&self) -> Arc<Mutex<Vec<AudioCommand>>> {
+        self.audio_log.clone()
+    }
+
     /// Frames the guest actually composed — the positive half of a boot assertion.
     /// Take these BEFORE boxing the platform; the emulator consumes the value.
     pub fn paint_counter(&self) -> Arc<AtomicUsize> {
@@ -162,7 +173,7 @@ impl Platform for TestPlatform {
     }
 
     fn audio_sink(&self) -> Box<dyn AudioSink> {
-        Box::new(TestAudioSink)
+        Box::new(TestAudioSink(self.audio_log.clone()))
     }
 
     fn write_stdout(&self, buf: &[u8]) {
@@ -266,10 +277,12 @@ impl Database for MemoryDatabase {
     }
 }
 
-pub struct TestAudioSink;
+pub struct TestAudioSink(Arc<Mutex<Vec<AudioCommand>>>);
 
 impl AudioSink for TestAudioSink {
-    fn send(&self, _command: wie_backend::AudioCommand) {}
+    fn send(&self, command: AudioCommand) {
+        self.0.lock().push(command);
+    }
 }
 
 impl Default for TestScreen {
