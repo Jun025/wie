@@ -23,3 +23,5 @@
 - `docs/player-updates` 는 넣지 않았다. 그 목록은 featurephone 사이트용이고, 이 변경은 `wie-web` 셸에만 있다.
 
 - 게임 파일명 유입: BOUNDED 0 · SUFFIX-ATTACHED 0 (`node scripts/corpus-name-inflow.mjs`).
+
+<!-- corpus-name-inflow v1 subjects=5 tree=f4cb8c1b73ba9115 B=0/0 P=1/1 S=0/0 -->
