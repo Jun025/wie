@@ -36,11 +36,6 @@ impl Canvas {
                 JavaMethodProto::new("keyReleased", "(I)V", Self::key_released, MethodAccessFlags::PROTECTED),
                 JavaMethodProto::new("setFullScreenMode", "(Z)V", Self::set_full_screen_mode, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("isDoubleBuffered", "()Z", Self::is_double_buffered, MethodAccessFlags::PUBLIC),
-                // Inherited from Displayable, and declared again only because this JVM resolves
-                // `invokespecial` in the named class alone: a subclass's `super.getHeight()` names
-                // Canvas and raised NoSuchMethodError (2 SKT titles at boot, 2026-09-27 census).
-                JavaMethodProto::new("getWidth", "()I", Self::get_width, MethodAccessFlags::PUBLIC),
-                JavaMethodProto::new("getHeight", "()I", Self::get_height, MethodAccessFlags::PUBLIC),
                 // wie private methods
                 JavaMethodProto::new("handleKeyEvent", "(II)V", Self::handle_key_event, MethodAccessFlags::empty()),
                 JavaMethodProto::new(
@@ -53,16 +48,6 @@ impl Canvas {
             fields: vec![],
             access_flags: ClassAccessFlags::PUBLIC | ClassAccessFlags::ABSTRACT,
         }
-    }
-
-    async fn get_width(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        jvm.invoke_special(&this, "javax/microedition/lcdui/Displayable", "getWidth", "()I", ())
-            .await
-    }
-
-    async fn get_height(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        jvm.invoke_special(&this, "javax/microedition/lcdui/Displayable", "getHeight", "()I", ())
-            .await
     }
 
     async fn init(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
@@ -618,7 +603,8 @@ mod test {
         )
     }
 
-    // A subclass's `super.getHeight()` compiles to invokespecial naming Canvas.
+    // A subclass's `super.getHeight()` compiles to invokespecial naming Canvas, which only inherits
+    // it from Displayable — resolved through `wie_jvm_support`'s `InheritedMethods`.
     #[test]
     fn canvas_super_size_resolves_on_canvas() -> Result<()> {
         run_jvm_test(Box::new([get_protos().into(), [RecordingCanvas::as_proto()].into()]), |jvm| async move {

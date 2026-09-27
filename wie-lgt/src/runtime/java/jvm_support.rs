@@ -1828,6 +1828,8 @@ pub(crate) mod tests {
                 ("java/lang/StringBuffer", 22, "append", "(C)Ljava/lang/StringBuffer;"),
                 // 간호사타이쿤2
                 ("java/io/DataInputStream", 22, "readBoolean", "()Z"),
+                // 73f3a21e981c
+                ("java/io/DataInputStream", 24, "readUnsignedByte", "()I"),
                 // 스파이더맨3
                 ("java/io/DataInputStream", 27, "readChar", "()C"),
                 // 슈퍼액션히어로

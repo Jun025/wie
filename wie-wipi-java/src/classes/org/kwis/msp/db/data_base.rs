@@ -138,12 +138,15 @@ impl DataBase {
     ) -> JvmResult<ClassInstanceRef<DataBase>> {
         tracing::debug!("org.kwis.msp.db.DataBase::openDataBase({data_base_name:?}, {record_size}, {create}, {flags})");
 
+        // Always create: `openRecordStore(_, false)` now throws RecordStoreNotFoundException for a
+        // missing store, which a KTF title catching `DataBaseException` would not expect. This keeps
+        // `create = false` opening an empty database, as it always has here.
         let record_store: ClassInstanceRef<RecordStore> = jvm
             .invoke_static(
                 "javax/microedition/rms/RecordStore",
                 "openRecordStore",
                 "(Ljava/lang/String;Z)Ljavax/microedition/rms/RecordStore;",
-                (data_base_name, create),
+                (data_base_name, true),
             )
             .await?;
 

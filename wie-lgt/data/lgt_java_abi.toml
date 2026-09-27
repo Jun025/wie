@@ -233,6 +233,18 @@ vtable = [
 #        getBytes — a String — and readUTF() is the only no-argument DataInputStream method that
 #        returns one.
 #
+# readUnsignedByte()I = 24 is the rule again, one past the measured readByte anchor, and it is
+# asked for by one title (sha12 `73f3a21e981c`, measured 2026-09-28: `Unimplemented:
+# java/io/DataInputStream vtable index 24` as the first thing its game thread does, then one
+# blank paint for the rest of the budget).
+#
+#   24 — its reader dispatches `ldr ip, [r3, #0x64]` (LR 0x76fe4) with r0 = the stream and nothing
+#        else set up, keeps only `r0 & 0xff` of the result, and does it again on the same stream
+#        (LR 0x77004) — one byte per call, no argument, an int result used as a byte. That fits
+#        readUnsignedByte()I and readByte()B alike; 23 is readByte by measurement, so the slot
+#        order is what names 24. Both return the same low byte, so a guest that masks gets the
+#        same value from either — the row cannot hand it a wrong number.
+#
 # readFully([B)V = 19 is the rule's first own slot, one before the readFully([BII)V row at 20,
 # and 스파이더맨3 asked for it next (measured 2026-09-26: `Unimplemented: java/io/DataInputStream
 # vtable index 19` 3/3, right after the 27 row above let its reader go on).
@@ -257,6 +269,7 @@ vtable = [
     { name = "readFully", descriptor = "([BII)V", index = 20 },
     { name = "readBoolean", descriptor = "()Z", index = 22 },
     { name = "readByte", descriptor = "()B", index = 23 },
+    { name = "readUnsignedByte", descriptor = "()I", index = 24 },
     { name = "readShort", descriptor = "()S", index = 25 },
     { name = "readChar", descriptor = "()C", index = 27 },
     { name = "readInt", descriptor = "()I", index = 28 },

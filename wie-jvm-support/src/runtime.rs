@@ -13,7 +13,7 @@ use rustjava_runtime::{
 use wie_backend::{AsyncCallable, System};
 use wie_util::WieError;
 
-use crate::{JvmImplementation, JvmSupport, WIE_RUSTJAR, WieJavaClassProto, WieJvmContext};
+use crate::{JvmImplementation, JvmSupport, WIE_RUSTJAR, WieJavaClassProto, WieJvmContext, jvm_implementation::InheritedMethods};
 
 mod file;
 
@@ -279,7 +279,7 @@ where
 
     async fn define_class(&self, jvm: &Jvm, data: &[u8]) -> JvmResult<Box<dyn ClassDefinition>> {
         match ClassDefinitionImpl::from_classfile(data) {
-            Ok(class) => Ok(Box::new(class)),
+            Ok(class) => InheritedMethods::wrap(jvm, class).await,
             Err(ClassDefinitionError::InvalidClassFile) => Err(jvm.exception("java/lang/ClassFormatError", "Invalid class file").await),
             Err(ClassDefinitionError::UnsupportedClassVersion(version)) => Err(jvm
                 .exception(
