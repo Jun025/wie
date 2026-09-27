@@ -159,4 +159,4 @@ wasm 노출은 하지 않았다 — 계약 표면이 바뀐다(Constraint 3). �
 10쌍 전부 이 브랜치가 건드린 파일(executor · system · display · event_queue · 4 emulator · wie_validate)에 **이미 있던** 주석이다. 이 회차가 새로 쓴 이름은 0 이다 — 표는 sha12 로만 적었다. 게임 바이트는 0 이다.
 
 
-<!-- corpus-name-inflow v1 subjects=19 tree=4183df8ee02b14ba B=11/10 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=19 tree=ef4848c60191f62b B=11/10 P=0/0 S=0/0 -->
