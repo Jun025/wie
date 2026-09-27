@@ -146,3 +146,6 @@ fmt · clippy `-D warnings`(stable · beta · wasm32) · `RUST_MIN_STACK=4194304
 게이트 재측: fmt · clippy `-D warnings`(stable · beta · wasm32) · `cargo test --all` 0 failed · `npm run build:wasm` · 러너 줄 전부 PASS·rc=0(keydraw paints 55/55).
 대상 재측(release · LTO 끔 · `--inject --keep-timeout --timeout 30 --pacing 8` · load1 112): `14a62a8521a0` **PASS** rc=0 · 27/27 · paints 483 ·
 `73f3a21e981c`(`--max-ticks 400000000`) **PASS** rc=0 · 27/27 · paints 69 · `DataInputStream vtable index 24` 로그 0.
+- 게임 파일명 유입(-fix2 재측): BOUNDED 90회/28쌍 · SUFFIX-ATTACHED 14회/4쌍. 이 회차 문서 추가분은 0건(도구 적중에 이 파일 없음) · 88→90 증가는 쌍 수 불변(28)이고 병합으로 들어온 기존 줄 몫이다.
+
+<!-- corpus-name-inflow v1 subjects=16 tree=488352ed2b788ab6 B=90/28 P=1/1 S=14/4 -->
