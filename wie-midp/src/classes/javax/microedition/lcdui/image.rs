@@ -29,6 +29,9 @@ impl Image {
             interfaces: vec![],
             methods: vec![
                 JavaMethodProto::new("<init>", "(II[BI)V", Self::init, MethodAccessFlags::empty()),
+                // SKT titles call `new Image()` (the platform they were built against had one): 5 of
+                // them died on NoSuchMethodError at boot in the 2026-09-27 census.
+                JavaMethodProto::new("<init>", "()V", Self::init_empty, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getWidth", "()I", Self::get_width, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getHeight", "()I", Self::get_height, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new(
@@ -91,6 +94,12 @@ impl Image {
         jvm.put_field(&mut this, "bpl", "I", bpl).await?;
 
         Ok(())
+    }
+
+    async fn init_empty(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+        // 1x1, not 0x0: every reader derives bytes-per-pixel as bpl / width.
+        let img_data = jvm.instantiate_array("B", 4).await?;
+        Self::init(jvm, context, this, 1, 1, img_data.into(), 4).await
     }
 
     async fn create_image(jvm: &Jvm, _: &mut WieJvmContext, width: i32, height: i32) -> JvmResult<ClassInstanceRef<Image>> {
@@ -382,6 +391,24 @@ mod tests {
         let expected = [pixels[0], T::xor_color(pixels[1], color)];
         assert_eq!(&*buffer.raw(), bytemuck::cast_slice(&expected));
         Ok(())
+    }
+
+    // SKT titles construct `new Image()`; readers divide bpl by width, so it must not be 0x0.
+    #[test]
+    fn no_arg_image_is_one_pixel() -> wie_util::Result<()> {
+        test_utils::run_jvm_test(Box::new([crate::get_protos().into()]), |jvm| async move {
+            let image: ClassInstanceRef<Image> = jvm.new_class("javax/microedition/lcdui/Image", "()V", ()).await?.into();
+            let width: i32 = jvm
+                .invoke_virtual(&image, "javax/microedition/lcdui/Image", "getWidth", "()I", ())
+                .await?;
+            let height: i32 = jvm
+                .invoke_virtual(&image, "javax/microedition/lcdui/Image", "getHeight", "()I", ())
+                .await?;
+            assert_eq!((width, height), (1, 1));
+            let mut buffer = JavaImageBuffer::<ArgbPixel>::new(&jvm, &image).await?;
+            let _ = buffer.get_pixel(0, 0);
+            Ok(())
+        })
     }
 
     #[test]

@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, format, string::String, vec, vec::Vec};
+use alloc::{boxed::Box, string::String, vec, vec::Vec};
 use core::{
     fmt::{self, Debug, Formatter},
     mem::size_of,
@@ -304,7 +304,7 @@ impl ClassDefinition for JavaClassDefinition {
     async fn instantiate(&self, jvm: &Jvm) -> JvmResult<Box<dyn ClassInstance>> {
         match JavaClassInstance::new(&mut self.core.clone(), self) {
             Ok(instance) => Ok(Box::new(instance)),
-            Err(e) => Err(jvm.exception("net/wie/WieError", &format!("Failed to instantiate class: {e}")).await),
+            Err(e) => Err(super::KtfJvmSupport::instantiation_error(jvm, e, "class").await),
         }
     }
 

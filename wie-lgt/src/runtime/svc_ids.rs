@@ -140,7 +140,10 @@ pub enum WIPICSvcId {
     GetFramebufferBpp = 0x36,
     Printk = 0x64,
     Sprintk = 0x65,
-    Unk13 = 0x68,
+    // Identified 2026-09-27 by behaviour, not by name: the call that ends the program after an
+    // LGT title's first-run notice (재실행 요청 · 메모리 확보 · 다운로드 완료 → EZ-i 메뉴). See
+    // `wipi_c::terminate_program`. Kernel section index 4.
+    TerminateProgram = 0x68,
     Unk1 = 0x6a,
     Exit = 0x6b,
     GetProgramName = 0x6f,
@@ -201,6 +204,17 @@ pub enum WIPICSvcId {
     TimeConvert = 0x322,
     TimeToTm = 0x323,
     DateTimeToTm = 0x338,
+    // 0x384.. is a byte-order section, identified 2026-09-27 from call sites (no symbols):
+    // 900/902 take and return 32-bit values stored big-endian into packets, 901/903 16-bit
+    // ones (901 turns a constant port 26100 into the connect argument), 904 takes a dotted-quad
+    // string literal and its result is the connect address. The 32/16 split is
+    // measured; which of each pair is hton vs ntoh is the BSD order and cannot matter on a
+    // little-endian guest — both are the same swap.
+    Htonl = 0x384,
+    Htons = 0x385,
+    Ntohl = 0x386,
+    Ntohs = 0x387,
+    InetAddr = 0x388,
     OpenDatabase = 0x190,
     ReadRecordSingle = 0x191,
     WriteRecordSingle = 0x192,
@@ -252,7 +266,7 @@ impl TryFrom<SvcId> for WIPICSvcId {
             0x36 => Self::GetFramebufferBpp,
             0x64 => Self::Printk,
             0x65 => Self::Sprintk,
-            0x68 => Self::Unk13,
+            0x68 => Self::TerminateProgram,
             0x6a => Self::Unk1,
             0x6b => Self::Exit,
             0x6f => Self::GetProgramName,
@@ -313,6 +327,11 @@ impl TryFrom<SvcId> for WIPICSvcId {
             0x322 => Self::TimeConvert,
             0x323 => Self::TimeToTm,
             0x338 => Self::DateTimeToTm,
+            0x384 => Self::Htonl,
+            0x385 => Self::Htons,
+            0x386 => Self::Ntohl,
+            0x387 => Self::Ntohs,
+            0x388 => Self::InetAddr,
             0x190 => Self::OpenDatabase,
             0x191 => Self::ReadRecordSingle,
             0x192 => Self::WriteRecordSingle,
