@@ -75,3 +75,4 @@ fmt · `cargo clippy --all -- -D warnings` · wasm clippy · `cargo +beta clippy
 나머지는 `jvm_support.rs` 에 원래 있던 줄이다(도구는 바뀐 파일의 본문 전체를 센다). SUFFIX 2건(`간호사타이쿤2` · `서든어택포켓`)도 원래 있던 주석이고,
 손으로 갈라 보니 둘 다 조사가 아니라 «더 긴 다른 제목»이다.
 이 절을 쓰고 난 뒤의 최종 수는 아래 표식이 갖는다(BOUNDED·SUFFIX 증가분은 이 절 자신의 언급이다 — SUFFIX 4건 = 위 2건 × 코드·이 절).
+<!-- corpus-name-inflow v1 subjects=4 tree=ceedf5cb62a406e4 B=54/25 P=1/1 S=4/4 -->
