@@ -1,0 +1,12 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-27-featurephone-demo-game-license-clean-selection-adopt-p1",
+  "title": "Manager.createPlayer(String) — 톤 장치 로케이터에 무음 플레이어",
+  "summary": "device://tone 에 빈 SMAF 플레이어를 돌려준다. WormGame --inject 가 06_OK 의 NoSuchMethodError(6/27) 에서 27/27 PASS 로.",
+  "changes": ["wie-midp manager.rs — createPlayer(String)", "smaf_player.rs — test_tone_device_locator_player", "docs/report/0337"],
+  "verification": ["WormGame wie_validate --inject 전 FAIL rc1 · 후 PASS rc0", "변이(로케이터 불일치) red"],
+  "limits": ["소리 없음 — ToneControl·playTone 미구현", "보유 코퍼스 사용 타이틀 0"],
+  "adoptedProposals": ["2026-09-27-featurephone-demo-game-license-clean-selection#p1"],
+  "proposals": []
+}
