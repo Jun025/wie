@@ -34,6 +34,8 @@
 
 ### 게이트
 - `cargo fmt --check` · `clippy --all -D warnings`(stable · beta) · `clippy --target wasm32 -D warnings` · `RUST_MIN_STACK=4194304 cargo test --all`(passed 546 · failed 0) rc=0.
+- ★첫 푸시 CI 가 전건 red 였다: 그 사이 main 에 #363(`d38450ab`)이 착지해 `wie-wipi-java` `get_protos()` 에 행이 늘었고, 이 PR 의 `LED` 행과 합쳐 56행인데 길이 선언은 55였다(텍스트 충돌 없는 의미 충돌). `origin/main`(`8fd2c014`)을 다시 병합하고 길이를 56으로 고쳤다. 병합 뒤 위 게이트·러너 줄·`build:wasm`·`check-engine-contract` 전부 재실행 rc=0 · `cargo test --all` passed **550** · failed 0.
+  ※`ImageObserver` 행이 그 배열에 두 번 있다 — main 에 이미 있던 것이고 이 회차 범위 밖이라 두었다.
 - `npm run build:wasm` · `check-engine-contract` · `npm run audit` rc=0.
 - 러너 줄(엔진 변경): `draw_j2me` · `helloworld_ktf/lgt` · `keydraw_ktf/lgt --inject --expect-last-frame` · `text_j2me --timeout 5` 전부 PASS · rc=0.
 - 게임 파일명 유입: 이 회차가 **더한 줄**에는 0건이다. 도구 표기 BOUNDED 20회/13쌍은 0329 와 같은 수 — 고친 파일에 **이미 있던** 주석이다(SUFFIX-ATTACHED 0).
