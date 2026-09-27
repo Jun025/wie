@@ -119,11 +119,18 @@ async fn strcat(core: &mut ArmCore, _: &mut (), ptr_dst: u32, ptr_src: u32) -> R
 async fn strncat(core: &mut ArmCore, _: &mut (), ptr_dst: u32, ptr_src: u32, size: u32) -> Result<()> {
     tracing::debug!("strncat({ptr_dst:#x}, {ptr_src:#x}, {size:#x})");
 
-    let src = read_null_terminated_string_bytes(core, ptr_src)?;
+    // src need not be NUL-terminated within n bytes, so read no further than n.
+    let mut src = Vec::new();
+    for i in 0..size {
+        let byte: u8 = read_generic(core, ptr_src + i)?;
+        if byte == 0 {
+            break;
+        }
+        src.push(byte);
+    }
     let dst = read_null_terminated_string_bytes(core, ptr_dst)?;
 
-    let src = &src[..min(size as usize, src.len())];
-    write_null_terminated_string_bytes(core, ptr_dst + dst.len() as u32, src)?;
+    write_null_terminated_string_bytes(core, ptr_dst + dst.len() as u32, &src)?;
 
     Ok(())
 }
@@ -374,6 +381,12 @@ mod tests {
             let mut joined = [0u8; 6];
             core.read_bytes(out, &mut joined)?;
             assert_eq!(&joined[..5], b"abcd\0");
+            // src need not be terminated within n: "gh" ends a mapped page, the next one is not mapped.
+            core.map(0x6000_0000, 0x1000)?;
+            core.write_bytes(0x6000_0ffe, b"gh")?;
+            let _: () = core.run_function(strncat_stub, &[out, 0x6000_0ffe, 2]).await?;
+            core.read_bytes(out, &mut joined)?;
+            assert_eq!(&joined, b"abcdgh");
 
             let ptr: u32 = core.run_function(malloc_stub, &[24]).await?;
             assert_ne!(ptr, 0);

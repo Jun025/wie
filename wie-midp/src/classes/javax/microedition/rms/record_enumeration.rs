@@ -91,6 +91,7 @@ impl RecordEnumerationImpl {
         let _: () = jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await?;
         jvm.put_field(&mut this, "store", "Ljavax/microedition/rms/RecordStore;", store).await?;
         jvm.put_field(&mut this, "ids", "[I", ids).await?;
+        jvm.put_field(&mut this, "index", "I", -1).await?;
 
         Ok(())
     }
@@ -104,28 +105,34 @@ impl RecordEnumerationImpl {
     async fn has_next_element(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<bool> {
         let index: i32 = jvm.get_field(&this, "index", "I").await?;
 
-        Ok(index < Self::num_records(jvm, context, this).await?)
+        Ok(index != Self::num_records(jvm, context, this).await? - 1)
     }
 
-    async fn has_previous_element(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<bool> {
+    async fn has_previous_element(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<bool> {
         let index: i32 = jvm.get_field(&this, "index", "I").await?;
 
-        Ok(index > 0)
+        Ok(Self::num_records(jvm, context, this).await? > 0 && index != 0)
     }
 
-    // next* reads ids[index] then advances; previous* steps back then reads, so next/previous undo each other.
+    // MIDP 2.0 (JSR118) current-position model, as in the RI: `index` is the element last returned, -1 right
+    // after creation or reset(). From -1, next gives the first element and previous gives the LAST; otherwise
+    // each call moves one step, so next-then-previous gives the element before, not the same one again.
     async fn step(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, forward: bool) -> JvmResult<i32> {
         let index: i32 = jvm.get_field(&this, "index", "I").await?;
         let count = Self::num_records(jvm, context, this.clone()).await?;
-        let at = if forward { index } else { index - 1 };
+        let at = match (index, forward) {
+            (-1, true) => 0,
+            (-1, false) => count - 1,
+            (_, true) => index + 1,
+            (_, false) => index - 1,
+        };
         if at < 0 || at >= count {
             return Err(jvm.exception("javax/microedition/rms/InvalidRecordIDException", "No more records").await);
         }
 
         let ids: ClassInstanceRef<Array<i32>> = jvm.get_field(&this, "ids", "[I").await?;
         let id: i32 = jvm.load_array(&ids, at as _, 1).await?[0];
-        jvm.put_field(&mut this, "index", "I", if forward { index + 1 } else { index - 1 })
-            .await?;
+        jvm.put_field(&mut this, "index", "I", at).await?;
 
         Ok(id)
     }
@@ -158,7 +165,7 @@ impl RecordEnumerationImpl {
     }
 
     async fn reset(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
-        jvm.put_field(&mut this, "index", "I", 0).await
+        jvm.put_field(&mut this, "index", "I", -1).await
     }
 
     async fn rebuild(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {

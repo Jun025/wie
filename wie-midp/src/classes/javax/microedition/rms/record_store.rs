@@ -483,20 +483,27 @@ mod test {
                     .await?;
                 let count: i32 = jvm.invoke_virtual(&plain, E, "numRecords", "()I", ()).await?;
                 assert_eq!(count, 3);
+                // JSR118: right after creation previousRecord() returns the LAST element, so there is one.
+                let fresh_has_previous: bool = jvm.invoke_virtual(&plain, E, "hasPreviousElement", "()Z", ()).await?;
+                assert!(fresh_has_previous);
                 let mut ids = Vec::new();
                 while jvm.invoke_virtual::<_, bool>(&plain, E, "hasNextElement", "()Z", ()).await? {
                     ids.push(jvm.invoke_virtual::<_, i32>(&plain, E, "nextRecordId", "()I", ()).await?);
                 }
                 assert_eq!(ids, [1, 2, 3]);
+                // Current-position model: from the last element (3), previous is the one before it.
                 let back: i32 = jvm.invoke_virtual(&plain, E, "previousRecordId", "()I", ()).await?;
-                assert_eq!(back, 3);
-                let past_end: JvmResult<i32> = async {
-                    let _: () = jvm.invoke_virtual(&plain, E, "reset", "()V", ()).await?;
-                    let _: i32 = jvm.invoke_virtual(&plain, E, "previousRecordId", "()I", ()).await?;
-                    Ok(0)
+                assert_eq!(back, 2);
+
+                // reset() = state right after creation, so walking backwards starts at the last element.
+                let _: () = jvm.invoke_virtual(&plain, E, "reset", "()V", ()).await?;
+                let mut ids = Vec::new();
+                while jvm.invoke_virtual::<_, bool>(&plain, E, "hasPreviousElement", "()Z", ()).await? {
+                    ids.push(jvm.invoke_virtual::<_, i32>(&plain, E, "previousRecordId", "()I", ()).await?);
                 }
-                .await;
-                assert!(matches!(past_end, Err(JavaError::JavaException(_))));
+                assert_eq!(ids, [3, 2, 1]);
+                let past_start: JvmResult<i32> = jvm.invoke_virtual(&plain, E, "previousRecordId", "()I", ()).await;
+                assert!(matches!(past_start, Err(JavaError::JavaException(_))));
 
                 let ordering = jvm.new_class("TestReverseFirstByte", "()V", ()).await?;
                 let sorted: ClassInstanceRef<RecordEnumeration> = jvm
