@@ -65,3 +65,7 @@
   - M3 검출 함수 `return false` → 시험 3 **FAILED**
 - 게이트: `cargo fmt --check` OK · `clippy --all -D warnings` OK · wasm32 clippy OK · `RUST_MIN_STACK=4194304 cargo test --all` rc=0(실패 0).
 - 진입점 호출(`init.rs`)을 직접 잡는 시험은 없다. 3종의 실행 결과 문구(위 표)가 그 증거다.
+- 추가 실측: `cargo +beta clippy --all -D warnings` OK · 러너 블록 6줄 전건 PASS(`keydraw_*` rc=0) · `npm run build:wasm` rc=0 · `check-engine-contract` OK · `npm run audit` PASSED.
+
+### 게임 파일명 유입
+`node scripts/corpus-name-inflow.mjs --corpus <game_lab>`: BOUNDED 1 · SUFFIX-ATTACHED 1. 둘 다 `wie-ktf/src/adf.rs` 의 기존 ADF 파싱 시험 한 줄이다(`origin/main` 에 이미 있다). 이 회차가 파일을 고쳐 대상에 들어왔을 뿐이고, 이 diff 가 더한 게임 이름은 0이다.
