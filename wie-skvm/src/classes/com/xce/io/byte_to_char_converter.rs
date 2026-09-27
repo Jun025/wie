@@ -1,11 +1,10 @@
 use alloc::vec;
 
+use jvm::{ClassInstanceRef, Jvm, Result as JvmResult};
 use jvm_class_proto::JavaMethodProto;
 use jvm_types::{ClassAccessFlags, MethodAccessFlags};
 
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
-
-use jvm::{ClassInstanceRef, Jvm, Result as JvmResult};
 
 // class com.xce.io.ByteToCharConverter
 // The byte → char half of SK-VM's converter pair; games only ever reach it through
