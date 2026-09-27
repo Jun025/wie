@@ -12,7 +12,7 @@
 //
 // ── Usage ────────────────────────────────────────────────────────────────────
 //   node scripts/playability-census.mjs run --bin <wie_validate> --out <dir> [--jobs 8]
-//        [--secs 30] [--long 600] [--only probe|long] <corpus dir>...
+//        [--secs 30] [--long 600] [--only probe|long|speed] <corpus dir>...
 //   node scripts/playability-census.mjs report --out <dir> --pin <wie sha>
 //        [--compat <compat.json>] [--changes <changes.json>] [--prs <gh-merged.json>]
 //
@@ -33,8 +33,8 @@
 //           ponytail: an attract-mode title that animates on its own reads as "ok" —
 //           a per-shot diff against a time-aligned baseline is the upgrade if that bites.
 //   longplay  titles with boot/render/input ok get --long seconds of a looping key script
-//           with a shot every 20 s: error = FAIL line; stall = 4 identical shots in a row
-//           (>= 60 s unchanged while keys keep arriving). A title whose 30 s probe already
+//           with a shot every 20 s: error = FAIL line. Never `stall` (see judge()); the longest run
+//           of identical shots goes to census.tsv as `still`. A title whose 30 s probe already
 //           failed after painting is `error` without the long run.
 //   sound   ok = a Play with events reached the sink; silent = none did. This is the
 //           engine side only: a command the browser host drops is #348's axis, not this one.
@@ -154,6 +154,16 @@ async function probe(t) {
   }
 }
 
+// Speed is wall-clock, so a starved host reads as a slow game. `--only speed` re-measures the
+// titles judged slow, alone (--jobs 1-2 is the point), into S.json; the judge prefers it.
+async function speed(t) {
+  const d = join(out, t.sha);
+  const f = join(d, 'S.json');
+  if (existsSync(f)) return;
+  const args = ['--inject', '--keep-timeout', '--timeout', String(opt.secs), '--pacing', String(PROBE_KEYS_AT), t.path];
+  writeFileSync(f, JSON.stringify(await validate(args, opt.secs + 120, join(d, 'S.stderr'))));
+}
+
 async function longplay(t) {
   const d = join(out, t.sha);
   const f = join(d, 'L.json');
@@ -197,6 +207,7 @@ function judge(sha) {
   const A = read(join(d, 'A.json'));
   const B = read(join(d, 'B.json'));
   const L = read(join(d, 'L.json'));
+  const S = read(join(d, 'S.json'));
   if (!A || !B) return null;
   const painted = (A.paints ?? 0) + (B.paints ?? 0) > 0;
   const content = A.content || B.content;
@@ -212,15 +223,19 @@ function judge(sha) {
   if (probeErr) ax.longplay = 'error';
   else if (!L) ax.longplay = 'n/a';
   else if (L.result === 'FAIL') ax.longplay = 'error';
-  else ax.longplay = maxRun(L.shots) >= 4 ? 'stall' : 'ok';
+  // ponytail: no `stall` verdict. Measured on this census's first pass: of 40 runs with 4+ identical
+  // 20 s shots, the ones opened were a sub-menu the key loop never backs out of (no CLR) and a
+  // notice waiting for NUM1 — the script's ceiling, not a frozen engine — and on a starved host a
+  // live title paints too rarely to tell. `still` in census.tsv keeps the count for a human.
+  else ax.longplay = 'ok';
   const au = A.audio ?? B.audio;
   ax.sound = ax.boot !== 'ok' || !au ? 'n/a' : au.plays - (au.empty_plays ?? 0) > 0 ? 'ok' : 'silent';
-  const p = A.pacing;
+  const p = (S ?? A).pacing;
   const windowMs = (opt.secs - PROBE_KEYS_AT) * 1000;
   let ratio = null;
   if (p && p.sleeps + p.timers > 0) ratio = 1 - (p.sleep_late_sum + p.timer_late_sum + p.gc_ms) / windowMs;
   ax.speed = ratio === null || !ok2 ? 'n/a' : ratio >= 0.9 ? 'ok' : 'slow';
-  return { A, B, L, ax, ratio, novel, baselineDistinct: baseline.size };
+  return { A, B, L, S, ax, ratio, novel, baselineDistinct: baseline.size };
 }
 
 function maxRun(hs) {
@@ -302,10 +317,18 @@ if (cmd === 'run') {
     process.exit(2);
   }
   const pop = population(opt.dirs);
-  writeFileSync(join(out, 'population.json'), JSON.stringify({ ...pop, dirs: opt.dirs.map((d) => resolve(d)) }));
+  // A second `run` into the same --out (another corpus slice) adds to the population, never replaces it.
+  const prev = read(join(out, 'population.json'));
+  const known = new Set(pop.titles.map((t) => t.sha));
+  const all = [...pop.titles, ...(prev?.titles ?? []).filter((t) => !known.has(t.sha))].sort((a, b) => a.sha.localeCompare(b.sha));
+  writeFileSync(join(out, 'population.json'), JSON.stringify({ ...pop, titles: all, dirs: [...new Set([...(prev?.dirs ?? []), ...opt.dirs.map((d) => resolve(d))])] }));
   console.error(`population: ${pop.files} files -> ${pop.titles.length} unique · excluded dirs ${JSON.stringify(pop.excluded)} · jobs ${opt.jobs}`);
   if (opt.only !== 'long') await pool(pop.titles, opt.jobs, probe);
-  if (opt.only !== 'probe') {
+  if (opt.only === 'speed') {
+    const slow = pop.titles.filter((t) => judge(t.sha)?.ax.speed === 'slow');
+    console.error(`speed: ${slow.length} titles judged slow, re-measured at --jobs ${opt.jobs}`);
+    await pool(slow, opt.jobs, speed);
+  } else if (opt.only !== 'probe') {
     const cand = pop.titles.filter((t) => {
       const j = judge(t.sha);
       return j && j.ax.input === 'ok' && j.ax.longplay === 'n/a';
@@ -318,7 +341,7 @@ if (cmd === 'run') {
   const prs = opt.prs ? read(resolve(opt.prs)) : [];
   const extra = opt.changes ? read(resolve(opt.changes)) : {};
   const entries = [];
-  const rows = [['sha256', 'platform', 'model', 'title', 'status', 'boot', 'render', 'input', 'longplay', 'sound', 'speed', 'ratio', 'paints', 'distinct', 'novel', 'base_distinct', 'audio', 'reasonA', 'reasonL', 'load1']];
+  const rows = [['sha256', 'platform', 'model', 'title', 'status', 'boot', 'render', 'input', 'longplay', 'sound', 'speed', 'ratio', 'paints', 'distinct', 'novel', 'base_distinct', 'audio', 'still', 'reasonA', 'reasonL', 'load1']];
   const clusters = new Map();
   for (const t of pop.titles) {
     const j = judge(t.sha);
@@ -357,9 +380,10 @@ if (cmd === 'run') {
       j.novel,
       j.baselineDistinct,
       j.A.audio ? `${j.A.audio.plays}/${j.A.audio.wave_events}w/${j.A.audio.midi_events}m` : '',
+      j.L ? maxRun(j.L.shots) : '',
       j.A.reason,
       j.L?.reason ?? '',
-      j.A.load1?.toFixed(0),
+      (j.S ?? j.A).load1?.toFixed(0),
     ]);
     // A title joins ONE playability cluster — its first failing axis — plus sound/speed ones.
     const first = ['boot', 'render', 'input', 'longplay'].find((a) => !['ok', 'n/a'].includes(j.ax[a]));
