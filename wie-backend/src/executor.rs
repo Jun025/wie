@@ -129,24 +129,39 @@ impl Executor {
     {
         let end = now() + budget_ms;
         loop {
-            let now = now();
+            let mut current = now();
 
-            if now > end {
+            if current > end {
                 break;
             }
 
-            {
+            let next_wakeup = {
                 let inner = self.inner.lock();
                 let running_task_count = inner.tasks.len() - inner.sleeping_tasks.len();
                 if running_task_count == 0 && !inner.sleeping_tasks.is_empty() {
-                    let next_wakeup = *inner.sleeping_tasks.values().min().unwrap();
-                    if now < next_wakeup {
-                        break;
-                    }
+                    Some(*inner.sleeping_tasks.values().min().unwrap())
+                } else {
+                    None
+                }
+            };
+
+            // Every task is asleep. Ending the tick here used to put each wake on the host's frame
+            // grid: 메이플스토리2007's sleep(60) woke 66.7 or 83.3ms later, never 60. A wake that
+            // falls inside the budget is waited for instead — spending CPU the budget already
+            // allowed — and one past it still ends the tick.
+            if let Some(next_wakeup) = next_wakeup
+                && current < next_wakeup
+            {
+                if next_wakeup > end {
+                    break;
+                }
+                match wait_until(&now, current, next_wakeup) {
+                    Some(woke) => current = woke,
+                    None => break,
                 }
             }
 
-            self.step(now)?;
+            self.step(current)?;
         }
 
         Ok(())
@@ -224,6 +239,33 @@ impl Executor {
 
         unsafe { Waker::from_raw(noop_raw_waker()) }
     }
+}
+
+// A clock read this many times in a row without moving is not going to move: a test's frozen
+// clock (`TestClock`), where waiting for a wake would never return. A real millisecond clock
+// moves long before this — a read costs tens of nanoseconds on both hosts.
+// ponytail: read-count heuristic; a host whose clock read takes ~1ns would end ticks early.
+const FROZEN_CLOCK_READS: u32 = 1_000_000;
+
+// Reads `now` until it reaches `until`; `None` if the clock stops moving first.
+fn wait_until<T>(now: &T, mut last: Instant, until: Instant) -> Option<Instant>
+where
+    T: Fn() -> Instant,
+{
+    let mut unchanged = 0;
+    while last < until {
+        let read = now();
+        if read == last {
+            unchanged += 1;
+            if unchanged >= FROZEN_CLOCK_READS {
+                return None;
+            }
+        } else {
+            unchanged = 0;
+            last = read;
+        }
+    }
+    Some(last)
 }
 
 #[cfg(test)]
@@ -305,6 +347,54 @@ mod tests {
         // spending the 14ms default is exactly the overrun of an 8.3ms frame this API exists to prevent.
         executor.tick_for(advancing_clock(0), 5).unwrap();
         assert_eq!(polls.load(Ordering::Relaxed), 5);
+    }
+
+    fn sleeper(executor: &mut Executor, millis: u64) -> Arc<AtomicBool> {
+        let woke = Arc::new(AtomicBool::new(false));
+        let woke_clone = woke.clone();
+        let executor_clone = executor.clone();
+        executor.spawn(move || async move {
+            executor_clone.sleep(millis);
+            YieldOnce(false).await;
+            woke_clone.store(true, Ordering::Relaxed);
+        });
+        woke
+    }
+
+    #[test]
+    fn test_tick_waits_for_a_wake_inside_its_budget() {
+        let mut executor = Executor::new();
+        // 10ms sits inside the 14ms budget: the same tick must wake it, not leave it to the next
+        // host frame. Ending the tick when every task sleeps is what stretched sleep(60) to 66.7/83.3ms.
+        let woke = sleeper(&mut executor, 10);
+        executor.tick(advancing_clock(0)).unwrap();
+        assert!(woke.load(Ordering::Relaxed));
+    }
+
+    #[test]
+    fn test_tick_ends_on_a_wake_past_its_budget() {
+        let mut executor = Executor::new();
+        let woke = sleeper(&mut executor, 30);
+        executor.tick(advancing_clock(0)).unwrap();
+        assert!(!woke.load(Ordering::Relaxed));
+        executor.tick(advancing_clock(40)).unwrap();
+        assert!(woke.load(Ordering::Relaxed));
+    }
+
+    #[test]
+    fn test_tick_ends_when_the_clock_is_frozen() {
+        let mut executor = Executor::new();
+        let woke = sleeper(&mut executor, 10);
+        // A `TestClock` that nobody advances. Waiting for the wake would never return; the read cap
+        // turns that hang into a failure instead of a stuck test run.
+        let reads = Cell::new(0u64);
+        let frozen = || {
+            reads.set(reads.get() + 1);
+            assert!(reads.get() < 10_000_000, "tick kept waiting on a clock that never moves");
+            Instant::from_epoch_millis(5)
+        };
+        executor.tick(frozen).unwrap();
+        assert!(!woke.load(Ordering::Relaxed));
     }
 
     #[test]
