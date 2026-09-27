@@ -63,3 +63,5 @@
 `WIE_AUDIO_DUMP` 미설정이면 `dump_audio` 는 env 조회 1회 후 반환 — 판정·출력 무변경. 시험 `audio_dump_line_keeps_every_event_in_worklet_shape`(형식이 바뀌면 red). `cargo fmt --check` · `clippy --all -D warnings`(stable · wasm32 · beta) rc 0 · `RUST_MIN_STACK=4194304 cargo test --all` **508 passed / 0 failed** · `npm run build:wasm` rc 0(글루 35,151 B · wasm 15,584,819 B) · `check-engine-contract` **109 pass / 0 violation**.
 
 게임 파일명 유입(`corpus-name-inflow --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 10회/6쌍 · SUFFIX-ATTACHED 0 — 이 회차 문서의 타이틀명 8(배틀몬스터·더팜1, 0315 에 이미 있는 이름) + `wie_validate.rs` 기존 줄 2(수정 파일이라 대상에 든 것 · 이 회차가 쓴 줄 아님).
+
+<!-- corpus-name-inflow v1 subjects=3 tree=a6a10563e4276783 B=10/6 P=0/0 S=0/0 -->
