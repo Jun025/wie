@@ -364,12 +364,24 @@ impl From<WIPICSvcId> for u32 {
 pub enum StdlibSvcId {
     Unk2 = 0x3f6,
     Sprintf = 0x3f7,
+    /// `f(buf, fmt, ap)` — identified at its one measured call site (2dbde9acca99, 2026-09-27): a
+    /// variadic function (`push {r0-r3}` on entry) formats its own `fmt, ...` into a stack buffer
+    /// and passes `ap` as the address of its first variadic slot (`add r2, sp, #0x120`, the word
+    /// after the saved `fmt`), then opens the resulting path.
+    Vsprintf = 0x3f9,
     Atoi = 0x3fb,
     Rand = 0x403,
     Srand = 0x404,
     Strcpy = 0x405,
     Strncpy = 0x406,
     Strcat = 0x407,
+    /// `f(dst, src, n)` — 4fdbd64c9fbd, in a key handler (2026-09-27): `memset(dst, 0, 0x42)`,
+    /// a two-argument string call on `dst`, then `if (n) f(dst, local_buf, n)`. Its import slot sits
+    /// between that two-argument call's and memmove's (0x415) in the image's ascending slot table,
+    /// and in this table each string call is followed by its counted form (0x405 strcpy / 0x406
+    /// strncpy). strncat is the one `(dst, src, n)` string function not yet placed. Shape plus
+    /// position, not a symbol name — revisit if a title passes something other than a string.
+    Strncat = 0x408,
     Strcmp = 0x409,
     Unk4 = 0x40a,
     Strstr = 0x410,
@@ -380,6 +392,12 @@ pub enum StdlibSvcId {
     Time = 0x41a,
     Localtime = 0x420,
     Unk3 = 0x424,
+    /// Identified from the caller, not guessed: the only call site measured (b7699c10dfd1, 2026-09-27)
+    /// is C++ `operator new` — `if (size == 0) size = 1; p = f(size); if (p) return p;` else the
+    /// exception path.
+    Malloc = 0x426,
+    /// Its pair, from the same image: `operator delete` is `if (p) f(p);`, reaching this slot.
+    Free = 0x428,
 }
 
 impl From<StdlibSvcId> for u32 {
