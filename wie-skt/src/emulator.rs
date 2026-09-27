@@ -22,6 +22,20 @@ pub struct SktEmulator {
     system: System,
 }
 
+// `m.MODEL` is read by 59 of the corpus's 84 SKT titles; two call `.equals` on it unchecked and
+// died at boot on null (2026-09-27 census). The value matches no real handset, so a title that
+// branches on the model takes the same default path a null-checking one already takes.
+const SYSTEM_PROPERTIES: [(&str, &str); 8] = [
+    ("MIN", "01000000000"),
+    ("m.MIN", "01000000000"),
+    ("m.COLOR", "7"),
+    ("m.VENDER", "vender"),
+    ("m.MODEL", "wie"),
+    ("m.CARRIER", "SKT"),
+    ("m.SK_VM", "10"),
+    ("com.xce.wipi.version", ""),
+];
+
 impl SktEmulator {
     pub fn from_archive(platform: Box<dyn Platform>, files: BTreeMap<String, Vec<u8>>) -> Result<Self> {
         let msd_file = files.iter().find(|x| x.0.ends_with(".msd")).unwrap();
@@ -107,15 +121,7 @@ impl SktEmulator {
         properties: BTreeMap<String, String>,
         main_class_name: Option<String>,
     ) -> Result<()> {
-        let system_properties = [
-            ("MIN", "01000000000"),
-            ("m.MIN", "01000000000"),
-            ("m.COLOR", "7"),
-            ("m.VENDER", "vender"),
-            ("m.CARRIER", "SKT"),
-            ("m.SK_VM", "10"),
-            ("com.xce.wipi.version", ""),
-        ];
+        let system_properties = SYSTEM_PROPERTIES;
         let properties = properties
             .into_iter()
             .map(|(k, v)| (format!("wie.appProperty.{k}"), v))
@@ -278,5 +284,10 @@ mod tests {
         let blue = image.get_pixel(1, 0);
         assert_eq!((red.r, red.g, red.b, red.a), (252, 0, 0, 255));
         assert_eq!((blue.r, blue.g, blue.b, blue.a), (0, 0, 255, 255));
+    }
+
+    #[test]
+    fn model_property_is_set() {
+        assert!(super::SYSTEM_PROPERTIES.iter().any(|(k, v)| *k == "m.MODEL" && !v.is_empty()));
     }
 }
