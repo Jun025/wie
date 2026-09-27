@@ -67,3 +67,5 @@
 - `cargo fmt --check` · `clippy --all -D warnings`(stable · beta) · `clippy --target wasm32 -D warnings` · `RUST_MIN_STACK=4194304 cargo test --all`(1,386초) · `npm run build:wasm` · `check-engine-contract` · `npm run audit` 전부 rc=0.
 - 러너 줄(엔진 변경): `draw_j2me` · `helloworld_ktf/lgt` · `keydraw_ktf/lgt --inject --expect-last-frame` · `text_j2me --timeout 5` 전부 PASS · rc=0.
 - 게임 파일명 유입: 이 회차가 **더한 줄**에는 0건이다. 도구 표기 BOUNDED 20회/13쌍은 고친 파일에 **이미 있던** 주석이다(SUFFIX-ATTACHED 0).
+
+<!-- corpus-name-inflow v1 subjects=28 tree=f10ed6f595cfd907 B=20/13 P=0/0 S=0/0 -->
