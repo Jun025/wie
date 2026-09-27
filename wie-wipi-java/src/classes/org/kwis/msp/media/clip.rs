@@ -62,6 +62,9 @@ impl Clip {
 
         let _: () = jvm.invoke_special(&this, "org/kwis/msp/media/BaseClip", "<init>", "()V", ()).await?;
         jvm.put_field(&mut this, "type", "Ljava/lang/String;", r#type).await?;
+        // Full volume until the game says otherwise — not the field's 0, which a game that reads
+        // `getVolume` back into `setVolume` would turn into silence.
+        jvm.put_field(&mut this, "volume", "I", 100).await?;
 
         Ok(())
     }
@@ -144,7 +147,10 @@ impl Clip {
         Ok(())
     }
 
-    async fn set_volume(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Clip>, level: i32) -> JvmResult<bool> {
+    // 0..100 (measured 2026-09-27: 85 KTF titles call it, all within 0..100 — 40, 60 and 50 the
+    // most common; 0 is how some turn their sound off). Applied to the clip's player now, and again
+    // by `Player.play`/`resume` for a clip whose player did not exist yet.
+    async fn set_volume(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Clip>, level: i32) -> JvmResult<bool> {
         tracing::debug!("org.kwis.msp.media.Clip::setVolume({this:?}, {level})");
 
         if !(0..=100).contains(&level) {
@@ -152,8 +158,22 @@ impl Clip {
         }
 
         jvm.put_field(&mut this, "volume", "I", level).await?;
+        Self::apply_volume(jvm, context, &this).await?;
 
         Ok(true)
+    }
+
+    /// Hands the clip's volume to its player's audio handle, if it has a player.
+    pub async fn apply_volume(jvm: &Jvm, context: &mut WieJvmContext, this: &ClassInstanceRef<Self>) -> JvmResult<()> {
+        let player = Self::player(jvm, this).await?;
+        if player.is_null() {
+            return Ok(());
+        }
+        let level: i32 = jvm.get_field(this, "volume", "I").await?;
+        let handle: i32 = jvm.get_field(&player, "audioHandle", "I").await?;
+        let _ = context.system().audio().set_volume(handle as u32, level as f32 / 100.0);
+
+        Ok(())
     }
 
     // not in spec, but some apps call it
@@ -331,7 +351,7 @@ mod test {
                 .invoke_virtual(&second_clip, "org/kwis/msp/media/Clip", "getVolume", "()I", ())
                 .await?;
 
-            assert_eq!(second_initial_volume, 0);
+            assert_eq!(second_initial_volume, 100);
             assert!(minimum_set);
             assert_eq!(minimum_volume, 0);
             assert!(maximum_set);
@@ -340,7 +360,7 @@ mod test {
             assert_eq!(volume_after_below_minimum, 100);
             assert!(!above_maximum_set);
             assert_eq!(volume_after_above_maximum, 100);
-            assert_eq!(second_final_volume, 0);
+            assert_eq!(second_final_volume, 100);
 
             Ok(())
         })

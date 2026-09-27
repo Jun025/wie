@@ -8,10 +8,10 @@
     "wie-lgt/src/runtime/svc_ids.rs — 0x68 TerminateProgram · 0x384–0x388",
     "wie-lgt/src/runtime/wipi_c.rs — terminate_program · swap32 · swap16 · inet_addr · 시험 2",
     "wie_cli/src/bin/wie_validate.rs — --relaunch N · relaunches 필드 · 시험 1",
-    "docs/report/0323"
+    "docs/report/0325"
   ],
   "verification": [
-    "LGT 전수 78 sha 전/후 짝(--inject) · 바뀐 25건 분류 — docs/report/0323",
+    "LGT 전수 78 sha 전/후 짝(--inject) · 바뀐 25건 분류 — docs/report/0325",
     "라이브 LGT 5종·퇴행 가드 2종 전후 판정 동일",
     "변이 5종 모두 red"
   ],
@@ -19,14 +19,14 @@
     "0x68 이름은 행동 기반(심볼 없음)",
     "run 의 db.clone() 공유는 커밋 픽스처로 잡지 못한다(코퍼스 전용)",
     "측정 load1 115–176 — 판정 축만 인용",
-    "후속 벽(제안 한도 2 초과분 · 발권용): 1100–1107 미식별(87b04639cdfe) · SVC 809(1cd151222bde) · SVC 2000(3ff5948e235e) · 첫 키 JavaException(acc4215b7ec0) · DB 저장 실패 종료 안내(63332c51d514) — docs/report/0323"
+    "후속 벽(제안 한도 2 초과분 · 발권용): 1100–1107 미식별(87b04639cdfe) · SVC 809(1cd151222bde) · SVC 2000(3ff5948e235e) · 첫 키 JavaException(acc4215b7ec0) · DB 저장 실패 종료 안내(63332c51d514) — docs/report/0325"
   ],
   "proposals": [
     {
       "title": "셸: 게임 종료(sticky exit) 뒤 DB 저장 + «다시 실행» 버튼",
       "plainSummary": "LGT 일부 게임은 첫 실행에서 안내를 띄우고 스스로 종료한다. 같은 저장 데이터로 다시 켜야 본 게임이 나온다.",
       "userBenefit": "첫 실행 안내에서 멈춘 것처럼 보이던 게임 4종 이상이 두 번째 실행부터 플레이된다.",
-      "why": "엔진은 이제 종료를 알린다(docs/report/0323). 재실행과 DB 유지는 셸 몫이다.",
+      "why": "엔진은 이제 종료를 알린다(docs/report/0325). 재실행과 DB 유지는 셸 몫이다.",
       "tradeoff": "메뉴 «종료» 와 첫 실행 종료가 같은 호출이라 자동 재실행은 사용자 종료도 되살린다 — 버튼 방식 권장.",
       "effort": "S",
       "target": "otterpebble"

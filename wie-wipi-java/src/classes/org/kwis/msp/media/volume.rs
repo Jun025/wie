@@ -48,14 +48,19 @@ impl Volume {
         }
     }
 
-    async fn get(_: &Jvm, _: &mut WieJvmContext) -> JvmResult<i32> {
-        tracing::warn!("stub org.kwis.msp.media.Volume::get()");
+    // The handset volume, 0..100 — what the game sets from its own sound setting (measured
+    // 2026-09-27 over the local corpus: 28 KTF titles call `set`, all with 20..80). It scales all
+    // of the game's sound, on top of each `Clip`'s own volume.
+    async fn get(_: &Jvm, context: &mut WieJvmContext) -> JvmResult<i32> {
+        tracing::debug!("org.kwis.msp.media.Volume::get()");
 
-        Ok(0)
+        Ok((context.system().audio().master_volume() * 100.0).round() as i32)
     }
 
-    async fn set(_: &Jvm, _: &mut WieJvmContext, level: i32) -> JvmResult<()> {
-        tracing::warn!("stub org.kwis.msp.media.Volume::set({level})");
+    async fn set(_: &Jvm, context: &mut WieJvmContext, level: i32) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.media.Volume::set({level})");
+
+        context.system().audio().set_master_volume(level as f32 / 100.0);
 
         Ok(())
     }

@@ -14,6 +14,10 @@ pub struct Audio {
     files: BTreeMap<AudioHandle, Arc<AudioSequence>>,
     playing: BTreeSet<AudioHandle>,
     last_audio_handle: AudioHandle,
+    /// Volume the game set on a handle (0.0..=1.0); absent = 1.0.
+    volumes: BTreeMap<AudioHandle, f32>,
+    /// Volume the game set for all its sound (0.0..=1.0) — multiplies every handle's.
+    master_volume: f32,
 }
 
 impl Audio {
@@ -23,6 +27,8 @@ impl Audio {
             files: BTreeMap::new(),
             playing: BTreeSet::new(),
             last_audio_handle: 0,
+            volumes: BTreeMap::new(),
+            master_volume: 1.0,
         }
     }
 
@@ -41,6 +47,7 @@ impl Audio {
 
         self.stop(audio_handle);
         self.playing.insert(audio_handle);
+        self.sink.set_gain(audio_handle, self.gain(audio_handle));
         self.sink.send(AudioCommand::Play {
             handle: audio_handle,
             sequence,
@@ -59,11 +66,46 @@ impl Audio {
     pub fn close(&mut self, audio_handle: AudioHandle) -> Result<(), AudioError> {
         self.stop(audio_handle);
 
+        self.volumes.remove(&audio_handle);
         if self.files.remove(&audio_handle).is_none() {
             return Err(AudioError::InvalidHandle);
         }
 
         Ok(())
+    }
+
+    /// The game's volume for one handle, `0.0..=1.0`. Takes effect at once if it is playing.
+    pub fn set_volume(&mut self, audio_handle: AudioHandle, volume: f32) -> Result<(), AudioError> {
+        if !self.files.contains_key(&audio_handle) {
+            return Err(AudioError::InvalidHandle);
+        }
+
+        self.volumes.insert(audio_handle, volume.clamp(0.0, 1.0));
+        if self.playing.contains(&audio_handle) {
+            self.sink.set_gain(audio_handle, self.gain(audio_handle));
+        }
+
+        Ok(())
+    }
+
+    pub fn volume(&self, audio_handle: AudioHandle) -> f32 {
+        self.volumes.get(&audio_handle).copied().unwrap_or(1.0)
+    }
+
+    /// The game's volume for all its sound, `0.0..=1.0`, on top of each handle's own.
+    pub fn set_master_volume(&mut self, volume: f32) {
+        self.master_volume = volume.clamp(0.0, 1.0);
+        for &audio_handle in &self.playing {
+            self.sink.set_gain(audio_handle, self.gain(audio_handle));
+        }
+    }
+
+    pub fn master_volume(&self) -> f32 {
+        self.master_volume
+    }
+
+    fn gain(&self, audio_handle: AudioHandle) -> f32 {
+        self.master_volume * self.volume(audio_handle)
     }
 }
 
@@ -187,5 +229,52 @@ mod tests {
 
         assert_eq!(commands.lock().unwrap()[1], AudioCommand::Stop { handle });
         assert!(audio.play(handle, false).is_err());
+    }
+    struct GainSink(Arc<Mutex<Vec<(&'static str, u32, f32)>>>);
+
+    impl AudioSink for GainSink {
+        fn send(&self, command: AudioCommand) {
+            let entry = match command {
+                AudioCommand::Play { handle, .. } => ("play", handle, 0.0),
+                AudioCommand::Stop { handle } => ("stop", handle, 0.0),
+            };
+            self.0.lock().unwrap().push(entry);
+        }
+
+        fn set_gain(&self, handle: u32, gain: f32) {
+            self.0.lock().unwrap().push(("gain", handle, gain));
+        }
+    }
+
+    // Every play is preceded by its gain, so a sink never keeps one past the next play; a change
+    // reaches the sink only for a playing handle; master multiplies; close forgets the volume.
+    #[test]
+    fn volume_reaches_the_sink_before_every_play_and_while_playing() {
+        let log = Arc::new(Mutex::new(Vec::new()));
+        let mut audio = Audio::new(Box::new(GainSink(log.clone())));
+        let a = audio.load_smaf(&[]).unwrap();
+        let b = audio.load_smaf(&[]).unwrap();
+
+        audio.set_volume(a, 0.5).unwrap();
+        audio.play(a, true).unwrap();
+        audio.set_master_volume(0.4);
+        audio.set_volume(b, 1.5).unwrap();
+        audio.play(b, false).unwrap();
+        audio.set_volume(a, 0.25).unwrap();
+
+        assert_eq!(
+            *log.lock().unwrap(),
+            vec![
+                ("gain", a, 0.5),
+                ("play", a, 0.0),
+                ("gain", a, 0.2),
+                ("gain", b, 0.4),
+                ("play", b, 0.0),
+                ("gain", a, 0.1),
+            ]
+        );
+        assert!(audio.set_volume(99, 0.5).is_err());
+        audio.close(a).unwrap();
+        assert_eq!(audio.volume(a), 1.0);
     }
 }

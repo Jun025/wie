@@ -8,7 +8,7 @@ use js_sys::{Array, Int16Array, Object, Reflect, Uint8Array};
 use wasm_bindgen::{JsValue, closure::Closure};
 use web_sys::{AudioContext, AudioWorkletNode, AudioWorkletNodeOptions, Blob, BlobPropertyBag, GainNode, Url};
 
-use wie_backend::{AudioCommand, AudioEventData, AudioSink};
+use wie_backend::{AudioCommand, AudioEventData, AudioHandle, AudioSink};
 
 /// The synth and scheduler, run on the audio thread. Shipped inside the wasm as a string and
 /// loaded from a Blob URL, because the engine artifact is exactly two files
@@ -56,12 +56,17 @@ struct State {
     gain: Option<GainNode>,
     mode: Mode,
     /// Commands received while the worklet module is still loading.
-    queue: Vec<AudioCommand>,
+    queue: Vec<Queued>,
     /// Handles whose events the worklet holds, least recently played first — a handle's sequence
     /// never changes, so a replay sends only the handle. Capped at [`RESIDENT_SEQUENCES`].
     loaded: VecDeque<u32>,
     /// Fallback only: next free playback position on the audio timeline (seconds).
     next_time: Cell<f64>,
+}
+
+enum Queued {
+    Command(AudioCommand),
+    Gain(AudioHandle, f32),
 }
 
 enum Mode {
@@ -111,9 +116,20 @@ impl AudioSink for WebAudioSink {
         let Some(state) = &self.state else { return };
         let mut state = state.borrow_mut();
         match &state.mode {
-            Mode::Loading => state.queue.push(command),
+            Mode::Loading => state.queue.push(Queued::Command(command)),
             Mode::Worklet(_) => state.post(&command),
             Mode::Fallback => state.play_pcm(&command),
+        }
+    }
+
+    // The fallback plays PCM at full gain: it is the no-worklet path, already missing MIDI.
+    fn set_gain(&self, handle: AudioHandle, gain: f32) {
+        let Some(state) = &self.state else { return };
+        let mut state = state.borrow_mut();
+        match &state.mode {
+            Mode::Loading => state.queue.push(Queued::Gain(handle, gain)),
+            Mode::Worklet(_) => state.post_gain(handle, gain),
+            Mode::Fallback => {}
         }
     }
 }
@@ -136,8 +152,11 @@ fn start_worklet(state: &Rc<RefCell<State>>) -> Result<(), JsValue> {
         match state.create_node() {
             Ok(node) => {
                 state.mode = Mode::Worklet(node);
-                for command in core::mem::take(&mut state.queue) {
-                    state.post(&command);
+                for queued in core::mem::take(&mut state.queue) {
+                    match queued {
+                        Queued::Command(command) => state.post(&command),
+                        Queued::Gain(handle, gain) => state.post_gain(handle, gain),
+                    }
                 }
             }
             Err(error) => {
@@ -163,8 +182,10 @@ fn start_worklet(state: &Rc<RefCell<State>>) -> Result<(), JsValue> {
 impl State {
     fn fall_back(&mut self) {
         self.mode = Mode::Fallback;
-        for command in core::mem::take(&mut self.queue) {
-            self.play_pcm(&command);
+        for queued in core::mem::take(&mut self.queue) {
+            if let Queued::Command(command) = queued {
+                self.play_pcm(&command);
+            }
         }
     }
 
@@ -245,6 +266,16 @@ impl State {
             let _ = Reflect::set(&evict, &JsValue::from_str("h"), &JsValue::from(handle));
             let _ = port.post_message(&evict);
         }
+    }
+
+    fn post_gain(&self, handle: AudioHandle, gain: f32) {
+        let Mode::Worklet(node) = &self.mode else { return };
+        let Ok(port) = node.port() else { return };
+        let message = Object::new();
+        let _ = Reflect::set(&message, &JsValue::from_str("t"), &JsValue::from_str("gain"));
+        let _ = Reflect::set(&message, &JsValue::from_str("h"), &JsValue::from(handle));
+        let _ = Reflect::set(&message, &JsValue::from_str("g"), &JsValue::from_f64(gain as f64));
+        let _ = port.post_message(&message);
     }
 
     /// The pre-worklet path: PCM only, scheduled back-to-back on a moving cursor so streamed

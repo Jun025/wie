@@ -1049,6 +1049,12 @@ fn main() {
         Some(pacing) => format!("{},\"pacing\":{pacing}}}", &json[..json.len() - 1]),
         None => json,
     };
+    // LGT only, so every other line is unchanged: the same static answer the browser host's
+    // `lgt_compile_model()` gives, for a batch census that has no browser.
+    let json = match lgt_compile_model(&result.platform, &args.filename) {
+        Some(model) => format!("{},\"lgt_compile_model\":{model:?}}}", &json[..json.len() - 1]),
+        None => json,
+    };
     let json = match result.relaunches {
         Some(n) => format!("{},\"relaunches\":{n}}}", &json[..json.len() - 1]),
         None => json,
@@ -1060,6 +1066,14 @@ fn main() {
     }
 
     std::process::exit(result.exit_code());
+}
+
+fn lgt_compile_model(platform: &str, filename: &str) -> Option<&'static str> {
+    if platform != "lgt" || !filename.ends_with("zip") {
+        return None;
+    }
+    let files = extract_zip(&fs::read(filename).ok()?).ok()?;
+    wie_lgt::detect_compile_model(&files).map(|m| m.as_str())
 }
 
 /// What the line written at SVC stub exhaustion says. `platform` is not known to the layer.
@@ -2200,6 +2214,14 @@ mod tests {
         assert_eq!(json_escape("\u{1}"), "\\u0001");
         // Non-ASCII passes through as UTF-8; JSON does not require escaping it.
         assert_eq!(json_escape("한"), "한");
+    }
+
+    /// `scripts/playability-census.mjs` reads this key for compat.json's `model`; only LGT gets it.
+    #[test]
+    fn lgt_compile_model_is_reported_for_lgt_only_test() {
+        let fixture = |f: &str| format!("{}/../test_data/{f}", env!("CARGO_MANIFEST_DIR"));
+        assert_eq!(super::lgt_compile_model("lgt", &fixture("helloworld_lgt.zip")), Some("clet"));
+        assert_eq!(super::lgt_compile_model("ktf", &fixture("helloworld_ktf.zip")), None);
     }
 
     /// The name handed to the emulators is the file name alone, on every host.
