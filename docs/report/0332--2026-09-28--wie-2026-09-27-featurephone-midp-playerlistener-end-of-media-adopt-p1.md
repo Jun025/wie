@@ -28,3 +28,5 @@
 ### 하지 않은 것
 - `STARTED`·`STOPPED`·`CLOSED` 통지. 명세에는 있지만 부르는 타이틀이 0 이라 과구현이다.
 - `getMediaTime` 은 계속 -1 이다.
+
+게임 파일명 유입(`corpus-name-inflow --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 1회/1쌍 · SUFFIX-ATTACHED 0회/0쌍. BOUNDED 1회는 수정 파일 `smaf_player.rs` 의 기존 주석 줄(main 에 이미 있음) — 이 회차 추가 줄 중 일치 0.
