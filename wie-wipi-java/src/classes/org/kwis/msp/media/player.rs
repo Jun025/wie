@@ -102,12 +102,13 @@ impl Player {
         Ok(false)
     }
 
-    async fn play_clip(jvm: &Jvm, _context: &mut WieJvmContext, clip: ClassInstanceRef<Clip>, repeat: bool) -> JvmResult<bool> {
+    async fn play_clip(jvm: &Jvm, context: &mut WieJvmContext, clip: ClassInstanceRef<Clip>, repeat: bool) -> JvmResult<bool> {
         tracing::debug!("org.kwis.msp.media.Player::play({clip:?}, {repeat})");
 
         let player = Clip::player(jvm, &clip).await?;
 
         if !player.is_null() {
+            Clip::apply_volume(jvm, context, &clip).await?;
             let _: () = jvm.invoke_virtual(&player, "net/wie/SmafPlayer", "start", "(Z)V", (repeat,)).await?;
 
             Ok(true)
@@ -142,12 +143,13 @@ impl Player {
     // "Still playing" is `getState() == STARTED`, which lets a one-shot go back to PREFETCHED
     // once its length has elapsed — so `resume` after a sound ended plays it again instead of
     // staying silent, as it did while this read the bare `started` flag.
-    async fn resume_clip(jvm: &Jvm, _: &mut WieJvmContext, clip: ClassInstanceRef<Clip>) -> JvmResult<bool> {
+    async fn resume_clip(jvm: &Jvm, context: &mut WieJvmContext, clip: ClassInstanceRef<Clip>) -> JvmResult<bool> {
         tracing::debug!("org.kwis.msp.media.Player::resume({clip:?})");
 
         let player = Clip::player(jvm, &clip).await?;
 
         if !player.is_null() {
+            Clip::apply_volume(jvm, context, &clip).await?;
             let state: i32 = jvm
                 .invoke_virtual(&player, "javax/microedition/media/Player", "getState", "()I", ())
                 .await?;
@@ -379,5 +381,47 @@ mod test {
 
             Ok(())
         })
+    }
+
+    // A volume set before the clip has data reaches the handle when it plays; `Volume` is the
+    // master on top. `getVolume` starts at 100, not the field's 0.
+    #[test]
+    fn test_clip_and_handset_volume_reach_the_audio_handle() -> Result<()> {
+        run_jvm_test_with_system(
+            Box::new([wie_midp::get_protos().into(), get_protos().into()]),
+            Box::new(TestPlatform::new()),
+            |jvm, system| async move {
+                let r#type: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, "audio/test").await?.into();
+                let clip: ClassInstanceRef<Clip> = jvm.new_class("org/kwis/msp/media/Clip", "(Ljava/lang/String;)V", (r#type,)).await?.into();
+
+                let initial: i32 = jvm.invoke_virtual(&clip, "org/kwis/msp/media/Clip", "getVolume", "()I", ()).await?;
+                let accepted: bool = jvm.invoke_virtual(&clip, "org/kwis/msp/media/Clip", "setVolume", "(I)Z", (40,)).await?;
+                let data = jvm.instantiate_array("B", 0).await?;
+                let _: () = jvm
+                    .invoke_virtual(&clip, "org/kwis/msp/media/Clip", "setBuffer", "([BI)V", (data, 0))
+                    .await?;
+                let _: bool = jvm
+                    .invoke_static(
+                        "org/kwis/msp/media/Player",
+                        "play",
+                        "(Lorg/kwis/msp/media/Clip;Z)Z",
+                        (clip.clone(), false),
+                    )
+                    .await?;
+                let player = Clip::player(&jvm, &clip).await?;
+                let handle: i32 = jvm.get_field(&player, "audioHandle", "I").await?;
+
+                let _: () = jvm.invoke_static("org/kwis/msp/media/Volume", "set", "(I)V", (60,)).await?;
+                let handset: i32 = jvm.invoke_static("org/kwis/msp/media/Volume", "get", "()I", ()).await?;
+
+                assert_eq!(initial, 100);
+                assert!(accepted);
+                assert_eq!(system.audio().volume(handle as u32), 0.4);
+                assert_eq!(handset, 60);
+                assert_eq!(system.audio().master_volume(), 0.6);
+
+                Ok(())
+            },
+        )
     }
 }
