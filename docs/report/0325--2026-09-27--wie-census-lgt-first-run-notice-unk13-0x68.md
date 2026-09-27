@@ -106,3 +106,5 @@ SVC 900–1100 대상(`--inject`, 재시작 없음 · 같은 시각 짝):
 `node scripts/corpus-name-inflow.mjs`(대상 5파일): BOUNDED **17회/12쌍** · SUFFIX-ATTACHED **0**. 17회는 전부 이 변경이
 건드린 파일의 **기존 줄**이다 — `git diff origin/main` 의 추가 줄에서 같은 이름을 세면 0. 이 회차가 새로 들인 게임명은 0,
 타이틀은 모두 sha12 로 적었다.
+
+<!-- corpus-name-inflow v1 subjects=5 tree=19617b72091cd537 B=17/12 P=0/0 S=0/0 -->
