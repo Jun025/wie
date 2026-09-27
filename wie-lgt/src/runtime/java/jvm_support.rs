@@ -1713,6 +1713,8 @@ pub(crate) mod tests {
                 ("java/io/DataInputStream", 32, "readUTF", "()Ljava/lang/String;"),
                 // 월드장기체스
                 ("java/util/Random", 10, "setSeed", "(J)V"),
+                // 월드장기체스
+                ("java/util/Vector", 31, "removeAllElements", "()V"),
             ] {
                 let class = jvm.resolve_class(class_name).await.unwrap();
                 let definition = class.definition.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap().clone();
