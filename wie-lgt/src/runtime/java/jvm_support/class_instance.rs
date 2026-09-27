@@ -13,7 +13,7 @@ use wie_core_arm::{Allocator, ArmCore};
 use wie_jvm_support::native::NativeJavaValueCodec;
 use wie_util::{ByteRead, ByteWrite, Result, read_generic, write_generic};
 
-use super::{JavaClassDefinition, JavaField, JavaReferenceField, LgtJvmWord, value::JavaValueCodec};
+use super::{JavaClassDefinition, JavaField, JavaHostField, JavaReferenceField, LgtJvmWord, value::JavaValueCodec};
 
 #[derive(Clone)]
 pub struct JavaClassInstance {
@@ -32,6 +32,7 @@ impl JavaClassInstance {
 
     pub fn instantiate(core: &mut ArmCore, class: &JavaClassDefinition, storage_size: usize) -> Result<Self> {
         let ptr_raw = Allocator::alloc(core, size_of::<RawJavaClassInstance>() as u32)?;
+        JavaHostField::forget_instance(core, ptr_raw);
         let allocated_storage_size = storage_size.max(size_of::<LgtJvmWord>());
         let ptr_fields = Allocator::alloc(core, allocated_storage_size as u32)?;
         core.write_bytes(ptr_fields, &vec![0; allocated_storage_size])?;
@@ -50,6 +51,7 @@ impl JavaClassInstance {
     }
 
     pub fn destroy_with_storage(mut self, storage_size: usize) -> Result<()> {
+        JavaHostField::forget_instance(&self.core, self.ptr_raw);
         let ptr_fields = self.ptr_fields()?;
         Allocator::free(&mut self.core, ptr_fields, storage_size.max(size_of::<LgtJvmWord>()) as u32)?;
         Allocator::free(&mut self.core, self.ptr_raw, size_of::<RawJavaClassInstance>() as u32)
@@ -116,6 +118,9 @@ impl ClassInstance for JavaClassInstance {
 
     fn get_field(&self, field: &dyn Field) -> JvmResult<JavaValue> {
         debug_assert!(!field.access_flags().contains(FieldAccessFlags::STATIC));
+        if let Some(field) = field.as_any().downcast_ref::<JavaHostField>() {
+            return Ok(field.get(&self.core, self.ptr_raw));
+        }
         let field_type = JavaType::parse(&field.descriptor());
         let word_index = if let Some(field) = field.as_any().downcast_ref::<JavaField>() {
             field.word_index().unwrap()
@@ -138,6 +143,10 @@ impl ClassInstance for JavaClassInstance {
 
     fn put_field(&mut self, field: &dyn Field, value: JavaValue) -> JvmResult<()> {
         debug_assert!(!field.access_flags().contains(FieldAccessFlags::STATIC));
+        if let Some(field) = field.as_any().downcast_ref::<JavaHostField>() {
+            field.put(&self.core, self.ptr_raw, value);
+            return Ok(());
+        }
         let word_index = if let Some(field) = field.as_any().downcast_ref::<JavaField>() {
             field.word_index().unwrap()
         } else {

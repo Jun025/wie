@@ -511,6 +511,20 @@ vtable = [
     { name = "schedule", descriptor = "(Ljava/util/TimerTask;JJ)V", index = 12 },
 ]
 
+# 학교가는길's game-loop task is a guest subclass `c` of java/util/TimerTask whose descriptor says
+# total=7 with no declared own field (measured 2026-09-26, docs/report/0296 ⑴-c) — so the phone's
+# TimerTask is SIX words (J2SE layout: lock, state, nextExecutionTime J, period J) and word 6 is c's
+# own hidden field, which c.run() loads as an object. rustjava-runtime 0.1.1 adds
+# lastScheduledExecutionTime J, eight words: every tick the Timer thread overwrote word 6 with the
+# low half of a timestamp and wrote word 7 past the instance, and c.run() died on 0xde07b454.
+# Kept host-side instead of shrinking the field or recomputing it, so scheduledExecutionTime() keeps
+# rustjava's exact value (the J2SE formula next±period drifts for fixed-delay tasks).
+[[class]]
+name = "java/util/TimerTask"
+host_field = [
+    { name = "lastScheduledExecutionTime", descriptor = "J" },
+]
+
 # 학교가는길 then dispatches index 32 on a java/util/Stack, 3/3 (measured 2026-09-26, with the Timer
 # row above in). Stack extends Vector, and the four Vector rows above (size 15, elementAt 23,
 # removeElementAt 27, insertElementAt 28) all sit where CLDC 1.1's Vector order puts them — 22

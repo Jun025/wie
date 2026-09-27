@@ -127,6 +127,12 @@ impl ArmCore {
         Ok(result)
     }
 
+    /// Identity of this emulated machine, stable while any clone of it is alive. For host-side
+    /// state that must be kept per core (two emulators can hand out the same guest addresses).
+    pub fn id(&self) -> usize {
+        Arc::as_ptr(&self.inner) as *const () as usize
+    }
+
     pub(crate) fn debug_inner(&self) -> Option<Arc<DebugInner>> {
         let inner = self.inner.lock();
 

@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-27",
+  "task": "wie-2026-09-27-lgt-timertask-host-layout-overwrites-guest-field-adopt-p0",
+  "title": "LGT TimerTask 폰 배치 6단어 — lastScheduledExecutionTime 호스트 쪽 표 · 학교가는길 게임 루프 생존",
+  "summary": "호스트 TimerTask(8단어)가 게스트 하위 클래스 필드와 인스턴스 밖을 덮던 것을 ABI host_field 행으로 6단어로 맞췄다. 학교가는길 Timer 스레드가 죽지 않고 100ms 주기로 돈다. 다음 벽은 lwc Component.repaint 스텁.",
+  "adoptedProposals": ["2026-09-27-lgt-no-frame-hang-first-wait-point#p0"],
+  "proposals": [
+    {
+      "title": "LGT 학교가는길 — org.kwis.msp.lwc.Component.repaint() 가 스텁이라 타이머가 돌아도 화면이 안 그려진다",
+      "plainSummary": "학교가는길의 게임 루프는 이제 살아서 0.1초마다 '다시 그려라'를 부르지만, 그 요청을 받는 부품이 아무 일도 하지 않아 화면이 검은 채로 남습니다.",
+      "userBenefit": "고치면 학교가는길이 첫 게임 화면을 그릴 수 있고, 같은 lwc 부품을 쓰는 다른 게임도 그리기 경로를 얻습니다.",
+      "why": "이 브랜치 release 실측(--timeout 20, 3/3): Timer 스레드 예외 0 · 'stub org.kwis.msp.lwc.Component::repaint(0x488423d0)' 196회/20s · paints 1 · only blank. wie-wipi-java component.rs 의 repaint()V 와 repaint(IIII)V 가 로그만 찍고 돌아온다(docs/report/0306).",
+      "tradeoff": "lwc 는 Component/ShellComponent 가 대부분 스텁이라 repaint 를 실제 paint 로 잇는 것은 Display·Card 경로와의 관계(누가 그래픽스를 주는가)를 정하는 설계 결정을 포함한다 — 한 줄 수정이 아니다.",
+      "effort": "L",
+      "target": "wie",
+      "kind": "product"
+    }
+  ]
+}

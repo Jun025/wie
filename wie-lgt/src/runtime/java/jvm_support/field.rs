@@ -1,8 +1,9 @@
-use alloc::{format, string::String};
+use alloc::{collections::BTreeMap, format, string::String};
 use core::fmt::{self, Debug, Formatter};
 
-use jvm::Field;
+use jvm::{Field, JavaType, JavaValue};
 use jvm_types::FieldAccessFlags;
+use spin::Mutex;
 use wipi_types::lgt::java::LgtJavaClassField as RawJavaField;
 
 use wie_core_arm::{Allocator, ArmCore};
@@ -115,5 +116,57 @@ impl Field for JavaStaticReferenceField {
 
     fn access_flags(&self) -> FieldAccessFlags {
         FieldAccessFlags::STATIC
+    }
+}
+
+/// A host-declared instance field stored outside instance storage (see `JavaClassAbi::host_field`).
+#[derive(Debug)]
+pub struct JavaHostField {
+    pub name: String,
+    pub descriptor: String,
+}
+
+impl Field for JavaHostField {
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    fn descriptor(&self) -> String {
+        self.descriptor.clone()
+    }
+
+    fn access_flags(&self) -> FieldAccessFlags {
+        FieldAccessFlags::PRIVATE
+    }
+}
+
+// Keyed by (core id, instance pointer): two emulators in one process hand out the same guest
+// addresses. ponytail: one global lock, taken only by host-field access and by instance
+// create/destroy while the table is non-empty.
+static HOST_FIELD_VALUES: Mutex<BTreeMap<(usize, u32), BTreeMap<String, JavaValue>>> = Mutex::new(BTreeMap::new());
+
+impl JavaHostField {
+    pub fn get(&self, core: &ArmCore, ptr_instance: u32) -> JavaValue {
+        HOST_FIELD_VALUES
+            .lock()
+            .get(&(core.id(), ptr_instance))
+            .and_then(|fields| fields.get(&self.name).cloned())
+            .unwrap_or_else(|| JavaType::parse(&self.descriptor).default())
+    }
+
+    pub fn put(&self, core: &ArmCore, ptr_instance: u32, value: JavaValue) {
+        HOST_FIELD_VALUES
+            .lock()
+            .entry((core.id(), ptr_instance))
+            .or_default()
+            .insert(self.name.clone(), value);
+    }
+
+    /// Drops whatever an earlier instance at this address left behind.
+    pub fn forget_instance(core: &ArmCore, ptr_instance: u32) {
+        let mut values = HOST_FIELD_VALUES.lock();
+        if !values.is_empty() {
+            values.remove(&(core.id(), ptr_instance));
+        }
     }
 }
