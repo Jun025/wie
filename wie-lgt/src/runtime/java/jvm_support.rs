@@ -35,7 +35,7 @@ use self::{
     array_class_instance::JavaArrayClassInstance,
     class_definition::JavaClassDefinition,
     class_instance::JavaClassInstance,
-    field::{JavaField, JavaReferenceField, JavaStaticReferenceField},
+    field::{JavaField, JavaHostField, JavaReferenceField, JavaStaticReferenceField},
     method::JavaMethod,
     value::JavaValueCodec,
     vtable::JavaVtableEntry,
@@ -498,7 +498,7 @@ pub(crate) mod tests {
     use alloc::{boxed::Box, string::String as RustString, sync::Arc, vec, vec::Vec};
     use core::{
         mem::{offset_of, size_of},
-        sync::atomic::{AtomicBool, Ordering},
+        sync::atomic::{AtomicBool, AtomicI64, Ordering},
     };
 
     use jvm::{Array, ClassDefinition, ClassInstance, ClassInstanceRef, JavaValue, Jvm, Method, Result as JvmResult, runtime::JavaLangString};
@@ -1476,6 +1476,121 @@ pub(crate) mod tests {
         while !done.load(Ordering::Relaxed) {
             system.tick()?;
         }
+
+        Ok(())
+    }
+
+    struct GuestTask;
+
+    static GUEST_TASK_SEEN: AtomicI64 = AtomicI64::new(-1);
+    static GUEST_TASK_OWN: AtomicI64 = AtomicI64::new(-1);
+
+    async fn guest_task_init(jvm: &Jvm, _context: &mut (), this: ClassInstanceRef<GuestTask>) -> JvmResult<()> {
+        jvm.invoke_special(&this, "java/util/TimerTask", "<init>", "()V", ()).await
+    }
+
+    // Records what scheduledExecutionTime() and the task's own field read from inside run() —
+    // the moment 학교가는길's c.run() found its field overwritten.
+    async fn guest_task_run(jvm: &Jvm, _context: &mut (), this: ClassInstanceRef<GuestTask>) -> JvmResult<()> {
+        let time: i64 = jvm
+            .invoke_virtual(&this, "java/util/TimerTask", "scheduledExecutionTime", "()J", ())
+            .await?;
+        let own: i32 = jvm.get_field(&this, "own", "I").await?;
+        GUEST_TASK_OWN.store(own.into(), Ordering::Relaxed);
+        GUEST_TASK_SEEN.store(time, Ordering::Relaxed);
+        Ok(())
+    }
+
+    // 학교가는길 (docs/report/0296 ⑴-c): the phone's TimerTask is six words, so a guest subclass's own
+    // field sits at word 6. rustjava's TimerTask carried lastScheduledExecutionTime J as words 6-7,
+    // and the Timer thread overwrote that field and one word past the instance on every tick.
+    // Dropping the `host_field` row in data/lgt_java_abi.toml turns every assertion here red.
+    #[test]
+    fn timer_task_keeps_the_phone_layout_and_scheduled_execution_time() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, core, implementation) = init_jvm(&system_clone).await?;
+            jvm.resolve_class("java/util/TimerTask").await.unwrap();
+            let timer_task = jvm.get_class("java/util/TimerTask").unwrap().definition;
+            let timer_task = timer_task.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap();
+            assert_eq!(timer_task.instance_field_word_count()?, 6);
+
+            let class = implementation
+                .define_class_rust(
+                    &jvm,
+                    JavaClassProto {
+                        name: "net/wie/test/GuestTask",
+                        parent_class: Some("java/util/TimerTask"),
+                        interfaces: vec![],
+                        methods: vec![
+                            JavaMethodProto::new("<init>", "()V", guest_task_init, MethodAccessFlags::PUBLIC),
+                            JavaMethodProto::new("run", "()V", guest_task_run, MethodAccessFlags::PUBLIC),
+                        ],
+                        fields: vec![JavaFieldProto::new("own", "I", FieldAccessFlags::PRIVATE)],
+                        access_flags: ClassAccessFlags::PUBLIC,
+                    },
+                    Box::new(()),
+                )
+                .await
+                .unwrap();
+            jvm.register_class(class, None).await.unwrap();
+            let mut task = jvm.new_class("net/wie/test/GuestTask", "()V", ()).await.unwrap();
+            let definition = jvm.get_class("net/wie/test/GuestTask").unwrap().definition;
+            let definition = definition.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap();
+            assert_eq!(definition.instance_field_word_count()?, 7);
+
+            // Words 0..=7: the whole instance plus the first word past it.
+            let ptr_fields = task.as_any().downcast_ref::<JavaClassInstance>().unwrap().ptr_fields()?;
+            let words = || {
+                (0..8)
+                    .map(|index| read_generic::<u32, _>(&core, ptr_fields + index * 4))
+                    .collect::<Result<Vec<_>>>()
+            };
+            jvm.put_field(&mut task, "own", "I", 0x1234_5678i32).await.unwrap();
+            let before = words()?;
+            assert_eq!(before[6], 0x1234_5678);
+
+            // The exact write the Timer thread makes each tick (value = the measured one).
+            jvm.put_field(&mut task, "lastScheduledExecutionTime", "J", 1790431442004i64)
+                .await
+                .unwrap();
+            assert_eq!(words()?, before, "host field wrote into or past the instance");
+            let time: i64 = jvm
+                .invoke_virtual(&task, "java/util/TimerTask", "scheduledExecutionTime", "()J", ())
+                .await
+                .unwrap();
+            assert_eq!(time, 1790431442004);
+
+            // A fresh instance has not run yet: 0, not a neighbour's value.
+            let fresh = jvm.new_class("net/wie/test/GuestTask", "()V", ()).await.unwrap();
+            let time: i64 = jvm
+                .invoke_virtual(&fresh, "java/util/TimerTask", "scheduledExecutionTime", "()J", ())
+                .await
+                .unwrap();
+            assert_eq!(time, 0);
+
+            // End to end through the real Timer thread: run() sees the time it was scheduled for.
+            let timer = jvm.new_class("java/util/Timer", "()V", ()).await.unwrap();
+            let _: () = jvm
+                .invoke_virtual(&timer, "java/util/Timer", "schedule", "(Ljava/util/TimerTask;J)V", (fresh.clone(), 0i64))
+                .await
+                .unwrap();
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        for _ in 0..100_000 {
+            if done.load(Ordering::Relaxed) && GUEST_TASK_SEEN.load(Ordering::Relaxed) != -1 {
+                break;
+            }
+            system.tick()?;
+        }
+        assert!(GUEST_TASK_SEEN.load(Ordering::Relaxed) > 0, "the Timer thread never ran the task");
+        assert_eq!(GUEST_TASK_OWN.load(Ordering::Relaxed), 0);
 
         Ok(())
     }

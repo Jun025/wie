@@ -26,7 +26,7 @@ use crate::runtime::{
 };
 
 use super::{
-    JavaClassInstance, JavaField, JavaMethod, JavaReferenceField, JavaStaticReferenceField, LgtJvmWord, find_generated_class,
+    JavaClassInstance, JavaField, JavaHostField, JavaMethod, JavaReferenceField, JavaStaticReferenceField, LgtJvmWord, find_generated_class,
     value::JavaValueCodec,
     vtable::{JavaVtable, JavaVtableEntry},
 };
@@ -62,6 +62,14 @@ impl JavaClassDefinition {
             access_flags,
         } = proto;
         let class_abi = JAVA_ABI.class(class_name);
+        // Host fields get no instance words and no guest-visible field entry; `field()` answers them.
+        let field_protos = field_protos
+            .into_iter()
+            .filter(|field| {
+                field.access_flags.contains(FieldAccessFlags::STATIC)
+                    || !class_abi.is_some_and(|class| class.is_host_field(&field.name, &field.descriptor))
+            })
+            .collect::<Vec<_>>();
         let fixed_fields = class_abi.map(|class| class.field.as_slice()).unwrap_or_default();
         let additional_fixed_fields = fixed_fields
             .iter()
@@ -854,6 +862,19 @@ impl ClassDefinition for JavaClassDefinition {
                 field.name() == name && field.descriptor() == descriptor && field.access_flags().contains(FieldAccessFlags::STATIC) == is_static
             })
             .map(|field| Box::new(field) as Box<_>)
+            .or_else(|| {
+                (!is_static
+                    && JAVA_ABI.is_host_field_name(name)
+                    && JAVA_ABI
+                        .class(&ClassDefinition::name(self))
+                        .is_some_and(|class| class.is_host_field(name, descriptor)))
+                .then(|| {
+                    Box::new(JavaHostField {
+                        name: name.into(),
+                        descriptor: descriptor.into(),
+                    }) as Box<_>
+                })
+            })
     }
 
     fn fields(&self) -> Vec<Box<dyn Field>> {
