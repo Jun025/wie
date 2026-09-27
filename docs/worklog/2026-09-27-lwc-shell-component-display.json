@@ -1,0 +1,8 @@
+{
+  "date": "2026-09-27",
+  "task": "wie-2026-09-27-lwc-component-repaint-stub-adopt-p0",
+  "title": "lwc ShellComponent 를 Display 에 올린다 · Component.repaint 가 그 카드로 — 학교가는길 첫 화면",
+  "summary": "ShellComponent.show 가 net.wie.ShellCard 를 Display 에 올리고 Component.repaint/serviceRepaints 가 그 카드 경로로 간다. 학교가는길 main FAIL(paints 1) → PASS(paints ~150) 3/3. lwc 참조 228 타이틀 교대 스윕 퇴행 0.",
+  "adoptedProposals": ["2026-09-27-lgt-timertask-host-field#p0"],
+  "proposals": []
+}

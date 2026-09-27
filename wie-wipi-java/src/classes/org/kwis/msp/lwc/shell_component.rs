@@ -5,7 +5,11 @@ use jvm_class_proto::JavaMethodProto;
 use jvm_types::{ClassAccessFlags, MethodAccessFlags};
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
-use crate::classes::org::kwis::msp::lwc::Component;
+use crate::classes::{
+    net::wie::ShellCard,
+    org::kwis::msp::lcdui::{Card, Display},
+    org::kwis::msp::lwc::Component,
+};
 
 // class org.kwis.msp.lwc.ShellComponent
 pub struct ShellComponent;
@@ -70,15 +74,54 @@ impl ShellComponent {
         Ok(())
     }
 
-    async fn show(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
-        tracing::warn!("stub org.kwis.msp.lwc.ShellComponent::show({this:?})");
+    // show()/hide() put the shell on and off the default Display through a net.wie.ShellCard, which
+    // is what gives it a screen: without this a ShellComponent game's paint is never called.
+    async fn show(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lwc.ShellComponent::show({this:?})");
+
+        let component: ClassInstanceRef<Component> = this.clone().instance.into();
+        if ShellCard::find(jvm, &component).await?.is_some() {
+            return Ok(());
+        }
+
+        let card: ClassInstanceRef<Card> = jvm
+            .new_class("net/wie/ShellCard", "(Lorg/kwis/msp/lwc/ShellComponent;)V", (this,))
+            .await?
+            .into();
+        let display = Self::default_display(jvm).await?;
+        jvm.invoke_virtual(
+            &display,
+            "org/kwis/msp/lcdui/Display",
+            "pushCard",
+            "(Lorg/kwis/msp/lcdui/Card;)V",
+            (card,),
+        )
+        .await
+    }
+
+    async fn hide(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lwc.ShellComponent::hide({this:?})");
+
+        let component: ClassInstanceRef<Component> = this.instance.into();
+        let Some(card) = ShellCard::find(jvm, &component).await? else {
+            return Ok(());
+        };
+        let display = Self::default_display(jvm).await?;
+        let _: bool = jvm
+            .invoke_virtual(
+                &display,
+                "org/kwis/msp/lcdui/Display",
+                "removeCard",
+                "(Lorg/kwis/msp/lcdui/Card;)Z",
+                (card,),
+            )
+            .await?;
 
         Ok(())
     }
 
-    async fn hide(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
-        tracing::warn!("stub org.kwis.msp.lwc.ShellComponent::hide({this:?})");
-
-        Ok(())
+    async fn default_display(jvm: &Jvm) -> JvmResult<ClassInstanceRef<Display>> {
+        jvm.invoke_static("org/kwis/msp/lcdui/Display", "getDefaultDisplay", "()Lorg/kwis/msp/lcdui/Display;", [])
+            .await
     }
 }
