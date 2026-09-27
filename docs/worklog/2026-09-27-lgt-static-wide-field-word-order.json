@@ -1,0 +1,23 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-27",
+  "task": "wie-2026-09-26-lgt-static-wide-field-word-order-adopt-p0",
+  "title": "LGT 정적 long/double 필드 — 게스트 저장 순서(high-first)를 실측하고 호스트를 맞췄다",
+  "summary": "놈3·체스마스터(Thumb)·배틀몬스터(ARM)가 정적 long 을 상위 워드 먼저 저장한다. 호스트 get/put_static_field 를 같은 순서로 바꿨다. 호스트가 게스트 정적 저장소에 닿는 호출부는 0 이라 순서만 맞추는 일이다.",
+  "changes": [
+    "wie-lgt/src/runtime/java/jvm_support/class_definition.rs — get_static_field/put_static_field 가 word n = 상위, n+1 = 하위",
+    "wie-lgt/src/runtime/java/jvm_support.rs — test_native_jvm_runtime 의 정적 long 단언을 게스트 근거 순서로",
+    "docs/report/0313"
+  ],
+  "verification": [
+    "디스어셈블: 놈3 0x1cc7a str r1 / 0x1cc7c str r0 (bl 반환 r1=상위) — docs/report/0313 §1",
+    "순서 되돌림 → FAILED(left 0x9abcdef0 · right 0x12345678) · 복원 → ok",
+    "cargo test --all 496 passed · 0 failed",
+    "체스마스터·놈3·배틀몬스터 base/fix 짝 — 회귀 0 (docs/report/0313 §4)"
+  ],
+  "limits": [
+    "KTF 쪽 정적 필드는 범위 밖"
+  ],
+  "adoptedProposals": ["2026-09-26-lgt-wide-field-host-word-order#p0"],
+  "proposals": []
+}

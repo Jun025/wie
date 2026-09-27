@@ -1218,14 +1218,16 @@ pub(crate) mod tests {
             assert_eq!(class_object, java_class_raw);
             assert_eq!(static_fields, java_class_instance.ptr_fields()? + 0x14);
             assert_eq!(read_generic::<u32, _>(&core, static_fields)?, 0x1234_5678);
-            assert_eq!(read_generic::<u32, _>(&core, static_fields + 4)?, 0x9abc_def0);
-            assert_eq!(read_generic::<u32, _>(&core, static_fields + 8)?, 0x1234_5678);
+            // 놈3 0x1cc7a/0x1cc7c: AOT code stores a static `long`'s high word in the named slot
+            // and the low word in the next one — the same order as instance fields.
+            assert_eq!(read_generic::<u32, _>(&core, static_fields + 4)?, 0x1234_5678);
+            assert_eq!(read_generic::<u32, _>(&core, static_fields + 8)?, 0x9abc_def0);
             assert_eq!(read_generic::<u32, _>(&core, static_fields + 12)?, reference_raw);
 
             static_definition.put_static_field(&*word_field, JavaValue::Int(0x7654_3210)).unwrap();
             assert_eq!(read_generic::<u32, _>(&core, static_fields)?, 0x7654_3210);
-            write_generic(&mut core, static_fields + 4, 0x89ab_cdefu32)?;
-            write_generic(&mut core, static_fields + 8, 0x0123_4567u32)?;
+            write_generic(&mut core, static_fields + 4, 0x0123_4567u32)?;
+            write_generic(&mut core, static_fields + 8, 0x89ab_cdefu32)?;
             assert_eq!(
                 i64::from(static_definition.get_static_field(&*wide_field).unwrap()),
                 0x0123_4567_89ab_cdef
