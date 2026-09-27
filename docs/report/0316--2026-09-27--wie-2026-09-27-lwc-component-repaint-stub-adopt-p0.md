@@ -46,6 +46,5 @@
 - 셸의 `<init>(IIII)` 경계는 여전히 버린다(ShellCard 는 전체 화면 Card). 학교가는길은 전체 화면이라 영향 없음.
 - 첫 화면은 안내문(색 2). 그 다음 화면까지 가는지는 이 회차가 재지 않았다.
 
-게임 이름 유입(`scripts/corpus-name-inflow.mjs --corpus <game_lab>`): BOUNDED 15회/11쌍 · SUFFIX-ATTACHED 3회/1쌍(학교가는길 + 조사 «은·이» — 진짜 언급). 전부 이 회차가 쓴 이름이다 — 대상 `학교가는길`(코드 주석 2곳 포함: `shell_card.rs` 시험 주석 · `component.rs` 의 기존 주석 줄) · 티켓이 지정한 회귀 5종 · 스윕 재실행 2건(`북천항해기2`·`일지매_영웅전기`, 이 문서만).
+게임 이름 유입(`scripts/corpus-name-inflow.mjs --corpus <game_lab>`): BOUNDED 19회/11쌍(이 줄의 이름 포함) · SUFFIX-ATTACHED 3회/1쌍(학교가는길 + 조사 «은·이» — 진짜 언급). 전부 이 회차가 쓴 이름이다 — 대상 `학교가는길`(코드 주석 2곳 포함: `shell_card.rs` 시험 주석 · `component.rs` 의 기존 주석 줄) · 티켓이 지정한 회귀 5종 · 스윕 재실행 2건(`북천항해기2`·`일지매_영웅전기`, 이 문서만).
 
-<!-- corpus-name-inflow v1 subjects=8 tree=471bf6e95508a619 B=19/11 P=0/0 S=3/1 -->
