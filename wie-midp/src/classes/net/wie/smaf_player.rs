@@ -492,6 +492,63 @@ mod test {
         })
     }
 
+    // `createPlayer(String)`: the tone device gives a silent player with the real state machine
+    // (WormGame's `--inject` died on this call); null and unknown locators fail as MIDP specifies.
+    #[test]
+    fn test_tone_device_locator_player() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            let create = async |locator: Option<&str>| -> JvmResult<ClassInstanceRef<Player>> {
+                let locator: ClassInstanceRef<String> = match locator {
+                    Some(x) => JavaLangString::from_rust_string(&jvm, x).await?.into(),
+                    None => None.into(),
+                };
+                jvm.invoke_static(
+                    "javax/microedition/media/Manager",
+                    "createPlayer",
+                    "(Ljava/lang/String;)Ljavax/microedition/media/Player;",
+                    (locator,),
+                )
+                .await
+            };
+            let state = async |player: &ClassInstanceRef<Player>| -> JvmResult<i32> {
+                jvm.invoke_virtual(player, "javax/microedition/media/Player", "getState", "()I", ()).await
+            };
+            let call = async |player: &ClassInstanceRef<Player>, name: &str| -> JvmResult<()> {
+                jvm.invoke_virtual(player, "javax/microedition/media/Player", name, "()V", ()).await
+            };
+
+            // Every lifecycle call succeeds; with no media the player never reads as STARTED
+            // (`get_state` models only STARTED/PREFETCHED).
+            let player = create(Some("device://tone")).await?;
+            for name in ["realize", "prefetch", "start", "stop"] {
+                call(&player, name).await?;
+                assert_eq!(state(&player).await?, 300, "{name}"); // PREFETCHED
+            }
+            let control_type = JavaLangString::from_rust_string(&jvm, "ToneControl").await?;
+            let control: ClassInstanceRef<Control> = jvm
+                .invoke_virtual(
+                    &player,
+                    "javax/microedition/media/Player",
+                    "getControl",
+                    "(Ljava/lang/String;)Ljavax/microedition/media/Control;",
+                    (control_type,),
+                )
+                .await?;
+            assert!(control.is_null());
+            call(&player, "close").await?;
+
+            let JavaError::JavaException(exception) = create(None).await.unwrap_err() else {
+                panic!()
+            };
+            assert!(jvm.is_instance(&*exception, "java/lang/IllegalArgumentException"));
+            let JavaError::JavaException(exception) = create(Some("http://example.com/a.mid")).await.unwrap_err() else {
+                panic!()
+            };
+            assert!(jvm.is_instance(&*exception, "javax/microedition/media/MediaException"));
+            Ok(())
+        })
+    }
+
     // Counts `playerUpdate` calls and keeps the last event.
     struct TestListener;
 
