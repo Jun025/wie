@@ -26,6 +26,10 @@ impl Component {
                 JavaMethodProto::new("setFocus", "()V", Self::set_focus, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getHeight", "()I", Self::get_height, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getWidth", "()I", Self::get_width, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getX", "()I", Self::get_x, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getY", "()I", Self::get_y, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("layout", "()V", Self::layout, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("validate", "()V", Self::layout, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("repaint", "()V", Self::repaint, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("repaint", "(IIII)V", Self::repaint_region, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("serviceRepaints", "()V", Self::service_repaints, MethodAccessFlags::PUBLIC),
@@ -91,6 +95,28 @@ impl Component {
         Ok(0)
     }
 
+    // The position half of the same answer: nothing is laid out, so every component sits at the
+    // origin. ae749cc5a777 calls ShellComponent.getX() at boot.
+    async fn get_x(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::getX({this:?})");
+
+        Ok(0)
+    }
+
+    async fn get_y(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::getY({this:?})");
+
+        Ok(0)
+    }
+
+    // No-op for the same reason: this layer never lays children out. a10a1f02b41b calls layout() on an
+    // AnnunciatorComponent at boot and validate() — the same request, also bound here — on its first key.
+    async fn layout(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::layout/validate({this:?})");
+
+        Ok(())
+    }
+
     // A shown ShellComponent sits on a net.wie.ShellCard, so its repaint is that card's repaint —
     // the same Card → CardCanvas → request_redraw path Card games take. A component that is not a
     // shown shell has nowhere to be drawn (children are never laid out here), so it stays a no-op.
@@ -148,5 +174,44 @@ impl Component {
         tracing::warn!("stub org.kwis.msp.lwc.Component::hasFocus({this:?})");
 
         Ok(false)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::boxed::Box;
+
+    use jvm::runtime::JavaLangString;
+    use test_utils::run_jvm_test;
+    use wie_util::Result;
+
+    use crate::get_protos;
+
+    /// Three census walls, each a missing lwc method a KTF title called at boot or on its first key:
+    /// `LabelComponent.<init>(String)` (33f3e7669599 · ca7fa8ade8ad), `ShellComponent.getX()` (ae749cc5a777)
+    /// and `AnnunciatorComponent.layout()`/`validate()` (a10a1f02b41b). Each is called the way the guest does — on
+    /// the subclass — so a method that only resolves on some other class still fails here.
+    #[test]
+    fn lwc_label_with_text_get_x_y_and_layout_resolve_on_the_classes_games_call() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            let label = JavaLangString::from_rust_string(&jvm, "label").await?;
+            let _ = jvm
+                .new_class("org/kwis/msp/lwc/LabelComponent", "(Ljava/lang/String;)V", (label,))
+                .await?;
+
+            let shell = jvm.new_class("org/kwis/msp/lwc/ShellComponent", "()V", ()).await?;
+            let x: i32 = jvm.invoke_virtual(&shell, "org/kwis/msp/lwc/ShellComponent", "getX", "()I", ()).await?;
+            let y: i32 = jvm.invoke_virtual(&shell, "org/kwis/msp/lwc/ShellComponent", "getY", "()I", ()).await?;
+            assert_eq!((x, y), (0, 0));
+
+            let annunciator = jvm.new_class("org/kwis/msp/lwc/AnnunciatorComponent", "(Z)V", (true,)).await?;
+            for method in ["layout", "validate"] {
+                let _: () = jvm
+                    .invoke_virtual(&annunciator, "org/kwis/msp/lwc/AnnunciatorComponent", method, "()V", ())
+                    .await?;
+            }
+
+            Ok(())
+        })
     }
 }
