@@ -31,3 +31,6 @@
 - 코퍼스 LGT binary.mod 100 중 import 0x5b 보유: 슈퍼액션히어로 · 월드장기체스(+ `_dup` 사본) · 메이플스토리2007 · 학교가는길. 나머지 셋 `--timeout 20` 2회씩 base ↔ 이 브랜치 판정·문면 동일(메이플스토리2007 PASS · 월드장기체스 FAIL error · 학교가는길 FAIL — 뒤 둘은 기존 벽, 0x5b 에 닿지 않는다).
 - 러너(LGT): `helloworld_lgt` PASS · `keydraw_lgt --inject --expect-last-frame` 기본 max-ticks 에서 base·이 브랜치 모두 `UNMEASURED max-ticks`(load1 70~113) → `--max-ticks 1000000000` 에서 둘 다 **PASS · paints 55 · rc0**.
 - 네 게이트 + beta: fmt OK · clippy/wasm clippy/beta clippy rc0 · `RUST_MIN_STACK=4194304 cargo test --all` 48 스위트 **496 passed 0 failed**.
+
+게임 이름 유입(`scripts/corpus-name-inflow.mjs --corpus <game_lab>`): BOUNDED 16 · SUFFIX-ATTACHED 2(아래 표식). `interface.rs` «파일 전체»가 대상이라 기존 주석의 타이틀이 함께 세어진다. 이 회차가 새로 쓴 이름은 `슈퍼액션히어로`(대상)와 회귀 대조 3타이틀(`월드장기체스`·`메이플스토리2007`·`학교가는길`, 이 문서만)이다.
+
