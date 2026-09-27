@@ -15,7 +15,12 @@ impl LED {
             name: "org/kwis/msp/handset/LED",
             parent_class: Some("java/lang/Object"),
             interfaces: vec![],
-            methods: vec![JavaMethodProto::new("set", "(I)V", Self::set, MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC)],
+            methods: vec![JavaMethodProto::new(
+                "set",
+                "(I)V",
+                Self::set,
+                MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+            )],
             fields: vec![],
             access_flags: ClassAccessFlags::PUBLIC,
         }

@@ -62,7 +62,14 @@ impl ByteToCharEucKr {
         Ok(written)
     }
 
-    async fn flush(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, _: ClassInstanceRef<Array<JavaChar>>, _: i32, _: i32) -> JvmResult<i32> {
+    async fn flush(
+        _: &Jvm,
+        _: &mut WieJvmContext,
+        this: ClassInstanceRef<Self>,
+        _: ClassInstanceRef<Array<JavaChar>>,
+        _: i32,
+        _: i32,
+    ) -> JvmResult<i32> {
         tracing::debug!("com.xce.io.ByteToCharEUC_KR::flush({this:?})");
 
         Ok(0)
@@ -83,29 +90,33 @@ mod tests {
     /// the length arguments (not end indices) must be honoured on both sides.
     #[test]
     fn euc_kr_convert_decodes_with_length_arguments() {
-        let result = run_jvm_test(
-            Box::new([wie_midp::get_protos().into(), get_protos().into()]),
-            |jvm| async move {
-                let converter = jvm.new_class("com/xce/io/ByteToCharEUC_KR", "()V", ()).await?;
-                let mut input = jvm.instantiate_array("B", 5).await?;
-                jvm.store_array(&mut input, 0, [0x7f_i8, 0xb0_u8 as i8, 0xa1_u8 as i8, 0x41, 0x7f]).await?;
-                let output = jvm.instantiate_array("C", 4).await?;
+        let result = run_jvm_test(Box::new([wie_midp::get_protos().into(), get_protos().into()]), |jvm| async move {
+            let converter = jvm.new_class("com/xce/io/ByteToCharEUC_KR", "()V", ()).await?;
+            let mut input = jvm.instantiate_array("B", 5).await?;
+            jvm.store_array(&mut input, 0, [0x7f_i8, 0xb0_u8 as i8, 0xa1_u8 as i8, 0x41, 0x7f])
+                .await?;
+            let output = jvm.instantiate_array("C", 4).await?;
 
-                let written: i32 = jvm
-                    .invoke_virtual(&converter, "com/xce/io/ByteToCharConverter", "convert", "([BII[CII)I", (input, 1, 3, output.clone(), 1, 3))
-                    .await?;
-                assert_eq!(written, 2);
-                let chars: Vec<JavaChar> = jvm.load_array(&output, 0, 4).await?;
-                assert_eq!(chars, [0, 0xac00, 0x41, 0]);
+            let written: i32 = jvm
+                .invoke_virtual(
+                    &converter,
+                    "com/xce/io/ByteToCharConverter",
+                    "convert",
+                    "([BII[CII)I",
+                    (input, 1, 3, output.clone(), 1, 3),
+                )
+                .await?;
+            assert_eq!(written, 2);
+            let chars: Vec<JavaChar> = jvm.load_array(&output, 0, 4).await?;
+            assert_eq!(chars, [0, 0xac00, 0x41, 0]);
 
-                let flushed: i32 = jvm
-                    .invoke_virtual(&converter, "com/xce/io/ByteToCharConverter", "flush", "([CII)I", (output, 0, 4))
-                    .await?;
-                assert_eq!(flushed, 0);
+            let flushed: i32 = jvm
+                .invoke_virtual(&converter, "com/xce/io/ByteToCharConverter", "flush", "([CII)I", (output, 0, 4))
+                .await?;
+            assert_eq!(flushed, 0);
 
-                JvmResult::Ok(())
-            },
-        );
+            JvmResult::Ok(())
+        });
         assert!(result.is_ok(), "{result:?}");
     }
 }

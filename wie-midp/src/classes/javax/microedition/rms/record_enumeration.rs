@@ -53,7 +53,12 @@ impl RecordEnumerationImpl {
             parent_class: Some("java/lang/Object"),
             interfaces: vec!["javax/microedition/rms/RecordEnumeration"],
             methods: vec![
-                JavaMethodProto::new("<init>", "(Ljavax/microedition/rms/RecordStore;[I)V", Self::init, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new(
+                    "<init>",
+                    "(Ljavax/microedition/rms/RecordStore;[I)V",
+                    Self::init,
+                    MethodAccessFlags::PUBLIC,
+                ),
                 JavaMethodProto::new("numRecords", "()I", Self::num_records, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("nextRecord", "()[B", Self::next_record, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("nextRecordId", "()I", Self::next_record_id, MethodAccessFlags::PUBLIC),
@@ -119,7 +124,8 @@ impl RecordEnumerationImpl {
 
         let ids: ClassInstanceRef<Array<i32>> = jvm.get_field(&this, "ids", "[I").await?;
         let id: i32 = jvm.load_array(&ids, at as _, 1).await?[0];
-        jvm.put_field(&mut this, "index", "I", if forward { index + 1 } else { index - 1 }).await?;
+        jvm.put_field(&mut this, "index", "I", if forward { index + 1 } else { index - 1 })
+            .await?;
 
         Ok(id)
     }
@@ -127,7 +133,8 @@ impl RecordEnumerationImpl {
     async fn record(jvm: &Jvm, this: &ClassInstanceRef<Self>, id: i32) -> JvmResult<ClassInstanceRef<Array<i8>>> {
         let store: ClassInstanceRef<RecordStore> = jvm.get_field(this, "store", "Ljavax/microedition/rms/RecordStore;").await?;
 
-        jvm.invoke_virtual(&store, "javax/microedition/rms/RecordStore", "getRecord", "(I)[B", (id,)).await
+        jvm.invoke_virtual(&store, "javax/microedition/rms/RecordStore", "getRecord", "(I)[B", (id,))
+            .await
     }
 
     async fn next_record_id(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
