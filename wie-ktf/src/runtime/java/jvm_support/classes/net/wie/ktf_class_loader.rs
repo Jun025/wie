@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, string::ToString, vec};
+use alloc::{boxed::Box, collections::BTreeSet, string::ToString, sync::Arc, vec};
 
 use bytemuck::cast_slice;
 use jvm::{
@@ -20,6 +20,8 @@ use crate::runtime::{init::load_native, java::jvm_support::class_definition::Jav
 pub struct ClassLoaderContext {
     pub core: ArmCore,
     pub system: System,
+    /// `.class` entries of the jar (`a/B`), which client.bin overrides — see `load_class`.
+    pub jar_classes: Arc<BTreeSet<alloc::string::String>>,
 }
 
 type ClassLoaderProto = JavaClassProto<ClassLoaderContext>;
@@ -41,6 +43,12 @@ impl KtfClassLoader {
                     MethodAccessFlags::PUBLIC,
                 ),
                 JavaMethodProto::new(
+                    "loadClass",
+                    "(Ljava/lang/String;)Ljava/lang/Class;",
+                    Self::load_class,
+                    MethodAccessFlags::PUBLIC,
+                ),
+                JavaMethodProto::new(
                     "findClass",
                     "(Ljava/lang/String;)Ljava/lang/Class;",
                     Self::find_class,
@@ -53,6 +61,12 @@ impl KtfClassLoader {
                 JavaFieldProto::new(
                     "instance",
                     "Lnet/wie/KtfClassLoader;",
+                    FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC,
+                ),
+                // Thrown when the guest heap is full — see `KtfJvmSupport::instantiation_error`.
+                JavaFieldProto::new(
+                    "outOfMemoryError",
+                    "Ljava/lang/OutOfMemoryError;",
                     FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC,
                 ),
             ],
@@ -80,6 +94,14 @@ impl KtfClassLoader {
 
         jvm.put_static_field("net/wie/KtfClassLoader", "instance", "Lnet/wie/KtfClassLoader;", this.clone())
             .await?;
+        let out_of_memory_error = jvm.new_class("java/lang/OutOfMemoryError", "()V", ()).await?;
+        jvm.put_static_field(
+            "net/wie/KtfClassLoader",
+            "outOfMemoryError",
+            "Ljava/lang/OutOfMemoryError;",
+            out_of_memory_error,
+        )
+        .await?;
 
         // load client.bin
         let name_rust = JavaLangString::to_rust_string(jvm, &binary_name).await?;
@@ -116,6 +138,51 @@ impl KtfClassLoader {
         jvm.put_field(&mut this, "nativeFunctions", "I", native_functions as i32).await?;
 
         Ok(())
+    }
+
+    // Parent-first, except for a class the jar ships as bytecode: client.bin is the AOT build of the
+    // same source, and the one the handset runs. Three KTF titles carry their `Clet.class` beside
+    // client.bin; loading that bytecode instead left a non-native main class (a host panic at boot)
+    // whose `native` methods had nothing to bind to. Titles without `.class` entries are unaffected.
+    async fn load_class(
+        jvm: &Jvm,
+        context: &mut ClassLoaderContext,
+        this: ClassInstanceRef<Self>,
+        name: ClassInstanceRef<String>,
+    ) -> JvmResult<ClassInstanceRef<Class>> {
+        tracing::debug!("net.wie.KtfClassLoader::loadClass({this:?}, {name:?})");
+
+        if !context.jar_classes.is_empty()
+            && context
+                .jar_classes
+                .contains(&JavaLangString::to_rust_string(jvm, &name).await?.replace('.', "/"))
+        {
+            let loaded: ClassInstanceRef<Class> = jvm
+                .invoke_virtual(
+                    &this,
+                    "java/lang/ClassLoader",
+                    "findLoadedClass",
+                    "(Ljava/lang/String;)Ljava/lang/Class;",
+                    (name.clone(),),
+                )
+                .await?;
+            if !loaded.is_null() {
+                return Ok(loaded);
+            }
+            let native = Self::find_class(jvm, context, this.clone(), name.clone()).await?;
+            if !native.is_null() {
+                return Ok(native);
+            }
+        }
+
+        jvm.invoke_special(
+            &this,
+            "java/lang/ClassLoader",
+            "loadClass",
+            "(Ljava/lang/String;)Ljava/lang/Class;",
+            (name,),
+        )
+        .await
     }
 
     async fn find_class(

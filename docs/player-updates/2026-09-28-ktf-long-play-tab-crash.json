@@ -1,0 +1,11 @@
+{
+  "date": "2026-09-28",
+  "kind": "fix",
+  "titles": [
+    "6c96c5050b2bd85a29d470ece66296ad32ebfac42148ccd4bfc43b35f221ade1",
+    "c94d6477792690f014853bb4bec0a9f8b19bb238a070095b5766488ee15fe780",
+    "e9fac881e602dad311ee9422a127d31aa07e4dc6ca3e1a1e54e90b42276282d0"
+  ],
+  "summary_ko": "오래 하다 보면 화면 전체가 꺼지던 문제를 고쳤어요. 일부 게임은 아직 몇 분 뒤 멈추지만, 이제 안내가 나와요.",
+  "pr": "https://github.com/Jun025/wie/pull/364"
+}

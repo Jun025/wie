@@ -10,16 +10,19 @@ mod name;
 mod value;
 mod vtable;
 
-use alloc::boxed::Box;
+use alloc::{borrow::ToOwned, boxed::Box, collections::BTreeSet, format, sync::Arc};
 use core::mem::{offset_of, size_of};
 use jvm_implementation::KtfJvmImplementation;
 
 use bytemuck::{Pod, Zeroable};
 use futures::TryFutureExt;
 
-use jvm::{ClassDefinition, ClassInstance, ClassInstanceRef, Field, Jvm, Result as JvmResult, runtime::JavaLangString};
+use jvm::{ClassDefinition, ClassInstance, ClassInstanceRef, Field, JavaError, Jvm, Result as JvmResult, runtime::JavaLangString};
 use jvm_types::FieldAccessFlags;
-use rustjava_runtime::classes::java::util::{Enumeration, jar::JarEntry};
+use rustjava_runtime::classes::java::{
+    lang::Throwable,
+    util::{Enumeration, jar::JarEntry},
+};
 
 use wie_backend::System;
 use wie_core_arm::{Allocator, ArmCore};
@@ -107,13 +110,17 @@ impl KtfJvmSupport {
             .await
             .unwrap();
 
-        let binary_name = loop {
+        // Also collect the jar's `.class` entries: 3 KTF titles ship their source `Clet.class`
+        // next to the AOT client.bin that holds the same classes, and the loader must pick client.bin.
+        let mut binary_name = None;
+        let mut jar_classes = BTreeSet::new();
+        loop {
             let has_more_elements: bool = jvm
                 .invoke_virtual(&entries, "java/util/Enumeration", "hasMoreElements", "()Z", [])
                 .await
                 .unwrap();
             if !has_more_elements {
-                return Err(WieError::FatalError("client.bin not found".into()));
+                break;
             }
 
             let entry: ClassInstanceRef<JarEntry> = jvm
@@ -126,10 +133,13 @@ impl KtfJvmSupport {
                 .unwrap();
             let name_rust = JavaLangString::to_rust_string(&jvm, &name).await.unwrap();
 
-            if name_rust.starts_with("client.bin") {
-                break name;
+            if let Some(class_name) = name_rust.strip_suffix(".class") {
+                jar_classes.insert(class_name.to_owned());
+            } else if binary_name.is_none() && name_rust.starts_with("client.bin") {
+                binary_name = Some(name);
             }
-        };
+        }
+        let binary_name = binary_name.ok_or_else(|| WieError::FatalError("client.bin not found".into()))?;
 
         let class_loader_class = JavaClassDefinition::new(
             core,
@@ -138,6 +148,7 @@ impl KtfJvmSupport {
             Box::new(ClassLoaderContext {
                 core: core.clone(),
                 system: system.clone(),
+                jar_classes: Arc::new(jar_classes),
             }) as Box<_>,
             jvm_implementation.java_functions(),
         )
@@ -214,6 +225,40 @@ impl KtfJvmSupport {
 
         jvm.invoke_virtual(&display, "javax/microedition/lcdui/Display", "disablePaint", "()V", ())
             .await
+    }
+
+    /// The error for a guest instance that could not be allocated.
+    ///
+    /// Building an exception allocates too, so on a full guest heap `jvm.exception` failed the same
+    /// way and recursed — instance, exception, `fillInStackTrace`'s string, instance — until the
+    /// *host* stack overflowed and took the whole tab down (3 KTF titles in the 2026-09-27 census,
+    /// after minutes of play). A full heap throws the `OutOfMemoryError` allocated up front
+    /// instead, the way a JVM keeps one in reserve; it stays a Java exception the guest may catch.
+    pub(crate) async fn instantiation_error(jvm: &Jvm, error: WieError, kind: &str) -> JavaError {
+        tracing::error!("Failed to instantiate {kind}: {error}");
+        if matches!(error, WieError::AllocationFailure)
+            && let Ok(reserved) = jvm
+                .get_static_field::<ClassInstanceRef<Throwable>>("net/wie/KtfClassLoader", "outOfMemoryError", "Ljava/lang/OutOfMemoryError;")
+                .await
+            && !reserved.is_null()
+        {
+            return JavaError::JavaException(reserved.into());
+        }
+
+        Self::wie_error(jvm, &format!("Failed to instantiate {kind}: {error}")).await
+    }
+
+    /// `jvm.exception("net/wie/WieError", message)` without its `unwrap`s: when the exception
+    /// itself cannot be allocated, the allocation's own error is returned instead of a host panic.
+    pub(crate) async fn wie_error(jvm: &Jvm, message: &str) -> JavaError {
+        let exception = async {
+            let message = JavaLangString::from_rust_string(jvm, message).await?;
+            jvm.new_class("net/wie/WieError", "(Ljava/lang/String;)V", (message,)).await
+        };
+        match exception.await {
+            Ok(x) => JavaError::JavaException(x),
+            Err(x) => x,
+        }
     }
 
     pub fn class_definition_raw(definition: &dyn ClassDefinition) -> Result<u32> {
@@ -369,6 +414,7 @@ mod test {
                 Box::new(ClassLoaderContext {
                     core: core.clone(),
                     system: system_clone.clone(),
+                    jar_classes: Default::default(),
                 }),
                 java_functions.clone(),
             )
@@ -530,6 +576,155 @@ mod test {
             jvm.ensure_initialized(&jvm.resolve_class("test/Before").await.unwrap()).await.unwrap();
             assert_eq!(initialization_count.load(Ordering::Relaxed), 1);
             jvm.pop_frame();
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+        Ok(())
+    }
+
+    // An allocation the guest heap cannot hold throws the reserved OutOfMemoryError, allocating nothing:
+    // building a fresh exception there needs the heap too, and recursed until the host stack overflowed.
+    #[test]
+    fn test_allocation_failure_throws_reserved_out_of_memory_error() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let mut system_clone = system.clone();
+        system.spawn(async move || {
+            let (jvm, core) = init_jvm(&mut system_clone).await?;
+            let loader_class = JavaClassDefinition::new(
+                &mut core.clone(),
+                &jvm,
+                KtfClassLoader::as_proto(),
+                Box::new(ClassLoaderContext {
+                    core: core.clone(),
+                    system: system_clone.clone(),
+                    jar_classes: Default::default(),
+                }),
+                JavaSvcFunctions::default(),
+            )
+            .await?;
+            jvm.register_class(Box::new(loader_class), None).await.unwrap();
+            let reserved = jvm.new_class("java/lang/OutOfMemoryError", "()V", ()).await.unwrap();
+            jvm.put_static_field(
+                "net/wie/KtfClassLoader",
+                "outOfMemoryError",
+                "Ljava/lang/OutOfMemoryError;",
+                reserved.clone(),
+            )
+            .await
+            .unwrap();
+
+            // 1 GiB of ints: more than the whole guest heap.
+            let Err(jvm::JavaError::JavaException(thrown)) = jvm.instantiate_array("I", 0x1000_0000).await else {
+                panic!("an array larger than the heap must not allocate");
+            };
+            assert_eq!(thrown.identity(), reserved.identity());
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+        Ok(())
+    }
+
+    // A class the jar also ships as bytecode comes from client.bin; every other class stays parent-first.
+    #[test]
+    fn test_load_class_prefers_client_bin_over_jar_bytecode() -> Result<()> {
+        async fn get_class(core: &mut ArmCore, natives: &mut Arc<Vec<(&'static str, u32)>>, ptr_name: u32) -> Result<u32> {
+            let name = alloc::string::String::from_utf8(wie_util::read_null_terminated_string_bytes(core, ptr_name)?).unwrap();
+            Ok(natives.iter().find(|(x, _)| *x == name).map_or(0, |(_, ptr)| *ptr))
+        }
+
+        // Both names resolve through the parent too (bootstrap protos, not loaded by init).
+        const SHADOWED: &str = "org/kwis/msf/io/Network";
+        const PLAIN: &str = "org/kwis/msf/io/Message";
+
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let mut system_clone = system.clone();
+        system.spawn(async move || {
+            let (jvm, mut core) = init_jvm(&mut system_clone).await?;
+            let java_functions = JavaSvcFunctions::default();
+            core.register_svc_handler(5, handle_java_svc, &java_functions)?;
+            let loader_class = JavaClassDefinition::new(
+                &mut core.clone(),
+                &jvm,
+                KtfClassLoader::as_proto(),
+                Box::new(ClassLoaderContext {
+                    core: core.clone(),
+                    system: system_clone.clone(),
+                    jar_classes: Arc::new([SHADOWED.into()].into()),
+                }),
+                java_functions.clone(),
+            )
+            .await?;
+            for method in loader_class.methods()? {
+                let mut raw: RawJavaMethod = read_generic(&core, method.ptr_raw)?;
+                raw.fn_body = core.make_svc_stub(5, method.ptr_raw)?;
+                write_generic(&mut core, method.ptr_raw, raw)?;
+            }
+            jvm.register_class(Box::new(loader_class), None).await.unwrap();
+            let mut loader = jvm.instantiate_class("net/wie/KtfClassLoader").await.unwrap();
+            let system_loader: Box<dyn jvm::ClassInstance> = jvm
+                .invoke_static("java/lang/ClassLoader", "getSystemClassLoader", "()Ljava/lang/ClassLoader;", [])
+                .await
+                .unwrap();
+            jvm.put_field(&mut loader, "parent", "Ljava/lang/ClassLoader;", system_loader)
+                .await
+                .unwrap();
+
+            let mut natives = Vec::new();
+            for name in [SHADOWED, PLAIN] {
+                let class = JavaClassDefinition::new(
+                    &mut core,
+                    &jvm,
+                    JavaClassProto {
+                        name,
+                        parent_class: Some("java/lang/Object"),
+                        interfaces: vec![],
+                        methods: vec![],
+                        fields: vec![],
+                        access_flags: ClassAccessFlags::PUBLIC,
+                    },
+                    Box::new(()),
+                    java_functions.clone(),
+                )
+                .await?;
+                natives.push((name, class.ptr_raw));
+            }
+            core.register_svc_handler(7, get_class, &Arc::new(natives.clone()))?;
+            let ptr_functions = Allocator::alloc(&mut core, size_of::<ExeInterfaceFunctions>() as u32)?;
+            let mut functions = ExeInterfaceFunctions::zeroed();
+            functions.fn_get_class = core.make_svc_stub(7, 0u32)?;
+            write_generic(&mut core, ptr_functions, functions)?;
+            jvm.put_field(&mut loader, "nativeFunctions", "I", ptr_functions as i32).await.unwrap();
+
+            for (name, native) in natives {
+                assert!(!jvm.has_class(name));
+                let java_name = JavaLangString::from_rust_string(&jvm, name).await.unwrap();
+                let _: ClassInstanceRef<Class> = jvm
+                    .invoke_virtual(
+                        &loader,
+                        "net/wie/KtfClassLoader",
+                        "loadClass",
+                        "(Ljava/lang/String;)Ljava/lang/Class;",
+                        (java_name,),
+                    )
+                    .await
+                    .unwrap();
+                let loaded = KtfJvmSupport::class_definition_raw(&*jvm.resolve_class(name).await.unwrap().definition)?;
+                assert_eq!(loaded == native, name == SHADOWED, "{name}");
+            }
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
