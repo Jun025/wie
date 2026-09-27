@@ -113,6 +113,10 @@ export class EmulatorSession {
   private muted = loadMuted();
 
   onError?: (err: EmuError) => void;
+  // Fired once when the guest ends itself (sticky has_exited()), AFTER the final
+  // save is persisted — so a relaunch from the exit panel boots the same DB.
+  // LGT first-run notices write a marker record and exit; the second run plays.
+  onExit?: () => void;
   // Fired whenever volume/mute changes (slider, pad, keyboard) so the UI gauge
   // stays in sync — the session is the single source of truth.
   onVolumeChange?: (volume: number, muted: boolean) => void;
@@ -171,6 +175,11 @@ export class EmulatorSession {
     if (!this.running || !this.emu) return;
     try {
       this.emu.tick();
+      if (this.emu.has_exited()) {
+        this.stop();
+        void this.persist().then(() => this.onExit?.());
+        return;
+      }
     } catch (e) {
       const kind = this.platformKind() ?? undefined;
       this.stop();
