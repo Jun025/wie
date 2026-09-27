@@ -7,6 +7,7 @@
 //                                                          [timeMs, 1, channels, rate, Int16Array]] }
 //   { t: "stop", h: handle }
 //   { t: "evict", h: handle }   — forget the handle's sequence; audio.rs resends `ev` on its next play
+//   { t: "gain", h: handle, g } — the game's volume for that handle (0..1): its playback now, else its next play
 //   { t: "stats" }              — replies { t: "stats", sequences, playbacks, voices } on the port
 // `ev` rides only on the first play of a handle (a handle's sequence never changes); later plays
 // reuse it. audio.rs keeps at most RESIDENT_SEQUENCES handles here and evicts the least recently
@@ -97,7 +98,8 @@ class WieAudioProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.sequences = new Map(); // handle -> { events: [{ f, midi? , pcm? }], lengthFrames }
-    this.playbacks = new Map(); // handle -> { seq, start, repeat, next, channels }
+    this.playbacks = new Map(); // handle -> { seq, start, repeat, next, channels, gain }
+    this.gains = new Map(); // handle -> gain for its next play (backend Audio sends one before every play)
     this.voices = [];
     this.port.onmessage = (event) => this.onMessage(event.data);
   }
@@ -106,7 +108,14 @@ class WieAudioProcessor extends AudioWorkletProcessor {
     if (message.t === "play") this.play(message);
     else if (message.t === "stop") this.stop(message.h);
     // A playing sequence keeps sounding: its playback holds the sequence object itself.
-    else if (message.t === "evict") this.sequences.delete(message.h);
+    else if (message.t === "evict") {
+      this.sequences.delete(message.h);
+      this.gains.delete(message.h);
+    } else if (message.t === "gain") {
+      const playback = this.playbacks.get(message.h);
+      if (playback) playback.gain = message.g;
+      else this.gains.set(message.h, message.g);
+    }
     else if (message.t === "stats")
       this.port.postMessage({ t: "stats", sequences: this.sequences.size, playbacks: this.playbacks.size, voices: this.voices.length });
   }
@@ -135,7 +144,9 @@ class WieAudioProcessor extends AudioWorkletProcessor {
     const seq = this.sequences.get(message.h);
     if (!seq) return;
     this.stop(message.h);
-    this.playbacks.set(message.h, { seq, start: currentFrame, repeat: !!message.r, next: 0, channels: newChannels() });
+    const gain = this.gains.get(message.h) ?? 1;
+    this.gains.delete(message.h);
+    this.playbacks.set(message.h, { seq, start: currentFrame, repeat: !!message.r, next: 0, channels: newChannels(), gain });
   }
 
   stop(handle) {
@@ -156,7 +167,7 @@ class WieAudioProcessor extends AudioWorkletProcessor {
 
   dispatch(handle, playback, event) {
     if (event.pcm) {
-      this.addVoice({ handle, kind: 2, pcm: event.pcm, pos: 0, step: event.pcm.srcRate / sampleRate, env: 1, stage: 1 });
+      this.addVoice({ handle, pb: playback, kind: 2, pcm: event.pcm, pos: 0, step: event.pcm.srcRate / sampleRate, env: 1, stage: 1 });
       return;
     }
     const data = event.midi;
@@ -168,7 +179,7 @@ class WieAudioProcessor extends AudioWorkletProcessor {
     const d1 = data[1] ?? 0;
     const d2 = data[2] ?? 0;
     if (type === 0x90 && d2 > 0) {
-      this.noteOn(handle, ch, c, d1, d2);
+      this.noteOn(handle, playback, ch, c, d1, d2);
     } else if (type === 0x80 || type === 0x90) {
       for (const voice of this.voices) {
         if (voice.handle === handle && voice.ch === ch && voice.note === d1 && voice.stage < 3 && !voice.held) {
@@ -213,19 +224,20 @@ class WieAudioProcessor extends AudioWorkletProcessor {
     }
   }
 
-  noteOn(handle, ch, c, note, velocity) {
+  noteOn(handle, pb, ch, c, note, velocity) {
     // Retrigger: a repeated key on the same channel cuts the previous one short.
     for (const voice of this.voices) {
       if (voice.handle === handle && voice.ch === ch && voice.note === note) this.release(voice, STOP_RELEASE_S);
     }
     const amp = (velocity / 127) * VOICE_GAIN;
     if (ch === 9) {
-      this.addVoice({ handle, ch, note, kind: 1, drum: drumPatch(note), t: 0, amp, phase: 0, env: 1, stage: 1, lp: 0 });
+      this.addVoice({ handle, pb, ch, note, kind: 1, drum: drumPatch(note), t: 0, amp, phase: 0, env: 1, stage: 1, lp: 0 });
       return;
     }
     const patch = PATCHES[(c.program >> 3) & 15];
     this.addVoice({
       handle,
+      pb,
       ch,
       note,
       kind: 0,
@@ -323,8 +335,10 @@ class WieAudioProcessor extends AudioWorkletProcessor {
       voice.gl = voice.gr = voice.amp * Math.SQRT1_2;
       voice.bend = 0;
     }
-    const gl = voice.gl;
-    const gr = voice.gr;
+    // The game's volume. `pb` is the playback object itself, so a stopped handle's release tail
+    // keeps the gain it had rather than jumping to 1.
+    const gl = voice.gl * voice.pb.gain;
+    const gr = voice.gr * voice.pb.gain;
 
     if (voice.kind === 1) return this.renderDrum(voice, left, right, frames, gl, gr);
 
@@ -412,7 +426,7 @@ class WieAudioProcessor extends AudioWorkletProcessor {
         if (voice.env < SILENT) return false;
       }
       const frac = pos - index;
-      const g = (PCM_GAIN * voice.env) / 32768;
+      const g = (PCM_GAIN * voice.pb.gain * voice.env) / 32768;
       const l0 = samples[index * channels];
       const l1 = samples[(index + 1) * channels];
       const l = (l0 + (l1 - l0) * frac) * g;

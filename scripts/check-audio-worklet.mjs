@@ -196,6 +196,47 @@ for (const repeat of [true, false]) {
   check("second module load into the same scope is a no-op", error === null && w.registrations() === 1, `error ${error} · registrations ${w.registrations()}`);
 }
 
+// 9. The game's volume: a gain sent before a play scales that play (MIDI and PCM alike), a gain
+//    sent while it plays scales it at once, 0 silences it, and the next play without a gain is
+//    back at 1 (backend Audio sends one before every play, so none may linger). Until 2026-09-27
+//    there was no gain: Clip.setVolume and the rest were stubs.
+{
+  const organ = [midi(0, 0xc0, 16), midi(0, 0x90, 64, 60)];
+  const pcm = new Int16Array(8000);
+  for (let i = 0; i < pcm.length; i++) pcm[i] = Math.round(4000 * Math.sin((2 * Math.PI * 440 * i) / 8000));
+  const level = (gain, ev) => {
+    const w = boot();
+    if (gain !== undefined) w.post({ t: "gain", h: 0, g: gain });
+    w.post({ t: "play", h: 0, r: true, d: 10000, ev });
+    w.render(0.1);
+    return w.render(0.2);
+  };
+  const midiRatio = level(0.5, organ) / level(undefined, organ);
+  const pcmRatio = level(0.5, [[0, 1, 1, 8000, pcm]]) / level(undefined, [[0, 1, 1, 8000, pcm]]);
+
+  const w = boot();
+  w.post({ t: "gain", h: 0, g: 0.5 });
+  w.post({ t: "play", h: 0, r: true, d: 10000, ev: organ });
+  w.render(0.1);
+  const half = w.render(0.2);
+  w.post({ t: "gain", h: 0, g: 0 });
+  const muted = w.render(0.2);
+  w.post({ t: "gain", h: 0, g: 1 });
+  const full = w.render(0.2);
+  w.post({ t: "gain", h: 0, g: 0 });
+  w.post({ t: "stop", h: 0 });
+  w.render(0.2);
+  w.post({ t: "play", h: 0, r: true, d: 10000 });
+  w.render(0.1);
+  const replay = w.render(0.2);
+  const near = (x, y) => Math.abs(x - y) < 0.05;
+  check(
+    "gain scales a play before and during it, 0 silences, and does not outlive the next play",
+    near(midiRatio, 0.5) && near(pcmRatio, 0.5) && muted < QUIET && near(full / half, 2) && near(replay / full, 1),
+    `midi ×${midiRatio.toFixed(3)} · pcm ×${pcmRatio.toFixed(3)} · muted ${muted.toExponential(1)} · 1/0.5 ×${(full / half).toFixed(3)} · replay/full ×${(replay / full).toFixed(3)}`,
+  );
+}
+
 if (failed) {
   console.error(`check-audio-worklet: ${failed} case(s) failed`);
   process.exit(1);
