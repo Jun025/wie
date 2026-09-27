@@ -136,4 +136,4 @@ fmt · clippy `-D warnings`(stable · beta · wasm32) · `RUST_MIN_STACK=4194304
 - 게임 파일명 유입: 이 회차가 **더한 줄**에는 0건이다(코드 주석은 sha12 로만 적었다). 도구 표기 BOUNDED·SUFFIX-ATTACHED 는 고친 파일에 **이미 있던** 주석과,
   이 브랜치가 아래에 깔고 있는 #350 의 파일에서 온다.
 
-<!-- corpus-name-inflow v1 subjects=25 tree=c513235d369a6f08 B=92/30 P=1/1 S=15/5 -->
+<!-- corpus-name-inflow v1 subjects=16 tree=9b7128206fcd4468 B=88/28 P=1/1 S=14/4 -->
