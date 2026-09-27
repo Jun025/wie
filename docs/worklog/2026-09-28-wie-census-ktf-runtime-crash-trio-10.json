@@ -1,0 +1,44 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-census-ktf-runtime-crash-trio-10",
+  "title": "KTF 런타임 중단 3형 — jar 바이트코드가 client.bin 을 가림 · 힙 소진 예외 재귀 · getNextEvent 4종 분류",
+  "summary": "jar 가 .class 로도 싣는 클래스는 client.bin 을 먼저 쓴다(2종 부팅·조작 통과). 게스트 힙이 차면 예약 OutOfMemoryError 를 던져 호스트 스택 넘침(탭 사망)을 오류 안내로 바꿨다(3종). getNextEvent 4종은 원인이 서로 다르다는 것까지 판정했다.",
+  "changes": [
+    "wie-ktf/src/runtime/java/jvm_support/classes/net/wie/ktf_class_loader.rs — loadClass 재정의 · outOfMemoryError 예약",
+    "wie-ktf/src/runtime/java/jvm_support.rs — jar .class 목록 · instantiation_error · wie_error · 시험 2",
+    "wie-ktf/src/runtime/java/jvm_support/{class_definition,array_class_definition,method}.rs — 호출부",
+    "docs/report/0330"
+  ],
+  "verification": [
+    "전/후 표 10종 + 퇴행(LGT 5 · 가드 2 · KTF playable 표본 10) — docs/report/0330",
+    "변이 2건 각각 red"
+  ],
+  "limits": [
+    "c94d64777926 · e9fac881e602 는 여전히 멈춘다(한 paint 안 NPE 무한 포획이 힙을 채움) — 탭이 아니라 게임만 멈춘다",
+    "3c658a46bbfb 다음 벽 MC_dbGetRecordSize(KTF DB 슬롯 11) — 인자 배치 미측정",
+    "getNextEvent 4종(155972cac664 · 30c7bd6fb01b · 568c339a8c07 · 2b1ed0c8d061) 미수정"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "한 paint 안 NPE 무한 포획 — 무엇이 null 인지 찾기",
+      "plainSummary": "두 판의 같은 게임이 5분쯤 하면 화면 그리기 도중 같은 오류를 수만 번 되풀이하다 멈춘다.",
+      "userBenefit": "이 게임을 오래 할 수 있게 된다.",
+      "why": "이번 회차는 그 되풀이가 탭을 죽이지 않게 했을 뿐이다. 되풀이는 게스트가 null 을 받는 데서 시작하고, 실기에서는 그 값이 null 이 아니었을 것이다.",
+      "tradeoff": "원인이 에뮬레이터 쪽(스텁이 null 반환 · GC 가 살아 있는 객체 수거)인지 게임 쪽인지 아직 모른다 — 조사부터다.",
+      "effort": "M",
+      "target": "c94d64777926 · e9fac881e602 (KTF)"
+    },
+    {
+      "kind": "product",
+      "title": "KTF DB 가 패키지 P/ 파일을 보게 하기",
+      "plainSummary": "게임 묶음에 들어 있는 저장 파일을 게임이 «없다»고 판정해, 첫 확인 버튼에서 멈춘다.",
+      "userBenefit": "그 게임이 첫 화면을 넘긴다.",
+      "why": "155972cac664 는 MC_dbExists 가 P/ 의 세 파일을 모두 0 으로 받고, 크기 0 으로 할당한 뒤 역참조해 죽는다. zip 의 P/ 는 파일시스템(add_virtual)에만 올라가고 DB 판정(exists·stat)은 DB 저장소만 본다.",
+      "tradeoff": "P/ 를 싣는 다른 KTF 타이틀도 판정이 바뀐다 — 전수 전/후가 필요하다.",
+      "effort": "M",
+      "target": "155972cac664 (KTF) · wie-wipi-c database.rs"
+    }
+  ]
+}
