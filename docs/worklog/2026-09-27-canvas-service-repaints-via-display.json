@@ -1,0 +1,16 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-27",
+  "task": "wie-2026-09-27-canvas-service-repaints-via-display-apocalypse-adopt-p0",
+  "title": "Canvas.serviceRepaints → Display.serviceRepaints — 아포칼립스 호스트 abort 제거",
+  "summary": "Canvas.serviceRepaints 가 대기 중 repaint 를 보지 않고 handlePaintEvent 를 불러 paint 안 serviceRepaints 가 무한 재귀했다. Display.serviceRepaints 로 넘긴다.",
+  "changes": ["wie-midp Canvas::service_repaints → Display.serviceRepaints", "canvas 시험 service_repaints_paints_only_a_pending_repaint", "docs/report/0312"],
+  "verification": [
+    "아포칼립스 기준 3/3 rc=134 → 수정 3/3 rc=0 PASS last true",
+    "serviceRepaints 참조 323 타이틀 교대 짝: 화면 나옴 기준 253 · 수정 252 · 어긋난 10 타이틀 재측 21 ↔ 22 · 화면을 잃은 타이틀 0",
+    "cargo test --all 497/0 · clippy stable/wasm/beta rc0 · 변이 red · runner 블록 PASS"
+  ],
+  "limits": ["paint 안 repaint() + serviceRepaints() 형태는 여전히 재귀한다"],
+  "proposals": [],
+  "adoptedProposals": ["2026-09-27-wie-display-handle-paint-event-concurrent-graphics-judge#p0"]
+}
