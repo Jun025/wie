@@ -139,6 +139,22 @@ pub fn harden(proto: &mut RuntimeClassProto) -> usize {
         // `append([CII)` still attaches and is still the reachable half.
         "java/lang/StringBuffer" => guard(proto, "append", "([CII)Ljava/lang/StringBuffer;", &[1], "str is null") as usize,
 
+        // `new String((char[]) null)` — `([C)V`/`([B)V` ask for the array length first, the
+        // partial and charset forms `load_array` straight away; either derefs the null ref.
+        // d552e095ddcf (KTF) panicked here 2 runs in 4 (`String::init_with_char_array`,
+        // docs/report/0030 §10-6-b). All six array-taking constructors, not just the one seen.
+        "java/lang/String" => [
+            "([C)V",
+            "([CII)V",
+            "([B)V",
+            "([BII)V",
+            "([BLjava/lang/String;)V",
+            "([BIILjava/lang/String;)V",
+        ]
+        .into_iter()
+        .filter(|descriptor| guard(proto, "<init>", descriptor, &[1], "array is null"))
+        .count(),
+
         // No `java/util/Timer` arm any more: slice D removed it because the pin declares all
         // four `schedule` forms itself (see the module header). The comment that used to sit
         // here still claimed one-shot `schedule` was absent — the opposite of the measurement
@@ -170,6 +186,7 @@ mod tests {
             ("java/lang/System", 1),
             ("java/io/ByteArrayInputStream", 1),
             ("java/lang/StringBuffer", 1), // slice D: insert(I,String) now upstream
+            ("java/lang/String", 6),       // every array-taking <init>
         ] {
             let mut proto = get_runtime_class_proto(name).unwrap();
             assert_eq!(harden(&mut proto), expected, "{name}: hardening not applied");
@@ -182,7 +199,8 @@ mod tests {
         instance.class_definition().name()
     }
 
-    /// The three null arguments the dropped fork guarded. Without the guard each of these
+    /// The three null arguments the dropped fork guarded, plus `String`'s array constructors
+    /// (d552e095ddcf, 2026-09-28). Without the guard each of these
     /// unwraps a null `ClassInstanceRef` inside `java_runtime` and aborts the process, so
     /// "comes back as a Java exception at all" is the whole assertion.
     ///
@@ -229,6 +247,19 @@ mod tests {
                 .await
                 .map(|_: ClassInstanceRef<()>| ())
                 .expect_err("append((char[]) null, ..) must throw");
+            assert_eq!(exception_class(err), "java/lang/NullPointerException");
+
+            // new String((char[]) null) — d552e095ddcf's panic — and new String((byte[]) null)
+            let err = jvm
+                .new_class("java/lang/String", "([C)V", (None.into(),) as (ClassInstanceRef<Array<u16>>,))
+                .await
+                .expect_err("new String((char[]) null) must throw");
+            assert_eq!(exception_class(err), "java/lang/NullPointerException");
+            let null_bytes: ClassInstanceRef<Array<i8>> = None.into();
+            let err = jvm
+                .new_class("java/lang/String", "([B)V", (null_bytes,))
+                .await
+                .expect_err("new String((byte[]) null) must throw");
             assert_eq!(exception_class(err), "java/lang/NullPointerException");
 
             Ok(())
