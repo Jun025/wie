@@ -36,6 +36,11 @@ impl Canvas {
                 JavaMethodProto::new("keyReleased", "(I)V", Self::key_released, MethodAccessFlags::PROTECTED),
                 JavaMethodProto::new("setFullScreenMode", "(Z)V", Self::set_full_screen_mode, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("isDoubleBuffered", "()Z", Self::is_double_buffered, MethodAccessFlags::PUBLIC),
+                // Inherited from Displayable, and declared again only because this JVM resolves
+                // `invokespecial` in the named class alone: a subclass's `super.getHeight()` names
+                // Canvas and raised NoSuchMethodError (2 SKT titles at boot, 2026-09-27 census).
+                JavaMethodProto::new("getWidth", "()I", Self::get_width, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getHeight", "()I", Self::get_height, MethodAccessFlags::PUBLIC),
                 // wie private methods
                 JavaMethodProto::new("handleKeyEvent", "(II)V", Self::handle_key_event, MethodAccessFlags::empty()),
                 JavaMethodProto::new(
@@ -48,6 +53,14 @@ impl Canvas {
             fields: vec![],
             access_flags: ClassAccessFlags::PUBLIC | ClassAccessFlags::ABSTRACT,
         }
+    }
+
+    async fn get_width(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        jvm.invoke_special(&this, "javax/microedition/lcdui/Displayable", "getWidth", "()I", ()).await
+    }
+
+    async fn get_height(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        jvm.invoke_special(&this, "javax/microedition/lcdui/Displayable", "getHeight", "()I", ()).await
     }
 
     async fn init(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
@@ -601,5 +614,17 @@ mod test {
                 Ok(())
             },
         )
+    }
+
+    // A subclass's `super.getHeight()` compiles to invokespecial naming Canvas.
+    #[test]
+    fn canvas_super_size_resolves_on_canvas() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into(), [RecordingCanvas::as_proto()].into()]), |jvm| async move {
+            let canvas: ClassInstanceRef<Canvas> = jvm.new_class("javax/microedition/lcdui/TestRecordingCanvas", "()V", ()).await?.into();
+            let width: i32 = jvm.invoke_special(&canvas, "javax/microedition/lcdui/Canvas", "getWidth", "()I", ()).await?;
+            let height: i32 = jvm.invoke_special(&canvas, "javax/microedition/lcdui/Canvas", "getHeight", "()I", ()).await?;
+            assert!(width > 0 && height > 0);
+            Ok(())
+        })
     }
 }
