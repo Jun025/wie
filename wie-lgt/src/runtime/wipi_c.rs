@@ -1,4 +1,8 @@
-use alloc::{boxed::Box, string::ToString, vec};
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec,
+};
 
 mod context;
 // ★slice D (orchestrator decision ⒝, 2026-09-16): upstream's LGT-specific graphics
@@ -57,7 +61,9 @@ use wipi_types::wipic::WIPICIndirectPtr;
 use wie_backend::System;
 use wie_core_arm::{ArmCore, EmulatedFunction, EmulatedFunctionParam, ResultWriter, SvcId};
 use wie_jvm_support::JvmSupport;
-use wie_util::{Result, read_generic, write_generic, write_null_terminated_string_bytes, write_null_terminated_table};
+use wie_util::{
+    Result, read_generic, read_null_terminated_string_bytes, write_generic, write_null_terminated_string_bytes, write_null_terminated_table,
+};
 use wie_wipi_c::{
     MethodImpl, WIPICContext, WIPICMethodBody, WIPICResult,
     api::{database, graphics as shared_graphics, kernel, media, misc, net},
@@ -103,7 +109,7 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::GetFramebufferBpp => graphics::get_framebuffer_bpp.into_body(),
         WIPICSvcId::Printk => kernel::printk.into_body(),
         WIPICSvcId::Sprintk => kernel::sprintk.into_body(),
-        WIPICSvcId::Unk13 => unk13.into_body(),
+        WIPICSvcId::TerminateProgram => terminate_program.into_body(),
         WIPICSvcId::Unk1 => unk1.into_body(),
         WIPICSvcId::Exit => kernel::exit.into_body(),
         WIPICSvcId::GetProgramName => kernel::get_program_name.into_body(),
@@ -164,6 +170,9 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::TimeConvert => time_convert.into_body(),
         WIPICSvcId::TimeToTm => time_to_tm.into_body(),
         WIPICSvcId::DateTimeToTm => time_to_tm.into_body(),
+        WIPICSvcId::Htonl | WIPICSvcId::Ntohl => swap32.into_body(),
+        WIPICSvcId::Htons | WIPICSvcId::Ntohs => swap16.into_body(),
+        WIPICSvcId::InetAddr => inet_addr.into_body(),
         WIPICSvcId::OpenDatabase => database::open_database.into_body(),
         WIPICSvcId::ReadRecordSingle => database::stream_read.into_body(),
         WIPICSvcId::WriteRecordSingle => database::stream_write.into_body(),
@@ -394,6 +403,41 @@ async fn time_now(context: &mut dyn WIPICContext, component_class: u32) -> Resul
     write_time_value(context, epoch_seconds as u32)
 }
 
+/// WIPIC 900/902 (`htonl`/`ntohl`): the guest is little-endian, so network order is a swap.
+async fn swap32(_context: &mut dyn WIPICContext, value: u32) -> Result<u32> {
+    Ok(value.swap_bytes())
+}
+
+/// WIPIC 901/903 (`htons`/`ntohs`). Callers pass a sign-extended short and re-narrow the
+/// result themselves, so only the low 16 bits are read and the answer is zero-extended.
+async fn swap16(_context: &mut dyn WIPICContext, value: u32) -> Result<u32> {
+    Ok(u32::from((value as u16).swap_bytes()))
+}
+
+/// WIPIC 904 (`inet_addr`): a dotted quad to an address in network order, `0xffffffff`
+/// (`INADDR_NONE`) when the string is not one. Only the four-decimal-part form is accepted —
+/// the one form measured at a call site; the BSD shorthand forms are not guessed at.
+async fn inet_addr(context: &mut dyn WIPICContext, ptr_cp: u32) -> Result<u32> {
+    let text = read_null_terminated_string_bytes(context, ptr_cp)?;
+    tracing::debug!("LGT inet_addr({:?})", String::from_utf8_lossy(&text));
+
+    Ok(parse_dotted_quad(&text).map_or(u32::MAX, u32::from_le_bytes))
+}
+
+fn parse_dotted_quad(text: &[u8]) -> Option<[u8; 4]> {
+    let mut out = [0u8; 4];
+    let mut parts = text.split(|&b| b == b'.');
+    for slot in &mut out {
+        let part = parts.next()?;
+        if part.is_empty() || part.len() > 3 || !part.iter().all(u8::is_ascii_digit) {
+            return None;
+        }
+        *slot = core::str::from_utf8(part).ok()?.parse().ok()?;
+    }
+
+    parts.next().is_none().then_some(out)
+}
+
 async fn time_component(_context: &mut dyn WIPICContext, name: u32) -> Result<u32> {
     tracing::debug!("LGT_timeComponent({name:#x})");
 
@@ -477,12 +521,28 @@ async fn unk11(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u
     Ok(0)
 }
 
-async fn unk13(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
-    tracing::warn!("stub unk13({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x})");
+/// WIPIC kernel index 4 (`0x68`): ends the program. The guest does not expect it to return.
+///
+/// Identified from the call sites, not from a symbol — none of the LGT images names it. Six
+/// titles that stopped on a first-run notice («게임을 다시 실행하여 주시기 바랍니다 · 아무키나
+/// 누르세요», «메모리 부족 … 리셋하여 주시기 바랍니다», «다운로드 되었습니다 … EZ-i 메뉴로
+/// 이동합니다») all do the same three things on the key: write a marker database (open with
+/// create + close, or delete + recreate), then call this with ONE integer in r0 (0, 2, 0x1b or
+/// -1 depending on the title — never a pointer), then discard the return value. With the old
+/// stub returning 0 the title fell back into its notice loop and redrew it on every key (27 calls
+/// in 27 keys on one title); what the notice text asks for is the phone taking the user back to
+/// the menu. So the engine's half is the same as `MC_knlExit` (`0x6b`): tell the host the guest
+/// asked to stop. Relaunching — with the database kept, which is where the marker lives — is the
+/// host's half, and a relaunched title passes the notice (see `docs/report` for the round).
+///
+/// KTF's table puts `MC_knlMExecute` at this index; the argument here is not a program name, so
+/// that is not what this is, and the name is deliberately behavioural.
+async fn terminate_program(context: &mut dyn WIPICContext, code: i32) -> Result<()> {
+    tracing::debug!("LGT WIPIC terminate_program({code})");
 
-    // kernel
+    context.system().platform().exit();
 
-    Ok(0)
+    Ok(())
 }
 
 async fn unk14(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
@@ -514,13 +574,99 @@ mod tests {
     use alloc::{boxed::Box, sync::Arc};
     use core::sync::atomic::{AtomicBool, Ordering};
 
-    use test_utils::TestPlatform;
+    use test_utils::{TestPlatform, TestPlatformEvent};
     use wie_backend::{DefaultTaskRunner, System};
     use wie_core_arm::Allocator;
     use wie_util::{ByteWrite, Result, read_generic};
 
     use super::{graphics, register_wipic_svc_handler};
     use crate::runtime::{SVC_CATEGORY_WIPIC, java::init_jvm, svc_ids::WIPICSvcId};
+
+    /// WIPIC `0x68` ends the program: it reaches `Platform::exit`, the way `MC_knlExit` does.
+    ///
+    /// Six LGT titles call it from their first-run notice with one integer (0x1b here is what
+    /// one of them passes). As a stub returning 0 it never told the host anything, and each title
+    /// redrew the notice on every key forever; the host could not tell «waiting» from «done».
+    #[test]
+    fn wipic_0x68_terminates_the_program() -> Result<()> {
+        let exited = Arc::new(AtomicBool::new(false));
+        let exited_clone = exited.clone();
+        let platform = TestPlatform::with_event_handler(move |event| {
+            if let TestPlatformEvent::Exit = event {
+                exited_clone.store(true, Ordering::Relaxed);
+            }
+        });
+        let mut system = System::new(Box::new(platform), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, _) = init_jvm(&system_clone).await?;
+            register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
+            assert_eq!(WIPICSvcId::TerminateProgram as u32, 0x68);
+            let stub = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::TerminateProgram)?;
+            let _: u32 = core.run_function(stub, &[0x1b]).await?;
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+        assert!(exited.load(Ordering::Relaxed), "0x68 must reach Platform::exit");
+
+        Ok(())
+    }
+
+    /// WIPIC 900–904 answer through the SVC table: byte swaps and `inet_addr`.
+    ///
+    /// Before, the table had no row for any of them and the first call was a fatal
+    /// «Unknown LGT WIPIC SVC id» — two titles died at boot on 900 (the value feeds their
+    /// backlight colour), others on 904 when opening a connection. The inputs are the ones
+    /// measured at call sites: port `0xffffa482` (a sign-extended short), a dotted-quad string (the test uses a TEST-NET address).
+    #[test]
+    fn wipic_byte_order_section_answers() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, _) = init_jvm(&system_clone).await?;
+            register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
+            let call = async |core: &mut wie_core_arm::ArmCore, id: WIPICSvcId, arg: u32| -> Result<u32> {
+                let stub = core.make_svc_stub(SVC_CATEGORY_WIPIC, id)?;
+                core.run_function(stub, &[arg]).await
+            };
+
+            for (id, number) in [(WIPICSvcId::Htonl, 900), (WIPICSvcId::Ntohl, 902)] {
+                assert_eq!(id as u32, number);
+                assert_eq!(call(&mut core, id, 0x0000_ffff).await?, 0xffff_0000);
+            }
+            for (id, number) in [(WIPICSvcId::Htons, 901), (WIPICSvcId::Ntohs, 903)] {
+                assert_eq!(id as u32, number);
+                assert_eq!(call(&mut core, id, 0xffff_a482).await?, 0x82a4);
+            }
+
+            assert_eq!(WIPICSvcId::InetAddr as u32, 904);
+            let text = Allocator::alloc(&mut core, 32)?;
+            core.write_bytes(text, b"192.0.2.45\0")?;
+            assert_eq!(call(&mut core, WIPICSvcId::InetAddr, text).await?.to_le_bytes(), [192, 0, 2, 45]);
+            core.write_bytes(text, b"192.0.2\0")?;
+            assert_eq!(call(&mut core, WIPICSvcId::InetAddr, text).await?, u32::MAX);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
 
     /// `MC_GRP_GET_FRAME_BUFFER_BPP` answers the display depth whatever its argument is.
     ///
