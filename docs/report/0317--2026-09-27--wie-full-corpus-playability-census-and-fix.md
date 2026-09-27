@@ -148,3 +148,9 @@ node scripts/playability-census.mjs report --out <dir> --pin <sha> --prs <gh-mer
 | 1 | longplay:error | panic during '…': called `Result::unwrap()` on an `Err` value: JavaException(#x#) @ wie-lgt/src/runtime/wipi_c/context.rs | fe76e641bb3d(lgt) |
 
 조작·소리 축 군집은 벽 문구가 없다(판정이 대조·계수라서). 속도는 판정이 `ok`/`n/a` 뿐이라 군집이 없다.
+
+### 게이트 · 유입
+- `cargo fmt --check` · `clippy --all -D warnings`(stable · beta) · `clippy --target wasm32 -D warnings` · `RUST_MIN_STACK=4194304 cargo test --all` 전부 rc=0.
+  새 시험은 `lgt_compile_model_is_reported_for_lgt_only_test` 다. 함수가 LGT 에서 `None` 을 내면 red 다.
+- 게임 파일명 유입: 이 회차가 **더한 줄**에는 0건이다. 도구 표기 BOUNDED 2회/2쌍은 `wie_validate.rs` 에 **이미 있던** 주석 2곳이다.
+- 제목·경로는 실행 때 파일명에서 읽는다. 그것을 적는 출력(`census.tsv` · `compat.json`)은 `--out` 이 가리키는 repo 밖에만 생긴다.

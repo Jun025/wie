@@ -307,7 +307,7 @@ const summaryKo = (prTitle) =>
             : '게임이 더 안정적으로 실행되도록 고쳤어요.';
 
 // "(KTF) 제목 [태그].zip" -> "제목"
-// A PR names a title when the name stands alone ("놈3" is not "놈") …
+// A PR names a title when the name stands alone ("X3" does not name "X") …
 const names = (text, title) => title.length >= 2 && new RegExp(`(^|[^\\p{L}\\p{N}])${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\p{L}\\p{N}])`, 'u').test(text);
 // … and does not name a different carrier (one name, two carriers' builds).
 const otherCarrier = (text, platform) => ['KTF', 'SKT', 'LGT'].some((c) => c !== platform && new RegExp(`\\b${c}\\b`, 'i').test(text)) && !new RegExp(`\\b${platform}\\b`, 'i').test(text);
