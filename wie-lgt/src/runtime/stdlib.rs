@@ -382,9 +382,9 @@ mod tests {
             core.read_bytes(out, &mut joined)?;
             assert_eq!(&joined[..5], b"abcd\0");
             // src need not be terminated within n: "gh" ends a mapped page, the next one is not mapped.
-            core.map(0x6000_0000, 0x1000)?;
-            core.write_bytes(0x6000_0ffe, b"gh")?;
-            let _: () = core.run_function(strncat_stub, &[out, 0x6000_0ffe, 2]).await?;
+            core.map(0x6000_0000, 0x1_0000)?; // one 64 KiB page
+            core.write_bytes(0x6000_fffe, b"gh")?;
+            let _: () = core.run_function(strncat_stub, &[out, 0x6000_fffe, 2]).await?;
             core.read_bytes(out, &mut joined)?;
             assert_eq!(&joined, b"abcdgh");
 
