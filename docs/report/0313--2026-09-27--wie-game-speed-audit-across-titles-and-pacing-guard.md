@@ -147,3 +147,14 @@ wasm 노출은 하지 않았다 — 계약 표면이 바뀐다(Constraint 3). �
 - 부하 load1 200~370 에서 쟀다. fps 절대값은 흔들리고, 짝 비교와 엔진 내부 계측이 판정 근거다.
 - GC 가 드물어진 만큼 쓰레기가 더 오래 산다(165ms 타이틀은 최대 3.3초). 할당 실패 시 재시도가 없는 것은 #338 과 같다.
 - `test_pacing` 은 J2ME 경로다. KTF clet 의 타이머 경로는 wie-midp 단위 시험이 잠근다.
+
+### 게이트(rebase 뒤 PR 머리 · 증적 `gates-final.log` · `runner.log`)
+- fmt · clippy `-D warnings`(stable · wasm32 · beta) rc=0.
+- `RUST_MIN_STACK=4194304 cargo test --all` **501 passed / 0 failed**.
+- runner 블록 전부 PASS: draw_j2me · helloworld 2종 · text_j2me, keydraw_ktf/lgt `--inject --expect-last-frame` 27/27 rc=0.
+- `npm run build:wasm` · `check-engine-contract`(109 pass · 위반 0) · `npm run audit` · `check-engine-runner-fixtures` rc=0.
+
+### 게임 파일명 유입
+`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab` 결과는 BOUNDED 10쌍 · SUFFIX-ATTACHED 0 이다.
+10쌍 전부 이 브랜치가 건드린 파일(executor · system · display · event_queue · 4 emulator · wie_validate)에 **이미 있던** 주석이다. 이 회차가 새로 쓴 이름은 0 이다 — 표는 sha12 로만 적었다. 게임 바이트는 0 이다.
+
