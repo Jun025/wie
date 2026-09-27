@@ -154,3 +154,4 @@ node scripts/playability-census.mjs report --out <dir> --pin <sha> --prs <gh-mer
   새 시험은 `lgt_compile_model_is_reported_for_lgt_only_test` 다. 함수가 LGT 에서 `None` 을 내면 red 다.
 - 게임 파일명 유입: 이 회차가 **더한 줄**에는 0건이다. 도구 표기 BOUNDED 2회/2쌍은 `wie_validate.rs` 에 **이미 있던** 주석 2곳이다.
 - 제목·경로는 실행 때 파일명에서 읽는다. 그것을 적는 출력(`census.tsv` · `compat.json`)은 `--out` 이 가리키는 repo 밖에만 생긴다.
+<!-- corpus-name-inflow v1 subjects=4 tree=96c7aae6581326d7 B=2/2 P=0/0 S=0/0 -->
