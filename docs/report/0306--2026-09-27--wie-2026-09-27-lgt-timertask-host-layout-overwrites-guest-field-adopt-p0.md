@@ -40,3 +40,7 @@
 ### 한계
 - 러너 블록(`wie_validate` 고정 픽스처)은 엔진 LGT 경로 변경이라 CI 밖에서만 본다 — 스윕이 그 몫을 했다.
 - `host_field` 에 참조 타입을 넣으면 수집기 루트가 되지 않는다(선언 주석에 적었다 · 검사기 없음).
+
+게임 이름 유입(`scripts/corpus-name-inflow.mjs --corpus <game_lab>`): BOUNDED 35 · SUFFIX-ATTACHED 6(아래 표식). 대상이 `lgt_java_abi.toml`·`jvm_support.rs` «파일 전체»라 기존 주석의 타이틀이 함께 세어진다. 이 회차가 새로 쓴 이름은 `학교가는길`(대상)과 회귀 스윕의 뒤집힘 4건(`제노니아2`·`테라 영원의 혼돈`·`나는마왕이다2`·`아니마`, 이 문서만)이다.
+
+<!-- corpus-name-inflow v1 subjects=9 tree=53c2fb931aa0bcce B=91/35 P=9/2 S=16/6 -->
