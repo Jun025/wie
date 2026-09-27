@@ -1,6 +1,6 @@
 ## [2026-09-27] 소리 silent 104 — «시도 없음 vs 경로 결손» 분류 · 결손 3종 수정 (wie-census-silent-104-classify-and-fix)
 
-**무엇을**: 전수 점검(0321)의 «소리 silent» 104종을 다시 재서 가르고, 경로 결손 3종을 고쳤다. ① WIPI-C `MC_knlGetSystemProperty("MEDIADEVICES")` = `"Yamaha_MA3"` ② KTF `org.kwis.msp.media.Player` 의 `BaseClip` 오버로드(play/stop/resume/pause)가 `Clip` 인스턴스면 Clip 경로로 ③ `BaseClip.setBuffer` 가 배열을 붙잡고 `Player.play` 가 게임이 다시 쓴 배열을 다시 읽는다.
+**무엇을**: 전수 점검(0321)의 «소리 silent» 104종을 다시 재서 가르고, 경로 결손 3종을 고쳤다. ① WIPI-C `MC_knlGetSystemProperty("MEDIADEVICES")` = `"Yamaha_MA3"` ② KTF `org.kwis.msp.media.Player` 의 `BaseClip` 오버로드(play/stop/resume/pause)가 `Clip` 인스턴스면 Clip 경로로 ③ `BaseClip.setBuffer` 가 배열을 붙잡고 `Player.play` 가 게임이 다시 쓴 배열을 다시 읽는다 — ★`Clip(type, byte[])` 생성자가 `setBuffer` 를 부르므로 **생성자로 만든 클립 전부**가 이 경로를 탄다(§3-3).
 **왜**: 후속 군집 표 1행(0321) — 104종이 한 덩어리로 «silent» 였고, 측정 창 문제와 엔진 결손이 섞여 있었다.
 **사용자 영향**: 6종이 소리를 낸다(KTF 3 · LGT 3). 나머지는 이 회차에서 바뀌지 않는다.
 
@@ -48,6 +48,31 @@
   - 처방: `BaseClip` 이 배열·크기·FNV-1a 해시를 들고, `Player.play`(Clip) 때 해시가 바뀌었으면 옛 플레이어를 닫고 다시 적재한다. 안 바뀌었으면 아무것도 안 한다(같은 핸들 — 시험이 잠근다).
   - `resume` 에는 걸지 않았다 — 매 `play` 직후 `resume` 을 부르는 타이틀이 있어, 거기서 해시를 매번 계산할 이유가 없다.
   - `clearData` 는 배열도 놓는다(지운 뒤 play 가 옛 배열을 되살리지 않게).
+  - ★**영향 범위(게이트② 정정)**: 배열을 붙잡는 것은 게임이 부른 `setBuffer` 만이 아니다. `Clip(type, byte[])` 생성자(와 그것을 거치는 `Clip(type, int)`·`Clip(type, resourceName)`)가 내부에서 `setBuffer` 를 부르므로 **생성자로 만든 클립을 쓰는 KTF Java 타이틀 전부**가 매 `Player.play` 마다 해시 계산(O(size))을 돈다. 이 회차의 퇴행 확인은 그 모집단 기준으로 다시 했다(§3-4).
+  - ★**게이트② 반려 수정 — `putData` 가 등록 배열을 놓는다.** 종전 판은 `putData` 가 `buffer`·`bufferSize`·`bufferHash` 를 건드리지 않아, `new Clip(type, A)` → `putData(B, 0, n)` → 게임이 A 를 다시 씀 → `play` 가 **A 로 되감아** `putData(B)` 소리를 지웠다(`setBuffer(S, n1)` 후 `putData(S, 0, n2)` 도 옛 길이 n1 로 잘렸다). 이제 공개 `putData` 는 등록을 풀고(`buffer = null`) 적재만 하며, `setBuffer`·`refresh` 는 내부 적재 함수(`load`)를 직접 부르고 `setBuffer` 는 그 **뒤에** 세 필드를 기록한다.
+    되돌리면 red: `test_put_data_releases_the_constructor_array` — 생성자 클립 → `putData` → 옛 배열 재기록 → play 2회, 핸들이 같아야 한다. `buffer = null` 줄을 지우면 핸들 `[1, 2]` 로 panicked(실측).
+
+### 3-4. 생성자 클립 표본 재측(게이트② 반려 승계)
+
+- 표본: ③ 근거 `4451036a7fb6` + 생성자 클립을 쓰는 KTF «소리 ok» 3종 — `0c67145b11df`(실행 로그에서 `Clip(type, resource)` → 생성자 → `setBuffer` 2회 · play 2 확인) · `135d1291501f` · `070daa5b552c`(jar 상수 풀에 `Clip` 과 `(Ljava/lang/String;[B)V` 동거).
+- 판 = release `wie_validate --inject --keys <0321 long.keys> --keep-timeout --timeout 60 --max-ticks 1e11` · 전 `bc358feb`(PR 부모) / 중 `a032acb5`(반려 판) / 후 `f5092bd1`(이 수정) 세 빌드를 **같은 시각에 나란히** · 2회 · load1 170~216.
+  - 결과 줄의 `UNMEASURED` 는 900 단계 키 루프가 60초에 다 들어가지 않아서다(입력 생존 판정 없음) — 여기서 읽는 것은 `audio` 뿐이다.
+- 칸 = 재생 / 빈 재생 / MIDI 이벤트.
+
+| sha12 | 회 | 전 `bc358feb` | 중 `a032acb5` | 후 `f5092bd1` |
+|---|---|---|---|---|
+| 4451036a7fb6 | 1 | 75 / 75 / 0 | 30 / 1 / 617 | 81 / 1 / 624 |
+| 4451036a7fb6 | 2 | 77 / 77 / 0 | 77 / 1 / 617 | 77 / 1 / 617 |
+| 0c67145b11df | 1 | 2 / 0 / 1,145 | 2 / 0 / 1,145 | 2 / 0 / 1,145 |
+| 0c67145b11df | 2 | 2 / 0 / 1,145 | 2 / 0 / 1,145 | 2 / 0 / 1,145 |
+| 135d1291501f | 1 | 6 / 0 / 2,432 | 6 / 0 / 2,432 | 6 / 0 / 2,432 |
+| 135d1291501f | 2 | 4 / 0 / 1,624 | 4 / 0 / 1,624 | 4 / 0 / 1,624 |
+| 070daa5b552c | 1 | 6 / 0 / 2,723 | 7 / 0 / 3,568 | 6 / 0 / 2,723 |
+| 070daa5b552c | 2 | 6 / 0 / 2,723 | 7 / 0 / 3,568 | 7 / 0 / 3,568 |
+
+- ③ 은 이 수정 뒤에도 선다: `4451036a7fb6` 은 전 빌드에서 재생이 **전부 빈 시퀀스**이고 중·후 모두 빈 재생 1 · MIDI 617~624.
+- **나빠짐 0**: 생성자 클립 3종은 후가 전과 같다. `070daa5b552c` 의 6 ↔ 7 은 60초 창 끝에 재생 1회가 들어오느냐의 흔들림이다 — 중·후 양쪽에서 두 값이 다 나왔다(이 짝 앞의 첫 측정 — 전 빌드가 잘못 중 빌드로 복사돼 «중 두 벌 + 후»가 된 판 — 에서도 중 6·6·6·18 · 후 7·6).
+- 이 표본들에서 게임 자신의 `putData` 호출은 관측되지 않았다(`0c67145b11df` 60초 debug 로그 0회) — 반려가 짚은 «생성자 → `putData` → 옛 배열 재기록» 순서는 단위 시험이 잠그고, 실게임에서는 «그 순서를 쓰는 타이틀에서 소리가 사라지지 않는다»까지만 말할 수 있다.
 - KTF `MC_mdaUnk17/18(3)`(9종)은 반환값 변이(0 → 7)로 짝 재측했으나 4종 모두 호출·소리·종료 시점이 같았다 — 이 회차의 결손으로 세지 않았다.
 
 ### 4. 전/후 — 같은 시각 짝 재측(104종 전부 · 90초)
@@ -197,4 +222,4 @@
 
 게임 파일명 유입(`corpus-name-inflow --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 4회/2쌍 · SUFFIX-ATTACHED 0회/0쌍. BOUNDED 4회는 전부 수정 파일의 기존 줄이다(`kernel.rs` 1 · `player.rs` 3 — 이 회차의 추가 줄 중 일치 0).
 
-<!-- corpus-name-inflow v1 subjects=7 tree=f2ec1d2a00bad1b0 B=4/2 P=1/1 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=7 tree=f4331bcb91f77eeb B=4/2 P=1/1 S=0/0 -->
