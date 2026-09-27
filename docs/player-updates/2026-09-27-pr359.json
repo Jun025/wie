@@ -1,0 +1,14 @@
+{
+  "date": "2026-09-27",
+  "kind": "sound",
+  "titles": [
+    "21ffd1c61ebdea00e477fc9241daf85212e3c3149823d3462c26f71f5df9c083",
+    "232122cdfb92bfce20f454fbd41c20ef20721d93fdbd289f95415caa5c4878e1",
+    "3412d851f78c22f1b4e57a805e59536c9f38e5d2e909dfb072cd72b305fe9cd6",
+    "4451036a7fb65261ec498f7146530475f7e965f35a445cce987731a0349b2980",
+    "5814101b801021a63b423e809f408d24a4ac476ed5bb1c6e3137c8d3de69bf3d",
+    "c1718bcdf8a904a27a6f252dac6b9cc2801e8303639126a944bf9785d23764ce"
+  ],
+  "summary_ko": "소리가 나지 않던 게임에서 효과음과 배경음이 나도록 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/359"
+}
