@@ -3,14 +3,15 @@ use alloc::vec;
 use smaf_player::{SmafEvent, parse_smaf};
 
 use jvm::{
-    Array, ClassInstanceRef, Jvm, Result,
+    Array, ClassInstanceRef, GlobalRef, Jvm, Result,
     runtime::{JavaIoInputStream, JavaLangString},
 };
 use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
-use rustjava_runtime::classes::java::{io::InputStream, lang::String};
+use rustjava_runtime::classes::java::{io::InputStream, lang::String, util::Vector};
 
-use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
+use wie_backend::{Event, Instant, System};
+use wie_jvm_support::{JvmSupport, WieJavaClassProto, WieJvmContext};
 
 use crate::classes::javax::microedition::media::{Control, PlayerListener};
 
@@ -79,6 +80,10 @@ impl SmafPlayer {
                 JavaFieldProto::new("started", "Z", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("startedAt", "J", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("lengthMs", "J", FieldAccessFlags::PRIVATE),
+                // `listeners`: `PlayerListener`s, created on the first add. `generation`: bumped by
+                // every start/stop/close, so an END_OF_MEDIA timer armed by an earlier start is void.
+                JavaFieldProto::new("listeners", "Ljava/util/Vector;", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("generation", "I", FieldAccessFlags::PRIVATE),
             ],
             access_flags: ClassAccessFlags::PUBLIC,
         }
@@ -117,8 +122,17 @@ impl SmafPlayer {
         jvm.put_field(&mut this, "started", "Z", true).await?;
         let now = context.system().platform().now().raw() as i64;
         jvm.put_field(&mut this, "startedAt", "J", now).await?;
+        let generation = Self::next_generation(jvm, &mut this).await?;
 
         context.system().audio().play(audio_handle as u32, repeat).unwrap();
+
+        // Only a player somebody listens to arms a timer — the rest keep today's behaviour exactly.
+        let length_ms: i64 = jvm.get_field(&this, "lengthMs", "J").await?;
+        let listeners: ClassInstanceRef<Vector> = jvm.get_field(&this, "listeners", "Ljava/util/Vector;").await?;
+        if length_ms > 0 && !listeners.is_null() {
+            let player = jvm.new_global_ref(&this).unwrap();
+            schedule_end_of_media(jvm.clone(), context.system().clone(), player, generation, now as u64 + length_ms as u64);
+        }
 
         Ok(())
     }
@@ -128,6 +142,7 @@ impl SmafPlayer {
 
         let audio_handle: i32 = jvm.get_field(&this, "audioHandle", "I").await?;
         jvm.put_field(&mut this, "started", "Z", false).await?;
+        Self::next_generation(jvm, &mut this).await?;
 
         let system = context.system();
 
@@ -136,8 +151,11 @@ impl SmafPlayer {
         Ok(())
     }
 
-    async fn close(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> Result<()> {
+    async fn close(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> Result<()> {
         tracing::debug!("net.wie.SmafPlayer::close({this:?})");
+
+        jvm.put_field(&mut this, "started", "Z", false).await?;
+        Self::next_generation(jvm, &mut this).await?;
 
         let audio_handle: i32 = jvm.get_field(&this, "audioHandle", "I").await?;
 
@@ -221,24 +239,99 @@ impl SmafPlayer {
         Ok(())
     }
 
+    // Only END_OF_MEDIA is delivered; STARTED/STOPPED/CLOSED are not (no title in the local corpus
+    // calls `addPlayerListener` at all — 2026-09-28 — so nothing yet asks for them).
     async fn add_player_listener(
-        _jvm: &Jvm,
+        jvm: &Jvm,
         _context: &mut WieJvmContext,
-        this: ClassInstanceRef<Self>,
+        mut this: ClassInstanceRef<Self>,
         listener: ClassInstanceRef<PlayerListener>,
     ) -> Result<()> {
-        tracing::warn!("stub net.wie.SmafPlayer::addPlayerListener({this:?}, {listener:?})");
+        tracing::debug!("net.wie.SmafPlayer::addPlayerListener({this:?}, {listener:?})");
+
+        if listener.is_null() {
+            return Ok(());
+        }
+        let mut listeners: ClassInstanceRef<Vector> = jvm.get_field(&this, "listeners", "Ljava/util/Vector;").await?;
+        if listeners.is_null() {
+            listeners = jvm.new_class("java/util/Vector", "()V", ()).await?.into();
+            jvm.put_field(&mut this, "listeners", "Ljava/util/Vector;", listeners.clone()).await?;
+        }
+        let present: bool = jvm
+            .invoke_virtual(&listeners, "java/util/Vector", "contains", "(Ljava/lang/Object;)Z", (listener.clone(),))
+            .await?;
+        if !present {
+            let _: () = jvm
+                .invoke_virtual(&listeners, "java/util/Vector", "addElement", "(Ljava/lang/Object;)V", (listener,))
+                .await?;
+        }
 
         Ok(())
     }
 
     async fn remove_player_listener(
-        _jvm: &Jvm,
+        jvm: &Jvm,
         _context: &mut WieJvmContext,
         this: ClassInstanceRef<Self>,
         listener: ClassInstanceRef<PlayerListener>,
     ) -> Result<()> {
-        tracing::warn!("stub net.wie.SmafPlayer::removePlayerListener({this:?}, {listener:?})");
+        tracing::debug!("net.wie.SmafPlayer::removePlayerListener({this:?}, {listener:?})");
+
+        let listeners: ClassInstanceRef<Vector> = jvm.get_field(&this, "listeners", "Ljava/util/Vector;").await?;
+        if !listeners.is_null() {
+            let _: bool = jvm
+                .invoke_virtual(&listeners, "java/util/Vector", "removeElement", "(Ljava/lang/Object;)Z", (listener,))
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn next_generation(jvm: &Jvm, this: &mut ClassInstanceRef<Self>) -> Result<i32> {
+        let generation = jvm.get_field::<i32>(this, "generation", "I").await?.wrapping_add(1);
+        jvm.put_field(this, "generation", "I", generation).await?;
+
+        Ok(generation)
+    }
+
+    /// The END_OF_MEDIA timer of one start. A one-shot ends there (the player is PREFETCHED again);
+    /// a loop posts END_OF_MEDIA at every pass, as MIDP's `setLoopCount` specifies, and re-arms.
+    async fn end_of_media(jvm: &Jvm, system: &System, player: &GlobalRef<Self>, generation: i32, due: u64) -> Result<()> {
+        let mut this = (**player).clone();
+        let current: i32 = jvm.get_field(&this, "generation", "I").await?;
+        if current != generation {
+            return Ok(());
+        }
+        let repeat: bool = jvm.get_field(&this, "repeat", "Z").await?;
+        if !repeat {
+            jvm.put_field(&mut this, "started", "Z", false).await?;
+        }
+
+        let listeners: ClassInstanceRef<Vector> = jvm.get_field(&this, "listeners", "Ljava/util/Vector;").await?;
+        let listeners: ClassInstanceRef<Array<PlayerListener>> = jvm
+            .invoke_virtual(&listeners, "java/util/Vector", "toArray", "()[Ljava/lang/Object;", ())
+            .await?;
+        let event: ClassInstanceRef<String> = jvm
+            .get_static_field("javax/microedition/media/PlayerListener", "END_OF_MEDIA", "Ljava/lang/String;")
+            .await?;
+        let length_ms: i64 = jvm.get_field(&this, "lengthMs", "J").await?;
+        for listener in jvm.load_array(&listeners, 0, jvm.array_length(&listeners).await?).await? {
+            let media_time = jvm.new_class("java/lang/Long", "(J)V", (length_ms,)).await?;
+            let _: () = jvm
+                .invoke_virtual(
+                    &listener,
+                    "javax/microedition/media/PlayerListener",
+                    "playerUpdate",
+                    "(Ljavax/microedition/media/Player;Ljava/lang/String;Ljava/lang/Object;)V",
+                    (this.clone(), event.clone(), media_time),
+                )
+                .await?;
+        }
+
+        if repeat && jvm.get_field::<i32>(&this, "generation", "I").await? == generation {
+            let player = jvm.new_global_ref(&this).unwrap();
+            schedule_end_of_media(jvm.clone(), system.clone(), player, generation, due + length_ms as u64);
+        }
 
         Ok(())
     }
@@ -263,6 +356,18 @@ impl SmafPlayer {
 
         Ok(jvm.instantiate_array("Ljavax/microedition/media/Control;", 0).await?.into())
     }
+}
+
+fn schedule_end_of_media(jvm: Jvm, system: System, player: GlobalRef<SmafPlayer>, generation: i32, due: u64) {
+    system
+        .clone()
+        .event_queue()
+        .push(Event::timer(Instant::from_epoch_millis(due), move || async move {
+            match SmafPlayer::end_of_media(&jvm, &system, &player, generation, due).await {
+                Ok(()) => Ok(()),
+                Err(error) => Err(JvmSupport::to_wie_err(&jvm, error).await),
+            }
+        }));
 }
 
 const PREFETCHED: i32 = 300;
@@ -298,10 +403,15 @@ fn sequence_length_ms(events: &[(usize, SmafEvent)]) -> u64 {
 
 #[cfg(test)]
 mod test {
-    use alloc::boxed::Box;
+    use alloc::{boxed::Box, vec, vec::Vec};
 
-    use jvm::{Array, ClassInstanceRef, JavaError, runtime::JavaLangString};
-    use test_utils::run_jvm_test;
+    use jvm::{Array, ClassInstanceRef, JavaError, Jvm, Result as JvmResult, runtime::JavaLangString};
+    use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
+    use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
+    use rustjava_runtime::classes::java::lang::{Object, String};
+    use test_utils::{TestClock, TestPlatform, run_jvm_test, run_jvm_test_with_system};
+    use wie_backend::{Event, System};
+    use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
     use wie_util::Result;
 
     use crate::{
@@ -380,6 +490,173 @@ mod test {
             let _: () = jvm.invoke_virtual(&player, "javax/microedition/media/Player", "close", "()V", ()).await?;
             Ok(())
         })
+    }
+
+    // Counts `playerUpdate` calls and keeps the last event.
+    struct TestListener;
+
+    impl TestListener {
+        fn as_proto() -> WieJavaClassProto {
+            WieJavaClassProto {
+                name: "TestListener",
+                parent_class: Some("java/lang/Object"),
+                interfaces: vec!["javax/microedition/media/PlayerListener"],
+                methods: vec![
+                    JavaMethodProto::new("<init>", "()V", Self::init, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new(
+                        "playerUpdate",
+                        "(Ljavax/microedition/media/Player;Ljava/lang/String;Ljava/lang/Object;)V",
+                        Self::player_update,
+                        MethodAccessFlags::PUBLIC,
+                    ),
+                ],
+                fields: vec![
+                    JavaFieldProto::new("count", "I", FieldAccessFlags::STATIC),
+                    JavaFieldProto::new("last", "Ljava/lang/String;", FieldAccessFlags::STATIC),
+                ],
+                access_flags: ClassAccessFlags::PUBLIC,
+            }
+        }
+
+        async fn init(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await
+        }
+
+        async fn player_update(
+            jvm: &Jvm,
+            _: &mut WieJvmContext,
+            _this: ClassInstanceRef<Self>,
+            _player: ClassInstanceRef<Player>,
+            event: ClassInstanceRef<String>,
+            _data: ClassInstanceRef<Object>,
+        ) -> JvmResult<()> {
+            let count: i32 = jvm.get_static_field("TestListener", "count", "I").await?;
+            jvm.put_static_field("TestListener", "count", "I", count + 1).await?;
+            jvm.put_static_field("TestListener", "last", "Ljava/lang/String;", event).await
+        }
+    }
+
+    // Runs every timer due by `clock`'s time; returns how many ran. What `EventQueue.getNextEvent` does.
+    async fn fire_due_timers(system: &System, clock: &TestClock) -> Result<usize> {
+        let mut fired = 0;
+        let mut later = Vec::new();
+        while let Some(event) = { system.event_queue().pop() } {
+            if let Event::Timer { due, callback } = event {
+                if due.raw() <= clock.peek() {
+                    callback().await?;
+                    fired += 1;
+                } else {
+                    later.push(Event::Timer { due, callback });
+                }
+            }
+        }
+        for event in later {
+            system.event_queue().push(event);
+        }
+        Ok(fired)
+    }
+
+    // END_OF_MEDIA reaches a listener once, `lengthMs` after a one-shot starts; a stop or close
+    // before then voids it; a loop posts it at every pass. Players nobody listens to arm nothing.
+    #[test]
+    fn test_end_of_media_reaches_listeners() -> Result<()> {
+        let clock = TestClock::new();
+        let test_clock = clock.clone();
+        run_jvm_test_with_system(
+            Box::new([get_protos().into(), [TestListener::as_proto()].into()]),
+            Box::new(TestPlatform::with_clock(clock)),
+            move |jvm, system| async move {
+                let clock = test_clock;
+                let count = async || -> JvmResult<i32> { jvm.get_static_field("TestListener", "count", "I").await };
+                let player = |loop_count: i32| {
+                    let jvm = jvm.clone();
+                    async move {
+                        let data = jvm.instantiate_array("B", 0).await?;
+                        let stream = jvm.new_class("java/io/ByteArrayInputStream", "([B)V", (data,)).await?;
+                        let content_type = JavaLangString::from_rust_string(&jvm, "application/vnd.smaf").await?;
+                        let mut player: ClassInstanceRef<Player> = jvm
+                            .invoke_static(
+                                "javax/microedition/media/Manager",
+                                "createPlayer",
+                                "(Ljava/io/InputStream;Ljava/lang/String;)Ljavax/microedition/media/Player;",
+                                (stream, content_type),
+                            )
+                            .await?;
+                        jvm.put_field(&mut player, "lengthMs", "J", 500i64).await?;
+                        let _: () = jvm
+                            .invoke_virtual(&player, "javax/microedition/media/Player", "setLoopCount", "(I)V", (loop_count,))
+                            .await?;
+                        JvmResult::Ok(player)
+                    }
+                };
+                let call = async |player: &ClassInstanceRef<Player>, name: &str| -> JvmResult<()> {
+                    jvm.invoke_virtual(player, "javax/microedition/media/Player", name, "()V", ()).await
+                };
+                let listen = async |player: &ClassInstanceRef<Player>| -> JvmResult<()> {
+                    let listener = jvm.new_class("TestListener", "()V", ()).await?;
+                    jvm.invoke_virtual(
+                        player,
+                        "javax/microedition/media/Player",
+                        "addPlayerListener",
+                        "(Ljavax/microedition/media/PlayerListener;)V",
+                        (listener,),
+                    )
+                    .await
+                };
+                let fire = async || fire_due_timers(&system, &clock).await.unwrap();
+
+                // Nobody listening: nothing is armed.
+                let quiet = player(1).await?;
+                call(&quiet, "start").await?;
+                clock.advance(1000);
+                assert_eq!(fire().await, 0);
+
+                // One-shot: nothing at 499 ms, one END_OF_MEDIA at 500, then PREFETCHED.
+                let one_shot = player(1).await?;
+                listen(&one_shot).await?;
+                call(&one_shot, "start").await?;
+                clock.advance(499);
+                assert_eq!(fire().await, 0);
+                clock.advance(1);
+                assert_eq!(fire().await, 1);
+                assert_eq!(count().await?, 1);
+                let last: ClassInstanceRef<String> = jvm.get_static_field("TestListener", "last", "Ljava/lang/String;").await?;
+                assert_eq!(JavaLangString::to_rust_string(&jvm, &last).await?, "endOfMedia");
+                let state: i32 = jvm
+                    .invoke_virtual(&one_shot, "javax/microedition/media/Player", "getState", "()I", ())
+                    .await?;
+                assert_eq!(state, 300);
+                clock.advance(5000);
+                assert_eq!(fire().await, 0);
+
+                // Stopped or closed before the end: the timer runs but nobody hears it.
+                for end in ["stop", "close"] {
+                    call(&one_shot, "start").await?;
+                    call(&one_shot, end).await?;
+                    clock.advance(500);
+                    assert_eq!(fire().await, 1);
+                    assert_eq!(count().await?, 1, "{end}");
+                }
+
+                // Loop: END_OF_MEDIA at every pass, until stopped.
+                let looping = player(-1).await?;
+                listen(&looping).await?;
+                call(&looping, "start").await?;
+                for pass in 2..5 {
+                    clock.advance(500);
+                    assert_eq!(fire().await, 1);
+                    assert_eq!(count().await?, pass);
+                }
+                call(&looping, "stop").await?;
+                clock.advance(500);
+                fire().await;
+                clock.advance(500);
+                assert_eq!(fire().await, 0);
+                assert_eq!(count().await?, 4);
+
+                Ok(())
+            },
+        )
     }
 
     #[test]
