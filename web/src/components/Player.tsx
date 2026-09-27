@@ -58,7 +58,7 @@ export function Player({ game, user, onExit, onMenu, toast, onReportCrash }: Pro
   const sessionRef = useRef<EmulatorSession | null>(null);
   const keymapRef = useRef<Record<string, EmuKey>>(loadKeymap());
   const { theme, toggle: toggleTheme } = useTheme();
-  const [status, setStatus] = useState<"loading" | "running" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "running" | "error" | "exited">("loading");
   const [error, setError] = useState<EmuError | null>(null);
   const [bootNonce, setBootNonce] = useState(0); // bump to re-boot the same game (restart after error)
   const [showRemap, setShowRemap] = useState(false);
@@ -80,6 +80,9 @@ export function Player({ game, user, onExit, onMenu, toast, onReportCrash }: Pro
       if (cancelled) return;
       setError(err);
       setStatus("error");
+    };
+    session.onExit = () => {
+      if (!cancelled) setStatus("exited");
     };
     session.onVolumeChange = (v, m) => {
       if (cancelled) return;
@@ -241,6 +244,25 @@ export function Player({ game, user, onExit, onMenu, toast, onReportCrash }: Pro
   return (
     <section className="fixed inset-0 z-20 flex flex-col overflow-y-auto overscroll-contain bg-surface">
       {error && <ErrorPanel error={error} onRestart={restart} onExit={onExit} onReport={() => void reportCrash(error)} toast={toast} />}
+
+      {/* The game ended itself (menu «종료», or an LGT first-run notice that writes
+          its marker and exits). Never auto-relaunch — both are the same engine call,
+          so that would resurrect a user's own quit. The save is already persisted
+          (onExit fires after persist), so «다시 실행» boots the same DB. */}
+      {status === "exited" && (
+        <div role="status" className="m-2 rounded-lg border border-edge bg-surface2 p-4 text-sm">
+          <p className="font-semibold">게임이 종료되었습니다</p>
+          <p className="mt-1 text-xs text-fg-dim">저장 데이터는 그대로 남아 있습니다. 처음 실행 안내 뒤 꺼지는 게임은 다시 실행하면 시작됩니다.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={restart} className="rounded-md border border-accent bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg hover:bg-accent-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+              다시 실행
+            </button>
+            <button type="button" onClick={onExit} className="rounded-md border border-edge px-3 py-1.5 text-xs font-medium hover:border-accent">
+              나가기
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Loading feedback: without it, a booting game shows only a blank canvas —
           indistinguishable from a frozen/running one — so a slow boot reads as a
