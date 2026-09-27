@@ -1,0 +1,46 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-census-ktf-classloader-header-table-8",
+  "title": "전수 점검 KTF KtfClassLoader 생성 예외 8종 — 원인 4갈래 · 2종 수리 · 머리 표 포맷 명명",
+  "summary": "8종의 원인은 넷이었다. java/io/UnavailableException 부재(1) · ADF AID 와 jar 이름 불일치(1) · 재배치 표로 시작하는 다른 client.bin ABI(3) · 범위 밖(KTF 단말 UI 라이브러리 com/ktf/kfc 1 · OMA DRM odcf 2). 앞의 둘은 고쳤고, 셋째는 포맷을 확정해 이름 붙은 오류로 멈추게 했다.",
+  "changes": [
+    "wie-wipi-java/src/classes/java/io/unavailable_exception.rs — java/io/UnavailableException + 시험",
+    "wie-ktf/src/emulator.rs — jar_filename(): <AID>.jar 부재 시 유일한 .jar 로 폴백 + 시험",
+    "wie-ktf/src/adf.rs · runtime/init.rs — is_relocation_prefixed() + 명명 오류 + 시험",
+    "docs/report/0328"
+  ],
+  "verification": [
+    "0392263fbb85: FAIL → PASS(부팅·화면) · --inject 27/27 PASS · 600초 PASS 패닉 0",
+    "d552e095ddcf: FAIL → 4회 중 PASS 2 · --inject 27/27 PASS · 나머지 2회는 다음 벽(String(char[]) null 호스트 패닉)",
+    "변이 3종(등록 제거 · 폴백 제거 · 검출 무력화) 각각 시험 red → 원상 green",
+    "라이브 LGT 5종 + 가드 2종 전/후 판정 동일"
+  ],
+  "limits": [
+    "재배치 표 포맷 3종은 여전히 부팅하지 않는다 — 이미지에 WIPI_exe 가 없고 sl 기준 위치 독립 코드라 진입 ABI 를 풀어야 한다",
+    "bfa8ec352451 은 com/ktf/kfc 6클래스가 필요하다. 참조 자료가 0 이라 추측 구현하지 않았다",
+    "60bd6cbc5936 · dab2d537f3ef 는 암호화된 DRM 컨테이너다 — 복호 키가 없다"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "new String((char[]) null) 이 호스트 패닉 대신 NullPointerException 을 내게 — d552e095ddcf(KTF)의 다음 벽",
+      "plainSummary": "한 게임이 시작 화면 뒤에 두 번 중 한 번꼴로 강제 종료된다. 빈 문자 배열로 글자를 만들 때 에뮬레이터가 오류를 게임에 돌려주지 않고 스스로 멈추기 때문이다.",
+      "userBenefit": "그 게임이 매번 시작 화면 너머로 진행할 수 있다. 같은 호출을 하는 다른 게임도 더 이상 강제 종료되지 않는다.",
+      "why": "이번 회차 실측: d552e095ddcf 4회 중 2회가 jvm-0.1.1 class_instance.rs:108:32 에서 패닉했고, 백트레이스는 rustjava_runtime String::init_with_char_array 였다. 2026-09-05 docs/report/0030 §10-6-b 가 «핀에도 hardening.rs 에도 없다»로 적은 후보인데, 이제 지목하는 타이틀이 생겼다.",
+      "tradeoff": "hardening.rs 에 java/lang/String arm 을 더하면 핀 밖 가드가 하나 는다(핀을 올릴 때 재확인 대상). String(byte[]) 도 같은 모양이라 함께 막는 것이 자연스럽다.",
+      "effort": "S",
+      "target": "wie_jvm_support/src/hardening.rs"
+    },
+    {
+      "kind": "product",
+      "title": "재배치 표로 시작하는 KTF client.bin 의 진입 ABI 를 풀어 3종을 부팅시킨다",
+      "plainSummary": "KTF 게임 3종이 다른 형식으로 포장돼 있어 전혀 시작되지 않는다. 포장 형식은 이번에 밝혔고, 남은 것은 게임 코드를 어떻게 시작시키는지 알아내는 일이다.",
+      "userBenefit": "KTF 게임 3종(1d5831e42a8a · 83fc429f9cbe · b907b0faf483)이 부팅 후보가 된다.",
+      "why": "컨테이너는 확정했다: [bss][count][오프셋…][이미지], 표준 스텁이 읽는 표와 같다. 이미지에는 WIPI_exe 가 없고, +0x24 에 Thumb 함수, +0x20/+0x28 에 0x13580001 이 있으며, 코드는 sl(r10)을 GOT 로 쓴다. 지금은 명명 오류로 멈춘다.",
+      "tradeoff": "L 규모 역공학이다. 3종만을 위해 두 번째 로더 경로가 생긴다. 같은 포맷이 더 나오지 않으면 비용 대비 효과가 작다.",
+      "effort": "L",
+      "target": "wie-ktf/src/runtime/init.rs"
+    }
+  ]
+}

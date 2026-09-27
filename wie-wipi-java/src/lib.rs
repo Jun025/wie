@@ -73,5 +73,6 @@ pub fn get_protos() -> [WieJavaClassProto; 55] {
         crate::classes::net::wie::WIPIMIDlet::as_proto(),
         crate::classes::wec::OEMDevice::as_proto(),
         crate::classes::wec::SYSTheme::as_proto(),
+        crate::classes::java::io::UnavailableException::as_proto(),
     ]
 }
