@@ -398,8 +398,12 @@ mod tests {
     fn no_arg_image_is_one_pixel() -> wie_util::Result<()> {
         test_utils::run_jvm_test(Box::new([crate::get_protos().into()]), |jvm| async move {
             let image: ClassInstanceRef<Image> = jvm.new_class("javax/microedition/lcdui/Image", "()V", ()).await?.into();
-            let width: i32 = jvm.invoke_virtual(&image, "javax/microedition/lcdui/Image", "getWidth", "()I", ()).await?;
-            let height: i32 = jvm.invoke_virtual(&image, "javax/microedition/lcdui/Image", "getHeight", "()I", ()).await?;
+            let width: i32 = jvm
+                .invoke_virtual(&image, "javax/microedition/lcdui/Image", "getWidth", "()I", ())
+                .await?;
+            let height: i32 = jvm
+                .invoke_virtual(&image, "javax/microedition/lcdui/Image", "getHeight", "()I", ())
+                .await?;
             assert_eq!((width, height), (1, 1));
             let mut buffer = JavaImageBuffer::<ArgbPixel>::new(&jvm, &image).await?;
             let _ = buffer.get_pixel(0, 0);

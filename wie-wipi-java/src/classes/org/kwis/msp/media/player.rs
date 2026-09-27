@@ -330,8 +330,12 @@ mod test {
         run_jvm_test(Box::new([wie_midp::get_protos().into(), get_protos().into()]), |jvm| async move {
             let null = || ClassInstanceRef::<Clip>::new(None);
 
-            let stopped: bool = jvm.invoke_static("org/kwis/msp/media/Player", "stop", "(Lorg/kwis/msp/media/Clip;)Z", (null(),)).await?;
-            let resumed: bool = jvm.invoke_static("org/kwis/msp/media/Player", "resume", "(Lorg/kwis/msp/media/Clip;)Z", (null(),)).await?;
+            let stopped: bool = jvm
+                .invoke_static("org/kwis/msp/media/Player", "stop", "(Lorg/kwis/msp/media/Clip;)Z", (null(),))
+                .await?;
+            let resumed: bool = jvm
+                .invoke_static("org/kwis/msp/media/Player", "resume", "(Lorg/kwis/msp/media/Clip;)Z", (null(),))
+                .await?;
             let played: bool = jvm
                 .invoke_static("org/kwis/msp/media/Player", "play", "(Lorg/kwis/msp/media/Clip;Z)Z", (null(), false))
                 .await?;

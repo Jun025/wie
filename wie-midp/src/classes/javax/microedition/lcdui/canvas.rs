@@ -56,11 +56,13 @@ impl Canvas {
     }
 
     async fn get_width(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        jvm.invoke_special(&this, "javax/microedition/lcdui/Displayable", "getWidth", "()I", ()).await
+        jvm.invoke_special(&this, "javax/microedition/lcdui/Displayable", "getWidth", "()I", ())
+            .await
     }
 
     async fn get_height(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        jvm.invoke_special(&this, "javax/microedition/lcdui/Displayable", "getHeight", "()I", ()).await
+        jvm.invoke_special(&this, "javax/microedition/lcdui/Displayable", "getHeight", "()I", ())
+            .await
     }
 
     async fn init(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
@@ -621,8 +623,12 @@ mod test {
     fn canvas_super_size_resolves_on_canvas() -> Result<()> {
         run_jvm_test(Box::new([get_protos().into(), [RecordingCanvas::as_proto()].into()]), |jvm| async move {
             let canvas: ClassInstanceRef<Canvas> = jvm.new_class("javax/microedition/lcdui/TestRecordingCanvas", "()V", ()).await?.into();
-            let width: i32 = jvm.invoke_special(&canvas, "javax/microedition/lcdui/Canvas", "getWidth", "()I", ()).await?;
-            let height: i32 = jvm.invoke_special(&canvas, "javax/microedition/lcdui/Canvas", "getHeight", "()I", ()).await?;
+            let width: i32 = jvm
+                .invoke_special(&canvas, "javax/microedition/lcdui/Canvas", "getWidth", "()I", ())
+                .await?;
+            let height: i32 = jvm
+                .invoke_special(&canvas, "javax/microedition/lcdui/Canvas", "getHeight", "()I", ())
+                .await?;
             assert!(width > 0 && height > 0);
             Ok(())
         })
