@@ -21,3 +21,5 @@
 ### 범위 밖
 - otterpebble featurephone 셸(worklog 의 `target`)에는 같은 흐름이 **이미 있다** — `apps/featurephone/app/page.tsx` `handleCleanExit`(persist → free → 종료 패널)와 `replay`, 착지 `9084141c7`(2026-07-13). 그래서 이 회차는 wie 의 `web/` 셸만 고친다.
 - `docs/player-updates` 는 넣지 않았다. 그 목록은 featurephone 사이트용이고, 이 변경은 `wie-web` 셸에만 있다.
+
+- 게임 파일명 유입: BOUNDED 0 · SUFFIX-ATTACHED 0 (`node scripts/corpus-name-inflow.mjs`).
