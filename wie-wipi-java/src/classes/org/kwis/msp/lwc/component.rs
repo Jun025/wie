@@ -6,6 +6,8 @@ use jvm_types::{ClassAccessFlags, MethodAccessFlags};
 
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
+use crate::classes::{net::wie::ShellCard, org::kwis::msp::lcdui::Graphics};
+
 // class org.kwis.msp.lwc.Component
 pub struct Component;
 
@@ -28,6 +30,7 @@ impl Component {
                 JavaMethodProto::new("repaint", "(IIII)V", Self::repaint_region, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("serviceRepaints", "()V", Self::service_repaints, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("hasFocus", "()Z", Self::has_focus, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("paint", "(Lorg/kwis/msp/lcdui/Graphics;)V", Self::paint, MethodAccessFlags::PUBLIC),
             ],
             fields: vec![],
             access_flags: ClassAccessFlags::PUBLIC | ClassAccessFlags::ABSTRACT,
@@ -88,16 +91,19 @@ impl Component {
         Ok(0)
     }
 
-    // The lwc widget layer has no paint plumbing in wie (all peers here are logged
-    // stubs); repaint follows the same contract. Games draw through Card/Canvas.
-    async fn repaint(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
-        tracing::warn!("stub org.kwis.msp.lwc.Component::repaint({this:?})");
+    // A shown ShellComponent sits on a net.wie.ShellCard, so its repaint is that card's repaint —
+    // the same Card → CardCanvas → request_redraw path Card games take. A component that is not a
+    // shown shell has nowhere to be drawn (children are never laid out here), so it stays a no-op.
+    async fn repaint(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lwc.Component::repaint({this:?})");
 
-        Ok(())
+        match ShellCard::find(jvm, &this).await? {
+            Some(card) => jvm.invoke_virtual(&card, "org/kwis/msp/lcdui/Card", "repaint", "()V", ()).await,
+            None => Ok(()),
+        }
     }
 
-    // The region-bounded repaint 학교가는길 calls. It defers to the whole-component form rather
-    // than logging separately, so the two stay one contract if that ever grows real plumbing.
+    // The region-bounded repaint 학교가는길 calls every timer tick.
     async fn repaint_region(
         jvm: &Jvm,
         _: &mut WieJvmContext,
@@ -107,15 +113,30 @@ impl Component {
         width: i32,
         height: i32,
     ) -> JvmResult<()> {
-        tracing::warn!("stub org.kwis.msp.lwc.Component::repaint({this:?}, {x}, {y}, {width}, {height})");
+        tracing::debug!("org.kwis.msp.lwc.Component::repaint({this:?}, {x}, {y}, {width}, {height})");
 
-        jvm.invoke_virtual(&this, "org/kwis/msp/lwc/Component", "repaint", "()V", ()).await
+        match ShellCard::find(jvm, &this).await? {
+            Some(card) => {
+                jvm.invoke_virtual(&card, "org/kwis/msp/lcdui/Card", "repaint", "(IIII)V", (x, y, width, height))
+                    .await
+            }
+            None => Ok(()),
+        }
     }
 
-    // serviceRepaints blocks until pending paints flush; with repaint a no-op there is nothing
-    // outstanding to wait for, so returning immediately is the honest equivalent.
-    async fn service_repaints(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
-        tracing::warn!("stub org.kwis.msp.lwc.Component::serviceRepaints({this:?})");
+    async fn service_repaints(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lwc.Component::serviceRepaints({this:?})");
+
+        match ShellCard::find(jvm, &this).await? {
+            Some(card) => jvm.invoke_virtual(&card, "org/kwis/msp/lcdui/Card", "serviceRepaints", "()V", ()).await,
+            None => Ok(()),
+        }
+    }
+
+    // What ShellCard calls when the guest shell does not override paint (a shell that only hosts a
+    // work component): lwc's own widgets are not drawn here, so there is nothing to put on screen.
+    async fn paint(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, g: ClassInstanceRef<Graphics>) -> JvmResult<()> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::paint({this:?}, {g:?})");
 
         Ok(())
     }

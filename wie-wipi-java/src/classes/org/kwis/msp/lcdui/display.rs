@@ -10,7 +10,7 @@ use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 use wie_midp::classes::javax::microedition::lcdui::Display as MidpDisplay;
 
 use crate::classes::{
-    net::wie::WIPIKeyCode,
+    net::wie::{CardCanvas, WIPIKeyCode},
     org::kwis::msp::lcdui::{Card, Jlet, JletEventListener},
 };
 
@@ -472,6 +472,10 @@ impl Display {
         };
 
         Ok(key_code)
+    }
+
+    pub async fn card_canvas(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<CardCanvas>> {
+        jvm.get_field(this, "cardCanvas", "Lnet/wie/CardCanvas;").await
     }
 
     pub async fn midp_display(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<MidpDisplay>> {
