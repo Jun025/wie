@@ -20,7 +20,7 @@
 | 3 | SKT `new Image()` → NoSuchMethodError `Image.<init>()V` | SKT 5 | 1×1 이미지 생성자. 0×0 은 안 된다 — 읽는 쪽이 모두 `bpl / width` 로 픽셀 폭을 구한다 | 부팅 fail 5 → 5종 모두 부팅·화면·조작 ok |
 | 4 | 게임의 `super.getHeight()` = invokespecial `Canvas.getHeight` → NoSuchMethodError | SKT 2 | `Canvas` 에 `getWidth/getHeight` 를 선언하고 `Displayable` 로 넘긴다. 핀의 JVM 이 invokespecial 을 이름 붙은 클래스에서만 찾기 때문이다(JVMS §5.4.3.3 는 상위까지 찾는다 · 후속) | 부팅 fail 2 → ok 1 · 다음 벽 1 |
 | 5 | SKT `System.getProperty("m.MODEL"/"m.EXT_SW")` = null → `.equals`·`.length` NPE | SKT 3 | 두 속성에 실제 기기와 겹치지 않는 값. 코퍼스 84종 중 `m.MODEL` 59종 · `m.EXT_SW` 7종이 읽는다. null 을 검사하던 타이틀은 같은 기본 경로를 탄다 | 부팅 fail 3 → ok 2 · 다음 벽 1 |
-| 6 | 게임이 끝날 때 호스트 스택 넘침(abort) | KTF 4 | `Jlet.notifyDestroyed` 가 `destroyApp` 를 되부르고 있었다. 게임의 `destroyApp` 는 `notifyDestroyed()` 로 끝나므로 무한 재귀가 된다. MIDP 에서 `destroyApp` 는 플랫폼이 부른다. 그래서 되부르기를 뺐다. `MIDlet.notifyDestroyed` 는 스텁이었는데, 이제 `MC_knlExit`·`System.exit` 과 같은 종료 경로를 탄다 | 전수 1회차 abort 4 · 재실행은 키 타이밍 따라 재현이 갈린다 — 판정은 단위 시험으로 |
+| 6 | 게임이 끝날 때 호스트 스택 넘침(abort) | KTF 6 | `Jlet.notifyDestroyed` 가 `destroyApp` 를 되부르고 있었다. 게임의 `destroyApp` 는 `notifyDestroyed()` 로 끝나므로 무한 재귀가 된다. MIDP 에서 `destroyApp` 는 플랫폼이 부른다. 그래서 되부르기를 뺐다. `MIDlet.notifyDestroyed` 는 스텁이었는데, 이제 `MC_knlExit`·`System.exit` 과 같은 종료 경로를 탄다 | 전: 30초 프로브 abort 2 · 10분 실행 abort 4. 후(수정 빌드 10분 · 그중 4종): abort **0**. 600초 완주 2 · 메뉴 «종료»로 clean exit 2. 30초 재현은 키 타이밍에 따라 갈린다 — 판정은 단위 시험으로 |
 | 7 | zip 안 게임 폴더가 2~3단 깊이, 또는 루트에 스크린샷이 같이 있음 → `unrecognized zip archive` | KTF 3 | `extract_zip` 이 표식(`__adf__`·`app_info`·`*.msd`)이 든 **유일한** 디렉터리로 재루팅한다. 루트에 표식이 있거나 후보가 둘이면 손대지 않는다 | 로드 실패 3 → 부팅 3(디버그) |
 
 «후» 는 전수 429종을 수정 빌드(`920e56fb`, 재루팅 전)로 한 번 더 잰 값이다. 개선 26건 중 20건이 위 군집이다. 나머지 6건은 조작 축이 한 번 재서 뒤집힌 것이다(0317 §측정의 한계).
@@ -52,4 +52,3 @@
 - `scripts/build-wasm.sh` rc=0 · `check-engine-contract.mjs` 109 pass / 0 violation · `npm run audit` PASSED.
 - 게임 파일명 유입: 이 회차가 **더한 줄**에는 0건이다(`git diff origin/main` 의 `+` 줄 기준).
 - 도구 표기는 BOUNDED 4회/2쌍 · SUFFIX-ATTACHED 1회/1쌍이다. 모두 이 회차가 손댄 파일에 **이미 있던** 주석 3곳이다(`jlet.rs` 1 · `player.rs` 3).
-<!-- corpus-name-inflow v1 subjects=10 tree=a83d10d12a1a39ee B=4/2 P=0/0 S=1/1 -->
