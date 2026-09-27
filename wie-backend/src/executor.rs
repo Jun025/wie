@@ -28,7 +28,8 @@ pub struct ExecutorInner {
     // order. Hash-order polling made scheduling differ per build artifact and
     // per run, flipping boot-order-sensitive titles between PASS and blank.
     tasks: BTreeMap<usize, Task>,
-    sleeping_tasks: BTreeMap<usize, Instant>,
+    // (wake, requested timeout ms)
+    sleeping_tasks: BTreeMap<usize, (Instant, u64)>,
     last_task_id: usize,
     last_now: Instant,
 }
@@ -139,20 +140,22 @@ impl Executor {
                 let inner = self.inner.lock();
                 let running_task_count = inner.tasks.len() - inner.sleeping_tasks.len();
                 if running_task_count == 0 && !inner.sleeping_tasks.is_empty() {
-                    Some(*inner.sleeping_tasks.values().min().unwrap())
+                    let next = inner.sleeping_tasks.values().map(|x| x.0).min().unwrap();
+                    let paced = inner.sleeping_tasks.values().filter(|x| x.1 > POLL_SLEEP_MS).map(|x| x.0).min();
+                    Some((next, paced))
                 } else {
                     None
                 }
             };
 
             // Every task is asleep. Ending the tick here used to put each wake on the host's frame
-            // grid: 메이플스토리2007's sleep(60) woke 66.7 or 83.3ms later, never 60. A wake that
-            // falls inside the budget is waited for instead — spending CPU the budget already
+            // grid: 메이플스토리2007's sleep(60) woke 66.7 or 83.3ms later, never 60. A paced wake
+            // that falls inside the budget is waited for instead — spending CPU the budget already
             // allowed — and one past it still ends the tick.
-            if let Some(next_wakeup) = next_wakeup
+            if let Some((next_wakeup, paced)) = next_wakeup
                 && current < next_wakeup
             {
-                if next_wakeup > end {
+                if paced.is_none_or(|paced| paced > end) {
                     break;
                 }
                 match wait_until(&now, current, next_wakeup) {
@@ -184,7 +187,7 @@ impl Executor {
         for (task_id, mut task) in tasks.into_iter() {
             let item = sleeping_tasks.get(&task_id);
             if let Some(item) = item {
-                if *item <= now {
+                if item.0 <= now {
                     sleeping_tasks.remove(&task_id);
                 } else {
                     next_tasks.insert(task_id, task);
@@ -221,7 +224,7 @@ impl Executor {
         let task_id = self.inner.lock().current_task_id.unwrap();
 
         let until = self.inner.lock().last_now + timeout;
-        self.inner.lock().sleeping_tasks.insert(task_id, until);
+        self.inner.lock().sleeping_tasks.insert(task_id, (until, timeout));
     }
 
     fn create_waker(&self) -> Waker {
@@ -240,6 +243,12 @@ impl Executor {
         unsafe { Waker::from_raw(noop_raw_waker()) }
     }
 }
+
+// A sleep this short is a poll, not a pace: KTF 영웅서기4 re-arms MC_knlSetTimer(1) every frame to
+// mean "as soon as you can", and the MIDP event thread checks its queue every 1ms. Only a longer
+// sleep keeps a tick alive; waiting on these too turned 영웅서기4 from 36 into 93 frames/s — the
+// game itself 2.6x faster — and spun every idle tick to its budget.
+const POLL_SLEEP_MS: u64 = 1;
 
 // A clock read this many times in a row without moving is not going to move: a test's frozen
 // clock (`TestClock`), where waiting for a wake would never return. A real millisecond clock
@@ -379,6 +388,22 @@ mod tests {
         assert!(!woke.load(Ordering::Relaxed));
         executor.tick(advancing_clock(40)).unwrap();
         assert!(woke.load(Ordering::Relaxed));
+    }
+
+    #[test]
+    fn test_tick_does_not_wait_for_a_1ms_poll() {
+        let mut executor = Executor::new();
+        // MC_knlSetTimer(1) every frame (KTF 영웅서기4): waiting on it lets such a loop run as fast
+        // as the emulator instead of once per host frame.
+        let woke = sleeper(&mut executor, 1);
+        // 1ms every 4 reads, so the wake is still ahead when the task goes to sleep.
+        let reads = Cell::new(0u64);
+        let slow = || {
+            reads.set(reads.get() + 1);
+            Instant::from_epoch_millis(reads.get() / 4)
+        };
+        executor.tick(slow).unwrap();
+        assert!(!woke.load(Ordering::Relaxed));
     }
 
     #[test]
