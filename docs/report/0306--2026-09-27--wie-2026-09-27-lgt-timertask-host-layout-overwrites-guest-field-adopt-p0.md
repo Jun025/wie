@@ -43,4 +43,4 @@
 
 게임 이름 유입(`scripts/corpus-name-inflow.mjs --corpus <game_lab>`): BOUNDED 35 · SUFFIX-ATTACHED 6(아래 표식). 대상이 `lgt_java_abi.toml`·`jvm_support.rs` «파일 전체»라 기존 주석의 타이틀이 함께 세어진다. 이 회차가 새로 쓴 이름은 `학교가는길`(대상)과 회귀 스윕의 뒤집힘 4건(`제노니아2`·`테라 영원의 혼돈`·`나는마왕이다2`·`아니마`, 이 문서만)이다.
 
-<!-- corpus-name-inflow v1 subjects=9 tree=53c2fb931aa0bcce B=91/35 P=9/2 S=16/6 -->
+<!-- corpus-name-inflow v1 subjects=9 tree=293b9001964eb913 B=95/35 P=9/2 S=16/6 -->
