@@ -16,6 +16,7 @@ members = [
     "wie-web",
     "wie_cli",
     "wie_featurephone",
+    "patches/classfile",
 ]
 
 # wie-app is upstream's Tauri desktop shell. It arrived with the 2026-09-16
@@ -115,6 +116,12 @@ wie-wipi-java = { version = "0.1.0", path = "wie-wipi-java" }
 futures-test = { version = "^0.3" }
 
 test-utils = { path = "test-utils" }
+
+# crates.io classfile 0.1.1 rejects modified UTF-8 (NUL = C0 80, surrogate pairs) in class
+# constants with ClassFormatError; upstream main still does. Drop this line and the directory
+# when a released classfile decodes it — the unit tests in patches/classfile say what "decodes" means.
+[patch.crates-io]
+classfile = { path = "patches/classfile" }
 
 [package]
 name = "wie"

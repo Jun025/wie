@@ -722,6 +722,7 @@ above the engine reaches back into it.
 - `wie_wipi_c`, `wie_wipi_java`, `wie_midp`, `wie_skvm` — the emulated API surfaces.
 - `wie_ktf`, `wie_lgt`, `wie_skt`, `wie_j2me` — per-carrier entry points (`wie_ktf`/`wie_lgt` hold the heavy reverse-engineered runtimes).
 - `wie_cli` — native host (also `wie_validate`, a headless triage runner); `wie_featurephone` — browser host, empty library off `wasm32` (Constraint 7; renamed from `wie_web` 2026-09-11 — upstream uses that name).
+- `patches/classfile` — crates.io `classfile` 0.1.1 plus one fix (modified UTF-8 constants), via `[patch.crates-io]`; its `README.md` has the removal condition.
 - `web/`, `functions/`, `migrations/`, `scripts/`, `docs/`, `data/`, `fonts/`, `test_data/` — non-Rust surfaces.
 
 **Full map: `docs/architecture.md`** — layer diagram, a role for every crate, and what each
