@@ -502,6 +502,15 @@ vtable = [
     { name = "elementAt", descriptor = "(I)Ljava/lang/Object;", index = 23 },
     { name = "removeElementAt", descriptor = "(I)V", index = 27 },
     { name = "insertElementAt", descriptor = "(Ljava/lang/Object;I)V", index = 28 },
+    # 월드장기체스's wall after Random 10 (measured 2026-09-27, call site disassembled, lr 0x2aab0).
+    # The caller loads the Vector from this.<field>[0], null-checks it, sets only r0 and
+    # dispatches `ldr ip,[r3,#0x80]` (= 4 + 4*31); no argument register is written (r1 is left
+    # over from an earlier conditional call), and the next instructions zero the sibling int at
+    # [field+4] without reading r0 — a void result. CLDC 1.1 Vector has two argument-free void
+    # methods: trimToSize at 11 and removeAllElements at 31, and the four rows above already sit
+    # where that order puts them, so 31 is removeAllElements. The same function reads size() via
+    # `[r3,#0x40]` (= 15), agreeing with the row above.
+    { name = "removeAllElements", descriptor = "()V", index = 31 },
 ]
 
 # 학교가는길 dispatches index 12 on a java/util/Timer as the first thing it does, 3/3, and the one
