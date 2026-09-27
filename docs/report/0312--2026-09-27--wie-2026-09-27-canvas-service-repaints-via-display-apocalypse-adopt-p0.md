@@ -56,3 +56,5 @@ guest paint 밖에서 `repaint()` 없이 `serviceRepaints()` 만 부르면 종�
 - paint 안에서 `repaint()` 를 부르고 이어서 `serviceRepaints()` 를 부르는 타이틀은 여전히 재귀한다(대기 중 repaint 가 매번 생긴다).
   아포칼립스는 그 형태가 아니다(원 제안 계수: repaint 3회). 교차 진입(다른 task)의 Graphics 상태 덮어쓰기는 이 회차 범위 밖이다.
 - 스윕은 타이틀당 1짝이다. 어긋난 것만 재측했다.
+
+- 게임 파일명 유입(`scripts/corpus-name-inflow.mjs --corpus <로컬 코퍼스>`): BOUNDED 5건(원장에 이미 쓰인 제목들) · SUFFIX-ATTACHED 0건.
