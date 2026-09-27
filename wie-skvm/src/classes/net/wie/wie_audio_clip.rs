@@ -192,10 +192,16 @@ impl WieAudioClip {
         Ok(())
     }
 
+    // Ends with a yield. f6fe2adc8cce runs its music from a thread whose whole body is
+    // `while (a) clip.play();` — no sleep, no wait. On the handset that thread is preempted; here
+    // guest threads are cooperative, so a play() that returns at once kept that one loop running
+    // forever and the tick it was in never ended (measured 2026-09-27: 150 s on one tick, the
+    // interpreter trace a two-instruction loop around this call).
     async fn play(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("net.wie.WieAudioClip::play({this:?})");
 
-        Self::start(jvm, context, &mut this, false).await
+        Self::start(jvm, context, &mut this, false).await?;
+        jvm.invoke_static("java/lang/Thread", "yield", "()V", ()).await
     }
 
     async fn r#loop(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
@@ -262,7 +268,8 @@ impl WieAudioClip {
 
 #[cfg(test)]
 mod test {
-    use alloc::{boxed::Box, vec::Vec};
+    use alloc::{boxed::Box, sync::Arc, vec::Vec};
+    use core::sync::atomic::{AtomicBool, Ordering};
 
     use jvm::{Array, ClassInstanceRef, JavaError, Result as JvmResult, runtime::JavaLangString};
     use rustjava_runtime::classes::java::lang::String;
@@ -469,5 +476,43 @@ mod test {
             })
             .collect();
         assert_eq!(shape, [("play", 0, true), ("stop", 0, false), ("play", 1, true), ("play", 2, true)]);
+    }
+
+    /// `play()` hands the thread over. f6fe2adc8cce's music thread is `while (a) clip.play();`;
+    /// without the yield another task never runs and the tick never ends. Here the other task is
+    /// spawned first and must have run by the time the loop's second `play()` returns.
+    #[test]
+    fn play_yields_so_a_play_loop_does_not_starve_other_threads() {
+        let result = run_jvm_test_with_system(
+            Box::new([wie_midp::get_protos().into(), get_protos().into()]),
+            Box::new(TestPlatform::new()),
+            |jvm, system| async move {
+                let ran = Arc::new(AtomicBool::new(false));
+                let ran_clone = ran.clone();
+                system.spawn(async move || {
+                    ran_clone.store(true, Ordering::SeqCst);
+                    Ok(())
+                });
+
+                let name = JavaLangString::from_rust_string(&jvm, "mmf").await?;
+                let clip: ClassInstanceRef<AudioClip> = jvm
+                    .invoke_static(
+                        "com/skt/m/AudioSystem",
+                        "getAudioClip",
+                        "(Ljava/lang/String;)Lcom/skt/m/AudioClip;",
+                        (name,),
+                    )
+                    .await?;
+                // Two, as in the guest's loop: a task spawned during a step is first polled in the
+                // next one, after this lower-numbered task has resumed.
+                for _ in 0..2 {
+                    let _: () = jvm.invoke_virtual(&clip, "com/skt/m/AudioClip", "play", "()V", ()).await?;
+                }
+                assert!(ran.load(Ordering::SeqCst), "play() returned without letting the other thread run");
+
+                Ok(())
+            },
+        );
+        assert!(result.is_ok(), "{result:?}");
     }
 }
