@@ -1,0 +1,8 @@
+{
+  "date": "2026-09-27",
+  "task": "wie-2026-09-26-battlemonster-field-input-scene-thread-death-adopt-p0",
+  "title": "놈3 --action-secs 1.2 스택 넘침 — origin/main 재현 0(ec28e2fe) · JavaMethod::run 호출부 시험",
+  "summary": "4646c3d8 overflow 2/2 ↔ origin/main PASS 4/4. ec28e2fe 의 release_to 가드 + String 26 구현이 닫았다. 가드 호출부 제거는 기존 495 시험이 못 잡아 시험 1건 추가(제거 시 red). 게임 개악: String 26 행·가드 둘 다 제거 FAIL 3/4 ↔ 가드 유지 PASS 4/4.",
+  "adoptedProposals": ["2026-09-26-battlemonster-field-input-is-scene-thread-death#p0"],
+  "proposals": []
+}
