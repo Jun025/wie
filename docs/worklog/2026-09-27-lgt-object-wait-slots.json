@@ -1,0 +1,16 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-27",
+  "task": "wie-2026-09-26-lgt-nurse-tycoon2-object-vtable-9-adopt-p0",
+  "title": "간호사타이쿤2 — java/lang/Object vtable 9 = wait() · 7 = wait(J)",
+  "summary": "호출부(synchronized 정적 락 · index 9 무인자 · index 7 long 1개 · 형제 함수가 같은 락에 notify)로 확정하고 두 행을 넣었다. 간호사타이쿤2 paints 0 → 722, SD한국전쟁 index 9 벽 소멸.",
+  "changes": ["wie-lgt/data/lgt_java_abi.toml", "wie-lgt/src/runtime/java/jvm_support.rs", "docs/report/0308"],
+  "verification": [
+    "간호사타이쿤2 --timeout 60: FAIL/0 → PASS/722 · --inject: PASS/91",
+    "LGT 코퍼스 93건 짝 회귀: 변화 2건(간호사타이쿤2 · SD한국전쟁) 모두 개선",
+    "변이(두 행 제거): abi_rows_cover_the_indexes_titles_actually_dispatch_on FAILED"
+  ],
+  "limits": ["8 · 2 · 6 은 도달 실행이 없어 비워 둔다", "호스트 클래스 표 길이가 2칸 줄었다 — 93건에서 새 벽은 없었다"],
+  "adoptedProposals": ["2026-09-26-lgt-class-block-word0-flag#p0"],
+  "proposals": []
+}

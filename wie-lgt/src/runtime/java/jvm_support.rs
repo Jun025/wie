@@ -1794,6 +1794,10 @@ pub(crate) mod tests {
             for (class_name, index, name, descriptor) in [
                 // 배틀몬스터
                 ("java/lang/Object", 5, "notify", "()V"),
+                // 간호사타이쿤2
+                ("java/lang/Object", 7, "wait", "(J)V"),
+                // 간호사타이쿤2
+                ("java/lang/Object", 9, "wait", "()V"),
                 // 배틀몬스터
                 ("java/io/ByteArrayInputStream", 13, "skip", "(J)J"),
                 // 턴·서든어택포켓

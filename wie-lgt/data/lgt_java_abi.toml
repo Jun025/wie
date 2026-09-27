@@ -19,7 +19,7 @@
 # finalize(), which CLDC 1.1 does not have. That is why the derivation drops two rather than one:
 # neither is in this ABI, and both stay unplaced.
 #
-# Index 5 is the only one filled, and it is filled on a MEASUREMENT, not on the order alone
+# Index 5 was the first one filled, and it is filled on a MEASUREMENT, not on the order alone
 # (measured 2026-09-23, 배틀몬스터, both copies):
 #
 #   PROBE_MONITOR enter 0x488453d0          <- monitorenter, java-interface import 0x56
@@ -49,12 +49,20 @@
 # signals. The order picks notify(), and notify() is also the safe one to be wrong about: standing
 # in for notifyAll() wakes one waiter instead of all. Installing a wait() where the guest meant a
 # notify parks the thread forever — the silent hang this lineage has been fighting — which is why
-# 7 8 stay empty. 9 is observed as wait() but not written: no run has reached it (0 `vtable index`
-# walls on either copy), so it is a row nothing yet exercises.
+# 7 8 stayed empty on the order alone.
 #
-# 2 6 7 8 (derived) and 9 (observed) are therefore NOT written, for the reason java/lang/Runtime index 10
-# below is not: a missing entry says its own name, and a wrong one does not. Filling 2 would hand
-# the guest a plausible wrong int; filling 7 8 on the order alone would risk a hang.
+# 간호사타이쿤2 then reached both 9 and 7 (measured 2026-09-27, binary.mod, same objdump). Its waiter
+# at 0x20c00 is `synchronized (L) { L.<9>(); L.<7>((long) (30 * (2 - x) + 10)); }` on a static
+# lock L: monitorenter (java import 0x56) on L at 0x20ce8, index 9 at 0x20d98 with only r0 set,
+# then index 7 at 0x20e00 with a sign-extended long in r1:r2 — at run time r1:r2 = 40:0. Its
+# sibling at 0x21790 is `synchronized (L) { L.<5>(); }` on the same static field (same pool word
+# 0x015013da). That is the 0x1f10/0x2200 handshake again, so 9 = wait() is now reached, and 7 takes
+# exactly one long, which is wait(J) and not wait(JI). Both are written; with them the waiter was
+# woken by the notify within ~25 ms and cycled ~1,080 times in 60 s (paints 0 -> 722), not parked.
+#
+# 2 6 8 (derived) are still NOT written, for the reason java/lang/Runtime index 10 below is not: a
+# missing entry says its own name, and a wrong one does not. Filling 2 would hand the guest a
+# plausible wrong int; filling 8 on the order alone would risk a hang.
 [[class]]
 name = "java/lang/Object"
 vtable_size = 10
@@ -63,6 +71,8 @@ vtable = [
     { name = "equals", descriptor = "(Ljava/lang/Object;)Z", index = 3 },
     { name = "toString", descriptor = "()Ljava/lang/String;", index = 4 },
     { name = "notify", descriptor = "()V", index = 5 },
+    { name = "wait", descriptor = "(J)V", index = 7 },
+    { name = "wait", descriptor = "()V", index = 9 },
 ]
 
 # Word 0 of a class object's field block is NOT free: guest static-field accessors read its low
