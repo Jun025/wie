@@ -22,6 +22,10 @@ const SOFTKEY_HEIGHT: i32 = 18;
 // Full mark-and-sweep cost ~10ms per paint on 배틀몬스터's heap, a fifth of its frame budget.
 // Garbage now lives up to this long; before upstream `95555afe` it lived until the guest called gc().
 const GC_INTERVAL_MS: i64 = 1000;
+// A heavy heap makes each collection cost more, and every task stops for it: two SKT titles paid
+// 91 and 165ms per collection, 15% of the wall clock at one a second. The next collection waits
+// until the last one's cost is at most this fraction of the time between them.
+const GC_COST_SHARE: i64 = 20;
 
 const TITLE_BACKGROUND: i32 = 0x263746;
 const WHITE: i32 = 0xffffff;
@@ -127,6 +131,7 @@ impl Display {
                 JavaFieldProto::new("paintDisabled", "Z", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("repaintPending", "Z", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("lastGcMillis", "J", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("lastGcCostMillis", "J", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("alertGeneration", "I", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("tickerGeneration", "I", FieldAccessFlags::PRIVATE),
             ],
@@ -914,11 +919,13 @@ impl Display {
         }
         let now = context.system().platform().now().raw() as i64;
         let last_gc: i64 = jvm.get_field(&this, "lastGcMillis", "J").await?;
-        if now - last_gc >= GC_INTERVAL_MS {
+        let last_cost: i64 = jvm.get_field(&this, "lastGcCostMillis", "J").await?;
+        if now - last_gc >= GC_INTERVAL_MS.max(last_cost * GC_COST_SHARE) {
             jvm.put_field(&mut this, "lastGcMillis", "J", now).await?;
             jvm.collect_garbage()?;
-            let gc_ms = (context.system().platform().now().raw() as i64 - now).max(0) as u64;
-            context.system().pacing().collected_garbage(gc_ms);
+            let gc_ms = (context.system().platform().now().raw() as i64 - now).max(0);
+            jvm.put_field(&mut this, "lastGcCostMillis", "J", gc_ms).await?;
+            context.system().pacing().collected_garbage(gc_ms as u64);
         }
 
         Ok(())
@@ -1683,6 +1690,41 @@ mod test {
                 garbage().await?;
                 paint_at(&jvm, &clock, &display, 2000).await?;
                 assert_eq!(jvm.collect_garbage()?, 0, "a paint 1000ms after it must");
+                Ok(())
+            },
+        )
+    }
+
+    #[test]
+    fn an_expensive_collection_spaces_out_the_next_one() -> Result<()> {
+        let clock = TestClock::new();
+        run_jvm_test_with_system(
+            test_protos(),
+            Box::new(TestPlatform::with_clock(clock.clone())),
+            move |jvm, _| async move {
+                let mut display: ClassInstanceRef<Display> = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?.into();
+                let garbage = async || -> JvmResult<()> {
+                    jvm.push_native_frame();
+                    let _ = JavaLangString::from_rust_string(&jvm, "garbage").await?;
+                    jvm.pop_frame();
+                    Ok(())
+                };
+                paint_at(&jvm, &clock, &display, 1000).await?;
+                // The clock stands still, so a collection here costs 0ms; say the last one cost 165ms.
+                jvm.put_field(&mut display, "lastGcCostMillis", "J", 165i64).await?;
+
+                garbage().await?;
+                paint_at(&jvm, &clock, &display, 2000).await?;
+                assert!(
+                    jvm.collect_garbage()? > 0,
+                    "a 165ms collection must not be followed by another after 1s — at one a second that is 16% of the clock"
+                );
+
+                garbage().await?;
+                paint_at(&jvm, &clock, &display, 1000 + 165 * 20).await?;
+                assert_eq!(jvm.collect_garbage()?, 0, "once 20x its cost has passed, collect");
+                let cost: i64 = jvm.get_field(&display, "lastGcCostMillis", "J").await?;
+                assert_eq!(cost, 0, "that collection's own cost (0ms on a still clock) replaces the old one");
                 Ok(())
             },
         )
