@@ -300,6 +300,48 @@ struct HeadlessAudioSink;
 impl AudioSink for HeadlessAudioSink {
     fn send(&self, command: wie_backend::AudioCommand) {
         AUDIO_TALLY.record(&command);
+        dump_audio(&command);
+    }
+}
+
+/// `WIE_AUDIO_DUMP=<file>`: append every command as one JSON line — the engine's real audio
+/// stream, for rendering the same song through two synths offline (`docs/report/0317`).
+/// ★The file holds the guest's music — keep it outside the repo (Constraint 9).
+fn dump_audio(command: &wie_backend::AudioCommand) {
+    use std::{io::Write, sync::OnceLock};
+    static START: OnceLock<std::time::Instant> = OnceLock::new();
+    let Some(path) = std::env::var_os("WIE_AUDIO_DUMP") else { return };
+    let at = START.get_or_init(std::time::Instant::now).elapsed().as_millis();
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+        let _ = writeln!(f, "{}", audio_dump_line(command, at));
+    }
+}
+
+/// `at` = ms since the first command. `ev` rows use `audio_worklet.js`'s message shape:
+/// `[ms, 0, midi bytes]` / `[ms, 1, channels, rate, samples]`.
+fn audio_dump_line(command: &wie_backend::AudioCommand, at: u128) -> String {
+    use wie_backend::{AudioCommand, AudioEventData};
+    match command {
+        AudioCommand::Play { handle, sequence, repeat } => {
+            let events: Vec<String> = sequence
+                .events
+                .iter()
+                .map(|e| match &e.data {
+                    AudioEventData::Midi(bytes) => format!("[{},0,{:?}]", e.time, bytes),
+                    AudioEventData::Wave {
+                        channels,
+                        sampling_rate,
+                        samples,
+                    } => format!("[{},1,{},{},{:?}]", e.time, channels, sampling_rate, samples),
+                })
+                .collect();
+            format!(
+                r#"{{"at":{at},"t":"play","h":{handle},"r":{repeat},"d":{},"ev":[{}]}}"#,
+                sequence.duration,
+                events.join(",")
+            )
+        }
+        AudioCommand::Stop { handle } => format!(r#"{{"at":{at},"t":"stop","h":{handle}}}"#),
     }
 }
 
@@ -1740,6 +1782,44 @@ mod tests {
         assert_eq!(
             tally.json(),
             r#"{"plays":2,"repeat_plays":1,"stops":1,"wave_events":1,"midi_events":2,"empty_plays":1}"#
+        );
+    }
+
+    #[test]
+    fn audio_dump_line_keeps_every_event_in_worklet_shape() {
+        use std::sync::Arc;
+
+        use wie_backend::{AudioCommand, AudioEventData, AudioSequence, TimedAudioEvent};
+
+        let sequence = Arc::new(AudioSequence {
+            duration: 500,
+            events: vec![
+                TimedAudioEvent {
+                    time: 0,
+                    data: AudioEventData::Midi(vec![0xc0, 36]),
+                },
+                TimedAudioEvent {
+                    time: 250,
+                    data: AudioEventData::Wave {
+                        channels: 1,
+                        sampling_rate: 8000,
+                        samples: vec![-1, 2],
+                    },
+                },
+            ],
+        });
+        let play = AudioCommand::Play {
+            handle: 3,
+            sequence,
+            repeat: true,
+        };
+        assert_eq!(
+            super::audio_dump_line(&play, 7),
+            r#"{"at":7,"t":"play","h":3,"r":true,"d":500,"ev":[[0,0,[192, 36]],[250,1,1,8000,[-1, 2]]]}"#
+        );
+        assert_eq!(
+            super::audio_dump_line(&AudioCommand::Stop { handle: 3 }, 9),
+            r#"{"at":9,"t":"stop","h":3}"#
         );
     }
 
