@@ -78,9 +78,50 @@ pub fn parse_bss_size(filename: &str) -> Result<u32> {
         .map_err(|e| WieError::FatalError(format!("Invalid bss_size in filename {filename}: {e}")))
 }
 
+/// A `client.bin` that begins with its relocation table instead of the self-relocating entry stub:
+/// `[u32 bss_size][u32 count][count × u32 image offsets, ascending][image]`, where the first word
+/// repeats the filename's bss size. The image behind it has no `WIPI_exe` export and addresses its
+/// globals through `sl` (a different runtime ABI), so running it the stub way jumps into the table.
+/// Measured on 3 KTF titles; the standard stub is `04 e0 c0 46` in all 190 working KTF titles.
+pub fn is_relocation_prefixed(data: &[u8], bss_size: u32) -> bool {
+    let word = |index: usize| data.get(index * 4..index * 4 + 4).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]));
+    let (Some(first), Some(count)) = (word(0), word(1)) else {
+        return false;
+    };
+    let count = count as usize;
+    if first != bss_size || count == 0 || (2 + count) * 4 > data.len() {
+        return false;
+    }
+    let image_len = (data.len() - (2 + count) * 4) as u32;
+    let offsets = (2..2 + count).map(|index| word(index).unwrap_or(u32::MAX));
+
+    offsets.clone().zip(offsets.skip(1)).all(|(a, b)| a < b) && word(1 + count).is_some_and(|last| last < image_len)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{KtfAdf, parse_bss_size};
+    use alloc::vec::Vec;
+
+    use super::{KtfAdf, is_relocation_prefixed, parse_bss_size};
+
+    fn words(values: &[u32]) -> Vec<u8> {
+        values.iter().flat_map(|value| value.to_le_bytes()).collect()
+    }
+
+    #[test]
+    fn relocation_prefixed_client_bin_is_detected() {
+        // bss 64 · 3 offsets · 16-byte image
+        let data = words(&[64, 3, 0, 8, 12, 0, 0, 0, 0]);
+        assert!(is_relocation_prefixed(&data, 64));
+        // filename bss disagrees with the first word
+        assert!(!is_relocation_prefixed(&data, 1096));
+        // offsets not ascending
+        assert!(!is_relocation_prefixed(&words(&[64, 3, 0, 12, 8, 0, 0, 0, 0]), 64));
+        // last offset past the image
+        assert!(!is_relocation_prefixed(&words(&[64, 3, 0, 8, 16, 0, 0, 0, 0]), 64));
+        // the standard entry stub (`b.n` + `nop`)
+        assert!(!is_relocation_prefixed(&words(&[0x46c0_e004, 0x2004_0224, 0x0002_0001]), 1096));
+    }
 
     #[test]
     fn parse_adf_full() {
