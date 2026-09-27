@@ -69,3 +69,5 @@
 
 ### 게임 파일명 유입
 `node scripts/corpus-name-inflow.mjs --corpus <game_lab>`: BOUNDED 1 · SUFFIX-ATTACHED 1. 둘 다 `wie-ktf/src/adf.rs` 의 기존 ADF 파싱 시험 한 줄이다(`origin/main` 에 이미 있다). 이 회차가 파일을 고쳐 대상에 들어왔을 뿐이고, 이 diff 가 더한 게임 이름은 0이다.
+
+<!-- corpus-name-inflow v1 subjects=10 tree=04455f7f14930fed B=1/1 P=0/0 S=1/1 -->
