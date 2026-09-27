@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-26",
+  "kind": "speed",
+  "titles": [
+    "517ed32c92d60a0c26a14ea913160901bfd5e6da68464b6a12c9c13e2d8f08d2"
+  ],
+  "summary_ko": "게임이 시작되기까지 걸리는 시간을 크게 줄였어요.",
+  "pr": "https://github.com/Jun025/wie/pull/311",
+  "enginePin": "8ec688bf54dae2ea02066bd5a9d3a7f6def67626"
+}

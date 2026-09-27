@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-27",
+  "kind": "fix",
+  "titles": [
+    "be08d047cbaef52f458ccdf4739ea5314b73e7ec9f5eb3ee0537c7b34f815e96"
+  ],
+  "summary_ko": "첫 화면이 나오도록 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/349",
+  "enginePin": "84418eea87f7721e7ed6702267f48205a6750618"
+}

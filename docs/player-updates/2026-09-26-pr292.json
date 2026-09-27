@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-26",
+  "kind": "fix",
+  "titles": [
+    "a30bbe008b5e570456b37c53dc849b73c9f6325050279f9da2ba35385ed10e67"
+  ],
+  "summary_ko": "마을에 들어간 뒤 게임이 꺼지던 문제를 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/292",
+  "enginePin": "7bac9acd11ca1d50d37e71245d05636aba05d84b"
+}

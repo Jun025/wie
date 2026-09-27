@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-26",
+  "kind": "fix",
+  "titles": [
+    "a30bbe008b5e570456b37c53dc849b73c9f6325050279f9da2ba35385ed10e67"
+  ],
+  "summary_ko": "처음 실행하면 이어하기가 아니라 새로하기부터 시작하도록 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/318",
+  "enginePin": "ac6c7b8524082d0cc095ab44900b1b4a70d172a4"
+}

@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-27",
+  "kind": "speed",
+  "titles": [
+    "13d7e3c21856081483448364a7b4d3db3cb5e67e710e9d86db1d0f68c127304c"
+  ],
+  "summary_ko": "게임이 원래 속도에 더 가깝게 움직이도록 맞췄어요.",
+  "pr": "https://github.com/Jun025/wie/pull/343",
+  "enginePin": "e5a76be3820785fd19d521d323f97623a20803b3"
+}

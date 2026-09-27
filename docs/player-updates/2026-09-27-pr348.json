@@ -1,0 +1,8 @@
+{
+  "date": "2026-09-27",
+  "kind": "sound",
+  "titles": [],
+  "summary_ko": "배경음악(MIDI)이 나오고, 반복하거나 멈추는 소리가 제대로 동작하도록 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/348",
+  "enginePin": "2cde4d94140c46f8dcb4b635f5b171c5d825a903"
+}
