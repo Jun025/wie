@@ -620,10 +620,12 @@ impl XFile {
         Ok(0)
     }
 
+    // Free bytes. 0 read as "storage full": fb80e97cbc57 checks `fsavail() < 0x2000` at four sites and
+    // quits on its first key (bytecode read 2026-09-27). Same figure as RecordStore.getSizeAvailable.
     async fn fs_available(_jvm: &Jvm, _context: &mut WieJvmContext) -> JvmResult<i32> {
         tracing::warn!("stub com.xce.io.XFile::fsavail()");
 
-        Ok(0)
+        Ok(1_000_000)
     }
 
     pub async fn raf(jvm: &Jvm, this: ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<RandomAccessFile>> {
@@ -973,5 +975,15 @@ mod tests {
         );
 
         assert!(result.is_ok(), "JVM test failed: {result:?}");
+    }
+
+    #[test]
+    fn fsavail_reports_room_for_a_save() {
+        let result = run_jvm_test(Box::new([Box::new([XFile::as_proto()])]), |jvm| async move {
+            let available: i32 = jvm.invoke_static("com/xce/io/XFile", "fsavail", "()I", ()).await?;
+            assert!(available >= 0x2000, "{available}");
+            Ok(())
+        });
+        assert!(result.is_ok(), "{result:?}");
     }
 }
