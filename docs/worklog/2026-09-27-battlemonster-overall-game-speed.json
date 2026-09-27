@@ -1,0 +1,37 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-27",
+  "task": "wie-battlemonster-overall-game-speed-slow",
+  "title": "배틀몬스터 게임 속도 — 숲 14 → 20fps · 마을 12 → 20fps(목표 20)",
+  "summary": "게임 루프는 repaint 뒤 Thread.yield 로 페인트를 기다리는 마감 방식(장면 주기 50ms). 호스트가 Redraw 를 tick 끝에만 넘기던 한 프레임과 매 페인트 전체 GC(약 10ms)가 여유 10ms 를 넘었다. repaint 는 yield 스핀(같은 task 의 두 번째 yield)에 바로 전달·아니면 tick 끝, 이벤트 대기는 1ms 마다 큐 확인, GC 는 1초에 1번.",
+  "changes": [
+    "wie-backend System: request_redraw/guest_yielded/guest_slept/flush_redraw · tick_for 끝에 flush · EventQueue::is_empty",
+    "wie-jvm-support JvmRuntime: sleep → guest_slept · yield → guest_yielded",
+    "wie-midp Display: repaint → System::request_redraw · handlePaintEvent GC 1000ms 간격",
+    "wie-midp net.wie.EventQueue: getNextEvent 빈 큐 대기가 1ms 마다 백엔드 큐 확인",
+    "docs/report/0305"
+  ],
+  "verification": [
+    "브라우저 CDP 교대 짝: 숲 3짝 14.25/13.60/14.22 → 19.98/19.98/19.95 · 전투 2짝 16.30/15.60 → 16.65/16.70 · 마을 1짝 11.95 → 20.00",
+    "회귀 교대 2짝(페인트/s): 영웅서기4 ≈37 · 메이플 13.65 · 현영맞고 3.8 · 체스마스터 0.8 · 놈3 6.8→≥7.0 — 퇴행 없음",
+    "주입 4종+영웅서기4 수정 10/10 PASS 27/27 · runner 블록 PASS(keydraw 는 --max-ticks 400000000, main 과 동일)",
+    "cargo test --all 495/0 · clippy stable/wasm/beta rc0 · 변이 10종 전부 red"
+  ],
+  "limits": [
+    "GC 가 1초 1회라 쓰레기가 최대 1초 산다 — 할당 실패 시 GC 후 재시도는 없다",
+    "마을은 1짝만 쟀다(한 판 12분)"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "고정 sleep 게임이 호스트 프레임 격자만큼 느려진다 — sleep 깨움을 tick 예산 안에서 정확히",
+      "plainSummary": "게임이 60ms 쉬라고 하면 우리는 다음 화면 갱신(16.7ms 단위)까지 기다려 67~83ms 를 쉬게 합니다. 쉬는 시간이 늘어난 만큼 게임이 느려집니다.",
+      "userBenefit": "메이플스토리2007 같은 고정 sleep 게임이 의도한 주기(sleep 60 + 약간)에 가까워집니다. 지금은 평균 약 73ms(13.65fps).",
+      "why": "이 회차 마커 측정: 메이플은 repaint → yield → sleep(60) 인데 깸이 rAF 격자에 붙어 주기가 66.7/83.3ms 로 갈린다. 실행기가 모든 task 가 잠들면 tick 을 끝내서다. 스크래치 변형(깸이 예산 안이면 계속 폴링)에서 sleep 인자와 실제 깸이 일치했다(전투: main 인자 10 → 깸 23.5ms · 변형 인자 30 → 깸 30.5ms).",
+      "tradeoff": "깸을 기다리는 동안 tick 예산 안에서 폴링하므로 쉬는 게임의 CPU 가 는다(예산 14ms 상한). 시계가 멈춘 TestClock 시험은 무한 루프가 되므로 시험 쪽 보완이 같이 필요하다.",
+      "effort": "M",
+      "target": "wie"
+    }
+  ],
+  "adoptedProposals": []
+}
