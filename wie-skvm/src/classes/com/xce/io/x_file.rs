@@ -979,7 +979,7 @@ mod tests {
 
     #[test]
     fn fsavail_reports_room_for_a_save() {
-        let result = run_jvm_test(Box::new([Box::new([XFile::as_proto()])]), |jvm| async move {
+        let result = run_jvm_test(Box::new([wie_midp::get_protos().into(), crate::get_protos().into()]), |jvm| async move {
             let available: i32 = jvm.invoke_static("com/xce/io/XFile", "fsavail", "()I", ()).await?;
             assert!(available >= 0x2000, "{available}");
             Ok(())

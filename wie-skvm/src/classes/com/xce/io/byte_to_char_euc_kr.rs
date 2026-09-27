@@ -76,8 +76,7 @@ mod tests {
     use jvm::{JavaChar, Result as JvmResult};
     use test_utils::run_jvm_test;
 
-    use super::ByteToCharEucKr;
-    use crate::classes::com::xce::io::ByteToCharConverter;
+    use crate::get_protos;
 
     /// fb80e97cbc57 decodes its Korean text through this converter at boot; without the class it
     /// died on `NoClassDefFoundError: com/xce/io/ByteToCharEUC_KR`. "가A" is EUC-KR B0 A1 41, and
@@ -85,7 +84,7 @@ mod tests {
     #[test]
     fn euc_kr_convert_decodes_with_length_arguments() {
         let result = run_jvm_test(
-            Box::new([Box::new([ByteToCharConverter::as_proto(), ByteToCharEucKr::as_proto()])]),
+            Box::new([wie_midp::get_protos().into(), get_protos().into()]),
             |jvm| async move {
                 let converter = jvm.new_class("com/xce/io/ByteToCharEUC_KR", "()V", ()).await?;
                 let mut input = jvm.instantiate_array("B", 5).await?;
