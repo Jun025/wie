@@ -36,3 +36,5 @@ hang 판정: 간호사타이쿤2 대기 스레드는 index 9 에서 약 25 ms �
 ### 게임 파일명 유입
 
 `node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab` 결과는 아래 표식 줄의 B·S 값이다. BOUNDED 와 SUFFIX-ATTACHED 는 대부분 이 브랜치가 건드린 두 파일에 이미 있던 제목 주석이다. 이 회차가 새로 쓴 이름은 간호사타이쿤2 · SD한국전쟁 두 제목과 코퍼스 경로 서술뿐이다. 게임 바이트는 쓰지 않았다.
+
+<!-- corpus-name-inflow v1 subjects=4 tree=213480240b1ff3d9 B=96/32 P=0/0 S=27/7 -->
