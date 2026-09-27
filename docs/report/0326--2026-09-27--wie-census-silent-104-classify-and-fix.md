@@ -194,3 +194,5 @@
 | 5 | #350 착지 후 재측(`182fa44210dc` `41466fc7f709` `52f1f32e3f72` `91c02913e1ea` `d1fba7ad5d1f`) | S |
 | 9 | KTF `MC_mdaUnk17/18(3)` 미식별 — 반환값 변이 무반응. 소리 무음과의 관계 미확인 | S(식별) |
 | 1 | `f44271803135` — `MC_mdaClipSetVolume(0x0, 0)`(클립 없음) · `VOLUMELEVEL` 미등재 · KTF `unk12-1` 4,407회 루프. `VOLUMELEVEL="3"` 은 무반응 | S |
+
+게임 파일명 유입(`corpus-name-inflow --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 4회/2쌍 · SUFFIX-ATTACHED 0회/0쌍. BOUNDED 4회는 전부 수정 파일의 기존 줄이다(`kernel.rs` 1 · `player.rs` 3 — 이 회차의 추가 줄 중 일치 0).
