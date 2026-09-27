@@ -512,6 +512,14 @@ vtable = [
 name = "java/util/Vector"
 vtable = [
     { name = "size", descriptor = "()I", index = 15 },
+    # 월드장기체스's wall after Vector 29 (measured 2026-09-28, call site disassembled, lr 0x21de0).
+    # The caller loads the Vector from this.<field>+0x18, null-checks it, sets only r0 and
+    # dispatches `ldr ip,[r3,#0x44]` (= 4 + 4*16). The result is a branch condition:
+    # `cmp r0,#0 ; bne` skips ahead, and only the zero path goes on to call index 24 (the
+    # firstElement slot) on the same Vector and type-check the object it returns. That is
+    # isEmpty()Z: size() or capacity() compared to zero would call firstElement on an empty
+    # Vector. CLDC 1.1 order also puts isEmpty at 16, right after the size row above.
+    { name = "isEmpty", descriptor = "()Z", index = 16 },
     { name = "elementAt", descriptor = "(I)Ljava/lang/Object;", index = 23 },
     { name = "removeElementAt", descriptor = "(I)V", index = 27 },
     { name = "insertElementAt", descriptor = "(Ljava/lang/Object;I)V", index = 28 },

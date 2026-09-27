@@ -50,6 +50,10 @@ pub async fn get_system_property(context: &mut dyn WIPICContext, ptr_id: WIPICWo
         "AIRPLANE_MODE" => "0",
         "ROAMING_AREA" => "0",
         "DS_LOCK" => "0",
+        // Titles look for "Yamaha_MA3" here — the SMAF chip, the one format `clip_put_data`
+        // plays — and create no clip without it: M_E_INVALID left 3 LGT titles silent
+        // (2026-09-27 silent-104 census, 0 → 2..8 plays in 90 s).
+        "MEDIADEVICES" => "Yamaha_MA3",
         _ => {
             tracing::warn!("unknown system property id: {id}");
             return Ok(-9); // M_E_INVALID
@@ -385,6 +389,22 @@ mod test {
         assert_eq!(get_system_property(&mut context, id, out, 16).await.unwrap(), 0);
         let result = read_null_terminated_string_bytes(&context, out).unwrap();
         assert_eq!(String::from_utf8(result).unwrap(), "01000000000");
+
+        Ok(())
+    }
+
+    // Titles pick their sound path off MEDIADEVICES; M_E_INVALID left them silent.
+    #[futures_test::test]
+    async fn test_get_system_property_media_devices() -> Result<()> {
+        let mut context = TestContext::new();
+        let id = context.alloc_raw(16).unwrap();
+        let out = context.alloc_raw(16).unwrap();
+
+        write_null_terminated_string_bytes(&mut context, id, b"MEDIADEVICES").unwrap();
+
+        assert_eq!(get_system_property(&mut context, id, out, 16).await.unwrap(), 0);
+        let result = read_null_terminated_string_bytes(&context, out).unwrap();
+        assert!(String::from_utf8(result).unwrap().contains("Yamaha_MA3"));
 
         Ok(())
     }

@@ -1,0 +1,36 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-27-wec-vector-vtable-16-adopt-p0",
+  "title": "월드장기체스 — java/util/Vector 16 = isEmpty()Z (호출부 디스어셈블)",
+  "summary": "호출부가 Vector 필드를 null 검사한 뒤 r0 만 세우고 [vtbl+0x44] 를 부른다. 결과를 `cmp r0,#0 ; bne` 분기 조건으로 쓰고, 0 쪽 경로만 같은 Vector 의 24번(firstElement 자리)을 불러 받은 객체의 타입을 본다 — 비어 있지 않을 때만 첫 원소를 꺼내는 isEmpty 의 모양이다. 벽이 Vector 16 에서 Vector 24 로 옮겨 갔다.",
+  "changes": [
+    "wie-lgt/data/lgt_java_abi.toml — Vector 블록 16 행 1줄 + 근거 주석",
+    "wie-lgt/src/runtime/java/jvm_support.rs — ABI 핀 테스트에 16 행 1줄",
+    "docs/report/0333"
+  ],
+  "verification": [
+    "전: FAIL · ticks 11158 · paints 0 · java/util/Vector vtable index 16 (lr 0x21de0)",
+    "후: 3/3 FAIL · ticks 11/20048/5956 · paints 0 · java/util/Vector vtable index 24",
+    "변이: isEmpty 행만 제거 → 핀 테스트 FAILED"
+  ],
+  "limits": [
+    "호출부 1곳 — 다른 타이틀 교차 없음",
+    "paints 0 그대로"
+  ],
+  "adoptedProposals": [
+    "2026-09-27-wec-vector-vtable-29#p0"
+  ],
+  "proposals": [
+    {
+      "title": "월드장기체스 — `java/util/Vector vtable index 24` 미구현 벽",
+      "plainSummary": "Vector 16 을 채우자 월드장기체스가 Vector 의 24 번 칸에서 멈춥니다. 이번 회차 디스어셈블에서 이미 그 칸을 부르는 자리가 보였습니다.",
+      "userBenefit": "월드장기체스 부팅이 다음 벽을 넘는 한 걸음입니다.",
+      "why": "이 회차 후 3/3 동일하게 `Unimplemented: java/util/Vector vtable index 24`. 같은 함수 0x21e04 가 isEmpty 가 거짓일 때 인자 없이 [vtbl+0x64] 를 부르고 반환 객체의 클래스를 읽는다 — 객체를 돌려주는 인자 없는 메서드(firstElement/lastElement/elements) 중 하나다.",
+      "tradeoff": "firstElement(24)·lastElement(25)·elements(17) 가 같은 모양(인자 0 · 객체 반환)이라 모양만으로는 안 갈린다 — 판정은 선언 순서와 주변 행이 한다.",
+      "effort": "S",
+      "target": "wie",
+      "kind": "product"
+    }
+  ]
+}

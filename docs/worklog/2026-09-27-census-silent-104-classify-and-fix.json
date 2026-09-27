@@ -1,0 +1,25 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-27",
+  "task": "wie-census-silent-104-classify-and-fix",
+  "title": "소리 silent 104 — «시도 없음 vs 경로 결손» 분류 · 결손 3종 수정",
+  "summary": "0321 의 silent 104종을 90초 창 + 미디어 호출 계수로 다시 재서 갈랐다: 창 부족 74(재생 확인 9 · 준비만 31 · 호출 없음 34) · 다른 벽이 먼저 19 · #350 소관 5 · 결손 6. 결손 3종(MEDIADEVICES 미등재 · Player BaseClip 오버로드 스텁 · setBuffer 배열 복사)을 고쳐 6종이 소리를 낸다.",
+  "changes": [
+    "wie-wipi-c/src/api/kernel.rs — MEDIADEVICES = Yamaha_MA3 · 시험 1",
+    "wie-wipi-java/src/classes/org/kwis/msp/media/player.rs — BaseClip 오버로드가 Clip 이면 Clip 경로 · play 가 setBuffer 배열 재적재 · 시험 2",
+    "wie-wipi-java/src/classes/org/kwis/msp/media/base_clip.rs — setBuffer 가 배열·크기·해시를 보관 · refresh",
+    "wie-wipi-java/src/classes/org/kwis/msp/media/clip.rs — Clip.setBuffer 가 BaseClip.setBuffer 로",
+    "docs/report/0326"
+  ],
+  "verification": [
+    "같은 시각 짝 재측 104종 × 90초: 소리 0→N 6종 · 나빠진 타이틀 0",
+    "되돌리면 red: 수정 3종 각각 변이 실측(panicked)",
+    "라이브 LGT 5 + 퇴행 가드 2: 전/후 7/7 부팅·화면 ok",
+    "fmt · clippy -D warnings(stable·beta·wasm32) · cargo test --all · npm run build:wasm rc0 · 러너 블록 PASS"
+  ],
+  "limits": [
+    "창 부족 74종은 포화 호스트(load 38~200)에서 잰 값이다 — «결손 없음»의 확정은 조용한 호스트 재측이 필요하다",
+    "KTF MC_mdaUnk17/18 은 식별하지 못했다(반환값 변이 무반응)"
+  ],
+  "proposals": []
+}

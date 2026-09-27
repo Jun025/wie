@@ -1,0 +1,24 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-27",
+  "task": "wie-2026-09-27-featurephone-audio-probe-script-adopt-p0",
+  "title": "브라우저 오디오 프로브를 로컬 도구로 — scripts/audio-probe.mjs",
+  "summary": "#348·#352 가 스크래치로 두 번 쓴 Playwright 오디오 프로브를 local-only 도구로 남겼다. 빌드 × 게임 쌍을 동시에 돌려 play/evict/gain · 워클릿 stats · 초당 RMS 를 낸다. #352 시퀀스 상한(70s 98 → 32)과 #356 게인 배수(×0.204 · ×0.365)를 이 도구로 재현했다.",
+  "changes": [
+    "scripts/audio-probe.mjs",
+    "AGENTS.md — local-only 목록 1항목",
+    "docs/report/0328"
+  ],
+  "verification": [
+    "#352: SKT b42e4242866b 보유 시퀀스 70s 98(이전) / 32(#352) — 보고서 96 / 32",
+    "#356: KTF 3185174d2121 게인 0.2 → RMS ×0.204 · LGT a30bbe008b5e 게인 0.36 → ×0.365"
+  ],
+  "limits": [
+    "RMS 절대값은 회차 간 비교 불가 — 한 실행 안의 배수로만 읽는다",
+    "셸 볼륨 UI 는 거치지 않는다(마스터 게인 1)"
+  ],
+  "adoptedProposals": [
+    "2026-09-27-featurephone-audio-loop-overlap-and-worklet-sequence-leak#p0"
+  ],
+  "proposals": []
+}

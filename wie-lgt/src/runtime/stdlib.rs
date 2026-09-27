@@ -1,4 +1,4 @@
-use alloc::{format, string::String};
+use alloc::{format, string::String, vec::Vec};
 use chrono::{DateTime, Datelike, FixedOffset, TimeZone, Timelike};
 use core::cmp::min;
 
@@ -16,12 +16,14 @@ pub fn register_stdlib_svc_handler(core: &mut ArmCore, system: &System) -> Resul
         match id.0 {
             x if x == StdlibSvcId::Unk2 as u32 => EmulatedFunction::call(&unk2, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Sprintf as u32 => EmulatedFunction::call(&sprintf, core, &mut ()).await?.write(core, lr),
+            x if x == StdlibSvcId::Vsprintf as u32 => EmulatedFunction::call(&vsprintf, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Atoi as u32 => EmulatedFunction::call(&atoi, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Rand as u32 => EmulatedFunction::call(&rand, core, system).await?.write(core, lr),
             x if x == StdlibSvcId::Srand as u32 => EmulatedFunction::call(&srand, core, system).await?.write(core, lr),
             x if x == StdlibSvcId::Strcpy as u32 => EmulatedFunction::call(&stdlib::strcpy, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Strncpy as u32 => EmulatedFunction::call(&strncpy, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Strcat as u32 => EmulatedFunction::call(&strcat, core, &mut ()).await?.write(core, lr),
+            x if x == StdlibSvcId::Strncat as u32 => EmulatedFunction::call(&strncat, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Strcmp as u32 => EmulatedFunction::call(&strcmp, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Unk4 as u32 => EmulatedFunction::call(&unk4, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Strstr as u32 => EmulatedFunction::call(&strstr, core, &mut ()).await?.write(core, lr),
@@ -32,6 +34,8 @@ pub fn register_stdlib_svc_handler(core: &mut ArmCore, system: &System) -> Resul
             x if x == StdlibSvcId::Time as u32 => EmulatedFunction::call(&time, core, system).await?.write(core, lr),
             x if x == StdlibSvcId::Localtime as u32 => EmulatedFunction::call(&localtime, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Unk3 as u32 => EmulatedFunction::call(&unk3, core, &mut ()).await?.write(core, lr),
+            x if x == StdlibSvcId::Malloc as u32 => EmulatedFunction::call(&malloc, core, &mut ()).await?.write(core, lr),
+            x if x == StdlibSvcId::Free as u32 => EmulatedFunction::call(&free, core, &mut ()).await?.write(core, lr),
             _ => Err(WieError::FatalError(format!("Unknown lgt stdlib import: {:#x}", id.0))),
         }
     }
@@ -67,6 +71,26 @@ async fn sprintf(core: &mut ArmCore, _: &mut (), ptr_dst: u32, ptr_format: u32, 
     Ok(result.len() as u32)
 }
 
+// `ap` is the address of the first variadic word. Only as many words as the format can consume
+// are read (two per conversion covers `%lld`), and reading stops at the first unmapped one.
+async fn vsprintf(core: &mut ArmCore, _: &mut (), ptr_dst: u32, ptr_format: u32, ap: u32) -> Result<u32> {
+    tracing::debug!("vsprintf({ptr_dst:#x}, {ptr_format:#x}, {ap:#x})");
+
+    let format = read_null_terminated_string_bytes(core, ptr_format)?;
+    let wanted = format.iter().filter(|&&x| x == b'%').count() * 2;
+    let mut args = Vec::with_capacity(wanted);
+    for i in 0..wanted as u32 {
+        match read_generic::<u32, _>(core, ap + i * 4) {
+            Ok(word) => args.push(word),
+            Err(_) => break,
+        }
+    }
+    let result = kernel::sprintf(core, &format, &args)?;
+    write_null_terminated_string_bytes(core, ptr_dst, &result)?;
+
+    Ok(result.len() as u32)
+}
+
 async fn strncpy(core: &mut ArmCore, _: &mut (), ptr_dst: u32, ptr_src: u32, size: u32) -> Result<()> {
     tracing::debug!("strncpy({ptr_dst:#x}, {ptr_src:#x}, {size:#x})");
 
@@ -88,6 +112,25 @@ async fn strcat(core: &mut ArmCore, _: &mut (), ptr_dst: u32, ptr_src: u32) -> R
 
     let offset = dst.len();
     write_null_terminated_string_bytes(core, ptr_dst + offset as u32, &src)?;
+
+    Ok(())
+}
+
+async fn strncat(core: &mut ArmCore, _: &mut (), ptr_dst: u32, ptr_src: u32, size: u32) -> Result<()> {
+    tracing::debug!("strncat({ptr_dst:#x}, {ptr_src:#x}, {size:#x})");
+
+    // src need not be NUL-terminated within n bytes, so read no further than n.
+    let mut src = Vec::new();
+    for i in 0..size {
+        let byte: u8 = read_generic(core, ptr_src + i)?;
+        if byte == 0 {
+            break;
+        }
+        src.push(byte);
+    }
+    let dst = read_null_terminated_string_bytes(core, ptr_dst)?;
+
+    write_null_terminated_string_bytes(core, ptr_dst + dst.len() as u32, &src)?;
 
     Ok(())
 }
@@ -171,6 +214,36 @@ async fn unk4(_core: &mut ArmCore, _: &mut (), a0: u32, a1: u32, a2: u32, a3: u3
     Ok(())
 }
 
+// The heap's free needs the size back, and C's free does not pass it: keep it in a word in front.
+const MALLOC_HEADER: u32 = 4;
+
+async fn malloc(core: &mut ArmCore, _: &mut (), size: u32) -> Result<u32> {
+    tracing::debug!("malloc({size:#x})");
+
+    let Some(total) = size.checked_add(MALLOC_HEADER) else {
+        return Ok(0);
+    };
+    let Ok(block) = Allocator::alloc(core, total) else {
+        // C's contract is a null return; the guest's operator new turns that into its own exception.
+        return Ok(0);
+    };
+    write_generic(core, block, total)?;
+
+    Ok(block + MALLOC_HEADER)
+}
+
+async fn free(core: &mut ArmCore, _: &mut (), ptr: u32) -> Result<()> {
+    tracing::debug!("free({ptr:#x})");
+
+    if ptr == 0 {
+        return Ok(());
+    }
+    let block = ptr - MALLOC_HEADER;
+    let total: u32 = read_generic(core, block)?;
+
+    Allocator::free(core, block, total)
+}
+
 async fn strstr(core: &mut ArmCore, _: &mut (), ptr_haystack: u32, ptr_needle: u32) -> Result<u32> {
     tracing::debug!("strstr({ptr_haystack:#x}, {ptr_needle:#x})");
 
@@ -197,7 +270,7 @@ mod tests {
     use wie_core_arm::{Allocator, ArmCore};
     use wie_util::{ByteRead, ByteWrite, Result};
 
-    use super::{rand, register_stdlib_svc_handler, srand};
+    use super::{free, malloc, rand, register_stdlib_svc_handler, srand};
     use crate::runtime::{SVC_CATEGORY_STDLIB, svc_ids::StdlibSvcId};
 
     #[test]
@@ -251,6 +324,81 @@ mod tests {
             let mut out = [0u8; 8];
             core.read_bytes(buffer, &mut out)?;
             assert_eq!(&out, b"ababcdef");
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    /// Imports 0x426/0x428 are malloc/free (b7699c10dfd1 died on `Unknown lgt stdlib import: 0x426`
+    /// at boot), 0x3f9 is vsprintf (2dbde9acca99, on its first keys) and 0x408 strncat (4fdbd64c9fbd,
+    /// in a key handler). Goes through the SVC table like the memmove test above, then checks the block is
+    /// really handed back: free must find its own size again.
+    #[test]
+    fn stdlib_imports_0x3f9_0x408_0x426_0x428_are_vsprintf_strncat_malloc_free_through_the_svc_table() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let mut core = ArmCore::new(false, None)?;
+            Allocator::init(&mut core)?;
+            let stack = Allocator::alloc(&mut core, 0x1000)?;
+            let mut context = core.save_context();
+            context.sp = stack + 0x1000;
+            core.restore_context(&context);
+            register_stdlib_svc_handler(&mut core, &system_clone)?;
+            let malloc_stub = core.make_svc_stub(SVC_CATEGORY_STDLIB, StdlibSvcId::Malloc)?;
+            let free_stub = core.make_svc_stub(SVC_CATEGORY_STDLIB, StdlibSvcId::Free)?;
+            assert_eq!((StdlibSvcId::Malloc as u32, StdlibSvcId::Free as u32), (0x426, 0x428));
+
+            // 0x3f9 = vsprintf: the arguments come from memory at `ap`, not from registers.
+            let vsprintf_stub = core.make_svc_stub(SVC_CATEGORY_STDLIB, StdlibSvcId::Vsprintf)?;
+            assert_eq!(StdlibSvcId::Vsprintf as u32, 0x3f9);
+            let text = Allocator::alloc(&mut core, 64)?;
+            core.write_bytes(text, b"%s/%d.Dat\0save\0")?;
+            let ap = Allocator::alloc(&mut core, 8)?;
+            core.write_bytes(ap, &[(text + 10).to_le_bytes(), 7u32.to_le_bytes()].concat())?;
+            let out = Allocator::alloc(&mut core, 32)?;
+            let written: u32 = core.run_function(vsprintf_stub, &[out, text, ap]).await?;
+            let mut formatted = [0u8; 11];
+            core.read_bytes(out, &mut formatted)?;
+            assert_eq!((written, &formatted), (10, b"save/7.Dat\0"));
+
+            // 0x408 = strncat: at most n bytes of src, then a terminator.
+            let strncat_stub = core.make_svc_stub(SVC_CATEGORY_STDLIB, StdlibSvcId::Strncat)?;
+            assert_eq!(StdlibSvcId::Strncat as u32, 0x408);
+            core.write_bytes(out, b"ab\0")?;
+            core.write_bytes(text, b"cdef\0")?;
+            let _: () = core.run_function(strncat_stub, &[out, text, 2]).await?;
+            let mut joined = [0u8; 6];
+            core.read_bytes(out, &mut joined)?;
+            assert_eq!(&joined[..5], b"abcd\0");
+            // src need not be terminated within n: "gh" ends a mapped page, the next one is not mapped.
+            core.map(0x6000_0000, 0x1_0000)?; // one 64 KiB page
+            core.write_bytes(0x6000_fffe, b"gh")?;
+            let _: () = core.run_function(strncat_stub, &[out, 0x6000_fffe, 2]).await?;
+            core.read_bytes(out, &mut joined)?;
+            assert_eq!(&joined, b"abcdgh");
+
+            let ptr: u32 = core.run_function(malloc_stub, &[24]).await?;
+            assert_ne!(ptr, 0);
+            core.write_bytes(ptr, &[0xab; 24])?;
+            assert!(Allocator::is_allocated(&core, ptr - 4, 28)?);
+            let _: () = core.run_function(free_stub, &[ptr]).await?;
+            assert!(!Allocator::is_allocated(&core, ptr - 4, 28)?);
+            let _: () = core.run_function(free_stub, &[0]).await?;
+
+            // Direct calls as well, for the null contract on an impossible size.
+            assert_eq!(malloc(&mut core, &mut (), u32::MAX).now_or_never().unwrap()?, 0);
+            free(&mut core, &mut (), 0).now_or_never().unwrap()?;
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())

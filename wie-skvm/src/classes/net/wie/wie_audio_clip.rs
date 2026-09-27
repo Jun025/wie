@@ -61,6 +61,8 @@ impl WieAudioClip {
                 JavaFieldProto::new("paused", "Z", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("closed", "Z", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("looping", "Z", FieldAccessFlags::PRIVATE),
+                // Host ms at which the last one-shot play() runs out; 0 = none sounding.
+                JavaFieldProto::new("soundingUntil", "J", FieldAccessFlags::PRIVATE),
                 // Handles (+ 1, like `audioHandle`) of loops whose clip was closed mid-loop.
                 JavaFieldProto::new("orphanLoops", "[I", FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC),
             ],
@@ -136,6 +138,11 @@ impl WieAudioClip {
         if repeat && looping {
             return Ok(());
         }
+        let now = context.system().platform().now().raw() as i64;
+        let sounding_until: i64 = jvm.get_field(this, "soundingUntil", "J").await?;
+        if !repeat && now < sounding_until {
+            return Ok(());
+        }
 
         jvm.put_field(this, "repeat", "Z", repeat).await?;
         jvm.put_field(this, "paused", "Z", false).await?;
@@ -146,6 +153,9 @@ impl WieAudioClip {
         if let Err(error) = context.system().audio().play(handle, repeat) {
             tracing::error!("net.wie.WieAudioClip: failed to play audio: {error:?}");
         }
+        let duration = if repeat { None } else { context.system().audio().duration(handle) };
+        let until = duration.map_or(0, |duration| now + duration as i64);
+        jvm.put_field(this, "soundingUntil", "J", until).await?;
 
         Ok(())
     }
@@ -188,14 +198,27 @@ impl WieAudioClip {
         }
         jvm.put_field(this, "paused", "Z", false).await?;
         jvm.put_field(this, "looping", "Z", false).await?;
+        jvm.put_field(this, "soundingUntil", "J", 0i64).await?;
 
         Ok(())
     }
 
+    // Ends with a yield. f6fe2adc8cce runs its music from a thread whose whole body is
+    // `while (a) clip.play();` — no sleep, no wait. On the handset that thread is preempted; here
+    // guest threads are cooperative, so a play() that returns at once kept that one loop running
+    // forever and the tick it was in never ended (measured 2026-09-27: 150 s on one tick, the
+    // interpreter trace a two-instruction loop around this call).
+    //
+    // And a play() on a clip whose last play() is still sounding is ignored (`soundingUntil`, set
+    // from the sequence's length). With the yield alone that loop restarted its song 146,619 times
+    // in a 30 s probe; ignoring it plays the song through and restarts it once it ends, which is
+    // what the loop is for. `loop` on a looping clip is ignored for the same reason (header).
+    // The cost: a game that re-triggers one clip faster than it lasts no longer cuts it short.
     async fn play(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("net.wie.WieAudioClip::play({this:?})");
 
-        Self::start(jvm, context, &mut this, false).await
+        Self::start(jvm, context, &mut this, false).await?;
+        jvm.invoke_static("java/lang/Thread", "yield", "()V", ()).await
     }
 
     async fn r#loop(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
@@ -211,6 +234,7 @@ impl WieAudioClip {
             context.system().audio().stop(handle);
             jvm.put_field(&mut this, "paused", "Z", true).await?;
             jvm.put_field(&mut this, "looping", "Z", false).await?;
+            jvm.put_field(&mut this, "soundingUntil", "J", 0i64).await?;
         }
 
         Ok(())
@@ -236,6 +260,7 @@ impl WieAudioClip {
             jvm.put_field(&mut this, "looping", "Z", false).await?;
         }
         jvm.put_field(&mut this, "paused", "Z", false).await?;
+        jvm.put_field(&mut this, "soundingUntil", "J", 0i64).await?;
 
         Ok(())
     }
@@ -262,11 +287,12 @@ impl WieAudioClip {
 
 #[cfg(test)]
 mod test {
-    use alloc::{boxed::Box, vec::Vec};
+    use alloc::{boxed::Box, sync::Arc, vec::Vec};
+    use core::sync::atomic::{AtomicBool, Ordering};
 
     use jvm::{Array, ClassInstanceRef, JavaError, Result as JvmResult, runtime::JavaLangString};
     use rustjava_runtime::classes::java::lang::String;
-    use test_utils::{TestPlatform, run_jvm_test, run_jvm_test_with_system};
+    use test_utils::{TestClock, TestPlatform, run_jvm_test, run_jvm_test_with_system};
     use wie_backend::AudioCommand;
 
     use crate::{classes::com::skt::m::AudioClip, get_protos};
@@ -469,5 +495,98 @@ mod test {
             })
             .collect();
         assert_eq!(shape, [("play", 0, true), ("stop", 0, false), ("play", 1, true), ("play", 2, true)]);
+    }
+
+    /// `play()` hands the thread over. f6fe2adc8cce's music thread is `while (a) clip.play();`;
+    /// without the yield another task never runs and the tick never ends. Here the other task is
+    /// spawned first and must have run by the time the loop's second `play()` returns.
+    #[test]
+    fn play_yields_so_a_play_loop_does_not_starve_other_threads() {
+        let result = run_jvm_test_with_system(
+            Box::new([wie_midp::get_protos().into(), get_protos().into()]),
+            Box::new(TestPlatform::new()),
+            |jvm, system| async move {
+                let ran = Arc::new(AtomicBool::new(false));
+                let ran_clone = ran.clone();
+                system.spawn(async move || {
+                    ran_clone.store(true, Ordering::SeqCst);
+                    Ok(())
+                });
+
+                let name = JavaLangString::from_rust_string(&jvm, "mmf").await?;
+                let clip: ClassInstanceRef<AudioClip> = jvm
+                    .invoke_static(
+                        "com/skt/m/AudioSystem",
+                        "getAudioClip",
+                        "(Ljava/lang/String;)Lcom/skt/m/AudioClip;",
+                        (name,),
+                    )
+                    .await?;
+                // Two, as in the guest's loop: a task spawned during a step is first polled in the
+                // next one, after this lower-numbered task has resumed.
+                for _ in 0..2 {
+                    let _: () = jvm.invoke_virtual(&clip, "com/skt/m/AudioClip", "play", "()V", ()).await?;
+                }
+                assert!(ran.load(Ordering::SeqCst), "play() returned without letting the other thread run");
+
+                Ok(())
+            },
+        );
+        assert!(result.is_ok(), "{result:?}");
+    }
+
+    /// A clip replayed while its last play() is still sounding is not restarted — f6fe2adc8cce's
+    /// `while (a) clip.play();` sent 146,619 Play commands in a 30 s probe before this. Once the
+    /// song has run out (the clock passes its length) or the clip was stopped, play() starts it again.
+    #[test]
+    fn play_is_not_restarted_while_the_clip_is_still_sounding() {
+        // A minimal SMAF: one `SEQU` chunk, two notes 50 × 20 ms apart, then end of stream.
+        let sequence = [0x00, 0x01, 0x0a, 0x32, 0x01, 0x0a, 0, 0, 0, 0];
+        let mut smaf = b"MMMD\0\0\0\0SEQU".to_vec();
+        smaf.extend_from_slice(&(sequence.len() as u32).to_be_bytes());
+        smaf.extend_from_slice(&sequence);
+        smaf.extend_from_slice(&[0, 0]);
+
+        let clock = TestClock::new();
+        let platform = TestPlatform::with_clock(clock.clone());
+        let log = platform.audio_log();
+
+        let result = run_jvm_test_with_system(
+            Box::new([wie_midp::get_protos().into(), get_protos().into()]),
+            Box::new(platform),
+            move |jvm, system| async move {
+                let name = JavaLangString::from_rust_string(&jvm, "mmf").await?;
+                let clip: ClassInstanceRef<AudioClip> = jvm
+                    .invoke_static(
+                        "com/skt/m/AudioSystem",
+                        "getAudioClip",
+                        "(Ljava/lang/String;)Lcom/skt/m/AudioClip;",
+                        (name,),
+                    )
+                    .await?;
+                let mut data = jvm.instantiate_array("B", smaf.len()).await?;
+                jvm.store_array(&mut data, 0, smaf.iter().map(|&x| x as i8)).await?;
+                let _: () = jvm
+                    .invoke_virtual(&clip, "net/wie/WieAudioClip", "open", "([BII)V", (data, 0, smaf.len() as i32))
+                    .await?;
+                let length = system.audio().duration(0).unwrap();
+                assert!(length >= 1000, "{length}");
+
+                let play = async || jvm.invoke_virtual::<_, ()>(&clip, "net/wie/WieAudioClip", "play", "()V", ()).await;
+                play().await?; // plays
+                play().await?; // still sounding: ignored
+                clock.advance(length);
+                play().await?; // ran out: plays again
+                let _: () = jvm.invoke_virtual(&clip, "net/wie/WieAudioClip", "stop", "()V", ()).await?;
+                play().await?; // stopped: plays again at once
+                clock.advance(1000); // past the tick budget, so the tick this ran in can end
+
+                Ok(())
+            },
+        );
+        assert!(result.is_ok(), "{result:?}");
+
+        let plays = log.lock().iter().filter(|command| matches!(command, AudioCommand::Play { .. })).count();
+        assert_eq!(plays, 3);
     }
 }

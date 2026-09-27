@@ -1727,6 +1727,32 @@ mod tests {
         Ok(())
     }
 
+    /// LBMP type 2 (2-bit gray, LCD page layout, optional mask plane) — f6fe2adc8cce's key legends
+    /// and puzzle tiles, which failed with `Unsupported grayscale type 2`; the game's paint then
+    /// dereferenced the null image on every frame. Each pixel below exercises one plane bit.
+    #[test]
+    fn test_decode_lbmp_gray2_planes_and_mask() -> Result<()> {
+        let mut data = Vec::new();
+        data.extend_from_slice(b"LBMP");
+        for field in [2u32, 2, 2, 2, 1] {
+            // type, width, height, size = width * ceil(height / 8), mask
+            data.extend_from_slice(&field.to_le_bytes());
+        }
+        data.extend_from_slice(&[0b01, 0b10]); // plane 0 (high bit), column bytes, LSB = top row
+        data.extend_from_slice(&[0b11, 0b00]); // plane 1 (low bit)
+        data.extend_from_slice(&[0b10, 0b00]); // mask: set = transparent
+
+        let image = decode_image(&data)?;
+
+        let expected = [((0, 0), 0, 0xff), ((0, 1), 170, 0), ((1, 0), 255, 0xff), ((1, 1), 85, 0xff)];
+        for ((x, y), level, alpha) in expected {
+            let color = image.get_pixel(x, y);
+            assert_eq!((color.r, color.g, color.b, color.a), (level, level, level, alpha), "pixel ({x}, {y})");
+        }
+
+        Ok(())
+    }
+
     fn gray(v: u8) -> Color {
         Color { a: 0xff, r: v, g: v, b: v }
     }

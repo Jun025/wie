@@ -57,6 +57,11 @@ impl Audio {
         Ok(())
     }
 
+    /// Milliseconds from the start of the sequence to its last event.
+    pub fn duration(&self, audio_handle: AudioHandle) -> Option<u64> {
+        self.files.get(&audio_handle).map(|sequence| sequence.duration)
+    }
+
     pub fn stop(&mut self, audio_handle: AudioHandle) {
         if self.playing.remove(&audio_handle) {
             self.sink.send(AudioCommand::Stop { handle: audio_handle });

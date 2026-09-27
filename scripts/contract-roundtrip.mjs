@@ -467,14 +467,36 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     mod2.init();
     check("B: fresh glue + default() no-arg (name-coupled wasm fetch)", true);
 
+    // One RMS record seeded before boot — the "first-run marker" an LGT notice
+    // title writes before it exits. B-relaunch below reads it back.
+    const le32 = (n) => [n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255];
+    const lstr = (t) => [...le32(t.length), ...new TextEncoder().encode(t)];
+    const seed = new Uint8Array([...new TextEncoder().encode(contract.saveMagic), ...le32(1), ...lstr("roundtrip"), ...lstr("marker"), ...le32(1), ...le32(1), ...le32(1), 7, ...le32(0)]);
     const b = await bootFixture(mod2, "helloworld_lgt.zip");
+    check("B: import_saves(seeded DB record) → true", b.emu.import_saves(seed) === true);
     check('B: platform_kind() === "LGT"', b.emu.platform_kind() === "LGT", `got ${b.emu.platform_kind()}`);
     check('B: lgt_compile_model() === "clet"', b.emu.lgt_compile_model() === "clet", `got ${b.emu.lgt_compile_model()}`);
     const runB = await tickLoop(b.emu, b.canvas, 20_000);
     check("B: tick loop survives (no throw)", runB.threw === null, runB.threw ?? `${runB.frames} frames`);
     check("B: clean exit observed (has_exited() flips true)", b.emu.has_exited() === true, `${runB.frames} frames, ${runB.pixels} px (fixture draws nothing — pixels are info only)`);
+    // ── B-relaunch: the shell's «다시 실행» after a clean exit (the LGT first-run
+    // notice path, docs/report/0325) — persist the exited instance's saves, boot a
+    // FRESH instance, import them. The DB must come through byte-identical, or the
+    // relaunched title sees no marker and shows its notice forever.
+    const afterExit = b.emu.export_saves();
+    check("B: DB survives the clean exit (export == seed)", afterExit.length === seed.length && afterExit.every((v, i) => v === seed[i]), `${afterExit.length} vs ${seed.length} bytes`);
     b.emu.free();
     check("B: free() (no throw)", true);
+    const b2 = await bootFixture(mod2, "helloworld_lgt.zip");
+    check("B-relaunch: import_saves(exited blob) on a fresh instance → true", b2.emu.import_saves(afterExit) === true);
+    const runB2 = await tickLoop(b2.emu, b2.canvas, 20_000);
+    const relaunched = b2.emu.export_saves();
+    check(
+      "B-relaunch: relaunched instance runs to exit with the same DB",
+      runB2.threw === null && b2.emu.has_exited() === true && relaunched.length === seed.length && relaunched.every((v, i) => v === seed[i]),
+      runB2.threw ?? `${runB2.frames} frames, ${relaunched.length} save bytes`,
+    );
+    b2.emu.free();
 
     // ── Scenario C: J2ME draw fixture — canvas blit, ASSERTED not reported ───
     const markC = guestOut.length;

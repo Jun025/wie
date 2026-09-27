@@ -369,6 +369,15 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   2026-09-20, which is the shape this lineage was once rejected for — and the round that moved them
   had itself re-implemented one of the three from scratch a round earlier without noticing it existed.
 
+- **`scripts/audio-probe.mjs` — local only (it needs a game file), and it is how an audio change is
+  checked in a real browser.** It boots the featurephone engine in headless Chromium through the
+  shell's own path (`AudioContext` → worklet → master gain → analyser), cycles keys, and prints per
+  run: plays/stops/evicts, the game volumes sent (`gain`), the worklet's `stats` (resident
+  sequences) and per-second RMS. `--wasm <dir>` is repeatable and every build × game pair runs **at
+  the same time**, so a before/after pair shares one load minute — read RMS only as a ratio inside
+  one invocation. It exists because #348 and #352 each rewrote it as scratch and #356's reviewer
+  could not reproduce the browser figure; its reproduction of both is in `docs/report/0328`.
+
 ### Documented-command liveness — one weekly scheduled job, decided 2026-09-10
 
 `.github/workflows/doc-liveness.yml` (weekly schedule + `workflow_dispatch` + a `pull_request`
