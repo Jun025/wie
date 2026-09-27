@@ -71,3 +71,5 @@
 
 ### 게임 이름 유입
 `corpus-name-inflow`: 유입 349건(BOUNDED) · 판단 필요 16건(SUFFIX-ATTACHED). **의도된 유입이다** — 공개 «지원 게임 목록»이 이 PR 의 산출물이고 이름은 `docs/player-data/compat.json` 과 위 upstream 겹침표에만 있다. 항목 파일(`docs/player-updates/`)의 문장에는 이름이 0 이다(대상은 sha256 으로 가리킨다). 게임 바이트 · 화면 캡처 · 키 스크립트 커밋 0.
+
+<!-- corpus-name-inflow v1 subjects=31 tree=e08894b78f1b9f3d B=394/349 P=0/0 S=20/16 -->
