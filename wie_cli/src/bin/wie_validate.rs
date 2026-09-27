@@ -445,7 +445,7 @@ impl AudioTally {
 type DbKey = (String, String);
 type DbStore = std::collections::HashMap<DbKey, std::collections::HashMap<RecordId, Vec<u8>>>;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct MemDbRepository {
     store: Arc<Mutex<DbStore>>,
 }
@@ -683,6 +683,15 @@ struct Args {
     /// boot can be left out. OFF by default; with it absent the line is unchanged.
     #[arg(long, value_name = "SECS", num_args = 0..=1, default_missing_value = "0", value_parser = positive_or_zero_secs)]
     pacing: Option<f64>,
+    /// After the guest asks to stop, boot the same file again — keeping the database — up to N
+    /// times, and carry on with the same schedule and deadline. Models the user relaunching a
+    /// title: several LGT titles end their FIRST run on purpose (a «다시 실행하여 주시기
+    /// 바랍니다» notice writes a marker database, then exits) and only play on the second. OFF
+    /// by default; with it absent the line is unchanged, and the JSON gains `relaunches` only
+    /// when it is given. A run that relaunched and then hit its budget reports that budget as
+    /// `stop`, not `clean exit`.
+    #[arg(long, value_name = "N", default_value_t = 0)]
+    relaunch: u32,
 }
 
 fn positive_or_zero_secs(s: &str) -> Result<f64, String> {
@@ -1040,6 +1049,16 @@ fn main() {
         Some(pacing) => format!("{},\"pacing\":{pacing}}}", &json[..json.len() - 1]),
         None => json,
     };
+    // LGT only, so every other line is unchanged: the same static answer the browser host's
+    // `lgt_compile_model()` gives, for a batch census that has no browser.
+    let json = match lgt_compile_model(&result.platform, &args.filename) {
+        Some(model) => format!("{},\"lgt_compile_model\":{model:?}}}", &json[..json.len() - 1]),
+        None => json,
+    };
+    let json = match result.relaunches {
+        Some(n) => format!("{},\"relaunches\":{n}}}", &json[..json.len() - 1]),
+        None => json,
+    };
     if tallies.svc_stub_exhausted.load(Ordering::SeqCst) && result.verdict() == svc_stub_exhausted_outcome().verdict() {
         eprintln!("wie_validate: result line already written when the SVC stub space ran out; not writing a second one");
     } else {
@@ -1047,6 +1066,14 @@ fn main() {
     }
 
     std::process::exit(result.exit_code());
+}
+
+fn lgt_compile_model(platform: &str, filename: &str) -> Option<&'static str> {
+    if platform != "lgt" || !filename.ends_with("zip") {
+        return None;
+    }
+    let files = extract_zip(&fs::read(filename).ok()?).ok()?;
+    wie_lgt::detect_compile_model(&files).map(|m| m.as_str())
 }
 
 /// What the line written at SVC stub exhaustion says. `platform` is not known to the layer.
@@ -1138,6 +1165,8 @@ struct Outcome {
     last_frame_center_nonuniform_bp: u64,
     /// `--pacing` only: `Pacing::summary_json` over the window.
     pacing: Option<String>,
+    /// `--relaunch` only: how many times the guest was booted again after asking to stop.
+    relaunches: Option<u32>,
 }
 
 impl Outcome {
@@ -1174,18 +1203,22 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
         max_center_nonuniform_bp: AtomicU64::new(0),
     });
     let exited = Arc::new(AtomicBool::new(false));
+    // One store for every boot of this run: `--relaunch` keeps it, which is the whole point.
+    let db = MemDbRepository::default();
 
-    let platform = Box::new(HeadlessPlatform {
-        screen: screen.clone(),
-        fs: MemoryFilesystem::new(),
-        db: MemDbRepository::default(),
-        stdout: stdout.clone(),
-        exited: exited.clone(),
-        // `.expect` and not `?`: `run` returns `Outcome`, and these bytes are a compile-time
-        // constant, so a failure here means the committed asset is corrupt — a build-wide fault,
-        // not a per-game one. `wie-backend`'s own `text_layout.rs` unwraps the same bytes.
-        font: Font::try_from_static(include_bytes!("../../../assets/neodgm.ttf")).expect("assets/neodgm.ttf failed to parse"),
-    });
+    let make_platform = || -> Box<dyn Platform> {
+        Box::new(HeadlessPlatform {
+            screen: screen.clone(),
+            fs: MemoryFilesystem::new(),
+            db: db.clone(),
+            stdout: stdout.clone(),
+            exited: exited.clone(),
+            // `.expect` and not `?`: `run` returns `Outcome`, and these bytes are a compile-time
+            // constant, so a failure here means the committed asset is corrupt — a build-wide fault,
+            // not a per-game one. `wie-backend`'s own `text_layout.rs` unwraps the same bytes.
+            font: Font::try_from_static(include_bytes!("../../../assets/neodgm.ttf")).expect("assets/neodgm.ttf failed to parse"),
+        })
+    };
 
     // ── load & route (mirrors wie_cli/src/main.rs) ──────────────────────────
     let buf = match fs::read(&args.filename) {
@@ -1197,7 +1230,8 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
         Ok(p) => p,
         Err(e) => return fail("unknown", format!("--profile-out: {e}"), 0, 0, false),
     };
-    let load = catch_unwind(AssertUnwindSafe(|| build_emulator(platform, &args.filename, buf, profile)));
+    let relaunch_buf = (args.relaunch > 0).then(|| buf.clone());
+    let load = catch_unwind(AssertUnwindSafe(|| build_emulator(make_platform(), &args.filename, buf, profile)));
     let (mut emulator, platform_name) = match load {
         Ok(Ok(v)) => v,
         Ok(Err((name, e))) => return fail(&name, format!("load error: {e}"), 0, 0, false),
@@ -1229,7 +1263,28 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     };
 
     let mut pacing_open = args.pacing == Some(0.0);
-    while !exited.load(Ordering::SeqCst) {
+    let mut relaunches = 0u32;
+    loop {
+        if exited.load(Ordering::SeqCst) {
+            let Some(buf) = relaunch_buf.as_ref().filter(|_| relaunches < args.relaunch) else {
+                break;
+            };
+            relaunches += 1;
+            exited.store(false, Ordering::SeqCst);
+            phase = format!("relaunch {relaunches}");
+            // No profile callback on a relaunch: `--profile-out` samples the first boot only.
+            match catch_unwind(AssertUnwindSafe(|| build_emulator(make_platform(), &args.filename, buf.clone(), None))) {
+                Ok(Ok((e, _))) => emulator = e,
+                Ok(Err((_, e))) => {
+                    run_err = Some(format!("load error on {phase}: {e}"));
+                    break;
+                }
+                Err(p) => {
+                    run_err = Some(format!("load panic on {phase}: {}", panic_message(&p)));
+                    break;
+                }
+            }
+        }
         let elapsed = loop_start.elapsed();
         if elapsed > deadline || ticks >= args.max_ticks {
             break;
@@ -1387,6 +1442,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     outcome.center_nonuniform_bp = screen.max_center_nonuniform_bp.load(Ordering::SeqCst);
 
     outcome.pacing = pacing;
+    outcome.relaunches = (args.relaunch > 0).then_some(relaunches);
     judge(&mut outcome, args.inject, args.expect_last_frame, stop, inputs);
     outcome
 }
@@ -1765,6 +1821,7 @@ fn pass(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         last_frame_nondominant_bp: 0,
         last_frame_center_nonuniform_bp: 0,
         pacing: None,
+        relaunches: None,
     }
 }
 
@@ -1788,11 +1845,42 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         last_frame_nondominant_bp: 0,
         last_frame_center_nonuniform_bp: 0,
         pacing: None,
+        relaunches: None,
     }
 }
 
 #[cfg(test)]
 mod tests {
+    /// `--relaunch N` boots the file again after each clean guest exit and reports the count.
+    ///
+    /// `helloworld_lgt` exits on its first tick, so every relaunch is consumed; without the
+    /// loop re-arming, `relaunches` would read 0 and `ticks` would stay at the single-boot
+    /// value. The database half is only held at the type: cloning the repository shares one
+    /// store, which is what `run` relies on to hand every boot the same database. Swapping the
+    /// `db.clone()` in `run` for a fresh `MemDbRepository::default()` is NOT caught here — no
+    /// committed fixture writes a record and exits; the LGT titles that do are corpus-only.
+    #[test]
+    fn relaunch_reboots_after_a_clean_exit_and_keeps_the_database() {
+        use clap::Parser;
+        use std::sync::{Arc, Mutex};
+
+        let file = concat!(env!("CARGO_MANIFEST_DIR"), "/../test_data/helloworld_lgt.zip");
+        let once = super::run(
+            &super::Args::try_parse_from(["wie_validate", file]).unwrap(),
+            Arc::new(Mutex::new(Vec::new())),
+        );
+        let twice = super::run(
+            &super::Args::try_parse_from(["wie_validate", "--relaunch", "2", file]).unwrap(),
+            Arc::new(Mutex::new(Vec::new())),
+        );
+        assert_eq!((once.stop, once.relaunches), ("clean exit", None));
+        assert_eq!((twice.stop, twice.relaunches), ("clean exit", Some(2)));
+        assert!(twice.ticks > once.ticks, "{} vs {}", twice.ticks, once.ticks);
+
+        let db = super::MemDbRepository::default();
+        assert!(Arc::ptr_eq(&db.store, &db.clone().store));
+    }
+
     #[test]
     fn audio_tally_counts_what_reached_the_sink() {
         use std::sync::Arc;
@@ -2126,6 +2214,14 @@ mod tests {
         assert_eq!(json_escape("\u{1}"), "\\u0001");
         // Non-ASCII passes through as UTF-8; JSON does not require escaping it.
         assert_eq!(json_escape("한"), "한");
+    }
+
+    /// `scripts/playability-census.mjs` reads this key for compat.json's `model`; only LGT gets it.
+    #[test]
+    fn lgt_compile_model_is_reported_for_lgt_only_test() {
+        let fixture = |f: &str| format!("{}/../test_data/{f}", env!("CARGO_MANIFEST_DIR"));
+        assert_eq!(super::lgt_compile_model("lgt", &fixture("helloworld_lgt.zip")), Some("clet"));
+        assert_eq!(super::lgt_compile_model("ktf", &fixture("helloworld_ktf.zip")), None);
     }
 
     /// The name handed to the emulators is the file name alone, on every host.
