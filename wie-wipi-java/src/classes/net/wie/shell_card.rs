@@ -210,7 +210,10 @@ mod test {
             jvm.put_field(&mut this, "repaintX", "I", x).await?;
             jvm.put_field(&mut this, "repaintY", "I", y).await?;
             jvm.put_field(&mut this, "repaintWidth", "I", w).await?;
-            jvm.put_field(&mut this, "repaintHeight", "I", h).await
+            jvm.put_field(&mut this, "repaintHeight", "I", h).await?;
+            // Forward, so a serviceRepaints that only paints pending regions (#345) still sees one.
+            jvm.invoke_special(&this, "javax/microedition/lcdui/Canvas", "repaint", "(IIII)V", (x, y, w, h))
+                .await
         }
     }
 
