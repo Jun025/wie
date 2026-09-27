@@ -30,3 +30,5 @@ WormGame 은 받은 플레이어에 `getControl("ToneControl").setSequence(…)`
 ### 게이트
 fmt · clippy `-D warnings`(stable·beta·wasm32) · `RUST_MIN_STACK=4194304 cargo test --all` rc 0. 러너 블록: `draw_j2me`·`helloworld_ktf`·`helloworld_lgt`·`text_j2me` PASS.
 `keydraw_ktf`·`keydraw_lgt` 는 기본 예산에서 `UNMEASURED` · `stop=max-ticks`(release 빌드) — 손대지 않은 바이너리도 같았다. `--max-ticks 500000000` 로 올리면 두 바이너리 모두 PASS · 27/27 · paints 55 · rc 0.
+
+게임 파일명 유입: 1건(BOUNDED) + 판단 필요 0건(SUFFIX-ATTACHED). 그 1건은 `smaf_player.rs` 에 이미 있던 주석 한 줄이고, 이 회차 diff 가 더한 줄에는 없다.
