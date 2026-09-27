@@ -3,14 +3,14 @@
   "date": "2026-09-27",
   "task": "wie-census-small-stub-bundle",
   "title": "전수 점검 소형 결손 묶음 — lwc·SKT 클래스·RMS 열거·LGT stdlib 4행·한 tick 미종료",
-  "summary": "S급 첫 벽 7군. 8종이 FAIL→PASS, 3종은 다음 벽으로 전진, 5종(식별 못 한 KTF ABI 2군 · kfc 툴킷)은 그대로. LGT import 4행은 호출부 디스어셈블로 식별했다. 상세 docs/report/0327.",
+  "summary": "S급 첫 벽 7군. 8종이 FAIL→PASS, 3종은 다음 벽으로 전진, 5종(식별 못 한 KTF ABI 2군 · kfc 툴킷)은 그대로. LGT import 4행은 호출부 디스어셈블로 식별했다. 상세 docs/report/0329.",
   "changes": [
     "wie-midp — RecordStore.enumerateRecords · RecordFilter/RecordComparator/RecordEnumeration · net/wie/RecordEnumerationImpl",
     "wie-skvm — com/xce/io/ByteToCharConverter·ByteToCharEUC_KR · com/xce/lcdui/TextComponentHandler · XFile.fsavail · WieAudioClip.play 양보 + 소리 나는 동안 재시작 안 함",
     "wie-wipi-java — lwc LabelComponent(String) · Component.getX/getY/layout/validate · handset/LED.set",
     "wie-lgt — stdlib import 0x3f9 vsprintf · 0x408 strncat · 0x426 malloc · 0x428 free",
     "wie-backend — LBMP type 2(2비트 회색 · 마스크 평면) 해독 · Audio::duration",
-    "docs/report/0327"
+    "docs/report/0329"
   ],
   "verification": [
     "같은 시각 짝 재측(전 = origin/main + #350, 후 = + 이 PR · release · 프로브 A) 32종 · load1 174~232",
