@@ -74,3 +74,5 @@ headless Chromium · 실제 `AudioContext → 마스터 GainNode → AnalyserNod
 - `wie_featurephone/src/audio.rs` 의 `set_gain` 은 네이티브 시험이 없다(wasm32 전용 크레이트 · Constraint 7) — 위 브라우저 표의 워클릿 게인 값(0.200/0.600/0.360/1.000 — 포트 메시지 가로채기로 읽음)이 판정한다.
 
 게임 파일명 유입(`corpus-name-inflow --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 34회/27쌍 · SUFFIX-ATTACHED 3회/3쌍. BOUNDED 중 29회는 이 회차가 쓴 줄(이 문서 · worklog · `audio_system.rs` 주석 2)이고 5회는 수정 파일의 기존 줄(`player.rs` 3 · `audio.rs` 2 — 이 회차가 쓴 줄 아님). SUFFIX-ATTACHED 3회는 조사가 붙은 진짜 언급 2(이 문서) + 더 긴 다른 제목 속 부분 일치 1.
+
+<!-- corpus-name-inflow v1 subjects=12 tree=026ebc4c5397ec49 B=34/27 P=0/0 S=3/3 -->
