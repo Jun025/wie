@@ -38,8 +38,8 @@
 //           failed after painting is `error` without the long run.
 //   sound   ok = a Play with events reached the sink; silent = none did. This is the
 //           engine side only: a command the browser host drops is #348's axis, not this one.
-//   speed   1 - (sleep lateness + timer lateness + GC) / window, the #347 ratio, headless.
-//           slow < 0.9. ★Wall-clock: host load inflates lateness — record load1 beside it.
+//   speed   1 - (sleep lateness + timer lateness + GC) / window, the #347 ratio, headless: `ok` at
+//           >= 0.9, else `n/a` — never `slow` (see judge()). load1 is recorded beside it.
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -155,7 +155,8 @@ async function probe(t) {
 }
 
 // Speed is wall-clock, so a starved host reads as a slow game. `--only speed` re-measures the
-// titles judged slow, alone (--jobs 1-2 is the point), into S.json; the judge prefers it.
+// titles that read below 0.9, alone (--jobs 1-2 is the point), into S.json; the judge takes the
+// better of the two readings, since each is a lower bound.
 async function speed(t) {
   const d = join(out, t.sha);
   const f = join(d, 'S.json');
@@ -230,11 +231,15 @@ function judge(sha) {
   else ax.longplay = 'ok';
   const au = A.audio ?? B.audio;
   ax.sound = ax.boot !== 'ok' || !au ? 'n/a' : au.plays - (au.empty_plays ?? 0) > 0 ? 'ok' : 'silent';
-  const p = (S ?? A).pacing;
+  // Lateness is wall-clock, so host load only ever ADDS to it: a ratio measured on a busy host is a
+  // lower bound. >= 0.9 there is a real `ok`; below it says nothing (measured 2026-09-27 at load1
+  // ~300: one title read 0.22 and 0.85 on two runs, another 0.49 headless and 0.927 in a quiet
+  // browser). So headless never says `slow` — it says `n/a`, and the ratio stays in census.tsv.
+  const lateRatio = (p) => (p && p.sleeps + p.timers > 0 ? 1 - (p.sleep_late_sum + p.timer_late_sum + p.gc_ms) / windowMs : null);
   const windowMs = (opt.secs - PROBE_KEYS_AT) * 1000;
-  let ratio = null;
-  if (p && p.sleeps + p.timers > 0) ratio = 1 - (p.sleep_late_sum + p.timer_late_sum + p.gc_ms) / windowMs;
-  ax.speed = ratio === null || !ok2 ? 'n/a' : ratio >= 0.9 ? 'ok' : 'slow';
+  const ratios = [A, S].map((r) => lateRatio(r?.pacing)).filter((r) => r !== null);
+  const ratio = ratios.length ? Math.max(...ratios) : null;
+  ax.speed = ok2 && ratio !== null && ratio >= 0.9 ? 'ok' : 'n/a';
   return { A, B, L, S, ax, ratio, novel, baselineDistinct: baseline.size };
 }
 
@@ -272,6 +277,11 @@ function wallOf(reason, stderrPath) {
   const head = lines.filter((l) => !l.startsWith('at ')).join(' ').replace(/\s+R\d+:.*$/, '');
   const frame = lines.filter((l) => l.startsWith('at ')).map((l) => l.slice(3)).find((l) => PLATFORM.test(l));
   let w = head.replace(/\b(?!(?:java|javax|org|com|net)\b)[\w$]+(\.[\w$<>]+\()/g, '<app>$1') + (frame ? ` @ ${frame}` : '');
+  // Two spellings of one death (the first pass wrote `killed (SIGABRT) after Ns`); stderr says why.
+  if (/SIGABRT/.test(head)) {
+    w = 'died on SIGABRT';
+    if (stderrPath && existsSync(stderrPath) && /overflowed its stack/.test(readFileSync(stderrPath, 'utf8'))) w += ' @ host stack overflow';
+  }
   if (/panic/.test(head) && stderrPath && existsSync(stderrPath)) {
     const at = /panicked at (?:.*\/registry\/src\/[^/]+\/)?(\S+?):\d+:\d+/.exec(readFileSync(stderrPath, 'utf8'));
     if (at) w += ` @ ${at[1]}`;
@@ -302,6 +312,13 @@ const names = (text, title) => title.length >= 2 && new RegExp(`(^|[^\\p{L}\\p{N
 // … and does not name a different carrier (one name, two carriers' builds).
 const otherCarrier = (text, platform) => ['KTF', 'SKT', 'LGT'].some((c) => c !== platform && new RegExp(`\\b${c}\\b`, 'i').test(text)) && !new RegExp(`\\b${platform}\\b`, 'i').test(text);
 
+// When the engine could not route an archive, name the carrier from the marker the zip's
+// central directory spells (file names are stored as plain bytes there).
+function sniffPlatform(path) {
+  const bytes = readFileSync(path).toString('latin1');
+  return /__adf__/.test(bytes) ? 'KTF' : /app_info/.test(bytes) ? 'LGT' : /\.msd/.test(bytes) ? 'SKT' : 'J2ME';
+}
+
 // NFC: macOS hands back file names decomposed (NFD), and PR titles are composed.
 const displayTitle = (p) =>
   basename(p)
@@ -323,10 +340,13 @@ if (cmd === 'run') {
   const all = [...pop.titles, ...(prev?.titles ?? []).filter((t) => !known.has(t.sha))].sort((a, b) => a.sha.localeCompare(b.sha));
   writeFileSync(join(out, 'population.json'), JSON.stringify({ ...pop, titles: all, dirs: [...new Set([...(prev?.dirs ?? []), ...opt.dirs.map((d) => resolve(d))])] }));
   console.error(`population: ${pop.files} files -> ${pop.titles.length} unique · excluded dirs ${JSON.stringify(pop.excluded)} · jobs ${opt.jobs}`);
-  if (opt.only !== 'long') await pool(pop.titles, opt.jobs, probe);
+  if (!opt.only || opt.only === 'probe') await pool(pop.titles, opt.jobs, probe);
   if (opt.only === 'speed') {
-    const slow = pop.titles.filter((t) => judge(t.sha)?.ax.speed === 'slow');
-    console.error(`speed: ${slow.length} titles judged slow, re-measured at --jobs ${opt.jobs}`);
+    const slow = pop.titles.filter((t) => {
+      const j = judge(t.sha);
+      return j && j.ax.render === 'ok' && j.ax.speed === 'n/a' && j.ratio !== null;
+    });
+    console.error(`speed: ${slow.length} titles below 0.9, re-measured at --jobs ${opt.jobs}`);
     await pool(slow, opt.jobs, speed);
   } else if (opt.only !== 'probe') {
     const cand = pop.titles.filter((t) => {
@@ -347,7 +367,7 @@ if (cmd === 'run') {
     const j = judge(t.sha);
     if (!j) continue;
     const title = displayTitle(t.path);
-    const platform = (j.A.platform && j.A.platform !== 'unknown' ? j.A.platform : t.path.split('/').at(-2)).toUpperCase();
+    const platform = j.A.platform && j.A.platform !== 'unknown' ? j.A.platform.toUpperCase() : sniffPlatform(t.path);
     const st = status(j.ax);
     const issues = Object.entries(j.ax)
       .map(([k, v]) => ISSUE_KO[`${k}:${v}`])
