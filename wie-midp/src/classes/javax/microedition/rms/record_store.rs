@@ -10,6 +10,8 @@ use rustjava_runtime::classes::java::lang::String;
 use wie_backend::Database;
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
+use crate::classes::javax::microedition::rms::{RecordComparator, RecordEnumeration, RecordFilter};
+
 // class javax.microedition.rms.RecordStore
 pub struct RecordStore;
 
@@ -31,6 +33,12 @@ impl RecordStore {
                 JavaMethodProto::new("setRecord", "(I[BII)V", Self::set_record, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getNumRecords", "()I", Self::get_num_records, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("closeRecordStore", "()V", Self::close_record_store, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new(
+                    "enumerateRecords",
+                    "(Ljavax/microedition/rms/RecordFilter;Ljavax/microedition/rms/RecordComparator;Z)Ljavax/microedition/rms/RecordEnumeration;",
+                    Self::enumerate_records,
+                    MethodAccessFlags::PUBLIC,
+                ),
                 JavaMethodProto::new(
                     "openRecordStore",
                     "(Ljava/lang/String;Z)Ljavax/microedition/rms/RecordStore;",
@@ -208,6 +216,68 @@ impl RecordStore {
         Ok(())
     }
 
+    // Filter, then order, once — the ids are fixed for the enumeration's life (see RecordEnumerationImpl).
+    // Without a comparator the order is ascending record id: MIDP leaves it undefined, and insertion
+    // order is what a store that only ever adds would give anyway.
+    async fn enumerate_records(
+        jvm: &Jvm,
+        context: &mut WieJvmContext,
+        this: ClassInstanceRef<Self>,
+        filter: ClassInstanceRef<RecordFilter>,
+        comparator: ClassInstanceRef<RecordComparator>,
+        keep_updated: bool,
+    ) -> JvmResult<ClassInstanceRef<RecordEnumeration>> {
+        tracing::debug!("javax.microedition.rms.RecordStore::enumerateRecords({this:?}, {filter:?}, {comparator:?}, {keep_updated})");
+
+        let mut ids = Self::get_database(jvm, context, &this).await?.get_record_ids().await;
+        ids.sort_unstable();
+
+        let mut kept: Vec<(i32, ClassInstanceRef<Array<i8>>)> = Vec::with_capacity(ids.len());
+        for id in ids {
+            let record: ClassInstanceRef<Array<i8>> = jvm
+                .invoke_virtual(&this, "javax/microedition/rms/RecordStore", "getRecord", "(I)[B", (id as i32,))
+                .await?;
+            if !filter.is_null() {
+                let matches: bool = jvm
+                    .invoke_virtual(&filter, "javax/microedition/rms/RecordFilter", "matches", "([B)Z", (record.clone(),))
+                    .await?;
+                if !matches {
+                    continue;
+                }
+            }
+
+            // Stable insertion sort through the guest's compare: an element moves ahead only of
+            // records that FOLLOW it (compare > 0), so EQUIVALENT records keep id order.
+            let mut at = kept.len();
+            if !comparator.is_null() {
+                while at > 0 {
+                    let order: i32 = jvm
+                        .invoke_virtual(
+                            &comparator,
+                            "javax/microedition/rms/RecordComparator",
+                            "compare",
+                            "([B[B)I",
+                            (kept[at - 1].1.clone(), record.clone()),
+                        )
+                        .await?;
+                    if order <= 0 {
+                        break;
+                    }
+                    at -= 1;
+                }
+            }
+            kept.insert(at, (id as i32, record));
+        }
+
+        let mut array = jvm.instantiate_array("I", kept.len()).await?;
+        jvm.store_array(&mut array, 0, kept.into_iter().map(|(id, _)| id)).await?;
+
+        Ok(jvm
+            .new_class("net/wie/RecordEnumerationImpl", "(Ljavax/microedition/rms/RecordStore;[I)V", (this, array))
+            .await?
+            .into())
+    }
+
     async fn open_record_store(
         jvm: &Jvm,
         _context: &mut WieJvmContext,
@@ -257,7 +327,17 @@ mod test {
     use test_utils::run_jvm_test;
     use wie_util::Result;
 
-    use crate::get_protos;
+    use alloc::{vec, vec::Vec};
+
+    use jvm::Jvm;
+    use jvm_class_proto::JavaMethodProto;
+    use jvm_types::{ClassAccessFlags, MethodAccessFlags};
+    use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
+
+    use crate::{
+        classes::javax::microedition::rms::{RecordComparator, RecordEnumeration, RecordFilter},
+        get_protos,
+    };
 
     use super::RecordStore;
 
@@ -313,4 +393,119 @@ mod test {
             Ok(())
         })
     }
+
+    // Reverse order by first byte, and a filter that drops records whose first byte is 2.
+    struct ReverseFirstByte;
+
+    impl ReverseFirstByte {
+        fn as_proto() -> WieJavaClassProto {
+            WieJavaClassProto {
+                name: "TestReverseFirstByte",
+                parent_class: Some("java/lang/Object"),
+                interfaces: vec!["javax/microedition/rms/RecordComparator", "javax/microedition/rms/RecordFilter"],
+                methods: vec![
+                    JavaMethodProto::new("<init>", "()V", Self::init, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new("compare", "([B[B)I", Self::compare, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new("matches", "([B)Z", Self::matches, MethodAccessFlags::PUBLIC),
+                ],
+                fields: vec![],
+                access_flags: ClassAccessFlags::PUBLIC,
+            }
+        }
+
+        async fn init(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await
+        }
+
+        async fn compare(jvm: &Jvm, _: &mut WieJvmContext, _: ClassInstanceRef<Self>, a: ClassInstanceRef<Array<i8>>, b: ClassInstanceRef<Array<i8>>) -> JvmResult<i32> {
+            let a: Vec<i8> = jvm.load_array(&a, 0, 1).await?;
+            let b: Vec<i8> = jvm.load_array(&b, 0, 1).await?;
+
+            Ok((b[0] as i32 - a[0] as i32).signum())
+        }
+
+        async fn matches(jvm: &Jvm, _: &mut WieJvmContext, _: ClassInstanceRef<Self>, a: ClassInstanceRef<Array<i8>>) -> JvmResult<bool> {
+            let a: Vec<i8> = jvm.load_array(&a, 0, 1).await?;
+
+            Ok(a[0] != 2)
+        }
+    }
+
+    /// 66959afab216 (SKT) died at boot on `NoSuchMethodError: RecordStore.enumerateRecords(RecordFilter,
+    /// RecordComparator,Z)`. Walks the enumeration both ways with no filter/comparator (ascending ids),
+    /// then with a guest filter and comparator, which is the part that calls back into Java.
+    #[test]
+    fn enumerate_records_filters_orders_and_walks_both_ways() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into(), Box::new([ReverseFirstByte::as_proto()])]), |jvm| async move {
+            let name: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, "enumerate").await?.into();
+            let store: ClassInstanceRef<RecordStore> = jvm
+                .invoke_static(
+                    "javax/microedition/rms/RecordStore",
+                    "openRecordStore",
+                    "(Ljava/lang/String;Z)Ljavax/microedition/rms/RecordStore;",
+                    (name, true),
+                )
+                .await?;
+            for first in [1i8, 3, 2] {
+                let mut data = jvm.instantiate_array("B", 1).await?;
+                jvm.store_array(&mut data, 0, [first]).await?;
+                let _: i32 = jvm
+                    .invoke_virtual(&store, "javax/microedition/rms/RecordStore", "addRecord", "([BII)I", (data, 0, 1))
+                    .await?;
+            }
+
+            const ENUMERATE: &str =
+                "(Ljavax/microedition/rms/RecordFilter;Ljavax/microedition/rms/RecordComparator;Z)Ljavax/microedition/rms/RecordEnumeration;";
+            const E: &str = "javax/microedition/rms/RecordEnumeration";
+            let no_filter: ClassInstanceRef<RecordFilter> = None.into();
+            let no_comparator: ClassInstanceRef<RecordComparator> = None.into();
+
+            let plain: ClassInstanceRef<RecordEnumeration> = jvm
+                .invoke_virtual(
+                    &store,
+                    "javax/microedition/rms/RecordStore",
+                    "enumerateRecords",
+                    ENUMERATE,
+                    (no_filter, no_comparator, false),
+                )
+                .await?;
+            let count: i32 = jvm.invoke_virtual(&plain, E, "numRecords", "()I", ()).await?;
+            assert_eq!(count, 3);
+            let mut ids = Vec::new();
+            while jvm.invoke_virtual::<_, bool>(&plain, E, "hasNextElement", "()Z", ()).await? {
+                ids.push(jvm.invoke_virtual::<_, i32>(&plain, E, "nextRecordId", "()I", ()).await?);
+            }
+            assert_eq!(ids, [1, 2, 3]);
+            let back: i32 = jvm.invoke_virtual(&plain, E, "previousRecordId", "()I", ()).await?;
+            assert_eq!(back, 3);
+            let past_end: JvmResult<i32> = async {
+                let _: () = jvm.invoke_virtual(&plain, E, "reset", "()V", ()).await?;
+                let _: i32 = jvm.invoke_virtual(&plain, E, "previousRecordId", "()I", ()).await?;
+                Ok(0)
+            }
+            .await;
+            assert!(matches!(past_end, Err(JavaError::JavaException(_))));
+
+            let ordering = jvm.new_class("TestReverseFirstByte", "()V", ()).await?;
+            let sorted: ClassInstanceRef<RecordEnumeration> = jvm
+                .invoke_virtual(
+                    &store,
+                    "javax/microedition/rms/RecordStore",
+                    "enumerateRecords",
+                    ENUMERATE,
+                    (ordering.clone(), ordering, false),
+                )
+                .await?;
+            let mut firsts = Vec::new();
+            while jvm.invoke_virtual::<_, bool>(&sorted, E, "hasNextElement", "()Z", ()).await? {
+                let record: ClassInstanceRef<Array<i8>> = jvm.invoke_virtual(&sorted, E, "nextRecord", "()[B", ()).await?;
+                let record: Vec<i8> = jvm.load_array(&record, 0, 1).await?;
+                firsts.push(record[0]);
+            }
+            assert_eq!(firsts, [3i8, 1]);
+
+            Ok(())
+        })
+    }
+
 }
