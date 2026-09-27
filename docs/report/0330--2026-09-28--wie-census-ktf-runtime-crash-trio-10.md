@@ -44,3 +44,5 @@
 ### 한계
 - ⒝ 는 «탭이 죽는다 → 게임이 멈춘다»로 **한 계급 내렸을 뿐**이다. NPE 루프가 진짜 벽이고, 실기에서는 GC 가 할당 실패 때 돌아 힙이 차지 않았을 것이다. 여기서 할당 실패 때 GC 를 돌리지 않은 이유: KTF 게스트는 ARM 스택·레지스터에 객체 포인터를 쥐고 있고 GC 는 그것을 못 본다 — 게스트 실행 중 수거는 살아 있는 객체를 지운다.
 - 예약 OOM 은 JVM 하나에 1개이고 공유된다(JVM 들의 관례). `jar_name` 이 없는 시험 JVM 에는 없다 → 종전 경로.
+
+게임 파일명 유입(`corpus-name-inflow --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 1회/1쌍 · SUFFIX-ATTACHED 0회/0쌍. BOUNDED 1회는 수정 파일 `jvm_support.rs` 의 기존 줄(main 에 이미 있음)이다 — 이 회차의 추가 줄 중 일치 0.
