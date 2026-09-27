@@ -6,8 +6,12 @@
 //   { t: "play", h: handle, r: repeat, d: durationMs, ev?: [[timeMs, 0, Uint8Array midi] |
 //                                                          [timeMs, 1, channels, rate, Int16Array]] }
 //   { t: "stop", h: handle }
+//   { t: "evict", h: handle }   — forget the handle's sequence; audio.rs resends `ev` on its next play
+//   { t: "stats" }              — replies { t: "stats", sequences, playbacks, voices } on the port
 // `ev` rides only on the first play of a handle (a handle's sequence never changes); later plays
-// reuse it. Everything below runs on the audio thread, so timing is sample-accurate and does not
+// reuse it. audio.rs keeps at most RESIDENT_SEQUENCES handles here and evicts the least recently
+// played, because nothing tells it when a handle is retired. `stats` is for measuring that from a
+// page (nothing in the engine asks). Everything below runs on the audio thread, so timing is sample-accurate and does not
 // depend on the emulator's tick rate.
 //
 // The synth is deliberately small: one 2-operator FM voice per note with a patch per General MIDI
@@ -101,6 +105,10 @@ class WieAudioProcessor extends AudioWorkletProcessor {
   onMessage(message) {
     if (message.t === "play") this.play(message);
     else if (message.t === "stop") this.stop(message.h);
+    // A playing sequence keeps sounding: its playback holds the sequence object itself.
+    else if (message.t === "evict") this.sequences.delete(message.h);
+    else if (message.t === "stats")
+      this.port.postMessage({ t: "stats", sequences: this.sequences.size, playbacks: this.playbacks.size, voices: this.voices.length });
   }
 
   load(handle, durationMs, events) {
@@ -423,4 +431,11 @@ class WieAudioProcessor extends AudioWorkletProcessor {
   }
 }
 
-registerProcessor("wie-audio", WieAudioProcessor);
+// A second module load into the same AudioContext (a second sink on a reused context) would make
+// registerProcessor throw NotSupportedError, reject addModule, and drop that sink to the MIDI-
+// silent fallback. The scope is shared by every module in the context, so a flag on it is enough;
+// the processor registered first is the same code.
+if (!globalThis.wieAudioRegistered) {
+  registerProcessor("wie-audio", WieAudioProcessor);
+  globalThis.wieAudioRegistered = true;
+}

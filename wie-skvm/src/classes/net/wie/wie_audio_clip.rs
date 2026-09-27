@@ -24,7 +24,19 @@ use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 // stopping there made all of them silent (measured in the browser: each `play` followed by a
 // `stop` in the same instant, output RMS 0). So `close` only retires the clip — later `play`s
 // are ignored — and the handle is released by the next `open`, which also bounds what stays
-// loaded to one handle per clip.
+// loaded to one handle per clip. `stop`/`pause` on a closed clip are ignored too: 드래곤나이트EX
+// calls `play` → `close` → `stop` within 66 µs (measured 2026-09-27), so a `stop` that reached a
+// closed clip's sound would cut its effects the way stopping in `close` cut 더팜1's.
+//
+// That leaves a loop whose clip was closed with nothing that can stop it except `open` on that
+// same object. 사고뭉치트윈스 starts its music on one clip (`open` → `loop` → `close`), calls
+// `stop` on it (ignored, closed), then plays the next song from a NEW clip — and the first song
+// kept looping under the second (measured: `loop_overlaps` 1, the only one in 50 SKT titles).
+// So a loop start stops every loop left behind by a closed clip (`orphanLoops`). Loops of clips
+// that are still open are left alone — the game can still stop those itself.
+//
+// `loop` on a clip that is already looping does nothing: 나이트메이커 calls it every frame, and
+// restarting there sent 86,769 plays in 60 s, each cutting the music back to its first note.
 pub struct WieAudioClip;
 
 impl WieAudioClip {
@@ -48,6 +60,9 @@ impl WieAudioClip {
                 JavaFieldProto::new("repeat", "Z", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("paused", "Z", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("closed", "Z", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("looping", "Z", FieldAccessFlags::PRIVATE),
+                // Handles (+ 1, like `audioHandle`) of loops whose clip was closed mid-loop.
+                JavaFieldProto::new("orphanLoops", "[I", FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC),
             ],
             access_flags: ClassAccessFlags::PUBLIC,
         }
@@ -112,15 +127,58 @@ impl WieAudioClip {
     }
 
     async fn start(jvm: &Jvm, context: &mut WieJvmContext, this: &mut ClassInstanceRef<Self>, repeat: bool) -> JvmResult<()> {
+        let Some(handle) = Self::handle(jvm, this).await? else {
+            jvm.put_field(this, "repeat", "Z", repeat).await?;
+            jvm.put_field(this, "paused", "Z", false).await?;
+            return Ok(());
+        };
+        let looping: bool = jvm.get_field(this, "looping", "Z").await?;
+        if repeat && looping {
+            return Ok(());
+        }
+
         jvm.put_field(this, "repeat", "Z", repeat).await?;
         jvm.put_field(this, "paused", "Z", false).await?;
-        if let Some(handle) = Self::handle(jvm, this).await?
-            && let Err(error) = context.system().audio().play(handle, repeat)
-        {
+        jvm.put_field(this, "looping", "Z", repeat).await?;
+        if repeat {
+            Self::stop_orphan_loops(jvm, context).await?;
+        }
+        if let Err(error) = context.system().audio().play(handle, repeat) {
             tracing::error!("net.wie.WieAudioClip: failed to play audio: {error:?}");
         }
 
         Ok(())
+    }
+
+    async fn orphan_loops(jvm: &Jvm) -> JvmResult<Vec<i32>> {
+        let orphans: ClassInstanceRef<Array<i32>> = jvm.get_static_field("net/wie/WieAudioClip", "orphanLoops", "[I").await?;
+        if orphans.is_null() {
+            return Ok(Vec::new());
+        }
+        let length = jvm.array_length(&orphans).await?;
+
+        jvm.load_array(&orphans, 0, length).await
+    }
+
+    async fn set_orphan_loops(jvm: &Jvm, handles: &[i32]) -> JvmResult<()> {
+        let mut orphans = jvm.instantiate_array("I", handles.len()).await?;
+        jvm.store_array(&mut orphans, 0, handles.iter().copied()).await?;
+
+        jvm.put_static_field("net/wie/WieAudioClip", "orphanLoops", "[I", orphans).await
+    }
+
+    /// Stops every loop left behind by a closed clip. A stale entry (its handle since released by
+    /// `open`) is harmless: stopping a handle that is not playing sends nothing.
+    async fn stop_orphan_loops(jvm: &Jvm, context: &mut WieJvmContext) -> JvmResult<()> {
+        let orphans = Self::orphan_loops(jvm).await?;
+        if orphans.is_empty() {
+            return Ok(());
+        }
+        for stored in orphans {
+            context.system().audio().stop(stored as u32 - 1);
+        }
+
+        Self::set_orphan_loops(jvm, &[]).await
     }
 
     async fn release(jvm: &Jvm, context: &mut WieJvmContext, this: &mut ClassInstanceRef<Self>) -> JvmResult<()> {
@@ -129,6 +187,7 @@ impl WieAudioClip {
             jvm.put_field(this, "audioHandle", "I", 0).await?;
         }
         jvm.put_field(this, "paused", "Z", false).await?;
+        jvm.put_field(this, "looping", "Z", false).await?;
 
         Ok(())
     }
@@ -151,6 +210,7 @@ impl WieAudioClip {
         if let Some(handle) = Self::handle(jvm, &this).await? {
             context.system().audio().stop(handle);
             jvm.put_field(&mut this, "paused", "Z", true).await?;
+            jvm.put_field(&mut this, "looping", "Z", false).await?;
         }
 
         Ok(())
@@ -173,6 +233,7 @@ impl WieAudioClip {
 
         if let Some(handle) = Self::handle(jvm, &this).await? {
             context.system().audio().stop(handle);
+            jvm.put_field(&mut this, "looping", "Z", false).await?;
         }
         jvm.put_field(&mut this, "paused", "Z", false).await?;
 
@@ -182,6 +243,16 @@ impl WieAudioClip {
     async fn close(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("net.wie.WieAudioClip::close({this:?})");
 
+        let closed: bool = jvm.get_field(&this, "closed", "Z").await?;
+        let looping: bool = jvm.get_field(&this, "looping", "Z").await?;
+        if !closed
+            && looping
+            && let Some(handle) = Self::loaded(jvm, &this).await?
+        {
+            let mut orphans = Self::orphan_loops(jvm).await?;
+            orphans.push(handle as i32 + 1);
+            Self::set_orphan_loops(jvm, &orphans).await?;
+        }
         jvm.put_field(&mut this, "closed", "Z", true).await?;
         jvm.put_field(&mut this, "paused", "Z", false).await?;
 
@@ -333,5 +404,70 @@ mod test {
                 ("play", 1, false), // and the close()s after it send nothing either
             ]
         );
+    }
+
+    /// 사고뭉치트윈스's song change, and 나이트메이커's per-frame `loop`. A loop left behind by a
+    /// closed clip is stopped when another loop starts; an open clip's loop is not (the game can
+    /// still stop it); and `loop` on a clip that is already looping sends nothing.
+    #[test]
+    fn audio_clip_loop_stops_loops_orphaned_by_close() {
+        let platform = TestPlatform::new();
+        let log = platform.audio_log();
+
+        let result = run_jvm_test_with_system(
+            Box::new([wie_midp::get_protos().into(), get_protos().into()]),
+            Box::new(platform),
+            |jvm, _system| async move {
+                let mut clips: Vec<ClassInstanceRef<AudioClip>> = Vec::new();
+                for _ in 0..3 {
+                    let name = JavaLangString::from_rust_string(&jvm, "mmf").await?;
+                    clips.push(
+                        jvm.invoke_static(
+                            "com/skt/m/AudioSystem",
+                            "getAudioClip",
+                            "(Ljava/lang/String;)Lcom/skt/m/AudioClip;",
+                            (name,),
+                        )
+                        .await?,
+                    );
+                }
+                let data = jvm.instantiate_array("B", 4).await?;
+                let call = async |clip: &ClassInstanceRef<AudioClip>, method: &str| -> JvmResult<()> {
+                    jvm.invoke_virtual(clip, "net/wie/WieAudioClip", method, "()V", ()).await
+                };
+
+                // Song 1 on clip 0, exactly as 사고뭉치트윈스 does it.
+                let _: () = jvm
+                    .invoke_virtual(&clips[0], "net/wie/WieAudioClip", "open", "([BII)V", (data.clone(), 0, 4))
+                    .await?;
+                call(&clips[0], "loop").await?;
+                call(&clips[0], "loop").await?; // already looping: nothing
+                call(&clips[0], "close").await?;
+                call(&clips[0], "stop").await?; // closed: ignored
+                // Song 2 on a new clip: song 1 must stop first.
+                let _: () = jvm
+                    .invoke_virtual(&clips[1], "net/wie/WieAudioClip", "open", "([BII)V", (data.clone(), 0, 4))
+                    .await?;
+                call(&clips[1], "loop").await?;
+                // A loop on a third clip while clip 1 is still open: clip 1's loop is left alone.
+                let _: () = jvm
+                    .invoke_virtual(&clips[2], "net/wie/WieAudioClip", "open", "([BII)V", (data, 0, 4))
+                    .await?;
+                call(&clips[2], "loop").await?;
+
+                Ok(())
+            },
+        );
+        assert!(result.is_ok(), "JVM test failed: {result:?}");
+
+        let shape: Vec<(&str, u32, bool)> = log
+            .lock()
+            .iter()
+            .map(|command| match command {
+                AudioCommand::Play { handle, repeat, .. } => ("play", *handle, *repeat),
+                AudioCommand::Stop { handle } => ("stop", *handle, false),
+            })
+            .collect();
+        assert_eq!(shape, [("play", 0, true), ("stop", 0, false), ("play", 1, true), ("play", 2, true)]);
     }
 }

@@ -5079,6 +5079,7 @@ dependencies = [
  "jvm-class-proto",
  "jvm-types",
  "rustjava-runtime",
+ "smaf-player",
  "test-utils",
  "tracing",
  "wie-backend",
