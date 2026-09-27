@@ -66,3 +66,5 @@
 - 배틀몬스터 전투·마을은 재지 않았다(숲만). 0305 에서 같은 형태(마감 방식 · 페인트 대기 yield 스핀)였고 숲이 20fps 그대로다.
 
 - 게임 파일명 유입(`scripts/corpus-name-inflow.mjs --corpus <로컬 코퍼스>`): BOUNDED 9건(원장에 이미 쓰인 제목들) + SUFFIX-ATTACHED 1건(`배틀몬스터는` — 조사가 붙은 진짜 언급, 다른 제목 아님).
+
+<!-- corpus-name-inflow v1 subjects=3 tree=53951575cd02c318 B=29/9 P=0/0 S=2/1 -->
