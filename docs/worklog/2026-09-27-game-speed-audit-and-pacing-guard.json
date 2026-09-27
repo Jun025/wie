@@ -9,7 +9,7 @@
     "wie-midp: repaint/handlePaintEvent/타이머 발화 계측 · GC 간격 = max(1000ms, 직전 비용 × 20)",
     "wie_cli wie_validate: --pacing [SECS]",
     "test-utils: TestClock::stepping/peek · scripts/make-pace-fixture.mjs · test_data/pace_j2me.zip · wie-j2me/tests/test_pacing.rs",
-    "AGENTS.md: runner 블록 NOT-RUN 1줄 · docs/report/0313"
+    "AGENTS.md: runner 블록 NOT-RUN 1줄 · docs/report/0314"
   ],
   "verification": [
     "브라우저 교대 2짝: GC 165ms 타이틀 10.85/10.80 → 11.85/11.85fps · 라이브 6종 퇴행 0",
