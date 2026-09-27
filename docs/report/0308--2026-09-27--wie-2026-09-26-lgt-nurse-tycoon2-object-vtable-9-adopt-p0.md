@@ -32,3 +32,7 @@ hang 판정: 간호사타이쿤2 대기 스레드는 index 9 에서 약 25 ms �
 - 부작용: 배치되지 않은 메서드는 표 끝에 빈 칸으로 덧붙는다(`vtable.rs` `unplaced`). 그래서 호스트 클래스 표가 2칸 짧아진다(Object 17 → 15). 위 93건에서 새 벽은 0건이다.
 - 변이: 두 행을 지우면 `abi_rows_cover…` 가 FAILED 한다.
 - 4게이트: fmt · clippy stable/beta/wasm32 `-D warnings` rc0 · `cargo test --all` 495 passed / 0 failed. 러너 블록 6 fixture 전부 PASS.
+
+### 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab` 결과는 아래 표식 줄의 B·S 값이다. BOUNDED 와 SUFFIX-ATTACHED 는 대부분 이 브랜치가 건드린 두 파일에 이미 있던 제목 주석이다. 이 회차가 새로 쓴 이름은 간호사타이쿤2 · SD한국전쟁 두 제목과 코퍼스 경로 서술뿐이다. 게임 바이트는 쓰지 않았다.
