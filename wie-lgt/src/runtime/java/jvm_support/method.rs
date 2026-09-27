@@ -281,9 +281,9 @@ mod tests {
 
     use test_utils::TestPlatform;
     use wie_backend::{DefaultTaskRunner, System};
-    use wie_core_arm::{Allocator, ArmCore};
+    use wie_core_arm::{Allocator, ArmCore, SvcId};
     use wie_jvm_support::{JvmImplementation, JvmSupport};
-    use wie_util::{Result, write_generic, write_null_terminated_string_bytes};
+    use wie_util::{Result, WieError, write_generic, write_null_terminated_string_bytes};
 
     use super::{JavaMethod, JavaMethodRunResult, RawJavaMethod};
     use crate::runtime::java::{
@@ -482,6 +482,90 @@ mod tests {
             // The unwind consumed the frame, and this pop comes after the wrapper returned (sp
             // is the caller's, not the frame's), so it is not the catch's own: nothing to pop.
             assert!(exception::pop(&mut core).is_err());
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+        Ok(())
+    }
+
+    // Guest code that enters two try blocks and then hits a host error, the way 놈3's paint reached
+    // `Unimplemented: java/lang/String vtable index 26` three calls deep. SVC 0x20 is unused by
+    // the LGT runtime.
+    async fn enter_tries_then_abort(core: &mut ArmCore, _: &mut (), _: SvcId) -> Result<()> {
+        for lr in [0x5001, 0x6001] {
+            let mut context = core.save_context();
+            context.lr = lr;
+            core.restore_context(&context);
+            exception::push(core)?;
+        }
+        Err(WieError::FatalError("unimplemented slot".into()))
+    }
+
+    // 놈3 (evidence nom3_292_overflow_trace_excerpt): with the dead frames left on the chain, the
+    // next throw in paint's caller resumed a catch on a stack that no longer existed, and the
+    // same frame was pushed and unwound 40,078 times until the host stack overflowed. The throw
+    // after JavaMethod::run returns must land in the caller's own frame.
+    #[test]
+    fn host_error_in_rust_invoked_guest_call_does_not_leave_its_frames_on_the_chain() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let mut core = ArmCore::new(false, None)?;
+            Allocator::init(&mut core)?;
+            let stack = Allocator::alloc(&mut core, 0x1000)?;
+            let mut context = core.save_context();
+            context.sp = stack + 0x1000;
+            core.restore_context(&context);
+
+            let implementation = LgtJvmImplementation::new(&mut core)?;
+            let protos = [wie_midp::get_protos().into(), wie_wipi_java::get_protos().into()];
+            let jvm = JvmSupport::new_jvm(&system_clone, None, Box::new(protos), &[], implementation).await?;
+            core.register_svc_handler(0x20, enter_tries_then_abort, &())?;
+
+            let code = Allocator::alloc(&mut core, 4)?;
+            write_generic(&mut core, code, [0xdf20u16, 0x4770])?; // svc #0x20; bx lr
+            let ptr_name = Allocator::alloc(&mut core, 6)?;
+            write_null_terminated_string_bytes(&mut core, ptr_name, b"paint")?;
+            let ptr_descriptor = Allocator::alloc(&mut core, 4)?;
+            write_null_terminated_string_bytes(&mut core, ptr_descriptor, b"()V")?;
+            let ptr_method = Allocator::alloc(&mut core, size_of::<RawJavaMethod>() as u32)?;
+            write_generic(
+                &mut core,
+                ptr_method,
+                RawJavaMethod {
+                    ptr_class: 0,
+                    ptr_name,
+                    ptr_descriptor,
+                    access_flags: MethodAccessFlags::STATIC.bits(),
+                    argument_word_count: 0,
+                    unk3: 0,
+                    ptr_method: code + 1,
+                    unk4: 0,
+                },
+            )?;
+
+            // The caller's own try.
+            let mut caller = context.clone();
+            caller.lr = 0x4001;
+            core.restore_context(&caller);
+            exception::push(&mut core)?;
+            core.restore_context(&context);
+
+            let result = JavaMethod::from_raw(ptr_method, &core).run(&jvm, Box::new([])).await;
+            assert!(result.is_err());
+
+            let mut throw = context.clone();
+            throw.lr = 0;
+            core.restore_context(&throw);
+            assert_eq!(exception::unwind(&mut core, 0x1234)?, Some(0x4001));
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
