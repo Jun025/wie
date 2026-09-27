@@ -34,3 +34,4 @@
 
 게임 이름 유입(`scripts/corpus-name-inflow.mjs --corpus <game_lab>`): BOUNDED 16 · SUFFIX-ATTACHED 2(아래 표식). `interface.rs` «파일 전체»가 대상이라 기존 주석의 타이틀이 함께 세어진다. 이 회차가 새로 쓴 이름은 `슈퍼액션히어로`(대상)와 회귀 대조 3타이틀(`월드장기체스`·`메이플스토리2007`·`학교가는길`, 이 문서만)이다.
 
+<!-- corpus-name-inflow v1 subjects=4 tree=7a22f922cba7ada4 B=28/16 P=0/0 S=3/2 -->
