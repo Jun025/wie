@@ -468,6 +468,35 @@ mod tests {
     }
 
     #[test]
+    fn test_sleep_wakes_on_the_first_step_at_or_after_its_deadline() {
+        let mut executor = Executor::new();
+
+        // One clock for the executor (1ms per read) and the task (reads without stepping).
+        let clock = Arc::new(AtomicU64::new(0));
+        let slept = Arc::new(AtomicU64::new(u64::MAX));
+        let woke = Arc::new(AtomicU64::new(u64::MAX));
+        let (clock_task, slept_task, woke_task, executor_task) = (clock.clone(), slept.clone(), woke.clone(), executor.clone());
+        executor.spawn(move || async move {
+            slept_task.store(clock_task.load(Ordering::SeqCst), Ordering::SeqCst);
+            executor_task.sleep(20);
+            YieldOnce(false).await;
+            woke_task.store(clock_task.load(Ordering::SeqCst), Ordering::SeqCst);
+        });
+
+        // A host that ticks back to back, as wie_validate does: each tick ends when every task
+        // sleeps, and the next one starts at once. A wake held past its deadline — rounded to a
+        // host frame, or waiting out a fixed slice as #291's getNextEvent did — shows up here.
+        while woke.load(Ordering::SeqCst) == u64::MAX {
+            let clock = clock.clone();
+            executor
+                .tick(move || Instant::from_epoch_millis(clock.fetch_add(1, Ordering::SeqCst)))
+                .unwrap();
+        }
+        let late = woke.load(Ordering::SeqCst) - slept.load(Ordering::SeqCst);
+        assert!((20..=22).contains(&late), "sleep(20) woke after {late}ms");
+    }
+
+    #[test]
     fn test_all_ok_tasks_complete() {
         let mut executor = Executor::new();
 

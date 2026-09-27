@@ -29,10 +29,10 @@ import { crc32, deflateSync } from "node:zlib";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const u2 = (v) => Buffer.from([(v >> 8) & 0xff, v & 0xff]);
+export const u2 = (v) => Buffer.from([(v >> 8) & 0xff, v & 0xff]);
 const u4 = (v) => Buffer.from([(v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff]);
 
-class ConstantPool {
+export class ConstantPool {
   #items = [];
   #index = new Map();
   #add(key, bytes) {
@@ -85,7 +85,7 @@ class ConstantPool {
 // drawMidlet). Offsets are byte offsets into `code`; the caller computes them
 // from the length of the buffers it concatenated, so a re-ordered instruction
 // cannot silently point the handler at the wrong pc.
-const method = (cp, name, desc, maxStack, maxLocals, code, handlers = []) => {
+export const method = (cp, name, desc, maxStack, maxLocals, code, handlers = []) => {
   const table = Buffer.concat(handlers.map((h) => Buffer.concat([u2(h.startPc), u2(h.endPc), u2(h.handlerPc), u2(h.catchType)])));
   const body = Buffer.concat([u2(maxStack), u2(maxLocals), u4(code.length), code, u2(handlers.length), table, u2(0)]);
   return Buffer.concat([u2(0x0001), u2(cp.utf8(name)), u2(cp.utf8(desc)), u2(1), u2(cp.utf8("Code")), u4(body.length), body]);
@@ -95,7 +95,7 @@ const method = (cp, name, desc, maxStack, maxLocals, code, handlers = []) => {
 // ConstantValue starts at 0, which is the "no key seen yet" state paint() tests.
 const staticIntField = (cp, name) => Buffer.concat([u2(0x0009), u2(cp.utf8(name)), u2(cp.utf8("I")), u2(0)]);
 
-const classFile = (cp, thisClass, superClass, methods, fields = []) => {
+export const classFile = (cp, thisClass, superClass, methods, fields = []) => {
   // Resolve every index BEFORE serializing the pool — an entry added afterwards
   // would be referenced but never written (parsers then unwrap() a None).
   const self_ = cp.class_(thisClass);

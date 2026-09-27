@@ -1,0 +1,27 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-27",
+  "task": "wie-game-speed-audit-across-titles-and-pacing-guard",
+  "title": "게임 속도 전수 점검 29종 · GC 비용 비례 간격 · 엔진 페이싱 계측과 퇴행 가드",
+  "summary": "브라우저로 29종(라이브 6 + KTF/SKT sha 표본 23)의 의도 주기 대 실제 주기를 쟀다. 비율 < 0.9 는 7종이다. 6종은 이미 알려진 rAF 격자 계급(wie-3 소관)이고, 1종은 새 계급(GC 1회 165ms × 1초 간격)이라 GC 간격을 비용의 20배로 늘렸다. 엔진이 늦깸·타이머 늦음·repaint→paint·GC 를 세고(Pacing · wie_validate --pacing), 계단 시계로 도는 J2ME 루프 픽스처가 cargo test --all 에서 #291/#338 퇴행을 잡는다.",
+  "changes": [
+    "wie-backend: Pacing(계측) · System::guest_sleep/pacing · Emulator::take_pacing · executor sleep 시험",
+    "wie-midp: repaint/handlePaintEvent/타이머 발화 계측 · GC 간격 = max(1000ms, 직전 비용 × 20)",
+    "wie_cli wie_validate: --pacing [SECS]",
+    "test-utils: TestClock::stepping/peek · scripts/make-pace-fixture.mjs · test_data/pace_j2me.zip · wie-j2me/tests/test_pacing.rs",
+    "AGENTS.md: runner 블록 NOT-RUN 1줄 · docs/report/0314"
+  ],
+  "verification": [
+    "브라우저 교대 2짝: GC 165ms 타이틀 10.85/10.80 → 11.85/11.85fps · 라이브 6종 퇴행 0",
+    "주입 라이브 6종 × 2회 12/12 PASS 27/27",
+    "cargo test --all 500/0 · fmt · clippy stable/wasm32/beta -D warnings rc0",
+    "변이 10종 전부 red · 로컬 퇴행 브랜치에서 cargo test --all rc=101"
+  ],
+  "limits": [
+    "비율은 하한이다(마감 루프가 흡수한 늦깸도 뺀다) · 부하 load1 200~370 에서 측정",
+    "GC 가 드물어진 타이틀은 쓰레기가 더 오래 산다(165ms 타이틀 최대 3.3초)",
+    "test_pacing 은 J2ME 경로 — WIPI 타이머 경로는 wie-midp 단위 시험이 잠근다"
+  ],
+  "proposals": [],
+  "adoptedProposals": []
+}

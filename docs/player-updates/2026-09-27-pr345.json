@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-27",
+  "kind": "fix",
+  "titles": [
+    "9babd9789bae476aa3c340544220340b1e1feff0bc440ca707cbb491d94d2786"
+  ],
+  "summary_ko": "화면을 그리다가 꺼지던 문제를 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/345",
+  "enginePin": "e3a1173e88c23585349dcbf3c377a30fb5c211cd"
+}

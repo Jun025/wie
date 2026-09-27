@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-26",
+  "kind": "fix",
+  "titles": [
+    "d01275d61fa9f0bac4d9b20f0b4b9d0b578e67bd2a21754f9e5d618c5126b235"
+  ],
+  "summary_ko": "게임 화면이 나오도록 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/323",
+  "enginePin": "81818e84f18187cfbfeff9efbbbec53e25aab96a"
+}

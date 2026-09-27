@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-27",
+  "kind": "speed",
+  "titles": [
+    "a30bbe008b5e570456b37c53dc849b73c9f6325050279f9da2ba35385ed10e67"
+  ],
+  "summary_ko": "게임이 초당 14장에서 20장으로 빨라졌어요.",
+  "pr": "https://github.com/Jun025/wie/pull/338",
+  "enginePin": "156c5c56492a937eb5ebd477e3abdb821ab5e778"
+}

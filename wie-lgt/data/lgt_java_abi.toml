@@ -502,6 +502,15 @@ vtable = [
     { name = "elementAt", descriptor = "(I)Ljava/lang/Object;", index = 23 },
     { name = "removeElementAt", descriptor = "(I)V", index = 27 },
     { name = "insertElementAt", descriptor = "(Ljava/lang/Object;I)V", index = 28 },
+    # 월드장기체스's wall after Vector 31 (measured 2026-09-27, call site disassembled, lr 0x2b598).
+    # A one-argument guest method loads the Vector from this.<field>[0], null-checks it, passes
+    # r0 = the Vector and r1 = its own argument (an object, 0x4884a240 beside the Vector's
+    # 0x48847180), and dispatches `ldr ip,[r3,#0x78]` (= 4 + 4*29). The next instruction is
+    # `mov r0,r5` — the call's result is overwritten unread and the method returns its argument.
+    # CLDC 1.1 order puts addElement(Object)V at 29 and removeElement(Object)Z at 30; the shape
+    # (one object, result unused) fits both, since Java may drop a boolean — so the order decides,
+    # as it does for the five rows around this one. A used result would have refuted 29.
+    { name = "addElement", descriptor = "(Ljava/lang/Object;)V", index = 29 },
     # 월드장기체스's wall after Random 10 (measured 2026-09-27, call site disassembled, lr 0x2aab0).
     # The caller loads the Vector from this.<field>[0], null-checks it, sets only r0 and
     # dispatches `ldr ip,[r3,#0x80]` (= 4 + 4*31); no argument register is written (r1 is left
