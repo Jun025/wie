@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-26",
+  "kind": "fix",
+  "titles": [
+    "517ed32c92d60a0c26a14ea913160901bfd5e6da68464b6a12c9c13e2d8f08d2"
+  ],
+  "summary_ko": "시작하는 도중 멈추던 문제를 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/328",
+  "enginePin": "4d8459195ec33c904a0aafa6bc87722a3c547a88"
+}

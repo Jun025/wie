@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-25",
+  "kind": "speed",
+  "titles": [
+    "49ade89578c59befbcc12945fa38070e0e31b625d9eff9975b5b5916d7055c42"
+  ],
+  "summary_ko": "게임이 초당 17장에서 35장으로 부드럽게 움직여요.",
+  "pr": "https://github.com/Jun025/wie/pull/291",
+  "enginePin": "3f0e6f47ba62d8f3d2009d2c00434a6498daf427"
+}

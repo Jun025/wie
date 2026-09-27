@@ -1,0 +1,12 @@
+{
+  "date": "2026-09-25",
+  "kind": "fix",
+  "titles": [
+    "2a8a3dcd07eb3fe804707b0fe50cca42f4efdefcb8f8233a54c22f98521f2d3c",
+    "3cc7a9b4cb15818cdd5a66f7e520c7b9b36f1df8d2df096aafa961b1cb2b682c",
+    "e68b1c8aef85c584dc6e5e225f0c226641b23f6c523bf0f59eb662151f9cf954"
+  ],
+  "summary_ko": "흰 화면만 나오던 문제를 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/301",
+  "enginePin": "4d5d639b122389cf53a27f0d1a56619b2d87ea9d"
+}

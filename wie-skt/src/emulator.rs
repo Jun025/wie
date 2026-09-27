@@ -12,7 +12,7 @@ use encoding_rs::EUC_KR;
 use jvm::{Result as JvmResult, runtime::JavaLangString};
 
 use wie_backend::{
-    DefaultTaskRunner, Emulator, Event, Platform, System,
+    DefaultTaskRunner, Emulator, Event, Pacing, Platform, System,
     canvas::{decode_res, encode_png},
 };
 use wie_jvm_support::{JvmSupport, RustJavaJvmImplementation};
@@ -170,6 +170,10 @@ impl SktEmulator {
 impl Emulator for SktEmulator {
     fn handle_event(&mut self, event: Event) {
         self.system.event_queue().push(event)
+    }
+
+    fn take_pacing(&mut self) -> Pacing {
+        self.system.pacing().take()
     }
 
     fn tick_for(&mut self, budget_ms: u64) -> Result<()> {

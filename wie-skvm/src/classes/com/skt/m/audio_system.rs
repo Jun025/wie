@@ -9,6 +9,8 @@ use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
 use crate::classes::com::skt::m::audio_clip::AudioClip;
 
+const MAX_VOLUME: i32 = 5;
+
 // class com.skt.m.AudioSystem
 pub struct AudioSystem;
 
@@ -73,32 +75,39 @@ impl AudioSystem {
         Ok(jvm.instantiate_array("Ljava/lang/String;", 0).await?.into())
     }
 
+    // Volume is 0..MAX_VOLUME per format, and it scales all of the game's sound: every clip an SKT
+    // title plays is "mmf" (see `WieAudioClip`), so one level serves every format. MAX_VOLUME is
+    // KEmulator's `getMaxVolume` (its `com/skt/m/AudioSystem.class` returns `iconst_5`). It was 0
+    // while stubbed, which told a game that scales its setting by the maximum to ask for silence.
+    // A level above the maximum (노리타이쿤 sets 50, 사고뭉치트윈스 15) is full volume.
     async fn get_max_volume(jvm: &Jvm, _context: &mut WieJvmContext, format: ClassInstanceRef<String>) -> JvmResult<i32> {
-        tracing::warn!("stub com.skt.m.AudioSystem::getMaxVolume({format:?})");
+        tracing::debug!("com.skt.m.AudioSystem::getMaxVolume({format:?})");
 
         if format.is_null() {
             return Err(jvm.exception("java/lang/NullPointerException", "format is null").await);
         }
 
-        Ok(0)
+        Ok(MAX_VOLUME)
     }
 
-    async fn get_volume(jvm: &Jvm, _context: &mut WieJvmContext, format: ClassInstanceRef<String>) -> JvmResult<i32> {
-        tracing::warn!("stub com.skt.m.AudioSystem::getVolume({format:?})");
+    async fn get_volume(jvm: &Jvm, context: &mut WieJvmContext, format: ClassInstanceRef<String>) -> JvmResult<i32> {
+        tracing::debug!("com.skt.m.AudioSystem::getVolume({format:?})");
 
         if format.is_null() {
             return Err(jvm.exception("java/lang/NullPointerException", "format is null").await);
         }
 
-        Ok(0)
+        Ok((context.system().audio().master_volume() * MAX_VOLUME as f32).round() as i32)
     }
 
-    async fn set_volume(jvm: &Jvm, _context: &mut WieJvmContext, format: ClassInstanceRef<String>, level: i32) -> JvmResult<()> {
-        tracing::warn!("stub com.skt.m.AudioSystem::setVolume({format:?}, {level})");
+    async fn set_volume(jvm: &Jvm, context: &mut WieJvmContext, format: ClassInstanceRef<String>, level: i32) -> JvmResult<()> {
+        tracing::debug!("com.skt.m.AudioSystem::setVolume({format:?}, {level})");
 
         if format.is_null() {
             return Err(jvm.exception("java/lang/NullPointerException", "format is null").await);
         }
+
+        context.system().audio().set_master_volume(level as f32 / MAX_VOLUME as f32);
 
         Ok(())
     }
@@ -108,9 +117,9 @@ impl AudioSystem {
 mod test {
     use alloc::boxed::Box;
 
-    use jvm::{ClassInstanceRef, JavaError, Result as JvmResult};
+    use jvm::{ClassInstanceRef, JavaError, Result as JvmResult, runtime::JavaLangString};
     use rustjava_runtime::classes::java::lang::String;
-    use test_utils::run_jvm_test;
+    use test_utils::{TestPlatform, run_jvm_test, run_jvm_test_with_system};
 
     use crate::{classes::com::skt::m::AudioClip, get_protos};
 
@@ -152,6 +161,38 @@ mod test {
 
             Ok(())
         });
+
+        assert!(result.is_ok(), "JVM test failed: {result:?}");
+    }
+
+    // 0..5, and the level scales every clip. With the maximum at 0 (the stub), 21 of the 30 SKT
+    // titles that set a volume read it and set 0; with 5, 20 of those 21 set a nonzero level.
+    #[test]
+    fn audio_system_volume_is_zero_to_five_and_sets_the_master() {
+        let result = run_jvm_test_with_system(
+            Box::new([wie_midp::get_protos().into(), get_protos().into()]),
+            Box::new(TestPlatform::new()),
+            |jvm, system| async move {
+                let mmf: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, "mmf").await?.into();
+                let max: i32 = jvm
+                    .invoke_static("com/skt/m/AudioSystem", "getMaxVolume", "(Ljava/lang/String;)I", (mmf.clone(),))
+                    .await?;
+                let initial: i32 = jvm
+                    .invoke_static("com/skt/m/AudioSystem", "getVolume", "(Ljava/lang/String;)I", (mmf.clone(),))
+                    .await?;
+                let _: () = jvm
+                    .invoke_static("com/skt/m/AudioSystem", "setVolume", "(Ljava/lang/String;I)V", (mmf.clone(), 3))
+                    .await?;
+                let set: i32 = jvm
+                    .invoke_static("com/skt/m/AudioSystem", "getVolume", "(Ljava/lang/String;)I", (mmf,))
+                    .await?;
+
+                assert_eq!((max, initial, set), (5, 5, 3));
+                assert_eq!(system.audio().master_volume(), 0.6);
+
+                Ok(())
+            },
+        );
 
         assert!(result.is_ok(), "JVM test failed: {result:?}");
     }

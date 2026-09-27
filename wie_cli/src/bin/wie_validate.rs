@@ -300,6 +300,48 @@ struct HeadlessAudioSink;
 impl AudioSink for HeadlessAudioSink {
     fn send(&self, command: wie_backend::AudioCommand) {
         AUDIO_TALLY.record(&command);
+        dump_audio(&command);
+    }
+}
+
+/// `WIE_AUDIO_DUMP=<file>`: append every command as one JSON line — the engine's real audio
+/// stream, for rendering the same song through two synths offline (`docs/report/0317`).
+/// ★The file holds the guest's music — keep it outside the repo (Constraint 9).
+fn dump_audio(command: &wie_backend::AudioCommand) {
+    use std::{io::Write, sync::OnceLock};
+    static START: OnceLock<std::time::Instant> = OnceLock::new();
+    let Some(path) = std::env::var_os("WIE_AUDIO_DUMP") else { return };
+    let at = START.get_or_init(std::time::Instant::now).elapsed().as_millis();
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+        let _ = writeln!(f, "{}", audio_dump_line(command, at));
+    }
+}
+
+/// `at` = ms since the first command. `ev` rows use `audio_worklet.js`'s message shape:
+/// `[ms, 0, midi bytes]` / `[ms, 1, channels, rate, samples]`.
+fn audio_dump_line(command: &wie_backend::AudioCommand, at: u128) -> String {
+    use wie_backend::{AudioCommand, AudioEventData};
+    match command {
+        AudioCommand::Play { handle, sequence, repeat } => {
+            let events: Vec<String> = sequence
+                .events
+                .iter()
+                .map(|e| match &e.data {
+                    AudioEventData::Midi(bytes) => format!("[{},0,{:?}]", e.time, bytes),
+                    AudioEventData::Wave {
+                        channels,
+                        sampling_rate,
+                        samples,
+                    } => format!("[{},1,{},{},{:?}]", e.time, channels, sampling_rate, samples),
+                })
+                .collect();
+            format!(
+                r#"{{"at":{at},"t":"play","h":{handle},"r":{repeat},"d":{},"ev":[{}]}}"#,
+                sequence.duration,
+                events.join(",")
+            )
+        }
+        AudioCommand::Stop { handle } => format!(r#"{{"at":{at},"t":"stop","h":{handle}}}"#),
     }
 }
 
@@ -310,6 +352,12 @@ impl AudioSink for HeadlessAudioSink {
 /// it send commands the host dropped? `wie_featurephone`'s sink played only `Wave` events until
 /// 2026-09-27, so a title whose line shows `midi_events > 0` was silent in the browser there and
 /// only there. Process-wide, like `svc_stub_slots`: one validator run is one guest.
+///
+/// Two keys describe handles rather than volume. `loop_overlaps` counts looping plays that start
+/// while ANOTHER handle's loop is still live (never stopped) — the "BGM that never ends under the
+/// next song" shape: a loop has no natural end, so it only stops on a `Stop`. `handles` counts
+/// distinct handles ever played, which is what the featurephone worklet kept resident until
+/// 2026-09-27 (it never freed a sequence); compare it with that sink's residency cap.
 struct AudioTally {
     plays: AtomicU64,
     repeat_plays: AtomicU64,
@@ -317,6 +365,14 @@ struct AudioTally {
     wave_events: AtomicU64,
     midi_events: AtomicU64,
     empty_plays: AtomicU64,
+    loop_overlaps: AtomicU64,
+    handles: Mutex<AudioHandles>,
+}
+
+#[derive(Default)]
+struct AudioHandles {
+    live_loops: std::collections::BTreeSet<u32>,
+    seen: std::collections::BTreeSet<u32>,
 }
 
 static AUDIO_TALLY: AudioTally = AudioTally {
@@ -326,13 +382,29 @@ static AUDIO_TALLY: AudioTally = AudioTally {
     wave_events: AtomicU64::new(0),
     midi_events: AtomicU64::new(0),
     empty_plays: AtomicU64::new(0),
+    loop_overlaps: AtomicU64::new(0),
+    handles: Mutex::new(AudioHandles {
+        live_loops: std::collections::BTreeSet::new(),
+        seen: std::collections::BTreeSet::new(),
+    }),
 };
 
 impl AudioTally {
     fn record(&self, command: &wie_backend::AudioCommand) {
         match command {
-            wie_backend::AudioCommand::Play { sequence, repeat, .. } => {
+            wie_backend::AudioCommand::Play { handle, sequence, repeat } => {
                 self.plays.fetch_add(1, Ordering::SeqCst);
+                let mut handles = self.handles.lock().unwrap();
+                handles.seen.insert(*handle);
+                // A play restarts its handle, so it ends whatever loop that handle had.
+                handles.live_loops.remove(handle);
+                if *repeat {
+                    if !handles.live_loops.is_empty() {
+                        self.loop_overlaps.fetch_add(1, Ordering::SeqCst);
+                    }
+                    handles.live_loops.insert(*handle);
+                }
+                drop(handles);
                 if *repeat {
                     self.repeat_plays.fetch_add(1, Ordering::SeqCst);
                 }
@@ -346,21 +418,24 @@ impl AudioTally {
                     };
                 }
             }
-            wie_backend::AudioCommand::Stop { .. } => {
+            wie_backend::AudioCommand::Stop { handle } => {
                 self.stops.fetch_add(1, Ordering::SeqCst);
+                self.handles.lock().unwrap().live_loops.remove(handle);
             }
         }
     }
 
     fn json(&self) -> String {
         format!(
-            "{{\"plays\":{},\"repeat_plays\":{},\"stops\":{},\"wave_events\":{},\"midi_events\":{},\"empty_plays\":{}}}",
+            "{{\"plays\":{},\"repeat_plays\":{},\"stops\":{},\"wave_events\":{},\"midi_events\":{},\"empty_plays\":{},\"loop_overlaps\":{},\"handles\":{}}}",
             self.plays.load(Ordering::SeqCst),
             self.repeat_plays.load(Ordering::SeqCst),
             self.stops.load(Ordering::SeqCst),
             self.wave_events.load(Ordering::SeqCst),
             self.midi_events.load(Ordering::SeqCst),
             self.empty_plays.load(Ordering::SeqCst),
+            self.loop_overlaps.load(Ordering::SeqCst),
+            self.handles.lock().unwrap().seen.len(),
         )
     }
 }
@@ -602,6 +677,19 @@ struct Args {
     /// the guest, not how often ticks come.
     #[arg(long, value_parser = clap::value_parser!(u32).range(1..=1000))]
     frame_hz: Option<u32>,
+    /// Add the engine's pacing counters to the JSON line as `pacing` (`wie_backend::Pacing`):
+    /// guest sleep/timer wake lateness, repaint -> paint latency and how many of those paints
+    /// crossed a host tick, paints and GCs. The window opens SECS into the run (default 0) so a
+    /// boot can be left out. OFF by default; with it absent the line is unchanged.
+    #[arg(long, value_name = "SECS", num_args = 0..=1, default_missing_value = "0", value_parser = positive_or_zero_secs)]
+    pacing: Option<f64>,
+}
+
+fn positive_or_zero_secs(s: &str) -> Result<f64, String> {
+    match s.parse::<f64>() {
+        Ok(v) if v.is_finite() && v >= 0.0 => Ok(v),
+        _ => Err(format!("expected seconds >= 0, got {s:?}")),
+    }
 }
 
 /// Cap on the `guest_stdout` field, in bytes of the lossy-decoded text.
@@ -948,6 +1036,10 @@ fn main() {
     } else {
         json
     };
+    let json = match &result.pacing {
+        Some(pacing) => format!("{},\"pacing\":{pacing}}}", &json[..json.len() - 1]),
+        None => json,
+    };
     if tallies.svc_stub_exhausted.load(Ordering::SeqCst) && result.verdict() == svc_stub_exhausted_outcome().verdict() {
         eprintln!("wie_validate: result line already written when the SVC stub space ran out; not writing a second one");
     } else {
@@ -1044,6 +1136,8 @@ struct Outcome {
     last_frame_distinct_colors: u64,
     last_frame_nondominant_bp: u64,
     last_frame_center_nonuniform_bp: u64,
+    /// `--pacing` only: `Pacing::summary_json` over the window.
+    pacing: Option<String>,
 }
 
 impl Outcome {
@@ -1134,10 +1228,15 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
         scripted: input_steps_total,
     };
 
+    let mut pacing_open = args.pacing == Some(0.0);
     while !exited.load(Ordering::SeqCst) {
         let elapsed = loop_start.elapsed();
         if elapsed > deadline || ticks >= args.max_ticks {
             break;
+        }
+        if !pacing_open && args.pacing.is_some_and(|secs| elapsed.as_secs_f64() >= secs) {
+            pacing_open = true;
+            emulator.take_pacing();
         }
 
         // Fire any scheduled input/screenshot events that are now due.
@@ -1198,6 +1297,8 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
         ticks += 1;
     }
 
+    // A window that never opened (the run ended first) reports nothing rather than the boot.
+    let pacing = pacing_open.then(|| emulator.take_pacing().summary_json());
     let paints = screen.paints.load(Ordering::SeqCst);
     let content = screen.saw_content.load(Ordering::SeqCst);
     // Derived from the loop's own exit state rather than set at each `break`: the two budget
@@ -1285,6 +1386,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     outcome.nondominant_bp = screen.max_nondominant_bp.load(Ordering::SeqCst);
     outcome.center_nonuniform_bp = screen.max_center_nonuniform_bp.load(Ordering::SeqCst);
 
+    outcome.pacing = pacing;
     judge(&mut outcome, args.inject, args.expect_last_frame, stop, inputs);
     outcome
 }
@@ -1662,6 +1764,7 @@ fn pass(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         last_frame_distinct_colors: 0,
         last_frame_nondominant_bp: 0,
         last_frame_center_nonuniform_bp: 0,
+        pacing: None,
     }
 }
 
@@ -1684,6 +1787,7 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         last_frame_distinct_colors: 0,
         last_frame_nondominant_bp: 0,
         last_frame_center_nonuniform_bp: 0,
+        pacing: None,
     }
 }
 
@@ -1702,6 +1806,8 @@ mod tests {
             wave_events: Default::default(),
             midi_events: Default::default(),
             empty_plays: Default::default(),
+            loop_overlaps: Default::default(),
+            handles: Default::default(),
         };
         let sequence = Arc::new(AudioSequence {
             duration: 10,
@@ -1736,10 +1842,65 @@ mod tests {
             repeat: false,
         });
         tally.record(&AudioCommand::Stop { handle: 0 });
+        // Loop 2 starts with no loop live (0 was stopped, 1 is a one-shot): no overlap. Loop 3
+        // starts while 2 is live: one. Replaying 3 restarts it while 2 is still live: two.
+        let short = Arc::new(AudioSequence { duration: 1, events: vec![] });
+        for handle in [2, 3, 3] {
+            tally.record(&AudioCommand::Play {
+                handle,
+                sequence: short.clone(),
+                repeat: true,
+            });
+        }
+        tally.record(&AudioCommand::Stop { handle: 2 });
+        // Only 3 is live now; restarting it overlaps nothing.
+        tally.record(&AudioCommand::Play {
+            handle: 3,
+            sequence: short,
+            repeat: true,
+        });
 
         assert_eq!(
             tally.json(),
-            r#"{"plays":2,"repeat_plays":1,"stops":1,"wave_events":1,"midi_events":2,"empty_plays":1}"#
+            r#"{"plays":6,"repeat_plays":5,"stops":2,"wave_events":1,"midi_events":2,"empty_plays":5,"loop_overlaps":2,"handles":4}"#
+        );
+    }
+
+    #[test]
+    fn audio_dump_line_keeps_every_event_in_worklet_shape() {
+        use std::sync::Arc;
+
+        use wie_backend::{AudioCommand, AudioEventData, AudioSequence, TimedAudioEvent};
+
+        let sequence = Arc::new(AudioSequence {
+            duration: 500,
+            events: vec![
+                TimedAudioEvent {
+                    time: 0,
+                    data: AudioEventData::Midi(vec![0xc0, 36]),
+                },
+                TimedAudioEvent {
+                    time: 250,
+                    data: AudioEventData::Wave {
+                        channels: 1,
+                        sampling_rate: 8000,
+                        samples: vec![-1, 2],
+                    },
+                },
+            ],
+        });
+        let play = AudioCommand::Play {
+            handle: 3,
+            sequence,
+            repeat: true,
+        };
+        assert_eq!(
+            super::audio_dump_line(&play, 7),
+            r#"{"at":7,"t":"play","h":3,"r":true,"d":500,"ev":[[0,0,[192, 36]],[250,1,1,8000,[-1, 2]]]}"#
+        );
+        assert_eq!(
+            super::audio_dump_line(&AudioCommand::Stop { handle: 3 }, 9),
+            r#"{"at":9,"t":"stop","h":3}"#
         );
     }
 

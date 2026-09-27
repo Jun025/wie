@@ -75,12 +75,33 @@ struct MdaClip {
 
     // not in sdk, for internal usage
     handle: u32,
+    /// 0..100, set by `MC_mdaClipSetVolume`; `clip_create` starts it at 100.
+    volume: i32,
+    /// Nonzero once `MC_mdaClipPutData` gave `handle` a sound — handle 0 is a real handle.
+    loaded: u32,
+}
+
+impl MdaClip {
+    fn apply_volume(&self, context: &mut dyn WIPICContext) {
+        if self.loaded != 0 {
+            let _ = context.system().audio().set_volume(self.handle, self.volume as f32 / 100.0);
+        }
+    }
 }
 
 pub async fn clip_create(context: &mut dyn WIPICContext, ptr_type: WIPICWord, buf_size: WIPICWord, callback: WIPICWord) -> Result<WIPICWord> {
     tracing::debug!("MC_mdaClipCreate({ptr_type:#x}, {buf_size:#x}, {callback:#x})");
 
     let clip = context.alloc_raw(size_of::<MdaClip>() as u32)?;
+    // The allocator does not zero, and `volume`/`loaded` are read before anything else writes them.
+    write_generic(
+        context,
+        clip,
+        MdaClip {
+            volume: 100,
+            ..Zeroable::zeroed()
+        },
+    )?;
 
     Ok(clip)
 }
@@ -146,7 +167,9 @@ pub async fn clip_put_data(context: &mut dyn WIPICContext, ptr_clip: WIPICWord, 
 
     let mut clip: MdaClip = read_generic(context, ptr_clip)?;
     clip.handle = handle;
+    clip.loaded = 1;
     write_generic(context, ptr_clip, clip)?;
+    clip.apply_volume(context);
 
     Ok(buf_size as _)
 }
@@ -163,26 +186,45 @@ pub async fn clip_set_position(_context: &mut dyn WIPICContext, clip: WIPICWord,
     Ok(0)
 }
 
-pub async fn clip_get_volume(_context: &mut dyn WIPICContext, clip: WIPICWord) -> Result<WIPICWord> {
-    tracing::warn!("stub MC_mdaClipGetVolume({clip:#x})");
+// Volumes are 0..100: measured 2026-09-27, 50 KTF/LGT titles call `MC_mdaClipSetVolume`, all within
+// 0..100 (60, 50 and 40 the most common). 13 of them first read `MC_mdaClipGetVolume` and set what
+// it answered — 0 while it was a stub, 100 now — so the getters must report the real volume before
+// the setters may take effect, or those 13 go silent.
+pub async fn clip_get_volume(context: &mut dyn WIPICContext, ptr_clip: WIPICWord) -> Result<WIPICWord> {
+    tracing::debug!("MC_mdaClipGetVolume({ptr_clip:#x})");
+
+    if ptr_clip == 0 {
+        return Ok(0);
+    }
+    let clip: MdaClip = read_generic(context, ptr_clip)?;
+
+    Ok(clip.volume as _)
+}
+
+pub async fn clip_set_volume(context: &mut dyn WIPICContext, ptr_clip: WIPICWord, volume: WIPICWord) -> Result<WIPICWord> {
+    tracing::debug!("MC_mdaClipSetVolume({ptr_clip:#x}, {volume})");
+
+    if ptr_clip == 0 {
+        return Ok(0);
+    }
+    let mut clip: MdaClip = read_generic(context, ptr_clip)?;
+    clip.volume = (volume as i32).clamp(0, 100);
+    write_generic(context, ptr_clip, clip)?;
+    clip.apply_volume(context);
 
     Ok(0)
 }
 
-pub async fn clip_set_volume(_context: &mut dyn WIPICContext, clip: WIPICWord, volume: WIPICWord) -> Result<WIPICWord> {
-    tracing::warn!("stub MC_mdaClipSetVolume({clip:#x}, {volume:#x})");
+pub async fn get_volume(context: &mut dyn WIPICContext) -> Result<WIPICWord> {
+    tracing::debug!("MC_mdaGetVolume");
 
-    Ok(0)
+    Ok((context.system().audio().master_volume() * 100.0).round() as _)
 }
 
-pub async fn get_volume(_context: &mut dyn WIPICContext) -> Result<WIPICWord> {
-    tracing::warn!("stub MC_mdaGetVolume");
+pub async fn set_volume(context: &mut dyn WIPICContext, volume: i32) -> Result<()> {
+    tracing::debug!("MC_mdaSetVolume({volume})");
 
-    Ok(0)
-}
-
-pub async fn set_volume(_context: &mut dyn WIPICContext, volume: i32) -> Result<()> {
-    tracing::warn!("stub MC_mdaSetVolume({volume})");
+    context.system().audio().set_master_volume(volume as f32 / 100.0);
 
     Ok(())
 }
@@ -283,4 +325,39 @@ pub async fn unk18(_context: &mut dyn WIPICContext, clip: WIPICWord) -> Result<W
     tracing::warn!("stub MC_mdaUnk18({clip:#x})");
 
     Ok(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::boxed::Box;
+
+    use test_utils::TestPlatform;
+    use wie_backend::{DefaultTaskRunner, System};
+
+    use crate::context::{WIPICContext, test::TestContext};
+
+    use super::{clip_create, clip_get_volume, clip_put_data, clip_set_volume, get_volume, set_volume};
+
+    // The getter answers 100 before any set: 13 titles read it and set what it said. A clip with no sound yet must not reach handle 0, which is the
+    // first clip anybody loaded.
+    #[futures_test::test]
+    async fn clip_and_master_volume_reach_the_audio_handle_test() {
+        let mut context = TestContext::with_system(System::new(Box::new(TestPlatform::new()), "pid", "aid", DefaultTaskRunner));
+        let loaded = clip_create(&mut context, 0, 0, 0).await.unwrap();
+        let empty = clip_create(&mut context, 0, 0, 0).await.unwrap();
+        assert_eq!(clip_get_volume(&mut context, loaded).await.unwrap(), 100);
+
+        clip_put_data(&mut context, loaded, 0x1000, 0).await.unwrap();
+        clip_set_volume(&mut context, loaded, 40).await.unwrap();
+        clip_set_volume(&mut context, empty, 10).await.unwrap();
+
+        assert_eq!(clip_get_volume(&mut context, loaded).await.unwrap(), 40);
+        assert_eq!(clip_get_volume(&mut context, empty).await.unwrap(), 10);
+        assert_eq!(context.system().audio().volume(0), 0.4);
+
+        assert_eq!(get_volume(&mut context).await.unwrap(), 100);
+        set_volume(&mut context, 60).await.unwrap();
+        assert_eq!(get_volume(&mut context).await.unwrap(), 60);
+        assert_eq!(context.system().audio().master_volume(), 0.6);
+    }
 }

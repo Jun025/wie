@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-24",
+  "kind": "fix",
+  "titles": [
+    "61ed69520fd34679be0a72029d4bbee25d10799e6c7dfeb9cefd8960a24bcb80"
+  ],
+  "summary_ko": "시작하지 못하던 문제를 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/274",
+  "enginePin": "ce619b2f0d2d44a195a95fd581c3470e6a60a8fb"
+}

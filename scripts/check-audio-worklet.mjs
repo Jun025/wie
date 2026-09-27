@@ -19,16 +19,21 @@ const BLOCK = 128;
 
 function boot() {
   let Processor;
+  let registrations = 0;
+  const replies = [];
   const ctx = {
     sampleRate: RATE,
     currentFrame: 0,
     AudioWorkletProcessor: class {
       constructor() {
-        this.port = { onmessage: null };
+        this.port = { onmessage: null, postMessage: (message) => replies.push(message) };
       }
     },
+    // Throws on a repeat name, as the real AudioWorkletGlobalScope does (NotSupportedError).
     registerProcessor: (name, cls) => {
       if (name !== "wie-audio") throw new Error(`unexpected processor name ${name}`);
+      if (Processor) throw new Error(`NotSupportedError: "${name}" is already registered`);
+      registrations++;
       Processor = cls;
     },
     Math,
@@ -36,7 +41,11 @@ function boot() {
     Map,
     Error,
   };
-  vm.runInNewContext(source, ctx);
+  vm.createContext(ctx);
+  // Each load gets its own scope, as each addModule gets its own module scope; the global (the
+  // AudioWorkletGlobalScope) is shared.
+  const load = () => vm.runInContext(`(function () {\n${source}\n})();`, ctx);
+  load();
   const proc = new Processor();
   return {
     post: (message) => proc.port.onmessage({ data: message }),
@@ -55,6 +64,22 @@ function boot() {
       return Math.sqrt(sum / n);
     },
     voices: () => proc.voices.length,
+    // What the worklet itself reports for `stats` — the number a page can read.
+    stats() {
+      proc.port.onmessage({ data: { t: "stats" } });
+      return replies.at(-1);
+    },
+    // Loads the module a second time into the same scope, as a second sink on a reused
+    // AudioContext would. Returns the error it threw, or null.
+    reload() {
+      try {
+        load();
+        return null;
+      } catch (error) {
+        return error;
+      }
+    },
+    registrations: () => registrations,
   };
 }
 
@@ -136,6 +161,80 @@ for (const repeat of [true, false]) {
   w.post({ t: "play", h: 0, r: false, d: 1000, ev });
   w.render(0.1);
   check("voices stay bounded", w.voices() <= 48, `voices ${w.voices()} after 100 simultaneous notes`);
+}
+
+// 7. evict frees a sequence without cutting it, and the next play of that handle needs `ev` again
+//    (audio.rs resends it). Until 2026-09-27 nothing was ever freed: one sequence per handle forever.
+{
+  const w = boot();
+  w.post({ t: "play", h: 7, r: true, d: 10000, ev: [midi(0, 0xc0, 16), midi(0, 0x90, 64, 100)] });
+  for (let h = 100; h < 110; h++) w.post({ t: "play", h, r: false, d: 50, ev: [midi(0, 0x99, 42, 90)] });
+  w.render(0.2);
+  const held = w.stats().sequences;
+  for (let h = 100; h < 110; h++) w.post({ t: "evict", h });
+  w.post({ t: "evict", h: 7 });
+  const left = w.stats().sequences;
+  const loopAfterEvict = w.render(0.3); // handle 7 is still looping
+  w.post({ t: "stop", h: 7 });
+  w.render(0.3);
+  w.post({ t: "play", h: 7, r: false, d: 300 }); // no ev: the sequence is gone
+  const bare = w.render(0.2);
+  w.post({ t: "play", h: 7, r: false, d: 300, ev: [midi(0, 0x99, 38, 120)] });
+  const resent = w.render(0.1);
+  check(
+    "evict frees sequences, keeps a playing one sounding, and a replay needs its events resent",
+    held === 11 && left === 0 && loopAfterEvict > LOUD && bare < QUIET && resent > LOUD,
+    `sequences ${held} → ${left} · looping after evict ${loopAfterEvict.toFixed(4)} · bare replay ${bare.toExponential(1)} · resent ${resent.toFixed(4)}`,
+  );
+}
+
+// 8. Loading the module twice into one scope neither throws nor re-registers (a throw rejects
+//    addModule and drops that sink to the MIDI-silent fallback).
+{
+  const w = boot();
+  const error = w.reload();
+  check("second module load into the same scope is a no-op", error === null && w.registrations() === 1, `error ${error} · registrations ${w.registrations()}`);
+}
+
+// 9. The game's volume: a gain sent before a play scales that play (MIDI and PCM alike), a gain
+//    sent while it plays scales it at once, 0 silences it, and the next play without a gain is
+//    back at 1 (backend Audio sends one before every play, so none may linger). Until 2026-09-27
+//    there was no gain: Clip.setVolume and the rest were stubs.
+{
+  const organ = [midi(0, 0xc0, 16), midi(0, 0x90, 64, 60)];
+  const pcm = new Int16Array(8000);
+  for (let i = 0; i < pcm.length; i++) pcm[i] = Math.round(4000 * Math.sin((2 * Math.PI * 440 * i) / 8000));
+  const level = (gain, ev) => {
+    const w = boot();
+    if (gain !== undefined) w.post({ t: "gain", h: 0, g: gain });
+    w.post({ t: "play", h: 0, r: true, d: 10000, ev });
+    w.render(0.1);
+    return w.render(0.2);
+  };
+  const midiRatio = level(0.5, organ) / level(undefined, organ);
+  const pcmRatio = level(0.5, [[0, 1, 1, 8000, pcm]]) / level(undefined, [[0, 1, 1, 8000, pcm]]);
+
+  const w = boot();
+  w.post({ t: "gain", h: 0, g: 0.5 });
+  w.post({ t: "play", h: 0, r: true, d: 10000, ev: organ });
+  w.render(0.1);
+  const half = w.render(0.2);
+  w.post({ t: "gain", h: 0, g: 0 });
+  const muted = w.render(0.2);
+  w.post({ t: "gain", h: 0, g: 1 });
+  const full = w.render(0.2);
+  w.post({ t: "gain", h: 0, g: 0 });
+  w.post({ t: "stop", h: 0 });
+  w.render(0.2);
+  w.post({ t: "play", h: 0, r: true, d: 10000 });
+  w.render(0.1);
+  const replay = w.render(0.2);
+  const near = (x, y) => Math.abs(x - y) < 0.05;
+  check(
+    "gain scales a play before and during it, 0 silences, and does not outlive the next play",
+    near(midiRatio, 0.5) && near(pcmRatio, 0.5) && muted < QUIET && near(full / half, 2) && near(replay / full, 1),
+    `midi ×${midiRatio.toFixed(3)} · pcm ×${pcmRatio.toFixed(3)} · muted ${muted.toExponential(1)} · 1/0.5 ×${(full / half).toFixed(3)} · replay/full ×${(replay / full).toFixed(3)}`,
+  );
 }
 
 if (failed) {

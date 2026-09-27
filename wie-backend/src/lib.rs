@@ -6,6 +6,7 @@ pub mod canvas;
 mod database;
 mod executor;
 mod frame_pacer;
+mod pacing;
 mod platform;
 mod screen;
 mod system;
@@ -20,6 +21,7 @@ pub use self::{
     database::{Database, DatabaseRepository, RecordId},
     executor::{AsyncCallable, AsyncCallableResult, TICK_BUDGET_MS},
     frame_pacer::FramePacer,
+    pacing::Pacing,
     platform::{Filesystem, Platform},
     screen::Screen,
     system::{Event, FilesystemOverlay, KeyCode, System},
@@ -49,6 +51,9 @@ pub trait Emulator {
 
     /// Run the emulator for at most `budget_ms` of wall-clock time (plus one poll's overrun).
     fn tick_for(&mut self, budget_ms: u64) -> Result<()>;
+
+    /// The engine's pacing counters since the last call (`Pacing`).
+    fn take_pacing(&mut self) -> Pacing;
 }
 
 pub struct ProfileSample {

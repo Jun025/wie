@@ -15,7 +15,7 @@ use jvm::{
     runtime::{JavaIoInputStream, JavaLangClassLoader},
 };
 
-use wie_backend::{Emulator, Event, Options, Platform, System, TaskRunner, extract_zip};
+use wie_backend::{Emulator, Event, Options, Pacing, Platform, System, TaskRunner, extract_zip};
 use wie_core_arm::{Allocator, ArmCore};
 use wie_jvm_support::JvmSupport;
 use wie_util::{Result, WieError};
@@ -219,6 +219,10 @@ impl LgtEmulator {
 impl Emulator for LgtEmulator {
     fn handle_event(&mut self, event: Event) {
         self.system.event_queue().push(event)
+    }
+
+    fn take_pacing(&mut self) -> Pacing {
+        self.system.pacing().take()
     }
 
     fn tick_for(&mut self, budget_ms: u64) -> Result<()> {

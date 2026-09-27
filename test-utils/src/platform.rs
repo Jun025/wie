@@ -18,6 +18,7 @@ static TEST_EPOCH: AtomicU64 = AtomicU64::new(0);
 #[derive(Clone, Default)]
 pub struct TestClock {
     epoch_millis: Arc<AtomicU64>,
+    step_millis: u64,
 }
 
 impl TestClock {
@@ -25,8 +26,22 @@ impl TestClock {
         Self::default()
     }
 
+    /// A clock that moves `millis` forward on every read, so elapsed time counts the engine's
+    /// clock reads, not the host's speed: a run is the same run on a loaded CI box and an idle one.
+    pub fn stepping(millis: u64) -> Self {
+        Self {
+            step_millis: millis,
+            ..Self::default()
+        }
+    }
+
     pub fn set(&self, epoch_millis: u64) {
         self.epoch_millis.store(epoch_millis, Ordering::SeqCst);
+    }
+
+    /// The current time, without the step a platform read takes.
+    pub fn peek(&self) -> u64 {
+        self.epoch_millis.load(Ordering::SeqCst)
     }
 
     pub fn advance(&self, millis: u64) {
@@ -157,7 +172,7 @@ impl Platform for TestPlatform {
 
     fn now(&self) -> Instant {
         if let Some(clock) = &self.clock {
-            return Instant::from_epoch_millis(clock.epoch_millis.load(Ordering::SeqCst));
+            return Instant::from_epoch_millis(clock.epoch_millis.fetch_add(clock.step_millis, Ordering::SeqCst));
         }
 
         let epoch = TEST_EPOCH.fetch_add(8, Ordering::SeqCst);
