@@ -1,0 +1,42 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-27",
+  "task": "wie-featurephone-demo-game-license-clean-selection",
+  "title": "「바로 해보기」 데모 — 외부 후보 9종 실측 후 직접 만든 MIT 데모 Pebble Snake 채택",
+  "summary": "라이선스 원문이 있는 외부 J2ME/WIPI 후보 9종을 현 엔진으로 부팅했다. 입력까지 통과한 것은 Sun WTK TilePuzzle(BSD-3) 하나였고 영문 폼 퍼즐이라 첫 경험으로 약했다. 우리 저작 MIDP 게임 Pebble Snake(MIT · 7,688 B · 한글 조작 안내 · SMAF 효과음 코드 생성)를 만들어 채택했다.",
+  "changes": [
+    "demo/pebble-snake/ — src 3 · stubs · build.sh · LICENSE · MANIFEST.MF · README.md",
+    ".gitignore — /demo/*/out/",
+    "docs/report/0327"
+  ],
+  "verification": [
+    "build.sh 2회 sha256 동일 5ed67caa…05c68",
+    "wie_validate 부팅 PASS · 13키 --inject PASS · audio plays 7 · midi_events 31",
+    "verify-browser.mjs @ wie-web.pages.dev rc 0 · 콘솔 에러 0"
+  ],
+  "limits": [
+    "브라우저에서 키 입력·소리 출력은 재지 않았다(헤드리스 --inject 와 audio 계수로 대신함)",
+    "속도 수치는 loadavg 178–245 에서 잰 값",
+    "Image.createImage(InputStream)(Lines·Sliding Puzzle) 등 나머지 막힘은 카드 문턱(최대 2)에 따라 docs/report/0327 표에만 남긴다"
+  ],
+  "proposals": [
+    {
+      "title": "클래스 상수의 NUL(C0 80)을 읽지 못해 ClassFormatError — modified UTF-8 디코딩",
+      "plainSummary": "문자열에 NUL 이 든 자바 클래스는 엔진이 아예 불러오지 못한다.",
+      "userBenefit": "\"\\0\" 을 쓰는 J2ME 게임이 부팅 단계에서 죽지 않게 된다.",
+      "why": "classfile 0.1.1 parse_utf8 이 String::from_utf8 로 읽는다. 자바는 NUL 을 C0 80 으로, 보조 평면 문자를 서로게이트 쌍으로 적으므로 표준 UTF-8 이 아니다. Pebble Snake 첫 빌드에서 실측.",
+      "tradeoff": "upstream 크레이트(RustJava 계열) 수정이라 [patch] 또는 upstream PR 이 필요하다.",
+      "effort": "S",
+      "target": "wie"
+    },
+    {
+      "title": "Manager.createPlayer(String) 톤/로케이터 플레이어 — WormGame(BSD-3) 입력 통과",
+      "plainSummary": "공개 데모 WormGame 이 확인 키를 누르면 죽는다. 없는 메서드 하나 때문이다.",
+      "userBenefit": "재배포 가능한 둘째 데모 후보가 생기고, 같은 호출을 쓰는 MIDP 게임도 산다.",
+      "why": "현 엔진 Manager 는 createPlayer(InputStream,String) 의 SMAF 만 지원. WormGame --inject 06_OK 에서 NoSuchMethodError.",
+      "tradeoff": "톤 시퀀스까지 합성하려면 범위가 커진다 — 첫 단계는 무음 플레이어로도 충분하다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}
