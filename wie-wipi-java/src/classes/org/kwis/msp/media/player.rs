@@ -72,28 +72,48 @@ impl Player {
         }
     }
 
-    async fn pause(_: &Jvm, _: &mut WieJvmContext, clip: ClassInstanceRef<BaseClip>) -> JvmResult<bool> {
-        tracing::warn!("stub org.kwis.msp.media.Player::pause({clip:?})");
-
-        Ok(false)
+    // A `Clip` passed as its `BaseClip` supertype takes the Clip path: some titles are compiled
+    // against the BaseClip signatures and play every sound through them (2026-09-27 silent-104
+    // census: 232122cdfb92, 3412d851f78c). A bare BaseClip still reports failure. MIDP `stop`
+    // keeps the media time, so it is WIPI's pause too.
+    fn as_clip(jvm: &Jvm, clip: &ClassInstanceRef<BaseClip>) -> Option<ClassInstanceRef<Clip>> {
+        (!clip.is_null() && jvm.is_instance(&***clip, "org/kwis/msp/media/Clip")).then(|| ClassInstanceRef::new(clip.instance.clone()))
     }
 
-    async fn stop(_: &Jvm, _: &mut WieJvmContext, clip: ClassInstanceRef<BaseClip>) -> JvmResult<bool> {
-        tracing::warn!("stub org.kwis.msp.media.Player::stop({clip:?})");
+    async fn pause(jvm: &Jvm, context: &mut WieJvmContext, clip: ClassInstanceRef<BaseClip>) -> JvmResult<bool> {
+        tracing::debug!("org.kwis.msp.media.Player::pause({clip:?})");
 
-        Ok(false)
+        match Self::as_clip(jvm, &clip) {
+            Some(clip) => Self::stop_clip(jvm, context, clip).await,
+            None => Ok(false),
+        }
     }
 
-    async fn resume(_: &Jvm, _: &mut WieJvmContext, clip: ClassInstanceRef<BaseClip>) -> JvmResult<bool> {
-        tracing::warn!("stub org.kwis.msp.media.Player::resume({clip:?})");
+    async fn stop(jvm: &Jvm, context: &mut WieJvmContext, clip: ClassInstanceRef<BaseClip>) -> JvmResult<bool> {
+        tracing::debug!("org.kwis.msp.media.Player::stop({clip:?})");
 
-        Ok(false)
+        match Self::as_clip(jvm, &clip) {
+            Some(clip) => Self::stop_clip(jvm, context, clip).await,
+            None => Ok(false),
+        }
     }
 
-    async fn play(_: &Jvm, _: &mut WieJvmContext, clip: ClassInstanceRef<BaseClip>, repeat: bool) -> JvmResult<bool> {
-        tracing::warn!("stub org.kwis.msp.media.Player::play({clip:?}, {repeat})");
+    async fn resume(jvm: &Jvm, context: &mut WieJvmContext, clip: ClassInstanceRef<BaseClip>) -> JvmResult<bool> {
+        tracing::debug!("org.kwis.msp.media.Player::resume({clip:?})");
 
-        Ok(false)
+        match Self::as_clip(jvm, &clip) {
+            Some(clip) => Self::resume_clip(jvm, context, clip).await,
+            None => Ok(false),
+        }
+    }
+
+    async fn play(jvm: &Jvm, context: &mut WieJvmContext, clip: ClassInstanceRef<BaseClip>, repeat: bool) -> JvmResult<bool> {
+        tracing::debug!("org.kwis.msp.media.Player::play({clip:?}, {repeat})");
+
+        match Self::as_clip(jvm, &clip) {
+            Some(clip) => Self::play_clip(jvm, context, clip, repeat).await,
+            None => Ok(false),
+        }
     }
 
     async fn record(_: &Jvm, _: &mut WieJvmContext, clip: ClassInstanceRef<BaseClip>) -> JvmResult<bool> {
@@ -105,6 +125,7 @@ impl Player {
     async fn play_clip(jvm: &Jvm, context: &mut WieJvmContext, clip: ClassInstanceRef<Clip>, repeat: bool) -> JvmResult<bool> {
         tracing::debug!("org.kwis.msp.media.Player::play({clip:?}, {repeat})");
 
+        BaseClip::refresh(jvm, &mut ClassInstanceRef::new(clip.instance.clone())).await?;
         let player = Clip::player(jvm, &clip).await?;
 
         if !player.is_null() {
@@ -216,6 +237,108 @@ mod test {
 
             Ok(())
         })
+    }
+
+    // `setBuffer` registers an array the game keeps writing into: a play after the game rewrote
+    // it must load the new bytes (a new handle), a play of unchanged bytes must not.
+    #[test]
+    fn test_play_reloads_a_rewritten_set_buffer_array() -> Result<()> {
+        let platform = TestPlatform::new();
+        let log = platform.audio_log();
+
+        run_jvm_test_with_system(
+            Box::new([wie_midp::get_protos().into(), get_protos().into()]),
+            Box::new(platform),
+            |jvm, _system| async move {
+                let r#type: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, "audio/test").await?.into();
+                let mut data = jvm.instantiate_array("B", 4).await?;
+                let clip: ClassInstanceRef<Clip> = jvm
+                    .new_class("org/kwis/msp/media/Clip", "(Ljava/lang/String;[B)V", (r#type, data.clone()))
+                    .await?
+                    .into();
+
+                for rewrite in [false, true] {
+                    if rewrite {
+                        jvm.store_array(&mut data, 0, [1i8, 2, 3, 4]).await?;
+                    }
+                    for _ in 0..2 {
+                        let _: bool = jvm
+                            .invoke_static(
+                                "org/kwis/msp/media/Player",
+                                "play",
+                                "(Lorg/kwis/msp/media/Clip;Z)Z",
+                                (clip.clone(), false),
+                            )
+                            .await?;
+                    }
+                }
+
+                Ok(())
+            },
+        )?;
+
+        let handles: Vec<u32> = log
+            .lock()
+            .iter()
+            .filter_map(|command| match command {
+                AudioCommand::Play { handle, .. } => Some(*handle),
+                AudioCommand::Stop { .. } => None,
+            })
+            .collect();
+        assert_eq!(handles.len(), 4);
+        assert_eq!(handles[0], handles[1]);
+        assert_ne!(handles[1], handles[2]);
+        assert_eq!(handles[2], handles[3]);
+
+        Ok(())
+    }
+
+    // A Clip handed over as its BaseClip supertype sounds: the BaseClip overloads were stubs,
+    // and the titles compiled against them were silent.
+    #[test]
+    fn test_clip_through_base_clip_overloads_plays() -> Result<()> {
+        let platform = TestPlatform::new();
+        let log = platform.audio_log();
+
+        run_jvm_test_with_system(
+            Box::new([wie_midp::get_protos().into(), get_protos().into()]),
+            Box::new(platform),
+            |jvm, _system| async move {
+                let r#type: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, "audio/test").await?.into();
+                let data = jvm.instantiate_array("B", 0).await?;
+                let clip: ClassInstanceRef<BaseClip> = jvm
+                    .new_class("org/kwis/msp/media/Clip", "(Ljava/lang/String;[B)V", (r#type, data))
+                    .await?
+                    .into();
+
+                let played: bool = jvm
+                    .invoke_static(
+                        "org/kwis/msp/media/Player",
+                        "play",
+                        "(Lorg/kwis/msp/media/BaseClip;Z)Z",
+                        (clip.clone(), true),
+                    )
+                    .await?;
+                let stopped: bool = jvm
+                    .invoke_static("org/kwis/msp/media/Player", "stop", "(Lorg/kwis/msp/media/BaseClip;)Z", (clip,))
+                    .await?;
+                assert!(played && stopped);
+
+                Ok(())
+            },
+        )?;
+
+        let shape: Vec<(&str, bool)> = log
+            .lock()
+            .iter()
+            .map(|command| match command {
+                AudioCommand::Play { repeat, .. } => ("play", *repeat),
+                AudioCommand::Stop { .. } => ("stop", false),
+            })
+            .collect();
+        assert_eq!(shape, [("play", true), ("stop", false)]);
+
+        Ok(())
     }
 
     #[test]
