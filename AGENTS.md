@@ -333,7 +333,7 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   per-title support page) is regenerated after a pin moves.** `run` measures every unique title on six
   axes into an `--out` directory OUTSIDE the repo; `report` turns that into `compat.json`, a private
   `census.tsv`, and `clusters.md` (sha prefixes only). What each axis can and cannot see is in its
-  header. Its speed axis is wall-clock: quote `load1` beside it (`docs/report/0317`).
+  header. Its speed axis is wall-clock: quote `load1` beside it (`docs/report/0321`).
 
 - **`scripts/corpus-name-inflow.mjs` — local only (same reason); a round that reports a "게임
   파일명 유입" number RUNS IT rather than re-deriving the predicate.** `node
