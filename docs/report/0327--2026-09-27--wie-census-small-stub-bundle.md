@@ -29,6 +29,7 @@
 
 ### 전/후 — 같은 시각 짝 재측
 - 전: `origin/main`(`16803a4a`) + #350(`ff40c906`) 병합 스크래치. 후: 같은 스크래치 + 이 PR. 둘 다 release 빌드.
+- 측정 뒤 `origin/main`(`f12e16e8` · #354·#356 착지)으로 rebase 했다(충돌 0). 짝 재측은 다시 하지 않았고, 게이트는 rebase 뒤에 다시 돌렸다.
 - 명령: `wie_validate --inject --keep-timeout --timeout 30 --pacing 8`(전수 점검 프로브 A와 같다). 타이틀마다 전·후를 4병렬로 나란히 돌렸다. 틱이 끝나지 않는 경우를 위해 벽시계 200초 상한.
 - 호스트 부하 load1 **174~232**(표의 마지막 열). 벽시계 축은 덜 진행된 상태로 쟀다.
 
@@ -66,5 +67,3 @@
 - `cargo fmt --check` · `clippy --all -D warnings`(stable · beta) · `clippy --target wasm32 -D warnings` · `RUST_MIN_STACK=4194304 cargo test --all`(1,386초) · `npm run build:wasm` · `check-engine-contract` · `npm run audit` 전부 rc=0.
 - 러너 줄(엔진 변경): `draw_j2me` · `helloworld_ktf/lgt` · `keydraw_ktf/lgt --inject --expect-last-frame` · `text_j2me --timeout 5` 전부 PASS · rc=0.
 - 게임 파일명 유입: 이 회차가 **더한 줄**에는 0건이다. 도구 표기 BOUNDED 20회/13쌍은 고친 파일에 **이미 있던** 주석이다(SUFFIX-ATTACHED 0).
-
-<!-- corpus-name-inflow v1 subjects=28 tree=6e13fcfc9af3a1f6 B=20/13 P=0/0 S=0/0 -->
