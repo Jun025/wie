@@ -136,4 +136,13 @@ fmt · clippy `-D warnings`(stable · beta · wasm32) · `RUST_MIN_STACK=4194304
 - 게임 파일명 유입: 이 회차가 **더한 줄**에는 0건이다(코드 주석은 sha12 로만 적었다). 도구 표기 BOUNDED·SUFFIX-ATTACHED 는 고친 파일에 **이미 있던** 주석과,
   이 브랜치가 아래에 깔고 있는 #350 의 파일에서 온다.
 
-<!-- corpus-name-inflow v1 subjects=16 tree=9b7128206fcd4468 B=88/28 P=1/1 S=14/4 -->
+### -fix2 — origin/main(da6c7a6a) 병합 해소 (wie-census-blank-screen-14-and-invokespecial-lookup-fix2)
+
+#359·#367·#361·#368 착지 뒤 병합 충돌 3파일을 합집합으로 풀었다(새 기능 0).
+- `rms.rs` — mod/pub use 에 main 의 `RecordComparator`·`RecordEnumeration(Impl)`·`RecordFilter` 와 이 PR 의 `RecordStoreNotFoundException` **전부**.
+- `record_store.rs` — 시험 모듈의 양쪽 추가분(이 PR `open_without_create_…` · main 의 열거 시험) **둘 다 보존**.
+- `lib.rs` `get_protos()` — 길이 **45**(base 40 + PR 1 + main 4) · `as_proto()` 행 45 · 중복 0.
+
+게이트 재측: fmt · clippy `-D warnings`(stable · beta · wasm32) · `cargo test --all` 0 failed · `npm run build:wasm` · 러너 줄 전부 PASS·rc=0(keydraw paints 55/55).
+대상 재측(release · LTO 끔 · `--inject --keep-timeout --timeout 30 --pacing 8` · load1 112): `14a62a8521a0` **PASS** rc=0 · 27/27 · paints 483 ·
+`73f3a21e981c`(`--max-ticks 400000000`) **PASS** rc=0 · 27/27 · paints 69 · `DataInputStream vtable index 24` 로그 0.

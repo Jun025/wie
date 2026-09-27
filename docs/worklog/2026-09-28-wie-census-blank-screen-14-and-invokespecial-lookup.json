@@ -16,7 +16,8 @@
     "같은 시각 짝(프로브 A/B) — 14a62a8521a0·73f3a21e981c uniform→ok/ok/ok · 라이브 LGT 5 + 가드 2 퇴행 0",
     "SKT/J2ME 82종 짝 스윕(20초) — PASS 62→67 · 나빠진 타이틀 0",
     "변이 4개 전건 red · 원상 green",
-    "cargo test --all 536 passed · fmt · clippy(stable·beta·wasm32)"
+    "cargo test --all 536 passed · fmt · clippy(stable·beta·wasm32)",
+    "-fix2 origin/main(da6c7a6a) 병합 — rms 4종 합집합 · get_protos 45 · 게이트 전건 · 대상 2종 PASS rc=0 27/27"
   ],
   "limits": [
     "load1 307~364 에서 잰 값이다 — paints 수는 하한",
