@@ -46,3 +46,5 @@
 - 예약 OOM 은 JVM 하나에 1개이고 공유된다(JVM 들의 관례). `jar_name` 이 없는 시험 JVM 에는 없다 → 종전 경로.
 
 게임 파일명 유입(`corpus-name-inflow --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 1회/1쌍 · SUFFIX-ATTACHED 0회/0쌍. BOUNDED 1회는 수정 파일 `jvm_support.rs` 의 기존 줄(main 에 이미 있음)이다 — 이 회차의 추가 줄 중 일치 0.
+
+<!-- corpus-name-inflow v1 subjects=7 tree=e7d9cb040f544e4c B=1/1 P=1/1 S=0/0 -->
