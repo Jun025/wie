@@ -1,0 +1,12 @@
+{
+  "date": "2026-09-28",
+  "kind": "fix",
+  "titles": [
+    "14a62a8521a0d434f8fffc7b85c1d2427335dac5d81e9f6b966f12d42ce5abce",
+    "2b6d785677955bb74adb52a791d545bf4f846fcee3b53d80bbf961e1924ad227",
+    "9aa31965cd1042844c47cdd6267a09eeb6477b674a00710571674114b4eac053",
+    "f81658d4ad1a00848c21fcf737f3b176f1bb9787051fb74f489e066602957a88"
+  ],
+  "summary_ko": "처음 실행할 때 저장 기록이 없으면 멈추거나 검은 화면이던 문제를 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/366"
+}
