@@ -1,6 +1,6 @@
 use std::{
     cell::{Cell, RefCell},
-    collections::BTreeSet,
+    collections::VecDeque,
     rc::Rc,
 };
 
@@ -16,6 +16,20 @@ use wie_backend::{AudioCommand, AudioEventData, AudioSink};
 /// a coordinated wie + otterpebble contract change.
 const WORKLET_SOURCE: &str = include_str!("audio_worklet.js");
 const PROCESSOR_NAME: &str = "wie-audio";
+
+/// How many handles' sequences the worklet keeps. A handle's events cross to the audio thread once
+/// and are reused by every later play, but `AudioCommand` has no "close", so the sink never learns
+/// that a handle is retired — and handles are never reused (`Audio` counts up). Until 2026-09-27
+/// every sequence ever played stayed in the worklet: 더팜1 opens a fresh handle per sound effect
+/// (27 in 60 s, PCM included), so a long session grew without bound. Past this many, the least
+/// recently played sequence is dropped; playing it again just resends its events.
+///
+/// Why not a close command: `AudioCommand` is upstream's, and its other sink (`wie-web`) matches
+/// it exhaustively, so a new variant breaks that crate. Eviction needs nothing from anyone else,
+/// and it is exact: the worklet's playback holds its own reference to the sequence, so dropping it
+/// never cuts a sound that is playing. 32 is well above the live handles an SKT title holds (one per
+/// clip object; the most in the 50-title corpus is 5), so in practice only retired handles go.
+const RESIDENT_SEQUENCES: usize = 32;
 
 /// WebAudio-backed sink.
 ///
@@ -43,9 +57,9 @@ struct State {
     mode: Mode,
     /// Commands received while the worklet module is still loading.
     queue: Vec<AudioCommand>,
-    /// Handles whose events the worklet already holds — a handle's sequence never changes, so a
-    /// replay sends only the handle.
-    loaded: BTreeSet<u32>,
+    /// Handles whose events the worklet holds, least recently played first — a handle's sequence
+    /// never changes, so a replay sends only the handle. Capped at [`RESIDENT_SEQUENCES`].
+    loaded: VecDeque<u32>,
     /// Fallback only: next free playback position on the audio timeline (seconds).
     next_time: Cell<f64>,
 }
@@ -69,7 +83,7 @@ impl WebAudioSink {
             gain,
             mode: Mode::Loading,
             queue: Vec::new(),
-            loaded: BTreeSet::new(),
+            loaded: VecDeque::new(),
             next_time: Cell::new(0.0),
         }));
 
@@ -169,6 +183,8 @@ impl State {
 
     fn post(&mut self, command: &AudioCommand) {
         let Mode::Worklet(node) = &self.mode else { return };
+        let Ok(port) = node.port() else { return };
+        let mut evicted = None;
         let message = Object::new();
         let set = |key: &str, value: &JsValue| {
             let _ = Reflect::set(&message, &JsValue::from_str(key), value);
@@ -179,7 +195,18 @@ impl State {
                 set("h", &JsValue::from(*handle));
                 set("r", &JsValue::from(*repeat));
                 set("d", &JsValue::from_f64(sequence.duration as f64));
-                if self.loaded.insert(*handle) {
+                let resident = match self.loaded.iter().position(|loaded| loaded == handle) {
+                    Some(index) => {
+                        self.loaded.remove(index);
+                        true
+                    }
+                    None => false,
+                };
+                self.loaded.push_back(*handle);
+                if self.loaded.len() > RESIDENT_SEQUENCES {
+                    evicted = self.loaded.pop_front();
+                }
+                if !resident {
                     let events = Array::new();
                     for event in &sequence.events {
                         let entry = Array::new();
@@ -211,8 +238,12 @@ impl State {
             }
         }
         // A failed post must never abort the emulation tick.
-        if let Ok(port) = node.port() {
-            let _ = port.post_message(&message);
+        let _ = port.post_message(&message);
+        if let Some(handle) = evicted {
+            let evict = Object::new();
+            let _ = Reflect::set(&evict, &JsValue::from_str("t"), &JsValue::from_str("evict"));
+            let _ = Reflect::set(&evict, &JsValue::from_str("h"), &JsValue::from(handle));
+            let _ = port.post_message(&evict);
         }
     }
 

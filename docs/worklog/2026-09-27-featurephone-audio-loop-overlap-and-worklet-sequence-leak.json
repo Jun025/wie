@@ -1,0 +1,50 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-27",
+  "task": "wie-featurephone-audio-loop-overlap-and-worklet-sequence-leak",
+  "title": "소리 복구 후속 — 겹치는 BGM · 매 프레임 재시작 BGM · 워클릿 시퀀스 누적 · 끝난 효과음 resume",
+  "summary": "#348 검수 minor 1~4. SKT 50타이틀 전수로 규칙을 골라 «루프 시작 시 닫힌 클립이 남긴 루프 정지» + «루프 중 loop() 무시»를 넣었고, 워클릿 시퀀스를 최근 32개로 제한했으며, SmafPlayer.getState 로 끝난 1회 재생을 resume 이 다시 틀게 했다.",
+  "changes": [
+    "wie-skvm net.wie.WieAudioClip — orphanLoops · looping",
+    "wie_featurephone audio.rs RESIDENT_SEQUENCES LRU · audio_worklet.js evict/stats/registerProcessor 가드",
+    "wie-midp SmafPlayer getState(STARTED/PREFETCHED) · startedAt/lengthMs · smaf-player 의존",
+    "wie-wipi-java Player.resume → getState 판정",
+    "wie_validate audio 키 loop_overlaps · handles",
+    "scripts/check-audio-worklet.mjs 7 → 9",
+    "docs/report/0316"
+  ],
+  "verification": [
+    "SKT 50타이틀 loop_overlaps 합 1 → 0 · 나이트메이커 plays 86,770 → 2 · 소리 난 타이틀 37 → 37",
+    "더팜1 브라우저 10분: 워클릿 시퀀스 853(main) → 32 · RMS 0.1337 → 0.1338 · 무음 초 0/600 양쪽",
+    "배틀몬스터 RMS 0.1012 = 0.1012 · 간호사타이쿤 0.0734 → 0.0814 · 사고뭉치트윈스 동시 루프 2 → 1"
+  ],
+  "limits": [
+    "audio.rs LRU 는 네이티브 시험 불가(wasm32 전용 크레이트) — 브라우저 실측으로 판정",
+    "SmafPlayer 생성마다 SMAF 재파싱 1회",
+    "J2ME getState 변화는 로컬 타이틀 0 이라 미계측"
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "브라우저 오디오 프로브를 로컬 도구로 영구화(scripts/)",
+      "plainSummary": "이번에 소리 크기와 워클릿 메모리를 재려고 만든 브라우저 측정기를 저장소에 남겨, 다음 소리 작업이 매번 새로 만들지 않게 합니다.",
+      "userBenefit": "소리 관련 수정이 «실제 브라우저에서 소리가 나는지»를 몇 분 만에 전/후 비교로 확인받습니다.",
+      "why": "#348 과 이번 회차가 각자 Playwright 프로브를 스크래치로 다시 썼다(두 번). 워클릿 stats 메시지가 생겨 보유 시퀀스·재생 수를 페이지에서 바로 읽을 수 있다.",
+      "tradeoff": "게임 파일이 필요해 CI 에는 못 올린다(Constraint 9) — smoke_gate.sh 처럼 local-only 선언이 필요하고 checker-census 무호출 1건이 는다.",
+      "effort": "S",
+      "target": "wie",
+      "kind": "meta"
+    },
+    {
+      "title": "MIDP PlayerListener END_OF_MEDIA 통지 — 곡이 끝났다는 이벤트 전달",
+      "plainSummary": "게임이 «곡이 끝나면 다음 곡을 튼다»를 이벤트로 기다리는 경우, 지금은 그 이벤트가 오지 않아 다음 곡이 안 나옵니다. 이번에 넣은 «클립 길이» 계산으로 끝나는 시각을 알 수 있게 됐습니다.",
+      "userBenefit": "곡이 끝난 뒤 다음 곡으로 넘어가는 게임에서 음악이 이어집니다.",
+      "why": "SmafPlayer.addPlayerListener 가 스텁이고, 이번 회차로 startedAt·lengthMs 가 생겨 종료 시각 계산이 가능해졌다. 로컬 J2ME 타이틀 0 이라 필요 타이틀은 미확인.",
+      "tradeoff": "리스너 호출은 이벤트 큐 배선이 필요하다(타이머) · 관측 타이틀이 없어 효과를 재지 못할 수 있다.",
+      "effort": "M",
+      "target": "wie",
+      "kind": "product"
+    }
+  ]
+}

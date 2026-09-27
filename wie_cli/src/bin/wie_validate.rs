@@ -310,6 +310,12 @@ impl AudioSink for HeadlessAudioSink {
 /// it send commands the host dropped? `wie_featurephone`'s sink played only `Wave` events until
 /// 2026-09-27, so a title whose line shows `midi_events > 0` was silent in the browser there and
 /// only there. Process-wide, like `svc_stub_slots`: one validator run is one guest.
+///
+/// Two keys describe handles rather than volume. `loop_overlaps` counts looping plays that start
+/// while ANOTHER handle's loop is still live (never stopped) — the "BGM that never ends under the
+/// next song" shape: a loop has no natural end, so it only stops on a `Stop`. `handles` counts
+/// distinct handles ever played, which is what the featurephone worklet kept resident until
+/// 2026-09-27 (it never freed a sequence); compare it with that sink's residency cap.
 struct AudioTally {
     plays: AtomicU64,
     repeat_plays: AtomicU64,
@@ -317,6 +323,14 @@ struct AudioTally {
     wave_events: AtomicU64,
     midi_events: AtomicU64,
     empty_plays: AtomicU64,
+    loop_overlaps: AtomicU64,
+    handles: Mutex<AudioHandles>,
+}
+
+#[derive(Default)]
+struct AudioHandles {
+    live_loops: std::collections::BTreeSet<u32>,
+    seen: std::collections::BTreeSet<u32>,
 }
 
 static AUDIO_TALLY: AudioTally = AudioTally {
@@ -326,13 +340,29 @@ static AUDIO_TALLY: AudioTally = AudioTally {
     wave_events: AtomicU64::new(0),
     midi_events: AtomicU64::new(0),
     empty_plays: AtomicU64::new(0),
+    loop_overlaps: AtomicU64::new(0),
+    handles: Mutex::new(AudioHandles {
+        live_loops: std::collections::BTreeSet::new(),
+        seen: std::collections::BTreeSet::new(),
+    }),
 };
 
 impl AudioTally {
     fn record(&self, command: &wie_backend::AudioCommand) {
         match command {
-            wie_backend::AudioCommand::Play { sequence, repeat, .. } => {
+            wie_backend::AudioCommand::Play { handle, sequence, repeat } => {
                 self.plays.fetch_add(1, Ordering::SeqCst);
+                let mut handles = self.handles.lock().unwrap();
+                handles.seen.insert(*handle);
+                // A play restarts its handle, so it ends whatever loop that handle had.
+                handles.live_loops.remove(handle);
+                if *repeat {
+                    if !handles.live_loops.is_empty() {
+                        self.loop_overlaps.fetch_add(1, Ordering::SeqCst);
+                    }
+                    handles.live_loops.insert(*handle);
+                }
+                drop(handles);
                 if *repeat {
                     self.repeat_plays.fetch_add(1, Ordering::SeqCst);
                 }
@@ -346,21 +376,24 @@ impl AudioTally {
                     };
                 }
             }
-            wie_backend::AudioCommand::Stop { .. } => {
+            wie_backend::AudioCommand::Stop { handle } => {
                 self.stops.fetch_add(1, Ordering::SeqCst);
+                self.handles.lock().unwrap().live_loops.remove(handle);
             }
         }
     }
 
     fn json(&self) -> String {
         format!(
-            "{{\"plays\":{},\"repeat_plays\":{},\"stops\":{},\"wave_events\":{},\"midi_events\":{},\"empty_plays\":{}}}",
+            "{{\"plays\":{},\"repeat_plays\":{},\"stops\":{},\"wave_events\":{},\"midi_events\":{},\"empty_plays\":{},\"loop_overlaps\":{},\"handles\":{}}}",
             self.plays.load(Ordering::SeqCst),
             self.repeat_plays.load(Ordering::SeqCst),
             self.stops.load(Ordering::SeqCst),
             self.wave_events.load(Ordering::SeqCst),
             self.midi_events.load(Ordering::SeqCst),
             self.empty_plays.load(Ordering::SeqCst),
+            self.loop_overlaps.load(Ordering::SeqCst),
+            self.handles.lock().unwrap().seen.len(),
         )
     }
 }
@@ -1702,6 +1735,8 @@ mod tests {
             wave_events: Default::default(),
             midi_events: Default::default(),
             empty_plays: Default::default(),
+            loop_overlaps: Default::default(),
+            handles: Default::default(),
         };
         let sequence = Arc::new(AudioSequence {
             duration: 10,
@@ -1736,10 +1771,27 @@ mod tests {
             repeat: false,
         });
         tally.record(&AudioCommand::Stop { handle: 0 });
+        // Loop 2 starts with no loop live (0 was stopped, 1 is a one-shot): no overlap. Loop 3
+        // starts while 2 is live: one. Replaying 3 restarts it while 2 is still live: two.
+        let short = Arc::new(AudioSequence { duration: 1, events: vec![] });
+        for handle in [2, 3, 3] {
+            tally.record(&AudioCommand::Play {
+                handle,
+                sequence: short.clone(),
+                repeat: true,
+            });
+        }
+        tally.record(&AudioCommand::Stop { handle: 2 });
+        // Only 3 is live now; restarting it overlaps nothing.
+        tally.record(&AudioCommand::Play {
+            handle: 3,
+            sequence: short,
+            repeat: true,
+        });
 
         assert_eq!(
             tally.json(),
-            r#"{"plays":2,"repeat_plays":1,"stops":1,"wave_events":1,"midi_events":2,"empty_plays":1}"#
+            r#"{"plays":6,"repeat_plays":5,"stops":2,"wave_events":1,"midi_events":2,"empty_plays":5,"loop_overlaps":2,"handles":4}"#
         );
     }
 
