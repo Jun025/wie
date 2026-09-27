@@ -323,4 +323,22 @@ mod test {
             Ok(())
         })
     }
+
+    // `play`/`stop`/`resume` on a NULL clip report failure; they panicked the host before.
+    #[test]
+    fn test_null_clip_reports_failure() -> Result<()> {
+        run_jvm_test(Box::new([wie_midp::get_protos().into(), get_protos().into()]), |jvm| async move {
+            let null = || ClassInstanceRef::<Clip>::new(None);
+
+            let stopped: bool = jvm.invoke_static("org/kwis/msp/media/Player", "stop", "(Lorg/kwis/msp/media/Clip;)Z", (null(),)).await?;
+            let resumed: bool = jvm.invoke_static("org/kwis/msp/media/Player", "resume", "(Lorg/kwis/msp/media/Clip;)Z", (null(),)).await?;
+            let played: bool = jvm
+                .invoke_static("org/kwis/msp/media/Player", "play", "(Lorg/kwis/msp/media/Clip;Z)Z", (null(), false))
+                .await?;
+
+            assert!(!stopped && !resumed && !played);
+
+            Ok(())
+        })
+    }
 }

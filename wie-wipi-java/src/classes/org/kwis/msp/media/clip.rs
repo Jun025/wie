@@ -229,7 +229,12 @@ impl Clip {
         jvm.get_field(&this, "volume", "I").await
     }
 
+    // A null clip has no player. `Player.stop(null)` is how several KTF titles silence a clip
+    // they never loaded (sound off): 4 of the 2026-09-27 census's titles panicked here instead.
     pub async fn player(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<Player>> {
+        if this.is_null() {
+            return Ok(ClassInstanceRef::new(None));
+        }
         jvm.get_field(this, "player", "Ljavax/microedition/media/Player;").await
     }
 }
