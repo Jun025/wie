@@ -263,7 +263,7 @@ const ISSUE_KO = {
   'input:none': '키를 눌러도 화면이 바뀌지 않을 수 있어요.',
   'longplay:error': '플레이 도중에 게임이 멈추거나 꺼질 수 있어요.',
   'longplay:stall': '오래 플레이하면 화면이 멈춘 채로 있을 수 있어요.',
-  'sound:silent': '소리가 나지 않아요.',
+  'sound:silent': '소리가 나지 않을 수 있어요.',
   'speed:slow': '원래보다 조금 느리게 움직일 수 있어요.',
 };
 
@@ -370,6 +370,7 @@ if (cmd === 'run') {
     const platform = j.A.platform && j.A.platform !== 'unknown' ? j.A.platform.toUpperCase() : sniffPlatform(t.path);
     const st = status(j.ax);
     const issues = Object.entries(j.ax)
+      .filter(([k]) => !(k === 'render' && j.ax.boot === 'fail')) // one line for a title that never started
       .map(([k, v]) => ISSUE_KO[`${k}:${v}`])
       .filter(Boolean);
     const changes = prs
