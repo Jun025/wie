@@ -1,0 +1,23 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-27-featurephone-midp-playerlistener-end-of-media-adopt-p1",
+  "title": "MIDP PlayerListener END_OF_MEDIA — 곡이 끝나면 리스너에 통지",
+  "summary": "SmafPlayer 의 리스너 등록·해제를 구현하고, 리스너가 있을 때만 startedAt+lengthMs 에 END_OF_MEDIA 타이머를 건다(반복 재생은 매 바퀴). 로컬 코퍼스에서 addPlayerListener 를 부르는 타이틀은 0 — 단위 시험으로만 잠갔다.",
+  "changes": [
+    "wie-midp/src/classes/net/wie/smaf_player.rs — add/removePlayerListener · END_OF_MEDIA 타이머 · 시험 1",
+    "docs/report/0332"
+  ],
+  "verification": [
+    "test_end_of_media_reaches_listeners — 한 번/반복/stop/close/무리스너",
+    "변이 3건 red"
+  ],
+  "limits": [
+    "관측 타이틀 0 — 효과는 재지 못했다",
+    "STARTED·STOPPED·CLOSED 미통지"
+  ],
+  "adoptedProposals": [
+    "2026-09-27-featurephone-audio-loop-overlap-and-worklet-sequence-leak#p1"
+  ],
+  "proposals": []
+}
