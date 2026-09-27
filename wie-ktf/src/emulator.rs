@@ -22,6 +22,21 @@ fn is_clet_mode(main_class_name: &str) -> bool {
     main_class_name == "Clet"
 }
 
+// The jar is normally `<AID>.jar`, but some archives carry their only jar under another id
+// (the ADF was re-issued with a new AID and the jar kept its original name). Fall back to the
+// sole `.jar` then; with zero or several jars keep `<AID>.jar` and let the load report it.
+fn jar_filename(aid: &str, files: &BTreeMap<String, Vec<u8>>) -> String {
+    let expected = format!("{aid}.jar");
+    if files.contains_key(&expected) {
+        return expected;
+    }
+    let mut jars = files.keys().filter(|name| name.ends_with(".jar"));
+    match (jars.next(), jars.next()) {
+        (Some(only), None) => only.clone(),
+        _ => expected,
+    }
+}
+
 struct KtfTaskRunner {
     core: ArmCore,
 }
@@ -73,7 +88,7 @@ impl KtfEmulator {
             tracing::warn!("Ignoring unsupported display size {width}x{height}: {error}");
         }
 
-        let jar_filename = format!("{}.jar", adf.aid);
+        let jar_filename = jar_filename(&adf.aid, &files);
 
         Self::load(platform, &jar_filename, &adf.pid, &adf.aid, Some(adf.mclass), &files, options)
     }
@@ -217,6 +232,18 @@ mod tests {
     use wie_util::{Result, WieError};
 
     use super::{KtfJvmSupport, KtfTaskRunner};
+
+    #[test]
+    fn jar_filename_falls_back_to_the_only_jar() {
+        use alloc::{collections::BTreeMap, string::ToString, vec::Vec};
+
+        let files = |names: &[&str]| names.iter().map(|name| (name.to_string(), Vec::new())).collect::<BTreeMap<_, _>>();
+
+        assert_eq!(super::jar_filename("A", &files(&["__adf__", "A.jar", "B.jar"])), "A.jar");
+        assert_eq!(super::jar_filename("A", &files(&["__adf__", "B.jar"])), "B.jar");
+        assert_eq!(super::jar_filename("A", &files(&["__adf__", "B.jar", "C.jar"])), "A.jar");
+        assert_eq!(super::jar_filename("A", &files(&["__adf__"])), "A.jar");
+    }
 
     #[test]
     fn clet_mode_is_selected_from_adf_mclass() {
