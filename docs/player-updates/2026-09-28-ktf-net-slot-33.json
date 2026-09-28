@@ -1,0 +1,9 @@
+{
+  "date": "2026-09-28",
+  "kind": "fix",
+  "titles": [
+    "04159045a7eaf257328ac1b2fb9e83fc5aadf5fbc2aba19cabaf24438a390c3c"
+  ],
+  "summary_ko": "게임 안에서 네트워크 기능으로 들어가면 에뮬레이터가 멈추던 문제를 고쳐, 연결 실패로 처리되고 게임이 계속되게 했어요.",
+  "pr": "https://github.com/Jun025/wie/pull/389"
+}
