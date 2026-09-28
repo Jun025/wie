@@ -63,3 +63,7 @@ main(`24bfcfad`, #374 포함) 재측 — 전(`56b2d5f9`)과 같은 시각 짝 ·
 - 퇴행 확인은 «부팅 10초 안에 slot 16 을 부르는» 14종까지다. 한참 뒤(저장·재저장 때)에만 부르는 타이틀은 이 체로 안 걸린다 — #374 가 KTF 전수 전/후로 본 범위와 같다.
 - 두 번째 제안(`#p1`, 0103BF27 로딩 스레드)은 이 엔진과 무관하다 — 손대지 않았다.
 - 주소·연산 코드 번호는 `ed6ad7318ac9` 한 이미지 기준이다. 다른 판은 위치가 다르다(바이트 서명으로 찾았다).
+
+게임 파일명 유입(`corpus-name-inflow --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 0회/0쌍 · SUFFIX-ATTACHED 0회/0쌍.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=f4329b2b3215a526 B=0/0 P=0/0 S=0/0 -->
