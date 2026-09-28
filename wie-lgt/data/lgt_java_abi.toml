@@ -508,6 +508,15 @@ vtable = [
     # Vector. CLDC 1.1 order also puts isEmpty at 16, right after the size row above.
     { name = "isEmpty", descriptor = "()Z", index = 16 },
     { name = "elementAt", descriptor = "(I)Ljava/lang/Object;", index = 23 },
+    # 월드장기체스's wall after Vector 16 (measured 2026-09-28, call site disassembled, lr 0x21e10).
+    # Right after the isEmpty() row above says "not empty", the caller sets only r0 = the Vector and
+    # dispatches `ldr ip,[r3,#0x64]` (= 4 + 4*24). The result is cast to a guest class and stored
+    # into this.<field>+0x28, and the next dispatch on the same Vector is `[r3,#0x70]` (= 27, the
+    # removeElementAt row below) with r1 = 0: take the element, then remove index 0 — a queue pop.
+    # Of the argument-free object returners (elements 17 · firstElement 24 · lastElement 25) only
+    # firstElement pairs with removing index 0; an Enumeration would not pass a guest-class cast.
+    # CLDC 1.1 order puts firstElement at 24, between the pinned elementAt (23) and removeElementAt (27).
+    { name = "firstElement", descriptor = "()Ljava/lang/Object;", index = 24 },
     { name = "removeElementAt", descriptor = "(I)V", index = 27 },
     { name = "insertElementAt", descriptor = "(Ljava/lang/Object;I)V", index = 28 },
     # 월드장기체스's wall after Vector 31 (measured 2026-09-27, call site disassembled, lr 0x2b598).

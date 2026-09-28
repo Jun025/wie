@@ -1,0 +1,36 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-28-wec-vector-vtable-16-adopt-p0",
+  "title": "월드장기체스 — java/util/Vector 24 = firstElement()Ljava/lang/Object; (호출부 디스어셈블)",
+  "summary": "isEmpty 가 거짓인 경로에서 Vector 24 를 인자 없이 부르고, 받은 객체를 게스트 클래스로 캐스트해 필드에 저장한 뒤 같은 Vector 에 removeElementAt(0)(27) 을 부른다 — 큐에서 맨 앞을 꺼내는 모양이라 firstElement 다. 월드장기체스가 처음으로 화면을 그린다(paints 0 → 5). 벽은 java/lang/String 22 로 옮겨 갔다.",
+  "changes": [
+    "wie-lgt/data/lgt_java_abi.toml — Vector 블록 24 행 1줄 + 근거 주석",
+    "wie-lgt/src/runtime/java/jvm_support.rs — ABI 핀 테스트에 24 행 1줄",
+    "docs/report/0343"
+  ],
+  "verification": [
+    "전: FAIL · ticks 1348 · paints 0 · java/util/Vector vtable index 24 (lr 0x21e10)",
+    "후: 3/3 FAIL · ticks 80937/32455/43096 · paints 5 · java/lang/String vtable index 22",
+    "변이: firstElement 행만 제거 → 핀 테스트 FAILED"
+  ],
+  "limits": [
+    "호출부 1곳 — 다른 타이틀 교차 없음",
+    "여전히 FAIL — 다음 벽 String 22"
+  ],
+  "adoptedProposals": [
+    "2026-09-28-wec-vector-vtable-16#p0"
+  ],
+  "proposals": [
+    {
+      "title": "월드장기체스 — `java/lang/String vtable index 22` 미구현 벽",
+      "plainSummary": "Vector 24 를 채우자 월드장기체스가 처음으로 화면을 그리기 시작했지만(5 프레임), 곧 String 의 22 번 칸에서 멈춥니다.",
+      "userBenefit": "화면이 나오기 시작한 타이틀이 다음 벽을 넘어 실제로 플레이 가능한 상태에 가까워집니다.",
+      "why": "이 회차 후 3/3 동일하게 `Unimplemented: java/lang/String vtable index 22`(paints 5). 첫 프레임이 나온 뒤의 벽이라 부팅이 아니라 진행 중 경로다.",
+      "tradeoff": "String 은 메서드가 많아 선언 순서만으로 판정하기 어렵다 — 이번처럼 호출부 디스어셈블로 인자·반환 모양을 확인해야 한다.",
+      "effort": "S",
+      "target": "wie",
+      "kind": "product"
+    }
+  ]
+}
