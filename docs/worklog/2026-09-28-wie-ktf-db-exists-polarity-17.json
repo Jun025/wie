@@ -1,0 +1,12 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-28-wie-census-ktf-db-exists-package-p-files-adopt-p1",
+  "title": "KTF slot 16 극성 — 나머지 18종도 반대 용법 0",
+  "summary": "부팅에 slot 16 을 부르는 KTF 19종을 현행/전부-0 두 번씩 돌려 같은 이름의 다음 DB 동작을 비교했다. 분기가 보이는 11종은 전부 0 을 듣고 읽는다. 반대 용법 0종 — 코드 변경 없음.",
+  "changes": ["docs/report/0350"],
+  "verification": ["KTF 266종 × 2 실행(임시 계측 빌드 · 커밋 0)"],
+  "limits": ["4decaeed58b1·568c339a8c07 은 부팅 12초 창에서 결과로 분기하지 않아 행동으로 못 가렸다"],
+  "adoptedProposals": ["2026-09-28-wie-census-ktf-db-exists-package-p-files#p1"],
+  "proposals": []
+}
