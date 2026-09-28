@@ -31,3 +31,7 @@
 - 변이 4개 전건 red · 원상 green(저장 안 함): ⑴ `setForeground` 가 저장 안 함 ⑵ 초기 -1 제거 ⑶ `setForeground` 가 `bg` 에 씀 ⑷ `setForeground` 등록 제거.
 - 이용자 소식(`docs/player-updates/`) 은 더하지 않았다 — 타이틀이 여전히 검은 화면이라 이용자가 보는 변화가 없다.
 - 게이트·러너·CI 결과는 PR 본문과 회신에 있다.
+
+### 게임 이름 유입
+`node scripts/corpus-name-inflow.mjs` — BOUNDED **1** · SUFFIX-ATTACHED **0**. 1건은 0352 가 적은 그 줄 — `component.rs` 의 기존 주석(`repaint(IIII)V` 위 · `origin/main` 에 이미 있다)이다. 도구가 «바뀐 파일의 본문 전체»를 보므로 그 파일을 고친 회차마다 잡힌다. 이 회차가 더한 줄에서는 **0건**이다.
+
