@@ -1,0 +1,36 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-28-wec-vector-vtable-24-adopt-p0",
+  "title": "월드장기체스 — java/lang/String 22 = indexOf(II)I (호출부 디스어셈블)",
+  "summary": "같은 String 에 22 번 칸을 연달아 두 번 부른다 — r1 = '&'(문자 상수), r2 = 시작 위치(앞 결과가 -1 이 아니면 그 +1). 결과는 -1 과 비교된다. 앞으로 훑으며 '&' 를 차례로 찾는 모양이라 indexOf(II)I 다. 벽은 java/util/Stack 33 으로 옮겨 갔다.",
+  "changes": [
+    "wie-lgt/data/lgt_java_abi.toml — String 블록 22 행 1줄 + 근거 주석",
+    "wie-lgt/src/runtime/java/jvm_support.rs — ABI 핀 테스트에 22 행 1줄",
+    "docs/report/0350"
+  ],
+  "verification": [
+    "전: FAIL · ticks 103466 · paints 5 · java/lang/String vtable index 22 (lr 0x7ac0)",
+    "후: 3/3 FAIL · ticks 85080/16901/71652 · paints 5 · java/util/Stack vtable index 33",
+    "변이: indexOf(II) 행만 제거 → 핀 테스트 FAILED"
+  ],
+  "limits": [
+    "호출부 1곳 — 다른 타이틀 교차 없음",
+    "여전히 FAIL — 다음 벽 Stack 33"
+  ],
+  "adoptedProposals": [
+    "2026-09-28-wec-vector-vtable-24#p0"
+  ],
+  "proposals": [
+    {
+      "title": "월드장기체스 — `java/util/Stack vtable index 33` 미구현 벽",
+      "plainSummary": "String 22 를 채우자 월드장기체스가 한 걸음 더 나아갔지만 이번엔 Stack 의 33 번 칸에서 멈춥니다.",
+      "userBenefit": "화면이 나오기 시작한 타이틀이 다음 벽을 넘어 실제로 플레이 가능한 상태에 가까워집니다.",
+      "why": "이 회차 후 3/3 동일하게 `Unimplemented: java/util/Stack vtable index 33`(paints 5). Stack 은 Vector 를 상속하므로 33 이 Vector 칸인지 Stack 자기 메서드(push·pop·peek·empty·search)인지부터 가려야 한다.",
+      "tradeoff": "선언 순서만으로는 Vector 쪽 마지막 칸과 Stack 첫 칸의 경계가 불확실하다 — 이번처럼 호출부 디스어셈블로 인자·반환 모양을 확인해야 한다.",
+      "effort": "S",
+      "target": "wie",
+      "kind": "product"
+    }
+  ]
+}
