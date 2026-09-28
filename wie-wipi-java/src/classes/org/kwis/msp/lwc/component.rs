@@ -1,8 +1,8 @@
 use alloc::vec;
 
 use jvm::{ClassInstanceRef, Jvm, Result as JvmResult};
-use jvm_class_proto::JavaMethodProto;
-use jvm_types::{ClassAccessFlags, MethodAccessFlags};
+use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
+use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
@@ -35,18 +35,37 @@ impl Component {
                 JavaMethodProto::new("serviceRepaints", "()V", Self::service_repaints, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("hasFocus", "()Z", Self::has_focus, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("paint", "(Lorg/kwis/msp/lcdui/Graphics;)V", Self::paint, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("setBackground", "(I)V", Self::set_background, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getBackground", "()I", Self::get_background, MethodAccessFlags::PUBLIC),
             ],
-            fields: vec![],
+            fields: vec![JavaFieldProto::new("bg", "I", FieldAccessFlags::PRIVATE)],
             access_flags: ClassAccessFlags::PUBLIC | ClassAccessFlags::ABSTRACT,
         }
     }
 
-    async fn init(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+    async fn init(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("stub org.kwis.msp.lwc.Component::<init>({this:?})");
 
         let _: () = jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await?;
+        // -1 is the javadoc's own "no background" value (setBackground: 「지정을 해제 할경우 -1값」).
+        // The canonical per-widget default is not in the API-only class files, so none is invented.
+        jvm.put_field(&mut this, "bg", "I", -1).await?;
 
         Ok(())
+    }
+
+    // Kept, not drawn: this layer paints no lwc widget (Component::paint is a no-op), so the colour
+    // only comes back from getBackground. ca7fa8ade8ad calls setBackground(I) at boot.
+    async fn set_background(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, bg: i32) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lwc.Component::setBackground({this:?}, {bg:#x})");
+
+        jvm.put_field(&mut this, "bg", "I", bg).await
+    }
+
+    async fn get_background(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::debug!("org.kwis.msp.lwc.Component::getBackground({this:?})");
+
+        jvm.get_field(&this, "bg", "I").await
     }
 
     async fn key_notify(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, r#type: i32, chr: i32) -> JvmResult<bool> {
@@ -210,6 +229,29 @@ mod tests {
                     .invoke_virtual(&annunciator, "org/kwis/msp/lwc/AnnunciatorComponent", method, "()V", ())
                     .await?;
             }
+
+            Ok(())
+        })
+    }
+
+    /// ca7fa8ade8ad's boot wall: setBackground(I) on a Component. Called on a ShellComponent — whose
+    /// constructor skips ContainerComponent.<init> — so the -1 default must come from Component.<init>.
+    #[test]
+    fn set_background_is_kept_and_get_background_starts_unset() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            let shell = jvm.new_class("org/kwis/msp/lwc/ShellComponent", "()V", ()).await?;
+            let bg: i32 = jvm
+                .invoke_virtual(&shell, "org/kwis/msp/lwc/Component", "getBackground", "()I", ())
+                .await?;
+            assert_eq!(bg, -1);
+
+            let _: () = jvm
+                .invoke_virtual(&shell, "org/kwis/msp/lwc/Component", "setBackground", "(I)V", (0x00123456,))
+                .await?;
+            let bg: i32 = jvm
+                .invoke_virtual(&shell, "org/kwis/msp/lwc/ShellComponent", "getBackground", "()I", ())
+                .await?;
+            assert_eq!(bg, 0x00123456);
 
             Ok(())
         })

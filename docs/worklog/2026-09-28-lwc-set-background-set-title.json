@@ -1,0 +1,34 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-28-lwc-widget-toolkit-children-button-exit-adopt-p0",
+  "title": "lwc — Component.setBackground/getBackground · ShellComponent.setTitle/getTitle",
+  "summary": "0345 의 «후» 벽 두 개. 33f3e7669599 가 PASS(3/3 · 키 27/27), ca7fa8ade8ad 는 다음 벽 setForeground(I)V(boot 3/3). 이 층은 그리지 않으므로 값은 보관만 — 화면 변화 0. 상세 docs/report/0352.",
+  "changes": [
+    "wie-wipi-java lwc — Component bg 필드(초기 -1 = javadoc 의 «지정 해제» 값) · setBackground(I)V · getBackground()I",
+    "wie-wipi-java lwc — ShellComponent cmpTitle 필드 · setTitle(String) 이 LabelComponent 로 보관 · setTitle(Component) · getTitle()",
+    "docs/report/0352"
+  ],
+  "verification": [
+    "전/후 프로브 A 각 3판 · load1 160~250",
+    "변이 6개 전건 red · 원상 green"
+  ],
+  "limits": [
+    "배경색·제목은 그려지지 않는다 — 보관만",
+    "위젯별 기본 배경색은 API 전용 클래스에 없어 구현하지 않았다(-1 로 시작)",
+    "setTitle(String) 이 만든 LabelComponent 는 문자열을 보관하지 않는다(기존 LabelComponent 동작)"
+  ],
+  "adoptedProposals": ["2026-09-28-lwc-widget-toolkit-children-button-exit#p0"],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "lwc 다음 벽 — Component.setForeground(I)",
+      "plainSummary": "배경색 지정을 넘은 KTF 타이틀 하나가 바로 다음 줄의 전경색 지정 메서드가 없어서 부팅 중 멈춘다.",
+      "userBenefit": "ca7fa8ade8ad 가 부팅을 넘어 다음 벽까지 간다.",
+      "why": "이번 회차 «후» 측정에서 ca7fa8ade8ad 가 3/3 모두 부팅 중 `Method setForeground(I)V not found from org/kwis/msp/lwc/Component` 로 멈췄다. 정본 javadoc 의 공개 메서드이고 getForeground()I 짝이 있다.",
+      "tradeoff": "javadoc 이 전경색 기본값을 «컴포넌트마다 다르다»고만 적어, getForeground 의 초기값은 근거 없이 정할 수 없다 — 초기값을 무엇으로 둘지(또는 getForeground 를 넣을지) 회차에서 판단해야 한다.",
+      "effort": "S",
+      "target": "wie-wipi-java lwc"
+    }
+  ]
+}
