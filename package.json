@@ -16,7 +16,9 @@
     "verify": "node scripts/verify-browser.mjs"
   },
   "devDependencies": {
+    "esbuild": "0.28.2",
     "playwright": "^1.61.1",
+    "spessasynth_core": "4.3.18",
     "wrangler": "^4.0.0"
   }
 }

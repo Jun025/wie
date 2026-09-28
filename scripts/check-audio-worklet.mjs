@@ -7,17 +7,30 @@
 // the "revert it and this goes red" guard for one of them. Offline, no browser, ~0.5 s.
 //
 //   node scripts/check-audio-worklet.mjs      # rc 0 = all cases hold, rc 1 = a case failed
-import { readFile } from "node:fs/promises";
+//
+// Cases 10+ are the optional soundfont synth (docs/worklog/2026-09-28-featurephone-soundfont-lazy-load.json).
+// They need the soundfont prelude, which is spessasynth_core bundled by build-soundfont-prelude.mjs, so
+// they need the root devDependencies (`npm ci`) — and the committed wie-web/public/GeneralUser.sf3.
+// Without them they are SKIPPED and say so; `--require-soundfont` turns that skip into a failure
+// (engine-contract.yml passes it where `npm ci` has run). Soundfont cases add ~5 s (one parse per boot).
+//   node scripts/check-audio-worklet.mjs --require-soundfont
+//   node scripts/check-audio-worklet.mjs --source <file>   # run against another worklet (mutation checks)
+import { readFile, mkdtemp, rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import vm from "node:vm";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const source = await readFile(path.join(root, "wie_featurephone/src/audio_worklet.js"), "utf8");
+const argv = process.argv.slice(2);
+const requireSoundfont = argv.includes("--require-soundfont");
+const sourceArg = argv.indexOf("--source");
+const source = await readFile(sourceArg >= 0 ? path.resolve(argv[sourceArg + 1]) : path.join(root, "wie_featurephone/src/audio_worklet.js"), "utf8");
 const RATE = 48000;
 const BLOCK = 128;
 
-function boot() {
+function boot(prelude) {
   let Processor;
   let registrations = 0;
   const replies = [];
@@ -40,8 +53,11 @@ function boot() {
     Float32Array,
     Map,
     Error,
+    console,
   };
   vm.createContext(ctx);
+  // audio.rs puts the prelude and the worklet in ONE Blob module, prelude first.
+  if (prelude) vm.runInContext(prelude, ctx);
   // Each load gets its own scope, as each addModule gets its own module scope; the global (the
   // AudioWorkletGlobalScope) is shared.
   const load = () => vm.runInContext(`(function () {\n${source}\n})();`, ctx);
@@ -64,6 +80,29 @@ function boot() {
       return Math.sqrt(sum / n);
     },
     voices: () => proc.voices.length,
+    // Posts a soundfont buffer and waits for the worklet's { t: "sf" } reply (it parses asynchronously).
+    async soundfont(buffer) {
+      const before = replies.length;
+      proc.port.onmessage({ data: { t: "sf", data: buffer } });
+      for (let spin = 0; spin < 2000; spin++) {
+        const reply = replies.slice(before).find((message) => message.t === "sf");
+        if (reply) return reply;
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      throw new Error("no sf reply from the worklet");
+    },
+    // Renders `seconds` and returns the left channel itself (for exact comparisons).
+    samples(seconds) {
+      const frames = Math.round(seconds * RATE);
+      const all = new Float32Array(frames);
+      for (let done = 0; done < frames; done += BLOCK) {
+        const out = [[new Float32Array(BLOCK), new Float32Array(BLOCK)]];
+        proc.process([], out);
+        ctx.currentFrame += BLOCK;
+        all.set(out[0][0].subarray(0, Math.min(BLOCK, frames - done)), done);
+      }
+      return all;
+    },
     // What the worklet itself reports for `stats` — the number a page can read.
     stats() {
       proc.port.onmessage({ data: { t: "stats" } });
@@ -235,6 +274,120 @@ for (const repeat of [true, false]) {
     near(midiRatio, 0.5) && near(pcmRatio, 0.5) && muted < QUIET && near(full / half, 2) && near(replay / full, 1),
     `midi ×${midiRatio.toFixed(3)} · pcm ×${pcmRatio.toFixed(3)} · muted ${muted.toExponential(1)} · 1/0.5 ×${(full / half).toFixed(3)} · replay/full ×${(replay / full).toFixed(3)}`,
   );
+}
+
+// ---- Soundfont (cases 10-15) -------------------------------------------------------------------
+const soundfontPath = path.join(root, "wie-web/public/GeneralUser.sf3");
+const haveDeps = existsSync(path.join(root, "node_modules/esbuild")) && existsSync(path.join(root, "node_modules/spessasynth_core"));
+if (!haveDeps || !existsSync(soundfontPath)) {
+  const why = !haveDeps ? "root devDependencies not installed (run `npm ci`)" : `${path.relative(root, soundfontPath)} missing`;
+  console.log(`SKIP soundfont cases 10-15 — ${why}. NOT MEASURED.`);
+  if (requireSoundfont) {
+    console.error("check-audio-worklet: --require-soundfont but the soundfont cases could not run");
+    process.exit(1);
+  }
+} else {
+  const tmp = await mkdtemp(path.join(os.tmpdir(), "wie-sf-prelude-"));
+  const preludeFile = path.join(tmp, "soundfont_prelude.js");
+  const { execFileSync } = await import("node:child_process");
+  execFileSync(process.execPath, [path.join(root, "scripts/build-soundfont-prelude.mjs"), preludeFile], { stdio: "ignore" });
+  const prelude = await readFile(preludeFile, "utf8");
+  await rm(tmp, { recursive: true, force: true });
+  const sfBytes = await readFile(soundfontPath);
+  const bank = () => sfBytes.buffer.slice(sfBytes.byteOffset, sfBytes.byteOffset + sfBytes.length);
+  const song = () => [midi(0, 0xc0, 0), midi(0, 0x90, 60, 100), midi(0, 0x90, 64, 100), midi(400, 0x80, 60, 0), midi(400, 0x80, 64, 0)];
+  const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+  const rmsOf = (a) => Math.sqrt(a.reduce((sum, v) => sum + v * v, 0) / a.length);
+  const script = (w) => {
+    w.post({ t: "gain", h: 2, g: 0.7 });
+    w.post({ t: "play", h: 2, r: true, d: 600, ev: song() });
+    const a = w.samples(0.5);
+    w.post({ t: "stop", h: 2 });
+    return [a, w.samples(0.3)];
+  };
+
+  // 10. The prelude alone changes nothing: with no soundfont posted, the output is sample-for-sample
+  //     the FM output of a build without the prelude (the "no URL" path).
+  {
+    const [a1, b1] = script(boot());
+    const [a2, b2] = script(boot(prelude));
+    check("prelude without a soundfont = FM output, sample-for-sample", same(a1, a2) && same(b1, b2) && rmsOf(a1) > LOUD, `rms ${rmsOf(a1).toFixed(4)} · equal ${same(a1, a2) && same(b1, b2)}`);
+  }
+
+  // 11. A soundfont that does not parse, or a build with no prelude, leaves FM exactly as it was.
+  {
+    const [fa, fb] = script(boot());
+    const noPrelude = boot();
+    const r1 = await noPrelude.soundfont(bank());
+    const [na, nb] = script(noPrelude);
+    const garbage = boot(prelude);
+    const r2 = await garbage.soundfont(new Uint8Array(4096).fill(7).buffer);
+    const [ga, gb] = script(garbage);
+    check(
+      "no prelude / unparsable soundfont both reply ok:false and stay FM, sample-for-sample",
+      r1.ok === false && r2.ok === false && garbage.stats().soundfont === "failed" && same(fa, na) && same(fb, nb) && same(fa, ga) && same(fb, gb),
+      `no-prelude ${JSON.stringify(r1)} · garbage ok ${r2.ok} (${String(r2.error).slice(0, 60)}) · state ${garbage.stats().soundfont}`,
+    );
+  }
+
+  // 12. After it parses, a NEW play renders through the soundfont; a play already running stays FM
+  //     until it is played again.
+  const w = boot(prelude);
+  {
+    w.post({ t: "play", h: 0, r: true, d: 10000, ev: [midi(0, 0xc0, 16), midi(0, 0x90, 60, 90)] });
+    w.render(0.1);
+    const reply = await w.soundfont(bank());
+    const runningStaysFm = w.stats().synths === 0 && w.render(0.1) > LOUD;
+    w.post({ t: "stop", h: 0 });
+    w.render(0.3);
+    w.post({ t: "play", h: 1, r: false, d: 600, ev: song() });
+    const sf = w.samples(0.4);
+    const fmBoot = boot();
+    fmBoot.post({ t: "play", h: 1, r: false, d: 600, ev: song() });
+    const fm = fmBoot.samples(0.4);
+    const stats = w.stats();
+    check(
+      "a new play after the soundfont parses renders through it; the running play stayed FM",
+      reply.ok === true && stats.soundfont === "ready" && stats.synths === 1 && runningStaysFm && rmsOf(sf) > LOUD && !same(sf, fm),
+      `parse ${reply.ms} ms · running play synths 0 → ${runningStaysFm} · new play synths ${stats.synths} · rms sf ${rmsOf(sf).toFixed(4)} vs fm ${rmsOf(fm).toFixed(4)}`,
+    );
+  }
+
+  // 13. A non-repeating soundfont play ends: its synth plays out its release and tail, then is dropped.
+  {
+    w.render(3.0);
+    const after = w.render(0.3);
+    check("a soundfont play ends, then its synth is dropped", after < QUIET && w.stats().synths === 0, `rms ${after.toExponential(1)} · synths ${w.stats().synths}`);
+  }
+
+  // 14. Stop silences a looping soundfont play within the FM release time, and drops its synth.
+  {
+    w.post({ t: "play", h: 3, r: true, d: 10000, ev: [midi(0, 0xc0, 48), midi(0, 0x90, 64, 110)] });
+    const before = w.render(0.3);
+    w.post({ t: "stop", h: 3 });
+    w.render(0.1);
+    const after = w.render(0.3);
+    check("Stop silences a soundfont play and drops its synth", before > LOUD && after < QUIET && w.stats().synths === 0, `rms before ${before.toFixed(4)} · after ${after.toExponential(1)} · synths ${w.stats().synths}`);
+  }
+
+  // 15. The game's gain scales a soundfont play, and PCM in the same sequence still plays.
+  {
+    const level = (gain) => {
+      if (gain !== undefined) w.post({ t: "gain", h: 4, g: gain });
+      w.post({ t: "play", h: 4, r: true, d: 10000, ev: [midi(0, 0xc0, 48), midi(0, 0x90, 64, 110)] });
+      w.render(0.2);
+      const rms = w.render(0.2);
+      w.post({ t: "stop", h: 4 });
+      w.render(0.2);
+      return rms;
+    };
+    const ratio = level(0.5) / level(undefined);
+    const pcm = new Int16Array(4000);
+    for (let i = 0; i < pcm.length; i++) pcm[i] = Math.round(12000 * Math.sin((2 * Math.PI * 440 * i) / 8000));
+    w.post({ t: "play", h: 5, r: false, d: 0, ev: [[0, 1, 1, 8000, pcm]] });
+    const pcmLevel = w.render(0.2);
+    check("gain scales a soundfont play; PCM still plays beside it", Math.abs(ratio - 0.5) < 0.05 && pcmLevel > LOUD, `gain 0.5 → ×${ratio.toFixed(3)} · pcm rms ${pcmLevel.toFixed(4)}`);
+  }
 }
 
 if (failed) {

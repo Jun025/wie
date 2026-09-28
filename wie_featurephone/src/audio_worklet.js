@@ -8,16 +8,27 @@
 //   { t: "stop", h: handle }
 //   { t: "evict", h: handle }   — forget the handle's sequence; audio.rs resends `ev` on its next play
 //   { t: "gain", h: handle, g } — the game's volume for that handle (0..1): its playback now, else its next play
-//   { t: "stats" }              — replies { t: "stats", sequences, playbacks, voices } on the port
+//   { t: "stats" }              — replies { t: "stats", sequences, playbacks, voices, soundfont, synths } on the port
+//   { t: "sf", data: ArrayBuffer } — a soundfont (sf2/sf3) fetched by audio.rs after the first play; replies
+//                                   { t: "sf", ok, ms?, error? }. Plays that start after it parses use it.
 // `ev` rides only on the first play of a handle (a handle's sequence never changes); later plays
 // reuse it. audio.rs keeps at most RESIDENT_SEQUENCES handles here and evicts the least recently
 // played, because nothing tells it when a handle is retired. `stats` is for measuring that from a
 // page (nothing in the engine asks). Everything below runs on the audio thread, so timing is sample-accurate and does not
 // depend on the emulator's tick rate.
 //
-// The synth is deliberately small: one 2-operator FM voice per note with a patch per General MIDI
-// family (smaf_player already maps SMAF tones onto GM programs), and a synthesized kit on MIDI
-// channel 10. It is not a soundfont — see docs/report for why the soundfont path was not taken.
+// The built-in synth is deliberately small: one 2-operator FM voice per note with a patch per General
+// MIDI family (smaf_player already maps SMAF tones onto GM programs), and a synthesized kit on MIDI
+// channel 10. It needs nothing but this file, so the first sound is never late.
+//
+// A soundfont is the optional second synth (operator A/B verdict "B is better", docs/report 0317).
+// When audio.rs is built with the soundfont prelude (spessasynth_core, bundled ahead of this file as
+// `globalThis.wieSoundfont`) and the host passed a soundfont URL, audio.rs fetches it after the first
+// play and posts it here. From the moment it has parsed, each NEW play renders its MIDI through its
+// own SpessaSynthProcessor (one per play, so each handle keeps its own 16 channels, and Stop and the
+// game's gain stay per handle, as with FM). A playback already running keeps FM until it is played
+// again — no mid-note switch. PCM always stays on the path below. No prelude, no URL, a failed fetch
+// or a failed parse all leave everything on FM: the soundfont can only add, never take away.
 //
 // `scripts/check-audio-worklet.mjs` runs this file under node with stub globals; keep it free of
 // anything but the AudioWorkletGlobalScope surface (`registerProcessor`, `sampleRate`,
@@ -35,6 +46,13 @@ const MIN_LOOP_MS = 20;
 const VOICE_GAIN = 0.28;
 const PCM_GAIN = 0.9;
 const SILENT = 1e-4;
+// Level match with the FM synth, so the hand-over from FM to the soundfont is not a volume drop.
+// On the three songs the operator judged (docs/report 0317), the soundfont's raw RMS is 2.00x /
+// 2.73x / 2.85x below FM's on the same events; 2.7 is their median, rounded. The listening files were
+// matched the same way (to FM's RMS), so this is the level the verdict was given at.
+const SF_GAIN = 2.7;
+// How long a soundfont synth keeps rendering after its last voice ends: its reverb/chorus tail.
+const SF_TAIL_S = 1.0;
 
 // One patch per GM family (program >> 3). ratio/index: FM modulator; idecay: modulator index
 // time constant (0 = constant); isus: index floor as a fraction; a: attack s; d: decay time
@@ -101,6 +119,10 @@ class WieAudioProcessor extends AudioWorkletProcessor {
     this.playbacks = new Map(); // handle -> { seq, start, repeat, next, channels, gain }
     this.gains = new Map(); // handle -> gain for its next play (backend Audio sends one before every play)
     this.voices = [];
+    this.soundfont = "none"; // none | loading | ready | failed
+    this.bank = null; // the parsed soundfont, shared by every synth
+    this.synths = []; // { handle, pb, synth, stopping, fade, tail } — soundfont synths still sounding
+    this.scratch = null;
     this.port.onmessage = (event) => this.onMessage(event.data);
   }
 
@@ -116,8 +138,47 @@ class WieAudioProcessor extends AudioWorkletProcessor {
       if (playback) playback.gain = message.g;
       else this.gains.set(message.h, message.g);
     }
+    else if (message.t === "sf") this.loadSoundfont(message.data);
     else if (message.t === "stats")
-      this.port.postMessage({ t: "stats", sequences: this.sequences.size, playbacks: this.playbacks.size, voices: this.voices.length });
+      this.port.postMessage({
+        t: "stats",
+        sequences: this.sequences.size,
+        playbacks: this.playbacks.size,
+        voices: this.voices.length,
+        soundfont: this.soundfont,
+        synths: this.synths.length,
+      });
+  }
+
+  // Parses on the audio thread, as spessasynth_lib does: the bank object is not transferable, and a
+  // second copy on the main thread would stall the emulator instead. Anything that goes wrong
+  // leaves `bank` null, which is exactly the FM path.
+  async loadSoundfont(data) {
+    const lib = globalThis.wieSoundfont;
+    if (!lib || this.soundfont !== "none") {
+      this.port.postMessage({ t: "sf", ok: false, error: lib ? `already ${this.soundfont}` : "no soundfont prelude in this build" });
+      return;
+    }
+    this.soundfont = "loading";
+    try {
+      await lib.ready;
+      const started = Date.now();
+      const bank = lib.SoundBankLoader.fromArrayBuffer(data);
+      // A synth that cannot be built fails here, once, rather than on every later play.
+      this.newSynth(lib, bank);
+      this.bank = bank;
+      this.soundfont = "ready";
+      this.port.postMessage({ t: "sf", ok: true, ms: Date.now() - started });
+    } catch (error) {
+      this.soundfont = "failed";
+      this.port.postMessage({ t: "sf", ok: false, error: String(error) });
+    }
+  }
+
+  newSynth(lib, bank) {
+    const synth = new lib.SpessaSynthProcessor(sampleRate, { eventsEnabled: false });
+    synth.soundBankManager.addSoundBank(bank, "main");
+    return synth;
   }
 
   load(handle, durationMs, events) {
@@ -146,10 +207,20 @@ class WieAudioProcessor extends AudioWorkletProcessor {
     this.stop(message.h);
     const gain = this.gains.get(message.h) ?? 1;
     this.gains.delete(message.h);
-    this.playbacks.set(message.h, { seq, start: currentFrame, repeat: !!message.r, next: 0, channels: newChannels(), gain });
+    const playback = { seq, start: currentFrame, repeat: !!message.r, next: 0, channels: newChannels(), gain, sf: null };
+    if (this.bank) {
+      playback.sf = this.newSynth(globalThis.wieSoundfont, this.bank);
+      this.synths.push({ handle: message.h, pb: playback, synth: playback.sf, stopping: false, fade: 1, tail: 0 });
+    }
+    this.playbacks.set(message.h, playback);
   }
 
   stop(handle) {
+    const playback = this.playbacks.get(handle);
+    // Fade the soundfont synth out over the same time FM voices get, then drop it (see mixSynths).
+    for (const entry of this.synths) {
+      if (entry.handle === handle && entry.pb === playback) entry.stopping = true;
+    }
     this.playbacks.delete(handle);
     for (const voice of this.voices) {
       if (voice.handle === handle) this.release(voice, STOP_RELEASE_S);
@@ -173,6 +244,10 @@ class WieAudioProcessor extends AudioWorkletProcessor {
     const data = event.midi;
     const status = data[0];
     if (status < 0x80 || status >= 0xf0) return;
+    if (playback.sf) {
+      playback.sf.processMessage(data);
+      return;
+    }
     const ch = status & 0x0f;
     const c = playback.channels[ch];
     const type = status & 0xf0;
@@ -283,6 +358,7 @@ class WieAudioProcessor extends AudioWorkletProcessor {
         // Sequence exhausted and its length has elapsed.
         if (!playback.repeat) {
           this.playbacks.delete(handle);
+          if (playback.sf) playback.sf.stopAllChannels(false);
           for (const voice of this.voices) {
             if (voice.handle === handle && voice.kind !== 2) this.release(voice, voice.patch ? voice.patch.r : 0.05);
           }
@@ -310,12 +386,43 @@ class WieAudioProcessor extends AudioWorkletProcessor {
       if (this.render(voice, left, right, frames)) alive.push(voice);
     }
     this.voices = alive;
+    if (this.synths.length) this.mixSynths(left, right, frames);
 
     for (let i = 0; i < frames; i++) {
       left[i] = Math.tanh(left[i]);
       if (right !== left) right[i] = Math.tanh(right[i]);
     }
     return true;
+  }
+
+  // Each soundfont synth renders into scratch and is mixed in at its handle's gain. A stopped one
+  // ramps to silence over STOP_RELEASE_S (a forced cut would click); an ended one plays its release
+  // and SF_TAIL_S of effects tail. Either way it is dropped afterwards.
+  mixSynths(left, right, frames) {
+    if (!this.scratch || this.scratch[0].length < frames) this.scratch = [new Float32Array(frames), new Float32Array(frames)];
+    const [sl, sr] = this.scratch;
+    const fadeStep = 1 / (STOP_RELEASE_S * sampleRate);
+    const kept = [];
+    for (const entry of this.synths) {
+      sl.fill(0, 0, frames);
+      sr.fill(0, 0, frames);
+      entry.synth.process(sl, sr, 0, frames);
+      const g = SF_GAIN * entry.pb.gain;
+      let fade = entry.fade;
+      for (let i = 0; i < frames; i++) {
+        if (entry.stopping) fade = Math.max(0, fade - fadeStep);
+        left[i] += sl[i] * g * fade;
+        right[i] += sr[i] * g * fade;
+      }
+      entry.fade = fade;
+      if (fade === 0) continue;
+      if (this.playbacks.get(entry.handle) !== entry.pb && entry.synth.voiceCount === 0) {
+        entry.tail += frames;
+        if (entry.tail >= SF_TAIL_S * sampleRate) continue;
+      }
+      kept.push(entry);
+    }
+    this.synths = kept;
   }
 
   // Returns false once the voice has gone silent for good.
