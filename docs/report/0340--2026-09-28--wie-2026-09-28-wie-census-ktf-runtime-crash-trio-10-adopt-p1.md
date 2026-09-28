@@ -86,3 +86,5 @@ slot 16 타이틀 4종(`4a4d…` `f981…` `d418…` `d60c…`)은 **FAIL 이 �
 - 전수는 `--inject` 20초 창이다 — 저장/재저장이 일어나는 장시간 경로(mode 4 재저장 뒤 exists 등)는 시험으로만 고정했다.
 
 게임 파일명 유입(`corpus-name-inflow --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 0회/0쌍 · SUFFIX-ATTACHED 0회/0쌍.
+
+<!-- corpus-name-inflow v1 subjects=4 tree=7fe5ed444b73ef71 B=0/0 P=0/0 S=0/0 -->
