@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, format, vec};
+use alloc::{boxed::Box, format, string::String, vec};
 
 use arm32_cpu::{Cpu, Memory, Mode, reg};
 
@@ -41,6 +41,21 @@ impl Arm32CpuEngine {
 
         Ok(EngineStopReason::Svc { category, lr, spsr })
     }
+
+    fn undefined_instruction_message(&self, pc: u32, cpsr: u32, lr: u32) -> String {
+        let thumb = cpsr & (1 << 5) != 0;
+        let mut bytes = [0u8; 4];
+        let insn = match self.mem.read_range(pc, if thumb { 2 } else { 4 }, &mut bytes) {
+            Ok(_) if thumb => format!("{:#06x}", u16::from_le_bytes([bytes[0], bytes[1]])),
+            Ok(_) => format!("{:#010x}", u32::from_le_bytes(bytes)),
+            Err(_) => "unreadable".into(),
+        };
+
+        format!(
+            "Undefined instruction at pc={pc:#x} ({}) insn={insn} lr={lr:#x}",
+            if thumb { "thumb" } else { "arm" }
+        )
+    }
 }
 
 impl ArmEngine for Arm32CpuEngine {
@@ -65,10 +80,15 @@ impl ArmEngine for Arm32CpuEngine {
                 break EngineStopReason::Yield;
             }
 
+            let cpsr = self.cpu.reg_get(Mode::User, reg::CPSR);
+            let lr = self.cpu.reg_get(Mode::User, reg::LR);
             let mut arm32cpu_memory = self.mem.as_arm32cpu_memory();
 
             if !(self.cpu.step(&mut arm32cpu_memory)) {
-                return Err(WieError::FatalError("Undefined instruction".into()));
+                // The caller's register dump is taken after every `run_function` on the way out has
+                // restored its caller's context, so it shows the thread's initial registers (PC 0),
+                // not these. This message is the only record of where the fault was.
+                return Err(WieError::FatalError(self.undefined_instruction_message(pc, cpsr, lr)));
             }
             instructions_executed += 1;
 
@@ -362,6 +382,22 @@ mod tests {
                 (EngineStopReason::End, true) | (EngineStopReason::Yield, false)
             ));
         }
+    }
+
+    #[test]
+    fn undefined_instruction_names_the_faulting_pc_and_lr() {
+        let mut engine = Arm32CpuEngine::new();
+        engine.mem_map(0x1000, 0x1000, MemoryPermission::ReadWriteExecute);
+        engine.mem_write(0x1000, &[0xc0, 0x46, 0x00, 0xe8]).unwrap(); // nop; lone BLX suffix (undefined on ARMv4T)
+        engine.reg_write(ArmRegister::Cpsr, 0x10);
+        engine.reg_write(ArmRegister::PC, 0x1001);
+        engine.reg_write(ArmRegister::LR, 0x2345);
+
+        let error = engine.run(0x2000, 10).err().unwrap();
+        assert_eq!(
+            alloc::format!("{error}"),
+            "Fatal error: Undefined instruction at pc=0x1002 (thumb) insn=0xe800 lr=0x2345"
+        );
     }
 
     #[test]

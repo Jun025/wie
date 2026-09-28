@@ -1,0 +1,23 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-28-wie-census-ktf-db-exists-package-p-files-adopt-p0",
+  "title": "KTF net 표 64칸 · slot 33 소켓 닫기 · Undefined instruction 이 고장 좌표를 싣는다",
+  "summary": "04159045a7ea 의 «PC 0 Undefined instruction» 은 널 콜백이 아니었다. 덤프는 오류가 풀린 뒤의 스레드 초기 문맥이고(전수 FAIL 44/44 동일), 실제 고장은 net 표 33번 호출이 30칸 표 끝을 넘어 이웃 할당(WIPICInterface.misc_interface)을 코드로 실행한 것이다. 부하 의존이 아니라 결정적 결함 — 부하는 그 화면 도달률만 바꾼다.",
+  "changes": [
+    "wie-ktf/src/runtime/wipi_c/method_table.rs — net 표 30→64, slot 33 = net::socket_close · 시험 1",
+    "wie-core-arm/src/engine/arm32_cpu.rs — Undefined instruction 메시지에 pc·상태·명령어·lr · 시험 1",
+    "docs/report/0356"
+  ],
+  "verification": [
+    "수정 전 순차 12회 7/12 FAIL(같은 pc/lr) → 수정 후 23회 FAIL 0 · 그 경로를 지난 5회 5/5 PASS 27",
+    "KTF 표본 30종 새 FAIL 0 · net 호출 0",
+    "4게이트 + beta clippy rc=0 · 엔진 러너 블록 전건 PASS · 변이 red"
+  ],
+  "limits": [
+    "slot 30–32·34–63 은 미식별 스텁(닿으면 좌표와 함께 Unimplemented)",
+    "tick_for 레지스터 덤프는 여전히 초기 문맥을 보여 준다 — Undefined instruction 만 좌표를 싣는다"
+  ],
+  "adoptedProposals": ["2026-09-28-wie-census-ktf-db-exists-package-p-files#p0"],
+  "proposals": []
+}
