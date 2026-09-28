@@ -35,4 +35,6 @@ PASS 가 FAIL 로 간 것 0. 러너 줄(draw·helloworld×2·keydraw×2 `--injec
 - catch 가 **다른 프레임**에서 잡혀야 하는 경우(현재 핸들러 표에 맞는 행이 없으면 `ptr_old_handler` 로 올라가지 않고 곧장 호스트 오류)는 이번 범위 밖이다 — 이 게임 경로는 같은 프레임에서 잡는다.
 - `ay` 의 null 출처 미특정(위).
 
-게임 파일명 유입: 아래 표식.
+게임 파일명 유입(`corpus-name-inflow --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 1회/1쌍 · SUFFIX-ATTACHED 0회/0쌍. BOUNDED 1회는 수정 파일 `jvm_support.rs` 의 기존 줄(main 에 이미 있음)이다 — 이 회차의 추가 줄 중 일치 0.
+
+<!-- corpus-name-inflow v1 subjects=5 tree=c6fa5c7c564e8999 B=1/1 P=0/0 S=0/0 -->
