@@ -407,6 +407,24 @@ pub fn get_net_method_table() -> Vec<WIPICMethodBody> {
         gen_stub(28, "MC_netHttpGetEncoding"),
         gen_stub(29, "MC_netHttpClose"),
     ]
+    .into_iter()
+    .chain((30..64).map(net_extension_slot))
+    .collect()
+}
+
+/// KTF's net table is longer than the 30 WIPI-C entries above, and a guest that indexes past the
+/// end of a short table reads the NEXT allocation as a function pointer. Measured on 04159045a7ea:
+/// its cleanup calls slot 33 and landed on `WIPICInterface.misc_interface` — a table address, run
+/// as ARM code — as `Undefined instruction` (docs/report/0356).
+///
+/// Slots 30–33 all take the fd `MC_netSocket` (slot 2) returned — 30 `(fd, …, callback)`,
+/// 31 `(fd, buf, len)`, 32 `(fd, buf, len, 3000)`, 33 `(fd)` alone in the error cleanup — so 33 is
+/// the socket teardown. The others stay unidentified until a title reaches them.
+fn net_extension_slot(function_id: u16) -> WIPICMethodBody {
+    match function_id {
+        33 => net::socket_close.into_body(),
+        _ => gen_unnamed_table_stub(WIPICTableId::Net as _, "Net", function_id),
+    }
 }
 
 fn gen_unk_stub(id: u32, index: u32) -> WIPICMethodBody {
@@ -679,7 +697,14 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
 
 #[cfg(test)]
 mod tests {
-    use super::unnamed_table_message;
+    use super::{get_net_method_table, unnamed_table_message};
+
+    /// A guest that indexes past the end of this table jumps to whatever the allocator placed next
+    /// (04159045a7ea's slot 33 — `Undefined instruction`). 64 like the other unnamed KTF tables.
+    #[test]
+    fn net_table_covers_the_ktf_extension_slots() {
+        assert_eq!(get_net_method_table().len(), 64);
+    }
 
     /// The message carries the coordinate: selector, function id, all four entry registers
     /// and the quoted name. Values only — the prose around them is free to change.
