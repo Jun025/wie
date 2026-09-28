@@ -528,6 +528,14 @@ vtable = [
     # isEmpty()Z: size() or capacity() compared to zero would call firstElement on an empty
     # Vector. CLDC 1.1 order also puts isEmpty at 16, right after the size row above.
     { name = "isEmpty", descriptor = "()Z", index = 16 },
+    # 월드장기체스's first-key wall after Stack 33 (measured 2026-09-28, call site disassembled, lr 0x2b19c).
+    # The caller loads the Vector from this.<field>+8 -> +0, null-checks it, sets r0 = the Vector and
+    # r1 = an object it null-checked earlier, and dispatches `ldr ip,[r3,#0x50]` (= 4 + 4*19). r2 is
+    # not written on that path (it held a stale heap pointer, not an int), so the method takes one
+    # argument. The int result is packed `orr r5,r1,r0,lsl #16` and stored — a position, not a flag,
+    # which rules out contains (18). CLDC 1.1 order puts indexOf(Object) at 19, and every pinned row
+    # of this block sits where that order puts it.
+    { name = "indexOf", descriptor = "(Ljava/lang/Object;)I", index = 19 },
     { name = "elementAt", descriptor = "(I)Ljava/lang/Object;", index = 23 },
     # 월드장기체스's wall after Vector 16 (measured 2026-09-28, call site disassembled, lr 0x21e10).
     # Right after the isEmpty() row above says "not empty", the caller sets only r0 = the Vector and
