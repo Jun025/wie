@@ -1,0 +1,22 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-28-ktf-classloader-cluster-8-verdict-adopt-p1",
+  "title": "재배치 표 KTF client.bin 3종 — 진입 ABI 실증 · 구현하지 않는다는 판정",
+  "summary": "코퍼스 296개 client.bin 가운데 이 포맷은 3개뿐이다. 두 번 재배치(표 + GOT [+0x18,+0x1c))하고 +0x24 를 부르면 세 타이틀 모두 get_interface(\"MNInterface\") 까지 온다. 그 인터페이스는 30칸 이상인데 참고 자료가 0 이라 구현하지 않았다.",
+  "changes": [
+    "docs/report/0340"
+  ],
+  "verification": [
+    "전수 세기: client.bin 296 · 표준 스텁 293 · 재배치 표 3",
+    "임시 패치(커밋 안 함)로 3종 모두 get_interface(MNInterface) 까지 도달 → init -1"
+  ],
+  "limits": [
+    "MNInterface 호출 오프셋 10개는 선형 스캔으로 센 하한이다",
+    "init 이후 클래스를 내보내는 ABI 와 fp 문맥 배치는 조사하지 않았다(근거 없음)"
+  ],
+  "adoptedProposals": [
+    "2026-09-28-ktf-classloader-cluster-8-verdict#p1"
+  ],
+  "proposals": []
+}
