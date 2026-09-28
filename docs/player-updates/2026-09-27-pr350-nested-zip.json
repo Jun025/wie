@@ -1,0 +1,12 @@
+{
+  "date": "2026-09-27",
+  "kind": "fix",
+  "titles": [
+    "1cf2e6076079e31e1229748870531f82de96aa3cff470b2c180f0f38ec14a855",
+    "94a34abdea2133a890888bfe1ddde381923dabbde3dd83bb73d08279fa1b3e5e",
+    "f770b15f887644a0cf8099b1328c4e70df10337c0ca4b9e83cfeea72a5e78893"
+  ],
+  "summary_ko": "압축 파일 안쪽 폴더에 든 게임도 열리도록 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/350",
+  "enginePin": "bb4d89310850d82bdbd1ba0bbdaee0407d2324c0"
+}

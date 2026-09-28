@@ -1,0 +1,15 @@
+{
+  "date": "2026-09-27",
+  "kind": "fix",
+  "titles": [
+    "1cdea1985955460922ffda7a4729417b015d30b15a3db5c504a26ced37be7054",
+    "3b5b98afa8906135aeb0f9881417a4580d1a1a005fb806e62a2c619793369e43",
+    "61ba00511b84482b0c85962ff0f4fe3d2a877fd6b3e4be8d2786bf6572451f35",
+    "7521052a0aa43fa7b932c153a24ab3e9ace279f7b86a3a090e9babca32f2a489",
+    "8ac1d682de08419bc5410f1a3d17df9fce7d21f0740a746f46e23d1130bd48ec",
+    "c654601e389f5444fadbbec558675e2da54093bedb6eb5080b268c2e5121d6ed"
+  ],
+  "summary_ko": "게임을 끝낼 때 오류로 꺼지던 문제를 고쳤어요. 이제 «게임종료»를 고르면 정상적으로 끝나요.",
+  "pr": "https://github.com/Jun025/wie/pull/350",
+  "enginePin": "bb4d89310850d82bdbd1ba0bbdaee0407d2324c0"
+}
