@@ -1,0 +1,49 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-census-blank-screen-14-and-invokespecial-lookup",
+  "title": "한 색/무화면 14종 첫 벽 재분류 · invokespecial 상위 클래스 탐색 · RMS 첫 실행 · LGT DataInputStream 24",
+  "summary": "14종을 첫 벽으로 9갈래로 나눴다(KTF 타이머 칸 4 · KTF 로딩 스레드 정지 2 · 이미 풀림 2 · RMS 첫 실행 1 · DataInputStream 24 1 · LBMP type 2(#361) 1 · FlushLcd 없음 1 · null 점프 1 · LGT unk1/unk11 1). openRecordStore(name,false) 가 없는 저장소에 RecordStoreNotFoundException 을 던지게 해 SKT 4종이 화면까지 간다(14종 밖 3종 포함). invokespecial 은 wie 가 넘기는 클래스 정의를 감싸 상속 메서드까지 찾게 했고 #350 의 Canvas 우회를 걷어냈다.",
+  "changes": [
+    "wie-jvm-support/src/jvm_implementation.rs — InheritedMethods · 시험 1",
+    "wie-jvm-support/src/runtime.rs — 게스트 바이트코드 정의도 감싼다",
+    "wie-midp — RecordStoreNotFoundException · openRecordStore create 반영 · 시험 1 · Canvas getWidth/getHeight 재선언 삭제",
+    "wie-wipi-java — KTF DataBase.openDataBase 는 항상 create(종전 동작 유지)",
+    "wie-lgt/data/lgt_java_abi.toml — DataInputStream 24 = readUnsignedByte()I · 시험 행 1",
+    "docs/report/0334"
+  ],
+  "verification": [
+    "같은 시각 짝(프로브 A/B) — 14a62a8521a0·73f3a21e981c uniform→ok/ok/ok · 라이브 LGT 5 + 가드 2 퇴행 0",
+    "SKT/J2ME 82종 짝 스윕(20초) — PASS 62→67 · 나빠진 타이틀 0",
+    "변이 4개 전건 red · 원상 green",
+    "cargo test --all 536 passed · fmt · clippy(stable·beta·wasm32)",
+    "-fix2 origin/main(da6c7a6a) 병합 — rms 4종 합집합 · get_protos 45 · 게이트 전건 · 대상 2종 PASS rc=0 27/27"
+  ],
+  "limits": [
+    "load1 307~364 에서 잰 값이다 — paints 수는 하한",
+    "d2957348ddf4 는 #361 착지 뒤에야 잴 수 있다",
+    "private·static 제외 필터는 시험이 없다"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "KTF 타이머 칸 군(앱 2개 · 파일 4개) — 게임이 기다리는 플랫폼 콜백 식별",
+      "plainSummary": "게임 4개가 켜지자마자 멈춰 화면이 안 나옵니다. 게임이 휴대폰 쪽에서 불러 주기를 기다리는 신호가 무엇인지 찾아 보내 줍니다.",
+      "userBenefit": "해당 게임 4개(2종)가 첫 화면부터 나올 수 있습니다.",
+      "why": "5ms 타이머는 돌지만 게임 자신의 타이머 표 3칸이 끝까지 비어 있고 상태 변수가 1에서 안 변한다(임시 계측 1,106틱). 상태 3으로 가는 함수는 게임 코드 어디서도 불리지 않고 콜백 표 +0x384 칸에만 등록된다 — 플랫폼이 부를 콜백으로 보인다.",
+      "tradeoff": "식별 근거가 이미지 한 개(판 두 개)뿐이면 추정 등재가 된다 — 같은 개발사의 다른 이미지에서 같은 표 모양을 찾아야 한다.",
+      "effort": "M",
+      "target": "d4188f8ef8c4 ed6ad7318ac9 8b01d4ae6af4 d60c34ffc9f6"
+    },
+    {
+      "kind": "product",
+      "title": "KTF 0103BF27 — 로딩 스레드가 monitor_exit 뒤 멈추는 원인",
+      "plainSummary": "게임 2개가 흰 화면에서 더 나아가지 않습니다. 불러오기를 맡은 작업이 도중에 멈추는 이유를 찾습니다.",
+      "userBenefit": "해당 게임 2개(1종)가 흰 화면을 지나갈 수 있습니다.",
+      "why": "로딩 스레드의 마지막 기록이 monitor_exit + 클래스 초기화 도우미 로그 2줄이고, 게임 스레드는 sleep 과 같은 도우미 호출만 수천 번 반복한다. 스케줄/모니터/클래스 초기화 상호작용 중 어디에서 멈추는지는 로그에 없다.",
+      "tradeoff": "KTF 스레드·모니터 경로를 건드리면 다른 KTF 타이틀에 걸린다 — 고친다면 KTF 전수 짝 재측이 필요하다.",
+      "effort": "M",
+      "target": "4120f27288ab 739c7657c1f2"
+    }
+  ]
+}

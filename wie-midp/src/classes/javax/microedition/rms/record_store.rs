@@ -284,11 +284,22 @@ impl RecordStore {
 
     async fn open_record_store(
         jvm: &Jvm,
-        _context: &mut WieJvmContext,
+        context: &mut WieJvmContext,
         name: ClassInstanceRef<String>,
         create: bool,
     ) -> JvmResult<ClassInstanceRef<Self>> {
         tracing::debug!("javax.microedition.rms.RecordStore::openRecordStore({name:?}, {create:?})");
+
+        // MIDP: without createIfNecessary a missing store throws. Titles detect their first run by
+        // catching this; opening an empty store instead left them reading record 1 into null.
+        let name_str = JavaLangString::to_rust_string(jvm, &name).await?;
+        let system = context.system();
+        let repository = system.platform().database_repository();
+        if create {
+            repository.open(&name_str, system.pid()).await;
+        } else if !repository.exists(&name_str, system.pid()).await {
+            return Err(jvm.exception("javax/microedition/rms/RecordStoreNotFoundException", &name_str).await);
+        }
 
         let store = jvm
             .new_class("javax/microedition/rms/RecordStore", "(Ljava/lang/String;)V", (name,))
@@ -393,6 +404,33 @@ mod test {
                 panic!("unknown record deletion succeeded");
             };
             assert!(jvm.is_instance(&*exception, "javax/microedition/rms/InvalidRecordIDException"));
+
+            Ok(())
+        })
+    }
+
+    // A title's first run is `openRecordStore(name, false)` throwing; after a create it opens.
+    #[test]
+    fn open_without_create_throws_until_the_store_exists() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            let open = async |create: bool| -> JvmResult<ClassInstanceRef<RecordStore>> {
+                let name: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, "first-run").await?.into();
+                jvm.invoke_static(
+                    "javax/microedition/rms/RecordStore",
+                    "openRecordStore",
+                    "(Ljava/lang/String;Z)Ljavax/microedition/rms/RecordStore;",
+                    (name, create),
+                )
+                .await
+            };
+
+            let Err(JavaError::JavaException(exception)) = open(false).await else {
+                panic!("a missing store opened without createIfNecessary");
+            };
+            assert!(jvm.is_instance(&*exception, "javax/microedition/rms/RecordStoreNotFoundException"));
+
+            open(true).await?;
+            open(false).await?;
 
             Ok(())
         })
