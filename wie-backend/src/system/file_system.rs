@@ -67,6 +67,15 @@ impl FilesystemOverlay {
         self.virtual_files.lock().insert(key, data);
     }
 
+    /// The archive-shipped bytes for `path`, ignoring anything the guest wrote since.
+    ///
+    /// For callers that need "what the package carries" rather than "what the file
+    /// holds now" — KTF's database API treats a packaged `P/` file as a seeded DB.
+    pub fn virtual_file(&self, path: &str) -> Option<Vec<u8>> {
+        let normalized = normalize_guest_path(path)?;
+        self.virtual_files.lock().get(&normalized).cloned()
+    }
+
     pub fn is_valid_path(&self, path: &str) -> bool {
         normalize_guest_path(path).is_some()
     }
