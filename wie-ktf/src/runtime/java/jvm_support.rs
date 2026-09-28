@@ -350,8 +350,9 @@ mod test {
     use wipi_types::ktf::{
         ExeInterfaceFunctions,
         java::{
-            JavaClass as RawJavaClass, JavaClassInstance as RawJavaClassInstance, JavaFieldDefinition as RawJavaField,
-            JavaMethodDefinition as RawJavaMethod,
+            JavaClass as RawJavaClass, JavaClassInstance as RawJavaClassInstance, JavaExceptionHandler as RawJavaExceptionHandler,
+            JavaFieldDefinition as RawJavaField, JavaMethodDefinition as RawJavaMethod,
+            JavaMethodExceptionTableEntry as RawJavaMethodExceptionTableEntry,
         },
     };
 
@@ -948,6 +949,82 @@ mod test {
         while !done.load(Ordering::Relaxed) {
             system.tick()?;
         }
+        Ok(())
+    }
+
+    #[test]
+    fn test_catch_handler_receives_thrown_exception() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+
+        let done = Arc::new(AtomicBool::new(false));
+
+        let done_clone = done.clone();
+        let mut system_clone = system.clone();
+        system.spawn(async move || {
+            let (jvm, mut core) = init_jvm(&mut system_clone).await?;
+
+            // One catch-all entry covering pc 0..10, target 0x1dd — the shape of the AOT frame
+            // whose handler calls a method on `e`.
+            let ptr_entry = Allocator::alloc(&mut core, size_of::<RawJavaMethodExceptionTableEntry>() as u32)?;
+            write_generic(
+                &mut core,
+                ptr_entry,
+                RawJavaMethodExceptionTableEntry {
+                    from_pc: 0,
+                    to_pc: 10,
+                    target: 0x1dd,
+                    ptr_class: 0,
+                },
+            )?;
+            let ptr_table = Allocator::alloc(&mut core, 4)?;
+            write_generic(&mut core, ptr_table, ptr_entry)?;
+            let ptr_method = Allocator::alloc(&mut core, size_of::<RawJavaMethod>() as u32)?;
+            let mut method = RawJavaMethod::zeroed();
+            method.fn_body_native_or_exception_table = ptr_table;
+            method.exception_table_count = 1;
+            write_generic(&mut core, ptr_method, method)?;
+
+            let ptr_functions = Allocator::alloc(&mut core, 8)?;
+            write_generic(&mut core, ptr_functions + 4, 0x1234u32)?;
+            let ptr_handler = Allocator::alloc(&mut core, size_of::<RawJavaExceptionHandler>() as u32)?;
+            let mut handler = RawJavaExceptionHandler::zeroed();
+            handler.ptr_method = ptr_method;
+            handler.current_pc = 5;
+            handler.ptr_functions = ptr_functions;
+            write_generic(&mut core, ptr_handler, handler)?;
+
+            let ptr_thread_context = KtfJvmSupport::current_thread_context(&core)?;
+            let mut thread_context: KtfJvmThreadContext = read_generic(&core, ptr_thread_context)?;
+            thread_context.current_java_exception_handler = ptr_handler;
+            write_generic(&mut core, ptr_thread_context, thread_context)?;
+
+            let exception = jvm.new_class("java/lang/NullPointerException", "()V", ()).await.unwrap();
+            let ptr_exception = KtfJvmSupport::class_instance_raw(&exception);
+            let result = JavaMethod::handle_exception(&mut core, &jvm, exception).await;
+            assert!(matches!(
+                result,
+                Err(WieError::JavaExceptionUnwind {
+                    target: 0x1dd,
+                    next_pc: 0x1234,
+                    ..
+                })
+            ));
+
+            let handler: RawJavaExceptionHandler = read_generic(&core, ptr_handler)?;
+            assert_eq!(handler.unk3, ptr_exception, "the catch block reads `e` from this slot");
+
+            done_clone.store(true, Ordering::Relaxed);
+
+            Ok(())
+        });
+
+        loop {
+            system.tick()?;
+            if done.load(Ordering::Relaxed) {
+                break;
+            }
+        }
+
         Ok(())
     }
 

@@ -262,6 +262,16 @@ impl JavaMethod {
                 let restore_context: u32 = read_generic(core, exception_handler.ptr_functions + 4)?;
                 let contexts_base = current_java_exception_handler + 24;
 
+                // The catch block reads its `e` from this slot (`wipi_types` calls it `unk3`), and no
+                // client.bin code writes it — the handset's throw did. Left 0, a handler that touches
+                // `e` throws NPE into its own still-registered try range: 43,276 catches in one paint
+                // on e9fac881e602 KTF (docs/report/0343).
+                write_generic(
+                    core,
+                    current_java_exception_handler + offset_of!(RawJavaExceptionHandler, unk3) as u32,
+                    KtfJvmSupport::class_instance_raw(&exception),
+                )?;
+
                 tracing::debug!(
                     "Java exception handler found: {:#x}, method: {:#x}",
                     entry.target,

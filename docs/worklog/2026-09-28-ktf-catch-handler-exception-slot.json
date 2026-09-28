@@ -1,0 +1,22 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-28-wie-census-ktf-runtime-crash-trio-10-adopt-p0",
+  "title": "KTF catch 블록이 받는 예외 객체 — 핸들러 레코드 +0x10 칸을 채운다",
+  "summary": "한 paint 안 NPE 무한 포획은 에뮬레이터가 catch 로 되감을 때 예외 객체를 핸들러 레코드에 쓰지 않아서였다. catch 블록이 e 를 0 으로 읽어 다시 NPE 를 내고, 같은 try 범위가 그것을 또 잡았다.",
+  "changes": [
+    "wie-ktf/src/runtime/java/jvm_support/method.rs — handle_exception 이 예외 객체를 핸들러 레코드 unk3(+0x10)에 기록",
+    "wie-ktf/src/runtime/java/jvm_support.rs — 시험 test_catch_handler_receives_thrown_exception",
+    "docs/report/0343"
+  ],
+  "verification": [
+    "e9fac881e602 시드 2 전/후: FAIL(java_throw 43,288) → PASS 600초(java_throw 5) — docs/report/0343",
+    "변이 1건 red"
+  ],
+  "limits": [
+    "현재 핸들러 표에 맞는 행이 없을 때 ptr_old_handler 로 올라가지 않는다(범위 밖)",
+    "필드 ay 가 null 인 출처 미특정 — 게임이 paint 전체 try/catch 로 감싼다"
+  ],
+  "adoptedProposals": ["2026-09-28-wie-census-ktf-runtime-crash-trio-10#p0"],
+  "proposals": []
+}
