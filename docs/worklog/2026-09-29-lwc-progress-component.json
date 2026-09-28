@@ -1,0 +1,23 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-29",
+  "task": "wie-2026-09-29-lwc-form-component-vertical-adopt-p0",
+  "title": "lwc — ProgressComponent 클래스",
+  "summary": "0362 의 «후» 벽. ca7fa8ade8ad 의 딴 스레드가 진행 막대를 만들고 넘어가지만(3/3) 여전히 검은 화면 — 다음 벽은 removeAllComponents()V 없음. 상세 docs/report/0366.",
+  "changes": ["wie-wipi-java lwc — ProgressComponent(<init>(ZI)V · setValue · getValue · getMaxValue · setMargin)", "docs/report/0366"],
+  "verification": ["전/후 프로브 A 각 3판 · java.lang.Error 3/3 → 0/3", "변이 3개 전건 red · 원상 green"],
+  "limits": ["막대는 그려지지 않는다 — 이 층은 lwc 위젯을 그리지 않는다", "step 은 기본값 1 고정(setStep 미구현)"],
+  "adoptedProposals": ["2026-09-29-lwc-form-component-vertical#p0"],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "lwc 다음 벽 — ContainerComponent.removeAllComponents()",
+      "plainSummary": "진행 막대를 만든 KTF 타이틀 하나가 이번엔 화면의 부품을 한꺼번에 지우는 기능이 없어 멈추고 검은 화면에 머문다.",
+      "userBenefit": "ca7fa8ade8ad 가 화면 부품을 비우고 다음 단계로 간다.",
+      "why": "이번 회차 «후» 측정 3/3 모두 딴 스레드가 `Method removeAllComponents()V not found from org/kwis/msp/lwc/ShellComponent` 로 죽는다(치명 · 판이 6.4초에 끝난다). 정본 javadoc 의 `ContainerComponent` 공개 메서드이고 `removeComponent` 는 이미 있다.",
+      "tradeoff": "자식 목록을 비우는 것뿐이라 작지만, 이 층이 lwc 를 그리지 않으므로 화면이 바로 살아나지는 않을 수 있다 — 다음 벽이 또 나올 수 있다.",
+      "effort": "S",
+      "target": "wie-wipi-java lwc"
+    }
+  ]
+}
