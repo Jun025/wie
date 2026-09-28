@@ -58,3 +58,6 @@
 
 ### 게이트
 회신(`~/orchestrator/reports/wie-featurephone-demo-arcade-pack2-shooter-breakout.done.md`)에 실측을 적는다.
+
+
+<!-- corpus-name-inflow v1 subjects=12 tree=0645c38f86875f67 B=0/0 P=0/0 S=0/0 -->
