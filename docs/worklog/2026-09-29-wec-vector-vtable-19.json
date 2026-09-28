@@ -7,7 +7,7 @@
   "changes": [
     "wie-lgt/data/lgt_java_abi.toml — Vector 블록 19 행 1줄 + 근거 주석",
     "wie-lgt/src/runtime/java/jvm_support.rs — ABI 핀 테스트에 19 행 1줄",
-    "docs/report/0362"
+    "docs/report/0363"
   ],
   "verification": [
     "전: --inject FAIL · input_steps 1/27 · paints 83 · java/util/Vector vtable index 19 (lr 0x2b19c)",
