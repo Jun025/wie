@@ -45,3 +45,9 @@ ticks 편차는 부하 때문이다 — 판정은 첫 예외가 바뀐 것(3/3 �
 - 호출부 1곳(한 타이틀).
 - 다음 벽 Stack 33 은 등재하지 않았다(범위 밖) — worklog 후속 제안.
 - player-updates 는 추가하지 않았다 — 타이틀은 여전히 FAIL(선례 #353·#367·#376 과 같은 판단).
+
+### 게임 파일명 유입 (`scripts/corpus-name-inflow.mjs --corpus <로컬 game_lab>`)
+
+유입 30건(BOUNDED) + 판단 필요 6건(SUFFIX-ATTACHED). 도구는 바뀐 파일의 본문 전체를 센다 — `jvm_support.rs`·`lgt_java_abi.toml`
+의 제목 언급은 대부분 원래 있던 주석이다. 이 회차가 새로 더한 제목은 `월드장기체스` 하나(ABI 주석 1 · 핀 테스트 주석 1 · 이 문서 · worklog)이고,
+선례(0333·0344)와 같은 자리다. SUFFIX-ATTACHED 6건은 `간호사타이쿤2`·`서든어택포켓` — «더 긴 다른 제목»이 든 원래 있던 주석이다.
