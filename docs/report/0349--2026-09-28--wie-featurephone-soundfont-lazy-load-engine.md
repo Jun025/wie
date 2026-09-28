@@ -61,6 +61,4 @@
 - 실기기(휴대폰) 파싱·첫 악기 해독의 오디오 끊김은 재지 않았다(데스크톱 크롬만) → 제안 p1.
 - `build-wasm.sh` 가 이제 node 를 요구한다(프렐류드). 모든 CI 호출처(`engine-contract`·`publish-artifact`·`web.yml`·`doc-liveness`)는 이미 node 를 셋업한다(실측).
 
-게임 파일명 유입(`corpus-name-inflow --corpus ~/work/otterpebble/wie/game_lab`): **BOUNDED 12회/8쌍** · **SUFFIX-ATTACHED 0**(판단 필요 0) · PREFIX-EMBEDDED 1. 이 문서의 6회는 배틀몬스터·더팜1(0315·0317 에 이미 있는 이름 — 같은 세 곡의 재렌더라 이름 없이는 대조를 적을 수 없다) · 나머지 6회는 이 회차가 고친 파일(`audio.rs`·`lib.rs`·`platform.rs`)의 **기존 줄**이다(이 회차가 쓴 줄 아님).
-
-<!-- corpus-name-inflow v1 subjects=21 tree=d0deb604754000fe B=14/8 P=1/1 S=0/0 -->
+게임 파일명 유입(`corpus-name-inflow --corpus ~/work/otterpebble/wie/game_lab`): **BOUNDED 14회/8쌍** · **SUFFIX-ATTACHED 0**(판단 필요 0) · PREFIX-EMBEDDED 1. 이 문서의 8회(이 문장 자신의 2회 포함)는 배틀몬스터·더팜1(0315·0317 에 이미 있는 이름 — 같은 세 곡의 재렌더라 이름 없이는 대조를 적을 수 없다) · 나머지 6회는 이 회차가 고친 파일(`audio.rs`·`lib.rs`·`platform.rs`)의 **기존 줄**이다(이 회차가 쓴 줄 아님).
