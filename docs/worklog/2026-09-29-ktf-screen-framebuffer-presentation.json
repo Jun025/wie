@@ -1,0 +1,37 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-29",
+  "task": "wie-2026-09-29-ktf-screen-framebuffer-presentation-verdict-adopt-p0",
+  "title": "KTF Java 모드 — 네이티브 화면 프레임버퍼를 Java paint 주기에 화면으로 올리기",
+  "summary": "midp Display 가 화면을 올리기 직전 KTF 갈고리가 화면 프레임버퍼와 Java 화면 이미지를 양방향 차이로 맞춘다. 대상 2종이 흰 화면 대신 인트로를 보인다. KTF 269종 짝 재측 판정 변화는 대상 2종뿐. 상세 docs/report/0367.",
+  "adoptedProposals": ["2026-09-29-ktf-screen-framebuffer-presentation-verdict#p0"],
+  "changes": [
+    "wie-backend System — screen compositor 갈고리",
+    "wie-midp Display — 화면 올리기 직전 갈고리 호출 · Image::image_buffer · put_pixels 경계 자름",
+    "wie-wipi-c ScreenFramebufferSync — 양방향 차이 동기",
+    "wie-ktf — 갈고리 등록",
+    "docs/report/0367"
+  ],
+  "verification": [
+    "대상 2종 20초 FAIL→PASS · distinct_colors 1→512 · 스냅숏 = 인트로",
+    "KTF 269종 12초 짝: FAIL→PASS 2(대상) · PASS→FAIL 1 은 20초 재측 3/3 PASS",
+    "변이: 갈고리 등록 제거 → 대상 2종 FAIL · distinct 1"
+  ],
+  "limits": [
+    "두 paint 사이 양쪽이 같은 화소를 바꾸면 네이티브가 이긴다",
+    "대상의 키 입력 이후 화면은 재지 않았다",
+    "비용 1.0~3.5 ms/paint 는 load1 130~210 에서 잰 값"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "KTF 화면 프레임버퍼 2종 — 인트로 다음(키 입력 이후) 화면 확인",
+      "plainSummary": "이번에 인트로가 나오게 된 두 게임이 키를 눌러 다음 화면으로 넘어가도 제대로 그려지는지 확인합니다.",
+      "userBenefit": "4120f27288ab 739c7657c1f2 를 인트로 너머까지 플레이할 수 있는지 알 수 있습니다.",
+      "why": "0367 은 키 없이 25초까지만 봤다 — 인트로 자막 스크롤까지 확인됐고 #SKIP 이후는 재지 않았다.",
+      "tradeoff": "키 경로에서 새 벽이 나오면 원인 규명이 또 한 회차다. 27키 스크립트는 부하에서 다른 화면에 닿으므로 --keys 로 경로를 적어야 한다.",
+      "effort": "S",
+      "target": "4120f27288ab 739c7657c1f2"
+    }
+  ]
+}

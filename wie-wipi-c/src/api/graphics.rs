@@ -7,11 +7,12 @@ pub use framebuffer::FrameBuffer;
 pub use grp_context::WIPICGraphicsContextIdx;
 pub use image::decode_image_framebuffer;
 
+use alloc::vec::Vec;
 use core::mem::size_of;
 
 use wie_backend::{
     Event,
-    canvas::{Clip, Color, PixelType, Rgb565Pixel, string_width},
+    canvas::{ArgbPixel, Clip, Color, Image, ImageBuffer, PixelType, Rgb565Pixel, string_width},
 };
 use wie_util::{Result, read_generic, write_generic};
 
@@ -45,6 +46,93 @@ pub async fn get_screen_framebuffer(context: &mut dyn WIPICContext, a0: WIPICWor
     write_generic(context, SCREEN_FRAMEBUFFER_PTR, memory.0)?;
 
     Ok(memory)
+}
+
+/// Keeps the native screen framebuffer and the Java screen image one picture, at each Java paint
+/// (KTF Java mode).
+///
+/// On the handset they are one memory, so a title may draw natively, call `Card.repaint`, and never
+/// `MC_grpFlushLcd` (docs/report/0361). Here they are two buffers, synced both ways per paint: native
+/// pixels changed since the last sync go onto the Java image, and Java pixels changed since then go
+/// into the native framebuffer. A title that draws in Java and merely holds the framebuffer keeps
+/// its picture; one that clears the screen in Java and redraws natively in the same colour — which
+/// no value diff sees — still gets its native picture back.
+// ponytail: a pixel both sides changed between two paints goes to native whatever the real order
+// was; a per-draw dirty log would settle it if a title ever shows it.
+#[derive(Default)]
+pub struct ScreenFramebufferSync {
+    native: Vec<u8>,
+    java: Vec<u8>,
+}
+
+impl ScreenFramebufferSync {
+    pub fn compose(&mut self, context: &mut dyn WIPICContext, current: &dyn Image, target: &mut dyn ImageBuffer) -> Result<()> {
+        let handle: u32 = read_generic(context, SCREEN_FRAMEBUFFER_PTR)?;
+        if handle == 0 {
+            return Ok(());
+        }
+
+        self.compose_framebuffer(context, WIPICIndirectPtr(handle), current, target)
+    }
+
+    fn compose_framebuffer(
+        &mut self,
+        context: &mut dyn WIPICContext,
+        handle: WIPICIndirectPtr,
+        current: &dyn Image,
+        target: &mut dyn ImageBuffer,
+    ) -> Result<()> {
+        let framebuffer = FrameBuffer(read_generic(context, context.data_ptr(handle)?)?);
+        let native = framebuffer.image(context)?;
+        let mut native_raw = native.raw().into_owned();
+        let java_raw = current.raw().into_owned();
+        if self.native.len() != native_raw.len() || self.java.len() != java_raw.len() {
+            // first sight: all of native counts as changed, black included
+            self.native = native_raw.iter().map(|x| !x).collect();
+            self.java = java_raw.clone();
+        }
+
+        let (nb, jb) = (native.bytes_per_pixel() as usize, current.bytes_per_pixel() as usize);
+        let (nw, jw) = (native.width() as usize, current.width() as usize);
+        let width = nw.min(jw);
+        let height = native.height().min(current.height()) as usize;
+        let mut mirrored = false;
+        for y in 0..height {
+            let at_native = |x: usize| (y * nw + x) * nb..(y * nw + x + 1) * nb;
+            let at_java = |x: usize| (y * jw + x) * jb..(y * jw + x + 1) * jb;
+            let mut x = 0;
+            while x < width {
+                let start = x;
+                while x < width && native_raw[at_native(x)] != self.native[at_native(x)] {
+                    x += 1;
+                }
+                if x > start {
+                    let colors: Vec<Color> = (start..x).map(|x| native.get_pixel(x as _, y as _)).collect();
+                    target.put_pixels(start as _, y as _, (x - start) as _, &colors);
+                    continue;
+                }
+
+                if java_raw[at_java(x)] != self.java[at_java(x)] {
+                    let color = current.get_pixel(x as _, y as _);
+                    let pixel = match nb {
+                        2 => bytemuck::bytes_of(&Rgb565Pixel::from_color(color)).to_vec(),
+                        _ => bytemuck::bytes_of(&ArgbPixel::from_color(color)).to_vec(),
+                    };
+                    native_raw[at_native(x)].copy_from_slice(&pixel);
+                    mirrored = true;
+                }
+                x += 1;
+            }
+        }
+
+        if mirrored {
+            framebuffer.write(context, &native_raw)?;
+        }
+        self.native = native_raw;
+        self.java = current.raw().into_owned();
+
+        Ok(())
+    }
 }
 
 pub async fn init_context(context: &mut dyn WIPICContext, p_grp_ctx: WIPICWord) -> Result<()> {
@@ -708,6 +796,8 @@ pub async fn get_framebuffer_bpp(context: &mut dyn WIPICContext, framebuffer: WI
 mod tests {
     use alloc::boxed::Box;
 
+    use wie_backend::canvas::VecImageBuffer;
+
     use crate::{MethodImpl, context::test::TestContext};
 
     use super::*;
@@ -755,6 +845,76 @@ mod tests {
 
         get.call(&mut context, Box::new([ptr_context, 0xff, output])).await?;
         assert_eq!(read_generic::<[i32; 5], _>(&context, output)?, [-12, 34, 999, 999, 999]);
+        Ok(())
+    }
+
+    #[derive(Default)]
+    struct Spans(Vec<(i32, i32, usize, u8)>);
+
+    impl ImageBuffer for Spans {
+        fn put_pixel(&mut self, _: i32, _: i32, _: Color) {
+            unreachable!()
+        }
+        fn put_pixels(&mut self, x: i32, y: i32, width: u32, colors: &[Color]) {
+            assert_eq!(width as usize, colors.len());
+            self.0.push((x, y, colors.len(), colors[0].r));
+        }
+        fn xor_pixel(&mut self, _: i32, _: i32, _: Color) {
+            unreachable!()
+        }
+    }
+
+    // native changes go to the Java image; Java changes go into native, so a later native redraw in
+    // the same colour is a change again
+    #[test]
+    fn screen_sync_is_two_way() -> Result<()> {
+        let mut context = TestContext::new();
+        let framebuffer = FrameBuffer::new(&mut context, 4, 2, 16)?;
+        let handle = context.alloc(size_of::<WIPICFramebuffer>() as _)?;
+        let data = context.data_ptr(handle)?;
+        write_generic(&mut context, data, framebuffer.0)?;
+        let mut sync = ScreenFramebufferSync::default();
+        let white = Color {
+            a: 0xff,
+            r: 0xff,
+            g: 0xff,
+            b: 0xff,
+        };
+        let red = Rgb565Pixel::from_color(Color {
+            a: 0xff,
+            r: 0xff,
+            g: 0,
+            b: 0,
+        });
+        let mut java = VecImageBuffer::<ArgbPixel>::new(4, 2);
+        let native = |context: &mut TestContext| -> Result<Vec<u16>> {
+            let raw = framebuffer.image(context)?.raw().into_owned();
+            Ok(bytemuck::pod_collect_to_vec(&raw))
+        };
+
+        let mut spans = Spans::default();
+        sync.compose_framebuffer(&mut context, handle, &java, &mut spans)?;
+        assert_eq!(spans.0, [(0, 0, 4, 0), (0, 1, 4, 0)]);
+
+        let mut spans = Spans::default();
+        sync.compose_framebuffer(&mut context, handle, &java, &mut spans)?;
+        assert!(spans.0.is_empty());
+
+        framebuffer.write(&mut context, bytemuck::cast_slice(&[0u16, red, red, 0, 0, 0, 0, red]))?;
+        sync.compose_framebuffer(&mut context, handle, &java, &mut spans)?;
+        assert_eq!(spans.0, [(1, 0, 2, 0xff), (3, 1, 1, 0xff)]);
+
+        // Java clears one pixel white: it reaches native, and nothing goes back to Java
+        let mut spans = Spans::default();
+        java.put_pixel(0, 1, white);
+        sync.compose_framebuffer(&mut context, handle, &java, &mut spans)?;
+        assert!(spans.0.is_empty());
+        assert_eq!(native(&mut context)?[4], 0xffff);
+
+        // native redraws it black — the value it had before Java's clear — and that is a change
+        framebuffer.write(&mut context, bytemuck::cast_slice(&[0u16, red, red, 0, 0, 0, 0, red]))?;
+        sync.compose_framebuffer(&mut context, handle, &java, &mut spans)?;
+        assert_eq!(spans.0, [(0, 1, 1, 0)]);
         Ok(())
     }
 }

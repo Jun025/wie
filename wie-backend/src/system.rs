@@ -11,6 +11,7 @@ use wie_util::Result;
 
 use crate::{
     AsyncCallable,
+    canvas::{Image, ImageBuffer},
     executor::{Executor, TICK_BUDGET_MS},
     pacing::Pacing,
     platform::Platform,
@@ -40,7 +41,12 @@ pub struct System {
     // (task, yields since that task last slept)
     yield_streak: Arc<Mutex<(u64, u32)>>,
     pacing: Arc<Mutex<Pacing>>,
+    screen_compositor: Arc<Mutex<Option<ScreenCompositor>>>,
 }
+
+/// Draws a guest-native screen onto the Java screen image before the host presents it: the image
+/// as it stands, and a writer onto the same pixels.
+pub type ScreenCompositor = Box<dyn FnMut(&dyn Image, &mut dyn ImageBuffer) + Send>;
 
 impl System {
     pub fn new<T>(platform: Box<dyn Platform>, pid: &str, aid: &str, task_runner: T) -> Self
@@ -63,6 +69,7 @@ impl System {
             redraw_pending: Arc::new(AtomicBool::new(false)),
             yield_streak: Arc::new(Mutex::new((0, 0))),
             pacing: Arc::new(Mutex::new(Pacing::default())),
+            screen_compositor: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -181,5 +188,19 @@ impl System {
 
     pub fn event_queue(&self) -> RwLockWriteGuard<'_, EventQueue> {
         self.event_queue.write()
+    }
+
+    pub fn set_screen_compositor(&self, compositor: ScreenCompositor) {
+        *self.screen_compositor.lock() = Some(compositor);
+    }
+
+    pub fn has_screen_compositor(&self) -> bool {
+        self.screen_compositor.lock().is_some()
+    }
+
+    pub fn compose_screen(&self, current: &dyn Image, target: &mut dyn ImageBuffer) {
+        if let Some(compositor) = self.screen_compositor.lock().as_mut() {
+            compositor(current, target);
+        }
     }
 }

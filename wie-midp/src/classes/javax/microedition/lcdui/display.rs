@@ -910,6 +910,11 @@ impl Display {
         let disable_paint: bool = jvm.get_field(&this, "paintDisabled", "Z").await?;
         if !disable_paint {
             let screen_image: ClassInstanceRef<Image> = jvm.get_field(&this, "screenImage", "Ljavax/microedition/lcdui/Image;").await?;
+            if context.system().has_screen_compositor() {
+                let current = Image::image(jvm, &screen_image).await?;
+                let mut buffer = Image::image_buffer(jvm, &screen_image).await?;
+                context.system().compose_screen(&*current, &mut *buffer);
+            }
             let image = Image::image(jvm, &screen_image).await?;
 
             let platform = context.system().platform();

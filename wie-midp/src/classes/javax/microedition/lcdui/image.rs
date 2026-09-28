@@ -221,6 +221,20 @@ impl Image {
         })
     }
 
+    pub async fn image_buffer(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<Box<dyn ImageBuffer>> {
+        let width: i32 = jvm.get_field(this, "w", "I").await?;
+        let bpl: i32 = jvm.get_field(this, "bpl", "I").await?;
+
+        let bytes_per_pixel = bpl / width;
+
+        Ok(match bytes_per_pixel {
+            1 => Box::new(JavaImageBuffer::<Rgb332Pixel>::new(jvm, this).await?) as _,
+            2 => Box::new(JavaImageBuffer::<Rgb565Pixel>::new(jvm, this).await?) as _,
+            4 => Box::new(JavaImageBuffer::<ArgbPixel>::new(jvm, this).await?) as _,
+            _ => unimplemented!("Unsupported pixel format: {bytes_per_pixel}"),
+        })
+    }
+
     pub async fn canvas(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<Box<dyn Canvas>> {
         let width: i32 = jvm.get_field(this, "w", "I").await?;
         let bpl: i32 = jvm.get_field(this, "bpl", "I").await?;
@@ -340,9 +354,11 @@ where
     }
 
     fn put_pixels(&mut self, x: i32, y: i32, _width: u32, colors: &[Color]) {
-        if x > self.width || y > self.height || x < 0 || y < 0 {
+        if x < 0 || y < 0 || x >= self.width || y >= self.height {
             return;
         }
+        // a span past the row end would spill into the next row, or past the last one into a panic
+        let colors = &colors[..colors.len().min((self.width - x) as usize)];
 
         let offset = (((y as u32) * self.width() + (x as u32)) * self.bytes_per_pixel()) as usize;
 

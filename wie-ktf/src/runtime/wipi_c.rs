@@ -4,7 +4,7 @@ use jvm::Jvm;
 use wie_backend::System;
 use wie_core_arm::{ArmCore, EmulatedFunction, EmulatedFunctionParam, ResultWriter, SvcId};
 use wie_util::{Result, WieError};
-use wie_wipi_c::{WIPICMethodBody, WIPICResult};
+use wie_wipi_c::{WIPICMethodBody, WIPICResult, api::graphics::ScreenFramebufferSync};
 
 use crate::runtime::SVC_CATEGORY_WIPIC;
 use crate::runtime::svc_ids::{WIPICKernelMethodId, WIPICTableId};
@@ -84,9 +84,16 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm, resources): &mut (Sy
 }
 
 pub fn register_wipic_svc_handler(core: &mut ArmCore, system: &System, jvm: &Jvm) -> Result<()> {
-    core.register_svc_handler(
-        SVC_CATEGORY_WIPIC,
-        handle_wipic_svc,
-        &(system.clone(), jvm.clone(), ResourceCache::default()),
-    )
+    let resources = ResourceCache::default();
+
+    // Clet mode disables the midp paint that would call this; it flushes by itself
+    let mut context = KtfWIPICContext::new(core.clone(), system.clone(), jvm.clone(), resources.clone());
+    let mut sync = ScreenFramebufferSync::default();
+    system.set_screen_compositor(Box::new(move |current, target| {
+        if let Err(err) = sync.compose(&mut context, current, target) {
+            tracing::warn!("screen framebuffer compose failed: {err:?}");
+        }
+    }));
+
+    core.register_svc_handler(SVC_CATEGORY_WIPIC, handle_wipic_svc, &(system.clone(), jvm.clone(), resources))
 }
