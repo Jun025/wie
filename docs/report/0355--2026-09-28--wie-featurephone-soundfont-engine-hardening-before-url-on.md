@@ -74,3 +74,5 @@
 - S 시나리오의 소리 검사는 헤드리스 Chromium 의 가짜 오디오 출력 위 `AnalyserNode` rms 다 — «실제 스피커»가 아니라 «그래프에 샘플이 흘렀다»를 뜻한다.
 
 게임 파일명 유입: BOUNDED 2회/2쌍 — 둘 다 `audio.rs` 의 기존 줄(이 회차가 쓴 것 아님) · SUFFIX-ATTACHED 0 · PREFIX-EMBEDDED 1(제외).
+
+<!-- corpus-name-inflow v1 subjects=10 tree=d6e0fac044d3373f B=2/2 P=1/1 S=0/0 -->
