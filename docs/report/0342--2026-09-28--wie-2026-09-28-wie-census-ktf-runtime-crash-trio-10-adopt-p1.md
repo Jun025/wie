@@ -87,4 +87,4 @@ slot 16 타이틀 4종(`4a4d…` `f981…` `d418…` `d60c…`)은 **FAIL 이 �
 
 게임 파일명 유입(`corpus-name-inflow --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 0회/0쌍 · SUFFIX-ATTACHED 0회/0쌍.
 
-<!-- corpus-name-inflow v1 subjects=4 tree=7fe5ed444b73ef71 B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=4 tree=d426d6a43a292ef4 B=0/0 P=0/0 S=0/0 -->
