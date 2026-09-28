@@ -54,6 +54,11 @@ pub type KtfJvmWord = u32;
 pub struct KtfJvmThreadContext {
     unk: [u32; 8],
     current_java_exception_handler: u32,
+    // A native body can hand its result back here instead of in r0: KTF AID 0103BF27
+    // writes `+0x24 = 2` and the int to `+0x28`, leaving an unrelated constant in r0.
+    // Before these fields existed those two stores landed past the end of this allocation.
+    pub(crate) native_result_type: u32,
+    pub(crate) native_result: [u32; 2],
 }
 
 #[repr(C)]
@@ -943,6 +948,59 @@ mod test {
 
             done_clone.store(true, Ordering::Relaxed);
             clock.advance(16);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_call_native_reads_result_published_in_thread_context() -> Result<()> {
+        use wie_util::ByteWrite;
+
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let mut system_clone = system.clone();
+        system.spawn(async move || {
+            let (_jvm, mut core) = init_jvm(&mut system_clone).await?;
+            let ptr_thread_context = KtfJvmSupport::current_thread_context(&core)?;
+            let ptr_slot = ptr_thread_context + core::mem::offset_of!(KtfJvmThreadContext, native_result_type) as u32;
+
+            // The KTF AID 0103BF27 shape: tag 2 at +0x24, the int at +0x28, an unrelated constant in r0.
+            let publishing = Allocator::alloc(&mut core, 24)?;
+            let mut code = Vec::new();
+            for half in [0x4a03u16, 0x2302, 0x6253, 0x4b03, 0x6293, 0x2007, 0x4770, 0x46c0] {
+                // ldr r2,=ctx; movs r3,#2; str r3,[r2,#0x24]; ldr r3,=value; str r3,[r2,#0x28]; movs r0,#7; bx lr
+                code.extend_from_slice(&half.to_le_bytes());
+            }
+            code.extend_from_slice(&ptr_thread_context.to_le_bytes());
+            code.extend_from_slice(&0x1234_5678u32.to_le_bytes());
+            core.write_bytes(publishing, &code)?;
+
+            // An r0-only native: movs r0,#7; bx lr
+            let plain = Allocator::alloc(&mut core, 4)?;
+            core.write_bytes(plain, &[0x07, 0x20, 0x70, 0x47])?;
+
+            let container = Allocator::alloc(&mut core, 8)?;
+
+            let _ = interface::call_native(&mut core, &mut (), publishing | 1, container).await?;
+            let slot: [u32; 2] = read_generic(&core, container)?;
+            assert_eq!(slot, [0x1234_5678, 0], "published int wins over r0");
+
+            // An outer native's pending result must survive an inner call, and an r0-only native
+            // must not be answered by it.
+            write_generic(&mut core, ptr_slot, [2u32, 0xdead, 0])?;
+            let _ = interface::call_native(&mut core, &mut (), plain | 1, container).await?;
+            let slot: u32 = read_generic(&core, container)?;
+            assert_eq!(slot, 7, "a tag left by an outer call does not answer this one");
+            let restored: [u32; 3] = read_generic(&core, ptr_slot)?;
+            assert_eq!(restored, [2, 0xdead, 0], "the outer call's slot is put back");
+
+            done_clone.store(true, Ordering::Relaxed);
             Ok(())
         });
 
