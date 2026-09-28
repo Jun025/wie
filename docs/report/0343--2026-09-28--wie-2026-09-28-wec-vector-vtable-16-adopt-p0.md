@@ -52,3 +52,4 @@ ticks 편차는 부하 때문이다 — 판정은 첫 예외가 바뀐 것(3/3 �
 유입 32건(BOUNDED) + 판단 필요 8건(SUFFIX-ATTACHED). 도구는 바뀐 파일의 본문 전체를 센다 — `jvm_support.rs`·`lgt_java_abi.toml`
 의 제목 언급은 대부분 원래 있던 주석이다. 이 회차가 새로 더한 제목은 `월드장기체스` 하나(ABI 주석 1 · 핀 테스트 주석 1 · 이 문서 · worklog)이고,
 선례(0311·0319·0333)와 같은 자리다. SUFFIX-ATTACHED 8건은 `간호사타이쿤2`·`서든어택포켓` — «더 긴 다른 제목»이 든 원래 있던 주석이다.
+<!-- corpus-name-inflow v1 subjects=4 tree=1a4934a8ad3786a9 B=98/32 P=0/0 S=20/8 -->
