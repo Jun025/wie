@@ -1,0 +1,12 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-28-lwc-widget-toolkit-children-button-exit-adopt-p1",
+  "title": "a10a1f02b41b 0xFFFFFFFC 벽 — catch 블록 e=0 되돌이, #375 가 이미 해소",
+  "summary": "벽의 원인은 KTF catch 핸들러의 e 칸이 0 이던 것(널 헤더 읽기 · 되돌이). #375(84461452)가 착지해 현행 main 에서 8/8 PASS. 변이(unk3 쓰기 제거)로 되돌아감을 확인. 코드 변경 없음. 상세 docs/report/0354.",
+  "changes": ["docs/report/0354"],
+  "verification": ["76795f84 · main 081029a5 · 변이 빌드 각 3~8판 · load1 200~290", "핸들러 0x189414:0x54 진입 수 main 1 ↔ 변이 26,173"],
+  "limits": ["현행 main 의 마지막 장면 한 색 판이 있다 — 재지 않았다", "wec/DMInfo 로드 실패는 그대로(게스트가 잡는다)"],
+  "adoptedProposals": ["2026-09-28-lwc-widget-toolkit-children-button-exit#p1"],
+  "proposals": []
+}
