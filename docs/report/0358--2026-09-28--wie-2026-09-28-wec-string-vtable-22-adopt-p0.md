@@ -60,4 +60,4 @@ worklog 후속 제안 1.
 `jvm_support.rs`·`lgt_java_abi.toml` 의 제목 언급은 대부분 원래 있던 주석이다. 이 회차가 새로 더한 제목은 `월드장기체스` 하나
 (ABI 주석 1 · 핀 테스트 주석 1 · 이 문서 · worklog)이고 선례(0344·0351)와 같은 자리다. SUFFIX-ATTACHED 는 두 종류다:
 `월드장기체스가`(이 회차가 쓴 조사 붙은 언급 — 실제 언급)와 `간호사타이쿤2`·`서든어택포켓`(«더 긴 다른 제목»이 든 원래 있던 주석).
-<!-- corpus-name-inflow v1 subjects=4 tree=3a84704282e412e7 B=101/32 P=0/0 S=21/8 -->
+<!-- corpus-name-inflow v1 subjects=4 tree=33f798228b320fdb B=101/32 P=0/0 S=21/8 -->
