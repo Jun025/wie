@@ -82,3 +82,4 @@
 ### 게임 파일명 유입
 `node scripts/corpus-name-inflow.mjs`: 유입 **330쌍(BOUNDED)** + 판단 필요 **15쌍(SUFFIX-ATTACHED)**. 전부 `docs/player-data/compat.json` 한 파일이다 — 계약(§1)상 제목 목록 그 자체다.
 main 대비 새로 들어온 `"title"` 줄은 **0** 이다(파일을 다시 써서 기존 제목이 다시 세졌다). 다른 7파일은 0 이다.
+
