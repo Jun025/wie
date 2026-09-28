@@ -1,0 +1,37 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-28-wie-census-blank-screen-14-and-invokespecial-lookup-adopt-p1",
+  "title": "KTF 0103BF27 — monitor_exit 뒤 멈춤은 11초 sleep · call_native 가 스레드 컨텍스트 결과 칸을 읽는다",
+  "summary": "로딩 루프의 sleep 주기를 주는 네이티브(0x1058bc)가 int 결과를 스레드 컨텍스트 +0x28(태그 +0x24 = 2)에 싣고 r0 에는 상수 11036 을 남겼다. call_native 가 r0 만 읽어 루프가 11초마다 돌았다. 칸을 읽게 했고 컨텍스트를 0x30 바이트로 늘려 넘치던 쓰기도 막았다. 화면은 오프스크린 버퍼가 화면으로 안 올라가는 다음 벽 때문에 아직 흰색이다.",
+  "adoptedProposals": [
+    "2026-09-28-wie-census-blank-screen-14-and-invokespecial-lookup#p1"
+  ],
+  "changes": [
+    "wie-ktf/src/runtime/java/interface.rs — call_native: 결과 칸 비우기·읽기·되돌리기",
+    "wie-ktf/src/runtime/java/jvm_support.rs — KtfJvmThreadContext 에 native_result_type · native_result · 시험 1",
+    "docs/report/0353"
+  ],
+  "verification": [
+    "대상 2종 20초 paints 5~6 → 380~399(여전히 한 색)",
+    "KTF 266종 짝 3회(키 없음 2 · --inject 1) — 나빠진 쪽 전건 짝 3회 재측에서 전/후 동일, 89c214dbd15d 만 UNMEASURED 3/10 대 6/10(유의 아님)",
+    "변이 3 전건 red · 원상 green",
+    "fmt · clippy(stable·beta·wasm32) · cargo test --all 581 passed · 러너 블록 PASS"
+  ],
+  "limits": [
+    "load1 171~433 에서 잰 값이다",
+    "태그는 2(int)만 관측했다 — long 등 다른 태그는 경고만 남기고 r0:r1 을 쓴다"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "KTF 0103BF27 — 오프스크린 버퍼를 화면에 올리는 경로 식별",
+      "plainSummary": "게임 2개가 이제 그림을 그리지만 화면에 보이지 않는 곳에만 그립니다. 그 그림을 화면으로 옮기는 방법을 찾습니다.",
+      "userBenefit": "해당 게임 2개(1종)가 흰 화면을 넘어 실제 화면을 보여 줄 수 있습니다.",
+      "why": "고친 뒤 20초에 FillRect 10,013 · DrawString 1,445 가 전부 MC_grpCreateOffScreenFrameBuffer 버퍼로 가고, 게임의 Card.paint(g) 는 g 에 그리지 않으며 FlushLcd·CopyFrameBuffer 는 0회다. 첫 paint 에서 스텁인 org.kwis.msp.lcdui.Graphics.getPixels(0,0,1,1,byte[],0,4) 를 한 번 부른다.",
+      "tradeoff": "getPixels 가 화소 형식 탐지용이라면 그 답에 따라 게임이 다른 그리기 경로를 고를 수 있다 — 추정 구현은 다른 KTF 타이틀의 화면을 바꿀 수 있어 KTF 전수 짝 재측이 필요하다.",
+      "effort": "M",
+      "target": "4120f27288ab 739c7657c1f2"
+    }
+  ]
+}

@@ -16,7 +16,7 @@ use wie_jvm_support::JvmSupport;
 use wie_util::{ByteRead, Result, WieError, read_generic, read_null_terminated_string_bytes, write_generic};
 
 use crate::runtime::java::jvm_support::{
-    JavaClassDefinition, JavaClassInstance, JavaMethod, JavaMethodResult, JavaVtable, KtfJvmSupport, KtfJvmWord,
+    JavaClassDefinition, JavaClassInstance, JavaMethod, JavaMethodResult, JavaVtable, KtfJvmSupport, KtfJvmThreadContext, KtfJvmWord,
 };
 use crate::runtime::{SVC_CATEGORY_JAVA_INTERFACE, svc_ids::JavaSvcId};
 
@@ -312,7 +312,31 @@ pub(super) async fn call_native(core: &mut ArmCore, _: &mut (), address: u32, pt
     // Both return words go to the slot: the caller reads a `J`/`D` result back as
     // `ldr r1, [r0, #4]; ldr r0, [r0]` (귀신사냥2007 KTF, 0x143060), and a word caller reads [r0]
     // only. Zeroing the high word cut `System.currentTimeMillis()` to its low 32 bits.
-    let (result, result_high) = match core.run_function::<(u32, u32)>(address, &[ptr_data, ptr_data]).await {
+    //
+    // A native may instead publish its result in the thread context (tag 2 = int, see
+    // `KtfJvmThreadContext::native_result_type`). The slot is cleared for this call and the
+    // caller's value put back afterwards, so a nested native's tag never answers for this one.
+    let ptr_thread_context = KtfJvmSupport::current_thread_context(core)?;
+    let ptr_slot = ptr_thread_context + offset_of!(KtfJvmThreadContext, native_result_type) as u32;
+    let saved_slot: Option<[u32; 3]> = if ptr_thread_context != 0 {
+        let saved = read_generic(core, ptr_slot)?;
+        write_generic(core, ptr_slot, [0u32; 3])?;
+        Some(saved)
+    } else {
+        None
+    };
+
+    let run = core.run_function::<(u32, u32)>(address, &[ptr_data, ptr_data]).await;
+
+    let published = if let Some(saved) = saved_slot {
+        let published: [u32; 3] = read_generic(core, ptr_slot)?;
+        write_generic(core, ptr_slot, saved)?;
+        published
+    } else {
+        [0; 3]
+    };
+
+    let (result, result_high) = match run {
         Ok(result) => result,
         Err(WieError::JavaExceptionUnwind {
             context_base,
@@ -320,6 +344,14 @@ pub(super) async fn call_native(core: &mut ArmCore, _: &mut (), address: u32, pt
             next_pc,
         }) => return map_exception_unwind(core, caller_sp, context_base, target, next_pc),
         Err(err) => return Err(err),
+    };
+    let (result, result_high) = match published {
+        [0, ..] => (result, result_high),
+        [2, value, _] => (value, 0),
+        [tag, ..] => {
+            tracing::warn!("call_native({address:#x}): unknown native result tag {tag}, using r0/r1");
+            (result, result_high)
+        }
     };
 
     write_generic(core, ptr_data, result)?;
