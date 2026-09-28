@@ -1,0 +1,26 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-28-lwc-set-background-set-title-adopt-p0",
+  "title": "lwc — Component.setForeground/getForeground",
+  "summary": "0352 의 «후» 벽. ca7fa8ade8ad 가 부팅 예외 없이 넘어가지만(3/3) 검은 화면 — 다음 벽은 FormComponent.<init>(Z)V. 전경색은 보관만. 상세 docs/report/0357.",
+  "changes": [
+    "wie-wipi-java lwc — Component fg 필드(초기 -1 = bg 와 같은 «색 없음» 값) · setForeground(I)V · getForeground()I",
+    "docs/report/0357"
+  ],
+  "verification": ["전/후 프로브 A 각 3판 · load1 130~290", "변이 4개 전건 red · 원상 green"],
+  "limits": ["전경색은 그려지지 않는다 — 보관만", "위젯별 기본 전경색은 javadoc·API 클래스 어디에도 없어 -1 로 시작한다 — 실기와 다를 수 있다"],
+  "adoptedProposals": ["2026-09-28-lwc-set-background-set-title#p0"],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "lwc 다음 벽 — FormComponent(boolean) 생성자",
+      "plainSummary": "전경색 지정을 넘은 KTF 타이틀 하나가 세로/가로 방향을 받는 폼 생성자가 없어 폼을 못 만들고 검은 화면에 머문다.",
+      "userBenefit": "ca7fa8ade8ad 가 폼을 만들고 다음 단계로 간다.",
+      "why": "이번 회차 «후» 측정 3/3 모두 stderr 에 `Method <init>(Z)V not found from org/kwis/msp/lwc/FormComponent`(부팅 스레드 밖 · 잡히지 않은 예외)가 남고 결과는 검은 화면이다. 정본 javadoc 에 `FormComponent(boolean bVertical)` 이 있다.",
+      "tradeoff": "이 층은 폼 배치를 하지 않으므로 bVertical 은 보관만 된다. 폼이 만들어져도 lwc 위젯은 그려지지 않아 화면이 바로 살아나지는 않을 수 있다.",
+      "effort": "S",
+      "target": "wie-wipi-java lwc"
+    }
+  ]
+}
