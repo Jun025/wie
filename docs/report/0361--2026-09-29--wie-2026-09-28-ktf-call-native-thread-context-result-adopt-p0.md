@@ -54,5 +54,6 @@
   두 방향을 다 지킨다. 이 판단과 KTF 전수 짝 재측은 제안 `#p0` 의 몫이다.
 
 ### 검증
-- 코드 변경 0 — 4게이트는 `origin/main`(`270e4770`) 그대로 돌렸다(결과는 회신).
-- `node scripts/corpus-name-inflow.mjs`: 아래 표식.
+- 코드 변경 0. 이 가지(`origin/main` `270e4770` + 문서 2개)에서 `cargo fmt --all -- --check` ·
+  `cargo clippy --all -- -D warnings`(stable·beta) · wasm32 clippy · `RUST_MIN_STACK=4194304 cargo test --all`(586 passed) rc=0.
+- `node scripts/corpus-name-inflow.mjs`: 유입 **0쌍(BOUNDED)** + 판단 필요 **0쌍(SUFFIX-ATTACHED)**. 타이틀은 sha 앞 12자로만 적었다.
