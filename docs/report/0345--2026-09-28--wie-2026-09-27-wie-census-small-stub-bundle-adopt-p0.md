@@ -46,3 +46,5 @@
 
 ### 게임 이름 유입
 `node scripts/corpus-name-inflow.mjs` — BOUNDED **3** · SUFFIX-ATTACHED **0**. 3건은 전부 `dialog_component.rs` 의 기존 주석 한 줄(`origin/main` 에 이미 있다)이다. 도구는 «바뀐 파일의 본문 전체»를 보므로 그 파일을 고친 이 회차에 잡혔다. 이 회차가 더한 줄(`git diff origin/main...HEAD` 의 `+` 줄)에서는 **0건**이다.
+
+<!-- corpus-name-inflow v1 subjects=10 tree=00e486ede7c4bc63 B=3/3 P=0/0 S=0/0 -->
