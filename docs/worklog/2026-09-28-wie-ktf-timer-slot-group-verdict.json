@@ -1,0 +1,20 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-28-wie-census-blank-screen-14-and-invokespecial-lookup-adopt-p0",
+  "title": "KTF 타이머 칸 군(4) 판정 — 플랫폼 콜백이 아니라 스크립트 내장함수 표 · 원인은 slot 16 극성(#374)",
+  "summary": "0334 가 플랫폼 콜백으로 본 +0x384 칸은 게임 스크립트 인터프리터의 내장함수 0xe1 이었다. 네 파일이 멈춘 원인은 엔진 fopen 래퍼가 slot 16 의 0 을 «있음»으로 읽는데 wie 가 없는 DB 에 0 을 돌려준 것이고, #374 가 이미 뒤집었다. 같은 엔진이 재생되는 7종에도 있고 그 행동이 같은 극성을 가리킨다. 코드 변경 0.",
+  "changes": [
+    "docs/report/0347"
+  ],
+  "verification": [
+    "slot 16 을 부팅 때 부르는 KTF 14종 같은 바이너리 짝 — 대상 4 FAIL→PASS · 회귀 0",
+    "main(24bfcfad) 전/후 같은 시각 짝 — 부팅 4/4 PASS · --inject(백스톱 해제) PASS 27/27 ×3 + clean exit 1"
+  ],
+  "limits": [
+    "부팅 10초 안에 slot 16 을 부르는 타이틀만 걸렀다",
+    "주소는 ed6ad7318ac9 한 이미지 기준"
+  ],
+  "adoptedProposals": ["2026-09-28-wie-census-blank-screen-14-and-invokespecial-lookup#p0"],
+  "proposals": []
+}
