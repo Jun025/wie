@@ -69,6 +69,21 @@ impl DialogComponent {
 
         jvm.put_field(&mut this, "type", "I", dialog_type).await?;
 
+        // The javadoc sizes the dialog by "the component added to it", and ca7fa8ade8ad reads that
+        // component back with getComponent(0) straight after construction — so it is the dialog's
+        // first child. A null cmp is not added (nothing would come back but null anyway).
+        if !component.is_null() {
+            let _: i32 = jvm
+                .invoke_virtual(
+                    &this,
+                    "org/kwis/msp/lwc/ContainerComponent",
+                    "addComponent",
+                    "(Lorg/kwis/msp/lwc/Component;)I",
+                    (component,),
+                )
+                .await?;
+        }
+
         Ok(())
     }
 
