@@ -44,3 +44,5 @@
 - 이 도구는 **로컬 전용**이다(에뮬레이터 · 헤드리스 둘 다 CI 밖). 게임 파일은 쓰지 않는다.
 
 재현: `npm ci && node scripts/build-soundfont-prelude.mjs && node scripts/soundfont-stall-probe.mjs --runs 3 --control`(데스크톱) · 에뮬레이터는 도구 머리주석. 원 로그: `~/orchestrator/reports/evidence/wie-2026-09-28-featurephone-soundfont-lazy-load-adopt-p1/`.
+
+게임 파일명 유입: BOUNDED 0 · SUFFIX-ATTACHED 0 (`scripts/corpus-name-inflow.mjs`).
