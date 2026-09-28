@@ -1,0 +1,47 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-27-wie-census-small-stub-bundle-adopt-p0",
+  "title": "KTF lwc 위젯 툴킷 — 자식 저장 · ButtonComponent · ProgramExitException",
+  "summary": "ContainerComponent 가 자식 목록을 들고 getComponent(I)/getNumberOfComponent 에 답한다(범위 밖 null — javadoc). DialogComponent 는 생성자 cmp 를 0번 자식으로. ButtonComponent·ProgramExitException 은 docs/reference 정본 계층·시그니처대로. 2종 다음 벽으로 전진, 1종(a10a1f02b41b) 불변. 상세 docs/report/0345.",
+  "changes": [
+    "wie-wipi-java lwc — ContainerComponent children(Vector, 첫 사용 때 생성) · addComponent/getComponent/getNumberOfComponent/removeComponent×2",
+    "wie-wipi-java lwc — DialogComponent(Component,String,int) 가 cmp 를 addComponent",
+    "wie-wipi-java lwc — ButtonComponent(부모 Component · ()V · (String,Image)V · setActionListener 보관)",
+    "wie-wipi-java msf — org/kwis/msf/core/ProgramExitException(부모 RuntimeException)",
+    "docs/report/0345"
+  ],
+  "verification": [
+    "전/후 프로브 A 각 3~4판 · load1 218~290",
+    "변이 6개 전건 red · 원상 green"
+  ],
+  "limits": [
+    "배치·그리기 없음 — ButtonComponent 는 그려지지 않고 키로 action 을 부르지 않는다",
+    "addComponent 의 null/이중 부모 예외(javadoc)는 구현하지 않았다",
+    "addComponent 반환값 = 인덱스는 javadoc 명시가 아니라 stack 순서와 맞춘 읽기다",
+    "ProgramExitException 을 던지는 경로는 이번 측정에서 관측되지 않았다"
+  ],
+  "adoptedProposals": ["2026-09-27-wie-census-small-stub-bundle#p0"],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "lwc 다음 벽 2개 — Component.setBackground(I) · ShellComponent.setTitle(String)",
+      "plainSummary": "이번에 벽을 넘은 KTF 2종이 각각 배경색 지정과 셸 제목 지정 메서드가 없어서 멈춘다.",
+      "userBenefit": "ca7fa8ade8ad 가 부팅을 넘고, 33f3e7669599 가 14번째 키 너머로 간다(다음 벽까지).",
+      "why": "짝 재측의 «후» 벽이 ca7fa8ade8ad `Method setBackground(I)V not found from org/kwis/msp/lwc/Component`(boot, 3/3) · 33f3e7669599 `Method setTitle(Ljava/lang/String;)V not found from org/kwis/msp/lwc/ShellComponent`(14_OK, 3/3)이다. 둘 다 정본 javadoc 에 있는 공개 메서드다.",
+      "tradeoff": "이 층은 그리지 않으므로 배경색·제목은 보관만 하게 된다 — 화면에는 안 나온다.",
+      "effort": "S",
+      "target": "wie-wipi-java lwc"
+    },
+    {
+      "kind": "product",
+      "title": "a10a1f02b41b 의 0xFFFFFFFC 잘못된 메모리 접근 — lwc 와 무관한 벽의 원인 식별",
+      "plainSummary": "이 KTF 타이틀은 첫 키 한두 번 뒤 주소 -4 를 읽다가 멈춘다. 이번 lwc 수정 전·후가 똑같다.",
+      "userBenefit": "a10a1f02b41b 가 첫 화면 너머로 간다.",
+      "why": "전 4/4 · 후 4/4 가 같은 주소(0xFFFFFFFC · PC 0x71008b7a 네이티브 함수)에서 멈춘다. 주소가 null 에서 4 를 뺀 값이라 널 객체의 헤더 읽기로 보이지만 확인하지 않았다. 이 타이틀은 getComponent·ButtonComponent 를 참조하지 않는다.",
+      "tradeoff": "원인이 KTF 런타임 ABI 쪽이면 크기가 커질 수 있다 — 먼저 추적으로 호출부만 좁힌다.",
+      "effort": "M",
+      "target": "wie-ktf"
+    }
+  ]
+}
