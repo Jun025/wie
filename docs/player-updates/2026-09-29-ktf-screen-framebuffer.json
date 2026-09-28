@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-29",
+  "kind": "fix",
+  "titles": [
+    "4120f27288abc27eb5ff318a2daf79f07823b5781af94f22fa5c0d1905e29295",
+    "739c7657c1f2fb9ade708d7552f58779e1b0666b5feb5e80713e4ace9d06b637"
+  ],
+  "summary_ko": "게임이 그린 그림이 화면에 올라가지 않아 하얀 화면만 보이던 문제를 고쳐, 인트로 화면이 제대로 나오게 했어요.",
+  "pr": "https://github.com/Jun025/wie/pull/399"
+}
