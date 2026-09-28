@@ -7,7 +7,7 @@
   "changes": [
     "wie-lgt/data/lgt_java_abi.toml — String 블록 22 행 1줄 + 근거 주석",
     "wie-lgt/src/runtime/java/jvm_support.rs — ABI 핀 테스트에 22 행 1줄",
-    "docs/report/0350"
+    "docs/report/0351"
   ],
   "verification": [
     "전: FAIL · ticks 103466 · paints 5 · java/lang/String vtable index 22 (lr 0x7ac0)",
