@@ -1,0 +1,23 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-29",
+  "task": "wie-2026-09-28-lwc-set-foreground-adopt-p0",
+  "title": "lwc — FormComponent(boolean) 생성자",
+  "summary": "0357 의 «후» 벽. ca7fa8ade8ad 의 딴 스레드가 폼을 만들고 넘어가지만(3/3) 여전히 검은 화면 — 다음 벽은 NoClassDefFoundError org/kwis/msp/lwc/ProgressComponent. 상세 docs/report/0362.",
+  "changes": ["wie-wipi-java lwc — FormComponent <init>(Z)V · vertical 필드에 보관", "docs/report/0362"],
+  "verification": ["전/후 프로브 A 각 3판 · load1 238~244", "변이 2개 전건 red · 원상 green"],
+  "limits": ["bVertical 은 보관만 — 이 층은 폼 배치를 하지 않는다", "인자 없는 생성자의 방향은 javadoc 에 없어 JVM 기본값(false)"],
+  "adoptedProposals": ["2026-09-28-lwc-set-foreground#p0"],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "lwc 다음 벽 — ProgressComponent 클래스",
+      "plainSummary": "폼을 만든 KTF 타이틀 하나가 진행 막대 위젯 클래스가 없어 그 스레드가 죽고 검은 화면에 머문다.",
+      "userBenefit": "ca7fa8ade8ad 가 진행 막대를 만들고 다음 단계로 간다.",
+      "why": "이번 회차 «후» 측정 3/3 모두 딴 스레드가 `java.lang.Error at d.run()V` 로 죽는다. debug 1판에서 원인이 `NoClassDefFoundError org/kwis/msp/lwc/ProgressComponent` 로 확인됐다. 정본 javadoc 에 `org/kwis/msp/lwc/ProgressComponent` 가 있다.",
+      "tradeoff": "이 층은 lwc 위젯을 그리지 않으므로 클래스가 생겨도 막대는 보이지 않는다. 게임이 부르는 메서드만 보관형으로 넣으면 다음 벽이 또 나올 수 있다.",
+      "effort": "S",
+      "target": "wie-wipi-java lwc"
+    }
+  ]
+}
