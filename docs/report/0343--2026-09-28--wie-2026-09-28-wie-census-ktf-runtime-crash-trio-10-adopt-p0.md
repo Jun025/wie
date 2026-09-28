@@ -22,6 +22,12 @@
 
 `c94d64777926` 과 `e9fac881e602` 의 client.bin 은 재배치 후 **바이트 동일**(`wie-ktf-dump` 산출물 `cmp`)이다 — 같은 코드 경로.
 
+### 퇴행(전/후 동시 · `--inject` 기본 예산 · release)
+KTF working 190개 중 25번째마다 8종:
+`1065985081fc` PASS→PASS · `1793f87924d4` PASS→PASS · `8801ab57a0ee` PASS→PASS · `dbd078113b97` PASS→PASS ·
+`5bff8d2168f7` UNMEASURED→PASS · `0e72b6bc12bb` `e09aca27c132` `fd3bf717db21` UNMEASURED→UNMEASURED(양쪽 다 키가 덜 전달됨 — 부하).
+PASS 가 FAIL 로 간 것 0. 러너 줄(draw·helloworld×2·keydraw×2 `--inject --expect-last-frame`·text) 전부 PASS · keydraw rc=0.
+
 ### 변이(되돌리면 red)
 - 새 `write_generic` 을 지운다 → `test_catch_handler_receives_thrown_exception` red(`the catch block reads e from this slot`).
 
