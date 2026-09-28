@@ -33,3 +33,5 @@
 - 부하 load1 약 170~340 에서 쟀다. 판정은 DB 호출 순서만 쓰고 PASS/FAIL 은 쓰지 않는다(⒝ 의 FAIL 은 없는 파일을 «있다»고 속인 결과라 판정에 넣지 않았다).
 
 게임 파일명 유입(`corpus-name-inflow --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 0회/0쌍 · SUFFIX-ATTACHED 0회/0쌍.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=393a60e8ac5e4ada B=0/0 P=0/0 S=0/0 -->
