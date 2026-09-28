@@ -27,3 +27,8 @@
 - 변이 2개 전건 red · 원상 green(저장 안 함): ⑴ `(Z)V` 등록 제거 ⑵ `vertical` 보관 제거.
 - 이용자 소식(`docs/player-updates/`) 은 더하지 않았다 — 타이틀이 여전히 검은 화면이다.
 - 게이트·러너·CI 결과는 PR 본문과 회신에 있다.
+
+### 게임 이름 유입
+`node scripts/corpus-name-inflow.mjs --corpus <game_lab>` — BOUNDED **0** · SUFFIX-ATTACHED **0**.
+
+
