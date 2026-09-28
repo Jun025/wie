@@ -69,7 +69,18 @@ pub async fn open_database(context: &mut dyn WIPICContext, ptr_name: WIPICWord, 
         return Ok(-22); // M_E_BADRECID — closest WIPI parameter-error idiom in this file
     }
 
-    let packaged = read_packaged_database(context, &name).await?;
+    // A packaged resource backs the DB for every mode (mode 4 keeps it). A packaged
+    // KTF `P/` file only seeds a DB that has nothing saved yet — mode 4 is a create
+    // and starts empty, as it does with no package at all. Writes always go to the
+    // repository; the shipped `P/` bytes never change, and once saved, the saved
+    // record wins.
+    let resource = read_packaged_resource(context, &name).await?;
+    let resource_backed = resource.is_some();
+    let packaged = match resource {
+        Some(data) => Some(data),
+        None if mode != 4 => context.system().filesystem().virtual_file(&name),
+        None => None,
+    };
 
     let system = context.system();
     let pid = system.pid().to_owned();
@@ -85,7 +96,7 @@ pub async fn open_database(context: &mut dyn WIPICContext, ptr_name: WIPICWord, 
     // preserve unrelated bytes (multi-slot saves at fixed byte offsets).
     let initial: Vec<u8> = if exists {
         let mut db = system.platform().database_repository().open(&name, &pid).await;
-        if mode == 4 && packaged.is_none() {
+        if mode == 4 && !resource_backed {
             db.delete(1).await;
             Vec::new()
         } else if let Some(data) = db.get(1).await {
@@ -578,18 +589,20 @@ pub async fn stat_by_name_ktf(context: &mut dyn WIPICContext, name_ptr: WIPICWor
         Err(_) => return Ok(-22),
     };
 
+    // Pull record 1's size as the "valid save" indicator the game checks
+    // against 0xC7 in v2[2]. A saved DB wins; otherwise a packaged `P/` file
+    // answers with its shipped size (see `read_packaged_database`).
     let system = context.system();
     let pid = system.pid().to_owned();
-    let exists = system.platform().database_repository().exists(&name, &pid).await;
-    if !exists {
+    let record_size = if system.platform().database_repository().exists(&name, &pid).await {
+        let db = system.platform().database_repository().open(&name, &pid).await;
+        db.get(1).await.map(|x| x.len() as u32).unwrap_or(0)
+    } else if let Some(data) = read_packaged_database(context, &name).await? {
+        data.len() as u32
+    } else {
         tracing::debug!("db.stat_by_name({name:?}, mode={mode}) -> -22 (not found)");
         return Ok(-22);
-    }
-
-    // Pull record 1's size as the "valid save" indicator the game checks
-    // against 0xC7 in v2[2].
-    let db = system.platform().database_repository().open(&name, &pid).await;
-    let record_size = db.get(1).await.map(|x| x.len() as u32).unwrap_or(0);
+    };
 
     if out_buf != 0 {
         write_generic(context, out_buf, 0u32)?;
@@ -601,32 +614,42 @@ pub async fn stat_by_name_ktf(context: &mut dyn WIPICContext, name_ptr: WIPICWor
     Ok(0)
 }
 
-/// KTF custom slot 16 — `MC_dbExists(name)`. Observed call shape across
-/// multiple titles is `(name_ptr, 1, size_hint_or_zero, callback_garbage)`.
-/// Titles call it before deciding whether to take the load or fresh-init
-/// path. Returning 1 unconditionally makes them try to load nonexistent
-/// state on first run and trip later, so we read the C string at `a0` and
-/// answer based on the real persisted state.
+/// KTF custom slot 16 — `MC_dbExists(name, 1, …)`. **0 = the DB exists, -12
+/// (`M_E_NOENT`) = it does not** — the same 0-is-success convention as slot 5
+/// (`stat_by_name_ktf`) and LGT's `exists_database`.
+///
+/// The polarity is read off the guests, not guessed. Over the 266 KTF archives in
+/// the local corpus, 19 titles reach this slot at boot; 18 test the result with
+/// `cmp r0, #0` right after the call (the 19th branches first and was not
+/// decoded), and 15 of those fold it straight into `ret == 0`. 155972cac664's own wrapper
+/// (`0x148960`) is `return MC_dbExists(name, 1) == 0`, and a `1` from it sends
+/// the title down the load path (`stat` then open `Config.dat` in read mode) —
+/// so 0 is «exists». This slot used to answer 1/0, i.e. inverted: «exists» for
+/// every missing DB and «missing» for every saved one.
+///
+/// A packaged `P/` file counts as existing (see `read_packaged_database`) — that
+/// title ships `FirstRun.dat`/`Certification.dat`/`Config.dat` there and reads
+/// them on first launch.
 pub async fn exists_database_ktf(context: &mut dyn WIPICContext, name_ptr: WIPICWord, _arg1: i32, _arg2: i32) -> Result<i32> {
     let name = match read_null_terminated_string_bytes(context, name_ptr) {
         Ok(bytes) => match String::from_utf8(bytes) {
             Ok(s) => s,
             Err(_) => {
-                tracing::warn!("MC_dbExists invalid utf8 name @ {name_ptr:#x}, defaulting to 0");
-                return Ok(0);
+                tracing::warn!("MC_dbExists invalid utf8 name @ {name_ptr:#x}, answering not-found");
+                return Ok(-12);
             }
         },
         Err(_) => {
-            tracing::warn!("MC_dbExists unreadable name @ {name_ptr:#x}, defaulting to 0");
-            return Ok(0);
+            tracing::warn!("MC_dbExists unreadable name @ {name_ptr:#x}, answering not-found");
+            return Ok(-12);
         }
     };
 
     let system = context.system();
     let pid = system.pid().to_owned();
-    let exists = system.platform().database_repository().exists(&name, &pid).await;
+    let exists = system.platform().database_repository().exists(&name, &pid).await || read_packaged_database(context, &name).await?.is_some();
 
-    let result = if exists { 1 } else { 0 };
+    let result = if exists { 0 } else { -12 }; // M_E_NOENT
     tracing::debug!("MC_dbExists({name:?}) -> {result}");
     Ok(result)
 }
@@ -664,7 +687,23 @@ async fn get_database_from_db_id(context: &mut dyn WIPICContext, db_id: i32) -> 
     Ok(open_db_for_handle(context, &handle).await)
 }
 
+/// The bytes a database named `name` starts from when nothing has been saved yet.
+///
+/// Two sources, in order: a context resource (LGT's jar), then an archive file the
+/// emulator loaded into the filesystem's virtual layer — KTF zips ship their initial
+/// save data under `P/` (e.g. `P/Config.dat`) and `wie_ktf::emulator::load` puts it
+/// there with the `P/` stripped, where KTF's resource lookup (jar only) cannot see it.
+/// Only the *packaged* bytes count: a file the guest wrote through the file API is
+/// not a database.
 async fn read_packaged_database(context: &mut dyn WIPICContext, name: &str) -> Result<Option<Vec<u8>>> {
+    if let Some(data) = read_packaged_resource(context, name).await? {
+        return Ok(Some(data));
+    }
+
+    Ok(context.system().filesystem().virtual_file(name))
+}
+
+async fn read_packaged_resource(context: &mut dyn WIPICContext, name: &str) -> Result<Option<Vec<u8>>> {
     if context.get_resource_size(name).await?.is_none() {
         return Ok(None);
     }
@@ -680,11 +719,11 @@ mod tests {
     use wie_backend::{DefaultTaskRunner, System};
     use wie_util::{ByteRead, ByteWrite};
 
-    use crate::context::test::TestContext;
+    use crate::context::{WIPICContext, test::TestContext};
 
     use super::{
-        KTF_DATABASE_STORAGE_LIMIT, delete_database, exists_database, list_databases, list_record_info, open_database, select_record, sort_records,
-        stream_read, stream_write, update_record,
+        KTF_DATABASE_STORAGE_LIMIT, delete_database, exists_database, exists_database_ktf, list_databases, list_record_info, open_database,
+        select_record, sort_records, stat_by_name_ktf, stream_read, stream_write, update_record,
     };
 
     /// KTF database slot 8 refuses, and refuses **without touching guest memory**.
@@ -875,6 +914,64 @@ mod tests {
         let mut data = [0; 9];
         context.read_bytes(0x2000, &mut data).unwrap();
         assert_eq!(&data, b"seed-data");
+    }
+
+    /// KTF slot 16 answers 0 for «exists» and -12 for «missing» — the polarity the
+    /// guests test (`cmp r0, #0` → `ret == 0`). A saved DB and a packaged `P/` file
+    /// both count; a name found nowhere does not.
+    #[futures_test::test]
+    async fn ktf_exists_is_zero_for_saved_or_packaged_and_noent_otherwise() {
+        let mut context = database_test_context();
+        context.system().filesystem().add_virtual("Config.dat", b"cfg-00".to_vec());
+        context.write_bytes(0x1000, b"Config.dat\0").unwrap();
+        context.write_bytes(0x1100, b"Save0.dat\0").unwrap();
+
+        assert_eq!(exists_database_ktf(&mut context, 0x1000, 1, 0).await.unwrap(), 0);
+        assert_eq!(exists_database_ktf(&mut context, 0x1100, 1, 0).await.unwrap(), -12);
+
+        let db_id = open_database(&mut context, 0x1100, 4, 1).await.unwrap();
+        assert!(db_id > 0);
+        assert_eq!(exists_database_ktf(&mut context, 0x1100, 1, 0).await.unwrap(), 0);
+    }
+
+    /// A packaged `P/` file is a DB the title can stat and read before it ever saves:
+    /// stat reports the shipped size, a read-mode open (mode 1) is seeded with the
+    /// shipped bytes instead of failing with M_E_NOENT.
+    #[futures_test::test]
+    async fn ktf_packaged_p_file_is_stat_and_read_as_a_seeded_database() {
+        let mut context = database_test_context();
+        context.system().filesystem().add_virtual("Config.dat", b"cfg-00".to_vec());
+        context.write_bytes(0x1000, b"Config.dat\0").unwrap();
+
+        assert_eq!(stat_by_name_ktf(&mut context, 0x1000, 0x1800, 1, 0).await.unwrap(), 0);
+        let mut size = [0; 4];
+        context.read_bytes(0x1808, &mut size).unwrap();
+        assert_eq!(u32::from_le_bytes(size), 6);
+
+        let db_id = open_database(&mut context, 0x1000, 1, 1).await.unwrap();
+        assert!(db_id > 0);
+        assert_eq!(stream_read(&mut context, db_id, 0x2000, 6).await.unwrap(), 6);
+        let mut data = [0; 6];
+        context.read_bytes(0x2000, &mut data).unwrap();
+        assert_eq!(&data, b"cfg-00");
+    }
+
+    /// Mode 4 is a create: a name backed only by a `P/` file starts empty, as it
+    /// would with no package, and the shipped bytes are left untouched — so a title
+    /// that re-saves over a packaged name still truncates.
+    #[futures_test::test]
+    async fn ktf_create_mode_over_packaged_p_file_starts_empty() {
+        let mut context = database_test_context();
+        context.system().filesystem().add_virtual("FirstRun.dat", b"\x01\0\0\0".to_vec());
+        context.write_bytes(0x1000, b"FirstRun.dat\0").unwrap();
+
+        let db_id = open_database(&mut context, 0x1000, 4, 1).await.unwrap();
+        assert!(db_id > 0);
+        assert_eq!(stream_read(&mut context, db_id, 0x2000, 4).await.unwrap(), -23); // M_E_EOF — nothing seeded
+        assert_eq!(
+            context.system().filesystem().virtual_file("FirstRun.dat").as_deref(),
+            Some(&b"\x01\0\0\0"[..])
+        );
     }
 
     fn database_test_context() -> TestContext {
