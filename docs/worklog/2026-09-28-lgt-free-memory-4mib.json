@@ -1,0 +1,12 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-27-wie-census-lgt-first-run-notice-unk13-0x68-adopt-p1",
+  "title": "LGT MC_knlGetFreeMemory/GetTotalMemory = 4MiB · KTF 1MiB 유지",
+  "summary": "LGT 한 타이틀의 «메모리 부족» 종료(임계 1,500,000)를 LGT 전용 4MiB 응답으로 해소. 공유 상수 인상은 KTF 한 타이틀이 1.2MB 이상에서 부팅 중 죽어 기각.",
+  "changes": ["wie-lgt/src/runtime/wipi_c.rs — get_memory · 시험 1", "docs/report/0341"],
+  "verification": ["KTF+LGT 344 sha 전/후 · 호출 77종 값 스윕 1/2/4/8MiB — docs/report/0341"],
+  "limits": ["실기 사양 근거 없음 — 값은 LGT 스윕 무변화 구간에서 골랐다", "측정 load1 19–160"],
+  "proposals": [],
+  "adoptedProposals": ["2026-09-27-wie-census-lgt-first-run-notice-unk13-0x68#p1"]
+}
