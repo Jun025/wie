@@ -17,8 +17,12 @@ use wie_backend::{AudioCommand, AudioEventData, AudioHandle, AudioSink};
 const WORKLET_SOURCE: &str = include_str!("audio_worklet.js");
 const PROCESSOR_NAME: &str = "wie-audio";
 /// spessasynth_core, bundled by `scripts/build-soundfont-prelude.mjs` and embedded by `build.rs`;
-/// empty in any build that did not go through `scripts/build-wasm.sh`. It runs ahead of
-/// [`WORKLET_SOURCE`] in the same Blob module and only publishes `globalThis.wieSoundfont`.
+/// empty in any build that did not go through `scripts/build-wasm.sh`. It only publishes
+/// `globalThis.wieSoundfont`, and is loaded as a SECOND module into the worklet's global scope once
+/// the soundfont file has arrived — never with [`WORKLET_SOURCE`]. Evaluating it costs ~100 ms of
+/// audio-thread CPU (stb-vorbis decodes its embedded wasm from base64 without `atob`, which the
+/// `AudioWorkletGlobalScope` lacks); until 2026-09-28 it rode in the same Blob, so with a URL the
+/// first `Play` queued behind that evaluation. Loaded afterwards, the first sound cannot wait for it.
 const SOUNDFONT_PRELUDE: &str = include_str!(concat!(env!("OUT_DIR"), "/soundfont_prelude.js"));
 
 /// How many handles' sequences the worklet keeps. A handle's events cross to the audio thread once
@@ -53,11 +57,12 @@ const RESIDENT_SEQUENCES: usize = 32;
 /// and PCM alike. When no context is supplied, every method is a no-op.
 ///
 /// With a soundfont URL (and a build carrying [`SOUNDFONT_PRELUDE`]), the first `Play` also starts
-/// a background fetch of that file; when it arrives it is handed to the worklet, and every play
-/// that starts after it parses renders its MIDI through the soundfont (operator A/B verdict, see
-/// `audio_worklet.js`). The first sound never waits for it, and any failure — fetch, HTTP status,
-/// parse — leaves the FM synth playing, which is what no URL means too. Without a URL the worklet
-/// module is byte-for-byte the one loaded before the soundfont existed.
+/// a background fetch of that file; when it arrives, the prelude is loaded as a second worklet
+/// module and the file is handed to the worklet, and every play that starts after it parses renders
+/// its MIDI through the soundfont (operator A/B verdict, see `audio_worklet.js`). The first sound
+/// never waits for any of it, and any failure — fetch, HTTP status, prelude load, parse — leaves the
+/// FM synth playing, which is what no URL means too. The worklet module is byte-for-byte the one
+/// loaded before the soundfont existed, URL or not.
 pub struct WebAudioSink {
     state: Option<Rc<RefCell<State>>>,
 }
@@ -76,14 +81,20 @@ struct State {
     soundfont: Soundfont,
 }
 
+/// `Off` is terminal. Otherwise: `NotRequested` → (first play) `Requested` → (file in hand)
+/// `Arrived` while the worklet module still loads, else straight on → `Prelude` → `Posted`. A failure
+/// anywhere ends the chain with a warning and the FM synth; `scripts/contract-roundtrip.mjs`
+/// Scenario S drives every arrow of this in a browser.
 enum Soundfont {
     /// No URL, or a build without the prelude: FM only, nothing is ever fetched.
     Off,
     /// Fetched after the first play.
     NotRequested(String),
     Requested,
-    /// Arrived while the worklet module was still loading; posted once the node exists.
+    /// Arrived while the worklet module was still loading; the prelude load starts once the node exists.
     Arrived(ArrayBuffer),
+    /// The prelude module is loading; the file is posted when it resolves.
+    Prelude,
     Posted,
 }
 
@@ -186,16 +197,8 @@ fn start_worklet(state: &Rc<RefCell<State>>) -> Result<(), JsValue> {
     let ctx = state.borrow().ctx.clone();
     let worklet = ctx.audio_worklet()?;
 
-    let options = BlobPropertyBag::new();
-    options.set_type("text/javascript");
-    // The prelude rides along only when a soundfont can actually be used, so with no URL the
-    // module is exactly the FM-only one.
-    let parts = match state.borrow().soundfont {
-        Soundfont::Off => Array::of1(&JsValue::from_str(WORKLET_SOURCE)),
-        _ => Array::of2(&JsValue::from_str(SOUNDFONT_PRELUDE), &JsValue::from_str(WORKLET_SOURCE)),
-    };
-    let blob = Blob::new_with_str_sequence_and_options(&parts, &options)?;
-    let url = Url::create_object_url_with_blob(&blob)?;
+    // Alone, with or without a URL: the prelude is a later module (see `load_prelude`).
+    let url = module_url(WORKLET_SOURCE)?;
     let promise = worklet.add_module(&url)?;
 
     let ready_state = state.clone();
@@ -215,11 +218,11 @@ fn start_worklet(state: &Rc<RefCell<State>>) -> Result<(), JsValue> {
                 // Only a buffer that arrived while loading moves on — any other state stays put
                 // (swapping unconditionally here once turned `NotRequested` into `Posted` before the
                 // first play, so the soundfont was never fetched; caught by the browser run, see
-                // the round's report).
+                // the round's report — and now by contract-roundtrip.mjs Scenario S3).
                 if matches!(state.soundfont, Soundfont::Arrived(_))
-                    && let Soundfont::Arrived(buffer) = core::mem::replace(&mut state.soundfont, Soundfont::Posted)
+                    && let Soundfont::Arrived(buffer) = core::mem::replace(&mut state.soundfont, Soundfont::Prelude)
                 {
-                    state.post_soundfont(&buffer);
+                    load_prelude(&ready_state, &state, buffer);
                 }
             }
             Err(error) => {
@@ -240,6 +243,43 @@ fn start_worklet(state: &Rc<RefCell<State>>) -> Result<(), JsValue> {
     on_error.forget();
 
     Ok(())
+}
+
+fn module_url(source: &str) -> Result<String, JsValue> {
+    let options = BlobPropertyBag::new();
+    options.set_type("text/javascript");
+    let blob = Blob::new_with_str_sequence_and_options(&Array::of1(&JsValue::from_str(source)), &options)?;
+    Url::create_object_url_with_blob(&blob)
+}
+
+/// Loads [`SOUNDFONT_PRELUDE`] as a second module into the worklet's global scope (where it
+/// publishes `globalThis.wieSoundfont` for the processor that already exists), then hands the
+/// soundfont to the worklet. Called with the node created and `state.soundfont` already `Prelude`.
+fn load_prelude(shared: &Rc<RefCell<State>>, state: &State, buffer: ArrayBuffer) {
+    let promise = state
+        .ctx
+        .audio_worklet()
+        .and_then(|worklet| module_url(SOUNDFONT_PRELUDE).and_then(|url| Ok((worklet.add_module(&url)?, url))));
+    let (promise, url) = match promise {
+        Ok(started) => started,
+        Err(error) => return soundfont_log(false, &format!("prelude could not load: {error:?}")),
+    };
+    let loaded_state = shared.clone();
+    let loaded_url = url.clone();
+    let on_loaded = Closure::once(move |_: JsValue| {
+        let _ = Url::revoke_object_url(&loaded_url);
+        let mut state = loaded_state.borrow_mut();
+        state.soundfont = Soundfont::Posted;
+        state.post_soundfont(&buffer);
+    });
+    let on_error = Closure::once(move |error: JsValue| {
+        let _ = Url::revoke_object_url(&url);
+        soundfont_log(false, &format!("prelude failed to load: {error:?}"));
+    });
+    let _ = promise.then2(&on_loaded, &on_error);
+    // One-shot callbacks owned by the promise from here on.
+    on_loaded.forget();
+    on_error.forget();
 }
 
 /// The soundfont's outcome, on the page console: this crate has no tracing subscriber, and the
@@ -275,8 +315,8 @@ fn fetch_soundfont(state: &Rc<RefCell<State>>, url: &str) -> Result<(), JsValue>
             match &state.mode {
                 Mode::Loading => state.soundfont = Soundfont::Arrived(buffer),
                 Mode::Worklet(_) => {
-                    state.soundfont = Soundfont::Posted;
-                    state.post_soundfont(&buffer);
+                    state.soundfont = Soundfont::Prelude;
+                    load_prelude(&arrived_state, &state, buffer);
                 }
                 Mode::Fallback => {}
             }

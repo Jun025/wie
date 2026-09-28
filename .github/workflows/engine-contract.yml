@@ -317,6 +317,10 @@ jobs:
               # builds the draw fixture the round-trip asserts the blit with —
               # editing it changes what the contract check proves.
               - 'scripts/make-draw-fixture.mjs'
+              # Scenario S's guest and the soundfont it serves (test inputs only — not artifact
+              # inputs, so publish-artifact.yml's on.push.paths rightly does not list them).
+              - 'scripts/make-sound-fixture.mjs'
+              - 'wie-web/public/GeneralUser.sf3'
               # Same reason, for Scenario E: the round-trip READS this script at
               # startup to derive the KTF fixture's bar height and key table, so
               # editing it can make the contract check throw (fail-closed) even

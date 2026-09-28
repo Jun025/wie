@@ -56,13 +56,15 @@ function boot(prelude) {
     console,
   };
   vm.createContext(ctx);
-  // audio.rs puts the prelude and the worklet in ONE Blob module, prelude first.
-  if (prelude) vm.runInContext(prelude, ctx);
   // Each load gets its own scope, as each addModule gets its own module scope; the global (the
   // AudioWorkletGlobalScope) is shared.
   const load = () => vm.runInContext(`(function () {\n${source}\n})();`, ctx);
   load();
   const proc = new Processor();
+  // audio.rs loads the worklet ALONE and the processor exists before the prelude arrives: the prelude
+  // is a second addModule, made only once the soundfont file is in hand (docs/report 0354). So it
+  // runs here after the processor is built, into the same global.
+  if (prelude) vm.runInContext(prelude, ctx);
   return {
     post: (message) => proc.port.onmessage({ data: message }),
     // Renders `seconds` and returns the RMS of the left channel.
@@ -276,12 +278,12 @@ for (const repeat of [true, false]) {
   );
 }
 
-// ---- Soundfont (cases 10-15) -------------------------------------------------------------------
+// ---- Soundfont (cases 10-18) -------------------------------------------------------------------
 const soundfontPath = path.join(root, "wie-web/public/GeneralUser.sf3");
 const haveDeps = existsSync(path.join(root, "node_modules/esbuild")) && existsSync(path.join(root, "node_modules/spessasynth_core"));
 if (!haveDeps || !existsSync(soundfontPath)) {
   const why = !haveDeps ? "root devDependencies not installed (run `npm ci`)" : `${path.relative(root, soundfontPath)} missing`;
-  console.log(`SKIP soundfont cases 10-15 — ${why}. NOT MEASURED.`);
+  console.log(`SKIP soundfont cases 10-18 — ${why}. NOT MEASURED.`);
   if (requireSoundfont) {
     console.error("check-audio-worklet: --require-soundfont but the soundfont cases could not run");
     process.exit(1);
@@ -348,26 +350,37 @@ if (!haveDeps || !existsSync(soundfontPath)) {
     const stats = w.stats();
     check(
       "a new play after the soundfont parses renders through it; the running play stayed FM",
-      reply.ok === true && stats.soundfont === "ready" && stats.synths === 1 && runningStaysFm && rmsOf(sf) > LOUD && !same(sf, fm),
-      `parse ${reply.ms} ms · running play synths 0 → ${runningStaysFm} · new play synths ${stats.synths} · rms sf ${rmsOf(sf).toFixed(4)} vs fm ${rmsOf(fm).toFixed(4)}`,
+      // voices === 0: the soundfont play renders ONLY through its synth. Without it, a play that
+      // reached both synths (sf + FM at once) passed every other term here — sf+fm is not fm either.
+      reply.ok === true && stats.soundfont === "ready" && stats.synths === 1 && stats.voices === 0 && runningStaysFm && rmsOf(sf) > LOUD && !same(sf, fm),
+      `parse ${reply.ms} ms · running play synths 0 → ${runningStaysFm} · new play synths ${stats.synths} · FM voices ${stats.voices} · rms sf ${rmsOf(sf).toFixed(4)} vs fm ${rmsOf(fm).toFixed(4)}`,
     );
   }
 
-  // 13. A non-repeating soundfont play ends: its synth plays out its release and tail, then is dropped.
+  // 13. A non-repeating soundfont play ends: its synth plays out its release and tail, then is pooled.
   {
     w.render(3.0);
     const after = w.render(0.3);
-    check("a soundfont play ends, then its synth is dropped", after < QUIET && w.stats().synths === 0, `rms ${after.toExponential(1)} · synths ${w.stats().synths}`);
+    check("a soundfont play ends, then its synth leaves the render list", after < QUIET && w.stats().synths === 0, `rms ${after.toExponential(1)} · synths ${w.stats().synths}`);
   }
 
-  // 14. Stop silences a looping soundfont play within the FM release time, and drops its synth.
+  // 14. Stop silences a looping soundfont play within the FM release time. Its synth keeps rendering
+  //     unheard for SF_TAIL_S — so its reverb drains before the pool hands it to another play — and
+  //     is then back in the pool.
   {
     w.post({ t: "play", h: 3, r: true, d: 10000, ev: [midi(0, 0xc0, 48), midi(0, 0x90, 64, 110)] });
     const before = w.render(0.3);
     w.post({ t: "stop", h: 3 });
     w.render(0.1);
     const after = w.render(0.3);
-    check("Stop silences a soundfont play and drops its synth", before > LOUD && after < QUIET && w.stats().synths === 0, `rms before ${before.toFixed(4)} · after ${after.toExponential(1)} · synths ${w.stats().synths}`);
+    const draining = w.stats().synths;
+    w.render(1.0);
+    const stats = w.stats();
+    check(
+      "Stop silences a soundfont play; its synth drains unheard, then returns to the pool",
+      before > LOUD && after < QUIET && draining === 1 && stats.synths === 0 && stats.idle >= 1,
+      `rms before ${before.toFixed(4)} · after ${after.toExponential(1)} · draining ${draining} → rendering ${stats.synths} idle ${stats.idle}`,
+    );
   }
 
   // 15. The game's gain scales a soundfont play, and PCM in the same sequence still plays.
@@ -387,6 +400,76 @@ if (!haveDeps || !existsSync(soundfontPath)) {
     w.post({ t: "play", h: 5, r: false, d: 0, ev: [[0, 1, 1, 8000, pcm]] });
     const pcmLevel = w.render(0.2);
     check("gain scales a soundfont play; PCM still plays beside it", Math.abs(ratio - 0.5) < 0.05 && pcmLevel > LOUD, `gain 0.5 → ×${ratio.toFixed(3)} · pcm rms ${pcmLevel.toFixed(4)}`);
+  }
+
+  // The synths are bounded and reused (docs/report 0354). `drain` outlasts a stopped synth's fade +
+  // SF_TAIL_S, after which it is back in the idle pool.
+  const drain = () => w.render(1.3);
+  const loop = (h, note) => w.post({ t: "play", h, r: true, d: 10000, ev: [midi(0, 0xc0, 48), midi(0, 0x90, note, 110)] });
+  drain();
+
+  // 16. Reuse: many plays in a row construct no new synth once the pool holds one — building one
+  //     allocates enough to drop an audio quantum (measured median 3.3 ms vs a 2.67 ms quantum).
+  {
+    const builtBefore = w.stats().built;
+    for (let i = 0; i < 8; i++) {
+      loop(20 + i, 60);
+      w.render(0.1);
+      w.post({ t: "stop", h: 20 + i });
+      drain();
+    }
+    const stats = w.stats();
+    check(
+      "sequential soundfont plays reuse one pooled synth",
+      stats.built === builtBefore && stats.synths === 0 && stats.idle >= 1,
+      `built ${builtBefore} → ${stats.built} over 8 plays · rendering ${stats.synths} · idle ${stats.idle}`,
+    );
+  }
+
+  // 17. A reused synth starts from a fresh MIDI state: a play that muted channel 0 (CC7 = 0), changed
+  //     its program and bent it must not carry into the next play that gets the same synth (the
+  //     pool hands back the most recently returned one).
+  {
+    const probe = (h) => {
+      w.post({ t: "play", h, r: true, d: 10000, ev: [midi(0, 0x90, 64, 110)] }); // no program, no CC: defaults
+      w.render(0.2);
+      const rms = w.render(0.2);
+      w.post({ t: "stop", h });
+      drain();
+      return rms;
+    };
+    const clean = probe(30);
+    w.post({ t: "play", h: 31, r: true, d: 10000, ev: [midi(0, 0xc0, 40), midi(0, 0xb0, 7, 0), midi(0, 0xe0, 0, 0), midi(0, 0x90, 50, 100)] });
+    w.render(0.2);
+    w.post({ t: "stop", h: 31 });
+    drain();
+    const after = probe(32);
+    check("a reused synth does not inherit the previous play's MIDI state", clean > LOUD && Math.abs(after / clean - 1) < 0.1, `rms fresh state ${clean.toFixed(4)} · after a muting play ${after.toFixed(4)} (×${(after / clean).toFixed(3)})`);
+  }
+
+  // 18. The cap: MAX_SF_SYNTHS (3) render at once. A play past it takes a synth that is only playing
+  //     its tail, and with every synth live it plays FM — it still sounds, and the count never grows.
+  {
+    loop(40, 55);
+    loop(41, 59);
+    w.post({ t: "play", h: 42, r: false, d: 100, ev: [midi(0, 0xc0, 0), midi(0, 0x90, 67, 100), midi(100, 0x80, 67, 0)] });
+    w.render(0.5); // 42 has ended; its synth is in its tail
+    const tailing = w.stats();
+    loop(43, 62); // takes 42's synth
+    w.render(0.2);
+    const stolen = w.stats();
+    loop(44, 64); // 40, 41, 43 all live: FM
+    w.render(0.1);
+    const fm = w.render(0.2);
+    const full = w.stats();
+    for (const h of [40, 41, 43, 44]) w.post({ t: "stop", h });
+    drain();
+    const done = w.stats();
+    check(
+      "at most 3 soundfont synths render; past that a tail is taken, then FM",
+      tailing.synths === 3 && stolen.synths === 3 && stolen.voices === 0 && full.synths === 3 && full.voices > 0 && fm > LOUD && full.built <= 3 && done.synths === 0 && done.idle === full.built,
+      `with a tail ${tailing.synths} · after taking it ${stolen.synths} (FM voices ${stolen.voices}) · 4 live plays ${full.synths} synths + ${full.voices} FM voices (rms ${fm.toFixed(4)}) · built ${full.built} · after stop: rendering ${done.synths} idle ${done.idle}`,
+    );
   }
 }
 
