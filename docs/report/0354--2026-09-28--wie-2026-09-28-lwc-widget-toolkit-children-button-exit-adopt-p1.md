@@ -28,3 +28,8 @@ PASS 판정 문구가 «멈춤»을 가리는 점에 주의: `76795f84` 와 변�
 ### 남은 것
 - 현행 `main` 의 이 타이틀 마지막 장면은 한 색인 판이 있다(`last_frame_content: false` — 로그 끈 첫 판). 이번 범위 밖이고 따로 재지 않았다.
 - `wec/DMInfo` 로드 실패 자체는 그대로다. 게스트가 잡아서 넘어가므로 지금은 벽이 아니다.
+
+### 게임 이름 유입
+`node scripts/corpus-name-inflow.mjs` — BOUNDED **0** · SUFFIX-ATTACHED **0**.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=217b6b54abdcefec B=0/0 P=0/0 S=0/0 -->
