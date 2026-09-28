@@ -82,16 +82,33 @@ function boot(prelude) {
       return Math.sqrt(sum / n);
     },
     voices: () => proc.voices.length,
-    // Posts a soundfont buffer and waits for the worklet's { t: "sf" } reply (it parses asynchronously).
+    // Samples of the parsed soundfont that hold decoded audio (what the synths' memory grows by).
+    decodedSamples: () => (proc.bank ? proc.bank.samples.filter((sample) => sample.audioData).length : 0),
+    // Every sample a GM preset's zones hold — what decoding the whole instrument would cost.
+    presetSamples: (program) =>
+      new Set(proc.bank.getPreset({ program, bankMSB: 0, bankLSB: 0, isGMGSDrum: false }, "gs").zones.flatMap((zone) => zone.instrument.zones.map((z) => z.sample))).size,
+    // Posts a soundfont buffer and waits for the worklet's { t: "sf" } reply. Parsing is queued work
+    // that only `process()` runs, so this renders while it waits — as the audio thread would.
     async soundfont(buffer) {
       const before = replies.length;
       proc.port.onmessage({ data: { t: "sf", data: buffer } });
       for (let spin = 0; spin < 2000; spin++) {
         const reply = replies.slice(before).find((message) => message.t === "sf");
         if (reply) return reply;
-        await new Promise((resolve) => setTimeout(resolve, 5));
+        this.render(0.05);
+        await new Promise((resolve) => setTimeout(resolve, 1));
       }
       throw new Error("no sf reply from the worklet");
+    },
+    // Renders until the worklet's work queue (decoding, synth construction) is empty; returns the
+    // seconds of audio that took.
+    settle() {
+      let seconds = 0;
+      while (proc.work.length && seconds < 60) {
+        this.render(0.05);
+        seconds += 0.05;
+      }
+      return seconds;
     },
     // Renders `seconds` and returns the left channel itself (for exact comparisons).
     samples(seconds) {
@@ -332,8 +349,12 @@ if (!haveDeps || !existsSync(soundfontPath)) {
     );
   }
 
-  // 12. After it parses, a NEW play renders through the soundfont; a play already running stays FM
-  //     until it is played again.
+  // 12. After it parses, a NEW play renders through the soundfont once its instruments are decoded:
+  //     the first play of an undecoded instrument is FM (decoding a whole instrument inside a play
+  //     held the audio thread 156 ms on an Android emulator — docs/report 0359) and queues exactly
+  //     the samples its notes reach; the next play uses the soundfont. A play already running stays
+  //     FM until it is played again, and a sequence resident when the soundfont arrives is queued
+  //     then, without waiting for a play.
   const w = boot(prelude);
   {
     w.post({ t: "play", h: 0, r: true, d: 10000, ev: [midi(0, 0xc0, 16), midi(0, 0x90, 60, 90)] });
@@ -341,21 +362,57 @@ if (!haveDeps || !existsSync(soundfontPath)) {
     const reply = await w.soundfont(bank());
     const runningStaysFm = w.stats().synths === 0 && w.render(0.1) > LOUD;
     w.post({ t: "stop", h: 0 });
+    w.settle();
+    const afterResident = w.decodedSamples();
     w.render(0.3);
     w.post({ t: "play", h: 1, r: false, d: 600, ev: song() });
+    const first = w.stats(); // the play message itself decodes nothing: it is FM and queued
+    // Quantum by quantum: at most one work item per `process()` — a whole instrument in one call is
+    // the stall this exists to remove.
+    const blocks = [];
+    let maxPerQuantum = 0;
+    for (let i = 0, left = first.work; i < (0.4 * RATE) / BLOCK; i++) {
+      blocks.push(w.samples(BLOCK / RATE));
+      const now = w.stats().work;
+      maxPerQuantum = Math.max(maxPerQuantum, left - now);
+      left = now;
+    }
+    const firstFm = Float32Array.from(blocks.flatMap((b) => [...b]));
+    w.settle();
+    const decoded = w.decodedSamples();
+    w.render(0.5);
+    w.post({ t: "play", h: 1, r: false, d: 600 });
     const sf = w.samples(0.4);
+    const decodedBySf = w.decodedSamples() - decoded; // the synth found everything already decoded
     const fmBoot = boot();
     fmBoot.post({ t: "play", h: 1, r: false, d: 600, ev: song() });
     const fm = fmBoot.samples(0.4);
     const stats = w.stats();
     check(
-      "a new play after the soundfont parses renders through it; the running play stayed FM",
+      "an undecoded instrument's first play is FM and queues its samples; its next play renders through the soundfont",
       // voices === 0: the soundfont play renders ONLY through its synth. Without it, a play that
       // reached both synths (sf + FM at once) passed every other term here — sf+fm is not fm either.
-      reply.ok === true && stats.soundfont === "ready" && stats.synths === 1 && stats.voices === 0 && runningStaysFm && rmsOf(sf) > LOUD && !same(sf, fm),
-      `parse ${reply.ms} ms · running play synths 0 → ${runningStaysFm} · new play synths ${stats.synths} · FM voices ${stats.voices} · rms sf ${rmsOf(sf).toFixed(4)} vs fm ${rmsOf(fm).toFixed(4)}`,
+      reply.ok === true && afterResident > 0 && runningStaysFm &&
+        first.synths === 0 && first.work > 0 && same(firstFm, fm) && maxPerQuantum === 1 && decodedBySf === 0 &&
+        stats.soundfont === "ready" && stats.synths === 1 && stats.voices === 0 && rmsOf(sf) > LOUD && !same(sf, fm),
+      `parse ${reply.ms} ms · resident sequence decoded without a play ${afterResident} · running play stays FM ${runningStaysFm} · ` +
+        `first play synths ${first.synths} work ${first.work} FM-identical ${same(firstFm, fm)} · work items per quantum ≤ ${maxPerQuantum} · decoded ${decoded} samples · ` +
+        `next play decodes ${decodedBySf} more · synths ${stats.synths} · FM voices ${stats.voices} · rms sf ${rmsOf(sf).toFixed(4)} vs fm ${rmsOf(fm).toFixed(4)}`,
     );
+    // Memory: only the samples the notes reach — what the synth's own lazy decoding would have kept.
+    const piano = w.presetSamples(0);
+    check("decoding stops at the samples the notes reach, not the whole instrument", decoded > afterResident && decoded < piano, `decoded samples ${decoded} · the piano preset holds ${piano}`);
   }
+
+  // Instruments later cases use, decoded the way a game gets them decoded: one FM play, then the work.
+  const warm = (ev) => {
+    w.post({ t: "play", h: 99, r: false, d: 100, ev });
+    w.render(0.1);
+    w.post({ t: "stop", h: 99 });
+    w.post({ t: "evict", h: 99 });
+    w.settle();
+  };
+  warm([midi(0, 0xc0, 48), ...[55, 59, 60, 62, 64].map((n) => midi(0, 0x90, n, 110)), midi(0, 0xc0, 40), midi(0, 0x90, 50, 100), midi(0, 0xc0, 0), midi(0, 0x90, 64, 110), midi(0, 0x90, 67, 100)]);
 
   // 13. A non-repeating soundfont play ends: its synth plays out its release and tail, then is pooled.
   {
@@ -391,7 +448,7 @@ if (!haveDeps || !existsSync(soundfontPath)) {
       w.render(0.2);
       const rms = w.render(0.2);
       w.post({ t: "stop", h: 4 });
-      w.render(0.2);
+      w.render(1.3); // back in the pool: a synth that would have to be built makes the play FM
       return rms;
     };
     const ratio = level(0.5) / level(undefined);
@@ -450,6 +507,11 @@ if (!haveDeps || !existsSync(soundfontPath)) {
   // 18. The cap: MAX_SF_SYNTHS (3) render at once. A play past it takes a synth that is only playing
   //     its tail, and with every synth live it plays FM — it still sounds, and the count never grows.
   {
+    // Three synths exist first: a play that needs one built is FM (case 12's rule, for synths).
+    for (const h of [40, 41, 42]) loop(h, 60);
+    w.settle();
+    for (const h of [40, 41, 42]) w.post({ t: "stop", h });
+    drain();
     loop(40, 55);
     loop(41, 59);
     w.post({ t: "play", h: 42, r: false, d: 100, ev: [midi(0, 0xc0, 0), midi(0, 0x90, 67, 100), midi(100, 0x80, 67, 0)] });

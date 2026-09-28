@@ -21,6 +21,10 @@
 //             ★Under the emulator (-no-audio) it swings by seconds either way, control runs included —
 //             read gapMax/procMax against baseLatency there (docs/report 0359).
 //   firstMs   play message → first non-silent output sample, wall clock (plays only).
+//   synths    soundfont synths rendering at the end of a play phase: ≥1 = that play used the
+//             soundfont, 0 = it played FM (an instrument not decoded yet plays FM — docs/report 0360).
+//   --worklet <file> measures another worklet (e.g. `git show origin/main:wie_featurephone/src/audio_worklet.js`)
+//             for a before/after pair on the same prelude and soundfont.
 // A soundfont row minus the same row of an --control run is the soundfont's own cost.
 // Date.now() in the worklet has 1 ms resolution; the render quantum is 128 frames (2.67 ms at 48 kHz).
 import { createServer } from "node:http";
@@ -41,7 +45,7 @@ const runs = Number(arg("--runs", "3"));
 const control = process.argv.includes("--control");
 
 const files = {
-  "/worklet.js": [path.join(root, "wie_featurephone/src/audio_worklet.js"), "text/javascript"],
+  "/worklet.js": [path.resolve(arg("--worklet", path.join(root, "wie_featurephone/src/audio_worklet.js"))), "text/javascript"],
   "/prelude.js": [path.join(root, "target/wie-soundfont/soundfont_prelude.js"), "text/javascript"],
   "/GeneralUser.sf3": [path.join(root, "wie-web/public/GeneralUser.sf3"), "application/octet-stream"],
 };
@@ -116,7 +120,7 @@ window.runProbe = async (fm) => {
   for (const [prog, ch, label] of progs) {
     await sleep(1300); // past STOP_RELEASE_S + SF_TAIL_S so the synth is back in the pool
     const hh = h++;
-    await phase("sf play " + label, async () => { node.port.postMessage({ t: "gain", h: hh, g: 1 }); node.port.postMessage(note(hh, prog, ch)); await sleep(900); });
+    await phase("sf play " + label, async () => { node.port.postMessage({ t: "gain", h: hh, g: 1 }); node.port.postMessage(note(hh, prog, ch)); await sleep(900); return { synths: (await ask("stats")).synths }; });
     node.port.postMessage({ t: "stop", h: hh });
   }
   const stats = await ask("stats");
