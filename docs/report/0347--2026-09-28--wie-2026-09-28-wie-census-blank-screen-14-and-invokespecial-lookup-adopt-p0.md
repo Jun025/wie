@@ -66,4 +66,4 @@ main(`24bfcfad`, #374 포함) 재측 — 전(`56b2d5f9`)과 같은 시각 짝 ·
 
 게임 파일명 유입(`corpus-name-inflow --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 0회/0쌍 · SUFFIX-ATTACHED 0회/0쌍.
 
-<!-- corpus-name-inflow v1 subjects=2 tree=f4329b2b3215a526 B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=2 tree=ce9384058c5eeea8 B=0/0 P=0/0 S=0/0 -->
