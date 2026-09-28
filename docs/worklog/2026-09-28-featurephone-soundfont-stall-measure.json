@@ -1,0 +1,29 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-28-featurephone-soundfont-lazy-load-adopt-p1",
+  "root": "2026-09-27-featurephone-soundfont-path-decision",
+  "title": "사운드폰트 전환 순간의 끊김 — Android 에뮬레이터 측정",
+  "summary": "출하 워클릿을 고치지 않고 감싸 재는 도구(scripts/soundfont-stall-probe.mjs)로 galaxy-s24 에뮬레이터 Chrome 124 에서 7쌍(사운드폰트↔FM 대조) 측정. 악기 첫 사용 때 샘플 해독이 렌더 1회를 중앙 156 ms 잡아 출력 버퍼(90.8 ms)를 넘기고, 첫 소리는 대조보다 약 200 ms 늦다. 판정: 끊김이 크다.",
+  "changes": ["scripts/soundfont-stall-probe.mjs (새 · 로컬 전용)", "docs/report/0359"],
+  "verification": [
+    "에뮬레이터 7쌍: 첫 사운드폰트 Play procMax 156 (42–605) ms ↔ 대조 1 · firstMs 258 ↔ 57 · 파싱 382 (106–3207) ms",
+    "데스크톱 헤드리스 3쌍: procMax 9 ↔ 1 · 파싱 37 ms",
+    "메모리: 전 샘플 해독 61.1 MB · 악기별 0.28–4.68 MB"
+  ],
+  "limits": ["실기 미검증: Galaxy S24 실기 · iOS Safari", "호스트 load1 40–241 — 에뮬레이터 수치가 부풀어 있다"],
+  "adoptedProposals": ["2026-09-28-featurephone-soundfont-lazy-load#p1"],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "처음 쓰는 악기는 한 번 FM 으로 내고, 그동안 조금씩 해독해 다음부터 사운드폰트로",
+      "plainSummary": "지금은 사운드폰트로 처음 쓰는 악기의 소리를 내는 순간 그 악기 녹음을 한꺼번에 풀어서 소리가 끊긴다. 그 한 번은 기존 FM 소리로 내고, 뒤에서 조금씩 풀어 두었다가 다음 재생부터 사운드폰트 소리를 쓰게 한다.",
+      "userBenefit": "휴대폰에서 게임 음악이 바뀌는 순간 소리가 뚝 끊기거나 늦게 나오지 않는다.",
+      "why": "에뮬레이터에서 악기 첫 사용 때 렌더 1회가 중앙 156 ms(최대 605) 오디오 스레드를 잡아 출력 버퍼 90.8 ms 를 넘겼고, 같은 악기 두 번째는 20 ms 로 떨어졌다(docs/report 0359). 원인은 sf3 샘플의 첫 사용 해독이다. 재생 중에는 합성기를 바꾸지 않는다는 기존 규칙과 같은 모양이라 들리는 변화가 작다.",
+      "tradeoff": "각 악기의 첫 재생 1회는 FM 음색으로 난다. 메모리는 지금과 같다(쓰는 악기만 해독 · 전부 미리 해독하면 61 MB). 워클릿 상태가 하나 는다(해독 대기 목록).",
+      "effort": "M",
+      "target": "wie",
+      "kind": "product"
+    }
+  ]
+}
