@@ -58,6 +58,7 @@ embeds the engine as WASM. Nothing above the engine is allowed to reach back int
 | `wie_featurephone` | Browser host (renamed from `wie_web` 2026-09-11 — upstream uses that name for its own web app). Compiles to an empty library off `wasm32` on purpose, so native workspace jobs stay green. |
 | `wie_ktf_dump` | Dev-only binary: dumps a KTF game's relocated `client.bin` for IDA/Ghidra. |
 | `test_utils` | Shared in-memory `Platform`/`Filesystem`/`Database`/JVM fixtures for tests. |
+| `patches/classfile` | Vendored crates.io `classfile` 0.1.1 with one fix (modified UTF-8 in class constants), applied by the root `[patch.crates-io]`. Its `README.md` says when to delete it. |
 
 ### Non-Rust surfaces
 

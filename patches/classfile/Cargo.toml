@@ -1,0 +1,15 @@
+# Vendored copy of crates.io `classfile` 0.1.1 (dlunch/RustJava @ 78ffcd7d, path `classfile`),
+# applied through `[patch.crates-io]` in the workspace root. One change: modified UTF-8 in
+# CONSTANT_Utf8 (src/constant_pool.rs `decode_modified_utf8`). Why and when to drop it: README.md.
+[package]
+name = "classfile"
+description = "A no_std parser and validator for Java class files"
+version = "0.1.1"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/dlunch/RustJava"
+publish = false
+
+[dependencies]
+jvm-types = { version = "0.1.1" }
+nom = { version = "^8.0", default-features = false, features = ["alloc"] }
