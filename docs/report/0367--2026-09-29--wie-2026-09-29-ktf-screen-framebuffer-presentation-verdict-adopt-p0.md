@@ -55,3 +55,6 @@
 ### 검증
 - `cargo fmt --all -- --check` · `cargo clippy --all -- -D warnings`(stable·beta) · wasm32 clippy · `RUST_MIN_STACK=4194304 cargo test --all`(588 passed · 0 failed) rc=0.
 - 러너 블록: draw_j2me · helloworld_ktf · helloworld_lgt · keydraw_ktf(rc=0) · text_j2me PASS. keydraw_lgt 첫 판 `UNMEASURED`(load1 ~370 굶주림) → 재측 2회 `PASS` · stop deadline · 27/27 키 · rc=0.
+- `node scripts/corpus-name-inflow.mjs`: BOUNDED **5쌍(6회)** + SUFFIX-ATTACHED **0쌍**. 5쌍 전부 이 회차가 고친 파일의 **기존 줄**이다
+  (`system.rs`·`display.rs` 의 페이싱 주석 · `graphics.rs` 의 null-guard 주석) — `git diff origin/main...HEAD` 의 추가·삭제 줄에서 그 이름 0회.
+  이 회차가 새로 들인 타이틀 표기는 sha 앞 12자뿐이다.
