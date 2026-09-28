@@ -7,10 +7,10 @@
   "changes": [
     "wie-wipi-c/src/api/database.rs — read_packaged_database P/ 폴백 · stat/exists KTF · open mode 4 는 P/ 시드 제외 · 시험 3",
     "wie-backend/src/system/file_system.rs — FilesystemOverlay::virtual_file",
-    "docs/report/0340"
+    "docs/report/0342"
   ],
   "verification": [
-    "KTF 266종 전/후 + 나빠진 17종·DB 닿는 10종 3회 재측 — 회귀 0 (docs/report/0340)",
+    "KTF 266종 전/후 + 나빠진 17종·DB 닿는 10종 3회 재측 — 회귀 0 (docs/report/0342)",
     "변이 3건 각각 red",
     "엔진 러너 블록 전건 PASS"
   ],
