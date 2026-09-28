@@ -6,7 +6,7 @@
 // play, prelude module, hand-over to the worklet) is wasm-only, so neither `cargo test` nor
 // scripts/check-audio-worklet.mjs runs it, and until 2026-09-28 no committed fixture made a sound
 // at all. It broke once already (the soundfont was never fetched) while every node case was green
-// (docs/report 0349, 0354).
+// (docs/report 0349, 0355).
 //
 // What it does: a MIDlet shows a Canvas; every keyPressed() prints SOUND_MARK on stdout, then
 // plays SMAF_BYTES through `Manager.createPlayer(InputStream, "application/vnd.smaf").start()` —

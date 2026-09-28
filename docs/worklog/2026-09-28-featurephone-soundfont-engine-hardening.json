@@ -14,7 +14,7 @@
   ],
   "verification": [
     "check-audio-worklet --require-soundfont 19/19 · 워클릿 변이 5종 전부 red",
-    "contract-roundtrip 65/65 · Rust/워클릿 변이 4종(재빌드) — docs/report 0354",
+    "contract-roundtrip 65/65 · Rust/워클릿 변이 4종(재빌드) — docs/report 0355",
     "첫 모듈 적재 Chromium 중앙 34.1 ms(종전 URL 있음) → 7.5 ms · 합성기 3개 CPU 12.4%"
   ],
   "limits": [

@@ -724,7 +724,7 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     g2.emu.free();
     check("G2: free() (no throw)", true);
 
-    // ── Scenario S: the audio sink's soundfont path, end to end (docs/report 0354) ─────
+    // ── Scenario S: the audio sink's soundfont path, end to end (docs/report 0355) ─────
     // wie_featurephone/src/audio.rs's soundfont state machine (Off / NotRequested / Requested /
     // Arrived / Prelude / Posted) is wasm-only: no cargo test and no node case reaches it, and it
     // broke once while all of those were green (the soundfont was never fetched). This drives it

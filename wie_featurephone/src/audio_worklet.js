@@ -26,7 +26,7 @@
 // `globalThis.wieSoundfont`) and the host passed a soundfont URL, audio.rs fetches it after the first
 // play, loads the prelude as a SECOND module into this same global scope, and only then posts the
 // file here — this module is always loaded alone, so the first sound never waits for the prelude
-// (docs/report 0354). From the moment it has parsed, each NEW play renders its MIDI through a
+// (docs/report 0355). From the moment it has parsed, each NEW play renders its MIDI through a
 // SpessaSynthProcessor of its own (so each handle keeps its own 16 channels, and Stop and the game's
 // gain stay per handle, as with FM). A playback already running keeps FM until it is played again —
 // no mid-note switch. PCM always stays on the path below. No prelude, no URL, a failed fetch or a
@@ -61,7 +61,7 @@ const SF_GAIN = 2.7;
 // How long a soundfont synth keeps rendering after its last voice ends: its reverb/chorus tail.
 const SF_TAIL_S = 1.0;
 // At most this many soundfont synths render at once (sounding, fading, or playing their tail). One
-// synth costs ~3-4% of a core in CPU time, ~90% of it effects (docs/report 0354 has the table), so 3
+// synth costs ~3-4% of a core in CPU time, ~90% of it effects (docs/report 0355 has the table), so 3
 // bounds the soundfont at ~12% on the desktop it was measured on — BGM plus two MIDI effects at once.
 // A 4th concurrent MIDI play takes the slot of a synth that is only playing its tail, else plays FM.
 const MAX_SF_SYNTHS = 3;

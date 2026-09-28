@@ -62,7 +62,7 @@ function boot(prelude) {
   load();
   const proc = new Processor();
   // audio.rs loads the worklet ALONE and the processor exists before the prelude arrives: the prelude
-  // is a second addModule, made only once the soundfont file is in hand (docs/report 0354). So it
+  // is a second addModule, made only once the soundfont file is in hand (docs/report 0355). So it
   // runs here after the processor is built, into the same global.
   if (prelude) vm.runInContext(prelude, ctx);
   return {
@@ -402,7 +402,7 @@ if (!haveDeps || !existsSync(soundfontPath)) {
     check("gain scales a soundfont play; PCM still plays beside it", Math.abs(ratio - 0.5) < 0.05 && pcmLevel > LOUD, `gain 0.5 → ×${ratio.toFixed(3)} · pcm rms ${pcmLevel.toFixed(4)}`);
   }
 
-  // The synths are bounded and reused (docs/report 0354). `drain` outlasts a stopped synth's fade +
+  // The synths are bounded and reused (docs/report 0355). `drain` outlasts a stopped synth's fade +
   // SF_TAIL_S, after which it is back in the idle pool.
   const drain = () => w.render(1.3);
   const loop = (h, note) => w.post({ t: "play", h, r: true, d: 10000, ev: [midi(0, 0xc0, 48), midi(0, 0x90, note, 110)] });
