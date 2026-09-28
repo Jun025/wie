@@ -49,3 +49,7 @@
 | ⒟ | 4개 연결(상하좌우) | `BUNCH = 3` + **대각선 포함** 8방향(`mark()`) |
 | ⒠ | 캐릭터 음성 · 구호 · 연쇄 숫자 연출 | 공통 `Sound.java` 효과음(MOVE/GOOD/BIG)만 · 연쇄는 옆 칸 「연쇄 n」 숫자 상자 색만 바뀜 |
 | ⒡ | 방해 알 · 대전 · 원작 캐릭터 · 음악 | 없음 — 1인 모드뿐, 방해 알·상대 코드 0 |
+
+게임 파일명 유입: BOUNDED 0 · SUFFIX-ATTACHED 0(subjects 7 · 코퍼스 `game_lab`).
+
+<!-- corpus-name-inflow v1 subjects=7 tree=bcdaece2fdd0ff13 B=0/0 P=0/0 S=0/0 -->
