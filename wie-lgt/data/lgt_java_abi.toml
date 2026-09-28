@@ -394,6 +394,14 @@ vtable = [
     # neighbour in the run; lastIndexOf(I)I has the same shape, and it is the position (23)
     # that separates the two.
     { name = "indexOf", descriptor = "(I)I", index = 21 },
+    # 월드장기체스's wall after Vector 24 (measured 2026-09-28, call site disassembled, lr 0x7ac0).
+    # Two back-to-back dispatches `ldr ip,[r3,#0x5c]` (= 4 + 4*22) on the same String with
+    # r1 = #0x26 ('&', a char constant, not a String) and r2 = a from index: the first result, if
+    # not -1, plus one becomes the second call's r2, and the second result is tested `cmn r0,#1`
+    # — a scan for successive '&'. Two int arguments and an int result leave indexOf(II) and
+    # lastIndexOf(II) (24); only a forward scan advances `from` past the last hit (lastIndexOf
+    # from i+1 would find i again). The rule puts indexOf(II) here, between 21 and 23.
+    { name = "indexOf", descriptor = "(II)I", index = 22 },
     # The same split loop's other half, and its next wall once 21 landed (measured 2026-09-24):
     # after `substring(0, i)` at 28 the loop does `s = s.<27>(i + 1)` — r0 = s, r1 = i + 1 and
     # nothing else, i.e. ONE int argument — and stores the result to the loop's string slot, which

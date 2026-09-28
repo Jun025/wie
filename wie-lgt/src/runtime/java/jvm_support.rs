@@ -1816,6 +1816,8 @@ pub(crate) mod tests {
                 ("java/lang/String", 19, "startsWith", "(Ljava/lang/String;)Z"),
                 // 일지매영웅전기
                 ("java/lang/String", 21, "indexOf", "(I)I"),
+                // 월드장기체스
+                ("java/lang/String", 22, "indexOf", "(II)I"),
                 // 놈3
                 ("java/lang/String", 26, "indexOf", "(Ljava/lang/String;I)I"),
                 // 일지매영웅전기 (after 21)
