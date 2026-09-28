@@ -96,6 +96,29 @@ try {
   bad(`wie_web_bg.wasm is not a compilable wasm module: ${e.message}`);
 }
 
+// ── 3b. The soundfont prelude rides inside the wasm (contract soundfontPrelude) ──
+// A build that skipped scripts/build-wasm.sh embeds an empty prelude (wie_featurephone/build.rs):
+// it compiles, passes everything above, accepts soundfontUrl — and plays FM only. This is the one
+// place that sees it before a release does.
+if (contract.soundfontPrelude) {
+  const { marker, licenses = [] } = contract.soundfontPrelude;
+  try {
+    const bytes = await readFile(path.join(wasmDir, "wie_web_bg.wasm"));
+    if (bytes.includes(Buffer.from(marker))) ok(`wie_web_bg.wasm carries the soundfont prelude (${marker})`);
+    else bad(`wie_web_bg.wasm has no soundfont prelude (marker ${marker} absent) — build it with scripts/build-wasm.sh, which bundles spessasynth_core`);
+  } catch (e) {
+    bad(`cannot read wie_web_bg.wasm for the soundfont marker: ${e.message}`);
+  }
+  for (const file of licenses) {
+    try {
+      await access(path.join(root, file));
+      ok(`soundfont license copy present: ${file}`);
+    } catch {
+      bad(`soundfont license copy missing: ${file} (publish-artifact.yml ships it with the release)`);
+    }
+  }
+}
+
 // ── 4. Source pins that the JS surface cannot reveal ─────────────────────────
 // key_down("NUM5") with an unmapped code is a SILENT no-op (parse_key → None),
 // so vocabulary loss is unobservable from JS — pin it at the source level.

@@ -32,6 +32,8 @@ pub struct WebPlatform {
     // JS-owned master gain node (output = gain → destination). Audio is routed
     // through it so the UI volume slider is the single source of truth.
     gain: Option<GainNode>,
+    // Optional soundfont the audio sink fetches after the first play (None = FM only).
+    soundfont_url: Option<String>,
     // Sticky clean-exit flag shared with `WieEmulator::has_exited`: set once when
     // the core requests a normal shutdown, never cleared for this instance.
     exited: Arc<AtomicBool>,
@@ -49,6 +51,7 @@ impl WebPlatform {
         database_repository: WebDatabaseRepository,
         audio_ctx: Option<AudioContext>,
         gain: Option<GainNode>,
+        soundfont_url: Option<String>,
         exited: Arc<AtomicBool>,
     ) -> Result<Self> {
         Ok(Self {
@@ -58,6 +61,7 @@ impl WebPlatform {
             font: Font::try_from_static(include_bytes!("../../assets/neodgm.ttf"))?,
             audio_ctx,
             gain,
+            soundfont_url,
             exited,
         })
     }
@@ -85,7 +89,7 @@ impl Platform for WebPlatform {
     }
 
     fn audio_sink(&self) -> Box<dyn AudioSink> {
-        Box::new(WebAudioSink::new(self.audio_ctx.clone(), self.gain.clone()))
+        Box::new(WebAudioSink::new(self.audio_ctx.clone(), self.gain.clone(), self.soundfont_url.clone()))
     }
 
     fn write_stdout(&self, buf: &[u8]) {

@@ -2,7 +2,8 @@
 #
 # Reproducible wasm build for the wie web frontend.
 #
-# 1. compile the wie_featurephone cdylib for wasm32
+# 0. bundle the soundfont prelude (spessasynth_core → one IIFE) that the audio worklet carries
+# 1. compile the wie_featurephone cdylib for wasm32 (build.rs embeds the prelude)
 # 2. run wasm-bindgen (--target web) to emit the ES-module glue + bindings wasm
 # 3. optionally shrink with wasm-opt if binaryen is installed
 #
@@ -13,6 +14,7 @@
 #   rustup target add wasm32-unknown-unknown
 #   cargo install wasm-bindgen-cli --version 0.2.108   # must match Cargo.lock
 #   (optional) brew install binaryen / npm i -g binaryen   # for wasm-opt
+#   the root devDependencies (spessasynth_core, esbuild) — installed here with `npm ci` if absent
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -20,6 +22,17 @@ cd "$REPO_ROOT"
 
 OUT_DIR="web/src/wasm"
 WASM_IN="target/wasm32-unknown-unknown/release/wie_featurephone.wasm"
+
+echo "==> soundfont prelude (docs/worklog/2026-09-28-featurephone-soundfont-lazy-load.json)"
+# Not optional: an artifact without it silently loses the soundfont, and check-engine-contract.mjs
+# fails such an artifact (contract soundfontPrelude). The two devDependencies are exact-pinned.
+if [ ! -d node_modules/spessasynth_core ] || [ ! -d node_modules/esbuild ]; then
+  echo "==> npm ci (root devDependencies for the prelude)"
+  npm ci --no-audit --no-fund
+fi
+PRELUDE="$REPO_ROOT/target/wie-soundfont/soundfont_prelude.js"
+node scripts/build-soundfont-prelude.mjs "$PRELUDE"
+export WIE_SOUNDFONT_PRELUDE="$PRELUDE"
 
 echo "==> cargo build (wasm32, release)"
 cargo build --target wasm32-unknown-unknown --release -p wie_featurephone

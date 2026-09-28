@@ -4,9 +4,9 @@ use std::{
     rc::Rc,
 };
 
-use js_sys::{Array, Int16Array, Object, Reflect, Uint8Array};
-use wasm_bindgen::{JsValue, closure::Closure};
-use web_sys::{AudioContext, AudioWorkletNode, AudioWorkletNodeOptions, Blob, BlobPropertyBag, GainNode, Url};
+use js_sys::{Array, ArrayBuffer, Int16Array, Object, Reflect, Uint8Array};
+use wasm_bindgen::{JsCast, JsValue, closure::Closure};
+use web_sys::{AudioContext, AudioWorkletNode, AudioWorkletNodeOptions, Blob, BlobPropertyBag, GainNode, MessageEvent, Response, Url};
 
 use wie_backend::{AudioCommand, AudioEventData, AudioHandle, AudioSink};
 
@@ -16,6 +16,10 @@ use wie_backend::{AudioCommand, AudioEventData, AudioHandle, AudioSink};
 /// a coordinated wie + otterpebble contract change.
 const WORKLET_SOURCE: &str = include_str!("audio_worklet.js");
 const PROCESSOR_NAME: &str = "wie-audio";
+/// spessasynth_core, bundled by `scripts/build-soundfont-prelude.mjs` and embedded by `build.rs`;
+/// empty in any build that did not go through `scripts/build-wasm.sh`. It runs ahead of
+/// [`WORKLET_SOURCE`] in the same Blob module and only publishes `globalThis.wieSoundfont`.
+const SOUNDFONT_PRELUDE: &str = include_str!(concat!(env!("OUT_DIR"), "/soundfont_prelude.js"));
 
 /// How many handles' sequences the worklet keeps. A handle's events cross to the audio thread once
 /// and are reused by every later play, but `AudioCommand` has no "close", so the sink never learns
@@ -47,6 +51,13 @@ const RESIDENT_SEQUENCES: usize = 32;
 /// The `AudioContext` must be created and resumed by the JS side on a user gesture (browser
 /// autoplay policy); output goes through the JS-owned master gain so the UI volume governs MIDI
 /// and PCM alike. When no context is supplied, every method is a no-op.
+///
+/// With a soundfont URL (and a build carrying [`SOUNDFONT_PRELUDE`]), the first `Play` also starts
+/// a background fetch of that file; when it arrives it is handed to the worklet, and every play
+/// that starts after it parses renders its MIDI through the soundfont (operator A/B verdict, see
+/// `audio_worklet.js`). The first sound never waits for it, and any failure — fetch, HTTP status,
+/// parse — leaves the FM synth playing, which is what no URL means too. Without a URL the worklet
+/// module is byte-for-byte the one loaded before the soundfont existed.
 pub struct WebAudioSink {
     state: Option<Rc<RefCell<State>>>,
 }
@@ -62,6 +73,18 @@ struct State {
     loaded: VecDeque<u32>,
     /// Fallback only: next free playback position on the audio timeline (seconds).
     next_time: Cell<f64>,
+    soundfont: Soundfont,
+}
+
+enum Soundfont {
+    /// No URL, or a build without the prelude: FM only, nothing is ever fetched.
+    Off,
+    /// Fetched after the first play.
+    NotRequested(String),
+    Requested,
+    /// Arrived while the worklet module was still loading; posted once the node exists.
+    Arrived(ArrayBuffer),
+    Posted,
 }
 
 enum Queued {
@@ -80,9 +103,17 @@ unsafe impl Send for WebAudioSink {}
 unsafe impl Sync for WebAudioSink {}
 
 impl WebAudioSink {
-    pub fn new(ctx: Option<AudioContext>, gain: Option<GainNode>) -> Self {
+    pub fn new(ctx: Option<AudioContext>, gain: Option<GainNode>, soundfont_url: Option<String>) -> Self {
         let Some(ctx) = ctx else { return Self { state: None } };
 
+        let soundfont = match soundfont_url {
+            Some(url) if !url.is_empty() && !SOUNDFONT_PRELUDE.is_empty() => Soundfont::NotRequested(url),
+            Some(url) if !url.is_empty() => {
+                soundfont_log(false, "URL given, but this build has no soundfont prelude");
+                Soundfont::Off
+            }
+            _ => Soundfont::Off,
+        };
         let state = Rc::new(RefCell::new(State {
             ctx,
             gain,
@@ -90,6 +121,7 @@ impl WebAudioSink {
             queue: Vec::new(),
             loaded: VecDeque::new(),
             next_time: Cell::new(0.0),
+            soundfont,
         }));
 
         if let Err(error) = start_worklet(&state) {
@@ -113,12 +145,28 @@ impl Drop for WebAudioSink {
 
 impl AudioSink for WebAudioSink {
     fn send(&self, command: AudioCommand) {
-        let Some(state) = &self.state else { return };
-        let mut state = state.borrow_mut();
-        match &state.mode {
-            Mode::Loading => state.queue.push(Queued::Command(command)),
-            Mode::Worklet(_) => state.post(&command),
-            Mode::Fallback => state.play_pcm(&command),
+        let Some(shared) = &self.state else { return };
+        let fetch = {
+            let mut state = shared.borrow_mut();
+            let is_play = matches!(command, AudioCommand::Play { .. });
+            match &state.mode {
+                Mode::Loading => state.queue.push(Queued::Command(command)),
+                Mode::Worklet(_) => state.post(&command),
+                Mode::Fallback => state.play_pcm(&command),
+            }
+            match &state.soundfont {
+                Soundfont::NotRequested(_) if is_play => match core::mem::replace(&mut state.soundfont, Soundfont::Requested) {
+                    Soundfont::NotRequested(url) => Some(url),
+                    _ => None,
+                },
+                _ => None,
+            }
+        };
+        // After the first play is on its way, never before it: the first sound must not wait.
+        if let Some(url) = fetch
+            && let Err(error) = fetch_soundfont(shared, &url)
+        {
+            soundfont_log(false, &format!("fetch could not start: {error:?}"));
         }
     }
 
@@ -140,7 +188,13 @@ fn start_worklet(state: &Rc<RefCell<State>>) -> Result<(), JsValue> {
 
     let options = BlobPropertyBag::new();
     options.set_type("text/javascript");
-    let blob = Blob::new_with_str_sequence_and_options(&Array::of1(&JsValue::from_str(WORKLET_SOURCE)), &options)?;
+    // The prelude rides along only when a soundfont can actually be used, so with no URL the
+    // module is exactly the FM-only one.
+    let parts = match state.borrow().soundfont {
+        Soundfont::Off => Array::of1(&JsValue::from_str(WORKLET_SOURCE)),
+        _ => Array::of2(&JsValue::from_str(SOUNDFONT_PRELUDE), &JsValue::from_str(WORKLET_SOURCE)),
+    };
+    let blob = Blob::new_with_str_sequence_and_options(&parts, &options)?;
     let url = Url::create_object_url_with_blob(&blob)?;
     let promise = worklet.add_module(&url)?;
 
@@ -157,6 +211,15 @@ fn start_worklet(state: &Rc<RefCell<State>>) -> Result<(), JsValue> {
                         Queued::Command(command) => state.post(&command),
                         Queued::Gain(handle, gain) => state.post_gain(handle, gain),
                     }
+                }
+                // Only a buffer that arrived while loading moves on — any other state stays put
+                // (swapping unconditionally here once turned `NotRequested` into `Posted` before the
+                // first play, so the soundfont was never fetched; caught by the browser run, see
+                // the round's report).
+                if matches!(state.soundfont, Soundfont::Arrived(_))
+                    && let Soundfont::Arrived(buffer) = core::mem::replace(&mut state.soundfont, Soundfont::Posted)
+                {
+                    state.post_soundfont(&buffer);
                 }
             }
             Err(error) => {
@@ -179,7 +242,91 @@ fn start_worklet(state: &Rc<RefCell<State>>) -> Result<(), JsValue> {
     Ok(())
 }
 
+/// The soundfont's outcome, on the page console: this crate has no tracing subscriber, and the
+/// shell needs to see why a soundfont it served is not heard. Never `console.error` — a missing
+/// soundfont is a degraded sound, not a failure (verify-browser.mjs fails a deploy on errors).
+fn soundfont_log(ok: bool, message: &str) {
+    let line = JsValue::from_str(&format!("[wie] soundfont {message}{}", if ok { "" } else { " — playing FM" }));
+    if ok {
+        web_sys::console::log_1(&line)
+    } else {
+        web_sys::console::warn_1(&line)
+    }
+}
+
+/// GETs the soundfont and hands it to the worklet. Every failure is logged and ends here, which
+/// leaves the worklet without a soundfont — the FM path.
+fn fetch_soundfont(state: &Rc<RefCell<State>>, url: &str) -> Result<(), JsValue> {
+    let window = web_sys::window().ok_or_else(|| JsValue::from_str("no window"))?;
+    let arrived_state = state.clone();
+    let on_response = Closure::once(move |response: JsValue| {
+        let body = match response.dyn_into::<Response>() {
+            Ok(response) if response.ok() => response.array_buffer(),
+            Ok(response) => Err(JsValue::from_str(&format!("HTTP {}", response.status()))),
+            Err(error) => Err(error),
+        };
+        let body = match body {
+            Ok(body) => body,
+            Err(error) => return soundfont_log(false, &format!("fetch failed: {error:?}")),
+        };
+        let on_buffer = Closure::once(move |buffer: JsValue| {
+            let Ok(buffer) = buffer.dyn_into::<ArrayBuffer>() else { return };
+            let mut state = arrived_state.borrow_mut();
+            match &state.mode {
+                Mode::Loading => state.soundfont = Soundfont::Arrived(buffer),
+                Mode::Worklet(_) => {
+                    state.soundfont = Soundfont::Posted;
+                    state.post_soundfont(&buffer);
+                }
+                Mode::Fallback => {}
+            }
+        });
+        let on_error = Closure::once(|error: JsValue| soundfont_log(false, &format!("download failed: {error:?}")));
+        let _ = body.then2(&on_buffer, &on_error);
+        on_buffer.forget();
+        on_error.forget();
+    });
+    let on_error = Closure::once(|error: JsValue| soundfont_log(false, &format!("fetch failed: {error:?}")));
+    let _ = window.fetch_with_str(url).then2(&on_response, &on_error);
+    // One-shot callbacks owned by the promise chain from here on.
+    on_response.forget();
+    on_error.forget();
+    Ok(())
+}
+
 impl State {
+    /// Transfers (not copies) the buffer to the audio thread. The worklet replies once with
+    /// `{ t: "sf", ok, … }`; that reply is only logged — FM stays the answer to anything but `ok`.
+    fn post_soundfont(&self, buffer: &ArrayBuffer) {
+        let Mode::Worklet(node) = &self.mode else { return };
+        let Ok(port) = node.port() else { return };
+        let on_message = Closure::<dyn FnMut(MessageEvent)>::new(|event: MessageEvent| {
+            let data = event.data();
+            let field = |key: &str| Reflect::get(&data, &JsValue::from_str(key)).unwrap_or(JsValue::UNDEFINED);
+            if field("t").as_string().as_deref() != Some("sf") {
+                return;
+            }
+            if field("ok").as_bool() == Some(true) {
+                soundfont_log(
+                    true,
+                    &format!(
+                        "ready (parsed in {} ms) — plays that start from now use it",
+                        field("ms").as_f64().unwrap_or(-1.0)
+                    ),
+                );
+            } else {
+                soundfont_log(false, &format!("not usable: {}", field("error").as_string().unwrap_or_default()));
+            }
+        });
+        port.set_onmessage(Some(on_message.as_ref().unchecked_ref()));
+        // Lives as long as the port; one per sink.
+        on_message.forget();
+        let message = Object::new();
+        let _ = Reflect::set(&message, &JsValue::from_str("t"), &JsValue::from_str("sf"));
+        let _ = Reflect::set(&message, &JsValue::from_str("data"), buffer);
+        let _ = port.post_message_with_transferable(&message, &Array::of1(buffer));
+    }
+
     fn fall_back(&mut self) {
         self.mode = Mode::Fallback;
         for queued in core::mem::take(&mut self.queue) {

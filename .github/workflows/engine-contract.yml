@@ -332,6 +332,12 @@ jobs:
               # include_bytes!'s into the artifact. Keep in sync with
               # publish-artifact.yml's on.push.paths (Constraint 4).
               - 'assets/**'
+              # Soundfont prelude + audio worklet (include_str!'d; publish-artifact.yml lists the same).
+              - 'wie_featurephone/src/*.js'
+              - 'wie_featurephone/src/*.mjs'
+              - 'scripts/build-soundfont-prelude.mjs'
+              - 'scripts/check-audio-worklet.mjs'
+              - 'licenses/**'
               - 'package.json'
               - 'package-lock.json'
               - '.github/workflows/engine-contract.yml'
@@ -381,6 +387,12 @@ jobs:
       - name: Contract check — static surface
         if: steps.changes.outputs.engine == 'true'
         run: node scripts/check-engine-contract.mjs
+
+      # The soundfont cases of the always-run audio step above SKIP there (no node_modules). Here
+      # build-wasm.sh has just run `npm ci`, so they run — and must (--require-soundfont).
+      - name: Audio worklet — soundfont cases (docs/worklog/2026-09-28-featurephone-soundfont-lazy-load.json)
+        if: steps.changes.outputs.engine == 'true'
+        run: node scripts/check-audio-worklet.mjs --require-soundfont
 
       - name: Contract check — browser boot round-trip
         if: steps.changes.outputs.engine == 'true'

@@ -2,9 +2,11 @@
 //!
 //! Game bytes arrive here as a `Uint8Array` that the user picked locally; they
 //! are injected straight into the emulator core in wasm memory and never touch
-//! the network. There is no `fetch`, `XMLHttpRequest`, `WebSocket`, or upload of
-//! any kind in this crate — the only data leaving wasm is the rendered frame
-//! (to the canvas) and audio samples (to WebAudio).
+//! the network. There is no `XMLHttpRequest`, `WebSocket`, or upload of any kind
+//! in this crate, and exactly one `fetch`: a GET of the soundfont URL the host
+//! passes to the constructor (`audio.rs` — no URL, no request), which carries no
+//! game data. The only data leaving wasm is the rendered frame (to the canvas)
+//! and audio samples (to WebAudio).
 //!
 //! The crate is compiled only for `wasm32`; on every other target it is empty so
 //! that native workspace jobs keep building.
@@ -73,6 +75,12 @@ impl WieEmulator {
     /// * `canvas` — the `<canvas>` the framebuffer is blitted onto.
     /// * `audio_ctx` — an already-resumed `AudioContext`, or `null` for silence.
     /// * `width` / `height` — emulator screen size (240×320 is the usual default).
+    /// * `soundfont_url` — optional sf2/sf3 the audio sink fetches in the background after the
+    ///   first sound and uses for plays that start once it has loaded. Omitted (or a build without
+    ///   the soundfont prelude) = the built-in FM synth only, the pre-soundfont behaviour.
+    // Positional because the JS constructor shape is the pinned engine contract
+    // (docs/contracts/featurephone-engine-contract.json `constructorShape`).
+    #[allow(clippy::too_many_arguments)]
     #[wasm_bindgen(constructor)]
     pub fn new(
         filename: &str,
@@ -82,6 +90,7 @@ impl WieEmulator {
         gain: Option<GainNode>,
         width: u32,
         height: u32,
+        soundfont_url: Option<String>,
     ) -> Result<WieEmulator, JsValue> {
         let ctx = canvas
             .get_context("2d")
@@ -122,6 +131,7 @@ impl WieEmulator {
                 WebDatabaseRepository::new(db_store.clone()),
                 audio_ctx,
                 gain,
+                soundfont_url,
                 exited.clone(),
             )
             .map_err(|e| JsValue::from_str(&format!("{e:?}")))?,

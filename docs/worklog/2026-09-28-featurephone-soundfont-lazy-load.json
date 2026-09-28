@@ -1,0 +1,49 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-featurephone-soundfont-lazy-load-engine",
+  "root": "2026-09-27-featurephone-soundfont-path-decision",
+  "title": "피처폰 게임 음악 — 사운드폰트(GeneralUser GS) 지연 로드 · 엔진 쪽",
+  "summary": "운영자 청취 판정 «B 가 낫다»에 따라 0317 의 지연 로드 설계를 구현했다. 생성자 8번째 선택 인자 soundfontUrl — 없으면 종전과 같은 동작(워클릿 출력 샘플 동일 · fetch 0). 주면 첫 Play 뒤 백그라운드 GET → 워클릿 파싱 → 새 Play 부터 Play 별 SpessaSynthProcessor. 실패는 전부 FM 유지. spessasynth_core 는 esbuild IIFE 로 wasm 안에 실려 계약의 파일 2개는 그대로다.",
+  "changes": [
+    "wie_featurephone: lib.rs(8번째 인자) · platform.rs · audio.rs(fetch·전달·준비 콜백) · audio_worklet.js(Play 별 사운드폰트 합성기 · SF_GAIN 2.7) · soundfont_prelude.mjs · build.rs",
+    "scripts/build-soundfont-prelude.mjs · scripts/build-wasm.sh 번들 단계 · package.json devDeps(spessasynth_core 4.3.18 · esbuild 0.28.2, exact)",
+    "docs/contracts/featurephone-engine-contract.json(arity 8 · soundfontPrelude) · scripts/check-engine-contract.mjs §3b",
+    "scripts/check-audio-worklet.mjs 케이스 10–15 · --require-soundfont · --source",
+    "licenses/(Apache-2.0 · GeneralUser GS 2.0.1 · THIRD_PARTY_AUDIO.md) · publish-artifact.yml 릴리스 자산",
+    "engine-contract.yml 필터 + --require-soundfont 스텝 · publish-artifact.yml on.push.paths(워클릿·프렐류드·락파일·licenses)"
+  ],
+  "verification": [
+    "3곡 재렌더: 전↔후(사운드폰트 미수신) 샘플 동일 3/3 · 후↔0317 B 포락선 상관 0.9954/0.9990/0.9979 · 음량 FM 대비 0.77–1.08",
+    "브라우저 끝-끝(로컬): URL 없음 요청 0 · URL 있음 첫 Play 뒤 GET·62 ms 파싱·새 Play 4 사운드폰트 · 404 FM 유지",
+    "변이 4종(M2·M4·M5·M6) 전부 red",
+    "fmt · clippy stable/wasm32/beta · cargo test 575/0 · build:wasm · check-engine-contract 113/0 · contract-roundtrip · check-audio-worklet 15/15 · audit"
+  ],
+  "limits": [
+    "audio.rs 의 fetch 배선은 CI 에서 실행되지 않는다(브라우저 실행은 로컬 · 게임 파일)",
+    "글루 38,683 / 40,000 B(여유 3.3%) — 제안으로 올리지 않았다(worklog 당 2건 상한) · 보고서 0349 한계 절",
+    "실기기 오디오 끊김 미측정"
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "title": "사운드폰트 배선을 CI 에서 한 번 돌리기 — 소리 나는 픽스처 + 왕복 시나리오",
+      "plainSummary": "엔진이 사운드폰트를 실제로 받아 쓰는지는 지금 로컬에서만 확인된다. 소리 한 음을 내는 작은 시험용 게임을 만들어, CI 의 브라우저 왕복 시험이 사운드폰트 주소를 주고 «첫 소리 뒤 요청 → 준비 → 새 소리가 사운드폰트»를 확인하게 한다.",
+      "userBenefit": "이번 회차에 실제로 있었던 «주소를 줘도 사운드폰트를 안 받는» 결함 같은 것이 사람 손 없이 PR 에서 잡힌다.",
+      "why": "그 결함은 노드 시험 15개가 전부 통과한 채로 있었다 — audio.rs 는 CI 어디서도 실행되지 않고, 커밋된 픽스처 중 소리를 내는 것이 없다(contract-roundtrip 은 7인자만 쓴다). 저장소에 GeneralUser.sf3 가 이미 있어 네트워크 없이 된다.",
+      "tradeoff": "픽스처 생성기 하나와 왕복 시나리오 하나가 늘고, 엔진 필터 뒤 왕복 시간이 사운드폰트 파싱만큼(브라우저 약 50 ms + 10.6 MB 로컬 서빙) 는다.",
+      "effort": "M",
+      "target": "wie"
+    },
+    {
+      "title": "실기기에서 사운드폰트 전환 순간의 끊김 재기",
+      "plainSummary": "사운드폰트 파싱과 악기 첫 사용 때의 해독은 소리를 내는 스레드에서 돈다. 데스크톱 크롬에서는 파싱 62 ms 였지만 휴대폰에서 얼마나 끊기는지는 모른다.",
+      "userBenefit": "게임 도중 음이 순간 끊기는지 알고, 필요하면 해독을 미리 해 두는 식으로 고칠 수 있다.",
+      "why": "node(부하 300–450)에서는 파싱 0.5–1.6 s 였고, 첫 악기 해독도 오디오 스레드에서 일어난다(spessasynth 설계). 셸 호스팅(otterpebble 티켓) 뒤에야 실기기로 잴 수 있다.",
+      "tradeoff": "실기기 측정은 사람 손(기기)이 필요하다. 끊김이 크면 미리 해독하는 비용(메모리)과 바꿔야 한다.",
+      "effort": "S",
+      "target": "wie"
+    }
+  ]
+}
