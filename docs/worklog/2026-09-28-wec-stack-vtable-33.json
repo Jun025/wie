@@ -7,7 +7,7 @@
   "changes": [
     "wie-lgt/data/lgt_java_abi.toml — Stack 블록 33 행 1줄 + 근거 주석",
     "wie-lgt/src/runtime/java/jvm_support.rs — ABI 핀 테스트에 33 행 1줄",
-    "docs/report/0356"
+    "docs/report/0358"
   ],
   "verification": [
     "전: FAIL · ticks 85841 · paints 5 · java/util/Stack vtable index 33 (lr 0x15368)",
