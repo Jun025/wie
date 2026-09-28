@@ -1,0 +1,37 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-28-wec-string-vtable-22-adopt-p0",
+  "title": "월드장기체스 — java/util/Stack 33 = pop() (호출부 디스어셈블) · 첫 화면 PASS",
+  "summary": "Stack 에서 인자 없이 33 번 칸을 불러 나온 객체를 null 검사·캐스트한 뒤 그 필드로 상태를 복원한다. 바로 위 함수가 같은 Stack 에 32(push)로 넣는 save/restore 짝이라 pop 이다(peek 과는 모양이 같아 순서가 가른다). 헤드리스 판정이 3/3 PASS 로 바뀌었고, 키를 누르면 java/util/Vector 19 에서 멈춘다.",
+  "changes": [
+    "wie-lgt/data/lgt_java_abi.toml — Stack 블록 33 행 1줄 + 근거 주석",
+    "wie-lgt/src/runtime/java/jvm_support.rs — ABI 핀 테스트에 33 행 1줄",
+    "docs/report/0356"
+  ],
+  "verification": [
+    "전: FAIL · ticks 85841 · paints 5 · java/util/Stack vtable index 33 (lr 0x15368)",
+    "후: 3/3 PASS · paints 920/953/876 · stop deadline · content true",
+    "변이: pop 행만 제거 → 핀 테스트 FAILED",
+    "--inject: FAIL · input_steps 1/27 · java/util/Vector vtable index 19"
+  ],
+  "limits": [
+    "호출부 1곳 — pop/peek 은 모양이 같아 순서와 push 짝으로 판정",
+    "첫 키에서 멈춤 — 아직 플레이 불가"
+  ],
+  "adoptedProposals": [
+    "2026-09-28-wec-string-vtable-22#p0"
+  ],
+  "proposals": [
+    {
+      "title": "월드장기체스 — 첫 키에서 `java/util/Vector vtable index 19` 미구현 벽",
+      "plainSummary": "Stack 33 을 채우자 월드장기체스가 첫 안내 화면까지 나오지만, 키를 한 번 누르면 Vector 의 19 번 칸에서 멈춥니다.",
+      "userBenefit": "첫 화면에서 멈춰 있던 타이틀이 메뉴·게임 화면으로 넘어가 실제로 플레이할 수 있는 상태에 가까워집니다.",
+      "why": "이 회차 후 헤드리스 3/3 PASS(paints 876~953) 이지만 `wie_validate --inject` 는 input_steps 1/27 에서 `Unimplemented: java/util/Vector vtable index 19` 로 멈춘다(paints 109). CLDC 1.1 Vector 순서로 19 는 indexOf(Object,int) 자리지만 인접 후보(indexOf(Object) 18 · lastIndexOf 20·21)와 모양이 비슷해 호출부 확인이 필요하다.",
+      "tradeoff": "indexOf 계열은 인자 개수(1 또는 2)와 int 반환으로만 갈린다 — 호출부 디스어셈블로 r2 사용 여부를 봐야 하며, 방향(indexOf/lastIndexOf)은 순서에 기댈 수 있다.",
+      "effort": "S",
+      "target": "wie",
+      "kind": "product"
+    }
+  ]
+}
