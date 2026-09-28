@@ -1,0 +1,35 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-29",
+  "task": "wie-2026-09-28-ktf-call-native-thread-context-result-adopt-p0",
+  "title": "KTF 0103BF27 — 그림은 화면 프레임버퍼로 간다 · 화면에 올리는 것은 Java paint 주기다(판정)",
+  "summary": "대상 2종의 그리기 13,297회가 전부 MC_grpGetScreenFrameBuffer 핸들로 가고 오프스크린 버퍼에는 0회다. 게임은 그린 뒤 Card.repaint/serviceRepaints 만 부르고 FlushLcd 는 부르지 않는다 — Java 화면과 네이티브 화면이 같은 메모리라는 가정이다. wie 는 Java screenImage 만 올려 네이티브 쪽이 화면에 가지 않는다. 시제품(커밋 0)으로 인트로 화면이 나오는 것을 확인했다. 코드 변경 0.",
+  "adoptedProposals": [
+    "2026-09-28-ktf-call-native-thread-context-result#p0"
+  ],
+  "changes": [
+    "docs/report/0361"
+  ],
+  "verification": [
+    "임시 계측: 그리기 대상 핸들 == 0x7fff1000 칸의 화면 프레임버퍼 핸들 · 오프스크린 핸들 그리기 0",
+    "시제품: 대상 2종 20초 FAIL→PASS · distinct_colors 1→512 · 스냅숏 = 인트로 화면",
+    "KTF 266종 12초 전수: Java 모드에서 화면 프레임버퍼를 받고 FlushLcd 0 인 것은 대상 2종뿐"
+  ],
+  "limits": [
+    "getPixels(0,0,1,1) 의 역할은 판정하지 않았다 — 스텁 그대로 화면이 나왔다",
+    "전수는 load1 120~170 · 12초 · 키 없음 1회",
+    "Clet 모드 11종(프레임버퍼 받고 FlushLcd 0 · 전부 FAIL)은 같은 원인인지 재지 않았다"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "KTF Java 모드 — 네이티브 화면 프레임버퍼를 Java paint 주기에 화면으로 올리기",
+      "plainSummary": "게임이 화면용 버퍼에 그린 그림을 에뮬레이터가 화면에 올리지 않아 흰 화면이 됩니다. 실제 폰처럼 화면 갱신 때 그 그림을 올립니다.",
+      "userBenefit": "해당 게임 2개(1종)가 흰 화면 대신 인트로와 게임 화면을 보여 줍니다.",
+      "why": "0361: 그리기 13,297회가 전부 MC_grpGetScreenFrameBuffer 핸들로 가고 FlushLcd 0 · 게임은 Card.repaint/serviceRepaints 로 화면 갱신을 맡긴다. 시제품(커밋 0)에서 그 버퍼를 올리자 인트로 화면이 나왔다.",
+      "tradeoff": "midp Display 의 화면 올리기에 KTF 쪽 갈고리가 필요하다(여러 크레이트). Java 이미지를 통째로 바꾸면 Java 로 그리는 타이틀을 가릴 수 있어 차이 기반 합성이 안전하지만 프레임마다 240x320 비교 비용이 든다. KTF 전수 짝 재측 필수 — 스스로 FlushLcd 하는 2종(93d5b6b8ceb5 974e0df9ab1e)이 1순위 확인 대상.",
+      "effort": "M",
+      "target": "4120f27288ab 739c7657c1f2"
+    }
+  ]
+}
