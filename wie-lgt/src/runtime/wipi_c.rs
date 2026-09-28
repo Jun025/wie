@@ -116,8 +116,8 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::Alloc => kernel::alloc.into_body(),
         WIPICSvcId::Calloc => kernel::calloc.into_body(),
         WIPICSvcId::Free => kernel::free.into_body(),
-        WIPICSvcId::GetTotalMemory => kernel::get_total_memory.into_body(),
-        WIPICSvcId::GetFreeMemory => kernel::get_free_memory.into_body(),
+        WIPICSvcId::GetTotalMemory => get_memory.into_body(),
+        WIPICSvcId::GetFreeMemory => get_memory.into_body(),
         WIPICSvcId::DefTimer => kernel::def_timer.into_body(),
         WIPICSvcId::SetTimer => kernel::set_timer.into_body(),
         WIPICSvcId::UnsetTimer => kernel::unset_timer.into_body(),
@@ -545,6 +545,22 @@ async fn terminate_program(context: &mut dyn WIPICContext, code: i32) -> Result<
     Ok(())
 }
 
+/// `MC_knlGetTotalMemory` / `MC_knlGetFreeMemory` on LGT: a fixed 4MiB for both.
+///
+/// The shared kernel answers 1MiB, and one LGT title shows «메모리 부족 — 단말기 리셋» and quits
+/// when free memory is ≤ 1,500,000 (`0x16e360`). It is LGT-only because KTF must stay at 1MiB: a
+/// KTF title sizes its pool as `free - 100KB` and dies at boot once that pool passes 1MiB
+/// (measured at 1,200,000). LGT callers were swept at 2/4/8MiB with no other change; the
+/// emulator's real heap is not answered because it is 256MiB and allocation-dependent — see
+/// `docs/report` for the round.
+async fn get_memory(_context: &mut dyn WIPICContext) -> Result<i32> {
+    tracing::debug!("LGT MC_knlGetTotalMemory/GetFreeMemory()");
+
+    Ok(LGT_MEMORY)
+}
+
+const LGT_MEMORY: i32 = 0x400000;
+
 async fn unk14(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
     tracing::warn!("stub unk14({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x})");
 
@@ -616,6 +632,35 @@ mod tests {
             system.tick()?;
         }
         assert!(exited.load(Ordering::Relaxed), "0x68 must reach Platform::exit");
+
+        Ok(())
+    }
+
+    /// LGT memory queries answer above the 1,500,000 threshold one title checks, and free ≤ total.
+    #[test]
+    fn wipic_memory_queries_clear_the_low_memory_notice() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, _) = init_jvm(&system_clone).await?;
+            register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
+            let free_stub = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::GetFreeMemory)?;
+            let total_stub = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::GetTotalMemory)?;
+            let free: u32 = core.run_function(free_stub, &[]).await?;
+            let total: u32 = core.run_function(total_stub, &[]).await?;
+            assert!(free > 1_500_000, "free {free} would show the low-memory notice");
+            assert!(free <= total);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
 
         Ok(())
     }
