@@ -57,3 +57,5 @@
 - 코드 변경 0. 이 가지(`origin/main` `270e4770` + 문서 2개)에서 `cargo fmt --all -- --check` ·
   `cargo clippy --all -- -D warnings`(stable·beta) · wasm32 clippy · `RUST_MIN_STACK=4194304 cargo test --all`(586 passed) rc=0.
 - `node scripts/corpus-name-inflow.mjs`: 유입 **0쌍(BOUNDED)** + 판단 필요 **0쌍(SUFFIX-ATTACHED)**. 타이틀은 sha 앞 12자로만 적었다.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=e73d2eed868903ce B=0/0 P=0/0 S=0/0 -->
