@@ -1,0 +1,10 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-28-ktf-classloader-cluster-8-verdict-adopt-p0",
+  "title": "new String((char[]) null) 호스트 패닉 → NullPointerException",
+  "summary": "hardening.rs 에 java/lang/String 의 배열 생성자 6종 널 가드. 시험·변이 red 확인. 게임 A/B 는 전 쪽 패닉 미재현(0/18)이라 증명력 없음.",
+  "changes": ["wie-jvm-support/src/hardening.rs", "docs/report/0339"],
+  "adoptedProposals": ["2026-09-28-ktf-classloader-cluster-8-verdict#p0"],
+  "proposals": []
+}

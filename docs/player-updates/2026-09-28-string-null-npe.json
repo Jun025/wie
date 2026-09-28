@@ -1,0 +1,9 @@
+{
+  "date": "2026-09-28",
+  "kind": "fix",
+  "titles": [
+    "d552e095ddcfd388fcfea591275cfc768fd70facabfdac451880a45516ed372d"
+  ],
+  "summary_ko": "빈 글자 데이터로 문장을 만들 때 에뮬레이터가 통째로 멈추던 문제를 고쳐, 게임이 그 오류를 스스로 처리하게 했어요.",
+  "pr": "https://github.com/Jun025/wie/pull/371"
+}
