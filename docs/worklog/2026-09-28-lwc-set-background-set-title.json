@@ -3,11 +3,11 @@
   "date": "2026-09-28",
   "task": "wie-2026-09-28-lwc-widget-toolkit-children-button-exit-adopt-p0",
   "title": "lwc — Component.setBackground/getBackground · ShellComponent.setTitle/getTitle",
-  "summary": "0345 의 «후» 벽 두 개. 33f3e7669599 가 PASS(3/3 · 키 27/27), ca7fa8ade8ad 는 다음 벽 setForeground(I)V(boot 3/3). 이 층은 그리지 않으므로 값은 보관만 — 화면 변화 0. 상세 docs/report/0351.",
+  "summary": "0345 의 «후» 벽 두 개. 33f3e7669599 가 PASS(3/3 · 키 27/27), ca7fa8ade8ad 는 다음 벽 setForeground(I)V(boot 3/3). 이 층은 그리지 않으므로 값은 보관만 — 화면 변화 0. 상세 docs/report/0352.",
   "changes": [
     "wie-wipi-java lwc — Component bg 필드(초기 -1 = javadoc 의 «지정 해제» 값) · setBackground(I)V · getBackground()I",
     "wie-wipi-java lwc — ShellComponent cmpTitle 필드 · setTitle(String) 이 LabelComponent 로 보관 · setTitle(Component) · getTitle()",
-    "docs/report/0351"
+    "docs/report/0352"
   ],
   "verification": [
     "전/후 프로브 A 각 3판 · load1 160~250",

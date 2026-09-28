@@ -37,5 +37,3 @@
 
 ### 게임 이름 유입
 `node scripts/corpus-name-inflow.mjs` — BOUNDED **1** · SUFFIX-ATTACHED **0**. 1건은 `component.rs` 의 기존 주석 한 줄(`repaint(IIII)V` 위 · `origin/main` 에 이미 있다)이다. 도구는 «바뀐 파일의 본문 전체»를 보므로 그 파일을 고친 이 회차에 잡혔다. 이 회차가 더한 줄에서는 **0건**이다.
-
-<!-- corpus-name-inflow v1 subjects=4 tree=c132bcf475cd67cb B=1/1 P=0/0 S=0/0 -->
