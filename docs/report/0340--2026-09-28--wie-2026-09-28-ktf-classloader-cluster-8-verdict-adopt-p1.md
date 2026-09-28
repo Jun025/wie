@@ -72,3 +72,5 @@
 
 - 코드 변경 없음(docs · worklog 만). 네 게이트는 이 브랜치에서 돌렸다 — 회신 참조.
 - 임시 패치로 돌린 실행 3건은 위 표에 있다. 패치는 `git checkout` 으로 되돌렸다.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=083fca104966c473 B=0/0 P=0/0 S=0/0 -->
