@@ -1,0 +1,35 @@
+# wie_validate --keys: one full round of 통통 조약돌, title → play → game-over card.
+# Run: demo/arcade-common/README.md §확인. Key names only: the plank swings once, then parks at
+# the left wall and waits, so the pebble is missed three times and the round ends.
+OK:1.5
+NUM5:0.3 LEFT:0.6 RIGHT:0.6 RIGHT:0.6 LEFT:0.6 LEFT:0.3 LEFT:0.3 LEFT:0.3
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2
+WAIT:2

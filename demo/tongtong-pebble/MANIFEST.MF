@@ -1,0 +1,6 @@
+MIDlet-Name: 통통 조약돌
+MIDlet-Vendor: otterpebble
+MIDlet-Version: 1.0.0
+MIDlet-1: 통통 조약돌, , TongtongPebble
+MicroEdition-Profile: MIDP-2.0
+MicroEdition-Configuration: CLDC-1.1
