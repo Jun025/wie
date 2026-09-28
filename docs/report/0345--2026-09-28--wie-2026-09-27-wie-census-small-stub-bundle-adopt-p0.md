@@ -43,3 +43,6 @@
 - 단위 시험 3개 파일 · 4개: 자식 추가·인덱스 조회·범위 밖 null·삭제(셸 위 — `ContainerComponent.<init>` 을 건너뛰는 경로) · 대화상자 0번 자식 · `ButtonComponent(String, Image)` + `setActionListener` 보관 · `ProgramExitException` 이 `RuntimeException`.
 - 변이 6개 전건 red · 원상 green: ⑴ `addComponent` 가 저장 안 함 ⑵ 범위 밖에서 예외 ⑶ 대화상자가 자식을 안 넣음 ⑷ `(String, Image)` 생성자 제거 ⑸ 부모 `Error` ⑹ `getNumberOfComponent` 를 `getComponentCount` 로.
 - 게이트·러너 결과는 PR 본문과 회신에 있다.
+
+### 게임 이름 유입
+`node scripts/corpus-name-inflow.mjs` — BOUNDED **3** · SUFFIX-ATTACHED **0**. 3건은 전부 `dialog_component.rs` 의 기존 주석 한 줄(`origin/main` 에 이미 있다)이다. 도구는 «바뀐 파일의 본문 전체»를 보므로 그 파일을 고친 이 회차에 잡혔다. 이 회차가 더한 줄(`git diff origin/main...HEAD` 의 `+` 줄)에서는 **0건**이다.
