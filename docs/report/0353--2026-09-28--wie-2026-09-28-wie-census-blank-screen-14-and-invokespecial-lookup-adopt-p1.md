@@ -50,3 +50,4 @@
 - 시험 1 · 변이 3(칸 무시 · 호출 전 비우기 삭제 · 되돌리기 삭제) 전건 red · 원상 green.
 - `cargo fmt --all -- --check` · `cargo clippy --all -- -D warnings`(stable·beta) · wasm32 clippy · `RUST_MIN_STACK=4194304 cargo test --all`(581 passed) rc=0.
 - 러너 블록: `draw_j2me` `helloworld_ktf` `helloworld_lgt` `text_j2me` PASS · `keydraw_ktf` `keydraw_lgt` `--inject --expect-last-frame` PASS rc=0(paints 55·55).
+- `node scripts/corpus-name-inflow.mjs`: 유입 **2쌍(BOUNDED)** + 판단 필요 **0쌍(SUFFIX-ATTACHED)**. 둘 다 손댄 두 파일에 main 부터 있던 주석 줄이다 — 이 PR 이 더한 줄 중 게임 이름은 **0**(`git diff origin/main...HEAD` 의 `+` 줄 계수).
