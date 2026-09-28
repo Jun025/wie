@@ -32,4 +32,4 @@ PASS 판정 문구가 «멈춤»을 가리는 점에 주의: `76795f84` 와 변�
 ### 게임 이름 유입
 `node scripts/corpus-name-inflow.mjs` — BOUNDED **0** · SUFFIX-ATTACHED **0**.
 
-<!-- corpus-name-inflow v1 subjects=2 tree=217b6b54abdcefec B=0/0 P=0/0 S=0/0 -->
+
