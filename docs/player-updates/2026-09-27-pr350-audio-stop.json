@@ -1,0 +1,16 @@
+{
+  "date": "2026-09-27",
+  "kind": "fix",
+  "titles": [
+    "155586ece7f8e46bd49b402d3b5620d570d7fc9237ef5c7ee1498e33fe27c8e3",
+    "182fa44210dc07ab275906a6a5e1ff1c0467017ff6f71492a0db7a73c1db8e61",
+    "339130e1eb47e2acc79abaaf4e55621a2c15c915951b672b157812a73a37b5ab",
+    "41466fc7f709c43a7b110d795c86e3e4eda25226b54c87c51576ffd15def3b78",
+    "52f1f32e3f726b87301b47ec3ee863a69c1d1fe8119222244b662fcb462db2df",
+    "91c02913e1eaf810796fbb554f4501581b70b772009050408f690733527bd16f",
+    "d1fba7ad5d1fcc11cb9d4daded9c117d4569cf8282903c57cdf14404bdb90c91"
+  ],
+  "summary_ko": "소리를 끄거나 멈출 때 게임이 꺼지던 문제를 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/350",
+  "enginePin": "bb4d89310850d82bdbd1ba0bbdaee0407d2324c0"
+}

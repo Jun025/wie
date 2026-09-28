@@ -15,6 +15,8 @@
 //        [--secs 30] [--long 600] [--only probe|long|speed] <corpus dir>...
 //   node scripts/playability-census.mjs report --out <dir> --pin <wie sha>
 //        [--compat <compat.json>] [--changes <changes.json>] [--prs <gh-merged.json>]
+//        [--speed <browser runs.jsonl>]
+//   node scripts/playability-census.mjs selftest     each speed/starvation rule against its counter-case
 //
 // `run` is resumable: a (title, phase) whose JSON is already in --out is skipped, so
 // re-running after a pin bump means deleting --out (or pointing at a new one). `report`
@@ -40,6 +42,9 @@
 //           engine side only: a command the browser host drops is #348's axis, not this one.
 //   speed   1 - (sleep lateness + timer lateness + GC) / window, the #347 ratio, headless: `ok` at
 //           >= 0.9, else `n/a` — never `slow` (see judge()). load1 is recorded beside it.
+//           `--speed` overrides that with browser runs (the #347 harness, one JSON line per run:
+//           `game` "<sha12>.zip", `loopHz`, `win`, `pacing`): two runs within 10% of each other
+//           give `ok` (>= 0.9) or `slow`; runs that disagree leave the headless verdict standing.
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -61,12 +66,12 @@ for (let i = 0; i < rest.length; i++) {
 opt.jobs = Number(opt.jobs);
 opt.secs = Number(opt.secs);
 opt.long = Number(opt.long);
-if (!opt.out || !['run', 'report'].includes(cmd)) {
-  console.error('usage: playability-census.mjs run|report --out <dir> …  (see the header)');
+if (cmd !== 'selftest' && (!opt.out || !['run', 'report'].includes(cmd))) {
+  console.error('usage: playability-census.mjs run|report --out <dir> … | selftest  (see the header)');
   process.exit(2);
 }
-const out = resolve(opt.out);
-mkdirSync(out, { recursive: true });
+const out = cmd === 'selftest' ? null : resolve(opt.out);
+if (out) mkdirSync(out, { recursive: true });
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
 
 // ── population: one entry per sha256, first path wins ──────────────────────
@@ -149,10 +154,20 @@ async function probe(t) {
     mkdirSync(join(d, name), { recursive: true });
     const args = ['--inject', '--keep-timeout', '--timeout', String(opt.secs), '--shotdir', join(d, name), ...extra, t.path];
     const r = await validate(args, opt.secs + 120, join(d, `${name}.stderr`));
+    // A probe the host starved is not a measurement: it is left unrecorded, so the next `run` retries
+    // it, instead of reading as `boot: fail`. Measured 2026-09-28: next to two Interactive-priority
+    // browsers, 296 of 429 probes ended at the deadline having ticked < 100 times with 0 paints; the
+    // previous run's real boot failures that ended at the deadline had all ticked >= 100.
+    if (starvedProbe(r)) {
+      starved++;
+      return;
+    }
     r.shots = shotHashes(join(d, name));
     writeFileSync(f, JSON.stringify(r));
   }
 }
+let starved = 0;
+const starvedProbe = (r) => r.stop === 'deadline' && !r.paints && (r.ticks ?? 0) < 100;
 
 // Speed is wall-clock, so a starved host reads as a slow game. `--only speed` re-measures the
 // titles that read below 0.9, alone (--jobs 1-2 is the point), into S.json; the judge takes the
@@ -203,6 +218,39 @@ async function pool(items, jobs, fn) {
 
 const read = (p) => (existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : null);
 
+// #347's ratio for one browser run: 1 - engine-added ms per frame / actual frame period. The game
+// thread waits on its own wake lateness, timer lateness and GC always, and on the paint only when it
+// spins on yield. It is a ratio against a period the game ASKED for, so a run with no requested wait
+// says nothing (a yield spin painting 246/s read 0.07; `sleep(0)` asks for nothing, so its "lateness"
+// is the yield's cost — one painting 200/s read 0.75), and neither does lateness past the whole frame
+// (a fixed-rate timer that has fallen behind read -6.2). Several waits or several blits per frame can
+// only push the ratio DOWN (lateness summed over waits that may overlap; a frame counted twice), so
+// outside one wait per frame a reading >= 0.9 still stands and one below it is dropped. Measured 2026-09-28.
+function browserRatio(r) {
+  const p = r.pacing;
+  if (r.err || !p || !r.loopHz) return null;
+  const frames = r.loopHz * r.win;
+  const sleeps = p.sleep_ms_p95 > 0 ? p.sleeps : 0;
+  const waits = sleeps + p.timers;
+  if (!waits) return null;
+  const spin = p.paints && p.yields > p.paints * 20;
+  const added = ((sleeps ? p.sleep_late_sum : 0) + p.timer_late_sum + (spin ? p.redraw_sum : 0) + p.gc_ms) / frames;
+  const ratio = 1 - added / (1000 / r.loopHz);
+  const oneWaitPerFrame = waits >= frames / 2 && waits <= frames * 2;
+  return ratio < 0 || (ratio < 0.9 && !oneWaitPerFrame) ? null : ratio;
+}
+const browserVerdict = (xs) => (xs.length >= 2 && Math.min(...xs) >= 0.9 * Math.max(...xs) ? [Math.min(...xs), Math.min(...xs) >= 0.9 ? 'ok' : 'slow'] : null);
+const browser = new Map();
+if (opt.speed)
+  for (const l of readFileSync(resolve(opt.speed), 'utf8').split('\n')) {
+    if (!l.startsWith('{')) continue;
+    const r = JSON.parse(l);
+    const x = r.game && browserRatio(r);
+    if (x === null || x === undefined) continue;
+    const k = r.game.slice(0, 12);
+    browser.set(k, [...(browser.get(k) ?? []), x]);
+  }
+
 function judge(sha) {
   const d = join(out, sha);
   const A = read(join(d, 'A.json'));
@@ -238,9 +286,13 @@ function judge(sha) {
   const lateRatio = (p) => (p && p.sleeps + p.timers > 0 ? 1 - (p.sleep_late_sum + p.timer_late_sum + p.gc_ms) / windowMs : null);
   const windowMs = (opt.secs - PROBE_KEYS_AT) * 1000;
   const ratios = [A, S].map((r) => lateRatio(r?.pacing)).filter((r) => r !== null);
-  const ratio = ratios.length ? Math.max(...ratios) : null;
+  let ratio = ratios.length ? Math.max(...ratios) : null;
   ax.speed = ok2 && ratio !== null && ratio >= 0.9 ? 'ok' : 'n/a';
-  return { A, B, L, S, ax, ratio, novel, baselineDistinct: baseline.size };
+  // A browser pair decides only when it agrees with itself: the host moves one run, not two alike.
+  const br = browser.get(sha.slice(0, 12)) ?? [];
+  const bv = ok2 ? browserVerdict(br) : null;
+  if (bv) [ratio, ax.speed] = bv;
+  return { A, B, L, S, ax, ratio, br, novel, baselineDistinct: baseline.size };
 }
 
 function maxRun(hs) {
@@ -328,6 +380,34 @@ const displayTitle = (p) =>
     .replace(/\s*[[(（][^\])）]*[\])）]\s*$/, '')
     .trim();
 
+if (cmd === 'selftest') {
+  // One browser run whose ratio is 1 - added/period: 10 frames/s over 10 s, one 100 ms sleep per frame.
+  const run = (p, extra = {}) => ({ loopHz: 10, win: 10, err: null, ...extra, pacing: { sleeps: 100, sleep_ms_p95: 100, sleep_late_sum: 0, timers: 0, timer_late_sum: 0, paints: 100, yields: 100, redraw_sum: 0, gc_ms: 0, ...p } });
+  const near = (a, b) => a !== null && Math.abs(a - b) < 1e-9;
+  const cases = [
+    ['on time reads 1', near(browserRatio(run({})), 1)],
+    ['20 ms late per 100 ms frame reads 0.8', near(browserRatio(run({ sleep_late_sum: 2000 })), 0.8)],
+    ['a GC counts', near(browserRatio(run({ gc_ms: 500 })), 0.95)],
+    ['an errored run says nothing', browserRatio(run({}, { err: 'exited' })) === null],
+    ['sleep(0) asks for no period', browserRatio(run({ sleep_ms_p95: 0, sleep_late_sum: 2000 })) === null],
+    ['a timer is a wait', near(browserRatio(run({ sleeps: 0, timers: 100, timer_late_sum: 1000 })), 0.9)],
+    ['lateness past the frame says nothing', browserRatio(run({ sleep_late_sum: 20000 })) === null],
+    ['5 waits per frame: 0.95 stands', near(browserRatio(run({ sleeps: 500, sleep_late_sum: 500 })), 0.95)],
+    ['5 waits per frame: 0.8 is dropped', browserRatio(run({ sleeps: 500, sleep_late_sum: 2000 })) === null],
+    ['one pair within 10% is a verdict', browserVerdict([0.8, 0.85])?.[1] === 'slow' && browserVerdict([0.95, 0.9])?.[1] === 'ok'],
+    ['a pair that disagrees is not', browserVerdict([0.7, 0.85]) === null && browserVerdict([0.8]) === null],
+    ['the verdict takes the lower reading', browserVerdict([0.95, 0.9])?.[0] === 0.9],
+    ['a starved probe is not recorded', starvedProbe({ stop: 'deadline', paints: 0, ticks: 3 })],
+    ['a probe that painted is', !starvedProbe({ stop: 'deadline', paints: 1, ticks: 3 })],
+    ['a deadline after 100 ticks is a real hang', !starvedProbe({ stop: 'deadline', paints: 0, ticks: 100 })],
+    ['an error is a real failure', !starvedProbe({ stop: 'error', paints: 0, ticks: 3 })],
+  ];
+  const bad = cases.filter(([, ok]) => !ok);
+  for (const [name] of bad) console.error(`selftest FAIL: ${name}`);
+  console.log(`selftest: ${cases.length - bad.length}/${cases.length}`);
+  process.exit(bad.length ? 1 : 0);
+}
+
 if (cmd === 'run') {
   if (!opt.bin || opt.dirs.length === 0) {
     console.error('run needs --bin <wie_validate> and at least one corpus dir');
@@ -341,6 +421,7 @@ if (cmd === 'run') {
   writeFileSync(join(out, 'population.json'), JSON.stringify({ ...pop, titles: all, dirs: [...new Set([...(prev?.dirs ?? []), ...opt.dirs.map((d) => resolve(d))])] }));
   console.error(`population: ${pop.files} files -> ${pop.titles.length} unique · excluded dirs ${JSON.stringify(pop.excluded)} · jobs ${opt.jobs}`);
   if (!opt.only || opt.only === 'probe') await pool(pop.titles, opt.jobs, probe);
+  if (starved) console.error(`★${starved} probes starved (deadline, < 100 ticks, 0 paints) — not recorded; run again when the host is quieter`);
   if (opt.only === 'speed') {
     const slow = pop.titles.filter((t) => {
       const j = judge(t.sha);
@@ -361,7 +442,7 @@ if (cmd === 'run') {
   const prs = opt.prs ? read(resolve(opt.prs)) : [];
   const extra = opt.changes ? read(resolve(opt.changes)) : {};
   const entries = [];
-  const rows = [['sha256', 'platform', 'model', 'title', 'status', 'boot', 'render', 'input', 'longplay', 'sound', 'speed', 'ratio', 'paints', 'distinct', 'novel', 'base_distinct', 'audio', 'still', 'reasonA', 'reasonL', 'load1']];
+  const rows = [['sha256', 'platform', 'model', 'title', 'status', 'boot', 'render', 'input', 'longplay', 'sound', 'speed', 'ratio', 'browser', 'paints', 'distinct', 'novel', 'base_distinct', 'audio', 'still', 'reasonA', 'reasonL', 'load1']];
   const clusters = new Map();
   for (const t of pop.titles) {
     const j = judge(t.sha);
@@ -396,6 +477,7 @@ if (cmd === 'run') {
       st,
       ...Object.values(j.ax),
       j.ratio?.toFixed(3) ?? '',
+      j.br.map((x) => x.toFixed(3)).join('/'),
       j.A.paints,
       j.A.distinct_colors,
       j.novel,
