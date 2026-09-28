@@ -1,0 +1,44 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-2026-09-28-wie-census-ktf-runtime-crash-trio-10-adopt-p1",
+  "title": "KTF DB 가 패키지 P/ 파일을 본다 · MC_dbExists 극성 0=있음",
+  "summary": "KTF DB 판정(exists·stat)과 읽기 open 이 zip P/ 파일을 저장 기록이 없을 때의 시드로 본다. 그 과정에서 slot 16 MC_dbExists 의 반환이 게스트 기대와 반대(1=있음)였음을 디스어셈블·전수로 확인해 0=있음/-12=없음으로 뒤집었다. 155972cac664 가 저장된 판으로 게임 화면까지 간다.",
+  "changes": [
+    "wie-wipi-c/src/api/database.rs — read_packaged_database P/ 폴백 · stat/exists KTF · open mode 4 는 P/ 시드 제외 · 시험 3",
+    "wie-backend/src/system/file_system.rs — FilesystemOverlay::virtual_file",
+    "docs/report/0340"
+  ],
+  "verification": [
+    "KTF 266종 전/후 + 나빠진 17종·DB 닿는 10종 3회 재측 — 회귀 0 (docs/report/0340)",
+    "변이 3건 각각 red",
+    "엔진 러너 블록 전건 PASS"
+  ],
+  "limits": [
+    "극성의 의미는 155972cac664 한 타이틀의 행동으로 확정 — 나머지 17종은 cmp r0,#0 까지만 실측",
+    "slot 16 타이틀 4종은 FAIL 이 사라졌지만 이 부하에서 대부분 max-ticks UNMEASURED"
+  ],
+  "adoptedProposals": ["2026-09-28-wie-census-ktf-runtime-crash-trio-10#p1"],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "04159045a7ea 15단계의 PC 0 «Undefined instruction»",
+      "plainSummary": "저장 파일을 읽게 되자 1단계에서 끝나던 게임이 한참 더 가는데, 네 번 중 한 번은 15단계쯤에서 멈춘다.",
+      "userBenefit": "그 게임을 끝까지 할 수 있게 된다.",
+      "why": "이번 회차 전에는 이 게임이 1단계를 넘은 적이 없어서 보이지 않던 벽이다. 레지스터가 전부 0 이고 PC 0 이라 널 콜백 호출로 보인다.",
+      "tradeoff": "4회 중 1회만 재현됐다 — 부하 의존인지부터 가려야 한다.",
+      "effort": "M",
+      "target": "04159045a7ea (KTF)"
+    },
+    {
+      "kind": "product",
+      "title": "slot 16 극성 — 나머지 17종의 래퍼가 결과를 어느 쪽으로 쓰는지 확인",
+      "plainSummary": "저장 확인 함수의 답을 뒤집은 근거가 한 게임의 동작뿐이다. 다른 게임들도 같은 뜻으로 쓰는지 확인한다.",
+      "userBenefit": "저장·이어하기가 다른 게임에서도 맞게 동작한다는 확신이 생긴다.",
+      "why": "18종이 모두 0 과 비교한다는 것까지는 실측했지만, 그 bool 을 «있음»으로 쓰는지는 155972cac664 에서만 따라갔다.",
+      "tradeoff": "타이틀마다 래퍼 호출부를 따라가야 한다(ktf-image-sweep window) — 기계적이지만 손이 든다.",
+      "effort": "S",
+      "target": "KTF slot 16 호출 18종 · wie-wipi-c database.rs"
+    }
+  ]
+}
