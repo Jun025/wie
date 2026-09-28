@@ -1,0 +1,36 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-29",
+  "task": "wie-2026-09-28-wec-stack-vtable-33-adopt-p0",
+  "title": "월드장기체스 — java/util/Vector 19 = indexOf(Object) (호출부 디스어셈블) · 27키 PASS",
+  "summary": "Vector 에 객체 하나(r1)만 넘겨 19 번 칸을 부르고 int 결과를 <<16 해 위치값으로 저장한다. r2 는 쓰이지 않아 (Object,int) 가 아니고, 반환이 위치값이라 contains 도 아니다. CLDC 1.1 순서도 19 = indexOf(Object) 다(제안 원문의 indexOf(Object,int) 추정은 한 칸 어긋났다). --inject 가 1/27 FAIL 에서 27/27 PASS 로 바뀌었지만, 요금 안내문 다음 화면이 흰 화면에 멈춰 키에 반응하지 않는다.",
+  "changes": [
+    "wie-lgt/data/lgt_java_abi.toml — Vector 블록 19 행 1줄 + 근거 주석",
+    "wie-lgt/src/runtime/java/jvm_support.rs — ABI 핀 테스트에 19 행 1줄",
+    "docs/report/0363"
+  ],
+  "verification": [
+    "전: --inject FAIL · input_steps 1/27 · paints 83 · java/util/Vector vtable index 19 (lr 0x2b19c)",
+    "후: --inject 3/3 PASS · input_steps 27/27 · paints 441/430/499 · rc=0",
+    "변이: indexOf 행만 제거 → 핀 테스트 FAILED"
+  ],
+  "limits": [
+    "호출부 1곳",
+    "키 6 이후 프레임이 전부 같다 — 흰 화면에 멈춰 아직 플레이 불가"
+  ],
+  "adoptedProposals": [
+    "2026-09-28-wec-stack-vtable-33#p0"
+  ],
+  "proposals": [
+    {
+      "title": "월드장기체스 — 요금 안내문 다음 화면이 흰 화면에 멈춘다(예외 없음)",
+      "plainSummary": "Vector 19 를 채우자 월드장기체스가 키를 모두 받지만, 안내문 다음 화면이 흰 바탕에 작은 점 하나만 있는 채로 멈춰 어떤 키에도 바뀌지 않습니다.",
+      "userBenefit": "안내문에서 멈춰 있는 타이틀이 메뉴·대국 화면으로 넘어가 실제로 둘 수 있게 됩니다.",
+      "why": "이 회차 후 --inject 는 27/27 PASS 지만 --shotdir 캡처를 해시하면 키 6~27 과 t10·t15 가 전부 같은 프레임(흰 바탕·청록 표식 하나·12색)이다. paints 는 계속 늘어 그리기는 반복된다. Unimplemented·새 예외가 없어 validator 는 이 멈춤을 보지 못한다.",
+      "tradeoff": "예외가 없는 조용한 벽이라 원인 후보(그리기 경로 · 이미지 로드 · 키 처리 · 입력 대기)를 캡처와 로그로 좁혀야 하고, 한 회차에 고쳐지지 않을 수 있다.",
+      "effort": "M",
+      "target": "wie",
+      "kind": "product"
+    }
+  ]
+}
