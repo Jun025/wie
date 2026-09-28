@@ -58,3 +58,5 @@
 - `node scripts/corpus-name-inflow.mjs`: BOUNDED **5쌍(6회)** + SUFFIX-ATTACHED **0쌍**. 5쌍 전부 이 회차가 고친 파일의 **기존 줄**이다
   (`system.rs`·`display.rs` 의 페이싱 주석 · `graphics.rs` 의 null-guard 주석) — `git diff origin/main...HEAD` 의 추가·삭제 줄에서 그 이름 0회.
   이 회차가 새로 들인 타이틀 표기는 sha 앞 12자뿐이다.
+
+<!-- corpus-name-inflow v1 subjects=8 tree=b4a776c0f995f04e B=6/5 P=0/0 S=0/0 -->
