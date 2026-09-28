@@ -75,3 +75,7 @@ UNMEASURED(max-ticks · load 147) → `--max-ticks 500000000` 로 전·후 둘 �
 
 ### 되돌리면 red
 `LGT_MEMORY` 를 `0x100000` 으로 → `wipic_memory_queries_clear_the_low_memory_notice` FAILED «free 1048576 would show the low-memory notice».
+
+### 게임명 유입
+`node scripts/corpus-name-inflow.mjs`(대상 3파일): BOUNDED **11회/6쌍** · SUFFIX-ATTACHED **0**. 11회는 전부 `wie-lgt/src/runtime/wipi_c.rs`
+의 **기존 줄**이다 — `git diff origin/main` 의 추가 줄에서 같은 이름을 세면 0. 이 회차가 새로 들인 게임명은 0, 타이틀은 sha12 로 적었다.
