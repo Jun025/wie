@@ -57,3 +57,4 @@ fps 창에는 부팅 1.5초가 들어 있어 실제 판 속도보다 조금 낮�
 ### 게이트
 - 로컬 4게이트: fmt ✅ · `cargo clippy --all -- -D warnings` ✅ · wasm clippy ✅ · `RUST_MIN_STACK=4194304 cargo test --all` rc 0 ✅ · `cargo +beta clippy --all -- -D warnings` rc 0 ✅
 - `npm run audit` PASS
+- 게임 파일명 유입(`corpus-name-inflow`): BOUNDED 0 · SUFFIX-ATTACHED 0 — 판단 필요 0건
