@@ -50,6 +50,9 @@
 //! overclaim as calling zero that, only smaller. The corpus measurement behind the widening,
 //! and the two titles it costs, are recorded on `inject_unmeasured` itself.
 //!
+//! `frozen_tail_steps` answers the other half: keys delivered, but did the screen react? It
+//! counts the trailing steps whose shot equals the previous one (report-only; see `Outcome`).
+//!
 //! Four opt-in flags change the schedule; with none given it is byte-for-byte the old one
 //! (`plan_schedule_defaults_unchanged_test`):
 //!
@@ -1092,7 +1095,7 @@ fn svc_stub_exhausted_outcome() -> Outcome {
 fn result_line(file: &str, result: &Outcome, tallies: &Tallies, elapsed_ms: u128) -> String {
     format!(
         "{{\"file\":{:?},\"platform\":{:?},\"result\":{:?},\"reason\":{:?},\"stop\":{:?},\
-         \"input_steps\":{},\"input_steps_total\":{},\
+         \"input_steps\":{},\"input_steps_total\":{},\"frozen_tail_steps\":{},\
          \"ticks\":{},\"paints\":{},\"content\":{},\
          \"last_frame_content\":{},\
          \"distinct_colors\":{},\"nondominant_pct\":{:.1},\"center_nonuniform_pct\":{:.1},\
@@ -1105,6 +1108,7 @@ fn result_line(file: &str, result: &Outcome, tallies: &Tallies, elapsed_ms: u128
         result.stop,
         result.input_steps,
         result.input_steps_total,
+        result.frozen_tail_steps,
         result.ticks,
         result.paints,
         result.content,
@@ -1142,6 +1146,11 @@ struct Outcome {
     /// needed to write down "28 steps ran" — a flag cannot say that.
     input_steps: u64,
     input_steps_total: u64,
+    /// `--inject` only: how many of the LAST input steps left the screen byte-identical to the
+    /// step before them (`frozen_tail`). A PASS says «did not stop», not «reacted»: 월드장기체스
+    /// passed 27/27 while every key from the first on showed the same frame. Measure-only — a
+    /// title may legitimately ignore the last few scripted keys, so no threshold is invented.
+    frozen_tail_steps: u64,
     ticks: u64,
     paints: u64,
     content: bool,
@@ -1262,6 +1271,9 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
         scripted: input_steps_total,
     };
 
+    // Hash of the frame at each step shot (`00_boot` and one per scripted step, not `tNNN`).
+    let mut step_frames: Vec<u64> = Vec::new();
+
     let mut pacing_open = args.pacing == Some(0.0);
     let mut relaunches = 0u32;
     loop {
@@ -1311,9 +1323,13 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
                         break;
                     }
                 }
-                ScheduledEv::Shot(label) => {
+                ScheduledEv::Shot(label, step) => {
+                    let last_frame = screen.last_frame.lock().unwrap();
+                    if *step {
+                        step_frames.push(last_frame.as_deref().map_or(0, frame_hash));
+                    }
                     if let Some(dir) = &args.shotdir
-                        && let Some(frame) = screen.last_frame.lock().unwrap().as_ref()
+                        && let Some(frame) = last_frame.as_ref()
                     {
                         let _ = save_png(&dir.join(format!("{stem}__{label}.png")), frame, SCREEN_W, SCREEN_H);
                     }
@@ -1441,6 +1457,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     outcome.nondominant_bp = screen.max_nondominant_bp.load(Ordering::SeqCst);
     outcome.center_nonuniform_bp = screen.max_center_nonuniform_bp.load(Ordering::SeqCst);
 
+    outcome.frozen_tail_steps = frozen_tail(&step_frames);
     outcome.pacing = pacing;
     outcome.relaunches = (args.relaunch > 0).then_some(relaunches);
     judge(&mut outcome, args.inject, args.expect_last_frame, stop, inputs);
@@ -1534,7 +1551,7 @@ fn plan_schedule(args: &Args) -> (Vec<(f64, ScheduledEv)>, f64, u64) {
         let script = args.keys.as_ref().map_or(&default[..], |k| &k.0[..]);
         let script = &script[..args.inject_keys.map_or(script.len(), |n| n.min(script.len()))];
         input_steps_total = script.iter().filter(|s| s.key.is_some()).count() as u64;
-        schedule.push((args.boot_secs, ScheduledEv::Shot("00_boot".into())));
+        schedule.push((args.boot_secs, ScheduledEv::Shot("00_boot".into(), true)));
         let mut t = args.boot_secs + 0.3;
         for (i, step) in script.iter().enumerate() {
             let label = format!("{:02}_{}", i + 1, step.name);
@@ -1543,7 +1560,7 @@ fn plan_schedule(args: &Args) -> (Vec<(f64, ScheduledEv)>, f64, u64) {
                 schedule.push((t, ScheduledEv::Key(kc, true, label.clone())));
                 schedule.push((t + step.hold.unwrap_or(0.15), ScheduledEv::Key(kc, false, label.clone())));
             }
-            schedule.push((t + gap - 0.05, ScheduledEv::Shot(label)));
+            schedule.push((t + gap - 0.05, ScheduledEv::Shot(label, true)));
             t += gap;
         }
         if !args.keep_timeout {
@@ -1554,7 +1571,7 @@ fn plan_schedule(args: &Args) -> (Vec<(f64, ScheduledEv)>, f64, u64) {
     if let Some(every) = args.shot_every {
         let mut k = every;
         while k < deadline_secs {
-            schedule.push((k, ScheduledEv::Shot(format!("t{k:05.1}"))));
+            schedule.push((k, ScheduledEv::Shot(format!("t{k:05.1}"), false)));
             k += every;
         }
         // Stable sort: same-instant events keep their scripted order.
@@ -1652,8 +1669,20 @@ fn positive_secs(s: &str) -> std::result::Result<f64, String> {
 enum ScheduledEv {
     /// key code, is_down, step label
     Key(KeyCode, bool, String),
-    /// screenshot with step label
-    Shot(String),
+    /// screenshot with step label; true for `00_boot` and the per-step shots, false for `--shot-every`
+    Shot(String, bool),
+}
+
+fn frame_hash(frame: &[u32]) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    frame.hash(&mut hasher);
+    hasher.finish()
+}
+
+/// Trailing steps whose shot equals the shot before it. `hashes[0]` is `00_boot`.
+fn frozen_tail(hashes: &[u64]) -> u64 {
+    hashes.windows(2).rev().take_while(|w| w[0] == w[1]).count() as u64
 }
 
 #[allow(clippy::type_complexity)]
@@ -1809,6 +1838,7 @@ fn pass(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         stop: STOP_BEFORE_LOOP,
         input_steps: 0,
         input_steps_total: 0,
+        frozen_tail_steps: 0,
         reason,
         ticks,
         paints,
@@ -1833,6 +1863,7 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         stop: STOP_BEFORE_LOOP,
         input_steps: 0,
         input_steps_total: 0,
+        frozen_tail_steps: 0,
         reason,
         ticks,
         paints,
@@ -2445,11 +2476,24 @@ mod tests {
         super::plan_schedule(&args)
     }
 
+    #[test]
+    fn frozen_tail_counts_trailing_unchanged_steps_test() {
+        use super::frozen_tail;
+        // boot, then a key that changes the screen, then three that do not (월드장기체스's shape).
+        assert_eq!(frozen_tail(&[1, 2, 2, 2, 2]), 3);
+        // A frame that changes on the last key is not frozen, whatever came before.
+        assert_eq!(frozen_tail(&[1, 1, 1, 2]), 0);
+        // Only the tail counts: an unchanged run in the middle is not reported.
+        assert_eq!(frozen_tail(&[1, 2, 2, 3, 4]), 0);
+        assert_eq!(frozen_tail(&[7]), 0);
+        assert_eq!(frozen_tail(&[]), 0);
+    }
+
     fn shots(schedule: &[(f64, super::ScheduledEv)]) -> Vec<String> {
         schedule
             .iter()
             .filter_map(|(_, e)| match e {
-                super::ScheduledEv::Shot(l) => Some(l.clone()),
+                super::ScheduledEv::Shot(l, _) => Some(l.clone()),
                 _ => None,
             })
             .collect()

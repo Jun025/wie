@@ -1,0 +1,40 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-29",
+  "task": "wie-2026-09-29-wec-vector-vtable-19-adopt-p0",
+  "title": "월드장기체스 — 흰 화면 멈춤은 repaint 영역을 버린 클립 · 부분 repaint 를 paint 클립으로 · frozen_tail_steps",
+  "summary": "게임이 부분 영역 repaint(60,138,120,46)을 요청하고 paint 에서 getClipWidth 로 그 요청이 왔는지 확인하는데, 엔진은 영역을 버리고 늘 전체 클립(240)을 주어 게임이 매 프레임 같은 요청만 반복했다. Display 가 repaint 영역의 합집합을 paint 클립으로 쓰고 CardCanvas 가 카드마다 reset 하며 그 클립을 되살리게 했다. 흰 화면 루프를 벗어나 제작사 로고까지 가고, 다음 벽 java/util/Vector 17 에서 멈춘다. wie_validate 에 보고 전용 frozen_tail_steps 를 더했다.",
+  "changes": [
+    "wie-midp/src/classes/javax/microedition/lcdui/display.rs — repaint 영역 합집합 필드 4개 · paint_clip · 테스트 1",
+    "wie-wipi-java/src/classes/net/wie/card_canvas.rs — 들어온 클립을 카드마다 clipRect 로 재적용",
+    "wie-wipi-java/src/classes/org/kwis/msp/lcdui/card.rs — 카드 캔버스 테스트 기대값 교정(클립 밖은 칠하지 않는다)",
+    "wie_cli/src/bin/wie_validate.rs — frozen_tail_steps(보고 전용) · 테스트 1",
+    "docs/report/0368"
+  ],
+  "verification": [
+    "전: --inject PASS 27/27 · 캡처 01~27 전부 같은 프레임(같은 술어로 26)",
+    "후: ×4 FAIL · 키마다 다른 프레임(로고) · java/util/Vector vtable index 17",
+    "변이: CardCanvas clipRect 제거 → 카드 테스트 FAILED · paint_clip 전체 고정 → 클립 테스트 FAILED",
+    "cargo test --all 589 passed / 0 failed"
+  ],
+  "limits": [
+    "원인 측정은 한 타이틀",
+    "Vector 17 에서 멈춘다 — 아직 플레이 불가",
+    "upstream 과 display.rs·card_canvas.rs 두 파일이 갈린다"
+  ],
+  "adoptedProposals": [
+    "2026-09-29-wec-vector-vtable-19#p0"
+  ],
+  "proposals": [
+    {
+      "title": "월드장기체스 — 로고 다음 java/util/Vector vtable index 17 미구현 벽",
+      "plainSummary": "흰 화면 멈춤이 풀리자 월드장기체스가 제작사 로고까지 나오지만, 두세 번째 키에서 Vector 17 번 칸이 비어 멈춥니다.",
+      "userBenefit": "로고 다음 화면(메뉴)으로 넘어가 실제 플레이에 한 걸음 더 가까워집니다.",
+      "why": "이 회차 후 --inject 4판 모두 키 2~3 에서 `Unimplemented: java/util/Vector vtable index 17` 로 멈춘다(재현 4/4). 0351·0358·0363 과 같은 모양의 벽이다.",
+      "tradeoff": "호출부 디스어셈블로 17 번이 무엇인지(CLDC 순서상 후보 여럿) 모양과 순서로 가려야 한다. 한 줄 추가지만 틀리게 채우면 조용한 오동작이 된다.",
+      "effort": "S",
+      "target": "wie",
+      "kind": "product"
+    }
+  ]
+}
