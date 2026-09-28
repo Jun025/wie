@@ -8,7 +8,7 @@
 //   { t: "stop", h: handle }
 //   { t: "evict", h: handle }   — forget the handle's sequence; audio.rs resends `ev` on its next play
 //   { t: "gain", h: handle, g } — the game's volume for that handle (0..1): its playback now, else its next play
-//   { t: "stats" }              — replies { t: "stats", sequences, playbacks, voices, soundfont, synths, idle, built } on the port
+//   { t: "stats" }              — replies { t: "stats", sequences, playbacks, voices, soundfont, synths, idle, built, work } on the port
 //   { t: "sf", data: ArrayBuffer } — a soundfont (sf2/sf3) fetched by audio.rs after the first play; replies
 //                                   { t: "sf", ok, ms?, error? }. Plays that start after it parses use it.
 // `ev` rides only on the first play of a handle (a handle's sequence never changes); later plays
@@ -31,6 +31,14 @@
 // gain stay per handle, as with FM). A playback already running keeps FM until it is played again —
 // no mid-note switch. PCM always stays on the path below. No prelude, no URL, a failed fetch or a
 // failed parse all leave everything on FM: the soundfont can only add, never take away.
+//
+// Nothing slow runs inside a message or a play (docs/report 0359 measured a first soundfont play
+// holding the audio thread 156 ms on an Android emulator, over its 90.8 ms output buffer). Parsing,
+// building a synth and decoding a sample (sf3 is Vorbis, decoded on first use) are queued as work
+// items that `process()` runs one at a time, resting after each (WORK_REST). A new play whose
+// instruments are not decoded yet plays FM and queues exactly the samples its notes reach — so the
+// memory is what lazy decoding would have used — and the next play of it uses the soundfont.
+// Sequences already resident when the soundfont arrives are queued at once.
 //
 // Those synths are bounded (MAX_SF_SYNTHS) and reused. Nearly all of a synth's cost is its effects
 // (reverb/chorus), paid whether it has 0 voices or 8, so the cost grows with the number of synths,
@@ -65,6 +73,12 @@ const SF_TAIL_S = 1.0;
 // bounds the soundfont at ~12% on the desktop it was measured on — BGM plus two MIDI effects at once.
 // A 4th concurrent MIDI play takes the slot of a synth that is only playing its tail, else plays FM.
 const MAX_SF_SYNTHS = 3;
+// After a work item that held the thread d ms, the next waits until WORK_REST × d ms of audio has
+// been rendered: work takes at most 1/(1+WORK_REST) of the thread, and the output buffer that the
+// item drained refills before the next one. The largest single sample decodes in ~2-5 ms on a
+// desktop (~15x that on the emulator), so one item stays under a 90 ms buffer where a whole
+// instrument did not.
+const WORK_REST = 2;
 
 // One patch per GM family (program >> 3). ratio/index: FM modulator; idecay: modulator index
 // time constant (0 = constant); isus: index floor as a fraction; a: attack s; d: decay time
@@ -136,6 +150,10 @@ class WieAudioProcessor extends AudioWorkletProcessor {
     this.synths = []; // { handle, pb, synth, stopping, fade, tail } — soundfont synths still rendering
     this.idle = []; // reset synths ready for the next play; synths.length + idle.length <= MAX_SF_SYNTHS
     this.built = 0; // synths ever constructed (stats — the pool keeps this at MAX_SF_SYNTHS or below)
+    this.building = 0; // synths queued for construction
+    this.work = []; // slow soundfont steps, run one per rest from process()
+    this.queued = new Set(); // samples already in `work`
+    this.rest = 0; // frames to render before the next work item
     this.scratch = null;
     this.port.onmessage = (event) => this.onMessage(event.data);
   }
@@ -163,12 +181,14 @@ class WieAudioProcessor extends AudioWorkletProcessor {
         synths: this.synths.length,
         idle: this.idle.length,
         built: this.built,
+        work: this.work.length,
       });
   }
 
   // Parses on the audio thread, as spessasynth_lib does: the bank object is not transferable, and a
-  // second copy on the main thread would stall the emulator instead. Anything that goes wrong
-  // leaves `bank` null, which is exactly the FM path.
+  // second copy on the main thread would stall the emulator instead. Parsing and the first synth are
+  // two work items, so the two stalls do not add up. Anything that goes wrong leaves `bank` null,
+  // which is exactly the FM path.
   async loadSoundfont(data) {
     const lib = globalThis.wieSoundfont;
     if (!lib || this.soundfont !== "none") {
@@ -176,20 +196,100 @@ class WieAudioProcessor extends AudioWorkletProcessor {
       return;
     }
     this.soundfont = "loading";
-    try {
-      await lib.ready;
-      const started = Date.now();
-      const bank = lib.SoundBankLoader.fromArrayBuffer(data);
-      // A synth that cannot be built fails here, once, rather than on every later play — and the
-      // one built here is the first play's, so that play does not pay for construction either.
-      this.idle.push(this.newSynth(lib, bank));
-      this.bank = bank;
-      this.soundfont = "ready";
-      this.port.postMessage({ t: "sf", ok: true, ms: Date.now() - started });
-    } catch (error) {
+    let ms = 0;
+    let bank = null;
+    const fail = (error) => {
       this.soundfont = "failed";
       this.port.postMessage({ t: "sf", ok: false, error: String(error) });
+    };
+    try {
+      await lib.ready;
+    } catch (error) {
+      fail(error);
+      return;
     }
+    this.work.push(() => {
+      const started = Date.now();
+      // The loader formats the file's creation date with toLocaleString for a log line that is
+      // switched off, and a thread's first toLocaleString builds an ICU formatter: parse holds the
+      // audio thread ~30% longer for it (27-37 ms → 18-21 ms, headless Chromium, docs/report 0360).
+      const toLocaleString = Date.prototype.toLocaleString;
+      Date.prototype.toLocaleString = Date.prototype.toISOString;
+      try {
+        bank = lib.SoundBankLoader.fromArrayBuffer(data);
+      } catch (error) {
+        fail(error);
+      } finally {
+        Date.prototype.toLocaleString = toLocaleString;
+      }
+      ms += Date.now() - started;
+    });
+    // A synth that cannot be built fails here, once, rather than on every later play.
+    this.work.push(() => {
+      if (!bank) return;
+      const started = Date.now();
+      try {
+        this.idle.push(this.newSynth(lib, bank));
+      } catch (error) {
+        fail(error);
+        return;
+      }
+      this.bank = bank;
+      this.soundfont = "ready";
+      this.port.postMessage({ t: "sf", ok: true, ms: ms + Date.now() - started });
+      for (const seq of this.sequences.values()) this.decoded(seq);
+    });
+  }
+
+  // Runs at most one work item per call: none while resting from the last one.
+  runWork(frames) {
+    if (this.rest > 0) {
+      this.rest -= frames;
+      return;
+    }
+    const started = Date.now();
+    this.work.shift()();
+    this.rest = ((Date.now() - started) * WORK_REST * sampleRate) / 1000;
+  }
+
+  // True when every sample this sequence's notes reach is decoded; otherwise queues the missing
+  // ones. The set is computed once per sequence, from its own program changes and bank selects —
+  // the same patch the synth would select (drums on channel 10).
+  decoded(seq) {
+    if (!seq.samples) {
+      const samples = new Set();
+      const patches = [];
+      for (let ch = 0; ch < 16; ch++) patches.push({ program: 0, bankMSB: 0, bankLSB: 0, isGMGSDrum: ch === 9 });
+      const presets = new Map();
+      for (const event of seq.events) {
+        const data = event.midi;
+        if (!data) continue;
+        const type = data[0] & 0xf0;
+        const patch = patches[data[0] & 0x0f];
+        if (type === 0xc0) patch.program = data[1];
+        else if (type === 0xb0 && data[1] === 0) patch.bankMSB = data[2];
+        else if (type === 0xb0 && data[1] === 32) patch.bankLSB = data[2];
+        else if (type === 0x90 && data[2] > 0) {
+          const key = `${patch.isGMGSDrum}:${patch.bankMSB}:${patch.bankLSB}:${patch.program}`;
+          if (!presets.has(key)) presets.set(key, this.bank.getPreset(patch, "gs"));
+          const preset = presets.get(key);
+          if (preset) for (const params of preset.getVoiceParameters(data[1], data[2])) samples.add(params.sample);
+        }
+      }
+      seq.samples = [...samples];
+    }
+    let ready = true;
+    for (const sample of seq.samples) {
+      if (sample.audioData) continue;
+      ready = false;
+      if (this.queued.has(sample)) continue;
+      this.queued.add(sample);
+      this.work.push(() => {
+        sample.getAudioData();
+        this.queued.delete(sample);
+      });
+    }
+    return ready;
   }
 
   newSynth(lib, bank) {
@@ -201,9 +301,17 @@ class WieAudioProcessor extends AudioWorkletProcessor {
 
   // A synth for a new play: an idle one, a new one while under the cap, or — at the cap — the one
   // that has been playing only its tail the longest (its reverb ends early). null = play FM.
+  // A synth that has to be built is queued instead, and this play is FM.
   takeSynth() {
     if (this.idle.length) return this.idle.pop();
-    if (this.synths.length < MAX_SF_SYNTHS) return this.newSynth(globalThis.wieSoundfont, this.bank);
+    if (this.synths.length + this.building < MAX_SF_SYNTHS) {
+      this.building++;
+      this.work.push(() => {
+        this.building--;
+        this.idle.push(this.newSynth(globalThis.wieSoundfont, this.bank));
+      });
+      return null;
+    }
     // Already silent (stopped and faded) first, then the furthest into its tail.
     const spent = (entry) => (entry.fade === 0 ? 1e12 : 0) + entry.tail;
     let victim = -1;
@@ -252,7 +360,7 @@ class WieAudioProcessor extends AudioWorkletProcessor {
     const gain = this.gains.get(message.h) ?? 1;
     this.gains.delete(message.h);
     const playback = { seq, start: currentFrame, repeat: !!message.r, next: 0, channels: newChannels(), gain, sf: null };
-    if (this.bank) playback.sf = this.takeSynth();
+    if (this.bank && this.decoded(seq)) playback.sf = this.takeSynth();
     if (playback.sf) this.synths.push({ handle: message.h, pb: playback, synth: playback.sf, stopping: false, fade: 1, tail: 0 });
     this.playbacks.set(message.h, playback);
   }
@@ -429,6 +537,7 @@ class WieAudioProcessor extends AudioWorkletProcessor {
     }
     this.voices = alive;
     if (this.synths.length) this.mixSynths(left, right, frames);
+    if (this.work.length) this.runWork(frames);
 
     for (let i = 0; i < frames; i++) {
       left[i] = Math.tanh(left[i]);

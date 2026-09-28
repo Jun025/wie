@@ -736,6 +736,7 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     //   S2  URL, file arrives while the worklet module is still loading (Arrived)
     //   S3  URL, module ready long before the first play (NotRequested must survive on_ready)
     //   S4  URL that 404s — warned, FM, no prelude, no error
+    //   S5  (in S3's run) an instrument not decoded yet — its first play is FM, the next is the soundfont
     const log = [];
     const t0 = performance.now();
     const at = () => performance.now() - t0;
@@ -932,6 +933,39 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
         "S3: the next play renders through the soundfont only (synth 1+, FM voices 0), and it is audible",
         quiet && playedSf && stats.soundfont === "ready" && stats.synths >= 1 && stats.voices === 0 && level > 1e-3,
         `soundfont ${stats.soundfont} · synths ${stats.synths} · FM voices ${stats.voices} · output rms ${level.toFixed(4)}`,
+      );
+
+      // S5 — a play whose instrument the soundfont has not decoded yet (strings: the guest never
+      // used it) plays FM, and decoding it runs as queued work on the audio thread, never inside the
+      // play (docs/report 0359: a whole instrument decoded in the play held an Android emulator's
+      // audio thread 156 ms). Once that work is done, the next play of it is the soundfont. Posted
+      // straight to the node — the guest has one sound — on a handle audio.rs never allocates.
+      const node = run.node();
+      const H = 0x7fff0000;
+      const strings = [[0, 0, new Uint8Array([0xc0, 48])], [0, 0, new Uint8Array([0x90, 64, 110])], [700, 0, new Uint8Array([0x80, 64, 0])]];
+      const idleAgain = async () => {
+        for (let i = 0; i < 60; i++) {
+          const st = await statsOf(run.emu, node);
+          if (st.voices === 0 && st.synths === 0 && st.work === 0) return true;
+          await pump(run.emu, 200);
+        }
+        return false;
+      };
+      const quiet5 = await idleAgain();
+      node.rawPost({ t: "play", h: H, r: false, d: 800, ev: strings });
+      const { stats: fm5, level: fmLevel } = await sounding(run, (st, lv) => st.voices > 0 && lv > 1e-3);
+      check(
+        "S5: an instrument not decoded yet — its first play sounds on FM (no soundfont synth)",
+        quiet5 && fm5.soundfont === "ready" && fm5.synths === 0 && fm5.voices > 0 && fmLevel > 1e-3,
+        `idle before ${quiet5} · synths ${fm5.synths} · FM voices ${fm5.voices} · work ${fm5.work} · output rms ${fmLevel.toFixed(4)}`,
+      );
+      const decoded5 = await idleAgain();
+      node.rawPost({ t: "play", h: H, r: false, d: 800 });
+      const { stats: sf5, level: sfLevel } = await sounding(run, (st, lv) => st.synths >= 1 && lv > 1e-3);
+      check(
+        "S5: once its decode work is done, the next play of it renders through the soundfont only",
+        decoded5 && sf5.synths >= 1 && sf5.voices === 0 && sfLevel > 1e-3,
+        `work drained ${decoded5} · synths ${sf5.synths} · FM voices ${sf5.voices} · output rms ${sfLevel.toFixed(4)}`,
       );
       await close(run);
     }

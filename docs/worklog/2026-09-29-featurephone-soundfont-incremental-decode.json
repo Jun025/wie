@@ -1,0 +1,17 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-29",
+  "task": "wie-featurephone-soundfont-incremental-decode-fm-fallback",
+  "root": "2026-09-27-featurephone-soundfont-path-decision",
+  "title": "사운드폰트 켜기 전 완화 — 해독 안 된 악기의 첫 Play 는 FM · 해독은 양자마다 하나씩",
+  "summary": "파싱·합성기 생성·샘플 해독을 process() 가 하나씩 쉬어 가며 돌리는 작업 목록으로 옮기고, 음표가 닿는 샘플이 덜 풀린 Play 는 FM 으로 낸다. 에뮬레이터 7쌍에서 첫 사운드폰트 Play procMax 63 (24–206) → 14 (5–62) ms — baseLatency 90.8 ms 아래.",
+  "changes": ["wie_featurephone/src/audio_worklet.js", "scripts/check-audio-worklet.mjs", "scripts/contract-roundtrip.mjs (S5)", "scripts/soundfont-stall-probe.mjs (--worklet · synths 열)", "docs/report/0360"],
+  "verification": [
+    "에뮬레이터 7쌍: 첫 사운드폰트 Play procMax 63 → 14 (최대 206 → 62) · firstMs 97 → 69",
+    "check-audio-worklet 전건 OK · 변이 4종 red · contract-roundtrip 67/67 · S5 변이 red"
+  ],
+  "limits": ["실기 미검증: Galaxy S24 실기 · iOS Safari", "파싱 1회(에뮬레이터 중앙 90 · 최대 187 ms)와 가장 큰 샘플 하나(1회 231 ms)는 여전히 버퍼를 넘길 수 있다 — 둘 다 더 쪼갤 API 가 없다"],
+  "adoptedProposals": ["2026-09-28-featurephone-soundfont-stall-measure#p0"],
+  "declinedProposals": [],
+  "proposals": []
+}
