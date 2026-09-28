@@ -37,4 +37,4 @@ PASS 가 FAIL 로 간 것 0. 러너 줄(draw·helloworld×2·keydraw×2 `--injec
 
 게임 파일명 유입(`corpus-name-inflow --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 1회/1쌍 · SUFFIX-ATTACHED 0회/0쌍. BOUNDED 1회는 수정 파일 `jvm_support.rs` 의 기존 줄(main 에 이미 있음)이다 — 이 회차의 추가 줄 중 일치 0.
 
-<!-- corpus-name-inflow v1 subjects=5 tree=c6fa5c7c564e8999 B=1/1 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=5 tree=ec1ef57830095703 B=1/1 P=0/0 S=0/0 -->
