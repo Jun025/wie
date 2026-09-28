@@ -1,0 +1,27 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-28",
+  "task": "wie-featurephone-soundfont-engine-hardening-before-url-on",
+  "root": "2026-09-27-featurephone-soundfont-path-decision",
+  "title": "사운드폰트 엔진 보강 — 셸이 URL 을 켜기 전 선행 조건(F1~F3 · m1)",
+  "summary": "#381 게이트② 지적 넷을 닫았다. F1: 첫 워클릿 모듈은 URL 유무와 무관하게 워클릿만 — 프렐류드는 사운드폰트 파일이 온 뒤 두 번째 addModule. F2: 동시 사운드폰트 합성기 3개 상한 + 유휴 풀(초기화 · 리버브 비우기). F3: 소리 내는 픽스처 + 브라우저 왕복 Scenario S1–S4 가 audio.rs 상태기계의 전 화살표를 CI 에서 돈다. m1: 사운드폰트 Play 에서 FM 보이스 0 단언.",
+  "changes": [
+    "wie_featurephone/src/audio.rs — Soundfont::Prelude · load_prelude · module_url",
+    "wie_featurephone/src/audio_worklet.js — MAX_SF_SYNTHS · takeSynth · resetSynth · 유휴 풀 · stats idle/built",
+    "scripts/make-sound-fixture.mjs(신규) · scripts/make-draw-fixture.mjs ConstantPool.interfaceMethod",
+    "scripts/contract-roundtrip.mjs Scenario S1–S4 · scripts/check-audio-worklet.mjs 케이스 12(m1)·14·16–18 · 프렐류드 적재 순서",
+    "engine-contract.yml 엔진 필터 · 계약 constructorShapeNote 문안"
+  ],
+  "verification": [
+    "check-audio-worklet --require-soundfont 19/19 · 워클릿 변이 5종 전부 red",
+    "contract-roundtrip 65/65 · Rust/워클릿 변이 4종(재빌드) — docs/report 0355",
+    "첫 모듈 적재 Chromium 중앙 34.1 ms(종전 URL 있음) → 7.5 ms · 합성기 3개 CPU 12.4%"
+  ],
+  "limits": [
+    "프렐류드 평가(~30 ms)가 첫 소리 뒤 오디오 스레드에서 한 번 돈다 — 실기기 크기는 #381 worklog p1",
+    "네 번째 동시 MIDI 재생은 FM — 코퍼스의 동시 MIDI 핸들 분포 미측정"
+  ],
+  "adoptedProposals": ["2026-09-28-featurephone-soundfont-lazy-load#p0"],
+  "declinedProposals": [],
+  "proposals": []
+}

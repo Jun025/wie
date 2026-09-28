@@ -67,6 +67,11 @@ export class ConstantPool {
     const nt = this.nameAndType(name, desc);
     return this.#add(`m:${cls}:${name}:${desc}`, Buffer.concat([Buffer.from([10]), u2(c), u2(nt)]));
   }
+  interfaceMethod(cls, name, desc) {
+    const c = this.class_(cls);
+    const nt = this.nameAndType(name, desc);
+    return this.#add(`im:${cls}:${name}:${desc}`, Buffer.concat([Buffer.from([11]), u2(c), u2(nt)]));
+  }
   field(cls, name, desc) {
     const c = this.class_(cls);
     const nt = this.nameAndType(name, desc);

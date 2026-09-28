@@ -223,6 +223,7 @@ import { fileURLToPath } from "node:url";
 
 import { BASE_RECT_PX, IMG_ERR_BROKEN, IMG_ERR_MISSING, IMG_H, IMG_RECT_PX, IMG_W, drawFixtureJar, keyBarPixels } from "./make-draw-fixture.mjs";
 import { DRAW_RESIZE_H, DRAW_RESIZE_W, RESIZE_DRAW_FIXTURE, RESIZE_FIXTURE, RESIZE_H, RESIZE_W } from "./make-resize-fixture.mjs";
+import { SOUND_MARK, soundFixtureJar } from "./make-sound-fixture.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const contract = JSON.parse(await readFile(path.join(root, "docs/contracts/featurephone-engine-contract.json"), "utf8"));
@@ -322,6 +323,15 @@ const server = createServer(async (req, res) => {
     res.end(jar);
     return;
   }
+  if (url.pathname === "/fixtures/sound_j2me.jar") {
+    const jar = soundFixtureJar();
+    res.writeHead(200, { "content-type": "application/java-archive", "content-length": jar.length });
+    res.end(jar);
+    return;
+  }
+  // Scenario S: the committed soundfont, served the way the shell will serve it. Any other name
+  // under /soundfont/ is a 404 (S4's failure path).
+  if (url.pathname === "/soundfont/GeneralUser.sf3") file = path.join(root, "wie-web/public/GeneralUser.sf3");
   if (url.pathname.startsWith("/wasm/")) file = path.join(root, contract.artifacts.dir, path.basename(url.pathname));
   if (url.pathname.startsWith("/fixtures/")) file = path.join(root, "test_data", path.basename(url.pathname));
   try {
@@ -337,7 +347,8 @@ await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const base = `http://127.0.0.1:${server.address().port}`;
 
 const { chromium } = await import("playwright");
-const launchOpts = { headless: true };
+// Scenario S plays audio without a user gesture; the shell resumes its AudioContext on one.
+const launchOpts = { headless: true, args: ["--autoplay-policy=no-user-gesture-required"] };
 if (process.env.WIE_CHROME_CHANNEL) launchOpts.channel = process.env.WIE_CHROME_CHANNEL;
 const browser = await chromium.launch(launchOpts);
 const page = await browser.newPage();
@@ -347,7 +358,7 @@ page.on("pageerror", (e) => consoleLog.push(`[pageerror] ${e.message}`));
 await page.goto(base + "/");
 page.setDefaultTimeout(120_000);
 
-const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys, img, resLine, resize }) => {
+const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys, img, resLine, resize, soundMark }) => {
   const steps = [];
   // wie_featurephone 은 게스트 stdout 을 console.log 로 낸다(Platform::write_stdout ->
   // web_sys::console::log_1). 원 함수를 그대로 호출하므로 Node 쪽 진단 수집은
@@ -712,11 +723,277 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     );
     g2.emu.free();
     check("G2: free() (no throw)", true);
+
+    // ── Scenario S: the audio sink's soundfont path, end to end (docs/report 0355) ─────
+    // wie_featurephone/src/audio.rs's soundfont state machine (Off / NotRequested / Requested /
+    // Arrived / Prelude / Posted) is wasm-only: no cargo test and no node case reaches it, and it
+    // broke once while all of those were green (the soundfont was never fetched). This drives it
+    // in a browser with a guest that plays one SMAF note per key (make-sound-fixture.mjs) and the
+    // committed soundfont, watching what the sink does from outside: the worklet modules it loads
+    // (and whether each carries the prelude), when it fetches, what it posts, and the worklet's
+    // own `stats`.
+    //   S1  no URL        — one module, no prelude, no fetch, FM sounds
+    //   S2  URL, file arrives while the worklet module is still loading (Arrived)
+    //   S3  URL, module ready long before the first play (NotRequested must survive on_ready)
+    //   S4  URL that 404s — warned, FM, no prelude, no error
+    const log = [];
+    const t0 = performance.now();
+    const at = () => performance.now() - t0;
+    let holdModule = null; // S2: the next addModule resolves only once this promise does
+    let bodyArrived = null;
+    const nativeAdd = AudioWorklet.prototype.addModule;
+    AudioWorklet.prototype.addModule = async function (url, options) {
+      const text = await (await nativeFetch(url)).text();
+      const entry = { what: "module", at: at(), prelude: text.includes(contract.soundfontPrelude.marker), bytes: text.length };
+      log.push(entry);
+      await nativeAdd.call(this, url, options);
+      entry.loadMs = at() - entry.at;
+      if (holdModule) {
+        const hold = holdModule;
+        holdModule = null;
+        await hold;
+      }
+      entry.readyAt = at();
+    };
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = (input, init) => {
+      const url = String(input && input.url ? input.url : input);
+      if (url.includes("/soundfont/")) log.push({ what: "sf-fetch", at: at(), url });
+      return nativeFetch(input, init);
+    };
+    const nativeBody = Response.prototype.arrayBuffer;
+    Response.prototype.arrayBuffer = function () {
+      const body = nativeBody.call(this);
+      if (this.url.includes("/soundfont/"))
+        body.then(() => {
+          log.push({ what: "sf-body", at: at() });
+          if (bodyArrived) bodyArrived();
+        });
+      return body;
+    };
+    const NativeNode = window.AudioWorkletNode;
+    const nodes = [];
+    window.AudioWorkletNode = class extends NativeNode {
+      constructor(...args) {
+        super(...args);
+        log.push({ what: "node", at: at() });
+        nodes.push(this);
+        this.lastStats = null;
+        this.port.addEventListener("message", (event) => {
+          if (event.data && event.data.t === "stats") this.lastStats = event.data;
+        });
+        this.port.start();
+        const post = this.port.postMessage.bind(this.port);
+        this.rawPost = post;
+        this.port.postMessage = (message, transfer) => {
+          if (message && (message.t === "play" || message.t === "sf")) log.push({ what: `post-${message.t}`, at: at() });
+          return transfer ? post(message, transfer) : post(message);
+        };
+      }
+    };
+    const warnOut = [];
+    const errorOut = [];
+    const realWarn = console.warn.bind(console);
+    const realError = console.error.bind(console);
+    console.warn = (...a) => {
+      warnOut.push(a.map(String).join(" "));
+      realWarn(...a);
+    };
+    console.error = (...a) => {
+      errorOut.push(a.map(String).join(" "));
+      realError(...a);
+    };
+
+    // Ticks the emulator per animation frame until `until()` holds or `ms` passes.
+    const pump = async (emu, ms, until = () => false) => {
+      const start = performance.now();
+      while (performance.now() - start < ms) {
+        emu.tick();
+        if (until()) return true;
+        await new Promise((r) => requestAnimationFrame(r));
+      }
+      return until();
+    };
+    const statsOf = async (emu, node) => {
+      node.lastStats = null;
+      node.rawPost({ t: "stats" });
+      await pump(emu, 3000, () => node.lastStats !== null);
+      return node.lastStats ?? {};
+    };
+    const levelOf = (analyser) => {
+      const buf = new Float32Array(analyser.fftSize);
+      analyser.getFloatTimeDomainData(buf);
+      return Math.sqrt(buf.reduce((sum, v) => sum + v * v, 0) / buf.length);
+    };
+    // Polls the worklet until `want(stats, level)` holds (the play is handled on the audio thread a
+    // quantum or more after it is posted, and later under load) — returns the last reading either way.
+    // Level FIRST, then stats: a soundfont synth is allocated when the play message lands but its
+    // notes (and any FM double render) only on the next quantum, so stats read before the level can
+    // say `synths 1 · voices 0` for a play that is about to render through both (measured: the
+    // double-render mutation passed 1 run in 2 with the order reversed).
+    const sounding = async (run, want) => {
+      let stats = {};
+      let level = 0;
+      for (let i = 0; i < 20; i++) {
+        level = levelOf(run.analyser);
+        stats = await statsOf(run.emu, run.node());
+        if (want(stats, level)) break;
+        await pump(run.emu, 100);
+      }
+      return { stats, level };
+    };
+    const since = (mark) => log.slice(mark);
+    const first = (entries, what) => entries.find((e) => e.what === what);
+    const count = (entries, what) => entries.filter((e) => e.what === what).length;
+    const ms = (x) => (x === undefined ? "-" : `${Math.round(x)} ms`);
+    // One guest key = one new Play; resolves once the guest printed its mark and the sink posted it.
+    const press = async (run) => {
+      const marks = guestOut.join("").split(soundMark).length;
+      const plays = count(log, "post-play");
+      run.emu.key_down("NUM5");
+      run.emu.key_up("NUM5");
+      const played = await pump(run.emu, 20_000, () => guestOut.join("").split(soundMark).length > marks && count(log, "post-play") > plays);
+      return played;
+    };
+    const boot = async (soundfontUrl) => {
+      const mark = log.length;
+      const ctx = new AudioContext();
+      await ctx.resume();
+      const gain = ctx.createGain();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 8192;
+      gain.connect(analyser);
+      analyser.connect(ctx.destination);
+      const bytes = new Uint8Array(await (await nativeFetch("/fixtures/sound_j2me.jar")).arrayBuffer());
+      const canvas = document.createElement("canvas");
+      document.body.appendChild(canvas);
+      const emu = new mod2.WieEmulator("sound_j2me.jar", bytes, canvas, ctx, gain, contract.screen.width, contract.screen.height, soundfontUrl);
+      return { emu, ctx, analyser, mark, outMark: guestOut.length, node: () => nodes[nodes.length - 1] };
+    };
+    // The FM note of an earlier play (5 s) must have ended before a soundfont play is judged by
+    // `voices === 0` — otherwise that term reads the old note, not a double render.
+    const fmSilent = async (run) => {
+      for (let i = 0; i < 40; i++) {
+        if ((await statsOf(run.emu, run.node())).voices === 0) return true;
+        await pump(run.emu, 300);
+      }
+      return false;
+    };
+    const soundfontReady = (run) => pump(run.emu, 60_000, () => guestOut.slice(run.outMark).join("").includes("[wie] soundfont ready") && count(since(run.mark), "post-sf") === 1);
+    const close = async (run) => {
+      run.emu.free();
+      await run.ctx.close();
+    };
+
+    // S1 — no URL: exactly the FM sink. One module, prelude-free; no fetch ever; the note sounds.
+    {
+      const run = await boot(undefined);
+      await pump(run.emu, 15_000, () => count(since(run.mark), "node") === 1);
+      const played = await press(run);
+      const { stats, level } = await sounding(run, (st, lv) => st.voices > 0 && lv > 1e-3);
+      await pump(run.emu, 1500); // room for a fetch that should not happen
+      const seen = since(run.mark);
+      const modules = seen.filter((e) => e.what === "module");
+      check("S1: no URL — the key plays a note through the FM synth, and it is audible", played && stats.voices > 0 && stats.soundfont === "none" && level > 1e-3, `voices ${stats.voices} · soundfont ${stats.soundfont} · output rms ${level.toFixed(4)}`);
+      check("S1: no URL — one worklet module, without the prelude, and no soundfont fetch", modules.length === 1 && !modules[0].prelude && count(seen, "sf-fetch") === 0, `modules ${modules.map((m) => `${m.bytes}B prelude=${m.prelude} load ${ms(m.loadMs)}`).join(", ")} · fetches ${count(seen, "sf-fetch")}`);
+      await close(run);
+    }
+
+    // S3 — URL, module long ready before the first play. The fetch must wait for that play and
+    // must still happen (on_ready once swapped NotRequested away, so it never did).
+    {
+      const run = await boot("/soundfont/GeneralUser.sf3");
+      await pump(run.emu, 15_000, () => count(since(run.mark), "node") === 1);
+      await pump(run.emu, 1000);
+      const idle = since(run.mark);
+      const firstModule = first(idle, "module");
+      check(
+        "S3: URL — the worklet module is loaded ALONE (no prelude), and nothing is fetched before the first play",
+        firstModule && !firstModule.prelude && count(idle, "module") === 1 && count(idle, "sf-fetch") === 0,
+        `module ${firstModule ? `${firstModule.bytes}B prelude=${firstModule.prelude} load ${ms(firstModule.loadMs)}` : "none"} · fetches before any play ${count(idle, "sf-fetch")}`,
+      );
+      const playedFm = await press(run);
+      const { stats: fmStats } = await sounding(run, (st) => st.voices > 0);
+      const ready = await soundfontReady(run);
+      const seen = since(run.mark);
+      const fetchAt = first(seen, "sf-fetch")?.at;
+      const playAt = first(seen, "post-play")?.at;
+      const bodyAt = first(seen, "sf-body")?.at;
+      const prelude = seen.filter((e) => e.what === "module")[1];
+      check(
+        "S3: the first play sounds on FM, then the soundfont is fetched, the prelude loads as a second module, and it is posted",
+        playedFm && fmStats.voices > 0 && ready && playAt <= fetchAt && prelude?.prelude === true && prelude.at >= bodyAt && count(seen, "post-sf") === 1,
+        `first play ${ms(playAt)} (FM voices ${fmStats.voices}) · fetch ${ms(fetchAt)} · body ${ms(bodyAt)} · prelude module ${ms(prelude?.at)} (load ${ms(prelude?.loadMs)}) · ready ${ready}`,
+      );
+      const quiet = await fmSilent(run);
+      const playedSf = await press(run);
+      const { stats, level } = await sounding(run, (st, lv) => st.synths >= 1 && lv > 1e-3);
+      check(
+        "S3: the next play renders through the soundfont only (synth 1+, FM voices 0), and it is audible",
+        quiet && playedSf && stats.soundfont === "ready" && stats.synths >= 1 && stats.voices === 0 && level > 1e-3,
+        `soundfont ${stats.soundfont} · synths ${stats.synths} · FM voices ${stats.voices} · output rms ${level.toFixed(4)}`,
+      );
+      await close(run);
+    }
+
+    // S2 — URL, the file arrives while the worklet module is still loading: the first module's
+    // resolution is held until the soundfont body is in, so the sink sees Arrived before its node.
+    {
+      const arrived = new Promise((resolve) => (bodyArrived = resolve));
+      holdModule = Promise.race([arrived, new Promise((r) => setTimeout(r, 30_000))]);
+      const run = await boot("/soundfont/GeneralUser.sf3");
+      // Key until the guest plays (its canvas may not be up on the first frames). The plays queue:
+      // the held module has not resolved, so there is no node yet.
+      let queued = false;
+      for (let i = 0; i < 40 && !queued; i++) {
+        run.emu.key_down("NUM5");
+        run.emu.key_up("NUM5");
+        queued = await pump(run.emu, 500, () => guestOut.slice(run.outMark).join("").includes(soundMark));
+      }
+      const nodeBeforePlay = count(since(run.mark), "node");
+      const ready = await soundfontReady(run);
+      bodyArrived = null;
+      const seen = since(run.mark);
+      const bodyAt = first(seen, "sf-body")?.at;
+      const nodeAt = first(seen, "node")?.at;
+      const prelude = seen.filter((e) => e.what === "module")[1];
+      check(
+        "S2: a soundfont that arrives before the worklet is ready is kept, then loaded and posted once it is",
+        queued && nodeBeforePlay === 0 && ready && bodyAt < nodeAt && prelude?.prelude === true && prelude.at >= nodeAt && count(seen, "post-sf") === 1,
+        `play queued before the node ${queued && nodeBeforePlay === 0} · body ${ms(bodyAt)} · node ${ms(nodeAt)} · prelude module ${ms(prelude?.at)} · ready ${ready}`,
+      );
+      const quiet = await fmSilent(run);
+      const playedSf = await press(run);
+      // `level` too: the synth is allocated when the play message lands, its notes only on the next
+      // quantum — `synths >= 1` alone can be read before anything (FM included) was dispatched.
+      const { stats, level } = await sounding(run, (st, lv) => st.synths >= 1 && lv > 1e-3);
+      check("S2: the next play renders through the soundfont only", quiet && playedSf && stats.synths >= 1 && stats.voices === 0 && level > 1e-3, `synths ${stats.synths} · FM voices ${stats.voices} · output rms ${level.toFixed(4)}`);
+      await close(run);
+    }
+
+    // S4 — URL that 404s: a warning, FM, no prelude module, and nothing on console.error.
+    {
+      const errorsBefore = errorOut.length;
+      const run = await boot("/soundfont/missing.sf3");
+      await pump(run.emu, 15_000, () => count(since(run.mark), "node") === 1);
+      await press(run);
+      await pump(run.emu, 5000, () => warnOut.some((w) => w.includes("[wie] soundfont") && w.includes("404")));
+      await press(run);
+      const { stats } = await sounding(run, (st) => st.voices > 0);
+      const seen = since(run.mark);
+      const warning = warnOut.find((w) => w.includes("[wie] soundfont") && w.includes("404"));
+      check(
+        "S4: a soundfont that 404s is warned about and FM keeps playing — no prelude, no console.error",
+        warning && stats.voices > 0 && stats.synths === 0 && count(seen, "module") === 1 && errorOut.length === errorsBefore,
+        `${warning ?? "no warning"} · FM voices ${stats.voices} · synths ${stats.synths} · modules ${count(seen, "module")} · console.error ${errorOut.length - errorsBefore}`,
+      );
+      await close(run);
+    }
   } catch (e) {
     check("scenario aborted by exception", false, (e && e.stack) || String(e));
   }
   return steps;
-}, { contract, representativeKeys: REPRESENTATIVE_KEYS, ktfKeys: KTF_KEYS, img: IMG, resLine, resize: RESIZE });
+}, { contract, representativeKeys: REPRESENTATIVE_KEYS, ktfKeys: KTF_KEYS, img: IMG, resLine, resize: RESIZE, soundMark: SOUND_MARK });
 
 await browser.close();
 server.close();
