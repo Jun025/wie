@@ -32,4 +32,4 @@
 - 창은 부팅 12초(`--inject`)다. `4decaeed58b1`·`568c339a8c07` 이 이 창 뒤에서 slot 16 결과로 분기하는지는 못 쟀다. 두 타이틀이 판정을 뒤집을 수 있는 유일한 자리다 — 래퍼를 정적으로 따라가야 닫힌다.
 - 부하 load1 약 170~340 에서 쟀다. 판정은 DB 호출 순서만 쓰고 PASS/FAIL 은 쓰지 않는다(⒝ 의 FAIL 은 없는 파일을 «있다»고 속인 결과라 판정에 넣지 않았다).
 
-게임 파일명 유입: 아래 표식.
+게임 파일명 유입(`corpus-name-inflow --corpus ~/work/otterpebble/wie/game_lab`): BOUNDED 0회/0쌍 · SUFFIX-ATTACHED 0회/0쌍.
