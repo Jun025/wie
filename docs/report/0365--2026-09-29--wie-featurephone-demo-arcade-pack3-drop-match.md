@@ -52,4 +52,4 @@
 
 게임 파일명 유입: BOUNDED 0 · SUFFIX-ATTACHED 0(subjects 7 · 코퍼스 `game_lab`).
 
-<!-- corpus-name-inflow v1 subjects=7 tree=bcdaece2fdd0ff13 B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=7 tree=dd0072c9fc004842 B=0/0 P=0/0 S=0/0 -->
