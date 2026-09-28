@@ -34,3 +34,6 @@
 - 단위 시험 2개: `setBackground` 보관 + 초기 -1(셸 위 — `ContainerComponent.<init>` 을 건너뛰는 경로라 기본값이 `Component.<init>` 에서 와야 한다) · `setTitle(String)` 이 `LabelComponent` 로 보관되고 `setTitle(Component)` 가 바꾼다 · 지정 전 null.
 - 변이 6개 전건 red · 원상 green: ⑴ `setBackground` 가 저장 안 함 ⑵ 초기 -1 제거 ⑶ `setTitle` 이 저장 안 함 ⑷ 문자열 제목이 `LabelComponent` 가 아님 ⑸ `setTitle(String)` 등록 제거 ⑹ `setBackground` 등록 제거.
 - 게이트·러너 결과는 PR 본문과 회신에 있다.
+
+### 게임 이름 유입
+`node scripts/corpus-name-inflow.mjs` — BOUNDED **1** · SUFFIX-ATTACHED **0**. 1건은 `component.rs` 의 기존 주석 한 줄(`repaint(IIII)V` 위 · `origin/main` 에 이미 있다)이다. 도구는 «바뀐 파일의 본문 전체»를 보므로 그 파일을 고친 이 회차에 잡혔다. 이 회차가 더한 줄에서는 **0건**이다.
