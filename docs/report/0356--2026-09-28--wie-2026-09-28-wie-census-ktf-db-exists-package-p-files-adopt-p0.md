@@ -43,3 +43,5 @@
 ### 남긴 것
 - `tick_for` 의 레지스터 덤프는 여전히 초기 문맥을 보여 준다(44/44). 이번 회차는 `Undefined instruction` 만 고장 좌표를 싣게 했고, `InvalidMemoryAccess` 는 주소만 싣는다(`pc` 없음). 덤프 자체를 고장 시점으로 옮기는 것은 이번 범위 밖이다.
 - 다른 짧은 표(util 7 · misc 5 · media 27 · uic 45 · unk3 0 · unk12)도 같은 모양의 위험이 있지만 **닿는 타이틀을 관측하지 않았다** — 넓히지 않았다(스텁 공간 비용 대비 근거 없음).
+
+<!-- corpus-name-inflow v1 subjects=4 tree=a566087743341340 B=0/0 P=0/0 S=0/0 -->
