@@ -601,6 +601,15 @@ host_field = [
 name = "java/util/Stack"
 vtable = [
     { name = "push", descriptor = "(Ljava/lang/Object;)Ljava/lang/Object;", index = 32 },
+    # 월드장기체스's wall after String 22 (measured 2026-09-28, call site disassembled, lr 0x15368).
+    # The caller loads the Stack from this.<field>+8 -> +0x20, null-checks it, sets only r0 and
+    # dispatches `ldr ip,[r3,#0x88]` (= 4 + 4*33). The result is null-checked, cast to a guest
+    # class, and its fields are passed to a method on the caller's argument — a saved state being
+    # restored. The function right above it pushes onto the same field's Stack via `[r3,#0x84]`
+    # (= 32, the push row above). Shape `()Ljava/lang/Object;` fits pop (33) and peek (34) alike, so
+    # the order decides; the save/restore pairing with push is what pop is for — peek would leave
+    # every saved state on the Stack.
+    { name = "pop", descriptor = "()Ljava/lang/Object;", index = 33 },
 ]
 
 [[class]]
