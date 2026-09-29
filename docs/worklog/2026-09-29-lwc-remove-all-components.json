@@ -1,0 +1,23 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-29",
+  "task": "wie-2026-09-29-lwc-progress-component-adopt-p0",
+  "title": "lwc — ContainerComponent.removeAllComponents()",
+  "summary": "0366 의 «후» 벽. ca7fa8ade8ad 가 FAIL(검은 화면) → PASS 3/3 · 첫 장면이 나온다. 그 뒤 화면은 스프라이트 시트가 통째로 겹쳐 그려져 깨진다. 상세 docs/report/0369.",
+  "changes": ["wie-wipi-java lwc — ContainerComponent.removeAllComponents()V", "docs/report/0369", "docs/player-updates/2026-09-29-lwc-remove-all-components.json"],
+  "verification": ["전/후 3판 · FAIL 3/3 → PASS 3/3 (--max-ticks 1e9)", "변이 2개 전건 red · 원상 green"],
+  "limits": ["키 5 이후 화면에 스프라이트 시트 전체가 겹쳐 그려진다 — 판정기는 PASS 로 센다"],
+  "adoptedProposals": ["2026-09-29-lwc-progress-component#p0"],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "ca7fa8ade8ad — 스프라이트 시트가 통째로 겹쳐 그려진다",
+      "plainSummary": "첫 장면이 나오게 된 KTF 타이틀이 몇 번 키를 누르면 캐릭터·글자 그림판 전체가 화면에 겹쳐 뿌려져 알아볼 수 없게 된다.",
+      "userBenefit": "ca7fa8ade8ad 의 인트로 뒤 화면(메뉴·게임)이 제대로 보인다.",
+      "why": "이번 회차 캡처(--shot-every 5)에서 키 3 까지는 인트로가 정상이고 키 5 부터 스프라이트 시트·글꼴 시트 전체가 장면 위에 겹쳐 그려진다. 원본 이미지 일부만 잘라 그려야 할 자리에서 클립 또는 원본 영역이 적용되지 않는 모양이다. wie_validate 는 «색이 있다» 만 봐서 PASS 로 센다.",
+      "tradeoff": "어느 그리기 경로(lcdui Graphics · lwc · KTF 네이티브)가 잘라내기를 놓치는지부터 좁혀야 한다 — 한 경로면 작지만, 공용 경로면 다른 타이틀 그림도 움직인다.",
+      "effort": "M",
+      "target": "wie-midp / wie-wipi-java 그리기"
+    }
+  ]
+}
