@@ -572,6 +572,13 @@ pub(crate) mod tests {
         Ok(())
     }
 
+    static GENERATED_RUN_CALLED: AtomicBool = AtomicBool::new(false);
+
+    async fn generated_run(_jvm: &Jvm, _context: &mut (), _this: ClassInstanceRef<DirectJlet>) -> JvmResult<()> {
+        GENERATED_RUN_CALLED.store(true, Ordering::Relaxed);
+        Ok(())
+    }
+
     async fn jlet_resume(_jvm: &Jvm, _context: &mut (), _this: ClassInstanceRef<DirectJlet>) -> JvmResult<()> {
         Ok(())
     }
@@ -1929,9 +1936,9 @@ pub(crate) mod tests {
                     continue;
                 }
                 let resolved = jvm.resolve_class(&class.name).await.unwrap();
-                // An interface row (java/lang/Runnable) names the slot in an IMPLEMENTER's
-                // compiled table, not in the interface's own table — `prepare_generated` reads it
-                // only to name a compiled slot. There is no link-time index to compare it with;
+                // An interface row (java/lang/Runnable) is a method's position in the interface;
+                // `prepare_generated` adds it to the slot the IMPLEMENTER's reference cell names, to
+                // name a compiled slot. There is no link-time index to compare it with;
                 // `generated_class_exposes_compiler_vtable_methods_to_jvm` covers that path.
                 if resolved.definition.access_flags().contains(ClassAccessFlags::INTERFACE) {
                     skipped_interfaces.push(class.name.as_str());
@@ -2035,7 +2042,10 @@ pub(crate) mod tests {
                         name: "net/wie/test/GeneratedRunnable",
                         parent_class: Some("java/lang/Object"),
                         interfaces: vec!["java/lang/Runnable"],
-                        methods: vec![JavaMethodProto::new("run", "()V", jlet_pause, MethodAccessFlags::PUBLIC)],
+                        methods: vec![
+                            JavaMethodProto::new("tick", "()V", jlet_pause, MethodAccessFlags::PUBLIC),
+                            JavaMethodProto::new("run", "()V", generated_run, MethodAccessFlags::PUBLIC),
+                        ],
                         fields: vec![],
                         access_flags: ClassAccessFlags::PUBLIC,
                     },
@@ -2046,17 +2056,22 @@ pub(crate) mod tests {
             let generated_definition = generated_class.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap();
             let raw_class: RawJavaClass = read_generic(&core, generated_definition.ptr_raw)?;
             let mut descriptor: RawJavaClassDescriptor = read_generic(&core, raw_class.ptr_descriptor)?;
-            let method: RawJavaMethod = read_generic(&core, descriptor.ptr_methods + size_of::<u32>() as u32)?;
-            let ptr_vtable = Allocator::alloc(&mut core, 12 * size_of::<u32>() as u32)?;
+            // As 월드장기체스's AI class has it: run is NOT at slot 10 — another method is — and the
+            // reference cell's second word says where run is (slot 11). Naming slot 10 `run`
+            // dispatches `tick`, and the flag below stays false.
+            let tick: RawJavaMethod = read_generic(&core, descriptor.ptr_methods + size_of::<u32>() as u32)?;
+            let run: RawJavaMethod = read_generic(&core, descriptor.ptr_methods + (size_of::<u32>() + size_of::<RawJavaMethod>()) as u32)?;
+            let ptr_vtable = Allocator::alloc(&mut core, 13 * size_of::<u32>() as u32)?;
             let mut inherited_vtable = vec![0; 11 * size_of::<u32>()];
             core.read_bytes(raw_class.unk1, &mut inherited_vtable)?;
             core.write_bytes(ptr_vtable, &inherited_vtable)?;
-            write_generic(&mut core, ptr_vtable + 11 * size_of::<u32>() as u32, method.ptr_method)?;
+            write_generic(&mut core, ptr_vtable + 11 * size_of::<u32>() as u32, tick.ptr_method)?;
+            write_generic(&mut core, ptr_vtable + 12 * size_of::<u32>() as u32, run.ptr_method)?;
 
             let interface_name = "java/lang/Runnable";
             let ptr_interface_name = Allocator::alloc(&mut core, interface_name.len() as u32 + 1)?;
             write_null_terminated_string_bytes(&mut core, ptr_interface_name, interface_name.as_bytes())?;
-            let ptr_interface_reference = Allocator::alloc(&mut core, size_of::<RawJavaInterfaceReference>() as u32)?;
+            let ptr_interface_reference = Allocator::alloc(&mut core, (size_of::<RawJavaInterfaceReference>() + size_of::<u32>()) as u32)?;
             write_generic(
                 &mut core,
                 ptr_interface_reference,
@@ -2064,6 +2079,7 @@ pub(crate) mod tests {
                     ptr_class_or_name: ptr_interface_name,
                 },
             )?;
+            write_generic(&mut core, ptr_interface_reference + size_of::<RawJavaInterfaceReference>() as u32, 11u32)?;
             let ptr_interface_references = Allocator::alloc(&mut core, (size_of::<RawJavaInterfaceReferences>() + size_of::<u32>()) as u32)?;
             write_generic(
                 &mut core,
@@ -2077,7 +2093,7 @@ pub(crate) mod tests {
             )?;
 
             descriptor.ptr_vtable = ptr_vtable;
-            descriptor.vtable_count = 11;
+            descriptor.vtable_count = 12;
             descriptor.ptr_interface_references = ptr_interface_references;
             descriptor.ptr_interface_names = 0;
             descriptor.ptr_methods = 0;
@@ -2104,6 +2120,10 @@ pub(crate) mod tests {
             jvm.invoke_virtual::<_, ()>(&instance, "java/lang/Runnable", "run", "()V", ())
                 .await
                 .unwrap();
+            assert!(
+                GENERATED_RUN_CALLED.load(Ordering::Relaxed),
+                "Runnable.run dispatched a slot other than the cell's"
+            );
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())

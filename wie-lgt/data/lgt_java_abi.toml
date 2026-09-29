@@ -629,10 +629,15 @@ vtable = [
     { name = "pop", descriptor = "()Ljava/lang/Object;", index = 33 },
 ]
 
+# An interface row's index is the method's POSITION in the interface, not a vtable slot: the
+# implementer's slot is the word after the interface's name in its reference cell, plus this index
+# (`prepare_generated`). run sits at 10 only when it is a direct Object subclass's one own method;
+# 월드장기체스's AI class keeps it at 63, and naming its slot 10 `run` sent Thread.start into a
+# paint method — the board froze on the AI's turn (docs/report, wec-import-0x64-adopt-p0 round).
 [[class]]
 name = "java/lang/Runnable"
 vtable = [
-    { name = "run", descriptor = "()V", index = 10 },
+    { name = "run", descriptor = "()V", index = 0 },
 ]
 
 [[class]]
