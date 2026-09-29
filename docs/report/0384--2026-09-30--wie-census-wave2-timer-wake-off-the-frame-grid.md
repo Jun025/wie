@@ -74,7 +74,7 @@
 - 중간판은 «Set 이 대기 중 타이머를 바꾼다»도 넣었다. 그러나 느려진 타이틀 넷 모두 Unset 을 불렀고, Set 교체를 요구하는 타이틀은 없었다. 그래서 되돌렸다(행동 변화 최소).
 
 ### 시험 · 개악(«되돌리면 red» · 상수 자기비교 없음)
-- 새 시험 7개:
+- 새 시험 6개:
   - `executor::tests::test_tick_waits_for_the_pace_of_a_poll`
   - `event_queue::test::a_guest_timer_fires_on_time_not_on_the_next_host_frame`(25ms 주기 · 17ms 격자 · 최악 ≤ 4ms)
   - `…::a_timer_held_back_in_its_arming_tick_fires_on_time_in_the_next`(콜백 작업 8ms 뒤 10ms 재설정 · ≤ 8ms)
@@ -102,7 +102,5 @@
 ### 게임 파일명 유입
 `node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab` 결과는 BOUNDED 11쌍 · SUFFIX-ATTACHED 0 이다.
 - 이 브랜치가 건드린 파일(executor · system · event_queue · 두 wipi_c context · smaf_player · kernel)에 이미 있던 주석이다.
-- 그리고 이 문서의 영웅서기4 · 배틀몬스터다. 둘 다 티켓의 Acceptance 가 이름으로 부르고, 0310·0314 가 이미 적었다.
+- 그리고 이 문서가 부르는 두 이름(영웅서기4 와 배틀몬스터)이다. 둘 다 티켓의 Acceptance 가 이름으로 부르고, 0310·0314 가 이미 적었다.
 - 새로 쓴 코드 주석은 sha12 로 적었다. 게임 바이트는 0 이다.
-
-<!-- corpus-name-inflow v1 subjects=15 tree=4518befbd9dd5149 B=18/11 P=0/0 S=1/1 -->
