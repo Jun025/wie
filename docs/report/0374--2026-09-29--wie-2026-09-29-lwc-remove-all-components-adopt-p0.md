@@ -43,3 +43,5 @@ load1 **287~446**. PASS↔FAIL 로 뒤집힌 것과 content 가 바뀐 것을 �
 
 ### 게임 이름 유입
 `node scripts/corpus-name-inflow.mjs --corpus <game_lab>` — BOUNDED **4회 / 3쌍** · SUFFIX-ATTACHED **0**. BOUNDED 4회는 전부 `display.rs` 에 **이미 `origin/main` 에 있던 주석**이다(도구는 수정 파일 본문 전체를 본다) — 이 변경의 추가 줄(`git diff origin/main...HEAD` 의 `+`)에서 세면 **0**.
+
+<!-- corpus-name-inflow v1 subjects=5 tree=d4b49a32085edb97 B=4/3 P=1/1 S=0/0 -->
