@@ -1,0 +1,45 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-29",
+  "task": "wie-census-wave2-recensus-and-fix-remaining-clusters",
+  "title": "2차 전수 검수 — main 313ddcd8 재측 · 군집 7개 수정 · compat.json 3c34efee",
+  "summary": "429종을 현재 main 으로 다시 재고 첫 벽 군집 7개(SKT Connector·TextComponentHandler, KTF 입력기·MC_netSocket·Interface4 레코드 DB·free(NULL)·%i)를 고쳤다. 전수 도구가 첫 실행 뒤 끝나는 타이틀을 한 번 다시 켠다. playable 307 → 349 · not-yet 47 → 30.",
+  "changes": [
+    "wie-midp io/Connector · wie-skvm TextComponentHandler · wie-wipi-java InputMethodHandler",
+    "wie-wipi-c net::socket · database::open_record_database/insert_record · sprintf %i",
+    "wie-ktf Interface4 라우팅 · KtfWIPICContext::free null 가드",
+    "scripts/playability-census.mjs --relaunch 1",
+    "docs/player-data/compat.json · docs/player-updates 3 · docs/report/0378"
+  ],
+  "verification": [
+    "변이 11종 전부 red",
+    "playable→limited 6 · limited→not-yet 1 짝 재측 — 퇴행 0",
+    "라이브 LGT 5종 · 가드 2종 playable 유지"
+  ],
+  "limits": [
+    "장시간 281종은 1회차 결과 재사용",
+    "조작 축 1회 측정"
+  ],
+  "proposals": [
+    {
+      "title": "LGT 미식별 WIPI-C SVC 번호 8종 — 칸마다 호출부로 이름 붙이기",
+      "plainSummary": "LGT 게임 8종이 서로 다른 미식별 시스템 호출 번호(103·239·240·809·1100·2000 등)에서 멈춥니다. 번호마다 어떤 기능인지 밝혀 이어 주면 그 게임들이 계속 진행합니다.",
+      "userBenefit": "플레이 도중이나 시작할 때 꺼지던 LGT 게임 8종이 더 오래, 또는 끝까지 플레이됩니다.",
+      "why": "3c34efee 전수에서 longplay:error 7종 + boot:fail 1종의 첫 벽이 `Unknown LGT WIPIC SVC id` 다. 번호가 제각각이라 한 칸 수정으로는 1종씩 풀린다. LGT 표는 섹션 기준(커널 100·그래픽 200·DB 400·미디어 1200 …)이 이미 밝혀져 있어 칸 위치는 좁혀진다.",
+      "tradeoff": "번호마다 호출부 레지스터를 봐야 해서 한 회차에 몇 칸씩만 풀린다. 등록 전 오류 메시지에 r0~r3 를 싣는 것이 먼저일 수 있다.",
+      "effort": "M",
+      "target": "wie",
+      "kind": "product"
+    },
+    {
+      "title": "SKT 4종 — 시작 때 4줄 대화상자 뒤 System.exit(-1)",
+      "plainSummary": "SKT 게임 4종이 시작하자마자 안내 대화상자를 2초 보여 주고 스스로 꺼집니다. 무엇을 검사해서 끄는지 찾아 맞춰 주면 실행됩니다.",
+      "userBenefit": "화면이 안 나오던 SKT 게임 4종이 실행될 수 있습니다.",
+      "why": "0ed66634d3dc · a42f77f44955 · c33090c12755 · eefc947d8337 모두 startApp 안에서 Graphics 로 4줄을 그리고 XDisplay.refresh → Thread.sleep(2000) → System.exit(-1) 이다. 다시 켜도 같다. MIDlet-Key 속성이 있어 설치 검사로 추정한다.",
+      "tradeoff": "검사가 기기 정보·키 대조라면 흉내 낼 값이 없어 못 풀 수도 있다. 먼저 대화상자 문구와 직전 호출을 확인하는 조사 회차가 필요하다.",
+      "effort": "S",
+      "target": "wie",
+      "kind": "product"
+    }
+  ]
+}

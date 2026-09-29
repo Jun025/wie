@@ -1,0 +1,9 @@
+{
+  "date": "2026-09-29",
+  "kind": "new-support",
+  "titles": [
+    "6af589a88cf9eb8d35d4275666b96169efe13a2a8aece805f3d0ecf658f4bcfc"
+  ],
+  "summary_ko": "저장 데이터를 여는 곳에서 시작하지 못하던 게임이 이제 실행돼요.",
+  "pr": "https://github.com/Jun025/wie/pull/412"
+}
