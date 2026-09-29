@@ -2,7 +2,8 @@
 # scripts/test-smoke-gate.sh — self-check for smoke_gate.sh's title matching. Local only, no game
 # bytes: a fake validator stands in for wie_validate (PASS unless the filename contains FAIL).
 # Cases: NFD filenames vs NFC baseline match N/N · a planted regression goes red · too many
-# absent titles is UNMEASURED · the gate with NFC normalization removed does NOT say OK.
+# absent titles is UNMEASURED · a PLATFORM_FILTER with no baseline titles is UNMEASURED · the gate
+# with NFC normalization removed, or failing, does NOT say OK.
 set -eo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 T="$(mktemp -d)"; trap 'rm -rf "${T:?}"' EXIT
@@ -20,7 +21,7 @@ corpus() { local d="$T/$1/ktf"; shift; mkdir -p "$d"; for t in "$@"; do : > "$d/
 baseline() { local b="$T/$1.tsv"; shift; : > "$b"; for t in "$@"; do printf 'ktf/%s.zip\tPASS\n' "$t" >> "$b"; done; }
 gate() { # gate <script> <name> → summary + verdict lines, then rc=<n>
   local o rc=0
-  o="$(BIN="$T/fake" WORKING_DIR="$T/$2" BASELINE="$T/$2.tsv" PLATFORM_FILTER=ktf RETRY=0 KILL=5 \
+  o="$(BIN="$T/fake" WORKING_DIR="$T/$2" BASELINE="$T/$2.tsv" PLATFORM_FILTER="${PF:-ktf}" RETRY=0 KILL=5 \
     bash "$1" 2>/dev/null)" || rc=$?
   printf '%s\n' "$o" | grep -E '^(== smoke_gate|OK|FAIL|UNMEASURED)' || true
   echo "rc=$rc"
@@ -51,5 +52,16 @@ sed 's/^nfc() {.*/nfc() { cat; }/' "$here/smoke_gate.sh" > "$T/worse/scripts/smo
 grep -q '^nfc() { cat; }' "$T/worse/scripts/smoke_gate.sh" || { echo "BAD  mutation did not apply"; exit 1; }
 out="$(gate "$T/worse/scripts/smoke_gate.sh" match)"; echo "$out"
 expect "mutant (no NFC) is not OK" "rc=2" "$out"
+
+# checked 0: a filter with no baseline titles (j2me has none) measured nothing — not OK.
+out="$(PF=j2me gate "$here/smoke_gate.sh" match)"; echo "$out"
+expect "filter with 0 baseline titles → UNMEASURED" "UNMEASURED" "$out"
+expect "  → rc=2" "rc=2" "$out"
+
+# 개악: nfc() failing (perl/Unicode::Normalize missing) must stop the gate, not compare nothing.
+sed 's/^nfc() {.*/nfc() { false; }/' "$here/smoke_gate.sh" > "$T/worse/scripts/smoke_gate.sh"
+grep -q '^nfc() { false; }' "$T/worse/scripts/smoke_gate.sh" || { echo "BAD  mutation did not apply"; exit 1; }
+out="$(gate "$T/worse/scripts/smoke_gate.sh" regress)"; echo "$out"
+case "$out" in *"OK"*|*"rc=0"*) echo "BAD  failing nfc() said OK"; bad=1 ;; *) echo "ok   failing nfc() is not OK" ;; esac
 
 [ "$bad" = 0 ] && echo "ALL OK" || { echo "FAILED"; exit 1; }

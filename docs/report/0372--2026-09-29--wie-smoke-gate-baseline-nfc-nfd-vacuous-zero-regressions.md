@@ -25,6 +25,18 @@ ok   absent 2/3 → UNMEASURED         rc=2
 ok   mutant (no NFC) is not OK       checked 0, 3 absent · UNMEASURED rc=2
 ```
 
+### 반려 승계 (wie-smoke-gate-baseline-nfc-nfd-vacuous-zero-regressions-fix)
+검수 M1: 대조가 0건인데도 `OK` rc=0 인 두 형상이 남았다(분모 0 이면 과반 조건이 거짓).
+- `UNMEASURED` 조건에 `checked == 0` 추가. `nfc` 호출을 `set -e` 가 잡는 단독 문장으로(기준선도 임시 파일로 받은 뒤 루프) ·
+  임시 파일은 `trap … EXIT` 한 곳에서 정리(명시 `rm -f` 3곳 삭제).
+
+| 형상 | 전 | 후 |
+|---|---|---|
+| ⒜ `PLATFORM_FILTER=j2me`(기준선 j2me 0건) | `checked 0, 0 absent, 0 regressions` · `OK` rc=0 | `UNMEASURED: 0 of 0 …` rc=2 |
+| ⒝ `nfc() { false; }` 개악 | `checked 0, 0 absent, 0 regressions` · `OK` rc=0 | 대조 전에 중단 rc=1 · `.nfc` 잔재 0 |
+
+픽스처에 두 케이스 추가 → `ALL OK`(6 케이스). 새 테스트를 수정 전 스크립트에 돌리면 `BAD` 3줄 · `FAILED`(개악 대조).
+
 유입 0건(BOUNDED) · 판단 필요 0건(SUFFIX-ATTACHED).
 
 <!-- corpus-name-inflow v1 subjects=5 tree=93fb330fa6f57d29 B=0/0 P=0/0 S=0/0 -->
