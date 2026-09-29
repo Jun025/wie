@@ -126,7 +126,7 @@ pub async fn set_timer(
     let arming = context.system().event_queue().arm_timer(ptr_timer);
     // When a tick may be kept alive until this timer is due (instead of the host's next frame, the
     // 16.7ms grid every timer used to land on): never for 1ms, which means "as soon as you can" (KTF
-    // 영웅서기4 re-arms MC_knlSetTimer(1) each frame; waiting on it ran the game at 44fps, not its 39),
+    // 49ade89578c5 re-arms MC_knlSetTimer(1) each frame; waiting on it ran the game at 44fps, not its 39),
     // and not in the tick this timer already fired in — a second fire there is a timer faster than
     // the host's frames (a ~10ms one: 62 -> 94fps).
     let tick = context.system().pacing().ticks();

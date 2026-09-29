@@ -693,8 +693,8 @@ mod test {
 
     #[test]
     fn a_1ms_guest_timer_is_left_to_the_host_frame() -> Result<()> {
-        // A poll (KTF 영웅서기4's MC_knlSetTimer(1), or a timer re-armed in the tick it fired in) keeps
-        // no tick alive: waiting on 영웅서기4's ran it at 44fps, not its 39.
+        // A poll (KTF 49ade89578c5's MC_knlSetTimer(1), or a timer re-armed in the tick it fired in)
+        // keeps no tick alive: waiting on 49ade89578c5's ran it at 44fps, not its 39.
         let worst = guest_timers_on_a_frame_grid(25, 0, 20, None)?;
         assert!(worst > 4, "a timer marked a poll kept the tick alive (worst {worst}ms late)");
         Ok(())
