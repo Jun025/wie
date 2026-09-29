@@ -326,6 +326,10 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   **Constraint 9 forbids from ever entering the repo, the build output, or any log**. There is no
   version of this check that runs in CI without breaking the constraint it sits beside; the
   committed baseline is identifiers and expected status only, never paths or bytes.
+  **`UNMEASURED` · rc=2 is not an OK** — more than half the baseline was absent, or none of
+  it was checked, so nothing was compared (until 2026-09-29 an NFD/NFC name mismatch made it
+  print "0 regressions / OK" having matched 0–1 of 292).
+  `bash scripts/test-smoke-gate.sh` self-checks the matching without game bytes.
 
 - **`scripts/game-lab-recensus.sh` + `scripts/game-lab-census-map.mjs` — local only, same reason, and
   they are a pair.** The runner re-validates an already-sorted corpus **read-only** and leaves one JSON
