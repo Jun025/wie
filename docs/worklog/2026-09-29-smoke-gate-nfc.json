@@ -1,0 +1,11 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-29",
+  "task": "wie-smoke-gate-baseline-nfc-nfd-vacuous-zero-regressions",
+  "title": "smoke_gate — NFC 정규화 대조 · absent 과반이면 UNMEASURED",
+  "summary": "기준선(NFC)과 코퍼스 파일명(NFD)이 바이트로 안 맞아 0~1/292 만 대조하고 OK 를 내던 것을 고쳤다. LGT 실코퍼스 checked 0 → 52.",
+  "changes": ["scripts/smoke_gate.sh", "scripts/test-smoke-gate.sh", "AGENTS.md 3줄", "docs/report/0372"],
+  "verification": ["전: checked 0, 292 absent, OK", "후: checked 52, 0 absent, 5 regressions — 5건 단건 재실행 2/2 PASS(부하 기아)", "픽스처 4종 ok · 변이(nfc 제거) UNMEASURED"],
+  "limits": ["KTF·SKT 는 이 회차에 실코퍼스로 재지 않았다(load ~490)"],
+  "proposals": []
+}
