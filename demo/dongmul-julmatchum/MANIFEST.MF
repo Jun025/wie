@@ -1,6 +1,6 @@
-MIDlet-Name: 몽글셋
+MIDlet-Name: 동물줄맞춤
 MIDlet-Vendor: otterpebble
-MIDlet-Version: 1.0.0
-MIDlet-1: 몽글셋, , MonggeulSet
+MIDlet-Version: 2.0.0
+MIDlet-1: 동물줄맞춤, , DongmulJulmatchum
 MicroEdition-Profile: MIDP-2.0
 MicroEdition-Configuration: CLDC-1.1

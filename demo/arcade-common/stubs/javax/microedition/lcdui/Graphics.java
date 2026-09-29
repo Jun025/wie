@@ -11,4 +11,5 @@ public class Graphics {
     public void drawRoundRect(int x, int y, int w, int h, int aw, int ah) {}
     public void drawLine(int x1, int y1, int x2, int y2) {}
     public void drawString(String s, int x, int y, int anchor) {}
+    public void drawImage(Image img, int x, int y, int anchor) {}
 }
