@@ -223,7 +223,7 @@ impl EventQueue {
                         MIDPKeyCode::from_key_code(x) as _,
                         0,
                     ],
-                    Event::Timer { due, poll, callback } => {
+                    Event::Timer { due, callback } => {
                         // TODO we should wait for timer more efficiently
                         if due <= now {
                             context.system().pacing().timer_fired(now - due);
@@ -232,7 +232,7 @@ impl EventQueue {
                                 .await?
                         } else {
                             // push it to event queue again
-                            pending_timer_events.push(Event::Timer { due, poll, callback });
+                            pending_timer_events.push(Event::Timer { due, callback });
                         }
 
                         continue;
@@ -281,15 +281,9 @@ impl EventQueue {
                 let deadline = now + next_timer.map_or(16, |x| x.clamp(1, 16));
                 // Those 1ms sleeps are polls, and a tick does not stay alive for a poll — so a timer
                 // due mid-tick fired on the host's next frame (16.7ms grid; 18 titles, 2026-09-28
-                // census). Poll on behalf of the earliest paced timer, as a sleep until it would.
-                let pace = pending_timer_events
-                    .iter()
-                    .filter_map(|x| match x {
-                        Event::Timer { due, poll: false, .. } => Some(*due),
-                        _ => None,
-                    })
-                    .min()
-                    .filter(|_| !callbacks_pending);
+                // census). Poll on behalf of the timer instead, as a sleep until it would — but for
+                // one timer per tick: past that the guest is asking for more than the host's frames.
+                let pace = next_timer.filter(|_| !context.system().pacing().timer_fired_this_tick()).map(|x| now + x);
                 while context.system().platform().now() < deadline {
                     match pace {
                         Some(pace) => context.system().sleep_toward(1, pace).await,
@@ -618,7 +612,7 @@ mod test {
         let clock = TestClock::stepping_micros(10);
         let mut system = System::new(Box::new(TestPlatform::with_clock(clock.clone())), "", "", DefaultTaskRunner);
         let worst = Arc::new(AtomicU64::new(0));
-        let started = Arc::new(AtomicU64::new(u64::MAX));
+        let started = Arc::new(AtomicBool::new(false));
         let done = Arc::new(AtomicBool::new(false));
         let (system_task, clock_task, worst_task, started_task, done_task) =
             (system.clone(), clock.clone(), worst.clone(), started.clone(), done.clone());
@@ -628,12 +622,11 @@ mod test {
                 .invoke_static("net/wie/EventQueue", "getEventQueue", "()Lnet/wie/EventQueue;", ())
                 .await
                 .unwrap();
-            started_task.store(clock_task.peek(), Ordering::SeqCst);
+            started_task.store(true, Ordering::SeqCst);
             for _ in 0..rounds {
-                let asked = system_task.platform().now();
-                let due = asked + after_ms;
+                let due = system_task.platform().now() + after_ms;
                 let (system_timer, clock_timer, worst_timer) = (system_task.clone(), clock_task.clone(), worst_task.clone());
-                system_task.event_queue().push(Event::guest_timer(asked, due, move || async move {
+                system_task.event_queue().push(Event::timer(due, move || async move {
                     worst_timer.fetch_max(clock_timer.peek() - due.raw(), Ordering::SeqCst);
                     // The key is what makes getNextEvent return; the timer itself is consumed internally.
                     system_timer.event_queue().push(Event::Keydown(KeyCode::NUM1));
@@ -649,33 +642,35 @@ mod test {
             Ok(())
         });
 
-        let mut frames_after_start = 0;
+        let mut frames = 0;
         while !done.load(Ordering::SeqCst) {
             system.tick()?;
-            if started.load(Ordering::SeqCst) != u64::MAX {
-                frames_after_start += 1;
+            if started.load(Ordering::SeqCst) {
+                frames += 1;
             }
             clock.set((clock.peek() / FRAME_MS + 1) * FRAME_MS);
-            assert!(frames_after_start < 10_000, "the guest never finished its timers");
+            assert!(frames < 10_000, "the guest never finished its timers");
         }
-        Ok((worst.load(Ordering::SeqCst), frames_after_start))
+        Ok((worst.load(Ordering::SeqCst), frames))
     }
 
     #[test]
     fn a_guest_timer_fires_on_time_not_on_the_next_host_frame() -> Result<()> {
         // 2026-09-28 census: 18 titles' WIPI timers fired up to a host frame late (p95 ≤ 23ms), because
-        // the wait for them was 1ms polls and a tick does not stay alive for a poll.
-        let (worst, _) = guest_timers_on_a_frame_grid(10, 20)?;
-        assert!(worst <= 2, "a 10ms timer fired {worst}ms late");
+        // the wait for them was 1ms polls and a tick does not stay alive for a poll. A 25ms period
+        // walks across the 17ms grid; only a due in the ~3ms a tick leaves the host may wait for
+        // the next frame.
+        let (worst, _) = guest_timers_on_a_frame_grid(25, 20)?;
+        assert!(worst <= 4, "a 25ms timer fired {worst}ms late");
         Ok(())
     }
 
     #[test]
-    fn a_1ms_guest_timer_still_fires_at_most_once_per_host_frame() -> Result<()> {
-        // KTF 영웅서기4 re-arms MC_knlSetTimer(1) every frame to mean "as soon as you can". Keeping a
-        // tick alive for it ran the game at emulator speed (36 -> 93fps).
-        let (_, frames) = guest_timers_on_a_frame_grid(1, 20)?;
-        assert!(frames >= 20, "20 1ms timers fired within {frames} host frames");
+    fn guest_timers_fire_at_most_once_per_host_frame() -> Result<()> {
+        // A guest asking for timers faster than the host's frames: 5ms here, MC_knlSetTimer(1) for
+        // KTF 영웅서기4. Waiting on every one ran such a loop at emulator speed, not the phone's.
+        let (_, frames) = guest_timers_on_a_frame_grid(5, 20)?;
+        assert!(frames >= 20, "20 5ms timers fired within {frames} host frames");
         Ok(())
     }
 

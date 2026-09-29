@@ -3,7 +3,7 @@ use core::pin::Pin;
 
 use wie_util::Result;
 
-use crate::{Instant, executor::POLL_SLEEP_MS};
+use crate::Instant;
 
 #[allow(clippy::upper_case_acronyms, non_camel_case_types)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -69,9 +69,7 @@ pub enum Event {
     Keydown(KeyCode),
     Keyup(KeyCode),
     Keyrepeat(KeyCode),
-    // `poll`: asked for at most `POLL_SLEEP_MS` ahead — "as soon as you can", which a host frame
-    // paces, rather than a period the engine should keep a tick alive for.
-    Timer { due: Instant, poll: bool, callback: TimerCallback },
+    Timer { due: Instant, callback: TimerCallback },
     Notify { r#type: i32, param1: i32, param2: i32 }, // wipi notifyEvent
 }
 
@@ -83,22 +81,6 @@ impl Event {
     {
         Event::Timer {
             due,
-            poll: false,
-            callback: Box::new(move || Box::pin(callback())),
-        }
-    }
-
-    /// A guest timer asked for at `asked`. One due within `POLL_SLEEP_MS` of it is a poll: KTF
-    /// 영웅서기4 re-arms MC_knlSetTimer(1) every frame, and keeping ticks alive for it ran the game
-    /// 2.6x fast (see `Executor::tick_for`).
-    pub fn guest_timer<F, Fut>(asked: Instant, due: Instant, callback: F) -> Self
-    where
-        F: FnOnce() -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<()>> + Send + 'static,
-    {
-        Event::Timer {
-            due,
-            poll: due <= asked + POLL_SLEEP_MS,
             callback: Box::new(move || Box::pin(callback())),
         }
     }
@@ -186,15 +168,5 @@ mod tests {
             })
         ));
         assert!(queue.pop().is_none());
-    }
-
-    #[test]
-    fn a_guest_timer_at_most_1ms_ahead_is_a_poll() {
-        let poll = |due| {
-            let timer = Event::guest_timer(Instant::from_epoch_millis(10), Instant::from_epoch_millis(due), || async { Ok(()) });
-            matches!(timer, Event::Timer { poll: true, .. })
-        };
-        assert!(poll(10) && poll(11), "MC_knlSetTimer(0/1) means as soon as you can");
-        assert!(!poll(12), "a 2ms timer is a period to keep");
     }
 }
