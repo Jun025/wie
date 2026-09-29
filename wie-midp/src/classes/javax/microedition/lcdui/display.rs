@@ -130,6 +130,7 @@ impl Display {
                 JavaFieldProto::new("height", "I", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("paintDisabled", "Z", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("repaintPending", "Z", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("paintingThread", "Ljava/lang/Thread;", FieldAccessFlags::PRIVATE),
                 // Union of the areas passed to repaint() since the last paint, as left/top/right/bottom.
                 // Empty (right <= left) means «no area recorded» and paints the whole content area.
                 JavaFieldProto::new("dirtyLeft", "I", FieldAccessFlags::PRIVATE),
@@ -842,18 +843,26 @@ impl Display {
         Ok(())
     }
 
-    async fn handle_paint_event(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+    async fn handle_paint_event(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("javax.microedition.lcdui.Display::handlePaintEvent({this:?})");
 
         // One paint at a time: the event thread and a game thread's serviceRepaints both land here,
-        // and every paint drives the one shared screenGraphics. Unserialized, the second paint's
+        // and every paint drives the one shared screenGraphics. Two at once, the second paint's
         // reset() wiped the clip the first had just set, so its next drawImage blitted a whole
-        // sprite sheet (ca7fa8ade8ad). The monitor is reentrant, so a paint() that calls
-        // serviceRepaints on its own thread still gets in.
-        let screen_graphics: ClassInstanceRef<Graphics> = jvm.get_field(&this, "screenGraphics", "Ljavax/microedition/lcdui/Graphics;").await?;
-        jvm.monitor_enter(&screen_graphics).await?;
-        let result = Self::paint_serialized(jvm, context, this).await;
-        jvm.monitor_exit(&screen_graphics).await?;
+        // sprite sheet (ca7fa8ade8ad). A paint arriving from another thread is not made to wait:
+        // the running paint() may itself be waiting on that thread, which deadlocked b475b6399684 when this
+        // was a monitor. It stays pending instead and the next tick paints it. A paint() that calls
+        // serviceRepaints on its own thread still gets in, as before.
+        let painting: ClassInstanceRef<()> = jvm.get_field(&this, "paintingThread", "Ljava/lang/Thread;").await?;
+        let current = jvm.current_java_thread();
+        if !painting.is_null() && painting.identity() != current.identity() {
+            jvm.put_field(&mut this, "repaintPending", "Z", true).await?;
+            context.system().request_redraw();
+            return Ok(());
+        }
+        jvm.put_field(&mut this, "paintingThread", "Ljava/lang/Thread;", current).await?;
+        let result = Self::paint_serialized(jvm, context, this.clone()).await;
+        jvm.put_field(&mut this, "paintingThread", "Ljava/lang/Thread;", painting).await?;
         result
     }
 
@@ -1234,6 +1243,8 @@ mod test {
                 fields: vec![
                     JavaFieldProto::new("paints", "I", FieldAccessFlags::PUBLIC),
                     JavaFieldProto::new("seenClipWidth", "I", FieldAccessFlags::PUBLIC),
+                    JavaFieldProto::new("released", "Z", FieldAccessFlags::PUBLIC),
+                    JavaFieldProto::new("sawRelease", "Z", FieldAccessFlags::PUBLIC),
                 ],
                 access_flags: ClassAccessFlags::PUBLIC,
             }
@@ -1243,7 +1254,9 @@ mod test {
             jvm.invoke_special(&this, "javax/microedition/lcdui/Screen", "<init>", "()V", ()).await
         }
 
-        // The first paint sets a clip, yields, then reads the clip back; any later paint sets another.
+        // The first paint sets a clip, yields until another thread sets `released` (bounded, so a
+        // deadlock fails the test instead of hanging it), then reads the clip back; any later
+        // paint sets another.
         async fn handle_paint_event(
             jvm: &Jvm,
             _context: &mut WieJvmContext,
@@ -1257,7 +1270,11 @@ mod test {
                 .invoke_virtual(&graphics, "javax/microedition/lcdui/Graphics", "setClip", "(IIII)V", (0, 0, width, width))
                 .await?;
             if paints == 0 {
-                for _ in 0..3 {
+                for _ in 0..50 {
+                    if jvm.get_field(&this, "released", "Z").await? {
+                        jvm.put_field(&mut this, "sawRelease", "Z", true).await?;
+                        break;
+                    }
                     let _: () = jvm.invoke_static("java/lang/Thread", "yield", "()V", ()).await?;
                 }
                 let seen: i32 = jvm
@@ -2184,9 +2201,11 @@ mod test {
     }
 
     #[test]
-    fn a_paint_from_another_thread_waits_for_the_one_in_progress() -> Result<()> {
+    fn a_paint_from_another_thread_neither_waits_nor_cuts_into_the_one_in_progress() -> Result<()> {
         // ca7fa8ade8ad: the event thread painted while the game thread's paint had yielded, and its
         // reset() on the shared screen graphics widened the game's clip — a whole sprite sheet drawn.
+        // b475b6399684: when that second paint instead waited, the first paint() waited on the second thread
+        // and neither ever finished. So the second paint returns at once and stays pending.
         run_jvm_test_with_system(test_protos(), Box::new(TestPlatform::new()), move |jvm, system| async move {
             let screen = jvm.new_class("javax/microedition/lcdui/TestYieldingPaintScreen", "()V", ()).await?;
             let display: ClassInstanceRef<Display> = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?.into();
@@ -2200,28 +2219,38 @@ mod test {
                 )
                 .await?;
 
-            let (other_jvm, other_display) = (jvm.clone(), display.clone());
+            let (other_jvm, other_display, mut other_screen) = (jvm.clone(), display.clone(), screen.clone());
             system.spawn(async move || {
                 other_jvm.attach_thread(None).await.unwrap();
                 let _: () = other_jvm
                     .invoke_virtual(&other_display, "javax/microedition/lcdui/Display", "handlePaintEvent", "()V", ())
                     .await
                     .unwrap();
+                other_jvm.put_field(&mut other_screen, "released", "Z", true).await.unwrap();
                 Ok(())
             });
             let _: () = jvm
                 .invoke_virtual(&display, "javax/microedition/lcdui/Display", "handlePaintEvent", "()V", ())
                 .await?;
+            assert!(
+                jvm.get_field::<bool>(&screen, "sawRelease", "Z").await?,
+                "the other thread's paint returned"
+            );
             assert_eq!(
                 jvm.get_field::<i32>(&screen, "seenClipWidth", "I").await?,
                 2,
                 "the other paint did not touch this one's clip"
             );
+            assert_eq!(jvm.get_field::<i32>(&screen, "paints", "I").await?, 1);
+            assert!(
+                jvm.get_field::<bool>(&display, "repaintPending", "Z").await?,
+                "the skipped paint is still owed"
+            );
 
-            for _ in 0..3 {
-                let _: () = jvm.invoke_static("java/lang/Thread", "yield", "()V", ()).await?;
-            }
-            assert_eq!(jvm.get_field::<i32>(&screen, "paints", "I").await?, 2, "the waiting paint ran afterwards");
+            let _: () = jvm
+                .invoke_virtual(&display, "javax/microedition/lcdui/Display", "serviceRepaints", "()V", ())
+                .await?;
+            assert_eq!(jvm.get_field::<i32>(&screen, "paints", "I").await?, 2, "and it is painted next");
             Ok(())
         })
     }

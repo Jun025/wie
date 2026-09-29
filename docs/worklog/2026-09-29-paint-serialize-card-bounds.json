@@ -3,11 +3,26 @@
   "date": "2026-09-29",
   "task": "wie-2026-09-29-lwc-remove-all-components-adopt-p0",
   "title": "스프라이트 시트 겹침 — 동시 paint 직렬화 · Card 경계 필드 가림",
-  "summary": "ca7fa8ade8ad 의 시트 겹침은 두 스레드의 paint 가 한 screenGraphics 를 번갈아 써서 생긴 클립 경합이었다. paint 를 모니터로 직렬화했고, 그러자 드러난 Card x/w 가림(34ab350dc98a)도 고쳤다. 상세 docs/report/0374.",
-  "changes": ["wie-midp Display::handlePaintEvent — screenGraphics 모니터로 직렬화", "wie-wipi-java Card — x/y/w/h 를 Card 클래스의 필드로 읽고 쓴다", "docs/report/0374", "docs/player-updates/2026-09-29-paint-serialize-card-bounds.json"],
-  "verification": ["KTF 전수 짝 286 파일(고유 266) · PASS 201 → 207", "뒤집힌 5건 전/후 3판씩 재측", "단위 시험 2건 · 변이 전건 red"],
-  "limits": ["6103e87874c6 — 부하 때 MasterCard.paint 에서 address 76 로 죽는다(전 5/10 · 후 3/10) · 게임 로직 ↔ paint 경합", "LGT·SKT 코퍼스 짝은 재지 않았다"],
-  "adoptedProposals": ["2026-09-29-lwc-remove-all-components#p0"],
+  "summary": "ca7fa8ade8ad 의 시트 겹침은 두 스레드의 paint 가 한 screenGraphics 를 번갈아 써서 생긴 클립 경합이었다. paint 를 한 번에 하나로 묶되(다른 스레드 paint 는 막지 않고 다음 틱으로 미룬다 — 첫 판의 모니터는 LGT b475b6399684 를 교착시켜 반려), 그러자 드러난 Card x/w 가림(34ab350dc98a)도 고쳤다. 상세 docs/report/0374.",
+  "changes": [
+    "wie-midp Display::handlePaintEvent — paintingThread 로 한 번에 하나 · 다른 스레드는 repaintPending 으로 미룬다",
+    "wie-wipi-java Card — x/y/w/h 를 Card 클래스의 필드로 읽고 쓴다",
+    "docs/report/0374",
+    "docs/player-updates/2026-09-29-paint-serialize-card-bounds.json"
+  ],
+  "verification": [
+    "KTF 전수 짝 286 파일(고유 266) · 전 PASS 239 → 후 240",
+    "LGT·SKT 최소 짝 75(broken 71 + KTF 4) · 전 57 → 후 56 · PASS→FAIL 1차 2건 3판 재측 모두 기존(양쪽 FAIL)",
+    "b475b6399684 PASS 3/3(첫 판 head 0 paints 4/4)",
+    "단위 시험 2건 · 변이(가드 제거·모니터 복원·이름 조회) 전건 red"
+  ],
+  "limits": [
+    "6103e87874c6 — 부하 때 MasterCard.paint 에서 address 76 로 죽는다 · 게임 로직 ↔ paint 경합",
+    "다른 스레드가 그리는 중이면 serviceRepaints 가 막지 않고 돌아온다(그 프레임은 다음 틱) — MIDP 의 «처리할 때까지 막는다» 와 다르다"
+  ],
+  "adoptedProposals": [
+    "2026-09-29-lwc-remove-all-components#p0"
+  ],
   "proposals": [
     {
       "kind": "product",
