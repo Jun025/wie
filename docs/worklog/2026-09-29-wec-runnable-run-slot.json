@@ -8,7 +8,7 @@
     "wie-lgt/src/runtime/java/jvm_support/class_definition.rs — 외부 인터페이스 참조 칸의 둘째 워드를 읽어 인터페이스 행의 기준 slot 으로 쓴다",
     "wie-lgt/data/lgt_java_abi.toml — Runnable.run index 10 → 0(인터페이스 안 순번)",
     "wie-lgt/src/runtime/java/jvm_support.rs — 생성 Runnable 시험을 run ≠ slot 10 모양으로(되돌리면 red)",
-    "docs/report/0383 · docs/player-updates/2026-09-29-wec-runnable-run-slot.json"
+    "docs/report/0383 · docs/player-updates/2026-09-29-wec-runnable-run-slot.json(2번째 커밋 · PR 번호)"
   ],
   "verification": [
     "전(main): 기본 --inject ×4 frozen_tail_steps 12 · 끝 13장 md5 1종 / AI 차례 경로 ×2 frozen 6",
