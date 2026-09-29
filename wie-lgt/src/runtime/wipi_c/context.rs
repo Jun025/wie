@@ -145,8 +145,9 @@ impl WIPICContext for LgtWIPICContext {
 
     fn set_timer(&mut self, due: Instant, callback: WIPICMethodBody) {
         let context = self.clone();
+        let asked = self.system().platform().now();
 
-        self.system().event_queue().push(Event::timer(due, move || {
+        self.system().event_queue().push(Event::guest_timer(asked, due, move || {
             let mut context = context.clone();
 
             async move {

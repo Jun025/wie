@@ -255,7 +255,7 @@ impl Executor {
 // mean "as soon as you can", and the MIDP event thread checks its queue every 1ms. Only a longer
 // sleep keeps a tick alive; waiting on these too turned 영웅서기4 from 36 into 93 frames/s — the
 // game itself 2.6x faster — and spun every idle tick to its budget.
-const POLL_SLEEP_MS: u64 = 1;
+pub(crate) const POLL_SLEEP_MS: u64 = 1;
 
 // A clock read this many times in a row without moving is not going to move: a test's frozen
 // clock (`TestClock`), where waiting for a wake would never return. A real millisecond clock
