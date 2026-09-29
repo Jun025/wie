@@ -98,3 +98,9 @@
 - 60fps 급의 +3~9% 는 «프레임마다 한 번» 발화가 이제 빠짐없이 된 몫이다(초당 55 → 59~60). 원래 폰이 60 이었는지는 모른다.
 - `MC_knlSetTimer` 를 대기 중인 타이머에 다시 부르면 종전처럼 발화가 둘이다. WIPI 명세로 확인하지 못했고, 그것을 요구하는 타이틀도 보지 못했다.
 - Java `java.util.Timer`(RustJava 핀)는 자기 `sleep(16)` 으로 돈다. #343 이 이미 그 sleep 을 정확히 깨운다. 이 PR 범위 밖이다(T1·T2 의 타이머 늦음은 전부 WIPI 경로였다).
+
+### 게임 파일명 유입
+`node scripts/corpus-name-inflow.mjs --corpus ~/work/otterpebble/wie/game_lab` 결과는 BOUNDED 11쌍 · SUFFIX-ATTACHED 0 이다.
+- 이 브랜치가 건드린 파일(executor · system · event_queue · 두 wipi_c context · smaf_player · kernel)에 이미 있던 주석이다.
+- 그리고 이 문서의 영웅서기4 · 배틀몬스터다. 둘 다 티켓의 Acceptance 가 이름으로 부르고, 0310·0314 가 이미 적었다.
+- 새로 쓴 코드 주석은 sha12 로 적었다. 게임 바이트는 0 이다.
