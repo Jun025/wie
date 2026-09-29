@@ -1,22 +1,21 @@
-# wie_validate --keys: the whole path in one run — home → settings (vibration off) → help
-# (all four pages) → start → play → CLR → "그만할까요?" 5 → home → start again → play until the
+# wie_validate --keys: the whole path in one run — home → settings (vibration off, level 쉬움,
+# motion 켬 → 줄임 → 끔 → back to 켬) → help (all four pages) → start → play → CLR →
+# "그만할까요?" 5 → home → start again → play (쉬움: more lines, so chains come up) until the
 # time bar runs out → "시간 끝" card → CLR → home. Key names only; the board is random, so the
-# moves are blind. Run: ../arcade-common/README.md §확인.
+# moves are blind. The second round sweeps the board in a snake, trying a swap right and a swap
+# down at each cell of the top four rows — lines, and so chains, come up far more often than
+# swapping in place. The sweep ends well inside the 90 s round, so no key lands on the end card.
+# Run: ../arcade-common/README.md §확인.
 WAIT:1.5
-DOWN:0.6 NUM5:0.6 DOWN:0.6 NUM5:0.6 CLR:0.6
+DOWN:0.6 NUM5:0.6 DOWN:0.6 NUM5:0.6 DOWN:0.6 NUM5:0.6 DOWN:0.6 NUM5:0.6 NUM5:0.6 NUM5:0.6 CLR:0.6
 DOWN:0.6 NUM5:0.6 NUM6:0.6 NUM6:0.6 NUM6:0.6 CLR:0.6
 UP:0.6 UP:0.6 NUM5:0.8
-NUM5:0.6 RIGHT:0.8 NUM5:0.6 DOWN:0.8 CLR:0.8 NUM5:0.8
+NUM5:0.6 RIGHT:1.4 NUM5:0.6 DOWN:1.4 CLR:0.8 NUM5:0.8
 NUM5:0.8
-NUM5:0.6 RIGHT:0.8 NUM5:0.6 DOWN:0.8 LEFT:0.5 NUM5:0.6 UP:0.8 DOWN:0.5
-NUM5:0.6 RIGHT:0.8 NUM5:0.6 DOWN:0.8 LEFT:0.5 NUM5:0.6 UP:0.8 DOWN:0.5
-NUM5:0.6 RIGHT:0.8 NUM5:0.6 DOWN:0.8 LEFT:0.5 NUM5:0.6 UP:0.8 DOWN:0.5
-NUM5:0.6 RIGHT:0.8 NUM5:0.6 DOWN:0.8 LEFT:0.5 NUM5:0.6 UP:0.8 DOWN:0.5
-NUM5:0.6 RIGHT:0.8 NUM5:0.6 DOWN:0.8 LEFT:0.5 NUM5:0.6 UP:0.8 DOWN:0.5
-NUM5:0.6 RIGHT:0.8 NUM5:0.6 DOWN:0.8 LEFT:0.5 NUM5:0.6 UP:0.8 DOWN:0.5
-NUM5:0.6 RIGHT:0.8 NUM5:0.6 DOWN:0.8 LEFT:0.5 NUM5:0.6 UP:0.8 DOWN:0.5
-NUM5:0.6 RIGHT:0.8 NUM5:0.6 DOWN:0.8 LEFT:0.5 NUM5:0.6 UP:0.8 DOWN:0.5
-NUM5:0.6 RIGHT:0.8 NUM5:0.6 DOWN:0.8 LEFT:0.5 NUM5:0.6 UP:0.8 DOWN:0.5
-NUM5:0.6 RIGHT:0.8 NUM5:0.6 DOWN:0.8 LEFT:0.5 NUM5:0.6 UP:0.8 DOWN:0.5
-WAIT:4 WAIT:4 WAIT:4 WAIT:4
+UP:0.3 UP:0.3 UP:0.3 LEFT:0.3 LEFT:0.3 LEFT:0.3
+NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 RIGHT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 RIGHT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 RIGHT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 RIGHT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 RIGHT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 RIGHT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 DOWN:0.3
+NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 LEFT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 LEFT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 LEFT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 LEFT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 LEFT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 LEFT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 DOWN:0.3
+NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 RIGHT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 RIGHT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 RIGHT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 RIGHT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 RIGHT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 RIGHT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 DOWN:0.3
+NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 LEFT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 LEFT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 LEFT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 LEFT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 LEFT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 LEFT:0.3 NUM5:0.4 RIGHT:0.8 NUM5:0.4 DOWN:0.8 DOWN:0.3
+WAIT:4 WAIT:4 WAIT:4 WAIT:4 WAIT:4 WAIT:4
 CLR:1.5 WAIT:1
