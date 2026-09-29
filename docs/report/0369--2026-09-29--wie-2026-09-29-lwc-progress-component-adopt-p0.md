@@ -24,3 +24,5 @@
 
 ### 게임 이름 유입
 `node scripts/corpus-name-inflow.mjs --corpus <game_lab>` — BOUNDED **0** · SUFFIX-ATTACHED **0**.
+
+<!-- corpus-name-inflow v1 subjects=4 tree=8622a4560d09c356 B=0/0 P=0/0 S=0/0 -->
