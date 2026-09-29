@@ -28,8 +28,8 @@ pub struct ExecutorInner {
     // order. Hash-order polling made scheduling differ per build artifact and
     // per run, flipping boot-order-sensitive titles between PASS and blank.
     tasks: BTreeMap<usize, Task>,
-    // (wake, requested timeout ms)
-    sleeping_tasks: BTreeMap<usize, (Instant, u64)>,
+    // (wake, the wake a tick stays alive for — `None` for a poll, see `POLL_SLEEP_MS`)
+    sleeping_tasks: BTreeMap<usize, (Instant, Option<Instant>)>,
     last_task_id: usize,
     last_now: Instant,
 }
@@ -141,7 +141,7 @@ impl Executor {
                 let running_task_count = inner.tasks.len() - inner.sleeping_tasks.len();
                 if running_task_count == 0 && !inner.sleeping_tasks.is_empty() {
                     let next = inner.sleeping_tasks.values().map(|x| x.0).min().unwrap();
-                    let paced = inner.sleeping_tasks.values().filter(|x| x.1 > POLL_SLEEP_MS).map(|x| x.0).min();
+                    let paced = inner.sleeping_tasks.values().filter_map(|x| x.1).min();
                     Some((next, paced))
                 } else {
                     None
@@ -221,10 +221,17 @@ impl Executor {
     }
 
     pub(crate) fn sleep(&self, timeout: u64) {
+        self.sleep_toward(timeout, None);
+    }
+
+    // A sleep of `timeout` that keeps a tick alive for `pace` instead of its own wake: a thread
+    // polling every millisecond for a WIPI timer is waiting for the timer, not for the poll.
+    pub(crate) fn sleep_toward(&self, timeout: u64, pace: Option<Instant>) {
         let task_id = self.inner.lock().current_task_id.unwrap();
 
         let until = self.inner.lock().last_now + timeout;
-        self.inner.lock().sleeping_tasks.insert(task_id, (until, timeout));
+        let pace = pace.or((timeout > POLL_SLEEP_MS).then_some(until));
+        self.inner.lock().sleeping_tasks.insert(task_id, (until, pace));
     }
 
     fn create_waker(&self) -> Waker {
@@ -248,7 +255,7 @@ impl Executor {
 // mean "as soon as you can", and the MIDP event thread checks its queue every 1ms. Only a longer
 // sleep keeps a tick alive; waiting on these too turned 영웅서기4 from 36 into 93 frames/s — the
 // game itself 2.6x faster — and spun every idle tick to its budget.
-const POLL_SLEEP_MS: u64 = 1;
+pub(crate) const POLL_SLEEP_MS: u64 = 1;
 
 // A clock read this many times in a row without moving is not going to move: a test's frozen
 // clock (`TestClock`), where waiting for a wake would never return. A real millisecond clock
@@ -404,6 +411,28 @@ mod tests {
         };
         executor.tick(slow).unwrap();
         assert!(!woke.load(Ordering::Relaxed));
+    }
+
+    #[test]
+    fn test_tick_waits_for_the_pace_of_a_poll() {
+        let mut executor = Executor::new();
+        // net.wie.EventQueue waiting for a WIPI timer due at 10ms: it polls every 1ms, and the tick
+        // must stay alive for the timer as it would for a sleep(10). Without the pace it is the
+        // bare 1ms poll above, and the timer fires on the host's next frame.
+        let woke = Arc::new(AtomicBool::new(false));
+        let (woke_task, executor_task) = (woke.clone(), executor.clone());
+        executor.spawn(move || async move {
+            executor_task.sleep_toward(1, Some(Instant::from_epoch_millis(10)));
+            YieldOnce(false).await;
+            woke_task.store(true, Ordering::Relaxed);
+        });
+        let reads = Cell::new(0u64);
+        let slow = || {
+            reads.set(reads.get() + 1);
+            Instant::from_epoch_millis(reads.get() / 4)
+        };
+        executor.tick(slow).unwrap();
+        assert!(woke.load(Ordering::Relaxed));
     }
 
     #[test]

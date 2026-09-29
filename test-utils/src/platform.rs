@@ -17,8 +17,9 @@ static TEST_EPOCH: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, Default)]
 pub struct TestClock {
-    epoch_millis: Arc<AtomicU64>,
-    step_millis: u64,
+    // microseconds, so a step can be shorter than the millisecond the engine reads
+    epoch_micros: Arc<AtomicU64>,
+    step_micros: u64,
 }
 
 impl TestClock {
@@ -29,23 +30,29 @@ impl TestClock {
     /// A clock that moves `millis` forward on every read, so elapsed time counts the engine's
     /// clock reads, not the host's speed: a run is the same run on a loaded CI box and an idle one.
     pub fn stepping(millis: u64) -> Self {
+        Self::stepping_micros(millis * 1000)
+    }
+
+    /// `stepping` below a millisecond: for a test where guest work between waits must cost less
+    /// than the waits themselves.
+    pub fn stepping_micros(micros: u64) -> Self {
         Self {
-            step_millis: millis,
+            step_micros: micros,
             ..Self::default()
         }
     }
 
     pub fn set(&self, epoch_millis: u64) {
-        self.epoch_millis.store(epoch_millis, Ordering::SeqCst);
+        self.epoch_micros.store(epoch_millis * 1000, Ordering::SeqCst);
     }
 
     /// The current time, without the step a platform read takes.
     pub fn peek(&self) -> u64 {
-        self.epoch_millis.load(Ordering::SeqCst)
+        self.epoch_micros.load(Ordering::SeqCst) / 1000
     }
 
     pub fn advance(&self, millis: u64) {
-        self.epoch_millis.fetch_add(millis, Ordering::SeqCst);
+        self.epoch_micros.fetch_add(millis * 1000, Ordering::SeqCst);
     }
 }
 
@@ -172,7 +179,7 @@ impl Platform for TestPlatform {
 
     fn now(&self) -> Instant {
         if let Some(clock) = &self.clock {
-            return Instant::from_epoch_millis(clock.epoch_millis.fetch_add(clock.step_millis, Ordering::SeqCst));
+            return Instant::from_epoch_millis(clock.epoch_micros.fetch_add(clock.step_micros, Ordering::SeqCst) / 1000);
         }
 
         let epoch = TEST_EPOCH.fetch_add(8, Ordering::SeqCst);

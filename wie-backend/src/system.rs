@@ -17,6 +17,7 @@ use crate::{
     platform::Platform,
     task::{SleepFuture, YieldFuture},
     task_runner::TaskRunner,
+    time::Instant,
 };
 
 use self::{audio::Audio, event_queue::EventQueue};
@@ -145,6 +146,13 @@ impl System {
 
     pub fn sleep(&self, timeout: u64) -> SleepFuture {
         SleepFuture::new(timeout, &self.executor)
+    }
+
+    /// `sleep(timeout)` on behalf of a wake at `pace`: the tick stays alive for `pace` as it would
+    /// for a sleep that long, so a thread that polls every millisecond for a timer due at `pace`
+    /// still runs it on time rather than on the host's next frame.
+    pub fn sleep_toward(&self, timeout: u64, pace: Instant) -> SleepFuture {
+        SleepFuture::toward(timeout, pace, &self.executor)
     }
 
     pub fn current_task_id(&self) -> u64 {
