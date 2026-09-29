@@ -42,3 +42,7 @@ key = hex(MD5( 통신사접두 + MIN + SERVICE_ID + "a0a535ef35b" ))  ==  MIDlet
 
 ### 5. 게이트
 PR 본문과 done 회신에 적는다.
+
+게임 파일명 유입: BOUNDED 0 · SUFFIX-ATTACHED 0.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=9aff503909e38869 B=0/0 P=0/0 S=0/0 -->
