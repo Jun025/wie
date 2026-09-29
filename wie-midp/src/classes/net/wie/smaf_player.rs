@@ -598,12 +598,12 @@ mod test {
         let mut fired = 0;
         let mut later = Vec::new();
         while let Some(event) = { system.event_queue().pop() } {
-            if let Event::Timer { due, poll, callback } = event {
+            if let Event::Timer { due, pace_from, callback } = event {
                 if due.raw() <= clock.peek() {
                     callback().await?;
                     fired += 1;
                 } else {
-                    later.push(Event::Timer { due, poll, callback });
+                    later.push(Event::Timer { due, pace_from, callback });
                 }
             }
         }

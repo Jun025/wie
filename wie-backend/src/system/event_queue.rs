@@ -72,8 +72,8 @@ pub enum Event {
     Keydown(KeyCode),
     Keyup(KeyCode),
     Keyrepeat(KeyCode),
-    // `poll`: see `Event::guest_timer`
-    Timer { due: Instant, poll: bool, callback: TimerCallback },
+    // `pace_from`: see `Event::guest_timer`
+    Timer { due: Instant, pace_from: u64, callback: TimerCallback },
     Notify { r#type: i32, param1: i32, param2: i32 }, // wipi notifyEvent
 }
 
@@ -83,19 +83,19 @@ impl Event {
         F: FnOnce() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
-        Self::guest_timer(due, false, callback)
+        Self::guest_timer(due, 0, callback)
     }
 
-    /// A guest timer. `poll`: it asks for no period of its own — as soon as possible, or faster than
-    /// the host's frames — so the next host frame paces it rather than a tick kept alive for it.
-    pub fn guest_timer<F, Fut>(due: Instant, poll: bool, callback: F) -> Self
+    /// A guest timer. `pace_from`: the first host tick (`Pacing::ticks`) that may be kept alive
+    /// until it is due; before that tick the host's next frame paces it, and `u64::MAX` never.
+    pub fn guest_timer<F, Fut>(due: Instant, pace_from: u64, callback: F) -> Self
     where
         F: FnOnce() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
         Event::Timer {
             due,
-            poll,
+            pace_from,
             callback: Box::new(move || Box::pin(callback())),
         }
     }

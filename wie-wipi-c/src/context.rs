@@ -22,8 +22,8 @@ pub trait WIPICContext: ByteRead + ByteWrite + Send + Sync {
     fn spawn(&mut self, callback: WIPICMethodBody) -> Result<()>;
     async fn get_resource_size(&self, name: &str) -> Result<Option<usize>>;
     async fn read_resource(&self, name: &str) -> Result<Vec<u8>>;
-    /// `poll`: `wie_backend::Event::guest_timer`.
-    fn set_timer(&mut self, due: Instant, poll: bool, callback: WIPICMethodBody);
+    /// `pace_from`: `wie_backend::Event::guest_timer`.
+    fn set_timer(&mut self, due: Instant, pace_from: u64, callback: WIPICMethodBody);
 }
 
 pub struct WIPICResult {
@@ -99,7 +99,7 @@ pub mod test {
         last_alloc: usize,
         system: Option<System>,
         resources: Vec<(String, Vec<u8>)>,
-        pub timers: Vec<(Instant, bool, WIPICMethodBody)>,
+        pub timers: Vec<(Instant, u64, WIPICMethodBody)>,
         pub calls: Vec<WIPICWord>,
     }
 
@@ -183,8 +183,8 @@ pub mod test {
                 .ok_or_else(|| WieError::FatalError(format!("Missing test resource: {name}")))
         }
 
-        fn set_timer(&mut self, due: Instant, poll: bool, callback: WIPICMethodBody) {
-            self.timers.push((due, poll, callback));
+        fn set_timer(&mut self, due: Instant, pace_from: u64, callback: WIPICMethodBody) {
+            self.timers.push((due, pace_from, callback));
         }
     }
 
