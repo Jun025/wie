@@ -106,9 +106,9 @@ pub async fn set_timer(
     impl MethodBody<WieError> for TimerCallback {
         #[tracing::instrument(name = "timer", skip_all)]
         async fn call(&self, context: &mut dyn WIPICContext, _: Box<[WIPICWord]>) -> Result<WIPICResult> {
-            // Re-armed or cancelled since: a title that re-arms with Unset + Set from outside its
-            // callback otherwise gains one more live timer chain each time (2d5cada03004 reached
-            // 37 callbacks/s, each ~84ms late).
+            // Unset since. With Unset a no-op, a title that re-arms with Unset + Set kept the old
+            // chain alive beside the new one, and its game loop ran two to four times per period
+            // (2d5cada03004: 37 callbacks/s of a 62ms timer; 3cc7a9b4cb15: 40/s of a 37ms one).
             if !context.system().event_queue().is_timer_armed(self.ptr_timer, self.arming) {
                 return Ok(WIPICResult { results: Vec::new() });
             }
@@ -457,17 +457,11 @@ mod test {
         Ok(core::mem::take(&mut context.calls))
     }
 
-    // Both were missing, so each Unset + Set from outside a timer's own callback added one more timer
-    // chain that never died (2d5cada03004: 37 callbacks/s, each ~84ms late).
-    #[futures_test::test]
-    async fn test_set_timer_rearms_a_pending_timer() -> Result<()> {
-        assert_eq!(fire_after(&[Some(100), Some(10)]).await?, [0x1234]);
-        Ok(())
-    }
-
+    // Unset was a no-op, so each Unset + Set left one more timer chain running for good.
     #[futures_test::test]
     async fn test_unset_timer_cancels_a_pending_timer() -> Result<()> {
         assert_eq!(fire_after(&[Some(10), None]).await?, []);
+        assert_eq!(fire_after(&[Some(10), None, Some(10)]).await?, [0x1234]);
         Ok(())
     }
 

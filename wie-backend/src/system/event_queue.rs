@@ -105,8 +105,15 @@ impl Event {
 pub struct EventQueue {
     input_events: VecDeque<Event>,
     events: VecDeque<Event>,
-    // guest timer (its address) -> (how many times it was armed or cancelled, host tick it last fired in)
-    timer_armings: BTreeMap<u32, (u64, Option<u64>)>,
+    // guest timer, by its address
+    timers: BTreeMap<u32, GuestTimer>,
+}
+
+#[derive(Default)]
+struct GuestTimer {
+    armings: u64,
+    cancelled_through: u64,
+    fired_in_tick: Option<u64>,
 }
 
 impl EventQueue {
@@ -129,29 +136,30 @@ impl EventQueue {
         self.input_events.is_empty() && self.events.is_empty()
     }
 
-    /// WIPI `MC_knlSetTimer` on a timer that is still pending re-arms it: the pending one must not
-    /// fire. Returns this arming, for `is_timer_armed` when it falls due.
+    /// Numbers an arming of a guest timer (WIPI `MC_knlSetTimer`), for `is_timer_armed` when it
+    /// falls due. One still pending is left alone — two Sets give two callbacks, as they always did.
     pub fn arm_timer(&mut self, timer: u32) -> u64 {
-        let (arming, _) = self.timer_armings.entry(timer).or_default();
-        *arming += 1;
-        *arming
+        let timer = self.timers.entry(timer).or_default();
+        timer.armings += 1;
+        timer.armings
     }
 
-    /// WIPI `MC_knlUnsetTimer`.
+    /// WIPI `MC_knlUnsetTimer`: every arming so far stops counting.
     pub fn cancel_timer(&mut self, timer: u32) {
-        self.arm_timer(timer);
+        let timer = self.timers.entry(timer).or_default();
+        timer.cancelled_through = timer.armings;
     }
 
     pub fn is_timer_armed(&self, timer: u32, arming: u64) -> bool {
-        self.timer_armings.get(&timer).map(|x| x.0) == Some(arming)
+        arming > self.timers.get(&timer).map_or(0, |x| x.cancelled_through)
     }
 
     pub fn timer_fired(&mut self, timer: u32, tick: u64) {
-        self.timer_armings.entry(timer).or_default().1 = Some(tick);
+        self.timers.entry(timer).or_default().fired_in_tick = Some(tick);
     }
 
     pub fn timer_fired_in(&self, timer: u32, tick: u64) -> bool {
-        self.timer_armings.get(&timer).and_then(|x| x.1) == Some(tick)
+        self.timers.get(&timer).and_then(|x| x.fired_in_tick) == Some(tick)
     }
 
     /// Keyboard input takes priority; events at the same priority remain FIFO.
