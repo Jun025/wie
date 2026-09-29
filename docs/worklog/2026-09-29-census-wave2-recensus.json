@@ -9,7 +9,7 @@
     "wie-wipi-c net::socket · database::open_record_database/insert_record · sprintf %i",
     "wie-ktf Interface4 라우팅 · KtfWIPICContext::free null 가드",
     "scripts/playability-census.mjs --relaunch 1",
-    "docs/player-data/compat.json · docs/player-updates 3 · docs/report/0378"
+    "docs/player-data/compat.json · docs/player-updates 3 · docs/report/0380"
   ],
   "verification": [
     "변이 11종 전부 red",

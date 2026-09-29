@@ -89,7 +89,8 @@
 ### 5. 데이터
 - `docs/player-data/compat.json` — pin `3c34efee`(이 PR 의 코드 커밋 · GitHub 에 있다). 그 뒤 커밋은 시험·문서뿐이라 엔진 동작이 같다.
 - 이용자 소식 3파일(`docs/player-updates/2026-09-29-census-wave2-*.json` · 5종). `4166acd8fc62` 는 상태가 그대로라 소식을 내지 않았다. `7d007391e4a1` 은 이미 playable 이었다.
-- 셸 반영: 계약 §3(릴리스 → `repository_dispatch` `publicData`). 수신부는 otterpebble #1160 이다.
+- 셸 반영: 계약 §3(릴리스 → `repository_dispatch` `publicData`). 수신부 otterpebble #1160 은 머지됐다.
+- 측정 뒤 main 에 #406(LGT paint 교착 해소)·#410(전수 `--jobs` 상한)·#411 이 착지했고 이 브랜치에 병합했다. compat.json 은 그 앞 `3c34efee` 로 잰 값이다. #406 이 나아지게 한 타이틀은 다음 전수에서 반영된다.
 
 ### 6. 한계
 - 장시간 281종은 1회차(`313ddcd8`) 결과를 그대로 썼다. 이 PR 이 바꾼 경로(위 1~7)를 그 타이틀들이 10분 동안 오류 없이 지났다는 뜻이지, 새 빌드로 다시 잰 것은 아니다. `%i` 처럼 오류 없이 동작만 바뀌는 수정은 이 방식으로는 보이지 않는다.
@@ -98,7 +99,5 @@
 
 ### 7. 게이트
 - 로컬: fmt · clippy `-D warnings`(stable · beta · wasm32) rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` 599/0 rc=0 · `npm run build:wasm` rc=0.
-- `player-data.mjs` OK(429 · 349/50/30) · `--selftest` 19 · worklog OK · 연번 OK(0378).
+- `player-data.mjs` OK(429 · 349/50/30) · `--selftest` 19 · worklog OK · 연번 OK(0380 · 0378 은 #410 이 먼저 잡았다).
 - 유입: 331쌍(BOUNDED) + 판단 필요 15쌍(SUFFIX-ATTACHED). compat.json 밖은 1쌍이고 `wie-ktf/src/runtime/wipi_c/context.rs` 에 main 부터 있던 주석이다. compat.json 은 계약상 제목 목록이고 main 대비 새 `"title"` 줄은 0 이다.
-
-<!-- corpus-name-inflow v1 subjects=20 tree=5f444ff1c6d8fa6c B=719/331 P=1/1 S=35/15 -->
