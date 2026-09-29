@@ -1,0 +1,16 @@
+# wie_validate --keys: KTF 739c7657c1f2 / 4120f27288ab (same game, two packagings) — title → new game
+# → intro story → first town → walk. Recorded 2026-09-29 on b4020093 (#399, the screen-framebuffer
+# sync that made these two draw at all). Grammar: `--keys` help / `parse_keys` in wie_validate.rs.
+#
+#   mkdir -p <dir>   # --shotdir does not create it
+#   cargo run -q --release -p wie_cli --bin wie_validate -- --inject --boot-secs 30 \
+#     --max-ticks 100000000000 --keys docs/keys/ktf-739c7657c1f2-town.keys --shotdir <dir> <game>
+#
+# --boot-secs 30 lands on the "press any key" title at load1 ~80–430 (the intro plays before it).
+# The OK on the menu opens the slot picker; the second OK asks "초기화 후 시작?" and only NUM1 (1.확인)
+# accepts it — OK there is a no-op. The four OKs page the story; HASH is the on-screen #SKIP and
+# closes the town's first NPC line. From step 14 on the fighter is in the town and NUM4/NUM6 walk.
+# Key names only — no game bytes. A fix that lets the game go further may move this path.
+HASH:6 DOWN:4 OK:8 OK:6 NUM1:8 WAIT:6
+OK:5 OK:5 OK:5 OK:5 WAIT:6 HASH:6 WAIT:6 OK:5 OK:5
+NUM5:3 NUM4:3 NUM6:3 NUM2:3 NUM8:3 NUM5:3 WAIT:6

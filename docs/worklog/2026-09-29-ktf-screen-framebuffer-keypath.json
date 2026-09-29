@@ -1,0 +1,15 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-29",
+  "task": "wie-2026-09-29-ktf-screen-framebuffer-presentation-adopt-p0",
+  "title": "KTF 화면 프레임버퍼 2종 — 인트로 다음(키 입력 이후) 화면 확인",
+  "summary": "대상 2종을 --keys 경로로 타이틀 → 새로하기 → 인트로 → 첫 마을 → 이동까지 확인. 벽 없음 · 코드 변경 0. 경로 docs/keys/ktf-739c7657c1f2-town.keys. 상세 docs/report/0369.",
+  "adoptedProposals": ["2026-09-29-ktf-screen-framebuffer-presentation#p0"],
+  "changes": ["docs/keys/ktf-739c7657c1f2-town.keys", "docs/report/0369"],
+  "verification": [
+    "3회 독립 실행 · 두 타이틀 PASS · 18/18 키 · distinct 512 · 마지막 프레임 두 타이틀 동일",
+    "임시 계측: Java→네이티브 되쓰기는 paint 4 전면 흰색 1회뿐 — 겹침·빈 프레임은 네이티브 그리기 그대로"
+  ],
+  "limits": ["마을 이후(던전·전투)는 재지 않았다", "겹침 1건이 실기와 같은지는 기준 화면이 없어 판정 못 함"],
+  "proposals": []
+}
