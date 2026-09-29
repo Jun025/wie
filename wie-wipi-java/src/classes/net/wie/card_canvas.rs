@@ -156,6 +156,13 @@ impl CardCanvas {
     async fn paint(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>, g: ClassInstanceRef<MidpGraphics>) -> JvmResult<()> {
         tracing::debug!("net.wie.CardCanvas::paint({this:?}, {g:?})");
 
+        // The clip Display set is the repaint area; the per-card reset below would widen it back
+        // to the whole screen, so keep it (absolute coordinates) and re-apply it inside each card.
+        let clip_x: i32 = jvm.get_field(&g, "clipX", "I").await?;
+        let clip_y: i32 = jvm.get_field(&g, "clipY", "I").await?;
+        let clip_width: i32 = jvm.get_field(&g, "clipWidth", "I").await?;
+        let clip_height: i32 = jvm.get_field(&g, "clipHeight", "I").await?;
+
         let graphics = jvm
             .new_class("org/kwis/msp/lcdui/Graphics", "(Ljavax/microedition/lcdui/Graphics;)V", (g,))
             .await?;
@@ -173,6 +180,15 @@ impl CardCanvas {
             let _: () = jvm.invoke_virtual(&graphics, "org/kwis/msp/lcdui/Graphics", "reset", "()V", ()).await?;
             let _: () = jvm
                 .invoke_virtual(&graphics, "org/kwis/msp/lcdui/Graphics", "translate", "(II)V", (x, y))
+                .await?;
+            let _: () = jvm
+                .invoke_virtual(
+                    &graphics,
+                    "org/kwis/msp/lcdui/Graphics",
+                    "clipRect",
+                    "(IIII)V",
+                    (clip_x - x, clip_y - y, clip_width, clip_height),
+                )
                 .await?;
 
             let paint_result: JvmResult<()> = jvm

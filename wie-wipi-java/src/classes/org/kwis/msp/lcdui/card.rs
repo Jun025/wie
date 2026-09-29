@@ -1023,7 +1023,7 @@ mod test {
     }
 
     #[test]
-    fn test_card_canvas_offsets_and_isolates_graphics_state() -> Result<()> {
+    fn test_card_canvas_offsets_clips_and_isolates_graphics_state() -> Result<()> {
         let fixture: Box<[WieJavaClassProto]> = Vec::from([TestCard::as_proto(), TestCanvas::as_proto()]).into_boxed_slice();
         run_jvm_test(
             Box::new([wie_midp::get_protos().into(), get_protos().into(), fixture]),
@@ -1145,12 +1145,15 @@ mod test {
                 let second_dirty = backend_image.get_pixel(5, 2);
                 let second_outside = backend_image.get_pixel(6, 2);
                 let below_dirty = backend_image.get_pixel(5, 4);
+                // The clip handed to CardCanvas.paint is the repaint area (Display sets it) and
+                // survives the per-card reset: pixels of a card outside it stay unpainted. Cards
+                // are still not clipped to their own bounds (upstream 7304facd).
                 assert_eq!((outside.r, outside.g, outside.b), (0, 0, 0));
-                assert_eq!((first_outside.r, first_outside.g, first_outside.b), (0xff, 0, 0));
+                assert_eq!((first_outside.r, first_outside.g, first_outside.b), (0, 0, 0));
                 assert_eq!((first_dirty.r, first_dirty.g, first_dirty.b), (0xff, 0, 0));
                 assert_eq!((second_dirty.r, second_dirty.g, second_dirty.b), (0, 0xff, 0));
-                assert_eq!((second_outside.r, second_outside.g, second_outside.b), (0, 0xff, 0));
-                assert_eq!((below_dirty.r, below_dirty.g, below_dirty.b), (0, 0xff, 0));
+                assert_eq!((second_outside.r, second_outside.g, second_outside.b), (0, 0, 0));
+                assert_eq!((below_dirty.r, below_dirty.g, below_dirty.b), (0, 0, 0));
 
                 Ok(())
             },

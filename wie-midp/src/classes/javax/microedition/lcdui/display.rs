@@ -130,6 +130,12 @@ impl Display {
                 JavaFieldProto::new("height", "I", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("paintDisabled", "Z", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("repaintPending", "Z", FieldAccessFlags::PRIVATE),
+                // Union of the areas passed to repaint() since the last paint, as left/top/right/bottom.
+                // Empty (right <= left) means «no area recorded» and paints the whole content area.
+                JavaFieldProto::new("dirtyLeft", "I", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("dirtyTop", "I", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("dirtyRight", "I", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("dirtyBottom", "I", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("lastGcMillis", "J", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("lastGcCostMillis", "J", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("alertGeneration", "I", FieldAccessFlags::PRIVATE),
@@ -728,6 +734,32 @@ impl Display {
         tracing::debug!("javax.microedition.lcdui.Display::repaint({this:?}, {x}, {y}, {width}, {height})");
 
         jvm.put_field(&mut this, "repaintPending", "Z", true).await?;
+
+        // The area becomes the paint's clip (MIDP Canvas.paint: «the clip region is set to the area
+        // to be painted»). A title that tells its own partial repaint from a full one by
+        // getClipWidth() otherwise never sees its partial paint and re-requests it forever.
+        // Negative sizes are the engine's own «whole screen» request.
+        let (left, top, right, bottom) = if width < 0 || height < 0 {
+            (0, 0, i32::MAX, i32::MAX)
+        } else {
+            (x, y, x.saturating_add(width), y.saturating_add(height))
+        };
+        if right > left && bottom > top {
+            let dirty_left: i32 = jvm.get_field(&this, "dirtyLeft", "I").await?;
+            let dirty_top: i32 = jvm.get_field(&this, "dirtyTop", "I").await?;
+            let dirty_right: i32 = jvm.get_field(&this, "dirtyRight", "I").await?;
+            let dirty_bottom: i32 = jvm.get_field(&this, "dirtyBottom", "I").await?;
+            let union = if dirty_right <= dirty_left || dirty_bottom <= dirty_top {
+                (left, top, right, bottom)
+            } else {
+                (dirty_left.min(left), dirty_top.min(top), dirty_right.max(right), dirty_bottom.max(bottom))
+            };
+            jvm.put_field(&mut this, "dirtyLeft", "I", union.0).await?;
+            jvm.put_field(&mut this, "dirtyTop", "I", union.1).await?;
+            jvm.put_field(&mut this, "dirtyRight", "I", union.2).await?;
+            jvm.put_field(&mut this, "dirtyBottom", "I", union.3).await?;
+        }
+
         // Timed from the guest's call, not from how the engine hands it on, so the latency stays
         // visible whichever path delivers the paint.
         let now = context.system().platform().now();
@@ -817,6 +849,13 @@ impl Display {
 
         // Repaints requested during painting belong to the next cycle.
         jvm.put_field(&mut this, "repaintPending", "Z", false).await?;
+        let dirty_left: i32 = jvm.get_field(&this, "dirtyLeft", "I").await?;
+        let dirty_top: i32 = jvm.get_field(&this, "dirtyTop", "I").await?;
+        let dirty_right: i32 = jvm.get_field(&this, "dirtyRight", "I").await?;
+        let dirty_bottom: i32 = jvm.get_field(&this, "dirtyBottom", "I").await?;
+        for field in ["dirtyLeft", "dirtyTop", "dirtyRight", "dirtyBottom"] {
+            jvm.put_field(&mut this, field, "I", 0).await?;
+        }
         let current_displayable: ClassInstanceRef<Displayable> = jvm
             .get_field(&this, "currentDisplayable", "Ljavax/microedition/lcdui/Displayable;")
             .await?;
@@ -876,7 +915,11 @@ impl Display {
                     "javax/microedition/lcdui/Graphics",
                     "setClip",
                     "(IIII)V",
-                    (0, 0, layout.content_width, layout.content_height),
+                    Self::paint_clip(
+                        (dirty_left, dirty_top, dirty_right, dirty_bottom),
+                        layout.content_width,
+                        layout.content_height,
+                    ),
                 )
                 .await?;
 
@@ -934,6 +977,17 @@ impl Display {
         }
 
         Ok(())
+    }
+
+    /// The repaint area clipped to the content area, as setClip's (x, y, width, height). An empty
+    /// area — a paint nobody asked for through repaint() — paints the whole content area.
+    fn paint_clip((left, top, right, bottom): (i32, i32, i32, i32), content_width: i32, content_height: i32) -> (i32, i32, i32, i32) {
+        if right <= left || bottom <= top {
+            return (0, 0, content_width, content_height);
+        }
+        let (left, top) = (left.clamp(0, content_width), top.clamp(0, content_height));
+        let (right, bottom) = (right.clamp(left, content_width), bottom.clamp(top, content_height));
+        (left, top, right - left, bottom - top)
     }
 
     async fn paint_chrome(
@@ -1733,6 +1787,64 @@ mod test {
                 Ok(())
             },
         )
+    }
+
+    // 월드장기체스 re-requested repaint(60, 138, 120, 46) every frame and drew only once
+    // getClipWidth() came back as the width it asked for; a whole-screen clip froze it.
+    #[test]
+    fn paint_clip_is_the_union_of_repaint_areas_since_the_last_paint() -> Result<()> {
+        run_jvm_test(test_protos(), |jvm| async move {
+            let screen: ClassInstanceRef<ViewportScreen> = jvm.new_class("javax/microedition/lcdui/TestViewportScreen", "()V", ()).await?.into();
+            let display: ClassInstanceRef<Display> = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?.into();
+            let _: () = jvm
+                .invoke_virtual(
+                    &display,
+                    "javax/microedition/lcdui/Display",
+                    "setCurrent",
+                    "(Ljavax/microedition/lcdui/Displayable;)V",
+                    (screen.clone(),),
+                )
+                .await?;
+
+            async fn paint_clip(
+                jvm: &Jvm,
+                display: &ClassInstanceRef<Display>,
+                screen: &ClassInstanceRef<ViewportScreen>,
+                repaints: &[(i32, i32, i32, i32)],
+            ) -> JvmResult<[i32; 4]> {
+                for &area in repaints {
+                    let _: () = jvm
+                        .invoke_virtual(display, "javax/microedition/lcdui/Display", "repaint", "(IIII)V", area)
+                        .await?;
+                }
+                let _: () = jvm
+                    .invoke_virtual(display, "javax/microedition/lcdui/Display", "handlePaintEvent", "()V", ())
+                    .await?;
+                let mut clip = [0; 4];
+                for (slot, field) in clip.iter_mut().zip(["clipX", "clipY", "clipWidth", "clipHeight"]) {
+                    *slot = jvm.get_field(screen, field, "I").await?;
+                }
+                Ok(clip)
+            }
+
+            let full = [0, 0, 320, viewport_height(&jvm, &screen).await?];
+            assert_eq!(paint_clip(&jvm, &display, &screen, &[]).await?, full, "an unrequested paint is whole");
+            assert_eq!(paint_clip(&jvm, &display, &screen, &[(60, 138, 120, 46)]).await?, [60, 138, 120, 46]);
+            assert_eq!(
+                paint_clip(&jvm, &display, &screen, &[(10, 20, 30, 40), (50, 60, 5, 5)]).await?,
+                [10, 20, 45, 45],
+                "two areas paint as their union"
+            );
+            assert_eq!(paint_clip(&jvm, &display, &screen, &[]).await?, full, "the area is consumed by the paint");
+            assert_eq!(paint_clip(&jvm, &display, &screen, &[(5, 5, 1, 1), (0, 0, -1, -1)]).await?, full);
+            assert_eq!(
+                paint_clip(&jvm, &display, &screen, &[(300, 10, 100, 10)]).await?,
+                [300, 10, 20, 10],
+                "clipped to the content area"
+            );
+
+            Ok(())
+        })
     }
 
     #[test]
