@@ -22,7 +22,7 @@ use wie_backend::System;
 use wie_core_arm::ArmCore;
 use wie_jvm_support::{JvmImplementation, JvmSupport, native::NativeJavaValueCodec};
 use wie_midp::get_protos as get_midp_protos;
-use wie_util::{Result, WieError, read_generic, read_null_terminated_string_bytes};
+use wie_util::{Result, WieError, read_generic, read_null_terminated_string_bytes, write_generic};
 use wie_wipi_java::get_protos as get_wipi_java_protos;
 use wipi_types::lgt::java::{LGT_JAVA_CLASS_SUPER_CLASS_IS_NAME, LgtJavaClass as RawJavaClass, LgtJavaClassDescriptor as RawJavaClassDescriptor};
 
@@ -38,7 +38,7 @@ use self::{
     field::{JavaField, JavaHostField, JavaReferenceField, JavaStaticReferenceField},
     method::JavaMethod,
     value::JavaValueCodec,
-    vtable::JavaVtableEntry,
+    vtable::{JavaVtable, JavaVtableEntry},
 };
 
 type LgtJvmWord = u32;
@@ -348,6 +348,36 @@ impl LgtJvmSupport {
             .ok_or_else(|| WieError::FatalError(format!("Unsupported interface class implementation: {class_name}")))?;
 
         definition.ptr_vtable()
+    }
+
+    /// Import `0x64`: the receiver's implementations of `interface_name`'s methods, laid out
+    /// like a vtable — word 0 the interface's raw class, word `1 + i` the receiver's target for
+    /// the interface's method `i` (the order `virtual_method_index` hands out when a guest links
+    /// an interface method). The guest calls word `1 + i` with the receiver in r0, and a zero
+    /// word sends it to its own fallback import (`0x40`) instead — so an unimplemented method
+    /// stays 0. Evidence: docs/report/0377.
+    pub async fn interface_method_table(core: &mut ArmCore, jvm: &Jvm, receiver_name: &str, interface_name: &str) -> Result<u32> {
+        let interface = jvm
+            .resolve_class(interface_name)
+            .await
+            .map_err(|JavaError::JavaException(instance)| WieError::JavaException(Self::class_instance_raw(&*instance)))?;
+        let interface = interface
+            .definition
+            .as_any()
+            .downcast_ref::<JavaClassDefinition>()
+            .ok_or_else(|| WieError::FatalError(format!("Unsupported interface class implementation: {interface_name}")))?
+            .clone();
+        let entries = interface.vtable_entries(jvm).await?;
+        let ptr_table = JavaVtable::allocate(core, entries.len())?;
+        write_generic(core, ptr_table, interface.ptr_raw)?;
+        for (index, entry) in entries.iter().enumerate() {
+            let target = match &entry.method {
+                Some(method) => Self::non_virtual_method_target(jvm, receiver_name, &method.name(), &method.descriptor()).unwrap_or(0),
+                None => 0,
+            };
+            write_generic(core, ptr_table + ((index + 1) * size_of::<u32>()) as u32, target)?;
+        }
+        Ok(ptr_table)
     }
 
     pub fn non_virtual_method_target(jvm: &Jvm, class_name: &str, name: &str, descriptor: &str) -> Result<u32> {
