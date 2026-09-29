@@ -22,6 +22,7 @@
 
 - **커밋 전 게이트**: `AGENTS.md` §Definition of Done 의 4종. `cargo clippy --workspace` 만으로는
   CI 를 예측하지 못한다 — `-D warnings`·wasm 타깃·`RUST_MIN_STACK=4194304` 까지 맞춰 돌려라.
+- 무거운 빌드·테스트(cargo build/test · vitest · next build · tsc -p · wrangler build)는 `~/orchestrator-live/bin/build-slot run -- <cmd>` 로 감싼다 — 머신당 슬롯을 넘으면 기다렸다 돈다(상한 30분 · rc 는 명령 그대로 · 라이브에 없으면 맨 명령).
 - ★**축소 금지 목록 = `AGENTS.md` §Constraints 표**(12행 + «Held by you» 절).
   ★**여기에 재열거하지 않는다** — 같은 사실을 두 곳에 적으면 한쪽이 낡는다.
   **ponytail 은 명시되지 않은 요구사항을 범위 밖으로 취급하므로** 그 표에 걸리는 제안은
