@@ -24,3 +24,7 @@ ok   planted regression              checked 3, 0 absent, 1 regressions · rc=1
 ok   absent 2/3 → UNMEASURED         rc=2
 ok   mutant (no NFC) is not OK       checked 0, 3 absent · UNMEASURED rc=2
 ```
+
+유입 0건(BOUNDED) · 판단 필요 0건(SUFFIX-ATTACHED).
+
+<!-- corpus-name-inflow v1 subjects=5 tree=156af88d8c5003d6 B=0/0 P=0/0 S=0/0 -->
