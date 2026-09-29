@@ -1,0 +1,11 @@
+{
+  "date": "2026-09-29",
+  "kind": "fix",
+  "titles": [
+    "ca7fa8ade8ad0843fda042649771bfdfb95119bae03baa6f53ad12b1c23d89ec",
+    "34ab350dc98a40b5c26a8b05f0c03cb67008fe25014c35926344c50112fadd17",
+    "249e655147a173c767d9b3ab2b848e935e273364e019cce2ee93dbf4fc75afbf"
+  ],
+  "summary_ko": "화면을 두 곳에서 동시에 그리다 그림판 전체가 겹쳐 보이던 문제를 고쳤어요. 흰 화면만 나오던 게임 하나도 이제 게임 화면이 나와요.",
+  "pr": "https://github.com/Jun025/wie/pull/406"
+}

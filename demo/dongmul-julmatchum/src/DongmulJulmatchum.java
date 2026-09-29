@@ -86,6 +86,12 @@ final class MatchGame extends Arcade {
     int newGame(int level) {
         kinds = KINDS[level];
         fill();
+        reset();
+        return ROUND_MS[level];
+    }
+
+    /** Cursor to the middle, nothing moving, no hint or labels up. */
+    private void reset() {
         cx = cy = N / 2;
         picked = false;
         phase = IDLE;
@@ -93,7 +99,29 @@ final class MatchGame extends Arcade {
         hintA = -1;
         badgeAge = BADGE_F;
         for (int i = 0; i < labelAge.length; i++) labelAge[i] = LABEL_F;
-        return ROUND_MS[level];
+        for (int i = 0; i < N * N; i++) drop[i] = 0;
+    }
+
+    /** kinds, cursor x, cursor y, then the 49 cells. The board is settled: pause calls end() first. */
+    byte[] snapshot() {
+        byte[] b = new byte[3 + N * N];
+        b[0] = (byte) kinds;
+        b[1] = (byte) cx;
+        b[2] = (byte) cy;
+        for (int i = 0; i < N * N; i++) b[3 + i] = (byte) board[i];
+        return b;
+    }
+
+    boolean restore(byte[] b, int off, int len) {
+        if (len != 3 + N * N || b[off] < 5 || b[off] > 6) return false;
+        for (int i = 0; i < N * N; i++) if (b[off + 3 + i] < 0 || b[off + 3 + i] >= b[off]) return false;
+        kinds = b[off];
+        for (int i = 0; i < N * N; i++) board[i] = b[off + 3 + i];
+        reset();
+        cx = Math.min(N - 1, Math.max(0, b[off + 1]));
+        cy = Math.min(N - 1, Math.max(0, b[off + 2]));
+        if (findMove() < 0) fill();
+        return true;
     }
 
     /** A fresh board with no line already made and at least one move. */
@@ -408,39 +436,80 @@ final class MatchGame extends Arcade {
         for (int i = 0; i < 3; i++) face(g, trio[i], cx - 62 + i * 62, cy + ((frame / 2 + i) % 3 == 0 ? -3 : 0), true);
     }
 
-    int helpPages() {
-        return 4;
+    /** Pastel tiles for the name logo on the title screen, one per letter. */
+    private static final int[] TILES = {0xF3D29B, 0xCBE8C9, 0xE4DDF5, 0xCFD7E6, 0xF6D0C4};
+
+    void paintTitle(Graphics g, int w, int bottom) {
+        // Two bands of small faces drift past in opposite directions, behind the logo.
+        int step = 44, shift = (frame * 4) % step;
+        for (int band = 0; band < 2; band++) {
+            int y = band == 0 ? 26 : bottom - 26;
+            g.setColor(0xEEF0F3);
+            g.fillRect(0, y - 20, w, 40);
+            for (int i = -1; i <= w / step + 1; i++) {
+                int x = band == 0 ? i * step + shift : i * step - shift;
+                face(g, ((i + 12) * (band == 0 ? 1 : 5) + band) % 6, x + step / 2, y, false);
+            }
+        }
+        int mid = bottom / 2;
+        paintEmblem(g, w / 2, mid - 42);
+        String n = name();
+        int tile = 40, gap = 4, x0 = (w - n.length() * (tile + gap) + gap) / 2;
+        for (int i = 0; i < n.length(); i++) {
+            int x = x0 + i * (tile + gap), y = mid - 4 - ((frame + i) % 5 == 0 ? 3 : 0);
+            g.setColor(0xD8DCE2);
+            g.fillRoundRect(x, y + 2, tile, tile, 14, 14);
+            g.setColor(TILES[i % TILES.length]);
+            g.fillRoundRect(x, y, tile, tile, 14, 14);
+            g.setColor(TEXT);
+            bold(g, n.substring(i, i + 1), x + tile / 2, y + (tile - lineH) / 2, Graphics.TOP | Graphics.HCENTER);
+        }
+        g.setColor(SUB);
+        g.drawString(tagline(), w / 2, mid + tile + 6, Graphics.TOP | Graphics.HCENTER);
     }
 
-    String paintHelp(Graphics g, int page, int top, int w, int bottom) {
+    String[] helpTopics() {
+        return new String[] {"기본 규칙", "점수 계산", "연쇄", "힌트와 섞기", "난이도", "동물 친구들", "조작 키", "설정"};
+    }
+
+    private static final String[] ANIMALS = {"곰", "수달", "고양이", "토끼", "펭귄", "개구리"};
+    private static final String[] EARS = {"둥근 귀", "작은 옆 귀", "뾰족한 귀", "긴 귀", "흰 얼굴 가면", "머리 위 눈"};
+
+    void paintHelp(Graphics g, int page, int top, int w, int bottom) {
         int cx = w / 2;
-        int y = top + lineH + 20; // below the page title
-        int cap = bottom - 2 * lineH - 12; // two caption lines at the foot of the page
+        int y = top + 6;
+        int cap = bottom - 2 * lineH - 6; // two caption lines at the foot of the page
         String[] lines;
-        String title;
         if (page == 0) {
-            title = "① 바꾸기";
             int[] pic = {0, 0, 2, 3, 4, 0};
-            int s = 60, ox = cx - 3 * s / 2;
+            int s = 56, ox = cx - 3 * s / 2;
             card(g, ox - 4, y - 4, 3 * s + 8, 2 * s + 8, 18);
             for (int i = 0; i < 6; i++) face(g, pic[i], ox + (i % 3) * s + s / 2, y + (i / 3) * s + s / 2, true);
             ring(g, ox + 2 * s, y, s, ACCENT, 3);
             ring(g, ox + 2 * s, y + s, s, ACCENT, 1);
             arrow(g, ox + 2 * s + s / 2, y + s - 6);
-            lines = new String[] {"5 로 집고 방향키로", "옆 동물과 자리를 바꿔요"};
-        } else if (page == 1) {
-            title = "② 셋이면 톡";
-            int s = 60, ox = cx - 3 * s / 2;
-            card(g, ox - 4, y - 4, 3 * s + 8, s + 8, 18);
-            g.setColor(0xFFF1BF);
-            g.fillRoundRect(ox, y, 3 * s, s, 16, 16);
-            for (int i = 0; i < 3; i++) face(g, 0, ox + i * s + s / 2, y + s / 2, true);
-            g.setColor(ACCENT);
-            bold(g, "+30", cx, y + s + 14, Graphics.TOP | Graphics.HCENTER);
+            g.setColor(TEXT);
+            bold(g, "옆 동물과 자리를 바꿔요", cx, y + 2 * s + 16, Graphics.TOP | Graphics.HCENTER);
             lines = new String[] {"같은 동물 셋 이상이 한 줄이면", "사라지고 점수를 얻어요"};
+        } else if (page == 1) {
+            for (int r = 0; r < 3; r++) {
+                int n = 3 + r, ry = y + r * 38, ox = 22;
+                if (r == 0) {
+                    g.setColor(0xFFF1BF);
+                    g.fillRoundRect(ox - 4, ry - 2, n * 32 + 8, 34, 14, 14);
+                }
+                for (int i = 0; i < n; i++) face(g, r == 1 ? 3 : r == 2 ? 5 : 0, ox + i * 32 + 16, ry + 15, false);
+                g.setColor(ACCENT);
+                bold(g, "+" + n * 10, w - 22, ry + 15 - lineH / 2, Graphics.TOP | Graphics.RIGHT);
+            }
+            int by = y + 3 * 38 + 6;
+            g.setColor(TEXT);
+            g.fillRoundRect(cx - 100, by, 200, lineH + 10, 16, 16);
+            g.setColor(WHITE);
+            bold(g, "연쇄 둘째 x2, 셋째 x3", cx, by + 5, Graphics.TOP | Graphics.HCENTER);
+            lines = new String[] {"동물 하나에 10점이에요", "연쇄마다 점수가 곱절로 커져요"};
         } else if (page == 2) {
-            title = "③ 연쇄";
-            int s = 56;
+            int s = 52;
             int[] col = {2, 5, 2};
             for (int i = 0; i < 3; i++) face(g, col[i], cx - 50, y + i * (s - 6) + s / 2, true);
             arrow(g, cx - 50, y + 2);
@@ -448,29 +517,73 @@ final class MatchGame extends Arcade {
             g.fillRoundRect(cx, y + s, 90, lineH + 10, 16, 16);
             g.setColor(WHITE);
             bold(g, "연쇄 x2", cx + 45, y + s + 5, Graphics.TOP | Graphics.HCENTER);
-            lines = new String[] {"빈자리로 떨어져 또 맞으면 연쇄!", "연쇄할수록 점수가 곱절로"};
-        } else {
-            title = "④ 조작";
-            String[][] keys = {{"2 4 6 8", "고르기"}, {"5", "집기 · 놓기"}, {"CLR", "그만하고 처음으로"}};
-            for (int i = 0; i < 3; i++) {
-                int ky = y + i * (lineH + 14);
-                g.setColor(TEXT);
-                g.fillRoundRect(28, ky - 4, 70, lineH + 8, 12, 12);
-                g.setColor(WHITE);
-                bold(g, keys[i][0], 63, ky, Graphics.TOP | Graphics.HCENTER);
-                g.setColor(TEXT);
-                g.drawString(keys[i][1], 110, ky, Graphics.TOP | Graphics.LEFT);
+            lines = new String[] {"빈자리로 떨어져 또 맞으면", "연쇄예요. 점수가 커져요"};
+        } else if (page == 3) {
+            int[] pic = {1, 3, 0, 4, 2, 2, 5, 0, 3};
+            int s = 40, ox = cx - 3 * s / 2;
+            card(g, ox - 4, y - 4, 3 * s + 8, 3 * s + 8, 16);
+            for (int i = 0; i < 9; i++) {
+                int x = ox + (i % 3) * s, yy = y + (i / 3) * s;
+                boolean hint = i == 3 || i == 4;
+                if (hint) ring(g, x, yy, s, ACCENT, 2);
+                face(g, pic[i], x + s / 2, yy + s / 2, hint ? alert : small);
             }
-            int by = y + 3 * (lineH + 14) + 12;
-            g.setColor(SURFACE2);
-            g.fillRoundRect(28, by, w - 56, 7, 7, 7);
-            g.setColor(0xF2B84B);
-            g.fillRoundRect(28, by, (w - 56) * 2 / 5, 7, 7, 7);
-            lines = new String[] {"위쪽 막대가 시간이에요", "막대가 다 줄면 끝"};
+            g.setColor(TEXT);
+            g.fillRoundRect(cx - 70, y + 3 * s + 12, 140, lineH + 8, 14, 14);
+            g.setColor(WHITE);
+            g.drawString("판을 새로 섞었어요", cx, y + 3 * s + 16, Graphics.TOP | Graphics.HCENTER);
+            lines = new String[] {"잠시 멈추면 둘 곳이 반짝여요", "둘 곳이 없으면 판을 섞어요"};
+        } else if (page == 4) {
+            for (int l = 0; l < 2; l++) {
+                int ry = y + l * 70, n = KINDS[l];
+                card(g, 14, ry, w - 28, 62, 16);
+                g.setColor(TEXT);
+                bold(g, LEVELS[l], 26, ry + 8, Graphics.TOP | Graphics.LEFT);
+                g.setColor(SUB);
+                g.drawString(l == 0 ? "동물 다섯" : "동물 여섯", w - 26, ry + 8, Graphics.TOP | Graphics.RIGHT);
+                for (int k = 0; k < n; k++) face(g, k, 36 + k * 28, ry + 40, false);
+                g.setColor(SURFACE2);
+                g.fillRoundRect(200 - 30, ry + 36, 44, 7, 7, 7);
+                g.setColor(0x4CC38A);
+                g.fillRoundRect(200 - 30, ry + 36, l == 0 ? 44 : 30, 7, 7, 7);
+            }
+            lines = new String[] {"위 막대가 남은 시간이에요", "기록은 난이도마다 따로 남아요"};
+        } else if (page == 5) {
+            for (int k = 0; k < 6; k++) {
+                int ry = y + k * 30;
+                face(g, k, 36, ry + 13, false);
+                g.setColor(TEXT);
+                bold(g, ANIMALS[k], 60, ry + 13 - lineH / 2, Graphics.TOP | Graphics.LEFT);
+                g.setColor(SUB);
+                g.drawString(EARS[k], w - 18, ry + 13 - lineH / 2, Graphics.TOP | Graphics.RIGHT);
+            }
+            lines = new String[] {"", "귀 모양으로도 알아볼 수 있어요"};
+        } else if (page == 6) {
+            String[][] keys = {{"2 4 6 8", "움직이기"}, {"5", "집기, 놓기"}, {"L", "고르기"}, {"R CLR", "뒤로 가기"}, {"종료", "게임 나가기"}};
+            for (int i = 0; i < keys.length; i++) {
+                int ky = y + i * (lineH + 12);
+                g.setColor(i == 4 ? 0xE8685A : TEXT);
+                g.fillRoundRect(18, ky - 4, 66, lineH + 8, 12, 12);
+                g.setColor(WHITE);
+                bold(g, keys[i][0], 51, ky, Graphics.TOP | Graphics.HCENTER);
+                g.setColor(TEXT);
+                g.drawString(keys[i][1], 96, ky, Graphics.TOP | Graphics.LEFT);
+            }
+            lines = new String[] {"게임 중 L R CLR 은", "메뉴를 열고 시간을 멈춰요"};
+        } else {
+            String[][] rows = {{"소리", "효과음을 켜고 꺼요"}, {"진동", "터질 때 떨려요"}, {"난이도", "쉬움, 보통"}, {"움직임", "켬, 줄임, 끔"}};
+            for (int i = 0; i < rows.length; i++) {
+                int ry = y + i * (lineH + 20);
+                card(g, 14, ry, w - 28, lineH + 12, 12);
+                g.setColor(TEXT);
+                bold(g, rows[i][0], 26, ry + 6, Graphics.TOP | Graphics.LEFT);
+                g.setColor(SUB);
+                g.drawString(rows[i][1], w - 26, ry + 6, Graphics.TOP | Graphics.RIGHT);
+            }
+            lines = new String[] {"움직임 끔이면 판이 바로 바뀌어요", "메뉴에서 언제든 바꿀 수 있어요"};
         }
         g.setColor(SUB);
         for (int i = 0; i < lines.length; i++) g.drawString(lines[i], cx, cap + i * (lineH + 4), Graphics.TOP | Graphics.HCENTER);
-        return title;
     }
 
     /** A small down-pointing triangle under (x, y). */

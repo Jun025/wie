@@ -1,6 +1,6 @@
-use alloc::{format, vec};
+use alloc::{boxed::Box, format, vec};
 
-use jvm::{ClassInstanceRef, Jvm, Result as JvmResult};
+use jvm::{ClassInstanceRef, Field, Jvm, Result as JvmResult};
 use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 
@@ -243,10 +243,10 @@ impl Card {
 
         let _: () = jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await?;
         jvm.put_field(&mut this, "display", "Lorg/kwis/msp/lcdui/Display;", display).await?;
-        jvm.put_field(&mut this, "x", "I", x).await?;
-        jvm.put_field(&mut this, "y", "I", y).await?;
-        jvm.put_field(&mut this, "w", "I", width).await?;
-        jvm.put_field(&mut this, "h", "I", height).await?;
+        Self::set_bound(jvm, &mut this, "x", x).await?;
+        Self::set_bound(jvm, &mut this, "y", y).await?;
+        Self::set_bound(jvm, &mut this, "w", width).await?;
+        Self::set_bound(jvm, &mut this, "h", height).await?;
         jvm.put_field(&mut this, "transparent", "Z", transparent).await?;
 
         Ok(())
@@ -255,8 +255,8 @@ impl Card {
     async fn move_card(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Card>, x: i32, y: i32) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.lcdui.Card::move({this:?}, {x}, {y})");
 
-        jvm.put_field(&mut this, "x", "I", x).await?;
-        jvm.put_field(&mut this, "y", "I", y).await
+        Self::set_bound(jvm, &mut this, "x", x).await?;
+        Self::set_bound(jvm, &mut this, "y", y).await
     }
 
     async fn resize(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Card>, width: i32, height: i32) -> JvmResult<()> {
@@ -268,20 +268,42 @@ impl Card {
                 .await);
         }
 
-        jvm.put_field(&mut this, "w", "I", width).await?;
-        jvm.put_field(&mut this, "h", "I", height).await
+        Self::set_bound(jvm, &mut this, "w", width).await?;
+        Self::set_bound(jvm, &mut this, "h", height).await
+    }
+
+    // x/y/w/h are protected (AromaWIPI javadoc), so a subclass may declare its own field of the same
+    // name — 34ab350dc98a's does, for `x` and `w`. jvm.get_field resolves from the runtime class and
+    // so returned the game's x = 240 and w = 0: the card painted off screen. Card's own code means
+    // Card's fields, so resolve them from Card.
+    async fn bound_field(jvm: &Jvm, name: &str) -> JvmResult<Box<dyn Field>> {
+        let card = jvm.resolve_class("org/kwis/msp/lcdui/Card").await?;
+        match card.definition.field(name, "I", false) {
+            Some(field) => Ok(field),
+            None => Err(jvm.exception("java/lang/NoSuchFieldError", name).await),
+        }
+    }
+
+    async fn bound(jvm: &Jvm, this: &ClassInstanceRef<Card>, name: &str) -> JvmResult<i32> {
+        let field = Self::bound_field(jvm, name).await?;
+        Ok(this.get_field(&*field)?.into())
+    }
+
+    async fn set_bound(jvm: &Jvm, this: &mut ClassInstanceRef<Card>, name: &str, value: i32) -> JvmResult<()> {
+        let field = Self::bound_field(jvm, name).await?;
+        this.put_field(&*field, value.into())
     }
 
     async fn get_x(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Card>) -> JvmResult<i32> {
         tracing::debug!("org.kwis.msp.lcdui.Card::getX({this:?})");
 
-        jvm.get_field(&this, "x", "I").await
+        Self::bound(jvm, &this, "x").await
     }
 
     async fn get_y(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Card>) -> JvmResult<i32> {
         tracing::debug!("org.kwis.msp.lcdui.Card::getY({this:?})");
 
-        jvm.get_field(&this, "y", "I").await
+        Self::bound(jvm, &this, "y").await
     }
 
     async fn pointer_notify(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Card>, r#type: i32, x: i32, y: i32) -> JvmResult<bool> {
@@ -306,20 +328,20 @@ impl Card {
     async fn get_width(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Card>) -> JvmResult<i32> {
         tracing::debug!("org.kwis.msp.lcdui.Card::getWidth({this:?})");
 
-        jvm.get_field(&this, "w", "I").await
+        Self::bound(jvm, &this, "w").await
     }
 
     async fn get_height(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Card>) -> JvmResult<i32> {
         tracing::debug!("org.kwis.msp.lcdui.Card::getHeight({this:?})");
 
-        jvm.get_field(&this, "h", "I").await
+        Self::bound(jvm, &this, "h").await
     }
 
     async fn repaint(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Card>) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.lcdui.Card::repaint({this:?})");
 
-        let width: i32 = jvm.get_field(&this, "w", "I").await?;
-        let height: i32 = jvm.get_field(&this, "h", "I").await?;
+        let width: i32 = Self::bound(jvm, &this, "w").await?;
+        let height: i32 = Self::bound(jvm, &this, "h").await?;
 
         let _: () = jvm
             .invoke_virtual(&this, "org/kwis/msp/lcdui/Card", "repaint", "(IIII)V", (0, 0, width, height))
@@ -344,10 +366,10 @@ impl Card {
             return Ok(());
         }
 
-        let card_x: i32 = jvm.get_field(&this, "x", "I").await?;
-        let card_y: i32 = jvm.get_field(&this, "y", "I").await?;
-        let card_width: i32 = jvm.get_field(&this, "w", "I").await?;
-        let card_height: i32 = jvm.get_field(&this, "h", "I").await?;
+        let card_x: i32 = Self::bound(jvm, &this, "x").await?;
+        let card_y: i32 = Self::bound(jvm, &this, "y").await?;
+        let card_width: i32 = Self::bound(jvm, &this, "w").await?;
+        let card_height: i32 = Self::bound(jvm, &this, "h").await?;
 
         let repaint_x = i64::from(x).max(0).min(i64::from(card_width));
         let repaint_y = i64::from(y).max(0).min(i64::from(card_height));
@@ -424,6 +446,54 @@ mod test {
         classes::org::kwis::msp::lcdui::{Display, Graphics},
         get_protos,
     };
+
+    // Declares its own `x` and `w`, as 34ab350dc98a's Card subclass does — legal, since Card's are protected.
+    struct ShadowingCard;
+
+    impl ShadowingCard {
+        fn as_proto() -> WieJavaClassProto {
+            WieJavaClassProto {
+                name: "test/ShadowingCard",
+                parent_class: Some("org/kwis/msp/lcdui/Card"),
+                interfaces: vec![],
+                methods: vec![
+                    JavaMethodProto::new("<init>", "(Lorg/kwis/msp/lcdui/Display;IIIIZ)V", Self::init, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new("paint", "(Lorg/kwis/msp/lcdui/Graphics;)V", Self::paint, MethodAccessFlags::PROTECTED),
+                ],
+                fields: vec![
+                    JavaFieldProto::new("x", "I", FieldAccessFlags::PRIVATE),
+                    JavaFieldProto::new("w", "I", FieldAccessFlags::PRIVATE),
+                ],
+                access_flags: ClassAccessFlags::PUBLIC,
+            }
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        async fn init(
+            jvm: &Jvm,
+            _: &mut WieJvmContext,
+            this: ClassInstanceRef<Self>,
+            display: ClassInstanceRef<Display>,
+            x: i32,
+            y: i32,
+            width: i32,
+            height: i32,
+            transparent: bool,
+        ) -> JvmResult<()> {
+            jvm.invoke_special(
+                &this,
+                "org/kwis/msp/lcdui/Card",
+                "<init>",
+                "(Lorg/kwis/msp/lcdui/Display;IIIIZ)V",
+                (display, x, y, width, height, transparent),
+            )
+            .await
+        }
+
+        async fn paint(_: &Jvm, _: &mut WieJvmContext, _: ClassInstanceRef<Self>, _: ClassInstanceRef<Graphics>) -> JvmResult<()> {
+            Ok(())
+        }
+    }
 
     struct TestCard;
 
@@ -1155,6 +1225,39 @@ mod test {
                 assert_eq!((second_outside.r, second_outside.g, second_outside.b), (0, 0, 0));
                 assert_eq!((below_dirty.r, below_dirty.g, below_dirty.b), (0, 0, 0));
 
+                Ok(())
+            },
+        )
+    }
+
+    #[test]
+    fn card_bounds_are_cards_own_fields_not_a_subclasss() -> Result<()> {
+        let fixture: Box<[WieJavaClassProto]> = Vec::from([ShadowingCard::as_proto()]).into_boxed_slice();
+        run_jvm_test(
+            Box::new([wie_midp::get_protos().into(), get_protos().into(), fixture]),
+            |jvm| async move {
+                let display: ClassInstanceRef<Display> = jvm.instantiate_class("org/kwis/msp/lcdui/Display").await?.into();
+                let mut card: ClassInstanceRef<ShadowingCard> = jvm
+                    .new_class(
+                        "test/ShadowingCard",
+                        "(Lorg/kwis/msp/lcdui/Display;IIIIZ)V",
+                        (display, 3, 4, 20, 30, false),
+                    )
+                    .await?
+                    .into();
+                jvm.put_field(&mut card, "x", "I", 240).await?;
+                jvm.put_field(&mut card, "w", "I", 0).await?;
+
+                let get = |name: &'static str| {
+                    let (jvm, card) = (jvm.clone(), card.clone());
+                    async move { jvm.invoke_virtual::<_, i32>(&card, "org/kwis/msp/lcdui/Card", name, "()I", ()).await }
+                };
+                assert_eq!(get("getX").await?, 3);
+                assert_eq!(get("getWidth").await?, 20);
+
+                let _: () = jvm.invoke_virtual(&card, "org/kwis/msp/lcdui/Card", "move", "(II)V", (7, 8)).await?;
+                assert_eq!(get("getX").await?, 7);
+                assert_eq!(jvm.get_field::<i32>(&card, "x", "I").await?, 240, "the subclass's own x is untouched");
                 Ok(())
             },
         )

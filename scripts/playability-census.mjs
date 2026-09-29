@@ -11,7 +11,7 @@
 // committed is `clusters.md`, which names titles by sha256 prefix only.
 //
 // ── Usage ────────────────────────────────────────────────────────────────────
-//   node scripts/playability-census.mjs run --bin <wie_validate> --out <dir> [--jobs 8]
+//   node scripts/playability-census.mjs run --bin <wie_validate> --out <dir> [--jobs <= ncpu, default ncpu/2]
 //        [--secs 30] [--long 600] [--only probe|long|speed] <corpus dir>...
 //   node scripts/playability-census.mjs report --out <dir> --pin <wie sha>
 //        [--compat <compat.json>] [--changes <changes.json>] [--prs <gh-merged.json>]
@@ -61,13 +61,26 @@ const RELAUNCH = ['--relaunch', '1'];
 const LONG_KEYS = 'OK:1 UP:0.5 UP:0.5 OK:1 DOWN:0.5 RIGHT:0.5 NUM5:1 LEFT:0.5 NUM5:1 OK:1 NUM2:0.5 NUM8:0.5 NUM4:0.5 NUM6:0.5 OK:1';
 
 const [cmd, ...rest] = process.argv.slice(2);
-const opt = { jobs: Math.max(1, Math.floor(cpus().length * 0.8)), secs: 30, long: 600, dirs: [] };
+// Default half the cores, never more than all of them: each job is a CPU-bound wie_validate, so
+// past ncpu the extra ones only add context switches (2026-09-29: --jobs 32 on 10 cores -> load1 450,
+// sys 80%+, idle 0%) and starve the wall-clock probes into UNMEASURED.
+function jobsFor(requested, ncpu) {
+  if (requested === undefined) return Math.max(1, Math.floor(ncpu / 2));
+  const n = Math.max(1, Math.floor(Number(requested)) || 1);
+  return Math.min(n, ncpu);
+}
+const opt = { secs: 30, long: 600, dirs: [] };
 for (let i = 0; i < rest.length; i++) {
   const a = rest[i];
   if (a.startsWith('--')) opt[a.slice(2)] = rest[++i];
   else opt.dirs.push(a);
 }
-opt.jobs = Number(opt.jobs);
+{
+  const ncpu = cpus().length;
+  const want = opt.jobs;
+  opt.jobs = jobsFor(want, ncpu);
+  if (want !== undefined && Number(want) > ncpu) console.error(`--jobs ${want} > ${ncpu} cores — capped to ${opt.jobs}`);
+}
 opt.secs = Number(opt.secs);
 opt.long = Number(opt.long);
 if (cmd !== 'selftest' && (!opt.out || !['run', 'report'].includes(cmd))) {
@@ -405,6 +418,11 @@ if (cmd === 'selftest') {
     ['a probe that painted is', !starvedProbe({ stop: 'deadline', paints: 1, ticks: 3 })],
     ['a deadline after 100 ticks is a real hang', !starvedProbe({ stop: 'deadline', paints: 0, ticks: 100 })],
     ['an error is a real failure', !starvedProbe({ stop: 'error', paints: 0, ticks: 3 })],
+    ['--jobs defaults to half the cores', jobsFor(undefined, 10) === 5],
+    ['--jobs default is at least 1', jobsFor(undefined, 1) === 1],
+    ['--jobs above ncpu is capped', jobsFor('32', 10) === 10],
+    ['--jobs within ncpu is kept', jobsFor('3', 10) === 3],
+    ['--jobs 0 / garbage becomes 1', jobsFor('0', 10) === 1 && jobsFor('x', 10) === 1],
   ];
   const bad = cases.filter(([, ok]) => !ok);
   for (const [name] of bad) console.error(`selftest FAIL: ${name}`);

@@ -7,4 +7,6 @@ public abstract class MIDlet {
     protected abstract void pauseApp();
     protected abstract void destroyApp(boolean unconditional) throws MIDletStateChangeException;
     public final void notifyDestroyed() {}
+
+    public final String getAppProperty(String key) { return null; }
 }
