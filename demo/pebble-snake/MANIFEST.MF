@@ -1,6 +1,0 @@
-MIDlet-Name: Pebble Snake
-MIDlet-Vendor: otterpebble
-MIDlet-Version: 1.0.0
-MIDlet-1: Pebble Snake, , PebbleSnake
-MicroEdition-Profile: MIDP-2.0
-MicroEdition-Configuration: CLDC-1.1

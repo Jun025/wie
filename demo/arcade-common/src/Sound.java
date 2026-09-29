@@ -1,6 +1,6 @@
 /*
  * otterpebble arcade — Copyright (c) 2026 otterpebble. MIT License (see LICENSE).
- * Shared by the five arcade demos; adapted from demo/pebble-snake/src/Sound.java.
+ * The demo game's jingles.
  *
  * The engine plays SMAF ("application/vnd.smaf"), the format Korean handsets shipped
  * with, and nothing else. Rather than ship binary sound files, each jingle is a short
