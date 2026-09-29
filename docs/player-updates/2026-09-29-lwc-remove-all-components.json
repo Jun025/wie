@@ -1,0 +1,9 @@
+{
+  "date": "2026-09-29",
+  "kind": "improvement",
+  "titles": [
+    "ca7fa8ade8ad0843fda042649771bfdfb95119bae03baa6f53ad12b1c23d89ec"
+  ],
+  "summary_ko": "게임이 화면의 부품을 한꺼번에 지우려다 멈춰 검은 화면에 머물던 문제를 고쳐, 첫 장면이 나오게 했어요. 그 뒤 화면은 아직 그림이 겹쳐 깨져 보여요.",
+  "pr": "https://github.com/Jun025/wie/pull/401"
+}
