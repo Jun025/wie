@@ -63,14 +63,22 @@ Display::callSerially(card) → Card::repaint(60, 138, 120, 46) → Thread::slee
 - 4게이트: `fmt` 0 · `clippy --all -D warnings` 0 · wasm32 clippy 0 · beta clippy 0 · `RUST_MIN_STACK=4194304 cargo test --all` **589 passed / 0 failed**.
 - 러너: `draw_j2me` PASS · `helloworld_ktf`/`_lgt` PASS(clean exit) · `text_j2me` PASS · `keydraw_ktf --inject --expect-last-frame` PASS rc=0.
   `keydraw_lgt` 는 **UNMEASURED(max-ticks · 6~11/27)** ×4 — load1 530~683. ⑶ 대조: `target-pre`(2026-09-27 빌드 · 이 변경 이전 · main 과 정확히 같은 트리는 아니다)도 ×3 **같은 UNMEASURED(4~5/27)** ⇒ 부하 굶주림이지 이 변경이 아니다.
-- smoke gate(`scripts/smoke_gate.sh` · 로컬 working 카탈로그 · boot+render): SMOKE_RESULT
+- smoke gate(`scripts/smoke_gate.sh` · 로컬 working 카탈로그 · boot+render): debug 바이너리로 working 카탈로그 **294판**(ktf 190 · lgt 54 · skt 50) 실행 — PASS 289 · FAIL 5
+  (전부 `ktf/`). 5건 모두 release 로 다시 돌리면 **PASS**, `target-pre` 도 PASS(paints 비슷)이고,
+  debug 로는 `--timeout 60` 에서 PASS(1건 확인 · 첫 paint 가 15초 뒤) ⇒ 부하 아래 debug 의 첫 paint 지연이지 이 변경이 아니다(load1 120~680).
+  ★**스크립트의 «0 regressions» 는 인용하지 않는다** — `checked 1 baseline titles, 291 absent` 였다. 이 Mac 의 코퍼스 파일명은 NFD 이고 기준선은 NFC 라
+  기준선 대조가 **1건**만 맞았다(실측: `working/skt` 파일명 `unicodedata.is_normalized('NFC')` = False). 위 294판 PASS/FAIL 은 스크립트의 실행 줄을 직접 센 값이다.
 
 ### 한계
 
 - 원인을 측정한 타이틀은 하나다. 다른 타이틀의 개선은 주장하지 않는다.
 - player-updates 는 추가하지 않았다 — 이용자에게는 아직 «플레이 불가»다.
 - 다음 벽 `Vector 17` 은 이 회차 범위 밖(worklog 후속 제안 1).
+- `smoke_gate.sh` 의 기준선 대조가 NFD 코퍼스에서 사실상 비어 있다(위 절) — 이 회차에서 고치지 않았다.
 
 ### 게임 파일명 유입 (`scripts/corpus-name-inflow.mjs --corpus <로컬 game_lab>`)
 
-INFLOW_NOTE
+유입 BOUNDED + 판단 필요 SUFFIX-ATTACHED 수는 아래 표식 줄이 정본이다. 이 회차가 새로 더한 제목은 `월드장기체스` 하나
+(display.rs 테스트 주석 1 · wie_validate.rs 주석 2 · 이 문서 · worklog)이고 0351·0358·0363 과 같은 자리다. BOUNDED 의 나머지
+세 제목은 이 회차가 고친 파일(display.rs · wie_validate.rs)에 **원래 있던** 주석이다.
+SUFFIX-ATTACHED 는 전부 `월드장기체스가`(이 회차가 쓴 조사 붙은 언급 — 실제 언급)다.
