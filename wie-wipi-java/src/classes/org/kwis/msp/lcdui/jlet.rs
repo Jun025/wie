@@ -5,7 +5,7 @@ use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 use rustjava_runtime::classes::java::lang::String;
 
-use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
+use wie_jvm_support::{WieJavaClassProto, WieJvmContext, get_declared_field, put_declared_field};
 use wie_midp::classes::javax::microedition::midlet::MIDlet;
 
 use crate::classes::org::kwis::msp::lcdui::{Display, EventQueue};
@@ -102,7 +102,7 @@ impl Jlet {
             )
             .await?;
 
-        jvm.put_field(&mut this, "dis", "Lorg/kwis/msp/lcdui/Display;", display).await?;
+        put_declared_field(jvm, &mut this, "org/kwis/msp/lcdui/Jlet", "dis", "Lorg/kwis/msp/lcdui/Display;", display).await?;
 
         let event_queue = jvm
             .new_class("org/kwis/msp/lcdui/EventQueue", "(Lorg/kwis/msp/lcdui/Jlet;)V", (this.clone(),))
@@ -171,7 +171,8 @@ impl Jlet {
     }
 
     pub async fn display(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<Display>> {
-        jvm.get_field(this, "dis", "Lorg/kwis/msp/lcdui/Display;").await
+        // A Jlet subclass may declare its own `dis` — the corpus has two (docs/report/0382).
+        get_declared_field(jvm, this, "org/kwis/msp/lcdui/Jlet", "dis", "Lorg/kwis/msp/lcdui/Display;").await
     }
 }
 
@@ -192,7 +193,9 @@ mod tests {
 
     use super::Jlet;
 
-    // A title's Jlet: counts how often the platform calls its destroyApp.
+    // A title's Jlet: counts how often the platform calls its destroyApp, and declares its own
+    // `dis` as two KTF titles' Jlets do (docs/report/0382) — protected, since a private one would
+    // share Jlet's slot in jvm-bytecode's storage rather than shadow it.
     struct TestJlet;
 
     impl TestJlet {
@@ -205,7 +208,10 @@ mod tests {
                     JavaMethodProto::new("<init>", "()V", Self::init, MethodAccessFlags::PUBLIC),
                     JavaMethodProto::new("destroyApp", "(Z)V", Self::destroy_app, MethodAccessFlags::PROTECTED),
                 ],
-                fields: vec![JavaFieldProto::new("destroyed", "I", FieldAccessFlags::STATIC)],
+                fields: vec![
+                    JavaFieldProto::new("destroyed", "I", FieldAccessFlags::STATIC),
+                    JavaFieldProto::new("dis", "Lorg/kwis/msp/lcdui/Display;", FieldAccessFlags::PROTECTED),
+                ],
                 access_flags: ClassAccessFlags::PUBLIC,
             }
         }
@@ -270,5 +276,20 @@ mod tests {
 
             Ok(())
         })
+    }
+
+    #[test]
+    fn display_is_the_jlets_own_field_not_a_subclasss() -> Result<()> {
+        run_jvm_test(
+            Box::new([wie_midp::get_protos().into(), get_protos().into(), [TestJlet::as_proto()].into()]),
+            |jvm| async move {
+                let _midlet = jvm.new_class("net/wie/WIPIMIDlet", "()V", ()).await?;
+                let mut jlet: ClassInstanceRef<Jlet> = jvm.new_class("TestJlet", "()V", ()).await?.into();
+                jvm.put_field(&mut jlet, "dis", "Lorg/kwis/msp/lcdui/Display;", None).await?;
+
+                assert!(!Jlet::display(&jvm, &jlet).await?.is_null(), "the subclass's null dis did not reach Jlet");
+                Ok(())
+            },
+        )
     }
 }
