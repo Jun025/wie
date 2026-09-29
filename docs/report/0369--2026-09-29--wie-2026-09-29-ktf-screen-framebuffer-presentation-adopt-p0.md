@@ -36,5 +36,6 @@
 2는 paint 가 네이티브 다시 그리기 도중에 걸린 프레임이다. 실기와 같은 모습인지는 이 자료로 판정할 수 없다(기준 화면 없음) — 추측하지 않는다.
 
 ### 검증
-- 4게이트: 아래 회신 참조(코드 변경 0 · 문서와 키 파일만).
-- `node scripts/corpus-name-inflow.mjs`: 아래 표식.
+- 코드 변경 0(문서·키 파일·worklog 만). 스크래치 자기 target(이 워크트리 `target/`):
+  `cargo fmt --all -- --check` · `cargo clippy --all -- -D warnings`(stable·beta) · wasm32 clippy · `RUST_MIN_STACK=4194304 cargo test --all`(589 passed · 0 failed) rc=0.
+- `node scripts/corpus-name-inflow.mjs --corpus <game_lab>`: BOUNDED **0쌍** + SUFFIX-ATTACHED **0쌍**. 타이틀 표기는 sha 앞 12자뿐이다.
