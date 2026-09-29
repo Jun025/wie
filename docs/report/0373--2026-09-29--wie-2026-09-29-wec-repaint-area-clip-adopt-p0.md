@@ -56,3 +56,4 @@ paints 는 부하에 따라 움직인다(0368 의 86~165). `frozen_tail_steps` �
 유입 32건(BOUNDED) + 판단 필요 8건(SUFFIX-ATTACHED). 이 회차가 새로 더한 제목은 `월드장기체스` 하나(ABI 주석 1 · 핀 테스트 주석 1 · 이 문서 · worklog)이고,
 선례(0344·0351)와 같은 자리다. SUFFIX-ATTACHED 중 `월드장기체스가`(이 문서·worklog)는 조사 붙은 실제 언급이고, 나머지 `간호사타이쿤2`·`서든어택포켓` 은
 «더 긴 다른 제목»이 든 원래 있던 주석이다.
+<!-- corpus-name-inflow v1 subjects=4 tree=4e12870ba85f22de B=106/32 P=0/0 S=20/8 -->
