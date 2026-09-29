@@ -1,8 +1,10 @@
-use alloc::{boxed::Box, format, string::String, string::ToString, vec::Vec};
+use alloc::{boxed::Box, collections::BTreeMap, format, string::String, string::ToString, sync::Arc, vec::Vec};
 use core::{
     mem::size_of,
     sync::atomic::{AtomicBool, Ordering},
 };
+
+use spin::Mutex;
 
 use jvm::{
     ClassInstance, ClassInstanceRef, JavaError, JavaType, Jvm,
@@ -53,6 +55,7 @@ pub fn get_java_interface_method(core: &mut ArmCore, function_index: u32) -> Res
         0x57 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::MonitorExit)?,
         0x5b => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::LoadLongArray)?,
         0x61 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::StoreReferenceArray)?,
+        0x64 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::GetInterfaceMethodTable)?,
         0x82 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::SetJarPath)?,
         0x83 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::StartApplication)?,
         0xe1 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::GetStringClass)?,
@@ -63,11 +66,19 @@ pub fn get_java_interface_method(core: &mut ArmCore, function_index: u32) -> Res
     })
 }
 
+/// Import 0x64's tables by (receiver class, interface): the guest asks again on every loop turn.
+type InterfaceMethodTables = Arc<Mutex<BTreeMap<(String, String), u32>>>;
+
 pub fn register_java_system_svc_handler(core: &mut ArmCore, jvm: &Jvm, ptr_jar_path: u32) -> Result<()> {
-    core.register_svc_handler(SVC_CATEGORY_JAVA_SYSTEM, handle_java_system_svc, &(jvm.clone(), ptr_jar_path))
+    let tables = InterfaceMethodTables::default();
+    core.register_svc_handler(SVC_CATEGORY_JAVA_SYSTEM, handle_java_system_svc, &(jvm.clone(), ptr_jar_path, tables))
 }
 
-async fn handle_java_system_svc(core: &mut ArmCore, (jvm, ptr_jar_path): &mut (Jvm, u32), id: SvcId) -> Result<JumpTo> {
+async fn handle_java_system_svc(
+    core: &mut ArmCore,
+    (jvm, ptr_jar_path, tables): &mut (Jvm, u32, InterfaceMethodTables),
+    id: SvcId,
+) -> Result<JumpTo> {
     let (_, lr) = core.read_pc_lr()?;
     let result: Result<()> = async {
         match JavaSystemSvcId::try_from(id)? {
@@ -94,6 +105,11 @@ async fn handle_java_system_svc(core: &mut ArmCore, (jvm, ptr_jar_path): &mut (J
             JavaSystemSvcId::GetInterfaceDispatchTable => EmulatedFunction::call(&java_get_interface_dispatch_table, core, jvm)
                 .await?
                 .write(core, lr),
+            JavaSystemSvcId::GetInterfaceMethodTable => {
+                EmulatedFunction::call(&java_get_interface_method_table, core, &mut (jvm.clone(), tables.clone()))
+                    .await?
+                    .write(core, lr)
+            }
             JavaSystemSvcId::PushExceptionFrame => EmulatedFunction::call(&java_push_exception_frame, core, &mut ()).await?.write(core, lr),
             JavaSystemSvcId::PopExceptionFrame => EmulatedFunction::call(&java_pop_exception_frame, core, &mut ()).await?.write(core, lr),
             JavaSystemSvcId::StoreReferenceArray => EmulatedFunction::call(&java_store_reference_array, core, jvm).await?.write(core, lr),
@@ -207,6 +223,24 @@ async fn java_get_interface_dispatch_table(core: &mut ArmCore, jvm: &mut Jvm, _p
     let interface_name = String::from_utf8(read_null_terminated_string_bytes(core, ptr_interface_name)?)
         .map_err(|error| WieError::FatalError(format!("Invalid LGT interface class name: {error}")))?;
     LgtJvmSupport::interface_dispatch_table(jvm, &interface_name).await
+}
+
+async fn java_get_interface_method_table(
+    core: &mut ArmCore,
+    (jvm, tables): &mut (Jvm, InterfaceMethodTables),
+    ptr_instance: u32,
+    ptr_interface_name: u32,
+) -> Result<u32> {
+    let interface_name = String::from_utf8(read_null_terminated_string_bytes(core, ptr_interface_name)?)
+        .map_err(|error| WieError::FatalError(format!("Invalid LGT interface class name: {error}")))?;
+    let receiver_name = LgtJvmSupport::class_instance_from_raw(core, ptr_instance)?.class_definition().name();
+    let key = (receiver_name, interface_name);
+    if let Some(table) = tables.lock().get(&key) {
+        return Ok(*table);
+    }
+    let table = LgtJvmSupport::interface_method_table(core, jvm, &key.0, &key.1).await?;
+    tables.lock().insert(key, table);
+    Ok(table)
 }
 
 async fn java_push_exception_frame(core: &mut ArmCore, _: &mut ()) -> Result<()> {
@@ -838,6 +872,7 @@ mod tests {
         sync::atomic::{AtomicBool, Ordering},
     };
 
+    use jvm::ClassInstance;
     use jvm_class_proto::{JavaClassProto, JavaFieldProto};
     use jvm_types::{ClassAccessFlags, FieldAccessFlags};
     use wipi_types::lgt::java::{LgtJavaClass as RawJavaClass, LgtJavaClassLink as RawJavaClassLink};
@@ -851,8 +886,8 @@ mod tests {
     use wie_util::WieError;
 
     use super::{
-        LgtJvmSupport, get_java_interface_method, java_link_imported_classes, java_load_long_array, java_store_long_array,
-        read_member_name_and_descriptor, register_java_system_svc_handler,
+        InterfaceMethodTables, LgtJvmSupport, get_java_interface_method, java_get_interface_method_table, java_link_imported_classes,
+        java_load_long_array, java_store_long_array, read_member_name_and_descriptor, register_java_system_svc_handler,
     };
     use crate::runtime::java::jvm_support::tests::init_jvm;
 
@@ -924,6 +959,63 @@ mod tests {
                     "{ptr_array:#x}[{index}] must throw into the guest"
                 );
             }
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    // 0x64 is how the title enumerates a Vector: `for (e = v.elements(); e.hasMoreElements();)
+    // x = e.nextElement();` asks for the receiver's Enumeration table on every turn, then calls
+    // word 1 and word 2 with the receiver in r0. It died here with "Unknown lgt java import: 0x64".
+    #[test]
+    fn interface_method_table_dispatches_on_the_receiver_in_interface_order() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, _) = init_jvm(&system_clone).await?;
+            register_java_system_svc_handler(&mut core, &jvm, 0)?;
+            get_java_interface_method(&mut core, 0x64)?;
+
+            let vector = jvm.new_class("java/util/Vector", "()V", ()).await.unwrap();
+            let element = jvm.new_class("java/lang/Object", "()V", ()).await.unwrap();
+            let _: () = jvm
+                .invoke_virtual(&vector, "java/util/Vector", "addElement", "(Ljava/lang/Object;)V", (element.clone(),))
+                .await
+                .unwrap();
+            let enumeration: Box<dyn ClassInstance> = jvm
+                .invoke_virtual(&vector, "java/util/Vector", "elements", "()Ljava/util/Enumeration;", ())
+                .await
+                .unwrap();
+            let ptr_enumeration = LgtJvmSupport::class_instance_raw(&*enumeration);
+
+            let name = "java/util/Enumeration";
+            let ptr_name = Allocator::alloc(&mut core, name.len() as u32 + 1)?;
+            write_null_terminated_string_bytes(&mut core, ptr_name, name.as_bytes())?;
+            let mut context = (jvm.clone(), InterfaceMethodTables::default());
+            let table = java_get_interface_method_table(&mut core, &mut context, ptr_enumeration, ptr_name).await?;
+            assert_eq!(
+                java_get_interface_method_table(&mut core, &mut context, ptr_enumeration, ptr_name).await?,
+                table
+            );
+
+            let has_more: u32 = read_generic(&core, table + 4)?;
+            let next: u32 = read_generic(&core, table + 8)?;
+            assert_eq!(core.run_function::<u32>(has_more, &[ptr_enumeration]).await?, 1);
+            assert_eq!(
+                core.run_function::<u32>(next, &[ptr_enumeration]).await?,
+                LgtJvmSupport::class_instance_raw(&*element)
+            );
+            assert_eq!(core.run_function::<u32>(has_more, &[ptr_enumeration]).await?, 0);
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())

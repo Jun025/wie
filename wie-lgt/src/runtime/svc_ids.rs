@@ -63,6 +63,7 @@ pub enum JavaSystemSvcId {
     MonitorExit = 34,
     StoreLongArray = 35,
     LoadLongArray = 36,
+    GetInterfaceMethodTable = 37,
 }
 
 impl TryFrom<SvcId> for JavaSystemSvcId {
@@ -107,6 +108,7 @@ impl TryFrom<SvcId> for JavaSystemSvcId {
             34 => Self::MonitorExit,
             35 => Self::StoreLongArray,
             36 => Self::LoadLongArray,
+            37 => Self::GetInterfaceMethodTable,
             _ => {
                 return Err(wie_util::WieError::FatalError(alloc::format!(
                     "Unknown LGT Java system SVC id {}",
@@ -437,7 +439,7 @@ mod tests {
     /// because it calls the handler directly. Every declared id must come back as itself.
     #[test]
     fn java_system_svc_ids_round_trip_and_table_stays_fail_closed() {
-        let last = JavaSystemSvcId::LoadLongArray as u32;
+        let last = JavaSystemSvcId::GetInterfaceMethodTable as u32;
         for id in 0..=last {
             let variant = JavaSystemSvcId::try_from(SvcId(id)).unwrap_or_else(|_| panic!("Java system SVC id {id} has no try_from row"));
             assert_eq!(u32::from(variant), id);
