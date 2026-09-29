@@ -23,3 +23,4 @@
 - 게이트·러너·CI 결과는 PR 본문과 회신에 있다.
 
 ### 게임 이름 유입
+`node scripts/corpus-name-inflow.mjs --corpus <game_lab>` — BOUNDED **0** · SUFFIX-ATTACHED **0**.
