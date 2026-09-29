@@ -1,0 +1,27 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-29",
+  "task": "wie-2026-09-29-paint-serialize-card-bounds-adopt-p0",
+  "title": "네이티브 필드 이름 조회 가림 — 전수 계수 후 걸린 세 필드만 선언 클래스 조회로",
+  "summary": "코퍼스 고유 429종을 등록 탐침으로 세어, 게임 하위 클래스가 가린 네이티브 필드는 Card.display·MIDlet.display·Jlet.dis(+0374 의 Card.x/y/w/h)뿐이었다. wie-jvm-support 의 get/put_declared_field 한 곳으로 모았다. 전/후 32종 화면 차이 없음. 상세 docs/report/0382.",
+  "changes": [
+    "wie-jvm-support declared_field.rs — get_declared_field / put_declared_field",
+    "wie-wipi-java Card — display 와 x/y/w/h 를 헬퍼로",
+    "wie-wipi-java Jlet — dis 를 헬퍼로",
+    "wie-midp MIDlet — display 를 헬퍼로",
+    "docs/report/0382"
+  ],
+  "verification": [
+    "등록 탐침 전수 429종 — 네이티브 조상 가림 52행 / 32종",
+    "전/후/탐침 동시 32종 · 판정 뒤집힘 3건 재측 3판 — 전·후 모두 요동",
+    "단위 시험 3건 · 변이(이름 조회 복원) 4/4 red"
+  ],
+  "limits": [
+    "SKT private display 3종은 jvm-bytecode 저장소 키에 선언 클래스가 없어 «공유» — upstream 에서만 풀린다",
+    "계수는 --inject 1판에서 등록된 클래스만 본다"
+  ],
+  "adoptedProposals": [
+    "2026-09-29-paint-serialize-card-bounds#p0"
+  ],
+  "proposals": []
+}
