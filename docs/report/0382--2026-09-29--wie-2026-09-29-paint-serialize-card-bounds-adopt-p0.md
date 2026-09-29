@@ -34,3 +34,5 @@
 
 ### 게임 이름 유입
 `node scripts/corpus-name-inflow.mjs --corpus <game_lab>` — BOUNDED **1회 / 1쌍** · SUFFIX-ATTACHED **1회 / 1쌍**. 둘 다 `jlet.rs` 의 **이미 `origin/main` 에 있던 주석** 한 줄이다(도구는 수정 파일 본문 전체를 본다) — 이 변경의 추가 줄(`git diff origin/main...HEAD` 의 `+`)에서 세면 **0**. 표·본문은 sha 앞 12자만 쓴다.
+
+<!-- corpus-name-inflow v1 subjects=7 tree=adc4710e76d51af9 B=1/1 P=3/1 S=1/1 -->
