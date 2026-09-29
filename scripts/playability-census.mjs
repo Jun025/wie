@@ -47,9 +47,10 @@
 //           give `ok` (>= 0.9) or `slow`; runs that disagree leave the headless verdict standing.
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { cpus, loadavg } from 'node:os';
 import { basename, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const EXCLUDED = ['_dup', '_nongame', 'vendor_sdk'];
 const PROBE_KEYS_AT = 8; // pacing window opens after boot
@@ -64,6 +65,54 @@ function jobsFor(requested, ncpu) {
   if (requested === undefined) return Math.max(1, Math.floor(ncpu / 2));
   const n = Math.max(1, Math.floor(Number(requested)) || 1);
   return Math.min(n, ncpu);
+}
+// One `run` per host. The --jobs cap only bounds one run; 2026-09-29 two runs from two scratch
+// copies (10 + 10 jobs on 10 cores) put load1 back at 528-592. So the lock is a FIXED path, not
+// one derived from the script's location, and a second run WAITS rather than refusing — a ticket
+// must not fail quietly because another lane got there first. mkdir is the atomic test-and-set.
+const LOCK = process.env.WIE_CENSUS_LOCK || '/tmp/wie-playability-census.lock';
+const alive = (pid) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === 'EPERM';
+  }
+};
+// ponytail: a dead holder whose pid was reused reads as alive (waits until that pid exits), and two
+// waiters reclaiming the same stale lock at once can both proceed; pid+start-time is the upgrade.
+async function hostLock(dir, pollMs = 2000) {
+  for (let told = false; ; ) {
+    try {
+      mkdirSync(dir);
+      writeFileSync(join(dir, 'pid'), String(process.pid));
+      process.on('exit', () => {
+        try {
+          if (readFileSync(join(dir, 'pid'), 'utf8') === String(process.pid)) rmSync(dir, { recursive: true, force: true });
+        } catch {}
+      });
+      return;
+    } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+    }
+    let pid = NaN;
+    try {
+      pid = Number(readFileSync(join(dir, 'pid'), 'utf8'));
+    } catch {}
+    let age = 0;
+    try {
+      age = Date.now() - statSync(dir).mtimeMs;
+    } catch {}
+    // No pid file yet is a holder between mkdir and write — unless it has been like that for 10 s.
+    if (pid ? !alive(pid) : age > 10000) {
+      console.error(`census lock ${dir}: holder ${pid || '?'} is gone — reclaiming`);
+      rmSync(dir, { recursive: true, force: true });
+      continue;
+    }
+    if (!told) console.error(`census lock ${dir}: another run (pid ${pid || '?'}) holds this host — waiting`);
+    told = true;
+    await new Promise((r) => setTimeout(r, pollMs));
+  }
 }
 const opt = { secs: 30, long: 600, dirs: [] };
 for (let i = 0; i < rest.length; i++) {
@@ -420,6 +469,46 @@ if (cmd === 'selftest') {
     ['--jobs within ncpu is kept', jobsFor('3', 10) === 3],
     ['--jobs 0 / garbage becomes 1', jobsFor('0', 10) === 1 && jobsFor('x', 10) === 1],
   ];
+  // The host lock, through the real `run` path (an empty corpus, so nothing is validated): a
+  // version that dropped the hostLock() call exits at once and fails the first case.
+  {
+    const tmp = join('/tmp', `wie-census-selftest-${process.pid}`);
+    rmSync(tmp, { recursive: true, force: true });
+    mkdirSync(join(tmp, 'corpus'), { recursive: true });
+    const lock = join(tmp, 'lock');
+    const runOnce = () =>
+      new Promise((res) => {
+        const env = { ...process.env, WIE_CENSUS_LOCK: lock };
+        const args = [fileURLToPath(import.meta.url), 'run', '--bin', '/nonexistent', '--out', join(tmp, 'out'), join(tmp, 'corpus')];
+        const c = spawn(process.execPath, args, { env });
+        let err = '';
+        c.stderr.on('data', (d) => (err += d));
+        const r = { err: () => err, done: false, code: null };
+        c.on('exit', (code) => Object.assign(r, { done: true, code }));
+        res(r);
+      });
+    const until = async (f, ms) => {
+      for (const t = Date.now(); Date.now() - t < ms && !f(); ) await new Promise((r) => setTimeout(r, 50));
+      return f();
+    };
+    // Held by a live pid (this one): the run waits, then proceeds once the holder lets go.
+    mkdirSync(lock);
+    writeFileSync(join(lock, 'pid'), String(process.pid));
+    const w = await runOnce();
+    const waited = (await until(() => w.err().includes('waiting'), 5000)) && !(await until(() => w.done, 1000));
+    rmSync(lock, { recursive: true, force: true });
+    const proceeded = (await until(() => w.done, 10000)) && w.code === 0;
+    cases.push(['a second run waits while the lock is held', waited], ['and proceeds once it is released', proceeded]);
+    // Held by a dead pid: reclaimed, run completes without waiting on it.
+    const dead = spawn(process.execPath, ['-e', '']);
+    await new Promise((r) => dead.on('exit', r));
+    mkdirSync(lock);
+    writeFileSync(join(lock, 'pid'), String(dead.pid));
+    const d = await runOnce();
+    cases.push(['a dead holder is reclaimed', (await until(() => d.done, 10000)) && d.code === 0 && d.err().includes('reclaiming')]);
+    cases.push(['the run releases the lock on exit', !existsSync(lock)]);
+    rmSync(tmp, { recursive: true, force: true });
+  }
   const bad = cases.filter(([, ok]) => !ok);
   for (const [name] of bad) console.error(`selftest FAIL: ${name}`);
   console.log(`selftest: ${cases.length - bad.length}/${cases.length}`);
@@ -431,6 +520,7 @@ if (cmd === 'run') {
     console.error('run needs --bin <wie_validate> and at least one corpus dir');
     process.exit(2);
   }
+  await hostLock(LOCK);
   const pop = population(opt.dirs);
   // A second `run` into the same --out (another corpus slice) adds to the population, never replaces it.
   const prev = read(join(out, 'population.json'));
