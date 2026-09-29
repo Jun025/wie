@@ -148,6 +148,53 @@ pub async fn open_database(context: &mut dyn WIPICContext, ptr_name: WIPICWord, 
     Ok(ptr_handle as _)
 }
 
+/// KTF WIPI-C **Interface4 slot 0** — the header's `MC_dbOpenDataBase(name, rsize, create, mode)`.
+///
+/// KTF's `Database` table slot 0 is a different, stream-style open (`open_database`). This table is
+/// unnamed in this repo; slot 0's shape is measured on three titles — `("SaveData", 0xeec, 0, 1)`,
+/// `("FG_102", 0x80, 0, 1)`, `(<name>, 0x80, 1, 1)` — a name, a record size, a create flag and a
+/// mode, which is exactly the header's record-database open. It returns the same handle the other
+/// database entry points already read, so any of them the title reaches next works on it.
+pub async fn open_record_database(context: &mut dyn WIPICContext, ptr_name: WIPICWord, record_size: i32, create: i32, mode: i32) -> Result<i32> {
+    tracing::debug!("KTF Interface4[0] MC_dbOpenDataBase({ptr_name:#x}, {record_size}, {create}, {mode})");
+
+    let Ok(name) = String::from_utf8(read_null_terminated_string_bytes(context, ptr_name)?) else {
+        return Ok(-22);
+    };
+    if name.len() > MAX_NAME_LEN {
+        return Ok(-22);
+    }
+
+    let system = context.system();
+    let pid = system.pid().to_owned();
+    if create == 0 && !system.platform().database_repository().exists(&name, &pid).await {
+        return Ok(-12); // M_E_NOENT
+    }
+    system.platform().database_repository().open(&name, &pid).await;
+
+    let mut handle = DatabaseHandle::zeroed();
+    handle.magic = DATABASE_HANDLE_MAGIC;
+    handle.name[..name.len()].copy_from_slice(name.as_bytes());
+
+    let ptr_handle = context.alloc_raw(size_of::<DatabaseHandle>() as _)?;
+    write_generic(context, ptr_handle, handle)?;
+
+    Ok(ptr_handle as _)
+}
+
+/// `MC_dbInsertRecord(fd, buf, len)` — a new record; returns its id.
+pub async fn insert_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WIPICWord, buf_len: WIPICWord) -> Result<i32> {
+    tracing::debug!("MC_dbInsertRecord({db_id:#x}, {buf_ptr:#x}, {buf_len})");
+
+    let Some(mut db) = get_database_from_db_id(context, db_id).await? else {
+        return Ok(-25); // M_E_INVALIDHANDLE
+    };
+    let mut buf = vec![0; buf_len as usize];
+    context.read_bytes(buf_ptr, &mut buf)?;
+
+    Ok(db.add(&buf).await as _)
+}
+
 pub async fn close_database(context: &mut dyn WIPICContext, db_id: i32) -> Result<i32> {
     tracing::debug!("MC_dbCloseDataBase({db_id:#x})");
 
@@ -722,9 +769,37 @@ mod tests {
     use crate::context::{WIPICContext, test::TestContext};
 
     use super::{
-        KTF_DATABASE_STORAGE_LIMIT, delete_database, exists_database, exists_database_ktf, list_databases, list_record_info, open_database,
-        select_record, sort_records, stat_by_name_ktf, stream_read, stream_write, update_record,
+        KTF_DATABASE_STORAGE_LIMIT, delete_database, exists_database, exists_database_ktf, get_number_of_records, insert_record, list_databases,
+        list_record, list_record_info, open_database, open_record_database, select_record, sort_records, stat_by_name_ktf, stream_read, stream_write,
+        update_record,
     };
+
+    /// KTF Interface4 is the header's record database: the call sequence three titles make —
+    /// open without create (absent: M_E_NOENT), open with create, insert, count, list, select.
+    #[futures_test::test]
+    async fn record_database_round_trip_test() {
+        let mut context = database_test_context();
+        context.write_bytes(0x1000, b"SaveData\0").unwrap();
+        context.write_bytes(0x1100, b"abcd").unwrap();
+
+        assert_eq!(open_record_database(&mut context, 0x1000, 0xeec, 0, 1).await.unwrap(), -12);
+        let fd = open_record_database(&mut context, 0x1000, 0xeec, 1, 1).await.unwrap();
+        assert!(fd > 0);
+
+        let id = insert_record(&mut context, fd, 0x1100, 4).await.unwrap();
+        assert!(id > 0);
+        assert_eq!(get_number_of_records(&mut context, fd).await.unwrap(), 1);
+        assert_eq!(list_record(&mut context, fd, 0x1200, 12).await.unwrap(), 1);
+        let mut word = [0; 4];
+        context.read_bytes(0x1200, &mut word).unwrap();
+        assert_eq!(word, (id as u32).to_le_bytes());
+        assert_eq!(select_record(&mut context, fd, id, 0x1300, 128).await.unwrap(), 0);
+        context.read_bytes(0x1300, &mut word).unwrap();
+        assert_eq!(&word, b"abcd");
+
+        // A later open without create finds it.
+        assert!(open_record_database(&mut context, 0x1000, 0xeec, 0, 1).await.unwrap() > 0);
+    }
 
     /// KTF database slot 8 refuses, and refuses **without touching guest memory**.
     ///

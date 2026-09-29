@@ -6,6 +6,8 @@ use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
+use crate::classes::org::kwis::msp::lcdui::InputMethodListener;
+
 // class org.kwis.msp.lcdui.InputMethodHandler
 pub struct InputMethodHandler;
 
@@ -20,8 +22,18 @@ impl InputMethodHandler {
                 JavaMethodProto::new("setCurrentMode", "(I)Z", Self::set_current_mode, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getCurrentMode", "()I", Self::get_current_mode, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("hideSymbolCard", "()V", Self::hide_symbol_card, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("notifyKeyInput", "(II)Z", Self::notify_key_input, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new(
+                    "setInputMethodListener",
+                    "(Lorg/kwis/msp/lcdui/InputMethodListener;)V",
+                    Self::set_input_method_listener,
+                    MethodAccessFlags::PUBLIC,
+                ),
             ],
-            fields: vec![JavaFieldProto::new("mode", "I", FieldAccessFlags::PRIVATE)],
+            fields: vec![
+                JavaFieldProto::new("mode", "I", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("listener", "Lorg/kwis/msp/lcdui/InputMethodListener;", FieldAccessFlags::PRIVATE),
+            ],
             access_flags: ClassAccessFlags::PUBLIC,
         }
     }
@@ -55,5 +67,62 @@ impl InputMethodHandler {
         tracing::warn!("stub org.kwis.msp.lcdui.InputMethodHandler::hideSymbolCard({this:?})");
 
         Ok(())
+    }
+
+    // wie has no input method, so no key is consumed by one: false hands every key back to the
+    // title's own handler.
+    async fn notify_key_input(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, r#type: i32, key: i32) -> JvmResult<bool> {
+        tracing::warn!("stub org.kwis.msp.lcdui.InputMethodHandler::notifyKeyInput({this:?}, {type}, {key})");
+
+        Ok(false)
+    }
+
+    // wie has no input method, so the listener is never called back; it is kept so the
+    // registration is observable to anything that later reads it.
+    async fn set_input_method_listener(
+        jvm: &Jvm,
+        _: &mut WieJvmContext,
+        mut this: ClassInstanceRef<Self>,
+        listener: ClassInstanceRef<InputMethodListener>,
+    ) -> JvmResult<()> {
+        tracing::warn!("stub org.kwis.msp.lcdui.InputMethodHandler::setInputMethodListener({this:?}, {listener:?})");
+
+        jvm.put_field(&mut this, "listener", "Lorg/kwis/msp/lcdui/InputMethodListener;", listener)
+            .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::boxed::Box;
+
+    use jvm::ClassInstanceRef;
+    use test_utils::run_jvm_test;
+    use wie_util::Result;
+
+    use crate::get_protos;
+
+    // A KTF title registers a listener before its text-entry screen; without the method that is fatal.
+    #[test]
+    fn listener_and_key_input_are_accepted() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            let handler = jvm.new_class("org/kwis/msp/lcdui/InputMethodHandler", "(I)V", (0,)).await?;
+            let listener: ClassInstanceRef<super::InputMethodListener> = jvm.new_class("java/lang/Object", "()V", ()).await?.into();
+            let _: () = jvm
+                .invoke_virtual(
+                    &handler,
+                    "org/kwis/msp/lcdui/InputMethodHandler",
+                    "setInputMethodListener",
+                    "(Lorg/kwis/msp/lcdui/InputMethodListener;)V",
+                    (listener,),
+                )
+                .await?;
+            let consumed: bool = jvm
+                .invoke_virtual(&handler, "org/kwis/msp/lcdui/InputMethodHandler", "notifyKeyInput", "(II)Z", (1, 53))
+                .await?;
+            assert!(!consumed);
+
+            Ok(())
+        })
     }
 }

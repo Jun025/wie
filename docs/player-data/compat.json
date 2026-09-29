@@ -1,7 +1,7 @@
 {
  "schema": 1,
- "generatedAt": "2026-09-28T04:31:25.782Z",
- "enginePin": "1dd9f81c46fb192237bf92b241c1aa3e6e2542bf",
+ "generatedAt": "2026-09-29T12:21:52.464Z",
+ "enginePin": "3c34efeedaea5e29857e80318d764fa18f655afb",
  "entries": [
   {
    "sha256": "6e5a1f88f0c0eedc6991293085060c811e487a701073a9c0e7fb1ed559065924",
@@ -50,12 +50,13 @@
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "ok",
+    "input": "no",
     "longplay": "no",
     "sound": "ok",
     "speed": "unknown"
    },
    "knownIssues_ko": [
+    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
    "changes": [],
@@ -109,7 +110,7 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -270,18 +271,16 @@
    "platform": "KTF",
    "model": null,
    "title": "고촌치킨",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "고촌치킨"
   },
@@ -664,18 +663,16 @@
    "platform": "KTF",
    "model": null,
    "title": "대통령타이쿤",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "대통령타이쿤"
   },
@@ -720,18 +717,16 @@
    "platform": "KTF",
    "model": null,
    "title": "던전앤파이터 격투가",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
     "boot": "ok",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "화면이 한 가지 색으로만 보여요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "던전앤파이터 격투가"
   },
@@ -740,18 +735,16 @@
    "platform": "KTF",
    "model": null,
    "title": "던전앤파이터 귀검사",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
-    "speed": "unknown"
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "던전앤파이터 귀검사"
   },
@@ -767,7 +760,7 @@
     "input": "ok",
     "longplay": "no",
     "sound": "no",
-    "speed": "unknown"
+    "speed": "ok"
    },
    "knownIssues_ko": [
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
@@ -781,18 +774,16 @@
    "platform": "KTF",
    "model": null,
    "title": "던파거너편",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
-    "speed": "unknown"
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "던파거너편"
   },
@@ -801,18 +792,16 @@
    "platform": "KTF",
    "model": null,
    "title": "던파거너편 (2)",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
-    "speed": "unknown"
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "던파거너편"
   },
@@ -821,18 +810,16 @@
    "platform": "KTF",
    "model": null,
    "title": "던파격투가편",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
     "boot": "ok",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "화면이 한 가지 색으로만 보여요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "던파격투가편"
   },
@@ -841,18 +828,16 @@
    "platform": "KTF",
    "model": null,
    "title": "던파귀검사2006",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
-    "speed": "unknown"
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "던파귀검사2006"
   },
@@ -861,20 +846,16 @@
    "platform": "KTF",
    "model": null,
    "title": "데몬헌터",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "no",
-    "sound": "no",
-    "speed": "unknown"
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "데몬헌터"
   },
@@ -919,16 +900,17 @@
    "platform": "KTF",
    "model": null,
    "title": "동전쌓기 에볼루션",
-   "status": "playable",
+   "status": "limited",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "ok",
-    "longplay": "ok",
+    "input": "no",
+    "longplay": "unknown",
     "sound": "no",
     "speed": "ok"
    },
    "knownIssues_ko": [
+    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
@@ -957,18 +939,16 @@
    "platform": "KTF",
    "model": null,
    "title": "두뇌게임q",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "두뇌게임q"
   },
@@ -977,18 +957,16 @@
    "platform": "KTF",
    "model": null,
    "title": "드래곤나이트 ex",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "드래곤나이트 ex"
   },
@@ -1017,18 +995,16 @@
    "platform": "KTF",
    "model": null,
    "title": "드래곤나이트EX",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "KT 드래곤나이트EX"
   },
@@ -1134,16 +1110,18 @@
    "platform": "KTF",
    "model": null,
    "title": "랩업만이살길",
-   "status": "playable",
+   "status": "limited",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "ok",
+    "longplay": "no",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "랩업만이살길"
   },
@@ -1226,18 +1204,16 @@
    "platform": "KTF",
    "model": null,
    "title": "루빅스큐브",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "루빅스큐브"
   },
@@ -1246,18 +1222,16 @@
    "platform": "KTF",
    "model": null,
    "title": "리듬스타1",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "리듬스타1"
   },
@@ -1307,7 +1281,7 @@
     "boot": "ok",
     "render": "ok",
     "input": "no",
-    "longplay": "unknown",
+    "longplay": "ok",
     "sound": "no",
     "speed": "unknown"
    },
@@ -1323,17 +1297,16 @@
    "platform": "KTF",
    "model": null,
    "title": "리얼싸커2009",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "no",
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
@@ -1344,17 +1317,16 @@
    "platform": "KTF",
    "model": null,
    "title": "리얼싸커2009 (2)",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "no",
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
@@ -1419,18 +1391,16 @@
    "platform": "KTF",
    "model": null,
    "title": "마법상점타이쿤2",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
-    "speed": "unknown"
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "마법상점타이쿤2"
   },
@@ -1439,20 +1409,16 @@
    "platform": "KTF",
    "model": null,
    "title": "마스터오브소드2 (작은화면)",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
     "boot": "ok",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "no",
-    "sound": "no",
-    "speed": "unknown"
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "화면이 한 가지 색으로만 보여요.",
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "마스터오브소드2-작은화면"
   },
@@ -1671,10 +1637,12 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "ok",
-    "speed": "unknown"
+    "sound": "no",
+    "speed": "ok"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "소리가 나지 않을 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "메이플스토리 도적편"
   },
@@ -1741,15 +1709,13 @@
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
+    "input": "ok",
     "longplay": "no",
-    "sound": "no",
-    "speed": "unknown"
+    "sound": "ok",
+    "speed": "ok"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
-    "소리가 나지 않을 수 있어요."
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
    "changes": [],
    "fileTitle": "물가에+돌튕기기"
@@ -1777,20 +1743,16 @@
    "platform": "KTF",
    "model": null,
    "title": "물가에돌튕기기3",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "no",
-    "sound": "no",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "물가에돌튕기기3"
   },
@@ -1871,19 +1833,16 @@
    "platform": "KTF",
    "model": null,
    "title": "미니게임의달인",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "no",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "미니게임의달인"
   },
@@ -2227,17 +2186,16 @@
    "platform": "KTF",
    "model": null,
    "title": "북천항해기2",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "no",
     "speed": "ok"
    },
    "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
@@ -2358,19 +2316,16 @@
    "platform": "KTF",
    "model": null,
    "title": "삼국쟁패2",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
-    "sound": "no",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "삼국쟁패2"
   },
@@ -2451,16 +2406,18 @@
    "platform": "KTF",
    "model": null,
    "title": "서든어택",
-   "status": "playable",
+   "status": "limited",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "ok",
+    "longplay": "no",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "서든어택"
   },
@@ -2527,19 +2484,16 @@
    "platform": "KTF",
    "model": null,
    "title": "소울카드마스터2",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "소울카드마스터2"
   },
@@ -2821,11 +2775,12 @@
     "render": "ok",
     "input": "no",
     "longplay": "unknown",
-    "sound": "ok",
+    "sound": "no",
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
+    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
+    "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
    "fileTitle": "알바 전설 편의점2"
@@ -2911,18 +2866,16 @@
    "platform": "KTF",
    "model": null,
    "title": "어스토니시아ep3",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "어스토니시아ep3"
   },
@@ -2955,10 +2908,12 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "ok",
+    "sound": "no",
     "speed": "ok"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "소리가 나지 않을 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "에픽크로니클2"
   },
@@ -2971,14 +2926,13 @@
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
-    "speed": "unknown"
+    "input": "ok",
+    "longplay": "no",
+    "sound": "ok",
+    "speed": "ok"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
    "changes": [],
    "fileTitle": "에픽크로니클PE"
@@ -3795,18 +3749,16 @@
    "platform": "KTF",
    "model": null,
    "title": "질주쾌감 스케쳐",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "질주쾌감 스케쳐"
   },
@@ -3833,19 +3785,16 @@
    "platform": "KTF",
    "model": null,
    "title": "질주쾌감스케쳐2",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "질주쾌감스케쳐2"
   },
@@ -3935,7 +3884,7 @@
     "input": "no",
     "longplay": "unknown",
     "sound": "no",
-    "speed": "unknown"
+    "speed": "ok"
    },
    "knownIssues_ko": [
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
@@ -4151,17 +4100,18 @@
    "platform": "KTF",
    "model": null,
    "title": "컴투스포춘골프3D",
-   "status": "not-yet",
+   "status": "limited",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "no",
+    "sound": "no",
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
+    "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
    "fileTitle": "컴투스포춘골프3D"
@@ -4177,12 +4127,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "케로로미니게임"
   },
@@ -4299,17 +4247,16 @@
    "platform": "KTF",
    "model": null,
    "title": "크로이센",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "no",
     "speed": "ok"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
@@ -4590,7 +4537,7 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "unknown"
+    "speed": "ok"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -4850,20 +4797,16 @@
    "platform": "KTF",
    "model": null,
    "title": "해적왕2007",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "no",
-    "sound": "no",
-    "speed": "unknown"
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "해적왕2007"
   },
@@ -4896,11 +4839,12 @@
     "render": "ok",
     "input": "ok",
     "longplay": "no",
-    "sound": "ok",
+    "sound": "no",
     "speed": "ok"
    },
    "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
+    "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
    "fileTitle": "헬싱"
@@ -4985,19 +4929,16 @@
    "platform": "KTF",
    "model": null,
    "title": "kbo 프로야구 2009",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "kbo 프로야구 2009"
   },
@@ -5006,19 +4947,16 @@
    "platform": "KTF",
    "model": null,
    "title": "kbo프로야구 2009",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "kbo프로야구 2009"
   },
@@ -5068,14 +5006,12 @@
     "boot": "ok",
     "render": "no",
     "input": "unknown",
-    "longplay": "no",
-    "sound": "no",
+    "longplay": "unknown",
+    "sound": "ok",
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "화면이 한 가지 색으로만 보여요.",
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
-    "소리가 나지 않을 수 있어요."
+    "화면이 한 가지 색으로만 보여요."
    ],
    "changes": [],
    "fileTitle": "sega미니게임6"
@@ -5107,14 +5043,13 @@
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
-    "speed": "unknown"
+    "input": "ok",
+    "longplay": "no",
+    "sound": "ok",
+    "speed": "ok"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
    "changes": [],
    "fileTitle": "2008베이징올림픽"
@@ -5128,13 +5063,13 @@
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "no",
     "sound": "no",
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
@@ -5187,10 +5122,12 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "ok",
+    "sound": "no",
     "speed": "ok"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "소리가 나지 않을 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "검은방3"
   },
@@ -5336,7 +5273,7 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "unknown"
+    "speed": "ok"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -5411,12 +5348,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "던전앤파이터귀검사"
   },
@@ -5445,19 +5380,16 @@
    "platform": "LGT",
    "model": "clet",
    "title": "라그나로크 바이올렛",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
-    "speed": "unknown"
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "라그나로크 바이올렛"
   },
@@ -5506,14 +5438,13 @@
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
+    "input": "ok",
+    "longplay": "no",
+    "sound": "ok",
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
    "changes": [],
    "fileTitle": "레이카르나"
@@ -5541,16 +5472,18 @@
    "platform": "LGT",
    "model": "clet",
    "title": "리듬스타1",
-   "status": "playable",
+   "status": "limited",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "ok",
+    "longplay": "no",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "리듬스타1"
   },
@@ -5559,16 +5492,18 @@
    "platform": "LGT",
    "model": "clet",
    "title": "리듬스타2",
-   "status": "playable",
+   "status": "limited",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "ok",
+    "longplay": "no",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "리듬스타2"
   },
@@ -5577,16 +5512,18 @@
    "platform": "LGT",
    "model": "clet",
    "title": "리듬페스티발",
-   "status": "playable",
+   "status": "limited",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "ok",
+    "longplay": "no",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "리듬페스티발"
   },
@@ -5601,11 +5538,12 @@
     "render": "ok",
     "input": "ok",
     "longplay": "no",
-    "sound": "ok",
+    "sound": "no",
     "speed": "ok"
    },
    "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
+    "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
    "fileTitle": "리얼사커매니저2009"
@@ -5695,12 +5633,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "무한신맞고2009"
   },
@@ -5804,19 +5740,16 @@
    "platform": "LGT",
    "model": "clet",
    "title": "붉은보석",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "붉은보석"
   },
@@ -5843,19 +5776,16 @@
    "platform": "LGT",
    "model": "clet",
    "title": "블레이드마스터3",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
-    "speed": "unknown"
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "블레이드마스터3"
   },
@@ -5963,13 +5893,13 @@
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "no",
     "sound": "no",
-    "speed": "unknown"
+    "speed": "ok"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
@@ -6023,19 +5953,16 @@
    "platform": "LGT",
    "model": "clet",
    "title": "에바스토-천공의렙소디",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
-    "speed": "unknown"
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "에바스토-천공의렙소디"
   },
@@ -6122,18 +6049,16 @@
    "platform": "LGT",
    "model": "aot-java",
    "title": "월드장기체스",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
-    "speed": "unknown"
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "월드장기체스"
   },
@@ -6160,19 +6085,16 @@
    "platform": "LGT",
    "model": "clet",
    "title": "이터널사가3",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
-    "speed": "unknown"
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "이터널사가3"
   },
@@ -6181,19 +6103,16 @@
    "platform": "LGT",
    "model": "clet",
    "title": "이터니티-천상의화원",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
-    "speed": "unknown"
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "이터니티-천상의화원"
   },
@@ -6280,18 +6199,16 @@
    "platform": "LGT",
    "model": "clet",
    "title": "제노니아2",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "제노니아2"
   },
@@ -6378,18 +6295,16 @@
    "platform": "LGT",
    "model": "clet",
    "title": "테라 영원의 혼돈",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "no"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요.",
     "원래보다 조금 느리게 움직일 수 있어요."
    ],
    "changes": [],
@@ -6497,18 +6412,16 @@
    "platform": "LGT",
    "model": "clet",
    "title": "하이브리드2",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "하이브리드2"
   },
@@ -6555,17 +6468,16 @@
    "platform": "LGT",
    "model": "aot-java",
    "title": "훼밀리마트타이쿤",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
     "boot": "ok",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "no",
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "화면이 한 가지 색으로만 보여요.",
     "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
@@ -6770,18 +6682,16 @@
    "platform": "SKT",
    "model": null,
    "title": "닥터k",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
-    "speed": "unknown"
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "닥터k"
   },
@@ -6832,12 +6742,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "대해적시대"
   },
@@ -6846,19 +6754,16 @@
    "platform": "SKT",
    "model": null,
    "title": "댄스배틀오디션",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
     "boot": "ok",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "no",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "화면이 한 가지 색으로만 보여요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "댄스배틀오디션"
   },
@@ -7069,18 +6974,16 @@
    "platform": "SKT",
    "model": null,
    "title": "메르헨전기",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
-    "speed": "unknown"
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "메르헨전기"
   },
@@ -7179,18 +7082,16 @@
    "platform": "SKT",
    "model": null,
    "title": "미니게임츄리닝",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "미니게임츄리닝"
   },
@@ -7295,12 +7196,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "불멸의용병"
   },
@@ -7476,18 +7375,16 @@
    "platform": "SKT",
    "model": null,
    "title": "스페셜포스",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "스페셜포스"
   },
@@ -7520,12 +7417,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "썸머스케치"
   },
@@ -7608,16 +7503,17 @@
    "platform": "SKT",
    "model": null,
    "title": "얼라이브",
-   "status": "playable",
+   "status": "limited",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "ok",
+    "input": "no",
     "longplay": "ok",
     "sound": "no",
     "speed": "unknown"
    },
    "knownIssues_ko": [
+    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
@@ -7916,12 +7812,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
-    "speed": "unknown"
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "킹덤언더파이어"
   },
@@ -7987,19 +7881,16 @@
    "platform": "SKT",
    "model": null,
    "title": "파파라치타이쿤",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "파파라치타이쿤"
   },
@@ -8026,18 +7917,16 @@
    "platform": "SKT",
    "model": null,
    "title": "포트리스",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "포트리스"
   },
@@ -8064,18 +7953,16 @@
    "platform": "SKT",
    "model": null,
    "title": "프린세스메이커4 (작은화면)",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "no",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "no",
     "speed": "ok"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
