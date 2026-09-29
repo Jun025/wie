@@ -40,6 +40,7 @@ impl ContainerComponent {
                     Self::remove_component,
                     MethodAccessFlags::PUBLIC,
                 ),
+                JavaMethodProto::new("removeAllComponents", "()V", Self::remove_all_components, MethodAccessFlags::PUBLIC),
             ],
             fields: vec![JavaFieldProto::new("children", "Ljava/util/Vector;", FieldAccessFlags::PRIVATE)],
             access_flags: ClassAccessFlags::PUBLIC | ClassAccessFlags::ABSTRACT,
@@ -117,6 +118,15 @@ impl ContainerComponent {
             .await?;
 
         Ok(())
+    }
+
+    // The javadoc: "모든 컴포넌트를 삭제합니다." ca7fa8ade8ad calls it on a ShellComponent, which
+    // inherits it from here.
+    async fn remove_all_components(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lwc.ContainerComponent::removeAllComponents({this:?})");
+
+        let children = Self::children(jvm, this).await?;
+        jvm.invoke_virtual(&children, "java/util/Vector", "removeAllElements", "()V", ()).await
     }
 
     // Created on first use, not in <init>: ShellComponent's constructors chain to Component.<init>
@@ -200,6 +210,11 @@ mod tests {
                 .await?;
             assert_eq!(count(&jvm, &shell).await?, 1);
             assert_eq!(get(&jvm, &shell, 0).await?.identity(), labels[1].identity());
+
+            // ca7fa8ade8ad's next wall: removeAllComponents()V on a ShellComponent.
+            let _: () = jvm.invoke_virtual(&shell, CONTAINER, "removeAllComponents", "()V", ()).await?;
+            assert_eq!(count(&jvm, &shell).await?, 0);
+            assert!(get(&jvm, &shell, 0).await?.is_null());
 
             Ok(())
         })
