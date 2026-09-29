@@ -46,3 +46,10 @@ pub async fn socket_close(_context: &mut dyn WIPICContext, fd: i32) -> Result<i3
     // three sites: docs/wipi-c-abi-error-codes.md.
     Ok(-1) // M_E_ERROR
 }
+
+// No network: the socket is never created. Same -1 as `socket_close`, same reasoning.
+pub async fn socket(_context: &mut dyn WIPICContext, domain: i32, r#type: i32) -> Result<i32> {
+    tracing::warn!("MC_netSocket({domain}, {type}) -> -1 (no network)");
+
+    Ok(-1) // M_E_ERROR
+}

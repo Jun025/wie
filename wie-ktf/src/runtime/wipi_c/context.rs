@@ -96,6 +96,11 @@ impl WIPICContext for KtfWIPICContext {
     }
 
     fn free(&mut self, memory: WIPICIndirectPtr) -> Result<()> {
+        // Freeing a null handle is a defined no-op (C `free(NULL)` / `MC_knlFree(NULL)`), as in LGT's
+        // `free_indirect`. A KTF title's first-run exit calls `MC_grpDestroyOffScreenFrameBuffer(0)`.
+        if memory.0 == 0 {
+            return Ok(());
+        }
         let size: u32 = read_generic(&self.core, memory.0 + 4)?;
         Allocator::free(&mut self.core, memory.0, size + 12)?;
 
@@ -179,5 +184,60 @@ impl ByteRead for KtfWIPICContext {
 impl ByteWrite for KtfWIPICContext {
     fn write_bytes(&mut self, address: WIPICWord, data: &[u8]) -> wie_util::Result<()> {
         self.core.write_bytes(address, data)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use alloc::{boxed::Box, sync::Arc};
+    use core::{
+        mem::size_of,
+        sync::atomic::{AtomicBool, Ordering},
+    };
+
+    use bytemuck::Zeroable;
+
+    use wipi_types::wipic::WIPICIndirectPtr;
+
+    use wie_backend::{DefaultTaskRunner, System};
+    use wie_core_arm::{Allocator, ArmCore};
+    use wie_util::{Result, write_generic};
+    use wie_wipi_c::WIPICContext;
+
+    use test_utils::TestPlatform;
+
+    use crate::runtime::java::jvm_support::{KtfJvmSupport, KtfJvmThreadContext};
+
+    use super::KtfWIPICContext;
+
+    // A KTF title's first-run exit destroys an offscreen frame buffer it never created.
+    #[test]
+    fn free_of_null_is_a_no_op() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let mut system_clone = system.clone();
+        system.spawn(async move || {
+            let mut core = ArmCore::new(false, None)?;
+            Allocator::init(&mut core)?;
+            let mut registers = core.save_context();
+            registers.sp = Allocator::alloc(&mut core, 0x100)? + 0x100;
+            core.restore_context(&registers);
+            let ptr_thread_context = Allocator::alloc(&mut core, size_of::<KtfJvmThreadContext>() as u32)?;
+            write_generic(&mut core, ptr_thread_context, KtfJvmThreadContext::zeroed())?;
+            KtfJvmSupport::set_current_thread_context(&mut core, ptr_thread_context)?;
+            let (jvm, _) = KtfJvmSupport::init(&mut core, &mut system_clone, None).await?;
+            let mut context = KtfWIPICContext::new(core, system_clone, jvm, Default::default());
+
+            context.free(WIPICIndirectPtr(0))?;
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
     }
 }

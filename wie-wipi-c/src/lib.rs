@@ -16,8 +16,8 @@ pub type WIPICMethodBody = Box<dyn MethodBody<WieError>>;
 
 /// Pins the `WIPICError` vocabulary this crate's return codes were judged against.
 ///
-/// `docs/wipi-c-abi-error-codes.md` decides four out-of-vocabulary return codes, and two of those
-/// four ride on "the vocabulary has no variant for this" — `net::socket_close` (no generic failure)
+/// `docs/wipi-c-abi-error-codes.md` decides five out-of-vocabulary return codes, and three of those
+/// five ride on "the vocabulary has no variant for this" — `net::socket_close`/`net::socket` (no generic failure)
 /// and `database::stream_read` (no EOF). Those are claims about an UPSTREAM enum: `wipi_types` is a
 /// git dependency with **no `rev` in `Cargo.toml`**, so what holds its revision is the lock file
 /// alone. Measured 2026-09-07 over the commits that actually changed that lock line: **31 of them,

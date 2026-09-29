@@ -54,6 +54,10 @@ import { basename, join, resolve } from 'node:path';
 const EXCLUDED = ['_dup', '_nongame', 'vendor_sdk'];
 const PROBE_KEYS_AT = 8; // pacing window opens after boot
 // Never CLR / soft keys: those quit many titles, and a clean exit ends the run early.
+// A title that ends its FIRST run on purpose (a «다시 실행해 주세요» notice after writing a marker
+// database) is relaunched once, database kept — what a player does. Without it such a title reads
+// as boot/render fail on every census (7da00ecd4804, 2026-09-29).
+const RELAUNCH = ['--relaunch', '1'];
 const LONG_KEYS = 'OK:1 UP:0.5 UP:0.5 OK:1 DOWN:0.5 RIGHT:0.5 NUM5:1 LEFT:0.5 NUM5:1 OK:1 NUM2:0.5 NUM8:0.5 NUM4:0.5 NUM6:0.5 OK:1';
 
 const [cmd, ...rest] = process.argv.slice(2);
@@ -152,7 +156,7 @@ async function probe(t) {
     const f = join(d, `${name}.json`);
     if (existsSync(f)) continue;
     mkdirSync(join(d, name), { recursive: true });
-    const args = ['--inject', '--keep-timeout', '--timeout', String(opt.secs), '--shotdir', join(d, name), ...extra, t.path];
+    const args = ['--inject', '--keep-timeout', '--timeout', String(opt.secs), '--shotdir', join(d, name), ...RELAUNCH, ...extra, t.path];
     const r = await validate(args, opt.secs + 120, join(d, `${name}.stderr`));
     // A probe the host starved is not a measurement: it is left unrecorded, so the next `run` retries
     // it, instead of reading as `boot: fail`. Measured 2026-09-28: next to two Interactive-priority
@@ -190,7 +194,7 @@ async function longplay(t) {
   writeFileSync(keys, Array(reps).fill(LONG_KEYS).join('\n'));
   // --max-ticks: the 50M default is an infinite-loop backstop sized for a boot, and a fast title
   // burns it in minutes — measured on this run's first pass, which ended runs at 3 of 10 minutes.
-  const args = ['--inject', '--keys', keys, '--keep-timeout', '--timeout', String(opt.long), '--max-ticks', '100000000000', '--shotdir', join(d, 'L'), '--shot-every', '20', t.path];
+  const args = ['--inject', '--keys', keys, '--keep-timeout', '--timeout', String(opt.long), '--max-ticks', '100000000000', '--shotdir', join(d, 'L'), '--shot-every', '20', ...RELAUNCH, t.path];
   const r = await validate(args, opt.long + 300, join(d, 'L.stderr'));
   // `--keys` also shoots once per key step; only the `tNNN.N` timer shots are evenly spaced.
   const timed = existsSync(join(d, 'L'))
