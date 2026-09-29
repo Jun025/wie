@@ -42,4 +42,4 @@ load1 **287~446**. PASS↔FAIL 로 뒤집힌 것과 content 가 바뀐 것을 �
 - 4게이트 · beta clippy · 러너 블록 6줄 PASS(`keydraw_*` rc=0). LGT·SKT 코퍼스 짝은 재지 않았다(⑴ 은 Java 공용 경로다).
 
 ### 게임 이름 유입
-아래 표식 참고.
+`node scripts/corpus-name-inflow.mjs --corpus <game_lab>` — BOUNDED **4회 / 3쌍** · SUFFIX-ATTACHED **0**. BOUNDED 4회는 전부 `display.rs` 에 **이미 `origin/main` 에 있던 주석**이다(도구는 수정 파일 본문 전체를 본다) — 이 변경의 추가 줄(`git diff origin/main...HEAD` 의 `+`)에서 세면 **0**.
