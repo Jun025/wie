@@ -72,6 +72,7 @@ YAML 이 아니라 JSON 인 이유: 파서 의존을 새로 들이지 않는다(
   못 채우면(아직 main 에 없음) 그 항목은 이번 빌드에서 빠진다 — 지어낸 핀으로 싣지 않는다.
 - 빌드 산출: `{ schema: 1, generatedAt, wieHead, entries: [{ id(파일 이름), …위 필드, enginePin }] }` 날짜 최신 먼저.
 - 게임별 `compat.json.changes` 는 **이 파일들에서 파생**한다(원천은 하나). `titles: []` 항목은 소식 피드에만 나온다.
+- ★`build` 는 **산출물 전체**를 셸 가져오기와 같은 규칙으로 다시 잰다 — `compat.json` 의 `changes[].enginePin` 은 40hex 또는 null, `updates.json` 의 `wieHead`·`enginePin` 은 40hex. 하나라도 어기면 **아무것도 쓰지 않고 실패**한다(셸은 위반 1건에 파일 전체를 거부하므로, 거부될 데이터를 릴리스에 싣지 않는다). 2026-09-29 `git log --diff-merges` 가 패치를 함께 켜 핀 자리에 `+}` 가 실렸고 셸이 compat 35건·updates 18건 위반으로 둘 다 버렸다.
 
 ## 3. 배달
 
