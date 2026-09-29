@@ -344,6 +344,9 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   axes into an `--out` directory OUTSIDE the repo; `report` turns that into `compat.json`, a private
   `census.tsv`, and `clusters.md` (sha prefixes only). What each axis can and cannot see is in its
   header. Its speed axis is wall-clock: quote `load1` beside it (`docs/report/0321`).
+  Run it as `~/orchestrator-live/bin/build-slot run -- node scripts/playability-census.mjs run …` and
+  leave `--jobs` at its default (half the cores; above `ncpu` is capped) — `--jobs 32` on this 10-core
+  Mac pushed load1 to 450 and starved every other lane (`docs/report/0378`).
 
 - **`scripts/corpus-name-inflow.mjs` — local only (same reason); a round that reports a "게임
   파일명 유입" number RUNS IT rather than re-deriving the predicate.** `node
