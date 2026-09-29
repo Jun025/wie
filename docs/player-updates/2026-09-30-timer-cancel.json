@@ -1,0 +1,11 @@
+{
+  "date": "2026-09-30",
+  "kind": "speed",
+  "titles": [
+    "2d5cada030045cfad14c9f29f0007ad79d1f4da7447658846f7bdbedc224130b",
+    "3cc7a9b4cb15818cdd5a66f7e520c7b9b36f1df8d2df096aafa961b1cb2b682c",
+    "601556233e719a97860d38f6d413673c2996b1a7010438504663c98b86ec776c"
+  ],
+  "summary_ko": "게임이 끈 타이머가 계속 울려 게임이 두세 배로 돌던 문제를 고쳐, 원래 속도로 움직여요. 화면이 전보다 덜 자주 바뀌는 것은 정상이에요.",
+  "pr": "https://github.com/Jun025/wie/pull/416"
+}
