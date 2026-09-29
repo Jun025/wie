@@ -61,6 +61,16 @@ SVC id 왕복 시험의 마지막 id 도 `GetInterfaceMethodTable` 로 옮겼다
 - 실행으로 확인한 호출부는 `0xd82c` 1곳(Enumeration)이다. `0x260f4`·`0x26df4` 는 디스어셈블로만 봤다.
 - 수신자가 메서드를 구현하지 않으면 워드를 0 으로 두어 게스트가 import `0x40` 을 부르게 한다 — `0x40` 은 아직 미등재라 그 경우 `Unknown lgt java import: 0x40` 로 드러난다(조용히 넘어가지 않는다).
 
+### 회귀
+
+- 네 게이트 + beta: fmt · clippy stable/wasm32/beta `-D warnings` rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` 51 스위트 **592 passed 0 failed**(자기 target `wie-2/target`).
+- 러너(AGENTS §The four gates): `draw_j2me` · `helloworld_ktf` · `helloworld_lgt` PASS · `keydraw_ktf`/`keydraw_lgt --inject --expect-last-frame` PASS · paints 55 · rc=0 · `text_j2me --timeout 5` PASS(load1 ~155).
+- 이 코드는 import 0x64 가 해석될 때만 돈다 — 전에는 그 해석이 곧 치명 오류였고, 전수 조사에서 0x64 로 죽은 타이틀은 0 이었다(위). 다른 타이틀의 기존 판정을 바꿀 경로는 없다.
+
 ### 게임 파일명 유입 (`scripts/corpus-name-inflow.mjs --corpus <로컬 game_lab>`)
 
-아래 표식 참조. 이 회차가 새로 쓴 제목은 `월드장기체스`(이 문서 · worklog) 하나다.
+유입 27건(BOUNDED) + 판단 필요 5건(SUFFIX-ATTACHED). 도구는 바뀐 파일의 본문 전체를 센다 — `interface.rs`·`jvm_support.rs`·`svc_ids.rs` 의 제목은 전부 원래 있던 주석이다(이 회차의 Rust 주석에는 제목이 없다).
+이 회차가 새로 쓴 제목은 `월드장기체스`(이 문서 · worklog) 하나다. SUFFIX-ATTACHED 중 `월드장기체스가`(이 문서 · worklog — 2쌍)는 조사 붙은 실제 언급이고,
+나머지 3쌍은 Rust 파일에 원래 있던 주석의 «더 긴 다른 제목»이다. player-updates 항목은 제목 대신 compat sha256 만 쓴다.
+
+<!-- corpus-name-inflow v1 subjects=6 tree=5f22883a029d4bfd B=58/27 P=0/0 S=10/5 -->
