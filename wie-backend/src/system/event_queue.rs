@@ -1,4 +1,7 @@
-use alloc::{boxed::Box, collections::VecDeque};
+use alloc::{
+    boxed::Box,
+    collections::{BTreeMap, VecDeque},
+};
 use core::pin::Pin;
 
 use wie_util::Result;
@@ -90,6 +93,8 @@ impl Event {
 pub struct EventQueue {
     input_events: VecDeque<Event>,
     events: VecDeque<Event>,
+    // guest timer (its address) -> how many times it was armed or cancelled
+    timer_armings: BTreeMap<u32, u64>,
 }
 
 impl EventQueue {
@@ -110,6 +115,23 @@ impl EventQueue {
 
     pub fn is_empty(&self) -> bool {
         self.input_events.is_empty() && self.events.is_empty()
+    }
+
+    /// WIPI `MC_knlSetTimer` on a timer that is still pending re-arms it: the pending one must not
+    /// fire. Returns this arming, for `is_timer_armed` when it falls due.
+    pub fn arm_timer(&mut self, timer: u32) -> u64 {
+        let arming = self.timer_armings.entry(timer).or_default();
+        *arming += 1;
+        *arming
+    }
+
+    /// WIPI `MC_knlUnsetTimer`.
+    pub fn cancel_timer(&mut self, timer: u32) {
+        self.arm_timer(timer);
+    }
+
+    pub fn is_timer_armed(&self, timer: u32, arming: u64) -> bool {
+        self.timer_armings.get(&timer) == Some(&arming)
     }
 
     /// Keyboard input takes priority; events at the same priority remain FIFO.

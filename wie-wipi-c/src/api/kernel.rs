@@ -99,12 +99,19 @@ pub async fn set_timer(
         ptr_timer: WIPICWord,
         fn_callback: WIPICWord,
         param: WIPICWord,
+        arming: u64,
     }
 
     #[async_trait::async_trait]
     impl MethodBody<WieError> for TimerCallback {
         #[tracing::instrument(name = "timer", skip_all)]
         async fn call(&self, context: &mut dyn WIPICContext, _: Box<[WIPICWord]>) -> Result<WIPICResult> {
+            // Re-armed or cancelled since: a title that re-arms with Unset + Set from outside its
+            // callback otherwise gains one more live timer chain each time (2d5cada03004 reached
+            // 37 callbacks/s, each ~84ms late).
+            if !context.system().event_queue().is_timer_armed(self.ptr_timer, self.arming) {
+                return Ok(WIPICResult { results: Vec::new() });
+            }
             context.call_function(self.fn_callback, &[self.ptr_timer, self.param]).await?;
 
             Ok(WIPICResult { results: Vec::new() })
@@ -114,6 +121,7 @@ pub async fn set_timer(
     let now = context.system().platform().now();
     let timeout = (((timeout_high as u64) << 32) | (timeout_low as u64)) as _;
     let timer: WIPICTimer = read_generic(context, ptr_timer)?;
+    let arming = context.system().event_queue().arm_timer(ptr_timer);
 
     context.set_timer(
         now + timeout,
@@ -121,14 +129,17 @@ pub async fn set_timer(
             ptr_timer,
             fn_callback: timer.fn_callback,
             param,
+            arming,
         }),
     );
 
     Ok(())
 }
 
-pub async fn unset_timer(_: &mut dyn WIPICContext, a0: WIPICWord) -> Result<()> {
-    tracing::warn!("stub MC_knlUnsetTimer({a0:#x})");
+pub async fn unset_timer(context: &mut dyn WIPICContext, ptr_timer: WIPICWord) -> Result<()> {
+    tracing::debug!("MC_knlUnsetTimer({ptr_timer:#x})");
+
+    context.system().event_queue().cancel_timer(ptr_timer);
 
     Ok(())
 }
@@ -348,7 +359,9 @@ mod test {
 
     use crate::{WIPICContext, context::test::TestContext, method::MethodImpl};
 
-    use super::{alloc, calloc, free, get_program_name, get_resource, get_resource_id, get_system_property, sprintk};
+    use super::{
+        alloc, calloc, def_timer, free, get_program_name, get_resource, get_resource_id, get_system_property, set_timer, sprintk, unset_timer,
+    };
 
     #[futures_test::test]
     async fn test_sprintk() -> Result<()> {
@@ -406,6 +419,39 @@ mod test {
         let result = read_null_terminated_string_bytes(&context, out).unwrap();
         assert!(String::from_utf8(result).unwrap().contains("Yamaha_MA3"));
 
+        Ok(())
+    }
+
+    // Arms `timer` per `ops` (a timeout to MC_knlSetTimer it, `None` to MC_knlUnsetTimer it), then
+    // lets every timer that was set fall due. Returns the guest callbacks that ran.
+    async fn fire_after(ops: &[Option<u32>]) -> Result<alloc::vec::Vec<u32>> {
+        let system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let mut context = TestContext::with_system(system);
+        let timer = context.alloc_raw(4).unwrap();
+        def_timer(&mut context, timer, 0x1234).await?;
+        for op in ops {
+            match op {
+                Some(timeout) => set_timer(&mut context, timer, *timeout, 0, 0).await?,
+                None => unset_timer(&mut context, timer).await?,
+            }
+        }
+        for (_, callback) in core::mem::take(&mut context.timers) {
+            callback.call(&mut context, Box::new([])).await?;
+        }
+        Ok(core::mem::take(&mut context.calls))
+    }
+
+    // Both were missing, so each Unset + Set from outside a timer's own callback added one more timer
+    // chain that never died (2d5cada03004: 37 callbacks/s, each ~84ms late).
+    #[futures_test::test]
+    async fn test_set_timer_rearms_a_pending_timer() -> Result<()> {
+        assert_eq!(fire_after(&[Some(100), Some(10)]).await?, [0x1234]);
+        Ok(())
+    }
+
+    #[futures_test::test]
+    async fn test_unset_timer_cancels_a_pending_timer() -> Result<()> {
+        assert_eq!(fire_after(&[Some(10), None]).await?, []);
         Ok(())
     }
 
