@@ -82,6 +82,6 @@ LGT import 썽크는 `.data` 에 16바이트씩 `push {lr}; bl <resolver>; .word
 
 ### 게임 파일명 유입
 
-`node scripts/corpus-name-inflow.mjs`: BOUNDED 15회/10쌍 · SUFFIX-ATTACHED 0회/0쌍. BOUNDED 15회는 전부 이 회차가 손댄 두 파일(`svc_ids.rs`·`wipi_c.rs`)의 **기존 줄**이다 — 이 회차가 더한 줄(`git diff origin/main -- wie-lgt` 의 `+` 줄)의 한글은 0자이고, 타이틀은 sha12 로만 적었다.
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 15회/10쌍 · SUFFIX-ATTACHED 0회/0쌍. BOUNDED 15회는 전부 이 회차가 손댄 파일 중 `svc_ids.rs`·`wipi_c.rs`의 **기존 줄**이다 — 이 회차가 더한 줄(`git diff origin/main -- wie-lgt` 의 `+` 줄)의 한글은 0자이고, 타이틀은 sha12 로만 적었다.
 
-<!-- corpus-name-inflow v1 subjects=4 tree=f45d1cc60c1feee2 B=15/10 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=5 tree=e0019774cea909dd B=15/10 P=0/0 S=0/0 -->
