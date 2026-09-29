@@ -104,3 +104,5 @@
 - 이 브랜치가 건드린 파일(executor · system · event_queue · 두 wipi_c context · smaf_player · kernel)에 이미 있던 주석이다.
 - 그리고 이 문서가 부르는 두 이름(영웅서기4 와 배틀몬스터)이다. 둘 다 티켓의 Acceptance 가 이름으로 부르고, 0310·0314 가 이미 적었다.
 - 새로 쓴 코드 주석은 sha12 로 적었다. 게임 바이트는 0 이다.
+
+<!-- corpus-name-inflow v1 subjects=15 tree=e4e155dd708cbcc5 B=19/11 P=0/0 S=0/0 -->
