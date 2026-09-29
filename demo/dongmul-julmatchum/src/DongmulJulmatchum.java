@@ -6,8 +6,10 @@
  * multiplier. The round ends when the time bar runs out. Each animal differs by its
  * silhouette (ears) as well as its colour, so the board still reads without colour.
  * The faces are PNGs drawn at build time by ../art/Faces.java — see why there.
+ * How the board animates, and why input never waits for it: the comment above IDLE below.
  */
 
+import javax.microedition.lcdui.Font;
 import javax.microedition.lcdui.Graphics;
 import javax.microedition.lcdui.Image;
 
@@ -23,20 +25,45 @@ final class MatchGame extends Arcade {
     private static final int[] KINDS = {5, 6}, ROUND_MS = {90000, 60000};
     /** Only used if a face image is missing from the jar. */
     private static final int[] COLORS = {0xE2A857, 0x94664C, 0x8B9BB9, 0xEDE8F7, 0x3E4A66, 0x8BC98B};
+    /** Each face's rim colour (art/Faces.java) — the pop ring, which must show on a white cell. */
+    private static final int[] RIMS = {0xAE7A30, 0x5F3F2D, 0x5A6A88, 0x958AB8, 0x252D40, 0x55935B};
 
-    private final Image[] small = new Image[6], big = new Image[6];
+    /*
+     * The board moves in phases, each a whole number of loop frames — never milliseconds, so a
+     * slow device sees the same animation, only slower, and the rules do not change with speed.
+     * Per motion setting (켬, 줄임, 끔): a phase of 0 frames is skipped, so 끔 plays like the
+     * board before animation: everything resolves inside the key press.
+     * Input never waits for a phase: moving the cursor and picking work at any time, and a swap
+     * pressed while the board still moves first completes the moving part at once (finish()).
+     */
+    private static final int IDLE = 0, SWAP = 1, NOSWAP = 2, POP = 3, FALL = 4;
+    private static final int[] SWAP_F = {2, 0, 0}, NOSWAP_F = {4, 0, 0}, POP_F = {3, 1, 0};
+    /** A refused swap leans toward its neighbour and back, in hundredths of a cell per frame. */
+    private static final int[] WOBBLE = {30, 45, 20, -8};
+    /** Frames a score or chain label stays up; frames of no input before the hint shows. */
+    private static final int LABEL_F = 6, BADGE_F = 8, HINT_F = 60, FIRST_HINT_F = 30;
+
+    private final Image[] small = new Image[6], big = new Image[6], happy = new Image[6], alert = new Image[6];
     private final int[] board = new int[N * N];
     private final boolean[] hit = new boolean[N * N];
-    private final boolean[] spark = new boolean[N * N];
+    /** During FALL: how many cells each face still has to come down from. */
+    private final int[] drop = new int[N * N];
     private int kinds = 6;
     private int cx, cy;
     private boolean picked;
-    private long sparkUntil;
+    private int phase, f, dur, a, b, chain, maxDrop;
+    private int idle, hintA = -1, hintB;
+    // Rising score labels (position in hundredths of a cell), and the chain badge.
+    private final int[] labelX = new int[4], labelY = new int[4], labelAge = new int[4];
+    private final String[] labelText = new String[4];
+    private int badgeAge = BADGE_F, badgeChain;
 
     MatchGame() {
         for (int k = 0; k < 6; k++) {
             small[k] = load("/f" + k + "_30.png");
             big[k] = load("/f" + k + "_56.png");
+            happy[k] = load("/f" + k + "_30h.png");
+            alert[k] = load("/f" + k + "_30a.png");
         }
     }
 
@@ -61,6 +88,11 @@ final class MatchGame extends Arcade {
         fill();
         cx = cy = N / 2;
         picked = false;
+        phase = IDLE;
+        idle = chain = 0;
+        hintA = -1;
+        badgeAge = BADGE_F;
+        for (int i = 0; i < labelAge.length; i++) labelAge[i] = LABEL_F;
         return ROUND_MS[level];
     }
 
@@ -74,10 +106,12 @@ final class MatchGame extends Arcade {
                 } while ((x >= 2 && board[i - 1] == k && board[i - 2] == k) || (y >= 2 && board[i - N] == k && board[i - 2 * N] == k));
                 board[i] = k;
             }
-        } while (!hasMove());
+        } while (findMove() < 0);
     }
 
     void key(int action) {
+        idle = 0;
+        hintA = -1;
         int dx = action == LEFT ? -1 : action == RIGHT ? 1 : 0;
         int dy = action == UP ? -1 : action == DOWN ? 1 : 0;
         if (action == FIRE) {
@@ -93,21 +127,146 @@ final class MatchGame extends Arcade {
             return;
         }
         picked = false;
-        swap(cy * N + cx, ny * N + nx);
+        finish();
+        a = cy * N + cx;
+        b = ny * N + nx;
+        swap(a, b);
         if (findLines() == 0) {
-            swap(cy * N + cx, ny * N + nx);
+            swap(a, b);
             sound.play(Sound.BAD);
-            return;
+            begin(NOSWAP, NOSWAP_F[motion]);
+        } else {
+            cx = nx;
+            cy = ny;
+            chain = 0;
+            begin(SWAP, SWAP_F[motion]);
         }
-        cx = nx;
-        cy = ny;
-        resolve();
+        settle();
     }
 
-    private void swap(int a, int b) {
-        int t = board[a];
-        board[a] = board[b];
-        board[b] = t;
+    void tick() {
+        for (int i = 0; i < labelAge.length; i++) if (labelAge[i] < LABEL_F) labelAge[i]++;
+        if (badgeAge < BADGE_F) badgeAge++;
+        if (phase == IDLE) {
+            if (++idle == (best[level] == 0 ? FIRST_HINT_F : HINT_F)) hintA = findMove();
+            return;
+        }
+        if (++f >= dur) endPhase();
+        settle();
+    }
+
+    void end() {
+        finish();
+    }
+
+    private void begin(int p, int frames) {
+        phase = p;
+        f = 0;
+        dur = frames;
+    }
+
+    /** Runs every phase that has no frames at this motion setting. */
+    private void settle() {
+        while (phase != IDLE && dur == 0) endPhase();
+    }
+
+    /** Completes whatever is still moving, at once. */
+    private void finish() {
+        while (phase != IDLE) endPhase();
+    }
+
+    private void endPhase() {
+        if (phase == SWAP) {
+            pop();
+        } else if (phase == POP) {
+            collapse();
+        } else if (phase == FALL) {
+            for (int i = 0; i < N * N; i++) drop[i] = 0;
+            if (findLines() > 0) {
+                pop();
+            } else if (findMove() < 0) {
+                fill();
+                for (int i = 0; i < N * N; i++) drop[i] = N;
+                maxDrop = N;
+                toast("판을 새로 섞었어요");
+                begin(FALL, fallFrames());
+            } else {
+                phase = IDLE;
+            }
+        } else {
+            phase = IDLE;
+        }
+    }
+
+    /** The lines on the board start to pop: they score now, and vanish when the phase ends. */
+    private void pop() {
+        int popped = findLines();
+        chain++;
+        int gain = popped * 10 * chain;
+        score += gain;
+        int sx = 0, sy = 0;
+        for (int i = 0; i < N * N; i++) {
+            if (hit[i]) {
+                sx += (i % N) * 100 + 50;
+                sy += (i / N) * 100 + 50;
+            }
+        }
+        int slot = 0;
+        for (int i = 1; i < labelAge.length; i++) if (labelAge[i] > labelAge[slot]) slot = i;
+        labelX[slot] = sx / popped;
+        labelY[slot] = sy / popped;
+        labelText[slot] = "+" + gain;
+        labelAge[slot] = 0;
+        if (chain > 1) {
+            badgeChain = chain;
+            badgeAge = 0;
+            if (motion == 2) toast("연쇄 x" + chain);
+            sound.play(Sound.BIG);
+            buzz(60);
+        } else {
+            sound.play(Sound.GOOD);
+        }
+        begin(POP, POP_F[motion]);
+    }
+
+    /** Popped faces go; the faces above fall into the gaps and new ones come in from the top. */
+    private void collapse() {
+        maxDrop = 0;
+        for (int x = 0; x < N; x++) {
+            int to = N - 1;
+            for (int y = N - 1; y >= 0; y--) {
+                int i = y * N + x;
+                if (hit[i]) continue;
+                board[to * N + x] = board[i];
+                drop[to * N + x] = to - y;
+                to--;
+            }
+            for (int y = to; y >= 0; y--) {
+                board[y * N + x] = rnd(kinds);
+                drop[y * N + x] = to + 1;
+            }
+            maxDrop = Math.max(maxDrop, to + 1);
+        }
+        begin(FALL, fallFrames());
+    }
+
+    /** How far a falling face has come after {@code n} frames, in hundredths of a cell: it speeds up. */
+    private static int travel(int n) {
+        return 25 * n * (n + 1);
+    }
+
+    /** Frames until the longest drop lands, plus one for the landing dip. Only full motion falls. */
+    private int fallFrames() {
+        if (motion != 0) return 0;
+        int n = 0;
+        while (travel(n) < maxDrop * 100) n++;
+        return n + 1;
+    }
+
+    private void swap(int p, int q) {
+        int t = board[p];
+        board[p] = board[q];
+        board[q] = t;
     }
 
     /** Marks every face in a line of three or more in {@code hit}; returns how many. */
@@ -130,71 +289,40 @@ final class MatchGame extends Arcade {
         return count;
     }
 
-    private void resolve() {
-        for (int i = 0; i < N * N; i++) spark[i] = false;
-        int chain = 0;
-        int popped;
-        while ((popped = findLines()) > 0) {
-            chain++;
-            score += popped * 10 * chain;
-            for (int i = 0; i < N * N; i++) {
-                if (hit[i]) {
-                    board[i] = -1;
-                    spark[i] = true;
-                }
-            }
-            // Faces fall into the gaps; new ones drop in from the top.
-            for (int x = 0; x < N; x++) {
-                int to = N - 1;
-                for (int y = N - 1; y >= 0; y--) {
-                    int k = board[y * N + x];
-                    if (k >= 0) {
-                        board[y * N + x] = -1;
-                        board[to * N + x] = k;
-                        to--;
-                    }
-                }
-                for (int y = to; y >= 0; y--) board[y * N + x] = rnd(kinds);
-            }
-        }
-        sparkUntil = System.currentTimeMillis() + 350;
-        if (chain > 1) {
-            toast("연쇄 x" + chain);
-            sound.play(Sound.BIG);
-            buzz(60);
-        } else {
-            sound.play(Sound.GOOD);
-        }
-        if (!hasMove()) {
-            fill();
-            toast("판을 새로 섞었어요");
-        }
-    }
-
-    private boolean hasMove() {
+    /** A cell whose swap with {@code hintB} makes a line, or -1 if the board has no move. */
+    private int findMove() {
         for (int i = 0; i < N * N; i++) {
-            int x = i % N;
-            if (x + 1 < N && swapMakesLine(i, i + 1)) return true;
-            if (i + N < N * N && swapMakesLine(i, i + N)) return true;
+            if (i % N + 1 < N && swapMakesLine(i, i + 1)) {
+                hintB = i + 1;
+                return i;
+            }
+            if (i + N < N * N && swapMakesLine(i, i + N)) {
+                hintB = i + N;
+                return i;
+            }
         }
-        return false;
+        return -1;
     }
 
-    private boolean swapMakesLine(int a, int b) {
-        swap(a, b);
+    private boolean swapMakesLine(int p, int q) {
+        swap(p, q);
         boolean ok = findLines() > 0;
-        swap(a, b);
+        swap(p, q);
         return ok;
     }
 
     /** A face centred on (x, y); {@code large} picks the 56px set over the 30px one. */
     private void face(Graphics g, int k, int x, int y, boolean large) {
+        face(g, k, x, y, large ? big : small);
+    }
+
+    private void face(Graphics g, int k, int x, int y, Image[] set) {
         if (k < 0) return;
-        Image img = (large ? big : small)[k];
+        Image img = set[k] != null ? set[k] : small[k];
         if (img != null) {
             g.drawImage(img, x, y, Graphics.HCENTER | Graphics.VCENTER);
         } else {
-            int d = large ? 50 : 26;
+            int d = set == big ? 50 : 26;
             g.setColor(COLORS[k]);
             g.fillArc(x - d / 2, y - d / 2, d, d, 0, 360);
         }
@@ -204,10 +332,12 @@ final class MatchGame extends Arcade {
         int s = Math.min((w - 16) / N, (h - top - 12) / N);
         int ox = (w - s * N) / 2, oy = top + (h - top - s * N) / 2;
         card(g, ox - 4, oy - 4, s * N + 8, s * N + 8, 18);
-        boolean sparkle = System.currentTimeMillis() < sparkUntil;
+        // 켬 walks the pop through three looks (glad face, small ring, wide pale ring); 줄임 shows only the first.
+        int popStage = phase != POP ? -1 : motion == 0 ? f : 0;
         for (int i = 0; i < N * N; i++) {
             int x = ox + (i % N) * s, y = oy + (i / N) * s;
-            if (sparkle && spark[i]) {
+            boolean popping = popStage >= 0 && hit[i];
+            if (popStage == 0 && hit[i]) {
                 g.setColor(0xFFF1BF);
                 g.fillRoundRect(x + 1, y + 1, s - 2, s - 2, 12, 12);
             } else if (((i % N) + (i / N)) % 2 == 0) {
@@ -215,9 +345,57 @@ final class MatchGame extends Arcade {
                 g.fillRoundRect(x + 1, y + 1, s - 2, s - 2, 12, 12);
             }
             boolean here = state == PLAY && i == cy * N + cx;
+            boolean hint = hintA >= 0 && (i == hintA || i == hintB);
             if (here) ring(g, x, y, s, picked ? ACCENT : TEXT, picked ? 3 : 2);
-            face(g, board[i], x + s / 2, y + s / 2 - (here && picked ? 2 : 0), false);
+            else if (hint) ring(g, x, y, s, ACCENT, 1);
+            if (popping && popStage > 0) {
+                burst(g, RIMS[board[i]], x + s / 2, y + s / 2, popStage == 1 ? s * 3 / 10 : s / 2, popStage == 2);
+                continue;
+            }
+            int dx = 0, dy = 0;
+            if ((phase == SWAP || phase == NOSWAP) && (i == a || i == b)) {
+                int o = i == a ? b : a;
+                int amt = phase == SWAP ? 100 * (dur - f) / (dur + 1) : WOBBLE[f];
+                dx = ((o % N) - (i % N)) * s * amt / 100;
+                dy = ((o / N) - (i / N)) * s * amt / 100;
+            } else if (phase == FALL && drop[i] > 0) {
+                int need = drop[i] * 100;
+                dy = -s * Math.max(0, need - travel(f + 1)) / 100;
+                if (need > travel(f) && need <= travel(f + 1)) dy = 2; // lands this frame: a small dip
+            } else if (hint && motion == 0) {
+                dx = frame % 2 == 0 ? -2 : 2;
+            }
+            if (here && picked) dy -= 2;
+            Image[] set = popping ? happy : (here && picked) || hint ? alert : small;
+            face(g, board[i], x + s / 2 + dx, y + s / 2 + dy, set);
         }
+        for (int i = 0; i < labelAge.length; i++) {
+            if (labelAge[i] >= LABEL_F) continue;
+            int lx = ox + labelX[i] * s / 100, ly = oy + labelY[i] * s / 100 - lineH / 2 - (motion == 0 ? labelAge[i] * s / 4 : 0);
+            int lw = Font.getDefaultFont().stringWidth(labelText[i]) + 10;
+            g.setColor(WHITE);
+            g.fillRoundRect(lx - lw / 2, ly - 2, lw, lineH + 4, 10, 10);
+            g.setColor(ACCENT);
+            bold(g, labelText[i], lx, ly, Graphics.TOP | Graphics.HCENTER);
+        }
+        if (badgeAge < BADGE_F && motion < 2) {
+            String t = "연쇄 x" + badgeChain;
+            int grow = motion == 0 && badgeAge == 0 ? 4 : 0;
+            int bw = Font.getDefaultFont().stringWidth(t) + 24 + 2 * grow, bh = lineH + 12 + 2 * grow;
+            int bx = ox + s * N / 2, by = oy + s * N / 2;
+            g.setColor(TEXT);
+            g.fillRoundRect(bx - bw / 2, by - bh / 2, bw, bh, 18, 18);
+            g.setColor(WHITE);
+            bold(g, t, bx, by - lineH / 2, Graphics.TOP | Graphics.HCENTER);
+        }
+    }
+
+    /** A ring and four sparks around (x, y); {@code pale} mixes the colour halfway to white. */
+    private static void burst(Graphics g, int rgb, int x, int y, int r, boolean pale) {
+        g.setColor(pale ? ((rgb >> 1) & 0x7F7F7F) + 0x808080 : rgb);
+        for (int t = 0; t < 2; t++) g.drawRoundRect(x - r + t, y - r + t, 2 * (r - t), 2 * (r - t), 2 * (r - t), 2 * (r - t));
+        int d = r * 7 / 10 + 3;
+        for (int q = 0; q < 4; q++) g.fillArc(x + (q < 2 ? -d : d) - 2, y + (q % 2 == 0 ? -d : d) - 2, 4, 4, 0, 360);
     }
 
     private static void ring(Graphics g, int x, int y, int s, int color, int thick) {

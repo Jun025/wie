@@ -37,6 +37,9 @@ abstract class Arcade extends Canvas implements Runnable {
 
     static final String[] MENU = {"시작", "설정", "도움말", "최고 점수", "기록 초기화"};
     static final String[] LEVELS = {"쉬움", "보통"};
+    /** The motion setting: full animation, a shortened one, or none (the board just changes). */
+    static final String[] MOTIONS = {"켬", "줄임", "끔"};
+    static final String[] MOTION_NOTES = {"움직임을 다 보여 줘요", "짧게, 흔들림 없이", "움직임 없이 바로"};
 
     final Sound sound = new Sound();
     final Random random = new Random();
@@ -50,13 +53,15 @@ abstract class Arcade extends Canvas implements Runnable {
     boolean newBest;
     int frame;
     long overAt;
+    int overFrame;
     String toast;
     long toastUntil;
 
-    // Saved in one record: best score per level, then sound · vibration · level.
+    // Saved in one record: best score per level, then sound · vibration · level · motion.
     final int[] best = new int[2];
     boolean vibrate = true;
     int level = 1;
+    int motion;
 
     // The round clock: milliseconds left, counted down only while playing, so the quit card pauses it.
     int roundMs, leftMs;
@@ -81,6 +86,9 @@ abstract class Arcade extends Canvas implements Runnable {
 
     /** Called every loop turn while playing. */
     void tick() {}
+
+    /** The time ran out: finish whatever is still moving, so a chain in flight still scores. */
+    void end() {}
 
     abstract void paintBoard(Graphics g, int top, int w, int h);
 
@@ -121,8 +129,10 @@ abstract class Arcade extends Canvas implements Runnable {
     }
 
     private void gameOver() {
+        end();
         state = OVER;
         overAt = System.currentTimeMillis();
+        overFrame = frame;
         newBest = score > best[level];
         if (newBest) {
             best[level] = score;
@@ -224,7 +234,7 @@ abstract class Arcade extends Canvas implements Runnable {
                     save();
                     state = HOME;
                 } else if (action == UP || action == DOWN) {
-                    row = (row + (action == UP ? 2 : 1)) % 3;
+                    row = (row + (action == UP ? 3 : 1)) % 4;
                 } else if (action == FIRE || action == LEFT || action == RIGHT) {
                     if (row == 0) {
                         sound.enabled = !sound.enabled;
@@ -232,8 +242,10 @@ abstract class Arcade extends Canvas implements Runnable {
                     } else if (row == 1) {
                         vibrate = !vibrate;
                         buzz(80);
-                    } else {
+                    } else if (row == 2) {
                         level = 1 - level;
+                    } else {
+                        motion = (motion + (action == LEFT ? 2 : 1)) % 3;
                     }
                     sound.play(Sound.TOGGLE);
                 }
@@ -322,10 +334,10 @@ abstract class Arcade extends Canvas implements Runnable {
 
     private void paintSettings(Graphics g, int w, int h) {
         int y = header(g, w, "설정") + 16;
-        String[] names = {"소리", "진동", "난이도"};
-        String[] values = {sound.enabled ? "켬" : "끔", vibrate ? "켬" : "끔", LEVELS[level]};
+        String[] names = {"소리", "진동", "난이도", "움직임"};
+        String[] values = {sound.enabled ? "켬" : "끔", vibrate ? "켬" : "끔", LEVELS[level], MOTIONS[motion]};
         int rh = lineH + 16;
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 4; i++) {
             int ry = y + i * (rh + 8);
             if (i == row) {
                 g.setColor(TEXT);
@@ -337,10 +349,10 @@ abstract class Arcade extends Canvas implements Runnable {
             g.setColor(i == 2 || values[i].equals("켬") ? ACCENT : SUB);
             bold(g, values[i], w - 30, ry + 8, Graphics.TOP | Graphics.RIGHT);
         }
-        y += 3 * (rh + 8) + 6;
+        y += 4 * (rh + 8) + 6;
         g.setColor(SUB);
-        g.drawString(level == 0 ? "쉬움: 동물 다섯 · 시간 넉넉히" : "보통: 동물 여섯 · 시간 보통", w / 2, y,
-            Graphics.TOP | Graphics.HCENTER);
+        String note = row == 3 ? MOTION_NOTES[motion] : level == 0 ? "쉬움: 동물 다섯 · 시간 넉넉히" : "보통: 동물 여섯 · 시간 보통";
+        g.drawString(note, w / 2, y, Graphics.TOP | Graphics.HCENTER);
         g.drawString("2 8 고르기 · 5 바꾸기", w / 2, h - 2 * lineH - 10, Graphics.TOP | Graphics.HCENTER);
         g.drawString("CLR 저장하고 처음으로", w / 2, h - lineH - 6, Graphics.TOP | Graphics.HCENTER);
     }
@@ -398,6 +410,9 @@ abstract class Arcade extends Canvas implements Runnable {
         }
     }
 
+    /** How many frames the end card's score takes to count up. */
+    static final int COUNT_FRAMES = 6;
+
     /** The yes/no card: 5 = yes, CLR = no. */
     private void ask(Graphics g, int w, int h, String question) {
         int cw = w - 48;
@@ -430,9 +445,14 @@ abstract class Arcade extends Canvas implements Runnable {
         int cx = w / 2;
         g.setColor(TEXT);
         bold(g, "시간 끝", cx, y + 12, Graphics.TOP | Graphics.HCENTER);
-        bold(g, score + " 점", cx, y + lineH + 20, Graphics.TOP | Graphics.HCENTER);
-        g.setColor(newBest ? ACCENT : SUB);
-        g.drawString(newBest ? "새 최고 기록!" : "최고 " + best[level], cx, y + 2 * lineH + 26, Graphics.TOP | Graphics.HCENTER);
+        // The score counts up over a few frames; a new best then blinks. Motion off shows it at once.
+        int age = frame - overFrame;
+        boolean counting = motion == 0 && age < COUNT_FRAMES;
+        bold(g, (counting ? score * age / COUNT_FRAMES : score) + " 점", cx, y + lineH + 20, Graphics.TOP | Graphics.HCENTER);
+        if (!counting && !(newBest && motion == 0 && (age / 2) % 2 == 1)) {
+            g.setColor(newBest ? ACCENT : SUB);
+            g.drawString(newBest ? "새 최고 기록!" : "최고 " + best[level], cx, y + 2 * lineH + 26, Graphics.TOP | Graphics.HCENTER);
+        }
         g.setColor(SURFACE2);
         g.fillRoundRect(cx - 60, y + 3 * lineH + 34, 120, lineH + 8, 16, 16);
         g.setColor(TEXT);
@@ -441,7 +461,8 @@ abstract class Arcade extends Canvas implements Runnable {
         g.drawString("CLR 처음으로", cx, y + 4 * lineH + 44, Graphics.TOP | Graphics.HCENTER);
     }
 
-    // ---- one record, named after the game: best easy · best normal (4 bytes each), sound · vibe · level ----
+    // ---- one record, named after the game: best easy · best normal (4 bytes each), sound · vibe · level · motion.
+    // An 11-byte record (from before motion existed) still loads; motion then stays on. ----
     private void load() {
         try {
             RecordStore rs = RecordStore.openRecordStore(name(), true);
@@ -454,6 +475,7 @@ abstract class Arcade extends Canvas implements Runnable {
                     sound.enabled = b[8] != 0;
                     vibrate = b[9] != 0;
                     level = b[10] == 0 ? 0 : 1;
+                    if (b.length >= 12 && b[11] >= 0 && b[11] < 3) motion = b[11];
                 }
             }
             rs.closeRecordStore();
@@ -463,7 +485,7 @@ abstract class Arcade extends Canvas implements Runnable {
     }
 
     private void save() {
-        byte[] b = new byte[11];
+        byte[] b = new byte[12];
         for (int i = 0; i < 2; i++) {
             int v = best[i];
             b[4 * i] = (byte) (v >>> 24);
@@ -474,6 +496,7 @@ abstract class Arcade extends Canvas implements Runnable {
         b[8] = (byte) (sound.enabled ? 1 : 0);
         b[9] = (byte) (vibrate ? 1 : 0);
         b[10] = (byte) level;
+        b[11] = (byte) motion;
         try {
             RecordStore rs = RecordStore.openRecordStore(name(), true);
             if (rs.getNumRecords() > 0) rs.setRecord(1, b, 0, b.length);

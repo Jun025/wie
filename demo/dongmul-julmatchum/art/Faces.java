@@ -8,7 +8,9 @@
  * soft (alpha) edges is blended by the engine's drawImage and reads smooth on the device.
  *
  * Run by ../../arcade-common/build-game.sh:  java Faces.java <class-dir>
- * Output: /f<kind>_<size>.png for kind 0..5 and size 30 (board) and 56 (home, help).
+ * Output: /f<kind>_<size>.png for kind 0..5 and size 30 (board) and 56 (home, help), plus two
+ * board-size expressions: /f<kind>_30h.png (happy, eyes closed in arcs — a face about to pop)
+ * and /f<kind>_30a.png (alert, wide eyes with a glint — the picked face and the hint).
  * Every face is drawn in a 100x100 box, then scaled. Same JDK -> same bytes.
  *
  * Style (kept away from existing mascot sets on purpose): flat muted pastels from the
@@ -33,18 +35,24 @@ import javax.imageio.ImageIO;
 
 public class Faces {
 
+    /** 0 = plain, 1 = happy (closed arcs), 2 = alert (wide eyes, glint). Read by the eye drawing. */
+    static int expr;
+
     public static void main(String[] args) throws Exception {
+        String[] suffix = {"", "h", "a"};
         for (int size : new int[] {30, 56}) {
-            for (int k = 0; k < 6; k++) {
-                BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
-                Graphics2D g = img.createGraphics();
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
-                g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-                g.scale(size / 100.0, size / 100.0);
-                face(g, k);
-                g.dispose();
-                ImageIO.write(img, "png", new File(args[0], "f" + k + "_" + size + ".png"));
+            for (expr = 0; expr < (size == 30 ? 3 : 1); expr++) {
+                for (int k = 0; k < 6; k++) {
+                    BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
+                    Graphics2D g = img.createGraphics();
+                    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+                    g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+                    g.scale(size / 100.0, size / 100.0);
+                    face(g, k);
+                    g.dispose();
+                    ImageIO.write(img, "png", new File(args[0], "f" + k + "_" + size + suffix[expr] + ".png"));
+                }
             }
         }
     }
@@ -68,8 +76,22 @@ public class Faces {
     }
 
     static void eyes(Graphics2D g, double y, double gap, double d) {
-        fill(g, oval(50 - gap, y, d, d * 1.15), 0x2B2F38);
-        fill(g, oval(50 + gap, y, d, d * 1.15), 0x2B2F38);
+        eye(g, 50 - gap, y, d);
+        eye(g, 50 + gap, y, d);
+    }
+
+    /** One dot eye in the current expression. */
+    static void eye(Graphics2D g, double x, double y, double d) {
+        if (expr == 1) {
+            g.setColor(new Color(0x2B2F38));
+            g.setStroke(new BasicStroke((float) (d * 0.5), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g.draw(new java.awt.geom.Arc2D.Double(x - d, y - d * 0.4, 2 * d, 1.6 * d, 20, 140, java.awt.geom.Arc2D.OPEN));
+        } else if (expr == 2) {
+            fill(g, oval(x, y, d * 1.45, d * 1.6), 0x2B2F38);
+            fill(g, oval(x + d * 0.25, y - d * 0.35, d * 0.5, d * 0.5), 0xFFFFFF);
+        } else {
+            fill(g, oval(x, y, d, d * 1.15), 0x2B2F38);
+        }
     }
 
     static void line(Graphics2D g, int rgb, float w, double x1, double y1, double x2, double y2) {
@@ -189,8 +211,13 @@ public class Faces {
                 body(g, a, 0x8BC98B, 0x55935B);
                 fill(g, oval(28, 32, 18, 18), 0xFFFFFF);
                 fill(g, oval(72, 32, 18, 18), 0xFFFFFF);
-                fill(g, oval(29, 33, 9, 10), 0x2B2F38);
-                fill(g, oval(71, 33, 9, 10), 0x2B2F38);
+                if (expr == 0) {
+                    fill(g, oval(29, 33, 9, 10), 0x2B2F38);
+                    fill(g, oval(71, 33, 9, 10), 0x2B2F38);
+                } else {
+                    eye(g, 29, 33, 9);
+                    eye(g, 71, 33, 9);
+                }
                 fill(g, oval(44, 58, 3.5, 3.5), 0x3F7446);
                 fill(g, oval(56, 58, 3.5, 3.5), 0x3F7446);
                 g.setColor(new Color(0x3F7446));
