@@ -45,4 +45,4 @@ PR 본문과 done 회신에 적는다.
 
 게임 파일명 유입: BOUNDED 0 · SUFFIX-ATTACHED 0.
 
-<!-- corpus-name-inflow v1 subjects=2 tree=6501bd0a66a89d30 B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=2 tree=a14bec8302ccdc6d B=0/0 P=0/0 S=0/0 -->
