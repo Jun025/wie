@@ -53,3 +53,16 @@ pub async fn socket(_context: &mut dyn WIPICContext, domain: i32, r#type: i32) -
 
     Ok(-1) // M_E_ERROR
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::context::test::TestContext;
+
+    use super::socket;
+
+    // A KTF title's MC_netSocket was fatal; with no network the socket is refused.
+    #[futures_test::test]
+    async fn socket_is_refused_test() {
+        assert_eq!(socket(&mut TestContext::new(), 2, 1).await.unwrap(), -1);
+    }
+}

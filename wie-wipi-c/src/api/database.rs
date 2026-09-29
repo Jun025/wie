@@ -769,9 +769,37 @@ mod tests {
     use crate::context::{WIPICContext, test::TestContext};
 
     use super::{
-        KTF_DATABASE_STORAGE_LIMIT, delete_database, exists_database, exists_database_ktf, list_databases, list_record_info, open_database,
-        select_record, sort_records, stat_by_name_ktf, stream_read, stream_write, update_record,
+        KTF_DATABASE_STORAGE_LIMIT, delete_database, exists_database, exists_database_ktf, get_number_of_records, insert_record, list_databases,
+        list_record, list_record_info, open_database, open_record_database, select_record, sort_records, stat_by_name_ktf, stream_read, stream_write,
+        update_record,
     };
+
+    /// KTF Interface4 is the header's record database: the call sequence three titles make —
+    /// open without create (absent: M_E_NOENT), open with create, insert, count, list, select.
+    #[futures_test::test]
+    async fn record_database_round_trip_test() {
+        let mut context = database_test_context();
+        context.write_bytes(0x1000, b"SaveData\0").unwrap();
+        context.write_bytes(0x1100, b"abcd").unwrap();
+
+        assert_eq!(open_record_database(&mut context, 0x1000, 0xeec, 0, 1).await.unwrap(), -12);
+        let fd = open_record_database(&mut context, 0x1000, 0xeec, 1, 1).await.unwrap();
+        assert!(fd > 0);
+
+        let id = insert_record(&mut context, fd, 0x1100, 4).await.unwrap();
+        assert!(id > 0);
+        assert_eq!(get_number_of_records(&mut context, fd).await.unwrap(), 1);
+        assert_eq!(list_record(&mut context, fd, 0x1200, 12).await.unwrap(), 1);
+        let mut word = [0; 4];
+        context.read_bytes(0x1200, &mut word).unwrap();
+        assert_eq!(word, (id as u32).to_le_bytes());
+        assert_eq!(select_record(&mut context, fd, id, 0x1300, 128).await.unwrap(), 0);
+        context.read_bytes(0x1300, &mut word).unwrap();
+        assert_eq!(&word, b"abcd");
+
+        // A later open without create finds it.
+        assert!(open_record_database(&mut context, 0x1000, 0xeec, 0, 1).await.unwrap() > 0);
+    }
 
     /// KTF database slot 8 refuses, and refuses **without touching guest memory**.
     ///
