@@ -1841,6 +1841,8 @@ pub(crate) mod tests {
                 // 월드장기체스
                 ("java/util/Vector", 16, "isEmpty", "()Z"),
                 // 월드장기체스
+                ("java/util/Vector", 17, "elements", "()Ljava/util/Enumeration;"),
+                // 월드장기체스
                 ("java/util/Vector", 19, "indexOf", "(Ljava/lang/Object;)I"),
                 // 월드장기체스
                 ("java/util/Vector", 24, "firstElement", "()Ljava/lang/Object;"),

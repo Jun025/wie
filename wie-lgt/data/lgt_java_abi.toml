@@ -528,6 +528,15 @@ vtable = [
     # isEmpty()Z: size() or capacity() compared to zero would call firstElement on an empty
     # Vector. CLDC 1.1 order also puts isEmpty at 16, right after the size row above.
     { name = "isEmpty", descriptor = "()Z", index = 16 },
+    # 월드장기체스's wall after the logo (measured 2026-09-29, call site disassembled, lr 0xd3b8).
+    # The caller loads the Vector from this.<field>+4, null-checks it, sets only r0 and dispatches
+    # `ldr ip,[r3,#0x48]` (= 4 + 4*17). The result is not used as an element: the loop head
+    # null-checks it and dispatches on it through the interface-method lookup, twice per turn —
+    # the first interface slot returns a flag that exits the loop (`cmp r0,#0 ; beq`), the second
+    # returns an object that gets a guest-class cast. That is elements() driving
+    # hasMoreElements()/nextElement(); firstElement (24) and lastElement (25) return the element
+    # itself. CLDC 1.1 order puts elements() at 17, right after the isEmpty row above.
+    { name = "elements", descriptor = "()Ljava/util/Enumeration;", index = 17 },
     # 월드장기체스's first-key wall after Stack 33 (measured 2026-09-28, call site disassembled, lr 0x2b19c).
     # The caller loads the Vector from this.<field>+8 -> +0, null-checks it, sets r0 = the Vector and
     # r1 = an object it null-checked earlier, and dispatches `ldr ip,[r3,#0x50]` (= 4 + 4*19). r2 is
