@@ -282,18 +282,21 @@ impl EventQueue {
                 // Those 1ms sleeps are polls, and a tick does not stay alive for a poll — so a timer
                 // due mid-tick fired on the host's next frame (16.7ms grid; 18 titles, 2026-09-28
                 // census). Poll on behalf of the earliest timer instead, as a sleep until it would —
-                // if it may keep this tick alive (`Event::guest_timer`).
-                let tick = context.system().pacing().ticks();
-                let pace = pending_timer_events
-                    .iter()
-                    .filter_map(|x| match x {
-                        Event::Timer { due, pace_from, .. } if *pace_from <= tick => Some(*due),
-                        _ => None,
-                    })
-                    .min()
-                    .filter(|_| !callbacks_pending);
+                // if it may keep this tick alive (`Event::guest_timer`). Asked every poll: the wait
+                // outlives the tick, and a timer held back in this one may keep the next alive.
+                let pace = |tick| {
+                    pending_timer_events
+                        .iter()
+                        .filter_map(|x| match x {
+                            Event::Timer { due, pace_from, .. } if *pace_from <= tick => Some(*due),
+                            _ => None,
+                        })
+                        .min()
+                        .filter(|_| !callbacks_pending)
+                };
                 while context.system().platform().now() < deadline {
-                    match pace {
+                    let tick = context.system().pacing().ticks();
+                    match pace(tick) {
                         Some(pace) => context.system().sleep_toward(1, pace).await,
                         None => context.system().sleep(1).await,
                     }
@@ -614,10 +617,10 @@ mod test {
     // A guest that arms `rounds` WIPI timers `after_ms` ahead, one per `getNextEvent`, on a host
     // that calls `tick` once per 17ms frame: the clock jumps to the next frame between ticks and
     // steps 10µs per engine read inside one, so the guest's own work costs well under a
-    // millisecond and what is measured is the wait. `poll`: each timer is one no tick is kept alive
-    // for (`Event::guest_timer`'s `u64::MAX`). Returns the worst
-    // lateness in ms.
-    fn guest_timers_on_a_frame_grid(after_ms: u64, rounds: u64, poll: bool) -> Result<u64> {
+    // millisecond and what is measured is the wait. `pace_after`: each timer may keep a tick alive from
+    // this many ticks after the one it is armed in (`Event::guest_timer`), never if `None`. Returns
+    // the worst lateness in ms.
+    fn guest_timers_on_a_frame_grid(after_ms: u64, rounds: u64, pace_after: Option<u64>) -> Result<u64> {
         const FRAME_MS: u64 = 17;
         let clock = TestClock::stepping_micros(10);
         let mut system = System::new(Box::new(TestPlatform::with_clock(clock.clone())), "", "", DefaultTaskRunner);
@@ -633,14 +636,16 @@ mod test {
             for _ in 0..rounds {
                 let due = system_task.platform().now() + after_ms;
                 let (system_timer, clock_timer, worst_timer) = (system_task.clone(), clock_task.clone(), worst_task.clone());
-                system_task
-                    .event_queue()
-                    .push(Event::guest_timer(due, if poll { u64::MAX } else { 0 }, move || async move {
+                system_task.event_queue().push(Event::guest_timer(
+                    due,
+                    pace_after.map_or(u64::MAX, |x| system_task.pacing().ticks() + x),
+                    move || async move {
                         worst_timer.fetch_max(clock_timer.peek() - due.raw(), Ordering::SeqCst);
                         // The key is what makes getNextEvent return; the timer itself is consumed internally.
                         system_timer.event_queue().push(Event::Keydown(KeyCode::NUM1));
                         Ok(())
-                    }));
+                    },
+                ));
                 let event = jvm.instantiate_array("I", 4).await.unwrap();
                 let _: () = jvm
                     .invoke_virtual(&queue, "net/wie/EventQueue", "getNextEvent", "([I)V", (event,))
@@ -667,8 +672,17 @@ mod test {
         // the wait for them was 1ms polls and a tick does not stay alive for a poll. A 25ms period
         // walks across the 17ms grid; only a due in the ~3ms a tick leaves the host may wait for
         // the next frame.
-        let worst = guest_timers_on_a_frame_grid(25, 20, false)?;
+        let worst = guest_timers_on_a_frame_grid(25, 20, Some(0))?;
         assert!(worst <= 4, "a 25ms timer fired {worst}ms late");
+        Ok(())
+    }
+
+    #[test]
+    fn a_timer_held_back_in_its_arming_tick_fires_on_time_in_the_next() -> Result<()> {
+        // The usual loop: a 10ms KTF clet timer re-armed from its own callback may not keep that tick
+        // alive, but its due lands in a later one — which must wait for it, not the tick after.
+        let worst = guest_timers_on_a_frame_grid(25, 20, Some(1))?;
+        assert!(worst <= 4, "a timer paced from the next tick fired {worst}ms late");
         Ok(())
     }
 
@@ -676,7 +690,7 @@ mod test {
     fn a_1ms_guest_timer_is_left_to_the_host_frame() -> Result<()> {
         // A poll (KTF 영웅서기4's MC_knlSetTimer(1), or a timer re-armed in the tick it fired in) keeps
         // no tick alive: waiting on 영웅서기4's ran it at 44fps, not its 39.
-        let worst = guest_timers_on_a_frame_grid(25, 20, true)?;
+        let worst = guest_timers_on_a_frame_grid(25, 20, None)?;
         assert!(worst > 4, "a timer marked a poll kept the tick alive (worst {worst}ms late)");
         Ok(())
     }
