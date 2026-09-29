@@ -82,3 +82,4 @@ Display::callSerially(card) → Card::repaint(60, 138, 120, 46) → Thread::slee
 (display.rs 테스트 주석 1 · wie_validate.rs 주석 2 · 이 문서 · worklog)이고 0351·0358·0363 과 같은 자리다. BOUNDED 의 나머지
 세 제목은 이 회차가 고친 파일(display.rs · wie_validate.rs)에 **원래 있던** 주석이다.
 SUFFIX-ATTACHED 는 전부 `월드장기체스가`(이 회차가 쓴 조사 붙은 언급 — 실제 언급)다.
+<!-- corpus-name-inflow v1 subjects=6 tree=2138db815a1aae62 B=11/8 P=0/0 S=4/2 -->
