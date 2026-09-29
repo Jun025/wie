@@ -842,8 +842,22 @@ impl Display {
         Ok(())
     }
 
-    async fn handle_paint_event(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
+    async fn handle_paint_event(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("javax.microedition.lcdui.Display::handlePaintEvent({this:?})");
+
+        // One paint at a time: the event thread and a game thread's serviceRepaints both land here,
+        // and every paint drives the one shared screenGraphics. Unserialized, the second paint's
+        // reset() wiped the clip the first had just set, so its next drawImage blitted a whole
+        // sprite sheet (ca7fa8ade8ad). The monitor is reentrant, so a paint() that calls
+        // serviceRepaints on its own thread still gets in.
+        let screen_graphics: ClassInstanceRef<Graphics> = jvm.get_field(&this, "screenGraphics", "Ljavax/microedition/lcdui/Graphics;").await?;
+        jvm.monitor_enter(&screen_graphics).await?;
+        let result = Self::paint_serialized(jvm, context, this).await;
+        jvm.monitor_exit(&screen_graphics).await?;
+        result
+    }
+
+    async fn paint_serialized(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         let now = context.system().platform().now();
         context.system().pacing().paint_started(now);
 
@@ -1200,6 +1214,60 @@ mod test {
 
     struct ViewportScreen;
     struct RecordingCommandListener;
+    struct YieldingPaintScreen;
+
+    impl YieldingPaintScreen {
+        fn as_proto() -> WieJavaClassProto {
+            JavaClassProto {
+                name: "javax/microedition/lcdui/TestYieldingPaintScreen",
+                parent_class: Some("javax/microedition/lcdui/Screen"),
+                interfaces: vec![],
+                methods: vec![
+                    JavaMethodProto::new("<init>", "()V", Self::init, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new(
+                        "handlePaintEvent",
+                        "(Ljavax/microedition/lcdui/Graphics;)V",
+                        Self::handle_paint_event,
+                        MethodAccessFlags::empty(),
+                    ),
+                ],
+                fields: vec![
+                    JavaFieldProto::new("paints", "I", FieldAccessFlags::PUBLIC),
+                    JavaFieldProto::new("seenClipWidth", "I", FieldAccessFlags::PUBLIC),
+                ],
+                access_flags: ClassAccessFlags::PUBLIC,
+            }
+        }
+
+        async fn init(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            jvm.invoke_special(&this, "javax/microedition/lcdui/Screen", "<init>", "()V", ()).await
+        }
+
+        // The first paint sets a clip, yields, then reads the clip back; any later paint sets another.
+        async fn handle_paint_event(
+            jvm: &Jvm,
+            _context: &mut WieJvmContext,
+            mut this: ClassInstanceRef<Self>,
+            graphics: ClassInstanceRef<Graphics>,
+        ) -> JvmResult<()> {
+            let paints: i32 = jvm.get_field(&this, "paints", "I").await?;
+            jvm.put_field(&mut this, "paints", "I", paints + 1).await?;
+            let width = if paints == 0 { 2 } else { 5 };
+            let _: () = jvm
+                .invoke_virtual(&graphics, "javax/microedition/lcdui/Graphics", "setClip", "(IIII)V", (0, 0, width, width))
+                .await?;
+            if paints == 0 {
+                for _ in 0..3 {
+                    let _: () = jvm.invoke_static("java/lang/Thread", "yield", "()V", ()).await?;
+                }
+                let seen: i32 = jvm
+                    .invoke_virtual(&graphics, "javax/microedition/lcdui/Graphics", "getClipWidth", "()I", ())
+                    .await?;
+                jvm.put_field(&mut this, "seenClipWidth", "I", seen).await?;
+            }
+            Ok(())
+        }
+    }
 
     impl ViewportScreen {
         fn as_proto() -> WieJavaClassProto {
@@ -1414,7 +1482,12 @@ mod test {
     fn test_protos() -> Box<[Box<[WieJavaClassProto]>]> {
         Box::new([
             get_protos().into(),
-            [ViewportScreen::as_proto(), RecordingCommandListener::as_proto()].into(),
+            [
+                ViewportScreen::as_proto(),
+                RecordingCommandListener::as_proto(),
+                YieldingPaintScreen::as_proto(),
+            ]
+            .into(),
         ])
     }
 
@@ -2106,6 +2179,49 @@ mod test {
             let dispatched: ClassInstanceRef<Command> = jvm.get_field(&listener, "lastCommand", "Ljavax/microedition/lcdui/Command;").await?;
             assert_eq!(dispatched.identity(), first_tied.identity());
 
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn a_paint_from_another_thread_waits_for_the_one_in_progress() -> Result<()> {
+        // ca7fa8ade8ad: the event thread painted while the game thread's paint had yielded, and its
+        // reset() on the shared screen graphics widened the game's clip — a whole sprite sheet drawn.
+        run_jvm_test_with_system(test_protos(), Box::new(TestPlatform::new()), move |jvm, system| async move {
+            let screen = jvm.new_class("javax/microedition/lcdui/TestYieldingPaintScreen", "()V", ()).await?;
+            let display: ClassInstanceRef<Display> = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?.into();
+            let _: () = jvm
+                .invoke_virtual(
+                    &display,
+                    "javax/microedition/lcdui/Display",
+                    "setCurrent",
+                    "(Ljavax/microedition/lcdui/Displayable;)V",
+                    (screen.clone(),),
+                )
+                .await?;
+
+            let (other_jvm, other_display) = (jvm.clone(), display.clone());
+            system.spawn(async move || {
+                other_jvm.attach_thread(None).await.unwrap();
+                let _: () = other_jvm
+                    .invoke_virtual(&other_display, "javax/microedition/lcdui/Display", "handlePaintEvent", "()V", ())
+                    .await
+                    .unwrap();
+                Ok(())
+            });
+            let _: () = jvm
+                .invoke_virtual(&display, "javax/microedition/lcdui/Display", "handlePaintEvent", "()V", ())
+                .await?;
+            assert_eq!(
+                jvm.get_field::<i32>(&screen, "seenClipWidth", "I").await?,
+                2,
+                "the other paint did not touch this one's clip"
+            );
+
+            for _ in 0..3 {
+                let _: () = jvm.invoke_static("java/lang/Thread", "yield", "()V", ()).await?;
+            }
+            assert_eq!(jvm.get_field::<i32>(&screen, "paints", "I").await?, 2, "the waiting paint ran afterwards");
             Ok(())
         })
     }
