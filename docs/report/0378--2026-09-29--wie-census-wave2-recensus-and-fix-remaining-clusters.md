@@ -95,3 +95,8 @@
 - 장시간 281종은 1회차(`313ddcd8`) 결과를 그대로 썼다. 이 PR 이 바꾼 경로(위 1~7)를 그 타이틀들이 10분 동안 오류 없이 지났다는 뜻이지, 새 빌드로 다시 잰 것은 아니다. `%i` 처럼 오류 없이 동작만 바뀌는 수정은 이 방식으로는 보이지 않는다.
 - 조작 축은 여전히 1회 측정이다(0321 한계 그대로). 전이 중 3종은 흔들림으로 판정했다.
 - Interface4 의 8·9·11 이후는 이름을 붙이지 않았다. 8(Sort)·9(GetAccessMode)는 헤더 순서상 이름이 있지만, 그 칸에 온 타이틀이 없어 레지스터로 확인하지 못했다.
+
+### 7. 게이트
+- 로컬: fmt · clippy `-D warnings`(stable · beta · wasm32) rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` 599/0 rc=0 · `npm run build:wasm` rc=0.
+- `player-data.mjs` OK(429 · 349/50/30) · `--selftest` 19 · worklog OK · 연번 OK(0378).
+- 유입: 331쌍(BOUNDED) + 판단 필요 15쌍(SUFFIX-ATTACHED). compat.json 밖은 1쌍이고 `wie-ktf/src/runtime/wipi_c/context.rs` 에 main 부터 있던 주석이다. compat.json 은 계약상 제목 목록이고 main 대비 새 `"title"` 줄은 0 이다.
