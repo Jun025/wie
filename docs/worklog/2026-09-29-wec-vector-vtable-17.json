@@ -7,7 +7,7 @@
   "changes": [
     "wie-lgt/data/lgt_java_abi.toml — Vector elements()Ljava/util/Enumeration; = 17 · 근거 주석",
     "wie-lgt/src/runtime/java/jvm_support.rs — ABI 핀 테스트 1줄",
-    "docs/report/0372"
+    "docs/report/0373"
   ],
   "verification": [
     "전: --inject ×2 FAIL · java/util/Vector vtable index 17",
