@@ -100,3 +100,5 @@
 - 로컬: fmt · clippy `-D warnings`(stable · beta · wasm32) rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` 599/0 rc=0 · `npm run build:wasm` rc=0.
 - `player-data.mjs` OK(429 · 349/50/30) · `--selftest` 19 · worklog OK · 연번 OK(0378).
 - 유입: 331쌍(BOUNDED) + 판단 필요 15쌍(SUFFIX-ATTACHED). compat.json 밖은 1쌍이고 `wie-ktf/src/runtime/wipi_c/context.rs` 에 main 부터 있던 주석이다. compat.json 은 계약상 제목 목록이고 main 대비 새 `"title"` 줄은 0 이다.
+
+<!-- corpus-name-inflow v1 subjects=20 tree=5f444ff1c6d8fa6c B=719/331 P=1/1 S=35/15 -->
