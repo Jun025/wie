@@ -6,7 +6,7 @@ use core::pin::Pin;
 
 use wie_util::Result;
 
-use crate::{Instant, executor::POLL_SLEEP_MS};
+use crate::Instant;
 
 #[allow(clippy::upper_case_acronyms, non_camel_case_types)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -72,8 +72,7 @@ pub enum Event {
     Keydown(KeyCode),
     Keyup(KeyCode),
     Keyrepeat(KeyCode),
-    // `poll`: asked for at most `POLL_SLEEP_MS` ahead — "as soon as you can", which a host frame
-    // paces, rather than a period the engine should keep a tick alive for.
+    // `poll`: see `Event::guest_timer`
     Timer { due: Instant, poll: bool, callback: TimerCallback },
     Notify { r#type: i32, param1: i32, param2: i32 }, // wipi notifyEvent
 }
@@ -84,24 +83,19 @@ impl Event {
         F: FnOnce() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
-        Event::Timer {
-            due,
-            poll: false,
-            callback: Box::new(move || Box::pin(callback())),
-        }
+        Self::guest_timer(due, false, callback)
     }
 
-    /// A guest timer asked for at `asked`. One due within `POLL_SLEEP_MS` of it is a poll: KTF
-    /// 영웅서기4 re-arms MC_knlSetTimer(1) every frame, and keeping ticks alive for it ran the game
-    /// faster than it ever ran (39 -> 44fps even at one timer per tick; see `Executor::tick_for`).
-    pub fn guest_timer<F, Fut>(asked: Instant, due: Instant, callback: F) -> Self
+    /// A guest timer. `poll`: it asks for no period of its own — as soon as possible, or faster than
+    /// the host's frames — so the next host frame paces it rather than a tick kept alive for it.
+    pub fn guest_timer<F, Fut>(due: Instant, poll: bool, callback: F) -> Self
     where
         F: FnOnce() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
         Event::Timer {
             due,
-            poll: due <= asked + POLL_SLEEP_MS,
+            poll,
             callback: Box::new(move || Box::pin(callback())),
         }
     }
@@ -111,8 +105,8 @@ impl Event {
 pub struct EventQueue {
     input_events: VecDeque<Event>,
     events: VecDeque<Event>,
-    // guest timer (its address) -> how many times it was armed or cancelled
-    timer_armings: BTreeMap<u32, u64>,
+    // guest timer (its address) -> (how many times it was armed or cancelled, host tick it last fired in)
+    timer_armings: BTreeMap<u32, (u64, Option<u64>)>,
 }
 
 impl EventQueue {
@@ -138,7 +132,7 @@ impl EventQueue {
     /// WIPI `MC_knlSetTimer` on a timer that is still pending re-arms it: the pending one must not
     /// fire. Returns this arming, for `is_timer_armed` when it falls due.
     pub fn arm_timer(&mut self, timer: u32) -> u64 {
-        let arming = self.timer_armings.entry(timer).or_default();
+        let (arming, _) = self.timer_armings.entry(timer).or_default();
         *arming += 1;
         *arming
     }
@@ -149,7 +143,15 @@ impl EventQueue {
     }
 
     pub fn is_timer_armed(&self, timer: u32, arming: u64) -> bool {
-        self.timer_armings.get(&timer) == Some(&arming)
+        self.timer_armings.get(&timer).map(|x| x.0) == Some(arming)
+    }
+
+    pub fn timer_fired(&mut self, timer: u32, tick: u64) {
+        self.timer_armings.entry(timer).or_default().1 = Some(tick);
+    }
+
+    pub fn timer_fired_in(&self, timer: u32, tick: u64) -> bool {
+        self.timer_armings.get(&timer).and_then(|x| x.1) == Some(tick)
     }
 
     /// Keyboard input takes priority; events at the same priority remain FIFO.
@@ -208,15 +210,5 @@ mod tests {
             })
         ));
         assert!(queue.pop().is_none());
-    }
-
-    #[test]
-    fn a_guest_timer_at_most_1ms_ahead_is_a_poll() {
-        let poll = |due| {
-            let timer = Event::guest_timer(Instant::from_epoch_millis(10), Instant::from_epoch_millis(due), || async { Ok(()) });
-            matches!(timer, Event::Timer { poll: true, .. })
-        };
-        assert!(poll(10) && poll(11), "MC_knlSetTimer(0/1) means as soon as you can");
-        assert!(!poll(12), "a 2ms timer is a period to keep");
     }
 }

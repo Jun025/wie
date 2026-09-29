@@ -156,11 +156,10 @@ impl WIPICContext for KtfWIPICContext {
             .ok_or_else(|| WieError::FatalError(alloc::format!("Resource disappeared before read: {name:?}")))
     }
 
-    fn set_timer(&mut self, due: Instant, callback: WIPICMethodBody) {
+    fn set_timer(&mut self, due: Instant, poll: bool, callback: WIPICMethodBody) {
         let context = self.clone();
-        let asked = self.system().platform().now();
 
-        self.system().event_queue().push(Event::guest_timer(asked, due, move || {
+        self.system().event_queue().push(Event::guest_timer(due, poll, move || {
             let mut context = context.clone();
 
             async move {

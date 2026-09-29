@@ -52,8 +52,6 @@ pub struct Pacing {
     sleep_ms: Samples,
     sleep_late: Samples,
     timer_late: Samples,
-    // the tick the last WIPI timer fired in
-    timer_tick: Option<u64>,
     redraw: Samples,
     redraw_cross_tick: u64,
     // (requested at, tick it was requested in) of the oldest repaint not yet painted
@@ -79,14 +77,11 @@ impl Pacing {
 
     pub fn timer_fired(&mut self, late_ms: u64) {
         self.timer_late.push(late_ms);
-        self.timer_tick = Some(self.ticks);
     }
 
-    /// A WIPI timer already fired in this host tick. The engine keeps a tick alive for at most one:
-    /// a guest asking for timers faster than the host's frames ran at their pace before only
-    /// because the frame grid held it back (a KTF clet with a ~10ms timer: 62 -> 94fps uncapped).
-    pub fn timer_fired_this_tick(&self) -> bool {
-        self.timer_tick == Some(self.ticks)
+    /// Host ticks so far — which tick this is.
+    pub fn ticks(&self) -> u64 {
+        self.ticks
     }
 
     pub fn redraw_requested(&mut self, now: Instant) {
@@ -114,13 +109,11 @@ impl Pacing {
     pub fn take(&mut self) -> Self {
         let pending = self.redraw_requested;
         let ticks = self.ticks;
-        let timer_tick = self.timer_tick;
         let taken = core::mem::take(self);
         // A request made before the window is still owed its paint; ticks keep counting so its
         // cross-tick test still compares like with like.
         self.redraw_requested = pending;
         self.ticks = ticks;
-        self.timer_tick = timer_tick;
         taken
     }
 

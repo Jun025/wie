@@ -112,6 +112,8 @@ pub async fn set_timer(
             if !context.system().event_queue().is_timer_armed(self.ptr_timer, self.arming) {
                 return Ok(WIPICResult { results: Vec::new() });
             }
+            let tick = context.system().pacing().ticks();
+            context.system().event_queue().timer_fired(self.ptr_timer, tick);
             context.call_function(self.fn_callback, &[self.ptr_timer, self.param]).await?;
 
             Ok(WIPICResult { results: Vec::new() })
@@ -122,9 +124,17 @@ pub async fn set_timer(
     let timeout = (((timeout_high as u64) << 32) | (timeout_low as u64)) as _;
     let timer: WIPICTimer = read_generic(context, ptr_timer)?;
     let arming = context.system().event_queue().arm_timer(ptr_timer);
+    // A timer that asks for no period of its own is left to the host's next frame (a poll), as every
+    // timer was before: 1ms means "as soon as you can" (KTF 영웅서기4 re-arms MC_knlSetTimer(1) each
+    // frame; waiting on it ran the game at 44fps, not its 39), and one re-armed in the tick it fired in
+    // asks for more than the host's frames (a ~10ms timer: 62 -> 94fps). Any other timer keeps the
+    // tick alive until it is due, rather than landing on the frame grid.
+    let tick = context.system().pacing().ticks();
+    let poll = timeout <= 1 || context.system().event_queue().timer_fired_in(ptr_timer, tick);
 
     context.set_timer(
         now + timeout,
+        poll,
         Box::new(TimerCallback {
             ptr_timer,
             fn_callback: timer.fn_callback,
@@ -435,7 +445,7 @@ mod test {
                 None => unset_timer(&mut context, timer).await?,
             }
         }
-        for (_, callback) in core::mem::take(&mut context.timers) {
+        for (_, _, callback) in core::mem::take(&mut context.timers) {
             callback.call(&mut context, Box::new([])).await?;
         }
         Ok(core::mem::take(&mut context.calls))
@@ -452,6 +462,31 @@ mod test {
     #[futures_test::test]
     async fn test_unset_timer_cancels_a_pending_timer() -> Result<()> {
         assert_eq!(fire_after(&[Some(10), None]).await?, []);
+        Ok(())
+    }
+
+    #[futures_test::test]
+    async fn test_which_timers_the_host_frame_paces() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let mut context = TestContext::with_system(system.clone());
+        let timer = context.alloc_raw(4).unwrap();
+        def_timer(&mut context, timer, 0x1234).await?;
+        let mut poll = async |context: &mut TestContext, timeout| {
+            set_timer(context, timer, timeout, 0, 0).await.unwrap();
+            context.timers.last().unwrap().1
+        };
+
+        assert!(poll(&mut context, 1).await, "MC_knlSetTimer(1): as soon as you can");
+        assert!(!poll(&mut context, 10).await, "a 10ms period keeps the tick alive");
+        let (_, _, callback) = context.timers.pop().unwrap();
+        callback.call(&mut context, Box::new([])).await?;
+        assert!(
+            poll(&mut context, 10).await,
+            "re-armed in the tick it fired in: faster than the host's frames"
+        );
+        system.tick()?;
+        assert!(!poll(&mut context, 10).await, "the next tick keeps it alive again");
+
         Ok(())
     }
 
