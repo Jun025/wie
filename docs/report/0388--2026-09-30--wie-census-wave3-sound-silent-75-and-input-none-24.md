@@ -71,4 +71,4 @@
 - 유입 330쌍(BOUNDED) + 판단 필요 15쌍(SUFFIX-ATTACHED). 전부 `docs/player-data/compat.json` 의 기존 제목 목록이다(계약상 제목 목록 · main 대비 새 `"title"` 줄 0).
 - 그 밖 파일(스크립트·엔진·회차 문서·worklog·소식)은 0 / 0 이다.
 
-<!-- corpus-name-inflow v1 subjects=6 tree=da50769892de540d B=718/330 P=0/0 S=35/15 -->
+<!-- corpus-name-inflow v1 subjects=6 tree=09c0d5dfaaa83b01 B=718/330 P=0/0 S=35/15 -->
