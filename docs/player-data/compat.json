@@ -50,13 +50,12 @@
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
+    "input": "ok",
     "longplay": "no",
     "sound": "ok",
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
    "changes": [],
@@ -231,18 +230,16 @@
    "platform": "KTF",
    "model": null,
    "title": "게임팩25",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "게임팩25"
   },
@@ -251,17 +248,17 @@
    "platform": "KTF",
    "model": null,
    "title": "겟앰프드",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
-    "speed": "unknown"
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "no",
+    "speed": "ok"
    },
    "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
+    "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
    "fileTitle": "겟앰프드"
@@ -2541,18 +2538,16 @@
    "platform": "KTF",
    "model": null,
    "title": "슈퍼리얼 테니스",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "슈퍼리얼 테니스"
   },
@@ -2922,18 +2917,16 @@
    "platform": "KTF",
    "model": null,
    "title": "에픽크로니클PE",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "에픽크로니클PE"
   },
@@ -4490,17 +4483,17 @@
    "platform": "KTF",
    "model": null,
    "title": "티어즈오브메탈",
-   "status": "not-yet",
+   "status": "limited",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "no",
+    "sound": "ok",
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
    "changes": [],
    "fileTitle": "티어즈오브메탈"
@@ -4606,18 +4599,16 @@
    "platform": "KTF",
    "model": null,
    "title": "폴라폴리2007",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "폴라폴리2007"
   },
@@ -5001,18 +4992,16 @@
    "platform": "KTF",
    "model": null,
    "title": "sega미니게임6",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
     "boot": "ok",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "화면이 한 가지 색으로만 보여요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "sega미니게임6"
   },

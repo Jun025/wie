@@ -974,7 +974,7 @@ impl Display {
 
         // Clet apps present by themselves (`MC_grpFlushLcd`), so their Java image is not presented —
         // unless the screen framebuffer changed: on the handset that buffer is LCD memory, and 11 KTF
-        // Clet titles draw into it and only `MC_grpRepaint` (docs/report/0361 · 0388). A title that
+        // Clet titles draw into it and only `MC_grpRepaint` (docs/report/0361 · 0390). A title that
         // flushes an off-screen buffer leaves it unchanged and is not repainted over.
         let disable_paint: bool = jvm.get_field(&this, "paintDisabled", "Z").await?;
         let screen_image: ClassInstanceRef<Image> = jvm.get_field(&this, "screenImage", "Ljavax/microedition/lcdui/Image;").await?;
