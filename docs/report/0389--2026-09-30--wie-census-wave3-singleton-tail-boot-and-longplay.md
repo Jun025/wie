@@ -68,6 +68,38 @@ Java 번호 · C 번호 · 버킷 크기 선택 · 할당기 크기 분기 · DB
 ### 7. compat.json 갱신 방법
 `playability-census.mjs run --bin <이 브랜치 wie_validate> --out <밖> <대상 21종 심볼릭 링크 디렉터리>` → `report` → 그 compat.json 의 6행을 `scripts/player-data.mjs` 의 `fromCensus`(import 와 같은 어휘 변환)로 바꿔 `status`·`axes`·`knownIssues_ko` 만 덮었다. 최상위 `enginePin` 은 `3c34efee` 그대로다 — 이 6행만 이 브랜치 코드로 쟀다.
 
+### 8. 게이트② 반려 승계 — `a23f3c9fc2cb` 짝 재측 · 6행 증적 (2026-10-01)
+검수 재측에서 이 행이 `limited`(input none)로 나왔다. 조용한 호스트(`host-load-guard --recovered` rc=0 · `build-slot run --` · `--jobs` ≤ 3)에서 다시 쟀다.
+전 = PR 머지베이스 `67c3f5d8` · 후 = `4a8c91e3`, 각자 자기 target 의 release `wie_validate`.
+
+| 런 | 빌드 | 판정 | A 프로브 | longplay |
+|---|---|---|---|---|
+| 짝 1 | 전 | not-yet · boot fail | FAIL · paints 0 | — |
+| 짝 1 | 후 | input **ok** | PASS · 27/27 키 · paints 187 · frozen 0 | (`--only probe`) |
+| 짝 2 | 전 | not-yet · boot fail | FAIL · paints 0 | — |
+| 짝 2 | 후 | input **ok** | UNMEASURED(max-ticks · 23/27 키) · paints 134 · frozen 0 | (`--only probe`) |
+| 6종 전체 | 후 | limited | PASS · input ok | **error** — `22_NUM5` 에서 `Unknown LGT WIPIC SVC id 2000`(PC 0) |
+| 단독 1 | 후 | **playable** | PASS | ok |
+| 단독 2 | 후 | **playable** | PASS | ok |
+
+- input: 조용한 호스트 5/5 ok. 검수 런의 none(`frozen_tail_steps 27/27` · paints 9)은 재현되지 않았다 ⇒ **행 `playable` 유지.**
+- ★longplay 1/3 error 는 숨기지 않는다: 그 런만 `--jobs 3` 이고 도중 load5 가 48 까지 올랐다. SVC 2000 은 `svc_ids.rs` 에 행이 없는 미구현 import 라 부하가 만든 오류가 아니라 **타이밍에 따라 닿는 경로**다. 이 PR 범위(데이터·증적) 밖이라 고치지 않았다 — 후속 대상.
+- 나머지 5행: 6종 전체 런이 PR 행과 축 전부 일치(speed n/a ↔ unknown 은 헤드리스 미판정).
+- `wie-wipi-c/src/api/kernel.rs` 의 `PHONENUMBER` 는 upstream(dlunch/wie)이 `""` 로 둔 값(주석 「putting this cause some game to fail authentication」)을 뒤집었다 — upstream 동기 시 이 줄이 충돌 지점이다.
+
+증적(repo 밖 · `~/orchestrator/reports/evidence/wie-census-wave3-singleton-tail-boot-and-longplay/`):
+
+| sha12 | 6종 전체 런(A/B/L.json) | 추가 |
+|---|---|---|
+| `33801c1ba14f` | `fix-after-full/33801c1ba14f…/` | — |
+| `517ed32c92d6` | `fix-after-full/517ed32c92d6…/` | — |
+| `61ed69520fd3` | `fix-after-full/61ed69520fd3…/` | — |
+| `96dc32e781d3` | `fix-after-full/96dc32e781d3…/` | — |
+| `a23f3c9fc2cb` | `fix-after-full/a23f3c9fc2cb…/`(L = SVC 2000) | `fix-pairs/pair-{before,after}-{1,2}/` · `fix-long-after-{1,2}/`(L ok) |
+| `b2da04c55cd4` | `fix-after-full/b2da04c55cd4…/` | — |
+
+report 산출: `fix-after-full/compat.json` · `census.tsv`.
+
 ### 게이트
 `cargo fmt --check` · `clippy --all -D warnings`(stable · beta) · `clippy --target wasm32 -D warnings` · `RUST_MIN_STACK=4194304 cargo test --all` · `npm run build:wasm` · `check-engine-contract` · `npm run audit` · `player-data` 전부 rc=0.
 러너 줄(엔진 변경): `draw_j2me` · `helloworld_ktf/lgt` · `keydraw_ktf/lgt --inject --expect-last-frame` · `text_j2me --timeout 5` 전부 PASS · rc=0(이 브랜치 release `wie_validate`).
