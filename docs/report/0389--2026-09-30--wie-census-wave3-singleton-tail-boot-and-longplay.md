@@ -108,4 +108,4 @@ report 산출: `fix-after-full/compat.json` · `census.tsv`.
 러너 줄(엔진 변경): `draw_j2me` · `helloworld_ktf/lgt` · `keydraw_ktf/lgt --inject --expect-last-frame` · `text_j2me --timeout 5` 전부 PASS · rc=0(이 브랜치 release `wie_validate`).
 게임 파일명 유입: 이 회차가 **더한 줄**에는 0건(코퍼스 한글 stem × 추가 줄 · compat.json 제외). 도구 표기 BOUNDED 361쌍 · SUFFIX-ATTACHED 19쌍은 계약상 제목 목록인 compat.json 과 고친 파일에 **이미 있던** 주석이다.
 
-<!-- corpus-name-inflow v1 subjects=20 tree=94861c731cba6dba B=821/361 P=0/0 S=49/19 -->
+<!-- corpus-name-inflow v1 subjects=20 tree=8e790feecc60d8bb B=821/361 P=0/0 S=49/19 -->
