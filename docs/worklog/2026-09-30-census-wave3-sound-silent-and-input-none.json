@@ -1,0 +1,34 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-30",
+  "task": "wie-census-wave3-sound-silent-75-and-input-none-24",
+  "title": "3차 군집 — 소리 없음 75종 · 조작 none 24종 분류 · WIPI-C 클립 id 수정",
+  "summary": "소리 75종을 다시 갈랐다. 12종은 측정 정정(긴 실행에서 이미 소리 남 · 30초 흔들림), 1종은 클립 id 0 수정으로 소리를 낸다. 나머지 62종은 다른 벽·키 루프 한계·게임 설정으로 가렸다. 조작 24종에서 키 매핑 결손은 0 이고, 멈춘 화면 9종과 API 없음 3종이 드러났다.",
+  "changes": [
+    "wie-wipi-c media::clip_create — clip_id 를 1부터 세는 계수로",
+    "scripts/playability-census.mjs — 소리 축은 A·B·L·S 전부를 본다(selftest 3건)",
+    "docs/player-data/compat.json 소리 축 13행 · docs/player-updates 1 · docs/report/0388"
+  ],
+  "verification": [
+    "created_clips_have_distinct_nonzero_ids_test — clip_id: 0 변이에서 red",
+    "selftest — L 을 빼는 변이에서 27/28",
+    "9d52de42e7f9 같은 시각 짝: 재생 0 → 3 · MIDI 0 → 4,876",
+    "대상 158종 재측 — 소리 ok → silent 0 · 상태 변화 4종은 짝 2회로 흔들림 확인"
+  ],
+  "limits": [
+    "158종 외 271종은 3c34efee 결과 재사용",
+    "load1 105~264"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "KTF com/ktf/kfc/ChoiceText 구현 — 첫 키에서 멈추는 타이틀",
+      "plainSummary": "KTF 게임 하나가 첫 키를 누르는 순간 선택 목록 부품(ChoiceText)을 찾지 못해 멈춥니다. 그 부품을 만들면 메뉴를 고를 수 있게 됩니다.",
+      "userBenefit": "키를 누르면 화면이 굳던 0c67145b11df 가 메뉴 선택부터 진행됩니다.",
+      "why": "이 회차 조작 재측에서 무키 394장 ↔ 키 18~20장이고 NoClassDefFoundError: com/ktf/kfc/ChoiceText 가 첫 키에서 난다. 네 가지 키 순서 모두 같다.",
+      "tradeoff": "com/ktf/kfc 는 UI 부품 모음이라 한 클래스만으로 끝나지 않을 수 있다(0380 이 GForm 부재도 적었다).",
+      "effort": "M",
+      "target": "wie-wipi-java(KTF 확장 클래스)"
+    }
+  ]
+}

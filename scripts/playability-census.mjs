@@ -38,7 +38,7 @@
 //           with a shot every 20 s: error = FAIL line. Never `stall` (see judge()); the longest run
 //           of identical shots goes to census.tsv as `still`. A title whose 30 s probe already
 //           failed after painting is `error` without the long run.
-//   sound   ok = a Play with events reached the sink; silent = none did. This is the
+//   sound   ok = a Play with events reached the sink in ANY run (probes, long, speed); silent = none did. This is the
 //           engine side only: a command the browser host drops is #348's axis, not this one.
 //   speed   1 - (sleep lateness + timer lateness + GC) / window, the #347 ratio, headless: `ok` at
 //           >= 0.9, else `n/a` — never `slow` (see judge()). load1 is recorded beside it.
@@ -343,8 +343,7 @@ function judge(sha) {
   // notice waiting for NUM1 — the script's ceiling, not a frozen engine — and on a starved host a
   // live title paints too rarely to tell. `still` in census.tsv keeps the count for a human.
   else ax.longplay = 'ok';
-  const au = A.audio ?? B.audio;
-  ax.sound = ax.boot !== 'ok' || !au ? 'n/a' : au.plays - (au.empty_plays ?? 0) > 0 ? 'ok' : 'silent';
+  ax.sound = soundVerdict(ax.boot, [A, B, L, S]);
   // Lateness is wall-clock, so host load only ever ADDS to it: a ratio measured on a busy host is a
   // lower bound. >= 0.9 there is a real `ok`; below it says nothing (measured 2026-09-27 at load1
   // ~300: one title read 0.22 and 0.85 on two runs, another 0.49 headless and 0.927 in a quiet
@@ -360,6 +359,15 @@ function judge(sha) {
   if (bv) [ratio, ax.speed] = bv;
   return { A, B, L, S, ax, ratio, br, novel, baselineDistinct: baseline.size };
 }
+
+// Sound is judged over EVERY run of the title, not the 30 s probes alone: many titles start their
+// music only past the title screen, which the 27-key probe often never leaves. Measured 2026-09-30 on
+// the 3c34efee census: 10 of 75 `silent` titles played sound in the 600 s long run (up to 508 plays).
+const soundVerdict = (boot, runs) => {
+  const au = runs.map((r) => r?.audio).filter(Boolean);
+  if (boot !== 'ok' || !au.length) return 'n/a';
+  return au.some((a) => a.plays - (a.empty_plays ?? 0) > 0) ? 'ok' : 'silent';
+};
 
 function maxRun(hs) {
   let best = 0;
@@ -471,6 +479,9 @@ if (cmd === 'selftest') {
     ['--jobs default is at least 1', jobsFor(undefined, 1) === 1],
     ['--jobs above ncpu is capped', jobsFor('32', 10) === 10],
     ['--jobs within ncpu is kept', jobsFor('3', 10) === 3],
+    ['sound heard only in the long run is ok', soundVerdict('ok', [{ audio: { plays: 0 } }, { audio: { plays: 0 } }, { audio: { plays: 3, empty_plays: 0 } }, null]) === 'ok'],
+    ['empty plays everywhere are silent', soundVerdict('ok', [{ audio: { plays: 2, empty_plays: 2 } }, null, { audio: { plays: 0 } }]) === 'silent'],
+    ['no audio record is n/a', soundVerdict('ok', [{}, null]) === 'n/a' && soundVerdict('fail', [{ audio: { plays: 1 } }]) === 'n/a'],
     ['--jobs 0 / garbage becomes 1', jobsFor('0', 10) === 1 && jobsFor('x', 10) === 1],
   ];
   // The host lock, through the real `run` path (an empty corpus, so nothing is validated): a

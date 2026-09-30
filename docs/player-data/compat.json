@@ -1,7 +1,7 @@
 {
  "schema": 1,
- "generatedAt": "2026-09-29T12:21:52.464Z",
- "enginePin": "3c34efeedaea5e29857e80318d764fa18f655afb",
+ "generatedAt": "2026-09-30T08:52:32.000Z",
+ "enginePin": "bd2337ff020a2eb19d8f561a912c4991bb58ae36",
  "entries": [
   {
    "sha256": "6e5a1f88f0c0eedc6991293085060c811e487a701073a9c0e7fb1ed559065924",
@@ -409,12 +409,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "귀혼무사편"
   },
@@ -575,12 +573,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "다이하드4"
   },
@@ -906,12 +902,11 @@
     "render": "ok",
     "input": "no",
     "longplay": "unknown",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
+    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
    ],
    "changes": [],
    "fileTitle": "kt 동전쌓기 에볼루션"
@@ -2118,12 +2113,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "버닝스톰"
   },
@@ -2775,12 +2768,11 @@
     "render": "ok",
     "input": "no",
     "longplay": "unknown",
-    "sound": "no",
+    "sound": "ok",
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
+    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
    ],
    "changes": [],
    "fileTitle": "알바 전설 편의점2"
@@ -2908,12 +2900,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "에픽크로니클2"
   },
@@ -4253,12 +4243,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "크로이센1.04"
   },
@@ -4745,12 +4733,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "피파7"
   },
@@ -5122,12 +5108,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "검은방3"
   },
@@ -5272,12 +5256,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "당구마스터2010"
   },
@@ -5538,12 +5520,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "no",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
    "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
-    "소리가 나지 않을 수 있어요."
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
    "changes": [],
    "fileTitle": "리얼사커매니저2009"
@@ -6380,12 +6361,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "lgt 하얀섬"
   },
@@ -7626,12 +7605,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "영웅서기2"
   },

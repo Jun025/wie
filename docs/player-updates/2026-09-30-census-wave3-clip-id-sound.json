@@ -1,0 +1,9 @@
+{
+  "date": "2026-09-30",
+  "kind": "sound",
+  "titles": [
+    "9d52de42e7f94093c240d5bd4440f574bf2e07e4d0182ec7e492db110f41da24"
+  ],
+  "summary_ko": "소리를 준비만 하고 한 번도 틀지 않던 문제를 고쳐, 이제 배경음과 효과음이 나요.",
+  "pr": "https://github.com/Jun025/wie/pull/421"
+}
