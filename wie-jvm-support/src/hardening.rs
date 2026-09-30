@@ -100,7 +100,7 @@ fn guard(proto: &mut RuntimeClassProto, name: &str, descriptor: &str, args: &'st
 /// 1. **A short read every time.** It decodes one 10-byte chunk and returns (`BUF_SIZE = 10`,
 ///    `break` once anything is decoded): a 759-byte resource read into a 759-char buffer comes
 ///    back as **6** chars. The spec allows short reads, but titles read a whole text file with
-///    ONE call and scan it for delimiters: 현영맞고2006 (LGT, 1b107b96bf4e) found none, built
+///    ONE call and scan it for delimiters: 1b107b96bf4e (LGT) found none, built
 ///    `new String(chars, 2, -2)`, and every key on its menu threw from then on — «게임시작»
 ///    never started (measured 2026-09-30 by the progress census).
 /// 2. **EUC-KR split across two chunks is garbled.** It holds back the last byte whenever it is
@@ -460,7 +460,7 @@ mod reader_read_tests {
     use wie_util::Result;
 
     /// One `read(char[], 0, n)` over a whole resource returns the whole resource — the call
-    /// 현영맞고2006 (1b107b96bf4e) makes on a 759-byte text file. Upstream returns 6 of 759 and
+    /// 1b107b96bf4e (LGT) makes on a 759-byte text file. Upstream returns 6 of 759 and
     /// this fails with `left: 6`. EUC-KR multibyte in the middle, so a chunk boundary that
     /// splits a character is crossed too; then the reader is drained and says so with -1.
     #[test]
