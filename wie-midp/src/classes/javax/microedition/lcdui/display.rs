@@ -1848,6 +1848,37 @@ mod test {
         )
     }
 
+    // Clet mode skips presenting the Java image, but a screen framebuffer the title drew into is
+    // presented: 11 KTF Clet titles draw there, only call MC_grpRepaint, and were a black screen.
+    #[test]
+    fn a_paint_disabled_display_presents_only_when_the_compositor_drew() -> Result<()> {
+        let platform = TestPlatform::new();
+        let paints = platform.paint_counter();
+        run_jvm_test_with_system(test_protos(), Box::new(platform), move |jvm, system| async move {
+            let display: ClassInstanceRef<Display> = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?.into();
+            let _: () = jvm
+                .invoke_virtual(&display, "javax/microedition/lcdui/Display", "disablePaint", "()V", ())
+                .await?;
+            let paint = async || -> JvmResult<usize> {
+                let _: () = jvm
+                    .invoke_virtual(&display, "javax/microedition/lcdui/Display", "handlePaintEvent", "()V", ())
+                    .await?;
+                Ok(paints.load(Ordering::SeqCst))
+            };
+
+            assert_eq!(paint().await?, 0, "no compositor: nothing to present");
+
+            let drew = Arc::new(AtomicBool::new(false));
+            let drew_clone = drew.clone();
+            system.set_screen_compositor(Box::new(move |_, _| drew_clone.load(Ordering::SeqCst)));
+            assert_eq!(paint().await?, 0, "native unchanged (an off-screen FlushLcd title): not repainted over");
+
+            drew.store(true, Ordering::SeqCst);
+            assert_eq!(paint().await?, 1, "native drawn: presented");
+            Ok(())
+        })
+    }
+
     #[test]
     fn an_expensive_collection_spaces_out_the_next_one() -> Result<()> {
         let clock = TestClock::new();
