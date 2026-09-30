@@ -239,7 +239,7 @@ pub async fn list_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
 /// each of the four candidate meanings there (register an extension · delete by pattern · list a
 /// type · select/ensure a directory) leaves nothing a fresh install would need. Until 2026-09-30 it
 /// refused with `Unimplemented`, which stopped both titles that reach it at boot
-/// (`docs/report/0390`).
+/// (`docs/report/0391`).
 pub async fn sort_records(context: &mut dyn WIPICContext, arg0: WIPICWord, arg1: WIPICWord) -> Result<i32> {
     let token = read_quotable_token(context, arg0);
     tracing::debug!("KTF database slot 8 (header name: MC_dbSortRecords)({arg0:#x}, {arg1:#x}) token={token:?} — no-op");

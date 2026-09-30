@@ -273,7 +273,7 @@ impl<'a> Arm32CpuMemory<'a> {
     /// Shipped titles read through null and go on: `2b1ed0c8d061` asks for a sound file whose name
     /// it misspells, keeps the empty sound, and later builds `*(null) + 8` as the data pointer it
     /// hands over with size 0. That typo is in the shipped binary, so the handset read address 0
-    /// and survived; faulting here stopped the title at its first serve (`docs/report/0390`).
+    /// and survived; faulting here stopped the title at its first serve (`docs/report/0391`).
     fn read_page(&mut self, addr: u32) -> Option<&[u8; PAGE_SIZE]> {
         if addr < NULL_READ_LIMIT && self.emulated_memory.pages[0].is_none() {
             if !NULL_READ_SEEN.swap(true, Ordering::Relaxed) {
