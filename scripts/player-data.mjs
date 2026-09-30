@@ -26,6 +26,17 @@ const UPDATES = join(ROOT, 'docs/player-updates');
 export const STATUSES = ['playable', 'limited', 'not-yet'];
 export const AXES = ['boot', 'render', 'input', 'longplay', 'sound', 'speed'];
 export const AXIS_VALUES = ['ok', 'partial', 'no', 'unknown'];
+// Axes beyond the six: carried only on rows a census measured, never required (the shell importer
+// checks AXES only and spreads the rest through). `progress` = the census's progress axis, drawn by
+// the shell's PROGRESS_UI (otterpebble apps/featurephone/lib/compat.ts).
+export const EXTRA_AXES = ['progress'];
+// Each extra axis carries its OWN public vocabulary — the one its consumer draws. The shell's
+// PROGRESS_UI (otterpebble #1244) knows `ok` and `stuck` and hides any other value, so mapping stuck
+// to the six-axis `no` would show the 22 `ok` rows and hide every stuck one — a display biased to
+// the good side. A census `error` (the run crashed) is not progress either, so it ships as `stuck`;
+// `n/a` (not measured) ships as no key at all.
+export const EXTRA_AXIS_VALUES = { progress: ['ok', 'stuck'] };
+const EXTRA_AXIS_MAP = { progress: { ok: 'ok', stuck: 'stuck', error: 'stuck' } };
 export const PLATFORMS = ['KTF', 'SKT', 'LGT', 'J2ME'];
 export const KINDS = ['new-support', 'fix', 'improvement', 'sound', 'speed'];
 const HEX40 = /^[0-9a-f]{40}$/;
@@ -107,6 +118,8 @@ export function validateCompat(d) {
     if (!str(x.fileTitle)) e.push(`${at}: empty fileTitle (the file-derived name, kept for search)`);
     if (!STATUSES.includes(x.status)) e.push(`${at}: status not in ${STATUSES}`);
     for (const a of AXES) if (!AXIS_VALUES.includes(x.axes?.[a])) e.push(`${at}: axes.${a} not in ${AXIS_VALUES}`);
+    for (const a of EXTRA_AXES)
+      if (x.axes && a in x.axes && !EXTRA_AXIS_VALUES[a].includes(x.axes[a])) e.push(`${at}: axes.${a} not in ${EXTRA_AXIS_VALUES[a]}`);
     if (!Array.isArray(x.knownIssues_ko) || !x.knownIssues_ko.every(str)) e.push(`${at}: knownIssues_ko must be non-empty strings`);
     if (!Array.isArray(x.changes)) e.push(`${at}: changes must be an array`);
     else
@@ -161,7 +174,10 @@ export function fromCensus(c) {
   const entries = c.entries.map((x) => ({
     ...x,
     fileTitle: x.title.replace(/_+/g, ' ').replace(/\s+/g, ' ').trim(), // census titles are file names
-    axes: Object.fromEntries(AXES.map((a) => [a, AXIS_MAP[x.axes?.[a]] ?? `?${x.axes?.[a]}`])),
+    axes: Object.fromEntries([
+      ...AXES.map((a) => [a, AXIS_MAP[x.axes?.[a]] ?? `?${x.axes?.[a]}`]),
+      ...EXTRA_AXES.filter((a) => a in (x.axes ?? {}) && x.axes[a] !== 'n/a').map((a) => [a, EXTRA_AXIS_MAP[a][x.axes[a]] ?? `?${x.axes[a]}`]),
+    ]),
     changes: [],
   }));
   return { schema: 1, generatedAt: c.generatedAt, enginePin: c.enginePin, entries: retitle(entries) };
@@ -213,6 +229,8 @@ function selftest() {
     ['compat schema 2', { ...good, schema: 2 }, null],
     ['unknown status', { ...good, entries: [{ ...good.entries[0], status: 'boots' }] }, null],
     ['census axis value leaks through', { ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, boot: 'fail' } }] }, null],
+    ['six-axis value on progress', { ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, progress: 'no' } }] }, null],
+    ['unmeasured progress shipped as a value', { ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, progress: 'unknown' } }] }, null],
     ['duplicate sha', { ...good, entries: [good.entries[0], good.entries[0]] }, null],
     ['short enginePin', { ...good, enginePin: 'abc' }, null],
     ['title keeps a bracket tag', { ...good, entries: [{ ...good.entries[0], title: '[큰화]t' }] }, null],
@@ -234,6 +252,14 @@ function selftest() {
   for (const [label, c, u] of cases) if (!errs(c, u).length) bad++, console.error(`selftest: NOT rejected — ${label}`);
   if (fromCensus({ ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, render: 'uniform', speed: 'n/a' } }] }).entries[0].axes.render !== 'no')
     bad++, console.error('selftest: census uniform must map to no');
+  const withProgress = (v) => fromCensus({ ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, ...v } }] }).entries[0].axes;
+  if (
+    withProgress({ progress: 'stuck' }).progress !== 'stuck' ||
+    withProgress({ progress: 'error' }).progress !== 'stuck' ||
+    'progress' in withProgress({}) ||
+    'progress' in withProgress({ progress: 'n/a' })
+  )
+    bad++, console.error('selftest: progress ships stuck/error as «stuck» (the shell hides «no»), and n/a as no key');
   const { compat } = assemble(good, [['2026-09-27-x.json', upd]], () => 'd'.repeat(40), 'e'.repeat(40));
   if (compat.entries[0].changes[0]?.summary_ko !== upd.summary_ko) bad++, console.error('selftest: an update must reach the title it names');
   const shipped = { ...compat, entries: [{ ...compat.entries[0], changes: [{ ...compat.entries[0].changes[0], enginePin: '+}' }] }] };

@@ -13,6 +13,7 @@
 // ── Usage ────────────────────────────────────────────────────────────────────
 //   node scripts/playability-census.mjs run --bin <wie_validate> --out <dir> [--jobs <= ncpu, default ncpu/2]
 //        [--secs 30] [--long 600] [--only probe|long|speed] <corpus dir>...
+//   node scripts/playability-census.mjs run … --only progress [--progress 1800] [--titles <file>] [--as P|P2]
 //   node scripts/playability-census.mjs report --out <dir> --pin <wie sha>
 //        [--compat <compat.json>] [--changes <changes.json>] [--prs <gh-merged.json>]
 //        [--speed <browser runs.jsonl>]
@@ -45,10 +46,14 @@
 //           `--speed` overrides that with browser runs (the #347 harness, one JSON line per run:
 //           `game` "<sha12>.zip", `loopHz`, `win`, `pacing`): two runs within 10% of each other
 //           give `ok` (>= 0.9) or `slow`; runs that disagree leave the headless verdict standing.
+//   progress  «does it keep moving forward», not «did it survive»: the progress policy for
+//           --progress seconds, `stuck` when no never-seen frame came in the last third (pair-confirmed
+//           by `--as P2`). Outside `status`. See progress() below.
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { cpus, loadavg } from 'node:os';
+import { inflateSync } from 'node:zlib';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -60,6 +65,11 @@ const PROBE_KEYS_AT = 8; // pacing window opens after boot
 // as boot/render fail on every census (7da00ecd4804, 2026-09-29).
 const RELAUNCH = ['--relaunch', '1'];
 const LONG_KEYS = 'OK:1 UP:0.5 UP:0.5 OK:1 DOWN:0.5 RIGHT:0.5 NUM5:1 LEFT:0.5 NUM5:1 OK:1 NUM2:0.5 NUM8:0.5 NUM4:0.5 NUM6:0.5 OK:1';
+// The progress policy (~30 s a cycle): confirm through notices and menus (OK/5, one left soft key,
+// one NUM1 for «1. 예» notices), then play — directions tapped and held, fire repeatedly. Never CLR
+// or the right soft key (back/quit on most titles); a title the left soft key quits is relaunched.
+const PROGRESS_KEYS = 'OK:1 NUM5:1 OK:1 NUM1:1 OK:1 LSOFT:1.5 OK:1 NUM5:1 UP:0.5 DOWN:0.5 DOWN:0.5 OK:1 RIGHT:0.5:1.5 LEFT:0.5:1.5 NUM6:0.5:1 NUM4:0.5:1 NUM2:0.5 NUM8:0.5 NUM5:0.4 NUM5:0.4 NUM5:0.4 UP:0.5:1 NUM5:0.4 DOWN:0.5:1 NUM5:0.4 OK:1';
+const PROGRESS_SHOT = 10; // seconds between timed shots
 
 const [cmd, ...rest] = process.argv.slice(2);
 // Default half the cores, never more than all of them: each job is a CPU-bound wie_validate, so
@@ -127,11 +137,15 @@ for (let i = 0; i < rest.length; i++) {
 {
   const ncpu = cpus().length;
   const want = opt.jobs;
-  opt.jobs = jobsFor(want, ncpu);
+  // A progress run holds a core for 10–30 minutes, not 30 s: default to a quarter of the cores so a
+  // bare `--only progress` leaves room for the other lanes (2026-09-30: 8–10 jobs starved a sibling
+  // lane's host-load gate for an hour).
+  opt.jobs = want === undefined && opt.only === 'progress' ? Math.max(1, Math.floor(ncpu / 4)) : jobsFor(want, ncpu);
   if (want !== undefined && Number(want) > ncpu) console.error(`--jobs ${want} > ${ncpu} cores — capped to ${opt.jobs}`);
 }
 opt.secs = Number(opt.secs);
 opt.long = Number(opt.long);
+opt.progress = Number(opt.progress ?? 1800);
 if (cmd !== 'selftest' && (!opt.out || !['run', 'report'].includes(cmd))) {
   console.error('usage: playability-census.mjs run|report --out <dir> … | selftest  (see the header)');
   process.exit(2);
@@ -268,6 +282,134 @@ async function longplay(t) {
   writeFileSync(f, JSON.stringify(r));
 }
 
+// ── progress: does the title keep moving FORWARD, not merely stay alive ─────
+// `--only progress` runs the progress policy (PROGRESS_KEYS, or a per-title recipe) for --progress
+// seconds with a shot every PROGRESS_SHOT s, into `<as>.json` (`--as P`, `--as P2` for the pair
+// re-measure). The measurement is the curve of NEW screens and `stall` = seconds from the last new
+// screen to the end of the run. A screen is a 16×16 grid of mean luminance (fingerprint()), and a
+// shot is new when it differs from EVERY screen seen so far in >= 8 cells by > 32 levels.
+// Why not the PNG hash (the first version): measured on this run, a slot picker with a glowing
+// cursor produced 27 distinct hashes in 30 min and a text-entry screen cycling letters 76, both read
+// `ok` while going nowhere. On the same 6 titles 32/8 calls those two and the frozen menu stuck and
+// keeps the two that play (new screens until 1300 s and 430 s of their runs) ok; 24/3 still let the
+// slot picker through.
+//   ponytail: a board game whose cursor walks the board without a move reads `ok` (a chess title,
+//   measured) — screen novelty cannot tell a cursor from play. Per-title recipes are the answer.
+// `--titles <file>` limits the run to listed titles, one per line: `<sha12> [secs] [recipe keys file]`.
+const titleList = () => {
+  if (!opt.titles) return null;
+  const m = new Map();
+  for (const l of readFileSync(resolve(opt.titles), 'utf8').split('\n')) {
+    const [sha, secs, keys] = l.split('#')[0].trim().split(/\s+/);
+    if (sha) m.set(sha.slice(0, 12), { secs: secs ? Number(secs) : null, keys: keys ? resolve(keys) : null });
+  }
+  return m;
+};
+async function progress(t, spec = {}) {
+  const stem = opt.as ?? 'P';
+  const d = join(out, t.sha);
+  const f = join(d, `${stem}.json`);
+  if (existsSync(f)) return;
+  const secs = spec.secs ?? opt.progress;
+  const shots = join(d, stem);
+  rmSync(shots, { recursive: true, force: true });
+  mkdirSync(shots, { recursive: true });
+  const keys = join(d, `${stem}.keys`);
+  // A recipe is a PREFIX (the path to where play starts — an ⒜ unlock), then the policy as usual.
+  writeFileSync(keys, [spec.keys ? readFileSync(spec.keys, 'utf8') : '', ...Array(Math.ceil(secs / 25)).fill(PROGRESS_KEYS)].join('\n'));
+  const args = ['--inject', '--keys', keys, '--keep-timeout', '--timeout', String(secs), '--max-ticks', '100000000000', '--shotdir', shots, '--shot-every', String(PROGRESS_SHOT), '--relaunch', '3', t.path];
+  const r = await validate(args, secs + 300, join(d, `${stem}.stderr`));
+  const all = readdirSync(shots).filter((n) => n.endsWith('.png'));
+  const timed = all.filter((n) => /__t\d+\.\d\.png$/.test(n)).sort();
+  // Keep the timed frames (the curve's evidence, and the stuck frame to look at); drop per-key ones.
+  for (const n of all) if (!timed.includes(n)) rmSync(join(shots, n));
+  r.shots = timed.map((n) => sha256(readFileSync(join(shots, n))));
+  r.fp = timed.map((n) => fingerprint(readFileSync(join(shots, n))).map(Math.round));
+  r.shot_names = timed;
+  r.secs = secs;
+  r.recipe = spec.keys ? basename(spec.keys) : null;
+  writeFileSync(f, JSON.stringify(r));
+}
+// A run recorded before `fp` existed is fingerprinted from its kept frames.
+function readProgress(d, stem) {
+  const r = read(join(d, `${stem}.json`));
+  if (r && !r.fp) r.fp = r.shot_names.map((n) => fingerprint(readFileSync(join(d, stem, n))).map(Math.round));
+  return r;
+}
+// Seconds of a run that brought no never-seen frame. A run that ended early (the guest quit and
+// used up its relaunches) counts the missing time as stalled, which is what a player would see.
+function progressCurve(r) {
+  const seen = [];
+  const uniq = [];
+  let lastNew = 0;
+  r.fp.forEach((f, i) => {
+    if (seen.every((s) => s.filter((v, k) => Math.abs(v - f[k]) > 32).length >= 8)) {
+      seen.push(f);
+      lastNew = (i + 1) * PROGRESS_SHOT;
+    }
+    uniq.push(seen.length);
+  });
+  return { uniq, lastNew, stall: r.secs - lastNew, distinct: seen.length };
+}
+// 16×16 mean luminance of an 8-bit RGBA, non-interlaced PNG — what wie_validate's --shotdir writes
+// (`png::ColorType::Rgba`, `BitDepth::Eight`). Anything else throws rather than guessing.
+function fingerprint(png, G = 16) {
+  const w = png.readUInt32BE(16);
+  const h = png.readUInt32BE(20);
+  if (png[24] !== 8 || png[25] !== 6 || png[28] !== 0) throw new Error('fingerprint: not an 8-bit RGBA non-interlaced PNG');
+  const idat = [];
+  for (let p = 8; p < png.length; ) {
+    const n = png.readUInt32BE(p);
+    if (png.toString('latin1', p + 4, p + 8) === 'IDAT') idat.push(png.subarray(p + 8, p + 8 + n));
+    p += 12 + n;
+  }
+  const raw = inflateSync(Buffer.concat(idat));
+  const stride = w * 4;
+  const px = Buffer.alloc(h * stride);
+  for (let y = 0; y < h; y++) {
+    const f = raw[y * (stride + 1)];
+    const src = y * (stride + 1) + 1;
+    const dst = y * stride;
+    for (let x = 0; x < stride; x++) {
+      const a = x >= 4 ? px[dst + x - 4] : 0;
+      const b = y ? px[dst - stride + x] : 0;
+      const c = x >= 4 && y ? px[dst - stride + x - 4] : 0;
+      const pa = Math.abs(b - c);
+      const pb = Math.abs(a - c);
+      const pc = Math.abs(a + b - 2 * c);
+      const pred = [0, a, b, (a + b) >> 1, pa <= pb && pa <= pc ? a : pb <= pc ? b : c][f];
+      px[dst + x] = (raw[src + x] + pred) & 255;
+    }
+  }
+  const sum = new Float64Array(G * G);
+  const cnt = new Float64Array(G * G);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const i = y * stride + x * 4;
+      const k = Math.floor((y * G) / h) * G + Math.floor((x * G) / w);
+      sum[k] += 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+      cnt[k]++;
+    }
+  return Array.from(sum, (v, k) => v / cnt[k]);
+}
+// ok | stuck | error for one run. The stall line is a third of the run (10 min of 30), floored at 3 min.
+function progressRun(r) {
+  if (!r) return null;
+  if (r.result === 'FAIL') return 'error';
+  const { stall } = progressCurve(r);
+  return stall >= Math.max(180, r.secs / 3) ? 'stuck' : 'ok';
+}
+// A `stuck` stands only when the pair re-measure (P2) agrees: one slow run on a loaded host looks
+// exactly like a stall. `stuck` without P2 is `n/a` — not measured, not guessed.
+function progressAxis(P, P2) {
+  const a = progressRun(P);
+  if (!a) return 'n/a';
+  if (a !== 'stuck') return a;
+  // Only a pair that actually moved overrules the stall; a pair that crashed or is missing proves nothing.
+  const b = progressRun(P2);
+  return b === 'ok' ? 'ok' : b === 'stuck' ? 'stuck' : 'n/a';
+}
+
 async function pool(items, jobs, fn) {
   let i = 0;
   let n = 0;
@@ -323,6 +465,8 @@ function judge(sha) {
   const B = read(join(d, 'B.json'));
   const L = read(join(d, 'L.json'));
   const S = read(join(d, 'S.json'));
+  const P = readProgress(d, 'P');
+  const P2 = readProgress(d, 'P2');
   if (!A || !B) return null;
   const painted = (A.paints ?? 0) + (B.paints ?? 0) > 0;
   const content = A.content || B.content;
@@ -357,7 +501,10 @@ function judge(sha) {
   const br = browser.get(sha.slice(0, 12)) ?? [];
   const bv = ok2 ? browserVerdict(br) : null;
   if (bv) [ratio, ax.speed] = bv;
-  return { A, B, L, S, ax, ratio, br, novel, baselineDistinct: baseline.size };
+  // Not part of `status` (see status()): whether a stuck title should read `limited` is the
+  // operator's wording to decide, so the axis is shipped beside the six, not folded into them.
+  ax.progress = progressAxis(P, P2);
+  return { A, B, L, S, P, P2, ax, ratio, br, novel, baselineDistinct: baseline.size };
 }
 
 // Sound is judged over EVERY run of the title, not the 30 s probes alone: many titles start their
@@ -484,6 +631,26 @@ if (cmd === 'selftest') {
     ['no audio record is n/a', soundVerdict('ok', [{}, null]) === 'n/a' && soundVerdict('fail', [{ audio: { plays: 1 } }]) === 'n/a'],
     ['--jobs 0 / garbage becomes 1', jobsFor('0', 10) === 1 && jobsFor('x', 10) === 1],
   ];
+  // Progress: 60 shots over 600 s. New frames until 400 s, then the same two alternating (a blink).
+  {
+    // A screen = one cell-block lit per index; the blink toggles 4 cells (< 8), so it is never new.
+    const block = (k, b) => Math.floor(k / 8) === b % 32;
+    const screen = (i) => Array.from({ length: 256 }, (_, k) => (block(k, i) || (i >= 32 && block(k, i + 16)) ? 255 : 0));
+    const blinkOf = (i) => Array.from({ length: 256 }, (_, k) => (k < 4 && i % 2 ? 100 : 0));
+    const run = (lastNewAt, extra = {}) => ({ result: 'UNMEASURED', secs: 600, ...extra, fp: Array.from({ length: 60 }, (_, i) => ((i + 1) * PROGRESS_SHOT <= lastNewAt ? screen(i) : blinkOf(i))) });
+    const blink = run(400);
+    cases.push(
+      ['a blink after the last new frame is a stall', progressCurve(blink).stall === 600 - 410 && progressCurve(blink).distinct === 41],
+      ['a stall under a third of the run is ok', progressRun(run(500)) === 'ok'],
+      ['a stall of a third is stuck', progressRun(run(380)) === 'stuck'],
+      ['a crash is error, whatever the curve', progressRun(run(600, { result: 'FAIL' })) === 'error'],
+      ['stuck needs its pair', progressAxis(run(100), null) === 'n/a' && progressAxis(run(100), run(100)) === 'stuck'],
+      ['a pair that moved overrules one slow run', progressAxis(run(100), run(600)) === 'ok'],
+      ['a pair that crashed confirms nothing', progressAxis(run(100), run(100, { result: 'FAIL' })) === 'n/a'],
+      ['ok and error need no pair', progressAxis(run(600), null) === 'ok' && progressAxis(run(600, { result: 'FAIL' }), null) === 'error'],
+      ['not measured is n/a', progressAxis(null, null) === 'n/a'],
+    );
+  }
   // The host lock, through the real `run` path (an empty corpus, so nothing is validated): a
   // version that dropped the hostLock() call exits at once and fails the first case.
   {
@@ -545,14 +712,27 @@ if (cmd === 'run') {
   console.error(`population: ${pop.files} files -> ${pop.titles.length} unique · excluded dirs ${JSON.stringify(pop.excluded)} · jobs ${opt.jobs}`);
   if (!opt.only || opt.only === 'probe') await pool(pop.titles, opt.jobs, probe);
   if (starved) console.error(`★${starved} probes starved (deadline, < 100 ticks, 0 paints) — not recorded; run again when the host is quieter`);
-  if (opt.only === 'speed') {
+  if (opt.only === 'progress') {
+    // Targets: playable, or limited with a clean longplay — the titles a player can get into.
+    const list = titleList();
+    const cand = pop.titles.filter((t) => {
+      if (list && !list.has(t.sha.slice(0, 12))) return false;
+      const j = judge(t.sha);
+      return j && j.ax.boot === 'ok' && j.ax.render === 'ok' && j.ax.longplay === 'ok';
+    });
+    // Longest budgets first, so a 60-minute run does not start last and set the wall time alone.
+    const spec = (t) => list?.get(t.sha.slice(0, 12)) ?? {};
+    cand.sort((a, b) => (spec(b).secs ?? opt.progress) - (spec(a).secs ?? opt.progress));
+    console.error(`progress: ${cand.length} titles × ${opt.progress}s default (as ${opt.as ?? 'P'})`);
+    await pool(cand, opt.jobs, (t) => progress(t, spec(t)));
+  } else if (opt.only === 'speed') {
     const slow = pop.titles.filter((t) => {
       const j = judge(t.sha);
       return j && j.ax.render === 'ok' && j.ax.speed === 'n/a' && j.ratio !== null;
     });
     console.error(`speed: ${slow.length} titles below 0.9, re-measured at --jobs ${opt.jobs}`);
     await pool(slow, opt.jobs, speed);
-  } else if (opt.only !== 'probe') {
+  } else if (opt.only !== 'probe' && opt.only !== 'progress') {
     const cand = pop.titles.filter((t) => {
       const j = judge(t.sha);
       return j && j.ax.input === 'ok' && j.ax.longplay === 'n/a';
@@ -565,7 +745,7 @@ if (cmd === 'run') {
   const prs = opt.prs ? read(resolve(opt.prs)) : [];
   const extra = opt.changes ? read(resolve(opt.changes)) : {};
   const entries = [];
-  const rows = [['sha256', 'platform', 'model', 'title', 'status', 'boot', 'render', 'input', 'longplay', 'sound', 'speed', 'ratio', 'browser', 'paints', 'distinct', 'novel', 'base_distinct', 'audio', 'still', 'reasonA', 'reasonL', 'load1']];
+  const rows = [['sha256', 'platform', 'model', 'title', 'status', 'boot', 'render', 'input', 'longplay', 'sound', 'speed', 'progress', 'ratio', 'browser', 'paints', 'distinct', 'novel', 'base_distinct', 'audio', 'still', 'p_stall', 'p_distinct', 'p2_stall', 'reasonA', 'reasonL', 'reasonP', 'load1']];
   const clusters = new Map();
   for (const t of pop.titles) {
     const j = judge(t.sha);
@@ -607,16 +787,21 @@ if (cmd === 'run') {
       j.baselineDistinct,
       j.A.audio ? `${j.A.audio.plays}/${j.A.audio.wave_events}w/${j.A.audio.midi_events}m` : '',
       j.L ? maxRun(j.L.shots) : '',
+      j.P ? progressCurve(j.P).stall : '',
+      j.P ? progressCurve(j.P).distinct : '',
+      j.P2 ? progressCurve(j.P2).stall : '',
       j.A.reason,
       j.L?.reason ?? '',
+      j.P?.reason ?? '',
       (j.S ?? j.A).load1?.toFixed(0),
     ]);
     // A title joins ONE playability cluster — its first failing axis — plus sound/speed ones.
     const first = ['boot', 'render', 'input', 'longplay'].find((a) => !['ok', 'n/a'].includes(j.ax[a]));
     for (const [axis, v] of Object.entries(j.ax)) {
-      if (['ok', 'n/a'].includes(v) || (axis !== first && !['sound', 'speed'].includes(axis))) continue;
-      const src = axis === 'longplay' && j.L?.result === 'FAIL' ? j.L : j.A;
-      const key = `${axis}:${v}\t${axis === 'sound' || axis === 'speed' || axis === 'input' ? '' : wallOf(src.reason, join(out, t.sha, `${src === j.L ? 'L' : 'A'}.stderr`))}`;
+      if (['ok', 'n/a'].includes(v) || (axis !== first && !['sound', 'speed', 'progress'].includes(axis))) continue;
+      const src = axis === 'progress' ? j.P : axis === 'longplay' && j.L?.result === 'FAIL' ? j.L : j.A;
+      const stem = src === j.P ? 'P' : src === j.L ? 'L' : 'A';
+      const key = `${axis}:${v}\t${axis === 'sound' || axis === 'speed' || axis === 'input' || (axis === 'progress' && v === 'stuck') ? '' : wallOf(src.reason, join(out, t.sha, `${stem}.stderr`))}`;
       if (!clusters.has(key)) clusters.set(key, []);
       clusters.get(key).push(`${t.sha.slice(0, 12)}(${platform.toLowerCase()})`);
     }
@@ -625,18 +810,18 @@ if (cmd === 'run') {
   writeFileSync(join(out, 'census.tsv'), rows.map((r) => r.map((c) => String(c ?? '').replace(/\s+/g, ' ')).join('\t')).join('\n') + '\n');
   const compat = { schema: 1, generatedAt: new Date().toISOString(), enginePin: opt.pin ?? null, entries };
   writeFileSync(opt.compat ? resolve(opt.compat) : join(out, 'compat.json'), JSON.stringify(compat, null, 1));
-  const axes = ['boot', 'render', 'input', 'longplay', 'sound', 'speed'];
+  const axes = ['boot', 'render', 'input', 'longplay', 'sound', 'speed', 'progress'];
   const md = [
     `# playability census — pin ${opt.pin ?? '?'} · ${entries.length} titles`,
     '',
     `population: ${pop.files} files -> ${pop.titles.length} unique · excluded dirs ${JSON.stringify(pop.excluded)}`,
     `status: ${JSON.stringify(count('status'))}`,
     '',
-    '| axis | ' + ['ok', 'n/a', 'fail', 'uniform', 'none', 'error', 'stall', 'silent', 'slow'].join(' | ') + ' |',
-    '|---|' + '---|'.repeat(9),
+    '| axis | ' + ['ok', 'n/a', 'fail', 'uniform', 'none', 'error', 'stall', 'silent', 'slow', 'stuck'].join(' | ') + ' |',
+    '|---|' + '---|'.repeat(10),
     ...axes.map((a) => {
       const c = entries.reduce((m, e) => ((m[e.axes[a]] = (m[e.axes[a]] ?? 0) + 1), m), {});
-      return `| ${a} | ` + ['ok', 'n/a', 'fail', 'uniform', 'none', 'error', 'stall', 'silent', 'slow'].map((k) => c[k] ?? '').join(' | ') + ' |';
+      return `| ${a} | ` + ['ok', 'n/a', 'fail', 'uniform', 'none', 'error', 'stall', 'silent', 'slow', 'stuck'].map((k) => c[k] ?? '').join(' | ') + ' |';
     }),
     '',
     '## clusters (first wall, by title count)',

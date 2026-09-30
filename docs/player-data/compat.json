@@ -73,7 +73,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -109,7 +110,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -333,7 +335,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "no"
+    "speed": "no",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "원래보다 조금 느리게 움직일 수 있어요."
@@ -407,7 +410,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -497,7 +501,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -551,7 +556,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -774,7 +780,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -792,7 +799,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -810,7 +818,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -846,7 +855,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -864,7 +874,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -1034,7 +1045,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "no"
+    "speed": "no",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요.",
@@ -1275,7 +1287,8 @@
     "input": "no",
     "longplay": "ok",
     "sound": "no",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
@@ -1296,7 +1309,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -1316,7 +1330,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -1408,7 +1423,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -1426,7 +1442,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -1464,7 +1481,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -1500,7 +1518,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -1650,7 +1669,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -1964,7 +1984,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -1982,7 +2003,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2018,7 +2040,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2075,7 +2098,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2093,7 +2117,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2147,7 +2172,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2165,7 +2191,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2183,7 +2210,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -2257,7 +2285,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -2295,7 +2324,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2385,7 +2415,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2423,7 +2454,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2612,7 +2644,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2686,7 +2719,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -2706,7 +2740,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -2746,7 +2781,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2842,7 +2878,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2950,7 +2987,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2968,7 +3006,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -3006,7 +3045,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -3098,7 +3138,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "no"
+    "speed": "no",
+    "progress": "ok"
    },
    "knownIssues_ko": [
     "원래보다 조금 느리게 움직일 수 있어요."
@@ -3210,7 +3251,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -3396,7 +3438,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -3488,7 +3531,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -3508,7 +3552,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -3568,7 +3613,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -3644,7 +3690,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -3829,7 +3876,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -3888,7 +3936,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -3960,7 +4009,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -3978,7 +4028,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4147,7 +4198,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4460,7 +4512,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4518,7 +4571,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -4538,7 +4592,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4632,7 +4687,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4650,7 +4706,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4668,7 +4725,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4707,7 +4765,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4763,7 +4822,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4781,7 +4841,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4838,7 +4899,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -5080,7 +5142,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -5208,7 +5271,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -5376,7 +5440,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -5550,7 +5615,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -5681,7 +5747,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -5988,7 +6055,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "no"
+    "speed": "no",
+    "progress": "ok"
    },
    "knownIssues_ko": [
     "원래보다 조금 느리게 움직일 수 있어요."
@@ -6118,7 +6186,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6212,7 +6281,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6369,7 +6439,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6405,7 +6476,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -6425,7 +6497,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6443,7 +6516,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -6523,7 +6597,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6579,7 +6654,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6657,7 +6733,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6711,7 +6788,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6747,7 +6825,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6783,7 +6862,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6821,7 +6901,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6895,7 +6976,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6913,7 +6995,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6931,7 +7014,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7021,7 +7105,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7057,7 +7142,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7075,7 +7161,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7165,7 +7252,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7219,7 +7307,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7294,7 +7383,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7350,7 +7440,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7440,7 +7531,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7458,7 +7550,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -7478,7 +7571,8 @@
     "input": "no",
     "longplay": "ok",
     "sound": "no",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
@@ -7499,7 +7593,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -7559,7 +7654,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7797,7 +7893,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7908,7 +8005,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7926,7 +8024,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -7946,7 +8045,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -7987,7 +8087,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -8005,7 +8106,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],

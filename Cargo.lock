@@ -4983,6 +4983,7 @@ version = "0.1.4"
 dependencies = [
  "async-trait",
  "bytemuck",
+ "encoding_rs",
  "futures-test",
  "jvm",
  "jvm-bytecode",

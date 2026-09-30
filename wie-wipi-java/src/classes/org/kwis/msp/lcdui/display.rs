@@ -1,7 +1,9 @@
 use alloc::vec;
 
-use jvm::{ClassInstanceRef, Jvm, Result as JvmResult};
-use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
+use alloc::boxed::Box;
+
+use jvm::{ClassInstanceRef, JavaError, JavaValue, Jvm, Result as JvmResult};
+use jvm_class_proto::{JavaFieldProto, JavaMethodProto, MethodBody};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 use rustjava_runtime::classes::java::lang::{Object, Runnable, String};
 
@@ -347,16 +349,59 @@ impl Display {
         Ok(())
     }
 
+    // javadoc: queue `r.run()` on the event thread `timeout` ms from now. It was a stub that
+    // dropped the Runnable, so a title that drives its loop this way froze on whatever it had
+    // painted: 5d3ba49eccf7 (KTF) sat on its title screen for the whole 10-minute progress run with
+    // 3 paints (measured 2026-09-30). The wait runs on its own task, then hands `r` to the untimed
+    // form, which queues it — so `run()` still happens on the event thread, never on this one.
     async fn call_serially_with_timeout(
-        _: &Jvm,
-        _: &mut WieJvmContext,
+        jvm: &Jvm,
+        context: &mut WieJvmContext,
         this: ClassInstanceRef<Self>,
         runnable: ClassInstanceRef<Runnable>,
         timeout: i32,
     ) -> JvmResult<()> {
-        tracing::warn!("stub org.kwis.msp.lcdui.Display::callSerially({this:?}, {runnable:?}, {timeout})");
+        tracing::debug!("org.kwis.msp.lcdui.Display::callSerially({this:?}, {runnable:?}, {timeout})");
 
-        Ok(())
+        if runnable.is_null() {
+            return Err(jvm.exception("java/lang/NullPointerException", "runnable is null").await);
+        }
+
+        struct Delayed {
+            display: ClassInstanceRef<Display>,
+            runnable: ClassInstanceRef<Runnable>,
+            timeout: u64,
+        }
+
+        #[async_trait::async_trait]
+        impl MethodBody<JavaError, WieJvmContext> for Delayed {
+            async fn call(&self, jvm: &Jvm, context: &mut WieJvmContext, _: Box<[JavaValue]>) -> Result<JavaValue, JavaError> {
+                jvm.attach_thread(None).await?;
+                context.system().sleep(self.timeout).await;
+                let _: () = jvm
+                    .invoke_virtual(
+                        &self.display,
+                        "org/kwis/msp/lcdui/Display",
+                        "callSerially",
+                        "(Ljava/lang/Runnable;)V",
+                        (self.runnable.clone(),),
+                    )
+                    .await?;
+
+                Ok(JavaValue::Void)
+            }
+        }
+
+        // javadoc: «timeout 이 0보다 작으면 0으로 간주».
+        let timeout = timeout.max(0) as u64;
+        context.spawn(
+            jvm,
+            Box::new(Delayed {
+                display: this,
+                runnable,
+                timeout,
+            }),
+        )
     }
 
     async fn is_color(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<bool> {
@@ -527,5 +572,96 @@ mod test {
 
             Ok(())
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::{boxed::Box, vec};
+
+    use jvm::{ClassInstanceRef, Jvm, Result as JvmResult};
+    use jvm_class_proto::JavaMethodProto;
+    use jvm_types::{ClassAccessFlags, MethodAccessFlags};
+
+    use test_utils::{TestPlatform, run_jvm_test_with_system};
+    use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
+    use wie_util::Result;
+
+    use crate::get_protos;
+
+    struct TestJlet;
+    impl TestJlet {
+        fn as_proto() -> WieJavaClassProto {
+            WieJavaClassProto {
+                name: "TestJlet",
+                parent_class: Some("org/kwis/msp/lcdui/Jlet"),
+                interfaces: vec![],
+                methods: vec![JavaMethodProto::new("<init>", "()V", Self::init, MethodAccessFlags::PUBLIC)],
+                fields: vec![],
+                access_flags: ClassAccessFlags::PUBLIC,
+            }
+        }
+        async fn init(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            jvm.invoke_special(&this, "org/kwis/msp/lcdui/Jlet", "<init>", "()V", ()).await
+        }
+    }
+
+    async fn queued(jvm: &Jvm) -> JvmResult<i32> {
+        let queue = jvm
+            .invoke_static("net/wie/EventQueue", "getEventQueue", "()Lnet/wie/EventQueue;", ())
+            .await?;
+        let events = jvm.get_field(&queue, "callSeriallyEvents", "Ljava/util/Vector;").await?;
+        jvm.invoke_virtual(&events, "java/util/Vector", "size", "()I", ()).await
+    }
+
+    // callSerially(r, timeout) used to drop `r`; 5d3ba49eccf7 never left its title screen. Now `r`
+    // reaches the event queue once `timeout` has passed — and not before. The test clock is
+    // virtual (TestPlatform steps 8 ms per read), so «not before» is shown against a control: an
+    // untimed-length call (timeout 0) and a far one (timeout 10 min) go in together; when the first
+    // has landed, the far one must still be out. Dropping the wait lands both at once.
+    #[test]
+    fn timed_call_serially_queues_the_runnable_after_the_timeout() -> Result<()> {
+        run_jvm_test_with_system(
+            Box::new([wie_midp::get_protos().into(), get_protos().into(), [TestJlet::as_proto()].into()]),
+            Box::new(TestPlatform::new()),
+            |jvm, system| async move {
+                let _midlet = jvm.new_class("net/wie/WIPIMIDlet", "()V", ()).await?;
+                let _jlet = jvm.new_class("TestJlet", "()V", ()).await?;
+                let display = jvm
+                    .invoke_static("org/kwis/msp/lcdui/Display", "getDefaultDisplay", "()Lorg/kwis/msp/lcdui/Display;", ())
+                    .await?;
+                let before = queued(&jvm).await?;
+                for timeout in [600_000, 0] {
+                    let runnable = jvm.new_class("java/lang/Thread", "()V", ()).await?;
+                    let _: () = jvm
+                        .invoke_virtual(
+                            &display,
+                            "org/kwis/msp/lcdui/Display",
+                            "callSerially",
+                            "(Ljava/lang/Runnable;I)V",
+                            (runnable, timeout),
+                        )
+                        .await?;
+                }
+                assert_eq!(queued(&jvm).await?, before, "queued on the caller's thread");
+                for _ in 0..200 {
+                    system.sleep(1).await;
+                    if queued(&jvm).await? > before {
+                        break;
+                    }
+                }
+                // Give the far one the same chance again: it must still be waiting.
+                for _ in 0..20 {
+                    system.sleep(1).await;
+                }
+                assert_eq!(
+                    queued(&jvm).await?,
+                    before + 1,
+                    "the 0 ms runnable only — the 10 min one is still waiting"
+                );
+
+                Ok(())
+            },
+        )
     }
 }
