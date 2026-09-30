@@ -18,7 +18,7 @@
       "title": "LGT 화면 버퍼 끝을 넘는 쓰기 — 힙 목록 헤더 손상",
       "plainSummary": "LGT 게임 2종이 화면 그림판 바로 뒤의 메모리를 덮어써서, 그 뒤로 메모리를 더 받지 못하고 멈춥니다. 게임이 그 주소를 어떻게 계산하는지 찾아 맞춰 줍니다.",
       "userBenefit": "진행 중 멈추던 LGT 게임 2종이 계속 실행될 수 있습니다.",
-      "why": "0390 §4: 18번째 목록 헤더가 0xFFFFFFFF/0xFF000000 로 덮임 · 쓰기는 MC_grpGetScreenFrameBuffer 의 0x25800 버퍼 바로 뒤(fe76 memset 480B · 1eaa strh pc=0x1232e) · 한 줄 여유를 주면 쓰는 주소가 그만큼 밀린다 ⇒ 할당 크기에서 주소를 얻는다.",
+      "why": "0392 §4: 18번째 목록 헤더가 0xFFFFFFFF/0xFF000000 로 덮임 · 쓰기는 MC_grpGetScreenFrameBuffer 의 0x25800 버퍼 바로 뒤(fe76 memset 480B · 1eaa strh pc=0x1232e) · 한 줄 여유를 주면 쓰는 주소가 그만큼 밀린다 ⇒ 할당 크기에서 주소를 얻는다.",
       "tradeoff": "버퍼 핸들 앞 크기 단어를 게임이 읽는다면 그 값의 의미(실기 레이아웃)를 맞춰야 해서 KTF 쪽에도 닿을 수 있다.",
       "effort": "M",
       "target": "wie",
