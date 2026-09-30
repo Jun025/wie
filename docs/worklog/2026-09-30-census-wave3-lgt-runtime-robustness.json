@@ -1,0 +1,28 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-30",
+  "task": "wie-census-wave3-lgt-runtime-robustness",
+  "title": "3차 군집 — LGT Thread 폰 배치 · 호스트 panic → Java 예외 · SKT MIDlet 표시 필드",
+  "summary": "0380 §4 의 LGT JVM panic 4 · class_instance panic 5 를 재현해 원인을 가렸다. LGT Thread 가 인스턴스 밖 5단어에 써서 GC 가 죽던 것(3종), null 인자 2곳, SKT MIDlet 표시 필드 저장 칸 공유를 고쳐 5종이 30초 3/3 PASS. 2종은 화면 버퍼 끝을 넘는 쓰기로 힙 헤더가 깨지는 것까지 좁혔다.",
+  "changes": [
+    "lgt_java_abi.toml java/lang/Thread host_field 5 + 시험",
+    "prepare_generated 호스트 상위 클래스 배치 불일치 로그",
+    "LGT 부모 클래스 해석·리소스 경로 unwrap 제거",
+    "WIPI Clip null 데이터 NPE · setFont(null) 기본 폰트 · MIDlet 표시 필드 이름"
+  ],
+  "verification": ["9종 + 가드 2 + 인접 2 전/후 3판", "LGT 79종 배치 불일치 전수", "변이 5종 red", "4게이트 + beta clippy"],
+  "limits": ["1eaa92092bee·fe76e641bb3d 는 panic 대신 WieError 로 끝난다", "0cc4ef7ede37·249e655147a1 은 30초 창에서 재현되지 않았다"],
+  "adoptedProposals": [],
+  "proposals": [
+    {
+      "title": "LGT 화면 버퍼 끝을 넘는 쓰기 — 힙 목록 헤더 손상",
+      "plainSummary": "LGT 게임 2종이 화면 그림판 바로 뒤의 메모리를 덮어써서, 그 뒤로 메모리를 더 받지 못하고 멈춥니다. 게임이 그 주소를 어떻게 계산하는지 찾아 맞춰 줍니다.",
+      "userBenefit": "진행 중 멈추던 LGT 게임 2종이 계속 실행될 수 있습니다.",
+      "why": "0390 §4: 18번째 목록 헤더가 0xFFFFFFFF/0xFF000000 로 덮임 · 쓰기는 MC_grpGetScreenFrameBuffer 의 0x25800 버퍼 바로 뒤(fe76 memset 480B · 1eaa strh pc=0x1232e) · 한 줄 여유를 주면 쓰는 주소가 그만큼 밀린다 ⇒ 할당 크기에서 주소를 얻는다.",
+      "tradeoff": "버퍼 핸들 앞 크기 단어를 게임이 읽는다면 그 값의 의미(실기 레이아웃)를 맞춰야 해서 KTF 쪽에도 닿을 수 있다.",
+      "effort": "M",
+      "target": "wie",
+      "kind": "product"
+    }
+  ]
+}

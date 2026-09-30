@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-30",
+  "kind": "fix",
+  "titles": [
+    "2a57e33133b5c5d6889cb6db63e0fd35b40137e5b7ece1f079ab9a3b0595f5c6",
+    "517ed32c92d60a0c26a14ea913160901bfd5e6da68464b6a12c9c13e2d8f08d2"
+  ],
+  "summary_ko": "게임을 하다 보면 갑자기 꺼지던 문제를 고쳤어요. 게임이 쓰는 기억 공간 일부가 엉뚱하게 덮이던 것이 원인이었어요.",
+  "pr": "https://github.com/Jun025/wie/pull/424"
+}
