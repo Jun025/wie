@@ -1,0 +1,20 @@
+{
+  "date": "2026-09-30",
+  "kind": "speed",
+  "titles": [
+    "0bc9cc28c05a32157af06cd41a60c626b2510126b01ca0f7ba392a72d5c31880",
+    "287af341dac8f421b9f599826fe68ff3d649cf9fa9467ceaddc139423a82f7b7",
+    "4b8c8f5ff7d61e1964eb8784d60997bcf977050a9df96cf853a9643109fec7ce",
+    "4fdbd64c9fbdfbf6d335847a01054dea5a2feb3efdb2a1e6aa5b288d77fda5de",
+    "503d5d2f196b378c3ce38c12fccf62b718c4169e84f6fe1b62eaabcfd2fcc133",
+    "5814101b801021a63b423e809f408d24a4ac476ed5bb1c6e3137c8d3de69bf3d",
+    "6f170f692586ec03cdda87df45699ea4151866fde36c988f4f2e331f8f68851e",
+    "7ec716a0cec985f80c3b59cdb02fb4d6d23752a8952090c28f27cbafaa5cacfc",
+    "cf067c5fd95282c6de331e39e89ba626119ac647c7245aad3eac5009abaf976f",
+    "f4c57c4a70600ff72b4191180f27776c175e76c3ace0897047565fb9cdbcebcc",
+    "0fdf45ec169ff0b1edd7434303201c6f418703137210a6c7780d750bcd9f1849",
+    "46b2238f87a68eec351881550a8117b924fe5b998d1eac974ff46bd7c54f3cd1"
+  ],
+  "summary_ko": "게임 안의 타이머가 화면 한 칸씩 늦게 울리던 것을 고쳐, 게임이 원래 박자에 더 가깝게 움직여요.",
+  "pr": "https://github.com/Jun025/wie/pull/416"
+}

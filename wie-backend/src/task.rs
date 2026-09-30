@@ -4,7 +4,7 @@ use core::{
     task::{Context, Poll},
 };
 
-use crate::executor::Executor;
+use crate::{executor::Executor, time::Instant};
 
 #[derive(Default)]
 pub struct YieldFuture {
@@ -42,6 +42,12 @@ impl SleepFuture {
     pub fn new(timeout: u64, executor: &Executor) -> Self {
         // we need executor from outside before rust `context_ext` stabilization
         executor.sleep(timeout);
+
+        Self { polled: false }
+    }
+
+    pub(crate) fn toward(timeout: u64, pace: Instant, executor: &Executor) -> Self {
+        executor.sleep_toward(timeout, Some(pace));
 
         Self { polled: false }
     }

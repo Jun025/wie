@@ -1,4 +1,7 @@
-use alloc::{boxed::Box, collections::VecDeque};
+use alloc::{
+    boxed::Box,
+    collections::{BTreeMap, VecDeque},
+};
 use core::pin::Pin;
 
 use wie_util::Result;
@@ -69,7 +72,8 @@ pub enum Event {
     Keydown(KeyCode),
     Keyup(KeyCode),
     Keyrepeat(KeyCode),
-    Timer { due: Instant, callback: TimerCallback },
+    // `pace_from`: see `Event::guest_timer`
+    Timer { due: Instant, pace_from: u64, callback: TimerCallback },
     Notify { r#type: i32, param1: i32, param2: i32 }, // wipi notifyEvent
 }
 
@@ -79,8 +83,19 @@ impl Event {
         F: FnOnce() -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<()>> + Send + 'static,
     {
+        Self::guest_timer(due, 0, callback)
+    }
+
+    /// A guest timer. `pace_from`: the first host tick (`Pacing::ticks`) that may be kept alive
+    /// until it is due; before that tick the host's next frame paces it, and `u64::MAX` never.
+    pub fn guest_timer<F, Fut>(due: Instant, pace_from: u64, callback: F) -> Self
+    where
+        F: FnOnce() -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<()>> + Send + 'static,
+    {
         Event::Timer {
             due,
+            pace_from,
             callback: Box::new(move || Box::pin(callback())),
         }
     }
@@ -90,6 +105,15 @@ impl Event {
 pub struct EventQueue {
     input_events: VecDeque<Event>,
     events: VecDeque<Event>,
+    // guest timer, by its address
+    timers: BTreeMap<u32, GuestTimer>,
+}
+
+#[derive(Default)]
+struct GuestTimer {
+    armings: u64,
+    cancelled_through: u64,
+    fired_in_tick: Option<u64>,
 }
 
 impl EventQueue {
@@ -110,6 +134,32 @@ impl EventQueue {
 
     pub fn is_empty(&self) -> bool {
         self.input_events.is_empty() && self.events.is_empty()
+    }
+
+    /// Numbers an arming of a guest timer (WIPI `MC_knlSetTimer`), for `is_timer_armed` when it
+    /// falls due. One still pending is left alone — two Sets give two callbacks, as they always did.
+    pub fn arm_timer(&mut self, timer: u32) -> u64 {
+        let timer = self.timers.entry(timer).or_default();
+        timer.armings += 1;
+        timer.armings
+    }
+
+    /// WIPI `MC_knlUnsetTimer`: every arming so far stops counting.
+    pub fn cancel_timer(&mut self, timer: u32) {
+        let timer = self.timers.entry(timer).or_default();
+        timer.cancelled_through = timer.armings;
+    }
+
+    pub fn is_timer_armed(&self, timer: u32, arming: u64) -> bool {
+        arming > self.timers.get(&timer).map_or(0, |x| x.cancelled_through)
+    }
+
+    pub fn timer_fired(&mut self, timer: u32, tick: u64) {
+        self.timers.entry(timer).or_default().fired_in_tick = Some(tick);
+    }
+
+    pub fn timer_fired_in(&self, timer: u32, tick: u64) -> bool {
+        self.timers.get(&timer).and_then(|x| x.fired_in_tick) == Some(tick)
     }
 
     /// Keyboard input takes priority; events at the same priority remain FIFO.

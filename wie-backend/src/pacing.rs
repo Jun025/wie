@@ -79,6 +79,11 @@ impl Pacing {
         self.timer_late.push(late_ms);
     }
 
+    /// Host ticks so far — which tick this is.
+    pub fn ticks(&self) -> u64 {
+        self.ticks
+    }
+
     pub fn redraw_requested(&mut self, now: Instant) {
         if self.redraw_requested.is_none() {
             self.redraw_requested = Some((now, self.ticks));

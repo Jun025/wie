@@ -22,7 +22,8 @@ pub trait WIPICContext: ByteRead + ByteWrite + Send + Sync {
     fn spawn(&mut self, callback: WIPICMethodBody) -> Result<()>;
     async fn get_resource_size(&self, name: &str) -> Result<Option<usize>>;
     async fn read_resource(&self, name: &str) -> Result<Vec<u8>>;
-    fn set_timer(&mut self, due: Instant, callback: WIPICMethodBody);
+    /// `pace_from`: `wie_backend::Event::guest_timer`.
+    fn set_timer(&mut self, due: Instant, pace_from: u64, callback: WIPICMethodBody);
 }
 
 pub struct WIPICResult {
@@ -98,6 +99,8 @@ pub mod test {
         last_alloc: usize,
         system: Option<System>,
         resources: Vec<(String, Vec<u8>)>,
+        pub timers: Vec<(Instant, u64, WIPICMethodBody)>,
+        pub calls: Vec<WIPICWord>,
     }
 
     impl TestContext {
@@ -108,6 +111,8 @@ pub mod test {
                 last_alloc: TEST_ALLOC_START,
                 system: None,
                 resources: Vec::new(),
+                timers: Vec::new(),
+                calls: Vec::new(),
             }
         }
 
@@ -117,6 +122,8 @@ pub mod test {
                 last_alloc: TEST_ALLOC_START,
                 system: Some(system),
                 resources: Vec::new(),
+                timers: Vec::new(),
+                calls: Vec::new(),
             }
         }
 
@@ -151,8 +158,9 @@ pub mod test {
             Ok(memory.0)
         }
 
-        async fn call_function(&mut self, _address: WIPICWord, _args: &[WIPICWord]) -> Result<WIPICWord> {
-            todo!()
+        async fn call_function(&mut self, address: WIPICWord, _args: &[WIPICWord]) -> Result<WIPICWord> {
+            self.calls.push(address);
+            Ok(0)
         }
 
         fn system(&mut self) -> &mut System {
@@ -175,8 +183,8 @@ pub mod test {
                 .ok_or_else(|| WieError::FatalError(format!("Missing test resource: {name}")))
         }
 
-        fn set_timer(&mut self, _due: Instant, _callback: WIPICMethodBody) {
-            todo!()
+        fn set_timer(&mut self, due: Instant, pace_from: u64, callback: WIPICMethodBody) {
+            self.timers.push((due, pace_from, callback));
         }
     }
 

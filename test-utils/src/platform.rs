@@ -17,8 +17,10 @@ static TEST_EPOCH: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone, Default)]
 pub struct TestClock {
-    epoch_millis: Arc<AtomicU64>,
-    step_millis: u64,
+    // (ms, µs past it): a step can be shorter than the millisecond the engine reads, and the
+    // millisecond stays the stored unit so any u64 epoch still fits
+    epoch: Arc<Mutex<(u64, u64)>>,
+    step_micros: u64,
 }
 
 impl TestClock {
@@ -29,23 +31,37 @@ impl TestClock {
     /// A clock that moves `millis` forward on every read, so elapsed time counts the engine's
     /// clock reads, not the host's speed: a run is the same run on a loaded CI box and an idle one.
     pub fn stepping(millis: u64) -> Self {
+        Self::stepping_micros(millis * 1000)
+    }
+
+    /// `stepping` below a millisecond: for a test where guest work between waits must cost less
+    /// than the waits themselves.
+    pub fn stepping_micros(micros: u64) -> Self {
         Self {
-            step_millis: millis,
+            step_micros: micros,
             ..Self::default()
         }
     }
 
     pub fn set(&self, epoch_millis: u64) {
-        self.epoch_millis.store(epoch_millis, Ordering::SeqCst);
+        *self.epoch.lock() = (epoch_millis, 0);
     }
 
     /// The current time, without the step a platform read takes.
     pub fn peek(&self) -> u64 {
-        self.epoch_millis.load(Ordering::SeqCst)
+        self.epoch.lock().0
     }
 
     pub fn advance(&self, millis: u64) {
-        self.epoch_millis.fetch_add(millis, Ordering::SeqCst);
+        self.epoch.lock().0 += millis;
+    }
+
+    fn read(&self) -> u64 {
+        let mut epoch = self.epoch.lock();
+        let now = epoch.0;
+        let micros = epoch.1 + self.step_micros;
+        *epoch = (now + micros / 1000, micros % 1000);
+        now
     }
 }
 
@@ -172,7 +188,7 @@ impl Platform for TestPlatform {
 
     fn now(&self) -> Instant {
         if let Some(clock) = &self.clock {
-            return Instant::from_epoch_millis(clock.epoch_millis.fetch_add(clock.step_millis, Ordering::SeqCst));
+            return Instant::from_epoch_millis(clock.read());
         }
 
         let epoch = TEST_EPOCH.fetch_add(8, Ordering::SeqCst);

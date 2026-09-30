@@ -102,12 +102,21 @@ pub async fn set_timer(
         ptr_timer: WIPICWord,
         fn_callback: WIPICWord,
         param: WIPICWord,
+        arming: u64,
     }
 
     #[async_trait::async_trait]
     impl MethodBody<WieError> for TimerCallback {
         #[tracing::instrument(name = "timer", skip_all)]
         async fn call(&self, context: &mut dyn WIPICContext, _: Box<[WIPICWord]>) -> Result<WIPICResult> {
+            // Unset since. With Unset a no-op, a title that re-arms with Unset + Set kept the old
+            // chain alive beside the new one, and its game loop ran two to four times per period
+            // (2d5cada03004: 37 callbacks/s of a 62ms timer; 3cc7a9b4cb15: 40/s of a 37ms one).
+            if !context.system().event_queue().is_timer_armed(self.ptr_timer, self.arming) {
+                return Ok(WIPICResult { results: Vec::new() });
+            }
+            let tick = context.system().pacing().ticks();
+            context.system().event_queue().timer_fired(self.ptr_timer, tick);
             context.call_function(self.fn_callback, &[self.ptr_timer, self.param]).await?;
 
             Ok(WIPICResult { results: Vec::new() })
@@ -117,21 +126,39 @@ pub async fn set_timer(
     let now = context.system().platform().now();
     let timeout = (((timeout_high as u64) << 32) | (timeout_low as u64)) as _;
     let timer: WIPICTimer = read_generic(context, ptr_timer)?;
+    let arming = context.system().event_queue().arm_timer(ptr_timer);
+    // When a tick may be kept alive until this timer is due (instead of the host's next frame, the
+    // 16.7ms grid every timer used to land on): never for 1ms, which means "as soon as you can" (KTF
+    // 49ade89578c5 re-arms MC_knlSetTimer(1) each frame; waiting on it ran the game at 44fps, not its 39),
+    // and not in the tick this timer already fired in — a second fire there is a timer faster than
+    // the host's frames (a ~10ms one: 62 -> 94fps).
+    let tick = context.system().pacing().ticks();
+    let pace_from = if timeout <= 1 {
+        u64::MAX
+    } else if context.system().event_queue().timer_fired_in(ptr_timer, tick) {
+        tick + 1
+    } else {
+        0
+    };
 
     context.set_timer(
         now + timeout,
+        pace_from,
         Box::new(TimerCallback {
             ptr_timer,
             fn_callback: timer.fn_callback,
             param,
+            arming,
         }),
     );
 
     Ok(())
 }
 
-pub async fn unset_timer(_: &mut dyn WIPICContext, a0: WIPICWord) -> Result<()> {
-    tracing::warn!("stub MC_knlUnsetTimer({a0:#x})");
+pub async fn unset_timer(context: &mut dyn WIPICContext, ptr_timer: WIPICWord) -> Result<()> {
+    tracing::debug!("MC_knlUnsetTimer({ptr_timer:#x})");
+
+    context.system().event_queue().cancel_timer(ptr_timer);
 
     Ok(())
 }
@@ -351,7 +378,9 @@ mod test {
 
     use crate::{WIPICContext, context::test::TestContext, method::MethodImpl};
 
-    use super::{alloc, calloc, free, get_program_name, get_resource, get_resource_id, get_system_property, sprintk};
+    use super::{
+        alloc, calloc, def_timer, free, get_program_name, get_resource, get_resource_id, get_system_property, set_timer, sprintk, unset_timer,
+    };
 
     #[futures_test::test]
     async fn test_sprintk() -> Result<()> {
@@ -423,6 +452,57 @@ mod test {
         assert_eq!(get_system_property(&mut context, id, out, 16).await.unwrap(), 0);
         let result = read_null_terminated_string_bytes(&context, out).unwrap();
         assert!(String::from_utf8(result).unwrap().contains("Yamaha_MA3"));
+
+        Ok(())
+    }
+
+    // Arms `timer` per `ops` (a timeout to MC_knlSetTimer it, `None` to MC_knlUnsetTimer it), then
+    // lets every timer that was set fall due. Returns the guest callbacks that ran.
+    async fn fire_after(ops: &[Option<u32>]) -> Result<alloc::vec::Vec<u32>> {
+        let system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let mut context = TestContext::with_system(system);
+        let timer = context.alloc_raw(4).unwrap();
+        def_timer(&mut context, timer, 0x1234).await?;
+        for op in ops {
+            match op {
+                Some(timeout) => set_timer(&mut context, timer, *timeout, 0, 0).await?,
+                None => unset_timer(&mut context, timer).await?,
+            }
+        }
+        for (_, _, callback) in core::mem::take(&mut context.timers) {
+            callback.call(&mut context, Box::new([])).await?;
+        }
+        Ok(core::mem::take(&mut context.calls))
+    }
+
+    // Unset was a no-op, so each Unset + Set left one more timer chain running for good.
+    #[futures_test::test]
+    async fn test_unset_timer_cancels_a_pending_timer() -> Result<()> {
+        assert_eq!(fire_after(&[Some(10), None]).await?, []);
+        assert_eq!(fire_after(&[Some(10), None, Some(10)]).await?, [0x1234]);
+        Ok(())
+    }
+
+    #[futures_test::test]
+    async fn test_when_a_timer_may_keep_a_tick_alive() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let mut context = TestContext::with_system(system.clone());
+        let timer = context.alloc_raw(4).unwrap();
+        def_timer(&mut context, timer, 0x1234).await?;
+        let pace_from = async |context: &mut TestContext, timeout| {
+            set_timer(context, timer, timeout, 0, 0).await.unwrap();
+            context.timers.last().unwrap().1
+        };
+        let tick = system.pacing().ticks();
+
+        assert_eq!(pace_from(&mut context, 1).await, u64::MAX, "MC_knlSetTimer(1): as soon as you can");
+        assert_eq!(pace_from(&mut context, 10).await, 0, "a 10ms period keeps the tick alive");
+        let (_, _, callback) = context.timers.pop().unwrap();
+        callback.call(&mut context, Box::new([])).await?;
+        // Re-armed from its own callback — the usual loop. Only this tick's second fire is withheld.
+        assert_eq!(pace_from(&mut context, 10).await, tick + 1);
+        system.tick()?;
+        assert_eq!(pace_from(&mut context, 10).await, 0);
 
         Ok(())
     }
