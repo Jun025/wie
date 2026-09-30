@@ -8,6 +8,7 @@ use wipi_types::wipic::{WIPICIndirectPtr, WIPICWord};
 
 use wie_backend::{AsyncCallable, Event, Instant, System};
 use wie_core_arm::{Allocator, ArmCore};
+use wie_jvm_support::JvmSupport;
 use wie_util::{ByteRead, ByteWrite, Result, WieError, read_generic, write_generic};
 use wie_wipi_c::{WIPICContext, WIPICMethodBody};
 
@@ -45,6 +46,25 @@ pub struct LgtWIPICContext {
 }
 
 impl LgtWIPICContext {
+    // A Java exception on these paths (fe76e641bb3d: an allocation failure) is an error, not a panic.
+    async fn resource_stream(&self, name: &str) -> Result<Option<Box<dyn jvm::ClassInstance>>> {
+        let stream = match JavaLangClassLoader::get_system_class_loader(&self.jvm).await {
+            Ok(class_loader) => JavaLangClassLoader::get_resource_as_stream(&self.jvm, &class_loader, name).await,
+            Err(error) => Err(error),
+        };
+        match stream {
+            Ok(stream) => Ok(stream),
+            Err(error) => Err(JvmSupport::to_wie_err(&self.jvm, error).await),
+        }
+    }
+
+    async fn collect_garbage(&self) -> Result<()> {
+        match self.jvm.collect_garbage() {
+            Ok(_) => Ok(()),
+            Err(error) => Err(JvmSupport::to_wie_err(&self.jvm, error).await),
+        }
+    }
+
     pub fn new(core: ArmCore, system: System, jvm: Jvm) -> Self {
         Self { core, system, jvm }
     }
@@ -107,28 +127,23 @@ impl WIPICContext for LgtWIPICContext {
     }
 
     async fn get_resource_size(&self, name: &str) -> Result<Option<usize>> {
-        let class_loader = JavaLangClassLoader::get_system_class_loader(&self.jvm).await.unwrap();
-        let stream = JavaLangClassLoader::get_resource_as_stream(&self.jvm, &class_loader, name).await.unwrap();
-
-        if let Some(stream) = stream {
-            let available: i32 = self
-                .jvm
-                .invoke_virtual(&stream, "java/io/InputStream", "available", "()I", ())
-                .await
-                .unwrap();
-            return Ok(Some(available as _));
+        if let Some(stream) = self.resource_stream(name).await? {
+            return match self.jvm.invoke_virtual(&stream, "java/io/InputStream", "available", "()I", ()).await {
+                Ok(available) => Ok(Some(i32::max(available, 0) as usize)),
+                Err(error) => Err(JvmSupport::to_wie_err(&self.jvm, error).await),
+            };
         }
-        self.jvm.collect_garbage().unwrap();
+        self.collect_garbage().await?;
 
         Ok(self.system.filesystem().size(name).await)
     }
 
     async fn read_resource(&self, name: &str) -> Result<Vec<u8>> {
-        let class_loader = JavaLangClassLoader::get_system_class_loader(&self.jvm).await.unwrap();
-        let stream = JavaLangClassLoader::get_resource_as_stream(&self.jvm, &class_loader, name).await.unwrap();
-
-        if let Some(stream) = stream {
-            return Ok(JavaIoInputStream::read_until_end(&self.jvm, &stream).await.unwrap());
+        if let Some(stream) = self.resource_stream(name).await? {
+            return match JavaIoInputStream::read_until_end(&self.jvm, &stream).await {
+                Ok(data) => Ok(data),
+                Err(error) => Err(JvmSupport::to_wie_err(&self.jvm, error).await),
+            };
         }
 
         let Some(size) = self.system.filesystem().size(name).await else {
@@ -138,7 +153,7 @@ impl WIPICContext for LgtWIPICContext {
         let read = self.system.filesystem().read(name, 0, size, &mut data).await.unwrap_or(0);
         data.truncate(read);
 
-        self.jvm.collect_garbage().unwrap();
+        self.collect_garbage().await?;
 
         Ok(data)
     }

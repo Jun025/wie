@@ -120,6 +120,10 @@ impl Clip {
         let _: () = jvm
             .invoke_special(&this, "org/kwis/msp/media/Clip", "<init>", "(Ljava/lang/String;)V", (r#type,))
             .await?;
+        // 85e94babc247 catches the NPE of a failed resource read and passes the null on.
+        if data.is_null() {
+            return Err(jvm.exception("java/lang/NullPointerException", "data").await);
+        }
         let length = jvm.array_length(&data).await?;
 
         let _: () = jvm
@@ -269,6 +273,21 @@ mod test {
     use wie_util::Result;
 
     use crate::{classes::org::kwis::msp::media::Clip, get_protos};
+
+    // 85e94babc247 catches this NPE; without the null check the host panicked instead.
+    #[test]
+    fn test_null_data_throws_null_pointer_exception() -> Result<()> {
+        run_jvm_test(Box::new([wie_midp::get_protos().into(), get_protos().into()]), |jvm| async move {
+            let r#type = JavaLangString::from_rust_string(&jvm, "audio/test").await?;
+            let data: ClassInstanceRef<jvm::Array<i8>> = None.into();
+            let result = jvm.new_class("org/kwis/msp/media/Clip", "(Ljava/lang/String;[B)V", (r#type, data)).await;
+            let Err(jvm::JavaError::JavaException(exception)) = result else {
+                panic!("expected an exception");
+            };
+            assert_eq!(exception.class_definition().name(), "java/lang/NullPointerException");
+            Ok(())
+        })
+    }
 
     #[test]
     fn test_position_and_stop_time_round_trip() -> Result<()> {

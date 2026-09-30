@@ -1,17 +1,17 @@
 use alloc::{boxed::Box, collections::BTreeMap, string::ToString, sync::Arc};
 use core::{ops::Deref, ops::DerefMut, pin::Pin};
 
-use jvm::{ClassDefinition, Jvm, Result as JvmResult};
+use jvm::{ClassDefinition, JavaError, Jvm, Result as JvmResult};
 use jvm_class_proto::JavaClassProto;
 use spin::Mutex;
 
 use wie_core_arm::ArmCore;
 use wie_jvm_support::JvmImplementation;
-use wie_util::Result;
+use wie_util::{Result, WieError};
 
 use crate::runtime::java::{JavaSvcFunctions, exception, register_java_svc_handler};
 
-use super::{JavaArrayClassDefinition, JavaClassDefinition};
+use super::{JavaArrayClassDefinition, JavaClassDefinition, LgtJvmSupport};
 
 #[derive(Clone)]
 pub struct LgtJvmImplementation {
@@ -46,6 +46,11 @@ impl JvmImplementation for LgtJvmImplementation {
         Box::pin(async move {
             match JavaClassDefinition::new(&mut self.core.clone(), jvm, proto, context, self.functions.clone()).await {
                 Ok(class) => Ok(Box::new(class) as Box<_>),
+                // The superclass failed to resolve: rethrow its exception, as a JVM would.
+                Err(WieError::JavaException(ptr_exception)) => match LgtJvmSupport::class_instance_from_raw(&self.core, ptr_exception) {
+                    Ok(exception) => Err(JavaError::JavaException(exception)),
+                    Err(error) => Err(super::host_error(jvm, &self.core, "net/wie/WieError", &error.to_string()).await),
+                },
                 Err(error) => Err(super::host_error(jvm, &self.core, "net/wie/WieError", &error.to_string()).await),
             }
         })

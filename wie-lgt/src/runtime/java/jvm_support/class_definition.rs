@@ -84,7 +84,7 @@ impl JavaClassDefinition {
             Some(
                 jvm.resolve_class(parent_name)
                     .await
-                    .unwrap()
+                    .map_err(|JavaError::JavaException(instance)| WieError::JavaException(JavaValueCodec::new(core).object_to_raw(&*instance)))?
                     .definition
                     .as_any()
                     .downcast_ref::<JavaClassDefinition>()
@@ -443,7 +443,7 @@ impl JavaClassDefinition {
     }
 
     pub async fn prepare_generated(&mut self, core: &mut ArmCore, jvm: &Jvm, generated_classes: u32) -> Result<()> {
-        self.patch_declared_instance_field_word_indices()?;
+        let base = self.patch_declared_instance_field_word_indices()?;
 
         let mut descriptor = self.descriptor()?;
         let class_name = ClassDefinition::name(self);
@@ -522,6 +522,19 @@ impl JavaClassDefinition {
         } else {
             None
         };
+        // The phone's layout of the superclass is `base` words. A host superclass defining more
+        // writes its extra words over this class's own fields and past the instance, and the
+        // collector later reads a zeroed header (java/lang/Thread, 2026-09-30). Fix: an ABI
+        // `host_field` row for the extra primitives, the way TimerTask has one.
+        if let Some(parent_class) = &parent_class {
+            let parent_word_count = parent_class.instance_field_word_count()?;
+            if parent_word_count > base as usize {
+                tracing::error!(
+                    "LGT class {class_name}: phone gives superclass {} {base} instance words, this engine defines {parent_word_count}",
+                    ClassDefinition::name(parent_class)
+                );
+            }
+        }
         if descriptor.flags & LGT_JAVA_CLASS_SUPER_CLASS_IS_NAME != 0 {
             descriptor.ptr_super_class = parent_class.as_ref().unwrap().ptr_raw;
             descriptor.flags &= !LGT_JAVA_CLASS_SUPER_CLASS_IS_NAME;
@@ -654,7 +667,8 @@ impl JavaClassDefinition {
         )
     }
 
-    pub fn patch_declared_instance_field_word_indices(&self) -> Result<()> {
+    /// Returns the phone's word count for the superclass part of an instance (`base`).
+    pub fn patch_declared_instance_field_word_indices(&self) -> Result<u32> {
         let fields = self.fields()?;
         let own_word_count = fields
             .iter()
@@ -684,7 +698,7 @@ impl JavaClassDefinition {
         let is_relative = declared_fields.iter().all(|(_, observed, relative, _)| observed == relative);
         let is_absolute = declared_fields.iter().all(|(_, observed, _, absolute)| observed == absolute);
         if is_absolute {
-            return Ok(());
+            return Ok(base);
         }
         if !is_relative {
             let observed = declared_fields.iter().map(|(_, index, _, _)| *index).collect::<Vec<_>>();
@@ -704,7 +718,7 @@ impl JavaClassDefinition {
             )?;
         }
 
-        Ok(())
+        Ok(base)
     }
 
     fn register_class_getters(&self, core: &mut ArmCore, jvm: &Jvm, functions: JavaSvcFunctions) -> Result<()> {
