@@ -96,7 +96,16 @@ struct CMethodProxy {
 async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm), id: SvcId) -> Result<()> {
     let wipic_context = LgtWIPICContext::new(core.clone(), system.clone(), jvm.clone());
     let (_, lr) = core.read_pc_lr()?;
-    let method = match WIPICSvcId::try_from(id)? {
+    // An unmapped id names its arguments and the guest return address, so the next round can read
+    // the call site instead of re-running the title under a debugger to learn what was passed.
+    let svc = WIPICSvcId::try_from(id).map_err(|_| {
+        let [r0, r1, r2, r3] = [0, 1, 2, 3].map(|i| u32::get(core, i));
+        wie_util::WieError::FatalError(alloc::format!(
+            "Unknown LGT WIPIC SVC id {} (r0={r0:#x} r1={r1:#x} r2={r2:#x} r3={r3:#x} lr={lr:#x})",
+            id.0
+        ))
+    })?;
+    let method = match svc {
         WIPICSvcId::CletRegister => {
             return EmulatedFunction::call(&clet_register, core, &mut (system.clone(), jvm.clone()))
                 .await?
@@ -170,6 +179,9 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::TimeConvert => time_convert.into_body(),
         WIPICSvcId::TimeToTm => time_to_tm.into_body(),
         WIPICSvcId::DateTimeToTm => time_to_tm.into_body(),
+        WIPICSvcId::UicConfigure => uic_configure.into_body(),
+        WIPICSvcId::UicSetEnable => uic_set_enable.into_body(),
+        WIPICSvcId::UicSetMaxTextSize => uic_set_max_text_size.into_body(),
         WIPICSvcId::Htonl | WIPICSvcId::Ntohl => swap32.into_body(),
         WIPICSvcId::Htons | WIPICSvcId::Ntohs => swap16.into_body(),
         WIPICSvcId::InetAddr => inet_addr.into_body(),
@@ -187,6 +199,7 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::Unk8 => database::exists_database.into_body(),
         WIPICSvcId::Connect => net::connect.into_body(),
         WIPICSvcId::Close => net::close.into_body(),
+        WIPICSvcId::Socket | WIPICSvcId::SocketAlt => net::socket.into_body(),
         WIPICSvcId::SocketWrite => net_socket_write.into_body(),
         WIPICSvcId::SocketRead => net_socket_read.into_body(),
         WIPICSvcId::SocketClose => net::socket_close.into_body(),
@@ -197,6 +210,8 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::ClipGetVolume => media::clip_get_volume.into_body(),
         WIPICSvcId::ClipSetVolume => media::clip_set_volume.into_body(),
         WIPICSvcId::Play => media::play.into_body(),
+        WIPICSvcId::Pause => media::pause.into_body(),
+        WIPICSvcId::Resume => media::resume.into_body(),
         WIPICSvcId::Stop => media::stop.into_body(),
         WIPICSvcId::Unk5 => unk5.into_body(),
         WIPICSvcId::Vibrator => media::vibrator.into_body(),
@@ -208,6 +223,7 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::GetMuteState => media::get_mute_state.into_body(),
         WIPICSvcId::BackLight => misc::back_light.into_body(),
         WIPICSvcId::Unk16 => unk16.into_body(),
+        WIPICSvcId::ListDataStores => list_data_stores.into_body(),
     };
 
     EmulatedFunction::call(
@@ -561,6 +577,37 @@ async fn get_memory(_context: &mut dyn WIPICContext) -> Result<i32> {
 
 const LGT_MEMORY: i32 = 0x400000;
 
+/// UIC 809/811/833 (`MC_uicConfigure`/`SetEnable`/`SetMaxTextSize`): the components 800–802 hand out
+/// are not real, so there is nothing to place, enable or size — accept and report success.
+async fn uic_configure(_context: &mut dyn WIPICContext, comp: u32, x: i32, y: i32, w: i32, h: i32, flags: u32) -> Result<u32> {
+    tracing::debug!("stub LGT MC_uicConfigure({comp:#x}, {x}, {y}, {w}, {h}, {flags:#x})");
+
+    Ok(0)
+}
+
+async fn uic_set_enable(_context: &mut dyn WIPICContext, comp: u32, enable: u32) -> Result<u32> {
+    tracing::debug!("stub LGT MC_uicSetEnable({comp:#x}, {enable})");
+
+    Ok(0)
+}
+
+async fn uic_set_max_text_size(_context: &mut dyn WIPICContext, comp: u32, size: i32) -> Result<u32> {
+    tracing::debug!("stub LGT MC_uicSetMaxTextSize({comp:#x}, {size})");
+
+    Ok(0)
+}
+
+/// WIPIC 1100: the phone's data-store names, NUL-separated, into `buf`. An empty list — see the id.
+async fn list_data_stores(context: &mut dyn WIPICContext, buf: u32, len: i32) -> Result<i32> {
+    tracing::debug!("LGT list_data_stores({buf:#x}, {len}) -> empty");
+
+    if buf != 0 && len > 0 {
+        write_generic(context, buf, 0u8)?;
+    }
+
+    Ok(0)
+}
+
 async fn unk14(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
     tracing::warn!("stub unk14({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x})");
 
@@ -779,6 +826,70 @@ mod tests {
             assert_eq!(word(16)?, 0xf800, "native foreground, read by the title");
             assert_eq!(word(20)?, 0x1234, "native background");
             assert_eq!(word(24)?, 255, "native alpha");
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    /// The ids named 2026-09-30 answer through the SVC table, and an id still unmapped names its arguments.
+    ///
+    /// Eight LGT titles stopped on `Unknown LGT WIPIC SVC id` 809 · 1100 · 1212 · 2000, each at a call site
+    /// read from the image (see each id in `svc_ids`). The answers are the no-device ones: no socket (-1),
+    /// an empty data-store list, and accepted UIC/media calls. The unmapped-id message carries r0–r3 and lr
+    /// because without them each id cost a debugger rerun of the title before its call site could be read.
+    #[test]
+    fn wipic_svc_ids_named_from_call_sites_answer() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, _) = init_jvm(&system_clone).await?;
+            register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
+
+            for (id, number) in [(WIPICSvcId::Socket, 602), (WIPICSvcId::SocketAlt, 2000)] {
+                assert_eq!(id as u32, number);
+                let stub = core.make_svc_stub(SVC_CATEGORY_WIPIC, id)?;
+                assert_eq!(
+                    core.run_function::<u32>(stub, &[2, 1]).await?,
+                    u32::MAX,
+                    "SVC {number} must answer «no socket»"
+                );
+            }
+            for (id, number) in [
+                (WIPICSvcId::UicConfigure, 809),
+                (WIPICSvcId::UicSetEnable, 811),
+                (WIPICSvcId::UicSetMaxTextSize, 833),
+                (WIPICSvcId::Pause, 1211),
+                (WIPICSvcId::Resume, 1212),
+            ] {
+                assert_eq!(id as u32, number);
+                let stub = core.make_svc_stub(SVC_CATEGORY_WIPIC, id)?;
+                assert_eq!(core.run_function::<u32>(stub, &[0, 0x5a, 0xf8, 0x3c]).await?, 0);
+            }
+
+            assert_eq!(WIPICSvcId::ListDataStores as u32, 1100);
+            let buf = Allocator::alloc(&mut core, 16)?;
+            core.write_bytes(buf, b"PHONEBOOK\0")?;
+            let stub = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::ListDataStores)?;
+            let _: u32 = core.run_function(stub, &[buf, 0xffe]).await?;
+            assert_eq!(read_generic::<u8, _>(&core, buf)?, 0, "1100 must hand back an empty list");
+
+            let stub = core.make_svc_stub(SVC_CATEGORY_WIPIC, 0x7d1u32)?;
+            let err = core.run_function::<u32>(stub, &[0x11, 0x22, 0x33, 0x44]).await.unwrap_err();
+            let text = alloc::format!("{err}");
+            assert!(
+                text.contains("Unknown LGT WIPIC SVC id 2001 (r0=0x11 r1=0x22 r2=0x33 r3=0x44 lr=0x"),
+                "{text}"
+            );
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())

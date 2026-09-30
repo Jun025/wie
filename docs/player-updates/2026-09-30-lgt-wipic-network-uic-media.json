@@ -1,0 +1,15 @@
+{
+  "date": "2026-09-30",
+  "kind": "fix",
+  "titles": [
+    "3ff5948e235e86e9e6f490666b0389c05a5171aefd36729b73639be138875206",
+    "5dc5d7091c017d3801e32d62814706ccdf4a9f6e4e9cc92bd00ea525da7202a4",
+    "b7699c10dfd1992814d26294e32c1376820802532eb5f70ba959a71ebd31ea45",
+    "863b8ab6a21df2c05e0d9ad085a5068fdf37433940093efe289b6459b7c1e7e9",
+    "1cd151222bdea0367757304cde2c537374517d60e1f5708a6359bbad4d05faf5",
+    "8f7758fa43b6beca7b1ddf5d1b58bdf3e8caa52d39fdc6fb52c1e1f34a3b2910",
+    "87b04639cdfef6ccd65a34c71f20ee9e6321a551cad6c67de5545dabbb3da15a"
+  ],
+  "summary_ko": "온라인 기능, 이름 입력창, 음악 일시정지를 쓰는 순간 꺼지던 문제를 고쳤어요. 온라인은 연결 안 됨으로 안내돼요. 일부 게임은 더 진행한 뒤 다른 곳에서 아직 멈춰요.",
+  "pr": "https://github.com/Jun025/wie/pull/419"
+}
