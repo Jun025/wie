@@ -59,6 +59,7 @@ speed `n/a` 는 헤드리스가 «느림»을 판정하지 않는 값이다(부�
 - **전화번호 116종**(바이너리에 `PHONENUMBER` 문자열 · KTF 55 · LGT 58) 전·후 짝(같은 시각 30초 A 프로브): 다른 것 5 — 좋아진 4(`b2da04c55cd4` `517ed32c92d6` `287af341dac8` `484108f6c8de`) · 나빠 보인 1 `4a4d2ac046f7`(주소 4 읽기) → 짝 3회 재측 **전·후 모두 3/3 PASS** ⇒ 간헐, 퇴행 아님.
   `484108f6c8de` 는 전 «clean exit(22/27)» → 후 끝까지 PASS.
 - **DB 83종**(`openDataBase` 문자열 · KTF 76 · LGT 7) 전·후 짝: 다른 것 2 — 둘 다 좋아짐(`96dc32e781d3` `b2da04c55cd4`).
+- `7da00ecd4804`(대상 밖 · 1절): 후 전수 한 번에서 input ok → none. 짝 재측(`--only probe` · 같은 시각) 2회: 전 ok·ok / 후 none·ok — 후 1회의 벽은 주소 0 읽기(`08_OK`)로, 전 빌드도 `3c34efee` 전수 B 프로브에서 같은 주소 0 에 걸렸다 ⇒ 간헐 · 같은 계급. 이 타이틀 바이너리에는 `PHONENUMBER`·`openDataBase` 문자열이 없다.
 - **라이브 LGT 5종 · 가드 2종**: 후 전수 7종 모두 playable. speed 는 `49ade89578c5` slow → ok, `13d7e3c21856` `b475b6399684` ok → n/a(부하 속 헤드리스는 판정 안 함 · 계약상 unknown) — 속도 코드는 건드리지 않았다.
 
 ### 6. 되돌리면 red — 7 변이 전건
@@ -72,4 +73,4 @@ Java 번호 · C 번호 · 버킷 크기 선택 · 할당기 크기 분기 · DB
 러너 줄(엔진 변경): `draw_j2me` · `helloworld_ktf/lgt` · `keydraw_ktf/lgt --inject --expect-last-frame` · `text_j2me --timeout 5` 전부 PASS · rc=0(이 브랜치 release `wie_validate`).
 게임 파일명 유입: 이 회차가 **더한 줄**에는 0건(코퍼스 한글 stem × 추가 줄 · compat.json 제외). 도구 표기 BOUNDED 361쌍 · SUFFIX-ATTACHED 19쌍은 계약상 제목 목록인 compat.json 과 고친 파일에 **이미 있던** 주석이다.
 
-<!-- corpus-name-inflow v1 subjects=20 tree=7f98b4686073068d B=821/361 P=0/0 S=49/19 -->
+<!-- corpus-name-inflow v1 subjects=20 tree=d55cf5029dd2dd5f B=821/361 P=0/0 S=49/19 -->
