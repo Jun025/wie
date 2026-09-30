@@ -17,6 +17,9 @@ const INSERT: i32 = -1;
 const REPLACE: i32 = 0;
 const DELETE: i32 = 1;
 const MULTITAP_MS: i64 = 1000;
+// Korean · English upper · English lower · number: the four the handsets' mode indicator cycled.
+// ponytail: a count, not a measured table — nothing here reads which mode is which.
+const MODE_COUNT: i32 = 4;
 // TextComponent: CONSTRAINT_NUMBER = 1; PASSWORD and PHONENUMBER are digits too (javadoc).
 const NUMERIC_CONSTRAINTS: [i32; 3] = [1, 2, 5];
 const MULTITAP: [&str; 10] = [" ", ".,-", "ABC", "DEF", "GHI", "JKL", "MNO", "PQRS", "TUV", "WXYZ"];
@@ -34,6 +37,13 @@ impl InputMethodHandler {
                 // d448aee68157 dies on `getCurrentInputMode()I not found` (progress census 2026-09-30).
                 // The javadoc gives it the same meaning as getCurrentMode, so it reads the same field.
                 JavaMethodProto::new("getCurrentInputMode", "()I", Self::get_current_mode, MethodAccessFlags::PUBLIC),
+                // …and then on `changeCurrentModeToNext()V not found` (same census, after the row above).
+                JavaMethodProto::new(
+                    "changeCurrentModeToNext",
+                    "()V",
+                    Self::change_current_mode_to_next,
+                    MethodAccessFlags::PUBLIC,
+                ),
                 JavaMethodProto::new("hideSymbolCard", "()V", Self::hide_symbol_card, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("notifyKeyInput", "(II)Z", Self::notify_key_input, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new(
@@ -72,6 +82,16 @@ impl InputMethodHandler {
         jvm.put_field(&mut this, "mode", "I", mode).await?;
 
         Ok(true)
+    }
+
+    // Every mode types the same Latin multi-tap here (notifyKeyInput), so the order of modes is not
+    // observable beyond the number itself; it steps through MODE_COUNT values and wraps, which keeps
+    // getCurrentMode inside a range a title can index a label table with.
+    async fn change_current_mode_to_next(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lcdui.InputMethodHandler::changeCurrentModeToNext({this:?})");
+
+        let mode: i32 = jvm.get_field(&this, "mode", "I").await?;
+        jvm.put_field(&mut this, "mode", "I", (mode + 1).rem_euclid(MODE_COUNT)).await
     }
 
     async fn get_current_mode(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
@@ -260,6 +280,13 @@ mod tests {
                 .invoke_virtual(&handler, "org/kwis/msp/lcdui/InputMethodHandler", "getCurrentInputMode", "()I", ())
                 .await?;
             assert_eq!(mode, 3);
+            let _: () = jvm
+                .invoke_virtual(&handler, "org/kwis/msp/lcdui/InputMethodHandler", "changeCurrentModeToNext", "()V", ())
+                .await?;
+            let mode: i32 = jvm
+                .invoke_virtual(&handler, "org/kwis/msp/lcdui/InputMethodHandler", "getCurrentMode", "()I", ())
+                .await?;
+            assert_eq!(mode, 0, "wraps after the last mode");
 
             // No listener: the javadoc's false, and nothing done.
             let handler = jvm.new_class("org/kwis/msp/lcdui/InputMethodHandler", "(I)V", (0,)).await?;
