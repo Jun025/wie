@@ -26,6 +26,9 @@ const UPDATES = join(ROOT, 'docs/player-updates');
 export const STATUSES = ['playable', 'limited', 'not-yet'];
 export const AXES = ['boot', 'render', 'input', 'longplay', 'sound', 'speed'];
 export const AXIS_VALUES = ['ok', 'partial', 'no', 'unknown'];
+// Axes the shell does not know yet: carried when a census measured them, never required (the shell
+// importer checks AXES only and spreads the rest through). `progress` = the census's 30-min axis.
+export const EXTRA_AXES = ['progress'];
 export const PLATFORMS = ['KTF', 'SKT', 'LGT', 'J2ME'];
 export const KINDS = ['new-support', 'fix', 'improvement', 'sound', 'speed'];
 const HEX40 = /^[0-9a-f]{40}$/;
@@ -107,6 +110,7 @@ export function validateCompat(d) {
     if (!str(x.fileTitle)) e.push(`${at}: empty fileTitle (the file-derived name, kept for search)`);
     if (!STATUSES.includes(x.status)) e.push(`${at}: status not in ${STATUSES}`);
     for (const a of AXES) if (!AXIS_VALUES.includes(x.axes?.[a])) e.push(`${at}: axes.${a} not in ${AXIS_VALUES}`);
+    for (const a of EXTRA_AXES) if (x.axes && a in x.axes && !AXIS_VALUES.includes(x.axes[a])) e.push(`${at}: axes.${a} not in ${AXIS_VALUES}`);
     if (!Array.isArray(x.knownIssues_ko) || !x.knownIssues_ko.every(str)) e.push(`${at}: knownIssues_ko must be non-empty strings`);
     if (!Array.isArray(x.changes)) e.push(`${at}: changes must be an array`);
     else
@@ -156,12 +160,12 @@ export function validateBuiltUpdates(d) {
 }
 
 // Census axis vocabulary (scripts/playability-census.mjs judge()) -> contract vocabulary.
-const AXIS_MAP = { ok: 'ok', 'n/a': 'unknown', fail: 'no', none: 'no', uniform: 'no', error: 'no', silent: 'no', slow: 'no', stall: 'no' };
+const AXIS_MAP = { ok: 'ok', 'n/a': 'unknown', fail: 'no', none: 'no', uniform: 'no', error: 'no', silent: 'no', slow: 'no', stall: 'no', stuck: 'no' };
 export function fromCensus(c) {
   const entries = c.entries.map((x) => ({
     ...x,
     fileTitle: x.title.replace(/_+/g, ' ').replace(/\s+/g, ' ').trim(), // census titles are file names
-    axes: Object.fromEntries(AXES.map((a) => [a, AXIS_MAP[x.axes?.[a]] ?? `?${x.axes?.[a]}`])),
+    axes: Object.fromEntries([...AXES, ...EXTRA_AXES.filter((a) => a in (x.axes ?? {}))].map((a) => [a, AXIS_MAP[x.axes?.[a]] ?? `?${x.axes?.[a]}`])),
     changes: [],
   }));
   return { schema: 1, generatedAt: c.generatedAt, enginePin: c.enginePin, entries: retitle(entries) };
@@ -213,6 +217,7 @@ function selftest() {
     ['compat schema 2', { ...good, schema: 2 }, null],
     ['unknown status', { ...good, entries: [{ ...good.entries[0], status: 'boots' }] }, null],
     ['census axis value leaks through', { ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, boot: 'fail' } }] }, null],
+    ['census progress value leaks through', { ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, progress: 'stuck' } }] }, null],
     ['duplicate sha', { ...good, entries: [good.entries[0], good.entries[0]] }, null],
     ['short enginePin', { ...good, enginePin: 'abc' }, null],
     ['title keeps a bracket tag', { ...good, entries: [{ ...good.entries[0], title: '[큰화]t' }] }, null],
@@ -234,6 +239,9 @@ function selftest() {
   for (const [label, c, u] of cases) if (!errs(c, u).length) bad++, console.error(`selftest: NOT rejected — ${label}`);
   if (fromCensus({ ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, render: 'uniform', speed: 'n/a' } }] }).entries[0].axes.render !== 'no')
     bad++, console.error('selftest: census uniform must map to no');
+  const withProgress = (v) => fromCensus({ ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, ...v } }] }).entries[0].axes;
+  if (withProgress({ progress: 'stuck' }).progress !== 'no' || 'progress' in withProgress({}))
+    bad++, console.error('selftest: progress must map stuck to no, and stay absent when the census did not measure it');
   const { compat } = assemble(good, [['2026-09-27-x.json', upd]], () => 'd'.repeat(40), 'e'.repeat(40));
   if (compat.entries[0].changes[0]?.summary_ko !== upd.summary_ko) bad++, console.error('selftest: an update must reach the title it names');
   const shipped = { ...compat, entries: [{ ...compat.entries[0], changes: [{ ...compat.entries[0].changes[0], enginePin: '+}' }] }] };
