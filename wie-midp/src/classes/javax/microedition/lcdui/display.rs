@@ -972,15 +972,19 @@ impl Display {
             }
         }
 
-        // HACK: disable paint for clet apps, as they handle paint by themselves
+        // Clet apps present by themselves (`MC_grpFlushLcd`), so their Java image is not presented —
+        // unless the screen framebuffer changed: on the handset that buffer is LCD memory, and 11 KTF
+        // Clet titles draw into it and only `MC_grpRepaint` (docs/report/0361 · 0388). A title that
+        // flushes an off-screen buffer leaves it unchanged and is not repainted over.
         let disable_paint: bool = jvm.get_field(&this, "paintDisabled", "Z").await?;
-        if !disable_paint {
-            let screen_image: ClassInstanceRef<Image> = jvm.get_field(&this, "screenImage", "Ljavax/microedition/lcdui/Image;").await?;
-            if context.system().has_screen_compositor() {
-                let current = Image::image(jvm, &screen_image).await?;
-                let mut buffer = Image::image_buffer(jvm, &screen_image).await?;
-                context.system().compose_screen(&*current, &mut *buffer);
-            }
+        let screen_image: ClassInstanceRef<Image> = jvm.get_field(&this, "screenImage", "Ljavax/microedition/lcdui/Image;").await?;
+        let mut native_drawn = false;
+        if context.system().has_screen_compositor() {
+            let current = Image::image(jvm, &screen_image).await?;
+            let mut buffer = Image::image_buffer(jvm, &screen_image).await?;
+            native_drawn = context.system().compose_screen(&*current, &mut *buffer);
+        }
+        if !disable_paint || native_drawn {
             let image = Image::image(jvm, &screen_image).await?;
 
             let platform = context.system().platform();
