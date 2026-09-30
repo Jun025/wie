@@ -1,4 +1,5 @@
 use alloc::vec;
+use core::sync::atomic::{AtomicI32, Ordering};
 
 use bytemuck::{Pod, Zeroable};
 
@@ -89,15 +90,22 @@ impl MdaClip {
     }
 }
 
+static NEXT_CLIP_ID: AtomicI32 = AtomicI32::new(1);
+
 pub async fn clip_create(context: &mut dyn WIPICContext, ptr_type: WIPICWord, buf_size: WIPICWord, callback: WIPICWord) -> Result<WIPICWord> {
     tracing::debug!("MC_mdaClipCreate({ptr_type:#x}, {buf_size:#x}, {callback:#x})");
 
     let clip = context.alloc_raw(size_of::<MdaClip>() as u32)?;
     // The allocator does not zero, and `volume`/`loaded` are read before anything else writes them.
+    // `clip_id` must be nonzero: games test it before playing. 9d52de42e7f9's play routine is
+    // `if (!clip || !clip->clipId) return;` ahead of `MC_mdaPlay` (disassembled 2026-09-30), so with
+    // the zeroed id it loaded all six sounds and never played one. A small counter, not the address:
+    // an id is what a game may index a table with.
     write_generic(
         context,
         clip,
         MdaClip {
+            clip_id: NEXT_CLIP_ID.fetch_add(1, Ordering::Relaxed),
             volume: 100,
             ..Zeroable::zeroed()
         },
@@ -336,7 +344,9 @@ mod tests {
 
     use crate::context::{WIPICContext, test::TestContext};
 
-    use super::{clip_create, clip_get_volume, clip_put_data, clip_set_volume, get_volume, set_volume};
+    use wie_util::read_generic;
+
+    use super::{MdaClip, clip_create, clip_get_volume, clip_put_data, clip_set_volume, get_volume, set_volume};
 
     // The getter answers 100 before any set: 13 titles read it and set what it said. A clip with no sound yet must not reach handle 0, which is the
     // first clip anybody loaded.
@@ -359,5 +369,19 @@ mod tests {
         set_volume(&mut context, 60).await.unwrap();
         assert_eq!(get_volume(&mut context).await.unwrap(), 60);
         assert_eq!(context.system().audio().master_volume(), 0.6);
+    }
+
+    // The first word of MC_MdaClip is its id, and games read it: 9d52de42e7f9 returns from its play
+    // routine when `clipId == 0`, so a zeroed id loaded every sound and played none.
+    #[futures_test::test]
+    async fn created_clips_have_distinct_nonzero_ids_test() {
+        let mut context = TestContext::with_system(System::new(Box::new(TestPlatform::new()), "pid", "aid", DefaultTaskRunner));
+        let a = clip_create(&mut context, 0, 0, 0).await.unwrap();
+        let b = clip_create(&mut context, 0, 0, 0).await.unwrap();
+        let (a, b): (MdaClip, MdaClip) = (read_generic(&context, a).unwrap(), read_generic(&context, b).unwrap());
+
+        assert_ne!(a.clip_id, 0);
+        assert_ne!(b.clip_id, 0);
+        assert_ne!(a.clip_id, b.clip_id);
     }
 }

@@ -66,10 +66,11 @@ pub struct ScreenFramebufferSync {
 }
 
 impl ScreenFramebufferSync {
-    pub fn compose(&mut self, context: &mut dyn WIPICContext, current: &dyn Image, target: &mut dyn ImageBuffer) -> Result<()> {
+    /// Returns whether any native pixel went onto `target`.
+    pub fn compose(&mut self, context: &mut dyn WIPICContext, current: &dyn Image, target: &mut dyn ImageBuffer) -> Result<bool> {
         let handle: u32 = read_generic(context, SCREEN_FRAMEBUFFER_PTR)?;
         if handle == 0 {
-            return Ok(());
+            return Ok(false);
         }
 
         self.compose_framebuffer(context, WIPICIndirectPtr(handle), current, target)
@@ -81,7 +82,7 @@ impl ScreenFramebufferSync {
         handle: WIPICIndirectPtr,
         current: &dyn Image,
         target: &mut dyn ImageBuffer,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         let framebuffer = FrameBuffer(read_generic(context, context.data_ptr(handle)?)?);
         let native = framebuffer.image(context)?;
         let mut native_raw = native.raw().into_owned();
@@ -97,6 +98,7 @@ impl ScreenFramebufferSync {
         let width = nw.min(jw);
         let height = native.height().min(current.height()) as usize;
         let mut mirrored = false;
+        let mut drawn = false;
         for y in 0..height {
             let at_native = |x: usize| (y * nw + x) * nb..(y * nw + x + 1) * nb;
             let at_java = |x: usize| (y * jw + x) * jb..(y * jw + x + 1) * jb;
@@ -109,6 +111,7 @@ impl ScreenFramebufferSync {
                 if x > start {
                     let colors: Vec<Color> = (start..x).map(|x| native.get_pixel(x as _, y as _)).collect();
                     target.put_pixels(start as _, y as _, (x - start) as _, &colors);
+                    drawn = true;
                     continue;
                 }
 
@@ -131,7 +134,7 @@ impl ScreenFramebufferSync {
         self.native = native_raw;
         self.java = current.raw().into_owned();
 
-        Ok(())
+        Ok(drawn)
     }
 }
 
@@ -893,21 +896,22 @@ mod tests {
         };
 
         let mut spans = Spans::default();
-        sync.compose_framebuffer(&mut context, handle, &java, &mut spans)?;
+        assert!(sync.compose_framebuffer(&mut context, handle, &java, &mut spans)?);
         assert_eq!(spans.0, [(0, 0, 4, 0), (0, 1, 4, 0)]);
 
+        // the returned flag is what a Clet paint presents on: nothing native changed, nothing drawn
         let mut spans = Spans::default();
-        sync.compose_framebuffer(&mut context, handle, &java, &mut spans)?;
+        assert!(!sync.compose_framebuffer(&mut context, handle, &java, &mut spans)?);
         assert!(spans.0.is_empty());
 
         framebuffer.write(&mut context, bytemuck::cast_slice(&[0u16, red, red, 0, 0, 0, 0, red]))?;
-        sync.compose_framebuffer(&mut context, handle, &java, &mut spans)?;
+        assert!(sync.compose_framebuffer(&mut context, handle, &java, &mut spans)?);
         assert_eq!(spans.0, [(1, 0, 2, 0xff), (3, 1, 1, 0xff)]);
 
         // Java clears one pixel white: it reaches native, and nothing goes back to Java
         let mut spans = Spans::default();
         java.put_pixel(0, 1, white);
-        sync.compose_framebuffer(&mut context, handle, &java, &mut spans)?;
+        assert!(!sync.compose_framebuffer(&mut context, handle, &java, &mut spans)?);
         assert!(spans.0.is_empty());
         assert_eq!(native(&mut context)?[4], 0xffff);
 

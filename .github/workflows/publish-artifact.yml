@@ -34,6 +34,14 @@ on:
       - "scripts/build-soundfont-prelude.mjs"
       - "package-lock.json"
       - "licenses/**"
+      # Public data rides the same release (the "Build public data" step): a merge that touches only
+      # these — a docs/player-updates entry, a census import, a builder fix — must still cut a release,
+      # or it never reaches the shell (#417 sat unpublished for a day). NOT mirrored into
+      # engine-contract.yml's paths-filter on purpose: that filter gates the wasm contract checks, and
+      # these inputs are validated by its always-run `player-data.mjs` step instead.
+      - "scripts/player-data.mjs"
+      - "docs/player-data/**"
+      - "docs/player-updates/**"
       - ".github/workflows/publish-artifact.yml"
   workflow_dispatch:
 

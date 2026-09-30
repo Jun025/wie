@@ -1,7 +1,7 @@
 {
  "schema": 1,
- "generatedAt": "2026-09-29T12:21:52.464Z",
- "enginePin": "3c34efeedaea5e29857e80318d764fa18f655afb",
+ "generatedAt": "2026-09-30T08:52:32.000Z",
+ "enginePin": "bd2337ff020a2eb19d8f561a912c4991bb58ae36",
  "entries": [
   {
    "sha256": "6e5a1f88f0c0eedc6991293085060c811e487a701073a9c0e7fb1ed559065924",
@@ -50,13 +50,12 @@
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
+    "input": "ok",
     "longplay": "no",
     "sound": "ok",
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
    "changes": [],
@@ -75,7 +74,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -112,7 +111,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -233,18 +232,16 @@
    "platform": "KTF",
    "model": null,
    "title": "게임팩25",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "게임팩25"
   },
@@ -253,17 +250,17 @@
    "platform": "KTF",
    "model": null,
    "title": "겟앰프드",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
-    "speed": "unknown"
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "no",
+    "speed": "ok"
    },
    "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
+    "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
    "fileTitle": "겟앰프드"
@@ -339,7 +336,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "no",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "원래보다 조금 느리게 움직일 수 있어요."
@@ -412,13 +409,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "귀혼무사편"
   },
@@ -562,7 +557,7 @@
     "longplay": "ok",
     "sound": "no",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -581,12 +576,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "다이하드4"
   },
@@ -788,7 +781,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -807,7 +800,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -826,7 +819,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "ok"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -863,7 +856,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -882,7 +875,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "unknown",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -917,12 +910,11 @@
     "render": "ok",
     "input": "no",
     "longplay": "unknown",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
+    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
    ],
    "changes": [],
    "fileTitle": "kt 동전쌓기 에볼루션"
@@ -1054,7 +1046,7 @@
     "longplay": "ok",
     "sound": "no",
     "speed": "no",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요.",
@@ -1296,7 +1288,7 @@
     "longplay": "ok",
     "sound": "no",
     "speed": "unknown",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
@@ -1318,7 +1310,7 @@
     "longplay": "ok",
     "sound": "no",
     "speed": "unknown",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -1339,7 +1331,7 @@
     "longplay": "ok",
     "sound": "no",
     "speed": "unknown",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -1432,7 +1424,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -1451,7 +1443,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -1490,7 +1482,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -1527,7 +1519,7 @@
     "longplay": "ok",
     "sound": "no",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -1678,7 +1670,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -1993,7 +1985,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2012,7 +2004,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "unknown",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2126,7 +2118,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2143,12 +2135,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "버닝스톰"
   },
@@ -2202,7 +2192,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2296,7 +2286,7 @@
     "longplay": "ok",
     "sound": "no",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -2335,7 +2325,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "unknown",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2426,7 +2416,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2465,7 +2455,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "unknown",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2573,18 +2563,16 @@
    "platform": "KTF",
    "model": null,
    "title": "슈퍼리얼 테니스",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "슈퍼리얼 테니스"
   },
@@ -2753,7 +2741,7 @@
     "longplay": "ok",
     "sound": "no",
     "speed": "unknown",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -2794,7 +2782,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2811,12 +2799,11 @@
     "render": "ok",
     "input": "no",
     "longplay": "unknown",
-    "sound": "no",
+    "sound": "ok",
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
+    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
    ],
    "changes": [],
    "fileTitle": "알바 전설 편의점2"
@@ -2892,7 +2879,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2945,12 +2932,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "에픽크로니클2"
   },
@@ -2959,18 +2944,16 @@
    "platform": "KTF",
    "model": null,
    "title": "에픽크로니클PE",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "에픽크로니클PE"
   },
@@ -3024,7 +3007,7 @@
     "longplay": "ok",
     "sound": "no",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -3269,7 +3252,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -3456,7 +3439,7 @@
     "longplay": "ok",
     "sound": "no",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -3549,7 +3532,7 @@
     "longplay": "ok",
     "sound": "no",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -3708,7 +3691,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -3894,7 +3877,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -3954,7 +3937,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "unknown",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4027,7 +4010,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4046,7 +4029,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4216,7 +4199,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4305,12 +4288,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "크로이센1.04"
   },
@@ -4532,7 +4513,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4543,17 +4524,17 @@
    "platform": "KTF",
    "model": null,
    "title": "티어즈오브메탈",
-   "status": "not-yet",
+   "status": "limited",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "no",
+    "sound": "ok",
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
    "changes": [],
    "fileTitle": "티어즈오브메탈"
@@ -4591,7 +4572,7 @@
     "longplay": "ok",
     "sound": "no",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -4612,7 +4593,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4661,18 +4642,16 @@
    "platform": "KTF",
    "model": null,
    "title": "폴라폴리2007",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "폴라폴리2007"
   },
@@ -4709,7 +4688,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4728,7 +4707,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4747,7 +4726,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4804,12 +4783,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "피파7"
   },
@@ -4865,7 +4842,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4923,7 +4900,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -5063,18 +5040,16 @@
    "platform": "KTF",
    "model": null,
    "title": "sega미니게임6",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
     "boot": "ok",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "화면이 한 가지 색으로만 보여요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "sega미니게임6"
   },
@@ -5168,7 +5143,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -5185,12 +5160,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "검은방3"
   },
@@ -5299,7 +5272,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -5336,12 +5309,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "당구마스터2010"
   },
@@ -5470,7 +5441,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -5603,12 +5574,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "no",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
    "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
-    "소리가 나지 않을 수 있어요."
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
    "changes": [],
    "fileTitle": "리얼사커매니저2009"
@@ -5646,7 +5616,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -5778,7 +5748,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "ok"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6450,12 +6420,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "lgt 하얀섬"
   },
@@ -6472,7 +6440,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6509,7 +6477,7 @@
     "longplay": "ok",
     "sound": "no",
     "speed": "unknown",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -6530,7 +6498,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6549,7 +6517,7 @@
     "longplay": "ok",
     "sound": "no",
     "speed": "unknown",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -6687,7 +6655,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6766,7 +6734,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6821,7 +6789,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6895,7 +6863,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6934,7 +6902,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7009,7 +6977,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "unknown",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7028,7 +6996,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7047,7 +7015,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7138,7 +7106,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7175,7 +7143,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "unknown",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7194,7 +7162,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "unknown",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7285,7 +7253,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7340,7 +7308,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7416,7 +7384,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "unknown",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7473,7 +7441,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "unknown",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7564,7 +7532,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7583,7 +7551,7 @@
     "longplay": "ok",
     "sound": "no",
     "speed": "unknown",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -7604,7 +7572,7 @@
     "longplay": "ok",
     "sound": "no",
     "speed": "unknown",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
@@ -7687,7 +7655,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "unknown",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7722,12 +7690,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "영웅서기2"
   },
@@ -7928,7 +7894,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -8040,7 +8006,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -8059,7 +8025,7 @@
     "longplay": "ok",
     "sound": "no",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -8080,7 +8046,7 @@
     "longplay": "ok",
     "sound": "no",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -8122,7 +8088,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -8141,7 +8107,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "no"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],

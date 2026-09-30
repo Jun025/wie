@@ -1,0 +1,11 @@
+{
+  "date": "2026-09-30",
+  "kind": "fix",
+  "titles": [
+    "2b1ed0c8d061be349f7b8c95d836ee8e10732e0bf49e292b5d62e3b25d563748",
+    "4decaeed58b1d07547ff55edbd816392ca51c6f77e35783c55babae5f120e7cb",
+    "568c339a8c0761896f6f1991fc8f2bbebd7ff6ae64e9a4ba0f35c6a60f1cb7d2"
+  ],
+  "summary_ko": "켜는 도중이나 플레이 도중에 갑자기 꺼지던 게임 3종이 이제 끝까지 이어져요.",
+  "pr": "https://github.com/Jun025/wie/pull/423"
+}
