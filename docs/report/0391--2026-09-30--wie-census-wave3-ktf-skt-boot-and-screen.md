@@ -121,3 +121,4 @@
 - 로컬(이 브랜치 · 시험 추가 뒤): `cargo fmt --all -- --check` · `cargo clippy --all -- -D warnings`(stable · beta) · wasm32 clippy rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` **605/0** rc=0 · `npm run build:wasm` rc=0.
   - 첫 `cargo test --all` 은 rustc 내부 패닉(`rustc_codegen_ssa/src/back/lto.rs:56`)으로 컴파일 중에 죽었다. 이어서 증분 캐시가 깨졌다(`file-system error deleting outdated file`). `CARGO_INCREMENTAL=0` 으로 다시 돌려 통과했다 — 시험 실패가 아니다.
 - 러너 블록(`a184f768` 릴리스): `draw_j2me` · `helloworld_ktf` · `helloworld_lgt` · `text_j2me`(`--timeout 5`) PASS. `keydraw_ktf`·`keydraw_lgt` 는 기본 `--max-ticks` 에서 `UNMEASURED`(`stop: max-ticks` · load1 100~150) — **전 빌드 `67c3f5d8` 도 같다**. `--max-ticks 2000000000` 으로 둘 다 PASS · 27/27 · `last_frame_content true` · rc=0(전 빌드도 같다).
+- 유입(`node scripts/corpus-name-inflow.mjs`): BOUNDED 336쌍 + SUFFIX-ATTACHED 15쌍. `compat.json` 밖의 일치는 이 PR 이 건드린 파일에 main 부터 있던 주석이다 — 이 PR 이 더한 코드 줄의 한글은 0줄이다. `compat.json` 은 계약상 제목 목록이고 main 대비 새 `"title"` 줄은 0 이다.
