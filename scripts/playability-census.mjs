@@ -53,6 +53,7 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { cpus, loadavg } from 'node:os';
+import { inflateSync } from 'node:zlib';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -281,11 +282,16 @@ async function longplay(t) {
 // ── progress: does the title keep moving FORWARD, not merely stay alive ─────
 // `--only progress` runs the progress policy (PROGRESS_KEYS, or a per-title recipe) for --progress
 // seconds with a shot every PROGRESS_SHOT s, into `<as>.json` (`--as P`, `--as P2` for the pair
-// re-measure). The measurement is the curve of NEW screens: `uniq[i]` = distinct frames seen by shot
-// i, and `stall` = seconds from the last never-seen frame to the end of the run.
-//   ponytail: a frame is its exact PNG hash, so a clock or an animated background reads as progress
-//   forever (a false `ok`), and a cursor blinking on one menu is correctly no progress. A low-res
-//   fingerprint (decode + downsample) is the upgrade if the false `ok`s show up in the frames.
+// re-measure). The measurement is the curve of NEW screens and `stall` = seconds from the last new
+// screen to the end of the run. A screen is a 16×16 grid of mean luminance (fingerprint()), and a
+// shot is new when it differs from EVERY screen seen so far in >= 8 cells by > 32 levels.
+// Why not the PNG hash (the first version): measured on this run, a slot picker with a glowing
+// cursor produced 27 distinct hashes in 30 min and a text-entry screen cycling letters 76, both read
+// `ok` while going nowhere. On the same 6 titles 32/8 calls those two and the frozen menu stuck and
+// keeps the two that play (new screens until 1300 s and 430 s of their runs) ok; 24/3 still let the
+// slot picker through.
+//   ponytail: a board game whose cursor walks the board without a move reads `ok` (a chess title,
+//   measured) — screen novelty cannot tell a cursor from play. Per-title recipes are the answer.
 // `--titles <file>` limits the run to listed titles, one per line: `<sha12> [secs] [keys file]`.
 const titleList = () => {
   if (!opt.titles) return null;
@@ -315,23 +321,73 @@ async function progress(t, spec = {}) {
   // Keep the timed frames (the curve's evidence, and the stuck frame to look at); drop per-key ones.
   for (const n of all) if (!timed.includes(n)) rmSync(join(shots, n));
   r.shots = timed.map((n) => sha256(readFileSync(join(shots, n))));
+  r.fp = timed.map((n) => fingerprint(readFileSync(join(shots, n))).map(Math.round));
   r.shot_names = timed;
   r.secs = secs;
   r.recipe = spec.keys ? basename(spec.keys) : null;
   writeFileSync(f, JSON.stringify(r));
 }
+// A run recorded before `fp` existed is fingerprinted from its kept frames.
+function readProgress(d, stem) {
+  const r = read(join(d, `${stem}.json`));
+  if (r && !r.fp) r.fp = r.shot_names.map((n) => fingerprint(readFileSync(join(d, stem, n))).map(Math.round));
+  return r;
+}
 // Seconds of a run that brought no never-seen frame. A run that ended early (the guest quit and
 // used up its relaunches) counts the missing time as stalled, which is what a player would see.
 function progressCurve(r) {
-  const seen = new Set();
+  const seen = [];
   const uniq = [];
   let lastNew = 0;
-  r.shots.forEach((h, i) => {
-    if (!seen.has(h)) lastNew = (i + 1) * PROGRESS_SHOT;
-    seen.add(h);
-    uniq.push(seen.size);
+  r.fp.forEach((f, i) => {
+    if (seen.every((s) => s.filter((v, k) => Math.abs(v - f[k]) > 32).length >= 8)) {
+      seen.push(f);
+      lastNew = (i + 1) * PROGRESS_SHOT;
+    }
+    uniq.push(seen.length);
   });
-  return { uniq, lastNew, stall: r.secs - lastNew, distinct: seen.size };
+  return { uniq, lastNew, stall: r.secs - lastNew, distinct: seen.length };
+}
+// 16×16 mean luminance of an 8-bit RGBA, non-interlaced PNG — what wie_validate's --shotdir writes
+// (`png::ColorType::Rgba`, `BitDepth::Eight`). Anything else throws rather than guessing.
+function fingerprint(png, G = 16) {
+  const w = png.readUInt32BE(16);
+  const h = png.readUInt32BE(20);
+  if (png[24] !== 8 || png[25] !== 6 || png[28] !== 0) throw new Error('fingerprint: not an 8-bit RGBA non-interlaced PNG');
+  const idat = [];
+  for (let p = 8; p < png.length; ) {
+    const n = png.readUInt32BE(p);
+    if (png.toString('latin1', p + 4, p + 8) === 'IDAT') idat.push(png.subarray(p + 8, p + 8 + n));
+    p += 12 + n;
+  }
+  const raw = inflateSync(Buffer.concat(idat));
+  const stride = w * 4;
+  const px = Buffer.alloc(h * stride);
+  for (let y = 0; y < h; y++) {
+    const f = raw[y * (stride + 1)];
+    const src = y * (stride + 1) + 1;
+    const dst = y * stride;
+    for (let x = 0; x < stride; x++) {
+      const a = x >= 4 ? px[dst + x - 4] : 0;
+      const b = y ? px[dst - stride + x] : 0;
+      const c = x >= 4 && y ? px[dst - stride + x - 4] : 0;
+      const pa = Math.abs(b - c);
+      const pb = Math.abs(a - c);
+      const pc = Math.abs(a + b - 2 * c);
+      const pred = [0, a, b, (a + b) >> 1, pa <= pb && pa <= pc ? a : pb <= pc ? b : c][f];
+      px[dst + x] = (raw[src + x] + pred) & 255;
+    }
+  }
+  const sum = new Float64Array(G * G);
+  const cnt = new Float64Array(G * G);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const i = y * stride + x * 4;
+      const k = Math.floor((y * G) / h) * G + Math.floor((x * G) / w);
+      sum[k] += 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+      cnt[k]++;
+    }
+  return Array.from(sum, (v, k) => v / cnt[k]);
 }
 // ok | stuck | error for one run. The stall line is a third of the run (10 min of 30), floored at 3 min.
 function progressRun(r) {
@@ -405,8 +461,8 @@ function judge(sha) {
   const B = read(join(d, 'B.json'));
   const L = read(join(d, 'L.json'));
   const S = read(join(d, 'S.json'));
-  const P = read(join(d, 'P.json'));
-  const P2 = read(join(d, 'P2.json'));
+  const P = readProgress(d, 'P');
+  const P2 = readProgress(d, 'P2');
   if (!A || !B) return null;
   const painted = (A.paints ?? 0) + (B.paints ?? 0) > 0;
   const content = A.content || B.content;
@@ -562,10 +618,14 @@ if (cmd === 'selftest') {
   ];
   // Progress: 60 shots over 600 s. New frames until 400 s, then the same two alternating (a blink).
   {
-    const run = (lastNewAt, extra = {}) => ({ result: 'UNMEASURED', secs: 600, ...extra, shots: Array.from({ length: 60 }, (_, i) => ((i + 1) * PROGRESS_SHOT <= lastNewAt ? `f${i}` : `blink${i % 2}`)) });
+    // A screen = one cell-block lit per index; the blink toggles 4 cells (< 8), so it is never new.
+    const block = (k, b) => Math.floor(k / 8) === b % 32;
+    const screen = (i) => Array.from({ length: 256 }, (_, k) => (block(k, i) || (i >= 32 && block(k, i + 16)) ? 255 : 0));
+    const blinkOf = (i) => Array.from({ length: 256 }, (_, k) => (k < 4 && i % 2 ? 100 : 0));
+    const run = (lastNewAt, extra = {}) => ({ result: 'UNMEASURED', secs: 600, ...extra, fp: Array.from({ length: 60 }, (_, i) => ((i + 1) * PROGRESS_SHOT <= lastNewAt ? screen(i) : blinkOf(i))) });
     const blink = run(400);
     cases.push(
-      ['a blink after the last new frame is a stall', progressCurve(blink).stall === 600 - 420 && progressCurve(blink).distinct === 42],
+      ['a blink after the last new frame is a stall', progressCurve(blink).stall === 600 - 410 && progressCurve(blink).distinct === 41],
       ['a stall under a third of the run is ok', progressRun(run(500)) === 'ok'],
       ['a stall of a third is stuck', progressRun(run(380)) === 'stuck'],
       ['a crash is error, whatever the curve', progressRun(run(600, { result: 'FAIL' })) === 'error'],
