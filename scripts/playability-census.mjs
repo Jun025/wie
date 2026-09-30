@@ -137,7 +137,10 @@ for (let i = 0; i < rest.length; i++) {
 {
   const ncpu = cpus().length;
   const want = opt.jobs;
-  opt.jobs = jobsFor(want, ncpu);
+  // A progress run holds a core for 10–30 minutes, not 30 s: default to a quarter of the cores so a
+  // bare `--only progress` leaves room for the other lanes (2026-09-30: 8–10 jobs starved a sibling
+  // lane's host-load gate for an hour).
+  opt.jobs = want === undefined && opt.only === 'progress' ? Math.max(1, Math.floor(ncpu / 4)) : jobsFor(want, ncpu);
   if (want !== undefined && Number(want) > ncpu) console.error(`--jobs ${want} > ${ncpu} cores — capped to ${opt.jobs}`);
 }
 opt.secs = Number(opt.secs);
@@ -402,8 +405,9 @@ function progressAxis(P, P2) {
   const a = progressRun(P);
   if (!a) return 'n/a';
   if (a !== 'stuck') return a;
+  // Only a pair that actually moved overrules the stall; a pair that crashed or is missing proves nothing.
   const b = progressRun(P2);
-  return b === null ? 'n/a' : b === a ? a : 'ok';
+  return b === 'ok' ? 'ok' : b === 'stuck' ? 'stuck' : 'n/a';
 }
 
 async function pool(items, jobs, fn) {
@@ -642,6 +646,7 @@ if (cmd === 'selftest') {
       ['a crash is error, whatever the curve', progressRun(run(600, { result: 'FAIL' })) === 'error'],
       ['stuck needs its pair', progressAxis(run(100), null) === 'n/a' && progressAxis(run(100), run(100)) === 'stuck'],
       ['a pair that moved overrules one slow run', progressAxis(run(100), run(600)) === 'ok'],
+      ['a pair that crashed confirms nothing', progressAxis(run(100), run(100, { result: 'FAIL' })) === 'n/a'],
       ['ok and error need no pair', progressAxis(run(600), null) === 'ok' && progressAxis(run(600, { result: 'FAIL' }), null) === 'error'],
       ['not measured is n/a', progressAxis(null, null) === 'n/a'],
     );

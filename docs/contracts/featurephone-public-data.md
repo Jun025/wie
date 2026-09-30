@@ -49,15 +49,15 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
 | sound | 이벤트가 든 재생이 엔진 → 싱크까지 왔다 | 30초 안에 한 번도 없다 | 부팅 안 됨 |
 | speed | 늦음 비율 ≥ 0.9(헤드리스 하한, 또는 브라우저 2회가 서로 10% 안) | 브라우저 2회가 서로 10% 안이고 < 0.9 | 그 밖 — 헤드리스 하나로는 «느림»을 판정하지 않는다(부하 속 측정은 하한) |
 
-| progress(선택) | 진도 정책 키로 N분 조작하는 동안 마지막 1/3 안에 새 화면(16×16 휘도 지문)이 나왔다 | 마지막 1/3 동안 새 화면 0 — 짝 재측 2회가 같을 때만 | 재지 않았다(대부분) |
+| progress(선택 · **공개 값 `ok`·`stuck`**) | `ok`: 진도 정책 키로 N분 조작하는 동안 마지막 1/3 안에 새 화면(16×16 휘도 지문)이 나왔다 | `stuck`: 마지막 1/3 동안 새 화면 0 — 짝 재측 2회가 같을 때만(실행 FAIL 도 `stuck`) | 키 없음 — 재지 않았다(대부분) |
 
 등급 = `playable`: boot·render·input·longplay 넷 다 `ok` · `limited`: boot·render 만 `ok` · `not-yet`: 그 밖.
 ★`playable` 은 «키를 눌러 화면이 바뀌고 10분 조작에서 안 멈췄다»까지다 — 사람이 끝까지 해 본 것이 아니다.
 ★측정 안 한 축은 `unknown` 이다. 추측으로 올리지 않는다.
 
 가져오기(`player-data.mjs import`)가 전수 조사의 축 어휘를 계약 어휘로 바꾼다:
-`ok→ok` · `n/a→unknown` · `fail`·`none`·`uniform`·`error`·`silent`·`stuck`→`no`.
-`progress` 는 **선택 축**이다 — 전수 조사가 잰 행에만 실리고, 셸 가져오기는 여섯 축만 검사하며 나머지 키는 그대로 통과시킨다(otterpebble `compat-import.mjs` 의 `...x` · `compat.tsx` 는 고정 축 목록만 그린다). 등급(`status`)에는 넣지 않았다. `partial` 은 지금 아무 측정도 내지 않는다.
+`ok→ok` · `n/a→unknown` · `fail`·`none`·`uniform`·`error`·`silent`→`no`(여섯 축). progress 만 `ok→ok` · `stuck`·`error`→`stuck` · `n/a`→키 없음.
+`progress` 는 **선택 축**이다 — 전수 조사가 잰 행에만 실리고(`n/a` 면 키 없음), 셸 가져오기는 여섯 축만 검사하며 나머지 키는 그대로 통과시킨다(otterpebble `compat-import.mjs` 의 `...x`). ★값 어휘가 여섯 축과 **다르다** — 셸 `PROGRESS_UI`(otterpebble `lib/compat.ts` · #1244)는 `ok`·`stuck` 만 그리고 모르는 값은 칸을 숨기므로, `no` 로 실으면 막힌 행만 사라져 «좋은 쪽만 보이는» 표시가 된다. 그래서 `stuck` 을 그대로 싣는다(`scripts/player-data.mjs` 의 `EXTRA_AXIS_VALUES`). 레시피(제목별 키)로 잰 결과는 싣지 않는다 — 이 축의 정의는 «정책 키». 등급(`status`)에는 넣지 않았다. `partial` 은 지금 아무 측정도 내지 않는다.
 
 ## 2. `updates.json` — 한 항목 한 파일
 

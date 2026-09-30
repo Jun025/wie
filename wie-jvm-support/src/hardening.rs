@@ -452,7 +452,7 @@ mod tests {
 
 #[cfg(test)]
 mod reader_read_tests {
-    use alloc::{boxed::Box, vec::Vec};
+    use alloc::{boxed::Box, vec, vec::Vec};
 
     use jvm::{Array, ClassInstanceRef, runtime::JavaLangString};
 
@@ -461,8 +461,8 @@ mod reader_read_tests {
 
     /// One `read(char[], 0, n)` over a whole resource returns the whole resource — the call
     /// 1b107b96bf4e (LGT) makes on a 759-byte text file. Upstream returns 6 of 759 and
-    /// this fails with `left: 6`. EUC-KR multibyte in the middle, so a chunk boundary that
-    /// splits a character is crossed too; then the reader is drained and says so with -1.
+    /// this fails with `left: 6`. The reader is then drained and says so with -1. (Its requests
+    /// end on line boundaries, so no character is split here — that is the next test's job.)
     #[test]
     fn one_read_fills_the_buffer_from_a_resource_stream() -> Result<()> {
         run_jvm_test(Box::new([]), |jvm| async move {
@@ -501,6 +501,52 @@ mod reader_read_tests {
 
             let eof: i32 = jvm.invoke_virtual(&reader, "java/io/Reader", "read", "([CII)I", (chars, 0, 10)).await?;
             assert_eq!(eof, -1);
+
+            Ok(())
+        })
+    }
+
+    /// A two-byte EUC-KR character split across two requests comes back whole. One ASCII byte in
+    /// front puts every 2-char request's byte boundary INSIDE a Hangul syllable (x | B0 A1 | …),
+    /// so the lead byte has to be carried to the next request. Without the carry
+    /// (`complete_prefix` bypassed) the lead is decoded alone and this reads U+FFFD.
+    #[test]
+    fn a_character_split_across_requests_is_carried_whole() -> Result<()> {
+        run_jvm_test(Box::new([]), |jvm| async move {
+            let mut text = vec![b'x'];
+            for _ in 0..8 {
+                text.extend_from_slice(&[0xb0, 0xa1, 0xb3, 0xaa]); // «가나» in EUC-KR
+            }
+
+            let mut bytes = jvm.instantiate_array("B", text.len()).await?;
+            jvm.store_array(&mut bytes, 0, text.iter().map(|&b| b as i8).collect::<Vec<_>>()).await?;
+            let stream = jvm.new_class("java/io/ByteArrayInputStream", "([B)V", (bytes,)).await?;
+            let charset = JavaLangString::from_rust_string(&jvm, "EUC-KR").await?;
+            let reader = jvm
+                .new_class(
+                    "java/io/InputStreamReader",
+                    "(Ljava/io/InputStream;Ljava/lang/String;)V",
+                    (stream, charset),
+                )
+                .await?;
+
+            let chars: ClassInstanceRef<Array<u16>> = jvm.instantiate_array("C", 2).await?.into();
+            let mut got = Vec::new();
+            loop {
+                let read: i32 = jvm
+                    .invoke_virtual(&reader, "java/io/Reader", "read", "([CII)I", (chars.clone(), 0, 2))
+                    .await?;
+                if read < 0 {
+                    break;
+                }
+                assert!(read > 0, "a read of 2 chars returned 0 before the end");
+                got.extend(jvm.load_array::<u16>(&chars, 0, read as usize).await?);
+            }
+            let want: Vec<u16> = "x가나가나가나가나가나가나가나가나".encode_utf16().collect();
+            assert_eq!(
+                alloc::string::String::from_utf16_lossy(&got),
+                alloc::string::String::from_utf16_lossy(&want)
+            );
 
             Ok(())
         })

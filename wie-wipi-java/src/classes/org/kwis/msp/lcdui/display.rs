@@ -615,7 +615,10 @@ mod tests {
     }
 
     // callSerially(r, timeout) used to drop `r`; 5d3ba49eccf7 never left its title screen. Now `r`
-    // reaches the event queue once `timeout` has passed — and not before.
+    // reaches the event queue once `timeout` has passed — and not before. The test clock is
+    // virtual (TestPlatform steps 8 ms per read), so «not before» is shown against a control: an
+    // untimed-length call (timeout 0) and a far one (timeout 10 min) go in together; when the first
+    // has landed, the far one must still be out. Dropping the wait lands both at once.
     #[test]
     fn timed_call_serially_queues_the_runnable_after_the_timeout() -> Result<()> {
         run_jvm_test_with_system(
@@ -627,25 +630,35 @@ mod tests {
                 let display = jvm
                     .invoke_static("org/kwis/msp/lcdui/Display", "getDefaultDisplay", "()Lorg/kwis/msp/lcdui/Display;", ())
                     .await?;
-                let runnable = jvm.new_class("java/lang/Thread", "()V", ()).await?;
                 let before = queued(&jvm).await?;
-                let _: () = jvm
-                    .invoke_virtual(
-                        &display,
-                        "org/kwis/msp/lcdui/Display",
-                        "callSerially",
-                        "(Ljava/lang/Runnable;I)V",
-                        (runnable, 50),
-                    )
-                    .await?;
-                assert_eq!(queued(&jvm).await?, before, "queued before its timeout");
+                for timeout in [600_000, 0] {
+                    let runnable = jvm.new_class("java/lang/Thread", "()V", ()).await?;
+                    let _: () = jvm
+                        .invoke_virtual(
+                            &display,
+                            "org/kwis/msp/lcdui/Display",
+                            "callSerially",
+                            "(Ljava/lang/Runnable;I)V",
+                            (runnable, timeout),
+                        )
+                        .await?;
+                }
+                assert_eq!(queued(&jvm).await?, before, "queued on the caller's thread");
                 for _ in 0..200 {
                     system.sleep(1).await;
                     if queued(&jvm).await? > before {
                         break;
                     }
                 }
-                assert_eq!(queued(&jvm).await?, before + 1);
+                // Give the far one the same chance again: it must still be waiting.
+                for _ in 0..20 {
+                    system.sleep(1).await;
+                }
+                assert_eq!(
+                    queued(&jvm).await?,
+                    before + 1,
+                    "the 0 ms runnable only — the 10 min one is still waiting"
+                );
 
                 Ok(())
             },

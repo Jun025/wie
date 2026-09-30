@@ -112,6 +112,13 @@ impl InputMethodHandler {
     // the next, CLR deletes. Each change goes to the listener's `notifyTextChanged(chars, len, pMode)`
     // (pMode insert -1 / replace 0 / delete 1 — javadoc). Numeric constraints insert the digit.
     //
+    // Argument order is (keyCode, type), not the (type, key) the stub was declared with: the javadoc
+    // says `notifyKeyInput(int keyCode, int type)` with type = EventQueue.KEY_PRESSED/RELEASED
+    // (docs/reference/AromaWIPI_javadoc.zip, org/kwis/msp/lcdui/InputMethodHandler.html), and a KTF
+    // title's calls log as (53, 1) — '5' pressed (docs/report/0393 §4). A delete passes len 1 over a
+    // one-slot array holding 0: the javadoc gives `len` as «처리할 문자의 갯수» and pMode 1 as delete,
+    // so the count is what a listener acts on; there is no character to hand over.
+    //
     // Why it exists: the stub consumed nothing and never called the listener, so a title that asks
     // for a name through this handler could never get past the prompt — a KTF title's shop-name screen
     // answered every key with «at least 1 character» for 30 minutes (1e43e2e0055f, progress census

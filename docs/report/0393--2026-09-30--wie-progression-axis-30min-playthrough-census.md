@@ -177,6 +177,7 @@
 
 **«되돌리면 red»**: 네 수정 모두 단위 시험이 있다. 수정을 빼면 각각 실패한다(실측).
 - `reader_read_tests::one_read_fills_the_buffer_from_a_resource_stream` — 핀 본문이면 540 대신 8을 돌려준다.
+- `reader_read_tests::a_character_split_across_requests_is_carried_whole`(게이트② F4 로 추가) — 앞에 1바이트를 덧대 2자 요청의 경계가 늘 한글 음절 가운데 걸린다. 보류를 끄면(`complete_prefix` 우회) `x�〕�가…` 로 red 다.
 - `input_method_handler::tests::keys_reach_the_listener_as_text`
 - `display::tests::timed_call_serially_queues_the_runnable_after_the_timeout` — stub 이면 큐가 늘지 않는다.
 - ABI 두 행: `abi_rows_cover_the_indexes_titles_actually_dispatch_on` 목록에 추가했다(빈 슬롯이면 panic).
@@ -200,10 +201,10 @@
 
 ### 6. compat.json · 셸
 
-- `axes.progress` 는 **선택 축**으로 넣었다(`scripts/player-data.mjs` 의 `EXTRA_AXES`). 잰 행에만 싣는다. 값은 `stuck→no`, `ok→ok`, `n/a→unknown` 이다. 없는 키는 «재지 않음»이다.
-- 셸(otterpebble `apps/featurephone`)은 **바꿀 것이 없다**(origin/main 실측). 가져오기(`scripts/compat-import.mjs`)는 여섯 축만 검사하고 나머지 키는 `...x` 로 그대로 넘긴다. 화면(`app/compat.tsx`)은 `AXIS_LABEL` 고정 목록만 그린다. `Axis` 타입(`lib/compat.ts`)도 여섯이라 `progress` 는 보이지 않는다.
+- `axes.progress` 는 **선택 축**으로 넣었다(`scripts/player-data.mjs` 의 `EXTRA_AXES`). 잰 행에만 싣는다. ★**공개 값은 `ok`·`stuck`** 이다(`EXTRA_AXIS_VALUES` · 계약 문서 progress 행). census `error` 도 `stuck` 으로 싣고, `n/a` 는 키를 싣지 않는다. 여섯 축의 `no`·`unknown` 어휘는 쓰지 않는다.
+- ★**어휘를 바꾼 이유(게이트② F3)**: 첫 판은 `stuck→no` 로 실었다. 그런데 셸 otterpebble main(#1244 · 6e9ba983)의 `PROGRESS_UI` 는 `ok`·`stuck` 만 그리고, 모르는 값이면 칸을 숨긴다(`progressOf`). 그대로 배포됐다면 **막힌 행은 전부 안 보이고 «계속 진행» 행만 보였을 것이다.** 좋은 쪽만 보이는 편향이다. 셸 가져오기(`compat-import.mjs`)는 여섯 축만 검사하므로 `stuck` 값을 그대로 통과시킨다.
 - `status` 규칙은 **바꾸지 않았다**. 제안(운영자 문안 결정): 확정 `stuck` 을 `limited` 로 내리지 **말 것**. 확정 `stuck` 의 다수가 ⒜(범용 정책의 한계)와 ⒟(측정 한계)다. 게임이 멈춘 것이 아니다. 내린다면 ⒝·⒞ 로 분류된 것만, 그리고 `knownIssues_ko` 문장과 함께 내려야 한다.
-- `docs/player-data/compat.json` 갱신 방법: 이 회차에 잰 102행에만 `axes.progress` 를 넣었다. 값은 P/P2(`f44c6bcd` 기준 · 수정 전) 판정이고, 이 브랜치 머리(수정 포함)로 잰 F 가 `ok` 이면 F 를 쓴다(레시피 2종). 결과는 `ok` 22 · `no` 80 이다. 셸이 이 키를 그리지 않는다는 것은 §6 첫 항목에 적었다. 나머지 행·`enginePin`·`status` 는 그대로다.
+- `docs/player-data/compat.json` 갱신 방법: 이 회차에 잰 102행에만 `axes.progress` 를 넣었다. 값은 P/P2(`f44c6bcd` 기준 · 수정 전) 판정 **그대로**다. ★공개 분포는 **`ok` 20 · `stuck` 82** 로, §2 표의 진도 축과 같다. 첫 판은 레시피 F 2종을 `ok` 로 덮어 22/80 이었다. 레시피는 «정책 키»라는 축 정의 밖이라 덮지 않는다(F8). origin/main 병합 뒤 main 의 compat.json 위에 같은 102행을 다시 적용했다(#423·#421 착지분 보존). 나머지 행·`enginePin`·`status` 는 그대로다.
 
 ### 7. 퇴행 확인
 
@@ -227,4 +228,19 @@
 
 `node scripts/corpus-name-inflow.mjs --corpus <game_lab>` 결과(15파일): 유입 360쌍(BOUNDED) · 판단 필요 19쌍(SUFFIX-ATTACHED). **이 diff 가 새로 들인 이름은 0**이다. 두 바구니 모두 이 diff 가 건드린 파일에 **원래 있던** 이름이다 — `docs/player-data/compat.json` 의 공개 제목(이 회차는 `progress` 키만 더했다), `lgt_java_abi.toml`·`jvm_support.rs`·`hardening.rs` 의 기존 주석. 새로 쓴 주석·문서·소식은 sha12 만 쓴다(`git diff origin/main` 의 `+` 줄에서 3자 이상 한글 연속은 메뉴 문구 «게임시작» 1건뿐).
 
-<!-- corpus-name-inflow v1 subjects=15 tree=7999e9474def7f51 B=821/360 P=0/0 S=49/19 -->
+### 10. 게이트② 반려 처분(-fix 회차)
+
+| # | 처분 |
+|---|---|
+| F1 main 충돌 | `git merge origin/main`(upstream 동기 repo라 rebase 는 하지 않는다). compat.json 은 main 쪽을 받고 102행 `progress` 를 `runs.jsonl` 판정으로 다시 적용했다 — 102행 · main 착지분 보존 |
+| F2 연번 | 0390 → **0393**(`--next-serial`). AGENTS.md·worklog 참조를 갱신했다 |
+| F3 어휘 | 공개 값 `ok`·`stuck`(§6). 분포 ok 20 · stuck 82 |
+| F4 경계 시험 | 위 §4 새 시험 · 개악 red |
+| F5 짝이 FAIL | `progressAxis` 는 짝이 실제로 움직였을 때만 `ok`, FAIL/없음이면 `n/a` 다. selftest 1줄을 더했다 |
+| F6 재생성 | import(`fromCensus`)가 `n/a` 면 키를 싣지 않는다. selftest 가 `progress: 'n/a'` 입력을 본다 |
+| F7 timeout 전 | 0 ms · 10분 두 호출을 같이 넣고, 앞엣것이 들어간 뒤에도 뒤엣것은 밖인지 본다. sleep 삭제·stub 복귀 둘 다 red(테스트 시계는 읽을 때마다 8 ms 가는 가상 시계라 «20 ms 뒤»는 구별력이 없었다) |
+| F8 22/80 | 레시피로 덮지 않는다 → 20/82(§6) |
+| F9 인자 순서 | 주석에 javadoc 경로와 측정 로그 `(53, 1)` 을 달았다. delete 의 `len=1` 은 javadoc «처리할 문자의 갯수»와 대조했다 |
+| F10 0 반환 | **안 고쳤다** — `InputStream.read(b,off,len>0)` 계약은 1바이트 이상 또는 -1 이라 0 은 깨진 스트림에서만 난다. 거기서 다시 돌면 무한 루프가 되므로 돌려받은 값을 그대로 둔다 |
+| F11 동시 실행 | `--only progress` 의 기본 `--jobs` 를 ncpu/4 로 내렸다(명시값은 종전대로 ncpu 상한) |
+
