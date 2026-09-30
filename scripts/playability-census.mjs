@@ -292,7 +292,7 @@ async function longplay(t) {
 // slot picker through.
 //   ponytail: a board game whose cursor walks the board without a move reads `ok` (a chess title,
 //   measured) — screen novelty cannot tell a cursor from play. Per-title recipes are the answer.
-// `--titles <file>` limits the run to listed titles, one per line: `<sha12> [secs] [keys file]`.
+// `--titles <file>` limits the run to listed titles, one per line: `<sha12> [secs] [recipe keys file]`.
 const titleList = () => {
   if (!opt.titles) return null;
   const m = new Map();
@@ -312,8 +312,8 @@ async function progress(t, spec = {}) {
   rmSync(shots, { recursive: true, force: true });
   mkdirSync(shots, { recursive: true });
   const keys = join(d, `${stem}.keys`);
-  const script = spec.keys ? readFileSync(spec.keys, 'utf8') : PROGRESS_KEYS;
-  writeFileSync(keys, Array(Math.ceil(secs / 25)).fill(script).join('\n'));
+  // A recipe is a PREFIX (the path to where play starts — an ⒜ unlock), then the policy as usual.
+  writeFileSync(keys, [spec.keys ? readFileSync(spec.keys, 'utf8') : '', ...Array(Math.ceil(secs / 25)).fill(PROGRESS_KEYS)].join('\n'));
   const args = ['--inject', '--keys', keys, '--keep-timeout', '--timeout', String(secs), '--max-ticks', '100000000000', '--shotdir', shots, '--shot-every', String(PROGRESS_SHOT), '--relaunch', '3', t.path];
   const r = await validate(args, secs + 300, join(d, `${stem}.stderr`));
   const all = readdirSync(shots).filter((n) => n.endsWith('.png'));
