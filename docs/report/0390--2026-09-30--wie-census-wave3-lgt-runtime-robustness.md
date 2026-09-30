@@ -73,3 +73,5 @@
 ### 8. 게이트
 
 fmt · clippy `-D warnings`(stable · beta · wasm32) rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` rc=0(51 묶음) · 러너 블록 PASS(`keydraw_*` 는 release 바이너리라 기본 `--max-ticks` 에 먼저 닿아 UNMEASURED — `origin/main` 빌드도 같다 · `--max-ticks` 를 올리면 두 종 PASS rc=0).
+
+<!-- corpus-name-inflow v1 subjects=13 tree=7496bb4e3b82d207 B=822/361 P=7/2 S=49/19 -->
