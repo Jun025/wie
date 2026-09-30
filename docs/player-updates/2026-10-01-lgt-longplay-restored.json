@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-01",
+  "kind": "fix",
+  "titles": [
+    "a23f3c9fc2cb84e931da79898c64651a7d0d21f578343cf87ca35baa74de440e"
+  ],
+  "summary_ko": "오래 플레이해도 멈추지 않는 것을 다시 확인했어요. 이제 끝까지 즐길 수 있어요.",
+  "pr": "https://github.com/Jun025/wie/pull/419"
+}
