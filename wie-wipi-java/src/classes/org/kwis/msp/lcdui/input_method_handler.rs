@@ -31,6 +31,9 @@ impl InputMethodHandler {
                 JavaMethodProto::new("<init>", "(I)V", Self::init, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("setCurrentMode", "(I)Z", Self::set_current_mode, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getCurrentMode", "()I", Self::get_current_mode, MethodAccessFlags::PUBLIC),
+                // d448aee68157 dies on `getCurrentInputMode()I not found` (progress census 2026-09-30).
+                // The javadoc gives it the same meaning as getCurrentMode, so it reads the same field.
+                JavaMethodProto::new("getCurrentInputMode", "()I", Self::get_current_mode, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("hideSymbolCard", "()V", Self::hide_symbol_card, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("notifyKeyInput", "(II)Z", Self::notify_key_input, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new(
@@ -247,6 +250,16 @@ mod tests {
             assert_eq!(typed(&jvm, 0, &[b'2' as i32, b'2' as i32, b'3' as i32]).await?, "BD"); // multi-tap: 2 2 -> B
             assert_eq!(typed(&jvm, 0, &[b'4' as i32, b'6' as i32, -16]).await?, "G"); // CLR deletes
             assert_eq!(typed(&jvm, 1, &[b'2' as i32, b'2' as i32]).await?, "22"); // CONSTRAINT_NUMBER types digits
+
+            // d448aee68157 asks for the mode by the other name.
+            let handler = jvm.new_class("org/kwis/msp/lcdui/InputMethodHandler", "(I)V", (0,)).await?;
+            let _: bool = jvm
+                .invoke_virtual(&handler, "org/kwis/msp/lcdui/InputMethodHandler", "setCurrentMode", "(I)Z", (3,))
+                .await?;
+            let mode: i32 = jvm
+                .invoke_virtual(&handler, "org/kwis/msp/lcdui/InputMethodHandler", "getCurrentInputMode", "()I", ())
+                .await?;
+            assert_eq!(mode, 3);
 
             // No listener: the javadoc's false, and nothing done.
             let handler = jvm.new_class("org/kwis/msp/lcdui/InputMethodHandler", "(I)V", (0,)).await?;
