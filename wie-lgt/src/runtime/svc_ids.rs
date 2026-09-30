@@ -274,8 +274,9 @@ pub enum WIPICSvcId {
     BackLight = 0x578,
     Unk16 = 0x581,
     // Same `(2, 1)` as `Socket` at the same call site, on the other side of a flag; 3ff5948e235e
-    // calls it right after `inet_addr`/`htons` and branches on `< 0`. All eight titles that reach it
-    // import both. Which socket variant it is does not matter while there is no network.
+    // calls it right after `inet_addr`/`htons` and branches on `< 0`. a23f3c9fc2cb imports it WITHOUT
+    // 0x25a and calls `f(2, 1)` at 0x3ebc4, then tests `< 0` and -14/-7/-99; -1 takes its own
+    // «socket failed» branch. Which socket variant it is does not matter while there is no network.
     SocketAlt = 0x7d0,
 }
 
