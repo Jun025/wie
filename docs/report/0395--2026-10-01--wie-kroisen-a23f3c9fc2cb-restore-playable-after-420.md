@@ -15,3 +15,5 @@
 - ★sound 축은 3/3 모두 census 가 `ok` 로 쟀지만(재생 42회) 이 회차 범위 밖이라 행의 `sound: no` 와 「소리가 나지 않을 수 있어요.」는 그대로 두었다.
 
 **사용자 영향**: 지원 현황 playable 366 → 367 · limited 43 → 42. (티켓 문안의 354 → 355 · 49 → 48 은 #420 시점 수이고, 그 뒤 착지분이 수를 옮겼다.)
+
+**게임 파일명 유입**: BOUNDED 330쌍 · SUFFIX-ATTACHED 15쌍 — 전부 `compat.json` 파일 단위 스캔이 잡은 기존 `title`·`fileTitle` 값이다. 이 회차가 더한 줄(`"status": "playable"` · `"longplay": "ok"` · player-updates · 이 문서)의 게임명은 0.
