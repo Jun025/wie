@@ -1,10 +1,10 @@
-## [2026-09-30] 3차 꼬리 — 단발 벽 14종 중 6종 playable · 8종은 다음 벽 기록 (wie-census-wave3-singleton-tail-boot-and-longplay)
+## [2026-09-30] 3차 꼬리 — 단발 벽 14종 중 6종 첫 벽 해소(5종 playable · 1종 limited) · 8종은 다음 벽 기록 (wie-census-wave3-singleton-tail-boot-and-longplay)
 
-**무엇을**: 전수 `3c34efee` 의 «수 1» 첫 벽 18종 중 형제 wave3 티켓과 겹치는 4종을 빼고 14종을 봤다. 6종이 not-yet/limited → **playable** 이 됐다. 나머지 8종은 다음 벽과 못 고친 이유를 적었다.
+**무엇을**: 전수 `3c34efee` 의 «수 1» 첫 벽 18종 중 형제 wave3 티켓과 겹치는 4종을 빼고 14종을 봤다. 6종의 첫 벽을 고쳤다 — 5종은 **playable**, `a23f3c9fc2cb` 는 not-yet → **limited**(longplay 치명 오류 · 8절). 나머지 8종은 다음 벽과 못 고친 이유를 적었다.
 
 **왜**: 운영자 지시(2026-09-30) 「미지원·부분지원 게임을 전수 검토해 모두 플레이 가능하게」. wave3 세 티켓은 수 2 이상 군집만 가져갔다.
 
-**사용자 영향**: 지원 현황 not-yet 30 → 26 · limited 50 → 48 · playable 349 → 355(`docs/player-data/compat.json` 6행).
+**사용자 영향**: 지원 현황 not-yet 30 → 26 · limited 50 → 49 · playable 349 → 354(`docs/player-data/compat.json` 6행).
 
 ### 1. 겹쳐서 뺀 것(stand down)
 | sha12 | 벽 | 주인 |
@@ -18,7 +18,7 @@
 | sha12 | 전 | 후 | 고친 것 |
 |---|---|---|---|
 | `b2da04c55cd4` LGT | not-yet · `/ by zero` @startApp | **playable** ok·ok·ok·ok·ok·n/a | `HandsetProperty.getSystemProperty("PHONENUMBER")` 가 `""` — 게임이 `hash % 번호.length()` |
-| `a23f3c9fc2cb` LGT | not-yet · SIGABRT(호스트 스택 넘침) | **playable** ok·ok·ok·ok·silent·ok | `MC_knlGetSystemProperty("PHONENUMBER")` 가 `""` — 게임이 `memcpy(buf, 번호, strlen(번호) - 4)` → 4GB 복사 → 예외 경로 재귀 |
+| `a23f3c9fc2cb` LGT | not-yet · SIGABRT(호스트 스택 넘침) | **limited** ok·ok·ok·**no**·silent·ok(8절) | `MC_knlGetSystemProperty("PHONENUMBER")` 가 `""` — 게임이 `memcpy(buf, 번호, strlen(번호) - 4)` → 4GB 복사 → 예외 경로 재귀 |
 | `96dc32e781d3` KTF | not-yet · NPE @startApp | **playable** ok·ok·ok·ok·ok·ok | `DataBase.openDataBase(name, n, false)` 가 없는 DB 를 만들어 줬다 → `DataBaseException` |
 | `33801c1ba14f` KTF | not-yet · `MC_grpEncodeImage` | **playable** ok·ok·ok·ok·ok·n/a | `MC_grpEncodeImage(fb, 0, 0, 240, 320, &len)` 구현 |
 | `517ed32c92d6` LGT | limited · bucket.rs index OOB panic | **playable** ok·ok·ok·ok·silent·n/a | 32바이트 칸을 `size 8` 로 반납 — 버킷을 주소로 고른다 |
@@ -79,11 +79,14 @@ Java 번호 · C 번호 · 버킷 크기 선택 · 할당기 크기 분기 · DB
 | 짝 2 | 전 | not-yet · boot fail | FAIL · paints 0 | — |
 | 짝 2 | 후 | input **ok** | UNMEASURED(max-ticks · 23/27 키) · paints 134 · frozen 0 | (`--only probe`) |
 | 6종 전체 | 후 | limited | PASS · input ok | **error** — `22_NUM5` 에서 `Unknown LGT WIPIC SVC id 2000`(PC 0) |
-| 단독 1 | 후 | **playable** | PASS | ok |
-| 단독 2 | 후 | **playable** | PASS | ok |
+| 단독 1 | 후 | **playable** | UNMEASURED(max-ticks · rc 2 · 23/27 키) | ok |
+| 단독 2 | 후 | **playable** | UNMEASURED(max-ticks · rc 2 · 22/27 키) | ok |
 
-- input: 조용한 호스트 5/5 ok. 검수 런의 none(`frozen_tail_steps 27/27` · paints 9)은 재현되지 않았다 ⇒ **행 `playable` 유지.**
-- ★longplay 1/3 error 는 숨기지 않는다: 그 런만 `--jobs 3` 이고 도중 load5 가 48 까지 올랐다. SVC 2000 은 `svc_ids.rs` 에 행이 없는 미구현 import 라 부하가 만든 오류가 아니라 **타이밍에 따라 닿는 경로**다. 이 PR 범위(데이터·증적) 밖이라 고치지 않았다 — 후속 대상.
+- input: 조용한 호스트 5런 중 **측정 2(PASS · 27/27)** · **미측정 3**(UNMEASURED — census 열의 `ok` 는 미측정 런에도 채워지는 도구 관행이다). 검수 런의 none(`frozen_tail_steps 27/27` · paints 9)은 재현 0 ⇒ input `ok` 유지.
+- ★longplay 1/3 error 는 숨기지 않는다: 그 런만 `--jobs 3` 이고 도중 load5 가 48 까지 올랐다. SVC 2000 은 `svc_ids.rs` 에 행이 없는 미구현 import 라 부하가 만든 오류가 아니라 **타이밍에 따라 닿는 경로**다. 이 PR 범위(데이터·증적) 밖이라 고치지 않았다.
+- ★⇒ **행은 `limited` · longplay `no`** + knownIssue 「플레이 도중에 게임이 멈추거나 꺼질 수 있어요.」(게이트② 2회차 반려 · 선례 `7da00ecd4804` 와 같은 문구). census 판정식(`playability-census.mjs` — longplay≠ok ⇒ limited)과 같은 답이다.
+- 후속: SVC 2000 을 구현한 뒤 재측해 `playable` 로 되돌리는 것은 별 엔진 티켓(총괄 발권)의 몫 — 이 회차 경계 밖.
+- sound `no` 의 근거 런은 1차 검수 런의 silent 하나다(이 회차 5런은 전부 sound ok · midi 2043) — 보수 표기로 둔다.
 - 나머지 5행: 6종 전체 런이 PR 행과 축 전부 일치(speed n/a ↔ unknown 은 헤드리스 미판정).
 - `wie-wipi-c/src/api/kernel.rs` 의 `PHONENUMBER` 는 upstream(dlunch/wie)이 `""` 로 둔 값(주석 「putting this cause some game to fail authentication」)을 뒤집었다 — upstream 동기 시 이 줄이 충돌 지점이다.
 

@@ -6246,16 +6246,17 @@
    "platform": "LGT",
    "model": null,
    "title": "크로이센",
-   "status": "playable",
+   "status": "limited",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "ok",
+    "longplay": "no",
     "sound": "no",
     "speed": "ok"
    },
    "knownIssues_ko": [
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
