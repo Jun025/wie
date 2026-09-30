@@ -244,3 +244,5 @@
 | F10 0 반환 | **안 고쳤다** — `InputStream.read(b,off,len>0)` 계약은 1바이트 이상 또는 -1 이라 0 은 깨진 스트림에서만 난다. 거기서 다시 돌면 무한 루프가 되므로 돌려받은 값을 그대로 둔다 |
 | F11 동시 실행 | `--only progress` 의 기본 `--jobs` 를 ncpu/4 로 내렸다(명시값은 종전대로 ncpu 상한) |
 
+
+<!-- corpus-name-inflow v1 subjects=15 tree=8024b2bb137f381d B=821/360 P=0/0 S=49/19 -->
