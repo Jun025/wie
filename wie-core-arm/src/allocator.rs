@@ -33,8 +33,9 @@ impl Allocator {
         }
     }
 
+    // Which allocator owns a block is a fact about its address; `size` is only the caller's claim.
     pub fn free(core: &mut ArmCore, address: u32, size: u32) -> Result<()> {
-        if size > BUCKET_MAX as _ {
+        if address < HEAP_BASE + HEAP_SIZE / 2 {
             ListAllocator::free(core, address)
         } else {
             BucketAllocator::free(core, HEAP_BASE + HEAP_SIZE / 2, address, size)
@@ -70,6 +71,19 @@ mod tests {
         Allocator::free(&mut core, bucket, 12)?;
         Allocator::free(&mut core, list, 1024)?;
         assert!(!Allocator::is_allocated(&core, bucket, 12)?);
+        assert!(!Allocator::is_allocated(&core, list, 1024)?);
+
+        Ok(())
+    }
+
+    // A block goes back to the allocator that owns its address, whatever size the caller claims.
+    #[test]
+    fn free_follows_the_address_not_the_size() -> Result<()> {
+        let mut core = ArmCore::new(false, None)?;
+        Allocator::init(&mut core)?;
+
+        let list = Allocator::alloc(&mut core, 1024)?;
+        Allocator::free(&mut core, list, 4)?;
         assert!(!Allocator::is_allocated(&core, list, 1024)?);
 
         Ok(())

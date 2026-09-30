@@ -39,7 +39,10 @@ pub async fn get_system_property(context: &mut dyn WIPICContext, ptr_id: WIPICWo
         "RSSILEVEL" => "30",
         "BATTERYLEVEL" => "100",
         "PHONEMODEL" => "Emulator",
-        "PHONENUMBER" => "", // putting this cause some game to fail authentication
+        // Was "" ("putting this cause some game to fail authentication" — no title named). An LGT
+        // title copies `strlen(number) - 4` bytes of it: "" became a 4 GB memcpy and a host stack
+        // overflow (a23f3c9fc2cb). SKT's MIN value; the titles that read this were re-run with it.
+        "PHONENUMBER" => "01000000000",
         "MIN" => "01000000000",
         "ANNUN_CALL" => "0",
         "ANNUN_SMS" => "0",
@@ -389,6 +392,21 @@ mod test {
         assert_eq!(get_system_property(&mut context, id, out, 16).await.unwrap(), 0);
         let result = read_null_terminated_string_bytes(&context, out).unwrap();
         assert_eq!(String::from_utf8(result).unwrap(), "01000000000");
+
+        Ok(())
+    }
+
+    // An LGT title copies `strlen(PHONENUMBER) - 4` bytes; "" underflowed into a 4 GB memcpy.
+    #[futures_test::test]
+    async fn test_get_system_property_phone_number_is_not_empty() -> Result<()> {
+        let mut context = TestContext::new();
+        let id = context.alloc_raw(16).unwrap();
+        let out = context.alloc_raw(16).unwrap();
+
+        write_null_terminated_string_bytes(&mut context, id, b"PHONENUMBER").unwrap();
+
+        assert_eq!(get_system_property(&mut context, id, out, 16).await.unwrap(), 0);
+        assert!(read_null_terminated_string_bytes(&context, out).unwrap().len() > 4);
 
         Ok(())
     }

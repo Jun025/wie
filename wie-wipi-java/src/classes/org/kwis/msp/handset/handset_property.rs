@@ -44,6 +44,9 @@ impl HandsetProperty {
             // Parsed with Integer.parseInt at startApp: "" threw NumberFormatException in 5 KTF
             // titles (2026-09-27 census). Mid-range of the handset's volume steps.
             "VOLUMELEVEL" => "3",
+            // An LGT title takes `hash % PHONENUMBER.length()` at startApp: "" was `/ by zero`
+            // (b2da04c55cd4, 2026-09-30). Same number SKT's `MIN` reports (wie-skt SYSTEM_PROPERTIES).
+            "PHONENUMBER" => "01000000000",
             _ => "",
         };
 
@@ -103,6 +106,25 @@ mod test {
                 .await?;
 
             assert!(JavaLangString::to_rust_string(&jvm, &value).await?.parse::<i32>().is_ok());
+            Ok(())
+        })
+    }
+
+    // An LGT title divides by `PHONENUMBER.length()` at startApp; "" was `/ by zero`.
+    #[test]
+    fn test_phone_number_is_not_empty() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            let name: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, "PHONENUMBER").await?.into();
+            let value: ClassInstanceRef<String> = jvm
+                .invoke_static(
+                    "org/kwis/msp/handset/HandsetProperty",
+                    "getSystemProperty",
+                    "(Ljava/lang/String;)Ljava/lang/String;",
+                    (name,),
+                )
+                .await?;
+
+            assert!(!JavaLangString::to_rust_string(&jvm, &value).await?.is_empty());
             Ok(())
         })
     }

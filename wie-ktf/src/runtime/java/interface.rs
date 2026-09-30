@@ -179,11 +179,17 @@ async fn find_java_method(class: &JavaClassDefinition, name: &str, descriptor: &
     Ok(method)
 }
 
+// The caller's lr is what locates the guest call site that loaded a null target.
+fn null_jump(core: &ArmCore) -> WieError {
+    let lr = core.read_pc_lr().map(|(_, lr)| lr).unwrap_or(0);
+    WieError::FatalError(alloc::format!("jump native address is null (lr {lr:#x})"))
+}
+
 async fn java_jump_1(core: &mut ArmCore, _: &mut (), arg1: u32, address: u32) -> Result<JavaMethodResult> {
     tracing::trace!("java_jump_1({arg1:#x}, {address:#x})");
 
     if address == 0 {
-        return Err(WieError::FatalError("jump native address is null".to_string()));
+        return Err(null_jump(core));
     }
 
     let caller_sp = core.save_context().sp;
@@ -304,7 +310,7 @@ pub(super) async fn call_native(core: &mut ArmCore, _: &mut (), address: u32, pt
     tracing::trace!("java_jump_native({address:#x}, {ptr_data:#x})");
 
     if address == 0 {
-        return Err(WieError::FatalError("jump native address is null".to_string()));
+        return Err(null_jump(core));
     }
 
     // TODO correctly figure out parameter
@@ -364,7 +370,7 @@ async fn java_jump_2(core: &mut ArmCore, _: &mut (), arg1: u32, arg2: u32, addre
     tracing::trace!("java_jump_2({arg1:#x}, {arg2:#x}, {address:#x})");
 
     if address == 0 {
-        return Err(WieError::FatalError("jump native address is null".to_string()));
+        return Err(null_jump(core));
     }
 
     let caller_sp = core.save_context().sp;
@@ -376,7 +382,7 @@ async fn java_jump_3(core: &mut ArmCore, _: &mut (), arg1: u32, arg2: u32, arg3:
     tracing::trace!("java_jump_3({arg1:#x}, {arg2:#x}, {arg3:#x}, {address:#x})");
 
     if address == 0 {
-        return Err(WieError::FatalError("jump native address is null".to_string()));
+        return Err(null_jump(core));
     }
 
     let caller_sp = core.save_context().sp;

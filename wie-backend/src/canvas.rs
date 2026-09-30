@@ -6,7 +6,10 @@ use core::mem::size_of;
 
 use ab_glyph::{Font as GlyphFont, FontArc, ScaleFont};
 use bytemuck::{Pod, cast_slice, pod_collect_to_vec};
-use image::{ExtendedColorType, ImageEncoder, ImageReader, codecs::png::PngEncoder};
+use image::{
+    ExtendedColorType, ImageEncoder, ImageReader,
+    codecs::{bmp::BmpEncoder, png::PngEncoder},
+};
 use num_traits::{Num, Zero};
 
 use wie_util::{Result, WieError};
@@ -922,6 +925,21 @@ pub fn decode_image(data: &[u8]) -> Result<Box<dyn Image>> {
         rgba.height(),
         pod_collect_to_vec(&data),
     )) as Box<_>)
+}
+
+/// A 24-bit BMP of the `width`x`height` region at (`x`, `y`), which the caller keeps inside `image`.
+pub fn encode_bmp(image: &dyn Image, x: u32, y: u32, width: u32, height: u32) -> Result<Vec<u8>> {
+    let colors = image.colors();
+    let rgb = (y..y + height)
+        .flat_map(|row| (x..x + width).map(move |col| (row * image.width() + col) as usize))
+        .flat_map(|index| [colors[index].r, colors[index].g, colors[index].b])
+        .collect::<Vec<_>>();
+    let mut encoded = Vec::new();
+    BmpEncoder::new(&mut encoded)
+        .write_image(&rgb, width, height, ExtendedColorType::Rgb8)
+        .map_err(|x| WieError::FatalError(x.to_string()))?;
+
+    Ok(encoded)
 }
 
 pub fn encode_png(image: &dyn Image) -> Result<Vec<u8>> {

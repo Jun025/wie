@@ -140,6 +140,13 @@ vtable = [
 name = "java/io/OutputStream"
 vtable = [
     { name = "write", descriptor = "([B)V", index = 11 },
+    # 61ed69520fd3 ends a save the same way from its key handler (measured 2026-09-30, 0x1b218..0x1b254,
+    # one stream held at sp+8): index 12 with r1 = an array, r2 = 0 and r3 = that array's length word,
+    # then index 13 and index 14, each with r0 only and the result ignored — `s.write(b, 0, b.length);
+    # s.flush(); s.close();`. 12 and 13 are the declaration order between the measured write([B) (11)
+    # and close() (14); the call shapes match them and nothing else in the class.
+    { name = "write", descriptor = "([BII)V", index = 12 },
+    { name = "flush", descriptor = "()V", index = 13 },
     # 턴 (4 sites) and 서든어택포켓 (5 sites — a separate binary) end every save the same way:
     # toByteArray (16) on the BAOS, then index 14 on the DataOutputStream wrapping it and index 14
     # on the BAOS itself, r0 only, return ignored, and neither stream is touched again before the

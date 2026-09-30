@@ -334,6 +334,40 @@ pub async fn create_image(
     Ok(1) // MC_GRP_IMAGE_DONE
 }
 
+/// `MC_grpEncodeImage(src, x, y, w, h, *len)`: the region as image bytes in a new memory block, whose
+/// id is returned and `*len` its size — what `MC_grpCreateImage(img, bufID, off, len)` reads back.
+/// BMP, the handsets' own format. An empty region is 0 with `*len` untouched.
+pub async fn encode_image(
+    context: &mut dyn WIPICContext,
+    src: WIPICIndirectPtr,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    p_len: WIPICWord,
+) -> Result<WIPICWord> {
+    tracing::debug!("MC_grpEncodeImage({:#x}, {x}, {y}, {w}, {h}, {p_len:#x})", src.0);
+
+    let framebuffer = FrameBuffer(read_generic(context, context.data_ptr(src)?)?);
+    let image = framebuffer.image(context)?;
+    let (x0, y0) = (x.clamp(0, image.width() as i32), y.clamp(0, image.height() as i32));
+    let x1 = x.saturating_add(w).clamp(x0, image.width() as i32);
+    let y1 = y.saturating_add(h).clamp(y0, image.height() as i32);
+    if x1 == x0 || y1 == y0 {
+        return Ok(0);
+    }
+
+    let data = wie_backend::canvas::encode_bmp(&*image, x0 as _, y0 as _, (x1 - x0) as _, (y1 - y0) as _)?;
+    let memory = context.alloc(data.len() as WIPICWord)?;
+    let ptr_data = context.data_ptr(memory)?;
+    context.write_bytes(ptr_data, &data)?;
+    if p_len != 0 {
+        write_generic(context, p_len, data.len() as WIPICWord)?;
+    }
+
+    Ok(memory.0)
+}
+
 pub async fn destroy_image(context: &mut dyn WIPICContext, image: WIPICIndirectPtr) -> Result<()> {
     tracing::debug!("MC_grpDestroyImage({:#x})", image.0);
 
@@ -845,6 +879,28 @@ mod tests {
 
         get.call(&mut context, Box::new([ptr_context, 0xff, output])).await?;
         assert_eq!(read_generic::<[i32; 5], _>(&context, output)?, [-12, 34, 999, 999, 999]);
+        Ok(())
+    }
+
+    // 33801c1ba14f encodes the whole screen at startApp. What comes back must be something
+    // MC_grpCreateImage reads, clipped to the framebuffer, with its size written to *len.
+    #[futures_test::test]
+    async fn encoded_image_reads_back_through_create_image() -> Result<()> {
+        let mut context = TestContext::new();
+        let framebuffer = create_offscreen_framebuffer(&mut context, 4, 3).await?;
+        let p_len = context.alloc_raw(4)?;
+
+        let memory = encode_image(&mut context, framebuffer, 1, 0, 10, 2, p_len).await?;
+        let len: u32 = read_generic(&context, p_len)?;
+        assert!(memory != 0 && len > 0);
+
+        let ptr_image = context.alloc_raw(4)?;
+        assert_eq!(create_image(&mut context, ptr_image, WIPICIndirectPtr(memory), 0, len).await?, 1);
+        let image = WIPICIndirectPtr(read_generic(&context, ptr_image)?);
+        assert_eq!(get_image_property(&mut context, image, 4).await?, 3);
+        assert_eq!(get_image_property(&mut context, image, 5).await?, 2);
+
+        assert_eq!(encode_image(&mut context, framebuffer, 5, 0, 2, 2, p_len).await?, 0);
         Ok(())
     }
 

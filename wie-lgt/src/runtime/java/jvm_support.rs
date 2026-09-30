@@ -1834,6 +1834,10 @@ pub(crate) mod tests {
                 ("java/io/ByteArrayInputStream", 13, "skip", "(J)J"),
                 // 턴·서든어택포켓
                 ("java/io/ByteArrayOutputStream", 16, "toByteArray", "()[B"),
+                // 61ed69520fd3
+                ("java/io/DataOutputStream", 12, "write", "([BII)V"),
+                // 61ed69520fd3
+                ("java/io/DataOutputStream", 13, "flush", "()V"),
                 ("java/lang/Runtime", 11, "freeMemory", "()J"),
                 ("java/lang/Runtime", 12, "totalMemory", "()J"),
                 // 배틀몬스터·학교가는길·체스마스터
