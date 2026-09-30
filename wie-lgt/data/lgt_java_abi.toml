@@ -592,6 +592,12 @@ vtable = [
 name = "java/util/Timer"
 vtable = [
     { name = "schedule", descriptor = "(Ljava/util/TimerTask;JJ)V", index = 12 },
+    # be08d047cbae's game thread dies on Timer index 16 about 3 s after boot (measured 2026-09-30 by
+    # the progress census: `Unimplemented: java/util/Timer vtable index 16`, uncaught, the screen
+    # never changes again). The CLDC 1.1 order in the comment above ends with cancel() at 16 — the
+    # seventh method of a run starting at 10 — and that is the only argument-free Timer method.
+    # Order-derived: the call site was NOT disassembled.
+    { name = "cancel", descriptor = "()V", index = 16 },
 ]
 
 # 학교가는길's game-loop task is a guest subclass `c` of java/util/TimerTask whose descriptor says
@@ -627,6 +633,11 @@ vtable = [
     # the order decides; the save/restore pairing with push is what pop is for — peek would leave
     # every saved state on the Stack.
     { name = "pop", descriptor = "()Ljava/lang/Object;", index = 33 },
+    # 73f3a21e981c's game thread dies on Stack index 35 right after its logo (measured 2026-09-30 by
+    # the progress census: `Unimplemented: java/util/Stack vtable index 35`). push 32 · pop 33 are
+    # pinned above, so the order continues peek 34 · empty 35 · search 36. Order-derived: the call
+    # site was NOT disassembled.
+    { name = "empty", descriptor = "()Z", index = 35 },
 ]
 
 [[class]]

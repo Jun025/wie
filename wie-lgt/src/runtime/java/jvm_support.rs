@@ -1882,6 +1882,10 @@ pub(crate) mod tests {
                 ("java/util/Vector", 31, "removeAllElements", "()V"),
                 // 월드장기체스
                 ("java/util/Stack", 33, "pop", "()Ljava/lang/Object;"),
+                // 73f3a21e981c (progress census 2026-09-30)
+                ("java/util/Stack", 35, "empty", "()Z"),
+                // be08d047cbae (progress census 2026-09-30)
+                ("java/util/Timer", 16, "cancel", "()V"),
             ] {
                 let class = jvm.resolve_class(class_name).await.unwrap();
                 let definition = class.definition.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap().clone();
