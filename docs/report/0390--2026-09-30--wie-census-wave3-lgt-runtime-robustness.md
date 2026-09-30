@@ -21,7 +21,7 @@
 ### 2. LGT `java/lang/Thread` 는 폰에서 4단어다
 
 - 탐침(스크래치 · 미커밋): 인스턴스 헤더 첫 단어를 0 으로 만드는 쓰기를 잡았다 — `Allocator::free` 는 한 번도 그 주소를 풀지 않았고, 쓴 쪽은 rustjava `Thread.<init>` 의 `put_field(daemon)` 이었다.
-- `HOSSXNet`(`a16f`) · `atdata/a`(`2a57`) 는 `Thread` 하위 클래스이고 선언 필드 0 · 전체 **4단어** · 참조 비트맵이 **2·3번 단어**를 가리킨다. rustjava 의 `Thread` 는 `id J`(0–1) · `target`(2) · `name`(3) 뒤에 `priority`·`interrupted`·`started`·`alive`·`daemon` 을 4–8번에 둔다 ⇒ **인스턴스 밖 5단어**에 썼다.
+- `a16f` · `2a57` 의 게스트 `Thread` 하위 클래스는 선언 필드 0 · 전체 **4단어** · 참조 비트맵이 **2·3번 단어**를 가리킨다. rustjava 의 `Thread` 는 `id J`(0–1) · `target`(2) · `name`(3) 뒤에 `priority`·`interrupted`·`started`·`alive`·`daemon` 을 4–8번에 둔다 ⇒ **인스턴스 밖 5단어**에 썼다.
 - 처방: `data/lgt_java_abi.toml` 의 `java/lang/Thread` 에 그 5개를 `host_field` 로(TimerTask 0296 과 같은 모양). 참조 둘은 인스턴스에 남아 GC 가 본다.
 - 전수: `prepare_generated` 가 «호스트 상위 클래스가 폰 배치보다 크다»를 `tracing::error` 로 말하게 했고, LGT 79종을 30초씩 돌렸다 — 걸린 것은 **`Thread` 3종뿐**(`a16f` `2a57` base 4 · `517ed` base 7). `517ed` 는 숨은 자기 단어 3개가 `priority` 등에 덮였고, 그것이 0380 의 «bucket.rs 범위 밖» 군집의 한 타이틀이었다. 짝 `6bc7f65e3022` 는 전·후 모두 30초 안에 재현되지 않았다.
 - 시험 `thread_keeps_the_phone_layout` — 행을 지우면 red.
