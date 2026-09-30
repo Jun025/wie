@@ -1,0 +1,36 @@
+{
+ "schema": "wie-worklog/1",
+ "date": "2026-09-30",
+ "task": "wie-census-wave3-ktf-skt-boot-and-screen",
+ "title": "3차 군집 — KTF 널 읽기 0 · Clet 화면 프레임버퍼 표시 · DB slot 8 무동작 · SKT 인증·재배치 client.bin 판정",
+ "summary": "KTF 게스트의 0x1000 미만 읽기를 0 으로(쓰기·점프·호스트 읽기는 오류 유지), Clet 모드에서 화면 프레임버퍼에 새로 그린 것이 있으면 화면에 올리고, DB slot 8 을 무동작 0 으로 바꿨다. SKT 4종은 구매자 전화번호에 묶인 MIDlet-Key 검사라 구현하지 않았고, 재배치 client.bin «6종»은 재배치 3 · OMA DRM 2 · KTF UI 라이브러리 1 로 갈렸다. 상세 docs/report/0391.",
+ "changes": [
+  "wie-core-arm/src/engine/arm32_cpu.rs — 널 페이지 읽기 0 + 1회 warn",
+  "wie-backend/src/system.rs · wie-wipi-c/src/api/graphics.rs · wie-ktf/src/runtime/wipi_c.rs — 합성기가 «네이티브 화소를 올렸나»를 돌려준다",
+  "wie-midp/src/classes/javax/microedition/lcdui/display.rs — paint 가 꺼진 Clet 도 네이티브를 그렸으면 화면에 올린다",
+  "wie-wipi-c/src/api/database.rs — DB slot 8 무동작 0",
+  "docs/report/0391"
+ ],
+ "proposals": [
+  {
+   "kind": "product",
+   "title": "LGT 마젠타 투명색 2종 — 게임이 직접 쓰는 이미지 화소의 키 값부터 잰다",
+   "plainSummary": "두 LGT 게임이 그림 둘레에 분홍색(투명해야 할 색)을 그대로 보여 줍니다. 이 게임들은 이미지를 스스로 화면 메모리에 옮기므로, 우리가 만든 이미지 화소의 투명색 값이 게임이 기대하는 값과 같은지부터 확인해야 합니다.",
+   "userBenefit": "타이틀 화면과 메뉴의 분홍 테두리가 사라져 원래 그림으로 보입니다.",
+   "why": "0391 §7: MC_grpDrawImage 0회 · MC_GRP_GET_FRAME_BUFFER_POINTER 4,972회 · 전경색 0xf81f 채우기 453회. 스크린숏 판정으로 화면의 20% 가 마젠타다(5814101b8010 로고 배경·모서리).",
+   "tradeoff": "게임 코드 안의 키 비교를 역공학해야 할 수 있다. 원인이 이미지 디코더 쪽이면 다른 LGT 타이틀의 그림도 바뀐다 — LGT 라이브 5종 짝 재측이 필요하다.",
+   "effort": "M",
+   "target": "5814101b8010 6b515884dbc1"
+  },
+  {
+   "kind": "product",
+   "title": "59263295de74 — 패키지 저장 파일의 값을 주소로 읽는 벽",
+   "plainSummary": "DB 칸 8 을 고치자 이 게임이 켜지고 그림도 나오지만, 몇 번 키를 누르면 기본으로 들어 있던 저장 파일을 읽다가 엉뚱한 메모리 주소에 접근해 멈춥니다.",
+   "userBenefit": "켜지기만 하던 게임이 실제로 플레이 단계까지 넘어갑니다.",
+   "why": "0391 §4: 키 4 에서 res/save.sav 스트림 읽기(3·9·472·192 바이트) 다음 920 바이트를 0x1d14250 으로 읽다 폴트. 그 주소는 저장 데이터에서 온 값으로 보인다.",
+   "tradeoff": "패키지에 든 저장 파일이 원 소유자 단말의 것일 수 있다 — 그렇다면 «씨앗 저장 파일을 쓰지 않는다»가 답일 수 있지만, 그것은 다른 KTF 타이틀의 시작 상태를 바꾼다.",
+   "effort": "M",
+   "target": "59263295de74"
+  }
+ ]
+}
