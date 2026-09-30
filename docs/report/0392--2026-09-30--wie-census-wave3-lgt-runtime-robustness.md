@@ -70,6 +70,22 @@
 - 합계 playable 349 → **356** · limited 50 → 44 · not-yet 30 → 29.
 - `0cc4ef7ede37` `249e655147a1` 은 이 회차가 원인을 고친 타이틀이 아니다(30초 창에서 재현 0) — 새 빌드 장시간 1판이 무오류였다는 뜻일 뿐이라 이용자 소식은 내지 않았다.
 
+**증적(재측 2026-10-01 · 반려 승계 `-fix`).** 첫 측정의 스크래치 `/tmp/wave3` 가 사라져 8행을 되짚을 수 없었다. 그래서 이 PR head(`31bf10c6`)의 release `wie_validate` 로 다시 쟀다. 조건은 `playability-census run --jobs 3 --long 600` 이고, 착수 직전 `host-load-guard --status --recovered` 는 rc=0 이었다. 판 1은 8종이다(load1 22~72 · 다른 레인의 부하가 도중에 올라왔다). 판 2는 아래 두 행만 쟀다(load1 7). 행 폴더마다 A/B/L(+S) `.json` 이 있고, 판마다 `compat.json`(census `report`)과 `compat-public.json`(`player-data.mjs import` 결과)이 있다.
+
+| sha12 | 판 1 | 판 2 | compat 행 | 증적 |
+|---|---|---|---|---|
+| `c7f543c73b91` | playable · longplay ok | — | 그대로 | `~/orchestrator/reports/evidence/wie-census-wave3-lgt-runtime-robustness/run1/c7f543c73b91/` |
+| `0cc4ef7ede37` | playable · longplay ok · speed n/a | playable · longplay ok · speed n/a | **speed ok → unknown** | `~/orchestrator/reports/evidence/wie-census-wave3-lgt-runtime-robustness/run1/0cc4ef7ede37/` · `~/orchestrator/reports/evidence/wie-census-wave3-lgt-runtime-robustness/run2/0cc4ef7ede37/` |
+| `85e94babc247` | playable · longplay ok | — | 그대로 | `~/orchestrator/reports/evidence/wie-census-wave3-lgt-runtime-robustness/run1/85e94babc247/` |
+| `249e655147a1` | playable · longplay ok | playable · longplay ok | 그대로 | `~/orchestrator/reports/evidence/wie-census-wave3-lgt-runtime-robustness/run1/249e655147a1/` · `~/orchestrator/reports/evidence/wie-census-wave3-lgt-runtime-robustness/run2/249e655147a1/` |
+| `517ed32c92d6` | playable · longplay ok · sound silent | — | 그대로 | `~/orchestrator/reports/evidence/wie-census-wave3-lgt-runtime-robustness/run1/517ed32c92d6/` |
+| `2a57e33133b5` | playable · longplay ok | — | 그대로 | `~/orchestrator/reports/evidence/wie-census-wave3-lgt-runtime-robustness/run1/2a57e33133b5/` |
+| `a16f08d025eb` | not-yet · render uniform | — | 그대로 | `~/orchestrator/reports/evidence/wie-census-wave3-lgt-runtime-robustness/run1/a16f08d025eb/` |
+| `0262a4fe3389` | playable · longplay ok | — | 그대로 | `~/orchestrator/reports/evidence/wie-census-wave3-lgt-runtime-robustness/run1/0262a4fe3389/` |
+
+- 바뀐 행은 `0cc4ef7ede37` 의 speed 하나다. 두 판 모두 30초 창 A 가 7/27 키에서 `max-ticks` 에 닿아 속도 비율이 나오지 않았다(`n/a` → 공개 어휘 `unknown`). status 는 playable 그대로라 합계 356/44/29 도 그대로다.
+- `0cc4ef7ede37` `249e655147a1` 은 이 PR 이 원인을 고친 타이틀이 아니다. 그래서 장시간을 두 판 쟀고, 두 판 모두 무오류였다. 앞의 새 빌드 1판까지 합치면 3판 연속 무오류다. 그래서 playable 을 유지했다.
+
 ### 8. 게이트
 
 fmt · clippy `-D warnings`(stable · beta · wasm32) rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` rc=0(51 묶음) · 러너 블록 PASS(`keydraw_*` 는 release 바이너리라 기본 `--max-ticks` 에 먼저 닿아 UNMEASURED — `origin/main` 빌드도 같다 · `--max-ticks` 를 올리면 두 종 PASS rc=0).
