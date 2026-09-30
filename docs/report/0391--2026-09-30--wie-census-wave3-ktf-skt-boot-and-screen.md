@@ -123,4 +123,4 @@
 - 러너 블록(`a184f768` 릴리스): `draw_j2me` · `helloworld_ktf` · `helloworld_lgt` · `text_j2me`(`--timeout 5`) PASS. `keydraw_ktf`·`keydraw_lgt` 는 기본 `--max-ticks` 에서 `UNMEASURED`(`stop: max-ticks` · load1 100~150) — **전 빌드 `67c3f5d8` 도 같다**. `--max-ticks 2000000000` 으로 둘 다 PASS · 27/27 · `last_frame_content true` · rc=0(전 빌드도 같다).
 - 유입(`node scripts/corpus-name-inflow.mjs`): BOUNDED 336쌍 + SUFFIX-ATTACHED 15쌍. `compat.json` 밖의 일치는 이 PR 이 건드린 파일에 main 부터 있던 주석이다 — 이 PR 이 더한 코드 줄의 한글은 0줄이다. `compat.json` 은 계약상 제목 목록이고 main 대비 새 `"title"` 줄은 0 이다.
 
-
+<!-- corpus-name-inflow v1 subjects=12 tree=0ad1a56b1b4a36cc B=725/336 P=1/1 S=35/15 -->
