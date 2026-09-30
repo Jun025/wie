@@ -1,4 +1,5 @@
 use alloc::vec;
+use core::sync::atomic::{AtomicI32, Ordering};
 
 use bytemuck::{Pod, Zeroable};
 
@@ -89,6 +90,8 @@ impl MdaClip {
     }
 }
 
+static NEXT_CLIP_ID: AtomicI32 = AtomicI32::new(1);
+
 pub async fn clip_create(context: &mut dyn WIPICContext, ptr_type: WIPICWord, buf_size: WIPICWord, callback: WIPICWord) -> Result<WIPICWord> {
     tracing::debug!("MC_mdaClipCreate({ptr_type:#x}, {buf_size:#x}, {callback:#x})");
 
@@ -96,12 +99,13 @@ pub async fn clip_create(context: &mut dyn WIPICContext, ptr_type: WIPICWord, bu
     // The allocator does not zero, and `volume`/`loaded` are read before anything else writes them.
     // `clip_id` must be nonzero: games test it before playing. 9d52de42e7f9's play routine is
     // `if (!clip || !clip->clipId) return;` ahead of `MC_mdaPlay` (disassembled 2026-09-30), so with
-    // the zeroed id it loaded all six sounds and never played one. The address is unique per live clip.
+    // the zeroed id it loaded all six sounds and never played one. A small counter, not the address:
+    // an id is what a game may index a table with.
     write_generic(
         context,
         clip,
         MdaClip {
-            clip_id: clip as i32,
+            clip_id: NEXT_CLIP_ID.fetch_add(1, Ordering::Relaxed),
             volume: 100,
             ..Zeroable::zeroed()
         },
