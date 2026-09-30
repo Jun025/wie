@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-30",
+  "kind": "new-support",
+  "titles": [
+    "4166acd8fc62e470dace534fa7c6110d2605c45fba63262a3fb82361a47a30ba",
+    "ab3d0020d7bcc23ef31ff17145efe70425b29f740d99fe235343d1c57e5cfd11"
+  ],
+  "summary_ko": "시작하면 검은 화면이나 한 가지 색만 보이던 게임 2종이 이제 게임 화면을 보여 주고 플레이할 수 있어요.",
+  "pr": "https://github.com/Jun025/wie/pull/423"
+}
