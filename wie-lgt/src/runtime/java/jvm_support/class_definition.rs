@@ -447,6 +447,8 @@ impl JavaClassDefinition {
 
         let mut descriptor = self.descriptor()?;
         let class_name = ClassDefinition::name(self);
+        // (interface, this class's vtable slot for the interface's first method) — see below.
+        let mut interface_slots: Vec<(String, usize)> = Vec::new();
         let interface_names = if descriptor.ptr_interface_names != 0 {
             ClassDefinition::interface_names(self)
         } else if descriptor.ptr_interface_references != 0 {
@@ -466,10 +468,10 @@ impl JavaClassDefinition {
                     continue;
                 }
 
-                let ptr_name = if ptr_generated_interface != 0 {
+                let (ptr_name, slot) = if ptr_generated_interface != 0 {
                     let interface: RawJavaClass = read_generic(core, ptr_generated_interface)?;
                     let interface_descriptor: RawJavaClassDescriptor = read_generic(core, interface.ptr_descriptor)?;
-                    interface_descriptor.ptr_name
+                    (interface_descriptor.ptr_name, None)
                 } else {
                     let ptr_name = reference.ptr_class_or_name;
                     let interface_name = String::from_utf8(read_null_terminated_string_bytes(core, ptr_name)?)
@@ -479,10 +481,20 @@ impl JavaClassDefinition {
                     })?;
                     reference.ptr_class_or_name = interface_class.definition.as_any().downcast_ref::<JavaClassDefinition>().unwrap().ptr_raw;
                     write_generic(core, ptr_reference, reference)?;
-                    ptr_name
+                    // The word after an external interface's name is where THIS class put the
+                    // interface's first method in its compiled vtable. It is not a fixed index:
+                    // 15 LGT titles hold 29 java/lang/Runnable cells reading 10, 11 (mostly Thread
+                    // subclasses — Thread.run) and, in 월드장기체스, 16 and 63 — where slot 10 is a
+                    // one-argument method. Generated-interface cells read 0 or unrelated data
+                    // there, so only this branch reads it.
+                    let slot: u32 = read_generic(core, ptr_reference + size_of::<RawJavaInterfaceReference>() as u32)?;
+                    (ptr_name, Some(slot as usize))
                 };
                 let interface_name = String::from_utf8(read_null_terminated_string_bytes(core, ptr_name)?)
                     .map_err(|error| WieError::FatalError(format!("Invalid LGT interface name: {error}")))?;
+                if let Some(slot) = slot {
+                    interface_slots.push((interface_name.clone(), slot));
+                }
                 interface_names.push(interface_name);
                 interface_name_pointers.push(ptr_name);
             }
@@ -547,13 +559,20 @@ impl JavaClassDefinition {
                 Vec::new()
             };
 
-            let mut abi_classes = Vec::new();
+            // (vtable slot, row). A class row's index is the slot; an interface row's index is the
+            // method's position in the interface, placed from this class's reference cell. With no
+            // cell (the names path) the old assumption stands: a direct Object subclass's first slot.
+            let mut abi_rows = Vec::new();
             if let Some(class) = JAVA_ABI.class(&class_name) {
-                abi_classes.push(class);
+                abi_rows.extend(class.vtable.iter().map(|row| (row.index, row)));
             }
             for interface_name in &interface_names {
                 if let Some(class) = JAVA_ABI.class(interface_name) {
-                    abi_classes.push(class);
+                    let base = interface_slots.iter().find(|(name, _)| name == interface_name).map_or_else(
+                        || JAVA_ABI.class("java/lang/Object").and_then(|object| object.vtable_size).unwrap_or(0),
+                        |&(_, slot)| slot,
+                    );
+                    abi_rows.extend(class.vtable.iter().map(|row| (base + row.index, row)));
                 }
             }
 
@@ -574,13 +593,10 @@ impl JavaClassDefinition {
                         parent_method.access_flags() & !MethodAccessFlags::ABSTRACT,
                     ))
                 } else {
-                    abi_classes.iter().find_map(|class| {
-                        class
-                            .vtable
-                            .iter()
-                            .find(|method| method.index == index)
-                            .map(|method| (method.name.clone(), method.descriptor.clone(), MethodAccessFlags::PUBLIC))
-                    })
+                    abi_rows
+                        .iter()
+                        .find(|(slot, _)| *slot == index)
+                        .map(|(_, method)| (method.name.clone(), method.descriptor.clone(), MethodAccessFlags::PUBLIC))
                 };
                 let Some((name, method_descriptor, access_flags)) = method else {
                     continue;

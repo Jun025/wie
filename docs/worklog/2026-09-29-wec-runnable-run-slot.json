@@ -1,0 +1,37 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-29",
+  "task": "wie-2026-09-29-wec-import-0x64-adopt-p0",
+  "title": "월드장기체스 — LGT Runnable.run 은 인터페이스 참조 칸이 가리키는 slot · AI 차례 정지 해소",
+  "summary": "연습 대국 정지는 키 순서가 아니라 AI 차례였다. Thread.start 가 AI 객체의 run() 대신 slot 10(부모 메서드의 1-인자 오버라이드, paint 경로)을 돌려 두 스레드가 같은 객체에서 wait 했다. 클래스의 인터페이스 참조 칸 둘째 워드가 run 의 slot(63)을 가리킨다는 것을 코퍼스 29칸으로 확인하고, 인터페이스 ABI 행을 그 slot 기준으로 붙이게 했다.",
+  "changes": [
+    "wie-lgt/src/runtime/java/jvm_support/class_definition.rs — 외부 인터페이스 참조 칸의 둘째 워드를 읽어 인터페이스 행의 기준 slot 으로 쓴다",
+    "wie-lgt/data/lgt_java_abi.toml — Runnable.run index 10 → 0(인터페이스 안 순번)",
+    "wie-lgt/src/runtime/java/jvm_support.rs — 생성 Runnable 시험을 run ≠ slot 10 모양으로(되돌리면 red)",
+    "docs/report/0383 · docs/player-updates/2026-09-29-wec-runnable-run-slot.json(2번째 커밋 · PR 번호)"
+  ],
+  "verification": [
+    "전(main): 기본 --inject ×4 frozen_tail_steps 12 · 끝 13장 md5 1종 / AI 차례 경로 ×2 frozen 6",
+    "후: AI 차례 경로 ×2 frozen 0 · 진행 2수(AI 가 둔다) / 기본 --inject ×4 는 key 25 에서 다음 벽(Integer vtable 12)",
+    "변이: 소스를 main 으로 되돌리면 generated_class_exposes_compiler_vtable_methods_to_jvm FAILED"
+  ],
+  "limits": [
+    "검증한 인터페이스는 Runnable(메서드 1개)뿐",
+    "이름 목록 경로(ptr_interface_names)는 칸이 없어 종전 slot 10 가정"
+  ],
+  "adoptedProposals": [
+    "2026-09-29-wec-import-0x64#p0"
+  ],
+  "proposals": [
+    {
+      "title": "월드장기체스 — 대국 메뉴 「계속하기」에서 java/lang/Integer vtable index 12 미구현",
+      "plainSummary": "이제 컴퓨터가 수를 두지만, 대국 중 메뉴를 열었다가 「계속하기」를 고르면 게임이 멈춥니다.",
+      "userBenefit": "메뉴를 오가며 한 판을 이어 둘 수 있는 쪽으로 한 걸음 더 갑니다.",
+      "why": "이 회차 후 기본 --inject 4판 모두 key 25(NUM1 = 계속하기)에서 d.paint 안 'Unimplemented: java/lang/Integer vtable index 12' 로 끝난다(4/4).",
+      "tradeoff": "Integer 의 CLDC 선언 순서만으로 12 를 정하면 조용히 틀린 메서드를 부를 수 있어 호출부 모양(인자·반환 사용)을 디스어셈블로 확인해야 한다.",
+      "effort": "S",
+      "target": "wie",
+      "kind": "product"
+    }
+  ]
+}
