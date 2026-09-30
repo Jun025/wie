@@ -2,7 +2,7 @@
   "schema": "wie-worklog/1",
   "date": "2026-09-30",
   "task": "wie-census-wave3-singleton-tail-boot-and-longplay",
-  "title": "3차 꼬리 — 단발 벽 14종 중 6종 playable",
+  "title": "3차 꼬리 — 단발 벽 14종 중 5종 playable · 1종 limited",
   "summary": "전화번호 빈 문자열(LGT 2) · 없는 DB 의 create=false(KTF 1) · MC_grpEncodeImage(KTF 1) · 할당기 반납 버킷(LGT 1) · DataOutputStream 12/13(LGT 1). 나머지 8종은 다음 벽을 docs/report/0389 에 적었다.",
   "changes": [
     "wie-wipi-c · wie-wipi-java — PHONENUMBER = 01000000000",
