@@ -9,6 +9,10 @@ use wie_jvm_support::{WieJavaClassProto, WieJvmContext, get_declared_field, put_
 
 use crate::classes::javax::microedition::lcdui::Display;
 
+// Not `display`: SKT titles declare a private `display` of the same type, and jvm-bytecode would give
+// both one storage slot (docs/report/0382 ⚠). No game names a field this.
+const DISPLAY_FIELD: &str = "wieDisplay";
+
 // abstract class javax.microedition.midlet.MIDlet
 pub struct MIDlet;
 
@@ -40,7 +44,7 @@ impl MIDlet {
                     "Ljavax/microedition/midlet/MIDlet;",
                     FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC,
                 ),
-                JavaFieldProto::new("display", "Ljavax/microedition/lcdui/Display;", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new(DISPLAY_FIELD, "Ljavax/microedition/lcdui/Display;", FieldAccessFlags::PRIVATE),
             ],
             access_flags: ClassAccessFlags::PUBLIC | ClassAccessFlags::ABSTRACT,
         }
@@ -65,7 +69,7 @@ impl MIDlet {
             jvm,
             &mut this,
             "javax/microedition/midlet/MIDlet",
-            "display",
+            DISPLAY_FIELD,
             "Ljavax/microedition/lcdui/Display;",
             display,
         )
@@ -107,7 +111,7 @@ impl MIDlet {
             jvm,
             this,
             "javax/microedition/midlet/MIDlet",
-            "display",
+            DISPLAY_FIELD,
             "Ljavax/microedition/lcdui/Display;",
         )
         .await
@@ -130,9 +134,9 @@ mod test {
 
     use super::MIDlet;
 
-    // Declares its own `display`, as five SKT titles' MIDlets do (docs/report/0382). Public, not
-    // private: jvm-bytecode keys instance storage by name, descriptor and flags, so a private one
-    // would share MIDlet's slot rather than shadow it.
+    // Declares its own private `display`, as three SKT titles' MIDlets do (docs/report/0382).
+    // jvm-bytecode keys instance storage by name, descriptor and flags, so under MIDlet's old field
+    // name the two shared one slot and the game's null was MIDlet's (0262a4fe3389).
     struct TestMIDlet;
 
     impl TestMIDlet {
@@ -145,7 +149,7 @@ mod test {
                 fields: vec![JavaFieldProto::new(
                     "display",
                     "Ljavax/microedition/lcdui/Display;",
-                    FieldAccessFlags::PUBLIC,
+                    FieldAccessFlags::PRIVATE,
                 )],
                 access_flags: ClassAccessFlags::PUBLIC,
             }
