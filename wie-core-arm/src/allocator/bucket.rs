@@ -94,26 +94,47 @@ impl BucketAllocator {
         Err(WieError::AllocationFailure)
     }
 
+    // The bucket is read off the ADDRESS, like C's free(); `size` only cross-checks it. Trusting the
+    // size put a 32-byte slot freed as `size <= 8` into the 8-byte bucket's arithmetic: an index
+    // 3x past its header (a host panic, 517ed32c92d6) or, closer in, some other slot's bit cleared.
     pub fn free(core: &mut ArmCore, base_address: u32, address: u32, size: u32) -> Result<()> {
-        let bucket_index = Self::find_bucket_index(size);
+        let Some(bucket_index) = Self::bucket_of_address(base_address, address) else {
+            return Err(WieError::FatalError(alloc::format!(
+                "bucket free of {address:#x} (size {size}): not a slot of any bucket"
+            )));
+        };
+        if bucket_index != Self::find_bucket_index(size) {
+            tracing::warn!(
+                "bucket free of {address:#x}: size {size} names a different bucket than the {}-byte slot it is",
+                BUCKETS[bucket_index].0
+            );
+        }
         let (slot_size, _) = BUCKETS[bucket_index];
         let header_address = base_address + region_offset(bucket_index) as u32;
         let header_len = header_length(bucket_index);
-
-        let mut header = vec![0u8; header_len];
-        core.read_bytes(header_address, &mut header)?;
 
         let offset = (address - header_address - header_len as u32) / slot_size as u32;
         let index = offset / 8;
         let bit = offset % 8;
 
-        debug_assert!(header[index as usize] & (1 << bit) == 0);
-
-        header[index as usize] |= 1 << bit;
-
-        core.write_bytes(header_address + index, &[header[index as usize]])?;
+        let mut byte = [0u8; 1];
+        core.read_bytes(header_address + index, &mut byte)?;
+        debug_assert!(byte[0] & (1 << bit) == 0);
+        byte[0] |= 1 << bit;
+        core.write_bytes(header_address + index, &byte)?;
 
         Ok(())
+    }
+
+    /// The bucket whose slot area holds `address` at a slot boundary.
+    fn bucket_of_address(base_address: u32, address: u32) -> Option<usize> {
+        (0..BUCKETS.len()).find(|&i| {
+            let (slot_size, slot_count) = BUCKETS[i];
+            let first_slot = base_address + (region_offset(i) + header_length(i)) as u32;
+            address
+                .checked_sub(first_slot)
+                .is_some_and(|offset| offset % slot_size as u32 == 0 && offset / (slot_size as u32) < slot_count as u32)
+        })
     }
 
     pub fn is_allocated(core: &ArmCore, base_address: u32, address: u32, size: u32) -> Result<bool> {
@@ -223,6 +244,26 @@ mod tests {
         BucketAllocator::free(&mut core, 0x40000000, a1, 1)?;
         let a1b = BucketAllocator::alloc(&mut core, 0x40000000, 1)?;
         assert_eq!(a1b, 0x40020004);
+
+        Ok(())
+    }
+
+    // 517ed32c92d6: a 32-byte slot freed with a size that names the 8-byte bucket panicked on an
+    // out-of-range header index. The slot must go back to ITS bucket, and nobody else's bit may move.
+    #[test]
+    fn test_free_uses_the_bucket_the_address_is_in() -> Result<()> {
+        let mut core = ArmCore::new(false, None).unwrap();
+        core.map(0x40000000, 0x8000000)?;
+        BucketAllocator::init(&mut core, 0x40000000, 0x8000000)?;
+
+        let small = BucketAllocator::alloc(&mut core, 0x40000000, 8)?;
+        let big = BucketAllocator::alloc(&mut core, 0x40000000, 32)?;
+        BucketAllocator::free(&mut core, 0x40000000, big, 4)?;
+
+        assert!(!BucketAllocator::is_allocated(&core, 0x40000000, big, 32)?);
+        assert!(BucketAllocator::is_allocated(&core, 0x40000000, small, 8)?);
+        assert_eq!(BucketAllocator::alloc(&mut core, 0x40000000, 32)?, big);
+        assert!(BucketAllocator::free(&mut core, 0x40000000, big + 1, 32).is_err());
 
         Ok(())
     }

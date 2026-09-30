@@ -138,17 +138,22 @@ impl DataBase {
     ) -> JvmResult<ClassInstanceRef<DataBase>> {
         tracing::debug!("org.kwis.msp.db.DataBase::openDataBase({data_base_name:?}, {record_size}, {create}, {flags})");
 
-        // Always create: `openRecordStore(_, false)` now throws RecordStoreNotFoundException for a
-        // missing store, which a KTF title catching `DataBaseException` would not expect. This keeps
-        // `create = false` opening an empty database, as it always has here.
-        let record_store: ClassInstanceRef<RecordStore> = jvm
+        // `create = false` on a missing database is `DataBaseException`, the one exception this API
+        // declares — not MIDP's RecordStoreNotFoundException, which a KTF title does not catch.
+        let record_store: ClassInstanceRef<RecordStore> = match jvm
             .invoke_static(
                 "javax/microedition/rms/RecordStore",
                 "openRecordStore",
                 "(Ljava/lang/String;Z)Ljavax/microedition/rms/RecordStore;",
-                (data_base_name, true),
+                (data_base_name, create),
             )
-            .await?;
+            .await
+        {
+            Err(jvm::JavaError::JavaException(e)) if jvm.is_instance(&*e, "javax/microedition/rms/RecordStoreNotFoundException") => {
+                return Err(jvm.exception("org/kwis/msp/db/DataBaseException", "database not found").await);
+            }
+            x => x?,
+        };
 
         let mut instance: ClassInstanceRef<DataBase> = jvm
             .new_class("org/kwis/msp/db/DataBase", "(Ljavax/microedition/rms/RecordStore;)V", (record_store,))
@@ -541,6 +546,46 @@ mod test {
 
             let _: () = jvm
                 .invoke_static("org/kwis/msp/db/DataBase", "deleteDataBase", "(Ljava/lang/String;I)V", (name, 1))
+                .await?;
+
+            Ok(())
+        })
+    }
+
+    // 96dc32e781d3 opens with create = false on its first run and takes the «new game» path only on
+    // DataBaseException; an empty database it was handed instead ended in an NPE at startApp.
+    #[test]
+    fn test_open_without_create_on_a_missing_database_is_data_base_exception() -> Result<()> {
+        run_jvm_test(Box::new([wie_midp::get_protos().into(), get_protos().into()]), |jvm| async move {
+            let name: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, "missing-db").await?.into();
+            let missing: JvmResult<ClassInstanceRef<DataBase>> = jvm
+                .invoke_static(
+                    "org/kwis/msp/db/DataBase",
+                    "openDataBase",
+                    "(Ljava/lang/String;IZ)Lorg/kwis/msp/db/DataBase;",
+                    (name.clone(), 32, false),
+                )
+                .await;
+            let Err(JavaError::JavaException(exception)) = missing else {
+                panic!("opening a missing database without create succeeded");
+            };
+            assert!(jvm.is_instance(&*exception, "org/kwis/msp/db/DataBaseException"));
+
+            let _: ClassInstanceRef<DataBase> = jvm
+                .invoke_static(
+                    "org/kwis/msp/db/DataBase",
+                    "openDataBase",
+                    "(Ljava/lang/String;IZ)Lorg/kwis/msp/db/DataBase;",
+                    (name.clone(), 32, true),
+                )
+                .await?;
+            let _: ClassInstanceRef<DataBase> = jvm
+                .invoke_static(
+                    "org/kwis/msp/db/DataBase",
+                    "openDataBase",
+                    "(Ljava/lang/String;IZ)Lorg/kwis/msp/db/DataBase;",
+                    (name, 32, false),
+                )
                 .await?;
 
             Ok(())
