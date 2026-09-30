@@ -1,0 +1,34 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-30",
+  "task": "wie-2026-09-29-lgt-wipic-svc-eight-unknown-ids-adopt-p0",
+  "title": "LGT 미식별 WIPI-C SVC — 오류에 r0~r3·lr · 호출부로 8칸 식별",
+  "summary": "Unknown LGT WIPIC SVC 오류에 SVC 진입 시점 r0~r3·lr 를 싣고, 그것으로 8종의 첫 벽을 재측해 호출부 디스어셈블로 602·2000(소켓) · 809·811·833(UIC) · 1211·1212(미디어 일시정지·재개) · 1100(데이터 저장소 목록)을 식별했다. 3종이 600초 무오류, 3종은 다음 벽까지 갔다.",
+  "changes": [
+    "wie-lgt handle_wipic_svc: 미등재 id 오류에 r0~r3·lr",
+    "wie-lgt svc_ids/wipi_c: 8칸 + 시험 1개",
+    "docs/report/0387 · docs/player-updates 1"
+  ],
+  "verification": [
+    "같은 시각 전/후 짝 8종(600초 장시간 · --relaunch 1)",
+    "변이 4종 red",
+    "4게이트 + beta clippy"
+  ],
+  "limits": [
+    "1100 은 빈 목록 — 실기에 있는 저장소 이름은 모른다",
+    "619d98bc8f64 는 이 회차 경로에서 벽에 닿지 않았다"
+  ],
+  "adoptedProposals": ["2026-09-29-census-wave2-recensus#p0"],
+  "proposals": [
+    {
+      "title": "LGT 다음 벽 — UIC 830 · DB 410 · Thumb 복귀 실패",
+      "plainSummary": "이번에 한 칸씩 더 나아간 LGT 게임 3종이 새 지점(입력창 글자 넣기 830, 저장소 410, 화면 설정 뒤 잘못된 복귀)에서 멈춥니다. 앞의 둘은 같은 방법으로 이름을 붙이고, 마지막은 엔진 쪽 원인을 찾습니다.",
+      "userBenefit": "이름 입력 화면과 음악 게임 한 종의 시작 화면에서 꺼지던 LGT 게임이 더 진행합니다.",
+      "why": "0387 §3 짝 재측의 후 열: 1cd151222bde 가 100키에 830(comp, 0, ptr, 0) · 87b04639cdfe 가 부팅 뒤 7키에 410(0x5b538, ptr, 0x3ff, 1) · 8f7758fa43b6 이 67키에 pc=0x3f8c(Thumb 코드) ARM 풀이 Undefined instruction. 830 은 KTF UIC 30 = InsertText 자리이고 같은 컴포넌트 핸들이다. 오류 문구에 r0~r3·lr 가 실려 호출부를 바로 볼 수 있다.",
+      "tradeoff": "830 을 채우면 831·834·835(텍스트 삭제·길이·읽기)가 곧 이어질 수 있다. Thumb 복귀 실패는 원인이 SVC 표가 아니라 엔진 복귀 경로일 수 있어 크기가 다르다.",
+      "effort": "M",
+      "target": "wie",
+      "kind": "product"
+    }
+  ]
+}

@@ -43,7 +43,8 @@ fn format(format: &str, args: &[u32], read_string: &mut dyn FnMut(u32) -> Result
                     result.push('%');
                     break;
                 }
-                'd' | 'u' => {
+                // `%i` is C's other spelling of `%d`; a KTF title builds resource names with it.
+                'd' | 'i' | 'u' => {
                     // ILP32 ABI: long is one word; only long long occupies two
                     let long = longs >= 2;
                     let raw = if long {
@@ -53,7 +54,7 @@ fn format(format: &str, args: &[u32], read_string: &mut dyn FnMut(u32) -> Result
                     };
                     // core::fmt panics on width >= 65536; guest-controlled width must be clamped
                     let width = width.unwrap_or(0).min(MAX_WIDTH);
-                    if c == 'd' {
+                    if c != 'u' {
                         let arg = if long { raw as i64 } else { raw as u32 as i32 as i64 };
                         if let Some('0') = flag {
                             result += &format!("{arg:0width$}");
@@ -159,6 +160,14 @@ mod test {
     #[test]
     fn test_unsigned() -> Result<()> {
         assert_eq!(format("%u", &[0xffff_ffff])?, "4294967295");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_i_is_d() -> Result<()> {
+        assert_eq!(format("ch0%i.mbac", &[3])?, "ch03.mbac");
+        assert_eq!(format("%i", &[0xffff_ffff])?, "-1");
 
         Ok(())
     }

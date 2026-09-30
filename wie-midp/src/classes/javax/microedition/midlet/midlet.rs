@@ -5,9 +5,13 @@ use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 use rustjava_runtime::classes::java::lang::String;
 
-use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
+use wie_jvm_support::{WieJavaClassProto, WieJvmContext, get_declared_field, put_declared_field};
 
 use crate::classes::javax::microedition::lcdui::Display;
+
+// Not `display`: SKT titles declare a private `display` of the same type, and jvm-bytecode would give
+// both one storage slot (docs/report/0382 ⚠). No game names a field this.
+const DISPLAY_FIELD: &str = "wieDisplay";
 
 // abstract class javax.microedition.midlet.MIDlet
 pub struct MIDlet;
@@ -40,7 +44,7 @@ impl MIDlet {
                     "Ljavax/microedition/midlet/MIDlet;",
                     FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC,
                 ),
-                JavaFieldProto::new("display", "Ljavax/microedition/lcdui/Display;", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new(DISPLAY_FIELD, "Ljavax/microedition/lcdui/Display;", FieldAccessFlags::PRIVATE),
             ],
             access_flags: ClassAccessFlags::PUBLIC | ClassAccessFlags::ABSTRACT,
         }
@@ -61,7 +65,15 @@ impl MIDlet {
 
         let display = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?;
 
-        jvm.put_field(&mut this, "display", "Ljavax/microedition/lcdui/Display;", display).await?;
+        put_declared_field(
+            jvm,
+            &mut this,
+            "javax/microedition/midlet/MIDlet",
+            DISPLAY_FIELD,
+            "Ljavax/microedition/lcdui/Display;",
+            display,
+        )
+        .await?;
 
         Ok(())
     }
@@ -94,7 +106,15 @@ impl MIDlet {
     }
 
     pub async fn display(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<Display>> {
-        jvm.get_field(this, "display", "Ljavax/microedition/lcdui/Display;").await
+        // A MIDlet subclass may declare its own `display` — the corpus has five (docs/report/0382).
+        get_declared_field(
+            jvm,
+            this,
+            "javax/microedition/midlet/MIDlet",
+            DISPLAY_FIELD,
+            "Ljavax/microedition/lcdui/Display;",
+        )
+        .await
     }
 }
 
@@ -106,14 +126,17 @@ mod test {
     use alloc::vec;
 
     use jvm::{ClassInstanceRef, Jvm, Result as JvmResult};
-    use jvm_class_proto::JavaMethodProto;
-    use jvm_types::{ClassAccessFlags, MethodAccessFlags};
+    use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
+    use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
     use test_utils::{TestPlatform, TestPlatformEvent, run_jvm_test_with_system};
     use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
     use wie_util::Result;
 
     use super::MIDlet;
 
+    // Declares its own private `display`, as three SKT titles' MIDlets do (docs/report/0382).
+    // jvm-bytecode keys instance storage by name, descriptor and flags, so under MIDlet's old field
+    // name the two shared one slot and the game's null was MIDlet's (0262a4fe3389).
     struct TestMIDlet;
 
     impl TestMIDlet {
@@ -123,7 +146,11 @@ mod test {
                 parent_class: Some("javax/microedition/midlet/MIDlet"),
                 interfaces: vec![],
                 methods: vec![JavaMethodProto::new("<init>", "()V", Self::init, MethodAccessFlags::PUBLIC)],
-                fields: vec![],
+                fields: vec![JavaFieldProto::new(
+                    "display",
+                    "Ljavax/microedition/lcdui/Display;",
+                    FieldAccessFlags::PRIVATE,
+                )],
                 access_flags: ClassAccessFlags::PUBLIC,
             }
         }
@@ -157,5 +184,23 @@ mod test {
 
         assert!(exited.load(Ordering::SeqCst));
         Ok(())
+    }
+
+    #[test]
+    fn display_is_the_midlets_own_field_not_a_subclasss() -> Result<()> {
+        run_jvm_test_with_system(
+            Box::new([crate::get_protos().into(), [TestMIDlet::as_proto()].into()]),
+            Box::new(TestPlatform::new()),
+            |jvm, _system| async move {
+                let mut midlet: ClassInstanceRef<MIDlet> = jvm.new_class("TestMIDlet", "()V", ()).await?.into();
+                jvm.put_field(&mut midlet, "display", "Ljavax/microedition/lcdui/Display;", None).await?;
+
+                assert!(
+                    !MIDlet::display(&jvm, &midlet).await?.is_null(),
+                    "the subclass's null display did not reach MIDlet"
+                );
+                Ok(())
+            },
+        )
     }
 }

@@ -217,7 +217,12 @@ impl Graphics {
         tracing::debug!("org.kwis.msp.lcdui.Graphics::setFont({this:?}, {font:?})");
 
         let midp_graphics = jvm.get_field(&this, "midpGraphics", "Ljavax/microedition/lcdui/Graphics;").await?;
-        let midp_font = Font::midp_font(jvm, &font).await?;
+        // null = the default font, as MIDP's setFont (which handles a null itself) defines it.
+        let midp_font: ClassInstanceRef<MidpFont> = if font.is_null() {
+            None.into()
+        } else {
+            Font::midp_font(jvm, &font).await?
+        };
 
         jvm.invoke_virtual(
             &midp_graphics,
@@ -922,6 +927,30 @@ mod test {
     use crate::{classes::org::kwis::msp::lcdui::Image, get_protos};
 
     use super::Graphics;
+
+    // c7f543c73b91 passes null; MIDP's setFont defines that as the default font.
+    #[test]
+    fn test_set_font_null_is_the_default_font() -> Result<()> {
+        run_jvm_test(Box::new([wie_midp::get_protos().into(), get_protos().into()]), |jvm| async move {
+            let image: ClassInstanceRef<Image> = jvm
+                .invoke_static("org/kwis/msp/lcdui/Image", "createImage", "(II)Lorg/kwis/msp/lcdui/Image;", (4, 1))
+                .await?;
+            let graphics: ClassInstanceRef<Graphics> = jvm
+                .invoke_virtual(&image, "org/kwis/msp/lcdui/Image", "getGraphics", "()Lorg/kwis/msp/lcdui/Graphics;", ())
+                .await?;
+            let font: ClassInstanceRef<super::Font> = None.into();
+            let _: () = jvm
+                .invoke_virtual(
+                    &graphics,
+                    "org/kwis/msp/lcdui/Graphics",
+                    "setFont",
+                    "(Lorg/kwis/msp/lcdui/Font;)V",
+                    (font,),
+                )
+                .await?;
+            Ok(())
+        })
+    }
 
     #[test]
     fn test_copy_area() -> Result<()> {

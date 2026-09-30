@@ -1,0 +1,9 @@
+{
+  "date": "2026-09-30",
+  "kind": "fix",
+  "titles": [
+    "33801c1ba14f436fcbe0cf6d7231429ebe73b828b893197ca3553b0e02240ec3"
+  ],
+  "summary_ko": "시작할 때 화면을 그림으로 저장하는 기능이 없어 멈추던 게임이 이제 켜지고 화면이 나와요.",
+  "pr": "https://github.com/Jun025/wie/pull/420"
+}

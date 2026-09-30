@@ -1,0 +1,11 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-30",
+  "task": "wie-2026-09-29-skt-four-startup-dialog-system-exit-adopt-p1",
+  "title": "SKT 4종 시작 종료 — XCE SecureUtil 인증키(구매자 전화번호 MD5) · 구현하지 않음",
+  "summary": "4종의 startApp 첫 호출이 XCE SecureUtil 인증 검사다. MIDlet-Key = MD5(통신사접두+MIN+SERVICE_ID+salt)라 맞는 값은 원 구매자의 전화번호뿐이다. 흉내 낼 값이 없어 코드를 바꾸지 않았다(docs/report/0386).",
+  "changes": ["docs/report/0386 (조사만 · 코드 변경 0)"],
+  "limits": ["대화상자는 XDisplay.refresh stub 때문에 화면에 나오지 않는다 — 채워도 앱은 종료되므로 제안하지 않았다"],
+  "proposals": [],
+  "adoptedProposals": ["2026-09-29-census-wave2-recensus#p1"]
+}

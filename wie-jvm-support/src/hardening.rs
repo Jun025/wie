@@ -27,7 +27,8 @@
 //! missing overload.** `wie_validate` reports it as a resolution error carrying the descriptor,
 //! so a single trace is enough to pick the next one.
 //!
-//! What remains here is therefore **only the null guards** — the half that panics the host.
+//! What remains here is the null guards — the half that panics the host — and one replaced
+//! body, `InputStreamReader.read` (`InputStreamReaderRead`, below), swapped the same way.
 //!
 //! Deliberately NOT covered (measured, not overlooked):
 //! - Pending-thread GC roots need no port at all. The 13-row probe that produced the "six
@@ -37,9 +38,10 @@
 //!   `global_references` as roots. (Corrected 2026-09-04; the first version of this comment
 //!   called it "impossible without a fork", which reported a risk that does not exist.)
 
-use alloc::boxed::Box;
+use alloc::{boxed::Box, vec, vec::Vec};
 
-use jvm::{JavaError, JavaValue, Jvm};
+use encoding_rs::{EUC_KR, UTF_8};
+use jvm::{ClassInstance, JavaChar, JavaError, JavaValue, Jvm, runtime::JavaLangString};
 use jvm_class_proto::{JavaMethodProto, MethodBody};
 use rustjava_runtime::{Runtime, RuntimeClassProto};
 
@@ -88,6 +90,160 @@ fn guard(proto: &mut RuntimeClassProto, name: &str, descriptor: &str, args: &'st
             }),
         },
     );
+
+    true
+}
+
+/// `InputStreamReader.read(char[], off, len)`, replacing the pin's body — which has two defects
+/// that together break reading a text resource:
+///
+/// 1. **A short read every time.** It decodes one 10-byte chunk and returns (`BUF_SIZE = 10`,
+///    `break` once anything is decoded): a 759-byte resource read into a 759-char buffer comes
+///    back as **6** chars. The spec allows short reads, but titles read a whole text file with
+///    ONE call and scan it for delimiters: 1b107b96bf4e (LGT) found none, built
+///    `new String(chars, 2, -2)`, and every key on its menu threw from then on — «게임시작»
+///    never started (measured 2026-09-30 by the progress census).
+/// 2. **EUC-KR split across two chunks is garbled.** It holds back the last byte whenever it is
+///    `>= 0x81`, which is also every TRAIL byte (0xA1..0xFE) of a complete character; the lead
+///    then ends the buffer, a fresh decoder consumes it, and the character comes out as U+FFFD.
+///
+/// So this reads until `len` chars or until more would block (`available() == 0` once something
+/// is read — the JDK's own `StreamDecoder` rule, so a live stream still returns what it has),
+/// and holds back only a genuinely incomplete trailing character. It keeps the pin's fields
+/// (`readBuf`/`writeBuf` carry the bytes and chars left over), so `ready()` and `close()` —
+/// still the pin's — see the same state.
+struct InputStreamReaderRead;
+
+/// Length of the prefix of `bytes` that ends on a character boundary. `bytes` always starts on
+/// one (only whole characters are ever consumed), so EUC-KR can be walked from the front.
+fn complete_prefix(charset: &str, bytes: &[u8]) -> usize {
+    if charset == "UTF-8" {
+        let Some(mut lead) = bytes.len().checked_sub(1) else { return 0 };
+        while lead > 0 && bytes[lead] & 0xc0 == 0x80 {
+            lead -= 1;
+        }
+        let need = match bytes[lead] {
+            0xc0..=0xdf => 2,
+            0xe0..=0xef => 3,
+            0xf0..=0xf7 => 4,
+            _ => 1,
+        };
+        if bytes.len() - lead < need { lead } else { bytes.len() }
+    } else {
+        let mut i = 0;
+        while i < bytes.len() {
+            let width = if bytes[i] >= 0x81 { 2 } else { 1 };
+            if i + width > bytes.len() {
+                break;
+            }
+            i += width;
+        }
+        i
+    }
+}
+
+#[async_trait::async_trait]
+impl MethodBody<JavaError, dyn Runtime> for InputStreamReaderRead {
+    async fn call(&self, jvm: &Jvm, _: &mut (dyn Runtime + 'static), args: Box<[JavaValue]>) -> Result<JavaValue, JavaError> {
+        let [
+            JavaValue::Object(Some(this)),
+            JavaValue::Object(buf),
+            JavaValue::Int(offset),
+            JavaValue::Int(length),
+        ] = &*args
+        else {
+            unreachable!("read([CII)I is called with (this, char[], int, int)");
+        };
+        let (mut this, offset, length) = (this.clone(), *offset, *length);
+        let Some(mut buf) = buf.clone() else {
+            return Err(jvm.exception("java/lang/NullPointerException", "buffer is null").await);
+        };
+        if offset < 0 || length < 0 || offset > jvm.array_length(&buf).await? as i32 - length {
+            return Err(jvm.exception("java/lang/IndexOutOfBoundsException", "Invalid offset or length").await);
+        }
+        if length == 0 {
+            return Ok(JavaValue::Int(0));
+        }
+
+        let charset = JavaLangString::to_rust_string(jvm, &jvm.get_field(&this, "charset", "Ljava/lang/String;").await?).await?;
+        let input: Box<dyn ClassInstance> = jvm.get_field(&this, "in", "Ljava/io/InputStream;").await?;
+        let mut write_buf: Box<dyn ClassInstance> = jvm.get_field(&this, "writeBuf", "[C").await?;
+        let pending: i32 = jvm.get_field(&this, "writeBufSize", "I").await?;
+        let mut chars: Vec<JavaChar> = jvm.load_array(&write_buf, 0, pending as usize).await?;
+        let mut read_buf: Box<dyn ClassInstance> = jvm.get_field(&this, "readBuf", "[B").await?;
+        let carried: i32 = jvm.get_field(&this, "readBufSize", "I").await?;
+        let mut bytes: Vec<u8> = jvm
+            .load_array::<i8>(&read_buf, 0, carried as usize)
+            .await?
+            .into_iter()
+            .map(|b| b as u8)
+            .collect();
+        let mut end_of_input: bool = jvm.get_field(&this, "endOfInput", "Z").await?;
+
+        while (chars.len() as i32) < length && !end_of_input {
+            if !chars.is_empty()
+                && jvm
+                    .invoke_virtual::<_, i32>(&input, "java/io/InputStream", "available", "()I", ())
+                    .await?
+                    <= 0
+            {
+                break;
+            }
+            // A character is at least one byte, so asking for the chars still wanted never
+            // decodes past `len` by more than the one character a carried lead completes.
+            let want = (length as usize - chars.len()).max(1);
+            let temp = jvm.instantiate_array("B", want).await?;
+            let read: i32 = jvm
+                .invoke_virtual(&input, "java/io/InputStream", "read", "([BII)I", (temp.clone(), 0, want as i32))
+                .await?;
+            if read < 0 {
+                end_of_input = true;
+            } else {
+                bytes.extend(jvm.load_array::<i8>(&temp, 0, read as usize).await?.into_iter().map(|b| b as u8));
+            }
+            let complete = if end_of_input { bytes.len() } else { complete_prefix(&charset, &bytes) };
+            let mut decoder = if charset == "UTF-8" { UTF_8 } else { EUC_KR }.new_decoder_without_bom_handling();
+            let mut decoded = vec![0u16; decoder.max_utf16_buffer_length(complete).unwrap_or(complete * 2)];
+            let (_, _, wrote, _) = decoder.decode_to_utf16(&bytes[..complete], &mut decoded, true);
+            chars.extend_from_slice(&decoded[..wrote]);
+            bytes.drain(..complete);
+            if read == 0 {
+                break;
+            }
+        }
+
+        if chars.is_empty() && end_of_input {
+            return Ok(JavaValue::Int(-1));
+        }
+        let out = chars.len().min(length as usize);
+        jvm.store_array(&mut buf, offset as usize, chars[..out].to_vec()).await?;
+
+        let rest = &chars[out..];
+        if rest.len() > jvm.array_length(&write_buf).await? {
+            write_buf = jvm.instantiate_array("C", rest.len()).await?;
+            jvm.put_field(&mut this, "writeBuf", "[C", write_buf.clone()).await?;
+        }
+        jvm.store_array(&mut write_buf, 0, rest.to_vec()).await?;
+        jvm.put_field(&mut this, "writeBufSize", "I", rest.len() as i32).await?;
+        if bytes.len() > jvm.array_length(&read_buf).await? {
+            read_buf = jvm.instantiate_array("B", bytes.len()).await?;
+            jvm.put_field(&mut this, "readBuf", "[B", read_buf.clone()).await?;
+        }
+        jvm.store_array(&mut read_buf, 0, bytes.iter().map(|&b| b as i8).collect::<Vec<_>>())
+            .await?;
+        jvm.put_field(&mut this, "readBufSize", "I", bytes.len() as i32).await?;
+        jvm.put_field(&mut this, "endOfInput", "Z", end_of_input).await?;
+
+        Ok(JavaValue::Int(out as i32))
+    }
+}
+
+fn replace_reader_read(proto: &mut RuntimeClassProto) -> bool {
+    let Some(method) = proto.methods.iter_mut().find(|x| x.name == "read" && x.descriptor == "([CII)I") else {
+        tracing::error!("hardening: {}::read([CII)I not found — reader read NOT replaced", proto.name);
+        return false;
+    };
+    method.body = Box::new(InputStreamReaderRead);
 
     true
 }
@@ -155,6 +311,8 @@ pub fn harden(proto: &mut RuntimeClassProto) -> usize {
         .filter(|descriptor| guard(proto, "<init>", descriptor, &[1], "array is null"))
         .count(),
 
+        "java/io/InputStreamReader" => replace_reader_read(proto) as usize,
+
         // No `java/util/Timer` arm any more: slice D removed it because the pin declares all
         // four `schedule` forms itself (see the module header). The comment that used to sit
         // here still claimed one-shot `schedule` was absent — the opposite of the measurement
@@ -187,6 +345,7 @@ mod tests {
             ("java/io/ByteArrayInputStream", 1),
             ("java/lang/StringBuffer", 1), // slice D: insert(I,String) now upstream
             ("java/lang/String", 6),       // every array-taking <init>
+            ("java/io/InputStreamReader", 1),
         ] {
             let mut proto = get_runtime_class_proto(name).unwrap();
             assert_eq!(harden(&mut proto), expected, "{name}: hardening not applied");
@@ -285,6 +444,109 @@ mod tests {
 
             let copied: Vec<i32> = jvm.load_array(&mut dest, 0, 3).await?;
             assert_eq!(copied, vec![1, 2, 3]);
+
+            Ok(())
+        })
+    }
+}
+
+#[cfg(test)]
+mod reader_read_tests {
+    use alloc::{boxed::Box, vec, vec::Vec};
+
+    use jvm::{Array, ClassInstanceRef, runtime::JavaLangString};
+
+    use test_utils::run_jvm_test;
+    use wie_util::Result;
+
+    /// One `read(char[], 0, n)` over a whole resource returns the whole resource — the call
+    /// 1b107b96bf4e (LGT) makes on a 759-byte text file. Upstream returns 6 of 759 and
+    /// this fails with `left: 6`. The reader is then drained and says so with -1. (Its requests
+    /// end on line boundaries, so no character is split here — that is the next test's job.)
+    #[test]
+    fn one_read_fills_the_buffer_from_a_resource_stream() -> Result<()> {
+        run_jvm_test(Box::new([]), |jvm| async move {
+            let mut text = Vec::new();
+            for i in 0..60 {
+                text.extend_from_slice(b"line ");
+                text.extend_from_slice(&[0xb0, 0xa1, 0xb3, 0xaa]); // «가나» in EUC-KR
+                text.push(b'0' + (i % 10) as u8);
+                text.push(b'\n');
+            }
+            let expected = 60 * 9;
+
+            let mut bytes = jvm.instantiate_array("B", text.len()).await?;
+            jvm.store_array(&mut bytes, 0, text.iter().map(|&b| b as i8).collect::<Vec<_>>()).await?;
+            let stream = jvm.new_class("java/io/ByteArrayInputStream", "([B)V", (bytes,)).await?;
+            let charset = JavaLangString::from_rust_string(&jvm, "EUC-KR").await?;
+            let reader = jvm
+                .new_class(
+                    "java/io/InputStreamReader",
+                    "(Ljava/io/InputStream;Ljava/lang/String;)V",
+                    (stream, charset),
+                )
+                .await?;
+
+            let chars: ClassInstanceRef<Array<u16>> = jvm.instantiate_array("C", expected + 10).await?.into();
+            let read: i32 = jvm
+                .invoke_virtual(&reader, "java/io/Reader", "read", "([CII)I", (chars.clone(), 0, expected as i32 + 10))
+                .await?;
+            assert_eq!(read, expected as i32);
+
+            let got: Vec<u16> = jvm.load_array(&chars, 0, expected).await?;
+            let want: Vec<u16> = (0..60)
+                .flat_map(|i| "line 가나".encode_utf16().chain([u16::from(b'0' + (i % 10) as u8), 10]))
+                .collect();
+            assert_eq!(got, want);
+
+            let eof: i32 = jvm.invoke_virtual(&reader, "java/io/Reader", "read", "([CII)I", (chars, 0, 10)).await?;
+            assert_eq!(eof, -1);
+
+            Ok(())
+        })
+    }
+
+    /// A two-byte EUC-KR character split across two requests comes back whole. One ASCII byte in
+    /// front puts every 2-char request's byte boundary INSIDE a Hangul syllable (x | B0 A1 | …),
+    /// so the lead byte has to be carried to the next request. Without the carry
+    /// (`complete_prefix` bypassed) the lead is decoded alone and this reads U+FFFD.
+    #[test]
+    fn a_character_split_across_requests_is_carried_whole() -> Result<()> {
+        run_jvm_test(Box::new([]), |jvm| async move {
+            let mut text = vec![b'x'];
+            for _ in 0..8 {
+                text.extend_from_slice(&[0xb0, 0xa1, 0xb3, 0xaa]); // «가나» in EUC-KR
+            }
+
+            let mut bytes = jvm.instantiate_array("B", text.len()).await?;
+            jvm.store_array(&mut bytes, 0, text.iter().map(|&b| b as i8).collect::<Vec<_>>()).await?;
+            let stream = jvm.new_class("java/io/ByteArrayInputStream", "([B)V", (bytes,)).await?;
+            let charset = JavaLangString::from_rust_string(&jvm, "EUC-KR").await?;
+            let reader = jvm
+                .new_class(
+                    "java/io/InputStreamReader",
+                    "(Ljava/io/InputStream;Ljava/lang/String;)V",
+                    (stream, charset),
+                )
+                .await?;
+
+            let chars: ClassInstanceRef<Array<u16>> = jvm.instantiate_array("C", 2).await?.into();
+            let mut got = Vec::new();
+            loop {
+                let read: i32 = jvm
+                    .invoke_virtual(&reader, "java/io/Reader", "read", "([CII)I", (chars.clone(), 0, 2))
+                    .await?;
+                if read < 0 {
+                    break;
+                }
+                assert!(read > 0, "a read of 2 chars returned 0 before the end");
+                got.extend(jvm.load_array::<u16>(&chars, 0, read as usize).await?);
+            }
+            let want: Vec<u16> = "x가나가나가나가나가나가나가나가나".encode_utf16().collect();
+            assert_eq!(
+                alloc::string::String::from_utf16_lossy(&got),
+                alloc::string::String::from_utf16_lossy(&want)
+            );
 
             Ok(())
         })

@@ -45,8 +45,8 @@ pub struct System {
 }
 
 /// Draws a guest-native screen onto the Java screen image before the host presents it: the image
-/// as it stands, and a writer onto the same pixels.
-pub type ScreenCompositor = Box<dyn FnMut(&dyn Image, &mut dyn ImageBuffer) + Send>;
+/// as it stands, and a writer onto the same pixels. Returns whether any native pixel went onto it.
+pub type ScreenCompositor = Box<dyn FnMut(&dyn Image, &mut dyn ImageBuffer) -> bool + Send>;
 
 impl System {
     pub fn new<T>(platform: Box<dyn Platform>, pid: &str, aid: &str, task_runner: T) -> Self
@@ -198,9 +198,10 @@ impl System {
         self.screen_compositor.lock().is_some()
     }
 
-    pub fn compose_screen(&self, current: &dyn Image, target: &mut dyn ImageBuffer) {
-        if let Some(compositor) = self.screen_compositor.lock().as_mut() {
-            compositor(current, target);
-        }
+    pub fn compose_screen(&self, current: &dyn Image, target: &mut dyn ImageBuffer) -> bool {
+        self.screen_compositor
+            .lock()
+            .as_mut()
+            .is_some_and(|compositor| compositor(current, target))
     }
 }

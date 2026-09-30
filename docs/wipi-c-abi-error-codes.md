@@ -1,7 +1,7 @@
 # `wie_wipi_c` return codes that are outside the `WIPICError` vocabulary
 
-Four host functions return an `i32` that is not a `WIPICError` variant. **All four are deliberate
-and stay as they are.** This file is the census and the reasoning; the four sites carry a one-line
+Five host functions return an `i32` that is not a `WIPICError` variant. **All five are deliberate
+and stay as they are.** This file is the census and the reasoning; the five sites carry a one-line
 comment pointing here. Read this before "cleaning up" any of them.
 
 ## The vocabulary, and why "outside it" is not automatically a defect
@@ -29,9 +29,9 @@ call sites in `wipic_sys`, covering **two** host functions:
 
 `get_resource` returned `-1` until 2026-09-07 and was changed to `-18` for exactly this reason
 (`docs/report/0069--…`). `create_image` only ever returns `1`, which is in the vocabulary. **So the
-transmute path is clean, and the four sites below are off it.**
+transmute path is clean, and the five sites below are off it.**
 
-## The four sites, and the disposition of each
+## The five sites, and the disposition of each
 
 Each was measured 2026-09-07: how the value reaches the guest, whether it is on the transmute path,
 and whether anything inside `wie_wipi_c` branches on it. **Internal branch readers: 0 for all four**
@@ -44,6 +44,7 @@ test that asserts the success path).
 | 2 | `database::seek_record_single`, unknown `origin` | `-1` | raw `i32` — lgt only (`WIPICSvcId::Unk12`) | keep |
 | 3 | `database::stream_read`, past EOF | `-23` (`M_E_EOF`) | raw `i32` — ktf + lgt | keep |
 | 4 | `media::clip_put_data`, null clip | `-1` | `wipic_sys` wrapper: `if result < 0 { Err(MediaError::Platform(result)) }` | keep |
+| 5 | `net::socket` (2026-09-29) | `-1` (`M_E_ERROR`) | raw `i32` — ktf only, no `wipic_sys` wrapper | keep — same reasoning as #1 |
 
 **Why keep, per site — the reasons are different, so do not collapse them into one rule.**
 

@@ -96,6 +96,11 @@ impl WIPICContext for KtfWIPICContext {
     }
 
     fn free(&mut self, memory: WIPICIndirectPtr) -> Result<()> {
+        // Freeing a null handle is a defined no-op (C `free(NULL)` / `MC_knlFree(NULL)`), as in LGT's
+        // `free_indirect`. A KTF title's first-run exit calls `MC_grpDestroyOffScreenFrameBuffer(0)`.
+        if memory.0 == 0 {
+            return Ok(());
+        }
         let size: u32 = read_generic(&self.core, memory.0 + 4)?;
         Allocator::free(&mut self.core, memory.0, size + 12)?;
 
@@ -179,5 +184,93 @@ impl ByteRead for KtfWIPICContext {
 impl ByteWrite for KtfWIPICContext {
     fn write_bytes(&mut self, address: WIPICWord, data: &[u8]) -> wie_util::Result<()> {
         self.core.write_bytes(address, data)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use alloc::{boxed::Box, sync::Arc};
+    use core::{
+        future::Future,
+        mem::size_of,
+        pin::Pin,
+        sync::atomic::{AtomicBool, Ordering},
+    };
+
+    use bytemuck::Zeroable;
+
+    use wipi_types::wipic::WIPICIndirectPtr;
+
+    use wie_backend::{DefaultTaskRunner, System};
+    use wie_core_arm::{Allocator, ArmCore};
+    use wie_util::{ByteWrite, Result, WieError, write_generic};
+    use wie_wipi_c::WIPICContext;
+
+    use test_utils::TestPlatform;
+
+    use crate::runtime::{
+        java::jvm_support::{KtfJvmSupport, KtfJvmThreadContext},
+        svc_ids::WIPICTableId,
+        wipi_c::method_table::get_method_body,
+    };
+
+    use super::KtfWIPICContext;
+
+    async fn new_context(system: &mut System) -> Result<KtfWIPICContext> {
+        let mut core = ArmCore::new(false, None)?;
+        Allocator::init(&mut core)?;
+        let mut registers = core.save_context();
+        registers.sp = Allocator::alloc(&mut core, 0x100)? + 0x100;
+        core.restore_context(&registers);
+        let ptr_thread_context = Allocator::alloc(&mut core, size_of::<KtfJvmThreadContext>() as u32)?;
+        write_generic(&mut core, ptr_thread_context, KtfJvmThreadContext::zeroed())?;
+        KtfJvmSupport::set_current_thread_context(&mut core, ptr_thread_context)?;
+        let (jvm, _) = KtfJvmSupport::init(&mut core, system, None).await?;
+
+        Ok(KtfWIPICContext::new(core, system.clone(), jvm, Default::default()))
+    }
+
+    fn run(body: fn(KtfWIPICContext) -> Pin<Box<dyn Future<Output = Result<()>> + Send>>) -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let mut system_clone = system.clone();
+        system.spawn(async move || {
+            body(new_context(&mut system_clone).await?).await?;
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    // A KTF title's first-run exit destroys an offscreen frame buffer it never created.
+    #[test]
+    fn free_of_null_is_a_no_op() -> Result<()> {
+        run(|mut context| Box::pin(async move { context.free(WIPICIndirectPtr(0)) }))
+    }
+
+    // Interface4 slot 0 is the header's record-database open, not the unnamed-table stub.
+    #[test]
+    fn interface4_slot_0_opens_a_record_database() -> Result<()> {
+        run(|mut context| {
+            Box::pin(async move {
+                let name = context.alloc_raw(16)?;
+                context.write_bytes(name, b"SaveData\0")?;
+                let open = get_method_body(WIPICTableId::Interface4, 0).unwrap();
+                let args = [name, 0xeec, 0, 1];
+                match open.call(&mut context, Box::new(args)).await {
+                    Err(WieError::Unimplemented(message)) => panic!("Interface4[0] is still a stub: {message}"),
+                    result => {
+                        result?;
+                    }
+                }
+
+                Ok(())
+            })
+        })
     }
 }

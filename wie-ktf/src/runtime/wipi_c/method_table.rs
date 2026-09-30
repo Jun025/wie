@@ -378,7 +378,7 @@ pub fn get_net_method_table() -> Vec<WIPICMethodBody> {
     vec![
         net::connect.into_body(),
         net::close.into_body(),
-        gen_stub(2, "MC_netSocket"),
+        net::socket.into_body(),
         gen_stub(3, "MC_netSocketConnect"),
         gen_stub(4, "MC_netSocketWrite"),
         gen_stub(5, "MC_netSocketRead"),
@@ -586,7 +586,7 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
             WIPICGraphicsMethodId::CreateImage => Some(graphics::create_image.into_body()),
             WIPICGraphicsMethodId::DestroyImage => Some(graphics::destroy_image.into_body()),
             WIPICGraphicsMethodId::DecodeNextImage => Some(gen_stub(34, "MC_grpDecodeNextImage")),
-            WIPICGraphicsMethodId::EncodeImage => Some(gen_stub(35, "MC_grpEncodeImage")),
+            WIPICGraphicsMethodId::EncodeImage => Some(graphics::encode_image.into_body()),
             WIPICGraphicsMethodId::PostEvent => Some(graphics::post_event.into_body()),
             WIPICGraphicsMethodId::HandleInput => Some(gen_stub(37, "MC_imHandleInput")),
             WIPICGraphicsMethodId::SetCurrentMode => Some(gen_stub(38, "MC_imSetCurrentMode")),
@@ -613,6 +613,19 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
             WIPICGraphicsMethodId::GetImageInfo => Some(gen_stub(59, "OEMC_grpGetImageInfo")),
         },
         WIPICTableId::Interface3 => get_unk3_method_table().into_iter().nth(function_id as usize),
+        // The header's record database, in header order — slots 3, 7 and 10 measured with a handle
+        // from slot 0 in r0 and the header's arguments after it (docs/report of this round).
+        WIPICTableId::Interface4 if function_id <= 10 && ![8, 9].contains(&function_id) => Some(match function_id {
+            0 => database::open_record_database.into_body(),
+            1 => database::close_database.into_body(),
+            2 => database::delete_database.into_body(),
+            3 => database::insert_record.into_body(),
+            4 => database::select_record.into_body(),
+            5 => database::update_record.into_body(),
+            6 => database::delete_record.into_body(),
+            7 => database::list_record.into_body(),
+            _ => database::get_number_of_records.into_body(),
+        }),
         WIPICTableId::Interface4 => {
             if function_id < 64 {
                 Some(gen_unnamed_table_stub(5, "Interface4", function_id))

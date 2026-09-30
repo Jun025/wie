@@ -1,0 +1,11 @@
+{
+  "date": "2026-09-30",
+  "kind": "fix",
+  "titles": [
+    "85e94babc24759be78f3e25025b1b1e4a59b67c972fb426dd0b534f7c285701d",
+    "c7f543c73b9103d57b5e9e5b825e6bdb595de812fbccf81b718db8d2e94fa756",
+    "0262a4fe3389fc957b2597e92f71a1c17db91e0728b656042b8a14f7f345c2af"
+  ],
+  "summary_ko": "시작하자마자, 또는 진행 중에 꺼지던 게임 3종이 이제 계속 실행돼요. 소리 파일을 못 찾거나 글꼴을 비워 둔 경우에도 꺼지지 않아요.",
+  "pr": "https://github.com/Jun025/wie/pull/424"
+}

@@ -1,4 +1,5 @@
 use alloc::{boxed::Box, format, string::String, vec};
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use arm32_cpu::{Cpu, Memory, Mode, reg};
 
@@ -163,6 +164,10 @@ impl ArmRegister {
 const TOTAL_MEMORY: u64 = 0x100000000;
 const PAGE_SIZE: usize = 0x10000;
 const PAGE_MASK: u32 = (PAGE_SIZE - 1) as _;
+const NULL_READ_LIMIT: u32 = 0x1000;
+static ZERO_PAGE: [u8; PAGE_SIZE] = [0; PAGE_SIZE];
+// ponytail: one flag per process, not per engine — per-engine needs a field on EmulatedMemory.
+static NULL_READ_SEEN: AtomicBool = AtomicBool::new(false);
 
 struct EmulatedMemory {
     pages: Box<[Option<Box<[u8; PAGE_SIZE]>>]>,
@@ -262,6 +267,23 @@ impl<'a> Arm32CpuMemory<'a> {
         }
     }
 
+    /// A guest READ below [`NULL_READ_LIMIT`] of unmapped memory yields 0 instead of faulting;
+    /// writes there, jumps there (`run`'s `pc < 0x1000`), and host-side reads still fault.
+    ///
+    /// Shipped titles read through null and go on: `2b1ed0c8d061` asks for a sound file whose name
+    /// it misspells, keeps the empty sound, and later builds `*(null) + 8` as the data pointer it
+    /// hands over with size 0. That typo is in the shipped binary, so the handset read address 0
+    /// and survived; faulting here stopped the title at its first serve (`docs/report/0391`).
+    fn read_page(&mut self, addr: u32) -> Option<&[u8; PAGE_SIZE]> {
+        if addr < NULL_READ_LIMIT && self.emulated_memory.pages[0].is_none() {
+            if !NULL_READ_SEEN.swap(true, Ordering::Relaxed) {
+                tracing::warn!("guest read through a null pointer ({addr:#x}) — reads as 0; logged once per process");
+            }
+            return Some(&ZERO_PAGE);
+        }
+        self.get_page(addr).map(|x| &*x)
+    }
+
     fn get_page(&mut self, addr: u32) -> Option<&mut [u8; PAGE_SIZE]> {
         let page_address = addr & !PAGE_MASK;
         let page_data = self.emulated_memory.pages[page_address as usize / PAGE_SIZE].as_mut();
@@ -279,7 +301,7 @@ impl Memory for Arm32CpuMemory<'_> {
     fn r8(&mut self, addr: u32) -> u8 {
         let offset = addr & PAGE_MASK;
 
-        let page = self.get_page(addr);
+        let page = self.read_page(addr);
         if page.is_none() {
             return 0;
         }
@@ -292,7 +314,7 @@ impl Memory for Arm32CpuMemory<'_> {
     fn r16(&mut self, addr: u32) -> u16 {
         let offset = addr & PAGE_MASK;
 
-        let page = self.get_page(addr);
+        let page = self.read_page(addr);
         if page.is_none() {
             return 0;
         }
@@ -305,7 +327,7 @@ impl Memory for Arm32CpuMemory<'_> {
     fn r32(&mut self, addr: u32) -> u32 {
         let offset = addr & PAGE_MASK;
 
-        let page = self.get_page(addr);
+        let page = self.read_page(addr);
         if page.is_none() {
             return 0;
         }
@@ -460,6 +482,25 @@ mod tests {
         let mut access = memory.as_arm32cpu_memory();
         assert_eq!(access.r32(0x20000), 0);
         assert_eq!(access.memory_error, Some(0x20000));
+    }
+
+    #[test]
+    fn guest_reads_through_null_are_zero_but_writes_and_higher_reads_still_fault() {
+        let mut memory = EmulatedMemory::new();
+        let mut access = memory.as_arm32cpu_memory();
+
+        assert_eq!((access.r8(0), access.r16(0x10), access.r32(0xffc)), (0, 0, 0));
+        assert_eq!(access.memory_error, None);
+
+        assert_eq!(access.r32(0x1000), 0);
+        assert_eq!(access.memory_error, Some(0x1000));
+
+        access.memory_error = None;
+        access.w32(0x8, 1);
+        assert_eq!(access.memory_error, Some(0x8));
+
+        let mut buf = [0; 4];
+        assert!(memory.read_range(0, 4, &mut buf).is_err(), "host-side reads keep faulting");
     }
 
     #[test]

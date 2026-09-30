@@ -1634,6 +1634,131 @@ pub(crate) mod tests {
         Ok(())
     }
 
+    // 1eaa92092bee: the superclass failed to resolve and JavaClassDefinition::new unwrapped it.
+    #[test]
+    fn define_class_rust_rethrows_an_unresolvable_superclass() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, _core, implementation) = init_jvm(&system_clone).await?;
+            let result = implementation
+                .define_class_rust(
+                    &jvm,
+                    JavaClassProto {
+                        name: "net/wie/test/Orphan",
+                        parent_class: Some("net/wie/test/NoSuchParent"),
+                        interfaces: vec![],
+                        methods: vec![],
+                        fields: vec![],
+                        access_flags: ClassAccessFlags::PUBLIC,
+                    },
+                    Box::new(()),
+                )
+                .await;
+            assert!(result.is_err());
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    struct GuestThread;
+
+    async fn guest_thread_init(jvm: &Jvm, _context: &mut (), this: ClassInstanceRef<GuestThread>) -> JvmResult<()> {
+        jvm.invoke_special(&this, "java/lang/Thread", "<init>", "()V", ()).await
+    }
+
+    // The phone's Thread is four words (id J · target · name); rustjava's added five primitives at
+    // words 4–8, so Thread.<init> wrote a guest subclass's own words and past the instance, and the
+    // collector panicked on the neighbour it zeroed (a16f08d025eb). Dropping the `host_field` rows
+    // for java/lang/Thread in data/lgt_java_abi.toml turns this red.
+    #[test]
+    fn thread_keeps_the_phone_layout() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, core, implementation) = init_jvm(&system_clone).await?;
+            jvm.resolve_class("java/lang/Thread").await.unwrap();
+            let thread = jvm.get_class("java/lang/Thread").unwrap().definition;
+            let thread = thread.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap();
+            assert_eq!(thread.instance_field_word_count()?, 4);
+
+            let class = implementation
+                .define_class_rust(
+                    &jvm,
+                    JavaClassProto {
+                        name: "net/wie/test/GuestThread",
+                        parent_class: Some("java/lang/Thread"),
+                        interfaces: vec![],
+                        methods: vec![JavaMethodProto::new("<init>", "()V", guest_thread_init, MethodAccessFlags::PUBLIC)],
+                        fields: vec![JavaFieldProto::new("own", "I", FieldAccessFlags::PRIVATE)],
+                        access_flags: ClassAccessFlags::PUBLIC,
+                    },
+                    Box::new(()),
+                )
+                .await
+                .unwrap();
+            jvm.register_class(class, None).await.unwrap();
+
+            // Allocate, mark word 4 (own) and word 5 (past the instance), then run Thread.<init>.
+            let definition = jvm.get_class("net/wie/test/GuestThread").unwrap().definition;
+            let mut instance = jvm.instantiate_class("net/wie/test/GuestThread").await.unwrap();
+            assert_eq!(
+                definition
+                    .as_any()
+                    .downcast_ref::<super::JavaClassDefinition>()
+                    .unwrap()
+                    .instance_field_word_count()?,
+                5
+            );
+            let ptr_fields = instance.as_any().downcast_ref::<JavaClassInstance>().unwrap().ptr_fields()?;
+            jvm.put_field(&mut instance, "own", "I", 0x1234_5678i32).await.unwrap();
+            let past = read_generic::<u32, _>(&core, ptr_fields + 5 * 4)?;
+            let _: () = jvm
+                .invoke_special(&instance, "net/wie/test/GuestThread", "<init>", "()V", ())
+                .await
+                .unwrap();
+            assert_eq!(
+                read_generic::<u32, _>(&core, ptr_fields + 4 * 4)?,
+                0x1234_5678,
+                "Thread.<init> wrote the subclass's own word"
+            );
+            assert_eq!(
+                read_generic::<u32, _>(&core, ptr_fields + 5 * 4)?,
+                past,
+                "Thread.<init> wrote past the instance"
+            );
+
+            let _: () = jvm
+                .invoke_virtual(&instance, "java/lang/Thread", "setPriority", "(I)V", (7,))
+                .await
+                .unwrap();
+            let priority: i32 = jvm.invoke_virtual(&instance, "java/lang/Thread", "getPriority", "()I", ()).await.unwrap();
+            assert_eq!(priority, 7);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
     /// A guest class whose name string cannot be read must come back as an error, not a panic.
     ///
     /// `register_generated_class` is reached from `java_register_class` with a class pointer
@@ -1841,6 +1966,10 @@ pub(crate) mod tests {
                 ("java/io/ByteArrayInputStream", 13, "skip", "(J)J"),
                 // 턴·서든어택포켓
                 ("java/io/ByteArrayOutputStream", 16, "toByteArray", "()[B"),
+                // 61ed69520fd3
+                ("java/io/DataOutputStream", 12, "write", "([BII)V"),
+                // 61ed69520fd3
+                ("java/io/DataOutputStream", 13, "flush", "()V"),
                 ("java/lang/Runtime", 11, "freeMemory", "()J"),
                 ("java/lang/Runtime", 12, "totalMemory", "()J"),
                 // 배틀몬스터·학교가는길·체스마스터
@@ -1889,6 +2018,10 @@ pub(crate) mod tests {
                 ("java/util/Vector", 31, "removeAllElements", "()V"),
                 // 월드장기체스
                 ("java/util/Stack", 33, "pop", "()Ljava/lang/Object;"),
+                // 73f3a21e981c (progress census 2026-09-30)
+                ("java/util/Stack", 35, "empty", "()Z"),
+                // be08d047cbae (progress census 2026-09-30)
+                ("java/util/Timer", 16, "cancel", "()V"),
             ] {
                 let class = jvm.resolve_class(class_name).await.unwrap();
                 let definition = class.definition.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap().clone();

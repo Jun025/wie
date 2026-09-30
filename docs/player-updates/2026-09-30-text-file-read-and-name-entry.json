@@ -1,0 +1,11 @@
+{
+  "date": "2026-09-30",
+  "kind": "fix",
+  "titles": [
+    "1b107b96bf4ed7d2634d778fb45c9c3e3a887f37f35c1b73359ff44c0acb3674",
+    "1e43e2e0055f83bc05bfa08c76ff27c2460d6fc8ab0e4ec190fb9e7252af7aef",
+    "5d3ba49eccf756d4d20d4d4289eca36a8927e12775eb94a08b2ae97a6f8e2b3d"
+  ],
+  "summary_ko": "메뉴에서 «게임 시작»을 눌러도 시작되지 않던 문제, 이름 입력칸에 글자가 들어가지 않던 문제, 타이틀 화면에서 더 넘어가지 않던 문제를 고쳤어요. 이제 게임 안으로 들어가 계속 진행할 수 있어요.",
+  "pr": "https://github.com/Jun025/wie/pull/425"
+}

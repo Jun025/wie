@@ -1,0 +1,10 @@
+{
+  "date": "2026-09-30",
+  "kind": "new-support",
+  "titles": [
+    "e085e193211d048f4906f801f79f7dd3ee6ef91e5405d179569c43e98460edc8",
+    "59263295de749f2b5f44d5aeb5ceedf06bffb60d888cfe26afdf4432b6082bef"
+  ],
+  "summary_ko": "저장 공간을 준비하다가 시작하지 못하던 게임 2종이 이제 켜져요. 그중 하나는 아직 플레이 도중에 멈출 수 있어요.",
+  "pr": "https://github.com/Jun025/wie/pull/423"
+}

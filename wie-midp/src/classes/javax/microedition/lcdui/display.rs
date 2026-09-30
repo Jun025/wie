@@ -972,15 +972,19 @@ impl Display {
             }
         }
 
-        // HACK: disable paint for clet apps, as they handle paint by themselves
+        // Clet apps present by themselves (`MC_grpFlushLcd`), so their Java image is not presented —
+        // unless the screen framebuffer changed: on the handset that buffer is LCD memory, and 11 KTF
+        // Clet titles draw into it and only `MC_grpRepaint` (docs/report/0361 · 0391). A title that
+        // flushes an off-screen buffer leaves it unchanged and is not repainted over.
         let disable_paint: bool = jvm.get_field(&this, "paintDisabled", "Z").await?;
-        if !disable_paint {
-            let screen_image: ClassInstanceRef<Image> = jvm.get_field(&this, "screenImage", "Ljavax/microedition/lcdui/Image;").await?;
-            if context.system().has_screen_compositor() {
-                let current = Image::image(jvm, &screen_image).await?;
-                let mut buffer = Image::image_buffer(jvm, &screen_image).await?;
-                context.system().compose_screen(&*current, &mut *buffer);
-            }
+        let screen_image: ClassInstanceRef<Image> = jvm.get_field(&this, "screenImage", "Ljavax/microedition/lcdui/Image;").await?;
+        let mut native_drawn = false;
+        if context.system().has_screen_compositor() {
+            let current = Image::image(jvm, &screen_image).await?;
+            let mut buffer = Image::image_buffer(jvm, &screen_image).await?;
+            native_drawn = context.system().compose_screen(&*current, &mut *buffer);
+        }
+        if !disable_paint || native_drawn {
             let image = Image::image(jvm, &screen_image).await?;
 
             let platform = context.system().platform();
@@ -1842,6 +1846,37 @@ mod test {
                 Ok(())
             },
         )
+    }
+
+    // Clet mode skips presenting the Java image, but a screen framebuffer the title drew into is
+    // presented: 11 KTF Clet titles draw there, only call MC_grpRepaint, and were a black screen.
+    #[test]
+    fn a_paint_disabled_display_presents_only_when_the_compositor_drew() -> Result<()> {
+        let platform = TestPlatform::new();
+        let paints = platform.paint_counter();
+        run_jvm_test_with_system(test_protos(), Box::new(platform), move |jvm, system| async move {
+            let display: ClassInstanceRef<Display> = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?.into();
+            let _: () = jvm
+                .invoke_virtual(&display, "javax/microedition/lcdui/Display", "disablePaint", "()V", ())
+                .await?;
+            let paint = async || -> JvmResult<usize> {
+                let _: () = jvm
+                    .invoke_virtual(&display, "javax/microedition/lcdui/Display", "handlePaintEvent", "()V", ())
+                    .await?;
+                Ok(paints.load(Ordering::SeqCst))
+            };
+
+            assert_eq!(paint().await?, 0, "no compositor: nothing to present");
+
+            let drew = Arc::new(AtomicBool::new(false));
+            let drew_clone = drew.clone();
+            system.set_screen_compositor(Box::new(move |_, _| drew_clone.load(Ordering::SeqCst)));
+            assert_eq!(paint().await?, 0, "native unchanged (an off-screen FlushLcd title): not repainted over");
+
+            drew.store(true, Ordering::SeqCst);
+            assert_eq!(paint().await?, 1, "native drawn: presented");
+            Ok(())
+        })
     }
 
     #[test]

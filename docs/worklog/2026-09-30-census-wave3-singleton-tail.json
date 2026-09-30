@@ -1,0 +1,36 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-09-30",
+  "task": "wie-census-wave3-singleton-tail-boot-and-longplay",
+  "title": "3차 꼬리 — 단발 벽 14종 중 5종 playable · 1종 limited",
+  "summary": "전화번호 빈 문자열(LGT 2) · 없는 DB 의 create=false(KTF 1) · MC_grpEncodeImage(KTF 1) · 할당기 반납 버킷(LGT 1) · DataOutputStream 12/13(LGT 1). 나머지 8종은 다음 벽을 docs/report/0389 에 적었다.",
+  "changes": [
+    "wie-wipi-c · wie-wipi-java — PHONENUMBER = 01000000000",
+    "wie-wipi-java — openDataBase(create=false) 없는 DB → DataBaseException",
+    "wie-wipi-c · wie-backend · wie-ktf — MC_grpEncodeImage (BMP · 메모리 id)",
+    "wie-core-arm — Allocator::free 가 주소로 버킷·리스트를 가른다",
+    "wie-lgt — ABI OutputStream 12 write([BII)V · 13 flush()V · 빈 칸 경고에 인자·lr",
+    "docs/report/0389 · player-updates 5 · compat.json 6행"
+  ],
+  "verification": [
+    "전수 도구 후 측정 21종: 대상 6종 playable · 라이브 5 + 가드 2 playable",
+    "짝 재측: 전화번호 문자열 116종 · openDataBase 83종 — 퇴행 0",
+    "변이 7건 전부 red"
+  ],
+  "limits": [
+    "할당기에 크기를 잘못 넘긴 호출자는 특정하지 못했다(경고로 남긴다)",
+    "EncodeImage 의 BMP 를 게임이 직접 해석하는지는 재지 않았다"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "손님 힙이 차서 호스트가 panic 하는 두 타이틀 — 무엇이 힙을 채우나",
+      "plainSummary": "LGT 한 타이틀은 키 두 번 만에, KTF 한 타이틀은 4~9분 뒤 게임 메모리가 가득 차고, 그때 에뮬레이터가 오류를 게임에 넘기지 못하고 통째로 꺼진다.",
+      "userBenefit": "두 타이틀(fe76e641bb3d · 7e2247bdf565)이 오래 플레이해도 꺼지지 않게 되고, 힙이 차는 다른 타이틀도 앱 전체가 꺼지는 대신 게임 안 오류로 끝난다.",
+      "why": "이 회차 측정: fe76e641bb3d 는 02 단계에서 17KB 배열 할당이 Allocation failure, 그 WieError 를 만드는 중 class_definition.rs:87 unwrap panic. 7e2247bdf565 는 259~795 단계에서 jvm_implementation.rs:55 unwrap(AllocationFailure) panic. 둘 다 원인(무엇이 힙을 채우는가)은 재지 않았다.",
+      "tradeoff": "누수인지 게임이 정말 많이 쓰는지 먼저 가려야 한다. 힙 사용량 계측이 필요하고, 누수면 한 회차에 안 끝날 수 있다.",
+      "effort": "M",
+      "target": "wie-core-arm allocator · wie-lgt/wie-ktf jvm_support"
+    }
+  ]
+}

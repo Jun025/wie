@@ -140,6 +140,13 @@ vtable = [
 name = "java/io/OutputStream"
 vtable = [
     { name = "write", descriptor = "([B)V", index = 11 },
+    # 61ed69520fd3 ends a save the same way from its key handler (measured 2026-09-30, 0x1b218..0x1b254,
+    # one stream held at sp+8): index 12 with r1 = an array, r2 = 0 and r3 = that array's length word,
+    # then index 13 and index 14, each with r0 only and the result ignored — `s.write(b, 0, b.length);
+    # s.flush(); s.close();`. 12 and 13 are the declaration order between the measured write([B) (11)
+    # and close() (14); the call shapes match them and nothing else in the class.
+    { name = "write", descriptor = "([BII)V", index = 12 },
+    { name = "flush", descriptor = "()V", index = 13 },
     # 턴 (4 sites) and 서든어택포켓 (5 sites — a separate binary) end every save the same way:
     # toByteArray (16) on the BAOS, then index 14 on the DataOutputStream wrapping it and index 14
     # on the BAOS itself, r0 only, return ignored, and neither stream is touched again before the
@@ -508,12 +515,26 @@ vtable = [
 # Still unobserved: with the row removed, a 2026-09-24 --inject sweep of all 100 LGT titles
 # dispatched Thread index 13 zero times, so 13 is derived and unmeasured.
 # Unresolved by observation (13) — re-measure trigger: a title observed dispatching this slot.
+#
+# Instance words: the phone's Thread is FOUR (measured 2026-09-30 — two titles subclass it with no
+# declared field and total=4, and the reference bitmap marks words 2 and 3). rustjava-runtime 0.1.1
+# lays out id J, target, name in exactly those four and then five primitives (priority · interrupted
+# · started · alive · daemon) at words 4–8, past the instance: Thread.<init> zeroed the next
+# allocation's header and the collector panicked on it (a16f08d025eb, 2a57e33133b5), and a subclass
+# with its own hidden words (517ed32c92d6, base 7) had them overwritten. Those five live host-side.
 [[class]]
 name = "java/lang/Thread"
 vtable = [
     { name = "start", descriptor = "()V", index = 10 },
     { name = "isAlive", descriptor = "()Z", index = 13 },
     { name = "setPriority", descriptor = "(I)V", index = 14 },
+]
+host_field = [
+    { name = "priority", descriptor = "I" },
+    { name = "interrupted", descriptor = "Z" },
+    { name = "started", descriptor = "Z" },
+    { name = "alive", descriptor = "Z" },
+    { name = "daemon", descriptor = "Z" },
 ]
 
 [[class]]
@@ -592,6 +613,12 @@ vtable = [
 name = "java/util/Timer"
 vtable = [
     { name = "schedule", descriptor = "(Ljava/util/TimerTask;JJ)V", index = 12 },
+    # be08d047cbae's game thread dies on Timer index 16 about 3 s after boot (measured 2026-09-30 by
+    # the progress census: `Unimplemented: java/util/Timer vtable index 16`, uncaught, the screen
+    # never changes again). The CLDC 1.1 order in the comment above ends with cancel() at 16 — the
+    # seventh method of a run starting at 10 — and that is the only argument-free Timer method.
+    # Order-derived: the call site was NOT disassembled.
+    { name = "cancel", descriptor = "()V", index = 16 },
 ]
 
 # 학교가는길's game-loop task is a guest subclass `c` of java/util/TimerTask whose descriptor says
@@ -627,6 +654,11 @@ vtable = [
     # the order decides; the save/restore pairing with push is what pop is for — peek would leave
     # every saved state on the Stack.
     { name = "pop", descriptor = "()Ljava/lang/Object;", index = 33 },
+    # 73f3a21e981c's game thread dies on Stack index 35 right after its logo (measured 2026-09-30 by
+    # the progress census: `Unimplemented: java/util/Stack vtable index 35`). push 32 · pop 33 are
+    # pinned above, so the order continues peek 34 · empty 35 · search 36. Order-derived: the call
+    # site was NOT disassembled.
+    { name = "empty", descriptor = "()Z", index = 35 },
 ]
 
 # An interface row's index is the method's POSITION in the interface, not a vtable slot: the

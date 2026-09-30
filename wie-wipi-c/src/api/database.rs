@@ -1,4 +1,4 @@
-use alloc::{borrow::ToOwned, boxed::Box, format, str, string::String, vec, vec::Vec};
+use alloc::{borrow::ToOwned, boxed::Box, str, string::String, vec, vec::Vec};
 use core::mem::size_of;
 
 use bytemuck::{Pod, Zeroable};
@@ -6,7 +6,7 @@ use bytemuck::{Pod, Zeroable};
 use wipi_types::wipic::WIPICWord;
 
 use wie_backend::Database;
-use wie_util::{Result, WieError, read_generic, read_null_terminated_string_bytes, read_quotable_token, write_generic};
+use wie_util::{Result, read_generic, read_null_terminated_string_bytes, read_quotable_token, write_generic};
 
 use crate::context::WIPICContext;
 
@@ -148,6 +148,53 @@ pub async fn open_database(context: &mut dyn WIPICContext, ptr_name: WIPICWord, 
     Ok(ptr_handle as _)
 }
 
+/// KTF WIPI-C **Interface4 slot 0** — the header's `MC_dbOpenDataBase(name, rsize, create, mode)`.
+///
+/// KTF's `Database` table slot 0 is a different, stream-style open (`open_database`). This table is
+/// unnamed in this repo; slot 0's shape is measured on three titles — `("SaveData", 0xeec, 0, 1)`,
+/// `("FG_102", 0x80, 0, 1)`, `(<name>, 0x80, 1, 1)` — a name, a record size, a create flag and a
+/// mode, which is exactly the header's record-database open. It returns the same handle the other
+/// database entry points already read, so any of them the title reaches next works on it.
+pub async fn open_record_database(context: &mut dyn WIPICContext, ptr_name: WIPICWord, record_size: i32, create: i32, mode: i32) -> Result<i32> {
+    tracing::debug!("KTF Interface4[0] MC_dbOpenDataBase({ptr_name:#x}, {record_size}, {create}, {mode})");
+
+    let Ok(name) = String::from_utf8(read_null_terminated_string_bytes(context, ptr_name)?) else {
+        return Ok(-22);
+    };
+    if name.len() > MAX_NAME_LEN {
+        return Ok(-22);
+    }
+
+    let system = context.system();
+    let pid = system.pid().to_owned();
+    if create == 0 && !system.platform().database_repository().exists(&name, &pid).await {
+        return Ok(-12); // M_E_NOENT
+    }
+    system.platform().database_repository().open(&name, &pid).await;
+
+    let mut handle = DatabaseHandle::zeroed();
+    handle.magic = DATABASE_HANDLE_MAGIC;
+    handle.name[..name.len()].copy_from_slice(name.as_bytes());
+
+    let ptr_handle = context.alloc_raw(size_of::<DatabaseHandle>() as _)?;
+    write_generic(context, ptr_handle, handle)?;
+
+    Ok(ptr_handle as _)
+}
+
+/// `MC_dbInsertRecord(fd, buf, len)` — a new record; returns its id.
+pub async fn insert_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WIPICWord, buf_len: WIPICWord) -> Result<i32> {
+    tracing::debug!("MC_dbInsertRecord({db_id:#x}, {buf_ptr:#x}, {buf_len})");
+
+    let Some(mut db) = get_database_from_db_id(context, db_id).await? else {
+        return Ok(-25); // M_E_INVALIDHANDLE
+    };
+    let mut buf = vec![0; buf_len as usize];
+    context.read_bytes(buf_ptr, &mut buf)?;
+
+    Ok(db.add(&buf).await as _)
+}
+
 pub async fn close_database(context: &mut dyn WIPICContext, db_id: i32) -> Result<i32> {
     tracing::debug!("MC_dbCloseDataBase({db_id:#x})");
 
@@ -185,23 +232,19 @@ pub async fn list_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
 /// KTF WIPI-C **Database slot 8** (header name `MC_dbSortRecords`; KTF's meaning is unknown).
 ///
 /// Disassembled arity is 2 — `f(r0 = pointer to a short ASCII token, r1 = 1)`; `r2`/`r3` are call
-/// machinery. So it refuses with `Unimplemented`, quotes the token, and never writes guest memory.
-/// Reverse-engineering notes (call sites, token, candidate operations):
-/// `docs/report/0175--2026-09-19--2026-09-18-repair-campaign-pilot-unimpl-stub-p0.md` §부록.
+/// machinery. Measured tokens are `"res"`/`"ga"`, each the directory part of the path the same call
+/// site then opens (`docs/report/0175`). What the slot *does* is still unnamed, so this does nothing:
+/// no guest memory is read beyond the logged token and none is written, and it returns 0. That is
+/// safe for every measured caller because all three call sites discard the result (0175 ⑶), and
+/// each of the four candidate meanings there (register an extension · delete by pattern · list a
+/// type · select/ensure a directory) leaves nothing a fresh install would need. Until 2026-09-30 it
+/// refused with `Unimplemented`, which stopped both titles that reach it at boot
+/// (`docs/report/0391`).
 pub async fn sort_records(context: &mut dyn WIPICContext, arg0: WIPICWord, arg1: WIPICWord) -> Result<i32> {
     let token = read_quotable_token(context, arg0);
-    tracing::debug!("KTF database slot 8 (header name: MC_dbSortRecords)({arg0:#x}, {arg1:#x}) token={token:?}");
+    tracing::debug!("KTF database slot 8 (header name: MC_dbSortRecords)({arg0:#x}, {arg1:#x}) token={token:?} — no-op");
 
-    let quoted = match &token {
-        Some(t) => format!(" ({t:?})"),
-        None => String::new(),
-    };
-
-    Err(WieError::Unimplemented(format!(
-        "8: KTF database slot 8 (header name MC_dbSortRecords) — argument layout unknown, \
-         measured r0={arg0:#x}{quoted} r1={arg1:#x} (arity 2: r2 holds the interface table, r3 the callee address); \
-         the header's (fd, buf, len, compare, filter) does not fit"
-    )))
+    Ok(0)
 }
 
 /// `MC_dbGetNumberOfRecords(dbID)` — number of records in the database, or the
@@ -722,114 +765,64 @@ mod tests {
     use crate::context::{WIPICContext, test::TestContext};
 
     use super::{
-        KTF_DATABASE_STORAGE_LIMIT, delete_database, exists_database, exists_database_ktf, list_databases, list_record_info, open_database,
-        select_record, sort_records, stat_by_name_ktf, stream_read, stream_write, update_record,
+        KTF_DATABASE_STORAGE_LIMIT, delete_database, exists_database, exists_database_ktf, get_number_of_records, insert_record, list_databases,
+        list_record, list_record_info, open_database, open_record_database, select_record, sort_records, stat_by_name_ktf, stream_read, stream_write,
+        update_record,
     };
 
-    /// KTF database slot 8 refuses, and refuses **without touching guest memory**.
+    /// KTF Interface4 is the header's record database: the call sequence three titles make —
+    /// open without create (absent: M_E_NOENT), open with create, insert, count, list, select.
+    #[futures_test::test]
+    async fn record_database_round_trip_test() {
+        let mut context = database_test_context();
+        context.write_bytes(0x1000, b"SaveData\0").unwrap();
+        context.write_bytes(0x1100, b"abcd").unwrap();
+
+        assert_eq!(open_record_database(&mut context, 0x1000, 0xeec, 0, 1).await.unwrap(), -12);
+        let fd = open_record_database(&mut context, 0x1000, 0xeec, 1, 1).await.unwrap();
+        assert!(fd > 0);
+
+        let id = insert_record(&mut context, fd, 0x1100, 4).await.unwrap();
+        assert!(id > 0);
+        assert_eq!(get_number_of_records(&mut context, fd).await.unwrap(), 1);
+        assert_eq!(list_record(&mut context, fd, 0x1200, 12).await.unwrap(), 1);
+        let mut word = [0; 4];
+        context.read_bytes(0x1200, &mut word).unwrap();
+        assert_eq!(word, (id as u32).to_le_bytes());
+        assert_eq!(select_record(&mut context, fd, id, 0x1300, 128).await.unwrap(), 0);
+        context.read_bytes(0x1300, &mut word).unwrap();
+        assert_eq!(&word, b"abcd");
+
+        // A later open without create finds it.
+        assert!(open_record_database(&mut context, 0x1000, 0xeec, 0, 1).await.unwrap() > 0);
+    }
+
+    /// KTF database slot 8 is a no-op that returns 0 and **never touches guest memory**.
     ///
     /// The first version of `sort_records` wrote record ids into what it took to be
-    /// a caller-supplied buffer. Measured against the two guests that reach the
-    /// slot, that "buffer" argument is `0x1` — so the write loop would have started
-    /// at guest address 1. This pins the property the rewrite bought: whatever the
-    /// two arguments turn out to mean, nothing is written until somebody knows.
-    ///
-    /// The sentinel sits at `0x0` and at `0x1000`: the first covers the address
-    /// the old loop would have started writing at, and the second is passed in as
-    /// `arg0` by the second case below, so a regression that writes *through an
-    /// argument* fails here rather than in a guest. (It no longer spans a
-    /// heap-range address — dropping `r2` took the only heap-range value out of
-    /// the inputs, and that value was never an argument in the first place.)
-    ///
-    /// It also pins the **error message**, because that string is this round's
-    /// actual product: the coordinate the next round starts from. Dropping
-    /// `r1={arg1:#x}` from it is otherwise a silent green.
+    /// a caller-supplied buffer; measured, that "buffer" argument is `0x1`, so the
+    /// loop would have started at guest address 1. The sentinels sit at `0x0` and at
+    /// `0x1000` (passed as `arg0` below), so a regression that writes *through an
+    /// argument* fails here rather than in a guest.
     #[futures_test::test]
-    async fn sort_records_never_writes_to_guest_memory_test() {
+    async fn sort_records_is_a_no_op_that_never_writes_test() {
         let mut context = database_test_context();
         const SENTINEL: [u8; 16] = [0xAB; 16];
         for base in [0x0u32, 0x1000] {
             context.write_bytes(base, &SENTINEL).unwrap();
         }
+        context.write_bytes(0x2000, b"res\0").unwrap();
 
-        // The arguments a real guest passed (2026-09-18), plus a run with the
-        // header's null-callback shape, which the withdrawn code treated as
-        // "write everything".
-        for args in [(0x13184cu32, 0x1u32), (0x1000, 0x0)] {
-            let err = sort_records(&mut context, args.0, args.1).await.unwrap_err();
-            assert!(
-                matches!(err, wie_util::WieError::Unimplemented(ref m)
-                    if m.contains("argument layout unknown")
-                        && m.contains(&alloc::format!("measured r0={:#x}", args.0))
-                        && m.contains(&alloc::format!("r1={:#x}", args.1))),
-                "slot 8 must refuse rather than act on a guessed layout, and must report both \
-                 measured arguments (that string is the next round's starting coordinate), got {err:?}"
-            );
+        // The arguments real guests pass (a token and 1), the header's null-callback
+        // shape, and an unreadable pointer.
+        for args in [(0x2000u32, 0x1u32), (0x1000, 0x0), (0xFFFF_0000, 0x1)] {
+            assert_eq!(sort_records(&mut context, args.0, args.1).await.unwrap(), 0);
         }
 
         for base in [0x0u32, 0x1000] {
             let mut seen = [0u8; 16];
             context.read_bytes(base, &mut seen).unwrap();
             assert_eq!(seen, SENTINEL, "slot 8 wrote to guest memory at {base:#x}");
-        }
-    }
-
-    /// Slot 8 quotes the token `r0` points at — and quotes **only** a short,
-    /// printable, readable one.
-    ///
-    /// The point of the quote is that the next title to reach this slot names its
-    /// own token in the failure instead of costing somebody a disassembly: the
-    /// two measured tokens, `"res"` and `"ga"`, took a synchronised Thumb sweep
-    /// of two images to recover. The point of the *bounds* is that `r0` is a
-    /// guest pointer and nothing here can prove it is not a path — so the four
-    /// negative cases below (too long, non-printable, unreadable, null) are as
-    /// load-bearing as the two positive ones. (The first revision said "three"
-    /// and there were already four.)
-    ///
-    /// The bounds themselves are pinned in `wie_util::quotable_token`'s test.
-    ///
-    /// Every case still asserts the raw `r0=` is present, because the quote is an
-    /// addition: a regression that loses the token must not also lose the
-    /// coordinate that was already there.
-    #[futures_test::test]
-    async fn sort_records_quotes_only_a_short_printable_token_test() {
-        let mut context = database_test_context();
-
-        // The two tokens real guests passed, measured 2026-09-19 by resolving the
-        // sl-relative pointer table in `0103451A` / `01031C0A`.
-        for (addr, token) in [(0x2000u32, &b"res\0"[..]), (0x2100, &b"ga\0"[..])] {
-            context.write_bytes(addr, token).unwrap();
-            let err = sort_records(&mut context, addr, 1).await.unwrap_err();
-            let wie_util::WieError::Unimplemented(m) = err else {
-                panic!("slot 8 must stay Unimplemented")
-            };
-            let want = alloc::format!("{:?}", str::from_utf8(&token[..token.len() - 1]).unwrap());
-            assert!(
-                m.contains(&want) && m.contains(&alloc::format!("measured r0={addr:#x}")),
-                "slot 8 must quote the token AND keep the raw pointer, got {m}"
-            );
-        }
-
-        // Not quoted: too long, non-printable, unreadable, null. The message keeps
-        // the raw pointer in every one of them.
-        //
-        let long = [b'a'; 17];
-        context.write_bytes(0x2200, &long).unwrap();
-        context.write_bytes(0x2300, b"ab\x01cd\0").unwrap();
-        for (addr, why) in [
-            (0x2200u32, "longer than QUOTABLE_TOKEN_MAX"),
-            (0x2300, "contains a control byte"),
-            (0xFFFF_0000, "unreadable"),
-            (0x0, "null"),
-        ] {
-            let err = sort_records(&mut context, addr, 1).await.unwrap_err();
-            let wie_util::WieError::Unimplemented(m) = err else {
-                panic!("slot 8 must stay Unimplemented")
-            };
-            assert!(
-                !m.contains(" (\"") && m.contains(&alloc::format!("measured r0={addr:#x}")),
-                "slot 8 must not quote a token that is {why}, and must still report r0, got {m}"
-            );
         }
     }
 

@@ -205,6 +205,14 @@ pub enum WIPICSvcId {
     TimeComponent = 0x321,
     TimeConvert = 0x322,
     TimeToTm = 0x323,
+    // The 0x320 section is UIC, in KTF's `MC_uic*` order — measured 2026-09-30 at one call site shared
+    // by two titles (1cd151222bde · 8f7758fa43b6): 800() → 801("TextComponent") → 802(ctx, class) →
+    // 809(comp, x, y, w, h, 3) → 833(comp, n) → 811(comp, 1), and 803(comp) on the old one first.
+    // KTF index 9/11/33 = Configure/SetEnable/SetMaxTextSize; the argument counts match. 800–803
+    // keep their older names and bodies (they only hand back a handle nothing reads).
+    UicConfigure = 0x329,
+    UicSetEnable = 0x32b,
+    UicSetMaxTextSize = 0x341,
     DateTimeToTm = 0x338,
     // 0x384.. is a byte-order section, identified 2026-09-27 from call sites (no symbols):
     // 900/902 take and return 32-bit values stored big-endian into packets, 901/903 16-bit
@@ -231,6 +239,9 @@ pub enum WIPICSvcId {
     Unk8 = 0x1a0,
     Connect = 0x258,
     Close = 0x259,
+    // `f(2, 1)` — AF_INET/SOCK_STREAM, KTF net index 2 `MC_netSocket`. One call site
+    // (863b8ab6a21d) picks between this and 0x7d0 on a flag with the same two arguments.
+    Socket = 0x25a,
     // net base 0x258 + index: idx4 SocketWrite, idx5 SocketRead, idx6 SocketClose.
     SocketWrite = 0x25c,
     SocketRead = 0x25d,
@@ -242,6 +253,10 @@ pub enum WIPICSvcId {
     ClipGetVolume = 0x4b8,
     ClipSetVolume = 0x4b9,
     Play = 0x4ba,
+    // Between Play and Stop in KTF's order (Play, Pause, Resume, Stop). b7699c10dfd1 calls 1211 or 1212
+    // on the same clip (`this+4`) from one function, chosen by a boolean argument, and tests `== 1`.
+    Pause = 0x4bb,
+    Resume = 0x4bc,
     Stop = 0x4bd,
     Unk5 = 0x4c0,
     Vibrator = 0x4c1,
@@ -251,8 +266,17 @@ pub enum WIPICSvcId {
     Unk10 = 0x4ce,
     SetMuteState = 0x4d1,
     GetMuteState = 0x4d2,
+    // `f(buf, 0xffe)` into a zeroed 0x1000 buffer, return value unused; the caller then splits `buf`
+    // on NUL and skips SMSDATA · MMSDATA · CALLHISTORY · SCHEDULE · NOTICE · PHONEBOOK · PHOTO ·
+    // ALARM · MORNINGCALL (87b04639cdfe) — a list of the phone's named data stores. Which stores is
+    // not known, so it answers an empty list, which is also the only honest answer here.
+    ListDataStores = 0x44c,
     BackLight = 0x578,
     Unk16 = 0x581,
+    // Same `(2, 1)` as `Socket` at the same call site, on the other side of a flag; 3ff5948e235e
+    // calls it right after `inet_addr`/`htons` and branches on `< 0`. All eight titles that reach it
+    // import both. Which socket variant it is does not matter while there is no network.
+    SocketAlt = 0x7d0,
 }
 
 impl TryFrom<SvcId> for WIPICSvcId {
@@ -328,6 +352,9 @@ impl TryFrom<SvcId> for WIPICSvcId {
             0x321 => Self::TimeComponent,
             0x322 => Self::TimeConvert,
             0x323 => Self::TimeToTm,
+            0x329 => Self::UicConfigure,
+            0x32b => Self::UicSetEnable,
+            0x341 => Self::UicSetMaxTextSize,
             0x338 => Self::DateTimeToTm,
             0x384 => Self::Htonl,
             0x385 => Self::Htons,
@@ -348,6 +375,7 @@ impl TryFrom<SvcId> for WIPICSvcId {
             0x1a0 => Self::Unk8,
             0x258 => Self::Connect,
             0x259 => Self::Close,
+            0x25a => Self::Socket,
             0x25c => Self::SocketWrite,
             0x25d => Self::SocketRead,
             0x25e => Self::SocketClose,
@@ -358,6 +386,8 @@ impl TryFrom<SvcId> for WIPICSvcId {
             0x4b8 => Self::ClipGetVolume,
             0x4b9 => Self::ClipSetVolume,
             0x4ba => Self::Play,
+            0x4bb => Self::Pause,
+            0x4bc => Self::Resume,
             0x4bd => Self::Stop,
             0x4c0 => Self::Unk5,
             0x4c1 => Self::Vibrator,
@@ -369,6 +399,8 @@ impl TryFrom<SvcId> for WIPICSvcId {
             0x4d2 => Self::GetMuteState,
             0x578 => Self::BackLight,
             0x581 => Self::Unk16,
+            0x44c => Self::ListDataStores,
+            0x7d0 => Self::SocketAlt,
             _ => return Err(wie_util::WieError::FatalError(alloc::format!("Unknown LGT WIPIC SVC id {}", value.0))),
         })
     }

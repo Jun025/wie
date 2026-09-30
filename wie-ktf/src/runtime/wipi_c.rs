@@ -86,13 +86,14 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm, resources): &mut (Sy
 pub fn register_wipic_svc_handler(core: &mut ArmCore, system: &System, jvm: &Jvm) -> Result<()> {
     let resources = ResourceCache::default();
 
-    // Clet mode disables the midp paint that would call this; it flushes by itself
+    // Clet mode presents only when this drew native pixels (see `Display`'s paint)
     let mut context = KtfWIPICContext::new(core.clone(), system.clone(), jvm.clone(), resources.clone());
     let mut sync = ScreenFramebufferSync::default();
     system.set_screen_compositor(Box::new(move |current, target| {
-        if let Err(err) = sync.compose(&mut context, current, target) {
+        sync.compose(&mut context, current, target).unwrap_or_else(|err| {
             tracing::warn!("screen framebuffer compose failed: {err:?}");
-        }
+            false
+        })
     }));
 
     core.register_svc_handler(SVC_CATEGORY_WIPIC, handle_wipic_svc, &(system.clone(), jvm.clone(), resources))

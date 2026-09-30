@@ -13,7 +13,8 @@
 // the same line. `build` derives each title's `changes` from those files: one source, not two.
 // ★No game bytes: titles, content hashes and sentences only.
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -25,6 +26,17 @@ const UPDATES = join(ROOT, 'docs/player-updates');
 export const STATUSES = ['playable', 'limited', 'not-yet'];
 export const AXES = ['boot', 'render', 'input', 'longplay', 'sound', 'speed'];
 export const AXIS_VALUES = ['ok', 'partial', 'no', 'unknown'];
+// Axes beyond the six: carried only on rows a census measured, never required (the shell importer
+// checks AXES only and spreads the rest through). `progress` = the census's progress axis, drawn by
+// the shell's PROGRESS_UI (otterpebble apps/featurephone/lib/compat.ts).
+export const EXTRA_AXES = ['progress'];
+// Each extra axis carries its OWN public vocabulary — the one its consumer draws. The shell's
+// PROGRESS_UI (otterpebble #1244) knows `ok` and `stuck` and hides any other value, so mapping stuck
+// to the six-axis `no` would show the 22 `ok` rows and hide every stuck one — a display biased to
+// the good side. A census `error` (the run crashed) is not progress either, so it ships as `stuck`;
+// `n/a` (not measured) ships as no key at all.
+export const EXTRA_AXIS_VALUES = { progress: ['ok', 'stuck'] };
+const EXTRA_AXIS_MAP = { progress: { ok: 'ok', stuck: 'stuck', error: 'stuck' } };
 export const PLATFORMS = ['KTF', 'SKT', 'LGT', 'J2ME'];
 export const KINDS = ['new-support', 'fix', 'improvement', 'sound', 'speed'];
 const HEX40 = /^[0-9a-f]{40}$/;
@@ -106,8 +118,16 @@ export function validateCompat(d) {
     if (!str(x.fileTitle)) e.push(`${at}: empty fileTitle (the file-derived name, kept for search)`);
     if (!STATUSES.includes(x.status)) e.push(`${at}: status not in ${STATUSES}`);
     for (const a of AXES) if (!AXIS_VALUES.includes(x.axes?.[a])) e.push(`${at}: axes.${a} not in ${AXIS_VALUES}`);
+    for (const a of EXTRA_AXES)
+      if (x.axes && a in x.axes && !EXTRA_AXIS_VALUES[a].includes(x.axes[a])) e.push(`${at}: axes.${a} not in ${EXTRA_AXIS_VALUES[a]}`);
     if (!Array.isArray(x.knownIssues_ko) || !x.knownIssues_ko.every(str)) e.push(`${at}: knownIssues_ko must be non-empty strings`);
     if (!Array.isArray(x.changes)) e.push(`${at}: changes must be an array`);
+    else
+      x.changes.forEach((c, j) => {
+        if (!DATE.test(c?.date ?? '')) e.push(`${at}.changes[${j}]: date must be YYYY-MM-DD`);
+        if (!(c?.enginePin === null || HEX40.test(c?.enginePin ?? ''))) e.push(`${at}.changes[${j}]: enginePin must be 40 lowercase hex or null`);
+        if (!str(c?.summary_ko)) e.push(`${at}.changes[${j}]: empty summary_ko`);
+      });
   });
   return e;
 }
@@ -136,13 +156,28 @@ export function validateUpdates(files, shas) {
   return e;
 }
 
+/** The built updates.json, by the shell importer's rules (otterpebble updates-import.mjs). */
+export function validateBuiltUpdates(d) {
+  const e = HEX40.test(d.wieHead ?? '') ? [] : ['updates: wieHead must be 40 lowercase hex'];
+  const ids = new Set();
+  for (const u of d.entries) {
+    if (ids.has(u.id)) e.push(`updates ${u.id}: duplicate id`);
+    ids.add(u.id);
+    if (!HEX40.test(u.enginePin ?? '')) e.push(`updates ${u.id}: enginePin must be 40 lowercase hex (got ${JSON.stringify(u.enginePin)})`);
+  }
+  return [...e, ...validateUpdates(d.entries.map(({ id, ...u }) => [`${id}.json`, u]), new Set())].filter((x) => !/is not in compat/.test(x));
+}
+
 // Census axis vocabulary (scripts/playability-census.mjs judge()) -> contract vocabulary.
 const AXIS_MAP = { ok: 'ok', 'n/a': 'unknown', fail: 'no', none: 'no', uniform: 'no', error: 'no', silent: 'no', slow: 'no', stall: 'no' };
 export function fromCensus(c) {
   const entries = c.entries.map((x) => ({
     ...x,
     fileTitle: x.title.replace(/_+/g, ' ').replace(/\s+/g, ' ').trim(), // census titles are file names
-    axes: Object.fromEntries(AXES.map((a) => [a, AXIS_MAP[x.axes?.[a]] ?? `?${x.axes?.[a]}`])),
+    axes: Object.fromEntries([
+      ...AXES.map((a) => [a, AXIS_MAP[x.axes?.[a]] ?? `?${x.axes?.[a]}`]),
+      ...EXTRA_AXES.filter((a) => a in (x.axes ?? {}) && x.axes[a] !== 'n/a').map((a) => [a, EXTRA_AXIS_MAP[a][x.axes[a]] ?? `?${x.axes[a]}`]),
+    ]),
     changes: [],
   }));
   return { schema: 1, generatedAt: c.generatedAt, enginePin: c.enginePin, entries: retitle(entries) };
@@ -157,9 +192,11 @@ function readUpdates() {
 }
 
 // The first-parent commit that added the file = the landing that shipped the change.
-function landedPin(file) {
-  const out = execFileSync('git', ['log', '--first-parent', '--diff-merges=first-parent', '--diff-filter=A', '--format=%H', '--', file], {
-    cwd: ROOT,
+// ★--no-patch is load-bearing: --diff-merges=<format> also turns the patch on (git 2.55), and the last
+// output line was then the file's closing «+}» — 2026-09-29 the shell refused every such update.
+export function landedPin(file, cwd = ROOT) {
+  const out = execFileSync('git', ['log', '--first-parent', '--diff-merges=first-parent', '--diff-filter=A', '--no-patch', '--format=%H', '--', file], {
+    cwd,
     encoding: 'utf8',
   }).trim();
   return out.split('\n').pop() || null;
@@ -192,6 +229,8 @@ function selftest() {
     ['compat schema 2', { ...good, schema: 2 }, null],
     ['unknown status', { ...good, entries: [{ ...good.entries[0], status: 'boots' }] }, null],
     ['census axis value leaks through', { ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, boot: 'fail' } }] }, null],
+    ['six-axis value on progress', { ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, progress: 'no' } }] }, null],
+    ['unmeasured progress shipped as a value', { ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, progress: 'unknown' } }] }, null],
     ['duplicate sha', { ...good, entries: [good.entries[0], good.entries[0]] }, null],
     ['short enginePin', { ...good, enginePin: 'abc' }, null],
     ['title keeps a bracket tag', { ...good, entries: [{ ...good.entries[0], title: '[큰화]t' }] }, null],
@@ -213,10 +252,40 @@ function selftest() {
   for (const [label, c, u] of cases) if (!errs(c, u).length) bad++, console.error(`selftest: NOT rejected — ${label}`);
   if (fromCensus({ ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, render: 'uniform', speed: 'n/a' } }] }).entries[0].axes.render !== 'no')
     bad++, console.error('selftest: census uniform must map to no');
+  const withProgress = (v) => fromCensus({ ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, ...v } }] }).entries[0].axes;
+  if (
+    withProgress({ progress: 'stuck' }).progress !== 'stuck' ||
+    withProgress({ progress: 'error' }).progress !== 'stuck' ||
+    'progress' in withProgress({}) ||
+    'progress' in withProgress({ progress: 'n/a' })
+  )
+    bad++, console.error('selftest: progress ships stuck/error as «stuck» (the shell hides «no»), and n/a as no key');
   const { compat } = assemble(good, [['2026-09-27-x.json', upd]], () => 'd'.repeat(40), 'e'.repeat(40));
   if (compat.entries[0].changes[0]?.summary_ko !== upd.summary_ko) bad++, console.error('selftest: an update must reach the title it names');
+  const shipped = { ...compat, entries: [{ ...compat.entries[0], changes: [{ ...compat.entries[0].changes[0], enginePin: '+}' }] }] };
+  if (!validateCompat(shipped).length) bad++, console.error('selftest: NOT rejected — shipped change with enginePin «+}»');
+  const built = { wieHead: 'e'.repeat(40), entries: [{ id: '2026-09-27-x', ...upd, enginePin: '+}' }] };
+  if (!validateBuiltUpdates(built).length) bad++, console.error('selftest: NOT rejected — built update with enginePin «+}»');
+  if (validateBuiltUpdates({ ...built, entries: [{ ...built.entries[0], enginePin: 'd'.repeat(40) }] }).length) bad++, console.error('selftest: a good built update is rejected');
+  // landedPin against a real repo where a merge commit adds the file (the 2026-09-29 «+}» case).
+  const repo = mkdtempSync(join(tmpdir(), 'player-data-'));
+  try {
+    const git = (...a) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: repo, encoding: 'utf8' }).trim();
+    git('init', '-q', '-b', 'main');
+    git('commit', '-q', '--allow-empty', '-m', 'root');
+    git('checkout', '-q', '-b', 'pr');
+    writeFileSync(join(repo, 'u.json'), '{\n  "a": 1\n}\n');
+    git('add', 'u.json');
+    git('commit', '-q', '-m', 'add');
+    git('checkout', '-q', 'main');
+    git('merge', '-q', '--no-ff', '-m', 'land', 'pr');
+    const pin = landedPin('u.json', repo);
+    if (pin !== git('rev-parse', 'HEAD')) bad++, console.error(`selftest: landedPin must be the merge commit, got ${JSON.stringify(pin)}`);
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
   if (bad) process.exit(1);
-  console.log(`player-data selftest: ${cases.length + 2} rules each reject their mutation`);
+  console.log(`player-data selftest: ${cases.length + 6} rules each reject their mutation`);
 }
 
 const [cmd, ...args] = process.argv.slice(2);
@@ -253,6 +322,12 @@ else if (cmd === 'import') {
     const missing = out.updates.entries.filter((u) => !u.enginePin);
     for (const u of missing) console.log(`::warning::player-data: ${u.id} has no landing commit — left out of this build`);
     if (missing.length) Object.assign(out, assemble(compat, files.filter(([n]) => !missing.some((u) => `${u.id}.json` === n)), pinOf, head));
+    // Ship nothing the shell would refuse: it drops the whole file on one violation.
+    const shipErr = [...validateCompat(out.compat), ...validateBuiltUpdates(out.updates)];
+    if (shipErr.length) {
+      console.error(`player-data build: ${shipErr.length} violations in the built output, nothing written:\n  ${shipErr.slice(0, 20).join('\n  ')}`);
+      process.exit(1);
+    }
     mkdirSync(args[oi + 1], { recursive: true });
     writeFileSync(join(args[oi + 1], 'compat.json'), JSON.stringify(out.compat) + '\n');
     writeFileSync(join(args[oi + 1], 'updates.json'), JSON.stringify(out.updates) + '\n');

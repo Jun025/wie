@@ -50,6 +50,14 @@ async fn handle_missing_java_vtable_entry(core: &mut ArmCore, _: &mut (), id: Sv
     let class_name = String::from_utf8(read_null_terminated_string_bytes(core, descriptor.ptr_name)?)
         .map_err(|error| WieError::FatalError(format!("Invalid LGT class name: {error}")))?;
 
+    // The call site and argument words are what name a row in data/lgt_java_abi.toml.
+    let (_, lr) = core.read_pc_lr()?;
+    let (r1, r2, r3): (u32, u32, u32) = (core.read_param(1)?, core.read_param(2)?, core.read_param(3)?);
+    tracing::warn!(
+        "{class_name} vtable index {}: this={ptr_instance:#x} r1={r1:#x} r2={r2:#x} r3={r3:#x} lr={lr:#x}",
+        id.0
+    );
+
     Err(WieError::Unimplemented(format!("{class_name} vtable index {}", id.0)))
 }
 
