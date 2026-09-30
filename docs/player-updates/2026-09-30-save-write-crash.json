@@ -1,0 +1,9 @@
+{
+  "date": "2026-09-30",
+  "kind": "fix",
+  "titles": [
+    "61ed69520fd34679be0a72029d4bbee25d10799e6c7dfeb9cefd8960a24bcb80"
+  ],
+  "summary_ko": "플레이 중 저장할 때 멈추던 문제를 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/420"
+}
