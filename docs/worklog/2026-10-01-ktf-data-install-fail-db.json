@@ -1,0 +1,11 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-01",
+  "task": "wie-ktf-data-install-fail-db-list-records-adopt-p0",
+  "title": "KTF «Data 인스톨에 실패» 두 종 — DB slot 7 rename · slot 4 lseek · slot 8 디렉터리 보장 · slot 15 크기 · '/' 이름 별칭",
+  "summary": "설치기가 slot 7 을 (원본 이름, 새 이름, 1) rename 으로 부르는데 목록 조회로 받아 -25 를 돌려줘 설치가 실패했다. 고친 뒤 벽 셋(슬래시 붙은 이름 · slot 4 가 lseek 인데 언제나 0 · slot 8 mkdir 뒤 stat 실패)을 차례로 넘어 두 종이 팀 선택 화면까지 간다(docs/report/0401).",
+  "changes": ["wie-wipi-c/src/api/database.rs", "wie-ktf/src/runtime/wipi_c/method_table.rs", "docs/player-updates/2026-10-01-ktf-data-install.json"],
+  "limits": ["slot 9(같은 shim 의 다음 op · (path, 1))은 이 코퍼스에서 불리지 않아 그대로 stub 이다"],
+  "proposals": [],
+  "adoptedProposals": ["2026-09-30-progression-axis-census#p0"]
+}

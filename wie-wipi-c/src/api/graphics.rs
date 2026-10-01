@@ -26,6 +26,12 @@ const FRAMEBUFFER_DEPTH: u32 = 16; // XXX hardcode to 16bpp as some game require
 const SCREEN_FRAMEBUFFER_PTR: u32 = 0x7fff1000;
 
 pub async fn get_screen_framebuffer(context: &mut dyn WIPICContext, a0: WIPICWord) -> Result<WIPICIndirectPtr> {
+    screen_framebuffer(context, a0, 0)
+}
+
+/// `spare_rows` are allocated below the reported height and never presented — room for a carrier
+/// whose titles draw past the height they are told (LGT: `wie_lgt`'s `softkey_rows`).
+pub fn screen_framebuffer(context: &mut dyn WIPICContext, a0: WIPICWord, spare_rows: u32) -> Result<WIPICIndirectPtr> {
     tracing::debug!("MC_grpGetScreenFrameBuffer({a0:#x})");
 
     let framebuffer_ptr: u32 = read_generic(context, SCREEN_FRAMEBUFFER_PTR)?;
@@ -39,7 +45,8 @@ pub async fn get_screen_framebuffer(context: &mut dyn WIPICContext, a0: WIPICWor
         (screen.width(), screen.height())
     };
 
-    let framebuffer = FrameBuffer::new(context, width, height, FRAMEBUFFER_DEPTH)?;
+    let mut framebuffer = FrameBuffer::new(context, width, height + spare_rows, FRAMEBUFFER_DEPTH)?;
+    framebuffer.0.height = height;
 
     let memory = context.alloc(size_of::<WIPICFramebuffer>() as WIPICWord)?;
     write_generic(context, context.data_ptr(memory)?, framebuffer.0)?;
