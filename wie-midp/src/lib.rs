@@ -5,7 +5,7 @@ pub mod classes;
 
 use wie_jvm_support::WieJavaClassProto;
 
-pub fn get_protos() -> [WieJavaClassProto; 46] {
+pub fn get_protos() -> [WieJavaClassProto; 47] {
     [
         classes::javax::microedition::io::Connector::as_proto(),
         classes::javax::microedition::lcdui::Alert::as_proto(),
@@ -29,6 +29,7 @@ pub fn get_protos() -> [WieJavaClassProto; 46] {
         classes::javax::microedition::lcdui::Screen::as_proto(),
         classes::javax::microedition::lcdui::StringItem::as_proto(),
         classes::javax::microedition::lcdui::TextBox::as_proto(),
+        classes::javax::microedition::lcdui::TextField::as_proto(),
         classes::javax::microedition::lcdui::Ticker::as_proto(),
         classes::javax::microedition::lcdui::game::GameCanvas::as_proto(),
         classes::javax::microedition::media::Control::as_proto(),
