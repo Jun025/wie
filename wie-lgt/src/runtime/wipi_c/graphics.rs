@@ -511,7 +511,6 @@ pub async fn set_shared_context(
 // is their key 0xf81f. Read from the two titles that do it (docs/report/0396): the store is a
 // direct `str` to +28, never a SetContext. The shared blits ignore the context, so the key was
 // drawn as magenta. +28 is the shared `offset`; no LGT title copies after SetContext(offset).
-// ponytail: one guest call per pixel; memoize (dst, src) per blit if a full-screen keyed blit shows up.
 const NATIVE_PIXEL_OP: u32 = core::mem::offset_of!(LgtGraphicsContext, pixel_op) as u32;
 
 #[allow(clippy::too_many_arguments)]
@@ -595,6 +594,8 @@ async fn blit_with_pixel_op(
     let source_base = context.data_ptr(source.buf)?;
     let mut source_row = vec![0u8; ((x1 - x0) as u32 * bytes_per_pixel) as usize];
     let mut target_row = vec![0u16; (x1 - x0) as usize];
+    // The procs read only their arguments and the title's globals, which cannot change mid-blit.
+    let mut results = alloc::collections::BTreeMap::new();
     for y in y0..y1 {
         let source_at = source_base + (sy + y) as u32 * source.bpl + (sx + x0) as u32 * bytes_per_pixel;
         let target_at = target_base + (dy + y) as u32 * target.bpl + (dx + x0) as u32 * 2;
@@ -612,7 +613,15 @@ async fn blit_with_pixel_op(
                 }
                 Rgb565Pixel::from_color(color)
             };
-            *target_pixel = context.call_function(pixel_op, &[*target_pixel as u32, source_pixel as u32]).await? as u16;
+            let pair = (*target_pixel as u32) << 16 | source_pixel as u32;
+            *target_pixel = match results.get(&pair) {
+                Some(&result) => result,
+                None => {
+                    let result = context.call_function(pixel_op, &[*target_pixel as u32, source_pixel as u32]).await? as u16;
+                    results.insert(pair, result);
+                    result
+                }
+            };
         }
         context.write_bytes(target_at, bytemuck::cast_slice(&target_row))?;
     }
