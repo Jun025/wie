@@ -6372,17 +6372,16 @@
    "platform": "LGT",
    "model": "clet",
    "title": "판타지포에버3",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "no"
    },
    "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "원래보다 조금 느리게 움직일 수 있어요."
    ],
    "changes": [],
