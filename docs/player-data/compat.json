@@ -4515,18 +4515,16 @@
    "platform": "KTF",
    "model": null,
    "title": "티어즈오브메탈",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "티어즈오브메탈"
   },

@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-01",
+  "kind": "fix",
+  "titles": [
+    "59263295de749f2b5f44d5aeb5ceedf06bffb60d888cfe26afdf4432b6082bef"
+  ],
+  "summary_ko": "몇 번 누르면 멈추던 게임이 이제 새 게임으로 시작해 끝까지 즐길 수 있어요.",
+  "pr": "https://github.com/Jun025/wie/pull/430"
+}
