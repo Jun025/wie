@@ -71,4 +71,7 @@
 
 ### 게임 파일명 유입 (`scripts/corpus-name-inflow.mjs`)
 
-(아래 커밋 후 채움)
+유입 31건(BOUNDED) + 판단 필요 4쌍 14회(SUFFIX-ATTACHED). 도구는 바뀐 파일의 본문 전체를 센다 — `lgt_java_abi.toml`·`jvm_support.rs` 의 제목 대부분은 원래 있던 주석이다.
+이 회차가 새로 쓴 제목은 `월드장기체스`(이 문서 · worklog · keys 파일 · `lgt_java_abi.toml` 주석 · 시험 주석) 하나다.
+SUFFIX-ATTACHED 4쌍(`간호사타이쿤`→`간호사타이쿤2` · `서든어택`→`서든어택포켓`)은 전부 바뀐 파일에 원래 있던 주석의 «더 긴 다른 제목»이고 이 회차가 쓴 언급이 아니다.
+player-updates 항목은 제목 대신 compat sha256 만 쓴다.
