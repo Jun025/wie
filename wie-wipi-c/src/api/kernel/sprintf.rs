@@ -4,15 +4,20 @@ use wie_util::{ByteRead, Result, read_null_terminated_string_bytes};
 
 const MAX_WIDTH: usize = 4096;
 
+/// C `sprintf`: the format's and `%s` arguments' bytes reach the output verbatim, whatever their encoding.
+///
+/// Each byte rides through `format` as the char of the same value and comes back as that byte. This
+/// used to decode as EUC-KR and re-encode, which is the identity on valid EUC-KR but not on anything
+/// else: a title whose strings are UTF-8 (8f7758fa43b6's `5.BAR`) got each undecodable byte back as
+/// `&#65533;`, 88 bytes in became 171 out, and that overran its 152-byte stack buffer into the saved
+/// return address.
 pub fn sprintf(context: &(impl ByteRead + ?Sized), format_bytes: &[u8], args: &[u32]) -> Result<Vec<u8>> {
-    let format_string = encoding_rs::EUC_KR.decode(format_bytes).0;
-    let result = self::format(&format_string, args, &mut |ptr| {
-        let bytes = read_null_terminated_string_bytes(context, ptr)?;
-
-        Ok(encoding_rs::EUC_KR.decode(&bytes).0.into_owned())
+    let chars = |bytes: &[u8]| bytes.iter().map(|&b| b as char).collect::<String>();
+    let result = self::format(&chars(format_bytes), args, &mut |ptr| {
+        Ok(chars(&read_null_terminated_string_bytes(context, ptr)?))
     })?;
 
-    Ok(encoding_rs::EUC_KR.encode(&result).0.into_owned())
+    Ok(result.chars().map(|c| c as u8).collect())
 }
 
 fn format(format: &str, args: &[u32], read_string: &mut dyn FnMut(u32) -> Result<String>) -> Result<String> {
@@ -249,6 +254,21 @@ mod test {
         let expected = "안녕 세계 A -7 42 beef";
         assert_eq!(encoding_rs::EUC_KR.decode(&result).0, expected);
         assert_eq!(result, encoding_rs::EUC_KR.encode(expected).0.into_owned());
+
+        Ok(())
+    }
+
+    /// 8f7758fa43b6's `%s` arguments are UTF-8: they, and a high `%c` byte, must come out byte-for-byte,
+    /// the same length a C `sprintf` writes.
+    #[test]
+    fn sprintf_passes_non_euc_kr_bytes_through() -> Result<()> {
+        let mut memory = GuestMemory { bytes: vec![0; 0x100] };
+        let utf8 = "종목|".as_bytes();
+        memory.bytes[0x40..0x40 + utf8.len()].copy_from_slice(utf8);
+
+        let result = super::sprintf(&memory, b"%s%s%c", &[0x40, 0x40, 0xb7])?;
+
+        assert_eq!(result, [utf8, utf8, &[0xb7]].concat());
 
         Ok(())
     }

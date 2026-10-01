@@ -181,6 +181,7 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::DateTimeToTm => time_to_tm.into_body(),
         WIPICSvcId::UicConfigure => uic_configure.into_body(),
         WIPICSvcId::UicSetEnable => uic_set_enable.into_body(),
+        WIPICSvcId::UicInsertText => uic_insert_text.into_body(),
         WIPICSvcId::UicSetMaxTextSize => uic_set_max_text_size.into_body(),
         WIPICSvcId::Htonl | WIPICSvcId::Ntohl => swap32.into_body(),
         WIPICSvcId::Htons | WIPICSvcId::Ntohs => swap16.into_body(),
@@ -195,6 +196,7 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::ListRecord => database::list_record.into_body(),
         WIPICSvcId::UpdateRecord => database::update_record.into_body(),
         WIPICSvcId::SelectRecord => database::select_record.into_body(),
+        WIPICSvcId::ListDirectory => list_directory.into_body(),
         WIPICSvcId::ListDatabases => database::list_databases.into_body(),
         WIPICSvcId::Unk8 => database::exists_database.into_body(),
         WIPICSvcId::Connect => net::connect.into_body(),
@@ -597,6 +599,28 @@ async fn uic_set_max_text_size(_context: &mut dyn WIPICContext, comp: u32, size:
     Ok(0)
 }
 
+/// UIC 830 (`MC_uicInsertText`): the component is not real, so there is no text to hold — accept.
+/// The one importer (1cd151222bde) imports none of 831/834/835 (delete · length · read).
+async fn uic_insert_text(_context: &mut dyn WIPICContext, comp: u32, pos: i32, text: u32, len: i32) -> Result<u32> {
+    tracing::debug!("stub LGT MC_uicInsertText({comp:#x}, {pos}, {text:#x}, {len})");
+
+    Ok(0)
+}
+
+/// WIPIC 410: a directory's entry names, NUL-separated, into `buf`. An empty list — see the id.
+// ponytail: empty, not the real entries — the backend has no directory listing. The one caller
+// skips every packaged name (≤ 11) and counts only extra content, so empty is what it acts on;
+// a title that lists its own saved files would see none. List the jar + database repository then.
+async fn list_directory(context: &mut dyn WIPICContext, dir: u32, buf: u32, len: i32, mode: i32) -> Result<i32> {
+    tracing::debug!("LGT list_directory({dir:#x}, {buf:#x}, {len}, {mode}) -> empty");
+
+    if buf != 0 && len > 0 {
+        write_generic(context, buf, 0u8)?;
+    }
+
+    Ok(0)
+}
+
 /// WIPIC 1100: the phone's data-store names, NUL-separated, into `buf`. An empty list — see the id.
 async fn list_data_stores(context: &mut dyn WIPICContext, buf: u32, len: i32) -> Result<i32> {
     tracing::debug!("LGT list_data_stores({buf:#x}, {len}) -> empty");
@@ -840,7 +864,7 @@ mod tests {
 
     /// The ids named 2026-09-30 answer through the SVC table, and an id still unmapped names its arguments.
     ///
-    /// Eight LGT titles stopped on `Unknown LGT WIPIC SVC id` 809 · 1100 · 1212 · 2000, each at a call site
+    /// Eight LGT titles stopped on `Unknown LGT WIPIC SVC id` 809 · 1100 · 1212 · 2000 (and next on 830 · 410), each at a call site
     /// read from the image (see each id in `svc_ids`). The answers are the no-device ones: no socket (-1),
     /// an empty data-store list, and accepted UIC/media calls. The unmapped-id message carries r0–r3 and lr
     /// because without them each id cost a debugger rerun of the title before its call site could be read.
@@ -867,6 +891,7 @@ mod tests {
             for (id, number) in [
                 (WIPICSvcId::UicConfigure, 809),
                 (WIPICSvcId::UicSetEnable, 811),
+                (WIPICSvcId::UicInsertText, 830),
                 (WIPICSvcId::UicSetMaxTextSize, 833),
                 (WIPICSvcId::Pause, 1211),
                 (WIPICSvcId::Resume, 1212),
@@ -882,6 +907,16 @@ mod tests {
             let stub = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::ListDataStores)?;
             let _: u32 = core.run_function(stub, &[buf, 0xffe]).await?;
             assert_eq!(read_generic::<u8, _>(&core, buf)?, 0, "1100 must hand back an empty list");
+
+            assert_eq!(WIPICSvcId::ListDirectory as u32, 410);
+            core.write_bytes(buf, b"012\0\0")?;
+            let stub = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::ListDirectory)?;
+            assert_eq!(
+                core.run_function::<u32>(stub, &[0, buf, 0x3ff, 1]).await?,
+                0,
+                "410's caller reads only a 0"
+            );
+            assert_eq!(read_generic::<u8, _>(&core, buf)?, 0, "410 must hand back an empty list");
 
             let stub = core.make_svc_stub(SVC_CATEGORY_WIPIC, 0x7d1u32)?;
             let err = core.run_function::<u32>(stub, &[0x11, 0x22, 0x33, 0x44]).await.unwrap_err();

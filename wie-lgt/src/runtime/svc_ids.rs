@@ -212,6 +212,10 @@ pub enum WIPICSvcId {
     // keep their older names and bodies (they only hand back a handle nothing reads).
     UicConfigure = 0x329,
     UicSetEnable = 0x32b,
+    // KTF index 30 = InsertText. 1cd151222bde 0x1b38 (2026-10-01): memset(this+8, 0, 256) →
+    // strcpy(this+8, s) → n = strlen(this+8) → 830(this[4], 0, this+8, n) — the same component
+    // handle 809/811/833 take, a position, the text and its length.
+    UicInsertText = 0x33e,
     UicSetMaxTextSize = 0x341,
     DateTimeToTm = 0x338,
     // 0x384.. is a byte-order section, identified 2026-09-27 from call sites (no symbols):
@@ -235,6 +239,12 @@ pub enum WIPICSvcId {
     ListRecord = 0x197,
     UpdateRecord = 0x198,
     SelectRecord = 0x199,
+    // `f(dir, buf, 0x3ff, 1)` into a zeroed 0x400 buffer, `== 0` checked; the caller then walks `buf`
+    // as NUL-separated names ending in an empty one (87b04639cdfe 0x15a88 "tbl/B" — keeps 3-digit
+    // names above 11 — and 0x15da4 "tbl/O" — counts `NNN.dat`). The jar ships `tbl/B/001`–`011` and
+    // no `tbl/O`: the packaged songs are 1–11 and anything listed is extra content. That is the
+    // WIPI `MC_fsList(name, buf, len, mode)` shape.
+    ListDirectory = 0x19a,
     ListDatabases = 0x19c,
     Unk8 = 0x1a0,
     Connect = 0x258,
@@ -355,6 +365,7 @@ impl TryFrom<SvcId> for WIPICSvcId {
             0x323 => Self::TimeToTm,
             0x329 => Self::UicConfigure,
             0x32b => Self::UicSetEnable,
+            0x33e => Self::UicInsertText,
             0x341 => Self::UicSetMaxTextSize,
             0x338 => Self::DateTimeToTm,
             0x384 => Self::Htonl,
@@ -372,6 +383,7 @@ impl TryFrom<SvcId> for WIPICSvcId {
             0x197 => Self::ListRecord,
             0x198 => Self::UpdateRecord,
             0x199 => Self::SelectRecord,
+            0x19a => Self::ListDirectory,
             0x19c => Self::ListDatabases,
             0x1a0 => Self::Unk8,
             0x258 => Self::Connect,
