@@ -74,5 +74,3 @@ MC_grpCreateOffScreenFrameBuffer(W, H + bar)                ; 240, 320 + 24
 - 러너 블록(debug): `draw_j2me` · `helloworld_ktf` · `helloworld_lgt` · `text_j2me`(`--timeout 5`) PASS · `keydraw_ktf`·`keydraw_lgt` `--inject --expect-last-frame` PASS · `last_frame_content true` · rc=0.
 - `node scripts/player-data.mjs` OK(429 · 369/40/20) · `node scripts/check-worklog-json.mjs` OK · `node scripts/check-docs-report-serial.mjs` OK.
 - 유입(`node scripts/corpus-name-inflow.mjs`): BOUNDED 337쌍 · SUFFIX-ATTACHED 15쌍 — 전부 이 PR 이 손댄 파일에 이미 있던 줄이다(`compat.json` 의 `title`·`fileTitle` · `wie-lgt/src/runtime/wipi_c.rs`·`wie-wipi-c/src/api/graphics.rs` 의 기존 주석 — 타이틀별 출현 수가 `origin/main` 과 같다). 이 회차가 더한 줄(코드 · 이 문서 · worklog · player-updates · `compat.json` 의 `status`/`longplay`/`knownIssues_ko`)의 게임명은 0 — 타이틀은 sha12 로만 적었다.
-
-
