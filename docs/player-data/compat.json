@@ -5573,18 +5573,16 @@
    "platform": "LGT",
    "model": "clet",
    "title": "메이플스토리 도적편",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "메이플스토리 도적편"
   },

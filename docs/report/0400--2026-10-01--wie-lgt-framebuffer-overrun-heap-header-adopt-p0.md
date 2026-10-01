@@ -2,7 +2,7 @@
 
 **무엇을**: LGT 의 `MC_grpGetScreenFrameBuffer` 가 픽셀 버퍼를 **알려주는 높이보다 소프트키 줄만큼 더** 잡는다(240·320 폭 24줄 · 176 폭 20줄 · 120·128 폭 14줄). 알려주는 높이·폭·bpl 은 그대로다. 공유 함수에 `spare_rows` 인자를 둔 `screen_framebuffer` 를 더했고, KTF 는 0 을 넘긴다(바이트 단위로 이전과 같다).
 **왜**: 0392 §4 의 벽 — `1eaa92092bee` · `fe76e641bb3d` 가 화면 버퍼 바로 뒤의 힙 목록 헤더를 덮어 `Allocation failure` 로 끝났다.
-**사용자 영향**: `1eaa92092bee` 가 30초 조작 FAIL 3/3 → **PASS 3/3**. `fe76e641bb3d` 는 할당 실패를 지나 다음 벽(LGT WIPIC SVC 603 미구현)에서 멈춘다. 가드 6종(LGT 5 · KTF 1)은 전·후 같다.
+**사용자 영향**: `1eaa92092bee` 가 30초 조작 FAIL 3/3 → **PASS 3/3** · 지원 현황 limited → **playable**(playable 368 → 369 · limited 41 → 40). `fe76e641bb3d` 는 할당 실패를 지나 다음 벽(LGT WIPIC SVC 603 미구현)에서 멈춘다. 가드 6종(LGT 5 · KTF 1)은 전·후 같다.
 
 증적: `~/orchestrator/reports/evidence/wie-lgt-framebuffer-overrun-heap-header-adopt-p0/`. sha12 만 쓴다.
 
@@ -40,7 +40,7 @@ MC_grpCreateOffScreenFrameBuffer(W, H + bar)                ; 240, 320 + 24
 
 | sha12 | 플랫폼 | 전 ×3 | 후 ×3 |
 |---|---|---|---|
-| `1eaa92092bee` | LGT | FAIL ×3 · 9~10번째 키 · Java 예외(할당 실패) | **PASS ×3** · 27/27 |
+| `1eaa92092bee` | LGT | FAIL ×3 · 9~12번째 키 · Java 예외(할당 실패) | **PASS ×3** · 27/27 |
 | `fe76e641bb3d` | LGT | FAIL ×3 · 2번째 키 · Java 예외(할당 실패) · paints 37 | FAIL ×3 · 20번째 키 · **SVC 603 미구현** · paints 154~161 |
 | `2a57e33133b5` | LGT | PASS ×3 | PASS ×3 |
 | `517ed32c92d6` | LGT | PASS ×3 | PASS ×3 |
@@ -49,13 +49,26 @@ MC_grpCreateOffScreenFrameBuffer(W, H + bar)                ; 240, 320 + 24
 | `40b9537968de` | LGT | PASS ×3 | PASS ×3 |
 | `49ade89578c5` | KTF | PASS ×3 | PASS ×3 |
 
+**부하 축을 숨기지 않는다.** 첫 묶음 도중 다른 레인의 부하로 `host-load-guard` 보류가 섰다(since `1790837634` — `863b`·`40b9` 일부와 `--max-ticks` 재측 전부가 그 안이었다). 그래서 보류가 풀린 뒤(`--status --recovered` rc=0 · 끝에서도 rc=0 · 증적 `hl-r3.txt`) 그 4종(`1eaa`·`517ed`·`863b`·`40b9`)을 `--max-ticks 2000000000` 으로 3판씩 다시 쟀다(증적 `pair3.log`). 결론은 같다: `1eaa` 전 FAIL ×3(11~12번째 키) · 후 PASS ×3 · 가드 3종 전·후 PASS(`40b9` 전 3판째 1회는 15/27 키에서 `clean exit` UNMEASURED — 전 빌드 쪽이다). 위 표는 이 재측까지 합친 값이다.
+
 `1eaa`·`517ed` 는 첫 묶음에서 release 가 기본 `--max-ticks` 에 먼저 닿아 UNMEASURED(전·후 모두 `517ed` · 후 `1eaa`)였다 — FAIL 이 아니다. 그 둘만 `--max-ticks 2000000000` 으로 다시 3판씩 쟀고 위 표가 그 값이다(증적 `pair.log`·`pair2.log`).
 
-### 6. 되돌리면 red
+### 6. 지원 현황(`compat.json`)
+
+`playability-census.mjs run --jobs 2 --long 600`(후 빌드 release) · 두 대상만 담은 스크래치 corpus(심링크). 시작 시 `--recovered` rc=0, **끝날 때는 다른 레인 부하로 보류**(load1 60 · rc=1) — 장시간 축은 «오류 없이 버텼나»이므로 부하는 덜 진행시킬 뿐 거짓 ok 를 만들지 않는다.
+
+| sha12 | A(30초) | L(600초) | census | 이 PR 의 행 |
+|---|---|---|---|---|
+| `1eaa92092bee` | 19/27 키 · `max-ticks`(UNMEASURED) | 854/900 키 · deadline · 오류 0 | playable · longplay ok | **limited → playable** · longplay no → ok · 알려진 문제 «멈추거나 꺼짐» 삭제 |
+| `fe76e641bb3d` | FAIL · 20번째 키 · SVC 603 | 돌지 않음(A 가 그린 뒤 실패) | limited · longplay error | 그대로(sound 는 census 가 ok 를 냈지만 이 회차가 잰 축이 아니다) |
+
+`status`·`longplay`·`knownIssues_ko` 만 바꿨다(0398 과 같은 방식) · 증적 `census/`.
+
+### 7. 되돌리면 red
 
 `get_screen_framebuffer` 가 `spare_rows` 0 을 넘기게 하면 `wipic_screen_framebuffer_has_softkey_rows_below_its_height` red(1 failed). 이 시험은 «알려주는 높이는 그대로»도 함께 잡는다.
 
-### 7. 게이트
+### 8. 게이트
 
 - `cargo fmt --all -- --check` · `cargo clippy --all -- -D warnings`(stable · beta) · wasm32 clippy · `RUST_MIN_STACK=4194304 cargo test --all`(51 묶음 · 실패 0) — 전부 rc=0. 이 worktree 의 target · build-slot 경유.
 - 러너 블록(debug): `draw_j2me` · `helloworld_ktf` · `helloworld_lgt` · `text_j2me`(`--timeout 5`) PASS · `keydraw_ktf`·`keydraw_lgt` `--inject --expect-last-frame` PASS · `last_frame_content true` · rc=0.
