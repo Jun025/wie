@@ -55,4 +55,4 @@ XCE 문서는 이 repo 에 없다. 게임 jar 의 클래스 파일을 직접 읽
 ### 6. 게임 파일명 유입
 `node scripts/corpus-name-inflow.mjs --corpus <game_lab>`: 유입 0건(BOUNDED 0회/0쌍) · 판단 필요 0건(SUFFIX-ATTACHED 0회/0쌍). 새 주석·문서·소식은 sha12 만 쓴다.
 
-<!-- corpus-name-inflow v1 subjects=10 tree=13fabe97846e52ba B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=10 tree=a214e644b191e065 B=0/0 P=0/0 S=0/0 -->
