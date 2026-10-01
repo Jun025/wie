@@ -73,5 +73,10 @@ rename 뒤 그 제목은 `open("/lo.dsk", 1)` 을 한다. 저장소 키가 문�
 
 **게임 파일명 유입**: BOUNDED 0회/0쌍 · SUFFIX-ATTACHED 0회/0쌍(`node scripts/corpus-name-inflow.mjs` · 이 브랜치의 5파일). 게임명은 sha12 로만 적었다.
 
+## 반려 승계 F1 (wie-ktf-data-install-fail-db-list-records-adopt-p0-fix)
+
+slot 7 rename 이 해석 후 «원본 = 대상»이면(`/x`→`x` 에서 `/x` 부재 · `x` 존재, 또는 `x`→`x`) 복사·삭제 없이 0 을 돌려준다(POSIX `rename(x,x)`). 종전은 `delete(dst)` 가 원본을 먼저 지워 rc=0 인 채 세이브가 사라졌다. 테스트 `ktf_slot7_rename_onto_itself_keeps_the_data` 가 두 형태를 잠그고, 가드를 빼면 red 다. 대상 2종 `--inject` 재측: `5028b8a5d19f` PASS 27/27 · 282 paints, `1cf2e6076079` PASS 27/27 · 302 (load1 34).
+
+minor 처분: m1 그대로(측정된 호출 형태 `ftell` 직후 `fseek` 에 맞고 주석이 가정을 말한다) · m2 그대로(shim 이 0/1/2 밖을 0 으로 접는다) · m3 그대로(같은 DB 의 두 이름이라는 설계의 귀결 · 일관적).
 
 <!-- corpus-name-inflow v1 subjects=5 tree=05f8b0adb2dfaaba B=0/0 P=0/0 S=0/0 -->

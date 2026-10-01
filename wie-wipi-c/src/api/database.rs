@@ -251,6 +251,11 @@ pub async fn list_record_or_rename_ktf(context: &mut dyn WIPICContext, a0: i32, 
         return Ok(-22);
     };
     let (src, dst) = (resolve_db_name(context, src).await, resolve_db_name(context, dst).await);
+    if src == dst {
+        // POSIX rename(x, x): nothing to do. The copy below would delete `dst` — the source — first.
+        tracing::debug!("KTF db rename({src:?} -> {dst:?}, {a2}) -> 0 (same name)");
+        return Ok(0);
+    }
     let system = context.system();
     let pid = system.pid().to_owned();
     if !system.platform().database_repository().exists(&src, &pid).await {
@@ -1093,6 +1098,28 @@ mod tests {
 
         // The source is gone now, so a second rename has nothing to move.
         assert_eq!(list_record_or_rename_ktf(&mut context, 0x1000, 0x3000, 1).await.unwrap(), -12);
+    }
+
+    /// Renaming a DB onto itself keeps it — also when `/x` resolves to an existing bare `x`.
+    #[futures_test::test]
+    async fn ktf_slot7_rename_onto_itself_keeps_the_data() {
+        let mut context = database_test_context();
+        let db_id = open_test_database(&mut context).await;
+        context.write_bytes(0x2000, b"save").unwrap();
+        assert_eq!(stream_write(&mut context, db_id, 0x2000, 4).await.unwrap(), 4);
+        assert_eq!(close_database(&mut context, db_id).await.unwrap(), 0);
+        context.write_bytes(0x3000, b"/records\0").unwrap();
+
+        for src in [0x3000, 0x1000] {
+            assert_eq!(list_record_or_rename_ktf(&mut context, src, 0x1000, 1).await.unwrap(), 0);
+            assert_eq!(exists_database(&mut context, 0x1000, 1).await.unwrap(), 0);
+            let db_id = open_database(&mut context, 0x1000, 0, 0).await.unwrap();
+            assert_eq!(stream_read(&mut context, db_id, 0x2100, 4).await.unwrap(), 4);
+            let mut data = [0; 4];
+            context.read_bytes(0x2100, &mut data).unwrap();
+            assert_eq!(&data, b"save");
+            assert_eq!(close_database(&mut context, db_id).await.unwrap(), 0);
+        }
     }
 
     /// KTF slot 4 is `lseek`: whence 0/1/2 = start/current/end, the new position comes back.
