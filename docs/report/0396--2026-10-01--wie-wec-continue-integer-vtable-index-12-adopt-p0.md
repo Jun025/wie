@@ -75,3 +75,5 @@
 이 회차가 새로 쓴 제목은 `월드장기체스`(이 문서 · worklog · keys 파일 · `lgt_java_abi.toml` 주석 · 시험 주석) 하나다.
 SUFFIX-ATTACHED 6건 중 4건은 `lgt_java_abi.toml`·`jvm_support.rs` 에 원래 있던 주석의 «더 긴 다른 제목»(`간호사타이쿤2` · `서든어택포켓`)이고, 2건은 이 문단이 그 두 제목을 인용한 것이다 — 이 회차가 새로 언급한 게임이 아니다.
 player-updates 항목은 제목 대신 compat sha256 만 쓴다.
+
+<!-- corpus-name-inflow v1 subjects=6 tree=c4d0b50c1d615194 B=110/33 P=0/0 S=16/6 -->
