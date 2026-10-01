@@ -1,0 +1,37 @@
+{
+ "schema": "wie-worklog/1",
+ "date": "2026-10-01",
+ "task": "wie-skvm-xce-lcdui-textcomponent-class-adopt-p1",
+ "title": "SKVM com/xce/lcdui/TextComponent 인터페이스 + 핸들러 2메서드 + MIDP TextField 상수",
+ "summary": "85f03ca7389e 가 이름 입력칸을 만들 때 죽던 두 클래스 벽을 호출부 실측 모양으로 넣었다. 예외 27→0 · 시작 화면 → 이름 입력 폼. 진도 축은 stuck 그대로다(폼에서 선다).",
+ "changes": [
+  "wie-skvm com/xce/lcdui/TextComponent (인터페이스 · 추상 13)",
+  "TextComponentHandler.setTextComponent · clear",
+  "wie-midp javax/microedition/lcdui/TextField (상수 전용)",
+  "docs/report/0400"
+ ],
+ "verification": [
+  "text_component_implementor_loads_and_registers · text_field_constants_match_midp",
+  "개악 red 3/3",
+  "--inject 전/후 짝 · progress 600s P+P2 전/후"
+ ],
+ "limits": [
+  "핸들러는 입력기가 아니다 — 이름 칸에 글자가 들어가지 않는다",
+  "진도 축 stuck → stuck"
+ ],
+ "proposals": [
+  {
+   "kind": "product",
+   "title": "SKVM TextComponentHandler 최소 입력기 — 숫자 키를 등록된 입력칸에 넣는다",
+   "plainSummary": "SKT 게임 하나가 이름 입력 화면까지 열리지만 입력칸에 글자가 들어가지 않아 넘어갈 수 없습니다. 휴대폰 입력기처럼 숫자 키를 글자로 바꿔 입력칸에 넣으면 게임을 시작할 수 있습니다.",
+   "userBenefit": "85f03ca7389e 가 이름 입력 화면을 넘어 실제 게임으로 들어갑니다.",
+   "why": "이 회차 후 빌드에서 progress P·P2 둘 다 이름 입력 폼에서 stall 590s 다. 게임 입력칸의 keyPressed(I)V 바이트코드가 핸들러 keyPressed(I)Z 를 부르고 결과를 버린다(pop) — 글자는 핸들러가 TextComponent.insert(C) 로 넣을 때만 들어가는데, 지금 핸들러는 setTextComponent 를 버리고 키를 받지 않는다.",
+   "tradeoff": "핸들러가 키를 «먹기» 시작하면 이 핸들러를 쓰는 다른 SKT 두 종(9a2cf5ffc9d3 · 14a62a8521a0)의 키 흐름도 바뀐다 — 입력칸이 등록됐을 때만 먹도록 하고 두 종을 짝 재측해야 한다. 한글 조합은 범위 밖(숫자·영문 멀티탭부터).",
+   "effort": "M",
+   "target": "wie-skvm(com/xce/lcdui/TextComponentHandler)"
+  }
+ ],
+ "adoptedProposals": [
+  "2026-09-30-progression-axis-census#p1"
+ ]
+}
