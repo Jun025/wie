@@ -88,7 +88,6 @@ pub async fn open_database(context: &mut dyn WIPICContext, ptr_name: WIPICWord, 
     let exists = system.platform().database_repository().exists(&name, &pid).await;
 
     if !exists && packaged.is_none() && mode == 1 {
-        tracing::warn!("TMPDBG open noent {name:?}");
         return Ok(-12); // M_E_NOENT
     }
 
@@ -731,6 +730,17 @@ pub async fn stat_by_name_ktf(context: &mut dyn WIPICContext, name_ptr: WIPICWor
     Ok(0)
 }
 
+/// KTF custom slot 15 — the open DB's size in bytes. Read off the one caller in the corpus
+/// (`docs/report/0398`): `size = lseek(h, 0, 2); if (size > 0) size = slot15(h); lseek(h, 0, 0)`,
+/// which became reachable once slot 4 stopped answering every size probe with 0.
+pub async fn file_size_ktf(context: &mut dyn WIPICContext, db_id: i32) -> Result<i32> {
+    let Some(handle) = load_handle(context, db_id)? else {
+        return Ok(-25); // M_E_INVALIDHANDLE
+    };
+    tracing::debug!("db.size({db_id:#x}) -> {}", handle.buffer_len);
+    Ok(handle.buffer_len as i32)
+}
+
 /// KTF custom slot 16 — `MC_dbExists(name, 1, …)`. **0 = the DB exists, -12
 /// (`M_E_NOENT`) = it does not** — the same 0-is-success convention as slot 5
 /// (`stat_by_name_ktf`) and LGT's `exists_database`.
@@ -857,8 +867,8 @@ mod tests {
     use crate::context::{WIPICContext, test::TestContext};
 
     use super::{
-        KTF_DATABASE_STORAGE_LIMIT, close_database, delete_database, exists_database, exists_database_ktf, get_number_of_records, insert_record,
-        list_databases, list_record, list_record_info, list_record_or_rename_ktf, open_database, open_record_database, select_record,
+        KTF_DATABASE_STORAGE_LIMIT, close_database, delete_database, exists_database, exists_database_ktf, file_size_ktf, get_number_of_records,
+        insert_record, list_databases, list_record, list_record_info, list_record_or_rename_ktf, open_database, open_record_database, select_record,
         select_record_ktf, sort_records, stat_by_name_ktf, stream_read, stream_write, update_record,
     };
 
@@ -1094,6 +1104,7 @@ mod tests {
         assert_eq!(stream_write(&mut context, db_id, 0x2000, 10).await.unwrap(), 10);
 
         assert_eq!(select_record_ktf(&mut context, db_id, 0, 2, 0).await.unwrap(), 10); // size probe
+        assert_eq!(file_size_ktf(&mut context, db_id).await.unwrap(), 10); // slot 15
         assert_eq!(select_record_ktf(&mut context, db_id, 0, 0, 0).await.unwrap(), 0);
         assert_eq!(stream_read(&mut context, db_id, 0x2100, 4).await.unwrap(), 4);
         assert_eq!(select_record_ktf(&mut context, db_id, 0, 1, 0).await.unwrap(), 4); // ftell
