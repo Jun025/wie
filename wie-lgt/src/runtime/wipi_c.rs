@@ -149,7 +149,7 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::DrawRect => wie_wipi_c::api::graphics::draw_rect.into_body(),
         WIPICSvcId::FillRect => wie_wipi_c::api::graphics::fill_rect.into_body(),
         WIPICSvcId::CopyFrameBuffer => graphics::copy_frame_buffer_with_pixel_op.into_body(),
-        WIPICSvcId::DrawImage => wie_wipi_c::api::graphics::draw_image.into_body(),
+        WIPICSvcId::DrawImage => graphics::draw_image_with_pixel_op.into_body(),
         WIPICSvcId::CopyArea => wie_wipi_c::api::graphics::copy_area.into_body(),
         WIPICSvcId::DrawArc => wie_wipi_c::api::graphics::draw_arc.into_body(),
         WIPICSvcId::FillArc => wie_wipi_c::api::graphics::fill_arc.into_body(),
@@ -838,13 +838,15 @@ mod tests {
         Ok(())
     }
 
-    /// `MC_grpCopyFrameBuffer` runs the title's pixel-op proc from the native `pixel_op` (+28).
+    /// `MC_grpCopyFrameBuffer` and `MC_grpDrawImage` run the title's pixel-op proc from the native
+    /// `pixel_op` (+28), on 16-bit pixels.
     ///
     /// Two LGT titles key their text and sprites this way: they store a proc at +28 directly and it
     /// returns `dst` when `src` is their key 0xf81f (docs/report/0396). Ignoring it drew the key as
-    /// magenta. The proc here is written for the test: `src == 0xf81f ? dst : src`.
+    /// magenta. A decoded image is ARGB, so its opaque magenta must reach the proc as 0xf81f.
+    /// The proc here is written for the test: `src == 0xf81f ? dst : src`.
     #[test]
-    fn wipic_copy_frame_buffer_runs_the_native_pixel_op() -> Result<()> {
+    fn wipic_blits_run_the_native_pixel_op() -> Result<()> {
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
         let done = Arc::new(AtomicBool::new(false));
         let done_clone = done.clone();
@@ -856,6 +858,7 @@ mod tests {
             let create = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::CreateOffscreenFramebuffer)?;
             let init = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::InitContext)?;
             let copy = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::CopyFrameBuffer)?;
+            let draw = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::DrawImage)?;
 
             let proc_code = Allocator::alloc(&mut core, 14)?;
             // movs r3,#0xf8; lsls r3,r3,#8; adds r3,#0x1f; cmp r1,r3; beq +0; movs r0,r1; bx lr
@@ -883,6 +886,15 @@ mod tests {
             write_generic(&mut core, record + 28, proc_code | 1)?;
             let _: u32 = core.run_function(copy, &[dst, 0, 0, 2, 1, src, 0, 0, record]).await?;
             assert_eq!(pixels(&core, dst)?, 0x1234_aaaa, "the key keeps dst, the rest takes src");
+
+            // An image record starts with its framebuffer: 2x1, 32bpp, [opaque magenta, #123456].
+            let argb = Allocator::alloc(&mut core, 8)?;
+            write_generic(&mut core, argb, [0xffff_00ffu32, 0xff12_3456])?;
+            let image = Allocator::alloc(&mut core, 20)?;
+            write_generic(&mut core, image, [2u32, 1, 8, 32, argb])?;
+            fill(&mut core, dst, 0xaaaa_aaaa)?;
+            let _: u32 = core.run_function(draw, &[dst, 0, 0, 2, 1, image, 0, 0, record]).await?;
+            assert_eq!(pixels(&core, dst)?, 0x11aa_aaaa, "#ff00ff is the key; #123456 lands as RGB565 0x11aa");
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())

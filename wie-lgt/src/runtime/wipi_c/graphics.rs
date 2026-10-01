@@ -7,7 +7,7 @@ use wipi_types::{
     wipic::{WIPICDisplayInfo, WIPICFramebuffer, WIPICGraphicsContext, WIPICIndirectPtr, WIPICWord},
 };
 
-use wie_backend::canvas::{ArgbPixel, Clip, Color, Image, PixelType, VecImageBuffer};
+use wie_backend::canvas::{ArgbPixel, Clip, Color, Image, PixelType, Rgb565Pixel, VecImageBuffer};
 use wie_core_arm::{Allocator, ArmCore};
 use wie_util::{Result, WieError, read_generic, write_generic};
 use wie_wipi_c::{
@@ -506,12 +506,12 @@ pub async fn set_shared_context(
 }
 
 // LGT titles key their sprites in their own code: they store a pixel-op proc in the NATIVE
-// `pixel_op` (+28) of the context they pass to `MC_grpCopyFrameBuffer`, and the copy calls it
-// per pixel as `proc(dst, src)` — returning `dst` when `src` is their key (0xf81f). Read from
-// the two titles that do it (docs/report/0396): the store is a direct `str` to +28, never a
-// SetContext. The shared copy ignores the context, so the key was drawn as magenta. +28 is
-// the shared `offset`, but no title in the LGT corpus copies after SetContext(offset).
-// ponytail: one guest call per pixel; memoize (dst, src) per copy if a full-screen keyed copy shows up.
+// `pixel_op` (+28) of the context they pass to `MC_grpDrawImage`/`MC_grpCopyFrameBuffer`, and
+// the blit calls it per pixel as `proc(dst, src)` on 16-bit pixels — returning `dst` when `src`
+// is their key 0xf81f. Read from the two titles that do it (docs/report/0396): the store is a
+// direct `str` to +28, never a SetContext. The shared blits ignore the context, so the key was
+// drawn as magenta. +28 is the shared `offset`; no LGT title copies after SetContext(offset).
+// ponytail: one guest call per pixel; memoize (dst, src) per blit if a full-screen keyed blit shows up.
 const NATIVE_PIXEL_OP: u32 = core::mem::offset_of!(LgtGraphicsContext, pixel_op) as u32;
 
 #[allow(clippy::too_many_arguments)]
@@ -527,6 +527,46 @@ pub async fn copy_frame_buffer_with_pixel_op(
     sy: i32,
     ptr_graphics: WIPICWord,
 ) -> Result<()> {
+    if !blit_with_pixel_op(context, dst, dx, dy, width, height, src, sx, sy, ptr_graphics).await? {
+        shared_graphics::copy_frame_buffer(context, dst, dx, dy, width, height, src, sx, sy, ptr_graphics).await?;
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn draw_image_with_pixel_op(
+    context: &mut dyn WIPICContext,
+    dst: WIPICIndirectPtr,
+    dx: i32,
+    dy: i32,
+    width: i32,
+    height: i32,
+    image: WIPICIndirectPtr,
+    sx: i32,
+    sy: i32,
+    ptr_graphics: WIPICWord,
+) -> Result<()> {
+    // A `WIPICImage` starts with its `img` framebuffer, so the image handle reads as one.
+    if !blit_with_pixel_op(context, dst, dx, dy, width, height, image, sx, sy, ptr_graphics).await? {
+        shared_graphics::draw_image(context, dst, dx, dy, width, height, image, sx, sy, ptr_graphics).await?;
+    }
+    Ok(())
+}
+
+/// `false` when the context has no pixel op (or the target is not 16-bit): the caller blits as before.
+#[allow(clippy::too_many_arguments)]
+async fn blit_with_pixel_op(
+    context: &mut dyn WIPICContext,
+    dst: WIPICIndirectPtr,
+    dx: i32,
+    dy: i32,
+    width: i32,
+    height: i32,
+    src: WIPICIndirectPtr,
+    sx: i32,
+    sy: i32,
+    ptr_graphics: WIPICWord,
+) -> Result<bool> {
     let pixel_op: WIPICWord = if ptr_graphics == 0 {
         0
     } else {
@@ -534,11 +574,11 @@ pub async fn copy_frame_buffer_with_pixel_op(
     };
     let target: WIPICFramebuffer = read_generic(context, context.data_ptr(dst)?)?;
     let source: WIPICFramebuffer = read_generic(context, context.data_ptr(src)?)?;
-    if pixel_op == 0 || target.bpp != 16 || source.bpp != 16 {
-        return shared_graphics::copy_frame_buffer(context, dst, dx, dy, width, height, src, sx, sy, ptr_graphics).await;
+    if pixel_op == 0 || target.bpp != 16 || !matches!(source.bpp, 16 | 32) {
+        return Ok(false);
     }
     tracing::debug!(
-        "MC_grpCopyFrameBuffer({:#x}, {dx}, {dy}, {width}, {height}, {:#x}, {sx}, {sy}, pixel_op {pixel_op:#x})",
+        "pixel op {pixel_op:#x}: {:#x} ({dx}, {dy}, {width}x{height}) <- {:#x} ({sx}, {sy})",
         dst.0,
         src.0
     );
@@ -548,23 +588,35 @@ pub async fn copy_frame_buffer_with_pixel_op(
     let x1 = width.min(target.width as i32 - dx).min(source.width as i32 - sx);
     let y1 = height.min(target.height as i32 - dy).min(source.height as i32 - sy);
     if x0 >= x1 {
-        return Ok(());
+        return Ok(true);
     }
+    let bytes_per_pixel = source.bpp / 8;
     let target_base = context.data_ptr(target.buf)?;
     let source_base = context.data_ptr(source.buf)?;
-    let mut source_row = vec![0u16; (x1 - x0) as usize];
+    let mut source_row = vec![0u8; ((x1 - x0) as u32 * bytes_per_pixel) as usize];
     let mut target_row = vec![0u16; (x1 - x0) as usize];
     for y in y0..y1 {
-        let source_at = source_base + (sy + y) as u32 * source.bpl + (sx + x0) as u32 * 2;
+        let source_at = source_base + (sy + y) as u32 * source.bpl + (sx + x0) as u32 * bytes_per_pixel;
         let target_at = target_base + (dy + y) as u32 * target.bpl + (dx + x0) as u32 * 2;
-        context.read_bytes(source_at, bytemuck::cast_slice_mut(&mut source_row))?;
+        context.read_bytes(source_at, &mut source_row)?;
         context.read_bytes(target_at, bytemuck::cast_slice_mut(&mut target_row))?;
-        for (target_pixel, &source_pixel) in target_row.iter_mut().zip(&source_row) {
+        for (target_pixel, source_pixel) in target_row.iter_mut().zip(source_row.chunks_exact(bytes_per_pixel as usize)) {
+            // The proc compares 16-bit pixels, so a decoded (ARGB) image pixel goes in as the RGB565
+            // value it would have on the handset; a fully transparent one is skipped like the shared blit.
+            let source_pixel = if bytes_per_pixel == 2 {
+                u16::from_le_bytes([source_pixel[0], source_pixel[1]])
+            } else {
+                let color = ArgbPixel::to_color(u32::from_le_bytes([source_pixel[0], source_pixel[1], source_pixel[2], source_pixel[3]]));
+                if color.a == 0 {
+                    continue;
+                }
+                Rgb565Pixel::from_color(color)
+            };
             *target_pixel = context.call_function(pixel_op, &[*target_pixel as u32, source_pixel as u32]).await? as u16;
         }
         context.write_bytes(target_at, bytemuck::cast_slice(&target_row))?;
     }
-    Ok(())
+    Ok(true)
 }
 
 pub async fn init_context(context: &mut dyn WIPICContext, ptr_context: WIPICWord) -> Result<()> {
