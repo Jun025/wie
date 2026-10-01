@@ -237,7 +237,7 @@ pub async fn list_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
 /// call it as `f(src_name, dst_name, 1)` — read off the caller, not guessed: an installer writes the
 /// jar's split chunks into `lo.z_`, closes it, then calls slot 7 with `r0 = "lo.z_"`, `r1 = "lo.dsk"`
 /// and branches on `r0 >= 0` to the next install stage, `< 0` to «Data 인스톨에 실패»
-/// (`docs/report/0398`). The next boot stats `lo.dsk`, so this is a rename. Until 2026-10-01 the name
+/// (`docs/report/0401`). The next boot stats `lo.dsk`, so this is a rename. Until 2026-10-01 the name
 /// fell into `list_record`, which answered M_E_INVALIDHANDLE, and the install never finished.
 pub async fn list_record_or_rename_ktf(context: &mut dyn WIPICContext, a0: i32, a1: WIPICWord, a2: WIPICWord) -> Result<i32> {
     if load_handle(context, a0)?.is_some() {
@@ -279,7 +279,7 @@ pub async fn list_record_or_rename_ktf(context: &mut dyn WIPICContext, a0: i32, 
 ///
 /// Disassembled arity is 2 — `f(r0 = path, r1 = 1)`. Report 0175 measured tokens `"res"`/`"ga"`,
 /// each the directory part of a path the same call site then opens, and left four meanings open;
-/// its H4 was «select/ensure a directory». `docs/report/0398` measured the deciding caller: a title's
+/// its H4 was «select/ensure a directory». `docs/report/0401` measured the deciding caller: a title's
 /// libc shim routes one POSIX op to this slot as `(path, 1)` (the next op goes to slot 9 with the
 /// same shape), and the title calls it with `"/shared"`, then `stat("/shared")` through slot 5,
 /// and exits when that stat fails — `mkdir` then check. So this records the directory as an empty
@@ -644,7 +644,7 @@ pub async fn stream_read(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
 
 /// KTF custom slot 4 — `lseek(handle, offset, whence)`, not the header's `MC_dbSelectRecord`.
 /// `whence` is 0 = from the start, 1 = from the current position, 2 = from the end, and the return
-/// value is the new position. Read off a title's own libc shim, not guessed (`docs/report/0398`):
+/// value is the new position. Read off a title's own libc shim, not guessed (`docs/report/0401`):
 /// its POSIX `lseek` passes SEEK_CUR/SEEK_END through as 1/2 (anything else as 0) and returns this
 /// slot's value unchanged, its `ftell` is `lseek(fd, 0, 1)`, and its `fseek(SEEK_CUR)` adds
 /// `ftell()` to the offset and seeks with 0. The corpus uses the same shapes: `(h, 0, 2)` then
@@ -652,7 +652,7 @@ pub async fn stream_read(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
 ///
 /// Until 2026-10-01 every whence was treated as «from the start» and the answer was always 0:
 /// a size probe read every file as empty, and a title that seeks from `ftell()` landed at a
-/// negative offset — the installer of `docs/report/0398` failed with «잘못된 리소스 파일».
+/// negative offset — the installer of `docs/report/0401` failed with «잘못된 리소스 파일».
 /// Seeking past the end is allowed (multi-slot saves write at a fixed offset; `stream_write`
 /// zero-fills the gap); a negative result is refused with -22 and moves nothing.
 pub async fn select_record_ktf(context: &mut dyn WIPICContext, db_id: i32, offset: i32, whence: WIPICWord, _arg3: WIPICWord) -> Result<i32> {
@@ -731,7 +731,7 @@ pub async fn stat_by_name_ktf(context: &mut dyn WIPICContext, name_ptr: WIPICWor
 }
 
 /// KTF custom slot 15 — the open DB's size in bytes. Read off the one caller in the corpus
-/// (`docs/report/0398`): `size = lseek(h, 0, 2); if (size > 0) size = slot15(h); lseek(h, 0, 0)`,
+/// (`docs/report/0401`): `size = lseek(h, 0, 2); if (size > 0) size = slot15(h); lseek(h, 0, 0)`,
 /// which became reachable once slot 4 stopped answering every size probe with 0.
 pub async fn file_size_ktf(context: &mut dyn WIPICContext, db_id: i32) -> Result<i32> {
     let Some(handle) = load_handle(context, db_id)? else {
@@ -783,7 +783,7 @@ pub async fn exists_database_ktf(context: &mut dyn WIPICContext, name_ptr: WIPIC
 }
 
 /// The repository key for a guest DB name: KTF titles name the same DB with and without a leading
-/// `/` — one installer stats and renames to `lo.dsk`, then opens `/lo.dsk` (`docs/report/0398`).
+/// `/` — one installer stats and renames to `lo.dsk`, then opens `/lo.dsk` (`docs/report/0401`).
 /// The name as given wins when it exists, so a save already stored under a `/` key keeps working;
 /// otherwise a saved DB under the bare name is used.
 async fn resolve_db_name(context: &mut dyn WIPICContext, name: String) -> String {
@@ -927,7 +927,7 @@ mod tests {
             assert_eq!(seen, SENTINEL, "slot 8 wrote to guest memory at {base:#x}");
         }
 
-        // `mkdir` then `stat`: the path now answers as present (docs/report/0398).
+        // `mkdir` then `stat`: the path now answers as present (docs/report/0401).
         assert_eq!(stat_by_name_ktf(&mut context, 0x2000, 0, 1, 0).await.unwrap(), 0);
     }
 
@@ -1073,7 +1073,7 @@ mod tests {
     }
 
     /// KTF slot 7 with a handle is the header's list; with two names it renames — the
-    /// installer's `lo.z_` → `lo.dsk` step (`docs/report/0398`).
+    /// installer's `lo.z_` → `lo.dsk` step (`docs/report/0401`).
     #[futures_test::test]
     async fn ktf_slot7_lists_for_a_handle_and_renames_for_two_names() {
         let mut context = database_test_context();
