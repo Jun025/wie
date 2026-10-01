@@ -116,3 +116,4 @@
 - 이 worktree 의 target 을 썼고 build-slot 을 거쳤다.
 - 러너 블록(후 release): `draw_j2me` · `helloworld_ktf` · `helloworld_lgt` · `text_j2me`(`--timeout 5`) PASS.
 - `keydraw_ktf`·`keydraw_lgt` `--inject --expect-last-frame` 은 기본 `--max-ticks` 에서 UNMEASURED(`stop: max-ticks`)였다 — **전 빌드도 같다**(0391·0392·0393 과 같은 기존 현상). `--max-ticks 2000000000` 으로 전·후 모두 PASS 27/27 · `last_frame_content true` · rc=0.
+- 유입(`node scripts/corpus-name-inflow.mjs`): BOUNDED 337쌍 · SUFFIX-ATTACHED 15쌍. 전부 `compat.json` 의 기존 `title`·`fileTitle` 줄이다 — 이 PR 이 그 파일을 건드려 주제가 됐다(#434 의 0402 와 같은 수). 이 회차가 더한 줄(코드 · 이 문서 · worklog · player-updates · `compat.json` 의 `status`/`longplay`/`knownIssues_ko`)의 게임명은 0 이다. 타이틀은 sha12 로만 적었다.
