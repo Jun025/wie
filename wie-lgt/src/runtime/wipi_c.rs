@@ -316,10 +316,10 @@ async fn clet_register(core: &mut ArmCore, (system, jvm): &mut (System, Jvm), fu
 /// rather than dying. Shared `wie_wipi_c::api::net` has no socket write/read, so
 /// these stay LGT-local (restored from `02ad8b5c`; the base swap #161 dropped them).
 /// The in-game network path is not reachable from a headless boot.
-// LGT titles draw a soft-key bar BELOW the screen height they are told: 알바타이쿤2 sizes its
-// canvas `height + 24` by this exact width table (binary.mod 0x289c4), and 메이플스토리 도적편 blits
+// LGT titles draw a soft-key bar BELOW the screen height they are told: `fe76e641bb3d` sizes its
+// canvas `height + 24` by this exact width table (binary.mod 0x289c4), and `1eaa92092bee` blits
 // down to row 343 of a 320-row screen. Without the rows that write lands on the next heap block's
-// header and the allocator later fails with ~127MB free (docs/report/0392 §4, 0400).
+// header and the allocator later fails with ~127MB free (docs/report/0392 §4, 0402).
 fn softkey_rows(width: u32) -> u32 {
     match width {
         120 | 128 => 14,
@@ -819,7 +819,7 @@ mod tests {
 
     /// The LGT screen framebuffer has 24 soft-key rows below the height it reports (240 or 320 wide).
     ///
-    /// Two LGT titles draw those rows (docs/report/0400); without them the 25th row lands on the
+    /// Two LGT titles draw those rows (docs/report/0402); without them the 25th row lands on the
     /// next heap block's header. The reported height must not grow — every LGT title lays out by it.
     #[test]
     fn wipic_screen_framebuffer_has_softkey_rows_below_its_height() -> Result<()> {
