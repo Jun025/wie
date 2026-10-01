@@ -73,3 +73,5 @@ rename 뒤 그 제목은 `open("/lo.dsk", 1)` 을 한다. 저장소 키가 문�
 
 **게임 파일명 유입**: BOUNDED 0회/0쌍 · SUFFIX-ATTACHED 0회/0쌍(`node scripts/corpus-name-inflow.mjs` · 이 브랜치의 5파일). 게임명은 sha12 로만 적었다.
 
+
+<!-- corpus-name-inflow v1 subjects=5 tree=05f8b0adb2dfaaba B=0/0 P=0/0 S=0/0 -->
