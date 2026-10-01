@@ -46,7 +46,7 @@ C `sprintf` 는 `%s` 바이트를 그대로 복사한다 ⇒ 88바이트, 버퍼
 | `87b04639cdfe` | FAIL 7키 · `410 (r0=0x5b538 r1=ptr r2=0x3ff r3=1 lr=0x15aa5)` | 854/900키 · 600초 무오류 |
 | `8f7758fa43b6` | FAIL 54키 · `Invalid memory access 0x2ea48a` | 854/900키 · 600초 무오류 |
 
-- `8f7758fa43b6` 의 «전»은 회차마다 흔들린다(§3-6): 300초 1회는 425키에서 시간 끝, 600초 3회 중 2회 FAIL 54 · 1회 무오류. 계측 빌드(같은 결함)는 12회 전부 54키 FAIL. «후»는 600초 무오류.
+- `8f7758fa43b6` 의 «전»은 회차마다 흔들린다(§3-6): 300초 1회는 425키에서 시간 끝, 600초 3회 중 2회 FAIL 54 · 1회 무오류. 계측 빌드(같은 결함)는 24회 전부 54키 FAIL. «후»는 600초 무오류.
 - 900스텝이 600초에 다 안 들어가 «무오류»는 `UNMEASURED`(시간 끝)다 — «그 시간 안에 오류가 없었다»로 읽는다.
 
 ### 5. 대상 밖 퇴행 — sprintf 는 모든 KTF·LGT 타이틀이 지난다
@@ -80,5 +80,3 @@ C `sprintf` 는 `%s` 바이트를 그대로 복사한다 ⇒ 88바이트, 버퍼
 ### 게임 파일명 유입
 
 `node scripts/corpus-name-inflow.mjs --corpus <game_lab>`: BOUNDED 15회/10쌍 · SUFFIX-ATTACHED 0회/0쌍. BOUNDED 15회는 전부 이 회차가 손댄 `wie-lgt` `svc_ids.rs`·`wipi_c.rs` 의 **기존 줄**이다 — 이 회차가 더한 줄(`git diff origin/main -- wie-lgt wie-wipi-c` 의 `+` 줄)의 한글은 시험 문자열 `"종목|"` 하나이고 그것은 걸린 이름이 아니다. 타이틀은 sha12 로만 적었다.
-
-<!-- corpus-name-inflow v1 subjects=6 tree=5802aadf87b8a672 B=15/10 P=0/0 S=0/0 -->
