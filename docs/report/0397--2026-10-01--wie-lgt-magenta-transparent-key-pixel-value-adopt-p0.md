@@ -72,3 +72,5 @@ fmt · clippy stable/wasm32/beta `-D warnings` · `RUST_MIN_STACK=4194304 cargo 
 **남은 것**: `34c48bbae783` 의 ≤10px 잔여(78/883 프레임) — 원인 미조사. 600초 «후» 열은 메모 전 빌드다 — 메모 빌드는 180초 짝에서 두 타이틀 모두 FAIL 아님(마젠타 임계 미만).
 
 **게임 파일명 유입**: BOUNDED 336쌍 · SUFFIX-ATTACHED 15쌍 — 전부 `compat.json` 파일 단위 스캔이 잡은 기존 `title`·`fileTitle` 값이다. 이 회차가 더한 줄(코드 · 이 문서 · worklog · player-updates · compat 의 status/longplay 2줄)의 게임명은 0.
+
+<!-- corpus-name-inflow v1 subjects=6 tree=823e98c201d4a0b6 B=729/336 P=0/0 S=35/15 -->
