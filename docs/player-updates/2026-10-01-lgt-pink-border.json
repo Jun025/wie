@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-01",
+  "kind": "fix",
+  "titles": [
+    "5814101b801021a63b423e809f408d24a4ac476ed5bb1c6e3137c8d3de69bf3d",
+    "34c48bbae783f11b95baf7fd7cecca483c10ec3391f7043109da3db94866d57d"
+  ],
+  "summary_ko": "그림과 글자 둘레에 보이던 분홍색 테두리가 사라졌어요. 이제 타이틀 화면과 메뉴가 원래 그림대로 보여요.",
+  "pr": "https://github.com/Jun025/wie/pull/0"
+}
