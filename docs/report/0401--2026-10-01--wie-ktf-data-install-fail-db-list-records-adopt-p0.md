@@ -79,4 +79,4 @@ slot 7 rename 이 해석 후 «원본 = 대상»이면(`/x`→`x` 에서 `/x` �
 
 minor 처분: m1 그대로(측정된 호출 형태 `ftell` 직후 `fseek` 에 맞고 주석이 가정을 말한다) · m2 그대로(shim 이 0/1/2 밖을 0 으로 접는다) · m3 그대로(같은 DB 의 두 이름이라는 설계의 귀결 · 일관적).
 
-<!-- corpus-name-inflow v1 subjects=5 tree=05f8b0adb2dfaaba B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=5 tree=0651b4698b25ddaf B=0/0 P=0/0 S=0/0 -->
