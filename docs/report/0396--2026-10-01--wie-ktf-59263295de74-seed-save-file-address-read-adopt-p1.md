@@ -80,3 +80,4 @@ L 의 `UNMEASURED · rc=2` 는 600초 예산 끝이지 오류가 아니다(0395 
 - `cargo fmt --all -- --check` · `cargo clippy --all -- -D warnings`(stable · beta) · wasm32 clippy · 전부 rc=0. `RUST_MIN_STACK=4194304 cargo test --all` **627/0** rc=0. 스크래치 target · build-slot 경유.
 - 러너 블록(후 빌드): `draw_j2me` · `helloworld_ktf` · `helloworld_lgt` · `text_j2me`(`--timeout 5`) PASS. `keydraw_ktf`·`keydraw_lgt` `--inject --expect-last-frame --max-ticks 2000000000` PASS 27/27 · `last_frame_content true`.
 - `node scripts/player-data.mjs` OK(429 · 368/41/20).
+- 유입(`node scripts/corpus-name-inflow.mjs`): BOUNDED 330쌍 · SUFFIX-ATTACHED 15쌍 — 전부 `compat.json` 파일 단위 스캔이 잡은 기존 `title`·`fileTitle` 값이다(main 과 같은 수 · 0395 와 같다). 이 회차가 더한 줄(코드 · 이 문서 · worklog · player-updates · `compat.json` 의 `status`/`longplay`/`knownIssues_ko`)의 게임명은 0.
