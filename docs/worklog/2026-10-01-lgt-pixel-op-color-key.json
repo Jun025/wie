@@ -3,7 +3,7 @@
   "date": "2026-10-01",
   "task": "wie-lgt-magenta-transparent-key-pixel-value-adopt-p0",
   "title": "LGT 마젠타 투명색 — 게임의 키 비교는 컨텍스트 native pixel_op(+28) 프록 안에 있다",
-  "summary": "두 LGT 타이틀은 그래픽 컨텍스트 +28 에 프록을 직접 써 넣고, DrawImage·CopyFrameBuffer 가 화소마다 proc(dst, src) 를 부르기를 기대한다. 프록은 src 가 키 0xf81f 면 dst 를 돌려준다. 공유 구현은 컨텍스트를 무시해 키가 마젠타로 찍혔다. LGT 두 SVC 가 프록을 부르게 했고, 디코드 이미지(ARGB) 화소는 RGB565 로 넘긴다(docs/report/0397).",
+  "summary": "두 LGT 타이틀은 그래픽 컨텍스트 +28 에 프록을 직접 써 넣고, DrawImage·CopyFrameBuffer 가 화소마다 proc(dst, src) 를 부르기를 기대한다. 프록은 src 가 키 0xf81f 면 dst 를 돌려준다. 공유 구현은 컨텍스트를 무시해 키가 마젠타로 찍혔다. LGT 두 SVC 가 프록을 부르게 했고, 디코드 이미지(ARGB) 화소는 RGB565 로 넘긴다(docs/report/0399).",
   "changes": [
     "wie-lgt: DrawImage · CopyFrameBuffer 를 LGT 래퍼로 — native pixel_op 가 있으면 화소마다 게스트 프록 호출, 없으면 종전 공유 경로",
     "단위 시험 wipic_blits_run_the_native_pixel_op (경로 되돌림 · 565 변환 제거 둘 다 red)",

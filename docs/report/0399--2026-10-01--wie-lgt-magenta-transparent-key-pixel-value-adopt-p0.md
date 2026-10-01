@@ -67,10 +67,8 @@ census L(load1 653)의 «23% 마젠타» 는 재현되지 않았다: 600초 두 
 ### 5. 게이트
 fmt · clippy stable/wasm32/beta `-D warnings` · `RUST_MIN_STACK=4194304 cargo test --all` rc=0 · 러너 블록 6줄 PASS(`keydraw_*` rc=0 · paints 79/55).
 
-**사용자 영향**: 두 LGT 타이틀의 타이틀 화면·메뉴·글자 둘레 분홍색이 사라진다. 지원 현황 playable 367 → 368 · limited 42 → 41(`5814101b8010` — longplay 의 FAIL 이 바로 이 마젠타 판정이었다. speed `no` 는 그대로).
+**사용자 영향**: 두 LGT 타이틀의 타이틀 화면·메뉴·글자 둘레 분홍색이 사라진다. 지원 현황 playable 368 → 369 · limited 41 → 40(main `c387adef` 기준 · `5814101b8010` — longplay 의 FAIL 이 바로 이 마젠타 판정이었다. speed `no` 는 그대로).
 
 **남은 것**: `34c48bbae783` 의 ≤10px 잔여(78/883 프레임) — 원인 미조사. 600초 «후» 열은 메모 전 빌드다 — 메모 빌드는 180초 짝에서 두 타이틀 모두 FAIL 아님(마젠타 임계 미만).
 
 **게임 파일명 유입**: BOUNDED 336쌍 · SUFFIX-ATTACHED 15쌍 — 전부 `compat.json` 파일 단위 스캔이 잡은 기존 `title`·`fileTitle` 값이다. 이 회차가 더한 줄(코드 · 이 문서 · worklog · player-updates · compat 의 status/longplay 2줄)의 게임명은 0.
-
-<!-- corpus-name-inflow v1 subjects=6 tree=823e98c201d4a0b6 B=729/336 P=0/0 S=35/15 -->

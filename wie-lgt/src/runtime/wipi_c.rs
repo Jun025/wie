@@ -842,7 +842,7 @@ mod tests {
     /// `pixel_op` (+28), on 16-bit pixels.
     ///
     /// Two LGT titles key their text and sprites this way: they store a proc at +28 directly and it
-    /// returns `dst` when `src` is their key 0xf81f (docs/report/0397). Ignoring it drew the key as
+    /// returns `dst` when `src` is their key 0xf81f (docs/report/0399). Ignoring it drew the key as
     /// magenta. A decoded image is ARGB, so its opaque magenta must reach the proc as 0xf81f.
     /// The proc here is written for the test: `src == 0xf81f ? dst : src`.
     #[test]

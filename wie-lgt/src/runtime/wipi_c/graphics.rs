@@ -508,7 +508,7 @@ pub async fn set_shared_context(
 // LGT titles key their sprites in their own code: they store a pixel-op proc in the NATIVE
 // `pixel_op` (+28) of the context they pass to `MC_grpDrawImage`/`MC_grpCopyFrameBuffer`, and
 // the blit calls it per pixel as `proc(dst, src)` on 16-bit pixels — returning `dst` when `src`
-// is their key 0xf81f. Read from the two titles that do it (docs/report/0397): the store is a
+// is their key 0xf81f. Read from the two titles that do it (docs/report/0399): the store is a
 // direct `str` to +28, never a SetContext. The shared blits ignore the context, so the key was
 // drawn as magenta. +28 is the shared `offset`; no LGT title copies after SetContext(offset).
 const NATIVE_PIXEL_OP: u32 = core::mem::offset_of!(LgtGraphicsContext, pixel_op) as u32;
