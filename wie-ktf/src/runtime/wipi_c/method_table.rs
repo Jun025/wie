@@ -648,7 +648,7 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
             WIPICDatabaseMethodId::SelectRecord => Some(database::select_record_ktf.into_body()),
             WIPICDatabaseMethodId::UpdateRecord => Some(database::stat_by_name_ktf.into_body()),
             WIPICDatabaseMethodId::DeleteRecord => Some(database::delete_record_ktf.into_body()),
-            WIPICDatabaseMethodId::ListRecord => Some(database::list_record.into_body()),
+            WIPICDatabaseMethodId::ListRecord => Some(database::list_record_or_rename_ktf.into_body()),
             WIPICDatabaseMethodId::SortRecords => Some(database::sort_records.into_body()),
             WIPICDatabaseMethodId::GetAccessMode => Some(gen_stub(9, "MC_dbGetAccessMode")),
             WIPICDatabaseMethodId::GetNumberOfRecords => Some(database::get_number_of_records.into_body()),
