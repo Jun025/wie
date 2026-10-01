@@ -13,7 +13,7 @@ use wie_jvm_support::JvmImplementation;
 
 use crate::runtime::java::{JavaSvcFunctions, register_java_svc_handler};
 
-use super::{JavaArrayClassDefinition, JavaClassDefinition};
+use super::{JavaArrayClassDefinition, JavaClassDefinition, KtfJvmSupport};
 
 #[derive(Clone)]
 pub struct KtfJvmImplementation {
@@ -48,19 +48,21 @@ impl JvmImplementation for KtfJvmImplementation {
         C: ?Sized + 'static + Send,
         Context: Sync + Send + DerefMut + Deref<Target = C> + Clone + 'static,
     {
+        // A full guest heap fails here too (7e2247bdf565, minutes in): hand the guest an exception
+        // instead of panicking the host, the way `instantiation_error` does for instances.
         Box::pin(async move {
-            Ok(Box::new(
-                JavaClassDefinition::new(&mut self.core.clone(), jvm, proto, context, self.java_functions.clone())
-                    .await
-                    .unwrap(),
-            ) as _)
+            match JavaClassDefinition::new(&mut self.core.clone(), jvm, proto, context, self.java_functions.clone()).await {
+                Ok(class) => Ok(Box::new(class) as _),
+                Err(error) => Err(KtfJvmSupport::instantiation_error(jvm, error, "class").await),
+            }
         })
     }
 
     async fn define_array_class(&self, jvm: &Jvm, element_type_name: &str) -> JvmResult<Box<dyn ClassDefinition>> {
         let class_name = format!("[{element_type_name}");
-        let class = JavaArrayClassDefinition::new(&mut self.core.clone(), jvm, &class_name).await.unwrap();
-
-        Ok(Box::new(class) as Box<_>)
+        match JavaArrayClassDefinition::new(&mut self.core.clone(), jvm, &class_name).await {
+            Ok(class) => Ok(Box::new(class) as Box<_>),
+            Err(error) => Err(KtfJvmSupport::instantiation_error(jvm, error, "array class").await),
+        }
     }
 }

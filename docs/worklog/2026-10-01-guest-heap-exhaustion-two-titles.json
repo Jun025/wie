@@ -1,0 +1,19 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-01",
+  "task": "wie-guest-heap-exhaustion-host-panic-two-titles-adopt-p0",
+  "title": "손님 힙이 차는 두 타이틀 — KTF 는 오프스크린 픽셀 누수, LGT 는 화면 버퍼 덮어쓰기(#434 가 처리)",
+  "summary": "7e2247bdf565: MC_grpDestroyOffScreenFrameBuffer 가 레코드만 반납하고 픽셀을 남겨 256바이트 버킷이 약 5분에 찼다(누수). fe76e641bb3d: 힙은 차지 않았다 — 게임이 화면 버퍼 끝 너머 24줄을 써서 다음 블록 헤더를 0xffffffff 로 덮었다(#434 가 같은 회차에 착지). docs/report/0403.",
+  "changes": [
+    "wie-wipi-c destroy_offscreen_framebuffer 가 buf 도 free",
+    "wie-ktf define_class_rust · define_array_class unwrap → instantiation_error",
+    "wie-core-arm AllocationFailure 시 list·버킷 점유 요약(깨진 헤더 표시)",
+    "docs/player-data/compat.json 1행 limited → playable"
+  ],
+  "limits": [
+    "KTF unwrap 처방은 대조 시험이 없다 — 클래스 정의를 실패시키려면 4바이트 버킷 100만 칸을 채워야 해 선형 탐색 할당기에서 너무 느리다",
+    "오프스크린을 만든 적 없이 지우는 타이틀(7da00ecd4804, 1회)은 이제 그 핸들의 픽셀까지 반납한다 — 짝 재측 PASS 3/3 이지만 그 핸들이 무엇이었는지는 재지 않았다"
+  ],
+  "adoptedProposals": ["2026-09-30-census-wave3-singleton-tail#p0"],
+  "proposals": []
+}

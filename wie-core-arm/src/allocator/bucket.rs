@@ -126,6 +126,18 @@ impl BucketAllocator {
         Ok(())
     }
 
+    /// `slot:used/count` per bucket — read-only count of the cleared header bits.
+    pub fn usage(core: &ArmCore, base_address: u32) -> Result<alloc::string::String> {
+        let mut out = alloc::string::String::new();
+        for (i, &(slot_size, slot_count)) in BUCKETS.iter().enumerate() {
+            let mut header = vec![0u8; header_length(i)];
+            core.read_bytes(base_address + region_offset(i) as u32, &mut header)?;
+            let used = slot_count - header.iter().map(|b| b.count_ones() as usize).sum::<usize>();
+            out += &alloc::format!("{}{slot_size}:{used}/{slot_count}", if i == 0 { "" } else { " " });
+        }
+        Ok(out)
+    }
+
     /// The bucket whose slot area holds `address` at a slot boundary.
     fn bucket_of_address(base_address: u32, address: u32) -> Option<usize> {
         (0..BUCKETS.len()).find(|&i| {
