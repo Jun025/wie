@@ -1,7 +1,7 @@
 mod bucket;
 mod list;
 
-use wie_util::Result;
+use wie_util::{Result, WieError};
 
 use crate::{
     ArmCore,
@@ -26,11 +26,20 @@ impl Allocator {
     }
 
     pub fn alloc(core: &mut ArmCore, size: u32) -> Result<u32> {
-        if size > BUCKET_MAX as _ {
+        let result = if size > BUCKET_MAX as _ {
             ListAllocator::alloc(core, HEAP_BASE, HEAP_SIZE / 2, size)
         } else {
             BucketAllocator::alloc(core, HEAP_BASE + HEAP_SIZE / 2, size)
+        };
+        if let Err(WieError::AllocationFailure) = &result {
+            // Which half ran out, and how full each is: «the guest heap is full» says nothing about why.
+            tracing::error!(
+                "guest heap allocation of {size:#x} bytes failed; list {}; buckets {}",
+                ListAllocator::usage(core, HEAP_BASE, HEAP_SIZE / 2).unwrap_or_default(),
+                BucketAllocator::usage(core, HEAP_BASE + HEAP_SIZE / 2).unwrap_or_default()
+            );
         }
+        result
     }
 
     // Which allocator owns a block is a fact about its address; `size` is only the caller's claim.

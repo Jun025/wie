@@ -533,6 +533,14 @@ pub async fn create_offscreen_framebuffer(context: &mut dyn WIPICContext, w: i32
 pub async fn destroy_offscreen_framebuffer(context: &mut dyn WIPICContext, framebuffer: WIPICIndirectPtr) -> Result<()> {
     tracing::debug!("MC_grpDestroyOffScreenFrameBuffer({:#x})", framebuffer.0);
 
+    // The pixels are a second allocation (`FrameBuffer::new`). Freeing only the record leaked
+    // them: 7e2247bdf565 makes and drops a 9x11 buffer ~400 times a second and filled the
+    // 256-byte bucket in about 5 minutes.
+    if let Some(record) = read_framebuffer_or_null(context, framebuffer)?
+        && record.buf.0 != 0
+    {
+        context.free(record.buf)?;
+    }
     context.free(framebuffer)?;
 
     Ok(())

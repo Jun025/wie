@@ -1,4 +1,4 @@
-use alloc::format;
+use alloc::{format, string::String};
 use core::mem::size_of;
 
 use bytemuck::{Pod, Zeroable};
@@ -101,6 +101,35 @@ impl ListAllocator {
         let header: ListAllocationHeader = read_generic(core, header_address)?;
         let allocation_size = (size as usize + size_of::<ListAllocationHeader>()).next_multiple_of(4) as u32 + CANARY_SIZE;
         Ok(header.in_use() && header.size() == allocation_size)
+    }
+
+    /// `used/total bytes · used blocks · largest free block` — read-only walk of the headers.
+    pub fn usage(core: &ArmCore, base_address: u32, base_size: u32) -> Result<String> {
+        let end = base_address + base_size;
+        let (mut cursor, mut used, mut used_blocks, mut largest_free) = (base_address, 0u32, 0u32, 0u32);
+        let mut free_run = 0u32;
+        while cursor < end {
+            let header: ListAllocationHeader = read_generic(core, cursor)?;
+            if header.size() == 0 || header.size() > end - cursor {
+                // A header no allocation could have written: something wrote over it.
+                return Ok(format!(
+                    "CORRUPT header {:#x} at {cursor:#x} after {used_blocks} used blocks",
+                    header.data
+                ));
+            }
+            if header.in_use() {
+                used += header.size();
+                used_blocks += 1;
+                free_run = 0;
+            } else {
+                free_run += header.size();
+                largest_free = largest_free.max(free_run);
+            }
+            cursor += header.size();
+        }
+        Ok(format!(
+            "used {used:#x}/{base_size:#x} in {used_blocks} blocks, largest free run {largest_free:#x}"
+        ))
     }
 
     fn find_address(core: &mut ArmCore, base_address: u32, base_size: u32, size: u32) -> Result<u32> {

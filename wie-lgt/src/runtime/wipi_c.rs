@@ -645,6 +645,41 @@ mod tests {
     use super::{graphics, register_wipic_svc_handler};
     use crate::runtime::{SVC_CATEGORY_WIPIC, java::init_jvm, svc_ids::WIPICSvcId};
 
+    // 7e2247bdf565 makes and drops a small offscreen buffer ~400 times a second. Destroy freed
+    // the record and kept the pixels, so the next create landed somewhere new every time.
+    #[test]
+    fn destroyed_offscreen_framebuffer_returns_its_pixels() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, _) = init_jvm(&system_clone).await?;
+            register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
+            let create = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::CreateOffscreenFramebuffer)?;
+            let destroy = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::DestroyOffscreenFramebuffer)?;
+            let pointer = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::GetFramebufferPointer)?;
+
+            let first: u32 = core.run_function(create, &[9, 11]).await?;
+            let first_pixels: u32 = core.run_function(pointer, &[first]).await?;
+            let _: u32 = core.run_function(destroy, &[first]).await?;
+
+            let second: u32 = core.run_function(create, &[9, 11]).await?;
+            let second_pixels: u32 = core.run_function(pointer, &[second]).await?;
+            assert_eq!(second_pixels, first_pixels, "the destroyed buffer's pixels were not freed");
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
     /// WIPIC `0x68` ends the program: it reaches `Platform::exit`, the way `MC_knlExit` does.
     ///
     /// Six LGT titles call it from their first-run notice with one integer (0x1b here is what
