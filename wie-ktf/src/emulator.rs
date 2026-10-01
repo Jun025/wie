@@ -37,6 +37,39 @@ fn jar_filename(aid: &str, files: &BTreeMap<String, Vec<u8>>) -> String {
     }
 }
 
+/// Packaged saves written by the original owner's handset that no other host can load, keyed by the
+/// MD5 of the title's jar (the jar identifies the build, as in `wie-lgt`'s `ORPHAN_ENTRIES`).
+/// Deliberately a list, never a rule — most KTF archives ship saves that load fine, and dropping
+/// every `P/` save would change their start state. A dropped title boots as a fresh install does:
+/// with no save, and writes its own.
+const DEVICE_BOUND_SAVES: &[([u8; 16], &[&str])] = &[
+    // AID 0103451A (archive sha256 59263295de74…). `res/save.sav` +0x214 holds 0x01d14250, a heap
+    // pointer of the handset that wrote it: the game reads 192 bytes into a struct, then
+    // `stream_read`s 920 bytes to the struct's +0x30 — that stale pointer (docs/report/0396).
+    // `res/savem.sav` came from the same handset and goes with it.
+    (
+        [
+            0x69, 0x7c, 0xcf, 0x63, 0x8d, 0xf0, 0x4b, 0x98, 0x27, 0xdb, 0x67, 0x75, 0x34, 0x27, 0xd5, 0x8e,
+        ],
+        &["res/save.sav", "res/savem.sav"],
+    ),
+];
+
+/// Remove the saves `table` names for this jar, both bare and under `P/` (`load` mounts both
+/// spellings at the same path).
+fn drop_device_bound_saves(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8], table: &[([u8; 16], &[&str])]) {
+    let hash = md5::compute(jar).0;
+    for (_, names) in table.iter().filter(|(md5, _)| *md5 == hash) {
+        for name in *names {
+            for key in [(*name).to_owned(), format!("P/{name}")] {
+                if files.remove(&key).is_some() {
+                    tracing::info!("Not mounting device-bound save {key}");
+                }
+            }
+        }
+    }
+}
+
 struct KtfTaskRunner {
     core: ArmCore,
 }
@@ -75,7 +108,7 @@ pub struct KtfEmulator {
 }
 
 impl KtfEmulator {
-    pub fn from_archive(platform: Box<dyn Platform>, files: BTreeMap<String, Vec<u8>>, options: Options) -> Result<Self> {
+    pub fn from_archive(platform: Box<dyn Platform>, mut files: BTreeMap<String, Vec<u8>>, options: Options) -> Result<Self> {
         let adf = files
             .get("__adf__")
             .ok_or_else(|| WieError::FatalError("Missing __adf__ in KTF archive".into()))?;
@@ -89,6 +122,9 @@ impl KtfEmulator {
         }
 
         let jar_filename = jar_filename(&adf.aid, &files);
+        if let Some(jar) = files.get(&jar_filename).cloned() {
+            drop_device_bound_saves(&mut files, &jar, DEVICE_BOUND_SAVES);
+        }
 
         Self::load(platform, &jar_filename, &adf.pid, &adf.aid, Some(adf.mclass), &files, options)
     }
@@ -231,7 +267,24 @@ mod tests {
     use wie_core_arm::{Allocator, ArmCore};
     use wie_util::{Result, WieError};
 
-    use super::{KtfJvmSupport, KtfTaskRunner};
+    use super::{KtfJvmSupport, KtfTaskRunner, drop_device_bound_saves};
+
+    #[test]
+    fn device_bound_saves_dropped_for_listed_jar_only() {
+        use alloc::{collections::BTreeMap, string::ToString, vec};
+
+        let archive = |names: &[&str]| names.iter().map(|name| (name.to_string(), vec![1])).collect::<BTreeMap<_, _>>();
+        let table: &[([u8; 16], &[&str])] = &[(md5::compute(b"listed").0, &["res/save.sav", "res/savem.sav"])];
+
+        let mut files = archive(&["A.jar", "__adf__", "P/res/save.sav", "res/savem.sav", "P/res/other.sav"]);
+        drop_device_bound_saves(&mut files, b"listed", table);
+        assert_eq!(files.keys().collect::<alloc::vec::Vec<_>>(), ["A.jar", "P/res/other.sav", "__adf__"]);
+
+        // Any other jar — every other title — mounts exactly what it shipped.
+        let mut files = archive(&["A.jar", "P/res/save.sav", "P/res/savem.sav"]);
+        drop_device_bound_saves(&mut files, b"other", table);
+        assert_eq!(files.len(), 3);
+    }
 
     #[test]
     fn jar_filename_falls_back_to_the_only_jar() {
