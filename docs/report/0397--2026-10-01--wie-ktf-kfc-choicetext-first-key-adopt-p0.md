@@ -42,5 +42,3 @@ API 문서가 이 repo 에 없어서, 게임이 실제로 찾는 서술자만 �
 ### 5. 게임 파일명 유입
 - 유입 2건(BOUNDED) + 판단 필요 0건(SUFFIX-ATTACHED). 2건 모두 이번 회차가 고친 파일(`shell_card.rs`·`component.rs`)에 **원래 있던** 주석 속 제목이다 — 이 PR 이 더한 줄에서는 0(`git diff origin/main` 의 `+` 줄 0).
 - 표식 줄은 도구 출력 그대로다.
-
-
