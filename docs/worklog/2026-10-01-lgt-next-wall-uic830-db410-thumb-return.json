@@ -1,0 +1,24 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-01",
+  "task": "wie-lgt-next-wall-uic830-db410-thumb-return-adopt-p0",
+  "title": "LGT 다음 벽 — UIC 830 · 410 디렉터리 목록 · «Thumb 복귀 실패» = sprintf 넘침",
+  "summary": "830(UIC InsertText)·410(디렉터리 이름 목록)을 호출부로 식별해 수락·빈 목록으로 답하고, 0387 의 «Thumb 복귀 실패»를 추적해 엔진 복귀 경로가 아니라 sprintf 가 UTF-8 인자를 EUC-KR 왕복하며 88→171바이트로 부풀려 게스트 스택 버퍼(152B)를 넘친 것임을 확정·수정했다. 세 타이틀 모두 600초 무오류.",
+  "changes": [
+    "wie-lgt svc_ids/wipi_c: 830 · 410 + 시험",
+    "wie-wipi-c kernel::sprintf: 바이트 그대로 + 시험",
+    "docs/report/0401 · docs/player-updates 1"
+  ],
+  "verification": [
+    "같은 조건 전/후 짝 3종(600초 장시간 · --relaunch 1)",
+    "작동 목록 KTF·LGT 전수 sprintf 출력 차이 계측",
+    "변이 3종 red",
+    "4게이트 + beta clippy"
+  ],
+  "limits": [
+    "410 은 빈 목록 — 자기 저장 파일을 목록으로 찾는 타이틀은 못 본다",
+    "830 은 글을 보관하지 않는다 — 831·834·835 를 import 하는 타이틀은 아직 없다"
+  ],
+  "adoptedProposals": ["2026-09-30-lgt-wipic-svc-eight-unknown-ids#p0"],
+  "proposals": []
+}
