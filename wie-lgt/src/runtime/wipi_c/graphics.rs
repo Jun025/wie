@@ -505,6 +505,64 @@ pub async fn set_shared_context(
     }
 }
 
+// LGT titles key their sprites in their own code: they store a pixel-op proc in the NATIVE
+// `pixel_op` (+28) of the context they pass to `MC_grpCopyFrameBuffer`, and the copy calls it
+// per pixel as `proc(dst, src)` — returning `dst` when `src` is their key (0xf81f). Read from
+// the two titles that do it (docs/report/0396): the store is a direct `str` to +28, never a
+// SetContext. The shared copy ignores the context, so the key was drawn as magenta. +28 is
+// the shared `offset`, but no title in the LGT corpus copies after SetContext(offset).
+// ponytail: one guest call per pixel; memoize (dst, src) per copy if a full-screen keyed copy shows up.
+const NATIVE_PIXEL_OP: u32 = core::mem::offset_of!(LgtGraphicsContext, pixel_op) as u32;
+
+#[allow(clippy::too_many_arguments)]
+pub async fn copy_frame_buffer_with_pixel_op(
+    context: &mut dyn WIPICContext,
+    dst: WIPICIndirectPtr,
+    dx: i32,
+    dy: i32,
+    width: i32,
+    height: i32,
+    src: WIPICIndirectPtr,
+    sx: i32,
+    sy: i32,
+    ptr_graphics: WIPICWord,
+) -> Result<()> {
+    let pixel_op: WIPICWord = if ptr_graphics == 0 {
+        0
+    } else {
+        read_generic(context, ptr_graphics + NATIVE_PIXEL_OP)?
+    };
+    let target: WIPICFramebuffer = read_generic(context, context.data_ptr(dst)?)?;
+    let source: WIPICFramebuffer = read_generic(context, context.data_ptr(src)?)?;
+    if pixel_op == 0 || target.bpp != 16 || source.bpp != 16 {
+        return shared_graphics::copy_frame_buffer(context, dst, dx, dy, width, height, src, sx, sy, ptr_graphics).await;
+    }
+    tracing::debug!("MC_grpCopyFrameBuffer({:#x}, {dx}, {dy}, {width}, {height}, {:#x}, {sx}, {sy}, pixel_op {pixel_op:#x})", dst.0, src.0);
+
+    let x0 = 0.max(-dx).max(-sx);
+    let y0 = 0.max(-dy).max(-sy);
+    let x1 = width.min(target.width as i32 - dx).min(source.width as i32 - sx);
+    let y1 = height.min(target.height as i32 - dy).min(source.height as i32 - sy);
+    if x0 >= x1 {
+        return Ok(());
+    }
+    let target_base = context.data_ptr(target.buf)?;
+    let source_base = context.data_ptr(source.buf)?;
+    let mut source_row = vec![0u16; (x1 - x0) as usize];
+    let mut target_row = vec![0u16; (x1 - x0) as usize];
+    for y in y0..y1 {
+        let source_at = source_base + (sy + y) as u32 * source.bpl + (sx + x0) as u32 * 2;
+        let target_at = target_base + (dy + y) as u32 * target.bpl + (dx + x0) as u32 * 2;
+        context.read_bytes(source_at, bytemuck::cast_slice_mut(&mut source_row))?;
+        context.read_bytes(target_at, bytemuck::cast_slice_mut(&mut target_row))?;
+        for (target_pixel, &source_pixel) in target_row.iter_mut().zip(&source_row) {
+            *target_pixel = context.call_function(pixel_op, &[*target_pixel as u32, source_pixel as u32]).await? as u16;
+        }
+        context.write_bytes(target_at, bytemuck::cast_slice(&target_row))?;
+    }
+    Ok(())
+}
+
 pub async fn init_context(context: &mut dyn WIPICContext, ptr_context: WIPICWord) -> Result<()> {
     tracing::debug!("MC_grpInitContext({ptr_context:#x})");
     write_generic(
