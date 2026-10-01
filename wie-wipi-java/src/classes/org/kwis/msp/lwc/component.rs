@@ -34,6 +34,7 @@ impl Component {
                 JavaMethodProto::new("repaint", "(IIII)V", Self::repaint_region, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("serviceRepaints", "()V", Self::service_repaints, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("hasFocus", "()Z", Self::has_focus, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("isShown", "()Z", Self::is_shown, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("paint", "(Lorg/kwis/msp/lcdui/Graphics;)V", Self::paint, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("setBackground", "(I)V", Self::set_background, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getBackground", "()I", Self::get_background, MethodAccessFlags::PUBLIC),
@@ -188,6 +189,15 @@ impl Component {
             }
             None => Ok(()),
         }
+    }
+
+    // Shown means "on the display", and the only component this layer puts on the display is a shell
+    // on its net.wie.ShellCard — the same test repaint uses. A child of a shown shell answers false:
+    // children are never laid out or drawn here. 0c67145b11df asks its shell from paint.
+    async fn is_shown(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<bool> {
+        tracing::debug!("org.kwis.msp.lwc.Component::isShown({this:?})");
+
+        Ok(ShellCard::find(jvm, &this).await?.is_some())
     }
 
     async fn service_repaints(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {

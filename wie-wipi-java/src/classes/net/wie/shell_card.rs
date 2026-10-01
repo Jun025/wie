@@ -265,7 +265,16 @@ mod test {
                     async move { jvm.invoke_virtual::<_, i32>(&canvas, "net/wie/CardCanvas", "countCard", "()I", ()).await }
                 };
 
+                let is_shown = || {
+                    let shell = shell.clone();
+                    let jvm = jvm.clone();
+                    async move {
+                        jvm.invoke_virtual::<_, bool>(&shell, "org/kwis/msp/lwc/Component", "isShown", "()Z", ())
+                            .await
+                    }
+                };
                 // Not shown yet: repaint has nowhere to go and must not throw.
+                assert!(!is_shown().await?);
                 let _: () = jvm
                     .invoke_virtual(&shell, "org/kwis/msp/lwc/Component", "repaint", "(IIII)V", (0, 0, 10, 10))
                     .await?;
@@ -275,6 +284,7 @@ mod test {
                 let _: () = jvm.invoke_virtual(&shell, "org/kwis/msp/lwc/ShellComponent", "show", "()V", ()).await?;
                 assert_eq!(card_count().await?, 1, "show() twice puts the shell on the display once");
                 assert_eq!(count("showCount").await?, 1);
+                assert!(is_shown().await?, "isShown asks the same question repaint does");
 
                 // repaint(IIII) reaches the canvas as a region repaint (the shell's card sits at 0,0)…
                 let _: () = jvm
@@ -300,6 +310,7 @@ mod test {
 
                 let _: () = jvm.invoke_virtual(&shell, "org/kwis/msp/lwc/ShellComponent", "hide", "()V", ()).await?;
                 assert_eq!(card_count().await?, 0);
+                assert!(!is_shown().await?);
 
                 Ok(())
             },
