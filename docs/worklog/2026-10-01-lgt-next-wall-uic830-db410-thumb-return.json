@@ -7,7 +7,7 @@
   "changes": [
     "wie-lgt svc_ids/wipi_c: 830 · 410 + 시험",
     "wie-wipi-c kernel::sprintf: 바이트 그대로 + 시험",
-    "docs/report/0401 · docs/player-updates 1"
+    "docs/report/0404 · docs/player-updates 1"
   ],
   "verification": [
     "같은 조건 전/후 짝 3종(600초 장시간 · --relaunch 1)",
