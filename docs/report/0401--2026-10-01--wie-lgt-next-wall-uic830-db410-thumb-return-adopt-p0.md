@@ -79,4 +79,4 @@ C `sprintf` 는 `%s` 바이트를 그대로 복사한다 ⇒ 88바이트, 버퍼
 
 ### 게임 파일명 유입
 
-INFLOW_PLACEHOLDER
+`node scripts/corpus-name-inflow.mjs --corpus <game_lab>`: BOUNDED 15회/10쌍 · SUFFIX-ATTACHED 0회/0쌍. BOUNDED 15회는 전부 이 회차가 손댄 `wie-lgt` `svc_ids.rs`·`wipi_c.rs` 의 **기존 줄**이다 — 이 회차가 더한 줄(`git diff origin/main -- wie-lgt wie-wipi-c` 의 `+` 줄)의 한글은 시험 문자열 `"종목|"` 하나이고 그것은 걸린 이름이 아니다. 타이틀은 sha12 로만 적었다.
