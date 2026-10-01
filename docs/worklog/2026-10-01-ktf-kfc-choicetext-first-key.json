@@ -1,0 +1,36 @@
+{
+ "schema": "wie-worklog/1",
+ "date": "2026-10-01",
+ "task": "wie-ktf-kfc-choicetext-first-key-adopt-p0",
+ "title": "KTF com/ktf/kfc ChoiceText·GFormComponent + lwc Component.isShown — 첫 키 벽",
+ "summary": "0c67145b11df 가 첫 키에서 만드는 이름 입력 폼의 부품 셋을 실측 서술자만으로 넣었다. 네 키 순서 모두 첫 키 오류가 사라지고 폼 화면에 닿는다. 폼 안 입력은 다음 벽이다.",
+ "changes": [
+  "wie-wipi-java com/ktf/kfc ChoiceText · GFormComponent",
+  "lwc Component.isShown()Z",
+  "docs/report/0397"
+ ],
+ "verification": [
+  "choice_text_goes_into_a_g_form_component · isShown 단언 3",
+  "변이 red 4/4",
+  "--inject 전/후 짝 2회 × 키 순서 4 + 무키"
+ ],
+ "limits": [
+  "GFormComponent 부모(ContainerComponent)는 추론",
+  "load1 32~39"
+ ],
+ "proposals": [
+  {
+   "kind": "product",
+   "title": "lwc 폼 입력 — 셸 키를 자식 위젯으로 넘기고 버튼 동작을 부른다",
+   "plainSummary": "KTF 게임 하나가 이름 입력 화면까지 열리지만 키가 입력칸과 버튼에 닿지 않아 넘어갈 수 없습니다. 키를 위젯에 전달하고 버튼을 누르면 동작하게 하면 게임을 시작할 수 있습니다.",
+   "userBenefit": "0c67145b11df 가 이름 입력 화면을 넘어 실제 게임으로 들어갑니다.",
+   "why": "이 회차 후 빌드에서 키를 넣은 8회 전부 마지막 프레임이 같은 폼 화면이고, 로그에서 셸의 Component.keyNotify stub 이 모든 키를 받아 true 를 돌려준다. ButtonComponent.setActionListener 는 불리지만 리스너가 한 번도 불리지 않는다.",
+   "tradeoff": "이 층은 lwc 위젯을 그리지 않고 배치도 하지 않는다. 키 전달·포커스·텍스트 입력·그리기를 같이 다뤄야 해서 L 이다.",
+   "effort": "L",
+   "target": "wie-wipi-java(lwc ShellComponent·TextBoxComponent·ButtonComponent)"
+  }
+ ],
+ "adoptedProposals": [
+  "2026-09-30-census-wave3-sound-silent-and-input-none#p0"
+ ]
+}
