@@ -68,3 +68,4 @@ main ↔ 시안 · 같은 시각 동시 · 2판 · jobs 3 · 5초 간격 화면 
 - `RUST_MIN_STACK=4194304 cargo test --all` rc=0 · 51 묶음 · 635 통과 · 실패 0.
 - `node scripts/check-worklog-json.mjs` OK · `node scripts/check-docs-report-serial.mjs` OK · `node scripts/player-data.mjs` OK(429 · 369/40/20 — 바뀌지 않음).
 - 러너 블록은 엔진 코드를 건드리지 않아 돌리지 않았다. §1~§3 의 실측은 release `wie_validate` 로 했다.
+- 유입(`node scripts/corpus-name-inflow.mjs`): BOUNDED 0 · SUFFIX-ATTACHED 0 — 이 회차가 더한 두 파일의 게임명 0. 타이틀은 sha12 로만 적었다.
