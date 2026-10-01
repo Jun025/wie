@@ -1,0 +1,13 @@
+# wie_validate --keys: 월드장기체스 (LGT) 연습 → 장기연습 → 판 → STAR(대국 메뉴) → NUM1(계속하기), twice.
+# Grammar: `--keys` help / `parse_keys` in wie_cli/src/bin/wie_validate.rs. Key names only — no game bytes.
+#
+#   cargo run -q --release -p wie_cli --bin wie_validate -- --inject --max-ticks 100000000000 \
+#     --keys docs/keys/wec-match-menu-continue.keys --shotdir <dir> <game>
+#
+# Step 19 (`19_NUM1`) is 계속하기; before java/lang/Integer.intValue (index 12) was in the ABI it
+# ended there with `Unimplemented: java/lang/Integer vtable index 12` (docs/report, round
+# wie-wec-continue-integer-vtable-index-12-adopt-p0). Steps 24/25 reopen the menu and continue again.
+WAIT:6 OK:3 OK:3 OK:3 WAIT:4 OK:3 WAIT:3            # 안내 → 로고 → 타이틀 → 메인 메뉴
+DOWN:2 OK:3 WAIT:2 OK:4 WAIT:3 OK:4 WAIT:4 NUM1:4 WAIT:4   # 연습하기 → 장기연습 → 상차림 1 → 판
+STAR:3 WAIT:2 NUM1:3 WAIT:5                         # 대국 메뉴 → 1.계속하기
+UP:2 UP:2 WAIT:5 STAR:3 NUM1:3 WAIT:5               # 커서 이동 → 메뉴 → 계속하기 다시

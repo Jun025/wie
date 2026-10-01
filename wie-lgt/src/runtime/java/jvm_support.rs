@@ -2003,6 +2003,8 @@ pub(crate) mod tests {
                 // 슈퍼액션히어로
                 ("java/io/DataInputStream", 32, "readUTF", "()Ljava/lang/String;"),
                 // 월드장기체스
+                ("java/lang/Integer", 12, "intValue", "()I"),
+                // 월드장기체스
                 ("java/util/Random", 10, "setSeed", "(J)V"),
                 // 월드장기체스
                 ("java/util/Vector", 16, "isEmpty", "()Z"),
