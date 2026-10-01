@@ -60,6 +60,7 @@ pub async fn open_database(context: &mut dyn WIPICContext, ptr_name: WIPICWord, 
         tracing::warn!("MC_dbOpenDataBase: invalid utf8 name @ {ptr_name:#x}");
         return Ok(-22);
     };
+    let name = resolve_db_name(context, name).await;
 
     // Validate before any repository side effects. Mode 4 deletes record 1
     // up front, so a too-long name reaching that path would wipe data we
@@ -161,6 +162,7 @@ pub async fn open_record_database(context: &mut dyn WIPICContext, ptr_name: WIPI
     let Ok(name) = String::from_utf8(read_null_terminated_string_bytes(context, ptr_name)?) else {
         return Ok(-22);
     };
+    let name = resolve_db_name(context, name).await;
     if name.len() > MAX_NAME_LEN {
         return Ok(-22);
     }
@@ -229,20 +231,85 @@ pub async fn list_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
     Ok(ids.len() as _)
 }
 
-/// KTF WIPI-C **Database slot 8** (header name `MC_dbSortRecords`; KTF's meaning is unknown).
+/// KTF WIPI-C **Database slot 7** (header name `MC_dbListRecords`).
 ///
-/// Disassembled arity is 2 — `f(r0 = pointer to a short ASCII token, r1 = 1)`; `r2`/`r3` are call
-/// machinery. Measured tokens are `"res"`/`"ga"`, each the directory part of the path the same call
-/// site then opens (`docs/report/0175`). What the slot *does* is still unnamed, so this does nothing:
-/// no guest memory is read beyond the logged token and none is written, and it returns 0. That is
-/// safe for every measured caller because all three call sites discard the result (0175 ⑶), and
-/// each of the four candidate meanings there (register an extension · delete by pattern · list a
-/// type · select/ensure a directory) leaves nothing a fresh install would need. Until 2026-09-30 it
-/// refused with `Unimplemented`, which stopped both titles that reach it at boot
-/// (`docs/report/0391`).
+/// With a real handle in `r0` it is the header's call and goes to `list_record`. KTF titles also
+/// call it as `f(src_name, dst_name, 1)` — read off the caller, not guessed: an installer writes the
+/// jar's split chunks into `lo.z_`, closes it, then calls slot 7 with `r0 = "lo.z_"`, `r1 = "lo.dsk"`
+/// and branches on `r0 >= 0` to the next install stage, `< 0` to «Data 인스톨에 실패»
+/// (`docs/report/0401`). The next boot stats `lo.dsk`, so this is a rename. Until 2026-10-01 the name
+/// fell into `list_record`, which answered M_E_INVALIDHANDLE, and the install never finished.
+pub async fn list_record_or_rename_ktf(context: &mut dyn WIPICContext, a0: i32, a1: WIPICWord, a2: WIPICWord) -> Result<i32> {
+    if load_handle(context, a0)?.is_some() {
+        return list_record(context, a0, a1, a2).await;
+    }
+
+    let (Ok(src), Ok(dst)) = (
+        String::from_utf8(read_null_terminated_string_bytes(context, a0 as _)?),
+        String::from_utf8(read_null_terminated_string_bytes(context, a1)?),
+    ) else {
+        return Ok(-22);
+    };
+    let (src, dst) = (resolve_db_name(context, src).await, resolve_db_name(context, dst).await);
+    if src == dst {
+        // POSIX rename(x, x): nothing to do. The copy below would delete `dst` — the source — first.
+        tracing::debug!("KTF db rename({src:?} -> {dst:?}, {a2}) -> 0 (same name)");
+        return Ok(0);
+    }
+    let system = context.system();
+    let pid = system.pid().to_owned();
+    if !system.platform().database_repository().exists(&src, &pid).await {
+        tracing::debug!("KTF db rename({src:?} -> {dst:?}, {a2}) -> -12 (no source)");
+        return Ok(-12); // M_E_NOENT
+    }
+
+    // ponytail: copy + delete through the existing `Database` trait — the backends have no rename.
+    // Holds the DB in host memory once; add `DatabaseRepository::rename` if that ever matters.
+    let source = system.platform().database_repository().open(&src, &pid).await;
+    system.platform().database_repository().delete(&dst, &pid).await;
+    let mut target = system.platform().database_repository().open(&dst, &pid).await;
+    for id in source.get_record_ids().await {
+        if let Some(data) = source.get(id).await {
+            target.set(id, &data).await;
+        }
+    }
+    drop(source);
+    system.platform().database_repository().delete(&src, &pid).await;
+
+    tracing::debug!("KTF db rename({src:?} -> {dst:?}, {a2}) -> 0");
+    Ok(0)
+}
+
+/// KTF WIPI-C **Database slot 8** (header name `MC_dbSortRecords`) — ensure a directory exists.
+///
+/// Disassembled arity is 2 — `f(r0 = path, r1 = 1)`. Report 0175 measured tokens `"res"`/`"ga"`,
+/// each the directory part of a path the same call site then opens, and left four meanings open;
+/// its H4 was «select/ensure a directory». `docs/report/0401` measured the deciding caller: a title's
+/// libc shim routes one POSIX op to this slot as `(path, 1)` (the next op goes to slot 9 with the
+/// same shape), and the title calls it with `"/shared"`, then `stat("/shared")` through slot 5,
+/// and exits when that stat fails — `mkdir` then check. So this records the directory as an empty
+/// database under that name, which is what slot 5 and slot 16 look up; a name that already exists
+/// is left alone. It still answers 0: the three callers measured in 0175 discard the result.
+/// Until 2026-10-01 it did nothing, and that title quit right after its data install.
 pub async fn sort_records(context: &mut dyn WIPICContext, arg0: WIPICWord, arg1: WIPICWord) -> Result<i32> {
     let token = read_quotable_token(context, arg0);
-    tracing::debug!("KTF database slot 8 (header name: MC_dbSortRecords)({arg0:#x}, {arg1:#x}) token={token:?} — no-op");
+    tracing::debug!("KTF database slot 8 (header name: MC_dbSortRecords)({arg0:#x}, {arg1:#x}) token={token:?} — ensure directory");
+
+    let Some(name) = read_null_terminated_string_bytes(context, arg0)
+        .ok()
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+    else {
+        return Ok(0);
+    };
+    let name = resolve_db_name(context, name).await;
+    if name.is_empty() || name.len() > MAX_NAME_LEN {
+        return Ok(0);
+    }
+    let system = context.system();
+    let pid = system.pid().to_owned();
+    if !system.platform().database_repository().exists(&name, &pid).await {
+        system.platform().database_repository().open(&name, &pid).await;
+    }
 
     Ok(0)
 }
@@ -305,6 +372,7 @@ pub async fn list_record_info(context: &mut dyn WIPICContext, ptr_name: WIPICWor
     let Ok(name) = String::from_utf8(read_null_terminated_string_bytes(context, ptr_name)?) else {
         return Ok(-22);
     };
+    let name = resolve_db_name(context, name).await;
     let system = context.system();
     let pid = system.pid().to_owned();
 
@@ -349,6 +417,7 @@ pub async fn exists_database(context: &mut dyn WIPICContext, ptr_name: WIPICWord
     let Ok(name) = String::from_utf8(read_null_terminated_string_bytes(context, ptr_name)?) else {
         return Ok(-22);
     };
+    let name = resolve_db_name(context, name).await;
     if read_packaged_database(context, &name).await?.is_some() {
         return Ok(0);
     }
@@ -483,6 +552,7 @@ pub async fn delete_database(context: &mut dyn WIPICContext, ptr_name: WIPICWord
     let Ok(name) = String::from_utf8(read_null_terminated_string_bytes(context, ptr_name)?) else {
         return Ok(-22);
     };
+    let name = resolve_db_name(context, name).await;
     let system = context.system();
     let pid = system.pid().to_owned();
 
@@ -577,38 +647,45 @@ pub async fn stream_read(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
     Ok(take as _)
 }
 
-/// KTF custom slot 4 — repurposed from standard `MC_dbSelectRecord` into a
-/// stream-control op `(handle, offset, mode)` that seeks both read/write
-/// cursors. The standard WIPI signature `(db_id, rec_id, buf_ptr, buf_len)`
-/// is not implemented; LGT routes do not use this slot.
-pub async fn select_record_ktf(context: &mut dyn WIPICContext, db_id: i32, rec_id: i32, mode: WIPICWord, _buf_len: WIPICWord) -> Result<i32> {
-    tracing::debug!("MC_dbSelectRecord({db_id:#x}, {rec_id}, mode={mode:#x}, {_buf_len})");
+/// KTF custom slot 4 — `lseek(handle, offset, whence)`, not the header's `MC_dbSelectRecord`.
+/// `whence` is 0 = from the start, 1 = from the current position, 2 = from the end, and the return
+/// value is the new position. Read off a title's own libc shim, not guessed (`docs/report/0401`):
+/// its POSIX `lseek` passes SEEK_CUR/SEEK_END through as 1/2 (anything else as 0) and returns this
+/// slot's value unchanged, its `ftell` is `lseek(fd, 0, 1)`, and its `fseek(SEEK_CUR)` adds
+/// `ftell()` to the offset and seeks with 0. The corpus uses the same shapes: `(h, 0, 2)` then
+/// `(h, 0, 0)` is a size probe before reading (11 KTF titles), `(h, n, 1)` skips `n` bytes.
+///
+/// Until 2026-10-01 every whence was treated as «from the start» and the answer was always 0:
+/// a size probe read every file as empty, and a title that seeks from `ftell()` landed at a
+/// negative offset — the installer of `docs/report/0401` failed with «잘못된 리소스 파일».
+/// Seeking past the end is allowed (multi-slot saves write at a fixed offset; `stream_write`
+/// zero-fills the gap); a negative result is refused with -22 and moves nothing.
+pub async fn select_record_ktf(context: &mut dyn WIPICContext, db_id: i32, offset: i32, whence: WIPICWord, _arg3: WIPICWord) -> Result<i32> {
+    tracing::debug!("db.lseek({db_id:#x}, {offset}, whence={whence:#x})");
 
     let Some(mut handle) = load_handle(context, db_id)? else {
         return Ok(-25); // M_E_INVALIDHANDLE
     };
 
-    // KTF reuses slot 4 as a stream-control op `(handle, offset, mode)`. The
-    // shapes observed across games:
-    //
-    //   - `(handle, slot_offset, 0)` — multi-slot save files store each
-    //     slot at a known byte offset within record 1; this seeks both
-    //     cursors so the next read/write hits the right slot while
-    //     preserving the bytes belonging to the other slots.
-    //   - `(handle, 0, 0)` and `(handle, 0, 2)` — rewinds both cursors.
-    //     mode=0 vs 2 isn't a length and isn't truncate (truncating on
-    //     mode=2 on the read path destroys a prefetched buffer during a
-    //     subsequent re-open and wipes the saved record). Both are treated
-    //     as plain seek-and-rewind.
-    if rec_id >= 0 {
-        let offset = rec_id as u32;
-        handle.read_cursor = offset;
-        handle.write_cursor = offset;
-        write_generic(context, db_id as _, handle)?;
-        return Ok(0);
+    // The two cursors move together on a seek and each only advances on its own op, so the one
+    // that moved since is the position.
+    let base = match whence {
+        0 => 0,
+        1 => handle.read_cursor.max(handle.write_cursor) as i64,
+        2 => handle.buffer_len as i64,
+        _ => return Ok(-22),
+    };
+    let Ok(position) = u32::try_from(base + offset as i64) else {
+        return Ok(-22); // M_E_BADRECID
+    };
+    if position > i32::MAX as u32 {
+        return Ok(-22);
     }
+    handle.read_cursor = position;
+    handle.write_cursor = position;
+    write_generic(context, db_id as _, handle)?;
 
-    Ok(-22) // M_E_BADRECID
+    Ok(position as i32)
 }
 
 /// Slot 5 — KTF custom `db_stat_by_name`. From observed call shape:
@@ -631,6 +708,7 @@ pub async fn stat_by_name_ktf(context: &mut dyn WIPICContext, name_ptr: WIPICWor
         },
         Err(_) => return Ok(-22),
     };
+    let name = resolve_db_name(context, name).await;
 
     // Pull record 1's size as the "valid save" indicator the game checks
     // against 0xC7 in v2[2]. A saved DB wins; otherwise a packaged `P/` file
@@ -655,6 +733,17 @@ pub async fn stat_by_name_ktf(context: &mut dyn WIPICContext, name_ptr: WIPICWor
 
     tracing::debug!("db.stat_by_name({name:?}, mode={mode}) -> 0 (size={record_size})");
     Ok(0)
+}
+
+/// KTF custom slot 15 — the open DB's size in bytes. Read off the one caller in the corpus
+/// (`docs/report/0401`): `size = lseek(h, 0, 2); if (size > 0) size = slot15(h); lseek(h, 0, 0)`,
+/// which became reachable once slot 4 stopped answering every size probe with 0.
+pub async fn file_size_ktf(context: &mut dyn WIPICContext, db_id: i32) -> Result<i32> {
+    let Some(handle) = load_handle(context, db_id)? else {
+        return Ok(-25); // M_E_INVALIDHANDLE
+    };
+    tracing::debug!("db.size({db_id:#x}) -> {}", handle.buffer_len);
+    Ok(handle.buffer_len as i32)
 }
 
 /// KTF custom slot 16 — `MC_dbExists(name, 1, …)`. **0 = the DB exists, -12
@@ -687,6 +776,7 @@ pub async fn exists_database_ktf(context: &mut dyn WIPICContext, name_ptr: WIPIC
             return Ok(-12);
         }
     };
+    let name = resolve_db_name(context, name).await;
 
     let system = context.system();
     let pid = system.pid().to_owned();
@@ -695,6 +785,23 @@ pub async fn exists_database_ktf(context: &mut dyn WIPICContext, name_ptr: WIPIC
     let result = if exists { 0 } else { -12 }; // M_E_NOENT
     tracing::debug!("MC_dbExists({name:?}) -> {result}");
     Ok(result)
+}
+
+/// The repository key for a guest DB name: KTF titles name the same DB with and without a leading
+/// `/` — one installer stats and renames to `lo.dsk`, then opens `/lo.dsk` (`docs/report/0401`).
+/// The name as given wins when it exists, so a save already stored under a `/` key keeps working;
+/// otherwise a saved DB under the bare name is used.
+async fn resolve_db_name(context: &mut dyn WIPICContext, name: String) -> String {
+    let bare = name.trim_start_matches('/');
+    if bare.len() == name.len() || bare.is_empty() {
+        return name;
+    }
+    let system = context.system();
+    let pid = system.pid().to_owned();
+    if !system.platform().database_repository().exists(&name, &pid).await && system.platform().database_repository().exists(bare, &pid).await {
+        return bare.to_owned();
+    }
+    name
 }
 
 /// Read a `DatabaseHandle` from guest memory if `db_id` looks like one.
@@ -765,9 +872,9 @@ mod tests {
     use crate::context::{WIPICContext, test::TestContext};
 
     use super::{
-        KTF_DATABASE_STORAGE_LIMIT, delete_database, exists_database, exists_database_ktf, get_number_of_records, insert_record, list_databases,
-        list_record, list_record_info, open_database, open_record_database, select_record, sort_records, stat_by_name_ktf, stream_read, stream_write,
-        update_record,
+        KTF_DATABASE_STORAGE_LIMIT, close_database, delete_database, exists_database, exists_database_ktf, file_size_ktf, get_number_of_records,
+        insert_record, list_databases, list_record, list_record_info, list_record_or_rename_ktf, open_database, open_record_database, select_record,
+        select_record_ktf, sort_records, stat_by_name_ktf, stream_read, stream_write, update_record,
     };
 
     /// KTF Interface4 is the header's record database: the call sequence three titles make —
@@ -805,7 +912,7 @@ mod tests {
     /// `0x1000` (passed as `arg0` below), so a regression that writes *through an
     /// argument* fails here rather than in a guest.
     #[futures_test::test]
-    async fn sort_records_is_a_no_op_that_never_writes_test() {
+    async fn slot8_ensures_a_directory_and_never_writes_guest_memory_test() {
         let mut context = database_test_context();
         const SENTINEL: [u8; 16] = [0xAB; 16];
         for base in [0x0u32, 0x1000] {
@@ -824,6 +931,9 @@ mod tests {
             context.read_bytes(base, &mut seen).unwrap();
             assert_eq!(seen, SENTINEL, "slot 8 wrote to guest memory at {base:#x}");
         }
+
+        // `mkdir` then `stat`: the path now answers as present (docs/report/0401).
+        assert_eq!(stat_by_name_ktf(&mut context, 0x2000, 0, 1, 0).await.unwrap(), 0);
     }
 
     #[futures_test::test]
@@ -965,6 +1075,99 @@ mod tests {
             context.system().filesystem().virtual_file("FirstRun.dat").as_deref(),
             Some(&b"\x01\0\0\0"[..])
         );
+    }
+
+    /// KTF slot 7 with a handle is the header's list; with two names it renames — the
+    /// installer's `lo.z_` → `lo.dsk` step (`docs/report/0401`).
+    #[futures_test::test]
+    async fn ktf_slot7_lists_for_a_handle_and_renames_for_two_names() {
+        let mut context = database_test_context();
+        let db_id = open_test_database(&mut context).await;
+        context.write_bytes(0x2000, b"chunk").unwrap();
+        assert_eq!(stream_write(&mut context, db_id, 0x2000, 5).await.unwrap(), 5);
+        assert_eq!(list_record_or_rename_ktf(&mut context, db_id, 0x2100, 1).await.unwrap(), 1);
+        assert_eq!(close_database(&mut context, db_id).await.unwrap(), 0);
+
+        context.write_bytes(0x3000, b"lo.dsk\0").unwrap();
+        assert_eq!(list_record_or_rename_ktf(&mut context, 0x1000, 0x3000, 1).await.unwrap(), 0);
+        assert_eq!(exists_database(&mut context, 0x1000, 1).await.unwrap(), -12);
+        assert_eq!(stat_by_name_ktf(&mut context, 0x3000, 0x1800, 1, 0).await.unwrap(), 0);
+        let mut size = [0; 4];
+        context.read_bytes(0x1808, &mut size).unwrap();
+        assert_eq!(u32::from_le_bytes(size), 5);
+
+        // The source is gone now, so a second rename has nothing to move.
+        assert_eq!(list_record_or_rename_ktf(&mut context, 0x1000, 0x3000, 1).await.unwrap(), -12);
+    }
+
+    /// Renaming a DB onto itself keeps it — also when `/x` resolves to an existing bare `x`.
+    #[futures_test::test]
+    async fn ktf_slot7_rename_onto_itself_keeps_the_data() {
+        let mut context = database_test_context();
+        let db_id = open_test_database(&mut context).await;
+        context.write_bytes(0x2000, b"save").unwrap();
+        assert_eq!(stream_write(&mut context, db_id, 0x2000, 4).await.unwrap(), 4);
+        assert_eq!(close_database(&mut context, db_id).await.unwrap(), 0);
+        context.write_bytes(0x3000, b"/records\0").unwrap();
+
+        for src in [0x3000, 0x1000] {
+            assert_eq!(list_record_or_rename_ktf(&mut context, src, 0x1000, 1).await.unwrap(), 0);
+            assert_eq!(exists_database(&mut context, 0x1000, 1).await.unwrap(), 0);
+            let db_id = open_database(&mut context, 0x1000, 0, 0).await.unwrap();
+            assert_eq!(stream_read(&mut context, db_id, 0x2100, 4).await.unwrap(), 4);
+            let mut data = [0; 4];
+            context.read_bytes(0x2100, &mut data).unwrap();
+            assert_eq!(&data, b"save");
+            assert_eq!(close_database(&mut context, db_id).await.unwrap(), 0);
+        }
+    }
+
+    /// KTF slot 4 is `lseek`: whence 0/1/2 = start/current/end, the new position comes back.
+    #[futures_test::test]
+    async fn ktf_slot4_is_lseek_and_returns_the_position() {
+        let mut context = database_test_context();
+        let db_id = open_test_database(&mut context).await;
+        context.write_bytes(0x2000, b"0123456789").unwrap();
+        assert_eq!(stream_write(&mut context, db_id, 0x2000, 10).await.unwrap(), 10);
+
+        assert_eq!(select_record_ktf(&mut context, db_id, 0, 2, 0).await.unwrap(), 10); // size probe
+        assert_eq!(file_size_ktf(&mut context, db_id).await.unwrap(), 10); // slot 15
+        assert_eq!(select_record_ktf(&mut context, db_id, 0, 0, 0).await.unwrap(), 0);
+        assert_eq!(stream_read(&mut context, db_id, 0x2100, 4).await.unwrap(), 4);
+        assert_eq!(select_record_ktf(&mut context, db_id, 0, 1, 0).await.unwrap(), 4); // ftell
+        assert_eq!(select_record_ktf(&mut context, db_id, 2, 1, 0).await.unwrap(), 6);
+        assert_eq!(select_record_ktf(&mut context, db_id, -3, 2, 0).await.unwrap(), 7);
+        assert_eq!(stream_read(&mut context, db_id, 0x2100, 3).await.unwrap(), 3);
+        let mut tail = [0; 3];
+        context.read_bytes(0x2100, &mut tail).unwrap();
+        assert_eq!(&tail, b"789");
+
+        // A negative result is refused and leaves the position where it was.
+        assert_eq!(select_record_ktf(&mut context, db_id, -982, 0, 0).await.unwrap(), -22);
+        assert_eq!(select_record_ktf(&mut context, db_id, 0, 1, 0).await.unwrap(), 10);
+        // Past the end is a position; writing there zero-fills the gap.
+        assert_eq!(select_record_ktf(&mut context, db_id, 12, 0, 0).await.unwrap(), 12);
+    }
+
+    /// `/name` reaches a DB saved as `name`, but a DB already saved under `/name` keeps winning.
+    #[futures_test::test]
+    async fn leading_slash_name_reaches_the_bare_db_without_shadowing_a_slashed_one() {
+        let mut context = database_test_context();
+        context.write_bytes(0x1000, b"lo.dsk\0").unwrap();
+        context.write_bytes(0x1100, b"/lo.dsk\0").unwrap();
+        assert_eq!(open_database(&mut context, 0x1100, 1, 1).await.unwrap(), -12);
+
+        let db_id = open_database(&mut context, 0x1000, 2, 1).await.unwrap();
+        context.write_bytes(0x2000, b"bare").unwrap();
+        assert_eq!(stream_write(&mut context, db_id, 0x2000, 4).await.unwrap(), 4);
+        let db_id = open_database(&mut context, 0x1100, 1, 1).await.unwrap();
+        assert_eq!(select_record_ktf(&mut context, db_id, 0, 2, 0).await.unwrap(), 4);
+
+        let pid = alloc::string::String::from(context.system().pid());
+        let mut slashed = context.system().platform().database_repository().open("/lo.dsk", &pid).await;
+        slashed.set(1, b"slashed!").await;
+        let db_id = open_database(&mut context, 0x1100, 1, 1).await.unwrap();
+        assert_eq!(select_record_ktf(&mut context, db_id, 0, 2, 0).await.unwrap(), 8);
     }
 
     fn database_test_context() -> TestContext {

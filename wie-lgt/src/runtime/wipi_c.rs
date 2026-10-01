@@ -138,7 +138,7 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::Unk2 => unk2.into_body(),
         WIPICSvcId::GetImageProperty => wie_wipi_c::api::graphics::get_image_property.into_body(),
         WIPICSvcId::GetImageFramebuffer => wie_wipi_c::api::graphics::get_image_framebuffer.into_body(),
-        WIPICSvcId::GetScreenFramebuffer => wie_wipi_c::api::graphics::get_screen_framebuffer.into_body(),
+        WIPICSvcId::GetScreenFramebuffer => get_screen_framebuffer.into_body(),
         WIPICSvcId::DestroyOffscreenFramebuffer => wie_wipi_c::api::graphics::destroy_offscreen_framebuffer.into_body(),
         WIPICSvcId::CreateOffscreenFramebuffer => wie_wipi_c::api::graphics::create_offscreen_framebuffer.into_body(),
         WIPICSvcId::InitContext => graphics::init_shared_context.into_body(),
@@ -316,6 +316,24 @@ async fn clet_register(core: &mut ArmCore, (system, jvm): &mut (System, Jvm), fu
 /// rather than dying. Shared `wie_wipi_c::api::net` has no socket write/read, so
 /// these stay LGT-local (restored from `02ad8b5c`; the base swap #161 dropped them).
 /// The in-game network path is not reachable from a headless boot.
+// LGT titles draw a soft-key bar BELOW the screen height they are told: `fe76e641bb3d` sizes its
+// canvas `height + 24` by this exact width table (binary.mod 0x289c4), and `1eaa92092bee` blits
+// down to row 343 of a 320-row screen. Without the rows that write lands on the next heap block's
+// header and the allocator later fails with ~127MB free (docs/report/0392 §4, 0402).
+fn softkey_rows(width: u32) -> u32 {
+    match width {
+        120 | 128 => 14,
+        176 => 20,
+        240 | 320 => 24,
+        _ => 0,
+    }
+}
+
+async fn get_screen_framebuffer(context: &mut dyn WIPICContext, a0: u32) -> Result<WIPICIndirectPtr> {
+    let width = context.system().platform().screen().width();
+    wie_wipi_c::api::graphics::screen_framebuffer(context, a0, softkey_rows(width))
+}
+
 async fn net_socket_write(_context: &mut dyn WIPICContext, fd: u32, buf: u32, len: u32, _a3: u32) -> Result<i32> {
     tracing::warn!("MC_netSocketWrite(fd={fd:#x}, buf={buf:#x}, len={len:#x}) -> -1 (no network)");
 
@@ -641,6 +659,7 @@ mod tests {
     use wie_backend::{DefaultTaskRunner, System};
     use wie_core_arm::{Allocator, ArmCore};
     use wie_util::{ByteWrite, Result, read_generic, write_generic};
+    use wipi_types::wipic::WIPICFramebuffer;
 
     use super::{graphics, register_wipic_svc_handler};
     use crate::runtime::{SVC_CATEGORY_WIPIC, java::init_jvm, svc_ids::WIPICSvcId};
@@ -786,6 +805,39 @@ mod tests {
             core.write_bytes(not_a_handle, &[0; 0x20])?;
             let bpp: u32 = core.run_function(stub, &[not_a_handle]).await?;
             assert_eq!(bpp, 16);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    /// The LGT screen framebuffer has 24 soft-key rows below the height it reports (240 or 320 wide).
+    ///
+    /// Two LGT titles draw those rows (docs/report/0402); without them the 25th row lands on the
+    /// next heap block's header. The reported height must not grow — every LGT title lays out by it.
+    #[test]
+    fn wipic_screen_framebuffer_has_softkey_rows_below_its_height() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, _) = init_jvm(&system_clone).await?;
+            register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
+            let stub = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::GetScreenFramebuffer)?;
+            let handle: u32 = core.run_function(stub, &[0]).await?;
+
+            let framebuffer: WIPICFramebuffer = read_generic(&core, handle)?;
+            assert_eq!((framebuffer.width, framebuffer.height), (320, 240)); // TestPlatform's screen
+            let allocated: u32 = read_generic(&core, framebuffer.buf.0 - 4)?;
+            assert_eq!(allocated, framebuffer.bpl * (240 + 24));
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())

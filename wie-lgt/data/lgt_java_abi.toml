@@ -672,6 +672,25 @@ vtable = [
     { name = "run", descriptor = "()V", index = 0 },
 ]
 
+# 월드장기체스's wall after the Runnable fix: in a match, STAR opens the game menu and NUM1 (계속하기)
+# dies in d.paint on `Unimplemented: java/lang/Integer vtable index 12` (measured 2026-10-01, call
+# site disassembled, lr 0x3a8e0). The caller at 0x3a834 loads a Stack from this.<field>+8 -> +0x14,
+# pops it (`[r3,#0x88]` = 33, the pop row above), casts the result, sets only r0 = that object and
+# dispatches `ldr ip,[r3,#0x34]` (= 4 + 4*12). The result is ONE word stored into this.<field>+8 -> +0
+# — and the sibling at 0x3a904 is the other half: it wraps that same word in a freshly constructed
+# object and pushes it onto the same Stack (`[r3,#0x84]` = 32) before overwriting the word. So it is
+# `stack.push(new Integer(cur))` / `cur = ((Integer) stack.pop()).intValue()`: no argument, an int
+# back. That excludes longValue/doubleValue (two words) and every Object row; CLDC 1.1 Integer
+# extends Object, so its own run starts at 10 with byteValue shortValue intValue longValue
+# floatValue doubleValue, and the order puts intValue at 12 — the same slot the shape picks.
+# byteValue/shortValue/floatValue share the one-word shape; only the order separates them, and a
+# value round-tripped through an int field is what intValue is for.
+[[class]]
+name = "java/lang/Integer"
+vtable = [
+    { name = "intValue", descriptor = "()I", index = 12 },
+]
+
 [[class]]
 name = "java/util/Random"
 vtable = [
