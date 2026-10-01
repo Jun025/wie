@@ -53,4 +53,6 @@ XCE 문서는 이 repo 에 없다. 게임 jar 의 클래스 파일을 직접 읽
 - 네 관문: `cargo fmt --check` · `clippy --all -D warnings` · `clippy --target wasm32-unknown-unknown -D warnings` · `cargo +beta clippy --all -D warnings` · `RUST_MIN_STACK=4194304 cargo test --all` 모두 rc=0.
 
 ### 6. 게임 파일명 유입
-`node scripts/corpus-name-inflow.mjs` 결과는 이 파일 맨 끝 표식 줄에 있다. 새 주석·문서·소식은 sha12 만 쓴다.
+`node scripts/corpus-name-inflow.mjs --corpus <game_lab>`: 유입 0건(BOUNDED 0회/0쌍) · 판단 필요 0건(SUFFIX-ATTACHED 0회/0쌍). 새 주석·문서·소식은 sha12 만 쓴다.
+
+<!-- corpus-name-inflow v1 subjects=10 tree=13fabe97846e52ba B=0/0 P=0/0 S=0/0 -->
