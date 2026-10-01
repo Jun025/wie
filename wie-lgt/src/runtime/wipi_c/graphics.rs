@@ -537,7 +537,11 @@ pub async fn copy_frame_buffer_with_pixel_op(
     if pixel_op == 0 || target.bpp != 16 || source.bpp != 16 {
         return shared_graphics::copy_frame_buffer(context, dst, dx, dy, width, height, src, sx, sy, ptr_graphics).await;
     }
-    tracing::debug!("MC_grpCopyFrameBuffer({:#x}, {dx}, {dy}, {width}, {height}, {:#x}, {sx}, {sy}, pixel_op {pixel_op:#x})", dst.0, src.0);
+    tracing::debug!(
+        "MC_grpCopyFrameBuffer({:#x}, {dx}, {dy}, {width}, {height}, {:#x}, {sx}, {sy}, pixel_op {pixel_op:#x})",
+        dst.0,
+        src.0
+    );
 
     let x0 = 0.max(-dx).max(-sx);
     let y0 = 0.max(-dy).max(-sy);
