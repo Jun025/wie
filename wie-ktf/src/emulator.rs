@@ -45,7 +45,7 @@ fn jar_filename(aid: &str, files: &BTreeMap<String, Vec<u8>>) -> String {
 const DEVICE_BOUND_SAVES: &[([u8; 16], &[&str])] = &[
     // AID 0103451A (archive sha256 59263295de74…). `res/save.sav` +0x214 holds 0x01d14250, a heap
     // pointer of the handset that wrote it: the game reads 192 bytes into a struct, then
-    // `stream_read`s 920 bytes to the struct's +0x30 — that stale pointer (docs/report/0396).
+    // `stream_read`s 920 bytes to the struct's +0x30 — that stale pointer (docs/report/0398).
     // `res/savem.sav` came from the same handset and goes with it.
     (
         [
