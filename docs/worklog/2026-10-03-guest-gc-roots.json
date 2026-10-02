@@ -1,0 +1,49 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-03",
+  "task": "wie-guest-gc-root-conservative-scan-live-lgt-leak",
+  "title": "LGT 게스트 객체 누수 — 게스트 레지스터·스택을 보수적 GC 루트로",
+  "summary": "게스트 new 를 jvm 객체 집합에 넣고, 게스트→호스트 호출마다 jvm 프레임을 쌓고, 수집 때마다 게스트 레지스터·스택·데이터를 보수적으로 훑어 루트로 넣는다. 1b107b96bf4e 대국 장면에서 인스턴스 수가 옛 모델 10분 1,120 → 28,431 에서 새 모델 60분 평탄(10분 평균 2,307~2,410)이 됐다. 스트레스 모드 위반 0.",
+  "changes": [
+    "wie-core-arm ArmCore::guest_root_words · run_function 이 비켜 둔 문맥 장부",
+    "wie-lgt jvm_support/guest_roots.rs — 인스턴스 블록 장부 · GuestRoots 전역 참조 · --gc-stress",
+    "wie-lgt java_instantiate(shallow_clone 등록 · 전역 참조 제거) · JavaMethodProxy::call · handle_java_system_svc 프레임 · 예외 장부 root_words · ELF 쓰기 섹션 등록",
+    "wie-wipi-java Display.callSerially 지연 작업 전역 참조",
+    "wie_validate --gc-stress N",
+    "docs/report/0421 · docs/keys/lgt-1b107b96bf4e-match.keys · docs/player-updates/2026-10-03-long-play-memory.json"
+  ],
+  "verification": [
+    "되돌리면 red 5종(core 2 · lgt 3)",
+    "스트레스 N=8·N=1 90초 7종 · N=4 600초 2종 — dangling 0 · 0xdeaddead 0 · panic 0",
+    "같은 장면 같은 계측 전 10분 / 후 60분 곡선"
+  ],
+  "limits": [
+    "스택 밖 게스트 네이티브 힙 블록은 훑지 않는다",
+    "KTF 는 설계만(§7)"
+  ],
+  "adoptedProposals": [
+    "2026-10-02-progression-walls-r3#p0"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "1b107b96bf4e 대국 소개(«Press Any Key»)가 간헐적으로 키를 받지 않는다",
+      "plainSummary": "대국 시작 직전 화면에서 키를 눌러도 넘어가지 않고 멈추는 일이 가끔 생기는 LGT 게임 한 종을 고친다.",
+      "userBenefit": "대국을 고르면 매번 게임이 시작된다.",
+      "why": "같은 키·같은 빌드(main 포함)로 돌려도 일부 실행에서 소개 화면이 끝까지 남고 그 뒤 paint 가 멈춘다(docs/report/0421 §5). 0418 의 60분 «후» 실행이 누수 장면에 못 들어간 것도 이것이다. 멈춘 실행은 Java 예외가 하나 더(7) 기록됐다.",
+      "tradeoff": "간헐이라 재현에 여러 번의 실행이 든다. 원인은 아직 재지 않았다.",
+      "effort": "M",
+      "target": "wie-lgt · wie-wipi-java(이벤트·스레드 경로)"
+    },
+    {
+      "kind": "product",
+      "title": "1b107b96bf4e 채널 화면 «3.전적» — String vtable index 29 미구현으로 게임 스레드 사망",
+      "plainSummary": "LGT 게임 한 종에서 전적 보기를 누르면 게임이 멈추는 문제를 고친다.",
+      "userBenefit": "전적 화면이 열리고 게임이 계속된다.",
+      "why": "채널 화면에서 NUM3 을 누르면 `Unimplemented: java/lang/String vtable index 29` 로 실행이 끝난다(main 빌드 실측 · docs/report/0421 §9).",
+      "tradeoff": "index 29 가 어느 메서드인지 호출 지점 역어셈으로 확정해야 한다(다른 String 행들과 같은 절차).",
+      "effort": "S",
+      "target": "wie-lgt/data/lgt_java_abi.toml"
+    }
+  ]
+}
