@@ -2,6 +2,7 @@
 
 **무엇을**: `wie-lgt` stdlib 표에 **0x3ff = strtol** 을 넣었다(`StdlibSvcId::Strtol` · `strtol`/`parse_long`). 키 경로 `docs/keys/lgt-acc4215b7ec0-help.keys` 를 더했다.
 **왜**: 채택 제안 `2026-10-01-lgt-annunciator-height-296-decide#p1` — 0405 §3 에서 `acc4215b7ec0` 가 `Unknown lgt stdlib import: 0x3ff` 로 2/2 FAIL.
+증적: `~/orchestrator/reports/evidence/wie-lgt-stdlib-import-0x3ff-adopt-p1/`. 타이틀은 sha12 로만 적는다.
 **사용자 영향**: 그 게임에서 메인 메뉴 → 도움말/기타 → 게임설명을 열면 멈추던 것이 열린다. 설명 글의 색 글씨(주황)도 그 값으로 칠해진다.
 
 ### 1. 호출부 — 의미를 정한 근거
@@ -18,22 +19,28 @@ strtoul 과는 이 타이틀이 넘기는 값(전부 `≤ 0xFFFFFF`)에서 결�
 ### 2. 결정적 재현 — 키 경로
 
 0405 의 FAIL 은 기본 27키가 «느릴 때만» 닿는 자리였다(이 회차 기본 27키 재측 main 1/3 · 1/3 · 0/6 FAIL — 실패 회차는 그리기 수가 180~183 으로 통과 회차 350~500 보다 적다). 느리면 앞쪽 `UP` 이 메인 메뉴 커서를 옮겨 놓고, 12·14번째 `OK` 가 **도움말/기타**로 들어간다.
-메뉴 커서 변형 6가지를 따로 쟀다(`LEFT` `RIGHT` `UP` `UP UP` `DOWN` `DOWN×3` 뒤 `OK`) — `UP UP OK` 하나만 0x3ff 에 닿는다. 그것을 `docs/keys/lgt-acc4215b7ec0-help.keys` 로 남겼다(7번째 `OK` = 게임설명).
+메인 메뉴에서 `UP` 하나가 연습모드 → 도움말/기타로 감아 돈다. 처음 시도(메뉴 뒤 8초 · 기본 누름 0.15초)는 `UP` 이 회차마다 먹히기도 하고 빠지기도 해서 같은 경로가 부하에 따라 0/3 · 3/3 으로 갈렸다(`UP UP` 은 첫 `UP` 이 빠질 때만 맞는다).
+메뉴가 다 들어오도록 15초 기다리고 키를 0.5초 누르니 갈림이 사라졌다 — 그것을 `docs/keys/lgt-acc4215b7ec0-help.keys` 로 남겼다(6번째 `OK` = 게임설명).
 
 ### 3. 전/후
 
 같은 키 경로 · release `wie_validate --inject --keys <경로> --max-ticks 1e11` · 동시 3개. 전 = `origin/main` `5cbd635e` · 후 = 이 브랜치.
 
-QUIET_TABLE
+시작·끝 `host-load-guard --status --recovered` rc=0(`hl-start.txt`·`hl-end.txt` · load 24).
 
-- 후에서 `strtol(…, …, 16)` 이 회당 280~290회 불린다(`RUST_LOG=wie_lgt::runtime::stdlib=debug`) — 통과가 «안 닿아서»가 아니다.
+| | 판정 | 키 | strtol 호출 |
+|---|---|---|---|
+| 전 ×3 | **FAIL ×3** · `06_OK` · `Unknown lgt stdlib import: 0x3ff` | 5/6 | 0 |
+| 후 ×3 | **PASS ×3** | 6/6 | 830 · 827 · 830 |
+
+- 후의 strtol 호출 수는 `RUST_LOG=wie_lgt::runtime::stdlib=debug` 로 셌다(전부 `(…, …, 16)`) — 통과가 «안 닿아서»가 아니다.
 - 후 화면: 게임설명 1/7 쪽이 열리고 강조 낱말이 주황(`0xFFAE08`)으로 칠해진다.
 
 ### 4. 짝 재측 — 같은 import 를 가진 다른 LGT
 
 `game_lab` LGT 78종(sha 중복 제외)의 `binary.mod` 를 걸었다. `(1, 0x3ff)` 바이트 쌍은 76종에 있지만 **썽크로 정렬된 자리(데이터 구간)는 둘**뿐이다 — 나머지는 우연한 바이트 일치다.
 - `acc4215b7ec0` — §1.
-- `393d359d0815`(ARM 링커 배치 · `ER_RW` `0x14005f0`) — 0x3fe · 0x3ff · 0x400 썽크가 나란히 있으나 **어느 썽크 주소도 코드·데이터 어디에도 없다**(4바이트 리터럴 · Thumb `bl`/`blx` 대상 전수 0). 묶여 들어온 죽은 썽크로 본다. 기본 27키 60초 짝(`--pacing 8 --relaunch 1`) main 6/6 · 후 6/6 PASS · 키 수 같음.
+- `393d359d0815`(ARM 링커 배치 · `ER_RW` `0x14005f0`) — 0x3fe · 0x3ff · 0x400 썽크가 나란히 있으나 **어느 썽크 주소도 코드·데이터 어디에도 없다**(4바이트 리터럴 · Thumb `bl`/`blx` 대상 전수 0). 묶여 들어온 죽은 썽크로 본다. 기본 27키 60초 짝(`--pacing 8 --relaunch 1`): 조용한 호스트(guard 시작·끝 rc=0)에서 main 3/3 · 후 3/3 PASS · 27/27키 · 그리기 수 897~899 로 같다. 부하 중 한 판(guard rc=1 · 참고만)도 main 3/3 · 후 3/3 PASS.
 ⇒ 0x3ff 의 의미를 다르게 쓰는 타이틀은 이 코퍼스에 없다. 다른 경로는 0x3ff 에 닿지 않으므로(구성상) 동작이 같다.
 
 ### 5. 되돌리면 red
