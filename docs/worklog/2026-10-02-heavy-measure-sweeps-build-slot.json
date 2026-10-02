@@ -1,0 +1,17 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-02",
+  "task": "wie-heavy-measure-sweeps-must-go-through-build-slot",
+  "title": "측정 스윕 동시 실행 상한 — CLAUDE.md 조항 + census 기본 --jobs ≤ 3",
+  "summary": "회차 측정이 에뮬레이터 20개를 동시에 띄워 호스트를 포화시킨 일을 규칙으로 막는다. otterpebble #1249 의 조항을 repo CLAUDE.md 에 옮기고 playability-census 의 기본 병렬을 3 으로 낮췄다.",
+  "changes": [
+    "CLAUDE.md: 측정·재생 스윕 조항 ⒜build-slot 또는 동시 ≤3 ⒝nohup 금지·자기 프로세스 0 ⒞host-load-guard --recovered rc=0",
+    "scripts/playability-census.mjs: jobsFor 기본 min(3, ncpu/2) · selftest 단언 갱신",
+    "AGENTS.md: census 기본값 서술 동기"
+  ],
+  "verification": [
+    "census selftest 37/37",
+    "build-slot 슬롯 3 격리 상태에서 4개 동시 → held=3 waiting=1 · 4번째 대기 후 실행"
+  ],
+  "proposals": []
+}
