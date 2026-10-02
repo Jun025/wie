@@ -1,0 +1,25 @@
+{
+ "schema": "wie-worklog/1",
+ "date": "2026-10-02",
+ "task": "wie-skvm-textcomponent-handler-multitap-input-adopt-p0",
+ "title": "SKVM TextComponentHandler 최소 멀티탭 입력기 — 등록된 입력칸에만 숫자 키",
+ "summary": "85f03ca7389e 의 이름 입력칸에 글자가 들어간다. 입력칸이 setTextComponent 로 등록됐을 때만 숫자 키를 먹고, 같은 키를 1초 안에 다시 누르면 글자를 돌린다. 등록하지 않는 SKT 두 종은 구조상 그대로다(짝 재측 동일).",
+ "changes": [
+  "wie-skvm com/xce/lcdui/TextComponentHandler.keyPressed — 멀티탭(E.161 대문자) · NUMERIC/PHONENUMBER/DECIMAL 은 숫자 그대로 · CLEAR=delete · 좌우=moveCursor",
+  "setTextComponent 가 입력칸을 붙잡고, clear·CLEAR 가 멀티탭 순환을 끝낸다",
+  "docs/report/0406"
+ ],
+ "verification": [
+  "registered_field_takes_multitap_and_digits · 개악 red 3/3",
+  "--keys 이름 입력 경로 전/후 짝 · --inject 전/후 짝(85f03ca7389e · 14a62a8521a0 · 9a2cf5ffc9d3)",
+  "progress 600s P+P2 전/후"
+ ],
+ "limits": [
+  "한글 조합·대소문자/입력 모드 전환 없음 — 이름은 영문 대문자·숫자만",
+  "keyReleased·keyRepeated 는 여전히 키를 먹지 않는다(측정된 호출부는 결과를 버린다)"
+ ],
+ "proposals": [],
+ "adoptedProposals": [
+  "2026-10-01-skvm-xce-textcomponent#p0"
+ ]
+}
