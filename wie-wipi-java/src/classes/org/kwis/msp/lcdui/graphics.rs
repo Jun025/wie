@@ -727,12 +727,15 @@ impl Graphics {
 
         let midp_graphics = jvm.get_field(&this, "midpGraphics", "Ljavax/microedition/lcdui/Graphics;").await?;
 
+        // WIPI pixels are 0x00RRGGBB with no alpha byte (the first implementation, 840014d9, read them as
+        // opaque RGB). Passing them as ARGB made every pixel transparent: a540945188ca draws all its art and
+        // glyphs through here and showed empty frames (docs/report/0420).
         jvm.invoke_virtual(
             &midp_graphics,
             "javax/microedition/lcdui/Graphics",
             "drawRGB",
             "([IIIIIIIZ)V",
-            (rgb_pixels, offset, bpl, x, y, width, height, true),
+            (rgb_pixels, offset, bpl, x, y, width, height, false),
         )
         .await
     }
@@ -1067,6 +1070,38 @@ mod test {
                 jvm.invoke_virtual::<_, i32>(&graphics, "org/kwis/msp/lcdui/Graphics", "getPixel", "(II)I", (1, 0))
                     .await?,
                 0
+            );
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_set_rgb_pixels_draws_alpha_less_pixels_opaque() -> Result<()> {
+        run_jvm_test(Box::new([wie_midp::get_protos().into(), get_protos().into()]), |jvm| async move {
+            let image: ClassInstanceRef<Image> = jvm
+                .invoke_static("org/kwis/msp/lcdui/Image", "createImage", "(II)Lorg/kwis/msp/lcdui/Image;", (2, 1))
+                .await?;
+            let graphics: ClassInstanceRef<Graphics> = jvm
+                .invoke_virtual(&image, "org/kwis/msp/lcdui/Image", "getGraphics", "()Lorg/kwis/msp/lcdui/Graphics;", ())
+                .await?;
+
+            let mut pixels = jvm.instantiate_array("I", 2).await?;
+            jvm.store_array(&mut pixels, 0, alloc::vec![0x00ff_ffffi32, 0x0012_3456]).await?;
+            let _: () = jvm
+                .invoke_virtual(
+                    &graphics,
+                    "org/kwis/msp/lcdui/Graphics",
+                    "setRGBPixels",
+                    "(IIII[III)V",
+                    (0, 0, 1, 1, pixels, 1, 2),
+                )
+                .await?;
+
+            assert_eq!(
+                jvm.invoke_virtual::<_, i32>(&graphics, "org/kwis/msp/lcdui/Graphics", "getPixel", "(II)I", (0, 0))
+                    .await?,
+                0x123456
             );
 
             Ok(())
