@@ -63,3 +63,5 @@
 ### 7. 게임 파일명 유입
 
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 0 · SUFFIX-ATTACHED 0. 타이틀은 sha12·jar MD5 로만 적었다.
+
+<!-- corpus-name-inflow v1 subjects=4 tree=38b4f2d6d217f369 B=0/0 P=0/0 S=0/0 -->
