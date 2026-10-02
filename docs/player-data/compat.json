@@ -1990,7 +1990,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "unknown",
-    "progress": "ok"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2856,7 +2856,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "ok"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4674,7 +4674,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "ok"
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
