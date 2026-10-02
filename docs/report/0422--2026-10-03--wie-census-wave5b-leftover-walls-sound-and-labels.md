@@ -43,7 +43,7 @@ r3 는 `890ae6e1` 에서 쟀다. 그 커밋에는 #448(`ce469d81` · `setCurrent
 | `b475b6399684` | stuck | **ok**(stall 30 · 새 화면 41) | 레시피(`game_lab/recipes-progress/` · 비커밋 · OK 12회로 설명서 → 스킨판 → 게임) |
 | `78bd51675574` | stuck | **ok**(stall 150 · 11) | 120×160 임시 빌드(r3 화면 규칙이 고르는 크기 · `wie_validate` 화면만 바꿈) |
 | `a540945188ca` | stuck | **ok**(stall 0 · 11) | 이 브랜치(§1) |
-| `38277d63b0ba` | (없음) | **ok**(stall 70 · 10) | `origin/main` 빌드 |
+| `38277d63b0ba` | (없음) | **ok**(stall 70 · 10) | 이 브랜치 빌드(§3 의 30초는 `origin/main` 빌드) |
 
 `ok` 는 짝 재측이 필요 없다(`stuck` 만 P2 를 요구한다). 다만 1800초 기본이 아니라 **600초 창**이다(r3 와 같은 창).
 
@@ -69,5 +69,3 @@ r3 는 `890ae6e1` 에서 쟀다. 그 커밋에는 #448(`ce469d81` · `setCurrent
 ### 9. 유입
 
 `node scripts/corpus-name-inflow.mjs --corpus <로컬 코퍼스>`: BOUNDED 718회 / 330쌍 · SUFFIX-ATTACHED 35회 / 15쌍. 전부 `docs/player-data/compat.json` 의 `title`·`fileTitle` 이다. 이 회차가 바꾼 5행에 원래 있던 표시 이름이 diff 맥락으로 잡힌 것이고, 이 파일은 설계상 이름을 갖는다. 회차 문서·worklog·소식·코드에 더한 게임 이름은 0이다(sha12 만).
-
-<!-- corpus-name-inflow v1 subjects=6 tree=1eb1030d104c8e7c B=718/330 P=0/0 S=35/15 -->
