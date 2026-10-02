@@ -115,10 +115,12 @@ impl Component {
         Ok(())
     }
 
-    async fn set_focus(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
-        tracing::warn!("stub org.kwis.msp.lwc.Component::setFocus({this:?})");
+    // Recorded so a shell can hand keys to it (ShellComponent::keyNotify). focusNotify is not
+    // called: it is still a stub, and no measured title overrides it.
+    async fn set_focus(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lwc.Component::setFocus({this:?})");
 
-        Ok(())
+        ShellCard::set_focus(jvm, this).await
     }
 
     async fn get_height(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
@@ -217,9 +219,9 @@ impl Component {
         Ok(())
     }
 
-    // Reported as false rather than tracked: setFocus and focusNotify are both stubs that keep
-    // no state, so a stored flag would claim a focus this layer never actually grants. Games
-    // that see false keep handling keys themselves, which is what the other lwc stubs assume.
+    // Still false although setFocus is now recorded: only a plain ShellComponent hands keys to the
+    // focused widget, and games that see false keep handling keys themselves — which is what the
+    // titles measured before the focus was recorded relied on. Answering truthfully is its own change.
     async fn has_focus(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<bool> {
         tracing::warn!("stub org.kwis.msp.lwc.Component::hasFocus({this:?})");
 

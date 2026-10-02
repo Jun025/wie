@@ -1,4 +1,4 @@
-use alloc::vec;
+use alloc::{boxed::Box, vec, vec::Vec};
 
 use jvm::{ClassInstanceRef, Jvm, Result as JvmResult};
 use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
@@ -7,10 +7,14 @@ use rustjava_runtime::classes::java::lang::String;
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
 use crate::classes::{
-    net::wie::ShellCard,
-    org::kwis::msp::lcdui::{Card, Display},
+    net::wie::{ShellCard, WIPIKeyCode},
+    org::kwis::msp::lcdui::{Card, Display, Graphics},
     org::kwis::msp::lwc::Component,
 };
+
+// Component.keyNotify's type values (javadoc: KEY_PRESSED, KEY_RELEASED, KEY_REPEATED) as
+// net.wie.CardCanvas sends them.
+const KEY_PRESSED: i32 = 1;
 
 // class org.kwis.msp.lwc.ShellComponent
 pub struct ShellComponent;
@@ -31,6 +35,8 @@ impl ShellComponent {
                     MethodAccessFlags::PUBLIC,
                 ),
                 JavaMethodProto::new("show", "()V", Self::show, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("keyNotify", "(II)Z", Self::key_notify, MethodAccessFlags::PROTECTED),
+                JavaMethodProto::new("paint", "(Lorg/kwis/msp/lcdui/Graphics;)V", Self::paint, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("hide", "()V", Self::hide, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("setTitle", "(Ljava/lang/String;)V", Self::set_title_string, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("setTitle", "(Lorg/kwis/msp/lwc/Component;)V", Self::set_title, MethodAccessFlags::PUBLIC),
@@ -154,6 +160,113 @@ impl ShellComponent {
         tracing::debug!("org.kwis.msp.lwc.ShellComponent::getTitle({this:?})");
 
         jvm.get_field(&this, "cmpTitle", "Lorg/kwis/msp/lwc/Component;").await
+    }
+
+    // The javadoc: a key goes to the component that has the focus (setFocus). This layer lays nothing
+    // out, so "next" is the next leaf in add order: UP/DOWN presses move the focus there, every other
+    // key goes to the focused leaf. 0c67145b11df's name form is two text boxes, a ChoiceText and a
+    // button, focus on the first box. A shell whose leaves do not hold the focus does nothing, as before.
+    // Always true, as before: the return value is what net.wie.CardCanvas reads to pass the key on.
+    // ponytail: UP/DOWN are never offered to the leaf first — no measured leaf uses them.
+    async fn key_notify(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, r#type: i32, key: i32) -> JvmResult<bool> {
+        tracing::debug!("org.kwis.msp.lwc.ShellComponent::keyNotify({this:?}, {type}, {key})");
+
+        let mut leaves = Vec::new();
+        Self::collect_leaves(jvm, this.clone().instance.into(), &mut leaves).await?;
+        if leaves.is_empty() {
+            return Ok(true);
+        }
+        let focus = ShellCard::focus(jvm).await?;
+        let Some(at) = leaves.iter().position(|leaf| !focus.is_null() && leaf.identity() == focus.identity()) else {
+            return Ok(true);
+        };
+
+        let step = match key {
+            x if x == WIPIKeyCode::UP as i32 => -1,
+            x if x == WIPIKeyCode::DOWN as i32 => 1,
+            _ => 0,
+        };
+        if step != 0 {
+            if r#type == KEY_PRESSED {
+                let next = (at as i32 + step).rem_euclid(leaves.len() as i32) as usize;
+                let _: () = jvm
+                    .invoke_virtual(&leaves[next], "org/kwis/msp/lwc/Component", "setFocus", "()V", ())
+                    .await?;
+            }
+        } else {
+            let _: bool = jvm
+                .invoke_virtual(&leaves[at], "org/kwis/msp/lwc/Component", "keyNotify", "(II)Z", (r#type, key))
+                .await?;
+        }
+        // The press may have moved the focus or changed a widget, so the form is drawn again — the
+        // whole display, since the title's own card under this one paints the form's background. A
+        // press that took the shell off the display finds nothing to repaint.
+        if r#type == KEY_PRESSED {
+            let _: () = jvm.invoke_virtual(&this, "org/kwis/msp/lwc/Component", "repaint", "()V", ()).await?;
+        }
+
+        Ok(true)
+    }
+
+    // A shell that does not draw itself (the guest did not override paint) lets its children draw:
+    // ShellCard calls this. Every lwc child but com.ktf.kfc.GFormComponent still draws nothing.
+    async fn paint(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, g: ClassInstanceRef<Graphics>) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lwc.ShellComponent::paint({this:?}, {g:?})");
+
+        let count: i32 = jvm
+            .invoke_virtual(&this, "org/kwis/msp/lwc/ContainerComponent", "getNumberOfComponent", "()I", ())
+            .await?;
+        for i in 0..count {
+            let child: ClassInstanceRef<Component> = jvm
+                .invoke_virtual(
+                    &this,
+                    "org/kwis/msp/lwc/ContainerComponent",
+                    "getComponent",
+                    "(I)Lorg/kwis/msp/lwc/Component;",
+                    (i,),
+                )
+                .await?;
+            if !child.is_null() {
+                let _: () = jvm
+                    .invoke_virtual(
+                        &child,
+                        "org/kwis/msp/lwc/Component",
+                        "paint",
+                        "(Lorg/kwis/msp/lcdui/Graphics;)V",
+                        (g.clone(),),
+                    )
+                    .await?;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn collect_leaves(jvm: &Jvm, component: ClassInstanceRef<Component>, leaves: &mut Vec<ClassInstanceRef<Component>>) -> JvmResult<()> {
+        let count: i32 = jvm
+            .invoke_virtual(&component, "org/kwis/msp/lwc/ContainerComponent", "getNumberOfComponent", "()I", ())
+            .await?;
+        for i in 0..count {
+            let child: ClassInstanceRef<Component> = jvm
+                .invoke_virtual(
+                    &component,
+                    "org/kwis/msp/lwc/ContainerComponent",
+                    "getComponent",
+                    "(I)Lorg/kwis/msp/lwc/Component;",
+                    (i,),
+                )
+                .await?;
+            if child.is_null() {
+                continue;
+            }
+            if jvm.is_instance(&**child, "org/kwis/msp/lwc/ContainerComponent") {
+                Box::pin(Self::collect_leaves(jvm, child, leaves)).await?;
+            } else {
+                leaves.push(child);
+            }
+        }
+
+        Ok(())
     }
 
     async fn default_display(jvm: &Jvm) -> JvmResult<ClassInstanceRef<Display>> {
