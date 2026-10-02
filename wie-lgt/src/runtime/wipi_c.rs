@@ -56,9 +56,12 @@ pub(super) mod graphics;
 
 use jvm::{Jvm, Result as JvmResult, runtime::JavaLangString};
 use wipi_types::lgt::CletFunctions;
-use wipi_types::wipic::WIPICIndirectPtr;
+use wipi_types::wipic::{WIPICFramebuffer, WIPICIndirectPtr, WIPICWord};
 
-use wie_backend::System;
+use wie_backend::{
+    System,
+    canvas::{Rgb565Pixel, VecImageBuffer},
+};
 use wie_core_arm::{ArmCore, EmulatedFunction, EmulatedFunctionParam, ResultWriter, SvcId};
 use wie_jvm_support::JvmSupport;
 use wie_util::{
@@ -156,7 +159,7 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::DrawString => wie_wipi_c::api::graphics::draw_string.into_body(),
         WIPICSvcId::GetRgbPixels => wie_wipi_c::api::graphics::get_rgb_pixels.into_body(),
         WIPICSvcId::SetRgbPixels => wie_wipi_c::api::graphics::set_rgb_pixels.into_body(),
-        WIPICSvcId::FlushLcd => wie_wipi_c::api::graphics::flush_lcd.into_body(),
+        WIPICSvcId::FlushLcd => flush_lcd.into_body(),
         WIPICSvcId::GetPixelFromRgb => shared_graphics::get_pixel_from_rgb.into_body(),
         WIPICSvcId::GetRgbFromPixel => shared_graphics::get_rgb_from_pixel.into_body(),
         WIPICSvcId::GetDisplayInfo => wie_wipi_c::api::graphics::get_display_info.into_body(),
@@ -335,6 +338,34 @@ fn softkey_rows(width: u32) -> u32 {
 async fn get_screen_framebuffer(context: &mut dyn WIPICContext, a0: u32) -> Result<WIPICIndirectPtr> {
     let width = context.system().platform().screen().width();
     wie_wipi_c::api::graphics::screen_framebuffer(context, a0, softkey_rows(width))
+}
+
+// `MC_grpFlushLcd`, presenting the screen framebuffer from `graphics::screen_present_row` down.
+async fn flush_lcd(
+    context: &mut dyn WIPICContext,
+    i: WIPICWord,
+    framebuffer: WIPICIndirectPtr,
+    x: WIPICWord,
+    y: WIPICWord,
+    w: WIPICWord,
+    h: WIPICWord,
+) -> Result<()> {
+    if framebuffer.0 == shared_graphics::screen_framebuffer_handle(context)? {
+        let fb: WIPICFramebuffer = read_generic(context, context.data_ptr(framebuffer)?)?;
+        let width = context.system().platform().screen().width();
+        let row = graphics::screen_present_row(context, &fb, softkey_rows(width))?;
+        if row != 0 {
+            tracing::debug!("MC_grpFlushLcd({i:#x}, {:#x}, ...) from row {row}", framebuffer.0);
+            // the screen framebuffer is always 16bpp (`FRAMEBUFFER_DEPTH`)
+            let mut pixels = vec![0u16; (fb.width * fb.height) as usize];
+            context.read_bytes(context.data_ptr(fb.buf)? + row * fb.bpl, bytemuck::cast_slice_mut(&mut pixels))?;
+            let image = VecImageBuffer::<Rgb565Pixel>::from_raw(fb.width, fb.height, pixels);
+            context.system().platform().screen().paint(&image);
+            return Ok(());
+        }
+    }
+
+    shared_graphics::flush_lcd(context, i, framebuffer, x, y, w, h).await
 }
 
 async fn net_socket_write(_context: &mut dyn WIPICContext, fd: u32, buf: u32, len: u32, _a3: u32) -> Result<i32> {
@@ -684,9 +715,10 @@ mod tests {
     use wie_backend::{DefaultTaskRunner, System};
     use wie_core_arm::{Allocator, ArmCore};
     use wie_util::{ByteWrite, Result, read_generic, write_generic};
-    use wipi_types::wipic::WIPICFramebuffer;
+    use wie_wipi_c::WIPICContext;
+    use wipi_types::wipic::{WIPICFramebuffer, WIPICIndirectPtr};
 
-    use super::{graphics, register_wipic_svc_handler};
+    use super::{LgtWIPICContext, graphics, register_wipic_svc_handler};
     use crate::runtime::{SVC_CATEGORY_WIPIC, java::init_jvm, svc_ids::WIPICSvcId};
 
     // 7e2247bdf565 makes and drops a small offscreen buffer ~400 times a second. Destroy freed
@@ -898,6 +930,52 @@ mod tests {
             assert_eq!((framebuffer.width, framebuffer.height), (320, 240)); // TestPlatform's screen
             let allocated: u32 = read_generic(&core, framebuffer.buf.0 - 4)?;
             assert_eq!(allocated, framebuffer.bpl * (240 + 24));
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    /// Four annunciator titles leave the top 24 rows blank and draw their soft-key bar into the
+    /// spare rows (docs/report/0405 §2). The first `MC_grpFlushLcd` that shows it moves the
+    /// presented window 24 rows down, and keeps it there through frames that do not.
+    #[test]
+    fn flush_lcd_latches_window_below_blank_annunciator_rows() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, _) = init_jvm(&system_clone).await?;
+            register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
+            graphics::init_process_state(&mut core, 320, 240)?;
+            let get = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::GetScreenFramebuffer)?;
+            let flush = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::FlushLcd)?;
+            let handle: u32 = core.run_function(get, &[0]).await?;
+            let mut context = LgtWIPICContext::new(core.clone(), system_clone.clone(), jvm.clone());
+            let fb: WIPICFramebuffer = read_generic(&core, context.data_ptr(WIPICIndirectPtr(handle))?)?;
+            let pixels = context.data_ptr(fb.buf)?;
+            let (top, bottom) = (pixels + 3 * fb.bpl, pixels + (fb.height + 23) * fb.bpl);
+            core.write_bytes(bottom, &[0xff, 0xff])?;
+
+            graphics::set_use_annunciator(&mut core, 0)?;
+            assert_eq!(graphics::screen_present_row(&mut context, &fb, 24)?, 0);
+            graphics::set_use_annunciator(&mut core, 1)?;
+            core.write_bytes(top, &[1, 0])?;
+            assert_eq!(graphics::screen_present_row(&mut context, &fb, 24)?, 0);
+
+            core.write_bytes(top, &[0, 0])?;
+            let _: u32 = core.run_function(flush, &[0, handle, 0, 0, 0, 0]).await?;
+            core.write_bytes(bottom, &[0, 0])?;
+            core.write_bytes(top, &[1, 0])?;
+            assert_eq!(graphics::screen_present_row(&mut context, &fb, 24)?, 24);
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())

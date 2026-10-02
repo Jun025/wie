@@ -29,6 +29,11 @@ pub async fn get_screen_framebuffer(context: &mut dyn WIPICContext, a0: WIPICWor
     screen_framebuffer(context, a0, 0)
 }
 
+/// The handle `screen_framebuffer` handed out, or 0 before the first call.
+pub fn screen_framebuffer_handle(context: &dyn WIPICContext) -> Result<u32> {
+    read_generic(context, SCREEN_FRAMEBUFFER_PTR)
+}
+
 /// `spare_rows` are allocated below the reported height and never presented — room for a carrier
 /// whose titles draw past the height they are told (LGT: `wie_lgt`'s `softkey_rows`).
 pub fn screen_framebuffer(context: &mut dyn WIPICContext, a0: WIPICWord, spare_rows: u32) -> Result<WIPICIndirectPtr> {

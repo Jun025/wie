@@ -30,6 +30,7 @@ struct LgtGraphicsState {
     ptr_screen_view: u32,
     ptr_annunciator_view: u32,
     ptr_screen_wrapper: u32,
+    screen_present_row: u32,
 }
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -91,6 +92,7 @@ pub fn init_process_state(core: &mut ArmCore, physical_width: u32, physical_heig
         ptr_screen_view: 0,
         ptr_annunciator_view: 0,
         ptr_screen_wrapper: 0,
+        screen_present_row: 0,
     };
     let ptr_state = Allocator::alloc(core, size_of::<LgtGraphicsState>() as u32)?;
     write_generic(core, ptr_state, state)?;
@@ -154,6 +156,41 @@ pub fn set_use_annunciator(core: &mut ArmCore, value: u32) -> Result<()> {
     let mut state: LgtGraphicsState = read_generic(core, ptr_state)?;
     state.use_annunciator = value;
     write_generic(core, ptr_state, state)
+}
+
+/// Row of the screen framebuffer `MC_grpFlushLcd` presents from. Four annunciator titles draw
+/// «annunciator + told height»: rows 0..`spare_rows` stay blank and the soft-key bar lands in the
+/// spare rows below (docs/report/0405 §2). The first flush that shows both — last spare row written,
+/// top `spare_rows` rows blank — latches `spare_rows`; a frame that later misses it (a black
+/// transition) must not jump the picture back 24 rows (docs/report/0407 §2).
+pub fn screen_present_row(context: &mut dyn WIPICContext, framebuffer: &WIPICFramebuffer, spare_rows: u32) -> Result<u32> {
+    let ptr_state: u32 = read_generic(context, GRAPHICS_STATE_ROOT)?;
+    if ptr_state == 0 || spare_rows == 0 {
+        return Ok(0);
+    }
+    let mut state: LgtGraphicsState = read_generic(context, ptr_state)?;
+    if state.screen_present_row != 0 || state.use_annunciator == 0 {
+        return Ok(state.screen_present_row);
+    }
+
+    let base = context.data_ptr(framebuffer.buf)?;
+    let mut row = vec![0u8; framebuffer.bpl as usize];
+    let mut written = |r: u32| -> Result<bool> {
+        context.read_bytes(base + r * framebuffer.bpl, &mut row)?;
+        Ok(row.iter().any(|&b| b != 0))
+    };
+    if !written(framebuffer.height + spare_rows - 1)? {
+        return Ok(0);
+    }
+    for r in 0..spare_rows {
+        if written(r)? {
+            return Ok(0);
+        }
+    }
+
+    state.screen_present_row = spare_rows;
+    write_generic(context, ptr_state, state)?;
+    Ok(spare_rows)
 }
 
 fn state(context: &dyn WIPICContext) -> Result<(u32, LgtGraphicsState)> {
@@ -1236,6 +1273,7 @@ mod tests {
             ptr_screen_backing: 0,
             ptr_screen_view: 0,
             ptr_annunciator_view: 0,
+            screen_present_row: 0,
             ptr_screen_wrapper: 0,
         };
 
@@ -1256,6 +1294,7 @@ mod tests {
             ptr_screen_backing: 0,
             ptr_screen_view: 0,
             ptr_annunciator_view: 0,
+            screen_present_row: 0,
             ptr_screen_wrapper: 0,
         };
         let framebuffer = LgtFramebuffer {
