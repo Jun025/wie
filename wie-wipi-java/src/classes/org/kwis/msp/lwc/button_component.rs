@@ -7,16 +7,22 @@ use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 use rustjava_runtime::classes::java::lang::{Object, String};
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
-use crate::classes::org::kwis::msp::{lcdui::Image, lwc::ActionListener};
+use crate::classes::{
+    net::wie::WIPIKeyCode,
+    org::kwis::msp::{
+        lcdui::Image,
+        lwc::{ActionListener, Component},
+    },
+};
 
 // class org.kwis.msp.lwc.ButtonComponent
 //
 // Parent, the two constructors, setActionListener and the field names are the ones
 // `docs/reference/AromaWIPI_classes.zip` declares. 33f3e7669599 constructs one with
 // (String, Image) and registers an ActionListener on it. Like the other lwc widgets here it is
-// not drawn and not laid out (Component::paint · getWidth stay the no-op/0 answers), and a key
-// press does not fire the listener — keyNotify is still Component's. The label, image and
-// listener are only kept, so a later measured wall can use them without a new field.
+// not drawn and not laid out (Component::paint · getWidth stay the no-op/0 answers). A FIRE press
+// that reaches it (ShellComponent hands keys to the focused leaf) calls the listener, as the
+// javadoc's setActionListener says: action(this button, o).
 pub struct ButtonComponent;
 
 impl ButtonComponent {
@@ -39,6 +45,7 @@ impl ButtonComponent {
                     Self::set_action_listener,
                     MethodAccessFlags::PUBLIC,
                 ),
+                JavaMethodProto::new("keyNotify", "(II)Z", Self::key_notify, MethodAccessFlags::PUBLIC),
             ],
             fields: vec![
                 JavaFieldProto::new("str", "Ljava/lang/String;", FieldAccessFlags::PRIVATE),
@@ -87,6 +94,34 @@ impl ButtonComponent {
         jvm.put_field(&mut this, "o", "Ljava/lang/Object;", object).await?;
 
         Ok(())
+    }
+
+    // Pressed, not released: the listener may take the form off the display, and the release then
+    // belongs to whatever replaced it. 1 = KEY_PRESSED as net.wie.CardCanvas sends it. Every key
+    // answers true, as Component's stub did.
+    async fn key_notify(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, r#type: i32, key: i32) -> JvmResult<bool> {
+        tracing::debug!("org.kwis.msp.lwc.ButtonComponent::keyNotify({this:?}, {type}, {key})");
+
+        if r#type != 1 || key != WIPIKeyCode::FIRE as i32 {
+            return Ok(true);
+        }
+        let listener: ClassInstanceRef<ActionListener> = jvm.get_field(&this, "l", "Lorg/kwis/msp/lwc/ActionListener;").await?;
+        if listener.is_null() {
+            return Ok(true);
+        }
+        let object: ClassInstanceRef<Object> = jvm.get_field(&this, "o", "Ljava/lang/Object;").await?;
+        let button: ClassInstanceRef<Component> = this.instance.into();
+        let _: () = jvm
+            .invoke_virtual(
+                &listener,
+                "org/kwis/msp/lwc/ActionListener",
+                "action",
+                "(Lorg/kwis/msp/lwc/Component;Ljava/lang/Object;)V",
+                (button, object),
+            )
+            .await?;
+
+        Ok(true)
     }
 }
 

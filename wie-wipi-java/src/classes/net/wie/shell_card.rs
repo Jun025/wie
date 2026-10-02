@@ -31,11 +31,17 @@ impl ShellCard {
                 JavaMethodProto::new("keyNotify", "(II)Z", Self::key_notify, MethodAccessFlags::PROTECTED),
                 JavaMethodProto::new("showNotify", "(Z)V", Self::show_notify, MethodAccessFlags::PROTECTED),
             ],
-            fields: vec![JavaFieldProto::new(
-                "shell",
-                "Lorg/kwis/msp/lwc/ShellComponent;",
-                FieldAccessFlags::PRIVATE,
-            )],
+            fields: vec![
+                JavaFieldProto::new("shell", "Lorg/kwis/msp/lwc/ShellComponent;", FieldAccessFlags::PRIVATE),
+                // The one lwc component that has the input focus (Component.setFocus). Static and here,
+                // not an instance field on an lwc class, for the layout reason above; one is enough
+                // because only the shell on top of the display receives keys.
+                JavaFieldProto::new(
+                    "focus",
+                    "Lorg/kwis/msp/lwc/Component;",
+                    FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC,
+                ),
+            ],
             access_flags: ClassAccessFlags::PUBLIC,
         }
     }
@@ -76,6 +82,15 @@ impl ShellCard {
         jvm.get_field(this, "shell", "Lorg/kwis/msp/lwc/ShellComponent;").await
     }
 
+    pub async fn focus(jvm: &Jvm) -> JvmResult<ClassInstanceRef<Component>> {
+        jvm.get_static_field("net/wie/ShellCard", "focus", "Lorg/kwis/msp/lwc/Component;").await
+    }
+
+    pub async fn set_focus(jvm: &Jvm, component: ClassInstanceRef<Component>) -> JvmResult<()> {
+        jvm.put_static_field("net/wie/ShellCard", "focus", "Lorg/kwis/msp/lwc/Component;", component)
+            .await
+    }
+
     /// The ShellCard currently on the default Display for `component`, if it is a shown shell.
     // ponytail: linear scan of the card stack — it holds one or two cards in practice.
     pub async fn find(jvm: &Jvm, component: &ClassInstanceRef<Component>) -> JvmResult<Option<ClassInstanceRef<Card>>> {
@@ -114,9 +129,10 @@ impl ShellCard {
 mod test {
     use alloc::{boxed::Box, vec, vec::Vec};
 
-    use jvm::{ClassInstanceRef, Jvm, Result as JvmResult};
+    use jvm::{ClassInstanceRef, Jvm, Result as JvmResult, runtime::JavaLangString};
     use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
     use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
+    use rustjava_runtime::classes::java::lang::{Object, String};
     use test_utils::run_jvm_test;
     use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
     use wie_midp::classes::javax::microedition::lcdui::Display as MidpDisplay;
@@ -124,8 +140,11 @@ mod test {
 
     use crate::{
         classes::{
-            net::wie::CardCanvas,
-            org::kwis::msp::lcdui::{Display, Graphics},
+            net::wie::{CardCanvas, WIPIKeyCode},
+            org::kwis::msp::{
+                lcdui::{Display, Graphics},
+                lwc::Component,
+            },
         },
         get_protos,
     };
@@ -217,41 +236,96 @@ mod test {
         }
     }
 
-    // Reverting show() or Component.repaint to the old logged stubs turns this red: nothing reaches
-    // the Display, so paintCount stays 0.
-    #[test]
-    fn shown_shell_component_is_painted_through_the_display() -> Result<()> {
-        let test_jlet = WieJavaClassProto {
+    fn test_jlet() -> WieJavaClassProto {
+        WieJavaClassProto {
             name: "test/TestJlet",
             parent_class: Some("org/kwis/msp/lcdui/Jlet"),
             interfaces: vec![],
             methods: vec![],
             fields: vec![],
             access_flags: ClassAccessFlags::PUBLIC,
-        };
-        let fixture: Box<[WieJavaClassProto]> = Vec::from([TestShell::as_proto(), SpyCardCanvas::as_proto(), test_jlet]).into_boxed_slice();
+        }
+    }
+
+    // A default Display on a card canvas of class `canvas_class`, the way a running Jlet has one.
+    async fn install_display(jvm: &Jvm, canvas_class: &str) -> JvmResult<ClassInstanceRef<CardCanvas>> {
+        let canvas: ClassInstanceRef<CardCanvas> = jvm.new_class(canvas_class, "()V", ()).await?.into();
+        let midp_display: ClassInstanceRef<MidpDisplay> = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?.into();
+        let _: () = jvm
+            .invoke_virtual(
+                &midp_display,
+                "javax/microedition/lcdui/Display",
+                "setCurrent",
+                "(Ljavax/microedition/lcdui/Displayable;)V",
+                (canvas.clone(),),
+            )
+            .await?;
+        let mut display: ClassInstanceRef<Display> = jvm.instantiate_class("org/kwis/msp/lcdui/Display").await?.into();
+        jvm.put_field(&mut display, "cardCanvas", "Lnet/wie/CardCanvas;", canvas.clone()).await?;
+        jvm.put_field(&mut display, "midpDisplay", "Ljavax/microedition/lcdui/Display;", midp_display)
+            .await?;
+        let mut jlet = jvm.instantiate_class("test/TestJlet").await?;
+        jvm.put_field(&mut jlet, "dis", "Lorg/kwis/msp/lcdui/Display;", display).await?;
+        jvm.put_static_field("org/kwis/msp/lcdui/Jlet", "currentJlet", "Lorg/kwis/msp/lcdui/Jlet;", jlet)
+            .await?;
+
+        Ok(canvas)
+    }
+
+    // The game's listener: counts action calls and keeps the last (component, object) pair.
+    struct TestListener;
+
+    impl TestListener {
+        fn as_proto() -> WieJavaClassProto {
+            WieJavaClassProto {
+                name: "test/TestListener",
+                parent_class: Some("java/lang/Object"),
+                interfaces: vec!["org/kwis/msp/lwc/ActionListener"],
+                methods: vec![
+                    JavaMethodProto::new("<init>", "()V", Self::init, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new(
+                        "action",
+                        "(Lorg/kwis/msp/lwc/Component;Ljava/lang/Object;)V",
+                        Self::action,
+                        MethodAccessFlags::PUBLIC,
+                    ),
+                ],
+                fields: vec![
+                    JavaFieldProto::new("count", "I", FieldAccessFlags::PUBLIC),
+                    JavaFieldProto::new("cmp", "Lorg/kwis/msp/lwc/Component;", FieldAccessFlags::PUBLIC),
+                    JavaFieldProto::new("o", "Ljava/lang/Object;", FieldAccessFlags::PUBLIC),
+                ],
+                access_flags: ClassAccessFlags::PUBLIC,
+            }
+        }
+
+        async fn init(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await
+        }
+
+        async fn action(
+            jvm: &Jvm,
+            _: &mut WieJvmContext,
+            mut this: ClassInstanceRef<Self>,
+            cmp: ClassInstanceRef<Component>,
+            o: ClassInstanceRef<Object>,
+        ) -> JvmResult<()> {
+            let count: i32 = jvm.get_field(&this, "count", "I").await?;
+            jvm.put_field(&mut this, "count", "I", count + 1).await?;
+            jvm.put_field(&mut this, "cmp", "Lorg/kwis/msp/lwc/Component;", cmp).await?;
+            jvm.put_field(&mut this, "o", "Ljava/lang/Object;", o).await
+        }
+    }
+
+    // Reverting show() or Component.repaint to the old logged stubs turns this red: nothing reaches
+    // the Display, so paintCount stays 0.
+    #[test]
+    fn shown_shell_component_is_painted_through_the_display() -> Result<()> {
+        let fixture: Box<[WieJavaClassProto]> = Vec::from([TestShell::as_proto(), SpyCardCanvas::as_proto(), test_jlet()]).into_boxed_slice();
         run_jvm_test(
             Box::new([wie_midp::get_protos().into(), get_protos().into(), fixture]),
             |jvm| async move {
-                let canvas: ClassInstanceRef<CardCanvas> = jvm.new_class("test/SpyCardCanvas", "()V", ()).await?.into();
-                let midp_display: ClassInstanceRef<MidpDisplay> = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?.into();
-                let _: () = jvm
-                    .invoke_virtual(
-                        &midp_display,
-                        "javax/microedition/lcdui/Display",
-                        "setCurrent",
-                        "(Ljavax/microedition/lcdui/Displayable;)V",
-                        (canvas.clone(),),
-                    )
-                    .await?;
-                let mut display: ClassInstanceRef<Display> = jvm.instantiate_class("org/kwis/msp/lcdui/Display").await?.into();
-                jvm.put_field(&mut display, "cardCanvas", "Lnet/wie/CardCanvas;", canvas.clone()).await?;
-                jvm.put_field(&mut display, "midpDisplay", "Ljavax/microedition/lcdui/Display;", midp_display)
-                    .await?;
-                let mut jlet = jvm.instantiate_class("test/TestJlet").await?;
-                jvm.put_field(&mut jlet, "dis", "Lorg/kwis/msp/lcdui/Display;", display).await?;
-                jvm.put_static_field("org/kwis/msp/lcdui/Jlet", "currentJlet", "Lorg/kwis/msp/lcdui/Jlet;", jlet)
-                    .await?;
+                let canvas = install_display(&jvm, "test/SpyCardCanvas").await?;
 
                 let shell: ClassInstanceRef<TestShell> = jvm.new_class("test/TestShell", "()V", ()).await?.into();
                 let count = |name: &'static str| {
@@ -311,6 +385,148 @@ mod test {
                 let _: () = jvm.invoke_virtual(&shell, "org/kwis/msp/lwc/ShellComponent", "hide", "()V", ()).await?;
                 assert_eq!(card_count().await?, 0);
                 assert!(!is_shown().await?);
+
+                Ok(())
+            },
+        )
+    }
+
+    /// 0c67145b11df's name form, built in the title's order: two text boxes, a ChoiceText and a
+    /// button on a GFormComponent, the form on a plain ShellComponent, focus on the first box. Every
+    /// key used to stop at the shell; now DOWN walks the focus to the button and FIRE calls the
+    /// listener — once, with the button and the registered object. On the way, digits typed into the
+    /// first box come back from getString and RIGHT moves the ChoiceText selection.
+    #[test]
+    fn shell_walks_focus_to_the_button_and_fire_calls_its_listener() -> Result<()> {
+        let fixture: Box<[WieJavaClassProto]> = Vec::from([TestListener::as_proto(), test_jlet()]).into_boxed_slice();
+        run_jvm_test(
+            Box::new([wie_midp::get_protos().into(), get_protos().into(), fixture]),
+            |jvm| async move {
+                // The display a running title has: the form's repaint after each press goes looking for it.
+                let _ = install_display(&jvm, "net/wie/CardCanvas").await?;
+                let form: ClassInstanceRef<Component> = jvm.new_class("com/ktf/kfc/GFormComponent", "()V", ()).await?.into();
+                let mut widgets: Vec<ClassInstanceRef<Component>> = Vec::new();
+                for _ in 0..2 {
+                    let text = JavaLangString::from_rust_string(&jvm, "").await?;
+                    widgets.push(
+                        jvm.new_class("org/kwis/msp/lwc/TextBoxComponent", "(Ljava/lang/String;I)V", (text, 0))
+                            .await?
+                            .into(),
+                    );
+                }
+                let mut choices = jvm.instantiate_array("Ljava/lang/String;", 2).await?;
+                let choice_strings = [
+                    JavaLangString::from_rust_string(&jvm, "a").await?,
+                    JavaLangString::from_rust_string(&jvm, "b").await?,
+                ];
+                jvm.store_array(&mut choices, 0, choice_strings).await?;
+                widgets.push(
+                    jvm.new_class("com/ktf/kfc/ChoiceText", "([Ljava/lang/String;)V", (choices,))
+                        .await?
+                        .into(),
+                );
+                let image: ClassInstanceRef<Object> = None.into();
+                let label: ClassInstanceRef<Object> = None.into();
+                let button: ClassInstanceRef<Component> = jvm
+                    .new_class(
+                        "org/kwis/msp/lwc/ButtonComponent",
+                        "(Ljava/lang/String;Lorg/kwis/msp/lcdui/Image;)V",
+                        (label, image),
+                    )
+                    .await?
+                    .into();
+                widgets.push(button.clone());
+                for widget in &widgets {
+                    let _: i32 = jvm
+                        .invoke_virtual(
+                            &form,
+                            "com/ktf/kfc/GFormComponent",
+                            "addComponent",
+                            "(Lorg/kwis/msp/lwc/Component;IIII)I",
+                            (widget.clone(), 0, 0, 0, 0),
+                        )
+                        .await?;
+                }
+                let shell = jvm.new_class("org/kwis/msp/lwc/ShellComponent", "()V", ()).await?;
+                let _: i32 = jvm
+                    .invoke_virtual(
+                        &shell,
+                        "org/kwis/msp/lwc/ContainerComponent",
+                        "addComponent",
+                        "(Lorg/kwis/msp/lwc/Component;)I",
+                        (form,),
+                    )
+                    .await?;
+                let listener = jvm.new_class("test/TestListener", "()V", ()).await?;
+                let tag: ClassInstanceRef<Object> = jvm.new_class("java/lang/Object", "()V", ()).await?.into();
+                let _: () = jvm
+                    .invoke_virtual(
+                        &button,
+                        "org/kwis/msp/lwc/ButtonComponent",
+                        "setActionListener",
+                        "(Lorg/kwis/msp/lwc/ActionListener;Ljava/lang/Object;)V",
+                        (listener.clone(), tag.clone()),
+                    )
+                    .await?;
+                let _: () = jvm
+                    .invoke_virtual(&widgets[0], "org/kwis/msp/lwc/Component", "setFocus", "()V", ())
+                    .await?;
+
+                // Press and release, the way net.wie.CardCanvas delivers a key.
+                let key = |code: WIPIKeyCode| {
+                    let shell = shell.clone();
+                    let jvm = jvm.clone();
+                    async move {
+                        for r#type in [1, 2] {
+                            let _: bool = jvm
+                                .invoke_virtual(&shell, "org/kwis/msp/lwc/ShellComponent", "keyNotify", "(II)Z", (r#type, code as i32))
+                                .await?;
+                        }
+                        JvmResult::Ok(())
+                    }
+                };
+                let count = || {
+                    let listener = listener.clone();
+                    let jvm = jvm.clone();
+                    async move { jvm.get_field::<i32>(&listener, "count", "I").await }
+                };
+
+                key(WIPIKeyCode::FIRE).await?;
+                assert_eq!(count().await?, 0, "FIRE on the text box is not the button's");
+
+                // Digits and CLR edit the focused text box; getString reads it back.
+                for code in [WIPIKeyCode::NUM1, WIPIKeyCode::NUM2, WIPIKeyCode::CLEAR, WIPIKeyCode::NUM3] {
+                    key(code).await?;
+                }
+                let typed: ClassInstanceRef<String> = jvm
+                    .invoke_virtual(&widgets[0], "org/kwis/msp/lwc/TextComponent", "getString", "()Ljava/lang/String;", ())
+                    .await?;
+                assert_eq!(JavaLangString::to_rust_string(&jvm, &typed).await?, "13");
+
+                // RIGHT on the ChoiceText moves the selection the listener reads.
+                key(WIPIKeyCode::DOWN).await?;
+                key(WIPIKeyCode::DOWN).await?;
+                key(WIPIKeyCode::RIGHT).await?;
+                let selected: i32 = jvm
+                    .invoke_virtual(&widgets[2], "com/ktf/kfc/ChoiceText", "getSelectedIndex", "()I", ())
+                    .await?;
+                assert_eq!(selected, 1);
+
+                key(WIPIKeyCode::DOWN).await?;
+                key(WIPIKeyCode::FIRE).await?;
+                assert_eq!(count().await?, 1);
+                let cmp: ClassInstanceRef<Component> = jvm.get_field(&listener, "cmp", "Lorg/kwis/msp/lwc/Component;").await?;
+                let o: ClassInstanceRef<Object> = jvm.get_field(&listener, "o", "Ljava/lang/Object;").await?;
+                assert_eq!(cmp.identity(), button.identity());
+                assert_eq!(o.identity(), tag.identity());
+
+                // DOWN past the last leaf wraps to the first; UP from there comes back to the button.
+                key(WIPIKeyCode::DOWN).await?;
+                key(WIPIKeyCode::FIRE).await?;
+                assert_eq!(count().await?, 1);
+                key(WIPIKeyCode::UP).await?;
+                key(WIPIKeyCode::FIRE).await?;
+                assert_eq!(count().await?, 2);
 
                 Ok(())
             },
