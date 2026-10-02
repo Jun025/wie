@@ -1,0 +1,11 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-02",
+  "task": "wie-lgt-stdlib-import-0x3ff-adopt-p1",
+  "title": "LGT stdlib import 0x3ff = strtol — acc4215b7ec0 도움말 화면 벽",
+  "summary": "acc4215b7ec0 의 유일한 0x3ff 호출부(0x36192)는 문자열 자원의 `|0xFFAE08|` 칸을 f(칸, &end, 16) 으로 읽어 \"%d\" 로 다시 쓴다 — strtol 모양이다. 도움말/기타 → 게임설명 키 경로(docs/keys)로 결정적으로 재현했고(main 3/3 FAIL), 구현 후 3/3 PASS · 회당 strtol 280~290회. LGT 78종 중 0x3ff 썽크를 가진 것은 이 타이틀과 393d359d0815 둘이고, 후자는 썽크를 참조하는 코드가 없다(docs/report/0406).",
+  "changes": ["wie-lgt StdlibSvcId::Strtol = 0x3ff + strtol 구현", "시험 2건(SVC 표 경유 · parse_long)", "docs/keys/lgt-acc4215b7ec0-help.keys"],
+  "limits": ["strtol 과 strtoul 은 이 타이틀이 넘기는 값(≤ 0xFFFFFF)에서 같다 — 0x7fffffff 를 넘기는 호출부가 나오면 다시 정한다"],
+  "adoptedProposals": ["2026-10-01-lgt-annunciator-height-296-decide#p1"],
+  "proposals": []
+}

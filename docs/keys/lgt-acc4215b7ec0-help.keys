@@ -1,0 +1,20 @@
+# wie_validate --keys: LGT acc4215b7ec0 — title → main menu → 도움말/기타 → 게임설명.
+# Grammar: `--keys` help / `parse_keys` in wie_cli/src/bin/wie_validate.rs.
+#
+#   mkdir -p <dir>   # --shotdir does not create it
+#   cargo run -q --release -p wie_cli --bin wie_validate -- --inject \
+#     --max-ticks 100000000000 --keys docs/keys/lgt-acc4215b7ec0-help.keys --shotdir <dir> <game>
+#
+# Step 7 (`07_OK`) opens 게임설명, whose text carries `|0xFFAE08|` colour fields parsed with
+# stdlib import 0x3ff (strtol). Before docs/report/0406 that step died on
+# `Unknown lgt stdlib import: 0x3ff` (3/3). Two UPs after the 8 s gap land on 도움말/기타
+# (measured, `05_UP`); one UP, LEFT, RIGHT or DOWN×1 did not reach it. Key names only — no game bytes.
+WAIT:10
+OK:5     # PRESS ANY KEY
+OK:8     # main menu slides in
+UP:3
+UP:3     # 도움말/기타
+OK:6     # its submenu, cursor on 게임설명
+OK:4     # 게임설명 — the strtol call site
+OK:4
+WAIT:4
