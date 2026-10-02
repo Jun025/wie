@@ -59,3 +59,7 @@
 ### 6. 되돌리면
 
 행을 빼면 그 타이틀은 §1 원본 열로 돌아간다(§4 전후가 그 측정이다). 함수는 바뀌지 않았고 `device_bound_saves_dropped_for_listed_jar_only` 가 그대로 지킨다.
+
+### 7. 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 0 · SUFFIX-ATTACHED 0. 타이틀은 sha12·jar MD5 로만 적었다.
