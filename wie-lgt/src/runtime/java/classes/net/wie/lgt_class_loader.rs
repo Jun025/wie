@@ -46,6 +46,12 @@ impl LgtClassLoader {
                     "Lnet/wie/LgtClassLoader;",
                     FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC,
                 ),
+                // Thrown when the guest heap is full — see `jvm_support::allocation_error`.
+                JavaFieldProto::new(
+                    "outOfMemoryError",
+                    "Ljava/lang/OutOfMemoryError;",
+                    FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC,
+                ),
             ],
             access_flags: ClassAccessFlags::PUBLIC,
         }

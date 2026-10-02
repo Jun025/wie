@@ -61,6 +61,9 @@ impl LgtJvmSupport {
         if let Err(error) = jvm.register_class(class, None).await {
             return Err(JvmSupport::to_wie_err(&jvm, error).await);
         }
+        if let Err(error) = reserve_out_of_memory_error(&jvm).await {
+            return Err(JvmSupport::to_wie_err(&jvm, error).await);
+        }
 
         let context = CletWrapperContext { core: core.clone() };
         for proto in [CletWrapper::as_proto(), CletWrapperCard::as_proto()] {
@@ -471,6 +474,38 @@ impl LgtJvmSupport {
     }
 }
 
+// Allocated while the heap is empty, so a full one still has an error to throw.
+async fn reserve_out_of_memory_error(jvm: &Jvm) -> jvm::Result<()> {
+    let reserved = jvm.new_class("java/lang/OutOfMemoryError", "()V", ()).await?;
+    jvm.put_static_field("net/wie/LgtClassLoader", "outOfMemoryError", "Ljava/lang/OutOfMemoryError;", reserved)
+        .await
+}
+
+async fn reserved_out_of_memory_error(jvm: &Jvm) -> Option<Box<dyn ClassInstance>> {
+    if !jvm.has_class("net/wie/LgtClassLoader") {
+        return None;
+    }
+    let reserved: jvm::ClassInstanceRef<()> = jvm
+        .get_static_field("net/wie/LgtClassLoader", "outOfMemoryError", "Ljava/lang/OutOfMemoryError;")
+        .await
+        .ok()?;
+    (!reserved.is_null()).then(|| reserved.into())
+}
+
+/// The error for a guest object or array that could not be allocated. A full heap throws the
+/// `OutOfMemoryError` allocated up front — a Java exception the guest may catch, built without
+/// allocating — the way KTF does (`KtfJvmSupport::instantiation_error`). 1b107b96bf4e ran 43
+/// minutes into a full heap and the host error built in its place could not be built either; the
+/// stand-in it got (`host_error` below) panicked the host as soon as anything read its class.
+pub(crate) async fn allocation_error(jvm: &Jvm, core: &ArmCore, kind: &str, error: WieError) -> JavaError {
+    if matches!(error, WieError::AllocationFailure)
+        && let Some(reserved) = reserved_out_of_memory_error(jvm).await
+    {
+        return JavaError::JavaException(reserved);
+    }
+    host_error(jvm, core, "net/wie/WieError", &format!("Failed to instantiate {kind}: {error}")).await
+}
+
 /// `Jvm::exception`, built fallibly for errors the JVM glue raises. Building allocates, so on an
 /// exhausted heap it fails too; `Jvm::exception` would then unwrap that failure or — through
 /// `instantiate`/`instantiate_array` — build another error for it, without end. The second attempt
@@ -484,8 +519,13 @@ pub(crate) async fn host_error(jvm: &Jvm, core: &ArmCore, r#type: &str, message:
         Ok(false) => {
             tracing::error!("LGT host error unbuildable, dropped: {type} {message}");
             // Stands in for the error that could not be built. No guest catch sees it: unwind
-            // raises a host error first, because the state begin_host_error left stays set.
-            return JavaError::JavaException(Box::new(JavaClassInstance::from_raw(0, &core)));
+            // raises a host error first, because the state begin_host_error left stays set. It
+            // is a real object, because host code reads it — the address-0 stand-in this used
+            // to be panicked the host on its class (1b107b96bf4e, `class_instance.rs` unwrap).
+            return JavaError::JavaException(match reserved_out_of_memory_error(jvm).await {
+                Some(reserved) => reserved,
+                None => Box::new(JavaClassInstance::from_raw(0, &core)),
+            });
         }
         Err(_) => return jvm.exception(r#type, message).await,
     }
@@ -608,6 +648,7 @@ pub(crate) mod tests {
             .await
             .unwrap();
         jvm.register_class(loader_class, None).await.unwrap();
+        super::reserve_out_of_memory_error(&jvm).await.unwrap();
         Ok((jvm, core, implementation))
     }
 
@@ -1970,6 +2011,8 @@ pub(crate) mod tests {
                 ("java/io/DataOutputStream", 12, "write", "([BII)V"),
                 // 61ed69520fd3
                 ("java/io/DataOutputStream", 13, "flush", "()V"),
+                // b475b6399684
+                ("java/io/DataOutputStream", 24, "writeUTF", "(Ljava/lang/String;)V"),
                 ("java/lang/Runtime", 11, "freeMemory", "()J"),
                 ("java/lang/Runtime", 12, "totalMemory", "()J"),
                 // 배틀몬스터·학교가는길·체스마스터

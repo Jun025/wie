@@ -1,7 +1,7 @@
 use alloc::{
     borrow::ToOwned,
     boxed::Box,
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     format, str,
     string::{String, ToString},
     vec,
@@ -14,6 +14,7 @@ use jvm::{Result as JvmResult, runtime::JavaLangString};
 use wie_backend::{
     DefaultTaskRunner, Emulator, Event, Pacing, Platform, System,
     canvas::{decode_res, encode_png},
+    extract_zip,
 };
 use wie_jvm_support::{JvmSupport, RustJavaJvmImplementation};
 use wie_util::{Result, WieError};
@@ -38,6 +39,87 @@ const SYSTEM_PROPERTIES: [(&str, &str); 9] = [
     ("com.xce.wipi.version", ""),
 ];
 
+// Handset screens an SKT package picks its art for, by width. The heights are the common panel
+// for each width — nothing in a package names one.
+//   ponytail: one height per width; read it off the package if a title branches on height alone.
+const HANDSET_DISPLAYS: [(u32, u32); 4] = [(120, 160), (128, 160), (176, 220), (240, 320)];
+
+/// The display an SKT package was built for, when its contents say so. Unlike KTF's `DisplaySize:`
+/// nothing declares it, but the code does: it names `<stem>_<width>.<ext>` for several widths and
+/// picks one by the reported screen width, and a package cut for small handsets ships only the
+/// small ones. bf54c05e58a9 names `_240` and holds only `_120`/`_176`, so on a 240-wide screen it
+/// draws a null image and stops; 78bd51675574 holds only `_120` of three. The widest width held
+/// beside a missing one is the screen it was cut for. Corpus scan 2026-10-02: those two titles of
+/// 462 packages, both SKT.
+fn package_display_size(jar: &[u8]) -> Option<(u32, u32)> {
+    let files = extract_zip(jar).ok()?;
+    let names = files.keys().map(|name| name.trim_start_matches('/')).collect::<BTreeSet<_>>();
+    let references = files
+        .iter()
+        .filter(|(name, _)| name.ends_with(".class"))
+        .flat_map(|(_, class)| class_utf8_constants(class));
+    display_size_for(&names, references)
+}
+
+fn display_size_for<'a>(names: &BTreeSet<&str>, references: impl Iterator<Item = &'a [u8]>) -> Option<(u32, u32)> {
+    let mut held = None;
+    for reference in references {
+        let Some(path) = str::from_utf8(reference).ok().map(|x| x.trim_start_matches('/')) else {
+            continue;
+        };
+        let Some((stem_width, ext)) = path.rsplit_once('.') else {
+            continue;
+        };
+        let Some((stem, width)) = stem_width.rsplit_once('_') else {
+            continue;
+        };
+        let Some(&(missing, _)) = HANDSET_DISPLAYS.iter().find(|(w, _)| w.to_string() == width) else {
+            continue;
+        };
+        if names.contains(path) {
+            continue;
+        }
+        for &(w, h) in &HANDSET_DISPLAYS {
+            if w < missing && names.contains(format!("{stem}_{w}.{ext}").as_str()) && held.is_none_or(|(held_w, _)| w > held_w) {
+                held = Some((w, h));
+            }
+        }
+    }
+    held
+}
+
+/// The CONSTANT_Utf8 strings of a class file's constant pool — where `ldc` string literals live.
+fn class_utf8_constants(class: &[u8]) -> Vec<&[u8]> {
+    let mut strings = Vec::new();
+    let Some(&[high, low]) = class.get(8..10) else {
+        return strings;
+    };
+    let (count, mut at, mut index) = (u16::from_be_bytes([high, low]), 10, 1);
+    while index < count {
+        let Some(&tag) = class.get(at) else {
+            break;
+        };
+        let length = match tag {
+            1 => {
+                let Some(&[high, low]) = class.get(at + 1..at + 3) else {
+                    break;
+                };
+                let length = u16::from_be_bytes([high, low]) as usize;
+                strings.extend(class.get(at + 3..at + 3 + length));
+                2 + length
+            }
+            7 | 8 | 16 => 2,
+            15 => 3,
+            3 | 4 | 9 | 10 | 11 | 12 | 18 => 4,
+            5 | 6 => 8,
+            _ => break,
+        };
+        at += 1 + length;
+        index += if matches!(tag, 5 | 6) { 2 } else { 1 };
+    }
+    strings
+}
+
 impl SktEmulator {
     pub fn from_archive(platform: Box<dyn Platform>, files: BTreeMap<String, Vec<u8>>) -> Result<Self> {
         let msd_file = files.iter().find(|x| x.0.ends_with(".msd")).unwrap();
@@ -46,6 +128,14 @@ impl SktEmulator {
         tracing::info!("Loading app {}, mclass {}", msd.id, msd.main_class);
 
         let jar_filename = msd_file.0.replace(".msd", ".jar");
+        if let Some((width, height)) = files.get(&jar_filename).and_then(|jar| package_display_size(jar))
+            && width < platform.screen().width()
+        {
+            tracing::info!("Package holds no assets wider than {width}: display {width}x{height}");
+            if let Err(error) = platform.screen().resize(width, height) {
+                tracing::warn!("Ignoring unsupported display size {width}x{height}: {error}");
+            }
+        }
 
         Self::load(platform, &jar_filename, &msd.id, Some(msd.main_class), msd.properties, &files)
     }
@@ -235,7 +325,7 @@ impl SktMsd {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{collections::BTreeMap, vec};
+    use alloc::{collections::BTreeMap, vec, vec::Vec};
 
     use super::{SktEmulator, SktMsd};
 
@@ -290,6 +380,33 @@ mod tests {
         let blue = image.get_pixel(1, 0);
         assert_eq!((red.r, red.g, red.b, red.a), (252, 0, 0, 255));
         assert_eq!((blue.r, blue.g, blue.b, blue.a), (0, 0, 255, 255));
+    }
+
+    // A class whose constant pool is a long, then the strings: the long takes two slots.
+    fn class_with(strings: &[&str]) -> Vec<u8> {
+        let mut class = vec![0xca, 0xfe, 0xba, 0xbe, 0, 0, 0, 46];
+        class.extend_from_slice(&(strings.len() as u16 + 3).to_be_bytes());
+        class.extend_from_slice(&[5, 0, 0, 0, 0, 0, 0, 0, 1]);
+        for string in strings {
+            class.push(1);
+            class.extend_from_slice(&(string.len() as u16).to_be_bytes());
+            class.extend_from_slice(string.as_bytes());
+        }
+        class
+    }
+
+    #[test]
+    fn display_size_is_the_widest_variant_a_package_holds_beside_a_missing_one() {
+        let class = class_with(&["/title/logo_120.png", "/title/logo_176.png", "/title/logo_240.png", "/bg_01.png"]);
+        let strings = super::class_utf8_constants(&class);
+        assert_eq!(strings.len(), 4, "the long before them takes two slots");
+
+        let held = |names: &[&'static str]| super::display_size_for(&names.iter().copied().collect(), strings.iter().copied());
+        assert_eq!(held(&["title/logo_120.png", "title/logo_176.png"]), Some((176, 220)));
+        assert_eq!(held(&["title/logo_120.png"]), Some((120, 160)));
+        // Every variant held, or none of them: nothing says the package is not for this screen.
+        assert_eq!(held(&["title/logo_120.png", "title/logo_176.png", "title/logo_240.png"]), None);
+        assert_eq!(held(&[]), None);
     }
 
     #[test]

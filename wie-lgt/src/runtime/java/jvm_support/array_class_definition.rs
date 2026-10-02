@@ -50,7 +50,7 @@ impl ArrayClassDefinition for JavaArrayClassDefinition {
     async fn instantiate_array(&self, jvm: &Jvm, length: usize) -> JvmResult<Box<dyn ClassInstance>> {
         match JavaArrayClassInstance::new(&mut self.core.clone(), self, length) {
             Ok(instance) => Ok(Box::new(instance)),
-            Err(error) => Err(super::host_error(jvm, &self.core, "net/wie/WieError", &format!("Failed to instantiate array: {error}")).await),
+            Err(error) => Err(super::allocation_error(jvm, &self.core, "array", error).await),
         }
     }
 }
@@ -66,21 +66,20 @@ mod tests {
     use alloc::{boxed::Box, sync::Arc};
     use core::sync::atomic::{AtomicBool, Ordering};
 
-    use jvm::JavaError;
+    use jvm::{ClassInstance, ClassInstanceRef, JavaError};
 
     use test_utils::TestPlatform;
     use wie_backend::{DefaultTaskRunner, System};
     use wie_core_arm::Allocator;
-    use wie_jvm_support::JvmSupport;
     use wie_util::{Result, WieError};
 
     use crate::runtime::java::{
         exception,
-        jvm_support::{LgtJvmSupport, tests::init_jvm},
+        jvm_support::{host_error, tests::init_jvm},
     };
 
     #[test]
-    fn exhausted_heap_ends_array_instantiation_with_a_host_error() -> Result<()> {
+    fn exhausted_heap_throws_the_reserved_out_of_memory_error() -> Result<()> {
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
         let done = Arc::new(AtomicBool::new(false));
         let done_clone = done.clone();
@@ -88,18 +87,22 @@ mod tests {
 
         system.spawn(async move || {
             let (jvm, mut core, _) = init_jvm(&system_clone).await?;
+            let reserved: Box<dyn ClassInstance> = jvm
+                .get_static_field::<ClassInstanceRef<()>>("net/wie/LgtClassLoader", "outOfMemoryError", "Ljava/lang/OutOfMemoryError;")
+                .await
+                .unwrap()
+                .into();
 
-            // With room left for the error, a failed allocation still throws it into the guest.
+            // An array larger than the heap throws it into the guest, which may catch it.
             let Err(JavaError::JavaException(error)) = jvm.instantiate_array("I", 0x1000_0000).await else {
                 panic!("an array larger than the heap must fail");
             };
-            assert_ne!(LgtJvmSupport::class_instance_raw(&*error), 0);
+            assert_eq!(error.identity(), reserved.identity());
             assert!(!exception::host_error_unbuildable(&core)?);
 
-            // 놈3: the array and its error's message both find their allocator full, so building the
-            // error fails the way the array did. Before, that recursed until the stack overflowed.
-            // The int[256] goes to the list half (over 512 bytes), filled by halving; the message's
-            // char[] to the 128-byte bucket.
+            // b475b6399684: the array and its error's message both find their allocator full. Building a
+            // fresh error there recursed until the stack overflowed; the reserved one allocates
+            // nothing. The int[256] goes to the list half (over 512 bytes), filled by halving.
             let mut size = 0x800_0000;
             while size > 512 {
                 if Allocator::alloc(&mut core, size).is_err() {
@@ -107,12 +110,19 @@ mod tests {
                 }
             }
             while Allocator::alloc(&mut core, 128).is_ok() {}
-            let Err(error) = jvm.instantiate_array("I", 256).await else {
+            let Err(JavaError::JavaException(error)) = jvm.instantiate_array("I", 256).await else {
                 panic!("the heap is full");
             };
+            assert_eq!(error.identity(), reserved.identity());
+            assert!(!exception::host_error_unbuildable(&core)?);
+
+            // 1b107b96bf4e: an error that cannot be built — any error, on a full heap — gets a
+            // stand-in, and host code reads its class. The address-0 stand-in panicked there.
+            assert!(exception::begin_host_error(&mut core)?);
+            let JavaError::JavaException(stand_in) = host_error(&jvm, &core, "net/wie/WieError", "unbuildable").await;
+            assert_eq!(stand_in.class_definition().name(), "java/lang/OutOfMemoryError");
             assert!(exception::host_error_unbuildable(&core)?);
             assert!(matches!(exception::unwind(&mut core, 0), Err(WieError::FatalError(_))));
-            assert!(matches!(JvmSupport::to_wie_err(&jvm, error).await, WieError::FatalError(_)));
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
