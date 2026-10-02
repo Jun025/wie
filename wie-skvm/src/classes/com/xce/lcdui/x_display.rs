@@ -142,5 +142,6 @@ mod test {
                 Ok(())
             },
         )
+        .unwrap();
     }
 }
