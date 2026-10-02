@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-02",
+  "kind": "improvement",
+  "titles": [
+    "0ed66634d3dce7eeb05ec9ca95488f507574a1c8b62f3446018cecbd5c4d2415",
+    "a42f77f4495565e57a0a1592dc92ac3ce44c8c462657f69df5984933cf4ecdfa",
+    "c33090c12755710fc599957a16a19b27babe161de34c8bb743d5e1557d089e70",
+    "eefc947d83374af5785201f34941e0e1d51cb12115d8d00edfd942179e8afe53",
+    "60bd6cbc5936626ae38e71bccab46cf8896ac5144e7b2f40b6176e53179ded3a",
+    "dab2d537f3ef93e4675454eb1fb808daef2a728cc31ac9d1ef8df0b943f9ec30"
+  ],
+  "summary_ko": "구매한 휴대폰에서만 켜지도록 잠긴 파일과 암호로 잠긴 파일을 지원 현황에 따로 안내해요. 이런 파일은 고쳐서 켜는 것이 아니라 여기서는 실행할 수 없는 파일이에요.",
+  "pr": "https://github.com/Jun025/wie/pull/0"
+}

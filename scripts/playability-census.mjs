@@ -14,6 +14,8 @@
 //   node scripts/playability-census.mjs run --bin <wie_validate> --out <dir> [--jobs <= ncpu, default ncpu/2]
 //        [--secs 30] [--long 600] [--only probe|long|speed] <corpus dir>...
 //   node scripts/playability-census.mjs run … --only progress [--progress 1800] [--titles <file>] [--as P|P2]
+//   node scripts/playability-census.mjs run … --only long --titles <file>   the long run, recipe-prefixed
+//        (`<sha12> [secs] [recipe keys file]`; keep the recipes in game_lab/ — they spell a title's menus)
 //   node scripts/playability-census.mjs report --out <dir> --pin <wie sha>
 //        [--compat <compat.json>] [--changes <changes.json>] [--prs <gh-merged.json>]
 //        [--speed <browser runs.jsonl>]
@@ -53,7 +55,7 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { cpus, loadavg } from 'node:os';
-import { inflateSync } from 'node:zlib';
+import { inflateRawSync, inflateSync } from 'node:zlib';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -260,14 +262,16 @@ async function speed(t) {
   writeFileSync(f, JSON.stringify(await validate(args, opt.secs + 120, join(d, 'S.stderr'))));
 }
 
-async function longplay(t) {
+async function longplay(t, spec = {}) {
   const d = join(out, t.sha);
   const f = join(d, 'L.json');
   if (existsSync(f)) return;
   mkdirSync(join(d, 'L'), { recursive: true });
   const keys = join(d, 'long.keys');
   const reps = Math.ceil(opt.long / 10);
-  writeFileSync(keys, Array(reps).fill(LONG_KEYS).join('\n'));
+  // A `--titles` recipe is a prefix here too: the loop alone never leaves some logos and menus, and
+  // a title whose music starts in play then reads `silent` (15 such, docs/report/0388 §1).
+  writeFileSync(keys, [spec.keys ? readFileSync(spec.keys, 'utf8') : '', ...Array(reps).fill(LONG_KEYS)].join('\n'));
   // --max-ticks: the 50M default is an infinite-loop backstop sized for a boot, and a fast title
   // burns it in minutes — measured on this run's first pass, which ended runs at 3 of 10 minutes.
   const args = ['--inject', '--keys', keys, '--keep-timeout', '--timeout', String(opt.long), '--max-ticks', '100000000000', '--shotdir', join(d, 'L'), '--shot-every', '20', ...RELAUNCH, t.path];
@@ -279,6 +283,7 @@ async function longplay(t) {
         .sort()
     : [];
   r.shots = timed.map((n) => sha256(readFileSync(join(d, 'L', n))));
+  r.recipe = spec.keys ? basename(spec.keys) : null;
   writeFileSync(f, JSON.stringify(r));
 }
 
@@ -592,6 +597,50 @@ function sniffPlatform(path) {
   return /__adf__/.test(bytes) ? 'KTF' : /app_info/.test(bytes) ? 'LGT' : /\.msd/.test(bytes) ? 'SKT' : 'J2ME';
 }
 
+// ── locked files: titles that cannot run anywhere but the original buyer's handset ────────────
+// Operator policy 2026-10-02: neither is to be unlocked (no phone-number recovery, no check bypass,
+// no decryption) — the census says so in the player's words instead of «아직 실행되지 않아요».
+//   drm    an OMA DRM container (`odcf` magic) where the jar should be — encrypted, decided statically.
+//   phone  an SKT purchase check (XCE `SecureUtil`: MD5 of carrier + the buyer's phone number +
+//          SERVICE_ID == `MIDlet-Key`, docs/report/0386) AND the title quit on its own before painting.
+//          The class alone is not enough: measured 2026-10-02, 41 titles carry it and 36 play — only
+//          the ones whose check runs at start and fails end with `clean exit` · 0 paints.
+const LOCK_KO = {
+  drm: '암호로 잠긴 파일이라 여기서는 실행할 수 없어요.',
+  phone: '구매한 휴대폰에서만 켜지도록 잠긴 파일이라 여기서는 실행할 수 없어요.',
+};
+// Central directory only; tolerates bytes prepended to the archive (some SKT jars carry 32).
+function zipEntries(buf) {
+  const e = buf.lastIndexOf(Buffer.from('PK\x05\x06', 'latin1'));
+  if (e < 0) return [];
+  const shift = e - buf.readUInt32LE(e + 12) - buf.readUInt32LE(e + 16);
+  const out = [];
+  for (let p = buf.readUInt32LE(e + 16) + shift, i = buf.readUInt16LE(e + 10); i > 0 && buf.readUInt32LE(p) === 0x02014b50; i--) {
+    const [method, size, nl] = [buf.readUInt16LE(p + 10), buf.readUInt32LE(p + 20), buf.readUInt16LE(p + 28)];
+    const lo = buf.readUInt32LE(p + 42) + shift;
+    out.push({
+      name: buf.toString('latin1', p + 46, p + 46 + nl),
+      data: () => {
+        const s = lo + 30 + buf.readUInt16LE(lo + 26) + buf.readUInt16LE(lo + 28);
+        return method === 0 ? buf.subarray(s, s + size) : inflateRawSync(buf.subarray(s, s + size));
+      },
+    });
+    p += 46 + nl + buf.readUInt16LE(p + 30) + buf.readUInt16LE(p + 32);
+  }
+  return out;
+}
+const PHONE_CHECK = ['MIDlet-Key', 'SERVICE_ID=', 'MIDlet-Jar-URL'];
+function lockOf(path) {
+  const buf = readFileSync(path);
+  const jars = /\.jar$/i.test(path) ? [buf] : zipEntries(buf).filter((x) => /\.jar$/i.test(x.name)).map((x) => x.data());
+  if (jars.some((j) => j.toString('latin1', 0, 4) === 'odcf')) return 'drm';
+  const check = jars.some((j) => zipEntries(j).some((c) => c.name.endsWith('.class') && PHONE_CHECK.every((k) => c.data().includes(k))));
+  return check ? 'phone' : null;
+}
+// The run half of `phone`: the title ended itself and never painted (the check exits before any frame).
+const quitUnpainted = (runs) => runs.every((r) => r && !r.paints) && runs.some((r) => r.stop === 'clean exit');
+const lockVerdict = (lock, runs) => (lock === 'drm' || (lock === 'phone' && quitUnpainted(runs)) ? lock : null);
+
 // NFC: macOS hands back file names decomposed (NFD), and PR titles are composed.
 const displayTitle = (p) =>
   basename(p)
@@ -650,6 +699,61 @@ if (cmd === 'selftest') {
       ['ok and error need no pair', progressAxis(run(600), null) === 'ok' && progressAxis(run(600, { result: 'FAIL' }), null) === 'error'],
       ['not measured is n/a', progressAxis(null, null) === 'n/a'],
     );
+  }
+  // Locked files, on synthetic archives (stored entries; CRC is not read).
+  {
+    const storedZip = (files) => {
+      const loc = [];
+      const cen = [];
+      let off = 0;
+      for (const [name, body] of Object.entries(files)) {
+        const n = Buffer.from(name, 'latin1');
+        const data = Buffer.from(body, 'latin1');
+        const l = Buffer.alloc(30);
+        l.writeUInt32LE(0x04034b50, 0);
+        l.writeUInt32LE(data.length, 18);
+        l.writeUInt32LE(data.length, 22);
+        l.writeUInt16LE(n.length, 26);
+        const c = Buffer.alloc(46);
+        c.writeUInt32LE(0x02014b50, 0);
+        c.writeUInt32LE(data.length, 20);
+        c.writeUInt32LE(data.length, 24);
+        c.writeUInt16LE(n.length, 28);
+        c.writeUInt32LE(off, 42);
+        loc.push(l, n, data);
+        cen.push(c, n);
+        off += 30 + n.length + data.length;
+      }
+      const cd = Buffer.concat(cen);
+      const e = Buffer.alloc(22);
+      e.writeUInt32LE(0x06054b50, 0);
+      e.writeUInt16LE(Object.keys(files).length, 8);
+      e.writeUInt16LE(Object.keys(files).length, 10);
+      e.writeUInt32LE(cd.length, 12);
+      e.writeUInt32LE(off, 16);
+      return Buffer.concat([...loc, cd, e]);
+    };
+    const tmp = join('/tmp', `wie-census-lock-${process.pid}`);
+    mkdirSync(tmp, { recursive: true });
+    const title = (name, jar, pad = 0) => {
+      const p = join(tmp, name);
+      writeFileSync(p, storedZip({ 'a.msd': 'MIDlet-Key: x', 'a.jar': Buffer.concat([Buffer.alloc(pad), jar]).toString('latin1') }));
+      return p;
+    };
+    const check = storedZip({ 'b.class': `..${PHONE_CHECK.join('..')}..`, 'M.class': 'startApp' });
+    const drm = title('drm.zip', Buffer.from('odcf\0\x02odrm', 'latin1'));
+    const phone = title('phone.zip', check, 32);
+    const plain = title('plain.zip', storedZip({ 'M.class': 'MIDlet-Key SERVICE_ID=' }));
+    const quit = { stop: 'clean exit', paints: 0 };
+    cases.push(
+      ['an odcf jar is drm, whatever the run did', lockOf(drm) === 'drm' && lockVerdict('drm', [{ paints: 5 }, { paints: 5 }]) === 'drm'],
+      ['the purchase check is found past prepended bytes', lockOf(phone) === 'phone'],
+      ['a jar without all three properties is not locked', lockOf(plain) === null],
+      ['the check that quit before painting is a lock', lockVerdict('phone', [quit, { stop: 'deadline', paints: 0 }]) === 'phone'],
+      ['the check in a title that paints is not', lockVerdict('phone', [quit, { stop: 'clean exit', paints: 3 }]) === null],
+      ['the check in a title that crashed is not', lockVerdict('phone', [{ stop: 'error', paints: 0 }, { stop: 'error', paints: 0 }]) === null],
+    );
+    rmSync(tmp, { recursive: true, force: true });
   }
   // The host lock, through the real `run` path (an empty corpus, so nothing is validated): a
   // version that dropped the hostLock() call exits at once and fails the first case.
@@ -733,12 +837,14 @@ if (cmd === 'run') {
     console.error(`speed: ${slow.length} titles below 0.9, re-measured at --jobs ${opt.jobs}`);
     await pool(slow, opt.jobs, speed);
   } else if (opt.only !== 'probe' && opt.only !== 'progress') {
+    const list = titleList();
     const cand = pop.titles.filter((t) => {
+      if (list && !list.has(t.sha.slice(0, 12))) return false;
       const j = judge(t.sha);
       return j && j.ax.input === 'ok' && j.ax.longplay === 'n/a';
     });
     console.error(`longplay: ${cand.length} candidates × ${opt.long}s`);
-    await pool(cand, opt.jobs, longplay);
+    await pool(cand, opt.jobs, (t) => longplay(t, list?.get(t.sha.slice(0, 12)) ?? {}));
   }
 } else {
   const pop = read(join(out, 'population.json'));
@@ -757,6 +863,9 @@ if (cmd === 'run') {
       .filter(([k]) => !(k === 'render' && j.ax.boot === 'fail')) // one line for a title that never started
       .map(([k, v]) => ISSUE_KO[`${k}:${v}`])
       .filter(Boolean);
+    // A locked file says only that: the other lines would read as «not fixed yet».
+    const lock = lockVerdict(lockOf(t.path), [j.A, j.B]);
+    if (lock) issues.splice(0, issues.length, LOCK_KO[lock]);
     const changes = prs
       .filter((pr) => names(pr.title, title) && !otherCarrier(pr.title, platform))
       .map((pr) => ({ date: pr.mergedAt.slice(0, 10), enginePin: pr.mergeCommit?.oid ?? null, summary_ko: summaryKo(pr.title), pr: pr.number }));
