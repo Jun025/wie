@@ -96,4 +96,4 @@ r2(`wie-progression-engine-walls-r2-null-image-dialog-npe-key`)의 `9789fec50f39
 
 `node scripts/corpus-name-inflow.mjs --corpus <로컬 코퍼스>`: BOUNDED 107회 / 31쌍 · SUFFIX-ATTACHED 14회 / 4쌍. 전부 이 회차가 고친 파일에 **이미 있던** 줄(`lgt_java_abi.toml` · `jvm_support.rs` 의 기존 주석·시험 행)이다. 이 회차가 더한 줄의 게임 이름은 0이다. 고쳐 쓴 주석 한 줄은 이름을 sha12 로 바꿨다.
 
-<!-- corpus-name-inflow v1 subjects=1332 tree=bf57f1fdeca8d872 B=107/31 P=2/2 S=14/4 -->
+<!-- corpus-name-inflow v1 subjects=11 tree=e0fe069025a85872 B=107/31 P=2/2 S=14/4 -->
