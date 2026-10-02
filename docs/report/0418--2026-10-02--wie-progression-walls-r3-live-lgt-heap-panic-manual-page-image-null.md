@@ -91,3 +91,7 @@ r2(`wie-progression-engine-walls-r2-null-image-dialog-npe-key`)의 `9789fec50f39
 | census «잠긴 파일» 판별에 설치 토큰 인증 종료 추가 — `44b6356d13f8` | 1 | ⒞ 표기 | S |
 | `b475b6399684` 스킨 모음판을 넘는 키 레시피 | 1 | ⒜ | S |
 | `78bd51675574` 진도 축 재측(120×160) | 1 | 측정 | S |
+
+### 9. 유입
+
+`node scripts/corpus-name-inflow.mjs --corpus <로컬 코퍼스>`: BOUNDED 107회 / 31쌍 · SUFFIX-ATTACHED 14회 / 4쌍. 전부 이 회차가 고친 파일에 **이미 있던** 줄(`lgt_java_abi.toml` · `jvm_support.rs` 의 기존 주석·시험 행)이다. 이 회차가 더한 줄의 게임 이름은 0이다. 고쳐 쓴 주석 한 줄은 이름을 sha12 로 바꿨다.
