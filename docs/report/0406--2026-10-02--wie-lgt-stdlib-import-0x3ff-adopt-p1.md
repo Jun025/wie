@@ -58,3 +58,5 @@ strtoul 과는 이 타이틀이 넘기는 값(전부 `≤ 0xFFFFFF`)에서 결�
 - `check-worklog-json` · `player-data` · `check-docs-report-serial` OK
 
 ### 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs --corpus <game_lab>`: BOUNDED 6회/6쌍 · SUFFIX-ATTACHED 0회/0쌍. BOUNDED 6회는 전부 이 회차가 손댄 `wie-lgt` `stdlib.rs`·`svc_ids.rs` 의 **기존 줄**이다 — `git diff origin/main` 의 `+` 줄에는 그 여섯 이름이 0회다. 타이틀은 sha12 로만 적었고, 키 경로 파일에는 화면 이름(메뉴 글자)만 있다.
