@@ -70,7 +70,7 @@
 //! on the schedule-derived deadline is lifted — the script's length IS the requested budget.
 //!
 //! Two more opt-in flags serve the progress census (`playability-census.mjs --only progress`,
-//! policy v2 — docs/report/0411): `--stall-secs`/`--stall-keys` splice an escape (CLR, the right
+//! policy v2 — docs/report/0413): `--stall-secs`/`--stall-keys` splice an escape (CLR, the right
 //! soft key, «next item») in only once the screen has stopped changing, and `--restart-at` boots
 //! the guest again mid-run with its database kept, so `db.resumed_reads` can say whether a save
 //! made in play comes back. With neither given the schedule and the JSON line are unchanged.
