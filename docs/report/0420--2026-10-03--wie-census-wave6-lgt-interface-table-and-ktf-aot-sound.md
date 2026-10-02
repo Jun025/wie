@@ -59,4 +59,4 @@ wave4 의 «조건은 AOT 코드 안»은 틀렸다. 세 종 다 `Clip` 을 만�
 
 ### 6. 게임 파일명 유입
 
-아래 표식 줄이 이 회차의 측정이다. 이 회차가 쓴 문서·worklog·소식·코드 주석은 타이틀을 sha12 로만 적었다. §1 진단 줄의 게임 클래스 이름은 자리표시로 바꿨다.
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 344쌍 + SUFFIX-ATTACHED 17쌍. BOUNDED 는 전부 `compat.json` 의 기존 `title`·`fileTitle` 값이다(이 회차는 그 행의 축만 바꿨다). SUFFIX-ATTACHED 는 `compat.json` 의 «더 긴 다른 제목»과 `jvm_support.rs` 에 원래 있던 주석 4줄이다. 이 회차가 더한 Rust 줄의 한글 0. 이 회차가 쓴 문서·worklog·소식·코드 주석은 타이틀을 sha12 로만 적었다. §1 진단 줄의 게임 클래스 이름은 자리표시로 바꿨다.
