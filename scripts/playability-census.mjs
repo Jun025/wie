@@ -634,9 +634,12 @@ function sniffPlatform(path) {
 // no decryption) — the census says so in the player's words instead of «아직 실행되지 않아요».
 //   drm    an OMA DRM container (`odcf` magic) where the jar should be — encrypted, decided statically.
 //   phone  an SKT purchase check (XCE `SecureUtil`: MD5 of carrier + the buyer's phone number +
-//          SERVICE_ID == `MIDlet-Key`, docs/report/0386) AND the title quit on its own before painting.
+//          SERVICE_ID == `MIDlet-Key`, docs/report/0386) AND the title quit on its own.
 //          The class alone is not enough: measured 2026-10-02, 41 titles carry it and 36 play — only
-//          the ones whose check runs at start and fails end with `clean exit` · 0 paints.
+//          the ones whose check runs at start and fails end with `clean exit`. Some paint first: the
+//          failing check draws «인증 되지 않은 컨텐츠» and then calls `System.exit` (docs/report/0420),
+//          so the rule is «every run quit, the unkeyed one included», not «0 paints». On the bd2337ff
+//          census that adds 2 of the 41 and no title that plays (those all end on `deadline`).
 const LOCK_KO = {
   drm: '암호로 잠긴 파일이라 여기서는 실행할 수 없어요.',
   phone: '구매한 휴대폰에서만 켜지도록 잠긴 파일이라 여기서는 실행할 수 없어요.',
@@ -669,9 +672,9 @@ function lockOf(path) {
   const check = jars.some((j) => zipEntries(j).some((c) => c.name.endsWith('.class') && PHONE_CHECK.every((k) => c.data().includes(k))));
   return check ? 'phone' : null;
 }
-// The run half of `phone`: the title ended itself and never painted (the check exits before any frame).
-const quitUnpainted = (runs) => runs.every((r) => r && !r.paints) && runs.some((r) => r.stop === 'clean exit');
-const lockVerdict = (lock, runs) => (lock === 'drm' || (lock === 'phone' && quitUnpainted(runs)) ? lock : null);
+// The run half of `phone`: the title ended itself — a run either quit or never painted.
+const quitOnItsOwn = (runs) => runs.every((r) => r && (r.stop === 'clean exit' || !r.paints)) && runs.some((r) => r.stop === 'clean exit');
+const lockVerdict = (lock, runs) => (lock === 'drm' || (lock === 'phone' && quitOnItsOwn(runs)) ? lock : null);
 
 // ── titles that cannot go on without the original carrier's server ─────────────────────────────
 // Operator policy 2026-10-02: the server is gone and its data is not ours to make up, so the census
@@ -807,7 +810,8 @@ if (cmd === 'selftest') {
       ['the purchase check is found past prepended bytes', lockOf(phone) === 'phone'],
       ['a jar without all three properties is not locked', lockOf(plain) === null],
       ['the check that quit before painting is a lock', lockVerdict('phone', [quit, { stop: 'deadline', paints: 0 }]) === 'phone'],
-      ['the check in a title that paints is not', lockVerdict('phone', [quit, { stop: 'clean exit', paints: 3 }]) === null],
+      ['the check in a title that keeps running is not', lockVerdict('phone', [quit, { stop: 'deadline', paints: 3 }]) === null],
+      ['the check that paints its refusal and quits is a lock', lockVerdict('phone', [{ stop: 'clean exit', paints: 7 }, { stop: 'clean exit', paints: 8 }]) === 'phone'],
       ['a connect retried 20 times is a network wall', netWall(['', 'WARN stub MC_netConnect(0x1, 0xa)\n'.repeat(20)])],
       ['a connect made once and passed is not', !netWall(['WARN stub MC_netConnect(0x1, 0xa)\n'.repeat(5), 'Network::connect()'])],
       ['a Java connect loop counts too', netWall(['stub org.kwis.msf.io.Network::connect()\n'.repeat(20)])],
@@ -919,13 +923,14 @@ if (cmd === 'run') {
     const title = displayTitle(t.path);
     const platform = j.A.platform && j.A.platform !== 'unknown' ? j.A.platform.toUpperCase() : sniffPlatform(t.path);
     const net = netWall(['A', 'L'].map((p) => join(out, t.sha, `${p}.stderr`)).filter(existsSync).map((f) => readFileSync(f, 'latin1')));
-    const st = net && status(j.ax) === 'playable' ? 'limited' : status(j.ax);
+    // A locked file says only that: the other lines would read as «not fixed yet». Its status is never
+    // better than not-yet — a check that paints its refusal box would otherwise read as playable.
+    const lock = lockVerdict(lockOf(t.path), [j.A, j.B]);
+    const st = lock ? 'not-yet' : net && status(j.ax) === 'playable' ? 'limited' : status(j.ax);
     const issues = Object.entries(j.ax)
       .filter(([k]) => !(k === 'render' && j.ax.boot === 'fail')) // one line for a title that never started
       .map(([k, v]) => ISSUE_KO[`${k}:${v}`])
       .filter(Boolean);
-    // A locked file says only that: the other lines would read as «not fixed yet».
-    const lock = lockVerdict(lockOf(t.path), [j.A, j.B]);
     if (lock) issues.splice(0, issues.length, LOCK_KO[lock]);
     else if (net) issues.splice(0, issues.length, NET_KO);
     const changes = prs

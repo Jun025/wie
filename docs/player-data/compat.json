@@ -7357,7 +7357,7 @@
    "platform": "SKT",
    "model": null,
    "title": "스페셜포스",
-   "status": "playable",
+   "status": "not-yet",
    "axes": {
     "boot": "ok",
     "render": "ok",
@@ -7367,7 +7367,9 @@
     "speed": "unknown",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "구매한 휴대폰에서만 켜지도록 잠긴 파일이라 여기서는 실행할 수 없어요."
+   ],
    "changes": [],
    "fileTitle": "스페셜포스"
   },
