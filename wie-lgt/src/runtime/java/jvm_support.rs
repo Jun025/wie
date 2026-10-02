@@ -3,6 +3,7 @@ mod array_class_instance;
 mod class_definition;
 mod class_instance;
 mod field;
+pub mod guest_roots;
 mod jvm_implementation;
 mod method;
 mod value;
@@ -50,6 +51,7 @@ impl LgtJvmSupport {
         let protos = [get_midp_protos().into(), get_wipi_java_protos().into()];
         let implementation = LgtJvmImplementation::new(core)?;
         let jvm = JvmSupport::new_jvm(system, jar_name, Box::new(protos), &[], implementation.clone()).await?;
+        guest_roots::install(&jvm, core);
 
         let class = match implementation
             .define_class_rust(&jvm, LgtClassLoader::as_proto(), Box::new(core.clone()))
@@ -643,6 +645,7 @@ pub(crate) mod tests {
         let protos = [get_midp_protos().into(), get_wipi_java_protos().into()];
         let implementation = LgtJvmImplementation::new(&mut core)?;
         let jvm = JvmSupport::new_jvm(system, None, Box::new(protos), &[], implementation.clone()).await?;
+        super::guest_roots::install(&jvm, &core);
         let loader_class = implementation
             .define_class_rust(&jvm, LgtClassLoader::as_proto(), Box::new(core.clone()))
             .await

@@ -23,3 +23,4 @@ mod runtime;
 
 pub use compile_model::{LgtCompileModel, detect_compile_model};
 pub use emulator::LgtEmulator;
+pub use runtime::{gc_stress_counts, set_gc_stress};

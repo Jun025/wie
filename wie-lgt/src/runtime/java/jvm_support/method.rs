@@ -224,7 +224,14 @@ where
 
         let codec = JavaValueCodec::new(core);
         let args = decode_method_arguments(&codec, &self.parameter_types, &raw_args);
+        // A frame of its own, so what the method allocates is rooted only while it runs. Without
+        // it everything landed in the frame of the host call the guest code was running under —
+        // for a game loop, one that never returns, so nothing it made was ever collected
+        // (1b107b96bf4e). What the guest keeps is rooted by the guest root scan instead.
+        super::guest_roots::stress_collect(&self.jvm, core);
+        self.jvm.push_native_frame();
         let result = self.proto.body.call(&self.jvm, &mut self.context.clone(), args.into_boxed_slice()).await;
+        self.jvm.pop_frame();
         let result = match result {
             Ok(value) => value,
             Err(JavaError::JavaException(instance)) => return Err(WieError::JavaException(codec.object_to_raw(&*instance))),
@@ -294,6 +301,43 @@ mod tests {
     async fn rust_wide_bridge(_jvm: &Jvm, observed: &mut Arc<Mutex<Option<(i64, u64)>>>, integer: i64, floating: f64) -> JvmResult<i64> {
         *observed.lock() = Some((integer, floating.to_bits()));
         Ok(integer ^ floating.to_bits() as i64)
+    }
+
+    // 1b107b96bf4e: the `String` a host method made for the guest is garbage once the guest drops
+    // it. Without a frame per call it was rooted in the frame of the host call the guest code ran
+    // under — for a game loop, one that never returns.
+    #[test]
+    fn what_a_host_method_made_for_the_guest_is_collected_once_dropped() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, _) = crate::runtime::java::init_jvm(&system_clone).await?;
+            let class = jvm.resolve_class("java/lang/String").await.unwrap();
+            let method = class.definition.method("valueOf", "(I)Ljava/lang/String;", true).unwrap();
+            let target = method.as_any().downcast_ref::<JavaMethod>().unwrap().target()?;
+
+            jvm.push_native_frame(); // the long-lived host frame a game loop runs under
+            let ptr_string: u32 = core.run_function(target, &[1234]).await?;
+            let string = LgtJvmSupport::class_instance_from_raw(&core, ptr_string)?;
+            assert_eq!(JavaLangString::to_rust_string(&jvm, &string).await.unwrap(), "1234");
+            drop(string);
+
+            jvm.collect_garbage().unwrap();
+            assert!(!Allocator::is_allocated(&core, ptr_string, 12)?);
+            jvm.pop_frame();
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
     }
 
     #[test]

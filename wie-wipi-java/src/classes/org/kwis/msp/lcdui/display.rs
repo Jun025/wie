@@ -2,7 +2,7 @@ use alloc::vec;
 
 use alloc::boxed::Box;
 
-use jvm::{ClassInstanceRef, JavaError, JavaValue, Jvm, Result as JvmResult};
+use jvm::{ClassInstanceRef, GlobalRef, JavaError, JavaValue, Jvm, Result as JvmResult};
 use jvm_class_proto::{JavaFieldProto, JavaMethodProto, MethodBody};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 use rustjava_runtime::classes::java::lang::{Object, Runnable, String};
@@ -367,9 +367,11 @@ impl Display {
             return Err(jvm.exception("java/lang/NullPointerException", "runnable is null").await);
         }
 
+        // Global references: nothing else may hold them while this sleeps (an LGT guest that
+        // passes a fresh Runnable keeps it only in a register), so a collection would free them.
         struct Delayed {
-            display: ClassInstanceRef<Display>,
-            runnable: ClassInstanceRef<Runnable>,
+            display: GlobalRef<Display>,
+            runnable: GlobalRef<Runnable>,
             timeout: u64,
         }
 
@@ -397,8 +399,8 @@ impl Display {
         context.spawn(
             jvm,
             Box::new(Delayed {
-                display: this,
-                runnable,
+                display: jvm.new_global_ref(&this).unwrap(),
+                runnable: jvm.new_global_ref(&runnable).unwrap(),
                 timeout,
             }),
         )

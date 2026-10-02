@@ -175,6 +175,10 @@ fn load_executable(core: &mut ArmCore, data: &[u8]) -> Result<u32> {
                 .0;
 
             core.load(data, shdr.sh_addr as u32, shdr.sh_size as usize)?;
+            // Guest code may keep an object pointer in a global; the GC root scan reads these.
+            if shdr.sh_flags & u64::from(elf::abi::SHF_WRITE) != 0 {
+                crate::runtime::java::add_guest_root_region(core, shdr.sh_addr as u32, shdr.sh_size as u32);
+            }
         }
     }
 

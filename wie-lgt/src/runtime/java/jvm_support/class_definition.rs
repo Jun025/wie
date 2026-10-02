@@ -424,6 +424,8 @@ impl JavaClassDefinition {
                 ptr_class_fields,
             )?;
             Allocator::free(&mut core, current_fields, storage_size.max(size_of::<LgtJvmWord>()) as u32)?;
+            super::guest_roots::untrack(&core, instance.ptr_raw, current_fields);
+            super::guest_roots::track(&core, instance.ptr_raw, ptr_class_fields, storage_size);
         }
 
         jvm.put_field(
