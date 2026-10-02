@@ -75,3 +75,7 @@
 ### 8. compat.json — 바꾸지 않았다
 
 진도 축이 바뀐 행이 없다. 600초로 잰 `d448aee68157` 은 `stuck` 이고, 나머지 둘은 300초에서도 `stuck` 이다. `status`·여섯 축은 이번 회차가 재지 않았다(§7). 게임별 `changes` 는 `docs/player-updates/2026-10-02-{logo-wall-printstream-getchars,notice-wall-timer-cancel,name-entry-text-box}.json` 에서 빌드 때 파생된다(계약 §2).
+
+### 9. 게임 이름 유입
+
+`node scripts/corpus-name-inflow.mjs --corpus <game_lab>` 결과(10파일): 유입 39쌍(BOUNDED) · 판단 필요 6쌍(SUFFIX-ATTACHED). **이 diff 가 새로 들인 이름은 0이다.** 두 바구니 모두 이 diff 가 건드린 파일(`lgt_java_abi.toml`·`jvm_support.rs`·`interface.rs`·`text_component.rs`)에 원래 있던 이름이다. 새로 쓴 주석·문서·소식은 sha12 만 쓴다. 고친 `text_component.rs` 필드 주석 한 줄의 이름은 sha12 로 바꿨다. `git diff origin/main` 의 코드 `+` 줄에서 3자 이상 한글 연속은 0건이다. 문서의 «게임시작»·«…골라봐» 는 화면 문구다.
