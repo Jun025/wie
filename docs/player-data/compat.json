@@ -2733,12 +2733,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "아스팔트4"
   },
@@ -3728,12 +3726,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "지크"
   },
@@ -4585,12 +4581,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "[큰화]페이블오브나이트"
   },
@@ -6256,19 +6250,16 @@
    "platform": "LGT",
    "model": "aot-java",
    "title": "턴",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
     "boot": "ok",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "no",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "화면이 한 가지 색으로만 보여요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "턴"
   },
