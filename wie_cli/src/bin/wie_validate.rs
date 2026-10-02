@@ -69,6 +69,12 @@
 //! `docs/keys/battlemonster-village.keys` is that path. Under `--keys` the 120 s cap
 //! on the schedule-derived deadline is lifted — the script's length IS the requested budget.
 //!
+//! Two more opt-in flags serve the progress census (`playability-census.mjs --only progress`,
+//! policy v2 — docs/report/0415): `--stall-secs`/`--stall-keys` splice an escape (CLR, the right
+//! soft key, «next item») in only once the screen has stopped changing, and `--restart-at` boots
+//! the guest again mid-run with its database kept, so `db.resumed_reads` can say whether a save
+//! made in play comes back. With neither given the schedule and the JSON line are unchanged.
+//!
 //! ── Two content axes, same predicate, different scope ────────────────────────
 //! `content`            — `has_content` ORed over EVERY painted frame ("did the game
 //!                         ever draw something?"). This is what PASS/FAIL uses.
@@ -451,6 +457,51 @@ type DbStore = std::collections::HashMap<DbKey, std::collections::HashMap<Record
 #[derive(Default, Clone)]
 struct MemDbRepository {
     store: Arc<Mutex<DbStore>>,
+    stats: Arc<Mutex<DbStats>>,
+}
+
+/// Save/RMS counters for the progress census: writes, reads, and `resumed_reads` — reads of a
+/// record that an EARLIER boot wrote after the first key arrived, i.e. «saved in play, read back
+/// after a relaunch». A record written before any key (an install-time default) never counts, so a
+/// title that only re-reads its own install data reads 0.
+/// ponytail: a high-score or options record written during play counts as a save too; telling
+/// «continue» from «remembered the best score» would need the guest's own menu, which is a recipe.
+#[derive(Default)]
+struct DbStats {
+    boot: u32,
+    playing: bool,
+    writes: u64,
+    reads: u64,
+    resumed_reads: u64,
+    written: std::collections::HashMap<(DbKey, RecordId), (u32, bool)>,
+}
+
+impl DbStats {
+    fn on_write(&mut self, key: &DbKey, id: RecordId) {
+        self.writes += 1;
+        self.written.insert((key.clone(), id), (self.boot, self.playing));
+    }
+
+    fn on_read(&mut self, key: &DbKey, id: RecordId) {
+        self.reads += 1;
+        if self
+            .written
+            .get(&(key.clone(), id))
+            .is_some_and(|&(boot, played)| played && boot < self.boot)
+        {
+            self.resumed_reads += 1;
+        }
+    }
+
+    fn json(&self) -> String {
+        format!(
+            "{{\"writes\":{},\"reads\":{},\"resumed_reads\":{},\"boots\":{}}}",
+            self.writes,
+            self.reads,
+            self.resumed_reads,
+            self.boot + 1
+        )
+    }
 }
 
 #[async_trait::async_trait]
@@ -460,6 +511,7 @@ impl DatabaseRepository for MemDbRepository {
         self.store.lock().unwrap().entry(key.clone()).or_default();
         Box::new(MemDatabase {
             store: self.store.clone(),
+            stats: self.stats.clone(),
             key,
         })
     }
@@ -479,6 +531,7 @@ impl DatabaseRepository for MemDbRepository {
 
 struct MemDatabase {
     store: Arc<Mutex<DbStore>>,
+    stats: Arc<Mutex<DbStats>>,
     key: DbKey,
 }
 
@@ -501,12 +554,14 @@ impl Database for MemDatabase {
     }
 
     async fn get(&self, id: RecordId) -> Option<Vec<u8>> {
-        self.store.lock().unwrap().get(&self.key)?.get(&id).cloned()
+        let data = self.store.lock().unwrap().get(&self.key)?.get(&id).cloned()?;
+        self.stats.lock().unwrap().on_read(&self.key, id);
+        Some(data)
     }
 
     async fn set(&mut self, id: RecordId, data: &[u8]) -> bool {
-        let mut store = self.store.lock().unwrap();
-        store.entry(self.key.clone()).or_default().insert(id, data.to_vec());
+        self.store.lock().unwrap().entry(self.key.clone()).or_default().insert(id, data.to_vec());
+        self.stats.lock().unwrap().on_write(&self.key, id);
         true
     }
 
@@ -695,6 +750,20 @@ struct Args {
     /// `stop`, not `clean exit`.
     #[arg(long, value_name = "N", default_value_t = 0)]
     relaunch: u32,
+    /// Progress policy v2: when no never-seen screen (`novel`, the census's 16×16 luminance rule)
+    /// has arrived for SECS, splice the next `--stall-keys` script in at that moment and push the
+    /// rest of the key script back by its length. Only when no key is held, never before
+    /// `--boot-secs`. Adds `stall_escapes` to the JSON. OFF by default; the schedule is unchanged.
+    #[arg(long, requires = "inject", value_parser = positive_secs)]
+    stall_secs: Option<f64>,
+    /// One escape script (`--keys` grammar); repeat the flag to rotate through several — e.g.
+    /// CLR, the right soft key, «down then confirm». Escapes are not counted in `input_steps`.
+    #[arg(long, requires = "stall_secs", value_parser = parse_keys)]
+    stall_keys: Vec<KeyScript>,
+    /// Boot the guest again at SECS of wall time, keeping the database — «turn it off and on,
+    /// then continue». Adds `restarted` to the JSON, and `db` (see `DbStats`) as `--relaunch` does.
+    #[arg(long, value_name = "SECS", value_parser = positive_secs)]
+    restart_at: Option<f64>,
 }
 
 fn positive_or_zero_secs(s: &str) -> Result<f64, String> {
@@ -1062,6 +1131,18 @@ fn main() {
         Some(n) => format!("{},\"relaunches\":{n}}}", &json[..json.len() - 1]),
         None => json,
     };
+    let json = match result.restarted {
+        Some(b) => format!("{},\"restarted\":{b}}}", &json[..json.len() - 1]),
+        None => json,
+    };
+    let json = match result.stall_escapes {
+        Some(n) => format!("{},\"stall_escapes\":{n}}}", &json[..json.len() - 1]),
+        None => json,
+    };
+    let json = match &result.db {
+        Some(db) => format!("{},\"db\":{db}}}", &json[..json.len() - 1]),
+        None => json,
+    };
     if tallies.svc_stub_exhausted.load(Ordering::SeqCst) && result.verdict() == svc_stub_exhausted_outcome().verdict() {
         eprintln!("wie_validate: result line already written when the SVC stub space ran out; not writing a second one");
     } else {
@@ -1176,6 +1257,12 @@ struct Outcome {
     pacing: Option<String>,
     /// `--relaunch` only: how many times the guest was booted again after asking to stop.
     relaunches: Option<u32>,
+    /// `--relaunch`/`--restart-at` only: `DbStats::json`.
+    db: Option<String>,
+    /// `--stall-secs` only: how many escape scripts were spliced in.
+    stall_escapes: Option<u32>,
+    /// `--restart-at` only: whether the forced reboot happened before the run ended.
+    restarted: Option<bool>,
 }
 
 impl Outcome {
@@ -1239,7 +1326,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
         Ok(p) => p,
         Err(e) => return fail("unknown", format!("--profile-out: {e}"), 0, 0, false),
     };
-    let relaunch_buf = (args.relaunch > 0).then(|| buf.clone());
+    let relaunch_buf = (args.relaunch > 0 || args.restart_at.is_some()).then(|| buf.clone());
     let load = catch_unwind(AssertUnwindSafe(|| build_emulator(make_platform(), &args.filename, buf, profile)));
     let (mut emulator, platform_name) = match load {
         Ok(Ok(v)) => v,
@@ -1254,7 +1341,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
         .unwrap_or("game")
         .to_string();
 
-    let (schedule, deadline_secs, input_steps_total) = plan_schedule(args);
+    let (mut schedule, deadline_secs, input_steps_total) = plan_schedule(args);
     let deadline = Duration::from_secs_f64(deadline_secs.max(1.0));
 
     // ── drive ───────────────────────────────────────────────────────────────
@@ -1276,14 +1363,27 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
 
     let mut pacing_open = args.pacing == Some(0.0);
     let mut relaunches = 0u32;
+    let mut restarted = false;
+    // Policy v2 state: screens seen so far, when the last new one came, keys held, escapes fired.
+    let mut seen: Vec<[f32; FP_CELLS]> = Vec::new();
+    let mut last_new = 0f64;
+    let mut held = 0u32;
+    let mut escapes = 0u32;
     loop {
-        if exited.load(Ordering::SeqCst) {
-            let Some(buf) = relaunch_buf.as_ref().filter(|_| relaunches < args.relaunch) else {
+        let restart_due = !restarted && args.restart_at.is_some_and(|secs| loop_start.elapsed().as_secs_f64() >= secs);
+        if exited.load(Ordering::SeqCst) || restart_due {
+            let Some(buf) = relaunch_buf.as_ref().filter(|_| restart_due || relaunches < args.relaunch) else {
                 break;
             };
-            relaunches += 1;
+            if restart_due {
+                restarted = true;
+                phase = "restart".into();
+            } else {
+                relaunches += 1;
+                phase = format!("relaunch {relaunches}");
+            }
             exited.store(false, Ordering::SeqCst);
-            phase = format!("relaunch {relaunches}");
+            db.stats.lock().unwrap().boot += 1;
             // No profile callback on a relaunch: `--profile-out` samples the first boot only.
             match catch_unwind(AssertUnwindSafe(|| build_emulator(make_platform(), &args.filename, buf.clone(), None))) {
                 Ok(Ok((e, _))) => emulator = e,
@@ -1309,13 +1409,19 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
         // Fire any scheduled input/screenshot events that are now due.
         while sched_idx < schedule.len() && schedule[sched_idx].0 <= elapsed.as_secs_f64() {
             match &schedule[sched_idx].1 {
-                ScheduledEv::Key(kc, down, label) => {
+                ev @ (ScheduledEv::Key(kc, down, label) | ScheduledEv::EscKey(kc, down, label)) => {
                     phase = label.clone();
                     // Counted on the DOWN half (one per scripted step) and BEFORE dispatch:
                     // a step that panics the guest was still delivered, and `input_steps` has
                     // to agree with the `panic on input '06_OK'` reason naming step 6.
-                    if *down {
+                    if *down && matches!(ev, ScheduledEv::Key(..)) {
                         inputs.delivered += 1;
+                    }
+                    if *down {
+                        held += 1;
+                        db.stats.lock().unwrap().playing = true;
+                    } else {
+                        held = held.saturating_sub(1);
                     }
                     let ev = if *down { Event::Keydown(*kc) } else { Event::Keyup(*kc) };
                     if let Err(p) = catch_unwind(AssertUnwindSafe(|| emulator.handle_event(ev))) {
@@ -1328,6 +1434,15 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
                     if *step {
                         step_frames.push(last_frame.as_deref().map_or(0, frame_hash));
                     }
+                    if args.stall_secs.is_some()
+                        && let Some(frame) = last_frame.as_deref()
+                    {
+                        let fp = fingerprint(frame, SCREEN_W, SCREEN_H);
+                        if novel(&seen, &fp) {
+                            seen.push(fp);
+                            last_new = elapsed.as_secs_f64();
+                        }
+                    }
                     if let Some(dir) = &args.shotdir
                         && let Some(frame) = last_frame.as_ref()
                     {
@@ -1339,6 +1454,15 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
         }
         if run_err.is_some() {
             break;
+        }
+        if let Some(stall) = args.stall_secs
+            && !args.stall_keys.is_empty()
+            && held == 0
+            && elapsed.as_secs_f64() >= args.boot_secs.max(last_new + stall)
+        {
+            let script = &args.stall_keys[escapes as usize % args.stall_keys.len()];
+            last_new = splice_escape(&mut schedule, sched_idx, elapsed.as_secs_f64(), script, escapes, args.action_secs);
+            escapes += 1;
         }
 
         let step = catch_unwind(AssertUnwindSafe(|| {
@@ -1460,6 +1584,9 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     outcome.frozen_tail_steps = frozen_tail(&step_frames);
     outcome.pacing = pacing;
     outcome.relaunches = (args.relaunch > 0).then_some(relaunches);
+    outcome.restarted = args.restart_at.map(|_| restarted);
+    outcome.stall_escapes = args.stall_secs.map(|_| escapes);
+    outcome.db = (args.relaunch > 0 || args.restart_at.is_some()).then(|| db.stats.lock().unwrap().json());
     judge(&mut outcome, args.inject, args.expect_last_frame, stop, inputs);
     outcome
 }
@@ -1669,8 +1796,58 @@ fn positive_secs(s: &str) -> std::result::Result<f64, String> {
 enum ScheduledEv {
     /// key code, is_down, step label
     Key(KeyCode, bool, String),
+    /// a `--stall-keys` key: same as `Key`, not counted in `input_steps`
+    EscKey(KeyCode, bool, String),
     /// screenshot with step label; true for `00_boot` and the per-step shots, false for `--shot-every`
     Shot(String, bool),
+}
+
+/// Splices one `--stall-keys` script into `schedule` at `now`: its keys go in from `now + 0.05`,
+/// and every pending key and step shot moves back by the script's length, so the policy resumes
+/// where it was. `--shot-every` frames stay on the wall clock. Returns when the escape ends — the
+/// caller restarts the stall clock there, so one stall buys one escape.
+fn splice_escape(schedule: &mut Vec<(f64, ScheduledEv)>, from: usize, now: f64, script: &KeyScript, n: u32, action_secs: f64) -> f64 {
+    let mut t = now + 0.05;
+    let mut evs = Vec::new();
+    for (i, step) in script.0.iter().enumerate() {
+        let label = format!("esc{n:02}_{:02}_{}", i + 1, step.name);
+        if let Some(kc) = step.key {
+            evs.push((t, ScheduledEv::EscKey(kc, true, label.clone())));
+            evs.push((t + step.hold.unwrap_or(0.15), ScheduledEv::EscKey(kc, false, label)));
+        }
+        t += step.gap.unwrap_or(action_secs);
+    }
+    let shift = t - now;
+    for ev in &mut schedule[from..] {
+        if !matches!(ev.1, ScheduledEv::Shot(_, false)) {
+            ev.0 += shift;
+        }
+    }
+    schedule.extend(evs);
+    schedule[from..].sort_by(|a, b| a.0.total_cmp(&b.0));
+    t
+}
+
+const FP_GRID: usize = 16;
+const FP_CELLS: usize = FP_GRID * FP_GRID;
+
+/// 16×16 mean luminance — `fingerprint()` in `scripts/playability-census.mjs`, on the frame itself.
+fn fingerprint(frame: &[u32], w: u32, h: u32) -> [f32; FP_CELLS] {
+    let (w, h) = (w as usize, h as usize);
+    let mut sum = [0f32; FP_CELLS];
+    let mut cnt = [0f32; FP_CELLS];
+    for (i, px) in frame.iter().enumerate().take(w * h) {
+        let (x, y) = (i % w, i / w);
+        let k = (y * FP_GRID / h) * FP_GRID + x * FP_GRID / w;
+        sum[k] += 0.299 * ((px >> 16) & 0xff) as f32 + 0.587 * ((px >> 8) & 0xff) as f32 + 0.114 * (px & 0xff) as f32;
+        cnt[k] += 1.0;
+    }
+    core::array::from_fn(|k| if cnt[k] > 0.0 { sum[k] / cnt[k] } else { 0.0 })
+}
+
+/// The census's «new screen» rule: differs from EVERY screen seen so far in >= 8 cells by > 32.
+fn novel(seen: &[[f32; FP_CELLS]], fp: &[f32; FP_CELLS]) -> bool {
+    seen.iter().all(|s| s.iter().zip(fp).filter(|(a, b)| (*a - *b).abs() > 32.0).count() >= 8)
 }
 
 fn frame_hash(frame: &[u32]) -> u64 {
@@ -1852,6 +2029,9 @@ fn pass(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         last_frame_center_nonuniform_bp: 0,
         pacing: None,
         relaunches: None,
+        db: None,
+        stall_escapes: None,
+        restarted: None,
     }
 }
 
@@ -1877,11 +2057,102 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         last_frame_center_nonuniform_bp: 0,
         pacing: None,
         relaunches: None,
+        db: None,
+        stall_escapes: None,
+        restarted: None,
     }
 }
 
 #[cfg(test)]
 mod tests {
+    /// Policy v2's splice: escape keys land at `now`, the pending script (keys and step shots)
+    /// moves back by the escape's length, `--shot-every` frames stay put, and the stall clock
+    /// restarts where the escape ends.
+    #[test]
+    fn stall_escape_splices_keys_and_shifts_the_rest() {
+        use super::ScheduledEv::{EscKey, Key, Shot};
+        let mut s = vec![
+            (1.0, Key(wie_backend::KeyCode::OK, true, "01_OK".into())),
+            (10.0, Key(wie_backend::KeyCode::UP, true, "02_UP".into())),
+            (10.5, Shot("02_UP".into(), true)),
+            (11.0, Shot("t011.0".into(), false)),
+        ];
+        let script = super::parse_keys("CLR:1.5 RSOFT:1").unwrap();
+        let end = super::splice_escape(&mut s, 1, 5.0, &script, 3, 0.6);
+        assert!((end - 7.55).abs() < 1e-9, "{end}");
+        let got: Vec<(String, f64)> = s
+            .iter()
+            .map(|(t, e)| {
+                let l = match e {
+                    Key(_, _, l) | EscKey(_, _, l) | Shot(l, _) => l.clone(),
+                };
+                (l, (t * 100.0).round() / 100.0)
+            })
+            .collect();
+        let want = [
+            ("01_OK", 1.0),
+            ("esc03_01_CLR", 5.05),
+            ("esc03_01_CLR", 5.2),
+            ("esc03_02_RSOFT", 6.55),
+            ("esc03_02_RSOFT", 6.7),
+            ("t011.0", 11.0),
+            ("02_UP", 12.55),
+            ("02_UP", 13.05),
+        ];
+        assert_eq!(got, want.map(|(l, t)| (l.to_string(), t)));
+    }
+
+    /// The same rule as the census's `progressCurve`: >= 8 of 256 cells off by > 32.
+    #[test]
+    fn novel_is_the_census_new_screen_rule() {
+        let black = super::fingerprint(&[0xff00_0000; 240 * 320], 240, 320);
+        let mut frame = vec![0xff00_0000u32; 240 * 320];
+        // 7 full cells white (15 × 20 px each): not new. An eighth: new.
+        let cell = |f: &mut Vec<u32>, c: usize| {
+            for y in 0..20 {
+                for x in 0..15 {
+                    f[y * 240 + c * 15 + x] = 0xffff_ffff;
+                }
+            }
+        };
+        (0..7).for_each(|c| cell(&mut frame, c));
+        assert!(!super::novel(&[black], &super::fingerprint(&frame, 240, 320)));
+        cell(&mut frame, 7);
+        assert!(super::novel(&[black], &super::fingerprint(&frame, 240, 320)));
+        assert!(super::novel(&[], &black));
+    }
+
+    /// A save counts as resumed only when a LATER boot reads a record written after the first key.
+    #[test]
+    fn db_stats_count_a_resumed_read_only_across_boots_after_play() {
+        let k = ("app".to_string(), "db".to_string());
+        let mut st = super::DbStats::default();
+        st.on_write(&k, 1); // install-time default, before any key
+        st.playing = true;
+        st.on_write(&k, 2); // a save in play
+        st.on_read(&k, 2); // same boot: not a resume
+        st.boot += 1;
+        st.on_read(&k, 1); // install data: not a resume
+        st.on_read(&k, 2);
+        assert_eq!((st.writes, st.reads, st.resumed_reads), (2, 3, 1));
+        assert_eq!(st.json(), r#"{"writes":2,"reads":3,"resumed_reads":1,"boots":2}"#);
+    }
+
+    /// `--restart-at` reboots the guest once mid-run, keeping the run going, and reports `db`.
+    #[test]
+    fn restart_at_reboots_once_and_reports_the_database() {
+        use clap::Parser;
+        use std::sync::{Arc, Mutex};
+
+        let file = concat!(env!("CARGO_MANIFEST_DIR"), "/../test_data/keydraw_ktf.zip");
+        let r = super::run(
+            &super::Args::try_parse_from(["wie_validate", "--restart-at", "1", "--timeout", "2", file]).unwrap(),
+            Arc::new(Mutex::new(Vec::new())),
+        );
+        assert_eq!(r.restarted, Some(true));
+        assert!(r.db.as_deref().is_some_and(|d| d.ends_with(r#""boots":2}"#)), "{:?}", r.db);
+    }
+
     /// `--relaunch N` boots the file again after each clean guest exit and reports the count.
     ///
     /// `helloworld_lgt` exits on its first tick, so every relaunch is consumed; without the
