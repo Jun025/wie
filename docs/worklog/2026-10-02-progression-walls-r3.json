@@ -1,0 +1,41 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-02",
+  "task": "wie-progression-walls-r3-live-lgt-heap-panic-manual-page-image-null",
+  "title": "진도 벽 3차 — LGT 힙 고갈 panic → 예약 OutOfMemoryError · 누수 원인 실측 · DataOutputStream 24 · SKT 패키지 화면 크기",
+  "summary": "1b107b96bf4e 의 panic 은 못 만든 오류 대신 돌려준 주소 0 인스턴스였다 — 예약 OutOfMemoryError 로 바꿨다. 누수는 게스트 new 가 수거되지 않고 게스트가 부른 호스트 메서드의 객체가 바깥 프레임에 묶이는 것이라 GC 루트 모델 변경(L)으로 남긴다. b475b6399684 는 DataOutputStream 24(writeUTF) 에서 게임 스레드가 죽었다. SKT 패키지가 넓은 화면 그림 없이 좁은 그림만 가지면 그 화면 크기로 띄운다(2종).",
+  "changes": [
+    "wie-lgt/src/runtime/java/jvm_support.rs — reserve_out_of_memory_error · allocation_error · host_error 대역을 예약 OOM 으로",
+    "wie-lgt/src/runtime/java/classes/net/wie/lgt_class_loader.rs — 정적 필드 outOfMemoryError",
+    "wie-lgt/src/runtime/java/jvm_support/{class_definition,array_class_definition}.rs — 할당 실패는 allocation_error",
+    "wie-lgt/data/lgt_java_abi.toml — DataOutputStream writeUTF 24 (근거 주석)",
+    "wie-skt/src/emulator.rs — package_display_size · class_utf8_constants · 시험 1",
+    "docs/report/0418 · docs/player-updates 2"
+  ],
+  "adoptedProposals": [
+    "2026-10-02-progression-axis-wave2-policy-v2#p0",
+    "2026-10-02-progression-axis-wave2-policy-v2#p1"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "LGT 장시간 플레이 — 게스트 스택을 GC 루트로 훑어 게스트 new·호스트 임시 객체를 수거",
+      "plainSummary": "LGT 게임을 한 장면에서 오래 하면 메모리가 차서 결국 멈추는 문제를 근본에서 고친다.",
+      "userBenefit": "문자열을 매 프레임 만드는 LGT 게임을 40분 넘게 해도 메모리가 차지 않는다.",
+      "why": "1b107b96bf4e 누수 장면에서 살아 있는 객체가 2.5분에 1.7k → 61k(char[] · String · StringBuffer)로 늘고 16바이트 버킷이 1.5분에 +31k 찬다(docs/report/0418 §1). 게스트 new 는 객체 집합 밖이라 수거되지 않고(#445 부터 전역 참조), 게스트가 부른 호스트 메서드가 만든 객체는 바깥 호스트 프레임 지역 변수에 묶인다. 이번 회차는 고갈 시 panic 만 막았다.",
+      "tradeoff": "수집 직전 게스트 스레드 스택·레지스터를 보수적으로 훑어야 하고 수집 호출 지점에 훅이 든다. 루트 하나를 놓치면 be08 같은 use-after-free 가 된다. KTF 도 같은 모양이라 범위를 정해야 한다.",
+      "effort": "L",
+      "target": "wie-lgt(jvm_support · interface) · wie-jvm-support(수집 훅) · wie-midp(Display 수집 호출)"
+    },
+    {
+      "kind": "product",
+      "title": "38277d63b0ba — 그림을 로드하기 전 첫 paint 의 drawImage(null) 이 notify 를 막아 흰 화면",
+      "plainSummary": "시작하자마자 흰 화면에 로딩 막대 한 조각만 남는 SKT 게임 한 종을 고친다.",
+      "userBenefit": "그 게임이 로딩을 마치고 시작 화면으로 넘어간다.",
+      "why": "run() 이 repaint(); wait(); 를 돌고 paint() 끝의 notify() 가 깨운다. 첫 paint 가 아직 null 인 그림으로 로딩 막대를 그리다 NPE 로 끝나 notify 에 닿지 못한다(docs/report/0418 §3). 실기가 이 순서를 어떻게 통과하는지는 재지 않았다.",
+      "tradeoff": "MIDP 명세는 null 이면 NPE 라, SKVM 실기 동작 근거 없이 null 그리기를 묵인하면 다른 게임을 바꿀 수 있다. 근거부터 찾아야 한다.",
+      "effort": "M",
+      "target": "wie-skvm · wie-midp(Graphics.drawImage) 또는 첫 paint 시점"
+    }
+  ]
+}
