@@ -89,7 +89,7 @@ KTF 는 ⒝만 있다. `java_new` 는 `instantiate_class` 라 객체 집합에 �
 
 ### 8. 게이트
 
-- `cargo fmt --check` · `cargo clippy --all -D warnings`(stable · beta) · `cargo clippy --target wasm32-unknown-unknown -D warnings` · `RUST_MIN_STACK=4194304 cargo test --all` **663 pass / 0 fail**(`CARGO_INCREMENTAL=0` — 첫 실행은 증분 캐시 파일이 사라져 rustc ICE) · `npm run build:wasm` rc=0 · `check-engine-contract` OK · `npm run audit` PASSED.
+- `cargo fmt --check` · `cargo clippy --all -D warnings`(stable · beta) · `cargo clippy --target wasm32-unknown-unknown -D warnings` · `RUST_MIN_STACK=4194304 cargo test --all` **664 pass / 0 fail**(#452 위 rebase 트리)(`CARGO_INCREMENTAL=0` — 첫 실행은 증분 캐시 파일이 사라져 rustc ICE) · `npm run build:wasm` rc=0 · `check-engine-contract` OK · `npm run audit` PASSED.
 - 러너 블록(release `wie_validate` · 이 브랜치): draw · helloworld ×2 · text PASS. keydraw ×2 `--inject --expect-last-frame` 는 load 40 에서 max-ticks 로 UNMEASURED(main 도 같음) → `--max-ticks 100000000000` 로 PASS · rc=0(paints 79 · 55 — main 과 같음).
 - **되돌리면 red**(증적 `revert-*.log`): ⒜ 되돌림 → `a_guest_new_nothing_points_at_is_collected_with_what_it_held` · ⒝ → `what_a_host_method_made_for_the_guest_is_collected_once_dropped` · 스캔 끔 → `a_guest_word_into_an_object_keeps_it_alive`(과수거) · 중첩 문맥 장부 끔 → `guest_root_words_see_registers_a_nested_call_put_aside` · 스택 스캔 끔 → `guest_root_words_see_a_thread_stack_from_its_sp_up`. be08 시험(`a_collection_keeps_what_a_guest_new_allocated`)은 이제 게스트 레지스터로 Stack 을 쥔다.
 - **기준선**: 측정 바이너리는 `cad17188`(#451) 위 이 브랜치다. 그 뒤 #452(0418 r3)가 먼저 착지해 그 위로 rebase 했다(충돌 0). #452 가 LGT 에서 바꾼 것은 힙 고갈 때의 오류 경로와 ABI 행 하나라 위 측정 경로와 겹치지 않는다. 시험·clippy 는 rebase 한 트리에서 다시 돌렸다.
