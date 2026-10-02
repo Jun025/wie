@@ -327,6 +327,14 @@ vtable = [
     { name = "writeShort", descriptor = "(I)V", index = 17 },
     { name = "writeInt", descriptor = "(I)V", index = 19 },
     { name = "writeLong", descriptor = "(J)V", index = 20 },
+    # b475b6399684's game thread dies on index 24 when its manual's OK writes a record
+    # (measured 2026-10-02: `Unimplemented: java/io/DataOutputStream vtable index 24`,
+    # r1 = a heap object, lr 0x31b3f), leaving the manual page up with every key dead. Counting
+    # on from 15 in CLDC 1.1 order — writeChar 18, writeFloat 21, writeDouble 22, writeChars 23,
+    # writeUTF 24 — CLDC has no writeBytes (J2SE's, which would push writeUTF to 25). The reader
+    # side already rules J2SE order out: readUTF is measured at 32, right after readDouble 31,
+    # where J2SE's readLine would sit.
+    { name = "writeUTF", descriptor = "(Ljava/lang/String;)V", index = 24 },
 ]
 
 # 훼밀리마트타이쿤 is the only title to reach these, and it names both of them itself rather than
