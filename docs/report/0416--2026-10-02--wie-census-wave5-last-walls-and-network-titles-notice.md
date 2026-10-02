@@ -85,3 +85,5 @@
 ### 10. 게임 파일명 유입
 
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 333쌍 + SUFFIX-ATTACHED 15쌍. 전부 이 PR 이전부터 있던 값이다 — `compat.json` 기존 제목 값, 그리고 `wie-midp` `display.rs` 의 기존 주석 4곳(이 PR 이 같은 파일을 고쳐 대상이 됐다). 이 PR 이 더한 줄에서는 0이다. 새로 적은 타이틀은 전부 sha12 다.
+
+
