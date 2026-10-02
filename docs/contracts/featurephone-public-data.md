@@ -52,6 +52,7 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
 | progress(선택 · **공개 값 `ok`·`stuck`**) | `ok`: 진도 정책 키로 N분 조작하는 동안 마지막 1/3 안에 새 화면(16×16 휘도 지문)이 나왔다 | `stuck`: 마지막 1/3 동안 새 화면 0 — 짝 재측 2회가 같을 때만(실행 FAIL 도 `stuck`) | 키 없음 — 재지 않았다(대부분) |
 
 등급 = `playable`: boot·render·input·longplay 넷 다 `ok` · `limited`: boot·render 만 `ok` · `not-yet`: 그 밖.
+★예외 하나 — **통신망 벽**(전수 도구 `netWall`): 한 실행에서 접속을 20회 이상 되풀이한 타이틀(옛 통신사 서버 없이는 못 넘어간다)은 넷이 `ok` 여도 `limited` 이고, `knownIssues_ko` 는 그 안내 한 줄뿐이다(`docs/report/0416`).
 ★`playable` 은 «키를 눌러 화면이 바뀌고 10분 조작에서 안 멈췄다»까지다 — 사람이 끝까지 해 본 것이 아니다.
 ★측정 안 한 축은 `unknown` 이다. 추측으로 올리지 않는다.
 

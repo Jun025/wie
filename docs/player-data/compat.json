@@ -91,10 +91,12 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "ok",
+    "sound": "no",
     "speed": "ok"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "소리가 나지 않을 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "간호사타이쿤"
   },
@@ -128,10 +130,12 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "ok",
+    "sound": "no",
     "speed": "ok"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "소리가 나지 않을 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "강철의 연금술사2"
   },
@@ -553,13 +557,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "다이어트타이쿤"
   },
@@ -1033,7 +1035,7 @@
    "platform": "KTF",
    "model": null,
    "title": "드래곤아이즈2",
-   "status": "playable",
+   "status": "limited",
    "axes": {
     "boot": "ok",
     "render": "ok",
@@ -1044,8 +1046,7 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요.",
-    "원래보다 조금 느리게 움직일 수 있어요."
+    "게임을 시작하려면 옛 통신사 서버에서 데이터를 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요."
    ],
    "changes": [],
    "fileTitle": "드래곤아이즈2"
@@ -1505,13 +1506,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "만귀토벌전"
   },
@@ -1931,10 +1930,12 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "ok",
+    "sound": "no",
     "speed": "ok"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "소리가 나지 않을 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "미니게임패밀리"
   },
@@ -2346,10 +2347,12 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "ok",
+    "sound": "no",
     "speed": "ok"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "소리가 나지 않을 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "삼국축구대전"
   },
@@ -2982,13 +2985,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "열혈교사전설2"
   },
@@ -3282,10 +3283,12 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "ok",
+    "sound": "no",
     "speed": "ok"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "소리가 나지 않을 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "월드크래프트"
   },
@@ -4168,11 +4171,13 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "ok",
+    "sound": "no",
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "소리가 나지 않을 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "코에이삼국지2"
   },
@@ -4519,12 +4524,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "파랜드택틱스 kt"
   },
@@ -4539,13 +4542,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "판타지포에버2"
   },
@@ -6334,12 +6335,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "테일즈위버 이스핀편"
   },
