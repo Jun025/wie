@@ -293,8 +293,8 @@ async function longplay(t, spec = {}) {
   // `--keys` also shoots once per key step; only the `tNNN.N` timer shots are evenly spaced.
   const timed = existsSync(join(d, 'L'))
     ? readdirSync(join(d, 'L'))
-        .filter((n) => /__t\d+\.\d\.png$/.test(n))
-        .sort()
+        .filter((n) => shotTime(n) !== null)
+        .sort(byShotTime)
     : [];
   r.shots = timed.map((n) => sha256(readFileSync(join(d, 'L', n))));
   r.recipe = spec.keys ? basename(spec.keys) : null;
@@ -342,7 +342,7 @@ async function progress(t, spec = {}) {
   const args = ['--inject', '--keys', keys, '--keep-timeout', '--timeout', String(total), '--max-ticks', '100000000000', '--shotdir', shots, '--shot-every', String(PROGRESS_SHOT), ...policy, t.path];
   const r = await validate(args, total + 300, join(d, `${stem}.stderr`));
   const all = readdirSync(shots).filter((n) => n.endsWith('.png'));
-  const timed = all.filter((n) => /__t\d+\.\d\.png$/.test(n)).sort();
+  const timed = all.filter((n) => shotTime(n) !== null).sort(byShotTime);
   // Keep the timed frames (the curve's evidence, and the stuck frame to look at); drop per-key ones.
   for (const n of all) if (!timed.includes(n)) rmSync(join(shots, n));
   r.shots = timed.map((n) => sha256(readFileSync(join(shots, n))));
@@ -353,6 +353,12 @@ async function progress(t, spec = {}) {
   r.recipe = spec.keys ? basename(spec.keys) : null;
   writeFileSync(f, JSON.stringify(r));
 }
+// `--shot-every` frame time from its name (`<stem>__t1000.0.png` -> 1000), null for a per-key shot.
+const shotTime = (n) => {
+  const m = /__t(\d+\.\d)\.png$/.exec(n);
+  return m ? Number(m[1]) : null;
+};
+const byShotTime = (a, b) => shotTime(a) - shotTime(b);
 // A run recorded before `fp` existed is fingerprinted from its kept frames.
 function readProgress(d, stem) {
   const r = read(join(d, `${stem}.json`));
@@ -361,18 +367,22 @@ function readProgress(d, stem) {
 }
 // Seconds of a run that brought no never-seen frame. A run that ended early (the guest quit and
 // used up its relaunches) counts the missing time as stalled, which is what a player would see.
+// The time is read off the name, never the index: names sort as text, and `t1000.0` < `t990.0`.
+// Until 2026-10-02 the frames were sorted that way, so every run past 1000 s (the 30-min reps of
+// docs/report/0393) was judged on frames out of order. A run recorded then is re-ordered here.
 function progressCurve(r) {
   const seen = [];
   const uniq = [];
   let lastNew = 0;
-  r.fp.forEach((f, i) => {
-    if ((i + 1) * PROGRESS_SHOT > r.secs) return; // the resume tail after `--restart-at` is not progress
+  const at = r.fp.map((f, i) => [r.shot_names ? shotTime(r.shot_names[i]) : (i + 1) * PROGRESS_SHOT, f]).sort((a, b) => a[0] - b[0]);
+  for (const [t, f] of at) {
+    if (t > r.secs) continue; // the resume tail after `--restart-at` is not progress
     if (seen.every((s) => s.filter((v, k) => Math.abs(v - f[k]) > 32).length >= 8)) {
       seen.push(f);
-      lastNew = (i + 1) * PROGRESS_SHOT;
+      lastNew = t;
     }
     uniq.push(seen.length);
-  });
+  }
   return { uniq, lastNew, stall: r.secs - lastNew, distinct: seen.length };
 }
 // 16×16 mean luminance of an 8-bit RGBA, non-interlaced PNG — what wie_validate's --shotdir writes
@@ -725,6 +735,12 @@ if (cmd === 'selftest') {
       ['the resume tail is outside the curve', (() => {
         const r = { result: 'UNMEASURED', secs: 480, fp: Array.from({ length: 60 }, (_, i) => ((i + 1) * PROGRESS_SHOT <= 200 || (i + 1) * PROGRESS_SHOT > 480 ? screen(i) : blinkOf(i))) };
         return progressCurve(r).stall === 480 - 210 && progressRun(r) === 'stuck';
+      })()],
+      ['frames are ordered by their time, not their name', (() => {
+        // New screens at 10..990 s, then a blink to 1200 s: by name `t1000.0`.. sort before `t110.0`.
+        const names = Array.from({ length: 120 }, (_, i) => `x__t${(i + 1) * 10}.0.png`).sort();
+        const r = { result: 'UNMEASURED', secs: 1200, shot_names: names, fp: names.map((n) => (shotTime(n) <= 990 ? screen(shotTime(n) / 10 - 1) : blinkOf(shotTime(n) / 10))) };
+        return progressCurve(r).lastNew === 1000 && progressRun(r) === 'ok';
       })()],
       ['a save read back after the restart is resume', saveOf({ db: { writes: 3, resumed_reads: 1 } }) === 'resume'],
       ['a save never read back is saved', saveOf({ db: { writes: 3, resumed_reads: 0 } }) === 'saved' && saveOf({ db: { writes: 0, resumed_reads: 0 } }) === 'none' && saveOf({}) === ''],
