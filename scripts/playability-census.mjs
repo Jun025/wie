@@ -13,7 +13,7 @@
 // ── Usage ────────────────────────────────────────────────────────────────────
 //   node scripts/playability-census.mjs run --bin <wie_validate> --out <dir> [--jobs <= ncpu, default min(3, ncpu/2)]
 //        [--secs 30] [--long 600] [--only probe|long|speed] <corpus dir>...
-//   node scripts/playability-census.mjs run … --only progress [--progress 1800] [--titles <file>] [--as P|P2]
+//   node scripts/playability-census.mjs run … --only progress [--progress 1800] [--titles <file>] [--as P|P2] [--policy v1]
 //   node scripts/playability-census.mjs run … --only long --titles <file>   the long run, recipe-prefixed
 //        (`<sha12> [secs] [recipe keys file]`; keep the recipes in game_lab/ — they spell a title's menus)
 //   node scripts/playability-census.mjs report --out <dir> --pin <wie sha>
@@ -72,6 +72,17 @@ const LONG_KEYS = 'OK:1 UP:0.5 UP:0.5 OK:1 DOWN:0.5 RIGHT:0.5 NUM5:1 LEFT:0.5 NU
 // or the right soft key (back/quit on most titles); a title the left soft key quits is relaunched.
 const PROGRESS_KEYS = 'OK:1 NUM5:1 OK:1 NUM1:1 OK:1 LSOFT:1.5 OK:1 NUM5:1 UP:0.5 DOWN:0.5 DOWN:0.5 OK:1 RIGHT:0.5:1.5 LEFT:0.5:1.5 NUM6:0.5:1 NUM4:0.5:1 NUM2:0.5 NUM8:0.5 NUM5:0.4 NUM5:0.4 NUM5:0.4 UP:0.5:1 NUM5:0.4 DOWN:0.5:1 NUM5:0.4 OK:1';
 const PROGRESS_SHOT = 10; // seconds between timed shots
+// Policy v2 (2026-10-02): the v1 cycle as-is, plus — only once the screen has stopped bringing
+// anything new for PROGRESS_STALL s — one escape, rotating through these. They are the keys v1 never
+// presses (back, the right soft key) and «the next menu item» that its OK-spam cannot reach. v1's ⒜
+// cluster (35 of 82 stuck) was mostly «no way back» out of help, info and empty-save screens.
+// A key that quits the title is answered by a relaunch, database kept.
+const PROGRESS_STALL = 60;
+const PROGRESS_ESCAPES = ['CLR:2', 'RSOFT:2', 'DOWN:0.5 OK:2', 'CLR:1 CLR:2', 'DOWN:0.5 DOWN:0.5 OK:2', 'UP:0.5 OK:2', 'NUM0:1 HASH:1 STAR:2'];
+// After the progress window the guest is booted again, database kept (`--restart-at`), and the
+// policy runs RESUME s more: «does a save made in play come back?» (`db.resumed_reads`). The
+// progress curve is judged on the window before the restart only, so v1 and v2 compare.
+const PROGRESS_RESUME = 120;
 
 const [cmd, ...rest] = process.argv.slice(2);
 // Default half the cores but at most 3, never more than all of them: each job is a CPU-bound
@@ -323,10 +334,13 @@ async function progress(t, spec = {}) {
   rmSync(shots, { recursive: true, force: true });
   mkdirSync(shots, { recursive: true });
   const keys = join(d, `${stem}.keys`);
+  const v2 = opt.policy !== 'v1';
+  const total = v2 ? secs + PROGRESS_RESUME : secs;
   // A recipe is a PREFIX (the path to where play starts — an ⒜ unlock), then the policy as usual.
-  writeFileSync(keys, [spec.keys ? readFileSync(spec.keys, 'utf8') : '', ...Array(Math.ceil(secs / 25)).fill(PROGRESS_KEYS)].join('\n'));
-  const args = ['--inject', '--keys', keys, '--keep-timeout', '--timeout', String(secs), '--max-ticks', '100000000000', '--shotdir', shots, '--shot-every', String(PROGRESS_SHOT), '--relaunch', '3', t.path];
-  const r = await validate(args, secs + 300, join(d, `${stem}.stderr`));
+  writeFileSync(keys, [spec.keys ? readFileSync(spec.keys, 'utf8') : '', ...Array(Math.ceil(total / 25)).fill(PROGRESS_KEYS)].join('\n'));
+  const policy = v2 ? ['--stall-secs', String(PROGRESS_STALL), ...PROGRESS_ESCAPES.flatMap((e) => ['--stall-keys', e]), '--restart-at', String(secs), '--relaunch', '8'] : ['--relaunch', '3'];
+  const args = ['--inject', '--keys', keys, '--keep-timeout', '--timeout', String(total), '--max-ticks', '100000000000', '--shotdir', shots, '--shot-every', String(PROGRESS_SHOT), ...policy, t.path];
+  const r = await validate(args, total + 300, join(d, `${stem}.stderr`));
   const all = readdirSync(shots).filter((n) => n.endsWith('.png'));
   const timed = all.filter((n) => /__t\d+\.\d\.png$/.test(n)).sort();
   // Keep the timed frames (the curve's evidence, and the stuck frame to look at); drop per-key ones.
@@ -335,6 +349,7 @@ async function progress(t, spec = {}) {
   r.fp = timed.map((n) => fingerprint(readFileSync(join(shots, n))).map(Math.round));
   r.shot_names = timed;
   r.secs = secs;
+  r.policy = v2 ? 'v2' : 'v1';
   r.recipe = spec.keys ? basename(spec.keys) : null;
   writeFileSync(f, JSON.stringify(r));
 }
@@ -351,6 +366,7 @@ function progressCurve(r) {
   const uniq = [];
   let lastNew = 0;
   r.fp.forEach((f, i) => {
+    if ((i + 1) * PROGRESS_SHOT > r.secs) return; // the resume tail after `--restart-at` is not progress
     if (seen.every((s) => s.filter((v, k) => Math.abs(v - f[k]) > 32).length >= 8)) {
       seen.push(f);
       lastNew = (i + 1) * PROGRESS_SHOT;
@@ -400,6 +416,9 @@ function fingerprint(png, G = 16) {
     }
   return Array.from(sum, (v, k) => v / cnt[k]);
 }
+// What happened to the guest's saves in a v2 run: `resume` = a record written in play was read back
+// after the restart · `saved` = it wrote, nothing came back · `none` = no write at all. '' = not recorded.
+const saveOf = (r) => (!r?.db ? '' : r.db.resumed_reads > 0 ? 'resume' : r.db.writes > 0 ? 'saved' : 'none');
 // ok | stuck | error for one run. The stall line is a third of the run (10 min of 30), floored at 3 min.
 function progressRun(r) {
   if (!r) return null;
@@ -702,6 +721,13 @@ if (cmd === 'selftest') {
       ['a pair that crashed confirms nothing', progressAxis(run(100), run(100, { result: 'FAIL' })) === 'n/a'],
       ['ok and error need no pair', progressAxis(run(600), null) === 'ok' && progressAxis(run(600, { result: 'FAIL' }), null) === 'error'],
       ['not measured is n/a', progressAxis(null, null) === 'n/a'],
+      // v2 runs PROGRESS_RESUME s past the window; new screens after the restart are not progress.
+      ['the resume tail is outside the curve', (() => {
+        const r = { result: 'UNMEASURED', secs: 480, fp: Array.from({ length: 60 }, (_, i) => ((i + 1) * PROGRESS_SHOT <= 200 || (i + 1) * PROGRESS_SHOT > 480 ? screen(i) : blinkOf(i))) };
+        return progressCurve(r).stall === 480 - 210 && progressRun(r) === 'stuck';
+      })()],
+      ['a save read back after the restart is resume', saveOf({ db: { writes: 3, resumed_reads: 1 } }) === 'resume'],
+      ['a save never read back is saved', saveOf({ db: { writes: 3, resumed_reads: 0 } }) === 'saved' && saveOf({ db: { writes: 0, resumed_reads: 0 } }) === 'none' && saveOf({}) === ''],
     );
   }
   // Locked files, on synthetic archives (stored entries; CRC is not read).
@@ -855,7 +881,7 @@ if (cmd === 'run') {
   const prs = opt.prs ? read(resolve(opt.prs)) : [];
   const extra = opt.changes ? read(resolve(opt.changes)) : {};
   const entries = [];
-  const rows = [['sha256', 'platform', 'model', 'title', 'status', 'boot', 'render', 'input', 'longplay', 'sound', 'speed', 'progress', 'ratio', 'browser', 'paints', 'distinct', 'novel', 'base_distinct', 'audio', 'still', 'p_stall', 'p_distinct', 'p2_stall', 'reasonA', 'reasonL', 'reasonP', 'load1']];
+  const rows = [['sha256', 'platform', 'model', 'title', 'status', 'boot', 'render', 'input', 'longplay', 'sound', 'speed', 'progress', 'ratio', 'browser', 'paints', 'distinct', 'novel', 'base_distinct', 'audio', 'still', 'p_stall', 'p_distinct', 'p2_stall', 'p_policy', 'p_escapes', 'p_save', 'reasonA', 'reasonL', 'reasonP', 'load1']];
   const clusters = new Map();
   for (const t of pop.titles) {
     const j = judge(t.sha);
@@ -903,6 +929,9 @@ if (cmd === 'run') {
       j.P ? progressCurve(j.P).stall : '',
       j.P ? progressCurve(j.P).distinct : '',
       j.P2 ? progressCurve(j.P2).stall : '',
+      j.P?.policy ?? (j.P ? 'v1' : ''),
+      j.P?.stall_escapes ?? '',
+      saveOf(j.P),
       j.A.reason,
       j.L?.reason ?? '',
       j.P?.reason ?? '',
