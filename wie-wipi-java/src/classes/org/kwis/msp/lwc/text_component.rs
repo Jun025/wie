@@ -32,8 +32,8 @@ impl TextComponent {
                 // wie writes it -- imHandler owns the mode -- so it stays at its default.
                 JavaFieldProto::new("iMode", "I", FieldAccessFlags::PROTECTED),
                 // Same story as iMode: read directly by 서든어택포켓 (`maxLength I`) and
-                // 훼밀리마트타이쿤 (`m_td [C`). setMaxLength is a no-op stub, so maxLength is
-                // not written here; m_td stays null until a key reaches keyNotify below.
+                // 훼밀리마트타이쿤 (`m_td [C`). setMaxLength is a no-op stub, so neither is
+                // written by it; m_td stays null until a key reaches keyNotify below.
                 JavaFieldProto::new("maxLength", "I", FieldAccessFlags::PROTECTED),
                 JavaFieldProto::new("m_td", "[C", FieldAccessFlags::PROTECTED),
                 JavaFieldProto::new("imHandler", "Lorg/kwis/msp/lcdui/InputMethodHandler;", FieldAccessFlags::PROTECTED),

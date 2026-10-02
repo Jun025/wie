@@ -36,20 +36,30 @@
 
 ### 3. 대조 · 퇴행
 - 단위 시험 `shell_walks_focus_to_the_button_and_fire_calls_its_listener`(shell_card.rs — 표시 장치 설치를 기존 시험과 함께 쓴다). 게임 순서대로 폼을 만든다: 칸 2 · ChoiceText · 버튼 → GFormComponent → ShellComponent, 첫 칸에 setFocus. 확인하는 것: 첫 칸에서 FIRE 하면 리스너 0회 · `NUM1 NUM2 CLR NUM3` 뒤 `getString` = "13" · DOWN DOWN RIGHT 뒤 `getSelectedIndex` = 1 · DOWN FIRE 하면 리스너 1회(인자는 버튼과 등록한 객체) · DOWN 이 순환해 FIRE 무반응 · UP FIRE 하면 2회.
-- 변이 red: §5 에 적었다.
+- 변이 red: §6 에 적었다.
 - 대상 밖 lwc 타이틀 15개. 코퍼스 문자열 스캔에서 `setFocus`·`ButtonComponent`·`ActionListener` 중 하나를 lwc `ShellComponent` 와 함께 갖는 것 + `85e94babc247`. 기본 27키로 전·후를 짝 2회 쟀다. 결과·오류 수·첫 예외가 전부 같다.
   - 마지막 화면 md5 는 같은 쪽 두 회차끼리도 다르다(예: `08b868809366` 전 2회). 그래서 md5 로는 가르지 않았다. 대신 후 빌드로 디버그 추적을 1회씩 돌렸다.
   - 새 코드에 닿는 타이틀은 `09a6a300994d`·`33f3e7669599` 2개뿐이다. 둘 다 `setFocus` 0회라 셸 `keyNotify` 는 일찍 돌아간다(전과 같은 답). 새 셸 `paint` 는 자식이 0개(`09a6…`)이거나 자식 `paint` 가 no-op stub(`33f3…`)이다.
   - 나머지 13개는 새 코드 진입 0. 대상 밖 동작 변경 0.
 
-### 4. 범위 밖으로 남긴 것
+### 4. 게이트
+- `cargo fmt --check` 0 · `cargo clippy --all -D warnings` 0 · wasm32 clippy 0 · `cargo +beta clippy --all -D warnings` 0 · `RUST_MIN_STACK=4194304 cargo test --all` 639 통과 · 실패 0.
+- runner 블록: draw_j2me · helloworld_ktf · helloworld_lgt · text_j2me PASS · keydraw_ktf/lgt `--inject --expect-last-frame` PASS(paints 80 · 55 · rc=0).
+
+### 5. 범위 밖으로 남긴 것
 - 한글·영문 멀티탭 입력. 칸은 숫자만 받는다.
 - `setMaxLength`·`maxLength` 기록. LGT 타이틀이 그 필드를 직접 읽는다(text_component.rs 주석). 그래서 이 회차에서 쓰지 않았다.
 - 일반 lwc 배치·그리기. `GFormComponent` 밖의 위젯은 여전히 그리지 않는다.
 - `compat.json` 의 조작 축(`no`)은 손대지 않았다. 그 축은 census 가 정한다(«키 넣은 실행이 무키 실행에 없던 프레임을 보이는가»). 다음 census 가 다시 잰다.
 
-### 5. 변이 red
-<!-- filled below -->
+### 6. 변이 red (실측 5/5 — 위 단위 시험이 각각 실패)
+| 변이 | 실패 단언 |
+|---|---|
+| `setFocus` 가 기록하지 않음 | `getString` = "13" |
+| `ButtonComponent.keyNotify` 등재 제거 | 리스너 1회 |
+| `ShellComponent.keyNotify` 등재 제거 | `getString` = "13" |
+| `getString` 이 입력을 무시 | `getString` = "13" |
+| `ChoiceText.keyNotify` 등재 제거 | `getSelectedIndex` = 1 |
 
-### 6. 게임 파일명 유입
+### 7. 게임 파일명 유입
 <!-- filled below -->
