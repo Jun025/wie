@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-02",
+  "kind": "fix",
+  "titles": [
+    "be08d047cbaef52f458ccdf4739ea5314b73e7ec9f5eb3ee0537c7b34f815e96"
+  ],
+  "summary_ko": "첫 안내 화면에서 멈춰 있던 게임 1종이 이제 다음 선택 화면으로 넘어가요.",
+  "pr": "https://github.com/Jun025/wie/pull/445"
+}

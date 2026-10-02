@@ -373,6 +373,11 @@ name = "java/lang/String"
 vtable = [
     { name = "length", descriptor = "()I", index = 10 },
     { name = "charAt", descriptor = "(I)C", index = 11 },
+    # 73f3a21e981c's wall once PrintStream 27 landed (measured 2026-10-02, call site disassembled,
+    # lr 0xbe114): r1 = 0, r2 = the length a slot-10 dispatch just returned, r3 = an array from a
+    # field, one stack word 0 — `s.getChars(0, s.length(), buf, 0)`, four arguments, void. The
+    # rule puts getChars(II[CI)V between charAt 11 and getBytes 14, at 12.
+    { name = "getChars", descriptor = "(II[CI)V", index = 12 },
     { name = "getBytes", descriptor = "()[B", index = 14 },
     # 월드장기체스's wall (measured 2026-09-25, call site disassembled). CCC.<init> checks one
     # String against constant-pool Strings in a chain: `if (s.<16>(c) == 0) flag = 1`, four
@@ -460,6 +465,12 @@ vtable = [
 [[class]]
 name = "java/io/PrintStream"
 vtable = [
+    # 73f3a21e981c's game thread dies on index 27 right after its logo (measured 2026-10-02:
+    # `Unimplemented: java/io/PrintStream vtable index 27`, r1 = 1, lr 0x71454). The count in the
+    # DataOutputStream note above — checkError 15, setError 16, print x9 at 17..25, println() 26 —
+    # puts println(boolean) at 27, the first of the seven println overloads before 34 below; r1 = 1
+    # is the one-word argument it takes.
+    { name = "println", descriptor = "(Z)V", index = 27 },
     { name = "println", descriptor = "(Ljava/lang/String;)V", index = 34 },
 ]
 
@@ -631,6 +642,9 @@ vtable = [
 # rustjava's exact value (the J2SE formula next±period drifts for fixed-delay tasks).
 [[class]]
 name = "java/util/TimerTask"
+vtable = [
+    { name = "cancel", descriptor = "()Z", index = 11 },
+]
 host_field = [
     { name = "lastScheduledExecutionTime", descriptor = "J" },
 ]
