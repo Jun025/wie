@@ -1,0 +1,22 @@
+{
+ "schema": "wie-worklog/1",
+ "date": "2026-10-03",
+ "task": "wie-shipped-save-progress-transplant-exclude-measured-titles",
+ "title": "원 주인 진도 이식 — 이어하기가 실측된 KTF 11종만 목록으로 뺀다",
+ "summary": "0417 «진도·기록 의심» 15종을 원본·뺀 사본 짝으로 쟀다. 이어하기로 원 주인 진도가 열린 10종 + 5e53e490c6f1 의 진도 파일만 jar MD5 목록(OWNER_PROGRESS_SAVES)으로 탑재하지 않는다.",
+ "changes": [
+  "wie-ktf OWNER_PROGRESS_SAVES (11행)",
+  "docs/report/0419",
+  "docs/player-updates/2026-10-03-owner-progress-saves.json"
+ ],
+ "verification": [
+  "15종 원본·전부 뺀 사본 같은 키 짝",
+  "다중 파일 6종은 진도 파일만 뺀 사본 재측",
+  "후 바이너리 원본 11종 + 대조 3종"
+ ],
+ "limits": [
+  "a7d1f26af3e1 은 이어하기 선택을 헤드리스로 못 눌러 미측정",
+  "8c8b11508cf5 는 이어하기 메뉴가 없어 범위 밖(시작 화면에 원 주인 기록·해금이 보인다)"
+ ],
+ "proposals": []
+}

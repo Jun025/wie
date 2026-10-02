@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-03",
+  "kind": "fix",
+  "titles": [
+    "3185174d21218cec9ca7c3ac1a99aa933e822073c11226712d708aab6ae0f70b",
+    "3b82763edba8b87063e88c2a8df8fb9e8a1ef6e2a04581307a0fa257986c5702",
+    "4bcd17980c059ab5058688e723a771a3d9541018eda799f2c21f7fc7aa1fe2bc",
+    "4df05a4dc45278ebb1ee06cf919df073122650a1d7e12b820a7099b39838bbb6",
+    "5e53e490c6f1b5845d79f12d204f4642fc283370085c036eb394de0b928c2fc1",
+    "6a885f89343c49b2d78b5db148d334bd1569979ec64c358d92bfc9875349c515",
+    "6b51d12b4be679888af06ae3815208a0d7589b51f3c6e9a5b4d4462af79dc7af",
+    "b1ec149b354c1838a512aba773fc38bf74cfc9cace61984f138394507b054ede",
+    "e09aca27c132c96752c1b8acaab9aacfc81297b2714d3815d8310b020ff37ee9",
+    "eb1614abed708f41237181e7d80547c941faa989dcef50e9338c6f71dbb61c01",
+    "edd11ce9b8d7fee95d0b682ebea8eee5591bc1f66e5369c9566145a8dcd43d99"
+  ],
+  "summary_ko": "게임 파일에 원래 주인이 하던 진행이 들어 있어 «이어하기»를 누르면 남의 게임이 열리던 게임이, 이제 처음 설치한 것처럼 새로 시작해요.",
+  "pr": "https://github.com/Jun025/wie/pull/0"
+}
