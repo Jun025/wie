@@ -6,6 +6,9 @@
 //! instance a guest word points into. Conservative: a word that only looks like a pointer keeps
 //! an object alive one collection longer, which is the safe direction; missing a real pointer
 //! frees an object the guest still uses.
+//!
+//! ponytail: the guest's own malloc blocks are not scanned — a pointer kept only inside one is
+//! missed; scan the guest heap's allocated blocks if a title is seen losing an object that way.
 
 use alloc::{boxed::Box, collections::BTreeMap, collections::BTreeSet, string::String, vec, vec::Vec};
 use core::{
@@ -37,6 +40,9 @@ static REGIONS: Mutex<BTreeMap<usize, Vec<(u32, u32)>>> = Mutex::new(BTreeMap::n
 // core ids whose JVM has finished bootstrapping and has the scan installed. A collection before that
 // is unsafe for its own reason: bootstrap classes have no java/lang/Class object yet.
 static INSTALLED: Mutex<BTreeSet<usize>> = Mutex::new(BTreeSet::new());
+// ponytail: nothing removes a core's entries from these three, which is safe only because an
+// `ArmCore` is never freed (a reboot leaks the old one, measured — so its id is never reused). If
+// cores start being freed, purge its entries on drop or a reused address inherits them.
 
 const HEAP: core::ops::Range<u32> = 0x4000_0000..0x5000_0000;
 
