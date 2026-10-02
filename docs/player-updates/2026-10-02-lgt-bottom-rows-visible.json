@@ -7,5 +7,6 @@
     "acc4215b7ec0cdbb6bbc260ff9f9d304301e4f38031497e013a328e6ddd00340",
     "fe76e641bb3df380b5a2cbd61b978c83c0cbead3ea3c13b6cf38b07571e74c5a"
   ],
-  "summary_ko": "화면이 아래로 밀려 맨 아래 안내 줄이 잘려 보이던 문제를 고쳤어요. 이제 위의 검은 띠 없이 화면 전체가 제자리에 보여요."
+  "summary_ko": "화면이 아래로 밀려 맨 아래 안내 줄이 잘려 보이던 문제를 고쳤어요. 이제 위의 검은 띠 없이 화면 전체가 제자리에 보여요.",
+  "pr": "https://github.com/Jun025/wie/pull/439"
 }
