@@ -100,7 +100,7 @@ mod tests {
             assert_eq!(error.identity(), reserved.identity());
             assert!(!exception::host_error_unbuildable(&core)?);
 
-            // 놈3: the array and its error's message both find their allocator full. Building a
+            // b475b6399684: the array and its error's message both find their allocator full. Building a
             // fresh error there recursed until the stack overflowed; the reserved one allocates
             // nothing. The int[256] goes to the list half (over 512 bytes), filled by halving.
             let mut size = 0x800_0000;
