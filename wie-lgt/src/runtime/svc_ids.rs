@@ -564,7 +564,7 @@ mod tests {
     }
 
     /// `MC_netSocketConnect` (603 = `0x25b`) is in the table. fe76e641bb3d died on
-    /// `Unknown LGT WIPIC SVC id 603` at its connect call site (docs/report/0406).
+    /// `Unknown LGT WIPIC SVC id 603` at its connect call site (docs/report/0408).
     #[test]
     fn wipic_svc_603_socket_connect_is_in_the_table() {
         let id = WIPICSvcId::try_from(SvcId(603)).expect("SVC 603 (MC_netSocketConnect) must be in the table");
