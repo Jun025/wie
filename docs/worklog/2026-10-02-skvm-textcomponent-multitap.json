@@ -7,7 +7,7 @@
  "changes": [
   "wie-skvm com/xce/lcdui/TextComponentHandler.keyPressed — 멀티탭(E.161 대문자) · NUMERIC/PHONENUMBER/DECIMAL 은 숫자 그대로 · CLEAR=delete · 좌우=moveCursor",
   "setTextComponent 가 입력칸을 붙잡고, clear·CLEAR 가 멀티탭 순환을 끝낸다",
-  "docs/report/0406"
+  "docs/report/0410"
  ],
  "verification": [
   "registered_field_takes_multitap_and_digits · 개악 red 3/3",
