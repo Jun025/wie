@@ -39,3 +39,5 @@
 - `RUST_MIN_STACK=4194304 cargo test --all` rc=0 · 51 묶음 · 639 통과 · 실패 0. 새 시험 `flush_lcd_latches_window_below_blank_annunciator_rows`(FlushLcd SVC 배선 · 어넌시에이터 끔 · 위 줄 칠함 · 래치 후 유지).
 - 러너 블록(수정 트리 release `wie_validate`): `draw_j2me`·`helloworld_ktf`·`helloworld_lgt`·`text_j2me` PASS. `keydraw_ktf/lgt` 는 기본 `--max-ticks` 에서 UNMEASURED(stop=max-ticks) — **손대지 않은 main 도 같다**. `--max-ticks 1e11` 로 둘 다 PASS · rc=0(LGT paints 55 = main 55).
 - 유입(`node scripts/corpus-name-inflow.mjs`): **BOUNDED 12회/7쌍 · SUFFIX-ATTACHED 0회/0쌍.** BOUNDED 12회는 전부 이 회차가 손댄 `wie-lgt/src/runtime/wipi_c.rs`·`wie-wipi-c/src/api/graphics.rs` 의 **기존 주석**이다. 이 회차가 더한 줄(`git diff origin/main...HEAD` 의 `+` 줄)의 게임명은 0 — 타이틀은 sha12 · 업데이트 소식은 sha256 으로만 적었다.
+
+<!-- corpus-name-inflow v1 subjects=6 tree=2dd486f6e02c2a43 B=12/7 P=0/0 S=0/0 -->
