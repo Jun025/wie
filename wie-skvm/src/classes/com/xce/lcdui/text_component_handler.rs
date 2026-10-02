@@ -1,6 +1,6 @@
 use alloc::vec;
 
-use jvm::{ClassInstanceRef, Jvm, Result as JvmResult};
+use jvm::{ClassInstanceRef, JavaChar, Jvm, Result as JvmResult};
 use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 
@@ -8,16 +8,37 @@ use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
 use super::TextComponent;
 
+// MIDP key codes as this engine delivers them (wie-midp event_queue).
+const CLEAR: i32 = 8;
+const LEFT: i32 = 142;
+const RIGHT: i32 = 145;
+// javax.microedition.lcdui.TextField
+const CONSTRAINT_MASK: i32 = 0xFFFF;
+const NUMERIC: i32 = 2;
+const PHONENUMBER: i32 = 3;
+const DECIMAL: i32 = 5;
+
+// ponytail: fixed ITU-T E.161 upper-case letters; no case/Hangul mode switch until a title needs one.
+const MULTITAP: [&[u8]; 10] = [b" 0", b".,?!1", b"ABC2", b"DEF3", b"GHI4", b"JKL5", b"MNO6", b"PQRS7", b"TUV8", b"WXYZ9"];
+const MULTITAP_MS: i64 = 1000;
+
 // class com.xce.lcdui.TextComponentHandler
 //
 // The handset's text-input overlay. The one caller measured (9a2cf5ffc9d3, paint path) gates every
 // other use on `isLoaded()` — `invokestatic isLoaded; ifne …; return` — so reporting "not loaded"
 // is the whole contract it needs: no input-method indicator is drawn. 14a62a8521a0 takes the handler
 // unconditionally in its text field's constructor, asks it for the input mode and offers it every
-// key, so those are here: one shared handler, mode 0, and no key consumed (false hands the key back
-// to the title). 85f03ca7389e's text fields also register themselves with setTextComponent on focus
-// and call clear() whenever their text is reset; with no input method running there is no composition
-// to drop, so both are no-ops. getTextComponent is still absent — no measured caller.
+// key, but never registers a field — so with nothing registered no key is consumed (false hands the
+// key back to the title) and that title sees exactly what it saw before this was an input method.
+//
+// 85f03ca7389e's text fields register themselves with setTextComponent on focus, and their
+// keyPressed is only `handler.keyPressed(key); pop` — the handler is the sole writer of text. So
+// with a field registered this is a minimal multitap input method: a digit key inserts a character
+// through the field's own TextComponent methods, the same key again within MULTITAP_MS cycles it in
+// place (replace), CLEAR deletes and LEFT/RIGHT go to moveCursor. NUMERIC-like constraints take the
+// digit itself. Hangul composition and mode switching are not here. The field calls clear() whenever
+// it resets its text or moves the cursor; that ends the current multitap cycle. getTextComponent is
+// still absent — no measured caller reaches it.
 pub struct TextComponentHandler;
 
 impl TextComponentHandler {
@@ -36,7 +57,7 @@ impl TextComponentHandler {
                     MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
                 ),
                 JavaMethodProto::new("getInputMode", "()I", Self::get_input_mode, MethodAccessFlags::PUBLIC),
-                JavaMethodProto::new("keyPressed", "(I)Z", Self::key_event, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("keyPressed", "(I)Z", Self::key_pressed, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("keyReleased", "(I)Z", Self::key_event, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("keyRepeated", "(I)Z", Self::key_event, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new(
@@ -47,11 +68,17 @@ impl TextComponentHandler {
                 ),
                 JavaMethodProto::new("clear", "()V", Self::clear, MethodAccessFlags::PUBLIC),
             ],
-            fields: vec![JavaFieldProto::new(
-                "instance",
-                "Lcom/xce/lcdui/TextComponentHandler;",
-                FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC,
-            )],
+            fields: vec![
+                JavaFieldProto::new(
+                    "instance",
+                    "Lcom/xce/lcdui/TextComponentHandler;",
+                    FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC,
+                ),
+                JavaFieldProto::new("component", "Lcom/xce/lcdui/TextComponent;", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("tapKey", "I", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("tapIndex", "I", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("tapTime", "J", FieldAccessFlags::PRIVATE),
+            ],
             access_flags: ClassAccessFlags::PUBLIC,
         }
     }
@@ -89,6 +116,59 @@ impl TextComponentHandler {
         Ok(0)
     }
 
+    async fn key_pressed(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, key: i32) -> JvmResult<bool> {
+        tracing::debug!("com.xce.lcdui.TextComponentHandler::keyPressed({this:?}, {key})");
+
+        const NAME: &str = "com/xce/lcdui/TextComponent";
+        let component: ClassInstanceRef<TextComponent> = jvm.get_field(&this, "component", "Lcom/xce/lcdui/TextComponent;").await?;
+        if component.is_null() {
+            return Ok(false);
+        }
+
+        match key {
+            CLEAR => {
+                let _: () = jvm.invoke_virtual(&component, NAME, "delete", "()V", ()).await?;
+                // The letter being cycled may be the one just deleted: replace would write at caret-1.
+                jvm.put_field(&mut this, "tapKey", "I", 0).await?;
+            }
+            LEFT | RIGHT => {
+                // moveCursor calls our clear() itself and repaints.
+                return jvm.invoke_virtual(&component, NAME, "moveCursor", "(I)V", (key,)).await.map(|()| true);
+            }
+            0x30..=0x39 => {
+                let constraints: i32 = jvm.invoke_virtual(&component, NAME, "getConstraints", "()I", ()).await?;
+                let letters = if matches!(constraints & CONSTRAINT_MASK, NUMERIC | PHONENUMBER | DECIMAL) {
+                    &[key as u8][..]
+                } else {
+                    MULTITAP[(key - 0x30) as usize]
+                };
+
+                let now = context.system().platform().now().raw() as i64;
+                let tap_key: i32 = jvm.get_field(&this, "tapKey", "I").await?;
+                let tap_time: i64 = jvm.get_field(&this, "tapTime", "J").await?;
+                if tap_key == key && letters.len() > 1 && now - tap_time < MULTITAP_MS {
+                    let index = (jvm.get_field::<i32>(&this, "tapIndex", "I").await? + 1) % letters.len() as i32;
+                    let _: () = jvm
+                        .invoke_virtual(&component, NAME, "replace", "(C)V", (letters[index as usize] as JavaChar,))
+                        .await?;
+                    jvm.put_field(&mut this, "tapIndex", "I", index).await?;
+                } else {
+                    let before: i32 = jvm.invoke_virtual(&component, NAME, "size", "()I", ()).await?;
+                    let _: () = jvm.invoke_virtual(&component, NAME, "insert", "(C)V", (letters[0] as JavaChar,)).await?;
+                    let after: i32 = jvm.invoke_virtual(&component, NAME, "size", "()I", ()).await?;
+                    // A full field ignores insert; cycling then would rewrite the last character instead.
+                    jvm.put_field(&mut this, "tapKey", "I", if after > before { key } else { 0 }).await?;
+                    jvm.put_field(&mut this, "tapIndex", "I", 0).await?;
+                }
+                jvm.put_field(&mut this, "tapTime", "J", now).await?;
+            }
+            _ => return Ok(false),
+        }
+        let _: () = jvm.invoke_virtual(&component, NAME, "repaint", "()V", ()).await?;
+
+        Ok(true)
+    }
+
     async fn key_event(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, key: i32) -> JvmResult<bool> {
         tracing::debug!("com.xce.lcdui.TextComponentHandler::key*({this:?}, {key})");
 
@@ -96,20 +176,21 @@ impl TextComponentHandler {
     }
 
     async fn set_text_component(
-        _: &Jvm,
+        jvm: &Jvm,
         _: &mut WieJvmContext,
-        this: ClassInstanceRef<Self>,
+        mut this: ClassInstanceRef<Self>,
         component: ClassInstanceRef<TextComponent>,
     ) -> JvmResult<()> {
         tracing::debug!("com.xce.lcdui.TextComponentHandler::setTextComponent({this:?}, {component:?})");
 
-        Ok(())
+        jvm.put_field(&mut this, "component", "Lcom/xce/lcdui/TextComponent;", component).await?;
+        jvm.put_field(&mut this, "tapKey", "I", 0).await
     }
 
-    async fn clear(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+    async fn clear(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("com.xce.lcdui.TextComponentHandler::clear({this:?})");
 
-        Ok(())
+        jvm.put_field(&mut this, "tapKey", "I", 0).await
     }
 }
 
@@ -117,9 +198,10 @@ impl TextComponentHandler {
 mod tests {
     use alloc::{boxed::Box, vec};
 
-    use jvm::{ClassInstanceRef, Jvm, Result as JvmResult};
-    use jvm_class_proto::JavaMethodProto;
-    use jvm_types::{ClassAccessFlags, MethodAccessFlags};
+    use jvm::{ClassInstanceRef, JavaChar, Jvm, Result as JvmResult, runtime::JavaLangString};
+    use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
+    use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
+    use rustjava_runtime::classes::java::lang::String;
     use test_utils::run_jvm_test;
     use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
@@ -225,6 +307,155 @@ mod tests {
                 let _: () = jvm
                     .invoke_virtual(&handler, "com/xce/lcdui/TextComponentHandler", "clear", "()V", ())
                     .await?;
+                Ok(())
+            },
+        );
+        assert!(result.is_ok(), "{result:?}");
+    }
+
+    // A text field that keeps its caret at the end, like 85f03ca7389e's while the name is typed.
+    struct EditField;
+
+    impl EditField {
+        fn as_proto() -> WieJavaClassProto {
+            WieJavaClassProto {
+                name: "test/EditField",
+                parent_class: Some("java/lang/Object"),
+                interfaces: vec!["com/xce/lcdui/TextComponent"],
+                methods: vec![
+                    JavaMethodProto::new("<init>", "(II)V", Self::init, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new("getConstraints", "()I", Self::get_constraints, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new("size", "()I", Self::size, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new("insert", "(C)V", Self::insert, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new("replace", "(C)V", Self::replace, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new("delete", "()V", Self::delete, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new("moveCursor", "(I)V", Self::move_cursor, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new("repaint", "()V", Self::repaint, MethodAccessFlags::PUBLIC),
+                ],
+                fields: vec![
+                    JavaFieldProto::new("text", "Ljava/lang/String;", FieldAccessFlags::PUBLIC),
+                    JavaFieldProto::new("constraints", "I", FieldAccessFlags::PUBLIC),
+                    JavaFieldProto::new("maxSize", "I", FieldAccessFlags::PUBLIC),
+                    JavaFieldProto::new("moved", "I", FieldAccessFlags::PUBLIC),
+                ],
+                access_flags: ClassAccessFlags::PUBLIC,
+            }
+        }
+
+        async fn init(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, constraints: i32, max_size: i32) -> JvmResult<()> {
+            let _: () = jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await?;
+            Self::set(jvm, &mut this, alloc::string::String::new()).await?;
+            jvm.put_field(&mut this, "constraints", "I", constraints).await?;
+            jvm.put_field(&mut this, "maxSize", "I", max_size).await
+        }
+
+        async fn get(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<alloc::string::String> {
+            let text: ClassInstanceRef<String> = jvm.get_field(this, "text", "Ljava/lang/String;").await?;
+            JavaLangString::to_rust_string(jvm, &text).await
+        }
+
+        async fn set(jvm: &Jvm, this: &mut ClassInstanceRef<Self>, text: alloc::string::String) -> JvmResult<()> {
+            let text: ClassInstanceRef<String> = JavaLangString::from_rust_string(jvm, &text).await?.into();
+            jvm.put_field(this, "text", "Ljava/lang/String;", text).await
+        }
+
+        async fn get_constraints(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+            jvm.get_field(&this, "constraints", "I").await
+        }
+
+        async fn size(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+            Ok(Self::get(jvm, &this).await?.len() as i32)
+        }
+
+        async fn insert(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, c: JavaChar) -> JvmResult<()> {
+            let mut text = Self::get(jvm, &this).await?;
+            if (text.len() as i32) < jvm.get_field::<i32>(&this, "maxSize", "I").await? {
+                text.push(c as u8 as char);
+            }
+            Self::set(jvm, &mut this, text).await
+        }
+
+        async fn replace(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, c: JavaChar) -> JvmResult<()> {
+            let mut text = Self::get(jvm, &this).await?;
+            text.pop();
+            text.push(c as u8 as char);
+            Self::set(jvm, &mut this, text).await
+        }
+
+        async fn delete(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            let mut text = Self::get(jvm, &this).await?;
+            text.pop();
+            Self::set(jvm, &mut this, text).await
+        }
+
+        async fn move_cursor(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, key: i32) -> JvmResult<()> {
+            jvm.put_field(&mut this, "moved", "I", key).await
+        }
+
+        async fn repaint(_: &Jvm, _: &mut WieJvmContext, _: ClassInstanceRef<Self>) -> JvmResult<()> {
+            Ok(())
+        }
+    }
+
+    /// 85f03ca7389e's name field only forwards keys (`handler.keyPressed(key); pop`): the text in it
+    /// is whatever this handler inserts. Unregistered, keys are handed back untouched.
+    #[test]
+    fn registered_field_takes_multitap_and_digits() {
+        let result = run_jvm_test(
+            Box::new([wie_midp::get_protos().into(), get_protos().into(), [EditField::as_proto()].into()]),
+            |jvm| async move {
+                const H: &str = "com/xce/lcdui/TextComponentHandler";
+                let handler: ClassInstanceRef<TextComponentHandler> = jvm
+                    .invoke_static(H, "getTextComponentHandler", "()Lcom/xce/lcdui/TextComponentHandler;", ())
+                    .await?;
+                async fn press(jvm: &Jvm, handler: &ClassInstanceRef<TextComponentHandler>, key: i32) -> JvmResult<bool> {
+                    jvm.invoke_virtual(handler, H, "keyPressed", "(I)Z", (key,)).await
+                }
+                async fn register(jvm: &Jvm, handler: &ClassInstanceRef<TextComponentHandler>, field: &ClassInstanceRef<EditField>) -> JvmResult<()> {
+                    let field = ClassInstanceRef::<TextComponent>::new(field.instance.clone());
+                    jvm.invoke_virtual(handler, H, "setTextComponent", "(Lcom/xce/lcdui/TextComponent;)V", (field,))
+                        .await
+                }
+                let (j, h) = (&jvm, &handler);
+
+                // Nothing registered: 14a62a8521a0's situation — every key goes back to the title.
+                assert!(!press(j, h, 0x35).await?);
+
+                let name: ClassInstanceRef<EditField> = jvm.new_class("test/EditField", "(II)V", (0, 3)).await?.into();
+                register(j, h, &name).await?;
+                // 5 → J, 5 again → K (cycled in place), 2 → A, CLEAR → deletes.
+                for key in [0x35, 0x35, 0x32] {
+                    assert!(press(j, h, key).await?);
+                }
+                assert_eq!(EditField::get(&jvm, &name).await?, "KA");
+                assert!(press(j, h, 8).await?);
+                assert_eq!(EditField::get(&jvm, &name).await?, "K");
+                // CLEAR ended the cycle: 2 again is a new letter, not a rewrite of K.
+                assert!(press(j, h, 0x32).await?);
+                assert_eq!(EditField::get(&jvm, &name).await?, "KA");
+                // clear() (the field resets or moves its caret) ends the cycle too.
+                let _: () = jvm.invoke_virtual(&handler, H, "clear", "()V", ()).await?;
+                assert!(press(j, h, 0x32).await?);
+                assert_eq!(EditField::get(&jvm, &name).await?, "KAA");
+                // Full field: insert is ignored, and pressing again must not rewrite the last letter.
+                assert!(press(j, h, 0x34).await?);
+                assert!(press(j, h, 0x34).await?);
+                assert_eq!(EditField::get(&jvm, &name).await?, "KAA");
+                assert!(press(j, h, 142).await?);
+                assert_eq!(jvm.get_field::<i32>(&name, "moved", "I").await?, 142);
+                assert!(!press(j, h, 0x23).await?); // '#': no mode switch here
+
+                // NUMERIC (85f03ca7389e's 11-digit field) takes the digit itself.
+                let number: ClassInstanceRef<EditField> = jvm.new_class("test/EditField", "(II)V", (2, 11)).await?.into();
+                register(j, h, &number).await?;
+                for key in [0x30, 0x31, 0x31] {
+                    assert!(press(j, h, key).await?);
+                }
+                assert_eq!(EditField::get(&jvm, &number).await?, "011");
+
+                // Unregistered again (focus left): keys go back to the title.
+                register(j, h, &ClassInstanceRef::new(None)).await?;
+                assert!(!press(j, h, 0x35).await?);
                 Ok(())
             },
         );
