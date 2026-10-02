@@ -308,18 +308,16 @@
    "platform": "KTF",
    "model": null,
    "title": "광수의 똥! 생각",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "광수의 똥! 생각"
   },
@@ -977,18 +975,16 @@
    "platform": "KTF",
    "model": null,
    "title": "드래곤나이트2",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "드래곤나이트2"
   },
@@ -1277,20 +1273,17 @@
    "platform": "KTF",
    "model": null,
    "title": "리얼사커2007",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
+    "input": "ok",
     "longplay": "ok",
-    "sound": "no",
-    "speed": "unknown",
+    "sound": "ok",
+    "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "리얼사커2007"
   },
@@ -1932,18 +1925,16 @@
    "platform": "KTF",
    "model": null,
    "title": "미니게임패밀리",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
-    "speed": "unknown"
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "미니게임패밀리"
   },
@@ -2517,19 +2508,16 @@
    "platform": "KTF",
    "model": null,
    "title": "슈렉3",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "슈렉3"
   },
@@ -2784,18 +2772,16 @@
    "platform": "KTF",
    "model": null,
    "title": "알바 전설 편의점2",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "알바 전설 편의점2"
   },
@@ -3428,13 +3414,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "이터널사가2"
   },
@@ -3521,13 +3505,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "전국호텔왕plus"
   },
@@ -3585,7 +3567,7 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
+    "암호로 잠긴 파일이라 여기서는 실행할 수 없어요."
    ],
    "changes": [],
    "fileTitle": "절묘한타이밍 01.00.05"
@@ -3662,7 +3644,7 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
+    "암호로 잠긴 파일이라 여기서는 실행할 수 없어요."
    ],
    "changes": [],
    "fileTitle": "정통맞고2007"
@@ -4647,18 +4629,16 @@
    "platform": "KTF",
    "model": null,
    "title": "푸시푸시삼국지",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "푸시푸시삼국지"
   },
@@ -4896,17 +4876,16 @@
    "platform": "KTF",
    "model": null,
    "title": "화산제일검2",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "no",
-    "speed": "unknown"
+    "speed": "ok"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
@@ -6649,8 +6628,7 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "게임 화면이 아직 나오지 않아요.",
-    "소리가 나지 않을 수 있어요."
+    "구매한 휴대폰에서만 켜지도록 잠긴 파일이라 여기서는 실행할 수 없어요."
    ],
    "changes": [],
    "fileTitle": "노리맥스영웅전"
@@ -7320,8 +7298,7 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "게임 화면이 아직 나오지 않아요.",
-    "소리가 나지 않을 수 있어요."
+    "구매한 휴대폰에서만 켜지도록 잠긴 파일이라 여기서는 실행할 수 없어요."
    ],
    "changes": [],
    "fileTitle": "삼국지연의2"
@@ -7904,8 +7881,7 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "게임 화면이 아직 나오지 않아요.",
-    "소리가 나지 않을 수 있어요."
+    "구매한 휴대폰에서만 켜지도록 잠긴 파일이라 여기서는 실행할 수 없어요."
    ],
    "changes": [],
    "fileTitle": "테일즈판타지 SKVM"
@@ -8040,8 +8016,7 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "게임 화면이 아직 나오지 않아요.",
-    "소리가 나지 않을 수 있어요."
+    "구매한 휴대폰에서만 켜지도록 잠긴 파일이라 여기서는 실행할 수 없어요."
    ],
    "changes": [],
    "fileTitle": "Chaos블레이드"
