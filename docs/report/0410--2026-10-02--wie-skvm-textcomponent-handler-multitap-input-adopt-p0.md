@@ -55,3 +55,6 @@ probe → long 600 → P → P2 를 바이너리마다 직렬로 돌렸다(10:12
 ### 5. 범위 밖으로 둔 것
 - 한글 조합 · 대소문자/입력 모드 전환(`#`·`*`) · `getInputMode` 실값 · `getTextComponent` — 측정된 호출부가 필요로 하지 않는다.
 - 멀티탭 표와 1초 창은 고정값이다(코드 `ponytail:` 주석). 바꿀 근거가 생기면 그때 바꾼다.
+
+### 6. 게임 파일명 유입
+`node scripts/corpus-name-inflow.mjs --corpus <game_lab>`: 유입 0건(BOUNDED 0회/0쌍) · 판단 필요 0건(SUFFIX-ATTACHED 0회/0쌍). 새 주석·문서·소식은 sha12 만 쓴다.
