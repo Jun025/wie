@@ -44,6 +44,14 @@ impl Component {
             fields: vec![
                 JavaFieldProto::new("bg", "I", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("fg", "I", FieldAccessFlags::PRIVATE),
+                // Protected in the javadoc, and AOT subclasses read them directly: d448aee68157's
+                // text box died on `Field xI not found from org/kwis/msp/lwc/Component` right after
+                // its first name entry. Left at 0, the same origin and size getX/getY/getWidth/
+                // getHeight report, since nothing is laid out here.
+                JavaFieldProto::new("x", "I", FieldAccessFlags::PROTECTED),
+                JavaFieldProto::new("y", "I", FieldAccessFlags::PROTECTED),
+                JavaFieldProto::new("w", "I", FieldAccessFlags::PROTECTED),
+                JavaFieldProto::new("h", "I", FieldAccessFlags::PROTECTED),
             ],
             access_flags: ClassAccessFlags::PUBLIC | ClassAccessFlags::ABSTRACT,
         }
@@ -261,6 +269,21 @@ mod tests {
                 let _: () = jvm
                     .invoke_virtual(&annunciator, "org/kwis/msp/lwc/AnnunciatorComponent", method, "()V", ())
                     .await?;
+            }
+
+            Ok(())
+        })
+    }
+
+    /// d448aee68157's wall after its first name entry: an AOT subclass reads the protected `x`
+    /// directly and died on `Field xI not found from org/kwis/msp/lwc/Component`.
+    #[test]
+    fn position_and_size_fields_resolve_on_a_subclass_and_match_the_getters() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            let shell = jvm.new_class("org/kwis/msp/lwc/ShellComponent", "()V", ()).await?;
+            for field in ["x", "y", "w", "h"] {
+                let value: i32 = jvm.get_field(&shell, field, "I").await?;
+                assert_eq!(value, 0, "{field}");
             }
 
             Ok(())

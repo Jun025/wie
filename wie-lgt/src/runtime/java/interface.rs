@@ -509,6 +509,15 @@ async fn java_instantiate(core: &mut ArmCore, jvm: &mut Jvm, ptr_class_object: u
         .await
         .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))?;
     let ptr_instance = LgtJvmSupport::class_instance_raw(&*instance);
+    // A guest `new` is never collected (it is not in the jvm's object set), but only the guest's
+    // registers and stack may point at it, and the collector cannot see those. Without a root
+    // here, what its host constructor allocated died at the next collection while the object
+    // lived on: be08d047cbae's Stack kept a freed elementData, reused as an int[], and the
+    // next pop panicked the host (`Expected object, got Int`). Rooting it keeps exactly the
+    // set the guest can still reach alive.
+    //   ponytail: never released — guest objects already live forever here, so this adds one
+    //   map entry each. Release it if guest objects ever become collectable.
+    core::mem::forget(jvm.new_global_ref(&ClassInstanceRef::<()>::new(Some(instance.clone()))));
 
     let mut initializer_callbacks = Vec::new();
     let mut current = Some(definition);
@@ -886,8 +895,8 @@ mod tests {
     use wie_util::WieError;
 
     use super::{
-        InterfaceMethodTables, LgtJvmSupport, get_java_interface_method, java_get_interface_method_table, java_link_imported_classes,
-        java_load_long_array, java_store_long_array, read_member_name_and_descriptor, register_java_system_svc_handler,
+        InterfaceMethodTables, LgtJvmSupport, get_java_interface_method, java_get_interface_method_table, java_instantiate,
+        java_link_imported_classes, java_load_long_array, java_store_long_array, read_member_name_and_descriptor, register_java_system_svc_handler,
     };
     use crate::runtime::java::jvm_support::tests::init_jvm;
 
@@ -971,7 +980,64 @@ mod tests {
         Ok(())
     }
 
-    // 0x64 is how the title enumerates a Vector: `for (e = v.elements(); e.hasMoreElements();)
+    // be08d047cbae: the guest `new`s a Stack, its host constructor allocates elementData, and the
+    // only reference to the Stack is in guest memory. A collection must not free elementData.
+    #[test]
+    fn a_collection_keeps_what_a_guest_new_allocated() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (mut jvm, mut core, _) = init_jvm(&system_clone).await?;
+            // The guest's own call: what the constructor allocates is held by this frame only
+            // until it returns, as it is when an AOT method runs `new Stack()`.
+            jvm.push_native_frame();
+            let class_object = jvm.resolve_class("java/util/Stack").await.unwrap().java_class();
+            let ptr_stack = java_instantiate(&mut core, &mut jvm, LgtJvmSupport::class_instance_raw(&*class_object)).await?;
+            let stack = LgtJvmSupport::class_instance_from_raw(&core, ptr_stack)?;
+            let _: () = jvm.invoke_special(&stack, "java/util/Stack", "<init>", "()V", ()).await.unwrap();
+            let element_data: Box<dyn ClassInstance> = jvm.get_field(&stack, "elementData", "[Ljava/lang/Object;").await.unwrap();
+            let ptr_element_data = LgtJvmSupport::class_instance_raw(&*element_data);
+            drop(element_data);
+            jvm.pop_frame();
+
+            jvm.collect_garbage().unwrap();
+
+            assert!(
+                Allocator::is_allocated(&core, ptr_element_data, 12)?,
+                "the guest's Stack still points at elementData"
+            );
+            let element = jvm.new_class("java/lang/Object", "()V", ()).await.unwrap();
+            let _: Box<dyn ClassInstance> = jvm
+                .invoke_virtual(
+                    &stack,
+                    "java/util/Stack",
+                    "push",
+                    "(Ljava/lang/Object;)Ljava/lang/Object;",
+                    (element.clone(),),
+                )
+                .await
+                .unwrap();
+            let popped: Box<dyn ClassInstance> = jvm
+                .invoke_virtual(&stack, "java/util/Stack", "pop", "()Ljava/lang/Object;", ())
+                .await
+                .unwrap();
+            assert!(popped.equals(&*element).unwrap());
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    // 0x64 is how the title enumerates a Vector:`for (e = v.elements(); e.hasMoreElements();)
     // x = e.nextElement();` asks for the receiver's Enumeration table on every turn, then calls
     // word 1 and word 2 with the receiver in r0. It died here with "Unknown lgt java import: 0x64".
     #[test]

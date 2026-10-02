@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-02",
+  "kind": "fix",
+  "titles": [
+    "73f3a21e981c7edbf3e54f767800653da764f8b91828068cc3daf35952e90bdc"
+  ],
+  "summary_ko": "로고가 나온 뒤 화면이 더 넘어가지 않던 게임 1종이 이제 시작 메뉴까지 열려요.",
+  "pr": "https://github.com/Jun025/wie/pull/445"
+}

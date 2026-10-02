@@ -1,0 +1,46 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-02",
+  "task": "wie-progression-engine-walls-check-type-printstream-lwc-x",
+  "title": "진도 축 엔진 벽 3건 — java_check_type 가설 반증 · LGT 게스트 new 를 GC 루트로 · PrintStream 27 · lwc 필드 x",
+  "summary": "KTF java_check_type 은 aastore 도우미 한 곳에서만 불리고 unk 는 남은 r2 라 «항상 참»은 ArrayStoreException 만 막는다 — AIOOBE/NPE 의 원인이 아니다. #425 의 TimerTask 11 panic 은 LGT 수집기가 게스트 new 객체(루트 아님)의 호스트 할당물을 지운 결과였다. 게스트 new 마다 전역 참조를 두고 ABI 행 셋(TimerTask.cancel 11 · PrintStream.println(Z) 27 · String.getChars 12)과 lwc Component 필드 x y w h · TextComponent.getMaxLength 를 더했다.",
+  "changes": [
+    "wie-lgt/src/runtime/java/interface.rs — java_instantiate 가 게스트 객체를 전역 참조로 붙든다 · 시험 a_collection_keeps_what_a_guest_new_allocated",
+    "wie-lgt/data/lgt_java_abi.toml — TimerTask cancel()Z 11 · PrintStream println(Z)V 27 · String getChars(II[CI)V 12 (호출부 근거 주석)",
+    "wie-lgt/src/runtime/java/jvm_support.rs — abi_rows_cover… 에 행 3개",
+    "wie-wipi-java lwc Component 필드 x y w h · TextComponent getMaxLength()I / setMaxLength 값 보관 · 시험 2",
+    "docs/report/0413 · docs/player-updates 3 (compat.json 무변경 — 600초 진도는 세 종 모두 stuck)"
+  ],
+  "verification": [
+    "전/후 진도 300초: 73f3a21e981c 새 화면 1 → 4(메뉴) · be08d047cbae 안내 → 선택 화면 · d448aee68157 새 화면 5 → 10(본편) · 600초 d448aee68157 도 stuck(나머지 둘은 300초에서 stuck)",
+    "A 프로브 13종 FAIL 0 → 0",
+    "되돌림 red: 루트 줄 · getChars 행 · x 필드 · setMaxLength 저장 각각 실측",
+    "게스트 new 루트 잔류: 300초 버킷 사용 +0 ~ +210KB(128MB 중) · 그림 수 변화 없음"
+  ],
+  "limits": [
+    "census 락을 다른 레인이 쥐고 있어 여섯 축 전수는 돌리지 않았다(build-slot 1잡 직렬로 A 프로브·진도만)",
+    "게스트 객체 전역 참조는 놓지 않는다 — 게스트 객체가 원래 수거되지 않으므로 늘어나는 것은 맵 항목과 수집 추적 대상이다"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "9789fec50f39 — 「게임시작」 직후 null Image 에 메서드 호출로 게임 스레드 사망",
+      "plainSummary": "시작 메뉴에서 게임을 시작하면 게임이 더 진행되지 않는 한 종을 고친다.",
+      "userBenefit": "그 게임을 메뉴 너머로 플레이할 수 있게 된다.",
+      "why": "ac.run 이 0x17c684 도우미에서 NPE 를 던진다. 해석된 참조는 org/kwis/msp/lcdui/Image 의 vtable 0x14 메서드다. 어느 이미지가 null 로 남았는지(로드 실패인지 정적 초기화 순서인지)는 이번 회차에서 추적하지 않았다(docs/report/0413 §1).",
+      "tradeoff": "역어셈 추적이 필요해 크기를 미리 알 수 없다.",
+      "effort": "M~L",
+      "target": "wie-ktf · wie-wipi-java(lcdui Image)"
+    },
+    {
+      "kind": "product",
+      "title": "73f3a21e981c — 서버 접속 실패 대화상자의 OK 키가 c_bf.keyNotify 에서 NPE",
+      "plainSummary": "시작 메뉴에 뜨는 «서버 접속 실패» 안내를 닫을 수 없는 문제를 고친다.",
+      "userBenefit": "안내를 닫고 메뉴에서 게임을 시작할 수 있게 된다.",
+      "why": "이번 회차가 로고 뒤 벽(PrintStream 27 · String 12)을 넘기자 메뉴 위에 대화상자가 뜨고, 그 OK 키마다 NullPointerException at c_bf.keyNotify 가 난다(docs/report/0413 §4). 대화상자 자체는 통신 없음(⒞)이지만 닫히지 않는 것은 엔진 쪽일 수 있다.",
+      "tradeoff": "통신 의존 경로라 고쳐도 메뉴 뒤에서 다시 통신에 막힐 수 있다.",
+      "effort": "M",
+      "target": "wie-lgt · wie-wipi-java(lwc)"
+    }
+  ]
+}

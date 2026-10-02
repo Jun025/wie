@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-02",
+  "kind": "fix",
+  "titles": [
+    "d448aee681574bffb97907e5ed5cdcf6676825e49711633ebe8ee675a76c4cb9"
+  ],
+  "summary_ko": "이름을 넣은 뒤 다음 입력칸에서 게임이 멈추던 게임 1종이 이제 본편으로 들어가요.",
+  "pr": "https://github.com/Jun025/wie/pull/445"
+}

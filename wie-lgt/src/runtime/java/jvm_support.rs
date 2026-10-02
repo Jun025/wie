@@ -2024,6 +2024,12 @@ pub(crate) mod tests {
                 ("java/util/Stack", 35, "empty", "()Z"),
                 // be08d047cbae (progress census 2026-09-30)
                 ("java/util/Timer", 16, "cancel", "()V"),
+                // be08d047cbae (call site disassembled 2026-10-02)
+                ("java/util/TimerTask", 11, "cancel", "()Z"),
+                // 73f3a21e981c
+                ("java/io/PrintStream", 27, "println", "(Z)V"),
+                // 73f3a21e981c (call site disassembled 2026-10-02)
+                ("java/lang/String", 12, "getChars", "(II[CI)V"),
             ] {
                 let class = jvm.resolve_class(class_name).await.unwrap();
                 let definition = class.definition.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap().clone();
