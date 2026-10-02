@@ -75,3 +75,5 @@
 
 ### 9. 게임 파일명 유입
 BOUNDED 330쌍 + SUFFIX-ATTACHED 15쌍 — 전부 `compat.json` 의 기존 `title`·`fileTitle` 값이다(그 밖 파일 0). 이 회차가 더한 코드·문서·worklog·이용자 소식의 게임명 0 · 키 파일은 `game_lab/` 에만 있다.
+
+<!-- corpus-name-inflow v1 subjects=11 tree=5a000865e9519481 B=718/330 P=0/0 S=35/15 -->
