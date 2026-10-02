@@ -59,3 +59,7 @@
 ### 6. 되돌리면 red
 
 `device_bound_saves_dropped_for_listed_jar_only` — 소문자 `p/` 키를 빼면 FAILED(`left: ["A.jar", "p/res/other.sav", "p/res/save.sav"]`). 목록 6행 자체는 시험이 아니라 §5 측정으로 확인했다(행을 빼면 그 타이틀은 §1 원본 열로 돌아간다).
+
+### 7. 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 330쌍 + SUFFIX-ATTACHED 15쌍 — 전부 `compat.json` 의 기존 제목 값이다. 이 PR 이 더한 줄에서는 0이다. 타이틀은 sha12 로만 적었다.
