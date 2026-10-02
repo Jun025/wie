@@ -67,3 +67,5 @@
   - SUFFIX-ATTACHED 1쌍은 그중 한 주석의 더 긴 다른 제목이다(조사 붙은 언급이 아니다).
   - 이 PR 이 더한 줄에서는 0이다(`git diff origin/main...HEAD` 의 `+` 줄 0). 주석 한 줄을 다시 감쌌다가 그 줄을 원문대로 되돌렸다.
 - 표식 줄은 도구 출력 그대로다.
+
+<!-- corpus-name-inflow v1 subjects=11 tree=70c48e7a6322fbaf B=6/5 P=1/1 S=1/1 -->
