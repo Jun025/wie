@@ -162,7 +162,7 @@ pub fn set_use_annunciator(core: &mut ArmCore, value: u32) -> Result<()> {
 /// «annunciator + told height»: rows 0..`spare_rows` stay blank and the soft-key bar lands in the
 /// spare rows below (docs/report/0405 §2). The first flush that shows both — last spare row written,
 /// top `spare_rows` rows blank — latches `spare_rows`; a frame that later misses it (a black
-/// transition) must not jump the picture back 24 rows (docs/report/0406 §2).
+/// transition) must not jump the picture back 24 rows (docs/report/0407 §2).
 pub fn screen_present_row(context: &mut dyn WIPICContext, framebuffer: &WIPICFramebuffer, spare_rows: u32) -> Result<u32> {
     let ptr_state: u32 = read_generic(context, GRAPHICS_STATE_ROOT)?;
     if ptr_state == 0 || spare_rows == 0 {

@@ -1,0 +1,11 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-02",
+  "task": "wie-lgt-top-blank-four-titles-shift-export-window-adopt-p0",
+  "title": "LGT 위 24줄을 비우는 4종 — 내보내는 창을 24줄 내린다",
+  "summary": "어넌시에이터를 켠 LGT 타이틀이 화면 버퍼의 마지막 여유 줄을 쓰고 위 24줄을 비운 채 flush 하면 그때부터 24~343줄을 내보낸다(고정). 짝 재측에서 프레임마다 판단하면 4종 중 3종이 오르내려 고정을 택했고, 나머지 어넌시에이터 10종은 한 번도 걸리지 않았다(docs/report/0407).",
+  "changes": ["wie-lgt: LGT 전용 MC_grpFlushLcd + graphics::screen_present_row(래치)", "wie-wipi-c: screen_framebuffer_handle 공개"],
+  "limits": ["판별은 60초 표본에서 쟀다 — 더 늦게 위 24줄을 칠하는 비대상 타이틀은 못 봤다", "1eaa92092bee 의 공지 화면은 0~23줄에도 그린다 — 고정된 창은 그 띠를 감춘다"],
+  "proposals": [],
+  "adoptedProposals": ["2026-10-01-lgt-annunciator-height-296-decide#p0"]
+}
