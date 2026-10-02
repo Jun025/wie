@@ -356,6 +356,11 @@ impl LgtJvmSupport {
     /// an interface method). The guest calls word `1 + i` with the receiver in r0, and a zero
     /// word sends it to its own fallback import (`0x40`) instead — so an unimplemented method
     /// stays 0. Evidence: docs/report/0377.
+    ///
+    /// An interface the title declares itself carries no method list (count 0), so its methods
+    /// cannot be named. The compiler already built this table for it, though: the implementing
+    /// class's reference cell for that interface is word 0 the interface class, then the class's
+    /// targets in interface order — so that cell is the answer.
     pub async fn interface_method_table(core: &mut ArmCore, jvm: &Jvm, receiver_name: &str, interface_name: &str) -> Result<u32> {
         let interface = jvm
             .resolve_class(interface_name)
@@ -367,6 +372,11 @@ impl LgtJvmSupport {
             .downcast_ref::<JavaClassDefinition>()
             .ok_or_else(|| WieError::FatalError(format!("Unsupported interface class implementation: {interface_name}")))?
             .clone();
+        if Self::generated_class_pointers(jvm, &interface).await?.contains(&interface.ptr_raw)
+            && let Some(cell) = Self::generated_interface_cell(core, jvm, receiver_name, interface.ptr_raw)?
+        {
+            return Ok(cell);
+        }
         let entries = interface.vtable_entries(jvm).await?;
         let ptr_table = JavaVtable::allocate(core, entries.len())?;
         write_generic(core, ptr_table, interface.ptr_raw)?;
@@ -378,6 +388,31 @@ impl LgtJvmSupport {
             write_generic(core, ptr_table + ((index + 1) * size_of::<u32>()) as u32, target)?;
         }
         Ok(ptr_table)
+    }
+
+    /// The receiver's (or nearest superclass's) compiler-generated reference cell whose word 0 is
+    /// `ptr_interface`.
+    fn generated_interface_cell(core: &ArmCore, jvm: &Jvm, receiver_name: &str, ptr_interface: u32) -> Result<Option<u32>> {
+        let mut current_name = Some(String::from(receiver_name));
+        while let Some(name) = current_name {
+            let Some(class) = jvm.get_class(&name) else {
+                return Ok(None);
+            };
+            if let Some(definition) = class.definition.as_any().downcast_ref::<JavaClassDefinition>() {
+                let ptr_references = definition.descriptor()?.ptr_interface_references;
+                if ptr_references != 0 {
+                    let count: u32 = read_generic(core, ptr_references)?;
+                    for index in 0..count {
+                        let ptr_cell: u32 = read_generic(core, ptr_references + (index + 1) * size_of::<u32>() as u32)?;
+                        if read_generic::<u32, _>(core, ptr_cell)? == ptr_interface {
+                            return Ok(Some(ptr_cell));
+                        }
+                    }
+                }
+            }
+            current_name = class.definition.super_class_name();
+        }
+        Ok(None)
     }
 
     pub fn non_virtual_method_target(jvm: &Jvm, class_name: &str, name: &str, descriptor: &str) -> Result<u32> {
@@ -792,6 +827,88 @@ pub(crate) mod tests {
                 "{child} slot {parent_len} lost its own method"
             );
             assert_eq!(raw_vtable_target(&core, ptr_child, index)?, expected, "{child} vtable index {index}");
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn interface_method_table_for_a_title_declared_interface_is_the_receivers_reference_cell() -> Result<()> {
+        // A title-declared interface has an empty method list, so the vtable-built table named
+        // nothing past Object and every interface slot read 0 — the guest then called its own
+        // «no method» import 0x40 and died (a16f08d025eb). The receiver's reference cell already
+        // is the table: interface class, then the receiver's targets in interface order.
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, implementation) = init_jvm(&system_clone).await?;
+            let define = async |name: &'static str, access_flags: ClassAccessFlags| -> Result<u32> {
+                let class = implementation
+                    .define_class_rust(
+                        &jvm,
+                        JavaClassProto::<()> {
+                            name,
+                            parent_class: Some("java/lang/Object"),
+                            interfaces: vec![],
+                            methods: vec![],
+                            fields: vec![],
+                            access_flags,
+                        },
+                        Box::new(()),
+                    )
+                    .await
+                    .unwrap();
+                Ok(class.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap().ptr_raw)
+            };
+            let ptr_interface = define(
+                "net/wie/test/IHandler",
+                ClassAccessFlags::PUBLIC | ClassAccessFlags::INTERFACE | ClassAccessFlags::ABSTRACT,
+            )
+            .await?;
+            let ptr_receiver = define("net/wie/test/Handler", ClassAccessFlags::PUBLIC).await?;
+
+            let generated_classes = Allocator::alloc(&mut core, 2 * size_of::<u32>() as u32)?;
+            write_generic(&mut core, generated_classes, 0u32)?;
+            write_generic(&mut core, generated_classes + size_of::<u32>() as u32, ptr_interface)?;
+            let system_loader: Box<dyn ClassInstance> = jvm
+                .invoke_static("java/lang/ClassLoader", "getSystemClassLoader", "()Ljava/lang/ClassLoader;", ())
+                .await
+                .unwrap();
+            let loader: Box<dyn ClassInstance> = jvm
+                .new_class(
+                    "net/wie/LgtClassLoader",
+                    "(Ljava/lang/ClassLoader;I)V",
+                    (system_loader, generated_classes as i32),
+                )
+                .await
+                .unwrap();
+            LgtJvmSupport::register_generated_class(&mut core, &jvm, ptr_interface, generated_classes, loader.clone()).await?;
+
+            let cell = Allocator::alloc(&mut core, 3 * size_of::<u32>() as u32)?;
+            for (index, word) in [ptr_interface, 0x1111, 0x2222].into_iter().enumerate() {
+                write_generic(&mut core, cell + (index * size_of::<u32>()) as u32, word)?;
+            }
+            let references = Allocator::alloc(&mut core, 2 * size_of::<u32>() as u32)?;
+            write_generic(&mut core, references, 1u32)?;
+            write_generic(&mut core, references + size_of::<u32>() as u32, cell)?;
+            let raw_receiver: RawJavaClass = read_generic(&core, ptr_receiver)?;
+            let mut descriptor: RawJavaClassDescriptor = read_generic(&core, raw_receiver.ptr_descriptor)?;
+            descriptor.ptr_interface_references = references;
+            write_generic(&mut core, raw_receiver.ptr_descriptor, descriptor)?;
+            LgtJvmSupport::register_generated_class(&mut core, &jvm, ptr_receiver, generated_classes, loader).await?;
+
+            let table = LgtJvmSupport::interface_method_table(&mut core, &jvm, "net/wie/test/Handler", "net/wie/test/IHandler").await?;
+            assert_eq!(table, cell);
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
