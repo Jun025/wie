@@ -65,3 +65,7 @@ r3 는 `890ae6e1` 에서 쟀다. 그 커밋에는 #448(`ce469d81` · `setCurrent
 | 군집 | 수 | 계급 | 크기 |
 |---|---|---|---|
 | KTF Card 높이(상태 표시줄) 모델 — `d1e0badfce82` | 1(+240×320 KTF 177종의 배치) | ⒝ · worklog p0 | M(짝 전수가 근거) |
+
+### 9. 유입
+
+`node scripts/corpus-name-inflow.mjs --corpus <로컬 코퍼스>`: BOUNDED 718회 / 330쌍 · SUFFIX-ATTACHED 35회 / 15쌍. 전부 `docs/player-data/compat.json` 의 `title`·`fileTitle` 이다. 이 회차가 바꾼 5행에 원래 있던 표시 이름이 diff 맥락으로 잡힌 것이고, 이 파일은 설계상 이름을 갖는다. 회차 문서·worklog·소식·코드에 더한 게임 이름은 0이다(sha12 만).
