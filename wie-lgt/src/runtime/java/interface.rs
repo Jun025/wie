@@ -50,6 +50,7 @@ pub fn get_java_interface_method(core: &mut ArmCore, function_index: u32) -> Res
         0x22 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::RaiseNullPointerException)?,
         0x23 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::RaiseArrayIndexException)?,
         0x25 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::RaiseArithmeticException)?,
+        0x26 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::RaiseClassCastException)?,
         0x54 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::Unk54)?,
         0x55 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::Unk55)?,
         0x56 => core.make_svc_stub(SVC_CATEGORY_JAVA_SYSTEM, JavaSystemSvcId::MonitorEnter)?,
@@ -137,6 +138,7 @@ async fn handle_java_system_svc(
                 .await?
                 .write(core, lr),
             JavaSystemSvcId::RaiseArithmeticException => EmulatedFunction::call(&java_raise_arithmetic_exception, core, jvm).await?.write(core, lr),
+            JavaSystemSvcId::RaiseClassCastException => EmulatedFunction::call(&java_raise_class_cast_exception, core, jvm).await?.write(core, lr),
             JavaSystemSvcId::Unk1 => EmulatedFunction::call(&java_unk1, core, &mut ()).await?.write(core, lr),
             JavaSystemSvcId::Unk2 => EmulatedFunction::call(&java_unk2, core, &mut ()).await?.write(core, lr),
             JavaSystemSvcId::Unk3 => EmulatedFunction::call(&java_unk3, core, &mut ()).await?.write(core, lr),
@@ -261,8 +263,18 @@ async fn java_pending_exception(core: &mut ArmCore, _: &mut ()) -> Result<u32> {
 }
 
 async fn java_is_class_assignable(core: &mut ArmCore, jvm: &Jvm, ptr_class: u32, ptr_class_name: u32, _ptr_fields: u32) -> Result<u32> {
-    let class_name = String::from_utf8(read_null_terminated_string_bytes(core, ptr_class_name)?)
-        .map_err(|error| WieError::FatalError(format!("Invalid LGT class name: {error}")))?;
+    // The target is a name string — except for an array type, where the guest passes import 0x0e's
+    // return value as is, and that is the `java/lang/Class` object `java_get_array_type` made.
+    // Read as a string it is "" and every `(char[]) x` failed (735a579d82ac: 1 such site of 130,
+    // 744 ClassCastExceptions in one run, the game stuck once it reached the field).
+    let class_name = if let Some(class_object) = LgtJvmSupport::class_object_at(core, ptr_class_name) {
+        JavaLangClass::name(jvm, &class_object)
+            .await
+            .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))?
+    } else {
+        String::from_utf8(read_null_terminated_string_bytes(core, ptr_class_name)?)
+            .map_err(|error| WieError::FatalError(format!("Invalid LGT class name: {error}")))?
+    };
     // Both pointers arrive in guest registers, so both get the same trust. `ptr_class` is the
     // class word the guest read out of the reference it threw, and a corrupted pending exception
     // hands us one that points nowhere (measured on 놈3: its `catch (InterruptedException)` around
@@ -308,6 +320,15 @@ async fn java_raise_array_index_exception(_core: &mut ArmCore, jvm: &mut Jvm, in
 
 async fn java_raise_arithmetic_exception(_core: &mut ArmCore, jvm: &mut Jvm) -> Result<()> {
     let JavaError::JavaException(exception) = jvm.exception("java/lang/ArithmeticException", "/ by zero").await;
+    Err(WieError::JavaException(LgtJvmSupport::class_instance_raw(&*exception)))
+}
+
+// `checkcast` failure. Read off the one title that imports it (735a579d82ac, LGT, 78 call sites):
+// every site is `if (obj != null && !IsClassAssignable(obj.class, T.name)) import_0x26();` — the
+// call comes straight after import 0x12 answered 0, with r0 still holding that 0, so it carries no
+// argument (not the object, not the target class) and the message stays empty.
+async fn java_raise_class_cast_exception(_core: &mut ArmCore, jvm: &mut Jvm) -> Result<()> {
+    let JavaError::JavaException(exception) = jvm.exception("java/lang/ClassCastException", "").await;
     Err(WieError::JavaException(LgtJvmSupport::class_instance_raw(&*exception)))
 }
 
@@ -902,8 +923,9 @@ mod tests {
     use wie_util::WieError;
 
     use super::{
-        InterfaceMethodTables, LgtJvmSupport, get_java_interface_method, java_get_interface_method_table, java_instantiate,
-        java_link_imported_classes, java_load_long_array, java_store_long_array, read_member_name_and_descriptor, register_java_system_svc_handler,
+        InterfaceMethodTables, LgtJvmSupport, get_java_interface_method, java_get_array_type, java_get_interface_method_table, java_instantiate,
+        java_is_class_assignable, java_link_imported_classes, java_load_long_array, java_raise_class_cast_exception, java_store_long_array,
+        read_member_name_and_descriptor, register_java_system_svc_handler,
     };
     use crate::runtime::java::jvm_support::tests::init_jvm;
 
@@ -1460,6 +1482,59 @@ mod tests {
             let b = LgtJvmSupport::field_word_index(&jvm, class_name, "b", "I", false)?;
             let linked: [u16; 4] = read_generic(&core, instance_field_word_indices)?;
             assert_eq!(linked, [a, a + 1, b, 0xeeee]);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    // `(char[]) x` hands import 0x12 import 0x0e's return value — our `[C` Class object — where a
+    // name string goes everywhere else. Read as a string it was "", so the cast always failed and
+    // import 0x26 (ClassCastException, unknown until now) was the only way out.
+    #[test]
+    fn class_assignable_takes_an_array_class_object_as_target_and_0x26_raises_class_cast() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (mut jvm, mut core, _) = init_jvm(&system_clone).await?;
+            register_java_system_svc_handler(&mut core, &jvm, 0)?;
+            get_java_interface_method(&mut core, 0x26)?;
+
+            let chars = jvm.instantiate_array("C", 2).await.unwrap();
+            // The guest's `ptr_class`: the instance's dispatch table, then its first word.
+            let ptr_dispatch: u32 = read_generic(&core, LgtJvmSupport::class_instance_raw(&*chars))?;
+            let ptr_char_array_class: u32 = read_generic(&core, ptr_dispatch)?;
+
+            let char_array = java_get_array_type(&mut core, &mut jvm, 1, 0, 5).await?;
+            let int_array = java_get_array_type(&mut core, &mut jvm, 1, 0, 10).await?;
+            assert_eq!(java_is_class_assignable(&mut core, &jvm, ptr_char_array_class, char_array, 0).await?, 1);
+            assert_eq!(java_is_class_assignable(&mut core, &jvm, ptr_char_array_class, int_array, 0).await?, 0);
+
+            // The name-string form every other site uses still works.
+            for (name, expected) in [("[C", 1), ("java/lang/Object", 1), ("java/lang/String", 0)] {
+                let ptr_name = Allocator::alloc(&mut core, name.len() as u32 + 1)?;
+                write_null_terminated_string_bytes(&mut core, ptr_name, name.as_bytes())?;
+                assert_eq!(
+                    java_is_class_assignable(&mut core, &jvm, ptr_char_array_class, ptr_name, 0).await?,
+                    expected,
+                    "{name}"
+                );
+            }
+
+            let Err(WieError::JavaException(ptr_exception)) = java_raise_class_cast_exception(&mut core, &mut jvm).await else {
+                panic!("import 0x26 must throw into the guest");
+            };
+            let exception = LgtJvmSupport::class_instance_from_raw(&core, ptr_exception)?;
+            assert_eq!(exception.class_definition().name(), "java/lang/ClassCastException");
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
