@@ -44,6 +44,9 @@ const HEX64 = /^[0-9a-f]{64}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const PR = /^https:\/\/github\.com\/Jun025\/wie\/pull\/\d+$/;
 const FILE = /^(\d{4}-\d{2}-\d{2})-[a-z0-9][a-z0-9-]*\.json$/;
+// Punctuation the shell's site copy refuses — same set as otterpebble scripts/user-copy-glyph-check.mjs
+// (r2), whose importer rejects the whole updates file on one hit (otterpebble#1279).
+const FORBIDDEN_PUNCT = /[—―–·・ㆍ‧∙•]/;
 const str = (v) => typeof v === 'string' && v.trim() !== '';
 
 // Display names come from file names, which carry file markers: bracket tags ([큰화], [SKVM], the
@@ -150,6 +153,7 @@ export function validateUpdates(files, shas) {
     if (!Array.isArray(u.titles)) e.push(`${name}: titles must be an array (empty = every title)`);
     else for (const t of u.titles) if (!shas.has(t)) e.push(`${name}: title ${String(t).slice(0, 12)} is not in compat.json`);
     if (!str(u.summary_ko)) e.push(`${name}: empty summary_ko`);
+    else if (FORBIDDEN_PUNCT.test(u.summary_ko)) e.push(`${name}: summary_ko has ${u.summary_ko.match(FORBIDDEN_PUNCT)[0]} — the site copy refuses —―–·・ㆍ‧∙•`);
     if (!PR.test(u.pr ?? '')) e.push(`${name}: pr must be https://github.com/Jun025/wie/pull/<n>`);
     if ('enginePin' in u && !HEX40.test(u.enginePin ?? '')) e.push(`${name}: enginePin must be 40 lowercase hex`);
   }
@@ -244,6 +248,7 @@ function selftest() {
     ['update: bad kind', good, [['2026-09-27-x.json', { ...upd, kind: 'misc' }]]],
     ['update: bad file name', good, [['x.json', upd]]],
     ['update: pr is not a wie PR', good, [['2026-09-27-x.json', { ...upd, pr: 'https://example.com/1' }]]],
+    ['update: forbidden punctuation', good, [['2026-09-27-x.json', { ...upd, summary_ko: '위·아래 키' }]]],
     ['update: unknown key', good, [['2026-09-27-x.json', { ...upd, summary: '' }]]],
   ];
   const errs = (c, u) => [...validateCompat(c), ...validateUpdates(u ?? [], new Set((c.entries ?? []).map((x) => x.sha256)))];

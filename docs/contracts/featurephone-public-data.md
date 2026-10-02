@@ -71,6 +71,7 @@ YAML 이 아니라 JSON 인 이유: 파서 의존을 새로 들이지 않는다(
   enginePin?: 40hex }
 ```
 
+- `summary_ko` 에 `—―–·・ㆍ‧∙•` 를 쓰지 않는다 — 셸 사이트 문구 래칫(otterpebble `scripts/user-copy-glyph-check.mjs`)이 거부하고 가져오기가 파일째 막힌다. `player-data.mjs` 가 검사한다.
 - `enginePin` 을 생략하면 빌드가 **그 파일을 main 에 들여온 first-parent 커밋**(= 머지)으로 채운다. 그래서 새 항목은 고친 PR 안에서 함께 쓰면 된다.
   못 채우면(아직 main 에 없음) 그 항목은 이번 빌드에서 빠진다 — 지어낸 핀으로 싣지 않는다.
 - 빌드 산출: `{ schema: 1, generatedAt, wieHead, entries: [{ id(파일 이름), …위 필드, enginePin }] }` 날짜 최신 먼저.
