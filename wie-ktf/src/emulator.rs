@@ -55,15 +55,66 @@ const DEVICE_BOUND_SAVES: &[([u8; 16], &[&str])] = &[
     ),
 ];
 
-/// Remove the saves `table` names for this jar, both bare and under `P/` (`load` mounts both
-/// spellings at the same path).
+/// The original owner's settings, shipped in the archive, that start the title with its sound off.
+/// Measured per title, keyed like `DEVICE_BOUND_SAVES` and dropped the same way, so the title starts
+/// as a fresh install does: removing only these files brings the sound back in the 30 s probes
+/// (0 plays → 1–8), and on the two titles whose settings screen was opened, turning the sound up there
+/// does the same — the game honours them, nothing in the engine is silent (docs/report/0417).
+/// Deliberately a list: other shipped settings and saves load as they always have.
+const OWNER_SOUND_OFF_SETTINGS: &[([u8; 16], &[&str])] = &[
+    // 2fc792485d91: one 11,255-byte record: settings and progress together.
+    (
+        [
+            0x26, 0xc9, 0x60, 0x35, 0x44, 0x6a, 0x98, 0x31, 0xcd, 0x3f, 0x53, 0xf7, 0x98, 0x48, 0x74, 0x30,
+        ],
+        &["sp.dat.db", "sp.dat.idx"],
+    ),
+    // 3185174d2121: 7 bytes.
+    (
+        [
+            0xe9, 0x18, 0x85, 0xfb, 0x2c, 0x0f, 0xec, 0x9e, 0xa9, 0x7a, 0x0d, 0x29, 0xc1, 0x5e, 0xd7, 0x2f,
+        ],
+        &["setup.dat"],
+    ),
+    // 5e53e490c6f1: 12 bytes; its settings screen shows the sound level at 0.
+    (
+        [
+            0x1a, 0x21, 0x23, 0xeb, 0x97, 0xe2, 0x51, 0xdb, 0xcb, 0x4b, 0x49, 0x0c, 0xee, 0x86, 0x30, 0xea,
+        ],
+        &["opt.txt"],
+    ),
+    // 6a885f89343c: a 6-byte DB; the title's other three DBs are not it.
+    (
+        [
+            0x52, 0xfd, 0x30, 0xf7, 0x1d, 0x56, 0x67, 0x96, 0x2a, 0xa0, 0xab, 0x99, 0xf4, 0x70, 0x68, 0xb0,
+        ],
+        &["sky4.db", "sky4.idx"],
+    ),
+    // bfa8ec352451: one record: the owner's name, scores and option flags.
+    (
+        [
+            0xcf, 0xa9, 0xe1, 0x86, 0x07, 0xf6, 0xdc, 0x07, 0xc6, 0x54, 0x82, 0x06, 0xbd, 0x25, 0xc2, 0xdf,
+        ],
+        &["kill.db", "kill.idx"],
+    ),
+    // de00506611a5: four records.
+    (
+        [
+            0x05, 0x55, 0x29, 0x80, 0x3d, 0x08, 0xea, 0x81, 0x6b, 0xa2, 0x12, 0x2a, 0x7f, 0x8d, 0xa6, 0x87,
+        ],
+        &["haga2.db", "haga2.idx"],
+    ),
+];
+
+/// Remove the files `table` names for this jar, bare and under either private directory spelling
+/// (`load` mounts all three at the same path).
 fn drop_device_bound_saves(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8], table: &[([u8; 16], &[&str])]) {
     let hash = md5::compute(jar).0;
     for (_, names) in table.iter().filter(|(md5, _)| *md5 == hash) {
         for name in *names {
-            for key in [(*name).to_owned(), format!("P/{name}")] {
+            for key in [(*name).to_owned(), format!("P/{name}"), format!("p/{name}")] {
                 if files.remove(&key).is_some() {
-                    tracing::info!("Not mounting device-bound save {key}");
+                    tracing::info!("Not mounting the original owner's {key}");
                 }
             }
         }
@@ -132,6 +183,7 @@ impl KtfEmulator {
         let jar_filename = jar_filename(&adf.aid, &files);
         if let Some(jar) = files.get(&jar_filename).cloned() {
             drop_device_bound_saves(&mut files, &jar, DEVICE_BOUND_SAVES);
+            drop_device_bound_saves(&mut files, &jar, OWNER_SOUND_OFF_SETTINGS);
         }
 
         Self::load(platform, &jar_filename, &adf.pid, &adf.aid, Some(adf.mclass), &files, options)
@@ -293,6 +345,11 @@ mod tests {
         let mut files = archive(&["A.jar", "__adf__", "P/res/save.sav", "res/savem.sav", "P/res/other.sav"]);
         drop_device_bound_saves(&mut files, b"listed", table);
         assert_eq!(files.keys().collect::<alloc::vec::Vec<_>>(), ["A.jar", "P/res/other.sav", "__adf__"]);
+
+        // A lowercase private directory is mounted at the same path, so it is dropped the same way.
+        let mut files = archive(&["A.jar", "p/res/save.sav", "p/res/other.sav"]);
+        drop_device_bound_saves(&mut files, b"listed", table);
+        assert_eq!(files.keys().collect::<alloc::vec::Vec<_>>(), ["A.jar", "p/res/other.sav"]);
 
         // Any other jar — every other title — mounts exactly what it shipped.
         let mut files = archive(&["A.jar", "P/res/save.sav", "P/res/savem.sav"]);
