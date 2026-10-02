@@ -347,7 +347,7 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   `--only progress` is a seventh, opt-in axis — «does it keep moving forward», not «did it survive» —
   and it is **not in `status`**; a `stuck` counts only when its `--as P2` pair agrees (`docs/report/0393`).
   Run it as `~/orchestrator-live/bin/build-slot run -- node scripts/playability-census.mjs run …` and
-  leave `--jobs` at its default (half the cores; above `ncpu` is capped) — `--jobs 32` on this 10-core
+  leave `--jobs` at its default (half the cores, at most 3; above `ncpu` is capped) — `--jobs 32` on this 10-core
   Mac pushed load1 to 450 and starved every other lane (`docs/report/0378`). Two runs never overlap: `run` takes
   the host lock `/tmp/wie-playability-census.lock` (fixed path, so scratch copies share it) and a second run
   **waits** for it — it does not fail. A dead holder's lock is reclaimed.
