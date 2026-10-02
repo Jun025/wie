@@ -104,3 +104,5 @@ wave4(`wie-census-wave4-remaining-walls-and-locked-titles`, 먼저 착지)의 �
 `cargo fmt --check` · `cargo clippy --all -D warnings` · wasm32 clippy · `+beta` clippy · `RUST_MIN_STACK=4194304 cargo test --all`(651 pass · 0 fail) · `npm run build:wasm` 은 모두 rc=0 이다. census selftest 48/48. 러너 블록 draw·helloworld×2·keydraw×2(`--expect-last-frame`)·text 는 모두 PASS 다. 되돌리면 red: `stall_escape_splices_keys_and_shifts_the_rest` · `novel_is_the_census_new_screen_rule` · `db_stats_count_a_resumed_read_only_across_boots_after_play` · `restart_at_reboots_once_and_reports_the_database` 가 새 함수와 동작을 직접 잡는다. census 쪽은 «the resume tail is outside the curve» 와 «frames are ordered by their time» 이 잡는다(각각 되돌려 FAIL 실측).
 
 유입(corpus-name-inflow): BOUNDED 333쌍 · SUFFIX-ATTACHED 15쌍 — 전부 이 회차가 고친 파일에 **이미 있던** 문자열(compat.json 의 공개 `title` 필드 · wie_validate.rs 의 기존 주석)이다. 이 회차가 더한 줄의 게임명 0(`git diff origin/main` 의 `+` 줄 대조).
+
+<!-- corpus-name-inflow v1 subjects=6 tree=5f084cda6ced45bd B=722/333 P=2/2 S=35/15 -->
