@@ -22,6 +22,7 @@ impl TextComponent {
                 JavaMethodProto::new("<init>", "()V", Self::init, MethodAccessFlags::PROTECTED),
                 JavaMethodProto::new("setString", "(Ljava/lang/String;)V", Self::set_string, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("setMaxLength", "(I)V", Self::set_max_length, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getMaxLength", "()I", Self::get_max_length, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getString", "()Ljava/lang/String;", Self::get_string, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("keyNotify", "(II)Z", Self::key_notify, MethodAccessFlags::PUBLIC),
             ],
@@ -32,8 +33,8 @@ impl TextComponent {
                 // wie writes it -- imHandler owns the mode -- so it stays at its default.
                 JavaFieldProto::new("iMode", "I", FieldAccessFlags::PROTECTED),
                 // Same story as iMode: read directly by 서든어택포켓 (`maxLength I`) and
-                // 훼밀리마트타이쿤 (`m_td [C`). setMaxLength is a no-op stub, so neither is
-                // written by it; m_td stays null until a key reaches keyNotify below.
+                // 훼밀리마트타이쿤 (`m_td [C`). setMaxLength keeps its value here; m_td stays null
+                // until a key reaches keyNotify below.
                 JavaFieldProto::new("maxLength", "I", FieldAccessFlags::PROTECTED),
                 JavaFieldProto::new("m_td", "[C", FieldAccessFlags::PROTECTED),
                 JavaFieldProto::new("imHandler", "Lorg/kwis/msp/lcdui/InputMethodHandler;", FieldAccessFlags::PROTECTED),
@@ -56,10 +57,18 @@ impl TextComponent {
         Ok(())
     }
 
-    async fn set_max_length(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<TextComponent>, max_length: i32) -> JvmResult<()> {
-        tracing::warn!("stub org.kwis.msp.lwc.TextComponent::<init>({this:?}, {max_length})");
+    // Kept so getMaxLength can answer it: d448aee68157's name box calls getMaxLength()I on the
+    // first key it receives, after setMaxLength(5). Nothing caps the typed text yet (keyNotify).
+    async fn set_max_length(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<TextComponent>, max_length: i32) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lwc.TextComponent::setMaxLength({this:?}, {max_length})");
 
-        Ok(())
+        jvm.put_field(&mut this, "maxLength", "I", max_length).await
+    }
+
+    async fn get_max_length(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<TextComponent>) -> JvmResult<i32> {
+        tracing::debug!("org.kwis.msp.lwc.TextComponent::getMaxLength({this:?})");
+
+        jvm.get_field(&this, "maxLength", "I").await
     }
 
     async fn set_string(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<TextComponent>, data: ClassInstanceRef<String>) -> JvmResult<()> {
@@ -84,8 +93,8 @@ impl TextComponent {
 
     // Minimal input: a digit press appends it, CLR removes the last character — the keys a
     // ShellComponent hands the focused text widget. The text is kept in m_td, the canonical
-    // buffer field (see its comment). No multi-tap letters, and no length cap: setMaxLength is
-    // still a no-op. 1 = KEY_PRESSED, -16 = CLR as net.wie.CardCanvas sends them.
+    // buffer field (see its comment). No multi-tap letters, and no length cap: setMaxLength only
+    // records the value. 1 = KEY_PRESSED, -16 = CLR as net.wie.CardCanvas sends them.
     async fn key_notify(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<TextComponent>, r#type: i32, key: i32) -> JvmResult<bool> {
         tracing::debug!("org.kwis.msp.lwc.TextComponent::keyNotify({this:?}, {type}, {key})");
 
@@ -113,5 +122,37 @@ impl TextComponent {
         jvm.put_field(&mut this, "m_td", "[C", buffer).await?;
 
         Ok(true)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::boxed::Box;
+
+    use jvm::ClassInstanceRef;
+    use test_utils::run_jvm_test;
+    use wie_util::Result;
+
+    use crate::get_protos;
+
+    /// d448aee68157's name box: setMaxLength(5), then getMaxLength()I on the first key it receives —
+    /// the method was missing, and the tick died on it.
+    #[test]
+    fn get_max_length_answers_what_set_max_length_kept() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            let null: ClassInstanceRef<()> = ClassInstanceRef::new(None);
+            let text_box = jvm
+                .new_class("org/kwis/msp/lwc/TextBoxComponent", "(Ljava/lang/String;I)V", (null, 0))
+                .await?;
+            let _: () = jvm
+                .invoke_virtual(&text_box, "org/kwis/msp/lwc/TextBoxComponent", "setMaxLength", "(I)V", (5,))
+                .await?;
+            let max: i32 = jvm
+                .invoke_virtual(&text_box, "org/kwis/msp/lwc/TextBoxComponent", "getMaxLength", "()I", ())
+                .await?;
+            assert_eq!(max, 5);
+
+            Ok(())
+        })
     }
 }
