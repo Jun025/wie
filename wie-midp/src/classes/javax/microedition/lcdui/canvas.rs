@@ -34,6 +34,8 @@ impl Canvas {
                 JavaMethodProto::new("keyPressed", "(I)V", Self::key_pressed, MethodAccessFlags::PROTECTED),
                 JavaMethodProto::new("keyRepeated", "(I)V", Self::key_repeated, MethodAccessFlags::PROTECTED),
                 JavaMethodProto::new("keyReleased", "(I)V", Self::key_released, MethodAccessFlags::PROTECTED),
+                JavaMethodProto::new("showNotify", "()V", Self::show_notify, MethodAccessFlags::PROTECTED),
+                JavaMethodProto::new("hideNotify", "()V", Self::hide_notify, MethodAccessFlags::PROTECTED),
                 JavaMethodProto::new("setFullScreenMode", "(Z)V", Self::set_full_screen_mode, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("isDoubleBuffered", "()Z", Self::is_double_buffered, MethodAccessFlags::PUBLIC),
                 // wie private methods
@@ -167,6 +169,19 @@ impl Canvas {
 
     async fn key_released(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, key: i32) -> JvmResult<()> {
         tracing::debug!("javax.microedition.lcdui.Canvas::keyReleased({this:?}, {key})");
+
+        Ok(())
+    }
+
+    // MIDP: empty here, overridden by titles; `Display.setCurrent` calls them as a Canvas comes and goes.
+    async fn show_notify(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+        tracing::debug!("javax.microedition.lcdui.Canvas::showNotify({this:?})");
+
+        Ok(())
+    }
+
+    async fn hide_notify(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+        tracing::debug!("javax.microedition.lcdui.Canvas::hideNotify({this:?})");
 
         Ok(())
     }

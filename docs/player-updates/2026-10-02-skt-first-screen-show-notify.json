@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-02",
+  "kind": "fix",
+  "titles": [
+    "38277d63b0ba2803076c82ff36f5bc1435d227d0401e4e9eedc455d56da5a68a",
+    "6e9991f0865084a70de9dfca224d8a2b0746fb519e2492ce8e3d0a114f81b389"
+  ],
+  "summary_ko": "로딩 화면이나 첫 로고에서 멈추던 SKT 게임이 이제 다음 화면으로 넘어가요. 화면이 바뀔 때 게임에 알려 주는 신호를 빠뜨리고 있었어요.",
+  "pr": "https://github.com/Jun025/wie/pull/448"
+}

@@ -644,6 +644,17 @@ function lockOf(path) {
 const quitUnpainted = (runs) => runs.every((r) => r && !r.paints) && runs.some((r) => r.stop === 'clean exit');
 const lockVerdict = (lock, runs) => (lock === 'drm' || (lock === 'phone' && quitUnpainted(runs)) ? lock : null);
 
+// ── titles that cannot go on without the original carrier's server ─────────────────────────────
+// Operator policy 2026-10-02: the server is gone and its data is not ours to make up, so the census
+// says so in the player's words, and `status` stays where the title really gets to (at most limited).
+// The rule is the run, not the code: measured 2026-10-02 on the bd2337ff census, 30 titles reach a
+// connect call and 29 of them play — they connect once (at most 5 times a run) and go on. A title
+// that cannot go on keeps asking: f44271803135 retried 99 times in a 30 s probe. Two more that read
+// as «network» on screen were engine walls with the data already shipped (docs/report/0414).
+const NET_KO = '게임을 시작하려면 옛 통신사 서버에서 데이터를 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.';
+const NET_CONNECT = /MC_netConnect|MC_netSocketConnect|MC_netHttpConnect|Network::connect\(/g;
+const netWall = (stderrs) => stderrs.some((text) => (text.match(NET_CONNECT) ?? []).length >= 20);
+
 // NFC: macOS hands back file names decomposed (NFD), and PR titles are composed.
 const displayTitle = (p) =>
   basename(p)
@@ -755,6 +766,9 @@ if (cmd === 'selftest') {
       ['a jar without all three properties is not locked', lockOf(plain) === null],
       ['the check that quit before painting is a lock', lockVerdict('phone', [quit, { stop: 'deadline', paints: 0 }]) === 'phone'],
       ['the check in a title that paints is not', lockVerdict('phone', [quit, { stop: 'clean exit', paints: 3 }]) === null],
+      ['a connect retried 20 times is a network wall', netWall(['', 'WARN stub MC_netConnect(0x1, 0xa)\n'.repeat(20)])],
+      ['a connect made once and passed is not', !netWall(['WARN stub MC_netConnect(0x1, 0xa)\n'.repeat(5), 'Network::connect()'])],
+      ['a Java connect loop counts too', netWall(['stub org.kwis.msf.io.Network::connect()\n'.repeat(20)])],
       ['the check in a title that crashed is not', lockVerdict('phone', [{ stop: 'error', paints: 0 }, { stop: 'error', paints: 0 }]) === null],
     );
     rmSync(tmp, { recursive: true, force: true });
@@ -862,7 +876,8 @@ if (cmd === 'run') {
     if (!j) continue;
     const title = displayTitle(t.path);
     const platform = j.A.platform && j.A.platform !== 'unknown' ? j.A.platform.toUpperCase() : sniffPlatform(t.path);
-    const st = status(j.ax);
+    const net = netWall(['A', 'L'].map((p) => join(out, t.sha, `${p}.stderr`)).filter(existsSync).map((f) => readFileSync(f, 'latin1')));
+    const st = net && status(j.ax) === 'playable' ? 'limited' : status(j.ax);
     const issues = Object.entries(j.ax)
       .filter(([k]) => !(k === 'render' && j.ax.boot === 'fail')) // one line for a title that never started
       .map(([k, v]) => ISSUE_KO[`${k}:${v}`])
@@ -870,6 +885,7 @@ if (cmd === 'run') {
     // A locked file says only that: the other lines would read as «not fixed yet».
     const lock = lockVerdict(lockOf(t.path), [j.A, j.B]);
     if (lock) issues.splice(0, issues.length, LOCK_KO[lock]);
+    else if (net) issues.splice(0, issues.length, NET_KO);
     const changes = prs
       .filter((pr) => names(pr.title, title) && !otherCarrier(pr.title, platform))
       .map((pr) => ({ date: pr.mergedAt.slice(0, 10), enginePin: pr.mergeCommit?.oid ?? null, summary_ko: summaryKo(pr.title), pr: pr.number }));
