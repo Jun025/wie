@@ -79,3 +79,5 @@
 ### 9. 게임 이름 유입
 
 `node scripts/corpus-name-inflow.mjs --corpus <game_lab>` 결과(10파일): 유입 39쌍(BOUNDED) · 판단 필요 6쌍(SUFFIX-ATTACHED). **이 diff 가 새로 들인 이름은 0이다.** 두 바구니 모두 이 diff 가 건드린 파일(`lgt_java_abi.toml`·`jvm_support.rs`·`interface.rs`·`text_component.rs`)에 원래 있던 이름이다. 새로 쓴 주석·문서·소식은 sha12 만 쓴다. 고친 `text_component.rs` 필드 주석 한 줄의 이름은 sha12 로 바꿨다. `git diff origin/main` 의 코드 `+` 줄에서 3자 이상 한글 연속은 0건이다. 문서의 «게임시작»·«…골라봐» 는 화면 문구다.
+
+<!-- corpus-name-inflow v1 subjects=10 tree=a96dfb8edeb6ba28 B=118/39 P=2/1 S=16/6 -->
