@@ -18,6 +18,7 @@ pub fn register_stdlib_svc_handler(core: &mut ArmCore, system: &System) -> Resul
             x if x == StdlibSvcId::Sprintf as u32 => EmulatedFunction::call(&sprintf, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Vsprintf as u32 => EmulatedFunction::call(&vsprintf, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Atoi as u32 => EmulatedFunction::call(&atoi, core, &mut ()).await?.write(core, lr),
+            x if x == StdlibSvcId::Strtol as u32 => EmulatedFunction::call(&strtol, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Rand as u32 => EmulatedFunction::call(&rand, core, system).await?.write(core, lr),
             x if x == StdlibSvcId::Srand as u32 => EmulatedFunction::call(&srand, core, system).await?.write(core, lr),
             x if x == StdlibSvcId::Strcpy as u32 => EmulatedFunction::call(&stdlib::strcpy, core, &mut ()).await?.write(core, lr),
@@ -153,6 +154,53 @@ async fn atoi(core: &mut ArmCore, _: &mut (), ptr_str: u32) -> Result<u32> {
     Ok(string.parse().unwrap_or(0))
 }
 
+async fn strtol(core: &mut ArmCore, _: &mut (), ptr_str: u32, ptr_end: u32, base: u32) -> Result<u32> {
+    tracing::debug!("strtol({ptr_str:#x}, {ptr_end:#x}, {base})");
+
+    let s = read_null_terminated_string_bytes(core, ptr_str)?;
+    let (value, consumed) = parse_long(&s, base);
+    if ptr_end != 0 {
+        write_generic(core, ptr_end, ptr_str + consumed as u32)?;
+    }
+
+    Ok(value as u32)
+}
+
+/// C `strtol` over bytes: returns the value and how many bytes it consumed (0 when no digits).
+fn parse_long(s: &[u8], base: u32) -> (i32, usize) {
+    let mut i = s.iter().take_while(|&&b| b == b' ' || (b'\t'..=b'\r').contains(&b)).count();
+    let negative = s.get(i) == Some(&b'-');
+    if matches!(s.get(i), Some(b'-' | b'+')) {
+        i += 1;
+    }
+    let hex_prefix = s.get(i) == Some(&b'0') && matches!(s.get(i + 1), Some(b'x' | b'X')) && s.get(i + 2).is_some_and(|b| b.is_ascii_hexdigit());
+    let base = match base {
+        0 if hex_prefix => 16,
+        0 if s.get(i) == Some(&b'0') => 8,
+        0 => 10,
+        x => x,
+    };
+    if base == 16 && hex_prefix {
+        i += 2;
+    }
+    if !(2..=36).contains(&base) {
+        return (0, 0);
+    }
+
+    let start = i;
+    let mut magnitude: i64 = 0;
+    while let Some(digit) = s.get(i).and_then(|&b| (b as char).to_digit(base)) {
+        magnitude = (magnitude * base as i64 + digit as i64).min(1 << 32); // saturate; clamped below
+        i += 1;
+    }
+    if i == start {
+        return (0, 0);
+    }
+    let value = if negative { -magnitude } else { magnitude };
+
+    (value.clamp(i32::MIN as i64, i32::MAX as i64) as i32, i)
+}
+
 async fn time(core: &mut ArmCore, system: &mut System, ptr_time: u32) -> Result<u32> {
     let epoch_seconds = (system.platform().now().raw() / 1000) as u32;
     tracing::debug!("time({ptr_time:#x}) -> {epoch_seconds}");
@@ -270,7 +318,7 @@ mod tests {
     use wie_core_arm::{Allocator, ArmCore};
     use wie_util::{ByteRead, ByteWrite, Result};
 
-    use super::{free, malloc, rand, register_stdlib_svc_handler, srand};
+    use super::{free, malloc, parse_long, rand, register_stdlib_svc_handler, srand};
     use crate::runtime::{SVC_CATEGORY_STDLIB, svc_ids::StdlibSvcId};
 
     #[test]
@@ -409,5 +457,57 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    /// Import 0x3ff is strtol: acc4215b7ec0 died on `Unknown lgt stdlib import: 0x3ff` in a menu, at
+    /// `f("0xFFAE08", &end, 16)` (see `StdlibSvcId::Strtol`). Goes through the SVC table, like the tests above.
+    #[test]
+    fn stdlib_import_0x3ff_is_strtol_through_the_svc_table() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let mut core = ArmCore::new(false, None)?;
+            Allocator::init(&mut core)?;
+            let stack = Allocator::alloc(&mut core, 0x1000)?;
+            let mut context = core.save_context();
+            context.sp = stack + 0x1000;
+            core.restore_context(&context);
+            register_stdlib_svc_handler(&mut core, &system_clone)?;
+            let stub = core.make_svc_stub(SVC_CATEGORY_STDLIB, StdlibSvcId::Strtol)?;
+            assert_eq!(StdlibSvcId::Strtol as u32, 0x3ff);
+
+            let text = Allocator::alloc(&mut core, 16)?;
+            core.write_bytes(text, b"0xFFAE08|\0")?;
+            let end = Allocator::alloc(&mut core, 4)?;
+            let value: u32 = core.run_function(stub, &[text, end, 16]).await?;
+            let mut end_ptr = [0u8; 4];
+            core.read_bytes(end, &mut end_ptr)?;
+            assert_eq!((value, u32::from_le_bytes(end_ptr)), (0xffae08, text + 8));
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_long_follows_c_strtol() {
+        assert_eq!(parse_long(b"0xFFAE08", 16), (0xffae08, 8));
+        assert_eq!(parse_long(b"FFFFFF", 16), (0xffffff, 6));
+        assert_eq!(parse_long(b"  -42abc", 10), (-42, 5));
+        assert_eq!(parse_long(b"0x", 16), (0, 1)); // "0" parsed, "x" left
+        assert_eq!(parse_long(b"017", 0), (0o17, 3));
+        assert_eq!(parse_long(b"0x1f", 0), (0x1f, 4));
+        assert_eq!(parse_long(b"zz", 10), (0, 0));
+        assert_eq!(parse_long(b"99999999999", 10), (i32::MAX, 11));
+        assert_eq!(parse_long(b"-99999999999", 10), (i32::MIN, 12));
     }
 }
