@@ -62,4 +62,8 @@
 | `ChoiceText.keyNotify` 등재 제거 | `getSelectedIndex` = 1 |
 
 ### 7. 게임 파일명 유입
-<!-- filled below -->
+- 유입 5쌍(BOUNDED) + 판단 필요 1쌍(SUFFIX-ATTACHED).
+  - BOUNDED 5쌍은 모두 이 회차가 고친 파일(`shell_card.rs`·`component.rs`·`text_component.rs`)에 **원래 있던** 주석 속 제목이다.
+  - SUFFIX-ATTACHED 1쌍은 그중 한 주석의 더 긴 다른 제목이다(조사 붙은 언급이 아니다).
+  - 이 PR 이 더한 줄에서는 0이다(`git diff origin/main...HEAD` 의 `+` 줄 0). 주석 한 줄을 다시 감쌌다가 그 줄을 원문대로 되돌렸다.
+- 표식 줄은 도구 출력 그대로다.
