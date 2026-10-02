@@ -25,6 +25,12 @@ impl XDisplay {
                     Self::copy_lcd,
                     MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
                 ),
+                JavaMethodProto::new(
+                    "clear",
+                    "(Ljavax/microedition/lcdui/Graphics;Ljavax/microedition/lcdui/Image;II)V",
+                    Self::clear,
+                    MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+                ),
             ],
             fields: vec![
                 JavaFieldProto::new("width", "I", FieldAccessFlags::PUBLIC | FieldAccessFlags::STATIC),
@@ -70,5 +76,71 @@ impl XDisplay {
         tracing::warn!("stub com.xce.lcdui.XDisplay::copyLCD({graphics:?}, {image:?}, {x}, {y}, {width}, {height})",);
 
         Ok(())
+    }
+
+    // No API document for this in the repo; 6e93f26fa2f5 calls it while loading a game and stops on
+    // NoSuchMethodError. A logged no-op like copyLCD above: what it clears (and with what) is unknown.
+    async fn clear(
+        _jvm: &Jvm,
+        _context: &mut WieJvmContext,
+        graphics: ClassInstanceRef<Graphics>,
+        image: ClassInstanceRef<Image>,
+        x: i32,
+        y: i32,
+    ) -> JvmResult<()> {
+        tracing::warn!("stub com.xce.lcdui.XDisplay::clear({graphics:?}, {image:?}, {x}, {y})");
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use alloc::boxed::Box;
+
+    use jvm::{ClassInstanceRef, Result as JvmResult};
+    use test_utils::run_jvm_test;
+
+    use wie_midp::classes::javax::microedition::lcdui::{Graphics, Image};
+
+    use super::XDisplay;
+
+    // 6e93f26fa2f5 resolves exactly this descriptor while loading a game; without it the load ends
+    // in NoSuchMethodError and the title never reaches play.
+    #[test]
+    fn clear_is_resolvable_with_the_descriptor_a_title_calls() {
+        run_jvm_test(
+            Box::new([wie_midp::get_protos().into(), [XDisplay::as_proto()].into()]),
+            |jvm| async move {
+                let image: ClassInstanceRef<Image> = jvm
+                    .invoke_static(
+                        "javax/microedition/lcdui/Image",
+                        "createImage",
+                        "(II)Ljavax/microedition/lcdui/Image;",
+                        (4, 4),
+                    )
+                    .await?;
+                let graphics: ClassInstanceRef<Graphics> = jvm
+                    .invoke_virtual(
+                        &image,
+                        "javax/microedition/lcdui/Image",
+                        "getGraphics",
+                        "()Ljavax/microedition/lcdui/Graphics;",
+                        (),
+                    )
+                    .await?;
+                let r: JvmResult<()> = jvm
+                    .invoke_static(
+                        "com/xce/lcdui/XDisplay",
+                        "clear",
+                        "(Ljavax/microedition/lcdui/Graphics;Ljavax/microedition/lcdui/Image;II)V",
+                        (graphics, image, 0, 0),
+                    )
+                    .await;
+                assert!(r.is_ok());
+
+                Ok(())
+            },
+        )
     }
 }

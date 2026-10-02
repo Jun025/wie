@@ -3428,13 +3428,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "이터널사가2"
   },
@@ -3521,13 +3519,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "전국호텔왕plus"
   },

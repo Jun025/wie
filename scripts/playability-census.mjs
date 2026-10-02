@@ -262,6 +262,7 @@ async function speed(t) {
   writeFileSync(f, JSON.stringify(await validate(args, opt.secs + 120, join(d, 'S.stderr'))));
 }
 
+const longKeys = (recipe, reps) => [recipe, ...Array(reps).fill(LONG_KEYS)].join('\n');
 async function longplay(t, spec = {}) {
   const d = join(out, t.sha);
   const f = join(d, 'L.json');
@@ -271,7 +272,7 @@ async function longplay(t, spec = {}) {
   const reps = Math.ceil(opt.long / 10);
   // A `--titles` recipe is a prefix here too: the loop alone never leaves some logos and menus, and
   // a title whose music starts in play then reads `silent` (15 such, docs/report/0388 §1).
-  writeFileSync(keys, [spec.keys ? readFileSync(spec.keys, 'utf8') : '', ...Array(reps).fill(LONG_KEYS)].join('\n'));
+  writeFileSync(keys, longKeys(spec.keys ? readFileSync(spec.keys, 'utf8') : '', reps));
   // --max-ticks: the 50M default is an infinite-loop backstop sized for a boot, and a fast title
   // burns it in minutes — measured on this run's first pass, which ended runs at 3 of 10 minutes.
   const args = ['--inject', '--keys', keys, '--keep-timeout', '--timeout', String(opt.long), '--max-ticks', '100000000000', '--shotdir', join(d, 'L'), '--shot-every', '20', ...RELAUNCH, t.path];
@@ -679,6 +680,7 @@ if (cmd === 'selftest') {
     ['empty plays everywhere are silent', soundVerdict('ok', [{ audio: { plays: 2, empty_plays: 2 } }, null, { audio: { plays: 0 } }]) === 'silent'],
     ['no audio record is n/a', soundVerdict('ok', [{}, null]) === 'n/a' && soundVerdict('fail', [{ audio: { plays: 1 } }]) === 'n/a'],
     ['--jobs 0 / garbage becomes 1', jobsFor('0', 10) === 1 && jobsFor('x', 10) === 1],
+    ['a long-run recipe comes before the loop', longKeys('NUM2:3', 2).split('\n')[0] === 'NUM2:3' && longKeys('NUM2:3', 2).split('\n').length === 3],
   ];
   // Progress: 60 shots over 600 s. New frames until 400 s, then the same two alternating (a blink).
   {
