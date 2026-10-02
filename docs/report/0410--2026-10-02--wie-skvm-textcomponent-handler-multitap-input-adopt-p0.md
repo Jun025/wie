@@ -58,3 +58,5 @@ probe → long 600 → P → P2 를 바이너리마다 직렬로 돌렸다(10:12
 
 ### 6. 게임 파일명 유입
 `node scripts/corpus-name-inflow.mjs --corpus <game_lab>`: 유입 0건(BOUNDED 0회/0쌍) · 판단 필요 0건(SUFFIX-ATTACHED 0회/0쌍). 새 주석·문서·소식은 sha12 만 쓴다.
+
+<!-- corpus-name-inflow v1 subjects=4 tree=c9bd61a2689bf33e B=0/0 P=0/0 S=0/0 -->
