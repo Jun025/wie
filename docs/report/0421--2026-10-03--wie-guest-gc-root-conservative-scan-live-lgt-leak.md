@@ -107,4 +107,4 @@ KTF 는 ⒝만 있다. `java_new` 는 `instantiate_class` 라 객체 집합에 �
 
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 78회 / 34쌍 · SUFFIX-ATTACHED 5회 / 3쌍. 전부 이 회차가 고친 파일에 **이미 있던** 줄(`init.rs`·`exception.rs`·`interface.rs`·`jvm_support.rs`·`wie_validate.rs` 의 기존 주석·시험 행)이다. SUFFIX-ATTACHED 3쌍은 더 긴 다른 제목이다. 이 회차가 더한 줄의 게임 이름은 0이다(`git diff origin/main...HEAD` 의 `+` 줄 대조 · 초안의 한 곳은 sha12 로 바꿨다).
 
-<!-- corpus-name-inflow v1 subjects=20 tree=ad613b018cacf2b1 B=78/34 P=9/2 S=5/3 -->
+<!-- corpus-name-inflow v1 subjects=20 tree=83a230aee7397920 B=78/34 P=9/2 S=5/3 -->
