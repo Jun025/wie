@@ -64,3 +64,4 @@ fd = 602(2, 1) → [0x1512a38]      ; MC_netSocket(AF_INET, SOCK_STREAM)
 - `cargo fmt --all -- --check` · `cargo clippy --all -- -D warnings`(stable · beta) · wasm32 clippy · `RUST_MIN_STACK=4194304 cargo test --all`(실패 0) — 전부 rc=0. 이 worktree 의 target · build-slot 경유.
 - 러너 블록(debug): `draw_j2me` · `helloworld_ktf` · `helloworld_lgt` · `text_j2me`(`--timeout 5`) PASS · `keydraw_ktf`·`keydraw_lgt` `--inject --expect-last-frame` PASS · `content true` · rc=0(증적 `runner.log` — rc 열은 따로 다시 쟀다).
 - `node scripts/player-data.mjs` OK · `node scripts/check-worklog-json.mjs` OK · `node scripts/check-docs-report-serial.mjs` OK.
+- 유입(`node scripts/corpus-name-inflow.mjs --corpus <main checkout>/game_lab` — 이 worktree 에는 corpus 가 없다): BOUNDED 340쌍 · SUFFIX-ATTACHED 15쌍 — 전부 이 PR 이 손댄 파일에 이미 있던 줄이다(`compat.json` 의 `title`·`fileTitle` · `svc_ids.rs`·`wipi_c.rs` 의 기존 주석). 이 회차가 더한 줄(diff `+` 155줄)과 그 331개 이름을 대조하면 **0** — 타이틀은 sha12 로만 적었다.
