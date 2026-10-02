@@ -16,6 +16,7 @@ use wipi_types::lgt::java::{LgtJavaClass as RawJavaClass, LgtJavaClassDescriptor
 use wie_core_arm::{ArmCore, EmulatedFunction, JumpTo, ResultWriter, SvcId};
 use wie_util::{Result, WieError, read_generic, read_null_terminated_string_bytes, write_generic};
 
+use super::jvm_support::guest_roots;
 use crate::runtime::{
     SVC_CATEGORY_JAVA_SYSTEM,
     java::{
@@ -80,6 +81,9 @@ async fn handle_java_system_svc(
     id: SvcId,
 ) -> Result<JumpTo> {
     let (_, lr) = core.read_pc_lr()?;
+    // A frame per call, as for the guest's calls to host methods (`JavaMethodProxy::call`).
+    guest_roots::stress_collect(jvm, core);
+    jvm.push_native_frame();
     let result: Result<()> = async {
         match JavaSystemSvcId::try_from(id)? {
             JavaSystemSvcId::InterfaceUnk0 => EmulatedFunction::call(&java_unk0, core, &mut ()).await?.write(core, lr),
@@ -139,6 +143,7 @@ async fn handle_java_system_svc(
         }
     }
     .await;
+    jvm.pop_frame();
 
     match result {
         Ok(()) => Ok(JumpTo(lr)),
@@ -508,16 +513,18 @@ async fn java_instantiate(core: &mut ArmCore, jvm: &mut Jvm, ptr_class_object: u
         .instantiate(jvm)
         .await
         .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))?;
+    // Into the jvm's object set, so it is collected once the guest drops it: the guest root scan
+    // keeps it while a guest register, stack or data word points at it. `instantiate_class` would
+    // register it too, but it also runs jvm-side class initialization, which LGT drives itself
+    // (`java_initialize_class`); `shallow_clone` registers without initializing. Before this a
+    // guest `new` was never collected, and from #445 neither was anything it pointed at
+    // (1b107b96bf4e: `StringBuffer`s and their `char[]`s, +31k in 1.5 minutes).
+    let original = instance;
+    let instance = jvm
+        .shallow_clone(&original)
+        .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))?;
+    original.destroy();
     let ptr_instance = LgtJvmSupport::class_instance_raw(&*instance);
-    // A guest `new` is never collected (it is not in the jvm's object set), but only the guest's
-    // registers and stack may point at it, and the collector cannot see those. Without a root
-    // here, what its host constructor allocated died at the next collection while the object
-    // lived on: be08d047cbae's Stack kept a freed elementData, reused as an int[], and the
-    // next pop panicked the host (`Expected object, got Int`). Rooting it keeps exactly the
-    // set the guest can still reach alive.
-    //   ponytail: never released — guest objects already live forever here, so this adds one
-    //   map entry each. Release it if guest objects ever become collectable.
-    core::mem::forget(jvm.new_global_ref(&ClassInstanceRef::<()>::new(Some(instance.clone()))));
 
     let mut initializer_callbacks = Vec::new();
     let mut current = Some(definition);
@@ -1002,6 +1009,10 @@ mod tests {
             let ptr_element_data = LgtJvmSupport::class_instance_raw(&*element_data);
             drop(element_data);
             jvm.pop_frame();
+            // The guest holds the Stack in a register; the guest root scan must see it there.
+            let mut context = core.save_context();
+            context.r4 = ptr_stack;
+            core.restore_context(&context);
 
             jvm.collect_garbage().unwrap();
 
@@ -1025,6 +1036,103 @@ mod tests {
                 .await
                 .unwrap();
             assert!(popped.equals(&*element).unwrap());
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    // A context in which no guest register points anywhere: what survives a collection is then
+    // what the guest roots it is given, plus the jvm's own roots.
+    fn clear_guest_registers(core: &mut ArmCore) {
+        let mut context = core.save_context();
+        (context.r0, context.r1, context.r2, context.r3, context.r4, context.r5, context.r6) = (0, 0, 0, 0, 0, 0, 0);
+        (context.r7, context.r8, context.sb, context.sl, context.fp, context.ip, context.lr) = (0, 0, 0, 0, 0, 0, 0);
+        core.restore_context(&context);
+    }
+
+    // 1b107b96bf4e: a guest `new` the guest dropped is garbage. It used to live forever — outside
+    // the jvm's object set, then pinned by a global reference — and every `char[]` it held with it:
+    // 16-byte blocks +31k in 1.5 minutes until the heap ran out (~40 minutes in).
+    #[test]
+    fn a_guest_new_nothing_points_at_is_collected_with_what_it_held() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (mut jvm, mut core, _) = init_jvm(&system_clone).await?;
+            jvm.push_native_frame();
+            let class_object = jvm.resolve_class("java/util/Stack").await.unwrap().java_class();
+            let ptr_stack = java_instantiate(&mut core, &mut jvm, LgtJvmSupport::class_instance_raw(&*class_object)).await?;
+            let stack = LgtJvmSupport::class_instance_from_raw(&core, ptr_stack)?;
+            let _: () = jvm.invoke_special(&stack, "java/util/Stack", "<init>", "()V", ()).await.unwrap();
+            let element_data: Box<dyn ClassInstance> = jvm.get_field(&stack, "elementData", "[Ljava/lang/Object;").await.unwrap();
+            let ptr_element_data = LgtJvmSupport::class_instance_raw(&*element_data);
+            drop((stack, element_data));
+            jvm.pop_frame();
+            clear_guest_registers(&mut core);
+
+            jvm.collect_garbage().unwrap();
+
+            assert!(!Allocator::is_allocated(&core, ptr_stack, 12)?, "the dropped guest object is freed");
+            assert!(!Allocator::is_allocated(&core, ptr_element_data, 12)?, "and what only it held");
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    // The other direction, where a miss is a use-after-free: a guest word keeps its object alive —
+    // a pointer to it, or into its field storage (AOT code may keep only `ptr_fields` or an element
+    // address across a call), or one past that storage's end (a loop's end pointer).
+    #[test]
+    fn a_guest_word_into_an_object_keeps_it_alive() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (mut jvm, mut core, _) = init_jvm(&system_clone).await?;
+            for holder in ["object", "storage", "element", "storage end"] {
+                jvm.push_native_frame();
+                let array = jvm.instantiate_array("I", 4).await.unwrap();
+                let ptr_array = LgtJvmSupport::class_instance_raw(&*array);
+                drop(array);
+                jvm.pop_frame();
+                let ptr_fields: u32 = read_generic(&core, ptr_array + 8)?;
+                let word = match holder {
+                    "object" => ptr_array,
+                    "storage" => ptr_fields,
+                    "element" => ptr_fields + 4 + 2 * 4,
+                    _ => ptr_fields + 4 + 4 * 4,
+                };
+                clear_guest_registers(&mut core);
+                let mut context = core.save_context();
+                context.r5 = word;
+                core.restore_context(&context);
+
+                jvm.collect_garbage().unwrap();
+                assert!(Allocator::is_allocated(&core, ptr_array, 12)?, "kept by a guest word at its {holder}");
+
+                clear_guest_registers(&mut core);
+                jvm.collect_garbage().unwrap();
+                assert!(!Allocator::is_allocated(&core, ptr_array, 12)?, "freed once that word is gone ({holder})");
+            }
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())

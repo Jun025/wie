@@ -764,6 +764,12 @@ struct Args {
     /// then continue». Adds `restarted` to the JSON, and `db` (see `DbStats`) as `--relaunch` does.
     #[arg(long, value_name = "SECS", value_parser = positive_secs)]
     restart_at: Option<f64>,
+    /// LGT GC stress, a debug mode: collect at every Nth guest→host call and poison what each
+    /// collection frees, so a guest reference the root scan missed faults at 0xdeaddead or is
+    /// counted. Adds `gc_stress` (`collections`, `dangling`) to the JSON. OFF by default; with it
+    /// absent the line is unchanged.
+    #[arg(long, value_name = "N", value_parser = clap::value_parser!(u32).range(1..))]
+    gc_stress: Option<u32>,
 }
 
 fn positive_or_zero_secs(s: &str) -> Result<f64, String> {
@@ -1076,6 +1082,9 @@ fn main() {
 
     let args = Args::parse();
     let start = StdInstant::now();
+    if let Some(every) = args.gc_stress {
+        wie_lgt::set_gc_stress(every);
+    }
 
     {
         let filename = args.filename.clone();
@@ -1141,6 +1150,16 @@ fn main() {
     };
     let json = match &result.db {
         Some(db) => format!("{},\"db\":{db}}}", &json[..json.len() - 1]),
+        None => json,
+    };
+    let json = match args.gc_stress {
+        Some(_) => {
+            let (collections, dangling) = wie_lgt::gc_stress_counts();
+            format!(
+                "{},\"gc_stress\":{{\"collections\":{collections},\"dangling\":{dangling}}}}}",
+                &json[..json.len() - 1]
+            )
+        }
         None => json,
     };
     if tallies.svc_stub_exhausted.load(Ordering::SeqCst) && result.verdict() == svc_stub_exhausted_outcome().verdict() {

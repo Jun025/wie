@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use core::mem::size_of;
 
 use bytemuck::{Pod, Zeroable};
@@ -224,6 +225,26 @@ pub fn release_to(core: &mut ArmCore, mark: Mark) -> Result<()> {
     state.consumed_len = mark.consumed_len;
     state.consumed_base = mark.consumed_base;
     write_generic(core, ptr_state, state)
+}
+
+/// What this ledger holds that may be the only reference to a guest object, for the conservative
+/// GC root scan: each thread's pending exception, and the registers every pushed try saved.
+pub fn root_words(core: &ArmCore) -> Result<Vec<u32>> {
+    let support_context: JavaSupportContext = read_generic(core, SUPPORT_CONTEXT_BASE)?;
+    let mut words = Vec::new();
+    let mut ptr_state = support_context.ptr_first_thread_state;
+    while ptr_state != 0 {
+        let state: ThreadExceptionState = read_generic(core, ptr_state)?;
+        words.push(state.ptr_pending_exception);
+        let mut ptr_frame = state.ptr_current_exception_frame;
+        while ptr_frame != 0 {
+            let frame: [u32; FRAME_WORDS as usize] = read_generic(core, ptr_frame)?;
+            words.extend_from_slice(&frame);
+            ptr_frame = frame[0];
+        }
+        ptr_state = state.ptr_next;
+    }
+    Ok(words)
 }
 
 pub fn pending(core: &ArmCore) -> Result<u32> {

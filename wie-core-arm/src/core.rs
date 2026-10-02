@@ -1,7 +1,7 @@
 use alloc::{borrow::ToOwned, boxed::Box, collections::BTreeMap, format, string::String, sync::Arc, vec, vec::Vec};
 use core::{
     mem::size_of,
-    sync::atomic::{AtomicU32, Ordering},
+    sync::atomic::{AtomicU32, AtomicU64, Ordering},
 };
 
 use spin::Mutex;
@@ -85,6 +85,23 @@ fn drain_samples(samples: &mut BTreeMap<Vec<u32>, u64>) -> Vec<ProfileSample> {
 pub struct ArmCore {
     pub(crate) inner: Arc<Mutex<ArmCoreInner>>, // TODO can we change it to another lock like async-lock?
     threads: Arc<Mutex<BTreeMap<ThreadId, ThreadState>>>,
+    // The guest registers each in-flight `run_function` put aside, keyed by call. While host code
+    // runs a nested guest call, these are the only copy of what the outer guest code held — the
+    // arguments of the host method it called included. See `guest_root_words`.
+    saved_contexts: Arc<Mutex<BTreeMap<u64, ArmCoreContext>>>,
+}
+
+static NEXT_SAVED_CONTEXT: AtomicU64 = AtomicU64::new(0);
+
+struct SavedContextGuard {
+    saved_contexts: Arc<Mutex<BTreeMap<u64, ArmCoreContext>>>,
+    key: u64,
+}
+
+impl Drop for SavedContextGuard {
+    fn drop(&mut self) {
+        self.saved_contexts.lock().remove(&self.key);
+    }
 }
 
 impl ArmCore {
@@ -118,6 +135,7 @@ impl ArmCore {
         let result = Self {
             inner: Arc::new(Mutex::new(inner)),
             threads: Arc::new(Mutex::new(BTreeMap::new())),
+            saved_contexts: Arc::new(Mutex::new(BTreeMap::new())),
         };
 
         if enable_gdbserver {
@@ -207,6 +225,35 @@ impl ArmCore {
         self.threads.lock().keys().cloned().collect()
     }
 
+    /// Every word guest code may be holding a pointer in, for a conservative GC root scan: the
+    /// registers — live, each thread's saved context, and each context `run_function` put aside
+    /// for a nested call — and each thread's stack from the lowest of those SPs inside it to its
+    /// top. Words that only look like pointers are included; that is the point of conservative.
+    pub fn guest_root_words(&self) -> Result<Vec<u32>> {
+        let mut contexts = vec![self.save_context()];
+        contexts.extend(self.saved_contexts.lock().values().cloned());
+
+        // threads before inner, as delete_thread_context takes them (freeing a stack locks inner).
+        let threads = self.threads.lock();
+        contexts.extend(threads.values().map(|thread| thread.context.clone()));
+
+        let mut words = contexts.iter().flat_map(ArmCoreContext::words).collect::<Vec<_>>();
+        for thread in threads.values() {
+            let (base, top) = (thread.stack_base as u32, (thread.stack_base + thread.stack_size) as u32);
+            let low = contexts
+                .iter()
+                .map(|context| context.sp & !3)
+                .filter(|sp| (base..=top).contains(sp))
+                .min()
+                .unwrap_or(base);
+            let mut stack = vec![0; (top - low) as usize];
+            self.read_bytes(low, &mut stack)?;
+            words.extend(stack.as_chunks::<4>().0.iter().map(|word| u32::from_le_bytes(*word)));
+        }
+
+        Ok(words)
+    }
+
     fn sample_profile(&self) {
         let mut inner = self.inner.lock();
         if inner.profile.is_none() {
@@ -251,6 +298,12 @@ impl ArmCore {
     {
         // we don't need to save r0-r3, but to make it simple, we save all registers
         let previous_context = self.save_context();
+        let key = NEXT_SAVED_CONTEXT.fetch_add(1, Ordering::Relaxed);
+        self.saved_contexts.lock().insert(key, previous_context.clone());
+        let _saved = SavedContextGuard {
+            saved_contexts: self.saved_contexts.clone(),
+            key,
+        };
         let result = self.run_function_inner(address, params).await;
         self.restore_context(&previous_context);
         result
@@ -974,6 +1027,48 @@ mod tests {
             }
             assert_eq!(result.load(Ordering::Relaxed), 1);
         }
+    }
+
+    async fn scan_roots(core: &mut ArmCore, words: &mut Arc<Mutex<Vec<u32>>>) -> Result<JumpTo> {
+        *words.lock() = core.guest_root_words()?;
+        Ok(JumpTo(core.read_pc_lr()?.0 | 1))
+    }
+
+    // The outer call's r0 is overwritten by the nested call's argument, so only the context
+    // run_function put aside still holds it — as a host method's arguments are held while it
+    // runs guest code that collects.
+    #[test]
+    fn guest_root_words_see_registers_a_nested_call_put_aside() {
+        let mut core = ArmCore::new(false, None).unwrap();
+        let words = Arc::new(Mutex::new(Vec::new()));
+        core.register_svc_handler(1, call_nested_arm, &Arc::new(AtomicU32::new(0))).unwrap();
+        core.register_svc_handler(2, scan_roots, &words).unwrap();
+        core.load(&[0x01, 0xdf, 0x70, 0x47], 0x1000, 4).unwrap(); // svc #1; bx lr
+        core.load(&[0x02, 0xdf, 0x70, 0x47], 0x10000, 4).unwrap(); // svc #2; bx lr
+
+        let observer = core.clone();
+        let mut run = pin!(core.run_function::<u32>(0x1001, &[0x4abc_0000]));
+        assert!(matches!(run.as_mut().poll(&mut Context::from_waker(Waker::noop())), Poll::Ready(Ok(_))));
+        assert!(words.lock().contains(&0x4abc_0000));
+        assert!(observer.saved_contexts.lock().is_empty(), "a finished call leaves nothing put aside");
+    }
+
+    #[test]
+    fn guest_root_words_see_a_thread_stack_from_its_sp_up() -> Result<()> {
+        let mut core = ArmCore::new(false, None)?;
+        crate::Allocator::init(&mut core)?;
+        let _thread = core.run_in_thread(|| async { Ok(()) })?;
+        let mut context = core.read_thread_context(1)?;
+        context.sp -= 8;
+        core.write_thread_context(1, &context);
+        core.write_bytes(context.sp + 4, &0x4123_4560u32.to_le_bytes())?;
+        core.write_bytes(context.sp - 4, &0x4333_3330u32.to_le_bytes())?;
+
+        let words = core.guest_root_words()?;
+        assert!(words.contains(&0x4123_4560));
+        assert!(!words.contains(&0x4333_3330), "below SP is dead");
+
+        Ok(())
     }
 
     #[test]

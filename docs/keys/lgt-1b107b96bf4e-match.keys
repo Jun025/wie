@@ -1,0 +1,15 @@
+# wie_validate --keys: LGT 1b107b96bf4e — notices → title → MENU 1 → channel help → 허접 channel →
+# match intro («Press Any Key») → play: the scene whose strings and sound clips leaked (docs/report/0421).
+# Grammar: `--keys` help / `parse_keys` in wie_cli/src/bin/wie_validate.rs. Key names only — no game bytes.
+#
+# The play line (last) is one ~14 s cycle; a long run repeats it — this round's 60-minute run used
+# `{ cat <this file>; yes "$(tail -1 <this file>)" | head -300; } > long.keys`.
+#
+#   wie_validate --inject --keys docs/keys/lgt-1b107b96bf4e-match.keys --keep-timeout --timeout 3600 \
+#     --max-ticks 100000000000 --shotdir <dir> --shot-every 30 <game>
+#
+# The match intro does not always take a key: on some runs of every build measured (main included) it
+# stays up for good (docs/report/0421 §5). Compare the t090 and t120 shots and re-run if they match.
+# Never NUM3 on the channel screen: that opens 전적, which dies on `String` vtable index 29.
+WAIT:8 OK:3 OK:3 OK:3 OK:3 OK:3 OK:3 NUM1:3 OK:3 OK:2 OK:2 OK:2 OK:2 OK:2 OK:2 OK:2 OK:4 OK:5 OK:5
+RIGHT:1 OK:3 LEFT:1 OK:3 OK:3 NUM5:2

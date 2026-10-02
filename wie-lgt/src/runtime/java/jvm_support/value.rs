@@ -21,6 +21,7 @@ impl JavaValueCodec {
 
 impl NativeJavaValueCodec for JavaValueCodec {
     fn object_from_raw(&self, raw: u32) -> Option<Box<dyn ClassInstance>> {
+        super::guest_roots::stress_check(&self.core, raw);
         let instance = JavaClassInstance::from_raw(raw, &self.core);
         // Reading the class is also the liveness check: it dereferences `raw` and then the
         // instance's `ptr_dispatch_table`, which every live instance has set.
