@@ -1,0 +1,29 @@
+{
+ "schema": "wie-worklog/1",
+ "date": "2026-10-03",
+ "task": "wie-census-wave6-lgt-interface-table-and-ktf-aot-sound",
+ "title": "6차 — LGT 게임 선언 인터페이스의 메서드 표 · KTF 소리 3종",
+ "summary": "LGT import 0x64 가 게임 선언 인터페이스에 대해 수신자의 컴파일러 참조 칸(인터페이스 클래스 + 수신자 target, 인터페이스 순서)을 표로 돌려준다. a16f08d025eb 가 not-yet → playable. KTF 소리 3종 중 2종은 동봉 소리 끔 설정(0417 목록에 2행), 1종은 게임의 소리 켜기 질문의 기본 선택이 «아니오»였다(측정 정정 · 레시피 비커밋).",
+ "changes": [
+  "wie-lgt LgtJvmSupport::interface_method_table · generated_interface_cell",
+  "wie-ktf OWNER_SOUND_OFF_SETTINGS 2행",
+  "docs/player-data/compat.json 4행",
+  "docs/player-updates 2건",
+  "docs/report/0420"
+ ],
+ "verification": [
+  "되돌리면 red 1(새 시험)",
+  "LGT AOT 18종 + KTF 3종 + 가드 2종 전후 프로브 A·B 짝 · 흔들린 2종 재측 2회",
+  "a16f08d025eb 600초 장시간 FAIL 0"
+ ],
+ "limits": [
+  "전수 도구 run 대신 같은 인자의 짝 러너(공용 슬롯·락 점유)",
+  "속도 축 미측정",
+  "load1 30~210"
+ ],
+ "adoptedProposals": [
+  "2026-10-02-census-wave4-locked-files#p0",
+  "2026-10-02-census-wave5-network-titles#p0"
+ ],
+ "proposals": []
+}

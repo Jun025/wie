@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-03",
+  "kind": "new-support",
+  "titles": [
+    "a16f08d025ebe57af3b6655217b167b505d4ddf19acbcfe609a14630183b1432"
+  ],
+  "summary_ko": "한 가지 색 화면에서 멈추던 LGT 게임이 이제 이야기 화면을 지나 스테이지를 플레이할 수 있고 소리도 나요. 게임이 직접 만든 기능 목록을 찾는 방법이 틀려 있었어요.",
+  "pr": "https://github.com/Jun025/wie/pull/453"
+}

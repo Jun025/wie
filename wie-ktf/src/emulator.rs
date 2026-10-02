@@ -104,6 +104,20 @@ const OWNER_SOUND_OFF_SETTINGS: &[([u8; 16], &[&str])] = &[
         ],
         &["haga2.db", "haga2.idx"],
     ),
+    // 7218e8720f8c: 8 bytes among the data files; the title writes 8 bytes back when it is absent.
+    (
+        [
+            0x93, 0x82, 0xc5, 0x4f, 0x44, 0xd6, 0xdc, 0xea, 0x90, 0xa9, 0x09, 0x51, 0x6c, 0x94, 0x2a, 0xc6,
+        ],
+        &["12_0.ida"],
+    ),
+    // 8bfd08fe4370: 18 bytes; the title writes 18 bytes back when it is absent.
+    (
+        [
+            0x01, 0xe6, 0x86, 0xc6, 0xfb, 0x5a, 0x46, 0xde, 0x39, 0xb3, 0x7e, 0xa4, 0x18, 0x51, 0x9e, 0x3b,
+        ],
+        &["kjik.mcf"],
+    ),
 ];
 
 /// The original owner's progress, shipped in the archive, that «continue» opens: a new player would
