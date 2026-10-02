@@ -81,3 +81,7 @@
 
 - load1 150~365(idle 0~1%) 동안 쟀다. `host-load-guard` 가 rc=1 이라 폭을 2로 줄였다(CLAUDE.md ⒞). 공용 전수 락은 전수 도구가 잡았다(전·후 차례로).
 - 진단(`isFile`·`File`·`openDataBase`·`exists` 이름 로그)은 작업 트리에서 넣고 커밋 전에 되돌렸다.
+
+### 10. 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 333쌍 + SUFFIX-ATTACHED 15쌍. 전부 이 PR 이전부터 있던 값이다 — `compat.json` 기존 제목 값, 그리고 `wie-midp` `display.rs` 의 기존 주석 4곳(이 PR 이 같은 파일을 고쳐 대상이 됐다). 이 PR 이 더한 줄에서는 0이다. 새로 적은 타이틀은 전부 sha12 다.
