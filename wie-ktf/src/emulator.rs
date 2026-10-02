@@ -106,6 +106,92 @@ const OWNER_SOUND_OFF_SETTINGS: &[([u8; 16], &[&str])] = &[
     ),
 ];
 
+/// The original owner's progress, shipped in the archive, that «continue» opens: a new player would
+/// pick up someone else's game. Measured per title — the original and a copy without only these files,
+/// same keys — and kept to the titles where «continue» was seen to open it; the copy starts as a fresh
+/// install does (the menu's default moves to «new», or «continue» says there is no save, and the new
+/// game runs). Deliberately a list (docs/report/0419): an archive mixes progress with settings, game
+/// data and download-complete flags, and dropping those stops titles that 0416 made playable.
+const OWNER_PROGRESS_SAVES: &[([u8; 16], &[&str])] = &[
+    // 3185174d2121: the owner's hospital: «continue» opens it with nine stats at Lv9.
+    (
+        [
+            0xe9, 0x18, 0x85, 0xfb, 0x2c, 0x0f, 0xec, 0x9e, 0xa9, 0x7a, 0x0d, 0x29, 0xc1, 0x5e, 0xd7, 0x2f,
+        ],
+        &["hospital1.dat", "hospital2.dat"],
+    ),
+    // 3b82763edba8: «continue» opens the owner's house with 39,395,782 in hand; dropped, it says there is no save.
+    (
+        [
+            0x8c, 0x80, 0x40, 0x67, 0x86, 0x37, 0xea, 0xf3, 0x20, 0xe4, 0x43, 0x27, 0x0e, 0xc9, 0xc1, 0xc0,
+        ],
+        &["real.db", "real.idx"],
+    ),
+    // 4bcd17980c05: «continue» opens the owner's run in the desert with 300 in hand.
+    (
+        [
+            0x59, 0xca, 0xba, 0xbf, 0x2c, 0x20, 0xd6, 0x91, 0x43, 0x56, 0xd7, 0x92, 0xa4, 0x78, 0x28, 0x3f,
+        ],
+        &["LdmDataFile.dat"],
+    ),
+    // 4df05a4dc452: «continue» opens the owner's game with 10 coins; the config and doll files stay.
+    (
+        [
+            0xd1, 0xdb, 0x89, 0x33, 0x26, 0x24, 0xee, 0xf4, 0x67, 0xec, 0xd8, 0xb6, 0x6a, 0xee, 0xcd, 0xdb,
+        ],
+        &["GameScore.txt"],
+    ),
+    // 5e53e490c6f1: «continue» opens the owner's year 196 with 15 players and 500M (its settings are in `OWNER_SOUND_OFF_SETTINGS`).
+    (
+        [
+            0x1a, 0x21, 0x23, 0xeb, 0x97, 0xe2, 0x51, 0xdb, 0xcb, 0x4b, 0x49, 0x0c, 0xee, 0x86, 0x30, 0xea,
+        ],
+        &["save0.txt"],
+    ),
+    // 6a885f89343c: the owner's two save slots and the slot index (scores 1720 and 1980).
+    (
+        [
+            0x52, 0xfd, 0x30, 0xf7, 0x1d, 0x56, 0x67, 0x96, 0x2a, 0xa0, 0xab, 0x99, 0xf4, 0x70, 0x68, 0xb0,
+        ],
+        &["sky0.db", "sky0.idx", "sky2.db", "sky2.idx", "sky3.db", "sky3.idx"],
+    ),
+    // 6b51d12b4be6: «continue» opens the owner's story mode; dropped, it says there is no save.
+    (
+        [
+            0xaf, 0x3f, 0x39, 0xb6, 0x04, 0x56, 0x5b, 0x81, 0x16, 0x06, 0x5a, 0xf5, 0x7c, 0xf5, 0x58, 0x11,
+        ],
+        &["hotong.dat"],
+    ),
+    // b1ec149b354c: «continue» opens the owner's 26 May accounts; the pizza, taste and topping tables are game data and stay.
+    (
+        [
+            0x36, 0xaf, 0x8b, 0x87, 0xd8, 0x07, 0x46, 0x46, 0xbe, 0xfb, 0x64, 0x58, 0xce, 0x0f, 0x15, 0xff,
+        ],
+        &["gGameData.db", "gGameData.idx"],
+    ),
+    // e09aca27c132: «continue» opens the owner's season map with 8.88M; the fortune table stays.
+    (
+        [
+            0x3f, 0x5c, 0x5e, 0x5a, 0x45, 0x21, 0x87, 0x05, 0x95, 0xc9, 0xbb, 0xfc, 0xa7, 0x82, 0xe8, 0x06,
+        ],
+        &["jsydata.db", "jsydata.idx"],
+    ),
+    // eb1614abed70: «continue» opens the owner's FILE 1 in the village; the 1-byte `certify`/`mix` flags stay.
+    (
+        [
+            0x6a, 0x67, 0xa9, 0x86, 0xb4, 0x61, 0x1e, 0x52, 0x65, 0xe3, 0xd1, 0x7d, 0x05, 0x01, 0xa6, 0xcd,
+        ],
+        &["save0", "save0_crc"],
+    ),
+    // edd11ce9b8d7: «continue» opens the owner's scenario with the beginner course passed.
+    (
+        [
+            0x3d, 0xfd, 0xc1, 0x4f, 0x9b, 0xbc, 0xda, 0x85, 0xed, 0xfd, 0x06, 0x39, 0xe7, 0x2c, 0x8b, 0x40,
+        ],
+        &["io.dat"],
+    ),
+];
+
 /// Remove the files `table` names for this jar, bare and under either private directory spelling
 /// (`load` mounts all three at the same path).
 fn drop_device_bound_saves(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8], table: &[([u8; 16], &[&str])]) {
@@ -184,6 +270,7 @@ impl KtfEmulator {
         if let Some(jar) = files.get(&jar_filename).cloned() {
             drop_device_bound_saves(&mut files, &jar, DEVICE_BOUND_SAVES);
             drop_device_bound_saves(&mut files, &jar, OWNER_SOUND_OFF_SETTINGS);
+            drop_device_bound_saves(&mut files, &jar, OWNER_PROGRESS_SAVES);
         }
 
         Self::load(platform, &jar_filename, &adf.pid, &adf.aid, Some(adf.mclass), &files, options)
