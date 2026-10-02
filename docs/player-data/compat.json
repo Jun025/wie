@@ -1507,8 +1507,7 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok",
-    "progress": "stuck"
+    "speed": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7362,18 +7361,16 @@
    "platform": "SKT",
    "model": null,
    "title": "센티멘탈러브",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "센티멘탈러브"
   },
@@ -7513,20 +7510,16 @@
    "platform": "SKT",
    "model": null,
    "title": "얼라이브",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
+    "input": "ok",
     "longplay": "ok",
-    "sound": "no",
-    "speed": "unknown",
-    "progress": "stuck"
+    "sound": "ok",
+    "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "[SKVM]얼라이브"
   },
