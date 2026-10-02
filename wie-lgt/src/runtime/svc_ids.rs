@@ -252,6 +252,10 @@ pub enum WIPICSvcId {
     // `f(2, 1)` — AF_INET/SOCK_STREAM, KTF net index 2 `MC_netSocket`. One call site
     // (863b8ab6a21d) picks between this and 0x7d0 on a flag with the same two arguments.
     Socket = 0x25a,
+    // KTF net index 3 `MC_netSocketConnect(fd, addr, port, cb, param)`. fe76e641bb3d 0x24428:
+    // fd from 602, addr from 904 (a dotted-quad literal), port through 901, cb 0x24501 reads r1 as
+    // the result, param 0 on the stack.
+    SocketConnect = 0x25b,
     // net base 0x258 + index: idx4 SocketWrite, idx5 SocketRead, idx6 SocketClose.
     SocketWrite = 0x25c,
     SocketRead = 0x25d,
@@ -389,6 +393,7 @@ impl TryFrom<SvcId> for WIPICSvcId {
             0x258 => Self::Connect,
             0x259 => Self::Close,
             0x25a => Self::Socket,
+            0x25b => Self::SocketConnect,
             0x25c => Self::SocketWrite,
             0x25d => Self::SocketRead,
             0x25e => Self::SocketClose,
@@ -556,5 +561,14 @@ mod tests {
         let id = WIPICSvcId::try_from(SvcId(0xcf)).expect("SVC 207 (MC_grpGetContext) must be in the table");
         assert!(matches!(id, WIPICSvcId::GetContext));
         assert_eq!(u32::from(id), 207);
+    }
+
+    /// `MC_netSocketConnect` (603 = `0x25b`) is in the table. fe76e641bb3d died on
+    /// `Unknown LGT WIPIC SVC id 603` at its connect call site (docs/report/0408).
+    #[test]
+    fn wipic_svc_603_socket_connect_is_in_the_table() {
+        let id = WIPICSvcId::try_from(SvcId(603)).expect("SVC 603 (MC_netSocketConnect) must be in the table");
+        assert!(matches!(id, WIPICSvcId::SocketConnect));
+        assert_eq!(u32::from(id), 0x25b);
     }
 }

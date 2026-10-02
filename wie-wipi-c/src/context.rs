@@ -101,6 +101,8 @@ pub mod test {
         resources: Vec<(String, Vec<u8>)>,
         pub timers: Vec<(Instant, u64, WIPICMethodBody)>,
         pub calls: Vec<WIPICWord>,
+        pub call_args: Vec<(WIPICWord, Vec<WIPICWord>)>,
+        pub spawned: Vec<WIPICMethodBody>,
     }
 
     impl TestContext {
@@ -113,6 +115,8 @@ pub mod test {
                 resources: Vec::new(),
                 timers: Vec::new(),
                 calls: Vec::new(),
+                call_args: Vec::new(),
+                spawned: Vec::new(),
             }
         }
 
@@ -124,6 +128,8 @@ pub mod test {
                 resources: Vec::new(),
                 timers: Vec::new(),
                 calls: Vec::new(),
+                call_args: Vec::new(),
+                spawned: Vec::new(),
             }
         }
 
@@ -158,8 +164,9 @@ pub mod test {
             Ok(memory.0)
         }
 
-        async fn call_function(&mut self, address: WIPICWord, _args: &[WIPICWord]) -> Result<WIPICWord> {
+        async fn call_function(&mut self, address: WIPICWord, args: &[WIPICWord]) -> Result<WIPICWord> {
             self.calls.push(address);
+            self.call_args.push((address, args.to_vec()));
             Ok(0)
         }
 
@@ -167,8 +174,9 @@ pub mod test {
             self.system.as_mut().unwrap()
         }
 
-        fn spawn(&mut self, _callback: WIPICMethodBody) -> Result<()> {
-            todo!()
+        fn spawn(&mut self, callback: WIPICMethodBody) -> Result<()> {
+            self.spawned.push(callback);
+            Ok(())
         }
 
         async fn get_resource_size(&self, name: &str) -> Result<Option<usize>> {

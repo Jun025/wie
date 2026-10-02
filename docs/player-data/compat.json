@@ -5927,17 +5927,16 @@
    "platform": "LGT",
    "model": "clet",
    "title": "알바타이쿤2",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "no",
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
