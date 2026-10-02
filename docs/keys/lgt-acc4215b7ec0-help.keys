@@ -9,7 +9,13 @@
 # stdlib import 0x3ff (strtol). Before docs/report/0406 that step died on
 # `Unknown lgt stdlib import: 0x3ff`. One UP wraps 연습모드 → 도움말/기타. Both the 15 s settle
 # and the 0.5 s holds are load-bearing: with an 8 s gap and the default 0.15 s hold the UP was
-# dropped in some runs and not others, at whatever load (docs/report/0406 §2). Key names only — no game bytes.
+# dropped in some runs and not others (docs/report/0406 §2). Key names only — no game bytes.
+#
+# Deterministic ONLY on a quiet host (host-load-guard rc=0 · measured load ≈24). Under load
+# (measured 125~300) step 06 never reaches 게임설명 and the run PASSes both before and after the
+# fix — the schedule is wall-clock (wie_validate.rs 「The injection SCHEDULE is wall-clock」).
+# Do not judge by PASS alone: confirm `strtol(` lines > 0 under
+# RUST_LOG=wie_lgt::runtime::stdlib=debug, or that <dir>/*06_OK.png shows 게임설명.
 WAIT:10
 OK:5:0.5     # PRESS ANY KEY
 OK:15:0.5    # main menu slides in — let it finish
