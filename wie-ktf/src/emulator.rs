@@ -70,6 +70,14 @@ fn drop_device_bound_saves(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8], ta
     }
 }
 
+/// The archive's private directory is mounted at the root, where the title looks for it. Archives
+/// spell it `P/` or `p/`: 25 KTF titles ship theirs lowercase, and one of them (1793f87924d4) shows
+/// «downloading 1/11» forever because `isFile` misses the data it shipped under `p/`
+/// (docs/report/0414).
+fn private_path(path: &str) -> &str {
+    path.strip_prefix("P/").or_else(|| path.strip_prefix("p/")).unwrap_or(path)
+}
+
 struct KtfTaskRunner {
     core: ArmCore,
 }
@@ -178,8 +186,7 @@ impl KtfEmulator {
         let system = System::new(platform, pid, aid, KtfTaskRunner { core: core.clone() });
 
         for (path, data) in files {
-            let path = path.trim_start_matches("P/");
-            system.filesystem().add_virtual(path, data.clone());
+            system.filesystem().add_virtual(private_path(path), data.clone());
         }
 
         Allocator::init(&mut core)?;
@@ -267,7 +274,14 @@ mod tests {
     use wie_core_arm::{Allocator, ArmCore};
     use wie_util::{Result, WieError};
 
-    use super::{KtfJvmSupport, KtfTaskRunner, drop_device_bound_saves};
+    use super::{KtfJvmSupport, KtfTaskRunner, drop_device_bound_saves, private_path};
+
+    #[test]
+    fn private_directory_mounts_at_the_root_in_either_case() {
+        assert_eq!(private_path("P/res/save.sav"), "res/save.sav");
+        assert_eq!(private_path("p/imgChar_.dat"), "imgChar_.dat");
+        assert_eq!(private_path("res/other.sav"), "res/other.sav");
+    }
 
     #[test]
     fn device_bound_saves_dropped_for_listed_jar_only() {

@@ -421,6 +421,10 @@ impl Display {
             .await?;
 
         let same_displayable = !old_displayable.is_null() && !displayable.is_null() && old_displayable.identity() == displayable.identity();
+        const CANVAS: &str = "javax/microedition/lcdui/Canvas";
+        if !old_displayable.is_null() && !same_displayable && jvm.is_instance(&**old_displayable, CANVAS) {
+            let _: () = jvm.invoke_virtual(&old_displayable, CANVAS, "hideNotify", "()V", ()).await?;
+        }
         if !old_displayable.is_null() && !same_displayable {
             let _: () = jvm
                 .invoke_virtual(
@@ -460,6 +464,12 @@ impl Display {
                     (this.clone(),),
                 )
                 .await?;
+        }
+
+        // A title may set up its first frame here: 38277d63b0ba sets the counter its loading screen
+        // keys on, and without the call it paints a null image and its game thread never wakes.
+        if !same_displayable && jvm.is_instance(&**displayable, CANVAS) {
+            let _: () = jvm.invoke_virtual(&displayable, CANVAS, "showNotify", "()V", ()).await?;
         }
 
         let fullscreen_mode: bool = jvm
@@ -1227,6 +1237,47 @@ mod test {
 
     struct ViewportScreen;
     struct RecordingCommandListener;
+    struct NotifyCanvas;
+
+    // Counts its show/hide notifications, as a title that sets up its first frame in showNotify does.
+    impl NotifyCanvas {
+        fn as_proto() -> WieJavaClassProto {
+            JavaClassProto {
+                name: "javax/microedition/lcdui/TestNotifyCanvas",
+                parent_class: Some("javax/microedition/lcdui/Canvas"),
+                interfaces: vec![],
+                methods: vec![
+                    JavaMethodProto::new("<init>", "()V", Self::init, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new("paint", "(Ljavax/microedition/lcdui/Graphics;)V", Self::paint, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new("showNotify", "()V", Self::show_notify, MethodAccessFlags::PROTECTED),
+                    JavaMethodProto::new("hideNotify", "()V", Self::hide_notify, MethodAccessFlags::PROTECTED),
+                ],
+                fields: vec![
+                    JavaFieldProto::new("shown", "I", FieldAccessFlags::PUBLIC),
+                    JavaFieldProto::new("hidden", "I", FieldAccessFlags::PUBLIC),
+                ],
+                access_flags: ClassAccessFlags::PUBLIC,
+            }
+        }
+
+        async fn init(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            jvm.invoke_special(&this, "javax/microedition/lcdui/Canvas", "<init>", "()V", ()).await
+        }
+
+        async fn paint(_: &Jvm, _: &mut WieJvmContext, _: ClassInstanceRef<Self>, _: ClassInstanceRef<Graphics>) -> JvmResult<()> {
+            Ok(())
+        }
+
+        async fn show_notify(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            let shown: i32 = jvm.get_field(&this, "shown", "I").await?;
+            jvm.put_field(&mut this, "shown", "I", shown + 1).await
+        }
+
+        async fn hide_notify(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            let hidden: i32 = jvm.get_field(&this, "hidden", "I").await?;
+            jvm.put_field(&mut this, "hidden", "I", hidden + 1).await
+        }
+    }
     struct YieldingPaintScreen;
 
     impl YieldingPaintScreen {
@@ -1507,6 +1558,7 @@ mod test {
                 ViewportScreen::as_proto(),
                 RecordingCommandListener::as_proto(),
                 YieldingPaintScreen::as_proto(),
+                NotifyCanvas::as_proto(),
             ]
             .into(),
         ])
@@ -1683,6 +1735,34 @@ mod test {
                 .await?;
             assert_eq!(jvm.get_field::<i32>(&screen, "callbackCount", "I").await?, 4);
             assert_eq!(jvm.get_field::<i32>(&screen, "lastHeight", "I").await?, detached_height);
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn set_current_notifies_the_canvas_shown_and_the_one_hidden() -> Result<()> {
+        run_jvm_test(test_protos(), |jvm| async move {
+            let display: ClassInstanceRef<Display> = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?.into();
+            let first = jvm.new_class("javax/microedition/lcdui/TestNotifyCanvas", "()V", ()).await?;
+            let second = jvm.new_class("javax/microedition/lcdui/TestNotifyCanvas", "()V", ()).await?;
+            for canvas in [&first, &first, &second] {
+                let _: () = jvm
+                    .invoke_virtual(
+                        &display,
+                        "javax/microedition/lcdui/Display",
+                        "setCurrent",
+                        "(Ljavax/microedition/lcdui/Displayable;)V",
+                        (canvas.clone(),),
+                    )
+                    .await?;
+            }
+
+            // Shown once (setting the same canvas again is not a change), then hidden for the second.
+            assert_eq!(jvm.get_field::<i32>(&first, "shown", "I").await?, 1);
+            assert_eq!(jvm.get_field::<i32>(&first, "hidden", "I").await?, 1);
+            assert_eq!(jvm.get_field::<i32>(&second, "shown", "I").await?, 1);
+            assert_eq!(jvm.get_field::<i32>(&second, "hidden", "I").await?, 0);
 
             Ok(())
         })

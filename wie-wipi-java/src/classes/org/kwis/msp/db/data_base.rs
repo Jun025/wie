@@ -1,6 +1,6 @@
-use alloc::vec;
+use alloc::{format, vec};
 
-use jvm::{Array, ClassInstanceRef, Jvm, Result as JvmResult};
+use jvm::{Array, ClassInstanceRef, Jvm, Result as JvmResult, runtime::JavaLangString};
 use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 use rustjava_runtime::classes::java::lang::String;
@@ -12,6 +12,20 @@ use super::{DataComparator, DataFilter};
 
 // class org.kwis.msp.db.DataBase
 pub struct DataBase;
+
+/// The records of a database as a KTF handset stores it: `<name>.idx` starts `qtpdb`, then the
+/// record size and the record count as big-endian words at 5 and 9; `<name>.db` holds the
+/// records back to back, each the full record size. 18 archives in the local corpus ship
+/// theirs; without this a title opens its own data empty — 74cb49013d64 then asks to download
+/// what it already shipped (docs/report/0414). Anything else is not ours to guess: `None`.
+fn packaged_records<'a>(idx: &[u8], db: &'a [u8]) -> Option<core::iter::Take<core::slice::Chunks<'a, u8>>> {
+    let word = |at: usize| Some(u32::from_be_bytes(idx.get(at..at + 4)?.try_into().ok()?) as usize);
+    if !idx.starts_with(b"qtpdb") {
+        return None;
+    }
+    let (size, count) = (word(5)?, word(9)?);
+    (size > 0 && db.len() >= size.checked_mul(count)?).then(|| db.chunks(size).take(count))
+}
 
 impl DataBase {
     pub fn as_proto() -> WieJavaClassProto {
@@ -130,13 +144,31 @@ impl DataBase {
 
     async fn open_data_base_with_flags(
         jvm: &Jvm,
-        _: &mut WieJvmContext,
+        context: &mut WieJvmContext,
         data_base_name: ClassInstanceRef<String>,
         record_size: i32,
         create: bool,
         flags: i32,
     ) -> JvmResult<ClassInstanceRef<DataBase>> {
         tracing::debug!("org.kwis.msp.db.DataBase::openDataBase({data_base_name:?}, {record_size}, {create}, {flags})");
+
+        // A database the archive ships filled in is installed on first open, as the handset had it.
+        // Once anything is saved under the name, the saved one wins.
+        let name = JavaLangString::to_rust_string(jvm, &data_base_name).await?;
+        let system = context.system();
+        let (idx, db) = (
+            system.filesystem().virtual_file(&format!("{name}.idx")),
+            system.filesystem().virtual_file(&format!("{name}.db")),
+        );
+        if let (Some(idx), Some(db)) = (idx, db)
+            && let Some(records) = packaged_records(&idx, &db)
+            && !system.platform().database_repository().exists(&name, system.pid()).await
+        {
+            let mut database = system.platform().database_repository().open(&name, system.pid()).await;
+            for record in records {
+                database.add(record).await;
+            }
+        }
 
         // `create = false` on a missing database is `DataBaseException`, the one exception this API
         // declares — not MIDP's RecordStoreNotFoundException, which a KTF title does not catch.
@@ -439,12 +471,58 @@ mod test {
 
     use jvm::{Array, ClassInstanceRef, JavaError, Result as JvmResult, runtime::JavaLangString};
     use rustjava_runtime::classes::java::lang::String;
-    use test_utils::run_jvm_test;
+    use test_utils::{TestPlatform, run_jvm_test, run_jvm_test_with_system};
     use wie_util::Result;
 
     use crate::get_protos;
 
     use super::DataBase;
+
+    // A title opens its shipped database without create and reads what the archive holds — the
+    // handset's `.idx` header and its records — instead of the DataBaseException an empty install gives.
+    #[test]
+    fn a_shipped_database_opens_with_its_records() -> Result<()> {
+        run_jvm_test_with_system(
+            Box::new([wie_midp::get_protos().into(), get_protos().into()]),
+            Box::new(TestPlatform::new()),
+            |jvm, system| async move {
+                let mut idx = b"qtpdb".to_vec();
+                idx.extend([0, 0, 0, 3, 0, 0, 0, 2]);
+                idx.resize(45, 0);
+                system.filesystem().add_virtual("D/Config.idx", idx);
+                system.filesystem().add_virtual("D/Config.db", b"abcdef".to_vec());
+
+                let name: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, "/D/Config").await?.into();
+                let database: ClassInstanceRef<DataBase> = jvm
+                    .invoke_static(
+                        "org/kwis/msp/db/DataBase",
+                        "openDataBase",
+                        "(Ljava/lang/String;IZ)Lorg/kwis/msp/db/DataBase;",
+                        (name, 3, false),
+                    )
+                    .await?;
+                let count: i32 = jvm
+                    .invoke_virtual(&database, "org/kwis/msp/db/DataBase", "getNumberOfRecords", "()I", ())
+                    .await?;
+                assert_eq!(count, 2);
+                let second: ClassInstanceRef<Array<i8>> = jvm
+                    .invoke_virtual(&database, "org/kwis/msp/db/DataBase", "selectRecord", "(I)[B", (1,))
+                    .await?;
+                assert_eq!(jvm.load_array::<i8>(&second, 0, 3).await?, [b'd' as i8, b'e' as i8, b'f' as i8]);
+
+                Ok(())
+            },
+        )
+    }
+
+    #[test]
+    fn packaged_records_needs_the_header_and_every_record() {
+        let mut idx = b"qtpdb".to_vec();
+        idx.extend([0, 0, 0, 2, 0, 0, 0, 2]);
+        assert_eq!(super::packaged_records(&idx, b"abcd").map(|r| r.count()), Some(2));
+        assert!(super::packaged_records(&idx, b"abc").is_none());
+        assert!(super::packaged_records(b"xtpdb\0\0\0\x02\0\0\0\x02", b"abcd").is_none());
+    }
 
     #[test]
     fn test_database_state_selection_and_stubs() -> Result<()> {
