@@ -441,6 +441,11 @@ pub enum StdlibSvcId {
     /// after the saved `fmt`), then opens the resulting path.
     Vsprintf = 0x3f9,
     Atoi = 0x3fb,
+    /// `f(str, &end, base)` — acc4215b7ec0's only call site (`0x36192`, 2026-10-02): it copies a
+    /// `|`-delimited field such as `0xFFAE08` out of a text resource, calls `f(field, &end, 16)`, and
+    /// formats the result with `"%d"`. That is strtol's shape (strtoul's too — the two agree on every
+    /// value this title passes, all `<= 0xFFFFFF`; revisit if a title parses past `0x7fffffff`).
+    Strtol = 0x3ff,
     Rand = 0x403,
     Srand = 0x404,
     Strcpy = 0x405,
