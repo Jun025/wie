@@ -72,3 +72,6 @@
 
 ### 8. 가드
 라이브·가드 7종(`49ade89578c5` `ddd885583b15` · LGT `13d7e3c21856` `1b107b96bf4e` `4ece6eeeaa04` `a30bbe008b5e` `b475b6399684`) 전·후 빌드 30초 짝: 결과·재생 수 같음(`a30bbe008b5e` 만 전 `clean exit` · 후 PASS — 첫 실행 안내로 끝나는 기존 흔들림이고 좋은 쪽이다).
+
+### 9. 게임 파일명 유입
+BOUNDED 330쌍 + SUFFIX-ATTACHED 15쌍 — 전부 `compat.json` 의 기존 `title`·`fileTitle` 값이다(그 밖 파일 0). 이 회차가 더한 코드·문서·worklog·이용자 소식의 게임명 0 · 키 파일은 `game_lab/` 에만 있다.
