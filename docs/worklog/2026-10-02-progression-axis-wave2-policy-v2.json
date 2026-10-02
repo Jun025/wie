@@ -3,7 +3,7 @@
   "date": "2026-10-02",
   "task": "wie-progression-axis-wave2-policy-v2-and-full-coverage",
   "title": "진도 정책 v2 · 세이브 이어하기 계측 · 1000초 넘는 실행의 곡선 정렬 수정 · 대표 60분",
-  "summary": "wie_validate 에 --stall-secs/--stall-keys(정체 뒤에만 뒤로·소프트키·다음 항목)와 --restart-at(저장 유지 재기동 · db.resumed_reads)을 넣고 census progress 를 v2 로 돌렸다. 시각을 이름순으로 정렬해 1000초 넘는 실행이 뒤섞여 판정되던 결함을 고쳤다 — 1차 30분 «ok» 5건이 거짓이었다 (docs/report/0414).",
+  "summary": "wie_validate 에 --stall-secs/--stall-keys(정체 뒤에만 뒤로·소프트키·다음 항목)와 --restart-at(저장 유지 재기동 · db.resumed_reads)을 넣고 census progress 를 v2 로 돌렸다. 시각을 이름순으로 정렬해 1000초 넘는 실행이 뒤섞여 판정되던 결함을 고쳤다 — 1차 30분 «ok» 5건이 거짓이었다 (docs/report/0415).",
   "changes": [
     "wie_cli/src/bin/wie_validate.rs: --stall-secs · --stall-keys · --restart-at · DbStats(db 필드) · splice_escape · fingerprint/novel",
     "scripts/playability-census.mjs: progress v2(PROGRESS_STALL·PROGRESS_ESCAPES·PROGRESS_RESUME) · 곡선을 시각 순으로 · p_policy/p_escapes/p_save 열",
@@ -20,7 +20,7 @@
       "title": "라이브 LGT 1b107b96bf4e — 40분 뒤 게스트 힙 고갈이 호스트 panic 으로",
       "plainSummary": "라이브에 올라 있는 LGT 게임 하나가 40분쯤 계속 하면 에뮬레이터째 멈춘다.",
       "userBenefit": "오래 해도 게임이 통째로 멈추지 않는다.",
-      "why": "v2 60분 실행에서 2564초에 «LGT host error unbuildable(guest heap exhausted)» 3회 뒤 class_instance.rs:109 class_definition 의 unwrap 이 InvalidMemoryAccess(0) 로 panic 했다. host_error 가 힙 고갈 때 내는 대체 예외가 주소 0 인스턴스라, 누군가 그 클래스를 읽는다(docs/report/0414 §4).",
+      "why": "v2 60분 실행에서 2564초에 «LGT host error unbuildable(guest heap exhausted)» 3회 뒤 class_instance.rs:109 class_definition 의 unwrap 이 InvalidMemoryAccess(0) 로 panic 했다. host_error 가 힙 고갈 때 내는 대체 예외가 주소 0 인스턴스라, 누군가 그 클래스를 읽는다(docs/report/0415 §4).",
       "tradeoff": "panic 경로만 막으면 게임은 여전히 힙이 바닥나 멈춘다. 힙이 왜 차는지(누수/GC)를 함께 봐야 한다 — 재현에 40분이 든다.",
       "effort": "M",
       "target": "wie-lgt/src/runtime/java/jvm_support.rs"
@@ -30,7 +30,7 @@
       "title": "라이브 LGT b475b6399684 — «게임시작» 뒤 설명서 마지막 쪽에서 어떤 키도 안 먹는다",
       "plainSummary": "라이브에 올라 있는 LGT 게임 하나가 «게임시작»을 누르면 나오는 설명서 마지막 쪽에서 더 넘어가지 않는다.",
       "userBenefit": "설명서를 넘기고 실제 게임을 할 수 있다.",
-      "why": "60분 v2 실행 내내(뒤로·소프트키·다음 항목 탈출 58회) 같은 쪽이었고, 손 키 시험에서 앞 두 쪽은 확인으로 넘어가지만 마지막 쪽은 OK·CLR·소프트키·숫자·방향키 전부 무반응이었다. 1차의 «⒜ CLR 필요» 분류는 틀렸다(docs/report/0414 §5).",
+      "why": "60분 v2 실행 내내(뒤로·소프트키·다음 항목 탈출 58회) 같은 쪽이었고, 손 키 시험에서 앞 두 쪽은 확인으로 넘어가지만 마지막 쪽은 OK·CLR·소프트키·숫자·방향키 전부 무반응이었다. 1차의 «⒜ CLR 필요» 분류는 틀렸다(docs/report/0415 §5).",
       "tradeoff": "게임이 이 쪽에서 무엇을 기다리는지(키 코드·스레드·리소스) 아직 모른다 — 조사부터.",
       "effort": "M",
       "target": "wie-lgt"

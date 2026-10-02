@@ -106,4 +106,3 @@ wave4(`wie-census-wave4-remaining-walls-and-locked-titles`, 먼저 착지)의 �
 유입(corpus-name-inflow): BOUNDED 333쌍 · SUFFIX-ATTACHED 15쌍 — 전부 이 회차가 고친 파일에 **이미 있던** 문자열(compat.json 의 공개 `title` 필드 · wie_validate.rs 의 기존 주석)이다. 이 회차가 더한 줄의 게임명 0(`git diff origin/main` 의 `+` 줄 대조).
 
 
-<!-- corpus-name-inflow v1 subjects=6 tree=7ad19667cdace56f B=722/333 P=2/2 S=35/15 -->
