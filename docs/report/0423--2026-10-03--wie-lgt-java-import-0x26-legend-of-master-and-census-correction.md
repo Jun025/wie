@@ -40,3 +40,5 @@
 ### 게이트
 - 네 게이트 + beta: fmt OK · clippy / wasm clippy / beta clippy rc0 · `RUST_MIN_STACK=4194304 cargo test --all` **51 스위트 666 passed 0 failed**(첫 판은 `target/debug/incremental` 의 `.pre-lto.bc` 결손 ICE — 그 크레이트 증분 디렉터리를 지우고 재실행).
 - 러너: draw_j2me · helloworld_ktf · helloworld_lgt · text_j2me PASS · keydraw_ktf/lgt `--inject --expect-last-frame` 기본 max-ticks 에서 `UNMEASURED max-ticks` → `--max-ticks 1000000000` 에서 둘 다 **PASS · rc0**(paints 80 · 55).
+
+게임 이름 유입(`scripts/corpus-name-inflow.mjs --corpus game_lab`): BOUNDED 774/355쌍 · SUFFIX-ATTACHED 40/18 — 전부 대상 파일 «전체»의 기존 문면이다(`compat.json` 의 `title`·`fileTitle` 필드, `interface.rs`·`jvm_support.rs` 의 기존 주석). 이 회차가 추가한 줄에는 게임 이름 0(코드·주석·소식 모두 sha12 만).
