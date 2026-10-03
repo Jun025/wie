@@ -1,0 +1,34 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-03",
+  "task": "wie-lgt-core-jvm-cycle-leaks-emulator-per-title-switch",
+  "title": "에뮬레이터 해제 시 코어↔JVM 순환 절단",
+  "summary": "Drop for 에뮬레이터 4종이 작업·SVC 핸들러·스레드·JVM 함수표를 비우고 LGT 장부 4종을 코어 id 로 지운다. 브라우저 한 탭에서 LGT·KTF 전환 24회 wasm 메모리 평탄(main 은 16번째에 OOM).",
+  "changes": [
+    "wie-backend System::teardown · Executor::clear",
+    "wie-core-arm ArmCore::teardown · on_teardown · live_cores",
+    "wie-lgt·wie-ktf JVM 함수표 teardown 훅 · Drop for 에뮬레이터 · guest_roots::forget · JavaHostField::forget_core",
+    "wie_validate live_cores",
+    "docs/report/0426"
+  ],
+  "verification": [
+    "test_emulator_freed(lgt·ktf) 되돌리면 red",
+    "--restart-at·--relaunch live_cores 1 · gc-stress dangling 0",
+    "브라우저 memory.buffer.byteLength main/PR 대조"
+  ],
+  "limits": [
+    "J2ME·SKT 순수 JVM 경로는 부팅당 약 0.45 MiB 가 남는다"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "J2ME·SKT 에뮬레이터 해제 후에도 부팅당 약 0.45 MiB 가 wasm 에 남는다",
+      "plainSummary": "J2ME 게임을 한 탭에서 바꿔 가며 띄우면 조금씩 메모리가 쌓이는 것을 마저 없앤다.",
+      "userBenefit": "J2ME·SKT 게임을 여러 번 바꿔 띄워도 탭 메모리가 늘지 않는다.",
+      "why": "docs/report/0426 브라우저 표: draw_j2me.jar 전환 12 + 가져오기 12 에서 6.1 → 16.4 MiB(main 은 21.8). 작업 순환을 끊은 뒤에도 남는 순수 JVM 경로(RustJava 내부 또는 wie-jvm-support) 순환이다. LGT·KTF 는 같은 측정에서 평탄.",
+      "tradeoff": "잔여 보유자를 찾으려면 JVM 쪽 강한 참조를 하나씩 재야 한다. 한 대분이 작아 급하지 않다.",
+      "effort": "S",
+      "target": "wie-j2me · wie-skt · wie-jvm-support"
+    }
+  ]
+}
