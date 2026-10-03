@@ -1,0 +1,21 @@
+{
+ "date": "2026-10-03",
+ "task": "wie-census-wave5b-leftover-walls-sound-and-labels",
+ "title": "5b차 — WIPI setRGBPixels 불투명 · 거절을 그리는 구매 검사 잠김 표기 · 남은 벽 실측",
+ "summary": "docs/report/0422",
+ "proposals": [
+  {
+   "title": "KTF Card 높이(상태 표시줄) 모델 — d1e0badfce82 판이 높이 320 에서 매 paint AIOOBE",
+   "plainSummary": "한 KTF 보드게임은 화면 높이가 320 이면 배경 표를 한 칸 넘겨 읽어 판이 안 그려진다. 높이 300 이면 정상이다.",
+   "userBenefit": "그 게임의 판이 보이고 진행된다. 실기 높이가 확인되면 다른 240×320 KTF 게임의 배치도 실기와 같아진다.",
+   "why": "게임은 띠 수를 getHeight()/10+1 로 정하고 int[5][32] 를 읽는다. 320 이면 33이 돼 넘친다. 실기는 상태 표시줄을 뺀 높이를 줬을 가능성이 크지만 KTF 실측값이 없다.",
+   "tradeoff": "높이를 바꾸면 240×320 KTF 177종 전부의 배치가 바뀐다. 짝 전수(320 대 후보 높이) 없이 하면 다른 게임을 깰 수 있다.",
+   "effort": "M",
+   "target": "wie-ktf / wie-wipi-java org.kwis.msp.lcdui Card·Display 높이",
+   "kind": "product"
+  }
+ ],
+ "adoptedProposals": [],
+ "declinedProposals": ["2026-10-02-progression-walls-r3#p1"],
+ "declinedReasons": { "2026-10-02-progression-walls-r3#p1": "resolved-by #448" }
+}
