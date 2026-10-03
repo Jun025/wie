@@ -1,8 +1,8 @@
 ## [2026-10-03] 5b차 — WIPI `setRGBPixels` 불투명 · 거절 문구를 그리고 끝나는 구매 단말 검사 · 남은 벽 셋 실측 (wie-census-wave5b-leftover-walls-sound-and-labels)
 
 **무엇을**: wave5·r3 가 남긴 벽 중 주인 없는 넷(티켓 4·5·6·7항)을 쟀다. 1·2항은 wave6(#453), 3항은 #449 가 맡아 이 회차는 손대지 않았다.
-**판정**: 5항 `a540945188ca` «글자 없음»은 **고쳤다**. 원인은 WIPI `Graphics.setRGBPixels` 였고, 같은 원인을 가진 KTF 4종이 함께 고쳐졌다(§1). 6항(설치 토큰 잠김 표기)도 **고쳤다**(§2). 4항 `38277d63b0ba` 는 #448 이 **이미 고쳤다**(§3). 5항 `d1e0badfce82` AIOOBE 는 **원인을 쟀고 고치지 않았다**. KTF 화면 높이 모델을 바꿔야 하는 일이다(§4). 7항은 **쟀다**(§5).
-**사용자 영향**: KTF 게임 5종에서 안 보이던 글자·메뉴·그림이 보인다. 한 종은 첫 화면부터 빈 판이었다. 구매 단말 검사에 막히는 SKT 게임 1종은 «플레이 가능»으로 잘못 나오던 것을 «잠긴 파일» 안내로 바꿨다.
+**판정**: 5항 `a540945188ca` «글자 없음»은 **고쳤다**. 원인은 WIPI `Graphics.setRGBPixels` 였고, 같은 원인을 가진 KTF 3종이 함께 고쳐졌다(§1). 6항(설치 토큰 잠김 표기)도 **고쳤다**(§2). 4항 `38277d63b0ba` 는 #448 이 **이미 고쳤다**(§3). 5항 `d1e0badfce82` AIOOBE 는 **원인을 쟀고 고치지 않았다**. KTF 화면 높이 모델을 바꿔야 하는 일이다(§4). 7항은 **쟀다**(§5).
+**사용자 영향**: KTF 게임 4종에서 안 보이던 글자·메뉴·그림이 보인다. 한 종은 첫 화면부터 빈 판이었다. 구매 단말 검사에 막히는 SKT 게임 1종은 «플레이 가능»으로 잘못 나오던 것을 «잠긴 파일» 안내로 바꿨다.
 
 증적: `~/orchestrator/reports/evidence/wie-census-wave5b-leftover-walls-sound-and-labels/`. 타이틀은 sha12 로만 적는다.
 
@@ -12,9 +12,15 @@
 - 원인: WIPI 의 화소는 알파 없는 `0x00RRGGBB` 다. 첫 구현(`840014d9`)은 이를 불투명 RGB 로 읽었다. upstream 의 MIDP 이관(`15ec4c09`)이 `drawRGB(…, processAlpha=true)` 로 넘기면서 알파 0 → **완전 투명**이 됐다. upstream main 도 같은 상태다.
 - 처방: `processAlpha=false`(`wie-wipi-java/src/classes/org/kwis/msp/lcdui/graphics.rs`). 시험 `test_set_rgb_pixels_draws_alpha_less_pixels_opaque` — `0x00123456` 을 찍고 `getPixel` 이 그 값이어야 한다. **되돌리면 red**(실측: `left: 0 · right: 1193046`).
 - 코퍼스에서 `setRGBPixels` 문자열을 가진 9종을 전·후 짝으로 쟀다(같은 27키 · 30초 · `wie_validate` 1개씩 · 증적 `setrgbpixels-pair.txt`).
-  - **글자가 나타남 5종**: `a540945188ca`(색 3 → 181 · 로고·메뉴·도움말) · `2c2ba3b84b98`(메뉴 글자) · `65bace1623a7` · `9c1c446a36e2`(「EMPTY · Play Time」) · `1b3b4868d46e`(메뉴).
-  - **변화 없음 4종**: `f80713702111` · `d9afc4db742c` · `5891a0c5d595` · `44c292be4e4c`(결과·색 수 같음).
+  - **글자가 나타남 4종**: `a540945188ca`(색 3 → 181 · 로고·메뉴·도움말) · `2c2ba3b84b98`(메뉴 글자) · `65bace1623a7` · `9c1c446a36e2`(「EMPTY · Play Time」).
+  - **변화 없음 5종**: `f80713702111` · `d9afc4db742c` · `5891a0c5d595`(결과·색 수 같음) · `44c292be4e4c`(축 불변·화면 퇴행 없음 — 알파 0x00 화소가 새로 그려지지만 색 수 축이 상한 512 에 포화돼 못 본다) · `1b3b4868d46e`(§1-a).
   - `2c2ba3b84b98` 후 실행은 `clean exit` 였다. 고정 27키가 이제 보이는 메뉴의 «나가기»를 고른 것이다(증적 `2c2b-after.png`). 전에는 같은 키가 빈 화면에서 아무것도 고르지 못했다. 엔진 퇴행이 아니라 키 일정의 결과다.
+
+### 1-a. 게이트② 정정 — `1b3b4868d46e` 은 이 고침과 무관하다 (wie-census-wave5b-leftover-walls-sound-and-labels-fix)
+
+- 처음 회차는 이 타이틀을 «글자가 나타남»으로 셌다. 그 짝은 «전 = 로딩 화면 / 후 = 메인 메뉴»로 **시점이 달랐다**. 차이는 타이밍이었다. 검수는 merge-base `7b1921ed` 빌드에서도 메인 메뉴 글자가 전부 보이고, 이 타이틀의 `setRGBPixels` 화소 알파가 전부 `0xFF`(바뀌는 화소 0)임을 쟀다.
+- 재측(같은 시점 짝 · 키 없음 `--inject --inject-keys 0 --keep-timeout --timeout 40 --shot-every 5` · release · base `7b1921ed` ↔ head · 1개씩 `build-slot`): `1b3b4868d46e` 은 5초~35초 7장이 **바이트까지 같다**. 나머지 3종은 같은 메인 메뉴(선택 막대·구분선 위치 같음)에서 base 는 글자가 없고 head 는 「게임시작 … 나가기」 6줄과 제목이 보인다(`2c2ba3b84b98` t15·t25·t30 · `65bace1623a7` t15·t20·t25 · `9c1c446a36e2` t10 base ↔ t15 head 등 같은 화면).
+- 처분: 소식(`docs/player-updates/2026-10-03-wipi-text-visible.json`)에서 빼고 수를 고쳤다(5종 → 4종 · 같은 원인 4종 → 3종). 증적 `fix-sametime/<sha12>-sametime-base-left-head-right.png`(왼쪽 base · 오른쪽 head · 위에서부터 5초 간격).
 
 ### 2. 6항 — 거절 문구를 그리고 스스로 끝나는 구매 단말 검사도 «잠긴 파일»
 
@@ -51,7 +57,7 @@ r3 는 `890ae6e1` 에서 쟀다. 그 커밋에는 #448(`ce469d81` · `setCurrent
 
 - `44b6356d13f8`: status playable → **not-yet** · 안내 = 잠긴 파일(§2 규칙이 다시 만들 값과 같다).
 - `a540945188ca` · `b475b6399684` · `78bd51675574`: `progress` stuck → **ok**. `38277d63b0ba`: `progress` **ok** 추가.
-- 다른 축은 손대지 않았다(글자가 생긴 4종은 원래 6축 `ok` 였다 — 화면 내용은 그 축이 못 본다). `docs/player-updates/2026-10-03-wipi-text-visible.json` 이 5종의 소식을 만든다.
+- 다른 축은 손대지 않았다(글자가 생긴 3종은 원래 6축 `ok` 였다 — 화면 내용은 그 축이 못 본다). `docs/player-updates/2026-10-03-wipi-text-visible.json` 이 4종의 소식을 만든다.
 
 ### 7. 퇴행
 
