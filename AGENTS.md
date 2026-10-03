@@ -130,7 +130,7 @@ for the same reason — `wie_validate` has no real canvas to resize:
 
 NOT-RUN: test_data/resize_ktf.zip — it exists to prove `Screen::resize` reaches a real screen, and
 `wie_validate`'s screen only records the size (since 2026-10-03; before that it ignored the call,
-which ran 93 KTF `176*220` packages at 240×320 — `docs/report/0419`), so running it here would
+which ran 93 KTF `176*220` packages at 240×320 — `docs/report/0425`), so running it here would
 assert nothing about a canvas. Its assertion lives in the browser round-trip (Scenario G), where the canvas is real.
 Built by `node scripts/make-resize-fixture.mjs` — the same guest as `helloworld_ktf.zip` plus one
 `DisplaySize:` line, byte-stable on regeneration.
