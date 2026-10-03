@@ -99,4 +99,4 @@ census A 프로브(30초 · `--relaunch 1 --pacing 8`)를 전·후 같은 순서
 
 ### 10. 게임 이름 유입
 
-INFLOW_SECTION
+`node scripts/corpus-name-inflow.mjs --corpus game_lab`(12파일): 유입 35쌍(BOUNDED) · 판단 필요 5쌍(SUFFIX-ATTACHED). **이 diff 가 새로 들인 이름은 0이다.** 두 바구니는 모두 이 diff 가 건드린 파일(`lgt_java_abi.toml`·`jvm_support.rs`·`text_component.rs` 등)에 원래 있던 이름이다. `git diff origin/main` 의 `+` 줄에서 코퍼스 stem(451개)과 맞는 것은 0건이다. 코드 `+` 줄의 3자 이상 한글은 1줄(«게임시작» · 화면 문구)뿐이다. 새로 쓴 주석·문서·소식은 sha12 만 쓴다.
