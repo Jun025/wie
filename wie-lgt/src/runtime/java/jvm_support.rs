@@ -92,6 +92,14 @@ impl LgtJvmSupport {
             .ok_or_else(|| WieError::FatalError(format!("LGT object reference {ptr_instance:#x} does not point at a live instance")))
     }
 
+    /// `ptr` as a `java/lang/Class` object, or `None` — quietly, because the caller is asking
+    /// "is this one?" about a word that is usually something else (a name string).
+    pub fn class_object_at(core: &ArmCore, ptr: u32) -> Option<Box<dyn ClassInstance>> {
+        let instance = JavaClassInstance::from_raw(ptr, core);
+        let is_class_object = instance.class().ok()?.try_name().ok()? == "java/lang/Class";
+        is_class_object.then(|| Box::new(instance) as Box<dyn ClassInstance>)
+    }
+
     pub fn class_instance_raw(instance: &dyn ClassInstance) -> u32 {
         if let Some(instance) = instance.as_any().downcast_ref::<JavaClassInstance>() {
             instance.ptr_raw

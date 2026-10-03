@@ -5441,7 +5441,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
