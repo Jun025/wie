@@ -13,7 +13,10 @@ use wie_midp::classes::javax::microedition::lcdui::Display as MidpDisplay;
 
 use crate::classes::{
     net::wie::{CardCanvas, WIPIKeyCode},
-    org::kwis::msp::lcdui::{Card, Jlet, JletEventListener},
+    org::kwis::msp::{
+        lcdui::{Card, Jlet, JletEventListener},
+        lwc::AnnunciatorComponent,
+    },
 };
 
 // class org.kwis.msp.lcdui.Display
@@ -329,7 +332,7 @@ impl Display {
             .invoke_virtual(&midp_display, "javax/microedition/lcdui/Display", "getHeight", "()I", ())
             .await?;
 
-        Ok(height)
+        Ok(height - AnnunciatorComponent::shown_height(jvm).await?)
     }
 
     async fn call_serially(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, r: ClassInstanceRef<Runnable>) -> JvmResult<()> {

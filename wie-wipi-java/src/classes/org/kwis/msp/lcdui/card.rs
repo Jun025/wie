@@ -7,7 +7,7 @@ use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext, get_declared_field, put_declared_field};
 use wie_midp::classes::javax::microedition::lcdui::Canvas;
 
-use crate::classes::org::kwis::msp::lcdui::Display;
+use crate::classes::org::kwis::msp::{lcdui::Display, lwc::AnnunciatorComponent};
 
 // abstract class org.kwis.msp.lcdui.Card
 pub struct Card;
@@ -127,13 +127,14 @@ impl Card {
 
         let width: i32 = jvm.invoke_virtual(&display, "org/kwis/msp/lcdui/Display", "getWidth", "()I", []).await?;
         let height: i32 = jvm.invoke_virtual(&display, "org/kwis/msp/lcdui/Display", "getHeight", "()I", []).await?;
+        let top = AnnunciatorComponent::shown_height(jvm).await?;
         let _: () = jvm
             .invoke_special(
                 &this,
                 "org/kwis/msp/lcdui/Card",
                 "<init>",
                 "(Lorg/kwis/msp/lcdui/Display;IIIIZ)V",
-                (display, 0, 0, width, height, transparent),
+                (display, 0, top, width, height, transparent),
             )
             .await?;
 
@@ -177,13 +178,14 @@ impl Card {
 
         let width: i32 = jvm.invoke_virtual(&display, "org/kwis/msp/lcdui/Display", "getWidth", "()I", []).await?;
         let height: i32 = jvm.invoke_virtual(&display, "org/kwis/msp/lcdui/Display", "getHeight", "()I", []).await?;
+        let top = AnnunciatorComponent::shown_height(jvm).await?;
         let _: () = jvm
             .invoke_special(
                 &this,
                 "org/kwis/msp/lcdui/Card",
                 "<init>",
                 "(Lorg/kwis/msp/lcdui/Display;IIIIZ)V",
-                (display, 0, 0, width, height, false),
+                (display, 0, top, width, height, false),
             )
             .await?;
 
