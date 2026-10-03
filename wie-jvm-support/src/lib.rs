@@ -20,7 +20,7 @@ use wie_util::{Result, WieError};
 pub use context::{WieJavaClassProto, WieJvmContext};
 pub use declared_field::{get_declared_field, put_declared_field};
 pub use jvm_implementation::{JvmImplementation, RustJavaJvmImplementation};
-use runtime::JvmRuntime;
+use runtime::{DefinedClasses, JvmRuntime};
 
 pub static WIE_RUSTJAR: &str = "wie.rustjar";
 
@@ -36,6 +36,14 @@ const PATH_SEPARATOR: &str = path_separator(cfg!(windows));
 
 const fn path_separator(windows: bool) -> &'static str {
     if windows { ";" } else { ":" }
+}
+
+struct SeverOnDrop(DefinedClasses);
+
+impl Drop for SeverOnDrop {
+    fn drop(&mut self) {
+        self.0.sever();
+    }
 }
 
 pub struct JvmSupport;
@@ -68,9 +76,14 @@ impl JvmSupport {
         .chain(properties.iter())
         .copied()
         .collect();
+        // Owned by the JVM alone, so it drops with it — see `DefinedClasses`.
+        let sever = SeverOnDrop(runtime.classes.clone());
         let jvm = Jvm::new(
             rustjava_runtime::get_bootstrap_class_loader(Box::new(runtime.clone())),
-            move || runtime.current_task_id(),
+            move || {
+                let _ = &sever;
+                runtime.current_task_id()
+            },
             properties,
         )
         .await

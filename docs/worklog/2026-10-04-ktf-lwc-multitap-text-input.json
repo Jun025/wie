@@ -1,0 +1,29 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-04",
+  "task": "wie-ktf-lwc-multitap-text-input-adopt",
+  "title": "KTF lwc 글자 입력기 — 공용 자판(멀티탭 영문·천지인 한글) · 입력 모드 3 = 한글",
+  "summary": "9789fec50f39 의 이름 칸은 setCurrentMode(3) 을 부르고 한글이 아닌 글자를 지운다. wie 는 3 을 숫자로 다뤘다. 자판을 wie-util::keypad 하나로 만들어 lwc TextComponent · lcdui InputMethodHandler · SKVM TextComponentHandler 가 같이 쓰게 했고, 모드 3 을 한글로 두었다. 그 게임은 «감시» 이름을 받고 다음 대사로 넘어간다. 0c67145b11df 는 이름에 한글이 들어간다.",
+  "changes": [
+    "wie-util/src/keypad.rs — press/back/render · Edit → Op · 영문 E.161 · 천지인 조합 · 시험 4",
+    "wie-wipi-java lcdui InputMethodHandler — 모드 표 [영대, 영소, 숫자, 한글] · 시작 모드 3 · compose(조합 상태는 composing [C) · notifyTextChanged 글자마다",
+    "wie-wipi-java lwc TextComponent.keyNotify — imHandler 경유 · '*' 모드 전환 · m_td 꼬리가 다르면 조합 새로 · TextField/TextBox 생성자 제한자 → 핸들러",
+    "wie-skvm TextComponentHandler — 공용 자판 사용(영대 고정 · 동작 동일)",
+    "docs/report/0428 · docs/player-updates 1"
+  ],
+  "verification": [
+    "짝 62종 기본 27키: 판정 뒤집힘 0 · 입력에 닿은 3종의 글자만 바뀜",
+    "이름 경로: 9789fec50f39 빈 칸 → «감시» 다음 대사 · 0c67145b11df 숫자 → «고치»·«미리» · 85f03ca7389e 화면 md5 동일",
+    "되돌림 red 4/4 · fmt · clippy stable/wasm32/beta · cargo test --all 677/0 · 러너 블록 PASS"
+  ],
+  "limits": [
+    "모드 0·1·2 의 번호와 천지인 배열·'*' 모드 키는 가정이다(report 0428 §2) — 레퍼런스 클래스 본문은 비어 있다",
+    "1e43e2e0055f · d448aee68157 의 입력 화면은 다시 재지 않았다",
+    "setMaxLength 는 여전히 값만 기록한다"
+  ],
+  "adoptedProposals": [
+    "2026-10-02-lwc-form-key-dispatch#p0",
+    "2026-10-03-progression-engine-walls-r2#p1"
+  ],
+  "proposals": []
+}

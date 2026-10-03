@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-04",
+  "kind": "fix",
+  "titles": [
+    "9789fec50f39febc2d75f48ecbb2f8e30dcdfbb7221241af99d0aa559218e299",
+    "0c67145b11dff72242c85d83fb07f77216c71fdc16fc63a332e1830355e56d2a"
+  ],
+  "summary_ko": "이름을 넣는 칸에 휴대폰 자판처럼 한글을 넣을 수 있어요. 같은 키를 여러 번 누르면 글자가 바뀌고, * 키로 영문과 숫자로 바꿀 수 있어요.",
+  "pr": "https://github.com/Jun025/wie/pull/461"
+}

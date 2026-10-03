@@ -1,10 +1,17 @@
-use alloc::{boxed::Box, collections::BTreeMap, format, sync::Arc, vec::Vec};
+use alloc::{
+    boxed::Box,
+    collections::{BTreeMap, BTreeSet},
+    format,
+    sync::Arc,
+    vec::Vec,
+};
 use core::time::Duration;
 
 use spin::Mutex;
 
-use jvm::{ClassDefinition, Jvm, Result as JvmResult};
-use jvm_bytecode::{ClassDefinitionError, ClassDefinitionImpl};
+use jvm::{ClassDefinition, ClassInstance, Field, JavaValue, Jvm, Result as JvmResult};
+use jvm_bytecode::{ArrayClassDefinitionImpl, ClassDefinitionError, ClassDefinitionImpl};
+use jvm_types::FieldAccessFlags;
 use rustjava_runtime::{
     File, FileDescriptorId, FileOpenOptions, FileSize, FileStat, FileType, IOError, IOResult, RT_RUSTJAR, Runtime, SpawnCallback,
     get_runtime_class_proto,
@@ -111,6 +118,93 @@ impl File for StderrFile {
     }
 }
 
+/// Every class this runtime defined, to cut the reference cycles among its objects once the JVM is
+/// dropped.
+///
+/// The `jvm` crate frees an object only when its last `Arc` goes, so any cycle outlives the JVM: a
+/// static holding an instance of its own class (the instance holds its class), `Writer.lock = this`,
+/// `Display` ↔ the current `Canvas`. Each boot leaked those objects and, through their classes'
+/// context, the `System` and its platform (~0.5 MiB a boot, measured). Nothing can run Java once the
+/// JVM is gone, so every object reachable from a static is emptied then.
+#[derive(Clone, Default)]
+pub struct DefinedClasses(Arc<Mutex<Vec<Box<dyn ClassDefinition>>>>);
+
+impl DefinedClasses {
+    fn record(&self, class: JvmResult<Box<dyn ClassDefinition>>) -> JvmResult<Box<dyn ClassDefinition>> {
+        // Only classes whose objects live in the `jvm` crate: KTF and LGT define theirs in guest memory.
+        if let Ok(class) = &class
+            && (**class).as_any().is::<InheritedMethods>()
+        {
+            self.0.lock().push(class.clone());
+        }
+        class
+    }
+
+    pub fn sever(&self) {
+        // Taken, not iterated in place: these definitions hold this list through their context.
+        let mut classes = core::mem::take(&mut *self.0.lock());
+        let by_name = classes.iter().map(|x| (x.name(), x.clone())).collect::<BTreeMap<_, _>>();
+
+        let mut pending = Vec::new();
+        for class in &mut classes {
+            for field in class.fields() {
+                if field.access_flags().contains(FieldAccessFlags::STATIC)
+                    && let Some(value) = take_object(class.get_static_field(&*field), &*field)
+                {
+                    pending.push(value);
+                    let _ = class.put_static_field(&*field, JavaValue::Object(None));
+                }
+            }
+        }
+
+        let mut seen = BTreeSet::new();
+        while let Some(mut object) = pending.pop() {
+            if !seen.insert(object.identity()) {
+                continue;
+            }
+            let definition = object.class_definition();
+            let name = definition.name();
+            if (*definition).as_any().is::<ArrayClassDefinitionImpl>() {
+                let Some(array) = object.as_array_instance_mut() else { continue };
+                if name.starts_with("[L") || name.starts_with("[[") {
+                    let length = array.length();
+                    let values = array.load(0, length).unwrap_or_default();
+                    pending.extend(values.into_iter().filter_map(|x| if let JavaValue::Object(x) = x { x } else { None }));
+                    let _ = array.store(0, (0..length).map(|_| JavaValue::Object(None)).collect());
+                }
+                continue;
+            }
+            // An instance holds the definition `InheritedMethods` wraps.
+            if !(*definition).as_any().is::<ClassDefinitionImpl>() {
+                continue;
+            }
+            let mut class = by_name.get(&name);
+            while let Some(definition) = class {
+                for field in definition.fields() {
+                    if !field.access_flags().contains(FieldAccessFlags::STATIC)
+                        && let Some(value) = take_object(object.get_field(&*field), &*field)
+                    {
+                        pending.push(value);
+                        let _ = object.put_field(&*field, JavaValue::Object(None));
+                    }
+                }
+                class = definition.super_class_name().and_then(|x| by_name.get(&x));
+            }
+        }
+    }
+}
+
+fn take_object(value: JvmResult<JavaValue>, field: &dyn Field) -> Option<Box<dyn ClassInstance>> {
+    let descriptor = field.descriptor();
+    if !(descriptor.starts_with('L') || descriptor.starts_with('[')) {
+        return None;
+    }
+    match value {
+        Ok(JavaValue::Object(x)) => x,
+        _ => None,
+    }
+}
+
 #[derive(Clone)]
 pub struct JvmRuntime<T>
 where
@@ -120,6 +214,7 @@ where
     implementation: T,
     protos: Arc<Mutex<Vec<WieJavaClassProto>>>,
     file_table: Arc<Mutex<FileTableInner>>,
+    pub(crate) classes: DefinedClasses,
 }
 
 impl<T> JvmRuntime<T>
@@ -136,6 +231,7 @@ where
             implementation,
             protos: Arc::new(Mutex::new(protos.into_vec().into_iter().flat_map(|x| x.into_vec()).collect())),
             file_table: Arc::new(Mutex::new(file_table)),
+            classes: DefinedClasses::default(),
         }
     }
 }
@@ -258,11 +354,9 @@ where
                 // defined, so no fork is needed to wrap a method body.
                 crate::hardening::harden(&mut proto);
 
-                return Ok(Some(
-                    self.implementation
-                        .define_class_rust(jvm, proto, Box::new(self.clone()) as Box<_>)
-                        .await?,
-                ));
+                return Ok(Some(self.classes.record(
+                    self.implementation.define_class_rust(jvm, proto, Box::new(self.clone()) as Box<_>).await,
+                )?));
             }
         } else if classpath == WIE_RUSTJAR {
             let proto_index = self.protos.lock().iter().position(|x| x.name == class);
@@ -270,7 +364,10 @@ where
                 let proto = self.protos.lock().remove(proto_index);
                 let context = Box::new(WieJvmContext::new(&self.system));
 
-                return Ok(Some(self.implementation.define_class_rust(jvm, proto, context as Box<_>).await?));
+                return Ok(Some(
+                    self.classes
+                        .record(self.implementation.define_class_rust(jvm, proto, context as Box<_>).await)?,
+                ));
             }
         }
 
@@ -279,7 +376,7 @@ where
 
     async fn define_class(&self, jvm: &Jvm, data: &[u8]) -> JvmResult<Box<dyn ClassDefinition>> {
         match ClassDefinitionImpl::from_classfile(data) {
-            Ok(class) => InheritedMethods::wrap(jvm, class).await,
+            Ok(class) => self.classes.record(InheritedMethods::wrap(jvm, class).await),
             Err(ClassDefinitionError::InvalidClassFile) => Err(jvm.exception("java/lang/ClassFormatError", "Invalid class file").await),
             Err(ClassDefinitionError::UnsupportedClassVersion(version)) => Err(jvm
                 .exception(

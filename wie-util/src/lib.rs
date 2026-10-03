@@ -13,6 +13,8 @@ use core::{
 
 use bytemuck::{AnyBitPattern, NoUninit, bytes_of};
 
+pub mod keypad;
+
 #[derive(Debug)]
 pub enum WieError {
     InvalidMemoryAccess(u32),

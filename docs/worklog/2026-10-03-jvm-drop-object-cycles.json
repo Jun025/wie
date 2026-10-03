@@ -1,0 +1,22 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-03",
+  "task": "wie-j2me-skt-emulator-drop-residual-wasm-growth",
+  "title": "JVM 해제 시 자바 객체 순환 절단 — J2ME·SKT 부팅당 잔류 제거",
+  "summary": "JvmRuntime 이 정의한 클래스를 기록하고, JVM 이 drop 될 때 정적 필드에서 닿는 jvm-bytecode 객체의 객체 필드·배열 원소를 비운다. 순환(정적 싱글턴·Writer.lock=this·Display↔Canvas)이 클래스 context 를 통해 System·플랫폼을 붙잡던 것이 풀린다.",
+  "changes": [
+    "wie-jvm-support DefinedClasses · SeverOnDrop(JVM 이 단독 소유)",
+    "wie-j2me/tests/test_emulator_freed.rs",
+    "docs/report/0427"
+  ],
+  "verification": [
+    "test_emulator_freed(j2me) — sever 호출을 빼면 red",
+    "브라우저 memory.buffer.byteLength base/PR 대조"
+  ],
+  "limits": [
+    "실행 중 GC 가 버린 순환 쓰레기는 여전히 남는다 — jvm-bytecode 의 destroy 가 no-op(상류 · 재지 않았다)",
+    "SKT 는 같은 경로(JvmSupport::new_jvm + RustJavaJvmImplementation)지만 픽스처가 없어 직접 재지 않았다"
+  ],
+  "adoptedProposals": ["2026-10-03-emulator-drop-cycles#p0"],
+  "proposals": []
+}
