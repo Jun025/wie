@@ -43,4 +43,4 @@
 
 게임 이름 유입(`scripts/corpus-name-inflow.mjs --corpus game_lab`): BOUNDED 774/355쌍 · SUFFIX-ATTACHED 40/18 — 전부 대상 파일 «전체»의 기존 문면이다(`compat.json` 의 `title`·`fileTitle` 필드, `interface.rs`·`jvm_support.rs` 의 기존 주석). 이 회차가 추가한 줄에는 게임 이름 0(코드·주석·소식 모두 sha12 만).
 
-<!-- corpus-name-inflow v1 subjects=6 tree=4143c641737fa028 B=774/355 P=2/1 S=40/18 -->
+<!-- corpus-name-inflow v1 subjects=6 tree=ccbb073f07d6dd3a B=774/355 P=2/1 S=40/18 -->
