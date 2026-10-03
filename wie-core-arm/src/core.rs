@@ -252,6 +252,23 @@ impl ArmCore {
         self.inner.lock().current_thread_id
     }
 
+    /// Whether a thread other than the current one is suspended in the middle of guest code — sliced
+    /// out by the instruction budget, not parked in a host call (sleep, wait, I/O). Host code that
+    /// hands the guest an event can wait for this to clear: a handset does not deliver a key into
+    /// the middle of another thread's frame (docs/report/0429).
+    pub fn others_preempted(&self) -> bool {
+        let current = self.current_thread_id();
+        self.threads.lock().iter().any(|(id, state)| Some(*id) != current && state.preempted)
+    }
+
+    fn set_preempted(&self, thread_id: Option<ThreadId>, preempted: bool) {
+        if let Some(id) = thread_id
+            && let Some(state) = self.threads.lock().get_mut(&id)
+        {
+            state.preempted = preempted;
+        }
+    }
+
     pub fn get_thread_ids(&self) -> Vec<ThreadId> {
         self.threads.lock().keys().cloned().collect()
     }
@@ -407,7 +424,14 @@ impl ArmCore {
             };
 
             if should_yield {
+                let preempted = if matches!(result, EngineStopReason::Yield) {
+                    self.current_thread_id()
+                } else {
+                    None
+                };
+                self.set_preempted(preempted, true);
                 YieldFuture::new().await;
+                self.set_preempted(preempted, false);
             }
 
             match result {
@@ -1122,6 +1146,42 @@ mod tests {
         }
         assert!(matches!(run.as_mut().poll(&mut cx), Poll::Ready(Ok(10_000))));
         assert_eq!(calls.load(Ordering::Relaxed), 10_000);
+    }
+
+    #[test]
+    fn only_a_thread_sliced_out_mid_code_counts_as_preempted() {
+        async fn park(_: &mut ArmCore, _: &mut ()) -> Result<()> {
+            YieldFuture::new().await;
+            Ok(())
+        }
+
+        let mut core = ArmCore::new(false, None).unwrap();
+        crate::Allocator::init(&mut core).unwrap();
+        core.register_svc_handler(1, park, &()).unwrap();
+        let mut spin = [0xc0, 0x46].repeat(20_000); // nop
+        spin.extend_from_slice(&[0x70, 0x47]); // bx lr
+        core.load(&spin, 0x1000, spin.len()).unwrap();
+        core.load(&[0x01, 0xdf, 0x70, 0x47], 0x20000, 4).unwrap(); // svc #1; bx lr
+
+        let mut cx = Context::from_waker(Waker::noop());
+        let mut runner = core.clone();
+        let mut sliced = pin!(
+            core.run_in_thread(move || async move { runner.run_function::<()>(0x1001, &[]).await })
+                .unwrap()
+        );
+        assert!(sliced.as_mut().poll(&mut cx).is_pending());
+        assert!(core.others_preempted(), "out of budget between two guest instructions");
+        while sliced.as_mut().poll(&mut cx).is_pending() {}
+        assert!(!core.others_preempted(), "a finished thread is not");
+
+        let mut runner = core.clone();
+        let mut parked = pin!(
+            core.run_in_thread(move || async move { runner.run_function::<()>(0x20001, &[]).await })
+                .unwrap()
+        );
+        assert!(parked.as_mut().poll(&mut cx).is_pending());
+        assert!(!core.others_preempted(), "waiting in a host call");
+        assert!(matches!(parked.as_mut().poll(&mut cx), Poll::Ready(Ok(()))));
     }
 
     #[test]

@@ -26,6 +26,8 @@ const GC_INTERVAL_MS: i64 = 1000;
 // 91 and 165ms per collection, 15% of the wall clock at one a second. The next collection waits
 // until the last one's cost is at most this fraction of the time between them.
 const GC_COST_SHARE: i64 = 20;
+// The longest a key waits for the other guest threads to reach a host call (handleKeyEvent).
+const KEY_WAITS_FOR_GUEST_MS: u32 = 250;
 
 const TITLE_BACKGROUND: i32 = 0x263746;
 const WHITE: i32 = 0xffffff;
@@ -780,8 +782,22 @@ impl Display {
         Ok(())
     }
 
-    async fn handle_key_event(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>, event_type: i32, code: i32) -> JvmResult<()> {
+    async fn handle_key_event(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>, event_type: i32, code: i32) -> JvmResult<()> {
         tracing::debug!("javax.microedition.lcdui.Display::handleKeyEvent({this:?}, {event_type:?}, {code})");
+
+        // A key is not delivered into the middle of another guest thread's frame. wie slices guest
+        // threads every 10k instructions; a handset hands a key over only while the others sit in a
+        // host call. 1b107b96bf4e's key handler nulls the menu images its game thread was sliced out
+        // drawing — the frame resumes into an NPE, game thread dead, match intro frozen
+        // (docs/report/0429). Bounded: a thread that never reaches a host call delays a key by the cap.
+        let mut waited = 0;
+        while waited < KEY_WAITS_FOR_GUEST_MS && context.system().guest_others_preempted() {
+            context.system().sleep(1).await;
+            waited += 1;
+        }
+        if waited > 0 {
+            tracing::debug!("key waited {waited}ms for a guest thread sliced out mid-code");
+        }
 
         let current_displayable: ClassInstanceRef<Displayable> = jvm
             .get_field(&this, "currentDisplayable", "Ljavax/microedition/lcdui/Displayable;")

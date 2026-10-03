@@ -31,6 +31,10 @@ impl TaskRunner for LgtTaskRunner {
     async fn run(&self, future: Pin<Box<dyn Future<Output = Result<()>> + Send>>) -> Result<()> {
         self.core.run_in_thread(async move || future.await)?.await
     }
+
+    fn others_preempted(&self) -> bool {
+        self.core.others_preempted()
+    }
 }
 
 /// Per-title archive entries that are NOT mounted, because the archive is a dump of a previous
