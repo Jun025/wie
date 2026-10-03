@@ -7,6 +7,8 @@ use rustjava_runtime::classes::java::lang::String;
 
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
+use super::TextComponent;
+
 // class org.kwis.msp.lwc.TextFieldComponent
 pub struct TextFieldComponent;
 
@@ -29,15 +31,14 @@ impl TextFieldComponent {
     async fn init(
         jvm: &Jvm,
         _: &mut WieJvmContext,
-        this: ClassInstanceRef<TextFieldComponent>,
+        mut this: ClassInstanceRef<TextFieldComponent>,
         data: ClassInstanceRef<String>,
         constraint: i32,
     ) -> JvmResult<()> {
         tracing::warn!("stub org.kwis.msp.lwc.TextFieldComponent::<init>({this:?}, {data:?}, {constraint:?})");
 
         let _: () = jvm.invoke_special(&this, "org/kwis/msp/lwc/TextComponent", "<init>", "()V", ()).await?;
-
-        Ok(())
+        TextComponent::set_constraint(jvm, &mut this, constraint).await
     }
 
     async fn insert(

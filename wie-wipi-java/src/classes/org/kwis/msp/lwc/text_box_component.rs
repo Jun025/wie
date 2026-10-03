@@ -7,6 +7,8 @@ use rustjava_runtime::classes::java::lang::String;
 
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
+use super::TextComponent;
+
 // class org.kwis.msp.lwc.TextBoxComponent
 pub struct TextBoxComponent;
 
@@ -28,21 +30,21 @@ impl TextBoxComponent {
     async fn init(
         jvm: &Jvm,
         _: &mut WieJvmContext,
-        this: ClassInstanceRef<TextBoxComponent>,
+        mut this: ClassInstanceRef<TextBoxComponent>,
         data: ClassInstanceRef<String>,
         constraint: i32,
     ) -> JvmResult<()> {
         tracing::warn!("stub org.kwis.msp.lwc.TextBoxComponent::<init>({this:?}, {data:?}, {constraint:?})");
 
         let _: () = jvm.invoke_special(&this, "org/kwis/msp/lwc/TextComponent", "<init>", "()V", ()).await?;
-
-        Ok(())
+        TextComponent::set_constraint(jvm, &mut this, constraint).await
     }
 
     // (text, maxLength, constraint), following MIDP's TextBox(title, text, maxSize, constraints)
     // ordering -- the middle int is routed to setMaxLength, which 붕어빵타이쿤3 also calls on this
-    // class directly. Both sinks are stubs today, so a swapped reading is not yet observable;
-    // whichever way round it is, the two ints land on a no-op and the constructor completes.
+    // class directly. setMaxLength only records its value, but the constraint now picks the input
+    // mode (1/2/5 type digits), so a swapped reading would show as a field typing the wrong kind of
+    // character. Unmeasured: no title reaching this constructor has been typed into.
     async fn init_with_max_length(
         jvm: &Jvm,
         _: &mut WieJvmContext,

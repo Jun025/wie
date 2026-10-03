@@ -1,10 +1,11 @@
-use alloc::vec;
+use alloc::{vec, vec::Vec};
 
-use jvm::{ClassInstanceRef, JavaChar, Jvm, Result as JvmResult};
+use jvm::{Array, ClassInstanceRef, JavaChar, Jvm, Result as JvmResult};
 use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
+use wie_util::keypad::{self, Edit, Mode, Op};
 
 use crate::classes::org::kwis::msp::lcdui::InputMethodListener;
 
@@ -17,12 +18,15 @@ const INSERT: i32 = -1;
 const REPLACE: i32 = 0;
 const DELETE: i32 = 1;
 const MULTITAP_MS: i64 = 1000;
-// Korean · English upper · English lower · number: the four the handsets' mode indicator cycled.
-// ponytail: a count, not a measured table — nothing here reads which mode is which.
-const MODE_COUNT: i32 = 4;
+// The mode numbers. Only 3 is measured: 9789fec50f39 and b22a7fcfb406 both setCurrentMode(3) on a
+// name prompt, 9789fec50f39 erases every digit typed there but keeps Hangul, and b22a7fcfb406's own
+// strip «가 A a 1» highlights 가 at 3. The rest follow that strip's order as changeCurrentModeToNext
+// steps it (3 → 0 → 1 → 2 → 3). ponytail: 0..2 are assumed (docs/report/0427 §2) — no reference here
+// numbers the modes; the stripped AromaWIPI classes leave them to native code.
+const MODES: [Mode; 4] = [Mode::Upper, Mode::Lower, Mode::Digit, Mode::Hangul];
+const HANGUL_MODE: i32 = 3;
 // TextComponent: CONSTRAINT_NUMBER = 1; PASSWORD and PHONENUMBER are digits too (javadoc).
 const NUMERIC_CONSTRAINTS: [i32; 3] = [1, 2, 5];
-const MULTITAP: [&str; 10] = [" ", ".,-", "ABC", "DEF", "GHI", "JKL", "MNO", "PQRS", "TUV", "WXYZ"];
 
 impl InputMethodHandler {
     pub fn as_proto() -> WieJavaClassProto {
@@ -59,7 +63,8 @@ impl InputMethodHandler {
                 JavaFieldProto::new("constraint", "I", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("lastKey", "I", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("lastAt", "J", FieldAccessFlags::PRIVATE),
-                JavaFieldProto::new("tap", "I", FieldAccessFlags::PRIVATE),
+                // The keys of the word being composed (wie_util::keypad tokens).
+                JavaFieldProto::new("composing", "[C", FieldAccessFlags::PRIVATE),
             ],
             access_flags: ClassAccessFlags::PUBLIC,
         }
@@ -70,6 +75,8 @@ impl InputMethodHandler {
 
         let _: () = jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await?;
         jvm.put_field(&mut this, "constraint", "I", constraint).await?;
+        // A handset starts a text field in Korean.
+        jvm.put_field(&mut this, "mode", "I", HANGUL_MODE).await?;
 
         Ok(())
     }
@@ -80,18 +87,19 @@ impl InputMethodHandler {
         tracing::warn!("stub org.kwis.msp.lcdui.InputMethodHandler::setCurrentMode({this:?}, {mode})");
 
         jvm.put_field(&mut this, "mode", "I", mode).await?;
+        Self::end_composition(jvm, &mut this).await?;
 
         Ok(true)
     }
 
-    // Every mode types the same Latin multi-tap here (notifyKeyInput), so the order of modes is not
-    // observable beyond the number itself; it steps through MODE_COUNT values and wraps, which keeps
-    // getCurrentMode inside a range a title can index a label table with.
-    async fn change_current_mode_to_next(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
+    // Steps through MODES and wraps, which keeps getCurrentMode inside a range a title can index a
+    // label table with. lwc TextComponent calls this on '*'.
+    pub async fn change_current_mode_to_next(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.lcdui.InputMethodHandler::changeCurrentModeToNext({this:?})");
 
         let mode: i32 = jvm.get_field(&this, "mode", "I").await?;
-        jvm.put_field(&mut this, "mode", "I", (mode + 1).rem_euclid(MODE_COUNT)).await
+        jvm.put_field(&mut this, "mode", "I", (mode + 1).rem_euclid(MODES.len() as i32)).await?;
+        Self::end_composition(jvm, &mut this).await
     }
 
     async fn get_current_mode(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
@@ -107,10 +115,10 @@ impl InputMethodHandler {
         Ok(())
     }
 
-    // A multi-tap keypad, which is what the handsets' automata did for Latin letters: a digit key
-    // inserts the first letter of its group, the same key again within MULTITAP_MS replaces it with
-    // the next, CLR deletes. Each change goes to the listener's `notifyTextChanged(chars, len, pMode)`
-    // (pMode insert -1 / replace 0 / delete 1 — javadoc). Numeric constraints insert the digit.
+    // The handsets' automaton (wie_util::keypad): multi-tap Latin, 천지인 Hangul, or digits for the
+    // numeric constraints; CLR takes back the last key. Each change goes to the listener's
+    // `notifyTextChanged(chars, len, pMode)` (pMode insert -1 / replace 0 / delete 1 — javadoc), one
+    // call per character: a Hangul key can rewrite one syllable and add the next (각 + ㅏ → 가가).
     //
     // Argument order is (keyCode, type), not the (type, key) the stub was declared with: the javadoc
     // says `notifyKeyInput(int keyCode, int type)` with type = EventQueue.KEY_PRESSED/RELEASED
@@ -122,10 +130,8 @@ impl InputMethodHandler {
     // Why it exists: the stub consumed nothing and never called the listener, so a title that asks
     // for a name through this handler could never get past the prompt — a KTF title's shop-name screen
     // answered every key with «at least 1 character» for 30 minutes (1e43e2e0055f, progress census
-    // 2026-09-30). ponytail: no Hangul automaton and no mode switching — every mode types Latin.
-    // A name the player can type is the unblock; a Korean automaton is the upgrade if a title
-    // rejects Latin names.
-    async fn notify_key_input(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, key: i32, r#type: i32) -> JvmResult<bool> {
+    // 2026-09-30).
+    async fn notify_key_input(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>, key: i32, r#type: i32) -> JvmResult<bool> {
         tracing::debug!("org.kwis.msp.lcdui.InputMethodHandler::notifyKeyInput({this:?}, {key}, {type})");
 
         let listener: ClassInstanceRef<InputMethodListener> = jvm.get_field(&this, "listener", "Lorg/kwis/msp/lcdui/InputMethodListener;").await?;
@@ -135,42 +141,94 @@ impl InputMethodHandler {
         if r#type != KEY_PRESSED {
             return Ok(key == CLEAR || (b'0' as i32..=b'9' as i32).contains(&key));
         }
-
-        let (chars, mode) = if key == CLEAR {
-            jvm.put_field(&mut this, "lastKey", "I", 0).await?;
-            (vec![], DELETE)
-        } else if let Some(group) = (b'0' as i32..=b'9' as i32).contains(&key).then(|| MULTITAP[(key - b'0' as i32) as usize]) {
-            let constraint: i32 = jvm.get_field(&this, "constraint", "I").await?;
-            if NUMERIC_CONSTRAINTS.contains(&constraint) {
-                (vec![key as JavaChar], INSERT)
-            } else {
-                let now = context.system().platform().now().raw() as i64;
-                let last_key: i32 = jvm.get_field(&this, "lastKey", "I").await?;
-                let last_at: i64 = jvm.get_field(&this, "lastAt", "J").await?;
-                let again = last_key == key && now - last_at < MULTITAP_MS;
-                let tap = if again { jvm.get_field::<i32>(&this, "tap", "I").await? + 1 } else { 0 };
-                jvm.put_field(&mut this, "lastKey", "I", key).await?;
-                jvm.put_field(&mut this, "lastAt", "J", now).await?;
-                jvm.put_field(&mut this, "tap", "I", tap).await?;
-                let letters = group.as_bytes();
-                (
-                    vec![letters[tap as usize % letters.len()] as JavaChar],
-                    if again { REPLACE } else { INSERT },
-                )
-            }
-        } else {
+        let Some(edit) = Self::compose(jvm, context, this, key, None).await? else {
             return Ok(false);
         };
 
-        let mut array = jvm.instantiate_array("C", chars.len().max(1)).await?;
-        jvm.store_array(&mut array, 0, chars.clone()).await?;
         // Resolved on the listener's own class: the interface proto here declares no methods.
         let class = listener.class_definition().name();
-        let _: () = jvm
-            .invoke_virtual(&listener, &class, "notifyTextChanged", "([CII)V", (array, 1, mode))
-            .await?;
+        for op in edit.ops() {
+            let (c, mode) = match op {
+                Op::Insert(c) => (c, INSERT),
+                Op::Replace(c) => (c, REPLACE),
+                Op::Delete => ('\0', DELETE),
+            };
+            let mut array = jvm.instantiate_array("C", 1).await?;
+            jvm.store_array(&mut array, 0, vec![c as JavaChar]).await?;
+            let _: () = jvm
+                .invoke_virtual(&listener, &class, "notifyTextChanged", "([CII)V", (array, 1, mode))
+                .await?;
+        }
 
         Ok(true)
+    }
+
+    /// One pressed key through the automaton: the edit to make before the caret, or None for a key
+    /// it does not type (only digits and CLR are). `text` — the field's text before the caret, when
+    /// the caller has it: if it no longer ends with the composition (the title rewrote it), the
+    /// composition is over and this key starts a new one.
+    pub async fn compose(
+        jvm: &Jvm,
+        context: &mut WieJvmContext,
+        mut this: ClassInstanceRef<Self>,
+        key: i32,
+        text: Option<&[JavaChar]>,
+    ) -> JvmResult<Option<Edit>> {
+        let constraint: i32 = jvm.get_field(&this, "constraint", "I").await?;
+        let mode = if NUMERIC_CONSTRAINTS.contains(&constraint) {
+            Mode::Digit
+        } else {
+            MODES[jvm.get_field::<i32>(&this, "mode", "I").await?.rem_euclid(MODES.len() as i32) as usize]
+        };
+        let composing: ClassInstanceRef<Array<JavaChar>> = jvm.get_field(&this, "composing", "[C").await?;
+        let mut tokens: Vec<char> = if composing.is_null() {
+            Vec::new()
+        } else {
+            let length = jvm.array_length(&composing).await?;
+            let chars: Vec<JavaChar> = jvm.load_array(&composing, 0, length).await?;
+            chars.into_iter().filter_map(|c| char::from_u32(c as u32)).collect()
+        };
+        if let Some(text) = text {
+            let shown: Vec<JavaChar> = keypad::render(mode, &tokens).iter().map(|&c| c as JavaChar).collect();
+            if !text.ends_with(&shown) {
+                tokens.clear();
+            }
+        }
+
+        let edit = if key == CLEAR {
+            jvm.put_field(&mut this, "lastKey", "I", 0).await?;
+            keypad::back(mode, &mut tokens).unwrap_or(Edit {
+                delete: 1,
+                insert: Vec::new(),
+            })
+        } else if (b'0' as i32..=b'9' as i32).contains(&key) {
+            let now = context.system().platform().now().raw() as i64;
+            let last_key: i32 = jvm.get_field(&this, "lastKey", "I").await?;
+            let last_at: i64 = jvm.get_field(&this, "lastAt", "J").await?;
+            jvm.put_field(&mut this, "lastKey", "I", key).await?;
+            jvm.put_field(&mut this, "lastAt", "J", now).await?;
+            keypad::press(
+                mode,
+                &mut tokens,
+                (key - b'0' as i32) as u8,
+                last_key == key && now - last_at < MULTITAP_MS,
+            )
+        } else {
+            return Ok(None);
+        };
+
+        let mut composing = jvm.instantiate_array("C", tokens.len()).await?;
+        jvm.store_array(&mut composing, 0, tokens.into_iter().map(|c| c as JavaChar).collect::<Vec<_>>())
+            .await?;
+        jvm.put_field(&mut this, "composing", "[C", composing).await?;
+
+        Ok(Some(edit))
+    }
+
+    async fn end_composition(jvm: &Jvm, this: &mut ClassInstanceRef<Self>) -> JvmResult<()> {
+        let empty = jvm.instantiate_array("C", 0).await?;
+        jvm.put_field(this, "composing", "[C", empty).await?;
+        jvm.put_field(this, "lastKey", "I", 0).await
     }
 
     // wie has no input method, so the listener is never called back; it is kept so the
@@ -234,10 +292,10 @@ mod tests {
             let mut text: Vec<char> = text.chars().collect();
             let got: Vec<JavaChar> = jvm.load_array(&chars, 0, len as usize).await?;
             match mode {
-                -1 => text.extend(got.iter().map(|&c| c as u8 as char)),
+                -1 => text.extend(got.iter().map(|&c| char::from_u32(c as u32).unwrap())),
                 0 => {
                     text.pop();
-                    text.extend(got.iter().map(|&c| c as u8 as char));
+                    text.extend(got.iter().map(|&c| char::from_u32(c as u32).unwrap()));
                 }
                 _ => {
                     text.pop();
@@ -248,8 +306,11 @@ mod tests {
         }
     }
 
-    async fn typed(jvm: &Jvm, constraint: i32, keys: &[i32]) -> JvmResult<String> {
+    async fn typed(jvm: &Jvm, constraint: i32, mode: i32, keys: &[i32]) -> JvmResult<String> {
         let handler = jvm.new_class("org/kwis/msp/lcdui/InputMethodHandler", "(I)V", (constraint,)).await?;
+        let _: bool = jvm
+            .invoke_virtual(&handler, "org/kwis/msp/lcdui/InputMethodHandler", "setCurrentMode", "(I)Z", (mode,))
+            .await?;
         let listener = jvm.new_class("test/Recorder", "()V", ()).await?;
         let _: () = jvm
             .invoke_virtual(
@@ -274,12 +335,23 @@ mod tests {
     #[test]
     fn keys_reach_the_listener_as_text() -> Result<()> {
         run_jvm_test(Box::new([get_protos().into(), Box::new([Recorder::as_proto()])]), |jvm| async move {
-            assert_eq!(typed(&jvm, 0, &[b'2' as i32, b'2' as i32, b'3' as i32]).await?, "BD"); // multi-tap: 2 2 -> B
-            assert_eq!(typed(&jvm, 0, &[b'4' as i32, b'6' as i32, -16]).await?, "G"); // CLR deletes
-            assert_eq!(typed(&jvm, 1, &[b'2' as i32, b'2' as i32]).await?, "22"); // CONSTRAINT_NUMBER types digits
+            let keys = |s: &str| s.bytes().map(|b| if b == b'<' { -16 } else { b as i32 }).collect::<Vec<_>>();
+            assert_eq!(typed(&jvm, 0, 0, &keys("223")).await?, "BD"); // English upper multi-tap: 2 2 -> B
+            assert_eq!(typed(&jvm, 0, 0, &keys("46<")).await?, "G"); // CLR deletes
+            assert_eq!(typed(&jvm, 0, 1, &keys("44")).await?, "h");
+            // Mode 3 is Hangul (천지인): ㄱ ㅣ ㆍ ㄱ ㆍ ㅣ — the last two strokes make ㅓ and move
+            // the final ㄱ on, which takes a replace and an insert in one key.
+            assert_eq!(typed(&jvm, 0, 3, &keys("412421")).await?, "가거");
+            assert_eq!(typed(&jvm, 0, 3, &keys("4124<")).await?, "가"); // CLR takes back the last stroke
+            assert_eq!(typed(&jvm, 1, 3, &keys("22")).await?, "22");
+            assert_eq!(typed(&jvm, 0, 2, &keys("22")).await?, "22"); // the number mode // CONSTRAINT_NUMBER types digits in any mode
 
-            // d448aee68157 asks for the mode by the other name.
+            // d448aee68157 asks for the mode by the other name. A new handler starts in Hangul.
             let handler = jvm.new_class("org/kwis/msp/lcdui/InputMethodHandler", "(I)V", (0,)).await?;
+            let mode: i32 = jvm
+                .invoke_virtual(&handler, "org/kwis/msp/lcdui/InputMethodHandler", "getCurrentMode", "()I", ())
+                .await?;
+            assert_eq!(mode, 3);
             let _: bool = jvm
                 .invoke_virtual(&handler, "org/kwis/msp/lcdui/InputMethodHandler", "setCurrentMode", "(I)Z", (3,))
                 .await?;
