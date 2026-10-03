@@ -61,10 +61,20 @@ pub(crate) struct ArmCoreInner {
     next_stub_address: u32,
     shared_stubs: BTreeMap<(u32, u32), u32>,
     profile: Option<ProfileState>,
+    teardown_hooks: Vec<Box<dyn FnOnce() + Send>>,
+}
+
+/// `ArmCore`s alive in this process. Read by tests and `wie_validate` to show an emulator is freed.
+static LIVE_CORES: AtomicU32 = AtomicU32::new(0);
+
+/// See [`LIVE_CORES`].
+pub fn live_cores() -> u32 {
+    LIVE_CORES.load(Ordering::Relaxed)
 }
 
 impl Drop for ArmCoreInner {
     fn drop(&mut self) {
+        LIVE_CORES.fetch_sub(1, Ordering::Relaxed);
         if let Some(mut profile) = self.profile.take() {
             let batch = drain_samples(&mut profile.samples);
             if !batch.is_empty() {
@@ -130,8 +140,10 @@ impl ArmCore {
             next_stub_address: FUNCTIONS_BASE,
             shared_stubs: BTreeMap::new(),
             profile,
+            teardown_hooks: Vec::new(),
         };
 
+        LIVE_CORES.fetch_add(1, Ordering::Relaxed);
         let result = Self {
             inner: Arc::new(Mutex::new(inner)),
             threads: Arc::new(Mutex::new(BTreeMap::new())),
@@ -149,6 +161,25 @@ impl ArmCore {
     /// state that must be kept per core (two emulators can hand out the same guest addresses).
     pub fn id(&self) -> usize {
         Arc::as_ptr(&self.inner) as *const () as usize
+    }
+
+    /// Break the reference cycles through this core so it can be freed: SVC handler contexts hold
+    /// the JVM and the system, which hold clones of this core. Call once the emulator is done —
+    /// the core cannot run guest code that reaches a handler afterwards. Dropped outside the
+    /// locks, since freeing a JVM or a thread stack locks the core again.
+    pub fn teardown(&self) {
+        let hooks = core::mem::take(&mut self.inner.lock().teardown_hooks);
+        hooks.into_iter().for_each(|hook| hook());
+        let handlers = core::mem::take(&mut self.inner.lock().svc_handlers);
+        drop(handlers);
+        let threads = core::mem::take(&mut *self.threads.lock());
+        drop(threads);
+    }
+
+    /// Run `hook` in [`Self::teardown`]: for a cycle through this core that the SVC handlers do
+    /// not own, e.g. a function table the JVM also holds.
+    pub fn on_teardown(&self, hook: impl FnOnce() + Send + 'static) {
+        self.inner.lock().teardown_hooks.push(Box::new(hook));
     }
 
     pub(crate) fn debug_inner(&self) -> Option<Arc<DebugInner>> {

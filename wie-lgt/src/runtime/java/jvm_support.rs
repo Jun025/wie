@@ -47,6 +47,12 @@ type LgtJvmWord = u32;
 pub struct LgtJvmSupport;
 
 impl LgtJvmSupport {
+    /// Drop a core's entries from the process-wide per-core tables, as its emulator is dropped.
+    pub fn forget_core(core: &ArmCore) {
+        guest_roots::forget(core);
+        JavaHostField::forget_core(core);
+    }
+
     pub async fn init(core: &mut ArmCore, system: &System, jar_name: Option<&str>) -> Result<Jvm> {
         let protos = [get_midp_protos().into(), get_wipi_java_protos().into()];
         let implementation = LgtJvmImplementation::new(core)?;

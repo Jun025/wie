@@ -115,6 +115,18 @@ impl Executor {
         task_id
     }
 
+    /// Drop every task. Tasks hold clones of what owns this executor (the system, the core, the
+    /// JVM), so an emulator whose tasks are never dropped is never freed. Dropped outside the
+    /// lock: a task's drop may reach back into the executor.
+    pub fn clear(&self) {
+        let tasks = {
+            let mut inner = self.inner.lock();
+            inner.sleeping_tasks.clear();
+            core::mem::take(&mut inner.tasks)
+        };
+        drop(tasks);
+    }
+
     // TODO we need to remove error handling from here. we need to JoinHandle like on spawn..
     pub fn tick<T>(&mut self, now: T) -> Result<()>
     where
