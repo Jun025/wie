@@ -53,3 +53,5 @@ keydraw_ktf PASS · live_cores 1. release `--relaunch 10 --gc-stress 20` hellowo
 ### 사용자 영향
 
 한 탭에서 게임을 바꿔 가며 띄우거나 파일을 가져올 때마다 에뮬레이터 한 대분(약 256 MiB)이 쌓이던 것이 사라졌다 — LGT·KTF 는 15번쯤 바꾸면 탭이 멈췄다.
+
+<!-- corpus-name-inflow v1 subjects=19 tree=6fb6701d08aea271 B=55/23 P=1/1 S=4/2 -->
