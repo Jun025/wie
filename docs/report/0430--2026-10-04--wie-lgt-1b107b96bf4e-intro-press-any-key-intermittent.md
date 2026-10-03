@@ -85,6 +85,7 @@
   - `only_a_thread_sliced_out_mid_code_counts_as_preempted` — 예산으로 잘린 스레드는 «잘림», 끝난 스레드와 호스트 호출 안에서 기다리는 스레드는 «아님». `set_preempted(…, true)` 를 끄면 red(«out of budget between two guest instructions»).
   - `a_holder_sliced_out_keeps_the_others_off_guest_code` — 붙든 스레드가 잘려 있는 동안 다른 스레드는 게스트 코드를 돌지 않고, 놓으면 돈다. `wait_for_holder` 를 끄면 red.
 - 러너 블록(release · 이 브랜치): draw · helloworld ×2 · text PASS. keydraw ×2 `--inject --expect-last-frame` 는 이 부하에서 main 도 이 브랜치도 `max-ticks` 로 UNMEASURED 였다. `--max-ticks 100000000000` 로 PASS · rc=0(paints 79 · 55 — 0421 과 같음).
+- 기준선: 측정 바이너리는 `d1ba7687`(#461) 위다. 그 뒤 #462(LGT ABI 2행)가 먼저 착지해 그 위로 rebase 했다(충돌 0). 시험·clippy 는 rebase 한 트리에서 다시 돌렸다(680/0).
 - 측정 규율: emulator 실행은 전부 `build-slot run` 으로 감쌌고 3개 이하 동시 · `nohup &` 없음. 짝·재측은 `host-load-guard --status --recovered` rc=0 을 기다린 뒤 시작했다. census 락은 쓰지 않았다(전수 아님 · wie 레인 6차 전수가 그 락을 쥐고 있었다).
 
 ### 7. 후속
@@ -97,4 +98,4 @@
 
 ### 8. 유입
 
-INFLOW-PLACEHOLDER
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 8회 / 7쌍 · SUFFIX-ATTACHED 0회 / 0쌍. 8회 모두 이 회차가 고친 파일(`system.rs` · `emulator.rs` · `display.rs`)에 **이미 있던** 주석·시험 행이다. 이 회차가 더한 줄의 게임 이름은 0이다(`git diff origin/main...HEAD` 의 `+` 줄 대조 · 타이틀은 sha12 로만 적었다).
