@@ -45,3 +45,7 @@ LGT `binary.mod` 는 ELF32 다. `objdump -d --triple=armv5te`(Thumb 이미지는
 
 - `be08d047cbae` 아이템 상점 체류(§4) — 진도 v2 키로 나가지 못하는지, 게임 쪽 대기인지 먼저 잰다. 이번 회차 관측 1판뿐이라 제안 카드로 올리지 않았다.
 - compat.json 은 바꾸지 않았다(진도 축은 600초 정의 · 이번 측정은 420초 1판).
+
+### 8. 게임 이름 유입
+
+`corpus-name-inflow`: BOUNDED 28쌍 · SUFFIX-ATTACHED 4쌍. 전부 이 회차가 손댄 두 파일(`lgt_java_abi.toml` · `jvm_support.rs`)에 **원래 있던** 주석이다. 이 회차가 더한 줄(`git diff origin/main...HEAD` 의 `+` 줄)은 코퍼스 stem 451개와 겹침 **0**이다 — 새 주석은 sha 앞 12자만 쓴다.
