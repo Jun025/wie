@@ -56,3 +56,5 @@
 ### 사용자 영향
 
 J2ME 게임을 한 탭에서 바꿔 띄우거나 가져올 때 쌓이던 메모리(부팅당 약 0.5 MiB)가 이제 쌓이지 않는다. LGT·KTF 는 0426 그대로.
+
+<!-- corpus-name-inflow v1 subjects=5 tree=40ac2237e401d4ca B=0/0 P=5/2 S=0/0 -->
