@@ -441,6 +441,13 @@ vtable = [
     { name = "indexOf", descriptor = "(Ljava/lang/String;I)I", index = 26 },
     { name = "substring", descriptor = "(I)Ljava/lang/String;", index = 27 },
     { name = "substring", descriptor = "(II)Ljava/lang/String;", index = 28 },
+    # 1b107b96bf4e's 전적 screen (channel screen, NUM3). Call site measured 2026-10-04 (Thumb, LR
+    # 0x5d7a9 = return of the `bl` at 0x5d7a4; four sibling sites 0x5d8d8 0x5d9d6 0x5dad4 0x5df9a
+    # have the same shape): r0 = a String loaded from a field, r1 = the result of a slot-4
+    # (toString) dispatch just before, and the result is stored back into the same field —
+    # `f = f.<29>(x.toString())`. One String argument and a String result: concat, where the CLDC
+    # order (28 substring(II) · 29 concat · 30 replace) already put it.
+    { name = "concat", descriptor = "(Ljava/lang/String;)Ljava/lang/String;", index = 29 },
     # be08d047cbae, reached once its selection screen took keys. CLDC 1.1 runs substring(II) concat
     # replace(CC) toLowerCase toUpperCase trim — 28..33, landing on the measured 28 and 33. Call site
     # measured 2026-10-03 (binary.mod file 0x8b168..0x8b198, LR 0x8c168): r1 = the char the index-11
@@ -613,6 +620,16 @@ vtable = [
     # firstElement pairs with removing index 0; an Enumeration would not pass a guest-class cast.
     # CLDC 1.1 order puts firstElement at 24, between the pinned elementAt (23) and removeElementAt (27).
     { name = "firstElement", descriptor = "()Ljava/lang/Object;", index = 24 },
+    # be08d047cbae's helper thread, on a java/util/Stack (measured 2026-10-04, call site
+    # disassembled, binary.mod ELF .text, LR 0x1388e0). The caller loads the Stack from
+    # this.<field>+8 -> +4, null-checks it, dispatches `[r3,#0x40]` (= 15, size) and continues only
+    # if the result is > 0; then reloads the same Stack, sets only r0 and dispatches `ldr ip,[r3,#0x68]`
+    # (= 4 + 4*25). r1 = 0x32 is the `mov r1,#50` stored a few instructions earlier, not an argument.
+    # The result is null-checked, its class compared against a guest class, and a method called on
+    # it: `if (s.size() > 0) { o = s.<25>(); … }`. Between the pinned firstElement 24 and
+    # removeElementAt 27 the only argument-free object returner is lastElement (setElementAt 26 is
+    # two-argument void) — on a Stack, the top without popping it.
+    { name = "lastElement", descriptor = "()Ljava/lang/Object;", index = 25 },
     { name = "removeElementAt", descriptor = "(I)V", index = 27 },
     { name = "insertElementAt", descriptor = "(Ljava/lang/Object;I)V", index = 28 },
     # 월드장기체스's wall after Vector 31 (measured 2026-09-27, call site disassembled, lr 0x2b598).

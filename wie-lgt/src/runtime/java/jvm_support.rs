@@ -2172,6 +2172,8 @@ pub(crate) mod tests {
                 ("java/lang/String", 26, "indexOf", "(Ljava/lang/String;I)I"),
                 // 일지매영웅전기 (after 21)
                 ("java/lang/String", 27, "substring", "(I)Ljava/lang/String;"),
+                // 1b107b96bf4e (call site disassembled 2026-10-04)
+                ("java/lang/String", 29, "concat", "(Ljava/lang/String;)Ljava/lang/String;"),
                 // be08d047cbae
                 ("java/lang/String", 30, "replace", "(CC)Ljava/lang/String;"),
                 // be08d047cbae — Object's row, dispatched on a String
@@ -2208,6 +2210,8 @@ pub(crate) mod tests {
                 ("java/util/Vector", 29, "addElement", "(Ljava/lang/Object;)V"),
                 // 월드장기체스
                 ("java/util/Vector", 31, "removeAllElements", "()V"),
+                // be08d047cbae — Vector's row, dispatched on a Stack (call site disassembled 2026-10-04)
+                ("java/util/Stack", 25, "lastElement", "()Ljava/lang/Object;"),
                 // 월드장기체스
                 ("java/util/Stack", 33, "pop", "()Ljava/lang/Object;"),
                 // 73f3a21e981c (progress census 2026-09-30)
