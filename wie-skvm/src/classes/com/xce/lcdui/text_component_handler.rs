@@ -5,6 +5,7 @@ use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
+use wie_util::keypad::{self, Mode, Op};
 
 use super::TextComponent;
 
@@ -18,8 +19,8 @@ const NUMERIC: i32 = 2;
 const PHONENUMBER: i32 = 3;
 const DECIMAL: i32 = 5;
 
-// ponytail: fixed ITU-T E.161 upper-case letters; no case/Hangul mode switch until a title needs one.
-const MULTITAP: [&[u8]; 10] = [b" 0", b".,?!1", b"ABC2", b"DEF3", b"GHI4", b"JKL5", b"MNO6", b"PQRS7", b"TUV8", b"WXYZ9"];
+// ponytail: upper-case Latin only (wie_util::keypad's E.161 table); no case/Hangul mode switch until
+// a title needs one — the only title typing here (85f03ca7389e) takes a Latin name.
 const MULTITAP_MS: i64 = 1000;
 
 // class com.xce.lcdui.TextComponentHandler
@@ -76,7 +77,7 @@ impl TextComponentHandler {
                 ),
                 JavaFieldProto::new("component", "Lcom/xce/lcdui/TextComponent;", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("tapKey", "I", FieldAccessFlags::PRIVATE),
-                JavaFieldProto::new("tapIndex", "I", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("tapChar", "C", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("tapTime", "J", FieldAccessFlags::PRIVATE),
             ],
             access_flags: ClassAccessFlags::PUBLIC,
@@ -137,29 +138,36 @@ impl TextComponentHandler {
             }
             0x30..=0x39 => {
                 let constraints: i32 = jvm.invoke_virtual(&component, NAME, "getConstraints", "()I", ()).await?;
-                let letters = if matches!(constraints & CONSTRAINT_MASK, NUMERIC | PHONENUMBER | DECIMAL) {
-                    &[key as u8][..]
+                let mode = if matches!(constraints & CONSTRAINT_MASK, NUMERIC | PHONENUMBER | DECIMAL) {
+                    Mode::Digit
                 } else {
-                    MULTITAP[(key - 0x30) as usize]
+                    Mode::Upper
                 };
 
+                // Latin renders as typed, so the letter being cycled is the whole composition.
                 let now = context.system().platform().now().raw() as i64;
                 let tap_key: i32 = jvm.get_field(&this, "tapKey", "I").await?;
                 let tap_time: i64 = jvm.get_field(&this, "tapTime", "J").await?;
-                if tap_key == key && letters.len() > 1 && now - tap_time < MULTITAP_MS {
-                    let index = (jvm.get_field::<i32>(&this, "tapIndex", "I").await? + 1) % letters.len() as i32;
-                    let _: () = jvm
-                        .invoke_virtual(&component, NAME, "replace", "(C)V", (letters[index as usize] as JavaChar,))
-                        .await?;
-                    jvm.put_field(&mut this, "tapIndex", "I", index).await?;
+                let again = tap_key == key && now - tap_time < MULTITAP_MS;
+                let mut tokens = if again {
+                    vec![char::from_u32(jvm.get_field::<JavaChar>(&this, "tapChar", "C").await? as u32).unwrap_or(' ')]
                 } else {
-                    let before: i32 = jvm.invoke_virtual(&component, NAME, "size", "()I", ()).await?;
-                    let _: () = jvm.invoke_virtual(&component, NAME, "insert", "(C)V", (letters[0] as JavaChar,)).await?;
-                    let after: i32 = jvm.invoke_virtual(&component, NAME, "size", "()I", ()).await?;
-                    // A full field ignores insert; cycling then would rewrite the last character instead.
-                    jvm.put_field(&mut this, "tapKey", "I", if after > before { key } else { 0 }).await?;
-                    jvm.put_field(&mut this, "tapIndex", "I", 0).await?;
+                    vec![]
+                };
+                let edit = keypad::press(mode, &mut tokens, (key - 0x30) as u8, again);
+                let before: i32 = jvm.invoke_virtual(&component, NAME, "size", "()I", ()).await?;
+                for op in edit.ops() {
+                    let _: () = match op {
+                        Op::Insert(c) => jvm.invoke_virtual(&component, NAME, "insert", "(C)V", (c as JavaChar,)).await?,
+                        Op::Replace(c) => jvm.invoke_virtual(&component, NAME, "replace", "(C)V", (c as JavaChar,)).await?,
+                        Op::Delete => jvm.invoke_virtual(&component, NAME, "delete", "()V", ()).await?,
+                    };
                 }
+                let after: i32 = jvm.invoke_virtual(&component, NAME, "size", "()I", ()).await?;
+                // A full field ignores insert; cycling then would rewrite the last character instead.
+                let typed = after > before || (again && edit.delete > 0);
+                jvm.put_field(&mut this, "tapKey", "I", if typed { key } else { 0 }).await?;
+                jvm.put_field(&mut this, "tapChar", "C", tokens[0] as JavaChar).await?;
                 jvm.put_field(&mut this, "tapTime", "J", now).await?;
             }
             _ => return Ok(false),

@@ -510,14 +510,16 @@ mod test {
                 key(WIPIKeyCode::FIRE).await?;
                 assert_eq!(count().await?, 0, "FIRE on the text box is not the button's");
 
-                // Digits and CLR edit the focused text box; getString reads it back.
-                for code in [WIPIKeyCode::NUM1, WIPIKeyCode::NUM2, WIPIKeyCode::CLEAR, WIPIKeyCode::NUM3] {
+                // Digits and CLR edit the focused text box (천지인 Hangul first: ㄱ ㅣ ㆍ ㄱ, CLR takes the
+                // final back), '*' moves to English; getString reads it back.
+                use WIPIKeyCode::*;
+                for code in [NUM4, NUM1, NUM2, NUM4, CLEAR, STAR, NUM2] {
                     key(code).await?;
                 }
                 let typed: ClassInstanceRef<String> = jvm
                     .invoke_virtual(&widgets[0], "org/kwis/msp/lwc/TextComponent", "getString", "()Ljava/lang/String;", ())
                     .await?;
-                assert_eq!(JavaLangString::to_rust_string(&jvm, &typed).await?, "13");
+                assert_eq!(JavaLangString::to_rust_string(&jvm, &typed).await?, "가A");
 
                 // RIGHT on the ChoiceText moves the selection the listener reads.
                 key(WIPIKeyCode::DOWN).await?;

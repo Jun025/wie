@@ -9,6 +9,11 @@ use rustjava_runtime::classes::java::lang::String;
 
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
+use crate::classes::org::kwis::msp::lcdui::InputMethodHandler;
+
+const IM_HANDLER: &str = "Lorg/kwis/msp/lcdui/InputMethodHandler;";
+const STAR: i32 = b'*' as i32;
+
 // class org.kwis.msp.lwc.TextComponent
 pub struct TextComponent;
 
@@ -104,18 +109,27 @@ impl TextComponent {
         Ok(jvm.new_class("java/lang/String", "([C)V", (text,)).await?.into())
     }
 
-    // Minimal input: a digit press appends it, CLR removes the last character — the keys a
-    // ShellComponent hands the focused text widget. The text is kept in m_td, the canonical
-    // buffer field (see its comment). No multi-tap letters, and no length cap: setMaxLength only
-    // records the value. 1 = KEY_PRESSED, -16 = CLR as net.wie.CardCanvas sends them.
-    async fn key_notify(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<TextComponent>, r#type: i32, key: i32) -> JvmResult<bool> {
+    // The keys a ShellComponent hands the focused text widget go through this widget's own imHandler,
+    // as the javadoc describes the real one doing: digits type (multi-tap Latin, 천지인 Hangul, or the
+    // digit for a numeric constraint), CLR takes back the last key or deletes, '*' moves to the next
+    // input mode. The text is kept in m_td, the canonical buffer field (see its comment), with the
+    // caret at its end. No length cap: setMaxLength only records the value.
+    // 1 = KEY_PRESSED, -16 = CLR as net.wie.CardCanvas sends them.
+    async fn key_notify(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<TextComponent>, r#type: i32, key: i32) -> JvmResult<bool> {
         tracing::debug!("org.kwis.msp.lwc.TextComponent::keyNotify({this:?}, {type}, {key})");
 
         // Every key answers true, as Component's stub always did: 0c67145b11df calls this directly
         // before its form is shown, and the answer it reads there stays the same.
-        let is_digit = (0x30..=0x39).contains(&key);
-        if r#type != 1 || (!is_digit && key != -16) {
+        if r#type != 1 {
             return Ok(true);
+        }
+        let handler: ClassInstanceRef<InputMethodHandler> = jvm.get_field(&this, "imHandler", IM_HANDLER).await?;
+        if key == STAR {
+            // ponytail: '*' as the mode key is assumed (docs/report/0428 §2); a title that draws its
+            // own mode key would want this off.
+            return InputMethodHandler::change_current_mode_to_next(jvm, context, handler)
+                .await
+                .map(|()| true);
         }
 
         let typed: ClassInstanceRef<Array<JavaChar>> = jvm.get_field(&this, "m_td", "[C").await?;
@@ -125,16 +139,24 @@ impl TextComponent {
             let length = jvm.array_length(&typed).await?;
             jvm.load_array(&typed, 0, length).await?
         };
-        if is_digit {
-            text.push(key as JavaChar);
-        } else {
-            text.pop();
-        }
+        let Some(edit) = InputMethodHandler::compose(jvm, context, handler, key, Some(&text)).await? else {
+            return Ok(true);
+        };
+        text.truncate(text.len().saturating_sub(edit.delete));
+        text.extend(edit.insert.iter().map(|&c| c as JavaChar));
+
         let mut buffer = jvm.instantiate_array("C", text.len()).await?;
         jvm.store_array(&mut buffer, 0, text).await?;
         jvm.put_field(&mut this, "m_td", "[C", buffer).await?;
 
         Ok(true)
+    }
+
+    /// The constructors that take a constraint (TextFieldComponent, TextBoxComponent) hand it to
+    /// the input method: numeric constraints type digits.
+    pub async fn set_constraint<T>(jvm: &Jvm, this: &mut ClassInstanceRef<T>, constraint: i32) -> JvmResult<()> {
+        let handler = jvm.new_class("org/kwis/msp/lcdui/InputMethodHandler", "(I)V", (constraint,)).await?;
+        jvm.put_field(this, "imHandler", IM_HANDLER, handler).await
     }
 }
 
@@ -197,6 +219,37 @@ mod tests {
                 .invoke_virtual(&field, "org/kwis/msp/lwc/TextComponent", "getString", "()Ljava/lang/String;", ())
                 .await?;
             assert_eq!(JavaLangString::to_rust_string(&jvm, &read).await?, "ab");
+
+            Ok(())
+        })
+    }
+
+    /// 9789fec50f39's name box rewrites the text (`setString("")`) between keys: the composition in
+    /// the input method must start again rather than rewrite a syllable the field no longer holds.
+    /// A numeric constraint types digits.
+    #[test]
+    fn keys_compose_hangul_and_a_rewritten_text_starts_a_new_word() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            const FIELD: &str = "org/kwis/msp/lwc/TextFieldComponent";
+            let null: ClassInstanceRef<()> = ClassInstanceRef::new(None);
+            let name = jvm.new_class(FIELD, "(Ljava/lang/String;I)V", (null.clone(), 0)).await?;
+            let number = jvm.new_class(FIELD, "(Ljava/lang/String;I)V", (null, 1)).await?;
+            let press = |field: ClassInstanceRef<()>, keys: &'static str| {
+                let jvm = jvm.clone();
+                async move {
+                    for key in keys.bytes() {
+                        let _: bool = jvm.invoke_virtual(&field, FIELD, "keyNotify", "(II)Z", (1, key as i32)).await?;
+                    }
+                    let text = jvm.invoke_virtual(&field, FIELD, "getString", "()Ljava/lang/String;", ()).await?;
+                    JavaLangString::to_rust_string(&jvm, &text).await
+                }
+            };
+
+            assert_eq!(press(name.clone().into(), "412").await?, "가");
+            let empty = JavaLangString::from_rust_string(&jvm, "").await?;
+            let _: () = jvm.invoke_virtual(&name, FIELD, "setString", "(Ljava/lang/String;)V", (empty,)).await?;
+            assert_eq!(press(name.clone().into(), "4").await?, "ㄱ");
+            assert_eq!(press(number.into(), "412").await?, "412");
 
             Ok(())
         })
