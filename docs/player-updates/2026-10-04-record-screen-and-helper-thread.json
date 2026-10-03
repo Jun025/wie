@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-04",
+  "kind": "fix",
+  "titles": [
+    "1b107b96bf4ed7d2634d778fb45c9c3e3a887f37f35c1b73359ff44c0acb3674",
+    "be08d047cbaef52f458ccdf4739ea5314b73e7ec9f5eb3ee0537c7b34f815e96"
+  ],
+  "summary_ko": "전적 보기를 누르면 멈추던 게임에서 이제 전적 화면이 열려요. 다른 게임 하나는 뒤에서 돌던 작업이 멈추지 않아 게임 안 상점까지 갈 수 있어요.",
+  "pr": "https://github.com/Jun025/wie/pull/462"
+}
