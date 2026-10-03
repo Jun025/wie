@@ -126,11 +126,12 @@ your diff.
 same document as the list instead of in the checker, which is the one thing the proposal behind this
 check warned about: a checker that knows which fixtures are "runner fixtures" becomes a second source
 of truth and drifts from this block. There are three today; the first two are the same exclusion
-for the same reason — `wie_validate` has no real screen to resize:
+for the same reason — `wie_validate` has no real canvas to resize:
 
 NOT-RUN: test_data/resize_ktf.zip — it exists to prove `Screen::resize` reaches a real screen, and
-`wie_validate`'s own `resize` is a no-op that returns `Ok(())`, so running it here would assert
-nothing. Its assertion lives in the browser round-trip (Scenario G), where the canvas is real.
+`wie_validate`'s screen only records the size (since 2026-10-03; before that it ignored the call,
+which ran 93 KTF `176*220` packages at 240×320 — `docs/report/0419`), so running it here would
+assert nothing about a canvas. Its assertion lives in the browser round-trip (Scenario G), where the canvas is real.
 Built by `node scripts/make-resize-fixture.mjs` — the same guest as `helloworld_ktf.zip` plus one
 `DisplaySize:` line, byte-stable on regeneration.
 
