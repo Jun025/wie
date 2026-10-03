@@ -12,6 +12,10 @@ pub trait TaskRunner: Sync + Send {
     fn others_preempted(&self) -> bool {
         false
     }
+
+    /// While `on`, the current guest thread's code runs as one piece against the others' up to its
+    /// next blocking host call.
+    fn hold_others(&self, _on: bool) {}
 }
 
 pub struct DefaultTaskRunner;

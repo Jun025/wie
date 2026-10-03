@@ -785,11 +785,13 @@ impl Display {
     async fn handle_key_event(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>, event_type: i32, code: i32) -> JvmResult<()> {
         tracing::debug!("javax.microedition.lcdui.Display::handleKeyEvent({this:?}, {event_type:?}, {code})");
 
-        // A key is not delivered into the middle of another guest thread's frame. wie slices guest
-        // threads every 10k instructions; a handset hands a key over only while the others sit in a
-        // host call. 1b107b96bf4e's key handler nulls the menu images its game thread was sliced out
-        // drawing — the frame resumes into an NPE, game thread dead, match intro frozen
-        // (docs/report/0429). Bounded: a thread that never reaches a host call delays a key by the cap.
+        // A key handler and another guest thread's frame do not interleave. wie slices guest threads
+        // every 10k instructions; on a handset the key goes in while the others sit in a host call,
+        // and runs to its own next one. 1b107b96bf4e's key handler nulls the menu images its game
+        // thread draws: sliced into the middle of that frame, the frame resumes into an NPE, the
+        // game thread dies and the match intro freezes (docs/report/0429). So wait for the others
+        // to reach a host call, then hold them off while the handler is sliced. Both are bounded:
+        // a thread that never reaches a host call costs a key the cap, as before.
         let mut waited = 0;
         while waited < KEY_WAITS_FOR_GUEST_MS && context.system().guest_others_preempted() {
             context.system().sleep(1).await;
@@ -804,6 +806,7 @@ impl Display {
             .await?;
 
         if !current_displayable.is_null() {
+            context.system().guest_hold_others(true);
             let result: JvmResult<()> = jvm
                 .invoke_virtual(
                     &current_displayable,
@@ -813,6 +816,7 @@ impl Display {
                     (event_type, code),
                 )
                 .await;
+            context.system().guest_hold_others(false);
 
             if let Err(x) = result {
                 Self::handle_exception(jvm, x).await?;

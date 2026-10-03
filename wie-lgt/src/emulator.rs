@@ -35,6 +35,10 @@ impl TaskRunner for LgtTaskRunner {
     fn others_preempted(&self) -> bool {
         self.core.others_preempted()
     }
+
+    fn hold_others(&self, on: bool) {
+        self.core.hold_others(on)
+    }
 }
 
 /// Per-title archive entries that are NOT mounted, because the archive is a dump of a previous
