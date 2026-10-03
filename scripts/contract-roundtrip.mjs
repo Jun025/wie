@@ -990,10 +990,14 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
       const seen = since(run.mark);
       const bodyAt = first(seen, "sf-body")?.at;
       const nodeAt = first(seen, "node")?.at;
+      // Order by log position, not timestamp: the held module resolves on the body, so the node
+      // follows it within the same millisecond and `bodyAt < nodeAt` failed on a tie (#454's CI).
+      const bodyIdx = seen.findIndex((e) => e.what === "sf-body");
+      const bodyFirst = bodyIdx >= 0 && bodyIdx < seen.findIndex((e) => e.what === "node");
       const prelude = seen.filter((e) => e.what === "module")[1];
       check(
         "S2: a soundfont that arrives before the worklet is ready is kept, then loaded and posted once it is",
-        queued && nodeBeforePlay === 0 && ready && bodyAt < nodeAt && prelude?.prelude === true && prelude.at >= nodeAt && count(seen, "post-sf") === 1,
+        queued && nodeBeforePlay === 0 && ready && bodyFirst && prelude?.prelude === true && prelude.at >= nodeAt && count(seen, "post-sf") === 1,
         `play queued before the node ${queued && nodeBeforePlay === 0} · body ${ms(bodyAt)} · node ${ms(nodeAt)} · prelude module ${ms(prelude?.at)} · ready ${ready}`,
       );
       const quiet = await fmSilent(run);
