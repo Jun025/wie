@@ -1,0 +1,47 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-03",
+  "task": "wie-progression-engine-walls-r2-null-image-dialog-npe-key",
+  "title": "진도 벽 2차 — 검증기 화면이 DisplaySize 를 따른다 · TextComponent 글자는 m_td · 셸 크기 = 화면 · LGT ABI 3행",
+  "summary": "9789fec50f39 의 null Image 는 wie_validate 화면이 resize 를 버려 176*220 패키지를 240×320 으로 돌린 탓이었다(게임이 없는 52.m 을 찾았다). 화면이 크기를 따르게 했고, 그 뒤 TextComponent.m_td null·setString 무시를 고쳤다. be08d047cbae 는 셸 getWidth/getHeight 가 0 이라 repaint(0,0,0,0) 이 아무것도 다시 그리지 않았다. 셸이 화면 크기를 답하게 했다(상태줄은 0). LGT ABI 행 StringBuffer.insert(II) 34 · String.replace(CC) 30 · Object.hashCode 2 를 호출부 역어셈으로 넣었다.",
+  "changes": [
+    "wie_cli/src/bin/wie_validate.rs — HeadlessScreen 이 resize 를 저장하고 프레임 소비처가 현재 크기를 쓴다 · 시험 headless_screen_follows_resize",
+    "wie-wipi-java lwc TextComponent — m_td 를 생성 때 빈 배열로 · setString 저장 · getString 은 m_td · 시험 1",
+    "wie-wipi-java lwc ShellComponent getWidth/getHeight = 기본 Display 크기 · AnnunciatorComponent 는 0 · 셸 시험에 단언",
+    "wie-lgt/data/lgt_java_abi.toml — StringBuffer insert(II) 34 · String replace(CC) 30 · Object hashCode 2(호출부 근거 주석) · abi 시험 행 3 · 늦게 연결된 칸 시험을 클래스별 답으로",
+    "AGENTS.md NOT-RUN resize_ktf 문구 정정 · docs/report/0425 · docs/player-updates 2"
+  ],
+  "verification": [
+    "진도 v2 300초: 9789fec50f39 새 화면 1 → 2(uncaught 2 → 0) · 73f3a21e981c 4 → 4 · be08d047cbae 1 → 4(600초에서는 stuck)",
+    "A 프로브 100종(라이브 LGT 5 · 가드 2 · KTF 176*220 93): FAIL 3 → 3 · content 98 → 98 · 뒤집힌 행 0",
+    "되돌림 red 7/7(resize · m_td 초기화 · setString 저장 · 셸 크기 · ABI 행 3)",
+    "fmt · clippy stable/wasm32 -D warnings · cargo test --all 660/0"
+  ],
+  "limits": [
+    "census 락을 다른 레인이 5시간 넘게 쥐어 census run 대신 같은 인자로 wie_validate 를 직접 1잡씩 돌렸다 · 여섯 축은 재지 않았다",
+    "73f3a21e981c 의 c_bf.paint NPE 는 전·후 모두 판마다 0~2회 나온다 — 원인 미확인(다음은 NPE 순간 게스트 lr 계측)",
+    "getString 은 더 이상 \"temp\" 를 돌려주지 않는다 — 입력이 없는 칸은 빈 문자열이다"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "be08d047cbae — 보조 스레드가 java/util/Stack vtable index 25 로 18초마다 죽는다",
+      "plainSummary": "선택 화면을 넘어간 게임 1종에서 뒤에서 도는 작업이 계속 멈추는 문제를 고친다.",
+      "userBenefit": "그 게임이 600초 동안 새 화면 4개에서 멈추던 자리를 넘을 수 있다.",
+      "why": "이번 회차가 선택 화면 키를 살리자 Unimplemented: java/util/Stack vtable index 25(lr 0x1388e0 · r1 0x32 · r2 0x4d)가 드러났다. 300초에 15회 uncaught 다(docs/report/0425 §4).",
+      "tradeoff": "호출부 역어셈으로 행을 확정해야 한다. 순서 유도만으로 넣으면 panic 이 났던 전례가 있다(0413).",
+      "effort": "S~M",
+      "target": "wie-lgt/data/lgt_java_abi.toml"
+    },
+    {
+      "kind": "product",
+      "title": "9789fec50f39 — 이름 칸이 숫자를 지운다 · KTF lwc 글자 입력",
+      "plainSummary": "게임 시작 뒤 이름을 넣어야 하는 게임 1종에서 글자를 넣을 수 있게 한다.",
+      "userBenefit": "그 게임을 이름 입력 너머 본편으로 플레이할 수 있게 된다.",
+      "why": "숫자 키는 m_td 에 닿지만 게임이 매번 setString(\"\") 으로 지운다(5회 중 5회 · docs/report/0425 §2). 글자 입력기(멀티탭 한글)가 KTF lwc 에 없다.",
+      "tradeoff": "입력기 설계가 필요하고 다른 lwc 입력칸 타이틀의 동작도 바뀐다.",
+      "effort": "L",
+      "target": "wie-wipi-java lwc TextComponent · InputMethodHandler"
+    }
+  ]
+}

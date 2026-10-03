@@ -360,6 +360,22 @@ mod test {
                 assert_eq!(count("showCount").await?, 1);
                 assert!(is_shown().await?, "isShown asks the same question repaint does");
 
+                // The shell answers the screen it is on: be08d047cbae repaints (0, 0, getWidth(),
+                // getHeight()) after every key, and Component's 0 × 0 made that repaint cover nothing.
+                let display: ClassInstanceRef<Display> = jvm
+                    .invoke_static("org/kwis/msp/lcdui/Display", "getDefaultDisplay", "()Lorg/kwis/msp/lcdui/Display;", [])
+                    .await?;
+                for method in ["getWidth", "getHeight"] {
+                    let size: i32 = jvm.invoke_virtual(&shell, "org/kwis/msp/lwc/Component", method, "()I", ()).await?;
+                    let expected: i32 = jvm.invoke_virtual(&display, "org/kwis/msp/lcdui/Display", method, "()I", ()).await?;
+                    assert!(size > 0, "shell {method} = {size}");
+                    assert_eq!(size, expected);
+                }
+                // …but the status strip, a ShellComponent this layer never draws, takes no room.
+                let strip = jvm.new_class("org/kwis/msp/lwc/AnnunciatorComponent", "(Z)V", (false,)).await?;
+                let strip_height: i32 = jvm.invoke_virtual(&strip, "org/kwis/msp/lwc/Component", "getHeight", "()I", ()).await?;
+                assert_eq!(strip_height, 0);
+
                 // repaint(IIII) reaches the canvas as a region repaint (the shell's card sits at 0,0)…
                 let _: () = jvm
                     .invoke_virtual(&shell, "org/kwis/msp/lwc/Component", "repaint", "(IIII)V", (1, 2, 3, 4))

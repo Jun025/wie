@@ -139,7 +139,7 @@ use std::{
     path::PathBuf,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     },
     time::{Duration, Instant as StdInstant, SystemTime, UNIX_EPOCH},
 };
@@ -161,8 +161,11 @@ use test_utils::MemoryFilesystem;
 // ── headless screen (captures last frame, counts paints) ─────────────────────
 
 struct HeadlessScreen {
-    width: u32,
-    height: u32,
+    /// Starts at SCREEN_W × SCREEN_H; `resize` moves it, as the shipped hosts' screens do. A KTF
+    /// package declaring `DisplaySize:176*220` reads its size back to pick resources, so a
+    /// screen that ignored the call ran it at a size its own package has no images for.
+    width: AtomicU32,
+    height: AtomicU32,
     paints: AtomicU64,
     redraw_requested: AtomicBool,
     last_frame: Mutex<Option<Vec<u32>>>,
@@ -259,8 +262,27 @@ fn frame_richness(data: &[u32], width: u32, height: u32) -> (u64, u64, u64) {
     (distinct, nondominant_bp, center_bp)
 }
 
+impl HeadlessScreen {
+    fn new() -> Self {
+        Self {
+            width: AtomicU32::new(SCREEN_W),
+            height: AtomicU32::new(SCREEN_H),
+            paints: AtomicU64::new(0),
+            redraw_requested: AtomicBool::new(false),
+            last_frame: Mutex::new(None),
+            saw_content: AtomicBool::new(false),
+            max_magenta_px: AtomicU64::new(0),
+            max_distinct_colors: AtomicU64::new(0),
+            max_nondominant_bp: AtomicU64::new(0),
+            max_center_nonuniform_bp: AtomicU64::new(0),
+        }
+    }
+}
+
 impl Screen for HeadlessScreen {
-    fn resize(&self, _width: u32, _height: u32) -> WieResult<()> {
+    fn resize(&self, width: u32, height: u32) -> WieResult<()> {
+        self.width.store(width, Ordering::SeqCst);
+        self.height.store(height, Ordering::SeqCst);
         Ok(())
     }
 
@@ -284,7 +306,7 @@ impl Screen for HeadlessScreen {
             .count() as u64;
         self.max_magenta_px.fetch_max(magenta, Ordering::SeqCst);
 
-        let (distinct, nondominant_bp, center_bp) = frame_richness(&data, self.width, self.height);
+        let (distinct, nondominant_bp, center_bp) = frame_richness(&data, self.width(), self.height());
         self.max_distinct_colors.fetch_max(distinct, Ordering::SeqCst);
         self.max_nondominant_bp.fetch_max(nondominant_bp, Ordering::SeqCst);
         self.max_center_nonuniform_bp.fetch_max(center_bp, Ordering::SeqCst);
@@ -294,11 +316,11 @@ impl Screen for HeadlessScreen {
     }
 
     fn width(&self) -> u32 {
-        self.width
+        self.width.load(Ordering::SeqCst)
     }
 
     fn height(&self) -> u32 {
-        self.height
+        self.height.load(Ordering::SeqCst)
     }
 }
 
@@ -1305,18 +1327,7 @@ impl Outcome {
 }
 
 fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
-    let screen = Arc::new(HeadlessScreen {
-        width: SCREEN_W,
-        height: SCREEN_H,
-        paints: AtomicU64::new(0),
-        redraw_requested: AtomicBool::new(false),
-        last_frame: Mutex::new(None),
-        saw_content: AtomicBool::new(false),
-        max_magenta_px: AtomicU64::new(0),
-        max_distinct_colors: AtomicU64::new(0),
-        max_nondominant_bp: AtomicU64::new(0),
-        max_center_nonuniform_bp: AtomicU64::new(0),
-    });
+    let screen = Arc::new(HeadlessScreen::new());
     let exited = Arc::new(AtomicBool::new(false));
     // One store for every boot of this run: `--relaunch` keeps it, which is the whole point.
     let db = MemDbRepository::default();
@@ -1456,7 +1467,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
                     if args.stall_secs.is_some()
                         && let Some(frame) = last_frame.as_deref()
                     {
-                        let fp = fingerprint(frame, SCREEN_W, SCREEN_H);
+                        let fp = fingerprint(frame, screen.width(), screen.height());
                         if novel(&seen, &fp) {
                             seen.push(fp);
                             last_new = elapsed.as_secs_f64();
@@ -1465,7 +1476,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
                     if let Some(dir) = &args.shotdir
                         && let Some(frame) = last_frame.as_ref()
                     {
-                        let _ = save_png(&dir.join(format!("{stem}__{label}.png")), frame, SCREEN_W, SCREEN_H);
+                        let _ = save_png(&dir.join(format!("{stem}__{label}.png")), frame, screen.width(), screen.height());
                     }
                 }
             }
@@ -1523,7 +1534,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     // ── final screenshot (back-compat single frame) ───────────────────────────
     if let Some(path) = &args.screenshot
         && let Some(frame) = screen.last_frame.lock().unwrap().as_ref()
-        && let Err(e) = save_png(path, frame, SCREEN_W, SCREEN_H)
+        && let Err(e) = save_png(path, frame, screen.width(), screen.height())
     {
         eprintln!("screenshot write failed: {e}");
     }
@@ -1533,7 +1544,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     // Calibrated above the levels normal screens reach, so the regression-baseline
     // games do not false-fail. This catches the color-key class; it cannot judge
     // subtler glyph/graphic correctness (that stays a human check).
-    let magenta_frac = screen.max_magenta_px.load(Ordering::SeqCst) as f64 / (SCREEN_W * SCREEN_H) as f64;
+    let magenta_frac = screen.max_magenta_px.load(Ordering::SeqCst) as f64 / (screen.width() * screen.height()) as f64;
 
     // ── classify ─────────────────────────────────────────────────────────────
     // NOTE: the richness metrics below are MEASURE-ONLY — they are recorded in the
@@ -1586,7 +1597,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     // painted frame: the last frame is already held in memory, so this is one extra pass over
     // one frame at the end of a run that painted `paints` of them.
     let (lf_colors, lf_nondominant, lf_center) = match screen.last_frame.lock().unwrap().as_deref() {
-        Some(frame) => frame_richness(frame, SCREEN_W, SCREEN_H),
+        Some(frame) => frame_richness(frame, screen.width(), screen.height()),
         None => (0, 0, 0),
     };
     outcome.last_frame_distinct_colors = lf_colors;
@@ -2319,10 +2330,10 @@ mod tests {
     };
     use std::sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, AtomicU64},
+        atomic::{AtomicBool, AtomicU32, AtomicU64},
     };
     use test_utils::MemoryFilesystem;
-    use wie_backend::Platform;
+    use wie_backend::{Platform, Screen};
 
     use super::{JavaExceptionTally, StubHitTally, Tallies, tally_layer, validator_subscriber};
 
@@ -2478,18 +2489,7 @@ mod tests {
     /// did-not-panic check while still drawing nothing.
     #[test]
     fn headless_platform_font_measures_text_test() {
-        let screen = Arc::new(HeadlessScreen {
-            width: SCREEN_W,
-            height: SCREEN_H,
-            paints: AtomicU64::new(0),
-            redraw_requested: AtomicBool::new(false),
-            last_frame: Mutex::new(None),
-            saw_content: AtomicBool::new(false),
-            max_magenta_px: AtomicU64::new(0),
-            max_distinct_colors: AtomicU64::new(0),
-            max_nondominant_bp: AtomicU64::new(0),
-            max_center_nonuniform_bp: AtomicU64::new(0),
-        });
+        let screen = Arc::new(HeadlessScreen::new());
         let platform = HeadlessPlatform {
             screen,
             fs: MemoryFilesystem::new(),
@@ -2507,6 +2507,17 @@ mod tests {
             let width = wie_backend::text_layout::minimum_width(font, text, 12.0);
             assert!(width > 0, "minimum_width({text:?}) = {width} — the font carries no usable metrics");
         }
+    }
+
+    /// A KTF package's `DisplaySize:176*220` reaches the screen through `resize`, and the guest
+    /// reads the size back to choose its images. 9789fec50f39 at the default 240×320 asked for a
+    /// resource only the 240-wide package has and died on the null image «게임시작» drew.
+    #[test]
+    fn headless_screen_follows_resize() {
+        let screen = HeadlessScreen::new();
+        assert_eq!((screen.width(), screen.height()), (SCREEN_W, SCREEN_H));
+        screen.resize(176, 220).unwrap();
+        assert_eq!((screen.width(), screen.height()), (176, 220));
     }
 
     /// The payload is the one part of the JSON line the guest controls, and both

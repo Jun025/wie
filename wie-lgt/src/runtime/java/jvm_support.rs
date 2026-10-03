@@ -726,7 +726,6 @@ pub(crate) mod tests {
             let child_before = definition(child).vtable_entries(&jvm).await?;
 
             let index = LgtJvmSupport::virtual_method_index(&jvm, parent, "getWidth", "()I").await? as usize;
-            let expected = LgtJvmSupport::non_virtual_method_target(&jvm, parent, "getWidth", "()I")?;
 
             // Not on a slot the subclass already uses — that would silently call something else.
             assert!(
@@ -734,12 +733,20 @@ pub(crate) mod tests {
                 "index {index} collides with the subclass's {} slots",
                 child_before.len()
             );
+            // Each class's own answer: ShellComponent overrides getWidth (a shell is its screen),
+            // so its slot holds the override and Component's holds the base method.
             for name in [parent, child] {
+                let expected = LgtJvmSupport::non_virtual_method_target(&jvm, name, "getWidth", "()I")?;
                 let class = definition(name);
                 let raw_class: RawJavaClass = read_generic(&core, class.ptr_raw)?;
                 let target: u32 = read_generic(&core, raw_class.unk1 + ((index + 1) * size_of::<u32>()) as u32)?;
                 assert_eq!(target, expected, "{name} vtable index {index}");
             }
+            assert_ne!(
+                LgtJvmSupport::non_virtual_method_target(&jvm, parent, "getWidth", "()I")?,
+                LgtJvmSupport::non_virtual_method_target(&jvm, child, "getWidth", "()I")?,
+                "the subclass slot would prove nothing if it shared the parent's method"
+            );
             // The subclass's existing slots are untouched.
             let child_after = definition(child).vtable_entries(&jvm).await?;
             for (slot, (before, after)) in child_before.iter().zip(&child_after).enumerate() {
@@ -2159,12 +2166,18 @@ pub(crate) mod tests {
                 ("java/lang/String", 26, "indexOf", "(Ljava/lang/String;I)I"),
                 // 일지매영웅전기 (after 21)
                 ("java/lang/String", 27, "substring", "(I)Ljava/lang/String;"),
+                // be08d047cbae
+                ("java/lang/String", 30, "replace", "(CC)Ljava/lang/String;"),
+                // be08d047cbae — Object's row, dispatched on a String
+                ("java/lang/String", 2, "hashCode", "()I"),
                 // 배틀몬스터
                 ("java/lang/StringBuffer", 10, "length", "()I"),
                 // 배틀몬스터
                 ("java/lang/StringBuffer", 13, "setLength", "(I)V"),
                 // 배틀몬스터
                 ("java/lang/StringBuffer", 22, "append", "(C)Ljava/lang/StringBuffer;"),
+                // 73f3a21e981c
+                ("java/lang/StringBuffer", 34, "insert", "(II)Ljava/lang/StringBuffer;"),
                 // 간호사타이쿤2
                 ("java/io/DataInputStream", 22, "readBoolean", "()Z"),
                 // 73f3a21e981c

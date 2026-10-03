@@ -2,7 +2,7 @@ use alloc::vec;
 
 use alloc::vec::Vec;
 
-use jvm::{Array, ClassInstanceRef, JavaChar, Jvm, Result as JvmResult, runtime::JavaLangString};
+use jvm::{Array, ClassInstanceRef, JavaChar, Jvm, Result as JvmResult};
 use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 use rustjava_runtime::classes::java::lang::String;
@@ -33,8 +33,8 @@ impl TextComponent {
                 // wie writes it -- imHandler owns the mode -- so it stays at its default.
                 JavaFieldProto::new("iMode", "I", FieldAccessFlags::PROTECTED),
                 // Same story as iMode: read directly by 서든어택포켓 (`maxLength I`) and
-                // 73f3a21e981c (`m_td [C`). setMaxLength keeps its value here; m_td stays null
-                // until a key reaches keyNotify below.
+                // 73f3a21e981c (`m_td [C`). setMaxLength keeps its value here; m_td starts empty
+                // (see init) and keyNotify below fills it.
                 JavaFieldProto::new("maxLength", "I", FieldAccessFlags::PROTECTED),
                 JavaFieldProto::new("m_td", "[C", FieldAccessFlags::PROTECTED),
                 JavaFieldProto::new("imHandler", "Lorg/kwis/msp/lcdui/InputMethodHandler;", FieldAccessFlags::PROTECTED),
@@ -54,6 +54,11 @@ impl TextComponent {
         jvm.put_field(&mut this, "imHandler", "Lorg/kwis/msp/lcdui/InputMethodHandler;", im_handler)
             .await?;
 
+        // Never null: 9789fec50f39's TextFieldComponent subclass reads `m_td.length` in its own
+        // keyNotify before handing the key on, so a null buffer was an NPE on the first key.
+        let empty = jvm.instantiate_array("C", 0).await?;
+        jvm.put_field(&mut this, "m_td", "[C", empty).await?;
+
         Ok(())
     }
 
@@ -71,24 +76,32 @@ impl TextComponent {
         jvm.get_field(&this, "maxLength", "I").await
     }
 
-    async fn set_string(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<TextComponent>, data: ClassInstanceRef<String>) -> JvmResult<()> {
-        tracing::warn!("stub org.kwis.msp.lwc.TextComponent::setString({this:?}, {data:?})");
+    // m_td is the text, whoever wrote it: setString, a typed key, or a guest subclass directly.
+    // 9789fec50f39 calls setString("") and reads getString() back every frame until they agree;
+    // with setString a no-op and getString answering "temp", that never settled and the
+    // allocations exhausted the guest heap.
+    async fn set_string(
+        jvm: &Jvm,
+        _: &mut WieJvmContext,
+        mut this: ClassInstanceRef<TextComponent>,
+        data: ClassInstanceRef<String>,
+    ) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lwc.TextComponent::setString({this:?}, {data:?})");
 
-        Ok(())
+        let chars: ClassInstanceRef<Array<JavaChar>> = if data.is_null() {
+            jvm.instantiate_array("C", 0).await?.into()
+        } else {
+            jvm.invoke_virtual(&data, "java/lang/String", "toCharArray", "()[C", ()).await?
+        };
+        jvm.put_field(&mut this, "m_td", "[C", chars).await
     }
 
     async fn get_string(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<TextComponent>) -> JvmResult<ClassInstanceRef<String>> {
-        tracing::warn!("stub org.kwis.msp.lwc.TextComponent::getString({this:?})");
+        tracing::debug!("org.kwis.msp.lwc.TextComponent::getString({this:?})");
 
-        // Typed text wins; until something is typed the old "temp" answer stays, so titles that
-        // never route a key here read exactly what they read before.
-        let typed: ClassInstanceRef<Array<JavaChar>> = jvm.get_field(&this, "m_td", "[C").await?;
-        if !typed.is_null() {
-            return Ok(jvm.new_class("java/lang/String", "([C)V", (typed,)).await?.into());
-        }
-        let result = JavaLangString::from_rust_string(jvm, "temp").await?;
+        let text: ClassInstanceRef<Array<JavaChar>> = jvm.get_field(&this, "m_td", "[C").await?;
 
-        Ok(result.into())
+        Ok(jvm.new_class("java/lang/String", "([C)V", (text,)).await?.into())
     }
 
     // Minimal input: a digit press appends it, CLR removes the last character — the keys a
@@ -129,7 +142,7 @@ impl TextComponent {
 mod tests {
     use alloc::boxed::Box;
 
-    use jvm::ClassInstanceRef;
+    use jvm::{Array, ClassInstanceRef, JavaChar, runtime::JavaLangString};
     use test_utils::run_jvm_test;
     use wie_util::Result;
 
@@ -151,6 +164,39 @@ mod tests {
                 .invoke_virtual(&text_box, "org/kwis/msp/lwc/TextBoxComponent", "getMaxLength", "()I", ())
                 .await?;
             assert_eq!(max, 5);
+
+            Ok(())
+        })
+    }
+
+    /// 9789fec50f39's name box: its TextFieldComponent subclass reads `m_td.length` on the first
+    /// key, before anything is typed, and its frame loop calls setString("") then reads getString()
+    /// back until the two agree.
+    #[test]
+    fn text_lives_in_m_td_from_construction_and_set_string_keeps_it() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            let null: ClassInstanceRef<()> = ClassInstanceRef::new(None);
+            let field = jvm
+                .new_class("org/kwis/msp/lwc/TextFieldComponent", "(Ljava/lang/String;I)V", (null, 0))
+                .await?;
+            let td: ClassInstanceRef<Array<JavaChar>> = jvm.get_field(&field, "m_td", "[C").await?;
+            assert!(!td.is_null(), "m_td is null before any key");
+            assert_eq!(jvm.array_length(&td).await?, 0);
+
+            let text = JavaLangString::from_rust_string(&jvm, "ab").await?;
+            let _: () = jvm
+                .invoke_virtual(
+                    &field,
+                    "org/kwis/msp/lwc/TextFieldComponent",
+                    "setString",
+                    "(Ljava/lang/String;)V",
+                    (text,),
+                )
+                .await?;
+            let read = jvm
+                .invoke_virtual(&field, "org/kwis/msp/lwc/TextComponent", "getString", "()Ljava/lang/String;", ())
+                .await?;
+            assert_eq!(JavaLangString::to_rust_string(&jvm, &read).await?, "ab");
 
             Ok(())
         })

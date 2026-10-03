@@ -41,6 +41,8 @@ impl ShellComponent {
                 JavaMethodProto::new("setTitle", "(Ljava/lang/String;)V", Self::set_title_string, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("setTitle", "(Lorg/kwis/msp/lwc/Component;)V", Self::set_title, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getTitle", "()Lorg/kwis/msp/lwc/Component;", Self::get_title, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getWidth", "()I", Self::get_width, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getHeight", "()I", Self::get_height, MethodAccessFlags::PUBLIC),
             ],
             fields: vec![JavaFieldProto::new("cmpTitle", "Lorg/kwis/msp/lwc/Component;", FieldAccessFlags::PRIVATE)],
             access_flags: ClassAccessFlags::PUBLIC,
@@ -267,6 +269,31 @@ impl ShellComponent {
         }
 
         Ok(())
+    }
+
+    // A shell is the screen it is shown on, so it answers the display's size where Component's stub
+    // answers 0. be08d047cbae reads its shell's size once and repaints (0, 0, width, height) after
+    // every key; at 0 × 0 that repaint covered nothing and the screen never moved off the first
+    // frame. ponytail: a shell built with (IIII) also answers the display size — no field keeps
+    // its own, because a field here would shift an LGT AOT subclass's field offsets.
+    async fn get_width(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::debug!("org.kwis.msp.lwc.ShellComponent::getWidth({this:?})");
+
+        let display = Self::default_display(jvm).await?;
+        if display.is_null() {
+            return Ok(0);
+        }
+        jvm.invoke_virtual(&display, "org/kwis/msp/lcdui/Display", "getWidth", "()I", ()).await
+    }
+
+    async fn get_height(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::debug!("org.kwis.msp.lwc.ShellComponent::getHeight({this:?})");
+
+        let display = Self::default_display(jvm).await?;
+        if display.is_null() {
+            return Ok(0);
+        }
+        jvm.invoke_virtual(&display, "org/kwis/msp/lcdui/Display", "getHeight", "()I", ()).await
     }
 
     async fn default_display(jvm: &Jvm) -> JvmResult<ClassInstanceRef<Display>> {
