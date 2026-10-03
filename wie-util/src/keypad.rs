@@ -9,7 +9,7 @@
 //! Every key re-renders the whole composition and the edit is the difference, so a Hangul vowel
 //! that moves the previous syllable's final consonant (각 + ㅏ → 가가) needs no special case.
 //!
-//! Layouts (docs/report/0427 §2 — none of this is documented in the repo, so read it as chosen):
+//! Layouts (docs/report/0428 §2 — none of this is documented in the repo, so read it as chosen):
 //! - Latin: ITU-T E.161 letters, the digit last (`2` → A B C 2).
 //! - Hangul: 천지인 — 1 ㅣ · 2 ㆍ · 3 ㅡ compose vowels by stroke; 4 ㄱㅋㄲ · 5 ㄴㄹ · 6 ㄷㅌㄸ ·
 //!   7 ㅂㅍㅃ · 8 ㅅㅎㅆ · 9 ㅈㅊㅉ · 0 ㅇㅁ cycle when pressed again.

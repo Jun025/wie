@@ -125,7 +125,7 @@ impl TextComponent {
         }
         let handler: ClassInstanceRef<InputMethodHandler> = jvm.get_field(&this, "imHandler", IM_HANDLER).await?;
         if key == STAR {
-            // ponytail: '*' as the mode key is assumed (docs/report/0427 §2); a title that draws its
+            // ponytail: '*' as the mode key is assumed (docs/report/0428 §2); a title that draws its
             // own mode key would want this off.
             return InputMethodHandler::change_current_mode_to_next(jvm, context, handler)
                 .await

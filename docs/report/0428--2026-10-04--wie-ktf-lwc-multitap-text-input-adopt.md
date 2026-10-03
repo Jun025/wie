@@ -93,5 +93,3 @@
 ### 9. 게임 이름 유입
 
 `node scripts/corpus-name-inflow.mjs`(14파일): 유입 5건(BOUNDED 5회/5쌍) · 판단 필요 1건(SUFFIX-ATTACHED 1회/1쌍). **이 diff 가 새로 들인 이름은 0이다.** 6건 모두 이 diff 가 건드린 파일(`shell_card.rs`·`text_box_component.rs`·`text_component.rs`)에 원래 있던 주석의 이름이다. SUFFIX-ATTACHED 1건은 같은 주석의 더 긴 제목이다. `git diff origin/main` 의 `+` 줄에서 코퍼스 제목과 맞는 것은 0건이다. 새 주석·문서·소식은 sha12 만 쓴다.
-
-<!-- corpus-name-inflow v1 subjects=14 tree=7ffe1c8eda52416e B=5/5 P=0/0 S=1/1 -->

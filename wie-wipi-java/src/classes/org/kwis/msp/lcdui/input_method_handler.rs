@@ -21,7 +21,7 @@ const MULTITAP_MS: i64 = 1000;
 // The mode numbers. Only 3 is measured: 9789fec50f39 and b22a7fcfb406 both setCurrentMode(3) on a
 // name prompt, 9789fec50f39 erases every digit typed there but keeps Hangul, and b22a7fcfb406's own
 // strip «가 A a 1» highlights 가 at 3. The rest follow that strip's order as changeCurrentModeToNext
-// steps it (3 → 0 → 1 → 2 → 3). ponytail: 0..2 are assumed (docs/report/0427 §2) — no reference here
+// steps it (3 → 0 → 1 → 2 → 3). ponytail: 0..2 are assumed (docs/report/0428 §2) — no reference here
 // numbers the modes; the stripped AromaWIPI classes leave them to native code.
 const MODES: [Mode; 4] = [Mode::Upper, Mode::Lower, Mode::Digit, Mode::Hangul];
 const HANGUL_MODE: i32 = 3;

@@ -9,7 +9,7 @@
     "wie-wipi-java lcdui InputMethodHandler — 모드 표 [영대, 영소, 숫자, 한글] · 시작 모드 3 · compose(조합 상태는 composing [C) · notifyTextChanged 글자마다",
     "wie-wipi-java lwc TextComponent.keyNotify — imHandler 경유 · '*' 모드 전환 · m_td 꼬리가 다르면 조합 새로 · TextField/TextBox 생성자 제한자 → 핸들러",
     "wie-skvm TextComponentHandler — 공용 자판 사용(영대 고정 · 동작 동일)",
-    "docs/report/0427 · docs/player-updates 1"
+    "docs/report/0428 · docs/player-updates 1"
   ],
   "verification": [
     "짝 62종 기본 27키: 판정 뒤집힘 0 · 입력에 닿은 3종의 글자만 바뀜",
@@ -17,7 +17,7 @@
     "되돌림 red 4/4 · fmt · clippy stable/wasm32/beta · cargo test --all 677/0 · 러너 블록 PASS"
   ],
   "limits": [
-    "모드 0·1·2 의 번호와 천지인 배열·'*' 모드 키는 가정이다(report 0427 §2) — 레퍼런스 클래스 본문은 비어 있다",
+    "모드 0·1·2 의 번호와 천지인 배열·'*' 모드 키는 가정이다(report 0428 §2) — 레퍼런스 클래스 본문은 비어 있다",
     "1e43e2e0055f · d448aee68157 의 입력 화면은 다시 재지 않았다",
     "setMaxLength 는 여전히 값만 기록한다"
   ],
