@@ -260,7 +260,7 @@ impl ArmCore {
     /// Whether a thread other than the current one is suspended in the middle of guest code — sliced
     /// out by the instruction budget, not parked in a host call (sleep, wait, I/O). Host code that
     /// hands the guest an event can wait for this to clear: a handset does not deliver a key into
-    /// the middle of another thread's frame (docs/report/0429).
+    /// the middle of another thread's frame (docs/report/0430).
     pub fn others_preempted(&self) -> bool {
         let current = self.current_thread_id();
         self.threads.lock().iter().any(|(id, state)| Some(*id) != current && state.preempted)
@@ -269,7 +269,7 @@ impl ArmCore {
     /// While `on`, the current thread holds the others: whenever it is sliced out mid-code, no
     /// other thread resumes guest code until it runs again, so its guest code runs as one piece up
     /// to its next blocking host call. A key handler that frees what another thread's frame draws
-    /// needs this (docs/report/0429). Capped at [`HOLD_ROUNDS`] rounds per wait.
+    /// needs this (docs/report/0430). Capped at [`HOLD_ROUNDS`] rounds per wait.
     pub fn hold_others(&self, on: bool) {
         let holder = if on { self.current_thread_id().unwrap_or(0) } else { 0 };
         self.holder.store(holder, Ordering::Relaxed);

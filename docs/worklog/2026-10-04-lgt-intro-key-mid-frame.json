@@ -9,7 +9,7 @@
     "wie-backend TaskRunner::others_preempted · hold_others(기본 아무것도 안 함) · System::guest_others_preempted · guest_hold_others",
     "wie-lgt LgtTaskRunner — 두 훅을 ArmCore 로",
     "wie-midp Display.handleKeyEvent — ⑴ 잘린 스레드가 있으면 1ms 씩 최대 250ms 대기 · ⑵ routeKeyEvent 동안 hold",
-    "docs/report/0429 · docs/player-updates 1"
+    "docs/report/0430 · docs/player-updates 1"
   ],
   "verification": [
     "main 재현: 문서 키 1/12 · 간격 0.3초 3/8 · 8초 2/8 — 7번째 예외는 늘 게스트 NPE",

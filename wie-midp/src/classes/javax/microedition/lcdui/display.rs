@@ -789,7 +789,7 @@ impl Display {
         // every 10k instructions; on a handset the key goes in while the others sit in a host call,
         // and runs to its own next one. 1b107b96bf4e's key handler nulls the menu images its game
         // thread draws: sliced into the middle of that frame, the frame resumes into an NPE, the
-        // game thread dies and the match intro freezes (docs/report/0429). So wait for the others
+        // game thread dies and the match intro freezes (docs/report/0430). So wait for the others
         // to reach a host call, then hold them off while the handler is sliced. Both are bounded:
         // a thread that never reaches a host call costs a key the cap, as before.
         let mut waited = 0;
