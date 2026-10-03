@@ -1,0 +1,29 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-04",
+  "task": "wie-lgt-1b107b96bf4e-intro-press-any-key-intermittent",
+  "title": "LGT 1b107b96bf4e 대국 소개 간헐 정체 — 키가 다른 스레드의 그리던 프레임 한가운데로 들어갔다",
+  "summary": "wie 는 게스트 스레드를 1만 명령마다 자른다. 1b107b96bf4e 의 키 처리(스레드 2)가 메뉴 이미지 필드를 비우는 순간 게임 스레드(스레드 3)가 그 메뉴를 그리다 잘려 있으면 이어 그린 프레임이 NPE 로 죽는다. LGT 에서는 ⑴ 다른 스레드가 코드 한가운데서 잘려 있으면 키를 넘기기 전에 호스트 호출에 닿기를 기다리고(최대 250ms) ⑵ 키 처리가 잘린 동안 다른 스레드를 게스트 코드로 돌려보내지 않는다(최대 200 회).",
+  "changes": [
+    "wie-core-arm ArmCore — ThreadState.preempted · others_preempted() · hold_others()/wait_for_holder · 시험 2",
+    "wie-backend TaskRunner::others_preempted · hold_others(기본 아무것도 안 함) · System::guest_others_preempted · guest_hold_others",
+    "wie-lgt LgtTaskRunner — 두 훅을 ArmCore 로",
+    "wie-midp Display.handleKeyEvent — ⑴ 잘린 스레드가 있으면 1ms 씩 최대 250ms 대기 · ⑵ routeKeyEvent 동안 hold",
+    "docs/report/0429 · docs/player-updates 1"
+  ],
+  "verification": [
+    "main 재현: 문서 키 1/12 · 간격 0.3초 3/8 · 8초 2/8 — 7번째 예외는 늘 게스트 NPE",
+    "계측: 필드는 모든 실행에서 키 처리(스레드 2)가 비운다 · 그 순간 스레드 3 이 그리기 루프 안에서 잘려 있던 실행만 정체 · 키 처리 스레드는 비우기 전 25~45회 잘린다",
+    "같은 키 20회 재측: main 5/20 ↔ 이 PR 0/20 (⑴ 만이면 1/20)",
+    "LGT 78종 짝 기본 27키: 판정 변화 4 — 셋은 max-ticks 백스톱(짝 재측 같음) · 1종 NPE 1회(재측 0/33) · 키 대기 최대 41ms",
+    "fmt · clippy stable/wasm32/beta · cargo test --all 680/0 · 러너 블록 PASS"
+  ],
+  "limits": [
+    "대기는 «호스트 호출에 닿을 때까지»만이다 — 게임 스레드가 호스트 호출 안에서 같은 상태를 들고 있는 경우는 막지 않는다",
+    "0418 의 60분 «후» 누수 장면 재측은 하지 않았다(티켓 범위 밖)"
+  ],
+  "adoptedProposals": [
+    "2026-10-03-guest-gc-roots#p0"
+  ],
+  "proposals": []
+}
