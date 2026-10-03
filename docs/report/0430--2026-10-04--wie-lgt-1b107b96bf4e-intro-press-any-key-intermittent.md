@@ -99,3 +99,5 @@
 ### 8. 유입
 
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 8회 / 7쌍 · SUFFIX-ATTACHED 0회 / 0쌍. 8회 모두 이 회차가 고친 파일(`system.rs` · `emulator.rs` · `display.rs`)에 **이미 있던** 주석·시험 행이다. 이 회차가 더한 줄의 게임 이름은 0이다(`git diff origin/main...HEAD` 의 `+` 줄 대조 · 타이틀은 sha12 로만 적었다).
+
+<!-- corpus-name-inflow v1 subjects=9 tree=f4c9e1ac41ed111b B=8/7 P=0/0 S=0/0 -->
