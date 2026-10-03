@@ -216,6 +216,16 @@ impl LgtEmulator {
     }
 }
 
+// The core, the system and the JVM all hold clones of one another (SVC handler contexts, tasks,
+// the JVM's own core handle), so dropping the emulator frees nothing unless the cycles are cut.
+impl Drop for LgtEmulator {
+    fn drop(&mut self) {
+        self.system.teardown();
+        self.core.teardown();
+        LgtJvmSupport::forget_core(&self.core);
+    }
+}
+
 impl Emulator for LgtEmulator {
     fn handle_event(&mut self, event: Event) {
         self.system.event_queue().push(event)

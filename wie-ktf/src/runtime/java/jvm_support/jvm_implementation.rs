@@ -25,6 +25,12 @@ impl KtfJvmImplementation {
     pub fn new(core: &mut ArmCore) -> Self {
         let java_functions = Arc::new(Mutex::new(BTreeMap::new()));
         register_java_svc_handler(core, &java_functions).unwrap();
+        // The proxies in this table hold the JVM, which holds this table: empty it on teardown.
+        let table = java_functions.clone();
+        core.on_teardown(move || {
+            let proxies = core::mem::take(&mut *table.lock());
+            drop(proxies);
+        });
 
         Self {
             core: core.clone(),

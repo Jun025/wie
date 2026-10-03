@@ -163,6 +163,14 @@ impl J2MEEmulator {
     }
 }
 
+// Tasks hold clones of the system and the JVM, so dropping the emulator frees
+// nothing unless the cycles are cut.
+impl Drop for J2MEEmulator {
+    fn drop(&mut self) {
+        self.system.teardown();
+    }
+}
+
 impl Emulator for J2MEEmulator {
     fn handle_event(&mut self, event: Event) {
         self.system.event_queue().push(event)

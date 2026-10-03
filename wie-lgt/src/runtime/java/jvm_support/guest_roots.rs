@@ -18,7 +18,7 @@ use core::{
     sync::atomic::{AtomicU32, AtomicU64, Ordering},
 };
 
-use jvm::{ClassDefinition, ClassInstance, ClassInstanceRef, Field, JavaValue, Jvm, Method, Result as JvmResult};
+use jvm::{ClassDefinition, ClassInstance, ClassInstanceRef, Field, GlobalRef, JavaValue, Jvm, Method, Result as JvmResult};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags};
 use spin::Mutex;
 use wipi_types::lgt::java::LgtJavaClassInstance as RawJavaClassInstance;
@@ -37,12 +37,13 @@ use super::value::JavaValueCodec;
 static BLOCKS: Mutex<BTreeMap<(usize, u32), (u32, u32)>> = Mutex::new(BTreeMap::new());
 // core id → guest memory ranges to scan besides registers and stacks (writable image sections).
 static REGIONS: Mutex<BTreeMap<usize, Vec<(u32, u32)>>> = Mutex::new(BTreeMap::new());
-// core ids whose JVM has finished bootstrapping and has the scan installed. A collection before that
-// is unsafe for its own reason: bootstrap classes have no java/lang/Class object yet.
-static INSTALLED: Mutex<BTreeSet<usize>> = Mutex::new(BTreeSet::new());
-// ponytail: nothing removes a core's entries from these three, which is safe only because an
-// `ArmCore` is never freed (a reboot leaks the old one, measured — so its id is never reused). If
-// cores start being freed, purge its entries on drop or a reused address inherits them.
+// core id → the scan's global reference, for cores whose JVM has finished bootstrapping and has the
+// scan installed. A collection before that is unsafe for its own reason: bootstrap classes have no
+// java/lang/Class object yet. Held here, not forgotten: the reference holds the core, and a
+// forgotten one kept every booted core alive.
+static INSTALLED: Mutex<BTreeMap<usize, GlobalRef<()>>> = Mutex::new(BTreeMap::new());
+// A core's entries leave all three in `forget`, which the emulator calls as it is dropped: a freed
+// core's address can be the next core's id, and a reused id would inherit them.
 
 const HEAP: core::ops::Range<u32> = 0x4000_0000..0x5000_0000;
 
@@ -69,11 +70,20 @@ pub fn add_region(core: &ArmCore, address: u32, size: u32) {
     REGIONS.lock().entry(core.id()).or_default().push((address, size));
 }
 
+pub fn forget(core: &ArmCore) {
+    let id = core.id();
+    BLOCKS.lock().retain(|(core_id, _), _| *core_id != id);
+    REGIONS.lock().remove(&id);
+    let roots = INSTALLED.lock().remove(&id);
+    drop(roots);
+}
+
 pub fn install(jvm: &Jvm, core: &ArmCore) {
-    INSTALLED.lock().insert(core.id());
     let roots = ClassInstanceRef::<()>::new(Some(Box::new(GuestRoots { core: core.clone() })));
-    // Never released: the scan must run at every collection for as long as this JVM lives.
-    core::mem::forget(jvm.new_global_ref(&roots));
+    // Released by `forget` only: the scan must run at every collection for as long as this JVM lives.
+    if let Some(roots) = jvm.new_global_ref(&roots) {
+        INSTALLED.lock().insert(core.id(), roots);
+    }
 }
 
 /// Every tracked instance a guest word points into.
@@ -140,7 +150,7 @@ pub fn gc_stress_counts() -> (u64, u64) {
 
 pub fn stress_collect(jvm: &Jvm, core: &ArmCore) {
     let every = STRESS_EVERY.load(Ordering::Relaxed);
-    if every != 0 && INSTALLED.lock().contains(&core.id()) && STRESS_CALLS.fetch_add(1, Ordering::Relaxed).is_multiple_of(every as u64) {
+    if every != 0 && INSTALLED.lock().contains_key(&core.id()) && STRESS_CALLS.fetch_add(1, Ordering::Relaxed).is_multiple_of(every as u64) {
         STRESS_COLLECTIONS.fetch_add(1, Ordering::Relaxed);
         if let Err(error) = jvm.collect_garbage() {
             tracing::error!("gc stress collection failed: {error:?}");
@@ -288,5 +298,24 @@ impl Field for GuestRoot {
 
     fn access_flags(&self) -> FieldAccessFlags {
         FieldAccessFlags::PRIVATE
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use wie_core_arm::ArmCore;
+
+    use super::{REGIONS, add_region, forget, is_tracked, track};
+
+    // A freed core's id can be the next core's: `forget` must leave nothing under it.
+    #[test]
+    fn forget_drops_every_entry_of_the_core() -> wie_util::Result<()> {
+        let core = ArmCore::new(false, None)?;
+        track(&core, 0x4000_0000, 0x4000_0100, 8);
+        add_region(&core, 0x1000, 0x10);
+        forget(&core);
+        assert!(!is_tracked(&core, 0x4000_0000));
+        assert!(!REGIONS.lock().contains_key(&core.id()));
+        Ok(())
     }
 }

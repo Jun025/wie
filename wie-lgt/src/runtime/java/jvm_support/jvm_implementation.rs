@@ -24,6 +24,12 @@ impl LgtJvmImplementation {
         let functions = Arc::new(Mutex::new(BTreeMap::new()));
         exception::init(core)?;
         register_java_svc_handler(core, &functions)?;
+        // The proxies in this table hold the JVM, which holds this table: empty it on teardown.
+        let table = functions.clone();
+        core.on_teardown(move || {
+            let proxies = core::mem::take(&mut *table.lock());
+            drop(proxies);
+        });
 
         Ok(Self {
             core: core.clone(),

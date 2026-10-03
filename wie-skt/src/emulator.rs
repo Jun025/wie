@@ -257,6 +257,14 @@ impl SktEmulator {
     }
 }
 
+// Tasks hold clones of the system and the JVM, so dropping the emulator frees
+// nothing unless the cycles are cut.
+impl Drop for SktEmulator {
+    fn drop(&mut self) {
+        self.system.teardown();
+    }
+}
+
 impl Emulator for SktEmulator {
     fn handle_event(&mut self, event: Event) {
         self.system.event_queue().push(event)

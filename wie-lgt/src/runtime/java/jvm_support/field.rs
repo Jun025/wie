@@ -1,4 +1,4 @@
-use alloc::{collections::BTreeMap, format, string::String};
+use alloc::{collections::BTreeMap, format, string::String, vec::Vec};
 use core::fmt::{self, Debug, Formatter};
 
 use jvm::{Field, JavaType, JavaValue};
@@ -160,6 +160,17 @@ impl JavaHostField {
             .entry((core.id(), ptr_instance))
             .or_default()
             .insert(self.name.clone(), value);
+    }
+
+    /// Drops every value a core's instances held — the values reference that core's objects, so
+    /// leaving them would keep the core alive and hand its entries to a later core at its address.
+    pub fn forget_core(core: &ArmCore) {
+        let id = core.id();
+        let values = HOST_FIELD_VALUES
+            .lock()
+            .extract_if(.., |(core_id, _), _| *core_id == id)
+            .collect::<Vec<_>>();
+        drop(values);
     }
 
     /// Drops whatever an earlier instance at this address left behind.

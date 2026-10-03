@@ -397,6 +397,15 @@ impl KtfEmulator {
     }
 }
 
+// Tasks and SVC handlers hold clones of the system, the core and the JVM, so dropping the emulator frees
+// nothing unless the cycles are cut.
+impl Drop for KtfEmulator {
+    fn drop(&mut self) {
+        self.system.teardown();
+        self.core.teardown();
+    }
+}
+
 impl Emulator for KtfEmulator {
     fn handle_event(&mut self, event: Event) {
         self.system.event_queue().push(event)

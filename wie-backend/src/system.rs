@@ -198,6 +198,14 @@ impl System {
         self.event_queue.write()
     }
 
+    /// Break the reference cycles through this system so the emulator owning it can be freed:
+    /// its tasks and the screen compositor capture clones of the system and the core.
+    pub fn teardown(&self) {
+        self.executor.clear();
+        let compositor = self.screen_compositor.lock().take();
+        drop(compositor);
+    }
+
     pub fn set_screen_compositor(&self, compositor: ScreenCompositor) {
         *self.screen_compositor.lock() = Some(compositor);
     }

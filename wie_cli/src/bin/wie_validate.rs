@@ -1166,6 +1166,10 @@ fn main() {
         Some(b) => format!("{},\"restarted\":{b}}}", &json[..json.len() - 1]),
         None => json,
     };
+    let json = match result.live_cores {
+        Some(n) => format!("{},\"live_cores\":{n}}}", &json[..json.len() - 1]),
+        None => json,
+    };
     let json = match result.stall_escapes {
         Some(n) => format!("{},\"stall_escapes\":{n}}}", &json[..json.len() - 1]),
         None => json,
@@ -1304,6 +1308,9 @@ struct Outcome {
     stall_escapes: Option<u32>,
     /// `--restart-at` only: whether the forced reboot happened before the run ended.
     restarted: Option<bool>,
+    /// `--relaunch`/`--restart-at` only: ARM cores alive at the end — 1 (the running guest) when
+    /// every earlier boot's emulator was freed, more when one leaked; 0 for J2ME/SKT, which have none.
+    live_cores: Option<u32>,
 }
 
 impl Outcome {
@@ -1617,6 +1624,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     outcome.restarted = args.restart_at.map(|_| restarted);
     outcome.stall_escapes = args.stall_secs.map(|_| escapes);
     outcome.db = (args.relaunch > 0 || args.restart_at.is_some()).then(|| db.stats.lock().unwrap().json());
+    outcome.live_cores = (args.relaunch > 0 || args.restart_at.is_some()).then(wie_core_arm::live_cores);
     judge(&mut outcome, args.inject, args.expect_last_frame, stop, inputs);
     outcome
 }
@@ -2062,6 +2070,7 @@ fn pass(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         db: None,
         stall_escapes: None,
         restarted: None,
+        live_cores: None,
     }
 }
 
@@ -2090,6 +2099,7 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
         db: None,
         stall_escapes: None,
         restarted: None,
+        live_cores: None,
     }
 }
 
