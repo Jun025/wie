@@ -193,7 +193,7 @@
 - 라이브 LGT 5 + 가드 2: 프로브 A 30초 짝.
   - 결과·재생 수·MIDI 가 같다. `4ece6eeeaa04` 는 2 → 3 · `1b107b96bf4e` 는 2 → 1 로 ±1 이다.
   - `13d7e3c21856` 은 첫 짝에서 후 쪽만 `max-ticks` 였다. 다시 재니 양쪽 다 `max-ticks`(재생 1/1)였다 — 부하다.
-- 속도: 배틀몬스터(`a30bbe008b5e`)·영웅서기4(`49ade89578c5`) paints 95 → 96 · 76 → 82(같은 시각 짝).
+- 속도: 속도 가드 `a30bbe008b5e`(목표 20fps)·`49ade89578c5`(≈35fps) paints 95 → 96 · 76 → 82(같은 시각 짝).
   - 바꾼 코드는 프레임 경로에 없다. 클립 적재 때 1회, SKT·J2ME 시작 때 1회, jar MD5 목록이다.
   - J2ME 페이싱 시험(`test_pacing` · 고정 시계)도 통과했다.
 - 4 게이트:
@@ -217,4 +217,4 @@
 
 ### 9. 게임 파일명 유입
 
-아래 표식 줄 참조. 이 회차가 쓴 코드·회차 문서·소식은 타이틀을 sha12 로만 적었다.
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 718회 / 330쌍 + SUFFIX-ATTACHED 35회 / 15쌍. 전부 `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 값이다(이 회차는 그 행의 소리 축·안내 줄만 바꿨다). 그 밖 파일은 0 / 0 이다. 코드·회차 문서·worklog·소식은 타이틀을 sha12 로만 적었다.
