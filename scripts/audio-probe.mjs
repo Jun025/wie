@@ -37,7 +37,8 @@
 //     audio.rs sent), since a game may play one song on many handles. `firstVsNext` counts songs
 //     whose first play took a different synth than a later play of the same song — what a player
 //     hears as "the song sounds different the second time"; `mixed` = the session's MIDI plays
-//     used both synths. Version-agnostic: it reads only `playbacks` and `pb.sf`.
+//     used both synths. Version-agnostic: it reads only `playbacks` and `pb.sf`. `drops` lists plays
+//     a stop or replay reached while the worklet still held them for the soundfont — never heard.
 //   rms mean / 2nd-half mean / silent seconds — from per-second RMS of the analyser, sampled
 //     every 50 ms. "Silent" is a second whose RMS is under 1e-4.
 //
@@ -132,7 +133,7 @@ const base = `http://127.0.0.1:${server.address().port}`;
 // Installed before any page script: count what audio.rs posts to the worklet, and keep the
 // worklet node so the probe can ask it for `stats`.
 const INIT = () => {
-  const probe = (window.__probe = { plays: 0, stops: 0, evicts: 0, gains: new Set(), evHandles: new Set(), nodes: [], stats: null, song: new Map(), playLog: [], sfReady: null, t0: performance.now() });
+  const probe = (window.__probe = { plays: 0, stops: 0, evicts: 0, gains: new Set(), evHandles: new Set(), nodes: [], stats: null, song: new Map(), playLog: [], drops: [], sfReady: null, t0: performance.now() });
   // FNV-1a over a play's events: one id per song, whatever handle carries it.
   const songOf = (ev) => {
     let h = 0x811c9dc5;
@@ -154,7 +155,13 @@ const INIT = () => {
       constructor(...a) {
         super(...a);
         const recv = new Map(), port = this.port, pbs = this.playbacks, set = pbs.set.bind(pbs), onm = this.onMessage.bind(this);
-        this.onMessage = (m) => { if (m && m.t === "play") recv.set(m.h, currentFrame); return onm(m); };
+        this.onMessage = (m) => {
+          if (m && m.t === "play") recv.set(m.h, currentFrame);
+          // A stop (or a replay) that lands while the play is still held for the soundfont: never heard.
+          if (m && (m.t === "stop" || m.t === "play") && this.held && this.held.has(m.h))
+            port.postMessage({ t: "probe-drop", h: m.h, heldMs: ((currentFrame - (recv.get(m.h) ?? currentFrame)) * 1000) / sampleRate });
+          return onm(m);
+        };
         pbs.set = (h, pb) => {
           port.postMessage({ t: "probe-play", h, sf: !!pb.sf, g: pb.gain, midi: pb.seq.events.some((e) => e.midi), holdMs: ((currentFrame - (recv.get(h) ?? currentFrame)) * 1000) / sampleRate });
           return set(h, pb);
@@ -194,6 +201,7 @@ const INIT = () => {
         this.port.addEventListener("message", (e) => {
           if (e.data && e.data.t === "stats") probe.stats = e.data;
           if (e.data && e.data.t === "sf") probe.sfReady = { ok: e.data.ok, at: Math.round(performance.now() - probe.t0), error: e.data.error };
+          if (e.data && e.data.t === "probe-drop") probe.drops.push({ at: Math.round(performance.now() - probe.t0), song: probe.song.get(e.data.h) ?? `h${e.data.h}`, heldMs: Math.round(e.data.heldMs) });
           if (e.data && e.data.t === "probe-play")
             probe.playLog.push({ at: Math.round(performance.now() - probe.t0), song: probe.song.get(e.data.h) ?? `h${e.data.h}`, sf: e.data.sf, midi: e.data.midi, g: Math.round(e.data.g * 1000) / 1000, holdMs: Math.round(e.data.holdMs) });
         });
@@ -302,6 +310,7 @@ const RUN = async ({ wasmIdx, gameIdx, gameName, secs, keyMs, keys, statsEvery, 
     mixed: midiPlays.some((p) => p.sf) && midiPlays.some((p) => !p.sf),
     holdMaxMs: Math.max(0, ...midiPlays.map((p) => p.holdMs)),
     playLog: probe.playLog,
+    drops: probe.drops,
   };
 };
 
@@ -361,7 +370,7 @@ for (const r of results) {
   if (r.plays === undefined) continue;
   console.log(`  plays ${r.plays} · stops ${r.stops} · evicts ${r.evicts} · gains [${r.gains.join(", ")}] · worklet ${r.worklet ? "yes" : "NO"}`);
   console.log(`  seq ${r.seq.map((s) => `${s.at}s=${s.sequences}${s.substitute ? "*" : ""}`).join(" ") || "-"}${r.seq.some((s) => s.substitute) ? "   (* no stats reply — distinct handles sent `ev`)" : ""}`);
-  console.log(`  MIDI plays ${r.midiPlays} (soundfont ${r.sfPlays}) · songs ${r.songs} (repeated ${r.repeatedSongs}) · first≠next ${r.firstVsNext} · mixed ${r.mixed} · hold max ${r.holdMaxMs} ms · soundfont ${r.sfReady ? `${r.sfReady.ok ? "ready" : "failed"} at ${r.sfReady.at} ms` : "-"}`);
+  console.log(`  MIDI plays ${r.midiPlays} (soundfont ${r.sfPlays}) · songs ${r.songs} (repeated ${r.repeatedSongs}) · first≠next ${r.firstVsNext} · mixed ${r.mixed} · hold max ${r.holdMaxMs} ms · dropped while held ${r.drops.length} · soundfont ${r.sfReady ? `${r.sfReady.ok ? "ready" : "failed"} at ${r.sfReady.at} ms` : "-"}`);
   console.log(`  rms mean ${f4(r.rmsMean)} · 2nd half ${f4(r.rmsSecondHalf)} · max ${f4(r.rmsMax)} · silent ${r.silentSeconds}/${r.seconds}s`);
   if (r.pageErrors?.length) console.log(`  page errors: ${r.pageErrors.slice(0, 3).join(" | ")}`);
 }
