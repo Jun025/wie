@@ -1,0 +1,23 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-04",
+  "task": "wie-vtable-unimplemented-string29-stack25",
+  "title": "LGT ABI 2행 — String concat 29 · Vector lastElement 25(호출부 역어셈)",
+  "summary": "1b107b96bf4e 의 전적 화면(채널 NUM3)이 String vtable 29 로, be08d047cbae 의 보조 스레드가 Stack(=Vector) vtable 25 로 죽었다. 호출부를 역어셈해 각각 concat(String) · lastElement() 로 확정하고 넣었다.",
+  "changes": [
+    "wie-lgt/data/lgt_java_abi.toml — String concat 29 · Vector lastElement 25(호출부 근거 주석)",
+    "wie-lgt jvm_support.rs abi 시험 행 2",
+    "docs/report/0429 · docs/player-updates 1"
+  ],
+  "verification": [
+    "1b107b96bf4e 채널 NUM3: 전 FAIL(stop error · String 29) → 후 PASS 2/2 · 전적 화면 표시",
+    "be08d047cbae 진도 v2 420초: Stack 25 uncaught 12 → 0 · paints 2357 → 4150",
+    "되돌림 red 2/2 · fmt · clippy stable/beta/wasm32 -D warnings · cargo test --all 672/0"
+  ],
+  "limits": [
+    "be08d047cbae 은 후 실행에서 아이템 상점 화면에 180초부터 머문다 — 원인 미조사",
+    "전·후 각 1판(진도 v2) — census 락을 쓰지 않고 같은 인자로 wie_validate 를 직접 돌렸다"
+  ],
+  "proposals": [],
+  "adoptedProposals": ["2026-10-03-guest-gc-roots#p1", "2026-10-03-progression-engine-walls-r2#p0"]
+}

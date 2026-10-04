@@ -9,6 +9,9 @@ pub struct ThreadState {
     pub context: ArmCoreContext,
     pub stack_base: usize,
     pub stack_size: usize,
+    /// Sliced out by the instruction budget between two guest instructions, rather than parked
+    /// in a host call. See [`ArmCore::others_preempted`].
+    pub preempted: bool,
 }
 
 impl ThreadState {
@@ -39,6 +42,7 @@ impl ThreadState {
             context,
             stack_base: stack_base as _,
             stack_size: STACK_SIZE as _,
+            preempted: false,
         })
     }
 }
