@@ -685,7 +685,7 @@ const lockVerdict = (lock, runs) => (lock === 'drm' || (lock === 'phone' && quit
 // as «network» on screen were engine walls with the data already shipped (docs/report/0414).
 // Only the 30 s probe A counts, and 50 is the line: the 600 s key loop reconnects in titles that
 // play (wave6 at pin 4ac38566 · L 66 · 66 · 29 · 28 in four of them), and a live title can ask 21
-// times while starting, against the wall's 100 (docs/report/0430).
+// times while starting, against the wall's 100 (docs/report/0432).
 const NET_KO = '게임을 시작하려면 옛 통신사 서버에서 데이터를 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.';
 const NET_CONNECT = /MC_netConnect|MC_netSocketConnect|MC_netHttpConnect|Network::connect\(/g;
 const netWall = (probeA) => (probeA.match(NET_CONNECT) ?? []).length >= 50;
