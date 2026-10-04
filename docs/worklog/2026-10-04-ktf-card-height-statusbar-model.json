@@ -1,0 +1,35 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-04",
+  "task": "wie-ktf-card-height-statusbar-model-d1e0badfce82",
+  "title": "KTF 상태 표시줄 자리 — show() 뒤의 Card 는 24행 아래 · 높이 296",
+  "summary": "docs/report/0431",
+  "changes": [
+    "wie-wipi-java lwc AnnunciatorComponent.show() — 240폭 화면에서 정적 shownHeight = 24",
+    "wie-wipi-java lcdui Display.getHeight — 화면 높이 − shownHeight · Card 기본 생성자 y = shownHeight",
+    "시험 shown_strip_moves_new_cards_below_it_on_a_240_wide_screen"
+  ],
+  "verification": [
+    "KTF 240×320 164종 census 프로브 짝(base d1ba7687 ↔ 모델): status·boot·render·input 뒤집힘 0 · sound silent→ok 1",
+    "d1e0badfce82 AIOOBE 0 · 판이 그려진다"
+  ],
+  "limits": [
+    "24 는 코퍼스 그림 높이의 최빈값이다(296 · 10종) — 단말별 문서 근거는 없다",
+    "표시줄 자체는 그리지 않는다(비워 둔 24행)"
+  ],
+  "adoptedProposals": [
+    "2026-10-03-census-wave5b-leftover-walls#p0"
+  ],
+  "proposals": [
+    {
+      "title": "KTF 176×220 상태 표시줄 18행 — 같은 모델을 176폭에 짝 재측으로",
+      "plainSummary": "작은 화면 KTF 게임의 배경 그림은 높이 202(= 220 − 18)가 가장 많다. 지금은 240폭에만 표시줄 자리를 비운다.",
+      "userBenefit": "작은 화면 KTF 게임도 실제 휴대폰과 같은 높이를 받아, 아래가 잘리거나 표가 넘치는 일이 줄어든다.",
+      "why": "176폭 전폭 그림의 최대 높이 최빈값이 202(7종)이고 220 은 4종이다(report 0431 §1). 240폭과 같은 형태다.",
+      "tradeoff": "176×220 KTF 93종의 배치가 바뀐다. 같은 census 프로브 짝이 근거여야 한다(약 35분 × 2).",
+      "effort": "S",
+      "target": "wie-wipi-java org.kwis.msp.lwc.AnnunciatorComponent STRIP_HEIGHT",
+      "kind": "product"
+    }
+  ]
+}

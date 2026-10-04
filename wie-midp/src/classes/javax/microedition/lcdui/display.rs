@@ -26,6 +26,8 @@ const GC_INTERVAL_MS: i64 = 1000;
 // 91 and 165ms per collection, 15% of the wall clock at one a second. The next collection waits
 // until the last one's cost is at most this fraction of the time between them.
 const GC_COST_SHARE: i64 = 20;
+// The longest a key waits for the other guest threads to reach a host call (handleKeyEvent).
+const KEY_WAITS_FOR_GUEST_MS: u32 = 250;
 
 const TITLE_BACKGROUND: i32 = 0x263746;
 const WHITE: i32 = 0xffffff;
@@ -780,14 +782,31 @@ impl Display {
         Ok(())
     }
 
-    async fn handle_key_event(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>, event_type: i32, code: i32) -> JvmResult<()> {
+    async fn handle_key_event(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>, event_type: i32, code: i32) -> JvmResult<()> {
         tracing::debug!("javax.microedition.lcdui.Display::handleKeyEvent({this:?}, {event_type:?}, {code})");
+
+        // A key handler and another guest thread's frame do not interleave. wie slices guest threads
+        // every 10k instructions; on a handset the key goes in while the others sit in a host call,
+        // and runs to its own next one. 1b107b96bf4e's key handler nulls the menu images its game
+        // thread draws: sliced into the middle of that frame, the frame resumes into an NPE, the
+        // game thread dies and the match intro freezes (docs/report/0430). So wait for the others
+        // to reach a host call, then hold them off while the handler is sliced. Both are bounded:
+        // a thread that never reaches a host call costs a key the cap, as before.
+        let mut waited = 0;
+        while waited < KEY_WAITS_FOR_GUEST_MS && context.system().guest_others_preempted() {
+            context.system().sleep(1).await;
+            waited += 1;
+        }
+        if waited > 0 {
+            tracing::debug!("key waited {waited}ms for a guest thread sliced out mid-code");
+        }
 
         let current_displayable: ClassInstanceRef<Displayable> = jvm
             .get_field(&this, "currentDisplayable", "Ljavax/microedition/lcdui/Displayable;")
             .await?;
 
         if !current_displayable.is_null() {
+            context.system().guest_hold_others(true);
             let result: JvmResult<()> = jvm
                 .invoke_virtual(
                     &current_displayable,
@@ -797,6 +816,7 @@ impl Display {
                     (event_type, code),
                 )
                 .await;
+            context.system().guest_hold_others(false);
 
             if let Err(x) = result {
                 Self::handle_exception(jvm, x).await?;

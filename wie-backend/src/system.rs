@@ -96,6 +96,16 @@ impl System {
         self.redraw_pending.store(true, Ordering::Release);
     }
 
+    /// See [`TaskRunner::others_preempted`].
+    pub fn guest_others_preempted(&self) -> bool {
+        self.task_runner.others_preempted()
+    }
+
+    /// See [`TaskRunner::hold_others`].
+    pub fn guest_hold_others(&self, on: bool) {
+        self.task_runner.hold_others(on)
+    }
+
     pub fn guest_yielded(&self) {
         self.pacing.lock().guest_yielded();
         let task = self.current_task_id();
