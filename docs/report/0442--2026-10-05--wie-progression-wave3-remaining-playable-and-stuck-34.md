@@ -91,9 +91,11 @@
 - §4 의 2종은 이 브랜치 빌드로 쟀다(§7).
 - `node scripts/player-data.mjs` OK(429 · 388/24/17).
 
-### 7. 고친 2종 — 이 브랜치 빌드로 600초
+### 7. 고친 2종 — 600초 정책 측정은 다음 회차
 
-FIX-RESULTS
+- census 판(이 브랜치 빌드 · P + P2)을 레시피 단계 뒤에 걸어 두었다. guard 가 05:55 부터 06:21 까지 holding 이라 시작하지 못했다. 그래서 거두었다.
+- 그래서 두 행의 `compat.json` 은 바꾸지 않았다: `e68b1c8aef85` 는 `stuck`, `320a5360a0f3` 은 키 없음.
+- 지금 있는 증거는 §4 의 수동 재현(90초 · 150초 · `build-slot run`)뿐이다.
 
 ### 8. 후속(이 티켓이 이어서 진다)
 
@@ -103,9 +105,11 @@ FIX-RESULTS
 | `9789fec50f39` 진도(첫 묶음 `chunk.aa` 에 들어 있다) | 위에 포함 |
 | ⒜ 미완 7종 레시피 | 타이틀별 S |
 | `b9bfcaf42722` ⒞ 확정과 `knownIssues_ko` | S |
+| §7 의 2종 600초 측정 → `compat.json` 행 갱신 | S |
 
 - LGT 타이틀 화면이 깨져 그려지는 것을 2종에서 봤다(`e68b1c8aef85` · `b9bfcaf42722`). 진도 벽은 아니다. 화면 축의 별건이다(worklog 제안).
 
 ### 9. 게임 파일명 유입
 
-INFLOW
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 341쌍 + SUFFIX-ATTACHED 15쌍. 전부 `compat.json` 의 기존 제목 값이다(이 회차는 제목 문자열을 바꾸지 않았다). 그 밖 파일 0. 타이틀은 sha12 로만 적었다.
+
