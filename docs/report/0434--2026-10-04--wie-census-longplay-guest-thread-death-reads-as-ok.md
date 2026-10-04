@@ -34,3 +34,5 @@
 - 다음 전수의 compat 에서 위 5종이 playable → limited 로 내려간다(이번 PR 은 compat 을 바꾸지 않는다).
 
 유입 0건(BOUNDED) · 판단 필요 0건(SUFFIX-ATTACHED).
+
+<!-- corpus-name-inflow v1 subjects=2 tree=d6949c539c5e494f B=0/0 P=0/0 S=0/0 -->
