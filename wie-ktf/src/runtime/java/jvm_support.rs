@@ -110,7 +110,7 @@ impl KtfJvmSupport {
         let jar_name_java = JavaLangString::from_rust_string(&jvm, jar_name.unwrap()).await.unwrap();
         let jar_file = jvm
             .new_class("java/util/jar/JarFile", "(Ljava/lang/String;)V", (jar_name_java,))
-            .or_else(async |error| Err(Box::pin(JvmSupport::to_wie_err(&jvm, error)).await))
+            .or_else(async |error| Err(JvmSupport::to_wie_err(&jvm, error).await))
             .await?;
         let entries: ClassInstanceRef<Enumeration> = jvm
             .invoke_virtual(&jar_file, "java/util/jar/JarFile", "entries", "()Ljava/util/Enumeration;", [])
@@ -176,10 +176,8 @@ impl KtfJvmSupport {
             )
             // The constructor loads client.bin, so an unsupported image (a relocation-table layout,
             // `docs/report/0340`) and a jar that is not a zip (an OMA DRM container) both throw here.
-            // That is the title's error to report, not a host panic. Boxed: inline, the error formatter
-            // grew `init`'s future past Windows' 1 MiB main-thread stack in the debug `wie_validate`
-            // (boot needed 1016K before this path existed — docs/report/0438 §9).
-            .or_else(async |error| Err(Box::pin(JvmSupport::to_wie_err(&jvm, error)).await))
+            // That is the title's error to report, not a host panic.
+            .or_else(async |error| Err(JvmSupport::to_wie_err(&jvm, error).await))
             .await?;
 
         Ok((jvm, class_loader))
