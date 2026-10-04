@@ -1,0 +1,35 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-05",
+  "task": "wie-census-wave7-engine-walls-boot-unwrap-memory-singles",
+  "title": "7차 엔진 벽 — KTF DB 슬롯 11 · InitParam4 +8 throw e · 부팅 panic → 오류",
+  "summary": "0432 §6 의 주인 없는 벽. 호출부 역어셈으로 DB 슬롯 11 = 남은 저장 공간(3종) · InitParam4 +8 = 만들어 둔 예외 던지기(2종)를 넣고, 부팅 jar/client.bin 예외의 unwrap panic 을 오류로 바꿨다(5종).",
+  "changes": [
+    "wie-ktf method_table — Database 11 → list_databases",
+    "wie-ktf init — InitParam4.unk1 = JavaThrowInstance · interface.rs java_throw_instance",
+    "wie-ktf jvm_support — JarFile·KtfClassLoader 생성 예외 → to_wie_err",
+    "시험 3 · docs/report/0438 · player-updates 1 · compat 1행"
+  ],
+  "verification": [
+    "3c658a46bbfb 30초 짝: input none(5 paints · 슬롯 11 FAIL) → ok(novel 11 · 133 paints · midi 234)",
+    "되돌림 red 2/2 · fmt · clippy stable/beta/wasm32 -D warnings · cargo test --all 690/0 · build:wasm rc0"
+  ],
+  "limits": [
+    "전·후 짝은 guard 포화로 일부 타이틀만 잼 — 0438 §6",
+    "장시간 주소 0/8 2종 재현 0/2 · input none 조사 미실행"
+  ],
+  "proposals": [
+    {
+      "title": "input none 17종 — 짝 2회 + 키 순서 4종으로 흔들림 거르기",
+      "plainSummary": "키를 눌러도 화면이 안 바뀐다고 표시된 게임 17종을 다시 재서, 진짜 막힌 것만 남긴다.",
+      "userBenefit": "잘못 «키가 안 먹는다»고 안내된 게임의 표시가 바로잡힌다.",
+      "why": "0432 §3-1 이 7종을 측정 흔들림으로 판정했다. 남은 것의 원인 계급(렌더 벽·포커스·입력 API)을 아직 모른다.",
+      "tradeoff": "약 120회 × 30초 측정 — 호스트가 붐비면 오래 걸린다.",
+      "effort": "S",
+      "target": "wie scripts/playability-census.mjs 인자와 같은 직접 실행(드라이버 준비됨)",
+      "kind": "product"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}
