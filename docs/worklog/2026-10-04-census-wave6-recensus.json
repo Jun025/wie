@@ -1,0 +1,35 @@
+{
+ "schema": "wie-worklog/1",
+ "date": "2026-10-04",
+ "task": "wie-census-wave6-full-recensus-at-main-all-axes-r2",
+ "title": "6차 — 한 핀 429종 전 축 재측 · compat 재생성 · 통신망 규칙 프로브 A 50회",
+ "summary": "핀 4ac38566 으로 429종을 다시 재 compat.json 을 만들었다(381/29/19 → 388/24/17). 내림 13건은 전·후 빌드 짝으로 판정해 엔진 퇴행 1건(8d8c24b7c198)을 확정했다. 핀 뒤 손 변경 16행은 덮지 않았다.",
+ "changes": [
+  "docs/player-data/compat.json 재생성",
+  "scripts/playability-census.mjs netWall 프로브 A · 50회",
+  "docs/contracts/featurephone-public-data.md 통신망 한 줄",
+  "docs/report/0430"
+ ],
+ "verification": [
+  "전·후 빌드 짝 재측 22행(input 9 · longplay 4 · sound 9)",
+  "전수 selftest 52/52 · 문턱 되돌리면 red",
+  "player-data OK"
+ ],
+ "limits": [
+  "진도는 표본 70 · 재사용 67행",
+  "speed 재사용 75행 · sound 재사용 9행",
+  "load1 5~252"
+ ],
+ "proposals": [
+  {
+   "kind": "product",
+   "title": "KTF 8d8c24b7c198 — 두 핀 사이에 생긴 플레이 중 종료를 이분 탐색으로 찾아 되돌린다",
+   "plainSummary": "KTF 게임 하나가 예전 엔진에서는 10분 넘게 잘 되던 것이, 지금 엔진에서는 10분 안에 오류로 꺼집니다. 그 사이에 들어간 엔진 변경 중 하나가 원인입니다.",
+   "userBenefit": "8d8c24b7c198 가 다시 오래 플레이해도 꺼지지 않는다(playable 로 복귀).",
+   "why": "0430 §3-2 실측: 전 빌드 bd2337ff 600초 생존 2/2 · 후 빌드 4ac38566 600초 안에 Java 예외로 FAIL 3/3(키 631~658 근처).",
+   "tradeoff": "두 핀 사이 커밋이 많아 이분 탐색에 빌드가 여러 번 든다. 원인 커밋이 다른 게임을 고친 변경이면 되돌리지 말고 그 경로만 손봐야 한다.",
+   "effort": "S",
+   "target": "wie-ktf(이분 탐색 bd2337ff..4ac38566)"
+  }
+ ]
+}
