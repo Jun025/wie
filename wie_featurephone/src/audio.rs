@@ -62,7 +62,7 @@ const RESIDENT_SEQUENCES: usize = 32;
 /// the file is handed to the worklet. Every MIDI play of the session renders through the soundfont,
 /// the first included: the worklet holds a play until it can (bounded — see `HOLD_MAX_MS` there).
 /// Until 2026-10-04 the fetch started after the first `Play`, so each song's first play was FM and
-/// its next the soundfont (docs/report 0438). Any failure — fetch, HTTP status, prelude load, parse —
+/// its next the soundfont (docs/report 0440). Any failure — fetch, HTTP status, prelude load, parse —
 /// is posted as `sfoff` and makes the whole session FM, which is what no URL means too. The worklet
 /// module is byte-for-byte the same URL or not; only the prelude waits for the file.
 pub struct WebAudioSink {

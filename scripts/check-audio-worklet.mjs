@@ -349,7 +349,7 @@ if (!haveDeps || !existsSync(soundfontPath)) {
     );
   }
 
-  // 12. One synth per session (docs/report 0438). In a session told a soundfont is coming (`sfwait`),
+  // 12. One synth per session (docs/report 0440). In a session told a soundfont is coming (`sfwait`),
   //     a MIDI play that arrives before the soundfont parsed is HELD, not played on FM, and starts on
   //     the soundfont once it has parsed and its samples are decoded. A play of an instrument not
   //     decoded yet is held the same way while exactly the samples its notes reach are decoded — one

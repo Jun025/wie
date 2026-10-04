@@ -33,7 +33,7 @@
 //
 // ONE SYNTH PER SESSION: in a session told a soundfont is coming (`sfwait`), every MIDI play renders
 // through it, the first included — until 2026-10-04 a song's first play was FM and its next one the
-// soundfont, which players heard as the song changing instruments (docs/report 0438). So a MIDI play
+// soundfont, which players heard as the song changing instruments (docs/report 0440). So a MIDI play
 // that cannot start on the soundfont yet is HELD — not played on FM — until the soundfont has parsed,
 // the samples its notes reach are decoded, and a synth is free; its samples go to the front of the
 // work queue. The hold is bounded by HOLD_MAX_MS. If the soundfont has not parsed by then, or it fails
@@ -92,14 +92,14 @@ const WORK_REST = 2;
 // While nothing sounds — no playback, voice or synth, only plays held for the soundfont — a stall
 // cannot be heard, so work runs back to back for up to this long per `process()` and does not rest.
 // A held play is otherwise as slow to start as one item per rest makes it, and a game that stops a
-// short sound before it starts loses that sound entirely (docs/report 0438 measured 56 such plays
+// short sound before it starts loses that sound entirely (docs/report 0440 measured 56 such plays
 // in 38 titles with one item per rest, against 7 without holding).
 const SILENT_WORK_MS = 10;
 // The longest a MIDI play is held for the soundfont (see the header). It covers what a held play
 // waits for on a slow device — prelude evaluation, parse (median 90 ms, max 187 ms on the Android
 // emulator — docs/report 0360) and decoding the samples of a song, one per rest — with the fetch
 // already started at boot. Past it the session gives up the soundfont rather than mix synths.
-// docs/report 0438 has the measured holds behind the number.
+// docs/report 0440 has the measured holds behind the number.
 const HOLD_MAX_MS = 3000;
 
 // One patch per GM family (program >> 3). ratio/index: FM modulator; idecay: modulator index
