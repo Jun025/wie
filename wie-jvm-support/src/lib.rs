@@ -162,6 +162,21 @@ mod tests {
         })
     }
 
+    /// The test above locks what `finish_launch` does; this one locks that every carrier's launch
+    /// ends through it. Their start functions need a whole guest to run, and only J2ME has one in
+    /// `cargo test`, so this reads the source: put a launch back to `Ok(())` and it goes red.
+    #[test]
+    fn every_carrier_launch_ends_through_finish_launch() {
+        for (carrier, source) in [
+            ("skt", include_str!("../../wie-skt/src/emulator.rs")),
+            ("j2me", include_str!("../../wie-j2me/src/emulator.rs")),
+            ("ktf", include_str!("../../wie-ktf/src/emulator.rs")),
+            ("lgt", include_str!("../../wie-lgt/src/emulator.rs")),
+        ] {
+            assert_eq!(source.matches("JvmSupport::finish_launch(&jvm, ").count(), 1, "{carrier}");
+        }
+    }
+
     /// `java.class.path` is split by `java.io.File.pathSeparator`, so the constant we build it
     /// with has to be the one the runtime splits with. Getting this wrong breaks class loading
     /// **only on the platform whose separator differs**, which is exactly the kind of bug a
