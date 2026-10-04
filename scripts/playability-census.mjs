@@ -683,9 +683,12 @@ const lockVerdict = (lock, runs) => (lock === 'drm' || (lock === 'phone' && quit
 // connect call and 29 of them play — they connect once (at most 5 times a run) and go on. A title
 // that cannot go on keeps asking: f44271803135 retried 99 times in a 30 s probe. Two more that read
 // as «network» on screen were engine walls with the data already shipped (docs/report/0414).
+// Only the 30 s probe A counts, and 50 is the line: the 600 s key loop reconnects in titles that
+// play (wave6 at pin 4ac38566 · L 66 · 66 · 29 · 28 in four of them), and a live title can ask 21
+// times while starting, against the wall's 100 (docs/report/0432).
 const NET_KO = '게임을 시작하려면 옛 통신사 서버에서 데이터를 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.';
 const NET_CONNECT = /MC_netConnect|MC_netSocketConnect|MC_netHttpConnect|Network::connect\(/g;
-const netWall = (stderrs) => stderrs.some((text) => (text.match(NET_CONNECT) ?? []).length >= 20);
+const netWall = (probeA) => (probeA.match(NET_CONNECT) ?? []).length >= 50;
 
 // NFC: macOS hands back file names decomposed (NFD), and PR titles are composed.
 const displayTitle = (p) =>
@@ -812,9 +815,9 @@ if (cmd === 'selftest') {
       ['the check that quit before painting is a lock', lockVerdict('phone', [quit, { stop: 'deadline', paints: 0 }]) === 'phone'],
       ['the check in a title that keeps running is not', lockVerdict('phone', [quit, { stop: 'deadline', paints: 3 }]) === null],
       ['the check that paints its refusal and quits is a lock', lockVerdict('phone', [{ stop: 'clean exit', paints: 7 }, { stop: 'clean exit', paints: 8 }]) === 'phone'],
-      ['a connect retried 20 times is a network wall', netWall(['', 'WARN stub MC_netConnect(0x1, 0xa)\n'.repeat(20)])],
-      ['a connect made once and passed is not', !netWall(['WARN stub MC_netConnect(0x1, 0xa)\n'.repeat(5), 'Network::connect()'])],
-      ['a Java connect loop counts too', netWall(['stub org.kwis.msf.io.Network::connect()\n'.repeat(20)])],
+      ['a connect retried 50 times in the probe is a network wall', netWall('WARN stub MC_netConnect(0x1, 0xa)\n'.repeat(50))],
+      ['a title asking 21 times while it starts is not', !netWall('WARN stub MC_netConnect(0x1, 0xa)\n'.repeat(21))],
+      ['a Java connect loop counts too', netWall('stub org.kwis.msf.io.Network::connect()\n'.repeat(50))],
       ['the check in a title that crashed is not', lockVerdict('phone', [{ stop: 'error', paints: 0 }, { stop: 'error', paints: 0 }]) === null],
     );
     rmSync(tmp, { recursive: true, force: true });
@@ -922,7 +925,8 @@ if (cmd === 'run') {
     if (!j) continue;
     const title = displayTitle(t.path);
     const platform = j.A.platform && j.A.platform !== 'unknown' ? j.A.platform.toUpperCase() : sniffPlatform(t.path);
-    const net = netWall(['A', 'L'].map((p) => join(out, t.sha, `${p}.stderr`)).filter(existsSync).map((f) => readFileSync(f, 'latin1')));
+    const probeA = join(out, t.sha, 'A.stderr');
+    const net = existsSync(probeA) && netWall(readFileSync(probeA, 'latin1'));
     // A locked file says only that: the other lines would read as «not fixed yet». Its status is never
     // better than not-yet — a check that paints its refusal box would otherwise read as playable.
     const lock = lockVerdict(lockOf(t.path), [j.A, j.B]);
