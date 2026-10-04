@@ -161,7 +161,7 @@ mod test {
 
     #[test]
     fn notify_destroyed_exits_and_never_returns_to_the_guest() -> Result<()> {
-        // 로디아전기 (d3e3b16cefd0) calls notifyDestroyed from its game loop; when the call returned,
+        // d3e3b16cefd0 calls notifyDestroyed from its game loop; when the call returned,
         // the loop read the field its destroyApp had just nulled and the thread died on a
         // NullPointerException. The program is gone on a handset — the caller does not come back.
         let exited = Arc::new(AtomicBool::new(false));

@@ -131,10 +131,9 @@ impl Executor {
     }
 
     /// Stop polling tasks, from the task that is running now on. A program that exits is gone on a
-    /// handset — no thread of it runs again — but here the other tasks went on being polled for the
-    /// rest of the tick. 로디아전기 nulls its canvas field in `destroyApp`, calls `notifyDestroyed`,
-    /// and its game thread then read the field 2ms later and died on a NullPointerException
-    /// (d3e3b16cefd0). Tasks are kept, not dropped: dropping them is `clear`'s, the host's call.
+    /// handset — no thread of it runs again — but here every other task went on being polled for
+    /// the rest of the tick. The task that asked is not stopped by this; see
+    /// `System::exit_from_guest`. Tasks are kept, not dropped: dropping them is `clear`'s, the host's.
     pub fn halt(&self) {
         self.inner.lock().halted = true;
     }
@@ -379,9 +378,8 @@ mod tests {
 
     #[test]
     fn test_halt_stops_every_task_including_later_ones_in_the_same_step() {
-        // 로디아전기 (d3e3b16cefd0): the main thread exits, and the game thread — spawned later, so
-        // polled after it in the same step — must not run again. Without `halt` it read a field
-        // `destroyApp` had just nulled and died on a NullPointerException.
+        // One thread exits; another — spawned later, so polled after it in the same step — must not
+        // run again, in this tick or any later one.
         let mut executor = Executor::new();
         let after_exit = Arc::new(AtomicU64::new(0));
 

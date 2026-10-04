@@ -209,7 +209,7 @@ impl System {
 
     /// [`exit`](Self::exit) from a guest thread, which then never returns to the guest either.
     /// `halt` stops the other threads but cannot stop the one that called, and that one goes on
-    /// until it next yields: 로디아전기 (d3e3b16cefd0) calls `notifyDestroyed` from its game loop,
+    /// until it next yields: d3e3b16cefd0 calls `notifyDestroyed` from its game loop,
     /// returns into the loop, and dies reading the field its `destroyApp` just nulled.
     pub async fn exit_from_guest<T>(&self) -> T {
         self.exit();

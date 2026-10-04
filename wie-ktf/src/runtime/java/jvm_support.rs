@@ -646,7 +646,7 @@ mod test {
 
     #[test]
     fn test_array_classes_carry_object_vtable() -> Result<()> {
-        // 심시티 (6c9f969f089f) calls equals(Object) on an int[] through the class's vtable; an array
+        // 6c9f969f089f calls equals(Object) on an int[] through the class's vtable; an array
         // class with none sent it to address 0. Each array class also needs its own vtable slot:
         // with a null vtable pointer every one of them took the index the next class then reused.
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
