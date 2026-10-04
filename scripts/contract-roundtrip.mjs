@@ -738,7 +738,7 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     //   S4  URL that 404s — warned, FM for every play, no prelude, no error
     //   S5  (in S3's run) an instrument not decoded yet — its first play waits, then is the soundfont
     //   S6  URL whose body takes longer than the worklet's HOLD_MAX_MS — FM for every play
-    // S3, S5 and S6 are the session invariant of docs/report 0440: one synth per session, from the
+    // S3, S5 and S6 are the session invariant of docs/report 0441: one synth per session, from the
     // first play of each song (until 2026-10-04 a song's first play was FM and its next the soundfont).
     const log = [];
     const t0 = performance.now();
