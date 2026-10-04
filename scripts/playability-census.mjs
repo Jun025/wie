@@ -197,6 +197,7 @@ function validate(args, killAfterSecs, stderrPath) {
     let stdout = '';
     const tail = [];
     let warns = 0;
+    let nets = 0;
     let partial = '';
     child.stdout.on('data', (b) => (stdout += b));
     child.stderr.on('data', (b) => {
@@ -204,6 +205,7 @@ function validate(args, killAfterSecs, stderrPath) {
       partial = lines.pop();
       for (const l of lines) {
         if (/\bWARN\b|panicked/.test(l)) warns++;
+        nets += (l.match(NET_CONNECT) ?? []).length; // the whole stream: the tail below keeps 200 lines
         tail.push(l);
         if (tail.length > 200) tail.shift();
       }
@@ -223,6 +225,7 @@ function validate(args, killAfterSecs, stderrPath) {
       }
       r.rc = code;
       r.stderr_warns = warns;
+      r.net_connects = nets;
       r.load1 = loadavg()[0];
       done(r);
     });
@@ -681,14 +684,28 @@ const lockVerdict = (lock, runs) => (lock === 'drm' || (lock === 'phone' && quit
 // says so in the player's words, and `status` stays where the title really gets to (at most limited).
 // The rule is the run, not the code: measured 2026-10-02 on the bd2337ff census, 30 titles reach a
 // connect call and 29 of them play — they connect once (at most 5 times a run) and go on. A title
-// that cannot go on keeps asking: f44271803135 retried 99 times in a 30 s probe. Two more that read
+// that cannot go on keeps asking: f44271803135 retried 416 to 2,463 times in a 30 s probe. Two more that read
 // as «network» on screen were engine walls with the data already shipped (docs/report/0414).
-// Only the 30 s probe A counts, and 50 is the line: the 600 s key loop reconnects in titles that
-// play (wave6 at pin 4ac38566 · L 66 · 66 · 29 · 28 in four of them), and a live title can ask 21
-// times while starting, against the wall's 100 (docs/report/0432).
+// Only the 30 s probe A counts: the 600 s key loop reconnects in titles that play (wave6 at pin
+// 4ac38566 · L 66 · 66 · 29 · 28 in four of them) (docs/report/0432).
+// The count is every connect line of the probe (`net_connects`, counted by validate() over the whole
+// stream). Until 2026-10-04 it was read off A.stderr, which keeps only the last 200 lines — a density,
+// not a count: the wall read 100 of its 2,463, and a wall logging 4+ other lines per retry would have
+// read < 50. A probe recorded before the field falls back to `stub_hits.first` (the real count, but
+// only for a top-5 stub — the wall's is) or that tail, whichever is larger; both are lower bounds.
+// The count moves with host load: a 30 s window holds as many retries as the machine lets it run. The
+// wall asked 2,438 and 2,463 times alone (load1 10–24) but 416–1,005 in the seven real censuses on disk
+// (load1 160–630, 416 at the lowest). The busiest live title asked 21, 25, 33, 34 and 113 times alone
+// and ≤ 2 in those censuses, so the old 50 would flag it one run in five. 200 is the line: 1.8× over
+// 113, 2.1× under 416 — and on all ten censuses on disk it flags the same titles the 50-line tail did
+// (500 missed the wall at 416). Reopen if a title lands in 113–416 (docs/report/0433).
 const NET_KO = '게임을 시작하려면 옛 통신사 서버에서 데이터를 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.';
 const NET_CONNECT = /MC_netConnect|MC_netSocketConnect|MC_netHttpConnect|Network::connect\(/g;
-const netWall = (probeA) => (probeA.match(NET_CONNECT) ?? []).length >= 50;
+const tailConnects = (text) => (text.match(NET_CONNECT) ?? []).length;
+const stubConnects = (A) => (A.stub_hits?.first ?? []).filter((x) => /MC_net(Socket|Http)?Connect$|Network::connect$/.test(x.name)).reduce((n, x) => n + x.count, 0);
+const netConnects = (A, stderrPath) =>
+  A.net_connects ?? Math.max(stubConnects(A), existsSync(stderrPath) ? tailConnects(readFileSync(stderrPath, 'latin1')) : 0);
+const netWall = (connects) => connects >= 200;
 
 // NFC: macOS hands back file names decomposed (NFD), and PR titles are composed.
 const displayTitle = (p) =>
@@ -815,10 +832,32 @@ if (cmd === 'selftest') {
       ['the check that quit before painting is a lock', lockVerdict('phone', [quit, { stop: 'deadline', paints: 0 }]) === 'phone'],
       ['the check in a title that keeps running is not', lockVerdict('phone', [quit, { stop: 'deadline', paints: 3 }]) === null],
       ['the check that paints its refusal and quits is a lock', lockVerdict('phone', [{ stop: 'clean exit', paints: 7 }, { stop: 'clean exit', paints: 8 }]) === 'phone'],
-      ['a connect retried 50 times in the probe is a network wall', netWall('WARN stub MC_netConnect(0x1, 0xa)\n'.repeat(50))],
-      ['a title asking 21 times while it starts is not', !netWall('WARN stub MC_netConnect(0x1, 0xa)\n'.repeat(21))],
-      ['a Java connect loop counts too', netWall('stub org.kwis.msf.io.Network::connect()\n'.repeat(50))],
+      ['the wall under census load (416 connects) is a network wall', netWall(tailConnects('WARN stub MC_netConnect(0x1, 0xa)\n'.repeat(416)))],
+      ['a live title asking 113 times while it starts is not', !netWall(tailConnects('WARN stub MC_netConnect(0x1, 0xa)\n'.repeat(113)))],
+      ['a Java connect loop counts too', netWall(tailConnects('stub org.kwis.msf.io.Network::connect()\n'.repeat(416)))],
+      ['a probe recorded with net_connects is read by it, not by its tail', netConnects({ net_connects: 2463 }, '/nonexistent') === 2463],
+      ['an older probe is read off stub_hits, whose count is the whole run', netWall(netConnects({ stub_hits: { first: [{ name: 'MC_netConnect', count: 2463 }] } }, '/nonexistent'))],
       ['the check in a title that crashed is not', lockVerdict('phone', [{ stop: 'error', paints: 0 }, { stop: 'error', paints: 0 }]) === null],
+    );
+    rmSync(tmp, { recursive: true, force: true });
+  }
+  // netWall through validate(): a wall that logs four other stubs per retry has 600 connects, but
+  // only 40 of them in the 200-line tail the old reading counted — under any line it could hold.
+  {
+    const tmp = join('/tmp', `wie-census-netwall-${process.pid}`);
+    rmSync(tmp, { recursive: true, force: true });
+    mkdirSync(tmp, { recursive: true });
+    const bin = join(tmp, 'fake.sh');
+    const retry = 'WARN stub MC_netConnect(0x1, 0xa)\\n' + 'WARN stub unk12-1\\n'.repeat(4);
+    writeFileSync(bin, `#!/bin/sh\ni=0; while [ $i -lt 600 ]; do printf '${retry}' >&2; i=$((i+1)); done\necho '{"result":"PASS","paints":1}'\n`, { mode: 0o755 });
+    const keep = opt.bin;
+    opt.bin = bin;
+    const r = await validate([], 30, join(tmp, 'A.stderr'));
+    opt.bin = keep;
+    const tail = tailConnects(readFileSync(join(tmp, 'A.stderr'), 'latin1'));
+    cases.push(
+      ['a wall with four stubs per retry has 40 connects in its tail — under the line', tail === 40 && !netWall(tail)],
+      ['and validate() counts all 600 of them, so it is a wall', r.net_connects === 600 && netWall(netConnects(r, join(tmp, 'A.stderr')))],
     );
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -925,8 +964,7 @@ if (cmd === 'run') {
     if (!j) continue;
     const title = displayTitle(t.path);
     const platform = j.A.platform && j.A.platform !== 'unknown' ? j.A.platform.toUpperCase() : sniffPlatform(t.path);
-    const probeA = join(out, t.sha, 'A.stderr');
-    const net = existsSync(probeA) && netWall(readFileSync(probeA, 'latin1'));
+    const net = netWall(netConnects(j.A, join(out, t.sha, 'A.stderr')));
     // A locked file says only that: the other lines would read as «not fixed yet». Its status is never
     // better than not-yet — a check that paints its refusal box would otherwise read as playable.
     const lock = lockVerdict(lockOf(t.path), [j.A, j.B]);
