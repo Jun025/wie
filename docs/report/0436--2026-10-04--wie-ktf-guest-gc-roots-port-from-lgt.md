@@ -100,3 +100,5 @@
 ### 9. 유입
 
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 64회 / 31쌍 · SUFFIX-ATTACHED 5회 / 3쌍. 전부 이 회차가 고친 파일에 **이미 있던** 줄(`wie-ktf` `interface.rs`·`jvm_support.rs`, `wie-lgt` `interface.rs`·`jvm_support.rs` 등의 기존 주석·시험 행)이다. SUFFIX-ATTACHED 3쌍은 더 긴 다른 제목이다. 이 회차가 더한 줄의 게임 이름은 0이다(`git diff origin/main...HEAD` 의 `+` 줄 대조).
+
+<!-- corpus-name-inflow v1 subjects=26 tree=54f4bfcc6df386da B=64/31 P=10/2 S=5/3 -->
