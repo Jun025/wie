@@ -361,6 +361,13 @@ vtable = [
 name = "java/util/Calendar"
 vtable = [
     { name = "get", descriptor = "(I)I", index = 19 },
+    # 73f3a21e981c builds a date at 0x5b9c0 (binary.mod, objdump --triple=armv5te, read 2026-10-05):
+    # four calls through word 0x74 = index 28 with (1, y) (2, m - 1) (5, d) (10, 0) — YEAR MONTH
+    # DAY_OF_MONTH HOUR, the only two-int method here being set(II)V — then one through word 0x5c =
+    # index 22 with no arguments whose result is null-checked and kept: getTime(). Its game thread
+    # died on 28, then (with 28 written) on 22.
+    { name = "getTime", descriptor = "()Ljava/util/Date;", index = 22 },
+    { name = "set", descriptor = "(II)V", index = 28 },
     { name = "setTime", descriptor = "(Ljava/util/Date;)V", index = 29 },
 ]
 

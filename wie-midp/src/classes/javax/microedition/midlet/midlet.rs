@@ -100,7 +100,7 @@ impl MIDlet {
     async fn notify_destroyed(_jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("javax.microedition.midlet.MIDlet::notifyDestroyed({this:?})");
 
-        context.system().platform().exit();
+        context.system().exit();
 
         Ok(())
     }

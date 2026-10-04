@@ -644,6 +644,48 @@ mod test {
         Ok(())
     }
 
+    #[test]
+    fn test_array_classes_carry_object_vtable() -> Result<()> {
+        // 심시티 (6c9f969f089f) calls equals(Object) on an int[] through the class's vtable; an array
+        // class with none sent it to address 0. Each array class also needs its own vtable slot:
+        // with a null vtable pointer every one of them took the index the next class then reused.
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let mut system_clone = system.clone();
+        system.spawn(async move || {
+            let (jvm, mut core) = init_jvm(&mut system_clone).await?;
+
+            let mut indexes = Vec::new();
+            for name in ["[I", "[B"] {
+                let class = jvm.resolve_class(name).await.unwrap();
+                let class = class
+                    .definition
+                    .as_any()
+                    .downcast_ref::<super::JavaArrayClassDefinition>()
+                    .unwrap()
+                    .class
+                    .clone();
+                let vtable = super::vtable::JavaVtable::from_raw(&core, class.ptr_vtable()?);
+                assert_ne!(class.ptr_vtable()?, 0, "{name} has no vtable");
+                assert!(
+                    vtable.find_method("equals", "(Ljava/lang/Object;)Z")?.is_some(),
+                    "{name} vtable lacks equals"
+                );
+                indexes.push(KtfJvmSupport::get_vtable_index(&mut core, &class)?);
+            }
+            assert_ne!(indexes[0], indexes[1]);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+        Ok(())
+    }
+
     // A class the jar also ships as bytecode comes from client.bin; every other class stays parent-first.
     #[test]
     fn test_load_class_prefers_client_bin_over_jar_bytecode() -> Result<()> {

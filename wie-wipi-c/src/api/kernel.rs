@@ -341,7 +341,7 @@ pub async fn get_free_memory(_context: &mut dyn WIPICContext) -> Result<i32> {
 pub async fn exit(context: &mut dyn WIPICContext, code: i32) -> Result<()> {
     tracing::debug!("MC_knlExit({code})");
 
-    context.system().platform().exit();
+    context.system().exit();
 
     Ok(())
 }

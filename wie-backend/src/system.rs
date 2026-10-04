@@ -200,6 +200,13 @@ impl System {
         self.platform.as_ref().as_ref()
     }
 
+    /// The program exits: none of its threads runs again (see [`Executor::halt`]), then the host
+    /// is told. Every guest exit path goes through here, not `platform().exit()` directly.
+    pub fn exit(&self) {
+        self.executor.halt();
+        self.platform.exit();
+    }
+
     pub fn audio(&self) -> RwLockWriteGuard<'_, Audio> {
         self.audio.as_ref().write()
     }

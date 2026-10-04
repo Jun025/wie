@@ -2224,6 +2224,9 @@ pub(crate) mod tests {
                 ("java/io/PrintStream", 27, "println", "(Z)V"),
                 // 73f3a21e981c (call site disassembled 2026-10-02)
                 ("java/lang/String", 12, "getChars", "(II[CI)V"),
+                // 73f3a21e981c — Calendar's rows, dispatched on a GregorianCalendar (call site disassembled 2026-10-05)
+                ("java/util/GregorianCalendar", 22, "getTime", "()Ljava/util/Date;"),
+                ("java/util/GregorianCalendar", 28, "set", "(II)V"),
             ] {
                 let class = jvm.resolve_class(class_name).await.unwrap();
                 let definition = class.definition.as_any().downcast_ref::<super::JavaClassDefinition>().unwrap().clone();

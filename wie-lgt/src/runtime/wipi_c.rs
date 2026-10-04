@@ -608,7 +608,7 @@ async fn unk11(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u
 async fn terminate_program(context: &mut dyn WIPICContext, code: i32) -> Result<()> {
     tracing::debug!("LGT WIPIC terminate_program({code})");
 
-    context.system().platform().exit();
+    context.system().exit();
 
     Ok(())
 }
