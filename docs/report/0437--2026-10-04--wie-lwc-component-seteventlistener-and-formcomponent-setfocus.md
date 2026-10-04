@@ -73,3 +73,5 @@
 ### 유입
 
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 2회 / 2쌍 · SUFFIX-ATTACHED 0회 / 0쌍. 둘 다 이 회차가 고친 파일(`shell_card.rs` · `component.rs`)에 **이미 있던** 주석 줄이다. 이 회차가 더한 줄의 게임 이름은 0이다(`git diff origin/main...HEAD` 의 `+` 줄 대조).
+
+<!-- corpus-name-inflow v1 subjects=8 tree=2a8209ebdd8b33e0 B=2/2 P=2/1 S=0/0 -->
