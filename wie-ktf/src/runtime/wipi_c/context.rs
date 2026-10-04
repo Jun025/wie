@@ -273,4 +273,21 @@ mod test {
             })
         })
     }
+
+    // Database slot 11 is free storage in bytes, not the header's `MC_dbGetRecordSize(fd)`: its callers
+    // pass nothing and keep a save only when the answer is at least the save's length.
+    #[test]
+    fn database_slot_11_answers_free_storage() -> Result<()> {
+        run(|mut context| {
+            Box::pin(async move {
+                let slot11 = get_method_body(WIPICTableId::Database, 11).unwrap();
+                let slot12 = get_method_body(WIPICTableId::Database, 12).unwrap();
+                let free = slot11.call(&mut context, Box::new([0; 4])).await?.results[0] as i32;
+                assert_eq!(free, slot12.call(&mut context, Box::new([])).await?.results[0] as i32);
+                assert!(free > 0x176f, "a boot check reads {free} as «not enough storage»");
+
+                Ok(())
+            })
+        })
+    }
 }
