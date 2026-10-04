@@ -89,3 +89,7 @@ wave5 규칙(A 또는 L 에서 20회 이상)을 이 핀에 대면 **playable 5�
 4. `node scripts/player-data.mjs` OK(429 · 388/24/17).
 - 이용자 소식은 «엔진 변경으로 상태가 실제로 바뀐» 2종(not-yet → playable · `b1ec149b354c` `87b04639cdfe`)만 냈다.
 - limited → playable 16 은 원인을 행마다 귀속하지 못했다. 측정 갱신으로 두고 소식은 내지 않았다(wave3 선례).
+
+### 8. 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 330쌍 + SUFFIX-ATTACHED 15쌍. 전부 `compat.json` 의 기존 제목 값이다(재생성 전후로 제목 문자열 차이 0). 그 밖 파일 0. 타이틀은 sha12 로만 적었다.
