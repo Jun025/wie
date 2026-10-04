@@ -96,3 +96,7 @@
 ### 8. 후속
 
 없음 — 아래 회신에 적은 한계(게스트 malloc 블록)는 관측된 결함이 없다.
+
+### 9. 유입
+
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 64회 / 31쌍 · SUFFIX-ATTACHED 5회 / 3쌍. 전부 이 회차가 고친 파일에 **이미 있던** 줄(`wie-ktf` `interface.rs`·`jvm_support.rs`, `wie-lgt` `interface.rs`·`jvm_support.rs` 등의 기존 주석·시험 행)이다. SUFFIX-ATTACHED 3쌍은 더 긴 다른 제목이다. 이 회차가 더한 줄의 게임 이름은 0이다(`git diff origin/main...HEAD` 의 `+` 줄 대조).
