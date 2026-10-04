@@ -30,5 +30,6 @@
       "effort": "S",
       "target": "wie-wipi-java/src/classes/org/kwis/msp/lwc"
     }
-  ]
+  ],
+  "adoptedProposals": ["2026-10-04-census-wave6-recensus#p0"]
 }
