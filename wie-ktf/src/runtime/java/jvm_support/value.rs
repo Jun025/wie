@@ -20,6 +20,7 @@ impl JavaValueCodec {
 
 impl NativeJavaValueCodec for JavaValueCodec {
     fn object_from_raw(&self, raw: u32) -> Option<Box<dyn ClassInstance>> {
+        wie_jvm_support::guest_roots::stress_check(self.core.id(), raw);
         let instance = JavaClassInstance::from_raw(raw, &self.core);
         // Same gate as LGT: reading the class is the liveness check, and the last frame where the
         // failure still has somewhere to go. No KTF title is known to reach it — this carrier is

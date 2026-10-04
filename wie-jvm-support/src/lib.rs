@@ -3,6 +3,7 @@ extern crate alloc;
 
 mod context;
 mod declared_field;
+pub mod guest_roots;
 mod hardening;
 mod jvm_implementation;
 pub mod native;

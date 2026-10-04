@@ -4,6 +4,7 @@ mod class_definition;
 mod class_instance;
 mod classes;
 mod field;
+mod guest_roots;
 mod jvm_implementation;
 mod method;
 mod name;
@@ -92,6 +93,7 @@ impl KtfJvmSupport {
         let protos = [wie_wipi_java::get_protos().into(), wie_midp::get_protos().into()];
         let jvm_implementation = KtfJvmImplementation::new(core);
         let jvm = JvmSupport::new_jvm(system, jar_name, Box::new(protos), &[], jvm_implementation.clone()).await?;
+        guest_roots::install(&jvm, core);
         register_java_interface_svc_handler(core, &jvm)?;
 
         let system_class_loader: Box<dyn ClassInstance> = jvm
@@ -1238,6 +1240,140 @@ mod test {
             }
         }
 
+        Ok(())
+    }
+
+    // A context in which no guest register points anywhere: what survives a collection is then what
+    // the guest roots it is given, plus the jvm's own roots.
+    fn clear_guest_registers(core: &mut ArmCore) {
+        let mut context = core.save_context();
+        (context.r0, context.r1, context.r2, context.r3, context.r4, context.r5, context.r6) = (0, 0, 0, 0, 0, 0, 0);
+        (context.r7, context.r8, context.sb, context.sl, context.fp, context.ip, context.lr) = (0, 0, 0, 0, 0, 0, 0);
+        core.restore_context(&context);
+    }
+
+    // 8d8c24b7c198: the `String` a host method made for the guest is garbage once the guest drops it.
+    // Without a frame per call it was rooted in the frame of the host call the guest code ran under —
+    // for a game loop, one that never returns — and the guest heap ran out after ~7.5 minutes.
+    #[test]
+    fn test_what_a_host_method_made_for_the_guest_is_collected_once_dropped() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let mut system_clone = system.clone();
+        system.spawn(async move || {
+            let (jvm, mut core) = init_jvm(&mut system_clone).await?;
+            let class = jvm.resolve_class("java/lang/String").await.unwrap();
+            let class = class.definition.as_any().downcast_ref::<JavaClassDefinition>().unwrap();
+            let method = class.method("valueOf", "(I)Ljava/lang/String;", true)?.unwrap();
+            let raw: RawJavaMethod = read_generic(&core, method.ptr_raw)?;
+
+            jvm.push_native_frame(); // the long-lived host frame a game loop runs under
+            let ptr_string: u32 = core.run_function(raw.fn_body, &[0, 1234]).await?;
+            let string: Box<dyn jvm::ClassInstance> = Box::new(JavaClassInstance::from_raw(ptr_string, &core));
+            assert_eq!(JavaLangString::to_rust_string(&jvm, &string).await.unwrap(), "1234");
+            drop(string);
+            clear_guest_registers(&mut core);
+
+            jvm.collect_garbage().unwrap();
+            assert!(!Allocator::is_allocated(&core, ptr_string, size_of::<RawJavaClassInstance>() as u32)?);
+            jvm.pop_frame();
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+        Ok(())
+    }
+
+    // The same for the guest's own `new`: `instantiate_class` roots it in the top frame, which the
+    // init SVC now pushes per call.
+    #[test]
+    fn test_a_guest_new_the_guest_dropped_is_collected() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let mut system_clone = system.clone();
+        system.spawn(async move || {
+            let (jvm, mut core) = init_jvm(&mut system_clone).await?;
+            crate::runtime::init::register_init_svc_handler(&mut core, &jvm)?;
+            let java_new = core.make_svc_stub(crate::runtime::SVC_CATEGORY_INIT, crate::runtime::svc_ids::InitSvcId::JavaNew)?;
+            let java_array_new = core.make_svc_stub(crate::runtime::SVC_CATEGORY_INIT, crate::runtime::svc_ids::InitSvcId::JavaArrayNew)?;
+            let class = jvm.resolve_class("java/lang/Object").await.unwrap();
+            let ptr_class = KtfJvmSupport::class_definition_raw(&*class.definition)?;
+
+            jvm.push_native_frame(); // the long-lived host frame a game loop runs under
+            let ptr_object: u32 = core.run_function(java_new, &[ptr_class]).await?;
+            let ptr_array: u32 = core.run_function(java_array_new, &[b'I' as u32, 4]).await?;
+            clear_guest_registers(&mut core);
+
+            jvm.collect_garbage().unwrap();
+            assert!(!Allocator::is_allocated(&core, ptr_object, size_of::<RawJavaClassInstance>() as u32)?);
+            assert!(!Allocator::is_allocated(&core, ptr_array, size_of::<RawJavaClassInstance>() as u32)?);
+            jvm.pop_frame();
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+        Ok(())
+    }
+
+    // The other direction, where a miss is a use-after-free: a guest word keeps its object alive — a
+    // pointer to it, or into its field storage (AOT code may keep only `ptr_fields` or an element
+    // address across a call), or one past that storage's end (a loop's end pointer).
+    #[test]
+    fn test_a_guest_word_into_an_object_keeps_it_alive() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let mut system_clone = system.clone();
+        system.spawn(async move || {
+            let (jvm, mut core) = init_jvm(&mut system_clone).await?;
+            let instance_size = size_of::<RawJavaClassInstance>() as u32;
+            for holder in ["object", "storage", "element", "storage end"] {
+                jvm.push_native_frame();
+                let array = jvm.instantiate_array("I", 4).await.unwrap();
+                let ptr_array = KtfJvmSupport::class_instance_raw(&array);
+                drop(array);
+                jvm.pop_frame();
+                // KTF storage: the vtable-index word, the length, then the elements.
+                let ptr_fields: u32 = read_generic(&core, ptr_array)?;
+                let word = match holder {
+                    "object" => ptr_array,
+                    "storage" => ptr_fields,
+                    "element" => ptr_fields + 8 + 2 * 4,
+                    _ => ptr_fields + 8 + 4 * 4,
+                };
+                clear_guest_registers(&mut core);
+                let mut context = core.save_context();
+                context.r5 = word;
+                core.restore_context(&context);
+
+                jvm.collect_garbage().unwrap();
+                assert!(
+                    Allocator::is_allocated(&core, ptr_array, instance_size)?,
+                    "kept by a guest word at its {holder}"
+                );
+
+                clear_guest_registers(&mut core);
+                jvm.collect_garbage().unwrap();
+                assert!(
+                    !Allocator::is_allocated(&core, ptr_array, instance_size)?,
+                    "freed once that word is gone ({holder})"
+                );
+            }
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
         Ok(())
     }
 }

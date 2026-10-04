@@ -11,7 +11,7 @@ use jvm::{ClassDefinition, ClassInstance, Field, JavaType, JavaValue, Result as 
 use wipi_types::ktf::java::JavaClassInstance as RawJavaClassInstance;
 
 use wie_core_arm::{Allocator, ArmCore};
-use wie_jvm_support::native::NativeJavaValueCodec;
+use wie_jvm_support::{guest_roots, native::NativeJavaValueCodec};
 use wie_util::{ByteRead, ByteWrite, read_generic, write_generic};
 
 use crate::runtime::java::jvm_support::KtfJvmSupport;
@@ -44,6 +44,9 @@ impl JavaClassInstance {
 
         tracing::trace!("Destroying instance at {:#x}", self.ptr_raw);
 
+        guest_roots::untrack(self.core.id(), self.ptr_raw, raw.ptr_fields);
+        guest_roots::stress_poison(&mut self.core, raw.ptr_fields, (field_size + 4) as _);
+        guest_roots::stress_poison(&mut self.core, self.ptr_raw, size_of::<RawJavaClassInstance>());
         Allocator::free(&mut self.core, raw.ptr_fields, (field_size + 4) as _)?;
         Allocator::free(&mut self.core, self.ptr_raw, size_of::<RawJavaClassInstance>() as _)?;
 
@@ -80,6 +83,7 @@ impl JavaClassInstance {
             },
         )?;
         write_generic(core, ptr_fields, (vtable_index * 4) << 5)?;
+        guest_roots::track(core.id(), ptr_raw, size_of::<RawJavaClassInstance>(), ptr_fields, field_size + 4);
 
         tracing::trace!("Instantiate {}, vtable_index {vtable_index:#x} at {ptr_raw:#x}", class.name()?);
 

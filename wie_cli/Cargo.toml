@@ -25,6 +25,7 @@ wie-util = { workspace = true }
 
 wie-core-arm = { workspace = true } # wie_validate reads the SVC stub high-water mark
 wie-j2me = { workspace = true }
+wie-jvm-support = { workspace = true } # wie_validate --gc-stress
 wie-ktf = { workspace = true }
 wie-lgt = { workspace = true }
 wie-skt = { workspace = true }

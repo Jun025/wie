@@ -228,7 +228,7 @@ where
         // it everything landed in the frame of the host call the guest code was running under —
         // for a game loop, one that never returns, so nothing it made was ever collected
         // (1b107b96bf4e). What the guest keeps is rooted by the guest root scan instead.
-        super::guest_roots::stress_collect(&self.jvm, core);
+        wie_jvm_support::guest_roots::stress_collect(&self.jvm, core.id());
         self.jvm.push_native_frame();
         let result = self.proto.body.call(&self.jvm, &mut self.context.clone(), args.into_boxed_slice()).await;
         self.jvm.pop_frame();

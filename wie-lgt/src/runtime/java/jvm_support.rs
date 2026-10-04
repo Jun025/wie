@@ -49,7 +49,7 @@ pub struct LgtJvmSupport;
 impl LgtJvmSupport {
     /// Drop a core's entries from the process-wide per-core tables, as its emulator is dropped.
     pub fn forget_core(core: &ArmCore) {
-        guest_roots::forget(core);
+        wie_jvm_support::guest_roots::forget(core.id());
         JavaHostField::forget_core(core);
     }
 

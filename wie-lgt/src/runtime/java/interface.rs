@@ -16,7 +16,6 @@ use wipi_types::lgt::java::{LgtJavaClass as RawJavaClass, LgtJavaClassDescriptor
 use wie_core_arm::{ArmCore, EmulatedFunction, JumpTo, ResultWriter, SvcId};
 use wie_util::{Result, WieError, read_generic, read_null_terminated_string_bytes, write_generic};
 
-use super::jvm_support::guest_roots;
 use crate::runtime::{
     SVC_CATEGORY_JAVA_SYSTEM,
     java::{
@@ -83,7 +82,7 @@ async fn handle_java_system_svc(
 ) -> Result<JumpTo> {
     let (_, lr) = core.read_pc_lr()?;
     // A frame per call, as for the guest's calls to host methods (`JavaMethodProxy::call`).
-    guest_roots::stress_collect(jvm, core);
+    wie_jvm_support::guest_roots::stress_collect(jvm, core.id());
     jvm.push_native_frame();
     let result: Result<()> = async {
         match JavaSystemSvcId::try_from(id)? {

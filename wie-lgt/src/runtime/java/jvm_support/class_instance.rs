@@ -10,10 +10,10 @@ use jvm_types::FieldAccessFlags;
 use wipi_types::lgt::java::LgtJavaClassInstance as RawJavaClassInstance;
 
 use wie_core_arm::{Allocator, ArmCore};
-use wie_jvm_support::native::NativeJavaValueCodec;
+use wie_jvm_support::{guest_roots, native::NativeJavaValueCodec};
 use wie_util::{ByteRead, ByteWrite, Result, read_generic, write_generic};
 
-use super::{JavaClassDefinition, JavaField, JavaHostField, JavaReferenceField, LgtJvmWord, guest_roots, value::JavaValueCodec};
+use super::{JavaClassDefinition, JavaField, JavaHostField, JavaReferenceField, LgtJvmWord, value::JavaValueCodec};
 
 #[derive(Clone)]
 pub struct JavaClassInstance {
@@ -46,7 +46,7 @@ impl JavaClassInstance {
                 ptr_fields,
             },
         )?;
-        guest_roots::track(core, ptr_raw, ptr_fields, allocated_storage_size);
+        guest_roots::track(core.id(), ptr_raw, size_of::<RawJavaClassInstance>(), ptr_fields, allocated_storage_size);
 
         Ok(Self::from_raw(ptr_raw, core))
     }
@@ -55,7 +55,7 @@ impl JavaClassInstance {
         JavaHostField::forget_instance(&self.core, self.ptr_raw);
         let ptr_fields = self.ptr_fields()?;
         let storage_size = storage_size.max(size_of::<LgtJvmWord>());
-        guest_roots::untrack(&self.core, self.ptr_raw, ptr_fields);
+        guest_roots::untrack(self.core.id(), self.ptr_raw, ptr_fields);
         guest_roots::stress_poison(&mut self.core, ptr_fields, storage_size);
         guest_roots::stress_poison(&mut self.core, self.ptr_raw, size_of::<RawJavaClassInstance>());
         Allocator::free(&mut self.core, ptr_fields, storage_size as u32)?;

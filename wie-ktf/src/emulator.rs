@@ -403,6 +403,7 @@ impl Drop for KtfEmulator {
     fn drop(&mut self) {
         self.system.teardown();
         self.core.teardown();
+        wie_jvm_support::guest_roots::forget(self.core.id());
     }
 }
 
