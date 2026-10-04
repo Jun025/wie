@@ -7,7 +7,7 @@
 
 **왜**: 운영자 지시(2026-09-30 · 10-04). 0432 §6 의 «1씩»·«5»·«2» 행에 주인 티켓이 없었다.
 
-**사용자 영향**: §6 표. 타이틀은 sha12 로만 적는다.
+**사용자 영향**: 지원 현황 388/24/17 → **391/23/15**(playable 3 · not-yet → limited 2). §6 표. 타이틀은 sha12 로만 적는다.
 
 ### 1. 부팅 `unwrap JavaException` 5종 — panic 은 없앴고, 부팅하게 만들지는 못했다
 
@@ -66,31 +66,40 @@
 | `3151fdc167b6` | KTF 커널 36(`MXUserMemInterf` 이름 조회) | 0389 판정 그대로 — 반환 표의 slot0 이후 뜻을 모른다. 이번에 새 근거 없음 |
 | `71d1d8235bd1`(SKT) | `NoClassDefFoundError: m/V3` | 0389 판정 그대로 — `m/V3`·`m/A3`·`m/XO_World` 3D 라이브러리(MBAC/MTRA 렌더러) |
 | `01f05f8231f4`(LGT) | 그림 0 | 미조사. census 경고: LGT wipi_c `unk1`·`unk7`·`unk10`·`unk11` 스텁 · `MC_imHandleInput` 스텁 — 이 중 무엇을 기다리는지 재지 못했다 |
-| `8b899f410f5d` | 검은 화면 | 이미 0435(176폭 상태줄 18행)가 풀었다(그쪽 짝 재측 2/2). compat 행은 그 회차가 갱신하지 않았다 — §6 |
+| `8b899f410f5d` | 검은 화면 | §3 으로 풀렸다 — §6(0435 의 «풀림»은 이 핀 main 에서 재현 안 됨) |
 
-### 6. 전/후 측정 — 잰 것만 적는다
+### 6. 전/후 측정 — 18종 짝 · 고친 5종 장시간 짝
 
-guard rc=0 배치는 01:37~01:45 의 7배치(21회)뿐이었다. 그 뒤 01:46 부터 제출 때까지 guard 는 «saturated/holding/recovering» 이었다(다른 레인의 부하 · idle 0~1%). 그래서 아래 다섯 타이틀만 짝이 있다. 나머지 짝과 장시간 L 은 재지 못했다(§8).
+- 1회차(2026-10-05 01:37~01:45 · guard rc=0 7배치): 5종 짝.
+- 재배차(04:55~06:42 · 스윕 전체를 `build-slot run --long` 한 임대로 · 안쪽 맨 실행 · 동시 ≤3 · 배치마다 guard rc=0): 나머지 13종 A/B 짝 + 장시간 L 5종 × 2빌드.
+- base = `origin/main` `9b4eb62e` · after = `c132e55b`. 그 뒤 커밋은 동작을 바꾸지 않는다(§9 의 `wie_validate` 스레드 · 시험 진단).
 
-| sha12 | 축 | base `9b4eb62e` | after `c132e55b` |
+| sha12 | base | after | compat |
 |---|---|---|---|
-| `3c658a46bbfb` | boot · render · input · sound | ok · ok · **none**(새 프레임 0) · 무음 — A/B 둘 다 `Unimplemented: 11` FAIL · 그림 5 | ok · ok · **ok**(새 프레임 11) · **ok**(midi 234) — 예외 0 · 그림 133/143 |
-| `1d5831e42a8a` | boot | fail — `panic … unwrap() … JavaException` | fail — `tick error … Unsupported KTF client.bin layout`(panic 0) |
-| `13d7e3c21856`(라이브 LGT) | input | ok(새 27) · A PASS | ok(새 14) · A `max-ticks` 15/27 |
-| `1b107b96bf4e`(라이브 LGT) | input | ok(새 25) · `max-ticks` 26/27 | ok(새 25) · `max-ticks` 26/27 |
-| `49ade89578c5`(가드) | input | ok · PASS | ok · PASS |
+| `3c658a46bbfb` | A/B `Unimplemented: 11` FAIL · 그림 5 · L 부팅 FAIL | input ok(새 11) · 소리 ok · **L 600초 생존**(854/900 · 그림 11,559) | limited → **playable** |
+| `4a4d2ac046f7` | A PASS · L 600초 생존 | A PASS · L 600초 생존 | limited → **playable**(longplay `no` 의 근거였던 슬롯 11 벽을 고쳤고, 이 핀 L 이 생존) |
+| `f981d228b757` | A PASS · L 생존 | A PASS · L 생존 | 이미 playable — 변화 없음 |
+| `5267badf20b3` | **boot FAIL**(null 네이티브 점프 · A·L 둘 다) | boot ok · render ok · input none(그림 1~2) · L 생존(그림 2) · 무음 | not-yet → **limited** |
+| `55aadf368b8e` | A input ok · L 생존 | A input ok · L 생존 | limited → **playable**(근거 = 0432 의 null 점프 벽을 §3 이 고쳤고, 이 핀 L 이 생존) |
+| `8b899f410f5d` | A/B 그림 2 · A `max-ticks` 9/27 · input none | **A PASS 27/27 · 그림 556/1004 · input ok(새 27) · 소리 ok** — 로그에 `java_throw_instance` | not-yet → **limited** |
+| `1d5831e42a8a` `83fc429f9cbe` `b907b0faf483` | boot `panic … unwrap()` | boot `tick error … Unsupported KTF client.bin layout`(panic 0) | 변화 없음 |
+| `60bd6cbc5936` `dab2d537f3ef` | boot `panic … unwrap()` | boot `ZipException … EOCD`(panic 0) | 변화 없음(잠김 안내 그대로) |
+| 라이브 LGT 5 · 가드 2 | — | boot·render·input 축 7종 모두 같다 | 변화 없음 |
 
-- 퇴행 0. `13d7e3c21856` 의 «A PASS → `max-ticks`»는 LGT 타이틀이다. 이 변경은 KTF 경로만 바꾼다(DB 표 · `InitParam4` · KTF 부팅). 그래서 퇴행으로 읽지 않았다. 판정 축(boot·render·input)은 같다.
-- `3c658a46bbfb` compat 행: input `no`→`ok` · sound `no`→`ok` · longplay `no`→`unknown`. 종전 `no` 는 30초 프로브의 FAIL 에서 나온 값이었고, 이 핀에서 장시간은 재지 않았다. status 는 `limited` 그대로다.
-- guard «holding» 중에 돌린 비공식 1회(§7 예외)도 방향이 같았다: `1d5831e42a8a`·`60bd6cbc5936` panic → 오류 · `3c658a46bbfb` 그림 5 → 125.
-- **고쳤지만 이 회차에 짝이 없는 것**: `4a4d2ac046f7` `f981d228b757`(슬롯 11 은 저장할 때만 닿는다 — 장시간 L 필요) · `5267badf20b3` `55aadf368b8e`(§3). 근거는 역어셈과 시험뿐이다. 그래서 compat 행·소식에 넣지 않았다.
+- **퇴행 0**:
+  - `13d7e3c21856`(LGT)의 A 가 1회차에서 «PASS → `max-ticks` 15/27» 이었다. 판정 축은 같고, 변경은 KTF 경로뿐이다.
+  - 나머지 6종은 결과·`stop` 까지 같거나 같은 축에서 흔들렸다(`4ece6eeeaa04` `a30bbe008b5e` 는 양쪽 다 `max-ticks`).
+- `8b899f410f5d` 는 0435 가 «풀었다»고 적은 타이틀이다. 그러나 이 핀 main 에서도 그림 2 에서 멈췄다(A·B 둘 다). 이 회차의 `throw e` 서비스가 그 경로를 지난다(after 로그 `java_throw_instance` 1회). ⇒ 0435 의 «풀림»은 이 핀에서 재현되지 않았다. 이 회차의 고침으로 귀속한다.
+- `4a4d2ac046f7` · `55aadf368b8e` 의 base 도 이번 L 에서 생존했다 — 두 벽은 키 시점에 따라 닿기도 하고 안 닿기도 한다(0432 §3-2). 그래서 «base 가 이번엔 죽었다»는 대비가 없다. playable 로 올린 근거는 둘이다: ① 0432 가 실측한 그 벽의 기전을 §2·§3 이 고쳤다 ② after 의 600초 L 이 생존했다.
+- 재측 안 한 축: speed(종전 값 유지) · progress(재지 않음).
 
 ### 7. 측정 조건
 - base = `origin/main` `9b4eb62e` 릴리스 · after = 이 브랜치 `c132e55b` 릴리스.
 - 인자는 census 와 같다. 프로브 A = `--inject --keep-timeout --timeout 30 --relaunch 1 --pacing 8`. B = `… --inject-keys 0 --shot-every 1`. L = `LONG_KEYS` 60회 · 600초 · `--shot-every 20`. 판정도 `judge()` 와 같다(입력 = A 에 B 에 없는 프레임이 있나).
+- 재배차분은 스윕 전체를 `~/orchestrator-live/bin/build-slot run --long` 한 임대로 감쌌고, 안쪽 실행은 맨 명령이다(PR #472 의 규칙).
 - **census 도구를 쓰지 않았다.** 다른 레인의 진도 census 가 호스트 락을 90분 넘게 쥐고 있었다. 대신 `wie_validate` 를 직접 돌렸다. 한 번에 3개 이하 · 모두 `build-slot run` 경유 · 배치마다 `host-load-guard --status --recovered` rc=0 을 기다렸다. 진척은 `~/scratch/w7/progress.log`(로컬).
 - 진도(`progress`) 축은 재지 않았다(§8).
-- 예외: 첫 비공식 한 쌍(30초 A 3타이틀 × 2빌드)은 guard 가 «holding» 일 때 돌렸다. 그 숫자는 §6 표에 쓰지 않았다. `3c658a46bbfb`·`1d5831e42a8a` 는 rc=0 배치에서 다시 쟀다. `60bd6cbc5936` 은 다시 재지 못했다.
+- 예외: 첫 비공식 한 쌍(30초 A 3타이틀 × 2빌드)은 guard 가 «holding» 일 때 돌렸다. 그 숫자는 §6 표에 쓰지 않았다. 세 타이틀 모두 rc=0 배치에서 다시 쟀다(§6).
 
 ### 8. 후속
 
@@ -102,9 +111,38 @@ guard rc=0 배치는 01:37~01:45 의 7배치(21회)뿐이었다. 그 뒤 01:46 �
 | 1 | `01f05f8231f4` LGT 그림 0 | 엔진(스텁 중 무엇을 기다리나) | M |
 | 1 | `3151fdc167b6` 커널 36 표 | 엔진(자료 0) | M~L |
 | 1 | `71d1d8235bd1` SKT 3D | 엔진(3D 렌더러) | L |
+| 1 | GUI 호스트(`wie_cli` 창)의 Windows 주 스레드 스택 여유 — 미측정(검증기는 §9 로 풀렸다) | 호스트 | S |
 
-### 9. 게임 파일명 유입
+### 9. Windows CI 빨간색 — 주 스레드 스택 넘침(재배차에서 고침)
 
-`node scripts/corpus-name-inflow.mjs`: BOUNDED 333쌍 + SUFFIX-ATTACHED 15쌍. 이 회차가 쓴 줄 중 게임 이름은 0이다 — BOUNDED 의 나머지는 `compat.json` 의 기존 제목 값(1행만 값 수정 · 제목 무변경)과, 손댄 `wie-ktf` 세 파일에 이미 있던 주석(이 회차의 `+` 줄 0)이다. 타이틀은 sha12 로만 적었다.
+첫 제출 head `57e6bc02` 는 `rust_ci (windows-latest, stable)` 만 red 였다.
+- push 3번 모두 red(3/3). 같은 시각 main · 다른 PR · Windows beta 는 green.
+- 시험: `wie_cli/tests/validate_profile_out.rs` — 디버그 `wie_validate` 가 JSON 한 줄도 내지 못했다.
 
-<!-- corpus-name-inflow v1 subjects=11 tree=f146b64541716424 B=721/333 P=1/1 S=35/15 -->
+**원인(실측)**: 그 시험이 stderr 를 버리고 있었다. 그래서 종료 상태와 stderr 꼬리를 남기게 하고 다시 돌렸다(`a0362451`):
+`exit code: 0xc00000fd` · `thread 'main' has overflowed its stack` — 키 없는 실행과 `--profile-out` 실행 모두.
+- `wie_validate` 는 에뮬레이터를 **주 스레드**에서 돌렸다.
+- Windows 주 스레드는 1 MiB 고정이다. CI 의 `RUST_MIN_STACK` 은 새로 띄우는 스레드에만 적용된다.
+- §1 의 오류 경로(`to_wie_err` 를 부팅 future 안에서 기다린다)가 그 한도를 넘겼다.
+
+**처음 시도는 틀렸다 — 남긴다.** macOS `ulimit -s` 이분 탐색으로 디버그 부팅의 주 스레드 필요량을 쟀다:
+
+| 빌드 | 필요량 |
+|---|---|
+| main | 1016K |
+| 첫 제출 | 1028K |
+| 오류 서식기 future 를 `Box::pin` 한 판(`2ecc71f0`) | 1016K |
+
+그런데 Windows stable 은 그 판에서도 red 였다. ⇒ macOS 수치는 Windows MSVC 디버그 프레임을 대신하지 못한다. 박스는 되돌렸다.
+
+**고침**: `wie_validate` 가 에뮬레이터를 크기 지정 스레드(8 MiB = macOS/Linux 주 스레드와 같은 값)에서 돌린다.
+- `std::thread::scope` + `spawn_scoped` 를 쓴다. `run()` 의 panic 은 종전처럼 그 안의 `catch_unwind` 가 잡는다. 바깥으로 나온 panic 은 `resume_unwind` 로 그대로 올린다.
+- 이제 주 스레드 한도와 무관하다: macOS `ulimit -s 512` 에서도 PASS(전에는 출력 0).
+- 되돌리면 red = Windows stable 의 위 실패(4 push).
+- GUI 호스트(`wie_cli` 의 창)는 바꾸지 않았다. winit 이 주 스레드를 요구하기 때문이다. 그쪽 Windows 스택은 이 회차가 재지 않았다(§8).
+
+### 10. 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 336쌍 + SUFFIX-ATTACHED 15쌍. 이 회차가 쓴 줄 중 게임 이름은 0이다 — BOUNDED 의 나머지는 `compat.json` 의 기존 제목 값(1행만 값 수정 · 제목 무변경)과, 손댄 `wie-ktf` 세 파일에 이미 있던 주석(이 회차의 `+` 줄 0)이다. 타이틀은 sha12 로만 적었다.
+
+<!-- corpus-name-inflow v1 subjects=14 tree=4f35016eeed2a44c B=725/336 P=1/1 S=35/15 -->
