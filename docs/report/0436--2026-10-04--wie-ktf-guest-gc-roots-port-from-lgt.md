@@ -83,7 +83,7 @@
 - **전수 N=8**(§5 와 같은 170종 · 기본 27키 · 확인 회차는 `--keep-timeout --timeout 90`): 강제 수집 1,073,574회(타이틀당 816 ~ 26,704 · 중앙 4,618) · **`dangling` 0 · `0xdeaddead` 0 · panic 0**. 결과는 PASS 143 · UNMEASURED 26(`clean exit` 16 · `max-ticks` 10) · FAIL 1(`0c67145b11df` — 위 미구현 메서드). `clean exit` 은 키가 «종료» 메뉴에 닿은 게임 자신의 종료이고, 같은 일이 main·브랜치에서도 양방향으로 나온다(스트레스가 느려 키가 다른 화면에 닿는다).
 - 1차(기본 마감 ~20초)에서 FAIL `no frame rendered` 였던 17종은 스트레스가 느려 첫 화면을 못 그린 것이다 — 90초로 다시 재면 모두 그린다.
 - **`keydraw_ktf` N=1**(매 호출 수집): PASS · paints 79 · 수집 6,479 · `dangling` 0.
-- **`8d8c24b7c198` N=4 · 600초**: (아래에 채운다)
+- **`8d8c24b7c198` N=4 · 600초**(§3 과 같은 키): UNMEASURED(853/900 키 · deadline) · paints 2,143 · 강제 수집 104,338 · `dangling` 0 · `0xdeaddead`·panic·게임 스레드 사망 0.
 
 ### 7. 게이트
 

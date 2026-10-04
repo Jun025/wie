@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-04",
+  "kind": "fix",
+  "titles": [
+    "8d8c24b7c198276bc8238a640f85cf2999bb96abc8a9230c9e82418f9774ba69"
+  ],
+  "summary_ko": "오래 하면 7~8분쯤 화면이 굳던 KTF 게임이 이제 메모리가 차지 않아 계속 이어서 할 수 있어요.",
+  "pr": "https://github.com/Jun025/wie/pull/469"
+}
