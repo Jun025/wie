@@ -133,7 +133,8 @@ mod test {
     use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
     use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
     use rustjava_runtime::classes::java::lang::{Object, String};
-    use test_utils::run_jvm_test;
+    use test_utils::{TestPlatform, run_jvm_test, run_jvm_test_with_system};
+    use wie_backend::Platform;
     use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
     use wie_midp::classes::javax::microedition::lcdui::Display as MidpDisplay;
     use wie_util::Result;
@@ -401,6 +402,56 @@ mod test {
                 let _: () = jvm.invoke_virtual(&shell, "org/kwis/msp/lwc/ShellComponent", "hide", "()V", ()).await?;
                 assert_eq!(card_count().await?, 0);
                 assert!(!is_shown().await?);
+
+                Ok(())
+            },
+        )
+    }
+
+    /// A shown status strip takes 24 rows off the top of a 240-wide screen: d1e0badfce82 shows it, then
+    /// makes its Card and sizes a 32-row table by `getHeight() / 10 + 1` — 320 rows overran it on
+    /// every paint. A card made before the strip is shown keeps the whole screen.
+    #[test]
+    fn shown_strip_moves_new_cards_below_it_on_a_240_wide_screen() -> Result<()> {
+        let platform = TestPlatform::new();
+        platform.screen().resize(240, 320)?;
+        let fixture: Box<[WieJavaClassProto]> = Vec::from([TestShell::as_proto(), test_jlet()]).into_boxed_slice();
+        run_jvm_test_with_system(
+            Box::new([wie_midp::get_protos().into(), get_protos().into(), fixture]),
+            Box::new(platform),
+            |jvm, _| async move {
+                let _ = install_display(&jvm, "net/wie/CardCanvas").await?;
+                let display: ClassInstanceRef<Display> = jvm
+                    .invoke_static("org/kwis/msp/lcdui/Display", "getDefaultDisplay", "()Lorg/kwis/msp/lcdui/Display;", [])
+                    .await?;
+                let bounds = |card: ClassInstanceRef<Object>| {
+                    let jvm = jvm.clone();
+                    async move {
+                        let mut v = [0; 3];
+                        for (slot, method) in v.iter_mut().zip(["getY", "getWidth", "getHeight"]) {
+                            *slot = jvm.invoke_virtual::<_, i32>(&card, "org/kwis/msp/lcdui/Card", method, "()I", ()).await?;
+                        }
+                        Ok::<_, jvm::JavaError>(v)
+                    }
+                };
+                let new_card = || {
+                    let jvm = jvm.clone();
+                    async move {
+                        let shell = jvm.new_class("test/TestShell", "()V", ()).await?;
+                        jvm.new_class("net/wie/ShellCard", "(Lorg/kwis/msp/lwc/ShellComponent;)V", (shell,)).await
+                    }
+                };
+
+                assert_eq!(bounds(new_card().await?.into()).await?, [0, 240, 320]);
+
+                let strip = jvm.new_class("org/kwis/msp/lwc/AnnunciatorComponent", "(Z)V", (false,)).await?;
+                let _: () = jvm
+                    .invoke_virtual(&strip, "org/kwis/msp/lwc/AnnunciatorComponent", "show", "()V", ())
+                    .await?;
+
+                let height: i32 = jvm.invoke_virtual(&display, "org/kwis/msp/lcdui/Display", "getHeight", "()I", ()).await?;
+                assert_eq!(height, 296);
+                assert_eq!(bounds(new_card().await?.into()).await?, [24, 240, 296]);
 
                 Ok(())
             },
