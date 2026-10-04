@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-04",
+  "kind": "fix",
+  "titles": [
+    "8b899f410f5d3788763643219d1393bd0d1bbfb86acbd57d5e78dcf06686d26d"
+  ],
+  "summary_ko": "작은 화면 KTF 게임도 위쪽 상태 표시줄 자리를 비운 실제 휴대폰 크기의 화면을 받아요. 검은 화면만 보이던 게임 하나가 이제 그림을 보여 줘요.",
+  "pr": "https://github.com/Jun025/wie/pull/468"
+}
