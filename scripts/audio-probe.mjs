@@ -266,7 +266,7 @@ const RUN = async ({ wasmIdx, gameIdx, gameName, secs, keyMs, keys, statsEvery, 
       for (const n of probe.nodes) n.port.postMessage({ t: "stats" });
       await new Promise((r) => setTimeout(r, 50));
       // No reply = a build older than #352: substitute the handles sent `ev` (see header).
-      seq.push(probe.stats ? { at, sequences: probe.stats.sequences, playbacks: probe.stats.playbacks, voices: probe.stats.voices } : { at, sequences: probe.evHandles.size, substitute: true });
+      seq.push(probe.stats ? { at, sequences: probe.stats.sequences, playbacks: probe.stats.playbacks, voices: probe.stats.voices, held: probe.stats.held, work: probe.stats.work, synths: probe.stats.synths } : { at, sequences: probe.evHandles.size, substitute: true });
     }
     await new Promise((r) => requestAnimationFrame(r));
   }

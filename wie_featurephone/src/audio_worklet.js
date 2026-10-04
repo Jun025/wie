@@ -45,7 +45,8 @@
 // Nothing slow runs inside a message or a play (docs/report 0359 measured a first soundfont play
 // holding the audio thread 156 ms on an Android emulator, over its 90.8 ms output buffer). Parsing,
 // building a synth and decoding a sample (sf3 is Vorbis, decoded on first use) are queued as work
-// items that `process()` runs one at a time, resting after each (WORK_REST) — exactly the samples a
+// items that `process()` runs one at a time, resting after each (WORK_REST), while anything sounds, and
+// back to back for up to SILENT_WORK_MS a quantum while nothing does — exactly the samples a
 // play's notes reach, so the memory is what lazy decoding would have used. Sequences already resident
 // when the soundfont arrives are queued at once.
 //
@@ -88,6 +89,12 @@ const MAX_SF_SYNTHS = 3;
 // desktop (~15x that on the emulator), so one item stays under a 90 ms buffer where a whole
 // instrument did not.
 const WORK_REST = 2;
+// While nothing sounds — no playback, voice or synth, only plays held for the soundfont — a stall
+// cannot be heard, so work runs back to back for up to this long per `process()` and does not rest.
+// A held play is otherwise as slow to start as one item per rest makes it, and a game that stops a
+// short sound before it starts loses that sound entirely (docs/report 0438 measured 56 such plays
+// in 38 titles with one item per rest, against 7 without holding).
+const SILENT_WORK_MS = 10;
 // The longest a MIDI play is held for the soundfont (see the header). It covers what a held play
 // waits for on a slow device — prelude evaluation, parse (median 90 ms, max 187 ms on the Android
 // emulator — docs/report 0360) and decoding the samples of a song, one per rest — with the fetch
@@ -269,15 +276,18 @@ class WieAudioProcessor extends AudioWorkletProcessor {
     this.releaseHeld();
   }
 
-  // Runs at most one work item per call: none while resting from the last one.
+  // Runs at most one work item per call — none while resting from the last one — while anything
+  // sounds; while nothing does, items up to SILENT_WORK_MS (see there).
   runWork(frames) {
-    if (this.rest > 0) {
+    const silent = this.playbacks.size === 0 && this.voices.length === 0 && this.synths.length === 0;
+    if (this.rest > 0 && !silent) {
       this.rest -= frames;
       return;
     }
     const started = Date.now();
-    this.work.shift()();
-    this.rest = ((Date.now() - started) * WORK_REST * sampleRate) / 1000;
+    do this.work.shift()();
+    while (silent && this.work.length && Date.now() - started < SILENT_WORK_MS);
+    this.rest = silent ? 0 : ((Date.now() - started) * WORK_REST * sampleRate) / 1000;
   }
 
   // True when every sample this sequence's notes reach is decoded; otherwise queues the missing

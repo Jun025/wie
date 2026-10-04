@@ -373,13 +373,14 @@ if (!haveDeps || !existsSync(soundfontPath)) {
     }
     const resident = w.render(0.2);
     const residentStats = w.stats();
-    w.post({ t: "stop", h: 0 });
     w.settle();
     const afterResident = w.decodedSamples();
-    w.render(1.3);
+    w.render(0.3);
+    // h:0 keeps sounding (on the soundfont) through the next hold: while anything sounds, work runs
+    // one item per quantum and rests — the stall guard. Silence is the other mode (below).
     w.post({ t: "play", h: 1, r: false, d: 600, ev: song() });
     const first = w.stats(); // the play message itself decodes nothing: it is held and queued
-    // Quantum by quantum: at most one work item per `process()`, and nothing on FM while held.
+    // Quantum by quantum: at most one work item per `process()`, and no FM voice while held.
     let maxPerQuantum = 0;
     let heldQuanta = 0;
     // Until it has played 0.4 s (HOLD_MAX_MS bounds the wait).
@@ -391,8 +392,8 @@ if (!haveDeps || !existsSync(soundfontPath)) {
       fmEver = Math.max(fmEver, now.voices);
       maxPerQuantum = Math.max(maxPerQuantum, left - now.work);
       left = now.work;
-      if (now.held && rmsOf(block) > 0) fmEver = Math.max(fmEver, 1); // anything audible while held
     }
+    w.post({ t: "stop", h: 0 });
     const decoded = w.decodedSamples();
     const sfStats = w.stats();
     w.render(1.3);
@@ -402,7 +403,7 @@ if (!haveDeps || !existsSync(soundfontPath)) {
     check(
       "soundfont session: the first play of each song waits for the soundfont and plays on it — never FM",
       reply.ok === true && early === 0 && heldEarly.held === 1 && heldEarly.soundfont === "pending" && started >= 0 && resident > LOUD && residentStats.synths === 1 &&
-        first.held === 1 && first.synths === 0 && first.work > 0 && heldQuanta > 0 && maxPerQuantum === 1 &&
+        first.held === 1 && first.work > 0 && heldQuanta > 0 && maxPerQuantum === 1 &&
         sfStats.held === 0 && sfStats.synths >= 1 && heldQuanta < (3 * RATE) / BLOCK && againStats.synths >= 1 && againStats.voices === 0 && rmsOf(again) > LOUD && fmEver === 0,
       `before parse: rms ${early} held ${heldEarly.held} (${heldEarly.soundfont}) · parse ${reply.ms} ms · resident song started on the soundfont after ${started} quanta (rms ${resident.toFixed(4)}) · ` +
         `new instrument held ${heldQuanta} quanta (${((heldQuanta * BLOCK * 1000) / RATE).toFixed(0)} ms) (≤ ${maxPerQuantum} work item per quantum) · next play synths ${againStats.synths} · FM voices ever ${fmEver}`,
@@ -410,6 +411,28 @@ if (!haveDeps || !existsSync(soundfontPath)) {
     // Memory: only the samples the notes reach — what the synth's own lazy decoding would have kept.
     const piano = w.presetSamples(0);
     check("decoding stops at the samples the notes reach, not the whole instrument", decoded > afterResident && decoded < piano, `decoded samples ${decoded} · the piano preset holds ${piano}`);
+
+    // While nothing sounds, a held play's work runs back to back (SILENT_WORK_MS per quantum, no
+    // rest): a stall nobody can hear, and a short sound the game stops early is not lost to the wait.
+    w.render(4); // past every release and SF_TAIL_S: no synth renders
+    const quietBefore = w.stats();
+    w.post({ t: "play", h: 2, r: false, d: 600, ev: [midi(0, 0xc0, 24), ...[40, 47, 52, 59, 64, 71].map((n) => midi(0, 0x90, n, 100))] });
+    const items = w.stats().work;
+    let quanta = 0;
+    let most = 0;
+    for (let left = items; w.stats().held && quanta < (3 * RATE) / BLOCK; quanta++) {
+      w.render(BLOCK / RATE);
+      most = Math.max(most, left - w.stats().work);
+      left = w.stats().work;
+    }
+    const silentStats = w.stats();
+    check(
+      "while nothing sounds, a held play's decoding runs back to back, and it then plays on the soundfont",
+      quietBefore.synths === 0 && quietBefore.voices === 0 && items > 2 && most > 1 && quanta < items && silentStats.held === 0 && silentStats.synths >= 1 && silentStats.voices === 0,
+      `${items} items drained in ${quanta} quanta (up to ${most} per quantum) · then synths ${silentStats.synths} FM voices ${silentStats.voices}`,
+    );
+    w.post({ t: "stop", h: 2 });
+    w.render(1.5);
   }
 
   // 19. A soundfont session that loses the soundfont is FM from start to end — never some songs one
