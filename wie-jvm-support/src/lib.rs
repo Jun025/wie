@@ -93,6 +93,17 @@ impl JvmSupport {
         Ok(jvm)
     }
 
+    /// Ends a launch that ran on the startup thread `Jvm::new` attached: an error becomes a
+    /// `WieError`, success detaches that thread — the event loop dispatches from now on. Left
+    /// attached it counted forever: `Thread.activeCount()` read 2 in play where a handset (one
+    /// system thread running `callSerially`) reads 1, and 66959afab216 starts its music only at 1.
+    pub async fn finish_launch(jvm: &Jvm, result: core::result::Result<(), JavaError>) -> Result<()> {
+        if let Err(err) = result {
+            return Err(Self::to_wie_err(jvm, err).await);
+        }
+        jvm.detach_thread().map_err(|_| WieError::FatalError("detach startup thread".into()))
+    }
+
     pub async fn to_wie_err(jvm: &Jvm, err: JavaError) -> WieError {
         let JavaError::JavaException(x) = err;
         // Formatting the trace allocates, so it fails where the heap is exhausted — an exception
@@ -137,6 +148,18 @@ mod tests {
     fn path_separator_mapping() {
         assert_eq!(path_separator(true), ";");
         assert_eq!(path_separator(false), ":");
+    }
+
+    #[test]
+    fn a_finished_launch_leaves_no_startup_thread_counted() -> Result<()> {
+        run_jvm_test(Box::new([]), |jvm| async move {
+            let before: i32 = jvm.invoke_static("java/lang/Thread", "activeCount", "()I", ()).await?;
+            assert!(crate::JvmSupport::finish_launch(&jvm, Ok(())).await.is_ok());
+
+            assert_eq!((before, jvm.active_thread_count()), (1, 0));
+
+            Ok(())
+        })
     }
 
     /// `java.class.path` is split by `java.io.File.pathSeparator`, so the constant we build it
