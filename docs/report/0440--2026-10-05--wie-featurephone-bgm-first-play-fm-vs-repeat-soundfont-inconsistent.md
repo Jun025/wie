@@ -108,3 +108,5 @@ GET 은 기동부터 이미 진행 중이다. 실측 대기는 데스크톱 전�
 `node scripts/check-audio-worklet.mjs --require-soundfont`, `node scripts/contract-roundtrip.mjs`, 에뮬레이터는 `soundfont-stall-probe.mjs` 머리주석.
 
 게임 파일명 유입: BOUNDED 5 · SUFFIX-ATTACHED 0 (`scripts/corpus-name-inflow.mjs`) — 5건 전부 `origin/main` 의 `audio.rs`·`lib.rs` 에 이미 있던 줄이고(이 회차가 그 두 파일을 고쳐 대상이 됐다), 이 diff 가 더한 줄에는 0건이다.
+
+
