@@ -371,6 +371,15 @@ vtable = [
     { name = "setTime", descriptor = "(Ljava/util/Date;)V", index = 29 },
 ]
 
+# 73f3a21e981c, straight after Calendar.getTime() above (0x5bad4): word 0x2c = index 10 on the Date
+# it got back, no arguments, and both r0 and r1 of the result are used — a long. Date's first
+# declared virtual method in CLDC 1.1 is getTime()J, which is where the placement rule puts it too.
+[[class]]
+name = "java/util/Date"
+vtable = [
+    { name = "getTime", descriptor = "()J", index = 10 },
+]
+
 # The rows in this file were measured a title at a time, but they agree on one rule, and the rule
 # is what lets a row be written for a class no title has pinned down yet:
 #
@@ -499,6 +508,11 @@ vtable = [
     # (binary.mod file 0x5bf74..0x5bf98, LR 0x5cf68): r6 = (r7 / 10) * 10, then `mov r1, #0` — a
     # literal zero — and r2 = r7 - r6, `ldr ip, [r3, #0x8c]` on the StringBuffer in r0:
     # `sb.insert(0, n % 10)`, a number written digit by digit from the right.
+    # 73f3a21e981c again, once its date fields were read (above, Calendar and Date): 0x5cf00 calls a
+    # helper with r0 = 227 — a string-pool index — and passes what it returns as r2, with r1 = 0, to
+    # word 0x7c = index 30. In the order above that is insert(I,String), one after insert(I,Object):
+    # `if (count > 2) sb.insert(0, ",")` in the same right-to-left digit loop as 34.
+    { name = "insert", descriptor = "(ILjava/lang/String;)Ljava/lang/StringBuffer;", index = 30 },
     { name = "insert", descriptor = "(II)Ljava/lang/StringBuffer;", index = 34 },
 ]
 

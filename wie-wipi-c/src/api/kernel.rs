@@ -341,9 +341,7 @@ pub async fn get_free_memory(_context: &mut dyn WIPICContext) -> Result<i32> {
 pub async fn exit(context: &mut dyn WIPICContext, code: i32) -> Result<()> {
     tracing::debug!("MC_knlExit({code})");
 
-    context.system().exit();
-
-    Ok(())
+    context.system().exit_from_guest().await
 }
 
 pub async fn get_cur_program_id(_context: &mut dyn WIPICContext) -> Result<WIPICWord> {

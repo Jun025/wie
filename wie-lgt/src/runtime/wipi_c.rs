@@ -608,9 +608,7 @@ async fn unk11(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u
 async fn terminate_program(context: &mut dyn WIPICContext, code: i32) -> Result<()> {
     tracing::debug!("LGT WIPIC terminate_program({code})");
 
-    context.system().exit();
-
-    Ok(())
+    context.system().exit_from_guest().await
 }
 
 /// `MC_knlGetTotalMemory` / `MC_knlGetFreeMemory` on LGT: a fixed 4MiB for both.
