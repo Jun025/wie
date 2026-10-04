@@ -25,16 +25,32 @@ pub fn register_init_svc_handler(core: &mut ArmCore, jvm: &Jvm) -> Result<()> {
 
 async fn handle_init_svc(core: &mut ArmCore, jvm: &mut Jvm, id: SvcId) -> Result<()> {
     let (_, lr) = core.read_pc_lr()?;
+    let id = InitSvcId::try_from(id)?;
 
-    match InitSvcId::try_from(id)? {
-        InitSvcId::GetInterface => get_interface(core, core.read_param(0)?).await?.write(core, lr),
-        InitSvcId::JavaThrow => EmulatedFunction::call(&java_throw, core, jvm).await?.write(core, lr),
-        InitSvcId::JavaCheckType => EmulatedFunction::call(&java_check_type, core, jvm).await?.write(core, lr),
-        InitSvcId::JavaNew => EmulatedFunction::call(&java_new, core, jvm).await?.write(core, lr),
-        InitSvcId::JavaArrayNew => EmulatedFunction::call(&java_array_new, core, jvm).await?.write(core, lr),
-        InitSvcId::JavaClassLoad => EmulatedFunction::call(&java_class_load, core, jvm).await?.write(core, lr),
-        InitSvcId::Alloc => EmulatedFunction::call(&alloc, core, &mut ()).await?.write(core, lr),
+    // The guest's `new`s and `throw`s each get a frame of their own: `instantiate_class` roots what it
+    // makes in the top frame, and the guest code calling here runs under a host call that, for a game
+    // loop, never returns. The guest root scan keeps what the guest goes on holding.
+    let frame = matches!(id, InitSvcId::JavaThrow | InitSvcId::JavaNew | InitSvcId::JavaArrayNew);
+    if frame {
+        wie_jvm_support::guest_roots::stress_collect(jvm, core.id());
+        jvm.push_native_frame();
     }
+    let result = async {
+        match id {
+            InitSvcId::GetInterface => get_interface(core, core.read_param(0)?).await?.write(core, lr),
+            InitSvcId::JavaThrow => EmulatedFunction::call(&java_throw, core, jvm).await?.write(core, lr),
+            InitSvcId::JavaCheckType => EmulatedFunction::call(&java_check_type, core, jvm).await?.write(core, lr),
+            InitSvcId::JavaNew => EmulatedFunction::call(&java_new, core, jvm).await?.write(core, lr),
+            InitSvcId::JavaArrayNew => EmulatedFunction::call(&java_array_new, core, jvm).await?.write(core, lr),
+            InitSvcId::JavaClassLoad => EmulatedFunction::call(&java_class_load, core, jvm).await?.write(core, lr),
+            InitSvcId::Alloc => EmulatedFunction::call(&alloc, core, &mut ()).await?.write(core, lr),
+        }
+    }
+    .await;
+    if frame {
+        jvm.pop_frame();
+    }
+    result
 }
 
 pub async fn load_native(
@@ -54,6 +70,10 @@ pub async fn load_native(
     }
 
     core.load(data, IMAGE_BASE, data.len() + bss_size as usize)?;
+    // Guest code may keep an object pointer in a global; the GC root scan reads the image. There is
+    // no section table to tell code from data, so it reads all of it — a code word that looks like a
+    // pointer into an instance only keeps that instance one collection longer.
+    wie_jvm_support::guest_roots::add_region(core.id(), IMAGE_BASE, data.len() as u32 + bss_size);
 
     // Patterns target instruction encodings, which the guest self-rebase at
     // IMAGE_BASE+1 doesn't rewrite — so installing here is sound and skips a

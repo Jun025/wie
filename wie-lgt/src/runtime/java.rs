@@ -19,7 +19,6 @@ mod jvm_support;
 pub use interface::{get_java_interface_method, register_java_system_svc_handler};
 pub use jvm_support::LgtJvmSupport;
 pub(crate) use jvm_support::guest_roots::add_region as add_guest_root_region;
-pub use jvm_support::guest_roots::{gc_stress_counts, set_gc_stress};
 #[cfg(test)]
 pub(crate) use jvm_support::tests::init_jvm;
 

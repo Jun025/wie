@@ -786,7 +786,7 @@ struct Args {
     /// then continue». Adds `restarted` to the JSON, and `db` (see `DbStats`) as `--relaunch` does.
     #[arg(long, value_name = "SECS", value_parser = positive_secs)]
     restart_at: Option<f64>,
-    /// LGT GC stress, a debug mode: collect at every Nth guest→host call and poison what each
+    /// LGT/KTF GC stress, a debug mode: collect at every Nth guest→host call and poison what each
     /// collection frees, so a guest reference the root scan missed faults at 0xdeaddead or is
     /// counted. Adds `gc_stress` (`collections`, `dangling`) to the JSON. OFF by default; with it
     /// absent the line is unchanged.
@@ -1105,7 +1105,7 @@ fn main() {
     let args = Args::parse();
     let start = StdInstant::now();
     if let Some(every) = args.gc_stress {
-        wie_lgt::set_gc_stress(every);
+        wie_jvm_support::guest_roots::set_gc_stress(every);
     }
 
     {
@@ -1180,7 +1180,7 @@ fn main() {
     };
     let json = match args.gc_stress {
         Some(_) => {
-            let (collections, dangling) = wie_lgt::gc_stress_counts();
+            let (collections, dangling) = wie_jvm_support::guest_roots::gc_stress_counts();
             format!(
                 "{},\"gc_stress\":{{\"collections\":{collections},\"dangling\":{dangling}}}}}",
                 &json[..json.len() - 1]

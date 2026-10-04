@@ -1,0 +1,35 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-04",
+  "task": "wie-ktf-guest-gc-roots-port-from-lgt",
+  "title": "KTF 게스트 GC 루트 — LGT #454 이식",
+  "summary": "KTF 게스트→호스트 호출(메서드 프록시 · init new/throw · 인터페이스 SVC)마다 jvm 프레임을 쌓고, 게스트가 레지스터·스택·이미지에만 쥔 포인터는 보수적 스캔으로 살린다. 스캔·장부·--gc-stress 는 wie-jvm-support::guest_roots 로 옮겨 LGT 와 함께 쓴다. 8d8c24b7c198 600초에서 프레임 지역 수가 2,723 근처로 평탄하다(프레임을 뺀 빌드는 3,278,186 까지 올라 478초에 힙이 찬다).",
+  "changes": [
+    "wie-jvm-support guest_roots.rs — 블록 장부 · 영역 · GuestRoots 전역 참조 · 스캔 · 스트레스 모드(LGT 에서 옮김)",
+    "wie-ktf JavaMethodProxy::call · handle_init_svc(JavaThrow/JavaNew/JavaArrayNew) · handle_java_interface_svc 프레임",
+    "wie-ktf 인스턴스 블록 장부(instantiate/destroy) · 이미지 스캔 영역 · Drop 에서 forget",
+    "wie-lgt guest_roots.rs 는 LGT 어댑터만 남김 · wie_validate --gc-stress 가 KTF 도 덮음",
+    "docs/report/0436"
+  ],
+  "verification": [
+    "되돌리면 red 3종(프록시 프레임 · init 프레임 · 스캔)",
+    "8d8c24b7c198 600초 3회 생존 · 프레임 지역 수 평탄",
+    "KTF 전수 짝 main ↔ 브랜치 · --gc-stress 8 전수"
+  ],
+  "limits": [
+    "게스트 malloc 블록은 훑지 않는다(LGT 와 같다)"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "org.kwis.msp.lwc 미구현 메서드 두 개 — Component.setEventListener(EventListener,Object) · FormComponent.setFocus(Component)",
+      "plainSummary": "KTF 게임 두 종에서 특정 화면으로 넘어갈 때 «메서드를 찾을 수 없다»로 게임이 끝나는 문제를 고친다.",
+      "userBenefit": "해당 메뉴·화면이 열리고 게임이 계속된다.",
+      "why": "전수 짝에서 65ef7052f528 은 27키 중 22번째에서 `Method setEventListener(Lorg/kwis/msp/lwc/EventListener;Ljava/lang/Object;)V not found from org/kwis/msp/lwc/Component`, 0c67145b11df 는 10번째에서 `setFocus(Lorg/kwis/msp/lwc/Component;)V not found from org/kwis/msp/lwc/FormComponent` 로 끝났다(docs/report/0436 §5). 두 메서드는 wie-wipi-java 어디에도 없어, 키가 그 화면에 닿으면 빌드와 무관하게 난다(같은 타이틀이 다른 실행에서는 그 화면에 못 닿아 PASS 했다).",
+      "tradeoff": "lwc 이벤트 리스너·포커스 모델을 어디까지 흉내 낼지 정해야 한다. 빈 구현은 화면을 열지만 리스너가 불리지 않을 수 있다.",
+      "effort": "S",
+      "target": "wie-wipi-java/src/classes/org/kwis/msp/lwc"
+    }
+  ],
+  "adoptedProposals": ["2026-10-04-census-wave6-recensus#p0"]
+}

@@ -415,7 +415,15 @@ where
         let mut context = self.context.clone();
         let (_, lr) = core.read_pc_lr()?;
 
+        // A frame of its own, so what the method allocates is rooted only while it runs. Without it
+        // everything landed in the frame of the host call the guest code was running under — for a
+        // game loop, one that never returns, so nothing it made was ever collected (8d8c24b7c198:
+        // the guest heap ran out after ~7.5 minutes). What the guest keeps is rooted by the guest
+        // root scan instead (`wie_jvm_support::guest_roots`).
+        wie_jvm_support::guest_roots::stress_collect(&self.jvm, core.id());
+        self.jvm.push_native_frame();
         let result = self.proto.body.call(&self.jvm, &mut context, args.into_boxed_slice()).await;
+        self.jvm.pop_frame();
         if let Err(JavaError::JavaException(x)) = result {
             // if we executed this from rust code, we should propagate this down
             if lr == RUN_FUNCTION_LR {

@@ -27,6 +27,15 @@ pub fn register_java_interface_svc_handler(core: &mut ArmCore, jvm: &Jvm) -> Res
 async fn handle_java_interface_svc(core: &mut ArmCore, jvm: &mut Jvm, id: SvcId) -> Result<()> {
     let (_, lr) = core.read_pc_lr()?;
 
+    // A frame per call, as for the guest's calls to host methods (`JavaMethodProxy::call`).
+    wie_jvm_support::guest_roots::stress_collect(jvm, core.id());
+    jvm.push_native_frame();
+    let result = handle_java_interface_svc_in_frame(core, jvm, id, lr).await;
+    jvm.pop_frame();
+    result
+}
+
+async fn handle_java_interface_svc_in_frame(core: &mut ArmCore, jvm: &mut Jvm, id: SvcId, lr: u32) -> Result<()> {
     match JavaSvcId::try_from(id)? {
         JavaSvcId::JavaJump1 => EmulatedFunction::call(&java_jump_1, core, &mut ()).await?.write(core, lr),
         JavaSvcId::JavaJump2 => EmulatedFunction::call(&java_jump_2, core, &mut ()).await?.write(core, lr),
