@@ -18,8 +18,10 @@ use crate::classes::{
 // class com.ktf.kfc.GFormComponent -- the form ChoiceText is placed on. Same source as ChoiceText:
 // 0c67145b11df resolves `<init>()V` and `addComponent(Lorg/kwis/msp/lwc/Component;IIII)I`, adds four
 // children (two text boxes, a ChoiceText, a button) and then passes the form itself to
-// `ShellComponent.addComponent(Lorg/kwis/msp/lwc/Component;)I`. A Component that holds children is
-// a ContainerComponent here; that it is the real parent is an inference, not a document.
+// `ShellComponent.addComponent(Lorg/kwis/msp/lwc/Component;)I`. The parent is FormComponent: the same
+// title calls `FormComponent.setFocus(Lorg/kwis/msp/lwc/Component;)V` on this form, and on KTF a method
+// the receiver's class does not inherit has no vtable slot — under ContainerComponent the call jumped
+// to address 0. The class is still not in the reference zip, so that call is the only evidence.
 //
 // The box each child is added with is the only placement this layer has, so the form keeps it and
 // paints its widgets there: a cleared box with the typed text or the selected choice, the button's
@@ -33,7 +35,7 @@ impl GFormComponent {
     pub fn as_proto() -> WieJavaClassProto {
         WieJavaClassProto {
             name: "com/ktf/kfc/GFormComponent",
-            parent_class: Some("org/kwis/msp/lwc/ContainerComponent"),
+            parent_class: Some("org/kwis/msp/lwc/FormComponent"),
             interfaces: vec![],
             methods: vec![
                 JavaMethodProto::new("<init>", "()V", Self::init, MethodAccessFlags::PUBLIC),
@@ -55,8 +57,7 @@ impl GFormComponent {
     async fn init(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("com.ktf.kfc.GFormComponent::<init>({this:?})");
 
-        jvm.invoke_special(&this, "org/kwis/msp/lwc/ContainerComponent", "<init>", "()V", ())
-            .await
+        jvm.invoke_special(&this, "org/kwis/msp/lwc/FormComponent", "<init>", "()V", ()).await
     }
 
     // The four ints read as a box (x, y, w, h): the title passes (110,135,60,17), (110,160,60,17),

@@ -9,7 +9,7 @@ use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 use crate::classes::{
     net::wie::{ShellCard, WIPIKeyCode},
     org::kwis::msp::lcdui::{Card, Display, Graphics},
-    org::kwis::msp::lwc::Component,
+    org::kwis::msp::lwc::{Component, KEY_NOTIFY},
 };
 
 // Component.keyNotify's type values (javadoc: KEY_PRESSED, KEY_RELEASED, KEY_REPEATED) as
@@ -101,14 +101,30 @@ impl ShellComponent {
             .await?
             .into();
         let display = Self::default_display(jvm).await?;
-        jvm.invoke_virtual(
-            &display,
-            "org/kwis/msp/lcdui/Display",
-            "pushCard",
-            "(Lorg/kwis/msp/lcdui/Card;)V",
-            (card,),
-        )
-        .await
+        let _: () = jvm
+            .invoke_virtual(
+                &display,
+                "org/kwis/msp/lcdui/Display",
+                "pushCard",
+                "(Lorg/kwis/msp/lcdui/Card;)V",
+                (card,),
+            )
+            .await?;
+
+        // A shell shown with none of its leaves focused gives the focus to the first one that takes
+        // input (labels do not), the traversal order keyNotify's UP/DOWN already walks. Without it
+        // keys reach no widget: 65ef7052f528's ID entry shows a text field it never calls setFocus on,
+        // and waits for its EventListener to hear OK. A title that sets the focus itself keeps it.
+        let mut leaves = Vec::new();
+        Self::collect_leaves(jvm, component, &mut leaves).await?;
+        let focus = ShellCard::focus(jvm).await?;
+        if !focus.is_null() && leaves.iter().any(|leaf| leaf.identity() == focus.identity()) {
+            return Ok(());
+        }
+        let Some(first) = leaves.into_iter().find(|leaf| !jvm.is_instance(&***leaf, "org/kwis/msp/lwc/LabelComponent")) else {
+            return Ok(());
+        };
+        jvm.invoke_virtual(&first, "org/kwis/msp/lwc/Component", "setFocus", "()V", ()).await
     }
 
     async fn hide(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
@@ -182,6 +198,12 @@ impl ShellComponent {
         let Some(at) = leaves.iter().position(|leaf| !focus.is_null() && leaf.identity() == focus.identity()) else {
             return Ok(true);
         };
+
+        // The focused leaf's EventListener sees the key first (Component.setEventListener); a key it
+        // takes neither moves the focus nor reaches the leaf.
+        if Component::notify_listener(jvm, &leaves[at], KEY_NOTIFY, r#type, key, 0).await? {
+            return Ok(true);
+        }
 
         let step = match key {
             x if x == WIPIKeyCode::UP as i32 => -1,
