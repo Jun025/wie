@@ -8,7 +8,7 @@
     "wie-backend Audio::load_smaf — 전체 파싱이 빈 목록이면 MMMD 선언 길이로 잘라 재파싱",
     "wie-jvm-support JvmSupport::finish_launch — 시작 스레드 detach · wie-skt/wie-j2me 시작 함수가 부른다",
     "wie-ktf OWNER_SOUND_OFF_SETTINGS 5행",
-    "compat.json 17행(sound ok 11 · 설정 안내 6) · docs/player-updates 3 · docs/report/0438"
+    "compat.json 17행(sound ok 11 · 설정 안내 6) · docs/player-updates 3 · docs/report/0440"
   ],
   "verification": [
     "고친 8종 전/후 짝 0 → 재생(§3) · 되돌림 red 2/2",
