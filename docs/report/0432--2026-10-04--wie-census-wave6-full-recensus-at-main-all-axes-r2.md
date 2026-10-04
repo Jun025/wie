@@ -94,4 +94,3 @@ wave5 규칙(A 또는 L 에서 20회 이상)을 이 핀에 대면 **playable 5�
 
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 330쌍 + SUFFIX-ATTACHED 15쌍. 전부 `compat.json` 의 기존 제목 값이다(재생성 전후로 제목 문자열 차이 0). 그 밖 파일 0. 타이틀은 sha12 로만 적었다.
 
-<!-- corpus-name-inflow v1 subjects=6 tree=aa7f1ea452cd8e31 B=718/330 P=0/0 S=35/15 -->
