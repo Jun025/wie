@@ -11,7 +11,7 @@ use crate::classes::org::kwis::msp::lcdui::Display;
 // Rows a shown status strip takes from the top of a 240-wide KTF screen. Measured in the corpus, not
 // known from a spec: of the 240×320 KTF packages whose largest full-width image is near the screen
 // height, the most common height is 296 (10 titles) against 320 (5), and d1e0badfce82 sizes a table
-// for at most 319 rows. 24 is also LGT's strip at this width (`wie-lgt` graphics). docs/report/0429.
+// for at most 319 rows. 24 is also LGT's strip at this width (`wie-lgt` graphics). docs/report/0431.
 // ponytail: one height for every 240-wide handset; other widths keep 0 (176-wide images peak at 202
 // = 220 − 18, measured but not paired).
 const STRIP_HEIGHT_240: i32 = 24;
