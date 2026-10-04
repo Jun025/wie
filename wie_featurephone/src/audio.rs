@@ -56,13 +56,15 @@ const RESIDENT_SEQUENCES: usize = 32;
 /// autoplay policy); output goes through the JS-owned master gain so the UI volume governs MIDI
 /// and PCM alike. When no context is supplied, every method is a no-op.
 ///
-/// With a soundfont URL (and a build carrying [`SOUNDFONT_PRELUDE`]), the first `Play` also starts
-/// a background fetch of that file; when it arrives, the prelude is loaded as a second worklet
-/// module and the file is handed to the worklet, and every play that starts after it parses renders
-/// its MIDI through the soundfont (operator A/B verdict, see `audio_worklet.js`). The first sound
-/// never waits for any of it, and any failure — fetch, HTTP status, prelude load, parse — leaves the
-/// FM synth playing, which is what no URL means too. The worklet module is byte-for-byte the one
-/// loaded before the soundfont existed, URL or not.
+/// With a soundfont URL (and a build carrying [`SOUNDFONT_PRELUDE`]), the sink starts a background
+/// fetch of that file when it is created — the engine's boot — and tells the worklet one is coming
+/// (`sfwait`) before any play. When it arrives, the prelude is loaded as a second worklet module and
+/// the file is handed to the worklet. Every MIDI play of the session renders through the soundfont,
+/// the first included: the worklet holds a play until it can (bounded — see `HOLD_MAX_MS` there).
+/// Until 2026-10-04 the fetch started after the first `Play`, so each song's first play was FM and
+/// its next the soundfont (docs/report 0438). Any failure — fetch, HTTP status, prelude load, parse —
+/// is posted as `sfoff` and makes the whole session FM, which is what no URL means too. The worklet
+/// module is byte-for-byte the same URL or not; only the prelude waits for the file.
 pub struct WebAudioSink {
     state: Option<Rc<RefCell<State>>>,
 }
@@ -81,15 +83,14 @@ struct State {
     soundfont: Soundfont,
 }
 
-/// `Off` is terminal. Otherwise: `NotRequested` → (first play) `Requested` → (file in hand)
-/// `Arrived` while the worklet module still loads, else straight on → `Prelude` → `Posted`. A failure
-/// anywhere ends the chain with a warning and the FM synth; `scripts/contract-roundtrip.mjs`
+/// `Off` is terminal. Otherwise: `Requested` (at creation) → (file in hand) `Arrived` while the
+/// worklet module still loads, else straight on → `Prelude` → `Posted`. A failure anywhere ends the
+/// chain in `Off` with a warning and an `sfoff` to the worklet; `scripts/contract-roundtrip.mjs`
 /// Scenario S drives every arrow of this in a browser.
 enum Soundfont {
-    /// No URL, or a build without the prelude: FM only, nothing is ever fetched.
+    /// No URL, a build without the prelude, or a failure: FM only.
     Off,
-    /// Fetched after the first play.
-    NotRequested(String),
+    /// Fetching; the worklet is told to wait for it (`sfwait`) as soon as it exists.
     Requested,
     /// Arrived while the worklet module was still loading; the prelude load starts once the node exists.
     Arrived(ArrayBuffer),
@@ -117,14 +118,15 @@ impl WebAudioSink {
     pub fn new(ctx: Option<AudioContext>, gain: Option<GainNode>, soundfont_url: Option<String>) -> Self {
         let Some(ctx) = ctx else { return Self { state: None } };
 
-        let soundfont = match soundfont_url {
-            Some(url) if !url.is_empty() && !SOUNDFONT_PRELUDE.is_empty() => Soundfont::NotRequested(url),
+        let fetch = match soundfont_url {
+            Some(url) if !url.is_empty() && !SOUNDFONT_PRELUDE.is_empty() => Some(url),
             Some(url) if !url.is_empty() => {
                 soundfont_log(false, "URL given, but this build has no soundfont prelude");
-                Soundfont::Off
+                None
             }
-            _ => Soundfont::Off,
+            _ => None,
         };
+        let soundfont = if fetch.is_some() { Soundfont::Requested } else { Soundfont::Off };
         let state = Rc::new(RefCell::new(State {
             ctx,
             gain,
@@ -138,6 +140,13 @@ impl WebAudioSink {
         if let Err(error) = start_worklet(&state) {
             tracing::warn!("audio worklet unavailable, MIDI will be silent: {error:?}");
             state.borrow_mut().fall_back();
+        }
+        // At boot, not at the first play: the worklet holds MIDI plays until the soundfont is in, so
+        // the sooner it arrives the less the first song waits.
+        if let Some(url) = fetch
+            && let Err(error) = fetch_soundfont(&state, &url)
+        {
+            state.borrow_mut().give_up(&format!("fetch could not start: {error:?}"));
         }
 
         Self { state: Some(state) }
@@ -156,28 +165,12 @@ impl Drop for WebAudioSink {
 
 impl AudioSink for WebAudioSink {
     fn send(&self, command: AudioCommand) {
-        let Some(shared) = &self.state else { return };
-        let fetch = {
-            let mut state = shared.borrow_mut();
-            let is_play = matches!(command, AudioCommand::Play { .. });
-            match &state.mode {
-                Mode::Loading => state.queue.push(Queued::Command(command)),
-                Mode::Worklet(_) => state.post(&command),
-                Mode::Fallback => state.play_pcm(&command),
-            }
-            match &state.soundfont {
-                Soundfont::NotRequested(_) if is_play => match core::mem::replace(&mut state.soundfont, Soundfont::Requested) {
-                    Soundfont::NotRequested(url) => Some(url),
-                    _ => None,
-                },
-                _ => None,
-            }
-        };
-        // After the first play is on its way, never before it: the first sound must not wait.
-        if let Some(url) = fetch
-            && let Err(error) = fetch_soundfont(shared, &url)
-        {
-            soundfont_log(false, &format!("fetch could not start: {error:?}"));
+        let Some(state) = &self.state else { return };
+        let mut state = state.borrow_mut();
+        match &state.mode {
+            Mode::Loading => state.queue.push(Queued::Command(command)),
+            Mode::Worklet(_) => state.post(&command),
+            Mode::Fallback => state.play_pcm(&command),
         }
     }
 
@@ -209,6 +202,10 @@ fn start_worklet(state: &Rc<RefCell<State>>) -> Result<(), JsValue> {
         match state.create_node() {
             Ok(node) => {
                 state.mode = Mode::Worklet(node);
+                // Before any play: from here the worklet holds MIDI plays for the soundfont.
+                if !matches!(state.soundfont, Soundfont::Off) {
+                    state.post_tag("sfwait");
+                }
                 for queued in core::mem::take(&mut state.queue) {
                     match queued {
                         Queued::Command(command) => state.post(&command),
@@ -216,13 +213,13 @@ fn start_worklet(state: &Rc<RefCell<State>>) -> Result<(), JsValue> {
                     }
                 }
                 // Only a buffer that arrived while loading moves on — any other state stays put
-                // (swapping unconditionally here once turned `NotRequested` into `Posted` before the
-                // first play, so the soundfont was never fetched; caught by the browser run, see
-                // the round's report — and now by contract-roundtrip.mjs Scenario S3).
+                // (swapping unconditionally here once turned a not-yet-fetched soundfont into
+                // `Posted`, so it was never fetched; caught by the browser run — and now by
+                // contract-roundtrip.mjs Scenario S3).
                 if matches!(state.soundfont, Soundfont::Arrived(_))
                     && let Soundfont::Arrived(buffer) = core::mem::replace(&mut state.soundfont, Soundfont::Prelude)
                 {
-                    load_prelude(&ready_state, &state, buffer);
+                    load_prelude(&ready_state, &mut state, buffer);
                 }
             }
             Err(error) => {
@@ -255,14 +252,14 @@ fn module_url(source: &str) -> Result<String, JsValue> {
 /// Loads [`SOUNDFONT_PRELUDE`] as a second module into the worklet's global scope (where it
 /// publishes `globalThis.wieSoundfont` for the processor that already exists), then hands the
 /// soundfont to the worklet. Called with the node created and `state.soundfont` already `Prelude`.
-fn load_prelude(shared: &Rc<RefCell<State>>, state: &State, buffer: ArrayBuffer) {
+fn load_prelude(shared: &Rc<RefCell<State>>, state: &mut State, buffer: ArrayBuffer) {
     let promise = state
         .ctx
         .audio_worklet()
         .and_then(|worklet| module_url(SOUNDFONT_PRELUDE).and_then(|url| Ok((worklet.add_module(&url)?, url))));
     let (promise, url) = match promise {
         Ok(started) => started,
-        Err(error) => return soundfont_log(false, &format!("prelude could not load: {error:?}")),
+        Err(error) => return state.give_up(&format!("prelude could not load: {error:?}")),
     };
     let loaded_state = shared.clone();
     let loaded_url = url.clone();
@@ -272,9 +269,10 @@ fn load_prelude(shared: &Rc<RefCell<State>>, state: &State, buffer: ArrayBuffer)
         state.soundfont = Soundfont::Posted;
         state.post_soundfont(&buffer);
     });
+    let failed_state = shared.clone();
     let on_error = Closure::once(move |error: JsValue| {
         let _ = Url::revoke_object_url(&url);
-        soundfont_log(false, &format!("prelude failed to load: {error:?}"));
+        failed_state.borrow_mut().give_up(&format!("prelude failed to load: {error:?}"));
     });
     let _ = promise.then2(&on_loaded, &on_error);
     // One-shot callbacks owned by the promise from here on.
@@ -294,11 +292,13 @@ fn soundfont_log(ok: bool, message: &str) {
     }
 }
 
-/// GETs the soundfont and hands it to the worklet. Every failure is logged and ends here, which
-/// leaves the worklet without a soundfont — the FM path.
+/// GETs the soundfont and hands it to the worklet. Every failure ends in [`State::give_up`] — the
+/// FM path, for the whole session.
 fn fetch_soundfont(state: &Rc<RefCell<State>>, url: &str) -> Result<(), JsValue> {
     let window = web_sys::window().ok_or_else(|| JsValue::from_str("no window"))?;
     let arrived_state = state.clone();
+    let response_state = state.clone();
+    let fetch_state = state.clone();
     let on_response = Closure::once(move |response: JsValue| {
         let body = match response.dyn_into::<Response>() {
             Ok(response) if response.ok() => response.array_buffer(),
@@ -307,7 +307,7 @@ fn fetch_soundfont(state: &Rc<RefCell<State>>, url: &str) -> Result<(), JsValue>
         };
         let body = match body {
             Ok(body) => body,
-            Err(error) => return soundfont_log(false, &format!("fetch failed: {error:?}")),
+            Err(error) => return response_state.borrow_mut().give_up(&format!("fetch failed: {error:?}")),
         };
         let on_buffer = Closure::once(move |buffer: JsValue| {
             let Ok(buffer) = buffer.dyn_into::<ArrayBuffer>() else { return };
@@ -316,17 +316,17 @@ fn fetch_soundfont(state: &Rc<RefCell<State>>, url: &str) -> Result<(), JsValue>
                 Mode::Loading => state.soundfont = Soundfont::Arrived(buffer),
                 Mode::Worklet(_) => {
                     state.soundfont = Soundfont::Prelude;
-                    load_prelude(&arrived_state, &state, buffer);
+                    load_prelude(&arrived_state, &mut state, buffer);
                 }
                 Mode::Fallback => {}
             }
         });
-        let on_error = Closure::once(|error: JsValue| soundfont_log(false, &format!("download failed: {error:?}")));
+        let on_error = Closure::once(move |error: JsValue| response_state.borrow_mut().give_up(&format!("download failed: {error:?}")));
         let _ = body.then2(&on_buffer, &on_error);
         on_buffer.forget();
         on_error.forget();
     });
-    let on_error = Closure::once(|error: JsValue| soundfont_log(false, &format!("fetch failed: {error:?}")));
+    let on_error = Closure::once(move |error: JsValue| fetch_state.borrow_mut().give_up(&format!("fetch failed: {error:?}")));
     let _ = window.fetch_with_str(url).then2(&on_response, &on_error);
     // One-shot callbacks owned by the promise chain from here on.
     on_response.forget();
@@ -365,6 +365,26 @@ impl State {
         let _ = Reflect::set(&message, &JsValue::from_str("t"), &JsValue::from_str("sf"));
         let _ = Reflect::set(&message, &JsValue::from_str("data"), buffer);
         let _ = port.post_message_with_transferable(&message, &Array::of1(buffer));
+    }
+
+    /// The soundfont will not come: logged, and the worklet (if it exists yet) stops holding plays
+    /// for it. Before the node exists, `Off` keeps `sfwait` from ever being sent.
+    fn give_up(&mut self, message: &str) {
+        soundfont_log(false, message);
+        let waiting = !matches!(self.soundfont, Soundfont::Off);
+        self.soundfont = Soundfont::Off;
+        if waiting {
+            self.post_tag("sfoff");
+        }
+    }
+
+    /// A message that is just its tag (`sfwait`, `sfoff`).
+    fn post_tag(&self, tag: &str) {
+        let Mode::Worklet(node) = &self.mode else { return };
+        let Ok(port) = node.port() else { return };
+        let message = Object::new();
+        let _ = Reflect::set(&message, &JsValue::from_str("t"), &JsValue::from_str(tag));
+        let _ = port.post_message(&message);
     }
 
     fn fall_back(&mut self) {
