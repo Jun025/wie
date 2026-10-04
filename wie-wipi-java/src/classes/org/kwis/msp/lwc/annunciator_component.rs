@@ -8,13 +8,13 @@ use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
 use crate::classes::org::kwis::msp::lcdui::Display;
 
-// Rows a shown status strip takes from the top of a 240-wide KTF screen. Measured in the corpus, not
-// known from a spec: of the 240×320 KTF packages whose largest full-width image is near the screen
-// height, the most common height is 296 (10 titles) against 320 (5), and d1e0badfce82 sizes a table
-// for at most 319 rows. 24 is also LGT's strip at this width (`wie-lgt` graphics). docs/report/0431.
-// ponytail: one height for every 240-wide handset; other widths keep 0 (176-wide images peak at 202
-// = 220 − 18, measured but not paired).
-const STRIP_HEIGHT_240: i32 = 24;
+// Rows a shown status strip takes from the top of a KTF screen, by screen width. Measured in the
+// corpus, not known from a spec: per width, the most common height of the largest full-width image
+// near the screen height. 240: 296 (10 titles) against 320 (5), and d1e0badfce82 sizes a table for at
+// most 319 rows; 24 is also LGT's strip at this width (`wie-lgt` graphics). docs/report/0431.
+// 176: 202 (7) against 220 (4). Other widths keep 0. docs/report/0435.
+// ponytail: one height per width; handsets of one width differed (290~306 at 240), nothing here tells them apart.
+const STRIP_HEIGHTS: [(i32, i32); 2] = [(240, 24), (176, 18)];
 
 // class org.kwis.msp.lwc.AnnunciatorComponent
 pub struct AnnunciatorComponent;
@@ -61,7 +61,7 @@ impl AnnunciatorComponent {
             return Ok(());
         }
         let width: i32 = jvm.invoke_virtual(&display, "org/kwis/msp/lcdui/Display", "getWidth", "()I", ()).await?;
-        let height = if width == 240 { STRIP_HEIGHT_240 } else { 0 };
+        let height = STRIP_HEIGHTS.iter().find(|&&(w, _)| w == width).map_or(0, |&(_, h)| h);
         jvm.put_static_field("org/kwis/msp/lwc/AnnunciatorComponent", "shownHeight", "I", height)
             .await
     }

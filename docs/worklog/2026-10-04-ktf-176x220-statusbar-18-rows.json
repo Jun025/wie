@@ -1,0 +1,22 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-04",
+  "task": "wie-ktf-176x220-statusbar-18-rows-pair-remeasure",
+  "title": "KTF 176×220 상태 표시줄 18행 — 폭별 한 표로 확장",
+  "summary": "docs/report/0435",
+  "changes": [
+    "wie-wipi-java lwc AnnunciatorComponent STRIP_HEIGHTS = [(240, 24), (176, 18)]",
+    "시험 shown_strip_moves_new_cards_below_it_on_a_176_wide_screen"
+  ],
+  "verification": [
+    "KTF 176×220 95종 census 프로브 짝(base 1d015ed0 ↔ 모델): 나빠짐 0 · 8b899f410f5d render uniform→ok(재측 2/2)"
+  ],
+  "limits": [
+    "18 은 코퍼스 그림 높이의 최빈값이다(202 · 7종)",
+    "표시줄 자체는 그리지 않는다"
+  ],
+  "adoptedProposals": [
+    "2026-10-04-ktf-card-height-statusbar-model#p0"
+  ],
+  "proposals": []
+}
