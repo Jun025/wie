@@ -15,8 +15,19 @@ mod text_component;
 mod text_field_component;
 
 pub use self::{
-    action_listener::ActionListener, annunciator_component::AnnunciatorComponent, button_component::ButtonComponent, component::Component,
-    container_component::ContainerComponent, dialog_component::DialogComponent, event_listener::EventListener, form_component::FormComponent,
-    grab_key_listener::GrabKeyListener, label_component::LabelComponent, progress_component::ProgressComponent, shell_component::ShellComponent,
-    text_box_component::TextBoxComponent, text_component::TextComponent, text_field_component::TextFieldComponent,
+    action_listener::ActionListener,
+    annunciator_component::AnnunciatorComponent,
+    button_component::ButtonComponent,
+    component::{Component, KEY_NOTIFY},
+    container_component::ContainerComponent,
+    dialog_component::DialogComponent,
+    event_listener::EventListener,
+    form_component::FormComponent,
+    grab_key_listener::GrabKeyListener,
+    label_component::LabelComponent,
+    progress_component::ProgressComponent,
+    shell_component::ShellComponent,
+    text_box_component::TextBoxComponent,
+    text_component::TextComponent,
+    text_field_component::TextFieldComponent,
 };

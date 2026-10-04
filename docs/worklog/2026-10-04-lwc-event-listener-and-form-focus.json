@@ -1,0 +1,25 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-04",
+  "task": "wie-lwc-component-seteventlistener-and-formcomponent-setfocus",
+  "title": "lwc Component.setEventListener · FormComponent.setFocus(Component)",
+  "summary": "리스너가 키·포커스 이동을 먼저 듣고(true 면 가져간다), FormComponent.setFocus 가 포커스를 옮기며, 보여진 셸은 포커스 잎이 없으면 첫 입력 잎에 포커스를 준다. GFormComponent 의 부모를 FormComponent 로 고쳐 KTF vtable 칸을 만든다. 두 타이틀이 그 화면을 넘어가고, lwc KTF 23+10종 짝에서 나빠짐 0 · 1종 좋아짐.",
+  "changes": [
+    "wie-wipi-java lwc/component.rs — setEventListener · notify_listener · setFocus 가 FOCUS_NOTIFY 를 알린다",
+    "wie-wipi-java lwc/shell_component.rs — 포커스 잎의 리스너가 키를 먼저 · show 의 첫 포커스",
+    "wie-wipi-java net/wie/shell_card.rs — 셸 자신의 리스너가 키를 먼저 · 시험 2종",
+    "wie-wipi-java lwc/form_component.rs — setFocus(Component)",
+    "wie-wipi-java kfc/g_form_component.rs — 부모 FormComponent",
+    "docs/report/0437"
+  ],
+  "verification": [
+    "되돌리면 red 5종(각 하나만)",
+    "0c67145b11df · 65ef7052f528 같은 키 레시피 main FAIL ↔ 브랜치 PASS",
+    "lwc KTF 33종 × 2회 짝 — PASS 64/64 · 예외 변화 0 · 33f3e7669599 좋아짐"
+  ],
+  "limits": [
+    "SHOW_NOTIFY · POINTER_NOTIFY 미전달 · focusNotify 호출 없음 · hasFocus false · 텍스트 필드 글자는 그리지 않는다"
+  ],
+  "proposals": [],
+  "adoptedProposals": ["2026-10-04-ktf-guest-gc-roots#p0"]
+}

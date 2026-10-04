@@ -6,7 +6,16 @@ use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
-use crate::classes::{net::wie::ShellCard, org::kwis::msp::lcdui::Graphics};
+use rustjava_runtime::classes::java::{lang::Object, util::Vector};
+
+use crate::classes::{
+    net::wie::ShellCard,
+    org::kwis::msp::{lcdui::Graphics, lwc::EventListener},
+};
+
+// The javadoc's EventListener.eventNotify types (FOCUS_NOTIFY 1 · KEY_NOTIFY 3).
+const FOCUS_NOTIFY: i32 = 1;
+pub const KEY_NOTIFY: i32 = 3;
 
 // class org.kwis.msp.lwc.Component
 pub struct Component;
@@ -40,6 +49,12 @@ impl Component {
                 JavaMethodProto::new("getBackground", "()I", Self::get_background, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("setForeground", "(I)V", Self::set_foreground, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getForeground", "()I", Self::get_foreground, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new(
+                    "setEventListener",
+                    "(Lorg/kwis/msp/lwc/EventListener;Ljava/lang/Object;)V",
+                    Self::set_event_listener,
+                    MethodAccessFlags::PUBLIC,
+                ),
             ],
             fields: vec![
                 JavaFieldProto::new("bg", "I", FieldAccessFlags::PRIVATE),
@@ -52,6 +67,10 @@ impl Component {
                 JavaFieldProto::new("y", "I", FieldAccessFlags::PROTECTED),
                 JavaFieldProto::new("w", "I", FieldAccessFlags::PROTECTED),
                 JavaFieldProto::new("h", "I", FieldAccessFlags::PROTECTED),
+                // setEventListener's registrations, as flat (component, listener, obj) triples. Static,
+                // not the canonical evtListener/evtListenerObj instance fields: an lwc instance field
+                // shifts an LGT AOT subclass's offsets (AnnunciatorComponent.shownHeight, net.wie.ShellCard).
+                JavaFieldProto::new("evtListeners", "Ljava/util/Vector;", FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC),
             ],
             access_flags: ClassAccessFlags::PUBLIC | ClassAccessFlags::ABSTRACT,
         }
@@ -124,11 +143,111 @@ impl Component {
     }
 
     // Recorded so a shell can hand keys to it (ShellComponent::keyNotify). focusNotify is not
-    // called: it is still a stub, and no measured title overrides it.
+    // called: it is still a stub, and no measured title overrides it. The listeners of the component
+    // losing and the one gaining the focus are told (FOCUS_NOTIFY, arg1 0/1); with nothing behind
+    // them to suppress, their answer is not read.
     async fn set_focus(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.lwc.Component::setFocus({this:?})");
 
-        ShellCard::set_focus(jvm, this).await
+        let old = ShellCard::focus(jvm).await?;
+        if !old.is_null() && old.identity() == this.identity() {
+            return Ok(());
+        }
+        ShellCard::set_focus(jvm, this.clone()).await?;
+        if !old.is_null() {
+            Self::notify_listener(jvm, &old, FOCUS_NOTIFY, 0, 0, 0).await?;
+        }
+        Self::notify_listener(jvm, &this, FOCUS_NOTIFY, 1, 0, 0).await?;
+
+        Ok(())
+    }
+
+    // The javadoc: the listener sees every event first, and returning true means it took the event.
+    // Delivered today: keys (ShellCard and ShellComponent::keyNotify, before keyNotify) and focus
+    // moves (setFocus). Not delivered: SHOW_NOTIFY and POINTER_NOTIFY — no lwc child is shown or
+    // pointed at here. A null listener removes the registration.
+    async fn set_event_listener(
+        jvm: &Jvm,
+        _: &mut WieJvmContext,
+        this: ClassInstanceRef<Self>,
+        listener: ClassInstanceRef<EventListener>,
+        obj: ClassInstanceRef<Object>,
+    ) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lwc.Component::setEventListener({this:?}, {listener:?}, {obj:?})");
+
+        let listeners = Self::listeners(jvm).await?;
+        if let Some(at) = Self::listener_index(jvm, &listeners, &this).await? {
+            for _ in 0..3 {
+                let _: () = jvm
+                    .invoke_virtual(&listeners, "java/util/Vector", "removeElementAt", "(I)V", (at,))
+                    .await?;
+            }
+        }
+        if listener.is_null() {
+            return Ok(());
+        }
+        let entry: [ClassInstanceRef<Object>; 3] = [this.instance.into(), listener.instance.into(), obj];
+        for value in entry {
+            let _: () = jvm
+                .invoke_virtual(&listeners, "java/util/Vector", "addElement", "(Ljava/lang/Object;)V", (value,))
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    /// Hands an event to `component`'s EventListener, if it has one; true means the listener took it.
+    pub async fn notify_listener(jvm: &Jvm, component: &ClassInstanceRef<Self>, r#type: i32, arg1: i32, arg2: i32, arg3: i32) -> JvmResult<bool> {
+        let listeners = Self::listeners(jvm).await?;
+        let Some(at) = Self::listener_index(jvm, &listeners, component).await? else {
+            return Ok(false);
+        };
+        let listener: ClassInstanceRef<EventListener> = jvm
+            .invoke_virtual(&listeners, "java/util/Vector", "elementAt", "(I)Ljava/lang/Object;", (at + 1,))
+            .await?;
+        let obj: ClassInstanceRef<Object> = jvm
+            .invoke_virtual(&listeners, "java/util/Vector", "elementAt", "(I)Ljava/lang/Object;", (at + 2,))
+            .await?;
+
+        jvm.invoke_virtual(
+            &listener,
+            "org/kwis/msp/lwc/EventListener",
+            "eventNotify",
+            "(IIIILjava/lang/Object;)Z",
+            (r#type, arg1, arg2, arg3, obj),
+        )
+        .await
+    }
+
+    // ponytail: linear scan by identity, and a registration outlives its component unless the guest
+    // clears it — a screen registers one or two. A map keyed by component when that stops holding.
+    async fn listener_index(jvm: &Jvm, listeners: &ClassInstanceRef<Vector>, component: &ClassInstanceRef<Self>) -> JvmResult<Option<i32>> {
+        let size: i32 = jvm.invoke_virtual(listeners, "java/util/Vector", "size", "()I", ()).await?;
+        for at in (0..size).step_by(3) {
+            let entry: ClassInstanceRef<Object> = jvm
+                .invoke_virtual(listeners, "java/util/Vector", "elementAt", "(I)Ljava/lang/Object;", (at,))
+                .await?;
+            if entry.identity() == component.identity() {
+                return Ok(Some(at));
+            }
+        }
+
+        Ok(None)
+    }
+
+    async fn listeners(jvm: &Jvm) -> JvmResult<ClassInstanceRef<Vector>> {
+        let listeners: ClassInstanceRef<Vector> = jvm
+            .get_static_field("org/kwis/msp/lwc/Component", "evtListeners", "Ljava/util/Vector;")
+            .await?;
+        if !listeners.is_null() {
+            return Ok(listeners);
+        }
+
+        let listeners: ClassInstanceRef<Vector> = jvm.new_class("java/util/Vector", "()V", ()).await?.into();
+        jvm.put_static_field("org/kwis/msp/lwc/Component", "evtListeners", "Ljava/util/Vector;", listeners.clone())
+            .await?;
+
+        Ok(listeners)
     }
 
     async fn get_height(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {

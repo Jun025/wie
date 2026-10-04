@@ -8,7 +8,7 @@ use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
 use crate::classes::org::kwis::msp::{
     lcdui::{Card, Display, Graphics},
-    lwc::{Component, ShellComponent},
+    lwc::{Component, KEY_NOTIFY, ShellComponent},
 };
 
 // class net.wie.ShellCard
@@ -65,7 +65,12 @@ impl ShellCard {
     async fn key_notify(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, r#type: i32, key: i32) -> JvmResult<bool> {
         tracing::debug!("net.wie.ShellCard::keyNotify({this:?}, {type}, {key})");
 
+        // The shell's own EventListener sees the key before the shell does (Component.setEventListener).
         let shell = Self::shell(jvm, &this).await?;
+        let component: ClassInstanceRef<Component> = shell.clone().instance.into();
+        if Component::notify_listener(jvm, &component, KEY_NOTIFY, r#type, key, 0).await? {
+            return Ok(true);
+        }
         jvm.invoke_virtual(&shell, "org/kwis/msp/lwc/Component", "keyNotify", "(II)Z", (r#type, key))
             .await
     }
@@ -141,7 +146,7 @@ mod test {
 
     use crate::{
         classes::{
-            net::wie::{CardCanvas, WIPIKeyCode},
+            net::wie::{CardCanvas, ShellCard, WIPIKeyCode},
             org::kwis::msp::{
                 lcdui::{Display, Graphics},
                 lwc::Component,
@@ -315,6 +320,64 @@ mod test {
             jvm.put_field(&mut this, "count", "I", count + 1).await?;
             jvm.put_field(&mut this, "cmp", "Lorg/kwis/msp/lwc/Component;", cmp).await?;
             jvm.put_field(&mut this, "o", "Ljava/lang/Object;", o).await
+        }
+    }
+
+    // A guest EventListener: records every eventNotify and takes (returns true for) one key code.
+    struct TestEventListener;
+
+    impl TestEventListener {
+        fn as_proto() -> WieJavaClassProto {
+            WieJavaClassProto {
+                name: "test/TestEventListener",
+                parent_class: Some("java/lang/Object"),
+                interfaces: vec!["org/kwis/msp/lwc/EventListener"],
+                methods: vec![
+                    JavaMethodProto::new("<init>", "()V", Self::init, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new("eventNotify", "(IIIILjava/lang/Object;)Z", Self::event_notify, MethodAccessFlags::PUBLIC),
+                ],
+                fields: vec![
+                    JavaFieldProto::new("focusGained", "I", FieldAccessFlags::PUBLIC),
+                    JavaFieldProto::new("keys", "I", FieldAccessFlags::PUBLIC),
+                    JavaFieldProto::new("lastKey", "I", FieldAccessFlags::PUBLIC),
+                    JavaFieldProto::new("take", "I", FieldAccessFlags::PUBLIC),
+                    JavaFieldProto::new("o", "Ljava/lang/Object;", FieldAccessFlags::PUBLIC),
+                ],
+                access_flags: ClassAccessFlags::PUBLIC,
+            }
+        }
+
+        async fn init(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await
+        }
+
+        #[allow(clippy::too_many_arguments)] // the arity is the Java descriptor's
+        async fn event_notify(
+            jvm: &Jvm,
+            _: &mut WieJvmContext,
+            mut this: ClassInstanceRef<Self>,
+            r#type: i32,
+            arg1: i32,
+            arg2: i32,
+            _: i32,
+            o: ClassInstanceRef<Object>,
+        ) -> JvmResult<bool> {
+            jvm.put_field(&mut this, "o", "Ljava/lang/Object;", o).await?;
+            match (r#type, arg1) {
+                (1, 1) => {
+                    let n: i32 = jvm.get_field(&this, "focusGained", "I").await?;
+                    jvm.put_field(&mut this, "focusGained", "I", n + 1).await?;
+                    Ok(false)
+                }
+                (3, 1) => {
+                    let n: i32 = jvm.get_field(&this, "keys", "I").await?;
+                    jvm.put_field(&mut this, "keys", "I", n + 1).await?;
+                    jvm.put_field(&mut this, "lastKey", "I", arg2).await?;
+                    let take: i32 = jvm.get_field(&this, "take", "I").await?;
+                    Ok(arg2 == take)
+                }
+                _ => Ok(false),
+            }
         }
     }
 
@@ -606,6 +669,191 @@ mod test {
                 key(WIPIKeyCode::UP).await?;
                 key(WIPIKeyCode::FIRE).await?;
                 assert_eq!(count().await?, 2);
+
+                Ok(())
+            },
+        )
+    }
+
+    /// 65ef7052f528's ID entry: a text field on a shell, the listener registered on the field, show(),
+    /// and no setFocus anywhere — the title waits for its listener to hear OK. Each piece reddens one
+    /// assertion when reverted: setEventListener (the method is missing), show's first focus (no
+    /// FOCUS_NOTIFY, no keys), the listener-first dispatch (a taken key still edits the field).
+    #[test]
+    fn event_listener_on_a_shown_text_field_hears_focus_and_keys_first() -> Result<()> {
+        let fixture: Box<[WieJavaClassProto]> = Vec::from([TestEventListener::as_proto(), test_jlet()]).into_boxed_slice();
+        run_jvm_test(
+            Box::new([wie_midp::get_protos().into(), get_protos().into(), fixture]),
+            |jvm| async move {
+                let canvas = install_display(&jvm, "net/wie/CardCanvas").await?;
+                let shell = jvm.new_class("org/kwis/msp/lwc/ShellComponent", "()V", ()).await?;
+                let text: ClassInstanceRef<String> = None.into();
+                let field: ClassInstanceRef<Component> = jvm
+                    .new_class("org/kwis/msp/lwc/TextFieldComponent", "(Ljava/lang/String;I)V", (text, 0))
+                    .await?
+                    .into();
+                let _: i32 = jvm
+                    .invoke_virtual(
+                        &shell,
+                        "org/kwis/msp/lwc/ContainerComponent",
+                        "addComponent",
+                        "(Lorg/kwis/msp/lwc/Component;)I",
+                        (field.clone(),),
+                    )
+                    .await?;
+                let mut listener = jvm.new_class("test/TestEventListener", "()V", ()).await?;
+                jvm.put_field(&mut listener, "take", "I", WIPIKeyCode::NUM1 as i32).await?;
+                let tag: ClassInstanceRef<Object> = jvm.new_class("java/lang/Object", "()V", ()).await?.into();
+                let _: () = jvm
+                    .invoke_virtual(
+                        &field,
+                        "org/kwis/msp/lwc/Component",
+                        "setEventListener",
+                        "(Lorg/kwis/msp/lwc/EventListener;Ljava/lang/Object;)V",
+                        (listener.clone(), tag.clone()),
+                    )
+                    .await?;
+                let _: () = jvm.invoke_virtual(&shell, "org/kwis/msp/lwc/ShellComponent", "show", "()V", ()).await?;
+
+                let field_ = |name: &'static str| {
+                    let listener = listener.clone();
+                    let jvm = jvm.clone();
+                    async move { jvm.get_field::<i32>(&listener, name, "I").await }
+                };
+                let typed = || {
+                    let field = field.clone();
+                    let jvm = jvm.clone();
+                    async move {
+                        let s: ClassInstanceRef<String> = jvm
+                            .invoke_virtual(&field, "org/kwis/msp/lwc/TextComponent", "getString", "()Ljava/lang/String;", ())
+                            .await?;
+                        JvmResult::Ok(JavaLangString::to_rust_string(&jvm, &s).await?)
+                    }
+                };
+                let press = |code: WIPIKeyCode| {
+                    let canvas = canvas.clone();
+                    let jvm = jvm.clone();
+                    async move {
+                        jvm.invoke_virtual::<_, ()>(&canvas, "net/wie/CardCanvas", "keyPressed", "(I)V", (code as i32,))
+                            .await
+                    }
+                };
+
+                assert_eq!(field_("focusGained").await?, 1, "show() gave the field the focus and told its listener");
+                let o: ClassInstanceRef<Object> = jvm.get_field(&listener, "o", "Ljava/lang/Object;").await?;
+                assert_eq!(o.identity(), tag.identity());
+
+                // Taken by the listener: the field never sees it.
+                press(WIPIKeyCode::NUM1).await?;
+                assert_eq!((field_("keys").await?, field_("lastKey").await?), (1, WIPIKeyCode::NUM1 as i32));
+                assert_eq!(typed().await?, "");
+
+                // Not taken: the listener hears it, then the field types it.
+                press(WIPIKeyCode::NUM2).await?;
+                assert_eq!(field_("keys").await?, 2);
+                assert_ne!(typed().await?, "");
+
+                // A null listener unregisters.
+                let none: ClassInstanceRef<Object> = None.into();
+                let _: () = jvm
+                    .invoke_virtual(
+                        &field,
+                        "org/kwis/msp/lwc/Component",
+                        "setEventListener",
+                        "(Lorg/kwis/msp/lwc/EventListener;Ljava/lang/Object;)V",
+                        (none.clone(), none),
+                    )
+                    .await?;
+                press(WIPIKeyCode::NUM1).await?;
+                assert_eq!(field_("keys").await?, 2);
+
+                Ok(())
+            },
+        )
+    }
+
+    /// 0c67145b11df's OK with an empty box: the button's listener calls FormComponent.setFocus(box) on
+    /// the GFormComponent. Reverting either the method or GFormComponent's FormComponent parent makes
+    /// the call fail to resolve; after it the next key types into that box.
+    #[test]
+    fn form_component_set_focus_on_a_g_form_moves_the_keys_to_that_box() -> Result<()> {
+        let fixture: Box<[WieJavaClassProto]> = Vec::from([test_jlet()]).into_boxed_slice();
+        run_jvm_test(
+            Box::new([wie_midp::get_protos().into(), get_protos().into(), fixture]),
+            |jvm| async move {
+                let _ = install_display(&jvm, "net/wie/CardCanvas").await?;
+                let form: ClassInstanceRef<Component> = jvm.new_class("com/ktf/kfc/GFormComponent", "()V", ()).await?.into();
+                let mut boxes: Vec<ClassInstanceRef<Component>> = Vec::new();
+                for _ in 0..2 {
+                    let text = JavaLangString::from_rust_string(&jvm, "").await?;
+                    let widget: ClassInstanceRef<Component> = jvm
+                        .new_class("org/kwis/msp/lwc/TextBoxComponent", "(Ljava/lang/String;I)V", (text, 0))
+                        .await?
+                        .into();
+                    let _: i32 = jvm
+                        .invoke_virtual(
+                            &form,
+                            "com/ktf/kfc/GFormComponent",
+                            "addComponent",
+                            "(Lorg/kwis/msp/lwc/Component;IIII)I",
+                            (widget.clone(), 0, 0, 0, 0),
+                        )
+                        .await?;
+                    boxes.push(widget);
+                }
+                let shell = jvm.new_class("org/kwis/msp/lwc/ShellComponent", "()V", ()).await?;
+                let _: i32 = jvm
+                    .invoke_virtual(
+                        &shell,
+                        "org/kwis/msp/lwc/ContainerComponent",
+                        "addComponent",
+                        "(Lorg/kwis/msp/lwc/Component;)I",
+                        (form.clone(),),
+                    )
+                    .await?;
+                let _: () = jvm.invoke_virtual(&boxes[0], "org/kwis/msp/lwc/Component", "setFocus", "()V", ()).await?;
+
+                let _: () = jvm
+                    .invoke_virtual(
+                        &form,
+                        "org/kwis/msp/lwc/FormComponent",
+                        "setFocus",
+                        "(Lorg/kwis/msp/lwc/Component;)V",
+                        (boxes[1].clone(),),
+                    )
+                    .await?;
+                assert_eq!(ShellCard::focus(&jvm).await?.identity(), boxes[1].identity());
+
+                let _: bool = jvm
+                    .invoke_virtual(
+                        &shell,
+                        "org/kwis/msp/lwc/ShellComponent",
+                        "keyNotify",
+                        "(II)Z",
+                        (1, WIPIKeyCode::NUM4 as i32),
+                    )
+                    .await?;
+                let mut typed = Vec::new();
+                for widget in &boxes {
+                    let s: ClassInstanceRef<String> = jvm
+                        .invoke_virtual(widget, "org/kwis/msp/lwc/TextComponent", "getString", "()Ljava/lang/String;", ())
+                        .await?;
+                    typed.push(JavaLangString::to_rust_string(&jvm, &s).await?.is_empty());
+                }
+                assert_eq!(typed, [true, false], "the key went to the box setFocus named");
+
+                // A null component is ignored rather than clearing the focus.
+                let none: ClassInstanceRef<Component> = None.into();
+                let _: () = jvm
+                    .invoke_virtual(
+                        &form,
+                        "org/kwis/msp/lwc/FormComponent",
+                        "setFocus",
+                        "(Lorg/kwis/msp/lwc/Component;)V",
+                        (none,),
+                    )
+                    .await?;
+                assert_eq!(ShellCard::focus(&jvm).await?.identity(), boxes[1].identity());
 
                 Ok(())
             },
