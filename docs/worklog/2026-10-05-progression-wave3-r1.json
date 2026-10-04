@@ -8,7 +8,7 @@
     "wie-lgt svc_ids · wipi_c — 0xee = MC_grpPostEvent · 0xf0 = MC_grpDrawPolygon · 시험 2",
     "wie-wipi-c graphics — draw_polygon",
     "docs/player-data/compat.json — progress 축 16행",
-    "docs/report/0441 · docs/player-updates 1"
+    "docs/report/0442 · docs/player-updates 1"
   ],
   "verification": [
     "e68b1c8aef85: 인증 실패 뒤 흰 화면(600초) → 타이틀 · 새 게임 · 이야기",
