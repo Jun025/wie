@@ -7,7 +7,7 @@ use alloc::{
 };
 use core::mem::{offset_of, size_of};
 
-use jvm::{ClassInstanceRef, Jvm, runtime::JavaLangString};
+use jvm::{ClassInstance, ClassInstanceRef, Jvm, runtime::JavaLangString};
 use rustjava_runtime::classes::java::util::Vector;
 use wipi_types::ktf::{InitParam2, java::WIPIJBInterface};
 
@@ -103,6 +103,22 @@ pub async fn java_throw(core: &mut ArmCore, jvm: &mut Jvm, ptr_error: KtfJvmWord
     let exception = match jvm.new_class(&error, "()V", ()).await {
         Ok(x) => x,
         Err(x) => return Err(JvmSupport::to_wie_err(jvm, x).await),
+    };
+
+    JavaMethod::handle_exception(core, jvm, exception).await
+}
+
+pub async fn java_throw_instance(core: &mut ArmCore, jvm: &mut Jvm, ptr_exception: u32, a1: u32) -> Result<JavaMethodResult> {
+    tracing::warn!("java_throw_instance({ptr_exception:#x}, {a1})");
+
+    // `throw null` throws NullPointerException, as `athrow` does.
+    let exception: Box<dyn ClassInstance> = if ptr_exception == 0 {
+        match jvm.new_class("java/lang/NullPointerException", "()V", ()).await {
+            Ok(x) => x,
+            Err(x) => return Err(JvmSupport::to_wie_err(jvm, x).await),
+        }
+    } else {
+        Box::new(JavaClassInstance::from_raw(ptr_exception, core))
     };
 
     JavaMethod::handle_exception(core, jvm, exception).await

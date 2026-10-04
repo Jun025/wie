@@ -209,7 +209,10 @@ mod test {
     use test_utils::TestPlatform;
 
     use crate::runtime::{
-        java::jvm_support::{KtfJvmSupport, KtfJvmThreadContext},
+        java::{
+            interface::java_throw_instance,
+            jvm_support::{KtfJvmSupport, KtfJvmThreadContext},
+        },
         svc_ids::WIPICTableId,
         wipi_c::method_table::get_method_body,
     };
@@ -285,6 +288,26 @@ mod test {
                 let free = slot11.call(&mut context, Box::new([0; 4])).await?.results[0] as i32;
                 assert_eq!(free, slot12.call(&mut context, Box::new([])).await?.results[0] as i32);
                 assert!(free > 0x176f, "a boot check reads {free} as «not enough storage»");
+
+                Ok(())
+            })
+        })
+    }
+
+    // `throw e` (InitParam4 +8) hands over the instance the guest built. With no handler registered it
+    // reaches the host as that very instance; `throw null` becomes a NullPointerException.
+    #[test]
+    fn throw_instance_throws_the_instance_it_is_given() -> Result<()> {
+        run(|context| {
+            Box::pin(async move {
+                let (mut core, mut jvm) = (context.core.clone(), context.jvm.clone());
+                let exception = jvm.new_class("java/lang/RuntimeException", "()V", ()).await.unwrap();
+                let raw = KtfJvmSupport::class_instance_raw(&exception);
+
+                let thrown = java_throw_instance(&mut core, &mut jvm, raw, 0).await;
+                assert!(matches!(thrown, Err(WieError::JavaException(x)) if x == raw));
+                let thrown = java_throw_instance(&mut core, &mut jvm, 0, 0).await;
+                assert!(matches!(thrown, Err(WieError::JavaException(x)) if x != 0 && x != raw));
 
                 Ok(())
             })
