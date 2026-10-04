@@ -249,11 +249,7 @@ impl SktEmulator {
                 .await
         };
 
-        if let Err(x) = result {
-            return Err(JvmSupport::to_wie_err(&jvm, x).await);
-        }
-
-        Ok(())
+        JvmSupport::finish_launch(&jvm, result).await
     }
 }
 
