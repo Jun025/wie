@@ -684,7 +684,7 @@ const lockVerdict = (lock, runs) => (lock === 'drm' || (lock === 'phone' && quit
 // says so in the player's words, and `status` stays where the title really gets to (at most limited).
 // The rule is the run, not the code: measured 2026-10-02 on the bd2337ff census, 30 titles reach a
 // connect call and 29 of them play — they connect once (at most 5 times a run) and go on. A title
-// that cannot go on keeps asking: f44271803135 retried 2,463 times in a 30 s probe. Two more that read
+// that cannot go on keeps asking: f44271803135 retried 416 to 2,463 times in a 30 s probe. Two more that read
 // as «network» on screen were engine walls with the data already shipped (docs/report/0414).
 // Only the 30 s probe A counts: the 600 s key loop reconnects in titles that play (wave6 at pin
 // 4ac38566 · L 66 · 66 · 29 · 28 in four of them) (docs/report/0432).
@@ -693,16 +693,19 @@ const lockVerdict = (lock, runs) => (lock === 'drm' || (lock === 'phone' && quit
 // not a count: the wall read 100 of its 2,463, and a wall logging 4+ other lines per retry would have
 // read < 50. A probe recorded before the field falls back to `stub_hits.first` (the real count, but
 // only for a top-5 stub — the wall's is) or that tail, whichever is larger; both are lower bounds.
-// 500 is the line, in the gap the full count shows: five probes of the busiest live title asked 21,
-// 25, 33, 34 and 113 times (so the old 50 would flag it one run in five), the wall 2,438 and 2,463.
-// Reopen if a title lands in 113–2,438 (docs/report/0433).
+// The count moves with host load: a 30 s window holds as many retries as the machine lets it run. The
+// wall asked 2,438 and 2,463 times alone (load1 10–24) but 416–1,005 in the seven real censuses on disk
+// (load1 160–630, 416 at the lowest). The busiest live title asked 21, 25, 33, 34 and 113 times alone
+// and ≤ 2 in those censuses, so the old 50 would flag it one run in five. 200 is the line: 1.8× over
+// 113, 2.1× under 416 — and on all ten censuses on disk it flags the same titles the 50-line tail did
+// (500 missed the wall at 416). Reopen if a title lands in 113–416 (docs/report/0433).
 const NET_KO = '게임을 시작하려면 옛 통신사 서버에서 데이터를 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.';
 const NET_CONNECT = /MC_netConnect|MC_netSocketConnect|MC_netHttpConnect|Network::connect\(/g;
 const tailConnects = (text) => (text.match(NET_CONNECT) ?? []).length;
 const stubConnects = (A) => (A.stub_hits?.first ?? []).filter((x) => /MC_net(Socket|Http)?Connect$|Network::connect$/.test(x.name)).reduce((n, x) => n + x.count, 0);
 const netConnects = (A, stderrPath) =>
   A.net_connects ?? Math.max(stubConnects(A), existsSync(stderrPath) ? tailConnects(readFileSync(stderrPath, 'latin1')) : 0);
-const netWall = (connects) => connects >= 500;
+const netWall = (connects) => connects >= 200;
 
 // NFC: macOS hands back file names decomposed (NFD), and PR titles are composed.
 const displayTitle = (p) =>
@@ -829,9 +832,9 @@ if (cmd === 'selftest') {
       ['the check that quit before painting is a lock', lockVerdict('phone', [quit, { stop: 'deadline', paints: 0 }]) === 'phone'],
       ['the check in a title that keeps running is not', lockVerdict('phone', [quit, { stop: 'deadline', paints: 3 }]) === null],
       ['the check that paints its refusal and quits is a lock', lockVerdict('phone', [{ stop: 'clean exit', paints: 7 }, { stop: 'clean exit', paints: 8 }]) === 'phone'],
-      ['a connect retried 500 times in the probe is a network wall', netWall(tailConnects('WARN stub MC_netConnect(0x1, 0xa)\n'.repeat(500)))],
+      ['the wall under census load (416 connects) is a network wall', netWall(tailConnects('WARN stub MC_netConnect(0x1, 0xa)\n'.repeat(416)))],
       ['a live title asking 113 times while it starts is not', !netWall(tailConnects('WARN stub MC_netConnect(0x1, 0xa)\n'.repeat(113)))],
-      ['a Java connect loop counts too', netWall(tailConnects('stub org.kwis.msf.io.Network::connect()\n'.repeat(500)))],
+      ['a Java connect loop counts too', netWall(tailConnects('stub org.kwis.msf.io.Network::connect()\n'.repeat(416)))],
       ['a probe recorded with net_connects is read by it, not by its tail', netConnects({ net_connects: 2463 }, '/nonexistent') === 2463],
       ['an older probe is read off stub_hits, whose count is the whole run', netWall(netConnects({ stub_hits: { first: [{ name: 'MC_netConnect', count: 2463 }] } }, '/nonexistent'))],
       ['the check in a title that crashed is not', lockVerdict('phone', [{ stop: 'error', paints: 0 }, { stop: 'error', paints: 0 }]) === null],
