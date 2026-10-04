@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-04",
+  "kind": "fix",
+  "titles": [
+    "d1e0badfce82ff692b93fd305bedf98a60dfb42df8ec74267fe2ae081cf90c0c"
+  ],
+  "summary_ko": "화면 위 상태 표시줄 자리를 비워 두는 KTF 게임이 실제 휴대폰과 같은 크기의 화면을 받아요. 판이 그려지지 않던 보드게임 하나가 이제 판과 말을 보여 줘요.",
+  "pr": "https://github.com/Jun025/wie/pull/0"
+}
