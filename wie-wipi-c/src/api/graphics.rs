@@ -768,6 +768,43 @@ pub async fn draw_line(context: &mut dyn WIPICContext, dst: WIPICIndirectPtr, x1
     primitives::draw_line(context, &framebuffer, x1, y1, x2, y2, color, clip)
 }
 
+/// `MC_grpDrawPolygon(dst, xPoints, yPoints, nPoints, pgc)`: the closed outline through the points.
+pub async fn draw_polygon(
+    context: &mut dyn WIPICContext,
+    dst: WIPICIndirectPtr,
+    x_points: WIPICWord,
+    y_points: WIPICWord,
+    count: i32,
+    pgc: WIPICWord,
+) -> Result<()> {
+    tracing::debug!("MC_grpDrawPolygon({:#x}, {x_points:#x}, {y_points:#x}, {count}, {pgc:#x})", dst.0);
+
+    if count <= 0 {
+        return Ok(());
+    }
+
+    let framebuffer = FrameBuffer(read_generic(context, context.data_ptr(dst)?)?);
+    let gctx: WIPICGraphicsContext = read_generic(context, pgc)?;
+    let clip = Clip {
+        x: 0,
+        y: 0,
+        width: framebuffer.0.width as _,
+        height: framebuffer.0.height as _,
+    };
+    let color = framebuffer.pixel_to_color(gctx.fgpxl);
+    let mut points = Vec::with_capacity(count as usize);
+    for i in 0..count as u32 {
+        let (x, y): (i32, i32) = (read_generic(context, x_points + i * 4)?, read_generic(context, y_points + i * 4)?);
+        points.push((x, y));
+    }
+    for (i, &(x1, y1)) in points.iter().enumerate() {
+        let (x2, y2) = points[(i + 1) % points.len()];
+        primitives::draw_line(context, &framebuffer, x1, y1, x2, y2, color, clip)?;
+    }
+
+    Ok(())
+}
+
 pub async fn post_event(context: &mut dyn WIPICContext, id: i32, r#type: i32, param1: i32, param2: i32) -> Result<i32> {
     tracing::debug!("MC_grpPostEvent({id}, {type}, {param1}, {param2})");
 

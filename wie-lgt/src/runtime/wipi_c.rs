@@ -171,7 +171,18 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::GetStringWidth => shared_graphics::get_string_width.into_body(),
         WIPICSvcId::CreateImage => wie_wipi_c::api::graphics::create_image.into_body(),
         WIPICSvcId::Unk0 => unk0.into_body(),
-        WIPICSvcId::Unk11 => unk11.into_body(),
+        // `0xee` takes `(id, type, param1, param2)` — the `MC_grpPostEvent` shape — and the event
+        // comes back through the clet's event handler. Measured on an LGT title whose first-run
+        // auth notice posts `(0, 0x5001, 2, 0)` on its key: as a stub returning 0 the event never
+        // arrived and the title sat on a white screen for the whole run; delivered, it goes on to
+        // the title screen. Nine more titles post `0xa600` once at boot. Not the KTF slot order:
+        // LGT has one more entry after `DrawImage`, so KTF's 36 lands at 0xed here, and the
+        // argument shape — not the index — is what names it.
+        WIPICSvcId::PostEvent => wie_wipi_c::api::graphics::post_event.into_body(),
+        // `0xf0` is `(dst framebuffer, xs, ys, n)` with the two arrays side by side on the stack —
+        // a polygon. One LGT title calls it with n = 4 right after setting the foreground pixel;
+        // with no row the first call was a fatal «Unknown LGT WIPIC SVC id 240» mid-play.
+        WIPICSvcId::DrawPolygon => wie_wipi_c::api::graphics::draw_polygon.into_body(),
         WIPICSvcId::ImGetSupportModeCount => im_get_support_mode_count.into_body(),
         WIPICSvcId::ImGetSupportedModes => im_get_supported_modes.into_body(),
         WIPICSvcId::Unk7 => unk7.into_body(),
@@ -583,12 +594,6 @@ async fn unk10(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u
     Ok(0)
 }
 
-async fn unk11(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
-    tracing::warn!("stub unk11({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x})");
-
-    Ok(0)
-}
-
 /// WIPIC kernel index 4 (`0x68`): ends the program. The guest does not expect it to return.
 ///
 /// Identified from the call sites, not from a symbol — none of the LGT images names it. Six
@@ -712,7 +717,7 @@ mod tests {
     use core::sync::atomic::{AtomicBool, Ordering};
 
     use test_utils::{TestPlatform, TestPlatformEvent};
-    use wie_backend::{DefaultTaskRunner, System};
+    use wie_backend::{DefaultTaskRunner, Event, System};
     use wie_core_arm::{Allocator, ArmCore};
     use wie_util::{ByteWrite, Result, read_generic, write_generic};
     use wie_wipi_c::WIPICContext;
@@ -790,6 +795,44 @@ mod tests {
             system.tick()?;
         }
         assert!(exited.load(Ordering::Relaxed), "0x68 must reach Platform::exit");
+
+        Ok(())
+    }
+
+    /// WIPIC `0xee` posts its event: `(id, type, param1, param2)` reaches the host event queue.
+    ///
+    /// The arguments are the ones an LGT title passes after its first-run auth notice. As a stub
+    /// the event was dropped and the title stayed on a white screen for the whole run.
+    #[test]
+    fn wipic_0xee_posts_the_event() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, _) = init_jvm(&system_clone).await?;
+            register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
+            assert_eq!(WIPICSvcId::PostEvent as u32, 0xee);
+            let stub = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::PostEvent)?;
+            let _: u32 = core.run_function(stub, &[0, 0x5001, 2, 0]).await?;
+            let posted = matches!(
+                system_clone.event_queue().pop(),
+                Some(Event::Notify {
+                    r#type: 0x5001,
+                    param1: 2,
+                    param2: 0
+                })
+            );
+            assert!(posted, "0xee must push the event it was given");
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
 
         Ok(())
     }
@@ -1085,6 +1128,52 @@ mod tests {
             fill(&mut core, dst, 0xaaaa_aaaa)?;
             let _: u32 = core.run_function(draw, &[dst, 0, 0, 2, 1, image, 0, 0, record]).await?;
             assert_eq!(pixels(&core, dst)?, 0x11aa_aaaa, "#ff00ff is the key; #123456 lands as RGB565 0x11aa");
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    /// WIPIC `0xf0` draws the closed outline through its points in the foreground pixel.
+    ///
+    /// An LGT title calls it mid-tutorial with `(dst, xs, ys, 4)`; with no row that call was fatal.
+    #[test]
+    fn wipic_0xf0_draws_the_polygon_outline() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, _) = init_jvm(&system_clone).await?;
+            register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
+            assert_eq!(WIPICSvcId::DrawPolygon as u32, 0xf0);
+            let create = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::CreateOffscreenFramebuffer)?;
+            let init = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::InitContext)?;
+            let set = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::SetContext)?;
+            let polygon = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::DrawPolygon)?;
+
+            let dst: u32 = core.run_function(create, &[5, 5]).await?;
+            let record = Allocator::alloc(&mut core, 52)?;
+            let _: u32 = core.run_function(init, &[record]).await?;
+            let _: u32 = core.run_function(set, &[record, 1, 0xffff]).await?; // FgPixelIdx, white
+            let xs = Allocator::alloc(&mut core, 16)?;
+            let ys = Allocator::alloc(&mut core, 16)?;
+            write_generic(&mut core, xs, [0i32, 4, 4, 0])?;
+            write_generic(&mut core, ys, [0i32, 0, 4, 4])?;
+            let _: u32 = core.run_function(polygon, &[dst, xs, ys, 4, record]).await?;
+
+            let (bpl, buf): (u32, u32) = (read_generic(&core, dst + 8)?, read_generic(&core, dst + 16)?);
+            let pixel = |x: u32, y: u32| read_generic::<u16, _>(&core, buf + y * bpl + x * 2);
+            assert_eq!(pixel(2, 0)?, 0xffff, "top edge");
+            assert_eq!(pixel(0, 2)?, 0xffff, "the closing edge back to the first point");
+            assert_eq!(pixel(2, 2)?, 0, "an outline, not a fill");
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
