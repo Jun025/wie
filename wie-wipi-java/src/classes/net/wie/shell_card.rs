@@ -413,13 +413,23 @@ mod test {
     /// every paint. A card made before the strip is shown keeps the whole screen.
     #[test]
     fn shown_strip_moves_new_cards_below_it_on_a_240_wide_screen() -> Result<()> {
+        shown_strip_moves_new_cards_below_it(240, 320, 24)
+    }
+
+    /// 176-wide screens lose 18 rows: 202 = 220 − 18 is the commonest full-width image height there.
+    #[test]
+    fn shown_strip_moves_new_cards_below_it_on_a_176_wide_screen() -> Result<()> {
+        shown_strip_moves_new_cards_below_it(176, 220, 18)
+    }
+
+    fn shown_strip_moves_new_cards_below_it(w: i32, h: i32, rows: i32) -> Result<()> {
         let platform = TestPlatform::new();
-        platform.screen().resize(240, 320)?;
+        platform.screen().resize(w as u32, h as u32)?;
         let fixture: Box<[WieJavaClassProto]> = Vec::from([TestShell::as_proto(), test_jlet()]).into_boxed_slice();
         run_jvm_test_with_system(
             Box::new([wie_midp::get_protos().into(), get_protos().into(), fixture]),
             Box::new(platform),
-            |jvm, _| async move {
+            move |jvm, _| async move {
                 let _ = install_display(&jvm, "net/wie/CardCanvas").await?;
                 let display: ClassInstanceRef<Display> = jvm
                     .invoke_static("org/kwis/msp/lcdui/Display", "getDefaultDisplay", "()Lorg/kwis/msp/lcdui/Display;", [])
@@ -442,7 +452,7 @@ mod test {
                     }
                 };
 
-                assert_eq!(bounds(new_card().await?.into()).await?, [0, 240, 320]);
+                assert_eq!(bounds(new_card().await?.into()).await?, [0, w, h]);
 
                 let strip = jvm.new_class("org/kwis/msp/lwc/AnnunciatorComponent", "(Z)V", (false,)).await?;
                 let _: () = jvm
@@ -450,8 +460,8 @@ mod test {
                     .await?;
 
                 let height: i32 = jvm.invoke_virtual(&display, "org/kwis/msp/lcdui/Display", "getHeight", "()I", ()).await?;
-                assert_eq!(height, 296);
-                assert_eq!(bounds(new_card().await?.into()).await?, [24, 240, 296]);
+                assert_eq!(height, h - rows);
+                assert_eq!(bounds(new_card().await?.into()).await?, [rows, w, h - rows]);
 
                 Ok(())
             },
