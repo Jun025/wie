@@ -113,3 +113,5 @@
 
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 341쌍 + SUFFIX-ATTACHED 15쌍. 전부 `compat.json` 의 기존 제목 값이다(이 회차는 제목 문자열을 바꾸지 않았다). 그 밖 파일 0. 타이틀은 sha12 로만 적었다.
 
+
+<!-- corpus-name-inflow v1 subjects=7 tree=0de46c51f1a06c81 B=734/341 P=0/0 S=35/15 -->
