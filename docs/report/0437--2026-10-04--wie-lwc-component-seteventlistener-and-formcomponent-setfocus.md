@@ -69,3 +69,7 @@
 
 - `0c67145b11df` 의 OK 버튼은 포커스가 떠난 뒤에도 빨간 오른쪽 테두리가 남는다 — main 에서도 같다(`DOWN` 으로 버튼을 돌아 나가도 남는다). 이 회차 범위 밖.
 - 리스너 등록은 게스트가 지우지 않으면 구성요소보다 오래 산다(정적 Vector · 선형 탐색) — 화면당 한두 개라 `ponytail:` 주석으로 상한을 적었다.
+
+### 유입
+
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 2회 / 2쌍 · SUFFIX-ATTACHED 0회 / 0쌍. 둘 다 이 회차가 고친 파일(`shell_card.rs` · `component.rs`)에 **이미 있던** 주석 줄이다. 이 회차가 더한 줄의 게임 이름은 0이다(`git diff origin/main...HEAD` 의 `+` 줄 대조).
