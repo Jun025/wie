@@ -70,11 +70,7 @@ impl Component {
                 // setEventListener's registrations, as flat (component, listener, obj) triples. Static,
                 // not the canonical evtListener/evtListenerObj instance fields: an lwc instance field
                 // shifts an LGT AOT subclass's offsets (AnnunciatorComponent.shownHeight, net.wie.ShellCard).
-                JavaFieldProto::new(
-                    "evtListeners",
-                    "Ljava/util/Vector;",
-                    FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC,
-                ),
+                JavaFieldProto::new("evtListeners", "Ljava/util/Vector;", FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC),
             ],
             access_flags: ClassAccessFlags::PUBLIC | ClassAccessFlags::ABSTRACT,
         }
@@ -182,7 +178,9 @@ impl Component {
         let listeners = Self::listeners(jvm).await?;
         if let Some(at) = Self::listener_index(jvm, &listeners, &this).await? {
             for _ in 0..3 {
-                let _: () = jvm.invoke_virtual(&listeners, "java/util/Vector", "removeElementAt", "(I)V", (at,)).await?;
+                let _: () = jvm
+                    .invoke_virtual(&listeners, "java/util/Vector", "removeElementAt", "(I)V", (at,))
+                    .await?;
             }
         }
         if listener.is_null() {

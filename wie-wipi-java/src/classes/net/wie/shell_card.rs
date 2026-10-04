@@ -733,7 +733,10 @@ mod test {
                 let press = |code: WIPIKeyCode| {
                     let canvas = canvas.clone();
                     let jvm = jvm.clone();
-                    async move { jvm.invoke_virtual::<_, ()>(&canvas, "net/wie/CardCanvas", "keyPressed", "(I)V", (code as i32,)).await }
+                    async move {
+                        jvm.invoke_virtual::<_, ()>(&canvas, "net/wie/CardCanvas", "keyPressed", "(I)V", (code as i32,))
+                            .await
+                    }
                 };
 
                 assert_eq!(field_("focusGained").await?, 1, "show() gave the field the focus and told its listener");
@@ -808,9 +811,7 @@ mod test {
                         (form.clone(),),
                     )
                     .await?;
-                let _: () = jvm
-                    .invoke_virtual(&boxes[0], "org/kwis/msp/lwc/Component", "setFocus", "()V", ())
-                    .await?;
+                let _: () = jvm.invoke_virtual(&boxes[0], "org/kwis/msp/lwc/Component", "setFocus", "()V", ()).await?;
 
                 let _: () = jvm
                     .invoke_virtual(
@@ -824,7 +825,13 @@ mod test {
                 assert_eq!(ShellCard::focus(&jvm).await?.identity(), boxes[1].identity());
 
                 let _: bool = jvm
-                    .invoke_virtual(&shell, "org/kwis/msp/lwc/ShellComponent", "keyNotify", "(II)Z", (1, WIPIKeyCode::NUM4 as i32))
+                    .invoke_virtual(
+                        &shell,
+                        "org/kwis/msp/lwc/ShellComponent",
+                        "keyNotify",
+                        "(II)Z",
+                        (1, WIPIKeyCode::NUM4 as i32),
+                    )
                     .await?;
                 let mut typed = Vec::new();
                 for widget in &boxes {
@@ -838,7 +845,13 @@ mod test {
                 // A null component is ignored rather than clearing the focus.
                 let none: ClassInstanceRef<Component> = None.into();
                 let _: () = jvm
-                    .invoke_virtual(&form, "org/kwis/msp/lwc/FormComponent", "setFocus", "(Lorg/kwis/msp/lwc/Component;)V", (none,))
+                    .invoke_virtual(
+                        &form,
+                        "org/kwis/msp/lwc/FormComponent",
+                        "setFocus",
+                        "(Lorg/kwis/msp/lwc/Component;)V",
+                        (none,),
+                    )
                     .await?;
                 assert_eq!(ShellCard::focus(&jvm).await?.identity(), boxes[1].identity());
 

@@ -121,7 +121,10 @@ impl ShellComponent {
         if !focus.is_null() && leaves.iter().any(|leaf| leaf.identity() == focus.identity()) {
             return Ok(());
         }
-        let Some(first) = leaves.into_iter().find(|leaf| !jvm.is_instance(&***leaf, "org/kwis/msp/lwc/LabelComponent")) else {
+        let Some(first) = leaves
+            .into_iter()
+            .find(|leaf| !jvm.is_instance(&***leaf, "org/kwis/msp/lwc/LabelComponent"))
+        else {
             return Ok(());
         };
         jvm.invoke_virtual(&first, "org/kwis/msp/lwc/Component", "setFocus", "()V", ()).await

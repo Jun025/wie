@@ -20,12 +20,7 @@ impl FormComponent {
             methods: vec![
                 JavaMethodProto::new("<init>", "()V", Self::init, Default::default()),
                 JavaMethodProto::new("<init>", "(Z)V", Self::init_with_vertical, Default::default()),
-                JavaMethodProto::new(
-                    "setFocus",
-                    "(Lorg/kwis/msp/lwc/Component;)V",
-                    Self::set_focus,
-                    MethodAccessFlags::PUBLIC,
-                ),
+                JavaMethodProto::new("setFocus", "(Lorg/kwis/msp/lwc/Component;)V", Self::set_focus, MethodAccessFlags::PUBLIC),
             ],
             fields: vec![JavaFieldProto::new("vertical", "Z", FieldAccessFlags::PRIVATE)],
             access_flags: Default::default(),
