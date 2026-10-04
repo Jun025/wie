@@ -64,3 +64,9 @@
 - `RUST_MIN_STACK=4194304 cargo test --all` rc=0.
 - 러너 블록 전건 PASS(`keydraw_ktf` paints 79 · `keydraw_lgt` 55).
 - 스크래치 타깃에서 `build-slot` 경유로 돌렸다.
+
+### 6. 유입
+
+- `node scripts/corpus-name-inflow.mjs` 결과: BOUNDED 1건, SUFFIX-ATTACHED 0건.
+- 그 1건은 `shell_card.rs` 에 **main 에 이미 있던** 한 줄이다(`origin/main` 본문에 1회 · 이 PR 의 diff 에 0회). 파일을 고친 탓에 대상에 잡혔다.
+- ⇒ 이 회차가 들인 게임 파일명은 **0건**이다.
