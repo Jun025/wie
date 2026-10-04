@@ -43,3 +43,4 @@
 - 그 1건은 `shell_card.rs` 에 **main 에 이미 있던** 한 줄이다(이 PR 의 diff 에 0회). 파일을 고친 탓에 대상에 잡혔다(0431 §6 과 같은 줄).
 - ⇒ 이 회차가 들인 게임 파일명은 **0건**이다.
 
+<!-- corpus-name-inflow v1 subjects=5 tree=c5daad3d18fe5a3e B=1/1 P=0/0 S=0/0 -->
