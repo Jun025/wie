@@ -75,8 +75,9 @@ impl WieEmulator {
     /// * `canvas` — the `<canvas>` the framebuffer is blitted onto.
     /// * `audio_ctx` — an already-resumed `AudioContext`, or `null` for silence.
     /// * `width` / `height` — emulator screen size (240×320 is the usual default).
-    /// * `soundfont_url` — optional sf2/sf3 the audio sink fetches in the background after the
-    ///   first sound and uses for plays that start once it has loaded. Omitted (or a build without
+    /// * `soundfont_url` — optional sf2/sf3 the audio sink fetches in the background from boot.
+    ///   Every MIDI play of the session renders through it, the first included (a play waits for it,
+    ///   bounded); if it fails or is too late, the whole session is FM. Omitted (or a build without
     ///   the soundfont prelude) = the built-in FM synth only, the pre-soundfont behaviour.
     // Positional because the JS constructor shape is the pinned engine contract
     // (docs/contracts/featurephone-engine-contract.json `constructorShape`).
