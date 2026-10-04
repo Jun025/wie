@@ -198,6 +198,7 @@ function validate(args, killAfterSecs, stderrPath) {
     const tail = [];
     let warns = 0;
     let nets = 0;
+    let deaths = 0;
     let partial = '';
     child.stdout.on('data', (b) => (stdout += b));
     child.stderr.on('data', (b) => {
@@ -206,6 +207,7 @@ function validate(args, killAfterSecs, stderrPath) {
       for (const l of lines) {
         if (/\bWARN\b|panicked/.test(l)) warns++;
         nets += (l.match(NET_CONNECT) ?? []).length; // the whole stream: the tail below keeps 200 lines
+        if (UNCAUGHT.test(l)) deaths++;
         tail.push(l);
         if (tail.length > 200) tail.shift();
       }
@@ -226,6 +228,7 @@ function validate(args, killAfterSecs, stderrPath) {
       r.rc = code;
       r.stderr_warns = warns;
       r.net_connects = nets;
+      r.uncaught_threads = deaths;
       r.load1 = loadavg()[0];
       done(r);
     });
@@ -519,14 +522,7 @@ function judge(sha) {
   const inputPanic = /panic on input/.test(A.reason ?? '');
   ax.input = !ok2 ? 'n/a' : novel > 0 && !inputPanic ? 'ok' : 'none';
   const probeErr = painted && A.result === 'FAIL' && /panic|error|killed|SVC stub/i.test(A.reason ?? '');
-  if (probeErr) ax.longplay = 'error';
-  else if (!L) ax.longplay = 'n/a';
-  else if (L.result === 'FAIL') ax.longplay = 'error';
-  // ponytail: no `stall` verdict. Measured on this census's first pass: of 40 runs with 4+ identical
-  // 20 s shots, the ones opened were a sub-menu the key loop never backs out of (no CLR) and a
-  // notice waiting for NUM1 — the script's ceiling, not a frozen engine — and on a starved host a
-  // live title paints too rarely to tell. `still` in census.tsv keeps the count for a human.
-  else ax.longplay = 'ok';
+  ax.longplay = longplayVerdict(probeErr, L, join(d, 'L.stderr'));
   ax.sound = soundVerdict(ax.boot, [A, B, L, S]);
   // Lateness is wall-clock, so host load only ever ADDS to it: a ratio measured on a busy host is a
   // lower bound. >= 0.9 there is a real `ok`; below it says nothing (measured 2026-09-27 at load1
@@ -707,6 +703,28 @@ const netConnects = (A, stderrPath) =>
   A.net_connects ?? Math.max(stubConnects(A), existsSync(stderrPath) ? tailConnects(readFileSync(stderrPath, 'latin1')) : 0);
 const netWall = (connects) => connects >= 200;
 
+// ── longplay: a guest Java thread that dies uncaught did not survive ───────────────────────────
+// rustjava logs `Uncaught exception in thread N:` when a guest thread's run() throws; the run then
+// spins to the deadline with nothing left to drive the game, so its result is UNMEASURED or PASS,
+// never FAIL. One heap exhaustion split one title into FAIL (OOM on the main tick) and «ok» (OOM on
+// the game thread) and read as a regression (8d8c24b7c198, wave6). On the wave6 corpus all 4 non-FAIL
+// longplays with the line had a frozen tail (21–29 of 29 timer shots identical, frozen_tail_steps
+// 603–850) — the frozen tail alone would also flag 54 titles parked on a menu (docs/report/0434).
+//   ponytail: any thread counts. A title whose helper thread dies while the game plays on would read
+//   `error`; none on disk. Name the thread here if one turns up.
+// The count is `uncaught_threads` (whole stream, validate()); a run recorded before it falls back to
+// the 200-line L.stderr tail — a lower bound.
+const UNCAUGHT = /uncaught exception in thread/i;
+const guestDied = (L, stderrPath) => (L.uncaught_threads ?? +(existsSync(stderrPath) && UNCAUGHT.test(readFileSync(stderrPath, 'latin1')))) > 0;
+const longplayVerdict = (probeErr, L, stderrPath) =>
+  probeErr ? 'error' : !L ? 'n/a' : L.result === 'FAIL' || guestDied(L, stderrPath) ? 'error' : 'ok';
+// ponytail: no `stall` verdict. Measured on this census's first pass: of 40 runs with 4+ identical
+// 20 s shots, the ones opened were a sub-menu the key loop never backs out of (no CLR) and a
+// notice waiting for NUM1 — the script's ceiling, not a frozen engine — and on a starved host a
+// live title paints too rarely to tell. `still` in census.tsv keeps the count for a human.
+// The exception block after the line, up to the next timestamped log line — a cluster wall.
+const uncaughtOf = (text) => /Uncaught exception in thread -?\d+:\n([\s\S]*?)(?=\n[^\n]*\d{4}-\d\d-\d\dT\d\d:|$)/.exec(text)?.[1] ?? null;
+
 // NFC: macOS hands back file names decomposed (NFD), and PR titles are composed.
 const displayTitle = (p) =>
   basename(p)
@@ -858,6 +876,31 @@ if (cmd === 'selftest') {
     cases.push(
       ['a wall with four stubs per retry has 40 connects in its tail — under the line', tail === 40 && !netWall(tail)],
       ['and validate() counts all 600 of them, so it is a wall', r.net_connects === 600 && netWall(netConnects(r, join(tmp, 'A.stderr')))],
+    );
+    rmSync(tmp, { recursive: true, force: true });
+  }
+  // longplay through validate(): a game thread that dies early, then 300 lines of a run spinning to
+  // the deadline — the death is out of the 200-line tail, and the result line still says PASS.
+  {
+    const tmp = join('/tmp', `wie-census-death-${process.pid}`);
+    rmSync(tmp, { recursive: true, force: true });
+    mkdirSync(tmp, { recursive: true });
+    const bin = join(tmp, 'fake.sh');
+    const death = 'ERROR rustjava_runtime::classes::java::lang::thread: Uncaught exception in thread -1258909751:\\njava.lang.NullPointerException\\n\\tat java/lang/Thread.run()V\\n';
+    writeFileSync(bin, `#!/bin/sh\nprintf '${death}' >&2\ni=0; while [ $i -lt 300 ]; do echo 'WARN stub unk12-1' >&2; i=$((i+1)); done\necho '{"result":"PASS","paints":1}'\n`, { mode: 0o755 });
+    const keep = opt.bin;
+    opt.bin = bin;
+    const r = await validate([], 30, join(tmp, 'L.stderr'));
+    opt.bin = keep;
+    const stderr = join(tmp, 'L.stderr');
+    writeFileSync(join(tmp, 'old.stderr'), death.replaceAll('\\n', '\n').replaceAll('\\t', '\t') + '2026-10-03T05:30:31.016169Z WARN next\n');
+    cases.push(
+      ['a guest thread death is counted over the whole stream', r.uncaught_threads === 1 && !UNCAUGHT.test(readFileSync(stderr, 'latin1'))],
+      ['a run whose game thread died is not a survivor', longplayVerdict(false, r, stderr) === 'error'],
+      ['a run with no death survives', longplayVerdict(false, { result: 'UNMEASURED', uncaught_threads: 0 }, '/nonexistent') === 'ok'],
+      ['a FAIL is still an error, no record is n/a', longplayVerdict(false, { result: 'FAIL', uncaught_threads: 0 }, '/nonexistent') === 'error' && longplayVerdict(false, null, '') === 'n/a'],
+      ['an older run is read off its tail', longplayVerdict(false, { result: 'UNMEASURED' }, join(tmp, 'old.stderr')) === 'error'],
+      ['the wall is the exception, not the next log line', uncaughtOf(readFileSync(join(tmp, 'old.stderr'), 'latin1')) === 'java.lang.NullPointerException\n\tat java/lang/Thread.run()V'],
     );
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -1020,9 +1063,11 @@ if (cmd === 'run') {
     const first = ['boot', 'render', 'input', 'longplay'].find((a) => !['ok', 'n/a'].includes(j.ax[a]));
     for (const [axis, v] of Object.entries(j.ax)) {
       if (['ok', 'n/a'].includes(v) || (axis !== first && !['sound', 'speed', 'progress'].includes(axis))) continue;
-      const src = axis === 'progress' ? j.P : axis === 'longplay' && j.L?.result === 'FAIL' ? j.L : j.A;
+      const died = axis === 'longplay' && j.L && j.L.result !== 'FAIL' && guestDied(j.L, join(out, t.sha, 'L.stderr'));
+      const src = axis === 'progress' ? j.P : axis === 'longplay' && (j.L?.result === 'FAIL' || died) ? j.L : j.A;
       const stem = src === j.P ? 'P' : src === j.L ? 'L' : 'A';
-      const key = `${axis}:${v}\t${axis === 'sound' || axis === 'speed' || axis === 'input' || (axis === 'progress' && v === 'stuck') ? '' : wallOf(src.reason, join(out, t.sha, `${stem}.stderr`))}`;
+      const reason = died ? `guest thread died: ${uncaughtOf(readFileSync(join(out, t.sha, 'L.stderr'), 'latin1')) ?? ''}` : src.reason;
+      const key = `${axis}:${v}\t${axis === 'sound' || axis === 'speed' || axis === 'input' || (axis === 'progress' && v === 'stuck') ? '' : wallOf(reason, join(out, t.sha, `${stem}.stderr`))}`;
       if (!clusters.has(key)) clusters.set(key, []);
       clusters.get(key).push(`${t.sha.slice(0, 12)}(${platform.toLowerCase()})`);
     }
