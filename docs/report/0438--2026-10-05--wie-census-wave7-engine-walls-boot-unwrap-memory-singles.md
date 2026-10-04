@@ -82,7 +82,7 @@ guard rc=0 배치는 01:37~01:45 의 7배치(21회)뿐이었다. 그 뒤 01:46 �
 
 - 퇴행 0. `13d7e3c21856` 의 «A PASS → `max-ticks`»는 LGT 타이틀이다. 이 변경은 KTF 경로만 바꾼다(DB 표 · `InitParam4` · KTF 부팅). 그래서 퇴행으로 읽지 않았다. 판정 축(boot·render·input)은 같다.
 - `3c658a46bbfb` compat 행: input `no`→`ok` · sound `no`→`ok` · longplay `no`→`unknown`. 종전 `no` 는 30초 프로브의 FAIL 에서 나온 값이었고, 이 핀에서 장시간은 재지 않았다. status 는 `limited` 그대로다.
-- guard «holding» 중에 돌린 비공식 1회(§7 예외)도 방향이 같았다: 텐가이·정통맞고 panic → 오류 · 셔터 그림 5 → 125.
+- guard «holding» 중에 돌린 비공식 1회(§7 예외)도 방향이 같았다: `1d5831e42a8a`·`60bd6cbc5936` panic → 오류 · `3c658a46bbfb` 그림 5 → 125.
 - **고쳤지만 이 회차에 짝이 없는 것**: `4a4d2ac046f7` `f981d228b757`(슬롯 11 은 저장할 때만 닿는다 — 장시간 L 필요) · `5267badf20b3` `55aadf368b8e`(§3). 근거는 역어셈과 시험뿐이다. 그래서 compat 행·소식에 넣지 않았다.
 
 ### 7. 측정 조건
@@ -90,7 +90,7 @@ guard rc=0 배치는 01:37~01:45 의 7배치(21회)뿐이었다. 그 뒤 01:46 �
 - 인자는 census 와 같다. 프로브 A = `--inject --keep-timeout --timeout 30 --relaunch 1 --pacing 8`. B = `… --inject-keys 0 --shot-every 1`. L = `LONG_KEYS` 60회 · 600초 · `--shot-every 20`. 판정도 `judge()` 와 같다(입력 = A 에 B 에 없는 프레임이 있나).
 - **census 도구를 쓰지 않았다.** 다른 레인의 진도 census 가 호스트 락을 90분 넘게 쥐고 있었다. 대신 `wie_validate` 를 직접 돌렸다. 한 번에 3개 이하 · 모두 `build-slot run` 경유 · 배치마다 `host-load-guard --status --recovered` rc=0 을 기다렸다. 진척은 `~/scratch/w7/progress.log`(로컬).
 - 진도(`progress`) 축은 재지 않았다(§8).
-- 예외: 첫 비공식 한 쌍(30초 A 3타이틀 × 2빌드 · 셔터·텐가이·정통맞고)은 guard 가 «holding» 일 때 돌렸다. 그 숫자는 §6 표에 쓰지 않았다. 셔터(`3c658a46bbfb`)·텐가이(`1d5831e42a8a`)는 rc=0 배치에서 다시 쟀다. 정통맞고(`60bd6cbc5936`)는 다시 재지 못했다.
+- 예외: 첫 비공식 한 쌍(30초 A 3타이틀 × 2빌드)은 guard 가 «holding» 일 때 돌렸다. 그 숫자는 §6 표에 쓰지 않았다. `3c658a46bbfb`·`1d5831e42a8a` 는 rc=0 배치에서 다시 쟀다. `60bd6cbc5936` 은 다시 재지 못했다.
 
 ### 8. 후속
 
@@ -104,3 +104,5 @@ guard rc=0 배치는 01:37~01:45 의 7배치(21회)뿐이었다. 그 뒤 01:46 �
 | 1 | `71d1d8235bd1` SKT 3D | 엔진(3D 렌더러) | L |
 
 ### 9. 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 334쌍 + SUFFIX-ATTACHED 15쌍. 이 회차가 쓴 줄 중 게임 이름은 0이다 — BOUNDED 의 나머지는 `compat.json` 의 기존 제목 값(1행만 값 수정 · 제목 무변경)과, 손댄 `wie-ktf` 세 파일에 이미 있던 주석(이 회차의 `+` 줄 0)이다. 타이틀은 sha12 로만 적었다.
