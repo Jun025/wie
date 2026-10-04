@@ -12,7 +12,22 @@ fn run(extra: &[&std::ffi::OsStr]) -> String {
         .env_remove("RUST_LOG")
         .output()
         .expect("wie_validate did not start");
-    String::from_utf8(out.stdout).unwrap()
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    if stdout.lines().count() != 1 {
+        // A run that died before its JSON line says why only here (exit status, stderr tail).
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        let tail: String = stderr
+            .lines()
+            .rev()
+            .take(15)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>()
+            .join("\n");
+        eprintln!("wie_validate {extra:?}: {} · stderr tail:\n{tail}", out.status);
+    }
+    stdout
 }
 
 #[test]

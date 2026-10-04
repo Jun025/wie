@@ -178,7 +178,7 @@ impl KtfJvmSupport {
             // `docs/report/0340`) and a jar that is not a zip (an OMA DRM container) both throw here.
             // That is the title's error to report, not a host panic. Boxed: inline, the error formatter
             // grew `init`'s future past Windows' 1 MiB main-thread stack in the debug `wie_validate`
-            // (boot needed 1016K before this path existed — docs/report/0438 §10).
+            // (boot needed 1016K before this path existed — docs/report/0438 §9).
             .or_else(async |error| Err(Box::pin(JvmSupport::to_wie_err(&jvm, error)).await))
             .await?;
 
