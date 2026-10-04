@@ -107,4 +107,4 @@ guard rc=0 배치는 01:37~01:45 의 7배치(21회)뿐이었다. 그 뒤 01:46 �
 
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 333쌍 + SUFFIX-ATTACHED 15쌍. 이 회차가 쓴 줄 중 게임 이름은 0이다 — BOUNDED 의 나머지는 `compat.json` 의 기존 제목 값(1행만 값 수정 · 제목 무변경)과, 손댄 `wie-ktf` 세 파일에 이미 있던 주석(이 회차의 `+` 줄 0)이다. 타이틀은 sha12 로만 적었다.
 
-<!-- corpus-name-inflow v1 subjects=11 tree=f3f15024d3429791 B=721/333 P=1/1 S=35/15 -->
+<!-- corpus-name-inflow v1 subjects=11 tree=f146b64541716424 B=721/333 P=1/1 S=35/15 -->
