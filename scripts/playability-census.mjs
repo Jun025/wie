@@ -66,6 +66,11 @@ const PROBE_KEYS_AT = 8; // pacing window opens after boot
 // database) is relaunched once, database kept — what a player does. Without it such a title reads
 // as boot/render fail on every census (7da00ecd4804, 2026-09-29).
 const RELAUNCH = ['--relaunch', '1'];
+// Every run here is bounded by --timeout. wie_validate's 50M-tick default is an infinite-loop backstop
+// sized for a boot, and a fast title burns it before the key schedule is done: on 12 of 17 input `none`
+// titles the 30 s probe A stopped at `max-ticks` after 2–17 of 27 keys, and 7 of them read `ok` once it
+// was lifted (docs/report/0453). So no run here keeps the backstop.
+const NO_TICK_CAP = ['--max-ticks', '100000000000'];
 const LONG_KEYS = 'OK:1 UP:0.5 UP:0.5 OK:1 DOWN:0.5 RIGHT:0.5 NUM5:1 LEFT:0.5 NUM5:1 OK:1 NUM2:0.5 NUM8:0.5 NUM4:0.5 NUM6:0.5 OK:1';
 // The progress policy (~30 s a cycle): confirm through notices and menus (OK/5, one left soft key,
 // one NUM1 for «1. 예» notices), then play — directions tapped and held, fire repeatedly. Never CLR
@@ -254,7 +259,7 @@ async function probe(t) {
     const f = join(d, `${name}.json`);
     if (existsSync(f)) continue;
     mkdirSync(join(d, name), { recursive: true });
-    const args = ['--inject', '--keep-timeout', '--timeout', String(opt.secs), '--shotdir', join(d, name), ...RELAUNCH, ...extra, t.path];
+    const args = ['--inject', '--keep-timeout', '--timeout', String(opt.secs), ...NO_TICK_CAP, '--shotdir', join(d, name), ...RELAUNCH, ...extra, t.path];
     const r = await validate(args, opt.secs + 120, join(d, `${name}.stderr`));
     // A probe the host starved is not a measurement: it is left unrecorded, so the next `run` retries
     // it, instead of reading as `boot: fail`. Measured 2026-09-28: next to two Interactive-priority
@@ -278,7 +283,7 @@ async function speed(t) {
   const d = join(out, t.sha);
   const f = join(d, 'S.json');
   if (existsSync(f)) return;
-  const args = ['--inject', '--keep-timeout', '--timeout', String(opt.secs), '--pacing', String(PROBE_KEYS_AT), t.path];
+  const args = ['--inject', '--keep-timeout', '--timeout', String(opt.secs), ...NO_TICK_CAP, '--pacing', String(PROBE_KEYS_AT), t.path];
   writeFileSync(f, JSON.stringify(await validate(args, opt.secs + 120, join(d, 'S.stderr'))));
 }
 
@@ -293,9 +298,8 @@ async function longplay(t, spec = {}) {
   // A `--titles` recipe is a prefix here too: the loop alone never leaves some logos and menus, and
   // a title whose music starts in play then reads `silent` (15 such, docs/report/0388 §1).
   writeFileSync(keys, longKeys(spec.keys ? readFileSync(spec.keys, 'utf8') : '', reps));
-  // --max-ticks: the 50M default is an infinite-loop backstop sized for a boot, and a fast title
-  // burns it in minutes — measured on this run's first pass, which ended runs at 3 of 10 minutes.
-  const args = ['--inject', '--keys', keys, '--keep-timeout', '--timeout', String(opt.long), '--max-ticks', '100000000000', '--shotdir', join(d, 'L'), '--shot-every', '20', ...RELAUNCH, t.path];
+  // The backstop ended this run's first pass at 3 of 10 minutes (NO_TICK_CAP).
+  const args = ['--inject', '--keys', keys, '--keep-timeout', '--timeout', String(opt.long), ...NO_TICK_CAP, '--shotdir', join(d, 'L'), '--shot-every', '20', ...RELAUNCH, t.path];
   const r = await validate(args, opt.long + 300, join(d, 'L.stderr'));
   // `--keys` also shoots once per key step; only the `tNNN.N` timer shots are evenly spaced.
   const timed = existsSync(join(d, 'L'))
@@ -346,7 +350,7 @@ async function progress(t, spec = {}) {
   // A recipe is a PREFIX (the path to where play starts — an ⒜ unlock), then the policy as usual.
   writeFileSync(keys, [spec.keys ? readFileSync(spec.keys, 'utf8') : '', ...Array(Math.ceil(total / 25)).fill(PROGRESS_KEYS)].join('\n'));
   const policy = v2 ? ['--stall-secs', String(PROGRESS_STALL), ...PROGRESS_ESCAPES.flatMap((e) => ['--stall-keys', e]), '--restart-at', String(secs), '--relaunch', '8'] : ['--relaunch', '3'];
-  const args = ['--inject', '--keys', keys, '--keep-timeout', '--timeout', String(total), '--max-ticks', '100000000000', '--shotdir', shots, '--shot-every', String(PROGRESS_SHOT), ...policy, t.path];
+  const args = ['--inject', '--keys', keys, '--keep-timeout', '--timeout', String(total), ...NO_TICK_CAP, '--shotdir', shots, '--shot-every', String(PROGRESS_SHOT), ...policy, t.path];
   const r = await validate(args, total + 300, join(d, `${stem}.stderr`));
   const all = readdirSync(shots).filter((n) => n.endsWith('.png'));
   const timed = all.filter((n) => shotTime(n) !== null).sort(byShotTime);
