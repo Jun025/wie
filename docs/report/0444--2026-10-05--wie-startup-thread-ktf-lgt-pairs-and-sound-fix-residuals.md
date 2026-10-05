@@ -67,3 +67,5 @@
 ### 7. 게임 파일명 유입
 
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 5회 / 5쌍 + SUFFIX-ATTACHED 0회 / 0쌍. 5회는 전부 이 회차가 고친 파일(`wie-backend/src/system.rs` · `wie-lgt/src/emulator.rs` · `wie-midp/.../smaf_player.rs`)의 **기존** 주석·시험 줄이다 — 이 회차가 더한 줄(`git diff origin/main` 의 `+` 줄)에는 0 이다. 이 회차는 타이틀을 sha12 로만 적었다.
+
+
