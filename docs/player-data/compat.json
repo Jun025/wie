@@ -333,7 +333,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -388,7 +388,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -426,7 +426,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -774,7 +774,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -1274,7 +1274,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -1312,7 +1312,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -1405,7 +1405,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -1498,7 +1498,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2166,7 +2166,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -3393,7 +3393,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4560,7 +4560,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4654,7 +4655,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6639,7 +6640,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7124,7 +7125,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
