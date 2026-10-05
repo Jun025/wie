@@ -32,6 +32,8 @@ pub struct ExecutorInner {
     sleeping_tasks: BTreeMap<usize, (Instant, Option<Instant>)>,
     last_task_id: usize,
     last_now: Instant,
+    // Set by `halt`: no task is polled again. See there.
+    halted: bool,
 }
 
 pub trait AsyncCallable<R>: Send
@@ -85,6 +87,7 @@ impl Executor {
             sleeping_tasks: BTreeMap::new(),
             last_task_id: 0,
             last_now: Instant::from_epoch_millis(0),
+            halted: false,
         }));
 
         Self { inner }
@@ -127,6 +130,14 @@ impl Executor {
         drop(tasks);
     }
 
+    /// Stop polling tasks, from the task that is running now on. A program that exits is gone on a
+    /// handset — no thread of it runs again — but here every other task went on being polled for
+    /// the rest of the tick. The task that asked is not stopped by this; see
+    /// `System::exit_from_guest`. Tasks are kept, not dropped: dropping them is `clear`'s, the host's.
+    pub fn halt(&self) {
+        self.inner.lock().halted = true;
+    }
+
     // TODO we need to remove error handling from here. we need to JoinHandle like on spawn..
     pub fn tick<T>(&mut self, now: T) -> Result<()>
     where
@@ -142,6 +153,9 @@ impl Executor {
     {
         let end = now() + budget_ms;
         loop {
+            if self.inner.lock().halted {
+                break;
+            }
             let mut current = now();
 
             if current > end {
@@ -197,6 +211,10 @@ impl Executor {
         let mut first_error = None;
 
         for (task_id, mut task) in tasks.into_iter() {
+            if self.inner.lock().halted {
+                next_tasks.insert(task_id, task);
+                continue;
+            }
             let item = sleeping_tasks.get(&task_id);
             if let Some(item) = item {
                 if item.0 <= now {
@@ -356,6 +374,31 @@ mod tests {
         // (17→35fps on KTF 영웅서기4) must turn this red.
         executor.tick(advancing_clock(0)).unwrap();
         assert_eq!(polls.load(Ordering::Relaxed), 14);
+    }
+
+    #[test]
+    fn test_halt_stops_every_task_including_later_ones_in_the_same_step() {
+        // One thread exits; another — spawned later, so polled after it in the same step — must not
+        // run again, in this tick or any later one.
+        let mut executor = Executor::new();
+        let after_exit = Arc::new(AtomicU64::new(0));
+
+        let halter = executor.clone();
+        executor.spawn(move || async move {
+            halter.halt();
+            YieldOnce(false).await;
+        });
+        let after_exit_clone = after_exit.clone();
+        executor.spawn(move || async move {
+            for _ in 0..1000 {
+                after_exit_clone.fetch_add(1, Ordering::Relaxed);
+                YieldOnce(false).await;
+            }
+        });
+
+        executor.tick(advancing_clock(0)).unwrap();
+        executor.tick(advancing_clock(100)).unwrap();
+        assert_eq!(after_exit.load(Ordering::Relaxed), 0);
     }
 
     #[test]

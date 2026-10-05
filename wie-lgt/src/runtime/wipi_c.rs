@@ -608,9 +608,7 @@ async fn unk11(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u
 async fn terminate_program(context: &mut dyn WIPICContext, code: i32) -> Result<()> {
     tracing::debug!("LGT WIPIC terminate_program({code})");
 
-    context.system().platform().exit();
-
-    Ok(())
+    context.system().exit_from_guest().await
 }
 
 /// `MC_knlGetTotalMemory` / `MC_knlGetFreeMemory` on LGT: a fixed 4MiB for both.
@@ -782,14 +780,20 @@ mod tests {
             let stub = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::TerminateProgram)?;
             let _: u32 = core.run_function(stub, &[0x1b]).await?;
 
+            // Never reached: an exit does not return to the guest (`System::exit_from_guest`).
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
         });
 
-        while !done.load(Ordering::Relaxed) {
+        for _ in 0..1000 {
             system.tick()?;
+            if exited.load(Ordering::Relaxed) {
+                break;
+            }
         }
+        system.tick()?;
         assert!(exited.load(Ordering::Relaxed), "0x68 must reach Platform::exit");
+        assert!(!done.load(Ordering::Relaxed), "0x68 returned to the guest");
 
         Ok(())
     }

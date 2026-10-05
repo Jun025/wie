@@ -185,7 +185,7 @@ mod tests {
     use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
     use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 
-    use test_utils::{TestPlatform, TestPlatformEvent, run_jvm_test, run_jvm_test_with_system};
+    use test_utils::{TestPlatform, run_jvm_test, run_jvm_test_until_exit, run_jvm_test_with_system};
     use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
     use wie_util::Result;
 
@@ -193,7 +193,7 @@ mod tests {
 
     use super::Jlet;
 
-    // A title's Jlet: counts how often the platform calls its destroyApp, and declares its own
+    // A title's Jlet: its destroyApp must never be reached from notifyDestroyed, and it declares its own
     // `dis` as two KTF titles' Jlets do (docs/report/0382) — protected, since a private one would
     // share Jlet's slot in jvm-bytecode's storage rather than shadow it.
     struct TestJlet;
@@ -208,10 +208,7 @@ mod tests {
                     JavaMethodProto::new("<init>", "()V", Self::init, MethodAccessFlags::PUBLIC),
                     JavaMethodProto::new("destroyApp", "(Z)V", Self::destroy_app, MethodAccessFlags::PROTECTED),
                 ],
-                fields: vec![
-                    JavaFieldProto::new("destroyed", "I", FieldAccessFlags::STATIC),
-                    JavaFieldProto::new("dis", "Lorg/kwis/msp/lcdui/Display;", FieldAccessFlags::PROTECTED),
-                ],
+                fields: vec![JavaFieldProto::new("dis", "Lorg/kwis/msp/lcdui/Display;", FieldAccessFlags::PROTECTED)],
                 access_flags: ClassAccessFlags::PUBLIC,
             }
         }
@@ -220,39 +217,28 @@ mod tests {
             jvm.invoke_special(&this, "org/kwis/msp/lcdui/Jlet", "<init>", "()V", ()).await
         }
 
-        async fn destroy_app(jvm: &Jvm, _: &mut WieJvmContext, _this: ClassInstanceRef<Self>, _unconditional: bool) -> JvmResult<()> {
-            let count: i32 = jvm.get_static_field("TestJlet", "destroyed", "I").await?;
-            jvm.put_static_field("TestJlet", "destroyed", "I", count + 1).await
+        async fn destroy_app(_: &Jvm, _: &mut WieJvmContext, _this: ClassInstanceRef<Self>, _unconditional: bool) -> JvmResult<()> {
+            panic!("notifyDestroyed called back into destroyApp");
         }
     }
 
     // notifyDestroyed ends the app and does not call back into destroyApp (which titles finish
-    // with notifyDestroyed(): that loop overflowed the host stack).
+    // with notifyDestroyed(): that loop overflowed the host stack). The call does not return, so
+    // TestJlet's destroyApp panics rather than counting into a static nobody could read back.
     #[test]
     fn notify_destroyed_exits_without_destroy_app() -> Result<()> {
-        let exited = Arc::new(AtomicBool::new(false));
-        let flag = exited.clone();
-        let platform = TestPlatform::with_event_handler(move |event| {
-            if matches!(event, TestPlatformEvent::Exit) {
-                flag.store(true, Ordering::SeqCst);
-            }
-        });
-
-        run_jvm_test_with_system(
+        let returned = run_jvm_test_until_exit(
             Box::new([wie_midp::get_protos().into(), get_protos().into(), [TestJlet::as_proto()].into()]),
-            Box::new(platform),
-            |jvm, _system| async move {
+            1000,
+            |jvm| async move {
                 let _midlet = jvm.new_class("net/wie/WIPIMIDlet", "()V", ()).await?;
                 let jlet = jvm.new_class("TestJlet", "()V", ()).await?;
                 let _: () = jvm.invoke_virtual(&jlet, "org/kwis/msp/lcdui/Jlet", "notifyDestroyed", "()V", ()).await?;
-
-                let destroyed: i32 = jvm.get_static_field("TestJlet", "destroyed", "I").await?;
-                assert_eq!(destroyed, 0);
                 Ok(())
             },
         )?;
 
-        assert!(exited.load(Ordering::SeqCst));
+        assert!(!returned, "notifyDestroyed returned to the guest");
         Ok(())
     }
 

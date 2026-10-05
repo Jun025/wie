@@ -200,6 +200,22 @@ impl System {
         self.platform.as_ref().as_ref()
     }
 
+    /// The program exits: none of its threads runs again (see [`Executor::halt`]), then the host
+    /// is told. Every guest exit path goes through here, not `platform().exit()` directly.
+    pub fn exit(&self) {
+        self.executor.halt();
+        self.platform.exit();
+    }
+
+    /// [`exit`](Self::exit) from a guest thread, which then never returns to the guest either.
+    /// `halt` stops the other threads but cannot stop the one that called, and that one goes on
+    /// until it next yields: d3e3b16cefd0 calls `notifyDestroyed` from its game loop,
+    /// returns into the loop, and dies reading the field its `destroyApp` just nulled.
+    pub async fn exit_from_guest<T>(&self) -> T {
+        self.exit();
+        core::future::pending().await
+    }
+
     pub fn audio(&self) -> RwLockWriteGuard<'_, Audio> {
         self.audio.as_ref().write()
     }

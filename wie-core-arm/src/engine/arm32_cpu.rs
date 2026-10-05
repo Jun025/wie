@@ -70,6 +70,11 @@ impl ArmEngine for Arm32CpuEngine {
             }
 
             if pc < 0x1000 {
+                // Same reason as the undefined-instruction message below: the register dump the
+                // caller prints is taken after the context is restored, so lr here is the only
+                // record of which call site branched to null.
+                let lr = self.cpu.reg_get(Mode::User, reg::LR);
+                tracing::error!("guest branched to {pc:#x}, lr={lr:#x}");
                 return Err(WieError::InvalidMemoryAccess(pc));
             }
 
