@@ -287,6 +287,16 @@ jobs:
           node scripts/player-data.mjs --selftest
           node scripts/player-data.mjs
 
+      # A branch that merged main mid-flight and then rewrote compat.json from data measured before that
+      # merge silently reverts the rows it received — no conflict, schema-valid. Compared on git lineage
+      # (fork point → merge-base → merge-tree result), not on values: a value-only rule flagged 3 of the
+      # last 6 legit compat landings. HEAD here is the PR merge commit, so the script reads HEAD^2.
+      - name: compat.json does not revert rows the branch received from main (scripts/check-compat-revert.mjs)
+        run: |
+          git fetch --no-tags --quiet origin main
+          node scripts/check-compat-revert.mjs --selftest
+          node scripts/check-compat-revert.mjs
+
       # 유입 marker freshness (docs/report/0196). Advisory since 2026-09-26: as a
       # blocking step it reddened 3 unrelated PRs, and it proves freshness, not truth.
       - name: Inflow marker is still fresh (docs/report/0196)
