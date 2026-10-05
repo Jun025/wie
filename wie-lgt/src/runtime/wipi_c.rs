@@ -182,6 +182,8 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         // `0xf0` is `(dst framebuffer, xs, ys, n)` with the two arrays side by side on the stack —
         // a polygon. One LGT title calls it with n = 4 right after setting the foreground pixel;
         // with no row the first call was a fatal «Unknown LGT WIPIC SVC id 240» mid-play.
+        // Outline vs fill is unresolved: it may be `MC_grpFillPolygon` — the screen did not tell
+        // them apart, and the index model leaves either open. The current implementation draws the outline.
         WIPICSvcId::DrawPolygon => wie_wipi_c::api::graphics::draw_polygon.into_body(),
         WIPICSvcId::ImGetSupportModeCount => im_get_support_mode_count.into_body(),
         WIPICSvcId::ImGetSupportedModes => im_get_supported_modes.into_body(),
@@ -1144,7 +1146,8 @@ mod tests {
         Ok(())
     }
 
-    /// WIPIC `0xf0` draws the closed outline through its points in the foreground pixel.
+    /// WIPIC `0xf0` draws the closed outline through its points in the foreground pixel (current
+    /// implementation — outline vs fill is unresolved, see `handle_wipic_svc`).
     ///
     /// An LGT title calls it mid-tutorial with `(dst, xs, ys, 4)`; with no row that call was fatal.
     #[test]
@@ -1177,7 +1180,7 @@ mod tests {
             let pixel = |x: u32, y: u32| read_generic::<u16, _>(&core, buf + y * bpl + x * 2);
             assert_eq!(pixel(2, 0)?, 0xffff, "top edge");
             assert_eq!(pixel(0, 2)?, 0xffff, "the closing edge back to the first point");
-            assert_eq!(pixel(2, 2)?, 0, "an outline, not a fill");
+            assert_eq!(pixel(2, 2)?, 0, "the current implementation draws the outline (fill unresolved)");
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())

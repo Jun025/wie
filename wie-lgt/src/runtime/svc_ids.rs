@@ -197,9 +197,10 @@ pub enum WIPICSvcId {
     GetStringWidth = 0xe7,
     CreateImage = 0xe9,
     Unk0 = 0xeb,
-    // `MC_grpPostEvent` — see `wipi_c::handle_wipic_svc`. Graphics section index 38.
+    // `MC_grpPostEvent` — named by argument shape, not index; see `wipi_c::handle_wipic_svc`.
     PostEvent = 0xee,
-    // `MC_grpDrawPolygon` — see `wipi_c::handle_wipic_svc`. Graphics section index 40.
+    // Drawn as `MC_grpDrawPolygon` — named by argument shape only. By KTF order this slot may be
+    // `MC_grpFillPolygon` instead; unresolved, see `wipi_c::handle_wipic_svc`.
     DrawPolygon = 0xf0,
     ImGetSupportModeCount = 0x12c,
     ImGetSupportedModes = 0x12d,
