@@ -52,11 +52,11 @@ pub(super) mod graphics;
 
 use jvm::{Jvm, Result as JvmResult, runtime::JavaLangString};
 use wipi_types::lgt::CletFunctions;
-use wipi_types::wipic::{WIPICFramebuffer, WIPICIndirectPtr, WIPICWord};
+use wipi_types::wipic::{WIPICFramebuffer, WIPICImage, WIPICIndirectPtr, WIPICWord};
 
 use wie_backend::{
     System,
-    canvas::{Rgb565Pixel, VecImageBuffer},
+    canvas::{PixelType, Rgb565Pixel, VecImageBuffer},
 };
 use wie_core_arm::{ArmCore, EmulatedFunction, EmulatedFunctionParam, ResultWriter, SvcId};
 use wie_jvm_support::JvmSupport;
@@ -163,7 +163,7 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::GetFontAscent => shared_graphics::get_font_ascent.into_body(),
         WIPICSvcId::GetFontDescent => shared_graphics::get_font_descent.into_body(),
         WIPICSvcId::GetStringWidth => shared_graphics::get_string_width.into_body(),
-        WIPICSvcId::CreateImage => wie_wipi_c::api::graphics::create_image.into_body(),
+        WIPICSvcId::CreateImage => create_image.into_body(),
         WIPICSvcId::Unk0 => unk0.into_body(),
         // `0xee` takes `(id, type, param1, param2)` — the `MC_grpPostEvent` shape — and the event
         // comes back through the clet's event handler. Measured on an LGT title whose first-run
@@ -373,6 +373,38 @@ async fn flush_lcd(
     }
 
     shared_graphics::flush_lcd(context, i, framebuffer, x, y, w, h).await
+}
+
+// `MC_grpCreateImage`, with an opaque image stored at the handset's 16bpp. LGT titles ask
+// `MC_GRP_GET_FRAME_BUFFER_BPP` (16, whatever the argument) and then read the framebuffer that
+// `MC_grpGetImageFrameBuffer` hands back as RGB565 themselves; the shared decoder stores 32bpp
+// ARGB, which read that way comes out as alternating garbage columns. Opaque only: the shared
+// draw path needs a transparent image's alpha, and on a 16bpp screen 888 -> 565 loses nothing.
+// ponytail: a transparent image read raw by the guest still stripes; needs a native mask to fix.
+async fn create_image(
+    context: &mut dyn WIPICContext,
+    ptr_image: WIPICWord,
+    image_data: WIPICIndirectPtr,
+    offset: u32,
+    len: u32,
+) -> Result<WIPICWord> {
+    let result = shared_graphics::create_image(context, ptr_image, image_data, offset, len).await?;
+    let memory: WIPICIndirectPtr = read_generic(context, ptr_image)?;
+    let address = context.data_ptr(memory)?;
+    let mut image: WIPICImage = read_generic(context, address)?;
+    if image.img.bpp != 32 {
+        return Ok(result);
+    }
+    let colors = shared_graphics::FrameBuffer(image.img).image(context)?.colors();
+    if colors.iter().all(|color| color.a == 0xff) {
+        let pixels = colors.into_iter().map(Rgb565Pixel::from_color).collect();
+        let rgb565 = VecImageBuffer::<Rgb565Pixel>::from_raw(image.img.width, image.img.height, pixels);
+        context.free(image.img.buf)?;
+        image.img = shared_graphics::FrameBuffer::from_image(context, &rgb565)?.0;
+        tracing::debug!("MC_grpCreateImage: {:#x} stored as RGB565", memory.0);
+        write_generic(context, address, image)?;
+    }
+    Ok(result)
 }
 
 async fn net_socket_write(_context: &mut dyn WIPICContext, fd: u32, buf: u32, len: u32, _a3: u32) -> Result<i32> {
@@ -687,7 +719,10 @@ mod tests {
     use core::sync::atomic::{AtomicBool, Ordering};
 
     use test_utils::{TestPlatform, TestPlatformEvent};
-    use wie_backend::{DefaultTaskRunner, Event, System};
+    use wie_backend::{
+        DefaultTaskRunner, Event, System,
+        canvas::{ArgbPixel, VecImageBuffer, encode_png},
+    };
     use wie_core_arm::{Allocator, ArmCore};
     use wie_util::{ByteWrite, Result, read_generic, write_generic};
     use wie_wipi_c::WIPICContext;
@@ -1104,6 +1139,51 @@ mod tests {
             fill(&mut core, dst, 0xaaaa_aaaa)?;
             let _: u32 = core.run_function(draw, &[dst, 0, 0, 2, 1, image, 0, 0, record]).await?;
             assert_eq!(pixels(&core, dst)?, 0x11aa_aaaa, "#ff00ff is the key; #123456 lands as RGB565 0x11aa");
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    /// `MC_grpCreateImage` stores an opaque image at 16bpp: titles read image pixels themselves as
+    /// RGB565, and a 32bpp image read that way stripes (two titles' whole title screens). An image
+    /// with transparency stays 32bpp, whose alpha the shared draw path needs.
+    #[test]
+    fn wipic_create_image_stores_opaque_images_as_rgb565() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, _) = init_jvm(&system_clone).await?;
+            register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
+            let create = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::CreateImage)?;
+
+            let create_image = async |core: &mut ArmCore, argb: [u32; 2]| -> Result<(WIPICFramebuffer, u32)> {
+                let png = encode_png(&VecImageBuffer::<ArgbPixel>::from_raw(2, 1, argb.to_vec()))?;
+                let data = Allocator::alloc(core, png.len() as u32)?;
+                core.write_bytes(data, &png)?;
+                let out = Allocator::alloc(core, 4)?;
+                let _: u32 = core.run_function(create, &[out, data, 0, png.len() as u32]).await?;
+                let handle: u32 = read_generic(core, out)?;
+                let framebuffer: WIPICFramebuffer = read_generic(core, handle)?;
+                let first: u32 = read_generic(core, framebuffer.buf.0)?;
+                Ok((framebuffer, first))
+            };
+
+            let (opaque, pixels) = create_image(&mut core, [0xff12_3456, 0xffff_00ff]).await?;
+            assert_eq!((opaque.bpp, opaque.bpl), (16, 4));
+            assert_eq!(pixels, 0xf81f_11aa, "#123456 and #ff00ff as RGB565, as the title reads them");
+
+            let (transparent, _) = create_image(&mut core, [0x0012_3456, 0xffff_00ff]).await?;
+            assert_eq!(transparent.bpp, 32, "alpha is kept for the draw path");
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())

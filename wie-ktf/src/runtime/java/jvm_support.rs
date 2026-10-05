@@ -1145,6 +1145,16 @@ mod test {
 
             let handler: RawJavaExceptionHandler = read_generic(&core, ptr_handler)?;
             assert_eq!(handler.unk3, ptr_exception, "the catch block reads `e` from this slot");
+            assert_eq!(handler.current_pc, 0x1dd, "the handler runs at its target");
+
+            // A `finally` rethrows from its own body, which no range covers: it leaves this frame
+            // instead of re-entering the handler it is running in (dbd078113b97 KTF, 86,010 throws in 3 s).
+            let again = Box::new(JavaClassInstance::from_raw(ptr_exception, &core));
+            let rethrown = JavaMethod::handle_exception(&mut core, &jvm, again).await;
+            assert!(
+                matches!(rethrown, Err(WieError::JavaException(x)) if x == ptr_exception),
+                "re-entered its own handler"
+            );
 
             done_clone.store(true, Ordering::Relaxed);
 
