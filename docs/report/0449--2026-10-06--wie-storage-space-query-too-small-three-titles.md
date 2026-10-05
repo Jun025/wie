@@ -52,3 +52,5 @@ head 에서 로고 뒤 `Unimplemented: 13: MC_knlGetAccessLevel`. 호출부 `0x1
 ### 6. 게임 파일명 유입
 
 - `corpus-name-inflow`: BOUNDED 0 + SUFFIX-ATTACHED 0.
+
+<!-- corpus-name-inflow v1 subjects=4 tree=e5fb5f2916865b34 B=0/0 P=0/0 S=0/0 -->
