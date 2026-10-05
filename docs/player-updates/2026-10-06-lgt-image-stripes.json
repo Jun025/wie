@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-06",
+  "kind": "fix",
+  "titles": [
+    "e68b1c8aef85c584dc6e5e225f0c226641b23f6c523bf0f59eb662151f9cf954",
+    "b9bfcaf427222a62a7c904c9561fca706725adf5782e1f4a57328bbe7dd349ab",
+    "01eef742dd0a89f1429f929182fecec3009341d3f2c0f3e1adc566a9bf03742d",
+    "1eaa92092bee50e2dc2d7649f9d9e60812f22a67371fdec905215bf7e5d38f20",
+    "863b8ab6a21df2c05e0d9ad085a5068fdf37433940093efe289b6459b7c1e7e9"
+  ],
+  "summary_ko": "타이틀 화면과 게임 화면의 그림이 줄무늬처럼 깨져 보이던 게임 다섯 개가 이제 제대로 보여요."
+}
