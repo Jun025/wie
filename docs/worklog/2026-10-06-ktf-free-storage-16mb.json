@@ -1,0 +1,31 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-06",
+  "task": "wie-storage-space-query-too-small-three-titles",
+  "title": "KTF 여유 저장 공간 답 1 MB → 16 MB · LGT 저장 실패 안내는 공간 질의가 아니다",
+  "summary": "KTF 설치 문턱(2103KB 초과)을 실측하고 슬롯 11·12 의 답을 16 MB 로 올렸다. LGT 1종과 KTF 의 다음 벽은 반환 규약 근거가 없어 남겼다. docs/report/0449.",
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "LGT 첫 실행에서 «데이터 저장 실패»로 꺼지는 1종",
+      "plainSummary": "처음 켜는 게임이 저장 파일이 없는데도 «저장 실패»라며 꺼진다.",
+      "userBenefit": "그 게임이 새 게임으로 시작한다.",
+      "why": "63332c51d514 의 로더(0xf248)가 MC_dbListRecordInfo 의 반환값을 보지 않고 항목의 크기 칸을 읽는다. 없는 DB 에 우리는 -12 만 돌려주고 칸을 안 써서 스택 찌꺼기가 크기가 된다(docs/report/0449 §3).",
+      "tradeoff": "실기가 없는 DB 를 «열기 실패»로 알렸는지 «크기 0 항목»으로 알렸는지 모른다. 다른 LGT 타이틀의 같은 호출부를 코퍼스에서 모아 어느 쪽과 맞는지 먼저 본다.",
+      "effort": "S~M",
+      "target": "wie-wipi-c database::open_database(모드 8) / list_record_info"
+    },
+    {
+      "kind": "product",
+      "title": "KTF MC_knlGetAccessLevel 에서 멈추는 1종(두 판)",
+      "plainSummary": "설치를 마친 게임이 제작사 화면 뒤에 멈춘다.",
+      "userBenefit": "974e0df9ab1e · f770b15f8876 이 다음 화면으로 넘어간다.",
+      "why": "이번 회차가 설치 공간 벽을 넘긴 뒤 커널 슬롯 13 이 Unimplemented 로 끝난다. 호출부 0x12af8c 는 (level & 0xbc) == 0xbc 일 때만 PHONENUMBER 를 읽고, 아니면 다른 갈래로 간다(docs/report/0449 §4).",
+      "tradeoff": "실기가 일반 다운로드 앱에 준 권한 값을 모른다. 두 갈래 모두 게임이 처리하므로 어느 갈래가 통신 없이 진행하는지 먼저 확인한다.",
+      "effort": "S",
+      "target": "wie-ktf wipi_c method_table Kernel 13"
+    }
+  ],
+  "adoptedProposals": ["2026-10-05-sound-silent-57#p1"],
+  "declinedProposals": []
+}
