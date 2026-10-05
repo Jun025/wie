@@ -59,3 +59,5 @@ base·head 를 같은 분에 나란히 돌렸다(load1 ~20). long 풀이 다른 
 ### 5. 게임 파일명 유입
 
 - `corpus-name-inflow`: BOUNDED 1 + SUFFIX-ATTACHED 0. 그 1건은 이 PR 이 건드린 파일의 기존 줄(`jvm_support.rs:1012`, main 에 이미 있다)이고, 이 PR 이 더한 줄에서는 0 이다.
+
+<!-- corpus-name-inflow v1 subjects=5 tree=ff0dba90a0b8d158 B=1/1 P=0/0 S=0/0 -->
