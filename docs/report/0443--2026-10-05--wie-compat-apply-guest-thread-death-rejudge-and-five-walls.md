@@ -87,6 +87,4 @@
 
 ### 9. 유입
 
-`node scripts/corpus-name-inflow.mjs`: 유입 370쌍(BOUNDED) · 판단 필요 19쌍(SUFFIX-ATTACHED). 전부 이 PR 이 손댄 파일에 **원래 있던** 이름이다 — `compat.json`(공개 제목 표, 계약상 제목을 싣는다)과 `lgt_java_abi.toml`·`wie-lgt` 시험의 기존 주석. 이 PR 이 더한 줄에는 게임명이 없다(주석은 sha12 로 적었고, 처음 쓴 이름 셋은 커밋 전에 sha12 로 바꿨다).
-
-<!-- corpus-name-inflow v1 subjects=17 tree=9cc194837c94bd5c B=843/371 P=0/0 S=50/20 -->
+`node scripts/corpus-name-inflow.mjs`: 유입 371쌍(BOUNDED) · 판단 필요 20쌍(SUFFIX-ATTACHED). 전부 이 PR 이 손댄 파일에 **원래 있던** 이름이다 — `compat.json`(공개 제목 표, 계약상 제목을 싣는다)과 `lgt_java_abi.toml`·`wie-lgt` 시험·`jlet.rs` 시험의 기존 주석. 이 PR 이 더한 줄에는 게임명이 없다(주석은 sha12 로 적었고, 처음 쓴 이름 셋은 커밋 전에 sha12 로 바꿨다).
