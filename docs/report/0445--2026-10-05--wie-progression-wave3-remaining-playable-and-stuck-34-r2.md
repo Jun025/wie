@@ -160,4 +160,4 @@ census 와 같은 키·탈출 규칙으로 쟀다(고친 빌드 · 재기동 꼬
 
 **게이트.** fmt OK · clippy `--all` / wasm / `+beta` rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` **701 passed / 0 failed**. 첫 두 번은 rustc ICE(`failed to open LTO bitcode file … pre-lto.bc`)로 빌드가 죽었다. 증분 캐시 파일이 빌드 도중 사라진 것이라 `CARGO_INCREMENTAL=0` 으로 다시 돌렸다. `player-data.mjs` OK.
 
-<!-- corpus-name-inflow v1 subjects=14 tree=1f43e8f283145090 B=735/342 P=0/0 S=35/15 -->
+<!-- corpus-name-inflow v1 subjects=14 tree=a8af1df7a1d9aa90 B=735/342 P=0/0 S=35/15 -->
