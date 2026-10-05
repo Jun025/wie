@@ -285,7 +285,7 @@ where
     fn exit(&self, status: i32) {
         tracing::debug!("Runtime::exit({status})");
 
-        self.system.platform().exit();
+        self.system.exit();
     }
 
     fn now(&self) -> u64 {

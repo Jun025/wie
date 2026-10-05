@@ -1124,7 +1124,19 @@ fn main() {
     // Hoisted so main can read what the guest printed after `run` returns; `run`
     // hands the same handle to HeadlessPlatform::write_stdout.
     let guest_out = Arc::new(Mutex::new(Vec::new()));
-    let result = run(&args, guest_out.clone());
+    // Windows gives the main thread a fixed 1 MiB and `RUST_MIN_STACK` only sizes spawned threads,
+    // so the emulator runs on a thread with an explicit stack. A debug KTF boot already needed about
+    // that much, and one more error path in the boot future overflowed it (0xc00000fd · docs/report/0438
+    // §9). 8 MiB is what the macOS/Linux main thread gives it anyway.
+    const EMULATOR_STACK: usize = 8 << 20;
+    let result = std::thread::scope(|s| {
+        std::thread::Builder::new()
+            .stack_size(EMULATOR_STACK)
+            .spawn_scoped(s, || run(&args, guest_out.clone()))
+            .expect("could not spawn the emulator thread")
+            .join()
+            .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+    });
     let elapsed_ms = start.elapsed().as_millis();
 
     // Emit a single JSON line for the batch wrapper to parse.

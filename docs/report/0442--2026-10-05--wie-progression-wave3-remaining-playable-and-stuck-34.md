@@ -64,7 +64,7 @@
 
 #### 4-2. LGT WIPIC `0xf0` = `MC_grpDrawPolygon`
 - 막힌 지점 → 다음 지점(`320a5360a0f3`): 튜토리얼 «대쉬» 연습에서 «Unknown LGT WIPIC SVC id 240 (r0 = 화면 버퍼 · r1/r2 = 스택의 이웃 배열 · r3 = 4)» 로 꺼진다(90초 정책 재현 · 전 빌드 FAIL 2/2) ⇒ 튜토리얼이 이어진다(150초 · UNMEASURED = 기한 도달).
-- 인자 `(dst, xs, ys, n)` 은 다각형이다. 외곽선(`DrawPolygon`)으로 넣었다. 그리기 원소는 기존 `draw_line` 이다. 채우기(`FillPolygon`)인지는 화면으로 가르지 못했다. 한계로 둔다.
+- 인자 `(dst, xs, ys, n)` 은 다각형이다. 외곽선(`DrawPolygon`)으로 넣었다. 그리기 원소는 기존 `draw_line` 이다. 채우기(`FillPolygon`)인지는 화면으로 가르지 못했다. 한계로 둔다. 색인 모형으로도 가르지 못한다(LGT 는 `DrawImage` 뒤 한 칸 밀리는데 `0xee` 를 PostEvent 로 보면 한 칸이 더 있다 — 그 뒤 `HandleInput` 의 위치에 따라 `0xf0` 은 Draw/FillPolygon 어느 쪽 자리도 된다). 그래서 코드 주석은 «인자 모양으로 붙인 이름 · Fill 일 수 있다»로 적고, 테스트도 «현재 구현은 외곽선»으로만 잠근다. `draw_polygon` 은 게스트 `count` 로 미리 할당하지 않고 점을 읽으며 그린다.
 - 이 타이틀은 `progress` 키가 없는 250 모집단에 있다. 6차 표본에 들지 않아 정책 진도에서 처음 드러났다.
 
 #### 4-3. 되돌리면 red
@@ -85,11 +85,13 @@
 
 ### 6. compat.json — 잰 행만
 
-- 방법: 6차 재생성 판(`enginePin` `4ac38566` 그대로)의 행 단위 수정이다. 이 회차가 잰 행의 `axes.progress` 만 바꿨다. status 규칙은 그대로다(총괄 판정 2026-10-02).
-- `ok` 16행(§2 ok 표): stuck → ok 13 · 없음 → ok 1(`7218e8720f8c`) · ok 유지 2(`a540945188ca` `b475b6399684` — 손 측정 행).
+- 방법: ★**현 `origin/main`(`d4a0f330`) 의 compat.json 위에** 이 회차가 잰 행의 `axes.progress` 만 얹었다. status 규칙은 그대로다(총괄 판정 2026-10-02).
+  - 초판(커밋 `e01ebe4e`)은 6차 재생성 판(`4ac38566`) 위에서 파일을 다시 써서, 그 사이 main 에 착지한 #473 의 17행(`sound` 11행 · `knownIssues_ko` 17행)을 옛 값으로 되돌렸다. 게이트② 반려(F1) 후 `origin/main` 을 이 브랜치에 merge 하고 행 단위로 다시 확인했다.
+  - 확인(`sha256+platform` 키 · `origin/main` ↔ 이 브랜치 head): `progress rows 14 · non-progress rows 0` · 추가/삭제 행 0 · 머리(`enginePin` 등) 차이 0.
+- 바뀐 행 14: stuck → ok 13 · 없음 → ok 1(`7218e8720f8c`). §2 ok 표의 나머지 2(`a540945188ca` `b475b6399684` — 손 측정 행)는 이미 `ok` 라 바뀌지 않았다(초판의 «16행»은 이 2행을 센 수였다).
 - `stuck` 17행은 그대로 `stuck` 이다. 레시피 값은 싣지 않는다(계약 `featurephone-public-data.md` §1 — 이 축은 «정책 키»).
 - §4 의 2종은 이 브랜치 빌드로 쟀다(§7).
-- `node scripts/player-data.mjs` OK(429 · 388/24/17).
+- `node scripts/player-data.mjs` OK(429 · 392/22/15 — main merge 후).
 
 ### 7. 고친 2종 — 600초 정책 측정은 다음 회차
 
@@ -114,4 +116,4 @@
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 341쌍 + SUFFIX-ATTACHED 15쌍. 전부 `compat.json` 의 기존 제목 값이다(이 회차는 제목 문자열을 바꾸지 않았다). 그 밖 파일 0. 타이틀은 sha12 로만 적었다.
 
 
-<!-- corpus-name-inflow v1 subjects=7 tree=0de46c51f1a06c81 B=734/341 P=0/0 S=35/15 -->
+<!-- corpus-name-inflow v1 subjects=7 tree=25a685bcf9d10b8b B=734/341 P=0/0 S=35/15 -->

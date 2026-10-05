@@ -652,7 +652,10 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
             WIPICDatabaseMethodId::SortRecords => Some(database::sort_records.into_body()),
             WIPICDatabaseMethodId::GetAccessMode => Some(gen_stub(9, "MC_dbGetAccessMode")),
             WIPICDatabaseMethodId::GetNumberOfRecords => Some(database::get_number_of_records.into_body()),
-            WIPICDatabaseMethodId::GetRecordSize => Some(gen_stub(11, "MC_dbGetRecordSize")),
+            // Not the header's `MC_dbGetRecordSize(fd)`: the three callers in the corpus (two engines) pass
+            // nothing and compare the answer, signed, against a byte count — a save's length, or 0x176f
+            // at boot — so it is slot 12's free-storage answer (`docs/report/0438` §2).
+            WIPICDatabaseMethodId::GetRecordSize => Some(database::list_databases.into_body()),
             WIPICDatabaseMethodId::ListDatabases => Some(database::list_databases.into_body()),
             WIPICDatabaseMethodId::Unk13 => Some(gen_stub(13, "MC_dbUnk13")),
             WIPICDatabaseMethodId::Unk14 => Some(gen_stub(14, "MC_dbUnk14")),

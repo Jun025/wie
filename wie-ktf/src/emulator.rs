@@ -118,6 +118,42 @@ const OWNER_SOUND_OFF_SETTINGS: &[([u8; 16], &[&str])] = &[
         ],
         &["kjik.mcf"],
     ),
+    // 34ab350dc98a: 3 bytes; the second is the sound level and the owner's is 0 (set to 3, it plays).
+    (
+        [
+            0x1c, 0x40, 0xaa, 0x0b, 0x3c, 0x04, 0xa7, 0x60, 0x95, 0xaa, 0x68, 0x6c, 0x28, 0xcf, 0xd0, 0x46,
+        ],
+        &["BG0"],
+    ),
+    // c7f543c73b91: four ints; the first is the sound level and the owner's is 0 (set to 3, it plays).
+    (
+        [
+            0x75, 0x09, 0x2c, 0xa0, 0x24, 0xa3, 0x54, 0x66, 0x08, 0xca, 0x10, 0x47, 0xbd, 0x9d, 0x30, 0x06,
+        ],
+        &["option.dat"],
+    ),
+    // db8ef04a6504: a 6-byte DB; the owner's first byte is 0, the title writes 3 there when it is absent.
+    (
+        [
+            0x64, 0x87, 0x7e, 0x4b, 0x6d, 0x24, 0x50, 0x2a, 0xb8, 0xdb, 0x3e, 0xb0, 0x5b, 0x6f, 0x48, 0xb2,
+        ],
+        &["config"],
+    ),
+    // e085e193211d: 8 bytes; the first is the sound level and the owner's is 0 (set to 5, it plays).
+    (
+        [
+            0x08, 0xa2, 0xe4, 0x6b, 0xe3, 0x74, 0x81, 0x68, 0xcc, 0x0b, 0x00, 0x21, 0x5e, 0x57, 0x87, 0x90,
+        ],
+        &["ga/cf.ga"],
+    ),
+    // 36b82cb67723: the profile and its backup copy — the owner's name, and a first int that is the
+    // sound level, 0 (set to 3, it plays). The other eight `peng*` files are not it.
+    (
+        [
+            0x47, 0xe3, 0x24, 0xc4, 0x31, 0x55, 0x49, 0xd8, 0x04, 0x7a, 0x5b, 0xfc, 0xbb, 0xf1, 0xac, 0x19,
+        ],
+        &["peng0.txt", "pengB0.txt"],
+    ),
 ];
 
 /// The original owner's progress, shipped in the archive, that «continue» opens: a new player would
@@ -385,15 +421,12 @@ impl KtfEmulator {
             .invoke_static("org/kwis/msp/lcdui/Main", "main", "([Ljava/lang/String;)V", (args_array,))
             .await;
 
-        if let Err(x) = result {
-            return Err(JvmSupport::to_wie_err(&jvm, x).await);
-        }
+        let result = match result {
+            Ok(()) if clet_mode => KtfJvmSupport::disable_midp_paint(&jvm).await,
+            result => result,
+        };
 
-        if clet_mode && let Err(x) = KtfJvmSupport::disable_midp_paint(&jvm).await {
-            return Err(JvmSupport::to_wie_err(&jvm, x).await);
-        }
-
-        Ok(())
+        JvmSupport::finish_launch(&jvm, result).await
     }
 }
 

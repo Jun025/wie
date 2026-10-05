@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-05",
+  "kind": "sound",
+  "titles": [
+    "34ab350dc98a40b5c26a8b05f0c03cb67008fe25014c35926344c50112fadd17",
+    "c7f543c73b9103d57b5e9e5b825e6bdb595de812fbccf81b718db8d2e94fa756",
+    "db8ef04a6504d9b011a89b032bbfcb585ab17eaa6a34a275603bc64e67f516c5",
+    "e085e193211d048f4906f801f79f7dd3ee6ef91e5405d179569c43e98460edc8",
+    "36b82cb677238bda62f0a6a96b020a1689b27f39fb082f7c780939613e319374"
+  ],
+  "summary_ko": "게임 파일에 원래 주인이 소리를 끈 설정이 들어 있어 소리 없이 시작하던 게임 5개가, 이제 처음 설치한 것처럼 소리가 켜진 채로 시작해요.",
+  "pr": "https://github.com/Jun025/wie/pull/473"
+}

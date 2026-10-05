@@ -769,6 +769,7 @@ pub async fn draw_line(context: &mut dyn WIPICContext, dst: WIPICIndirectPtr, x1
 }
 
 /// `MC_grpDrawPolygon(dst, xPoints, yPoints, nPoints, pgc)`: the closed outline through the points.
+/// Named by argument shape; it may be `MC_grpFillPolygon` — the screen did not tell them apart.
 pub async fn draw_polygon(
     context: &mut dyn WIPICContext,
     dst: WIPICIndirectPtr,
@@ -792,14 +793,16 @@ pub async fn draw_polygon(
         height: framebuffer.0.height as _,
     };
     let color = framebuffer.pixel_to_color(gctx.fgpxl);
-    let mut points = Vec::with_capacity(count as usize);
-    for i in 0..count as u32 {
-        let (x, y): (i32, i32) = (read_generic(context, x_points + i * 4)?, read_generic(context, y_points + i * 4)?);
-        points.push((x, y));
-    }
-    for (i, &(x1, y1)) in points.iter().enumerate() {
-        let (x2, y2) = points[(i + 1) % points.len()];
-        primitives::draw_line(context, &framebuffer, x1, y1, x2, y2, color, clip)?;
+    // Read as we draw: `count` is guest-supplied, so nothing is allocated from it.
+    let read_point = |context: &mut dyn WIPICContext, i: u32| -> Result<(i32, i32)> {
+        Ok((read_generic(context, x_points + i * 4)?, read_generic(context, y_points + i * 4)?))
+    };
+    let first = read_point(context, 0)?;
+    let mut prev = first;
+    for i in 1..=count as u32 {
+        let next = if i == count as u32 { first } else { read_point(context, i)? };
+        primitives::draw_line(context, &framebuffer, prev.0, prev.1, next.0, next.1, color, clip)?;
+        prev = next;
     }
 
     Ok(())

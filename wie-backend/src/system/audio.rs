@@ -34,7 +34,7 @@ impl Audio {
 
     pub fn load_smaf(&mut self, data: &[u8]) -> Result<AudioHandle, AudioError> {
         let audio_handle = self.last_audio_handle;
-        let sequence = Arc::new(convert_smaf_events(parse_smaf(data)));
+        let sequence = Arc::new(convert_smaf_events(parse_smaf_in(data)));
 
         self.last_audio_handle += 1;
         self.files.insert(audio_handle, sequence);
@@ -111,6 +111,24 @@ impl Audio {
 
     fn gain(&self, audio_handle: AudioHandle) -> f32 {
         self.master_volume * self.volume(audio_handle)
+    }
+}
+
+// A KTF title hands `MC_mdaClipPutData` a 13,000-byte buffer holding a 10,201-byte SMAF file;
+// `Smaf::parse` reads chunks up to the end of the slice and needs exactly the CRC after the last
+// one, so the padding failed the whole parse and every play was an empty sequence. When the whole
+// buffer yields nothing, parse it again cut at the length the `MMMD` header declares. Only then:
+// a header that misstates its length (0 in a committed test) still parses whole, as it always did.
+// Public because MIDP's `SmafPlayer` measures the clip length off the same events.
+// The declared length is a u32 straight from the file: `saturating_add`, or a broken header near
+// u32::MAX overflows (a debug panic on wasm32, where usize is 32 bits).
+pub fn parse_smaf_in(data: &[u8]) -> Vec<(usize, SmafEvent)> {
+    let events = parse_smaf(data);
+    match data {
+        [b'M', b'M', b'M', b'D', a, b, c, d, ..] if events.is_empty() => {
+            parse_smaf(&data[..data.len().min(u32::from_be_bytes([*a, *b, *c, *d]).saturating_add(8) as usize)])
+        }
+        _ => events,
     }
 }
 
@@ -191,6 +209,40 @@ mod tests {
                 ],
             }
         );
+    }
+
+    // One note in a format-2 score track, then a buffer padded past the file. Padding is only fatal
+    // for some lengths (here 6 or 7 mod 8 — the measured title's 2,799 is one of them).
+    #[test]
+    fn smaf_in_a_padded_buffer_still_plays_its_notes() {
+        let seq = [0x00, 0x90, 0x3c, 0x40, 0x10, 0x00, 0xff, 0x2f, 0x00];
+        let mut mtr = vec![0x02, 0x00, 0x02, 0x02];
+        mtr.extend([0; 16]);
+        mtr.extend(b"Mtsq");
+        mtr.extend((seq.len() as u32).to_be_bytes());
+        mtr.extend(seq);
+        let mut file = b"MMMD".to_vec();
+        file.extend((8 + mtr.len() as u32 + 2).to_be_bytes());
+        file.extend(b"MTR\x05");
+        file.extend((mtr.len() as u32).to_be_bytes());
+        file.extend(mtr);
+        file.extend([0, 0]);
+        file.extend([0; 6]);
+
+        let mut audio = Audio::new(Box::new(RecordingSink(Arc::new(Mutex::new(Vec::new())))));
+        let handle = audio.load_smaf(&file).unwrap();
+
+        assert!(!audio.files[&handle].events.is_empty());
+    }
+
+    // A broken file whose header declares a length near u32::MAX: no panic, just nothing to play.
+    #[test]
+    fn smaf_declaring_a_length_near_u32_max_loads_empty() {
+        let mut file = b"MMMD".to_vec();
+        file.extend(u32::MAX.to_be_bytes());
+        file.extend(b"MTR\x05garbage");
+
+        assert!(super::parse_smaf_in(&file).is_empty());
     }
 
     #[test]

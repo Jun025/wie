@@ -331,6 +331,8 @@ pub async fn get_number_of_records(context: &mut dyn WIPICContext, db_id: i32) -
 /// Although the standard interface names function ID 12 `MC_dbListDataBase`,
 /// KTF titles use its no-argument return value as an available-storage byte count.
 /// Known callers reject values below 0x100 and 0x1200 respectively.
+/// KTF slot 11 (header name `MC_dbGetRecordSize`) is served by this too: its callers pass no
+/// argument and refuse to save when the answer is below the save's length (or is not above 0x176f at boot).
 pub async fn list_databases(context: &mut dyn WIPICContext) -> Result<i32> {
     let system = context.system();
     let pid = system.pid().to_owned();

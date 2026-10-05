@@ -220,7 +220,7 @@ impl LgtEmulator {
             });
         }
 
-        Ok(())
+        JvmSupport::finish_launch(&jvm, Ok(())).await
     }
 }
 

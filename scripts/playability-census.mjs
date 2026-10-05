@@ -88,8 +88,9 @@ const [cmd, ...rest] = process.argv.slice(2);
 // Default half the cores but at most 3, never more than all of them: each job is a CPU-bound
 // wie_validate, so past ncpu the extra ones only add context switches (2026-09-29: --jobs 32 on 10
 // cores -> load1 450, sys 80%+, idle 0%) and starve the wall-clock probes into UNMEASURED. The 3 is
-// the host's build-slot count on 10 cores: a census shares the Mac with every other lane's builds
-// (2026-10-02: 20 emulator processes at load1 240 — CLAUDE.md «측정 스윕»).
+// the host's short build-slot count on 10 cores: a census shares the Mac with every other lane's builds
+// (2026-10-02: 20 emulator processes at load1 240 — CLAUDE.md «측정 스윕»). The run itself takes ONE
+// `build-slot run --long` lease and these jobs run inside it — they do not take slots of their own.
 function jobsFor(requested, ncpu) {
   if (requested === undefined) return Math.max(1, Math.min(3, Math.floor(ncpu / 2)));
   const n = Math.max(1, Math.floor(Number(requested)) || 1);

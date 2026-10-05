@@ -110,8 +110,8 @@ impl KtfJvmSupport {
         let jar_name_java = JavaLangString::from_rust_string(&jvm, jar_name.unwrap()).await.unwrap();
         let jar_file = jvm
             .new_class("java/util/jar/JarFile", "(Ljava/lang/String;)V", (jar_name_java,))
-            .await
-            .unwrap();
+            .or_else(async |error| Err(JvmSupport::to_wie_err(&jvm, error).await))
+            .await?;
         let entries: ClassInstanceRef<Enumeration> = jvm
             .invoke_virtual(&jar_file, "java/util/jar/JarFile", "entries", "()Ljava/util/Enumeration;", [])
             .await
@@ -174,8 +174,11 @@ impl KtfJvmSupport {
                     (SUPPORT_CONTEXT_BASE + offset_of!(KtfJvmSupportContext, ptr_current_jvm_thread_context) as u32) as i32,
                 ),
             )
-            .await
-            .unwrap();
+            // The constructor loads client.bin, so an unsupported image (a relocation-table layout,
+            // `docs/report/0340`) and a jar that is not a zip (an OMA DRM container) both throw here.
+            // That is the title's error to report, not a host panic.
+            .or_else(async |error| Err(JvmSupport::to_wie_err(&jvm, error).await))
+            .await?;
 
         Ok((jvm, class_loader))
     }
@@ -661,6 +664,48 @@ mod test {
                 panic!("an array larger than the heap must not allocate");
             };
             assert_eq!(thrown.identity(), reserved.identity());
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_array_classes_carry_object_vtable() -> Result<()> {
+        // 6c9f969f089f calls equals(Object) on an int[] through the class's vtable; an array
+        // class with none sent it to address 0. Each array class also needs its own vtable slot:
+        // with a null vtable pointer every one of them took the index the next class then reused.
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let mut system_clone = system.clone();
+        system.spawn(async move || {
+            let (jvm, mut core) = init_jvm(&mut system_clone).await?;
+
+            let mut indexes = Vec::new();
+            for name in ["[I", "[B"] {
+                let class = jvm.resolve_class(name).await.unwrap();
+                let class = class
+                    .definition
+                    .as_any()
+                    .downcast_ref::<super::JavaArrayClassDefinition>()
+                    .unwrap()
+                    .class
+                    .clone();
+                let vtable = super::vtable::JavaVtable::from_raw(&core, class.ptr_vtable()?);
+                assert_ne!(class.ptr_vtable()?, 0, "{name} has no vtable");
+                assert!(
+                    vtable.find_method("equals", "(Ljava/lang/Object;)Z")?.is_some(),
+                    "{name} vtable lacks equals"
+                );
+                indexes.push(KtfJvmSupport::get_vtable_index(&mut core, &class)?);
+            }
+            assert_ne!(indexes[0], indexes[1]);
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
