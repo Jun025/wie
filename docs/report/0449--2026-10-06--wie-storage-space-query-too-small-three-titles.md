@@ -48,3 +48,7 @@ head 에서 로고 뒤 `Unimplemented: 13: MC_knlGetAccessLevel`. 호출부 `0x1
 ### 5. compat
 
 수정하지 않았다. 두 KTF 행의 축은 이번 짝 측정이 아니라 census 6축으로 다시 재야 한다(`974e0df9ab1e` 는 지금 `playable` 인데 실제로는 첫 화면에서 끝났다 — census 축이 안내 화면을 «작동»으로 본 것). ⇒ `check-compat-revert` 인용 대상 없음(바뀐 행 0).
+
+### 6. 게임 파일명 유입
+
+- `corpus-name-inflow`: BOUNDED 0 + SUFFIX-ATTACHED 0.
