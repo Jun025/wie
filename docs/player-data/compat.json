@@ -48,19 +48,16 @@
    "platform": "KTF",
    "model": null,
    "title": "2006월드올림픽",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "no",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "2006월드올림픽"
   },
@@ -697,18 +694,16 @@
    "platform": "KTF",
    "model": null,
    "title": "더팜1",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "더팜1"
   },
@@ -1615,18 +1610,16 @@
    "platform": "KTF",
    "model": null,
    "title": "메이플스토리",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "메이플스토리"
   },
@@ -1635,18 +1628,16 @@
    "platform": "KTF",
    "model": null,
    "title": "메이플스토리 (2)",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "메이플스토리"
   },
@@ -1655,18 +1646,16 @@
    "platform": "KTF",
    "model": null,
    "title": "메이플스토리 궁수편",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "메이플스토리 궁수편"
   },
@@ -2092,18 +2081,16 @@
    "platform": "KTF",
    "model": null,
    "title": "박정석 영웅탄생",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "박정석 영웅탄생"
   },
@@ -2838,18 +2825,16 @@
    "platform": "KTF",
    "model": null,
    "title": "알바 전설 편의점2",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "알바 전설 편의점2"
   },
@@ -6929,19 +6914,17 @@
    "platform": "SKT",
    "model": null,
    "title": "로맨스소드",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "unknown",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "로맨스소드"
   },
@@ -7079,18 +7062,16 @@
    "platform": "SKT",
    "model": null,
    "title": "물가에돌튕기기IQ",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "물가에돌튕기기IQ"
   },
