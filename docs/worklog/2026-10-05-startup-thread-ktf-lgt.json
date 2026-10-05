@@ -1,0 +1,22 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-05",
+  "task": "wie-startup-thread-ktf-lgt-pairs-and-sound-fix-residuals",
+  "title": "KTF·LGT 시작 스레드 떼기 · 347종 짝 · J2ME 표본 · #473 잔여 m1~m3",
+  "summary": "KTF·LGT 시작 함수도 finish_launch 로 끝난다(진단 표본 15/15 에서 붙은 스레드 수 -1). 347종 짝 결과 345/347 같음(2종은 재측에서 같음) · activeCount 호출 0회. J2ME 손님 5종 #473 전/후 결과 10/10 같음 · activeCount 2→1. m1 saturating · m2 호출부 잠금 · m3 MIDP lengthMs 재파싱.",
+  "changes": [
+    "wie-ktf start · wie-lgt do_start → JvmSupport::finish_launch",
+    "wie-backend parse_smaf_in 공개 · saturating_add",
+    "wie-midp SmafPlayer::init lengthMs 가 parse_smaf_in 사용",
+    "시험 3: smaf_declaring_a_length_near_u32_max_loads_empty · every_carrier_launch_ends_through_finish_launch · test_a_padded_clip_still_has_a_length"
+  ],
+  "verification": [
+    "347종 프로브 A 30초 짝(build-slot --long 1임대) · 되돌림 red 3/3 · cargo test --all 692/0 · clippy stable/wasm32/beta rc0 · 러너 블록 PASS"
+  ],
+  "limits": [
+    "코퍼스 J2ME 0종 — 저장소 손님 4 + 스크래치 손님 1 로 쟀다",
+    "m2 는 소스 문자열 시험(SKT 고정 손님 0)"
+  ],
+  "adoptedProposals": ["2026-10-05-sound-silent-57#p0"],
+  "proposals": []
+}
