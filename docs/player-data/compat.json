@@ -5582,7 +5582,7 @@
    "platform": "LGT",
    "model": "clet",
    "title": "몬스터마스터",
-   "status": "playable",
+   "status": "limited",
    "axes": {
     "boot": "ok",
     "render": "ok",
@@ -5592,7 +5592,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "처음 실행할 때 게임사 서버에서 인증서를 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요."
+   ],
    "changes": [],
    "fileTitle": "몬스터마스터"
   },

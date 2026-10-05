@@ -702,6 +702,11 @@ const stubConnects = (A) => (A.stub_hits?.first ?? []).filter((x) => /MC_net(Soc
 const netConnects = (A, stderrPath) =>
   A.net_connects ?? Math.max(stubConnects(A), existsSync(stderrPath) ? tailConnects(readFileSync(stderrPath, 'latin1')) : 0);
 const netWall = (connects) => connects >= 200;
+// A server wall the count cannot see: the title asks once per answer, fails, and loops on the same question
+// (2 connects in probe A). Named one at a time from the frames and the stderr — docs/report/0443.
+const NET_HAND = {
+  b9bfcaf42722: '처음 실행할 때 게임사 서버에서 인증서를 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.',
+};
 
 // ── longplay: a guest Java thread that dies uncaught did not survive ───────────────────────────
 // rustjava logs `Uncaught exception in thread N:` when a guest thread's run() throws; the run then
@@ -1007,7 +1012,7 @@ if (cmd === 'run') {
     if (!j) continue;
     const title = displayTitle(t.path);
     const platform = j.A.platform && j.A.platform !== 'unknown' ? j.A.platform.toUpperCase() : sniffPlatform(t.path);
-    const net = netWall(netConnects(j.A, join(out, t.sha, 'A.stderr')));
+    const net = netWall(netConnects(j.A, join(out, t.sha, 'A.stderr'))) ? NET_KO : (NET_HAND[t.sha.slice(0, 12)] ?? null);
     // A locked file says only that: the other lines would read as «not fixed yet». Its status is never
     // better than not-yet — a check that paints its refusal box would otherwise read as playable.
     const lock = lockVerdict(lockOf(t.path), [j.A, j.B]);
@@ -1017,7 +1022,7 @@ if (cmd === 'run') {
       .map(([k, v]) => ISSUE_KO[`${k}:${v}`])
       .filter(Boolean);
     if (lock) issues.splice(0, issues.length, LOCK_KO[lock]);
-    else if (net) issues.splice(0, issues.length, NET_KO);
+    else if (net) issues.splice(0, issues.length, net);
     const changes = prs
       .filter((pr) => names(pr.title, title) && !otherCarrier(pr.title, platform))
       .map((pr) => ({ date: pr.mergedAt.slice(0, 10), enginePin: pr.mergeCommit?.oid ?? null, summary_ko: summaryKo(pr.title), pr: pr.number }));
