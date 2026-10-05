@@ -126,10 +126,9 @@ mod test {
     use jvm::{ClassInstanceRef, Jvm, Result as JvmResult};
     use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
     use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
-    use test_utils::{TestPlatform, TestPlatformEvent, run_jvm_test_with_system};
-    use wie_backend::{DefaultTaskRunner, System};
-    use wie_jvm_support::{JvmSupport, RustJavaJvmImplementation, WieJavaClassProto, WieJvmContext};
-    use wie_util::{Result, WieError};
+    use test_utils::{TestPlatform, run_jvm_test_until_exit, run_jvm_test_with_system};
+    use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
+    use wie_util::Result;
 
     use super::MIDlet;
 
@@ -161,45 +160,22 @@ mod test {
 
     #[test]
     fn notify_destroyed_exits_and_never_returns_to_the_guest() -> Result<()> {
-        // d3e3b16cefd0 calls notifyDestroyed from its game loop; when the call returned,
-        // the loop read the field its destroyApp had just nulled and the thread died on a
+        // d3e3b16cefd0 calls notifyDestroyed from its game loop; when the call returned, the loop
+        // read the field its destroyApp had just nulled and the thread died on a
         // NullPointerException. The program is gone on a handset — the caller does not come back.
-        let exited = Arc::new(AtomicBool::new(false));
-        let flag = exited.clone();
-        let platform = TestPlatform::with_event_handler(move |event| {
-            if matches!(event, TestPlatformEvent::Exit) {
-                flag.store(true, Ordering::SeqCst);
-            }
-        });
-        let returned = Arc::new(AtomicBool::new(false));
-        let returned_clone = returned.clone();
+        let returned = run_jvm_test_until_exit(
+            Box::new([crate::get_protos().into(), [TestMIDlet::as_proto()].into()]),
+            1000,
+            |jvm| async move {
+                let midlet: ClassInstanceRef<MIDlet> = jvm.new_class("TestMIDlet", "()V", ()).await?.into();
+                let _: () = jvm
+                    .invoke_virtual(&midlet, "javax/microedition/midlet/MIDlet", "notifyDestroyed", "()V", ())
+                    .await?;
+                Ok(())
+            },
+        )?;
 
-        let mut system = System::new(Box::new(platform), "", "", DefaultTaskRunner);
-        let system_clone = system.clone();
-        system.spawn(async move || {
-            let protos: Box<[Box<[WieJavaClassProto]>]> = Box::new([crate::get_protos().into(), [TestMIDlet::as_proto()].into()]);
-            let jvm = JvmSupport::new_jvm(&system_clone, None, protos, &[], RustJavaJvmImplementation).await?;
-            let midlet: ClassInstanceRef<MIDlet> = jvm.new_class("TestMIDlet", "()V", ()).await.unwrap().into();
-            let _: () = jvm
-                .invoke_virtual(&midlet, "javax/microedition/midlet/MIDlet", "notifyDestroyed", "()V", ())
-                .await
-                .unwrap();
-            returned_clone.store(true, Ordering::SeqCst);
-            Ok::<_, WieError>(())
-        });
-
-        for _ in 0..1000 {
-            system.tick()?;
-            if exited.load(Ordering::SeqCst) {
-                break;
-            }
-        }
-        for _ in 0..10 {
-            system.tick()?;
-        }
-
-        assert!(exited.load(Ordering::SeqCst));
-        assert!(!returned.load(Ordering::SeqCst), "notifyDestroyed returned to the guest");
+        assert!(!returned, "notifyDestroyed returned to the guest");
         Ok(())
     }
 

@@ -67,6 +67,10 @@
 | KTF 배열 vtable | `test_array_classes_carry_object_vtable` | `[I has no vtable` |
 | ABI 행 | `abi_rows_cover_the_indexes_titles_actually_dispatch_on` (4행 추가) | `Calendar` 22 행 제거 시 패닉 |
 
+종료가 돌아오지 않게 되면서 «종료 호출이 끝나기를 기다리는» 기존 시험 둘(`wipic_0x68_terminates_the_program` · Jlet `notify_destroyed_exits_without_destroy_app`)이 멈춘 채 돌았다. 둘 다 «종료했다 + 돌아오지 않았다»를 확인하도록 바꿨다. JVM 쪽 둘(MIDlet·Jlet)은 `test_utils::run_jvm_test_until_exit` 를 쓴다(종료까지 tick, 그 뒤 10 tick, `func` 이 돌아왔는지 반환). Jlet 시험의 `destroyApp` 은 정적 필드에 세던 것을 패닉으로 바꿨다 — 호출이 돌아오지 않으니 센 값을 읽을 자리가 없다.
+
+게이트(최종 head): fmt OK · clippy stable·wasm32·beta `-D warnings` rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` 691 passed · 0 failed · `npm run build:wasm` rc=0 · `check-engine-contract` 113 pass · `npm run audit` 통과.
+
 ### 6. 퇴행 — 프로브 A 30초 짝(센서스 A 와 같은 인자) · 전 `9b4eb62e` · 후 최종
 
 라이브 LGT 5(`13d7e3c21856` `1b107b96bf4e` `4ece6eeeaa04` `a30bbe008b5e` `b475b6399684`) + 가드 2(`49ade89578c5` `ddd885583b15`) + KTF 8 · SKT 4(compat `playable` 에서 등간격): 19쌍 모두 `result`·`stop`·사망 수 같음(사망 0 → 0), 키 도달 ±1, 화면 수 ±16. `max-ticks` 로 끝나는 9쌍은 양쪽이 똑같이 그렇다. 커밋된 runner 블록 6줄 PASS(keydraw 2줄 rc=0).
@@ -84,5 +88,3 @@
 ### 9. 유입
 
 `node scripts/corpus-name-inflow.mjs`: 유입 370쌍(BOUNDED) · 판단 필요 19쌍(SUFFIX-ATTACHED). 전부 이 PR 이 손댄 파일에 **원래 있던** 이름이다 — `compat.json`(공개 제목 표, 계약상 제목을 싣는다)과 `lgt_java_abi.toml`·`wie-lgt` 시험의 기존 주석. 이 PR 이 더한 줄에는 게임명이 없다(주석은 sha12 로 적었고, 처음 쓴 이름 셋은 커밋 전에 sha12 로 바꿨다).
-
-<!-- corpus-name-inflow v1 subjects=14 tree=798ef5df19b8facb B=842/370 P=0/0 S=49/19 -->

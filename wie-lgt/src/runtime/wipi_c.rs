@@ -780,14 +780,20 @@ mod tests {
             let stub = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::TerminateProgram)?;
             let _: u32 = core.run_function(stub, &[0x1b]).await?;
 
+            // Never reached: an exit does not return to the guest (`System::exit_from_guest`).
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
         });
 
-        while !done.load(Ordering::Relaxed) {
+        for _ in 0..1000 {
             system.tick()?;
+            if exited.load(Ordering::Relaxed) {
+                break;
+            }
         }
+        system.tick()?;
         assert!(exited.load(Ordering::Relaxed), "0x68 must reach Platform::exit");
+        assert!(!done.load(Ordering::Relaxed), "0x68 returned to the guest");
 
         Ok(())
     }
