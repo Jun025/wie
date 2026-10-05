@@ -1,0 +1,21 @@
+{
+  "schema": "worklog/v1",
+  "date": "2026-10-06",
+  "task": "wie-lgt-title-screen-striped-render-two-titles",
+  "title": "LGT 타이틀 화면 줄무늬 — 불투명 이미지를 RGB565 로 저장",
+  "summary": "LGT 게임은 이미지 화소를 RGB565 로 직접 읽는데 우리는 32bpp 로 저장해 열이 번갈아 깨졌다. 불투명 이미지는 16bpp 로 저장한다. 5종의 화면이 고쳐졌다. 보고: docs/report/0450.",
+  "adoptedProposals": ["2026-10-05-progression-wave3-r1#p0"],
+  "declinedProposals": [],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "LGT 투명 이미지를 게임이 직접 읽을 때의 줄무늬 3종",
+      "plainSummary": "LGT 게임 세 개에서 투명한 부분이 있는 그림이 아직 줄무늬처럼 깨진다.",
+      "userBenefit": "메뉴 배경처럼 투명한 부분이 있는 그림도 제대로 보인다.",
+      "why": "이 회차의 표본(LGT 78종)에서 투명 이미지 화소를 게임이 직접 읽는 타이틀이 3종(0baceb1dfe9c · a23f3c9fc2cb · 63332c51d514) 남았다. 0baceb1dfe9c 의 메뉴 배경 귀퉁이가 그대로 줄무늬다(줄무늬 점수 13.7%).",
+      "tradeoff": "LGT 단말이 투명 이미지를 어떤 형식(16bpp 와 마스크인지)으로 넘기는지 먼저 알아야 한다. 모른 채 16bpp 로 바꾸면 투명 부분이 불투명하게 그려질 수 있다.",
+      "effort": "M",
+      "target": "wie-lgt 그래픽(MC_grpCreateImage 투명 이미지)"
+    }
+  ]
+}

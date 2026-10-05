@@ -1,0 +1,13 @@
+# wie_validate --keys: SKT 55c453b46254 — 메인 메뉴 → 새 게임 → 오리지널 모드 → 게임 선택(첫 칸) → 캐릭터 선택 →
+# 본 게임 안내 대화. Recorded 2026-10-06 on 9f8b0ae2 (docs/report/0451). Key names only — no game bytes.
+# Grammar: `--keys` help / `parse_keys` in wie_cli/src/bin/wie_validate.rs. Every key is the default 0.15 s tap.
+#
+#   mkdir -p <dir>   # --shotdir does not create it
+#   cargo run -q --release -p wie_cli --bin wie_validate -- --inject --keep-timeout --timeout 60 \
+#     --max-ticks 100000000000 --keys docs/keys/skt-55c453b46254-start.keys --shotdir <dir> --shot-every 1 <game>
+#
+# ★The character screen is where earlier recipes stalled, and it is the game's rule, not lost taps:
+# in 오리지널 모드 on a fresh save, slots 1 and 3 are locked (FIRE returns), and FIRE on a slot already
+# picked is ignored. The game starts after TWO distinct unlocked picks — slot 0, then slot 2 (RIGHT RIGHT).
+WAIT:6 OK:3 OK:3 NUM1:4 OK:4 OK:6
+OK:4 RIGHT:3 RIGHT:3 OK:6
