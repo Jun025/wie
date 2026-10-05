@@ -52,3 +52,6 @@ fmt · clippy `-D warnings`(stable · wasm32 · beta) rc=0 · `RUST_MIN_STACK=41
 
 ### 7. 게임 파일명 유입
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 330쌍 + SUFFIX-ATTACHED 15쌍 — 전부 `compat.json` 의 기존 `title`·`fileTitle` 값이다(이 회차는 제목 문자열을 바꾸지 않았다). 그 밖 파일 0. 화면 안내 문구는 게임 안 문장이고 제목이 아니다. 타이틀은 sha12 로만 적었다.
+
+
+<!-- corpus-name-inflow v1 subjects=4 tree=86e07edcf28b032c B=718/330 P=0/0 S=35/15 -->
