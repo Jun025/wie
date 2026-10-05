@@ -1580,4 +1580,75 @@ mod test {
         }
         Ok(())
     }
+
+    /// KTF `MC_grpCopyFrameBuffer`/`MC_grpDrawImage` run the proc set with `MC_grpSetContext(PIXELOP)`
+    /// as `proc(src, dst, param1)` on 16-bit pixels (docs/report/0446).
+    ///
+    /// Two titles key glyphs and sprites this way; the blits ignored the context and drew the key as
+    /// magenta. The proc here is written for the test: `src == 0xf81f ? dst : src`.
+    #[test]
+    fn test_wipic_blits_run_the_context_pixel_op() -> Result<()> {
+        use crate::runtime::{
+            SVC_CATEGORY_WIPIC,
+            svc_ids::{WIPICGraphicsMethodId, WIPICTableId},
+            wipi_c::register_wipic_svc_handler,
+        };
+
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let mut system_clone = system.clone();
+        system.spawn(async move || {
+            let (jvm, mut core) = init_jvm(&mut system_clone).await?;
+            register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
+            let svc = |core: &mut ArmCore, id| core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICTableId::Graphics.function_id(id));
+            let (init, set) = (svc(&mut core, WIPICGraphicsMethodId::InitContext)?, svc(&mut core, WIPICGraphicsMethodId::SetContext)?);
+            let (copy, draw) = (svc(&mut core, WIPICGraphicsMethodId::CopyFrameBuffer)?, svc(&mut core, WIPICGraphicsMethodId::DrawImage)?);
+
+            let proc_code = Allocator::alloc(&mut core, 14)?;
+            // movs r3,#0xf8; lsls r3,r3,#8; adds r3,#0x1f; cmp r0,r3; bne +0; movs r0,r1; bx lr
+            write_generic(&mut core, proc_code, [0x23f8u16, 0x021b, 0x331f, 0x4298, 0xd100, 0x0008, 0x4770])?;
+
+            // KTF handles are indirect: `*handle` is a block whose data starts at +8.
+            let indirect = |core: &mut ArmCore, data: &[u32]| -> Result<u32> {
+                let block = Allocator::alloc(core, 8 + data.len() as u32 * 4)?;
+                for (i, &word) in data.iter().enumerate() {
+                    write_generic(core, block + 8 + i as u32 * 4, word)?;
+                }
+                let handle = Allocator::alloc(core, 4)?;
+                write_generic(core, handle, block)?;
+                Ok(handle)
+            };
+            let pixels = |core: &ArmCore, buf: u32| -> Result<u32> { read_generic(core, read_generic::<u32, _>(core, buf)? + 8) };
+            let src_buf = indirect(&mut core, &[0x1234_f81f])?; // [key, 0x1234]
+            let dst_buf = indirect(&mut core, &[0xaaaa_aaaa])?;
+            let src = indirect(&mut core, &[2, 1, 4, 16, src_buf])?;
+            let dst = indirect(&mut core, &[2, 1, 4, 16, dst_buf])?;
+            let fill = |core: &mut ArmCore, buf: u32| -> Result<()> { write_generic(core, read_generic::<u32, _>(core, buf)? + 8, 0xaaaa_aaaau32) };
+
+            let record = Allocator::alloc(&mut core, 52)?;
+            let _: u32 = core.run_function(init, &[record]).await?;
+            let _: u32 = core.run_function(copy, &[dst, 0, 0, 2, 1, src, 0, 0, record]).await?;
+            assert_eq!(pixels(&core, dst_buf)?, 0x1234_f81f, "no pixel op: a plain copy");
+
+            fill(&mut core, dst_buf)?;
+            let _: u32 = core.run_function(set, &[record, 5, proc_code | 1]).await?; // PixelopIdx
+            let _: u32 = core.run_function(copy, &[dst, 0, 0, 2, 1, src, 0, 0, record]).await?;
+            assert_eq!(pixels(&core, dst_buf)?, 0x1234_aaaa, "the key keeps dst, the rest takes src");
+
+            // An image record starts with its framebuffer: 2x1, 32bpp, [opaque magenta, #123456].
+            let argb = indirect(&mut core, &[0xffff_00ff, 0xff12_3456])?;
+            let image = indirect(&mut core, &[2, 1, 8, 32, argb])?;
+            fill(&mut core, dst_buf)?;
+            let _: u32 = core.run_function(draw, &[dst, 0, 0, 2, 1, image, 0, 0, record]).await?;
+            assert_eq!(pixels(&core, dst_buf)?, 0x11aa_aaaa, "#ff00ff is the key; #123456 lands as RGB565 0x11aa");
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+        Ok(())
+    }
 }

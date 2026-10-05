@@ -7,7 +7,7 @@ pub use framebuffer::FrameBuffer;
 pub use grp_context::WIPICGraphicsContextIdx;
 pub use image::decode_image_framebuffer;
 
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 use core::mem::size_of;
 
 use wie_backend::{
@@ -588,6 +588,144 @@ pub async fn copy_frame_buffer(
     };
 
     primitives::copy_framebuffer(context, &dst_framebuffer, dx, dy, w as u32, h as u32, &src_framebuffer, sx, sy, clip)
+}
+
+// KTF titles key their sprites the same way LGT ones do, but through the API: they set the proc with
+// `MC_grpSetContext(PIXELOP)` on the context they hand to `MC_grpDrawImage`/`MC_grpCopyFrameBuffer`.
+// Read from two titles (docs/report/0446): one keys glyph tiles on magenta and returns its text
+// colour for the rest, so without the proc the glyphs were drawn on magenta boxes.
+#[allow(clippy::too_many_arguments)]
+pub async fn draw_image_with_context_pixel_op(
+    context: &mut dyn WIPICContext,
+    framebuffer: WIPICIndirectPtr,
+    dx: i32,
+    dy: i32,
+    w: i32,
+    h: i32,
+    image: WIPICIndirectPtr,
+    sx: i32,
+    sy: i32,
+    graphics_context: WIPICWord,
+) -> Result<()> {
+    // A `WIPICImage` starts with its `img` framebuffer, so the image handle reads as one.
+    let (pixel_op, param1) = context_pixel_op(context, graphics_context)?;
+    if !blit_with_pixel_op(context, framebuffer, dx, dy, w, h, image, sx, sy, pixel_op, PixelOpArgs::SrcDstParam1(param1)).await? {
+        draw_image(context, framebuffer, dx, dy, w, h, image, sx, sy, graphics_context).await?;
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn copy_frame_buffer_with_context_pixel_op(
+    context: &mut dyn WIPICContext,
+    dst: WIPICIndirectPtr,
+    dx: i32,
+    dy: i32,
+    w: i32,
+    h: i32,
+    src: WIPICIndirectPtr,
+    sx: i32,
+    sy: i32,
+    pgc: WIPICWord,
+) -> Result<()> {
+    let (pixel_op, param1) = context_pixel_op(context, pgc)?;
+    if !blit_with_pixel_op(context, dst, dx, dy, w, h, src, sx, sy, pixel_op, PixelOpArgs::SrcDstParam1(param1)).await? {
+        copy_frame_buffer(context, dst, dx, dy, w, h, src, sx, sy, pgc).await?;
+    }
+    Ok(())
+}
+
+fn context_pixel_op(context: &mut dyn WIPICContext, graphics_context: WIPICWord) -> Result<(WIPICWord, WIPICWord)> {
+    if graphics_context == 0 {
+        return Ok((0, 0));
+    }
+    let grp_ctx: WIPICGraphicsContext = read_generic(context, graphics_context)?;
+    Ok((grp_ctx.pixel_op_func_ptr, grp_ctx.param1))
+}
+
+/// How a title's pixel-op proc takes its pixels — the two carriers disagree, both read off the procs.
+pub enum PixelOpArgs {
+    /// LGT: `proc(dst, src)` (docs/report/0399).
+    DstSrc,
+    /// KTF: `proc(src, dst, param1)` — the WIPI `MC_GrpPixelOpProc` order (docs/report/0446).
+    SrcDstParam1(WIPICWord),
+}
+
+/// Blit through a title's per-pixel proc on 16-bit pixels. `false` when there is no proc (or the
+/// target is not 16-bit): the caller blits as before.
+#[allow(clippy::too_many_arguments)]
+pub async fn blit_with_pixel_op(
+    context: &mut dyn WIPICContext,
+    dst: WIPICIndirectPtr,
+    dx: i32,
+    dy: i32,
+    width: i32,
+    height: i32,
+    src: WIPICIndirectPtr,
+    sx: i32,
+    sy: i32,
+    pixel_op: WIPICWord,
+    args: PixelOpArgs,
+) -> Result<bool> {
+    let target: WIPICFramebuffer = read_generic(context, context.data_ptr(dst)?)?;
+    let source: WIPICFramebuffer = read_generic(context, context.data_ptr(src)?)?;
+    if pixel_op == 0 || target.bpp != 16 || !matches!(source.bpp, 16 | 32) {
+        return Ok(false);
+    }
+    tracing::debug!(
+        "pixel op {pixel_op:#x}: {:#x} ({dx}, {dy}, {width}x{height}) <- {:#x} ({sx}, {sy})",
+        dst.0,
+        src.0
+    );
+
+    let x0 = 0.max(-dx).max(-sx);
+    let y0 = 0.max(-dy).max(-sy);
+    let x1 = width.min(target.width as i32 - dx).min(source.width as i32 - sx);
+    let y1 = height.min(target.height as i32 - dy).min(source.height as i32 - sy);
+    if x0 >= x1 {
+        return Ok(true);
+    }
+    let bytes_per_pixel = source.bpp / 8;
+    let target_base = context.data_ptr(target.buf)?;
+    let source_base = context.data_ptr(source.buf)?;
+    let mut source_row = vec![0u8; ((x1 - x0) as u32 * bytes_per_pixel) as usize];
+    let mut target_row = vec![0u16; (x1 - x0) as usize];
+    // The procs read only their arguments and the title's globals, which cannot change mid-blit.
+    let mut results = alloc::collections::BTreeMap::new();
+    for y in y0..y1 {
+        let source_at = source_base + (sy + y) as u32 * source.bpl + (sx + x0) as u32 * bytes_per_pixel;
+        let target_at = target_base + (dy + y) as u32 * target.bpl + (dx + x0) as u32 * 2;
+        context.read_bytes(source_at, &mut source_row)?;
+        context.read_bytes(target_at, bytemuck::cast_slice_mut(&mut target_row))?;
+        for (target_pixel, source_pixel) in target_row.iter_mut().zip(source_row.chunks_exact(bytes_per_pixel as usize)) {
+            // The proc compares 16-bit pixels, so a decoded (ARGB) image pixel goes in as the RGB565
+            // value it would have on the handset; a fully transparent one is skipped like the shared blit.
+            let source_pixel = if bytes_per_pixel == 2 {
+                u16::from_le_bytes([source_pixel[0], source_pixel[1]])
+            } else {
+                let color = ArgbPixel::to_color(u32::from_le_bytes([source_pixel[0], source_pixel[1], source_pixel[2], source_pixel[3]]));
+                if color.a == 0 {
+                    continue;
+                }
+                Rgb565Pixel::from_color(color)
+            };
+            let pair = (*target_pixel as u32) << 16 | source_pixel as u32;
+            *target_pixel = match results.get(&pair) {
+                Some(&result) => result,
+                None => {
+                    let (target, source) = (*target_pixel as u32, source_pixel as u32);
+                    let result = match args {
+                        PixelOpArgs::DstSrc => context.call_function(pixel_op, &[target, source]).await?,
+                        PixelOpArgs::SrcDstParam1(param1) => context.call_function(pixel_op, &[source, target, param1]).await?,
+                    } as u16;
+                    results.insert(pair, result);
+                    result
+                }
+            };
+        }
+        context.write_bytes(target_at, bytemuck::cast_slice(&target_row))?;
+    }
+    Ok(true)
 }
 
 pub async fn get_font(_: &mut dyn WIPICContext, face: i32, size: i32, style: i32) -> Result<i32> {
