@@ -123,3 +123,5 @@ compat-revert: OK — main 에서 받은 행을 받기 전 값으로 되돌린 �
 
 - `node scripts/corpus-name-inflow.mjs`(이 브랜치 ↔ `origin/main`): BOUNDED 731회/338쌍 + SUFFIX-ATTACHED 35회/15쌍 — `compat.json` 의 기존 `title` 필드 몫이다.
 - `compat.json` 을 뺀 9경로: BOUNDED 13회/8쌍 · SUFFIX-ATTACHED 0. 전부 이 PR 이 건드린 파일의 «main 에 있던 줄»이다(그 파일 전체를 읽는 술어라 잡힌다). 이 PR 이 더한 줄에서 그 이름들을 세면 0 이다 — 새 코드·문서는 타이틀을 sha12 로만 부른다.
+
+
