@@ -64,3 +64,5 @@ head 빌드 · `--inject`(기본 27키) · `--max-ticks 4000000000` · graphics 
 - `RUST_MIN_STACK=4194304 cargo test --all` rc=0. 처음 두 번은 rustc ICE 로 rc=101 이었다. `target/debug/incremental/wie_core_arm-*` 의 LTO bitcode 파일이 빌드 도중 사라졌다(코드 실패가 아니다). `CARGO_INCREMENTAL=0` 으로 돌려 통과했다.
 - 러너 블록 6줄 PASS. `keydraw_ktf`/`keydraw_lgt` 는 `--inject --expect-last-frame` 에서 rc=0 · paints 79/55.
 - 스윕 2번과 짝 측정 묶음은 각각 `build-slot run --long` 임대 1개로 감쌌다. 첫 스윕은 long 슬롯 대기가 상한 1800초를 넘어 `over=1` 로 돌았다(다른 레인이 2시간 넘게 쥐고 있었다). 회차 밖 프로세스는 0이다.
+- 게임 파일명 유입: `corpus-name-inflow` BOUNDED 11회/6쌍 · SUFFIX-ATTACHED 0. 11회 모두 `wie-lgt/src/runtime/wipi_c.rs` 에 이미 있던 주석이다(`origin/main` 판에서 같은 6개 이름이 9줄). 이 회차가 더한 줄에는 0건이다.
+
