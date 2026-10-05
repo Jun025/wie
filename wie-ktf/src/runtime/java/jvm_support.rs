@@ -1602,8 +1602,14 @@ mod test {
             let (jvm, mut core) = init_jvm(&mut system_clone).await?;
             register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
             let svc = |core: &mut ArmCore, id| core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICTableId::Graphics.function_id(id));
-            let (init, set) = (svc(&mut core, WIPICGraphicsMethodId::InitContext)?, svc(&mut core, WIPICGraphicsMethodId::SetContext)?);
-            let (copy, draw) = (svc(&mut core, WIPICGraphicsMethodId::CopyFrameBuffer)?, svc(&mut core, WIPICGraphicsMethodId::DrawImage)?);
+            let (init, set) = (
+                svc(&mut core, WIPICGraphicsMethodId::InitContext)?,
+                svc(&mut core, WIPICGraphicsMethodId::SetContext)?,
+            );
+            let (copy, draw) = (
+                svc(&mut core, WIPICGraphicsMethodId::CopyFrameBuffer)?,
+                svc(&mut core, WIPICGraphicsMethodId::DrawImage)?,
+            );
 
             let proc_code = Allocator::alloc(&mut core, 14)?;
             // movs r3,#0xf8; lsls r3,r3,#8; adds r3,#0x1f; cmp r0,r3; bne +0; movs r0,r1; bx lr

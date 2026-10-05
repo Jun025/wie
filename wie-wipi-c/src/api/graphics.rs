@@ -608,8 +608,8 @@ pub async fn draw_image_with_context_pixel_op(
     graphics_context: WIPICWord,
 ) -> Result<()> {
     // A `WIPICImage` starts with its `img` framebuffer, so the image handle reads as one.
-    let (pixel_op, param1) = context_pixel_op(context, graphics_context)?;
-    if !blit_with_pixel_op(context, framebuffer, dx, dy, w, h, image, sx, sy, pixel_op, PixelOpArgs::SrcDstParam1(param1)).await? {
+    let (pixel_op, args) = context_pixel_op(context, graphics_context)?;
+    if !blit_with_pixel_op(context, framebuffer, dx, dy, w, h, image, sx, sy, pixel_op, args).await? {
         draw_image(context, framebuffer, dx, dy, w, h, image, sx, sy, graphics_context).await?;
     }
     Ok(())
@@ -628,19 +628,19 @@ pub async fn copy_frame_buffer_with_context_pixel_op(
     sy: i32,
     pgc: WIPICWord,
 ) -> Result<()> {
-    let (pixel_op, param1) = context_pixel_op(context, pgc)?;
-    if !blit_with_pixel_op(context, dst, dx, dy, w, h, src, sx, sy, pixel_op, PixelOpArgs::SrcDstParam1(param1)).await? {
+    let (pixel_op, args) = context_pixel_op(context, pgc)?;
+    if !blit_with_pixel_op(context, dst, dx, dy, w, h, src, sx, sy, pixel_op, args).await? {
         copy_frame_buffer(context, dst, dx, dy, w, h, src, sx, sy, pgc).await?;
     }
     Ok(())
 }
 
-fn context_pixel_op(context: &mut dyn WIPICContext, graphics_context: WIPICWord) -> Result<(WIPICWord, WIPICWord)> {
+fn context_pixel_op(context: &mut dyn WIPICContext, graphics_context: WIPICWord) -> Result<(WIPICWord, PixelOpArgs)> {
     if graphics_context == 0 {
-        return Ok((0, 0));
+        return Ok((0, PixelOpArgs::SrcDstParam1(0)));
     }
     let grp_ctx: WIPICGraphicsContext = read_generic(context, graphics_context)?;
-    Ok((grp_ctx.pixel_op_func_ptr, grp_ctx.param1))
+    Ok((grp_ctx.pixel_op_func_ptr, PixelOpArgs::SrcDstParam1(grp_ctx.param1)))
 }
 
 /// How a title's pixel-op proc takes its pixels — the two carriers disagree, both read off the procs.
