@@ -42,7 +42,10 @@ struct DatabaseHandle {
 }
 
 const MIN_BUFFER_CAPACITY: u32 = 64;
-const KTF_DATABASE_STORAGE_LIMIT: u64 = 1024 * 1024;
+// The handset's free storage, not a quota anyone measured: callers only compare it from below. A KTF
+// install-time check refuses 2,153,472 bytes and passes 2,201,600 (974e0df9ab1e · «2103KB 필요») — 1 MB
+// ended that title at its first screen. 16 MB clears every known caller with room (docs/report/0449).
+const KTF_DATABASE_STORAGE_LIMIT: u64 = 16 * 1024 * 1024;
 // "MCDB" — sentinel at the start of the handle struct so we can distinguish
 // a real DB handle pointer from an unrelated guest pointer (e.g. a C-string
 // name pointer that KTF's slot 6 passes through the same SVC argument slot).
@@ -936,6 +939,13 @@ mod tests {
 
         // `mkdir` then `stat`: the path now answers as present (docs/report/0401).
         assert_eq!(stat_by_name_ktf(&mut context, 0x2000, 0, 1, 0).await.unwrap(), 0);
+    }
+
+    // A title's install check wants more than 2103 KB free; below that it quits at its first screen.
+    #[futures_test::test]
+    async fn ktf_available_database_storage_covers_a_2103kb_install() {
+        let mut context = database_test_context();
+        assert!(list_databases(&mut context).await.unwrap() >= 2150 * 1024);
     }
 
     #[futures_test::test]
