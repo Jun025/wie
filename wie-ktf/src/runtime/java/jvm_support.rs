@@ -1242,6 +1242,56 @@ mod test {
         Ok(())
     }
 
+    // The scope is entered by the JVM→guest boundary itself (`Method::run`), not by its callers: the
+    // body sees an empty chain however deep the caller's was, and the caller's is back afterwards.
+    #[test]
+    fn test_jvm_call_runs_in_its_own_exception_scope() -> Result<()> {
+        async fn probe(_jvm: &Jvm, core: &mut ArmCore) -> jvm::Result<i32> {
+            Ok(KtfJvmSupport::current_java_exception_handler(core).unwrap() as i32)
+        }
+
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let mut system_clone = system.clone();
+        system.spawn(async move || {
+            let (jvm, mut core) = init_jvm(&mut system_clone).await?;
+            let java_functions = JavaSvcFunctions::default();
+            core.register_svc_handler(5, handle_java_svc, &java_functions)?;
+            let class = JavaClassDefinition::new(
+                &mut core.clone(),
+                &jvm,
+                JavaClassProto {
+                    name: "test/Probe",
+                    parent_class: Some("java/lang/Object"),
+                    interfaces: vec![],
+                    methods: vec![JavaMethodProto::new("probe", "()I", probe, MethodAccessFlags::STATIC)],
+                    fields: vec![],
+                    access_flags: ClassAccessFlags::PUBLIC,
+                },
+                Box::new(core.clone()),
+                java_functions.clone(),
+            )
+            .await?;
+            let method = class.method("probe", "()I", true)?.unwrap();
+            let mut raw: RawJavaMethod = read_generic(&core, method.ptr_raw)?;
+            raw.fn_body = core.make_svc_stub(5, method.ptr_raw)?;
+            write_generic(&mut core, method.ptr_raw, raw)?;
+
+            KtfJvmSupport::set_current_java_exception_handler(&mut core, 0x1234)?; // the caller's chain
+            let seen = <JavaMethod as jvm::Method>::run(&method, &jvm, Box::new([])).await.unwrap();
+            assert!(matches!(seen, JavaValue::Int(0)), "the body ran under the caller's chain: {seen:?}");
+            assert_eq!(KtfJvmSupport::current_java_exception_handler(&mut core)?, 0x1234);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+        Ok(())
+    }
+
     #[test]
     fn test_exception_class_matches_raw_class_and_vtable() -> Result<()> {
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
