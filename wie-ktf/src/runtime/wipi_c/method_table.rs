@@ -252,7 +252,7 @@ pub fn get_util_method_table() -> Vec<WIPICMethodBody> {
         util::htons.into_body(),
         gen_stub(2, "MC_utilNtohl"),
         gen_stub(3, "MC_utilNtohs"),
-        gen_stub(4, "MC_utilInetAddrInt"),
+        util::inet_addr.into_body(),
         gen_stub(5, "MC_utilInetAddrStr"),
         gen_stub(6, "OEMC_utilHashbySHA1"),
     ]
@@ -423,8 +423,20 @@ pub fn get_net_method_table() -> Vec<WIPICMethodBody> {
 fn net_extension_slot(function_id: u16) -> WIPICMethodBody {
     match function_id {
         33 => net::socket_close.into_body(),
+        34 => net_open_by_host.into_body(),
         _ => gen_unnamed_table_stub(WIPICTableId::Net as _, "Net", function_id),
     }
+}
+
+/// Slot 34 takes a `"host:port"` C string and `0xff` — 30c7bd6fb01b calls it with
+/// `kt68wipiwicgsfr.magicn.com:27090` after the player answers «yes» to its online prompt, then goes
+/// on to `MC_utilInetAddrInt("218.145.70.36")` and `MC_netConnect` whatever this returns (measured).
+/// No network here, so it fails the same way `MC_netSocket` does: -1.
+async fn net_open_by_host(context: &mut dyn WIPICContext, host: WIPICWord, flag: WIPICWord) -> Result<i32> {
+    let host = wie_util::read_null_terminated_string_bytes(context, host)?;
+    tracing::warn!("Net slot 34({:?}, {flag:#x}) -> -1 (no network)", String::from_utf8_lossy(&host));
+
+    Ok(-1) // M_E_ERROR
 }
 
 fn gen_unk_stub(id: u32, index: u32) -> WIPICMethodBody {

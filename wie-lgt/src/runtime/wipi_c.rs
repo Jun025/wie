@@ -1,8 +1,4 @@
-use alloc::{
-    boxed::Box,
-    string::{String, ToString},
-    vec,
-};
+use alloc::{boxed::Box, string::ToString, vec};
 
 mod context;
 // ★slice D (orchestrator decision ⒝, 2026-09-16): upstream's LGT-specific graphics
@@ -64,9 +60,7 @@ use wie_backend::{
 };
 use wie_core_arm::{ArmCore, EmulatedFunction, EmulatedFunctionParam, ResultWriter, SvcId};
 use wie_jvm_support::JvmSupport;
-use wie_util::{
-    Result, read_generic, read_null_terminated_string_bytes, write_generic, write_null_terminated_string_bytes, write_null_terminated_table,
-};
+use wie_util::{Result, read_generic, write_generic, write_null_terminated_string_bytes, write_null_terminated_table};
 use wie_wipi_c::{
     MethodImpl, WIPICContext, WIPICMethodBody, WIPICResult,
     api::{database, graphics as shared_graphics, kernel, media, misc, net},
@@ -201,7 +195,7 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::UicSetMaxTextSize => uic_set_max_text_size.into_body(),
         WIPICSvcId::Htonl | WIPICSvcId::Ntohl => swap32.into_body(),
         WIPICSvcId::Htons | WIPICSvcId::Ntohs => swap16.into_body(),
-        WIPICSvcId::InetAddr => inet_addr.into_body(),
+        WIPICSvcId::InetAddr => wie_wipi_c::api::util::inet_addr.into_body(),
         WIPICSvcId::OpenDatabase => database::open_database.into_body(),
         WIPICSvcId::ReadRecordSingle => database::stream_read.into_body(),
         WIPICSvcId::WriteRecordSingle => database::stream_write.into_body(),
@@ -525,30 +519,6 @@ async fn swap32(_context: &mut dyn WIPICContext, value: u32) -> Result<u32> {
 /// result themselves, so only the low 16 bits are read and the answer is zero-extended.
 async fn swap16(_context: &mut dyn WIPICContext, value: u32) -> Result<u32> {
     Ok(u32::from((value as u16).swap_bytes()))
-}
-
-/// WIPIC 904 (`inet_addr`): a dotted quad to an address in network order, `0xffffffff`
-/// (`INADDR_NONE`) when the string is not one. Only the four-decimal-part form is accepted —
-/// the one form measured at a call site; the BSD shorthand forms are not guessed at.
-async fn inet_addr(context: &mut dyn WIPICContext, ptr_cp: u32) -> Result<u32> {
-    let text = read_null_terminated_string_bytes(context, ptr_cp)?;
-    tracing::debug!("LGT inet_addr({:?})", String::from_utf8_lossy(&text));
-
-    Ok(parse_dotted_quad(&text).map_or(u32::MAX, u32::from_le_bytes))
-}
-
-fn parse_dotted_quad(text: &[u8]) -> Option<[u8; 4]> {
-    let mut out = [0u8; 4];
-    let mut parts = text.split(|&b| b == b'.');
-    for slot in &mut out {
-        let part = parts.next()?;
-        if part.is_empty() || part.len() > 3 || !part.iter().all(u8::is_ascii_digit) {
-            return None;
-        }
-        *slot = core::str::from_utf8(part).ok()?.parse().ok()?;
-    }
-
-    parts.next().is_none().then_some(out)
 }
 
 async fn time_component(_context: &mut dyn WIPICContext, name: u32) -> Result<u32> {

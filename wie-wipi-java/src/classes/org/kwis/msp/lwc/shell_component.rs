@@ -3,13 +3,13 @@ use alloc::{boxed::Box, vec, vec::Vec};
 use jvm::{ClassInstanceRef, Jvm, Result as JvmResult};
 use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
-use rustjava_runtime::classes::java::lang::String;
+use rustjava_runtime::classes::java::lang::{Object, String};
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
 use crate::classes::{
     net::wie::{ShellCard, WIPIKeyCode},
     org::kwis::msp::lcdui::{Card, Display, Graphics},
-    org::kwis::msp::lwc::{Component, KEY_NOTIFY},
+    org::kwis::msp::lwc::{Component, GrabKeyListener, KEY_NOTIFY},
 };
 
 // Component.keyNotify's type values (javadoc: KEY_PRESSED, KEY_RELEASED, KEY_REPEATED) as
@@ -43,6 +43,14 @@ impl ShellComponent {
                 JavaMethodProto::new("getTitle", "()Lorg/kwis/msp/lwc/Component;", Self::get_title, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getWidth", "()I", Self::get_width, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getHeight", "()I", Self::get_height, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("grabKey", "(I)V", Self::grab_key, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("ungrabKey", "(I)V", Self::ungrab_key, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new(
+                    "setGrabKeyListener",
+                    "(Lorg/kwis/msp/lwc/GrabKeyListener;Ljava/lang/Object;)V",
+                    Self::set_grab_key_listener,
+                    MethodAccessFlags::PUBLIC,
+                ),
             ],
             fields: vec![JavaFieldProto::new("cmpTitle", "Lorg/kwis/msp/lwc/Component;", FieldAccessFlags::PRIVATE)],
             access_flags: ClassAccessFlags::PUBLIC,
@@ -319,6 +327,33 @@ impl ShellComponent {
             return Ok(0);
         }
         jvm.invoke_virtual(&display, "org/kwis/msp/lcdui/Display", "getHeight", "()I", ()).await
+    }
+
+    // 85e94babc247 grabs keys and sets a GrabKeyListener from its paint. A grabbed key reaches the
+    // listener before the shell (net.wie.ShellCard.keyNotify). ponytail: one grab set for every shell —
+    // only the shell on top of the display receives keys.
+    async fn grab_key(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, key: i32) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lwc.ShellComponent::grabKey({this:?}, {key})");
+
+        ShellCard::set_grabbed(jvm, key, true).await
+    }
+
+    async fn ungrab_key(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, key: i32) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lwc.ShellComponent::ungrabKey({this:?}, {key})");
+
+        ShellCard::set_grabbed(jvm, key, false).await
+    }
+
+    async fn set_grab_key_listener(
+        jvm: &Jvm,
+        _: &mut WieJvmContext,
+        this: ClassInstanceRef<Self>,
+        listener: ClassInstanceRef<GrabKeyListener>,
+        param: ClassInstanceRef<Object>,
+    ) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lwc.ShellComponent::setGrabKeyListener({this:?}, {listener:?}, {param:?})");
+
+        ShellCard::set_grab_listener(jvm, listener, param).await
     }
 
     async fn default_display(jvm: &Jvm) -> JvmResult<ClassInstanceRef<Display>> {
