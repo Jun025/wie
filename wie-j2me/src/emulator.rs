@@ -155,11 +155,7 @@ impl J2MEEmulator {
             .invoke_static("net/wie/Launcher", "start", "(Ljava/lang/String;)V", (main_class_java,))
             .await;
 
-        if let Err(x) = result {
-            return Err(JvmSupport::to_wie_err(&jvm, x).await);
-        }
-
-        Ok(())
+        JvmSupport::finish_launch(&jvm, result).await
     }
 }
 

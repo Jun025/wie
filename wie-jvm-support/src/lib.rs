@@ -93,6 +93,17 @@ impl JvmSupport {
         Ok(jvm)
     }
 
+    /// Ends a launch that ran on the startup thread `Jvm::new` attached: an error becomes a
+    /// `WieError`, success detaches that thread — the event loop dispatches from now on. Left
+    /// attached it counted forever: `Thread.activeCount()` read 2 in play where a handset (one
+    /// system thread running `callSerially`) reads 1, and 66959afab216 starts its music only at 1.
+    pub async fn finish_launch(jvm: &Jvm, result: core::result::Result<(), JavaError>) -> Result<()> {
+        if let Err(err) = result {
+            return Err(Self::to_wie_err(jvm, err).await);
+        }
+        jvm.detach_thread().map_err(|_| WieError::FatalError("detach startup thread".into()))
+    }
+
     pub async fn to_wie_err(jvm: &Jvm, err: JavaError) -> WieError {
         let JavaError::JavaException(x) = err;
         // Formatting the trace allocates, so it fails where the heap is exhausted — an exception
@@ -137,6 +148,33 @@ mod tests {
     fn path_separator_mapping() {
         assert_eq!(path_separator(true), ";");
         assert_eq!(path_separator(false), ":");
+    }
+
+    #[test]
+    fn a_finished_launch_leaves_no_startup_thread_counted() -> Result<()> {
+        run_jvm_test(Box::new([]), |jvm| async move {
+            let before: i32 = jvm.invoke_static("java/lang/Thread", "activeCount", "()I", ()).await?;
+            assert!(crate::JvmSupport::finish_launch(&jvm, Ok(())).await.is_ok());
+
+            assert_eq!((before, jvm.active_thread_count()), (1, 0));
+
+            Ok(())
+        })
+    }
+
+    /// The test above locks what `finish_launch` does; this one locks that every carrier's launch
+    /// ends through it. Their start functions need a whole guest to run, and only J2ME has one in
+    /// `cargo test`, so this reads the source: put a launch back to `Ok(())` and it goes red.
+    #[test]
+    fn every_carrier_launch_ends_through_finish_launch() {
+        for (carrier, source) in [
+            ("skt", include_str!("../../wie-skt/src/emulator.rs")),
+            ("j2me", include_str!("../../wie-j2me/src/emulator.rs")),
+            ("ktf", include_str!("../../wie-ktf/src/emulator.rs")),
+            ("lgt", include_str!("../../wie-lgt/src/emulator.rs")),
+        ] {
+            assert_eq!(source.matches("JvmSupport::finish_launch(&jvm, ").count(), 1, "{carrier}");
+        }
     }
 
     /// `java.class.path` is split by `java.io.File.pathSeparator`, so the constant we build it

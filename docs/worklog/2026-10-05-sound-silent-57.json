@@ -1,0 +1,44 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-05",
+  "task": "wie-sound-silent-57-recipes-settings-and-aot",
+  "title": "소리 없음 57종 재분류 — SMAF 뒤 여분 · 시작 스레드 · KTF 동봉 설정 5 · 설정 안내 6",
+  "summary": "0432 §6 의 sound:silent 57종을 행마다 갈랐다(A 3 · B 5 · C 6 · D 17 · E 3 · F 17 · G 6). 엔진 두 곳(SMAF 여분 바이트 재파싱 · SKT/J2ME 시작 스레드 detach)과 KTF 동봉 소리 끔 설정 5행을 고쳤다.",
+  "changes": [
+    "wie-backend Audio::load_smaf — 전체 파싱이 빈 목록이면 MMMD 선언 길이로 잘라 재파싱",
+    "wie-jvm-support JvmSupport::finish_launch — 시작 스레드 detach · wie-skt/wie-j2me 시작 함수가 부른다",
+    "wie-ktf OWNER_SOUND_OFF_SETTINGS 5행",
+    "compat.json 17행(sound ok 11 · 설정 안내 6) · docs/player-updates 3 · docs/report/0440"
+  ],
+  "verification": [
+    "고친 8종 전/후 짝 0 → 재생(§3) · 되돌림 red 2/2",
+    "SKT 82종 프로브 A 짝: 결과 82/82 같음 · 재생 수 72/82 같음(나머지 ±1, 1종 일회성)",
+    "라이브 LGT 5 + 가드 2 짝 · fmt · clippy stable/wasm32/beta -D warnings · cargo test --all 689/0 · build:wasm rc0"
+  ],
+  "limits": [
+    "호스트 guard 가 회차 내내 holding/saturated — 폭 2 짝으로만 쟀다",
+    "C 안내 중 5aa438fbdc87 은 AOT 라 설정 메뉴 화면을 직접 보지 않았다"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "KTF·LGT 시작 스레드도 시작 뒤 떼기",
+      "plainSummary": "SKT·J2ME 에서 고친 «실행 중인 작업 수가 하나 많게 보이는» 문제가 KTF·LGT 에도 같은 모양으로 남아 있을 수 있다.",
+      "userBenefit": "작업 수를 보고 음악이나 동작을 정하는 KTF·LGT 게임이 단말처럼 움직인다.",
+      "why": "이 회차가 SKT 시작 함수에서 그 스레드가 붙은 채 남는 것을 쟀고(activeCount 922회 모두 2), KTF·LGT 시작 함수도 같은 모양으로 돌아간다. KTF client.bin 83종이 activeCount import 이름을 갖고 있다.",
+      "tradeoff": "347종을 짝으로 다시 재야 한다. 영향이 0일 수도 있다(호출한다는 증거는 아직 없다).",
+      "effort": "M",
+      "target": "wie-ktf/src/emulator.rs start · wie-lgt/src/emulator.rs do_start"
+    },
+    {
+      "kind": "product",
+      "title": "저장·설치 공간 부족 안내로 끝나는 3종",
+      "plainSummary": "게임이 시작하자마자 «저장 공간이 부족해요»라고 말하고 꺼지는 게임 3종이 있다.",
+      "userBenefit": "3종이 시작 화면을 넘어간다(소리 판정도 그 뒤에야 가능하다).",
+      "why": "이 회차 57종 분류에서 관측했다(974e0df9ab1e · f770b15f8876 «설치 공간 부족 2103KB» · 63332c51d514 «데이터 저장 실패»). 여유 공간을 묻는 호출이 0 이거나 작게 답하는 것으로 보인다.",
+      "tradeoff": "어느 API 가 공간을 묻는지 먼저 찾아야 한다(KTF 1 · LGT 1 계열).",
+      "effort": "S~M",
+      "target": "wie-wipi-c / wie-ktf / wie-lgt 의 여유 공간 질의"
+    }
+  ]
+}

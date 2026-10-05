@@ -13,7 +13,7 @@ use crate::{
     emulator::IMAGE_BASE,
     runtime::{
         SVC_CATEGORY_INIT,
-        java::interface::{get_wipi_jb_interface, java_array_new, java_check_type, java_class_load, java_new, java_throw},
+        java::interface::{get_wipi_jb_interface, java_array_new, java_check_type, java_class_load, java_new, java_throw, java_throw_instance},
         svc_ids::InitSvcId,
         wipi_c::{interface::get_wipic_knl_interface, register_wipic_svc_handler},
     },
@@ -30,7 +30,10 @@ async fn handle_init_svc(core: &mut ArmCore, jvm: &mut Jvm, id: SvcId) -> Result
     // The guest's `new`s and `throw`s each get a frame of their own: `instantiate_class` roots what it
     // makes in the top frame, and the guest code calling here runs under a host call that, for a game
     // loop, never returns. The guest root scan keeps what the guest goes on holding.
-    let frame = matches!(id, InitSvcId::JavaThrow | InitSvcId::JavaNew | InitSvcId::JavaArrayNew);
+    let frame = matches!(
+        id,
+        InitSvcId::JavaThrow | InitSvcId::JavaThrowInstance | InitSvcId::JavaNew | InitSvcId::JavaArrayNew
+    );
     if frame {
         wie_jvm_support::guest_roots::stress_collect(jvm, core.id());
         jvm.push_native_frame();
@@ -39,6 +42,7 @@ async fn handle_init_svc(core: &mut ArmCore, jvm: &mut Jvm, id: SvcId) -> Result
         match id {
             InitSvcId::GetInterface => get_interface(core, core.read_param(0)?).await?.write(core, lr),
             InitSvcId::JavaThrow => EmulatedFunction::call(&java_throw, core, jvm).await?.write(core, lr),
+            InitSvcId::JavaThrowInstance => EmulatedFunction::call(&java_throw_instance, core, jvm).await?.write(core, lr),
             InitSvcId::JavaCheckType => EmulatedFunction::call(&java_check_type, core, jvm).await?.write(core, lr),
             InitSvcId::JavaNew => EmulatedFunction::call(&java_new, core, jvm).await?.write(core, lr),
             InitSvcId::JavaArrayNew => EmulatedFunction::call(&java_array_new, core, jvm).await?.write(core, lr),
@@ -117,20 +121,7 @@ pub async fn load_native(
     let ptr_param_3 = Allocator::alloc(core, size_of::<InitParam3>() as u32)?;
     write_generic(core, ptr_param_3, param_3)?;
 
-    let param_4 = InitParam4 {
-        fn_get_interface: core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::GetInterface)?,
-        fn_java_throw: core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaThrow)?,
-        unk1: 0,
-        unk2: 0,
-        fn_java_check_type: core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaCheckType)?,
-        fn_java_new: core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaNew)?,
-        fn_java_array_new: core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaArrayNew)?,
-        fn_visit_gc_root: 0,
-        fn_java_class_load: core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaClassLoad)?,
-        unk7: 0,
-        unk8: 0,
-        fn_alloc: core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::Alloc)?,
-    };
+    let param_4 = init_param_4(core)?;
 
     let ptr_param_4 = Allocator::alloc(core, size_of::<InitParam4>() as u32)?;
     write_generic(core, ptr_param_4, param_4)?;
@@ -177,8 +168,52 @@ async fn get_interface(core: &mut ArmCore, ptr_name: u32) -> Result<u32> {
     }
 }
 
+fn init_param_4(core: &mut ArmCore) -> Result<InitParam4> {
+    Ok(InitParam4 {
+        fn_get_interface: core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::GetInterface)?,
+        fn_java_throw: core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaThrow)?,
+        // `throw e` for an exception the guest already constructed (`fn_java_throw` builds one from a
+        // class name). Read off two titles' AOT throw helper: `jump_2(e, 0, param4.unk1)`, called
+        // right after `new Exception` — left 0, that throw was a null native jump (docs/report/0438 §3).
+        unk1: core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaThrowInstance)?,
+        unk2: 0,
+        fn_java_check_type: core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaCheckType)?,
+        fn_java_new: core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaNew)?,
+        fn_java_array_new: core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaArrayNew)?,
+        fn_visit_gc_root: 0,
+        fn_java_class_load: core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::JavaClassLoad)?,
+        unk7: 0,
+        unk8: 0,
+        fn_alloc: core.make_svc_stub(SVC_CATEGORY_INIT, InitSvcId::Alloc)?,
+    })
+}
+
 async fn alloc(core: &mut ArmCore, _: &mut (), a0: u32) -> Result<u32> {
     tracing::trace!("alloc({a0})");
 
     Allocator::alloc(core, a0)
+}
+
+#[cfg(test)]
+mod tests {
+    use wie_core_arm::{Allocator, ArmCore};
+    use wie_util::Result;
+
+    use super::{SVC_CATEGORY_INIT, alloc, init_param_4};
+
+    // Two titles' AOT throw helper calls this slot with an exception they already built; 0 there is a
+    // null native jump at the first `throw` (docs/report/0438 §3).
+    #[test]
+    fn init_param_4_wires_throw_instance() -> Result<()> {
+        let mut core = ArmCore::new(false, None)?;
+        Allocator::init(&mut core)?;
+        // Any handler: stubs need their category registered, and this test never calls one.
+        core.register_svc_handler(SVC_CATEGORY_INIT, alloc, &())?;
+        let param_4 = init_param_4(&mut core)?;
+
+        assert_ne!(param_4.unk1, 0);
+        assert_ne!(param_4.unk1, param_4.fn_java_throw);
+
+        Ok(())
+    }
 }

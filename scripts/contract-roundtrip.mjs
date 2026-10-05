@@ -331,7 +331,7 @@ const server = createServer(async (req, res) => {
   }
   // Scenario S: the committed soundfont, served the way the shell will serve it. Any other name
   // under /soundfont/ is a 404 (S4's failure path).
-  if (url.pathname === "/soundfont/GeneralUser.sf3") file = path.join(root, "wie-web/public/GeneralUser.sf3");
+  if (url.pathname === "/soundfont/GeneralUser.sf3" || url.pathname === "/soundfont/slow/GeneralUser.sf3") file = path.join(root, "wie-web/public/GeneralUser.sf3");
   if (url.pathname.startsWith("/wasm/")) file = path.join(root, contract.artifacts.dir, path.basename(url.pathname));
   if (url.pathname.startsWith("/fixtures/")) file = path.join(root, "test_data", path.basename(url.pathname));
   try {
@@ -734,14 +734,18 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     // own `stats`.
     //   S1  no URL        — one module, no prelude, no fetch, FM sounds
     //   S2  URL, file arrives while the worklet module is still loading (Arrived)
-    //   S3  URL, module ready long before the first play (NotRequested must survive on_ready)
-    //   S4  URL that 404s — warned, FM, no prelude, no error
-    //   S5  (in S3's run) an instrument not decoded yet — its first play is FM, the next is the soundfont
+    //   S3  URL — fetched at boot; the first play renders through the soundfont, never FM
+    //   S4  URL that 404s — warned, FM for every play, no prelude, no error
+    //   S5  (in S3's run) an instrument not decoded yet — its first play waits, then is the soundfont
+    //   S6  URL whose body takes longer than the worklet's HOLD_MAX_MS — FM for every play
+    // S3, S5 and S6 are the session invariant of docs/report 0441: one synth per session, from the
+    // first play of each song (until 2026-10-04 a song's first play was FM and its next the soundfont).
     const log = [];
     const t0 = performance.now();
     const at = () => performance.now() - t0;
     let holdModule = null; // S2: the next addModule resolves only once this promise does
     let bodyArrived = null;
+    let slowBodyMs = 0; // S6: a /slow/ soundfont body resolves this much later
     const nativeAdd = AudioWorklet.prototype.addModule;
     AudioWorklet.prototype.addModule = async function (url, options) {
       const text = await (await nativeFetch(url)).text();
@@ -764,7 +768,8 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     };
     const nativeBody = Response.prototype.arrayBuffer;
     Response.prototype.arrayBuffer = function () {
-      const body = nativeBody.call(this);
+      let body = nativeBody.call(this);
+      if (this.url.includes("/soundfont/slow/")) body = body.then((b) => new Promise((r) => setTimeout(() => r(b), slowBodyMs)));
       if (this.url.includes("/soundfont/"))
         body.then(() => {
           log.push({ what: "sf-body", at: at() });
@@ -843,6 +848,24 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
       }
       return { stats, level };
     };
+    // Polls until the play renders through a soundfont synth and is audible, recording the most FM
+    // voices seen on the way — 0 means no FM note sounded at any poll of this play.
+    const sfOnly = async (run) => {
+      let stats = {};
+      let level = 0;
+      let fmMax = 0;
+      let heldFirst = null;
+      const started = performance.now();
+      for (let i = 0; i < 80; i++) {
+        level = levelOf(run.analyser);
+        stats = await statsOf(run.emu, run.node());
+        heldFirst ??= stats.held;
+        fmMax = Math.max(fmMax, stats.voices);
+        if (stats.synths >= 1 && level > 1e-3) break;
+        await pump(run.emu, 100);
+      }
+      return { stats, level, fmMax, heldFirst, waitMs: performance.now() - started };
+    };
     const since = (mark) => log.slice(mark);
     const first = (entries, what) => entries.find((e) => e.what === what);
     const count = (entries, what) => entries.filter((e) => e.what === what).length;
@@ -900,31 +923,30 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
       await close(run);
     }
 
-    // S3 — URL, module long ready before the first play. The fetch must wait for that play and
-    // must still happen (on_ready once swapped NotRequested away, so it never did).
+    // S3 — URL: the soundfont fetch starts when the engine boots, before any play (until 2026-10-04 it
+    // waited for the first play, so that play was FM). The worklet module is still loaded alone; the
+    // prelude follows once the file is in. The first play — pressed as soon as the node exists, so
+    // it may well arrive before the soundfont has parsed — waits for it and renders through it only.
     {
       const run = await boot("/soundfont/GeneralUser.sf3");
       await pump(run.emu, 15_000, () => count(since(run.mark), "node") === 1);
-      await pump(run.emu, 1000);
       const idle = since(run.mark);
       const firstModule = first(idle, "module");
       check(
-        "S3: URL — the worklet module is loaded ALONE (no prelude), and nothing is fetched before the first play",
-        firstModule && !firstModule.prelude && count(idle, "module") === 1 && count(idle, "sf-fetch") === 0,
-        `module ${firstModule ? `${firstModule.bytes}B prelude=${firstModule.prelude} load ${ms(firstModule.loadMs)}` : "none"} · fetches before any play ${count(idle, "sf-fetch")}`,
+        "S3: URL — the worklet module is loaded ALONE (no prelude), and the soundfont fetch starts at boot, before any play",
+        firstModule && !firstModule.prelude && count(idle, "sf-fetch") === 1 && count(idle, "post-play") === 0,
+        `module ${firstModule ? `${firstModule.bytes}B prelude=${firstModule.prelude} load ${ms(firstModule.loadMs)}` : "none"} · fetch ${ms(first(idle, "sf-fetch")?.at)} · plays before it ${count(idle, "post-play")}`,
       );
-      const playedFm = await press(run);
-      const { stats: fmStats } = await sounding(run, (st) => st.voices > 0);
+      const played = await press(run);
+      const sf1 = await sfOnly(run);
       const ready = await soundfontReady(run);
       const seen = since(run.mark);
-      const fetchAt = first(seen, "sf-fetch")?.at;
-      const playAt = first(seen, "post-play")?.at;
       const bodyAt = first(seen, "sf-body")?.at;
       const prelude = seen.filter((e) => e.what === "module")[1];
       check(
-        "S3: the first play sounds on FM, then the soundfont is fetched, the prelude loads as a second module, and it is posted",
-        playedFm && fmStats.voices > 0 && ready && playAt <= fetchAt && prelude?.prelude === true && prelude.at >= bodyAt && count(seen, "post-sf") === 1,
-        `first play ${ms(playAt)} (FM voices ${fmStats.voices}) · fetch ${ms(fetchAt)} · body ${ms(bodyAt)} · prelude module ${ms(prelude?.at)} (load ${ms(prelude?.loadMs)}) · ready ${ready}`,
+        "S3: the first play renders through the soundfont only — no FM note at any point — and the prelude loaded as a second module",
+        played && ready && sf1.fmMax === 0 && sf1.stats.synths >= 1 && sf1.level > 1e-3 && prelude?.prelude === true && prelude.at >= bodyAt && count(seen, "post-sf") === 1,
+        `held at first look ${sf1.heldFirst} · soundfont after ${ms(sf1.waitMs)} · synths ${sf1.stats.synths} · FM voices seen ${sf1.fmMax} · rms ${sf1.level.toFixed(4)} · body ${ms(bodyAt)} · prelude module ${ms(prelude?.at)}`,
       );
       const quiet = await fmSilent(run);
       const playedSf = await press(run);
@@ -936,10 +958,10 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
       );
 
       // S5 — a play whose instrument the soundfont has not decoded yet (strings: the guest never
-      // used it) plays FM, and decoding it runs as queued work on the audio thread, never inside the
-      // play (docs/report 0359: a whole instrument decoded in the play held an Android emulator's
-      // audio thread 156 ms). Once that work is done, the next play of it is the soundfont. Posted
-      // straight to the node — the guest has one sound — on a handle audio.rs never allocates.
+      // used it) waits — held, silent, no FM — while its samples are decoded as queued work on the
+      // audio thread, never inside the play (docs/report 0359: a whole instrument decoded in the play
+      // held an Android emulator's audio thread 156 ms), then renders through the soundfont only.
+      // Posted straight to the node — the guest has one sound — on a handle audio.rs never allocates.
       const node = run.node();
       const H = 0x7fff0000;
       const strings = [[0, 0, new Uint8Array([0xc0, 48])], [0, 0, new Uint8Array([0x90, 64, 110])], [700, 0, new Uint8Array([0x80, 64, 0])]];
@@ -953,19 +975,11 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
       };
       const quiet5 = await idleAgain();
       node.rawPost({ t: "play", h: H, r: false, d: 800, ev: strings });
-      const { stats: fm5, level: fmLevel } = await sounding(run, (st, lv) => st.voices > 0 && lv > 1e-3);
+      const sf5 = await sfOnly(run);
       check(
-        "S5: an instrument not decoded yet — its first play sounds on FM (no soundfont synth)",
-        quiet5 && fm5.soundfont === "ready" && fm5.synths === 0 && fm5.voices > 0 && fmLevel > 1e-3,
-        `idle before ${quiet5} · synths ${fm5.synths} · FM voices ${fm5.voices} · work ${fm5.work} · output rms ${fmLevel.toFixed(4)}`,
-      );
-      const decoded5 = await idleAgain();
-      node.rawPost({ t: "play", h: H, r: false, d: 800 });
-      const { stats: sf5, level: sfLevel } = await sounding(run, (st, lv) => st.synths >= 1 && lv > 1e-3);
-      check(
-        "S5: once its decode work is done, the next play of it renders through the soundfont only",
-        decoded5 && sf5.synths >= 1 && sf5.voices === 0 && sfLevel > 1e-3,
-        `work drained ${decoded5} · synths ${sf5.synths} · FM voices ${sf5.voices} · output rms ${sfLevel.toFixed(4)}`,
+        "S5: an instrument not decoded yet — its first play waits for its samples (no FM note), then renders through the soundfont only",
+        quiet5 && sf5.heldFirst === 1 && sf5.fmMax === 0 && sf5.stats.synths >= 1 && sf5.level > 1e-3,
+        `idle before ${quiet5} · held at first look ${sf5.heldFirst} · soundfont after ${ms(sf5.waitMs)} · synths ${sf5.stats.synths} · FM voices seen ${sf5.fmMax} · output rms ${sf5.level.toFixed(4)}`,
       );
       await close(run);
     }
@@ -1009,7 +1023,8 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
       await close(run);
     }
 
-    // S4 — URL that 404s: a warning, FM, no prelude module, and nothing on console.error.
+    // S4 — URL that 404s: a warning, FM, no prelude module, and nothing on console.error. The worklet
+    // reads `failed` when the 404 lands after it told it to wait (`sfoff`), `none` when before.
     {
       const errorsBefore = errorOut.length;
       const run = await boot("/soundfont/missing.sf3");
@@ -1022,8 +1037,38 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
       const warning = warnOut.find((w) => w.includes("[wie] soundfont") && w.includes("404"));
       check(
         "S4: a soundfont that 404s is warned about and FM keeps playing — no prelude, no console.error",
-        warning && stats.voices > 0 && stats.synths === 0 && count(seen, "module") === 1 && errorOut.length === errorsBefore,
-        `${warning ?? "no warning"} · FM voices ${stats.voices} · synths ${stats.synths} · modules ${count(seen, "module")} · console.error ${errorOut.length - errorsBefore}`,
+        warning && stats.voices > 0 && stats.synths === 0 && stats.held === 0 && stats.soundfont !== "ready" && count(seen, "module") === 1 && errorOut.length === errorsBefore,
+        `${warning ?? "no warning"} · FM voices ${stats.voices} · synths ${stats.synths} · held ${stats.held} · worklet ${stats.soundfont} · modules ${count(seen, "module")} · console.error ${errorOut.length - errorsBefore}`,
+      );
+      await close(run);
+    }
+
+    // S6 — URL whose body takes longer than HOLD_MAX_MS (3 s) after the first play: that play waits,
+    // then starts on FM, and the session stays FM — the soundfont arriving afterwards is refused.
+    // A slow first visit gets the pre-soundfont sound throughout, never a song that changes synth.
+    {
+      const errorsBefore = errorOut.length;
+      slowBodyMs = 8000;
+      const run = await boot("/soundfont/slow/GeneralUser.sf3");
+      await pump(run.emu, 15_000, () => count(since(run.mark), "node") === 1);
+      const played = await press(run);
+      const held = await statsOf(run.emu, run.node());
+      // Up to 8 s: the hold alone is 3 s, and the guest's note is short — poll, do not sleep past it.
+      const fm = { stats: {} };
+      for (const t = performance.now(); performance.now() - t < 8000; ) {
+        fm.stats = await statsOf(run.emu, run.node());
+        if (fm.stats.voices > 0 || fm.stats.synths > 0) break;
+        await pump(run.emu, 50);
+      }
+      const refused = await pump(run.emu, 20_000, () => warnOut.some((w) => w.includes("[wie] soundfont") && w.includes("already failed")));
+      await fmSilent(run);
+      const playedAgain = await press(run);
+      const { stats, level } = await sounding(run, (st, lv) => st.voices > 0 && lv > 1e-3);
+      slowBodyMs = 0;
+      check(
+        "S6: a soundfont later than HOLD_MAX_MS — the waiting play starts on FM, the late file is refused, and the next play is FM too",
+        played && held.held === 1 && fm.stats.voices > 0 && fm.stats.synths === 0 && refused && playedAgain && stats.voices > 0 && stats.synths === 0 && stats.soundfont === "failed" && level > 1e-3 && errorOut.length === errorsBefore,
+        `held ${held.held} (${held.soundfont}) · then FM voices ${fm.stats.voices} synths ${fm.stats.synths} · late file refused ${refused} · next play FM voices ${stats.voices} synths ${stats.synths} (${stats.soundfont}) · console.error ${errorOut.length - errorsBefore}`,
       );
       await close(run);
     }

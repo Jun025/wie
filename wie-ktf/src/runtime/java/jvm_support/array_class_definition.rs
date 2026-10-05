@@ -14,7 +14,7 @@ use wie_core_arm::{Allocator, ArmCore};
 use wie_jvm_support::native::array_element_size;
 use wie_util::{write_generic, write_null_terminated_string_bytes};
 
-use super::{KtfJvmSupport, Result, array_class_instance::JavaArrayClassInstance, class_definition::JavaClassDefinition};
+use super::{KtfJvmSupport, Result, array_class_instance::JavaArrayClassInstance, class_definition::JavaClassDefinition, vtable::JavaVtable};
 
 #[derive(Clone)]
 pub struct JavaArrayClassDefinition {
@@ -82,6 +82,16 @@ impl JavaArrayClassDefinition {
         )?;
 
         let class = JavaArrayClassDefinition::from_raw(ptr_raw, core);
+
+        // An array is an Object, and the guest dispatches Object's methods on it through the
+        // class's vtable like on any other instance. With no vtable, 6c9f969f089f calling
+        // equals(Object) on an int[] read a null table and branched to address 0 — and every array
+        // class shared one vtable slot index (`get_vtable_index` matches a 0 pointer to nothing and
+        // appends it where the next class lands). Built the way a class's is: Object's methods,
+        // in Object's order, in a table of the array class's own.
+        let vtable = JavaVtable::new(core, &class.class)?;
+        write_generic(core, ptr_raw + 12, vtable.ptr_raw)?;
+        write_generic(core, ptr_raw + 16, vtable.len()? as u16)?;
 
         Ok(class)
     }

@@ -257,12 +257,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "겟앰프드"
   },
@@ -309,18 +307,16 @@
    "platform": "KTF",
    "model": null,
    "title": "광수의 똥! 생각",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "광수의 똥! 생각"
   },
@@ -757,13 +753,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "kt 던전앤히어로"
   },
@@ -1297,13 +1291,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "리얼싸커2009"
   },
@@ -1318,13 +1310,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "리얼싸커2009"
   },
@@ -1519,17 +1509,18 @@
    "platform": "KTF",
    "model": null,
    "title": "맞고삼국대전",
-   "status": "not-yet",
+   "status": "limited",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
+    "boot": "ok",
+    "render": "ok",
+    "input": "no",
+    "longplay": "ok",
+    "sound": "no",
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
+    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
+    "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
    "fileTitle": "맞고삼국대전"
@@ -1641,12 +1632,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "메이플스토리 도적편"
   },
@@ -1746,18 +1735,16 @@
    "platform": "KTF",
    "model": null,
    "title": "물가에돌튕기기3",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "물가에돌튕기기3"
   },
@@ -2046,12 +2033,11 @@
     "render": "ok",
     "input": "no",
     "longplay": "unknown",
-    "sound": "no",
+    "sound": "ok",
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
+    "키를 눌러도 화면이 바뀌지 않을 수 있어요."
    ],
    "changes": [],
    "fileTitle": "박정석 영웅탄생"
@@ -2061,18 +2047,16 @@
    "platform": "KTF",
    "model": null,
    "title": "방탈출",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "방탈출"
   },
@@ -2199,13 +2183,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "북천항해기2"
   },
@@ -2279,7 +2261,7 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
+    "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
    ],
    "changes": [],
    "fileTitle": "블레이드마스터2"
@@ -2473,20 +2455,16 @@
    "platform": "KTF",
    "model": null,
    "title": "셔터-영혼의울림",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "no",
-    "sound": "no",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "셔터-영혼의울림"
   },
@@ -3582,13 +3560,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "점핑펭"
   },
@@ -3672,19 +3648,16 @@
    "platform": "KTF",
    "model": null,
    "title": "주타이쿤2",
-   "status": "not-yet",
+   "status": "limited",
    "axes": {
     "boot": "ok",
-    "render": "no",
-    "input": "unknown",
+    "render": "ok",
+    "input": "ok",
     "longplay": "unknown",
-    "sound": "no",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "화면이 한 가지 색으로만 보여요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "주타이쿤2"
   },
@@ -4105,12 +4078,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "no",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
    "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
-    "소리가 나지 않을 수 있어요."
+    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요."
    ],
    "changes": [],
    "fileTitle": "컴투스포춘골프3D"
@@ -4870,12 +4842,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "화산제일검2"
   },
@@ -6780,12 +6750,10 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "드래곤아이즈"
   },
@@ -6841,7 +6809,7 @@
     "speed": "ok"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
+    "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
    ],
    "changes": [],
    "fileTitle": "레스토랑타이쿤2006"
@@ -7457,7 +7425,7 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
+    "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
    ],
    "changes": [],
    "fileTitle": "어스토니시아ep3"
@@ -7497,7 +7465,7 @@
     "progress": "ok"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
+    "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
    ],
    "changes": [],
    "fileTitle": "에이지오브엠파이어2"
@@ -7517,7 +7485,7 @@
     "speed": "ok"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
+    "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
    ],
    "changes": [],
    "fileTitle": "엑스맨"
@@ -7719,7 +7687,7 @@
     "speed": "ok"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
+    "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
    ],
    "changes": [],
    "fileTitle": "코인마스터"
