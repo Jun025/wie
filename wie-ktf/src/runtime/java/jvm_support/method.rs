@@ -275,6 +275,11 @@ impl JavaMethod {
                         ptr_handler + offset_of!(RawJavaExceptionHandler, unk3) as u32,
                         KtfJvmSupport::class_instance_raw(&exception),
                     )?;
+                    // The handler now runs at `target`, so the record says so. Compiled code writes this slot
+                    // only where a range covers the handler body (a catch block covered by its `finally`); a
+                    // `finally` that rethrows writes nothing, and with the try-range pc still here its own
+                    // rethrow re-entered it forever — 86,010 throws in 3 s on dbd078113b97 KTF (docs/report/0448).
+                    write_generic(core, ptr_handler + offset_of!(RawJavaExceptionHandler, current_pc) as u32, entry.target)?;
                     // The frames above the catching one are gone, and so are their records.
                     KtfJvmSupport::set_current_java_exception_handler(core, ptr_handler)?;
 

@@ -1,0 +1,10 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-06",
+  "task": "wie-ktf-network-connect-fail-null-jump-crash",
+  "title": "KTF finally 재던짐이 자기 핸들러로 되돌아오던 무한 루프",
+  "summary": "잡는 순간 핸들러 레코드의 current_pc 를 target 으로 옮긴다. Network.connect() 의 -1 은 게임이 비교하는 실패 값이라 그대로 둔다. docs/report/0448.",
+  "proposals": [],
+  "adoptedProposals": ["2026-10-05-progression-wave3-r2#p1"],
+  "declinedProposals": []
+}
