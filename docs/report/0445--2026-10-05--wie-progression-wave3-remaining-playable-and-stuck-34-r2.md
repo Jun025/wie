@@ -7,6 +7,8 @@
 
 조건: 핀 `9b4eb62e`(1회차와 같은 사본) · 정책 v2 600초 + 재기동 120초 · 스윕 «전체»를 `build-slot run --long` 임대 1개로 감쌌다(안쪽 실행은 맨 명령) · census 호스트 잠금.
 
+★**측정 엔진이 둘이다**(반려 F2 · §9). ok 41행 = `9b4eb62e`(#470 시점 main · #476·#477·이 PR 의 엔진 변경 이전). stuck 8행 = 이 PR head 빌드 `33b38ac2`(#475 -fix 를 merge 한 뒤 · main `d4a0f330` 포함)로 다시 쟀다 — 8행 값이 그대로다. 고친 2종 = 이 PR 빌드(§4-1).
+
 | 단계 | 시각 | jobs | load1 (시작 → 끝) | idle (시작 → 끝) |
 |---|---|---|---|---|
 | P `chunk.aa` | 07:51–09:51 | 3 | 32.9 → 9.1 | 0% → 42% |
@@ -99,11 +101,12 @@ census 와 같은 키·탈출 규칙으로 쟀다(고친 빌드 · 재기동 꼬
 
 ### 6. compat 갱신
 
-- `axes.progress`: `chunk.aa` 31행 중 고친 2종을 뺀 29행. 계약 어휘대로 `error → stuck` 이다. `(없음) → ok` 22 · `(없음) → stuck` 6 · `stuck → ok` 1(`9789fec50f39`).
-- `chunk.ab` 20행: `(없음) → ok` 18 · `(없음) → stuck` 2(렌더 FAIL · 계약상 «실행 FAIL 도 stuck»). P2 짝이 없는 6종은 `n/a` 라 싣지 않았다.
+- `axes.progress`: `chunk.aa` 31행 중 고친 2종을 뺀 29행. 계약 어휘대로 `error → stuck` 이다. `(없음) → ok` 22 · `(없음) → stuck` 6 · `stuck → ok` 1(`9789fec50f39`). ok 23 은 `9b4eb62e` 측정, stuck 6 은 §9 에서 이 PR head 빌드로 다시 쟀다.
+- `chunk.ab` 20행: `(없음) → ok` 18 · `(없음) → stuck` 2(렌더 FAIL · 계약상 «실행 FAIL 도 stuck»). P2 짝이 없는 6종은 `n/a` 라 싣지 않았다. stuck 2 도 §9 에서 다시 쟀다(같은 렌더 FAIL · 17% · 62%).
 - 고친 2종(`0e6cd188729e` `070daa5b552c`): `ok`(§4-1). 이 PR 이 고친 빌드로 쟀다.
 - `b9bfcaf42722`: §5.
 - 6차 판(`enginePin` `4ac38566`) 위의 행 단위 수정이다. 1회차와 같은 방식이다. `player-data.mjs` OK.
+- ★§2(할 일 2)와 어긋나지 않는다: 미룬 것은 #475 가 고친 2종의 행이고, 이 절의 progress 행은 그 2종을 건드리지 않는다. 다만 ok 41 은 옛 엔진(`9b4eb62e`) 값이다 — 그 뒤 엔진 변경(#476·#477·이 PR)이 그 타이틀을 퇴행시켰다면 이 값은 낡은 `ok` 다. 이 회차는 그 41종을 다시 재지 않았다(§9).
 
 ### 7. 다음 회차
 
@@ -120,5 +123,41 @@ census 와 같은 키·탈출 규칙으로 쟀다(고친 빌드 · 재기동 꼬
 - 342 는 `compat.json` 의 기존 제목, #475 가 고친 `wie-lgt` 주석의 기존 언급, `jvm_support.rs` 의 기존 줄(main 에 이미 있다)이다.
 - 이 PR 이 더한 줄만(`875f3a71..HEAD`, `compat.json` 제외) 코퍼스 파일 이름과 대조하면 0 이다.
 
+
+### 9. 반려 승계(`-r2-fix`) — compat 되돌림 · 측정 엔진 · 경계 시험
+
+**F1 — compat 되돌림.** 이 브랜치는 #475 의 옛 pin `875f3a71` 위에 있어 #473·#476 이 고친 23행을 옛 값으로 되돌리고 있었다. #475 -fix head `55b01999`(main `d4a0f330` 포함)를 merge 했다. `compat.json` 충돌은 «`55b01999` 판 + 이 PR 이 `875f3a71 → ddbd8e84` 에서 바꾼 필드만» 으로 풀었다(progress 51행 · `b9bfcaf42722` 의 status·knownIssues_ko). `origin/main` 대비 `sha256+platform` 행 단위 비교:
+
+| 항목 | 수 |
+|---|---|
+| 바뀐 행 | 66 |
+| = 이 PR(progress 51 + `b9bfcaf42722` 1) | 52 |
+| + #475 -fix(progress 14) | 14 |
+| 겹침 · 설명 안 되는 행 · 빠진 행 | 0 · 0 · 0 |
+| progress 밖 필드가 바뀐 행 | 1(`b9bfcaf42722` · 의도) |
+| top 필드(`schema`·`generatedAt`·`enginePin`) 차이 | 0 |
+
+검수가 겹침 후보로 든 `5028b8a5d19f`·`1793f87924d4`·`d4188f8ef8c4` 는 #475 -fix 행이고 `e085e193211d` 는 이 PR 행이다. 둘이 같은 행을 건드리지 않는다. `e085e193211d` 는 progress 만 이 PR 값이고 `sound`·`knownIssues_ko` 는 main 값이다.
+
+**F2 — ⒜ 를 골랐다.** stuck 8행을 이 PR head 빌드(`33b38ac2` · release `wie_validate`)로 다시 쟀다. 같은 정책(v2 600초 + 재기동 120초 · P 후 `p2list.mjs` 가 고른 P2 짝) · `build-slot run --long` 임대 1개 · `--jobs 3` · 시작 전 `host-load-guard --recovered` rc=0 · 14:32–15:44 · load1 7.6(시작) · 10.5(14:57). 후보 판정용 A·B·L 프로브는 옛 out 에서 가져왔다(그 축은 이 회차가 바꾸지 않는다).
+
+| sha12 | P (stall · 화면 수) | P2 | 공개 값 | 이전 값 |
+|---|---|---|---|---|
+| `135d1291501f` | 530 · 7 | 같음 | stuck | stuck |
+| `3185174d2121` | 590 · 1 | 같음 | stuck | stuck |
+| `33f3e7669599` | 300 · 6 | 같음 | stuck | stuck |
+| `44c292be4e4c` | 260 · 6 | 같음 | stuck | stuck |
+| `cb7c7f87f9e6` | 400 · 10 | 같음 | stuck | stuck |
+| `dbd078113b97` | 590 · 1 | 같음 | stuck | stuck |
+| `46b2238f87a6` | 렌더 FAIL 17% | 같음 | stuck | stuck |
+| `7e2247bdf565` | 렌더 FAIL 62% | 짝 없음(stall 70 · `p2list` 기준 밖 · 1회차도 같다) | stuck | stuck |
+
+값이 하나도 바뀌지 않아 `compat.json` 에 더 고칠 것이 없다. ok 41행은 다시 재지 않았다(§6 마지막 줄).
+
+**m1 — 경계 시험.** `test_jvm_call_runs_in_its_own_exception_scope`: 시험 클래스의 정적 host 메서드를 `<JavaMethod as jvm::Method>::run` 으로 부른다. 몸체는 그 순간의 handler 를 돌려준다. 호출자 chain 을 `0x1234` 로 두고 부르면 몸체는 `0` 을 보고, 돌아온 뒤 `0x1234` 가 복원된다. `method.rs` 의 `enter/leave_exception_scope` 두 줄을 지우면 **FAILED**(`the body ran under the caller's chain`)다. 되돌리면 PASS 다.
+
+**연번.** `0443` 은 #476(`wie-compat-apply-guest-thread-death-rejudge-and-five-walls`)이 먼저 착지했다. 이 파일을 `0445` 로 옮기고 이 PR 이 더한 참조 5곳을 고쳤다.
+
+**게이트.** fmt OK · clippy `--all` / wasm / `+beta` rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` **701 passed / 0 failed**. 첫 두 번은 rustc ICE(`failed to open LTO bitcode file … pre-lto.bc`)로 빌드가 죽었다. 증분 캐시 파일이 빌드 도중 사라진 것이라 `CARGO_INCREMENTAL=0` 으로 다시 돌렸다. `player-data.mjs` OK.
 
 <!-- corpus-name-inflow v1 subjects=14 tree=1f43e8f283145090 B=735/342 P=0/0 S=35/15 -->
