@@ -100,3 +100,5 @@ changed 42 · 이 회차가 잰 행 밖 0
 
 - `corpus-name-inflow`(origin/main 대비): BOUNDED 332 + SUFFIX-ATTACHED 15. 전부 `compat.json` 의 기존 제목이다(이 PR 은 progress 값만 바꿨다).
 - `compat.json` 을 뺀 7경로: BOUNDED 2 + SUFFIX-ATTACHED 0. 그 2건(`jvm_support.rs` · `graphics.rs`)은 main 에 이미 있는 줄이고, 이 PR 이 더한 줄(`+`)과 대조하면 0 이다.
+
+<!-- corpus-name-inflow v1 subjects=8 tree=4773a25ed5583b06 B=720/332 P=0/0 S=35/15 -->
