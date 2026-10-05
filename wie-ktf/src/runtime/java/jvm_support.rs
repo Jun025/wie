@@ -1657,4 +1657,41 @@ mod test {
         }
         Ok(())
     }
+
+    /// 30c7bd6fb01b's «connect?» path, in the order it calls: Net slot 34 with a `"host:port"` string
+    /// (no network here, so -1 like `MC_netSocket`), then util slot 4 `MC_utilInetAddrInt` on the
+    /// server's dotted quad — an address in network order; anything else is INADDR_NONE.
+    #[test]
+    fn test_net_slot_34_fails_without_network() -> Result<()> {
+        use crate::runtime::{SVC_CATEGORY_WIPIC, svc_ids::WIPICTableId, wipi_c::register_wipic_svc_handler};
+
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let mut system_clone = system.clone();
+        system.spawn(async move || {
+            let (jvm, mut core) = init_jvm(&mut system_clone).await?;
+            register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
+            let slot = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICTableId::Net.function_id(34u16))?;
+
+            let host = Allocator::alloc(&mut core, 64)?;
+            wie_util::write_null_terminated_string_bytes(&mut core, host, b"kt68wipiwicgsfr.magicn.com:27090")?;
+            let ret: u32 = core.run_function(slot, &[host, 0xff]).await?;
+            assert_eq!(ret as i32, -1);
+
+            let inet_addr = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICTableId::Util.function_id(4u16))?;
+            let ret: u32 = core.run_function(inet_addr, &[host]).await?;
+            assert_eq!(ret, u32::MAX);
+            wie_util::write_null_terminated_string_bytes(&mut core, host, b"218.145.70.36")?;
+            let ret: u32 = core.run_function(inet_addr, &[host]).await?;
+            assert_eq!(ret.to_le_bytes(), [218, 145, 70, 36]);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+        Ok(())
+    }
 }

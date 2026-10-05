@@ -1,14 +1,15 @@
-use alloc::vec;
+use alloc::{vec, vec::Vec};
 
-use jvm::{ClassInstanceRef, Jvm, Result as JvmResult};
+use jvm::{Array, ClassInstanceRef, Jvm, Result as JvmResult};
 use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 
+use rustjava_runtime::classes::java::lang::Object;
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
 use crate::classes::org::kwis::msp::{
     lcdui::{Card, Display, Graphics},
-    lwc::{Component, KEY_NOTIFY, ShellComponent},
+    lwc::{Component, GrabKeyListener, KEY_NOTIFY, ShellComponent},
 };
 
 // class net.wie.ShellCard
@@ -41,6 +42,16 @@ impl ShellCard {
                     "Lorg/kwis/msp/lwc/Component;",
                     FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC,
                 ),
+                // ShellComponent.grabKey / setGrabKeyListener, static for the same reason: the keys a
+                // shell grabbed (indexed `key & 127` — WIPI codes are -16..57, no two collide) and the
+                // listener + param that hears them.
+                JavaFieldProto::new("grabbed", "[Z", FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC),
+                JavaFieldProto::new(
+                    "grabListener",
+                    "Lorg/kwis/msp/lwc/GrabKeyListener;",
+                    FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC,
+                ),
+                JavaFieldProto::new("grabParam", "Ljava/lang/Object;", FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC),
             ],
             access_flags: ClassAccessFlags::PUBLIC,
         }
@@ -64,6 +75,27 @@ impl ShellCard {
 
     async fn key_notify(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, r#type: i32, key: i32) -> JvmResult<bool> {
         tracing::debug!("net.wie.ShellCard::keyNotify({this:?}, {type}, {key})");
+
+        // A grabbed key goes to the GrabKeyListener first (`grabKeyNotify(type, key, param)`); a key it
+        // takes goes no further. 85e94babc247 grabs keys and sets the listener from its paint.
+        let listener: ClassInstanceRef<GrabKeyListener> = jvm
+            .get_static_field("net/wie/ShellCard", "grabListener", "Lorg/kwis/msp/lwc/GrabKeyListener;")
+            .await?;
+        if !listener.is_null() && Self::is_grabbed(jvm, key).await? {
+            let param: ClassInstanceRef<Object> = jvm.get_static_field("net/wie/ShellCard", "grabParam", "Ljava/lang/Object;").await?;
+            let taken: bool = jvm
+                .invoke_virtual(
+                    &listener,
+                    "org/kwis/msp/lwc/GrabKeyListener",
+                    "grabKeyNotify",
+                    "(IILjava/lang/Object;)Z",
+                    (r#type, key, param),
+                )
+                .await?;
+            if taken {
+                return Ok(true);
+            }
+        }
 
         // The shell's own EventListener sees the key before the shell does (Component.setEventListener).
         let shell = Self::shell(jvm, &this).await?;
@@ -94,6 +126,30 @@ impl ShellCard {
     pub async fn set_focus(jvm: &Jvm, component: ClassInstanceRef<Component>) -> JvmResult<()> {
         jvm.put_static_field("net/wie/ShellCard", "focus", "Lorg/kwis/msp/lwc/Component;", component)
             .await
+    }
+
+    pub async fn set_grabbed(jvm: &Jvm, key: i32, grabbed: bool) -> JvmResult<()> {
+        let mut keys: ClassInstanceRef<Array<bool>> = jvm.get_static_field("net/wie/ShellCard", "grabbed", "[Z").await?;
+        if keys.is_null() {
+            keys = jvm.instantiate_array("Z", 128).await?.into();
+            jvm.put_static_field("net/wie/ShellCard", "grabbed", "[Z", keys.clone()).await?;
+        }
+        jvm.store_array(&mut keys, (key & 127) as usize, [grabbed]).await
+    }
+
+    async fn is_grabbed(jvm: &Jvm, key: i32) -> JvmResult<bool> {
+        let keys: ClassInstanceRef<Array<bool>> = jvm.get_static_field("net/wie/ShellCard", "grabbed", "[Z").await?;
+        if keys.is_null() {
+            return Ok(false);
+        }
+        let value: Vec<bool> = jvm.load_array(&keys, (key & 127) as usize, 1).await?;
+        Ok(value[0])
+    }
+
+    pub async fn set_grab_listener(jvm: &Jvm, listener: ClassInstanceRef<GrabKeyListener>, param: ClassInstanceRef<Object>) -> JvmResult<()> {
+        jvm.put_static_field("net/wie/ShellCard", "grabListener", "Lorg/kwis/msp/lwc/GrabKeyListener;", listener)
+            .await?;
+        jvm.put_static_field("net/wie/ShellCard", "grabParam", "Ljava/lang/Object;", param).await
     }
 
     /// The ShellCard currently on the default Display for `component`, if it is a shown shell.
@@ -239,6 +295,47 @@ mod test {
             // Forward, so a serviceRepaints that only paints pending regions (#345) still sees one.
             jvm.invoke_special(&this, "javax/microedition/lcdui/Canvas", "repaint", "(IIII)V", (x, y, w, h))
                 .await
+        }
+    }
+
+    // A GrabKeyListener that counts the keys it hears and takes them.
+    struct TestGrab;
+
+    impl TestGrab {
+        fn as_proto() -> WieJavaClassProto {
+            WieJavaClassProto {
+                name: "test/TestGrab",
+                parent_class: Some("java/lang/Object"),
+                interfaces: vec!["org/kwis/msp/lwc/GrabKeyListener"],
+                methods: vec![
+                    JavaMethodProto::new("<init>", "()V", Self::init, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new(
+                        "grabKeyNotify",
+                        "(IILjava/lang/Object;)Z",
+                        Self::grab_key_notify,
+                        MethodAccessFlags::PUBLIC,
+                    ),
+                ],
+                fields: vec![JavaFieldProto::new("heard", "I", FieldAccessFlags::PRIVATE)],
+                access_flags: ClassAccessFlags::PUBLIC,
+            }
+        }
+
+        async fn init(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await
+        }
+
+        async fn grab_key_notify(
+            jvm: &Jvm,
+            _: &mut WieJvmContext,
+            mut this: ClassInstanceRef<Self>,
+            _: i32,
+            _: i32,
+            _: ClassInstanceRef<Object>,
+        ) -> JvmResult<bool> {
+            let heard: i32 = jvm.get_field(&this, "heard", "I").await?;
+            jvm.put_field(&mut this, "heard", "I", heard + 1).await?;
+            Ok(true)
         }
     }
 
@@ -854,6 +951,54 @@ mod test {
                     )
                     .await?;
                 assert_eq!(ShellCard::focus(&jvm).await?.identity(), boxes[1].identity());
+
+                Ok(())
+            },
+        )
+    }
+
+    /// 85e94babc247: grabKey(int) + setGrabKeyListener from paint. A grabbed key reaches the listener and
+    /// stops there; another key goes to the shell as before; ungrabKey ends the grab.
+    #[test]
+    fn grabbed_key_goes_to_the_grab_key_listener_first() -> Result<()> {
+        let fixture: Box<[WieJavaClassProto]> =
+            Vec::from([TestShell::as_proto(), TestGrab::as_proto(), SpyCardCanvas::as_proto(), test_jlet()]).into_boxed_slice();
+        run_jvm_test(
+            Box::new([wie_midp::get_protos().into(), get_protos().into(), fixture]),
+            |jvm| async move {
+                let _ = install_display(&jvm, "test/SpyCardCanvas").await?;
+                let shell: ClassInstanceRef<TestShell> = jvm.new_class("test/TestShell", "()V", ()).await?.into();
+                let card = jvm
+                    .new_class("net/wie/ShellCard", "(Lorg/kwis/msp/lwc/ShellComponent;)V", (shell.clone(),))
+                    .await?;
+                let grab = jvm.new_class("test/TestGrab", "()V", ()).await?;
+                let shell_keys = || jvm.get_field::<i32>(&shell, "keyCount", "I");
+                let heard = || jvm.get_field::<i32>(&grab, "heard", "I");
+                let press = |key: i32| jvm.invoke_virtual::<_, bool>(&card, "net/wie/ShellCard", "keyNotify", "(II)Z", (1, key));
+
+                let _: () = jvm
+                    .invoke_virtual(&shell, "org/kwis/msp/lwc/ShellComponent", "grabKey", "(I)V", (35,))
+                    .await?;
+                let _: () = jvm
+                    .invoke_virtual(
+                        &shell,
+                        "org/kwis/msp/lwc/ShellComponent",
+                        "setGrabKeyListener",
+                        "(Lorg/kwis/msp/lwc/GrabKeyListener;Ljava/lang/Object;)V",
+                        (grab.clone(), None::<Box<dyn jvm::ClassInstance>>),
+                    )
+                    .await?;
+
+                assert!(press(35).await?);
+                assert_eq!((heard().await?, shell_keys().await?), (1, 0), "a grabbed key stops at the listener");
+                let _: bool = press(WIPIKeyCode::UP as i32).await?;
+                assert_eq!((heard().await?, shell_keys().await?), (1, 1), "another key goes to the shell");
+
+                let _: () = jvm
+                    .invoke_virtual(&shell, "org/kwis/msp/lwc/ShellComponent", "ungrabKey", "(I)V", (35,))
+                    .await?;
+                let _: bool = press(35).await?;
+                assert_eq!((heard().await?, shell_keys().await?), (1, 2), "ungrabbed: back to the shell");
 
                 Ok(())
             },
