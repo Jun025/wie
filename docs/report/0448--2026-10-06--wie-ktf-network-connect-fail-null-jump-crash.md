@@ -55,3 +55,7 @@ base·head 를 같은 분에 나란히 돌렸다(load1 ~20). long 풀이 다른 
 
 - `compat.json` 은 건드리지 않았다. 이 행의 `progress: stuck` 은 정책 600초 짝 측정으로만 바꿀 수 있고, 그 측정은 long 풀 몫이다(다음 진도 회차).
 - 인접 `30c7bd6fb01b`(KTF Net 표 슬롯 34 `Unimplemented`)는 **다른 축**이다 — WIPI-C 네이티브 인터페이스 표이고 Java 예외 디스패치가 아니다. 이 회차는 판정만 하고 남겼다.
+
+### 5. 게임 파일명 유입
+
+- `corpus-name-inflow`: BOUNDED 1 + SUFFIX-ATTACHED 0. 그 1건은 이 PR 이 건드린 파일의 기존 줄(`jvm_support.rs:1012`, main 에 이미 있다)이고, 이 PR 이 더한 줄에서는 0 이다.
