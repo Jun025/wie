@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-05",
+  "kind": "fix",
+  "titles": [
+    "0e6cd188729ed48823ea4d6d7638e0f74e6754fea5c21ae4eb0295c0bb67cd6b",
+    "070daa5b552ca43e4ae7d062320b3086e5d9401e647a83787087ea2137b2ce1f"
+  ],
+  "summary_ko": "메뉴를 오가다 화면을 그리는 도중 게임이 꺼지던 두 게임이 이제 계속 진행돼요.",
+  "pr": "https://github.com/Jun025/wie/pull/0"
+}
