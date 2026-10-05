@@ -592,7 +592,7 @@ pub async fn copy_frame_buffer(
 
 // KTF titles key their sprites the same way LGT ones do, but through the API: they set the proc with
 // `MC_grpSetContext(PIXELOP)` on the context they hand to `MC_grpDrawImage`/`MC_grpCopyFrameBuffer`.
-// Read from two titles (docs/report/0446): one keys glyph tiles on magenta and returns its text
+// Read from two titles (docs/report/0447): one keys glyph tiles on magenta and returns its text
 // colour for the rest, so without the proc the glyphs were drawn on magenta boxes.
 #[allow(clippy::too_many_arguments)]
 pub async fn draw_image_with_context_pixel_op(
@@ -647,7 +647,7 @@ fn context_pixel_op(context: &mut dyn WIPICContext, graphics_context: WIPICWord)
 pub enum PixelOpArgs {
     /// LGT: `proc(dst, src)` (docs/report/0399).
     DstSrc,
-    /// KTF: `proc(src, dst, param1)` — the WIPI `MC_GrpPixelOpProc` order (docs/report/0446).
+    /// KTF: `proc(src, dst, param1)` — the WIPI `MC_GrpPixelOpProc` order (docs/report/0447).
     SrcDstParam1(WIPICWord),
 }
 

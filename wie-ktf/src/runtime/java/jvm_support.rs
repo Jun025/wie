@@ -1582,7 +1582,7 @@ mod test {
     }
 
     /// KTF `MC_grpCopyFrameBuffer`/`MC_grpDrawImage` run the proc set with `MC_grpSetContext(PIXELOP)`
-    /// as `proc(src, dst, param1)` on 16-bit pixels (docs/report/0446).
+    /// as `proc(src, dst, param1)` on 16-bit pixels (docs/report/0447).
     ///
     /// Two titles key glyphs and sprites this way; the blits ignored the context and drew the key as
     /// magenta. The proc here is written for the test: `src == 0xf81f ? dst : src`.

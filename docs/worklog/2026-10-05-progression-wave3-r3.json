@@ -8,7 +8,7 @@
     "wie-wipi-c — LGT 의 픽셀 연산 블릿을 공용으로 옮김(PixelOpArgs) · KTF 용 DrawImage/CopyFrameBuffer 진입점",
     "wie-ktf method_table — DrawImage/CopyFrameBuffer 가 컨텍스트 픽셀 연산을 돈다 · 시험 1",
     "docs/player-data/compat.json — progress 41행 + 고친 2종",
-    "docs/report/0446 · docs/player-updates 1"
+    "docs/report/0447 · docs/player-updates 1"
   ],
   "verification": [
     "46b2238f87a6 · 7e2247bdf565: 렌더 FAIL(마젠타 17% · 62%) → FAIL 없음(같은 키 재생)",
