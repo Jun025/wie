@@ -69,7 +69,7 @@ const RELAUNCH = ['--relaunch', '1'];
 // Every run here is bounded by --timeout. wie_validate's 50M-tick default is an infinite-loop backstop
 // sized for a boot, and a fast title burns it before the key schedule is done: on 12 of 17 input `none`
 // titles the 30 s probe A stopped at `max-ticks` after 2–17 of 27 keys, and 7 of them read `ok` once it
-// was lifted (docs/report/0449). So no run here keeps the backstop.
+// was lifted (docs/report/0453). So no run here keeps the backstop.
 const NO_TICK_CAP = ['--max-ticks', '100000000000'];
 const LONG_KEYS = 'OK:1 UP:0.5 UP:0.5 OK:1 DOWN:0.5 RIGHT:0.5 NUM5:1 LEFT:0.5 NUM5:1 OK:1 NUM2:0.5 NUM8:0.5 NUM4:0.5 NUM6:0.5 OK:1';
 // The progress policy (~30 s a cycle): confirm through notices and menus (OK/5, one left soft key,
