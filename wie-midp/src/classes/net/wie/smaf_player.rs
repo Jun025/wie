@@ -1,6 +1,6 @@
 use alloc::vec;
 
-use smaf_player::{SmafEvent, parse_smaf};
+use smaf_player::SmafEvent;
 
 use jvm::{
     Array, ClassInstanceRef, GlobalRef, Jvm, Result,
@@ -10,7 +10,7 @@ use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 use rustjava_runtime::classes::java::{io::InputStream, lang::String, util::Vector};
 
-use wie_backend::{Event, Instant, System};
+use wie_backend::{Event, Instant, System, parse_smaf_in};
 use wie_jvm_support::{JvmSupport, WieJavaClassProto, WieJvmContext};
 
 use crate::classes::javax::microedition::media::{Control, PlayerListener};
@@ -98,7 +98,7 @@ impl SmafPlayer {
         let audio_handle = context.system().audio().load_smaf(&data).unwrap();
 
         jvm.put_field(&mut this, "audioHandle", "I", audio_handle as i32).await?;
-        jvm.put_field(&mut this, "lengthMs", "J", sequence_length_ms(&parse_smaf(&data)) as i64)
+        jvm.put_field(&mut this, "lengthMs", "J", sequence_length_ms(&parse_smaf_in(&data)) as i64)
             .await?;
 
         Ok(())
@@ -714,6 +714,45 @@ mod test {
                 Ok(())
             },
         )
+    }
+
+    // The KTF title behind `parse_smaf_in` hands over its SMAF inside a longer buffer; the clip's
+    // length has to come off the same retry the sound does, or a one-shot reads as over at once.
+    #[test]
+    fn test_a_padded_clip_still_has_a_length() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            let seq = [0x00, 0x90, 0x3c, 0x40, 0x10, 0x00, 0xff, 0x2f, 0x00];
+            let mut mtr = vec![0x02, 0x00, 0x02, 0x02];
+            mtr.extend([0; 16]);
+            mtr.extend(b"Mtsq");
+            mtr.extend((seq.len() as u32).to_be_bytes());
+            mtr.extend(seq);
+            let mut file: Vec<u8> = b"MMMD".to_vec();
+            file.extend((8 + mtr.len() as u32 + 2).to_be_bytes());
+            file.extend(b"MTR\x05");
+            file.extend((mtr.len() as u32).to_be_bytes());
+            file.extend(mtr);
+            file.extend([0, 0, 0, 0, 0, 0, 0, 0]);
+
+            let mut data = jvm.instantiate_array("B", file.len()).await?;
+            jvm.store_array(&mut data, 0, file.into_iter().map(|x| x as i8).collect::<Vec<_>>())
+                .await?;
+            let stream = jvm.new_class("java/io/ByteArrayInputStream", "([B)V", (data,)).await?;
+            let content_type = JavaLangString::from_rust_string(&jvm, "application/vnd.smaf").await?;
+            let player: ClassInstanceRef<Player> = jvm
+                .invoke_static(
+                    "javax/microedition/media/Manager",
+                    "createPlayer",
+                    "(Ljava/io/InputStream;Ljava/lang/String;)Ljavax/microedition/media/Player;",
+                    (stream, content_type),
+                )
+                .await?;
+
+            let length_ms: i64 = jvm.get_field(&player, "lengthMs", "J").await?;
+            assert!(length_ms > 0, "lengthMs {length_ms}");
+
+            Ok(())
+        })
     }
 
     #[test]

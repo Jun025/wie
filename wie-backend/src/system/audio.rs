@@ -119,11 +119,14 @@ impl Audio {
 // one, so the padding failed the whole parse and every play was an empty sequence. When the whole
 // buffer yields nothing, parse it again cut at the length the `MMMD` header declares. Only then:
 // a header that misstates its length (0 in a committed test) still parses whole, as it always did.
-fn parse_smaf_in(data: &[u8]) -> Vec<(usize, SmafEvent)> {
+// Public because MIDP's `SmafPlayer` measures the clip length off the same events.
+// The declared length is a u32 straight from the file: `saturating_add`, or a broken header near
+// u32::MAX overflows (a debug panic on wasm32, where usize is 32 bits).
+pub fn parse_smaf_in(data: &[u8]) -> Vec<(usize, SmafEvent)> {
     let events = parse_smaf(data);
     match data {
         [b'M', b'M', b'M', b'D', a, b, c, d, ..] if events.is_empty() => {
-            parse_smaf(&data[..data.len().min(8 + u32::from_be_bytes([*a, *b, *c, *d]) as usize)])
+            parse_smaf(&data[..data.len().min(u32::from_be_bytes([*a, *b, *c, *d]).saturating_add(8) as usize)])
         }
         _ => events,
     }
@@ -230,6 +233,16 @@ mod tests {
         let handle = audio.load_smaf(&file).unwrap();
 
         assert!(!audio.files[&handle].events.is_empty());
+    }
+
+    // A broken file whose header declares a length near u32::MAX: no panic, just nothing to play.
+    #[test]
+    fn smaf_declaring_a_length_near_u32_max_loads_empty() {
+        let mut file = b"MMMD".to_vec();
+        file.extend(u32::MAX.to_be_bytes());
+        file.extend(b"MTR\x05garbage");
+
+        assert!(super::parse_smaf_in(&file).is_empty());
     }
 
     #[test]

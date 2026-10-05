@@ -23,6 +23,7 @@ use crate::{
 use self::{audio::Audio, event_queue::EventQueue};
 
 pub use self::{
+    audio::parse_smaf_in,
     event_queue::{Event, KeyCode},
     file_system::FilesystemOverlay,
 };

@@ -421,15 +421,12 @@ impl KtfEmulator {
             .invoke_static("org/kwis/msp/lcdui/Main", "main", "([Ljava/lang/String;)V", (args_array,))
             .await;
 
-        if let Err(x) = result {
-            return Err(JvmSupport::to_wie_err(&jvm, x).await);
-        }
+        let result = match result {
+            Ok(()) if clet_mode => KtfJvmSupport::disable_midp_paint(&jvm).await,
+            result => result,
+        };
 
-        if clet_mode && let Err(x) = KtfJvmSupport::disable_midp_paint(&jvm).await {
-            return Err(JvmSupport::to_wie_err(&jvm, x).await);
-        }
-
-        Ok(())
+        JvmSupport::finish_launch(&jvm, result).await
     }
 }
 
