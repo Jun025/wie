@@ -486,6 +486,7 @@ than let it be ignored — a periodically-red check that people scroll past is w
   plain Korean, no game names in the sentence (the title is referenced by its `compat.json` sha256).
   Omit `enginePin` — the release fills in the merge. Schema and checker:
   `docs/contracts/featurephone-public-data.md`, `node scripts/player-data.mjs` (`contract` job).
+  Rows a PR changes in `compat.json` are counted against the **merge result**, never `git diff main head` (that diff shows main's own later changes as reverts — two false criticals on 2026-10-05): quote `node scripts/check-compat-revert.mjs`'s «착지 기준 바뀐 행», which also reddens a branch that absorbed main's rows and then wrote their pre-merge values back.
 - **Follow-up proposals go in a `docs/worklog/*.json`, or they do not exist.** When a task leaves
   follow-up recommendations (or adopts/declines earlier ones), write
   `docs/worklog/YYYY-MM-DD-<slug>.json` in the same PR. The cockpit 「후속 작업 추천」 panel reads

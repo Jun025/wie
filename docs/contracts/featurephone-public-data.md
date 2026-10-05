@@ -91,3 +91,4 @@ YAML 이 아니라 JSON 인 이유: 파서 의존을 새로 들이지 않는다(
 
 - 전수 조사를 다시 돌린 뒤: `node scripts/player-data.mjs import <report 가 쓴 compat.json>` → 커밋.
 - 게임 동작을 바꾸는 PR: 항목 파일 1개를 같은 PR 에 넣는다(`AGENTS.md` §Landing paperwork).
+- ★main 을 머지한 브랜치가 그 «머지 전» 측정으로 compat.json 을 다시 쓰면 받은 행이 옛 값으로 되돌아간다 — `node scripts/check-compat-revert.mjs`(`contract` 잡)가 red 로 낸다. 의도한 되돌림은 그 PR 의 worklog `intendedCompatReverts: ["<sha12>:<필드>"]` 로만 통과한다.
