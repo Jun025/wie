@@ -95,3 +95,8 @@ changed 42 · 이 회차가 잰 행 밖 0
 - `30c7bd6fb01b`: KTF Net 슬롯 34 `(host:port 문자열, 0xff)` 의 정체와 실패 반환 규약. 호출부를 이미지에서 읽어야 한다(sl 상대 주소라 문자열 상수 검색으로는 안 잡혔다).
 - `96dc32e781d3`: paint 안 `Invalid memory access`. KTF 힙 고갈 축(`wie-ktf-guest-gc-roots-port-from-lgt`)과 겹치는지부터 확인한다.
 - ⒜ 13종은 레시피 후보다(비커밋 `game_lab/recipes-progress/`).
+
+### 6. 게임 파일명 유입
+
+- `corpus-name-inflow`(origin/main 대비): BOUNDED 332 + SUFFIX-ATTACHED 15. 전부 `compat.json` 의 기존 제목이다(이 PR 은 progress 값만 바꿨다).
+- `compat.json` 을 뺀 7경로: BOUNDED 2 + SUFFIX-ATTACHED 0. 그 2건(`jvm_support.rs` · `graphics.rs`)은 main 에 이미 있는 줄이고, 이 PR 이 더한 줄(`+`)과 대조하면 0 이다.
