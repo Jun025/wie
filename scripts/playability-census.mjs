@@ -704,7 +704,7 @@ const netConnects = (A, stderrPath) =>
   A.net_connects ?? Math.max(stubConnects(A), existsSync(stderrPath) ? tailConnects(readFileSync(stderrPath, 'latin1')) : 0);
 const netWall = (connects) => connects >= 200;
 // A server wall the count cannot see: the title asks once per answer, fails, and loops on the same question
-// (2 connects in probe A). Named one at a time from the frames and the stderr — docs/report/0443.
+// (2 connects in probe A). Named one at a time from the frames and the stderr — docs/report/0445.
 const NET_HAND = {
   b9bfcaf42722: '처음 실행할 때 게임사 서버에서 인증서를 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.',
 };

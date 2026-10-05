@@ -246,7 +246,7 @@ impl JavaMethod {
         // that belongs to a CALLER frame is found by walking it, as the handset runtime did. Stopping at
         // the innermost record let the exception escape to the host while the dead frames' records stayed
         // registered, and the next throw read them: «Invalid memory access» in paint on two KTF titles and
-        // «jump native address is null» on a third (docs/report/0443).
+        // «jump native address is null» on a third (docs/report/0445).
         let mut ptr_handler = KtfJvmSupport::current_java_exception_handler(core)?;
         // ponytail: a step cap instead of cycle detection — a chain this long is already corrupt.
         for _ in 0..4096 {

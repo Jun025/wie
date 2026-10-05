@@ -1163,7 +1163,7 @@ mod test {
 
     /// A catch in the CALLER's frame: the innermost record's table does not cover its pc, so the
     /// throw walks `ptr_old_handler` to the frame that does, and that record becomes current — the
-    /// inner frame is gone (docs/report/0443).
+    /// inner frame is gone (docs/report/0445).
     #[test]
     fn test_throw_walks_to_the_caller_frames_catch() -> Result<()> {
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);

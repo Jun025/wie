@@ -8,7 +8,7 @@
     "wie-ktf handle_exception — ptr_old_handler 사슬을 걷는다 · JVM→게스트 호출마다 사슬을 비우고 되돌린다 · 시험 1",
     "scripts/playability-census.mjs — NET_HAND(접속 횟수로 안 잡히는 서버 벽)",
     "docs/player-data/compat.json — progress 29행 · b9bfcaf42722 limited",
-    "docs/report/0443 · docs/player-updates 1"
+    "docs/report/0445 · docs/player-updates 1"
   ],
   "verification": [
     "0e6cd188729e · 070daa5b552c: 311초 Invalid memory access(재현 키) → 420초 FAIL 없음",
