@@ -118,3 +118,8 @@ compat-revert: OK — main 에서 받은 행을 받기 전 값으로 되돌린 �
 - `cd ~/scratch/w7prog/r3 && ~/orchestrator-live/bin/build-slot run --long -- bash drive.sh` — 같은 `--out` 이라 잰 것은 건너뛰고 `af` 부터 돈다. ★그때의 main(#480·#481·#482·#483·이 PR 포함)을 다시 빌드하고 `drive.sh` 의 `BIN`·`--pin` 을 바꿔라. 그러면 `ad`·`ae` 와 `af`… 의 빌드가 갈린다 — 표에 빌드 sha 를 나눠 적어라.
 - `23919eb33365`(PixelOp) · `30c7bd6fb01b`(#481 관계) 는 새 main 빌드로 다시 재면 판정이 바뀔 수 있다.
 - 남긴 ⒝: `f2280c6699a0`(getNextEvent 안 메모리 접근) · `568c339a8c07`(바탕 그림 없음) · `96dc32e781d3`(paint 안 메모리 접근).
+
+### 8. 게임 파일명 유입
+
+- `node scripts/corpus-name-inflow.mjs`(이 브랜치 ↔ `origin/main`): BOUNDED 731회/338쌍 + SUFFIX-ATTACHED 35회/15쌍 — `compat.json` 의 기존 `title` 필드 몫이다.
+- `compat.json` 을 뺀 9경로: BOUNDED 13회/8쌍 · SUFFIX-ATTACHED 0. 전부 이 PR 이 건드린 파일의 «main 에 있던 줄»이다(그 파일 전체를 읽는 술어라 잡힌다). 이 PR 이 더한 줄에서 그 이름들을 세면 0 이다 — 새 코드·문서는 타이틀을 sha12 로만 부른다.
