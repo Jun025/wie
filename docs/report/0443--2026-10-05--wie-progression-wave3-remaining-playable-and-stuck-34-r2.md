@@ -119,3 +119,6 @@ census 와 같은 키·탈출 규칙으로 쟀다(고친 빌드 · 재기동 꼬
 - `corpus-name-inflow`(origin/main 대비 · #475 커밋 포함): BOUNDED 342 + SUFFIX-ATTACHED 15.
 - 342 는 `compat.json` 의 기존 제목, #475 가 고친 `wie-lgt` 주석의 기존 언급, `jvm_support.rs` 의 기존 줄(main 에 이미 있다)이다.
 - 이 PR 이 더한 줄만(`875f3a71..HEAD`, `compat.json` 제외) 코퍼스 파일 이름과 대조하면 0 이다.
+
+
+<!-- corpus-name-inflow v1 subjects=14 tree=1f43e8f283145090 B=735/342 P=0/0 S=35/15 -->
