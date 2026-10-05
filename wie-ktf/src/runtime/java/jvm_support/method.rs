@@ -10,7 +10,6 @@ use core::{
     mem::{offset_of, size_of},
     ops::{Deref, DerefMut},
 };
-use futures::TryFutureExt;
 use jvm::{ClassInstance, JavaError, JavaType, JavaValue, Jvm, Method, Result as JvmResult};
 use jvm_class_proto::JavaMethodProto;
 use jvm_types::MethodAccessFlags;
@@ -243,47 +242,56 @@ impl JavaMethod {
     pub async fn handle_exception(core: &mut ArmCore, jvm: &Jvm, exception: Box<dyn ClassInstance>) -> Result<JavaMethodResult> {
         tracing::warn!("Java exception thrown: {exception:?}");
 
-        let current_java_exception_handler = KtfJvmSupport::current_java_exception_handler(core)?;
-
-        if current_java_exception_handler == 0 {
-            return Err(WieError::JavaException(KtfJvmSupport::class_instance_raw(&exception)));
-        }
-
-        let exception_handler: RawJavaExceptionHandler = read_generic(core, current_java_exception_handler)?;
-
-        let method = JavaMethod::from_raw(exception_handler.ptr_method, core);
-        let exception_table = method.exception_table()?;
-
-        for entry in exception_table {
-            if entry.from_pc <= exception_handler.current_pc
-                && exception_handler.current_pc < entry.to_pc
-                && Self::exception_class_matches(core, jvm, &*exception, entry.ptr_class)?
-            {
-                let restore_context: u32 = read_generic(core, exception_handler.ptr_functions + 4)?;
-                let contexts_base = current_java_exception_handler + 24;
-
-                // The catch block reads its `e` from this slot (`wipi_types` calls it `unk3`), and no
-                // client.bin code writes it — the handset's throw did. Left 0, a handler that touches
-                // `e` throws NPE into its own still-registered try range: 43,276 catches in one paint
-                // on e9fac881e602 KTF (docs/report/0343).
-                write_generic(
-                    core,
-                    current_java_exception_handler + offset_of!(RawJavaExceptionHandler, unk3) as u32,
-                    KtfJvmSupport::class_instance_raw(&exception),
-                )?;
-
-                tracing::debug!(
-                    "Java exception handler found: {:#x}, method: {:#x}",
-                    entry.target,
-                    exception_handler.ptr_method
-                );
-
-                return Err(WieError::JavaExceptionUnwind {
-                    context_base: contexts_base,
-                    target: entry.target,
-                    next_pc: restore_context,
-                });
+        // The handler records form a chain through `ptr_old_handler`, one per frame inside a try. A catch
+        // that belongs to a CALLER frame is found by walking it, as the handset runtime did. Stopping at
+        // the innermost record let the exception escape to the host while the dead frames' records stayed
+        // registered, and the next throw read them: «Invalid memory access» in paint on two KTF titles and
+        // «jump native address is null» on a third (docs/report/0445).
+        let mut ptr_handler = KtfJvmSupport::current_java_exception_handler(core)?;
+        // ponytail: a step cap instead of cycle detection — a chain this long is already corrupt.
+        for _ in 0..4096 {
+            if ptr_handler == 0 {
+                break;
             }
+            let exception_handler: RawJavaExceptionHandler = read_generic(core, ptr_handler)?;
+
+            let method = JavaMethod::from_raw(exception_handler.ptr_method, core);
+            let exception_table = method.exception_table()?;
+
+            for entry in exception_table {
+                if entry.from_pc <= exception_handler.current_pc
+                    && exception_handler.current_pc < entry.to_pc
+                    && Self::exception_class_matches(core, jvm, &*exception, entry.ptr_class)?
+                {
+                    let restore_context: u32 = read_generic(core, exception_handler.ptr_functions + 4)?;
+                    let contexts_base = ptr_handler + 24;
+
+                    // The catch block reads its `e` from this slot (`wipi_types` calls it `unk3`), and no
+                    // client.bin code writes it — the handset's throw did. Left 0, a handler that touches
+                    // `e` throws NPE into its own still-registered try range: 43,276 catches in one paint
+                    // on e9fac881e602 KTF (docs/report/0343).
+                    write_generic(
+                        core,
+                        ptr_handler + offset_of!(RawJavaExceptionHandler, unk3) as u32,
+                        KtfJvmSupport::class_instance_raw(&exception),
+                    )?;
+                    // The frames above the catching one are gone, and so are their records.
+                    KtfJvmSupport::set_current_java_exception_handler(core, ptr_handler)?;
+
+                    tracing::debug!(
+                        "Java exception handler found: {:#x}, method: {:#x}",
+                        entry.target,
+                        exception_handler.ptr_method
+                    );
+
+                    return Err(WieError::JavaExceptionUnwind {
+                        context_base: contexts_base,
+                        target: entry.target,
+                        next_pc: restore_context,
+                    });
+                }
+            }
+            ptr_handler = exception_handler.ptr_old_handler;
         }
 
         Err(WieError::JavaException(KtfJvmSupport::class_instance_raw(&exception)))
@@ -351,17 +359,22 @@ impl Method for JavaMethod {
 
     async fn run(&self, jvm: &Jvm, args: Box<[JavaValue]>) -> JvmResult<JavaValue> {
         let jvm_clone = jvm.clone();
-        self.run(args)
-            .or_else(async move |x| {
-                Err(match x {
-                    WieError::JavaException(x) => JavaError::JavaException(Box::new(JavaClassInstance::from_raw(x, &self.core))),
-                    WieError::JavaExceptionUnwind { .. } => {
-                        KtfJvmSupport::wie_error(&jvm_clone, "Java exception unwind crossed into JVM caller").await
-                    }
-                    _ => KtfJvmSupport::wie_error(&jvm_clone, &x.to_string()).await,
-                })
-            })
-            .await
+        // A JVM→guest call is its own try scope: the guest's handler chain starts empty here and the
+        // caller's is put back on the way out. A throw no guest frame catches leaves the call as a host
+        // error, and the frames it skipped never unregister their records — without this the chain kept
+        // pointing into their dead stack, and the next walk read whatever was written there since.
+        let mut core = self.core.clone();
+        let scope = KtfJvmSupport::enter_exception_scope(&mut core);
+        let result = self.run(args).await;
+        KtfJvmSupport::leave_exception_scope(&mut core, scope);
+        match result {
+            Ok(x) => Ok(x),
+            Err(WieError::JavaException(x)) => Err(JavaError::JavaException(Box::new(JavaClassInstance::from_raw(x, &self.core)))),
+            Err(WieError::JavaExceptionUnwind { .. }) => {
+                Err(KtfJvmSupport::wie_error(&jvm_clone, "Java exception unwind crossed into JVM caller").await)
+            }
+            Err(x) => Err(KtfJvmSupport::wie_error(&jvm_clone, &x.to_string()).await),
+        }
     }
 
     fn access_flags(&self) -> MethodAccessFlags {

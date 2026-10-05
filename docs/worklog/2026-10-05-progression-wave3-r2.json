@@ -1,0 +1,47 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-05",
+  "task": "wie-progression-wave3-remaining-playable-and-stuck-34-r2",
+  "title": "진도 3차 2회차 — 250종 첫 묶음 · KTF 예외 사슬 · 서버 인증서 벽",
+  "summary": "남은 playable 250 중 첫 묶음 31종을 600초 정책으로 쟀다(ok 23 · stuck 5 · error 3). error 3 중 2종은 KTF 예외가 호출자 프레임의 catch 를 못 찾고 죽은 프레임의 핸들러 레코드를 남기던 벽이라 고쳤다. 레시피 미완 7 중 4종은 레시피로 ok 가 됐고, b9bfcaf42722 는 서버 인증서 벽으로 확정해 limited 로 표기했다.",
+  "changes": [
+    "wie-ktf handle_exception — ptr_old_handler 사슬을 걷는다 · JVM→게스트 호출마다 사슬을 비우고 되돌린다 · 시험 1",
+    "scripts/playability-census.mjs — NET_HAND(접속 횟수로 안 잡히는 서버 벽)",
+    "docs/player-data/compat.json — progress 29행 · b9bfcaf42722 limited",
+    "docs/report/0445 · docs/player-updates 1"
+  ],
+  "verification": [
+    "0e6cd188729e · 070daa5b552c: 311초 Invalid memory access(재현 키) → 420초 FAIL 없음",
+    "예외 잦은 KTF 8종 옛/새 짝 60초: result·content·frozen·throw 수 같음",
+    "되돌림 red 1 · fmt · clippy stable/beta/wasm32 -D warnings · cargo test --all 690/0 · 러너 블록 PASS"
+  ],
+  "limits": [
+    "250 중 1묶음만 쟀다 — chunk.ab 부터 같은 --out 으로 이어 간다",
+    "고친 2종(#475)의 compat 행은 #475 머지 뒤로 미뤘다",
+    "dbd078113b97(연결 실패 뒤 null 점프) · 3185174d2121(보라 화면 고정)은 남겼다"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "짧은 키 탭을 게임이 놓치는 문제 조사",
+      "plainSummary": "어떤 게임은 키를 짧게 톡 누르면 반응하지 않고 꾹 눌러야만 움직인다.",
+      "userBenefit": "메뉴와 캐릭터 선택에서 평소처럼 눌러도 게임이 반응한다.",
+      "why": "55c453b46254 의 게임 선택·캐릭터 선택 화면이 0.15초 누름은 무시하고 0.6초 누름만 받았다(같은 판에서 비교). 게임이 키 상태를 주기적으로 읽는데 누름과 뗌이 그 사이에 둘 다 지나가는 모양이다.",
+      "tradeoff": "키 뗌을 늦추면 연타가 느려질 수 있다. 몇 타이틀이 같은 모양인지 아직 모른다.",
+      "effort": "M",
+      "target": "키 이벤트 전달(wie-midp event_queue · wie-skvm)"
+    },
+    {
+      "kind": "product",
+      "title": "KTF 연결 실패 뒤 null 점프로 꺼지는 1종",
+      "plainSummary": "통신 기능을 누르면 게임이 그대로 꺼진다.",
+      "userBenefit": "통신 메뉴를 잘못 눌러도 게임이 꺼지지 않는다.",
+      "why": "dbd078113b97 이 시작 직후 OK 에서 Network.connect() 가 -1 을 돌려받은 뒤 NPE 를 거쳐 jump native address is null 로 죽는다. 같은 키 순서에서 매번 재현된다.",
+      "tradeoff": "실기가 연결 실패를 어떤 값이나 예외로 알렸는지 확인해야 한다. 바꾸면 다른 KTF 통신 타이틀도 영향을 받는다.",
+      "effort": "M",
+      "target": "wie-wipi-java org.kwis.msf.io.Network · wie-ktf java_jump"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}

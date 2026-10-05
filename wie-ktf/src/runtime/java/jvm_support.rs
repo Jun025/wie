@@ -326,6 +326,34 @@ impl KtfJvmSupport {
         Ok(thread_context.current_java_exception_handler)
     }
 
+    /// `(thread context, the caller's handler)` — written back to that same context by
+    /// `leave_exception_scope`, whichever thread is current by then. None if it cannot be read.
+    pub fn enter_exception_scope(core: &mut ArmCore) -> Option<(u32, u32)> {
+        let ptr_thread_context = Self::current_thread_context(core).ok()?;
+        let saved = Self::current_java_exception_handler(core).ok()?;
+        Self::write_java_exception_handler(core, ptr_thread_context, 0).ok()?;
+        Some((ptr_thread_context, saved))
+    }
+
+    pub fn leave_exception_scope(core: &mut ArmCore, scope: Option<(u32, u32)>) {
+        if let Some((ptr_thread_context, saved)) = scope {
+            let _ = Self::write_java_exception_handler(core, ptr_thread_context, saved);
+        }
+    }
+
+    fn write_java_exception_handler(core: &mut ArmCore, ptr_thread_context: u32, ptr_handler: u32) -> Result<()> {
+        write_generic(
+            core,
+            ptr_thread_context + offset_of!(KtfJvmThreadContext, current_java_exception_handler) as u32,
+            ptr_handler,
+        )
+    }
+
+    pub fn set_current_java_exception_handler(core: &mut ArmCore, ptr_handler: u32) -> Result<()> {
+        let ptr_thread_context = Self::current_thread_context(core)?;
+        Self::write_java_exception_handler(core, ptr_thread_context, ptr_handler)
+    }
+
     pub fn set_current_thread_context(core: &mut ArmCore, ptr_thread_context: u32) -> Result<()> {
         write_generic(
             core,
@@ -1130,6 +1158,137 @@ mod test {
             }
         }
 
+        Ok(())
+    }
+
+    /// A catch in the CALLER's frame: the innermost record's table does not cover its pc, so the
+    /// throw walks `ptr_old_handler` to the frame that does, and that record becomes current — the
+    /// inner frame is gone (docs/report/0445).
+    #[test]
+    fn test_throw_walks_to_the_caller_frames_catch() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+
+        let done = Arc::new(AtomicBool::new(false));
+
+        let done_clone = done.clone();
+        let mut system_clone = system.clone();
+        system.spawn(async move || {
+            let (jvm, mut core) = init_jvm(&mut system_clone).await?;
+
+            let record = |core: &mut ArmCore, from_pc: u32, to_pc: u32, target: u32, current_pc: u32, ptr_old_handler: u32| -> Result<u32> {
+                let ptr_entry = Allocator::alloc(core, size_of::<RawJavaMethodExceptionTableEntry>() as u32)?;
+                write_generic(
+                    core,
+                    ptr_entry,
+                    RawJavaMethodExceptionTableEntry {
+                        from_pc,
+                        to_pc,
+                        target,
+                        ptr_class: 0,
+                    },
+                )?;
+                let ptr_table = Allocator::alloc(core, 4)?;
+                write_generic(core, ptr_table, ptr_entry)?;
+                let ptr_method = Allocator::alloc(core, size_of::<RawJavaMethod>() as u32)?;
+                let mut method = RawJavaMethod::zeroed();
+                method.fn_body_native_or_exception_table = ptr_table;
+                method.exception_table_count = 1;
+                write_generic(core, ptr_method, method)?;
+
+                let ptr_functions = Allocator::alloc(core, 8)?;
+                write_generic(core, ptr_functions + 4, 0x1234u32)?;
+                let ptr_handler = Allocator::alloc(core, size_of::<RawJavaExceptionHandler>() as u32)?;
+                let mut handler = RawJavaExceptionHandler::zeroed();
+                handler.ptr_method = ptr_method;
+                handler.current_pc = current_pc;
+                handler.ptr_old_handler = ptr_old_handler;
+                handler.ptr_functions = ptr_functions;
+                write_generic(core, ptr_handler, handler)?;
+                Ok(ptr_handler)
+            };
+            // caller: try covers pc 0..10, it is at pc 5 · callee: its try covers 0..10, it is at pc 20 (outside)
+            let outer = record(&mut core, 0, 10, 0x2ee, 5, 0)?;
+            let inner = record(&mut core, 0, 10, 0x1dd, 20, outer)?;
+
+            let ptr_thread_context = KtfJvmSupport::current_thread_context(&core)?;
+            let mut thread_context: KtfJvmThreadContext = read_generic(&core, ptr_thread_context)?;
+            thread_context.current_java_exception_handler = inner;
+            write_generic(&mut core, ptr_thread_context, thread_context)?;
+
+            let exception = jvm.new_class("java/lang/NullPointerException", "()V", ()).await.unwrap();
+            let result = JavaMethod::handle_exception(&mut core, &jvm, exception).await;
+            assert!(
+                matches!(result, Err(WieError::JavaExceptionUnwind { target: 0x2ee, context_base, .. }) if context_base == outer + 24),
+                "the caller's catch, not a host error"
+            );
+            assert_eq!(KtfJvmSupport::current_java_exception_handler(&mut core)?, outer);
+
+            // A JVM→guest call starts with an empty chain and hands the caller's back on the way out,
+            // so a throw that escapes the call cannot leave the dead frames' records registered.
+            let scope = KtfJvmSupport::enter_exception_scope(&mut core);
+            assert_eq!(KtfJvmSupport::current_java_exception_handler(&mut core)?, 0);
+            KtfJvmSupport::set_current_java_exception_handler(&mut core, inner)?; // a frame that never unregistered
+            KtfJvmSupport::leave_exception_scope(&mut core, scope);
+            assert_eq!(KtfJvmSupport::current_java_exception_handler(&mut core)?, outer);
+
+            done_clone.store(true, Ordering::Relaxed);
+
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+        Ok(())
+    }
+
+    // The scope is entered by the JVM→guest boundary itself (`Method::run`), not by its callers: the
+    // body sees an empty chain however deep the caller's was, and the caller's is back afterwards.
+    #[test]
+    fn test_jvm_call_runs_in_its_own_exception_scope() -> Result<()> {
+        async fn probe(_jvm: &Jvm, core: &mut ArmCore) -> jvm::Result<i32> {
+            Ok(KtfJvmSupport::current_java_exception_handler(core).unwrap() as i32)
+        }
+
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let mut system_clone = system.clone();
+        system.spawn(async move || {
+            let (jvm, mut core) = init_jvm(&mut system_clone).await?;
+            let java_functions = JavaSvcFunctions::default();
+            core.register_svc_handler(5, handle_java_svc, &java_functions)?;
+            let class = JavaClassDefinition::new(
+                &mut core.clone(),
+                &jvm,
+                JavaClassProto {
+                    name: "test/Probe",
+                    parent_class: Some("java/lang/Object"),
+                    interfaces: vec![],
+                    methods: vec![JavaMethodProto::new("probe", "()I", probe, MethodAccessFlags::STATIC)],
+                    fields: vec![],
+                    access_flags: ClassAccessFlags::PUBLIC,
+                },
+                Box::new(core.clone()),
+                java_functions.clone(),
+            )
+            .await?;
+            let method = class.method("probe", "()I", true)?.unwrap();
+            let mut raw: RawJavaMethod = read_generic(&core, method.ptr_raw)?;
+            raw.fn_body = core.make_svc_stub(5, method.ptr_raw)?;
+            write_generic(&mut core, method.ptr_raw, raw)?;
+
+            KtfJvmSupport::set_current_java_exception_handler(&mut core, 0x1234)?; // the caller's chain
+            let seen = <JavaMethod as jvm::Method>::run(&method, &jvm, Box::new([])).await.unwrap();
+            assert!(matches!(seen, JavaValue::Int(0)), "the body ran under the caller's chain: {seen:?}");
+            assert_eq!(KtfJvmSupport::current_java_exception_handler(&mut core)?, 0x1234);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
         Ok(())
     }
 
