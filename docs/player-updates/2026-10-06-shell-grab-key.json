@@ -4,5 +4,6 @@
   "titles": [
     "85e94babc24759be78f3e25025b1b1e4a59b67c972fb426dd0b534f7c285701d"
   ],
-  "summary_ko": "게임이 끝나고 다시 하기를 고르면 꺼지던 게임 하나가 이제 계속 이어서 할 수 있어요."
+  "summary_ko": "게임이 끝나고 다시 하기를 고르면 꺼지던 게임 하나가 이제 계속 이어서 할 수 있어요.",
+  "pr": "https://github.com/Jun025/wie/pull/485"
 }

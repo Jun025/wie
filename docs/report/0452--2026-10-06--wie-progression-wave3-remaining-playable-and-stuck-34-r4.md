@@ -16,7 +16,7 @@
 | P `ae`(30) | 00:55–02:55 | 3 | 21.2 → 10.0 | 1% → 54% | ① |
 | 고친 벽 짧은 확인(단발) | 03:2x–03:5x | 1 | — | — | short |
 | P2 `ae`(13) | 03:20–04:08 | 3 | 12.9 → 9.0 | 6% → 15% | ② |
-| 고친 2종 P·P2(이 PR 빌드) | 04:08–04:4x | 2 | 8.9 → | 78% → | ③ |
+| 고친 2종 P·P2(이 PR 빌드) | 04:08–04:32 | 2 | 8.9 → 8.5 | 78% → 46% | ③ |
 
 - 타이틀별 `load1`(census 열): `ad` 최소 10 · 중앙 15 · 최대 68 / `ae` 최소 10 · 중앙 16 · 최대 166.
 - 02:55 에 P `ae` 가 끝난 자리에서 드라이버를 멈췄다(자기 pid). 남은 시간에 P2 `ae` 와 고친 2종 판정을 넣으려고 임대를 다시 잡았다(②③). ②는 다른 레인의 long 임대가 먼저 있어 22분 기다렸다.
@@ -102,10 +102,19 @@ stub MC_netConnect(0x1215cd, 0x19af44)   ← 기존 스텁: 1틱 뒤 콜백에 M
 
 ### 6. compat 행 단위 비교
 
-착지 기준(`check-compat-revert.mjs` = 이 브랜치와 `origin/main` 의 merge 결과 ↔ main):
-§7 의 출력을 그대로 옮긴다.
+`origin/main` `2e0ac37e` ↔ head(`sha256+platform` 키 · axes 하위 키 단위):
 
-### 7. 게이트 · 이어하기
+```
+rows 429 -> 429 changed by field set {"axes.progress":59}
+  (none)->ok 40 · (none)->stuck 19
+compat-revert: OK — main 에서 받은 행을 받기 전 값으로 되돌린 필드 0 (fork bdf58a8e → mb 2e0ac37e) · 착지 기준 바뀐 행 59
+```
 
-§ 회신 파일(`reports/wie-progression-wave3-remaining-playable-and-stuck-34-r4.done.md`)에 실행 출력을 둔다.
-- 이어하기: `cd ~/scratch/w7prog/r3 && ~/orchestrator-live/bin/build-slot run --long -- bash drive.sh` — 같은 `--out` 이라 잰 것은 건너뛰고 `af` 부터 돈다. ★그때의 main(#480·#481·#482·#483·이 PR 포함)을 다시 빌드하고 `drive.sh` 의 `BIN`·`--pin` 을 바꿔라. 그러면 `ad`·`ae` 와 `af`… 의 빌드가 갈린다 — 표에 빌드 sha 를 나눠 적어라.
+- 59 = `ad`·`ae` 60 − `974e0df9ab1e`(§5). ok 40 = `1bc1317c` ok 39 + `85e94babc247`(이 PR 빌드). stuck 19 = `1bc1317c` stuck 18(`974e` 제외) + error 1(`f2280c6699a0` · error 는 stuck 으로 적는다).
+- `30c7bd6fb01b` 은 3회차가 이미 stuck 으로 적었고 이 PR 빌드 판정도 stuck 이라 바뀐 행이 아니다.
+
+### 7. 이어하기
+
+- `cd ~/scratch/w7prog/r3 && ~/orchestrator-live/bin/build-slot run --long -- bash drive.sh` — 같은 `--out` 이라 잰 것은 건너뛰고 `af` 부터 돈다. ★그때의 main(#480·#481·#482·#483·이 PR 포함)을 다시 빌드하고 `drive.sh` 의 `BIN`·`--pin` 을 바꿔라. 그러면 `ad`·`ae` 와 `af`… 의 빌드가 갈린다 — 표에 빌드 sha 를 나눠 적어라.
+- `23919eb33365`(PixelOp) · `30c7bd6fb01b`(#481 관계) 는 새 main 빌드로 다시 재면 판정이 바뀔 수 있다.
+- 남긴 ⒝: `f2280c6699a0`(getNextEvent 안 메모리 접근) · `568c339a8c07`(바탕 그림 없음) · `96dc32e781d3`(paint 안 메모리 접근).
