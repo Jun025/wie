@@ -73,6 +73,7 @@ Java 예외는 첫 실행의 `RecordStoreNotFoundException` 1건뿐이다. 이�
 
 `71d1d8235bd1` 1행만 바꿨다: status `limited → playable` · longplay `unknown → ok` · knownIssue 「첫 스테이지가 시작되기 직전에 멈춰요.」 삭제. speed 는 재지 않아 `unknown` 그대로다.
 다른 81종은 3-2 에서 축이 바뀌지 않았으므로 손대지 않았다.
+`node scripts/check-compat-revert.mjs`: 「착지 기준 바뀐 행 1」(= 위 1행). 같은 파일을 쓰는 #493(진도 3차 -r6)과는 `git merge-tree` 충돌 0 이다.
 
 ### 검증
 
@@ -85,3 +86,5 @@ Java 예외는 첫 실행의 `RecordStoreNotFoundException` 1건뿐이다. 이�
 ### 후속
 
 없음. `71d1d8235bd1` 의 speed·progress 는 다음 census 회차가 잰다. 0455 후속 3 의 longplay 는 이 회차에서 쟀다.
+
+게임 파일명 유입: 이 회차 파일 4개(코드·회차 문서·worklog·업데이트 소식)만 넘기면 BOUNDED 6쌍 · SUFFIX-ATTACHED 0쌍이다. 6쌍은 전부 `wie_audio_clip.rs` 에 **이미 있던** 주석·시험의 이름이다. 이 회차가 더한 줄(`git diff origin/main...HEAD`)의 게임명은 0 이다. 기본 실행(브랜치 전체)은 compat.json(계약상 제목 목록)까지 포함하므로 아래 표식의 B·S 값이 크다.
