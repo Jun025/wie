@@ -116,3 +116,5 @@
 | 3 | `71d1d8235bd1` | longplay·speed·progress 미측정 | S — 1이 착지한 뒤 census 한 번 | §4 |
 
 게임 파일명 유입: 도구 기본 실행(브랜치 전체)은 BOUNDED 330쌍 · SUFFIX-ATTACHED 15쌍이다. 전부 `docs/player-data/compat.json` 안이다(계약상 제목 목록 · SUFFIX 35회 모두 그 파일). compat.json 을 뺀 이 회차 파일만 넘기면 BOUNDED 0 · SUFFIX-ATTACHED 0 이다.
+
+<!-- corpus-name-inflow v1 subjects=12 tree=6d311b423d77b467 B=718/330 P=0/0 S=35/15 -->
