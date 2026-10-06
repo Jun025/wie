@@ -112,3 +112,6 @@ compat 의 두 행은 `playability-census.mjs report` 가 이 측정에서 계�
 
 - 시험 4개(`relocated::tests`): 부모 이름 참조와 필드 이동 · 문자열 상수 입양 · 중첩 진입 스택 · catch 재개.
 - 되돌리면 red 5 변이 전건: 필드 이동 생략 · 부모를 이름 대신 `Object` 로 · 상수 머리 미교체 · 보관 `sp` 무시(`max`) · 처리기 반환을 `lr` 로. 각각 해당 시험이 FAILED 였고, 원상에서는 4/4 통과했다.
+
+게임 파일명 유입: 도구 기본 실행(브랜치 전체)은 BOUNDED 333쌍 · SUFFIX-ATTACHED 16쌍이다. 거의 전부 `docs/player-data/compat.json` 안이다(계약상 제목 목록).
+compat.json 을 뺀 이 회차 파일만 넘기면 BOUNDED 3쌍 · SUFFIX-ATTACHED 1쌍이다. 모두 이 회차가 고친 파일에 원래 있던 줄이다(`adf.rs` 시험 · `interface.rs`·`jvm_support.rs` 주석). 이 회차가 더한 줄에는 0이다.
