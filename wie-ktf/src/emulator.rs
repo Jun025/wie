@@ -295,6 +295,14 @@ impl TaskRunner for KtfTaskRunner {
 
         result
     }
+
+    fn others_preempted(&self) -> bool {
+        self.core.others_preempted()
+    }
+
+    fn hold_others(&self, on: bool) -> bool {
+        self.core.hold_others(on)
+    }
 }
 
 pub struct KtfEmulator {

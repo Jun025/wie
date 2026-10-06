@@ -20,6 +20,7 @@ pub struct KtfWIPICContext {
     system: System,
     jvm: Jvm, // We need jvm to access resource in jvm. TODO is there better way to do this?
     resources: ResourceCache,
+    wide_graphics_context: bool,
 }
 
 /// Resource bytes by name, shared by every context of one WIPI-C runtime.
@@ -40,7 +41,14 @@ impl KtfWIPICContext {
             system,
             jvm,
             resources,
+            wide_graphics_context: false,
         }
+    }
+
+    /// See [`WIPICContext::wide_graphics_context`] — set for an image built on the KTF SDK runtime.
+    pub fn with_wide_graphics_context(mut self, wide: bool) -> Self {
+        self.wide_graphics_context = wide;
+        self
     }
 
     async fn resource(&self, name: &str) -> Result<Option<Vec<u8>>> {
@@ -83,6 +91,10 @@ impl KtfWIPICContext {
 
 #[async_trait::async_trait]
 impl WIPICContext for KtfWIPICContext {
+    fn wide_graphics_context(&self) -> bool {
+        self.wide_graphics_context
+    }
+
     fn alloc_raw(&mut self, size: WIPICWord) -> Result<WIPICWord> {
         Allocator::alloc(&mut self.core, size)
     }

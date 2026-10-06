@@ -270,9 +270,13 @@ impl ArmCore {
     /// other thread resumes guest code until it runs again, so its guest code runs as one piece up
     /// to its next blocking host call. A key handler that frees what another thread's frame draws
     /// needs this (docs/report/0430). Capped at [`HOLD_ROUNDS`] rounds per wait.
-    pub fn hold_others(&self, on: bool) {
-        let holder = if on { self.current_thread_id().unwrap_or(0) } else { 0 };
-        self.holder.store(holder, Ordering::Relaxed);
+    ///
+    /// Returns whether the current thread already held them, so a nested holder (a paint run from
+    /// inside a key handler) can leave the outer hold in place.
+    pub fn hold_others(&self, on: bool) -> bool {
+        let current = self.current_thread_id().unwrap_or(0);
+        let previous = self.holder.swap(if on { current } else { 0 }, Ordering::Relaxed);
+        current != 0 && previous == current
     }
 
     async fn wait_for_holder(&self) {
@@ -1216,6 +1220,27 @@ mod tests {
         assert!(matches!(holder.as_mut().poll(&mut cx), Poll::Ready(Ok(()))));
         while other.as_mut().poll(&mut cx).is_pending() {}
         assert_eq!(calls.load(Ordering::Relaxed), 1, "and runs once the holder lets go");
+    }
+
+    #[test]
+    fn a_nested_hold_reports_the_outer_one() {
+        let mut core = ArmCore::new(false, None).unwrap();
+        crate::Allocator::init(&mut core).unwrap();
+        let runner = core.clone();
+        let mut thread = pin!(
+            core.run_in_thread(move || async move {
+                assert!(!runner.hold_others(true), "first hold");
+                assert!(runner.hold_others(true), "a paint inside a key handler sees the handler's hold");
+                assert!(runner.hold_others(false));
+                assert!(!runner.hold_others(false));
+                Ok(())
+            })
+            .unwrap()
+        );
+        assert!(matches!(
+            thread.as_mut().poll(&mut Context::from_waker(Waker::noop())),
+            Poll::Ready(Ok(()))
+        ));
     }
 
     #[test]

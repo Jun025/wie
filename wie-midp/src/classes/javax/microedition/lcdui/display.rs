@@ -976,6 +976,11 @@ impl Display {
                 )
                 .await?;
 
+            // A paint() and another guest thread's code do not interleave either (see handleKeyEvent).
+            // 5267badf20b3's paint() stores a "ready" static and then the object its game thread
+            // draws with; sliced between the two stores, the game thread saw "ready", read the null
+            // object and died on the first frame. Held up to paint()'s next blocking host call.
+            let held = context.system().guest_hold_others(true);
             let result: JvmResult<()> = jvm
                 .invoke_virtual(
                     &current_displayable,
@@ -985,6 +990,9 @@ impl Display {
                     (screen_graphics.clone(),),
                 )
                 .await;
+            if !held {
+                context.system().guest_hold_others(false);
+            }
             let _: () = jvm
                 .invoke_virtual(&screen_graphics, "javax/microedition/lcdui/Graphics", "reset", "()V", ())
                 .await?;
@@ -1236,14 +1244,18 @@ impl Display {
 mod test {
     use alloc::sync::Arc;
     use alloc::{boxed::Box, vec};
-    use core::sync::atomic::{AtomicBool, Ordering};
+    use core::{
+        future::Future,
+        pin::Pin,
+        sync::atomic::{AtomicBool, Ordering},
+    };
 
     use jvm::{ClassInstanceRef, JavaValue, Jvm, Result as JvmResult, runtime::JavaLangString};
     use jvm_class_proto::{JavaClassProto, JavaFieldProto, JavaMethodProto};
     use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 
-    use test_utils::{TestClock, TestPlatform, run_jvm_test, run_jvm_test_with_system};
-    use wie_backend::{DefaultTaskRunner, Event, System};
+    use test_utils::{TestClock, TestPlatform, run_jvm_test, run_jvm_test_with_runner, run_jvm_test_with_system};
+    use wie_backend::{DefaultTaskRunner, Event, System, TaskRunner};
     use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
     use wie_util::Result;
 
@@ -1275,6 +1287,7 @@ mod test {
                 fields: vec![
                     JavaFieldProto::new("shown", "I", FieldAccessFlags::PUBLIC),
                     JavaFieldProto::new("hidden", "I", FieldAccessFlags::PUBLIC),
+                    JavaFieldProto::new("paintedHeld", "Z", FieldAccessFlags::PUBLIC),
                 ],
                 access_flags: ClassAccessFlags::PUBLIC,
             }
@@ -1284,8 +1297,13 @@ mod test {
             jvm.invoke_special(&this, "javax/microedition/lcdui/Canvas", "<init>", "()V", ()).await
         }
 
-        async fn paint(_: &Jvm, _: &mut WieJvmContext, _: ClassInstanceRef<Self>, _: ClassInstanceRef<Graphics>) -> JvmResult<()> {
-            Ok(())
+        // Records whether the others were held while it ran, leaving the hold as it found it.
+        async fn paint(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, _: ClassInstanceRef<Graphics>) -> JvmResult<()> {
+            let held = context.system().guest_hold_others(true);
+            if !held {
+                context.system().guest_hold_others(false);
+            }
+            jvm.put_field(&mut this, "paintedHeld", "Z", held).await
         }
 
         async fn show_notify(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
@@ -1783,6 +1801,48 @@ mod test {
             assert_eq!(jvm.get_field::<i32>(&first, "hidden", "I").await?, 1);
             assert_eq!(jvm.get_field::<i32>(&second, "shown", "I").await?, 1);
             assert_eq!(jvm.get_field::<i32>(&second, "hidden", "I").await?, 0);
+
+            Ok(())
+        })
+    }
+
+    /// A runner with one hold flag — enough for one guest thread.
+    struct HoldRunner(Arc<AtomicBool>);
+
+    #[async_trait::async_trait]
+    impl TaskRunner for HoldRunner {
+        async fn run(&self, future: Pin<Box<dyn Future<Output = Result<()>> + Send>>) -> Result<()> {
+            future.await
+        }
+
+        fn hold_others(&self, on: bool) -> bool {
+            self.0.swap(on, Ordering::Relaxed)
+        }
+    }
+
+    #[test]
+    fn paint_runs_with_the_other_guest_threads_held() -> Result<()> {
+        // 5267badf20b3: paint() publishes "ready" and then the object its game thread draws with.
+        let held = Arc::new(AtomicBool::new(false));
+        let runner = HoldRunner(held.clone());
+        run_jvm_test_with_runner(test_protos(), Box::new(TestPlatform::new()), runner, move |jvm, _| async move {
+            let display: ClassInstanceRef<Display> = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?.into();
+            let canvas = jvm.new_class("javax/microedition/lcdui/TestNotifyCanvas", "()V", ()).await?;
+            let _: () = jvm
+                .invoke_virtual(
+                    &display,
+                    "javax/microedition/lcdui/Display",
+                    "setCurrent",
+                    "(Ljavax/microedition/lcdui/Displayable;)V",
+                    (canvas.clone(),),
+                )
+                .await?;
+            let _: () = jvm
+                .invoke_virtual(&display, "javax/microedition/lcdui/Display", "handlePaintEvent", "()V", ())
+                .await?;
+
+            assert!(jvm.get_field::<bool>(&canvas, "paintedHeld", "Z").await?);
+            assert!(!held.load(Ordering::Relaxed), "and let go after");
 
             Ok(())
         })

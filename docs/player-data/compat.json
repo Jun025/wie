@@ -1551,19 +1551,16 @@
    "platform": "KTF",
    "model": null,
    "title": "맞고삼국대전",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
+    "input": "ok",
     "longplay": "ok",
-    "sound": "no",
-    "speed": "unknown"
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "맞고삼국대전"
   },
@@ -2862,18 +2859,16 @@
    "platform": "KTF",
    "model": null,
    "title": "액션히어로3D",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "unknown",
-    "speed": "unknown"
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "액션히어로3D"
   },
@@ -3396,17 +3391,17 @@
    "platform": "KTF",
    "model": null,
    "title": "이노티아연대기2",
-   "status": "playable",
+   "status": "limited",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "ok",
-    "sound": "no",
-    "speed": "unknown"
+    "longplay": "no",
+    "sound": "ok",
+    "speed": "ok"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
+    "설치 인증(구매 기록)을 확인하는 단계에서 멈춰서, 여기서는 그 뒤로 진행할 수 없어요."
    ],
    "changes": [],
    "fileTitle": "이노티아연대기2"
@@ -3420,14 +3415,13 @@
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
-    "speed": "unknown"
+    "input": "ok",
+    "longplay": "no",
+    "sound": "ok",
+    "speed": "ok"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
+    "설치 인증(구매 기록)을 확인하는 단계에서 멈춰서, 여기서는 그 뒤로 진행할 수 없어요."
    ],
    "changes": [],
    "fileTitle": "이노티아연대기2"
@@ -4929,17 +4923,16 @@
    "platform": "KTF",
    "model": null,
    "title": "헬싱",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "no",
+    "longplay": "ok",
     "sound": "no",
     "speed": "ok"
    },
    "knownIssues_ko": [
-    "플레이 도중에 게임이 멈추거나 꺼질 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
@@ -5266,7 +5259,7 @@
     "speed": "unknown"
    },
    "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
+    "구매한 휴대폰에서만 켜지도록 잠긴 파일이라 여기서는 실행할 수 없어요."
    ],
    "changes": [],
    "fileTitle": "게임빌2010프로야구"
@@ -6867,7 +6860,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6904,7 +6898,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6941,7 +6936,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6978,7 +6974,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6996,7 +6993,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
@@ -7091,7 +7089,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7109,7 +7108,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7127,7 +7127,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7145,7 +7146,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7238,7 +7240,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7256,7 +7259,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7274,7 +7278,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7292,7 +7297,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7329,7 +7335,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7347,7 +7354,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7384,7 +7392,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7422,7 +7431,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7459,7 +7469,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7477,7 +7488,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7516,7 +7528,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7534,7 +7547,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7552,7 +7566,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7570,7 +7585,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7668,7 +7684,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [
     "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
@@ -7688,7 +7705,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7725,7 +7743,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7743,7 +7762,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7761,7 +7781,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7798,7 +7819,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7816,7 +7838,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7834,7 +7857,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7852,7 +7876,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7870,7 +7895,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
@@ -7908,7 +7934,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7926,7 +7953,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7963,7 +7991,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -8001,7 +8030,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -8019,7 +8049,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -8037,7 +8068,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],

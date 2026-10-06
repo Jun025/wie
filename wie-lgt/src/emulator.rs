@@ -36,7 +36,7 @@ impl TaskRunner for LgtTaskRunner {
         self.core.others_preempted()
     }
 
-    fn hold_others(&self, on: bool) {
+    fn hold_others(&self, on: bool) -> bool {
         self.core.hold_others(on)
     }
 }

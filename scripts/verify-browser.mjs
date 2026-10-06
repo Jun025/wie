@@ -31,27 +31,55 @@ const BASE = process.env.WIE_BASE || "http://localhost:8788";
 const launchOpts = { headless: true };
 if (process.env.WIE_CHROME_CHANNEL) launchOpts.channel = process.env.WIE_CHROME_CHANNEL;
 const browser = await chromium.launch(launchOpts);
-const page = await browser.newPage();
 
-const logs = [];
+// Every request of EVERY attempt feeds the leak audit below — a retry must never
+// hide a request a failed attempt made. Console errors count from the attempt
+// that completed only; the failed attempt's are printed, not dropped.
 const requests = [];
-page.on("console", (m) => logs.push(`[console.${m.type()}] ${m.text()}`));
-page.on("pageerror", (e) => logs.push(`[pageerror] ${e.message}`));
-page.on("request", (req) => {
-  requests.push({ method: req.method(), url: req.url(), postLen: (req.postData() || "").length, post: req.postData() || "" });
-});
+let logs = [];
+let page;
 
-console.log(`▶ loading ${BASE}`);
-await page.goto(BASE, { waitUntil: "networkidle" });
+// One attempt = a fresh page through boot → upload → run. Healthy runs reach
+// `run-game` 0.8–2.2s after upload (58 main deploys, 2026-10-01~06); the two reds
+// waited 10s and 30s on a page that never got there, and a by-hand rerun passed —
+// stuck, not slow, so a larger timeout buys nothing and one fresh page does
+// (docs/report/0463).
+async function attempt() {
+  logs = [];
+  page = await browser.newPage();
+  page.on("console", (m) => logs.push(`[console.${m.type()}] ${m.text()}`));
+  page.on("pageerror", (e) => logs.push(`[pageerror] ${e.message}`));
+  page.on("request", (req) => {
+    requests.push({ method: req.method(), url: req.url(), postLen: (req.postData() || "").length, post: req.postData() || "" });
+  });
+  page.on("response", (res) => {
+    if (res.status() >= 400) logs.push(`[http ${res.status()}] ${res.url()}`);
+  });
 
-console.log(`▶ uploading game (BYOF): ${gamePath}`);
-await page.setInputFiles('[data-testid="file-input"]', gamePath);
+  console.log(`▶ loading ${BASE}`);
+  await page.goto(BASE, { waitUntil: "networkidle" });
 
-// Wait for it to land in the device-local library, then click Run.
-await page.waitForSelector('[data-testid="run-game"]', { timeout: 10000 });
-console.log("▶ game appeared in device-local library");
-await page.click('[data-testid="run-game"]');
-await page.waitForSelector('[data-testid="screen"]', { timeout: 10000 });
+  console.log(`▶ uploading game (BYOF): ${gamePath}`);
+  await page.setInputFiles('[data-testid="file-input"]', gamePath, { timeout: 10000 });
+
+  // Wait for it to land in the device-local library, then click Run.
+  await page.waitForSelector('[data-testid="run-game"]', { timeout: 10000 });
+  console.log("▶ game appeared in device-local library");
+  await page.click('[data-testid="run-game"]');
+  await page.waitForSelector('[data-testid="screen"]', { timeout: 10000 });
+}
+
+try {
+  await attempt();
+} catch (e) {
+  if (e.name !== "TimeoutError") throw e;
+  // ponytail: exactly one retry — a page that is really broken fails twice and stays red.
+  console.log(`▶ attempt 1 timed out (${e.message.split("\n")[0]}) — its logs:`);
+  for (const l of logs) console.log("   " + l);
+  console.log("▶ retrying once on a fresh page");
+  await page.close();
+  await attempt();
+}
 
 // Let the emulator run.
 await page.waitForTimeout(10000);

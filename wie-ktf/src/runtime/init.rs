@@ -92,7 +92,10 @@ pub async fn load_native(
     // narrow the range if that ever becomes false.
     wie_core_arm::install_binary_patches(core, data, &[(IMAGE_BASE, data.len() as u32)])?;
 
-    register_wipic_svc_handler(core, system, jvm)?;
+    // The KTF SDK runtime asks for this interface by name at init; an image without it was not built
+    // on that runtime (the repo's own keydraw fixture — `wipi` crate, packed graphics context).
+    let sdk_runtime = data.windows(22).any(|w| w == b"WIPICX_incMemInterface");
+    register_wipic_svc_handler(core, system, jvm, sdk_runtime)?;
     register_init_svc_handler(core, jvm)?;
 
     tracing::debug!("Loaded at {IMAGE_BASE:#x}, size {:#x}, bss {bss_size:#x}", data.len());
