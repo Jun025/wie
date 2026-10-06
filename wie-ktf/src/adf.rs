@@ -83,6 +83,7 @@ pub fn parse_bss_size(filename: &str) -> Result<u32> {
 /// repeats the filename's bss size. The image behind it has no `WIPI_exe` export and addresses its
 /// globals through `sl` (a different runtime ABI), so running it the stub way jumps into the table.
 /// Measured on 3 KTF titles; the standard stub is `04 e0 c0 46` in all 190 working KTF titles.
+/// `runtime::relocated` loads it.
 pub fn is_relocation_prefixed(data: &[u8], bss_size: u32) -> bool {
     let word = |index: usize| data.get(index * 4..index * 4 + 4).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]));
     let (Some(first), Some(count)) = (word(0), word(1)) else {

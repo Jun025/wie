@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-07",
+  "kind": "new-support",
+  "titles": [
+    "1d5831e42a8a41d4c875b81e2606e779c5559b051f536686a0bd08e20ac9e71e",
+    "b907b0faf483d99a13c0abf9ed8b3dbcb1a6ab7a0ef7a2b7a7a00f3da4b59bba"
+  ],
+  "pr": "https://github.com/Jun025/wie/pull/499",
+  "summary_ko": "프로그램 파일 형식이 달라 켜지지 않던 KTF 게임 두 개가 이제 켜져서 게임 화면까지 가요. 그중 하나는 아직 소리가 나지 않을 수 있어요."
+}

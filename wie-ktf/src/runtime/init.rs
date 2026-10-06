@@ -14,6 +14,7 @@ use crate::{
     runtime::{
         SVC_CATEGORY_INIT,
         java::interface::{get_wipi_jb_interface, java_array_new, java_check_type, java_class_load, java_new, java_throw, java_throw_instance},
+        relocated,
         svc_ids::InitSvcId,
         wipi_c::{interface::get_wipic_knl_interface, register_wipic_svc_handler},
     },
@@ -68,9 +69,7 @@ pub async fn load_native(
 ) -> Result<u32> {
     let bss_size = parse_bss_size(filename)?;
     if is_relocation_prefixed(data, bss_size) {
-        return Err(WieError::FatalError(format!(
-            "Unsupported KTF client.bin layout: {filename} starts with a relocation table, not the WIPI_exe entry stub"
-        )));
+        return relocated::load(core, jvm, data, bss_size).await;
     }
 
     core.load(data, IMAGE_BASE, data.len() + bss_size as usize)?;
@@ -163,6 +162,7 @@ async fn get_interface(core: &mut ArmCore, ptr_name: u32) -> Result<u32> {
     match name.as_str() {
         "WIPIC_knlInterface" => get_wipic_knl_interface(core),
         "WIPI_JBInterface" => get_wipi_jb_interface(core),
+        "MNInterface" => relocated::get_mn_interface(core),
         _ => {
             tracing::warn!("Unknown {name}");
 
