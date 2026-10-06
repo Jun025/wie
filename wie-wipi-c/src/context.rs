@@ -24,6 +24,11 @@ pub trait WIPICContext: ByteRead + ByteWrite + Send + Sync {
     async fn read_resource(&self, name: &str) -> Result<Vec<u8>>;
     /// `pace_from`: `wie_backend::Event::guest_timer`.
     fn set_timer(&mut self, due: Instant, pace_from: u64, callback: WIPICMethodBody);
+    /// Whether the title's graphics context is all words (KTF) rather than the packed record
+    /// `wipi_types` describes. See `api::graphics::read_grp_ctx`.
+    fn wide_graphics_context(&self) -> bool {
+        false
+    }
 }
 
 pub struct WIPICResult {
@@ -103,6 +108,7 @@ pub mod test {
         pub calls: Vec<WIPICWord>,
         pub call_args: Vec<(WIPICWord, Vec<WIPICWord>)>,
         pub spawned: Vec<WIPICMethodBody>,
+        pub wide_graphics_context: bool,
     }
 
     impl TestContext {
@@ -117,6 +123,7 @@ pub mod test {
                 calls: Vec::new(),
                 call_args: Vec::new(),
                 spawned: Vec::new(),
+                wide_graphics_context: false,
             }
         }
 
@@ -130,6 +137,7 @@ pub mod test {
                 calls: Vec::new(),
                 call_args: Vec::new(),
                 spawned: Vec::new(),
+                wide_graphics_context: false,
             }
         }
 
@@ -193,6 +201,10 @@ pub mod test {
 
         fn set_timer(&mut self, due: Instant, pace_from: u64, callback: WIPICMethodBody) {
             self.timers.push((due, pace_from, callback));
+        }
+
+        fn wide_graphics_context(&self) -> bool {
+            self.wide_graphics_context
         }
     }
 
