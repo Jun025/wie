@@ -6,7 +6,7 @@ use core::{
 
 use jvm::{Jvm, Result as JvmResult};
 
-use wie_backend::{DefaultTaskRunner, Platform, System};
+use wie_backend::{DefaultTaskRunner, Platform, System, TaskRunner};
 use wie_jvm_support::{JvmSupport, RustJavaJvmImplementation, WieJavaClassProto};
 use wie_util::{Result, WieError};
 
@@ -26,7 +26,17 @@ where
     T: FnOnce(Jvm, System) -> F + Send + 'static,
     F: Future<Output = JvmResult<()>> + Send,
 {
-    let mut system = System::new(platform, "", "", DefaultTaskRunner);
+    run_jvm_test_with_runner(protos, platform, DefaultTaskRunner, func)
+}
+
+/// [`run_jvm_test_with_system`] with the caller's [`TaskRunner`], for host code that talks to it.
+pub fn run_jvm_test_with_runner<T, F, R>(protos: Box<[Box<[WieJavaClassProto]>]>, platform: Box<dyn Platform>, runner: R, func: T) -> Result<()>
+where
+    T: FnOnce(Jvm, System) -> F + Send + 'static,
+    F: Future<Output = JvmResult<()>> + Send,
+    R: TaskRunner + 'static,
+{
+    let mut system = System::new(platform, "", "", runner);
 
     let done = Arc::new(AtomicBool::new(false));
     let done_clone = done.clone();

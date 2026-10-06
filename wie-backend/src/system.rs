@@ -103,7 +103,7 @@ impl System {
     }
 
     /// See [`TaskRunner::hold_others`].
-    pub fn guest_hold_others(&self, on: bool) {
+    pub fn guest_hold_others(&self, on: bool) -> bool {
         self.task_runner.hold_others(on)
     }
 
