@@ -679,6 +679,11 @@ function lockOf(path) {
 // The run half of `phone`: the title ended itself — a run either quit or never painted.
 const quitOnItsOwn = (runs) => runs.every((r) => r && (r.stop === 'clean exit' || !r.paints)) && runs.some((r) => r.stop === 'clean exit');
 const lockVerdict = (lock, runs) => (lock === 'drm' || (lock === 'phone' && quitOnItsOwn(runs)) ? lock : null);
+// A purchase check the static rule cannot see — native code, not an SKT class. Named one at a time
+// from the disassembly (docs/report/0463). 01f05f8231f4 (LGT): the decrypted `audio.adt` licence and
+// every save are compared with `PHONENUMBER`; the saves' mismatch pauses the scene before the first
+// frame (black), and without them the licence's draws «인증에 실패하였습니다» and quits.
+const LOCK_HAND = { '01f05f8231f4': 'phone' };
 
 // ── titles that cannot go on without the original carrier's server ─────────────────────────────
 // Operator policy 2026-10-02: the server is gone and its data is not ours to make up, so the census
@@ -1024,7 +1029,7 @@ if (cmd === 'run') {
     const net = netWall(netConnects(j.A, join(out, t.sha, 'A.stderr'))) ? NET_KO : (HAND_WALL[t.sha.slice(0, 12)] ?? null);
     // A locked file says only that: the other lines would read as «not fixed yet». Its status is never
     // better than not-yet — a check that paints its refusal box would otherwise read as playable.
-    const lock = lockVerdict(lockOf(t.path), [j.A, j.B]);
+    const lock = lockVerdict(lockOf(t.path), [j.A, j.B]) ?? LOCK_HAND[t.sha.slice(0, 12)] ?? null;
     const st = lock ? 'not-yet' : net && status(j.ax) === 'playable' ? 'limited' : status(j.ax);
     const issues = Object.entries(j.ax)
       .filter(([k]) => !(k === 'render' && j.ax.boot === 'fail')) // one line for a title that never started

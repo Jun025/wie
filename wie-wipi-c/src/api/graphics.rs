@@ -150,18 +150,77 @@ impl ScreenFramebufferSync {
     }
 }
 
+/// A KTF title's graphics context: the same fields as `WIPICGraphicsContext` with every one a word,
+/// `clip` and `offset` included (64 bytes). Measured on 3151fdc167b6, whose own SetContext writes
+/// TRANS at +0x1c, ALPHA at +0x20 (and +0x30), OFFSET at +0x24/+0x28 and PIXELOP at +0x2c, calling
+/// `MC_grpSetContext` only for the other indices (docs/report/0463). Read through the 52-byte layout,
+/// its ALPHA write became the pixel-op pointer the blit then called (`0x7d00f81f` · 7da00ecd4804
+/// `0x3000f81f`, the same studio) and its key colour was never seen. Only KTF SDK images get it: the
+/// `wipi` crate that builds keydraw_ktf lays the record out packed, and LGT keeps its own (`wie-lgt`).
+fn read_grp_ctx(context: &dyn WIPICContext, ptr: WIPICWord) -> Result<WIPICGraphicsContext> {
+    if !context.wide_graphics_context() {
+        return read_generic(context, ptr);
+    }
+    let w: [WIPICWord; 16] = read_generic(context, ptr)?;
+    Ok(WIPICGraphicsContext {
+        mask: w[0],
+        clip: [w[1], w[2], w[3], w[4]].map(|value| value as u16),
+        fgpxl: w[5],
+        bgpxl: w[6],
+        transpxl: w[7],
+        alpha: w[8],
+        offset: [w[9], w[10]].map(|value| value as u16),
+        pixel_op_func_ptr: w[11],
+        param1: w[12],
+        reserved: w[13],
+        font: w[14],
+        style: w[15],
+    })
+}
+
+fn write_grp_ctx(context: &mut dyn WIPICContext, ptr: WIPICWord, c: WIPICGraphicsContext) -> Result<()> {
+    if !context.wide_graphics_context() {
+        return write_generic(context, ptr, c);
+    }
+    let word = |value: u16| i32::from(value as i16) as WIPICWord;
+    let [c0, c1, c2, c3] = c.clip.map(word);
+    let [o0, o1] = c.offset.map(word);
+    write_generic(
+        context,
+        ptr,
+        [
+            c.mask,
+            c0,
+            c1,
+            c2,
+            c3,
+            c.fgpxl,
+            c.bgpxl,
+            c.transpxl,
+            c.alpha,
+            o0,
+            o1,
+            c.pixel_op_func_ptr,
+            c.param1,
+            c.reserved,
+            c.font,
+            c.style,
+        ],
+    )
+}
+
 pub async fn init_context(context: &mut dyn WIPICContext, p_grp_ctx: WIPICWord) -> Result<()> {
     tracing::debug!("MC_grpInitContext({p_grp_ctx:#x})");
 
     let grp_ctx = WIPICGraphicsContext::default();
-    write_generic(context, p_grp_ctx, grp_ctx)?;
+    write_grp_ctx(context, p_grp_ctx, grp_ctx)?;
     Ok(())
 }
 
 pub async fn set_context(context: &mut dyn WIPICContext, p_grp_ctx: WIPICWord, op: WIPICGraphicsContextIdx, pv: WIPICWord) -> Result<()> {
     tracing::debug!("MC_grpSetContext({p_grp_ctx:#x}, {op:?}, {pv:#x})");
 
-    let mut grp_ctx: WIPICGraphicsContext = read_generic(context, p_grp_ctx)?;
+    let mut grp_ctx: WIPICGraphicsContext = read_grp_ctx(context, p_grp_ctx)?;
     match op {
         WIPICGraphicsContextIdx::ClipIdx => {
             let clip: [i32; 4] = read_generic(context, pv)?;
@@ -201,7 +260,7 @@ pub async fn set_context(context: &mut dyn WIPICContext, p_grp_ctx: WIPICWord, o
             tracing::warn!("MC_grpSetContext({p_grp_ctx:#x}, {op:?}, {pv:#x}): ignoring invalid op");
         }
     }
-    write_generic(context, p_grp_ctx, grp_ctx)?;
+    write_grp_ctx(context, p_grp_ctx, grp_ctx)?;
 
     Ok(())
 }
@@ -209,7 +268,7 @@ pub async fn set_context(context: &mut dyn WIPICContext, p_grp_ctx: WIPICWord, o
 pub async fn get_context(context: &mut dyn WIPICContext, p_grp_ctx: WIPICWord, op: WIPICGraphicsContextIdx, pv: WIPICWord) -> Result<()> {
     tracing::debug!("MC_grpGetContext({p_grp_ctx:#x}, {op:?}, {pv:#x})");
 
-    let grp_ctx: WIPICGraphicsContext = read_generic(context, p_grp_ctx)?;
+    let grp_ctx: WIPICGraphicsContext = read_grp_ctx(context, p_grp_ctx)?;
     match op {
         WIPICGraphicsContextIdx::ClipIdx => write_generic(context, pv, grp_ctx.clip.map(|value| i32::from(value as i16)))?,
         WIPICGraphicsContextIdx::FgPixelIdx => write_generic(context, pv, grp_ctx.fgpxl)?,
@@ -231,7 +290,7 @@ pub async fn put_pixel(context: &mut dyn WIPICContext, dst_fb: WIPICIndirectPtr,
     tracing::debug!("MC_grpPutPixel({:#x}, {x}, {y}, {p_gctx:?})", dst_fb.0);
 
     let framebuffer = FrameBuffer(read_generic(context, context.data_ptr(dst_fb)?)?);
-    let gctx: WIPICGraphicsContext = read_generic(context, p_gctx)?;
+    let gctx: WIPICGraphicsContext = read_grp_ctx(context, p_gctx)?;
 
     let color = framebuffer.pixel_to_color(gctx.fgpxl);
     primitives::put_pixel(
@@ -257,7 +316,7 @@ pub async fn fill_rect(context: &mut dyn WIPICContext, dst_fb: WIPICIndirectPtr,
     }
 
     let framebuffer = FrameBuffer(read_generic(context, context.data_ptr(dst_fb)?)?);
-    let gctx: WIPICGraphicsContext = read_generic(context, p_gctx)?;
+    let gctx: WIPICGraphicsContext = read_grp_ctx(context, p_gctx)?;
     let clip = Clip {
         x: x as _,
         y: y as _,
@@ -288,7 +347,7 @@ pub async fn draw_arc(
     }
 
     let framebuffer = FrameBuffer(read_generic(context, context.data_ptr(dst)?)?);
-    let gctx: WIPICGraphicsContext = read_generic(context, p_gctx)?;
+    let gctx: WIPICGraphicsContext = read_grp_ctx(context, p_gctx)?;
     let clip = Clip {
         x: x as _,
         y: y as _,
@@ -319,7 +378,7 @@ pub async fn fill_arc(
     }
 
     let framebuffer = FrameBuffer(read_generic(context, context.data_ptr(dst)?)?);
-    let gctx: WIPICGraphicsContext = read_generic(context, p_gctx)?;
+    let gctx: WIPICGraphicsContext = read_grp_ctx(context, p_gctx)?;
     let clip = Clip {
         x: x as _,
         y: y as _,
@@ -660,7 +719,7 @@ fn context_pixel_op(context: &mut dyn WIPICContext, graphics_context: WIPICWord)
     if graphics_context == 0 {
         return Ok((0, PixelOpArgs::SrcDstParam1(0)));
     }
-    let grp_ctx: WIPICGraphicsContext = read_generic(context, graphics_context)?;
+    let grp_ctx: WIPICGraphicsContext = read_grp_ctx(context, graphics_context)?;
     Ok((grp_ctx.pixel_op_func_ptr, PixelOpArgs::SrcDstParam1(grp_ctx.param1)))
 }
 
@@ -809,7 +868,7 @@ pub async fn draw_string(
     };
 
     let framebuffer = FrameBuffer(read_generic(context, context.data_ptr(dst)?)?);
-    let gctx: WIPICGraphicsContext = read_generic(context, pgc)?;
+    let gctx: WIPICGraphicsContext = read_grp_ctx(context, pgc)?;
 
     let clip = Clip {
         x: 0,
@@ -910,7 +969,7 @@ pub async fn draw_rect(context: &mut dyn WIPICContext, dst: WIPICIndirectPtr, x:
     }
 
     let framebuffer = FrameBuffer(read_generic(context, context.data_ptr(dst)?)?);
-    let gctx: WIPICGraphicsContext = read_generic(context, pgc)?;
+    let gctx: WIPICGraphicsContext = read_grp_ctx(context, pgc)?;
     let clip = Clip {
         x: x as _,
         y: y as _,
@@ -926,7 +985,7 @@ pub async fn draw_line(context: &mut dyn WIPICContext, dst: WIPICIndirectPtr, x1
     tracing::debug!("MC_grpDrawLine({:#x}, {x1}, {y1}, {x2}, {y2}, {pgc:#x})", dst.0);
 
     let framebuffer = FrameBuffer(read_generic(context, context.data_ptr(dst)?)?);
-    let gctx: WIPICGraphicsContext = read_generic(context, pgc)?;
+    let gctx: WIPICGraphicsContext = read_grp_ctx(context, pgc)?;
     let clip = Clip {
         x: 0,
         y: 0,
@@ -955,7 +1014,7 @@ pub async fn draw_polygon(
     }
 
     let framebuffer = FrameBuffer(read_generic(context, context.data_ptr(dst)?)?);
-    let gctx: WIPICGraphicsContext = read_generic(context, pgc)?;
+    let gctx: WIPICGraphicsContext = read_grp_ctx(context, pgc)?;
     let clip = Clip {
         x: 0,
         y: 0,
@@ -1068,6 +1127,30 @@ mod tests {
     use crate::{MethodImpl, context::test::TestContext};
 
     use super::*;
+
+    /// 3151fdc167b6 sets TRANS and ALPHA by storing words at +0x1c and +0x20 itself, between
+    /// `MC_grpSetContext` calls for the rest (docs/report/0463).
+    #[futures_test::test]
+    async fn a_wide_context_is_read_where_the_title_wrote_it() -> Result<()> {
+        let mut context = TestContext::new();
+        context.wide_graphics_context = true;
+        let ptr = context.alloc_raw(64)?;
+        let out = context.alloc_raw(4)?;
+        init_context(&mut context, ptr).await?;
+        let set = set_context.into_body();
+        let get = get_context.into_body();
+        set.call(&mut context, Box::new([ptr, 1, 0x1234])).await?;
+        assert_eq!(read_generic::<WIPICWord, _>(&context, ptr + 0x14)?, 0x1234, "fg after four clip words");
+
+        write_generic(&mut context, ptr + 0x1c, 0xf81fu32)?;
+        write_generic(&mut context, ptr + 0x20, 0x3000_f81fu32)?;
+        for (op, expected) in [(3, 0xf81f), (4, 0x3000_f81f), (5, 0)] {
+            get.call(&mut context, Box::new([ptr, op, out])).await?;
+            assert_eq!(read_generic::<WIPICWord, _>(&context, out)?, expected, "op {op}");
+        }
+
+        Ok(())
+    }
 
     #[futures_test::test]
     async fn context_values_are_written_to_the_output_pointer() -> Result<()> {

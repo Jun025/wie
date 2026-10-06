@@ -1610,7 +1610,7 @@ mod test {
         let mut system_clone = system.clone();
         system.spawn(async move || {
             let (jvm, mut core) = init_jvm(&mut system_clone).await?;
-            register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
+            register_wipic_svc_handler(&mut core, &system_clone, &jvm, false)?;
             let svc = |core: &mut ArmCore, id| core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICTableId::Graphics.function_id(id));
             let (init, set) = (
                 svc(&mut core, WIPICGraphicsMethodId::InitContext)?,
@@ -1681,7 +1681,7 @@ mod test {
         let mut system_clone = system.clone();
         system.spawn(async move || {
             let (jvm, mut core) = init_jvm(&mut system_clone).await?;
-            register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
+            register_wipic_svc_handler(&mut core, &system_clone, &jvm, false)?;
             let slot = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICTableId::Net.function_id(34u16))?;
 
             let host = Allocator::alloc(&mut core, 64)?;

@@ -6,7 +6,7 @@ use wipi_types::{
 };
 
 use wie_core_arm::ArmCore;
-use wie_util::{Result, WieError};
+use wie_util::{ByteRead, ByteWrite, Result, WieError, read_generic, write_generic};
 use wie_wipi_c::{
     MethodImpl, WIPICContext, WIPICMethodBody,
     api::{database, graphics, kernel, media, misc, net, uic, util},
@@ -462,6 +462,61 @@ pub fn get_unk12_method_table() -> Vec<WIPICMethodBody> {
     vec![gen_unk_stub(12, 0), gen_unk_stub(12, 1), gen_unk_stub(12, 2)]
 }
 
+/// `"MXUserMemInterf"` — the table kernel slot 36 returns for that name. Measured on 3151fdc167b6
+/// (docs/report/0463), its only caller: slot 0 is `(region, size)` on a static buffer (0x14400 and
+/// 0x28800 bytes), slot 1 `(region, n)` returns a pointer the caller copies `n` bytes into, with no
+/// null check, and nearly every slot-1 call follows a fresh slot 0 on the same region. A wrapper
+/// passes `(region, p)` to slot 3 but nothing calls it; slot 2 is never read. So slots 0 and 1 are a
+/// bump arena over the caller's own buffer; 2 and 3 report themselves.
+///
+/// The arena keeps its cursor in its own first 8 bytes (`end`, `next`) — slot 1 is handed only the
+/// region, so that is the one place it can find it. Where the handset kept it is not known.
+pub fn get_user_mem_method_table() -> Vec<WIPICMethodBody> {
+    vec![
+        user_mem_init.into_body(),
+        user_mem_alloc.into_body(),
+        gen_unnamed_table_stub(WIPICTableId::UserMem as _, "UserMem", 2),
+        gen_unnamed_table_stub(WIPICTableId::UserMem as _, "UserMem", 3),
+    ]
+}
+
+const USER_MEM_HEADER: WIPICWord = 8;
+
+async fn user_mem_init(context: &mut dyn WIPICContext, region: WIPICWord, size: WIPICWord) -> Result<()> {
+    tracing::debug!("MXUserMem init({region:#x}, {size:#x})");
+    arena_init(context, region, size)
+}
+
+async fn user_mem_alloc(context: &mut dyn WIPICContext, region: WIPICWord, size: WIPICWord) -> Result<WIPICWord> {
+    tracing::debug!("MXUserMem alloc({region:#x}, {size:#x})");
+    arena_alloc(context, region, size)
+}
+
+fn arena_init<M: ByteWrite + ?Sized>(memory: &mut M, region: WIPICWord, size: WIPICWord) -> Result<()> {
+    let end = region
+        .checked_add(size)
+        .filter(|_| size >= USER_MEM_HEADER)
+        .ok_or_else(|| WieError::FatalError(format!("MXUserMem init({region:#x}, {size:#x}): not a region")))?;
+    write_generic(memory, region, [end, region + USER_MEM_HEADER])
+}
+
+/// A block of `size` bytes, 4-aligned, or 0 once the region is spent.
+fn arena_alloc<M: ByteRead + ByteWrite + ?Sized>(memory: &mut M, region: WIPICWord, size: WIPICWord) -> Result<WIPICWord> {
+    let [end, next]: [WIPICWord; 2] = read_generic(memory, region)?;
+    let Some(after) = size
+        .checked_add(3)
+        .map(|x| x & !3)
+        .and_then(|x| next.checked_add(x))
+        .filter(|&x| x <= end)
+    else {
+        tracing::warn!("MXUserMem alloc({region:#x}, {size:#x}): region spent (next {next:#x}, end {end:#x})");
+        return Ok(0);
+    };
+    write_generic(memory, region + 4, after)?;
+
+    Ok(next)
+}
+
 pub fn get_stub_method_table(interface: WIPICWord) -> Vec<WIPICMethodBody> {
     (0..64).map(|_| gen_stub(interface, "stub")).collect::<Vec<_>>()
 }
@@ -530,7 +585,8 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
             WIPICKernelMethodId::Reserved1 => None,
             WIPICKernelMethodId::Reserved2 => Some(gen_ktf_kernel_extension_stub(34, "MC_knlReserved2")),
             WIPICKernelMethodId::Reserved3 => Some(gen_ktf_kernel_extension_stub(35, "MC_knlReserved3")),
-            WIPICKernelMethodId::Reserved4 => Some(gen_ktf_kernel_extension_stub(36, "MC_knlReserved4")),
+            // Looks a table up by name — answered with core access in `handle_wipic_svc`.
+            WIPICKernelMethodId::Reserved4 => None,
             WIPICKernelMethodId::Reserved5 => Some(gen_ktf_kernel_extension_stub(37, "MC_knlReserved5")),
             WIPICKernelMethodId::Reserved6 => Some(gen_ktf_kernel_extension_stub(38, "MC_knlReserved6")),
             WIPICKernelMethodId::Reserved7 => Some(gen_ktf_kernel_extension_stub(39, "MC_knlReserved7")),
@@ -720,12 +776,49 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
                 None
             }
         }
+        WIPICTableId::UserMem => get_user_mem_method_table().into_iter().nth(function_id as usize),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{get_net_method_table, unnamed_table_message};
+    use alloc::{vec, vec::Vec};
+
+    use wie_util::{ByteRead, ByteWrite};
+
+    use super::{arena_alloc, arena_init, get_net_method_table, unnamed_table_message};
+
+    struct Memory(Vec<u8>);
+
+    impl ByteRead for Memory {
+        fn read_bytes(&self, address: u32, result: &mut [u8]) -> wie_util::Result<usize> {
+            result.copy_from_slice(&self.0[address as usize..address as usize + result.len()]);
+            Ok(result.len())
+        }
+    }
+
+    impl ByteWrite for Memory {
+        fn write_bytes(&mut self, address: u32, data: &[u8]) -> wie_util::Result<()> {
+            self.0[address as usize..address as usize + data.len()].copy_from_slice(data);
+            Ok(())
+        }
+    }
+
+    /// 3151fdc167b6 resets the region and takes one block, again and again (docs/report/0463).
+    #[test]
+    fn user_mem_arena_bumps_inside_its_region_and_starts_over_on_init() {
+        let mut memory = Memory(vec![0; 0x200]);
+        arena_init(&mut memory, 0x100, 0x40).unwrap();
+        let first = arena_alloc(&mut memory, 0x100, 5).unwrap();
+        let second = arena_alloc(&mut memory, 0x100, 4).unwrap();
+        assert_eq!((first, second), (0x108, 0x110), "after the cursor, 4-aligned");
+        assert_eq!(arena_alloc(&mut memory, 0x100, 0x30).unwrap(), 0, "past the end");
+        assert_eq!(arena_alloc(&mut memory, 0x100, 0x2c).unwrap(), 0x114, "the rest still fits");
+
+        arena_init(&mut memory, 0x100, 0x40).unwrap();
+        assert_eq!(arena_alloc(&mut memory, 0x100, 1).unwrap(), 0x108);
+        assert!(arena_init(&mut memory, 0x100, 4).is_err(), "no room for its own cursor");
+    }
 
     /// A guest that indexes past the end of this table jumps to whatever the allocator placed next
     /// (04159045a7ea's slot 33 — `Undefined instruction`). 64 like the other unnamed KTF tables.
