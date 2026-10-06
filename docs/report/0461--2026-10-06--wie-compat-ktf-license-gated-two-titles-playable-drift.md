@@ -24,3 +24,4 @@ knownIssues_ko 는 두 행 모두 위 안내 1줄로 바꿨다(벽 앞의 다른
 4게이트(fmt · clippy · wasm clippy · `RUST_MIN_STACK` test) green · `playability-census.mjs selftest` 62/62 · `player-data.mjs` OK · `check-worklog-json` OK.
 게임명 유입: 이 문서·스크립트만 재면 BOUNDED 0 · SUFFIX-ATTACHED 0. 아래 표식의 B=718/330 · S=35/15 는 `compat.json` 전체 본문(기존 제목 필드)이고 0459 표식과 같은 값이다 — 이 회차가 더한 제목은 없다.
 
+<!-- corpus-name-inflow v1 subjects=3 tree=45bc4bab071ae6b6 B=718/330 P=0/0 S=35/15 -->
