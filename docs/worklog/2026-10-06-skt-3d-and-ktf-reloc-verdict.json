@@ -8,7 +8,7 @@
     "wie-skvm/src/mascot.rs — MBAC v2/v3 · MTRA v2–v5 · 8비트 BMP · 평행 투영 z-버퍼 래스터",
     "wie-skvm/src/classes/m/ — m/XO_World · m/A3 · m/V3",
     "wie-skvm/src/classes/com/xce/io/x_file.rs — READ_RESOURCE 에서 buf 채움",
-    "docs/report/0454"
+    "docs/report/0455"
   ],
   "verification": [
     "되돌리면 red 6 변이 전건",
@@ -24,7 +24,7 @@
       "title": "SKT AudioClip.play 를 소리 스레드에서 재생 동안 블록하고 close 로 끊기게",
       "plainSummary": "SKT 게임 대부분은 소리를 따로 도는 작은 일꾼(스레드)에서 냅니다. 실제 폰에서는 그 일꾼이 곡이 끝날 때까지 기다리는데, 에뮬레이터는 바로 돌아와서 곡을 너무 자주 다시 틀거나 한 게임은 아예 멈춥니다.",
       "userBenefit": "71d1d8235bd1 이 1스테이지를 시작할 수 있고, 다른 SKT 게임의 배경음이 끊겨 다시 시작되는 현상이 줄어듭니다.",
-      "why": "0454 §2-3: 소리 스레드가 모니터를 쥔 채 자는 교착은 실기에서 play 가 블록하고 close 가 예외로 끊을 때만 풀린다. 소리 스레드 run() 에서 AudioClip.play 를 부르는 SKT 타이틀 84종 중 74종(정적).",
+      "why": "0455 §2-3: 소리 스레드가 모니터를 쥔 채 자는 교착은 실기에서 play 가 블록하고 close 가 예외로 끊을 때만 풀린다. 소리 스레드 run() 에서 AudioClip.play 를 부르는 SKT 타이틀 84종 중 74종(정적).",
       "tradeoff": "74종의 소리·스레드 타이밍이 함께 바뀐다 — SKT 전수 전/후 짝이 필수. 주 스레드에서 효과음을 내는 타이틀이 블록되지 않게 스레드를 가려야 한다.",
       "effort": "M",
       "target": "wie-skvm/src/classes/net/wie/wie_audio_clip.rs"
@@ -34,7 +34,7 @@
       "title": "KTF 재배치 client.bin 3종 — 서술자 배열 적재기 + MNInterface 실행 추적",
       "plainSummary": "KTF 게임 3종은 프로그램 파일 형식이 달라 켜지지 않습니다. 안의 데이터 구조는 보통 KTF 게임과 거의 같다는 것을 이번에 확인했습니다.",
       "userBenefit": "3개 게임이 켜질 수 있습니다.",
-      "why": "0454 §3: 클래스 등록부(hdr[0] → 끝·개수) · 0x24 서술자(부모 = 이름표 색인) · 표준 필드·이름 부호화. 남은 것은 MNInterface 칸(10개 이상)과 fp 스레드 문맥(+0x34 = 스택).",
+      "why": "0455 §3: 클래스 등록부(hdr[0] → 끝·개수) · 0x24 서술자(부모 = 이름표 색인) · 표준 필드·이름 부호화. 남은 것은 MNInterface 칸(10개 이상)과 fp 스레드 문맥(+0x34 = 스택).",
       "tradeoff": "MNInterface 참고 자료가 0이라 칸마다 실행 추적이 필요하다. 3종뿐이다(296 client.bin 중).",
       "effort": "L",
       "target": "wie-ktf/src/runtime/init.rs"
