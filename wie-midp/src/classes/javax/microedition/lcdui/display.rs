@@ -1849,6 +1849,34 @@ mod test {
     }
 
     #[test]
+    fn a_paint_inside_a_held_key_handler_leaves_the_hold_in_place() -> Result<()> {
+        // A key handler that repaints (serviceRepaints) holds the others; its paint must not let go.
+        let held = Arc::new(AtomicBool::new(true));
+        let runner = HoldRunner(held.clone());
+        run_jvm_test_with_runner(test_protos(), Box::new(TestPlatform::new()), runner, move |jvm, _| async move {
+            let display: ClassInstanceRef<Display> = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?.into();
+            let canvas = jvm.new_class("javax/microedition/lcdui/TestNotifyCanvas", "()V", ()).await?;
+            let _: () = jvm
+                .invoke_virtual(
+                    &display,
+                    "javax/microedition/lcdui/Display",
+                    "setCurrent",
+                    "(Ljavax/microedition/lcdui/Displayable;)V",
+                    (canvas.clone(),),
+                )
+                .await?;
+            let _: () = jvm
+                .invoke_virtual(&display, "javax/microedition/lcdui/Display", "handlePaintEvent", "()V", ())
+                .await?;
+
+            assert!(jvm.get_field::<bool>(&canvas, "paintedHeld", "Z").await?);
+            assert!(held.load(Ordering::Relaxed), "the key handler's hold outlives its paint");
+
+            Ok(())
+        })
+    }
+
+    #[test]
     fn size_changed_coalesces_callback_decoration_mutation() -> Result<()> {
         run_jvm_test(test_protos(), |jvm| async move {
             let mut screen: ClassInstanceRef<ViewportScreen> = jvm.new_class("javax/microedition/lcdui/TestViewportScreen", "()V", ()).await?.into();

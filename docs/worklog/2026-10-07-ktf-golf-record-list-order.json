@@ -1,0 +1,26 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-07",
+  "task": "wie-ktf-golf-course-loader-addr08-handle-table-zero",
+  "title": "7da00ecd4804 «주소 8» = 저장 레코드 목록 순서 — WIPI-C 레코드 목록을 오름차순으로",
+  "summary": "코스 로더의 빈 핸들 칸(18·24·34번 — 0번이 아니다)은, 저장 슬롯을 ids[i] 로 읽는 게임에 wie_validate 의 HashMap 이 프로세스마다 다른 순서를 넘겨 빈 슬롯의 코스 바이트(0x00/0xff)를 읽은 결과였다. MC_dbListRecords · MC_dbListRecordInfo 가 id 를 오름차순으로 넘긴다(브라우저 호스트는 이미 BTreeMap). #496 이월 — paint 중첩 붙들기 시험.",
+  "changes": [
+    "wie-wipi-c database — list_record · list_record_info 가 get_record_ids 를 정렬해서 넘긴다",
+    "wie-wipi-c 시험 record_listings_are_in_ascending_id_order_test · wie-midp 시험 a_paint_inside_a_held_key_handler_leaves_the_hold_in_place",
+    "docs/report/0467"
+  ],
+  "verification": [
+    "fmt · clippy stable/beta/wasm32 -D warnings · cargo test --all 726/0 · 러너 픽스처 PASS",
+    "되돌리면 red: 정렬 제거(두 자리 각각) · if !held 제거",
+    "150초 짝 base 33720b84 9/18 FAIL(주소 8) ↔ head 0/17 · 600초 짝 0/3 ↔ 0/3 · 목록 호출 KTF/LGT 29종 프로브 A 짝 — docs/report/0467 §3 §5"
+  ],
+  "limits": [
+    "사이트(브라우저)는 이미 오름차순이라 플레이어에게 바뀌는 것은 없다 — compat 은 다음 census 가 잰다",
+    "5a59f62d1f1a 장시간 «주소 0» 은 보지 않았다 — 20초 스캔에서 목록을 부르지 않아 같은 원인이라는 근거가 없다"
+  ],
+  "proposals": [],
+  "adoptedProposals": [
+    "2026-10-06-census-wave8-engine-walls#p0"
+  ],
+  "declinedProposals": []
+}
