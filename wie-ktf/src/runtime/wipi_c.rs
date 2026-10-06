@@ -55,14 +55,14 @@ impl EmulatedFunction<(), WIPICMethodResult, ()> for CMethodProxy {
     }
 }
 
-async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm, resources): &mut (System, Jvm, ResourceCache), id: SvcId) -> Result<()> {
+async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm, resources, wide): &mut (System, Jvm, ResourceCache, bool), id: SvcId) -> Result<()> {
     let table_id = WIPICTableId::try_from(id.0 >> 16)?;
     let function_id = id.0 as u16;
     let (_, lr) = core.read_pc_lr()?;
     if table_id == WIPICTableId::Kernel && function_id == WIPICKernelMethodId::Reserved1 as u16 {
         return interface::get_wipic_interfaces(
             core,
-            &mut KtfWIPICContext::new(core.clone(), system.clone(), jvm.clone(), resources.clone()),
+            &mut KtfWIPICContext::new(core.clone(), system.clone(), jvm.clone(), resources.clone()).with_wide_graphics_context(*wide),
         )
         .await?
         .write(core, lr);
@@ -72,7 +72,7 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm, resources): &mut (Sy
         let ptr_name = core.read_param(0)?;
         return interface::get_extension_interface(
             core,
-            &mut KtfWIPICContext::new(core.clone(), system.clone(), jvm.clone(), resources.clone()),
+            &mut KtfWIPICContext::new(core.clone(), system.clone(), jvm.clone(), resources.clone()).with_wide_graphics_context(*wide),
             ptr_name,
         )?
         .write(core, lr);
@@ -83,7 +83,7 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm, resources): &mut (Sy
 
     EmulatedFunction::call(
         &CMethodProxy {
-            context: KtfWIPICContext::new(core.clone(), system.clone(), jvm.clone(), resources.clone()),
+            context: KtfWIPICContext::new(core.clone(), system.clone(), jvm.clone(), resources.clone()).with_wide_graphics_context(*wide),
             body,
         },
         core,
@@ -93,11 +93,13 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm, resources): &mut (Sy
     .write(core, lr)
 }
 
-pub fn register_wipic_svc_handler(core: &mut ArmCore, system: &System, jvm: &Jvm) -> Result<()> {
+/// `wide_graphics_context`: the image runs on the KTF SDK runtime (see `init::load_native`).
+pub fn register_wipic_svc_handler(core: &mut ArmCore, system: &System, jvm: &Jvm, wide_graphics_context: bool) -> Result<()> {
     let resources = ResourceCache::default();
 
     // Clet mode presents only when this drew native pixels (see `Display`'s paint)
-    let mut context = KtfWIPICContext::new(core.clone(), system.clone(), jvm.clone(), resources.clone());
+    let mut context =
+        KtfWIPICContext::new(core.clone(), system.clone(), jvm.clone(), resources.clone()).with_wide_graphics_context(wide_graphics_context);
     let mut sync = ScreenFramebufferSync::default();
     system.set_screen_compositor(Box::new(move |current, target| {
         sync.compose(&mut context, current, target).unwrap_or_else(|err| {
@@ -106,5 +108,9 @@ pub fn register_wipic_svc_handler(core: &mut ArmCore, system: &System, jvm: &Jvm
         })
     }));
 
-    core.register_svc_handler(SVC_CATEGORY_WIPIC, handle_wipic_svc, &(system.clone(), jvm.clone(), resources))
+    core.register_svc_handler(
+        SVC_CATEGORY_WIPIC,
+        handle_wipic_svc,
+        &(system.clone(), jvm.clone(), resources, wide_graphics_context),
+    )
 }

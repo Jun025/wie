@@ -155,7 +155,8 @@ impl ScreenFramebufferSync {
 /// TRANS at +0x1c, ALPHA at +0x20 (and +0x30), OFFSET at +0x24/+0x28 and PIXELOP at +0x2c, calling
 /// `MC_grpSetContext` only for the other indices (docs/report/0454). Read through the 52-byte layout,
 /// its ALPHA write became the pixel-op pointer the blit then called (`0x7d00f81f` · 7da00ecd4804
-/// `0x3000f81f`, the same studio) and its key colour was never seen. LGT keeps the packed record (`wie-lgt` `graphics.rs`, keydraw_lgt).
+/// `0x3000f81f`, the same studio) and its key colour was never seen. Only KTF SDK images get it: the
+/// `wipi` crate that builds keydraw_ktf lays the record out packed, and LGT keeps its own (`wie-lgt`).
 fn read_grp_ctx(context: &dyn WIPICContext, ptr: WIPICWord) -> Result<WIPICGraphicsContext> {
     if !context.wide_graphics_context() {
         return read_generic(context, ptr);
