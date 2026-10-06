@@ -29,7 +29,7 @@ SKT 코퍼스 84파일(82종)을 다시 셌다. 0455 의 «74/84» 는 셈법이
   - `pause()` 중이면 계속 기다린다. 이렇게 안 하면 반복 재생 스레드가 일시정지를 바로 다시 틀어 버린다.
   - 다른 스레드의 `open()` 이면 정상으로 돌아온다.
   - 다른 스레드의 `stop()`·`close()` 면 `UserStopException` 을 던진다.
-- `close()`: 블록 중인 `play()` 가 있을 때만 소리를 멈춘다. 더팜1 의 `open → play → close`(같은 스레드 · 블록 없음)는 종전대로 소리를 남긴다.
+- `close()`: 블록 중인 `play()` 가 있을 때만 소리를 멈춘다. 효과음의 `open → play → close`(같은 스레드 · 블록 없음)는 종전대로 소리를 남긴다.
   선행 결론(`wie-featurephone-audio-loop-overlap-and-worklet-sequence-leak`: `close` 는 소리를 끊지 않는다 · 닫힌 클립 `stop` 무시 · 고아 루프 정지)은 그대로다. `close` 가 소리를 끊는 경우는 «블록 중인 `play()` 를 다른 스레드가 끝낼 때» 하나만 더해졌다.
 - `loop()` 는 바꾸지 않았다(`47fe675bfffd` 는 `loop()` 도 같은 `try` 안에 있지만, 블록하는 `loop` 는 이 회차 근거 밖이다).
 - `71d1d8235bd1` 의 교착이 풀리는 길(0455 §2-3): `stop()` 이 `clip.close()` 를 부르면 소리 스레드의 `play()` 가 `UserStopException` 으로 끝난다. 그 `catch` 가 `isRepeat=false` 로 만들고, 스레드는 `wait()` 로 모니터를 놓는다.

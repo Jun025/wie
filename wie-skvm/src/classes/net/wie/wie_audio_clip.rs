@@ -334,7 +334,7 @@ impl WieAudioClip {
         tracing::debug!("net.wie.WieAudioClip::close({this:?})");
 
         let closed: bool = jvm.get_field(&this, "closed", "Z").await?;
-        // Ending a sound thread's play() ends its sound too (header: this is not 더팜1's close).
+        // Ending a sound thread's play() ends its sound too — unlike an effect's open → play → close (header).
         if !closed
             && Self::stop_user(jvm, &mut this).await?
             && let Some(handle) = Self::loaded(jvm, &this).await?
