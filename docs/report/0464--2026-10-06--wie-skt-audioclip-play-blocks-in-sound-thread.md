@@ -23,6 +23,13 @@ SKT 코퍼스 84파일(82종)을 다시 셌다. 0455 의 «74/84» 는 셈법이
   상한(코드 주석 `ponytail:`): 게임 루프의 `run()` 이 소리 도우미를 직접 부르면 그 효과음도 블록한다. 코퍼스에는 그런 곳이 없다.
 - **예외 종류**: `47fe675bfffd` 는 다른 스레드의 `clip.stop()` 으로 소리 스레드의 `play()` 를 끊고, 그 `play()` 를 `catch (UserStopException)` 으로 받는다. 실기 의미가 이름으로 남은 유일한 근거다. 나머지 93곳은 `Exception` 을 잡으므로 `UserStopException extends Exception` 은 94곳 모두에서 잡힌다.
 
+**참고 구현 — KEmulator**(`game_lab/vendor_sdk` 의 SK-VM 에뮬레이터 `KEmulator-mmpp.jar` · `javap -c -p`):
+- SDK 인터페이스 `com.skt.m.AudioClip` 이 `play() throws UserStopException, IOException` 을 선언한다(`loop()` 도 같다).
+- `AudioClipImpl.play()` 는 재생 스레드를 띄운 뒤 `len` 이 지날 때까지 `startLock.wait(remaining)` 로 기다린다. 그 사이 `stop()` 이 `stopped=true` 로 만들면 `UserStopException("Playback was stopped")` 을 던진다.
+- 차이 둘을 숨기지 않는다.
+  ⑴ KEmulator 는 스레드를 가리지 않고 블록한다. 이 회차는 티켓 요구(주 스레드 효과음은 블록 금지)에 따라 위 기준으로 좁혔다.
+  ⑵ KEmulator 의 `close()` 는 `len=0` 으로 만들어 `play()` 를 **정상 반환**시킨다(예외 아님). 이 회차의 «`close` 도 `UserStopException`» 은 0455 §2-3 의 판단을 따른 것이다. `71d1d8235bd1` 의 `stop()` 은 `close()` 만 부르고, 교착을 푸는 `isRepeat=false` 는 `play()` 를 감싼 `catch` 에만 있기 때문이다. 정상 반환이면 그 스레드는 `isRepeat` 를 쥔 채 모니터 안에서 다시 잠든다(§2 끝).
+
 ### 2. 의미
 
 - `play()`(소리 스레드): 종전대로 소리를 시작한다. 그다음 `soundingUntil`(곡 길이) 까지 `Thread.sleep` 으로 기다린다(20ms 단위).
@@ -89,4 +96,3 @@ Java 예외는 첫 실행의 `RecordStoreNotFoundException` 1건뿐이다. 이�
 
 게임 파일명 유입: 이 회차 파일 4개(코드·회차 문서·worklog·업데이트 소식)만 넘기면 BOUNDED 6쌍 · SUFFIX-ATTACHED 0쌍이다. 6쌍은 전부 `wie_audio_clip.rs` 에 **이미 있던** 주석·시험의 이름이다. 이 회차가 더한 줄(`git diff origin/main...HEAD`)의 게임명은 0 이다. 기본 실행(브랜치 전체)은 BOUNDED 336쌍 · SUFFIX-ATTACHED 15쌍이다. compat.json(계약상 제목 목록)이 들어가기 때문이고, SUFFIX 35회는 모두 그 파일 안이다. compat.json 밖의 BOUNDED 13회는 위 6쌍이다.
 
-<!-- corpus-name-inflow v1 subjects=5 tree=beb64bf0a2591e1c B=731/336 P=0/0 S=35/15 -->
