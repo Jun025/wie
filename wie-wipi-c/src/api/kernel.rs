@@ -327,7 +327,7 @@ pub async fn sprintk(
 }
 
 /// Fixed answer for `MC_knlGetTotalMemory`/`MC_knlGetFreeMemory` (LGT answers its own, `wie-lgt` `get_memory`).
-/// 1MiB stopped a KTF title at its «memory low» notice; 2MiB was swept across every KTF caller (docs/report/0454).
+/// 1MiB stopped a KTF title at its «memory low» notice; 2MiB was swept across every KTF caller (docs/report/0456).
 const KTF_MEMORY: i32 = 0x200000;
 
 pub async fn get_total_memory(_context: &mut dyn WIPICContext) -> Result<i32> {
@@ -385,7 +385,7 @@ mod test {
         set_timer, sprintk, unset_timer,
     };
 
-    // A KTF title stops at «메모리가 부족합니다» when free memory is 1MiB (docs/report/0454).
+    // A KTF title stops at «메모리가 부족합니다» when free memory is 1MiB (docs/report/0456).
     #[futures_test::test]
     async fn test_free_memory_clears_the_ktf_low_memory_notice() -> Result<()> {
         let mut context = TestContext::new();
