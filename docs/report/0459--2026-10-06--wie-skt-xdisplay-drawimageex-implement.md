@@ -33,7 +33,7 @@ head 바이너리로 `scripts/playability-census.mjs run`(이 1종 · probe A/B 
 `compat.json` 은 이 1행만 바꿨다: status limited → **playable** · input no → ok · longplay unknown → ok · speed unknown → ok · knownIssues_ko 에서 «키를 눌러도 화면이 바뀌지 않을 수 있어요.» 삭제. sound 는 `no` 그대로(census `silent` = 계약 어휘 `no`). progress 는 이 회차에 재지 않아 키를 넣지 않았다.
 ★`report --compat <경로>` 는 그 경로를 **측정한 행만으로 덮어쓴다**(1행 파일이 된다). 저장소 파일에 바로 주지 말고 사본에 받아 행을 옮겨라.
 `node scripts/player-data.mjs` OK(429 · playable 401 · limited 14 · not-yet 14).
-CHECK_COMPAT_REVERT
+`node scripts/check-compat-revert.mjs`: `compat-revert: OK — 브랜치가 main 을 받은 적이 없다 · 착지 기준 바뀐 행 1` — 이 회차가 잰 1행뿐. origin/main `382e64fc`(#487 진도 3차 -r5 의 compat 변경 포함)과 `git merge-tree` 충돌 0.
 
 ### 6. 게이트
 fmt · clippy `-D warnings`(stable · wasm32 · beta) rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` rc=0(715 passed · 0 failed). 러너 블록: `draw_j2me` · `helloworld_ktf` · `helloworld_lgt` PASS · `keydraw_ktf` PASS rc=0(paints 79) · `keydraw_lgt` PASS rc=0(paints 55) · `text_j2me` PASS.
