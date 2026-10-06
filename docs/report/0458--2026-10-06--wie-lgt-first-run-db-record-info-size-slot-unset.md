@@ -61,4 +61,4 @@ compat.json 은 이 1행만 바꿨다: input·sound `ok` 이고, 두 knownIssue(
 증적(repo 밖): `~/orchestrator/reports/evidence/wie-lgt-first-run-db-record-info-size-slot-unset/`(짝 스크린샷 · 호출부 창 · census.tsv 두 벌).
 게임 파일명 유입: 이 회차가 **더한 줄**에는 0건이다. 도구 기본 실행은 BOUNDED 336쌍 · SUFFIX-ATTACHED 15쌍이다. 그중 compat.json(계약상 제목 목록) 밖에서 걸린 것은 `wie-lgt/src/runtime/wipi_c.rs` 11회 · 6쌍인데, 이 회차가 그 파일에서 바꾼 것은 디스패치 한 줄(`open_database` → `open_database_lgt`)뿐이다. 즉 이미 있던 주석이다. compat.json 을 뺀 실행의 SUFFIX-ATTACHED 는 0 이다.
 
-<!-- corpus-name-inflow v1 subjects=6 tree=1529ea602737a716 B=729/336 P=0/0 S=35/15 -->
+<!-- corpus-name-inflow v1 subjects=6 tree=ce9483579efbee9c B=729/336 P=0/0 S=35/15 -->
