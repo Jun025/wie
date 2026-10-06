@@ -1,0 +1,8 @@
+{
+  "date": "2026-10-06",
+  "task": "wie-ktf-free-memory-1mib-to-2mib-with-46-title-sweep",
+  "title": "KTF 남은 메모리 답 1MiB → 2MiB — 호출 49종 회귀 0",
+  "summary": "«메모리가 부족합니다»에서 멈추던 KTF 타이틀 1종이 2MiB 로 타이틀 화면까지 간다. 두 스텁을 부르는 KTF 49종 전/후 짝 측정에서 판정 회귀 0(docs/report/0454).",
+  "adoptedProposals": ["2026-10-06-input-none-17-recheck#p0"],
+  "proposals": []
+}
