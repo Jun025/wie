@@ -371,6 +371,29 @@ pub async fn seek_record_single(context: &mut dyn WIPICContext, db_id: i32, offs
     Ok(position as i32)
 }
 
+/// LGT `MC_dbOpenDataBase`: mode 8 opens for writing and creates the database when it is missing.
+///
+/// 22 LGT titles open with mode 8, and 8 of them open with nothing but modes 1 and 8 — no other way to
+/// make a save. Mode 8 is followed by a write at 60 of its 100 call sites. So on the handset an opened mode-8
+/// database exists from that moment, empty. The generic path only creates it on the first write, and
+/// 63332c51d514 asks `list_record_info` about it before writing: it opens its save with mode 8, takes
+/// any of -1·-3·-9·-11·-12·-13·-24 as «no save», and otherwise reads the size from the entry without
+/// looking at the return value — an empty file has to answer size 0 there (docs/report/0456).
+pub async fn open_database_lgt(context: &mut dyn WIPICContext, ptr_name: WIPICWord, mode: i32, r#type: i32) -> Result<i32> {
+    if mode == 8
+        && let Ok(name) = String::from_utf8(read_null_terminated_string_bytes(context, ptr_name)?)
+    {
+        let name = resolve_db_name(context, name).await;
+        let system = context.system();
+        let pid = system.pid().to_owned();
+        if name.len() <= MAX_NAME_LEN && !system.platform().database_repository().exists(&name, &pid).await {
+            system.platform().database_repository().open(&name, &pid).await;
+        }
+    }
+
+    open_database(context, ptr_name, mode, r#type).await
+}
+
 pub async fn list_record_info(context: &mut dyn WIPICContext, ptr_name: WIPICWord, buf_ptr: WIPICWord, capacity: WIPICWord) -> Result<i32> {
     tracing::debug!("MC_dbListRecordInfo({ptr_name:#x}, {buf_ptr:#x}, {capacity})");
 
@@ -395,6 +418,18 @@ pub async fn list_record_info(context: &mut dyn WIPICContext, ptr_name: WIPICWor
 
     let db = system.platform().database_repository().open(&name, &pid).await;
     let ids = db.get_record_ids().await;
+
+    // An existing database with no record is an empty file: one entry of size 0. Callers read the
+    // entry whenever this returns 0 (85 of 120 LGT call sites branch on it before touching the entry), so
+    // returning 0 with nothing written handed them stack garbage as the size.
+    if ids.is_empty() {
+        if capacity > 0 {
+            write_generic(context, buf_ptr, 1u32)?;
+            write_generic(context, buf_ptr + 4, 0u32)?;
+            write_generic(context, buf_ptr + 8, 0u32)?;
+        }
+        return Ok(0);
+    }
 
     let mut written = 0;
     for id in ids {
@@ -878,8 +913,8 @@ mod tests {
 
     use super::{
         KTF_DATABASE_STORAGE_LIMIT, close_database, delete_database, exists_database, exists_database_ktf, file_size_ktf, get_number_of_records,
-        insert_record, list_databases, list_record, list_record_info, list_record_or_rename_ktf, open_database, open_record_database, select_record,
-        select_record_ktf, sort_records, stat_by_name_ktf, stream_read, stream_write, update_record,
+        insert_record, list_databases, list_record, list_record_info, list_record_or_rename_ktf, open_database, open_database_lgt,
+        open_record_database, select_record, select_record_ktf, sort_records, stat_by_name_ktf, stream_read, stream_write, update_record,
     };
 
     /// KTF Interface4 is the header's record database: the call sequence three titles make —
@@ -981,6 +1016,32 @@ mod tests {
         let db_id = open_database(&mut context, 0x1000, 4, 0).await.unwrap();
         assert!(db_id > 0);
         assert_eq!(exists_database(&mut context, 0x1000, 1).await.unwrap(), 0);
+    }
+
+    #[futures_test::test]
+    async fn lgt_write_mode_8_creates_the_database_and_its_info_is_one_empty_entry() {
+        let mut context = database_test_context();
+        context.write_bytes(0x1000, b"SAV0\0").unwrap();
+        // what the caller's stack slot held before the call — the size it read when nothing was written
+        context.write_bytes(0x2100, &[0xef; 12]).unwrap();
+
+        assert_eq!(list_record_info(&mut context, 0x1000, 0x2100, 1).await.unwrap(), -12);
+        assert!(open_database_lgt(&mut context, 0x1000, 8, 1).await.unwrap() > 0);
+        assert_eq!(exists_database(&mut context, 0x1000, 1).await.unwrap(), 0);
+        assert_eq!(list_record_info(&mut context, 0x1000, 0x2100, 1).await.unwrap(), 0);
+        let mut entry = [0; 12];
+        context.read_bytes(0x2100, &mut entry).unwrap();
+        assert_eq!(entry, [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    }
+
+    #[futures_test::test]
+    async fn generic_mode_8_still_creates_lazily() {
+        // KTF shares `open_database`; the mode-8 evidence is LGT's, so KTF keeps create-on-write
+        let mut context = database_test_context();
+        context.write_bytes(0x1000, b"SAV0\0").unwrap();
+
+        assert!(open_database(&mut context, 0x1000, 8, 1).await.unwrap() > 0);
+        assert_eq!(exists_database(&mut context, 0x1000, 1).await.unwrap(), -12);
     }
 
     #[futures_test::test]
