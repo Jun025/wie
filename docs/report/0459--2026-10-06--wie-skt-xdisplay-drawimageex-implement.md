@@ -37,3 +37,6 @@ head 바이너리로 `scripts/playability-census.mjs run`(이 1종 · probe A/B 
 
 ### 6. 게이트
 fmt · clippy `-D warnings`(stable · wasm32 · beta) rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` rc=0(715 passed · 0 failed). 러너 블록: `draw_j2me` · `helloworld_ktf` · `helloworld_lgt` PASS · `keydraw_ktf` PASS rc=0(paints 79) · `keydraw_lgt` PASS rc=0(paints 55) · `text_j2me` PASS.
+
+### 7. 게임 파일명 유입
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 330쌍 + SUFFIX-ATTACHED 15쌍 — 전부 `compat.json` 의 기존 `title`·`fileTitle` 값이다(이 회차는 제목 문자열을 바꾸지 않았다). 회차 문서 · worklog · 이용자 소식 · 코드는 0. 타이틀은 sha12 로만 적었다. vendor_sdk 경로는 게임이 아니라 에뮬레이터 아카이브다.
