@@ -1,6 +1,6 @@
 use alloc::{vec, vec::Vec};
 
-use jvm::{Array, ClassInstanceRef, Jvm, Result as JvmResult};
+use jvm::{Array, ClassInstanceRef, JavaError, Jvm, Result as JvmResult};
 use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 use rustjava_runtime::classes::java::lang::String;
@@ -63,6 +63,10 @@ impl WieAudioClip {
                 JavaFieldProto::new("looping", "Z", FieldAccessFlags::PRIVATE),
                 // Host ms at which the last one-shot play() runs out; 0 = none sounding.
                 JavaFieldProto::new("soundingUntil", "J", FieldAccessFlags::PRIVATE),
+                // A play() on a sound thread is waiting for this clip to run out; and stop()/close()
+                // ended that wait (see `play`).
+                JavaFieldProto::new("blocking", "Z", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("userStopped", "Z", FieldAccessFlags::PRIVATE),
                 // Handles (+ 1, like `audioHandle`) of loops whose clip was closed mid-loop.
                 JavaFieldProto::new("orphanLoops", "[I", FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC),
             ],
@@ -214,11 +218,72 @@ impl WieAudioClip {
     // in a 30 s probe; ignoring it plays the song through and restarts it once it ends, which is
     // what the loop is for. `loop` on a looping clip is ignored for the same reason (header).
     // The cost: a game that re-triggers one clip faster than it lasts no longer cuts it short.
+    //
+    // On a sound thread play() blocks until the clip runs out, and a stop() or close() from another
+    // thread ends it with `UserStopException` — the handset's behaviour, which the SKT sound threads
+    // are written against (docs/report/0465). 71d1d8235bd1's thread loops
+    // `synchronized (this) { while (!isPlaying) { if (isRepeat) sleep(100); else wait(); } }` and then
+    // plays outside the lock; its stop() is `clip.close()`, and only the exception out of play()
+    // clears `isRepeat`. A play() that returned at once left the thread re-opening the song every
+    // 100 ms, and a stop() landing between two of those left it asleep holding the lock for good.
+    // 47fe675bfffd catches `UserStopException` around its play(); every other one of the 94 play()
+    // sites in the SKT corpus catches `Exception`.
+    //
+    // "A sound thread" is read off the Java stack: `run()` is the caller or the caller's caller.
+    // Every one of those 94 sites is in a `run()` that only plays sound, or in a helper that such a
+    // `run()` calls — the corpus has no play() on the game's own thread at all. Anything deeper
+    // does not block: that branch is a guard for an effect played from game code, so it cannot
+    // freeze the game; no corpus title takes it, and the test's `effect()` is its only witness.
+    // ponytail: depth, not "what this thread is for" — a game loop whose run() called a sound helper
+    // directly would block on its effects; the corpus has none (docs/report/0465 §1).
     async fn play(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("net.wie.WieAudioClip::play({this:?})");
 
         Self::start(jvm, context, &mut this, false).await?;
+        if Self::on_sound_thread(jvm) && Self::handle(jvm, &this).await?.is_some() {
+            Self::wait_until_done(jvm, context, &mut this).await?;
+        }
         jvm.invoke_static("java/lang/Thread", "yield", "()V", ()).await
+    }
+
+    fn on_sound_thread(jvm: &Jvm) -> bool {
+        // [0] is this play() itself.
+        jvm.stack_trace().iter().skip(1).take(2).any(|frame| frame.ends_with(".run()V"))
+    }
+
+    async fn wait_until_done(jvm: &Jvm, context: &mut WieJvmContext, this: &mut ClassInstanceRef<Self>) -> JvmResult<()> {
+        jvm.put_field(this, "blocking", "Z", true).await?;
+        jvm.put_field(this, "userStopped", "Z", false).await?;
+        let result = async {
+            loop {
+                if jvm.get_field(this, "userStopped", "Z").await? {
+                    let exception = jvm.new_class("com/skt/m/UserStopException", "()V", ()).await?;
+                    return Err(JavaError::JavaException(exception));
+                }
+                let paused: bool = jvm.get_field(this, "paused", "Z").await?;
+                let until: i64 = jvm.get_field(this, "soundingUntil", "J").await?;
+                let now = context.system().platform().now().raw() as i64;
+                if !paused && now >= until {
+                    return Ok(());
+                }
+                let step = if paused { 20 } else { (until - now).min(20) };
+                let _: () = jvm.invoke_static("java/lang/Thread", "sleep", "(J)V", (step,)).await?;
+            }
+        }
+        .await;
+        jvm.put_field(this, "blocking", "Z", false).await?;
+
+        result
+    }
+
+    /// stop()/close() from another thread while a sound thread's play() waits on this clip.
+    async fn stop_user(jvm: &Jvm, this: &mut ClassInstanceRef<Self>) -> JvmResult<bool> {
+        let blocking: bool = jvm.get_field(this, "blocking", "Z").await?;
+        if blocking {
+            jvm.put_field(this, "userStopped", "Z", true).await?;
+        }
+
+        Ok(blocking)
     }
 
     async fn r#loop(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
@@ -255,6 +320,7 @@ impl WieAudioClip {
     async fn stop(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("net.wie.WieAudioClip::stop({this:?})");
 
+        Self::stop_user(jvm, &mut this).await?;
         if let Some(handle) = Self::handle(jvm, &this).await? {
             context.system().audio().stop(handle);
             jvm.put_field(&mut this, "looping", "Z", false).await?;
@@ -265,10 +331,17 @@ impl WieAudioClip {
         Ok(())
     }
 
-    async fn close(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
+    async fn close(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("net.wie.WieAudioClip::close({this:?})");
 
         let closed: bool = jvm.get_field(&this, "closed", "Z").await?;
+        // Ending a sound thread's play() ends its sound too — unlike an effect's open → play → close (header).
+        if !closed
+            && Self::stop_user(jvm, &mut this).await?
+            && let Some(handle) = Self::loaded(jvm, &this).await?
+        {
+            context.system().audio().stop(handle);
+        }
         let looping: bool = jvm.get_field(&this, "looping", "Z").await?;
         if !closed
             && looping
@@ -287,7 +360,7 @@ impl WieAudioClip {
 
 #[cfg(test)]
 mod test {
-    use alloc::{boxed::Box, sync::Arc, vec::Vec};
+    use alloc::{boxed::Box, sync::Arc, vec, vec::Vec};
     use core::sync::atomic::{AtomicBool, Ordering};
 
     use jvm::{Array, ClassInstanceRef, JavaError, Result as JvmResult, runtime::JavaLangString};
@@ -295,7 +368,102 @@ mod test {
     use test_utils::{TestClock, TestPlatform, run_jvm_test, run_jvm_test_with_system};
     use wie_backend::AudioCommand;
 
+    use jvm::Jvm;
+    use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
+    use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
+    use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
+
     use crate::{classes::com::skt::m::AudioClip, get_protos};
+
+    /// The shape of an SKT sound thread: `run()` plays the static clip, directly or (`viaHelper`)
+    /// through a helper as 8 titles do; `effect()` plays it through the same helper from anywhere
+    /// else. `outcome`: 1 = play() returned, 2 = it threw `UserStopException`.
+    struct SoundThread;
+
+    impl SoundThread {
+        fn as_proto() -> WieJavaClassProto {
+            WieJavaClassProto {
+                name: "test/SoundThread",
+                parent_class: Some("java/lang/Object"),
+                interfaces: vec!["java/lang/Runnable"],
+                methods: vec![
+                    JavaMethodProto::new("<init>", "()V", Self::init, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new("run", "()V", Self::run, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new("effect", "()V", Self::effect, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new("helper", "()V", Self::helper, MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC),
+                ],
+                fields: vec![
+                    JavaFieldProto::new("clip", "Lcom/skt/m/AudioClip;", FieldAccessFlags::STATIC),
+                    JavaFieldProto::new("outcome", "I", FieldAccessFlags::STATIC),
+                    JavaFieldProto::new("viaHelper", "Z", FieldAccessFlags::STATIC),
+                ],
+                access_flags: ClassAccessFlags::PUBLIC,
+            }
+        }
+
+        async fn init(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await
+        }
+
+        async fn run(jvm: &Jvm, _context: &mut WieJvmContext, _this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            let clip: ClassInstanceRef<AudioClip> = jvm.get_static_field("test/SoundThread", "clip", "Lcom/skt/m/AudioClip;").await?;
+            let via_helper: bool = jvm.get_static_field("test/SoundThread", "viaHelper", "Z").await?;
+            let played = if via_helper {
+                jvm.invoke_static::<_, ()>("test/SoundThread", "helper", "()V", ()).await
+            } else {
+                jvm.invoke_virtual::<_, ()>(&clip, "com/skt/m/AudioClip", "play", "()V", ()).await
+            };
+            let outcome = match played {
+                Ok(()) => 1,
+                Err(JavaError::JavaException(exception)) if jvm.is_instance(&*exception, "com/skt/m/UserStopException") => 2,
+                Err(error) => return Err(error),
+            };
+            jvm.put_static_field("test/SoundThread", "outcome", "I", outcome).await
+        }
+
+        async fn effect(jvm: &Jvm, _context: &mut WieJvmContext, _this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            jvm.invoke_static("test/SoundThread", "helper", "()V", ()).await
+        }
+
+        async fn helper(jvm: &Jvm, _context: &mut WieJvmContext) -> JvmResult<()> {
+            let clip: ClassInstanceRef<AudioClip> = jvm.get_static_field("test/SoundThread", "clip", "Lcom/skt/m/AudioClip;").await?;
+            jvm.invoke_virtual(&clip, "com/skt/m/AudioClip", "play", "()V", ()).await
+        }
+    }
+
+    /// A minimal SMAF: one `SEQU` chunk, two notes 50 × 20 ms apart, then end of stream.
+    fn smaf() -> Vec<u8> {
+        let sequence = [0x00, 0x01, 0x0a, 0x32, 0x01, 0x0a, 0, 0, 0, 0];
+        let mut smaf = b"MMMD\0\0\0\0SEQU".to_vec();
+        smaf.extend_from_slice(&(sequence.len() as u32).to_be_bytes());
+        smaf.extend_from_slice(&sequence);
+        smaf.extend_from_slice(&[0, 0]);
+        smaf
+    }
+
+    /// Opens `smaf()` on a new clip and stores it in `SoundThread.clip`; returns it and a `SoundThread`.
+    async fn open_sound_thread_clip(jvm: &Jvm) -> JvmResult<(ClassInstanceRef<AudioClip>, Box<dyn jvm::ClassInstance>)> {
+        let name = JavaLangString::from_rust_string(jvm, "mmf").await?;
+        let clip: ClassInstanceRef<AudioClip> = jvm
+            .invoke_static(
+                "com/skt/m/AudioSystem",
+                "getAudioClip",
+                "(Ljava/lang/String;)Lcom/skt/m/AudioClip;",
+                (name,),
+            )
+            .await?;
+        let bytes = smaf();
+        let mut data = jvm.instantiate_array("B", bytes.len()).await?;
+        jvm.store_array(&mut data, 0, bytes.iter().map(|&x| x as i8)).await?;
+        let _: () = jvm
+            .invoke_virtual(&clip, "net/wie/WieAudioClip", "open", "([BII)V", (data, 0, bytes.len() as i32))
+            .await?;
+        jvm.put_static_field("test/SoundThread", "clip", "Lcom/skt/m/AudioClip;", clip.clone())
+            .await?;
+        let thread = jvm.new_class("test/SoundThread", "()V", ()).await?;
+
+        Ok((clip, thread))
+    }
 
     #[test]
     fn audio_clip_accepts_valid_slices_and_rejects_invalid_ranges() {
@@ -540,13 +708,7 @@ mod test {
     /// song has run out (the clock passes its length) or the clip was stopped, play() starts it again.
     #[test]
     fn play_is_not_restarted_while_the_clip_is_still_sounding() {
-        // A minimal SMAF: one `SEQU` chunk, two notes 50 × 20 ms apart, then end of stream.
-        let sequence = [0x00, 0x01, 0x0a, 0x32, 0x01, 0x0a, 0, 0, 0, 0];
-        let mut smaf = b"MMMD\0\0\0\0SEQU".to_vec();
-        smaf.extend_from_slice(&(sequence.len() as u32).to_be_bytes());
-        smaf.extend_from_slice(&sequence);
-        smaf.extend_from_slice(&[0, 0]);
-
+        let smaf = smaf();
         let clock = TestClock::new();
         let platform = TestPlatform::with_clock(clock.clone());
         let log = platform.audio_log();
@@ -588,5 +750,117 @@ mod test {
 
         let plays = log.lock().iter().filter(|command| matches!(command, AudioCommand::Play { .. })).count();
         assert_eq!(plays, 3);
+    }
+
+    /// 71d1d8235bd1's sound thread: play() from `run()` waits until the clip has run out, as on the
+    /// handset; play() from anywhere else still returns at once, so an effect cannot freeze a game.
+    #[test]
+    fn play_on_a_sound_thread_blocks_until_the_clip_runs_out() {
+        let clock = TestClock::stepping(1);
+        let result = run_jvm_test_with_system(
+            Box::new([wie_midp::get_protos().into(), get_protos().into(), Box::new([SoundThread::as_proto()])]),
+            Box::new(TestPlatform::with_clock(clock.clone())),
+            move |jvm, system| async move {
+                let (clip, thread) = open_sound_thread_clip(&jvm).await?;
+                let length = system.audio().duration(0).unwrap();
+                assert!(length >= 1000, "{length}");
+
+                for via_helper in [false, true] {
+                    jvm.put_static_field("test/SoundThread", "viaHelper", "Z", via_helper).await?;
+                    let before = clock.peek();
+                    let _: () = jvm.invoke_virtual(&thread, "test/SoundThread", "run", "()V", ()).await?;
+                    let waited = clock.peek() - before;
+                    assert!(
+                        waited >= length,
+                        "run()'s play() (helper {via_helper}) returned after {waited} ms of a {length} ms clip"
+                    );
+                    let outcome: i32 = jvm.get_static_field("test/SoundThread", "outcome", "I").await?;
+                    assert_eq!(outcome, 1);
+                }
+
+                let before = clock.peek();
+                let _: () = jvm.invoke_virtual(&thread, "test/SoundThread", "effect", "()V", ()).await?;
+                let waited = clock.peek() - before;
+                assert!(waited < length / 2, "an effect's play() waited {waited} ms");
+                let _: () = jvm.invoke_virtual(&clip, "net/wie/WieAudioClip", "stop", "()V", ()).await?;
+
+                Ok(())
+            },
+        );
+        assert!(result.is_ok(), "{result:?}");
+    }
+
+    /// While paused, a sound thread's play() keeps waiting — past the clip's length — and another
+    /// thread's open() lets it return normally (docs/report/0465 §2).
+    #[test]
+    fn a_sound_threads_play_waits_through_pause_and_returns_on_open() {
+        let result = run_jvm_test_with_system(
+            Box::new([wie_midp::get_protos().into(), get_protos().into(), Box::new([SoundThread::as_proto()])]),
+            Box::new(TestPlatform::with_clock(TestClock::stepping(1))),
+            move |jvm, system| async move {
+                let (clip, runnable) = open_sound_thread_clip(&jvm).await?;
+                let length = system.audio().duration(0).unwrap();
+                let thread = jvm.new_class("java/lang/Thread", "(Ljava/lang/Runnable;)V", (runnable,)).await?;
+                let _: () = jvm.invoke_virtual(&thread, "java/lang/Thread", "start", "()V", ()).await?;
+                let _: () = jvm.invoke_static("java/lang/Thread", "sleep", "(J)V", (100i64,)).await?;
+
+                let _: () = jvm.invoke_virtual(&clip, "net/wie/WieAudioClip", "pause", "()V", ()).await?;
+                let _: () = jvm.invoke_static("java/lang/Thread", "sleep", "(J)V", (length as i64 + 200,)).await?;
+                let outcome: i32 = jvm.get_static_field("test/SoundThread", "outcome", "I").await?;
+                assert_eq!(outcome, 0, "play() returned while paused");
+
+                let bytes = smaf();
+                let mut data = jvm.instantiate_array("B", bytes.len()).await?;
+                jvm.store_array(&mut data, 0, bytes.iter().map(|&x| x as i8)).await?;
+                let _: () = jvm
+                    .invoke_virtual(&clip, "net/wie/WieAudioClip", "open", "([BII)V", (data, 0, bytes.len() as i32))
+                    .await?;
+                let _: () = jvm.invoke_static("java/lang/Thread", "sleep", "(J)V", (100i64,)).await?;
+                let outcome: i32 = jvm.get_static_field("test/SoundThread", "outcome", "I").await?;
+                assert_eq!(outcome, 1, "open() did not let play() return normally");
+
+                Ok(())
+            },
+        );
+        assert!(result.is_ok(), "{result:?}");
+    }
+
+    /// The way out of 71d1d8235bd1's deadlock: another thread's close() (its stop()) — or stop()
+    /// (47fe675bfffd) — ends the sound thread's play() with `UserStopException`, and stops the sound.
+    #[test]
+    fn stop_or_close_ends_a_sound_threads_play_with_user_stop_exception() {
+        for method in ["close", "stop"] {
+            let platform = TestPlatform::with_clock(TestClock::stepping(1));
+            let log = platform.audio_log();
+            let result = run_jvm_test_with_system(
+                Box::new([wie_midp::get_protos().into(), get_protos().into(), Box::new([SoundThread::as_proto()])]),
+                Box::new(platform),
+                move |jvm, _system| async move {
+                    let (clip, runnable) = open_sound_thread_clip(&jvm).await?;
+                    let thread = jvm.new_class("java/lang/Thread", "(Ljava/lang/Runnable;)V", (runnable,)).await?;
+                    let _: () = jvm.invoke_virtual(&thread, "java/lang/Thread", "start", "()V", ()).await?;
+                    let _: () = jvm.invoke_static("java/lang/Thread", "sleep", "(J)V", (100i64,)).await?;
+                    let outcome: i32 = jvm.get_static_field("test/SoundThread", "outcome", "I").await?;
+                    assert_eq!(outcome, 0, "play() did not wait for the clip");
+
+                    let _: () = jvm.invoke_virtual(&clip, "net/wie/WieAudioClip", method, "()V", ()).await?;
+                    let _: () = jvm.invoke_static("java/lang/Thread", "sleep", "(J)V", (100i64,)).await?;
+                    let outcome: i32 = jvm.get_static_field("test/SoundThread", "outcome", "I").await?;
+                    assert_eq!(outcome, 2, "{method}() did not end play() with UserStopException");
+
+                    Ok(())
+                },
+            );
+            assert!(result.is_ok(), "{method}: {result:?}");
+            let shape: Vec<&str> = log
+                .lock()
+                .iter()
+                .map(|command| match command {
+                    AudioCommand::Play { .. } => "play",
+                    AudioCommand::Stop { .. } => "stop",
+                })
+                .collect();
+            assert_eq!(shape, ["play", "stop"], "{method}");
+        }
     }
 }

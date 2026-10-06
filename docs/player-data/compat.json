@@ -7909,18 +7909,16 @@
    "platform": "SKT",
    "model": null,
    "title": "크레이지버스",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "unknown",
+    "longplay": "ok",
     "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "첫 스테이지가 시작되기 직전에 멈춰요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "크레이지버스"
   },
