@@ -94,3 +94,5 @@ rows 429 -> 429 changed by field set {"axes.progress":60}
 ### 6. 게임 파일명 유입
 
 - `node scripts/corpus-name-inflow.mjs`(이 브랜치 ↔ `origin/main`) 의 수는 전부 `compat.json` 의 기존 `title` 필드 몫이다. `compat.json` 을 뺀 경로(이 문서)는 아래 표식 줄의 수와 별도로 0 이다 — 이 문서는 타이틀을 sha12 로만 부른다.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=ad60f8f5277349fc B=718/330 P=0/0 S=35/15 -->
