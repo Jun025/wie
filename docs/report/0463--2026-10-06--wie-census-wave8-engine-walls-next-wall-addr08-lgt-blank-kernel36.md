@@ -121,7 +121,7 @@
 
 - compat 4행만: `5267badf20b3` `3151fdc167b6` `5a59f62d1f1a` = `report` 판정을 `scripts/player-data.mjs` 의 `fromCensus` 로 옮겨 `status`·`axes`·`knownIssues_ko` 만 덮었다(다른 필드와 `progress` 는 그대로). `01f05f8231f4` = `knownIssues_ko` 1줄만(§4 · `LOCK_HAND`).
 - `7da00ecd4804` 는 바꾸지 않았다(상태 같음 · 소리 축은 재생 0↔1 회의 흔들림).
-- 지원 현황 401/14/14 → 403/14/12 · 위 3종 · `fb80e97cbc57` 등 병합분은 main 의 값 그대로다.
+- 지원 현황(main `9c8d9729` 기준) 401/14/14 → **404/13/12** — playable +3(`5267` `3151` `5a59`) · not-yet −1(`3151`) · limited −2.
 - 소식 3: `2026-10-06-paint-thread-order.json`(`5267`) · `2026-10-06-ktf-drawing-settings.json`(`7da0` `5a59`) · `2026-10-06-ktf-memory-interface.json`(`3151`).
 
 ### 8. 게이트(build-slot · 병합 뒤 트리)
@@ -144,4 +144,4 @@
 - 도구 표기 BOUNDED 340쌍 · SUFFIX-ATTACHED 15쌍. 전부 계약상 제목 목록인 `compat.json` 과, 이 회차가 고친 파일에 **이미 있던** 주석이다(`system.rs` · `jvm_support.rs` · `context.rs` · `emulator.rs` · `display.rs` · `graphics.rs`).
 - 이 회차가 더한 줄의 게임 이름은 0이다(타이틀은 sha12 로만 적었다).
 
-<!-- corpus-name-inflow v1 subjects=24 tree=507ee05ddbffad76 B=729/340 P=0/0 S=35/15 -->
+<!-- corpus-name-inflow v1 subjects=24 tree=7b1d1c3975a25044 B=729/340 P=0/0 S=35/15 -->
