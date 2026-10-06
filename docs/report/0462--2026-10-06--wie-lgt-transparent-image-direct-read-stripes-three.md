@@ -79,4 +79,4 @@
 - `compat.json` 은 바꾸지 않았다. `render` 축은 줄무늬를 보지 못한다(0450 §4 와 같은 판단).
 - 게임 파일명 유입: `corpus-name-inflow` BOUNDED 12회/7쌍 · SUFFIX-ATTACHED 0. 12회 모두 이 회차가 손댄 두 파일(`wie-lgt/src/runtime/wipi_c.rs` · `wie-wipi-c/src/api/graphics.rs`)에 이미 있던 주석이다(`origin/main` 판에서 같은 6개 이름이 12회). 이 회차가 더한 줄에는 0건이다.
 
-<!-- corpus-name-inflow v1 subjects=6 tree=a972949868a563bf B=12/7 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=6 tree=b62407c3ed98e50e B=12/7 P=0/0 S=0/0 -->
