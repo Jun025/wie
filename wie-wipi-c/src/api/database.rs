@@ -223,7 +223,11 @@ pub async fn list_record(context: &mut dyn WIPICContext, db_id: i32, buf_ptr: WI
     let Some(db) = get_database_from_db_id(context, db_id).await? else {
         return Ok(-25); // M_E_INVALIDHANDLE
     };
-    let ids = db.get_record_ids().await;
+    // Ascending, as the shipped browser host's `BTreeMap` already returns them. A KTF golf title
+    // reads this as its save slots (`ids[slot]`); `wie_validate`'s `HashMap` handed it a random
+    // order per process, so it loaded an empty slot's course byte and crashed (docs/report/0467).
+    let mut ids = db.get_record_ids().await;
+    ids.sort_unstable();
 
     let mut cursor = 0;
     for &id in &ids {
@@ -417,7 +421,8 @@ pub async fn list_record_info(context: &mut dyn WIPICContext, ptr_name: WIPICWor
     }
 
     let db = system.platform().database_repository().open(&name, &pid).await;
-    let ids = db.get_record_ids().await;
+    let mut ids = db.get_record_ids().await;
+    ids.sort_unstable(); // see `list_record`
 
     // An existing database with no record is an empty file: one entry of size 0. Callers read the
     // entry whenever this returns 0 (85 of 120 LGT call sites branch on it before touching the entry), so
@@ -942,6 +947,37 @@ mod tests {
 
         // A later open without create finds it.
         assert!(open_record_database(&mut context, 0x1000, 0xeec, 0, 1).await.unwrap() > 0);
+    }
+
+    /// Both record listings hand the guest ascending ids, whatever order the host store keeps them in.
+    /// `TestPlatform`'s store is a randomly seeded `HashMap`, like `wie_validate`'s: without the sort
+    /// 16 ids come back in ascending order with odds of 1 in 16!. A KTF title reads `ids[slot]` as its
+    /// save slot, and a shuffled list made it load an empty slot and crash (docs/report/0467).
+    #[futures_test::test]
+    async fn record_listings_are_in_ascending_id_order_test() {
+        let mut context = database_test_context();
+        let db_id = open_test_database(&mut context).await;
+        context.write_bytes(0x2000, b"abcd").unwrap();
+        for _ in 0..16 {
+            assert!(insert_record(&mut context, db_id, 0x2000, 4).await.unwrap() > 0);
+        }
+        let read = |context: &TestContext, base: u32, stride: u32| {
+            (0..16)
+                .map(|i| {
+                    let mut word = [0; 4];
+                    context.read_bytes(base + i * stride, &mut word).unwrap();
+                    u32::from_le_bytes(word)
+                })
+                .collect::<alloc::vec::Vec<_>>()
+        };
+
+        assert_eq!(list_record(&mut context, db_id, 0x3000, 64).await.unwrap(), 16);
+        let ids = read(&context, 0x3000, 4);
+        assert!(ids.is_sorted(), "MC_dbListRecords: {ids:?}");
+
+        assert_eq!(list_record_info(&mut context, 0x1000, 0x4000, 16).await.unwrap(), 0);
+        let ids = read(&context, 0x4000, 12);
+        assert!(ids.is_sorted(), "MC_dbListRecordInfo: {ids:?}");
     }
 
     /// KTF database slot 8 is a no-op that returns 0 and **never touches guest memory**.
