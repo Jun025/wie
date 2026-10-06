@@ -144,4 +144,4 @@
 - 도구 표기 BOUNDED 340쌍 · SUFFIX-ATTACHED 15쌍. 전부 계약상 제목 목록인 `compat.json` 과, 이 회차가 고친 파일에 **이미 있던** 주석이다(`system.rs` · `jvm_support.rs` · `context.rs` · `emulator.rs` · `display.rs` · `graphics.rs`).
 - 이 회차가 더한 줄의 게임 이름은 0이다(타이틀은 sha12 로만 적었다).
 
-<!-- corpus-name-inflow v1 subjects=24 tree=7b1d1c3975a25044 B=729/340 P=0/0 S=35/15 -->
+<!-- corpus-name-inflow v1 subjects=24 tree=5319bea1c2958c1b B=729/340 P=0/0 S=35/15 -->
