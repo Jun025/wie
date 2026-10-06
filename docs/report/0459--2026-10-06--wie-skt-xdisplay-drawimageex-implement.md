@@ -42,4 +42,4 @@ fmt · clippy `-D warnings`(stable · wasm32 · beta) rc=0 · `RUST_MIN_STACK=41
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 330쌍 + SUFFIX-ATTACHED 15쌍 — 전부 `compat.json` 의 기존 `title`·`fileTitle` 값이다(이 회차는 제목 문자열을 바꾸지 않았다). 회차 문서 · worklog · 이용자 소식 · 코드는 0. 타이틀은 sha12 로만 적었다. vendor_sdk 경로는 게임이 아니라 에뮬레이터 아카이브다.
 
 
-
+<!-- corpus-name-inflow v1 subjects=5 tree=23a5030580ab292c B=718/330 P=0/0 S=35/15 -->
