@@ -380,7 +380,7 @@ async fn flush_lcd(
 // `MC_grpGetImageFrameBuffer` hands back as RGB565 themselves; the shared decoder stores 32bpp
 // ARGB, which read that way comes out as alternating garbage columns. A transparent pixel keeps its
 // colour too: titles key transparency themselves on a colour they read out of an image, so the
-// colour is what they need (docs/report/0457). The alpha goes beside it as an 8bpp `mask`, which the
+// colour is what they need (docs/report/0460). The alpha goes beside it as an 8bpp `mask`, which the
 // shared draw paths apply (`shared_graphics::image_alpha`).
 async fn create_image(
     context: &mut dyn WIPICContext,
