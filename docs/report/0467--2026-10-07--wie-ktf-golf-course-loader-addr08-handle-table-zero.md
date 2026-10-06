@@ -77,3 +77,5 @@
 
 - 도구 표기 BOUNDED 4회/3쌍 · SUFFIX-ATTACHED 0쌍. 셋 다 이 회차가 시험을 더한 `display.rs` 에 **이미 있던** 주석이다.
 - 이 회차가 더한 줄의 게임 이름은 0이다(타이틀은 sha12 로만 적었다).
+
+<!-- corpus-name-inflow v1 subjects=4 tree=6195ffd787ecd8fb B=4/3 P=0/0 S=0/0 -->
