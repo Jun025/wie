@@ -1,0 +1,8 @@
+{
+ "date": "2026-10-06",
+ "task": "wie-skt-xdisplay-drawimageex-implement",
+ "title": "SKT XDisplay.drawImageEx 구현 — 로고에서 멈추던 1종이 게임 화면까지",
+ "summary": "drawImageEx 를 Graphics2D.drawImage 위임으로 등록했다. 인자 의미는 KEmulator 구현과 게임 호출부(둘째 Image 에 null)로 확정. fb80e97cbc57 limited → playable(docs/report/0459).",
+ "adoptedProposals": ["2026-10-06-input-none-17-recheck#p1"],
+ "proposals": []
+}
