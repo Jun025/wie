@@ -6710,17 +6710,16 @@
    "platform": "SKT",
    "model": null,
    "title": "다크슬레이어2",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
+    "input": "ok",
+    "longplay": "ok",
     "sound": "no",
-    "speed": "unknown"
+    "speed": "ok"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
     "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
