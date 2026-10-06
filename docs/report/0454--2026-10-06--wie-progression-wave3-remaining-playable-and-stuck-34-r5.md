@@ -90,3 +90,7 @@ rows 429 -> 429 changed by field set {"axes.progress":60}
 
 - `cd ~/scratch/w7prog/r5 && ~/orchestrator-live/bin/build-slot run --long -- bash drive5.sh` 는 재측을 다시 하지 않는다(`outR5` 에 결과가 있다). `af`·`ag` 는 같은 `--out` 이라 건너뛰고 `ah` 부터 돈다. ★그때의 main 을 빌드해 `BIN`·`PIN` 을 바꿔라.
 - 남은 ⒝: `96dc32e781d3`(AOT paint 경로) · `568c339a8c07`(바탕 그림 없음) · `c5b3f6835d00`(힙 고갈).
+
+### 6. 게임 파일명 유입
+
+- `node scripts/corpus-name-inflow.mjs`(이 브랜치 ↔ `origin/main`) 의 수는 전부 `compat.json` 의 기존 `title` 필드 몫이다. `compat.json` 을 뺀 경로(이 문서)는 아래 표식 줄의 수와 별도로 0 이다 — 이 문서는 타이틀을 sha12 로만 부른다.
