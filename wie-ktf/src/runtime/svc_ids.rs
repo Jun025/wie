@@ -466,6 +466,9 @@ pub enum WIPICTableId {
     Interface14 = 15,
     Interface15 = 16,
     Interface16 = 17,
+    // Not one of the `get_wipic_interfaces` tables: the table kernel slot 36 hands out for
+    // `"MXUserMemInterf"` (see `wipi_c::interface::get_extension_interface`).
+    UserMem = 18,
 }
 
 impl WIPICTableId {
@@ -497,6 +500,7 @@ impl TryFrom<u32> for WIPICTableId {
             15 => Self::Interface14,
             16 => Self::Interface15,
             17 => Self::Interface16,
+            18 => Self::UserMem,
             _ => return Err(wie_util::WieError::FatalError(alloc::format!("Unknown KTF WIPIC table id {value}"))),
         })
     }
@@ -506,7 +510,8 @@ impl TryFrom<u32> for WIPICTableId {
 ///
 /// `Reserved1`-`Reserved13` (ids 33-43, 57-58) are this repo's placeholders — the WIPI spec's kernel
 /// section ends at `MC_knlGetResource`. Id 36 measured: `f("MXUserMemInterf", -1, -1, 0, 0)` → interface
-/// pointer. Notes: `docs/report/0178--2026-09-19--2026-09-18-repair-campaign-pilot-unimpl-stub-p2.md` §부록.
+/// pointer (`docs/report/0178` §부록) — now answered by `wipi_c::interface::get_extension_interface`
+/// (docs/report/0454), so it no longer reaches this message.
 pub fn ktf_kernel_extension_message(id: u16, placeholder: &str) -> alloc::string::String {
     alloc::format!(
         "unidentified KTF kernel extension — `{placeholder}` is this repo's placeholder name for slot {id}, \

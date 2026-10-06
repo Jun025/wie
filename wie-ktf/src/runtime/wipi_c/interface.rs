@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{format, string::String, vec::Vec};
 use core::mem::{size_of, size_of_val};
 
 use bytemuck::Pod;
@@ -6,7 +6,7 @@ use bytemuck::Pod;
 use wipi_types::ktf::wipic::WIPICInterface;
 
 use wie_core_arm::{Allocator, ArmCore};
-use wie_util::{Result, write_generic};
+use wie_util::{Result, WieError, read_null_terminated_string_bytes, write_generic};
 use wie_wipi_c::{WIPICContext, WIPICMethodBody};
 
 use crate::runtime::wipi_c::method_table::{self, get_database_interface, get_graphics_interface};
@@ -25,6 +25,22 @@ fn write_methods(core: &mut ArmCore, context: &mut dyn WIPICContext, table_id: W
     }
 
     Ok(address)
+}
+
+/// Kernel slot 36: `f(name, -1, -1, 0, 0)` → a method table, looked up by name. Measured on
+/// 3151fdc167b6 (docs/report/0454), whose one call asks for `"MXUserMemInterf"` and calls slot 0 of
+/// the result straight away. Any other name stops here and says which — a 0 would be a null call.
+pub fn get_extension_interface(core: &mut ArmCore, context: &mut dyn WIPICContext, ptr_name: u32) -> Result<u32> {
+    let name = read_null_terminated_string_bytes(context, ptr_name)?;
+    tracing::debug!("kernel slot 36 ({:?})", String::from_utf8_lossy(&name));
+
+    match name.as_slice() {
+        b"MXUserMemInterf" => write_methods(core, context, WIPICTableId::UserMem, method_table::get_user_mem_method_table()),
+        _ => Err(WieError::Unimplemented(format!(
+            "36: kernel slot 36 asked for interface {:?}; only \"MXUserMemInterf\" is known (docs/report/0454)",
+            String::from_utf8_lossy(&name)
+        ))),
+    }
 }
 
 pub fn get_wipic_knl_interface(core: &mut ArmCore) -> Result<u32> {
