@@ -370,6 +370,7 @@ async fn multi_array_new(core: &mut ArmCore, jvm: &mut Jvm, ptr_class: u32, dime
     }
 }
 
+#[allow(clippy::double_must_use)] // temporary until https://github.com/rust-lang/rust-clippy/issues/17529 fix lands
 #[async_recursion::async_recursion]
 async fn new_array(jvm: &Jvm, name: &str, lengths: &[u32]) -> jvm::Result<Box<dyn ClassInstance>> {
     let mut array = jvm.instantiate_array(&name[1..], lengths[0] as _).await?;
