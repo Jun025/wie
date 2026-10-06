@@ -115,3 +115,5 @@ compat 의 두 행은 `playability-census.mjs report` 가 이 측정에서 계�
 
 게임 파일명 유입: 도구 기본 실행(브랜치 전체)은 BOUNDED 333쌍 · SUFFIX-ATTACHED 16쌍이다. 거의 전부 `docs/player-data/compat.json` 안이다(계약상 제목 목록).
 compat.json 을 뺀 이 회차 파일만 넘기면 BOUNDED 3쌍 · SUFFIX-ATTACHED 1쌍이다. 모두 이 회차가 고친 파일에 원래 있던 줄이다(`adf.rs` 시험 · `interface.rs`·`jvm_support.rs` 주석). 이 회차가 더한 줄에는 0이다.
+
+<!-- corpus-name-inflow v1 subjects=12 tree=98e3903aee4d121f B=721/333 P=6/1 S=36/16 -->
