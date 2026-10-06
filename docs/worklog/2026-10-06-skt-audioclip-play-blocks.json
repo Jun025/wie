@@ -1,0 +1,24 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-06",
+  "task": "wie-skt-audioclip-play-blocks-in-sound-thread",
+  "title": "SKT AudioClip.play — 소리 스레드에서 재생 동안 블록 · stop/close 가 UserStopException 으로 끊는다",
+  "summary": "play 의 호출자 또는 그 호출자가 run() 이면 곡이 끝날 때까지 기다리고, 다른 스레드의 stop/close 가 UserStopException 으로 끊는다. 71d1d8235bd1 의 1스테이지가 시작되고, SKT 82종 전/후 짝에서 축·결과 변화 0 · 곡 재시작 감소 17 probe.",
+  "changes": [
+    "wie-skvm/src/classes/net/wie/wie_audio_clip.rs",
+    "docs/player-data/compat.json — 71d1d8235bd1 1행",
+    "docs/report/0464"
+  ],
+  "verification": [
+    "되돌리면 red 6 변이 전건",
+    "SKT 82종 census probe base↔head: status·boot·render·input·sound·result·stop·첫 예외 변화 0"
+  ],
+  "limits": [
+    "블록 기준은 스택 깊이(run() 에서 2프레임 이내)다 — 게임 루프 run() 이 소리 도우미를 직접 부르면 그 효과음도 블록한다(코퍼스 0건)",
+    "loop() 는 블록하지 않는다"
+  ],
+  "adoptedProposals": [
+    "2026-10-06-skt-3d-and-ktf-reloc-verdict#p0"
+  ],
+  "proposals": []
+}
