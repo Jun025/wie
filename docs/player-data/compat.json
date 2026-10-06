@@ -3396,17 +3396,17 @@
    "platform": "KTF",
    "model": null,
    "title": "이노티아연대기2",
-   "status": "playable",
+   "status": "limited",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "ok",
-    "sound": "no",
-    "speed": "unknown"
+    "longplay": "no",
+    "sound": "ok",
+    "speed": "ok"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
+    "설치 인증(구매 기록)을 확인하는 단계에서 멈춰서, 여기서는 그 뒤로 진행할 수 없어요."
    ],
    "changes": [],
    "fileTitle": "이노티아연대기2"
@@ -3420,14 +3420,13 @@
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
-    "speed": "unknown"
+    "input": "ok",
+    "longplay": "no",
+    "sound": "ok",
+    "speed": "ok"
    },
    "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
+    "설치 인증(구매 기록)을 확인하는 단계에서 멈춰서, 여기서는 그 뒤로 진행할 수 없어요."
    ],
    "changes": [],
    "fileTitle": "이노티아연대기2"
