@@ -1,0 +1,10 @@
+{
+  "schema": "worklog/v1",
+  "date": "2026-10-06",
+  "task": "wie-lgt-transparent-image-direct-read-stripes-three",
+  "title": "LGT 투명 이미지도 RGB565 로 저장 — 투명도는 8bpp 마스크로 곁에",
+  "summary": "LGT 게임은 투명 이미지도 화소를 RGB565 로 직접 읽고, 투명색(마젠타)을 스스로 키로 쓴다. 투명 이미지도 16bpp 로 저장하고 알파는 마스크로 둬 그리기 경로가 쓴다. 보고: docs/report/0462.",
+  "adoptedProposals": ["2026-10-06-lgt-title-screen-stripes#p0"],
+  "declinedProposals": [],
+  "proposals": []
+}

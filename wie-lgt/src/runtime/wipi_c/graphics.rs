@@ -572,7 +572,7 @@ pub async fn copy_frame_buffer_with_pixel_op(
     ptr_graphics: WIPICWord,
 ) -> Result<()> {
     let pixel_op = native_pixel_op(context, ptr_graphics)?;
-    if !shared_graphics::blit_with_pixel_op(context, dst, dx, dy, width, height, src, sx, sy, pixel_op, PixelOpArgs::DstSrc).await? {
+    if !shared_graphics::blit_with_pixel_op(context, dst, dx, dy, width, height, src, sx, sy, pixel_op, PixelOpArgs::DstSrc, false).await? {
         shared_graphics::copy_frame_buffer(context, dst, dx, dy, width, height, src, sx, sy, ptr_graphics).await?;
     }
     Ok(())
@@ -593,7 +593,7 @@ pub async fn draw_image_with_pixel_op(
 ) -> Result<()> {
     // A `WIPICImage` starts with its `img` framebuffer, so the image handle reads as one.
     let pixel_op = native_pixel_op(context, ptr_graphics)?;
-    if !shared_graphics::blit_with_pixel_op(context, dst, dx, dy, width, height, image, sx, sy, pixel_op, PixelOpArgs::DstSrc).await? {
+    if !shared_graphics::blit_with_pixel_op(context, dst, dx, dy, width, height, image, sx, sy, pixel_op, PixelOpArgs::DstSrc, true).await? {
         shared_graphics::draw_image(context, dst, dx, dy, width, height, image, sx, sy, ptr_graphics).await?;
     }
     Ok(())
