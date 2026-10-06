@@ -231,8 +231,9 @@ impl WieAudioClip {
     //
     // "A sound thread" is read off the Java stack: `run()` is the caller or the caller's caller.
     // Every one of those 94 sites is in a `run()` that only plays sound, or in a helper that such a
-    // `run()` calls; an effect played from the game's own code (1367261bc3ee: an event handler ->
-    // helper -> play) is deeper and does not block, so it cannot freeze the game.
+    // `run()` calls — the corpus has no play() on the game's own thread at all. Anything deeper
+    // does not block: that branch is a guard for an effect played from game code, so it cannot
+    // freeze the game; no corpus title takes it, and the test's `effect()` is its only witness.
     // ponytail: depth, not "what this thread is for" — a game loop whose run() called a sound helper
     // directly would block on its effects; the corpus has none (docs/report/0465 §1).
     async fn play(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
@@ -782,6 +783,41 @@ mod test {
                 let waited = clock.peek() - before;
                 assert!(waited < length / 2, "an effect's play() waited {waited} ms");
                 let _: () = jvm.invoke_virtual(&clip, "net/wie/WieAudioClip", "stop", "()V", ()).await?;
+
+                Ok(())
+            },
+        );
+        assert!(result.is_ok(), "{result:?}");
+    }
+
+    /// While paused, a sound thread's play() keeps waiting — past the clip's length — and another
+    /// thread's open() lets it return normally (docs/report/0465 §2).
+    #[test]
+    fn a_sound_threads_play_waits_through_pause_and_returns_on_open() {
+        let result = run_jvm_test_with_system(
+            Box::new([wie_midp::get_protos().into(), get_protos().into(), Box::new([SoundThread::as_proto()])]),
+            Box::new(TestPlatform::with_clock(TestClock::stepping(1))),
+            move |jvm, system| async move {
+                let (clip, runnable) = open_sound_thread_clip(&jvm).await?;
+                let length = system.audio().duration(0).unwrap();
+                let thread = jvm.new_class("java/lang/Thread", "(Ljava/lang/Runnable;)V", (runnable,)).await?;
+                let _: () = jvm.invoke_virtual(&thread, "java/lang/Thread", "start", "()V", ()).await?;
+                let _: () = jvm.invoke_static("java/lang/Thread", "sleep", "(J)V", (100i64,)).await?;
+
+                let _: () = jvm.invoke_virtual(&clip, "net/wie/WieAudioClip", "pause", "()V", ()).await?;
+                let _: () = jvm.invoke_static("java/lang/Thread", "sleep", "(J)V", (length as i64 + 200,)).await?;
+                let outcome: i32 = jvm.get_static_field("test/SoundThread", "outcome", "I").await?;
+                assert_eq!(outcome, 0, "play() returned while paused");
+
+                let bytes = smaf();
+                let mut data = jvm.instantiate_array("B", bytes.len()).await?;
+                jvm.store_array(&mut data, 0, bytes.iter().map(|&x| x as i8)).await?;
+                let _: () = jvm
+                    .invoke_virtual(&clip, "net/wie/WieAudioClip", "open", "([BII)V", (data, 0, bytes.len() as i32))
+                    .await?;
+                let _: () = jvm.invoke_static("java/lang/Thread", "sleep", "(J)V", (100i64,)).await?;
+                let outcome: i32 = jvm.get_static_field("test/SoundThread", "outcome", "I").await?;
+                assert_eq!(outcome, 1, "open() did not let play() return normally");
 
                 Ok(())
             },
