@@ -1,0 +1,12 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-06",
+  "task": "wie-ktf-knl-get-access-level-slot13",
+  "title": "KTF MC_knlGetAccessLevel — 두 갈래 모두 진행 없음 · 구현 안 함",
+  "summary": "974e0df9ab1e·f770b15f8876(같은 client.bin): 값 0 은 인증오류 1001 후 종료, 0xbc 비트 값은 MC_knlGetExecNames 로 자기 AID 라이선스 기록 대조 → 지어내야 하므로 멈춘다.",
+  "changes": ["docs/report/0457"],
+  "verification": ["임시 빌드 값 0·0xff × 두 판 실측 — 통신 0"],
+  "limits": ["실기 정확 값 미상 — 0xbc 비트 포함만 근거"],
+  "proposals": [],
+  "adoptedProposals": ["2026-10-06-ktf-free-storage-16mb#p1"]
+}
