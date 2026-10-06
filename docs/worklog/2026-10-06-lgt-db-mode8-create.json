@@ -1,0 +1,22 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-06",
+  "task": "wie-lgt-first-run-db-record-info-size-slot-unset",
+  "title": "LGT 모드 8 열기는 DB 를 만든다 · 빈 DB 정보는 크기 0 항목",
+  "summary": "63332c51d514 가 첫 실행에서 «데이터 저장 실패»로 꺼지던 원인은 모드 8 로 연 DB 가 정보 질의 시점에 아직 없던 것이다. 코퍼스 LGT 43종의 호출부로 «열기 실패»가 아니라 «모드 8 = 쓰기·생성 · 빈 파일 = 크기 0 항목» 계약을 골랐다.",
+  "changes": [
+    "wie-wipi-c/src/api/database.rs — open_database_lgt(모드 8 이면 없는 DB 를 만든다) · list_record_info(빈 DB 는 크기 0 항목 1개)",
+    "wie-lgt/src/runtime/wipi_c.rs — LGT OpenDatabase 를 open_database_lgt 로",
+    "docs/report/0458"
+  ],
+  "verification": [
+    "63332c51d514 base: 안내 뒤 clean exit(1키) · head: 타이틀·메뉴 27/27키 PASS",
+    "되돌리면 red 2 변이"
+  ],
+  "limits": [
+    "KTF 는 바꾸지 않았다 — 모드 8 근거가 LGT 호출부뿐이다",
+    "모드 2 는 그대로(생성 시점 근거 없음)"
+  ],
+  "proposals": [],
+  "adoptedProposals": ["2026-10-06-ktf-free-storage-16mb#p0"]
+}

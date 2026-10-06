@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-06",
+  "kind": "fix",
+  "titles": [
+    "fb80e97cbc57454f9b0a21c3fc4f60db40bb8a71c75f316ee545e21ccc442072"
+  ],
+  "pr": "https://github.com/Jun025/wie/pull/492",
+  "summary_ko": "로고 화면에서 더 나아가지 않던 SKT 액션 게임 하나가 이제 인트로를 지나 게임 화면까지 가고 키를 누르면 움직여요. 소리는 아직 나지 않아요."
+}

@@ -1,6 +1,9 @@
 use alloc::vec;
 
-use jvm::{Array, ClassInstanceRef, Jvm, Result as JvmResult, runtime::JavaLangString};
+use jvm::{
+    Array, ClassInstanceRef, Jvm, Result as JvmResult,
+    runtime::{JavaIoInputStream, JavaLangString},
+};
 use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 use rustjava_runtime::classes::java::{
@@ -276,8 +279,7 @@ impl XFile {
                 return Err(jvm.exception("java/io/IOException", "Resource not found").await);
             }
 
-            jvm.put_field(&mut this, "is", "Ljava/io/InputStream;", resource_stream).await?;
-            jvm.put_field(&mut this, "type", "I", FILE_JAR).await?;
+            Self::open_jar_entry(jvm, &mut this, resource_stream).await?;
         } else {
             if mode == READ_DIRECTORY {
                 return Err(jvm.exception("java/io/IOException", "Directory reads are not supported").await);
@@ -311,6 +313,20 @@ impl XFile {
         }
 
         Ok(())
+    }
+
+    // A jar entry is held in memory as `buf` from `offset`: titles ship their own
+    // `com.xce.io.XResource extends XFile` that reads those two protected fields directly when
+    // `type == FILE_JAR` (71d1d8235bd1), and a null `buf` is an NPE on its first read. `read` and
+    // `available` keep going through `is`, now a stream over that same buffer.
+    async fn open_jar_entry(jvm: &Jvm, this: &mut ClassInstanceRef<Self>, entry: ClassInstanceRef<InputStream>) -> JvmResult<()> {
+        let data = JavaIoInputStream::read_until_end(jvm, &entry).await?;
+        let mut buf = jvm.instantiate_array("B", data.len() as _).await?;
+        jvm.array_raw_buffer_mut(&mut buf).await?.write(0, &data)?;
+        let stream = jvm.new_class("java/io/ByteArrayInputStream", "([B)V", (buf.clone(),)).await?;
+        jvm.put_field(this, "buf", "[B", buf).await?;
+        jvm.put_field(this, "is", "Ljava/io/InputStream;", stream).await?;
+        jvm.put_field(this, "type", "I", FILE_JAR).await
     }
 
     async fn init_with_jar(
@@ -648,6 +664,36 @@ mod tests {
 
     use super::{FILE_JAR, READ_RESOURCE, XFile};
     use crate::classes::com::xce::io::{file_input_stream::FileInputStream, file_output_stream::FileOutputStream};
+
+    #[test]
+    fn jar_entry_is_exposed_as_buf_from_offset_and_still_reads_through_is() {
+        let result = run_jvm_test(Box::new([Box::new([XFile::as_proto()])]), |jvm| async move {
+            let mut file: ClassInstanceRef<XFile> = jvm.instantiate_class("com/xce/io/XFile").await?.into();
+            jvm.put_field(&mut file, "mode", "I", READ_RESOURCE).await?;
+            jvm.put_field(&mut file, "offset", "I", 0).await?;
+            let mut bytes = jvm.instantiate_array("B", 3).await?;
+            jvm.store_array(&mut bytes, 0, [7i8, 8, 9]).await?;
+            let entry = jvm.new_class("java/io/ByteArrayInputStream", "([B)V", (bytes,)).await?.into();
+            XFile::open_jar_entry(&jvm, &mut file, entry).await?;
+
+            let file_type: i32 = jvm.get_field(&file, "type", "I").await?;
+            assert_eq!(file_type, FILE_JAR);
+            let buf: ClassInstanceRef<Array<i8>> = jvm.get_field(&file, "buf", "[B").await?;
+            assert_eq!(jvm.load_array::<i8>(&buf, 0, 3).await?, [7, 8, 9]);
+            let available: i32 = jvm.invoke_virtual(&file, "com/xce/io/XFile", "available", "()I", ()).await?;
+            assert_eq!(available, 3);
+            let out = jvm.instantiate_array("B", 3).await?;
+            let read: i32 = jvm
+                .invoke_virtual(&file, "com/xce/io/XFile", "read", "([BII)I", (out.clone(), 0, 3))
+                .await?;
+            assert_eq!(read, 3);
+            assert_eq!(jvm.load_array::<i8>(&out, 0, 3).await?, [7, 8, 9]);
+
+            Ok(())
+        });
+
+        assert!(result.is_ok(), "JVM test failed: {result:?}");
+    }
 
     #[test]
     fn xfile_write_read_and_seek_round_trip() {
