@@ -714,8 +714,12 @@ const netConnects = (A, stderrPath) =>
 const netWall = (connects) => connects >= 200;
 // A server wall the count cannot see: the title asks once per answer, fails, and loops on the same question
 // (2 connects in probe A). Named one at a time from the frames and the stderr — docs/report/0445.
-const NET_HAND = {
+// Also any other wall a title cannot pass without us making up data, treated the same way (one line,
+// at most limited): the KTF install-license check — the engine would have to invent the record (0457).
+const HAND_WALL = {
   b9bfcaf42722: '처음 실행할 때 게임사 서버에서 인증서를 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.',
+  '974e0df9ab1e': '설치 인증(구매 기록)을 확인하는 단계에서 멈춰서, 여기서는 그 뒤로 진행할 수 없어요.',
+  f770b15f8876: '설치 인증(구매 기록)을 확인하는 단계에서 멈춰서, 여기서는 그 뒤로 진행할 수 없어요.',
 };
 
 // ── longplay: a guest Java thread that dies uncaught did not survive ───────────────────────────
@@ -1022,7 +1026,7 @@ if (cmd === 'run') {
     if (!j) continue;
     const title = displayTitle(t.path);
     const platform = j.A.platform && j.A.platform !== 'unknown' ? j.A.platform.toUpperCase() : sniffPlatform(t.path);
-    const net = netWall(netConnects(j.A, join(out, t.sha, 'A.stderr'))) ? NET_KO : (NET_HAND[t.sha.slice(0, 12)] ?? null);
+    const net = netWall(netConnects(j.A, join(out, t.sha, 'A.stderr'))) ? NET_KO : (HAND_WALL[t.sha.slice(0, 12)] ?? null);
     // A locked file says only that: the other lines would read as «not fixed yet». Its status is never
     // better than not-yet — a check that paints its refusal box would otherwise read as playable.
     const lock = lockVerdict(lockOf(t.path), [j.A, j.B]) ?? LOCK_HAND[t.sha.slice(0, 12)] ?? null;
