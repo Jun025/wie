@@ -326,16 +326,20 @@ pub async fn sprintk(
     Ok(result.len() as _)
 }
 
+/// Fixed answer for `MC_knlGetTotalMemory`/`MC_knlGetFreeMemory` (LGT answers its own, `wie-lgt` `get_memory`).
+/// 1MiB stopped a KTF title at its «memory low» notice; 2MiB was swept across every KTF caller (docs/report/0456).
+const KTF_MEMORY: i32 = 0x200000;
+
 pub async fn get_total_memory(_context: &mut dyn WIPICContext) -> Result<i32> {
     tracing::warn!("stub MC_knlGetTotalMemory()");
 
-    Ok(0x100000) // TODO hardcoded
+    Ok(KTF_MEMORY)
 }
 
 pub async fn get_free_memory(_context: &mut dyn WIPICContext) -> Result<i32> {
     tracing::warn!("stub MC_knlGetFreeMemory()");
 
-    Ok(0x100000) // TODO hardcoded
+    Ok(KTF_MEMORY)
 }
 
 pub async fn exit(context: &mut dyn WIPICContext, code: i32) -> Result<()> {
@@ -377,8 +381,21 @@ mod test {
     use crate::{WIPICContext, context::test::TestContext, method::MethodImpl};
 
     use super::{
-        alloc, calloc, def_timer, free, get_program_name, get_resource, get_resource_id, get_system_property, set_timer, sprintk, unset_timer,
+        alloc, calloc, def_timer, free, get_free_memory, get_program_name, get_resource, get_resource_id, get_system_property, get_total_memory,
+        set_timer, sprintk, unset_timer,
     };
+
+    // A KTF title stops at «메모리가 부족합니다» when free memory is 1MiB (docs/report/0456).
+    #[futures_test::test]
+    async fn test_free_memory_clears_the_ktf_low_memory_notice() -> Result<()> {
+        let mut context = TestContext::new();
+
+        let free = get_free_memory(&mut context).await?;
+        assert!(free > 0x100000, "free {free} shows a KTF title's low-memory notice");
+        assert!(free <= get_total_memory(&mut context).await?);
+
+        Ok(())
+    }
 
     #[futures_test::test]
     async fn test_sprintk() -> Result<()> {
