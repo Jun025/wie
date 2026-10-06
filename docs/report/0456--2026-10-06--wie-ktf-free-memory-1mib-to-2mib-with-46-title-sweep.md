@@ -44,3 +44,5 @@ fmt · clippy `-D warnings`(stable · wasm32 · beta) rc=0 · `RUST_MIN_STACK=41
 
 ### 7. 게임 파일명 유입
 `node scripts/corpus-name-inflow.mjs`: BOUNDED **1회/1쌍** · SUFFIX-ATTACHED **0**. 그 1회는 `wie-wipi-c/src/api/kernel.rs` 의 **기존 주석 줄**이다 — 이 회차의 추가 줄에는 없다. 타이틀은 sha12 로만 적었다.
+
+<!-- corpus-name-inflow v1 subjects=4 tree=e17f9a521d2aa073 B=1/1 P=0/0 S=0/0 -->
