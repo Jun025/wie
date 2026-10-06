@@ -95,3 +95,5 @@ Java 예외는 첫 실행의 `RecordStoreNotFoundException` 1건뿐이다. 이�
 없음. `71d1d8235bd1` 의 speed·progress 는 다음 census 회차가 잰다. 0455 후속 3 의 longplay 는 이 회차에서 쟀다.
 
 게임 파일명 유입: 이 회차 파일 4개(코드·회차 문서·worklog·업데이트 소식)만 넘기면 BOUNDED 6쌍 · SUFFIX-ATTACHED 0쌍이다. 6쌍은 전부 `wie_audio_clip.rs` 에 **이미 있던** 주석·시험의 이름이다. 이 회차가 더한 줄(`git diff origin/main...HEAD`)의 게임명은 0 이다. 기본 실행(브랜치 전체)은 BOUNDED 336쌍 · SUFFIX-ATTACHED 15쌍이다. compat.json(계약상 제목 목록)이 들어가기 때문이고, SUFFIX 35회는 모두 그 파일 안이다. compat.json 밖의 BOUNDED 13회는 위 6쌍이다.
+
+<!-- corpus-name-inflow v1 subjects=5 tree=a60075c3e81d9444 B=731/336 P=0/0 S=35/15 -->
