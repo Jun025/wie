@@ -680,7 +680,7 @@ function lockOf(path) {
 const quitOnItsOwn = (runs) => runs.every((r) => r && (r.stop === 'clean exit' || !r.paints)) && runs.some((r) => r.stop === 'clean exit');
 const lockVerdict = (lock, runs) => (lock === 'drm' || (lock === 'phone' && quitOnItsOwn(runs)) ? lock : null);
 // A purchase check the static rule cannot see — native code, not an SKT class. Named one at a time
-// from the disassembly (docs/report/0457). 01f05f8231f4 (LGT): the decrypted `audio.adt` licence and
+// from the disassembly (docs/report/0463). 01f05f8231f4 (LGT): the decrypted `audio.adt` licence and
 // every save are compared with `PHONENUMBER`; the saves' mismatch pauses the scene before the first
 // frame (black), and without them the licence's draws «인증에 실패하였습니다» and quits.
 const LOCK_HAND = { '01f05f8231f4': 'phone' };

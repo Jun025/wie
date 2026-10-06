@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-06",
+  "kind": "fix",
+  "titles": [
+    "7da00ecd48040a097a4168c5c60e156b74f7259e04f82a504a2a6fe8149e4c57",
+    "5a59f62d1f1a026e1c4a0c754ad2f8703216fd50af3d4891ce1071c14bf6cda5"
+  ],
+  "summary_ko": "게임이 직접 정한 투명색과 그리기 설정을 그대로 읽게 해서, 키를 몇 번 누르면 꺼지던 게임 하나가 계속 돌아가고, 다른 게임 하나의 그림에 남던 분홍색 테두리가 사라졌어요.",
+  "pr": "https://github.com/Jun025/wie/pull/PRNUM"
+}

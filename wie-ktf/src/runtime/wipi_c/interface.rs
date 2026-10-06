@@ -28,7 +28,7 @@ fn write_methods(core: &mut ArmCore, context: &mut dyn WIPICContext, table_id: W
 }
 
 /// Kernel slot 36: `f(name, -1, -1, 0, 0)` → a method table, looked up by name. Measured on
-/// 3151fdc167b6 (docs/report/0457), whose one call asks for `"MXUserMemInterf"` and calls slot 0 of
+/// 3151fdc167b6 (docs/report/0463), whose one call asks for `"MXUserMemInterf"` and calls slot 0 of
 /// the result straight away. The KTF SDK runtime asks `InitParam4`'s `fn_get_interface` for its
 /// own interfaces with the same `(name, -1, -1, 0, 0)` (`"WIPICX_incMemInterface"`, 5a59f62d1f1a
 /// `0x10dc8e`). Any other name stops here and says which — a 0 would be a null call.
@@ -39,7 +39,7 @@ pub fn get_extension_interface(core: &mut ArmCore, context: &mut dyn WIPICContex
     match name.as_slice() {
         b"MXUserMemInterf" => write_methods(core, context, WIPICTableId::UserMem, method_table::get_user_mem_method_table()),
         _ => Err(WieError::Unimplemented(format!(
-            "36: kernel slot 36 asked for interface {:?}; only \"MXUserMemInterf\" is known (docs/report/0457)",
+            "36: kernel slot 36 asked for interface {:?}; only \"MXUserMemInterf\" is known (docs/report/0463)",
             String::from_utf8_lossy(&name)
         ))),
     }

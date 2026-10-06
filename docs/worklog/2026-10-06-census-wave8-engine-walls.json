@@ -1,0 +1,35 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-06",
+  "task": "wie-census-wave8-engine-walls-next-wall-addr08-lgt-blank-kernel36",
+  "title": "8차 엔진 벽 — KTF paint 경합 · KTF 그래픽 컨텍스트 워드 64B · 커널 36 · LGT 구매 휴대폰 잠금",
+  "summary": "0438 §000-4 의 주인 없는 엔진 벽 5종. paint 붙들기(5267badf20b3) · KTF SDK 이미지의 그래픽 컨텍스트를 워드 64바이트로(7da00ecd4804·3151fdc167b6·5a59f62d1f1a) · 커널 36 = 이름으로 표 찾기 + MXUserMemInterf 영역 할당기(3151fdc167b6) · 01f05f8231f4 = 구매 휴대폰 잠금(풀지 않음 · census LOCK_HAND).",
+  "changes": [
+    "wie-midp Display — paint 동안 guest_hold_others · wie-ktf KtfTaskRunner others_preempted/hold_others · hold_others 가 이전 상태를 돌려준다",
+    "wie-wipi-c graphics — read_grp_ctx/write_grp_ctx · WIPICContext::wide_graphics_context · wie-ktf 는 WIPICX_incMemInterface 가 든 이미지만",
+    "wie-ktf — 커널 36 get_extension_interface · WIPICTableId::UserMem 영역 할당기",
+    "scripts/playability-census.mjs LOCK_HAND · compat 행 · player-updates 3 · docs/report/0463"
+  ],
+  "verification": [
+    "fmt · clippy stable/beta/wasm32 -D warnings · cargo test --all 710/0 · runner 픽스처(keydraw --max-ticks)",
+    "되돌리면 red: paint_runs_with_the_other_guest_threads_held · a_wide_context_is_read_where_the_title_wrote_it · user_mem_arena_… · test_key_reach(판별 제거)",
+    "census 형식 직접 실행 base 544a0643 ↔ head — 대상·라이브·가드 12종 A/B/L · 컨텍스트 사용 KTF 71종 A/B — docs/report/0463 §6"
+  ],
+  "limits": [
+    "7da00ecd4804 장시간 «주소 8» 은 남았다(코스 로드 0x13a544 · 키 시점 의존) · 5a59f62d1f1a 소리 없음은 보지 않았다 · progress 축은 재지 않았다"
+  ],
+  "proposals": [
+    {
+      "title": "7da00ecd4804 코스 로드 중 «주소 8» — 핸들 표 0번 칸이 비는 경로",
+      "plainSummary": "한 골프 게임이 코스를 불러오다 가끔 꺼진다. 어느 메모리 칸이 비어 있는지는 찾았고, 왜 비는지를 찾는다.",
+      "userBenefit": "그 게임이 플레이 도중 꺼지지 않게 된다.",
+      "why": "이 회차가 그래픽 설정 벽을 걷어내자 장시간 실행이 키 24 에서 코스 로더(0x13a544)의 «핸들 표[0] → 0 + 8» 쓰기로 멈췄다. 같은 키로 다시 돌리면 나지 않을 때도 있다(키 시점 의존).",
+      "tradeoff": "재현이 흔들려 같은 키를 여러 번 돌려야 한다.",
+      "effort": "M",
+      "target": "wie-ktf (KTF 메모리 핸들) · 진단은 스크래치 계측",
+      "kind": "product"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}
