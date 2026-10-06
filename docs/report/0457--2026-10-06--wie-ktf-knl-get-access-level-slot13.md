@@ -38,3 +38,5 @@
 ### 검증
 코드 변경 0(이 문서와 worklog 만). 임시 빌드 2벌은 `git checkout` 으로 되돌렸다.
 증적(repo 밖): `~/orchestrator/reports/evidence/wie-ktf-knl-get-access-level-slot13/`(base · 값 0 · 값 0xff 스크린샷 · validate JSON).
+
+<!-- corpus-name-inflow v1 subjects=2 tree=5727059df4c9a0a4 B=0/0 P=0/0 S=0/0 -->
