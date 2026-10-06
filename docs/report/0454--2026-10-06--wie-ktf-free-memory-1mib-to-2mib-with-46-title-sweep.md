@@ -41,3 +41,6 @@ fmt · clippy `-D warnings`(stable · wasm32 · beta) rc=0 · `RUST_MIN_STACK=41
 
 ### 6. 되돌리면 red
 `KTF_MEMORY` 를 `0x100000` 으로 → `test_free_memory_clears_the_ktf_low_memory_notice` FAILED «free 1048576 shows a KTF title's low-memory notice».
+
+### 7. 게임 파일명 유입
+`node scripts/corpus-name-inflow.mjs`: BOUNDED **1회/1쌍** · SUFFIX-ATTACHED **0**. 그 1회는 `wie-wipi-c/src/api/kernel.rs` 의 **기존 주석 줄**이다 — 이 회차의 추가 줄에는 없다. 타이틀은 sha12 로만 적었다.
