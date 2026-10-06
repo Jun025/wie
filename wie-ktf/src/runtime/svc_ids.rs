@@ -511,7 +511,7 @@ impl TryFrom<u32> for WIPICTableId {
 /// `Reserved1`-`Reserved13` (ids 33-43, 57-58) are this repo's placeholders — the WIPI spec's kernel
 /// section ends at `MC_knlGetResource`. Id 36 measured: `f("MXUserMemInterf", -1, -1, 0, 0)` → interface
 /// pointer (`docs/report/0178` §부록) — now answered by `wipi_c::interface::get_extension_interface`
-/// (docs/report/0454), so it no longer reaches this message.
+/// (docs/report/0457), so it no longer reaches this message.
 pub fn ktf_kernel_extension_message(id: u16, placeholder: &str) -> alloc::string::String {
     alloc::format!(
         "unidentified KTF kernel extension — `{placeholder}` is this repo's placeholder name for slot {id}, \

@@ -153,7 +153,7 @@ impl ScreenFramebufferSync {
 /// A KTF title's graphics context: the same fields as `WIPICGraphicsContext` with every one a word,
 /// `clip` and `offset` included (64 bytes). Measured on 3151fdc167b6, whose own SetContext writes
 /// TRANS at +0x1c, ALPHA at +0x20 (and +0x30), OFFSET at +0x24/+0x28 and PIXELOP at +0x2c, calling
-/// `MC_grpSetContext` only for the other indices (docs/report/0454). Read through the 52-byte layout,
+/// `MC_grpSetContext` only for the other indices (docs/report/0457). Read through the 52-byte layout,
 /// its ALPHA write became the pixel-op pointer the blit then called (`0x7d00f81f` · 7da00ecd4804
 /// `0x3000f81f`, the same studio) and its key colour was never seen. Only KTF SDK images get it: the
 /// `wipi` crate that builds keydraw_ktf lays the record out packed, and LGT keeps its own (`wie-lgt`).
@@ -1097,7 +1097,7 @@ mod tests {
     use super::*;
 
     /// 3151fdc167b6 sets TRANS and ALPHA by storing words at +0x1c and +0x20 itself, between
-    /// `MC_grpSetContext` calls for the rest (docs/report/0454).
+    /// `MC_grpSetContext` calls for the rest (docs/report/0457).
     #[futures_test::test]
     async fn a_wide_context_is_read_where_the_title_wrote_it() -> Result<()> {
         let mut context = TestContext::new();

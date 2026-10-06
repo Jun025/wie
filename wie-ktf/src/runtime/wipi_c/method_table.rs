@@ -463,7 +463,7 @@ pub fn get_unk12_method_table() -> Vec<WIPICMethodBody> {
 }
 
 /// `"MXUserMemInterf"` — the table kernel slot 36 returns for that name. Measured on 3151fdc167b6
-/// (docs/report/0454), its only caller: slot 0 is `(region, size)` on a static buffer (0x14400 and
+/// (docs/report/0457), its only caller: slot 0 is `(region, size)` on a static buffer (0x14400 and
 /// 0x28800 bytes), slot 1 `(region, n)` returns a pointer the caller copies `n` bytes into, with no
 /// null check, and nearly every slot-1 call follows a fresh slot 0 on the same region. A wrapper
 /// passes `(region, p)` to slot 3 but nothing calls it; slot 2 is never read. So slots 0 and 1 are a
@@ -804,7 +804,7 @@ mod tests {
         }
     }
 
-    /// 3151fdc167b6 resets the region and takes one block, again and again (docs/report/0454).
+    /// 3151fdc167b6 resets the region and takes one block, again and again (docs/report/0457).
     #[test]
     fn user_mem_arena_bumps_inside_its_region_and_starts_over_on_init() {
         let mut memory = Memory(vec![0; 0x200]);
