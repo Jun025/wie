@@ -374,8 +374,9 @@ mod test {
 
     use crate::{classes::com::skt::m::AudioClip, get_protos};
 
-    /// The shape of an SKT sound thread: `run()` plays the static clip; `effect()` plays it from
-    /// anywhere else. `outcome`: 1 = play() returned, 2 = it threw `UserStopException`.
+    /// The shape of an SKT sound thread: `run()` plays the static clip, directly or (`viaHelper`)
+    /// through a helper as 8 titles do; `effect()` plays it through the same helper from anywhere
+    /// else. `outcome`: 1 = play() returned, 2 = it threw `UserStopException`.
     struct SoundThread;
 
     impl SoundThread {
@@ -388,10 +389,12 @@ mod test {
                     JavaMethodProto::new("<init>", "()V", Self::init, MethodAccessFlags::PUBLIC),
                     JavaMethodProto::new("run", "()V", Self::run, MethodAccessFlags::PUBLIC),
                     JavaMethodProto::new("effect", "()V", Self::effect, MethodAccessFlags::PUBLIC),
+                    JavaMethodProto::new("helper", "()V", Self::helper, MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC),
                 ],
                 fields: vec![
                     JavaFieldProto::new("clip", "Lcom/skt/m/AudioClip;", FieldAccessFlags::STATIC),
                     JavaFieldProto::new("outcome", "I", FieldAccessFlags::STATIC),
+                    JavaFieldProto::new("viaHelper", "Z", FieldAccessFlags::STATIC),
                 ],
                 access_flags: ClassAccessFlags::PUBLIC,
             }
@@ -403,7 +406,13 @@ mod test {
 
         async fn run(jvm: &Jvm, _context: &mut WieJvmContext, _this: ClassInstanceRef<Self>) -> JvmResult<()> {
             let clip: ClassInstanceRef<AudioClip> = jvm.get_static_field("test/SoundThread", "clip", "Lcom/skt/m/AudioClip;").await?;
-            let outcome = match jvm.invoke_virtual::<_, ()>(&clip, "com/skt/m/AudioClip", "play", "()V", ()).await {
+            let via_helper: bool = jvm.get_static_field("test/SoundThread", "viaHelper", "Z").await?;
+            let played = if via_helper {
+                jvm.invoke_static::<_, ()>("test/SoundThread", "helper", "()V", ()).await
+            } else {
+                jvm.invoke_virtual::<_, ()>(&clip, "com/skt/m/AudioClip", "play", "()V", ()).await
+            };
+            let outcome = match played {
                 Ok(()) => 1,
                 Err(JavaError::JavaException(exception)) if jvm.is_instance(&*exception, "com/skt/m/UserStopException") => 2,
                 Err(error) => return Err(error),
@@ -412,6 +421,10 @@ mod test {
         }
 
         async fn effect(jvm: &Jvm, _context: &mut WieJvmContext, _this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            jvm.invoke_static("test/SoundThread", "helper", "()V", ()).await
+        }
+
+        async fn helper(jvm: &Jvm, _context: &mut WieJvmContext) -> JvmResult<()> {
             let clip: ClassInstanceRef<AudioClip> = jvm.get_static_field("test/SoundThread", "clip", "Lcom/skt/m/AudioClip;").await?;
             jvm.invoke_virtual(&clip, "com/skt/m/AudioClip", "play", "()V", ()).await
         }
@@ -751,12 +764,18 @@ mod test {
                 let length = system.audio().duration(0).unwrap();
                 assert!(length >= 1000, "{length}");
 
-                let before = clock.peek();
-                let _: () = jvm.invoke_virtual(&thread, "test/SoundThread", "run", "()V", ()).await?;
-                let waited = clock.peek() - before;
-                assert!(waited >= length, "run()'s play() returned after {waited} ms of a {length} ms clip");
-                let outcome: i32 = jvm.get_static_field("test/SoundThread", "outcome", "I").await?;
-                assert_eq!(outcome, 1);
+                for via_helper in [false, true] {
+                    jvm.put_static_field("test/SoundThread", "viaHelper", "Z", via_helper).await?;
+                    let before = clock.peek();
+                    let _: () = jvm.invoke_virtual(&thread, "test/SoundThread", "run", "()V", ()).await?;
+                    let waited = clock.peek() - before;
+                    assert!(
+                        waited >= length,
+                        "run()'s play() (helper {via_helper}) returned after {waited} ms of a {length} ms clip"
+                    );
+                    let outcome: i32 = jvm.get_static_field("test/SoundThread", "outcome", "I").await?;
+                    assert_eq!(outcome, 1);
+                }
 
                 let before = clock.peek();
                 let _: () = jvm.invoke_virtual(&thread, "test/SoundThread", "effect", "()V", ()).await?;
