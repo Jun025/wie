@@ -375,12 +375,13 @@ async fn flush_lcd(
     shared_graphics::flush_lcd(context, i, framebuffer, x, y, w, h).await
 }
 
-// `MC_grpCreateImage`, with an opaque image stored at the handset's 16bpp. LGT titles ask
+// `MC_grpCreateImage`, with the image stored at the handset's 16bpp. LGT titles ask
 // `MC_GRP_GET_FRAME_BUFFER_BPP` (16, whatever the argument) and then read the framebuffer that
 // `MC_grpGetImageFrameBuffer` hands back as RGB565 themselves; the shared decoder stores 32bpp
-// ARGB, which read that way comes out as alternating garbage columns. Opaque only: the shared
-// draw path needs a transparent image's alpha, and on a 16bpp screen 888 -> 565 loses nothing.
-// ponytail: a transparent image read raw by the guest still stripes; needs a native mask to fix.
+// ARGB, which read that way comes out as alternating garbage columns. A transparent pixel keeps its
+// colour too: titles key transparency themselves on a colour they read out of an image, so the
+// colour is what they need (docs/report/0457). The alpha goes beside it as an 8bpp `mask`, which the
+// shared draw paths apply (`shared_graphics::image_alpha`).
 async fn create_image(
     context: &mut dyn WIPICContext,
     ptr_image: WIPICWord,
@@ -396,14 +397,17 @@ async fn create_image(
         return Ok(result);
     }
     let colors = shared_graphics::FrameBuffer(image.img).image(context)?.colors();
-    if colors.iter().all(|color| color.a == 0xff) {
-        let pixels = colors.into_iter().map(Rgb565Pixel::from_color).collect();
-        let rgb565 = VecImageBuffer::<Rgb565Pixel>::from_raw(image.img.width, image.img.height, pixels);
-        context.free(image.img.buf)?;
-        image.img = shared_graphics::FrameBuffer::from_image(context, &rgb565)?.0;
-        tracing::debug!("MC_grpCreateImage: {:#x} stored as RGB565", memory.0);
-        write_generic(context, address, image)?;
+    if colors.iter().any(|color| color.a != 0xff) {
+        let mask = shared_graphics::FrameBuffer::new(context, image.img.width, image.img.height, 8)?;
+        mask.write(context, &colors.iter().map(|color| color.a).collect::<alloc::vec::Vec<_>>())?;
+        image.mask = mask.0;
     }
+    let pixels = colors.into_iter().map(Rgb565Pixel::from_color).collect();
+    let rgb565 = VecImageBuffer::<Rgb565Pixel>::from_raw(image.img.width, image.img.height, pixels);
+    context.free(image.img.buf)?;
+    image.img = shared_graphics::FrameBuffer::from_image(context, &rgb565)?.0;
+    tracing::debug!("MC_grpCreateImage: {:#x} stored as RGB565 (mask {})", memory.0, image.mask.bpp == 8);
+    write_generic(context, address, image)?;
     Ok(result)
 }
 
@@ -726,7 +730,7 @@ mod tests {
     use wie_core_arm::{Allocator, ArmCore};
     use wie_util::{ByteWrite, Result, read_generic, write_generic};
     use wie_wipi_c::WIPICContext;
-    use wipi_types::wipic::{WIPICFramebuffer, WIPICIndirectPtr};
+    use wipi_types::wipic::{WIPICFramebuffer, WIPICImage, WIPICIndirectPtr};
 
     use super::{LgtWIPICContext, graphics, register_wipic_svc_handler};
     use crate::runtime::{SVC_CATEGORY_WIPIC, java::init_jvm, svc_ids::WIPICSvcId};
@@ -1151,11 +1155,11 @@ mod tests {
         Ok(())
     }
 
-    /// `MC_grpCreateImage` stores an opaque image at 16bpp: titles read image pixels themselves as
-    /// RGB565, and a 32bpp image read that way stripes (two titles' whole title screens). An image
-    /// with transparency stays 32bpp, whose alpha the shared draw path needs.
+    /// `MC_grpCreateImage` stores an image at 16bpp: titles read image pixels themselves as RGB565,
+    /// and a 32bpp image read that way stripes (whole title screens). A transparent pixel keeps its
+    /// colour — titles key on it — and its alpha goes to an 8bpp `mask` that `MC_grpDrawImage` applies.
     #[test]
-    fn wipic_create_image_stores_opaque_images_as_rgb565() -> Result<()> {
+    fn wipic_create_image_stores_images_as_rgb565_with_an_alpha_mask() -> Result<()> {
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
         let done = Arc::new(AtomicBool::new(false));
         let done_clone = done.clone();
@@ -1165,25 +1169,52 @@ mod tests {
             let (jvm, mut core, _) = init_jvm(&system_clone).await?;
             register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
             let create = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::CreateImage)?;
+            let create_framebuffer = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::CreateOffscreenFramebuffer)?;
+            let init = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::InitContext)?;
+            let draw = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::DrawImage)?;
 
-            let create_image = async |core: &mut ArmCore, argb: [u32; 2]| -> Result<(WIPICFramebuffer, u32)> {
+            let create_image = async |core: &mut ArmCore, argb: [u32; 2]| -> Result<(u32, WIPICImage, u32)> {
                 let png = encode_png(&VecImageBuffer::<ArgbPixel>::from_raw(2, 1, argb.to_vec()))?;
                 let data = Allocator::alloc(core, png.len() as u32)?;
                 core.write_bytes(data, &png)?;
                 let out = Allocator::alloc(core, 4)?;
                 let _: u32 = core.run_function(create, &[out, data, 0, png.len() as u32]).await?;
                 let handle: u32 = read_generic(core, out)?;
-                let framebuffer: WIPICFramebuffer = read_generic(core, handle)?;
-                let first: u32 = read_generic(core, framebuffer.buf.0)?;
-                Ok((framebuffer, first))
+                let image: WIPICImage = read_generic(core, handle)?;
+                let first: u32 = read_generic(core, image.img.buf.0)?;
+                Ok((handle, image, first))
             };
 
-            let (opaque, pixels) = create_image(&mut core, [0xff12_3456, 0xffff_00ff]).await?;
-            assert_eq!((opaque.bpp, opaque.bpl), (16, 4));
+            let (_, opaque, pixels) = create_image(&mut core, [0xff12_3456, 0xffff_00ff]).await?;
+            assert_eq!((opaque.img.bpp, opaque.img.bpl), (16, 4));
             assert_eq!(pixels, 0xf81f_11aa, "#123456 and #ff00ff as RGB565, as the title reads them");
+            assert_eq!(opaque.mask.buf.0, 0, "an opaque image needs no mask");
 
-            let (transparent, _) = create_image(&mut core, [0x0012_3456, 0xffff_00ff]).await?;
-            assert_eq!(transparent.bpp, 32, "alpha is kept for the draw path");
+            let (handle, transparent, pixels) = create_image(&mut core, [0x00ff_00ff, 0xff12_3456]).await?;
+            assert_eq!((transparent.img.bpp, transparent.img.bpl), (16, 4));
+            assert_eq!(pixels, 0x11aa_f81f, "the transparent pixel keeps its colour: titles key on it");
+            assert_eq!((transparent.mask.bpp, transparent.mask.bpl), (8, 2));
+            let alpha: u16 = read_generic(&core, transparent.mask.buf.0)?;
+            assert_eq!(alpha, 0xff00);
+
+            let dst: u32 = core.run_function(create_framebuffer, &[2, 1]).await?;
+            let dst_buf: u32 = read_generic(&core, dst + 16)?;
+            write_generic(&mut core, dst_buf, 0xaaaa_aaaau32)?;
+            let record = Allocator::alloc(&mut core, 52)?;
+            let _: u32 = core.run_function(init, &[record]).await?;
+            let _: u32 = core.run_function(draw, &[dst, 0, 0, 2, 1, handle, 0, 0, record]).await?;
+            let drawn: u32 = read_generic(&core, dst_buf)?;
+            assert_eq!(drawn, 0x11aa_aaaa, "the masked pixel leaves dst, the opaque one lands");
+
+            // The same through a title's pixel-op proc, here `return src` (movs r0,r1; bx lr).
+            let (handle, _, _) = create_image(&mut core, [0x0012_3456, 0xffff_00ff]).await?;
+            let proc_code = Allocator::alloc(&mut core, 4)?;
+            write_generic(&mut core, proc_code, [0x0008u16, 0x4770])?;
+            write_generic(&mut core, record + 28, proc_code | 1)?;
+            write_generic(&mut core, dst_buf, 0xaaaa_aaaau32)?;
+            let _: u32 = core.run_function(draw, &[dst, 0, 0, 2, 1, handle, 0, 0, record]).await?;
+            let drawn: u32 = read_generic(&core, dst_buf)?;
+            assert_eq!(drawn, 0xf81f_aaaa, "the proc never sees the masked pixel");
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())

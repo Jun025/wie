@@ -7,12 +7,12 @@ pub use framebuffer::FrameBuffer;
 pub use grp_context::WIPICGraphicsContextIdx;
 pub use image::decode_image_framebuffer;
 
-use alloc::{vec, vec::Vec};
+use alloc::{boxed::Box, vec, vec::Vec};
 use core::mem::size_of;
 
 use wie_backend::{
     Event,
-    canvas::{ArgbPixel, Clip, Color, Image, ImageBuffer, PixelType, Rgb565Pixel, string_width},
+    canvas::{ArgbPixel, Clip, Color, Image, ImageBuffer, PixelType, Rgb565Pixel, VecImageBuffer, string_width},
 };
 use wie_util::{Result, read_generic, write_generic};
 
@@ -413,7 +413,15 @@ pub async fn draw_image(
     let framebuffer = FrameBuffer(read_generic(context, context.data_ptr(framebuffer)?)?);
     let image: WIPICImage = read_generic(context, context.data_ptr(image)?)?;
 
-    let src_image = FrameBuffer(image.img).image(context)?;
+    let mut src_image = FrameBuffer(image.img).image(context)?;
+    if let Some(alpha) = image_alpha(context, &image)? {
+        let pixels = src_image
+            .colors()
+            .into_iter()
+            .zip(alpha)
+            .map(|(color, a)| ArgbPixel::from_color(Color { a, ..color }));
+        src_image = Box::new(VecImageBuffer::<ArgbPixel>::from_raw(image.img.width, image.img.height, pixels.collect()));
+    }
     let clip = Clip {
         x: dx as _,
         y: dy as _,
@@ -422,6 +430,19 @@ pub async fn draw_image(
     };
 
     primitives::draw_image(context, &framebuffer, dx, dy, w as u32, h as u32, &*src_image, sx, sy, clip)
+}
+
+/// The alpha of an image whose colours are stored without it: LGT's `MC_grpCreateImage` keeps the
+/// pixels at the handset's 16bpp and the transparency beside them in `mask`, one byte per pixel.
+/// `None` when the image carries no such mask (its pixels are opaque or hold their own alpha).
+pub fn image_alpha(context: &mut dyn WIPICContext, image: &WIPICImage) -> Result<Option<Vec<u8>>> {
+    let mask = image.mask;
+    if mask.bpp != 8 || mask.buf.0 == 0 || (mask.width, mask.height) != (image.img.width, image.img.height) {
+        return Ok(None);
+    }
+    let mut alpha = vec![0; (mask.bpl * mask.height) as usize];
+    context.read_bytes(context.data_ptr(mask.buf)?, &mut alpha)?;
+    Ok(Some(alpha))
 }
 
 pub async fn flush_lcd(
@@ -609,7 +630,7 @@ pub async fn draw_image_with_context_pixel_op(
 ) -> Result<()> {
     // A `WIPICImage` starts with its `img` framebuffer, so the image handle reads as one.
     let (pixel_op, args) = context_pixel_op(context, graphics_context)?;
-    if !blit_with_pixel_op(context, framebuffer, dx, dy, w, h, image, sx, sy, pixel_op, args).await? {
+    if !blit_with_pixel_op(context, framebuffer, dx, dy, w, h, image, sx, sy, pixel_op, args, true).await? {
         draw_image(context, framebuffer, dx, dy, w, h, image, sx, sy, graphics_context).await?;
     }
     Ok(())
@@ -629,7 +650,7 @@ pub async fn copy_frame_buffer_with_context_pixel_op(
     pgc: WIPICWord,
 ) -> Result<()> {
     let (pixel_op, args) = context_pixel_op(context, pgc)?;
-    if !blit_with_pixel_op(context, dst, dx, dy, w, h, src, sx, sy, pixel_op, args).await? {
+    if !blit_with_pixel_op(context, dst, dx, dy, w, h, src, sx, sy, pixel_op, args, false).await? {
         copy_frame_buffer(context, dst, dx, dy, w, h, src, sx, sy, pgc).await?;
     }
     Ok(())
@@ -666,12 +687,19 @@ pub async fn blit_with_pixel_op(
     sy: i32,
     pixel_op: WIPICWord,
     args: PixelOpArgs,
+    source_is_image: bool,
 ) -> Result<bool> {
     let target: WIPICFramebuffer = read_generic(context, context.data_ptr(dst)?)?;
     let source: WIPICFramebuffer = read_generic(context, context.data_ptr(src)?)?;
     if pixel_op == 0 || target.bpp != 16 || !matches!(source.bpp, 16 | 32) {
         return Ok(false);
     }
+    let alpha = if source_is_image {
+        let image: WIPICImage = read_generic(context, context.data_ptr(src)?)?;
+        image_alpha(context, &image)?
+    } else {
+        None
+    };
     tracing::debug!(
         "pixel op {pixel_op:#x}: {:#x} ({dx}, {dy}, {width}x{height}) <- {:#x} ({sx}, {sy})",
         dst.0,
@@ -697,9 +725,13 @@ pub async fn blit_with_pixel_op(
         let target_at = target_base + (dy + y) as u32 * target.bpl + (dx + x0) as u32 * 2;
         context.read_bytes(source_at, &mut source_row)?;
         context.read_bytes(target_at, bytemuck::cast_slice_mut(&mut target_row))?;
-        for (target_pixel, source_pixel) in target_row.iter_mut().zip(source_row.chunks_exact(bytes_per_pixel as usize)) {
+        let alpha_at = ((sy + y) as u32 * source.width + (sx + x0) as u32) as usize;
+        for (i, (target_pixel, source_pixel)) in target_row.iter_mut().zip(source_row.chunks_exact(bytes_per_pixel as usize)).enumerate() {
             // The proc compares 16-bit pixels, so a decoded (ARGB) image pixel goes in as the RGB565
             // value it would have on the handset; a fully transparent one is skipped like the shared blit.
+            if alpha.as_ref().is_some_and(|alpha| alpha[alpha_at + i] == 0) {
+                continue;
+            }
             let source_pixel = if bytes_per_pixel == 2 {
                 u16::from_le_bytes([source_pixel[0], source_pixel[1]])
             } else {

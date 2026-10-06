@@ -1,0 +1,11 @@
+{
+  "date": "2026-10-06",
+  "kind": "fix",
+  "titles": [
+    "0baceb1dfe9c388d08e9225fabdf68ee82f289fa42fdfec9cfab77c78f553288",
+    "a23f3c9fc2cb84e931da79898c64651a7d0d21f578343cf87ca35baa74de440e",
+    "0606d43702e7d3197afefc8d5cd5f075adb8cf06b599a59748345be3115391d7"
+  ],
+  "summary_ko": "투명한 부분이 있는 그림이 줄무늬나 얼룩으로 깨져 보이던 게임 세 개가 이제 제대로 보여요.",
+  "pr": "https://github.com/Jun025/wie/pull/0"
+}
