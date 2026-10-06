@@ -7,7 +7,7 @@
   "changes": [
     "wie-wipi-c/src/api/database.rs — open_database_lgt(모드 8 이면 없는 DB 를 만든다) · list_record_info(빈 DB 는 크기 0 항목 1개)",
     "wie-lgt/src/runtime/wipi_c.rs — LGT OpenDatabase 를 open_database_lgt 로",
-    "docs/report/0456"
+    "docs/report/0458"
   ],
   "verification": [
     "63332c51d514 base: 안내 뒤 clean exit(1키) · head: 타이틀·메뉴 27/27키 PASS",

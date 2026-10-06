@@ -378,7 +378,7 @@ pub async fn seek_record_single(context: &mut dyn WIPICContext, db_id: i32, offs
 /// database exists from that moment, empty. The generic path only creates it on the first write, and
 /// 63332c51d514 asks `list_record_info` about it before writing: it opens its save with mode 8, takes
 /// any of -1·-3·-9·-11·-12·-13·-24 as «no save», and otherwise reads the size from the entry without
-/// looking at the return value — an empty file has to answer size 0 there (docs/report/0456).
+/// looking at the return value — an empty file has to answer size 0 there (docs/report/0458).
 pub async fn open_database_lgt(context: &mut dyn WIPICContext, ptr_name: WIPICWord, mode: i32, r#type: i32) -> Result<i32> {
     if mode == 8
         && let Ok(name) = String::from_utf8(read_null_terminated_string_bytes(context, ptr_name)?)
