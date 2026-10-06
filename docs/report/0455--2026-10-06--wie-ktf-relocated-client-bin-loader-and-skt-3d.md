@@ -114,3 +114,5 @@
 | 1 | `71d1d8235bd1`(+ SKT 소리 스레드 74종) | `AudioClip.play` 가 소리 스레드에서 재생 동안 블록하고, `close` 가 그 `play` 를 예외로 끊어야 한다 | M — 74종 전/후 짝 필수 | §2-3 |
 | 2 | KTF `1d5831e42a8a` `83fc429f9cbe` `b907b0faf483` | 서술자 배열 적재기 + `MNInterface` 칸(10개 이상) + `fp` 문맥(+0x34 = 스택) | L | §3 |
 | 3 | `71d1d8235bd1` | longplay·speed·progress 미측정 | S — 1이 착지한 뒤 census 한 번 | §4 |
+
+게임 파일명 유입: 도구 기본 실행(브랜치 전체)은 BOUNDED 330쌍 · SUFFIX-ATTACHED 15쌍이다. 전부 `docs/player-data/compat.json` 안이다(계약상 제목 목록 · SUFFIX 35회 모두 그 파일). compat.json 을 뺀 이 회차 파일만 넘기면 BOUNDED 0 · SUFFIX-ATTACHED 0 이다.
