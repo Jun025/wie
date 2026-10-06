@@ -221,7 +221,7 @@ impl WieAudioClip {
     //
     // On a sound thread play() blocks until the clip runs out, and a stop() or close() from another
     // thread ends it with `UserStopException` — the handset's behaviour, which the SKT sound threads
-    // are written against (docs/report/0461). 71d1d8235bd1's thread loops
+    // are written against (docs/report/0463). 71d1d8235bd1's thread loops
     // `synchronized (this) { while (!isPlaying) { if (isRepeat) sleep(100); else wait(); } }` and then
     // plays outside the lock; its stop() is `clip.close()`, and only the exception out of play()
     // clears `isRepeat`. A play() that returned at once left the thread re-opening the song every
@@ -234,7 +234,7 @@ impl WieAudioClip {
     // `run()` calls; an effect played from the game's own code (1367261bc3ee: an event handler ->
     // helper -> play) is deeper and does not block, so it cannot freeze the game.
     // ponytail: depth, not "what this thread is for" — a game loop whose run() called a sound helper
-    // directly would block on its effects; the corpus has none (docs/report/0461 §1).
+    // directly would block on its effects; the corpus has none (docs/report/0463 §1).
     async fn play(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("net.wie.WieAudioClip::play({this:?})");
 
