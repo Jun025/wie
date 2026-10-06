@@ -77,3 +77,4 @@
 - 러너 블록 6줄 PASS. `keydraw_ktf`/`keydraw_lgt` 는 `--inject --expect-last-frame` 에서 rc=0 · paints 79/55.
 - 짝 스윕과 6333 재측은 각각 `build-slot run --long` 임대 1개로 감쌌다. 둘 다 long 슬롯이 만석이라 대기한 뒤 돌았다(다른 레인이 쥐고 있었다). 회차 밖 프로세스는 0이다.
 - `compat.json` 은 바꾸지 않았다. `render` 축은 줄무늬를 보지 못한다(0450 §4 와 같은 판단).
+- 게임 파일명 유입: `corpus-name-inflow` BOUNDED 12회/7쌍 · SUFFIX-ATTACHED 0. 12회 모두 이 회차가 손댄 두 파일(`wie-lgt/src/runtime/wipi_c.rs` · `wie-wipi-c/src/api/graphics.rs`)에 이미 있던 주석이다(`origin/main` 판에서 같은 6개 이름이 12회). 이 회차가 더한 줄에는 0건이다.
