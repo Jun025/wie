@@ -1,0 +1,19 @@
+{
+ "date": "2026-10-07",
+ "task": "wie-ktf-relocated-client-bin-descriptor-loader-and-mninterface",
+ "title": "KTF 재배치 client.bin 적재기 — MNInterface 13칸 · fp 문맥 · 3종 중 2종 부팅",
+ "summary": "재배치 표 형식 client.bin 을 적재한다(runtime::relocated). 클래스 레코드·이름 참조·필드 오프셋을 연결하고, MNInterface 13칸과 이미지 +0x480 의 호스트 워드 6개, fp 스레드 문맥, 문자열 상수, setjmp 꼴 예외 복귀를 맞췄다. 1d5831e42a8a·b907b0faf483 이 켜지고 그린다. 83fc429f9cbe 는 com/ktf/kfc/GProgressBar 가 없어 멈춘다(docs/report/0466).",
+ "adoptedProposals": ["2026-10-06-skt-3d-and-ktf-reloc-verdict#p1"],
+ "proposals": [
+  {
+   "kind": "product",
+   "title": "KTF 라이브러리 진행 막대(com/ktf/kfc/GProgressBar) 구현",
+   "plainSummary": "프로그램 형식이 달라 켜지지 않던 KTF 게임 하나가 이제 시작은 됩니다. 그런데 휴대폰에 들어 있던 '진행 막대' 부품이 에뮬레이터에 없어서 첫 화면 전에 멈춥니다.",
+   "userBenefit": "83fc429f9cbe 가 시작 화면까지 갈 수 있습니다.",
+   "why": "0466 §7: 이 타이틀의 적재는 이제 되지만 load_java_class(com/ktf/kfc/GProgressBar) 가 실패하고, 게임이 그 예외를 잡은 뒤 null 진행 막대로 startApp 에서 NPE 가 난다. 이미지 이름표에는 setMaximum(I)Z · setValue(I)Z 가 있다. com/ktf/kfc 의 다른 클래스(ChoiceText · GFormComponent · GMenubarForm)는 이미 있다.",
+   "tradeoff": "참고 자료가 없으면 그리는 모양은 추정이 된다. 코퍼스에서 이 클래스를 쓰는 타이틀은 이 1종뿐이다(0397 §코퍼스 참조).",
+   "effort": "M",
+   "target": "wie-wipi-java/src/classes/com/ktf/kfc/"
+  }
+ ]
+}

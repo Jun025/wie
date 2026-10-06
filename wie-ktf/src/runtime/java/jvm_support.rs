@@ -60,6 +60,9 @@ pub struct KtfJvmThreadContext {
     // Before these fields existed those two stores landed past the end of this allocation.
     pub(crate) native_result_type: u32,
     pub(crate) native_result: [u32; 2],
+    // Words the relocated-image runtime reads off this context (`fp` = the context there):
+    // +0x30 its function table · +0x34 the native stack · +0x38 the JVM context (`runtime::relocated`).
+    relocated: [u32; 4],
 }
 
 #[repr(C)]
@@ -67,7 +70,24 @@ pub struct KtfJvmThreadContext {
 struct KtfJvmSupportContext {
     ptr_vtables_base: u32,
     ptr_current_jvm_thread_context: u32,
+    /// Nonzero only for a relocated image: the image's own current-thread-context cell.
+    relocated_thread_cell: u32,
+    relocated_functions: u32,
+    relocated_names: u32,
 }
+
+/// The relocated-image runtime's thread-context ABI (`runtime::relocated`), when one is loaded.
+#[derive(Clone, Copy)]
+pub(crate) struct RelocatedAbi {
+    pub functions: u32,
+    pub ptr_jvm_context: u32,
+    /// Class reference `(index << 1) | 1` → `names[index]`.
+    pub names: u32,
+}
+
+/// Where the current exception handler record sits in a thread context: `+0x20` for the standard
+/// runtime, `+0x2c` for the relocated one (its try helpers write `[fp, #0x2c]`).
+const RELOCATED_HANDLER_OFFSET: u32 = 0x2c;
 
 const SUPPORT_CONTEXT_BASE: u32 = 0x7fff0000;
 
@@ -174,8 +194,8 @@ impl KtfJvmSupport {
                     (SUPPORT_CONTEXT_BASE + offset_of!(KtfJvmSupportContext, ptr_current_jvm_thread_context) as u32) as i32,
                 ),
             )
-            // The constructor loads client.bin, so an unsupported image (a relocation-table layout,
-            // `docs/report/0340`) and a jar that is not a zip (an OMA DRM container) both throw here.
+            // The constructor loads client.bin, so an image that fails to load and a jar that is not a
+            // zip (an OMA DRM container) both throw here.
             // That is the title's error to report, not a host panic.
             .or_else(async |error| Err(JvmSupport::to_wie_err(&jvm, error).await))
             .await?;
@@ -321,9 +341,36 @@ impl KtfJvmSupport {
 
     pub fn current_java_exception_handler(core: &mut ArmCore) -> Result<u32> {
         let ptr_thread_context = Self::current_thread_context(core)?;
-        let thread_context: KtfJvmThreadContext = read_generic(core, ptr_thread_context)?;
 
-        Ok(thread_context.current_java_exception_handler)
+        read_generic(core, ptr_thread_context + Self::handler_offset(core)?)
+    }
+
+    fn handler_offset(core: &ArmCore) -> Result<u32> {
+        Ok(if Self::relocated_abi(core)?.is_some() {
+            RELOCATED_HANDLER_OFFSET
+        } else {
+            offset_of!(KtfJvmThreadContext, current_java_exception_handler) as u32
+        })
+    }
+
+    pub(crate) fn relocated_abi(core: &ArmCore) -> Result<Option<RelocatedAbi>> {
+        let context: KtfJvmSupportContext = read_generic(core, SUPPORT_CONTEXT_BASE)?;
+
+        Ok((context.relocated_thread_cell != 0).then_some(RelocatedAbi {
+            functions: context.relocated_functions,
+            ptr_jvm_context: context.ptr_vtables_base - offset_of!(InitParam2, ptr_java_vtables) as u32,
+            names: context.relocated_names,
+        }))
+    }
+
+    pub(crate) fn set_relocated_abi(core: &mut ArmCore, thread_cell: u32, functions: u32, names: u32) -> Result<()> {
+        let mut context: KtfJvmSupportContext = read_generic(core, SUPPORT_CONTEXT_BASE)?;
+        context.relocated_thread_cell = thread_cell;
+        context.relocated_functions = functions;
+        context.relocated_names = names;
+        write_generic(core, SUPPORT_CONTEXT_BASE, context)?;
+
+        write_generic(core, thread_cell, context.ptr_current_jvm_thread_context)
     }
 
     /// `(thread context, the caller's handler)` — written back to that same context by
@@ -342,11 +389,8 @@ impl KtfJvmSupport {
     }
 
     fn write_java_exception_handler(core: &mut ArmCore, ptr_thread_context: u32, ptr_handler: u32) -> Result<()> {
-        write_generic(
-            core,
-            ptr_thread_context + offset_of!(KtfJvmThreadContext, current_java_exception_handler) as u32,
-            ptr_handler,
-        )
+        let offset = Self::handler_offset(core)?;
+        write_generic(core, ptr_thread_context + offset, ptr_handler)
     }
 
     pub fn set_current_java_exception_handler(core: &mut ArmCore, ptr_handler: u32) -> Result<()> {
@@ -359,7 +403,17 @@ impl KtfJvmSupport {
             core,
             SUPPORT_CONTEXT_BASE + offset_of!(KtfJvmSupportContext, ptr_current_jvm_thread_context) as u32,
             ptr_thread_context,
-        )
+        )?;
+        // A relocated image reads the current context through a cell of its own (image `+0x20`).
+        let cell: u32 = read_generic(
+            core,
+            SUPPORT_CONTEXT_BASE + offset_of!(KtfJvmSupportContext, relocated_thread_cell) as u32,
+        )?;
+        if cell != 0 {
+            write_generic(core, cell, ptr_thread_context)?;
+        }
+
+        Ok(())
     }
 
     pub fn current_thread_context(core: &ArmCore) -> Result<u32> {
@@ -1342,24 +1396,33 @@ mod test {
                 .unwrap()
                 .clone();
 
-            assert!(JavaMethod::exception_class_matches(&core, &jvm, &*exception, 0)?);
-            assert!(JavaMethod::exception_class_matches(&core, &jvm, &*exception, null_pointer_class.ptr_raw)?);
+            assert!(JavaMethod::exception_class_matches(&core, &jvm, &*exception, None, 0)?);
             assert!(JavaMethod::exception_class_matches(
                 &core,
                 &jvm,
                 &*exception,
+                None,
+                null_pointer_class.ptr_raw
+            )?);
+            assert!(JavaMethod::exception_class_matches(
+                &core,
+                &jvm,
+                &*exception,
+                None,
                 null_pointer_class.ptr_vtable()?
             )?);
             assert!(JavaMethod::exception_class_matches(
                 &core,
                 &jvm,
                 &*exception,
+                None,
                 runtime_exception_class.ptr_vtable()?
             )?);
             assert!(!JavaMethod::exception_class_matches(
                 &core,
                 &jvm,
                 &*exception,
+                None,
                 illegal_argument_class.ptr_vtable()?
             )?);
 

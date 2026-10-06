@@ -23,7 +23,7 @@ use wie_core_arm::{
     Allocator, ArmCore, EmulatedFunction, EmulatedFunctionParam, RUN_FUNCTION_LR, RegisteredFunction, RegisteredFunctionHolder, ResultWriter, SvcId,
 };
 use wie_jvm_support::native::{NativeJavaValueCodec, decode_method_arguments, encode_method_arguments, method_argument_word_count};
-use wie_util::{ByteWrite, Result, WieError, read_generic, write_generic};
+use wie_util::{ByteWrite, Result, WieError, read_generic, read_null_terminated_string_bytes, write_generic};
 
 use crate::{
     emulator::IMAGE_BASE,
@@ -173,25 +173,33 @@ impl JavaMethod {
             }
         }
 
-        let result: JavaMethodRunResult = if access_flags.contains(MethodAccessFlags::NATIVE) {
-            let arg_container = Allocator::alloc(&mut core, (raw_args.len() as u32) * 4)?;
-            for (i, arg) in raw_args.iter().enumerate() {
-                write_generic(&mut core, arg_container + (i * 4) as u32, *arg)?;
-            }
+        let relocated = crate::runtime::relocated::enter(&mut core)?;
+        let result: Result<JavaMethodRunResult> = async {
+            Ok(if access_flags.contains(MethodAccessFlags::NATIVE) {
+                let arg_container = Allocator::alloc(&mut core, (raw_args.len() as u32) * 4)?;
+                for (i, arg) in raw_args.iter().enumerate() {
+                    write_generic(&mut core, arg_container + (i * 4) as u32, *arg)?;
+                }
 
-            tracing::trace!("Calling native method: {:#x}", raw.fn_body_native_or_exception_table);
-            let result = run_with_unwind(&mut core, raw.fn_body_native_or_exception_table, vec![0, arg_container]).await;
+                tracing::trace!("Calling native method: {:#x}", raw.fn_body_native_or_exception_table);
+                let result = run_with_unwind(&mut core, raw.fn_body_native_or_exception_table, vec![0, arg_container]).await;
 
-            Allocator::free(&mut core, arg_container, (raw_args.len() as u32) * 4)?;
+                Allocator::free(&mut core, arg_container, (raw_args.len() as u32) * 4)?;
 
-            result?
-        } else {
-            let mut params = vec![0];
-            params.extend(raw_args);
+                result?
+            } else {
+                let mut params = vec![0];
+                params.extend(raw_args);
 
-            tracing::trace!("Calling method: {:#x}", raw.fn_body);
-            run_with_unwind(&mut core, raw.fn_body, params).await?
-        };
+                tracing::trace!("Calling method: {:#x}", raw.fn_body);
+                run_with_unwind(&mut core, raw.fn_body, params).await?
+            })
+        }
+        .await;
+        if let Some(entry) = relocated {
+            crate::runtime::relocated::leave(&mut core, entry)?;
+        }
+        let result = result?;
 
         if matches!(return_type, JavaType::Double | JavaType::Long) {
             Ok(codec.decode_wide(result.result, result.result_high, &return_type))
@@ -220,9 +228,23 @@ impl JavaMethod {
         Ok(result)
     }
 
-    pub(super) fn exception_class_matches(core: &ArmCore, jvm: &Jvm, exception: &dyn ClassInstance, ptr_class: u32) -> Result<bool> {
+    pub(super) fn exception_class_matches(
+        core: &ArmCore,
+        jvm: &Jvm,
+        exception: &dyn ClassInstance,
+        relocated_names: Option<u32>,
+        ptr_class: u32,
+    ) -> Result<bool> {
         if ptr_class == 0 {
             return Ok(true);
+        }
+        // A relocated image names the class instead: `(index << 1) | 1` into its name table.
+        if let Some(names) = relocated_names
+            && ptr_class & 1 == 1
+        {
+            let ptr_name: u32 = read_generic(core, names + (ptr_class >> 1) * 4)?;
+            let name = String::from_utf8_lossy(&read_null_terminated_string_bytes(core, ptr_name)?).into_owned();
+            return Ok(jvm.is_instance(exception, &name));
         }
 
         if let Some(instance) = exception.as_any().downcast_ref::<JavaClassInstance>() {
@@ -248,20 +270,37 @@ impl JavaMethod {
         // registered, and the next throw read them: «Invalid memory access» in paint on two KTF titles and
         // «jump native address is null» on a third (docs/report/0445).
         let mut ptr_handler = KtfJvmSupport::current_java_exception_handler(core)?;
+        // The relocated runtime's record keeps the try pc at +0x10 and has the catch read `e` from +0x38
+        // (its try helper fills +0x0c with 0 and stores r4–r7, r8, sb, -, sl from +0x18 — `runtime::relocated`).
+        let relocated = KtfJvmSupport::relocated_abi(core)?;
+        let (pc_offset, exception_offset) = if relocated.is_some() {
+            (0x10, 0x38)
+        } else {
+            (
+                offset_of!(RawJavaExceptionHandler, current_pc) as u32,
+                offset_of!(RawJavaExceptionHandler, unk3) as u32,
+            )
+        };
         // ponytail: a step cap instead of cycle detection — a chain this long is already corrupt.
         for _ in 0..4096 {
             if ptr_handler == 0 {
                 break;
             }
+            // A relocated image's record of a frame outside this host entry is the outer entry's to catch:
+            // resuming it here would run that frame inside this entry's call.
+            if relocated.is_some() && !crate::runtime::relocated::entry_owns_record(core, ptr_handler)? {
+                break;
+            }
             let exception_handler: RawJavaExceptionHandler = read_generic(core, ptr_handler)?;
+            let current_pc: u32 = read_generic(core, ptr_handler + pc_offset)?;
 
             let method = JavaMethod::from_raw(exception_handler.ptr_method, core);
             let exception_table = method.exception_table()?;
 
             for entry in exception_table {
-                if entry.from_pc <= exception_handler.current_pc
-                    && exception_handler.current_pc < entry.to_pc
-                    && Self::exception_class_matches(core, jvm, &*exception, entry.ptr_class)?
+                if entry.from_pc <= current_pc
+                    && current_pc < entry.to_pc
+                    && Self::exception_class_matches(core, jvm, &*exception, relocated.map(|x| x.names), entry.ptr_class)?
                 {
                     let restore_context: u32 = read_generic(core, exception_handler.ptr_functions + 4)?;
                     let contexts_base = ptr_handler + 24;
@@ -270,16 +309,12 @@ impl JavaMethod {
                     // client.bin code writes it — the handset's throw did. Left 0, a handler that touches
                     // `e` throws NPE into its own still-registered try range: 43,276 catches in one paint
                     // on e9fac881e602 KTF (docs/report/0343).
-                    write_generic(
-                        core,
-                        ptr_handler + offset_of!(RawJavaExceptionHandler, unk3) as u32,
-                        KtfJvmSupport::class_instance_raw(&exception),
-                    )?;
+                    write_generic(core, ptr_handler + exception_offset, KtfJvmSupport::class_instance_raw(&exception))?;
                     // The handler now runs at `target`, so the record says so. Compiled code writes this slot
                     // only where a range covers the handler body (a catch block covered by its `finally`); a
                     // `finally` that rethrows writes nothing, and with the try-range pc still here its own
                     // rethrow re-entered it forever — 86,010 throws in 3 s on dbd078113b97 KTF (docs/report/0448).
-                    write_generic(core, ptr_handler + offset_of!(RawJavaExceptionHandler, current_pc) as u32, entry.target)?;
+                    write_generic(core, ptr_handler + pc_offset, entry.target)?;
                     // The frames above the catching one are gone, and so are their records.
                     KtfJvmSupport::set_current_java_exception_handler(core, ptr_handler)?;
 
@@ -289,6 +324,11 @@ impl JavaMethod {
                         exception_handler.ptr_method
                     );
 
+                    // The record is this entry's (checked above), so the relocated runtime resumes it in
+                    // place, as `map_exception_unwind` does for a jump: the handler's frame is below.
+                    if relocated.is_some() {
+                        return Ok(JavaMethodResult::new(vec![contexts_base, entry.target], Some(restore_context)));
+                    }
                     return Err(WieError::JavaExceptionUnwind {
                         context_base: contexts_base,
                         target: entry.target,

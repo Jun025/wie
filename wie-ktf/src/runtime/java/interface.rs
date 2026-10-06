@@ -153,7 +153,7 @@ fn map_jump_result(core: &ArmCore, caller_sp: u32, result: core::result::Result<
     }
 }
 
-async fn get_java_method(core: &mut ArmCore, _: &mut (), ptr_class: u32, ptr_fullname: u32) -> Result<u32> {
+pub(crate) async fn get_java_method(core: &mut ArmCore, _: &mut (), ptr_class: u32, ptr_fullname: u32) -> Result<u32> {
     let fullname = KtfJvmSupport::read_name(core, ptr_fullname)?;
 
     tracing::debug!("get_java_method({ptr_class:#x}, {fullname})");
@@ -222,7 +222,7 @@ async fn java_jump_1(core: &mut ArmCore, _: &mut (), arg1: u32, address: u32) ->
     map_jump_result(core, caller_sp, result)
 }
 
-async fn register_class(core: &mut ArmCore, jvm: &mut Jvm, ptr_class: u32) -> Result<()> {
+pub(crate) async fn register_class(core: &mut ArmCore, jvm: &mut Jvm, ptr_class: u32) -> Result<()> {
     tracing::trace!("register_class({ptr_class:#x})");
 
     let class: JavaClassDefinition = KtfJvmSupport::class_from_raw(core, ptr_class);
@@ -281,7 +281,7 @@ async fn register_java_string(core: &mut ArmCore, jvm: &mut Jvm, offset: u32, le
     Ok(KtfJvmSupport::class_instance_raw(&instance) as _)
 }
 
-async fn get_field(core: &mut ArmCore, _: &mut (), ptr_class: u32, field_name: u32) -> Result<u32> {
+pub(crate) async fn get_field(core: &mut ArmCore, _: &mut (), ptr_class: u32, field_name: u32) -> Result<u32> {
     tracing::debug!("get_field({ptr_class:#x}, {field_name:#x})");
 
     let field_name = KtfJvmSupport::read_name(core, field_name)?;
@@ -313,7 +313,7 @@ async fn jb_unk5(_: &mut ArmCore, _: &mut (), a0: u32, a1: u32) -> Result<u32> {
     Ok(0)
 }
 
-async fn monitor_enter(core: &mut ArmCore, jvm: &mut Jvm, ptr_raw: u32) -> Result<u32> {
+pub(crate) async fn monitor_enter(core: &mut ArmCore, jvm: &mut Jvm, ptr_raw: u32) -> Result<u32> {
     tracing::debug!("monitor_enter({ptr_raw:#x})");
 
     let instance = JavaClassInstance::from_raw(ptr_raw, core);
@@ -322,7 +322,7 @@ async fn monitor_enter(core: &mut ArmCore, jvm: &mut Jvm, ptr_raw: u32) -> Resul
     Ok(0)
 }
 
-async fn monitor_exit(core: &mut ArmCore, jvm: &mut Jvm, ptr_raw: u32) -> Result<u32> {
+pub(crate) async fn monitor_exit(core: &mut ArmCore, jvm: &mut Jvm, ptr_raw: u32) -> Result<u32> {
     tracing::debug!("monitor_exit({ptr_raw:#x})");
 
     let instance = JavaClassInstance::from_raw(ptr_raw, core);
