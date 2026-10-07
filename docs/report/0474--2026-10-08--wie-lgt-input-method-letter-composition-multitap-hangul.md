@@ -74,5 +74,3 @@
 - 회차가 띄운 프로세스: 끝에 `/tmp/imdbg/wv_*` 0(`pgrep`).
 - 폭 하나를 어겼다: 입력기 호출 기록 스윕은 가드 rc=1 을 보고도 `-P 3` 으로 걸어 두었다. 임대를 기다리는 동안 `-P 2` 로 고쳤고, 실제로는 2로 돌았다.
 - 게임 파일명 유입(`corpus-name-inflow` · 이 브랜치 대 `origin/main`): BOUNDED 338쌍 · SUFFIX-ATTACHED 15쌍. 전부 «건드린 파일 전체»의 기존 언급이다. `compat.json` 의 `title`·`fileTitle`(공개 계약 필드)과 `svc_ids.rs`·`wipi_c.rs` 의 기존 주석이다. 이 회차가 «추가한» 줄의 게임명은 0 이다(`git diff` 추가 줄 대조 · 종전 주석의 한 이름은 sha12 로 바꿨다).
-
-<!-- corpus-name-inflow v1 subjects=10 tree=a8642df03de14822 B=728/338 P=0/0 S=35/15 -->
