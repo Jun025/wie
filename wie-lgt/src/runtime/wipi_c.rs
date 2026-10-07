@@ -1,4 +1,10 @@
-use alloc::{boxed::Box, string::ToString, vec};
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 
 mod context;
 // ★slice D (orchestrator decision ⒝, 2026-09-16): upstream's LGT-specific graphics
@@ -54,12 +60,15 @@ use jvm::{Jvm, Result as JvmResult, runtime::JavaLangString};
 use wipi_types::lgt::CletFunctions;
 use wipi_types::wipic::{WIPICFramebuffer, WIPICImage, WIPICIndirectPtr, WIPICWord};
 
+use encoding_rs::EUC_KR;
+use spin::Mutex;
 use wie_backend::{
     System,
     canvas::{PixelType, Rgb565Pixel, VecImageBuffer},
 };
 use wie_core_arm::{ArmCore, EmulatedFunction, EmulatedFunctionParam, ResultWriter, SvcId};
 use wie_jvm_support::JvmSupport;
+use wie_util::keypad::{self, MULTITAP_MS, Mode};
 use wie_util::{Result, read_generic, write_generic, write_null_terminated_string_bytes, write_null_terminated_table};
 use wie_wipi_c::{
     MethodImpl, WIPICContext, WIPICMethodBody, WIPICResult,
@@ -181,9 +190,23 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::DrawPolygon => wie_wipi_c::api::graphics::draw_polygon.into_body(),
         WIPICSvcId::ImGetSupportModeCount => im_get_support_mode_count.into_body(),
         WIPICSvcId::ImGetSupportedModes => im_get_supported_modes.into_body(),
-        WIPICSvcId::Unk7 => unk7.into_body(),
-        WIPICSvcId::Unk6 => unk6.into_body(),
-        WIPICSvcId::ImHandleInput => im_handle_input.into_body(),
+        // The input method keeps state per emulator (mode, the keys being composed), so these three
+        // take the core — its id keys `IM_STATE` — rather than a `WIPICContext`.
+        WIPICSvcId::ImSetCurrentMode => {
+            return EmulatedFunction::call(&im_set_current_mode, core, &mut (system.clone(), jvm.clone()))
+                .await?
+                .write(core, lr);
+        }
+        WIPICSvcId::ImGetCurrentMode => {
+            return EmulatedFunction::call(&im_get_current_mode, core, &mut (system.clone(), jvm.clone()))
+                .await?
+                .write(core, lr);
+        }
+        WIPICSvcId::ImHandleInput => {
+            return EmulatedFunction::call(&im_handle_input, core, &mut (system.clone(), jvm.clone()))
+                .await?
+                .write(core, lr);
+        }
         WIPICSvcId::TimeNow => time_now.into_body(),
         WIPICSvcId::TimeComponent => time_component.into_body(),
         WIPICSvcId::TimeConvert => time_convert.into_body(),
@@ -476,48 +499,132 @@ async fn im_get_supported_modes(context: &mut dyn WIPICContext) -> Result<u32> {
     Ok(table)
 }
 
-// `(key, type, buf1, *size1, buf2, *size2)` — the header's shape, and what 그랜드체이스/놈ZERO pass.
-// At the sites read (그랜드체이스 2/2, 놈ZERO 3/7) callers zero-fill both buffers, preset the sizes and
-// ignore the return. Registering it matters once 0x12c reports modes: 그랜드체이스 goes on to
-// call it and dies on `Unknown LGT WIPIC SVC id 304` without this row.
-// buf1/*size1 is what the key commits; the caller appends it to its field. Measured on
-// 1cd151222bde's name entry (sizes preset to 0, buffers 8 bytes apart): as a no-op every key left
-// the field empty and the title would not leave the screen; committing the digit shows it, and
-// the name is taken.
-// ponytail: number mode only — a digit key commits itself; no multi-tap letters or Hangul
-// composition (that needs buf2/*size2 and a commit timer). Add when a title refuses a digit name.
-async fn im_handle_input(context: &mut dyn WIPICContext, key: u32, r#type: u32, buf1: u32, size1: u32, _buf2: u32, size2: u32) -> Result<u32> {
-    tracing::debug!("MC_imHandleInput({key:#x}, {:#x}, {buf1:#x}, {size1:#x}, {size2:#x})", r#type);
+// The guest side of 0x12e..0x130, read off 1cd151222bde's text field (docs/report/0471 §2):
+// - `0x12e(i)` takes an index into the 0x12d names; that title steps it with UP/DOWN.
+// - `0x130(key, type, buf1, *size1, buf2, *size2)`, both buffers zero-filled and both sizes 0 on
+//   entry, return ignored. buf1/*size1 is COMMITTED text: the caller copies it over the character
+//   it is showing after its committed text and advances past it. buf2/*size2 is the character
+//   still COMPOSING: shown after the committed text, not advanced past, replaced by the next call.
+//   Bytes are EUC-KR — the caller walks them as KS X 1001 pairs (its own 0xb0..0xc8 / 0xa4 test).
+//   Each buffer is 8 bytes from the other: at most 4 bytes and the NUL.
+// - Only key presses reach it: digits, and UP/DOWN/RIGHT/CLR, after which the caller treats what it
+//   shows as committed (it re-measures its text with strlen). No timer — a multi-tap letter is
+//   committed by the next key, which is how the window below can be checked at press time.
+// Registering 0x130 at all matters once 0x12c reports modes: 그랜드체이스 goes on to call it and
+// dies on `Unknown LGT WIPIC SVC id 304` without the row.
+// ponytail: the mode before any 0x12e is index 0 (EN/S) — what 0x12f answered when it was a stub,
+// not a measured device default.
+async fn im_set_current_mode(core: &mut ArmCore, _: &mut (System, Jvm), mode: u32) -> Result<u32> {
+    tracing::debug!("MC_imSetCurrentMode({mode})");
+
+    let mut states = IM_STATE.lock();
+    let state = states.entry(core.id()).or_default();
+    *state = ImState {
+        mode: mode as usize % IM_MODES.len(),
+        ..Default::default()
+    };
+
+    Ok(0)
+}
+
+async fn im_get_current_mode(core: &mut ArmCore, _: &mut (System, Jvm)) -> Result<u32> {
+    Ok(IM_STATE.lock().get(&core.id()).map_or(0, |state| state.mode as u32))
+}
+
+// Keyed by core id, as `HOST_FIELD_VALUES` is: two emulators in one process.
+// ponytail: never removed — one small entry per emulator ever booted in the process.
+static IM_STATE: Mutex<BTreeMap<usize, ImState>> = Mutex::new(BTreeMap::new());
+
+#[derive(Default)]
+struct ImState {
+    mode: usize,
+    // The keys of the character still composing (wie_util::keypad tokens).
+    tokens: Vec<char>,
+    last_key: u8,
+    last_at: u64,
+}
+
+#[allow(clippy::too_many_arguments)] // the header's six arguments plus the core and its context
+async fn im_handle_input(
+    core: &mut ArmCore,
+    (system, _): &mut (System, Jvm),
+    key: u32,
+    r#type: u32,
+    buf1: u32,
+    size1: u32,
+    buf2: u32,
+    size2: u32,
+) -> Result<u32> {
+    tracing::debug!("MC_imHandleInput({key:#x}, {type:#x}, {buf1:#x}, {size1:#x}, {buf2:#x}, {size2:#x})");
 
     let key = key as u8;
-    if !key.is_ascii_digit() || buf1 == 0 || size1 == 0 {
-        return Ok(0);
-    }
-    write_null_terminated_string_bytes(context, buf1, &[key])?;
-    write_generic(context, size1, 1u32)?;
-    if size2 != 0 {
-        write_generic(context, size2, 0u32)?;
+    let now = system.platform().now().raw();
+    let (commit, compose) = {
+        let mut states = IM_STATE.lock();
+        let state = states.entry(core.id()).or_default();
+        let mode = [Mode::Lower, Mode::Upper, Mode::Hangul, Mode::Digit][state.mode]; // IM_MODES order
+        if key.is_ascii_digit() {
+            let again = state.last_key == key && now.saturating_sub(state.last_at) < MULTITAP_MS as u64;
+            (state.last_key, state.last_at) = (key, now);
+            keypad::press(mode, &mut state.tokens, key - b'0', again);
+            im_settle(mode, &mut state.tokens)
+        } else {
+            // Any other key ends the composition: what is shown is committed.
+            let shown = keypad::render(mode, &state.tokens);
+            *state = ImState {
+                mode: state.mode,
+                ..Default::default()
+            };
+            (shown, Vec::new())
+        }
+    };
+
+    for (buf, size, text) in [(buf1, size1, &commit), (buf2, size2, &compose)] {
+        if buf == 0 || size == 0 {
+            continue;
+        }
+        let bytes = EUC_KR.encode(&text.iter().collect::<String>().replace('ᆢ', "ㆍㆍ")).0.into_owned();
+        write_null_terminated_string_bytes(core, buf, &bytes)?;
+        write_generic(core, size, bytes.len() as u32)?;
     }
 
-    Ok(1)
+    Ok(!(commit.is_empty() && compose.is_empty()) as u32)
+}
+
+/// Splits the composition into (committed, composing): everything but the last character is final
+/// (천지인 only ever rewrites the last syllable — 각 + ㅏ → 가가 rewrites 각 and adds 가), and the
+/// tokens are cut down to the last character's. Digits never compose.
+fn im_settle(mode: Mode, tokens: &mut Vec<char>) -> (Vec<char>, Vec<char>) {
+    let mut shown = keypad::render(mode, tokens);
+    if mode == Mode::Digit {
+        tokens.clear();
+        return (shown, Vec::new());
+    }
+    let Some(last) = shown.pop() else {
+        return (Vec::new(), Vec::new());
+    };
+    match (0..tokens.len())
+        .rev()
+        .find(|&j| keypad::render(mode, &tokens[j..]) == [last] && keypad::render(mode, &tokens[..j]) == shown)
+    {
+        Some(j) => {
+            tokens.drain(..j);
+            (shown, vec![last])
+        }
+        // ponytail: no split found commits it all — not reached by the 천지인 table, kept so a
+        // future layout cannot make a committed character come back.
+        None => {
+            tokens.clear();
+            shown.push(last);
+            (shown, Vec::new())
+        }
+    }
 }
 
 async fn unk5(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
     tracing::warn!("stub unk5({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x})");
 
     // media
-
-    Ok(0)
-}
-
-async fn unk6(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
-    tracing::warn!("stub unk6({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x})");
-
-    Ok(0)
-}
-
-async fn unk7(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
-    tracing::warn!("stub unk7({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x})");
 
     Ok(0)
 }
@@ -734,10 +841,10 @@ async fn unk16(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u
 
 #[cfg(test)]
 mod tests {
-    use alloc::{boxed::Box, sync::Arc};
+    use alloc::{boxed::Box, sync::Arc, vec, vec::Vec};
     use core::sync::atomic::{AtomicBool, Ordering};
 
-    use test_utils::{TestPlatform, TestPlatformEvent};
+    use test_utils::{TestClock, TestPlatform, TestPlatformEvent};
     use wie_backend::{
         DefaultTaskRunner, Event, System,
         canvas::{ArgbPixel, VecImageBuffer, encode_png},
@@ -982,11 +1089,14 @@ mod tests {
         Ok(())
     }
 
-    /// A digit key commits itself to buf1/*size1 (1cd151222bde's name entry stayed empty while
-    /// this was a no-op); any other key leaves both buffers as the caller zero-filled them.
+    /// 0x130 as 1cd151222bde's text field reads it (docs/report/0471 §2): buf1 is committed, buf2 is
+    /// the character still composing, both EUC-KR. A digit key in number mode commits itself (the
+    /// field stayed empty while this was a no-op); a letter key cycles within the multi-tap window
+    /// and is committed by the next different key, the same key after the window, or a non-digit key.
     #[test]
-    fn wipic_im_handle_input_commits_a_digit() -> Result<()> {
-        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+    fn wipic_im_handle_input_commits_and_composes() -> Result<()> {
+        let clock = TestClock::new();
+        let mut system = System::new(Box::new(TestPlatform::with_clock(clock.clone())), "", "", DefaultTaskRunner);
         let done = Arc::new(AtomicBool::new(false));
         let done_clone = done.clone();
         let system_clone = system.clone();
@@ -994,23 +1104,43 @@ mod tests {
         system.spawn(async move || {
             let (jvm, mut core, _) = init_jvm(&system_clone).await?;
             register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
+            let set_mode = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::ImSetCurrentMode)?;
+            let get_mode = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::ImGetCurrentMode)?;
             let stub = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::ImHandleInput)?;
             assert_eq!(WIPICSvcId::ImHandleInput as u32, 0x130);
 
             let mem = Allocator::alloc(&mut core, 0x20)?;
             let (buf2, buf1, size1, size2) = (mem, mem + 8, mem + 0x10, mem + 0x14);
-            core.write_bytes(mem, &[0; 0x20])?;
+            // (key, committed, composing) — the caller zero-fills both buffers before every call.
+            let press = async |core: &mut ArmCore, key: u32| -> Result<(Vec<u8>, Vec<u8>)> {
+                core.write_bytes(mem, &[0; 0x20])?;
+                let _: u32 = core.run_function(stub, &[key, 0x1f6, buf1, size1, buf2, size2]).await?;
+                let (n1, n2): (u32, u32) = (read_generic(core, size1)?, read_generic(core, size2)?);
+                let b1: [u8; 8] = read_generic(core, buf1)?;
+                let b2: [u8; 8] = read_generic(core, buf2)?;
+                Ok((b1[..n1 as usize].to_vec(), b2[..n2 as usize].to_vec()))
+            };
+            let none: Vec<u8> = Vec::new();
 
-            let _: u32 = core.run_function(stub, &[b'7' as u32, 0x1f6, buf1, size1, buf2, size2]).await?;
-            let committed: [u8; 2] = read_generic(&core, buf1)?;
-            assert_eq!(committed, [b'7', 0]);
-            assert_eq!(read_generic::<u32, _>(&core, size1)?, 1);
-            assert_eq!(read_generic::<u32, _>(&core, size2)?, 0);
+            let _: u32 = core.run_function(set_mode, &[3]).await?; // N123
+            assert_eq!(core.run_function::<u32>(get_mode, &[]).await?, 3);
+            assert_eq!(press(&mut core, b'7' as u32).await?, (b"7".to_vec(), none.clone()));
 
-            core.write_bytes(mem, &[0; 0x20])?;
-            let _: u32 = core.run_function(stub, &[0x9d, 0x1f6, buf1, size1, buf2, size2]).await?;
-            let untouched: [u8; 0x20] = read_generic(&core, mem)?;
-            assert_eq!(untouched, [0; 0x20]);
+            let _: u32 = core.run_function(set_mode, &[1]).await?; // EN/L
+            assert_eq!(press(&mut core, b'2' as u32).await?, (none.clone(), b"A".to_vec()));
+            assert_eq!(press(&mut core, b'2' as u32).await?, (none.clone(), b"B".to_vec()));
+            assert_eq!(press(&mut core, b'3' as u32).await?, (b"B".to_vec(), b"D".to_vec()));
+            clock.advance(1500);
+            assert_eq!(press(&mut core, b'3' as u32).await?, (b"D".to_vec(), b"D".to_vec()));
+            assert_eq!(press(&mut core, 0xfc).await?, (b"D".to_vec(), none.clone())); // RIGHT
+            assert_eq!(press(&mut core, 0xfc).await?, (none.clone(), none.clone()));
+
+            let _: u32 = core.run_function(set_mode, &[2]).await?; // KO, 천지인: ㄱ ㅣ ㆍ ㄱ ㅣ
+            assert_eq!(press(&mut core, b'4' as u32).await?, (none.clone(), vec![0xa4, 0xa1])); // ㄱ
+            assert_eq!(press(&mut core, b'1' as u32).await?, (none.clone(), vec![0xb1, 0xe2])); // 기
+            assert_eq!(press(&mut core, b'2' as u32).await?, (none.clone(), vec![0xb0, 0xa1])); // 가
+            assert_eq!(press(&mut core, b'4' as u32).await?, (none.clone(), vec![0xb0, 0xa2])); // 각
+            assert_eq!(press(&mut core, b'1' as u32).await?, (vec![0xb0, 0xa1], vec![0xb1, 0xe2])); // 가 + 기
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
