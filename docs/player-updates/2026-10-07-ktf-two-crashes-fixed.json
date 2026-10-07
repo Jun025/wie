@@ -3,8 +3,9 @@
   "kind": "fix",
   "titles": [
     "96dc32e781d39c44cae4e07ebd32b57ad3c31362885a5f9a441975fff834451f",
-    "f2280c6699a0d98b5f482bdaf0258aba85cc41935f7e67e04376ea5c3a41d9ef"
+    "f2280c6699a0d98b5f482bdaf0258aba85cc41935f7e67e04376ea5c3a41d9ef",
+    "7ec716a0cec985f80c3b59cdb02fb4d6d23752a8952090c28f27cbafaa5cacfc"
   ],
   "pr": "https://github.com/Jun025/wie/pull/504",
-  "summary_ko": "하다가 갑자기 꺼지던 KTF 게임 두 개(경영 게임 하나, 고스톱 하나)가 이제 꺼지지 않고 계속 진행돼요."
+  "summary_ko": "하다가 갑자기 꺼지던 KTF 게임 두 개(경영 게임 하나, 고스톱 하나)가 이제 꺼지지 않고 계속 진행돼요. 화면이 까맣게만 나오던 KTF 퍼즐 게임 하나도 이제 메뉴와 게임 화면이 보이고 키로 할 수 있어요."
 }
