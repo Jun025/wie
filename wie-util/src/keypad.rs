@@ -16,6 +16,9 @@
 
 use alloc::vec::Vec;
 
+/// A key pressed again within this many milliseconds cycles the last character (multi-tap).
+pub const MULTITAP_MS: i64 = 1000;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Mode {
     Hangul,

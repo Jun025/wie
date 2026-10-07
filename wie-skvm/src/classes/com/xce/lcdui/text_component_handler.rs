@@ -5,7 +5,7 @@ use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
-use wie_util::keypad::{self, Mode, Op};
+use wie_util::keypad::{self, MULTITAP_MS, Mode, Op};
 
 use super::TextComponent;
 
@@ -21,7 +21,6 @@ const DECIMAL: i32 = 5;
 
 // ponytail: upper-case Latin only (wie_util::keypad's E.161 table); no case/Hangul mode switch until
 // a title needs one — the only title typing here (85f03ca7389e) takes a Latin name.
-const MULTITAP_MS: i64 = 1000;
 
 // class com.xce.lcdui.TextComponentHandler
 //
