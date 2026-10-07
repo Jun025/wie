@@ -91,4 +91,4 @@
 
 - 도구 표기 BOUNDED 0쌍 · SUFFIX-ATTACHED 0쌍. 타이틀은 sha12 로만 적었다.
 
-<!-- corpus-name-inflow v1 subjects=1 tree=8b5970bb839a963c B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=1 tree=90af90e018bb7f79 B=0/0 P=0/0 S=0/0 -->
