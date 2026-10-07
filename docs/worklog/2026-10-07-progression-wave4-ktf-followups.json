@@ -1,0 +1,27 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-07",
+  "task": "wie-progression-wave4-stuck-ktf-classify-and-engine-walls",
+  "title": "진도 4차 KTF 후속 — 현 핀 600초 재측(docs/report/0470 후속 군집)",
+  "summary": "stuck 70 분류에서 계급을 600초 판정 없이 둔 무리를 현 핀으로 다시 잰다. 나머지 후속 행은 done 회신에 문턱 불통과 사유를 남긴다.",
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "KTF 현 핀 600초 P·P2 재측 — ⒟ 35종 + 이번에 고친 3종",
+      "plainSummary": "막힘으로 표시된 KTF 38종을 지금 엔진으로 10분씩 다시 돌려, 실제로 막히는지 아니면 이미 넘어가는지 판정을 새로 매긴다.",
+      "userBenefit": "지원 현황 페이지의 «막힘» 표시가 지금 엔진 기준으로 맞춰진다 — 이미 넘어가는 타이틀은 막힘 표시가 빠진다.",
+      "why": "이 회차 ⒟ 35종은 짧은 재현만 있어 계급을 정하지 못했다(docs/report/0470 §3). 게이트② 검수자 600초 표본 5종은 ok 2 · stuck 3, 고친 3종 중 2종은 600초 P ok 였다 — 지금 재면 판정이 바뀐다.",
+      "tradeoff": "측정만 하고 엔진은 고치지 않는다. long 빌드 슬롯과 census 잠금을 묶음당 약 1시간+P2 동안 쥐어 다른 레인 스윕이 기다린다.",
+      "effort": "S(사람 손) · 기계 시간 약 3~4시간(jobs 3)",
+      "target": "docs/player-data/compat.json (progress) · scripts/playability-census.mjs --only progress --progress 600"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": [],
+  "notCarded": {
+    "미측정 7 의 L 재측 → P·P2": "census/audit 상한 1장 — 위 카드와 같은 측정 축이라 그 회차에 묶을 수 있다. docs/report/0470 후속 군집에 남김",
+    "넷째 벽 후보 3종(8c71be3ad26d · c3057f46c59b · a10a1f02b41b)": "실기 의미가 미확정이라 «지금 실행 가능» 문턱 미달(a10a1f02b41b 는 DRM 경계 확인 대기). docs/report/0470 §5·후속 군집에 남김",
+    "3185174d2121 빈 안내 상자": "엔진 탓인지 미확인 — «관측 아닌 질문». docs/report/0470 후속 군집에 남김",
+    "lwc 글자 상한의 CLR 엣지": "관측 사례 0(검수자 코드 판독) — «이번 회차 관측» 문턱 미달"
+  }
+}
