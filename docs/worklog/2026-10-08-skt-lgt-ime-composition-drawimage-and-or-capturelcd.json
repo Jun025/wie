@@ -1,0 +1,14 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-08",
+  "task": "wie-skt-lgt-ime-composition-drawimage-and-or-capturelcd",
+  "title": "LGT 입력기·SKT Graphics2D 후속 — 형제 PR 이 먼저 착지 · 저부하 재측",
+  "summary": "#p0 은 #508, #p1 은 #506 이 먼저 착지했다(같은 카드의 중복 배차). 이 PR 은 저부하 재측(be08d047cbae ok)과 독립 재현 측정만 남긴다 — docs/report/0475.",
+  "proposals": [],
+  "adoptedProposals": [],
+  "declinedProposals": [],
+  "notes": {
+    "#p0": "#508 이 채택·착지(docs/worklog/2026-10-08-lgt-input-method-composition.json)",
+    "#p1": "#506 이 채택·착지"
+  }
+}
