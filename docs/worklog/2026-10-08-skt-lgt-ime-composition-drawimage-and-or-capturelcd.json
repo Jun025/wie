@@ -2,15 +2,13 @@
   "schema": "wie-worklog/1",
   "date": "2026-10-08",
   "task": "wie-skt-lgt-ime-composition-drawimage-and-or-capturelcd",
-  "title": "LGT 입력기 글자 조합 · SKT Graphics2D DRAW_AND/OR · captureLCD",
-  "summary": "0469 §6 후속 카드 두 장. #p0(LGT 입력기)는 이 PR 이 구현, #p1(SKT 그림)은 #506 이 먼저 착지. 측정과 판정은 회차 문서 0475.",
+  "title": "LGT 입력기·SKT Graphics2D 후속 — 형제 PR 이 먼저 착지 · 저부하 재측",
+  "summary": "#p0 은 #508, #p1 은 #506 이 먼저 착지했다(같은 카드의 중복 배차). 이 PR 은 저부하 재측(be08d047cbae ok)과 독립 재현 측정만 남긴다 — docs/report/0475.",
   "proposals": [],
-  "adoptedProposals": [
-    "2026-10-07-progression-wave4-skt-lgt-followups#p0",
-    "2026-10-07-progression-wave4-skt-lgt-followups#p1"
-  ],
+  "adoptedProposals": [],
   "declinedProposals": [],
   "notes": {
-    "#p1": "#506 이 먼저 착지(같은 두 벽 + copyLCD). 이 PR 의 SKT 코드는 병합에서 main 쪽을 택해 0 이다 — 측정만 docs/report/0475 §3 에 남긴다."
+    "#p0": "#508 이 채택·착지(docs/worklog/2026-10-08-lgt-input-method-composition.json)",
+    "#p1": "#506 이 채택·착지"
   }
 }

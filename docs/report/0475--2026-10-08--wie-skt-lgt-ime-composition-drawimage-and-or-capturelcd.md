@@ -1,12 +1,12 @@
-## [2026-10-08] LGT 입력기 글자 조합 · SKT Graphics2D DRAW_AND/OR · captureLCD (wie-skt-lgt-ime-composition-drawimage-and-or-capturelcd)
+## [2026-10-08] LGT 입력기·SKT Graphics2D 후속 — 형제 PR 이 먼저 착지 · 저부하 재측 1종 ok (wie-skt-lgt-ime-composition-drawimage-and-or-capturelcd)
 
-**무엇을**: 0469 §6 의 후속 카드 두 장(`2026-10-07-progression-wave4-skt-lgt-followups#p0` · `#p1`)을 함께 진다. ★`#p1`(SKT ②③)은 이 회차가 도는 동안 형제 PR **#506**(`wie-skt-graphics2d-draw-and-or-and-capturelcd` · 0473)이 같은 두 벽 + `XDisplay.copyLCD` 로 먼저 착지했다. 그래서 `main` 병합에서 `graphics_2d.rs` 는 **main 쪽을 택했고 이 PR 의 SKT 코드 변경은 0** 이다. 아래 ②③ 의 측정은 이 브랜치의 첫 구현(같은 의미 — 채널별 AND/OR · 투명 원본 무동작 · 화면 이미지 사본)으로 잰 **독립 재현**으로 남긴다. ① LGT `MC_imHandleInput`(0x130)이 숫자만 확정하던 것을 글자 조합 입력기로 바꿨다. `buf1` 은 이 키로 끝난 글, `buf2` 는 아직 조합 중인 글이다. 0x12e·0x12f 를 `MC_imSetCurrentMode`·`MC_imGetCurrentMode` 로 구현했다(종전 stub `unk7`·`unk6`). ②③ SKT `Graphics2D.drawImage` `DRAW_AND`/`DRAW_OR` · `captureLCD` — 이 브랜치의 첫 구현으로 전/후를 쟀고, 코드는 병합에서 #506 의 것으로 대체됐다. ④ 저부하 재측 3종의 진도를 다시 쟀다.
-**왜**: 운영자 지시(미지원·부분지원 게임 완성도) · 채택 제안 두 건.
-**사용자 영향**: `1cd151222bde` 의 이름 칸에 한글·영문 이름이 들어간다(종전 숫자만 · «가니» 로 확인 대화상자까지 확인). `be08d047cbae` 의 진도가 저부하 짝 재측으로 `ok` 가 됐다(코드 무관). SKT 그림 변화는 #506 의 것이다(0473).
+**무엇을**: 0469 §6 의 후속 카드 두 장(`2026-10-07-progression-wave4-skt-lgt-followups#p0` LGT 입력기 · `#p1` SKT 그림)을 받은 회차다. ★두 카드는 이 회차가 도는 동안 형제 PR 이 먼저 착지했다 — `#p1` = **#506**(0473 · DRAW_AND/OR · captureLCD · copyLCD), `#p0` = **#508**(0474 · buf1/buf2 · 0x12e/0x12f · 천지인). 이 브랜치도 같은 것을 구현해 쟀으나 `main` 병합에서 **코드는 전부 main 쪽을 택했다**(이 PR 의 엔진 코드 변경 0). 이 PR 에 남는 것은 ④ 저부하 재측(`be08d047cbae` progress `stuck → ok`)과, 이 브랜치의 첫 구현으로 잰 전/후 측정(형제 회차의 독립 재현)이다.
+**왜**: 운영자 지시(미지원·부분지원 게임 완성도) · 티켓 4번(저부하 재측). 같은 카드가 세 티켓으로 나뉘어 배차됐다(중복 — 회신에 적는다).
+**사용자 영향**: `be08d047cbae` 의 진도 배지가 `stuck` → `ok`. 나머지 화면 변화는 #506·#508 의 것이다.
 
-타이틀은 sha12 로만 적는다. 프레임 PNG·키 레시피는 커밋하지 않았다(증적 `~/orchestrator/reports/evidence/wie-skt-lgt-ime-composition-drawimage-and-or-capturelcd/`).
+타이틀은 sha12 로만 적는다. 프레임 PNG·키 레시피는 커밋하지 않았다(증적 `~/orchestrator/reports/evidence/wie-skt-lgt-ime-composition-drawimage-and-or-capturelcd/`). 아래 «후»(`wv_fix`)는 **이 브랜치의 첫 구현**이다 — 착지한 #506·#508 코드가 아니다. 의미는 같다(채널별 AND/OR · 투명 원본 무동작 · 화면 이미지 사본 · buf1 = 끝난 글 / buf2 = 조합 중 · `wie_util::keypad`).
 
-### 1. LGT 입력기 — 두 버퍼의 뜻은 호출부에서 읽었다
+### 1. LGT 입력기 — 두 버퍼의 뜻(0474 와 같은 결론 · 독립 역어셈)
 
 `1cd151222bde` 이름 칸에서 0x130 의 귀환 주소(`lr = 0x179f`)를 진단 빌드로 잡아 호출부를 역어셈했다(Thumb · 바이트는 레포 밖).
 
@@ -18,7 +18,7 @@
 - ⇒ `buf1` = 끝난 글(붙인다), `buf2` = 조합 중인 글(보여 주고 다음 호출이 다시 쓴다). 게임이 스스로 붙이는 경로는 `size1 == 0` 일 때만 탄다(`size1 > 0` 이 플래그를 먼저 내린다). 그래서 «키가 바뀌면 지난 글을 buf1 로 돌려준다» 로 구현하면 이중으로 붙지 않는다.
 - 모드: 이 타이틀은 화면에 들어설 때마다 `0x12e(2)` 를 부른다. 2 는 우리 0x12d 표(`EN/S · EN/L · KO · N123`)의 **KO** 다. 화면 오른쪽의 모드 표시도 «가» 다. 종전에는 0x12e 를 무시하고 숫자만 확정했다.
 
-구현(`wie-lgt/src/runtime/wipi_c.rs`):
+이 브랜치의 첫 구현(병합에서 #508 로 대체):
 
 | 항목 | 고른 값 | 근거 |
 |---|---|---|
@@ -32,7 +32,7 @@
 | `ᆢ`(ㆍ 두 번) | `‥` 로 보낸다 | EUC-KR 에 코드가 없다(**가정** — 실기 표시는 모른다) |
 | CLR · `*` | 다루지 않는다 | 이 호출부에 오지 않는다(숫자 키만) |
 
-- 0x12e 를 부르지 않는 타이틀은 0 = `EN/S`(소문자)로 시작한다. 종전에는 숫자만 들어갔다. 이 회차 프로브 A 30종(§4) 중 판정이 바뀐 것은 없다.
+- 0x12e 를 부르지 않는 타이틀은 0 = `EN/S`(소문자)로 시작했다. 이 구현으로 잰 프로브 A 30종(§4) 중 판정이 바뀐 것은 없다.
 
 ### 2. 측정 조건
 
@@ -51,7 +51,7 @@
 
 | sha12 | 대상 | 레시피 | 진도 P 전 | 진도 P 후 | 무엇이 보였나 |
 |---|---|---|---|---|---|
-| `1cd151222bde` | 입력기 | 이름 칸까지 OK 13회 | stuck(정체 440초) | stuck(정체 230초) | 둘 다 이름 칸을 지나 종목 선택 → «레전드 선수 생성» 에서 정책이 맴돈다. 이름이 전 «5» · 후 «ㄴ»(정책 키 `NUM5` · KO 모드). 막힌 자리는 이름 칸이 아니다 — ⒜ 정책 한계 |
+| `1cd151222bde` | 입력기 | 이름 칸까지 OK 13회 | stuck(정체 440초) | stuck(정체 230초) | 둘 다 이름 칸을 지나 종목 선택 → «레전드 선수 생성» 에서 정책이 맴돈다. 이름이 전 «5» · 후 «ㄴ»(정책 키 `NUM5` · KO 모드). 막힌 자리는 이름 칸이 아니다 — ⒜ 정책 한계. ★0474 는 이 행을 `ok` 로 바꿨다(짝 1회 · 접두 없음). 이 회차의 단일 P 는 접두가 달라 그 판정을 뒤집을 근거가 아니다 — compat 는 0474 값 그대로 둔다 |
 | `c107462e5f8a` | AND | 걷기 | ok(170) | ok(170) | 같음 |
 | `d1dce4a36141` | OR·AND | 걷기 | ok(40) | ok(40) | 같음 |
 | `f12984cd0d37` | AND·OR(0469 stub 집계) | — | (재지 않음 · compat stuck) | stuck(470) | 본편 첫 대화 뒤 장비·능력치 화면에서 정책이 맴돈다 |
@@ -91,23 +91,20 @@
 
 ### 5. 되돌리면 red
 
-- `wipic_im_handle_input_commits_finished_text_and_composes_the_rest` — 0x130 본문만 종전(숫자만)으로 되돌린 트리에서 FAILED(EN/L 첫 단언).
-- SKT 시험 두 개(`graphics_2d_and_or_modes_combine_with_the_target` · `graphics_2d_capture_lcd_copies_the_screen`)는 병합 전 트리에서 «되돌리면 red» 를 확인했으나(둘 다 FAILED) **병합에서 버렸다** — #506 이 같은 경로에 자기 시험을 두었다.
+- LGT 시험(`wipic_im_handle_input_commits_finished_text_and_composes_the_rest`)과 SKT 시험 두 개(`graphics_2d_and_or_modes_combine_with_the_target` · `graphics_2d_capture_lcd_copies_the_screen`)는 병합 전 트리에서 «되돌리면 red» 를 확인했으나(둘 다 FAILED) 셋 다 **병합에서 버렸다** — #506·#508 이 같은 경로에 자기 시험을 두었다. 이 PR 에는 «되돌리면 red» 대상 코드가 없다.
 
 ### 6. compat · 소식
 
-- `docs/player-data/compat.json` 두 행만 바꿨다(`node scripts/check-compat-revert.mjs --base origin/main --head HEAD` → OK · 되돌린 필드 0 · 착지 기준 바뀐 행 2).
-  - `1cd151222bde`: 안내 «이름 칸에는 아직 숫자만 들어가요.» 삭제(census `HAND_NOTE` 에서도 삭제). 진도 축은 stuck 그대로(§3).
+- `docs/player-data/compat.json` 한 행만 바꿨다(`node scripts/check-compat-revert.mjs --base origin/main --head HEAD` → COMPATREV).
   - `be08d047cbae`: progress `stuck → ok`(저부하 P·P2 짝 · §3). 이 회차 코드와 무관한 재측이다.
 - SKT 6종은 compat 를 바꾸지 않았다(0473 과 같다 — 진도 그대로).
-- `docs/player-updates/2026-10-08-lgt-name-letters.json`(kind `fix` · `1cd151222bde`) 1개.
+- 소식 파일은 더하지 않았다(`1cd151222bde` 소식은 #508 의 것 · `be08d047cbae` 는 재측이라 «고친 것» 이 아니다).
 
 ### 7. 게이트
 
-- `cargo fmt --check` · `cargo clippy --all -D warnings` · wasm32 · `+beta` 전부 rc=0. `RUST_MIN_STACK=4194304 cargo test --all` **739 passed / 0 failed**(main 병합 뒤 · 병합 전 736). `npm run build:wasm` rc=0 · `check-engine-contract` 113 pass / 0 · `npm run audit` PASSED · census selftest 62/62 · `player-data` OK · `check-docs-report-serial` OK(0475) · `check-worklog-json` OK.
+- `cargo fmt --check` · `cargo clippy --all -D warnings` · wasm32 · `+beta` 전부 rc=0. `RUST_MIN_STACK=4194304 cargo test --all` **739 passed / 0 failed**(#506 병합 뒤 · 병합 전 736). `npm run build:wasm` rc=0 · `check-engine-contract` 113 pass / 0 · `npm run audit` PASSED · census selftest 62/62 · `player-data` OK · `check-docs-report-serial` OK(0475) · `check-worklog-json` OK.
 - 러너 블록(병합 뒤 다시): draw · helloworld ×2 · keydraw ×2(`--inject --expect-last-frame` · rc=0 · paints 79 / 55) · text 전부 PASS.
 - 회차가 띄운 프로세스: 회차 끝에 `wv_base`·`wv_fix`·census 0(`pgrep` 03:58).
 - 측정 임대: `build-slot run --long` 4회(00:59~01:47 · 01:49~03:20 · 03:20~03:44 · 03:44~03:56) · 각 `--jobs ≤ 2` · 착수 전 `host-load-guard --status --recovered` rc=0(두 번째 임대는 rc=0 이 될 때까지 7분 대기) · `nohup` 0.
 - 유입(`scripts/corpus-name-inflow.mjs`): 회차 문서·소식·worklog 는 BOUNDED 0 · SUFFIX-ATTACHED 0. 브랜치 전체는 BOUNDED 340쌍 · SUFFIX-ATTACHED 15쌍 — compat 행의 기존 `title` 과 `wipi_c.rs` 의 기존 주석(0x130 주석 블록을 고쳐 쓰며 옮긴 타이틀 이름 2개 포함 · 새로 넣은 게임명 0)이다.
 
-<!-- corpus-name-inflow v1 subjects=7 tree=7a1650a389cc186d B=733/340 P=0/0 S=35/15 -->
