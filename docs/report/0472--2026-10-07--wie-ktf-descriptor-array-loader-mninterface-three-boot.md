@@ -86,3 +86,9 @@
 | — | ⑴ 3종 | 판정(배치 무관 · 바꾸지 않음) | — |
 | — | ⑵ paint 붙들기 | 판정(10종 퇴행 0 · `070daa5b552c` 는 붙들기 쪽이 빠르다) | — |
 | 1 | `83fc429f9cbe` `GProgressBar` | 엔진 · #501 진행 중 | — |
+
+### 6. 게임 파일명 유입
+
+- 도구 표기 BOUNDED 0쌍 · SUFFIX-ATTACHED 0쌍. 타이틀은 sha12 로만 적었다.
+
+<!-- corpus-name-inflow v1 subjects=1 tree=8b5970bb839a963c B=0/0 P=0/0 S=0/0 -->
