@@ -68,7 +68,7 @@ impl TextComponent {
     }
 
     // Kept so getMaxLength can answer it: d448aee68157's name box calls getMaxLength()I on the
-    // first key it receives, after setMaxLength(5). Nothing caps the typed text yet (keyNotify).
+    // first key it receives, after setMaxLength(5). keyNotify caps the typed text at it.
     async fn set_max_length(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<TextComponent>, max_length: i32) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.lwc.TextComponent::setMaxLength({this:?}, {max_length})");
 
@@ -113,7 +113,7 @@ impl TextComponent {
     // as the javadoc describes the real one doing: digits type (multi-tap Latin, 천지인 Hangul, or the
     // digit for a numeric constraint), CLR takes back the last key or deletes, '*' moves to the next
     // input mode. The text is kept in m_td, the canonical buffer field (see its comment), with the
-    // caret at its end. No length cap: setMaxLength only records the value.
+    // caret at its end, and never longer than setMaxLength (when one was set).
     // 1 = KEY_PRESSED, -16 = CLR as net.wie.CardCanvas sends them.
     async fn key_notify(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<TextComponent>, r#type: i32, key: i32) -> JvmResult<bool> {
         tracing::debug!("org.kwis.msp.lwc.TextComponent::keyNotify({this:?}, {type}, {key})");
@@ -142,7 +142,15 @@ impl TextComponent {
         let Some(edit) = InputMethodHandler::compose(jvm, context, handler, key, Some(&text)).await? else {
             return Ok(true);
         };
-        text.truncate(text.len().saturating_sub(edit.delete));
+        let kept = text.len().saturating_sub(edit.delete);
+        // setMaxLength caps the text: 0c67145b11df sets 4 and copies the text into its own 8-byte
+        // buffer, so typing past 4 killed its game thread (`ArrayIndexOutOfBoundsException: 16 > 8`)
+        // and the name form never closed. A key that would pass the cap does nothing.
+        let max_length: i32 = jvm.get_field(&this, "maxLength", "I").await?;
+        if max_length > 0 && kept + edit.insert.len() > max_length as usize {
+            return Ok(true);
+        }
+        text.truncate(kept);
         text.extend(edit.insert.iter().map(|&c| c as JavaChar));
 
         let mut buffer = jvm.instantiate_array("C", text.len()).await?;
@@ -249,7 +257,11 @@ mod tests {
             let empty = JavaLangString::from_rust_string(&jvm, "").await?;
             let _: () = jvm.invoke_virtual(&name, FIELD, "setString", "(Ljava/lang/String;)V", (empty,)).await?;
             assert_eq!(press(name.clone().into(), "4").await?, "ㄱ");
-            assert_eq!(press(number.into(), "412").await?, "412");
+            assert_eq!(press(number.clone().into(), "412").await?, "412");
+
+            // 0c67145b11df: setMaxLength(4), and a key past it changes nothing.
+            let _: () = jvm.invoke_virtual(&number, FIELD, "setMaxLength", "(I)V", (4,)).await?;
+            assert_eq!(press(number.into(), "5678").await?, "4125");
 
             Ok(())
         })
