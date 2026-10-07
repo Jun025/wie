@@ -217,4 +217,6 @@
 
 ### 9. 게임 파일명 유입
 
-`node scripts/corpus-name-inflow.mjs` 결과는 회신에 적는다. 이 문서는 타이틀을 sha12 로만 적었다.
+`node scripts/corpus-name-inflow.mjs`(이 브랜치 ↔ `origin/main`): BOUNDED 724회/335쌍 + SUFFIX-ATTACHED 36회/16쌍.
+- 전부 기존 줄이다 — `compat.json` 의 `title` 값과 `hardening.rs`·`text_component.rs` 의 기존 주석. 이 회차가 더한 줄에서는 0이다(회차 문서·소식·`hardening.rs`·`shell_component.rs` 를 따로 재면 BOUNDED 2쌍 = `hardening.rs` 의 기존 주석 · SUFFIX 0).
+- 이 문서는 타이틀을 sha12 로만 적었다.
