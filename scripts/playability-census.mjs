@@ -731,7 +731,6 @@ const HAND_WALL = {
 // lines only — the `progress` axis itself stays the policy's verdict.
 const WALK_TIP = '메뉴를 여는 소프트키 없이 방향키와 확인 키로 움직이면 계속 진행돼요.';
 const HAND_NOTE = {
-  '1cd151222bde': ['이름 칸에는 아직 숫자만 들어가요.'],
   '61ed69520fd3': [WALK_TIP],
   c107462e5f8a: [WALK_TIP],
   d1dce4a36141: [WALK_TIP],
