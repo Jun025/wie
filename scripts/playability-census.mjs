@@ -720,6 +720,23 @@ const HAND_WALL = {
   b9bfcaf42722: '처음 실행할 때 게임사 서버에서 인증서를 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.',
   '974e0df9ab1e': '설치 인증(구매 기록)을 확인하는 단계에서 멈춰서, 여기서는 그 뒤로 진행할 수 없어요.',
   f770b15f8876: '설치 인증(구매 기록)을 확인하는 단계에서 멈춰서, 여기서는 그 뒤로 진행할 수 없어요.',
+  // Progress wave 4 (docs/report/0469 §2): the last screen of a `stuck` run, read off the frames.
+  '0093012b8c36': '처음 실행할 때 게임사 서버에서 인증서를 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.',
+  '3ff5948e235e': '게임을 계속하려면 사용자 인증을 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.',
+  caf9d76ffd13: '게임사 서버에 접속하는 화면에서 멈춰서, 여기서는 그 뒤로 진행할 수 없어요.',
+  '73f3a21e981c': '이름을 등록하려면 게임사 서버에 접속해야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.',
+};
+// A line a player needs that no axis can say, added after the axis lines: how a `stuck` title was
+// moved on by hand (a recipe run, docs/report/0442 · 0469), or what a fix still leaves out. Measured
+// lines only — the `progress` axis itself stays the policy's verdict.
+const WALK_TIP = '메뉴를 여는 소프트키 없이 방향키와 확인 키로 움직이면 계속 진행돼요.';
+const HAND_NOTE = {
+  '1cd151222bde': ['이름 칸에는 아직 숫자만 들어가요.'],
+  '61ed69520fd3': [WALK_TIP],
+  c107462e5f8a: [WALK_TIP],
+  d1dce4a36141: [WALK_TIP],
+  '7089dec0e8df': [WALK_TIP],
+  ccb45e6b8d80: [WALK_TIP],
 };
 
 // ── longplay: a guest Java thread that dies uncaught did not survive ───────────────────────────
@@ -1037,6 +1054,7 @@ if (cmd === 'run') {
       .filter(Boolean);
     if (lock) issues.splice(0, issues.length, LOCK_KO[lock]);
     else if (net) issues.splice(0, issues.length, net);
+    else issues.push(...(HAND_NOTE[t.sha.slice(0, 12)] ?? []));
     const changes = prs
       .filter((pr) => names(pr.title, title) && !otherCarrier(pr.title, platform))
       .map((pr) => ({ date: pr.mergedAt.slice(0, 10), enginePin: pr.mergeCommit?.oid ?? null, summary_ko: summaryKo(pr.title), pr: pr.number }));
