@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-07",
+  "kind": "improvement",
+  "titles": [
+    "83fc429f9cbec89c4ce169d5e6c2917c850ba9525f7eb6c983cb77af948b5200"
+  ],
+  "pr": "https://github.com/Jun025/wie/pull/501",
+  "summary_ko": "켜자마자 멈추던 KTF 게임 하나가 이제 첫 화면과 메뉴까지 나와요. 게임을 시작하면 아직 불러오는 화면에서 멈춰요."
+}

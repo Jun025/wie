@@ -1,0 +1,36 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-07",
+  "task": "wie-ktf-kfc-gprogressbar",
+  "title": "KTF com/ktf/kfc/GProgressBar — 83fc429f9cbe 시작 화면",
+  "summary": "83fc429f9cbe 가 적재 후 com/ktf/kfc/GProgressBar 를 찾지 못해 startApp 에서 NPE 로 멈췄다. 실행 추적으로 잰 세 메서드(<init>()V · setMaximum(I)Z · setValue(I)Z)만 넣었다. 첫 화면과 메인 메뉴까지 간다.",
+  "changes": [
+    "wie-wipi-java com/ktf/kfc/GProgressBar — 최댓값·현재값만 보관 · 그리기 없음(게임이 paint 를 부르지 않는다)",
+    "docs/report/0468 · docs/player-updates/2026-10-07-ktf-progress-bar-title-screen.json"
+  ],
+  "verification": [
+    "fmt · clippy stable/beta/wasm32 -D warnings · cargo test --all · 러너 픽스처 PASS",
+    "되돌리면 red: setValue 를 proto 에서 빼면 시험 FAILED",
+    "프로브 A/B 20종(kfc 4 · 표준 KTF 16) — 83fc429f9cbe FAIL→PASS · 나머지 19종 판정 변화 0 · 예외 수 흔들림 3종은 재측에서 base 끼리도 흔들린다 — docs/report/0468 §3"
+  ],
+  "limits": [
+    "부모 Component 와 setter 반환값 true 는 추정이다 — 추적에 근거가 없다(0468 §1)",
+    "게임을 시작하면 불러오기 화면에서 게임 스레드가 null+0x6c 로 죽는다 — 이 클래스와 이어지는 근거는 없고 원인은 조사하지 않았다(0468 §4)"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "83fc429f9cbe 불러오기 화면 — 게임 스레드가 null+0x6c 로 주소 0 분기",
+      "plainSummary": "이제 첫 화면과 메뉴까지 나오는 KTF 게임 하나가, 게임을 시작하면 '불러오는 중' 화면에서 멈춥니다.",
+      "userBenefit": "83fc429f9cbe 를 실제로 플레이할 수 있게 됩니다.",
+      "why": "0468 §4: 이어하기·새로하기 둘 다 불러오기 화면에서 게임 스레드 c.run 이 문자열 줄바꿈(substring · Font.stringWidth 반복) 직후 null 포인터 +0x6c 를 읽고 주소 0 으로 분기한다(lr=0x1489f9). 형제 GFormComponent 주석이 적은 «상속하지 않은 메서드는 vtable 칸이 없어 주소 0» 형태와 닮았지만 확인하지 않았다.",
+      "tradeoff": "원인을 아직 모른다. lr 주변 코드를 scripts/ktf-image-sweep.py window 로 읽는 것부터 시작해야 해서 크기를 미리 정할 수 없다.",
+      "effort": "M",
+      "target": "wie-ktf · wie-wipi-java (원인에 따라)"
+    }
+  ],
+  "adoptedProposals": [
+    "2026-10-07-ktf-relocated-client-bin-loader#p0"
+  ],
+  "declinedProposals": []
+}

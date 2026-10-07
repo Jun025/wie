@@ -16,7 +16,7 @@ use wie_jvm_support::WieJavaClassProto;
 // Measured, not reasoned: with them still registered, `new java/lang/VirtualMachineError()`
 // already threw `InstantiationError`, which only the runtime's ABSTRACT definition does.
 // Locked by `tests/preload_classes_come_from_the_runtime.rs`.
-pub fn get_protos() -> [WieJavaClassProto; 62] {
+pub fn get_protos() -> [WieJavaClassProto; 63] {
     [
         crate::classes::org::kwis::msp::lcdui::ImageObserver::as_proto(),
         crate::classes::org::kwis::msp::lcdui::InputMethodListener::as_proto(),
@@ -80,5 +80,6 @@ pub fn get_protos() -> [WieJavaClassProto; 62] {
         crate::classes::com::ktf::kfc::ChoiceText::as_proto(),
         crate::classes::com::ktf::kfc::GFormComponent::as_proto(),
         crate::classes::com::ktf::kfc::GMenubarForm::as_proto(),
+        crate::classes::com::ktf::kfc::GProgressBar::as_proto(),
     ]
 }
