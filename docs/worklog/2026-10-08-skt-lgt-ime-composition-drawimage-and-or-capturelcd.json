@@ -1,0 +1,13 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-08",
+  "task": "wie-skt-lgt-ime-composition-drawimage-and-or-capturelcd",
+  "title": "LGT 입력기 글자 조합 · SKT Graphics2D DRAW_AND/OR · captureLCD",
+  "summary": "0469 §6 후속 카드 두 장을 함께 진다. 측정과 판정은 회차 문서 0473.",
+  "proposals": [],
+  "adoptedProposals": [
+    "2026-10-07-progression-wave4-skt-lgt-followups#p0",
+    "2026-10-07-progression-wave4-skt-lgt-followups#p1"
+  ],
+  "declinedProposals": []
+}

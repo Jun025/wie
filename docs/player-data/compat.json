@@ -5161,8 +5161,7 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요.",
-    "이름 칸에는 아직 숫자만 들어가요."
+    "소리가 나지 않을 수 있어요."
    ],
    "changes": [],
    "fileTitle": "2010밴쿠버올림픽"
@@ -6540,7 +6539,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
