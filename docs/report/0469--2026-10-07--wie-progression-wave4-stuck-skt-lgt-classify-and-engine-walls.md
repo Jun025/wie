@@ -147,4 +147,4 @@
 - 러너 블록: draw · helloworld ×2 · keydraw ×2(`--inject --expect-last-frame` · rc=0 · paints 79 / 55) · text 전부 PASS.
 - 회차가 띄운 프로세스: 회차 끝에 `wv_*`·census 0(`pgrep` 확인).
 
-<!-- corpus-name-inflow v1 subjects=11 tree=7ce89301ba03e8cf B=792/351 P=1/1 S=45/17 -->
+<!-- corpus-name-inflow v1 subjects=12 tree=1cdfa3b83e6fde23 B=792/351 P=1/1 S=45/17 -->
