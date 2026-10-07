@@ -1,0 +1,14 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-08",
+  "task": "wie-lgt-input-method-letter-composition-multitap-hangul",
+  "title": "LGT 입력기 — 영문 멀티탭 · 천지인 한글 조합 · 모드 설정/조회",
+  "summary": "MC_imHandleInput 의 buf1(확정)·buf2(조합 중) 의미를 1cd151222bde 호출부에서 읽고 wie_util::keypad 로 조합한다. 0x12e·0x12f 를 모드 설정/조회로 붙였다. docs/report/0474.",
+  "proposals": [],
+  "adoptedProposals": ["2026-10-07-progression-wave4-skt-lgt-followups#p0"],
+  "declinedProposals": [],
+  "notCarded": {
+    "나머지 호출 타이틀 7종의 글 입력 화면": "정책 키 600초로 닿지 않는다(서버 선택 확인창 · 두 키 동시 누르기 등 ⒜) — 엔진 벽 관측 0 · 문턱 미달. docs/report/0474 §3",
+    "0x12e 이전 기본 모드(EN/S)": "기기 근거 없음 · 숫자를 넣은 3종은 모두 그 전에 0x12e 를 불렀다 — 이 값이 쓰인 관측 0"
+  }
+}

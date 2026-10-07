@@ -499,7 +499,7 @@ async fn im_get_supported_modes(context: &mut dyn WIPICContext) -> Result<u32> {
     Ok(table)
 }
 
-// The guest side of 0x12e..0x130, read off 1cd151222bde's text field (docs/report/0471 §2):
+// The guest side of 0x12e..0x130, read off 1cd151222bde's text field (docs/report/0474 §2):
 // - `0x12e(i)` takes an index into the 0x12d names; that title steps it with UP/DOWN.
 // - `0x130(key, type, buf1, *size1, buf2, *size2)`, both buffers zero-filled and both sizes 0 on
 //   entry, return ignored. buf1/*size1 is COMMITTED text: the caller copies it over the character
@@ -510,6 +510,8 @@ async fn im_get_supported_modes(context: &mut dyn WIPICContext) -> Result<u32> {
 // - Only key presses reach it: digits, and UP/DOWN/RIGHT/CLR, after which the caller treats what it
 //   shows as committed (it re-measures its text with strlen). No timer — a multi-tap letter is
 //   committed by the next key, which is how the window below can be checked at press time.
+// - Five other callers send key 0x9d, once before any digit or right after one (same buffer layout);
+//   read as «finish the composition», which is what every non-digit key does here.
 // Registering 0x130 at all matters once 0x12c reports modes: 그랜드체이스 goes on to call it and
 // dies on `Unknown LGT WIPIC SVC id 304` without the row.
 // ponytail: the mode before any 0x12e is index 0 (EN/S) — what 0x12f answered when it was a stub,
@@ -1089,7 +1091,7 @@ mod tests {
         Ok(())
     }
 
-    /// 0x130 as 1cd151222bde's text field reads it (docs/report/0471 §2): buf1 is committed, buf2 is
+    /// 0x130 as 1cd151222bde's text field reads it (docs/report/0474 §2): buf1 is committed, buf2 is
     /// the character still composing, both EUC-KR. A digit key in number mode commits itself (the
     /// field stayed empty while this was a no-op); a letter key cycles within the multi-tap window
     /// and is committed by the next different key, the same key after the window, or a non-digit key.
