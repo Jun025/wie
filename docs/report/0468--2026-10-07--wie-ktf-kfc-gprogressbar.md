@@ -58,3 +58,7 @@ head 바이너리에 `RUST_LOG=wie_ktf::runtime::java::interface=debug` 를 걸�
 
 - 4게이트(fmt · clippy stable/beta/wasm32 `-D warnings` · `cargo test --all`) 통과.
 - 시험 `g_progress_bar_takes_maximum_and_value`: 생성 · 두 setter 의 반환값과 저장값을 본다. `setValue` 를 proto 에서 빼면 FAILED 였고, 원상에서 통과했다.
+
+게임 파일명 유입: BOUNDED 0쌍 · SUFFIX-ATTACHED 0쌍(도구 기본 실행 · 브랜치 전체).
+
+<!-- corpus-name-inflow v1 subjects=6 tree=758fe9ba8d3c8d9f B=0/0 P=0/0 S=0/0 -->
