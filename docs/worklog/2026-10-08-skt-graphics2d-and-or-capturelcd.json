@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-08",
+  "task": "wie-skt-graphics2d-draw-and-or-and-capturelcd",
+  "title": "SKT Graphics2D DRAW_AND/OR · captureLCD · XDisplay.copyLCD",
+  "summary": "AND/OR 픽셀 연산과 화면 캡처 2종을 KEmulator 근거로 구현. 전후 측정·진도는 docs/report/0473.",
+  "proposals": [],
+  "adoptedProposals": ["2026-10-07-progression-wave4-skt-lgt-followups#p1"],
+  "declinedProposals": []
+}
