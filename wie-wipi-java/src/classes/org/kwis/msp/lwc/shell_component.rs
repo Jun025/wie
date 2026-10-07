@@ -83,13 +83,49 @@ impl ShellComponent {
         Ok(())
     }
 
+    // The work component is a child of the shell, so keys reach it (key_notify walks the children)
+    // and the guest can take it back by index: 09a6a300994d's profile form calls setWorkComponent
+    // with its text field, then getNumberOfComponent and removeComponent(0) on a key — against an
+    // empty shell that was `ArrayIndexOutOfBoundsException: 0 >= 0` on every key, and the form never
+    // closed. ponytail: a second call adds a second child rather than replacing the first — replacing
+    // needs a field to remember it, and a field here would shift an AOT subclass's field offsets.
     async fn set_work_component(
-        _: &Jvm,
+        jvm: &Jvm,
         _: &mut WieJvmContext,
         this: ClassInstanceRef<Self>,
         component: ClassInstanceRef<Component>,
     ) -> JvmResult<()> {
-        tracing::warn!("stub org.kwis.msp.lwc.ShellComponent::setWorkComponent({this:?}, {component:?})");
+        tracing::debug!("org.kwis.msp.lwc.ShellComponent::setWorkComponent({this:?}, {component:?})");
+
+        if component.is_null() {
+            return Ok(());
+        }
+        let count: i32 = jvm
+            .invoke_virtual(&this, "org/kwis/msp/lwc/ContainerComponent", "getNumberOfComponent", "()I", ())
+            .await?;
+        for i in 0..count {
+            let child: ClassInstanceRef<Component> = jvm
+                .invoke_virtual(
+                    &this,
+                    "org/kwis/msp/lwc/ContainerComponent",
+                    "getComponent",
+                    "(I)Lorg/kwis/msp/lwc/Component;",
+                    (i,),
+                )
+                .await?;
+            if !child.is_null() && child.identity() == component.identity() {
+                return Ok(());
+            }
+        }
+        let _: i32 = jvm
+            .invoke_virtual(
+                &this,
+                "org/kwis/msp/lwc/ContainerComponent",
+                "addComponent",
+                "(Lorg/kwis/msp/lwc/Component;)I",
+                (component,),
+            )
+            .await?;
 
         Ok(())
     }
@@ -425,6 +461,43 @@ mod tests {
                 )
                 .await?;
             assert_eq!(title.identity(), other.identity());
+
+            Ok(())
+        })
+    }
+
+    /// 09a6a300994d's profile form: setWorkComponent(field), then on a key getNumberOfComponent and
+    /// removeComponent(0). The work component is child 0, once however many times it is set.
+    #[test]
+    fn work_component_is_a_child_the_guest_can_remove_by_index() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            const CONTAINER: &str = "org/kwis/msp/lwc/ContainerComponent";
+            let shell = jvm.new_class("org/kwis/msp/lwc/ShellComponent", "()V", ()).await?;
+            let null: ClassInstanceRef<()> = ClassInstanceRef::new(None);
+            let field = jvm
+                .new_class("org/kwis/msp/lwc/TextFieldComponent", "(Ljava/lang/String;I)V", (null, 0))
+                .await?;
+            for _ in 0..2 {
+                let _: () = jvm
+                    .invoke_virtual(
+                        &shell,
+                        "org/kwis/msp/lwc/ShellComponent",
+                        "setWorkComponent",
+                        "(Lorg/kwis/msp/lwc/Component;)V",
+                        (field.clone(),),
+                    )
+                    .await?;
+            }
+            let count: i32 = jvm.invoke_virtual(&shell, CONTAINER, "getNumberOfComponent", "()I", ()).await?;
+            assert_eq!(count, 1);
+            let child: ClassInstanceRef<Component> = jvm
+                .invoke_virtual(&shell, CONTAINER, "getComponent", "(I)Lorg/kwis/msp/lwc/Component;", (0,))
+                .await?;
+            assert_eq!(child.identity(), field.identity());
+
+            let _: () = jvm.invoke_virtual(&shell, CONTAINER, "removeComponent", "(I)V", (0,)).await?;
+            let count: i32 = jvm.invoke_virtual(&shell, CONTAINER, "getNumberOfComponent", "()I", ()).await?;
+            assert_eq!(count, 0);
 
             Ok(())
         })

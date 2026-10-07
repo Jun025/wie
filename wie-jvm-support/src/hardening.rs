@@ -27,8 +27,9 @@
 //! missing overload.** `wie_validate` reports it as a resolution error carrying the descriptor,
 //! so a single trace is enough to pick the next one.
 //!
-//! What remains here is the null guards — the half that panics the host — and one replaced
-//! body, `InputStreamReader.read` (`InputStreamReaderRead`, below), swapped the same way.
+//! What remains here is the null guards — the half that panics the host — one replaced
+//! body, `InputStreamReader.read` (`InputStreamReaderRead`, below), swapped the same way, and
+//! one null the pin refuses that a handset takes (`NullTimeZoneIsDefault`).
 //!
 //! Deliberately NOT covered (measured, not overlooked):
 //! - Pending-thread GC roots need no port at all. The 13-row probe that produced the "six
@@ -64,6 +65,54 @@ impl MethodBody<JavaError, dyn Runtime> for NullArgGuard {
 
         self.inner.call(jvm, context, args).await
     }
+}
+
+/// `Calendar.getInstance(TimeZone)` with a null zone answers the default zone's calendar — what
+/// `getInstance()` returns — where the pin throws `NullPointerException: timeZone`.
+/// 33f3e7669599 (KTF) passes null there from its key handler (no `TimeZone` call precedes it in
+/// the trace), so every key threw and its title screen never moved. It plays on a handset, so the
+/// handset's library takes the null.
+/// ponytail: the default zone (GMT here) is assumed for null — a title that needs a different
+/// zone would show a shifted clock, not an exception.
+struct NullTimeZoneIsDefault {
+    inner: Box<dyn MethodBody<JavaError, dyn Runtime>>,
+}
+
+#[async_trait::async_trait]
+impl MethodBody<JavaError, dyn Runtime> for NullTimeZoneIsDefault {
+    async fn call(&self, jvm: &Jvm, context: &mut (dyn Runtime + 'static), mut args: Box<[JavaValue]>) -> Result<JavaValue, JavaError> {
+        if matches!(args.first(), Some(JavaValue::Object(None))) {
+            let zone: jvm::ClassInstanceRef<()> = jvm
+                .invoke_static("java/util/TimeZone", "getDefault", "()Ljava/util/TimeZone;", ())
+                .await?;
+            args[0] = zone.instance.into();
+        }
+
+        self.inner.call(jvm, context, args).await
+    }
+}
+
+fn default_null_time_zone(proto: &mut RuntimeClassProto) -> bool {
+    let Some(index) = proto
+        .methods
+        .iter()
+        .position(|x| x.name == "getInstance" && x.descriptor == "(Ljava/util/TimeZone;)Ljava/util/Calendar;")
+    else {
+        tracing::error!("hardening: {}::getInstance(TimeZone) not found — null zone NOT defaulted", proto.name);
+        return false;
+    };
+    let old = proto.methods.remove(index);
+    proto.methods.insert(
+        index,
+        JavaMethodProto {
+            name: old.name,
+            descriptor: old.descriptor,
+            access_flags: old.access_flags,
+            body: Box::new(NullTimeZoneIsDefault { inner: old.body }),
+        },
+    );
+
+    true
 }
 
 /// `args` are indices into the *call frame*, so an instance method's `this` is 0.
@@ -313,6 +362,8 @@ pub fn harden(proto: &mut RuntimeClassProto) -> usize {
 
         "java/io/InputStreamReader" => replace_reader_read(proto) as usize,
 
+        "java/util/Calendar" => default_null_time_zone(proto) as usize,
+
         // No `java/util/Timer` arm any more: slice D removed it because the pin declares all
         // four `schedule` forms itself (see the module header). The comment that used to sit
         // here still claimed one-shot `schedule` was absent — the opposite of the measurement
@@ -346,6 +397,7 @@ mod tests {
             ("java/lang/StringBuffer", 1), // slice D: insert(I,String) now upstream
             ("java/lang/String", 6),       // every array-taking <init>
             ("java/io/InputStreamReader", 1),
+            ("java/util/Calendar", 1),
         ] {
             let mut proto = get_runtime_class_proto(name).unwrap();
             assert_eq!(harden(&mut proto), expected, "{name}: hardening not applied");
@@ -420,6 +472,23 @@ mod tests {
                 .await
                 .expect_err("new String((byte[]) null) must throw");
             assert_eq!(exception_class(err), "java/lang/NullPointerException");
+
+            Ok(())
+        })
+    }
+
+    /// 33f3e7669599 calls `Calendar.getInstance(null)` on every key; the pin threw NPE there.
+    #[test]
+    fn calendar_get_instance_with_a_null_zone_uses_the_default_zone() -> Result<()> {
+        run_jvm_test(Box::new([]), |jvm| async move {
+            let null: ClassInstanceRef<()> = None.into();
+            let calendar: ClassInstanceRef<()> = jvm
+                .invoke_static("java/util/Calendar", "getInstance", "(Ljava/util/TimeZone;)Ljava/util/Calendar;", (null,))
+                .await?;
+            let zone: ClassInstanceRef<()> = jvm
+                .invoke_virtual(&calendar, "java/util/Calendar", "getTimeZone", "()Ljava/util/TimeZone;", ())
+                .await?;
+            assert!(!zone.is_null());
 
             Ok(())
         })

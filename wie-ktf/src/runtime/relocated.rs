@@ -150,10 +150,11 @@ pub async fn load(core: &mut ArmCore, jvm: &Jvm, data: &[u8], bss_size: u32) -> 
     Ok(ptr_functions)
 }
 
-/// The image's string literals are prebuilt objects: a `String` `{fields = self + 4 → [slot 5, value, 0,
-/// length]}` over a `char[]` `{self + 4 → [slot 0, length, chars]}`. Two things differ from this JVM's
-/// objects: it numbers vtable slots as classes first appear (the image assumes `char[]` = 0, `String` =
-/// 5), and an object's class sits at `+4` — exactly where these compact literals start their fields.
+/// The image's string literals are prebuilt objects: a `String` `{fields = self + 4 → [0x280, value, 0,
+/// length]}` over a `char[]` `{self + 4 → [0, length, chars]}`. Two things differ from this JVM's
+/// objects: their header word places the class at a fixed record (`char[]` the first, `String` the
+/// second, `0x280 >> 5 = 0x14` = one `JavaClass` record) where the host's classes are wherever they
+/// were made, and an object's class sits at `+4` — exactly where these compact literals start their fields.
 /// The image only ever reads an object through its fields pointer, so each literal keeps its address
 /// and fields and gets a header of the host's shape. 215 · 289 · 208 literals in the three images,
 /// every one of that shape.
@@ -163,8 +164,8 @@ async fn adopt_string_literals(core: &mut ArmCore, jvm: &Jvm) -> Result<()> {
 
     let string_class = resolve(jvm, "java/lang/String").await?;
     let chars_class = resolve(jvm, "[C").await?;
-    let string_slot = vtable_word(core, string_class)?;
-    let chars_slot = vtable_word(core, chars_class)?;
+    let string_slot = header_word(core, string_class)?;
+    let chars_slot = header_word(core, chars_class)?;
     let start: u32 = read_generic(core, IMAGE_BASE + HEADER_STRINGS)?;
     let end: u32 = read_generic(core, IMAGE_BASE + HEADER_GOT_START)?;
 
@@ -196,10 +197,10 @@ async fn adopt_string_literals(core: &mut ArmCore, jvm: &Jvm) -> Result<()> {
     Ok(())
 }
 
-fn vtable_word(core: &mut ArmCore, ptr_class: u32) -> Result<u32> {
+fn header_word(core: &mut ArmCore, ptr_class: u32) -> Result<u32> {
     let class = JavaClassDefinition::from_raw(ptr_class, core);
 
-    Ok((KtfJvmSupport::get_vtable_index(core, &class)? * 4) << 5)
+    KtfJvmSupport::object_header(core, &class)
 }
 
 fn relocate(core: &mut ArmCore, address: u32) -> Result<()> {

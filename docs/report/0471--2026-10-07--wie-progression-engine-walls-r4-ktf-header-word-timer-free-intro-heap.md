@@ -1,0 +1,199 @@
+## [2026-10-07] 진도 벽 4차 — KTF 객체 머리 낱말을 «클래스 레코드 오프셋»으로 · `MC_knlAlloc` 블록을 0 으로 · 인트로·힙·저부하 판정 (wie-progression-engine-walls-r4-ktf-header-word-timer-free-intro-heap)
+
+**무엇을**: 진도 3차(0460 §7)가 남긴 엔진 의심 넷과 저부하 재측 후보 넷을 처분했다. 엔진 수정은 둘이다.
+1. KTF 객체의 첫 필드 낱말을 `(클래스 레코드 − JVM 문맥) << 5` 로 쓴다. 종전에는 `(vtable 표 칸 번호 × 4) << 5` 였다. 호스트가 만드는 클래스 레코드(0x14 바이트)는 힙이 아니라 이미지 바로 아래(`0x80000`)에 둔다(`wie-ktf/.../jvm_support.rs`).
+2. `MC_knlAlloc` 이 돌려주는 블록을 0 으로 채운다. `MC_knlCalloc` 과 같은 길을 탄다(`wie-wipi-c/src/api/kernel.rs` · KTF·LGT 공통).
+
+**왜**: 운영자 지시(2026-09-30 · 10-07 「이어서 필요한 후속 작업들을 완전자율주행으로」). 0460 §3-1·§7 의 남김에 주인 티켓이 없었다.
+
+**사용자 영향**: 2분쯤 지나 꺼지던 KTF 경영 게임 하나(`96dc32e781d3`)와 시작 10초 만에 꺼지던 KTF 고스톱 하나(`f2280c6699a0`)가 이제 끝까지 돈다. 둘 다 진도 `stuck → ok` 이다. 퇴행 짝에서 화면이 까맣기만 하던 KTF 퍼즐 하나(`7ec716a0cec9`)가 `MC_knlAlloc` 수정으로 메뉴·게임까지 그려져 `limited → playable` 이 됐다(§6-2). 재측으로 `c5b3f6835d00` · `8fec741a782d` 도 `stuck → ok` 다(엔진 변경과 무관 — §4·§5).
+
+### 1. `96dc32e781d3` — 객체 머리 낱말의 뜻
+
+#### 1-1. 무엇이 어긋났나
+
+- KTF 이미지의 `init` 은 셋째 인자(JVM 문맥 · 엔진의 `InitParam2`)를 전역에 둔다. 이 타이틀은 `0x1533d0` 에서 `[0x1754a0]` 에 쓴다.
+- 이미지 안의 런타임 함수는 «문맥 + (객체 첫 낱말 `asrs #5`)» 를 **`JavaClass*`** 로 읽는다.
+  - `0x153cf6`(가상 호출): `+0xc` = vtable
+  - `0x154da2`(`aastore`): `+8` = 서술자 → `+0x14` = 원소형
+  - `0x1547a0`(필드 지연 해석): 그 값을 `0x154688`(접근 검사)에 넘긴다. 검사 함수는 `protected` 필드일 때 `[[x+8]+8]`(서술자 → 부모)를 0 이 나올 때까지 따라간다.
+- 엔진은 그 낱말을 `(칸 번호 × 4) << 5` 로 써 왔다. 그러면 «문맥 + 낱말 >> 5» 는 `ptr_java_vtables[칸 − 3]` 의 주소다.
+  - `+0xc` 는 마침 `ptr_java_vtables[칸]` = 진짜 vtable 이다. 그래서 가상 호출은 맞았다.
+  - `+8` 은 **앞 칸의 vtable 포인터**다. 그것을 서술자로 걸어 내려가다 `0x044770e4` 에서 메모리 오류가 났다(0460 §3-1 의 결함 지점 `0x1546f2`).
+- `aastore` 쪽은 같은 쓰레기를 원소형으로 넘기지만, 호스트 `java_check_type` 이 셋째 인자가 0 이 아니면 1 을 돌려줘서 드러나지 않았다.
+
+#### 1-2. 근거 수(⒜ 전수 스캔)
+
+KTF 고유 파일 266종 중 이미지를 꺼낸 264종을 Thumb 역어셈해 `asrs|lsrs rX, rY, #5` → `adds rZ, rB, rX` → `rZ` 를 밑으로 하는 적재/호출을 셌다(스크래치 스크립트 · 커밋 0).
+
+| 형태 | 이미지 수 |
+|---|---|
+| `asrs #5` + `[rZ, #0xc]`(vtable) + `[rZ, #8]`(서술자) + `rZ` 를 인자로 넘기는 호출 | **261** |
+| `lsrs #5` + `[rZ, #0xc]` 만 | 3(재배치 이미지 `1d5831e42a8a` `83fc429f9cbe` `b907b0faf483`) |
+
+- 나머지 2종(`60bd6cbc5936` `dab2d537f3ef`)은 스캔 스크립트(파이썬 `zipfile`)가 안쪽 jar 를 열지 못해 재지 못했다.
+- ⇒ «머리 낱말 → `JavaClass*`» 는 이 타이틀 하나의 사정이 아니다. **표준 KTF 이미지 전부가 같은 런타임을 싣고 같은 뜻으로 읽는다.**
+- 이 타이틀만 죽은 이유는 `+8` 을 실제로 걷는 길이 «다른 패키지의 `protected` 필드 접근»뿐이어서다. 대부분의 타이틀은 그 길을 밟지 않는다.
+- 재배치 이미지의 문자열 상수가 이를 따로 뒷받침한다. 상수의 머리 낱말은 `char[]` = `0`, `String` = `0x280` 이다. `0x280 >> 5 = 0x14` = `JavaClass` 레코드 하나 크기다(0466 은 이것을 «vtable 칸 5» 로 읽었다).
+
+#### 1-3. 선택지(⒝)
+
+| 방법 | 고치는 것 | 위험 | 판정 |
+|---|---|---|---|
+| **머리 형식 변경** — 낱말 = `(클래스 레코드 − 문맥) << 5` | 문맥 + 낱말 >> 5 가 **클래스 그 자체**가 된다. `+0xc`(vtable)는 종전과 같은 값이라 디스패치는 바뀌지 않는다 | 27비트(`asrs`)라 레코드가 문맥에서 ±64MB 안에 있어야 한다. 힙(`0x40000000`)의 호스트 클래스는 닿지 않는다 ⇒ 호스트 레코드를 이미지 아래로 옮겨야 한다 | **채택** |
+| 대리 레코드 표 — 칸마다 `JavaClass` 사본 | `+8`·`+0xc` 는 맞는다 | 정체성이 깨진다. 접근 검사 `0x1546d2`·`0x1546ee` 는 걸어 온 포인터를 진짜 클래스와 `cmp` 한다. «객체 클래스 == 접근자 클래스»(가장 흔한 `protected` 경우)가 거짓이 되어 게임이 `IllegalAccessError` 를 던진다 | 기각 |
+| SVC 대체 / 바이너리 패치 | 해석 함수 하나만 | 함수 주소가 이미지마다 다르다(261개). 패턴 패치는 `+8` 을 읽는 다른 자리(`aastore`)를 남긴다 | 기각 |
+
+#### 1-4. 고친 것
+
+- `KtfJvmSupport::init`: `0x80000`–`0x100000`(512KB)을 매핑한다. 문맥(`InitParam2`)을 `0x80000` 에 두고, 호스트 클래스 레코드는 `0x81000` 부터 차례로 놓는다(`alloc_class_record` · 클래스는 내리지 않으므로 해제 없음).
+  - `class_definition.rs` · `array_class_definition.rs` 의 `JavaClass` 할당이 이 자리를 쓴다.
+  - 문맥이 이미지(`0x100000`)와 호스트 레코드 **아래**에 있으므로 오프셋은 늘 0 이상이다. `lsrs` 를 쓰는 재배치 이미지에도 맞다.
+- `KtfJvmSupport::object_header` 가 낱말을 만든다. 범위를 넘으면 이름 붙은 오류를 낸다(조용히 잘리지 않게).
+- `class_instance.rs`(인스턴스)와 `relocated.rs`(문자열 상수 입양)가 같은 함수를 쓴다.
+- 쓰지 않게 된 `get_vtable_index` 는 지웠다. 128칸짜리 `ptr_java_vtables` 표를 클래스가 129개를 넘으면 넘쳐 쓰던 길도 함께 사라진다. 표 자체는 게스트가 보는 구조체라 그대로 둔다.
+- 시험: `test_array_classes_carry_object_vtable` 에 «문맥 + 낱말 >> 5 == 클래스 레코드 · 그 `+0xc` == vtable» 을 더했다.
+  - **되돌리면 red**: `object_header` 를 칸 번호 꼴(`(offset / 0x14 * 4) << 5`)로 바꾸면 `the header does not lead to the class` 로 실패한다(확인함).
+
+#### 1-5. 전/후
+
+| 실행 | main `f5c02609` | 이 브랜치 |
+|---|---|---|
+| 단발 200초(census P 키) | 112.8초 `159_OK` 메모리 오류 · paints 306 | 286단계 · paints 886 · 오류 없음 |
+| census P 600초+120 | FAIL `159_OK` | PASS · 754/754단계 · paints 3,961 · stall 230 |
+| census P2 | (0460: 같은 자리 같은 오류) | PASS · paints 4,000 · stall 70 |
+| 진도 | stuck | **ok** |
+
+- 마지막 화면은 마을(영화관 경영) 화면과 대화 상자다. 예외 11건은 첫 실행의 `RecordStoreNotFoundException: config`(세이브 없음 — 게임이 잡는다)다.
+
+### 2. `f2280c6699a0` — 타이머 콜백의 `MC_knlFree(0x720061)`
+
+#### 2-1. 원인
+
+진단 빌드(커밋 0)로 «힙 밖 핸들을 `free` 하는 순간의 호출자»와 «그 주소에 호스트가 쓴 기록»을 잡았다.
+
+1. 호출 사슬: 타이머 콜백 → `0x105bd8`(슬롯 표 `p + 0x17c + i*4` 의 레코드를 지운다) → `0x10a90c`(레코드의 `+4` 와 `+0x10` 핸들을 `MC_knlFree`).
+2. 그 레코드는 `MC_knlAlloc(0x14)` 가 준 블록이다(핸들 `0x4904c140` · 데이터 `+12`). 게임은 이 블록을 한 번 받고 한 번도 `free` 하지 않았다.
+3. 게임은 `+0x10` 을 **쓰지 않았다**. 그 자리 값 `0x00720061` 은 UTF-16 `"ar"` 이다.
+4. 호스트 쓰기 기록: 같은 주소에 앞서 JVM 이 `char[]` 를 두 번 만들었다(`"0102CA9E.jar"` · `"19.wdi…"`). GC 가 그 `char[]` 를 거둔 뒤 같은 블록이 `MC_knlAlloc(0x14)` 로 나갔다. 블록 끝 두 낱말은 `".jar"` 가 남은 것이다.
+
+#### 2-2. 판정과 수정
+
+- 게임은 «새로 받은 블록의 안 쓴 필드는 0» 을 전제한다. 이 엔진에서는 WIPI-C 힙과 JVM 힙이 **같은 할당기**를 쓴다. 그래서 새 블록에 거둔 Java 객체의 바이트가 남을 수 있다.
+- 단말에서는 C 힙의 블록이 Java 문자열 글자를 담고 나올 수 없다. 그래서 `MC_knlAlloc` 이 0 으로 채운 블록을 주게 했다(`calloc` 과 같은 함수).
+- `free` 는 건드리지 않았다. 힙 밖 핸들은 여전히 메모리 오류다(삼키지 않는다).
+- 「`MC_knlSetTimer` 가 대기 중 타이머를 바꾸나」 축(wave2 미확인): 이 실행의 타이머는 `0x17cc70` 하나를 100ms 로 다시 거는 것뿐이다. 죽기 직전 `MC_knlUnsetTimer(0x17cb70)` 은 다른 타이머다. 해제·재설정 순서는 원인이 아니었다.
+- 시험: `test_alloc_returns_zeroed_memory` — 먼저 더럽힌 자리를 `alloc` 이 다시 줄 때 0 이어야 한다.
+  - **되돌리면 red**: `alloc` 을 `alloc_or_null` 직행으로 돌리면 실패한다(확인함).
+
+#### 2-3. 전/후
+
+| 실행 | main `f5c02609` | 이 브랜치 |
+|---|---|---|
+| 단발(census P 키) | 9.4초 `07_OK` 메모리 오류 `7471205`(`0x720065`) | 120초 · 166단계 · paints 1,231 · 오류 없음 |
+| census P 600초+120 | FAIL `07_OK` · paints 32 | PASS · 754/754단계 · paints 2,211 · stall 270 |
+| census P2 | (0460: 720초 생존 · stall 10) | PASS · paints 4,502 · stall 0 |
+| 진도 | stuck | **ok** |
+
+- 마지막 화면은 «시나리오 모드를 다시 시작하시겠습니까?» 확인창이다(정책 키가 메뉴를 돈다). 게임판까지 갔다.
+
+### 3. `990ae27f67e6` — 인트로 다음 쪽이 안 나온다: 엔진 벽이 아니다
+
+- 인트로는 `g.ak(Graphics)` 가 그린다. 그릴 때마다 정적 `o` 를 1 올리고, 줄 배열(86줄)에서 `o + i − 5` 번째 줄을 쓴다. `o + i == 91` 이면 멈춘다.
+- 다음 화면으로 넘기는 것은 `g.run()`(`callSerially` 로 750ms 마다)의 `o == 92` 검사다.
+- 키를 누르면 `keyPressed → u(int) → b(IIII) → serviceRepaints` 로 **그 자리에서 한 번 더 그린다**. 그래서 `o` 가 92 에 닿은 뒤 `run()` 이 검사하기 전에 키 그림이 끼면 `o + i − 5 = 87` 을 읽어 `ArrayIndexOutOfBoundsException: 88 > 86` 이 난다. 이것은 `aaload` 경계 검사(`jvm.rs` 의 `offset + count > size`)다.
+- `paint()` 는 시작에 `j = true` 를 세우고 끝에서 내린다. 예외가 `paint` 밖으로 나가면 `j` 가 남아 **그 뒤의 모든 `paint` 가 첫 줄에서 돌아간다.** 화면이 배경에 멈춘 이유다(`run()` 은 92 를 보고 넘어가지만 그려지지 않는다).
+- 확인(이 브랜치 바이너리 · 같은 앞 키):
+  - 인트로 동안 키를 누르지 않으면 → 이야기가 끝까지 나오고 `MISSION 1 START` → 스테이지 화면. 예외 0.
+  - 인트로 중 `*`(Skip) 한 번 → 곧장 `MISSION 1 START` → 스테이지. 예외 0.
+- 판정: 게임 자신의 경쟁 조건이다(검사는 `run()` 에만 있고 그리기 경계는 `== 91` 등식). 진도 정책의 연타가 그것을 밟는다. 엔진을 고칠 근거는 없다 → compat 행은 바꾸지 않았다.
+- 덧붙임(고치지 않음): 이 엔진의 `callSerially` 는 백엔드 큐가 비었을 때나 다시 그리기 직후에만 돈다. 그래서 키 사건이 먼저 처리된다. MIDP 는 «사건 흐름과 직렬» 을 말하지만, 순서를 맞춰도 750ms 창 안의 키 그림은 그대로 끼므로 이 타이틀의 막힘을 없애지는 못한다.
+
+### 4. `c5b3f6835d00` — 힙 고갈: 현행 main 에서 재현되지 않는다
+
+| 실행 | 0454(5회차 · 그때의 main) | main `f5c02609` |
+|---|---|---|
+| census P 600초 | 250초 `366_NUM5` 에서 `Allocation failure` | PASS · 754/754단계 · paints 11,619 · stall 120 |
+
+- 진도 = **ok**(stall 120 < 200 이라 짝 없이 ok · ok 는 부하로 거짓이 될 수 없다).
+- 그 사이 착지한 KTF GC 뿌리 이식(`wie-ktf-guest-gc-roots-port-from-lgt` · #469)이 이 축의 주인이다. 누수 장면을 따로 찾을 필요가 없어졌다.
+
+### 5. 저부하 재측 후보 넷
+
+main `f5c02609` · census P 600초+120 · 2026-10-07 16:55–17:55 측정. `host-load-guard --status --recovered` 가 15분 안에 회복하지 않아 jobs 2 로 돌렸다(idle 0% · load1 12→24).
+
+| sha12 | 0460 P(load1) | 이번 P(load1) | p_stall | 판정 |
+|---|---|---|---|---|
+| `8fec741a782d` | stuck(84) | PASS · paints 7,964(14) | 170 | **ok** — stall < 200 이라 짝 없이 ok. ok 는 부하로 거짓이 될 수 없다 ⇒ ⒝(부하가 만든 거짓 stuck)였다 |
+| `c361632541a7` | stuck(95) | PASS · paints 5,774(15) | 230 | **판정 보류** |
+| `0262a4fe3389` | stuck(57) | PASS · paints 6,436(20) | 260 | **판정 보류** |
+| `1a69522a7d43` | stuck | PASS · paints 12,751(20) | 450 | **판정 보류** |
+
+- 셋은 P 만으로는 stuck 후보다(stall ≥ 200). 짝(P2)이 있어야 stuck 이 확정된다.
+- 짝을 돌릴 «idle 이 충분한 창»이 이 회차 동안 오지 않았다. `host-load-guard --status --recovered` 는 16:2x–01:0x 내내 rc=1 이었다(회복 중 · 포화). census 호스트 잠금도 다른 레인 둘이 번갈아 쥐었다.
+- 그래서 판정을 적지 않았다. compat 은 그대로(stuck)다. ⒜/⒝ 를 가르려면 저부하 창에서 P2 짝을 돌려야 한다(§9).
+
+### 6. 퇴행(전/후 짝)
+
+#### 6-1. 프로브 A·B — KTF 266종 + LGT 15종
+
+- 대상: KTF 고유 266종 전부 + LGT 15종(라이브 `13d7e3c21856` `1b107b96bf4e` `4ece6eeeaa04` `a30bbe008b5e` `b475b6399684` · 가드 `ddd885583b15` · `1a69522a7d43` · playable sha 순 8). `MC_knlAlloc` 이 LGT 에도 걸리므로 LGT 를 넣었다.
+- 방법: census `--only probe`(30초) 를 main `f5c02609` 로 한 번(20:12–21:44 · jobs 3), 이 브랜치로 한 번(21:49–00:07 · jobs 2 — 가드 미회복) 돌렸다. 굶은 프로브 0. 타이틀별 load1 9.8–53.
+- 결과: **281종 · 562짝 중 판정(result·stop·content·소리)이 다른 짝 3 · census 축이 다른 종 3.** 전부 같은 시각 짝으로 다시 쟀다(같은 인자 · 두 바이너리 동시 실행 · 2회).
+
+| sha12 | 축 | census 한 번씩 | 같은 시각 짝 2회 | 판정 |
+|---|---|---|---|---|
+| `f2280c6699a0` | A 판정 | FAIL(`10_OK` 메모리 오류) → PASS | — | 고친 것(§2) |
+| `7ec716a0cec9` | input | none → ok | main none·none / 브랜치 ok·ok | **고친 것**(§6-2) |
+| `65bace1623a7` | B paints·소리 | 266·있음 → 46·없음 | 174·182 ↔ 175·179 · 소리 둘 다 있음 | 굶음 — 브랜치 쪽 B 가 ticks 125k(main 1.34M) · load1 43 |
+| `2cbd63e4427a` | A 소리 | 없음 → 있음 | main 0·2 / 브랜치 2·2 | main 도 흔들린다 — 변경 아님 |
+| `aa3fcba4598b` | input | ok → none | 네 번 모두 none | main 의 census 한 번이 흔들림 — 변경 아님 |
+
+- 예외 수가 다른 짝 9: 첫 예외는 같고 수만 다르다(`image is null` · `RecordStoreNotFoundException` · `NumberFormatException` — 0466 이 «시점 차»로 본 같은 무리). `f2280c6699a0` 의 1 → 0 은 고친 메모리 오류다.
+- 마지막 프레임 색 수가 20 이상 차이 난 짝 중 브랜치 쪽이 크게 낮은 6종(`65ef7052f528` `69e516bb2ffa` `d4188f8ef8c4` `ca7fa8ade8ad` `1b3b4868d46e` `1fe6c1c897d7`)도 같은 시각 짝으로 다시 쟀다. 6종 모두 두 바이너리의 색 수가 같았고 paints 차는 5 이하였다.
+- 라이브 LGT 5 · 가드 2 · 재배치 3 은 A·B 판정과 paints 가 같은 범위다(예: `49ade89578c5` A 888 → 1,300 · `ddd885583b15` A 1,530 → 1,203 — census 한 번씩이라 시점 차).
+
+#### 6-2. `7ec716a0cec9` — 덤으로 고쳐진 타이틀
+
+- main 은 30초 내내 상태 줄만 그리고 화면이 까맣다(A 색 14). 브랜치는 로고 → 메뉴 → 레벨 선택 → 게임판이다(A 색 116 · B 108).
+- 머리 낱말만 고친 중간 바이너리(`1f30a732`)로 같은 A 를 돌리면 색 14 · 까맣다. ⇒ **`MC_knlAlloc` 0 채움이 고쳤다**(§2 와 같은 무리 — 안 쓴 필드를 0 으로 믿는 게임).
+- 장시간(600초 · census L 인자 · 브랜치): UNMEASURED(deadline · 854/900단계 — census L 의 정상 꼴) · paints 11,830 · 예외 0 · 소리 재생 671회. 마지막 장면은 키 설정 메뉴(긴 키 루프가 들어갔다)다.
+
+#### 6-3. 표본 L — 가드
+
+| sha12 | main | 브랜치 |
+|---|---|---|
+| `49ade89578c5`(KTF) | UNMEASURED · 854/900 · paints 19,023 · 예외 0 · 재생 16 | UNMEASURED · 854/900 · paints 18,829 · 예외 0 · 재생 17 |
+| `ddd885583b15`(LGT) | UNMEASURED · 854/900 · paints 22,532 · 예외 0 · 재생 16 | UNMEASURED · 854/900 · paints 24,433 · 예외 0 · 재생 17 |
+
+- main 쪽은 census `--only long`, 브랜치 쪽은 같은 인자를 그대로 쓴 작은 러너(동시 2)로 돌렸다. 브랜치 쪽 census 실행은 다른 레인이 호스트 잠금을 쥐어(00:28–) 멈췄다. 그래서 잠금을 기다리던 내 임대 안에서 3종만 직접 돌렸다.
+- 표본은 계획 6종에서 가드 2종(+ §6-2 의 1종)으로 줄였다. 같은 이유(잠금 대기 · 회차 시간)다.
+
+**퇴행: 0.** 판정이 바뀐 것은 고친 두 종(`f2280c6699a0` · `7ec716a0cec9`)뿐이다.
+
+### 7. compat · 소식
+
+- compat 5행:
+  - `axes.progress` `stuck → ok`: `96dc32e781d3` · `f2280c6699a0` · `c5b3f6835d00` · `8fec741a782d`. 근거는 §1-5 · §2-3 · §4 · §5 의 census 판정(정책 v2 600초)이다.
+  - `7ec716a0cec9`: `limited → playable` · `input no → ok` · `longplay unknown → ok` · `knownIssues_ko` 의 «키를 눌러도 화면이 바뀌지 않을 수 있어요» 삭제. 근거는 §6-2(브랜치 census 판정 = playable · 모든 축 ok).
+- 소식: `docs/player-updates/2026-10-07-ktf-two-crashes-fixed.json`(고친 세 타이틀). 재측으로 바뀐 두 행(`c5b3f6835d00` · `8fec741a782d`)은 이 PR 이 플레이를 바꾸지 않았으므로 소식에 넣지 않았다.
+
+### 8. 게이트(이 브랜치)
+
+- `cargo fmt --all -- --check` OK.
+- clippy `--all` · wasm32 · `+beta` `-D warnings` 전부 rc=0(beta 는 `unused dependency` 경고만).
+- `RUST_MIN_STACK=4194304 cargo test --all` **731 passed / 0 failed**.
+- 러너 블록(엔진 변경): `draw_j2me` · `helloworld_ktf/lgt` · `text_j2me --timeout 5` PASS · `keydraw_ktf/lgt --inject --expect-last-frame` PASS · rc=0(paints 79 · 55).
+- `npm run build:wasm` rc=0 · `check-engine-contract` 113 pass / 0 violation.
+- `player-data.mjs` OK(429 · 407/11/11 · 131 updates) · `check-compat-revert` OK(착지 기준 바뀐 행 5) · `check-docs-report-serial` OK(0471 — 0469 를 #502 가 먼저 잡아 옮겼다) · `check-worklog-json` OK · `npm run audit` PASSED.
+- 유입(`corpus-name-inflow` · 이 브랜치 ↔ main): BOUNDED 332쌍 + SUFFIX-ATTACHED 15쌍 — 전부 compat 의 기존 `title` 필드다. 회차 문서와 소식만 재면 BOUNDED 0 · SUFFIX-ATTACHED 0.
+- worklog: 제안 0(문턱 규칙 — §9 는 측정 하나와 다른 레인 몫이다) — 파일 없음.
+
+### 9. 후속
+
+| 대상 | 내용 | 크기 |
+|---|---|---|
+| `c361632541a7` `0262a4fe3389` `1a69522a7d43` | 저부하 창에서 P2 짝(§5) — ⒜/⒝ 판정만 | S(측정) |
+| `990ae27f67e6` | 게임 경쟁 조건(§3) — 엔진 변경 불요. 진도 판정은 정책 탓 막힘이다. «인트로 중 `*` 로 넘기면 된다»를 `knownIssues_ko` 에 적을지는 SKT 진도 레인(`wie-progression-wave4-stuck-skt-lgt-classify-and-engine-walls`)의 분류에 맡긴다 | S |
+
+<!-- corpus-name-inflow v1 subjects=9 tree=fd0fc34d40c08a57 B=720/332 P=2/1 S=35/15 -->

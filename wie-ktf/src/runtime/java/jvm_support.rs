@@ -26,10 +26,10 @@ use rustjava_runtime::classes::java::{
 };
 
 use wie_backend::System;
-use wie_core_arm::{Allocator, ArmCore};
+use wie_core_arm::ArmCore;
 use wie_jvm_support::JvmSupport;
 use wie_midp::classes::javax::microedition::midlet::MIDlet;
-use wie_util::{Result, WieError, read_generic, read_null_terminated_table, write_generic};
+use wie_util::{Result, WieError, read_generic, write_generic};
 
 use wipi_types::ktf::{ExeInterfaceFunctions, InitParam2, java::JavaClass as RawJavaClass};
 
@@ -74,6 +74,8 @@ struct KtfJvmSupportContext {
     relocated_thread_cell: u32,
     relocated_functions: u32,
     relocated_names: u32,
+    /// Where the next host-made class record goes (see [`CLASS_REGION_BASE`]).
+    next_class_record: u32,
 }
 
 /// The relocated-image runtime's thread-context ABI (`runtime::relocated`), when one is loaded.
@@ -91,6 +93,17 @@ const RELOCATED_HANDLER_OFFSET: u32 = 0x2c;
 
 const SUPPORT_CONTEXT_BASE: u32 = 0x7fff0000;
 
+/// The JVM context handed to the image's `init` (its 3rd argument), then every class record the
+/// host makes. An object's first field word is `(class record - JVM context) << 5`: the image's own
+/// runtime reads `context + (word >> 5)` as the object's `JavaClass` — `+0xc` for the vtable, and
+/// `+8` (the descriptor) for its access check and `aastore` element type (`asrs #5` in 261 of 264
+/// KTF images; the relocated ones use `lsrs`, so the offset stays non-negative). The word has 27
+/// bits, so every class record must sit within 64MB above the context: the image's own records are
+/// at `IMAGE_BASE` and up, so the host's go just below it rather than in the heap at `HEAP_BASE`.
+const CLASS_REGION_BASE: u32 = 0x80000;
+const CLASS_REGION_SIZE: u32 = 0x80000;
+const CLASS_RECORDS_START: u32 = CLASS_REGION_BASE + 0x1000;
+
 pub struct KtfJvmSupport;
 
 impl KtfJvmSupport {
@@ -101,14 +114,14 @@ impl KtfJvmSupport {
             unk3: 0,
             ptr_java_vtables: [0; 128],
         };
-        let ptr_jvm_context = Allocator::alloc(core, size_of::<InitParam2>() as u32)?;
+        core.map(CLASS_REGION_BASE, CLASS_REGION_SIZE)?;
+        let ptr_jvm_context = CLASS_REGION_BASE;
         write_generic(core, ptr_jvm_context, jvm_context)?;
 
-        write_generic(
-            core,
-            SUPPORT_CONTEXT_BASE + offset_of!(KtfJvmSupportContext, ptr_vtables_base) as u32,
-            ptr_jvm_context + 12,
-        )?;
+        let mut context: KtfJvmSupportContext = read_generic(core, SUPPORT_CONTEXT_BASE)?;
+        context.ptr_vtables_base = ptr_jvm_context + offset_of!(InitParam2, ptr_java_vtables) as u32;
+        context.next_class_record = CLASS_RECORDS_START;
+        write_generic(core, SUPPORT_CONTEXT_BASE, context)?;
 
         let protos = [wie_wipi_java::get_protos().into(), wie_midp::get_protos().into()];
         let jvm_implementation = KtfJvmImplementation::new(core);
@@ -320,23 +333,34 @@ impl KtfJvmSupport {
         }
     }
 
-    pub fn get_vtable_index(core: &mut ArmCore, class: &JavaClassDefinition) -> Result<u32> {
-        // TODO remove context
-        let context_data: KtfJvmSupportContext = read_generic(core, SUPPORT_CONTEXT_BASE)?;
-        let ptr_vtables = read_null_terminated_table(core, context_data.ptr_vtables_base)?;
-
-        let ptr_vtable = class.ptr_vtable()?;
-
-        for (index, &current_ptr_vtable) in ptr_vtables.iter().enumerate() {
-            if ptr_vtable == current_ptr_vtable {
-                return Ok(index as _);
-            }
+    /// An object's first field word for `class` (see [`CLASS_REGION_BASE`]).
+    pub fn object_header(core: &ArmCore, class: &JavaClassDefinition) -> Result<u32> {
+        let context: KtfJvmSupportContext = read_generic(core, SUPPORT_CONTEXT_BASE)?;
+        let ptr_jvm_context = context.ptr_vtables_base - offset_of!(InitParam2, ptr_java_vtables) as u32;
+        let offset = class.ptr_raw.wrapping_sub(ptr_jvm_context);
+        if offset >= 1 << 26 {
+            return Err(WieError::FatalError(format!(
+                "class record {:#x} is out of an object header's reach from {ptr_jvm_context:#x}",
+                class.ptr_raw
+            )));
         }
 
-        let index = ptr_vtables.len();
-        write_generic(core, context_data.ptr_vtables_base + (index * size_of::<u32>()) as u32, ptr_vtable)?;
+        Ok(offset << 5)
+    }
 
-        Ok(index as _)
+    /// Space for a host-made class record, in reach of [`Self::object_header`]. Never freed, as
+    /// classes are never unloaded.
+    pub(crate) fn alloc_class_record(core: &mut ArmCore) -> Result<u32> {
+        let mut context: KtfJvmSupportContext = read_generic(core, SUPPORT_CONTEXT_BASE)?;
+        let size = size_of::<RawJavaClass>() as u32;
+        let ptr = context.next_class_record;
+        if ptr < CLASS_RECORDS_START || ptr + size > CLASS_REGION_BASE + CLASS_REGION_SIZE {
+            return Err(WieError::FatalError(format!("no room for a class record at {ptr:#x}")));
+        }
+        context.next_class_record = ptr + size;
+        write_generic(core, SUPPORT_CONTEXT_BASE, context)?;
+
+        Ok(ptr)
     }
 
     pub fn current_java_exception_handler(core: &mut ArmCore) -> Result<u32> {
@@ -732,8 +756,10 @@ mod test {
     #[test]
     fn test_array_classes_carry_object_vtable() -> Result<()> {
         // 6c9f969f089f calls equals(Object) on an int[] through the class's vtable; an array
-        // class with none sent it to address 0. Each array class also needs its own vtable slot:
-        // with a null vtable pointer every one of them took the index the next class then reused.
+        // class with none sent it to address 0. Each array class also needs its own header word.
+        // And the header must lead the image's runtime to the class itself, not just to its vtable:
+        // it reads `context + (word >> 5)` as a `JavaClass` — `+8` for the descriptor in its access
+        // check and `aastore` (96dc32e781d3 walked a vtable table as a class chain and faulted).
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
         let done = Arc::new(AtomicBool::new(false));
         let done_clone = done.clone();
@@ -741,7 +767,8 @@ mod test {
         system.spawn(async move || {
             let (jvm, mut core) = init_jvm(&mut system_clone).await?;
 
-            let mut indexes = Vec::new();
+            let ptr_jvm_context = super::CLASS_REGION_BASE;
+            let mut headers = Vec::new();
             for name in ["[I", "[B"] {
                 let class = jvm.resolve_class(name).await.unwrap();
                 let class = class
@@ -757,9 +784,14 @@ mod test {
                     vtable.find_method("equals", "(Ljava/lang/Object;)Z")?.is_some(),
                     "{name} vtable lacks equals"
                 );
-                indexes.push(KtfJvmSupport::get_vtable_index(&mut core, &class)?);
+                let header = KtfJvmSupport::object_header(&core, &class)?;
+                let seen = ptr_jvm_context + ((header as i32) >> 5) as u32;
+                assert_eq!(seen, class.ptr_raw, "{name}: the header does not lead to the class");
+                let raw: RawJavaClass = read_generic(&core, seen)?;
+                assert_eq!(raw.ptr_vtable, class.ptr_vtable()?);
+                headers.push(header);
             }
-            assert_ne!(indexes[0], indexes[1]);
+            assert_ne!(headers[0], headers[1]);
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())

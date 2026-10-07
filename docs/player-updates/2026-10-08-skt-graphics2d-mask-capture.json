@@ -1,0 +1,11 @@
+{
+  "date": "2026-10-08",
+  "kind": "fix",
+  "titles": [
+    "c107462e5f8a6c1612a7232ed30388dbc48935e5fa2d6650d1e2ba1221217a73",
+    "d1dce4a3614196a6255c898bcdf121a7c4dd656e25925bdd9f8be8768a2ce6d0",
+    "ec2f8f2e02a2d62570222322b5cacaaf39cdabf3d1d8b45ed859ea27a8e54123"
+  ],
+  "pr": "https://github.com/Jun025/wie/pull/506",
+  "summary_ko": "SKT 게임 몇 개에서 로고 자리가 검은 상자로 나오거나, 움직인 캐릭터와 지나간 그림이 지워지지 않고 화면에 겹겹이 남던 문제를 고쳤어요."
+}
