@@ -5506,7 +5506,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6387,7 +6387,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6774,7 +6775,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -7026,7 +7028,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7064,7 +7067,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7083,7 +7086,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7196,7 +7199,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7215,7 +7219,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "unknown",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7234,7 +7238,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7738,7 +7742,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "unknown",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7929,7 +7933,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
