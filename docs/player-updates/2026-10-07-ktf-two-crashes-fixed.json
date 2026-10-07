@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-07",
+  "kind": "fix",
+  "titles": [
+    "96dc32e781d39c44cae4e07ebd32b57ad3c31362885a5f9a441975fff834451f",
+    "f2280c6699a0d98b5f482bdaf0258aba85cc41935f7e67e04376ea5c3a41d9ef"
+  ],
+  "pr": "https://github.com/Jun025/wie/pull/504",
+  "summary_ko": "하다가 갑자기 꺼지던 KTF 게임 두 개(경영 게임 하나, 고스톱 하나)가 이제 꺼지지 않고 계속 진행돼요."
+}
