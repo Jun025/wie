@@ -1,4 +1,11 @@
-use alloc::{boxed::Box, string::ToString, vec};
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
+
+use bytemuck::{Pod, Zeroable};
 
 mod context;
 // ★slice D (orchestrator decision ⒝, 2026-09-16): upstream's LGT-specific graphics
@@ -60,7 +67,7 @@ use wie_backend::{
 };
 use wie_core_arm::{ArmCore, EmulatedFunction, EmulatedFunctionParam, ResultWriter, SvcId};
 use wie_jvm_support::JvmSupport;
-use wie_util::{Result, read_generic, write_generic, write_null_terminated_string_bytes, write_null_terminated_table};
+use wie_util::{Result, keypad, read_generic, write_generic, write_null_terminated_string_bytes, write_null_terminated_table};
 use wie_wipi_c::{
     MethodImpl, WIPICContext, WIPICMethodBody, WIPICResult,
     api::{database, graphics as shared_graphics, kernel, media, misc, net},
@@ -181,8 +188,8 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::DrawPolygon => wie_wipi_c::api::graphics::draw_polygon.into_body(),
         WIPICSvcId::ImGetSupportModeCount => im_get_support_mode_count.into_body(),
         WIPICSvcId::ImGetSupportedModes => im_get_supported_modes.into_body(),
-        WIPICSvcId::Unk7 => unk7.into_body(),
-        WIPICSvcId::Unk6 => unk6.into_body(),
+        WIPICSvcId::ImSetCurrentMode => im_set_current_mode.into_body(),
+        WIPICSvcId::ImGetCurrentMode => im_get_current_mode.into_body(),
         WIPICSvcId::ImHandleInput => im_handle_input.into_body(),
         WIPICSvcId::TimeNow => time_now.into_body(),
         WIPICSvcId::TimeComponent => time_component.into_body(),
@@ -476,48 +483,137 @@ async fn im_get_supported_modes(context: &mut dyn WIPICContext) -> Result<u32> {
     Ok(table)
 }
 
+// The input method's state lives in the guest's root page, so two emulators in one process keep
+// their own (the `TIME_VALUE_PTR` page). Zero is «EN/S, nothing composing» — what 0x12f answered
+// before a title set a mode.
+const IM_STATE_PTR: u32 = 0x7fff1020;
+const IM_TOKENS: usize = 16;
+// The multi-tap window of the other two input methods (SKVM `TextComponentHandler`, lwc).
+const IM_MULTITAP_MS: u64 = 1000;
+
+#[derive(Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
+struct ImState {
+    mode: u32,
+    last_key: u32,
+    last_time: u64,
+    // Chars of `render(tokens)` already handed back in buf1; the rest is the composing text.
+    committed: u32,
+    len: u32,
+    tokens: [u32; IM_TOKENS],
+}
+
+fn im_keypad_mode(mode: u32) -> keypad::Mode {
+    match IM_MODES.get(mode as usize) {
+        Some(&"EN/L") => keypad::Mode::Upper,
+        Some(&"KO") => keypad::Mode::Hangul,
+        Some(&"N123") => keypad::Mode::Digit,
+        _ => keypad::Mode::Lower,
+    }
+}
+
+// 0x12e `MC_imSetCurrentMode(mode)`: an index into 0x12d's table. 1cd151222bde sets 2 (KO) on every
+// screen it enters, its name entry included, so a set also ends any composition.
+async fn im_set_current_mode(context: &mut dyn WIPICContext, mode: u32) -> Result<u32> {
+    tracing::debug!("MC_imSetCurrentMode({mode})");
+    if mode as usize >= IM_MODES.len() {
+        return Ok(0);
+    }
+    let state = ImState { mode, ..Zeroable::zeroed() };
+    write_generic(context, IM_STATE_PTR, state)?;
+    Ok(1)
+}
+
+async fn im_get_current_mode(context: &mut dyn WIPICContext) -> Result<u32> {
+    let state: ImState = read_generic(context, IM_STATE_PTR)?;
+    Ok(state.mode)
+}
+
 // `(key, type, buf1, *size1, buf2, *size2)` — the header's shape, and what 그랜드체이스/놈ZERO pass.
 // At the sites read (그랜드체이스 2/2, 놈ZERO 3/7) callers zero-fill both buffers, preset the sizes and
 // ignore the return. Registering it matters once 0x12c reports modes: 그랜드체이스 goes on to
 // call it and dies on `Unknown LGT WIPIC SVC id 304` without this row.
-// buf1/*size1 is what the key commits; the caller appends it to its field. Measured on
-// 1cd151222bde's name entry (sizes preset to 0, buffers 8 bytes apart): as a no-op every key left
-// the field empty and the title would not leave the screen; committing the digit shows it, and
-// the name is taken.
-// ponytail: number mode only — a digit key commits itself; no multi-tap letters or Hangul
-// composition (that needs buf2/*size2 and a commit timer). Add when a title refuses a digit name.
-async fn im_handle_input(context: &mut dyn WIPICContext, key: u32, r#type: u32, buf1: u32, size1: u32, _buf2: u32, size2: u32) -> Result<u32> {
-    tracing::debug!("MC_imHandleInput({key:#x}, {:#x}, {buf1:#x}, {size1:#x}, {size2:#x})", r#type);
+// What the two buffers mean is read off 1cd151222bde's caller (digit keys only reach it; buffers
+// 8 bytes apart, 5 zeroed each, so one EUC-KR syllable plus NUL fits):
+//   size1 > 0  → it appends buf1 to the field and ends its own «pending» record;
+//   size2 > 0  → it writes buf2 after the field WITHOUT growing its length (the composing text,
+//                shown, retyped by the next call) and records it as pending with the key.
+//   A different key with a pending record and size1 == 0 makes it append the pending text itself.
+// So buf1 = text this key finished, buf2 = text still composing — the handset's split. The text is
+// `wie_util::keypad` (multi-tap Latin, 천지인 Hangul), the rule the lwc and SKVM input methods use:
+// the same key within IM_MULTITAP_MS cycles. N123 commits the digit at once (no composition).
+// ponytail: no CLR / `*` here — they never reach this caller (it filters to digits).
+async fn im_handle_input(context: &mut dyn WIPICContext, key: u32, r#type: u32, buf1: u32, size1: u32, buf2: u32, size2: u32) -> Result<u32> {
+    tracing::debug!("MC_imHandleInput({key:#x}, {:#x}, {buf1:#x}, {size1:#x}, {buf2:#x}, {size2:#x})", r#type);
 
     let key = key as u8;
     if !key.is_ascii_digit() || buf1 == 0 || size1 == 0 {
         return Ok(0);
     }
-    write_null_terminated_string_bytes(context, buf1, &[key])?;
-    write_generic(context, size1, 1u32)?;
-    if size2 != 0 {
-        write_generic(context, size2, 0u32)?;
+    let mut state: ImState = read_generic(context, IM_STATE_PTR)?;
+    let mode = im_keypad_mode(state.mode);
+    let now = context.system().platform().now().raw();
+    let again = state.last_key == key as u32 && now.saturating_sub(state.last_time) < IM_MULTITAP_MS;
+
+    let mut tokens: Vec<char> = state.tokens[..state.len as usize].iter().filter_map(|&c| char::from_u32(c)).collect();
+    keypad::press(mode, &mut tokens, key - b'0', again);
+    let rendered = keypad::render(mode, &tokens);
+    // N123 finishes the digit; otherwise the last char is still composing.
+    let split = if mode == keypad::Mode::Digit {
+        rendered.len()
+    } else {
+        rendered.len() - 1
+    };
+    let split = split.max((state.committed as usize).min(rendered.len()));
+    let start = (state.committed as usize).min(split);
+    let finished: String = rendered[start..split].iter().collect();
+    let rest = &rendered[split..];
+    let composing: String = rest.iter().collect();
+
+    // Keep the shortest tail of tokens that still renders the composing text; if none does, keep
+    // them all and remember how much is finished. Past IM_TOKENS the composition starts over.
+    let (from, done) = match (0..=tokens.len()).find(|&k| keypad::render(mode, &tokens[k..]) == rest) {
+        Some(k) => (k, 0),
+        None => (0, split),
+    };
+    let (from, done) = if tokens.len() - from > IM_TOKENS {
+        (tokens.len(), 0)
+    } else {
+        (from, done)
+    };
+    state.tokens = [0; IM_TOKENS];
+    for (slot, c) in state.tokens.iter_mut().zip(&tokens[from..]) {
+        *slot = *c as u32;
+    }
+    state.len = (tokens.len() - from) as u32;
+    state.committed = done as u32;
+    state.last_key = key as u32;
+    state.last_time = now;
+    write_generic(context, IM_STATE_PTR, state)?;
+
+    let finished = im_encode(&finished);
+    write_null_terminated_string_bytes(context, buf1, &finished)?;
+    write_generic(context, size1, finished.len() as u32)?;
+    if buf2 != 0 && size2 != 0 {
+        let composing = im_encode(&composing);
+        write_null_terminated_string_bytes(context, buf2, &composing)?;
+        write_generic(context, size2, composing.len() as u32)?;
     }
 
     Ok(1)
+}
+
+// EUC-KR, as the guest draws text. `ᆢ` (two ㆍ strokes, a half-typed vowel) has no code there, so
+// it goes out as `‥` (chosen, not measured) rather than as an encoder escape.
+fn im_encode(text: &str) -> Vec<u8> {
+    let text = text.replace('ᆢ', "‥");
+    encoding_rs::EUC_KR.encode(&text).0.into_owned()
 }
 
 async fn unk5(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
     tracing::warn!("stub unk5({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x})");
 
     // media
-
-    Ok(0)
-}
-
-async fn unk6(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
-    tracing::warn!("stub unk6({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x})");
-
-    Ok(0)
-}
-
-async fn unk7(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
-    tracing::warn!("stub unk7({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x})");
 
     Ok(0)
 }
@@ -737,13 +833,13 @@ mod tests {
     use alloc::{boxed::Box, sync::Arc};
     use core::sync::atomic::{AtomicBool, Ordering};
 
-    use test_utils::{TestPlatform, TestPlatformEvent};
+    use test_utils::{TestClock, TestPlatform, TestPlatformEvent};
     use wie_backend::{
         DefaultTaskRunner, Event, System,
         canvas::{ArgbPixel, VecImageBuffer, encode_png},
     };
     use wie_core_arm::{Allocator, ArmCore};
-    use wie_util::{ByteWrite, Result, read_generic, write_generic};
+    use wie_util::{ByteRead, ByteWrite, Result, read_generic, write_generic};
     use wie_wipi_c::WIPICContext;
     use wipi_types::wipic::{WIPICFramebuffer, WIPICImage, WIPICIndirectPtr};
 
@@ -982,11 +1078,14 @@ mod tests {
         Ok(())
     }
 
-    /// A digit key commits itself to buf1/*size1 (1cd151222bde's name entry stayed empty while
-    /// this was a no-op); any other key leaves both buffers as the caller zero-filled them.
+    /// buf1 = what a key finished, buf2 = what is still composing (1cd151222bde's caller appends the
+    /// first and shows the second). N123 commits the digit; Latin cycles a key pressed again inside
+    /// the multi-tap window; KO composes 천지인 syllables. While this was digits-only, the KO name
+    /// field 1cd151222bde selects could hold nothing but digits.
     #[test]
-    fn wipic_im_handle_input_commits_a_digit() -> Result<()> {
-        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+    fn wipic_im_handle_input_commits_finished_text_and_composes_the_rest() -> Result<()> {
+        let clock = TestClock::new();
+        let mut system = System::new(Box::new(TestPlatform::with_clock(clock.clone())), "", "", DefaultTaskRunner);
         let done = Arc::new(AtomicBool::new(false));
         let done_clone = done.clone();
         let system_clone = system.clone();
@@ -994,23 +1093,51 @@ mod tests {
         system.spawn(async move || {
             let (jvm, mut core, _) = init_jvm(&system_clone).await?;
             register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
-            let stub = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::ImHandleInput)?;
+            let handle = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::ImHandleInput)?;
+            let set_mode = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::ImSetCurrentMode)?;
+            let get_mode = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::ImGetCurrentMode)?;
             assert_eq!(WIPICSvcId::ImHandleInput as u32, 0x130);
 
             let mem = Allocator::alloc(&mut core, 0x20)?;
             let (buf2, buf1, size1, size2) = (mem, mem + 8, mem + 0x10, mem + 0x14);
-            core.write_bytes(mem, &[0; 0x20])?;
+            let press = async |core: &mut ArmCore, key: u8| -> Result<(alloc::string::String, alloc::string::String)> {
+                core.write_bytes(mem, &[0; 0x20])?;
+                let _: u32 = core.run_function(handle, &[key as u32, 0x1f6, buf1, size1, buf2, size2]).await?;
+                let read = |core: &ArmCore, buf, size| -> Result<alloc::string::String> {
+                    let len: u32 = read_generic(core, size)?;
+                    let mut bytes = alloc::vec![0; len as usize];
+                    core.read_bytes(buf, &mut bytes)?;
+                    Ok(encoding_rs::EUC_KR.decode(&bytes).0.into_owned())
+                };
+                Ok((read(core, buf1, size1)?, read(core, buf2, size2)?))
+            };
+            let pair = |a: &str, b: &str| (a.into(), b.into());
 
-            let _: u32 = core.run_function(stub, &[b'7' as u32, 0x1f6, buf1, size1, buf2, size2]).await?;
-            let committed: [u8; 2] = read_generic(&core, buf1)?;
-            assert_eq!(committed, [b'7', 0]);
-            assert_eq!(read_generic::<u32, _>(&core, size1)?, 1);
-            assert_eq!(read_generic::<u32, _>(&core, size2)?, 0);
-
+            // N123: the digit is finished at once.
+            let _: u32 = core.run_function(set_mode, &[3]).await?;
+            assert_eq!(press(&mut core, b'7').await?, pair("7", ""));
             core.write_bytes(mem, &[0; 0x20])?;
-            let _: u32 = core.run_function(stub, &[0x9d, 0x1f6, buf1, size1, buf2, size2]).await?;
+            let _: u32 = core.run_function(handle, &[0x9d, 0x1f6, buf1, size1, buf2, size2]).await?;
             let untouched: [u8; 0x20] = read_generic(&core, mem)?;
             assert_eq!(untouched, [0; 0x20]);
+
+            // EN/L: 2 2 → B (cycled in place), 3 finishes it; 3 again after the window is a new D.
+            let _: u32 = core.run_function(set_mode, &[1]).await?;
+            let mode: u32 = core.run_function(get_mode, &[]).await?;
+            assert_eq!(mode, 1);
+            assert_eq!(press(&mut core, b'2').await?, pair("", "A"));
+            assert_eq!(press(&mut core, b'2').await?, pair("", "B"));
+            assert_eq!(press(&mut core, b'3').await?, pair("B", "D"));
+            clock.advance(1500);
+            assert_eq!(press(&mut core, b'3').await?, pair("D", "D"));
+
+            // KO: ㄱ ㅣ ㆍ ㄱ → 각, then ㅣ moves the ㄱ: 가 is finished, 기 composes.
+            let _: u32 = core.run_function(set_mode, &[2]).await?;
+            assert_eq!(press(&mut core, b'4').await?, pair("", "ㄱ"));
+            assert_eq!(press(&mut core, b'1').await?, pair("", "기"));
+            assert_eq!(press(&mut core, b'2').await?, pair("", "가"));
+            assert_eq!(press(&mut core, b'4').await?, pair("", "각"));
+            assert_eq!(press(&mut core, b'1').await?, pair("가", "기"));
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
