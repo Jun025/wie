@@ -166,16 +166,20 @@ pub async fn unset_timer(context: &mut dyn WIPICContext, ptr_timer: WIPICWord) -
 pub async fn alloc(context: &mut dyn WIPICContext, size: WIPICWord) -> Result<WIPICIndirectPtr> {
     tracing::debug!("MC_knlAlloc({size:#x})");
 
-    if size == 0 {
-        return Ok(WIPICIndirectPtr(0));
-    }
-
-    alloc_or_null(context, size)
+    // Zeroed, like a block a device's C heap hands out for the first time. Here that heap is shared
+    // with the JVM, so a fresh block can hold a collected object's bytes — and a title that reads a
+    // field it never wrote frees them as a handle (f2280c6699a0: `MC_knlFree(0x720061)`, the UTF-16
+    // ".jar" left by a destroyed `char[]` in its 0x14-byte record's last field).
+    alloc_zeroed(context, size)
 }
 
 pub async fn calloc(context: &mut dyn WIPICContext, size: WIPICWord) -> Result<WIPICIndirectPtr> {
     tracing::debug!("MC_knlCalloc({size:#x})");
 
+    alloc_zeroed(context, size)
+}
+
+fn alloc_zeroed(context: &mut dyn WIPICContext, size: WIPICWord) -> Result<WIPICIndirectPtr> {
     if size == 0 {
         return Ok(WIPICIndirectPtr(0));
     }
@@ -393,6 +397,23 @@ mod test {
         let free = get_free_memory(&mut context).await?;
         assert!(free > 0x100000, "free {free} shows a KTF title's low-memory notice");
         assert!(free <= get_total_memory(&mut context).await?);
+
+        Ok(())
+    }
+
+    // A block that held a collected JVM object comes back zeroed, not with its bytes (f2280c6699a0).
+    #[futures_test::test]
+    async fn test_alloc_returns_zeroed_memory() -> Result<()> {
+        let mut context = TestContext::new();
+
+        let stale = context.alloc_raw(0)?;
+        context.write_bytes(stale, &[0x61, 0, 0x72, 0, 0xff, 0xff, 0xff, 0xff])?;
+
+        let memory = alloc(&mut context, 8).await?;
+        let mut data = [0xaa; 8];
+        context.read_bytes(context.data_ptr(memory)?, &mut data)?;
+        assert_eq!(context.data_ptr(memory)?, stale);
+        assert_eq!(data, [0; 8]);
 
         Ok(())
     }
