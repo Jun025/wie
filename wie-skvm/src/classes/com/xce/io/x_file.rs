@@ -11,6 +11,7 @@ use rustjava_runtime::classes::java::{
     lang::String,
 };
 
+use wie_backend::zip_entry;
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
 pub(super) const STDSTREAM: i32 = 0;
@@ -331,8 +332,8 @@ impl XFile {
 
     async fn init_with_jar(
         jvm: &Jvm,
-        _context: &mut WieJvmContext,
-        this: ClassInstanceRef<Self>,
+        context: &mut WieJvmContext,
+        mut this: ClassInstanceRef<Self>,
         jar_file: ClassInstanceRef<String>,
         name: ClassInstanceRef<String>,
     ) -> JvmResult<()> {
@@ -343,8 +344,28 @@ impl XFile {
         }
 
         let _: () = jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await?;
-        tracing::warn!("unsupported com.xce.io.XFile::<init>(jarfile, name)");
-        Err(jvm.exception("java/io/IOException", "JAR file selection is not supported").await)
+
+        // KEmulator opens `jarfile` beside the app's own files and reads `name` (leading '/'
+        // dropped) out of it whole. Titles ship a second jar of data next to the main one
+        // (ccb45e6b8d80's `data.jar`) and read every level through this constructor.
+        let jar_path = JavaLangString::to_rust_string(jvm, &jar_file).await?;
+        let entry_name = JavaLangString::to_rust_string(jvm, &name).await?;
+        let Some(data) = context
+            .system()
+            .filesystem()
+            .virtual_file(&jar_path)
+            .and_then(|jar| zip_entry(&jar, entry_name.trim_start_matches('/')))
+        else {
+            return Err(jvm.exception("java/io/IOException", "JAR entry not found").await);
+        };
+
+        let mut bytes = jvm.instantiate_array("B", data.len() as _).await?;
+        jvm.array_raw_buffer_mut(&mut bytes).await?.write(0, &data)?;
+        let entry = jvm.new_class("java/io/ByteArrayInputStream", "([B)V", (bytes,)).await?;
+        // FILE_JAR is read through `is` only when the mode says resource (see `available`/`read`).
+        jvm.put_field(&mut this, "mode", "I", READ_RESOURCE).await?;
+        jvm.put_field(&mut this, "offset", "I", 0).await?;
+        Self::open_jar_entry(jvm, &mut this, entry.into()).await
     }
 
     async fn exists(jvm: &Jvm, context: &mut WieJvmContext, name: ClassInstanceRef<String>) -> JvmResult<bool> {
@@ -660,7 +681,7 @@ mod tests {
 
     use jvm::{Array, ClassInstanceRef, JavaError, Result as JvmResult, runtime::JavaLangString};
     use rustjava_runtime::classes::java::lang::String;
-    use test_utils::run_jvm_test;
+    use test_utils::{TestPlatform, run_jvm_test, run_jvm_test_with_system};
 
     use super::{FILE_JAR, READ_RESOURCE, XFile};
     use crate::classes::com::xce::io::{file_input_stream::FileInputStream, file_output_stream::FileOutputStream};
@@ -691,6 +712,55 @@ mod tests {
 
             Ok(())
         });
+
+        assert!(result.is_ok(), "JVM test failed: {result:?}");
+    }
+
+    // `XFile(jarfile, name)` reads `name` out of a jar the package ships beside its own
+    // (ccb45e6b8d80's `data.jar`); before, every call threw and no level text loaded.
+    #[test]
+    fn jar_file_selection_reads_an_entry_of_a_packaged_jar() {
+        // A stored zip holding `d.txt` = "hi".
+        const JAR: [u8; 110] = [
+            80, 75, 3, 4, 20, 0, 0, 0, 0, 0, 162, 141, 71, 93, 172, 42, 147, 216, 2, 0, 0, 0, 2, 0, 0, 0, 5, 0, 0, 0, 100, 46, 116, 120, 116, 104,
+            105, 80, 75, 1, 2, 20, 3, 20, 0, 0, 0, 0, 0, 162, 141, 71, 93, 172, 42, 147, 216, 2, 0, 0, 0, 2, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 128, 1, 0, 0, 0, 0, 100, 46, 116, 120, 116, 80, 75, 5, 6, 0, 0, 0, 0, 1, 0, 1, 0, 51, 0, 0, 0, 37, 0, 0, 0, 0, 0,
+        ];
+        let result = run_jvm_test_with_system(
+            Box::new([Box::new([XFile::as_proto()])]),
+            Box::new(TestPlatform::new()),
+            |jvm, system| async move {
+                system.filesystem().add_virtual("data.jar", JAR.to_vec());
+                let open = |entry: &'static str| {
+                    let jvm = jvm.clone();
+                    async move {
+                        let jar: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, "data.jar").await?.into();
+                        let name: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, entry).await?.into();
+                        jvm.new_class("com/xce/io/XFile", "(Ljava/lang/String;Ljava/lang/String;)V", (jar, name))
+                            .await
+                            .map(ClassInstanceRef::<XFile>::from)
+                    }
+                };
+
+                let file = open("/d.txt").await?;
+                assert_eq!(jvm.get_field::<i32>(&file, "type", "I").await?, FILE_JAR);
+                let available: i32 = jvm.invoke_virtual(&file, "com/xce/io/XFile", "available", "()I", ()).await?;
+                assert_eq!(available, 2);
+                let out = jvm.instantiate_array("B", 2).await?;
+                let read: i32 = jvm
+                    .invoke_virtual(&file, "com/xce/io/XFile", "read", "([BII)I", (out.clone(), 0, 2))
+                    .await?;
+                assert_eq!(read, 2);
+                assert_eq!(jvm.load_array::<i8>(&out, 0, 2).await?, [b'h' as i8, b'i' as i8]);
+
+                let Err(JavaError::JavaException(exception)) = open("missing.txt").await else {
+                    panic!("a missing entry opened");
+                };
+                assert!(jvm.is_instance(&*exception, "java/io/IOException"));
+
+                Ok(())
+            },
+        );
 
         assert!(result.is_ok(), "JVM test failed: {result:?}");
     }
