@@ -72,7 +72,7 @@ impl JavaClassInstance {
         let zero = iter::repeat_n(0, (field_size + 4) as _).collect::<Vec<_>>();
         core.write_bytes(ptr_fields, &zero)?;
 
-        let vtable_index = KtfJvmSupport::get_vtable_index(core, class)?;
+        let header = KtfJvmSupport::object_header(core, class)?;
 
         write_generic(
             core,
@@ -82,10 +82,10 @@ impl JavaClassInstance {
                 ptr_class: class.ptr_raw,
             },
         )?;
-        write_generic(core, ptr_fields, (vtable_index * 4) << 5)?;
+        write_generic(core, ptr_fields, header)?;
         guest_roots::track(core.id(), ptr_raw, size_of::<RawJavaClassInstance>(), ptr_fields, field_size + 4);
 
-        tracing::trace!("Instantiate {}, vtable_index {vtable_index:#x} at {ptr_raw:#x}", class.name()?);
+        tracing::trace!("Instantiate {}, header {header:#x} at {ptr_raw:#x}", class.name()?);
 
         Ok(Self::from_raw(ptr_raw, core))
     }
