@@ -34,7 +34,7 @@ impl JavaArrayClassDefinition {
         let java_lang_object = jvm.resolve_class("java/lang/Object").await.unwrap();
         let java_lang_object_raw = KtfJvmSupport::class_definition_raw(&*java_lang_object.definition)?;
 
-        let ptr_raw = Allocator::alloc(core, size_of::<RawJavaClass>() as u32)?;
+        let ptr_raw = KtfJvmSupport::alloc_class_record(core)?;
 
         let element_type_name = &name[1..];
         let element_type_raw = if element_type_name.starts_with('L') {
@@ -85,10 +85,8 @@ impl JavaArrayClassDefinition {
 
         // An array is an Object, and the guest dispatches Object's methods on it through the
         // class's vtable like on any other instance. With no vtable, 6c9f969f089f calling
-        // equals(Object) on an int[] read a null table and branched to address 0 — and every array
-        // class shared one vtable slot index (`get_vtable_index` matches a 0 pointer to nothing and
-        // appends it where the next class lands). Built the way a class's is: Object's methods,
-        // in Object's order, in a table of the array class's own.
+        // equals(Object) on an int[] read a null table and branched to address 0. Built the way a
+        // class's is: Object's methods, in Object's order, in a table of the array class's own.
         let vtable = JavaVtable::new(core, &class.class)?;
         write_generic(core, ptr_raw + 12, vtable.ptr_raw)?;
         write_generic(core, ptr_raw + 16, vtable.len()? as u16)?;
