@@ -71,6 +71,13 @@ impl Component {
                 // not the canonical evtListener/evtListenerObj instance fields: an lwc instance field
                 // shifts an LGT AOT subclass's offsets (AnnunciatorComponent.shownHeight, net.wie.ShellCard).
                 JavaFieldProto::new("evtListeners", "Ljava/util/Vector;", FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC),
+                // The component a guest last told `focusNotify(true)` — what hasFocus answers. Static
+                // for the same reason as evtListeners.
+                JavaFieldProto::new(
+                    "notifiedFocus",
+                    "Lorg/kwis/msp/lwc/Component;",
+                    FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC,
+                ),
             ],
             access_flags: ClassAccessFlags::PUBLIC | ClassAccessFlags::ABSTRACT,
         }
@@ -123,8 +130,20 @@ impl Component {
         Ok(true)
     }
 
-    async fn focus_notify(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, focus: bool) -> JvmResult<()> {
-        tracing::warn!("stub org.kwis.msp.lwc.Component::focusNotify({this:?}, {focus:?})");
+    // Records the focus for hasFocus. 70d709c40e10 hands its ID field `focusNotify(true)` itself
+    // and then only lets OK close the dialog while `hasFocus()` says so.
+    async fn focus_notify(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, focus: bool) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lwc.Component::focusNotify({this:?}, {focus:?})");
+
+        let current: ClassInstanceRef<Self> = jvm
+            .get_static_field("org/kwis/msp/lwc/Component", "notifiedFocus", "Lorg/kwis/msp/lwc/Component;")
+            .await?;
+        let is_current = !current.is_null() && current.identity() == this.identity();
+        if focus || is_current {
+            let next = if focus { this } else { None.into() };
+            jvm.put_static_field("org/kwis/msp/lwc/Component", "notifiedFocus", "Lorg/kwis/msp/lwc/Component;", next)
+                .await?;
+        }
 
         Ok(())
     }
@@ -346,13 +365,19 @@ impl Component {
         Ok(())
     }
 
-    // Still false although setFocus is now recorded: only a plain ShellComponent hands keys to the
-    // focused widget, and games that see false keep handling keys themselves — which is what the
-    // titles measured before the focus was recorded relied on. Answering truthfully is its own change.
-    async fn has_focus(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<bool> {
-        tracing::warn!("stub org.kwis.msp.lwc.Component::hasFocus({this:?})");
+    // True only for the component a guest focused through focusNotify — a guest that calls it is
+    // running its own focus and asks back (70d709c40e10 sat on its ID dialog for good while this was
+    // always false). setFocus is still not reported: only a plain ShellComponent hands keys to that
+    // widget, and games that see false keep handling keys themselves, which the titles measured
+    // before setFocus was recorded rely on.
+    async fn has_focus(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<bool> {
+        tracing::debug!("org.kwis.msp.lwc.Component::hasFocus({this:?})");
 
-        Ok(false)
+        let focused: ClassInstanceRef<Self> = jvm
+            .get_static_field("org/kwis/msp/lwc/Component", "notifiedFocus", "Lorg/kwis/msp/lwc/Component;")
+            .await?;
+
+        Ok(!focused.is_null() && focused.identity() == this.identity())
     }
 }
 
@@ -389,6 +414,41 @@ mod tests {
                     .invoke_virtual(&annunciator, "org/kwis/msp/lwc/AnnunciatorComponent", method, "()V", ())
                     .await?;
             }
+
+            Ok(())
+        })
+    }
+
+    /// 70d709c40e10 focuses its ID field with `focusNotify(true)` and lets OK close the dialog only
+    /// while `hasFocus()` answers true; it was always false and the title sat there.
+    #[test]
+    fn has_focus_follows_focus_notify() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            let field = jvm.new_class("org/kwis/msp/lwc/ShellComponent", "()V", ()).await?;
+            let other = jvm.new_class("org/kwis/msp/lwc/ShellComponent", "()V", ()).await?;
+            let has = |c| {
+                let jvm = jvm.clone();
+                async move {
+                    jvm.invoke_virtual::<_, bool>(&c, "org/kwis/msp/lwc/Component", "hasFocus", "()Z", ())
+                        .await
+                }
+            };
+            let notify = |c, focus: bool| {
+                let jvm = jvm.clone();
+                async move {
+                    jvm.invoke_virtual::<_, ()>(&c, "org/kwis/msp/lwc/Component", "focusNotify", "(Z)V", (focus,))
+                        .await
+                }
+            };
+
+            assert!(!has(field.clone()).await?);
+            notify(field.clone(), true).await?;
+            assert!(has(field.clone()).await?);
+            assert!(!has(other.clone()).await?);
+            notify(other.clone(), false).await?;
+            assert!(has(field.clone()).await?, "losing focus elsewhere keeps this one");
+            notify(field.clone(), false).await?;
+            assert!(!has(field).await?);
 
             Ok(())
         })
