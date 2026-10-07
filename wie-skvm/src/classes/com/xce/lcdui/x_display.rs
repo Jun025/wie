@@ -70,9 +70,11 @@ impl XDisplay {
         Ok(())
     }
 
+    // KEmulator: `Graphics2D.captureLCD(x, y, width, height)` drawn into `image.getGraphics()` at
+    // (0, 0, TOP | LEFT); `graphics` is unused. Null or empty arguments stay the no-op they were.
     #[allow(clippy::too_many_arguments)]
     async fn copy_lcd(
-        _jvm: &Jvm,
+        jvm: &Jvm,
         _context: &mut WieJvmContext,
         graphics: ClassInstanceRef<Graphics>,
         image: ClassInstanceRef<Image>,
@@ -81,9 +83,37 @@ impl XDisplay {
         width: i32,
         height: i32,
     ) -> JvmResult<()> {
-        tracing::warn!("stub com.xce.lcdui.XDisplay::copyLCD({graphics:?}, {image:?}, {x}, {y}, {width}, {height})",);
+        tracing::debug!("com.xce.lcdui.XDisplay::copyLCD({graphics:?}, {image:?}, {x}, {y}, {width}, {height})");
 
-        Ok(())
+        if image.is_null() || width <= 0 || height <= 0 {
+            return Ok(());
+        }
+
+        let captured: ClassInstanceRef<Image> = jvm
+            .invoke_static(
+                "com/skt/m/Graphics2D",
+                "captureLCD",
+                "(IIII)Ljavax/microedition/lcdui/Image;",
+                (x, y, width, height),
+            )
+            .await?;
+        let target: ClassInstanceRef<Graphics> = jvm
+            .invoke_virtual(
+                &image,
+                "javax/microedition/lcdui/Image",
+                "getGraphics",
+                "()Ljavax/microedition/lcdui/Graphics;",
+                (),
+            )
+            .await?;
+        jvm.invoke_virtual(
+            &target,
+            "javax/microedition/lcdui/Graphics",
+            "drawImage",
+            "(Ljavax/microedition/lcdui/Image;III)V",
+            (captured, 0, 0, 20),
+        )
+        .await
     }
 
     // Argument names and behaviour from KEmulator's XDisplay (gfx, image, tx, ty, srcImage, sx, sy, sw, sh, mode):
@@ -124,7 +154,7 @@ impl XDisplay {
     }
 
     // No API document for this in the repo; 6e93f26fa2f5 calls it while loading a game and stops on
-    // NoSuchMethodError. A logged no-op like copyLCD above: what it clears (and with what) is unknown.
+    // NoSuchMethodError. A logged no-op: what it clears (and with what) is unknown.
     async fn clear(
         _jvm: &Jvm,
         _context: &mut WieJvmContext,
