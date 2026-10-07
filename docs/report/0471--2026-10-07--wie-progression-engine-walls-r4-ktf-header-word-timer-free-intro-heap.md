@@ -185,6 +185,9 @@ main `f5c02609` · census P 600초+120 · 2026-10-07 16:55–17:55 측정. `host
 - `RUST_MIN_STACK=4194304 cargo test --all` **731 passed / 0 failed**.
 - 러너 블록(엔진 변경): `draw_j2me` · `helloworld_ktf/lgt` · `text_j2me --timeout 5` PASS · `keydraw_ktf/lgt --inject --expect-last-frame` PASS · rc=0(paints 79 · 55).
 - `npm run build:wasm` rc=0 · `check-engine-contract` 113 pass / 0 violation.
+- `player-data.mjs` OK(429 · 407/11/11 · 131 updates) · `check-compat-revert` OK(착지 기준 바뀐 행 5) · `check-docs-report-serial` OK(0471 — 0469 를 #502 가 먼저 잡아 옮겼다) · `check-worklog-json` OK · `npm run audit` PASSED.
+- 유입(`corpus-name-inflow` · 이 브랜치 ↔ main): BOUNDED 332쌍 + SUFFIX-ATTACHED 15쌍 — 전부 compat 의 기존 `title` 필드다. 회차 문서와 소식만 재면 BOUNDED 0 · SUFFIX-ATTACHED 0.
+- worklog: 제안 0(문턱 규칙 — §9 는 측정 하나와 다른 레인 몫이다) — 파일 없음.
 
 ### 9. 후속
 
