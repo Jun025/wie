@@ -95,15 +95,15 @@
 
 ### 6. compat · 소식
 
-- `docs/player-data/compat.json` 한 행만 바꿨다(`node scripts/check-compat-revert.mjs --base origin/main --head HEAD` → COMPATREV).
+- `docs/player-data/compat.json` 한 행만 바꿨다(`node scripts/check-compat-revert.mjs --base origin/main --head HEAD` → OK · 되돌린 필드 0 · 착지 기준 바뀐 행 1).
   - `be08d047cbae`: progress `stuck → ok`(저부하 P·P2 짝 · §3). 이 회차 코드와 무관한 재측이다.
 - SKT 6종은 compat 를 바꾸지 않았다(0473 과 같다 — 진도 그대로).
 - 소식 파일은 더하지 않았다(`1cd151222bde` 소식은 #508 의 것 · `be08d047cbae` 는 재측이라 «고친 것» 이 아니다).
 
 ### 7. 게이트
 
-- `cargo fmt --check` · `cargo clippy --all -D warnings` · wasm32 · `+beta` 전부 rc=0. `RUST_MIN_STACK=4194304 cargo test --all` **739 passed / 0 failed**(#506 병합 뒤 · 병합 전 736). `npm run build:wasm` rc=0 · `check-engine-contract` 113 pass / 0 · `npm run audit` PASSED · census selftest 62/62 · `player-data` OK · `check-docs-report-serial` OK(0475) · `check-worklog-json` OK.
-- 러너 블록(병합 뒤 다시): draw · helloworld ×2 · keydraw ×2(`--inject --expect-last-frame` · rc=0 · paints 79 / 55) · text 전부 PASS.
+- `cargo fmt --check` · `cargo clippy --all -D warnings` · wasm32 · `+beta` 전부 rc=0. `RUST_MIN_STACK=4194304 cargo test --all` **739 passed / 0 failed**(#506·#508 병합 뒤 · 엔진 코드 = main · 병합 전 736). `npm run build:wasm` rc=0 · `check-engine-contract` 113 pass / 0 · `npm run audit` PASSED · census selftest 62/62 · `player-data` OK · `check-docs-report-serial` OK(0475) · `check-worklog-json` OK.
+- 러너 블록(#506 병합 뒤 · #508 병합 뒤에는 엔진 차이가 0 이라 다시 돌리지 않았다): draw · helloworld ×2 · keydraw ×2(`--inject --expect-last-frame` · rc=0 · paints 79 / 55) · text 전부 PASS.
 - 회차가 띄운 프로세스: 회차 끝에 `wv_base`·`wv_fix`·census 0(`pgrep` 03:58).
 - 측정 임대: `build-slot run --long` 4회(00:59~01:47 · 01:49~03:20 · 03:20~03:44 · 03:44~03:56) · 각 `--jobs ≤ 2` · 착수 전 `host-load-guard --status --recovered` rc=0(두 번째 임대는 rc=0 이 될 때까지 7분 대기) · `nohup` 0.
 - 유입(`scripts/corpus-name-inflow.mjs`): 회차 문서·소식·worklog 는 BOUNDED 0 · SUFFIX-ATTACHED 0. 브랜치 전체는 BOUNDED 340쌍 · SUFFIX-ATTACHED 15쌍 — compat 행의 기존 `title` 과 `wipi_c.rs` 의 기존 주석(0x130 주석 블록을 고쳐 쓰며 옮긴 타이틀 이름 2개 포함 · 새로 넣은 게임명 0)이다.
