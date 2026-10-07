@@ -5,7 +5,7 @@ use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
-use wie_util::keypad::{self, Edit, Mode, Op};
+use wie_util::keypad::{self, Edit, MULTITAP_MS, Mode, Op};
 
 use crate::classes::org::kwis::msp::lcdui::InputMethodListener;
 
@@ -17,7 +17,6 @@ const CLEAR: i32 = -16; // the WIPI CLR key code (net/wie/CardCanvas)
 const INSERT: i32 = -1;
 const REPLACE: i32 = 0;
 const DELETE: i32 = 1;
-const MULTITAP_MS: i64 = 1000;
 // The mode numbers. Only 3 is measured: 9789fec50f39 and b22a7fcfb406 both setCurrentMode(3) on a
 // name prompt, 9789fec50f39 erases every digit typed there but keeps Hangul, and b22a7fcfb406's own
 // strip «가 A a 1» highlights 가 at 3. The rest follow that strip's order as changeCurrentModeToNext
