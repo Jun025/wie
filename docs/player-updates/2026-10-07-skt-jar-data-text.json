@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-07",
+  "kind": "fix",
+  "titles": [
+    "ccb45e6b8d809e459fa32d4ec8d8d16d457c938430dd40318dd462ef45887512"
+  ],
+  "pr": "https://github.com/Jun025/wie/pull/502",
+  "summary_ko": "게임과 함께 들어 있는 자료 묶음을 읽지 못해 일정 장면의 대화창이 비어 있던 SKT 육성 게임 하나가 이제 글과 고르기 창을 보여 줘요."
+}
