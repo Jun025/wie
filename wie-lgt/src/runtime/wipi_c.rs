@@ -480,11 +480,26 @@ async fn im_get_supported_modes(context: &mut dyn WIPICContext) -> Result<u32> {
 // At the sites read (그랜드체이스 2/2, 놈ZERO 3/7) callers zero-fill both buffers, preset the sizes and
 // ignore the return. Registering it matters once 0x12c reports modes: 그랜드체이스 goes on to
 // call it and dies on `Unknown LGT WIPIC SVC id 304` without this row.
-// ponytail: no IME — input is not composed; implement when a title needs typed text.
-async fn im_handle_input(_context: &mut dyn WIPICContext, key: u32, r#type: u32) -> Result<u32> {
-    tracing::warn!("stub MC_imHandleInput({key:#x}, {:#x})", r#type);
+// buf1/*size1 is what the key commits; the caller appends it to its field. Measured on
+// 1cd151222bde's name entry (sizes preset to 0, buffers 8 bytes apart): as a no-op every key left
+// the field empty and the title would not leave the screen; committing the digit shows it, and
+// the name is taken.
+// ponytail: number mode only — a digit key commits itself; no multi-tap letters or Hangul
+// composition (that needs buf2/*size2 and a commit timer). Add when a title refuses a digit name.
+async fn im_handle_input(context: &mut dyn WIPICContext, key: u32, r#type: u32, buf1: u32, size1: u32, _buf2: u32, size2: u32) -> Result<u32> {
+    tracing::debug!("MC_imHandleInput({key:#x}, {:#x}, {buf1:#x}, {size1:#x}, {size2:#x})", r#type);
 
-    Ok(0)
+    let key = key as u8;
+    if !key.is_ascii_digit() || buf1 == 0 || size1 == 0 {
+        return Ok(0);
+    }
+    write_null_terminated_string_bytes(context, buf1, &[key])?;
+    write_generic(context, size1, 1u32)?;
+    if size2 != 0 {
+        write_generic(context, size2, 0u32)?;
+    }
+
+    Ok(1)
 }
 
 async fn unk5(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {
@@ -955,6 +970,47 @@ mod tests {
             core.write_bytes(not_a_handle, &[0; 0x20])?;
             let bpp: u32 = core.run_function(stub, &[not_a_handle]).await?;
             assert_eq!(bpp, 16);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    /// A digit key commits itself to buf1/*size1 (1cd151222bde's name entry stayed empty while
+    /// this was a no-op); any other key leaves both buffers as the caller zero-filled them.
+    #[test]
+    fn wipic_im_handle_input_commits_a_digit() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, mut core, _) = init_jvm(&system_clone).await?;
+            register_wipic_svc_handler(&mut core, &system_clone, &jvm)?;
+            let stub = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::ImHandleInput)?;
+            assert_eq!(WIPICSvcId::ImHandleInput as u32, 0x130);
+
+            let mem = Allocator::alloc(&mut core, 0x20)?;
+            let (buf2, buf1, size1, size2) = (mem, mem + 8, mem + 0x10, mem + 0x14);
+            core.write_bytes(mem, &[0; 0x20])?;
+
+            let _: u32 = core.run_function(stub, &[b'7' as u32, 0x1f6, buf1, size1, buf2, size2]).await?;
+            let committed: [u8; 2] = read_generic(&core, buf1)?;
+            assert_eq!(committed, [b'7', 0]);
+            assert_eq!(read_generic::<u32, _>(&core, size1)?, 1);
+            assert_eq!(read_generic::<u32, _>(&core, size2)?, 0);
+
+            core.write_bytes(mem, &[0; 0x20])?;
+            let _: u32 = core.run_function(stub, &[0x9d, 0x1f6, buf1, size1, buf2, size2]).await?;
+            let untouched: [u8; 0x20] = read_generic(&core, mem)?;
+            assert_eq!(untouched, [0; 0x20]);
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())

@@ -5161,7 +5161,8 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
+    "소리가 나지 않을 수 있어요.",
+    "이름 칸에는 아직 숫자만 들어가요."
    ],
    "changes": [],
    "fileTitle": "2010밴쿠버올림픽"
@@ -5305,7 +5306,7 @@
    "platform": "LGT",
    "model": "clet",
    "title": "냐옹타이쿤2",
-   "status": "playable",
+   "status": "limited",
    "axes": {
     "boot": "ok",
     "render": "ok",
@@ -5315,7 +5316,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "게임사 서버에 접속하는 화면에서 멈춰서, 여기서는 그 뒤로 진행할 수 없어요."
+   ],
    "changes": [],
    "fileTitle": "냐옹타이쿤2"
   },
@@ -5503,7 +5506,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -5590,7 +5593,7 @@
    "platform": "LGT",
    "model": "clet",
    "title": "리듬스타2",
-   "status": "playable",
+   "status": "limited",
    "axes": {
     "boot": "ok",
     "render": "ok",
@@ -5600,7 +5603,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "처음 실행할 때 게임사 서버에서 인증서를 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요."
+   ],
    "changes": [],
    "fileTitle": "리듬스타2"
   },
@@ -5990,7 +5995,7 @@
    "platform": "LGT",
    "model": "clet",
    "title": "아니마",
-   "status": "playable",
+   "status": "limited",
    "axes": {
     "boot": "ok",
     "render": "ok",
@@ -6000,7 +6005,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "게임을 계속하려면 사용자 인증을 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요."
+   ],
    "changes": [],
    "fileTitle": "아니마"
   },
@@ -6380,7 +6387,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -6562,7 +6570,7 @@
    "platform": "LGT",
    "model": "aot-java",
    "title": "훼밀리마트타이쿤",
-   "status": "playable",
+   "status": "limited",
    "axes": {
     "boot": "ok",
     "render": "ok",
@@ -6572,7 +6580,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "이름을 등록하려면 게임사 서버에 접속해야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요."
+   ],
    "changes": [],
    "fileTitle": "훼밀리마트타이쿤"
   },
@@ -6610,7 +6620,9 @@
     "speed": "unknown",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "메뉴를 여는 소프트키 없이 방향키와 확인 키로 움직이면 계속 진행돼요."
+   ],
    "changes": [],
    "fileTitle": "SD한국전쟁"
   },
@@ -6687,7 +6699,8 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
+    "소리가 나지 않을 수 있어요.",
+    "메뉴를 여는 소프트키 없이 방향키와 확인 키로 움직이면 계속 진행돼요."
    ],
    "changes": [],
    "fileTitle": "교실이데아"
@@ -6762,7 +6775,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
@@ -6956,7 +6970,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "메뉴를 여는 소프트키 없이 방향키와 확인 키로 움직이면 계속 진행돼요."
+   ],
    "changes": [],
    "fileTitle": "디지몬 RPG II"
   },
@@ -7012,7 +7028,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7050,7 +7067,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7069,7 +7086,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7182,7 +7199,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7201,7 +7219,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "unknown",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7220,7 +7238,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7625,7 +7643,8 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
+    "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요.",
+    "메뉴를 여는 소프트키 없이 방향키와 확인 키로 움직이면 계속 진행돼요."
    ],
    "changes": [],
    "fileTitle": "어스토니시아ep3"
@@ -7723,7 +7742,7 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "unknown",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -7914,7 +7933,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -8129,7 +8149,8 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
+    "소리가 나지 않을 수 있어요.",
+    "메뉴를 여는 소프트키 없이 방향키와 확인 키로 움직이면 계속 진행돼요."
    ],
    "changes": [],
    "fileTitle": "프린세스메이커4 큰화면"

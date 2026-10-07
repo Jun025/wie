@@ -443,6 +443,12 @@ vtable = [
     # lastIndexOf(II) (24); only a forward scan advances `from` past the last hit (lastIndexOf
     # from i+1 would find i again). The rule puts indexOf(II) here, between 21 and 23.
     { name = "indexOf", descriptor = "(II)I", index = 22 },
+    # 70d709c40e10, reached once its ID dialog took OK (measured 2026-10-07, call site disassembled,
+    # lr 0xf820): r1 = #0x3e ('>', a char constant) and r2 a stale heap word — ONE int argument; the
+    # result is tested `cmp r0, #0 ; ble` and then passed as r2 of a slot-28 dispatch with r1 = 0,
+    # `s = s.substring(0, i)`. indexOf(I) is already 21; lastIndexOf(I) has the same shape and the
+    # rule puts it here, between indexOf(II) 22 and lastIndexOf(II) 24.
+    { name = "lastIndexOf", descriptor = "(I)I", index = 23 },
     # The same split loop's other half, and its next wall once 21 landed (measured 2026-09-24):
     # after `substring(0, i)` at 28 the loop does `s = s.<27>(i + 1)` — r0 = s, r1 = i + 1 and
     # nothing else, i.e. ONE int argument — and stores the result to the loop's string slot, which

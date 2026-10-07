@@ -102,6 +102,22 @@ pub fn extract_zip(zip: &[u8]) -> Result<BTreeMap<String, Vec<u8>>> {
     Ok(strip_common_wrapper_dir(reroot_at_marker(files)))
 }
 
+/// One entry of a zip archive by its exact name. Unlike `extract_zip` it does not re-root: a
+/// guest naming an entry inside a jar it ships (SKT `XFile(jarfile, name)`) means that path.
+pub fn zip_entry(zip: &[u8], name: &str) -> Option<Vec<u8>> {
+    extern crate std; // XXX
+
+    use std::io::{Cursor, Read};
+    use zip::ZipArchive;
+
+    let mut archive = ZipArchive::new(Cursor::new(zip)).ok()?;
+    let mut file = archive.by_name(name).ok()?;
+    let mut data = Vec::new();
+    file.read_to_end(&mut data).ok()?;
+
+    Some(data)
+}
+
 /// A game archive's marker (`__adf__`, `app_info`, `*.msd`) sits at the root. When none does but
 /// exactly one directory holds one, that directory IS the game: re-root there and drop what lies
 /// outside it. Measured 2026-09-27: 3 KTF titles nest the game two or three levels deep, two of
