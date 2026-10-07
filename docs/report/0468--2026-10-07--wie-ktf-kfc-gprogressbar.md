@@ -61,4 +61,4 @@ head 바이너리에 `RUST_LOG=wie_ktf::runtime::java::interface=debug` 를 걸�
 
 게임 파일명 유입: BOUNDED 0쌍 · SUFFIX-ATTACHED 0쌍(도구 기본 실행 · 브랜치 전체).
 
-<!-- corpus-name-inflow v1 subjects=6 tree=758fe9ba8d3c8d9f B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=6 tree=f3c8a4a13cf5a12e B=0/0 P=0/0 S=0/0 -->
