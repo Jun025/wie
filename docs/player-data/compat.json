@@ -55,7 +55,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -95,7 +96,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "«스토리 모드»는 시작할 때 서버에 접속하려 해서, 여기서는 글자 없는 안내 상자에서 멈춰요."
+   ],
    "changes": [],
    "fileTitle": "간호사타이쿤"
   },
@@ -647,7 +650,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "랭킹 메뉴는 옛 통신사 서버에 접속해야 해서, 여기서는 «통신장애입니다» 안내가 나와요."
+   ],
    "changes": [],
    "fileTitle": "대물낚시광2"
   },
@@ -701,7 +706,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -1122,7 +1128,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -1558,7 +1565,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -1614,7 +1622,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -1632,7 +1641,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -1650,7 +1660,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2085,7 +2096,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2373,7 +2385,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "게임사 서버에 접속하는 메뉴는 여기서는 «서버 접속 중…»에서 넘어가지 않아요."
+   ],
    "changes": [],
    "fileTitle": "삼국쟁패2"
   },
@@ -2774,7 +2788,8 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
+    "소리가 나지 않을 수 있어요.",
+    "게임을 시작할 때 옛 통신사 서버에 접속해야 해서, 여기서는 «네트워크 접속 실패» 안내가 나온 뒤 처음으로 돌아가요."
    ],
    "changes": [],
    "fileTitle": "아르덴전기"
@@ -2829,7 +2844,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "unknown",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2866,7 +2882,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "stuck"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4568,7 +4585,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "서버에 접속하는 단계에서 «네트워크 문제로 서버에 접속하지 못하였습니다» 안내가 나와, 여기서는 그 뒤로 진행할 수 없어요."
+   ],
    "changes": [],
    "fileTitle": "트랜스포머"
   },
@@ -4701,7 +4720,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "서버에 접속하는 단계에서 «네트워크 접속에 실패하였습니다» 안내가 나와, 여기서는 그 뒤로 진행할 수 없어요."
+   ],
    "changes": [],
    "fileTitle": "폴라폴리2007"
   },
