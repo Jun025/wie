@@ -195,3 +195,5 @@ main `f5c02609` · census P 600초+120 · 2026-10-07 16:55–17:55 측정. `host
 |---|---|---|
 | `c361632541a7` `0262a4fe3389` `1a69522a7d43` | 저부하 창에서 P2 짝(§5) — ⒜/⒝ 판정만 | S(측정) |
 | `990ae27f67e6` | 게임 경쟁 조건(§3) — 엔진 변경 불요. 진도 판정은 정책 탓 막힘이다. «인트로 중 `*` 로 넘기면 된다»를 `knownIssues_ko` 에 적을지는 SKT 진도 레인(`wie-progression-wave4-stuck-skt-lgt-classify-and-engine-walls`)의 분류에 맡긴다 | S |
+
+<!-- corpus-name-inflow v1 subjects=9 tree=fd0fc34d40c08a57 B=720/332 P=2/1 S=35/15 -->
