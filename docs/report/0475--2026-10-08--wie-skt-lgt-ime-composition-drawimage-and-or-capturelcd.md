@@ -96,7 +96,7 @@
 
 ### 6. compat · 소식
 
-- `docs/player-data/compat.json` 두 행만 바꿨다(`node scripts/check-compat-revert.mjs --base origin/main --head HEAD` → 아래 §7).
+- `docs/player-data/compat.json` 두 행만 바꿨다(`node scripts/check-compat-revert.mjs --base origin/main --head HEAD` → OK · 되돌린 필드 0 · 착지 기준 바뀐 행 2).
   - `1cd151222bde`: 안내 «이름 칸에는 아직 숫자만 들어가요.» 삭제(census `HAND_NOTE` 에서도 삭제). 진도 축은 stuck 그대로(§3).
   - `be08d047cbae`: progress `stuck → ok`(저부하 P·P2 짝 · §3). 이 회차 코드와 무관한 재측이다.
 - SKT 6종은 compat 를 바꾸지 않았다(0473 과 같다 — 진도 그대로).
@@ -104,7 +104,7 @@
 
 ### 7. 게이트
 
-- `cargo fmt --check` · `cargo clippy --all -D warnings` · wasm32 · `+beta` 전부 rc=0. `RUST_MIN_STACK=4194304 cargo test --all` **739 passed / 0 failed**(main 병합 뒤 · 병합 전 736). `npm run build:wasm` rc=0 · `check-engine-contract` 113 pass / 0 · `npm run audit` PASSED · census selftest 62/62 · `player-data` OK · `check-worklog-json` OK.
+- `cargo fmt --check` · `cargo clippy --all -D warnings` · wasm32 · `+beta` 전부 rc=0. `RUST_MIN_STACK=4194304 cargo test --all` **739 passed / 0 failed**(main 병합 뒤 · 병합 전 736). `npm run build:wasm` rc=0 · `check-engine-contract` 113 pass / 0 · `npm run audit` PASSED · census selftest 62/62 · `player-data` OK · `check-docs-report-serial` OK(0475) · `check-worklog-json` OK.
 - 러너 블록(병합 뒤 다시): draw · helloworld ×2 · keydraw ×2(`--inject --expect-last-frame` · rc=0 · paints 79 / 55) · text 전부 PASS.
 - 회차가 띄운 프로세스: 회차 끝에 `wv_base`·`wv_fix`·census 0(`pgrep` 03:58).
 - 측정 임대: `build-slot run --long` 4회(00:59~01:47 · 01:49~03:20 · 03:20~03:44 · 03:44~03:56) · 각 `--jobs ≤ 2` · 착수 전 `host-load-guard --status --recovered` rc=0(두 번째 임대는 rc=0 이 될 때까지 7분 대기) · `nohup` 0.
