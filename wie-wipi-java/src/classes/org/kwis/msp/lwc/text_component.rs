@@ -143,9 +143,9 @@ impl TextComponent {
             return Ok(true);
         };
         let kept = text.len().saturating_sub(edit.delete);
-        // setMaxLength caps the text: 0c67145b11df sets 4 and copies the text into its own 8-byte
-        // buffer, so typing past 4 killed its game thread (`ArrayIndexOutOfBoundsException: 16 > 8`)
-        // and the name form never closed. A key that would pass the cap does nothing.
+        // setMaxLength caps the text: 0c67145b11df sets 4 on both name boxes, and typing past it
+        // killed its game thread (`ArrayIndexOutOfBoundsException: 16 > 8` — an array sized for
+        // the cap) so the name form never closed. A key that would pass the cap does nothing.
         let max_length: i32 = jvm.get_field(&this, "maxLength", "I").await?;
         if max_length > 0 && kept + edit.insert.len() > max_length as usize {
             return Ok(true);
