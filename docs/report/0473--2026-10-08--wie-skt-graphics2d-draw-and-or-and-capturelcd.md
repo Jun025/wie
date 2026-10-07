@@ -75,3 +75,5 @@
 - 되돌리면 red: AND/OR 분기를 막으면 `graphics_2d_and_or_modes_combine_target_and_source_inside_the_clip` · captureLCD 를 빈 그림으로 되돌리면 `graphics_2d_capture_lcd_copies_the_screen_image` · copyLCD 를 no-op 으로 되돌려도 같은 테스트가 red(각각 실제로 돌려 확인).
 - 러너 블록: draw · helloworld ×2 · text PASS(`wv_fix2` 릴리스) · keydraw ×2 `--inject --expect-last-frame` PASS rc=0(paints 79 / 55 · 문서 그대로 `cargo run` 디버그). ★릴리스 바이너리로 같은 줄을 돌리면 keydraw 가 `UNMEASURED`·`stop=max-ticks`(키 5개)다 — main 바이너리도 똑같다. 릴리스가 빨라 5천만 틱 상한을 키 일정 전에 다 쓴다. 이 회차의 퇴행이 아니다.
 - 회차가 띄운 프로세스: 끝낼 때 `wv_main`·`wv_fix*`·census 0(`pgrep` 확인).
+
+<!-- corpus-name-inflow v1 subjects=5 tree=709f73b54198c0d9 B=0/0 P=0/0 S=0/0 -->
