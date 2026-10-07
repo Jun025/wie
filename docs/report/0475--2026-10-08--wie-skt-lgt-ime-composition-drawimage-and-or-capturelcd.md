@@ -1,8 +1,8 @@
 ## [2026-10-08] LGT 입력기 글자 조합 · SKT Graphics2D DRAW_AND/OR · captureLCD (wie-skt-lgt-ime-composition-drawimage-and-or-capturelcd)
 
-**무엇을**: 0469 §6 의 후속 카드 두 장(`2026-10-07-progression-wave4-skt-lgt-followups#p0` · `#p1`)을 함께 진다. ① LGT `MC_imHandleInput`(0x130)이 숫자만 확정하던 것을 글자 조합 입력기로 바꿨다. `buf1` 은 이 키로 끝난 글, `buf2` 는 아직 조합 중인 글이다. 0x12e·0x12f 를 `MC_imSetCurrentMode`·`MC_imGetCurrentMode` 로 구현했다(종전 stub `unk7`·`unk6`). ② SKT `Graphics2D.drawImage` 의 `DRAW_AND`(1)·`DRAW_OR`(2)가 그리지 않고 돌아오던 것을 채널별 AND·OR 로 그린다. ③ SKT `Graphics2D.captureLCD` 가 빈 이미지를 주던 것을 화면 이미지의 사본으로 바꿨다. ④ 저부하 재측 3종의 진도를 다시 쟀다.
+**무엇을**: 0469 §6 의 후속 카드 두 장(`2026-10-07-progression-wave4-skt-lgt-followups#p0` · `#p1`)을 함께 진다. ★`#p1`(SKT ②③)은 이 회차가 도는 동안 형제 PR **#506**(`wie-skt-graphics2d-draw-and-or-and-capturelcd` · 0473)이 같은 두 벽 + `XDisplay.copyLCD` 로 먼저 착지했다. 그래서 `main` 병합에서 `graphics_2d.rs` 는 **main 쪽을 택했고 이 PR 의 SKT 코드 변경은 0** 이다. 아래 ②③ 의 측정은 이 브랜치의 첫 구현(같은 의미 — 채널별 AND/OR · 투명 원본 무동작 · 화면 이미지 사본)으로 잰 **독립 재현**으로 남긴다. ① LGT `MC_imHandleInput`(0x130)이 숫자만 확정하던 것을 글자 조합 입력기로 바꿨다. `buf1` 은 이 키로 끝난 글, `buf2` 는 아직 조합 중인 글이다. 0x12e·0x12f 를 `MC_imSetCurrentMode`·`MC_imGetCurrentMode` 로 구현했다(종전 stub `unk7`·`unk6`). ②③ SKT `Graphics2D.drawImage` `DRAW_AND`/`DRAW_OR` · `captureLCD` — 이 브랜치의 첫 구현으로 전/후를 쟀고, 코드는 병합에서 #506 의 것으로 대체됐다. ④ 저부하 재측 3종의 진도를 다시 쟀다.
 **왜**: 운영자 지시(미지원·부분지원 게임 완성도) · 채택 제안 두 건.
-**사용자 영향**: `1cd151222bde` 의 이름 칸에 한글·영문 이름이 들어간다(종전 숫자만 · «가니» 로 확인 대화상자까지 확인). `d1dce4a36141` 의 시작 회사 로고 두 장이 검은 상자 대신 그려진다. 나머지는 §3 표.
+**사용자 영향**: `1cd151222bde` 의 이름 칸에 한글·영문 이름이 들어간다(종전 숫자만 · «가니» 로 확인 대화상자까지 확인). `be08d047cbae` 의 진도가 저부하 짝 재측으로 `ok` 가 됐다(코드 무관). SKT 그림 변화는 #506 의 것이다(0473).
 
 타이틀은 sha12 로만 적는다. 프레임 PNG·키 레시피는 커밋하지 않았다(증적 `~/orchestrator/reports/evidence/wie-skt-lgt-ime-composition-drawimage-and-or-capturelcd/`).
 
@@ -39,7 +39,7 @@
 | 엔진 | sha | 쓴 곳 |
 |---|---|---|
 | main | `0bacaa19` (`wv_base`) | 전/후의 «전» |
-| 이 브랜치 | `c71ff066` 과 같은 코드(`wv_fix`) | 전/후의 «후» |
+| 이 브랜치 | `c71ff066` 과 같은 코드(`wv_fix` · SKT 는 #506 이전의 이 브랜치 구현) | 전/후의 «후» |
 
 - 임대: 측정 스윕은 `build-slot run --long` 임대 네 번(§7) · `--jobs 2` · census 는 **사본 + 개인 잠금 경로**(`WIE_CENSUS_LOCK`). 기본 잠금은 다른 레인의 census 가 쥐고 있었다(0469 와 같은 처지). 사본은 진도 단계에서 «longplay 판정이 없어도 목록의 타이틀은 잰다» 한 줄만 바꿨다(이 회차는 long 축을 다시 재지 않았다).
 - 단발 진단(15~85초 · 프레임 0.25~0.5초 간격)은 short 임대다.
@@ -69,14 +69,14 @@
 
 - 전(P)은 «후 P 가 ok 이거나 입력기 대상» 인 4종만 같은 키로 쟀다. 나머지 3종은 후가 compat 의 기존 값과 같아 전을 재지 않았다.
 
-그림 전/후(180초 · 5초 간격 프레임 · 전·후 같은 키 · 같은 시각에 나란히):
+그림 전/후(이 브랜치의 첫 SKT 구현 · 180초 · 5초 간격 프레임 · 전·후 같은 키 · 같은 시각에 나란히). 0473(#506)의 결과와 같다: `d1dce4a36141` 로고 · `ec2f8f2e02a2` 메뉴 배경. `c107462e5f8a` 의 잔상은 이 브랜치에 없는 `copyLCD` 로 #506 이 고쳤다 — 아래 «무관»은 이 브랜치 구현 기준이다:
 
 | sha12 | 호출(전 · 180초) | 프레임 비교 | 진도와의 관계 |
 |---|---|---|---|
 | `c107462e5f8a` | `DRAW_AND` 71회(15~86초) | t005~t070 **0 px** 차. t075 부터는 걷는 길이 갈라진다(전·후 모두 주인공 잔상 — 이 수정과 무관) | 보이는 변화 없음 |
 | `d1dce4a36141` | `DRAW_OR` 99회(시작 0.1초) · `DRAW_AND` 5회(13초) · `captureLCD` 1회 | 시작 회사 로고 두 장: 전 = **검은 상자** · 후 = 로고(0.5초 간격 16초 · t0.5~t3.0 에 3,563~5,040 px 차) | 시작 화면뿐 |
 | `f12984cd0d37` | 이 창에서 0회 | 커서 깜빡임 위상 차뿐 | 관측 못 함(정책 키 180초 안에서 호출 0) |
-| `ec2f8f2e02a2` | `captureLCD(0,0,240,336)` 2회(1.5·2.8초) | 메뉴 진입(3초)부터 메뉴 뒤 어두운 배경의 로고 자리 1,122 px 가 다르다(전 = 로고·장식, 후 = 없음) | 같은 메뉴 · 같은 키 반응. 어느 쪽이 실기와 같은지는 근거가 없다 |
+| `ec2f8f2e02a2` | `captureLCD(0,0,240,336)` 2회(1.5·2.8초) | 메뉴 진입(3초)부터 메뉴 뒤 어두운 배경의 로고 자리 1,122 px 가 다르다(전 = 로고·장식, 후 = 없음) | 같은 메뉴 · 같은 키 반응. 0473 은 KEmulator 근거로 후(깨끗한 배경)를 옳다고 본다 |
 | `090877d7a3e0` | `captureLCD` 12×13 영역 78회 | 36장(5초 간격) · 60장(0.25초 간격 15초) **전부 0 px** | 보이는 변화 없음 |
 | `7089dec0e8df` | `captureLCD` 12×13 영역 130회 | 36장 **전부 0 px** | 보이는 변화 없음 |
 
@@ -92,19 +92,19 @@
 ### 5. 되돌리면 red
 
 - `wipic_im_handle_input_commits_finished_text_and_composes_the_rest` — 0x130 본문만 종전(숫자만)으로 되돌린 트리에서 FAILED(EN/L 첫 단언).
-- `graphics_2d_and_or_modes_combine_with_the_target` · `graphics_2d_capture_lcd_copies_the_screen` — AND/OR 조기 반환·캡처 생략만 되돌린 트리에서 둘 다 FAILED(`--no-fail-fast`).
+- SKT 시험 두 개(`graphics_2d_and_or_modes_combine_with_the_target` · `graphics_2d_capture_lcd_copies_the_screen`)는 병합 전 트리에서 «되돌리면 red» 를 확인했으나(둘 다 FAILED) **병합에서 버렸다** — #506 이 같은 경로에 자기 시험을 두었다.
 
 ### 6. compat · 소식
 
 - `docs/player-data/compat.json` 두 행만 바꿨다(`node scripts/check-compat-revert.mjs --base origin/main --head HEAD` → 아래 §7).
   - `1cd151222bde`: 안내 «이름 칸에는 아직 숫자만 들어가요.» 삭제(census `HAND_NOTE` 에서도 삭제). 진도 축은 stuck 그대로(§3).
   - `be08d047cbae`: progress `stuck → ok`(저부하 P·P2 짝 · §3). 이 회차 코드와 무관한 재측이다.
-- SKT 6종은 compat 를 바꾸지 않았다 — 진도가 그대로다. 그림이 바뀐 `d1dce4a36141` 도 시작 로고뿐이라 안내 줄을 달지 않았다.
+- SKT 6종은 compat 를 바꾸지 않았다(0473 과 같다 — 진도 그대로).
 - `docs/player-updates/2026-10-08-lgt-name-letters.json`(kind `fix` · `1cd151222bde`) 1개.
 
 ### 7. 게이트
 
-- `cargo fmt --check` · `cargo clippy --all -D warnings` · wasm32 · `+beta` 전부 rc=0. `RUST_MIN_STACK=4194304 cargo test --all` **736 passed / 0 failed**. `npm run build:wasm` rc=0 · `check-engine-contract` 113 pass / 0 · `npm run audit` PASSED · census selftest 62/62 · `player-data` OK · `check-worklog-json` OK.
-- 러너 블록: draw · helloworld ×2 · keydraw ×2(`--inject --expect-last-frame` · rc=0 · paints 79 / 55) · text 전부 PASS.
+- `cargo fmt --check` · `cargo clippy --all -D warnings` · wasm32 · `+beta` 전부 rc=0. `RUST_MIN_STACK=4194304 cargo test --all` **739 passed / 0 failed**(main 병합 뒤 · 병합 전 736). `npm run build:wasm` rc=0 · `check-engine-contract` 113 pass / 0 · `npm run audit` PASSED · census selftest 62/62 · `player-data` OK · `check-worklog-json` OK.
+- 러너 블록(병합 뒤 다시): draw · helloworld ×2 · keydraw ×2(`--inject --expect-last-frame` · rc=0 · paints 79 / 55) · text 전부 PASS.
 - 회차가 띄운 프로세스: 회차 끝에 `wv_base`·`wv_fix`·census 0(`pgrep` 03:58).
 - 측정 임대: `build-slot run --long` 4회(00:59~01:47 · 01:49~03:20 · 03:20~03:44 · 03:44~03:56) · 각 `--jobs ≤ 2` · 착수 전 `host-load-guard --status --recovered` rc=0(두 번째 임대는 rc=0 이 될 때까지 7분 대기) · `nohup` 0.

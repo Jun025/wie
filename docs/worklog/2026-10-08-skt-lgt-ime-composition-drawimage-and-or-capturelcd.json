@@ -3,11 +3,14 @@
   "date": "2026-10-08",
   "task": "wie-skt-lgt-ime-composition-drawimage-and-or-capturelcd",
   "title": "LGT 입력기 글자 조합 · SKT Graphics2D DRAW_AND/OR · captureLCD",
-  "summary": "0469 §6 후속 카드 두 장을 함께 진다. 측정과 판정은 회차 문서 0473.",
+  "summary": "0469 §6 후속 카드 두 장. #p0(LGT 입력기)는 이 PR 이 구현, #p1(SKT 그림)은 #506 이 먼저 착지. 측정과 판정은 회차 문서 0475.",
   "proposals": [],
   "adoptedProposals": [
     "2026-10-07-progression-wave4-skt-lgt-followups#p0",
     "2026-10-07-progression-wave4-skt-lgt-followups#p1"
   ],
-  "declinedProposals": []
+  "declinedProposals": [],
+  "notes": {
+    "#p1": "#506 이 먼저 착지(같은 두 벽 + copyLCD). 이 PR 의 SKT 코드는 병합에서 main 쪽을 택해 0 이다 — 측정만 docs/report/0475 §3 에 남긴다."
+  }
 }
