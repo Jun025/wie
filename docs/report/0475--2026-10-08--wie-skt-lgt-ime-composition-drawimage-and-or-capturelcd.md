@@ -108,3 +108,5 @@
 - 측정 임대: `build-slot run --long` 4회(00:59~01:47 · 01:49~03:20 · 03:20~03:44 · 03:44~03:56) · 각 `--jobs ≤ 2` · 착수 전 `host-load-guard --status --recovered` rc=0(두 번째 임대는 rc=0 이 될 때까지 7분 대기) · `nohup` 0.
 - 유입(`scripts/corpus-name-inflow.mjs` · 대상 3파일): BOUNDED 330쌍 · SUFFIX-ATTACHED 15쌍 — 전부 `compat.json` 이 이미 갖고 있던 `title`/`fileTitle` 이다(이 PR 이 바꾼 것은 `be08d047cbae` 행의 `progress` 한 값). 회차 문서·worklog 만 따로 재면 BOUNDED 0 · SUFFIX-ATTACHED 0.
 
+
+<!-- corpus-name-inflow v1 subjects=3 tree=bfb073bc19306bd5 B=718/330 P=0/0 S=35/15 -->
