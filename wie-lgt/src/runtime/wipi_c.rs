@@ -512,7 +512,7 @@ async fn im_get_supported_modes(context: &mut dyn WIPICContext) -> Result<u32> {
 //   committed by the next key, which is how the window below can be checked at press time.
 // - Five other callers send key 0x9d, once before any digit or right after one (same buffer layout);
 //   read as «finish the composition», which is what every non-digit key does here.
-// Registering 0x130 at all matters once 0x12c reports modes: 그랜드체이스 goes on to call it and
+// Registering 0x130 at all matters once 0x12c reports modes: 236c7da689f6 goes on to call it and
 // dies on `Unknown LGT WIPIC SVC id 304` without the row.
 // ponytail: the mode before any 0x12e is index 0 (EN/S) — what 0x12f answered when it was a stub,
 // not a measured device default.
