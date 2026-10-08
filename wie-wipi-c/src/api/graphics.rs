@@ -220,6 +220,7 @@ const CLIP_MASK: WIPICWord = 1;
 /// image at 76 under [108, 143, 138, 172] — a logo revealed one 30-pixel window at a time. Drawn
 /// unclipped, every window showed the whole image and the screen filled with overlapping copies.
 /// ponytail: the pixel-op blit (`blit_with_pixel_op`) does not clip; no title clips and keys at once.
+/// Text is the deliberate exception (`draw_string`).
 fn context_clip(context: &dyn WIPICContext, p_gctx: WIPICWord, clip: Clip) -> Result<Clip> {
     if p_gctx == 0 {
         return Ok(clip);
@@ -920,7 +921,9 @@ pub async fn draw_string(
     };
 
     let color = framebuffer.pixel_to_color(gctx.fgpxl);
-    let clip = context_clip(context, pgc, clip)?;
+    // Not narrowed by the context clip, on purpose: this layer's glyphs sit a few pixels lower than
+    // the handset's, and 4decaeed58b1 clips each text line and menu label to its box, so clipping
+    // cut every line in half (its labels already overhung the button's lower edge unclipped).
     primitives::draw_text(context, &framebuffer, &string, x, y, color, clip)
 }
 

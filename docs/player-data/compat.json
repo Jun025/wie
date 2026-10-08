@@ -1041,19 +1041,16 @@
    "platform": "KTF",
    "model": null,
    "title": "드래곤로드",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "ok"
    },
-   "knownIssues_ko": [
-    "키를 눌러도 화면이 바뀌지 않을 수 있어요.",
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "드래곤로드"
   },
@@ -3756,14 +3753,14 @@
    "platform": "KTF",
    "model": null,
    "title": "주타이쿤2",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "unknown",
+    "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4490,7 +4487,9 @@
     "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "오래 플레이해 보는 검사를 아직 마치지 못해서, 끝까지 잘 되는지는 아직 확인하지 못했어요."
+   ],
    "changes": [],
    "fileTitle": "테일즈판타지"
   },
@@ -5803,14 +5802,14 @@
    "platform": "LGT",
    "model": "clet",
    "title": "바이오크로니클",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "unknown",
+    "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown"
+    "speed": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
