@@ -33,16 +33,19 @@
 // Scenario D (same J2ME instance — KEY DELIVERY, ASSERTED):
 //   Scenario A's sweep only proves key_down/key_up don't throw, which an engine
 //   that drops every event also passes. Here the fixture's keyPressed() paints a
-//   bar as wide as the MIDP code it received, so the canvas says WHICH code
-//   reached the guest. Representative keys only (soft/numeric/direction).
+//   bar as wide as the code it received (+ KEY_CODE_BIAS), so the canvas says WHICH
+//   code reached the guest. The guest is J2ME, so that code is contract
+//   keyJ2meCodes — the standard values (-6, 53, -1), not the SKVM ones
+//   (keyMidpCodes 6, 53, 141). Representative keys only (soft/numeric/direction).
 //
 //   ── Why 3 and not all 20 (decided 2026-09-04, do not "complete" this list) ──
 //   Delivery splits into a per-key part and a key-agnostic part, and they need
 //   different guards:
-//     · per-key   — two tables: parse_key (name -> KeyCode) and
-//                   MIDPKeyCode::from_key_code (KeyCode -> the int the guest
-//                   sees). BOTH are pinned statically for all 20 keys by
-//                   check-engine-contract.mjs §4 / §4b.
+//     · per-key   — three tables: parse_key (name -> KeyCode),
+//                   MIDPKeyCode::from_key_code (KeyCode -> the SKVM int) and,
+//                   for a J2ME guest, Canvas to_standard (SKVM int -> standard
+//                   int). ALL are pinned statically for every key by
+//                   check-engine-contract.mjs §4 / §4b / §4e.
 //     · key-agnostic — handle_event -> event queue -> Canvas::handleKeyEvent ->
 //                   keyPressed(code). Measured: not one branch on which key, so
 //                   this half is proven by ANY key that arrives. 3 witnesses
@@ -78,6 +81,13 @@
 //     event_queue.rs:298 path, key-agnostic — event kind again, on the dispatch side
 //     canvas.rs:157      path, key-agnostic — event type -> keyPressed/Released/Repeated;
 //                                     `code` passes through untouched
+//     canvas.rs to_standard  TABLE (added 2026-10-09) — SKVM int -> standard int, J2ME
+//                                     only (Canvas.standardKeyCodes); pinned, §4e. Per-key,
+//                                     but a table, not a branch: this scenario's 3 keys
+//                                     cross it and §4e pins the rest
+//     canvas.rs from_standard OFF-PATH (added 2026-10-09) — its inverse, read only by the
+//                                     guest-initiated getGameAction/getKeyCode/getKeyName;
+//                                     §4e checks it undoes every to_standard arm
 //     canvas.rs:94       OFF-PATH   — Canvas::getGameAction. Guest-initiated: its only entry is
 //                                     the JavaMethodProto the guest calls (zero internal callers,
 //                                     measured), so it runs AFTER delivery on a code the guest
@@ -230,28 +240,30 @@ const contract = JSON.parse(await readFile(path.join(root, "docs/contracts/featu
 
 // Scenario D's representative keys — one per class of the contract vocabulary,
 // deliberately NOT all 20 — the reasoning is in the Scenario D header above.
-//   soft key  — the shell's menu/back key, low "phone key" code band
+//   soft key  — the shell's menu/back key (-6 for a J2ME guest)
 //   numeric   — ASCII-valued band
-//   direction — MIDP Canvas named-key band (141..148), the shell's D-pad
-// The expected `midp` is READ FROM THE CONTRACT (keyMidpCodes), not restated
-// here: it is the number the GUEST sees, and check-engine-contract.mjs §4b pins
-// the same contract entry against MIDPKeyCode in
-// wie_midp/src/classes/net/wie/event_queue.rs. So a rewiring there fails twice
-// — statically there, and here loudly (the guest paints a differently-sized
-// bar) — instead of silently.
+//   direction — the shell's D-pad (-1..-4 for a J2ME guest)
+// The expected `midp` is READ FROM THE CONTRACT (keyJ2meCodes — the guest is
+// J2ME), not restated here: it is the number the GUEST sees, and
+// check-engine-contract.mjs §4b/§4e pin the same entries against MIDPKeyCode and
+// Canvas to_standard. So a rewiring there fails twice — statically there, and
+// here loudly (the guest paints a differently-sized bar) — instead of silently.
 // ASCENDING code order is required — see make-draw-fixture.mjs (the bar is a
-// union across frames, so ascending keeps every expected count exact).
+// union across frames, so ascending keeps every expected count exact); the list
+// is sorted below rather than trusted.
 const REPRESENTATIVE_KEYS = [
   { code: "LEFT_SOFT_KEY", cls: "soft key" },
-  { code: "NUM5", cls: "numeric" },
   { code: "UP", cls: "direction" },
-].map((k) => {
-  const midp = contract.keyMidpCodes?.[k.code];
-  // Fail-closed: a missing contract entry must not silently become `undefined`
-  // pixels (which would compare equal to nothing and hang the tick loop).
-  if (typeof midp !== "number") throw new Error(`contract.keyMidpCodes has no code for representative key "${k.code}"`);
-  return { ...k, midp, expectPixels: keyBarPixels(midp) };
-});
+  { code: "NUM5", cls: "numeric" },
+]
+  .map((k) => {
+    const midp = contract.keyJ2meCodes?.[k.code];
+    // Fail-closed: a missing contract entry must not silently become `undefined`
+    // pixels (which would compare equal to nothing and hang the tick loop).
+    if (typeof midp !== "number") throw new Error(`contract.keyJ2meCodes has no code for representative key "${k.code}"`);
+    return { ...k, midp, expectPixels: keyBarPixels(midp) };
+  })
+  .sort((a, b) => a.midp - b.midp);
 
 // ── Scenario E constants: DERIVED from the fixture's own source, never restated ──
 // keydraw_ktf.zip is a committed binary, so its constants cannot be exported the
@@ -564,16 +576,16 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     // ── Scenario D: does a key press REACH THE GUEST? (behavioral, not no-throw) ─
     // Scenario A only proves key_down/key_up don't throw — an engine that drops
     // every event passes that. Here the guest itself answers: its keyPressed()
-    // paints a bar as wide as the MIDP code it was handed, so the canvas encodes
-    // WHICH code arrived. Same instance as C: it never exits and keeps painting.
+    // paints a bar as wide as the code it was handed (+ bias), so the canvas encodes
+    // WHICH code arrived — for this J2ME guest, the standard code (keyJ2meCodes). Same instance as C: it never exits and keeps painting.
     for (const k of representativeKeys) {
       c.emu.key_down(k.code);
       const runD = await tickLoop(c.emu, c.canvas, 15_000, (px) => px === k.expectPixels);
       c.emu.key_up(k.code);
       check(
-        `D: "${k.code}" (${k.cls}) reaches the guest — it paints MIDP code ${k.midp}`,
+        `D: "${k.code}" (${k.cls}) reaches the guest — it paints J2ME code ${k.midp}`,
         runD.threw === null && runD.pixels === k.expectPixels,
-        runD.threw ?? `${runD.pixels} px, expected ${k.expectPixels} (base + ${k.midp}*bar) after ${runD.frames} frames`,
+        runD.threw ?? `${runD.pixels} px, expected ${k.expectPixels} (base + (${k.midp}+bias)*bar) after ${runD.frames} frames`,
       );
     }
 

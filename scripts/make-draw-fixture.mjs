@@ -127,6 +127,10 @@ export const classFile = (cp, thisClass, superClass, methods, fields = []) => {
 export const BASE_RECT_PX = 32 * 32; // the always-drawn rect (Scenario C)
 export const KEY_BAR_Y = 32; // just below the base rect, so the two never overlap
 export const KEY_BAR_H = 8; // px per unit of key code → pixels = BASE + code*8
+// Added to the code before it becomes the bar width: J2ME guests get the standard
+// codes (contract keyJ2meCodes, -11..-1 for the named keys), and a negative width
+// paints nothing. 16 lifts the lowest (-11) to a visible 5 px and keeps the order.
+export const KEY_CODE_BIAS = 16;
 
 // ── The bundled image resource (Scenario C-img) ──────────────────────────────
 // startApp() opens this BY NAME through Image.createImage(String) and stores the
@@ -190,9 +194,10 @@ export const TEXT_ANCHOR = 20; // Graphics.TOP(16) | Graphics.LEFT(4)
 export const TEXT_COLOR = 0x00ff00; // visible — this jar has no exact-count consumer
 
 // Total non-black pixels once the image bar is up and one key of `midpCode` has
-// been delivered. Exported so the expectation lives in ONE place — the fixture
+// been delivered (`guestCode` = the int keyPressed received). Exported so the
+// expectation lives in ONE place — the fixture
 // that draws it (scripts/contract-roundtrip.mjs imports this, never restates it).
-export const keyBarPixels = (midpCode) => BASE_RECT_PX + IMG_RECT_PX + midpCode * KEY_BAR_H;
+export const keyBarPixels = (guestCode) => BASE_RECT_PX + IMG_RECT_PX + (guestCode + KEY_CODE_BIAS) * KEY_BAR_H;
 
 // Minimal opaque-white RGB PNG, emitted byte-wise for the same reason the class
 // files are: the repo (and CI) has no image tooling, and a committed binary
@@ -223,8 +228,8 @@ const IMAGE = "javax/microedition/lcdui/Image";
 
 // ── DrawCanvas extends Canvas ────────────────────────────────────────────────
 // paint() fills the base rect, and — once keyPressed() has stored a code — a
-// second bar whose WIDTH IS THE MIDP KEY CODE the guest received. That makes the
-// canvas readable from JS as an exact number: 1024 base px + code*8 bar px, so
+// second bar whose WIDTH IS THE KEY CODE the guest received (+ KEY_CODE_BIAS). That makes the
+// canvas readable from JS as an exact number: 1024 base px + (code+bias)*8 bar px, so
 // scripts/contract-roundtrip.mjs can assert not just "a key arrived" but "the
 // guest saw exactly this code" (Scenario D).
 //
@@ -256,7 +261,8 @@ const drawCanvas = (withText = false) => {
     Buffer.from([0x2b, 0x03]), // aload_1 (Graphics), iconst_0 (x = 0)
     Buffer.from([0x10, KEY_BAR_Y]), // bipush  (y)
     Buffer.from([0xb2]),
-    u2(keyHit), // getstatic keyHit (width = the received code)
+    u2(keyHit), // getstatic keyHit (the received code)
+    Buffer.from([0x10, KEY_CODE_BIAS, 0x60]), // bipush KEY_CODE_BIAS, iadd (width = code + bias)
     Buffer.from([0x10, KEY_BAR_H]), // bipush  (h)
     Buffer.from([0xb6]),
     u2(fillRect),

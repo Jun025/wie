@@ -27,6 +27,13 @@
 - 시험: `j2me_canvas_gets_standard_key_codes_and_skvm_does_not` — 번역을 지우면 J2ME 절반이, 무조건 번역하면 SKVM 절반이 red(번역 제거로 red 확인).
 - 데모 빌드 2회 동일 sha256 `88f99a9a0de36695acf7cdd0bf57b33cd3433112b309c1daccb36279cdb4085f` · 58,752 B(openjdk 17).
 
+### 계약(Constraint 3) — 같은 PR
+- `docs/contracts/featurephone-engine-contract.json` 에 **`keyJ2meCodes`**(J2ME 게스트가 받는 정수 22개) 신설. `keyMidpCodes` 는 SKVM 게스트 기준으로 그대로 참이다.
+- `check-engine-contract.mjs` **§4e**: `to_standard` 의 각 갈래를 `keyJ2meCodes` 에 대조(갈래 없는 키는 `_ => code` 이므로 `keyMidpCodes` 값과 같아야 함) + `from_standard` 가 각 갈래를 되돌리는지. 갈래 값 하나 바꾸면 «miswired», 역표 하나 바꾸면 «asymmetric» 으로 red(둘 다 손으로 확인).
+- 브라우저 왕복 **Scenario D** 는 J2ME 게스트라 이제 `keyJ2meCodes`(-6 · -1 · 53)를 기대한다. 음수 폭은 아무것도 안 그리므로 픽스처가 막대 폭에 `KEY_CODE_BIAS = 16` 을 더한다(`make-draw-fixture.mjs` 수출 · `keyBarPixels` 가 반영). 키는 코드 오름차순으로 정렬해 쓴다. 로컬 `contract-roundtrip.mjs` **67/67**.
+  `test_data/draw_j2me.zip` 은 새 jar 로 다시 묶었다(옛 zip 의 날짜·압축 속성 그대로 — 옛 jar 로 같은 방법을 쓰면 옛 zip 과 바이트 동일함을 먼저 확인).
+- 셸은 키 «이름»만 보내므로 otterpebble 쪽 코드 변경은 없다.
+
 ### 배포 순서 — ★엔진보다 데모 jar 가 먼저
 엔진 머지는 곧바로 셸에 배포된다(otterpebble `wie-artifact-receive.yml` 이 핀을 직접 커밋·배포). 셸의 데모 jar 는
 otterpebble `apps/featurephone/public/demo/` 에 커밋된 옛 바이트(`9a18bf3f`)라 **새 엔진 + 옛 jar = 위쪽 키가 종료 확인**이다.
