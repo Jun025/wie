@@ -27,3 +27,5 @@
 `1d5831e42a8a` 의 키별 화면은 base↔head 28장 중 20장이 다른데, base 를 두 번 더 돌리면 base↔base 도 20장·4장이 다르다(마지막 화면 색 수 63·78·63, head 74). 시점 차이다.
 
 compat 변경 0(엔진 결과 불변).
+
+유입: BOUNDED 0 · SUFFIX-ATTACHED 0.
