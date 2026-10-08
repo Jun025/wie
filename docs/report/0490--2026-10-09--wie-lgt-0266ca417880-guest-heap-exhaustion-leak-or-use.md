@@ -31,12 +31,14 @@
 
 ### 3. 600초 결과(전/후)
 
-| 빌드 | 결과 | 끝 | 키 | 예외 | 비고 |
-|---|---|---|---|---|---|
-| 수거 뺌(= 0482 상태 재현) | FAIL | error · 404.7초 | 551 / 1370 | 1 | `guest heap allocation of 0x2c8db bytes failed` → `java.lang.OutOfMemoryError at net/wie/EventQueue.getNextEvent` — 0482 와 같은 문장 |
-| 현 main · 레시피만 600초 | PASS | deadline | 616 / 616 | 0 | paints 25,081 |
-| 현 main · census 인자 720초 | UNMEASURED(키가 시간보다 길다 — 판정 아님) | deadline | 1011 / 1370 | 0 | `restarted` true · paints 18,909 |
-| 현 main · census `--only progress --progress 600`(P) | UNMEASURED(판정 아님) · 진도 ok | deadline · 720초 | 1011 / 1370 | 0 | §4 |
+전/후를 가르는 것은 **census 인자 짝(1·2행)** 뿐이다. 레시피만 600초(4행)는 수거를 뺀 빌드도 통과한다(게이트② 검수 실측 · PASS 616/616 · 예외 0) — «후» 증거로 읽지 마라.
+
+| 구분 | 빌드 · 입력 | 결과 | 끝 | 키 | 예외 | 비고 |
+|---|---|---|---|---|---|---|
+| **전** | 수거 뺌(= 0482 상태 재현) · census 인자 | FAIL | error · 404.7초 | 551 / 1370 | 1 | `guest heap allocation of 0x2c8db bytes failed` → `java.lang.OutOfMemoryError at net/wie/EventQueue.getNextEvent` — 0482 와 같은 문장 |
+| **후** | 현 main · census 인자 720초 | UNMEASURED(키가 시간보다 길다 — 판정 아님) | deadline | 1011 / 1370 | 0 | `restarted` true · paints 18,909 · 1행의 사망 지점(551키) 너머 생존 |
+| 후 | 현 main · census `--only progress --progress 600`(P) | UNMEASURED(판정 아님) · 진도 ok | deadline · 720초 | 1011 / 1370 | 0 | §4 |
+| 판별 못 함 | 현 main · 레시피만 600초 | PASS | deadline | 616 / 616 | 0 | paints 25,081 · 수거 뺌 빌드도 같은 입력에서 PASS(검수 실측) |
 
 - 0482 는 417번째 키에서 죽었고 재현은 551번째에서 죽었다 — 호스트 부하에 따라 키 하나당 시간이 다르다. 문장과 할당 크기(0x2c8db)·블록 수(1416 ↔ 1520)가 같은 병이다.
 
@@ -51,7 +53,7 @@
 ### 5. 퇴행 · 시험
 
 - 엔진 변경 0 ⇒ 다른 LGT 표본·smoke gate 퇴행은 이 회차로 생길 수 없다(코드 diff 가 문서뿐).
-- «되돌리면 red» 시험은 새로 만들지 않았다. ★0484 §4 가 이미 적었듯 `set_timer` 의 수거 **호출 자리**는 단위 시험이 잠그지 않는다(타이머를 쓰는 LGT 픽스처가 없다). 이 회차의 실측이 그 호출을 빼면 실제 타이틀이 7분 안에 죽는다는 것을 보였다 — 그 자리를 지우는 변경은 이 문서를 근거로 거절하라.
+- «되돌리면 red» 시험은 새로 만들지 않았다. ★0484 §4 가 이미 적었듯 `set_timer` 의 수거 **호출 자리**는 단위 시험이 잠그지 않는다(타이머를 쓰는 LGT 픽스처가 없다). 이 회차의 실측이 그 호출을 빼면 실제 타이틀이 7분 안에 죽는다는 것을 보였다 — 그 자리를 지우는 변경은 이 문서를 근거로 거절하라. ★산문만으로는 잠기지 않으므로 잠그는 시험을 후속 제안으로 올렸다(`docs/worklog/2026-10-09-lgt-0266ca417880-heap-exhaustion.json` `#p0`) — 돌연변이 실측상 그 한 줄을 지워도 `cargo test --all` 은 green 이다.
 
 ### 6. 측정 자원
 
