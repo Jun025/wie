@@ -1,10 +1,10 @@
-use alloc::vec;
+use alloc::{boxed::Box, vec, vec::Vec};
 
-use jvm::{ClassInstanceRef, Jvm, Result as JvmResult};
+use jvm::{ClassInstance, ClassInstanceRef, Jvm, Result as JvmResult};
 use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 
-use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
+use wie_jvm_support::{WieJavaClassProto, WieJvmContext, get_declared_field};
 use wie_midp::classes::{
     javax::microedition::lcdui::{Canvas as MidpCanvas, Graphics as MidpGraphics},
     net::wie::MIDPKeyCode,
@@ -168,14 +168,33 @@ impl CardCanvas {
             .await?;
 
         let cards = jvm.get_field(&this, "cards", "Ljava/util/Vector;").await?;
-        let length = jvm.invoke_virtual(&cards, "java/util/Vector", "size", "()I", ()).await?;
+        let length: i32 = jvm.invoke_virtual(&cards, "java/util/Vector", "size", "()I", ()).await?;
 
+        // An opaque card hides every card under it that it covers, and those are not painted at all:
+        // a title may leave such a card in a state its paint() cannot survive (aa3fcba4598b nulls its
+        // logo card's image array, then pushes the game card over it), and an exception from it would
+        // abort the loop before the card on top is drawn.
+        let mut stack: Vec<(Box<dyn ClassInstance>, [i32; 4], bool)> = Vec::with_capacity(length as usize);
         for i in 0..length {
-            let card = jvm
+            let card: Box<dyn ClassInstance> = jvm
                 .invoke_virtual(&cards, "java/util/Vector", "elementAt", "(I)Ljava/lang/Object;", (i,))
                 .await?;
             let x: i32 = jvm.invoke_virtual(&card, "org/kwis/msp/lcdui/Card", "getX", "()I", ()).await?;
             let y: i32 = jvm.invoke_virtual(&card, "org/kwis/msp/lcdui/Card", "getY", "()I", ()).await?;
+            let w: i32 = jvm.invoke_virtual(&card, "org/kwis/msp/lcdui/Card", "getWidth", "()I", ()).await?;
+            let h: i32 = jvm.invoke_virtual(&card, "org/kwis/msp/lcdui/Card", "getHeight", "()I", ()).await?;
+            let transparent: bool = get_declared_field(jvm, &card, "org/kwis/msp/lcdui/Card", "transparent", "Z").await?;
+            stack.push((card, [x, y, w, h], transparent));
+        }
+
+        for (i, (card, [x, y, w, h], _)) in stack.iter().enumerate() {
+            let covered = stack[i + 1..]
+                .iter()
+                .any(|(_, [ox, oy, ow, oh], transparent)| !transparent && *ox <= *x && *oy <= *y && ox + ow >= x + w && oy + oh >= y + h);
+            if covered {
+                continue;
+            }
+            let (x, y) = (*x, *y);
 
             let _: () = jvm.invoke_virtual(&graphics, "org/kwis/msp/lcdui/Graphics", "reset", "()V", ()).await?;
             let _: () = jvm
@@ -193,7 +212,7 @@ impl CardCanvas {
 
             let paint_result: JvmResult<()> = jvm
                 .invoke_virtual(
-                    &card,
+                    card,
                     "org/kwis/msp/lcdui/Card",
                     "paint",
                     "(Lorg/kwis/msp/lcdui/Graphics;)V",

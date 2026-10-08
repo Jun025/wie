@@ -1286,4 +1286,73 @@ mod test {
             },
         )
     }
+
+    // aa3fcba4598b nulls its logo card's image array and pushes the game card over it; that logo
+    // card's paint() then throws, so painting it at all blanked the game card above.
+    #[test]
+    fn an_opaque_card_hides_the_cards_it_covers() -> Result<()> {
+        let fixture: Box<[WieJavaClassProto]> = Vec::from([TestCard::as_proto()]).into_boxed_slice();
+        run_jvm_test(
+            Box::new([wie_midp::get_protos().into(), get_protos().into(), fixture]),
+            |jvm| async move {
+                let display: ClassInstanceRef<Display> = jvm.instantiate_class("org/kwis/msp/lcdui/Display").await?.into();
+                let card = |x: i32, w: i32, transparent: bool| {
+                    let (jvm, display) = (jvm.clone(), display.clone());
+                    async move {
+                        jvm.new_class(
+                            "test/TestCard",
+                            "(Lorg/kwis/msp/lcdui/Display;IIIIZ)V",
+                            (display, x, 1, w, 4, transparent),
+                        )
+                        .await
+                    }
+                };
+                // bottom → top: wider than the opaque card · inside it · transparent over both · opaque
+                let peeking = card(0, 8, false).await?;
+                let hidden = card(2, 4, false).await?;
+                let glass = card(0, 8, true).await?;
+                let opaque = card(1, 6, false).await?;
+
+                let canvas: ClassInstanceRef<CardCanvas> = jvm.new_class("net/wie/CardCanvas", "()V", ()).await?.into();
+                for c in [&peeking, &hidden, &glass, &opaque] {
+                    let _: () = jvm
+                        .invoke_virtual(&canvas, "net/wie/CardCanvas", "pushCard", "(Lorg/kwis/msp/lcdui/Card;)V", (c.clone(),))
+                        .await?;
+                }
+                let image: ClassInstanceRef<MidpImage> = jvm
+                    .invoke_static(
+                        "javax/microedition/lcdui/Image",
+                        "createImage",
+                        "(II)Ljavax/microedition/lcdui/Image;",
+                        (10, 10),
+                    )
+                    .await?;
+                let graphics: ClassInstanceRef<MidpGraphics> = jvm
+                    .invoke_virtual(
+                        &image,
+                        "javax/microedition/lcdui/Image",
+                        "getGraphics",
+                        "()Ljavax/microedition/lcdui/Graphics;",
+                        (),
+                    )
+                    .await?;
+                let _: () = jvm
+                    .invoke_virtual(
+                        &canvas,
+                        "net/wie/CardCanvas",
+                        "paint",
+                        "(Ljavax/microedition/lcdui/Graphics;)V",
+                        (graphics,),
+                    )
+                    .await?;
+
+                let mut painted = Vec::new();
+                for c in [&peeking, &hidden, &glass, &opaque] {
+                    painted.push(jvm.get_field::<i32>(c, "paintCount", "I").await?);
+                }
+                assert_eq!(painted, [1, 0, 1, 1]);
+                Ok(())
+            },
+        )
+    }
 }
