@@ -21,11 +21,13 @@ const DECIMAL: i32 = 5;
 // The measured callers (ec2f8f2e02a2 · 2f5246006bd8 · f2ae515201f2) forward every key to keyPressed
 // and never repaint afterwards; ec2f8f2e02a2 copies getText() into its name only inside paint, and
 // its OK refuses an empty name. So a key that changes the text repaints the field itself, or the
-// title never sees it. Digit keys are multitap upper-case Latin (wie_util::keypad, as SKVM's
+// title never sees it (a key that changes nothing does not). Digit keys are multitap upper-case Latin (wie_util::keypad, as SKVM's
 // TextComponentHandler) — the same key within MULTITAP_MS cycles the last letter — and NUMERIC-like
 // constraints take the digit. CLEAR deletes. keyReleased has nothing to do: a cycle ends by time
 // or by another key.
-// ponytail: upper-case Latin only, no Hangul/mode key — no measured title asks for one.
+// ponytail: upper-case Latin only, no Hangul/mode key — no measured title asks for one. `0` is a
+// space (keypad's E.161 table, shared with TextComponentHandler); a title that must refuse a
+// blank-only name checks that itself.
 pub struct XTextField;
 
 impl XTextField {
@@ -128,24 +130,21 @@ impl XTextField {
     async fn input_char(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, key: JavaChar) -> JvmResult<()> {
         tracing::debug!("com.xce.lcdui.XTextField::inputChar({this:?}, {key})");
 
-        let text: ClassInstanceRef<String> = jvm.get_field(&this, "text", "Ljava/lang/String;").await?;
-        let length: i32 = jvm.invoke_virtual(&text, "java/lang/String", "length", "()I", ()).await?;
-        let max_size: i32 = jvm.get_field(&this, "maxSize", "I").await?;
-        if length >= max_size {
-            return Ok(());
-        }
+        Self::append(jvm, &mut this, key).await?;
+        Ok(())
+    }
 
-        let char_string: ClassInstanceRef<String> = jvm.invoke_static("java/lang/String", "valueOf", "(C)Ljava/lang/String;", (key,)).await?;
-        let text: ClassInstanceRef<String> = jvm
-            .invoke_virtual(
-                &text,
-                "java/lang/String",
-                "concat",
-                "(Ljava/lang/String;)Ljava/lang/String;",
-                (char_string,),
-            )
-            .await?;
-        jvm.put_field(&mut this, "text", "Ljava/lang/String;", text).await
+    /// Appends unless the field is full; ends any multitap cycle either way. Returns whether the text changed.
+    async fn append(jvm: &Jvm, this: &mut ClassInstanceRef<Self>, key: JavaChar) -> JvmResult<bool> {
+        jvm.put_field(this, "tapKey", "I", 0).await?;
+        let mut text = Self::text(jvm, this).await?;
+        let max_size: i32 = jvm.get_field(this, "maxSize", "I").await?;
+        if text.chars().count() as i32 >= max_size {
+            return Ok(false);
+        }
+        text.push(char::from_u32(key as u32).unwrap_or(char::REPLACEMENT_CHARACTER));
+        Self::put_text(jvm, this, &text).await?;
+        Ok(true)
     }
 
     async fn set_focus(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, focus: bool) -> JvmResult<()> {
@@ -184,24 +183,25 @@ impl XTextField {
             return Ok(());
         }
 
-        match key_code {
+        let changed = match key_code {
             0x30..=0x39 => Self::multitap(jvm, context, &mut this, key_code).await?,
             CLEAR => {
+                jvm.put_field(&mut this, "tapKey", "I", 0).await?;
                 let mut text = Self::text(jvm, &this).await?;
-                text.pop();
-                Self::put_text(jvm, &mut this, &text).await?;
-                jvm.put_field(&mut this, "tapKey", "I", 0).await?;
+                let changed = text.pop().is_some();
+                if changed {
+                    Self::put_text(jvm, &mut this, &text).await?;
+                }
+                changed
             }
-            32..=126 => {
-                jvm.put_field(&mut this, "tapKey", "I", 0).await?;
-                Self::input_char(jvm, context, this.clone(), key_code as JavaChar).await?;
-            }
-            _ => return Ok(()),
-        }
-        Self::repaint(jvm, context, this).await
+            32..=126 => Self::append(jvm, &mut this, key_code as JavaChar).await?,
+            _ => false,
+        };
+        if changed { Self::repaint(jvm, context, this).await } else { Ok(()) }
     }
 
-    async fn multitap(jvm: &Jvm, context: &mut WieJvmContext, this: &mut ClassInstanceRef<Self>, key_code: i32) -> JvmResult<()> {
+    /// Returns whether the text changed.
+    async fn multitap(jvm: &Jvm, context: &mut WieJvmContext, this: &mut ClassInstanceRef<Self>, key_code: i32) -> JvmResult<bool> {
         let constraints: i32 = jvm.get_field(this, "constraints", "I").await?;
         let mode = if matches!(constraints & CONSTRAINT_MASK, NUMERIC | PHONENUMBER | DECIMAL) {
             Mode::Digit
@@ -214,10 +214,6 @@ impl XTextField {
         let again = tap_key == key_code && now - tap_time < MULTITAP_MS;
         let mut text = Self::text(jvm, this).await?;
         let max_size: i32 = jvm.get_field(this, "maxSize", "I").await?;
-        // A full field takes no new letter, and must not start a cycle that would rewrite the last one.
-        if !again && text.chars().count() as i32 >= max_size {
-            return jvm.put_field(this, "tapKey", "I", 0).await;
-        }
 
         let mut tokens = if again {
             vec![char::from_u32(jvm.get_field::<JavaChar>(this, "tapChar", "C").await? as u32).unwrap_or(' ')]
@@ -225,6 +221,13 @@ impl XTextField {
             vec![]
         };
         let edit = keypad::press(mode, &mut tokens, (key_code - 0x30) as u8, again);
+        // Judged on the length AFTER the edit: a letter cycle replaces in place, but a digit has
+        // nothing to cycle and appends even when pressed again. A full field takes no new
+        // character, and the refused key starts no cycle that would rewrite the last one.
+        if (text.chars().count() - edit.delete + edit.insert.len()) as i32 > max_size {
+            jvm.put_field(this, "tapKey", "I", 0).await?;
+            return Ok(false);
+        }
         for _ in 0..edit.delete {
             text.pop();
         }
@@ -232,7 +235,8 @@ impl XTextField {
         Self::put_text(jvm, this, &text).await?;
         jvm.put_field(this, "tapKey", "I", key_code).await?;
         jvm.put_field(this, "tapChar", "C", tokens[0] as JavaChar).await?;
-        jvm.put_field(this, "tapTime", "J", now).await
+        jvm.put_field(this, "tapTime", "J", now).await?;
+        Ok(true)
     }
 
     async fn text(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<RustString> {
@@ -653,10 +657,21 @@ mod tests {
                 let wxyz: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, "WXYZ").await?.into();
                 let _: () = jvm.invoke_virtual(&name, X, "setText", "(Ljava/lang/String;)V", (wxyz,)).await?;
                 assert_eq!(press(&jvm, &name, &[0x33, 0x34, 0x34]).await?, "WXYZD");
+                // Only keys that changed the text repainted: 2 2 3 · CLEAR · 3 · 3 (4 4 were refused).
+                assert_eq!(jvm.get_field::<i32>(&canvas, "repaintCount", "I").await?, 6);
 
                 // 2f5246006bd8's 9-digit field: `new XTextField("", 9, 2, canvas)` (NUMERIC).
                 let number = field(&jvm, &canvas, 9, 2).await?;
                 assert_eq!(press(&jvm, &number, &[0x30, 0x31, 0x31]).await?, "011");
+                // A full NUMERIC field: the same digit again within the window must not append.
+                let short = field(&jvm, &canvas, 3, 2).await?;
+                assert_eq!(press(&jvm, &short, &[0x31, 0x32, 0x33, 0x33]).await?, "123");
+
+                // inputChar ends a cycle: the 2 after it is a new letter, not a rewrite of 'X'.
+                let direct = field(&jvm, &canvas, 5, 0).await?;
+                let _: () = jvm.invoke_virtual(&direct, X, "keyPressed", "(I)V", (0x32,)).await?;
+                let _: () = jvm.invoke_virtual(&direct, X, "inputChar", "(C)V", ('X' as JavaChar,)).await?;
+                assert_eq!(press(&jvm, &direct, &[0x32]).await?, "AXA");
                 Ok(())
             },
         );
