@@ -1,0 +1,8 @@
+{
+ "date": "2026-10-09",
+ "task": "wie-lgt-0266ca417880-guest-heap-exhaustion-leak-or-use",
+ "title": "LGT 0266ca417880 게스트 힙 고갈 — 누수 판정 · #518 수거가 이미 고쳤다",
+ "summary": "수거 호출만 뺀 빌드가 0482 와 같은 문장으로 6분 44초에 죽고(리스트 2^17 블록 154→757), 현 main 은 600초 평탄(4~14). 엔진 변경 0. docs/report/0488.",
+ "adoptedProposals": ["2026-10-08-progression-wave5-play-tips#p1"],
+ "proposals": []
+}
