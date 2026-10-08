@@ -16,6 +16,8 @@
 //   node scripts/playability-census.mjs run … --only progress [--progress 1800] [--titles <file>] [--as P|P2] [--policy v1]
 //   node scripts/playability-census.mjs run … --only long --titles <file>   the long run, recipe-prefixed
 //        (`<sha12> [secs] [recipe keys file]`; keep the recipes in game_lab/ — they spell a title's menus)
+//   node scripts/playability-census.mjs run … --budget <secs>   stop handing out titles after <secs> (wait for
+//        the census lock included); exit 3 = more remain. One lease per call — `scripts/census-drive.sh` loops it.
 //   node scripts/playability-census.mjs report --out <dir> --pin <wie sha>
 //        [--compat <compat.json>] [--changes <changes.json>] [--prs <gh-merged.json>]
 //        [--speed <browser runs.jsonl>]
@@ -101,8 +103,8 @@ const [cmd, ...rest] = process.argv.slice(2);
 // wie_validate, so past ncpu the extra ones only add context switches (2026-09-29: --jobs 32 on 10
 // cores -> load1 450, sys 80%+, idle 0%) and starve the wall-clock probes into UNMEASURED. The 3 is
 // the host's short build-slot count on 10 cores: a census shares the Mac with every other lane's builds
-// (2026-10-02: 20 emulator processes at load1 240 — CLAUDE.md «측정 스윕»). The run itself takes ONE
-// `build-slot run --long` lease and these jobs run inside it — they do not take slots of their own.
+// (2026-10-02: 20 emulator processes at load1 240 — CLAUDE.md «측정 스윕»). Each `--budget` call takes one
+// `build-slot run --long` lease (scripts/census-drive.sh) and these jobs run inside it — no slots of their own.
 function jobsFor(requested, ncpu) {
   if (requested === undefined) return Math.max(1, Math.min(3, Math.floor(ncpu / 2)));
   const n = Math.max(1, Math.floor(Number(requested)) || 1);
@@ -465,12 +467,24 @@ function progressAxis(P, P2) {
   return b === 'ok' ? 'ok' : b === 'stuck' ? 'stuck' : 'n/a';
 }
 
+// `--budget`: a run that would hold a `build-slot --long` lease for hours is cut into calls of about
+// this long (2026-10-05~08: one lease per sweep held the long pool 5–7.5 h while 8 waited). Titles in
+// flight finish, so a call lasts budget + its longest title. Done titles are skipped on the next call
+// (`run` is resumable), so the cut changes when a title is measured, never what it measures.
+//   ponytail: a probe that starves every time is re-tried on every call; the driver's call cap bounds it.
+const T0 = Date.now();
+let more = false;
 async function pool(items, jobs, fn) {
   let i = 0;
   let n = 0;
+  const over = () => opt.budget !== undefined && Date.now() - T0 > Number(opt.budget) * 1000;
   await Promise.all(
     Array.from({ length: jobs }, async () => {
       while (i < items.length) {
+        if (over()) {
+          more = true;
+          return;
+        }
         const t = items[i++];
         await fn(t);
         if (++n % 10 === 0) console.error(`  ${n}/${items.length}  load1=${loadavg()[0].toFixed(0)}`);
@@ -1041,6 +1055,10 @@ if (cmd === 'run') {
   writeFileSync(join(out, 'population.json'), JSON.stringify({ ...pop, titles: all, dirs: [...new Set([...(prev?.dirs ?? []), ...opt.dirs.map((d) => resolve(d))])] }));
   console.error(`population: ${pop.files} files -> ${pop.titles.length} unique · excluded dirs ${JSON.stringify(pop.excluded)} · jobs ${opt.jobs}`);
   if (!opt.only || opt.only === 'probe') await pool(pop.titles, opt.jobs, probe);
+  if (more) {
+    console.error(`--budget ${opt.budget}s spent — more titles remain; run again (exit 3)`);
+    process.exit(3);
+  }
   if (starved) console.error(`★${starved} probes starved (deadline, < 100 ticks, 0 paints) — not recorded; run again when the host is quieter`);
   if (opt.only === 'progress') {
     // Targets: playable, or limited with a clean longplay — the titles a player can get into.
@@ -1071,6 +1089,10 @@ if (cmd === 'run') {
     });
     console.error(`longplay: ${cand.length} candidates × ${opt.long}s`);
     await pool(cand, opt.jobs, (t) => longplay(t, list?.get(t.sha.slice(0, 12)) ?? {}));
+  }
+  if (more) {
+    console.error(`--budget ${opt.budget}s spent — more titles remain; run again (exit 3)`);
+    process.exit(3);
   }
 } else {
   const pop = read(join(out, 'population.json'));
