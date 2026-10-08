@@ -136,4 +136,5 @@ agneay-100(100종 · MIT · 전부 코드로 그림): **playable 99 · limited 1
   baseline 292 대비 퇴행 0 · rc 0**.
 - 이 PR 의 동작 변경 중 기존 타이틀에 닿을 수 있는 것은 셋뿐이다 — `Class.getResourceAsStream` 폴백 · `createPlayer` 가 받는 형식 ·
   `getControl` 이 null 대신 컨트롤을 돌려줌. 나머지는 «없던 메서드·클래스» 추가라 그것을 부르던 타이틀은 전에는 죽었다.
-- 코퍼스 이름 유입(`corpus-name-inflow` · 이 회차 diff): 표식 줄 = 회신.
+- 코퍼스 이름 유입(`node scripts/corpus-name-inflow.mjs` · 이 브랜치의 바뀐 파일 전체): BOUNDED 6회/5쌍 · SUFFIX-ATTACHED 0 — 6회 전부
+  이 브랜치 이전부터 있던 줄이다(`git diff origin/main...HEAD` 의 추가 줄에서 그 이름 0회). 이 회차가 들인 이름 = 0.
