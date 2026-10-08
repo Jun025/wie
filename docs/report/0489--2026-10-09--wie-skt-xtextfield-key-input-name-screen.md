@@ -49,4 +49,4 @@ SKT 코퍼스(`game_lab/{working,broken}/skt` 84 파일)에서 `XTextField` 를 
 ### 6. 게임 파일명 유입
 `node scripts/corpus-name-inflow.mjs`: 유입 0건(BOUNDED 0회/0쌍) · 판단 필요 0건(SUFFIX-ATTACHED 0회/0쌍). 새 주석·문서·소식은 sha12 만 쓴다.
 
-<!-- corpus-name-inflow v1 subjects=4 tree=ed33014fe3486c52 B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=4 tree=c947c1b011eb5fa4 B=0/0 P=0/0 S=0/0 -->
