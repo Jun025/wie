@@ -91,3 +91,10 @@
 - `npm run build:wasm` rc=0 · `node scripts/check-engine-contract.mjs` 113 pass · `npm run audit` 통과 · `node scripts/player-data.mjs` · `--selftest` 28 · census `selftest` 64/64.
 - 되돌리면 red(각각 되돌려 FAILED 확인 · 원상 green): 널 클립 갈래 제거 → 클립 시험 2 FAILED · `context_clip` 무력화 → `drawing_stays_inside_the_context_clip` FAILED · `GForm` 등록 제거 → kfc 시험 2 FAILED · `getGTextListener` 의 재사용 제거 → `g_text_field_…` FAILED · 수거 일정에서 비용 항 제거 → `timer_collection_…` FAILED · player-data 규칙 제거 → selftest 2건 «NOT rejected» · census 대체 문장 제거 → census selftest 63/64.
 
+
+### 10. 게임 파일명 유입
+
+도구 기본 실행(`origin/main...HEAD` · 15파일): BOUNDED 332쌍 · SUFFIX-ATTACHED 15쌍.
+- 둘 다 전부 `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 값이다(형제 회차와 같은 수 · 0478 §유입). 이 회차는 그 파일의 8행 `status`·`axes`·`knownIssues_ko` 만 바꿨고 제목은 건드리지 않았다.
+- 그 밖의 BOUNDED 2쌍(`wie-lgt` context.rs · `wie-wipi-c` graphics.rs)은 이 회차가 손댄 파일의 **기존 주석**이다 — 이 브랜치가 더한 줄(`git diff` 의 `+`)에는 0건.
+- 이 문서·worklog·업데이트 소식은 타이틀을 sha12 로만 적었다.
