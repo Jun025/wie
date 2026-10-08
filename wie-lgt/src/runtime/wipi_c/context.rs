@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, format, sync::Arc, vec, vec::Vec};
+use alloc::{boxed::Box, collections::BTreeMap, format, vec, vec::Vec};
 
 use jvm::{
     Jvm,
@@ -47,16 +47,31 @@ fn free_indirect(core: &mut ArmCore, memory: WIPICIndirectPtr) -> Result<()> {
 const GC_INTERVAL_MS: u64 = 1000;
 const GC_COST_SHARE: u64 = 20;
 
-/// When this context's last timer collection ran and what it cost, shared by every clone.
-#[derive(Default)]
+/// When an emulator's last timer collection ran and what it cost. Keyed by `ArmCore::id`, not held
+/// by the context: a context is built afresh for every SVC (`handle_wipic_svc`), so a per-context
+/// clock was always new and collected on every timer tick — measured 754 collections in 110 s on
+/// 236c7da689f6 where the schedule allows ~110.
+/// ponytail: an entry outlives its core; a later core with the same id finds a stale `last` and
+/// waits at most one interval longer for its first collection.
+#[derive(Clone, Copy, Default)]
 struct GcClock {
     last: u64,
     cost: u64,
 }
 
+static GC_CLOCKS: spin::Mutex<BTreeMap<usize, GcClock>> = spin::Mutex::new(BTreeMap::new());
+
 impl GcClock {
     fn due(&self, now: u64) -> bool {
         now.saturating_sub(self.last) >= GC_INTERVAL_MS.max(self.cost * GC_COST_SHARE)
+    }
+
+    fn of(id: usize) -> Self {
+        GC_CLOCKS.lock().get(&id).copied().unwrap_or_default()
+    }
+
+    fn record(id: usize, last: u64, cost: u64) {
+        GC_CLOCKS.lock().insert(id, GcClock { last, cost });
     }
 }
 
@@ -66,7 +81,6 @@ pub struct LgtWIPICContext {
     core: ArmCore,
     system: System,
     jvm: Jvm,
-    gc: Arc<spin::Mutex<GcClock>>,
 }
 
 impl LgtWIPICContext {
@@ -90,22 +104,17 @@ impl LgtWIPICContext {
     }
 
     pub fn new(core: ArmCore, system: System, jvm: Jvm) -> Self {
-        Self {
-            core,
-            system,
-            jvm,
-            gc: Arc::new(spin::Mutex::new(GcClock::default())),
-        }
+        Self { core, system, jvm }
     }
 
     async fn collect_garbage_if_due(&mut self) -> Result<()> {
-        let now = self.system.platform().now().raw();
-        if !self.gc.lock().due(now) {
+        let (id, now) = (self.core.id(), self.system.platform().now().raw());
+        if !GcClock::of(id).due(now) {
             return Ok(());
         }
         self.collect_garbage().await?;
         let cost = self.system.platform().now().raw().saturating_sub(now);
-        *self.gc.lock() = GcClock { last: now, cost };
+        GcClock::record(id, now, cost);
         self.system.pacing().collected_garbage(cost);
 
         Ok(())
@@ -235,17 +244,24 @@ mod tests {
 
     use super::{alloc_indirect, free_indirect};
 
-    /// The timer path's collection schedule: once a second, and stretched while a collection is
-    /// costly. Without `due`, a Clet title collects never (4fdbd64c9fbd filled its heap) or on
-    /// every timer tick.
+    /// The timer path's collection schedule: once a second, stretched while a collection is costly,
+    /// and one clock per emulator however many contexts ask. A per-context clock collected on every
+    /// tick (236c7da689f6: 754 collections in 110 s); without `due` a Clet never collects at all
+    /// (4fdbd64c9fbd filled its heap).
     #[test]
     fn timer_collection_waits_a_second_and_for_its_cost() {
-        let clock = super::GcClock { last: 10_000, cost: 0 };
-        assert!(!clock.due(10_999));
-        assert!(clock.due(11_000));
-        let costly = super::GcClock { last: 10_000, cost: 100 };
-        assert!(!costly.due(11_999));
-        assert!(costly.due(12_000));
+        use super::GcClock;
+
+        let id = usize::MAX - 1;
+        GcClock::record(id, 10_000, 0);
+        assert!(!GcClock::of(id).due(10_999));
+        assert!(GcClock::of(id).due(11_000));
+        GcClock::record(id, 10_000, 100);
+        assert!(!GcClock::of(id).due(11_999));
+        GcClock::record(usize::MAX - 2, 11_500, 0);
+        assert!(!GcClock::of(usize::MAX - 2).due(12_000));
+        assert!(GcClock::of(id).due(12_000));
+        assert!(GcClock::of(usize::MAX - 2).due(12_500), "another emulator has its own clock");
     }
 
     /// `free(NULL)` is a no-op, and a real handle still frees.
