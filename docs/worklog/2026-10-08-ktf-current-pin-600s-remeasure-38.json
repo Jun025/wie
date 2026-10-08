@@ -1,0 +1,13 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-08",
+  "task": "wie-ktf-current-pin-600s-remeasure-38",
+  "title": "KTF 현 핀 600초 P·P2 재측 — 막힘 38종(⒟ 35 + 4차 고친 3)",
+  "summary": "main 60e9062c release 로 정책 v2 600초 P(38) · P2(P stuck 25). 14종 stuck→ok, 24종 stuck 유지. 엔진 수정 0. docs/report/0476.",
+  "proposals": [],
+  "adoptedProposals": ["2026-10-07-progression-wave4-ktf-followups#p0"],
+  "declinedProposals": [],
+  "notCarded": {
+    "stuck 24종의 계급 재분류(⒜/⒝)": "이 회차는 측정만 — stderr 축에서 게임 스레드 사망·미구현 패닉 0. 마지막 화면 분류는 하지 않아 «새 벽» 관측이 없다(문턱 미달). docs/report/0476 §3"
+  }
+}
