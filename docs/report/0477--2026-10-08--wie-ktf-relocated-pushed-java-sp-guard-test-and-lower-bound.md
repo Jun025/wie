@@ -29,3 +29,5 @@
 compat 변경 0(엔진 결과 불변).
 
 유입: BOUNDED 0 · SUFFIX-ATTACHED 0.
+
+<!-- corpus-name-inflow v1 subjects=3 tree=c61b3abab6e9f97b B=0/0 P=0/0 S=0/0 -->
