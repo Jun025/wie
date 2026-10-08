@@ -58,3 +58,5 @@
 - 엔진: `origin/main` `82959a5b` release `wie_validate`(계측 빌드 2개는 `/tmp` 스크래치 · 커밋 안 함).
 - 단발 실행마다 `build-slot run --long` 1건(600~720초). census 는 `scripts/census-drive.sh`(임대 = phase). A·B·L 은 `reports-2026-09-30-playability-census-bd2337ff` 의 것을 옮겨 썼다(0482 와 같은 방식).
 - 동시 실행 1. `nohup` 0. 끝난 뒤 내 `wie_validate` 0.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=57a9caab54183220 B=0/0 P=0/0 S=0/0 -->
