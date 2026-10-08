@@ -4481,18 +4481,16 @@
    "platform": "KTF",
    "model": null,
    "title": "테일즈판타지",
-   "status": "not-yet",
+   "status": "limited",
    "axes": {
-    "boot": "no",
-    "render": "no",
-    "input": "unknown",
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
     "longplay": "unknown",
-    "sound": "unknown",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "아직 실행되지 않아요(시작하는 도중에 멈춰요)."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "테일즈판타지"
   },

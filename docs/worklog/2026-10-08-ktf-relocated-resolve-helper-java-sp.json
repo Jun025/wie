@@ -1,0 +1,25 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-08",
+  "task": "wie-ktf-83fc429f9cbe-loading-screen-null-0x6c-branch-zero",
+  "title": "KTF 재배치 이미지 — 리졸브 헬퍼에서 들어온 호스트 진입이 바깥 Java 프레임을 덮었다",
+  "summary": "83fc429f9cbe 의 게임 스레드가 불러오기 화면에서 죽은 원인은 null 이 아니다. 리졸브 헬퍼가 네이티브 스택에서 MN_CLASS_LOAD 를 부르면, 호스트가 클래스 로더를 돌리면서 새 프레임을 c.run 프레임 위에 놓아 this 를 덮었다. enter 가 헬퍼가 [native top - 8] 에 넣어 둔 Java sp 도 보게 했다. 이야기 장면과 지도 화면까지 간다.",
+  "changes": [
+    "wie-ktf runtime/relocated.rs — enter: 파킹(+0x24)이 없을 때 리졸브 헬퍼가 넣어 둔 Java sp(pushed_java_sp) 아래에 새 프레임",
+    "docs/report/0476 · compat 83fc429f9cbe not-yet → limited · docs/player-updates/2026-10-08-ktf-loading-screen-into-game.json"
+  ],
+  "verification": [
+    "fmt · clippy stable/beta/wasm32 -D warnings · cargo test --all · 러너 픽스처 PASS",
+    "되돌리면 red: a_nested_entry_goes_below_the_java_sp_a_resolve_helper_pushed FAILED",
+    "base↔head --inject: 게임 스레드 uncaught 1 → 0 · frozen_tail 25 → 0 · paints 33 → 81"
+  ],
+  "limits": [
+    "던지기 헬퍼 4곳(MN_THROW · MN_THROW_INSTANCE)은 Java sp 를 남기지 않는다 — 예외 생성자 프레임이 가장 바깥 프레임에 놓일 수 있다(0476 §5) · 관측된 실패는 없다",
+    "longplay·speed 는 재지 않았다 — census 호스트 잠금을 다른 레인이 쥐고 있었다"
+  ],
+  "proposals": [],
+  "adoptedProposals": [
+    "2026-10-07-ktf-kfc-gprogressbar#p0"
+  ],
+  "declinedProposals": []
+}
