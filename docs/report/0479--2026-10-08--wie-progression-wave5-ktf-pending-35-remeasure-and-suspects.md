@@ -92,3 +92,5 @@
   - `a10a1f02b41b`: stuck → ok · `knownIssues_ko` 1줄(게임 안 네트워크 메뉴의 오류 안내).
   - `c3057f46c59b`: `knownIssues_ko` 1줄(진행 요령).
 - `docs/player-updates/2026-10-08-ktf-event-consent-window.json` 1건(`a10a1f02b41b`).
+
+<!-- corpus-name-inflow v1 subjects=7 tree=da8574d2968a1938 B=718/330 P=1/1 S=35/15 -->
