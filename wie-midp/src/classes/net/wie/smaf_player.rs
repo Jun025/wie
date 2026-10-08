@@ -84,6 +84,7 @@ impl SmafPlayer {
                 // every start/stop/close, so an END_OF_MEDIA timer armed by an earlier start is void.
                 JavaFieldProto::new("listeners", "Ljava/util/Vector;", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("generation", "I", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("control", "Lnet/wie/PlayerControl;", FieldAccessFlags::PRIVATE),
             ],
             access_flags: ClassAccessFlags::PUBLIC,
         }
@@ -95,11 +96,12 @@ impl SmafPlayer {
         let _: () = jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await?;
 
         let data = JavaIoInputStream::read_until_end(jvm, &stream).await?;
-        let audio_handle = context.system().audio().load_smaf(&data).unwrap();
+        // SMAF, or — for a general MIDP title — a MIDI file or a PCM WAV, told apart by content
+        let audio_handle = context.system().audio().load(&data).unwrap();
+        let length_ms = sequence_length_ms(&parse_smaf_in(&data)).max(context.system().audio().duration(audio_handle).unwrap_or(0));
 
         jvm.put_field(&mut this, "audioHandle", "I", audio_handle as i32).await?;
-        jvm.put_field(&mut this, "lengthMs", "J", sequence_length_ms(&parse_smaf_in(&data)) as i64)
-            .await?;
+        jvm.put_field(&mut this, "lengthMs", "J", length_ms as i64).await?;
 
         Ok(())
     }
@@ -342,19 +344,40 @@ impl SmafPlayer {
         this: ClassInstanceRef<Self>,
         control_type: ClassInstanceRef<String>,
     ) -> Result<ClassInstanceRef<Control>> {
-        tracing::warn!("stub net.wie.SmafPlayer::getControl({this:?}, {control_type:?})");
+        tracing::debug!("net.wie.SmafPlayer::getControl({this:?}, {control_type:?})");
 
         if control_type.is_null() {
             return Err(jvm.exception("java/lang/IllegalArgumentException", "Control type is null").await);
         }
+        let name = JavaLangString::to_rust_string(jvm, &control_type).await?;
+        let name = name.rsplit('.').next().unwrap_or_default();
+        if name != "VolumeControl" && name != "ToneControl" {
+            return Ok(None.into());
+        }
 
-        Ok(None.into())
+        Self::control(jvm, this).await
+    }
+
+    // One control object a player, answering both VolumeControl and ToneControl.
+    async fn control(jvm: &Jvm, mut this: ClassInstanceRef<Self>) -> Result<ClassInstanceRef<Control>> {
+        let control: ClassInstanceRef<Control> = jvm.get_field(&this, "control", "Lnet/wie/PlayerControl;").await?;
+        if !control.is_null() {
+            return Ok(control);
+        }
+        let control = jvm.new_class("net/wie/PlayerControl", "(Lnet/wie/SmafPlayer;)V", (this.clone(),)).await?;
+        jvm.put_field(&mut this, "control", "Lnet/wie/PlayerControl;", control.clone()).await?;
+
+        Ok(control.into())
     }
 
     async fn get_controls(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> Result<ClassInstanceRef<Array<Control>>> {
-        tracing::warn!("stub net.wie.SmafPlayer::getControls({this:?})");
+        tracing::debug!("net.wie.SmafPlayer::getControls({this:?})");
 
-        Ok(jvm.instantiate_array("Ljavax/microedition/media/Control;", 0).await?.into())
+        let control = Self::control(jvm, this).await?;
+        let mut controls = jvm.instantiate_array("Ljavax/microedition/media/Control;", 1).await?;
+        jvm.store_array(&mut controls, 0, vec![control]).await?;
+
+        Ok(controls.into())
     }
 }
 
@@ -446,10 +469,29 @@ mod test {
                     (),
                 )
                 .await?;
-            assert_eq!(jvm.array_length(&controls).await?, 0);
+            assert_eq!(jvm.array_length(&controls).await?, 1);
+
+            for (name, supported) in [
+                ("VolumeControl", true),
+                ("javax.microedition.media.control.VolumeControl", true),
+                ("ToneControl", true),
+                ("RecordControl", false),
+            ] {
+                let control_type = JavaLangString::from_rust_string(&jvm, name).await?;
+                let control: ClassInstanceRef<Control> = jvm
+                    .invoke_virtual(
+                        &player,
+                        "javax/microedition/media/Player",
+                        "getControl",
+                        "(Ljava/lang/String;)Ljavax/microedition/media/Control;",
+                        (control_type,),
+                    )
+                    .await?;
+                assert_eq!(!control.is_null(), supported, "{name}");
+            }
 
             let control_type = JavaLangString::from_rust_string(&jvm, "VolumeControl").await?;
-            let control: ClassInstanceRef<Control> = jvm
+            let volume: ClassInstanceRef<Control> = jvm
                 .invoke_virtual(
                     &player,
                     "javax/microedition/media/Player",
@@ -458,7 +500,10 @@ mod test {
                     (control_type,),
                 )
                 .await?;
-            assert!(control.is_null());
+            let level: i32 = jvm
+                .invoke_virtual(&volume, "javax/microedition/media/control/VolumeControl", "setLevel", "(I)I", (150,))
+                .await?;
+            assert_eq!(level, 100);
 
             let JavaError::JavaException(exception) = jvm
                 .invoke_virtual::<_, ClassInstanceRef<Control>>(
@@ -534,7 +579,20 @@ mod test {
                     (control_type,),
                 )
                 .await?;
-            assert!(control.is_null());
+            // VERSION 1, one C4 quarter note at the default 120 bpm: the tone player now has 500 ms to play
+            let mut sequence = jvm.instantiate_array("B", 4).await?;
+            jvm.store_array(&mut sequence, 0, vec![-2i8, 1, 60, 16]).await?;
+            let _: () = jvm
+                .invoke_virtual(
+                    &control,
+                    "javax/microedition/media/control/ToneControl",
+                    "setSequence",
+                    "([B)V",
+                    (sequence,),
+                )
+                .await?;
+            let length_ms: i64 = jvm.get_field(&player, "lengthMs", "J").await?;
+            assert_eq!(length_ms, 500);
             call(&player, "close").await?;
 
             let JavaError::JavaException(exception) = create(None).await.unwrap_err() else {

@@ -1,4 +1,5 @@
 mod audio;
+mod audio_formats;
 mod event_queue;
 mod file_system;
 
@@ -24,6 +25,7 @@ use self::{audio::Audio, event_queue::EventQueue};
 
 pub use self::{
     audio::parse_smaf_in,
+    audio_formats::{parse_tone_sequence, tone},
     event_queue::{Event, KeyCode},
     file_system::FilesystemOverlay,
 };

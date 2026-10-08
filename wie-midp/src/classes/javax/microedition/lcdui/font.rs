@@ -23,6 +23,14 @@ impl Font {
                 JavaMethodProto::new("<clinit>", "()V", Self::cl_init, MethodAccessFlags::STATIC),
                 JavaMethodProto::new("<init>", "()V", Self::init, MethodAccessFlags::empty()),
                 JavaMethodProto::new("getHeight", "()I", Self::get_height, MethodAccessFlags::PUBLIC),
+                // what the font was asked for — every face, style and size renders with the one host font
+                JavaMethodProto::new("getFace", "()I", Self::get_face, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getStyle", "()I", Self::get_style, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getSize", "()I", Self::get_size, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("isPlain", "()Z", Self::is_plain, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("isBold", "()Z", Self::is_bold, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("isItalic", "()Z", Self::is_italic, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("isUnderlined", "()Z", Self::is_underlined, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getBaselinePosition", "()I", Self::get_baseline_position, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("stringWidth", "(Ljava/lang/String;)I", Self::string_width, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new(
@@ -47,6 +55,9 @@ impl Font {
                 ),
             ],
             fields: vec![
+                JavaFieldProto::new("face", "I", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("style", "I", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("size", "I", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new(
                     "FACE_SYSTEM",
                     "I",
@@ -154,9 +165,46 @@ impl Font {
     async fn get_font(jvm: &Jvm, _: &mut WieJvmContext, face: i32, style: i32, size: i32) -> JvmResult<ClassInstanceRef<Font>> {
         tracing::warn!("stub javax.microedition.lcdui.Font::getFont({face:?}, {style:?}, {size:?})");
 
-        let instance = jvm.new_class("javax/microedition/lcdui/Font", "()V", []).await?;
+        let mut instance: ClassInstanceRef<Font> = jvm.new_class("javax/microedition/lcdui/Font", "()V", []).await?.into();
+        jvm.put_field(&mut instance, "face", "I", face).await?;
+        jvm.put_field(&mut instance, "style", "I", style).await?;
+        jvm.put_field(&mut instance, "size", "I", size).await?;
 
-        Ok(instance.into())
+        Ok(instance)
+    }
+
+    async fn get_face(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Font>) -> JvmResult<i32> {
+        jvm.get_field(&this, "face", "I").await
+    }
+
+    async fn get_style(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Font>) -> JvmResult<i32> {
+        jvm.get_field(&this, "style", "I").await
+    }
+
+    async fn get_size(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Font>) -> JvmResult<i32> {
+        jvm.get_field(&this, "size", "I").await
+    }
+
+    async fn style_bit(jvm: &Jvm, this: &ClassInstanceRef<Font>, bit: i32) -> JvmResult<bool> {
+        let style: i32 = jvm.get_field(this, "style", "I").await?;
+
+        Ok(if bit == 0 { style == 0 } else { style & bit != 0 })
+    }
+
+    async fn is_plain(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Font>) -> JvmResult<bool> {
+        Self::style_bit(jvm, &this, 0).await
+    }
+
+    async fn is_bold(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Font>) -> JvmResult<bool> {
+        Self::style_bit(jvm, &this, 1).await
+    }
+
+    async fn is_italic(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Font>) -> JvmResult<bool> {
+        Self::style_bit(jvm, &this, 2).await
+    }
+
+    async fn is_underlined(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Font>) -> JvmResult<bool> {
+        Self::style_bit(jvm, &this, 4).await
     }
 
     async fn string_width(jvm: &Jvm, context: &mut WieJvmContext, _: ClassInstanceRef<Self>, string: ClassInstanceRef<String>) -> JvmResult<i32> {

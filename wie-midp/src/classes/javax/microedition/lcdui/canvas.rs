@@ -1,8 +1,9 @@
-use alloc::vec;
+use alloc::{string::String as RustString, vec};
 
-use jvm::{ClassInstanceRef, Jvm, Result as JvmResult};
+use jvm::{ClassInstanceRef, Jvm, Result as JvmResult, runtime::JavaLangString};
 use jvm_class_proto::JavaMethodProto;
 use jvm_types::{ClassAccessFlags, MethodAccessFlags};
+use rustjava_runtime::classes::java::lang::String;
 
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
@@ -38,6 +39,15 @@ impl Canvas {
                 JavaMethodProto::new("hideNotify", "()V", Self::hide_notify, MethodAccessFlags::PROTECTED),
                 JavaMethodProto::new("setFullScreenMode", "(Z)V", Self::set_full_screen_mode, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("isDoubleBuffered", "()Z", Self::is_double_buffered, MethodAccessFlags::PUBLIC),
+                // A keypad handset with no touch screen — what every title here was built for.
+                JavaMethodProto::new("hasPointerEvents", "()Z", Self::no, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("hasPointerMotionEvents", "()Z", Self::no, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("hasRepeatEvents", "()Z", Self::yes, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("pointerPressed", "(II)V", Self::pointer_event, MethodAccessFlags::PROTECTED),
+                JavaMethodProto::new("pointerReleased", "(II)V", Self::pointer_event, MethodAccessFlags::PROTECTED),
+                JavaMethodProto::new("pointerDragged", "(II)V", Self::pointer_event, MethodAccessFlags::PROTECTED),
+                JavaMethodProto::new("getKeyCode", "(I)I", Self::get_key_code, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getKeyName", "(I)Ljava/lang/String;", Self::get_key_name, MethodAccessFlags::PUBLIC),
                 // wie private methods
                 JavaMethodProto::new("handleKeyEvent", "(II)V", Self::handle_key_event, MethodAccessFlags::empty()),
                 JavaMethodProto::new(
@@ -197,6 +207,52 @@ impl Canvas {
         tracing::warn!("stub javax.microedition.lcdui.Canvas::isDoubleBuffered({this:?})");
 
         Ok(true)
+    }
+
+    async fn no(_: &Jvm, _: &mut WieJvmContext, _: ClassInstanceRef<Self>) -> JvmResult<bool> {
+        Ok(false)
+    }
+
+    async fn yes(_: &Jvm, _: &mut WieJvmContext, _: ClassInstanceRef<Self>) -> JvmResult<bool> {
+        Ok(true)
+    }
+
+    async fn pointer_event(_: &Jvm, _: &mut WieJvmContext, _: ClassInstanceRef<Self>, _: i32, _: i32) -> JvmResult<()> {
+        Ok(())
+    }
+
+    // The inverse of getGameAction.
+    async fn get_key_code(jvm: &Jvm, _: &mut WieJvmContext, _: ClassInstanceRef<Self>, game_action: i32) -> JvmResult<i32> {
+        let key = match game_action {
+            1 => MIDPKeyCode::UP,
+            6 => MIDPKeyCode::DOWN,
+            2 => MIDPKeyCode::LEFT,
+            5 => MIDPKeyCode::RIGHT,
+            8 => MIDPKeyCode::FIRE,
+            9 => MIDPKeyCode::KEY_NUM7, // GAME_A..D: 7, 9, *, #
+            10 => MIDPKeyCode::KEY_NUM9,
+            11 => MIDPKeyCode::KEY_STAR,
+            12 => MIDPKeyCode::KEY_POUND,
+            _ => return Err(jvm.exception("java/lang/IllegalArgumentException", "invalid game action").await),
+        };
+
+        Ok(key as i32)
+    }
+
+    async fn get_key_name(jvm: &Jvm, _: &mut WieJvmContext, _: ClassInstanceRef<Self>, key: i32) -> JvmResult<ClassInstanceRef<String>> {
+        let name: RustString = match MIDPKeyCode::from_raw(key) {
+            Some(MIDPKeyCode::UP) => "Up".into(),
+            Some(MIDPKeyCode::DOWN) => "Down".into(),
+            Some(MIDPKeyCode::LEFT) => "Left".into(),
+            Some(MIDPKeyCode::RIGHT) => "Right".into(),
+            Some(MIDPKeyCode::FIRE) => "Select".into(),
+            Some(MIDPKeyCode::KEY_STAR) => "*".into(),
+            Some(MIDPKeyCode::KEY_POUND) => "#".into(),
+            _ if (48..=57).contains(&key) => alloc::format!("{}", key - 48),
+            _ => return Err(jvm.exception("java/lang/IllegalArgumentException", "invalid key code").await),
+        };
+
+        Ok(JavaLangString::from_rust_string(jvm, &name).await?.into())
     }
 
     async fn handle_key_event(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>, event_type: i32, code: i32) -> JvmResult<()> {

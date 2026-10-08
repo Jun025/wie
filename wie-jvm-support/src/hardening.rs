@@ -297,6 +297,111 @@ fn replace_reader_read(proto: &mut RuntimeClassProto) -> bool {
     true
 }
 
+/// `new InputStreamReader(in, "US-ASCII")` reads as UTF-8 — an exact superset for every byte ASCII
+/// defines. The pin knows only UTF-8 and EUC-KR and throws `UnsupportedEncodingException` for the
+/// rest; CLDC handsets take US-ASCII, and j2me-2048 reads its English locale file with it, caught the
+/// exception as an `IOException` and called `notifyDestroyed` on the first key (2026-10-08).
+/// ponytail: only the ASCII names — ISO-8859-1 differs from both decoders above 0x7F, so it still throws.
+struct AsciiReadsAsUtf8 {
+    inner: Box<dyn MethodBody<JavaError, dyn Runtime>>,
+}
+
+#[async_trait::async_trait]
+impl MethodBody<JavaError, dyn Runtime> for AsciiReadsAsUtf8 {
+    async fn call(&self, jvm: &Jvm, context: &mut (dyn Runtime + 'static), mut args: Box<[JavaValue]>) -> Result<JavaValue, JavaError> {
+        if let Some(JavaValue::Object(Some(charset))) = args.get(2) {
+            let name = JavaLangString::to_rust_string(jvm, charset).await?;
+            if ["US-ASCII", "ASCII", "US_ASCII"].iter().any(|x| name.eq_ignore_ascii_case(x)) {
+                args[2] = JavaValue::Object(Some(JavaLangString::from_rust_string(jvm, "UTF-8").await?));
+            }
+        }
+
+        self.inner.call(jvm, context, args).await
+    }
+}
+
+fn ascii_reads_as_utf8(proto: &mut RuntimeClassProto) -> bool {
+    let Some(index) = proto
+        .methods
+        .iter()
+        .position(|x| x.name == "<init>" && x.descriptor == "(Ljava/io/InputStream;Ljava/lang/String;)V")
+    else {
+        tracing::error!("hardening: {}::<init>(InputStream, String) not found — ASCII NOT mapped", proto.name);
+        return false;
+    };
+    let old = proto.methods.remove(index);
+    proto.methods.insert(
+        index,
+        JavaMethodProto {
+            name: old.name,
+            descriptor: old.descriptor,
+            access_flags: old.access_flags,
+            body: Box::new(AsciiReadsAsUtf8 { inner: old.body }),
+        },
+    );
+
+    true
+}
+
+/// `Class.getResourceAsStream` falls back to the system class loader — the MIDlet jar — when the
+/// class's own loader finds nothing. The pin asks the class's loader only, and a platform class's
+/// loader is the bootstrap one, which has no jar resources: `Image.class.getResourceAsStream("/x.png")`
+/// — the idiom of Nokia's example `ImageHelper`, copied into open-source MIDP games — came back null
+/// and the game died in `Image.createImage(null)` before its first paint (j2me-lines, 2026-10-08).
+/// On a handset every class reads the one jar, so the fallback is what the guest expects.
+struct ResourceFromMidletJar {
+    inner: Box<dyn MethodBody<JavaError, dyn Runtime>>,
+}
+
+#[async_trait::async_trait]
+impl MethodBody<JavaError, dyn Runtime> for ResourceFromMidletJar {
+    async fn call(&self, jvm: &Jvm, context: &mut (dyn Runtime + 'static), args: Box<[JavaValue]>) -> Result<JavaValue, JavaError> {
+        let name = args.get(1).cloned();
+        let found = self.inner.call(jvm, context, args).await?;
+        let (JavaValue::Object(None), Some(JavaValue::Object(Some(name)))) = (&found, name) else {
+            return Ok(found);
+        };
+
+        let loader: Box<dyn ClassInstance> = jvm
+            .invoke_static("java/lang/ClassLoader", "getSystemClassLoader", "()Ljava/lang/ClassLoader;", ())
+            .await?;
+        let stream: Option<Box<dyn ClassInstance>> = jvm
+            .invoke_virtual(
+                &loader,
+                "java/lang/ClassLoader",
+                "getResourceAsStream",
+                "(Ljava/lang/String;)Ljava/io/InputStream;",
+                (name,),
+            )
+            .await?;
+
+        Ok(JavaValue::Object(stream))
+    }
+}
+
+fn resource_from_midlet_jar(proto: &mut RuntimeClassProto) -> bool {
+    let Some(index) = proto
+        .methods
+        .iter()
+        .position(|x| x.name == "getResourceAsStream" && x.descriptor == "(Ljava/lang/String;)Ljava/io/InputStream;")
+    else {
+        tracing::error!("hardening: {}::getResourceAsStream not found — jar fallback NOT applied", proto.name);
+        return false;
+    };
+    let old = proto.methods.remove(index);
+    proto.methods.insert(
+        index,
+        JavaMethodProto {
+            name: old.name,
+            descriptor: old.descriptor,
+            access_flags: old.access_flags,
+            body: Box::new(ResourceFromMidletJar { inner: old.body }),
+        },
+    );
+
+    true
+}
+
 /// Adds a method the pin does not define. Refuses to shadow an existing one: if the pin grows
 /// the method later, we must drop ours rather than silently win the lookup.
 #[allow(dead_code)] // slice D: wie 사본이 전부 upstream 으로 흡수돼 현재 호출자 0.
@@ -360,9 +465,11 @@ pub fn harden(proto: &mut RuntimeClassProto) -> usize {
         .filter(|descriptor| guard(proto, "<init>", descriptor, &[1], "array is null"))
         .count(),
 
-        "java/io/InputStreamReader" => replace_reader_read(proto) as usize,
+        "java/io/InputStreamReader" => replace_reader_read(proto) as usize + ascii_reads_as_utf8(proto) as usize,
 
         "java/util/Calendar" => default_null_time_zone(proto) as usize,
+
+        "java/lang/Class" => resource_from_midlet_jar(proto) as usize,
 
         // No `java/util/Timer` arm any more: slice D removed it because the pin declares all
         // four `schedule` forms itself (see the module header). The comment that used to sit
@@ -394,10 +501,11 @@ mod tests {
         for (name, expected) in [
             ("java/lang/System", 1),
             ("java/io/ByteArrayInputStream", 1),
-            ("java/lang/StringBuffer", 1), // slice D: insert(I,String) now upstream
-            ("java/lang/String", 6),       // every array-taking <init>
-            ("java/io/InputStreamReader", 1),
+            ("java/lang/StringBuffer", 1),    // slice D: insert(I,String) now upstream
+            ("java/lang/String", 6),          // every array-taking <init>
+            ("java/io/InputStreamReader", 2), // read body + ASCII charset
             ("java/util/Calendar", 1),
+            ("java/lang/Class", 1),
         ] {
             let mut proto = get_runtime_class_proto(name).unwrap();
             assert_eq!(harden(&mut proto), expected, "{name}: hardening not applied");
@@ -570,6 +678,34 @@ mod reader_read_tests {
 
             let eof: i32 = jvm.invoke_virtual(&reader, "java/io/Reader", "read", "([CII)I", (chars, 0, 10)).await?;
             assert_eq!(eof, -1);
+
+            Ok(())
+        })
+    }
+
+    /// `new InputStreamReader(in, "US-ASCII")` opens and reads — the pin threw
+    /// `UnsupportedEncodingException` and j2me-2048 quit on it.
+    #[test]
+    fn us_ascii_reader_opens_and_reads() -> Result<()> {
+        run_jvm_test(Box::new([]), |jvm| async move {
+            let mut bytes = jvm.instantiate_array("B", 2).await?;
+            jvm.store_array(&mut bytes, 0, vec![b'h' as i8, b'i' as i8]).await?;
+            let stream = jvm.new_class("java/io/ByteArrayInputStream", "([B)V", (bytes,)).await?;
+            let charset = JavaLangString::from_rust_string(&jvm, "us-ascii").await?;
+            let reader = jvm
+                .new_class(
+                    "java/io/InputStreamReader",
+                    "(Ljava/io/InputStream;Ljava/lang/String;)V",
+                    (stream, charset),
+                )
+                .await?;
+
+            let chars: ClassInstanceRef<Array<u16>> = jvm.instantiate_array("C", 4).await?.into();
+            let read: i32 = jvm
+                .invoke_virtual(&reader, "java/io/Reader", "read", "([CII)I", (chars.clone(), 0, 4))
+                .await?;
+            assert_eq!(read, 2);
+            assert_eq!(jvm.load_array::<u16>(&chars, 0, 2).await?, [b'h' as u16, b'i' as u16]);
 
             Ok(())
         })
