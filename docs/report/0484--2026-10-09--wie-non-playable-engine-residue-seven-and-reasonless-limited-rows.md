@@ -65,7 +65,7 @@
   - 프레임이 크게 다른 클립 타이틀 10종을 눈으로 봤다: 키 타이밍에 따른 다른 경로(메뉴 진입 시점 등)였고 그림 깨짐은 없었다. `04159045a7ea` 의 «OK:확인» 글자 유무 차이는 base 끼리도 갈렸다(두 base 실행의 프레임 열이 각각 head 와 같다) — 깜빡임이다.
 - **장시간 짝**(LGT 수거 대상 playable 6종 · 600초 · `LONG_KEYS` 루프): `8f7758fa43b6` `1cd151222bde` `af7d82e5e239` `580a66c32fff` `c9b287e3edcf` `236c7da689f6` — base·head 모두 FAIL 0 · 할당 실패 0 · 854/900 단계. (이 짝은 «매 틱 수거» 판으로 쟀다 — 지금보다 수거가 잦은, 더 센 쪽이다.)
 - head census 가드: `49ade89578c5` `ddd885583b15` 6축 ok — 퇴행 0.
-- 러너 줄(AGENTS §러너): 4게이트 안의 픽스처 시험이 green 이다(아래 §검증).
+- 러너 줄(AGENTS · 머지 뒤 head release): `draw_j2me` · `helloworld_ktf/lgt` · `text_j2me --timeout 5` PASS. `keydraw_ktf/lgt --inject --expect-last-frame` 은 첫 실행이 `UNMEASURED · stop max-ticks`(load1 52)였다 — 지시대로 `--max-ticks` 를 올리자 둘 다 PASS · rc=0 · 27/27 · paints 79 / 55(유휴 범위 안).
 
 ### 6. `287af341dac8` — 엔진이 아니라 «첫 실행 재시작»
 
