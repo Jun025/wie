@@ -68,7 +68,7 @@
 ### 4. compat
 
 `83fc429f9cbe` 행: `not-yet` → `limited`. boot·render·input `ok`(§2 head · 27키 내내 화면이 바뀐다) · sound `ok`(head 실행에서 MIDI 재생이 실제로 났다) · longplay·speed `unknown`. `knownIssues_ko` 의 «시작하는 도중에 멈춰요» 를 지웠다. longplay 를 재지 못한 이유: census 호스트 잠금을 다른 레인의 전수 progress 실행(600초 × 전 타이틀)이 쥐고 있었다. 그래서 `playable` 로 올리지 않았다.
-<!-- COMPAT_REVERT -->
+`node scripts/check-compat-revert.mjs --head HEAD --base origin/main`: «OK — 브랜치가 main 을 받은 적이 없다 · 착지 기준 바뀐 행 1».
 
 업데이트 소식: `docs/player-updates/2026-10-08-ktf-loading-screen-into-game.json`.
 
