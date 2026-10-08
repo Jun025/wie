@@ -81,3 +81,5 @@
 - 4게이트 통과: fmt · clippy stable/beta/wasm32 `-D warnings` · `RUST_MIN_STACK=4194304 cargo test --all`. beta 의 `unused dependency softbuffer/winit` 경고는 원래 있던 것이고 rc 는 0 이다.
 - 시험 `a_nested_entry_goes_below_the_java_sp_a_resolve_helper_pushed`: 네이티브 스택 맨 위에 `push {r2, lr}` 모양을 놓고 `enter` 뒤 `sp` 를 본다. 수정을 되돌리면 FAILED(`left 0x4000bfe8 · right 0x40007f2c`)였고, 원상에서 통과했다.
 - 러너 줄(head release): `draw_j2me` · `helloworld_ktf/lgt` · `text_j2me --timeout 5` PASS. `keydraw_ktf/lgt --inject --expect-last-frame` 은 기본 상한에서 `UNMEASURED · max-ticks` 였다(0473 §러너 · release 가 5천만 틱을 키 일정보다 먼저 쓴다). `--max-ticks 100000000000` 로 PASS · rc=0(paints 79 · 55)이었다.
+
+게임 파일명 유입(도구 기본 실행 · 브랜치 전체): BOUNDED 330쌍 · SUFFIX-ATTACHED 15쌍. 전부 «건드린 파일 전체»인 `compat.json` 의 `title`·`fileTitle`(공개 계약 필드)에 원래 있던 이름이다. 이 회차가 «추가한» 줄의 게임명은 0 이다(`git diff` 추가 줄 대조).
