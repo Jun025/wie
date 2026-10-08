@@ -112,6 +112,13 @@ impl J2MEEmulator {
 
         let protos = [wie_midp::get_protos().into()];
         let jvm = JvmSupport::new_jvm(system, Some(&jar_filename), Box::new(protos), &properties, RustJavaJvmImplementation).await?;
+        // A J2ME title is written for the standard key codes (-1..-7); SKVM shares wie-midp and keeps SKT's.
+        if let Err(error) = jvm
+            .put_static_field("javax/microedition/lcdui/Canvas", "standardKeyCodes", "Z", true)
+            .await
+        {
+            return Err(JvmSupport::to_wie_err(&jvm, error).await);
+        }
 
         let main_class_name = if let Some(x) = main_class_name {
             x.replace('.', "/")

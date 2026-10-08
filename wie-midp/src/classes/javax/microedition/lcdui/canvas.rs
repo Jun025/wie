@@ -1,8 +1,8 @@
 use alloc::{string::String as RustString, vec};
 
 use jvm::{ClassInstanceRef, Jvm, Result as JvmResult, runtime::JavaLangString};
-use jvm_class_proto::JavaMethodProto;
-use jvm_types::{ClassAccessFlags, MethodAccessFlags};
+use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
+use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 use rustjava_runtime::classes::java::lang::String;
 
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
@@ -57,7 +57,8 @@ impl Canvas {
                     MethodAccessFlags::empty(),
                 ),
             ],
-            fields: vec![],
+            // Set by wie-j2me: J2ME titles get the standard key codes (see `to_standard`).
+            fields: vec![JavaFieldProto::new("standardKeyCodes", "Z", FieldAccessFlags::STATIC)],
             access_flags: ClassAccessFlags::PUBLIC | ClassAccessFlags::ABSTRACT,
         }
     }
@@ -150,9 +151,10 @@ impl Canvas {
         Ok(())
     }
 
-    async fn get_game_action(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, key: i32) -> JvmResult<i32> {
+    async fn get_game_action(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, key: i32) -> JvmResult<i32> {
         tracing::debug!("javax.microedition.lcdui.Canvas::getGameAction({this:?}, {key})");
 
+        let key = if standard_key_codes(jvm).await? { from_standard(key) } else { key };
         let action = match MIDPKeyCode::from_raw(key) {
             Some(MIDPKeyCode::UP) => 1,    // UP
             Some(MIDPKeyCode::DOWN) => 6,  // DOWN
@@ -236,10 +238,15 @@ impl Canvas {
             _ => return Err(jvm.exception("java/lang/IllegalArgumentException", "invalid game action").await),
         };
 
-        Ok(key as i32)
+        Ok(if standard_key_codes(jvm).await? {
+            to_standard(key as i32)
+        } else {
+            key as i32
+        })
     }
 
     async fn get_key_name(jvm: &Jvm, _: &mut WieJvmContext, _: ClassInstanceRef<Self>, key: i32) -> JvmResult<ClassInstanceRef<String>> {
+        let key = if standard_key_codes(jvm).await? { from_standard(key) } else { key };
         let name: RustString = match MIDPKeyCode::from_raw(key) {
             Some(MIDPKeyCode::UP) => "Up".into(),
             Some(MIDPKeyCode::DOWN) => "Down".into(),
@@ -263,6 +270,8 @@ impl Canvas {
         } else {
             return Err(jvm.exception("java/lang/IllegalArgumentException", "Invalid keyboard event type").await);
         };
+        // The queue carries SKT codes (Screens, GameCanvas key states read them); translate only here.
+        let code = if standard_key_codes(jvm).await? { to_standard(code) } else { code };
 
         let _: () = match event_type {
             KeyboardEventType::KeyPressed => {
@@ -303,6 +312,47 @@ impl Canvas {
 
         Ok(())
     }
+}
+
+async fn standard_key_codes(jvm: &Jvm) -> JvmResult<bool> {
+    jvm.get_static_field("javax/microedition/lcdui/Canvas", "standardKeyCodes", "Z").await
+}
+
+// The key codes a general J2ME title waits for — the Nokia/Sony Ericsson values every MIDP
+// handset outside Korea used, and what sperm-race and j3de switch on (case -1..-4, soft keys -6/-7).
+// MIDPKeyCode's values are SKVM's (up 141, soft keys 6/7), so a J2ME title saw RIGHT do nothing.
+// HANGUP is SKVM's -1, which is UP here; it moves to -11, the Nokia end key.
+fn to_standard(code: i32) -> i32 {
+    match MIDPKeyCode::from_raw(code) {
+        Some(MIDPKeyCode::UP) => -1,
+        Some(MIDPKeyCode::DOWN) => -2,
+        Some(MIDPKeyCode::LEFT) => -3,
+        Some(MIDPKeyCode::RIGHT) => -4,
+        Some(MIDPKeyCode::FIRE) => -5,
+        Some(MIDPKeyCode::LEFT_SOFT_KEY) => -6,
+        Some(MIDPKeyCode::RIGHT_SOFT_KEY) => -7,
+        Some(MIDPKeyCode::CLEAR) => -8,
+        Some(MIDPKeyCode::CALL) => -10,
+        Some(MIDPKeyCode::HANGUP) => -11,
+        _ => code,
+    }
+}
+
+fn from_standard(code: i32) -> i32 {
+    let key = match code {
+        -1 => MIDPKeyCode::UP,
+        -2 => MIDPKeyCode::DOWN,
+        -3 => MIDPKeyCode::LEFT,
+        -4 => MIDPKeyCode::RIGHT,
+        -5 => MIDPKeyCode::FIRE,
+        -6 => MIDPKeyCode::LEFT_SOFT_KEY,
+        -7 => MIDPKeyCode::RIGHT_SOFT_KEY,
+        -8 => MIDPKeyCode::CLEAR,
+        -10 => MIDPKeyCode::CALL,
+        -11 => MIDPKeyCode::HANGUP,
+        _ => return code,
+    };
+    key as i32
 }
 
 #[cfg(test)]
@@ -672,6 +722,65 @@ mod test {
                 Ok(())
             },
         )
+    }
+
+    // J2ME (wie-j2me sets standardKeyCodes) gets -1..-7; SKVM keeps the SKT values. Reverting the
+    // translation fails the J2ME half, translating unconditionally fails the SKVM half.
+    #[test]
+    fn j2me_canvas_gets_standard_key_codes_and_skvm_does_not() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into(), [RecordingCanvas::as_proto()].into()]), |jvm| async move {
+            const C: &str = "javax/microedition/lcdui/Canvas";
+            for standard in [true, false] {
+                jvm.put_static_field(C, "standardKeyCodes", "Z", standard).await?;
+                let display: ClassInstanceRef<Display> = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?.into();
+                let canvas: ClassInstanceRef<Canvas> = jvm.new_class("javax/microedition/lcdui/TestRecordingCanvas", "()V", ()).await?.into();
+                let _: () = jvm.invoke_virtual(&canvas, C, "setFullScreenMode", "(Z)V", (true,)).await?;
+                let _: () = jvm
+                    .invoke_virtual(
+                        &display,
+                        "javax/microedition/lcdui/Display",
+                        "setCurrent",
+                        "(Ljavax/microedition/lcdui/Displayable;)V",
+                        (canvas.clone(),),
+                    )
+                    .await?;
+                for (key, standard_code) in [
+                    (MIDPKeyCode::UP, -1),
+                    (MIDPKeyCode::RIGHT, -4),
+                    (MIDPKeyCode::FIRE, -5),
+                    (MIDPKeyCode::LEFT_SOFT_KEY, -6),
+                    (MIDPKeyCode::RIGHT_SOFT_KEY, -7),
+                    (MIDPKeyCode::HANGUP, -11),
+                    (MIDPKeyCode::KEY_NUM6, 54),
+                ] {
+                    let key = key as i32;
+                    let _: () = jvm
+                        .invoke_virtual(
+                            &display,
+                            "javax/microedition/lcdui/Display",
+                            "handleKeyEvent",
+                            "(II)V",
+                            (KeyboardEventType::KeyPressed as i32, key),
+                        )
+                        .await?;
+                    let expected = if standard { standard_code } else { key };
+                    assert_eq!(
+                        jvm.get_field::<i32>(&canvas, "pressed", "I").await?,
+                        expected,
+                        "standard={standard} key={key}"
+                    );
+                }
+                // getGameAction / getKeyCode are each other's inverse on the codes the canvas receives.
+                let (up, right) = if standard { (-1, -4) } else { (141, 145) };
+                assert_eq!(jvm.invoke_virtual::<_, i32>(&canvas, C, "getGameAction", "(I)I", (right,)).await?, 5);
+                assert_eq!(jvm.invoke_virtual::<_, i32>(&canvas, C, "getKeyCode", "(I)I", (5,)).await?, right);
+                assert_eq!(jvm.invoke_virtual::<_, i32>(&canvas, C, "getGameAction", "(I)I", (up,)).await?, 1);
+                // SKVM's -1 is HANGUP, not a game action.
+                let minus_one: i32 = jvm.invoke_virtual(&canvas, C, "getGameAction", "(I)I", (-1,)).await?;
+                assert_eq!(minus_one, if standard { 1 } else { 0 });
+            }
+            Ok(())
+        })
     }
 
     // A subclass's `super.getHeight()` compiles to invokespecial naming Canvas, which only inherits

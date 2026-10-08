@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "date": "2026-10-09",
+  "task": "wie-j2me-standard-keycodes-with-demo",
+  "title": "J2ME 에 표준 키코드(-1~-7) 전달 — 데모와 함께",
+  "summary": "Canvas 경계에서 J2ME 일 때만 SKT 키값을 표준 키코드로 번역(getGameAction/getKeyCode/getKeyName 대칭). SKVM 은 그대로. 데모 종료키 -1 → -11(옛 엔진 -1 도 인식).",
+  "proposals": [],
+  "adoptedProposals": ["2026-10-09-license-clean-midp-corpus#p0"],
+  "declinedProposals": []
+}

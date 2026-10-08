@@ -9,6 +9,7 @@ public abstract class Canvas extends Displayable {
     public final void repaint() {}
     public final void serviceRepaints() {}
     public int getGameAction(int keyCode) { return 0; }
+    public int getKeyCode(int gameAction) { return 0; }
     protected void keyPressed(int keyCode) {}
     public void setFullScreenMode(boolean mode) {}
 }
