@@ -257,6 +257,12 @@ impl ArmCore {
         self.inner.lock().current_thread_id
     }
 
+    /// The lowest address of the current thread's stack, or `None` outside any `run_in_thread` thread.
+    pub fn current_stack_base(&self) -> Option<u32> {
+        let id = self.current_thread_id()?;
+        self.threads.lock().get(&id).map(|thread| thread.stack_base as u32)
+    }
+
     /// Whether a thread other than the current one is suspended in the middle of guest code — sliced
     /// out by the instruction budget, not parked in a host call (sleep, wait, I/O). Host code that
     /// hands the guest an event can wait for this to clear: a handset does not deliver a key into
