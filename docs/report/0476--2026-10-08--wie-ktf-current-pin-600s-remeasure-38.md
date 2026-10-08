@@ -90,3 +90,18 @@
 
 - 이 브랜치의 `compat.json`(= `origin/main` `60e9062c` 의 파일) 위에 위 14행의 `axes.progress` 만 `stuck` → `ok` 로 바꿨다. 다른 키·행은 그대로다. 직렬화는 원본과 같다(들여쓰기 1칸).
 - 고친 3종은 엔진이 바뀐 회차(#503)가 이미 `docs/player-updates/2026-10-07-ktf-input-forms-pass.json` 을 냈다. 이 회차는 게임 동작을 바꾸지 않아 소식 파일을 더하지 않았다.
+- `node scripts/check-compat-revert.mjs --head HEAD --base origin/main`: «compat-revert: OK — 브랜치가 main 을 받은 적이 없다 · 착지 기준 바뀐 행 14».
+
+### 5. 게이트
+
+- `cargo fmt --check` rc=0 · `cargo clippy --all -D warnings` rc=0 · wasm32 rc=0 · `+beta` rc=0.
+  - `+beta` 는 `wie_cli` 에 «unused dependency» 경고를 낸다(`directories` `midir` `rodio` 등). rc 는 0 이다. 이 회차가 건드린 코드는 없다.
+- `RUST_MIN_STACK=4194304 cargo test --all` rc=0 · 739 passed / 0 failed.
+- `node scripts/player-data.mjs` OK · `check-worklog-json.mjs` OK · `npm run audit` PASSED.
+- 러너 블록은 돌리지 않았다. 엔진 코드 변경이 0 이기 때문이다.
+
+### 6. 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs`(이 브랜치 ↔ `origin/main`): BOUNDED 718회/330쌍 + SUFFIX-ATTACHED 35회/15쌍.
+- 전부 `compat.json` 의 기존 `title` 값이다. 이 회차는 그 파일의 `axes.progress` 14값만 바꿨다.
+- 이 문서와 worklog 는 타이틀을 sha12 로만 적었다.
