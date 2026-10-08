@@ -1,0 +1,25 @@
+{
+ "schema": "wie-worklog/1",
+ "date": "2026-10-09",
+ "task": "wie-skt-xtextfield-key-input-name-screen",
+ "title": "SKVM XTextField 키 입력 — 숫자 멀티탭 · CLEAR · 글자가 바뀌면 스스로 repaint",
+ "summary": "ec2f8f2e02a2 의 이름 화면이 넘어간다. 게임은 키를 XTextField.keyPressed 로만 넘기고 다시 그리지 않으며, 이름은 paint 안의 getText() 로만 읽는다. 입력칸이 스스로 repaint 하게 했고, 숫자 키는 멀티탭 영문 대문자(NUMERIC 류는 숫자)로 바꿨다. XTextField 를 부르는 다른 SKT 11종은 같은 화면에 닿는다(이름 글자만 5 → J).",
+ "changes": [
+  "wie-skvm com/xce/lcdui/XTextField.keyPressed — 숫자 멀티탭(wie_util::keypad · 1초 창) · CLEAR 지움 · 글자가 바뀌면 repaint",
+  "keyRepeated 는 숫자를 무시 · keyReleased 스텁 제거(할 일 없음) · setText 가 순환을 끝낸다",
+  "docs/report/0489"
+ ],
+ "verification": [
+  "digit_keys_type_multitap_and_repaint · 개악 red 2/2(repaint 제거 · 멀티탭 제거)",
+  "ec2f8f2e02a2 --keys 이름 경로 전/후 · 2f5246006bd8 · f2ae515201f2 · 2d66945008c1 레시피 전/후 · XTextField 호출 SKT 9종 --inject 전/후",
+  "SKT smoke gate 50/50 · 퇴행 0"
+ ],
+ "limits": [
+  "영문 대문자·숫자만 — 2f5246006bd8 화면이 «한글 4자까지» 라고 하나 한글 조합은 없다",
+  "14a62a8521a0 의 이름 화면은 이 회차에서 도달하지 못해 재지 않았다"
+ ],
+ "proposals": [],
+ "adoptedProposals": [
+  "2026-10-08-progression-wave5-play-tips#p0"
+ ]
+}
