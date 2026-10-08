@@ -550,16 +550,19 @@ pub(crate) fn enter(core: &mut ArmCore) -> Result<Option<Entry>> {
 
 /// The Java `sp` a resolve helper pushed at `[native stack top - 8]` (`push {r2, lr}` · `push {r1, r2,
 /// lr}` · `push {r3, lr}`, the old `sp` in `r2`/`r3`) — if `sp` is on that native stack and the word is
-/// where this entry's Java frames are. The four throw helpers save nothing; they get `None`.
+/// where this entry's Java frames are. The four throw helpers save nothing; they get `None` — unless
+/// an earlier resolve call left its word there, which passes if the new frame still fits the stack.
 fn pushed_java_sp(core: &ArmCore, native_stack: u32, sp: u32) -> Result<Option<u32>> {
     let java_top = native_stack.wrapping_sub(NATIVE_STACK_GAP);
     if !(java_top < sp && sp <= native_stack) {
         return Ok(None);
     }
     let pushed: u32 = read_generic(core, native_stack - 8)?;
+    // The new frame goes `NATIVE_STACK_GAP` below `pushed`; it must not leave the thread's stack.
+    let bottom = core.current_stack_base().unwrap_or(0).saturating_add(NATIVE_STACK_GAP);
 
     // ponytail: 1 MB = one guest thread stack (wie-core-arm `thread.rs`); a stale word outside it is ignored.
-    Ok((pushed <= java_top && java_top - pushed < 0x10_0000).then_some(pushed))
+    Ok((pushed <= java_top && java_top - pushed < 0x10_0000 && pushed >= bottom).then_some(pushed))
 }
 
 /// Whether a try record belongs to a frame of the innermost host entry: its frames lie below that
@@ -781,6 +784,52 @@ mod tests {
 
             leave(&mut core, entry)?;
             assert_eq!(core.save_context().sp, native_top - 0x1c);
+        })
+    }
+
+    // A word at the native stack top that is not a Java `sp` of this entry (a throw helper pushes
+    // nothing there) is ignored: the frames go where they went before resolve helpers were read.
+    #[test]
+    fn a_nested_entry_ignores_a_word_that_is_not_a_java_sp() -> Result<()> {
+        run!(|jvm, core, ptr_thread_context| {
+            let native_top = core.save_context().sp;
+            let java_top = native_top - NATIVE_STACK_GAP;
+            write_generic(&mut core, ptr_thread_context + CONTEXT_SAVED_SP, 0u32)?;
+            write_generic(&mut core, ptr_thread_context + CONTEXT_NATIVE_STACK, native_top)?;
+            let mut context = core.save_context();
+            context.sp = native_top - 0x1c;
+            core.restore_context(&context);
+
+            for word in [RUN_FUNCTION_LR, java_top + 4, java_top - 0x10_0000] {
+                write_generic(&mut core, native_top - 8, word)?;
+                let entry = enter(&mut core)?.unwrap();
+                assert_eq!(core.save_context().sp, native_top - 0x1c - NATIVE_STACK_GAP, "{word:#x}");
+                leave(&mut core, entry)?;
+            }
+        })
+    }
+
+    // A stale Java `sp` near the bottom of the thread's stack would put the new frames below it.
+    #[test]
+    fn a_nested_entry_stays_inside_the_thread_stack() -> Result<()> {
+        run!(|jvm, core, ptr_thread_context| {
+            let _thread = core.run_in_thread(|| async { Ok(()) })?;
+            let id = *core.get_thread_ids().iter().max().unwrap();
+            let _guard = core.enter_thread_context(id);
+            let native_top = core.save_context().sp;
+            let base = core.current_stack_base().unwrap();
+            write_generic(&mut core, ptr_thread_context + CONTEXT_SAVED_SP, 0u32)?;
+            write_generic(&mut core, ptr_thread_context + CONTEXT_NATIVE_STACK, native_top)?;
+            let mut context = core.save_context();
+            context.sp = native_top - 0x1c;
+            core.restore_context(&context);
+
+            for (pushed, sp) in [(base + 0x100, native_top - 0x1c - NATIVE_STACK_GAP), (base + NATIVE_STACK_GAP, base)] {
+                write_generic(&mut core, native_top - 8, pushed)?;
+                let entry = enter(&mut core)?.unwrap();
+                assert_eq!(core.save_context().sp, sp, "{pushed:#x}");
+                leave(&mut core, entry)?;
+            }
         })
     }
 
