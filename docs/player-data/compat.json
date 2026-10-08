@@ -1475,7 +1475,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "메뉴를 여는 소프트키 없이 방향키와 확인 키, 숫자 5 키로 움직이고 싸우면 계속 진행돼요."
+   ],
    "changes": [],
    "fileTitle": "마스터오브소드2-큰화면"
   },
@@ -3751,7 +3753,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "확인 키는 일시정지 창을 여니, 싸울 때는 방향키로 움직이며 숫자 5 키를 누르면 돼요."
+   ],
    "changes": [],
    "fileTitle": "kt 졸라맨액션학원"
   },
@@ -3940,7 +3944,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "목장 안내 창을 확인 키로 닫은 뒤 숫자 1 키부터 6 키까지 눌러 우유를 짜면 돼요."
+   ],
    "changes": [],
    "fileTitle": "짜요짜요타이쿤2"
   },
@@ -4783,7 +4789,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "이름 칸은 숫자 키로 글자를 넣고 확인 키를 누르고, 거실 메뉴에서 아래 방향키를 세 번 눌러 «Schedule»을 고르면 한 달 일정이 진행돼요."
+   ],
    "changes": [],
    "fileTitle": "프린세스메이커4"
   },
@@ -4996,7 +5004,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "처음 메뉴에서 확인 키를 두 번 누르면 시작하고, 마을에서 멀리 가면 강한 적이 나오니 근처에서 싸우면 오래 즐길 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "화산제일검2"
   },
@@ -5322,7 +5332,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "«새로하기»를 고르면 묻는 창의 커서가 «아니오»에 있으니 왼쪽 방향키로 «예»를 고른 뒤 확인 키를 누르면 1장 이야기가 시작돼요."
+   ],
    "changes": [],
    "fileTitle": "나는마왕이다2"
   },
@@ -5476,7 +5488,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "처음 안내 창들은 확인 키로 닫으면 되고, 캐릭터를 고른 뒤 방향키로 움직이며 확인 키로 공격하면 던전이 진행돼요."
+   ],
    "changes": [],
    "fileTitle": "던전앤파이터귀검사"
   },
@@ -5495,7 +5509,9 @@
     "speed": "unknown",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "첫 화면에서 확인 키로 «이어하기»와 저장 칸을 고르면 바로 시작하고, 방향키로 움직이며 확인 키로 공격하면 돼요."
+   ],
    "changes": [],
    "fileTitle": "데몬헌터"
   },
@@ -6824,7 +6840,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "대화 선택지는 숫자 1 키나 숫자 2 키로 고르면 다음 장면으로 이어져요."
+   ],
    "changes": [],
    "fileTitle": "닥터k"
   },
@@ -7417,7 +7435,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "«새로하기»와 «처음부터하기»를 고르고, 이름 화면에서 숫자 5 키를 두 번 누른 뒤 위 방향키로 정하면 이야기가 이어져요."
+   ],
    "changes": [],
    "fileTitle": "삼국쟁패2열왕전기"
   },
@@ -7475,7 +7495,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "처음 화면에서 확인 키를 몇 번 누르면 가게 문이 열리고, 방향키와 확인 키로 손님을 맞을 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "생과일타이쿤2"
   },
@@ -7629,7 +7651,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "처음 메뉴에서 확인 키로 «게임시작»을 누른 뒤 아래 방향키로 «새로하기»를 고르면 이야기가 시작돼요."
+   ],
    "changes": [],
    "fileTitle": "어스토니시아ep1"
   },
@@ -7921,7 +7945,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "처음 화면부터 확인 키만 눌러 기본 설정으로 들어가면 경기가 시작되고, 확인 키로 공을 칠 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "컴투스프로야구2SKT"
   },
@@ -8018,7 +8044,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "«새로하기»에서 이름 칸에 숫자 5 키를 두 번 누르고 확인 키로 넘긴 뒤, 준비 메뉴에서 위 방향키로 «출격»을 고르면 전투가 시작돼요."
+   ],
    "changes": [],
    "fileTitle": "[SKVM]택티컬퀘스트"
   },
