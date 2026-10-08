@@ -98,3 +98,5 @@
 - 둘 다 전부 `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 값이다(형제 회차와 같은 수 · 0478 §유입). 이 회차는 그 파일의 8행 `status`·`axes`·`knownIssues_ko` 만 바꿨고 제목은 건드리지 않았다.
 - 그 밖의 BOUNDED 2쌍(`wie-lgt` context.rs · `wie-wipi-c` graphics.rs)은 이 회차가 손댄 파일의 **기존 주석**이다 — 이 브랜치가 더한 줄(`git diff` 의 `+`)에는 0건.
 - 이 문서·worklog·업데이트 소식은 타이틀을 sha12 로만 적었다.
+
+<!-- corpus-name-inflow v1 subjects=15 tree=d8ec337c158b0e2f B=721/332 P=0/0 S=35/15 -->
