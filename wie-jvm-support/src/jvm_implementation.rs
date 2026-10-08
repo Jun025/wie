@@ -173,7 +173,7 @@ impl ClassDefinition for InheritedMethods {
 ///
 /// A loop that never calls a method is not covered; LuaJ, and every guest seen so far, calls.
 ///
-/// Measured, not chosen (`docs/report/0487`): loveme's ticks averaged 126 ms at 10 000, 33 ms at
+/// Measured, not chosen (`docs/report/0488`): loveme's ticks averaged 126 ms at 10 000, 33 ms at
 /// 2 500 and 23 ms at 1 000 (load ~27, 14 ms budget), while 86 SKT/J2ME titles painted the same
 /// at 1 000 as with no forced yield (median ratio 1.000). Raising it lengthens the worst tick a
 /// non-yielding guest can hold; lowering it buys little more, since the yield costs one executor

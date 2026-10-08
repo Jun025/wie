@@ -48,7 +48,7 @@ release `wie_validate`. base = `origin/main` `82959a5b`. 후보는 같은 트리
 |---|---|
 | LGT + SKT (`PLATFORM_FILTER="lgt skt"`) | ran 104: **104 PASS / 0 FAIL** · baseline 102 확인 · 결측 0 · **퇴행 0** |
 | KTF 앞 95 | ran 95: **95 PASS / 0 FAIL** · baseline 95 확인 · 결측 0 · **퇴행 0** |
-| KTF 뒤 95 | SG_KTF_B |
+| KTF 뒤 95 | ran 95: **95 PASS / 0 FAIL** · baseline 95 확인 · 결측 0 · **퇴행 0** |
 
 KTF 는 190개라 한 임대(30분 목표)에 안 들어간다. 그래서 둘로 나눴다. 각 절반은 심링크 디렉터리와 그 절반만 담은 baseline(`BASELINE=`)으로 돌렸다. 「결측 > 절반 = UNMEASURED」 규칙에 걸리지 않게 하려는 것이다.
 
