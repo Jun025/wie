@@ -5,8 +5,10 @@ pub mod classes;
 
 use wie_jvm_support::WieJavaClassProto;
 
-pub fn get_protos() -> [WieJavaClassProto; 47] {
+pub fn get_protos() -> [WieJavaClassProto; 57] {
     [
+        classes::java::lang::Reference::as_proto(),
+        classes::java::lang::WeakReference::as_proto(),
         classes::javax::microedition::io::Connector::as_proto(),
         classes::javax::microedition::lcdui::Alert::as_proto(),
         classes::javax::microedition::lcdui::AlertType::as_proto(),
@@ -26,17 +28,24 @@ pub fn get_protos() -> [WieJavaClassProto; 47] {
         classes::javax::microedition::lcdui::Item::as_proto(),
         classes::javax::microedition::lcdui::ItemCommandListener::as_proto(),
         classes::javax::microedition::lcdui::ItemStateListener::as_proto(),
+        classes::javax::microedition::lcdui::List::as_proto(),
         classes::javax::microedition::lcdui::Screen::as_proto(),
         classes::javax::microedition::lcdui::StringItem::as_proto(),
         classes::javax::microedition::lcdui::TextBox::as_proto(),
         classes::javax::microedition::lcdui::TextField::as_proto(),
         classes::javax::microedition::lcdui::Ticker::as_proto(),
         classes::javax::microedition::lcdui::game::GameCanvas::as_proto(),
+        classes::javax::microedition::lcdui::game::Layer::as_proto(),
+        classes::javax::microedition::lcdui::game::LayerManager::as_proto(),
+        classes::javax::microedition::lcdui::game::Sprite::as_proto(),
+        classes::javax::microedition::lcdui::game::TiledLayer::as_proto(),
         classes::javax::microedition::media::Control::as_proto(),
         classes::javax::microedition::media::Controllable::as_proto(),
         classes::javax::microedition::media::Manager::as_proto(),
         classes::javax::microedition::media::MediaException::as_proto(),
         classes::javax::microedition::media::Player::as_proto(),
+        classes::javax::microedition::media::ToneControl::as_proto(),
+        classes::javax::microedition::media::VolumeControl::as_proto(),
         classes::javax::microedition::media::PlayerListener::as_proto(),
         classes::javax::microedition::midlet::MIDlet::as_proto(),
         classes::javax::microedition::rms::InvalidRecordIDException::as_proto(),
@@ -52,6 +61,7 @@ pub fn get_protos() -> [WieJavaClassProto; 47] {
         classes::net::wie::EventQueue::as_proto(),
         classes::net::wie::ItemStateEvent::as_proto(),
         classes::net::wie::Launcher::as_proto(),
+        classes::net::wie::PlayerControl::as_proto(),
         classes::net::wie::SmafPlayer::as_proto(),
         classes::net::wie::WieError::as_proto(),
     ]

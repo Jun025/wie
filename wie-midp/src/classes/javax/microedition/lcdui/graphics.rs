@@ -112,8 +112,19 @@ impl Graphics {
                 JavaMethodProto::new("translate", "(II)V", Self::translate, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("drawRGB", "([IIIIIIIZ)V", Self::draw_rgb, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("setGrayScale", "(I)V", Self::set_gray_scale, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("fillTriangle", "(IIIIII)V", Self::fill_triangle, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("copyArea", "(IIIIIII)V", Self::copy_area, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getRedComponent", "()I", Self::get_red_component, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getGreenComponent", "()I", Self::get_green_component, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getBlueComponent", "()I", Self::get_blue_component, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getGrayScale", "()I", Self::get_gray_scale, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getDisplayColor", "(I)I", Self::get_display_color, MethodAccessFlags::PUBLIC),
+                // ponytail: DOTTED is accepted and drawn solid. Dash the line plotters if a title's look depends on it.
+                JavaMethodProto::new("setStrokeStyle", "(I)V", Self::set_stroke_style, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getStrokeStyle", "()I", Self::get_stroke_style, MethodAccessFlags::PUBLIC),
             ],
             fields: vec![
+                JavaFieldProto::new("strokeStyle", "I", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("img", "Ljavax/microedition/lcdui/Image;", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("width", "I", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("height", "I", FieldAccessFlags::PRIVATE),
@@ -654,20 +665,22 @@ impl Graphics {
 
         let src_image = Image::image(jvm, &img).await?;
 
-        let mut canvas = Self::canvas(jvm, &mut this).await?;
+        // TRANS_ROT90/ROT270/MIRROR_ROT90/MIRROR_ROT270 swap the destination's width and height;
+        // the anchor applies to the transformed region (JSR-118 Graphics.drawRegion).
+        let (dst_width, dst_height) = if matches!(transform, 4..=7) { (height, width) } else { (width, height) };
 
         let x_delta = if anchor.contains(Anchor::HCENTER) {
-            -width / 2
+            -dst_width / 2
         } else if anchor.contains(Anchor::RIGHT) {
-            -height
+            -dst_width
         } else {
             0
         };
 
         let y_delta = if anchor.contains(Anchor::VCENTER) {
-            -height / 2
+            -dst_height / 2
         } else if anchor.contains(Anchor::BOTTOM) {
-            -height
+            -dst_height
         } else {
             0
         };
@@ -680,7 +693,8 @@ impl Graphics {
 
         let clip = Self::clip(jvm, &this).await?;
 
-        canvas.draw(x as _, y as _, width as _, height as _, &*src_image, src_x, src_y, clip);
+        let mut canvas = Self::canvas(jvm, &mut this).await?;
+        draw_transformed(&mut *canvas, &*src_image, (src_x, src_y, width, height), transform, x, y, clip);
 
         Ok(())
     }
@@ -878,6 +892,118 @@ impl Graphics {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
+    async fn fill_triangle(
+        jvm: &Jvm,
+        _: &mut WieJvmContext,
+        mut this: ClassInstanceRef<Self>,
+        x1: i32,
+        y1: i32,
+        x2: i32,
+        y2: i32,
+        x3: i32,
+        y3: i32,
+    ) -> JvmResult<()> {
+        tracing::debug!("javax.microedition.lcdui.Graphics::fillTriangle({this:?}, {x1}, {y1}, {x2}, {y2}, {x3}, {y3})");
+
+        let rgb: i32 = jvm.get_field(&this, "color", "I").await?;
+        let translate_x: i32 = jvm.get_field(&this, "translateX", "I").await?;
+        let translate_y: i32 = jvm.get_field(&this, "translateY", "I").await?;
+        let clip = Self::clip(jvm, &this).await?;
+        let mut canvas = Self::canvas(jvm, &mut this).await?;
+
+        let color = Rgb8Pixel::to_color(rgb as _);
+        for (y, left, right) in triangle_spans((x1, y1), (x2, y2), (x3, y3), clip.y, clip.y.saturating_add(clip.height as i32)) {
+            canvas.fill_rect(translate_x + left, translate_y + y, (right - left + 1) as u32, 1, color, clip);
+        }
+
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn copy_area(
+        jvm: &Jvm,
+        _: &mut WieJvmContext,
+        mut this: ClassInstanceRef<Self>,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+        dest_x: i32,
+        dest_y: i32,
+        anchor: Anchor,
+    ) -> JvmResult<()> {
+        tracing::debug!("javax.microedition.lcdui.Graphics::copyArea({this:?}, {x}, {y}, {width}, {height}, {dest_x}, {dest_y})");
+
+        if width <= 0 || height <= 0 {
+            return Ok(());
+        }
+        let dx = if anchor.contains(Anchor::HCENTER) {
+            -width / 2
+        } else if anchor.contains(Anchor::RIGHT) {
+            -width
+        } else {
+            0
+        };
+        let dy = if anchor.contains(Anchor::VCENTER) {
+            -height / 2
+        } else if anchor.contains(Anchor::BOTTOM) {
+            -height
+        } else {
+            0
+        };
+        let translate_x: i32 = jvm.get_field(&this, "translateX", "I").await?;
+        let translate_y: i32 = jvm.get_field(&this, "translateY", "I").await?;
+        let clip = Self::clip(jvm, &this).await?;
+        let mut canvas = Self::canvas(jvm, &mut this).await?;
+        canvas.copy_area(
+            translate_x + dest_x + dx,
+            translate_y + dest_y + dy,
+            translate_x + x,
+            translate_y + y,
+            width as u32,
+            height as u32,
+            clip,
+        );
+
+        Ok(())
+    }
+
+    async fn get_red_component(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        Ok((jvm.get_field::<i32>(&this, "color", "I").await? >> 16) & 0xff)
+    }
+
+    async fn get_green_component(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        Ok((jvm.get_field::<i32>(&this, "color", "I").await? >> 8) & 0xff)
+    }
+
+    async fn get_blue_component(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        Ok(jvm.get_field::<i32>(&this, "color", "I").await? & 0xff)
+    }
+
+    // the luminance of the current colour, as the RI computes it
+    async fn get_gray_scale(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        let c: i32 = jvm.get_field(&this, "color", "I").await?;
+
+        Ok((((c >> 16) & 0xff) * 76 + ((c >> 8) & 0xff) * 150 + (c & 0xff) * 29) >> 8)
+    }
+
+    // a 24-bit display shows every colour as asked
+    async fn get_display_color(_: &Jvm, _: &mut WieJvmContext, _: ClassInstanceRef<Self>, color: i32) -> JvmResult<i32> {
+        Ok(color & 0xffffff)
+    }
+
+    async fn set_stroke_style(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, style: i32) -> JvmResult<()> {
+        if style != 0 && style != 1 {
+            return Err(jvm.exception("java/lang/IllegalArgumentException", "invalid stroke style").await);
+        }
+        jvm.put_field(&mut this, "strokeStyle", "I", style).await
+    }
+
+    async fn get_stroke_style(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        jvm.get_field(&this, "strokeStyle", "I").await
+    }
+
     async fn set_gray_scale(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, value: i32) -> JvmResult<()> {
         tracing::debug!("javax.microedition.lcdui.Graphics::setGrayScale({this:?}, {value})");
 
@@ -888,7 +1014,7 @@ impl Graphics {
         Ok(())
     }
 
-    async fn canvas(jvm: &Jvm, this: &mut ClassInstanceRef<Graphics>) -> JvmResult<Box<dyn BackendCanvas>> {
+    pub(crate) async fn canvas(jvm: &Jvm, this: &mut ClassInstanceRef<Graphics>) -> JvmResult<Box<dyn BackendCanvas>> {
         let image = Self::image(jvm, this).await?;
         let mut canvas = Image::canvas(jvm, &image).await?;
         let xor_mode: bool = jvm.get_field(this, "xorMode", "Z").await?;
@@ -937,6 +1063,103 @@ impl Graphics {
     }
 }
 
+// Horizontal spans (y, left, right — inclusive) covering the triangle, for rows in [y_from, y_to).
+// Each row takes the pixel centres inside the edges, so two triangles sharing an edge neither gap
+// nor overlap along it; a degenerate triangle still covers its line.
+fn triangle_spans(a: (i32, i32), b: (i32, i32), c: (i32, i32), y_from: i32, y_to: i32) -> Vec<(i32, i32, i32)> {
+    let top = a.1.min(b.1).min(c.1).max(y_from);
+    let bottom = a.1.max(b.1).max(c.1).min(y_to - 1);
+    let edges = [(a, b), (b, c), (c, a)];
+    let mut spans = Vec::new();
+    for y in top..=bottom {
+        let (mut left, mut right) = (f64::MAX, f64::MIN);
+        for ((x0, y0), (x1, y1)) in edges {
+            let (lo, hi) = (y0.min(y1), y0.max(y1));
+            if y < lo || y > hi {
+                continue;
+            }
+            if y0 == y1 {
+                left = left.min(x0.min(x1) as f64);
+                right = right.max(x0.max(x1) as f64);
+            } else {
+                let x = x0 as f64 + (y - y0) as f64 * (x1 - x0) as f64 / (y1 - y0) as f64;
+                left = left.min(x);
+                right = right.max(x);
+            }
+        }
+        if left <= right {
+            spans.push((y, round(left), round(right)));
+        }
+    }
+
+    spans
+}
+
+fn round(x: f64) -> i32 {
+    // no_std: f64::round is not in core
+    if x >= 0.0 { (x + 0.5) as i32 } else { (x - 0.5) as i32 }
+}
+
+// Where pixel (x, y) of a w×h region drawn with `transform` comes from, in the untransformed region.
+pub(crate) fn region_source_point(transform: i32, x: i32, y: i32, w: i32, h: i32) -> (i32, i32) {
+    match transform {
+        1 => (x, h - 1 - y),         // TRANS_MIRROR_ROT180
+        2 => (w - 1 - x, y),         // TRANS_MIRROR
+        3 => (w - 1 - x, h - 1 - y), // TRANS_ROT180
+        4 => (y, x),                 // TRANS_MIRROR_ROT270
+        5 => (y, h - 1 - x),         // TRANS_ROT90
+        6 => (w - 1 - y, x),         // TRANS_ROT270
+        7 => (w - 1 - y, h - 1 - x), // TRANS_MIRROR_ROT90
+        _ => (x, y),
+    }
+}
+
+// Draws the (sx, sy, w, h) region of `src` with `transform`, its transformed top-left at canvas (x, y).
+pub(crate) fn draw_transformed(
+    canvas: &mut dyn BackendCanvas,
+    src: &dyn wie_backend::canvas::Image,
+    (sx, sy, w, h): (i32, i32, i32, i32),
+    transform: i32,
+    x: i32,
+    y: i32,
+    clip: Clip,
+) {
+    if transform == 0 {
+        canvas.draw(x, y, w.max(0) as _, h.max(0) as _, src, sx, sy, clip);
+    } else if w > 0 && h > 0 {
+        let region = transformed_region(src, sx, sy, w, h, transform);
+        let (out_w, out_h) = if matches!(transform, 4..=7) { (h, w) } else { (w, h) };
+        canvas.draw(x, y, out_w as _, out_h as _, &region, 0, 0, clip);
+    }
+}
+
+// Copies the (sx, sy, w, h) region of `src` into a new buffer laid out as `transform` asks
+// (javax.microedition.lcdui.game.Sprite TRANS_* values). Pixels outside `src` stay transparent.
+pub(crate) fn transformed_region(
+    src: &dyn wie_backend::canvas::Image,
+    sx: i32,
+    sy: i32,
+    w: i32,
+    h: i32,
+    transform: i32,
+) -> VecImageBuffer<ArgbPixel> {
+    use wie_backend::canvas::ImageBuffer;
+
+    let (out_w, out_h) = if matches!(transform, 4..=7) { (h, w) } else { (w, h) };
+    let mut out = VecImageBuffer::<ArgbPixel>::new(out_w as _, out_h as _);
+    for y in 0..out_h {
+        for x in 0..out_w {
+            let (rx, ry) = region_source_point(transform, x, y, w, h);
+            let (px, py) = (sx + rx, sy + ry);
+            if px >= 0 && py >= 0 && (px as u32) < src.width() && (py as u32) < src.height() {
+                out.put_pixel(x, y, src.get_pixel(px, py));
+            }
+        }
+    }
+
+    out
+}
+
 #[cfg(test)]
 mod test {
     use alloc::{boxed::Box, vec};
@@ -947,6 +1170,16 @@ mod test {
     use wie_util::Result;
 
     use crate::{classes::javax::microedition::lcdui::Image, get_protos};
+
+    #[test]
+    fn triangle_spans_cover_rows_within_the_clip() {
+        use super::triangle_spans;
+
+        let spans = triangle_spans((0, 0), (4, 0), (0, 4), i32::MIN, i32::MAX);
+        assert_eq!(spans, [(0, 0, 4), (1, 0, 3), (2, 0, 2), (3, 0, 1), (4, 0, 0)]);
+        assert_eq!(triangle_spans((0, 0), (4, 0), (0, 4), 1, 3), [(1, 0, 3), (2, 0, 2)]);
+        assert_eq!(triangle_spans((0, 2), (5, 2), (9, 2), i32::MIN, i32::MAX), [(2, 0, 9)]); // degenerate: a line
+    }
 
     #[test]
     fn test_graphics() -> Result<()> {

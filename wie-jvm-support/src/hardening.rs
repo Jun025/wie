@@ -297,6 +297,65 @@ fn replace_reader_read(proto: &mut RuntimeClassProto) -> bool {
     true
 }
 
+/// `Class.getResourceAsStream` falls back to the system class loader — the MIDlet jar — when the
+/// class's own loader finds nothing. The pin asks the class's loader only, and a platform class's
+/// loader is the bootstrap one, which has no jar resources: `Image.class.getResourceAsStream("/x.png")`
+/// — the idiom of Nokia's example `ImageHelper`, copied into open-source MIDP games — came back null
+/// and the game died in `Image.createImage(null)` before its first paint (j2me-lines, 2026-10-08).
+/// On a handset every class reads the one jar, so the fallback is what the guest expects.
+struct ResourceFromMidletJar {
+    inner: Box<dyn MethodBody<JavaError, dyn Runtime>>,
+}
+
+#[async_trait::async_trait]
+impl MethodBody<JavaError, dyn Runtime> for ResourceFromMidletJar {
+    async fn call(&self, jvm: &Jvm, context: &mut (dyn Runtime + 'static), args: Box<[JavaValue]>) -> Result<JavaValue, JavaError> {
+        let name = args.get(1).cloned();
+        let found = self.inner.call(jvm, context, args).await?;
+        let (JavaValue::Object(None), Some(JavaValue::Object(Some(name)))) = (&found, name) else {
+            return Ok(found);
+        };
+
+        let loader: Box<dyn ClassInstance> = jvm
+            .invoke_static("java/lang/ClassLoader", "getSystemClassLoader", "()Ljava/lang/ClassLoader;", ())
+            .await?;
+        let stream: Option<Box<dyn ClassInstance>> = jvm
+            .invoke_virtual(
+                &loader,
+                "java/lang/ClassLoader",
+                "getResourceAsStream",
+                "(Ljava/lang/String;)Ljava/io/InputStream;",
+                (name,),
+            )
+            .await?;
+
+        Ok(JavaValue::Object(stream))
+    }
+}
+
+fn resource_from_midlet_jar(proto: &mut RuntimeClassProto) -> bool {
+    let Some(index) = proto
+        .methods
+        .iter()
+        .position(|x| x.name == "getResourceAsStream" && x.descriptor == "(Ljava/lang/String;)Ljava/io/InputStream;")
+    else {
+        tracing::error!("hardening: {}::getResourceAsStream not found — jar fallback NOT applied", proto.name);
+        return false;
+    };
+    let old = proto.methods.remove(index);
+    proto.methods.insert(
+        index,
+        JavaMethodProto {
+            name: old.name,
+            descriptor: old.descriptor,
+            access_flags: old.access_flags,
+            body: Box::new(ResourceFromMidletJar { inner: old.body }),
+        },
+    );
+
+    true
+}
+
 /// Adds a method the pin does not define. Refuses to shadow an existing one: if the pin grows
 /// the method later, we must drop ours rather than silently win the lookup.
 #[allow(dead_code)] // slice D: wie 사본이 전부 upstream 으로 흡수돼 현재 호출자 0.
@@ -364,6 +423,8 @@ pub fn harden(proto: &mut RuntimeClassProto) -> usize {
 
         "java/util/Calendar" => default_null_time_zone(proto) as usize,
 
+        "java/lang/Class" => resource_from_midlet_jar(proto) as usize,
+
         // No `java/util/Timer` arm any more: slice D removed it because the pin declares all
         // four `schedule` forms itself (see the module header). The comment that used to sit
         // here still claimed one-shot `schedule` was absent — the opposite of the measurement
@@ -398,6 +459,7 @@ mod tests {
             ("java/lang/String", 6),       // every array-taking <init>
             ("java/io/InputStreamReader", 1),
             ("java/util/Calendar", 1),
+            ("java/lang/Class", 1),
         ] {
             let mut proto = get_runtime_class_proto(name).unwrap();
             assert_eq!(harden(&mut proto), expected, "{name}: hardening not applied");

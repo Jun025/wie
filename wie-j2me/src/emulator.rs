@@ -94,7 +94,21 @@ impl J2MEEmulator {
             .into_iter()
             .map(|(k, v)| (format!("wie.appProperty.{k}"), v))
             .collect::<Vec<_>>();
-        let properties = properties.iter().map(|(k, v)| (k.as_ref(), v.as_ref())).collect::<Vec<_>>();
+        // The system properties a MIDP 2.0 handset defines (JSR-118 §6.2.1, CLDC 1.1). A general MIDP
+        // title reads them at boot and dereferences the answer: LuaJ's `PackageLib` takes
+        // `charAt(0)` of `file.separator` (JSR-75), so a null killed loveme before its first paint.
+        let standard = [
+            ("microedition.platform", "wie"),
+            ("microedition.configuration", "CLDC-1.1"),
+            ("microedition.profiles", "MIDP-2.0"),
+            ("microedition.locale", "ko-KR"),
+            ("microedition.encoding", "EUC-KR"),
+            ("file.separator", "/"),
+        ];
+        let properties = standard
+            .into_iter()
+            .chain(properties.iter().map(|(k, v)| (k.as_ref(), v.as_ref())))
+            .collect::<Vec<_>>();
 
         let protos = [wie_midp::get_protos().into()];
         let jvm = JvmSupport::new_jvm(system, Some(&jar_filename), Box::new(protos), &properties, RustJavaJvmImplementation).await?;

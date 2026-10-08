@@ -2,6 +2,7 @@ use alloc::{boxed::Box, collections::BTreeMap, collections::BTreeSet, sync::Arc,
 
 use smaf_player::{SmafEvent, parse_smaf};
 
+use super::audio_formats;
 use crate::{AudioCommand, AudioEventData, AudioHandle, AudioSequence, AudioSink, TimedAudioEvent};
 
 #[derive(Debug)]
@@ -33,13 +34,33 @@ impl Audio {
     }
 
     pub fn load_smaf(&mut self, data: &[u8]) -> Result<AudioHandle, AudioError> {
+        Ok(self.load_sequence(convert_smaf_events(parse_smaf_in(data))))
+    }
+
+    /// A clip whose format is told by its first bytes: Standard MIDI File, PCM WAV, else SMAF —
+    /// what MIDP's `Manager.createPlayer` gets, where the declared type is often wrong or null.
+    pub fn load(&mut self, data: &[u8]) -> Result<AudioHandle, AudioError> {
+        match audio_formats::parse_midi(data).or_else(|| audio_formats::parse_wav(data)) {
+            Some(sequence) => Ok(self.load_sequence(sequence)),
+            None => self.load_smaf(data),
+        }
+    }
+
+    pub fn load_sequence(&mut self, sequence: AudioSequence) -> AudioHandle {
         let audio_handle = self.last_audio_handle;
-        let sequence = Arc::new(convert_smaf_events(parse_smaf_in(data)));
 
         self.last_audio_handle += 1;
-        self.files.insert(audio_handle, sequence);
+        self.files.insert(audio_handle, Arc::new(sequence));
 
-        Ok(audio_handle)
+        audio_handle
+    }
+
+    /// Replaces what `audio_handle` plays (a tone player given a new `ToneControl` sequence).
+    pub fn replace(&mut self, audio_handle: AudioHandle, sequence: AudioSequence) -> Result<(), AudioError> {
+        let file = self.files.get_mut(&audio_handle).ok_or(AudioError::InvalidHandle)?;
+        *file = Arc::new(sequence);
+
+        Ok(())
     }
 
     pub fn play(&mut self, audio_handle: AudioHandle, repeat: bool) -> Result<(), AudioError> {
