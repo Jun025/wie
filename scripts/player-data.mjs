@@ -206,6 +206,17 @@ export function landedPin(file, cwd = ROOT) {
   return out.split('\n').pop() || null;
 }
 
+// «마지막 확인» (the shell's /support header reads generatedAt): rounds edit compat rows by hand and
+// leave generatedAt at the last full census, so it stood still while rows changed daily (10-04 vs
+// #471…#512). Bumping it in each PR would make every compat PR conflict on one line, so the shipped
+// value is derived here instead: the later of the census time and the last first-parent landing that
+// touched compat.json. The committer date keeps its own offset, so slice(0, 10) is the landing's
+// local date. No history (shallow clone) = the census time, unchanged.
+export function checkedAt(generatedAt, cwd = ROOT) {
+  const landed = execFileSync('git', ['log', '--first-parent', '-1', '--format=%cI', '--', 'docs/player-data/compat.json'], { cwd, encoding: 'utf8' }).trim();
+  return landed && new Date(landed) > new Date(generatedAt) ? landed : generatedAt;
+}
+
 export function assemble(compat, files, pinOf, wieHead) {
   const entries = files
     .map(([name, u]) => ({ id: name.replace(/\.json$/, ''), ...u, enginePin: u.enginePin ?? pinOf(name) }))
@@ -286,11 +297,25 @@ function selftest() {
     git('merge', '-q', '--no-ff', '-m', 'land', 'pr');
     const pin = landedPin('u.json', repo);
     if (pin !== git('rev-parse', 'HEAD')) bad++, console.error(`selftest: landedPin must be the merge commit, got ${JSON.stringify(pin)}`);
+    // checkedAt: a row edit landed after the census moves «마지막 확인»; a later landing that does not
+    // touch compat.json does not; a census newer than every landing wins.
+    const at = (d, ...a) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: repo, env: { ...process.env, GIT_COMMITTER_DATE: d } });
+    mkdirSync(join(repo, 'docs/player-data'), { recursive: true });
+    writeFileSync(join(repo, 'docs/player-data/compat.json'), '{"generatedAt":"2026-10-04T01:26:49.632Z"}\n');
+    at('2026-10-04T12:00:00+09:00', 'add', '-A');
+    at('2026-10-04T12:00:00+09:00', 'commit', '-q', '-m', 'census');
+    writeFileSync(join(repo, 'docs/player-data/compat.json'), '{"generatedAt":"2026-10-04T01:26:49.632Z","row":1}\n');
+    at('2026-10-08T21:00:46+09:00', 'commit', '-q', '-am', 'row edit');
+    at('2026-10-09T09:00:00+09:00', 'commit', '-q', '--allow-empty', '-m', 'unrelated');
+    const c1 = checkedAt('2026-10-04T01:26:49.632Z', repo);
+    if (c1.slice(0, 10) !== '2026-10-08') bad++, console.error(`selftest: checkedAt must follow the last compat.json landing (2026-10-08), got ${c1}`);
+    const c2 = checkedAt('2026-10-10T00:00:00.000Z', repo);
+    if (c2 !== '2026-10-10T00:00:00.000Z') bad++, console.error(`selftest: checkedAt must keep a census newer than every landing, got ${c2}`);
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }
   if (bad) process.exit(1);
-  console.log(`player-data selftest: ${cases.length + 6} rules each reject their mutation`);
+  console.log(`player-data selftest: ${cases.length + 8} rules each reject their mutation`);
 }
 
 const [cmd, ...args] = process.argv.slice(2);
@@ -323,6 +348,7 @@ else if (cmd === 'import') {
     // An update with no explicit pin and no landing commit (shallow clone, or not on main yet)
     // is left out rather than shipped with a made-up pin.
     const pinOf = (name) => landedPin(join('docs/player-updates', name));
+    compat.generatedAt = checkedAt(compat.generatedAt);
     const out = assemble(compat, files, pinOf, head);
     const missing = out.updates.entries.filter((u) => !u.enginePin);
     for (const u of missing) console.log(`::warning::player-data: ${u.id} has no landing commit — left out of this build`);
