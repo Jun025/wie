@@ -99,3 +99,5 @@ OSS 의 base FAIL 3개는 0485 §4 의 알려진 벽이다(bubblet-asha · finif
 ### 하지 않은 것
 - 호출 없는 순수 루프(산술만 도는 `for`)는 여전히 한 poll 을 쥔다. 해석기 루프 안에 정지점을 두려면 crates.io 크레이트를 갈라야 한다. 그런 게스트는 아직 관측되지 않았다.
 - 시계 기반 예산(«틱 끝을 넘으면 양보»)은 쓰지 않았다. 그러려면 호출 경로에서 시계를 읽어야 한다. 그런데 `test_pacing.rs` 는 시계 읽기 1회 = 1 ms 로 결정성을 잡는다. 호출 수 기반은 결정적이고, ARM 의 `INSTRUCTIONS_PER_YIELD` 와 같은 모양이다.
+
+<!-- corpus-name-inflow v1 subjects=7 tree=73d62a07d52bdfe6 B=0/0 P=0/0 S=0/0 -->
