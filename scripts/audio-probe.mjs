@@ -41,7 +41,8 @@
 //     a stop or replay reached while the worklet still held them for the soundfont — never heard.
 //   rms mean / 2nd-half mean / silent seconds — from per-second RMS of the analyser, sampled
 //     every 50 ms. "Silent" is a second whose RMS is under 1e-4.
-//   ticks · tick max / p99 ms · ticks over 50 ms — wall time of each `emu.tick()`, the call the
+//   ticks · paints · tick max / p99 ms · ticks over 50 ms — paints are the engine's putImageData
+//     calls (one per guest frame shown); tick times are the wall time of each `emu.tick()`, the call the
 //     shell makes once per frame: the page can paint and take input only between two of them.
 //     A run whose page has not answered 60 s past --secs reports «a tick never returned» rather
 //     than waiting on it (a guest that never yields holds the tick, and the page with it).
@@ -137,7 +138,13 @@ const base = `http://127.0.0.1:${server.address().port}`;
 // Installed before any page script: count what audio.rs posts to the worklet, and keep the
 // worklet node so the probe can ask it for `stats`.
 const INIT = () => {
-  const probe = (window.__probe = { plays: 0, stops: 0, evicts: 0, gains: new Set(), evHandles: new Set(), nodes: [], stats: null, song: new Map(), playLog: [], drops: [], sfReady: null, t0: performance.now() });
+  const probe = (window.__probe = { plays: 0, stops: 0, evicts: 0, gains: new Set(), evHandles: new Set(), nodes: [], stats: null, song: new Map(), playLog: [], drops: [], sfReady: null, t0: performance.now(), paints: 0 });
+  // WebScreen::paint puts each guest frame into its back canvas with putImageData — one call a paint.
+  const putImageData = CanvasRenderingContext2D.prototype.putImageData;
+  CanvasRenderingContext2D.prototype.putImageData = function (...args) {
+    probe.paints++;
+    return putImageData.apply(this, args);
+  };
   // FNV-1a over a play's events: one id per song, whatever handle carries it.
   const songOf = (ev) => {
     let h = 0x811c9dc5;
@@ -317,6 +324,7 @@ const RUN = async ({ wasmIdx, gameIdx, gameName, secs, keyMs, keys, statsEvery, 
     mixed: midiPlays.some((p) => p.sf) && midiPlays.some((p) => !p.sf),
     holdMaxMs: Math.max(0, ...midiPlays.map((p) => p.holdMs)),
     ticks: tickMs.length,
+    paints: probe.paints,
     tickMaxMs: Math.round(Math.max(0, ...tickMs)),
     tickP99Ms: Math.round([...tickMs].sort((a, b) => a - b)[Math.floor(tickMs.length * 0.99)] ?? 0),
     ticksOver50Ms: tickMs.filter((v) => v > 50).length,
@@ -386,7 +394,7 @@ for (const r of results) {
   console.log(`  plays ${r.plays} · stops ${r.stops} · evicts ${r.evicts} · gains [${r.gains.join(", ")}] · worklet ${r.worklet ? "yes" : "NO"}`);
   console.log(`  seq ${r.seq.map((s) => `${s.at}s=${s.sequences}${s.substitute ? "*" : ""}`).join(" ") || "-"}${r.seq.some((s) => s.substitute) ? "   (* no stats reply — distinct handles sent `ev`)" : ""}`);
   console.log(`  MIDI plays ${r.midiPlays} (soundfont ${r.sfPlays}) · songs ${r.songs} (repeated ${r.repeatedSongs}) · first≠next ${r.firstVsNext} · mixed ${r.mixed} · hold max ${r.holdMaxMs} ms · dropped while held ${r.drops.length} · soundfont ${r.sfReady ? `${r.sfReady.ok ? "ready" : "failed"} at ${r.sfReady.at} ms` : "-"}`);
-  console.log(`  ticks ${r.ticks} · tick max ${r.tickMaxMs} ms · p99 ${r.tickP99Ms} ms · over 50 ms ${r.ticksOver50Ms}`);
+  console.log(`  ticks ${r.ticks} · paints ${r.paints} · tick max ${r.tickMaxMs} ms · p99 ${r.tickP99Ms} ms · over 50 ms ${r.ticksOver50Ms}`);
   console.log(`  rms mean ${f4(r.rmsMean)} · 2nd half ${f4(r.rmsSecondHalf)} · max ${f4(r.rmsMax)} · silent ${r.silentSeconds}/${r.seconds}s`);
   if (r.pageErrors?.length) console.log(`  page errors: ${r.pageErrors.slice(0, 3).join(" | ")}`);
 }
