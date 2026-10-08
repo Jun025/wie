@@ -24,6 +24,8 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
 `build` 가 내보내는 값은 **그것과 «`compat.json` 을 건드린 마지막 first-parent 착지»의 커밋 시각 중 늦은 쪽**이다
 (`checkedAt` · 착지 시각은 자기 오프셋 그대로라 앞 10자가 그 날짜다). 회차는 행만 손으로 고치므로 PR 마다 이 줄을
 올리게 하면 형제 PR 이 모두 한 줄에서 충돌한다 — 그래서 PR 이 아니라 빌드가 정한다. ★커밋된 `generatedAt` 을 손으로 올리지 마라.
+얕은 클론(`git rev-parse --is-shallow-repository` = true)에서는 착지 시각을 믿을 수 없어 **전수 조사 시각을 그대로** 낸다 — 얕은 경계 커밋은
+부모가 없어 «모든 파일을 추가한 커밋»으로 보이므로 `git log -- compat.json` 이 빈 값이 아니라 HEAD 를 돌려준다. publish 는 `fetch-depth: 0` 이어야 한다.
 
 총괄 초안과 다른 점과 이유:
 
