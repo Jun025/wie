@@ -16,7 +16,7 @@ use wie_jvm_support::WieJavaClassProto;
 // Measured, not reasoned: with them still registered, `new java/lang/VirtualMachineError()`
 // already threw `InstantiationError`, which only the runtime's ABSTRACT definition does.
 // Locked by `tests/preload_classes_come_from_the_runtime.rs`.
-pub fn get_protos() -> [WieJavaClassProto; 66] {
+pub fn get_protos() -> [WieJavaClassProto; 67] {
     [
         crate::classes::org::kwis::msp::lcdui::ImageObserver::as_proto(),
         crate::classes::org::kwis::msp::lcdui::InputMethodListener::as_proto(),
@@ -74,6 +74,7 @@ pub fn get_protos() -> [WieJavaClassProto; 66] {
         crate::classes::net::wie::ShellCard::as_proto(),
         crate::classes::net::wie::WIPIFileOutputStream::as_proto(),
         crate::classes::net::wie::WIPIMIDlet::as_proto(),
+        crate::classes::wec::DMInfo::as_proto(),
         crate::classes::wec::OEMDevice::as_proto(),
         crate::classes::wec::SYSTheme::as_proto(),
         crate::classes::java::io::UnavailableException::as_proto(),

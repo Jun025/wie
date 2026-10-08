@@ -1242,7 +1242,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "미션에 실패한 뒤 나오는 메뉴에서 «튜토리얼»에 커서를 두면 화면이 멈춰요. «다시하기»를 고르면 이어서 할 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "루빅스큐브"
   },
@@ -1790,7 +1792,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -2112,7 +2115,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4505,7 +4509,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4523,7 +4528,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
@@ -4907,9 +4913,11 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "게임 안의 네트워크 메뉴는 여기서는 «네트워크 작업 중 오류가 발생하거나 사용자에 의해 중단되었습니다» 안내가 나와요."
+   ],
    "changes": [],
    "fileTitle": "해적왕2007"
   },
@@ -4944,7 +4952,8 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "no",
-    "speed": "ok"
+    "speed": "ok",
+    "progress": "ok"
    },
    "knownIssues_ko": [
     "소리가 나지 않을 수 있어요."
