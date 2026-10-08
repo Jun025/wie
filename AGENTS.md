@@ -347,8 +347,8 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   header. Its speed axis is wall-clock: quote `load1` beside it (`docs/report/0321`).
   `--only progress` is a seventh, opt-in axis — «does it keep moving forward», not «did it survive» —
   and it is **not in `status`**; a `stuck` counts only when its `--as P2` pair agrees (`docs/report/0393`).
-  Run it as `~/orchestrator-live/bin/build-slot run --long -- node scripts/playability-census.mjs run …` (the
-  long pool: one lease for the whole run, its `--jobs` inside it — `CLAUDE.md` «측정 스윕») and
+  Run it as `bash scripts/census-drive.sh <run args…>` — one `build-slot run --long` lease per `run --budget`
+  call (~15 min), never one lease for the whole sweep (it held the long pool 7.5 h — `CLAUDE.md` «측정 스윕») and
   leave `--jobs` at its default (half the cores, at most 3; above `ncpu` is capped) — `--jobs 32` on this 10-core
   Mac pushed load1 to 450 and starved every other lane (`docs/report/0378`). Two runs never overlap: `run` takes
   the host lock `/tmp/wie-playability-census.lock` (fixed path, so scratch copies share it) and a second run

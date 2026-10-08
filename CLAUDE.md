@@ -25,10 +25,12 @@
 - 무거운 빌드·테스트(cargo build/test · vitest · next build · tsc -p · wrangler build)는 `~/orchestrator-live/bin/build-slot run -- <cmd>` 로 감싼다 — 머신당 슬롯을 넘으면 기다렸다 돈다(상한 30분 · rc 는 명령 그대로 · 라이브에 없으면 맨 명령).
 - ★**측정·재생 스윕도 같다**(2026-10-02 · 회차 측정으로 `wv_main`/`wie_validate` **20개 동시 · 합 223% CPU** · load1 240 · idle 0% — 호스트 부하 가드는 «신규 배차»만 막아 회차 «안»에서 흩뿌린 프로세스를 못 본다 · 선례 otterpebble #1249):
   ⒜에뮬레이터 실행(`wie_validate`·그 사본 `wv_*` · `--inject` 짝 재측 포함)은 동시 실행 상한(**≤ 3**)을 둔 러너로만 돌린다 — 조합마다 `&` 로 한꺼번에 띄우지 마라. 전체 스윕은 `scripts/playability-census.mjs`(기본 `--jobs` ≤ 3 · 호스트 잠금)를 쓴다.
-  ★**스윕은 «long 풀»이다 — 스윕 «전체»를 한 번의 `~/orchestrator-live/bin/build-slot run --long -- <러너>` 로 감싼다**(census `run`·짝 재측 묶음·`--max-ticks`/`--timeout` 수 분 이상 장주행). 러너 «안»의 실행은 맨 명령이다 — 안에서 다시 `build-slot` 으로 감싸지 마라(스윕 하나가 short 풀까지 먹는다). 단발 확인 1회(수십 초)만 맨 `build-slot run -- <cmd>`(short).
-  ★왜: 빌드 슬롯은 short 3 · long 1 의 2급이다(orchestrator PR #1285). 스윕을 맨 `build-slot run --` 로 보내면 short 풀을 차지하고, 짧은 빌드가 30분을 기다린다(7일 대기의 53% · 나쁜 시간대 점유자 전부가 wie 스윕). 실행마다 `--long` 을 따로 받으면 long 1칸에서 직렬이 된다(실측 2.1배 — `docs/report/0439`).
+  ★**스윕은 «long 풀»이다 — 드라이버는 phase(게임/조합 묶음) 마다 `~/orchestrator-live/bin/build-slot run --long -- <phase 명령>` 을 잡고 반납한다 · 임대 1건 ≤ 30분 목표.** census 는 `bash scripts/census-drive.sh <run 인자…>` 가 그 루프다(`run --budget 900` 1회 = 임대 1건 · exit 3 이면 다음 임대). phase 명령 «안»의 실행은 맨 명령이다 — 안에서 다시 `build-slot` 으로 감싸지 마라(스윕 하나가 short 풀까지 먹는다). 단발 확인 1회(수십 초)만 맨 `build-slot run -- <cmd>`(short).
+  ★**금지 예 — «ONE lease»: 스윕 «전체»를 한 번의 `build-slot run --long` 으로 감싸기**(종전 이 줄의 지시였다). 2026-10-05~08 long 임대 held_max **26974s(7.5h)**·19861s·17942s 의 점유자가 전부 그 형상(census `run` · scratch `drive*.sh`)이었고 그 사이 long 수요 max 8.
+  ★왜: 빌드 슬롯은 short 3 · long 2 의 2급이다(orchestrator PR #1285 · #1302). 스윕을 맨 `build-slot run --` 로 보내면 short 풀을 차지하고, 짧은 빌드가 30분을 기다린다(7일 대기의 53% · 나쁜 시간대 점유자 전부가 wie 스윕). 실행(게임 1개)마다 `--long` 을 따로 받으면 long 칸에서 직렬이 된다(실측 2.1배 — `docs/report/0439`) — 그래서 단위는 «실행»도 «스윕 전체»도 아닌 «phase(≈15분 묶음)»다.
+  ★**드라이버는 repo `scripts/` 에 둔다 — 스크래치에 복제하지 마라**(scratch `drive*.sh` 사본들이 낡은 «ONE lease» 형상을 계속 베꼈다).
   ⒝`nohup … &` 로 회차 밖에 떨어뜨리지 마라(부모가 launchd 가 되면 회차 종료·STUCK 판정이 못 본다) — 회차를 끝낼 때 **자기가 띄운 프로세스 0** 을 확인한다.
-  ⒞스윕 착수 전 `~/orchestrator-live/bin/host-load-guard --status --recovered` 를 친다 — **rc=0 일 때만** 전 폭으로 돌린다. rc≠0 이면 폭을 줄이거나(≤2) 기다린다(출력 글자로 판정하지 마라).
+  ⒞드라이버 안에 `host-load-guard --status --recovered` 대기 폴링을 넣지 마라 — 임대 대기가 그 역할이다(hold-mode 는 observe 라 그 폴링은 아무것도 기다리지 않는다). 폭은 census 기본 `--jobs`(≤ 3)를 따른다.
 - ★**축소 금지 목록 = `AGENTS.md` §Constraints 표**(12행 + «Held by you» 절).
   ★**여기에 재열거하지 않는다** — 같은 사실을 두 곳에 적으면 한쪽이 낡는다.
   **ponytail 은 명시되지 않은 요구사항을 범위 밖으로 취급하므로** 그 표에 걸리는 제안은
