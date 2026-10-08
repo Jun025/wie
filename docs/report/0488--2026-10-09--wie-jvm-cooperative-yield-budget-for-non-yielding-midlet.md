@@ -82,6 +82,7 @@ OSS 의 base FAIL 3개는 0485 §4 의 알려진 벽이다(bubblet-asha · finif
 **④ 저장소 게이트**
 - `cargo fmt --check` · `clippy --all -D warnings` · wasm clippy · `+beta clippy`: 모두 rc 0.
 - `RUST_MIN_STACK=4194304 cargo test --all`: rc 0 · 실패 0. `wie-j2me/tests/test_pacing.rs` 도 통과했다. 그 픽스처의 게임 루프는 1 000 호출에 닿지 않는다.
+- 코퍼스 이름 유입(`node scripts/corpus-name-inflow.mjs` · 이 브랜치의 바뀐 파일 전체): BOUNDED 0 · SUFFIX-ATTACHED 0.
 - runner block: draw_j2me · helloworld_ktf/lgt PASS · keydraw_ktf 79 paints 27/27 · keydraw_lgt 55 paints 27/27(둘 다 rc 0) · text_j2me PASS.
 
 ### «되돌리면 red»
