@@ -1,0 +1,7 @@
+{
+  "date": "2026-10-09",
+  "kind": "improvement",
+  "titles": [],
+  "summary_ko": "쉬지 않고 계산만 하는 자바 게임을 열면 브라우저 탭이 멈추던 문제를 고쳤어요. 무거운 게임도 화면이 끊기지 않고 키 입력을 받아요.",
+  "pr": "https://github.com/Jun025/wie/pull/521"
+}

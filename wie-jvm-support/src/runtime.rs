@@ -20,7 +20,10 @@ use rustjava_runtime::{
 use wie_backend::{AsyncCallable, System};
 use wie_util::WieError;
 
-use crate::{JvmImplementation, JvmSupport, WIE_RUSTJAR, WieJavaClassProto, WieJvmContext, jvm_implementation::InheritedMethods};
+use crate::{
+    JvmImplementation, JvmSupport, WIE_RUSTJAR, WieJavaClassProto, WieJvmContext,
+    jvm_implementation::{GuestCalls, InheritedMethods},
+};
 
 mod file;
 
@@ -215,6 +218,7 @@ where
     protos: Arc<Mutex<Vec<WieJavaClassProto>>>,
     file_table: Arc<Mutex<FileTableInner>>,
     pub(crate) classes: DefinedClasses,
+    guest_calls: GuestCalls,
 }
 
 impl<T> JvmRuntime<T>
@@ -232,6 +236,7 @@ where
             protos: Arc::new(Mutex::new(protos.into_vec().into_iter().flat_map(|x| x.into_vec()).collect())),
             file_table: Arc::new(Mutex::new(file_table)),
             classes: DefinedClasses::default(),
+            guest_calls: GuestCalls::default(),
         }
     }
 }
@@ -376,7 +381,9 @@ where
 
     async fn define_class(&self, jvm: &Jvm, data: &[u8]) -> JvmResult<Box<dyn ClassDefinition>> {
         match ClassDefinitionImpl::from_classfile(data) {
-            Ok(class) => self.classes.record(InheritedMethods::wrap(jvm, class).await),
+            Ok(class) => self
+                .classes
+                .record(InheritedMethods::wrap(jvm, class, Some(self.guest_calls.clone())).await),
             Err(ClassDefinitionError::InvalidClassFile) => Err(jvm.exception("java/lang/ClassFormatError", "Invalid class file").await),
             Err(ClassDefinitionError::UnsupportedClassVersion(version)) => Err(jvm
                 .exception(

@@ -390,6 +390,8 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   the same time**, so a before/after pair shares one load minute — read RMS only as a ratio inside
   one invocation. It exists because #348 and #352 each rewrote it as scratch and #356's reviewer
   could not reproduce the browser figure; its reproduction of both is in `docs/report/0328`.
+  It also times every `emu.tick()` (max · p99 · over 50 ms) — the page paints and takes input only
+  between two — so it is how a stalled-tab claim is measured too (`docs/report/0488`).
 
 ### Documented-command liveness — one weekly scheduled job, decided 2026-09-10
 
