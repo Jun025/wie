@@ -107,3 +107,5 @@
 `node scripts/corpus-name-inflow.mjs`(이 브랜치 ↔ `origin/main`): BOUNDED 718회/330쌍 + SUFFIX-ATTACHED 35회/15쌍.
 - 전부 `compat.json` 의 기존 `title` 값이다. 이 회차는 그 파일의 `axes.progress` 14값만 바꿨다.
 - 이 문서와 worklog 는 타이틀을 sha12 로만 적었다.
+
+<!-- corpus-name-inflow v1 subjects=3 tree=ada2477087ac4a66 B=718/330 P=0/0 S=35/15 -->
