@@ -67,10 +67,49 @@ boot 프로브(무입력 12 s · `--jobs 2` · 같은 jar 119개 · base = `orig
 | MIDP 표준 시스템 속성(`microedition.*`·`file.separator`) | `wie-j2me/src/emulator.rs` | (없음) |
 | `Manager.createPlayer` 가 SMAF 외 전부 `MediaException` → MIDI(SMF 0/1 · 템포 맵)·PCM WAV·`playTone`·`ToneControl`·`VolumeControl` | `wie-backend/src/system/audio_formats.rs` · `media/manager.rs` · `net/wie/player_control.rs` | `audio_formats::tests::*` · `test_unsupported_player_controls`(갱신) |
 | `Class.getResourceAsStream` 이 플랫폼 클래스(부트스트랩 로더)에서 null → MIDlet jar 폴백 | `wie-jvm-support/src/hardening.rs` | `every_guard_is_actually_applied`(`java/lang/Class` 1) |
+| `new InputStreamReader(in, "US-ASCII")` 가 `UnsupportedEncodingException` → UTF-8 로 읽음(ASCII 의 상위집합 · ISO-8859-1 은 그대로 예외) | 같은 파일 | `us_ascii_reader_opens_and_reads` · `every_guard…`(`InputStreamReader` 2) |
 
 ### 3. 채택분 6축 + 진도
 
-CENSUS_TABLE
+`scripts/playability-census.mjs run --jobs 2 --secs 20 --long 30` + `--only progress --progress 300`(대상 = 이름 붙은 19개 중 boot·render·longplay ok 9개),
+after 바이너리(엔진 코드 = `3b079c29` · §2 마지막 행의 US-ASCII 수정 전), load1 11~134. 축 순서 boot·render·input·longplay·sound·speed·progress
+(`o` ok · `n` no/none/silent/error · `u` 측정 안 됨/n/a · `s` stuck). 원본 census.tsv = 회신 증거 폴더.
+
+**전체 119: playable 108 · limited 5 · not-yet 6.**
+
+| title | sha12 | status | boot · render · input · longplay · sound · speed · progress | note |
+|---|---|---|---|---|
+| bubblet-asha | `327cea349314` | not-yet | `nnuuuuu` | tick error during 'boot': Fatal error: java.lang.NullPointerException: |
+| finifactory | `69913109bf0c` | not-yet | `nnuuuuu` | tick error during 'boot': Fatal error: java.lang.NoClassDefFoundError: |
+| j2me-2048 | `8cc1b48394d5` | limited | `oonunuu` | --inject delivered 1/27 input steps (run ended: clean exit) — input su |
+| j2me-lines | `cea17e90494e` | playable | `oooonou` | booted + rendered + survived input sequence (visual correctness NOT ch |
+| j3de | `9fdfe561edf0` | limited | `oonunou` | booted + rendered + survived input sequence (visual correctness NOT ch |
+| kurve | `d802d0331bc1` | not-yet | `nnuuuuu` | tick error during 'boot': Fatal error: java.lang.NoClassDefFoundError: |
+| loveme | `6aefa71fd645` | not-yet | `nnuuuuu` | died on SIGKILL (census kill at 140s) |
+| minitruco | `a72a2e40174c` | playable | `oooonoo` | booted + rendered + survived input sequence (visual correctness NOT ch |
+| mobapp-game | `fee8af1b3a15` | limited | `ooonnou` | --inject delivered 39/45 input steps (run ended: deadline) — input sur |
+| pipes | `a11c41405c4e` | playable | `oooonuu` | booted + rendered + survived input sequence (visual correctness NOT ch |
+| redball | `8238f5449347` | limited | `oonunuu` | booted + rendered + survived input sequence (visual correctness NOT ch |
+| slime-volleyball | `0ca8a98b8fa3` | playable | `oooonuu` | booted + rendered + survived input sequence (visual correctness NOT ch |
+| sperm-race | `bf5b031018aa` | playable | `ooooooo` | booted + rendered + survived input sequence (visual correctness NOT ch |
+| stickfight | `835acd535a5f` | playable | `ooooouo` | booted + rendered + survived input sequence (visual correctness NOT ch |
+| sudoku-woodie | `4e86c821ccd2` | playable | `oooonuu` | booted + rendered + survived input sequence (visual correctness NOT ch |
+| wipi_game_ktf | `c20b2f9318f4` | not-yet | `onuunuu` | only blank/uniform frames (black screen) |
+| wipi_game_lgt | `2e4d71573ae6` | not-yet | `onunnuu` | SVC stub space exhausted (line written at exhaustion; see stderr) |
+| wtk-tilepuzzle | `e75e4d830e0c` | playable | `oooonuu` | booted + rendered + survived input sequence (visual correctness NOT ch |
+| wtk-wormgame | `f408cc6f846a` | playable | `ooooouu` | booted + rendered + survived input sequence (visual correctness NOT ch |
+
+agneay-100(100종 · MIT · 전부 코드로 그림): **playable 99 · limited 1** — boot·render 100/100 · input ok 99(none 1 = `noughts-grid`, 첫 키가
+마감 전에 1/27 만 닿음 · 4.3M ticks) · longplay ok 99 · sound ok 96(silent 4) · speed ok 87(n/a 13 = 0.9 미만 · 부하 측정).
+
+- **진도**: 9개 중 ok 3(stickfight · minitruco · sperm-race), 나머지 6은 단발 정체(stall 200~290 s)인데 P2 짝을 돌리지 않아 census 규칙상 `n/a`.
+  ★정체 6 중 다수는 아래 «입력 축의 공통 벽»(표준 키코드)과 겹친다 — 방향키가 먹지 않으면 새 화면이 안 나온다.
+- **j2me-2048** `oonunuu`: census 는 US-ASCII 수정 전 바이너리였다 — 첫 키에 `InputStreamReader(in, "US-ASCII")` 가
+  `UnsupportedEncodingException` 을 던져 게임이 스스로 `notifyDestroyed`. 수정 후 단발 `--inject`(틱 상한 해제): **PASS · 27/27 · 예외 0**,
+  캡처에서 타일이 합쳐져 점수 20.
+- **mobapp-game** longplay `n`: L 결과가 UNMEASURED(39/45 키 · 마감) — 예외 9건은 전부 첫 실행의 `RecordStoreNotFoundException`. 원인 미규명.
+- **redball** input none: 공이 튀는 애니메이션 예제라 키를 받지 않는다(소스에 keyPressed 없음) — 엔진 문제 아님.
+- 화면 확인(캡처 · 회신 증거 폴더): j2me-lines 보드·공(Sprite) · sperm-race 캐릭터 화면 · j2me-2048 진행 판.
 
 ### 4. 남은 벽 — 고치지 않은 것과 이유
 
@@ -80,7 +119,7 @@ CENSUS_TABLE
 | kurve (GPL) | 생성자에서 `javax.bluetooth.LocalDevice` | 범위 밖: 블루투스 2인 대전 전용 — 스텁을 넣어도 «블루투스를 켜라» 경고 뒤 종료가 원작 동작 |
 | bubblet-asha (GPL) | `System.getProperty("com.nokia.keyboard.type").equals(…)` | 범위 밖: Nokia Asha 전용(+JSR-211). 우리가 Nokia 로 자처하면 다른 게임이 Nokia 전용 API 로 간다 |
 | loveme (MIT-0) | 고친 뒤 startApp 이 Lua 를 해석하며 **한 틱 안에서 30 s 넘게** 양보하지 않는다 — `wie_validate --timeout 12` 가 반환하지 않고 7분 넘게 CPU 를 썼다(sample: 바이트코드 해석기 루프) | 제안(#p1): 브라우저 호스트도 같은 시간 동안 멈춘다 |
-| wipi_game (MIT · KTF/LGT) | 로딩 화면이 검정 단색(KTF 11 · LGT 10 paints). SDK 가 `fgpxl` 에 ARGB32 를 그대로 넣는 것은 확인(16bpp 화면에서는 색이 틀어진다) — **단색 검정의 원인은 아니다**(흰 글자도 안 보인다) | 미규명 — 이 회차 시간 상한. WIPI-C 경로라 통신사 코퍼스와 같은 코드를 지난다 |
+| wipi_game (MIT · KTF/LGT) | 로딩 화면이 검정 단색(무입력 12 s: KTF 11 · LGT 10 paints · census 의 `--inject` 에서는 LGT 가 `SVC stub space exhausted`). SDK 가 `fgpxl` 에 ARGB32 를 그대로 넣는 것은 확인(16bpp 화면에서는 색이 틀어진다) — **단색 검정의 원인은 아니다**(흰 글자도 안 보인다) | 미규명 — 이 회차 시간 상한. WIPI-C 경로라 통신사 코퍼스와 같은 코드를 지난다 |
 
 **입력 축의 공통 벽**(제안 #p0): 노키아·소니에릭슨용 게임은 방향키 -1~-4 · 확인 -5 · 소프트키 -6/-7 을
 기다리는데 wie 는 SKT 값(위 141 · 소프트 6/7)을 보낸다. sperm-race 캐릭터 화면 실측 — RIGHT 두 번의 캡처는
@@ -93,4 +132,8 @@ CENSUS_TABLE
 - 러너 블록(AGENTS §The four gates): draw_j2me · helloworld_ktf/lgt PASS · keydraw_ktf PASS · keydraw_lgt PASS(rc 0) — 첫 1회는
   UNMEASURED(load1 69) 였고 같은 부하에서 base·after 재실행이 둘 다 PASS 55 paints · text_j2me PASS
 - 가드 두 제목(after vs base · `--inject` 27키): `49ade89578c5` PASS/PASS · `ddd885583b15` PASS/PASS(입력 27/27 둘 다)
-- SMOKE_LINE
+- **통신사 코퍼스 smoke gate**(`WORKING_DIR=game_lab/working scripts/smoke_gate.sh` · after 바이너리 · boot+render): **294 PASS / 0 FAIL ·
+  baseline 292 대비 퇴행 0 · rc 0**.
+- 이 PR 의 동작 변경 중 기존 타이틀에 닿을 수 있는 것은 셋뿐이다 — `Class.getResourceAsStream` 폴백 · `createPlayer` 가 받는 형식 ·
+  `getControl` 이 null 대신 컨트롤을 돌려줌. 나머지는 «없던 메서드·클래스» 추가라 그것을 부르던 타이틀은 전에는 죽었다.
+- 코퍼스 이름 유입(`corpus-name-inflow` · 이 회차 diff): 표식 줄 = 회신.
