@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, format, vec, vec::Vec};
+use alloc::{boxed::Box, collections::BTreeMap, format, vec, vec::Vec};
 
 use jvm::{
     Jvm,
@@ -37,6 +37,44 @@ fn free_indirect(core: &mut ArmCore, memory: WIPICIndirectPtr) -> Result<()> {
     Allocator::free(core, base_address, size + size_of::<WIPICWord>() as WIPICWord)
 }
 
+// A Clet title's frames never reach MIDP `Display`'s paint, which is where garbage is collected: it
+// draws through `MC_grpFlushLcd` from its own `MC_knlSetTimer` callback. 4fdbd64c9fbd's collections
+// stopped once its title card gave way to the timer loop and every Java object made after that
+// stayed: the 16-byte heap bucket kept about 50,750 of every 65,536 allocations until its 524,288
+// slots were full, and the 600-second run ended in an `unwrap` panic on the next allocation.
+// So a timer callback collects too, on the same schedule as `Display` (wie-midp `GC_INTERVAL_MS`,
+// `GC_COST_SHARE`): at most once a second, and never more than a twentieth of the time between.
+const GC_INTERVAL_MS: u64 = 1000;
+const GC_COST_SHARE: u64 = 20;
+
+/// When an emulator's last timer collection ran and what it cost. Keyed by `ArmCore::id`, not held
+/// by the context: a context is built afresh for every SVC (`handle_wipic_svc`), so a per-context
+/// clock was always new and collected on every timer tick — measured 754 collections in 110 s on
+/// 236c7da689f6 where the schedule allows ~110.
+/// ponytail: an entry outlives its core; a later core with the same id finds a stale `last` and
+/// waits at most one interval longer for its first collection.
+#[derive(Clone, Copy, Default)]
+struct GcClock {
+    last: u64,
+    cost: u64,
+}
+
+static GC_CLOCKS: spin::Mutex<BTreeMap<usize, GcClock>> = spin::Mutex::new(BTreeMap::new());
+
+impl GcClock {
+    fn due(&self, now: u64) -> bool {
+        now.saturating_sub(self.last) >= GC_INTERVAL_MS.max(self.cost * GC_COST_SHARE)
+    }
+
+    fn of(id: usize) -> Self {
+        GC_CLOCKS.lock().get(&id).copied().unwrap_or_default()
+    }
+
+    fn record(id: usize, last: u64, cost: u64) {
+        GC_CLOCKS.lock().insert(id, GcClock { last, cost });
+    }
+}
+
 // mostly same as ktf's one, can we merge those?
 #[derive(Clone)]
 pub struct LgtWIPICContext {
@@ -67,6 +105,19 @@ impl LgtWIPICContext {
 
     pub fn new(core: ArmCore, system: System, jvm: Jvm) -> Self {
         Self { core, system, jvm }
+    }
+
+    async fn collect_garbage_if_due(&mut self) -> Result<()> {
+        let (id, now) = (self.core.id(), self.system.platform().now().raw());
+        if !GcClock::of(id).due(now) {
+            return Ok(());
+        }
+        self.collect_garbage().await?;
+        let cost = self.system.platform().now().raw().saturating_sub(now);
+        GcClock::record(id, now, cost);
+        self.system.pacing().collected_garbage(cost);
+
+        Ok(())
     }
 }
 
@@ -166,7 +217,7 @@ impl WIPICContext for LgtWIPICContext {
 
             async move {
                 callback.call(&mut context, Box::new([])).await?;
-                Ok(())
+                context.collect_garbage_if_due().await
             }
         }))
     }
@@ -192,6 +243,26 @@ mod tests {
     use wie_util::Result;
 
     use super::{alloc_indirect, free_indirect};
+
+    /// The timer path's collection schedule: once a second, stretched while a collection is costly,
+    /// and one clock per emulator however many contexts ask. A per-context clock collected on every
+    /// tick (236c7da689f6: 754 collections in 110 s); without `due` a Clet never collects at all
+    /// (4fdbd64c9fbd filled its heap).
+    #[test]
+    fn timer_collection_waits_a_second_and_for_its_cost() {
+        use super::GcClock;
+
+        let id = usize::MAX - 1;
+        GcClock::record(id, 10_000, 0);
+        assert!(!GcClock::of(id).due(10_999));
+        assert!(GcClock::of(id).due(11_000));
+        GcClock::record(id, 10_000, 100);
+        assert!(!GcClock::of(id).due(11_999));
+        GcClock::record(usize::MAX - 2, 11_500, 0);
+        assert!(!GcClock::of(usize::MAX - 2).due(12_000));
+        assert!(GcClock::of(id).due(12_000));
+        assert!(GcClock::of(usize::MAX - 2).due(12_500), "another emulator has its own clock");
+    }
 
     /// `free(NULL)` is a no-op, and a real handle still frees.
     ///

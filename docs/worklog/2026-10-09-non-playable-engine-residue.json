@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-09",
+  "task": "wie-non-playable-engine-residue-seven-and-reasonless-limited-rows",
+  "title": "비-playable 엔진 잔여 6종 · 이유 없는 행 0",
+  "summary": "WIPI-C 문맥 클립(널 포함) · KTF kfc 폼 3종 · LGT Clet 타이머 수거 · census 첫 실행 재시작. 6종 중 5종 playable, 이유 없는 행 3 → 0. 측정은 docs/report/0479.",
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "aa3fcba4598b 로고 카드 paint 의 null 배열 원인 찾기",
+      "plainSummary": "KTF 게임 하나가 로고 다음에 흰 화면만 보여요. 화면을 그리는 코드가 아직 채워지지 않은 목록을 매 프레임 읽다가 멈춰요.",
+      "userBenefit": "그 게임이 로고 다음 화면으로 넘어가면 «부분 지원»에서 벗어날 수 있어요.",
+      "why": "이번 회차에서 원인 지점(카드의 배열 필드 getfield → aaload null 검사, 0x13252c 부근)까지는 쟀지만 그 필드를 채우는 코드가 왜 안 도는지는 찾지 못했다. 게임 스레드는 살아 있고 예외 없이 돈다.",
+      "tradeoff": "역어셈 추적이 길어질 수 있다(M). 원인이 서버 연결이면 정책 대상으로 끝난다.",
+      "effort": "M",
+      "target": "wie-ktf"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}

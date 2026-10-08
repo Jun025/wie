@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-09",
+  "kind": "new-support",
+  "titles": [
+    "362c57e2b2b7c9c6de2b51c91df8094383f1acee512bf07a87ec055a71e4cf2e"
+  ],
+  "pr": "https://github.com/Jun025/wie/pull/518",
+  "summary_ko": "시작하자마자 멈추던 KTF 게임 하나가 이제 실행돼요. 로고와 배경 그림이 여러 겹으로 겹쳐 보이지 않고 제자리에 그려져요."
+}
