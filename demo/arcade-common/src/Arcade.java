@@ -7,9 +7,10 @@
  * shrinking time bar, a pause menu, and yes/no cards. Every screen shows its soft-key labels
  * along the bottom. A game only fills in the rules, the board, the title picture and the help.
  *
- * Keys, as they reach keyPressed in wie — measured with a probe MIDlet, not assumed
- * (docs/report/0379): left soft key 6, right soft key 7,
- * CLR 8, the red end key (HANGUP) -1. Left soft = select, right soft and CLR = back, and in
+ * Keys, as they reach keyPressed in wie: the standard J2ME codes since wie gave them to J2ME
+ * (2026-10-09) — left soft key -6, right soft key -7, CLR -8, the red end key (HANGUP) -11,
+ * up -1. An older wie sent the SKT values (6, 7, 8, end key -1 — measured with a probe MIDlet,
+ * docs/report/0379); both are accepted. Left soft = select, right soft and CLR = back, and in
  * play all three open the pause menu. The end key asks to quit from anywhere.
  * Colours follow otterpebble DESIGN.md: a light neutral surface, one text colour, and
  * colour only where it means something. Screen text: no dashes, no middle dots, 해요체.
@@ -26,8 +27,8 @@ import javax.microedition.rms.RecordStore;
 abstract class Arcade extends Canvas implements Runnable {
     static final int LOGO = 0, TITLE = 1, MENU = 2, LEVEL = 3, PLAY = 4, PAUSE = 5, OVER = 6, SETTINGS = 7, HELP = 8, PAGE = 9,
         SCORES = 10, CREDITS = 11, ASK = 12;
-    /** Some handsets send the negative of these; both are accepted. */
-    static final int KEY_LSOFT = 6, KEY_RSOFT = 7, KEY_CLR = 8, KEY_HANGUP = -1;
+    /** The older wie sent these positive; both signs are accepted. */
+    static final int KEY_LSOFT = 6, KEY_RSOFT = 7, KEY_CLR = 8, KEY_HANGUP = -11;
 
     // DESIGN.md light tokens: --background, --surface, --surface-2, --text, --text-sub.
     static final int WHITE = 0xFFFFFF;
@@ -325,7 +326,8 @@ abstract class Arcade extends Canvas implements Runnable {
     protected synchronized void keyPressed(int key) {
         boolean lsoft = key == KEY_LSOFT || key == -KEY_LSOFT;
         boolean back = key == KEY_RSOFT || key == -KEY_RSOFT || key == KEY_CLR || key == -KEY_CLR;
-        boolean hangup = key == KEY_HANGUP;
+        // -1 is up under the standard codes; only an older wie (up = 141) meant the end key by it.
+        boolean hangup = key == KEY_HANGUP || key == -1 && getKeyCode(UP) != -1;
         int action = lsoft ? FIRE : back || hangup ? 0 : getGameAction(key);
         // Keypad digits first: handsets differ in which digits they report as game actions.
         if (key == KEY_NUM2) action = UP;

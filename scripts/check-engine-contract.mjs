@@ -226,6 +226,50 @@ if (wipiEnumStart === -1 || wipiEnumEnd === -1 || fromMidpStart === -1 || fromMi
   }
 }
 
+// ── 4e. Third hop, J2ME only: the MIDP int -> the standard int the guest is handed ─
+// wie-j2me sets Canvas.standardKeyCodes, and Canvas::handleKeyEvent then converts
+// once more through to_standard (getGameAction/getKeyCode/getKeyName read back
+// through from_standard). A swapped row is "press up, the game reads down" on
+// every general J2ME title and nothing on the SKVM path would notice — SKVM
+// guests keep keyMidpCodes. Same shape as §4c: contract value vs. the product's
+// own literals. A key with no arm falls through `_ => code`, so it must equal
+// its keyMidpCodes value; every arm must also be undone by from_standard.
+{
+  const canvasRs = "wie-midp/src/classes/javax/microedition/lcdui/canvas.rs";
+  const cvRs = await readFile(path.join(root, canvasRs), "utf8");
+  const body = (name) => {
+    const start = cvRs.indexOf(`fn ${name}(`);
+    const end = start === -1 ? -1 : cvRs.indexOf("\n}", start);
+    return start === -1 || end === -1 ? null : cvRs.slice(start, end);
+  };
+  const toStd = body("to_standard");
+  const fromStd = body("from_standard");
+  const midpStart = eqRs.indexOf("pub enum MIDPKeyCode");
+  const midpEnd = midpStart === -1 ? -1 : eqRs.indexOf("\n}", midpStart);
+  if (!toStd || !fromStd || midpStart === -1 || midpEnd === -1) {
+    bad(`J2ME key codes unverifiable: \`fn to_standard(\`/\`fn from_standard(\` not found (or unterminated) in ${canvasRs} — refusing to fail-open; fix the checker's locator if it moved`);
+  } else {
+    const midpByCode = new Map([...eqRs.slice(midpStart, midpEnd).matchAll(/^\s*([A-Z][A-Z0-9_]*)\s*=\s*(-?\d+)\s*,/gm)].map((m) => [Number(m[2]), m[1]]));
+    const toArms = new Map([...toStd.matchAll(/Some\(MIDPKeyCode::([A-Z][A-Z0-9_]*)\)\s*=>\s*(-?\d+)\s*,/g)].map((m) => [m[1], Number(m[2])]));
+    const fromArms = new Map([...fromStd.matchAll(/^\s*(-?\d+)\s*=>\s*MIDPKeyCode::([A-Z][A-Z0-9_]*)\s*,/gm)].map((m) => [Number(m[1]), m[2]]));
+    if (!/_\s*=>\s*code\s*,/.test(toStd)) bad(`J2ME key codes unverifiable: to_standard has no \`_ => code\` arm — refusing to fail-open`);
+    for (const [key, expected] of Object.entries(contract.keyJ2meCodes)) {
+      const variant = midpByCode.get(contract.keyMidpCodes?.[key]);
+      if (variant === undefined) {
+        bad(`J2ME key code unverifiable: "${key}" has no MIDPKeyCode variant carrying its pinned code ${contract.keyMidpCodes?.[key]}`);
+        continue;
+      }
+      const actual = toArms.has(variant) ? toArms.get(variant) : contract.keyMidpCodes[key];
+      if (actual !== expected) bad(`J2ME key code miswired: "${key}" now reaches a J2ME guest as ${actual} (MIDPKeyCode::${variant}), contract pins ${expected} — pressing this key would input a different one`);
+      else if (toArms.has(variant) && fromArms.get(expected) !== variant) bad(`J2ME key code asymmetric: from_standard does not map ${expected} back to MIDPKeyCode::${variant} ("${key}") — getGameAction/getKeyName would misread it`);
+      else ok(`to_standard hands a J2ME guest ${expected} for "${key}" (MIDPKeyCode::${variant})`);
+    }
+    for (const key of contract.keyVocabulary) {
+      if (!(key in contract.keyJ2meCodes)) bad(`contract gap: keyVocabulary lists "${key}" but keyJ2meCodes does not pin its J2ME-visible code`);
+    }
+  }
+}
+
 // ── 4d. The other direction: the guest asks "was that key UP?" ──────────────
 // getGameAction is not on the delivery path (the guest calls it, on a code it
 // already holds), so §4/§4b/§4c never look at it — yet a swapped row there is
