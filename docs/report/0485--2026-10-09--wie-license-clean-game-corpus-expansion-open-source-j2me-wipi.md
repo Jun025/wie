@@ -138,3 +138,5 @@ agneay-100(100종 · MIT · 전부 코드로 그림): **playable 99 · limited 1
   `getControl` 이 null 대신 컨트롤을 돌려줌. 나머지는 «없던 메서드·클래스» 추가라 그것을 부르던 타이틀은 전에는 죽었다.
 - 코퍼스 이름 유입(`node scripts/corpus-name-inflow.mjs` · 이 브랜치의 바뀐 파일 전체): BOUNDED 6회/5쌍 · SUFFIX-ATTACHED 0 — 6회 전부
   이 브랜치 이전부터 있던 줄이다(`git diff origin/main...HEAD` 의 추가 줄에서 그 이름 0회). 이 회차가 들인 이름 = 0.
+
+<!-- corpus-name-inflow v1 subjects=36 tree=2b90f7ab6e1d45ca B=6/5 P=0/0 S=0/0 -->
