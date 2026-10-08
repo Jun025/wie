@@ -7,7 +7,7 @@
  "changes": [
   "wie-skvm com/xce/lcdui/XTextField.keyPressed — 숫자 멀티탭(wie_util::keypad · 1초 창) · CLEAR 지움 · 글자가 바뀌면 repaint",
   "keyRepeated 는 숫자를 무시 · keyReleased 스텁 제거(할 일 없음) · setText 가 순환을 끝낸다",
-  "docs/report/0487"
+  "docs/report/0489"
  ],
  "verification": [
   "digit_keys_type_multitap_and_repaint · 개악 red 2/2(repaint 제거 · 멀티탭 제거)",
