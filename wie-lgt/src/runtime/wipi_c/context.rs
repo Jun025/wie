@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, format, vec, vec::Vec};
+use alloc::{boxed::Box, format, sync::Arc, vec, vec::Vec};
 
 use jvm::{
     Jvm,
@@ -37,12 +37,36 @@ fn free_indirect(core: &mut ArmCore, memory: WIPICIndirectPtr) -> Result<()> {
     Allocator::free(core, base_address, size + size_of::<WIPICWord>() as WIPICWord)
 }
 
+// A Clet title's frames never reach MIDP `Display`'s paint, which is where garbage is collected: it
+// draws through `MC_grpFlushLcd` from its own `MC_knlSetTimer` callback. 4fdbd64c9fbd's collections
+// stopped once its title card gave way to the timer loop and every Java object made after that
+// stayed: the 16-byte heap bucket kept about 50,750 of every 65,536 allocations until its 524,288
+// slots were full, and the 600-second run ended in an `unwrap` panic on the next allocation.
+// So a timer callback collects too, on the same schedule as `Display` (wie-midp `GC_INTERVAL_MS`,
+// `GC_COST_SHARE`): at most once a second, and never more than a twentieth of the time between.
+const GC_INTERVAL_MS: u64 = 1000;
+const GC_COST_SHARE: u64 = 20;
+
+/// When this context's last timer collection ran and what it cost, shared by every clone.
+#[derive(Default)]
+struct GcClock {
+    last: u64,
+    cost: u64,
+}
+
+impl GcClock {
+    fn due(&self, now: u64) -> bool {
+        now.saturating_sub(self.last) >= GC_INTERVAL_MS.max(self.cost * GC_COST_SHARE)
+    }
+}
+
 // mostly same as ktf's one, can we merge those?
 #[derive(Clone)]
 pub struct LgtWIPICContext {
     core: ArmCore,
     system: System,
     jvm: Jvm,
+    gc: Arc<spin::Mutex<GcClock>>,
 }
 
 impl LgtWIPICContext {
@@ -66,7 +90,25 @@ impl LgtWIPICContext {
     }
 
     pub fn new(core: ArmCore, system: System, jvm: Jvm) -> Self {
-        Self { core, system, jvm }
+        Self {
+            core,
+            system,
+            jvm,
+            gc: Arc::new(spin::Mutex::new(GcClock::default())),
+        }
+    }
+
+    async fn collect_garbage_if_due(&mut self) -> Result<()> {
+        let now = self.system.platform().now().raw();
+        if !self.gc.lock().due(now) {
+            return Ok(());
+        }
+        self.collect_garbage().await?;
+        let cost = self.system.platform().now().raw().saturating_sub(now);
+        *self.gc.lock() = GcClock { last: now, cost };
+        self.system.pacing().collected_garbage(cost);
+
+        Ok(())
     }
 }
 
@@ -166,7 +208,7 @@ impl WIPICContext for LgtWIPICContext {
 
             async move {
                 callback.call(&mut context, Box::new([])).await?;
-                Ok(())
+                context.collect_garbage_if_due().await
             }
         }))
     }
@@ -192,6 +234,19 @@ mod tests {
     use wie_util::Result;
 
     use super::{alloc_indirect, free_indirect};
+
+    /// The timer path's collection schedule: once a second, and stretched while a collection is
+    /// costly. Without `due`, a Clet title collects never (4fdbd64c9fbd filled its heap) or on
+    /// every timer tick.
+    #[test]
+    fn timer_collection_waits_a_second_and_for_its_cost() {
+        let clock = super::GcClock { last: 10_000, cost: 0 };
+        assert!(!clock.due(10_999));
+        assert!(clock.due(11_000));
+        let costly = super::GcClock { last: 10_000, cost: 100 };
+        assert!(!costly.due(11_999));
+        assert!(costly.due(12_000));
+    }
 
     /// `free(NULL)` is a no-op, and a real handle still frees.
     ///

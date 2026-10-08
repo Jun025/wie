@@ -124,6 +124,8 @@ export function validateCompat(d) {
     for (const a of EXTRA_AXES)
       if (x.axes && a in x.axes && !EXTRA_AXIS_VALUES[a].includes(x.axes[a])) e.push(`${at}: axes.${a} not in ${EXTRA_AXIS_VALUES[a]}`);
     if (!Array.isArray(x.knownIssues_ko) || !x.knownIssues_ko.every(str)) e.push(`${at}: knownIssues_ko must be non-empty strings`);
+    // A row the shell marks limited/not-yet with no sentence tells the player «화면만» and not why.
+    else if (x.status !== 'playable' && !x.knownIssues_ko.length) e.push(`${at}: status ${x.status} needs at least one knownIssues_ko sentence (why it is not playable)`);
     if (!Array.isArray(x.changes)) e.push(`${at}: changes must be an array`);
     else
       x.changes.forEach((c, j) => {
@@ -235,6 +237,8 @@ function selftest() {
     ['census axis value leaks through', { ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, boot: 'fail' } }] }, null],
     ['six-axis value on progress', { ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, progress: 'no' } }] }, null],
     ['unmeasured progress shipped as a value', { ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, progress: 'unknown' } }] }, null],
+    ['limited row with no reason', { ...good, entries: [{ ...good.entries[0], status: 'limited' }] }, null],
+    ['not-yet row with no reason', { ...good, entries: [{ ...good.entries[0], status: 'not-yet' }] }, null],
     ['duplicate sha', { ...good, entries: [good.entries[0], good.entries[0]] }, null],
     ['short enginePin', { ...good, enginePin: 'abc' }, null],
     ['title keeps a bracket tag', { ...good, entries: [{ ...good.entries[0], title: '[큰화]t' }] }, null],

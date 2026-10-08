@@ -66,6 +66,13 @@ const PROBE_KEYS_AT = 8; // pacing window opens after boot
 // database) is relaunched once, database kept — what a player does. Without it such a title reads
 // as boot/render fail on every census (7da00ecd4804, 2026-09-29).
 const RELAUNCH = ['--relaunch', '1'];
+// A title that writes its first save and then asks to be quit and started again, but never quits
+// by itself, is booted again at that many seconds — the player's restart (`--restart-at`, database
+// kept). Only the probes and the long run: the progress policy has its own restart. Read from the
+// image, not guessed: 287af341dac8's save loader opens `save0.data`, and when it is missing creates
+// it and sets the screen state whose case draws «완전히 종료후 다시 실행해 주세요»; no key leaves it.
+const RESTART_FIRST = { '287af341dac8': 4 };
+const firstRestart = (t) => (RESTART_FIRST[t.sha.slice(0, 12)] ? ['--restart-at', String(RESTART_FIRST[t.sha.slice(0, 12)])] : []);
 // Every run here is bounded by --timeout. wie_validate's 50M-tick default is an infinite-loop backstop
 // sized for a boot, and a fast title burns it before the key schedule is done: on 12 of 17 input `none`
 // titles the 30 s probe A stopped at `max-ticks` after 2–17 of 27 keys, and 7 of them read `ok` once it
@@ -259,7 +266,7 @@ async function probe(t) {
     const f = join(d, `${name}.json`);
     if (existsSync(f)) continue;
     mkdirSync(join(d, name), { recursive: true });
-    const args = ['--inject', '--keep-timeout', '--timeout', String(opt.secs), ...NO_TICK_CAP, '--shotdir', join(d, name), ...RELAUNCH, ...extra, t.path];
+    const args = ['--inject', '--keep-timeout', '--timeout', String(opt.secs), ...NO_TICK_CAP, '--shotdir', join(d, name), ...RELAUNCH, ...firstRestart(t), ...extra, t.path];
     const r = await validate(args, opt.secs + 120, join(d, `${name}.stderr`));
     // A probe the host starved is not a measurement: it is left unrecorded, so the next `run` retries
     // it, instead of reading as `boot: fail`. Measured 2026-09-28: next to two Interactive-priority
@@ -299,7 +306,7 @@ async function longplay(t, spec = {}) {
   // a title whose music starts in play then reads `silent` (15 such, docs/report/0388 §1).
   writeFileSync(keys, longKeys(spec.keys ? readFileSync(spec.keys, 'utf8') : '', reps));
   // The backstop ended this run's first pass at 3 of 10 minutes (NO_TICK_CAP).
-  const args = ['--inject', '--keys', keys, '--keep-timeout', '--timeout', String(opt.long), ...NO_TICK_CAP, '--shotdir', join(d, 'L'), '--shot-every', '20', ...RELAUNCH, t.path];
+  const args = ['--inject', '--keys', keys, '--keep-timeout', '--timeout', String(opt.long), ...NO_TICK_CAP, '--shotdir', join(d, 'L'), '--shot-every', '20', ...RELAUNCH, ...firstRestart(t), t.path];
   const r = await validate(args, opt.long + 300, join(d, 'L.stderr'));
   // `--keys` also shoots once per key step; only the `tNNN.N` timer shots are evenly spaced.
   const timed = existsSync(join(d, 'L'))
@@ -730,13 +737,31 @@ const HAND_WALL = {
 // moved on by hand (a recipe run, docs/report/0442 · 0469), or what a fix still leaves out. Measured
 // lines only — the `progress` axis itself stays the policy's verdict.
 const WALK_TIP = '메뉴를 여는 소프트키 없이 방향키와 확인 키로 움직이면 계속 진행돼요.';
+const RESTART_KO = '처음 실행하면 저장 파일을 만든 뒤 «완전히 종료후 다시 실행해 주세요» 안내에서 멈춰요. 게임을 껐다가 다시 켜면 시작할 수 있어요.';
 const HAND_NOTE = {
+  '287af341dac8': [RESTART_KO],
   '61ed69520fd3': [WALK_TIP],
   c107462e5f8a: [WALK_TIP],
   d1dce4a36141: [WALK_TIP],
   '7089dec0e8df': [WALK_TIP],
   ccb45e6b8d80: [WALK_TIP],
 };
+
+// A row that is not playable always says why: `player-data.mjs` refuses one with no sentence (the
+// shell showed «화면만» and nothing else on three rows, 2026-10-08). The axes say it for most; the one
+// gap is a title whose long run was never measured (input ok, longplay n/a) — say exactly that.
+const UNMEASURED_KO = '오래 플레이해 보는 검사를 아직 마치지 못해서, 끝까지 잘 되는지는 아직 확인하지 못했어요.';
+function knownIssues(ax, st, sha12, lock, net) {
+  if (lock) return [LOCK_KO[lock]];
+  if (net) return [net];
+  const issues = Object.entries(ax)
+    .filter(([k]) => !(k === 'render' && ax.boot === 'fail')) // one line for a title that never started
+    .map(([k, v]) => ISSUE_KO[`${k}:${v}`])
+    .filter(Boolean);
+  issues.push(...(HAND_NOTE[sha12] ?? []));
+  if (st !== 'playable' && !issues.length) issues.push(UNMEASURED_KO);
+  return issues;
+}
 
 // ── longplay: a guest Java thread that dies uncaught did not survive ───────────────────────────
 // rustjava logs `Uncaught exception in thread N:` when a guest thread's run() throws; the run then
@@ -798,6 +823,8 @@ if (cmd === 'selftest') {
     ['empty plays everywhere are silent', soundVerdict('ok', [{ audio: { plays: 2, empty_plays: 2 } }, null, { audio: { plays: 0 } }]) === 'silent'],
     ['no audio record is n/a', soundVerdict('ok', [{}, null]) === 'n/a' && soundVerdict('fail', [{ audio: { plays: 1 } }]) === 'n/a'],
     ['--jobs 0 / garbage becomes 1', jobsFor('0', 10) === 1 && jobsFor('x', 10) === 1],
+    ['a limited row with no failing axis still says why', knownIssues({ boot: 'ok', render: 'ok', input: 'ok', longplay: 'n/a', sound: 'ok', speed: 'n/a' }, 'limited', '000000000000', null, null).length === 1],
+    ['a playable row with no failing axis says nothing', knownIssues({ boot: 'ok', render: 'ok', input: 'ok', longplay: 'ok', sound: 'ok', speed: 'ok' }, 'playable', '000000000000', null, null).length === 0],
     ['a long-run recipe comes before the loop', longKeys('NUM2:3', 2).split('\n')[0] === 'NUM2:3' && longKeys('NUM2:3', 2).split('\n').length === 3],
   ];
   // Progress: 60 shots over 600 s. New frames until 400 s, then the same two alternating (a blink).
@@ -1047,13 +1074,7 @@ if (cmd === 'run') {
     // better than not-yet — a check that paints its refusal box would otherwise read as playable.
     const lock = lockVerdict(lockOf(t.path), [j.A, j.B]) ?? LOCK_HAND[t.sha.slice(0, 12)] ?? null;
     const st = lock ? 'not-yet' : net && status(j.ax) === 'playable' ? 'limited' : status(j.ax);
-    const issues = Object.entries(j.ax)
-      .filter(([k]) => !(k === 'render' && j.ax.boot === 'fail')) // one line for a title that never started
-      .map(([k, v]) => ISSUE_KO[`${k}:${v}`])
-      .filter(Boolean);
-    if (lock) issues.splice(0, issues.length, LOCK_KO[lock]);
-    else if (net) issues.splice(0, issues.length, net);
-    else issues.push(...(HAND_NOTE[t.sha.slice(0, 12)] ?? []));
+    const issues = knownIssues(j.ax, st, t.sha.slice(0, 12), lock, net);
     const changes = prs
       .filter((pr) => names(pr.title, title) && !otherCarrier(pr.title, platform))
       .map((pr) => ({ date: pr.mergedAt.slice(0, 10), enginePin: pr.mergeCommit?.oid ?? null, summary_ko: summaryKo(pr.title), pr: pr.number }));

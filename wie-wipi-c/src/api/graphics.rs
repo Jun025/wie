@@ -209,6 +209,34 @@ fn write_grp_ctx(context: &mut dyn WIPICContext, ptr: WIPICWord, c: WIPICGraphic
     )
 }
 
+/// The mask bit a set clip carries: WIPI marks a context field it holds as `1 << <field>_IDX`, and
+/// CLIP_IDX is 0. Only `MC_grpSetContext(CLIP)` sets it here, so a context a title never clipped
+/// draws exactly as before.
+const CLIP_MASK: WIPICWord = 1;
+
+/// `clip` narrowed to the context's clip when one is set. The context's rectangle is x1, y1, x2, y2
+/// inclusive — LGT's record names the words that way (`clip_x1` … `clip_y2`), and 362c57e2b2b7's
+/// values fit it: it sets [79, 143, 109, 172], draws a 62-wide image at x 47, then the same
+/// image at 76 under [108, 143, 138, 172] — a logo revealed one 30-pixel window at a time. Drawn
+/// unclipped, every window showed the whole image and the screen filled with overlapping copies.
+/// ponytail: the pixel-op blit (`blit_with_pixel_op`) does not clip; no title clips and keys at once.
+fn context_clip(context: &dyn WIPICContext, p_gctx: WIPICWord, clip: Clip) -> Result<Clip> {
+    if p_gctx == 0 {
+        return Ok(clip);
+    }
+    let gctx = read_grp_ctx(context, p_gctx)?;
+    if gctx.mask & CLIP_MASK == 0 {
+        return Ok(clip);
+    }
+    let [x1, y1, x2, y2] = gctx.clip.map(|value| i32::from(value as i16));
+    Ok(clip.intersect(&Clip {
+        x: x1,
+        y: y1,
+        width: (i64::from(x2) + 1 - i64::from(x1)).max(0) as u32,
+        height: (i64::from(y2) + 1 - i64::from(y1)).max(0) as u32,
+    }))
+}
+
 pub async fn init_context(context: &mut dyn WIPICContext, p_grp_ctx: WIPICWord) -> Result<()> {
     tracing::debug!("MC_grpInitContext({p_grp_ctx:#x})");
 
@@ -222,9 +250,17 @@ pub async fn set_context(context: &mut dyn WIPICContext, p_grp_ctx: WIPICWord, o
 
     let mut grp_ctx: WIPICGraphicsContext = read_grp_ctx(context, p_grp_ctx)?;
     match op {
+        // A null clip is «no clip»: 362c57e2b2b7 passes 0 here in its startApp, and reading the four
+        // words through it ended the boot. It goes back to the MC_grpInitContext state.
+        // ponytail: OffsetIdx reads through pv the same way; no title passes it null.
+        WIPICGraphicsContextIdx::ClipIdx if pv == 0 => {
+            grp_ctx.clip = WIPICGraphicsContext::default().clip;
+            grp_ctx.mask &= !CLIP_MASK;
+        }
         WIPICGraphicsContextIdx::ClipIdx => {
             let clip: [i32; 4] = read_generic(context, pv)?;
             grp_ctx.clip = clip.map(|value| value as u16);
+            grp_ctx.mask |= CLIP_MASK;
         }
         WIPICGraphicsContextIdx::FgPixelIdx => {
             grp_ctx.fgpxl = pv as _;
@@ -325,6 +361,7 @@ pub async fn fill_rect(context: &mut dyn WIPICContext, dst_fb: WIPICIndirectPtr,
     };
 
     let color = framebuffer.pixel_to_color(gctx.fgpxl);
+    let clip = context_clip(context, p_gctx, clip)?;
     primitives::fill_rect(context, &framebuffer, x, y, w as u32, h as u32, color, clip)
 }
 
@@ -356,6 +393,7 @@ pub async fn draw_arc(
     };
 
     let color = framebuffer.pixel_to_color(gctx.fgpxl);
+    let clip = context_clip(context, p_gctx, clip)?;
     primitives::draw_arc(context, &framebuffer, x, y, w as u32, h as u32, start_angle, arc_angle, color, clip)
 }
 
@@ -387,6 +425,7 @@ pub async fn fill_arc(
     };
 
     let color = framebuffer.pixel_to_color(gctx.fgpxl);
+    let clip = context_clip(context, p_gctx, clip)?;
     primitives::fill_arc(context, &framebuffer, x, y, w as u32, h as u32, start_angle, arc_angle, color, clip)
 }
 
@@ -488,6 +527,7 @@ pub async fn draw_image(
         height: h as _,
     };
 
+    let clip = context_clip(context, graphics_context, clip)?;
     primitives::draw_image(context, &framebuffer, dx, dy, w as u32, h as u32, &*src_image, sx, sy, clip)
 }
 
@@ -608,6 +648,7 @@ pub async fn copy_area(
         height: h as _,
     };
 
+    let clip = context_clip(context, pgc, clip)?;
     primitives::copy_area(context, &framebuffer, dx, dy, w as u32, h as u32, x, y, clip)
 }
 
@@ -667,6 +708,7 @@ pub async fn copy_frame_buffer(
         height: h as _,
     };
 
+    let clip = context_clip(context, pgc, clip)?;
     primitives::copy_framebuffer(context, &dst_framebuffer, dx, dy, w as u32, h as u32, &src_framebuffer, sx, sy, clip)
 }
 
@@ -878,6 +920,7 @@ pub async fn draw_string(
     };
 
     let color = framebuffer.pixel_to_color(gctx.fgpxl);
+    let clip = context_clip(context, pgc, clip)?;
     primitives::draw_text(context, &framebuffer, &string, x, y, color, clip)
 }
 
@@ -978,6 +1021,7 @@ pub async fn draw_rect(context: &mut dyn WIPICContext, dst: WIPICIndirectPtr, x:
     };
 
     let color = framebuffer.pixel_to_color(gctx.fgpxl);
+    let clip = context_clip(context, pgc, clip)?;
     primitives::draw_rect(context, &framebuffer, x, y, w as u32, h as u32, color, clip)
 }
 
@@ -994,6 +1038,7 @@ pub async fn draw_line(context: &mut dyn WIPICContext, dst: WIPICIndirectPtr, x1
     };
 
     let color = framebuffer.pixel_to_color(gctx.fgpxl);
+    let clip = context_clip(context, pgc, clip)?;
     primitives::draw_line(context, &framebuffer, x1, y1, x2, y2, color, clip)
 }
 
@@ -1021,6 +1066,7 @@ pub async fn draw_polygon(
         width: framebuffer.0.width as _,
         height: framebuffer.0.height as _,
     };
+    let clip = context_clip(context, pgc, clip)?;
     let color = framebuffer.pixel_to_color(gctx.fgpxl);
     // Read as we draw: `count` is guest-supplied, so nothing is allocated from it.
     let read_point = |context: &mut dyn WIPICContext, i: u32| -> Result<(i32, i32)> {
@@ -1195,6 +1241,54 @@ mod tests {
 
         get.call(&mut context, Box::new([ptr_context, 0xff, output])).await?;
         assert_eq!(read_generic::<[i32; 5], _>(&context, output)?, [-12, 34, 999, 999, 999]);
+        Ok(())
+    }
+
+    // 362c57e2b2b7 clears the clip with a null pointer in its startApp; that is not an address to read.
+    #[futures_test::test]
+    async fn a_null_clip_resets_the_clip() -> Result<()> {
+        let mut context = TestContext::new();
+        let ptr_context = context.alloc_raw(size_of::<WIPICGraphicsContext>() as u32)?;
+        let input = context.alloc_raw(16)?;
+        let output = context.alloc_raw(16)?;
+        init_context(&mut context, ptr_context).await?;
+        let set = set_context.into_body();
+        let get = get_context.into_body();
+        get.call(&mut context, Box::new([ptr_context, 0, output])).await?;
+        let initial: [i32; 4] = read_generic(&context, output)?;
+
+        write_generic(&mut context, input, [1i32, 2, 30, 40])?;
+        set.call(&mut context, Box::new([ptr_context, 0, input])).await?;
+        set.call(&mut context, Box::new([ptr_context, 0, 0])).await?;
+        get.call(&mut context, Box::new([ptr_context, 0, output])).await?;
+        assert_eq!(read_generic::<[i32; 4], _>(&context, output)?, initial);
+        Ok(())
+    }
+
+    // 362c57e2b2b7 reveals its logo through a moving clip window; ignoring the clip drew the whole
+    // image every time. A null clip lifts it again.
+    #[futures_test::test]
+    async fn drawing_stays_inside_the_context_clip() -> Result<()> {
+        let mut context = TestContext::new();
+        let fb = create_offscreen_framebuffer(&mut context, 4, 2).await?;
+        let gctx = context.alloc_raw(size_of::<WIPICGraphicsContext>() as u32)?;
+        let rect = context.alloc_raw(16)?;
+        init_context(&mut context, gctx).await?;
+        let set = set_context.into_body();
+        set.call(&mut context, Box::new([gctx, 1, 0xffff])).await?;
+        let pixels = |context: &mut TestContext| -> Result<Vec<u16>> {
+            let framebuffer = FrameBuffer(read_generic(context, context.data_ptr(fb)?)?);
+            Ok(bytemuck::pod_collect_to_vec(&framebuffer.image(context)?.raw()))
+        };
+
+        write_generic(&mut context, rect, [1i32, 1, 2, 1])?;
+        set.call(&mut context, Box::new([gctx, 0, rect])).await?;
+        fill_rect(&mut context, fb, 0, 0, 4, 2, gctx).await?;
+        assert_eq!(pixels(&mut context)?, [0, 0, 0, 0, 0, 0xffff, 0xffff, 0]);
+
+        set.call(&mut context, Box::new([gctx, 0, 0])).await?;
+        fill_rect(&mut context, fb, 0, 0, 4, 2, gctx).await?;
+        assert_eq!(pixels(&mut context)?, [0xffff; 8]);
         Ok(())
     }
 
