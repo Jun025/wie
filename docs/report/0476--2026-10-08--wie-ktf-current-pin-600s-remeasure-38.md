@@ -106,5 +106,4 @@
 - 전부 `compat.json` 의 기존 `title` 값이다. 이 회차는 그 파일의 `axes.progress` 14값만 바꿨다.
 - 이 문서와 worklog 는 타이틀을 sha12 로만 적었다.
 
-
-
+<!-- corpus-name-inflow v1 subjects=3 tree=893d1a23368ca2ca B=718/330 P=0/0 S=35/15 -->
