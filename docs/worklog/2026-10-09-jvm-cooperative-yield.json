@@ -1,0 +1,10 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-09",
+  "task": "wie-jvm-cooperative-yield-budget-for-non-yielding-midlet",
+  "title": "양보하지 않는 MIDlet 을 1 000 호출마다 끊는다 — 바이트코드 JVM 의 협력적 양보",
+  "summary": "게스트 바이트코드 메서드 진입에서 1 000 호출마다 YieldFuture. loveme: --timeout 12 가 반환하지 않던 것(90 s 강제 종료) → rc=0 · 13 s · PASS. 브라우저: 양보 없는 빌드는 80 s 동안 tick 이 돌아오지 않음 → 양보 빌드 tick p99 26 ms. 86 개 SKT/J2ME 표본 PASS 손실 0 · paints 중앙비 1.000. docs/report/0487.",
+  "proposals": [],
+  "adoptedProposals": ["2026-10-09-license-clean-midp-corpus#p1"],
+  "declinedProposals": []
+}

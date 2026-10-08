@@ -41,6 +41,10 @@
 //     a stop or replay reached while the worklet still held them for the soundfont — never heard.
 //   rms mean / 2nd-half mean / silent seconds — from per-second RMS of the analyser, sampled
 //     every 50 ms. "Silent" is a second whose RMS is under 1e-4.
+//   ticks · tick max / p99 ms · ticks over 50 ms — wall time of each `emu.tick()`, the call the
+//     shell makes once per frame: the page can paint and take input only between two of them.
+//     A run whose page has not answered 60 s past --secs reports «a tick never returned» rather
+//     than waiting on it (a guest that never yields holds the tick, and the page with it).
 //
 // Read RMS as a comparison, never as an absolute: it depends on the key cycle, on where the game
 // is when a key lands, and on host load (ticks per second). Compare builds only inside one
@@ -238,11 +242,14 @@ const RUN = async ({ wasmIdx, gameIdx, gameName, secs, keyMs, keys, statsEvery, 
   let nextKey = start + 2000; // let it boot before the first key
   let nextStats = start + statsEvery * 1000;
   let lastSample = 0;
+  const tickMs = [];
 
   while (performance.now() - start < secs * 1000) {
     const now = performance.now();
     try {
+      const t = performance.now();
       emu.tick();
+      tickMs.push(performance.now() - t);
     } catch (e) {
       error = String(e);
       break;
@@ -309,6 +316,10 @@ const RUN = async ({ wasmIdx, gameIdx, gameName, secs, keyMs, keys, statsEvery, 
     firstVsNext,
     mixed: midiPlays.some((p) => p.sf) && midiPlays.some((p) => !p.sf),
     holdMaxMs: Math.max(0, ...midiPlays.map((p) => p.holdMs)),
+    ticks: tickMs.length,
+    tickMaxMs: Math.round(Math.max(0, ...tickMs)),
+    tickP99Ms: Math.round([...tickMs].sort((a, b) => a - b)[Math.floor(tickMs.length * 0.99)] ?? 0),
+    ticksOver50Ms: tickMs.filter((v) => v > 50).length,
     playLog: probe.playLog,
     drops: probe.drops,
   };
@@ -329,7 +340,11 @@ const runOne = ([w, g]) =>
           page.on("pageerror", (e) => pageErrors.push(e.message));
           await page.addInitScript(INIT);
           await page.goto(base + "/");
-          const r = await page.evaluate(RUN, {
+          let stuck;
+          const hang = new Promise((_, reject) => {
+            stuck = setTimeout(() => reject(new Error(`a tick never returned — the page did not answer ${opt.secs + 60} s in`)), (opt.secs + 60) * 1000);
+          });
+          const r = await Promise.race([hang, page.evaluate(RUN, {
             wasmIdx: w,
             gameIdx: g,
             gameName: path.basename(opt.games[g]),
@@ -340,7 +355,7 @@ const runOne = ([w, g]) =>
             width: contract.screen.width,
             height: contract.screen.height,
             soundfontUrl: opt.soundfont ? "/soundfont" : undefined,
-          });
+          })]).finally(() => clearTimeout(stuck));
           return { wasm: opt.wasm[w], game: opt.games[g], ...r, pageErrors };
         } catch (e) {
           return { wasm: opt.wasm[w], game: opt.games[g], error: String(e) };
@@ -371,6 +386,7 @@ for (const r of results) {
   console.log(`  plays ${r.plays} · stops ${r.stops} · evicts ${r.evicts} · gains [${r.gains.join(", ")}] · worklet ${r.worklet ? "yes" : "NO"}`);
   console.log(`  seq ${r.seq.map((s) => `${s.at}s=${s.sequences}${s.substitute ? "*" : ""}`).join(" ") || "-"}${r.seq.some((s) => s.substitute) ? "   (* no stats reply — distinct handles sent `ev`)" : ""}`);
   console.log(`  MIDI plays ${r.midiPlays} (soundfont ${r.sfPlays}) · songs ${r.songs} (repeated ${r.repeatedSongs}) · first≠next ${r.firstVsNext} · mixed ${r.mixed} · hold max ${r.holdMaxMs} ms · dropped while held ${r.drops.length} · soundfont ${r.sfReady ? `${r.sfReady.ok ? "ready" : "failed"} at ${r.sfReady.at} ms` : "-"}`);
+  console.log(`  ticks ${r.ticks} · tick max ${r.tickMaxMs} ms · p99 ${r.tickP99Ms} ms · over 50 ms ${r.ticksOver50Ms}`);
   console.log(`  rms mean ${f4(r.rmsMean)} · 2nd half ${f4(r.rmsSecondHalf)} · max ${f4(r.rmsMax)} · silent ${r.silentSeconds}/${r.seconds}s`);
   if (r.pageErrors?.length) console.log(`  page errors: ${r.pageErrors.slice(0, 3).join(" | ")}`);
 }
