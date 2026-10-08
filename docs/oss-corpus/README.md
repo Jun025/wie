@@ -4,14 +4,14 @@ Games whose redistribution is permitted **in writing**, collected to find where 
 short on general MIDP titles. The carrier corpus (`game_lab/`, git-ignored, Constraint 9) is mostly
 WIPI-C and carrier Java; it almost never reaches the MIDP 2.0 surface a general J2ME game is built
 on (`lcdui.game`, `List`, MIDI/WAV players). This corpus does. Round and measurements:
-`docs/report/0483`.
+`docs/report/0485`.
 
 ## What is here, and what is not
 
 | file | what |
 |---|---|
 | `candidates.csv` | every candidate looked at (78): source URL, license, the evidence for it (file path or quoted header), commit, build, verdict (채택 / 보류 / 제외) and the reason |
-| `agneay-100-games.csv` | the 100 titles inside the one adopted collection (`github.com/agneay/…`, MIT), with their MIDlet class and the sha256 of each rebuilt jar |
+| `agneay-100-games.csv` | the 100 titles inside the one adopted collection (`github.com/agneay/j2me-100-games`, MIT), with their MIDlet class and the sha256 of each rebuilt jar |
 
 **No game jar is committed.** Three reasons, any one of which would be enough:
 
@@ -19,7 +19,7 @@ on (`lcdui.game`, `List`, MIDI/WAV players). This corpus does. Round and measure
    protects — the repo publishes a WASM artifact that otterpebble deploys — does not know the
    difference between a licensed jar and an unlicensed one. Keeping all game bytes out keeps the
    rule checkable.
-2. Ten of the adopted titles are GPL. Shipping a GPL binary obliges the shipper to offer the
+2. Nine of the adopted titles are GPL. Shipping a GPL binary obliges the shipper to offer the
    corresponding source; a jar in this repo would put that obligation on every artifact built from it.
 3. Nothing needs them here: every jar is rebuilt from a pinned upstream commit, so the ledger
    (URL + commit + build + sha256) reproduces it.
