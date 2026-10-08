@@ -64,4 +64,4 @@ SKT 코퍼스(`game_lab/{working,broken}/skt` 84 파일)에서 `XTextField` 를 
 - R1 이 놓친 `31c90441f639`(`c.<init>` 이 계산된 상한 · 제약 0): `--inject` 27키 main ↔ R1 ↔ R2 전부 PASS 27/27 · 예외 1 · 28컷 중 26 바이트 동일(R1·R2 같은 2컷). 이 실행은 `warn` 로그라 입력칸 생성 여부는 재지 않았다.
 - `smoke_gate.sh`(SKT · R2 debug): 50/50 PASS · 퇴행 0.
 
-<!-- corpus-name-inflow v1 subjects=4 tree=c947c1b011eb5fa4 B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=4 tree=a6835591c3396f4d B=0/0 P=0/0 S=0/0 -->
