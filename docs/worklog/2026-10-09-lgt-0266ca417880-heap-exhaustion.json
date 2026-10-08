@@ -1,0 +1,21 @@
+{
+ "date": "2026-10-09",
+ "task": "wie-lgt-0266ca417880-guest-heap-exhaustion-leak-or-use",
+ "title": "LGT 0266ca417880 게스트 힙 고갈 — 누수 판정 · #518 수거가 이미 고쳤다",
+ "summary": "수거 호출만 뺀 빌드가 0482 와 같은 문장으로 6분 44초에 죽고(리스트 2^17 블록 154→757), 현 main 은 600초 평탄(4~14). 엔진 변경 0. docs/report/0490.",
+ "adoptedProposals": [
+  "2026-10-08-progression-wave5-play-tips#p1"
+ ],
+ "proposals": [
+  {
+   "kind": "meta",
+   "title": "LGT Clet 타이머 콜백의 쓰레기 수거 호출을 시험으로 잠그기",
+   "plainSummary": "LGT 게임이 타이머로 화면을 그릴 때도 메모리 정리가 도는지를 자동 시험이 확인하게 한다. 지금은 그 한 줄을 지워도 시험이 모두 통과한다.",
+   "userBenefit": "오래 하면 7분 안에 메모리가 차서 멈추던 문제가 조용히 되살아나는 것을 PR 단계에서 막는다.",
+   "why": "0490 §1·§5: LgtWIPICContext::set_timer → collect_garbage_if_due 호출만 빼면 0266ca417880 이 404.7초에 0482 와 같은 힙 고갈로 죽는다(게이트② 돌연변이 재현). 그런데 cargo test --all 은 green 이고 결함은 census 급 장주행에서만 보인다 — 타이머를 쓰는 LGT 픽스처가 없다.",
+   "tradeoff": "픽스처 경로는 LGT 생성기(make-wipi-keydraw-fixture.sh 계열)에 MC_knlSetTimer 를 쓰는 변형을 더해야 해 비싸다. 싼 경로는 set_timer 이벤트 1회 처리 뒤 수거 1회(GcClock 기록) 단언 — 호출 자리만 잠그고 실제 타이틀 동작은 못 본다.",
+   "effort": "S(단언 경로) ~ M(픽스처 경로)",
+   "target": "wie-lgt/src/runtime/wipi_c/context.rs set_timer · wie-lgt/tests"
+  }
+ ]
+}
