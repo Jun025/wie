@@ -1,14 +1,31 @@
-use alloc::vec;
+use alloc::{string::String as RustString, vec};
 
-use jvm::{ClassInstanceRef, JavaChar, Jvm, Result as JvmResult};
+use jvm::{ClassInstanceRef, JavaChar, Jvm, Result as JvmResult, runtime::JavaLangString};
 use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 use rustjava_runtime::classes::java::lang::String;
 
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 use wie_midp::classes::javax::microedition::lcdui::{Canvas, Graphics};
+use wie_util::keypad::{self, MULTITAP_MS, Mode};
+
+const CLEAR: i32 = 8;
+// javax.microedition.lcdui.TextField
+const CONSTRAINT_MASK: i32 = 0xFFFF;
+const NUMERIC: i32 = 2;
+const PHONENUMBER: i32 = 3;
+const DECIMAL: i32 = 5;
 
 // class com.xce.lcdui.XTextField
+//
+// The measured callers (ec2f8f2e02a2 · 2f5246006bd8 · f2ae515201f2) forward every key to keyPressed
+// and never repaint afterwards; ec2f8f2e02a2 copies getText() into its name only inside paint, and
+// its OK refuses an empty name. So a key that changes the text repaints the field itself, or the
+// title never sees it. Digit keys are multitap upper-case Latin (wie_util::keypad, as SKVM's
+// TextComponentHandler) — the same key within MULTITAP_MS cycles the last letter — and NUMERIC-like
+// constraints take the digit. CLEAR deletes. keyReleased has nothing to do: a cycle ends by time
+// or by another key.
+// ponytail: upper-case Latin only, no Hangul/mode key — no measured title asks for one.
 pub struct XTextField;
 
 impl XTextField {
@@ -48,6 +65,9 @@ impl XTextField {
                 JavaFieldProto::new("width", "I", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("height", "I", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("canvas", "Ljavax/microedition/lcdui/Canvas;", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("tapKey", "I", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("tapChar", "C", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("tapTime", "J", FieldAccessFlags::PRIVATE),
             ],
             access_flags: ClassAccessFlags::PUBLIC,
         }
@@ -156,7 +176,7 @@ impl XTextField {
         jvm.put_field(&mut this, "height", "I", height).await
     }
 
-    async fn key_pressed(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>, key_code: i32) -> JvmResult<()> {
+    async fn key_pressed(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, key_code: i32) -> JvmResult<()> {
         tracing::debug!("com.xce.lcdui.XTextField::keyPressed({this:?}, {key_code})");
 
         let focus: bool = jvm.get_field(&this, "focus", "Z").await?;
@@ -164,19 +184,79 @@ impl XTextField {
             return Ok(());
         }
 
-        if (32..=126).contains(&key_code) {
-            return Self::input_char(jvm, context, this, key_code as JavaChar).await;
+        match key_code {
+            0x30..=0x39 => Self::multitap(jvm, context, &mut this, key_code).await?,
+            CLEAR => {
+                let mut text = Self::text(jvm, &this).await?;
+                text.pop();
+                Self::put_text(jvm, &mut this, &text).await?;
+                jvm.put_field(&mut this, "tapKey", "I", 0).await?;
+            }
+            32..=126 => {
+                jvm.put_field(&mut this, "tapKey", "I", 0).await?;
+                Self::input_char(jvm, context, this.clone(), key_code as JavaChar).await?;
+            }
+            _ => return Ok(()),
         }
-        Ok(())
+        Self::repaint(jvm, context, this).await
+    }
+
+    async fn multitap(jvm: &Jvm, context: &mut WieJvmContext, this: &mut ClassInstanceRef<Self>, key_code: i32) -> JvmResult<()> {
+        let constraints: i32 = jvm.get_field(this, "constraints", "I").await?;
+        let mode = if matches!(constraints & CONSTRAINT_MASK, NUMERIC | PHONENUMBER | DECIMAL) {
+            Mode::Digit
+        } else {
+            Mode::Upper
+        };
+        let now = context.system().platform().now().raw() as i64;
+        let tap_key: i32 = jvm.get_field(this, "tapKey", "I").await?;
+        let tap_time: i64 = jvm.get_field(this, "tapTime", "J").await?;
+        let again = tap_key == key_code && now - tap_time < MULTITAP_MS;
+        let mut text = Self::text(jvm, this).await?;
+        let max_size: i32 = jvm.get_field(this, "maxSize", "I").await?;
+        // A full field takes no new letter, and must not start a cycle that would rewrite the last one.
+        if !again && text.chars().count() as i32 >= max_size {
+            return jvm.put_field(this, "tapKey", "I", 0).await;
+        }
+
+        let mut tokens = if again {
+            vec![char::from_u32(jvm.get_field::<JavaChar>(this, "tapChar", "C").await? as u32).unwrap_or(' ')]
+        } else {
+            vec![]
+        };
+        let edit = keypad::press(mode, &mut tokens, (key_code - 0x30) as u8, again);
+        for _ in 0..edit.delete {
+            text.pop();
+        }
+        text.extend(edit.insert);
+        Self::put_text(jvm, this, &text).await?;
+        jvm.put_field(this, "tapKey", "I", key_code).await?;
+        jvm.put_field(this, "tapChar", "C", tokens[0] as JavaChar).await?;
+        jvm.put_field(this, "tapTime", "J", now).await
+    }
+
+    async fn text(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<RustString> {
+        let text: ClassInstanceRef<String> = jvm.get_field(this, "text", "Ljava/lang/String;").await?;
+        JavaLangString::to_rust_string(jvm, &text).await
+    }
+
+    async fn put_text(jvm: &Jvm, this: &mut ClassInstanceRef<Self>, text: &str) -> JvmResult<()> {
+        let text: ClassInstanceRef<String> = JavaLangString::from_rust_string(jvm, text).await?.into();
+        jvm.put_field(this, "text", "Ljava/lang/String;", text).await
     }
 
     async fn key_repeated(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>, key_code: i32) -> JvmResult<()> {
         tracing::debug!("com.xce.lcdui.XTextField::keyRepeated({this:?}, {key_code})");
+
+        // A held digit would cycle its letters at the repeat rate.
+        if (0x30..=0x39).contains(&key_code) {
+            return Ok(());
+        }
         Self::key_pressed(jvm, context, this, key_code).await
     }
 
     async fn key_released(_jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>, key_code: i32) -> JvmResult<()> {
-        tracing::warn!("stub com.xce.lcdui.XTextField::keyReleased({this:?}, {key_code})");
+        tracing::debug!("com.xce.lcdui.XTextField::keyReleased({this:?}, {key_code})");
 
         Ok(())
     }
@@ -271,6 +351,7 @@ impl XTextField {
 
         let max_size: i32 = jvm.get_field(&this, "maxSize", "I").await?;
         let text = Self::truncate_text(jvm, text, max_size).await?;
+        jvm.put_field(&mut this, "tapKey", "I", 0).await?;
         jvm.put_field(&mut this, "text", "Ljava/lang/String;", text).await
     }
 }
@@ -489,8 +570,9 @@ mod tests {
                     .await?;
                 assert_eq!(JavaLangString::to_rust_string(&jvm, &text).await?, "wxy");
 
+                // 'd' and 'e' each repainted the field; this is the third.
                 let _: () = jvm.invoke_virtual(&field, "com/xce/lcdui/XTextField", "repaint", "()V", ()).await?;
-                assert_eq!(jvm.get_field::<i32>(&canvas, "repaintCount", "I").await?, 1);
+                assert_eq!(jvm.get_field::<i32>(&canvas, "repaintCount", "I").await?, 3);
                 assert_eq!(jvm.get_field::<i32>(&canvas, "repaintX", "I").await?, 3);
                 assert_eq!(jvm.get_field::<i32>(&canvas, "repaintY", "I").await?, 5);
                 assert_eq!(jvm.get_field::<i32>(&canvas, "repaintWidth", "I").await?, 40);
@@ -515,6 +597,66 @@ mod tests {
                 };
                 assert!(jvm.is_instance(&*exception, "java/lang/NullPointerException"));
 
+                Ok(())
+            },
+        );
+
+        assert!(result.is_ok(), "JVM test failed: {result:?}");
+    }
+
+    /// ec2f8f2e02a2's name screen: the title forwards each key to keyPressed, never repaints, reads
+    /// getText() only in paint, and its OK refuses an empty name — so typing must change the text
+    /// AND repaint, or the screen never moves on.
+    #[test]
+    fn digit_keys_type_multitap_and_repaint() {
+        let result = run_jvm_test(
+            Box::new([
+                wie_midp::get_protos().into(),
+                [XTextField::as_proto(), TrackingCanvas::as_proto(), TrackingGraphics::as_proto()].into(),
+            ]),
+            |jvm| async move {
+                const X: &str = "com/xce/lcdui/XTextField";
+                let canvas: ClassInstanceRef<Canvas> = jvm.new_class("test/TrackingCanvas", "()V", ()).await?.into();
+                async fn field(jvm: &Jvm, canvas: &ClassInstanceRef<Canvas>, max: i32, constraints: i32) -> JvmResult<ClassInstanceRef<XTextField>> {
+                    let empty: ClassInstanceRef<String> = JavaLangString::from_rust_string(jvm, "").await?.into();
+                    let field: ClassInstanceRef<XTextField> = jvm
+                        .new_class(
+                            X,
+                            "(Ljava/lang/String;IILjavax/microedition/lcdui/Canvas;)V",
+                            (empty, max, constraints, canvas.clone()),
+                        )
+                        .await?
+                        .into();
+                    let _: () = jvm.invoke_virtual(&field, X, "setFocus", "(Z)V", (true,)).await?;
+                    Ok(field)
+                }
+                async fn press(jvm: &Jvm, field: &ClassInstanceRef<XTextField>, keys: &[i32]) -> JvmResult<alloc::string::String> {
+                    for &key in keys {
+                        let _: () = jvm.invoke_virtual(field, X, "keyPressed", "(I)V", (key,)).await?;
+                        let _: () = jvm.invoke_virtual(field, X, "keyReleased", "(I)V", (key,)).await?;
+                    }
+                    let text: ClassInstanceRef<String> = jvm.invoke_virtual(field, X, "getText", "()Ljava/lang/String;", ()).await?;
+                    JavaLangString::to_rust_string(jvm, &text).await
+                }
+
+                // ec2f8f2e02a2: `new XTextField("", 5, 0, this)`.
+                let name = field(&jvm, &canvas, 5, 0).await?;
+                // 2 → A, 2 again → B (cycled in place), 3 → D.
+                assert_eq!(press(&jvm, &name, &[0x32, 0x32, 0x33]).await?, "BD");
+                assert_eq!(jvm.get_field::<i32>(&canvas, "repaintCount", "I").await?, 3);
+                // CLEAR deletes and ends the cycle: 3 again is a new letter.
+                assert_eq!(press(&jvm, &name, &[8, 0x33]).await?, "BD");
+                // A held digit does not cycle.
+                let _: () = jvm.invoke_virtual(&name, X, "keyRepeated", "(I)V", (0x33,)).await?;
+                assert_eq!(press(&jvm, &name, &[]).await?, "BD");
+                // setText ends the cycle too; a full field takes nothing and rewrites nothing.
+                let wxyz: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, "WXYZ").await?.into();
+                let _: () = jvm.invoke_virtual(&name, X, "setText", "(Ljava/lang/String;)V", (wxyz,)).await?;
+                assert_eq!(press(&jvm, &name, &[0x33, 0x34, 0x34]).await?, "WXYZD");
+
+                // 2f5246006bd8's 9-digit field: `new XTextField("", 9, 2, canvas)` (NUMERIC).
+                let number = field(&jvm, &canvas, 9, 2).await?;
+                assert_eq!(press(&jvm, &number, &[0x30, 0x31, 0x31]).await?, "011");
                 Ok(())
             },
         );
