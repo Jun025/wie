@@ -83,3 +83,5 @@
 - 러너 줄(head release): `draw_j2me` · `helloworld_ktf/lgt` · `text_j2me --timeout 5` PASS. `keydraw_ktf/lgt --inject --expect-last-frame` 은 기본 상한에서 `UNMEASURED · max-ticks` 였다(0473 §러너 · release 가 5천만 틱을 키 일정보다 먼저 쓴다). `--max-ticks 100000000000` 로 PASS · rc=0(paints 79 · 55)이었다.
 
 게임 파일명 유입(도구 기본 실행 · 브랜치 전체): BOUNDED 330쌍 · SUFFIX-ATTACHED 15쌍. 전부 «건드린 파일 전체»인 `compat.json` 의 `title`·`fileTitle`(공개 계약 필드)에 원래 있던 이름이다. 이 회차가 «추가한» 줄의 게임명은 0 이다(`git diff` 추가 줄 대조).
+
+<!-- corpus-name-inflow v1 subjects=5 tree=03cea0b533d2eec3 B=718/330 P=0/0 S=35/15 -->
