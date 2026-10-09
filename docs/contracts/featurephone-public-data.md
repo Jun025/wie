@@ -76,7 +76,7 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
 
 가져오기(`player-data.mjs import`)가 전수 조사의 축 어휘를 계약 어휘로 바꾼다:
 `ok→ok` · `n/a→unknown` · `fail`·`none`·`uniform`·`error`·`silent`→`no`(여섯 축). progress 만 `ok→ok` · `stuck`·`error`→`stuck` · `n/a`→키 없음.
-`progress` 는 **선택 축**이다 — 전수 조사가 잰 행에만 실리고(`n/a` 면 키 없음), 셸 가져오기는 여섯 축만 검사하며 나머지 키는 그대로 통과시킨다(otterpebble `compat-import.mjs` 의 `...x`). ★값 어휘가 여섯 축과 **다르다** — 셸 `PROGRESS_UI`(otterpebble `lib/compat.ts` · #1244)는 `ok`·`stuck` 만 그리고 모르는 값은 칸을 숨기므로, `no` 로 실으면 막힌 행만 사라져 «좋은 쪽만 보이는» 표시가 된다. 그래서 `stuck` 을 그대로 싣는다(`scripts/player-data.mjs` 의 `EXTRA_AXIS_VALUES`). 레시피(제목별 키)로 잰 결과는 싣지 않는다 — 이 축의 정의는 «정책 키». 등급(`status`)에는 넣지 않았다. `partial` 은 지금 아무 측정도 내지 않는다.
+`progress` 는 **선택 축**이다 — 전수 조사가 잰 행에만 실리고(`n/a` 면 키 없음), 셸 가져오기는 여섯 축만 검사하며 나머지 키는 그대로 통과시킨다(otterpebble `compat-import.mjs` 의 `...x`). ★값 어휘가 여섯 축과 **다르다** — 셸 `PROGRESS_UI`(otterpebble `lib/compat.ts` · #1244)는 `ok`·`stuck` 만 그리고 모르는 값은 칸을 숨기므로, `no` 로 실으면 막힌 행만 사라져 «좋은 쪽만 보이는» 표시가 된다. 그래서 `stuck` 을 그대로 싣는다(`scripts/player-data.mjs` 의 `EXTRA_AXIS_VALUES`). 레시피(제목별 키)로 잰 결과는 원칙적으로 싣지 않는다 — 이 축의 정의는 «정책 키». ★예외 하나(2026-10-10 · `docs/report/0496`): 그 레시피를 이용자 문장으로 옮긴 `playTips_ko` 가 **같은 행에 함께 실리고**, 레시피 접두 + 정책 키 판의 짝(P·P2)이 **둘 다** `ok` 이며, 두 판의 마지막 1/3 화면을 사람이 놀이로 확인했을 때만 `ok` 를 싣는다 — 요령을 따라 하는 이용자에게 참인 배지다. 화면 새로움은 커서·창 깜박임을 진행과 못 가르므로(0496 §1 실측: 레시피 P `ok` 19 중 7 이 메뉴·창·커서) 눈 확인 없이 레시피 `ok` 를 싣지 않는다. 등급(`status`)에는 넣지 않았다. `partial` 은 지금 아무 측정도 내지 않는다.
 
 ## 2. `updates.json` — 한 항목 한 파일
 
