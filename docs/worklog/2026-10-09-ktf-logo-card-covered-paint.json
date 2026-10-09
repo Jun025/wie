@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-09",
+  "task": "wie-ktf-aa3fcba4598b-logo-card-null-array-root-cause",
+  "title": "로고 뒤 흰 화면 — 덮인 카드를 그리다 예외",
+  "summary": "aa3fcba4598b 의 로고 카드는 끝날 때 자기 이미지 배열을 비우고 게임 카드를 위에 쌓는다. CardCanvas.paint 가 덮인 로고 카드까지 그리다 NPE 로 루프를 끝내 게임 카드가 한 번도 안 그려졌다. 불투명 카드가 완전히 덮는 아래 카드는 그리지 않는다. 측정은 docs/report/0491.",
+  "proposals": [],
+  "adoptedProposals": ["2026-10-09-non-playable-engine-residue#p0"],
+  "declinedProposals": []
+}
