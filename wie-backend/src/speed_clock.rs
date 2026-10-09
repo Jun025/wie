@@ -23,7 +23,7 @@ struct State {
 }
 
 pub const MIN_SPEED: f64 = 1.0;
-pub const MAX_SPEED: f64 = 3.0;
+pub const MAX_SPEED: f64 = 2.0;
 
 impl Default for SpeedClock {
     fn default() -> Self {
@@ -71,7 +71,7 @@ impl SpeedClock {
     }
 
     /// A tick budget of `wall_ms` wall-clock milliseconds, in guest milliseconds: the executor
-    /// measures its budget on the guest clock, so without this a 3x tick would end after a third
+    /// measures its budget on the guest clock, so without this a 2x tick would end after half
     /// of the host frame and the game would not get faster.
     pub fn budget(&self, wall_ms: u64) -> u64 {
         (wall_ms as f64 * self.speed()) as u64
@@ -108,7 +108,9 @@ mod tests {
     fn speed_is_clamped_and_not_quantized() {
         let clock = SpeedClock::new();
         assert_eq!(clock.set_speed(0.0, 0.5), 1.0);
-        assert_eq!(clock.set_speed(0.0, 3.7), 3.0);
+        assert_eq!(clock.set_speed(0.0, 2.7), 2.0);
+        assert_eq!(clock.set_speed(0.0, 3.0), 2.0);
+        assert_eq!(clock.set_speed(0.0, 2.0), 2.0);
         assert_eq!(clock.set_speed(0.0, f64::NAN), 1.0);
         assert_eq!(clock.set_speed(0.0, f64::INFINITY), 1.0);
         assert_eq!(clock.set_speed(0.0, 1.37), 1.37);
@@ -128,7 +130,7 @@ mod tests {
         let clock = SpeedClock::new();
         let mut last = 0;
         let mut wall = 1_000_000.0;
-        for (i, speed) in [2.0, 1.0, 3.0, 1.5, 1.0, 2.75].into_iter().enumerate() {
+        for (i, speed) in [2.0, 1.0, 1.75, 1.5, 1.0, 1.25].into_iter().enumerate() {
             for _ in 0..50 {
                 wall += 0.7;
                 let now = clock.now(wall).raw();
@@ -147,8 +149,8 @@ mod tests {
         let clock = SpeedClock::new();
         assert_eq!(clock.now(1000.0).raw(), 1000);
         clock.set_speed(1100.0, 2.0); // +100 at 1x
-        clock.set_speed(1200.0, 3.0); // +200 at 2x
-        assert_eq!(clock.now(1300.0).raw(), 1000 + 100 + 200 + 300);
+        clock.set_speed(1200.0, 1.5); // +200 at 2x
+        assert_eq!(clock.now(1300.0).raw(), 1000 + 100 + 200 + 150);
     }
 
     struct YieldOnce(bool);
@@ -200,9 +202,9 @@ mod tests {
     fn a_2x_sleep_100_wakes_after_about_50_wall_ms() {
         let one = sleep_100_wakes_after(1.0);
         let two = sleep_100_wakes_after(2.0);
-        let three = sleep_100_wakes_after(3.0);
+        let three = sleep_100_wakes_after(3.0); // clamped to 2x
         assert!((99.0..=102.0).contains(&one), "1x: {one}ms");
         assert!((49.0..=52.0).contains(&two), "2x: {two}ms");
-        assert!((33.0..=35.0).contains(&three), "3x: {three}ms");
+        assert!((49.0..=52.0).contains(&three), "3x clamped to 2x: {three}ms");
     }
 }
