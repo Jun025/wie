@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-09",
+  "task": "wie-featurephone-play-speed-scale-api",
+  "title": "게임 배속 1.0~3.0배 연속 설정 엔진 API",
+  "summary": "SpeedClock 을 Platform::now 뒤에 두고 틱 예산을 게스트 ms 로 환산. 실측 docs/report/0494.",
+  "proposals": [
+    {
+      "title": "WIPI 타이머의 «틱당 1회» 상한을 배속에 비례시키기",
+      "plainSummary": "브라우저에서 타이머로 도는 게임은 한 화면 프레임에 타이머가 한 번만 울려서, 배속을 올려도 화면 주사율 이상으로 빨라지지 않아요.",
+      "userBenefit": "1배에서 이미 초당 수십 번 타이머를 쓰는 KTF·LGT 게임도 2·3배가 실제로 빨라진다.",
+      "why": "MC_knlSetTimer 가 같은 틱에서 이미 발화한 타이머를 pace_from = tick + 1 로 다음 호스트 프레임에 미룬다(wie-wipi-c kernel.rs). 1배 기기 속도를 지키려는 규칙이라 배속 S 에서는 «틱당 S회»가 같은 뜻이다. 0494 의 wie_validate 표는 틱을 쉬지 않고 이어서 이 상한을 못 본다.",
+      "tradeoff": "1배 동작은 그대로 둬야 한다(62 -> 94fps 회귀 이력). 배속 값을 System 까지 내려야 해서 wie-backend 에 한 필드가 는다.",
+      "effort": "S~M",
+      "target": "wie-wipi-c/src/api/kernel.rs set_timer · wie-backend System",
+      "kind": "product"
+    },
+    {
+      "title": "LGT 표본이 배속 1.2~1.7배에 그치는 원인 가르기",
+      "plainSummary": "LGT 게임 두 개가 3배로 설정해도 1.2~1.7배만 빨라졌는데, CPU 가 꽉 찬 것도 아니라 원인을 아직 몰라요.",
+      "userBenefit": "LGT 게임에서도 고른 배속이 그대로 나온다.",
+      "why": "0494 실측: 287af341 1.73 · 863b8ab6 1.17(3배). 창 안 tick 이 대부분 짧아 CPU 포화가 아니다. 게스트 시각을 맞춘 창이라 국면 차이도 아니다.",
+      "tradeoff": "원인이 게스트 자체의 루프(호스트 틱 수에 묶임)면 고칠 것이 없을 수 있다 — 그때는 결론만 남긴다.",
+      "effort": "M",
+      "target": "wie-lgt runtime · wie_validate --speed --pacing",
+      "kind": "product"
+    }
+  ]
+}

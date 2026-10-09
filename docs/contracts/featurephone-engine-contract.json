@@ -44,8 +44,11 @@
     "export_saves",
     "has_saves",
     "import_saves",
+    "set_speed",
+    "speed",
     "free"
   ],
+  "setSpeedNote": "set_speed(speed: number) → number · speed() → number (2026-10-09). 게임 배속 1.0~3.0 «연속»(양자화 없음) — 범위 밖은 clamp, NaN·무한은 1.0, 반환값 = 실제 적용값. 게스트 시계(sleep·타이머·currentTimeMillis)가 배속으로 흐르고 바꾸는 순간 시각이 튀거나 되감기지 않는다. 틱 한 번의 벽시계 몫은 그대로라 CPU 가 모자라면 «낼 수 있는 만큼». 오디오 피치·템포는 바꾸지 않는다. 호출하지 않으면 1.0 = 종전 동작과 같다.",
   "keyVocabularyNote": "셸이 engine.key_down/key_up 으로 «실제로 보내는» 이름. CALL·HANGUP 은 화면의 «통화»·«종료» 버튼이 보낸다(otterpebble apps/featurephone/app/player.tsx 의 <GameKey code=\"CALL\"|\"HANGUP\"> → RunningGame.press → emu.key_down · 2026-09-04 origin/main 실측). ★키보드 바인딩은 없다(KEY_MAP 에 0건) — 버튼만이다. VOLUME_UP·VOLUME_DOWN 은 «넣지 마라»: 셸이 엔진에 보내지 않고(호스트 게인 노드 setVolume 이 진다) 넣으면 계약이 쓰이지 않는 표면을 약속하게 된다.",
   "keyVocabulary": [
     "UP", "DOWN", "LEFT", "RIGHT", "OK",

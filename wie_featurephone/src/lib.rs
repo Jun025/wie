@@ -28,7 +28,7 @@ use js_sys::{Object, Reflect, Uint8Array};
 use wasm_bindgen::prelude::*;
 use web_sys::{AudioContext, GainNode, HtmlCanvasElement};
 
-use wie_backend::{Emulator, Event, FramePacer, KeyCode, Options, extract_zip};
+use wie_backend::{Emulator, Event, FramePacer, KeyCode, Options, SpeedClock, extract_zip};
 use wie_j2me::J2MEEmulator;
 use wie_ktf::KtfEmulator;
 use wie_lgt::{LgtEmulator, detect_compile_model};
@@ -64,6 +64,8 @@ pub struct WieEmulator {
     // For LGT titles, the statically-detected compile model ("clet"/"aot-java");
     // `None` for non-LGT platforms. Set once at construction, never changes.
     lgt_compile_model: Option<&'static str>,
+    // Play speed: the guest clock `WebPlatform::now` reads (see `set_speed`).
+    clock: Arc<SpeedClock>,
 }
 
 #[wasm_bindgen]
@@ -124,6 +126,7 @@ impl WieEmulator {
         // somehow paints before its first request_redraw.
         let redraw: RedrawFlag = Arc::new(AtomicBool::new(true));
         let exited: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+        let clock = Arc::new(SpeedClock::new());
 
         let platform = Box::new(
             WebPlatform::new(
@@ -134,6 +137,7 @@ impl WieEmulator {
                 gain,
                 soundfont_url,
                 exited.clone(),
+                clock.clone(),
             )
             .map_err(|e| JsValue::from_str(&format!("{e:?}")))?,
         );
@@ -154,6 +158,7 @@ impl WieEmulator {
             platform_kind,
             lgt_compile_model,
             pacer: FramePacer::new(),
+            clock,
         })
     }
 
@@ -202,15 +207,31 @@ impl WieEmulator {
         if self.exited.load(Ordering::Acquire) {
             return Ok(());
         }
-        // `Date.now()` is the clock the platform's `now()` — and so the executor's budget — reads.
+        // The pacer works in wall time; the executor measures its budget on the guest clock, which
+        // runs `speed` times as fast, so the same wall-clock slice is `speed` times the guest budget.
         let budget = self.pacer.begin(js_sys::Date::now() as u64);
-        let result = self.inner.tick_for(budget);
+        let result = self.inner.tick_for(self.clock.budget(budget));
         self.pacer.end(js_sys::Date::now() as u64);
         result.map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
         if self.redraw.swap(false, Ordering::AcqRel) {
             self.inner.handle_event(Event::Redraw);
         }
         Ok(())
+    }
+
+    /// Set the play speed: the game runs `speed` times as fast as real time. Continuous in
+    /// `[1.0, 3.0]` (not quantized); values outside are clamped, NaN and infinities are 1.0.
+    /// Returns the speed applied. Every guest timer follows (sleeps, WIPI/MIDP timers, the clock a
+    /// game reads); changing it mid-game never makes the guest clock jump or run backwards. Each
+    /// tick still takes the same wall-clock slice of the frame, so where the CPU cannot keep up the
+    /// game runs as fast as it can. Audio pitch and tempo are not changed.
+    pub fn set_speed(&mut self, speed: f64) -> f64 {
+        self.clock.set_speed(js_sys::Date::now(), speed)
+    }
+
+    /// The current play speed (1.0 until `set_speed` is called).
+    pub fn speed(&self) -> f64 {
+        self.clock.speed()
     }
 
     /// True once the emulator core requested a NORMAL shutdown (the
