@@ -61,3 +61,4 @@
 
 도구 기본 실행(`origin/main...HEAD` · 6파일): BOUNDED 330쌍 · SUFFIX-ATTACHED 15쌍 — 둘 다 전부 `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 값이다(0484 §10 과 같은 모양). 이 회차는 그 파일의 1행 `status`·`axes`·`knownIssues_ko` 만 바꿨다. 그 밖의 파일은 0건 — 이 문서·worklog·업데이트 소식은 타이틀을 sha12 로만 적었다.
 
+<!-- corpus-name-inflow v1 subjects=6 tree=69a96c4bc1dd72a0 B=718/330 P=0/0 S=35/15 -->
