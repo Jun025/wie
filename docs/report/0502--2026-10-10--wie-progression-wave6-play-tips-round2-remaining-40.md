@@ -153,4 +153,4 @@
 - `node scripts/player-data.mjs` OK(429 · 150 updates) · `check-compat-revert` OK(착지 기준 바뀐 행 23) · `playability-census.mjs selftest` 65/65 · `check-worklog-json` OK.
 - 유입: 이 회차가 더한 줄(문서 5 + compat 추가 78줄)은 BOUNDED 0 · SUFFIX-ATTACHED 0 이다. 브랜치 전체 B=718/330 · S=35/15 는 기존 `compat.json` title 등이고 0482 와 같은 값이다.
 
-<!-- corpus-name-inflow v1 subjects=6 tree=3eef6c6f5e845b6f B=718/330 P=0/0 S=35/15 -->
+<!-- corpus-name-inflow v1 subjects=6 tree=a55c356e01adabc7 B=718/330 P=0/0 S=35/15 -->
