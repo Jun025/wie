@@ -129,3 +129,5 @@ node scripts/audio-probe.mjs --wasm <tree A>/web/src/wasm --wasm <tree B>/web/sr
 - wasm(`wie_web_bg.wasm`): `a891e2e4` c1da5dcd1ac4 · `090a3eed` ff25292a5a13 · `e0ef6a81` 764456daba00 · `82959a5b` c64994f7e240.
 - 회차별 load1(실행 시작 시 1분 평균 · 최소~최대): 회차 1 37.1~120.1 · 2 27.4~76.2 · 3 36.1~52.6 · 4 64.1~126.0 · 5 126.1~169.0 ·
   s1 40.3~76.7 · s2 34.5~43.4 · s3 31.0~40.6 · s4 37.5~59.2 · s5 55.1~89.7.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=fae0a8cd1b5ed1f8 B=0/0 P=0/0 S=0/0 -->
