@@ -220,7 +220,7 @@ impl WieEmulator {
     }
 
     /// Set the play speed: the game runs `speed` times as fast as real time. Continuous in
-    /// `[1.0, 3.0]` (not quantized); values outside are clamped, NaN and infinities are 1.0.
+    /// `[1.0, 2.0]` (not quantized); values outside are clamped, NaN and infinities are 1.0.
     /// Returns the speed applied. Every guest timer follows (sleeps, WIPI/MIDP timers, the clock a
     /// game reads); changing it mid-game never makes the guest clock jump or run backwards. Each
     /// tick still takes the same wall-clock slice of the frame, so where the CPU cannot keep up the

@@ -760,7 +760,7 @@ struct Args {
     #[arg(long, value_parser = clap::value_parser!(u32).range(1..=1000))]
     frame_hz: Option<u32>,
     /// Play speed, as `wie_featurephone`'s `set_speed`: the guest clock runs X times as fast as
-    /// the wall clock (clamped to 1.0..=3.0) and each tick's budget is scaled so it still takes the
+    /// the wall clock (clamped to 1.0..=2.0) and each tick's budget is scaled so it still takes the
     /// same wall-clock slice. Default 1.0 = the wall clock, so existing runs are unchanged. The
     /// deadline and the key schedule stay on the wall clock.
     #[arg(long, value_name = "X", default_value_t = 1.0)]
