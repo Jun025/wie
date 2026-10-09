@@ -19,3 +19,4 @@
 - 유입: 이 회차가 더한 줄에 새 제목 0 — 브랜치 전체 BOUNDED 330 · SUFFIX-ATTACHED 15 는 기존 `compat.json` title(0482 와 같은 값).
 
 
+<!-- corpus-name-inflow v1 subjects=6 tree=c6635189d767330b B=718/330 P=0/0 S=35/15 -->
