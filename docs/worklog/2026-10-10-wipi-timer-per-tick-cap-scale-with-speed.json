@@ -1,0 +1,8 @@
+{
+  "date": "2026-10-10",
+  "task": "wie-wipi-timer-per-tick-cap-scale-with-speed",
+  "title": "WIPI 타이머 «틱당 1회» 상한을 배속에 비례",
+  "summary": "MC_knlSetTimer 의 틱당 발화 상한을 floor(S*(t+1))-floor(S*t) 로 배속에 비례. 1배 = 1 그대로. 브라우저 60Hz 실측 LGT 287af341 2배 달성 1.00 -> 1.54~1.56. docs/report/0498.",
+  "adoptedProposals": ["2026-10-09-play-speed-scale-api#p0"],
+  "proposals": []
+}

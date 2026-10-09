@@ -24,6 +24,12 @@
 //     --soundfont <file> pass it to the engine as the soundfont URL (served from this probe), so the
 //                        run is the shell's soundfont session rather than FM only
 //     --jobs <n>         runs at once (default 3; each is its own browser)
+//     --speed <x>        call `set_speed(x)` right after boot. Repeatable: each speed is its own run
+//                        (build × game × speed), as at the same time as the rest. Omitted = never called.
+//     --paint-window <a,b>  also count paints between GUEST second a and b — wall a/x..b/x at speed
+//                        x — and end the run at b/x (overrides --secs). Equal windows of guest time
+//                        hold equal paints when the game keeps up with the speed, so achieved speed =
+//                        x × paints(x) / paints(1): docs/report/0494's method, on the browser's frames.
 //
 // What it reports per run (engine build × game):
 //   plays / stops / evicts / gains — messages audio.rs posted to the worklet port, counted by
@@ -64,7 +70,7 @@ const contract = JSON.parse(await readFile(path.join(root, "docs/contracts/featu
 const DEFAULT_KEYS = "OK OK LEFT_SOFT_KEY NUM5 DOWN OK DOWN OK UP OK LEFT OK RIGHT OK NUM5 LEFT_SOFT_KEY RIGHT_SOFT_KEY DOWN DOWN OK UP OK STAR HASH NUM1 OK OK";
 
 const args = process.argv.slice(2);
-const opt = { wasm: [], secs: 40, keyMs: 700, keys: DEFAULT_KEYS.split(" "), statsEvery: 10, json: false, soundfont: null, jobs: 3, games: [] };
+const opt = { wasm: [], secs: 40, keyMs: 700, keys: DEFAULT_KEYS.split(" "), statsEvery: 10, json: false, soundfont: null, jobs: 3, games: [], speeds: [], window: null };
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
   const next = () => {
@@ -79,12 +85,16 @@ for (let i = 0; i < args.length; i++) {
   else if (a === "--json") opt.json = true;
   else if (a === "--soundfont") opt.soundfont = path.resolve(next());
   else if (a === "--jobs") opt.jobs = Number(next());
+  else if (a === "--speed") opt.speeds.push(Number(next()));
+  else if (a === "--paint-window") opt.window = next().split(",").map(Number);
   else if (a === "-h" || a === "--help") usage();
   else if (a.startsWith("--")) usage(`unknown option ${a}`);
   else opt.games.push(path.resolve(a));
 }
 if (opt.games.length === 0) usage("no game file given");
 if (opt.wasm.length === 0) opt.wasm.push(path.join(root, contract.artifacts.dir));
+if (opt.speeds.some((x) => !(x > 0))) usage("--speed must be a positive number");
+if (opt.window && !(opt.window.length === 2 && opt.window[0] >= 0 && opt.window[1] > opt.window[0])) usage("--paint-window wants <a,b> with 0 <= a < b");
 if (!(opt.secs > 0) || !(opt.keyMs >= 0) || !(opt.statsEvery > 0) || !(opt.jobs >= 1)) usage("--secs / --key-ms / --stats-every / --jobs must be positive numbers");
 const unknownKeys = opt.keys.filter((k) => !(k in contract.keyMidpCodes));
 if (unknownKeys.length) usage(`not in the contract key vocabulary: ${unknownKeys.join(", ")}`);
@@ -93,7 +103,7 @@ function usage(err) {
   const help = readFileSync(fileURLToPath(import.meta.url), "utf8")
     .split("\n")
     .filter((l) => l.startsWith("//"))
-    .slice(0, 48)
+    .slice(0, 54)
     .map((l) => l.slice(3))
     .join("\n");
   if (err) console.error(`audio-probe: ${err}\n`);
@@ -138,11 +148,12 @@ const base = `http://127.0.0.1:${server.address().port}`;
 // Installed before any page script: count what audio.rs posts to the worklet, and keep the
 // worklet node so the probe can ask it for `stats`.
 const INIT = () => {
-  const probe = (window.__probe = { plays: 0, stops: 0, evicts: 0, gains: new Set(), evHandles: new Set(), nodes: [], stats: null, song: new Map(), playLog: [], drops: [], sfReady: null, t0: performance.now(), paints: 0 });
+  const probe = (window.__probe = { plays: 0, stops: 0, evicts: 0, gains: new Set(), evHandles: new Set(), nodes: [], stats: null, song: new Map(), playLog: [], drops: [], sfReady: null, t0: performance.now(), paints: 0, paintAt: [] });
   // WebScreen::paint puts each guest frame into its back canvas with putImageData — one call a paint.
   const putImageData = CanvasRenderingContext2D.prototype.putImageData;
   CanvasRenderingContext2D.prototype.putImageData = function (...args) {
     probe.paints++;
+    probe.paintAt.push(performance.now());
     return putImageData.apply(this, args);
   };
   // FNV-1a over a play's events: one id per song, whatever handle carries it.
@@ -221,7 +232,7 @@ const INIT = () => {
     };
 };
 
-const RUN = async ({ wasmIdx, gameIdx, gameName, secs, keyMs, keys, statsEvery, width, height, soundfontUrl }) => {
+const RUN = async ({ wasmIdx, gameIdx, gameName, secs, keyMs, keys, statsEvery, width, height, soundfontUrl, speed, window: win }) => {
   const probe = window.__probe;
   const mod = await import(`/wasm/${wasmIdx}/wie_web.js`);
   await mod.default(`/wasm/${wasmIdx}/wie_web_bg.wasm`);
@@ -239,6 +250,9 @@ const RUN = async ({ wasmIdx, gameIdx, gameName, secs, keyMs, keys, statsEvery, 
   const canvas = document.createElement("canvas");
   document.body.appendChild(canvas);
   const emu = new mod.WieEmulator(gameName, bytes, canvas, ctx, master, width, height, soundfontUrl);
+  const appliedSpeed = speed === undefined ? null : emu.set_speed(speed);
+  const rate = appliedSpeed ?? 1;
+  if (win) secs = win[1] / rate;
 
   const buf = new Float32Array(analyser.fftSize);
   const perSecond = []; // [sumSq, samples] per second
@@ -325,6 +339,8 @@ const RUN = async ({ wasmIdx, gameIdx, gameName, secs, keyMs, keys, statsEvery, 
     holdMaxMs: Math.max(0, ...midiPlays.map((p) => p.holdMs)),
     ticks: tickMs.length,
     paints: probe.paints,
+    speed: appliedSpeed,
+    paintsWindow: win ? probe.paintAt.filter((t) => t - start >= (win[0] * 1000) / rate && t - start < (win[1] * 1000) / rate).length : null,
     tickMaxMs: Math.round(Math.max(0, ...tickMs)),
     tickP99Ms: Math.round([...tickMs].sort((a, b) => a - b)[Math.floor(tickMs.length * 0.99)] ?? 0),
     ticksOver50Ms: tickMs.filter((v) => v > 50).length,
@@ -337,8 +353,9 @@ const { chromium } = await import("playwright");
 const launchArgs = ["--autoplay-policy=no-user-gesture-required", "--disable-background-timer-throttling", "--disable-renderer-backgrounding"];
 const pending = [];
 // Game-major: the builds of one game run back to back, so a before/after pair shares the load.
-for (let g = 0; g < opt.games.length; g++) for (let w = 0; w < opt.wasm.length; w++) pending.push([w, g]);
-const runOne = ([w, g]) =>
+const speeds = opt.speeds.length ? opt.speeds : [undefined];
+for (let g = 0; g < opt.games.length; g++) for (const x of speeds) for (let w = 0; w < opt.wasm.length; w++) pending.push([w, g, x, pending.length]);
+const runOne = ([w, g, x]) =>
       (async () => {
         // One browser per run: nothing shared (audio thread, timers) between the runs being compared.
         const browser = await chromium.launch({ headless: true, args: launchArgs });
@@ -350,7 +367,8 @@ const runOne = ([w, g]) =>
           await page.goto(base + "/");
           let stuck;
           const hang = new Promise((_, reject) => {
-            stuck = setTimeout(() => reject(new Error(`a tick never returned — the page did not answer ${opt.secs + 60} s in`)), (opt.secs + 60) * 1000);
+            const runSecs = opt.window ? opt.window[1] : opt.secs; // b/x <= b: a speed is never below 1
+            stuck = setTimeout(() => reject(new Error(`a tick never returned — the page did not answer ${runSecs + 60} s in`)), (runSecs + 60) * 1000);
           });
           const r = await Promise.race([hang, page.evaluate(RUN, {
             wasmIdx: w,
@@ -363,6 +381,8 @@ const runOne = ([w, g]) =>
             width: contract.screen.width,
             height: contract.screen.height,
             soundfontUrl: opt.soundfont ? "/soundfont" : undefined,
+            speed: x,
+            window: opt.window,
           })]).finally(() => clearTimeout(stuck));
           return { wasm: opt.wasm[w], game: opt.games[g], ...r, pageErrors };
         } catch (e) {
@@ -377,7 +397,7 @@ await Promise.all(
   Array.from({ length: Math.min(opt.jobs, pending.length) }, async () => {
     while (pending.length) {
       const job = pending.shift();
-      const i = job[0] * opt.games.length + job[1];
+      const i = job[3];
       results[i] = await runOne(job);
       if (opt.json) console.log(JSON.stringify(results[i]));
     }
@@ -388,13 +408,13 @@ server.close();
 const f4 = (v) => (typeof v === "number" ? v.toFixed(4) : "-");
 for (const r of results) {
   if (opt.json) continue; // printed as each run finished
-  console.log(`\n■ ${path.basename(r.game)}  @ ${path.relative(root, r.wasm) || r.wasm}`);
+  console.log(`\n■ ${path.basename(r.game)}  @ ${path.relative(root, r.wasm) || r.wasm}${r.speed ? `  ×${r.speed}` : ""}`);
   if (r.error) console.log(`  stopped: ${r.error}`);
   if (r.plays === undefined) continue;
   console.log(`  plays ${r.plays} · stops ${r.stops} · evicts ${r.evicts} · gains [${r.gains.join(", ")}] · worklet ${r.worklet ? "yes" : "NO"}`);
   console.log(`  seq ${r.seq.map((s) => `${s.at}s=${s.sequences}${s.substitute ? "*" : ""}`).join(" ") || "-"}${r.seq.some((s) => s.substitute) ? "   (* no stats reply — distinct handles sent `ev`)" : ""}`);
   console.log(`  MIDI plays ${r.midiPlays} (soundfont ${r.sfPlays}) · songs ${r.songs} (repeated ${r.repeatedSongs}) · first≠next ${r.firstVsNext} · mixed ${r.mixed} · hold max ${r.holdMaxMs} ms · dropped while held ${r.drops.length} · soundfont ${r.sfReady ? `${r.sfReady.ok ? "ready" : "failed"} at ${r.sfReady.at} ms` : "-"}`);
-  console.log(`  ticks ${r.ticks} · paints ${r.paints} · tick max ${r.tickMaxMs} ms · p99 ${r.tickP99Ms} ms · over 50 ms ${r.ticksOver50Ms}`);
+  console.log(`  ticks ${r.ticks} · paints ${r.paints}${r.paintsWindow === null ? "" : ` (guest ${opt.window.join("–")} s: ${r.paintsWindow})`} · tick max ${r.tickMaxMs} ms · p99 ${r.tickP99Ms} ms · over 50 ms ${r.ticksOver50Ms}`);
   console.log(`  rms mean ${f4(r.rmsMean)} · 2nd half ${f4(r.rmsSecondHalf)} · max ${f4(r.rmsMax)} · silent ${r.silentSeconds}/${r.seconds}s`);
   if (r.pageErrors?.length) console.log(`  page errors: ${r.pageErrors.slice(0, 3).join(" | ")}`);
 }
