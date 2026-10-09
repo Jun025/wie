@@ -77,4 +77,4 @@ MIDP `currentTimeMillis`·`Display` 타이머, LGT stdlib `time`, executor `slee
 
 게임 파일명 유입: 유입 7건(BOUNDED · 전건 이번에 고친 파일 3개의 «기존» 주석 — 이 회차가 쓴 줄에는 0) + 판단 필요 0건(SUFFIX-ATTACHED).
 
-
+<!-- corpus-name-inflow v1 subjects=9 tree=11f7153eb3f19634 B=8/7 P=1/1 S=0/0 -->
