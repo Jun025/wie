@@ -113,7 +113,8 @@ pub struct EventQueue {
 struct GuestTimer {
     armings: u64,
     cancelled_through: u64,
-    fired_in_tick: Option<u64>,
+    // (host tick, fires in it) of its last fire
+    fired_in_tick: (u64, u32),
 }
 
 impl EventQueue {
@@ -155,11 +156,19 @@ impl EventQueue {
     }
 
     pub fn timer_fired(&mut self, timer: u32, tick: u64) {
-        self.timers.entry(timer).or_default().fired_in_tick = Some(tick);
+        let fired = &mut self.timers.entry(timer).or_default().fired_in_tick;
+        *fired = (tick, if fired.0 == tick { fired.1 + 1 } else { 1 });
     }
 
-    pub fn timer_fired_in(&self, timer: u32, tick: u64) -> bool {
-        self.timers.get(&timer).and_then(|x| x.fired_in_tick) == Some(tick)
+    /// How many times this timer fired in host tick `tick`.
+    pub fn timer_fires_in(&self, timer: u32, tick: u64) -> u32 {
+        match self.timers.get(&timer) {
+            Some(GuestTimer {
+                fired_in_tick: (fired, count),
+                ..
+            }) if *fired == tick => *count,
+            _ => 0,
+        }
     }
 
     /// Keyboard input takes priority; events at the same priority remain FIFO.

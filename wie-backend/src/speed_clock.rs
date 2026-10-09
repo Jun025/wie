@@ -78,6 +78,15 @@ impl SpeedClock {
     }
 }
 
+/// How many times one guest timer may fire in host tick `tick` at play `speed` (WIPI
+/// `MC_knlSetTimer`'s once-per-host-frame rule, `docs/report/0384`): `speed` per tick on average,
+/// as `floor(speed * (tick + 1)) - floor(speed * tick)` — 1 at 1x, 1 and 2 alternating at 1.5x,
+/// 2 at 2x. Each tick stands alone: a tick that fired less banks nothing for the next.
+pub fn timer_fires_per_tick(speed: f64, tick: u64) -> u32 {
+    let speed = SpeedClock::clamp(speed);
+    ((speed * (tick + 1) as f64).floor() - (speed * tick as f64).floor()) as u32
+}
+
 impl State {
     fn guest(&mut self, wall_ms: f64) -> f64 {
         let (wall, guest) = *self.anchor.get_or_insert((wall_ms, wall_ms));
@@ -103,6 +112,22 @@ mod tests {
 
     use super::SpeedClock;
     use crate::executor::Executor;
+
+    #[test]
+    fn timer_fires_per_tick_is_speed_on_average_and_one_at_1x() {
+        use super::timer_fires_per_tick;
+        let window = |speed| (1000..1060).map(|tick| timer_fires_per_tick(speed, tick)).collect::<alloc::vec::Vec<_>>();
+
+        assert!(window(1.0).iter().all(|&x| x == 1), "1x stays once per host tick");
+        assert!(window(2.0).iter().all(|&x| x == 2));
+        let half = window(1.5);
+        assert!(half.iter().all(|&x| x == 1 || x == 2));
+        assert_eq!(half.iter().sum::<u32>(), 90, "1.5x: 90 fires in 60 ticks");
+        assert_eq!(window(1.25).iter().sum::<u32>(), 75);
+        // Far into a run, where `speed * tick` is large.
+        assert_eq!(timer_fires_per_tick(1.0, u32::MAX as u64 * 7), 1);
+        assert_eq!(timer_fires_per_tick(f64::NAN, 3), 1);
+    }
 
     #[test]
     fn speed_is_clamped_and_not_quantized() {
