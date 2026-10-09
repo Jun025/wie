@@ -144,3 +144,11 @@
 
 - `14a62a8521a0` 이름 상자 입력 경로 · `3ccc6cf147d2` 30초 정지 — worklog 카드.
 - 막힘 3(`3eb73c20bbae` 가게 돈 · `1f0d7e81336a` 동료 확정 · `21ffd1c61ebd` 넘길 수 없는 컷신)은 카드로 만들지 않았다. 엔진 결함 근거가 없고(예외 0), 플레이 방법을 모른다는 «질문»이라서다.
+
+### 8. 게이트
+
+- `cargo fmt --all -- --check` OK · `cargo clippy --all -- -D warnings` OK · `cargo clippy --target wasm32-unknown-unknown -- -D warnings` OK(build-slot).
+- `RUST_MIN_STACK=4194304 cargo test --all` **764 passed / 0 failed**(build-slot).
+- 엔진 코드 변경 0 ⇒ «되돌리면 red» 대조는 해당 없다. 라이브 등재분과 가드의 엔진 동작도 그대로다. 바뀐 것은 compat 23행(요령 23 · progress 9)과 census `HAND_TIP` · 계약 한 문장뿐이다.
+- `node scripts/player-data.mjs` OK(429 · 150 updates) · `check-compat-revert` OK(착지 기준 바뀐 행 23) · `playability-census.mjs selftest` 65/65 · `check-worklog-json` OK.
+- 유입: 이 회차가 더한 줄(문서 5 + compat 추가 78줄)은 BOUNDED 0 · SUFFIX-ATTACHED 0 이다. 브랜치 전체 B=718/330 · S=35/15 는 기존 `compat.json` title 등이고 0482 와 같은 값이다.
