@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-10",
+  "task": "wie-lgt-speed-shortfall-root-cause",
+  "title": "LGT 표본 배속 미달 원인 — 게스트 루프 «일 + 고정 10 ms» × 프레임당 엔진 CPU",
+  "summary": "두 LGT 표본은 프레임마다 일을 한 뒤 MC_knlSetTimer(10) 을 다시 건다. 배속은 대기만 줄여 달성 = (a+10)/(a+10/S) — 네이티브 8칸을 3% 안에서 맞춘다(a 5.2 · 12.8 ms). a 의 65%(287af341)·18%(863b8ab6)는 기본 도형마다 프레임버퍼 전체를 읽고 다시 쓰는 비용. docs/report/0501.",
+  "adoptedProposals": ["2026-10-09-play-speed-scale-api#p1"],
+  "proposals": [
+    {
+      "title": "WIPI-C 그리기 함수가 호출마다 화면 전체를 복사하지 않게",
+      "plainSummary": "선 하나·사각형 하나를 그릴 때마다 엔진이 화면 전체(240×320)를 게스트 메모리에서 꺼내고 다시 쓰고 있어요. 그린 곳만 다루도록 바꿉니다.",
+      "userBenefit": "선·사각형을 많이 그리는 LGT/WIPI-C 게임이 같은 컴퓨터에서 덜 버벅이고, 배속을 올렸을 때 더 빨라진다(표본 추정 2배 설정 1.46 → 약 1.74배).",
+      "why": "0501 프로파일: 287af341 은 프레임당 MC_grpDrawLine 210회, 타이머 콜백 CPU 의 65% 가 FrameBuffer::canvas()+flush() 의 전체 복사. 863b8ab6 은 MC_grpFillRect 133회/프레임 · 18%.",
+      "tradeoff": "1배 화면 갱신도 빨라진다(같은 식 — 원래 기기 주기와의 관계는 모른다). 효과는 2개 표본의 프로파일 비율 추정이라 착지 회차가 다시 재야 한다. 클립·투명색·오프스크린 경로(0484·0491 축)를 함께 지켜야 한다.",
+      "effort": "M",
+      "target": "wie-wipi-c/src/api/graphics/framebuffer.rs · graphics.rs 기본 도형",
+      "kind": "product"
+    }
+  ]
+}
