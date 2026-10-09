@@ -1,0 +1,23 @@
+{
+ "schema": "wie-worklog/1",
+ "date": "2026-10-10",
+ "task": "wie-play-speed-tick-cost-commit-bisect",
+ "title": "tick 당 비용 증가 귀속 — #476 halted 잠금(+3~4% · 브라우저에도) · #517 코드 배치(+4~5% · 네이티브만) · 하네스 0",
+ "summary": "first-parent 14점 + 갈래 판 6개를 50M tick CPU 시간으로 쟀다(n=5). 계단은 둘이고, 둘 다 System::tick_for 의 기계어 크기 변화와 함께 움직인다. #476 은 executor 의 halted 잠금이 원인이고 브라우저 3cc7a9b4cb15 paints 를 −1.5~5.3%(3/3) 낮춘다. #517 은 소스 무변경 함수의 인라인 변화라 브라우저에서 보이지 않았다.",
+ "changes": ["docs/report/0500 — 커밋 귀속 · 갈래 판 · 기계어 크기 · 브라우저 3회"],
+ "verification": ["CPU ms/50M tick 16판×3게임×5회 + 9판×3게임×5회 · 브라우저 2쌍×3회 · load1 27~169(저부하 창 없음)"],
+ "limits": ["벽시계 판정 불가(고부하) · 3cc7a9b4cb15 네이티브는 게임 경로 편차로 귀속 제외 · 발행 아티팩트·Safari·실기 미측정"],
+ "adoptedProposals": ["2026-10-09-play-speed-regression-bisect#p0"],
+ "proposals": [
+  {
+   "kind": "product",
+   "title": "executor halted 플래그를 잠금 밖 AtomicBool 로",
+   "plainSummary": "게임 종료 처리용 표시 하나를 확인하느라 엔진이 매 반복마다 잠금을 한 번 더 잡는다. 잠금 없는 읽기로 바꾼다.",
+   "userBenefit": "엔진을 꽉 채우는 게임(3cc7a9b4cb15 등)에서 화면 갱신이 2~5% 돌아온다(브라우저 3/3 에서 이만큼 줄었다).",
+   "why": "#476 이 Executor::tick_for 반복마다, step 태스크마다 inner.lock().halted 를 더 잡는다. 그 두 줄만 뺀 판이 #476 전과 같은 CPU 다(docs/report/0500 §근거 ⑵). halted 는 한 번 세워지면 내려가지 않아 잠금이 필요 없다.",
+   "tradeoff": "executor.rs 몇 줄 · 기존 halt 시험이 동작을 잠근다. Relaxed 읽기라 halt 직후 같은 반복 1회가 더 돌 수 있는데, 지금도 step 안의 태스크 순서상 같은 성질이다.",
+   "effort": "S",
+   "target": "wie-backend/src/executor.rs"
+  }
+ ]
+}
