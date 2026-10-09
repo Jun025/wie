@@ -130,12 +130,14 @@ pub async fn set_timer(
     // When a tick may be kept alive until this timer is due (instead of the host's next frame, the
     // 16.7ms grid every timer used to land on): never for 1ms, which means "as soon as you can" (KTF
     // 49ade89578c5 re-arms MC_knlSetTimer(1) each frame; waiting on it ran the game at 44fps, not its 39),
-    // and not in the tick this timer already fired in — a second fire there is a timer faster than
-    // the host's frames (a ~10ms one: 62 -> 94fps).
+    // and not in a tick this timer already fired its share of — a second fire there at 1x is a timer
+    // faster than the host's frames (a ~10ms one: 62 -> 94fps). At play speed S the share is S per
+    // tick (`timer_fires_per_tick`), or a 60Hz host held every timer game to 60 fires/s at any speed.
     let tick = context.system().pacing().ticks();
+    let share = wie_backend::timer_fires_per_tick(context.system().platform().speed(), tick);
     let pace_from = if timeout <= 1 {
         u64::MAX
-    } else if context.system().event_queue().timer_fired_in(ptr_timer, tick) {
+    } else if context.system().event_queue().timer_fires_in(ptr_timer, tick) >= share {
         tick + 1
     } else {
         0
@@ -539,6 +541,30 @@ mod test {
         assert_eq!(pace_from(&mut context, 10).await, tick + 1);
         system.tick()?;
         assert_eq!(pace_from(&mut context, 10).await, 0);
+
+        Ok(())
+    }
+
+    // At play speed 2 a timer keeps its tick alive for a second fire, and only the third is withheld.
+    #[futures_test::test]
+    async fn test_a_timer_may_fire_speed_times_per_tick() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new().with_speed(2.0)), "", "", DefaultTaskRunner);
+        let mut context = TestContext::with_system(system.clone());
+        let timer = context.alloc_raw(4).unwrap();
+        def_timer(&mut context, timer, 0x1234).await?;
+        let fire_and_rearm = async |context: &mut TestContext| {
+            let (_, _, callback) = context.timers.pop().unwrap();
+            callback.call(context, Box::new([])).await.unwrap();
+            set_timer(context, timer, 10, 0, 0).await.unwrap();
+            context.timers.last().unwrap().1
+        };
+        set_timer(&mut context, timer, 10, 0, 0).await?;
+        let tick = system.pacing().ticks();
+
+        assert_eq!(fire_and_rearm(&mut context).await, 0, "1st fire of the tick: the 2nd may keep it alive");
+        assert_eq!(fire_and_rearm(&mut context).await, tick + 1, "2nd fire: the 3rd waits for the next tick");
+        system.tick()?;
+        assert_eq!(fire_and_rearm(&mut context).await, 0);
 
         Ok(())
     }

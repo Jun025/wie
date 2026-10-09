@@ -6,6 +6,11 @@ pub trait Platform: Send + Sync {
     fn font(&self) -> &Font;
     fn screen(&self) -> &dyn Screen;
     fn now(&self) -> Instant;
+    /// The play speed `now()` runs at (`SpeedClock`), for engine rules counted in host ticks
+    /// rather than guest time. 1.0 for a host without one.
+    fn speed(&self) -> f64 {
+        1.0
+    }
     fn database_repository(&self) -> &dyn DatabaseRepository;
     fn filesystem(&self) -> &dyn Filesystem;
     fn audio_sink(&self) -> Box<dyn AudioSink>;

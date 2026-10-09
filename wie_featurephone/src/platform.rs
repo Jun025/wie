@@ -6,7 +6,7 @@ use js_sys::{Function, Reflect};
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{AudioContext, GainNode};
 
-use wie_backend::{AudioSink, DatabaseRepository, Filesystem, Instant, Platform, Screen, canvas::Font};
+use wie_backend::{AudioSink, DatabaseRepository, Filesystem, Instant, Platform, Screen, SpeedClock, canvas::Font};
 use wie_util::Result;
 
 use crate::audio::WebAudioSink;
@@ -37,6 +37,8 @@ pub struct WebPlatform {
     // Sticky clean-exit flag shared with `WieEmulator::has_exited`: set once when
     // the core requests a normal shutdown, never cleared for this instance.
     exited: Arc<AtomicBool>,
+    // The play-speed clock `now()` reads, shared with `WieEmulator::set_speed`.
+    clock: Arc<SpeedClock>,
 }
 
 // Single-threaded browser runtime; the only non-Send field is the JS audio
@@ -45,6 +47,7 @@ unsafe impl Send for WebPlatform {}
 unsafe impl Sync for WebPlatform {}
 
 impl WebPlatform {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         screen: WebScreen,
         filesystem: WebFilesystem,
@@ -53,6 +56,7 @@ impl WebPlatform {
         gain: Option<GainNode>,
         soundfont_url: Option<String>,
         exited: Arc<AtomicBool>,
+        clock: Arc<SpeedClock>,
     ) -> Result<Self> {
         Ok(Self {
             screen,
@@ -63,6 +67,7 @@ impl WebPlatform {
             gain,
             soundfont_url,
             exited,
+            clock,
         })
     }
 }
@@ -77,7 +82,11 @@ impl Platform for WebPlatform {
     }
 
     fn now(&self) -> Instant {
-        Instant::from_epoch_millis(js_sys::Date::now() as u64)
+        self.clock.now(js_sys::Date::now())
+    }
+
+    fn speed(&self) -> f64 {
+        self.clock.speed()
     }
 
     fn database_repository(&self) -> &dyn DatabaseRepository {
