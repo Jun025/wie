@@ -56,3 +56,8 @@
 - 되돌리면 red: `CardCanvas.paint` 를 `origin/main` 판으로 되돌리면 `an_opaque_card_hides_the_cards_it_covers` FAILED(`[1, 1, 1, 1]`) · 원상 green.
 - `node scripts/player-data.mjs` · `--selftest` · `node scripts/check-compat-revert.mjs` · `node scripts/check-docs-report-serial.mjs` · `node scripts/check-worklog-json.mjs` · `npm run audit` 통과.
 - 자원: 측정 실행마다 long 임대 1 · 그 안 3폭 이하 · `nohup` 0 · 끝난 뒤 자기 `wie_validate` 0. load1 13~19.
+
+### 7. 게임 파일명 유입
+
+도구 기본 실행(`origin/main...HEAD` · 6파일): BOUNDED 330쌍 · SUFFIX-ATTACHED 15쌍 — 둘 다 전부 `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 값이다(0484 §10 과 같은 모양). 이 회차는 그 파일의 1행 `status`·`axes`·`knownIssues_ko` 만 바꿨다. 그 밖의 파일은 0건 — 이 문서·worklog·업데이트 소식은 타이틀을 sha12 로만 적었다.
+
