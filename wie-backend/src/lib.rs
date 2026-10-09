@@ -9,6 +9,7 @@ mod frame_pacer;
 mod pacing;
 mod platform;
 mod screen;
+mod speed_clock;
 mod system;
 mod task;
 mod task_runner;
@@ -24,6 +25,7 @@ pub use self::{
     pacing::Pacing,
     platform::{Filesystem, Platform},
     screen::Screen,
+    speed_clock::{MAX_SPEED, MIN_SPEED, SpeedClock},
     system::{Event, FilesystemOverlay, KeyCode, System, parse_smaf_in, parse_tone_sequence, tone},
     task::YieldFuture,
     task_runner::{DefaultTaskRunner, TaskRunner},

@@ -148,7 +148,7 @@ use clap::Parser;
 
 use wie_backend::{
     AudioSink, Database, DatabaseRepository, Emulator, Event, Filesystem, Font, FramePacer, Instant, KeyCode, Options, Platform, ProfileCallback,
-    ProfileSample, RecordId, Screen, canvas::Image, extract_zip,
+    ProfileSample, RecordId, Screen, SpeedClock, TICK_BUDGET_MS, canvas::Image, extract_zip,
 };
 use wie_j2me::J2MEEmulator;
 use wie_ktf::KtfEmulator;
@@ -614,6 +614,8 @@ struct HeadlessPlatform {
     stdout: Arc<Mutex<Vec<u8>>>,
     exited: Arc<AtomicBool>,
     font: Font,
+    // `--speed`: the same play-speed clock `wie_featurephone` puts behind `now()`.
+    clock: Arc<SpeedClock>,
 }
 
 impl Platform for HeadlessPlatform {
@@ -635,7 +637,7 @@ impl Platform for HeadlessPlatform {
 
     fn now(&self) -> Instant {
         let since = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-        Instant::from_epoch_millis(since.as_millis() as _)
+        self.clock.now(since.as_secs_f64() * 1000.0)
     }
 
     fn database_repository(&self) -> &dyn DatabaseRepository {
@@ -757,6 +759,12 @@ struct Args {
     /// the guest, not how often ticks come.
     #[arg(long, value_parser = clap::value_parser!(u32).range(1..=1000))]
     frame_hz: Option<u32>,
+    /// Play speed, as `wie_featurephone`'s `set_speed`: the guest clock runs X times as fast as
+    /// the wall clock (clamped to 1.0..=3.0) and each tick's budget is scaled so it still takes the
+    /// same wall-clock slice. Default 1.0 = the wall clock, so existing runs are unchanged. The
+    /// deadline and the key schedule stay on the wall clock.
+    #[arg(long, value_name = "X", default_value_t = 1.0)]
+    speed: f64,
     /// Add the engine's pacing counters to the JSON line as `pacing` (`wie_backend::Pacing`):
     /// guest sleep/timer wake lateness, repaint -> paint latency and how many of those paints
     /// crossed a host tick, paints and GCs. The window opens SECS into the run (default 0) so a
@@ -1350,6 +1358,8 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
     let exited = Arc::new(AtomicBool::new(false));
     // One store for every boot of this run: `--relaunch` keeps it, which is the whole point.
     let db = MemDbRepository::default();
+    let clock = Arc::new(SpeedClock::new());
+    clock.set_speed(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs_f64() * 1000.0, args.speed);
 
     let make_platform = || -> Box<dyn Platform> {
         Box::new(HeadlessPlatform {
@@ -1362,6 +1372,7 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
             // constant, so a failure here means the committed asset is corrupt — a build-wide fault,
             // not a per-game one. `wie-backend`'s own `text_layout.rs` unwraps the same bytes.
             font: Font::try_from_static(include_bytes!("../../../assets/neodgm.ttf")).expect("assets/neodgm.ttf failed to parse"),
+            clock: clock.clone(),
         })
     };
 
@@ -1516,8 +1527,8 @@ fn run(args: &Args, stdout: Arc<Mutex<Vec<u8>>>) -> Outcome {
 
         let step = catch_unwind(AssertUnwindSafe(|| {
             match tick_budget {
-                Some(budget) => emulator.tick_for(budget)?,
-                None => emulator.tick()?,
+                Some(budget) => emulator.tick_for(clock.budget(budget))?,
+                None => emulator.tick_for(clock.budget(TICK_BUDGET_MS))?,
             }
             // Faithfully reproduce the windowed flow: the emulator paints in
             // response to the Redraw event it requested via request_redraw.
@@ -2519,6 +2530,7 @@ mod tests {
             stdout: Arc::new(Mutex::new(Vec::new())),
             exited: Arc::new(AtomicBool::new(false)),
             font: wie_backend::Font::try_from_static(include_bytes!("../../../assets/neodgm.ttf")).expect("assets/neodgm.ttf failed to parse"),
+            clock: Default::default(),
         };
 
         // Through the trait, not the field: the defect was in the `Platform` impl.
