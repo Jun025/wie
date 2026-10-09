@@ -207,3 +207,5 @@ node scripts/audio-probe.mjs --wasm <dir bd770b73> --wasm <dir 7ca47380> --secs 
 # 마이크로벤치 (임시 #[ignore] 시험 · 커밋 안 함)
 cargo test --release -p wie-jvm-support --lib spin_bench -- --ignored --nocapture
 ```
+
+<!-- corpus-name-inflow v1 subjects=2 tree=de634a352b4badf2 B=0/0 P=0/0 S=0/0 -->
