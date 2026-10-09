@@ -25,7 +25,7 @@ pub use self::{
     pacing::Pacing,
     platform::{Filesystem, Platform},
     screen::Screen,
-    speed_clock::{MAX_SPEED, MIN_SPEED, SpeedClock},
+    speed_clock::{MAX_SPEED, MIN_SPEED, SpeedClock, timer_fires_per_tick},
     system::{Event, FilesystemOverlay, KeyCode, System, parse_smaf_in, parse_tone_sequence, tone},
     task::YieldFuture,
     task_runner::{DefaultTaskRunner, TaskRunner},

@@ -107,6 +107,7 @@ pub struct TestPlatform {
     font: Font,
     clock: Option<TestClock>,
     audio_log: Arc<Mutex<Vec<AudioCommand>>>,
+    speed: f64,
 }
 
 impl Default for TestPlatform {
@@ -125,6 +126,7 @@ impl TestPlatform {
             font: Font::try_from_static(include_bytes!("../../assets/neodgm.ttf")).unwrap(),
             clock: None,
             audio_log: Arc::default(),
+            speed: 1.0,
         }
     }
 
@@ -140,6 +142,7 @@ impl TestPlatform {
             font: Font::try_from_static(include_bytes!("../../assets/neodgm.ttf")).unwrap(),
             clock: None,
             audio_log: Arc::default(),
+            speed: 1.0,
         }
     }
 
@@ -152,11 +155,18 @@ impl TestPlatform {
             font: Font::try_from_static(include_bytes!("../../assets/neodgm.ttf")).unwrap(),
             clock: Some(clock),
             audio_log: Arc::default(),
+            speed: 1.0,
         }
     }
 }
 
 impl TestPlatform {
+    /// The play speed `Platform::speed` reports (1.0 otherwise). The clock is not sped up.
+    pub fn with_speed(mut self, speed: f64) -> Self {
+        self.speed = speed;
+        self
+    }
+
     /// Every command the guest sent the audio sink, in order. Take this BEFORE boxing the
     /// platform, like [`Self::paint_counter`] — it is how a test asserts that a guest-facing
     /// audio API actually reaches the sink rather than returning quietly.
@@ -193,6 +203,10 @@ impl Platform for TestPlatform {
 
         let epoch = TEST_EPOCH.fetch_add(8, Ordering::SeqCst);
         Instant::from_epoch_millis(epoch) // TODO
+    }
+
+    fn speed(&self) -> f64 {
+        self.speed
     }
 
     fn database_repository(&self) -> &dyn DatabaseRepository {

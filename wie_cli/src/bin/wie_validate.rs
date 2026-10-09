@@ -640,6 +640,10 @@ impl Platform for HeadlessPlatform {
         self.clock.now(since.as_secs_f64() * 1000.0)
     }
 
+    fn speed(&self) -> f64 {
+        self.clock.speed()
+    }
+
     fn database_repository(&self) -> &dyn DatabaseRepository {
         &self.db
     }

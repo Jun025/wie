@@ -85,6 +85,10 @@ impl Platform for WebPlatform {
         self.clock.now(js_sys::Date::now())
     }
 
+    fn speed(&self) -> f64 {
+        self.clock.speed()
+    }
+
     fn database_repository(&self) -> &dyn DatabaseRepository {
         &self.database_repository
     }
