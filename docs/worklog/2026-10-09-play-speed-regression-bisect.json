@@ -1,0 +1,22 @@
+{
+ "schema": "wie-worklog/1",
+ "date": "2026-10-09",
+ "task": "wie-play-speed-regression-bisect-since-1005-fix",
+ "title": "플레이 속도 신고 — 급저하 크기의 엔진 회귀는 못 봤다 · tick 당 비용 +4~15% 는 실재(귀속 미확정)",
+ "summary": "bd770b73 ↔ 7ca47380 을 브라우저·고속 코어·저속 코어로 쟀다. 같은 50M tick 의 벽시계가 현행에서 +4~15% 길다(9/9). 브라우저의 예산 포화 표본 3cc7a9b4cb15 는 paints −1.8~4.2%(5/5)다. #476 단독은 0~4% 만 설명한다.",
+ "changes": ["docs/report/0495 — 범위 정정(#476 executor halted lock · #471 하네스 스레드) · stop 열 · 50M tick 정규화 · #476 이분 · 3점 위치 · 미측정 조건 · #521 재개 조건"],
+ "verification": ["#476 이분 a891e2e4 ↔ 090a3eed 3회 · 3점 bd770b73/090a3eed/7ca47380 3회 · 브라우저 3cc7a9b4cb15 6회 · 155972cac664 2회"],
+ "limits": ["커밋별 귀속 미확정 · 발행 아티팩트·모바일 Safari·실기 미측정"],
+ "proposals": [
+  {
+   "kind": "product",
+   "title": "tick 당 비용 +4~15% 를 커밋 단위로 이분",
+   "plainSummary": "10-05 이후 엔진이 같은 일을 하는 데 4~15% 더 오래 걸린다. 어느 변경 때문인지 아직 모른다.",
+   "userBenefit": "엔진을 꽉 채우는 게임(3cc7a9b4cb15 등)에서 화면 갱신이 2~4% 덜 나온다. 원인 커밋을 찾으면 되돌리거나 고칠 수 있다.",
+   "why": "#476 단독은 0~4% 만 설명하고, 나머지는 #471 과 그 뒤 51 커밋에 흩어져 있다(docs/report/0495 §⒟). #471 은 측정 하네스 자신도 바꿨다(ca4d77c3).",
+   "tradeoff": "rev 당 release 빌드 1회(~10분) · 이분 5~6단계. 신호가 3~5% 라 load 가 낮을 때 3회 이상 반복해야 한다. 하네스 스레드 변경은 bd770b73 판에 그 한 커밋만 얹은 판으로 따로 갈라야 한다.",
+   "effort": "M",
+   "target": "wie-backend executor · wie_cli wie_validate · 090a3eed..7ca47380"
+  }
+ ]
+}
