@@ -8,7 +8,7 @@
 //   { t: "stop", h: handle }
 //   { t: "evict", h: handle }   — forget the handle's sequence; audio.rs resends `ev` on its next play
 //   { t: "gain", h: handle, g } — the game's volume for that handle (0..1): its playback now, else its next play
-//   { t: "stats" }              — replies { t: "stats", sequences, playbacks, voices, soundfont, synths, idle, built, work, held } on the port
+//   { t: "stats" }              — replies { t: "stats", sequences, playbacks, voices, soundfont, synths, idle, built, work, held, holds } on the port
 //   { t: "sfwait" }             — a soundfont is on its way (audio.rs sends it before any play when it has a URL)
 //   { t: "sf", data: ArrayBuffer } — the soundfont (sf2/sf3); replies { t: "sf", ok, ms?, error? }
 //   { t: "sfoff" }              — it will not come (fetch, HTTP or prelude failed): FM for the session
@@ -178,6 +178,7 @@ class WieAudioProcessor extends AudioWorkletProcessor {
     this.rest = 0; // frames to render before the next work item
     this.scratch = null;
     this.held = new Map(); // handle -> { repeat, since } — MIDI plays waiting for the soundfont
+    this.holds = 0; // plays ever held (stats — `held` alone misses a hold released before anyone asked)
     this.port.onmessage = (event) => this.onMessage(event.data);
   }
 
@@ -211,6 +212,7 @@ class WieAudioProcessor extends AudioWorkletProcessor {
         built: this.built,
         work: this.work.length,
         held: this.held.size,
+        holds: this.holds,
       });
   }
 
@@ -409,8 +411,10 @@ class WieAudioProcessor extends AudioWorkletProcessor {
     const seq = this.sequences.get(message.h);
     if (!seq) return;
     this.stop(message.h);
-    if (this.mustWait(seq)) this.held.set(message.h, { repeat: !!message.r, since: currentFrame });
-    else this.begin(message.h, seq, !!message.r);
+    if (this.mustWait(seq)) {
+      this.held.set(message.h, { repeat: !!message.r, since: currentFrame });
+      this.holds++;
+    } else this.begin(message.h, seq, !!message.r);
   }
 
   // A MIDI play in a soundfont session that cannot start on the soundfont yet (see the header).
