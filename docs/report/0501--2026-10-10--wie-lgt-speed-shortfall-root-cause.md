@@ -87,3 +87,5 @@
 «프레임마다 하는 일이 벽시계로 고정이고 게임이 그 끝에서 10 ms 를 쉰다»는 구조임을 확정했다. 줄일 수 있는 몫(그리기마다 화면 전체를 복사)은 별 PR 로 제안한다.
 
 게임 파일명 유입: 유입 0건(BOUNDED) + 판단 필요 0건(SUFFIX-ATTACHED).
+
+<!-- corpus-name-inflow v1 subjects=2 tree=f27bae1c8c410364 B=0/0 P=0/0 S=0/0 -->
