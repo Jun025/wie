@@ -17,6 +17,7 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
               title: <표시 이름>, fileTitle: <파일에서 온 원 이름(검색·추적용)>, status: "playable"|"limited"|"not-yet",
               axes: { boot, render, input, longplay, sound, speed: "ok"|"partial"|"no"|"unknown" },
               knownIssues_ko: [쉬운 한국어 문장],
+              playTips_ko?: [쉬운 한국어 문장](선택 · 없으면 키 자체를 생략),
               changes: [{ date, enginePin, summary_ko, kind, pr }] }] }
 ```
 
@@ -42,6 +43,15 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
 **뺀 뒤 같은 통신사 안에서 겹칠 때만** 구별 표기를 붙인다: 뺀 표식 하나(화면 크기가 있으면 그것, 없으면 판 번호)가 그 묶음에서 유일하면 ` (작은화면)`처럼, 아니면 ` (2)`·` (3)`(표식 짧은 순 → sha256 순).
 
 `changes` 의 `kind`·`pr` 과 `fileTitle` 은 셸 가져오기가 요구하지 않는 **추가 필드**다(모르는 키는 무시된다).
+
+★**`knownIssues_ko` 와 `playTips_ko` 를 가른다**(2026-10-09):
+- `knownIssues_ko` = **안 되는 것**(빠진 소리·막히는 지점·서버 벽 등). 셸은 «알려진 문제»로 보인다. `playable` 이 아닌 행은 ≥1 줄(검사기 거부).
+- `playTips_ko` = **게임은 정상이고, 이렇게 하면 앞으로 나아간다**는 이용자 안내(직접 잰 진행 요령 · `docs/report/0469`·`0482`).
+  선택 필드 — 요령이 없으면 **키를 생략**한다(빈 배열은 검사기가 거부: «없음»의 표기를 하나로). 등급·축과 무관하다.
+- 원천은 전수 조사의 `HAND_TIP`(`scripts/playability-census.mjs`)이다 — 재생성해도 요령이 «알려진 문제»로 돌아가지 않는다.
+  잠김·통신망 벽 행은 그 안내 한 줄뿐이라 요령을 싣지 않는다.
+- ★문제를 적고 «이렇게 하면 넘어간다»를 덧붙인 줄(예: 껐다 켜야 시작되는 타이틀)은 **문제**다 — `knownIssues_ko` 에 둔다.
+- 셸이 이 키를 그리기 전에는 요령이 화면에서 빠진다(모르는 키는 무시) — 셸 표시는 otterpebble 쪽 티켓 몫이다.
 
 ### 등급 술어 — 무엇을 봤으면 그 등급인가
 

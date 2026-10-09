@@ -752,8 +752,10 @@ const HAND_WALL = {
 // lines only — the `progress` axis itself stays the policy's verdict.
 const WALK_TIP = '메뉴를 여는 소프트키 없이 방향키와 확인 키로 움직이면 계속 진행돼요.';
 const RESTART_KO = '처음 실행하면 저장 파일을 만든 뒤 «완전히 종료후 다시 실행해 주세요» 안내에서 멈춰요. 게임을 껐다가 다시 켜면 시작할 수 있어요.';
-const HAND_NOTE = {
-  '287af341dac8': [RESTART_KO],
+const HAND_NOTE = { '287af341dac8': [RESTART_KO] };
+// How a title that works is moved forward — not a problem, so it ships as `playTips_ko`, not
+// `knownIssues_ko` (the shell lists the latter under «알려진 문제» · contract §1).
+const HAND_TIP = {
   '61ed69520fd3': [WALK_TIP],
   c107462e5f8a: [WALK_TIP],
   d1dce4a36141: [WALK_TIP],
@@ -854,6 +856,7 @@ if (cmd === 'selftest') {
     ['--jobs 0 / garbage becomes 1', jobsFor('0', 10) === 1 && jobsFor('x', 10) === 1],
     ['a limited row with no failing axis still says why', knownIssues({ boot: 'ok', render: 'ok', input: 'ok', longplay: 'n/a', sound: 'ok', speed: 'n/a' }, 'limited', '000000000000', null, null).length === 1],
     ['a playable row with no failing axis says nothing', knownIssues({ boot: 'ok', render: 'ok', input: 'ok', longplay: 'ok', sound: 'ok', speed: 'ok' }, 'playable', '000000000000', null, null).length === 0],
+    ['a play tip is not a known issue', !knownIssues({ boot: 'ok', render: 'ok', input: 'ok', longplay: 'ok', sound: 'ok', speed: 'ok' }, 'playable', '61ed69520fd3', null, null).length && HAND_TIP['61ed69520fd3'].length === 1],
     ['a long-run recipe comes before the loop', longKeys('NUM2:3', 2).split('\n')[0] === 'NUM2:3' && longKeys('NUM2:3', 2).split('\n').length === 3],
   ];
   // Progress: 60 shots over 600 s. New frames until 400 s, then the same two alternating (a blink).
@@ -1112,6 +1115,7 @@ if (cmd === 'run') {
     const lock = lockVerdict(lockOf(t.path), [j.A, j.B]) ?? LOCK_HAND[t.sha.slice(0, 12)] ?? null;
     const st = lock ? 'not-yet' : net && status(j.ax) === 'playable' ? 'limited' : status(j.ax);
     const issues = knownIssues(j.ax, st, t.sha.slice(0, 12), lock, net);
+    const tips = lock || net ? [] : (HAND_TIP[t.sha.slice(0, 12)] ?? []);
     const changes = prs
       .filter((pr) => names(pr.title, title) && !otherCarrier(pr.title, platform))
       .map((pr) => ({ date: pr.mergedAt.slice(0, 10), enginePin: pr.mergeCommit?.oid ?? null, summary_ko: summaryKo(pr.title), pr: pr.number }));
@@ -1125,6 +1129,7 @@ if (cmd === 'run') {
       status: st,
       axes: j.ax,
       knownIssues_ko: issues,
+      ...(tips.length ? { playTips_ko: tips } : {}),
       changes: changes.map(({ date, enginePin, summary_ko }) => ({ date, enginePin, summary_ko })),
     });
     rows.push([

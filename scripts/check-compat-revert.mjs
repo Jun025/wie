@@ -5,7 +5,7 @@
 // 자료로 compat.json 을 다시 써 그 행을 옛 값으로 되돌리는 것. 충돌이 없고 스키마도 통과해 `contract`
 // 가 green 인 채 착지한다.
 //
-// 판정(행 = `sha256|platform` · 필드 = status·title·model·fileTitle·axes.*·knownIssues_ko·changes · 행 자체):
+// 판정(행 = `sha256|platform` · 필드 = status·title·model·fileTitle·axes.*·knownIssues_ko·playTips_ko·changes · 행 자체):
 //   fork = 브랜치가 main 에서 처음 갈라진 점(first-parent) · mb = merge-base(브랜치, main) ·
 //   landing = git merge-tree(main, 브랜치) = 실제로 착지할 내용.
 //   fork ≠ mb 인 필드(= 브랜치가 머지로 «받은» main 의 변경) 중
@@ -39,7 +39,7 @@ const ABSENT = "∅";
 
 function flatten(e) {
   const f = { "(row)": "present" };
-  for (const k of ["status", "title", "model", "fileTitle", "knownIssues_ko", "changes"]) f[k] = JSON.stringify(e[k] ?? null);
+  for (const k of ["status", "title", "model", "fileTitle", "knownIssues_ko", "playTips_ko", "changes"]) f[k] = JSON.stringify(e[k] ?? null);
   for (const [k, v] of Object.entries(e.axes ?? {})) f[`axes.${k}`] = String(v);
   return f;
 }
