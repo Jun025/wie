@@ -76,3 +76,5 @@ MIDP `currentTimeMillis`·`Display` 타이머, LGT stdlib `time`, executor `slee
 게임이 1~3배 사이 원하는 빠르기로 돈다 — J2ME·KTF Java 는 그대로, SKT·LGT 일부는 CPU·프레임에 묶여 덜 빨라진다.
 
 게임 파일명 유입: 유입 7건(BOUNDED · 전건 이번에 고친 파일 3개의 «기존» 주석 — 이 회차가 쓴 줄에는 0) + 판단 필요 0건(SUFFIX-ATTACHED).
+
+
