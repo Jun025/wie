@@ -126,6 +126,10 @@ export function validateCompat(d) {
     if (!Array.isArray(x.knownIssues_ko) || !x.knownIssues_ko.every(str)) e.push(`${at}: knownIssues_ko must be non-empty strings`);
     // A row the shell marks limited/not-yet with no sentence tells the player «화면만» and not why.
     else if (x.status !== 'playable' && !x.knownIssues_ko.length) e.push(`${at}: status ${x.status} needs at least one knownIssues_ko sentence (why it is not playable)`);
+    // Optional: how to move a working title forward. Absent when there is none — an empty array is refused
+    // so «no tips» has one spelling the shell can test.
+    if ('playTips_ko' in x && !(Array.isArray(x.playTips_ko) && x.playTips_ko.length && x.playTips_ko.every(str)))
+      e.push(`${at}: playTips_ko must be omitted or a non-empty array of non-empty strings`);
     if (!Array.isArray(x.changes)) e.push(`${at}: changes must be an array`);
     else
       x.changes.forEach((c, j) => {
@@ -266,6 +270,9 @@ function selftest() {
     ['unmeasured progress shipped as a value', { ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, progress: 'unknown' } }] }, null],
     ['limited row with no reason', { ...good, entries: [{ ...good.entries[0], status: 'limited' }] }, null],
     ['not-yet row with no reason', { ...good, entries: [{ ...good.entries[0], status: 'not-yet' }] }, null],
+    ['empty playTips_ko array', { ...good, entries: [{ ...good.entries[0], playTips_ko: [] }] }, null],
+    ['playTips_ko with an empty line', { ...good, entries: [{ ...good.entries[0], playTips_ko: [''] }] }, null],
+    ['playTips_ko as a string', { ...good, entries: [{ ...good.entries[0], playTips_ko: '키를 누르세요.' }] }, null],
     ['duplicate sha', { ...good, entries: [good.entries[0], good.entries[0]] }, null],
     ['short enginePin', { ...good, enginePin: 'abc' }, null],
     ['title keeps a bracket tag', { ...good, entries: [{ ...good.entries[0], title: '[큰화]t' }] }, null],
@@ -285,6 +292,7 @@ function selftest() {
   const errs = (c, u) => [...validateCompat(c), ...validateUpdates(u ?? [], new Set((c.entries ?? []).map((x) => x.sha256)))];
   let bad = 0;
   if (errs(good, [['2026-09-27-x.json', upd]]).length) bad++, console.error('selftest: the good fixture is rejected');
+  if (validateCompat({ ...good, entries: [{ ...good.entries[0], playTips_ko: ['확인 키로 시작해요.'] }] }).length) bad++, console.error('selftest: a row with playTips_ko is rejected');
   for (const [label, c, u] of cases) if (!errs(c, u).length) bad++, console.error(`selftest: NOT rejected — ${label}`);
   if (fromCensus({ ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, render: 'uniform', speed: 'n/a' } }] }).entries[0].axes.render !== 'no')
     bad++, console.error('selftest: census uniform must map to no');

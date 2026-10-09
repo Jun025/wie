@@ -1472,7 +1472,8 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
+   "knownIssues_ko": [],
+   "playTips_ko": [
     "메뉴를 여는 소프트키 없이 방향키와 확인 키, 숫자 5 키로 움직이고 싸우면 계속 진행돼요."
    ],
    "changes": [],
@@ -3752,7 +3753,8 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
+   "knownIssues_ko": [],
+   "playTips_ko": [
     "확인 키는 일시정지 창을 여니, 싸울 때는 방향키로 움직이며 숫자 5 키를 누르면 돼요."
    ],
    "changes": [],
@@ -3944,7 +3946,8 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
+   "knownIssues_ko": [],
+   "playTips_ko": [
     "목장 안내 창을 확인 키로 닫은 뒤 숫자 1 키부터 6 키까지 눌러 우유를 짜면 돼요."
    ],
    "changes": [],
@@ -4790,7 +4793,8 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
+   "knownIssues_ko": [],
+   "playTips_ko": [
     "이름 칸은 숫자 키로 글자를 넣고 확인 키를 누르고, 거실 메뉴에서 아래 방향키를 세 번 눌러 «Schedule»을 고르면 한 달 일정이 진행돼요."
    ],
    "changes": [],
@@ -5005,7 +5009,8 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
+   "knownIssues_ko": [],
+   "playTips_ko": [
     "처음 메뉴에서 확인 키를 두 번 누르면 시작하고, 마을에서 멀리 가면 강한 적이 나오니 근처에서 싸우면 오래 즐길 수 있어요."
    ],
    "changes": [],
@@ -5333,7 +5338,8 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
+   "knownIssues_ko": [],
+   "playTips_ko": [
     "«새로하기»를 고르면 묻는 창의 커서가 «아니오»에 있으니 왼쪽 방향키로 «예»를 고른 뒤 확인 키를 누르면 1장 이야기가 시작돼요."
    ],
    "changes": [],
@@ -5489,7 +5495,8 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
+   "knownIssues_ko": [],
+   "playTips_ko": [
     "처음 안내 창들은 확인 키로 닫으면 되고, 캐릭터를 고른 뒤 방향키로 움직이며 확인 키로 공격하면 던전이 진행돼요."
    ],
    "changes": [],
@@ -5510,7 +5517,8 @@
     "speed": "unknown",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
+   "knownIssues_ko": [],
+   "playTips_ko": [
     "첫 화면에서 확인 키로 «이어하기»와 저장 칸을 고르면 바로 시작하고, 방향키로 움직이며 확인 키로 공격하면 돼요."
    ],
    "changes": [],
@@ -6662,7 +6670,8 @@
     "speed": "unknown",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
+   "knownIssues_ko": [],
+   "playTips_ko": [
     "메뉴를 여는 소프트키 없이 방향키와 확인 키로 움직이면 계속 진행돼요."
    ],
    "changes": [],
@@ -6741,7 +6750,9 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요.",
+    "소리가 나지 않을 수 있어요."
+   ],
+   "playTips_ko": [
     "메뉴를 여는 소프트키 없이 방향키와 확인 키로 움직이면 계속 진행돼요."
    ],
    "changes": [],
@@ -6841,7 +6852,8 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
+   "knownIssues_ko": [],
+   "playTips_ko": [
     "대화 선택지는 숫자 1 키나 숫자 2 키로 고르면 다음 장면으로 이어져요."
    ],
    "changes": [],
@@ -7014,7 +7026,8 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
+   "knownIssues_ko": [],
+   "playTips_ko": [
     "메뉴를 여는 소프트키 없이 방향키와 확인 키로 움직이면 계속 진행돼요."
    ],
    "changes": [],
@@ -7436,7 +7449,8 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
+   "knownIssues_ko": [],
+   "playTips_ko": [
     "«새로하기»와 «처음부터하기»를 고르고, 이름 화면에서 숫자 5 키를 두 번 누른 뒤 위 방향키로 정하면 이야기가 이어져요."
    ],
    "changes": [],
@@ -7496,7 +7510,8 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
+   "knownIssues_ko": [],
+   "playTips_ko": [
     "처음 화면에서 확인 키를 몇 번 누르면 가게 문이 열리고, 방향키와 확인 키로 손님을 맞을 수 있어요."
    ],
    "changes": [],
@@ -7652,7 +7667,8 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
+   "knownIssues_ko": [],
+   "playTips_ko": [
     "처음 메뉴에서 확인 키로 «게임시작»을 누른 뒤 아래 방향키로 «새로하기»를 고르면 이야기가 시작돼요."
    ],
    "changes": [],
@@ -7693,7 +7709,9 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요.",
+    "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
+   ],
+   "playTips_ko": [
     "메뉴를 여는 소프트키 없이 방향키와 확인 키로 움직이면 계속 진행돼요."
    ],
    "changes": [],
@@ -7946,7 +7964,8 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
+   "knownIssues_ko": [],
+   "playTips_ko": [
     "처음 화면부터 확인 키만 눌러 기본 설정으로 들어가면 경기가 시작되고, 확인 키로 공을 칠 수 있어요."
    ],
    "changes": [],
@@ -8045,7 +8064,8 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
+   "knownIssues_ko": [],
+   "playTips_ko": [
     "«새로하기»에서 이름 칸에 숫자 5 키를 두 번 누르고 확인 키로 넘긴 뒤, 준비 메뉴에서 위 방향키로 «출격»을 고르면 전투가 시작돼요."
    ],
    "changes": [],
@@ -8203,7 +8223,9 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요.",
+    "소리가 나지 않을 수 있어요."
+   ],
+   "playTips_ko": [
     "메뉴를 여는 소프트키 없이 방향키와 확인 키로 움직이면 계속 진행돼요."
    ],
    "changes": [],
