@@ -986,12 +986,16 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
         return false;
       };
       const quiet5 = await idleAgain();
+      // `holds` (plays ever held), not `held` at the first poll: while nothing sounds the samples
+      // decode back to back (SILENT_WORK_MS), so on a fast audio thread the hold can end before the
+      // first stats reply — publish run 37948035765 read `held 0` and failed a correct engine.
+      const holds5 = (await statsOf(run.emu, node)).holds;
       node.rawPost({ t: "play", h: H, r: false, d: 800, ev: strings });
       const sf5 = await sfOnly(run);
       check(
         "S5: an instrument not decoded yet — its first play waits for its samples (no FM note), then renders through the soundfont only",
-        quiet5 && sf5.heldFirst === 1 && sf5.fmMax === 0 && sf5.stats.synths >= 1 && sf5.level > 1e-3,
-        `idle before ${quiet5} · held at first look ${sf5.heldFirst} · soundfont after ${ms(sf5.waitMs)} · synths ${sf5.stats.synths} · FM voices seen ${sf5.fmMax} · output rms ${sf5.level.toFixed(4)}`,
+        quiet5 && sf5.stats.holds - holds5 === 1 && sf5.fmMax === 0 && sf5.stats.synths >= 1 && sf5.level > 1e-3,
+        `idle before ${quiet5} · held ${sf5.stats.holds - holds5} (at first look ${sf5.heldFirst}) · soundfont after ${ms(sf5.waitMs)} · synths ${sf5.stats.synths} · FM voices seen ${sf5.fmMax} · output rms ${sf5.level.toFixed(4)}`,
       );
       await close(run);
     }
