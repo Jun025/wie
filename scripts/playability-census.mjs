@@ -776,7 +776,7 @@ const HAND_TIP = {
   f2ae515201f2: ['«새로하기»에서 이름 칸에 숫자 5 키를 두 번 누르고 확인 키로 넘긴 뒤, 준비 메뉴에서 위 방향키로 «출격»을 고르면 전투가 시작돼요.'],
   f5bd7a91a107: ['목장 안내 창을 확인 키로 닫은 뒤 숫자 1 키부터 6 키까지 눌러 우유를 짜면 돼요.'],
   fe184f834bc7: ['확인 키는 일시정지 창을 여니, 싸울 때는 방향키로 움직이며 숫자 5 키를 누르면 돼요.'],
-  // Progress wave 6 (docs/report/0496): 13 whose recipe 600 s frames stay in play, 10 whose entry into play
+  // Progress wave 6 (docs/report/0502): 13 whose recipe 600 s frames stay in play, 10 whose entry into play
   // was seen at pin 7ca47380 but whose play does not last the run — the line says only how to get in.
   '0266ca417880': ['처음 화면부터 확인 키를 누르다가 서버 선택 확인 창이 나오면 왼쪽 방향키로 «예»를 고른 뒤 확인 키를 눌러야 이야기로 넘어가요.'],
   '0392263fbb85': ['처음 메뉴에서 아래 방향키로 «새로하기»를 고른 뒤 확인 키로 이야기를 넘기면 전투가 시작돼요.'],
