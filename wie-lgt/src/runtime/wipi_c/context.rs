@@ -264,6 +264,66 @@ mod tests {
         assert!(GcClock::of(usize::MAX - 2).due(12_500), "another emulator has its own clock");
     }
 
+    /// A timer callback collects: the `collect_garbage_if_due` call in `set_timer`'s event is what
+    /// keeps a Clet's heap from filling, and nothing else in `cargo test --all` reaches it — no LGT
+    /// fixture arms a timer. Without that call 0266ca417880 died of heap exhaustion at 404.7 s
+    /// (docs/report/0490 §1·§5) while every test stayed green. This locks the call site only; the
+    /// schedule is `timer_collection_waits_a_second_and_for_its_cost`.
+    #[test]
+    fn a_timer_callback_collects_garbage() -> Result<()> {
+        use alloc::{boxed::Box, sync::Arc, vec::Vec};
+        use core::sync::atomic::{AtomicBool, Ordering};
+
+        use test_utils::{TestClock, TestPlatform};
+        use wie_backend::{DefaultTaskRunner, Event, System};
+        use wie_util::WieError;
+        use wie_wipi_c::{MethodBody, WIPICContext, WIPICResult};
+
+        use super::{GcClock, LgtWIPICContext};
+        use crate::runtime::java::init_jvm;
+
+        struct Noop;
+
+        #[async_trait::async_trait]
+        impl MethodBody<WieError> for Noop {
+            async fn call(&self, _: &mut dyn WIPICContext, _: Box<[u32]>) -> Result<WIPICResult> {
+                Ok(WIPICResult { results: Vec::new() })
+            }
+        }
+
+        // Past the first interval, so the first collection is due; stepping, because with a frozen
+        // clock this test hung (measured).
+        let clock = TestClock::stepping(1);
+        clock.set(50_000);
+        let mut system = System::new(Box::new(TestPlatform::with_clock(clock)), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let (done_task, system_task) = (done.clone(), system.clone());
+
+        system.spawn(async move || {
+            let (jvm, core, _) = init_jvm(&system_task).await?;
+            let id = core.id();
+            let mut context = LgtWIPICContext::new(core, system_task.clone(), jvm);
+            context.set_timer(system_task.platform().now(), u64::MAX, Box::new(Noop));
+
+            let Some(Event::Timer { callback, .. }) = system_task.event_queue().pop() else {
+                panic!("set_timer pushed no timer event");
+            };
+            let before = system_task.platform().now().raw();
+            assert!(GcClock::of(id).last < before);
+            callback().await?;
+            assert!(GcClock::of(id).last > before, "the timer callback did not collect");
+
+            done_task.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
     /// `free(NULL)` is a no-op, and a real handle still frees.
     ///
     /// The guard is what keeps 메탈슬러그 서바이벌 booting (`MC_grpDestroyOffScreenFrameBuffer(0)`).

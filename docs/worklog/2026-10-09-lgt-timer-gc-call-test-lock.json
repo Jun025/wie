@@ -1,0 +1,10 @@
+{
+ "date": "2026-10-09",
+ "task": "wie-2026-10-09-lgt-0266ca417880-timer-gc-call-test-lock-adopt-p0",
+ "title": "LGT Clet 타이머 콜백의 쓰레기 수거 호출을 시험으로 잠근다",
+ "summary": "set_timer 이벤트 1회 처리 뒤 GcClock 수거 기록을 단언하는 시험 1개. 호출을 지우면 red. 제품 변경 0. docs/report/0492.",
+ "adoptedProposals": [
+  "2026-10-09-lgt-0266ca417880-heap-exhaustion#p0"
+ ],
+ "proposals": []
+}
