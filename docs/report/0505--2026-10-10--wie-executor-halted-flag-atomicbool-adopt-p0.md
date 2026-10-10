@@ -72,3 +72,5 @@ node scripts/audio-probe.mjs --wasm <s>/before/web/src/wasm --wasm <s>/after-tre
 ### 게임 파일명 유입
 - `corpus-name-inflow`: BOUNDED 5회 / 2쌍 · SUFFIX-ATTACHED 0. 5회 전부 `executor.rs` 에 **이미 있던** 주석이다(`origin/main` 판에 같은 5회). 이 diff 의 `+` 줄에는 0회다.
   도구는 수정된 파일의 본문 전체를 보기 때문에 잡혔다. **이 회차의 신규 유입은 0 이다.**
+
+<!-- corpus-name-inflow v1 subjects=3 tree=3880ffa95f5f1382 B=5/2 P=0/0 S=0/0 -->
