@@ -68,3 +68,7 @@ CARGO_TARGET_DIR=<자기 target> ~/orchestrator-live/bin/build-slot run -- cargo
 node scripts/audio-probe.mjs --wasm <s>/before/web/src/wasm --wasm <s>/after-tree/web/src/wasm --secs 30 --jobs 2 --json <game>
 ```
 - 네이티브 sha256 앞 12자: main `98e4083b9ecf` · 이 PR `ead6616bc3e6` · 대조 `64505a5112c7`.
+
+### 게임 파일명 유입
+- `corpus-name-inflow`: BOUNDED 5회 / 2쌍 · SUFFIX-ATTACHED 0. 5회 전부 `executor.rs` 에 **이미 있던** 주석이다(`origin/main` 판에 같은 5회). 이 diff 의 `+` 줄에는 0회다.
+  도구는 수정된 파일의 본문 전체를 보기 때문에 잡혔다. **이 회차의 신규 유입은 0 이다.**
