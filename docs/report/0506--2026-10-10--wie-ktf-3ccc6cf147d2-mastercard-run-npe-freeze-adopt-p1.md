@@ -52,7 +52,8 @@
   - `6eb93824daf8`(644 → 609): 3회 재측 main 771~781 · 이 브랜치 706~997 — 잡음.
   - `a540945188ca`(**436 → 350 · 4회 재측 모두 −18~22%**): 진짜다. paint 362번 중 80번이 44~56ms 기다렸다(게임 스레드가 프레임 하나를 그만큼 쉬지 않고 계산한다 · 증적 `a540945188ca-paint-waits.txt`). 2초 간격 화면은 두 빌드가 같다(도움말 화면 · `a540945188ca-main-vs-fix.png`). 빠진 paint 는 게임 프레임이 아니라 «계산 도중의 덧 paint» 다. 단, 이 판정은 그 한 화면에서만 본 것이다.
 - 어느 쪽 변경이 그 감소를 냈나(`a540945188ca` 4회): main 429~448 · core 만 438~456 · paint 기다림만 373~381 · 둘 다 346~360. ⇒ paint 기다림이다. 그리고 core 변경이 기다림을 더 정확하게(조금 더 자주) 만든다.
-- 전체 runner 줄(AGENTS §Definition of Done): `draw_j2me` · `helloworld_ktf` · `helloworld_lgt` PASS · `keydraw_ktf`/`keydraw_lgt` `--inject --expect-last-frame` PASS rc=0 · `text_j2me` PASS.
+- main 합류 뒤(`1fbf1fb3` · #536~#538 포함) 다시 쟀다: 묶음 A 키 · 40초 · 6회씩 `3ccc` 0/6 · `4288` 0/6 정지(paints 691~695 · 572~574).
+- 전체 runner 줄(AGENTS §Definition of Done · 합류 뒤): `draw_j2me` · `helloworld_ktf` · `helloworld_lgt` PASS · `keydraw_ktf`/`keydraw_lgt` `--inject --expect-last-frame` PASS rc=0 · `text_j2me` PASS.
 
 ### 5. 한계
 
@@ -64,5 +65,3 @@
 
 - `node scripts/corpus-name-inflow.mjs`: BOUNDED 4회/3쌍 · SUFFIX-ATTACHED 0 · PREFIX-EMBEDDED 0.
 - BOUNDED 4회는 전부 `display.rs` 의 기존 주석이다(`origin/main` 에 같은 4회 · 이 브랜치의 추가 줄 `+` 에는 0회). 이 회차가 들인 이름은 0이다.
-
-<!-- corpus-name-inflow v1 subjects=5 tree=81983d4632c4b452 B=4/3 P=0/0 S=0/0 -->
