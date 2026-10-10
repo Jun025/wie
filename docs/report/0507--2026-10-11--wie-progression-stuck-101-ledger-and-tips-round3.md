@@ -137,3 +137,5 @@
 - `RUST_MIN_STACK=4194304 cargo test --all` **775 passed / 0 failed**(build-slot).
 - `node scripts/player-data.mjs` OK(429 · 156 updates) · `check-compat-revert` OK(착지 기준 바뀐 행 18) · census `selftest` 65/65 · `check-worklog-json` OK · `npm run audit` PASSED.
 - 유입: 이 회차가 더한 줄의 BOUNDED 는 0 이다. SUFFIX-ATTACHED 는 1쌍으로, 요령 문장 안 화면 메뉴 글자 «턴종료» 다(제목이 아니다). 브랜치 전체 B=718/330 은 기존 `compat.json` title 이고(이 회차는 title 을 바꾸지 않았다), S=39/18 은 그 title 들과 위 «턴종료» 1쌍이다.
+
+<!-- corpus-name-inflow v1 subjects=6 tree=aa19bb39c2f48a56 B=718/330 P=0/0 S=39/18 -->
