@@ -1,0 +1,8 @@
+{
+  "date": "2026-10-10",
+  "task": "wie-wipi-grp-draw-no-full-framebuffer-copy-adopt-p0",
+  "title": "WIPI-C 그리기가 호출마다 화면 전체를 복사하지 않게 — 그린 영역만 게스트 메모리와 주고받는다",
+  "summary": "write_canvas 가 도형의 경계 상자 ∩ 클립 ∩ 버퍼만 읽고 쓴다(WindowImageBuffer · 버퍼 크기는 그대로라 캔버스의 클리핑 판단은 같다). 재측(CPU 시계 · 창 [12,24] 게스트 s): 287af341 2배 1.45 → 1.70 · 863b8ab6 1.25 → 1.30, 1배 프레임 주기 15.3 → 11.1 ms · 22.4 → 20.5 ms. docs/report/0503.",
+  "adoptedProposals": ["2026-10-10-lgt-speed-shortfall-root-cause#p0"],
+  "proposals": []
+}
