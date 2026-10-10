@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-10",
+  "kind": "fix",
+  "titles": [
+    "3ccc6cf147d2d537a27b60e151732c2bed0144127bd1b93944591b0e4169373b",
+    "4288d8c1c6acc1531dc2b1c1e033101ff5623907977dc5059cf7ea700d6373d4"
+  ],
+  "summary_ko": "시나리오 모드를 새로 시작하면 무대 소개 화면에서 가끔 멈춰 키가 안 먹던 문제를 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/0"
+}

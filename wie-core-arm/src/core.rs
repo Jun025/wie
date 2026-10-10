@@ -463,7 +463,11 @@ impl ArmCore {
             };
 
             if should_yield {
-                let preempted = if matches!(result, EngineStopReason::Yield) {
+                // A budget that runs out on an `svc` slices the thread out just as mid-code: the host
+                // call has not started yet, and the frame around it is half done. Left unmarked, a
+                // paint read the thread as parked and freed what its frame was filling
+                // (3ccc6cf147d2, docs/report/0503).
+                let preempted = if matches!(result, EngineStopReason::Yield | EngineStopReason::Svc { .. }) {
                     self.current_thread_id()
                 } else {
                     None
@@ -1283,6 +1287,32 @@ mod tests {
         assert!(parked.as_mut().poll(&mut cx).is_pending());
         assert!(!core.others_preempted(), "waiting in a host call");
         assert!(matches!(parked.as_mut().poll(&mut cx), Poll::Ready(Ok(()))));
+    }
+
+    #[test]
+    fn a_budget_that_runs_out_on_an_svc_counts_as_preempted() {
+        async fn host_call(_: &mut ArmCore, _: &mut ()) -> Result<()> {
+            Ok(())
+        }
+
+        let mut core = ArmCore::new(false, None).unwrap();
+        crate::Allocator::init(&mut core).unwrap();
+        core.register_svc_handler(1, host_call, &()).unwrap();
+        // The budget's last instruction is the `svc`, so the engine stops on it with nothing left.
+        let mut code = [0xc0, 0x46].repeat(INSTRUCTIONS_PER_YIELD as usize - 1); // nop
+        code.extend_from_slice(&[0x01, 0xdf, 0x70, 0x47]); // svc #1; bx lr
+        core.load(&code, 0x1000, code.len()).unwrap();
+
+        let mut cx = Context::from_waker(Waker::noop());
+        let mut runner = core.clone();
+        let mut sliced = pin!(
+            core.run_in_thread(move || async move { runner.run_function::<()>(0x1001, &[]).await })
+                .unwrap()
+        );
+        assert!(sliced.as_mut().poll(&mut cx).is_pending());
+        assert!(core.others_preempted(), "out of budget on the svc, before the host call runs");
+        while sliced.as_mut().poll(&mut cx).is_pending() {}
+        assert!(!core.others_preempted());
     }
 
     #[test]
