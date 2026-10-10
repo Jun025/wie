@@ -1,0 +1,25 @@
+{
+ "schema": "wie-worklog/1",
+ "date": "2026-10-10",
+ "task": "wie-skt-14a62a8521a0-name-box-no-input-adopt-p0",
+ "title": "SKVM 처리기 키를 포커스 XTextField 로 — 14a62a8521a0 이름 상자에 글자가 들어간다",
+ "summary": "14a62a8521a0 의 이름 상자는 XTextField 를 감싼 클래스가 모든 키를 TextComponentHandler.keyPressed 로만 넘기고 setTextComponent 를 부르지 않는다. 포커스 XTextField 를 기억해 두고, 등록이 없으면 처리기가 키를 그 입력칸으로 넘긴다. 코퍼스에서 이 조합은 이 게임뿐이고 다른 14종 짝 재측은 퇴행 0.",
+ "changes": [
+  "wie-skvm com/xce/lcdui/XTextField — setFocus(true) 가 정적 focused 에 자기를 둔다 · keyPressed 본체를 take_key(글자가 바뀌었나) 로",
+  "wie-skvm com/xce/lcdui/TextComponentHandler.keyPressed — 등록이 없으면 focused XTextField 로 넘긴다",
+  "docs/report/0503"
+ ],
+ "verification": [
+  "handler_keys_reach_the_focused_field · 개악 red(폴백 제거)",
+  "14a62a8521a0 --keys 이름 경로 전/후: 글자 0 → KAM · 이야기·거리·연습 화면",
+  "XTextField 13종 + 85f03ca7389e --inject 27키 전/후 14/14 PASS · 예외 수 동일 · 이름 레시피 3종 같은 경로"
+ ],
+ "limits": [
+  "영문 대문자·숫자만 · 한글 조합 없음",
+  "진도 축(600초 P/P2)은 재지 않았다 — compat.json progress 는 그대로"
+ ],
+ "proposals": [],
+ "adoptedProposals": [
+  "2026-10-10-progression-wave6-play-tips-round2#p0"
+ ]
+}
