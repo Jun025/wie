@@ -466,7 +466,7 @@ impl ArmCore {
                 // A budget that runs out on an `svc` slices the thread out just as mid-code: the host
                 // call has not started yet, and the frame around it is half done. Left unmarked, a
                 // paint read the thread as parked and freed what its frame was filling
-                // (3ccc6cf147d2, docs/report/0503).
+                // (3ccc6cf147d2, docs/report/0506).
                 let preempted = if matches!(result, EngineStopReason::Yield | EngineStopReason::Svc { .. }) {
                     self.current_thread_id()
                 } else {

@@ -991,7 +991,7 @@ impl Display {
             // cannot cover. 3ccc6cf147d2's paint() frees a set of images while its game thread,
             // sliced in the middle of loading that same set, is still filling them; resumed, the
             // load read the nulled array, the game thread died and the stage briefing froze
-            // (docs/report/0503). So wait as a key does, unless an outer handler already holds.
+            // (docs/report/0506). So wait as a key does, unless an outer handler already holds.
             let mut held = context.system().guest_hold_others(true);
             if !held {
                 context.system().guest_hold_others(false);

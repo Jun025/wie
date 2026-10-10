@@ -2,7 +2,7 @@
   "date": "2026-10-10",
   "task": "wie-ktf-3ccc6cf147d2-mastercard-run-npe-freeze-adopt-p1",
   "title": "KTF 3ccc6cf147d2 무대 소개 정지 — paint 가 게임 스레드의 적재 한가운데로 들어갔다",
-  "summary": "게임의 paint 경로가 다른 스레드가 채우던 이미지 배열을 비웠다. paint 도 잘린 스레드를 기다리게 하고, svc 위에서 다한 예산도 잘림으로 센다. 짝 재측 main 정지 5/28 ↔ 0/28. docs/report/0503.",
+  "summary": "게임의 paint 경로가 다른 스레드가 채우던 이미지 배열을 비웠다. paint 도 잘린 스레드를 기다리게 하고, svc 위에서 다한 예산도 잘림으로 센다. 짝 재측 main 정지 5/28 ↔ 0/28. docs/report/0506.",
   "proposals": [],
   "adoptedProposals": ["2026-10-10-progression-wave6-play-tips-round2#p1"],
   "notCarded": {
