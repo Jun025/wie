@@ -65,4 +65,4 @@
 - `node scripts/corpus-name-inflow.mjs`: BOUNDED 4회/3쌍 · SUFFIX-ATTACHED 0 · PREFIX-EMBEDDED 0.
 - BOUNDED 4회는 전부 `display.rs` 의 기존 주석이다(`origin/main` 에 같은 4회 · 이 브랜치의 추가 줄 `+` 에는 0회). 이 회차가 들인 이름은 0이다.
 
-<!-- corpus-name-inflow v1 subjects=5 tree=d21a6e7ad51a0121 B=4/3 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=5 tree=81983d4632c4b452 B=4/3 P=0/0 S=0/0 -->
