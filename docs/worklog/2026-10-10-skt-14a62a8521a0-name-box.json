@@ -7,7 +7,7 @@
  "changes": [
   "wie-skvm com/xce/lcdui/XTextField — setFocus(true) 가 정적 focused 에 자기를 둔다 · keyPressed 본체를 take_key(글자가 바뀌었나) 로",
   "wie-skvm com/xce/lcdui/TextComponentHandler.keyPressed — 등록이 없으면 focused XTextField 로 넘긴다",
-  "docs/report/0503"
+  "docs/report/0504"
  ],
  "verification": [
   "handler_keys_reach_the_focused_field · 개악 red(폴백 제거)",
