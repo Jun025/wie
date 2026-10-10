@@ -2,6 +2,7 @@ use alloc::{boxed::Box, collections::BTreeMap, sync::Arc};
 use core::{
     future::Future,
     pin::Pin,
+    sync::atomic::{AtomicBool, Ordering},
     task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
 };
 
@@ -32,8 +33,6 @@ pub struct ExecutorInner {
     sleeping_tasks: BTreeMap<usize, (Instant, Option<Instant>)>,
     last_task_id: usize,
     last_now: Instant,
-    // Set by `halt`: no task is polled again. See there.
-    halted: bool,
 }
 
 pub trait AsyncCallable<R>: Send
@@ -76,6 +75,10 @@ impl AsyncCallableResult for () {
 #[derive(Clone)]
 pub struct Executor {
     inner: Arc<Mutex<ExecutorInner>>,
+    // Set by `halt`: no task is polled again. See there. Outside the lock because it is read once
+    // per `tick_for` iteration and once per task in `step`, and it only ever goes false -> true:
+    // taking the lock for it cost +3~4% CPU per tick (docs/report/0500).
+    halted: Arc<AtomicBool>,
 }
 
 impl Executor {
@@ -87,10 +90,12 @@ impl Executor {
             sleeping_tasks: BTreeMap::new(),
             last_task_id: 0,
             last_now: Instant::from_epoch_millis(0),
-            halted: false,
         }));
 
-        Self { inner }
+        Self {
+            inner,
+            halted: Arc::new(AtomicBool::new(false)),
+        }
     }
 
     pub fn spawn<C, R>(&self, callable: C) -> usize
@@ -135,7 +140,7 @@ impl Executor {
     /// the rest of the tick. The task that asked is not stopped by this; see
     /// `System::exit_from_guest`. Tasks are kept, not dropped: dropping them is `clear`'s, the host's.
     pub fn halt(&self) {
-        self.inner.lock().halted = true;
+        self.halted.store(true, Ordering::Relaxed);
     }
 
     // TODO we need to remove error handling from here. we need to JoinHandle like on spawn..
@@ -153,7 +158,7 @@ impl Executor {
     {
         let end = now() + budget_ms;
         loop {
-            if self.inner.lock().halted {
+            if self.halted.load(Ordering::Relaxed) {
                 break;
             }
             let mut current = now();
@@ -211,7 +216,7 @@ impl Executor {
         let mut first_error = None;
 
         for (task_id, mut task) in tasks.into_iter() {
-            if self.inner.lock().halted {
+            if self.halted.load(Ordering::Relaxed) {
                 next_tasks.insert(task_id, task);
                 continue;
             }
