@@ -136,4 +136,4 @@
 - `cargo fmt --all -- --check` OK · `cargo clippy --all -- -D warnings` OK · `cargo clippy --target wasm32-unknown-unknown -- -D warnings` OK(build-slot).
 - `RUST_MIN_STACK=4194304 cargo test --all` **775 passed / 0 failed**(build-slot).
 - `node scripts/player-data.mjs` OK(429 · 156 updates) · `check-compat-revert` OK(착지 기준 바뀐 행 18) · census `selftest` 65/65 · `check-worklog-json` OK · `npm run audit` PASSED.
-- 유입: 이 회차가 더한 줄의 BOUNDED 는 0 이다. SUFFIX-ATTACHED 는 1쌍으로, 요령 문장 안 화면 메뉴 글자 «턴종료» 다(제목이 아니다). 브랜치 전체 B=719/331 · S=39/17 은 기존 `compat.json` title 이다. 0502 의 718/330 · 35/15 에서 늘어난 것은 main 이 그 사이 더한 행이다.
+- 유입: 이 회차가 더한 줄의 BOUNDED 는 0 이다. SUFFIX-ATTACHED 는 1쌍으로, 요령 문장 안 화면 메뉴 글자 «턴종료» 다(제목이 아니다). 브랜치 전체 B=719/331 은 기존 `compat.json` title 이고(이 회차는 title 을 바꾸지 않았다), S=39/17 은 그 title 들과 위 «턴종료» 1쌍이다.
