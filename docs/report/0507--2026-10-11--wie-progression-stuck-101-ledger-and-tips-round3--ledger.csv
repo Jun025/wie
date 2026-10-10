@@ -1,0 +1,102 @@
+sha12,platform,class,guidance,status_after,progress_after,basis,pin,note
+0cc4ef7ede37,KTF,a-below,none,playable,stuck,0507,26f79198,entry needs only the confirm key (criterion 2)
+1cdea1985955,KTF,a-below,none,playable,stuck,0507,26f79198,entry needs only the confirm key (criterion 2)
+3151fdc167b6,KTF,a-below,none,playable,stuck,0507,26f79198,entry needs only the confirm key (criterion 2)
+44c292be4e4c,KTF,a-below,none,playable,stuck,0507,26f79198,entry needs only the confirm key (criterion 2)
+6af589a88cf9,KTF,a-below,none,playable,stuck,0507,26f79198,entry needs only the confirm key (criterion 2)
+8c6821fab969,KTF,a-below,none,playable,stuck,0502,7ca47380,entry seen but the path ends at an unexplained wall (criterion 4)
+a20c2044305c,KTF,a-below,none,playable,stuck,0502,7ca47380,entry needs only the confirm key (criterion 2)
+87b04639cdfe,LGT,a-below,none,playable,stuck,0502,7ca47380,entry seen but the path ends at an unexplained wall (criterion 4)
+ecb1bf8d2079,LGT,a-below,none,playable,stuck,0507,26f79198,entry needs only the confirm key (criterion 2)
+fe76e641bb3d,LGT,a-below,none,playable,stuck,0502,7ca47380,entry needs only the confirm key (criterion 2)
+52edc54e2b23,SKT,a-below,none,playable,stuck,0502,7ca47380,entry needs only the confirm key (criterion 2)
+66959afab216,SKT,a-below,none,playable,stuck,0502,7ca47380,entry needs only the confirm key (criterion 2)
+6e93f26fa2f5,SKT,a-below,none,playable,stuck,0502,7ca47380,entry needs only the confirm key (criterion 2)
+a0436eb1ddbb,SKT,a-below,none,playable,stuck,0502,7ca47380,entry needs only the confirm key (criterion 2)
+bf54c05e58a9,SKT,a-below,none,playable,stuck,0502,7ca47380,entry needs only the confirm key (criterion 2)
+e3276ce8557c,SKT,a-below,none,playable,stuck,0502,7ca47380,entry needs only the confirm key (criterion 2)
+fb80e97cbc57,SKT,a-below,none,playable,stuck,0502,7ca47380,entry needs only the confirm key (criterion 2)
+c3057f46c59b,KTF,a-issue,issue,playable,stuck,0479,11a6fac3,retry guidance in knownIssues
+287af341dac8,LGT,a-issue,issue,playable,stuck,0493,-,restart guidance in knownIssues
+155586ece7f8,KTF,a-tip-new,tip,playable,ok,0507,26f79198,recipe P and P2 both play in the last third
+174237758542,KTF,a-tip-new,tip,playable,stuck,0507,26f79198,recipe P plays in the last third; pair does not confirm
+182fa44210dc,KTF,a-tip-new,tip,playable,stuck,0507,26f79198,entry into play seen; play does not last the run (tip says how to get in)
+33801c1ba14f,KTF,a-tip-new,tip,playable,stuck,0507,26f79198,recipe P plays in the last third; pair does not confirm
+36acdf213c33,KTF,a-tip-new,tip,playable,ok,0507,26f79198,recipe P and P2 both play in the last third
+3b5b98afa890,KTF,a-tip-new,tip,playable,stuck,0507,26f79198,entry into play seen; play does not last the run (tip says how to get in)
+6d63b4025bef,KTF,a-tip-new,tip,playable,stuck,0507,26f79198,recipe P plays in the last third; pair does not confirm
+8d2828ab8a3f,KTF,a-tip-new,tip,playable,stuck,0507,26f79198,entry into play seen; play does not last the run (tip says how to get in)
+d552e095ddcf,KTF,a-tip-new,tip,playable,stuck,0507,26f79198,entry into play seen; play does not last the run (tip says how to get in)
+d9384b388ea5,KTF,a-tip-new,tip,playable,stuck,0507,26f79198,entry into play seen; play does not last the run (tip says how to get in)
+ed6ad7318ac9,KTF,a-tip-new,tip,playable,stuck,0507,26f79198,recipe P plays in the last third; pair does not confirm
+70d709c40e10,LGT,a-tip-new,tip,playable,ok,0507,26f79198,recipe P and P2 both play in the last third
+863b8ab6a21d,LGT,a-tip-new,tip,playable,ok,0507,26f79198,recipe P and P2 both play in the last third
+0262a4fe3389,SKT,a-tip-new,tip,playable,ok,0507,26f79198,recipe P and P2 both play in the last third
+688a87e210d8,SKT,a-tip-new,tip,playable,ok,0507,26f79198,recipe P and P2 both play in the last third
+0392263fbb85,KTF,a-tip,tip,playable,stuck,0502,7ca47380,tip already shipped
+0f9e1026724d,KTF,a-tip,tip,playable,stuck,0502,7ca47380,tip already shipped
+1e43e2e0055f,KTF,a-tip,tip,playable,stuck,0502,7ca47380,tip already shipped
+4288d8c1c6ac,KTF,a-tip,tip,playable,stuck,0502,7ca47380,tip already shipped
+5aa438fbdc87,KTF,a-tip,tip,playable,stuck,0502,7ca47380,tip already shipped
+69e516bb2ffa,KTF,a-tip,tip,playable,stuck,0482,74c9d915,tip already shipped
+739c7657c1f2,KTF,a-tip,tip,playable,stuck,0502,7ca47380,tip already shipped
+9e16cc54d0ab,KTF,a-tip,tip,playable,stuck,0482,74c9d915,tip already shipped
+c95bf2740c69,KTF,a-tip,tip,playable,stuck,0482,74c9d915,tip already shipped
+d5e996a53118,KTF,a-tip,tip,playable,stuck,0502,7ca47380,tip already shipped
+db8ef04a6504,KTF,a-tip,tip,playable,stuck,0502,7ca47380,tip already shipped
+ea35907b22a4,KTF,a-tip,tip,playable,stuck,0502,7ca47380,tip already shipped
+f5bd7a91a107,KTF,a-tip,tip,playable,stuck,0482,74c9d915,tip already shipped
+fe184f834bc7,KTF,a-tip,tip,playable,stuck,0482,74c9d915,tip already shipped
+0266ca417880,LGT,a-tip,tip,playable,stuck,0502,7ca47380,tip already shipped
+61ed69520fd3,LGT,a-tip,tip,playable,stuck,0469,f5c02609,tip already shipped
+870cd071b4dc,LGT,a-tip,tip,playable,stuck,0482,74c9d915,tip already shipped
+9acb5e0387eb,LGT,a-tip,tip,playable,stuck,0482,74c9d915,tip already shipped
+af7d82e5e239,LGT,a-tip,tip,playable,stuck,0502,7ca47380,tip already shipped
+c1718bcdf8a9,LGT,a-tip,tip,playable,stuck,0482,74c9d915,tip already shipped
+090877d7a3e0,SKT,a-tip,tip,playable,stuck,0482,74c9d915,tip already shipped
+2d66945008c1,SKT,a-tip,tip,playable,stuck,0482,74c9d915,tip already shipped
+2f5246006bd8,SKT,a-tip,tip,playable,stuck,0502,7ca47380,tip already shipped
+4f99be2762e2,SKT,a-tip,tip,playable,stuck,0482,74c9d915,tip already shipped
+7089dec0e8df,SKT,a-tip,tip,playable,stuck,0469,f5c02609,tip already shipped
+9aa31965cd10,SKT,a-tip,tip,playable,stuck,0482,74c9d915,tip already shipped
+c107462e5f8a,SKT,a-tip,tip,playable,stuck,0469,f5c02609,tip already shipped
+ccb45e6b8d80,SKT,a-tip,tip,playable,stuck,0469,f5c02609,tip already shipped
+d1dce4a36141,SKT,a-tip,tip,playable,stuck,0469,f5c02609,tip already shipped
+dae153ad28ba,SKT,a-tip,tip,playable,stuck,0482,74c9d915,tip already shipped
+ec2f8f2e02a2,SKT,a-tip,tip,playable,stuck,0502,7ca47380,tip already shipped
+f12984cd0d37,SKT,a-tip,tip,playable,stuck,0502,7ca47380,tip already shipped
+f2ae515201f2,SKT,a-tip,tip,playable,stuck,0482,74c9d915,tip already shipped
+3ccc6cf147d2,KTF,b-engine,none,playable,stuck,0506/0507,26f79198,owner 0506 (landed); now reaches the stage; entry is confirm-key only
+8c71be3ad26d,KTF,b-engine,none,playable,stuck,0470,f5c02609,hidden text box charAt(4); no owner
+d448aee68157,KTF,b-engine,none,playable,stuck,0478/0507,26f79198,name box takes no digits (suspect); no owner
+1a69522a7d43,LGT,b-engine,none,playable,stuck,0507,26f79198,tutorial needs the call key (not injectable); online register panics the host; no owner
+14a62a8521a0,SKT,b-engine,none,playable,stuck,0504,a3da330d,owner 0504 (landed); progress not remeasured
+c361632541a7,SKT,b-engine,none,playable,stuck,0507,26f79198,loads the 240 image set the jar does not ship (176 only); screens black; no owner
+30c7bd6fb01b,KTF,c-server,issue,playable,stuck,0470,f5c02609,server line already in knownIssues
+3185174d2121,KTF,c-server,issue,playable,stuck,0470,f5c02609,server line already in knownIssues
+568c339a8c07,KTF,c-server,issue,playable,stuck,0452/0470,1bc1317c,server line already in knownIssues
+689c491586b9,KTF,c-server,issue,playable,stuck,0470,f5c02609,server line already in knownIssues
+77c2d0bcd435,KTF,c-server,issue,playable,stuck,0470,f5c02609,server line already in knownIssues
+dbd078113b97,KTF,c-server,issue,playable,stuck,0470,f5c02609,server line already in knownIssues
+0fdf45ec169f,LGT,c-server,issue,limited,stuck,0507,26f79198,connect screen loops after the title; no key leaves it -> limited
+f5e21001612d,LGT,c-server,issue,playable,stuck,0469/0507,f5c02609,authentication question after the birthday (0469); this round could not reach it
+640428a9cf9e,SKT,c-server,issue,limited,stuck,0507,26f79198,boots into a required data download; yes fails; no quits -> limited
+0eb19d9bbe7a,KTF,q-skill,none,playable,stuck,0507,26f79198,district too expensive; week end control not found
+135d1291501f,KTF,q-skill,none,playable,stuck,0507,26f79198,yes/no box after hiring ignores OK; number 1 not tried
+145f760b2f4a,KTF,q-skill,none,playable,stuck,0507,26f79198,week schedule never confirms
+33f3e7669599,KTF,q-skill,none,playable,stuck,0507,26f79198,profile screen ignores keys after the first steps
+46b2238f87a6,KTF,q-skill,none,playable,stuck,0507,26f79198,no key fires the shot
+4fcd4b74020e,KTF,q-skill,none,playable,stuck,0507,26f79198,move is never confirmed on the battle map
+55aadf368b8e,KTF,q-skill,none,playable,stuck,0507,26f79198,runner tutorial needs timed jumps
+859aa864797b,KTF,q-skill,none,playable,stuck,0507,26f79198,cooking gauge timing not found
+8a33aafc06a2,KTF,q-skill,none,playable,stuck,0507,26f79198,tip dialog never moves on
+965eee81e442,KTF,q-skill,none,playable,stuck,0507,26f79198,character does not move in the shop tutorial
+aa3fcba4598b,KTF,q-skill,none,playable,stuck,0491/0507,26f79198,coins never collected; stage 1-1 never ends
+b1ec149b354c,KTF,q-skill,none,playable,stuck,0507,26f79198,dough gauge timing not found
+b907b0faf483,KTF,q-skill,none,playable,stuck,0507,26f79198,prologue scroll not skippable within 150 s
+c181cae84146,KTF,q-skill,none,playable,stuck,0507,26f79198,tutorial step asks for the hash key; not confirmed
+cb7c7f87f9e6,KTF,q-skill,none,playable,stuck,0507,26f79198,shop start leads to a news page that stays
+21ffd1c61ebd,LGT,q-skill,none,playable,stuck,0502,7ca47380,chapter cutscene not skippable within 150 s
+1f0d7e81336a,SKT,q-skill,none,playable,stuck,0502,7ca47380,party pick never confirms
+3eb73c20bbae,SKT,q-skill,none,playable,stuck,0502,7ca47380,shop: not enough money; no way found
+990ae27f67e6,SKT,q-skill,none,playable,stuck,0469/0507,26f79198,the title own intro counter bug leaves a background-only scene (0469 sec 5)

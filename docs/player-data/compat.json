@@ -823,6 +823,9 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [],
+   "playTips_ko": [
+    "처음 메뉴에서 아래 방향키로 «새로 하기»를 고르고 능력치를 확인 키로 나눈 뒤 숫자 1 키로 정하면, 숲에서 방향키로 움직이며 확인 키로 총을 쏠 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "던파거너편"
   },
@@ -1498,6 +1501,9 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [],
+   "playTips_ko": [
+    "확인 키로 이야기를 넘기면 들판에서 오른쪽 방향키로 나아가며 확인 키로 칼을 휘두르고, 숫자 2 키로 뛰어 언덕을 올라요."
+   ],
    "changes": [],
    "fileTitle": "마스터오브소드3"
   },
@@ -1612,6 +1618,9 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [],
+   "playTips_ko": [
+    "처음 이야기는 CLR 키로 넘기고 도움말 창을 확인 키로 닫으면 마을을 방향키로 걸어 다닐 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "메르헨전기 KTF"
   },
@@ -1650,6 +1659,9 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [],
+   "playTips_ko": [
+    "처음 화면에서 «게임방법»이 아니라 «게임시작»에서 확인 키를 누르고 이야기를 확인 키로 넘기면 마을에 들어가요."
+   ],
    "changes": [],
    "fileTitle": "메이플스토리"
   },
@@ -2071,6 +2083,9 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [],
+   "playTips_ko": [
+    "이야기는 숫자 0 키로 건너뛰고, 방에서 확인 키로 메뉴를 연 뒤 숫자 3 키로 «키우기»를 고르면 마당에서 햄스터를 돌볼 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "미니햄스터키우기"
   },
@@ -2109,6 +2124,9 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [],
+   "playTips_ko": [
+    "처음 메뉴에서 «1.게임시작»을 확인 키로 열고 아래 방향키로 «새로하기»를 고른 뒤 확인 키로 난이도를 정하고 이야기를 넘기면 집 화면에서 시작돼요."
+   ],
    "changes": [],
    "fileTitle": "박정석 영웅탄생"
   },
@@ -2299,6 +2317,9 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [],
+   "playTips_ko": [
+    "굽는 판에서 숫자 키로 칸마다 반죽을 붓고 확인 키를 연타해 화력을 올리면 붕어빵이 익기 시작해요."
+   ],
    "changes": [],
    "fileTitle": "붕어빵타이쿤3작은화면"
   },
@@ -2607,9 +2628,12 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
+   "playTips_ko": [
+    "이야기는 CLR 키로 넘기고, 확인 키로 유닛을 골라 방향키로 옮긴 뒤 확인 키로 행동을 정하고, 왼쪽 소프트키로 연 메뉴에서 «턴종료»를 확인 키로 고르면 적이 움직이며 다음 턴으로 넘어가요."
+   ],
    "changes": [],
    "fileTitle": "슈퍼로봇 택틱스 r"
   },
@@ -3269,6 +3293,9 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [],
+   "playTips_ko": [
+    "처음 화면에서 확인 키를 누르고 아래 방향키로 «New Game»을 고른 뒤 확인 키를 누르고, 이야기 글이 다 올라갈 때까지 기다리면 마을에서 확인 키로 대화를 넘길 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "영웅전설4 주홍물방울"
   },
@@ -4344,6 +4371,9 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [],
+   "playTips_ko": [
+    "문자 수신 동의 창에서 아래 방향키로 «아니오»를 고르고 «스토리모드»에서 확인 키를 누른 뒤 ＃ 키로 이야기를 넘기면 나무 마을을 방향키로 걸어 다닐 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "크로노스 윙"
   },
@@ -4499,9 +4529,12 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
+   "playTips_ko": [
+    "처음 이야기는 CLR 키로 넘기고 «새로하기»에서 숫자 1 키로 «예»를 고른 뒤 확인 키로 난이도와 이야기를 넘기면, 방향키로 자리를 옮기며 확인 키로 탑을 지어 적을 막을 수 있어요."
+   ],
    "changes": [],
    "fileTitle": "타워크래프트"
   },
@@ -5714,9 +5747,12 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
+   "playTips_ko": [
+    "서버 접속을 묻는 창에서는 확인 키로 «아니오»를 고르고, 게임을 시작한 뒤 화면에 나오는 숫자 키를 맞춰 누르면 리듬 판이 이어져요."
+   ],
    "changes": [],
    "fileTitle": "리듬페스티발"
   },
@@ -6255,9 +6291,12 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
+   "playTips_ko": [
+    "확인 키로 대국에 들어간 뒤 아래 방향키로 졸 위에 커서를 놓고 확인 키, 위 방향키, 확인 키를 차례로 누르면 말이 한 칸 나가고 상대가 응수해요."
+   ],
    "changes": [],
    "fileTitle": "월드장기체스"
   },
@@ -6497,7 +6536,7 @@
    "platform": "LGT",
    "model": "clet",
    "title": "테라 영원의 혼돈",
-   "status": "playable",
+   "status": "limited",
    "axes": {
     "boot": "ok",
     "render": "ok",
@@ -6507,7 +6546,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "게임을 시작하면 게임사 서버에 접속해야 하는데, 그 서버가 지금은 없어 «서버에 연결중입니다» 안내에서 넘어가지 않아요."
+   ],
    "changes": [],
    "fileTitle": "lgt 테라 영원의 혼돈"
   },
@@ -6526,7 +6567,9 @@
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "생일을 넣은 뒤 처음 한 번 인증 서버에 접속하라는 안내가 나오는데, 그 서버가 지금은 없어 여기서는 인증할 수 없어요."
+   ],
    "changes": [],
    "fileTitle": "테일즈위버 막시민편"
   },
@@ -7854,9 +7897,12 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
+   "playTips_ko": [
+    "모드 선택에서 아래 방향키와 확인 키로 맵을 고르고 리프트권 창에서 숫자 1 키를 누른 뒤, 위 방향키를 빠르게 연타하면 속도가 붙어 코스를 완주해요."
+   ],
    "changes": [],
    "fileTitle": "엑스피드스노보드"
   },
@@ -8087,9 +8133,12 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
+   "playTips_ko": [
+    "확인 키로 시작하면 바로 튜토리얼 경주가 되고, 위 방향키를 연타해 달리다가 장애물은 숫자 4 키와 숫자 6 키로 피하면 다음 장으로 넘어가요."
+   ],
    "changes": [],
    "fileTitle": "크리스탈보더"
   },
@@ -8260,7 +8309,7 @@
    "platform": "SKT",
    "model": null,
    "title": "프린세스메이커4 (작은화면)",
-   "status": "playable",
+   "status": "limited",
    "axes": {
     "boot": "ok",
     "render": "ok",
@@ -8271,7 +8320,7 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
+    "게임을 시작할 때 필수 데이터 파일을 서버에서 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요."
    ],
    "changes": [],
    "fileTitle": "프린세스메이커4 작은화면"

@@ -746,13 +746,20 @@ const HAND_WALL = {
   '3ff5948e235e': '게임을 계속하려면 사용자 인증을 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.',
   caf9d76ffd13: '게임사 서버에 접속하는 화면에서 멈춰서, 여기서는 그 뒤로 진행할 수 없어요.',
   '73f3a21e981c': '이름을 등록하려면 게임사 서버에 접속해야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.',
+  // Progress round 3 (docs/report/0507): a server step no answer passes, read off the frames.
+  '0fdf45ec169f': '게임을 시작하면 게임사 서버에 접속해야 하는데, 그 서버가 지금은 없어 «서버에 연결중입니다» 안내에서 넘어가지 않아요.',
+  '640428a9cf9e': '게임을 시작할 때 필수 데이터 파일을 서버에서 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.',
 };
 // A line a player needs that no axis can say, added after the axis lines: how a `stuck` title was
 // moved on by hand (a recipe run, docs/report/0442 · 0469), or what a fix still leaves out. Measured
 // lines only — the `progress` axis itself stays the policy's verdict.
 const WALK_TIP = '메뉴를 여는 소프트키 없이 방향키와 확인 키로 움직이면 계속 진행돼요.';
 const RESTART_KO = '처음 실행하면 저장 파일을 만든 뒤 «완전히 종료후 다시 실행해 주세요» 안내에서 멈춰요. 게임을 껐다가 다시 켜면 시작할 수 있어요.';
-const HAND_NOTE = { '287af341dac8': [RESTART_KO] };
+const HAND_NOTE = {
+  '287af341dac8': [RESTART_KO],
+  // Progress round 3 (docs/report/0507): the authentication question seen at 0469, which no server answers.
+  f5e21001612d: ['생일을 넣은 뒤 처음 한 번 인증 서버에 접속하라는 안내가 나오는데, 그 서버가 지금은 없어 여기서는 인증할 수 없어요.'],
+};
 // How a title that works is moved forward — not a problem, so it ships as `playTips_ko`, not
 // `knownIssues_ko` (the shell lists the latter under «알려진 문제» · contract §1).
 const HAND_TIP = {
@@ -801,6 +808,23 @@ const HAND_TIP = {
   ea35907b22a4: ['처음 메뉴에서 위 방향키로 «새로시작»을 고른 뒤 확인 키로 이야기를 넘기면 지도와 전투가 이어져요.'],
   ec2f8f2e02a2: ['처음 화면에서 확인 키로 새 게임을 고르고 «예»를 누른 뒤, 이름 화면에서 숫자 키로 글자를 넣고 확인 키를 누르면 이야기가 시작돼요.'],
   f12984cd0d37: ['저장 칸 목록 맨 위 줄에서 오른쪽 방향키로 «이어하기»를 «새로하기»로 바꾼 뒤 확인 키를 누르면 이야기가 시작돼요.'],
+  // Progress round 3 (docs/report/0507): recipes found for the stuck rows no round had tried, at pin 26f79198 —
+  // 10 whose 600 s frames stay in play, 5 whose entry was seen but whose play does not last the run.
+  '0262a4fe3389': ['모드 선택에서 아래 방향키와 확인 키로 맵을 고르고 리프트권 창에서 숫자 1 키를 누른 뒤, 위 방향키를 빠르게 연타하면 속도가 붙어 코스를 완주해요.'],
+  '155586ece7f8': ['이야기는 CLR 키로 넘기고, 확인 키로 유닛을 골라 방향키로 옮긴 뒤 확인 키로 행동을 정하고, 왼쪽 소프트키로 연 메뉴에서 «턴종료»를 확인 키로 고르면 적이 움직이며 다음 턴으로 넘어가요.'],
+  '174237758542': ['굽는 판에서 숫자 키로 칸마다 반죽을 붓고 확인 키를 연타해 화력을 올리면 붕어빵이 익기 시작해요.'],
+  '182fa44210dc': ['처음 화면에서 확인 키를 누르고 아래 방향키로 «New Game»을 고른 뒤 확인 키를 누르고, 이야기 글이 다 올라갈 때까지 기다리면 마을에서 확인 키로 대화를 넘길 수 있어요.'],
+  '33801c1ba14f': ['확인 키로 이야기를 넘기면 들판에서 오른쪽 방향키로 나아가며 확인 키로 칼을 휘두르고, 숫자 2 키로 뛰어 언덕을 올라요.'],
+  '36acdf213c33': ['처음 이야기는 CLR 키로 넘기고 «새로하기»에서 숫자 1 키로 «예»를 고른 뒤 확인 키로 난이도와 이야기를 넘기면, 방향키로 자리를 옮기며 확인 키로 탑을 지어 적을 막을 수 있어요.'],
+  '3b5b98afa890': ['처음 화면에서 «게임방법»이 아니라 «게임시작»에서 확인 키를 누르고 이야기를 확인 키로 넘기면 마을에 들어가요.'],
+  '688a87e210d8': ['확인 키로 시작하면 바로 튜토리얼 경주가 되고, 위 방향키를 연타해 달리다가 장애물은 숫자 4 키와 숫자 6 키로 피하면 다음 장으로 넘어가요.'],
+  '6d63b4025bef': ['이야기는 숫자 0 키로 건너뛰고, 방에서 확인 키로 메뉴를 연 뒤 숫자 3 키로 «키우기»를 고르면 마당에서 햄스터를 돌볼 수 있어요.'],
+  '70d709c40e10': ['확인 키로 대국에 들어간 뒤 아래 방향키로 졸 위에 커서를 놓고 확인 키, 위 방향키, 확인 키를 차례로 누르면 말이 한 칸 나가고 상대가 응수해요.'],
+  '863b8ab6a21d': ['서버 접속을 묻는 창에서는 확인 키로 «아니오»를 고르고, 게임을 시작한 뒤 화면에 나오는 숫자 키를 맞춰 누르면 리듬 판이 이어져요.'],
+  '8d2828ab8a3f': ['처음 이야기는 CLR 키로 넘기고 도움말 창을 확인 키로 닫으면 마을을 방향키로 걸어 다닐 수 있어요.'],
+  d552e095ddcf: ['처음 메뉴에서 «1.게임시작»을 확인 키로 열고 아래 방향키로 «새로하기»를 고른 뒤 확인 키로 난이도를 정하고 이야기를 넘기면 집 화면에서 시작돼요.'],
+  d9384b388ea5: ['문자 수신 동의 창에서 아래 방향키로 «아니오»를 고르고 «스토리모드»에서 확인 키를 누른 뒤 ＃ 키로 이야기를 넘기면 나무 마을을 방향키로 걸어 다닐 수 있어요.'],
+  ed6ad7318ac9: ['처음 메뉴에서 아래 방향키로 «새로 하기»를 고르고 능력치를 확인 키로 나눈 뒤 숫자 1 키로 정하면, 숲에서 방향키로 움직이며 확인 키로 총을 쏠 수 있어요.'],
 };
 
 // A row that is not playable always says why: `player-data.mjs` refuses one with no sentence (the
