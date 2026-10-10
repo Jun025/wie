@@ -59,3 +59,8 @@
 - paint 를 기다리게 한 것은 «단말에서는 paint 가 다른 스레드의 프레임 한가운데로 들어가지 않는다»는 0430 의 전제를 paint 로 넓힌 것이다. 실기의 스케줄러는 재지 못했다.
 - 그 대가로 프레임 하나를 오래 계산하는 KTF·LGT 게임은 paint 수가 준다(`a540945188ca` −20%). 이번 표본 27종에서 그런 게임은 그 하나였다. census 속도 축으로 전체를 다시 재지는 않았다.
 - SKT·J2ME 는 바뀌지 않는다(`TaskRunner` 기본값 · `others_preempted` 거짓).
+
+### 6. 게임 파일명 유입
+
+- `node scripts/corpus-name-inflow.mjs`: BOUNDED 4회/3쌍 · SUFFIX-ATTACHED 0 · PREFIX-EMBEDDED 0.
+- BOUNDED 4회는 전부 `display.rs` 의 기존 주석이다(`origin/main` 에 같은 4회 · 이 브랜치의 추가 줄 `+` 에는 0회). 이 회차가 들인 이름은 0이다.
