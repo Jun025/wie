@@ -58,4 +58,4 @@
 
 증적(캡처 띠 · 짝 비교표)은 저장소 밖 `~/orchestrator/reports/evidence/wie-skt-14a62a8521a0-name-box-no-input-adopt-p0/` 에 있다.
 
-<!-- corpus-name-inflow v1 subjects=5 tree=d60ee0212749accb B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=5 tree=5c9d7f8122abd390 B=0/0 P=0/0 S=0/0 -->
