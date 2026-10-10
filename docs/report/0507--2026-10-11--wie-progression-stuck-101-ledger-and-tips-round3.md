@@ -52,7 +52,7 @@
 
 | sha12 | 판정 | P / P2 정체(초) | 마지막 3분의 1(눈) | progress |
 |---|---|---|---|---|
-| `155586ece7f8` | 놀이 확인 | 90 / 100 | 전술 지도 · 적 턴 · 전투 장면 | stuck → **ok** |
+| `155586ece7f8` | 놀이 확인 | 90 / 100 | 전술 지도 · 적 차례 · 전투 장면 | stuck → **ok** |
 | `36acdf213c33` | 놀이 확인 | 0 / 40 | 탑 방어 · 단계가 오른다 | stuck → **ok** |
 | `70d709c40e10` | 놀이 확인 | 60 / 60 | 장기 대국 · 수가 늘고 점수가 바뀐다 | stuck → **ok** |
 | `0262a4fe3389` | 놀이 확인 | 90 / 0 | 코스 주행 · STAGE CLEAR · 다음 맵 | stuck → **ok** |
@@ -132,4 +132,8 @@
 
 ### 9. 게이트
 
-엔진 코드 변경 0 이다. 바뀐 것은 compat 18행 · census 손 표 · 문서뿐이다. 그래서 «되돌리면 red» 대조는 해당 없다. 게이트 결과는 PR 본문과 회신에 적는다.
+엔진 코드 변경 0 이다. 바뀐 것은 compat 18행 · census 손 표 · 문서뿐이다. 그래서 «되돌리면 red» 대조는 해당 없다.
+- `cargo fmt --all -- --check` OK · `cargo clippy --all -- -D warnings` OK · `cargo clippy --target wasm32-unknown-unknown -- -D warnings` OK(build-slot).
+- `RUST_MIN_STACK=4194304 cargo test --all` **775 passed / 0 failed**(build-slot).
+- `node scripts/player-data.mjs` OK(429 · 156 updates) · `check-compat-revert` OK(착지 기준 바뀐 행 18) · census `selftest` 65/65 · `check-worklog-json` OK · `npm run audit` PASSED.
+- 유입: 이 회차가 더한 줄의 BOUNDED 는 0 이다. SUFFIX-ATTACHED 는 1쌍으로, 요령 문장 안 화면 메뉴 글자 «턴종료» 다(제목이 아니다). 브랜치 전체 B=719/331 · S=39/17 은 기존 `compat.json` title 이다. 0502 의 718/330 · 35/15 에서 늘어난 것은 main 이 그 사이 더한 행이다.
