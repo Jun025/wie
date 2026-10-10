@@ -792,11 +792,7 @@ impl Display {
         // game thread dies and the match intro freezes (docs/report/0430). So wait for the others
         // to reach a host call, then hold them off while the handler is sliced. Both are bounded:
         // a thread that never reaches a host call costs a key the cap, as before.
-        let mut waited = 0;
-        while waited < KEY_WAITS_FOR_GUEST_MS && context.system().guest_others_preempted() {
-            context.system().sleep(1).await;
-            waited += 1;
-        }
+        let waited = Self::wait_for_guest_threads(context).await;
         if waited > 0 {
             tracing::debug!("key waited {waited}ms for a guest thread sliced out mid-code");
         }
@@ -824,6 +820,17 @@ impl Display {
         }
 
         Ok(())
+    }
+
+    /// Waits, at most [`KEY_WAITS_FOR_GUEST_MS`], for every other guest thread to reach a host call
+    /// (sleep, wait, I/O) — where a handset hands over an event. Returns the milliseconds waited.
+    async fn wait_for_guest_threads(context: &mut WieJvmContext) -> u32 {
+        let mut waited = 0;
+        while waited < KEY_WAITS_FOR_GUEST_MS && context.system().guest_others_preempted() {
+            context.system().sleep(1).await;
+            waited += 1;
+        }
+        waited
     }
 
     async fn handle_alert_timeout(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>, generation: i32) -> JvmResult<()> {
@@ -980,7 +987,20 @@ impl Display {
             // 5267badf20b3's paint() stores a "ready" static and then the object its game thread
             // draws with; sliced between the two stores, the game thread saw "ready", read the null
             // object and died on the first frame. Held up to paint()'s next blocking host call.
-            let held = context.system().guest_hold_others(true);
+            // Nor does a paint start in the middle of another thread's frame — the half the hold
+            // cannot cover. 3ccc6cf147d2's paint() frees a set of images while its game thread,
+            // sliced in the middle of loading that same set, is still filling them; resumed, the
+            // load read the nulled array, the game thread died and the stage briefing froze
+            // (docs/report/0506). So wait as a key does, unless an outer handler already holds.
+            let mut held = context.system().guest_hold_others(true);
+            if !held {
+                context.system().guest_hold_others(false);
+                let waited = Self::wait_for_guest_threads(context).await;
+                if waited > 0 {
+                    tracing::debug!("paint waited {waited}ms for a guest thread sliced out mid-code");
+                }
+                held = context.system().guest_hold_others(true);
+            }
             let result: JvmResult<()> = jvm
                 .invoke_virtual(
                     &current_displayable,
@@ -1247,7 +1267,7 @@ mod test {
     use core::{
         future::Future,
         pin::Pin,
-        sync::atomic::{AtomicBool, Ordering},
+        sync::atomic::{AtomicBool, AtomicU32, Ordering},
     };
 
     use jvm::{ClassInstanceRef, JavaValue, Jvm, Result as JvmResult, runtime::JavaLangString};
@@ -1843,6 +1863,60 @@ mod test {
 
             assert!(jvm.get_field::<bool>(&canvas, "paintedHeld", "Z").await?);
             assert!(!held.load(Ordering::Relaxed), "and let go after");
+
+            Ok(())
+        })
+    }
+
+    /// A runner whose other guest thread stays sliced out mid-code for the first `.0` asks, and that
+    /// records how many asks were left when paint() took its hold.
+    struct SlicedRunner(Arc<AtomicU32>, Arc<AtomicU32>);
+
+    #[async_trait::async_trait]
+    impl TaskRunner for SlicedRunner {
+        async fn run(&self, future: Pin<Box<dyn Future<Output = Result<()>> + Send>>) -> Result<()> {
+            future.await
+        }
+
+        fn others_preempted(&self) -> bool {
+            self.0
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |left| left.checked_sub(1))
+                .is_ok()
+        }
+
+        fn hold_others(&self, on: bool) -> bool {
+            if on {
+                self.1.store(self.0.load(Ordering::Relaxed), Ordering::Relaxed);
+            }
+            false
+        }
+    }
+
+    #[test]
+    fn paint_waits_for_a_thread_sliced_out_mid_code() -> Result<()> {
+        // 3ccc6cf147d2: paint() frees what the game thread, sliced mid-frame, is still filling.
+        let sliced = Arc::new(AtomicU32::new(3));
+        let left_at_paint = Arc::new(AtomicU32::new(u32::MAX));
+        let runner = SlicedRunner(sliced.clone(), left_at_paint.clone());
+        run_jvm_test_with_runner(test_protos(), Box::new(TestPlatform::new()), runner, move |jvm, _| async move {
+            let display: ClassInstanceRef<Display> = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?.into();
+            let canvas = jvm.new_class("javax/microedition/lcdui/TestNotifyCanvas", "()V", ()).await?;
+            let _: () = jvm
+                .invoke_virtual(
+                    &display,
+                    "javax/microedition/lcdui/Display",
+                    "setCurrent",
+                    "(Ljavax/microedition/lcdui/Displayable;)V",
+                    (canvas.clone(),),
+                )
+                .await?;
+            let _: () = jvm
+                .invoke_virtual(&display, "javax/microedition/lcdui/Display", "handlePaintEvent", "()V", ())
+                .await?;
+
+            // The last hold taken is paint()'s own (TestNotifyCanvas::paint): by then the other
+            // thread had reached its host call.
+            assert_eq!(left_at_paint.load(Ordering::Relaxed), 0);
 
             Ok(())
         })
