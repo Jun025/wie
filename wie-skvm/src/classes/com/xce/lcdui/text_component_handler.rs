@@ -7,7 +7,7 @@ use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 use wie_util::keypad::{self, MULTITAP_MS, Mode, Op};
 
-use super::TextComponent;
+use super::{TextComponent, XTextField};
 
 // MIDP key codes as this engine delivers them (wie-midp event_queue).
 const CLEAR: i32 = 8;
@@ -27,9 +27,10 @@ const DECIMAL: i32 = 5;
 // The handset's text-input overlay. The one caller measured (9a2cf5ffc9d3, paint path) gates every
 // other use on `isLoaded()` — `invokestatic isLoaded; ifne …; return` — so reporting "not loaded"
 // is the whole contract it needs: no input-method indicator is drawn. 14a62a8521a0 takes the handler
-// unconditionally in its text field's constructor, asks it for the input mode and offers it every
-// key, but never registers a field — so with nothing registered no key is consumed (false hands the
-// key back to the title) and that title sees exactly what it saw before this was an input method.
+// unconditionally in its name box's constructor, asks it for the input mode and offers it every key,
+// but never registers a TextComponent: the box is a focused XTextField, and the handler is the only
+// thing its keys reach. So with nothing registered the key goes to the focused XTextField, and is
+// consumed when it changed the text; with no focused field either it is handed back (false).
 //
 // 85f03ca7389e's text fields register themselves with setTextComponent on focus, and their
 // keyPressed is only `handler.keyPressed(key); pop` — the handler is the sole writer of text. So
@@ -122,7 +123,12 @@ impl TextComponentHandler {
         const NAME: &str = "com/xce/lcdui/TextComponent";
         let component: ClassInstanceRef<TextComponent> = jvm.get_field(&this, "component", "Lcom/xce/lcdui/TextComponent;").await?;
         if component.is_null() {
-            return Ok(false);
+            let field = XTextField::focused(jvm).await?;
+            return if field.is_null() {
+                Ok(false)
+            } else {
+                XTextField::take_key(jvm, context, field, key).await
+            };
         }
 
         match key {
@@ -425,7 +431,7 @@ mod tests {
                 }
                 let (j, h) = (&jvm, &handler);
 
-                // Nothing registered: 14a62a8521a0's situation — every key goes back to the title.
+                // Nothing registered and no XTextField focused: every key goes back to the title.
                 assert!(!press(j, h, 0x35).await?);
 
                 let name: ClassInstanceRef<EditField> = jvm.new_class("test/EditField", "(II)V", (0, 3)).await?.into();

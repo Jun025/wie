@@ -1,0 +1,12 @@
+{
+ "schema": "wie-worklog/1",
+ "date": "2026-10-10",
+ "task": "wie-executor-halted-flag-atomicbool-adopt-p0",
+ "title": "executor halted 를 잠금 밖 AtomicBool 로 — 잠금은 빠졌으나 네이티브 CPU 는 코드 배치로 +2.4~4.1% · 브라우저 변화 없음",
+ "summary": "halted 를 Executor 의 Arc<AtomicBool>(Relaxed)로 옮겼다. halt 시험은 통과한다. 50M tick CPU(n=5)는 main 대비 +4.1%/+2.4% 다. 검사 두 줄을 지운 대조 판은 −1.5/−2.2% 다. 이 판은 System::tick_for 에서 BTreeMap Values::next 가 인라인에서 빠졌다(1→4곳). 브라우저 3cc7a9b4cb15 paints 는 중앙값 +2.2%(3/4)로 잡음 범위다.",
+ "changes": ["wie-backend/src/executor.rs — halted: ExecutorInner bool → Executor Arc<AtomicBool>", "docs/report/0505"],
+ "verification": ["4게이트 + beta clippy · cargo test --all 771 통과", "네이티브 3판×2게임×5회 · 브라우저 2판×4회 · host-load-guard rc=0"],
+ "limits": ["네이티브 회귀는 인라인 결정 몫으로 판정(대조 판 근거) — 인라인 운은 좇지 않았다", "브라우저 n=4"],
+ "adoptedProposals": ["2026-10-10-play-speed-tick-cost-commit-bisect#p0"],
+ "proposals": []
+}

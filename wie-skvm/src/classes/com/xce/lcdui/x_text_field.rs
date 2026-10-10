@@ -9,6 +9,8 @@ use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 use wie_midp::classes::javax::microedition::lcdui::{Canvas, Graphics};
 use wie_util::keypad::{self, MULTITAP_MS, Mode};
 
+const NAME: &str = "com/xce/lcdui/XTextField";
+const DESCRIPTOR: &str = "Lcom/xce/lcdui/XTextField;";
 const CLEAR: i32 = 8;
 // javax.microedition.lcdui.TextField
 const CONSTRAINT_MASK: i32 = 0xFFFF;
@@ -28,6 +30,12 @@ const DECIMAL: i32 = 5;
 // ponytail: upper-case Latin only, no Hangul/mode key — no measured title asks for one. `0` is a
 // space (keypad's E.161 table, shared with TextComponentHandler); a title that must refuse a
 // blank-only name checks that itself.
+//
+// 14a62a8521a0's name box never calls keyPressed here: its wrapper focuses the field and offers every
+// key to TextComponentHandler.keyPressed instead, and never calls setTextComponent. So the field that
+// holds focus is kept in `focused`, and the handler gives it a key when no TextComponent is registered.
+// No other title in the corpus calls the handler's keyPressed on a field of this class (measured),
+// so their keys still arrive here exactly once.
 pub struct XTextField;
 
 impl XTextField {
@@ -70,6 +78,7 @@ impl XTextField {
                 JavaFieldProto::new("tapKey", "I", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("tapChar", "C", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("tapTime", "J", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("focused", "Lcom/xce/lcdui/XTextField;", FieldAccessFlags::STATIC),
             ],
             access_flags: ClassAccessFlags::PUBLIC,
         }
@@ -149,7 +158,17 @@ impl XTextField {
 
     async fn set_focus(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, focus: bool) -> JvmResult<()> {
         tracing::debug!("com.xce.lcdui.XTextField::setFocus({this:?}, {focus})");
-        jvm.put_field(&mut this, "focus", "Z", focus).await
+        jvm.put_field(&mut this, "focus", "Z", focus).await?;
+
+        if focus {
+            jvm.put_static_field(NAME, "focused", DESCRIPTOR, this).await?;
+        }
+        Ok(())
+    }
+
+    /// The field that last took focus, or null. It may have lost focus since; take_key checks.
+    pub async fn focused(jvm: &Jvm) -> JvmResult<ClassInstanceRef<Self>> {
+        jvm.get_static_field(NAME, "focused", DESCRIPTOR).await
     }
 
     async fn set_bounds(
@@ -175,12 +194,17 @@ impl XTextField {
         jvm.put_field(&mut this, "height", "I", height).await
     }
 
-    async fn key_pressed(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, key_code: i32) -> JvmResult<()> {
+    async fn key_pressed(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>, key_code: i32) -> JvmResult<()> {
         tracing::debug!("com.xce.lcdui.XTextField::keyPressed({this:?}, {key_code})");
 
+        Self::take_key(jvm, context, this, key_code).await.map(|_| ())
+    }
+
+    /// keyPressed's work; returns whether the text changed (a changed field has repainted itself).
+    pub async fn take_key(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, key_code: i32) -> JvmResult<bool> {
         let focus: bool = jvm.get_field(&this, "focus", "Z").await?;
         if !focus {
-            return Ok(());
+            return Ok(false);
         }
 
         let changed = match key_code {
@@ -197,7 +221,10 @@ impl XTextField {
             32..=126 => Self::append(jvm, &mut this, key_code as JavaChar).await?,
             _ => false,
         };
-        if changed { Self::repaint(jvm, context, this).await } else { Ok(()) }
+        if changed {
+            Self::repaint(jvm, context, this).await?;
+        }
+        Ok(changed)
     }
 
     /// Returns whether the text changed.
@@ -372,7 +399,7 @@ mod tests {
     use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
     use wie_midp::classes::javax::microedition::lcdui::{Canvas, Graphics, Image};
 
-    use super::XTextField;
+    use super::{super::TextComponentHandler, XTextField};
 
     struct TrackingCanvas;
     struct TrackingGraphics;
@@ -672,6 +699,64 @@ mod tests {
                 let _: () = jvm.invoke_virtual(&direct, X, "keyPressed", "(I)V", (0x32,)).await?;
                 let _: () = jvm.invoke_virtual(&direct, X, "inputChar", "(C)V", ('X' as JavaChar,)).await?;
                 assert_eq!(press(&jvm, &direct, &[0x32]).await?, "AXA");
+                Ok(())
+            },
+        );
+
+        assert!(result.is_ok(), "JVM test failed: {result:?}");
+    }
+
+    /// 14a62a8521a0's name box: `new XTextField("", 64, 0, canvas)`, `setFocus(true)`, then every key
+    /// goes only to `TextComponentHandler.keyPressed` (no setTextComponent). The focused field must
+    /// take it; once focus leaves, the handler hands keys back again.
+    #[test]
+    fn handler_keys_reach_the_focused_field() {
+        let result = run_jvm_test(
+            Box::new([
+                wie_midp::get_protos().into(),
+                crate::get_protos().into(),
+                [TrackingCanvas::as_proto(), TrackingGraphics::as_proto()].into(),
+            ]),
+            |jvm| async move {
+                const X: &str = "com/xce/lcdui/XTextField";
+                const H: &str = "com/xce/lcdui/TextComponentHandler";
+                let handler: ClassInstanceRef<TextComponentHandler> = jvm
+                    .invoke_static(H, "getTextComponentHandler", "()Lcom/xce/lcdui/TextComponentHandler;", ())
+                    .await?;
+                async fn press(jvm: &Jvm, handler: &ClassInstanceRef<TextComponentHandler>, key: i32) -> JvmResult<bool> {
+                    jvm.invoke_virtual(handler, H, "keyPressed", "(I)Z", (key,)).await
+                }
+                let canvas: ClassInstanceRef<Canvas> = jvm.new_class("test/TrackingCanvas", "()V", ()).await?.into();
+                let empty: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, "").await?.into();
+                let name: ClassInstanceRef<XTextField> = jvm
+                    .new_class(
+                        X,
+                        "(Ljava/lang/String;IILjavax/microedition/lcdui/Canvas;)V",
+                        (empty, 64, 0, canvas.clone()),
+                    )
+                    .await?
+                    .into();
+                let text = async |jvm: &Jvm| -> JvmResult<alloc::string::String> {
+                    let text: ClassInstanceRef<String> = jvm.invoke_virtual(&name, X, "getText", "()Ljava/lang/String;", ()).await?;
+                    JavaLangString::to_rust_string(jvm, &text).await
+                };
+
+                // Not focused yet: nothing to type into.
+                assert!(!press(&jvm, &handler, 0x35).await?);
+                let _: () = jvm.invoke_virtual(&name, X, "setFocus", "(Z)V", (true,)).await?;
+                // 5 5 → K, 2 → A, CLEAR, 6 → M. Each is consumed and repaints the canvas.
+                for key in [0x35, 0x35, 0x32, 8, 0x36] {
+                    assert!(press(&jvm, &handler, key).await?);
+                }
+                assert_eq!(text(&jvm).await?, "KM");
+                assert_eq!(jvm.get_field::<i32>(&canvas, "repaintCount", "I").await?, 5);
+                // A key the field does not take (UP) goes back to the title.
+                assert!(!press(&jvm, &handler, 141).await?);
+
+                // The title's mode-key path refocuses (setFocus false then true) — still the same field.
+                let _: () = jvm.invoke_virtual(&name, X, "setFocus", "(Z)V", (false,)).await?;
+                assert!(!press(&jvm, &handler, 0x32).await?);
+                assert_eq!(text(&jvm).await?, "KM");
                 Ok(())
             },
         );

@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-10",
+  "kind": "speed",
+  "titles": [
+    "287af341dac8f421b9f599826fe68ff3d649cf9fa9467ceaddc139423a82f7b7",
+    "863b8ab6a21df2c05e0d9ad085a5068fdf37433940093efe289b6459b7c1e7e9"
+  ],
+  "summary_ko": "선이나 사각형을 많이 그리는 게임이 덜 버벅여요. 빠르기를 2배로 두면 더 빨라지고(한 게임은 약 1.5배에서 1.7배로), 1배에서도 화면이 더 자주 바뀔 수 있어요.",
+  "pr": "https://github.com/Jun025/wie/pull/536"
+}
