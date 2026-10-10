@@ -21,17 +21,42 @@ pub fn read_text(context: &dyn WIPICContext, address: u32, length: i32) -> Resul
     Ok(Some(encoding_rs::EUC_KR.decode(&bytes).0.into_owned()))
 }
 
-fn write_canvas<F>(context: &mut dyn WIPICContext, framebuffer: &FrameBuffer, operation: F) -> Result<()>
+/// `x, y, width, height` as an area for `write_canvas`, in i64 so guest extremes cannot overflow.
+fn area(x: i32, y: i32, width: u32, height: u32) -> Option<[i64; 4]> {
+    Some([x as i64, y as i64, x as i64 + width as i64, y as i64 + height as i64])
+}
+
+/// Run `operation` on the part of `framebuffer` it can touch: `area` (`[x0, y0, x1, y1)`, `None` = anywhere)
+/// within `clip` and the buffer. Only that part goes between guest memory and the canvas, and the
+/// operation gets it as its clip, so nothing outside it can change.
+fn write_canvas<F>(context: &mut dyn WIPICContext, framebuffer: &FrameBuffer, area: Option<[i64; 4]>, clip: Clip, operation: F) -> Result<()>
 where
-    F: FnOnce(&mut dyn wie_backend::canvas::Canvas),
+    F: FnOnce(&mut dyn wie_backend::canvas::Canvas, Clip),
 {
-    let mut canvas = framebuffer.canvas(context)?;
-    operation(&mut **canvas);
+    let [ax0, ay0, ax1, ay1] = area.unwrap_or([i64::MIN, i64::MIN, i64::MAX, i64::MAX]);
+    let x0 = ax0.max(clip.x as i64).max(0);
+    let y0 = ay0.max(clip.y as i64).max(0);
+    let x1 = ax1.min(clip.x as i64 + clip.width as i64).min(framebuffer.0.width as i64);
+    let y1 = ay1.min(clip.y as i64 + clip.height as i64).min(framebuffer.0.height as i64);
+    if x0 >= x1 || y0 >= y1 {
+        return Ok(());
+    }
+    let region = Clip {
+        x: x0 as i32,
+        y: y0 as i32,
+        width: (x1 - x0) as u32,
+        height: (y1 - y0) as u32,
+    };
+
+    let mut canvas = framebuffer.canvas(context, region)?;
+    operation(&mut **canvas, region);
     canvas.flush()
 }
 
 pub fn put_pixel(context: &mut dyn WIPICContext, framebuffer: &FrameBuffer, x: i32, y: i32, color: Color, clip: Clip) -> Result<()> {
-    write_canvas(context, framebuffer, |canvas| canvas.put_pixel(x, y, color, clip))
+    write_canvas(context, framebuffer, area(x, y, 1, 1), clip, |canvas, clip| {
+        canvas.put_pixel(x, y, color, clip)
+    })
 }
 
 pub fn fill_rect(
@@ -44,7 +69,9 @@ pub fn fill_rect(
     color: Color,
     clip: Clip,
 ) -> Result<()> {
-    write_canvas(context, framebuffer, |canvas| canvas.fill_rect(x, y, width, height, color, clip))
+    write_canvas(context, framebuffer, area(x, y, width, height), clip, |canvas, clip| {
+        canvas.fill_rect(x, y, width, height, color, clip)
+    })
 }
 
 pub fn draw_line(
@@ -57,7 +84,11 @@ pub fn draw_line(
     color: Color,
     clip: Clip,
 ) -> Result<()> {
-    write_canvas(context, framebuffer, |canvas| canvas.draw_line(x1, y1, x2, y2, color, clip))
+    // bresenham stays inside the endpoints' box, also after the canvas clips the segment to the image
+    let line = Some([x1.min(x2) as i64, y1.min(y2) as i64, x1.max(x2) as i64 + 1, y1.max(y2) as i64 + 1]);
+    write_canvas(context, framebuffer, line, clip, |canvas, clip| {
+        canvas.draw_line(x1, y1, x2, y2, color, clip)
+    })
 }
 
 pub fn draw_rect(
@@ -70,7 +101,9 @@ pub fn draw_rect(
     color: Color,
     clip: Clip,
 ) -> Result<()> {
-    write_canvas(context, framebuffer, |canvas| canvas.draw_rect(x, y, width, height, color, clip))
+    write_canvas(context, framebuffer, area(x, y, width, height), clip, |canvas, clip| {
+        canvas.draw_rect(x, y, width, height, color, clip)
+    })
 }
 
 pub fn draw_arc(
@@ -85,7 +118,7 @@ pub fn draw_arc(
     color: Color,
     clip: Clip,
 ) -> Result<()> {
-    write_canvas(context, framebuffer, |canvas| {
+    write_canvas(context, framebuffer, area(x, y, width, height), clip, |canvas, clip| {
         canvas.draw_arc(x, y, width, height, start_angle, arc_angle, color, clip)
     })
 }
@@ -102,7 +135,7 @@ pub fn fill_arc(
     color: Color,
     clip: Clip,
 ) -> Result<()> {
-    write_canvas(context, framebuffer, |canvas| {
+    write_canvas(context, framebuffer, area(x, y, width, height), clip, |canvas, clip| {
         canvas.fill_arc(x, y, width, height, start_angle, arc_angle, color, clip)
     })
 }
@@ -119,7 +152,7 @@ pub fn draw_image(
     source_y: i32,
     clip: Clip,
 ) -> Result<()> {
-    write_canvas(context, framebuffer, |canvas| {
+    write_canvas(context, framebuffer, area(x, y, width, height), clip, |canvas, clip| {
         canvas.draw(x, y, width, height, image, source_x, source_y, clip)
     })
 }
@@ -136,7 +169,7 @@ pub fn copy_area(
     clip: Clip,
 ) -> Result<()> {
     let image = framebuffer.image(context)?;
-    write_canvas(context, framebuffer, |canvas| {
+    write_canvas(context, framebuffer, area(x, y, width, height), clip, |canvas, clip| {
         canvas.draw(x, y, width, height, &*image, source_x, source_y, clip)
     })
 }
@@ -154,14 +187,15 @@ pub fn copy_framebuffer(
     clip: Clip,
 ) -> Result<()> {
     let image = source.image(context)?;
-    write_canvas(context, destination, |canvas| {
+    write_canvas(context, destination, area(x, y, width, height), clip, |canvas, clip| {
         canvas.draw(x, y, width, height, &*image, source_x, source_y, clip)
     })
 }
 
 pub fn draw_text(context: &mut dyn WIPICContext, framebuffer: &FrameBuffer, string: &str, x: i32, y: i32, color: Color, clip: Clip) -> Result<()> {
     let font = context.system().platform().font().clone();
-    write_canvas(context, framebuffer, |canvas| {
+    // glyph extents are the font's business: the whole clip
+    write_canvas(context, framebuffer, None, clip, |canvas, clip| {
         canvas.draw_text(&font, string, x, y, wie_backend::canvas::TextAlignment::Left, color, clip)
     })
 }
@@ -251,7 +285,8 @@ pub fn set_rgb_pixels(
         context.read_bytes(address, &mut pixels[offset..offset + row_bytes])?;
     }
 
-    write_canvas(context, framebuffer, |canvas| {
+    // guest coordinates wrap (`wrapping_add`), so there is no one box: the whole clip
+    write_canvas(context, framebuffer, None, clip, |canvas, clip| {
         for row_index in 0..height {
             let row_offset = row_index as usize * row_bytes;
             let row = &pixels[row_offset..row_offset + row_bytes];
@@ -365,5 +400,150 @@ mod tests {
                 height: 1,
             },
         )
+    }
+}
+
+/// Every primitive against the canvas it used to run on — the whole buffer read, drawn, written back —
+/// over a patterned buffer, so a region too small (lost pixels) or a write outside it (changed pixels)
+/// both show. Covers clips, off-buffer and extreme coordinates, a source with transparent pixels
+/// (the colour key arrives as alpha 0), and offscreen buffers narrower and wider than the source.
+#[cfg(test)]
+mod region_tests {
+    use alloc::{boxed::Box, vec::Vec};
+
+    use wie_backend::canvas::{ArgbPixel, Canvas, Clip, Color, Image, ImageBufferCanvas, PixelType, Rgb565Pixel, VecImageBuffer};
+    use wie_util::Result;
+
+    use super::*;
+    use crate::context::test::TestContext;
+
+    struct Lcg(u32);
+    impl Lcg {
+        fn next(&mut self) -> u32 {
+            self.0 = self.0.wrapping_mul(1_103_515_245).wrapping_add(12345);
+            self.0 >> 8
+        }
+        fn coord(&mut self, size: u32) -> i32 {
+            match self.next() % 16 {
+                0 => i32::MIN + (self.next() % 4) as i32,
+                1 => i32::MAX - (self.next() % 4) as i32,
+                _ => (self.next() % (size + 8)) as i32 - 4,
+            }
+        }
+        fn len(&mut self, size: u32) -> u32 {
+            if self.next() % 16 == 0 {
+                u32::MAX - self.next() % 4
+            } else {
+                self.next() % (size + 4)
+            }
+        }
+        fn color(&mut self) -> Color {
+            let v = self.next();
+            Color {
+                a: 0xff,
+                r: v as u8,
+                g: (v >> 8) as u8,
+                b: (v >> 16) as u8,
+            }
+        }
+    }
+
+    fn reference<P: PixelType + 'static>(raw: &[u8], w: u32, h: u32, op: &dyn Fn(&mut dyn Canvas)) -> Vec<u8> {
+        let mut canvas = ImageBufferCanvas::new(VecImageBuffer::<P>::from_raw(w, h, bytemuck::pod_collect_to_vec(raw)));
+        op(&mut canvas);
+        canvas.image().raw().into_owned()
+    }
+
+    fn sweep(bpp: u32, w: u32, h: u32, seed: u32) -> Result<()> {
+        let mut context = TestContext::new();
+        let framebuffer = FrameBuffer::new(&mut context, w, h, bpp)?;
+        let mut rng = Lcg(seed);
+        let pattern: Vec<u8> = (0..w * h * bpp / 8).map(|_| rng.next() as u8).collect();
+
+        // the source: half its pixels transparent, sized off the target's
+        let (sw, sh) = (w / 2 + 3, h + 2);
+        let source: Box<dyn Image> = Box::new(VecImageBuffer::<ArgbPixel>::from_raw(
+            sw,
+            sh,
+            (0..sw * sh)
+                .map(|i| {
+                    ArgbPixel::from_color(Color {
+                        a: if i % 2 == 0 { 0 } else { 0xff },
+                        ..rng.color()
+                    })
+                })
+                .collect(),
+        ));
+        let source_framebuffer = FrameBuffer::from_image(&mut context, &*source)?;
+
+        for round in 0..400 {
+            framebuffer.write(&mut context, &pattern)?;
+            let clip = if rng.next() % 3 == 0 {
+                Clip {
+                    x: 0,
+                    y: 0,
+                    width: w,
+                    height: h,
+                }
+            } else {
+                Clip {
+                    x: rng.coord(w),
+                    y: rng.coord(h),
+                    width: rng.len(w),
+                    height: rng.len(h),
+                }
+            };
+            let (x, y, x2, y2) = (rng.coord(w), rng.coord(h), rng.coord(w), rng.coord(h));
+            let (cw, ch) = (rng.len(w), rng.len(h));
+            let (sx, sy) = (rng.coord(sw), rng.coord(sh));
+            let color = rng.color();
+            let kind = round % 10;
+
+            let op = |canvas: &mut dyn Canvas| match kind {
+                0 => canvas.put_pixel(x, y, color, clip),
+                1 => canvas.fill_rect(x, y, cw, ch, color, clip),
+                2 => canvas.draw_line(x, y, x2, y2, color, clip),
+                3 => canvas.draw_rect(x, y, cw, ch, color, clip),
+                4 => canvas.draw_arc(x, y, cw % 64, ch % 64, sx, sy, color, clip),
+                5 => canvas.fill_arc(x, y, cw % 64, ch % 64, sx, sy, color, clip),
+                6 | 8 => canvas.draw(x, y, cw, ch, &*source, sx, sy, clip),
+                7 => {
+                    let image = canvas.image();
+                    let copy = VecImageBuffer::<ArgbPixel>::from_raw(w, h, image.colors().into_iter().map(ArgbPixel::from_color).collect());
+                    canvas.draw(x, y, cw, ch, &copy, sx, sy, clip)
+                }
+                _ => {}
+            };
+            let expected = match bpp {
+                16 => reference::<Rgb565Pixel>(&pattern, w, h, &op),
+                _ => reference::<ArgbPixel>(&pattern, w, h, &op),
+            };
+
+            match kind {
+                0 => put_pixel(&mut context, &framebuffer, x, y, color, clip)?,
+                1 => fill_rect(&mut context, &framebuffer, x, y, cw, ch, color, clip)?,
+                2 => draw_line(&mut context, &framebuffer, x, y, x2, y2, color, clip)?,
+                3 => draw_rect(&mut context, &framebuffer, x, y, cw, ch, color, clip)?,
+                4 => draw_arc(&mut context, &framebuffer, x, y, cw % 64, ch % 64, sx, sy, color, clip)?,
+                5 => fill_arc(&mut context, &framebuffer, x, y, cw % 64, ch % 64, sx, sy, color, clip)?,
+                6 => draw_image(&mut context, &framebuffer, x, y, cw, ch, &*source, sx, sy, clip)?,
+                7 => copy_area(&mut context, &framebuffer, x, y, cw, ch, sx, sy, clip)?,
+                8 => copy_framebuffer(&mut context, &framebuffer, x, y, cw, ch, &source_framebuffer, sx, sy, clip)?,
+                _ => {}
+            }
+
+            let actual = framebuffer.image(&mut context)?.raw().into_owned();
+            assert!(actual == expected, "bpp {bpp} {w}x{h} round {round} kind {kind}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn drawing_through_a_region_matches_drawing_the_whole_buffer() -> Result<()> {
+        for (seed, (w, h)) in [(64, 48), (9, 11), (31, 7), (1, 1)].into_iter().enumerate() {
+            sweep(16, w, h, seed as u32 + 1)?;
+            sweep(32, w, h, seed as u32 + 101)?;
+        }
+        Ok(())
     }
 }
