@@ -64,3 +64,5 @@
 - `docs/player-updates/2026-10-11-lgt-online-register-no-crash.json`(fix).
 - 0507 원장 csv 72행 note · basis 0511.
 - worklog `docs/worklog/2026-10-11-lgt-1a69522a7d43-nested-paint-host-panic.json`: adopted `…round3#p1` · 카드 1(`connect()` 반환값 전수).
+
+유입: BOUNDED 333쌍은 전부 `compat.json` 의 기존 행(이 회차가 바꾼 것은 `1a69522a7d43` 의 `knownIssues_ko` 한 줄 · 제목 0) · 그 파일을 뺀 6파일은 BOUNDED 3쌍(`display.rs` 기존 주석 · 이 회차 diff 에 0회) · SUFFIX-ATTACHED 1(census 의 기존 «턴종료» 줄).
