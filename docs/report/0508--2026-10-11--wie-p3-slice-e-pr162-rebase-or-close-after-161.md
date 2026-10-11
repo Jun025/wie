@@ -3,7 +3,7 @@
 **무엇을** — 처분 전용(제품 코드 0줄). PR #162(head `3bf1bfbd` · 2026-09-16 · 게이트② approve)를 **닫았다**.
 STATE.md «다음» 의 조각 E 줄과 `docs/upstream-realign-p3-slices.md` §6 E 배너를 그 결과로 고쳤다.
 
-**왜** — #162 는 코드 PR 이 아니라 **#161 «착지 전» head `f533ba54` 를 잰 조사 기록**이다(리포트 0116 · 4파일 전부 문서).
+**왜** — #162 는 코드 PR 이 아니라 **#161 «착지 전» head `f533ba54` 를 잰 조사 기록**이다(4파일 전부 문서 · 본문 = PR #162 head `3bf1bfbd` 의 `docs/report/0116--2026-09-16--wie-p3-slice-e-verify-web-contract-on-new-base.md` — main 미착지 · 닫힌 PR 에서만 열람: `git fetch origin pull/162/head`. F2 «두 레그» 분석 · 「깨지지 않은 것」 절 · F1 12건 전수는 거기에만 있다).
 그 피검체는 착지하지 않았고, #161 은 `-fix2`/`-fix3` 를 거쳐 다른 head 로 착지했다(`37734e74`).
 #162 head 는 #161 을 포함하지 않고 `origin/main` 보다 **3,261 커밋** 뒤다.
 `git merge-tree --write-tree origin/main 3bf1bfbd` → **CONFLICT 2**(`STATE.md` · `docs/upstream-realign-p3-slices.md`) —
