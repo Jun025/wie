@@ -33,3 +33,8 @@ L2 의 키별 화면 880장 중 키 69 뒤로는 두 장만 번갈아 나온다.
 ### 4. 게이트
 
 - 4종(fmt · clippy stable · clippy wasm32 · `RUST_MIN_STACK=4194304 cargo test --all`) — PR 본문에 결과.
+
+### 5. 게임 파일명 유입
+
+- 도구 기본(3파일): BOUNDED 718회/330쌍 · SUFFIX-ATTACHED 36회/16쌍 — 전부 `compat.json` 의 `title`·`fileTitle` 칸이다. 그 파일은 공개 데이터 스키마상 제목을 원래 담고, 이 회차는 두 행의 `status`·`axes`·`knownIssues_ko` 만 바꿨다(diff 에 `title` 줄 0).
+- 이 회차가 쓴 두 파일(보고 · 업데이트 소식)만 대상으로: BOUNDED 0회/0쌍 · SUFFIX-ATTACHED 0회/0쌍. 타이틀은 sha12 로만 적었다.
