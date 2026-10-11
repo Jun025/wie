@@ -28,3 +28,5 @@
 
 upstream 이 «해결»이라 한 시점의 코드는 전부 main 에 있다 → ③ 종결. 우리 빌드에서의 재현 0 은 **측정하지 못했다**
 (수단 부재). 재개 조건: 우리 빌드에서 스테이지 5 정지 보고가 새로 들어올 때. upstream 발신 0.
+
+유입: BOUNDED 1쌍(`STATE.md` 의 기존 줄 — 이 회차가 쓴 줄 아님, `git diff origin/main -- STATE.md` 에 0회) · SUFFIX-ATTACHED 0.
