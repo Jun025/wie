@@ -71,7 +71,7 @@ f2ae515201f2,SKT,a-tip,tip,playable,stuck,0482,74c9d915,tip already shipped
 d448aee68157,KTF,a-below,none,playable,stuck,0510,6ea6a6bd,name box takes keys and digits (not drawn: lwc TextBox paints nothing); policy reaches the pet room (P/P2 250/310); not an engine wall
 1a69522a7d43,LGT,b-engine,none,playable,stuck,0511,6ea6a6bd,tutorial needs the call key (not injectable); online register: host panic fixed 0511 (nested paint) - now stops on the dialog (title's network thread dies after connect() -1); owner 0511
 14a62a8521a0,SKT,ok-policy,none,playable,ok,0504/0510,6ea6a6bd,policy P/P2 0/0 ok; dance stages after the name box
-c361632541a7,SKT,b-engine,none,playable,stuck,0507,26f79198,loads the 240 image set the jar does not ship (176 only); screens black; no owner
+c361632541a7,SKT,b-engine,none,playable,stuck,0512,709e5c0a,display fixed (176x186 by jar hash; 0512): art and play screens draw; P/P2 stall on the menu-developed dialog from ~160 s; cause not measured
 30c7bd6fb01b,KTF,c-server,issue,playable,stuck,0470,f5c02609,server line already in knownIssues
 3185174d2121,KTF,c-server,issue,playable,stuck,0470,f5c02609,server line already in knownIssues
 568c339a8c07,KTF,c-server,issue,playable,stuck,0452/0470,1bc1317c,server line already in knownIssues
