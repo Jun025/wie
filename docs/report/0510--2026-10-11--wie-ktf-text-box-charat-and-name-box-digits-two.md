@@ -83,3 +83,6 @@
 - wasm 빌드: Rust 변경이 없어 돌리지 않았다.
 - `node scripts/player-data.mjs` OK(429 · 156 updates) · `check-compat-revert` OK(착지 기준 바뀐 행 1) · `check-worklog-json` OK · `npm run audit` PASSED · 연번 검사 OK.
 - 유입: 이 회차가 더한 문서(0510 · worklog)는 BOUNDED 0 · SUFFIX-ATTACHED 0 이다. 원장 csv 4행은 sha12 와 영어 메모뿐이다. 브랜치 전체 B=718/330 · S=36/16 은 기존 `compat.json` title 이다(이 회차는 title 을 바꾸지 않았다).
+
+
+<!-- corpus-name-inflow v1 subjects=4 tree=10b59ba11e1b0247 B=718/330 P=0/0 S=36/16 -->
