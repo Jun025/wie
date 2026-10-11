@@ -316,10 +316,11 @@
     **PR #161** 로 들어갔다(**MERGED `2026-09-16T08:35:30Z`** · 머지 `37734e74`) ⇒
     `git merge-base origin/main upstream/main` = ★**`44fbf265`**(≠ `fa641a8a` · P3 DoD 리터럴 충족) · behind **1,140 → 15**.
     ★**그러므로 「선행 D 가 멈춰 있다」를 근거로 후속을 미루지 마라 — 그 전제는 2026-09-16 에 사라졌다.** →
-    ★~~**E** 웹 계약·아티팩트(M·med · 선행 D)~~ **돌았다 · ★«미착지»**(2026-09-16
-    `wie-p3-slice-e-verify-web-contract-on-new-base` + `-fix`) — **PR #162 OPEN**(개설 `2026-09-16T03:27:17Z` ·
-    2026-09-23 재확인). ★**종전 「미착수」는 거짓이다.** 회신 정본 =
-    `~/orchestrator/reports/wie-p3-slice-e-verify-web-contract-on-new-base-fix.done.md`.
+    ★~~**E** 웹 계약·아티팩트(M·med · 선행 D)~~ ★**닫혔다 — PR #162 는 착지 없이 «닫음»**(2026-10-11
+    `wie-p3-slice-e-pr162-rebase-or-close-after-161` · 정본 `docs/report/0508--…`). #162 는 #161 «착지 전» head
+    `f533ba54` 를 잰 조사 기록이고, 그 결함 F1(어댑터)·F4(계약 로케이터)·F5(고아 시험 · 0153)·upstream
+    `release.yaml`(park)은 **#161 착지 사슬과 후속 회차가 이미 고쳤다.** 남은 것 하나 = F2(wasm clippy 레그가
+    `wie_featurephone` 을 린트하지 않는다 — 컴파일은 required `build-web` 이 잡는다). ★**조각 E 를 다시 발권하지 마라.**
     ★★**D 의 ⒟ 는 «충돌 0» 이 아니라 «빌드 게이트»다 — 근거는 「★«미해결 0» 이 «컴파일된다»를 뜻하지 않는다」이고,
     ★그 근거는 «참»이다.** 아래 둘은 **충돌 74 «안»에 `UD` 로 있고**, 그 항목을 「한쪽 고르고 끝」으로 풀면 빌드가 깨진다:
     ⑴★**`UD wie_cli/Cargo.toml`**(1건) — upstream 이 네이티브 호스트를 루트 패키지로 옮겼다

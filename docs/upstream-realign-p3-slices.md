@@ -674,6 +674,9 @@ verdict §3-5 는 「upstream `LgtEmulator` 는 아카이브에서 **`applicatio
 
 ### E — `wie-p3-post-swap-web-contract-and-artifact`
 
+> ★★★**[닫혔다 2026-10-11 · `wie-p3-slice-e-pr162-rebase-or-close-after-161` · 정본 `docs/report/0508--…`]
+> 아래 배너의 «PR #162 OPEN» 은 낡았다 — #162 는 착지 없이 «닫았다»(근거 = 그 리포트 표). 조각 E 를 재발권하지 마라.**
+>
 > ★★**[돌았다 · «미착지» 2026-09-16 · `wie-p3-slice-e-verify-web-contract-on-new-base`(+`-fix`)]
 > 이 절에는 배너가 없었고, 그래서 `STATE.md` 가 이 조각을 «미착수»로 적고 있었다**(2026-09-23 정정).
 > **PR #162 OPEN**(개설 `2026-09-16T03:27:17Z` · 2026-09-23 재확인) — 회신 정본은
