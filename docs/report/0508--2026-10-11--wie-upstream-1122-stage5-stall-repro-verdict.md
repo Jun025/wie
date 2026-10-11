@@ -1,4 +1,4 @@
-## [2026-10-11] upstream #1122(컴삼촉 스테이지 5 정지) — main 포함 여부 판정 (wie-upstream-1122-stage5-stall-repro-verdict)
+## [2026-10-11] upstream #1122(`4fcd4b74020e` 스테이지 5 정지) — main 포함 여부 판정 (wie-upstream-1122-stage5-stall-repro-verdict)
 
 **무엇을**: STATE.md «다음» ③ 을 실측으로 닫았다. 엔진 코드 변경 0.
 **왜**: ③ 은 2026-08-15 기준 「upstream OPEN」이었는데 upstream 이 2026-09-07 에 닫았다.
