@@ -30,3 +30,5 @@ upstream 이 «해결»이라 한 시점의 코드는 전부 main 에 있다 →
 (수단 부재). 재개 조건: 우리 빌드에서 스테이지 5 정지 보고가 새로 들어올 때. upstream 발신 0.
 
 유입: BOUNDED 1쌍(`STATE.md` 의 기존 줄 — 이 회차가 쓴 줄 아님, `git diff origin/main -- STATE.md` 에 0회) · SUFFIX-ATTACHED 0.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=2badb2ea72c4909b B=2/1 P=0/0 S=0/0 -->
