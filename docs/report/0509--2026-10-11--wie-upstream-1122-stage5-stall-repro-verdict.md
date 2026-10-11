@@ -31,4 +31,4 @@ upstream 이 «해결»이라 한 시점의 코드는 전부 main 에 있다 →
 
 유입: BOUNDED 1쌍(`STATE.md` 의 기존 줄 — 이 회차가 쓴 줄 아님, `git diff origin/main -- STATE.md` 에 0회) · SUFFIX-ATTACHED 0.
 
-<!-- corpus-name-inflow v1 subjects=2 tree=2badb2ea72c4909b B=2/1 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=2 tree=443d9680db61626f B=2/1 P=0/0 S=0/0 -->
