@@ -49,7 +49,7 @@ const HANDSET_DISPLAYS: [(u32, u32); 4] = [(120, 160), (128, 160), (176, 220), (
 // `img_176/` from 151 — its bytecode) and ships only `img_176/`, whose 176x202 background is drawn
 // for a canvas of 186: the 220 panel less an 18 px status bar and a 16 px soft-key bar. The 176 row
 // above cannot be 186 — bf54c05e58a9 lays its dialogue box out to 220, and at 186 it is cut off.
-// Measured 2026-10-11 (docs/report/0511).
+// Measured 2026-10-11 (docs/report/0512).
 //   ponytail: one row per title; a rule when a second title needs one.
 const DISPLAY_OVERRIDES: [([u8; 16], (u32, u32)); 1] = [(
     [
