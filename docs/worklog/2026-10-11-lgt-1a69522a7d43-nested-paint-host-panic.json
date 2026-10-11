@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-11",
+  "task": "wie-lgt-1a69522a7d43-online-register-guest-exception-host-panic",
+  "title": "LGT 1a69522a7d43 — 온라인 등록 뒤 호스트 패닉: paint 안 serviceRepaints 의 무한 중첩",
+  "summary": "패닉의 원인은 게스트 예외가 아니라 같은 스레드의 paint 중첩이었다. paint() 가 repaint()+serviceRepaints() 를 부르면 Display 가 그 자리에서 paint 를 한 겹 더 열었고, 매 겹의 쓰레기가 열린 프레임에 묶여 16바이트 칸이 찼다. 중첩을 다음 틱으로 미뤄 패닉은 사라졌다. 등록 화면에서 멈추는 것은 남았다(게임 자신의 통신 스레드가 connect() -1 뒤 NPE 로 죽는다). docs/report/0511.",
+  "adoptedProposals": ["2026-10-11-progression-stuck-101-ledger-round3#p1"],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "org.kwis.msf.io.Network.connect() 가 -1 대신 0 을 돌려주면 통신 실패 안내가 뜨는지 전수로 잰다",
+      "plainSummary": "온라인 등록을 고르면 멈추는 게임이, 통신 연결 단계의 대답만 바꿔 주면 «연결에 실패했습니다» 안내를 띄우고 메뉴로 돌아와요. 같은 통신 기능을 쓰는 게임 160개에서 이 대답을 바꿔도 괜찮은지 재야 해요.",
+      "userBenefit": "통신 기능을 고른 뒤 화면이 멈추던 게임이 실패 안내를 보여 주고 계속 놀 수 있게 돼요.",
+      "why": "0511 실측: 1a69522a7d43 은 connect()==-1 이면 스트림을 열지 않고 «참»을 돌려 다음 쓰기에서 자기 NPE 로 통신 스레드가 죽는다(0x6d9b2 adds r0,#1; bne → 0x6db6e return 1). 시험 빌드에서 connect() 를 0 으로 바꾸면 소켓 열기가 기존 규칙(SchemeNotFoundException «Network is not supported»)을 받고, 게임이 잡아 «연결에 실패하였습니다» → 확인 → 주 메뉴로 돌아온다(paints 1607 · 멈춤 없음). 반대로 0448 의 KTF dbd078113b97 은 -1 을 실패로 비교한다.",
+      "tradeoff": "공유 스텁이라 KTF 143 · LGT 16 · SKT 1 = 160종(jar 에 클래스 이름이 있는 것)이 대상이다. dbd078113b97(0448)·3185174d2121(0470 ⒞)의 실패 길과 census netWall 계수(Network::connect 경고 수)가 바뀔 수 있어 전수 짝 프로브가 먼저다.",
+      "effort": "M",
+      "target": "wie-wipi-java org/kwis/msf/io/network.rs · 대상 160종(1a69522a7d43 · dbd078113b97 · 3185174d2121 먼저)"
+    }
+  ]
+}
