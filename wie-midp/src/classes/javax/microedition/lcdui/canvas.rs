@@ -393,7 +393,10 @@ mod test {
                         MethodAccessFlags::PROTECTED,
                     ),
                 ],
-                fields: vec![JavaFieldProto::new("paints", "I", FieldAccessFlags::PUBLIC)],
+                fields: vec![
+                    JavaFieldProto::new("paints", "I", FieldAccessFlags::PUBLIC),
+                    JavaFieldProto::new("repaints", "Z", FieldAccessFlags::PUBLIC),
+                ],
                 access_flags: ClassAccessFlags::PUBLIC,
             }
         }
@@ -402,6 +405,8 @@ mod test {
             jvm.invoke_special(&this, "javax/microedition/lcdui/Canvas", "<init>", "()V", ()).await
         }
 
+        // With `repaints` set it first asks for the next frame — the animation loop 1a69522a7d43
+        // runs inside paint().
         async fn paint(
             jvm: &Jvm,
             _context: &mut WieJvmContext,
@@ -412,6 +417,9 @@ mod test {
             jvm.put_field(&mut this, "paints", "I", paints + 1).await?;
             // Stop a recursion here rather than overflow the test thread; the count shows it.
             if paints < 8 {
+                if jvm.get_field(&this, "repaints", "Z").await? {
+                    let _: () = jvm.invoke_virtual(&this, "javax/microedition/lcdui/Canvas", "repaint", "()V", ()).await?;
+                }
                 let _: () = jvm
                     .invoke_virtual(&this, "javax/microedition/lcdui/Canvas", "serviceRepaints", "()V", ())
                     .await?;
@@ -455,6 +463,15 @@ mod test {
                 .invoke_virtual(&canvas, "javax/microedition/lcdui/Canvas", "serviceRepaints", "()V", ())
                 .await?;
             assert_eq!(paints().await? - base, 2);
+
+            // A repaint asked for inside paint belongs to the next paint, not to a nested one.
+            let mut servicing = canvas.clone();
+            jvm.put_field(&mut servicing, "repaints", "Z", true).await?;
+            let _: () = jvm
+                .invoke_virtual(&display, "javax/microedition/lcdui/Display", "handlePaintEvent", "()V", ())
+                .await?;
+            assert_eq!(paints().await? - base, 3, "serviceRepaints inside paint nested a paint");
+            assert!(jvm.get_field::<bool>(&display, "repaintPending", "Z").await?, "and it stays pending");
             Ok(())
         })
     }

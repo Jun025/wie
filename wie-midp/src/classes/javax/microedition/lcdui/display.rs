@@ -888,11 +888,13 @@ impl Display {
         // reset() wiped the clip the first had just set, so its next drawImage blitted a whole
         // sprite sheet (ca7fa8ade8ad). A paint arriving from another thread is not made to wait:
         // the running paint() may itself be waiting on that thread, which deadlocked b475b6399684 when this
-        // was a monitor. It stays pending instead and the next tick paints it. A paint() that calls
-        // serviceRepaints on its own thread still gets in, as before.
+        // was a monitor. It stays pending instead and the next tick paints it. So does one from a
+        // paint() that repaints and calls serviceRepaints on its own thread: let in, it nests a
+        // paint per level that the next level repeats, every level's garbage rooted by the open
+        // frames, until a 12-byte allocation fails and the host panics (1a69522a7d43).
         let painting: ClassInstanceRef<()> = jvm.get_field(&this, "paintingThread", "Ljava/lang/Thread;").await?;
         let current = jvm.current_java_thread();
-        if !painting.is_null() && painting.identity() != current.identity() {
+        if !painting.is_null() {
             jvm.put_field(&mut this, "repaintPending", "Z", true).await?;
             context.system().request_redraw();
             return Ok(());
