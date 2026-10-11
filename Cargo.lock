@@ -5096,6 +5096,7 @@ dependencies = [
  "bytemuck",
  "encoding_rs",
  "jvm",
+ "md5",
  "tracing",
  "wie-backend",
  "wie-jvm-support",

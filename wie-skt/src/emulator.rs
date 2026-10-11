@@ -44,6 +44,20 @@ const SYSTEM_PROPERTIES: [(&str, &str); 9] = [
 //   ponytail: one height per width; read it off the package if a title branches on height alone.
 const HANDSET_DISPLAYS: [(u32, u32); 4] = [(120, 160), (128, 160), (176, 220), (240, 320)];
 
+// The display a title's own code needs where its art says nothing the rule below can read, by MD5
+// of the jar. c361632541a7 picks an art directory by canvas height alone (`img_240/` above 196,
+// `img_176/` from 151 — its bytecode) and ships only `img_176/`, whose 176x202 background is drawn
+// for a canvas of 186: the 220 panel less an 18 px status bar and a 16 px soft-key bar. The 176 row
+// above cannot be 186 — bf54c05e58a9 lays its dialogue box out to 220, and at 186 it is cut off.
+// Measured 2026-10-11 (docs/report/0511).
+//   ponytail: one row per title; a rule when a second title needs one.
+const DISPLAY_OVERRIDES: [([u8; 16], (u32, u32)); 1] = [(
+    [
+        0x2f, 0x75, 0x01, 0x25, 0x56, 0xc0, 0x15, 0x3f, 0x69, 0x8c, 0xc1, 0x6d, 0x17, 0x0d, 0x9e, 0xb5,
+    ],
+    (176, 186),
+)];
+
 /// The display an SKT package was built for, when its contents say so. Unlike KTF's `DisplaySize:`
 /// nothing declares it, but the code does: it names `<stem>_<width>.<ext>` for several widths and
 /// picks one by the reported screen width, and a package cut for small handsets ships only the
@@ -52,6 +66,9 @@ const HANDSET_DISPLAYS: [(u32, u32); 4] = [(120, 160), (128, 160), (176, 220), (
 /// beside a missing one is the screen it was cut for. Corpus scan 2026-10-02: those two titles of
 /// 462 packages, both SKT.
 fn package_display_size(jar: &[u8]) -> Option<(u32, u32)> {
+    if let Some(size) = display_override(md5::compute(jar).0) {
+        return Some(size);
+    }
     let files = extract_zip(jar).ok()?;
     let names = files.keys().map(|name| name.trim_start_matches('/')).collect::<BTreeSet<_>>();
     let references = files
@@ -59,6 +76,10 @@ fn package_display_size(jar: &[u8]) -> Option<(u32, u32)> {
         .filter(|(name, _)| name.ends_with(".class"))
         .flat_map(|(_, class)| class_utf8_constants(class));
     display_size_for(&names, references)
+}
+
+fn display_override(digest: [u8; 16]) -> Option<(u32, u32)> {
+    DISPLAY_OVERRIDES.iter().find(|(hash, _)| *hash == digest).map(|&(_, size)| size)
 }
 
 fn display_size_for<'a>(names: &BTreeSet<&str>, references: impl Iterator<Item = &'a [u8]>) -> Option<(u32, u32)> {
@@ -411,6 +432,15 @@ mod tests {
         // Every variant held, or none of them: nothing says the package is not for this screen.
         assert_eq!(held(&["title/logo_120.png", "title/logo_176.png", "title/logo_240.png"]), None);
         assert_eq!(held(&[]), None);
+    }
+
+    #[test]
+    fn a_title_whose_code_needs_another_canvas_gets_it_by_jar_hash() {
+        let c361632541a7 = [
+            0x2f, 0x75, 0x01, 0x25, 0x56, 0xc0, 0x15, 0x3f, 0x69, 0x8c, 0xc1, 0x6d, 0x17, 0x0d, 0x9e, 0xb5,
+        ];
+        assert_eq!(super::display_override(c361632541a7), Some((176, 186)));
+        assert_eq!(super::display_override(md5::compute(b"any other jar").0), None);
     }
 
     #[test]
