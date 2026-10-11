@@ -1,0 +1,22 @@
+{
+  "date": "2026-10-11",
+  "task": "wie-ktf-text-box-charat-and-name-box-digits-two",
+  "title": "KTF 진도 엔진 벽 2 — charAt(4) · 이름 상자 숫자 · 재측 2",
+  "summary": "0507 원장 b-engine 4행을 6ea6a6bd 에서 재측. 8c71be3ad26d·d448aee68157 은 정책 키로 이름 상자를 지나 본편(엔진 벽 아님). 14a62a8521a0 정책 짝 0/0 → progress ok. 3ccc6cf147d2 짝 340/340 stuck. getString 덧채움 모형은 두 게임의 빈 이름 거절을 깨서 기각. docs/report/0510.",
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "KTF lwc 글상자가 입력한 글자를 그리지 않는다",
+      "plainSummary": "KTF 게임의 이름 입력 칸에 글자를 쳐도 화면에 아무것도 안 보여요.",
+      "userBenefit": "이름을 칠 때 무엇을 쳤는지 보여서, 입력이 안 되는 줄 알고 멈추지 않아요.",
+      "why": "이 핀 6ea6a6bd 실측(d448aee68157 낮 인트로): 키는 TextBoxComponent 에 들어가고(숫자 모드 «2263» · 한글 모드 모두) OK 로 다음 창에 넘어간다. 그런데 Component::paint 가 스텁이라 칸이 늘 비어 보인다. 0507 탐색이 이것을 «숫자를 안 받는다»로 읽었다.",
+      "tradeoff": "글자를 그릴 자리가 필요하다. 이 게임은 FormComponent 안에 상자 둘을 위치 없이 넣는데 lwc 층은 아무것도 배치하지 않는다. Form 세로 쌓기가 먼저이고, 잘못 배치하면 엉뚱한 곳에 글자가 찍힌다. lwc 를 쓰는 KTF 타이틀(정적 검사: 문자열 setMaxLength 를 가진 KTF 36종)의 짝 재측이 필요하다.",
+      "effort": "M",
+      "target": "wie_wipi_java lwc TextComponent·FormComponent · 대상 d448aee68157 8c71be3ad26d"
+    }
+  ],
+  "notCarded": {
+    "8c71be3ad26d charAt(4) 의 실기 동작": "진도를 막지 않는다(P/P2 본편). 덧채움 모형은 기각했고 실기 경로는 ARM 해독이 필요 — 관측된 막힘이 없어 카드로 만들지 않는다",
+    "3ccc6cf147d2 환경설정 메뉴에서 맴돎": "예외 0 · 정책·레시피 둘 다 메뉴에서 끝난다 — 엔진 벽 근거 없음(q-skill)"
+  }
+}
