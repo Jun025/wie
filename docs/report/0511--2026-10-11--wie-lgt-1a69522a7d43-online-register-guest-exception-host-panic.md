@@ -51,12 +51,18 @@
 
 - 판정·stop·content·steps 바뀐 것 0. `49ade89578c5` 의 paints 는 두 빌드 모두 약 1170 / 약 1870 두 갈래로 나뉜다(빌드 차이 아님).
 - 넓은 짝 프로브(무작위 40종 + 위 8종 · census `--only probe`)는 다른 회차의 장시간 census 가 호스트 잠금(`/tmp/wie-playability-census.lock`)을 연달아 잡아 돌지 못했다. 기다리는 동안 내 long 임대가 놀아 그 판은 내렸다.
-- 대상 6축 + `progress 600`: census 를 잠금 뒤에 걸어 두었다(아래 «6축» 절 · 결과가 오면 채운다).
 - 네 게이트: fmt OK · clippy stable/wasm32 `-D warnings` OK · beta clippy rc 0 · `RUST_MIN_STACK=4194304 cargo test --all` 775 통과 0 실패. 러너 블록 6줄 PASS(keydraw KTF paints 79 · LGT 55).
 
-### 5. 6축
+### 5. 대상 6축 + progress(census · 단독 · 잠금을 얻은 뒤)
 
-(대기 중)
+| 축 | base | head |
+|---|---|---|
+| boot · render · input · longplay · sound · speed | ok × 6 (status playable · ratio 0.992) | ok × 6 (playable · 0.994) |
+| probe A paints · distinct · novel | 1059 · 103 · 27 | 1088 · 103 · 27 |
+| progress P(600초 · 정책 v2) | 마지막 진전 450초 · distinct 7 · 탈출 9 | 450초 · 7 · 8 |
+
+- P2 짝은 돌리지 않아 census 판정은 `n/a` 다. compat 의 `stuck` 은 0507 짝 판정 그대로 둔다(P 가 두 빌드에서 같다).
+- 정책 키 길은 랭킹 → 온라인 등록에 닿지 않는다 ⇒ 이 축들은 고친 길을 재지 않는다. 고친 길은 §4 첫 행(`--keys` 판)이 잰다.
 
 ### 6. 장부
 
