@@ -67,4 +67,4 @@
 
 유입: BOUNDED 333쌍은 전부 `compat.json` 의 기존 행(이 회차가 바꾼 것은 `1a69522a7d43` 의 `knownIssues_ko` 한 줄 · 제목 0) · 그 파일을 뺀 6파일은 BOUNDED 3쌍(`display.rs` 기존 주석 · 이 회차 diff 에 0회) · SUFFIX-ATTACHED 1(census 의 기존 «턴종료» 줄).
 
-<!-- corpus-name-inflow v1 subjects=7 tree=500e503c8b1fcbd8 B=722/333 P=1/1 S=38/18 -->
+<!-- corpus-name-inflow v1 subjects=8 tree=c332b95bfbdcb2bd B=722/333 P=1/1 S=38/18 -->
