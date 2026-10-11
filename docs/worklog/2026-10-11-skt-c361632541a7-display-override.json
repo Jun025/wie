@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-11",
+  "task": "wie-skt-c361632541a7-img240-display-size-black-screen",
+  "title": "SKT c361632541a7 — 화면 크기 176x186 덮어쓰기 · img_240 없어 검은 화면",
+  "summary": "게임이 캔버스 높이만으로 그림 묶음을 고른다(>196 → img_240/). 176 칸 높이를 바꾸면 bf54c05e58a9 가 잘려서 jar MD5 한 줄로 이 타이틀만 176x186. 예외 ~1,700 → 0 · 진도 새 화면 3 → 16 · progress 는 여전히 stuck(메뉴 개발 완료 대화상자). docs/report/0512.",
+  "proposals": [],
+  "adoptedProposals": [
+    "2026-10-11-progression-stuck-101-ledger-round3#p0"
+  ],
+  "notCarded": {
+    "c361632541a7 메뉴 개발 완료 대화상자에서 160초부터 멈춤": "원인 미측정(정책 키 한계인지 엔진인지 모른다) — 관측은 했으나 지금 손댈 근거가 없다. 0512 §4"
+  }
+}
