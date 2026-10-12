@@ -760,7 +760,7 @@ const HAND_NOTE = {
   // Progress round 3 (docs/report/0507): the authentication question seen at 0469, which no server answers.
   f5e21001612d: ['생일을 넣은 뒤 처음 한 번 인증 서버에 접속하라는 안내가 나오는데, 그 서버가 지금은 없어 여기서는 인증할 수 없어요.'],
   // docs/report/0511: the host panic is gone; the title's own network thread still dies when connect() fails.
-  '1a69522a7d43': ['랭킹의 «온라인 등록»은 게임사 서버가 지금은 없어 쓸 수 없어요. «예»를 고르면 화면이 멈추니 고르지 마세요.'],
+  '1a69522a7d43': ['랭킹의 «온라인 등록»은 게임사 서버가 지금은 없어 쓸 수 없어요. «예»를 고르면 «연결에 실패하였습니다» 안내가 뜨고, 확인을 누르면 주 메뉴로 돌아와요.'],
 };
 // How a title that works is moved forward — not a problem, so it ships as `playTips_ko`, not
 // `knownIssues_ko` (the shell lists the latter under «알려진 문제» · contract §1).
