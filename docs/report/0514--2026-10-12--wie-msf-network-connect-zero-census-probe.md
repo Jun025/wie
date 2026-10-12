@@ -57,3 +57,5 @@ fmt OK · clippy stable/wasm32 `-D warnings` OK · beta clippy rc 0 · `RUST_MIN
 - worklog `docs/worklog/2026-10-12-msf-network-connect-zero.json`: adopted `2026-10-11-lgt-1a69522a7d43-nested-paint-host-panic#p0` · 카드 0.
 
 유입: BOUNDED 330쌍은 전부 `compat.json` 의 기존 행(이 회차가 바꾼 것은 `1a69522a7d43` 의 `knownIssues_ko` 한 줄 · 제목 0) · 그 파일을 뺀 8파일은 BOUNDED 0 · SUFFIX-ATTACHED 1(census 의 기존 «턴종료» 줄 · 이 회차 diff 에 0회).
+
+<!-- corpus-name-inflow v1 subjects=9 tree=11d742cdb41d3b81 B=718/330 P=0/0 S=38/18 -->
