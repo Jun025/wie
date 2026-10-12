@@ -161,7 +161,9 @@ impl ContainerComponent {
             }
             let x: i32 = jvm.get_field(&child, "x", "I").await?;
             let y: i32 = jvm.get_field(&child, "y", "I").await?;
-            let _: () = jvm.invoke_virtual(&g, "org/kwis/msp/lcdui/Graphics", "translate", "(II)V", (x, y)).await?;
+            let _: () = jvm
+                .invoke_virtual(&g, "org/kwis/msp/lcdui/Graphics", "translate", "(II)V", (x, y))
+                .await?;
             let _: () = jvm
                 .invoke_virtual(
                     &child,
@@ -171,7 +173,9 @@ impl ContainerComponent {
                     (g.clone(),),
                 )
                 .await?;
-            let _: () = jvm.invoke_virtual(&g, "org/kwis/msp/lcdui/Graphics", "translate", "(II)V", (-x, -y)).await?;
+            let _: () = jvm
+                .invoke_virtual(&g, "org/kwis/msp/lcdui/Graphics", "translate", "(II)V", (-x, -y))
+                .await?;
         }
 
         Ok(())
@@ -327,7 +331,9 @@ mod tests {
             let child = get(jvm, &this, i as i32).await?;
             let mut size = 0;
             for getter in ["getX", "getY", "getWidth", "getHeight"] {
-                size |= jvm.invoke_virtual::<_, i32>(&child, "org/kwis/msp/lwc/Component", getter, "()I", ()).await?;
+                size |= jvm
+                    .invoke_virtual::<_, i32>(&child, "org/kwis/msp/lwc/Component", getter, "()I", ())
+                    .await?;
             }
             let place = if size == 0 { (0, 0, 0, 0) } else { (x, y, w, h) };
             let _: () = jvm
@@ -382,12 +388,21 @@ mod tests {
                     .invoke_virtual(&image, "org/kwis/msp/lcdui/Image", "getGraphics", "()Lorg/kwis/msp/lcdui/Graphics;", ())
                     .await?;
                 let _: () = jvm
-                    .invoke_virtual(&form, "org/kwis/msp/lwc/Component", "paint", "(Lorg/kwis/msp/lcdui/Graphics;)V", (g.clone(),))
+                    .invoke_virtual(
+                        &form,
+                        "org/kwis/msp/lwc/Component",
+                        "paint",
+                        "(Lorg/kwis/msp/lcdui/Graphics;)V",
+                        (g.clone(),),
+                    )
                     .await?;
 
                 let pixel = |x: i32, y: i32| {
                     let (jvm, g) = (jvm.clone(), g.clone());
-                    async move { jvm.invoke_virtual::<_, i32>(&g, "org/kwis/msp/lcdui/Graphics", "getPixel", "(II)I", (x, y)).await }
+                    async move {
+                        jvm.invoke_virtual::<_, i32>(&g, "org/kwis/msp/lcdui/Graphics", "getPixel", "(II)I", (x, y))
+                            .await
+                    }
                 };
                 let mut boxes = Vec::new();
                 for (x, y, w, h) in PLACES {
@@ -397,7 +412,10 @@ mod tests {
                             rows.push(pixel(x + dx, y + dy).await? & 0xffffff);
                         }
                     }
-                    assert!(rows.iter().filter(|&&p| p == BG).count() > rows.len() / 2, "box at ({x}, {y}) has no background");
+                    assert!(
+                        rows.iter().filter(|&&p| p == BG).count() > rows.len() / 2,
+                        "box at ({x}, {y}) has no background"
+                    );
                     assert!(rows.iter().any(|&p| p != BG), "box at ({x}, {y}) has no text");
                     boxes.push(rows);
                 }

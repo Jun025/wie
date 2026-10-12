@@ -273,7 +273,9 @@ mod tests {
                 .new_class("org/kwis/msp/lwc/TextBoxComponent", "(Ljava/lang/String;II)V", (null, 1, 20))
                 .await?;
             let height: i32 = jvm.invoke_virtual(&sized, "org/kwis/msp/lwc/Component", "getHeight", "()I", ()).await?;
-            let max: i32 = jvm.invoke_virtual(&sized, "org/kwis/msp/lwc/TextComponent", "getMaxLength", "()I", ()).await?;
+            let max: i32 = jvm
+                .invoke_virtual(&sized, "org/kwis/msp/lwc/TextComponent", "getMaxLength", "()I", ())
+                .await?;
             assert_eq!((height, max), (20, 0));
             let _: bool = jvm
                 .invoke_virtual(&sized, "org/kwis/msp/lwc/TextComponent", "keyNotify", "(II)Z", (1, b'4' as i32))
@@ -281,7 +283,11 @@ mod tests {
             let typed = jvm
                 .invoke_virtual(&sized, "org/kwis/msp/lwc/TextComponent", "getString", "()Ljava/lang/String;", ())
                 .await?;
-            assert_eq!(JavaLangString::to_rust_string(&jvm, &typed).await?, "4", "constraint 1 (NUMBER) types digits");
+            assert_eq!(
+                JavaLangString::to_rust_string(&jvm, &typed).await?,
+                "4",
+                "constraint 1 (NUMBER) types digits"
+            );
 
             Ok(())
         })
