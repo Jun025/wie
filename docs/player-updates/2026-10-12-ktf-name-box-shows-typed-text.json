@@ -4,5 +4,6 @@
   "titles": [
     "d448aee681574bffb97907e5ed5cdcf6676825e49711633ebe8ee675a76c4cb9"
   ],
-  "summary_ko": "이름을 지어 주는 칸에 글자를 쳐도 아무것도 안 보였어요. 이제 친 글자가 칸에 바로 보여요."
+  "summary_ko": "이름을 지어 주는 칸에 글자를 쳐도 아무것도 안 보였어요. 이제 친 글자가 칸에 바로 보여요.",
+  "pr": "https://github.com/Jun025/wie/pull/548"
 }
