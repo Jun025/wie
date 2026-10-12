@@ -55,3 +55,8 @@
 - 0507 원장 csv `d448aee68157` 행: basis `0515` · pin `1c06afa6` · note 갱신.
 - `docs/player-updates/2026-10-12-ktf-name-box-shows-typed-text.json` 1건.
 - compat 행 변경 0(§2).
+
+### 7. 게임 파일명 유입
+
+- 도구 기본(이 브랜치가 바꾼 9파일): BOUNDED 4회/4쌍 · SUFFIX-ATTACHED 1회/1쌍. 전부 `component.rs`·`text_component.rs` 에 **이 회차 전부터 있던** 주석 줄이다 — 이 회차 diff 의 추가 줄(`+`)에서 그 이름은 0회다. SUFFIX 1건은 BOUNDED 의 더 긴 제목 안의 접두다.
+- 이 회차가 새로 쓴 문장은 타이틀을 sha12 로만 적었다.
