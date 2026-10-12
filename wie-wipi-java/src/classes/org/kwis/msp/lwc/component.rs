@@ -16,6 +16,9 @@ use crate::classes::{
 // The javadoc's EventListener.eventNotify types (FOCUS_NOTIFY 1 · KEY_NOTIFY 3).
 const FOCUS_NOTIFY: i32 = 1;
 pub const KEY_NOTIFY: i32 = 3;
+// configure's mask bits, from the constant pool of AromaWIPI_classes.zip's Component.class.
+const POS_MASK: i32 = 1;
+const SIZE_MASK: i32 = 2;
 
 // class org.kwis.msp.lwc.Component
 pub struct Component;
@@ -38,7 +41,7 @@ impl Component {
                 JavaMethodProto::new("getX", "()I", Self::get_x, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getY", "()I", Self::get_y, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("layout", "()V", Self::layout, MethodAccessFlags::PUBLIC),
-                JavaMethodProto::new("validate", "()V", Self::layout, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("validate", "()V", Self::validate, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("repaint", "()V", Self::repaint, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("repaint", "(IIII)V", Self::repaint_region, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("serviceRepaints", "()V", Self::service_repaints, MethodAccessFlags::PUBLIC),
@@ -61,8 +64,8 @@ impl Component {
                 JavaFieldProto::new("fg", "I", FieldAccessFlags::PRIVATE),
                 // Protected in the javadoc, and AOT subclasses read them directly: d448aee68157's
                 // text box died on `Field xI not found from org/kwis/msp/lwc/Component` right after
-                // its first name entry. Left at 0, the same origin and size getX/getY/getWidth/
-                // getHeight report, since nothing is laid out here.
+                // its first name entry. configure writes them and getX/getY/getWidth/getHeight read
+                // them: the box within the parent (javadoc configure: 「상위 컴포넌트내에서 위치 x, y」).
                 JavaFieldProto::new("x", "I", FieldAccessFlags::PROTECTED),
                 JavaFieldProto::new("y", "I", FieldAccessFlags::PROTECTED),
                 JavaFieldProto::new("w", "I", FieldAccessFlags::PROTECTED),
@@ -97,8 +100,8 @@ impl Component {
         Ok(())
     }
 
-    // Kept, not drawn: this layer paints no lwc widget (Component::paint is a no-op), so the colour
-    // only comes back from getBackground. ca7fa8ade8ad calls setBackground(I) at boot.
+    // Drawn by TextComponent.paint (the only lwc widget this layer paints) and given back by
+    // getBackground. ca7fa8ade8ad calls setBackground(I) at boot.
     async fn set_background(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, bg: i32) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.lwc.Component::setBackground({this:?}, {bg:#x})");
 
@@ -111,7 +114,7 @@ impl Component {
         jvm.get_field(&this, "bg", "I").await
     }
 
-    // Kept, not drawn — the same as setBackground. ca7fa8ade8ad calls setForeground(I) at boot, right after it.
+    // The text colour TextComponent.paint uses. ca7fa8ade8ad calls setForeground(I) at boot, right after setBackground.
     async fn set_foreground(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, fg: i32) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.lwc.Component::setForeground({this:?}, {fg:#x})");
 
@@ -154,9 +157,29 @@ impl Component {
         Ok(())
     }
 
+    // The javadoc: POS_MASK moves the component to (x, y) in its parent, SIZE_MASK resizes it to
+    // (w, h). d448aee68157's form places its name box this way from its own layout().
     #[allow(clippy::too_many_arguments)]
-    async fn configure(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, x: i32, y: i32, w: i32, h: i32, mask: i32) -> JvmResult<()> {
-        tracing::warn!("stub org.kwis.msp.lwc.Component::configure({this:?}, {x}, {y}, {w}, {h}, {mask})");
+    async fn configure(
+        jvm: &Jvm,
+        _: &mut WieJvmContext,
+        mut this: ClassInstanceRef<Self>,
+        x: i32,
+        y: i32,
+        w: i32,
+        h: i32,
+        mask: i32,
+    ) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lwc.Component::configure({this:?}, {x}, {y}, {w}, {h}, {mask})");
+
+        if mask & POS_MASK != 0 {
+            jvm.put_field(&mut this, "x", "I", x).await?;
+            jvm.put_field(&mut this, "y", "I", y).await?;
+        }
+        if mask & SIZE_MASK != 0 {
+            jvm.put_field(&mut this, "w", "I", w).await?;
+            jvm.put_field(&mut this, "h", "I", h).await?;
+        }
 
         Ok(())
     }
@@ -269,46 +292,56 @@ impl Component {
         Ok(listeners)
     }
 
-    async fn get_height(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        tracing::warn!("stub org.kwis.msp.lwc.Component::getHeight({this:?})");
+    // What configure kept (0 until something configures it — no default size is invented, except
+    // a text box's one line, see TextBoxComponent). ae749cc5a777 calls ShellComponent.getX() at boot.
+    async fn get_height(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::debug!("org.kwis.msp.lwc.Component::getHeight({this:?})");
 
-        Ok(0)
+        jvm.get_field(&this, "h", "I").await
     }
 
-    // Paired with getHeight, which has returned 0 since this layer landed: the lwc widgets are
-    // never laid out here, so there is no measured width to report and inventing one would be a
-    // guess a game could lay out against.
-    async fn get_width(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        tracing::warn!("stub org.kwis.msp.lwc.Component::getWidth({this:?})");
+    async fn get_width(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::debug!("org.kwis.msp.lwc.Component::getWidth({this:?})");
 
-        Ok(0)
+        jvm.get_field(&this, "w", "I").await
     }
 
-    // The position half of the same answer: nothing is laid out, so every component sits at the
-    // origin. ae749cc5a777 calls ShellComponent.getX() at boot.
-    async fn get_x(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        tracing::warn!("stub org.kwis.msp.lwc.Component::getX({this:?})");
+    async fn get_x(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::debug!("org.kwis.msp.lwc.Component::getX({this:?})");
 
-        Ok(0)
+        jvm.get_field(&this, "x", "I").await
     }
 
-    async fn get_y(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        tracing::warn!("stub org.kwis.msp.lwc.Component::getY({this:?})");
+    async fn get_y(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::debug!("org.kwis.msp.lwc.Component::getY({this:?})");
 
-        Ok(0)
+        jvm.get_field(&this, "y", "I").await
     }
 
-    // No-op for the same reason: this layer never lays children out. a10a1f02b41b calls layout() on an
-    // AnnunciatorComponent at boot and validate() — the same request, also bound here — on its first key.
+    // No-op: the javadoc's layout places a component's *children*, and the stock containers' own
+    // rules (FormComponent's vertical stack, the gab) are not in the API-only class files. A guest
+    // subclass's override is what runs — see validate. a10a1f02b41b calls layout() on an
+    // AnnunciatorComponent at boot.
     async fn layout(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
-        tracing::warn!("stub org.kwis.msp.lwc.Component::layout/validate({this:?})");
+        tracing::debug!("stub org.kwis.msp.lwc.Component::layout({this:?})");
 
         Ok(())
     }
 
+    // The javadoc: validate calls layout (virtually, so a guest override runs) and is itself called
+    // from paintContent/showNotify; ContainerComponent.paint calls it before drawing the children.
+    // d448aee68157's form only places its name box from its own layout(). a10a1f02b41b calls
+    // validate() on its first key.
+    async fn validate(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lwc.Component::validate({this:?})");
+
+        jvm.invoke_virtual(&this, "org/kwis/msp/lwc/Component", "layout", "()V", ()).await
+    }
+
     // A shown ShellComponent sits on a net.wie.ShellCard, so its repaint is that card's repaint —
-    // the same Card → CardCanvas → request_redraw path Card games take. A component that is not a
-    // shown shell has nowhere to be drawn (children are never laid out here), so it stays a no-op.
+    // the same Card → CardCanvas → request_redraw path Card games take. A child is drawn only as part
+    // of its shell's paint and no parent is tracked to reach that shell, so its repaint stays a no-op —
+    // a ShellComponent repaints itself after every key it hands on.
     async fn repaint(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.lwc.Component::repaint({this:?})");
 
@@ -341,7 +374,7 @@ impl Component {
 
     // Shown means "on the display", and the only component this layer puts on the display is a shell
     // on its net.wie.ShellCard — the same test repaint uses. A child of a shown shell answers false:
-    // children are never laid out or drawn here. 0c67145b11df asks its shell from paint.
+    // no parent is tracked to ask. 0c67145b11df asks its shell from paint.
     async fn is_shown(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<bool> {
         tracing::debug!("org.kwis.msp.lwc.Component::isShown({this:?})");
 
@@ -357,8 +390,8 @@ impl Component {
         }
     }
 
-    // What ShellCard calls when the guest shell does not override paint (a shell that only hosts a
-    // work component): lwc's own widgets are not drawn here, so there is nothing to put on screen.
+    // A leaf with nothing of its own to draw: labels, buttons and the rest are still not drawn here.
+    // ContainerComponent and TextComponent override it.
     async fn paint(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, g: ClassInstanceRef<Graphics>) -> JvmResult<()> {
         tracing::warn!("stub org.kwis.msp.lwc.Component::paint({this:?}, {g:?})");
 
