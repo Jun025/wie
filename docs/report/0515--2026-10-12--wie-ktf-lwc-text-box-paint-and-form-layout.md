@@ -48,10 +48,10 @@
 
 - fmt OK · `clippy --all -D warnings` rc=0 · wasm32 clippy rc=0 · `+beta clippy` rc=0(기존 unused-dependency 경고) · `RUST_MIN_STACK=4194304 cargo test --all` 778 passed / 0 failed.
 - `npm run build:wasm` rc=0 · `check-engine-contract` 137 pass / 0 violation · `npm run audit` PASSED.
-- 러너 블록(`cargo run` 디버그): draw_j2me · helloworld_ktf · helloworld_lgt PASS · keydraw_ktf/lgt `--inject --expect-last-frame` PASS(27/27) · text_j2me PASS.
+- 러너 블록: draw_j2me · helloworld_ktf · helloworld_lgt · text_j2me PASS(release 바이너리) · keydraw_ktf/lgt `--inject --expect-last-frame` PASS(27/27 · 문서대로 `cargo run` 디버그 — release 는 전·후 둘 다 max-ticks 로 UNMEASURED).
 
 ### 6. 원장 · 소식
 
-- 0507 원장 csv `d448aee68157` 행: basis `0514` · pin `1c06afa6` · note 갱신.
+- 0507 원장 csv `d448aee68157` 행: basis `0515` · pin `1c06afa6` · note 갱신.
 - `docs/player-updates/2026-10-12-ktf-name-box-shows-typed-text.json` 1건.
 - compat 행 변경 0(§2).
