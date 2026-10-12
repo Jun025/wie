@@ -61,4 +61,4 @@
 - 도구 기본(이 브랜치가 바꾼 9파일): BOUNDED 4회/4쌍 · SUFFIX-ATTACHED 1회/1쌍. 전부 `component.rs`·`text_component.rs` 에 **이 회차 전부터 있던** 주석 줄이다 — 이 회차 diff 의 추가 줄(`+`)에서 그 이름은 0회다. SUFFIX 1건은 BOUNDED 의 더 긴 제목 안의 접두다.
 - 이 회차가 새로 쓴 문장은 타이틀을 sha12 로만 적었다.
 
-<!-- corpus-name-inflow v1 subjects=9 tree=a21f7f39253ab80a B=4/4 P=0/0 S=1/1 -->
+<!-- corpus-name-inflow v1 subjects=9 tree=98ecb361ad85d50e B=4/4 P=0/0 S=1/1 -->
