@@ -34,15 +34,39 @@ impl Network {
         }
     }
 
+    // 0, not -1: the failure belongs to opening the socket (`URL.find` throws SchemeNotFoundException),
+    // which titles catch and report. A title that reads -1 as «no stream, carry on» wrote to a null
+    // stream and lost its network thread instead (docs/report/0511 §3); census pair over the 160
+    // titles shipping this class: docs/report/0514.
     async fn connect(_: &Jvm, _: &mut WieJvmContext) -> JvmResult<i32> {
         tracing::warn!("stub org.kwis.msf.io.Network::connect()");
 
-        Ok(-1)
+        Ok(0)
     }
 
     async fn disconnect(_: &Jvm, _: &mut WieJvmContext) -> JvmResult<()> {
         tracing::warn!("stub org.kwis.msf.io.Network::disconnect()");
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::boxed::Box;
+
+    use test_utils::run_jvm_test;
+    use wie_util::Result;
+
+    use crate::get_protos;
+
+    #[test]
+    fn connect_succeeds_so_the_socket_reports_the_failure() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            let rc: i32 = jvm.invoke_static("org/kwis/msf/io/Network", "connect", "()I", ()).await?;
+            assert_eq!(rc, 0, "connect() must succeed; URL.find is where networking fails");
+
+            Ok(())
+        })
     }
 }
