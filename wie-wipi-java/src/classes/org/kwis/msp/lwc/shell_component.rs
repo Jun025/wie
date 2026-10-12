@@ -9,7 +9,7 @@ use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 use crate::classes::{
     net::wie::{ShellCard, WIPIKeyCode},
     org::kwis::msp::lcdui::{Card, Display, Graphics},
-    org::kwis::msp::lwc::{Component, GrabKeyListener, KEY_NOTIFY},
+    org::kwis::msp::lwc::{Component, ContainerComponent, GrabKeyListener, KEY_NOTIFY},
 };
 
 // Component.keyNotify's type values (javadoc: KEY_PRESSED, KEY_RELEASED, KEY_REPEATED) as
@@ -280,37 +280,11 @@ impl ShellComponent {
     }
 
     // A shell that does not draw itself (the guest did not override paint) lets its children draw:
-    // ShellCard calls this. Every lwc child but com.ktf.kfc.GFormComponent still draws nothing.
+    // ShellCard calls this. Each child is drawn in its own box (ContainerComponent::paint_children).
     async fn paint(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, g: ClassInstanceRef<Graphics>) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.lwc.ShellComponent::paint({this:?}, {g:?})");
 
-        let count: i32 = jvm
-            .invoke_virtual(&this, "org/kwis/msp/lwc/ContainerComponent", "getNumberOfComponent", "()I", ())
-            .await?;
-        for i in 0..count {
-            let child: ClassInstanceRef<Component> = jvm
-                .invoke_virtual(
-                    &this,
-                    "org/kwis/msp/lwc/ContainerComponent",
-                    "getComponent",
-                    "(I)Lorg/kwis/msp/lwc/Component;",
-                    (i,),
-                )
-                .await?;
-            if !child.is_null() {
-                let _: () = jvm
-                    .invoke_virtual(
-                        &child,
-                        "org/kwis/msp/lwc/Component",
-                        "paint",
-                        "(Lorg/kwis/msp/lcdui/Graphics;)V",
-                        (g.clone(),),
-                    )
-                    .await?;
-            }
-        }
-
-        Ok(())
+        ContainerComponent::paint_children(jvm, this.instance.into(), g).await
     }
 
     async fn collect_leaves(jvm: &Jvm, component: ClassInstanceRef<Component>, leaves: &mut Vec<ClassInstanceRef<Component>>) -> JvmResult<()> {

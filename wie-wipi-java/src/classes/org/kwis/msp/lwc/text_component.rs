@@ -9,10 +9,14 @@ use rustjava_runtime::classes::java::lang::String;
 
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
-use crate::classes::org::kwis::msp::lcdui::InputMethodHandler;
+use crate::classes::org::kwis::msp::lcdui::{Font, Graphics, InputMethodHandler};
 
 const IM_HANDLER: &str = "Lorg/kwis/msp/lcdui/InputMethodHandler;";
 const STAR: i32 = b'*' as i32;
+// TextComponent.CONSTRAINT_PASSWORD, from the constant pool of AromaWIPI_classes.zip.
+const CONSTRAINT_PASSWORD: i32 = 2;
+// MIDP Graphics.TOP | LEFT, which org.kwis.msp.lcdui.Graphics forwards as is.
+const TOP_LEFT: i32 = 0x10 | 0x04;
 
 // class org.kwis.msp.lwc.TextComponent
 pub struct TextComponent;
@@ -30,6 +34,7 @@ impl TextComponent {
                 JavaMethodProto::new("getMaxLength", "()I", Self::get_max_length, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getString", "()Ljava/lang/String;", Self::get_string, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("keyNotify", "(II)Z", Self::key_notify, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("paint", "(Lorg/kwis/msp/lcdui/Graphics;)V", Self::paint, MethodAccessFlags::PUBLIC),
             ],
             fields: vec![
                 JavaFieldProto::new("m_cPos", "I", FieldAccessFlags::PROTECTED),
@@ -160,6 +165,68 @@ impl TextComponent {
         Ok(true)
     }
 
+    // The box and the text in it, in the component's own coordinates (its container translated g to
+    // its (x, y)): the background when one is set (javadoc paintContent: 「색상이 -1이면, 칠하진 않습니다」),
+    // then the text left-aligned, vertically centred, in the foreground colour — black while it is
+    // unset (-1). A password box shows one '*' per character. d448aee68157's name box typed into a
+    // box that was never drawn, so the game looked like it took no keys. A box nothing has given a
+    // size draws nothing. ponytail: no caret or input-mode mark; add them when a title is seen to need one.
+    async fn paint(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<TextComponent>, g: ClassInstanceRef<Graphics>) -> JvmResult<()> {
+        tracing::debug!("org.kwis.msp.lwc.TextComponent::paint({this:?}, {g:?})");
+
+        let w: i32 = jvm.get_field(&this, "w", "I").await?;
+        let h: i32 = jvm.get_field(&this, "h", "I").await?;
+        if w <= 0 || h <= 0 {
+            return Ok(());
+        }
+        let bg: i32 = jvm.get_field(&this, "bg", "I").await?;
+        if bg != -1 {
+            let _: () = jvm.invoke_virtual(&g, "org/kwis/msp/lcdui/Graphics", "setColor", "(I)V", (bg,)).await?;
+            let _: () = jvm
+                .invoke_virtual(&g, "org/kwis/msp/lcdui/Graphics", "fillRect", "(IIII)V", (0, 0, w, h))
+                .await?;
+        }
+
+        let typed: ClassInstanceRef<Array<JavaChar>> = jvm.get_field(&this, "m_td", "[C").await?;
+        if typed.is_null() {
+            return Ok(());
+        }
+        let length = jvm.array_length(&typed).await?;
+        if length == 0 {
+            return Ok(());
+        }
+        let handler: ClassInstanceRef<InputMethodHandler> = jvm.get_field(&this, "imHandler", IM_HANDLER).await?;
+        let constraint: i32 = if handler.is_null() {
+            0
+        } else {
+            jvm.get_field(&handler, "constraint", "I").await?
+        };
+        let text = if constraint == CONSTRAINT_PASSWORD {
+            let mut stars = jvm.instantiate_array("C", length).await?;
+            jvm.store_array(&mut stars, 0, vec![b'*' as JavaChar; length]).await?;
+            stars.into()
+        } else {
+            typed
+        };
+
+        let fg: i32 = jvm.get_field(&this, "fg", "I").await?;
+        let _: () = jvm
+            .invoke_virtual(&g, "org/kwis/msp/lcdui/Graphics", "setColor", "(I)V", (if fg == -1 { 0 } else { fg },))
+            .await?;
+        let font: ClassInstanceRef<Font> = jvm
+            .invoke_virtual(&g, "org/kwis/msp/lcdui/Graphics", "getFont", "()Lorg/kwis/msp/lcdui/Font;", ())
+            .await?;
+        let font_height: i32 = jvm.invoke_virtual(&font, "org/kwis/msp/lcdui/Font", "getHeight", "()I", ()).await?;
+        jvm.invoke_virtual(
+            &g,
+            "org/kwis/msp/lcdui/Graphics",
+            "drawChars",
+            "([CIIIII)V",
+            (text, 0, length as i32, 2, ((h - font_height) / 2).max(0), TOP_LEFT),
+        )
+        .await
+    }
+
     /// The constructors that take a constraint (TextFieldComponent, TextBoxComponent) hand it to
     /// the input method: numeric constraints type digits.
     pub async fn set_constraint<T>(jvm: &Jvm, this: &mut ClassInstanceRef<T>, constraint: i32) -> JvmResult<()> {
@@ -179,10 +246,12 @@ mod tests {
     use crate::get_protos;
 
     /// d448aee68157's name box: setMaxLength(5), then getMaxLength()I on the first key it receives —
-    /// the method was missing, and the tick died on it.
+    /// the method was missing, and the tick died on it. The box starts one line tall, and the
+    /// three-int constructor is (data, constraints, h) as the javadoc orders it — its last int is the
+    /// height, not a maximum length.
     #[test]
     fn get_max_length_answers_what_set_max_length_kept() -> Result<()> {
-        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+        run_jvm_test(Box::new([wie_midp::get_protos().into(), get_protos().into()]), |jvm| async move {
             let null: ClassInstanceRef<()> = ClassInstanceRef::new(None);
             let text_box = jvm
                 .new_class("org/kwis/msp/lwc/TextBoxComponent", "(Ljava/lang/String;I)V", (null, 0))
@@ -194,6 +263,25 @@ mod tests {
                 .invoke_virtual(&text_box, "org/kwis/msp/lwc/TextBoxComponent", "getMaxLength", "()I", ())
                 .await?;
             assert_eq!(max, 5);
+            let height: i32 = jvm
+                .invoke_virtual(&text_box, "org/kwis/msp/lwc/Component", "getHeight", "()I", ())
+                .await?;
+            assert!(height > 0, "a text box starts with a height");
+
+            let null: ClassInstanceRef<()> = ClassInstanceRef::new(None);
+            let sized = jvm
+                .new_class("org/kwis/msp/lwc/TextBoxComponent", "(Ljava/lang/String;II)V", (null, 1, 20))
+                .await?;
+            let height: i32 = jvm.invoke_virtual(&sized, "org/kwis/msp/lwc/Component", "getHeight", "()I", ()).await?;
+            let max: i32 = jvm.invoke_virtual(&sized, "org/kwis/msp/lwc/TextComponent", "getMaxLength", "()I", ()).await?;
+            assert_eq!((height, max), (20, 0));
+            let _: bool = jvm
+                .invoke_virtual(&sized, "org/kwis/msp/lwc/TextComponent", "keyNotify", "(II)Z", (1, b'4' as i32))
+                .await?;
+            let typed = jvm
+                .invoke_virtual(&sized, "org/kwis/msp/lwc/TextComponent", "getString", "()Ljava/lang/String;", ())
+                .await?;
+            assert_eq!(JavaLangString::to_rust_string(&jvm, &typed).await?, "4", "constraint 1 (NUMBER) types digits");
 
             Ok(())
         })
