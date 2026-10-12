@@ -1,0 +1,11 @@
+{
+  "date": "2026-10-12",
+  "task": "wie-msf-network-connect-zero-census-probe",
+  "title": "org.kwis.msf.io.Network.connect() 0 — 162종 짝 퇴행 0",
+  "summary": "connect() 를 -1 → 0. 실패는 소켓 열기의 SchemeNotFoundException 이 진다. census probe 162종 짝 나빠진 축 0 · connect 도달 14종 짝 판정 변화 0 · 1a69522a7d43 은 실패 안내 → 주 메뉴. docs/report/0514.",
+  "proposals": [],
+  "adoptedProposals": [
+    "2026-10-11-lgt-1a69522a7d43-nested-paint-host-panic#p0"
+  ],
+  "declinedProposals": []
+}

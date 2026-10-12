@@ -1,0 +1,10 @@
+# wie_validate --keys: LGT 1a69522a7d43 — notice → speed check → title → main menu → item 5 (ranking)
+# → ＃ (online register) → 예 → 예 → the network notice. Key names only — no game bytes.
+#
+#   wie_validate --inject --keys docs/keys/lgt-1a69522a7d43-online-register.keys --keep-timeout --timeout 90 \
+#     --max-ticks 100000000000 --shotdir <dir> <game>
+#
+# connect() -1 (before 0514): the last shots stay on «접속 시 통화료가 부과됩니다» (the title's network thread
+# died on its own NPE). connect() 0: «연결에 실패하였습니다» → OK → main menu (docs/report/0514).
+# The first OK:25 waits out the one-time speed check; under heavy load it can need longer.
+WAIT:8 OK:25 OK:4 DOWN:2 DOWN:2 DOWN:2 DOWN:2 OK:4 HASH:4 OK:4 OK:8 OK:8 OK:8
