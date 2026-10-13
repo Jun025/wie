@@ -9,7 +9,7 @@
 
 **왜**: 운영자 지시(2026-09-30 · 10-13): 엔진 등 기능 완성도. 원인 미상 문장 0 이 목표다.
 
-**사용자 영향**: 5종에서 소리가 난다(엔진 4 · 측정 정정 1). 5종은 «게임 파일에 소리를 끈 설정이 있어 게임 안에서 켜면 들린다»고 안내한다. 1종은 왜 소리가 안 나는지 정확한 이유를 적는다. 11종 밖에서도 `40b9537968de`(이미 `ok`)의 30초 재생이 3 → 10 으로 늘었다(4-3).
+**사용자 영향**: 5종에서 소리가 난다(엔진 4 · 측정 정정 1). 5종은 «게임 파일에 소리를 끈 설정이 있어 게임 안에서 켜면 들린다»고 안내한다. 1종은 왜 소리가 안 나는지 정확한 이유를 적는다.
 
 ### 1. 방법
 
@@ -45,7 +45,7 @@
 | `fb80e97cbc57` | SKT | ⒜ | 동봉 `ds2.opt` 첫 바이트 = 소리 모드 `f.C`, 원 주인 0. 소리 요청 `h.a(IB)V` 가 `f.C == 0` 이면 바로 돌아간다(javap). 파일이 없으면 기본 1. 옵션 화면이 `f.C` 를 쓴다 | 0 | 0 · 바이트 1 이면 31 · 114,378 |
 | `ccb45e6b8d80` | SKT | ⒜ | 동봉 `sc.txt` 의 `bp`(33번째 값) = 소리 켬, 원 주인 0. `e.a(II)V` 는 `bp == 1` 일 때만 클립을 연다(javap · 필드 추적에서 시작 0.1초 뒤 `bp` 1 → 0). 환경설정 `u(int)` 가 `bp` 를 바꾼다 | 0 | 0 · 값 1 이면 5 · 3,685 |
 | `5a59f62d1f1a` | KTF | ⒜ | 동봉 `config.dat` 첫 바이트 = 소리 크기, 원 주인 0. 게임이 그 값으로 `MC_mdaSetVolume(0)` 을 부른다. 3 이면 재생. 처음 메뉴에 OPTION | 0 | 0 · 3 이면 68 · 8,321 |
-| `b907b0faf483` | KTF | ⒜ | 동봉 `config.sav` 둘째 바이트 = 소리 켬, 원 주인 0. 1 이면 재생. 첫·넷째·셋째 바이트는 무관(0 그대로). 처음 메뉴에 OPTION · 이미지에 `VolumeUp`/`SetMute` | 0 | 0 · 1 이면 50 · 130 |
+| `b907b0faf483` | KTF | ⒜ | 동봉 `config.sav` 둘째 바이트 = 소리 켬, 원 주인 0. 1 이면 재생. 첫·넷째·셋째 바이트는 무관(0 그대로). 처음 메뉴에 OPTION · 이미지에 `VolumeUp`/`SetMute` | 0 | 0 · 1 이면 50 · 130(타이틀 레시피 + 키 고리 120초) · 1 · 130(검수자 재현 · probe A 기본 27키 120초) |
 | `689c491586b9` | KTF | ⒝ | 시작하자마자 서버 접속 실패 안내 뒤 스스로 끝난다(5키 · `clean exit`). 그때까지 클립 생성조차 0 — 매체 호출 기록 0(전·후 같음). 이미지에는 `Clip`·`Player.play` 가 있다 | 0 | 0 |
 | `6c9f969f089f` | KTF | ⒜ | 동봉 `P/personal_data` 의 둘째 int(오프셋 0x04) = 소리 끔 플래그, 원 주인 1. 0 이면 재생. 이미지에 `PD__SOUND_OFF` · `SetMute` · `IDS_SOUND` · `op_options`, 처음 메뉴에 «환경 설정» (§3) | 0 | 0 · 0 이면 44 · 1,012 |
 
@@ -67,6 +67,7 @@
 - `PlayMMF`(`a7d1f26af3e1` · 이미지 `0x106630`): `this` 필드 검사 → 경로로 자원 열기 → null 이면 반환. 함정 패치로 첫 키에서 `PlayMMF` 가 불리는 것을 확인했다. `IsSoundOn` 을 1 로 고정한 판은 재생 0 그대로였다(소리 설정은 켜짐 · 환경설정 화면 «on»).
 - 고침: 원래 이름 → 시스템 로더(종전 그대로) → 둘 다 null 이고 이름이 상대이면 `패키지/이름` 으로 같은 두 길을 한 번 더.
   - ★종전에 찾던 자원은 같은 길로 찾는다. 바뀌는 것은 «종전에 null 이던 요청»뿐이다.
+  - 같은 이름이 루트와 패키지 둘 다에 있으면 루트가 이긴다. 자바 규약이면 패키지 쪽이지만, 이것은 종전 동작 보존이다(시험의 `("b.mmf", Some(b"root"))` 가 그 순서를 못박는다).
 - 되돌리면 red: `a_relative_resource_name_is_found_beside_its_class`. 상대 분기를 끄면 `left: None`(실측).
 
 #### 4-2. 멈출 것 없는 `Player.stop`(`wie-wipi-java` `Player::stop_clip`)
@@ -83,20 +84,23 @@
 - `1cd151222bde`(LGT 네이티브) 30초 로그: `unknown system property id: VOLUMELEVEL` 5회 · `VIBRATORLEVEL` 4회.
 - Java `HandsetProperty` 는 이미 `"3"` 을 답한다(eceeb889). 같은 단말이니 같은 값을 쓴다. `VIBRATORLEVEL` 은 소리가 아니라 그대로 둔다.
 - 되돌리면 red: `test_get_system_property_volume_level`(줄을 빼면 rc ≠ 0 · 실측).
-- 전·후 짝: 문자열 `VOLUMELEVEL` 을 네이티브 바이너리에 가진 18종(정적 검사) × probe A. 16종 같음 · `1cd151222bde` 0 → 1 · `40b9537968de` 3 → 10(MIDI 742 → 2,500 · 이미 `ok`). 18종 모두 후 빌드에서 `unknown system property id: VOLUMELEVEL` 0회.
+- 전·후 짝: 문자열 `VOLUMELEVEL` 을 네이티브 바이너리에 가진 18종(정적 검사) × probe A. 17종 같음 · `1cd151222bde` 0 → 1. 18종 모두 후 빌드에서 `unknown system property id: VOLUMELEVEL` 0회.
+  - ★정정(게이트② 반려 후): 첫 판은 `40b9537968de` 를 «3 → 10(MIDI 742 → 2,500)»으로 적었다. 이 회차 스윕의 짝 1회 값이었고, 검수자가 같은 인자(census probe A · `--pacing 8 --relaunch 1 --max-ticks 1e11 --timeout 30`)로 전·후 동시 짝 4회(그중 1회는 `RUST_LOG=warn`)를 재니 4/4 가 3/742 → 3/742 였다. 분기는 닿지만(`VOLUMELEVEL` 경고 전 2 → 후 0) 들리는 변화는 재현되지 않으므로 «개선»에서 뺐다(`reports/wie-playable-sound-no-eleven-unexplained.review.md`).
 
 ### 5. 퇴행
 
 census probe A(30초) 짝. 전 = `origin/main` · 후 = 이 브랜치(4-3 전 판 · 4-3 은 위 18종 짝).
 
-- **짝 207종**: 문자열 검사로 `org/kwis/msp/media/Player`+`stop`(클래스) 또는 `(…Clip;)Z+stop`(AOT 이미지)을 가진 195종(KTF 193 · SKT 2) ∪ 라이브 LGT 5 ∪ 가드 2 ∪ 11종.
-  - 판정(result · stop · 소리 들림 여부)이 다른 것: **3 — 전부 고친 타이틀**(`a7d1f26af3e1` `51011b242bb5` `888702965551` 이 0 → 재생).
+- **짝 207종**(이 회차): 문자열 검사로 `org/kwis/msp/media/Player`+`stop`(클래스) 또는 `(…Clip;)Z+stop`(KTF AOT 이미지 `client.bin*`)을 가진 195종(KTF 193 · SKT 2) ∪ 라이브 LGT 5 ∪ 가드 2 ∪ 11종.
+  - ★집합 정정(게이트② 반려 후): 이 회차의 문자열 검사는 `.class` 와 `client.bin*` 만 읽고 **LGT `binary.mod` 를 읽지 않았다.** zip 안 jar 까지 2단으로 `binary.mod` 를 읽으면 `Player`·`(Lorg/kwis/msp/media/Clip;)Z`·`stop` 을 가진 **LGT 18종**이 더 있다. 이 회차가 짝으로 잰 것은 그중 라이브 LGT 5 뿐이었다(나머지 13 은 «후 빌드만» 쪽).
+  - 그 18종은 검수자가 짝으로 쟀다(전 = `origin/main` `e65b3a48` · 후 = #550 머지 트리 · probe A 30초 동시 짝): `1b107b96bf4e` 외 **17종 전건 `Player::stop` 실호출(1~49회) · plays·MIDI·wave·`stop` 호출 수·result 전부 동일**(`reports/wie-playable-sound-no-eleven-unexplained.review.md` 짝 표). `1b107b96bf4e` 는 아래.
+  - ⇒ `Player.stop` 문자열 보유 **213종**(KTF 193 · SKT 2 · LGT 18) 전부 짝으로 쟀다(LGT 13 은 검수자 측정). 판정(result · stop · 소리 들림 여부)이 다른 것: **3 — 전부 고친 타이틀**(`a7d1f26af3e1` `51011b242bb5` `888702965551` 이 0 → 재생).
   - 재생·MIDI 수만 다른 것 18종. 7종을 전·후 2회씩 다시 쟀다: 전 빌드끼리도 같은 폭으로 흔들린다(`0a6f495f0b35` 전 19·14·14 / 후 15·14·14 · `1d18b7cc06d1` MIDI 전 10,224·6,199·6,199 / 후 6,199·6,199·10,224).
-    - `1b107b96bf4e`(라이브 LGT) 전 16·14·13 / 후 12·11·11. 이 타이틀은 `Player.stop` 문자열이 없고, 상대 이름 분기 도달 0 · `VOLUMELEVEL` 0 — 바뀐 코드가 닿지 않는다. 0440 도 이 타이틀에서 ±1~2 를 봤다.
+    - `1b107b96bf4e`(라이브 LGT) — ★정정: 첫 판의 «`Player.stop` 문자열이 없어 바뀐 코드가 닿지 않는다»는 **거짓**이었다. `binary.mod` 에 `Player`·`stop` 이 있고, 후 빌드 debug 로그에 `Player::stop(` 이 30초에 13·16·16회(전 10·12·14) — 재생마다 부른다. 즉 `stop` 반환값 변경이 **닿는다.** 재생 수는 짝마다 방향이 바뀐다: 이 회차 전 16·14·13 / 후 12·11·11, 검수자 전 10·12·14 / 후 13·16·16(MIDI 648 · result PASS 양쪽 같음). ⇒ 타이밍에 민감할 뿐 **손실은 없다**(양쪽 다 재생).
     - `704839f1a6c8` 전 2·1·2 / 후 1·1·1 — 매체 debug 짝에서 호출 순서(`stop`·`stop`·`play`)가 양쪽 같고 둘 다 재생 2. 둘째 재생이 30초 끝에 걸리는 시각 차다.
 - **나머지 222종**: 후 빌드만 돌렸다(상대 이름 분기가 닿는지 보려고). PASS 212 · `clean exit` 5 · FAIL 5. FAIL 은 `MC_knlGet…` 미구현(`974e0df9ab1e` `f770b15f8876` · `limited` 설치 인증 벽) 등 이 회차 코드가 닿지 않는 것이다.
 - **상대 이름 분기 도달**: 429종 후 빌드 로그에서 `also tries` 가 찍힌 것은 `a7d1f26af3e1` · `51011b242bb5` 둘뿐이다.
-- 라이브 LGT 5 · 가드 2: 결과·재생 수 같음(`1b107b96bf4e` 은 위). 그림 수 `49ade89578c5` 2,141 → 2,059 · `ddd885583b15` 1,603 → 1,588 · 나머지 ±1 — 두 가드는 바뀐 코드가 닿지 않는다(`Player.stop` 문자열 없음 · 분기 도달 0 · `VOLUMELEVEL` 없음). 사운드폰트 경로(`wie-backend` 오디오 · 브라우저 워크렛)는 손대지 않았다.
+- 라이브 LGT 5 · 가드 2: 결과·재생 수 같음(`1b107b96bf4e` 은 위). 그림 수 `49ade89578c5` 2,141 → 2,059 · `ddd885583b15` 1,603 → 1,588 · 나머지 ±1 — 두 가드는 바뀐 코드가 닿지 않는다(`Player.stop` 문자열 없음 · 검수자 debug 로그에서 `stop` 호출 0 · 분기 도달 0 · `VOLUMELEVEL` 없음). 사운드폰트 경로(`wie-backend` 오디오 · 브라우저 워크렛)는 손대지 않았다.
 - 4 게이트: `cargo fmt --all -- --check` rc 0 · `cargo clippy --all -- -D warnings` rc 0 · wasm32 rc 0 · `+beta` rc 0(기존 unused-dependency 경고 9줄) · `RUST_MIN_STACK=4194304 cargo test --all` **782 passed / 0 failed**.
 - `npm run build:wasm` rc 0 · `check-engine-contract` 137 pass / 0 violation.
 
@@ -113,5 +117,3 @@ census probe A(30초) 짝. 전 = `origin/main` · 후 = 이 브랜치(4-3 전 �
 ### 7. 게임 파일명 유입
 
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 725회 / 334쌍 + SUFFIX-ATTACHED 36회 / 16쌍. compat.json 밖의 걸림은 이 회차가 고친 코드 파일의 «기존» 주석(전부 이 회차 전부터 있던 줄)이다. 이 회차가 쓴 코드 주석·회차 문서·worklog·소식은 타이틀을 sha12 로만 적었다.
-
-<!-- corpus-name-inflow v1 subjects=9 tree=370e82c3bf3e2359 B=725/334 P=0/0 S=36/16 -->
