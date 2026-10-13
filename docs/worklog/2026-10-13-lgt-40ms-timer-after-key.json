@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-13",
+  "task": "wie-lgt-40ms-timer-after-key-0-67x",
+  "title": "LGT 40ms 타이머 게임 키 뒤 느림 — 게임 자체 그리기 × ARM 해석 처리량",
+  "summary": "9acb5e0387eb 브라우저 짝(audio-probe --paint-window 10,40) 2회: 키 있음 376·377 / 없음 750·750 그리기(0.50). 원인: 키 뒤 화면에서 clet paint 콜백이 프레임당 약 370만 ARM 명령(게임 자체의 픽셀 단위 팔레트 블릿·사각형 채움)을 해석 — 주 스레드의 91% paint · 73% ARM 해석 · 타이머 콜백 6%. 타이머·이벤트·paint 경로 결함 아님. 엔진·compat 변경 0. docs/report/0518.",
+  "proposals": [],
+  "adoptedProposals": ["2026-10-13-playable-speed-unknown-42-remeasure#p1"],
+  "declinedProposals": []
+}
