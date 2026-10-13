@@ -138,15 +138,22 @@ impl Player {
         }
     }
 
+    // True only when there was something to stop. 888702965551 calls `stop` before each sound and
+    // plays it only when that returns false — so on its handset stopping an idle clip said false.
+    // Answering true for every clip with a player kept all of its sounds from ever starting
+    // (docs/report/0517). "Playing" is `getState() == STARTED`, the same test `resume_clip` uses.
     async fn stop_clip(jvm: &Jvm, _: &mut WieJvmContext, clip: ClassInstanceRef<Clip>) -> JvmResult<bool> {
         tracing::debug!("org.kwis.msp.media.Player::stop({clip:?})");
 
         let player = Clip::player(jvm, &clip).await?;
 
         if !player.is_null() {
+            let state: i32 = jvm
+                .invoke_virtual(&player, "javax/microedition/media/Player", "getState", "()I", ())
+                .await?;
             let _: () = jvm.invoke_virtual(&player, "javax/microedition/media/Player", "stop", "()V", ()).await?;
 
-            return Ok(true);
+            return Ok(state == STARTED);
         }
 
         Ok(false)
@@ -418,6 +425,33 @@ mod test {
         })
     }
 
+    #[test]
+    fn test_stopping_an_idle_clip_reports_false() -> Result<()> {
+        run_jvm_test(Box::new([wie_midp::get_protos().into(), get_protos().into()]), |jvm| async move {
+            let r#type: ClassInstanceRef<String> = JavaLangString::from_rust_string(&jvm, "audio/test").await?.into();
+            let data = jvm.instantiate_array("B", 0).await?;
+            let clip: ClassInstanceRef<Clip> = jvm
+                .new_class("org/kwis/msp/media/Clip", "(Ljava/lang/String;[B)V", (r#type, data))
+                .await?
+                .into();
+
+            let stop = async |clip: ClassInstanceRef<Clip>| -> jvm::Result<bool> {
+                jvm.invoke_static("org/kwis/msp/media/Player", "stop", "(Lorg/kwis/msp/media/Clip;)Z", (clip,))
+                    .await
+            };
+            assert!(!stop(clip.clone()).await?, "a clip that never played has nothing to stop");
+
+            let played: bool = jvm
+                .invoke_static("org/kwis/msp/media/Player", "play", "(Lorg/kwis/msp/media/Clip;Z)Z", (clip.clone(), true))
+                .await?;
+            assert!(played);
+            assert!(stop(clip.clone()).await?, "a playing clip is stopped");
+            assert!(!stop(clip).await?, "and then it is idle again");
+
+            Ok(())
+        })
+    }
+
     // The Clip overload is the one 배틀몬스터 calls; the BaseClip overload above it is a bare
     // stub, so asserting only that one would pass with the Clip signature still unregistered.
     #[test]
@@ -437,7 +471,7 @@ mod test {
                 .invoke_static("org/kwis/msp/media/Player", "resume", "(Lorg/kwis/msp/media/Clip;)Z", (clip,))
                 .await?;
 
-            assert!(stopped);
+            assert!(!stopped, "the clip never played, so there was nothing to stop");
             assert!(resumed);
 
             Ok(())
