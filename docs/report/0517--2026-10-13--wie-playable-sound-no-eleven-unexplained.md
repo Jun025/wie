@@ -96,7 +96,7 @@ census probe A(30초) 짝. 전 = `origin/main` · 후 = 이 브랜치(4-3 전 �
     - `704839f1a6c8` 전 2·1·2 / 후 1·1·1 — 매체 debug 짝에서 호출 순서(`stop`·`stop`·`play`)가 양쪽 같고 둘 다 재생 2. 둘째 재생이 30초 끝에 걸리는 시각 차다.
 - **나머지 222종**: 후 빌드만 돌렸다(상대 이름 분기가 닿는지 보려고). PASS 212 · `clean exit` 5 · FAIL 5. FAIL 은 `MC_knlGet…` 미구현(`974e0df9ab1e` `f770b15f8876` · `limited` 설치 인증 벽) 등 이 회차 코드가 닿지 않는 것이다.
 - **상대 이름 분기 도달**: 429종 후 빌드 로그에서 `also tries` 가 찍힌 것은 `a7d1f26af3e1` · `51011b242bb5` 둘뿐이다.
-- 라이브 LGT 5 · 가드 2: 결과·재생 수 같음(`1b107b96bf4e` 은 위). 그림 수 `49ade89578c5` 2,141 → 2,059 · `ddd885583b15` 1,603 → 1,588 · 나머지 ±1 — 두 가드는 바뀐 코드가 닿지 않는다(`Player.stop` 문자열 없음 · 분기 도달 0 · `VOLUMELEVEL` 없음). 배틀몬스터 사운드폰트 경로(`wie-backend` 오디오 · 브라우저 워크렛)는 손대지 않았다.
+- 라이브 LGT 5 · 가드 2: 결과·재생 수 같음(`1b107b96bf4e` 은 위). 그림 수 `49ade89578c5` 2,141 → 2,059 · `ddd885583b15` 1,603 → 1,588 · 나머지 ±1 — 두 가드는 바뀐 코드가 닿지 않는다(`Player.stop` 문자열 없음 · 분기 도달 0 · `VOLUMELEVEL` 없음). 사운드폰트 경로(`wie-backend` 오디오 · 브라우저 워크렛)는 손대지 않았다.
 - 4 게이트: `cargo fmt --all -- --check` rc 0 · `cargo clippy --all -- -D warnings` rc 0 · wasm32 rc 0 · `+beta` rc 0(기존 unused-dependency 경고 9줄) · `RUST_MIN_STACK=4194304 cargo test --all` **782 passed / 0 failed**.
 - `npm run build:wasm` rc 0 · `check-engine-contract` 137 pass / 0 violation.
 
