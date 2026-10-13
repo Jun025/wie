@@ -85,4 +85,4 @@
 - 이용자 소식은 내지 않았다. 엔진을 바꾸지 않은 측정 갱신이다(wave3·6차 선례).
 
 ### 5. 게임 파일명 유입
-타이틀은 sha12 로만 적었다. `compat.json` 은 `axes.speed` 값만 바뀌었다(제목 문자열 차이 0).
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 330쌍 + SUFFIX-ATTACHED 16쌍. 전부 이 PR 이 건드린 `compat.json` 의 기존 제목 값이다. 이 PR 은 그 파일에서 `axes.speed` 값만 바꿨다(제목 문자열 차이 0). 그 밖 파일 0. 타이틀은 sha12 로만 적었다.
