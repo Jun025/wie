@@ -57,6 +57,9 @@ pub async fn get_system_property(context: &mut dyn WIPICContext, ptr_id: WIPICWo
         // plays — and create no clip without it: M_E_INVALID left 3 LGT titles silent
         // (2026-09-27 silent-104 census, 0 → 2..8 plays in 90 s).
         "MEDIADEVICES" => "Yamaha_MA3",
+        // The handset's volume step — the value Java's `HandsetProperty` answers. An LGT title reads
+        // it before each sound and played nothing on M_E_INVALID (1cd151222bde, docs/report/0517).
+        "VOLUMELEVEL" => "3",
         _ => {
             tracing::warn!("unknown system property id: {id}");
             return Ok(-9); // M_E_INVALID
@@ -490,6 +493,22 @@ mod test {
         assert_eq!(get_system_property(&mut context, id, out, 16).await.unwrap(), 0);
         let result = read_null_terminated_string_bytes(&context, out).unwrap();
         assert!(String::from_utf8(result).unwrap().contains("Yamaha_MA3"));
+
+        Ok(())
+    }
+
+    // 1cd151222bde reads VOLUMELEVEL before each sound and played none on M_E_INVALID. Same value as
+    // Java's `HandsetProperty`, so the two APIs agree on one handset.
+    #[futures_test::test]
+    async fn test_get_system_property_volume_level() -> Result<()> {
+        let mut context = TestContext::new();
+        let id = context.alloc_raw(16).unwrap();
+        let out = context.alloc_raw(16).unwrap();
+
+        write_null_terminated_string_bytes(&mut context, id, b"VOLUMELEVEL").unwrap();
+
+        assert_eq!(get_system_property(&mut context, id, out, 16).await.unwrap(), 0);
+        assert_eq!(read_null_terminated_string_bytes(&context, out).unwrap(), b"3");
 
         Ok(())
     }
