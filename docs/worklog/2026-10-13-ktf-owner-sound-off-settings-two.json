@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-13",
+  "task": "wie-ktf-owner-sound-off-settings-two-titles",
+  "title": "KTF 동봉 소리 끔 설정 2종을 OWNER_SOUND_OFF_SETTINGS 로",
+  "summary": "b907b0faf483 config.sav · 5a59f62d1f1a config.dat 를 jar MD5 목록으로 뺀다. 빼기 짝: 600초 재생 0 → 278 · 0 → 453. boot·render·input·longplay·progress 판정 퇴행 0 · speed 같은 시각 짝 0.99 대. compat 2행 sound no → ok. docs/report/0518.",
+  "proposals": [],
+  "adoptedProposals": ["2026-10-13-playable-sound-no-eleven-unexplained#p0"],
+  "declinedProposals": []
+}
