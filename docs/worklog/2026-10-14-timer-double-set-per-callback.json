@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-14",
+  "task": "wie-timer-double-set-per-callback-queue-growth",
+  "title": "대기 중인 WIPI 타이머에 다시 건 Set 은 실패(-1) — 군집 D 3종 speed ok",
+  "summary": "AromaWIPI 1.1.1.8 참조 에뮬레이터(WIPIEmul.exe 0x44781e)는 이미 걸린 MCTimer 에 Set 하면 -1 을 돌려주고 기한을 두며 param 만 바꾼다. arm_timer 를 그 의미로 바꿨다. 타이머 게임 111종 전·후 짝: 거절이 일어나는 곳은 4종이고, 판정 변화는 speed n/a→ok 5행(그중 3행이 이 변경의 효과)이며 나빠진 행은 0이다. docs/report/0518.",
+  "proposals": [],
+  "adoptedProposals": ["2026-10-13-playable-speed-unknown-42-remeasure#p0"],
+  "declinedProposals": []
+}

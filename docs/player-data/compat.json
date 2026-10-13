@@ -5130,7 +5130,7 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown",
+    "speed": "ok",
     "progress": "ok"
    },
    "knownIssues_ko": [],
@@ -5149,7 +5149,7 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown",
+    "speed": "ok",
     "progress": "ok"
    },
    "knownIssues_ko": [],
@@ -5263,7 +5263,7 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown",
+    "speed": "ok",
     "progress": "ok"
    },
    "knownIssues_ko": [],
