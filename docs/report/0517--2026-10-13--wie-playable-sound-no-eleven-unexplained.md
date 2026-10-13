@@ -117,3 +117,4 @@ census probe A(30초) 짝. 전 = `origin/main` · 후 = 이 브랜치(4-3 전 �
 ### 7. 게임 파일명 유입
 
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 725회 / 334쌍 + SUFFIX-ATTACHED 36회 / 16쌍. compat.json 밖의 걸림은 이 회차가 고친 코드 파일의 «기존» 주석(전부 이 회차 전부터 있던 줄)이다. 이 회차가 쓴 코드 주석·회차 문서·worklog·소식은 타이틀을 sha12 로만 적었다.
+<!-- corpus-name-inflow v1 subjects=9 tree=3bef2122bda81f3e B=725/334 P=0/0 S=36/16 -->
