@@ -88,6 +88,9 @@ pub async fn def_timer(context: &mut dyn WIPICContext, ptr_timer: WIPICWord, fn_
     let timer = WIPICTimer { fn_callback };
 
     write_generic(context, ptr_timer, timer)?;
+    // A Def resets the timer, pending or not: the reference emulator's Def (WIPIEmul.exe 0x448493)
+    // first clears it through 0x4477eb (type 2, no alarm), so a Set after a Def succeeds.
+    context.system().event_queue().cancel_timer(ptr_timer);
 
     Ok(())
 }
@@ -564,6 +567,14 @@ mod test {
         );
         // Fired, so no longer pending: its callback may Set it again.
         assert_eq!(set_timer(&mut context, timer, 10, 0, 3).await?, 0);
+        // Pending again, but a Def resets it (WIPIEmul.exe 0x448493 -> 0x4477eb): the old arming
+        // never calls back and the next Set succeeds.
+        def_timer(&mut context, timer, 0x5678).await?;
+        assert_eq!(set_timer(&mut context, timer, 10, 0, 4).await?, 0);
+        for (_, _, callback) in core::mem::take(&mut context.timers) {
+            callback.call(&mut context, Box::new([])).await?;
+        }
+        assert_eq!(context.call_args, [(0x5678, alloc::vec![timer, 4])], "only the arming after the Def fires");
 
         Ok(())
     }
