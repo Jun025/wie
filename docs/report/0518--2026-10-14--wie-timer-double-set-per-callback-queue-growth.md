@@ -59,3 +59,4 @@
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 331쌍 + SUFFIX-ATTACHED 16쌍. 전부 이 PR 이 건드린 `compat.json` 의 기존 제목 값이다. 이 회차는 compat 의 speed 값 3개만 바꿨다(제목 문자열 차이 0). 타이틀은 sha12 로만 적었다.
 
 
+
