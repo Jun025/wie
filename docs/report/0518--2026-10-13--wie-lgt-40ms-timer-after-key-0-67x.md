@@ -75,4 +75,4 @@
 
 ### 5. 게임 파일명 유입
 
-이 회차가 쓴 파일 2개(이 문서 · worklog)에 타이틀은 sha12 로만 적었다.
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 0 · SUFFIX-ATTACHED 0. 타이틀은 sha12 로만 적었다.
