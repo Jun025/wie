@@ -86,3 +86,6 @@
 
 ### 5. 게임 파일명 유입
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 330쌍 + SUFFIX-ATTACHED 16쌍. 전부 이 PR 이 건드린 `compat.json` 의 기존 제목 값이다. 이 PR 은 그 파일에서 `axes.speed` 값만 바꿨다(제목 문자열 차이 0). 그 밖 파일 0. 타이틀은 sha12 로만 적었다.
+
+
+<!-- corpus-name-inflow v1 subjects=3 tree=5d7199ceb4b041a5 B=718/330 P=0/0 S=36/16 -->
