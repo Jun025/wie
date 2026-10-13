@@ -541,7 +541,7 @@ mod test {
     }
 
     // A Set on a pending timer fails and leaves its due time alone (AromaWIPI's WIPIEmul.exe
-    // 0x44781e, docs/report/0518). It added a second callback, so a title that Sets twice in every
+    // 0x44781e, docs/report/0520). It added a second callback, so a title that Sets twice in every
     // callback (cdd3eb5f9142) gained one more pending callback per callback.
     #[futures_test::test]
     async fn test_set_timer_on_a_pending_timer_fails() -> Result<()> {

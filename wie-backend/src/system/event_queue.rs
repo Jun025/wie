@@ -143,7 +143,7 @@ impl EventQueue {
     /// WIPI `MC_knlSetTimer`. `None` while the timer is still pending: a Set does not touch a pending
     /// timer's due time and fails, though its param still wins. That is what the reference
     /// emulator (AromaWIPI 1.1.1.8, `WIPIEmul.exe` 0x44781e) does, and `MCTimer` is one node of
-    /// an intrusive alarm list, so it cannot be due twice (docs/report/0518). A title that Sets
+    /// an intrusive alarm list, so it cannot be due twice (docs/report/0520). A title that Sets
     /// twice per callback (cdd3eb5f9142) piled up one more callback per callback here.
     pub fn arm_timer(&mut self, timer: u32, param: u32) -> Option<u64> {
         let timer = self.timers.entry(timer).or_default();

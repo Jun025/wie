@@ -36,7 +36,7 @@
 - 위 표의 마지막 두 행(거절 0)은 이 변경의 효과가 **아니다**. before 런의 load1 이 19 였고, compat 은 이미 둘 다 `ok` 다. 그래서 compat 에 반영할 것이 없다.
 - 3종: late p50 이 4~11 **초**에서 0 으로 떨어졌다(쌓이던 대기가 사라졌다). 발화 수는 명목에 가까워졌다. 0516 의 debug 런은 cdd3 의 콜백을 57~64/s 로 셌다(명목 47.6/s).
 - `3cc7a9b4cb15`(거절 1회): speed ok → ok(0.992 → 0.999) · sound ok → ok.
-- 전 111행: `docs/report/0518--2026-10-14--wie-timer-double-set-per-callback-queue-growth--pair.csv`(sha12 만).
+- 전 111행: `docs/report/0520--2026-10-14--wie-timer-double-set-per-callback-queue-growth--pair.csv`(sha12 만).
 - 위 CSV 의 `status_*` 는 probe 만 돈 상태의 값이다(longplay 미측 ⇒ `limited`). 전·후 차이는 0이다.
 - **progress**(거절이 일어나는 4종 · `--only long --long 120` → `--only progress --progress 300` · before 02:49–03:08 · after 03:08–03:27): 4종 모두 longplay `ok → ok` · progress `ok → ok` · status `playable → playable`. 나빠진 행은 0이다.
 
@@ -60,4 +60,3 @@
 
 
 
-<!-- corpus-name-inflow v1 subjects=7 tree=861be239786da4d6 B=719/331 P=0/0 S=36/16 -->
