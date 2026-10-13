@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-13",
+  "kind": "sound",
+  "titles": [
+    "1cd151222bdea0367757304cde2c537374517d60e1f5708a6359bbad4d05faf5"
+  ],
+  "summary_ko": "게임이 휴대폰의 소리 크기를 물었을 때 답을 받지 못해 소리를 내지 않았어요. 이제 소리 크기를 알려 줘서 소리가 나요.",
+  "pr": "https://github.com/Jun025/wie/pull/550"
+}

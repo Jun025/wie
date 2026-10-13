@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-13",
+  "task": "wie-playable-sound-no-eleven-unexplained",
+  "title": "playable 인데 소리 없음 11종 — 원인 미상 문장 0",
+  "summary": "엔진 3곳(Class.getResourceAsStream 상대 이름 · 멈출 것 없는 Player.stop 은 false · WIPI-C VOLUMELEVEL). 동봉 설정 끔 5 · 측정 정정 1 · 이유 문장 1. census probe A 짝 퇴행 판정 변화 0. docs/report/0517.",
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "KTF 동봉 소리 끔 설정 2종을 OWNER_SOUND_OFF_SETTINGS 로 빼기",
+      "plainSummary": "원 주인이 소리를 꺼 둔 설정 파일이 든 KTF 게임 2종(5a59f62d1f1a · b907b0faf483)을 처음 설치한 것처럼 시작하게 한다.",
+      "userBenefit": "게임 안 설정을 찾아 들어가지 않아도 처음부터 소리가 난다.",
+      "why": "이 회차는 티켓 처분대로 안내 문장만 바꿨다. b907b0faf483 은 config.sav 를 빼면 120초 재생 50(실측) · 5a59f62d1f1a 는 config.dat 첫 바이트를 3 으로 바꾸면 재생 68 이다. 0440 의 B 5종과 같은 형태다.",
+      "tradeoff": "파일째 빼므로 그 파일의 다른 설정(조작·속도 등)도 처음 값이 된다. 5a59f62d1f1a 는 빼기 짝을 아직 재지 않았다.",
+      "effort": "S",
+      "target": "wie-ktf OWNER_SOUND_OFF_SETTINGS · compat 2행"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}

@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-13",
+  "kind": "sound",
+  "titles": [
+    "a7d1f26af3e12a4d13638994465e0d1e81630a547d647bb36cfed8c71a9e242d",
+    "51011b242bb5485dde836fed1af8c5dff41a1994e3eb35fc26fc01198d697add"
+  ],
+  "summary_ko": "게임이 소리 파일을 찾지 못해 음악과 효과음이 하나도 나지 않았어요. 이제 소리 파일을 제대로 찾아서 들려요.",
+  "pr": "https://github.com/Jun025/wie/pull/550"
+}

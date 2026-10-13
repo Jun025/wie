@@ -39,10 +39,13 @@
 //!   `global_references` as roots. (Corrected 2026-09-04; the first version of this comment
 //!   called it "impossible without a fork", which reported a risk that does not exist.)
 
-use alloc::{boxed::Box, vec, vec::Vec};
+use alloc::{boxed::Box, format, vec, vec::Vec};
 
 use encoding_rs::{EUC_KR, UTF_8};
-use jvm::{ClassInstance, JavaChar, JavaError, JavaValue, Jvm, runtime::JavaLangString};
+use jvm::{
+    ClassInstance, JavaChar, JavaError, JavaValue, Jvm,
+    runtime::{JavaLangClass, JavaLangString},
+};
 use jvm_class_proto::{JavaMethodProto, MethodBody};
 use rustjava_runtime::{Runtime, RuntimeClassProto};
 
@@ -349,6 +352,14 @@ fn ascii_reads_as_utf8(proto: &mut RuntimeClassProto) -> bool {
 /// — the idiom of Nokia's example `ImageHelper`, copied into open-source MIDP games — came back null
 /// and the game died in `Image.createImage(null)` before its first paint (j2me-lines, 2026-10-08).
 /// On a handset every class reads the one jar, so the fallback is what the guest expects.
+///
+/// A name without a leading `/` is relative to the class's package (`Class.getResourceAsStream`'s
+/// contract); the pin passes it to the loader as is, so it is looked up at the jar root. Two KTF
+/// titles keep their sounds beside their sound class and ask by the bare name — `"title.mmf"` from
+/// `ghostcity/Sound` for `ghostcity/title.mmf`, `"sound/ting.mmf"` from `sook/Utils/CSound` — and
+/// each request came back null, so the class gave up before making a clip: no sound at all
+/// (a7d1f26af3e1 · 51011b242bb5, docs/report/0517). The package-relative name is tried only after
+/// the name as given found nothing, so every resource found before is found the same way.
 struct ResourceFromMidletJar {
     inner: Box<dyn MethodBody<JavaError, dyn Runtime>>,
 }
@@ -356,27 +367,55 @@ struct ResourceFromMidletJar {
 #[async_trait::async_trait]
 impl MethodBody<JavaError, dyn Runtime> for ResourceFromMidletJar {
     async fn call(&self, jvm: &Jvm, context: &mut (dyn Runtime + 'static), args: Box<[JavaValue]>) -> Result<JavaValue, JavaError> {
-        let name = args.get(1).cloned();
-        let found = self.inner.call(jvm, context, args).await?;
-        let (JavaValue::Object(None), Some(JavaValue::Object(Some(name)))) = (&found, name) else {
-            return Ok(found);
+        let (Some(JavaValue::Object(Some(this))), Some(JavaValue::Object(Some(name)))) = (args.first().cloned(), args.get(1).cloned()) else {
+            return self.inner.call(jvm, context, args).await;
         };
+        let found = self.inner.call(jvm, context, args).await?;
+        if !matches!(found, JavaValue::Object(None)) {
+            return Ok(found);
+        }
+        if let Some(stream) = system_resource(jvm, name.clone()).await? {
+            return Ok(JavaValue::Object(Some(stream)));
+        }
 
-        let loader: Box<dyn ClassInstance> = jvm
-            .invoke_static("java/lang/ClassLoader", "getSystemClassLoader", "()Ljava/lang/ClassLoader;", ())
-            .await?;
-        let stream: Option<Box<dyn ClassInstance>> = jvm
-            .invoke_virtual(
-                &loader,
-                "java/lang/ClassLoader",
-                "getResourceAsStream",
-                "(Ljava/lang/String;)Ljava/io/InputStream;",
-                (name,),
+        let relative = JavaLangString::to_rust_string(jvm, &name).await?;
+        let class_name = JavaLangClass::name(jvm, &this).await?;
+        let (false, Some((package, _))) = (relative.starts_with('/'), class_name.rsplit_once('/')) else {
+            return Ok(JavaValue::Object(None));
+        };
+        let resolved_name = format!("{package}/{relative}");
+        tracing::debug!("Class.getResourceAsStream({relative}) also tries {resolved_name}");
+        let resolved = JavaLangString::from_rust_string(jvm, &resolved_name).await?;
+
+        let found = self
+            .inner
+            .call(
+                jvm,
+                context,
+                Box::new([JavaValue::Object(Some(this)), JavaValue::Object(Some(resolved.clone()))]),
             )
             .await?;
+        if !matches!(found, JavaValue::Object(None)) {
+            return Ok(found);
+        }
 
-        Ok(JavaValue::Object(stream))
+        Ok(JavaValue::Object(system_resource(jvm, resolved).await?))
     }
+}
+
+async fn system_resource(jvm: &Jvm, name: Box<dyn ClassInstance>) -> Result<Option<Box<dyn ClassInstance>>, JavaError> {
+    let loader: Box<dyn ClassInstance> = jvm
+        .invoke_static("java/lang/ClassLoader", "getSystemClassLoader", "()Ljava/lang/ClassLoader;", ())
+        .await?;
+
+    jvm.invoke_virtual(
+        &loader,
+        "java/lang/ClassLoader",
+        "getResourceAsStream",
+        "(Ljava/lang/String;)Ljava/io/InputStream;",
+        (name,),
+    )
+    .await
 }
 
 fn resource_from_midlet_jar(proto: &mut RuntimeClassProto) -> bool {
@@ -755,5 +794,130 @@ mod reader_read_tests {
 
             Ok(())
         })
+    }
+
+    /// A relative name is found beside the asking class, as `Class.getResourceAsStream` promises:
+    /// `pkg/Snd` asks for `"snd/a.mmf"` and gets `pkg/snd/a.mmf` (a7d1f26af3e1 · 51011b242bb5 asked
+    /// this way for every sound and got null — docs/report/0517). A name that exists at the root
+    /// still wins, so nothing that was found before moves; an absolute name is not rewritten.
+    #[test]
+    fn a_relative_resource_name_is_found_beside_its_class() -> Result<()> {
+        extern crate std;
+        use core::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+
+        use jvm::runtime::JavaIoInputStream;
+        use jvm_types::ClassAccessFlags;
+        use test_utils::TestPlatform;
+        use wie_backend::{DefaultTaskRunner, System};
+
+        use crate::{JvmSupport, RustJavaJvmImplementation, WieJavaClassProto};
+
+        let jar = stored_zip(&[("pkg/snd/a.mmf", b"beside"), ("b.mmf", b"root"), ("pkg/b.mmf", b"beside b")]);
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        system.filesystem().add_virtual("t.jar", jar);
+
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+        system.spawn(async move || {
+            let proto = WieJavaClassProto {
+                name: "pkg/Snd",
+                parent_class: Some("java/lang/Object"),
+                interfaces: vec![],
+                methods: vec![],
+                fields: vec![],
+                access_flags: ClassAccessFlags::PUBLIC,
+            };
+            let jvm = JvmSupport::new_jvm(
+                &system_clone,
+                Some("t.jar"),
+                Box::new([Box::new([proto]) as Box<[_]>]),
+                &[],
+                RustJavaJvmImplementation,
+            )
+            .await?;
+
+            let class_name = JavaLangString::from_rust_string(&jvm, "pkg.Snd").await.unwrap();
+            let class: Box<dyn jvm::ClassInstance> = jvm
+                .invoke_static("java/lang/Class", "forName", "(Ljava/lang/String;)Ljava/lang/Class;", (class_name,))
+                .await
+                .unwrap();
+            for (name, want) in [
+                ("snd/a.mmf", Some(&b"beside"[..])),
+                ("b.mmf", Some(b"root")),
+                ("/snd/a.mmf", None),
+                ("snd/none.mmf", None),
+            ] {
+                let name_string = JavaLangString::from_rust_string(&jvm, name).await.unwrap();
+                let stream: Option<Box<dyn jvm::ClassInstance>> = jvm
+                    .invoke_virtual(
+                        &class,
+                        "java/lang/Class",
+                        "getResourceAsStream",
+                        "(Ljava/lang/String;)Ljava/io/InputStream;",
+                        (name_string,),
+                    )
+                    .await
+                    .unwrap();
+                let got = match stream {
+                    Some(stream) => Some(JavaIoInputStream::read_until_end(&jvm, &stream).await.unwrap()),
+                    None => None,
+                };
+                assert_eq!(got.as_deref(), want, "{name}");
+            }
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok::<_, wie_util::WieError>(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    /// A jar of stored entries — the CRC is real because the zip reader checks it.
+    fn stored_zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
+        fn crc32(data: &[u8]) -> u32 {
+            !data.iter().fold(!0u32, |c, &b| {
+                (0..8).fold(c ^ b as u32, |c, _| if c & 1 == 1 { (c >> 1) ^ 0xedb8_8320 } else { c >> 1 })
+            })
+        }
+        let (mut out, mut central) = (Vec::new(), Vec::new());
+        for (name, data) in entries {
+            let offset = out.len() as u32;
+            let head = |sig: u32| {
+                let mut h = sig.to_le_bytes().to_vec();
+                h.extend([20, 0, 0, 0, 0, 0, 0, 0, 0, 0]); // version, flags, stored, time, date
+                h.extend(crc32(data).to_le_bytes());
+                h.extend((data.len() as u32).to_le_bytes());
+                h.extend((data.len() as u32).to_le_bytes());
+                h.extend((name.len() as u16).to_le_bytes());
+                h.extend([0, 0]); // extra length
+                h
+            };
+            out.extend(head(0x0403_4b50));
+            out.extend(name.as_bytes());
+            out.extend(*data);
+            let mut c = 0x0201_4b50u32.to_le_bytes().to_vec();
+            c.extend([20, 0]); // made by
+            c.extend(&head(0)[4..]);
+            c.extend([0; 10]); // comment length, disk, internal, external attributes
+            c.extend(offset.to_le_bytes());
+            c.extend(name.as_bytes());
+            central.extend(c);
+        }
+        let (at, size, count) = (out.len() as u32, central.len() as u32, entries.len() as u16);
+        out.extend(central);
+        out.extend(0x0605_4b50u32.to_le_bytes());
+        out.extend([0, 0, 0, 0]);
+        out.extend(count.to_le_bytes());
+        out.extend(count.to_le_bytes());
+        out.extend(size.to_le_bytes());
+        out.extend(at.to_le_bytes());
+        out.extend([0, 0]);
+        out
     }
 }
