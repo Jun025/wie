@@ -49,7 +49,7 @@ census `report` 판정(위 같은 실행 + `--only long --long 600` + `--only pr
 
 ### 4. 검증
 
-- 되돌리면 red: `emulator::tests::owner_sound_off_settings_cover_the_two_0518_titles`. `b907b0faf483` 행을 빼면 `left: None`(실측). 게임 jar 는 커밋할 수 없어(Constraint 9) 빠지는 동작이 아니라 행을 못박는다 — 동작은 `device_bound_saves_dropped_for_listed_jar_only` 가 이미 본다.
+- 되돌리면 red: `emulator::tests::owner_sound_off_settings_cover_the_two_0519_titles`. `b907b0faf483` 행을 빼면 `left: None`(실측). 게임 jar 는 커밋할 수 없어(Constraint 9) 빠지는 동작이 아니라 행을 못박는다 — 동작은 `device_bound_saves_dropped_for_listed_jar_only` 가 이미 본다.
 - 4 게이트: `cargo fmt --all -- --check` rc 0 · `cargo clippy --all -- -D warnings` rc 0 · wasm32 rc 0 · `+beta` rc 0(기존 unused-dependency 경고 9줄) · `RUST_MIN_STACK=4194304 cargo test --all` **783 passed / 0 failed**.
 - 러너 블록: draw · helloworld ×2 · text PASS · keydraw ×2 `--inject --expect-last-frame` PASS · rc 0.
 - `node scripts/player-data.mjs` · `node scripts/check-compat-revert.mjs` — 회신에 인용.
@@ -62,5 +62,3 @@ census `report` 판정(위 같은 실행 + `--only long --long 600` + `--only pr
 ### 6. 게임 파일명 유입
 
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 718회 / 330쌍 + SUFFIX-ATTACHED 36회 / 16쌍. 전부 `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 값이다(이 회차는 그 2행의 소리 축·안내 줄만 바꿨다). 그 밖 파일은 0 이다. 코드·회차 문서·worklog·소식은 타이틀을 sha12/sha256 으로만 적었다.
-
-<!-- corpus-name-inflow v1 subjects=5 tree=bc8f4b9f14ab152e B=718/330 P=0/0 S=36/16 -->

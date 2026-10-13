@@ -524,11 +524,11 @@ mod tests {
         assert_eq!(files.len(), 3);
     }
 
-    // Measured, not derivable: without these files the two titles play from the start (docs/report/0518).
+    // Measured, not derivable: without these files the two titles play from the start (docs/report/0519).
     // The jars are game bytes and cannot be here, so this pins the rows rather than the drop. The MD5s
     // are `md5 -q <jar>` output pasted as-is, so a slip copying them into the table's byte rows fails here.
     #[test]
-    fn owner_sound_off_settings_cover_the_two_0518_titles() {
+    fn owner_sound_off_settings_cover_the_two_0519_titles() {
         let names = |hex: &str| {
             let md5: [u8; 16] = core::array::from_fn(|i| u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).unwrap());
             super::OWNER_SOUND_OFF_SETTINGS.iter().find(|(m, _)| *m == md5).map(|(_, n)| *n)
