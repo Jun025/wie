@@ -109,3 +109,8 @@ census probe A(30초) 짝. 전 = `origin/main` · 후 = 이 브랜치(4-3 전 �
 - 이용자 소식: 엔진 고침 3건(4-1 · 4-2 · 4-3). 측정 정정(`c107462e5f8a`)은 소식을 내지 않았다(0440 선례).
 - 갱신 방법: 위 행만 손으로 고쳤다(전수 재생성 아님). `node scripts/check-compat-revert.mjs` OK.
 - KTF ⒜ 2종(`5a59f62d1f1a` · `b907b0faf483`)은 0440 B 처럼 `OWNER_SOUND_OFF_SETTINGS` 로 동봉 파일을 빼면 처음부터 소리가 난다(`b907b0faf483` 파일을 빼면 재생 50 · 실측). 티켓 ⒜ 처분(안내 문장)을 따랐고 목록 추가는 하지 않았다.
+
+### 7. 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 725회 / 334쌍 + SUFFIX-ATTACHED 36회 / 16쌍. compat.json 밖의 걸림은 이 회차가 고친 코드 파일의 «기존» 주석(전부 이 회차 전부터 있던 줄)이다. 이 회차가 쓴 코드 주석·회차 문서·worklog·소식은 타이틀을 sha12 로만 적었다.
+
