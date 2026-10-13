@@ -62,3 +62,5 @@ census `report` 판정(위 같은 실행 + `--only long --long 600` + `--only pr
 ### 6. 게임 파일명 유입
 
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 718회 / 330쌍 + SUFFIX-ATTACHED 36회 / 16쌍. 전부 `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 값이다(이 회차는 그 2행의 소리 축·안내 줄만 바꿨다). 그 밖 파일은 0 이다. 코드·회차 문서·worklog·소식은 타이틀을 sha12/sha256 으로만 적었다.
+
+<!-- corpus-name-inflow v1 subjects=5 tree=e0df4a604bc8c42e B=718/330 P=0/0 S=36/16 -->
