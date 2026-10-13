@@ -58,3 +58,7 @@ census `report` 판정(위 같은 실행 + `--only long --long 600` + `--only pr
 ### 5. 되돌리기
 
 두 행을 빼면 §1 의 «원본» 열로 돌아간다. compat 2행은 `sound: no` + 안내 문장으로.
+
+### 6. 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 718회 / 330쌍 + SUFFIX-ATTACHED 36회 / 16쌍. 전부 `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 값이다(이 회차는 그 2행의 소리 축·안내 줄만 바꿨다). 그 밖 파일은 0 이다. 코드·회차 문서·worklog·소식은 타이틀을 sha12/sha256 으로만 적었다.
