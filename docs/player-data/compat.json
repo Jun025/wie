@@ -33,13 +33,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "2006영혼낚시"
   },
@@ -2808,7 +2806,7 @@
     "progress": "ok"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
+    "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
    ],
    "changes": [],
    "fileTitle": "심시티 2억에디트1"
@@ -2829,7 +2827,7 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요.",
+    "여기서 볼 수 있는 처음 화면과 안내 화면에서는 게임이 소리를 틀지 않아요. 그 뒤 화면은 아래 서버 문제로 들어갈 수 없어요.",
     "게임을 시작할 때 옛 통신사 서버에 접속해야 해서, 여기서는 «네트워크 접속 실패» 안내가 나온 뒤 처음으로 돌아가요."
    ],
    "changes": [],
@@ -3272,7 +3270,7 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
+    "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
    ],
    "changes": [],
    "fileTitle": "영웅전설3 하얀마녀"
@@ -3660,13 +3658,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "전설의 마법학교2"
   },
@@ -4173,13 +4169,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "카우스블레이드"
   },
@@ -5040,7 +5034,7 @@
     "progress": "ok"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
+    "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
    ],
    "changes": [],
    "fileTitle": "헬싱"
@@ -5268,13 +5262,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "unknown",
     "progress": "ok"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "2010밴쿠버올림픽"
   },
@@ -6839,13 +6831,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
-   ],
+   "knownIssues_ko": [],
    "playTips_ko": [
     "메뉴를 여는 소프트키 없이 방향키와 확인 키로 움직이면 계속 진행돼요."
    ],
@@ -6926,7 +6916,7 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
+    "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
    ],
    "changes": [],
    "fileTitle": "다크슬레이어2"
@@ -8341,7 +8331,7 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "소리가 나지 않을 수 있어요."
+    "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
    ],
    "playTips_ko": [
     "메뉴를 여는 소프트키 없이 방향키와 확인 키로 움직이면 계속 진행돼요."

@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-13",
+  "kind": "sound",
+  "titles": [
+    "888702965551622a01cbff78cfbf030146990c22c691adf189aaa625b53ced54"
+  ],
+  "summary_ko": "효과음을 틀기 전에 «멈춤» 결과를 확인하는 게임에서 소리가 하나도 나지 않았어요. 이제 효과음과 음악이 들려요.",
+  "pr": "https://github.com/Jun025/wie/pull/550"
+}
