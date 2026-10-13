@@ -128,7 +128,8 @@ pub async fn set_timer(
     let timeout = (((timeout_high as u64) << 32) | (timeout_low as u64)) as _;
     let timer: WIPICTimer = read_generic(context, ptr_timer)?;
     let Some(arming) = context.system().event_queue().arm_timer(ptr_timer, param) else {
-        return Ok(-1); // still pending — see `arm_timer`
+        tracing::debug!("MC_knlSetTimer({ptr_timer:#x}): still pending, refused");
+        return Ok(-1); // see `arm_timer`
     };
     // When a tick may be kept alive until this timer is due (instead of the host's next frame, the
     // 16.7ms grid every timer used to land on): never for 1ms, which means "as soon as you can" (KTF
