@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-13",
+  "task": "wie-playable-speed-unknown-42-quiet-host-remeasure",
+  "title": "playable speed unknown 42종 재측 — 21종 ok · 21종 구조적 unknown",
+  "summary": "d7059f1f 로 42종 speed 재측. 21종 unknown→ok. 남은 21종: 타이머 중복 arm 누적 3 · 부하 무관 타이머 지연 2 · 주 루프 아닌 sleep 1 · 대기 없음 14 · 창 미도달 1. slow 확정 0. 조용한 창은 오지 않았다(가드 saturated/recovering). docs/report/0516.",
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "같은 타이머를 콜백마다 두 번 거는 게임의 대기열 누적",
+      "plainSummary": "게임 3종이 타이머를 한 번에 두 번씩 걸어 대기 중인 타이머가 계속 쌓이고, 그 결과 게임 속도가 원래보다 빨라진다.",
+      "userBenefit": "해당 게임들이 원래 속도로 돌고, 속도 표시도 '알 수 없음'에서 실제 값으로 바뀔 수 있다.",
+      "why": "cdd3eb5f9142·4892a1abc0f8·1cd151222bde: 콜백당 MC_knlSetTimer 2회·Unset 0회. arm_timer 는 두 Set 을 두 콜백으로 유지해 대기열이 콜백마다 1씩 늘고 timer_late 가 창 안에서 선형 증가(비율 −197~−430). 콜백은 명목 47.6/s 대비 57~64/s.",
+      "tradeoff": "'두 Set = 두 콜백'은 의도된 결정이다(kernel.rs 주석). 실기에서 재설정이 교체인지 근거(설정 바이트·호출 기록)를 먼저 확보해야 하고, 바꾸면 2d5cada03004·3cc7a9b4cb15 등 타이머 게임 전수 짝 재측이 필요하다.",
+      "effort": "M",
+      "target": "wie-wipi-c/src/api/kernel.rs set_timer · wie-backend event_queue arm_timer"
+    },
+    {
+      "kind": "product",
+      "title": "LGT 40ms 타이머 게임이 키 입력 뒤 0.67배 속도",
+      "plainSummary": "게임 1종(9acb5e0387eb)이 플레이 화면에서 원래보다 약 3분의 2 속도로 움직인다. 부하와 상관없이 같은 값이 나온다.",
+      "userBenefit": "해당 게임이 원래 속도로 움직인다.",
+      "why": "40ms 타이머 late p50 41 / p95 97ms · 22초 창 370회 = 16.8/s(명목 25/s) · 세 읽기 0.341/0.374/0.340(load1 9~17). 키 없는 15초 런은 24.7/s(명목). 키 뒤 화면에서만 늦다.",
+      "tradeoff": "헤드리스 단독으로는 slow 를 확정하지 못한다. audio-probe --speed/--paint-window 의 브라우저 짝으로 먼저 확정해야 한다.",
+      "effort": "S~M",
+      "target": "wie-midp event_queue Timer pace_from · wie-lgt timer 경로"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}
