@@ -112,7 +112,10 @@ pub struct EventQueue {
 #[derive(Default)]
 struct GuestTimer {
     armings: u64,
-    cancelled_through: u64,
+    // The arming that will still fire: set, not yet fired, not unset.
+    pending: Option<u64>,
+    // The last Set's param — the one its callback gets, even when that Set was refused.
+    param: u32,
     // (host tick, fires in it) of its last fire
     fired_in_tick: (u64, u32),
 }
@@ -137,27 +140,38 @@ impl EventQueue {
         self.input_events.is_empty() && self.events.is_empty()
     }
 
-    /// Numbers an arming of a guest timer (WIPI `MC_knlSetTimer`), for `is_timer_armed` when it
-    /// falls due. One still pending is left alone — two Sets give two callbacks, as they always did.
-    pub fn arm_timer(&mut self, timer: u32) -> u64 {
+    /// WIPI `MC_knlSetTimer`. `None` while the timer is still pending: a Set does not touch a pending
+    /// timer's due time and fails, though its param still wins. That is what the reference
+    /// emulator (AromaWIPI 1.1.1.8, `WIPIEmul.exe` 0x44781e) does, and `MCTimer` is one node of
+    /// an intrusive alarm list, so it cannot be due twice (docs/report/0518). A title that Sets
+    /// twice per callback (cdd3eb5f9142) piled up one more callback per callback here.
+    pub fn arm_timer(&mut self, timer: u32, param: u32) -> Option<u64> {
         let timer = self.timers.entry(timer).or_default();
+        timer.param = param;
+        if timer.pending.is_some() {
+            return None;
+        }
         timer.armings += 1;
-        timer.armings
+        timer.pending = Some(timer.armings);
+        timer.pending
     }
 
-    /// WIPI `MC_knlUnsetTimer`: every arming so far stops counting.
+    /// WIPI `MC_knlUnsetTimer`.
     pub fn cancel_timer(&mut self, timer: u32) {
-        let timer = self.timers.entry(timer).or_default();
-        timer.cancelled_through = timer.armings;
+        self.timers.entry(timer).or_default().pending = None;
     }
 
-    pub fn is_timer_armed(&self, timer: u32, arming: u64) -> bool {
-        arming > self.timers.get(&timer).map_or(0, |x| x.cancelled_through)
-    }
-
-    pub fn timer_fired(&mut self, timer: u32, tick: u64) {
-        let fired = &mut self.timers.entry(timer).or_default().fired_in_tick;
+    /// `arming` fell due in host tick `tick`: the param to call back with, or `None` if it was unset.
+    /// The timer is no longer pending from here, so its callback may Set it again.
+    pub fn fire_timer(&mut self, timer: u32, arming: u64, tick: u64) -> Option<u32> {
+        let timer = self.timers.get_mut(&timer)?;
+        if timer.pending != Some(arming) {
+            return None;
+        }
+        timer.pending = None;
+        let fired = &mut timer.fired_in_tick;
         *fired = (tick, if fired.0 == tick { fired.1 + 1 } else { 1 });
+        Some(timer.param)
     }
 
     /// How many times this timer fired in host tick `tick`.
