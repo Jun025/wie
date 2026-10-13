@@ -3265,13 +3265,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
-    "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "영웅전설3 하얀마녀"
   },
@@ -5029,13 +5027,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "ok"
    },
-   "knownIssues_ko": [
-    "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "헬싱"
   },

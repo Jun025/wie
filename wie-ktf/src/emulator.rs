@@ -154,6 +154,21 @@ const OWNER_SOUND_OFF_SETTINGS: &[([u8; 16], &[&str])] = &[
         ],
         &["peng0.txt", "pengB0.txt"],
     ),
+    // b907b0faf483: 6 bytes; the second is «sound on» and the owner's is 0 (set to 1, it plays).
+    (
+        [
+            0x0f, 0x42, 0xb6, 0xec, 0x06, 0x92, 0xfd, 0x29, 0x31, 0x20, 0x7c, 0xb4, 0x75, 0x19, 0x81, 0xc3,
+        ],
+        &["config.sav"],
+    ),
+    // 5a59f62d1f1a: 4 bytes, shipped twice (bare and under `P/`); the first is the sound level and the
+    // owner's is 0 (set to 3, it plays). `save.dat` beside it is not it.
+    (
+        [
+            0x84, 0x05, 0x24, 0x81, 0xea, 0x39, 0x45, 0x7b, 0xa8, 0xf8, 0xd7, 0xfb, 0x06, 0x25, 0x2e, 0x57,
+        ],
+        &["config.dat"],
+    ),
 ];
 
 /// The original owner's progress, shipped in the archive, that «continue» opens: a new player would
@@ -507,6 +522,20 @@ mod tests {
         let mut files = archive(&["A.jar", "P/res/save.sav", "P/res/savem.sav"]);
         drop_device_bound_saves(&mut files, b"other", table);
         assert_eq!(files.len(), 3);
+    }
+
+    // Measured, not derivable: without these files the two titles play from the start (docs/report/0519).
+    // The jars are game bytes and cannot be here, so this pins the rows rather than the drop. The MD5s
+    // are `md5 -q <jar>` output pasted as-is, so a slip copying them into the table's byte rows fails here.
+    #[test]
+    fn owner_sound_off_settings_cover_the_two_0519_titles() {
+        let names = |hex: &str| {
+            let md5: [u8; 16] = core::array::from_fn(|i| u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).unwrap());
+            super::OWNER_SOUND_OFF_SETTINGS.iter().find(|(m, _)| *m == md5).map(|(_, n)| *n)
+        };
+
+        assert_eq!(names("0f42b6ec0692fd2931207cb4751981c3"), Some(&["config.sav"][..])); // b907b0faf483
+        assert_eq!(names("84052481ea39457ba8f8d7fb06252e57"), Some(&["config.dat"][..])); // 5a59f62d1f1a
     }
 
     #[test]
