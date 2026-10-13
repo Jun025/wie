@@ -44,7 +44,4 @@
 
 ### 5. 게임 파일명 유입
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 1쌍 + SUFFIX-ATTACHED 0쌍. 그 1쌍은 `wie-wipi-c/src/api/kernel.rs` 에 `origin/main` 부터 있던 기존 주석이다. 이 회차가 그 파일을 고쳐서 대상에 들어왔을 뿐이고, 이 회차 diff 의 그 문자열은 0회다. 이 회차는 타이틀을 sha12/sha256 으로만 적었다.
-
-
-
-
+<!-- corpus-name-inflow v1 subjects=4 tree=8a6ebe38f513bb5c B=1/1 P=0/0 S=0/0 -->
