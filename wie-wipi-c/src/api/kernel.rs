@@ -98,13 +98,12 @@ pub async fn set_timer(
     timeout_low: WIPICWord,
     timeout_high: WIPICWord,
     param: WIPICWord,
-) -> Result<()> {
+) -> Result<i32> {
     tracing::debug!("MC_knlSetTimer({ptr_timer:#x}, {timeout_low:#x}, {timeout_high:#x}, {param:#x})");
 
     struct TimerCallback {
         ptr_timer: WIPICWord,
         fn_callback: WIPICWord,
-        param: WIPICWord,
         arming: u64,
     }
 
@@ -115,12 +114,11 @@ pub async fn set_timer(
             // Unset since. With Unset a no-op, a title that re-arms with Unset + Set kept the old
             // chain alive beside the new one, and its game loop ran two to four times per period
             // (2d5cada03004: 37 callbacks/s of a 62ms timer; 3cc7a9b4cb15: 40/s of a 37ms one).
-            if !context.system().event_queue().is_timer_armed(self.ptr_timer, self.arming) {
-                return Ok(WIPICResult { results: Vec::new() });
-            }
             let tick = context.system().pacing().ticks();
-            context.system().event_queue().timer_fired(self.ptr_timer, tick);
-            context.call_function(self.fn_callback, &[self.ptr_timer, self.param]).await?;
+            let Some(param) = context.system().event_queue().fire_timer(self.ptr_timer, self.arming, tick) else {
+                return Ok(WIPICResult { results: Vec::new() });
+            };
+            context.call_function(self.fn_callback, &[self.ptr_timer, param]).await?;
 
             Ok(WIPICResult { results: Vec::new() })
         }
@@ -129,7 +127,10 @@ pub async fn set_timer(
     let now = context.system().platform().now();
     let timeout = (((timeout_high as u64) << 32) | (timeout_low as u64)) as _;
     let timer: WIPICTimer = read_generic(context, ptr_timer)?;
-    let arming = context.system().event_queue().arm_timer(ptr_timer);
+    let Some(arming) = context.system().event_queue().arm_timer(ptr_timer, param) else {
+        tracing::debug!("MC_knlSetTimer({ptr_timer:#x}): still pending, refused");
+        return Ok(-1); // see `arm_timer`
+    };
     // When a tick may be kept alive until this timer is due (instead of the host's next frame, the
     // 16.7ms grid every timer used to land on): never for 1ms, which means "as soon as you can" (KTF
     // 49ade89578c5 re-arms MC_knlSetTimer(1) each frame; waiting on it ran the game at 44fps, not its 39),
@@ -152,12 +153,11 @@ pub async fn set_timer(
         Box::new(TimerCallback {
             ptr_timer,
             fn_callback: timer.fn_callback,
-            param,
             arming,
         }),
     );
 
-    Ok(())
+    Ok(0)
 }
 
 pub async fn unset_timer(context: &mut dyn WIPICContext, ptr_timer: WIPICWord) -> Result<()> {
@@ -522,7 +522,7 @@ mod test {
         def_timer(&mut context, timer, 0x1234).await?;
         for op in ops {
             match op {
-                Some(timeout) => set_timer(&mut context, timer, *timeout, 0, 0).await?,
+                Some(timeout) => _ = set_timer(&mut context, timer, *timeout, 0, 0).await?,
                 None => unset_timer(&mut context, timer).await?,
             }
         }
@@ -540,6 +540,34 @@ mod test {
         Ok(())
     }
 
+    // A Set on a pending timer fails and leaves its due time alone (AromaWIPI's WIPIEmul.exe
+    // 0x44781e, docs/report/0520). It added a second callback, so a title that Sets twice in every
+    // callback (cdd3eb5f9142) gained one more pending callback per callback.
+    #[futures_test::test]
+    async fn test_set_timer_on_a_pending_timer_fails() -> Result<()> {
+        assert_eq!(fire_after(&[Some(10), Some(10)]).await?, [0x1234]);
+        assert_eq!(fire_after(&[Some(10), Some(10), None, Some(10)]).await?, [0x1234]);
+
+        let system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let mut context = TestContext::with_system(system);
+        let timer = context.alloc_raw(4).unwrap();
+        def_timer(&mut context, timer, 0x1234).await?;
+        assert_eq!(set_timer(&mut context, timer, 10, 0, 1).await?, 0);
+        assert_eq!(set_timer(&mut context, timer, 99, 0, 2).await?, -1);
+        assert_eq!(context.timers.len(), 1, "the due time is the first Set's");
+        let (_, _, callback) = context.timers.pop().unwrap();
+        callback.call(&mut context, Box::new([])).await?;
+        assert_eq!(
+            context.call_args.pop().unwrap(),
+            (0x1234, alloc::vec![timer, 2]),
+            "the param is the last Set's"
+        );
+        // Fired, so no longer pending: its callback may Set it again.
+        assert_eq!(set_timer(&mut context, timer, 10, 0, 3).await?, 0);
+
+        Ok(())
+    }
+
     #[futures_test::test]
     async fn test_when_a_timer_may_keep_a_tick_alive() -> Result<()> {
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
@@ -553,12 +581,14 @@ mod test {
         let tick = system.pacing().ticks();
 
         assert_eq!(pace_from(&mut context, 1).await, u64::MAX, "MC_knlSetTimer(1): as soon as you can");
+        unset_timer(&mut context, timer).await?;
         assert_eq!(pace_from(&mut context, 10).await, 0, "a 10ms period keeps the tick alive");
         let (_, _, callback) = context.timers.pop().unwrap();
         callback.call(&mut context, Box::new([])).await?;
         // Re-armed from its own callback — the usual loop. Only this tick's second fire is withheld.
         assert_eq!(pace_from(&mut context, 10).await, tick + 1);
         system.tick()?;
+        unset_timer(&mut context, timer).await?;
         assert_eq!(pace_from(&mut context, 10).await, 0);
 
         Ok(())
