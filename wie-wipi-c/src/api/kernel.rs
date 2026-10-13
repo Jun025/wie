@@ -574,7 +574,11 @@ mod test {
         for (_, _, callback) in core::mem::take(&mut context.timers) {
             callback.call(&mut context, Box::new([])).await?;
         }
-        assert_eq!(context.call_args, [(0x5678, alloc::vec![timer, 4])], "only the arming after the Def fires");
+        assert_eq!(
+            context.call_args,
+            [(0x5678, alloc::vec![timer, 4])],
+            "only the arming after the Def fires"
+        );
 
         Ok(())
     }

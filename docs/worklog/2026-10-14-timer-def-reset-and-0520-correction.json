@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-14",
+  "task": "wie-timer-reject-followup-def-reset-and-report-correction",
+  "title": "MC_knlDefTimer 가 대기 중인 타이머를 지운다 + 0520 서술 보정",
+  "summary": "참조 WIPIEmul.exe 의 Def(0x448493)는 0x4477eb 로 타이머를 먼저 비운다. def_timer 가 cancel_timer 를 부르게 했다. 타이머 게임 112종에서 대기 중 재Def 0회(30s · 재Def 16종은 120s 재측도 0회) — 실행이 바뀌는 타이틀 0종. 0520 의 3cc7·79d9 체감 속도 변화와 r0 서술을 바로잡았다. docs/report/0521.",
+  "proposals": [],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}
