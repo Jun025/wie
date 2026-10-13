@@ -56,4 +56,6 @@
 - release 바이너리로 keydraw 를 돌리면 before·after 둘 다 `UNMEASURED`(stop `max-ticks`)다. 이 변경과는 무관하다. 문서의 러너 줄은 debug 다.
 
 ### 5. 게임 파일명 유입
-`node scripts/corpus-name-inflow.mjs` 의 결과와 표식은 회신·PR 에 둔다. 이 회차는 compat 의 speed 값 3개만 바꿨다(제목 문자열 차이 0). 타이틀은 sha12 로만 적었다.
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 331쌍 + SUFFIX-ATTACHED 16쌍. 전부 이 PR 이 건드린 `compat.json` 의 기존 제목 값이다. 이 회차는 compat 의 speed 값 3개만 바꿨다(제목 문자열 차이 0). 타이틀은 sha12 로만 적었다.
+
+
