@@ -93,7 +93,7 @@ MD=$EVID/$DATE.md
 sus=$(node scripts/regression-diff.mjs report --base "$R/base-compat.json" --new "$R/out/compat.json" --long "$R/long.titles" ${pair[@]+"${pair[@]}"} \
   --pin "$PIN" --tool-pin "$TOOL_PIN" --elapsed $(($(date +%s) - T0)) --date "$DATE" --out "$MD") || incomplete diff
 cp "$R/out/compat.json" "$R/compat.json"
-# Keep this round and the one before it whole; older rounds keep only their compat.json (≈300 MB of frames each).
+# Keep this round and the one before it whole; older rounds keep only their compat.json (a round is ≈1.8 GB of frames, measured 2026-10-20).
 ls -d "$ROOT"/*/ | sort -r | tail -n +3 | while read -r d; do rm -rf "${d}out" "${d}pair" "${d}pair-corpus" "${d}wie_validate"; done
 echo "regression-census: $MD · suspects $sus · candidates $n · $(($(date +%s) - T0))s" >&2
 if ((sus > 0)); then note "WIE_REGRESSION_SUSPECT n=$sus pin=${PIN:0:8}"; else note "WIE_REGRESSION_CLEAR pin=${PIN:0:8}"; fi

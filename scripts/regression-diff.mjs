@@ -77,7 +77,8 @@ export function drift(base, cur, long = new Set()) {
     }
     // In --long and the run happened (a title whose input is not ok never gets one).
     const ran = long.has(sha.slice(0, 12)) && norm(n.axes.longplay) !== 'unknown';
-    for (const d of rowDrift(b, n, ran)) (d.dir === 'down' ? down : up).push({ sha12: sha.slice(0, 12), ...d });
+    const rowStatus = `${b.status} → ${n.status}`;
+    for (const d of rowDrift(b, n, ran)) (d.dir === 'down' ? down : up).push({ sha12: sha.slice(0, 12), rowStatus, ...d });
   }
   const added = [...rows(cur).keys()].filter((s) => !B.has(s)).map((s) => s.slice(0, 12));
   return { down, up, unmeasured, added };
@@ -111,7 +112,7 @@ function markdown({ base, cur, long, res, pin, toolPin, elapsed, date }) {
     '',
     '## 퇴행 의심 · 내림 후보 (sha12 · 축 · 전 → 후 · 짝 재측 · 재현)',
     '',
-    ...t(res.cands, '| sha12 | 축 | 전 | 후 | 짝 | 재현 |', (c) => `| \`${c.sha12}\` | ${c.axis} | ${c.before} | ${c.after} | ${c.pair?.after ?? (res.paired ? '같지 않음' : '미측')} | ${c.pair ? '**재현**' : '아니오'} |`),
+    ...t(res.cands, '| sha12 | 축 | 전 | 후 | 짝 | 재현 | 행 상태(compat → 이번) |', (c) => `| \`${c.sha12}\` | ${c.axis} | ${c.before} | ${c.after} | ${c.pair?.after ?? (res.paired ? '같지 않음' : '미측')} | ${c.pair ? '**재현**' : '아니오'} | ${c.rowStatus} |`),
     '',
     ...(sus
       ? ['다음 행동: 의심 행마다 compat 핀과 이번 핀 사이를 같은 시각 짝으로 좁혀(`wie_validate` 전/후 바이너리) 원인 PR 을 찾고 티켓을 연다 — compat 행은 그 티켓이 고친다.', '']
