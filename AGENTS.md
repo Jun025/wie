@@ -354,6 +354,11 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   the host lock `/tmp/wie-playability-census.lock` (fixed path, so scratch copies share it) and a second run
   **waits** for it — it does not fail. A dead holder's lock is reclaimed.
 
+- **`scripts/regression-census.sh` — local only (same reason); the weekly regression watch over that census.**
+  It measures `origin/main` on every title and reports only rows that went DOWN against
+  `docs/player-data/compat.json`, pair-confirmed; it never writes compat. Rules: `scripts/regression-diff.mjs`
+  header (`selftest` there). Output: `~/orchestrator/reports/evidence/wie-weekly-regression/<date>.md` + one ledger line.
+
 - **`scripts/corpus-name-inflow.mjs` — local only (same reason); a round that reports a "게임
   파일명 유입" number RUNS IT rather than re-deriving the predicate.** `node
   scripts/corpus-name-inflow.mjs` (defaults to this branch's changes against `origin/main`; pass
