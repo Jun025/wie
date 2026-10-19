@@ -31,7 +31,8 @@ const RANK = { ok: 2, partial: 1, no: 0 };
 const STATUS = { playable: 2, limited: 1, 'not-yet': 0 };
 const PROBE_AXES = ['boot', 'render', 'input'];
 const AXES = [...PROBE_AXES, 'longplay', 'sound', 'speed'];
-// A wall (server, purchase check, lock) caps a row whatever its axes say — keep its status as measured.
+// A NEW wall (server, purchase check, lock) caps a row whatever its axes say — keep its status as measured.
+// One base already carried is a note on a row that stayed playable (1a69522a7d43's «온라인 등록»).
 // ponytail: matched on the shipped sentence; a census constant to import is the upgrade if a wall is reworded.
 const WALL = /서버|인증|잠긴/;
 
@@ -40,7 +41,8 @@ const statusOf = (ax) =>
   ax.boot === 'ok' && ax.render === 'ok' && ax.input === 'ok' && ax.longplay === 'ok' ? 'playable' : ax.boot === 'ok' && ax.render === 'ok' ? 'limited' : 'not-yet';
 // Status of a row outside --long: `limited` only because longplay was not run this round keeps base's.
 function lifted(b, n) {
-  if (n.status !== 'limited' || b.status !== 'playable' || (n.knownIssues_ko ?? []).some((s) => WALL.test(s))) return n.status;
+  const newWall = (n.knownIssues_ko ?? []).some((s) => WALL.test(s) && !(b.knownIssues_ko ?? []).includes(s));
+  if (n.status !== 'limited' || b.status !== 'playable' || newWall) return n.status;
   const ax = Object.fromEntries(AXES.map((a) => [a, norm(n.axes[a])]));
   return statusOf({ ...ax, longplay: norm(b.axes.longplay) });
 }
@@ -176,6 +178,10 @@ if (cmd === 'changed') {
     ['suspects count rows, not axes', suspectRows(confirm(d.down, d.down)) === 1],
     ['a long-run row: silent is down', k(drift(base, { entries: [row(1, 'playable', ax({ sound: 'silent' }))] }, L1).down) === '1:sound'],
     ['a wall keeps the measured status', k(drift(base, { entries: [row(3, 'limited', ax({ longplay: 'n/a' }), { knownIssues_ko: ['그 서버가 지금은 없어'] })] }).down) === '3:status'],
+    ['a wall line base already carried does not cap', (() => {
+      const note = { knownIssues_ko: ['랭킹은 게임사 서버가 지금은 없어 쓸 수 없어요.'] };
+      return drift({ entries: [row(3, 'playable', ax(), note)] }, { entries: [row(3, 'limited', ax({ longplay: 'n/a' }), note)] }).down.length === 0;
+    })()],
     ['n/a is never a side', drift({ entries: [row(1, 'playable', ax({ speed: 'unknown' }))] }, { entries: [row(1, 'playable', ax({ speed: 'n/a' }))] }, L1).down.length === 0],
     ['a row missing from the round is unmeasured, not down', drift(base, { entries: [] }).unmeasured.length === 3 && drift(base, { entries: [] }).down.length === 0],
     ['changed: probe axes only', changed(base, cur).join() === '111111111111,222222222222'],
