@@ -710,7 +710,7 @@ struct Args {
     inject_keys: Option<usize>,
     /// Key script replacing the built-in 27 keys: a file path, or the script inline.
     /// Whitespace-separated `NAME[:GAP[:HOLD]]` steps, `#` starts a comment; NAME is a
-    /// key (`OK UP DOWN LEFT RIGHT LSOFT RSOFT CLR STAR HASH NUM0`..`NUM9`) or `WAIT`
+    /// key (`OK UP DOWN LEFT RIGHT LSOFT RSOFT CLR CALL STAR HASH NUM0`..`NUM9`) or `WAIT`
     /// (no key, still a shot). GAP = seconds until the next step (default --action-secs),
     /// HOLD = seconds the key stays down (default 0.15). Lifts the 120 s deadline cap.
     /// Unchecked: keep HOLD < GAP (else the next key goes down before this one is up) and
@@ -1819,6 +1819,7 @@ fn parse_keys(v: &str) -> std::result::Result<KeyScript, String> {
             "LSOFT" => Some(KeyCode::LEFT_SOFT_KEY),
             "RSOFT" => Some(KeyCode::RIGHT_SOFT_KEY),
             "CLR" => Some(KeyCode::CLEAR),
+            "CALL" => Some(KeyCode::CALL),
             "STAR" => Some(KeyCode::STAR),
             "HASH" => Some(KeyCode::HASH),
             "NUM0" => Some(KeyCode::NUM0),
@@ -2931,6 +2932,9 @@ mod tests {
             super::Args::try_parse_from(["wie_validate", "--keys", "OK", "g"]).is_err(),
             "--keys requires --inject"
         );
+        // The web shell's 📞 button: 1a69522a7d43's tutorial waits for it, and without a name here
+        // no recipe could press it.
+        assert!(matches!(super::parse_keys("CALL").unwrap().0[0].key, Some(wie_backend::KeyCode::CALL)));
         let example = concat!(env!("CARGO_MANIFEST_DIR"), "/../docs/keys/battlemonster-village.keys");
         let (s, _, n) = plan(&["--inject", "--keys", example]);
         assert_eq!(n, 99);
