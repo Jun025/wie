@@ -1,0 +1,111 @@
+sha12,platform,status,progress,class,cluster,guidance,prev_class,basis,pin,note
+3185174d2121,KTF,playable,stuck,c,server,issue,c-server,0470,f5c02609,server line already in knownIssues
+cb7c7f87f9e6,KTF,playable,stuck,d,key-path-not-found,none,q-skill,0525,a90f1472,"0507 recipe (NUM1 tutorial, order, start) at 600 s P: stuck, stall 510 s, 5 distinct screens"
+aa3fcba4598b,KTF,playable,stuck,d,key-path-not-found,none,q-skill,0491/0507,26f79198,coins never collected; stage 1-1 never ends
+55aadf368b8e,KTF,playable,stuck,d,key-path-not-found,none,q-skill,0507,26f79198,runner tutorial needs timed jumps
+44c292be4e4c,KTF,playable,stuck,d,confirm-only-entry,none,a-below,0507,26f79198,entry needs only the confirm key (criterion 2)
+dbd078113b97,KTF,playable,stuck,c,server,issue,c-server,0470,f5c02609,server line already in knownIssues
+135d1291501f,KTF,playable,stuck,d,key-path-not-found,none,q-skill,0525,a90f1472,"0507 recipe (NUM1 for the yes/no box) at 600 s P: stuck, stall 370 s, 7 distinct screens"
+8c71be3ad26d,KTF,playable,stuck,d,play-reached (novelty below line),none,a-below,0510,6ea6a6bd,policy passes the name box into the farm (0510 P/P2 430/480); stall is the screen-novelty line on a play screen
+ed6ad7318ac9,KTF,playable,stuck,b,tip,tip,a-tip-new,0507,26f79198,recipe P plays in the last third; pair does not confirm
+739c7657c1f2,KTF,playable,stuck,b,tip,tip,a-tip,0502,7ca47380,tip already shipped
+33f3e7669599,KTF,playable,stuck,d,key-path-not-found,none,q-skill,0507,26f79198,profile screen ignores keys after the first steps
+f44271803135,KTF,limited,stuck,c,server,issue,-,compat,-,status row text
+859aa864797b,KTF,playable,stuck,d,key-path-not-found,none,q-skill,0507,26f79198,cooking gauge timing not found
+46b2238f87a6,KTF,playable,stuck,d,key-path-not-found,none,q-skill,0507/0525,a90f1472,"no key fires the cue ball; 0525 paired a held OK/NUM5 (3 s) with host-style Keyrepeat events against none: same frames, gauge never moves - not a held-key wall"
+c3057f46c59b,KTF,playable,stuck,b,issue-guidance,issue,a-issue,0479,11a6fac3,retry guidance in knownIssues
+6af589a88cf9,KTF,playable,stuck,d,confirm-only-entry,none,a-below,0507,26f79198,entry needs only the confirm key (criterion 2)
+c95bf2740c69,KTF,playable,stuck,b,tip,tip,a-tip,0482,74c9d915,tip already shipped
+33801c1ba14f,KTF,playable,stuck,b,tip,tip,a-tip-new,0507,26f79198,recipe P plays in the last third; pair does not confirm
+8d2828ab8a3f,KTF,playable,stuck,b,tip,tip,a-tip-new,0507,26f79198,entry into play seen; play does not last the run (tip says how to get in)
+1cdea1985955,KTF,playable,stuck,d,confirm-only-entry,none,a-below,0507,26f79198,entry needs only the confirm key (criterion 2)
+3b5b98afa890,KTF,playable,stuck,b,tip,tip,a-tip-new,0507,26f79198,entry into play seen; play does not last the run (tip says how to get in)
+db8ef04a6504,KTF,playable,stuck,b,tip,tip,a-tip,0502,7ca47380,tip already shipped
+c181cae84146,KTF,playable,stuck,d,key-path-not-found,none,q-skill,0507,26f79198,tutorial step asks for the hash key; not confirmed
+d448aee68157,KTF,playable,stuck,d,play-reached (novelty below line),none,a-below,0515,1c06afa6,policy reaches the pet room (0510/0515 P/P2 220/310); stall is the screen-novelty line on a play screen
+6d63b4025bef,KTF,playable,stuck,b,tip,tip,a-tip-new,0507,26f79198,recipe P plays in the last third; pair does not confirm
+d552e095ddcf,KTF,playable,stuck,b,tip,tip,a-tip-new,0507,26f79198,entry into play seen; play does not last the run (tip says how to get in)
+174237758542,KTF,playable,stuck,b,tip,tip,a-tip-new,0507,26f79198,recipe P plays in the last third; pair does not confirm
+5aa438fbdc87,KTF,playable,stuck,b,tip,tip,a-tip,0502,7ca47380,tip already shipped
+30c7bd6fb01b,KTF,playable,stuck,c,server,issue,c-server,0470,f5c02609,server line already in knownIssues
+0cc4ef7ede37,KTF,playable,stuck,d,confirm-only-entry,none,a-below,0507,26f79198,entry needs only the confirm key (criterion 2)
+8c6821fab969,KTF,playable,stuck,a,A2 path-end wall (cause unknown),none,a-below,0502,7ca47380,entry seen but the path ends at an unexplained wall (0507 criterion 4); not re-measured this round
+689c491586b9,KTF,playable,stuck,c,server,issue,c-server,0470,f5c02609,server line already in knownIssues
+0eb19d9bbe7a,KTF,playable,stuck,d,key-path-not-found,none,q-skill,0507,26f79198,district too expensive; week end control not found
+3151fdc167b6,KTF,playable,stuck,d,confirm-only-entry,none,a-below,0507,26f79198,entry needs only the confirm key (criterion 2)
+a20c2044305c,KTF,playable,stuck,d,confirm-only-entry,none,a-below,0502,7ca47380,entry needs only the confirm key (criterion 2)
+0f9e1026724d,KTF,playable,stuck,b,tip,tip,a-tip,0502,7ca47380,tip already shipped
+b907b0faf483,KTF,playable,stuck,d,key-path-not-found,none,q-skill,0507,26f79198,prologue scroll not skippable within 150 s
+182fa44210dc,KTF,playable,stuck,b,tip,tip,a-tip-new,0507,26f79198,entry into play seen; play does not last the run (tip says how to get in)
+974e0df9ab1e,KTF,limited,unmeasured,c,install-auth,issue,-,compat,-,status row text
+f770b15f8876,KTF,limited,unmeasured,c,install-auth,issue,-,compat,-,status row text
+d5e996a53118,KTF,playable,stuck,b,tip,tip,a-tip,0502,7ca47380,tip already shipped
+dab2d537f3ef,KTF,not-yet,unmeasured,c,encrypted,issue,-,compat,-,status row text
+60bd6cbc5936,KTF,not-yet,unmeasured,c,encrypted,issue,-,compat,-,status row text
+fe184f834bc7,KTF,playable,stuck,b,tip,tip,a-tip,0482,74c9d915,tip already shipped
+f5bd7a91a107,KTF,playable,stuck,b,tip,tip,a-tip,0482,74c9d915,tip already shipped
+ea35907b22a4,KTF,playable,stuck,b,tip,tip,a-tip,0502,7ca47380,tip already shipped
+1e43e2e0055f,KTF,playable,stuck,b,tip,tip,a-tip,0502,7ca47380,tip already shipped
+4fcd4b74020e,KTF,playable,stuck,d,key-path-not-found,none,q-skill,0507,26f79198,move is never confirmed on the battle map
+965eee81e442,KTF,playable,stuck,d,key-path-not-found,none,q-skill,0507/0525,a90f1472,character does not move in the shop tutorial; 0525 paired held arrows/NUM4/6 with and without Keyrepeat: same frames - not a held-key wall
+d9384b388ea5,KTF,playable,stuck,b,tip,tip,a-tip-new,0507,26f79198,entry into play seen; play does not last the run (tip says how to get in)
+0392263fbb85,KTF,playable,stuck,b,tip,tip,a-tip,0502,7ca47380,tip already shipped
+3ccc6cf147d2,KTF,playable,stuck,d,key-path-not-found,none,q-skill,0506/0510,6ea6a6bd,policy P/P2 340/340 and 4288 recipe P/P2 540/540 both end in the settings menu; 0 uncaught; not an engine wall
+4288d8c1c6ac,KTF,playable,stuck,b,tip,tip,a-tip,0502,7ca47380,tip already shipped
+77c2d0bcd435,KTF,playable,stuck,c,server,issue,c-server,0470,f5c02609,server line already in knownIssues
+568c339a8c07,KTF,playable,stuck,c,server,issue,c-server,0452/0470,1bc1317c,server line already in knownIssues
+69e516bb2ffa,KTF,playable,stuck,b,tip,tip,a-tip,0482,74c9d915,tip already shipped
+b1ec149b354c,KTF,playable,stuck,d,key-path-not-found,none,q-skill,0507,26f79198,dough gauge timing not found
+9e16cc54d0ab,KTF,playable,stuck,b,tip,tip,a-tip,0482,74c9d915,tip already shipped
+8a33aafc06a2,KTF,playable,stuck,d,key-path-not-found,none,q-skill,0507,26f79198,tip dialog never moves on
+145f760b2f4a,KTF,playable,stuck,d,key-path-not-found,none,q-skill,0507,26f79198,week schedule never confirms
+af7d82e5e239,LGT,playable,stuck,b,tip,tip,a-tip,0502,7ca47380,tip already shipped
+01f05f8231f4,LGT,not-yet,unmeasured,c,policy-lock,issue,-,compat,-,status row text
+c1718bcdf8a9,LGT,playable,stuck,b,tip,tip,a-tip,0482,74c9d915,tip already shipped
+caf9d76ffd13,LGT,limited,stuck,c,server,issue,-,compat,-,status row text
+21ffd1c61ebd,LGT,playable,stuck,d,key-path-not-found,none,q-skill,0502,7ca47380,chapter cutscene not skippable within 150 s
+870cd071b4dc,LGT,playable,stuck,b,tip,tip,a-tip,0482,74c9d915,tip already shipped
+9acb5e0387eb,LGT,playable,stuck,b,tip,tip,a-tip,0482,74c9d915,tip already shipped
+0093012b8c36,LGT,limited,stuck,c,server,issue,-,compat,-,status row text
+b9bfcaf42722,LGT,limited,stuck,c,server,issue,-,compat,-,status row text
+87b04639cdfe,LGT,playable,stuck,a,A2 path-end wall (cause unknown),none,a-below,0502,7ca47380,entry seen but the path ends at an unexplained wall (0507 criterion 4); not re-measured this round
+1a69522a7d43,LGT,playable,stuck,a,A1 call-key-not-scriptable (harness),issue,b-engine,0525,a90f1472,"wie_validate --keys had no CALL; with CALL the run passes the grill tutorial (money 350->1060 by t290) and then sits at the counter screen; CALL presses there change nothing; 600 s P (wv a90f1472+CALL): stuck, stall 380 s, last new screen t220"
+3ff5948e235e,LGT,limited,stuck,c,server,issue,-,compat,-,status row text
+fe76e641bb3d,LGT,playable,stuck,d,confirm-only-entry,none,a-below,0502,7ca47380,entry needs only the confirm key (criterion 2)
+287af341dac8,LGT,playable,stuck,b,issue-guidance,issue,a-issue,0493,-,restart guidance in knownIssues
+0266ca417880,LGT,playable,stuck,b,tip,tip,a-tip,0502,7ca47380,tip already shipped
+0fdf45ec169f,LGT,limited,stuck,c,server,issue,c-server,0507,26f79198,connect screen loops after the title; no key leaves it -> limited
+f5e21001612d,LGT,playable,stuck,c,server,issue,c-server,0469/0507,f5c02609,authentication question after the birthday (0469); this round could not reach it
+ecb1bf8d2079,LGT,playable,stuck,d,confirm-only-entry,none,a-below,0507,26f79198,entry needs only the confirm key (criterion 2)
+73f3a21e981c,LGT,limited,stuck,c,server,issue,-,compat,-,status row text
+61ed69520fd3,LGT,playable,stuck,b,tip,tip,a-tip,0469,f5c02609,tip already shipped
+c107462e5f8a,SKT,playable,stuck,b,tip,tip,a-tip,0469,f5c02609,tip already shipped
+c33090c12755,SKT,not-yet,unmeasured,c,policy-lock,issue,-,compat,-,status row text
+a0436eb1ddbb,SKT,playable,stuck,d,confirm-only-entry,none,a-below,0507/0525,a90f1472,entry needs only the confirm key; the 2430 ArrayIndexOutOfBounds of its last P are 0 in a 150 s probe on this pin
+fb80e97cbc57,SKT,playable,stuck,d,confirm-only-entry,issue,a-below,0502,7ca47380,entry needs only the confirm key (criterion 2)
+9aa31965cd10,SKT,playable,stuck,b,tip,tip,a-tip,0482,74c9d915,tip already shipped
+66959afab216,SKT,playable,stuck,d,confirm-only-entry,none,a-below,0502,7ca47380,entry needs only the confirm key (criterion 2)
+d1dce4a36141,SKT,playable,stuck,b,tip,tip,a-tip,0469,f5c02609,tip already shipped
+ec2f8f2e02a2,SKT,playable,stuck,b,tip,tip,a-tip,0502,7ca47380,tip already shipped
+c361632541a7,SKT,playable,stuck,a,A3 SKT dialog stall after menu (cause unknown),issue,b-engine,0512/0525,a90f1472,display fixed 0512; 150 s probe on this pin: 0 exceptions (was 2493); P/P2 stall on the menu dialog from ~160 s (0512); cause not measured
+bf54c05e58a9,SKT,playable,stuck,d,confirm-only-entry,none,a-below,0502,7ca47380,entry needs only the confirm key (criterion 2)
+52edc54e2b23,SKT,playable,stuck,d,confirm-only-entry,none,a-below,0502,7ca47380,entry needs only the confirm key (criterion 2)
+2f5246006bd8,SKT,playable,stuck,b,tip,tip,a-tip,0502,7ca47380,tip already shipped
+2d66945008c1,SKT,playable,stuck,b,tip,tip,a-tip,0482,74c9d915,tip already shipped
+a42f77f44955,SKT,not-yet,unmeasured,c,policy-lock,issue,-,compat,-,status row text
+4f99be2762e2,SKT,playable,stuck,b,tip,tip,a-tip,0482,74c9d915,tip already shipped
+44b6356d13f8,SKT,not-yet,stuck,c,policy-lock,issue,-,compat,-,status row text
+090877d7a3e0,SKT,playable,stuck,b,tip,tip,a-tip,0482,74c9d915,tip already shipped
+7089dec0e8df,SKT,playable,stuck,b,tip,tip,a-tip,0469,f5c02609,tip already shipped
+1f0d7e81336a,SKT,playable,stuck,d,key-path-not-found,none,q-skill,0502,7ca47380,party pick never confirms
+dae153ad28ba,SKT,playable,stuck,b,tip,tip,a-tip,0482,74c9d915,tip already shipped
+6e93f26fa2f5,SKT,playable,stuck,d,confirm-only-entry,issue,a-below,0502,7ca47380,entry needs only the confirm key (criterion 2)
+f12984cd0d37,SKT,playable,stuck,b,tip,tip,a-tip,0502,7ca47380,tip already shipped
+f2ae515201f2,SKT,playable,stuck,b,tip,tip,a-tip,0482,74c9d915,tip already shipped
+0ed66634d3dc,SKT,not-yet,unmeasured,c,policy-lock,issue,-,compat,-,status row text
+3eb73c20bbae,SKT,playable,stuck,d,key-path-not-found,none,q-skill,0502,7ca47380,shop: not enough money; no way found
+e3276ce8557c,SKT,playable,stuck,d,confirm-only-entry,none,a-below,0502,7ca47380,entry needs only the confirm key (criterion 2)
+990ae27f67e6,SKT,playable,stuck,d,key-path-not-found,none,q-skill,0469/0507,26f79198,the title own intro counter bug leaves a background-only scene (0469 sec 5)
+640428a9cf9e,SKT,limited,stuck,c,server,issue,c-server,0507,26f79198,boots into a required data download; yes fails; no quits -> limited
+ccb45e6b8d80,SKT,playable,stuck,b,tip,tip,a-tip,0469,f5c02609,tip already shipped
+eefc947d8337,SKT,not-yet,unmeasured,c,policy-lock,issue,-,compat,-,status row text
