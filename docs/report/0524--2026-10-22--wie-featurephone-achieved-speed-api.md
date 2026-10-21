@@ -39,6 +39,16 @@
   export 주석을 한 줄로 줄이고 정의는 `AchievedSpeed` 에 뒀다. 상한은 올리지 않았다 → **39,859 B** · `check-engine-contract.mjs` 138 pass · 0 violation.
 - 브라우저에서 실게임 수치는 재지 않았다(게임 파일 필요 · 셸 표시 티켓 `otterpebble-featurephone-achieved-speed-indicator` 가 화면에서 본다).
 
+### 게이트② 반려 승계 (wie-featurephone-achieved-speed-api-fix)
+
+- **틱 사이 공백 > 0.5 s 는 창에 넣지 않고 창을 비운다**(`HOST_PAUSE_MS`). 셸은 `visibilitychange` 에서 `pause()` 하지 않으므로
+  rAF 만 멈춘 백그라운드 탭·앱 전환·화면 잠금 뒤 첫 틱이 30 s 공백을 «간격 하나»로 넣었다 — 직전 틱이 굶었으면 약 2 s 동안 ≈0배,
+  안 굶었으면 약 2 s 동안 굶음을 가려 ≈speed. 0.5 s = 2 fps 아래면 «페이싱»이 아니라 «호스트가 안 부름»으로 본다.
+- 시험 `a_host_pause_starts_a_new_window`: 30 s 공백 뒤 첫 값 = speed, 0.5 s 뒤 = 기기 값(2×14/16.7) — 직전 틱 굶음/안 굶음 두 갈래.
+  개악 대조(가드를 `if false && …` 로 끔): `last_starved=true` 갈래 첫 단언 red, `false` 갈래만 돌리면 1.9947 ≠ 1.6766 red.
+- 계약 `achievedSpeedNote` 에 그 한 문장을 더했다(export 표면 무변경). 0348 §1 하네스 줄에 «이제 featurephone 이 매 틱 `take_pacing` 으로
+  창을 비운다» 1줄 덧. 하한 ≈0.84×speed 고지는 그대로다(확인만).
+
 ### 사용자 영향
 
 - 지금은 없다(엔진 API만). 셸이 «고른 배속 vs 실제 배속»을 보여 줄 수 있게 된다. 1배 동작 변경 0 — waker 는 깃발만 세우고 폴링 순서·횟수는 그대로다.

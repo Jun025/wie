@@ -50,7 +50,7 @@
     "free"
   ],
   "setSpeedNote": "set_speed(speed: number) → number · speed() → number (2026-10-09). 게임 배속 1.0~2.0 «연속»(양자화 없음) — 범위 밖은 clamp, NaN·무한은 1.0, 반환값 = 실제 적용값. 게스트 시계(sleep·타이머·currentTimeMillis)가 배속으로 흐르고 바꾸는 순간 시각이 튀거나 되감기지 않는다. 틱 한 번의 벽시계 몫은 그대로라 CPU 가 모자라면 «낼 수 있는 만큼». 오디오 피치·템포는 바꾸지 않는다. 호출하지 않으면 1.0 = 종전 동작과 같다.",
-  "achievedSpeedNote": "achieved_speed() → number (2026-10-21). 최근 2초 틱 창에서 «실제로 낸 배속» = 게스트 시간 ÷ 벽시계, 단 «틱 예산이 다 됐는데 게스트가 CPU 를 더 원한» 틱 끝 → 다음 틱 시작 구간은 세지 않는다. 기기가 따라가면 speed() 와 같고 그 이하만 나온다. 게임이 자는 시간은 «제때»로 세므로 수치를 낮추지도 부풀리지도 않는다. 생성 직후·set_speed 직후 틱 2회 전까지는 speed() 를 돌려준다(set_speed 가 창을 비운다). 하한 ≈ 0.84 × speed()(60Hz) — 엔진은 «더 원했다»만 알지 «얼마나»는 모른다.",
+  "achievedSpeedNote": "achieved_speed() → number (2026-10-21). 최근 2초 틱 창에서 «실제로 낸 배속» = 게스트 시간 ÷ 벽시계, 단 «틱 예산이 다 됐는데 게스트가 CPU 를 더 원한» 틱 끝 → 다음 틱 시작 구간은 세지 않는다. 기기가 따라가면 speed() 와 같고 그 이하만 나온다. 게임이 자는 시간은 «제때»로 세므로 수치를 낮추지도 부풀리지도 않는다. 생성 직후·set_speed 직후 틱 2회 전까지는 speed() 를 돌려준다(set_speed 가 창을 비운다). 틱 사이가 0.5초를 넘으면(백그라운드 탭·앱 전환·화면 잠금 — 호스트가 틱을 안 부른 공백) 그 공백은 세지 않고 창을 비운다. 하한 ≈ 0.84 × speed()(60Hz) — 엔진은 «더 원했다»만 알지 «얼마나»는 모른다.",
   "keyVocabularyNote": "셸이 engine.key_down/key_up 으로 «실제로 보내는» 이름. CALL·HANGUP 은 화면의 «통화»·«종료» 버튼이 보낸다(otterpebble apps/featurephone/app/player.tsx 의 <GameKey code=\"CALL\"|\"HANGUP\"> → RunningGame.press → emu.key_down · 2026-09-04 origin/main 실측). ★키보드 바인딩은 없다(KEY_MAP 에 0건) — 버튼만이다. VOLUME_UP·VOLUME_DOWN 은 «넣지 마라»: 셸이 엔진에 보내지 않고(호스트 게인 노드 setVolume 이 진다) 넣으면 계약이 쓰이지 않는 표면을 약속하게 된다.",
   "keyVocabulary": [
     "UP", "DOWN", "LEFT", "RIGHT", "OK",

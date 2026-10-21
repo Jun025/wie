@@ -96,7 +96,8 @@ pub fn timer_fires_per_tick(speed: f64, tick: u64) -> u32 {
 /// (`Pacing::starved_ticks`) to the start of the next. The guest clock itself never stops — it is
 /// the wall clock times `speed` — so measured on it the ratio is `speed` by construction. A gap
 /// after a tick in which every task slept is counted in full: a guest asleep is on schedule, so
-/// sleeping neither lowers nor inflates the figure. The tick itself always counts.
+/// sleeping neither lowers nor inflates the figure. The tick itself always counts. A gap of more than
+/// `HOST_PAUSE_MS` is the host not ticking, not a frame: it is not counted and starts a new window.
 ///
 /// ponytail: a starved guest reads at least `speed × budget ÷ frame` (≈0.84 × `speed` at 60Hz)
 /// however much more CPU it wanted — the executor sees *that* it wanted more, not how much. A
@@ -113,6 +114,10 @@ pub struct AchievedSpeed {
 
 pub const ACHIEVED_WINDOW_MS: f64 = 2000.0;
 
+// A gap between ticks longer than this is the host not ticking at all — a background tab (rAF stops
+// but the wall clock runs on), an app switch, a locked screen — not pacing. It starts a new window.
+const HOST_PAUSE_MS: f64 = 500.0;
+
 impl AchievedSpeed {
     /// A tick ran from `begin_ms` to `end_ms` on the wall clock; `starved` if it ended on its
     /// budget with the guest still wanting CPU.
@@ -121,6 +126,11 @@ impl AchievedSpeed {
             && begin_ms > b
         {
             let total = begin_ms - b;
+            if total > HOST_PAUSE_MS {
+                self.reset();
+                self.last = Some((begin_ms, end_ms, starved));
+                return;
+            }
             let counted = if was_starved { (e - b).clamp(0.0, total) } else { total };
             self.intervals.push_back((total, counted));
             self.total += total;
@@ -398,5 +408,29 @@ mod tests {
             t += 16.0;
         }
         assert_eq!(achieved.get(1.0), 1.0);
+    }
+
+    #[test]
+    fn a_host_pause_starts_a_new_window() {
+        // A tab in the background: no ticks for 30s, then 60Hz again on a device that starves the
+        // guest (2 × 14ms of every 16.7ms ≈ 1.68). Before the gap the last tick was or was not starved.
+        for last_starved in [true, false] {
+            let mut achieved = AchievedSpeed::default();
+            let mut t = 0.0;
+            for _ in 0..200 {
+                achieved.tick(t, t + 14.0, last_starved);
+                t += 16.7;
+            }
+            t += 30_000.0;
+            achieved.tick(t, t + 14.0, true);
+            assert_eq!(achieved.get(2.0), 2.0, "last_starved={last_starved}: nothing measured since the gap");
+            for _ in 0..30 {
+                t += 16.7;
+                achieved.tick(t, t + 14.0, true);
+            }
+            // half a second later the figure is the device's, not the gap's
+            let got = achieved.get(2.0);
+            assert!((got - 2.0 * 14.0 / 16.7).abs() < 1e-6, "last_starved={last_starved}: {got}");
+        }
     }
 }
