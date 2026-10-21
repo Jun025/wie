@@ -59,7 +59,7 @@ status 수는 그대로다(411 / 10 / 8).
 
 - `origin/main` `a90f1472` release 로 36행 probe(`census-drive.sh --only probe`, jobs 3)를 돌렸다. 이어 playable 속도 미상 18행을 `--only speed --jobs 1` 로 쟀다.
 - 시작 시 `host-load-guard --status --recovered` rc=0(load1 37)이었다. probe 도중 포화로 바뀌었다(23:22 rc=1 · load1 157 · idle 0.1%). 측정 행의 load1 은 84~187 이다(표 `load1` 열).
-- 결과: **새 `ok` 0**. 대기 없는 14행은 비율이 여전히 없다(부하 무관). 비율이 있는 3행은 `d5e996a53118` 0.347(0516 0.78) · `71d1d8235bd1` 0.794 · `9acb5e0387eb` 0.854 로, 전부 부하 속 하한이다. 판정은 바꾸지 않았다.
+- 결과: **새 `ok` 0**. 대기 없는 14행은 비율이 여전히 없다(부하 무관). 비율이 있는 3행은 `d5e996a53118` 0.347(0516 0.78) · `71d1d8235bd1` 0.794 · `9acb5e0387eb` 0.854 로, 전부 부하 속 하한이다. 헤드리스로는 판정을 바꾸지 않았다(`9acb5e0387eb` 는 §4 의 브라우저 짝으로 바꿨다).
 - 0520·0521(타이머 고침)이 0516 뒤에 들어왔지만, 대기 없는 행에 새 대기 경로가 생기지는 않았다(비율 `null` 그대로).
 - 조용한 창에서 다시 재더라도 바뀔 수 있는 것은 `d5e996a53118` 하나다. 나머지는 구조상 같은 답이다. 그래서 창을 기다리지 않았다.
 
@@ -67,7 +67,7 @@ status 수는 그대로다(411 / 10 / 8).
 
 - 4 게이트: `cargo fmt --all -- --check` rc 0 · `cargo clippy --all -- -D warnings` rc 0 · wasm32 rc 0 · `+beta` rc 0(기존 unused-dependency 경고 9줄) · `RUST_MIN_STACK=4194304 cargo test --all` **785 passed / 0 failed**.
 - 러너 블록: draw · helloworld ×2 · text PASS · keydraw ×2 `--inject --expect-last-frame` PASS · rc 0.
-- `node scripts/player-data.mjs` OK(429 · 411/10/8) · `node scripts/check-compat-revert.mjs` — 회신에 인용한다.
+- `node scripts/player-data.mjs` OK(429 · 411/10/8) · `node scripts/check-compat-revert.mjs` OK(착지 기준 바뀐 행 3).
 - 측정 규율: 에뮬레이터는 전부 `build-slot run` 안에서 돌렸다. 스윕은 `census-drive.sh` phase 임대로 돌렸고, 동시 실행은 최대 3이다. `nohup` 0 · 회차 끝에 내가 띄운 에뮬레이터 0.
 - 바이트 바꾼 사본은 `/tmp` 에만 있다(비커밋 · Constraint 9).
 
