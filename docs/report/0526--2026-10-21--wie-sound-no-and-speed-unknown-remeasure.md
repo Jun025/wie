@@ -1,6 +1,6 @@
 ## [2026-10-21] 소리 없음 16 · 소리 미상 3 · 속도 미상 26 — 36행 전수 표 · KTF 동봉 소리 끔 2종 바이트 고침 · LGT 1종 속도 «느림» 확정 (wie-sound-no-and-speed-unknown-remeasure)
 
-**무엇을**: `compat.json`(origin/main `a90f1472`)에서 소리 `no` 16 · `unknown` 3 · 속도 `unknown` 26 을 행마다 갈랐다. 겹치는 행을 빼면 **36행**이다(티켓의 «42»는 중복 제거 전 어림). 표는 [`0525--…--table.csv`](0525--2026-10-21--wie-sound-no-and-speed-unknown-remeasure--table.csv)다.
+**무엇을**: `compat.json`(origin/main `a90f1472`)에서 소리 `no` 16 · `unknown` 3 · 속도 `unknown` 26 을 행마다 갈랐다. 겹치는 행을 빼면 **36행**이다(티켓의 «42»는 중복 제거 전 어림). 표는 [`0526--…--table.csv`](0526--2026-10-21--wie-sound-no-and-speed-unknown-remeasure--table.csv)다.
 - 엔진: `wie-ktf` `OWNER_SOUND_OFF_BYTES` 를 새로 두었다. 원 주인이 소리를 꺼 둔 동봉 설정 파일을 빼면 게임이 멈추는 2종에서, 그 설정 바이트만 «켬» 값으로 바꿔 올린다.
 - `compat.json` 3행을 고쳤다. 소리 `no → ok` 2행(위 2종 · 안내 문장 제거)과 `9acb5e0387eb` 속도 `unknown → no` 1행이다. 속도 행에는 느린 이유 문장을 하나 더했다.
 - 이용자 소식 1건.
@@ -74,5 +74,3 @@ status 수는 그대로다(411 / 10 / 8).
 ### 7. 게임 파일명 유입
 
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 718회 / 330쌍 + SUFFIX-ATTACHED 36회 / 16쌍. 전부 `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 값이다. 이 회차는 그 파일에서 3행의 소리·속도 축과 안내 줄만 바꿨다. 그 밖 파일의 걸림은 0 이다. 코드 주석·회차 문서·표·worklog·소식은 타이틀을 sha12/sha256 으로만 적었다.
-
-<!-- corpus-name-inflow v1 subjects=6 tree=958d3db84e0195b2 B=718/330 P=0/0 S=36/16 -->
