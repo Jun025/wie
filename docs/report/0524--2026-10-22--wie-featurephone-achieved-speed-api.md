@@ -58,4 +58,4 @@
 `node scripts/corpus-name-inflow.mjs`: 유입 7건(BOUNDED · 10회) + 판단 필요 0건(SUFFIX-ATTACHED). 전부 이 회차가 손댄 파일
 (`executor.rs` · `system.rs` · `wie_featurephone/src/lib.rs`)에 **원래 있던** 주석이다. 이 회차가 더한 줄에 든 것은 0이다.
 
-<!-- corpus-name-inflow v1 subjects=8 tree=6159e33c485de00e B=10/7 P=1/1 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=9 tree=a66194a2662731ee B=10/7 P=1/1 S=0/0 -->
