@@ -26,4 +26,4 @@
 - **되돌리면 red**: `policyRow` 를 항상 false 로 → 20/21 rc=1. 경과를 고정값으로 → 20/21 rc=1.
 - **10-20 회차 재판정**(같은 `base-compat.json` · `out` · `pair`): 종전 도구 의심 **2** → 이번 도구 의심 **0**, 정책 행 축 변화(참고) 2.
 - 4 게이트: fmt · clippy stable/wasm32/beta `-D warnings`(beta 는 `wie_cli` manifest 경고 7 · 기존) · `RUST_MIN_STACK=4194304 cargo test --all` 784/0 · `npm run audit` PASS · `check-docs-report-serial` OK.
-- 게임 파일명 유입: 유입 330건(BOUNDED) + 판단 필요 16건(SUFFIX-ATTACHED) — 대상 4건 중 `compat.json` 의 `title` 필드(기존 공개 데이터)다. 이번 문서·스크립트는 sha12 만 쓴다.
+- 게임 파일명 유입: 유입 330건(BOUNDED) + 판단 필요 16건(SUFFIX-ATTACHED) — 전부 `compat.json` 의 기존 `title` 필드다(그 파일만 넣어 재도 330·16 · 스크립트 2 + 이 문서만 넣으면 0·0).
