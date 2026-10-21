@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-22",
+  "task": "wie-weekly-perf-regression-axis",
+  "title": "주간 퇴행 감시에 속도 축 — perf-watch",
+  "summary": "고정 표본에서 지난 핀과 origin/main 을 나란히 재는 속도 감시를 주간 감시 첫 단계로 붙였다. 첫 실측(bd770b73 → a90f1472)이 10-09 이후의 새 속도 하락을 보였다.",
+  "report": "docs/report/0527--2026-10-22--wie-weekly-perf-regression-axis.md",
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "10-09 이후 들어온 속도 하락을 커밋 단위로 가르기(7ca47380..a90f1472)",
+      "plainSummary": "첫 주간 속도 측정에서, 예산을 꽉 채우는 LGT 게임 하나가 브라우저에서 화면을 약 28% 덜 그렸고 엔진의 tick 당 비용도 10-09 대비 25%p 안팎 더 늘었다. 언제 들어왔는지 이번 PR 의 도구로 가른다.",
+      "userBenefit": "무거운 게임이 셸에서 느려진 원인이 회귀면 되돌릴 수 있고, 타이머 수정의 정상 결과면 그렇다고 확정해 오해를 없앤다.",
+      "why": "docs/report/0527 §3 — native +32~41%(bd770b73 대비 · 7ca47380 까지는 +7~10%) · 브라우저 3cc7a9b4cb15 paints 400 → 285(5/6 · 짝 재현). 같은 판 둘을 맞댄 원상 실행에서도 285 수준이라 묶음 편차가 아니다.",
+      "tradeoff": "이분 1점에 30~40분(네이티브만이면 15~20분) · 빌드 1점에 15~25분. 귀속이 LGT 타이머 수정으로 나오면 고칠 것이 없다.",
+      "effort": "M — `bash scripts/perf-watch.sh compare <A> <B> <out>` 로 first-parent 이진 탐색 4~5점 · 브라우저는 3cc7a9b4cb15 하나만으로 줄여도 된다.",
+      "target": "wie"
+    }
+  ]
+}

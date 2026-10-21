@@ -12,6 +12,7 @@
 # 4. regression-diff.mjs: DOWN rows are candidates; candidates are re-measured once with the same binary
 #    (the pair) and only those that go down again are «suspects». UP rows are a note. compat is not written.
 # 5. evidence md (sha12 only) + one ledger line: WIE_REGRESSION_SUSPECT n=<n> pin=<sha8> | WIE_REGRESSION_CLEAR.
+# Before 1: scripts/perf-watch.sh, the speed axis (≈ 30–60 min, its own WIE_PERF_* line).
 # Every sweep goes through census-drive.sh (one build-slot --long lease per ~15 min, census lock, --jobs
 # default ≤ 3). Nothing here is backgrounded. The whole round stops at WIE_REGRESSION_MAX_SECS (6 h).
 # A round is resumable: re-running on the same date reuses its binary and every result already on disk.
@@ -40,6 +41,10 @@ note() {
 with_recipes() { while read -r s; do if [[ -f $RECIPES/$s.keys ]]; then echo "$s 600 $RECIPES/$s.keys"; else echo "$s"; fi; done; }
 drive() { bash scripts/census-drive.sh --bin "$R/wie_validate" "$@"; }
 census_report() { node scripts/playability-census.mjs report --out "$1" --pin "$PIN" >/dev/null; }
+
+# The speed axis first, while the morning is quiet: its own guard (so a busy week is counted there too), builds and ledger line (perf-watch.sh header).
+# Its failure never stops this census.
+bash scripts/perf-watch.sh || true
 
 if [[ -x $OB/host-load-guard ]] && ! "$OB/host-load-guard" --status --recovered >&2; then
   note "WIE_REGRESSION_SKIPPED reason=host-load date=$DATE (이번 주 건너뜀)"
