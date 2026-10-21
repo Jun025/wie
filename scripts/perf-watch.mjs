@@ -27,12 +27,15 @@
 //            this axis only moves on the budget-saturated samples (3cc7a9b4cb15 · 155972cac664).
 // Judging, per axis × sample, over the paired reps: alarm when the median slowdown ≥ max(5 %, 2 × the
 // standard deviation of the paired slowdowns), with ≥ 2 valid pairs (fewer = unmeasured, never clear).
+// A median ≥ 5 % under a threshold its own spread raised is `noisy`, not ok: the spread hid it (classify()).
 // The shell driver re-measures an alarmed sample once more (the pair, as the compat census does) and
-// only a sample that alarms again is a regression.
+// only a sample that alarms again is a regression; an alarm the pair could not measure is unmeasured (pairUp()).
+// A round owes every SAMPLES row on each axis it ran. Fewer than half judged is no round: report exits 3,
+// writes no judge.json, and the next round keeps this round's A — a missing corpus never moves the baseline (tally()).
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
-import { loadavg } from 'node:os';
+import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
+import { loadavg, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -46,7 +49,8 @@ export const SAMPLES = [
   { sha12: '835acd535a5f', platform: 'j2me', axes: ['native', 'browser'] },
   { sha12: '8238f5449347', platform: 'j2me', axes: ['native'] },
   { sha12: 'bf5b031018aa', platform: 'j2me', axes: ['browser'] },
-  { sha12: '976141a9525b', platform: 'skt', axes: ['native', 'browser'] },
+  // Browser only: SKT ticks are paced, so CPU per tick did not move under a +54 % engine (0.7 · 0 · 0.5 — docs/report/0527 §7).
+  { sha12: '976141a9525b', platform: 'skt', axes: ['browser'] },
   { sha12: 'd1234e0ddb75', platform: 'skt', axes: ['native', 'browser'] },
   { sha12: '1065985081fc', platform: 'ktf', axes: ['native', 'browser'] },
   { sha12: '155972cac664', platform: 'ktf', axes: ['native', 'browser'] },
@@ -66,6 +70,15 @@ const stdev = (a) => {
 };
 const r1 = (v) => Math.round(v * 10) / 10;
 
+// slow: the per-rep slowdowns of one axis × sample, in percent.
+export function classify(slow) {
+  if (slow.length < 2) return { verdict: 'unmeasured' };
+  const med = median(slow);
+  const dev = stdev(slow);
+  const threshold = Math.max(FLOOR, 2 * dev);
+  return { median: r1(med), dev: r1(dev), threshold: r1(threshold), verdict: med >= threshold ? 'alarm' : med >= FLOOR ? 'noisy' : 'ok' };
+}
+
 // rows: { axis, rep, sample, side: 'a'|'b', metric|null } -> per axis × sample verdict.
 export function judge(rows, reps = null) {
   const keep = rows.filter((r) => !reps || (r.rep >= reps[0] && r.rep <= reps[1]));
@@ -84,16 +97,31 @@ export function judge(rows, reps = null) {
       if (!(p.a > 0) || !(p.b > 0)) continue;
       slow.push(100 * (axis === 'native' ? p.b / p.a - 1 : p.a / p.b - 1));
     }
-    if (slow.length < 2) {
-      out.push({ axis, sample, pairs: slow.length, verdict: 'unmeasured', slow: slow.map(r1) });
-      continue;
-    }
-    const med = median(slow);
-    const dev = stdev(slow);
-    const threshold = Math.max(FLOOR, 2 * dev);
-    out.push({ axis, sample, pairs: slow.length, slow: slow.map(r1), median: r1(med), dev: r1(dev), threshold: r1(threshold), verdict: med >= threshold ? 'alarm' : 'ok' });
+    out.push({ axis, sample, pairs: slow.length, slow: slow.map(r1), ...classify(slow) });
   }
   return out.sort((x, y) => (x.axis + x.sample).localeCompare(y.axis + y.sample));
+}
+
+// first = judge(reps 1–3), pair = judge(reps 4–6).
+export function pairUp(first, pair) {
+  const again = (v) => pair.find((p) => p.axis === v.axis && p.sample === v.sample)?.verdict;
+  const alarms = first.filter((v) => v.verdict === 'alarm');
+  return { regressions: alarms.filter((v) => again(v) === 'alarm'), unconfirmed: alarms.filter((v) => !again(v) || again(v) === 'unmeasured') };
+}
+
+// What the round owes (SAMPLES × the axes it ran) against what it judged.
+export function tally(first, pair, axes) {
+  const expected = SAMPLES.flatMap((s) => s.axes.filter((a) => axes.includes(a)).map((a) => [a, s.sha12]));
+  const { regressions, unconfirmed } = pairUp(first, pair);
+  const judged = (a, s) => first.find((v) => v.axis === a && v.sample === s && v.verdict !== 'unmeasured');
+  const unmeasured = expected.filter(([a, s]) => !judged(a, s)).length + unconfirmed.length;
+  return {
+    regressions,
+    unmeasured,
+    expected: expected.length,
+    noisy: first.filter((v) => v.verdict === 'noisy').length,
+    complete: 2 * (expected.length - unmeasured) >= expected.length && expected.length > 0,
+  };
 }
 
 // --- measuring -------------------------------------------------------------------------------------------
@@ -157,6 +185,9 @@ async function run(o) {
 }
 
 function resolveSamples(out, dirs) {
+  // A resumed round keeps its list unless a sample was missing (or moved): those are looked for again.
+  const prev = join(out, 'samples.json');
+  if (existsSync(prev) && JSON.parse(readFileSync(prev, 'utf8')).every((s) => s.path && existsSync(s.path) && SAMPLES.some((x) => x.sha12 === s.sha12))) return 0;
   const want = new Map(SAMPLES.map((s) => [s.sha12, s]));
   const found = new Map();
   const walk = (d) => {
@@ -182,12 +213,14 @@ function report(o) {
   const rows = readRows(o.out);
   const first = judge(rows, [1, 3]);
   const pair = judge(rows, [4, 6]);
-  const regressions = first.filter((v) => v.verdict === 'alarm' && pair.find((p) => p.axis === v.axis && p.sample === v.sample)?.verdict === 'alarm');
+  const t = tally(first, pair, (o.axes ?? 'native,browser').split(','));
   const loads = rows.map((r) => r.load1).filter((v) => v >= 0);
+  const pin = (p) => (/^[0-9a-f]{40}$/.test(p) ? p.slice(0, 8) : p); // a build dir name (…-slow64) is kept whole
   const L = [];
   L.push(`# wie 주간 속도 감시 — ${o.date}`, '');
-  L.push(`- 기준(A) \`${o['a-pin'].slice(0, 8)}\` → 대상(B) \`${o['b-pin'].slice(0, 8)}\` · 도구 \`${o['tool-pin'].slice(0, 8)}\` · load1 ${Math.min(...loads)}~${Math.max(...loads)}`);
-  L.push(`- 판정: 느려짐 중앙값 ≥ max(${FLOOR}%, 2×편차) 이고 짝 재측(회 4~6)에서도 같으면 퇴행. **퇴행 ${regressions.length}** · 1차 경보 ${first.filter((v) => v.verdict === 'alarm').length} · 미측정 ${first.filter((v) => v.verdict === 'unmeasured').length}`);
+  L.push(`- 기준(A) \`${pin(o['a-pin'])}\` → 대상(B) \`${pin(o['b-pin'])}\` · 도구 \`${o['tool-pin'].slice(0, 8)}\` · load1 ${loads.length ? `${Math.min(...loads)}~${Math.max(...loads)}` : '–'}`);
+  if (!t.complete) L.push(`- ★**미완 — 판정하지 않았다.** 미측정 ${t.unmeasured}/${t.expected}(절반 넘게 못 잼). 다음 회차의 기준(A)은 이 회차로 옮기지 않는다.`);
+  L.push(`- 판정: 느려짐 중앙값 ≥ max(${FLOOR}%, 2×편차) 이고 짝 재측(회 4~6)에서도 같으면 퇴행. **퇴행 ${t.regressions.length}** · 1차 경보 ${first.filter((v) => v.verdict === 'alarm').length} · 미측정 ${t.unmeasured}/${t.expected} · 편차에 묻힘(noisy) ${t.noisy}`);
   L.push('- 축: native = 50M tick 당 CPU ms(높을수록 느림) · browser = 30 s paints(낮을수록 느림). 느려짐 % 는 «B 가 A 보다 얼마나 느린가».', '');
   L.push('| 축 | 표본 | 쌍 | 회별 느려짐 % | 중앙값 | 편차 | 문턱 | 판정 | 짝 재측 |', '|---|---|---|---|---|---|---|---|---|');
   for (const v of first) {
@@ -198,8 +231,8 @@ function report(o) {
   for (const r of rows) L.push(`| ${r.axis} | ${r.rep} | \`${r.sample}\` | ${r.side} | ${r.metric ?? '–'} | ${r.stop ?? r.error ?? r.note ?? ''} | ${r.load1} |`);
   L.push('', '</details>', '');
   writeFileSync(o.md, L.join('\n'));
-  writeFileSync(join(o.out, 'judge.json'), JSON.stringify({ first, pair, regressions }, null, 1) + '\n');
-  return regressions.length;
+  if (t.complete) writeFileSync(join(o.out, 'judge.json'), JSON.stringify({ first, pair, regressions: t.regressions }, null, 1) + '\n');
+  return t;
 }
 
 // --- selftest ------------------------------------------------------------------------------------------
@@ -217,28 +250,62 @@ function selftest() {
   add('native', 'onevalid', [[6200, null], [null, 6300], [6100, 6800]]);
   add('browser', 'fewer', [[390, 350], [395, 352], [388, 349]]); // paints −10 %: slower
   add('browser', 'more', [[390, 430], [395, 433], [388, 429]]);
-  add('browser', 'edge', [[420, 400], [420, 400], [420, 400]]); // exactly +5.0 % slower
   add('native', 'under', [[6000, 6294], [6000, 6294], [6000, 6294]]); // +4.9 % every time, no spread: the floor holds
   const v = Object.fromEntries(judge(rows).map((x) => [`${x.axis}/${x.sample}`, x]));
   const cases = [
     ['개악 +10% → 경보', v['native/slow10'].verdict === 'alarm'],
     ['원상 ±1% → 무경보', v['native/same'].verdict === 'ok'],
-    ['중앙값 +6.7% 라도 편차 ±10% 면 무경보(문턱 = 2×편차)', v['native/noisy'].verdict === 'ok' && v['native/noisy'].threshold > 10],
+    ['중앙값 +6.7% 라도 편차 ±10% 면 경보 아님 — noisy(ok 와 다름 · 문턱 = 2×편차)', v['native/noisy'].verdict === 'noisy' && v['native/noisy'].threshold > 10],
     ['빨라짐 → 무경보', v['native/faster'].verdict === 'ok'],
     ['유효 쌍 1 → 미측정(무경보 아님)', v['native/onevalid'].verdict === 'unmeasured'],
     ['browser paints −10% → 경보', v['browser/fewer'].verdict === 'alarm'],
     ['browser paints +10% → 무경보', v['browser/more'].verdict === 'ok'],
-    ['정확히 +5% → 경보(이상)', v['browser/edge'].verdict === 'alarm'],
+    // The threshold itself, on exactly representable percentages (a ratio like 420/400 lands a hair above 5).
+    ['문턱 경계: 중앙값 = 5 · 편차 0 → 경보(≥)', classify([5, 5, 5]).verdict === 'alarm'],
+    ['문턱 경계: 중앙값 = 2×편차 = 6 → 경보(≥)', classify([3, 9]).verdict === 'alarm' && classify([3, 9]).threshold === 6],
     ['편차 0 · +4.9% → 무경보(문턱 하한 5%)', v['native/under'].verdict === 'ok'],
   ];
-  // The pair: an alarm in reps 1–3 that reps 4–6 do not repeat is not a regression.
+  // The pair, through the same pairUp() report() calls.
   add('native', 'flake', [[6200, 7000], [6200, 7000], [6200, 7000]]);
   add('native', 'flake', [[6200, 6200], [6200, 6250], [6200, 6180]], 4);
   add('native', 'slow10', [[6200, 6840], [6300, 6900], [6150, 6790]], 4);
-  const p1 = judge(rows, [1, 3]);
-  const p2 = judge(rows, [4, 6]);
-  const reg = p1.filter((x) => x.verdict === 'alarm' && p2.find((y) => y.axis === x.axis && y.sample === x.sample)?.verdict === 'alarm').map((x) => x.sample);
-  cases.push(['짝 재측이 재현 안 하면 퇴행 아님', !reg.includes('flake')], ['짝 재측도 경보면 퇴행', reg.includes('slow10')]);
+  add('native', 'lostpair', [[6200, 7000], [6200, 7000], [6200, 7000]]);
+  add('native', 'lostpair', [[6200, null], [6200, null], [6200, null]], 4);
+  const { regressions, unconfirmed } = pairUp(judge(rows, [1, 3]), judge(rows, [4, 6]));
+  const reg = regressions.map((x) => x.sample);
+  cases.push(
+    ['짝 재측이 재현 안 하면 퇴행 아님', !reg.includes('flake')],
+    ['짝 재측도 경보면 퇴행', reg.includes('slow10')],
+    ['짝 재측이 미측정이면 퇴행도 무경보도 아님 — unconfirmed', !reg.includes('lostpair') && unconfirmed.some((x) => x.sample === 'lostpair')],
+  );
+  const lost = rows.filter((r) => r.sample === 'lostpair').map((r) => ({ ...r, sample: '0606d43702e7' }));
+  const t1 = tally(judge(lost, [1, 3]), judge(lost, [4, 6]), ['native']);
+  cases.push(['그 unconfirmed 는 원장의 unmeasured 로 센다', t1.unmeasured === t1.expected && t1.regressions.length === 0]);
+  // The round, through report(): a missing corpus or a broken validator is INCOMPLETE and leaves no judge.json.
+  const round = (name, metric) => {
+    const out = join(tmpdir(), `perf-watch-selftest-${process.pid}-${name}`);
+    rmSync(out, { recursive: true, force: true });
+    mkdirSync(out, { recursive: true });
+    const lines = [];
+    if (metric !== undefined)
+      for (const s of SAMPLES.filter((x) => x.axes.includes('native')))
+        for (const rep of [1, 2, 3]) for (const side of ['a', 'b']) lines.push(JSON.stringify({ axis: 'native', rep, sample: s.sha12, side, load1: 1, metric: metric && (side === 'a' ? 6000 : 6060) }));
+    writeFileSync(join(out, 'native.jsonl'), lines.join('\n') + (lines.length ? '\n' : ''));
+    const t = report({ out, md: join(out, 'perf.md'), 'a-pin': 'a'.repeat(40), 'b-pin': 'b'.repeat(40), 'tool-pin': 'c'.repeat(40), date: 'selftest', axes: 'native' });
+    const r = { ...t, judged: existsSync(join(out, 'judge.json')), md: readFileSync(join(out, 'perf.md'), 'utf8') };
+    rmSync(out, { recursive: true, force: true });
+    return r;
+  };
+  const empty = round('empty');
+  const allnull = round('allnull', null);
+  const full = round('full', 1);
+  const expected = SAMPLES.filter((x) => x.axes.includes('native')).length;
+  cases.push(
+    [`코퍼스 비움(행 0) → 미완 · unmeasured ${expected}/${expected} · judge.json 없음`, !empty.complete && empty.unmeasured === expected && empty.expected === expected && !empty.judged],
+    ['행 0 의 증적 md 에 Infinity 없음', !empty.md.includes('Infinity')],
+    ['측정 행 전부 null → 미완 · judge.json 없음', !allnull.complete && allnull.unmeasured === expected && !allnull.judged],
+    ['전 표본 +1% → 완료 · unmeasured 0 · judge.json 있음', full.complete && full.unmeasured === 0 && full.regressions.length === 0 && full.judged],
+  );
   let fail = 0;
   for (const [name, ok] of cases) {
     if (!ok) fail++;
@@ -264,7 +331,12 @@ else if (cmd === 'judge') {
   // Prints the alarmed samples of one axis, comma-joined: the --only list of the pair re-measure.
   const v = judge(readRows(o.out), o.reps ? o.reps.split('-').map(Number) : null).filter((x) => !o.axis || x.axis === o.axis);
   console.log(v.filter((x) => x.verdict === 'alarm').map((x) => x.sample).join(','));
-} else if (cmd === 'report') console.log(report(o));
+} else if (cmd === 'report') {
+  // stdout: <regressions> <unmeasured> <expected> <noisy>; exit 3 = incomplete (no judge.json written).
+  const t = report(o);
+  console.log(`${t.regressions.length} ${t.unmeasured} ${t.expected} ${t.noisy}`);
+  if (!t.complete) process.exit(3);
+}
 else {
   console.error('usage: perf-watch.mjs resolve|run|judge|report|selftest — see the header');
   process.exit(2);

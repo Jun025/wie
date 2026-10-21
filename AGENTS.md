@@ -360,7 +360,9 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   header (`selftest` there). Output: `~/orchestrator/reports/evidence/wie-weekly-regression/<date>.md` + one ledger line.
   Its first step is **`scripts/perf-watch.sh`, the speed axis** the census cannot see: fixed samples, last round's pin
   against `origin/main` side by side, native CPU per 50M ticks + browser paints per 30 s, pair-confirmed
-  (`WIE_PERF_REGRESSION` / `WIE_PERF_CLEAR` / `WIE_PERF_SKIPPED streak=`). Its `compare <A> <B>` is how a speed
+  (`WIE_PERF_REGRESSION` / `WIE_PERF_CLEAR`, each with `unmeasured=<k>/<owed>` / `WIE_PERF_SKIPPED streak=` in round
+  dates / `WIE_PERF_INCOMPLETE stage=measure` when under half was judged — that one never moves the baseline).
+  Test it with `bash scripts/perf-watch.sh selftest` (sandboxed), never by running the weekly path. Its `compare <A> <B>` is how a speed
   bisect is run — do not write another scratch driver for it (`docs/report/0527`).
 
 - **`scripts/corpus-name-inflow.mjs` — local only (same reason); a round that reports a "게임

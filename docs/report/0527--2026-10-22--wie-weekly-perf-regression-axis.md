@@ -97,4 +97,46 @@
 - 빌드 sha12: `a90f1472` 네이티브 `6e62dba95a59` · wasm `0fdd8fe863a0` · spin16 `da8c5744287a`/`acfb80a7c996` · spin64 `1aca22313110`/`7863d84a5e1c` · `bd770b73` `27266fb59574`/`a085e78c4f74`.
 - 게임 파일명 유입: 유입 0건(BOUNDED) · 판단 필요 0건(SUFFIX-ATTACHED).
 
+### 7. 게이트② 반려 승계(wie-weekly-perf-regression-axis-fix)
+반려 사유 둘을 고쳤다. 어느 쪽이든 원장에서 **측정하지 않은 회차가 CLEAR 로 보이던** 문제다.
+
+**① 침묵 CLEAR.** 코퍼스가 비거나 측정 행이 전부 null 이어도 `WIE_PERF_CLEAR` 가 나갔다. `judge.json` 까지 써져서 다음 회차 A 가 측정 없이 전진했다.
+- 표본이 없으면 `judge()` 에 그룹이 생기지 않는다. 그래서 «미측정»으로도 세지지 않았다.
+- 이제 `tally()` 가 «이 회차가 갚아야 할 칸»(SAMPLES × 돌린 축)을 기준으로 미측정을 센다. 1차 경보인데 짝 재측이 미측정인 칸도 여기에 넣는다.
+- 원장 줄은 `WIE_PERF_CLEAR|REGRESSION … unmeasured=<k>/<칸> noisy=<j>` 다.
+- 판정된 칸이 절반 미만이면 `report` 가 rc=3 을 낸다. 원장은 `WIE_PERF_INCOMPLETE stage=measure unmeasured=k/e …` 이고, `judge.json` 은 쓰지 않는다. 다음 회차는 A 를 옮기지 않는다.
+  - 절반은 `smoke_gate.sh` 의 UNMEASURED 선례(«절반 넘게 없음»)를 따랐다. 일부만 미측정이면 CLEAR/REGRESSION 그대로이고, 그 수가 원장 줄에 실린다.
+- 표본을 못 찾은 회차는 같은 날 재실행에서 다시 찾는다(`resolve` 는 전부 찾은 목록만 재사용한다). 행이 0이어도 증적 md 의 load1 은 `–` 다(`Infinity` 해소).
+- `b-pin` 이 이미 있는 재개 회차는 `git fetch` 를 건너뛴다.
+
+**② streak 이 호출을 셌다.** `skips` 는 이제 «연속 수 + 마지막 건너뜀 날짜» 를 담는다. 같은 날짜로 재실행하면 같은 줄이 다시 나오고 수는 그대로다.
+- 원인: `regression-census.sh` 는 같은 날 재개를 공식 지원하고, 그때마다 perf-watch 를 먼저 부른다.
+- 2026-10-21 23:20 원장의 `streak=1·2·3` 3줄은 이 PR 의 시험이 실 원장에 낸 오염이다(§5). 이 계수 버그가 그 수를 부풀렸다. **이 회차부터 시험은 `bash scripts/perf-watch.sh selftest` 의 샌드박스에서만 한다** — `HOME`·`WIE_REGRESSION_ROOT`·`WIE_PERF_EVIDENCE`·`WIE_REGRESSION_NOTE` 를 `mktemp -d` 아래로 돌리고, 가짜 `host-load-guard`·`note` 를 둔다. 끝나면 지운다. 실 원장의 `WIE_PERF_` 줄은 회차 전후로 같은 3줄이다.
+
+**권고 처리**
+
+| 권고 | 처리 |
+|---|---|
+| 감도 0 표본 `976141a9525b`(SKT 페이싱 · spin64 에 0.7·0·0.5) | 네이티브 축에서 뺐다(브라우저만 남김). 칸은 16 → 15(네이티브 8 → 7)다. 이 표본의 브라우저 감도도 실증되지 않았다(§2 — 브라우저는 예산 포화 표본에서만 움직인다). |
+| 편차에 묻힘(`d1234e0ddb75`) | 새 판정 `noisy` 를 더했다. 중앙값은 5% 이상인데 편차가 올린 문턱 아래인 경우다. `ok` 와 따로 증적과 원장(`noisy=`)에 드러난다. 짝 재측·퇴행 수에는 넣지 않는다. 기존 증적을 다시 판정하면 10-22 주간 `d1234` 네이티브(+40.8 중앙값 · 문턱 97)와 spin64 의 `d1234` 가 `noisy` 이고, 원상은 0 이다. |
+| selftest `+5%` 경계가 `>` 를 못 가림 | 문턱 비교를 `classify()` 로 뽑았다. 정확히 표현되는 느려짐(`[5,5,5]` · `[3,9]` → 중앙값 6 = 2×편차 3)으로 직접 시험한다. |
+| 짝 재측 판정이 selftest 사본 | `pairUp()` 으로 뽑았다. `report()` 와 selftest 가 같은 함수를 부른다. |
+| 브라우저 «개악 → 경보» 미실증 | 그대로 둔다(§2). |
+| A 크리프(주 <5%) | 이 PR 에서 고치지 않는다. 메타 제안 문턱(AGENTS.md §Proposal threshold)에 걸려 worklog 카드로 올리지 않았다. |
+| `prev` 가 사전순 마지막 `judge.json` | 날짜 이름 디렉터리(`YYYY-MM-DD`)만 본다. |
+| `compare` 증적 핀이 8자로 잘림 | 40자 hex 만 8자로 줄인다. 빌드 디렉터리 이름(`…-slow64`)은 그대로 둔다. |
+
+**개악 대조**(제품 코드를 되돌리면 red 가 되는지 확인했다)
+- `perf-watch.mjs selftest` 18/18 · 드라이버 selftest 7/7 이다.
+- 되돌림마다 실패 수:
+  - `>=` → `>`: 2 FAIL
+  - `pairUp` 짝 조건 삭제: 2 FAIL
+  - `noisy` 삭제: 1 FAIL
+  - `judge.json` 무조건 쓰기: 2 FAIL
+  - 완료 조건 `true`: 2 FAIL
+  - unconfirmed 를 미측정에서 뺌: 1 FAIL
+  - streak 날짜 비교 삭제: 2 FAIL(«streak=3»)
+  - rc=3 처리 삭제: 2 FAIL(«stage=report»)
+- 리뷰가 실측한 생존 돌연변이 둘(`>=→>` · `report()` 짝 조건)이 이제 잡힌다.
+
 <!-- corpus-name-inflow v1 subjects=6 tree=b23375924d80e038 B=0/0 P=0/0 S=0/0 -->
