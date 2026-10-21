@@ -48,6 +48,8 @@ fi
 
 R=$ROOT/$DATE
 mkdir -p "$R" "$EVID"
+# The round's first start: a resumed round reports its whole elapsed time, not the last invocation's.
+[[ -s $R/started ]] || echo "$T0" >"$R/started"
 if [[ ! -x $R/wie_validate ]]; then
   git fetch -q origin main || exit 1
   [[ -d $BUILD ]] || git worktree add -q --detach "$BUILD" origin/main || exit 1
@@ -91,7 +93,7 @@ fi
 
 MD=$EVID/$DATE.md
 sus=$(node scripts/regression-diff.mjs report --base "$R/base-compat.json" --new "$R/out/compat.json" --long "$R/long.titles" ${pair[@]+"${pair[@]}"} \
-  --pin "$PIN" --tool-pin "$TOOL_PIN" --elapsed $(($(date +%s) - T0)) --date "$DATE" --out "$MD") || incomplete diff
+  --pin "$PIN" --tool-pin "$TOOL_PIN" --started "$(cat "$R/started")" --date "$DATE" --out "$MD") || incomplete diff
 cp "$R/out/compat.json" "$R/compat.json"
 # Keep this round and the one before it whole; older rounds keep only their compat.json (a round is ≈1.8 GB of frames, measured 2026-10-20).
 ls -d "$ROOT"/*/ | sort -r | tail -n +3 | while read -r d; do rm -rf "${d}out" "${d}pair" "${d}pair-corpus" "${d}wie_validate"; done

@@ -6,7 +6,7 @@
 //   node scripts/regression-diff.mjs candidates --base <compat> --new <compat> --long <titles>
 //        --population <out/population.json> --pair-corpus <dir> --pair-long <file>  links the downgraded rows for the pair
 //   node scripts/regression-diff.mjs report --base <compat> --new <compat> --long <titles> [--pair <compat> --pair-long <file>]
-//        --pin <sha> --tool-pin <sha> --elapsed <secs> --date <YYYY-MM-DD> --out <md>                   prints the suspect count
+//        --pin <sha> --tool-pin <sha> --started <epoch> --date <YYYY-MM-DD> --out <md>                   prints the suspect count
 //   node scripts/regression-diff.mjs selftest
 //
 // Either vocabulary reads: the census's (`ok`/`n/a`/`none`/…, scripts/playability-census.mjs) and the
@@ -20,6 +20,9 @@
 //   status                  playable > limited > not-yet. A row outside --long reads `limited` for want of a
 //                           long run; when that is all it lacks it keeps its base status (lifted()).
 //   progress                not measured here (opt-in census axis, 30 min a title) — never compared.
+// A policy row — not playable and its only known issue a wall line (the census's locked file or gone server:
+// such rows carry that one line and nothing else, featurephone-public-data.md §knownIssues_ko) — is not run
+// by policy, so its axes measure a refusal screen: an axis going down there is a note, only `status` counts.
 // The compat is NEVER written: an UP is a note, a DOWN is a candidate, and a candidate the pair (same
 // binary, re-measured once) shows again is a «suspect».
 import { lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -35,6 +38,8 @@ const AXES = [...PROBE_AXES, 'longplay', 'sound', 'speed'];
 // One base already carried is a note on a row that stayed playable (1a69522a7d43's «온라인 등록»).
 // ponytail: matched on the shipped sentence; a census constant to import is the upgrade if a wall is reworded.
 const WALL = /서버|인증|잠긴/;
+
+const policyRow = (b) => b.status !== 'playable' && b.knownIssues_ko?.length === 1 && WALL.test(b.knownIssues_ko[0]);
 
 const rows = (c) => new Map(c.entries.map((e) => [e.sha256, e]));
 const statusOf = (ax) =>
@@ -68,6 +73,7 @@ export function drift(base, cur, long = new Set()) {
   const B = rows(base);
   const down = [];
   const up = [];
+  const policy = [];
   const unmeasured = [];
   for (const [sha, b] of B) {
     const n = rows(cur).get(sha);
@@ -78,10 +84,13 @@ export function drift(base, cur, long = new Set()) {
     // In --long and the run happened (a title whose input is not ok never gets one).
     const ran = long.has(sha.slice(0, 12)) && norm(n.axes.longplay) !== 'unknown';
     const rowStatus = `${b.status} → ${n.status}`;
-    for (const d of rowDrift(b, n, ran)) (d.dir === 'down' ? down : up).push({ sha12: sha.slice(0, 12), rowStatus, ...d });
+    for (const d of rowDrift(b, n, ran)) {
+      const to = d.dir === 'up' ? up : d.axis !== 'status' && policyRow(b) ? policy : down;
+      to.push({ sha12: sha.slice(0, 12), rowStatus, ...d });
+    }
   }
   const added = [...rows(cur).keys()].filter((s) => !B.has(s)).map((s) => s.slice(0, 12));
-  return { down, up, unmeasured, added };
+  return { down, up, policy, unmeasured, added };
 }
 
 // Rows whose probe axes differ from the previous round: they get this round's long run.
@@ -99,7 +108,9 @@ const needsLong = (c, long) => long.has(c.sha12) && ['longplay', 'sound', 'statu
 const sha12s = (file) => new Set(readFileSync(file, 'utf8').split('\n').map((l) => l.split('#')[0].trim().split(/\s+/)[0]).filter(Boolean).map((s) => s.slice(0, 12)));
 const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
 
-function markdown({ base, cur, long, res, pin, toolPin, elapsed, date }) {
+// `started` is the round's first start: a resumed round's last invocation alone took seconds (2026-10-20 read «3s»).
+function markdown({ base, cur, long, res, pin, toolPin, started, now = Math.floor(Date.now() / 1000), date }) {
+  const elapsed = now - started;
   const sus = suspectRows(res.cands);
   const t = (xs, head, f) => (xs.length ? [head, `|${'---|'.repeat(head.split('|').length - 2)}`, ...xs.map(f)] : ['(없음)']);
   return [
@@ -108,7 +119,7 @@ function markdown({ base, cur, long, res, pin, toolPin, elapsed, date }) {
     `- 측정 바이너리 핀: \`${pin}\` (origin/main · release \`wie_validate\`)`,
     `- 도구 핀: \`${toolPin}\` · 대조 기준: \`docs/player-data/compat.json\` (enginePin \`${base.enginePin}\` · ${base.entries.length}행)`,
     `- 걸린 시간: ${elapsed}s (${(elapsed / 3600).toFixed(2)}h) · 이번 회차 측정 행 ${cur.entries.length} · 미측 ${res.unmeasured.length} · 장주행(L 600s) 대상 ${long.size}행`,
-    `- ★퇴행 의심(짝 재현) **${sus}행** · 내림 후보 ${new Set(res.cands.map((c) => c.sha12)).size}행(${res.cands.length}건) · 올림(참고) ${res.up.length} — compat 는 고치지 않았다`,
+    `- ★퇴행 의심(짝 재현) **${sus}행** · 내림 후보 ${new Set(res.cands.map((c) => c.sha12)).size}행(${res.cands.length}건) · 올림(참고) ${res.up.length} · 정책 행 축 변화(참고) ${res.policy.length} — compat 는 고치지 않았다`,
     '',
     '## 퇴행 의심 · 내림 후보 (sha12 · 축 · 전 → 후 · 짝 재측 · 재현)',
     '',
@@ -117,6 +128,10 @@ function markdown({ base, cur, long, res, pin, toolPin, elapsed, date }) {
     ...(sus
       ? ['다음 행동: 의심 행마다 compat 핀과 이번 핀 사이를 같은 시각 짝으로 좁혀(`wie_validate` 전/후 바이너리) 원인 PR 을 찾고 티켓을 연다 — compat 행은 그 티켓이 고친다.', '']
       : []),
+    '## 정책 행 축 변화 (참고 — 잠김·서버 벽 행은 축 내림을 퇴행으로 세지 않는다 · status 만 센다)',
+    '',
+    ...t(res.policy, '| sha12 | 축 | 전 | 후 | 행 상태(compat → 이번) |', (c) => `| \`${c.sha12}\` | ${c.axis} | ${c.before} | ${c.after} | ${c.rowStatus} |`),
+    '',
     '## 올림 (참고 — compat 는 자동으로 고치지 않는다)',
     '',
     ...t(res.up, '| sha12 | 축 | 전 | 후 |', (c) => `| \`${c.sha12}\` | ${c.axis} | ${c.before} | ${c.after} |`),
@@ -159,7 +174,7 @@ if (cmd === 'changed') {
   const d = drift(base, cur, long);
   const pairDown = opt.pair ? drift(base, readJson(opt.pair), sha12s(opt['pair-long'])).down : [];
   const res = { ...d, cands: confirm(d.down, pairDown), paired: Boolean(opt.pair) };
-  writeFileSync(opt.out, markdown({ base, cur, long, res, pin: opt.pin, toolPin: opt['tool-pin'], elapsed: Number(opt.elapsed), date: opt.date }));
+  writeFileSync(opt.out, markdown({ base, cur, long, res, pin: opt.pin, toolPin: opt['tool-pin'], started: Number(opt.started), date: opt.date }));
   console.log(suspectRows(res.cands));
 } else if (cmd === 'selftest') {
   const ax = (o = {}) => ({ boot: 'ok', render: 'ok', input: 'ok', longplay: 'ok', sound: 'ok', speed: 'ok', ...o });
@@ -187,6 +202,22 @@ if (cmd === 'changed') {
     ['a row missing from the round is unmeasured, not down', drift(base, { entries: [] }).unmeasured.length === 3 && drift(base, { entries: [] }).down.length === 0],
     ['changed: probe axes only', changed(base, cur).join() === '111111111111,222222222222'],
     ['the pair confirms the same axis only', confirm(d.down, [{ sha12: '111111111111', axis: 'input', after: 'no' }]).filter((c) => c.pair).length === 1],
+    ...(() => {
+      const lock = { knownIssues_ko: ['구매한 휴대폰에서만 켜지도록 잠긴 파일이라 여기서는 실행할 수 없어요.'] };
+      const lb = { entries: [row(4, 'not-yet', ax(), lock), row(5, 'limited', ax({ longplay: 'unknown' }), { knownIssues_ko: ['그 서버가 지금은 없어'] })] };
+      const lockDown = drift(lb, { entries: [row(4, 'not-yet', ax({ input: 'none', render: 'none' }), lock), row(5, 'limited', ax({ render: 'none' }), lock)] });
+      const lockStatus = drift(lb, { entries: [row(4, 'limited', ax(), lock)] }, new Set(['444444444444']));
+      const twoLines = drift({ entries: [row(4, 'not-yet', ax(), { knownIssues_ko: [...lock.knownIssues_ko, '소리가 안 나요.'] })] }, { entries: [row(4, 'not-yet', ax({ input: 'none' }))] });
+      return [
+        ['a policy row: axes going down are a note, not a candidate', lockDown.down.length === 0 && k(lockDown.policy) === '4:input 4:render 5:render'],
+        ['a policy row: status moving still counts', drift(lb, { entries: [row(5, 'not-yet', ax({ render: 'none' }), lock)] }).down.some((x) => x.axis === 'status')],
+        ['a policy row moving up is a plain note', k(lockStatus.up) === '4:status' && lockStatus.policy.length === 0],
+        ['an ordinary row: an axis going down is a candidate', k(drift({ entries: [row(6, 'limited', ax({ longplay: 'unknown' }))] }, { entries: [row(6, 'limited', ax({ render: 'none', longplay: 'n/a' }))] }).down) === '6:render'],
+        ['a wall line beside another issue is not a policy row', k(twoLines.down) === '4:input'],
+        ['a playable row with a wall note is not a policy row', k(drift({ entries: [row(4, 'playable', ax(), lock)] }, { entries: [row(4, 'playable', ax({ render: 'none' }), lock)] }).down) === '4:render'],
+        ['elapsed counts from the round start, not the last invocation', markdown({ base: { enginePin: 'x', entries: [] }, cur: { entries: [] }, long: new Set(), res: { ...lockDown, cands: [] }, started: 1000, now: 10799, date: 'd' }).includes('걸린 시간: 9799s (2.72h)')],
+      ];
+    })(),
     ['a status-only downgrade needs the long run in the pair only for a long row', needsLong({ sha12: '111111111111', axis: 'status' }, L1) && !needsLong({ sha12: '111111111111', axis: 'input' }, L1)],
   ];
   const bad = cases.filter(([, ok]) => !ok);

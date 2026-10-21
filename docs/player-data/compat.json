@@ -7675,7 +7675,7 @@
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "ok",
+    "input": "no",
     "longplay": "ok",
     "sound": "ok",
     "speed": "unknown",
@@ -8343,7 +8343,7 @@
    "status": "not-yet",
    "axes": {
     "boot": "ok",
-    "render": "ok",
+    "render": "no",
     "input": "no",
     "longplay": "unknown",
     "sound": "no",
