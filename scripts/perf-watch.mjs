@@ -218,6 +218,7 @@ function selftest() {
   add('browser', 'fewer', [[390, 350], [395, 352], [388, 349]]); // paints −10 %: slower
   add('browser', 'more', [[390, 430], [395, 433], [388, 429]]);
   add('browser', 'edge', [[420, 400], [420, 400], [420, 400]]); // exactly +5.0 % slower
+  add('native', 'under', [[6000, 6294], [6000, 6294], [6000, 6294]]); // +4.9 % every time, no spread: the floor holds
   const v = Object.fromEntries(judge(rows).map((x) => [`${x.axis}/${x.sample}`, x]));
   const cases = [
     ['개악 +10% → 경보', v['native/slow10'].verdict === 'alarm'],
@@ -228,6 +229,7 @@ function selftest() {
     ['browser paints −10% → 경보', v['browser/fewer'].verdict === 'alarm'],
     ['browser paints +10% → 무경보', v['browser/more'].verdict === 'ok'],
     ['정확히 +5% → 경보(이상)', v['browser/edge'].verdict === 'alarm'],
+    ['편차 0 · +4.9% → 무경보(문턱 하한 5%)', v['native/under'].verdict === 'ok'],
   ];
   // The pair: an alarm in reps 1–3 that reps 4–6 do not repeat is not a regression.
   add('native', 'flake', [[6200, 7000], [6200, 7000], [6200, 7000]]);

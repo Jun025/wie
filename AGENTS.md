@@ -361,7 +361,7 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   Its first step is **`scripts/perf-watch.sh`, the speed axis** the census cannot see: fixed samples, last round's pin
   against `origin/main` side by side, native CPU per 50M ticks + browser paints per 30 s, pair-confirmed
   (`WIE_PERF_REGRESSION` / `WIE_PERF_CLEAR` / `WIE_PERF_SKIPPED streak=`). Its `compare <A> <B>` is how a speed
-  bisect is run — do not write another scratch driver for it (`docs/report/0524`).
+  bisect is run — do not write another scratch driver for it (`docs/report/0527`).
 
 - **`scripts/corpus-name-inflow.mjs` — local only (same reason); a round that reports a "게임
   파일명 유입" number RUNS IT rather than re-deriving the predicate.** `node
