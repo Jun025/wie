@@ -139,4 +139,4 @@
   - rc=3 처리 삭제: 2 FAIL(«stage=report»)
 - 리뷰가 실측한 생존 돌연변이 둘(`>=→>` · `report()` 짝 조건)이 이제 잡힌다.
 
-<!-- corpus-name-inflow v1 subjects=6 tree=b23375924d80e038 B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=6 tree=941ea06eb8e6b885 B=0/0 P=0/0 S=0/0 -->
