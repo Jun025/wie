@@ -95,3 +95,4 @@ worklog `docs/worklog/2026-10-22-progression-stuck-triage-wave7.json` 카드 2:
 - 바뀐 코드는 `wie_validate` 의 키 이름 표 한 줄이다. 엔진 크레이트는 건드리지 않았다.
 - 프로세스: 에뮬레이터는 동시 3 이하로 돌렸다(`build-slot run`(short) 단발 · census 는 `census-drive.sh` 의 long 임대). 회차 끝에 내 `wv_*` 프로세스는 0 이다. `nohup` 0.
 - 증적(화면 · 키 스크립트 · out)은 저장소 밖 `~/scratch/w7wave/` 에 있다. 레시피는 비커밋 `game_lab/recipes-progress/` 다.
+- 유입(`node scripts/corpus-name-inflow.mjs`): 이 회차가 더한 줄의 BOUNDED 는 0 이다. 파일 전체 BOUNDED 4회/3쌍은 모두 `wie_validate.rs` 의 기존 주석이다(이 회차는 그 파일에 키 이름 한 줄 · 도움말 한 단어 · 시험 3줄만 더했다). SUFFIX-ATTACHED 0.
