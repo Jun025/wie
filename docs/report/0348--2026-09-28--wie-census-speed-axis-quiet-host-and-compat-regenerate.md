@@ -8,7 +8,6 @@
 
 ### 1. 속도 — 브라우저 2회, 서로 10% 안일 때만 판정
 - 하네스: #347 그대로다(Chrome for Testing headless + CDP · `caffeinate -u -d` · 8초 워밍 · 15초 창 · OK 2.5초마다). wasm 은 `1dd9f81c` + 스크래치 export `take_pacing` 이다(PR 에 없음 · 계약 무변경).
-  - ★2026-10-22 덧(#557): 이제 `wie_featurephone` 이 매 틱 `take_pacing()` 으로 Pacing 창을 비운다(`achieved_speed` 용). 이 하네스처럼 스크래치 export `take_pacing` 으로 15초 창을 재면 1틱짜리 창만 보인다 — 다시 재려면 `achieved_speed()` 를 읽거나 그 줄을 빼고 재라.
 - 실행: 스크래치 launchd 잡 `ProcessType=Interactive` 두 개. 1회차는 목록 순, 2회차는 역순으로 돌아 같은 타이틀의 두 번이 시간상 떨어져 있다.
 - 조용한 시간대는 없었다. `perf-sample.csv` 시간대 평균 idle 이 모든 시간 23~30% 였다. 측정 중 load1 은 137~670(중앙 307)이다. 그래서 idle 문턱으로 고르지 않고 매 회차 idle·load1 을 기록했다. 판정은 «두 번이 서로 10% 안»이 거른다.
 - 대상: 헤드리스로 화면이 나왔는데 속도가 n/a 인 타이틀 + 가드 2종 = **237종 · 476회**.

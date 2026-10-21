@@ -46,8 +46,10 @@
   안 굶었으면 약 2 s 동안 굶음을 가려 ≈speed. 0.5 s = 2 fps 아래면 «페이싱»이 아니라 «호스트가 안 부름»으로 본다.
 - 시험 `a_host_pause_starts_a_new_window`: 30 s 공백 뒤 첫 값 = speed, 0.5 s 뒤 = 기기 값(2×14/16.7) — 직전 틱 굶음/안 굶음 두 갈래.
   개악 대조(가드를 `if false && …` 로 끔): `last_starved=true` 갈래 첫 단언 red, `false` 갈래만 돌리면 1.9947 ≠ 1.6766 red.
-- 계약 `achievedSpeedNote` 에 그 한 문장을 더했다(export 표면 무변경). 0348 §1 하네스 줄에 «이제 featurephone 이 매 틱 `take_pacing` 으로
-  창을 비운다» 1줄 덧. 하한 ≈0.84×speed 고지는 그대로다(확인만).
+- 계약 `achievedSpeedNote` 에 그 한 문장을 더했다(export 표면 무변경). 하한 ≈0.84×speed 고지는 그대로다(확인만).
+- ★0348 계열 측정에 주의: 이제 featurephone 이 **매 틱 `take_pacing()` 으로 Pacing 창을 비운다**. 0348 §1 하네스처럼 스크래치 export
+  `take_pacing` 으로 15 s 창을 재면 1틱짜리 창만 보인다 — `achieved_speed()` 를 읽거나 `lib.rs` 의 그 줄을 빼고 재라.
+  (0348 본문에 덧붙이지 않은 까닭: 그 회차의 유입 표식이 STALE 로 바뀐다 — 착지한 회차 표식은 고치지 않는다.)
 
 ### 사용자 영향
 
