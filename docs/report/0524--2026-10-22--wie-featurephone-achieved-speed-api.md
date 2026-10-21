@@ -42,3 +42,8 @@
 ### 사용자 영향
 
 - 지금은 없다(엔진 API만). 셸이 «고른 배속 vs 실제 배속»을 보여 줄 수 있게 된다. 1배 동작 변경 0 — waker 는 깃발만 세우고 폴링 순서·횟수는 그대로다.
+
+### 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs`: 유입 7건(BOUNDED · 10회) + 판단 필요 0건(SUFFIX-ATTACHED). 전부 이 회차가 손댄 파일
+(`executor.rs` · `system.rs` · `wie_featurephone/src/lib.rs`)에 **원래 있던** 주석이다. 이 회차가 더한 줄에 든 것은 0이다.
