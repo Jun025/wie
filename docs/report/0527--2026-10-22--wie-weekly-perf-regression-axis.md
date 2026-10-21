@@ -96,3 +96,5 @@
 - `node scripts/perf-watch.mjs selftest` 11/11 · `bash scripts/regression-census.sh selftest` 21/21 · `npm run audit` PASS · `check-docs-report-serial` OK(0524 은 열린 #557 이 먼저 claim 해 0527 로 옮겼다).
 - 빌드 sha12: `a90f1472` 네이티브 `6e62dba95a59` · wasm `0fdd8fe863a0` · spin16 `da8c5744287a`/`acfb80a7c996` · spin64 `1aca22313110`/`7863d84a5e1c` · `bd770b73` `27266fb59574`/`a085e78c4f74`.
 - 게임 파일명 유입: 유입 0건(BOUNDED) · 판단 필요 0건(SUFFIX-ATTACHED).
+
+<!-- corpus-name-inflow v1 subjects=6 tree=b23375924d80e038 B=0/0 P=0/0 S=0/0 -->
