@@ -1,0 +1,44 @@
+## [2026-10-22] featurephone: «실제로 낸 배속» 조회 API (wie-featurephone-achieved-speed-api)
+
+### 무엇을
+
+- `WieEmulator::achieved_speed() -> f64`(wasm export 1개 · 계약 `methods` + `achievedSpeedNote`). 최근 2초 틱 창의 «실제로 낸 배속».
+- 정의(`wie_backend::AchievedSpeed` 문서 주석): 게스트 시간 ÷ 벽시계. 단 시계는 **게스트가 굶는 동안 멈춘다**.
+  굶음 = 틱이 예산을 다 썼는데 게스트가 CPU 를 더 원했던 경우이고, 그 틱이 끝난 때부터 다음 틱이 시작할 때까지가 굶는 구간이다.
+  틱 자체는 언제나 센다. 모든 태스크가 잔 틱 뒤의 틈은 «제때»로 다 센다.
+- ★`SpeedClock` 을 그대로 재면 안 되는 이유: 게스트 시계는 벽시계 × `speed` 라서 CPU 가 모자라도 그 비가 **정의상 항상 `speed`** 다.
+  티켓 문안의 «게스트가 본 가상 시간 ÷ 벽시계»는 이 시계로는 아무것도 재지 못한다. 그래서 «굶는 동안 멈추는» 시계로 정의했다.
+- 굶음 판별 = `Executor::wants_cpu()`. 지금까지 no-op 이던 waker 를 `alloc::task::Wake` 깃발로 바꿨다(no-op vtable 삭제).
+  `YieldFuture`(ARM 코어가 `INSTRUCTIONS_PER_YIELD` 마다, JVM 인터프리터가 조각 사이에 기다린다)는 `wake_by_ref` 를 부른다.
+  JVM 모니터 `wait`·sleep 은 부르지 않는다.
+  ★«틱 끝에 잠들지 않은 태스크가 있다»로 판별하면 틀린다: `Object.wait()`(무기한)·`Thread.join` 으로 걸린 태스크도 executor 에는
+  «안 자는» 태스크라 매 틱 예산까지 돈다. 그러면 따라가는 게임도 굶는다고 읽힌다(시험 `a_guest_parked_on_a_monitor_is_not_starved`).
+- 전달 경로: `System::tick_for` → `Pacing::tick_ended(starved)` → `Pacing::starved_ticks`(창 카운터 · `summary_json` 끝에
+  `"starved_ticks"`) → featurephone 이 매 틱 `take_pacing()` 으로 읽는다. `Emulator` 트레이트 변경 0.
+  featurephone 에서는 그전까지 아무도 pacing 을 읽지 않았다 — 매 틱 take 하므로 그 표본 Vec(상한 4×65,536)도 더는 쌓이지 않는다.
+- `set_speed` 가 창을 비운다. 비운 뒤(생성 직후 포함) 틱 2회 전까지는 `speed()` 를 돌려준다.
+
+### 한계 (ponytail 주석)
+
+- 굶은 게스트는 «얼마나 더 원했든» `speed × 예산 ÷ 프레임` 아래로 내려가지 않는다(60Hz ≈ 0.84 × speed).
+  executor 는 «더 원했다»만 보고 «얼마나»는 못 본다. 깊은 측정은 여전히 0498 의 그리기 수 비교(`audio-probe.mjs --paint-window`)다.
+  예: 0498 의 `287af341` 2배 실측 1.54~1.56 을 이 API 는 ≈1.68~1.72 로 읽을 것이다(브라우저에서 재지 않았다 — 아래).
+- `Thread.yield` 스핀으로 기다리는 게스트는 굶는다고 읽힌다 — CPU 를 실제로 다 쓰므로 틀린 말은 아니다.
+
+### 검증
+
+- 단위 시험(`speed_clock.rs` · 60Hz 모의 호스트 · 14 ms 예산 · 3 s):
+  - 여유 → `speed` 와 정확히 같음(1배·2배).
+  - 모니터에 걸린 태스크만 있음 → 2.0.
+  - 예산 포화(`YieldFuture` 무한) → 1.72(< 2).
+  - 배속 변경 직후 창 초기화: reset 직후 새 speed 그대로, 굶은 틱이 창에서 빠짐.
+  - 창이 2초인지.
+- 4게이트: fmt · clippy stable/wasm32(+`-p wie_featurephone`)/beta `-D warnings` · `RUST_MIN_STACK=4194304 cargo test --all` 789 pass / 0 fail.
+- 러너 블록 전건 PASS(draw_j2me · helloworld ×2 · keydraw ×2 `--inject --expect-last-frame` rc=0 · text_j2me `--timeout 5`) · load1 56.
+- `wie_web.js`: 긴 문서 주석을 단 첫 빌드가 **40,452 B**(상한 40,000 초과)였다 — wasm-bindgen 이 export 의 문서 주석을 JS 로 복사한다.
+  export 주석을 한 줄로 줄이고 정의는 `AchievedSpeed` 에 뒀다. 상한은 올리지 않았다 → **39,859 B** · `check-engine-contract.mjs` 138 pass · 0 violation.
+- 브라우저에서 실게임 수치는 재지 않았다(게임 파일 필요 · 셸 표시 티켓 `otterpebble-featurephone-achieved-speed-indicator` 가 화면에서 본다).
+
+### 사용자 영향
+
+- 지금은 없다(엔진 API만). 셸이 «고른 배속 vs 실제 배속»을 보여 줄 수 있게 된다. 1배 동작 변경 0 — waker 는 깃발만 세우고 폴링 순서·횟수는 그대로다.

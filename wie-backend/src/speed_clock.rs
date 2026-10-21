@@ -1,3 +1,5 @@
+use alloc::collections::VecDeque;
+
 use spin::Mutex;
 
 use crate::time::Instant;
@@ -87,6 +89,64 @@ pub fn timer_fires_per_tick(speed: f64, tick: u64) -> u32 {
     ((speed * (tick + 1) as f64).floor() - (speed * tick as f64).floor()) as u32
 }
 
+/// The play speed a host actually got over the last `ACHIEVED_WINDOW_MS` of wall time.
+///
+/// Defined as guest time ÷ wall time on a clock that, unlike `SpeedClock`, stops while the guest is
+/// starved: from the end of a tick that ran out of budget with the guest still wanting CPU
+/// (`Pacing::starved_ticks`) to the start of the next. The guest clock itself never stops — it is
+/// the wall clock times `speed` — so measured on it the ratio is `speed` by construction. A gap
+/// after a tick in which every task slept is counted in full: a guest asleep is on schedule, so
+/// sleeping neither lowers nor inflates the figure. The tick itself always counts.
+///
+/// ponytail: a starved guest reads at least `speed × budget ÷ frame` (≈0.84 × `speed` at 60Hz)
+/// however much more CPU it wanted — the executor sees *that* it wanted more, not how much. A
+/// paint-rate comparison against 1x (`scripts/audio-probe.mjs --paint-window`) is the deep measure.
+#[derive(Default)]
+pub struct AchievedSpeed {
+    // (wall interval, counted part of it) per tick-to-tick interval, oldest first
+    intervals: VecDeque<(f64, f64)>,
+    total: f64,
+    counted: f64,
+    // (begin, end, starved) of the last tick
+    last: Option<(f64, f64, bool)>,
+}
+
+pub const ACHIEVED_WINDOW_MS: f64 = 2000.0;
+
+impl AchievedSpeed {
+    /// A tick ran from `begin_ms` to `end_ms` on the wall clock; `starved` if it ended on its
+    /// budget with the guest still wanting CPU.
+    pub fn tick(&mut self, begin_ms: f64, end_ms: f64, starved: bool) {
+        if let Some((b, e, was_starved)) = self.last
+            && begin_ms > b
+        {
+            let total = begin_ms - b;
+            let counted = if was_starved { (e - b).clamp(0.0, total) } else { total };
+            self.intervals.push_back((total, counted));
+            self.total += total;
+            self.counted += counted;
+            while let Some(&(t, c)) = self.intervals.front()
+                && self.total - t >= ACHIEVED_WINDOW_MS
+            {
+                self.intervals.pop_front();
+                self.total -= t;
+                self.counted -= c;
+            }
+        }
+        self.last = Some((begin_ms, end_ms, starved));
+    }
+
+    /// Forget the window — after a speed change, so the figure is about the new speed only.
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+
+    /// The speed achieved at play speed `speed`; `speed` itself until two ticks have run.
+    pub fn get(&self, speed: f64) -> f64 {
+        if self.total > 0.0 { speed * self.counted / self.total } else { speed }
+    }
+}
+
 impl State {
     fn guest(&mut self, wall_ms: f64) -> f64 {
         let (wall, guest) = *self.anchor.get_or_insert((wall_ms, wall_ms));
@@ -110,8 +170,8 @@ mod tests {
         task::{Context, Poll},
     };
 
-    use super::SpeedClock;
-    use crate::executor::Executor;
+    use super::{AchievedSpeed, SpeedClock};
+    use crate::{executor::Executor, task::YieldFuture};
 
     #[test]
     fn timer_fires_per_tick_is_speed_on_average_and_one_at_1x() {
@@ -231,5 +291,112 @@ mod tests {
         assert!((99.0..=102.0).contains(&one), "1x: {one}ms");
         assert!((49.0..=52.0).contains(&two), "2x: {two}ms");
         assert!((49.0..=52.0).contains(&three), "3x clamped to 2x: {three}ms");
+    }
+
+    // How a guest shaped like `guest` plays at `speed` on a 60Hz host with the 14ms budget, the wall
+    // clock advancing 0.1ms per read: the achieved speed after 3s of wall time.
+    fn achieved<F, Fut>(speed: f64, guest: F) -> f64
+    where
+        F: FnOnce(Executor) -> Fut + Send + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        let clock = Arc::new(SpeedClock::new());
+        let wall = Arc::new(AtomicU64::new(10_000_000)); // tenths of a ms
+        clock.set_speed(1_000_000.0, speed);
+        let mut executor = Executor::new();
+        let task_executor = executor.clone();
+        executor.spawn(move || async move {
+            guest(task_executor).await;
+            Ok::<(), wie_util::WieError>(())
+        });
+
+        let mut achieved = AchievedSpeed::default();
+        let mut frame = 10_000_000u64;
+        for _ in 0..180 {
+            wall.store(frame, Ordering::SeqCst);
+            let (c, w) = (clock.clone(), wall.clone());
+            executor
+                .tick_for(move || c.now(w.fetch_add(1, Ordering::SeqCst) as f64 / 10.0), clock.budget(14))
+                .unwrap();
+            achieved.tick(frame as f64 / 10.0, wall.load(Ordering::SeqCst) as f64 / 10.0, executor.wants_cpu());
+            frame += 167; // 16.7ms
+        }
+        achieved.get(speed)
+    }
+
+    // Never finishes and never asks to be polled again: a JVM monitor `wait` with nobody to notify.
+    struct Parked;
+
+    impl Future for Parked {
+        type Output = ();
+
+        fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
+            Poll::Pending
+        }
+    }
+
+    #[test]
+    fn a_guest_with_cpu_to_spare_achieves_its_speed() {
+        for speed in [1.0, 2.0] {
+            let got = achieved(speed, |executor| async move {
+                loop {
+                    executor.sleep(10);
+                    YieldOnce(false).await;
+                }
+            });
+            assert_eq!(got, speed);
+        }
+    }
+
+    #[test]
+    fn a_guest_parked_on_a_monitor_is_not_starved() {
+        // It spins every tick to its budget, but nothing in it wants the CPU.
+        assert_eq!(achieved(2.0, |_| Parked), 2.0);
+    }
+
+    #[test]
+    fn a_guest_that_fills_its_budget_achieves_less_than_its_speed() {
+        // The ARM core and the JVM interpreter yield this way between slices of work.
+        let got = achieved(2.0, |_| async {
+            loop {
+                YieldFuture::new().await;
+            }
+        });
+        // 2 × 14ms of every 16.7ms frame = 1.68, plus what the tick overruns its budget by
+        // (1.72 when written: the guest clock is whole milliseconds).
+        assert!((1.6..1.8).contains(&got), "{got}");
+    }
+
+    #[test]
+    fn a_speed_change_starts_a_new_window() {
+        let mut achieved = AchievedSpeed::default();
+        let mut t = 0.0;
+        for _ in 0..200 {
+            achieved.tick(t, t + 14.0, true);
+            t += 16.0;
+        }
+        assert!(achieved.get(2.0) < 1.8);
+        achieved.reset();
+        assert_eq!(achieved.get(1.5), 1.5, "nothing measured yet at the new speed");
+        for _ in 0..200 {
+            achieved.tick(t, t + 5.0, false);
+            t += 16.0;
+        }
+        assert_eq!(achieved.get(1.5), 1.5, "the starved ticks before the change are gone");
+    }
+
+    #[test]
+    fn the_window_is_the_last_two_seconds() {
+        let mut achieved = AchievedSpeed::default();
+        let mut t = 0.0;
+        for _ in 0..1000 {
+            achieved.tick(t, t + 8.0, true); // half of every frame counted
+            t += 16.0;
+        }
+        for _ in 0..200 {
+            achieved.tick(t, t + 1.0, false); // 3.2s of on-schedule frames
+            t += 16.0;
+        }
+        assert_eq!(achieved.get(1.0), 1.0);
     }
 }
