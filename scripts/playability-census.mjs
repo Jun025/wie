@@ -827,6 +827,10 @@ const HAND_TIP = {
   d552e095ddcf: ['처음 메뉴에서 «1.게임시작»을 확인 키로 열고 아래 방향키로 «새로하기»를 고른 뒤 확인 키로 난이도를 정하고 이야기를 넘기면 집 화면에서 시작돼요.'],
   d9384b388ea5: ['문자 수신 동의 창에서 아래 방향키로 «아니오»를 고르고 «스토리모드»에서 확인 키를 누른 뒤 ＃ 키로 이야기를 넘기면 나무 마을을 방향키로 걸어 다닐 수 있어요.'],
   ed6ad7318ac9: ['처음 메뉴에서 아래 방향키로 «새로 하기»를 고르고 능력치를 확인 키로 나눈 뒤 숫자 1 키로 정하면, 숲에서 방향키로 움직이며 확인 키로 총을 쏠 수 있어요.'],
+  // docs/report/0528 (pins 6bbbbf94 → 7c840765): the two A2 «path-end walls». 87b04639cdfe's notes needed the
+  // clip callback's STARTED (an engine fix); 8c6821fab969's rooftop lessons each want one UP timing (a recipe).
+  '87b04639cdfe': ['두 키를 함께 누르는 시험에서 «미지원폰» 창이 나오면 오른쪽 방향키로 «아니오»를 고른 뒤 확인 키를 누르고, 곡을 고르면 내려오는 음표의 번호에 맞춰 숫자 키를 누르면 돼요.'],
+  '8c6821fab969': ['«새로시작»으로 들어가 옥상 안내가 나오면 위 방향키로 뛰어오른 뒤 공중에서 위 방향키를 길게 누르면 흔들기, 빠르게 두 번 누르면 천장으로 올라가며 다음으로 넘어가요.'],
 };
 
 // A row that is not playable always says why: `player-data.mjs` refuses one with no sentence (the
