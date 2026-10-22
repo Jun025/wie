@@ -1,0 +1,8 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-10-22",
+  "task": "wie-mda-clip-callback-end-of-data-stopped-and-started-reentry",
+  "title": "클립 콜백 END_OF_DATA·STOPPED 발신 · STARTED 재진입 가드 · SMAF 길이 PCM 꼬리",
+  "summary": "WIPI 명세(AromaWIPI Player)대로 한 번 재생 끝에 END_OF_DATA(길이 + 500ms), 소리 나던 클립의 MC_mdaStop 에 STOPPED, 반복 경계는 무발신. STARTED 전달 중 같은 클립 재생은 무시. 500ms 는 863b8ab6a21d 싱크 화면이 잰 하한 300ms 에서. SMAF duration 을 PCM 꼬리까지 늘려 소리 도중 END 를 막았다. 콜백 96종 60초: 새 이벤트 69종 base 짝 판정 69/69 동일 · 곡 끝 대기 형상 5814101b8010 발견(곡이 이어짐) · 멈춤 대기 3종 다음 소리 나옴. docs/report/0533.",
+  "proposals": []
+}
