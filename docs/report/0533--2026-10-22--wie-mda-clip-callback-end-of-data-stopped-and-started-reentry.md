@@ -101,3 +101,5 @@ X 는 사용자 싱크 설정(저장에서 읽고 ±1)이고, 새 저장에서 0
 - `cargo fmt --all -- --check` OK · `cargo clippy --all -- -D warnings` rc=0 · `cargo clippy --target wasm32-unknown-unknown -- -D warnings` rc=0 · `cargo +beta clippy --all -- -D warnings` rc=0(경고는 `wie_cli` 매니페스트 «unused dependency» 9줄 · 기존).
 - `RUST_MIN_STACK=4194304 cargo test --all` **809 passed / 0 failed**.
 - 러너 블록: `draw_j2me.jar` · `helloworld_ktf.zip` · `helloworld_lgt.zip` PASS · `keydraw_ktf.zip` PASS rc=0(paints 79) · `keydraw_lgt.zip` PASS rc=0(paints 55) · `text_j2me.jar` PASS.
+
+<!-- corpus-name-inflow v1 subjects=5 tree=b1f64205d2d5672a B=0/0 P=0/0 S=0/0 -->
