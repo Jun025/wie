@@ -292,7 +292,7 @@ pub async fn play(context: &mut dyn WIPICContext, ptr_clip: WIPICWord, repeat: W
         // callback that replays on END spin. Add it if a title waits on an empty clip.
         let duration = context.system().audio().duration(clip.handle).unwrap_or(0);
         if repeat == 0 && duration > 0 {
-            let due = context.system().platform().now() + duration;
+            let due = context.system().platform().now() + duration + END_OF_DATA_LAG_MS;
             context.set_timer(
                 due,
                 u64::MAX,
@@ -303,6 +303,13 @@ pub async fn play(context: &mut dyn WIPICContext, ptr_clip: WIPICWord, repeat: W
 
     Ok(0)
 }
+
+// END_OF_DATA comes this long after the data runs out. 863b8ab6a21d (LGT) plays its 2700 ms sync
+// clip and closes the sync screen only if the clip is still STARTED 3000 ms after STARTED: on time
+// it stayed on that screen for good, 250 ms late 2/2 still did, 350 ms late 2/2 went on (0533 §3).
+// So its handset reported the end at least 300 ms late; 500 leaves room for its frame polling.
+// ponytail: one figure for every handset, from one title's floor; per-title only if one needs less.
+const END_OF_DATA_LAG_MS: u64 = 500;
 
 const MC_MDA_STATUS_END_OF_DATA: WIPICWord = 1;
 const MC_MDA_STATUS_STARTED: WIPICWord = 2;
@@ -555,8 +562,8 @@ mod tests {
         assert_eq!(context.call_args, [(0x14335, vec![with_cb, 2])]);
     }
 
-    // A one-shot ends with END_OF_DATA when its length has elapsed, and is then stopped: a later
-    // MC_mdaStop sends nothing.
+    // A one-shot ends with END_OF_DATA once its length (+ END_OF_DATA_LAG_MS) has elapsed, and is
+    // then stopped: a later MC_mdaStop sends nothing.
     #[futures_test::test]
     async fn one_shot_ends_with_end_of_data_test() {
         let mut context = context();
@@ -566,7 +573,10 @@ mod tests {
         play(&mut context, clip, 0).await.unwrap();
         run_spawned(&mut context).await;
         assert_eq!(context.timers.len(), 1);
-        assert!((500..1000).contains(&(context.timers[0].0.raw() - now.raw())), "due when the sound ends");
+        assert!(
+            (1000..1500).contains(&(context.timers[0].0.raw() - now.raw())),
+            "due 500 ms after the sound ends"
+        );
         run_timers(&mut context).await;
         assert_eq!(context.call_args, [(0xcb, vec![clip, 2]), (0xcb, vec![clip, 1])]);
 
