@@ -102,4 +102,4 @@ X 는 사용자 싱크 설정(저장에서 읽고 ±1)이고, 새 저장에서 0
 - `RUST_MIN_STACK=4194304 cargo test --all` **809 passed / 0 failed**.
 - 러너 블록: `draw_j2me.jar` · `helloworld_ktf.zip` · `helloworld_lgt.zip` PASS · `keydraw_ktf.zip` PASS rc=0(paints 79) · `keydraw_lgt.zip` PASS rc=0(paints 55) · `text_j2me.jar` PASS.
 
-<!-- corpus-name-inflow v1 subjects=5 tree=b1f64205d2d5672a B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=5 tree=8aba4ce92f1e5098 B=0/0 P=0/0 S=0/0 -->
