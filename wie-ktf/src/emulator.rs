@@ -171,6 +171,43 @@ const OWNER_SOUND_OFF_SETTINGS: &[([u8; 16], &[&str])] = &[
     ),
 ];
 
+/// The same owner's «sound off», for titles that cannot lose the file holding it: without it one
+/// title exits at start and the other freezes (docs/report/0440, 0517). Only the measured bytes are
+/// rewritten to the value that plays — (jar MD5, file, offset, bytes); the rest of the file loads as shipped.
+const OWNER_SOUND_OFF_BYTES: &[([u8; 16], &str, usize, &[u8])] = &[
+    // 5aa438fbdc87: `op_save.db` (5 bytes), the first is the sound level and the owner's is 0 (3 plays).
+    (
+        [
+            0x09, 0xbf, 0x6d, 0x6d, 0x5b, 0xf4, 0x8f, 0xe6, 0x59, 0xee, 0xb1, 0x56, 0x3c, 0xed, 0x5a, 0xb9,
+        ],
+        "op_save.db",
+        0,
+        &[3],
+    ),
+    // 6c9f969f089f: `personal_data` (868 bytes), the big-endian int at +4 is the sound-off flag, the owner's is 1.
+    (
+        [
+            0x8f, 0xc4, 0xf1, 0x4b, 0x20, 0xe4, 0xcd, 0xd0, 0x26, 0x39, 0xfd, 0x32, 0x26, 0xd2, 0xaa, 0xac,
+        ],
+        "personal_data",
+        4,
+        &[0, 0, 0, 0],
+    ),
+];
+
+/// Rewrite the bytes `table` names for this jar, wherever `drop_device_bound_saves` would look.
+fn turn_owner_sound_on(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8], table: &[([u8; 16], &str, usize, &[u8])]) {
+    let hash = md5::compute(jar).0;
+    for (_, name, offset, value) in table.iter().filter(|(md5, ..)| *md5 == hash) {
+        for key in [(*name).to_owned(), format!("P/{name}"), format!("p/{name}")] {
+            if let Some(bytes) = files.get_mut(&key).and_then(|data| data.get_mut(*offset..offset + value.len())) {
+                bytes.copy_from_slice(value);
+                tracing::info!("Turning the original owner's sound on in {key}");
+            }
+        }
+    }
+}
+
 /// The original owner's progress, shipped in the archive, that «continue» opens: a new player would
 /// pick up someone else's game. Measured per title — the original and a copy without only these files,
 /// same keys — and kept to the titles where «continue» was seen to open it; the copy starts as a fresh
@@ -344,6 +381,7 @@ impl KtfEmulator {
             drop_device_bound_saves(&mut files, &jar, DEVICE_BOUND_SAVES);
             drop_device_bound_saves(&mut files, &jar, OWNER_SOUND_OFF_SETTINGS);
             drop_device_bound_saves(&mut files, &jar, OWNER_PROGRESS_SAVES);
+            turn_owner_sound_on(&mut files, &jar, OWNER_SOUND_OFF_BYTES);
         }
 
         Self::load(platform, &jar_filename, &adf.pid, &adf.aid, Some(adf.mclass), &files, options)
@@ -536,6 +574,38 @@ mod tests {
 
         assert_eq!(names("0f42b6ec0692fd2931207cb4751981c3"), Some(&["config.sav"][..])); // b907b0faf483
         assert_eq!(names("84052481ea39457ba8f8d7fb06252e57"), Some(&["config.dat"][..])); // 5a59f62d1f1a
+    }
+
+    // Same pinning as above for the byte rows, plus the rewrite itself on a stand-in jar.
+    #[test]
+    fn owner_sound_off_bytes_rewrite_only_the_listed_bytes() {
+        use alloc::{collections::BTreeMap, string::ToString, vec};
+
+        let row = |hex: &str| {
+            let md5: [u8; 16] = core::array::from_fn(|i| u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).unwrap());
+            super::OWNER_SOUND_OFF_BYTES
+                .iter()
+                .find(|(m, ..)| *m == md5)
+                .map(|(_, n, o, v)| (*n, *o, *v))
+        };
+        assert_eq!(row("09bf6d6d5bf48fe659eeb1563ced5ab9"), Some(("op_save.db", 0, &[3][..]))); // 5aa438fbdc87
+        assert_eq!(row("8fc4f14b20e4cdd02639fd3226d2aaac"), Some(("personal_data", 4, &[0, 0, 0, 0][..]))); // 6c9f969f089f
+
+        let table: &[([u8; 16], &str, usize, &[u8])] = &[(md5::compute(b"listed").0, "s.db", 1, &[9, 9])];
+        let archive = || {
+            [("P/s.db".to_string(), vec![1, 2, 3, 4]), ("t.db".to_string(), vec![1, 2, 3, 4])]
+                .into_iter()
+                .collect::<BTreeMap<_, _>>()
+        };
+
+        let mut files = archive();
+        super::turn_owner_sound_on(&mut files, b"listed", table);
+        assert_eq!(files["P/s.db"], [1, 9, 9, 4]);
+        assert_eq!(files["t.db"], [1, 2, 3, 4]);
+
+        let mut files = archive();
+        super::turn_owner_sound_on(&mut files, b"other", table);
+        assert_eq!(files, archive());
     }
 
     #[test]
