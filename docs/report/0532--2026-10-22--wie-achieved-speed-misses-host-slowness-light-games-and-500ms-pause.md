@@ -97,12 +97,35 @@ otterpebble `origin/main`(`4efc20ec`)을 스크래치 detached worktree 에서 �
 - 1/60초 여유는 «60Hz 기기를 기준»이라는 선택이다. 30Hz 기기에서 sleep 으로 도는 게임은 약간(≤ 7%) 낮게 읽힐 수 있다(시험에서 0.9× 이상 확인).
 - 가벼운 게임의 값은 참값보다 크다(CPU/20 2배: 0.79 vs 0.50) — 할 일 시각 뒤 1/60초를 «제때»로 주기 때문이다. 방향과 표시 여부는 맞다.
 - `guest_waiting_until` 은 WIPI/MIDP 이벤트 루프 한 곳이다 — 이벤트 루프가 기다리지 않는 사이(콜백 실행 중)엔 `None` 이라 너그럽게(«제때») 읽힌다.
-  이 경로는 단위 시험이 pacing 합성만 본다. 실제 걸림은 무거운 LGT(타이머) 게임의 CPU/20 값 하락(1.75 → 1.22)으로만 확인했다(셋 중 무엇이 기여했는지는 가르지 않았다).
+  이 경로는 이제 실 `System` + 실 `getNextEvent` 시험이 잠근다(아래 «검수 반려 수정»).
+
+### 검수 반려 수정 (게이트② 사이클 1 · `-fix`)
+
+검수가 넣은 개악 셋(M1 `system.rs` 가 `next_due()` 대신 `None` · M2 이벤트 루프 `guest_waiting_until(due)` 삭제 · M7 `next_due` 가 1 ms poll 포함)이 워크스페이스 시험 전건 green 이었다.
+`speed_clock.rs` 의 `achieved_on` 은 `executor.next_due()` 를 직접 부르는 사본이라 제품 배선을 지나지 않았다.
+
+- 실엔진 시험 4갈래(`take_pacing().due()` · `System::pacing().due()`):
+  - ⑴ `wie-j2me/tests/test_pacing.rs` `a_tick_that_ends_on_a_guest_sleep_reports_its_wake_as_due` — 커밋된 `pace_j2me` 게스트(`Thread.sleep` 로 50 ms 기한)가 10 s 동안 매 틱 `due` 를 내고, 그중 16 ms 넘게 앞선 것이 프레임 수 이상이다(실측 600틱 전부 · 1..=35 ms · 16 ms 초과 400).
+  - ⑴' `wie-midp` `a_tick_reports_a_sleeping_guest_s_wake_as_due_and_a_poll_as_nothing` — `sleep(10)` → `Some(10)`, ⑶ `sleep(1)` 만 도는 게스트 → `None`.
+  - ⑵ `a_guest_waiting_for_a_key_has_nothing_due` — 빈 큐 `getNextEvent`(키 대기) → `None`.
+  - ⑷ `a_held_back_timer_is_due_though_the_event_loop_only_polls_for_it` — `pace_from` 이 막힌 WIPI 타이머(due 30)를 1 ms poll 로 기다리는 이벤트 루프 → `Some(30)`.
+- 게스트→벽시계 환산을 `SpeedClock::wall_at` 하나로 뺐다. `wie_featurephone` `tick` 과 시험 헬퍼 `achieved_on` 이 같은 함수를 부른다. 단위 시험 `a_guest_due_is_nearer_on_the_wall_clock_at_2x`.
+- 개악 실측(`cargo test --no-fail-fast -p wie-backend -p wie-midp -p wie-j2me` · 한 건씩 넣고 원복):
+
+| 개악 | rc | RED 시험 |
+|---|---|---|
+| M1 `tick_ended(wants_cpu(), None)` | 101 | ⑴ j2me · ⑴' midp |
+| M2 `guest_waiting_until(due);` 삭제 | 101 | ⑷ |
+| M7 `next_due` = `map(\|x\| x.0)` | 101 | ⑴ j2me · ⑴'⑶ · ⑵ · ⑷ |
+| F2 `wall_at` 의 `/ speed` → `* speed` | 101 | `a_guest_due_is_nearer_on_the_wall_clock_at_2x` |
+
+  F2 개악에서 `achieved_on` 기반 시험들은 green 이었다 — 그 축은 새 단위 시험 하나가 잡는다.
+- 정의(due 기준 · 멈춤 = 공백 0.5 s ∧ 최근 최장 ×8)는 바꾸지 않았다. F3(상대 멈춤 경계)·F4(무거운 게임 값 = 상한)·F6(census 비결정성)은 기록만 한다(검수 §발견).
 
 ### 검증
 
 - 4게이트: `cargo fmt --all -- --check` · `cargo clippy --all -- -D warnings` · wasm32 clippy(+`-p wie_featurephone`) · `cargo +beta clippy --all -- -D warnings` 모두 rc=0 ·
-  `RUST_MIN_STACK=4194304 cargo test --all` **796 pass / 0 fail**.
+  `RUST_MIN_STACK=4194304 cargo test --all` **796 pass / 0 fail**. 반려 수정 뒤 재실행: 같은 4게이트 + beta rc=0 · **801 pass / 0 fail**(+5) · 러너 블록 전건 PASS(keydraw rc=0) · load1 7.
 - 러너 블록 전건 PASS(draw_j2me · helloworld ×2 · keydraw_ktf/lgt `--inject --expect-last-frame` rc=0 · paints 79/55 · text_j2me `--timeout 5`) · load1 11~94.
 - `check-engine-contract.mjs` 138 pass · `npm run audit` PASSED · `wie_web.js` 39,859 B(전과 같음).
 
