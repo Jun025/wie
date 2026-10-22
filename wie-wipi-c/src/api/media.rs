@@ -82,6 +82,12 @@ struct MdaClip {
     loaded: u32,
     /// `MC_mdaClipCreate`'s `cb(clip, status)`; 0 = none.
     callback: WIPICWord,
+    /// Bumped by every play and stop: an END_OF_DATA timer armed by an earlier play is void.
+    generation: u32,
+    /// Nonzero from a play until its END_OF_DATA or a stop.
+    sounding: u32,
+    /// Nonzero from a play until its STARTED callback returns.
+    starting: u32,
 }
 
 impl MdaClip {
@@ -125,6 +131,8 @@ pub async fn clip_free(context: &mut dyn WIPICContext, clip: WIPICWord) -> Resul
         return Ok(0);
     }
 
+    // A zero id tells a pending callback the clip is gone (`ClipStatusCallback::live`).
+    write_generic(context, clip, 0i32)?;
     context.free_raw(clip, size_of::<MdaClip>() as u32)?;
 
     Ok(0)
@@ -240,6 +248,11 @@ pub async fn set_volume(context: &mut dyn WIPICContext, volume: i32) -> Result<(
     Ok(())
 }
 
+// Events follow the WIPI media model (AromaWIPI javadoc, `org.kwis.msp.media.Player`, the Java face
+// of these calls): STARTED when a play begins, END_OF_DATA when its data runs out, STOPPED when a
+// stop ends a play that was sounding — a stop on a stopped clip "does nothing". A repeat play's data
+// never runs out, so nothing is sent at the loop boundary. Each event reaches `cb` after the call
+// that caused it returns, like the `MC_netConnect` callbacks.
 pub async fn play(context: &mut dyn WIPICContext, ptr_clip: WIPICWord, repeat: WIPICWord) -> Result<i32> {
     tracing::debug!("MC_mdaPlay({ptr_clip:#x}, {repeat})");
 
@@ -247,38 +260,103 @@ pub async fn play(context: &mut dyn WIPICContext, ptr_clip: WIPICWord, repeat: W
         return Ok(0);
     }
 
-    let clip: MdaClip = read_generic(context, ptr_clip)?;
+    let mut clip: MdaClip = read_generic(context, ptr_clip)?;
 
-    let result = context.system().audio().play(clip.handle, repeat != 0);
+    // "Playing a clip that is playing does nothing" (same javadoc). Held only while its STARTED is
+    // pending, where a callback that answers STARTED with MC_mdaPlay would restart the song and
+    // queue another STARTED forever; anywhere else a replay still restarts the sound, as it always did.
+    if clip.starting != 0 && clip.sounding != 0 {
+        tracing::debug!("MC_mdaPlay({ptr_clip:#x}): STARTED not yet delivered, ignored");
+        return Ok(0);
+    }
 
-    match result {
-        Err(x) => tracing::error!("Failed to load audio: {x:?}"),
-        // The clip's callback hears that the sound started, after this call returns. 87b04639cdfe
-        // (LGT, binary.mod 0x14334) takes the song's start time only in `cb(clip, STARTED)` and
-        // places its notes against it, so without the event the song played with no notes.
-        Ok(()) if clip.callback != 0 => context.spawn(Box::new(ClipStatusCallback {
-            callback: clip.callback,
-            clip: ptr_clip,
-            status: MC_MDA_STATUS_STARTED,
-        }))?,
-        Ok(()) => {}
+    if let Err(x) = context.system().audio().play(clip.handle, repeat != 0) {
+        tracing::error!("Failed to load audio: {x:?}");
+        return Ok(0);
+    }
+
+    clip.generation = clip.generation.wrapping_add(1);
+    clip.sounding = 1;
+    if clip.callback != 0 {
+        clip.starting = 1;
+    }
+    write_generic(context, ptr_clip, clip)?;
+
+    if clip.callback != 0 {
+        // 87b04639cdfe (LGT, binary.mod 0x14334) takes the song's start time only in
+        // `cb(clip, STARTED)` and places its notes against it, so without the event the song played
+        // with no notes.
+        context.spawn(Box::new(ClipStatusCallback::new(&clip, ptr_clip, MC_MDA_STATUS_STARTED)))?;
+
+        // ponytail: a clip with no events (duration 0) never ends; END_OF_DATA at once would let a
+        // callback that replays on END spin. Add it if a title waits on an empty clip.
+        let duration = context.system().audio().duration(clip.handle).unwrap_or(0);
+        if repeat == 0 && duration > 0 {
+            let due = context.system().platform().now() + duration;
+            context.set_timer(
+                due,
+                u64::MAX,
+                Box::new(ClipStatusCallback::new(&clip, ptr_clip, MC_MDA_STATUS_END_OF_DATA)),
+            );
+        }
     }
 
     Ok(0)
 }
 
+const MC_MDA_STATUS_END_OF_DATA: WIPICWord = 1;
 const MC_MDA_STATUS_STARTED: WIPICWord = 2;
+const MC_MDA_STATUS_STOPPED: WIPICWord = 3;
 
 struct ClipStatusCallback {
     callback: WIPICWord,
     clip: WIPICWord,
+    clip_id: i32,
+    generation: u32,
     status: WIPICWord,
+}
+
+impl ClipStatusCallback {
+    fn new(clip: &MdaClip, ptr_clip: WIPICWord, status: WIPICWord) -> Self {
+        Self {
+            callback: clip.callback,
+            clip: ptr_clip,
+            clip_id: clip.clip_id,
+            generation: clip.generation,
+            status,
+        }
+    }
+
+    /// The clip, unless it was freed since (`clip_free` zeroes the id; a new clip there has another).
+    fn live(&self, context: &mut dyn WIPICContext) -> Result<Option<MdaClip>> {
+        let clip: MdaClip = read_generic(context, self.clip)?;
+
+        Ok((clip.clip_id == self.clip_id).then_some(clip))
+    }
 }
 
 #[async_trait::async_trait]
 impl MethodBody<WieError> for ClipStatusCallback {
     async fn call(&self, context: &mut dyn WIPICContext, _: Box<[WIPICWord]>) -> Result<WIPICResult> {
+        let Some(mut clip) = self.live(context)? else {
+            return Ok(WIPICResult { results: Vec::new() });
+        };
+        if self.status == MC_MDA_STATUS_END_OF_DATA {
+            if clip.generation != self.generation {
+                return Ok(WIPICResult { results: Vec::new() });
+            }
+            clip.sounding = 0;
+            write_generic(context, self.clip, clip)?;
+        }
+
         context.call_function(self.callback, &[self.clip, self.status]).await?;
+
+        if self.status == MC_MDA_STATUS_STARTED
+            && let Some(mut clip) = self.live(context)?
+        {
+            clip.starting = 0;
+            write_generic(context, self.clip, clip)?;
+        }
 
         Ok(WIPICResult { results: Vec::new() })
     }
@@ -331,11 +409,17 @@ pub async fn stop(context: &mut dyn WIPICContext, ptr_clip: WIPICWord) -> Result
         return Ok(0);
     }
 
-    let clip: MdaClip = read_generic(context, ptr_clip)?;
+    let mut clip: MdaClip = read_generic(context, ptr_clip)?;
 
-    let system = context.system();
+    context.system().audio().stop(clip.handle);
 
-    system.audio().stop(clip.handle);
+    let was_sounding = clip.sounding != 0;
+    clip.generation = clip.generation.wrapping_add(1);
+    clip.sounding = 0;
+    write_generic(context, ptr_clip, clip)?;
+    if was_sounding && clip.callback != 0 {
+        context.spawn(Box::new(ClipStatusCallback::new(&clip, ptr_clip, MC_MDA_STATUS_STOPPED)))?;
+    }
 
     Ok(0)
 }
@@ -366,16 +450,16 @@ pub async fn unk18(_context: &mut dyn WIPICContext, clip: WIPICWord) -> Result<W
 
 #[cfg(test)]
 mod tests {
-    use alloc::boxed::Box;
+    use alloc::{boxed::Box, vec, vec::Vec};
 
     use test_utils::TestPlatform;
-    use wie_backend::{DefaultTaskRunner, System};
+    use wie_backend::{AudioSequence, DefaultTaskRunner, System};
 
     use crate::context::{WIPICContext, test::TestContext};
 
     use wie_util::read_generic;
 
-    use super::{MdaClip, clip_create, clip_get_volume, clip_put_data, clip_set_volume, get_volume, play, set_volume};
+    use super::{MdaClip, clip_create, clip_free, clip_get_volume, clip_put_data, clip_set_volume, get_volume, play, set_volume, stop};
 
     // The getter answers 100 before any set: 13 titles read it and set what it said. A clip with no sound yet must not reach handle 0, which is the
     // first clip anybody loaded.
@@ -414,12 +498,46 @@ mod tests {
         assert_ne!(a.clip_id, b.clip_id);
     }
 
+    fn context() -> TestContext {
+        TestContext::with_system(System::new(Box::new(TestPlatform::new()), "pid", "aid", DefaultTaskRunner))
+    }
+
+    /// A clip with callback 0xcb whose sound lasts `duration` ms.
+    async fn clip_lasting(context: &mut TestContext, duration: u64) -> u32 {
+        let clip = clip_create(context, 0, 0, 0xcb).await.unwrap();
+        clip_put_data(context, clip, 0x1000, 0).await.unwrap();
+        let handle = read_generic::<MdaClip, _>(&*context, clip).unwrap().handle;
+        let sequence = AudioSequence {
+            duration,
+            events: Vec::new(),
+        };
+        context.system().audio().replace(handle, sequence).unwrap();
+
+        clip
+    }
+
+    async fn run_spawned(context: &mut TestContext) {
+        for callback in core::mem::take(&mut context.spawned) {
+            callback.call(context, Box::new([])).await.unwrap();
+        }
+    }
+
+    async fn run_timers(context: &mut TestContext) {
+        for (_, _, callback) in core::mem::take(&mut context.timers) {
+            callback.call(context, Box::new([])).await.unwrap();
+        }
+    }
+
+    fn statuses(context: &mut TestContext) -> Vec<u32> {
+        core::mem::take(&mut context.call_args).into_iter().map(|(_, args)| args[1]).collect()
+    }
+
     // 87b04639cdfe's clip callback (binary.mod 0x14334) stores the song's start time on
     // `cb(clip, MC_MDA_STATUS_STARTED)` and its notes fall against it: with no event the song played
     // and no note ever came down. A clip created without a callback gets nothing.
     #[futures_test::test]
     async fn play_tells_the_clip_callback_it_started_test() {
-        let mut context = TestContext::with_system(System::new(Box::new(TestPlatform::new()), "pid", "aid", DefaultTaskRunner));
+        let mut context = context();
         let with_cb = clip_create(&mut context, 0, 0, 0x14335).await.unwrap();
         let without_cb = clip_create(&mut context, 0, 0, 0).await.unwrap();
         clip_put_data(&mut context, with_cb, 0x1000, 0).await.unwrap();
@@ -427,11 +545,121 @@ mod tests {
 
         play(&mut context, without_cb, 0).await.unwrap();
         assert!(context.spawned.is_empty());
+        assert!(context.timers.is_empty());
 
         play(&mut context, with_cb, 0).await.unwrap();
         assert!(context.call_args.is_empty(), "the event comes after MC_mdaPlay returns");
         let callback = context.spawned.pop().unwrap();
         callback.call(&mut context, Box::new([])).await.unwrap();
-        assert_eq!(context.call_args, [(0x14335, alloc::vec![with_cb, 2])]);
+        assert_eq!(context.call_args, [(0x14335, vec![with_cb, 2])]);
+    }
+
+    // A one-shot ends with END_OF_DATA when its length has elapsed, and is then stopped: a later
+    // MC_mdaStop sends nothing.
+    #[futures_test::test]
+    async fn one_shot_ends_with_end_of_data_test() {
+        let mut context = context();
+        let clip = clip_lasting(&mut context, 500).await;
+        let now = context.system().platform().now();
+
+        play(&mut context, clip, 0).await.unwrap();
+        run_spawned(&mut context).await;
+        assert_eq!(context.timers.len(), 1);
+        assert!((500..1000).contains(&(context.timers[0].0.raw() - now.raw())), "due when the sound ends");
+        run_timers(&mut context).await;
+        assert_eq!(context.call_args, [(0xcb, vec![clip, 2]), (0xcb, vec![clip, 1])]);
+
+        context.call_args.clear();
+        stop(&mut context, clip).await.unwrap();
+        assert!(context.spawned.is_empty());
+    }
+
+    // MC_mdaStop on a sounding clip sends STOPPED after it returns and voids the play's END_OF_DATA;
+    // a second stop sends nothing.
+    #[futures_test::test]
+    async fn stop_sends_stopped_and_voids_end_of_data_test() {
+        let mut context = context();
+        let clip = clip_lasting(&mut context, 500).await;
+
+        play(&mut context, clip, 0).await.unwrap();
+        run_spawned(&mut context).await;
+        stop(&mut context, clip).await.unwrap();
+        assert_eq!(statuses(&mut context), [2], "STOPPED comes after MC_mdaStop returns");
+        run_spawned(&mut context).await;
+        run_timers(&mut context).await;
+        stop(&mut context, clip).await.unwrap();
+        run_spawned(&mut context).await;
+
+        assert_eq!(statuses(&mut context), [3]);
+    }
+
+    // A repeat play never runs out of data: no END_OF_DATA at the loop boundary, STOPPED on stop.
+    // A replay voids the earlier play's END_OF_DATA.
+    #[futures_test::test]
+    async fn repeat_play_has_no_end_of_data_and_replay_voids_the_old_one_test() {
+        let mut context = context();
+        let clip = clip_lasting(&mut context, 500).await;
+
+        play(&mut context, clip, 1).await.unwrap();
+        run_spawned(&mut context).await;
+        assert!(context.timers.is_empty());
+        stop(&mut context, clip).await.unwrap();
+        run_spawned(&mut context).await;
+        assert_eq!(statuses(&mut context), [2, 3]);
+
+        play(&mut context, clip, 0).await.unwrap();
+        run_spawned(&mut context).await;
+        play(&mut context, clip, 0).await.unwrap();
+        run_spawned(&mut context).await;
+        run_timers(&mut context).await;
+        assert_eq!(statuses(&mut context), [2, 2, 1], "one END_OF_DATA, the second play's");
+    }
+
+    // A callback that answers STARTED with MC_mdaPlay on the same clip would restart the song and
+    // queue another STARTED, forever. Playing a playing clip does nothing (AromaWIPI `Player.play`),
+    // so that play is ignored; once STARTED has returned a replay restarts the sound as before.
+    #[futures_test::test]
+    async fn play_inside_its_own_started_is_ignored_test() {
+        let mut context = context();
+        let clip = clip_lasting(&mut context, 500).await;
+
+        play(&mut context, clip, 0).await.unwrap();
+        // what the callback does, while STARTED is being delivered
+        play(&mut context, clip, 0).await.unwrap();
+        assert_eq!(context.spawned.len(), 1);
+        assert_eq!(context.timers.len(), 1);
+        run_spawned(&mut context).await;
+
+        play(&mut context, clip, 0).await.unwrap();
+        assert_eq!(context.spawned.len(), 1, "after STARTED a replay starts again");
+    }
+
+    // A stop inside STARTED ends the play, so a play after it starts again — the guard is "already
+    // playing", not "inside a callback".
+    #[futures_test::test]
+    async fn play_after_stop_inside_started_starts_again_test() {
+        let mut context = context();
+        let clip = clip_lasting(&mut context, 500).await;
+
+        play(&mut context, clip, 0).await.unwrap();
+        stop(&mut context, clip).await.unwrap();
+        play(&mut context, clip, 0).await.unwrap();
+
+        assert_eq!(context.spawned.len(), 3);
+    }
+
+    // A freed clip hears nothing more: MC_mdaPlay then MC_mdaClipFree leaves STARTED and
+    // END_OF_DATA pending against memory that is no longer a clip.
+    #[futures_test::test]
+    async fn freed_clip_gets_no_callback_test() {
+        let mut context = context();
+        let clip = clip_lasting(&mut context, 500).await;
+
+        play(&mut context, clip, 0).await.unwrap();
+        clip_free(&mut context, clip).await.unwrap();
+        run_spawned(&mut context).await;
+        run_timers(&mut context).await;
+
+        assert!(context.call_args.is_empty());
     }
 }
