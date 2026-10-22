@@ -86,8 +86,10 @@ struct MdaClip {
     generation: u32,
     /// Nonzero from a play until its END_OF_DATA or a stop.
     sounding: u32,
-    /// Nonzero from a play until its STARTED callback returns.
+    /// Nonzero from a play until its STARTED callback returns, or new data replaces what it plays.
     starting: u32,
+    /// The last play's `repeat != 0`.
+    repeat: u32,
 }
 
 impl MdaClip {
@@ -187,6 +189,8 @@ pub async fn clip_put_data(context: &mut dyn WIPICContext, ptr_clip: WIPICWord, 
     let mut clip: MdaClip = read_generic(context, ptr_clip)?;
     clip.handle = handle;
     clip.loaded = 1;
+    // A play of the new data is not a replay of the pending one (`play`'s guard).
+    clip.starting = 0;
     write_generic(context, ptr_clip, clip)?;
     clip.apply_volume(context);
 
@@ -265,7 +269,8 @@ pub async fn play(context: &mut dyn WIPICContext, ptr_clip: WIPICWord, repeat: W
     // "Playing a clip that is playing does nothing" (same javadoc). Held only while its STARTED is
     // pending, where a callback that answers STARTED with MC_mdaPlay would restart the song and
     // queue another STARTED forever; anywhere else a replay still restarts the sound, as it always did.
-    if clip.starting != 0 && clip.sounding != 0 {
+    // Only the same play — same data, same repeat: new data or another repeat is a different play.
+    if clip.starting != 0 && clip.sounding != 0 && clip.repeat == (repeat != 0) as u32 {
         tracing::debug!("MC_mdaPlay({ptr_clip:#x}): STARTED not yet delivered, ignored");
         return Ok(0);
     }
@@ -277,6 +282,7 @@ pub async fn play(context: &mut dyn WIPICContext, ptr_clip: WIPICWord, repeat: W
 
     clip.generation = clip.generation.wrapping_add(1);
     clip.sounding = 1;
+    clip.repeat = (repeat != 0) as u32;
     if clip.callback != 0 {
         clip.starting = 1;
     }
@@ -359,8 +365,10 @@ impl MethodBody<WieError> for ClipStatusCallback {
         tracing::debug!("MC_mda clip callback {:#x}({:#x}, {})", self.callback, self.clip, self.status);
         context.call_function(self.callback, &[self.clip, self.status]).await?;
 
+        // A stop and play inside the callback queued a new STARTED; its guard is not ours to lift.
         if self.status == MC_MDA_STATUS_STARTED
             && let Some(mut clip) = self.live(context)?
+            && clip.generation == self.generation
         {
             clip.starting = 0;
             write_generic(context, self.clip, clip)?;
@@ -657,6 +665,53 @@ mod tests {
         play(&mut context, clip, 0).await.unwrap();
 
         assert_eq!(context.spawned.len(), 3);
+    }
+
+    // The guard holds a replay of the play whose STARTED is pending, not any play: new data put in
+    // that window is a new sound, so the play after it starts — and sends its own STARTED.
+    #[futures_test::test]
+    async fn play_after_new_data_while_started_pending_starts_test() {
+        let mut context = context();
+        let clip = clip_lasting(&mut context, 500).await;
+
+        play(&mut context, clip, 0).await.unwrap();
+        clip_put_data(&mut context, clip, 0x1000, 0).await.unwrap();
+        play(&mut context, clip, 0).await.unwrap();
+
+        assert_eq!(context.spawned.len(), 2);
+    }
+
+    // Same window, a repeat request on a one-shot play: it is a different play, so it restarts as a
+    // repeat and the one-shot's END_OF_DATA is void.
+    #[futures_test::test]
+    async fn play_with_other_repeat_while_started_pending_starts_test() {
+        let mut context = context();
+        let clip = clip_lasting(&mut context, 500).await;
+
+        play(&mut context, clip, 0).await.unwrap();
+        play(&mut context, clip, 1).await.unwrap();
+        run_spawned(&mut context).await;
+        run_timers(&mut context).await;
+
+        assert_eq!(statuses(&mut context), [2, 2], "two STARTED, no END_OF_DATA");
+    }
+
+    // A callback that stops and replays inside STARTED queues a new STARTED; the old one's return
+    // must not lift the guard that the new one holds.
+    #[futures_test::test]
+    async fn old_started_return_keeps_the_new_plays_guard_test() {
+        let mut context = context();
+        let clip = clip_lasting(&mut context, 500).await;
+
+        play(&mut context, clip, 0).await.unwrap();
+        // what the callback does, while the first STARTED is being delivered
+        stop(&mut context, clip).await.unwrap();
+        play(&mut context, clip, 0).await.unwrap();
+        let old_started = context.spawned.remove(0);
+        old_started.call(&mut context, Box::new([])).await.unwrap();
+
+        play(&mut context, clip, 0).await.unwrap();
+        assert_eq!(context.spawned.len(), 2, "STOPPED and the new STARTED only");
     }
 
     // A freed clip hears nothing more: MC_mdaPlay then MC_mdaClipFree leaves STARTED and
