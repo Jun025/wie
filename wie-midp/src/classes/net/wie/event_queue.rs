@@ -610,6 +610,78 @@ mod test {
         Ok((at_before, completed.load(Ordering::SeqCst)))
     }
 
+    // `Pacing::due` after one tick of a fresh `System` whose task `guest` runs on a clock held at 0:
+    // what `AchievedSpeed` (wie-backend speed_clock.rs) reads to tell a guest that has work due from
+    // one waiting for a key. `guest` gets the system and, for a JVM guest, a JVM to call into.
+    fn due_after_a_tick<F, Fut>(guest: F) -> Result<Option<u64>>
+    where
+        F: FnOnce(System, Jvm) -> Fut + Send + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        let clock = TestClock::new();
+        let mut system = System::new(Box::new(TestPlatform::with_clock(clock)), "", "", DefaultTaskRunner);
+        let system_task = system.clone();
+        system.spawn(async move || {
+            let jvm = JvmSupport::new_jvm(&system_task, None, Box::new([get_protos().into()]), &[], RustJavaJvmImplementation).await?;
+            guest(system_task, jvm).await;
+            Ok(())
+        });
+        system.tick()?;
+        let due = system.pacing().due().map(|x| x.raw());
+        Ok(due)
+    }
+
+    async fn get_next_event(jvm: Jvm) {
+        let queue = jvm
+            .invoke_static("net/wie/EventQueue", "getEventQueue", "()Lnet/wie/EventQueue;", ())
+            .await
+            .unwrap();
+        let event = jvm.instantiate_array("I", 4).await.unwrap();
+        let _: () = jvm
+            .invoke_virtual(&queue, "net/wie/EventQueue", "getNextEvent", "([I)V", (event,))
+            .await
+            .unwrap();
+    }
+
+    #[test]
+    fn a_tick_reports_a_sleeping_guest_s_wake_as_due_and_a_poll_as_nothing() -> Result<()> {
+        assert_eq!(due_after_a_tick(|system, _| async move { system.sleep(10).await })?, Some(10));
+        // A 1ms sleep is a poll (`POLL_SLEEP_MS`): it says when the guest looks again, not that it has
+        // work then. Counted, every guest that polls would read as running late on any host.
+        assert_eq!(
+            due_after_a_tick(|system, _| async move {
+                loop {
+                    system.sleep(1).await
+                }
+            })?,
+            None
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_guest_waiting_for_a_key_has_nothing_due() -> Result<()> {
+        // getNextEvent on an empty queue waits a 16ms slice in 1ms polls: nothing is due, so a slow
+        // host does not make a menu waiting for a key read as running late.
+        assert_eq!(due_after_a_tick(|_, jvm| get_next_event(jvm))?, None);
+        Ok(())
+    }
+
+    #[test]
+    fn a_held_back_timer_is_due_though_the_event_loop_only_polls_for_it() -> Result<()> {
+        // A timer that may not keep a tick alive (`Event::guest_timer`'s `pace_from` — here never) is
+        // waited for in 1ms polls, which the executor does not count; only the event loop knows the
+        // guest has work at 30.
+        let due = due_after_a_tick(|system, jvm| async move {
+            system
+                .event_queue()
+                .push(Event::guest_timer(Instant::from_epoch_millis(30), u64::MAX, || async { Ok(()) }));
+            get_next_event(jvm).await
+        })?;
+        assert_eq!(due, Some(30));
+        Ok(())
+    }
+
     #[test]
     fn timer_due_mid_slice_fires_without_waiting_for_the_whole_slice() -> Result<()> {
         // A KTF clet paces its game loop with MC_knlSetTimer. With a flat 16ms sleep a timer due

@@ -40,7 +40,9 @@ fn field(json: &str, key: &str) -> u64 {
     tail[..tail.find([',', '}']).unwrap()].parse().unwrap_or(u64::MAX)
 }
 
-fn run_pace_fixture() -> Result<String> {
+// The fixture on a stepping clock, past its warm-up: the emulator, the clock, and one host tick that
+// answers a redraw request the way wie_validate's loop does.
+fn boot_pace_fixture() -> Result<(J2MEEmulator, TestClock, impl Fn(&mut J2MEEmulator) -> Result<()>)> {
     let clock = TestClock::stepping(1);
     let platform = TestPlatform::with_clock(clock.clone());
     let redraw = platform.redraw_flag();
@@ -51,7 +53,7 @@ fn run_pace_fixture() -> Result<String> {
         .clone();
     let mut emulator = J2MEEmulator::from_jar(Box::new(platform), "pace_j2me.jar", jar)?;
 
-    let tick = |emulator: &mut J2MEEmulator| -> Result<()> {
+    let tick = move |emulator: &mut J2MEEmulator| -> Result<()> {
         emulator.tick()?;
         // wie_validate's host loop: answer a host redraw request with the event.
         if redraw.swap(false, Ordering::SeqCst) {
@@ -59,11 +61,16 @@ fn run_pace_fixture() -> Result<String> {
         }
         Ok(())
     };
-    let now = || clock.peek();
-    while now() < WARMUP_MS {
+    while clock.peek() < WARMUP_MS {
         tick(&mut emulator)?;
     }
     emulator.take_pacing();
+    Ok((emulator, clock, tick))
+}
+
+fn run_pace_fixture() -> Result<String> {
+    let (mut emulator, clock, tick) = boot_pace_fixture()?;
+    let now = || clock.peek();
     let from = now();
     while now() < from + WINDOW_MS {
         tick(&mut emulator)?;
@@ -110,6 +117,42 @@ fn a_deadline_game_loop_runs_at_the_period_it_asks_for() -> Result<()> {
     assert!(
         gcs * 10 <= paints,
         "{gcs} GCs over {paints} paints — a collection per paint is #338's other half: {pacing}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_tick_that_ends_on_a_guest_sleep_reports_its_wake_as_due() -> Result<()> {
+    // `AchievedSpeed` (wie-backend speed_clock.rs) reads `Pacing::due` to tell a light game on a slow
+    // host — its wake passes before the next tick — from one waiting for a key. The fixture sleeps
+    // to a 50ms deadline, and its MIDP event thread meanwhile polls the queue every 1ms: the wake is
+    // the due, the polls are not (a poll would put the due 1ms ahead, and every tick would read late).
+    let (mut emulator, clock, tick) = boot_pace_fixture()?;
+    let (mut ticks, mut leads) = (0u64, Vec::new());
+    let from = clock.peek();
+    while clock.peek() < from + WINDOW_MS {
+        tick(&mut emulator)?;
+        ticks += 1;
+        let now = clock.peek();
+        if let Some(due) = emulator.take_pacing().due() {
+            leads.push(due.raw() as i64 - now as i64);
+        }
+    }
+    leads.sort();
+    // Measured on this tree: all 600 ticks report a due, 1..=35ms ahead, 400 of them past a 16ms
+    // host frame (a 39ms sleep spans three 16ms ticks). A tick that drops the executor's wake
+    // reports none; one that counts the 1ms polls reports every due 1ms ahead.
+    let frames = WINDOW_MS / PERIOD_MS;
+    let far = leads.iter().filter(|&&x| x > 16).count() as u64;
+    assert!(
+        far >= frames,
+        "{far} ticks (of {ticks}, {} with a due) saw the guest's wake past a host frame over {frames} frames — \
+         the due is no longer the sleep's wake (dropped, or a 1ms poll in its place): {leads:?}",
+        leads.len()
+    );
+    assert!(
+        leads.iter().all(|&x| (1..=PERIOD_MS as i64).contains(&x)),
+        "a due is the guest's next wake, within its {PERIOD_MS}ms period and not in the past: {leads:?}"
     );
     Ok(())
 }

@@ -72,6 +72,12 @@ impl SpeedClock {
         state.speed
     }
 
+    /// The wall time of guest time `guest`, seen from wall time `wall_ms`: guest time runs `speed`
+    /// times as fast, so guest work due 100ms ahead at 2x is 50 wall ms ahead.
+    pub fn wall_at(&self, wall_ms: f64, guest: Instant) -> f64 {
+        wall_ms + (guest.raw() as f64 - self.now(wall_ms).raw() as f64) / self.speed()
+    }
+
     /// A tick budget of `wall_ms` wall-clock milliseconds, in guest milliseconds: the executor
     /// measures its budget on the guest clock, so without this a 2x tick would end after half
     /// of the host frame and the game would not get faster.
@@ -287,6 +293,17 @@ mod tests {
         assert_eq!(clock.now(1300.0).raw(), 1000 + 100 + 200 + 150);
     }
 
+    #[test]
+    fn a_guest_due_is_nearer_on_the_wall_clock_at_2x() {
+        // `wie_featurephone`'s `tick` converts `Pacing::due` with this; at 2x a due 100 guest ms
+        // ahead is 50 wall ms ahead, at 1x the same 100.
+        let clock = SpeedClock::new();
+        clock.set_speed(1000.0, 2.0);
+        assert_eq!(clock.wall_at(1500.0, Instant::from_epoch_millis(2100)), 1550.0);
+        clock.set_speed(1500.0, 1.0);
+        assert_eq!(clock.wall_at(1500.0, Instant::from_epoch_millis(2100)), 1600.0);
+    }
+
     struct YieldOnce(bool);
 
     impl Future for YieldOnce {
@@ -369,8 +386,7 @@ mod tests {
                 .tick_for(move || c.now(w.fetch_add(1, Ordering::SeqCst) as f64 / 10.0), clock.budget(14))
                 .unwrap();
             let end = wall.load(Ordering::SeqCst) as f64 / 10.0;
-            let guest_end = clock.now(end).raw() as f64;
-            let due = executor.next_due().map(|due| end + (due.raw() as f64 - guest_end) / speed);
+            let due = executor.next_due().map(|due| clock.wall_at(end, due));
             achieved.tick(frame as f64 / 10.0, end, 14.0, executor.wants_cpu(), due);
             frame += (frame_ms * 10.0) as u64;
         }

@@ -219,9 +219,8 @@ impl WieEmulator {
         self.pacer.end(end as u64);
         // Taken every tick, so the window is this tick; nothing else here reads the pacing counters.
         let pacing = self.inner.take_pacing();
-        // The guest's next due work, guest clock -> wall clock: guest time runs `speed` times as fast.
-        let guest_end = self.clock.now(end).raw() as f64;
-        let due = pacing.due().map(|due| end + (due.raw() as f64 - guest_end) / self.clock.speed());
+        // The guest's next due work, on the wall clock.
+        let due = pacing.due().map(|due| self.clock.wall_at(end, due));
         self.achieved.tick(begin, end, budget as f64, pacing.starved_ticks() > 0, due);
         result.map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
         if self.redraw.swap(false, Ordering::AcqRel) {
