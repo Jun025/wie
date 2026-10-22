@@ -87,7 +87,7 @@ fb80e97cbc57,SKT,playable,stuck,d,confirm-only-entry,issue,a-below,0502,7ca47380
 66959afab216,SKT,playable,stuck,d,confirm-only-entry,none,a-below,0502,7ca47380,entry needs only the confirm key (criterion 2)
 d1dce4a36141,SKT,playable,stuck,b,tip,tip,a-tip,0469,f5c02609,tip already shipped
 ec2f8f2e02a2,SKT,playable,stuck,b,tip,tip,a-tip,0502,7ca47380,tip already shipped
-c361632541a7,SKT,playable,stuck,a,A3 SKT dialog stall after menu (cause unknown),issue,b-engine,0512/0525,a90f1472,display fixed 0512; 150 s probe on this pin: 0 exceptions (was 2493); P/P2 stall on the menu dialog from ~160 s (0512); cause not measured
+c361632541a7,SKT,playable,ok,b,A3 resolved 0528: day-end menu needs its 5th item (game design not engine),tip,b-engine,0512/0525/0528,6bbbbf94,display fixed 0512; 0528: the 160 s screen is the day-end menu (5 items · only the 5th starts the next day) and its menu-develop sub-screen leaves only on CLR with the cursor reset to 0 so policy OK re-enters it; recipe CLR CLR UP OK P/P2 600 s both ok (stall 0/0 · 60 new frames each · date 3/04 to 3/05 by eye)
 bf54c05e58a9,SKT,playable,stuck,d,confirm-only-entry,none,a-below,0502,7ca47380,entry needs only the confirm key (criterion 2)
 52edc54e2b23,SKT,playable,stuck,d,confirm-only-entry,none,a-below,0502,7ca47380,entry needs only the confirm key (criterion 2)
 2f5246006bd8,SKT,playable,stuck,b,tip,tip,a-tip,0502,7ca47380,tip already shipped

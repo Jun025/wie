@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-22",
+  "task": "wie-perf-regression-bisect-7ca47380-to-a90f1472",
+  "title": "10-09 이후 속도 하락 귀속 — 네이티브는 wie_validate 시계(#527) · 브라우저는 타이머 거절(#553)",
+  "summary": "7ca47380..a90f1472 에서 네이티브 50M tick 당 CPU +27% 는 d92edc49(#527) 1커밋이 +25.7% 를 낸다 — 엔진이 아니라 측정 하네스 wie_validate 의 now()/budget() 가 SpeedClock 잠금을 거치게 된 몫이다. 브라우저 3cc7a9b4cb15 paints 400 → 285 는 9640c156(#553) 의 대기 중 타이머 재Set 거절이 낸다 — 0521 이 이미 충실도 교정으로 판정했다. 둘 다 고칠 것 없음.",
+  "report": "docs/report/0529--2026-10-22--wie-perf-regression-bisect-7ca47380-to-a90f1472.md",
+  "adoptedProposals": ["2026-10-22-weekly-perf-regression-axis#p0"],
+  "proposals": []
+}

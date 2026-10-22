@@ -1,0 +1,37 @@
+sha12,platform,status,sound_before,sound_after,speed_before,speed_after,class,disposition,evidence,ratio_this_round,load1
+55aadf368b8e,KTF,playable,ok,ok,unknown,unknown,미측정(속도 · 대기 없음),유지,창 안 sleep·타이머 0 — 비율의 분모가 없어 이 도구로는 원리상 못 잰다(0516 N),,176
+4a7e489bf6ab,KTF,playable,ok,ok,unknown,unknown,미측정(속도 · 대기 없음),유지,창 안 sleep·타이머 0 — 비율의 분모가 없어 이 도구로는 원리상 못 잰다(0516 N),,167
+f44271803135,KTF,limited,no,no,ok,ok,원래 소리 없음(닿는 화면),서버 벽,통신망 벽(net 821/30초) · 재생 0,0.880,91
+6103e87874c6,KTF,playable,ok,ok,unknown,unknown,미측정(속도 · 대기 없음),유지,창 안 sleep·타이머 0 — 비율의 분모가 없어 이 도구로는 원리상 못 잰다(0516 N),,184
+5aa438fbdc87,KTF,playable,no,ok,ok,ok,기기 설정(동봉 소리 끔),엔진 고침(이 PR),op_save.db 첫 바이트 0→3 · 파일째 빼면 스스로 종료(0440) · 짝 90초 재생 0→5,0.925,176
+7f73422ba19b,KTF,playable,ok,ok,unknown,unknown,미측정(속도 · 대기 없음),유지,창 안 sleep·타이머 0 — 비율의 분모가 없어 이 도구로는 원리상 못 잰다(0516 N),,143
+2cbd63e4427a,KTF,playable,ok,ok,unknown,unknown,미측정(속도 · 대기 없음),유지,창 안 sleep·타이머 0 — 비율의 분모가 없어 이 도구로는 원리상 못 잰다(0516 N),,152
+6c9f969f089f,KTF,playable,no,ok,ok,ok,기기 설정(동봉 소리 끔),엔진 고침(이 PR),personal_data +4 int 1→0 · 파일째 빼면 화면 멈춤(0440·0517) · 짝 90초 재생 0→3,0.860,160
+689c491586b9,KTF,playable,no,no,unknown,unknown,원래 소리 없음(닿는 화면),안내 유지,서버 접속 실패 뒤 종료 · 매체 호출 0(0517),,187
+1b3b4868d46e,KTF,playable,ok,ok,unknown,unknown,미측정(속도 · 대기 없음),유지,창 안 sleep·타이머 0 — 비율의 분모가 없어 이 도구로는 원리상 못 잰다(0516 N),,137
+0eb19d9bbe7a,KTF,playable,ok,ok,unknown,unknown,미측정(속도 · 대기 없음),유지,창 안 sleep·타이머 0 — 비율의 분모가 없어 이 도구로는 원리상 못 잰다(0516 N),,122
+d5e996a53118,KTF,playable,ok,ok,unknown,unknown,미측정(속도 · 헤드리스만),후속,5 ms 타이머 · 헤드리스 0.78(0516)·0.35(이 회차 load1 84) · 브라우저 짝 없음,0.347,84
+dab2d537f3ef,KTF,not-yet,unknown,unknown,unknown,unknown,미측정(암호 파일),정책,OMA DRM 컨테이너 · 부팅 안 됨(0330),,96
+60bd6cbc5936,KTF,not-yet,unknown,unknown,unknown,unknown,미측정(암호 파일),정책,같음,,170
+ea35907b22a4,KTF,playable,ok,ok,unknown,unknown,미측정(속도 · 대기 없음),유지,창 안 sleep·타이머 0 — 비율의 분모가 없어 이 도구로는 원리상 못 잰다(0516 N),,87
+86132b2ed76f,KTF,playable,ok,ok,unknown,unknown,미측정(속도 · 대기 없음),유지,창 안 sleep·타이머 0 — 비율의 분모가 없어 이 도구로는 원리상 못 잰다(0516 N),,143
+01f05f8231f4,LGT,not-yet,unknown,unknown,unknown,unknown,미측정(잠긴 파일),정책,부팅 안 됨(그림 0),,122
+9acb5e0387eb,LGT,playable,ok,ok,unknown,no,속도 느림 확정,브라우저 짝,브라우저 2회 0.50·0.50(0518) · 원인 = 게임 자체 그리기 × ARM 해석 처리량,0.854,86
+61ed69520fd3,LGT,playable,ok,ok,unknown,unknown,미측정(속도 · 대기 없음),유지,창 안 sleep·타이머 0 — 비율의 분모가 없어 이 도구로는 원리상 못 잰다(0516 N),,187
+c33090c12755,SKT,not-yet,no,no,unknown,unknown,미측정(잠긴 파일),정책,구매 단말 잠금 · 그림 0 · 스스로 종료 — 소리 no 는 거부 경로의 측정,,129
+fb80e97cbc57,SKT,playable,no,no,ok,ok,기기 설정(동봉 소리 끔),안내 유지,ds2.opt 첫 바이트 0(1 이면 재생 31 · 0517) · SKT 는 동봉 파일 처분 장치가 없다,0.927,109
+c361632541a7,SKT,playable,no,no,ok,ok,기기 설정(동봉 소리 끔),엔진이 고칠 수 있음(후속),pnjrestop 빼면 재생 10(0440),0.987,123
+f81658d4ad1a,SKT,playable,ok,ok,unknown,unknown,미측정(속도 · 대기 없음),유지,창 안 sleep·타이머 0 — 비율의 분모가 없어 이 도구로는 원리상 못 잰다(0516 N),,107
+a42f77f44955,SKT,not-yet,no,no,unknown,unknown,미측정(잠긴 파일),정책,같음,1.000,130
+44b6356d13f8,SKT,not-yet,ok,ok,unknown,unknown,미측정(잠긴 파일),정책,구매 단말 잠금 · 시작 직후 종료 — 속도 창 없음,,152
+ca1132f2e7bc,SKT,playable,ok,ok,unknown,unknown,미측정(속도 · 대기 없음),유지,창 안 sleep·타이머 0 — 비율의 분모가 없어 이 도구로는 원리상 못 잰다(0516 N),,106
+7089dec0e8df,SKT,playable,no,no,unknown,unknown,기기 설정(동봉 소리 끔),엔진이 고칠 수 있음(후속),slot3.sav 빼면 재생 3(0440),,160
+38277d63b0ba,SKT,playable,ok,ok,unknown,unknown,미측정(속도 · 대기 없음),유지,창 안 sleep·타이머 0 — 비율의 분모가 없어 이 도구로는 원리상 못 잰다(0516 N),,152
+abc0c5789259,SKT,playable,no,no,ok,ok,기기 설정(동봉 소리 끔),엔진이 고칠 수 있음(후속),Rms 빼면 재생 2(0440),0.976,131
+f483ba078c14,SKT,playable,no,no,ok,ok,기기 설정(동봉 소리 끔),안내 유지,option 첫 바이트 3=끔(0388 javap) · SKT 처분 장치 없음,0.753,103
+6e93f26fa2f5,SKT,playable,no,no,ok,ok,기기 설정(동봉 소리 끔),엔진이 고칠 수 있음(후속),data.sav(진도 섞임) 빼면 재생 1(0440) · 진도가 같이 사라지는 대가,0.508,160
+71d1d8235bd1,SKT,playable,ok,ok,unknown,unknown,미측정(속도 · 주 루프 아님),유지,sleep 이 프레임 대기가 아니다(0516 W) · 0.79,0.794,92
+0ed66634d3dc,SKT,not-yet,no,no,unknown,unknown,미측정(잠긴 파일),정책,같음,,88
+640428a9cf9e,SKT,limited,no,no,ok,ok,원래 소리 없음(닿는 화면),서버 벽,«필수 데이터 전송» → 통신망(0440) · 재생 0,0.575,187
+ccb45e6b8d80,SKT,playable,no,no,ok,ok,기기 설정(동봉 소리 끔),안내 유지,sc.txt bp=0(1 이면 재생 5 · 0517) · SKT 처분 장치 없음,0.928,106
+eefc947d8337,SKT,not-yet,no,no,unknown,unknown,미측정(잠긴 파일),정책,같음,,97

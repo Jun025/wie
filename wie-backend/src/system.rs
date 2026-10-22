@@ -85,7 +85,7 @@ impl System {
         let platform = self.platform.clone();
         let result = self.executor.tick_for(move || platform.now(), budget_ms);
         self.flush_redraw();
-        self.pacing.lock().tick_ended();
+        self.pacing.lock().tick_ended(self.executor.wants_cpu());
         result
     }
 

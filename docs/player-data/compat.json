@@ -2351,13 +2351,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "stuck"
    },
-   "knownIssues_ko": [
-    "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
-   ],
+   "knownIssues_ko": [],
    "playTips_ko": [
     "처음 화면에서 확인 키를 계속 눌러 이야기를 넘기면 마을에서 방향키로 걸어 다닐 수 있어요."
    ],
@@ -2804,13 +2802,11 @@
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
-    "sound": "no",
+    "sound": "ok",
     "speed": "ok",
     "progress": "ok"
    },
-   "knownIssues_ko": [
-    "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "심시티 2억에디트1"
   },
@@ -5578,10 +5574,12 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown",
+    "speed": "no",
     "progress": "stuck"
    },
-   "knownIssues_ko": [],
+   "knownIssues_ko": [
+    "키를 눌러 게임이 시작된 뒤에는 원래 속도의 절반쯤으로 느리게 움직여요."
+   ],
    "playTips_ko": [
     "첫 화면에서 확인 키로 «이어하기»와 저장 칸을 고르면 바로 시작하고, 방향키로 움직이며 확인 키로 공격하면 돼요."
    ],
@@ -7154,10 +7152,13 @@
     "longplay": "ok",
     "sound": "no",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [
     "게임 파일에 소리를 끈 설정이 들어 있어요. 게임 안 설정에서 소리를 켜면 들려요."
+   ],
+   "playTips_ko": [
+    "하루 영업이 끝나고 다섯 칸 메뉴가 나오면 위아래 방향키로 맨 아래 «다음날로» 칸에 커서를 옮긴 뒤 확인 키를 누르면 다음 날 영업이 시작돼요. «메뉴개발» 화면에 들어갔다면 CLR 키로 나올 수 있어요. 네 칸 메뉴가 나오는 모드는 아직 확인하지 않았어요."
    ],
    "changes": [],
    "fileTitle": "레스토랑타이쿤2006"

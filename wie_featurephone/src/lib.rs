@@ -28,7 +28,7 @@ use js_sys::{Object, Reflect, Uint8Array};
 use wasm_bindgen::prelude::*;
 use web_sys::{AudioContext, GainNode, HtmlCanvasElement};
 
-use wie_backend::{Emulator, Event, FramePacer, KeyCode, Options, SpeedClock, extract_zip};
+use wie_backend::{AchievedSpeed, Emulator, Event, FramePacer, KeyCode, Options, SpeedClock, extract_zip};
 use wie_j2me::J2MEEmulator;
 use wie_ktf::KtfEmulator;
 use wie_lgt::{LgtEmulator, detect_compile_model};
@@ -66,6 +66,8 @@ pub struct WieEmulator {
     lgt_compile_model: Option<&'static str>,
     // Play speed: the guest clock `WebPlatform::now` reads (see `set_speed`).
     clock: Arc<SpeedClock>,
+    // What `speed` actually comes to on this device (see `achieved_speed`).
+    achieved: AchievedSpeed,
 }
 
 #[wasm_bindgen]
@@ -159,6 +161,7 @@ impl WieEmulator {
             lgt_compile_model,
             pacer: FramePacer::new(),
             clock,
+            achieved: AchievedSpeed::default(),
         })
     }
 
@@ -209,9 +212,13 @@ impl WieEmulator {
         }
         // The pacer works in wall time; the executor measures its budget on the guest clock, which
         // runs `speed` times as fast, so the same wall-clock slice is `speed` times the guest budget.
-        let budget = self.pacer.begin(js_sys::Date::now() as u64);
+        let begin = js_sys::Date::now();
+        let budget = self.pacer.begin(begin as u64);
         let result = self.inner.tick_for(self.clock.budget(budget));
-        self.pacer.end(js_sys::Date::now() as u64);
+        let end = js_sys::Date::now();
+        self.pacer.end(end as u64);
+        // Taken every tick, so the window is this tick; nothing else here reads the pacing counters.
+        self.achieved.tick(begin, end, self.inner.take_pacing().starved_ticks() > 0);
         result.map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
         if self.redraw.swap(false, Ordering::AcqRel) {
             self.inner.handle_event(Event::Redraw);
@@ -226,12 +233,20 @@ impl WieEmulator {
     /// tick still takes the same wall-clock slice of the frame, so where the CPU cannot keep up the
     /// game runs as fast as it can. Audio pitch and tempo are not changed.
     pub fn set_speed(&mut self, speed: f64) -> f64 {
+        self.achieved.reset();
         self.clock.set_speed(js_sys::Date::now(), speed)
     }
 
     /// The current play speed (1.0 until `set_speed` is called).
     pub fn speed(&self) -> f64 {
         self.clock.speed()
+    }
+
+    /// The play speed actually achieved over the last 2s; at most `speed()`. See `AchievedSpeed`.
+    // Kept to one line: wasm-bindgen copies this comment into wie_web.js, which has a byte budget
+    // (contract `artifacts.maxBytes`). The definition and its floor are on `wie_backend::AchievedSpeed`.
+    pub fn achieved_speed(&self) -> f64 {
+        self.achieved.get(self.clock.speed())
     }
 
     /// True once the emulator core requested a NORMAL shutdown (the
