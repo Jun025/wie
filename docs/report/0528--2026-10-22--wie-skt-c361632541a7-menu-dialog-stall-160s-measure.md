@@ -82,8 +82,15 @@
 엔진 코드 변경은 0 이다. 바뀐 것은 compat 1행 · census 손 표 1줄 · 원장 1행 · 문서다. 그래서 «되돌리면 red» 대조는 해당 없다.
 - `cargo fmt --all -- --check` rc=0 · `cargo clippy --all -- -D warnings` rc=0 · `cargo clippy --target wasm32-unknown-unknown -- -D warnings` rc=0 · `cargo +beta clippy --all -- -D warnings` rc=0(build-slot).
 - `RUST_MIN_STACK=4194304 cargo test --all` **784 passed / 0 failed**(build-slot).
-- `node scripts/player-data.mjs` · `node scripts/check-compat-revert.mjs` · census `selftest` · `check-worklog-json` · `npm run audit` 은 PR 본문에 값을 적는다.
+- `node scripts/player-data.mjs` OK(429 · 168 updates) · `check-compat-revert` OK(착지 기준 바뀐 행 1) · census `selftest` 65/65 · `check-worklog-json` OK · `check-docs-report-serial` OK · `npm run audit` PASSED.
 
 ### 8. 후속
 
 - 제안 0. 정책 키에 «메뉴 끝 칸 고르기» 탈출을 넣는 것은 관측 1종이라 문턱(관측 · 지금 실행 가능 · 중복 아님) 중 «관측»이 한 종뿐이다. 다른 게임에서 같은 꼴이 나오면 그때 근거가 된다.
+
+### 9. 게임 이름 유입
+
+`node scripts/corpus-name-inflow.mjs`(이 브랜치 · 6파일): BOUNDED 718회/330쌍 · SUFFIX-ATTACHED 37회/17쌍.
+- BOUNDED 는 전부 `compat.json` 의 기존 `title`·`fileTitle` 이다. 이 회차는 그 값을 바꾸지 않았다(파일 단위로 세므로 전체가 잡힌다 · 0507 §9 와 같다).
+- SUFFIX-ATTACHED 는 `compat.json` 기존 title 과, census 의 기존 요령 문장 안 화면 메뉴 글자 «턴종료» 1쌍이다(제목이 아니다).
+- 이 회차가 더한 줄(요령 · 문서 · 소식 · 원장 · worklog)은 sha12 와 화면 메뉴 글자(«메뉴개발» · «다음날로»)만 쓴다.
