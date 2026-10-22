@@ -11,6 +11,8 @@
 //!   and `redraw_cross_tick`, how many of those paints started in a later host tick than their
 //!   request. That count is host-speed independent: #338's shape is every paint crossing a tick.
 //! - `gcs` per `paints`: a full collection per paint was the other half of #338.
+//! - `starved_ticks` host ticks that ended on their budget with the guest still wanting CPU
+//!   (`Executor::wants_cpu`) — what `AchievedSpeed` reads.
 
 use alloc::{format, string::String, vec::Vec};
 
@@ -59,11 +61,13 @@ pub struct Pacing {
     paints: u64,
     gcs: u64,
     gc_ms: u64,
+    starved_ticks: u64,
 }
 
 impl Pacing {
-    pub(crate) fn tick_ended(&mut self) {
+    pub(crate) fn tick_ended(&mut self, starved: bool) {
         self.ticks += 1;
+        self.starved_ticks += u64::from(starved);
     }
 
     pub fn guest_yielded(&mut self) {
@@ -82,6 +86,11 @@ impl Pacing {
     /// Host ticks so far — which tick this is.
     pub fn ticks(&self) -> u64 {
         self.ticks
+    }
+
+    /// Ticks in this window that ended with the guest still wanting CPU (module doc).
+    pub fn starved_ticks(&self) -> u64 {
+        self.starved_ticks
     }
 
     pub fn redraw_requested(&mut self, now: Instant) {
@@ -125,7 +134,7 @@ impl Pacing {
              \"sleep_late_p50\":{},\"sleep_late_p95\":{},\"sleep_late_sum\":{},\
              \"timers\":{},\"timer_late_p50\":{},\"timer_late_p95\":{},\"timer_late_sum\":{},\
              \"redraws\":{},\"redraw_p50\":{},\"redraw_p95\":{},\"redraw_sum\":{},\"redraw_cross_tick\":{},\
-             \"paints\":{},\"gcs\":{},\"gc_ms\":{}}}",
+             \"paints\":{},\"gcs\":{},\"gc_ms\":{},\"starved_ticks\":{}}}",
             self.ticks,
             self.yields,
             self.sleep_ms.count,
@@ -147,6 +156,7 @@ impl Pacing {
             self.paints,
             self.gcs,
             self.gc_ms,
+            self.starved_ticks,
         )
     }
 }
@@ -163,7 +173,7 @@ mod tests {
         pacing.redraw_requested(Instant::from_epoch_millis(12)); // coalesced into the first
         pacing.paint_started(Instant::from_epoch_millis(13));
         pacing.redraw_requested(Instant::from_epoch_millis(20));
-        pacing.tick_ended();
+        pacing.tick_ended(false);
         pacing.paint_started(Instant::from_epoch_millis(36));
         pacing.paint_started(Instant::from_epoch_millis(40)); // no request: a paint, not a redraw
 

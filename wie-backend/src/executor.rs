@@ -1,9 +1,9 @@
-use alloc::{boxed::Box, collections::BTreeMap, sync::Arc};
+use alloc::{boxed::Box, collections::BTreeMap, sync::Arc, task::Wake};
 use core::{
     future::Future,
     pin::Pin,
     sync::atomic::{AtomicBool, Ordering},
-    task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
+    task::{Context, Poll, Waker},
 };
 
 use spin::Mutex;
@@ -79,6 +79,24 @@ pub struct Executor {
     // per `tick_for` iteration and once per task in `step`, and it only ever goes false -> true:
     // taking the lock for it cost +3~4% CPU per tick (docs/report/0500).
     halted: Arc<AtomicBool>,
+    // Set when a task polled in the current step asks to be polled again (`wants_cpu`).
+    woken: Arc<Woken>,
+}
+
+// The waker every task is polled with. Polling does not depend on it — every pending task is polled
+// each step — but who calls it tells a task that wants to run (`YieldFuture`, which the ARM core and
+// the JVM interpreter await between slices) from one parked on something (a JVM monitor `wait`, a
+// sleep), which is the difference `wants_cpu` reports.
+struct Woken(AtomicBool);
+
+impl Wake for Woken {
+    fn wake(self: Arc<Self>) {
+        self.wake_by_ref();
+    }
+
+    fn wake_by_ref(self: &Arc<Self>) {
+        self.0.store(true, Ordering::Relaxed);
+    }
 }
 
 impl Executor {
@@ -95,6 +113,7 @@ impl Executor {
         Self {
             inner,
             halted: Arc::new(AtomicBool::new(false)),
+            woken: Arc::new(Woken(AtomicBool::new(false))),
         }
     }
 
@@ -156,6 +175,7 @@ impl Executor {
     where
         T: Fn() -> Instant,
     {
+        self.woken.0.store(false, Ordering::Relaxed);
         let end = now() + budget_ms;
         loop {
             if self.halted.load(Ordering::Relaxed) {
@@ -201,12 +221,21 @@ impl Executor {
         Ok(())
     }
 
+    /// After a tick: whether its last pass over the tasks left one asking to run again — a tick that
+    /// ended on its budget with the guest still wanting CPU. A tick that ended because every task
+    /// slept, or that only re-polled tasks parked on a monitor, reads `false`.
+    pub fn wants_cpu(&self) -> bool {
+        self.woken.0.load(Ordering::Relaxed)
+    }
+
     pub fn current_task_id(&self) -> u64 {
         self.inner.lock().current_task_id.unwrap() as _
     }
 
     fn step(&mut self, now: Instant) -> Result<()> {
         self.inner.lock().last_now = now;
+        self.woken.0.store(false, Ordering::Relaxed);
+        let waker = Waker::from(self.woken.clone());
 
         let mut next_tasks = BTreeMap::new();
         let tasks = core::mem::take(&mut self.inner.lock().tasks);
@@ -230,7 +259,6 @@ impl Executor {
                 }
             }
 
-            let waker = self.create_waker();
             let mut context = Context::from_waker(&waker);
             self.inner.lock().current_task_id = Some(task_id);
 
@@ -267,22 +295,6 @@ impl Executor {
         let until = self.inner.lock().last_now + timeout;
         let pace = pace.or((timeout > POLL_SLEEP_MS).then_some(until));
         self.inner.lock().sleeping_tasks.insert(task_id, (until, pace));
-    }
-
-    fn create_waker(&self) -> Waker {
-        unsafe fn noop_clone(_data: *const ()) -> RawWaker {
-            noop_raw_waker()
-        }
-
-        unsafe fn noop(_data: *const ()) {}
-
-        const NOOP_WAKER_VTABLE: RawWakerVTable = RawWakerVTable::new(noop_clone, noop, noop, noop);
-
-        const fn noop_raw_waker() -> RawWaker {
-            RawWaker::new(core::ptr::null(), &NOOP_WAKER_VTABLE)
-        }
-
-        unsafe { Waker::from_raw(noop_raw_waker()) }
     }
 }
 
