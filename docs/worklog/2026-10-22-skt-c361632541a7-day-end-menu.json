@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-22",
+  "task": "wie-skt-c361632541a7-menu-dialog-stall-160s-measure",
+  "title": "SKT c361632541a7 — 160초 정체는 하루 끝 메뉴(5칸 중 5번째만 다음 날) · 엔진 수정 0 · 요령 1줄",
+  "summary": "160초 화면은 하루 끝 메뉴의 «메뉴개발» 하위 화면이다. 그 화면은 CLR 로만 나오고 커서를 0 으로 되돌리므로, 정책 키의 확인 키가 다시 «메뉴개발»로 들어간다. 다음 날은 5번째 칸 «다음날로»뿐이다. 탐색 3판(정책 · CLR UP OK · CLR OK 대조) + 레시피 600초 짝 P/P2 둘 다 ok(정체 0/0). compat progress stuck → ok · playTips_ko 1줄. docs/report/0528.",
+  "proposals": [],
+  "adoptedProposals": [
+    "2026-10-22-progression-stuck-triage-wave7#p0"
+  ]
+}

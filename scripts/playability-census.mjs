@@ -827,6 +827,8 @@ const HAND_TIP = {
   d552e095ddcf: ['처음 메뉴에서 «1.게임시작»을 확인 키로 열고 아래 방향키로 «새로하기»를 고른 뒤 확인 키로 난이도를 정하고 이야기를 넘기면 집 화면에서 시작돼요.'],
   d9384b388ea5: ['문자 수신 동의 창에서 아래 방향키로 «아니오»를 고르고 «스토리모드»에서 확인 키를 누른 뒤 ＃ 키로 이야기를 넘기면 나무 마을을 방향키로 걸어 다닐 수 있어요.'],
   ed6ad7318ac9: ['처음 메뉴에서 아래 방향키로 «새로 하기»를 고르고 능력치를 확인 키로 나눈 뒤 숫자 1 키로 정하면, 숲에서 방향키로 움직이며 확인 키로 총을 쏠 수 있어요.'],
+  // docs/report/0528: the day-end menu's way forward is its 5th item, and «메뉴개발» leaves only on CLR (cursor back to 0).
+  c361632541a7: ['하루 영업이 끝나고 다섯 칸 메뉴가 나오면 위 방향키를 한 번 눌러 맨 아래 «다음날로»를 고른 뒤 확인 키를 누르면 다음 날 영업이 시작돼요. «메뉴개발» 화면에 들어갔다면 CLR 키로 나올 수 있어요.'],
 };
 
 // A row that is not playable always says why: `player-data.mjs` refuses one with no sentence (the
