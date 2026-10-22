@@ -96,7 +96,7 @@
 - `RUST_MIN_STACK=4194304 cargo test --all` **785 passed / 0 failed**(0525 의 784 + 이 회차 시험 1).
 - 러너 블록(AGENTS.md §Definition of Done): `draw_j2me.jar` · `helloworld_ktf.zip` · `helloworld_lgt.zip` PASS · `keydraw_ktf.zip` PASS rc=0(paints 79) · `keydraw_lgt.zip` PASS rc=0(paints 55) · `text_j2me.jar` PASS.
 - 프로세스: 에뮬레이터는 동시 3 이하로 돌렸다. census 는 `census-drive.sh`(long 임대 · phase 마다)로 돌렸다. 340종 스캔은 85종 묶음마다 long 임대 1건이다. 단발 탐색은 `build-slot run`(short)이다. `nohup` 은 0 이다. 회차 끝에 내 `wv_*` 프로세스는 0 이다. 이 회차 동안 load1 은 14~110 이었다.
-- 유입(`node scripts/corpus-name-inflow.mjs`): 유입 330건(BOUNDED 718회/330쌍) + 판단 필요 17건(SUFFIX-ATTACHED 37회/17쌍). 이 수는 파일 전체를 센 것이다. BOUNDED 는 모두 `compat.json` 의 기존 `title`/`fileTitle` 필드다(그 파일은 설계상 모든 제목을 담는다). SUFFIX-ATTACHED 는 그 파일의 «더 긴 다른 제목»(…2 · …3 · …1.04)과 `playability-census.mjs` 의 0507 줄 «턴종료» 다. 이 회차가 더한 줄(요령 2줄 · 회차 문서 · 이용자 소식 · worklog)의 BOUNDED 와 SUFFIX-ATTACHED 는 0 이다. 게임 화면의 안내 문구를 옮길 때 주인공 이름은 «(주인공)»으로 바꿨다.
+- 유입(`node scripts/corpus-name-inflow.mjs`): 유입 330건(BOUNDED 718회/330쌍) + 판단 필요 17건(SUFFIX-ATTACHED 37회/17쌍). 이 수는 파일 전체를 센 것이다. BOUNDED 는 모두 `compat.json` 의 기존 `title`/`fileTitle` 필드다(그 파일은 설계상 모든 제목을 담는다). SUFFIX-ATTACHED 는 그 파일의 «더 긴 다른 제목»(…2 · …3 · …1.04)과 `playability-census.mjs` 의 0507 요령 한 줄(메뉴 이름에 붙은 한 글자 stem)이다. 이 회차가 더한 줄(요령 2줄 · 회차 문서 · 이용자 소식 · worklog)의 BOUNDED 와 SUFFIX-ATTACHED 는 0 이다. 게임 화면의 안내 문구를 옮길 때 주인공 이름은 «(주인공)»으로 바꿨다.
 - 증적(화면 · 키 스크립트 · out · 스캔 표)은 저장소 밖 `~/scratch/a2wall/` 에 있다. 레시피는 비커밋 `game_lab/recipes-progress/` 다.
 
 
