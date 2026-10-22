@@ -92,7 +92,5 @@
 
 `node scripts/corpus-name-inflow.mjs`(이 브랜치 · 6파일): BOUNDED 718회/330쌍 · SUFFIX-ATTACHED 37회/17쌍.
 - BOUNDED 는 전부 `compat.json` 의 기존 `title`·`fileTitle` 이다. 이 회차는 그 값을 바꾸지 않았다(파일 단위로 세므로 전체가 잡힌다 · 0507 §9 와 같다).
-- SUFFIX-ATTACHED 는 `compat.json` 기존 title 과, census 의 기존 요령 문장 안 화면 메뉴 글자 «턴종료» 1쌍이다(제목이 아니다).
+- SUFFIX-ATTACHED 는 `compat.json` 기존 title 과, census 의 기존 요령 문장 안 화면 메뉴 글자 1쌍(0507 §9 가 적은 그것 · 제목이 아니다)이다.
 - 이 회차가 더한 줄(요령 · 문서 · 소식 · 원장 · worklog)은 sha12 와 화면 메뉴 글자(«메뉴개발» · «다음날로»)만 쓴다.
-
-<!-- corpus-name-inflow v1 subjects=6 tree=a02586d64f7bdf28 B=718/330 P=0/0 S=38/18 -->
