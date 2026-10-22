@@ -1,13 +1,13 @@
-use alloc::vec;
+use alloc::{boxed::Box, vec, vec::Vec};
 use core::sync::atomic::{AtomicI32, Ordering};
 
 use bytemuck::{Pod, Zeroable};
 
 use wipi_types::wipic::WIPICWord;
 
-use wie_util::{Result, read_generic, write_generic};
+use wie_util::{Result, WieError, read_generic, write_generic};
 
-use crate::context::WIPICContext;
+use crate::{WIPICResult, context::WIPICContext, method::MethodBody};
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -80,6 +80,8 @@ struct MdaClip {
     volume: i32,
     /// Nonzero once `MC_mdaClipPutData` gave `handle` a sound — handle 0 is a real handle.
     loaded: u32,
+    /// `MC_mdaClipCreate`'s `cb(clip, status)`; 0 = none.
+    callback: WIPICWord,
 }
 
 impl MdaClip {
@@ -107,6 +109,7 @@ pub async fn clip_create(context: &mut dyn WIPICContext, ptr_type: WIPICWord, bu
         MdaClip {
             clip_id: NEXT_CLIP_ID.fetch_add(1, Ordering::Relaxed),
             volume: 100,
+            callback,
             ..Zeroable::zeroed()
         },
     )?;
@@ -248,11 +251,37 @@ pub async fn play(context: &mut dyn WIPICContext, ptr_clip: WIPICWord, repeat: W
 
     let result = context.system().audio().play(clip.handle, repeat != 0);
 
-    if let Err(x) = result {
-        tracing::error!("Failed to load audio: {x:?}");
+    match result {
+        Err(x) => tracing::error!("Failed to load audio: {x:?}"),
+        // The clip's callback hears that the sound started, after this call returns. 87b04639cdfe
+        // (LGT, binary.mod 0x14334) takes the song's start time only in `cb(clip, STARTED)` and
+        // places its notes against it, so without the event the song played with no notes.
+        Ok(()) if clip.callback != 0 => context.spawn(Box::new(ClipStatusCallback {
+            callback: clip.callback,
+            clip: ptr_clip,
+            status: MC_MDA_STATUS_STARTED,
+        }))?,
+        Ok(()) => {}
     }
 
     Ok(0)
+}
+
+const MC_MDA_STATUS_STARTED: WIPICWord = 2;
+
+struct ClipStatusCallback {
+    callback: WIPICWord,
+    clip: WIPICWord,
+    status: WIPICWord,
+}
+
+#[async_trait::async_trait]
+impl MethodBody<WieError> for ClipStatusCallback {
+    async fn call(&self, context: &mut dyn WIPICContext, _: Box<[WIPICWord]>) -> Result<WIPICResult> {
+        context.call_function(self.callback, &[self.clip, self.status]).await?;
+
+        Ok(WIPICResult { results: Vec::new() })
+    }
 }
 
 pub async fn clip_alloc_player(_context: &mut dyn WIPICContext, clip: WIPICWord, param: WIPICWord) -> Result<WIPICWord> {
@@ -346,7 +375,7 @@ mod tests {
 
     use wie_util::read_generic;
 
-    use super::{MdaClip, clip_create, clip_get_volume, clip_put_data, clip_set_volume, get_volume, set_volume};
+    use super::{MdaClip, clip_create, clip_get_volume, clip_put_data, clip_set_volume, get_volume, play, set_volume};
 
     // The getter answers 100 before any set: 13 titles read it and set what it said. A clip with no sound yet must not reach handle 0, which is the
     // first clip anybody loaded.
@@ -383,5 +412,26 @@ mod tests {
         assert_ne!(a.clip_id, 0);
         assert_ne!(b.clip_id, 0);
         assert_ne!(a.clip_id, b.clip_id);
+    }
+
+    // 87b04639cdfe's clip callback (binary.mod 0x14334) stores the song's start time on
+    // `cb(clip, MC_MDA_STATUS_STARTED)` and its notes fall against it: with no event the song played
+    // and no note ever came down. A clip created without a callback gets nothing.
+    #[futures_test::test]
+    async fn play_tells_the_clip_callback_it_started_test() {
+        let mut context = TestContext::with_system(System::new(Box::new(TestPlatform::new()), "pid", "aid", DefaultTaskRunner));
+        let with_cb = clip_create(&mut context, 0, 0, 0x14335).await.unwrap();
+        let without_cb = clip_create(&mut context, 0, 0, 0).await.unwrap();
+        clip_put_data(&mut context, with_cb, 0x1000, 0).await.unwrap();
+        clip_put_data(&mut context, without_cb, 0x1000, 0).await.unwrap();
+
+        play(&mut context, without_cb, 0).await.unwrap();
+        assert!(context.spawned.is_empty());
+
+        play(&mut context, with_cb, 0).await.unwrap();
+        assert!(context.call_args.is_empty(), "the event comes after MC_mdaPlay returns");
+        let callback = context.spawned.pop().unwrap();
+        callback.call(&mut context, Box::new([])).await.unwrap();
+        assert_eq!(context.call_args, [(0x14335, alloc::vec![with_cb, 2])]);
     }
 }

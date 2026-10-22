@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-22",
+  "kind": "fix",
+  "titles": [
+    "87b04639cdfef6ccd65a34c71f20ee9e6321a551cad6c67de5545dabbb3da15a"
+  ],
+  "summary_ko": "곡을 고르면 음악은 나오는데 음표가 하나도 내려오지 않았어요. 이제 곡이 시작되는 때를 게임이 알 수 있어서 음표가 내려오고 판정과 점수가 붙어요.",
+  "pr": "https://github.com/Jun025/wie/pull/563"
+}

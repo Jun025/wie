@@ -2741,9 +2741,12 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
+   "playTips_ko": [
+    "«새로시작»으로 들어가 옥상 안내가 나오면 위 방향키로 뛰어오른 뒤 공중에서 위 방향키를 길게 누르면 흔들기, 빠르게 두 번 누르면 천장으로 올라가며 다음으로 넘어가요."
+   ],
    "changes": [],
    "fileTitle": "스파이더맨3"
   },
@@ -5872,9 +5875,12 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
+   "playTips_ko": [
+    "두 키를 함께 누르는 시험에서 «미지원폰» 창이 나오면 오른쪽 방향키로 «아니오»를 고른 뒤 확인 키를 누르고, 곡을 고르면 내려오는 음표의 번호에 맞춰 숫자 키를 누르면 돼요."
+   ],
    "changes": [],
    "fileTitle": "뮤직팩토리"
   },
