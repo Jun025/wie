@@ -100,3 +100,5 @@
 - 증적(화면 · 키 스크립트 · out · 스캔 표)은 저장소 밖 `~/scratch/a2wall/` 에 있다. 레시피는 비커밋 `game_lab/recipes-progress/` 다.
 
 
+
+<!-- corpus-name-inflow v1 subjects=6 tree=6aa9a0cde682f464 B=718/330 P=4/1 S=37/17 -->
