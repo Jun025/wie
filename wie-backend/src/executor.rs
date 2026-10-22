@@ -228,6 +228,12 @@ impl Executor {
         self.woken.0.load(Ordering::Relaxed)
     }
 
+    /// After a tick: the earliest wake of a paced sleep (one that keeps a tick alive — not a poll,
+    /// see `POLL_SLEEP_MS`), the next time a sleeping guest has work. `None` if no task sleeps so.
+    pub fn next_due(&self) -> Option<Instant> {
+        self.inner.lock().sleeping_tasks.values().filter_map(|x| x.1).min()
+    }
+
     pub fn current_task_id(&self) -> u64 {
         self.inner.lock().current_task_id.unwrap() as _
     }

@@ -405,6 +405,7 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   between two — so it is how a stalled-tab claim is measured too (`docs/report/0488`).
   `--speed x --paint-window a,b` counts paints in a guest-time window on the browser's own frames —
   how achieved play speed is measured where `wie_validate`'s never-sleeping loop cannot see it (`docs/report/0498`).
+  `--cpu-throttle n` stands in for a slow device and prints the engine's `achieved_speed()` beside it (`docs/report/0532`).
 
 ### Documented-command liveness — one weekly scheduled job, decided 2026-09-10
 

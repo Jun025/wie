@@ -12,7 +12,10 @@
 //!   request. That count is host-speed independent: #338's shape is every paint crossing a tick.
 //! - `gcs` per `paints`: a full collection per paint was the other half of #338.
 //! - `starved_ticks` host ticks that ended on their budget with the guest still wanting CPU
-//!   (`Executor::wants_cpu`) — what `AchievedSpeed` reads.
+//!   (`Executor::wants_cpu`) — what `AchievedSpeed` reads, with `due`.
+//! - `due`         at the end of the last tick, the earliest guest time a waiting guest has work
+//!   due: a paced sleep's wake (`Executor::next_due`), a pending WIPI timer or `callSerially` slice
+//!   (`guest_waiting_until`). `None` = nothing waits on a time (a guest idle until a key).
 
 use alloc::{format, string::String, vec::Vec};
 
@@ -62,12 +65,31 @@ pub struct Pacing {
     gcs: u64,
     gc_ms: u64,
     starved_ticks: u64,
+    due: Option<Instant>,
+    // What the event loop's current wait is for (`guest_waiting_until`); state, not a window figure.
+    waiting_until: Option<Instant>,
 }
 
 impl Pacing {
-    pub(crate) fn tick_ended(&mut self, starved: bool) {
+    pub(crate) fn tick_ended(&mut self, starved: bool, due: Option<Instant>) {
         self.ticks += 1;
         self.starved_ticks += u64::from(starved);
+        self.due = match (due, self.waiting_until) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (a, b) => a.or(b),
+        };
+    }
+
+    /// The event loop is waiting, and has guest work due at `due` (a timer, a `callSerially` slice)
+    /// even where its own sleeps are polls that do not say so — a timer held back by the per-tick
+    /// fire cap is one. `None` when the wait ends.
+    pub fn guest_waiting_until(&mut self, due: Option<Instant>) {
+        self.waiting_until = due;
+    }
+
+    /// `due` of the last tick (module doc).
+    pub fn due(&self) -> Option<Instant> {
+        self.due
     }
 
     pub fn guest_yielded(&mut self) {
@@ -118,11 +140,13 @@ impl Pacing {
     pub fn take(&mut self) -> Self {
         let pending = self.redraw_requested;
         let ticks = self.ticks;
+        let waiting_until = self.waiting_until;
         let taken = core::mem::take(self);
         // A request made before the window is still owed its paint; ticks keep counting so its
-        // cross-tick test still compares like with like.
+        // cross-tick test still compares like with like. A wait outlives the window.
         self.redraw_requested = pending;
         self.ticks = ticks;
+        self.waiting_until = waiting_until;
         taken
     }
 
@@ -173,7 +197,7 @@ mod tests {
         pacing.redraw_requested(Instant::from_epoch_millis(12)); // coalesced into the first
         pacing.paint_started(Instant::from_epoch_millis(13));
         pacing.redraw_requested(Instant::from_epoch_millis(20));
-        pacing.tick_ended(false);
+        pacing.tick_ended(false, None);
         pacing.paint_started(Instant::from_epoch_millis(36));
         pacing.paint_started(Instant::from_epoch_millis(40)); // no request: a paint, not a redraw
 
@@ -200,5 +224,23 @@ mod tests {
         let json = pacing.summary_json();
         assert!(json.contains("\"sleeps\":0,\"sleep_ms_p05\":null"), "{json}");
         assert!(json.contains("\"redraws\":1,\"redraw_p50\":4"), "{json}");
+    }
+
+    #[test]
+    fn due_is_the_earlier_of_the_executor_and_the_event_loop_and_a_wait_outlives_take() {
+        let at = Instant::from_epoch_millis;
+        let due = |pacing: &Pacing| pacing.due().map(|x| x.raw());
+        let mut pacing = Pacing::default();
+        pacing.tick_ended(false, Some(at(50)));
+        assert_eq!(due(&pacing), Some(50));
+        pacing.guest_waiting_until(Some(at(30)));
+        let _ = pacing.take();
+        pacing.tick_ended(false, Some(at(50)));
+        assert_eq!(due(&pacing), Some(30), "the timer the event loop waits for");
+        pacing.tick_ended(false, None);
+        assert_eq!(due(&pacing), Some(30));
+        pacing.guest_waiting_until(None);
+        pacing.tick_ended(false, None);
+        assert_eq!(due(&pacing), None);
     }
 }
