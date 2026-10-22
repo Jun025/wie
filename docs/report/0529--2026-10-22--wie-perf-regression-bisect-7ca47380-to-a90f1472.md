@@ -89,3 +89,5 @@
 - `check-docs-report-serial`(0528 은 열린 #561 이 claim → 0529) · `check-worklog-json`.
 
 - 게임 파일명 유입: 유입 0건(BOUNDED) · 판단 필요 0건(SUFFIX-ATTACHED).
+
+<!-- corpus-name-inflow v1 subjects=2 tree=5bc60441c8005708 B=0/0 P=0/0 S=0/0 -->
