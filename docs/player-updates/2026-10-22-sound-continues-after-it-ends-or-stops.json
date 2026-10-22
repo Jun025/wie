@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-22",
+  "kind": "sound",
+  "titles": [
+    "5814101b801021a63b423e809f408d24a4ac476ed5bb1c6e3137c8d3de69bf3d",
+    "4a4d2ac046f7c3dfdb94fe771cfc9ebc326a4705779e8ad014d52093669ad7f9",
+    "f981d228b7577afaa5e02fc682f2bb1ad08835e21d539c5e852f3e5a931c0cab",
+    "e68b1c8aef85c584dc6e5e225f0c226641b23f6c523bf0f59eb662151f9cf954"
+  ],
+  "summary_ko": "곡이 한 번 끝나면 음악이 멈추거나, 첫 소리 뒤로 배경음과 효과음이 더 나오지 않던 게임이 있었어요. 이제 소리가 끝나거나 멈춘 때를 게임이 알 수 있어서 음악이 이어지고 다음 소리가 나와요.",
+  "pr": "https://github.com/Jun025/wie/pull/566"
+}
