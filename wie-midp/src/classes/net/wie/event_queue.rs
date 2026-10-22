@@ -266,14 +266,14 @@ impl EventQueue {
                 // timer-paced guest (a KTF clet's game loop) one extra host frame per game frame.
                 // Recurring callSerially work keeps the 16ms slice it is paced by.
                 let callbacks_pending = jvm.invoke_virtual::<_, i32>(&events, "java/util/Vector", "size", "()I", ()).await? > 0;
-                let next_timer = pending_timer_events
+                let earliest_timer = pending_timer_events
                     .iter()
                     .filter_map(|x| match x {
-                        Event::Timer { due, .. } => Some(due.raw().saturating_sub(now.raw())),
+                        Event::Timer { due, .. } => Some(*due),
                         _ => None,
                     })
-                    .min()
-                    .filter(|_| !callbacks_pending);
+                    .min();
+                let next_timer = earliest_timer.map(|x| x.raw().saturating_sub(now.raw())).filter(|_| !callbacks_pending);
                 // Re-check the backend queue every millisecond of the wait: a Redraw handed over
                 // mid-wait otherwise sits until the wait ends, and 배틀몬스터's game thread spins until
                 // its paint lands (measured 16.4ms of a 50ms frame). Callbacks and timers still run
@@ -294,6 +294,10 @@ impl EventQueue {
                         .min()
                         .filter(|_| !callbacks_pending)
                 };
+                // What this wait is for, for `AchievedSpeed`: a host that does not tick again before
+                // it is the game running late — a held-back timer included, which `pace` leaves out.
+                let due = if callbacks_pending { Some(deadline) } else { earliest_timer };
+                context.system().pacing().guest_waiting_until(due);
                 while context.system().platform().now() < deadline {
                     let tick = context.system().pacing().ticks();
                     match pace(tick) {
@@ -304,6 +308,8 @@ impl EventQueue {
                         break;
                     }
                 }
+
+                context.system().pacing().guest_waiting_until(None);
 
                 for event in pending_timer_events.drain(..) {
                     context.system().event_queue().push(event);

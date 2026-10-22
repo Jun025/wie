@@ -92,12 +92,27 @@ pub fn timer_fires_per_tick(speed: f64, tick: u64) -> u32 {
 /// The play speed a host actually got over the last `ACHIEVED_WINDOW_MS` of wall time.
 ///
 /// Defined as guest time ÷ wall time on a clock that, unlike `SpeedClock`, stops while the guest is
-/// starved: from the end of a tick that ran out of budget with the guest still wanting CPU
-/// (`Pacing::starved_ticks`) to the start of the next. The guest clock itself never stops — it is
-/// the wall clock times `speed` — so measured on it the ratio is `speed` by construction. A gap
-/// after a tick in which every task slept is counted in full: a guest asleep is on schedule, so
-/// sleeping neither lowers nor inflates the figure. The tick itself always counts. A gap of more than
-/// `HOST_PAUSE_MS` is the host not ticking, not a frame: it is not counted and starts a new window.
+/// behind: the guest clock itself never stops — it is the wall clock times `speed` — so measured on
+/// it the ratio is `speed` by construction. Of each tick-to-tick interval, what counts runs from the
+/// tick's start
+///
+/// - to the end of its budget (`budget_ms`), if it ran out of budget with the guest still wanting CPU
+///   (`starved`). A tick runs past its budget only by a step the executor cannot cut, and a starved
+///   guest's step that ran on far past it is the host's CPU falling short as well (the heavy game at
+///   CPU/60: a 14ms budget, ticks of 1.7s);
+/// - to `GRID_MS` past the guest's next due work (`due_ms`: a paced sleep's wake, a pending timer —
+///   `Pacing::due`) if it was waiting on a time — wherever that falls, the tick itself included. A
+///   game frame that ran past the game's own next frame, or a host that came back after it, is the
+///   game running late: the light game on a slow device, which never starves (its frame is one step
+///   the budget cannot cut) and so read as on schedule (`docs/report/0532`);
+/// - to the next tick if nothing waits on a time (idle until a key): asleep on nothing is on schedule.
+///
+/// A gap longer than `HOST_PAUSE_MS` that is also `PAUSE_RATIO` times every interval of the last
+/// `ACHIEVED_WINDOW_MS` (pauses included, so a host that hitches now and then reads its next hitch
+/// as a frame) is the host not ticking — a background tab (rAF stops but the wall clock runs on),
+/// the shell's pause, an app switch — not a frame: that interval is left out and the window kept,
+/// so a pause holds the figure. A host that is slow *every* frame is not paused by this, however
+/// slow: its frames read low.
 ///
 /// ponytail: a starved guest reads at least `speed × budget ÷ frame` (≈0.84 × `speed` at 60Hz)
 /// however much more CPU it wanted — the executor sees *that* it wanted more, not how much. A
@@ -108,33 +123,52 @@ pub struct AchievedSpeed {
     intervals: VecDeque<(f64, f64)>,
     total: f64,
     counted: f64,
-    // (begin, end, starved) of the last tick
-    last: Option<(f64, f64, bool)>,
+    // (begin, end, until when the gap after it counts) of the last tick
+    last: Option<(f64, f64, f64)>,
+    // (start of the next tick, interval) of every interval of the last `ACHIEVED_WINDOW_MS`, pauses
+    // included: what a gap is judged against
+    recent: VecDeque<(f64, f64)>,
 }
 
 pub const ACHIEVED_WINDOW_MS: f64 = 2000.0;
 
-// A gap between ticks longer than this is the host not ticking at all — a background tab (rAF stops
-// but the wall clock runs on), an app switch, a locked screen — not pacing. It starts a new window.
+// The frame grid of the 60Hz host this is measured against: a wake that waits for the next frame
+// by less than a frame is how every host runs a sleep, not a slow one (`Executor::tick_for`).
+const GRID_MS: f64 = 1000.0 / 60.0;
+
+// A gap between ticks is a pause only past both: longer than this, and this many times the longest
+// interval of the last `ACHIEVED_WINDOW_MS`. Under CPU throttle (docs/report/0532) a slow host's
+// frames run 233ms with a longest of 1.2s, 567ms with a longest of 19s, or 40ms with 0.9s hitches
+// between — the absolute bound alone read every frame of the second as a pause, and the interval
+// before alone every hitch of the third, so the figure stayed near `speed`.
 const HOST_PAUSE_MS: f64 = 500.0;
+const PAUSE_RATIO: f64 = 8.0;
 
 impl AchievedSpeed {
-    /// A tick ran from `begin_ms` to `end_ms` on the wall clock; `starved` if it ended on its
-    /// budget with the guest still wanting CPU.
-    pub fn tick(&mut self, begin_ms: f64, end_ms: f64, starved: bool) {
-        if let Some((b, e, was_starved)) = self.last
+    /// A tick of `budget_ms` ran from `begin_ms` to `end_ms` on the wall clock; `starved` if it ended
+    /// on its budget with the guest still wanting CPU; `due_ms` the wall time of its next due work if
+    /// it was waiting on a time (`Pacing::due`).
+    pub fn tick(&mut self, begin_ms: f64, end_ms: f64, budget_ms: f64, starved: bool, due_ms: Option<f64>) {
+        if let Some((b, e, counts_until)) = self.last
             && begin_ms > b
         {
-            let total = begin_ms - b;
-            if total > HOST_PAUSE_MS {
-                self.reset();
-                self.last = Some((begin_ms, end_ms, starved));
-                return;
+            let interval = begin_ms - b;
+            let tick = (e - b).clamp(0.0, interval);
+            let gap = interval - tick;
+            while let Some(&(at, _)) = self.recent.front()
+                && at < begin_ms - ACHIEVED_WINDOW_MS
+            {
+                self.recent.pop_front();
             }
-            let counted = if was_starved { (e - b).clamp(0.0, total) } else { total };
-            self.intervals.push_back((total, counted));
-            self.total += total;
-            self.counted += counted;
+            let longest = self.recent.iter().map(|x| x.1).fold(0.0, f64::max);
+            let paused = gap > HOST_PAUSE_MS && gap > PAUSE_RATIO * longest;
+            self.recent.push_back((begin_ms, interval));
+            if !paused {
+                let counted = (counts_until.min(begin_ms) - b).clamp(0.0, interval);
+                self.intervals.push_back((interval, counted));
+                self.total += interval;
+                self.counted += counted;
+            }
             while let Some(&(t, c)) = self.intervals.front()
                 && self.total - t >= ACHIEVED_WINDOW_MS
             {
@@ -143,7 +177,12 @@ impl AchievedSpeed {
                 self.counted -= c;
             }
         }
-        self.last = Some((begin_ms, end_ms, starved));
+        let counts_until = match (starved, due_ms) {
+            (true, _) => end_ms.min(begin_ms + budget_ms),
+            (false, Some(due)) => due + GRID_MS,
+            (false, None) => f64::INFINITY,
+        };
+        self.last = Some((begin_ms, end_ms, counts_until));
     }
 
     /// Forget the window — after a speed change, so the figure is about the new speed only.
@@ -303,9 +342,10 @@ mod tests {
         assert!((49.0..=52.0).contains(&three), "3x clamped to 2x: {three}ms");
     }
 
-    // How a guest shaped like `guest` plays at `speed` on a 60Hz host with the 14ms budget, the wall
-    // clock advancing 0.1ms per read: the achieved speed after 3s of wall time.
-    fn achieved<F, Fut>(speed: f64, guest: F) -> f64
+    // How a guest shaped like `guest` plays at `speed` on a host ticking every `frame_ms` with the
+    // 14ms budget, the wall clock advancing 0.1ms per read: the achieved speed after 180 ticks, as
+    // the browser host feeds it (`wie_featurephone`'s `tick`).
+    fn achieved_on<F, Fut>(speed: f64, frame_ms: f64, guest: F) -> f64
     where
         F: FnOnce(Executor) -> Fut + Send + 'static,
         Fut: Future<Output = ()> + Send + 'static,
@@ -328,12 +368,22 @@ mod tests {
             executor
                 .tick_for(move || c.now(w.fetch_add(1, Ordering::SeqCst) as f64 / 10.0), clock.budget(14))
                 .unwrap();
-            achieved.tick(frame as f64 / 10.0, wall.load(Ordering::SeqCst) as f64 / 10.0, executor.wants_cpu());
-            frame += 167; // 16.7ms
+            let end = wall.load(Ordering::SeqCst) as f64 / 10.0;
+            let guest_end = clock.now(end).raw() as f64;
+            let due = executor.next_due().map(|due| end + (due.raw() as f64 - guest_end) / speed);
+            achieved.tick(frame as f64 / 10.0, end, 14.0, executor.wants_cpu(), due);
+            frame += (frame_ms * 10.0) as u64;
         }
         achieved.get(speed)
     }
 
+    fn achieved<F, Fut>(speed: f64, guest: F) -> f64
+    where
+        F: FnOnce(Executor) -> Fut + Send + 'static,
+        Fut: Future<Output = ()> + Send + 'static,
+    {
+        achieved_on(speed, 16.7, guest)
+    }
     // Never finishes and never asks to be polled again: a JVM monitor `wait` with nobody to notify.
     struct Parked;
 
@@ -372,9 +422,83 @@ mod tests {
                 YieldFuture::new().await;
             }
         });
-        // 2 × 14ms of every 16.7ms frame = 1.68, plus what the tick overruns its budget by
-        // (1.72 when written: the guest clock is whole milliseconds).
+        // 2 × 14ms of every 16.7ms frame = 1.68: what the tick overruns its budget by does not count.
         assert!((1.6..1.8).contains(&got), "{got}");
+    }
+
+    // A game loop that sleeps 10ms a frame: never starved, whatever the host.
+    async fn sleeps_10(executor: Executor) {
+        loop {
+            executor.sleep(10);
+            YieldOnce(false).await;
+        }
+    }
+
+    #[test]
+    fn a_guest_with_cpu_to_spare_on_a_slow_host_achieves_less() {
+        // 4 frames a second (CPU throttle, docs/report/0532): the game wanted a frame every 10ms
+        // and got one every 250ms. Before `due` it read exactly `speed` — it never starved.
+        for speed in [1.0, 2.0] {
+            let got = achieved_on(speed, 250.0, sleeps_10);
+            assert!(got < 0.5 * speed, "speed {speed}: {got}");
+        }
+        // 30Hz: within a frame of the 60Hz grid's lateness, so not reported as slow.
+        let got = achieved_on(2.0, 33.3, sleeps_10);
+        assert!(got > 0.9 * 2.0, "30Hz: {got}");
+    }
+
+    #[test]
+    fn a_guest_waiting_on_nothing_is_on_schedule_on_a_slow_host() {
+        // Parked until a key: nothing is due, so a late host keeps it waiting for nothing.
+        assert_eq!(achieved_on(2.0, 250.0, |_| Parked), 2.0);
+    }
+
+    #[test]
+    fn frames_slower_than_the_pause_bound_still_read_low() {
+        // 600ms a frame, every frame: a slow host, not a paused one. Before, each gap past 500ms
+        // emptied the window and the figure stayed at `speed`.
+        assert!(achieved_on(2.0, 600.0, sleeps_10) < 1.0);
+        let starved = achieved_on(2.0, 600.0, |_| async {
+            loop {
+                YieldFuture::new().await;
+            }
+        });
+        assert!(starved < 0.2, "{starved}");
+
+        // A starved guest whose step runs on far past the budget: 14ms of every 1.7s frame.
+        let mut achieved = AchievedSpeed::default();
+        let mut t = 0.0;
+        for _ in 0..20 {
+            achieved.tick(t, t + 1700.0, 14.0, true, None);
+            t += 1710.0;
+        }
+        let got = achieved.get(2.0);
+        assert!((got - 2.0 * 14.0 / 1710.0).abs() < 1e-9, "{got}");
+
+        // 40ms frames with a 900ms hitch every fourth: the hitches are the host, not pauses.
+        let mut achieved = AchievedSpeed::default();
+        let mut t = 0.0;
+        for i in 0..200 {
+            achieved.tick(t, t + 14.0, 14.0, true, None);
+            t += if i % 4 == 3 { 900.0 } else { 40.0 };
+        }
+        let got = achieved.get(2.0);
+        assert!(got < 0.5, "{got}");
+    }
+
+    #[test]
+    fn work_that_runs_past_its_due_counts_only_to_the_grid() {
+        // The light game at CPU/20 (docs/report/0532): one guest step of 155ms the 14ms budget
+        // cannot cut, its next frame due 25ms in, the next tick 176ms after this one. Not starved —
+        // it never asked for more — so before, the whole tick counted and it read `speed`.
+        let mut achieved = AchievedSpeed::default();
+        let mut t = 0.0;
+        for _ in 0..40 {
+            achieved.tick(t, t + 155.0, 14.0, false, Some(t + 25.0));
+            t += 176.0;
+        }
+        let got = achieved.get(1.0);
+        assert!((got - (25.0 + 1000.0 / 60.0) / 176.0).abs() < 1e-9, "{got}");
     }
 
     #[test]
@@ -382,14 +506,14 @@ mod tests {
         let mut achieved = AchievedSpeed::default();
         let mut t = 0.0;
         for _ in 0..200 {
-            achieved.tick(t, t + 14.0, true);
+            achieved.tick(t, t + 14.0, 14.0, true, None);
             t += 16.0;
         }
         assert!(achieved.get(2.0) < 1.8);
         achieved.reset();
         assert_eq!(achieved.get(1.5), 1.5, "nothing measured yet at the new speed");
         for _ in 0..200 {
-            achieved.tick(t, t + 5.0, false);
+            achieved.tick(t, t + 5.0, 14.0, false, None);
             t += 16.0;
         }
         assert_eq!(achieved.get(1.5), 1.5, "the starved ticks before the change are gone");
@@ -400,37 +524,42 @@ mod tests {
         let mut achieved = AchievedSpeed::default();
         let mut t = 0.0;
         for _ in 0..1000 {
-            achieved.tick(t, t + 8.0, true); // half of every frame counted
+            achieved.tick(t, t + 8.0, 14.0, true, None); // half of every frame counted
             t += 16.0;
         }
         for _ in 0..200 {
-            achieved.tick(t, t + 1.0, false); // 3.2s of on-schedule frames
+            achieved.tick(t, t + 1.0, 14.0, false, None); // 3.2s of on-schedule frames
             t += 16.0;
         }
         assert_eq!(achieved.get(1.0), 1.0);
     }
 
     #[test]
-    fn a_host_pause_starts_a_new_window() {
-        // A tab in the background: no ticks for 30s, then 60Hz again on a device that starves the
-        // guest (2 × 14ms of every 16.7ms ≈ 1.68). Before the gap the last tick was or was not starved.
-        for last_starved in [true, false] {
+    fn a_host_pause_holds_the_figure() {
+        // A tab in the background, or the shell's pause: no ticks for 30s, on a device that starves
+        // the guest (2 × 14ms of every 16.7ms ≈ 1.68) and on one too slow for 60Hz (a 16ms tick every
+        // 600ms, the guest due 10ms after each). Before the gap the last tick was or was not starved.
+        for (frame, starved, due) in [(16.7, true, None), (16.7, false, Some(0.0)), (600.0, false, Some(10.0))] {
+            let tick = if starved { 14.0 } else { 16.0 };
             let mut achieved = AchievedSpeed::default();
             let mut t = 0.0;
+            let feed = |achieved: &mut AchievedSpeed, t: f64| achieved.tick(t, t + tick, 14.0, starved, due.map(|d: f64| t + tick + d));
             for _ in 0..200 {
-                achieved.tick(t, t + 14.0, last_starved);
-                t += 16.7;
+                feed(&mut achieved, t);
+                t += frame;
             }
+            let before = achieved.get(2.0);
+            // Below `speed` where it can be, so a reset (which reads `speed`) would show; on schedule,
+            // a 30s gap counted as a late frame would read ≈0.
+            assert_eq!(before < 1.9, starved || frame > 100.0, "frame {frame}: {before}");
             t += 30_000.0;
-            achieved.tick(t, t + 14.0, true);
-            assert_eq!(achieved.get(2.0), 2.0, "last_starved={last_starved}: nothing measured since the gap");
+            feed(&mut achieved, t);
+            assert_eq!(achieved.get(2.0), before, "frame {frame}: the gap is left out, the window kept");
             for _ in 0..30 {
-                t += 16.7;
-                achieved.tick(t, t + 14.0, true);
+                t += frame;
+                feed(&mut achieved, t);
             }
-            // half a second later the figure is the device's, not the gap's
-            let got = achieved.get(2.0);
-            assert!((got - 2.0 * 14.0 / 16.7).abs() < 1e-6, "last_starved={last_starved}: {got}");
+            assert!((achieved.get(2.0) - before).abs() < 1e-9, "frame {frame}: still the device's figure");
         }
     }
 }
