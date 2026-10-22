@@ -111,3 +111,8 @@ otterpebble `origin/main`(`4efc20ec`)을 스크래치 detached worktree 에서 �
 - 느린 기기(또는 바쁜 탭)에서 셸의 «지금은 약 N배로 돌고 있어요»가 **이제 뜬다** — 가벼운 게임도. 정상 기기에서는 종전처럼 안 뜬다(측정 0%).
 - 메뉴를 열었다 닫거나 탭을 숨겼다 돌아와도 값이 튀지 않는다(멈춤 전 값 유지).
 - 게임 진행 자체는 바뀌지 않는다 — 측정만 바뀌었다(실행 순서·예산·타이머 발화 무변경). 그래서 `docs/player-updates/` 항목은 넣지 않았다.
+
+### 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs --corpus <레인 루트>/game_lab`: 유입 8건(BOUNDED · 11회) + 판단 필요 0건(SUFFIX-ATTACHED). 전부 이 회차가 손댄 파일
+(`executor.rs` · `system.rs` · `event_queue.rs` · `wie_featurephone/src/lib.rs`)에 **원래 있던** 주석이다. 이 회차가 더한 줄에 든 것은 0이다(`git diff origin/main...HEAD -U0` 의 `+` 줄 대조).
