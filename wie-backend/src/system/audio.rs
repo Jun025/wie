@@ -153,8 +153,26 @@ pub fn parse_smaf_in(data: &[u8]) -> Vec<(usize, SmafEvent)> {
     }
 }
 
+// `duration` runs to the end of the longest PCM sample when that is past the last event — as WAV's
+// does, and as the featurephone worklet already measures it (`audio_worklet.js` `load`). Ending at
+// the last event, the KTF/LGT clip END_OF_DATA arrived while the sample still played: 863b8ab6a21d's
+// sync clip (one wave at 2.7 s) ended before its 3 s measurement and the sync screen never closed.
 fn convert_smaf_events(events: Vec<(usize, SmafEvent)>) -> AudioSequence {
-    let duration = events.iter().map(|(time, _)| *time as u64).max().unwrap_or(0);
+    let duration = events
+        .iter()
+        .map(|(time, event)| {
+            let tail = match event {
+                SmafEvent::Wave {
+                    channel,
+                    sampling_rate,
+                    data,
+                } if *sampling_rate > 0 => (data.len() as u64 / (*channel).max(1) as u64) * 1000 / *sampling_rate as u64,
+                _ => 0,
+            };
+            *time as u64 + tail
+        })
+        .max()
+        .unwrap_or(0);
     let events = events
         .into_iter()
         .filter_map(|(time, event)| {
@@ -204,6 +222,19 @@ mod tests {
         fn send(&self, command: AudioCommand) {
             self.0.lock().unwrap().push(command);
         }
+    }
+
+    // 8000 stereo frames at 8 kHz = 1000 ms from 100 ms: the clip lasts to 1100, past its last event.
+    #[test]
+    fn smaf_duration_covers_the_longest_pcm_tail() {
+        let wave = SmafEvent::Wave {
+            channel: 2,
+            sampling_rate: 8000,
+            data: vec![0; 16000],
+        };
+        let sequence = convert_smaf_events(vec![(100, wave), (900, SmafEvent::End)]);
+
+        assert_eq!(sequence.duration, 1100);
     }
 
     #[test]
