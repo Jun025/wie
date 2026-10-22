@@ -299,9 +299,9 @@ mod tests {
         // ahead is 50 wall ms ahead, at 1x the same 100.
         let clock = SpeedClock::new();
         clock.set_speed(1000.0, 2.0);
-        assert_eq!(clock.wall_at(1500.0, Instant::from_epoch_millis(2100)), 1550.0);
+        assert_eq!(clock.wall_at(1500.0, crate::Instant::from_epoch_millis(2100)), 1550.0);
         clock.set_speed(1500.0, 1.0);
-        assert_eq!(clock.wall_at(1500.0, Instant::from_epoch_millis(2100)), 1600.0);
+        assert_eq!(clock.wall_at(1500.0, crate::Instant::from_epoch_millis(2100)), 1600.0);
     }
 
     struct YieldOnce(bool);
