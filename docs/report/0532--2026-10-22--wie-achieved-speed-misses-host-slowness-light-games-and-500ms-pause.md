@@ -140,4 +140,4 @@ otterpebble `origin/main`(`4efc20ec`)을 스크래치 detached worktree 에서 �
 `node scripts/corpus-name-inflow.mjs --corpus <레인 루트>/game_lab`: 유입 8건(BOUNDED · 11회) + 판단 필요 0건(SUFFIX-ATTACHED). 전부 이 회차가 손댄 파일
 (`executor.rs` · `system.rs` · `event_queue.rs` · `wie_featurephone/src/lib.rs`)에 **원래 있던** 주석이다. 이 회차가 더한 줄에 든 것은 0이다(`git diff origin/main...HEAD -U0` 의 `+` 줄 대조).
 
-<!-- corpus-name-inflow v1 subjects=11 tree=01f6ba2d58795d34 B=11/8 P=1/1 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=12 tree=8ea4846e8c717411 B=11/8 P=1/1 S=0/0 -->
