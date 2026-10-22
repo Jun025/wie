@@ -349,6 +349,7 @@ impl MethodBody<WieError> for ClipStatusCallback {
             write_generic(context, self.clip, clip)?;
         }
 
+        tracing::debug!("MC_mda clip callback {:#x}({:#x}, {})", self.callback, self.clip, self.status);
         context.call_function(self.callback, &[self.clip, self.status]).await?;
 
         if self.status == MC_MDA_STATUS_STARTED
