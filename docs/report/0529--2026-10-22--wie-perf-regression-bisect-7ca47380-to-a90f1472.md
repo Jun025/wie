@@ -87,3 +87,5 @@
 ### 6. 검증
 - 4 게이트(문서만 바꾼 diff 지만 AGENTS.md 대로): fmt rc0 · clippy stable/wasm32/beta `-D warnings` rc0(beta 는 `wie_cli` manifest 경고 7 · 기존) · `RUST_MIN_STACK=4194304 cargo test --all` 784/0.
 - `check-docs-report-serial`(0528 은 열린 #561 이 claim → 0529) · `check-worklog-json`.
+
+- 게임 파일명 유입: 유입 0건(BOUNDED) · 판단 필요 0건(SUFFIX-ATTACHED).
