@@ -1,0 +1,9 @@
+{
+ "date": "2026-10-23",
+ "task": "wie-worklog-record-cross-repo-adoption-achieved-speed-p0",
+ "title": "achieved-speed 상한 문구 제안 — otterpebble 이행분 채택 기록",
+ "summary": "구현은 otterpebble PR #1360(머지 9545910c · 2026-10-23)이고 이 원장은 채택 기록이다. tower 는 ref 를 저장소 안에서만 정산하므로 wie 제안은 wie worklog 의 adoptedProposals 로만 닫힌다. docs/report/0536",
+ "report": "docs/report/0536--2026-10-23--wie-worklog-record-cross-repo-adoption-achieved-speed-p0.md",
+ "proposals": [],
+ "adoptedProposals": ["2026-10-22-achieved-speed-host-slowness#p0"]
+}
