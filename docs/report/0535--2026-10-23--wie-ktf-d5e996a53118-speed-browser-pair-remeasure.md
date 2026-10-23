@@ -70,3 +70,5 @@
 ### 7. 게임 파일명 유입
 
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 718회 / 330쌍 + SUFFIX-ATTACHED 36회 / 16쌍. 전부 `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 값이다. 이 회차는 그 파일에서 1행의 speed 값만 바꿨다. 그 밖 파일의 걸림은 0 이고, 회차 문서·표·worklog 는 타이틀을 sha12 로만 적었다.
+
+<!-- corpus-name-inflow v1 subjects=4 tree=58d63dc086978f36 B=718/330 P=0/0 S=36/16 -->
