@@ -66,3 +66,7 @@
 1. `~/orchestrator-live/bin/build-slot run -- npm run build:wasm` → `web/src/wasm` 를 스크래치로 복사.
 2. 게임은 sha12 이름의 심링크로 스크래치에 둔다(타이틀 비노출).
 3. §2 명령 셋(키 700·1배속 / 키 350·2배속 / 키 없음·2배속)을 `build-slot run --long` 임대 안에서 동시에 띄운다.
+
+### 7. 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 718회 / 330쌍 + SUFFIX-ATTACHED 36회 / 16쌍. 전부 `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 값이다. 이 회차는 그 파일에서 1행의 speed 값만 바꿨다. 그 밖 파일의 걸림은 0 이고, 회차 문서·표·worklog 는 타이틀을 sha12 로만 적었다.
