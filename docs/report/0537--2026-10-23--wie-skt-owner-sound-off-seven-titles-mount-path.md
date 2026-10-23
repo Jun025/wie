@@ -42,4 +42,4 @@
 
 `node scripts/corpus-name-inflow.mjs` 결과는 BOUNDED 718회 / 330쌍 + SUFFIX-ATTACHED 36회 / 16쌍이다. 전부 `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 값이다. 이 회차는 그 파일에서 7행의 소리 축과 안내 줄만 바꿨다. 그 밖 파일에서 걸린 것은 0 이다. 코드 주석·회차 문서·worklog·소식은 타이틀을 sha12·sha256·jar MD5 로만 적었다.
 
-<!-- corpus-name-inflow v1 subjects=11 tree=8ff55aa435211f57 B=718/330 P=0/0 S=36/16 -->
+<!-- corpus-name-inflow v1 subjects=11 tree=c211bec74114cfeb B=718/330 P=0/0 S=36/16 -->
