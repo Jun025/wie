@@ -62,10 +62,20 @@ jobs:
       # The former `--ignore RUSTSEC-2026-0194 --ignore RUSTSEC-2026-0195`
       # (quick-xml XML DoS) is GONE as of 2026-07-31: wayland-scanner 0.31.11
       # adopted quick-xml ^0.41, so `cargo update -p wayland-scanner` lifted us
-      # to the patched 0.41.0 and the suppression is no longer needed. This step
-      # now runs with NO ignores at all — any future suppression must be added
-      # back by explicit advisory ID with its reachability argument, never as a
-      # blanket ignore.
+      # to the patched 0.41.0 and the suppression is no longer needed.
+      #
+      # ★The three `--ignore`s below (2026-10-23) are that rule applied, not an
+      # exception to it: zip 8.6.0 RUSTSEC-2026-0367/0368/0369 are fixed only in
+      # zip 9, and `rustjava-runtime` 0.1.1 (≤0.3.2) requires `^8.6` — leaving 8.x
+      # means moving the RustJava pin, a design task (AGENTS.md Constraint 8).
+      # All three are in `ZipArchive::extract` / `ZipStreamReader::extract`
+      # (writing entries to a directory); neither we nor rustjava-runtime call
+      # either — every use is `ZipArchive::new` + `by_name`/`by_index` into
+      # memory. Reachability argument and removal condition: ledger §D of
+      # docs/project-kb/02_status.md. The SAME list is on pr-audit.yml's audit
+      # line, and scripts/check-audit-warnings.mjs (next step) goes RED when the
+      # two lists differ, when an ignored ID is no longer reported (stale — delete
+      # it), or when one has no §D row. Never blanket, never a whole crate.
       #
       # WHEN THIS GOES RED, READ THE LEDGER FIRST:
       #   docs/project-kb/02_status.md — "공급망 추적 대장"
@@ -77,11 +87,13 @@ jobs:
       # quoting the row. Answering a repeat advisory from scratch is the waste
       # this exists to prevent.
       - name: cargo audit
-        run: cargo audit
+        run: cargo audit --ignore RUSTSEC-2026-0367 --ignore RUSTSEC-2026-0368 --ignore RUSTSEC-2026-0369
 
-      # TWO list ↔ reality comparisons, one step, ONE `cargo audit --json`. A SEPARATE
-      # step from the audit above on purpose: that one keeps its own exit code and runs
-      # with no ignores (Constraint 5); this one only compares.
+      # THREE list ↔ reality comparisons, one step, ONE `cargo audit --json` (the third,
+      # added 2026-10-23, is the named --ignore list above — see the checker's IGNORES block).
+      # A SEPARATE step from the audit above on purpose: that one keeps its own exit code
+      # and runs with only the named ignores (Constraint 5); this one runs UNIGNORED and
+      # only compares.
       #
       # (1) the expected list, .github/rust-audit-expected-warnings.json. Asymmetric by
       #     design, which is what keeps it from becoming a suppression:

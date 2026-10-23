@@ -26,6 +26,10 @@
 // A human fixed it on 2026-09-08; this makes the machine say it next time. It reads
 // the SAME `actual` computed above, so the two checks can never disagree about what
 // the warnings are.
+//
+// THIRD CHECK (2026-10-23): the named `--ignore`s on the audit line of rust-audit.yaml and
+// pr-audit.yml — same list in both, every ID still reported by the unignored audit below,
+// and every ID argued in ledger §D. See the IGNORES block at the bottom.
 import { readFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -141,6 +145,48 @@ if (rowLines.length === 0 || unparsed.length > 0) {
   } else {
     console.log("\nOK 대장 A 가 실제와 일치한다");
   }
+}
+
+// ── 이름 억제(--ignore) ↔ 실제 · 두 워크플로 · 대장 §D ─────────────────────────────
+// Constraint 5 는 억제를 «이름 + 도달성 논증»으로만 허락한다. 그 억제가 조용히 낡는 길이 셋이라 셋 다 red:
+//   ⑴ rust-audit.yaml 과 pr-audit.yml 의 목록이 다르다 — 두 잡이 «무엇이 실패인가»에서 갈라진다.
+//   ⑵ 억제한 ID 를 cargo audit 이 더는 내지 않는다(위 auditJson 은 무-억제로 돈다) — 해소됐으니 지워라.
+//      남겨 두면 같은 ID 가 나중에 «다른 판본»에서 되살아나도 아무도 못 본다.
+//   ⑶ 억제한 ID 에 대장 §D 행(줄머리 `| **D-<n>** |`)이 없다 — 논증 없는 억제다.
+const AUDIT_WORKFLOWS = [".github/workflows/rust-audit.yaml", ".github/workflows/pr-audit.yml"];
+console.log(`\nIGNORES  --ignore ↔ cargo audit 실제 · ${AUDIT_WORKFLOWS.length} 워크플로 · ${LEDGER_FILE} §D`);
+const ignoreSets = [];
+for (const f of AUDIT_WORKFLOWS) {
+  const runLines = (await readFile(f, "utf8")).split("\n").filter((l) => /^\s*run:\s*cargo audit(\s|$)/.test(l));
+  if (runLines.length !== 1) {
+    failed = true;
+    console.log(`  ❌ ${f}: \`run: cargo audit…\` 줄이 ${runLines.length}개다(1개여야 읽는다) — «못 쟀다».`);
+    continue;
+  }
+  ignoreSets.push({ f, ids: new Set([...runLines[0].matchAll(/--ignore\s+(\S+)/g)].map((m) => m[1])) });
+}
+if (ignoreSets.length === AUDIT_WORKFLOWS.length) {
+  const [a, b] = ignoreSets;
+  const diff = [...a.ids].filter((x) => !b.ids.has(x)).concat([...b.ids].filter((x) => !a.ids.has(x)));
+  const reported = new Set((report.vulnerabilities?.list ?? []).map((v) => v.advisory?.id));
+  const dRows = ledger.split("\n").filter((l) => /^\|\s*\*\*D-\d+\*\*\s*\|/.test(l));
+  const stale = [...a.ids].filter((x) => !reported.has(x));
+  const unargued = [...a.ids].filter((x) => !dRows.some((l) => l.includes(x)));
+  console.log(`  억제 ${a.ids.size}건 · §D 행 ${dRows.length}건`);
+  for (const x of a.ids) if (!diff.includes(x) && !stale.includes(x) && !unargued.includes(x)) console.log(`    · 유효: ${x}`);
+  if (diff.length) {
+    failed = true;
+    console.log(`  ❌ 두 워크플로의 --ignore 가 다르다: ${diff.join(" ")} — 같은 목록이어야 한다`);
+  }
+  if (stale.length) {
+    failed = true;
+    console.log(`  ❌ 억제했는데 cargo audit 이 «더는 내지 않는» 자문: ${stale.join(" ")} — 두 워크플로에서 지우고 §D 행을 C 로 옮겨라`);
+  }
+  if (unargued.length) {
+    failed = true;
+    console.log(`  ❌ §D 행이 없는 억제: ${unargued.join(" ")} — 도달성 논증 없이 억제하지 마라(Constraint 5)`);
+  }
+  if (!diff.length && !stale.length && !unargued.length) console.log("\nOK 억제 목록이 두 워크플로·실제·§D 와 일치한다");
 }
 
 if (failed) {

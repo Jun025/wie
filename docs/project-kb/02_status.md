@@ -59,6 +59,10 @@
 실측 기준: `cargo-audit 0.22.2` · advisory-db **1,251 advisories** ·
 `Cargo.lock` **557 패키지** · **2026-09-19 재측**(`wie-security-audit-schedule-red-three-days-unattended`).
 **억제(`--ignore`·`audit.toml`·`deny.toml`) 0건** — 이 0은 억제로 만든 0이 아니다(세 파일 전건 **부재** 확인).
+> ★**[2026-10-23] 위 「억제 0건」은 그날까지의 사실이다** — 이제 **이름 억제 3건**(zip RUSTSEC-2026-0367/0368/0369)이
+> 두 워크플로의 `cargo audit` 줄에 있다. ★그 셋은 **경고가 아니라 취약점**이라 이 A 표(경고 집합)의 불변식 «밖»이고,
+> 정본은 아래 **§D** 다(`wie-rust-audit-main-red-since-1018-advisory-batch`). 위 머리의 `vulnerabilities 0` 은 «무-플래그»
+> 기준으로는 이제 거짓이다 — 무-플래그 `cargo audit` 은 **3건 · exit 1**, 워크플로의 억제 붙은 줄이 **0건 · exit 0** 이다.
 
 > ★★**2026-09-19 — 이 대장이 처음으로 «되살아난 해소분»을 만났다.** `Security audit`(schedule)이 **3일 연속 red**
 > 였고(09-17·18·19), 원인은 새 자문이 아니라 ★**base swap `36df9c31` 이 `Cargo.lock` 을 통째로 갈아
@@ -253,6 +257,12 @@ x86_64 에서도 돈다. **그 축들이 좁히는 것은 «AVX2 없는 x86» �
 | **C-3**<br>(구 **A-3**) | **권고 없음**(yanked) | `spin`(직접 — `Cargo.toml:46` · 워크스페이스 6 크레이트 상속) | ★**해소 2026-08-08** — 같은 커밋 `22df9531` 에서 `0.12.0`(yanked) → **`0.12.2`**. **2026-09-08 `Cargo.lock` 재확인 = `0.12.2`** | ★**도달 불가**(feature 축 · 위 ⓑ) — 상향 «전»에도 타지 않았다 | ★**`default-features = false, features = ["spin_mutex","rwlock"]` 가 전제다** — `once`/`lazylock`/`lock_api` 를 켜면 ⓑ 의 판정이 무효가 된다(0.12.1·0.12.2 결함이 정확히 그 두 축이다) |
 | **C-4** | RUSTSEC-2026-0285 | `rustls`(간접 — `wie`/`wie-app` → `sentry 0.49.2` → `ureq 3.4.1` → `rustls`) | ★**해소 2026-09-19** — `0.23.44` → **`0.23.45`** = 권고 `Upgrade to >=0.23.45` 경계 도달(`Cargo.lock` 2줄 · `Cargo.toml` 무접촉) | ★**노출 분석을 «하지 않았다» — 버전축으로만 닫았다.** 잰 것은 «범위» 하나뿐이다: ★**배포되는 WASM 아티팩트에는 없다** — `cargo tree -p wie_featurephone --target wasm32-unknown-unknown -i rustls` → **`did not match any packages`**(대조군 `wie-backend` 는 정상 출력 ⇒ 빈 답이 아니라 «부재»다). 도달면은 **네이티브 데스크톱/앱 호스트뿐**이고, TLS 핸드셰이크 경로를 우리가 타는지는 **재지 않았다** | ★**`sentry@0.49.2`/`ureq@3.4.1` 기준의 «경로» 실측이다** — 그 둘을 올리면 다시 재라. ★**도달성 판정이 «없으므로» 이 행을 「안 탄다」의 근거로 인용하지 마라** — 다시 affected 구간으로 내려가면 그때 처음부터 재야 한다 |
 
+| **C-5** | RUSTSEC-2026-0338 · 0340 · 0343 | `quinn-proto`(간접 — `sentry 0.49.2` → `reqwest` → `quinn` → `quinn-proto`, ★**lockfile 에만 있다**) | ★**해소 2026-10-23** — `cargo update -p quinn-proto` **0.11.17 → 0.11.19**(권고 `>=0.11.18`) | ★**빌드 그래프 0** — `cargo tree -i quinn-proto -e all --target all` → `nothing to print`(활성 feature 로는 컴파일조차 안 된다). 도달성 판정이 아니라 «부재» 실측이다 | ★**`sentry@0.49.2` 의 feature 조합 기준** — sentry 를 올리거나 `reqwest` 의 http3/QUIC feature 가 켜지면 다시 재라 |
+| **C-6** | RUSTSEC-2026-0346 · 0347 · 0348 · 0349 | `rustls`(간접 — C-4 와 같은 `sentry → ureq → rustls`) | ★**해소 2026-10-23** — `cargo update -p rustls` **0.23.45 → 0.23.46**(권고 `>=0.23.46`) | ★**버전축으로만 닫았다**(C-4 와 같은 처분) — WASM 아티팩트에는 없다(`cargo tree -p wie-featurephone --target wasm32-unknown-unknown -i rustls` → `nothing to print`). 네이티브 호스트의 TLS 경로를 타는지는 **재지 않았다** | ★**`sentry@0.49.2`/`ureq@3.4.1` 기준의 «경로» 실측** — 그 둘을 올리면 다시 재라. 「안 탄다」의 근거로 인용하지 마라 |
+| **C-7** | RUSTSEC-2026-0382 | `rustls-webpki`(간접 — `rustls` 경유) | ★**해소 2026-10-23** — **0.103.15 → 0.103.16**(권고 `>=0.103.16, <0.104.0-alpha.1`) | ★**버전축으로만 닫았다** — WASM 에 없다(같은 명령 `nothing to print`) | ★**C-6 과 같다** — `rustls` 를 0.24 계열로 올리면 `rustls-webpki` 계열도 바뀌니 다시 재라 |
+| **C-8** | RUSTSEC-2026-0381 | `webpki-roots`(간접 — `sentry → ureq → webpki-roots`) | ★**해소 2026-10-23** — **1.0.9 → 1.0.11**(권고 `>=1.0.10`) | ★**버전축으로만 닫았다**(번들 루트 인증서 목록 갱신) — WASM 에 없다 | ★**`ureq@3.4.1` 기준** — ureq 를 올리면 다시 재라 |
+| **C-9** | RUSTSEC-2026-0383 | `webpki-root-certs`(간접 — `rustls-platform-verifier` 경유, ★**lockfile 에만 있다**) | ★**해소 2026-10-23** — **1.0.9 → 1.0.11**(권고 `>=1.0.10`) | ★**빌드 그래프 0** — `cargo tree -i webpki-root-certs -e all --target all` → `nothing to print` | ★**C-5 와 같다** — sentry/reqwest feature 조합이 바뀌면 다시 재라 |
+
 > ★★**C-1·C-2 는 «되살아났다가 복원됐다» — 이 표를 「한 번 해소하면 끝」으로 읽지 마라.**
 > 2026-09-19 `wie-security-audit-schedule-red-three-days-unattended`:
 > base swap `36df9c31` 이 **C-1 `rtrb` 0.3.5 → 0.3.4** · **C-2 `event-listener` 5.4.2 → 5.4.1** 로 되돌렸고,
@@ -278,6 +288,19 @@ x86_64 에서도 돈다. **그 축들이 좁히는 것은 «AVX2 없는 x86» �
 rodio 요구가 `^0.3.2` 라 **rodio 를 건드리지 않고** 패치판으로 갈 수 있었다(가장 싼 처분).
 ⇒ ★**실보안 이득은 0에 가깝다** — 값한 것은 daily red 를 끈 것과, rodio 가 나중에 `read_chunk` 를
 쓰더라도 이미 패치판이라는 것뿐이다. **그 사실을 숨기지 않는다.**
+
+### D. 이름 억제 — **취약점인데 «올려서» 못 닫은 것** (2026-10-23 신설 `[wie-rust-audit-main-red-since-1018-advisory-batch]`)
+
+> ★**A·C 와 목적이 다르다.** A 는 비게이팅 «경고», C 는 «해소분»의 판정 보존이고, **D 는 지금도 lockfile 에 있는
+> «취약점»을 Constraint 5 의 단서(「이름 + 도달성 논증」)로 `--ignore` 한 것**이다. ★**D 행 하나 = `--ignore` 하나** —
+> `scripts/check-audit-warnings.mjs` 의 IGNORES 절이 ⑴`rust-audit.yaml`·`pr-audit.yml` 두 줄의 목록이 같은가
+> ⑵억제한 ID 를 무-억제 `cargo audit` 이 아직 내는가(안 내면 «낡은 억제» — 지우고 행을 C 로 옮겨라)
+> ⑶억제한 ID 마다 여기 행이 있는가 — 셋 다 **red** 로 본다(매일 Security audit 잡).
+> ★**처분 순서는 «올리기 먼저»다** — 이 표에 행을 더하기 전에 `cargo update -p` 와 상위 크레이트의 요구 범위를 먼저 재라.
+
+| # | 자문 | 대상 | 왜 못 올렸나 | ★도달성 논증 | 해제 조건 |
+|---|---|---|---|---|---|
+| **D-1** | RUSTSEC-2026-0367 · RUSTSEC-2026-0368 · RUSTSEC-2026-0369 | `zip` **8.6.0**(직접 — `wie-backend/Cargo.toml:22` `^8.6` · 간접 — `rustjava-runtime 0.1.1` `^8.6`) | 패치는 **zip 9.0.0 이상에만** 있다(8.x 백포트 없음). `rustjava-runtime` 은 **0.1.1 ~ 0.3.2 전부 `^8.6`**, `^9.0.5` 는 **0.3.3 부터**(crates.io 인덱스 실측). wie-backend 만 9 로 올리면 8.6.0 이 rustjava 쪽에 남아 자문은 그대로다 ⇒ ★**RustJava 핀 이동(Constraint 8 · 설계 사안) 없이는 못 닫는다** | 세 자문 모두 **«파일시스템으로 풀기»** API 의 결함이다 — `ZipArchive::extract`/`extract_unwrapped_root_dir`(SUID 비트 보존 · 바깥을 가리키는 심링크 생성)와 `ZipStreamReader::extract`(심링크 너머로 권한 적용). ⑴**우리 소스 축**: `.rs` 전수에서 `zip` 사용처는 `wie-backend/src/lib.rs` 하나 — `ZipArchive::new(Cursor)` + `by_index`(`:88`)/`by_name`(`:117`)로 **메모리 `Vec<u8>` 에 읽기만** 하고 `extract`·`ZipStreamReader` ★**0건**. ⑵**rustjava-runtime 0.1.1 축**: `use zip::ZipArchive` 는 `classes/java/util/zip/zip_file.rs` 하나 — `ZipArchive::new(Cursor)` + `by_name`(`:96`·`:147`)뿐, `extract` ★**0건**. ⑶**호스트 축**: 배포 아티팩트(wasm32)에는 쓸 파일시스템이 없다 | ★**`rustjava-runtime` 을 `>=0.3.3` 로 옮겨 lockfile 의 zip 이 `>=9.0.0` 이 되면** 무-억제 `cargo audit` 이 이 셋을 더는 내지 않고, IGNORES 절이 «낡은 억제»로 **red** 를 낸다 — 그때 두 워크플로의 `--ignore` 3개를 지우고 이 행을 C 로 옮겨라. ⑴⑵ 는 **그 판본의 소스 실측**이라 `rustjava-runtime`·`wie-backend` 의 zip 사용이 바뀌면(특히 `extract` 도입) 다시 재라 |
 
 ## 두 트랙 — 엔진 정상화 현황
 
