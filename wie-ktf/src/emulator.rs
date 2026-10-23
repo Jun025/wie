@@ -374,6 +374,28 @@ mod tests {
         assert_eq!(private_path("res/other.sav"), "res/other.sav");
     }
 
+    // The rows are pinned in `wie-backend`; this pins that the KTF mount path applies them.
+    #[test]
+    fn from_archive_turns_the_owner_sound_on() {
+        use alloc::{collections::BTreeMap, vec};
+        use wie_backend::{Options, owner_files::WIRING_PROBE_JAR};
+
+        let files = BTreeMap::from([
+            ("__adf__".into(), b"AID:probe\nPID:probe\nMClass:Probe\n".to_vec()),
+            ("probe.jar".into(), WIRING_PROBE_JAR.to_vec()),
+            ("P/probe.sav".into(), vec![0]),
+            ("P/probe.opt".into(), vec![0]),
+        ]);
+        let options = Options {
+            enable_gdbserver: false,
+            profile: None,
+        };
+        let emulator = super::KtfEmulator::from_archive(Box::new(TestPlatform::new()), files, options).unwrap();
+
+        assert_eq!(emulator.system.filesystem().virtual_file("probe.sav"), None);
+        assert_eq!(emulator.system.filesystem().virtual_file("probe.opt"), Some(vec![1]));
+    }
+
     #[test]
     fn jar_filename_falls_back_to_the_only_jar() {
         use alloc::{collections::BTreeMap, string::ToString, vec::Vec};

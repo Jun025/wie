@@ -5097,6 +5097,7 @@ dependencies = [
  "encoding_rs",
  "jvm",
  "md5",
+ "test-utils",
  "tracing",
  "wie-backend",
  "wie-jvm-support",
