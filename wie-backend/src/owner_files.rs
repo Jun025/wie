@@ -12,6 +12,13 @@ use alloc::{borrow::ToOwned, collections::BTreeMap, format, string::String, vec:
 /// the engine is silent (docs/report/0417, 0537). Deliberately a list: other shipped settings and
 /// saves load as they always have.
 pub const OWNER_SOUND_OFF_SETTINGS: &[([u8; 16], &[&str])] = &[
+    // Not a title: `WIRING_PROBE_JAR`, so each carrier's tests can see its `from_archive` route here.
+    (
+        [
+            0x26, 0x7b, 0x1e, 0x2a, 0x93, 0xff, 0x10, 0x59, 0x16, 0x5a, 0xc6, 0xe0, 0xd5, 0xc2, 0x3e, 0x4a,
+        ],
+        &["probe.sav"],
+    ),
     // KTF
     // 2fc792485d91: one 11,255-byte record: settings and progress together.
     (
@@ -142,6 +149,15 @@ pub const OWNER_SOUND_OFF_SETTINGS: &[([u8; 16], &[&str])] = &[
 /// progress in the same file (docs/report/0537). Only the measured bytes are rewritten to the value
 /// that plays — (jar MD5, file, offset, bytes); the rest of the file loads as shipped.
 pub const OWNER_SOUND_OFF_BYTES: &[([u8; 16], &str, usize, &[u8])] = &[
+    // Not a title: `WIRING_PROBE_JAR`, as above.
+    (
+        [
+            0x26, 0x7b, 0x1e, 0x2a, 0x93, 0xff, 0x10, 0x59, 0x16, 0x5a, 0xc6, 0xe0, 0xd5, 0xc2, 0x3e, 0x4a,
+        ],
+        "probe.opt",
+        0,
+        &[1],
+    ),
     // KTF
     // 5aa438fbdc87: `op_save.db` (5 bytes), the first is the sound level and the owner's is 0 (3 plays).
     (
@@ -209,6 +225,11 @@ pub const OWNER_SOUND_OFF_BYTES: &[([u8; 16], &str, usize, &[u8])] = &[
     ),
 ];
 
+/// A «jar» no title ships, listed in both lists above: a carrier test mounting it with `probe.sav`
+/// and `probe.opt` sees the first dropped and the second rewritten only if `from_archive` calls
+/// `turn_owner_sound_on` — the rows alone cannot show that, since the real jars are game bytes.
+pub const WIRING_PROBE_JAR: &[u8] = b"wie owner-files wiring probe";
+
 /// Start the title with the sound on where the owner left it off: both lists above, for this jar.
 pub fn turn_owner_sound_on(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8]) {
     drop_owner_files(files, jar, OWNER_SOUND_OFF_SETTINGS);
@@ -247,7 +268,7 @@ pub fn rewrite_owner_bytes(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8], ta
 mod tests {
     use alloc::{collections::BTreeMap, string::ToString, vec, vec::Vec};
 
-    use super::{OWNER_SOUND_OFF_BYTES, OWNER_SOUND_OFF_SETTINGS, drop_owner_files, rewrite_owner_bytes, turn_owner_sound_on};
+    use super::{OWNER_SOUND_OFF_BYTES, OWNER_SOUND_OFF_SETTINGS, WIRING_PROBE_JAR, drop_owner_files, rewrite_owner_bytes, turn_owner_sound_on};
 
     fn md5(hex: &str) -> [u8; 16] {
         core::array::from_fn(|i| u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).unwrap())
@@ -329,11 +350,23 @@ mod tests {
         assert_eq!(row("a8a613b3af6cada57eab7852bf24f473"), Some(("ds2.opt", 0, &[1][..]))); // fb80e97cbc57
     }
 
-    // 6e93f26fa2f5 keeps its owner's progress in the file that holds «sound on», so it must never
-    // be dropped — only that byte moves.
+    // These titles keep their owner's progress in the file that holds «sound on», so it must never
+    // be dropped — only that byte moves (docs/report/0537).
     #[test]
     fn a_file_holding_progress_is_rewritten_never_dropped() {
-        let hash = md5("02085b4b1dda8d3941a54d231d77d4e3");
-        assert!(!OWNER_SOUND_OFF_SETTINGS.iter().any(|(m, _)| *m == hash));
+        for (hex, file) in [
+            ("bdb4097414186a1c19d59c853deef642", "Rms"),      // abc0c5789259: the whole game context
+            ("02085b4b1dda8d3941a54d231d77d4e3", "data.sav"), // 6e93f26fa2f5: save slots and autosave
+        ] {
+            assert_eq!(names(hex).filter(|names| names.contains(&file)), None, "{hex} {file}");
+            assert_eq!(row(hex).map(|(name, ..)| name), Some(file), "{hex} {file}");
+        }
+    }
+
+    #[test]
+    fn wiring_probe_rows_are_keyed_to_the_probe_jar() {
+        assert_eq!(md5::compute(WIRING_PROBE_JAR).0, md5("267b1e2a93ff1059165ac6e0d5c23e4a"));
+        assert_eq!(names("267b1e2a93ff1059165ac6e0d5c23e4a"), Some(&["probe.sav"][..]));
+        assert_eq!(row("267b1e2a93ff1059165ac6e0d5c23e4a"), Some(("probe.opt", 0, &[1][..])));
     }
 }

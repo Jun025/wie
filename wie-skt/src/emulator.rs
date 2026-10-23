@@ -358,6 +358,25 @@ mod tests {
 
     use super::{SktEmulator, SktMsd};
 
+    // The rows are pinned in `wie-backend`; this pins that the SKT mount path applies them.
+    #[test]
+    fn from_archive_turns_the_owner_sound_on() {
+        use alloc::boxed::Box;
+        use test_utils::TestPlatform;
+        use wie_backend::owner_files::WIRING_PROBE_JAR;
+
+        let files = BTreeMap::from([
+            ("probe.msd".into(), b"MIDlet-1: probe,,Probe\nDD-ProgName: probe\n".to_vec()),
+            ("probe.jar".into(), WIRING_PROBE_JAR.to_vec()),
+            ("probe.sav".into(), vec![0]),
+            ("probe.opt".into(), vec![0]),
+        ]);
+        let emulator = SktEmulator::from_archive(Box::new(TestPlatform::new()), files).unwrap();
+
+        assert_eq!(emulator.system.filesystem().virtual_file("probe.sav"), None);
+        assert_eq!(emulator.system.filesystem().virtual_file("probe.opt"), Some(vec![1]));
+    }
+
     #[test]
     fn parse_msd_name() {
         let msd = SktMsd::parse(
