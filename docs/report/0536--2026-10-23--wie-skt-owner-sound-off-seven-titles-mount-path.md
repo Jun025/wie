@@ -37,3 +37,7 @@
 - `node scripts/player-data.mjs` · `node scripts/check-compat-revert.mjs` · `node scripts/check-worklog-json.mjs`: 회신 파일에 적었다.
 - 측정 규율: 에뮬레이터 실행은 모두 `build-slot run --long` 임대 2건 안에서 했고, 동시 실행은 최대 3이다. `nohup` 0. 회차 끝에 내가 띄운 에뮬레이터 0.
 - 게임 파일과 꺼낸 jar 는 `/tmp` 에만 있다(비커밋 · Constraint 9). 코드·문서는 타이틀을 sha12 와 jar MD5 로만 적었다.
+
+### 4. 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs` 결과는 BOUNDED 718회 / 330쌍 + SUFFIX-ATTACHED 36회 / 16쌍이다. 전부 `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 값이다. 이 회차는 그 파일에서 7행의 소리 축과 안내 줄만 바꿨다. 그 밖 파일에서 걸린 것은 0 이다. 코드 주석·회차 문서·worklog·소식은 타이틀을 sha12·sha256·jar MD5 로만 적었다.
