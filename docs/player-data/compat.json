@@ -3498,7 +3498,7 @@
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown",
+    "speed": "ok",
     "progress": "stuck"
    },
    "knownIssues_ko": [],
