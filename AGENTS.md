@@ -585,6 +585,8 @@ chain grows by itself), and 38 of 123 merged PRs did nothing but adopt/decline p
 - **A proposal a sibling PR already resolved is closed by the round that notices**, in
   `declinedProposals` — keep the ref bare (the consumer matches it verbatim) and put the reason in the
   free-form `"declinedReasons": { "<ref>": "resolved-by #<PR>" }`.
+- **A wie proposal another repo implemented is adopted by a wie worklog** — tower settles refs per repo, so
+  the implementer's own worklog cannot close it. Name the PR and merge sha in `summary`'s first sentence.
 
 ### Git Workflow
 
