@@ -56,7 +56,10 @@
 
 ### 5. 검증
 
-(아래 §5 는 커밋 전 게이트 결과로 채운다.)
+- 4 게이트(`build-slot run` 안): `cargo fmt --all -- --check` rc 0 · `cargo clippy --all -- -D warnings` rc 0 · wasm32 rc 0 · `+beta` rc 0(기존 `wie_cli` manifest 경고 7줄) · `RUST_MIN_STACK=4194304 cargo test --all` **812 passed / 0 failed**.
+- 엔진 코드를 건드리지 않아 러너 블록은 돌리지 않았다.
+- `node scripts/player-data.mjs` OK(429 · 411/10/8) · `node scripts/check-compat-revert.mjs` OK(착지 기준 바뀐 행 1) · `node scripts/check-worklog-json.mjs` OK · `npm run audit` PASSED.
+- 측정 규율: 브라우저 실행은 `build-slot run --long` 임대 2건(각 약 2분) 안에서 돌렸고, 동시 실행은 최대 3이다. `nohup` 0 · 회차 끝에 내가 띄운 프로세스 0.
 
 ### 6. 재현
 
