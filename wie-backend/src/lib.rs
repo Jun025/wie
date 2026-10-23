@@ -6,6 +6,7 @@ pub mod canvas;
 mod database;
 mod executor;
 mod frame_pacer;
+pub mod owner_files;
 mod pacing;
 mod platform;
 mod screen;

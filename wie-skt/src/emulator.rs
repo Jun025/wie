@@ -15,6 +15,7 @@ use wie_backend::{
     DefaultTaskRunner, Emulator, Event, Pacing, Platform, System,
     canvas::{decode_res, encode_png},
     extract_zip,
+    owner_files::turn_owner_sound_on,
 };
 use wie_jvm_support::{JvmSupport, RustJavaJvmImplementation};
 use wie_util::{Result, WieError};
@@ -142,7 +143,7 @@ fn class_utf8_constants(class: &[u8]) -> Vec<&[u8]> {
 }
 
 impl SktEmulator {
-    pub fn from_archive(platform: Box<dyn Platform>, files: BTreeMap<String, Vec<u8>>) -> Result<Self> {
+    pub fn from_archive(platform: Box<dyn Platform>, mut files: BTreeMap<String, Vec<u8>>) -> Result<Self> {
         let msd_file = files.iter().find(|x| x.0.ends_with(".msd")).unwrap();
         let msd = SktMsd::parse(msd_file.0, msd_file.1);
 
@@ -156,6 +157,9 @@ impl SktEmulator {
             if let Err(error) = platform.screen().resize(width, height) {
                 tracing::warn!("Ignoring unsupported display size {width}x{height}: {error}");
             }
+        }
+        if let Some(jar) = files.get(&jar_filename).cloned() {
+            turn_owner_sound_on(&mut files, &jar);
         }
 
         Self::load(platform, &jar_filename, &msd.id, Some(msd.main_class), msd.properties, &files)

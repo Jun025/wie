@@ -6,7 +6,10 @@ use bytemuck::Zeroable;
 use futures::future::poll_fn;
 use jvm::{ClassInstance, Result as JvmResult, runtime::JavaLangString};
 
-use wie_backend::{Emulator, Event, Options, Pacing, Platform, System, TaskRunner};
+use wie_backend::{
+    Emulator, Event, Options, Pacing, Platform, System, TaskRunner,
+    owner_files::{drop_owner_files, turn_owner_sound_on},
+};
 use wie_core_arm::{Allocator, ArmCore};
 use wie_jvm_support::JvmSupport;
 use wie_util::{Result, WieError, write_generic};
@@ -55,159 +58,6 @@ const DEVICE_BOUND_SAVES: &[([u8; 16], &[&str])] = &[
     ),
 ];
 
-/// The original owner's settings, shipped in the archive, that start the title with its sound off.
-/// Measured per title, keyed like `DEVICE_BOUND_SAVES` and dropped the same way, so the title starts
-/// as a fresh install does: removing only these files brings the sound back in the 30 s probes
-/// (0 plays → 1–8), and on the two titles whose settings screen was opened, turning the sound up there
-/// does the same — the game honours them, nothing in the engine is silent (docs/report/0417).
-/// Deliberately a list: other shipped settings and saves load as they always have.
-const OWNER_SOUND_OFF_SETTINGS: &[([u8; 16], &[&str])] = &[
-    // 2fc792485d91: one 11,255-byte record: settings and progress together.
-    (
-        [
-            0x26, 0xc9, 0x60, 0x35, 0x44, 0x6a, 0x98, 0x31, 0xcd, 0x3f, 0x53, 0xf7, 0x98, 0x48, 0x74, 0x30,
-        ],
-        &["sp.dat.db", "sp.dat.idx"],
-    ),
-    // 3185174d2121: 7 bytes.
-    (
-        [
-            0xe9, 0x18, 0x85, 0xfb, 0x2c, 0x0f, 0xec, 0x9e, 0xa9, 0x7a, 0x0d, 0x29, 0xc1, 0x5e, 0xd7, 0x2f,
-        ],
-        &["setup.dat"],
-    ),
-    // 5e53e490c6f1: 12 bytes; its settings screen shows the sound level at 0.
-    (
-        [
-            0x1a, 0x21, 0x23, 0xeb, 0x97, 0xe2, 0x51, 0xdb, 0xcb, 0x4b, 0x49, 0x0c, 0xee, 0x86, 0x30, 0xea,
-        ],
-        &["opt.txt"],
-    ),
-    // 6a885f89343c: a 6-byte DB; the title's other three DBs are not it.
-    (
-        [
-            0x52, 0xfd, 0x30, 0xf7, 0x1d, 0x56, 0x67, 0x96, 0x2a, 0xa0, 0xab, 0x99, 0xf4, 0x70, 0x68, 0xb0,
-        ],
-        &["sky4.db", "sky4.idx"],
-    ),
-    // bfa8ec352451: one record: the owner's name, scores and option flags.
-    (
-        [
-            0xcf, 0xa9, 0xe1, 0x86, 0x07, 0xf6, 0xdc, 0x07, 0xc6, 0x54, 0x82, 0x06, 0xbd, 0x25, 0xc2, 0xdf,
-        ],
-        &["kill.db", "kill.idx"],
-    ),
-    // de00506611a5: four records.
-    (
-        [
-            0x05, 0x55, 0x29, 0x80, 0x3d, 0x08, 0xea, 0x81, 0x6b, 0xa2, 0x12, 0x2a, 0x7f, 0x8d, 0xa6, 0x87,
-        ],
-        &["haga2.db", "haga2.idx"],
-    ),
-    // 7218e8720f8c: 8 bytes among the data files; the title writes 8 bytes back when it is absent.
-    (
-        [
-            0x93, 0x82, 0xc5, 0x4f, 0x44, 0xd6, 0xdc, 0xea, 0x90, 0xa9, 0x09, 0x51, 0x6c, 0x94, 0x2a, 0xc6,
-        ],
-        &["12_0.ida"],
-    ),
-    // 8bfd08fe4370: 18 bytes; the title writes 18 bytes back when it is absent.
-    (
-        [
-            0x01, 0xe6, 0x86, 0xc6, 0xfb, 0x5a, 0x46, 0xde, 0x39, 0xb3, 0x7e, 0xa4, 0x18, 0x51, 0x9e, 0x3b,
-        ],
-        &["kjik.mcf"],
-    ),
-    // 34ab350dc98a: 3 bytes; the second is the sound level and the owner's is 0 (set to 3, it plays).
-    (
-        [
-            0x1c, 0x40, 0xaa, 0x0b, 0x3c, 0x04, 0xa7, 0x60, 0x95, 0xaa, 0x68, 0x6c, 0x28, 0xcf, 0xd0, 0x46,
-        ],
-        &["BG0"],
-    ),
-    // c7f543c73b91: four ints; the first is the sound level and the owner's is 0 (set to 3, it plays).
-    (
-        [
-            0x75, 0x09, 0x2c, 0xa0, 0x24, 0xa3, 0x54, 0x66, 0x08, 0xca, 0x10, 0x47, 0xbd, 0x9d, 0x30, 0x06,
-        ],
-        &["option.dat"],
-    ),
-    // db8ef04a6504: a 6-byte DB; the owner's first byte is 0, the title writes 3 there when it is absent.
-    (
-        [
-            0x64, 0x87, 0x7e, 0x4b, 0x6d, 0x24, 0x50, 0x2a, 0xb8, 0xdb, 0x3e, 0xb0, 0x5b, 0x6f, 0x48, 0xb2,
-        ],
-        &["config"],
-    ),
-    // e085e193211d: 8 bytes; the first is the sound level and the owner's is 0 (set to 5, it plays).
-    (
-        [
-            0x08, 0xa2, 0xe4, 0x6b, 0xe3, 0x74, 0x81, 0x68, 0xcc, 0x0b, 0x00, 0x21, 0x5e, 0x57, 0x87, 0x90,
-        ],
-        &["ga/cf.ga"],
-    ),
-    // 36b82cb67723: the profile and its backup copy — the owner's name, and a first int that is the
-    // sound level, 0 (set to 3, it plays). The other eight `peng*` files are not it.
-    (
-        [
-            0x47, 0xe3, 0x24, 0xc4, 0x31, 0x55, 0x49, 0xd8, 0x04, 0x7a, 0x5b, 0xfc, 0xbb, 0xf1, 0xac, 0x19,
-        ],
-        &["peng0.txt", "pengB0.txt"],
-    ),
-    // b907b0faf483: 6 bytes; the second is «sound on» and the owner's is 0 (set to 1, it plays).
-    (
-        [
-            0x0f, 0x42, 0xb6, 0xec, 0x06, 0x92, 0xfd, 0x29, 0x31, 0x20, 0x7c, 0xb4, 0x75, 0x19, 0x81, 0xc3,
-        ],
-        &["config.sav"],
-    ),
-    // 5a59f62d1f1a: 4 bytes, shipped twice (bare and under `P/`); the first is the sound level and the
-    // owner's is 0 (set to 3, it plays). `save.dat` beside it is not it.
-    (
-        [
-            0x84, 0x05, 0x24, 0x81, 0xea, 0x39, 0x45, 0x7b, 0xa8, 0xf8, 0xd7, 0xfb, 0x06, 0x25, 0x2e, 0x57,
-        ],
-        &["config.dat"],
-    ),
-];
-
-/// The same owner's «sound off», for titles that cannot lose the file holding it: without it one
-/// title exits at start and the other freezes (docs/report/0440, 0517). Only the measured bytes are
-/// rewritten to the value that plays — (jar MD5, file, offset, bytes); the rest of the file loads as shipped.
-const OWNER_SOUND_OFF_BYTES: &[([u8; 16], &str, usize, &[u8])] = &[
-    // 5aa438fbdc87: `op_save.db` (5 bytes), the first is the sound level and the owner's is 0 (3 plays).
-    (
-        [
-            0x09, 0xbf, 0x6d, 0x6d, 0x5b, 0xf4, 0x8f, 0xe6, 0x59, 0xee, 0xb1, 0x56, 0x3c, 0xed, 0x5a, 0xb9,
-        ],
-        "op_save.db",
-        0,
-        &[3],
-    ),
-    // 6c9f969f089f: `personal_data` (868 bytes), the big-endian int at +4 is the sound-off flag, the owner's is 1.
-    (
-        [
-            0x8f, 0xc4, 0xf1, 0x4b, 0x20, 0xe4, 0xcd, 0xd0, 0x26, 0x39, 0xfd, 0x32, 0x26, 0xd2, 0xaa, 0xac,
-        ],
-        "personal_data",
-        4,
-        &[0, 0, 0, 0],
-    ),
-];
-
-/// Rewrite the bytes `table` names for this jar, wherever `drop_device_bound_saves` would look.
-fn turn_owner_sound_on(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8], table: &[([u8; 16], &str, usize, &[u8])]) {
-    let hash = md5::compute(jar).0;
-    for (_, name, offset, value) in table.iter().filter(|(md5, ..)| *md5 == hash) {
-        for key in [(*name).to_owned(), format!("P/{name}"), format!("p/{name}")] {
-            if let Some(bytes) = files.get_mut(&key).and_then(|data| data.get_mut(*offset..offset + value.len())) {
-                bytes.copy_from_slice(value);
-                tracing::info!("Turning the original owner's sound on in {key}");
-            }
-        }
-    }
-}
-
 /// The original owner's progress, shipped in the archive, that «continue» opens: a new player would
 /// pick up someone else's game. Measured per title — the original and a copy without only these files,
 /// same keys — and kept to the titles where «continue» was seen to open it; the copy starts as a fresh
@@ -243,7 +93,7 @@ const OWNER_PROGRESS_SAVES: &[([u8; 16], &[&str])] = &[
         ],
         &["GameScore.txt"],
     ),
-    // 5e53e490c6f1: «continue» opens the owner's year 196 with 15 players and 500M (its settings are in `OWNER_SOUND_OFF_SETTINGS`).
+    // 5e53e490c6f1: «continue» opens the owner's year 196 with 15 players and 500M (its settings are in `wie_backend::owner_files::OWNER_SOUND_OFF_SETTINGS`).
     (
         [
             0x1a, 0x21, 0x23, 0xeb, 0x97, 0xe2, 0x51, 0xdb, 0xcb, 0x4b, 0x49, 0x0c, 0xee, 0x86, 0x30, 0xea,
@@ -293,21 +143,6 @@ const OWNER_PROGRESS_SAVES: &[([u8; 16], &[&str])] = &[
         &["io.dat"],
     ),
 ];
-
-/// Remove the files `table` names for this jar, bare and under either private directory spelling
-/// (`load` mounts all three at the same path).
-fn drop_device_bound_saves(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8], table: &[([u8; 16], &[&str])]) {
-    let hash = md5::compute(jar).0;
-    for (_, names) in table.iter().filter(|(md5, _)| *md5 == hash) {
-        for name in *names {
-            for key in [(*name).to_owned(), format!("P/{name}"), format!("p/{name}")] {
-                if files.remove(&key).is_some() {
-                    tracing::info!("Not mounting the original owner's {key}");
-                }
-            }
-        }
-    }
-}
 
 /// The archive's private directory is mounted at the root, where the title looks for it. Archives
 /// spell it `P/` or `p/`: 25 KTF titles ship theirs lowercase, and one of them (1793f87924d4) shows
@@ -378,10 +213,9 @@ impl KtfEmulator {
 
         let jar_filename = jar_filename(&adf.aid, &files);
         if let Some(jar) = files.get(&jar_filename).cloned() {
-            drop_device_bound_saves(&mut files, &jar, DEVICE_BOUND_SAVES);
-            drop_device_bound_saves(&mut files, &jar, OWNER_SOUND_OFF_SETTINGS);
-            drop_device_bound_saves(&mut files, &jar, OWNER_PROGRESS_SAVES);
-            turn_owner_sound_on(&mut files, &jar, OWNER_SOUND_OFF_BYTES);
+            drop_owner_files(&mut files, &jar, DEVICE_BOUND_SAVES);
+            drop_owner_files(&mut files, &jar, OWNER_PROGRESS_SAVES);
+            turn_owner_sound_on(&mut files, &jar);
         }
 
         Self::load(platform, &jar_filename, &adf.pid, &adf.aid, Some(adf.mclass), &files, options)
@@ -531,81 +365,13 @@ mod tests {
     use wie_core_arm::{Allocator, ArmCore};
     use wie_util::{Result, WieError};
 
-    use super::{KtfJvmSupport, KtfTaskRunner, drop_device_bound_saves, private_path};
+    use super::{KtfJvmSupport, KtfTaskRunner, private_path};
 
     #[test]
     fn private_directory_mounts_at_the_root_in_either_case() {
         assert_eq!(private_path("P/res/save.sav"), "res/save.sav");
         assert_eq!(private_path("p/imgChar_.dat"), "imgChar_.dat");
         assert_eq!(private_path("res/other.sav"), "res/other.sav");
-    }
-
-    #[test]
-    fn device_bound_saves_dropped_for_listed_jar_only() {
-        use alloc::{collections::BTreeMap, string::ToString, vec};
-
-        let archive = |names: &[&str]| names.iter().map(|name| (name.to_string(), vec![1])).collect::<BTreeMap<_, _>>();
-        let table: &[([u8; 16], &[&str])] = &[(md5::compute(b"listed").0, &["res/save.sav", "res/savem.sav"])];
-
-        let mut files = archive(&["A.jar", "__adf__", "P/res/save.sav", "res/savem.sav", "P/res/other.sav"]);
-        drop_device_bound_saves(&mut files, b"listed", table);
-        assert_eq!(files.keys().collect::<alloc::vec::Vec<_>>(), ["A.jar", "P/res/other.sav", "__adf__"]);
-
-        // A lowercase private directory is mounted at the same path, so it is dropped the same way.
-        let mut files = archive(&["A.jar", "p/res/save.sav", "p/res/other.sav"]);
-        drop_device_bound_saves(&mut files, b"listed", table);
-        assert_eq!(files.keys().collect::<alloc::vec::Vec<_>>(), ["A.jar", "p/res/other.sav"]);
-
-        // Any other jar — every other title — mounts exactly what it shipped.
-        let mut files = archive(&["A.jar", "P/res/save.sav", "P/res/savem.sav"]);
-        drop_device_bound_saves(&mut files, b"other", table);
-        assert_eq!(files.len(), 3);
-    }
-
-    // Measured, not derivable: without these files the two titles play from the start (docs/report/0519).
-    // The jars are game bytes and cannot be here, so this pins the rows rather than the drop. The MD5s
-    // are `md5 -q <jar>` output pasted as-is, so a slip copying them into the table's byte rows fails here.
-    #[test]
-    fn owner_sound_off_settings_cover_the_two_0519_titles() {
-        let names = |hex: &str| {
-            let md5: [u8; 16] = core::array::from_fn(|i| u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).unwrap());
-            super::OWNER_SOUND_OFF_SETTINGS.iter().find(|(m, _)| *m == md5).map(|(_, n)| *n)
-        };
-
-        assert_eq!(names("0f42b6ec0692fd2931207cb4751981c3"), Some(&["config.sav"][..])); // b907b0faf483
-        assert_eq!(names("84052481ea39457ba8f8d7fb06252e57"), Some(&["config.dat"][..])); // 5a59f62d1f1a
-    }
-
-    // Same pinning as above for the byte rows, plus the rewrite itself on a stand-in jar.
-    #[test]
-    fn owner_sound_off_bytes_rewrite_only_the_listed_bytes() {
-        use alloc::{collections::BTreeMap, string::ToString, vec};
-
-        let row = |hex: &str| {
-            let md5: [u8; 16] = core::array::from_fn(|i| u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).unwrap());
-            super::OWNER_SOUND_OFF_BYTES
-                .iter()
-                .find(|(m, ..)| *m == md5)
-                .map(|(_, n, o, v)| (*n, *o, *v))
-        };
-        assert_eq!(row("09bf6d6d5bf48fe659eeb1563ced5ab9"), Some(("op_save.db", 0, &[3][..]))); // 5aa438fbdc87
-        assert_eq!(row("8fc4f14b20e4cdd02639fd3226d2aaac"), Some(("personal_data", 4, &[0, 0, 0, 0][..]))); // 6c9f969f089f
-
-        let table: &[([u8; 16], &str, usize, &[u8])] = &[(md5::compute(b"listed").0, "s.db", 1, &[9, 9])];
-        let archive = || {
-            [("P/s.db".to_string(), vec![1, 2, 3, 4]), ("t.db".to_string(), vec![1, 2, 3, 4])]
-                .into_iter()
-                .collect::<BTreeMap<_, _>>()
-        };
-
-        let mut files = archive();
-        super::turn_owner_sound_on(&mut files, b"listed", table);
-        assert_eq!(files["P/s.db"], [1, 9, 9, 4]);
-        assert_eq!(files["t.db"], [1, 2, 3, 4]);
-
-        let mut files = archive();
-        super::turn_owner_sound_on(&mut files, b"other", table);
-        assert_eq!(files, archive());
     }
 
     #[test]
