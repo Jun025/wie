@@ -1,0 +1,11 @@
+{
+  "date": "2026-10-23",
+  "task": "wie-skt-owner-sound-off-seven-titles-mount-path",
+  "title": "SKT 동봉 «소리 끔» 설정 7종 — KTF 장치를 wie-backend 로 옮겨 SKT 마운트 경로에도",
+  "summary": "OWNER_SOUND_OFF_SETTINGS·OWNER_SOUND_OFF_BYTES 와 두 적용 함수를 wie-backend::owner_files 로 옮겨 KTF·SKT 가 한 목록을 쓴다. SKT 7행(파일 빼기 2 · 바이트 5). 6e93f26fa2f5 는 진도가 든 data.sav 의 +569 바이트만 바꾼다.",
+  "verification": "7종 재생 0 → 1~12(전·후 짝 · 90초 · release). KTF 기존 4종 전·후 같음.",
+  "proposals": [],
+  "adoptedProposals": [
+    "2026-10-21-sound-no-and-speed-unknown-remeasure#p0"
+  ]
+}
