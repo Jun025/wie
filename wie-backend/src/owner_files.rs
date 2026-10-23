@@ -9,7 +9,7 @@ use alloc::{borrow::ToOwned, collections::BTreeMap, format, string::String, vec:
 /// Measured per title, and dropped so the title starts as a fresh install does: removing only these
 /// files brings the sound back in the 30 s probes (0 plays → 1–10), and on the titles whose settings
 /// screen was opened, turning the sound up there does the same — the game honours them, nothing in
-/// the engine is silent (docs/report/0417, 0536). Deliberately a list: other shipped settings and
+/// the engine is silent (docs/report/0417, 0537). Deliberately a list: other shipped settings and
 /// saves load as they always have.
 pub const OWNER_SOUND_OFF_SETTINGS: &[([u8; 16], &[&str])] = &[
     // KTF
@@ -139,7 +139,7 @@ pub const OWNER_SOUND_OFF_SETTINGS: &[([u8; 16], &[&str])] = &[
 
 /// The same owner's «sound off», for titles that cannot lose the file holding it: without it one
 /// title exits at start and another freezes (docs/report/0440, 0517), and some hold the owner's
-/// progress in the same file (docs/report/0536). Only the measured bytes are rewritten to the value
+/// progress in the same file (docs/report/0537). Only the measured bytes are rewritten to the value
 /// that plays — (jar MD5, file, offset, bytes); the rest of the file loads as shipped.
 pub const OWNER_SOUND_OFF_BYTES: &[([u8; 16], &str, usize, &[u8])] = &[
     // KTF
@@ -309,7 +309,7 @@ mod tests {
     }
 
     // Measured, not derivable: with these rows the titles play from the start (docs/report/0519, 0526,
-    // 0536). The jars are game bytes and cannot be here, so this pins the rows rather than the effect.
+    // 0537). The jars are game bytes and cannot be here, so this pins the rows rather than the effect.
     // The MD5s are `md5 -q <jar>` output pasted as-is, so a slip copying them into the byte rows fails here.
     #[test]
     fn owner_sound_off_rows_cover_the_measured_titles() {
