@@ -87,9 +87,10 @@ jobs:
         with:
           tool: cargo-audit
 
-      # No ignores, no `--deny warnings`, no `continue-on-error` — identical semantics to the
-      # daily job's audit step on purpose, so the two can never disagree about what counts as a
-      # failure. Vulnerabilities exit non-zero; informational warnings (unmaintained / yanked)
+      # No `--deny warnings`, no `continue-on-error`, and the SAME named `--ignore`s as the daily
+      # job's audit step (zip RUSTSEC-2026-0367/0368/0369 — reachability in ledger §D) — identical
+      # semantics on purpose, so the two can never disagree about what counts as a failure;
+      # scripts/check-audit-warnings.mjs reddens the daily job if the two lists drift. Vulnerabilities exit non-zero; informational warnings (unmaintained / yanked)
       # print and exit 0. The allowed-warning list and the ledger comparison are NOT run here;
       # they stay in rust-audit.yaml (see the header).
       #
@@ -97,4 +98,4 @@ jobs:
       # section C holds the exposure verdicts we already reached and the dependency version each
       # was measured against.
       - name: cargo audit
-        run: cargo audit
+        run: cargo audit --ignore RUSTSEC-2026-0367 --ignore RUSTSEC-2026-0368 --ignore RUSTSEC-2026-0369
