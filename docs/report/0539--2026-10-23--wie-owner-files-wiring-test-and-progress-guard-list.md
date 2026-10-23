@@ -22,3 +22,5 @@
 ### 게이트
 - `cargo fmt --check` · `clippy --all -D warnings` · wasm clippy · `+beta clippy` 모두 rc 0 이다. `RUST_MIN_STACK=4194304 cargo test --all` 은 rc 0 · **816 passed / 0 failed** 다(813 에 새 시험 3개: KTF·SKT 배선, 탐침 행 고정).
 - 엔진 runner 블록 6줄은 모두 `PASS` · rc 0 이다(load1 6.2).
+
+<!-- corpus-name-inflow v1 subjects=6 tree=eb6107b0d34506f1 B=0/0 P=0/0 S=0/0 -->
