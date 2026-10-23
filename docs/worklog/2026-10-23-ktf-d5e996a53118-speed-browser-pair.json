@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-23",
+  "task": "wie-ktf-d5e996a53118-speed-browser-pair-remeasure",
+  "title": "KTF d5e996a53118 속도 브라우저 짝 — 정상 확정",
+  "summary": "브라우저 2회(게스트 10~40초 그리기 · 2배속 하한 1.80·1.81)로 1배속 비율 1.00·1.00 을 확인해 compat.json speed 를 unknown → ok 로 바꿨다. 명목치 = 2배 여유에서 같은 키 경로가 그리는 수(키 없는 실행으로 먼저 확인).",
+  "report": "docs/report/0535--2026-10-23--wie-ktf-d5e996a53118-speed-browser-pair-remeasure.md",
+  "adoptedProposals": ["2026-10-21-sound-no-and-speed-unknown-remeasure#p1"],
+  "proposals": []
+}

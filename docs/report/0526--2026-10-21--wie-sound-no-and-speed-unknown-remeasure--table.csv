@@ -10,7 +10,7 @@ f44271803135,KTF,limited,no,no,ok,ok,원래 소리 없음(닿는 화면),서버 
 689c491586b9,KTF,playable,no,no,unknown,unknown,원래 소리 없음(닿는 화면),안내 유지,서버 접속 실패 뒤 종료 · 매체 호출 0(0517),,187
 1b3b4868d46e,KTF,playable,ok,ok,unknown,unknown,미측정(속도 · 대기 없음),유지,창 안 sleep·타이머 0 — 비율의 분모가 없어 이 도구로는 원리상 못 잰다(0516 N),,137
 0eb19d9bbe7a,KTF,playable,ok,ok,unknown,unknown,미측정(속도 · 대기 없음),유지,창 안 sleep·타이머 0 — 비율의 분모가 없어 이 도구로는 원리상 못 잰다(0516 N),,122
-d5e996a53118,KTF,playable,ok,ok,unknown,unknown,미측정(속도 · 헤드리스만),후속,5 ms 타이머 · 헤드리스 0.78(0516)·0.35(이 회차 load1 84) · 브라우저 짝 없음,0.347,84
+d5e996a53118,KTF,playable,ok,ok,unknown,ok,속도 정상 확정,브라우저 짝(0535),5 ms 타이머 · 헤드리스 0.78(0516)·0.35(이 회차 load1 84) · 브라우저 2회 그리기 1.00·1.00 · 2배속 하한 1.80·1.81(0535),0.347,84
 dab2d537f3ef,KTF,not-yet,unknown,unknown,unknown,unknown,미측정(암호 파일),정책,OMA DRM 컨테이너 · 부팅 안 됨(0330),,96
 60bd6cbc5936,KTF,not-yet,unknown,unknown,unknown,unknown,미측정(암호 파일),정책,같음,,170
 ea35907b22a4,KTF,playable,ok,ok,unknown,unknown,미측정(속도 · 대기 없음),유지,창 안 sleep·타이머 0 — 비율의 분모가 없어 이 도구로는 원리상 못 잰다(0516 N),,87
