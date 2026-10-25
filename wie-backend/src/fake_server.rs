@@ -51,6 +51,13 @@ const SERVERS: &[Server] = &[
         port: 15133,
         respond: certificate_c2s,
     },
+    // 0093012b8c36: «인증서가 없습니다» → 예 — a keep-alive, then one login, then the title screen.
+    Server {
+        aid: "0002D504",
+        host: [121, 254, 169, 67],
+        port: 13505,
+        respond: login_0200,
+    },
 ];
 
 /// caf9d76ffd13's packets: `[total length u16 LE][command u16 LE][body]`, the length counting the
@@ -93,6 +100,31 @@ fn certificate_c2s(request: &mut Vec<u8>) -> Option<Vec<u8>> {
         }
         _ => None,
     }
+}
+
+/// 0093012b8c36's packets: `[total length u16 LE][class][sub]`, a 16-byte header whose halfword at
+/// 12 must be `0xff` (the dispatcher at binary.mod 0x6eda0 shows «에러» for anything else), then the
+/// body. It sends a 24-byte keep-alive (class `0xff`, sub 1) and the 576-byte login (class 2, sub 0 —
+/// phone number and model, built from `PHONENUMBER`/`PHONEMODEL`).
+///
+/// The login is answered with class 2, sub 0 and a 0x48-byte body: its handler (0x6f05c) copies the
+/// body, marks the certificate as received in the save it keeps — so a relaunch does not ask again
+/// (measured) — reads two options from body bytes 1..8 only when byte 1 is nonzero, and moves to the
+/// title screen (state 11). It checks no result byte, so an all-zero body is a success. The
+/// keep-alive gets no answer, as nothing waits for one.
+fn login_0200(request: &mut Vec<u8>) -> Option<Vec<u8>> {
+    let mut reply = Vec::new();
+    while let Some(packet) = take_packet(request, |x| u16::from_le_bytes([x[0], x[1]]) as usize) {
+        if packet[2..4] == [0x02, 0x00] {
+            let mut answer = vec![0; 0x58];
+            answer[0] = 0x58;
+            answer[2] = 0x02;
+            answer[0xc] = 0xff;
+            reply.extend(answer);
+        }
+    }
+
+    (!reply.is_empty()).then_some(reply)
 }
 
 /// The first whole packet in `request`, removed from it; None until one has arrived. `length` reads
@@ -205,6 +237,12 @@ impl FakeNet {
         Some(socket.reply.drain(..n).collect())
     }
 
+    /// Whether `fd` is one of these sockets — the gate a call checks before it touches guest
+    /// memory or schedules a callback, so a title with none sees the network exactly as before.
+    pub fn contains(&self, fd: i32) -> bool {
+        self.sockets.contains_key(&fd)
+    }
+
     pub fn readable(&self, fd: i32) -> bool {
         self.sockets.get(&fd).is_some_and(|x| !x.reply.is_empty())
     }
@@ -269,6 +307,26 @@ mod tests {
         assert_eq!(reply[45], 1);
         // a command it does not know gets no answer rather than a guess
         assert_eq!(net.write(fd, &[4, 0, 0x00, 0x02]), Some(false));
+    }
+
+    // 0093012b8c36: the keep-alive and the login arrive in one buffer; only the login is answered.
+    #[test]
+    fn login_0200_answers_the_login_not_the_keep_alive() {
+        let mut net = FakeNet::new("0002D504");
+        let fd = net.socket().unwrap();
+        assert!(net.connect(fd, [121, 254, 169, 67], 13505));
+        let mut keep_alive = vec![0x18, 0, 0xff, 0x01];
+        keep_alive.resize(0x18, 0);
+        keep_alive[0xc] = 0xff;
+        assert_eq!(net.write(fd, &keep_alive), Some(false));
+        let mut login = vec![0x40, 0x02, 0x02, 0x00];
+        login.resize(0x240, 0);
+        assert_eq!(net.write(fd, &login), Some(true));
+
+        let reply = net.read(fd, 0x100).unwrap();
+        assert_eq!(reply.len(), 0x58);
+        assert_eq!((&reply[..4], reply[0xc]), (&[0x58, 0, 0x02, 0x00][..], 0xff));
+        assert!(reply[0x10..].iter().all(|&x| x == 0));
     }
 
     // b9bfcaf42722: hello, then the certificate with its length at offset 6.

@@ -6,8 +6,9 @@ use wie_util::{Result, WieError};
 
 use crate::{WIPICResult, context::WIPICContext, method::MethodBody};
 
-// `MC_netSocketRead`/`Write`'s «try again when the callback fires» — caf9d76ffd13's socket class
-// (binary.mod 0x197fa, 0x19906) compares against exactly this before it calls `MC_netSetReadCB`.
+// `MC_netSocketRead`/`Write`'s «try again when the callback fires» — b9bfcaf42722's first read
+// gets it and registers `MC_netSetReadCB` (measured; caf9d76ffd13's socket class compares against
+// it too, binary.mod 0x197fa, 0x19906, but its reply is always queued before it reads).
 const M_E_WOULDBLOCK: i32 = -19;
 
 /// `cb(args…)` on the next turn of the executor, as the handset delivers network callbacks;
@@ -119,11 +120,17 @@ pub async fn socket(context: &mut dyn WIPICContext, domain: i32, r#type: i32) ->
 }
 
 // The whole buffer is always taken; a reply the fake server queues wakes a pending read callback.
+// Any other fd is refused before `buf` is read, as the LGT stub this replaced did: a title with no
+// server must not have a garbage `len` allocated or a bad `buf` turned into a fault.
 pub async fn socket_write(context: &mut dyn WIPICContext, fd: i32, buf: u32, len: i32) -> Result<i32> {
+    if !context.system().fake_net().contains(fd) {
+        tracing::warn!("MC_netSocketWrite({fd}, {buf:#x}, {len}) -> -1 (no network)");
+        return Ok(-1);
+    }
     let mut data = vec![0; len.max(0) as usize];
     context.read_bytes(buf, &mut data)?;
     let Some(replied) = context.system().fake_net().write(fd, &data) else {
-        tracing::warn!("MC_netSocketWrite({fd}, {buf:#x}, {len}) -> -1 (no network)");
+        tracing::warn!("MC_netSocketWrite({fd}, {buf:#x}, {len}) -> -1 (not connected)");
         return Ok(-1);
     };
     let waiting = if replied { context.system().fake_net().take_read_cb(fd) } else { None };
@@ -153,7 +160,12 @@ pub async fn socket_read(context: &mut dyn WIPICContext, fd: i32, buf: u32, len:
 }
 
 // `MC_netSetReadCB(fd, cb, param)`: one shot — `cb(fd, M_E_SUCCESS, param)` once a reply is queued.
+// Only on a fake server's socket; any other fd is -1 with no callback, as `set_write_cb` below.
 pub async fn set_read_cb(context: &mut dyn WIPICContext, fd: i32, cb: WIPICWord, param: WIPICWord) -> Result<i32> {
+    if !context.system().fake_net().contains(fd) {
+        tracing::warn!("MC_netSetReadCB({fd}, {cb:#x}, {param:#x}) -> -1 (no network)");
+        return Ok(-1);
+    }
     let readable = context.system().fake_net().readable(fd);
     if readable {
         context.spawn(Box::new(Callback {
@@ -168,8 +180,13 @@ pub async fn set_read_cb(context: &mut dyn WIPICContext, fd: i32, cb: WIPICWord,
     Ok(0)
 }
 
-// `MC_netSetWriteCB(fd, cb, param)`: a write never blocks here, so the socket is writable now.
+// `MC_netSetWriteCB(fd, cb, param)`: a write never blocks here, so a fake server's socket is
+// writable now. Any other fd is -1 with no callback — no socket is announced as writable.
 pub async fn set_write_cb(context: &mut dyn WIPICContext, fd: i32, cb: WIPICWord, param: WIPICWord) -> Result<i32> {
+    if !context.system().fake_net().contains(fd) {
+        tracing::warn!("MC_netSetWriteCB({fd}, {cb:#x}, {param:#x}) -> -1 (no network)");
+        return Ok(-1);
+    }
     context.spawn(Box::new(Callback {
         cb,
         args: vec![fd as WIPICWord, 0, param],
@@ -189,7 +206,7 @@ mod tests {
     use wie_backend::{DefaultTaskRunner, System};
     use wie_util::{ByteRead, ByteWrite};
 
-    use super::{WIPICContext, connect, set_read_cb, socket, socket_connect, socket_read, socket_write};
+    use super::{WIPICContext, connect, set_read_cb, set_write_cb, socket, socket_connect, socket_read, socket_write};
 
     fn context(aid: &str) -> TestContext {
         TestContext::with_system(System::new(Box::new(TestPlatform::new()), "", aid, DefaultTaskRunner))
@@ -213,40 +230,54 @@ mod tests {
         assert_eq!(context.call_args, [(0x24501, vec![u32::MAX, u32::MAX, 7])]);
     }
 
-    // caf9d76ffd13's whole exchange through the WIPI-C calls, as its socket class makes them: the
-    // connects succeed, the first read would block and leaves a read callback, the login's reply
-    // wakes it, and the reply reads back whole.
+    // b9bfcaf42722's certificate exchange through the WIPI-C calls, in the order and with the
+    // addresses a run of the title makes them (docs/report/0542): the connects succeed, the first
+    // read would block and leaves a read callback, the hello's reply wakes it, and the reply reads
+    // back. caf9d76ffd13 writes before it reads and never takes the callback path.
     #[futures_test::test]
     async fn listed_title_talks_to_its_fake_server_test() {
-        let mut context = context("00026E9C");
-        connect(&mut context, 0x196f9, 9).await.unwrap();
+        let mut context = context("0002A61E");
+        connect(&mut context, 0x4a24d, 0x150770c).await.unwrap();
         assert_eq!(context.spawned.len(), 1); // `cb(M_E_SUCCESS, param)`, a tick later
         context.spawned.clear();
         let fd = socket(&mut context, 2, 1).await.unwrap();
         assert!(fd >= 0);
-        // `inet_addr("218.145.70.36")` and `htons(31106)`, as the title passes them
-        socket_connect(&mut context, fd, u32::from_le_bytes([218, 145, 70, 36]), 0x8279, 0x1979d, 9)
-            .await
-            .unwrap();
+        // `inet_addr("211.115.66.250")` and `htons(15133)`, as the title passes them
+        socket_connect(&mut context, fd, 0xfa4273d3, 0x1d3b, 0x4a205, 0x150770c).await.unwrap();
         for callback in core::mem::take(&mut context.spawned) {
             callback.call(&mut context, Box::new([])).await.unwrap();
         }
-        assert_eq!(context.call_args, [(0x1979d, vec![fd as u32, 0, 9])]);
+        assert_eq!(context.call_args, [(0x4a205, vec![fd as u32, 0, 0x150770c])]);
 
-        let buf = context.alloc_raw(0x40).unwrap();
-        assert_eq!(socket_read(&mut context, fd, buf, 4).await.unwrap(), -19);
-        set_read_cb(&mut context, fd, 0x19941, 9).await.unwrap();
-        let mut login = vec![0x3f, 0, 0x02, 0x01];
-        login.resize(0x3f, 0);
-        context.write_bytes(buf, &login).unwrap();
-        assert_eq!(socket_write(&mut context, fd, buf, 0x3f).await.unwrap(), 0x3f);
+        let buf = context.alloc_raw(0x80).unwrap();
+        assert_eq!(socket_read(&mut context, fd, buf, 2).await.unwrap(), -19);
+        set_read_cb(&mut context, fd, 0x49861, 0x150770c).await.unwrap();
+        assert!(context.spawned.is_empty()); // nothing to read yet
+        let mut hello = vec![0, 0x49, 0, 0x00];
+        hello.resize(0x49, 0);
+        context.write_bytes(buf, &hello).unwrap();
+        assert_eq!(socket_write(&mut context, fd, buf, 0x49).await.unwrap(), 0x49);
         let woken = context.spawned.pop().unwrap();
         woken.call(&mut context, Box::new([])).await.unwrap();
-        assert_eq!(context.call_args.last(), Some(&(0x19941, vec![fd as u32, 0, 9])));
+        assert_eq!(context.call_args.last(), Some(&(0x49861, vec![fd as u32, 0, 0x150770c])));
 
-        assert_eq!(socket_read(&mut context, fd, buf, 0x40).await.unwrap(), 46);
-        let mut reply = [0; 5];
+        assert_eq!(socket_read(&mut context, fd, buf, 2).await.unwrap(), 2);
+        assert_eq!(socket_read(&mut context, fd, buf + 2, 4).await.unwrap(), 4);
+        let mut reply = [0; 6];
         context.read_bytes(buf, &mut reply).unwrap();
-        assert_eq!(reply, [46, 0, 0x03, 0x01, 1]);
+        assert_eq!(reply, [0, 6, 0, 0x00, 0, 0]);
+    }
+
+    // 0fdf45ec169f has no listed server; after its `MC_netConnect` fails it writes one byte to fd 0,
+    // a socket it never made. An unlisted title's write is refused before `buf` is read — a `buf`
+    // outside guest memory stays -1 rather than becoming a fault — and its SetWriteCB/SetReadCB
+    // announce nothing.
+    #[futures_test::test]
+    async fn unlisted_title_write_and_callbacks_stay_offline_test() {
+        let mut context = context("0002B76D");
+        assert_eq!(socket_write(&mut context, 0, 0xf000_0000, 16).await.unwrap(), -1);
+        assert_eq!(set_write_cb(&mut context, 0, 0x1284fd, 0).await.unwrap(), -1);
+        assert_eq!(set_read_cb(&mut context, 0, 0x1284fd, 0).await.unwrap(), -1);
+        assert!(context.spawned.is_empty());
     }
 }
