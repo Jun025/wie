@@ -1,6 +1,6 @@
 ## [2026-10-26] SKT 서버 벽 `640428a9cf9e` — 받던 것이 게임 자원이라 남김, 안내 문장만 교정 (wie-skt-server-wall-princessmaker4-small-required-data)
 
-**무엇을**: SKT `limited` 1종 `640428a9cf9e`(프린세스메이커4 작은화면 · 서버 벽)가 서버에서 무엇을 받는지 javap 와 실행 로그로 쟀다. 판정은 ⒝(jar 밖 게임 자원)다. 엔진 코드는 바꾸지 않았다. `HAND_WALL` 과 `compat.json` 의 안내 문장만 실제 벽에 맞게 고쳤다.
+**무엇을**: SKT `limited` 1종 `640428a9cf9e`(서버 벽)가 서버에서 무엇을 받는지 javap 와 실행 로그로 쟀다. 판정은 ⒝(jar 밖 게임 자원)다. 엔진 코드는 바꾸지 않았다. `HAND_WALL` 과 `compat.json` 의 안내 문장만 실제 벽에 맞게 고쳤다.
 
 **왜**: 운영자 지시(2026-10-26)는 SKT 미플레이 판을 플레이 가능으로 만드는 것이다. `not-yet` 5종은 구매 단말 잠금이라 정책상 범위 밖이고, 남은 1종이 이 판이다. 0542 의 `wie_backend::fake_server` 에 SKT 행을 더할 수 있는지 먼저 판별했다.
 
@@ -40,3 +40,7 @@
 ### 5. 남은 SKT 미플레이
 
 `not-yet` 5종(구매 단말 잠금)과 이 1종(⒝)이다. 이 판을 켜려면 원래 서버가 주던 28개 파일이 있어야 한다. 엔진 쪽에서 할 수 있는 일은 없다.
+
+### 6. 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs`(이 브랜치 대 `origin/main`): BOUNDED 와 SUFFIX-ATTACHED 는 모두 바뀐 파일 «전체»를 훑은 수다. 이 회차가 더한 줄에서 나온 것은 없다. `compat.json` 의 기존 `title`·`fileTitle` 칸과 `playability-census.mjs` 의 기존 안내 문장(«턴종료»)이 잡혔다. 이 보고서 본문에는 제목을 쓰지 않았다(sha12 로만 가리킨다).
