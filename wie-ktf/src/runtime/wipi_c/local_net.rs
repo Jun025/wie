@@ -21,7 +21,7 @@ use spin::Mutex;
 
 use wipi_types::wipic::WIPICWord;
 
-use wie_util::{Result, WieError, read_generic, write_generic};
+use wie_util::{Result, WieError};
 use wie_wipi_c::{MethodBody, WIPICContext, WIPICResult, api::net};
 
 /// The descriptor `MC_netSocket` hands a listed title. Any positive value works; this one is
@@ -111,7 +111,10 @@ pub async fn socket_open(
     tracing::warn!("Net slot 30({addr:#x}, {port}) -> {}", if ours { "local server" } else { "refused" });
 
     let result = if ours { 0 } else { u32::MAX }; // M_E_SUCCESS / M_E_ERROR
-    context.spawn(Box::new(Callback { cb, args: vec![fd as _, result, param] }))?;
+    context.spawn(Box::new(Callback {
+        cb,
+        args: vec![fd as _, result, param],
+    }))?;
 
     Ok(0)
 }
@@ -123,7 +126,8 @@ pub async fn socket_send(context: &mut dyn WIPICContext, fd: i32, buf: WIPICWord
         return Err(WieError::Unimplemented(alloc::format!("Net slot 31 on fd {fd}")));
     }
 
-    let request = (0..len.max(0) as u32).map(|i| read_generic(context, buf + i)).collect::<Result<Vec<u8>>>()?;
+    let mut request = vec![0; len.max(0) as usize];
+    context.read_bytes(buf, &mut request)?;
     let reply = server_for(context).and_then(|server| (server.reply)(&request));
     tracing::warn!("Net slot 31({len} bytes) -> reply {:?}", reply.as_ref().map(Vec::len));
     PENDING.lock().extend(reply.unwrap_or_default());
@@ -145,9 +149,7 @@ pub async fn socket_recv(context: &mut dyn WIPICContext, fd: i32, buf: WIPICWord
     if bytes.is_empty() {
         return Ok(WOULD_BLOCK);
     }
-    for (i, byte) in bytes.iter().enumerate() {
-        write_generic(context, buf + i as u32, *byte)?;
-    }
+    context.write_bytes(buf, &bytes)?;
 
     Ok(bytes.len() as _)
 }

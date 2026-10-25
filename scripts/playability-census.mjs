@@ -711,7 +711,8 @@ const LOCK_HAND = { '01f05f8231f4': 'phone' };
 // says so in the player's words, and `status` stays where the title really gets to (at most limited).
 // The rule is the run, not the code: measured 2026-10-02 on the bd2337ff census, 30 titles reach a
 // connect call and 29 of them play — they connect once (at most 5 times a run) and go on. A title
-// that cannot go on keeps asking: f44271803135 retried 416 to 2,463 times in a 30 s probe. Two more that read
+// that cannot go on keeps asking: f44271803135 retried 416 to 2,463 times in a 30 s probe (since 0541 a local server
+// answers it, so it connects once — the numbers stay as the measurement behind the line). Two more that read
 // as «network» on screen were engine walls with the data already shipped (docs/report/0414).
 // Only the 30 s probe A counts: the 600 s key loop reconnects in titles that play (wave6 at pin
 // 4ac38566 · L 66 · 66 · 29 · 28 in four of them) (docs/report/0432).
@@ -760,6 +761,11 @@ const HAND_NOTE = {
   // Progress round 3 (docs/report/0507): the authentication question seen at 0469, which no server answers.
   f5e21001612d: ['생일을 넣은 뒤 처음 한 번 인증 서버에 접속하라는 안내가 나오는데, 그 서버가 지금은 없어 여기서는 인증할 수 없어요.'],
   // docs/report/0511: the host panic is gone; the title's own network thread still dies when connect() fails.
+  // docs/report/0541: the download server is answered locally; the title then asks for a restart, as its handset did.
+  f44271803135: [
+    '처음 실행하면 추가 데이터를 확인한 뒤 «단말기를 재시작 해야 됩니다» 안내가 나오고 게임이 꺼져요. 다시 켜면 처음 메뉴가 나와요.',
+    '처음부터 들어 있는 저장 칸을 «이어하기»로 고르면 «세이브 데이터가 강제로 변경되어 게임을 종료합니다» 안내 뒤 게임이 꺼져요.',
+  ],
   '1a69522a7d43': ['랭킹의 «온라인 등록»은 게임사 서버가 지금은 없어 쓸 수 없어요. «예»를 고르면 «연결에 실패하였습니다» 안내가 뜨고, 확인을 누르면 주 메뉴로 돌아와요.'],
 };
 // How a title that works is moved forward — not a problem, so it ships as `playTips_ko`, not
@@ -783,6 +789,7 @@ const HAND_TIP = {
   c95bf2740c69: ['메뉴를 여는 소프트키 없이 방향키와 확인 키, 숫자 5 키로 움직이고 싸우면 계속 진행돼요.'],
   dae153ad28ba: ['처음 화면부터 확인 키만 눌러 기본 설정으로 들어가면 경기가 시작되고, 확인 키로 공을 칠 수 있어요.'],
   f2ae515201f2: ['«새로하기»에서 이름 칸에 숫자 5 키를 두 번 누르고 확인 키로 넘긴 뒤, 준비 메뉴에서 위 방향키로 «출격»을 고르면 전투가 시작돼요.'],
+  f44271803135: ['처음 메뉴에서 왼쪽 방향키로 «새로하기»를 고르고 확인 키를 세 번 누르면 이야기가 시작돼요.'],
   f5bd7a91a107: ['목장 안내 창을 확인 키로 닫은 뒤 숫자 1 키부터 6 키까지 눌러 우유를 짜면 돼요.'],
   fe184f834bc7: ['확인 키는 일시정지 창을 여니, 싸울 때는 방향키로 움직이며 숫자 5 키를 누르면 돼요.'],
   // Progress wave 6 (docs/report/0502): 13 whose recipe 600 s frames stay in play, 10 whose entry into play
