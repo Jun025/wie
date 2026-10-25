@@ -16,7 +16,7 @@ pub type ThreadId = usize;
 
 pub use self::{
     allocator::Allocator,
-    binary_patches::install_binary_patches,
+    binary_patches::{install_binary_patches, install_title_binary_patches},
     context::ArmCoreContext,
     core::{ArmCore, RUN_FUNCTION_LR, RunFunctionResult, SVC_STUB_CAPACITY, live_cores, svc_stub_high_water},
     function::{EmulatedFunction, EmulatedFunctionParam, JumpTo, RegisteredFunction, RegisteredFunctionHolder, ResultWriter, SvcId},

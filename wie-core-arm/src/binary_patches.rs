@@ -30,6 +30,15 @@ pub fn install_binary_patches(core: &mut ArmCore, data: &[u8], scan_ranges: &[(u
     Ok(0)
 }
 
+/// Hash-keyed entries only — for a host whose titles must not pick up the generic entry (LGT).
+pub fn install_title_binary_patches(core: &mut ArmCore, data: &[u8], scan_ranges: &[(u32, u32)]) -> Result<usize> {
+    let hash = md5::compute(data).0;
+    match parser::binary_patches().iter().find(|e| matches!(e.hash, Some(h) if h == hash)) {
+        Some(entry) => install_entry(core, entry, scan_ranges, true),
+        None => Ok(0),
+    }
+}
+
 struct Entry {
     hash: Option<[u8; 16]>,
     name: alloc::string::String,

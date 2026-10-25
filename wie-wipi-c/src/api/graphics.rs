@@ -508,6 +508,9 @@ pub async fn draw_image(
         framebuffer.0,
         image.0
     );
+    if image.0 == 0 {
+        return Ok(()); // see `get_image_property`
+    }
 
     let framebuffer = FrameBuffer(read_generic(context, context.data_ptr(framebuffer)?)?);
     let image: WIPICImage = read_generic(context, context.data_ptr(image)?)?;
@@ -730,6 +733,9 @@ pub async fn draw_image_with_context_pixel_op(
     sy: i32,
     graphics_context: WIPICWord,
 ) -> Result<()> {
+    if image.0 == 0 {
+        return Ok(()); // see `get_image_property`
+    }
     // A `WIPICImage` starts with its `img` framebuffer, so the image handle reads as one.
     let (pixel_op, args) = context_pixel_op(context, graphics_context)?;
     if !blit_with_pixel_op(context, framebuffer, dx, dy, w, h, image, sx, sy, pixel_op, args, true).await? {
@@ -995,6 +1001,14 @@ pub async fn get_image_framebuffer(_context: &mut dyn WIPICContext, image: WIPIC
 pub async fn get_image_property(context: &mut dyn WIPICContext, image: WIPICIndirectPtr, property: i32) -> Result<i32> {
     tracing::debug!("MC_grpGetImageProperty({:#x}, {property})", image.0);
 
+    // A NULL image is one the guest never created. The handsets had readable memory at 0, so a
+    // title that sizes and draws it goes on (f44271803135's first map, docs/report/ for
+    // wie-ktf-dragoneyes2-connecting-wall-offline-path); here it has no size and draws nothing —
+    // the host-side half of the guest null-read rule in `wie_core_arm` (docs/report/0391).
+    if image.0 == 0 {
+        tracing::debug!("MC_grpGetImageProperty(NULL, {property}) -> 0");
+        return Ok(0);
+    }
     let image: WIPICImage = read_generic(context, context.data_ptr(image)?)?;
 
     Ok(match property {
@@ -1244,6 +1258,21 @@ mod tests {
 
         get.call(&mut context, Box::new([ptr_context, 0xff, output])).await?;
         assert_eq!(read_generic::<[i32; 5], _>(&context, output)?, [-12, 34, 999, 999, 999]);
+        Ok(())
+    }
+
+    // f44271803135 sizes and draws an image it never created on its first map; that faulted the host.
+    #[futures_test::test]
+    async fn a_null_image_has_no_size_and_draws_nothing() -> Result<()> {
+        let mut context = TestContext::new();
+        let gc = context.alloc_raw(size_of::<WIPICGraphicsContext>() as u32)?;
+        init_context(&mut context, gc).await?;
+
+        assert_eq!(get_image_property(&mut context, WIPICIndirectPtr(0), 4).await?, 0);
+        assert_eq!(get_image_property(&mut context, WIPICIndirectPtr(0), 5).await?, 0);
+        draw_image_with_context_pixel_op(&mut context, WIPICIndirectPtr(0), 0, 0, 8, 8, WIPICIndirectPtr(0), 0, 0, gc).await?;
+        draw_image(&mut context, WIPICIndirectPtr(0), 0, 0, 8, 8, WIPICIndirectPtr(0), 0, 0, gc).await?;
+
         Ok(())
     }
 
