@@ -5410,19 +5410,16 @@
    "platform": "LGT",
    "model": "clet",
    "title": "냐옹타이쿤2",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok",
-    "progress": "stuck"
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "게임사 서버에 접속하는 화면에서 멈춰서, 여기서는 그 뒤로 진행할 수 없어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "냐옹타이쿤2"
   },
@@ -5716,7 +5713,7 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "처음 실행할 때 게임사 서버에서 인증서를 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요."
+    "처음 실행할 때 인증서를 받으라는 안내가 나오는데, 어느 버튼을 눌러도 게임이 꺼져서 여기서는 그 뒤로 진행할 수 없어요."
    ],
    "changes": [],
    "fileTitle": "리듬스타2"
@@ -5827,19 +5824,16 @@
    "platform": "LGT",
    "model": "clet",
    "title": "몬스터마스터",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok",
-    "progress": "stuck"
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "처음 실행할 때 게임사 서버에서 인증서를 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "몬스터마스터"
   },
