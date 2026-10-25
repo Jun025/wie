@@ -70,3 +70,5 @@ otterpebble `apps/featurephone/lib/compat.json` 은 다음 wie 릴리스 가져�
 ### 10. 게임 파일명 유입
 
 `node scripts/corpus-name-inflow.mjs`(기본 대상 = 이 브랜치의 추가·수정 파일 전체 본문): 유입 339건(BOUNDED) · 판단 필요 18건(SUFFIX-ATTACHED). 거의 전부가 이 회차가 세 행만 고친 `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 칸이다. 그 파일을 뺀 대상으로는 9건 · 2건이고, 전부 이 회차가 손댄 파일(`system.rs`·`svc_ids.rs`·`wipi_c.rs`)에 원래 있던 주석이다. 이 회차가 더한 줄에는 게임 이름이 없다(추가 줄 대조). 보고서·worklog·코드는 sha12 로만 적었다.
+
+<!-- corpus-name-inflow v1 subjects=12 tree=67402b313f837eaf B=729/339 P=0/0 S=38/18 -->
