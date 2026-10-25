@@ -133,7 +133,5 @@ otterpebble `apps/featurephone/lib/compat.json` 은 다음 wie 릴리스 가져�
 
 `node scripts/corpus-name-inflow.mjs` 를 기본 대상(이 브랜치의 추가·수정 파일 전체 본문)으로 돌렸다. 유입은 341건(BOUNDED)이고 판단 필요는 17건(SUFFIX-ATTACHED)이다.
 - `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 칸이 거의 전부다. 이 회차는 그 파일에서 세 행만 고쳤다.
-- 그 파일을 뺀 12경로로는 11건 · 1건이다. 11건은 손댄 코드 파일(`system.rs`·`svc_ids.rs`·`wipi_c.rs`·`stdlib.rs`)에 원래 있던 주석이다. 1건은 census 의 기존 요령 문장 «턴종료»다.
+- 그 파일을 뺀 12경로로는 11건 · 1건이다. 11건은 손댄 코드 파일(`system.rs`·`svc_ids.rs`·`wipi_c.rs`·`stdlib.rs`)에 원래 있던 주석이다. 1건은 census 에 원래 있던 요령 문장 한 줄이다.
 - 이 회차가 더한 줄에는 게임 이름이 없다(추가 줄 대조 0). 첫 판 worklog 제안 문장에 있던 게임 이름 하나는 sha12 로 바꿨다. 보고서·worklog·코드는 sha12 로만 적었다.
-
-<!-- corpus-name-inflow v1 subjects=13 tree=1d229ac52673364b B=731/341 P=0/0 S=38/18 -->
