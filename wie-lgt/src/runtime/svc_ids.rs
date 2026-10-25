@@ -266,6 +266,11 @@ pub enum WIPICSvcId {
     SocketWrite = 0x25c,
     SocketRead = 0x25d,
     SocketClose = 0x25e,
+    // net base + 13/14 (the KTF net order), `(fd, cb, param)`: b9bfcaf42722 registers SetReadCB on
+    // `M_E_WOULDBLOCK` from its first read (cb 0x49861, measured — docs/report/0542). caf9d76ffd13
+    // calls both from the same branch (binary.mod 0x1980c, 0x19916) but never reaches it.
+    SetReadCb = 0x265,
+    SetWriteCb = 0x266,
     ClipCreate = 0x4b0,
     ClipFree = 0x4b1,
     ClipPutData = 0x4b3,
@@ -404,6 +409,8 @@ impl TryFrom<SvcId> for WIPICSvcId {
             0x25c => Self::SocketWrite,
             0x25d => Self::SocketRead,
             0x25e => Self::SocketClose,
+            0x265 => Self::SetReadCb,
+            0x266 => Self::SetWriteCb,
             0x4b0 => Self::ClipCreate,
             0x4b1 => Self::ClipFree,
             0x4b3 => Self::ClipPutData,
@@ -466,7 +473,13 @@ pub enum StdlibSvcId {
     /// position, not a symbol name — revisit if a title passes something other than a string.
     Strncat = 0x408,
     Strcmp = 0x409,
-    Unk4 = 0x40a,
+    /// `f(a, b, n)` — caf9d76ffd13's saved-login check (binary.mod 0x166c2): the handset's
+    /// `PHONENUMBER` against the 12 bytes it stored, nonzero meaning «인증에 실패» (2026-10-26).
+    /// Position too: the table follows C's `<string.h>` order (strcpy · strncpy · strcat · strncat ·
+    /// strcmp here, the search run from 0x40b), and between strcmp and strchr that order has strcoll ·
+    /// strncmp · strxfrm — of which only strncmp takes `(a, b, n)` and answers 0 for «same». Until
+    /// then it was a no-op that left `a` in r0, so every comparison read «different» (docs/report/0542).
+    Strncmp = 0x40a,
     /// `f(str, '.')` — 01f05f8231f4 (2026-10-26) on `"ui/slt_pitch.raw"`, then reads `.raw` off the
     /// result. Position too: 0x40b..0x410 is exactly C's `<string.h>` run strchr · strcspn · strpbrk ·
     /// strrchr · strspn · strstr, and 0x410 is strstr.
@@ -517,8 +530,8 @@ mod tests {
     ///
     /// `02ad8b5c` added both rows so 테라-영원의혼돈 gets `-1` and falls back to offline play instead of
     /// dying on `Unknown LGT WIPIC SVC id 604`; the base swap (#161) dropped them and nothing noticed,
-    /// because no fixture reaches the network path. Shared `wie_wipi_c::api::net` has no socket
-    /// write/read, so these cannot be re-wired to it — they are LGT-local `-1` stubs again.
+    /// because no fixture reaches the network path. They now go to shared `wie_wipi_c::api::net`,
+    /// which still answers `-1` for every title without a fake server (docs/report/0542).
     #[test]
     fn wipic_svc_604_605_socket_write_read_are_in_the_table() {
         let write = WIPICSvcId::try_from(SvcId(604)).expect("SVC 604 (MC_netSocketWrite) must be in the table");

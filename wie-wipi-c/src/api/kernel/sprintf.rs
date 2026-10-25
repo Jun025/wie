@@ -33,7 +33,12 @@ fn format(format: &str, args: &[u32], read_string: &mut dyn FnMut(u32) -> Result
 
         let mut spec = String::from("%");
         let mut flag = None;
+        // `-` left-justifies; `.n` is a precision (a `%s`'s most bytes, an integer's fewest digits).
+        // 3ff5948e235e builds its packet header with `"@A%-8d%10.10s"`, which came out verbatim
+        // while either was unsupported.
+        let mut left = false;
         let mut width = None;
+        let mut precision: Option<usize> = None;
         let mut longs = 0u32;
         loop {
             let Some(c) = chars.next() else {
@@ -43,6 +48,8 @@ fn format(format: &str, args: &[u32], read_string: &mut dyn FnMut(u32) -> Result
             };
             spec.push(c);
 
+            // core::fmt panics on width >= 65536; guest-controlled width must be clamped
+            let w = width.unwrap_or(0).min(MAX_WIDTH);
             match c {
                 '%' => {
                     result.push('%');
@@ -57,30 +64,24 @@ fn format(format: &str, args: &[u32], read_string: &mut dyn FnMut(u32) -> Result
                     } else {
                         next_arg(&mut arg_iter) as u64
                     };
-                    // core::fmt panics on width >= 65536; guest-controlled width must be clamped
-                    let width = width.unwrap_or(0).min(MAX_WIDTH);
-                    if c != 'u' {
-                        let arg = if long { raw as i64 } else { raw as u32 as i32 as i64 };
-                        if let Some('0') = flag {
-                            result += &format!("{arg:0width$}");
-                        } else {
-                            result += &format!("{arg:width$}");
-                        }
-                    } else if let Some('0') = flag {
-                        result += &format!("{raw:0width$}");
+                    let (sign, digits) = if c == 'u' {
+                        ("", format!("{raw}"))
                     } else {
-                        result += &format!("{raw:width$}");
-                    }
+                        let arg = if long { raw as i64 } else { raw as u32 as i32 as i64 };
+                        (if arg < 0 { "-" } else { "" }, format!("{}", arg.unsigned_abs()))
+                    };
+                    result += &pad_integer(sign, digits, w, left, flag == Some('0'), precision);
                     break;
                 }
                 's' => {
                     let ptr = next_arg(&mut arg_iter);
-                    if ptr == 0 {
-                        result += "(null)";
-                        break;
+                    let text = if ptr == 0 { "(null)".into() } else { read_string(ptr)? };
+                    let text: String = text.chars().take(precision.unwrap_or(usize::MAX)).collect();
+                    if left {
+                        result += &format!("{text:<w$}");
+                    } else {
+                        result += &format!("{text:>w$}");
                     }
-
-                    result += &read_string(ptr)?;
                     break;
                 }
                 'c' => {
@@ -93,15 +94,15 @@ fn format(format: &str, args: &[u32], read_string: &mut dyn FnMut(u32) -> Result
                     } else {
                         next_arg(&mut arg_iter) as u64
                     };
-                    let width = width.unwrap_or(0).min(MAX_WIDTH);
-                    if let Some('0') = flag {
-                        result += &format!("{arg:0width$x}");
-                    } else {
-                        result += &format!("{arg:width$x}");
-                    }
+                    result += &pad_integer("", format!("{arg:x}"), w, left, flag == Some('0'), precision);
                     break;
                 }
                 'l' => longs += 1,
+                '-' if width.is_none() && precision.is_none() => left = true,
+                '.' if precision.is_none() => precision = Some(0),
+                '0'..='9' if precision.is_some() => {
+                    precision = Some(precision.unwrap_or(0).saturating_mul(10).saturating_add(c.to_digit(10).unwrap() as usize))
+                }
                 '0' if width.is_none() => flag = Some('0'),
                 '0'..='9' => width = Some(width.unwrap_or(0).saturating_mul(10).saturating_add(c.to_digit(10).unwrap() as usize)),
                 _ => {
@@ -114,6 +115,30 @@ fn format(format: &str, args: &[u32], read_string: &mut dyn FnMut(u32) -> Result
     }
 
     Ok(result)
+}
+
+/// C's integer conversion after the digits are known: a precision is the fewest digits, zero-filled
+/// (`%.2d` of 5 is `05`, and `%.0d` of 0 is nothing), and a `0` flag fills the width with zeros
+/// after the sign only when there is no precision — C ignores it otherwise.
+fn pad_integer(sign: &str, mut digits: String, width: usize, left: bool, zero: bool, precision: Option<usize>) -> String {
+    if let Some(precision) = precision {
+        if precision == 0 && digits == "0" {
+            digits.clear();
+        }
+        let precision = precision.min(MAX_WIDTH);
+        if digits.len() < precision {
+            digits.insert_str(0, &"0".repeat(precision - digits.len()));
+        }
+    }
+    let body = format!("{sign}{digits}");
+    if left {
+        format!("{body:<width$}")
+    } else if zero && precision.is_none() {
+        let fill = width.saturating_sub(body.len());
+        format!("{sign}{}{digits}", "0".repeat(fill))
+    } else {
+        format!("{body:>width$}")
+    }
 }
 
 fn next_arg<'a>(arg_iter: &mut impl Iterator<Item = &'a u32>) -> u32 {
@@ -229,6 +254,24 @@ mod test {
         // core::fmt panics on width >= 65536; must not propagate guest width unclamped
         assert_eq!(format("%65536d", &[1])?.len(), 4096);
         assert_eq!(format("%99999999999999999999d", &[1])?.len(), 4096);
+
+        Ok(())
+    }
+
+    // 3ff5948e235e's packet header: left-justified length, then a session id cut and padded to ten.
+    #[test]
+    fn test_left_justify_and_precision() -> Result<()> {
+        assert_eq!(format("@A%-8d%10.10s", &[51, 1])?, "@A51            stub");
+        assert_eq!(format("[%-4x|%-3s|%.2s]", &[0xa, 1, 1])?, "[a   |stub|st]");
+
+        Ok(())
+    }
+
+    // An integer's precision is its fewest digits, zero-filled; with one, C ignores the `0` flag.
+    #[test]
+    fn test_integer_precision() -> Result<()> {
+        assert_eq!(format("%.2d|%.3x|%5.3d|%-5.2u|", &[5, 0xa, (-7i32) as u32, 4])?, "05|00a| -007|04   |");
+        assert_eq!(format("%05.2d|%.0d|%05d", &[3, 0, (-42i32) as u32])?, "   03||-0042");
 
         Ok(())
     }

@@ -4,7 +4,9 @@ use core::cmp::min;
 
 use wie_backend::System;
 use wie_core_arm::{Allocator, ArmCore, EmulatedFunction, ResultWriter, SvcId, stdlib};
-use wie_util::{ByteWrite, Result, WieError, read_generic, read_null_terminated_string_bytes, write_generic, write_null_terminated_string_bytes};
+use wie_util::{
+    ByteRead, ByteWrite, Result, WieError, read_generic, read_null_terminated_string_bytes, write_generic, write_null_terminated_string_bytes,
+};
 use wie_wipi_c::api::kernel;
 
 use crate::runtime::{SVC_CATEGORY_STDLIB, svc_ids::StdlibSvcId};
@@ -26,7 +28,7 @@ pub fn register_stdlib_svc_handler(core: &mut ArmCore, system: &System) -> Resul
             x if x == StdlibSvcId::Strcat as u32 => EmulatedFunction::call(&strcat, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Strncat as u32 => EmulatedFunction::call(&strncat, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Strcmp as u32 => EmulatedFunction::call(&strcmp, core, &mut ()).await?.write(core, lr),
-            x if x == StdlibSvcId::Unk4 as u32 => EmulatedFunction::call(&unk4, core, &mut ()).await?.write(core, lr),
+            x if x == StdlibSvcId::Strncmp as u32 => EmulatedFunction::call(&strncmp, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Strchr as u32 => EmulatedFunction::call(&strchr, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Strstr as u32 => EmulatedFunction::call(&strstr, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Strlen as u32 => EmulatedFunction::call(&stdlib::strlen, core, &mut ()).await?.write(core, lr),
@@ -257,10 +259,24 @@ async fn unk3(core: &mut ArmCore, _: &mut (), a0: u32) -> Result<()> {
     Ok(())
 }
 
-async fn unk4(_core: &mut ArmCore, _: &mut (), a0: u32, a1: u32, a2: u32, a3: u32) -> Result<()> {
-    tracing::warn!("unk4({a0:#x}, {a1:#x}, {a2:#x}, {a3:#x})");
+async fn strncmp(core: &mut ArmCore, _: &mut (), ptr_str1: u32, ptr_str2: u32, size: u32) -> Result<u32> {
+    tracing::debug!("strncmp({ptr_str1:#x}, {ptr_str2:#x}, {size:#x})");
 
-    Ok(())
+    // At most `size` bytes of each, as C reads them: a buffer with no NUL inside `size` is legal.
+    let read = |ptr: u32| -> Result<Vec<u8>> {
+        let mut bytes = Vec::new();
+        let mut byte = [0];
+        while bytes.len() < size as usize {
+            core.read_bytes(ptr + bytes.len() as u32, &mut byte)?;
+            if byte[0] == 0 {
+                break;
+            }
+            bytes.push(byte[0]);
+        }
+        Ok(bytes)
+    };
+
+    Ok(read(ptr_str1)?.cmp(&read(ptr_str2)?) as u32)
 }
 
 // The heap's free needs the size back, and C's free does not pass it: keep it in a word in front.
@@ -498,6 +514,48 @@ mod tests {
             let mut end_ptr = [0u8; 4];
             core.read_bytes(end, &mut end_ptr)?;
             assert_eq!((value, u32::from_le_bytes(end_ptr)), (0xffae08, text + 8));
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    /// Import 0x40a is strncmp: caf9d76ffd13 compares the `PHONENUMBER` it saved at login with the
+    /// handset's, 12 bytes, and a no-op here left the first pointer in r0 — «인증에 실패» on every
+    /// launch after the first (see `StdlibSvcId::Strncmp`). Goes through the SVC table.
+    #[test]
+    fn stdlib_import_0x40a_is_strncmp_through_the_svc_table() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let mut core = ArmCore::new(false, None)?;
+            Allocator::init(&mut core)?;
+            let stack = Allocator::alloc(&mut core, 0x1000)?;
+            let mut context = core.save_context();
+            context.sp = stack + 0x1000;
+            core.restore_context(&context);
+            register_stdlib_svc_handler(&mut core, &system_clone)?;
+            let stub = core.make_svc_stub(SVC_CATEGORY_STDLIB, StdlibSvcId::Strncmp)?;
+            assert_eq!(StdlibSvcId::Strncmp as u32, 0x40a);
+
+            let a = Allocator::alloc(&mut core, 12)?;
+            let b = Allocator::alloc(&mut core, 12)?;
+            core.write_bytes(a, b"01000000000\0")?;
+            core.write_bytes(b, b"01000000000\0")?;
+            let same: u32 = core.run_function(stub, &[a, b, 12]).await?;
+            core.write_bytes(b, b"01000000001\0")?;
+            let less: u32 = core.run_function(stub, &[a, b, 12]).await?;
+            let prefix: u32 = core.run_function(stub, &[a, b, 10]).await?;
+            assert_eq!((same, less as i32, prefix), (0, -1, 0));
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())

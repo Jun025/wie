@@ -14,6 +14,7 @@ use crate::{
     AsyncCallable,
     canvas::{Image, ImageBuffer},
     executor::{Executor, TICK_BUDGET_MS},
+    fake_server::FakeNet,
     pacing::Pacing,
     platform::Platform,
     task::{SleepFuture, YieldFuture},
@@ -46,6 +47,7 @@ pub struct System {
     yield_streak: Arc<Mutex<(u64, u32)>>,
     pacing: Arc<Mutex<Pacing>>,
     screen_compositor: Arc<Mutex<Option<ScreenCompositor>>>,
+    fake_net: Arc<Mutex<FakeNet>>,
 }
 
 /// Draws a guest-native screen onto the Java screen image before the host presents it: the image
@@ -74,6 +76,7 @@ impl System {
             yield_streak: Arc::new(Mutex::new((0, 0))),
             pacing: Arc::new(Mutex::new(Pacing::default())),
             screen_compositor: Arc::new(Mutex::new(None)),
+            fake_net: Arc::new(Mutex::new(FakeNet::new(aid))),
         }
     }
 
@@ -217,6 +220,11 @@ impl System {
     pub async fn exit_from_guest<T>(&self) -> T {
         self.exit();
         core::future::pending().await
+    }
+
+    /// The in-engine stand-ins for this title's dead servers (`fake_server`).
+    pub fn fake_net(&self) -> MutexGuard<'_, FakeNet> {
+        self.fake_net.lock()
     }
 
     pub fn audio(&self) -> RwLockWriteGuard<'_, Audio> {
