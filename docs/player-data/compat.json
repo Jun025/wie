@@ -5702,18 +5702,18 @@
    "platform": "LGT",
    "model": "clet",
    "title": "리듬스타2",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok",
-    "progress": "stuck"
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "처음 실행할 때 인증서를 받으라는 안내가 나오는데, 어느 버튼을 눌러도 게임이 꺼져서 여기서는 그 뒤로 진행할 수 없어요."
+   "knownIssues_ko": [],
+   "playTips_ko": [
+    "처음 실행할 때 인증서를 받을지 묻는 창의 커서가 «아니오»에 있으니 왼쪽 방향키로 «예»를 고른 뒤 확인 키를 누르면 인증서를 받고 게임이 시작돼요. 다음부터는 묻지 않아요."
    ],
    "changes": [],
    "fileTitle": "리듬스타2"
