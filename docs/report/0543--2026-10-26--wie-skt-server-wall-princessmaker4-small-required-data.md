@@ -43,4 +43,4 @@
 
 ### 6. 게임 파일명 유입
 
-`node scripts/corpus-name-inflow.mjs`(이 브랜치 대 `origin/main`): BOUNDED 와 SUFFIX-ATTACHED 는 모두 바뀐 파일 «전체»를 훑은 수다. 이 회차가 더한 줄에서 나온 것은 없다. `compat.json` 의 기존 `title`·`fileTitle` 칸과 `playability-census.mjs` 의 기존 안내 문장(«턴종료»)이 잡혔다. 이 보고서 본문에는 제목을 쓰지 않았다(sha12 로만 가리킨다).
+`node scripts/corpus-name-inflow.mjs`(이 브랜치 대 `origin/main`): BOUNDED 와 SUFFIX-ATTACHED 는 모두 바뀐 파일 «전체»를 훑은 수다. 이 회차가 더한 줄에서 나온 것은 없다. `compat.json` 의 기존 `title`·`fileTitle` 칸과 `playability-census.mjs` 의 기존 안내 문장 한 줄(SUFFIX-ATTACHED · 조사가 붙은 일반 낱말)이 잡혔다. 이 보고서 본문에는 제목을 쓰지 않았다(sha12 로만 가리킨다).
