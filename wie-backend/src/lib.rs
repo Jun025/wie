@@ -5,6 +5,7 @@ mod audio_sink;
 pub mod canvas;
 mod database;
 mod executor;
+pub mod fake_server;
 mod frame_pacer;
 pub mod owner_files;
 mod pacing;

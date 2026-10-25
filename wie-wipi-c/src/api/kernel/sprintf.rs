@@ -33,7 +33,11 @@ fn format(format: &str, args: &[u32], read_string: &mut dyn FnMut(u32) -> Result
 
         let mut spec = String::from("%");
         let mut flag = None;
+        // `-` left-justifies; `.n` is a precision (a `%s`'s most bytes). 3ff5948e235e builds its packet
+        // header with `"@A%-8d%10.10s"`, which came out verbatim while either was unsupported.
+        let mut left = false;
         let mut width = None;
+        let mut precision: Option<usize> = None;
         let mut longs = 0u32;
         loop {
             let Some(c) = chars.next() else {
@@ -43,6 +47,8 @@ fn format(format: &str, args: &[u32], read_string: &mut dyn FnMut(u32) -> Result
             };
             spec.push(c);
 
+            // core::fmt panics on width >= 65536; guest-controlled width must be clamped
+            let w = width.unwrap_or(0).min(MAX_WIDTH);
             match c {
                 '%' => {
                     result.push('%');
@@ -57,30 +63,36 @@ fn format(format: &str, args: &[u32], read_string: &mut dyn FnMut(u32) -> Result
                     } else {
                         next_arg(&mut arg_iter) as u64
                     };
-                    // core::fmt panics on width >= 65536; guest-controlled width must be clamped
-                    let width = width.unwrap_or(0).min(MAX_WIDTH);
-                    if c != 'u' {
+                    if left {
+                        if c != 'u' {
+                            let arg = if long { raw as i64 } else { raw as u32 as i32 as i64 };
+                            result += &format!("{arg:<w$}");
+                        } else {
+                            result += &format!("{raw:<w$}");
+                        }
+                    } else if c != 'u' {
                         let arg = if long { raw as i64 } else { raw as u32 as i32 as i64 };
                         if let Some('0') = flag {
-                            result += &format!("{arg:0width$}");
+                            result += &format!("{arg:0w$}");
                         } else {
-                            result += &format!("{arg:width$}");
+                            result += &format!("{arg:w$}");
                         }
                     } else if let Some('0') = flag {
-                        result += &format!("{raw:0width$}");
+                        result += &format!("{raw:0w$}");
                     } else {
-                        result += &format!("{raw:width$}");
+                        result += &format!("{raw:w$}");
                     }
                     break;
                 }
                 's' => {
                     let ptr = next_arg(&mut arg_iter);
-                    if ptr == 0 {
-                        result += "(null)";
-                        break;
+                    let text = if ptr == 0 { "(null)".into() } else { read_string(ptr)? };
+                    let text: String = text.chars().take(precision.unwrap_or(usize::MAX)).collect();
+                    if left {
+                        result += &format!("{text:<w$}");
+                    } else {
+                        result += &format!("{text:>w$}");
                     }
-
-                    result += &read_string(ptr)?;
                     break;
                 }
                 'c' => {
@@ -93,15 +105,21 @@ fn format(format: &str, args: &[u32], read_string: &mut dyn FnMut(u32) -> Result
                     } else {
                         next_arg(&mut arg_iter) as u64
                     };
-                    let width = width.unwrap_or(0).min(MAX_WIDTH);
-                    if let Some('0') = flag {
-                        result += &format!("{arg:0width$x}");
+                    if left {
+                        result += &format!("{arg:<w$x}");
+                    } else if let Some('0') = flag {
+                        result += &format!("{arg:0w$x}");
                     } else {
-                        result += &format!("{arg:width$x}");
+                        result += &format!("{arg:w$x}");
                     }
                     break;
                 }
                 'l' => longs += 1,
+                '-' if width.is_none() && precision.is_none() => left = true,
+                '.' if precision.is_none() => precision = Some(0),
+                '0'..='9' if precision.is_some() => {
+                    precision = Some(precision.unwrap_or(0).saturating_mul(10).saturating_add(c.to_digit(10).unwrap() as usize))
+                }
                 '0' if width.is_none() => flag = Some('0'),
                 '0'..='9' => width = Some(width.unwrap_or(0).saturating_mul(10).saturating_add(c.to_digit(10).unwrap() as usize)),
                 _ => {
@@ -229,6 +247,15 @@ mod test {
         // core::fmt panics on width >= 65536; must not propagate guest width unclamped
         assert_eq!(format("%65536d", &[1])?.len(), 4096);
         assert_eq!(format("%99999999999999999999d", &[1])?.len(), 4096);
+
+        Ok(())
+    }
+
+    // 3ff5948e235e's packet header: left-justified length, then a session id cut and padded to ten.
+    #[test]
+    fn test_left_justify_and_precision() -> Result<()> {
+        assert_eq!(format("@A%-8d%10.10s", &[51, 1])?, "@A51            stub");
+        assert_eq!(format("[%-4x|%-3s|%.2s]", &[0xa, 1, 1])?, "[a   |stub|st]");
 
         Ok(())
     }

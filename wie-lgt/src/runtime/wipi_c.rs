@@ -236,8 +236,10 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::Close => net::close.into_body(),
         WIPICSvcId::Socket | WIPICSvcId::SocketAlt => net::socket.into_body(),
         WIPICSvcId::SocketConnect => net::socket_connect.into_body(),
-        WIPICSvcId::SocketWrite => net_socket_write.into_body(),
-        WIPICSvcId::SocketRead => net_socket_read.into_body(),
+        WIPICSvcId::SocketWrite => net::socket_write.into_body(),
+        WIPICSvcId::SocketRead => net::socket_read.into_body(),
+        WIPICSvcId::SetReadCb => net::set_read_cb.into_body(),
+        WIPICSvcId::SetWriteCb => net::set_write_cb.into_body(),
         WIPICSvcId::SocketClose => net::socket_close.into_body(),
         WIPICSvcId::ClipCreate => media::clip_create.into_body(),
         WIPICSvcId::ClipFree => media::clip_free.into_body(),
@@ -345,13 +347,6 @@ async fn clet_register(core: &mut ArmCore, (system, jvm): &mut (System, Jvm), fu
     Ok(())
 }
 
-/// `MC_netSocketWrite` (net table index 4, SVC 0x25c) and `MC_netSocketRead`
-/// (index 5, 0x25d). The emulator has no real network, so instead of crashing on
-/// an unknown SVC we return -1 (error). Games (테라-영원의혼돈) that attempt an
-/// online connection then see the write/read fail and fall back to offline play
-/// rather than dying. Shared `wie_wipi_c::api::net` has no socket write/read, so
-/// these stay LGT-local (restored from `02ad8b5c`; the base swap #161 dropped them).
-/// The in-game network path is not reachable from a headless boot.
 // LGT titles draw a soft-key bar BELOW the screen height they are told: `fe76e641bb3d` sizes its
 // canvas `height + 24` by this exact width table (binary.mod 0x289c4), and `1eaa92092bee` blits
 // down to row 343 of a 320-row screen. Without the rows that write lands on the next heap block's
@@ -432,18 +427,6 @@ async fn create_image(
     tracing::debug!("MC_grpCreateImage: {:#x} stored as RGB565 (mask {})", memory.0, image.mask.bpp == 8);
     write_generic(context, address, image)?;
     Ok(result)
-}
-
-async fn net_socket_write(_context: &mut dyn WIPICContext, fd: u32, buf: u32, len: u32, _a3: u32) -> Result<i32> {
-    tracing::warn!("MC_netSocketWrite(fd={fd:#x}, buf={buf:#x}, len={len:#x}) -> -1 (no network)");
-
-    Ok(-1)
-}
-
-async fn net_socket_read(_context: &mut dyn WIPICContext, fd: u32, buf: u32, len: u32, _a3: u32) -> Result<i32> {
-    tracing::warn!("MC_netSocketRead(fd={fd:#x}, buf={buf:#x}, len={len:#x}) -> -1 (no network)");
-
-    Ok(-1)
 }
 
 async fn unk0(_context: &mut dyn WIPICContext, a0: u32, a1: u32, a2: u32, a3: u32) -> Result<u32> {

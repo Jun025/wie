@@ -266,6 +266,10 @@ pub enum WIPICSvcId {
     SocketWrite = 0x25c,
     SocketRead = 0x25d,
     SocketClose = 0x25e,
+    // net base + 13/14 (the KTF net order): caf9d76ffd13 registers them on `M_E_WOULDBLOCK` from
+    // read/write (binary.mod 0x1980c, 0x19916) with `(fd, cb, param)`.
+    SetReadCb = 0x265,
+    SetWriteCb = 0x266,
     ClipCreate = 0x4b0,
     ClipFree = 0x4b1,
     ClipPutData = 0x4b3,
@@ -404,6 +408,8 @@ impl TryFrom<SvcId> for WIPICSvcId {
             0x25c => Self::SocketWrite,
             0x25d => Self::SocketRead,
             0x25e => Self::SocketClose,
+            0x265 => Self::SetReadCb,
+            0x266 => Self::SetWriteCb,
             0x4b0 => Self::ClipCreate,
             0x4b1 => Self::ClipFree,
             0x4b3 => Self::ClipPutData,
