@@ -149,6 +149,7 @@ fn load_executable(core: &mut ArmCore, data: &[u8]) -> Result<u32> {
     let strtab = strtab_opt.ok_or_else(|| WieError::FatalError("ELF is missing section name string table".into()))?;
 
     let mut code_base = None;
+    let mut code_range = [(0, 0)];
     let mut raptor_entry = None;
     for shdr in shdrs {
         let section_name = strtab
@@ -164,6 +165,7 @@ fn load_executable(core: &mut ArmCore, data: &[u8]) -> Result<u32> {
         }
         if code_base.is_none() && shdr.sh_addr != 0 && shdr.sh_flags & u64::from(elf::abi::SHF_EXECINSTR) != 0 {
             code_base = Some(shdr.sh_addr as u32);
+            code_range = [(shdr.sh_addr as u32, shdr.sh_size as u32)];
         }
 
         if shdr.sh_addr != 0 {
@@ -181,6 +183,9 @@ fn load_executable(core: &mut ArmCore, data: &[u8]) -> Result<u32> {
             }
         }
     }
+
+    // Hash-keyed entries only: the generic KTF copy hooks were never measured on LGT titles.
+    wie_core_arm::install_title_binary_patches(core, data, &code_range)?;
 
     let entrypoint = choose_entrypoint(raptor_entry, code_base, elf.ehdr.e_entry as u32);
     tracing::debug!("Entrypoint: {entrypoint:#x} (e_entry {:#x})", elf.ehdr.e_entry);
