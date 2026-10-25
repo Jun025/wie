@@ -743,7 +743,9 @@ const HAND_WALL = {
   '73f3a21e981c': '이름을 등록하려면 게임사 서버에 접속해야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.',
   // Progress round 3 (docs/report/0507): a server step no answer passes, read off the frames.
   '0fdf45ec169f': '게임을 시작하면 게임사 서버에 접속해야 하는데, 그 서버가 지금은 없어 «서버에 연결중입니다» 안내에서 넘어가지 않아요.',
-  '640428a9cf9e': '게임을 시작할 때 필수 데이터 파일을 서버에서 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.',
+  // 640428a9cf9e stays (docs/report/0543): its server sent 28 files (27 pictures + data.jar) that its
+  // package does not carry, so no fake_server reply can stand in for them.
+  '640428a9cf9e': '처음 실행할 때 게임사 서버에서 그림과 게임 데이터를 받아 와야 하는데, 그 서버가 지금은 없고 이 파일에는 그 데이터가 들어 있지 않아 여기서는 진행할 수 없어요. 같은 게임의 큰화면 판은 데이터가 함께 들어 있어서 할 수 있어요.',
 };
 // A line a player needs that no axis can say, added after the axis lines: how a `stuck` title was
 // moved on by hand (a recipe run, docs/report/0442 · 0469), or what a fix still leaves out. Measured
