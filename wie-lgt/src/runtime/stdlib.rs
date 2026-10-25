@@ -27,6 +27,7 @@ pub fn register_stdlib_svc_handler(core: &mut ArmCore, system: &System) -> Resul
             x if x == StdlibSvcId::Strncat as u32 => EmulatedFunction::call(&strncat, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Strcmp as u32 => EmulatedFunction::call(&strcmp, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Unk4 as u32 => EmulatedFunction::call(&unk4, core, &mut ()).await?.write(core, lr),
+            x if x == StdlibSvcId::Strchr as u32 => EmulatedFunction::call(&strchr, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Strstr as u32 => EmulatedFunction::call(&strstr, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Strlen as u32 => EmulatedFunction::call(&stdlib::strlen, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Memcpy as u32 => EmulatedFunction::call(&stdlib::memcpy, core, &mut ()).await?.write(core, lr),
@@ -306,6 +307,17 @@ async fn strstr(core: &mut ArmCore, _: &mut (), ptr_haystack: u32, ptr_needle: u
     Ok(position.map_or(0, |position| ptr_haystack + position as u32))
 }
 
+async fn strchr(core: &mut ArmCore, _: &mut (), ptr_str: u32, c: u32) -> Result<u32> {
+    tracing::debug!("strchr({ptr_str:#x}, {c:#x})");
+
+    // C: `c` is converted to char, and the terminator itself can be found.
+    let c = c as u8;
+    let s = read_null_terminated_string_bytes(core, ptr_str)?;
+    let position = if c == 0 { Some(s.len()) } else { s.iter().position(|&b| b == c) };
+
+    Ok(position.map_or(0, |position| ptr_str + position as u32))
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::{boxed::Box, sync::Arc};
@@ -486,6 +498,45 @@ mod tests {
             let mut end_ptr = [0u8; 4];
             core.read_bytes(end, &mut end_ptr)?;
             assert_eq!((value, u32::from_le_bytes(end_ptr)), (0xffae08, text + 8));
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+
+        Ok(())
+    }
+
+    /// Import 0x40b is strchr: 01f05f8231f4 died on `Unknown lgt stdlib import: 0x40b` at its first
+    /// pitch, finding the extension of `"ui/slt_pitch.raw"` (see `StdlibSvcId::Strchr`).
+    #[test]
+    fn stdlib_import_0x40b_is_strchr_through_the_svc_table() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let system_clone = system.clone();
+
+        system.spawn(async move || {
+            let mut core = ArmCore::new(false, None)?;
+            Allocator::init(&mut core)?;
+            let stack = Allocator::alloc(&mut core, 0x1000)?;
+            let mut context = core.save_context();
+            context.sp = stack + 0x1000;
+            core.restore_context(&context);
+            register_stdlib_svc_handler(&mut core, &system_clone)?;
+            let stub = core.make_svc_stub(SVC_CATEGORY_STDLIB, StdlibSvcId::Strchr)?;
+            assert_eq!(StdlibSvcId::Strchr as u32, 0x40b);
+
+            let text = Allocator::alloc(&mut core, 16)?;
+            core.write_bytes(text, b"a/b.c.raw\0")?;
+            let mut got = [0; 3];
+            for (found, c) in got.iter_mut().zip([b'.', b'x', 0]) {
+                *found = core.run_function::<u32>(stub, &[text, c as u32]).await?;
+            }
+            assert_eq!(got, [text + 3, 0, text + 9]);
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())

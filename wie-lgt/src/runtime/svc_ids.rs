@@ -467,6 +467,10 @@ pub enum StdlibSvcId {
     Strncat = 0x408,
     Strcmp = 0x409,
     Unk4 = 0x40a,
+    /// `f(str, '.')` — 01f05f8231f4 (2026-10-26) on `"ui/slt_pitch.raw"`, then reads `.raw` off the
+    /// result. Position too: 0x40b..0x410 is exactly C's `<string.h>` run strchr · strcspn · strpbrk ·
+    /// strrchr · strspn · strstr, and 0x410 is strstr.
+    Strchr = 0x40b,
     Strstr = 0x410,
     Strlen = 0x411,
     Memcpy = 0x414,

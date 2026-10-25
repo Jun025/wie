@@ -98,3 +98,25 @@ pattern = "70 b5 0b 1c 03 43 03 22 13 40 04 1c"
 [[entry.hook]]
 kind = "strlen"
 pattern = "30 b5 03 23 03 40 04 1c 00 2b"
+
+# LGT 01f05f8231f4 (sha256 prefix of the package) — a purchase-phone lock, lifted for this one title
+# on the operator's instruction of 2026-10-26 (docs/report/0463 §4 found it; policy stays for every
+# other locked title). Both sites compare 12 bytes against `PHONENUMBER`; each patch turns the
+# branch on that compare into the "matched" path, so no number is ever known or stored here.
+[[entry]]
+name = "LGT 01f05f8231f4 owner check"
+hash = "8629d3e8d1ca0e9e6add209c24349544"
+
+# Save loader 0x69ccc: `if (owner_check) { if (memcmp(save+12, PHONENUMBER, 12)) error -1001 }`.
+# `beq` past the compare → `b`. The save's own checksum (0x69dc2) still runs.
+[[entry.patch]]
+pc = 0x69d72
+bytes = "16 e0"
+expect = "16 d0"
+
+# Licence 0x68280: decrypted `P/audio.adt` + 0x28 vs `PHONENUMBER` — equal → 1 (licensed).
+# `beq` to the return-1 tail → `b`. A missing `audio.adt` still returns 0 before this.
+[[entry.patch]]
+pc = 0x682cc
+bytes = "09 e0"
+expect = "09 d0"

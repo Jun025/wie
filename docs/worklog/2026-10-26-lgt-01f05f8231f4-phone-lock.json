@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-26",
+  "task": "wie-lgt-gamevil2010-baseball-phone-lock-normalize",
+  "title": "LGT 01f05f8231f4 구매 휴대폰 잠금 해제 — 해시 키 바이트 패치 2건 · stdlib 0x40b = strchr",
+  "summary": "운영자 지시(2026-10-26)로 이 판 하나만 소유자 확인 두 곳(저장 로더 0x69d72 · audio.adt 라이선스 0x682cc)의 분기를 «일치» 쪽으로 돌렸다. LGT 는 해시 키 항목만 설치한다. 다음 벽 stdlib 0x40b 를 strchr 로 구현했다. not-yet → playable(소리 silent).",
+  "verification": "census run/report playable · 개악 2종(항목 제거 → 그림 0 · 라이선스 행 제거 → 인증 실패 종료) · SKT SecureUtil c33090c12755 전·후 잠금 그대로 · LGT clet 10종 probe 판정 20/20 같음 · 번호 유출 0(docs/report/0540).",
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "LGT 01f05f8231f4 동봉 저장의 «소리 끔»을 켬으로 — LGT 마운트 경로에 owner_files 장치 배선",
+      "plainSummary": "이 게임은 이제 실행되지만 원래 주인이 꺼 둔 소리 설정이 같이 들어 있어 소리가 나지 않는다. 그 설정 바이트만 켬으로 바꾼다.",
+      "userBenefit": "이 야구 게임을 소리와 함께 처음부터 즐길 수 있다.",
+      "why": "0540 실측: 동봉 game_*.sav 를 뺀 스크래치 사본은 재생 2 · MIDI 1,496 인데 동봉 그대로는 재생 0 이다. 0537 의 동봉 소리 끔 장치는 KTF·SKT 마운트 경로에만 있다.",
+      "tradeoff": "저장 7개에 원 주인 진도가 함께 들어 있어 파일 빼기는 안 된다. 저장이 암호화돼 있어(0x69c24) 소리 바이트 위치를 디스어셈블로 찾아야 하고, 저장 체크섬(0x69dc2)도 맞춰야 한다.",
+      "effort": "M",
+      "target": "wie-backend/src/owner_files.rs · wie-lgt 마운트 경로"
+    }
+  ]
+}
