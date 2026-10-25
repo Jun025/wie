@@ -66,3 +66,7 @@ otterpebble `apps/featurephone/lib/compat.json` 은 다음 wie 릴리스 가져�
 
 - 네 게이트: fmt rc=0 · clippy `-D warnings` rc=0 · wasm clippy rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` rc=0(822 통과 · 0 실패). beta clippy rc=0.
 - 엔진 러너 블록(릴리스 빌드): `draw_j2me`·`helloworld_ktf`·`helloworld_lgt`·`text_j2me` PASS. `keydraw_ktf`·`keydraw_lgt` 는 기본 `--max-ticks` 에서 `UNMEASURED`(`stop` = `max-ticks`, 27키 중 8키) — 릴리스 빌드가 키 일정 전에 틱 상한을 먹은 것이다(AGENTS.md: max-ticks 면 상한을 올린다). `--max-ticks 2000000000` 으로 이 브랜치·`origin/main` 모두 PASS · rc=0 · 27/27 · paints 79/55(main 80/55).
+
+### 10. 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs`(기본 대상 = 이 브랜치의 추가·수정 파일 전체 본문): 유입 339건(BOUNDED) · 판단 필요 18건(SUFFIX-ATTACHED). 거의 전부가 이 회차가 세 행만 고친 `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 칸이다. 그 파일을 뺀 대상으로는 9건 · 2건이고, 전부 이 회차가 손댄 파일(`system.rs`·`svc_ids.rs`·`wipi_c.rs`)에 원래 있던 주석이다. 이 회차가 더한 줄에는 게임 이름이 없다(추가 줄 대조). 보고서·worklog·코드는 sha12 로만 적었다.
