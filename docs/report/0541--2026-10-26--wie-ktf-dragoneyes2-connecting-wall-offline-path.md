@@ -80,3 +80,6 @@ load1 7~294(빌드 대기 중 최고 294 · 전수 프로브 52·33·17~34 · �
 ### 8. 게임 파일명 유입
 
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 331쌍 + SUFFIX-ATTACHED 17쌍. 전부 이 PR 이전부터 있던 값이다 — `compat.json` 기존 제목 값, `graphics.rs` 의 기존 주석 1곳, 전수 도구의 다른 판 요령 1곳. 이 PR 이 더한 줄에서는 0 이다(이 문서·`local_net.rs`·새 안내 3줄 모두 판을 sha 로만 부른다). 티켓 id 의 로마자 표기는 총괄이 정한 이름이라 그대로 두었다.
+
+
+<!-- corpus-name-inflow v1 subjects=7 tree=c9ad84236b7dae7a B=719/331 P=0/0 S=37/17 -->
