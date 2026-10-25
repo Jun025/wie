@@ -9,7 +9,7 @@
 //!
 //! A responder sees the bytes the guest has written so far on one connection and answers with the
 //! bytes the guest will read. The replies are the smallest ones the title's own parser accepts as
-//! «success»; the real server's shape is unknown. docs/report/0541 has, per title, the parser read
+//! «success»; the real server's shape is unknown. docs/report/0542 has, per title, the parser read
 //! off the image and what each reply byte satisfies.
 
 use alloc::{
@@ -80,7 +80,7 @@ fn login_0102(request: &mut Vec<u8>) -> Option<Vec<u8>> {
 /// hello (type 0) and, on the reply of the same type, asks for the certificate (type 0x14); the
 /// reply to that carries `[u16 BE length][bytes]` from offset 6, which the title writes to
 /// `cert.c2s` (0x1e596, 0x1e19c). Sixteen zero bytes were enough: the relaunched title went
-/// straight to its story without asking again (docs/report/0541).
+/// straight to its story without asking again (docs/report/0542).
 fn certificate_c2s(request: &mut Vec<u8>) -> Option<Vec<u8>> {
     let packet = take_packet(request, |x| u16::from_be_bytes([x[0], x[1]]) as usize)?;
     match packet[3] {

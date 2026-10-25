@@ -738,12 +738,12 @@ const netWall = (connects) => connects >= 200;
 // Also any other wall a title cannot pass without us making up data, treated the same way (one line,
 // at most limited): the KTF install-license check — the engine would have to invent the record (0457).
 // caf9d76ffd13 and b9bfcaf42722 left this table when the engine began answering for their servers
-// (wie_backend::fake_server · docs/report/0541).
+// (wie_backend::fake_server · docs/report/0542).
 const HAND_WALL = {
   '974e0df9ab1e': '설치 인증(구매 기록)을 확인하는 단계에서 멈춰서, 여기서는 그 뒤로 진행할 수 없어요.',
   f770b15f8876: '설치 인증(구매 기록)을 확인하는 단계에서 멈춰서, 여기서는 그 뒤로 진행할 수 없어요.',
   // Progress wave 4 (docs/report/0469 §2): the last screen of a `stuck` run, read off the frames.
-  // docs/report/0541: either button on that notice ends the run without a single connect.
+  // docs/report/0542: either button on that notice ends the run without a single connect.
   '0093012b8c36': '처음 실행할 때 인증서를 받으라는 안내가 나오는데, 어느 버튼을 눌러도 게임이 꺼져서 여기서는 그 뒤로 진행할 수 없어요.',
   '3ff5948e235e': '게임을 계속하려면 사용자 인증을 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.',
   '73f3a21e981c': '이름을 등록하려면 게임사 서버에 접속해야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.',
