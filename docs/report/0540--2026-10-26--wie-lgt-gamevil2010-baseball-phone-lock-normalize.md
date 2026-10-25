@@ -67,3 +67,5 @@ LGT clet 표본 10종(`1cd151222bde` `236c7da689f6` `2a8a3dcd07eb` `2dbde9acca99
 
 - 도구 표기 BOUNDED 338쌍 · SUFFIX-ATTACHED 17쌍이다. 전부 계약상 제목 목록인 `compat.json` 과, 이 회차가 고친 파일(`init.rs` · `stdlib.rs` · `svc_ids.rs`)에 **이미 있던** 주석이다.
 - 이 회차가 더한 줄의 게임 이름은 0이다(타이틀은 sha12 로만 적었다).
+
+<!-- corpus-name-inflow v1 subjects=11 tree=36860b0decb23056 B=728/338 P=1/1 S=37/17 -->
