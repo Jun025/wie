@@ -12,6 +12,7 @@ use wie_wipi_c::{
     api::{database, graphics, kernel, media, misc, net, uic, util},
 };
 
+use super::local_net;
 use crate::runtime::{
     SVC_CATEGORY_WIPIC,
     svc_ids::{WIPICDatabaseMethodId, WIPICGraphicsMethodId, WIPICKernelMethodId, WIPICTableId},
@@ -376,9 +377,9 @@ pub fn get_media_method_table() -> Vec<WIPICMethodBody> {
 
 pub fn get_net_method_table() -> Vec<WIPICMethodBody> {
     vec![
-        net::connect.into_body(),
+        local_net::connect.into_body(),
         net::close.into_body(),
-        net::socket.into_body(),
+        local_net::socket.into_body(),
         gen_stub(3, "MC_netSocketConnect"),
         gen_stub(4, "MC_netSocketWrite"),
         gen_stub(5, "MC_netSocketRead"),
@@ -389,7 +390,7 @@ pub fn get_net_method_table() -> Vec<WIPICMethodBody> {
         gen_stub(10, "MC_netSocketRcvFrom"),
         gen_stub(11, "MC_netGetHostAddr"),
         gen_stub(12, "MC_netSocketAccept"),
-        gen_stub(13, "MC_netSetReadCB"),
+        local_net::set_read_cb.into_body(),
         gen_stub(14, "MC_netSetWriteCB"),
         gen_stub(15, "MC_netHttpOpen"),
         gen_stub(16, "MC_netHttpConnect"),
@@ -422,6 +423,9 @@ pub fn get_net_method_table() -> Vec<WIPICMethodBody> {
 /// the socket teardown. The others stay unidentified until a title reaches them.
 fn net_extension_slot(function_id: u16) -> WIPICMethodBody {
     match function_id {
+        30 => local_net::socket_open.into_body(),
+        31 => local_net::socket_send.into_body(),
+        32 => local_net::socket_recv.into_body(),
         33 => net::socket_close.into_body(),
         34 => net_open_by_host.into_body(),
         _ => gen_unnamed_table_stub(WIPICTableId::Net as _, "Net", function_id),

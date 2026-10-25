@@ -11,6 +11,7 @@ use crate::runtime::svc_ids::{WIPICKernelMethodId, WIPICTableId};
 
 mod context;
 pub mod interface;
+mod local_net;
 mod method_table;
 
 use context::{KtfWIPICContext, ResourceCache};
