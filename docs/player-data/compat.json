@@ -6523,19 +6523,16 @@
    "platform": "LGT",
    "model": "clet",
    "title": "테라 영원의 혼돈",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok",
-    "progress": "stuck"
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "게임을 시작하면 게임사 서버에 접속해야 하는데, 그 서버가 지금은 없어 «서버에 연결중입니다» 안내에서 넘어가지 않아요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "lgt 테라 영원의 혼돈"
   },
@@ -6701,7 +6698,7 @@
    "platform": "LGT",
    "model": "aot-java",
    "title": "훼밀리마트타이쿤",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
@@ -6712,7 +6709,8 @@
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "이름을 등록하려면 게임사 서버에 접속해야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요."
+    "켤 때마다 정식사용자 인증을 하려고 게임사 서버에 접속하는데, 그 서버가 지금은 없어 «사용자인증에 실패하였습니다» 안내가 나와요. 확인을 누르면 메뉴로 가고, «게임시작»으로 이야기와 매장 운영을 할 수 있어요.",
+    "이벤트와 네트워크 메뉴의 랭킹은 이름을 등록하려고 게임사 서버에 접속하는데, 그 서버가 지금은 없어 쓸 수 없어요."
    ],
    "changes": [],
    "fileTitle": "훼밀리마트타이쿤"
