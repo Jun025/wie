@@ -46,6 +46,4 @@
 
 ### 4. 게임 파일명 유입
 
-`node scripts/corpus-name-inflow.mjs`: 유입 718회/330쌍(BOUNDED) · 판단 필요 37회/17쌍(SUFFIX-ATTACHED). 거의 전부가 이 회차가 두 행만 고친 `compat.json` 의 기존 `title` 칸이다. 그 파일을 빼면 유입 0건(BOUNDED) · 판단 필요 1건(SUFFIX-ATTACHED: census 의 기존 문장 «턴종료» — 게임명이 아니다). 더한 줄에는 게임 이름이 없다.
-
-
+`node scripts/corpus-name-inflow.mjs`: 유입 718회/330쌍(BOUNDED) · 판단 필요 37회/17쌍(SUFFIX-ATTACHED). 거의 전부가 이 회차가 두 행만 고친 `compat.json` 의 기존 `title` 칸이다. 그 파일을 빼면 유입 0건(BOUNDED) · 판단 필요 1건(SUFFIX-ATTACHED: census 의 기존 요령 문장 속 한 낱말이 짧은 제목과 겹친 것 — 게임명이 아니다). 더한 줄에는 게임 이름이 없다.
