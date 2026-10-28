@@ -70,4 +70,4 @@ KTF 표본 15종(`f44271803135` 드래곤아이즈2 포함) probe A·B 전·후:
 
 
 
-<!-- corpus-name-inflow v1 subjects=6 tree=2d0b4dd9d57b1c10 B=718/330 P=0/0 S=37/17 -->
+<!-- corpus-name-inflow v1 subjects=7 tree=07367f09e696dc08 B=721/332 P=0/0 S=38/18 -->
