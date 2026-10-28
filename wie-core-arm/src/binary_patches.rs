@@ -13,30 +13,30 @@ use self::{
     patch::{PatchSpec, PatternPatchSpec},
 };
 
-/// Match the binary against the embedded patch table and install any matching
-/// patches/hooks. The on-disk MD5 selects a hash-keyed entry first, falling
-/// back to a hash-less generic entry. `scan_ranges` are the `(base, size)` byte
-/// ranges searched for pattern matching (typically the guest `.text` region).
+/// Match the binary against the embedded patch table and install the hash-less
+/// generic entry, then the entry keyed by the on-disk MD5 on top of it.
+/// `scan_ranges` are the `(base, size)` byte ranges searched for pattern
+/// matching (typically the guest `.text` region).
 /// Returns the number of patches + hooks installed.
 pub fn install_binary_patches(core: &mut ArmCore, data: &[u8], scan_ranges: &[(u32, u32)]) -> Result<usize> {
-    let hash = md5::compute(data).0;
     let entries = parser::binary_patches();
-    if let Some(entry) = entries.iter().find(|e| matches!(e.hash, Some(h) if h == hash)) {
-        return install_entry(core, entry, scan_ranges, true);
-    }
-    if let Some(entry) = entries.iter().find(|e| e.hash.is_none()) {
-        return install_entry(core, entry, scan_ranges, false);
-    }
-    Ok(0)
+    let generic = entries.iter().find(|e| e.hash.is_none()).map(|e| (e, false));
+    install_entries(
+        core,
+        &[generic, title_entry(&entries, data)].into_iter().flatten().collect::<Vec<_>>(),
+        scan_ranges,
+    )
 }
 
 /// Hash-keyed entries only — for a host whose titles must not pick up the generic entry (LGT).
 pub fn install_title_binary_patches(core: &mut ArmCore, data: &[u8], scan_ranges: &[(u32, u32)]) -> Result<usize> {
+    let entries = parser::binary_patches();
+    install_entries(core, &title_entry(&entries, data).into_iter().collect::<Vec<_>>(), scan_ranges)
+}
+
+fn title_entry<'a>(entries: &'a [Entry], data: &[u8]) -> Option<(&'a Entry, bool)> {
     let hash = md5::compute(data).0;
-    match parser::binary_patches().iter().find(|e| matches!(e.hash, Some(h) if h == hash)) {
-        Some(entry) => install_entry(core, entry, scan_ranges, true),
-        None => Ok(0),
-    }
+    entries.iter().find(|e| matches!(e.hash, Some(h) if h == hash)).map(|e| (e, true))
 }
 
 struct Entry {
@@ -90,27 +90,47 @@ struct PatternMatch {
     exit_b_bytes: Option<[u8; 2]>,
 }
 
+#[cfg(test)]
 fn install_entry(core: &mut ArmCore, entry: &Entry, scan_ranges: &[(u32, u32)], is_specific: bool) -> Result<usize> {
-    let hooks = hook::resolve_hooks(core, entry, scan_ranges)?;
-    let n_patches = patch::install_patches(core, entry, scan_ranges, &hooks)?;
+    install_entries(core, &[(entry, is_specific)], scan_ranges)
+}
 
-    // A hash-keyed entry that produces zero installations is a strong signal
-    // that the binary drifted from what the patch table targets. Generic
-    // (hash-less) entries have no such guarantee. We trust the caller's
-    // `is_specific` rather than `entry.hash.is_some()` so that a placeholder
-    // all-zero hash in a fixture doesn't accidentally trigger this.
-    if n_patches == 0 && hooks.is_empty() {
-        if is_specific {
-            return Err(WieError::FatalError(format!(
-                "entry {}: hash matched but produced 0 patches/hooks (table likely out of date)",
-                entry.name
-            )));
+/// Install several entries as one: every entry's patches are checked against every entry's hooks,
+/// and the SVC dispatcher is registered once (it can only be registered once). No entries → 0.
+fn install_entries(core: &mut ArmCore, entries: &[(&Entry, bool)], scan_ranges: &[(u32, u32)]) -> Result<usize> {
+    if entries.is_empty() {
+        return Ok(0);
+    }
+    let resolved = entries
+        .iter()
+        .map(|(entry, _)| hook::resolve_hooks(core, entry, scan_ranges))
+        .collect::<Result<Vec<_>>>()?;
+    let hooks = resolved.concat();
+
+    let mut n = hooks.len();
+    for ((entry, is_specific), own_hooks) in entries.iter().zip(&resolved) {
+        let n_patches = patch::install_patches(core, entry, scan_ranges, &hooks)?;
+        n += n_patches;
+
+        // A hash-keyed entry that produces zero installations is a strong signal
+        // that the binary drifted from what the patch table targets. Generic
+        // (hash-less) entries have no such guarantee. We trust the caller's
+        // `is_specific` rather than `entry.hash.is_some()` so that a placeholder
+        // all-zero hash in a fixture doesn't accidentally trigger this.
+        if n_patches == 0 && own_hooks.is_empty() {
+            if *is_specific {
+                return Err(WieError::FatalError(format!(
+                    "entry {}: hash matched but produced 0 patches/hooks (table likely out of date)",
+                    entry.name
+                )));
+            }
+            tracing::warn!("entry {}: generic entry produced 0 patches/hooks", entry.name);
         }
-        tracing::warn!("entry {}: generic entry produced 0 patches/hooks", entry.name);
     }
 
-    hook::apply_hooks(core, &entry.name, &hooks)?;
-    Ok(n_patches + hooks.len())
+    let name = entries.iter().map(|(e, _)| e.name.as_str()).collect::<Vec<_>>().join(" + ");
+    hook::apply_hooks(core, &name, &hooks)?;
+    Ok(n)
 }
 
 /// Scans on 2-byte boundaries since all Thumb instructions are halfword-aligned.
@@ -345,6 +365,35 @@ mod tests {
 
             let n = install_entry(&mut core, &entry, &[], true)?;
             assert_eq!(n, 2);
+            Ok(())
+        }
+
+        #[test]
+        fn install_entries_stacks_a_title_entry_on_the_generic_one() -> Result<()> {
+            // KTF: generic hooks plus a hash-keyed patch in one install — the SVC dispatcher can
+            // only be registered once, so two separate installs fail at boot.
+            let mut core = ArmCore::new(false, None)?;
+            core.map(0x2000, 0x100)?;
+            core.write_bytes(0x2000, &[0xaa, 0xbb])?;
+
+            let mut generic = empty_entry("generic", None);
+            generic.hooks.push(Hook {
+                pc: 0x2011,
+                kind: HookKind::Memcpy,
+            });
+            let mut title = empty_entry("title", Some([0u8; 16]));
+            title.patches.push(PatchSpec {
+                pc: 0x2000,
+                bytes: vec![0x11, 0x22],
+                expect: Some(vec![0xaa, 0xbb]),
+            });
+
+            assert_eq!(install_entries(&mut core, &[(&generic, false), (&title, true)], &[])?, 2);
+            let mut buf = [0u8; 2];
+            core.read_bytes(0x2000, &mut buf)?;
+            assert_eq!(buf, [0x11, 0x22]);
+            core.read_bytes(0x2010, &mut buf)?;
+            assert_eq!(buf, [0x80, 0xdf]);
             Ok(())
         }
 
