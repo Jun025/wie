@@ -59,7 +59,8 @@ const SERVERS: &[Server] = &[
         respond: login_0200,
     },
     // 3ff5948e235e: the first-run «사용자 인증» — one request, then the title writes `inzung.an` and goes on.
-    // 211.239.165.13:8035 is the other mode's host (binary.mod 0x3d6f4); the first run dials this one.
+    // Unanswered, it reaches the same branch only after ~600 failed tries (a loading bar ~24 s longer,
+    // docs/report/0544). 211.239.165.13:8035 is the other mode's host (binary.mod 0x3d6f4).
     Server {
         aid: "0003266D",
         host: [211, 239, 165, 14],

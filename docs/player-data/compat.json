@@ -6116,18 +6116,18 @@
    "platform": "LGT",
    "model": "clet",
    "title": "아니마",
-   "status": "limited",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "ok",
-    "progress": "stuck"
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "게임을 계속하려면 사용자 인증을 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요."
+   "knownIssues_ko": [],
+   "playTips_ko": [
+    "처음 실행할 때 사용자 인증을 묻는 창의 커서가 «아니오»에 있으니 왼쪽 방향키로 «예»를 고른 뒤 확인 키를 누르면 인증을 마치고 게임이 시작돼요. 다음부터는 묻지 않아요."
    ],
    "changes": [],
    "fileTitle": "아니마"
