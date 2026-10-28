@@ -67,6 +67,20 @@ const SERVERS: &[Server] = &[
         port: 7205,
         respond: register_a_lgt,
     },
+    // 0fdf45ec169f: the first-run «인증» after PRESS ANY KEY — one request, then the title menu. The port
+    // is 11002 plus a random 0 or 1 (binary.mod 0x113b9c); both are the same server.
+    Server {
+        aid: "0002B76D",
+        host: [222, 122, 160, 61],
+        port: 11002,
+        respond: certify_lgt01,
+    },
+    Server {
+        aid: "0002B76D",
+        host: [222, 122, 160, 61],
+        port: 11003,
+        respond: certify_lgt01,
+    },
 ];
 
 /// caf9d76ffd13's packets: `[total length u16 LE][command u16 LE][body]`, the length counting the
@@ -154,6 +168,19 @@ fn register_a_lgt(request: &mut Vec<u8>) -> Option<Vec<u8>> {
     }
 
     Some(b"@A11      A".to_vec())
+}
+
+/// 0fdf45ec169f's requests (built at binary.mod 0x1153d0) carry no length: `LGT`, a type byte, then
+/// fixed fields. Type 1 is the 60-byte «인증» — the title's name and the code `41000` at 0x36. A reply is
+/// `[body length u32 LE][body]` (0x128d10 reads 4 bytes, then that many), and the body's first byte is
+/// its type. The handler of the screen that waits for this one (0x11913e) takes type 1 and stores the
+/// next byte as the result: 1 is «인증이 완료되었습니다», 2 «인증이 확인되었습니다», anything else
+/// «인증에 실패하였습니다» (0x117ec4). The title keeps the result, so a relaunch does not dial again
+/// (measured). Any other request gets no answer.
+fn certify_lgt01(request: &mut Vec<u8>) -> Option<Vec<u8>> {
+    let packet = take_packet(request, |_| 60)?;
+
+    packet.starts_with(b"LGT\x01").then(|| vec![2, 0, 0, 0, 1, 1])
 }
 
 /// The first whole packet in `request`, removed from it; None until one has arrived. `length` reads
@@ -372,6 +399,29 @@ mod tests {
         assert_eq!(net.read(fd, 0x100), Some(b"@A11      A".to_vec()));
 
         assert_eq!(net.write(fd, b"@A24      1911112222YP_1"), Some(false));
+    }
+
+    // 0fdf45ec169f: the 60-byte «인증», split the way a short write would leave it, gets type 1 with
+    // result 1; the one-byte write its cleanup sends on the way out (0x1287c4) gets nothing.
+    #[test]
+    fn certify_lgt01_answers_the_certification_only() {
+        let mut net = FakeNet::new("0002B76D");
+        let fd = net.socket().unwrap();
+        assert!(net.connect(fd, [222, 122, 160, 61], 11003));
+        let mut request = b"LGT\x01".to_vec();
+        request.resize(60, 0);
+        assert_eq!(net.write(fd, &request[..30]), Some(false));
+        assert_eq!(net.write(fd, &request[30..]), Some(true));
+        assert_eq!(net.read(fd, 4), Some(vec![2, 0, 0, 0]));
+        assert_eq!(net.read(fd, 2), Some(vec![1, 1]));
+
+        assert_eq!(net.write(fd, &[0]), Some(false));
+
+        let fd = net.socket().unwrap();
+        assert!(net.connect(fd, [222, 122, 160, 61], 11002));
+        let mut other = b"LGT\x05".to_vec();
+        other.resize(60, 0);
+        assert_eq!(net.write(fd, &other), Some(false));
     }
 
     // b9bfcaf42722: hello, then the certificate with its length at offset 6.

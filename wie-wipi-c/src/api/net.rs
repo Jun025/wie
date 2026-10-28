@@ -268,13 +268,13 @@ mod tests {
         assert_eq!(reply, [0, 6, 0, 0x00, 0, 0]);
     }
 
-    // 0fdf45ec169f has no listed server; after its `MC_netConnect` fails it writes one byte to fd 0,
-    // a socket it never made. An unlisted title's write is refused before `buf` is read — a `buf`
-    // outside guest memory stays -1 rather than becoming a fault — and its SetWriteCB/SetReadCB
-    // announce nothing.
+    // The shape 0fdf45ec169f had while it had no listed server: after its `MC_netConnect` failed it
+    // wrote one byte to fd 0, a socket it never made. An unlisted title's write is refused before `buf`
+    // is read — a `buf` outside guest memory stays -1 rather than becoming a fault — and its
+    // SetWriteCB/SetReadCB announce nothing.
     #[futures_test::test]
     async fn unlisted_title_write_and_callbacks_stay_offline_test() {
-        let mut context = context("0002B76D");
+        let mut context = context("00000000");
         assert_eq!(socket_write(&mut context, 0, 0xf000_0000, 16).await.unwrap(), -1);
         assert_eq!(set_write_cb(&mut context, 0, 0x1284fd, 0).await.unwrap(), -1);
         assert_eq!(set_read_cb(&mut context, 0, 0x1284fd, 0).await.unwrap(), -1);
