@@ -108,4 +108,4 @@ A·B **30쌍 전부 같은 판정 · 같은 종료**(PASS · deadline)다. 그�
 도구 표기: BOUNDED 330건 · SUFFIX-ATTACHED 17건 — 전부 계약상 제목 목록인 `compat.json` 과
 `playability-census.mjs` 에 **이미 있던** 줄이다.
 
-<!-- corpus-name-inflow v1 subjects=10 tree=3716106b9239962c B=718/330 P=0/0 S=37/17 -->
+<!-- corpus-name-inflow v1 subjects=10 tree=7c1c89912ef5f4aa B=718/330 P=0/0 S=37/17 -->
