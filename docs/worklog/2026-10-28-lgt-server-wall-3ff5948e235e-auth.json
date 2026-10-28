@@ -1,0 +1,8 @@
+{
+  "date": "2026-10-28",
+  "task": "wie-2026-10-26-lgt-server-wall-six-titles-adopt-p0",
+  "title": "LGT 3ff5948e235e 사용자 인증 해독과 가짜 서버 행",
+  "summary": "제안 2026-10-26-lgt-server-wall-six-titles#p0 를 채택해 종결했다. 판정은 진행(요청은 상수 10자와 게임 이름·버전뿐, 응답은 본문 첫 바이트 A 만 본다). fake_server 에 행을 더했고, 행이 없어도 약 600번 재시도 뒤 같은 성공 분기로 가므로 벽이 아니라 «아니오» 커서였다. compat limited → playable · 요령 한 줄. docs/report/0544.",
+  "adoptedProposals": ["2026-10-26-lgt-server-wall-six-titles#p0"],
+  "proposals": []
+}

@@ -58,6 +58,15 @@ const SERVERS: &[Server] = &[
         port: 13505,
         respond: login_0200,
     },
+    // 3ff5948e235e: the first-run «사용자 인증» — one request, then the title writes `inzung.an` and goes on.
+    // Unanswered, it reaches the same branch only after ~600 failed tries (a loading bar ~24 s longer,
+    // docs/report/0544). 211.239.165.13:8035 is the other mode's host (binary.mod 0x3d6f4).
+    Server {
+        aid: "0003266D",
+        host: [211, 239, 165, 14],
+        port: 7205,
+        respond: register_a_lgt,
+    },
 ];
 
 /// caf9d76ffd13's packets: `[total length u16 LE][command u16 LE][body]`, the length counting the
@@ -125,6 +134,26 @@ fn login_0200(request: &mut Vec<u8>) -> Option<Vec<u8>> {
     }
 
     (!reply.is_empty()).then_some(reply)
+}
+
+/// 3ff5948e235e's packets (ARM): `@A`, the total length as `%-8d`, then — on a request only — a
+/// 10-character id (a constant in the image, 0xf03c) before the body (binary.mod 0x3d930). The first
+/// run's request body is `A_LGT_<title>_<version>_UNKNOWN_WIPI` (0x3c088): nothing tied to the handset
+/// or a purchase. A reply's body starts right after the length (0xebd8 cuts the packet by it, 0x3dc7c
+/// drops those 10 bytes), and for this request the only thing checked is that the body starts with
+/// `A` (0x3dfcc); the caller then writes `inzung.an` (two zero bytes) and shows «인증에 성공하였습니다»
+/// (0x51820). Any other request gets no answer.
+fn register_a_lgt(request: &mut Vec<u8>) -> Option<Vec<u8>> {
+    let packet = take_packet(request, |x| {
+        let digits = x.get(2..10).unwrap_or(&[]);
+        let digits = core::str::from_utf8(digits).unwrap_or("").trim_end();
+        digits.parse().unwrap_or(usize::MAX)
+    })?;
+    if !packet.get(20..).is_some_and(|x| x.starts_with(b"A_LGT_")) {
+        return None;
+    }
+
+    Some(b"@A11      A".to_vec())
 }
 
 /// The first whole packet in `request`, removed from it; None until one has arrived. `length` reads
@@ -327,6 +356,22 @@ mod tests {
         assert_eq!(reply.len(), 0x58);
         assert_eq!((&reply[..4], reply[0xc]), (&[0x58, 0, 0x02, 0x00][..], 0xff));
         assert!(reply[0x10..].iter().all(|&x| x == 0));
+    }
+
+    // 3ff5948e235e: the length is ASCII, so nothing is answered until all of it and the packet are in;
+    // the reply's body is the one `A` its parser checks.
+    #[test]
+    fn register_a_lgt_answers_the_registration_only() {
+        let mut net = FakeNet::new("0003266D");
+        let fd = net.socket().unwrap();
+        assert!(net.connect(fd, [211, 239, 165, 14], 7205));
+        let request = b"@A36      1911112222A_LGT_x_1.0_WIPI";
+        assert_eq!(net.write(fd, &request[..6]), Some(false));
+        assert_eq!(net.write(fd, &request[6..35]), Some(false));
+        assert_eq!(net.write(fd, &request[35..]), Some(true));
+        assert_eq!(net.read(fd, 0x100), Some(b"@A11      A".to_vec()));
+
+        assert_eq!(net.write(fd, b"@A24      1911112222YP_1"), Some(false));
     }
 
     // b9bfcaf42722: hello, then the certificate with its length at offset 6.

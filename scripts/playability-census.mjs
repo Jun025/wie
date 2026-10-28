@@ -734,12 +734,11 @@ const netWall = (connects) => connects >= 200;
 // Also any other wall a title cannot pass without us making up data, treated the same way (one line,
 // at most limited): the KTF install-license check — the engine would have to invent the record (0457).
 // caf9d76ffd13, b9bfcaf42722 and 0093012b8c36 left this table when the engine began answering for
-// their servers (wie_backend::fake_server · docs/report/0542).
+// their servers (wie_backend::fake_server · docs/report/0542), 3ff5948e235e too (docs/report/0544).
 const HAND_WALL = {
   '974e0df9ab1e': '설치 인증(구매 기록)을 확인하는 단계에서 멈춰서, 여기서는 그 뒤로 진행할 수 없어요.',
   f770b15f8876: '설치 인증(구매 기록)을 확인하는 단계에서 멈춰서, 여기서는 그 뒤로 진행할 수 없어요.',
   // Progress wave 4 (docs/report/0469 §2): the last screen of a `stuck` run, read off the frames.
-  '3ff5948e235e': '게임을 계속하려면 사용자 인증을 받아야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.',
   '73f3a21e981c': '이름을 등록하려면 게임사 서버에 접속해야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.',
   // Progress round 3 (docs/report/0507): a server step no answer passes, read off the frames.
   '0fdf45ec169f': '게임을 시작하면 게임사 서버에 접속해야 하는데, 그 서버가 지금은 없어 «서버에 연결중입니다» 안내에서 넘어가지 않아요.',
@@ -790,6 +789,8 @@ const HAND_TIP = {
   fe184f834bc7: ['확인 키는 일시정지 창을 여니, 싸울 때는 방향키로 움직이며 숫자 5 키를 누르면 돼요.'],
   // docs/report/0542: «아니오», where the cursor starts, ends the run; «예» takes the certificate once.
   '0093012b8c36': ['처음 실행할 때 인증서를 받을지 묻는 창의 커서가 «아니오»에 있으니 왼쪽 방향키로 «예»를 고른 뒤 확인 키를 누르면 인증서를 받고 게임이 시작돼요. 다음부터는 묻지 않아요.'],
+  // docs/report/0544: the same cursor on the first-run «사용자 인증» question; «아니오» asks it again.
+  '3ff5948e235e': ['처음 실행할 때 사용자 인증을 묻는 창의 커서가 «아니오»에 있으니 왼쪽 방향키로 «예»를 고른 뒤 확인 키를 누르면 인증을 마치고 게임이 시작돼요. 다음부터는 묻지 않아요.'],
   // Progress wave 6 (docs/report/0502): 13 whose recipe 600 s frames stay in play, 10 whose entry into play
   // was seen at pin 7ca47380 but whose play does not last the run — the line says only how to get in.
   '0266ca417880': ['처음 화면부터 확인 키를 누르다가 서버 선택 확인 창이 나오면 왼쪽 방향키로 «예»를 고른 뒤 확인 키를 눌러야 이야기로 넘어가요.'],

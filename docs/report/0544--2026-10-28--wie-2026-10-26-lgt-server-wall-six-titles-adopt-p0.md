@@ -1,0 +1,93 @@
+## [2026-10-28] LGT 3ff5948e235e 사용자 인증 — 판정 함수 해독, 가짜 서버 행 추가, 벽이 아니라 커서였음 (wie-2026-10-26-lgt-server-wall-six-titles-adopt-p0)
+
+**무엇을**: `3ff5948e235e` 의 첫 실행 «사용자 인증» 요청과 응답 판정을 binary.mod(ARM)에서 읽고, `wie_backend::fake_server` 표에 이 판의 행(AID `0003266D` · 211.239.165.14:7205)을 더했다. 응답은 판정 함수가 보는 것만 채운 `@A11      A` 11바이트다. census 의 `HAND_WALL` 에서 이 판을 빼고 `HAND_TIP` 에 «예»를 고르라는 한 줄을 더했다. `compat.json` 행을 `limited` → `playable` 로 바꿨다.
+
+**왜**: 0542 §1 이 «응답 판정(`0x3d668`→`0x51728`)의 성공 조건을 다 읽지 못했다»로 남긴 판이다(제안 `2026-10-26-lgt-server-wall-six-titles#p0`). 티켓은 먼저 그 «인증»이 구매 인증이나 단말 묶음인지 가리라고 했다.
+
+**사용자 영향**: 인증 질문에서 «예»를 고르면 곧바로 «인증에 성공하였습니다»가 나오고 게임에 들어간다. 다시 켜면 묻지 않는다. 지원 페이지는 «진행할 수 없어요» 대신 «예»를 고르라는 요령을 보인다.
+
+### 1. 판정 — 진행(구매·단말과 무관)
+
+보내는 것과 받는 것 모두 단말이나 구매에 묶인 값이 없다.
+- **요청 머리** `@A%-8d%10.10s`(`0x3d930`): 길이 다음의 10자는 `0xf03c` 가 이미지 안의 상수 문자열을 `strcpy` 한 것이다. `PHONENUMBER` 를 읽지 않는다. 그래서 어느 폰에서나 같은 10자다.
+- **요청 본문** `A_LGT_%s_%s_UNKNOWN_WIPI`(`0x3c088`, 모드 1): 두 `%s` 는 호출부(`0x51404`)가 넘기는 게임 이름 상수와 버전 상수 `1.0.2` 다.
+- **응답 판정**: `0xebd8` 가 `@`(또는 `AM`)로 시작하는 패킷을 `atoi(+2)` 길이로 자른다. `0x3dc7c` 는 앞 10바이트를 떼고 본문을 본다. `YX` 는 오류 문구, `YY` 는 확인 응답이고, 그 밖에는 모드로 분기한다. 모드 1(`0x3dfcc`)은 **본문 첫 바이트가 `A` 인지만** 본다(`0x3f4f8` → 1).
+- **성공 처리**(`0x51820`): 2바이트 0 을 `inzung.an` 에 쓰고 상태 7(«인증에 성공하였습니다»)로 간다. 저장하는 값도 0 이다.
+
+발췌와 디스어셈블러는 증거 폴더 `disasm-excerpt.txt`·`armdis.py` 에 있다. 인증 뒤에 나오는 «고객정보 활용동의»·«SMS 수신 동의» 창은 게임이 보여 주는 안내문이고, 그 창에서 통신은 나가지 않는다.
+
+### 2. 벽이 아니었다 — 개악 대조의 결과
+
+티켓은 «행을 지우면 인증에서 멈춘다»를 대조로 기대했다. 실측은 다르다. **행을 지운 빌드도 «예»를 고르면 인증을 통과한다.**
+- 접속이 실패하면 `MC_netClose` 를 약 600번 되풀이한다(실측 602). 그 뒤 같은 «인증에 성공하였습니다» 화면이 나온다(프레임). 호출부 `0x51750` 의 `cmp r0,#0xa; cmpne r0,#0` 은 0 도 성공 분기로 보낸다. 실패 경로가 실제로 0 을 돌려주는지는 추적하지 않았다.
+- 같은 키(`auth.keys`)로 두 빌드를 1초 간격 프레임으로 찍었다. «인증에 성공하였습니다»의 첫 프레임은 행이 있으면 `t033`, 없으면 `t057` 이었다. 마지막 확인 키는 약 19초에 눌렸다(load1 약 8).
+- 그러니 이 행이 바꾸는 것은 «멈춤 → 진행»이 아니다. **로딩 막대를 약 24초 덜 보는 것**과 **실패 재시도 대신 판정 함수가 읽는 성공 응답으로 지나가는 것**이다.
+
+census 가 이 판을 `stuck` 으로 잰 까닭은 질문 창의 커서가 «아니오»에서 시작하기 때문이다. «아니오»는 «정상적인 게임 진행을 위해서는 사용자 인증 절차가 필요합니다»를 띄우고 같은 질문으로 돌아온다. 0469 가 읽은 마지막 화면이 그 고리다. 0542 의 `0093012b8c36` 과 같은 모양이라 같은 요령 한 줄로 적었다.
+
+### 3. 근거 — 프레임
+
+증거 폴더(로컬): `~/orchestrator/reports/evidence/wie-2026-10-26-lgt-server-wall-six-titles-adopt-p0/`.
+
+1. **인증 다음 화면**(`fix-walk-sheet.png` · 키 `walk.keys`): 재실행 안내 → 이용안내 → 안내 → 인증 질문에서 왼쪽 → «인증에 성공하였습니다»(`fix-06-auth-success.png`) → 고객정보 동의 2장 → SMS 동의(아니오) → 저장 데이터 확인(아니오) → 등급 → 타이틀(v1.0.2) → 메뉴 → 저장 칸 → **Class Select**(`fix-16-class-select.png`).
+2. **행을 지운 빌드**(`norow-walk-sheet.png`, 같은 키): 인증 질문 뒤 로딩 막대가 세 걸음(약 18초) 더 이어지고 «인증에 성공하였습니다»에 닿는다. 그 사이 키가 로딩 화면에 떨어져, 같은 키로는 등급 화면까지만 갔다.
+3. **다시 켜기**(`fix-restart-sheet.png` · `--restart-at 115` · DB 유지): 이용안내 → 안내 → 저장 데이터 확인 → 등급 → 타이틀 → 메뉴. 인증 질문이 다시 나오지 않는다.
+
+### 4. A/B 와 census
+
+`wie_validate` 릴리스 빌드, census 프로브 A(정책 키 27개 · `--pacing 8`) · B(키 0)를 짝으로 쟀다. 대조는 행만 지운 빌드다(이 판에는 `origin/main` 과 같은 동작이다. 차이는 쓰이지 않는 함수 하나다).
+
+| 빌드 | A | B | A 접속 횟수 | census `report` 의 이 판 줄 |
+|---|---|---|---|---|
+| 행 있음 | PASS 27/27 · paints 621 · 색 214 | PASS · paints 714 | 2 | 벽 문구 없음, 요령 한 줄 |
+| 행 없음 | PASS 27/27 · paints 557 · 색 214 | PASS · paints 713 | 335 | `NET_KO`(접속 200회 이상) |
+
+- A/B 판정(PASS)은 두 빌드를 가르지 못한다. 가르는 것은 접속 횟수와 §3 의 프레임이다.
+- 행이 없으면 실패 재시도가 census 의 망 벽 문턱(200회)을 넘어 `NET_KO` 가 붙는다. 행이 있으면 그 줄이 사라진다.
+- 긴 실행(600초, `--only long`) 결과는 §6 에 있다.
+
+### 5. compat.json
+
+- `3ff5948e235e`: `status` `limited` → `playable`, `knownIssues_ko` 를 비웠다.
+- `playTips_ko` 1줄을 더했다. 커서가 «아니오»에 있으니 «예»를 고르라는 안내다. census `HAND_TIP` 에도 같은 문장을 두었다.
+- `axes.progress` 키를 뺐다. 그 `stuck` 은 «아니오» 고리에서 잰 값이고, 이번 회차에 진도 정책(1800초)을 다시 재지 않았다(계약 §1 «키 없음 = 재지 않았다» · 0542 §5 와 같은 처리).
+- 착지 기준 바뀐 행 수는 회신에 `check-compat-revert` 출력으로 인용한다.
+
+### 6. census 긴 실행
+
+행 있는 빌드로 census `run --only long`(600초, census 의 긴 키)을 한 번 더 돌렸다(`census-drive.sh` · long 임대 1건 · load1 8~12).
+- 프레임(`census-long-sheet.png`): 인증 뒤 동의 창 → «저장된 데이터를 확인중입니다» → 프롤로그 → 성 안 대화 → 숲 → 진영 대화까지 600초 동안 이어진다.
+- 소리: 재생 6회 · MIDI 이벤트 5244.
+- 그 실행에서 게임은 211.239.165.13:8035(다른 모드의 호스트, 표 밖)에 31번 접속했고 모두 실패했다. 게임은 매번 시한 뒤 계속 진행했다(§7).
+- 이 디렉터리로 `report` 를 다시 내면 이 판은 `playable` 이고, 축은 boot·render·input·longplay·sound·speed 가 모두 `ok`, progress 는 `n/a`(재지 않음)다. 벽 문구 없이 요령 한 줄만 남는다. 커밋한 `compat.json` 행과 같은 결론이다.
+
+### 7. 한계
+
+- 응답은 실기 서버의 것이 아니라 판정 함수가 읽는 최소(본문 `A` 한 글자)다. 이 판은 인증 뒤에 서버 값을 쓰지 않는다(`inzung.an` 은 0 두 바이트).
+- 표에는 모드 1의 호스트만 올렸다. 다른 모드(`B_LGT_`·랭킹 `RR_`·업로드 `YP_` 등, 211.239.165.13:8035 포함)에는 답하지 않는다. 그 기능은 종전처럼 시한 뒤 실패한다.
+- 진도(progress) 축은 다시 재지 않았다(§5).
+- 브라우저 셸에서는 재지 않았다. 같은 엔진 코드가 답하므로 동작은 같아야 하지만 실측은 아니다.
+
+### 8. featurephone 셸 동기
+
+otterpebble `apps/featurephone/lib/compat.json` 은 다음 wie 릴리스 가져오기로 받는다. 이 회차에서 otterpebble 은 건드리지 않았다.
+
+### 9. 이용자 소식
+
+`docs/player-updates/2026-10-28-lgt-user-auth-answered.json`(`improvement`) 1건을 더했다. 종전에도 «예»를 고르면 오래 기다린 뒤 지나갔으므로 `fix` 가 아니라 `improvement` 로 적었다.
+
+### 10. 게이트
+
+- 네 게이트: fmt rc=0 · clippy `-D warnings` rc=0 · wasm clippy rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` rc=0(830 통과 · 0 실패) · beta clippy rc=0.
+- 엔진 러너 블록(릴리스 빌드): `draw_j2me`·`helloworld_ktf`·`helloworld_lgt`·`text_j2me` PASS. `keydraw_ktf`·`keydraw_lgt` 는 기본 `--max-ticks` 에서 `UNMEASURED`(`stop` = `max-ticks`, 8/27)였다. 0542 §9 와 같은 현상이다. `--max-ticks 2000000000` 으로 두 판 모두 PASS · rc=0 · 27/27(paints 79/55)이다.
+- `fake_server` 단위 테스트 `register_a_lgt_answers_the_registration_only`: 길이가 다 오기 전에는 답하지 않고, `A_LGT_` 가 아닌 요청에는 답하지 않는다.
+- `check-worklog-json` OK · `player-data` OK · `npm run audit` PASSED · `check-docs-report-serial` OK · census `selftest` 65/65.
+
+### 11. 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs` 를 기본 대상(이 브랜치의 추가·수정 파일 전체 본문)으로 돌렸다. 유입은 BOUNDED 와 SUFFIX-ATTACHED 를 함께 적는다(마지막 줄 표식).
+- 거의 전부가 `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 칸이다. 이 회차는 그 파일에서 한 행의 상태·요령 칸만 고쳤다.
+- 그 파일을 뺀 경로(코드·census·보고서·worklog)로는 BOUNDED 0 · SUFFIX-ATTACHED 1 이다. 그 1건은 census 에 원래 있던 요령 문장 속 낱말이고 게임 이름이 아니다.
+- 이 회차가 더한 줄에는 게임 이름이 없다(추가 줄 대조 0). 보고서·worklog·코드·이용자 소식은 sha12 또는 sha256 으로만 적었다.
+
+<!-- corpus-name-inflow v1 subjects=6 tree=7bf8c459f6bafd37 B=718/330 P=0/0 S=37/17 -->
