@@ -383,7 +383,7 @@ where
         match ClassDefinitionImpl::from_classfile(data) {
             Ok(class) => self
                 .classes
-                .record(InheritedMethods::wrap(jvm, class, Some(self.guest_calls.clone())).await),
+                .record(InheritedMethods::wrap(jvm, class, Some(self.guest_calls.clone()), crate::class_patches::forced_bools(data)).await),
             Err(ClassDefinitionError::InvalidClassFile) => Err(jvm.exception("java/lang/ClassFormatError", "Invalid class file").await),
             Err(ClassDefinitionError::UnsupportedClassVersion(version)) => Err(jvm
                 .exception(

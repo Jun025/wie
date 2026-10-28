@@ -657,6 +657,12 @@ function sniffPlatform(path) {
 // ── locked files: titles that cannot run anywhere but the original buyer's handset ────────────
 // Operator policy 2026-10-02: neither is to be unlocked (no phone-number recovery, no check bypass,
 // no decryption) — the census says so in the player's words instead of «아직 실행되지 않아요».
+// That policy is lifted ONE sha AT A TIME by the operator, never by a rule here: 2026-10-26 for one
+// LGT title and 2026-10-28 for five SKT ones, whose checks the engine now answers (the class-hash
+// table in `wie-jvm-support/src/class_patches.rs` — no number is read, recovered or stored). Nothing
+// below changed for them: `lockVerdict` asks whether the title still quits on its own, and an
+// unlocked one does not, so it leaves this bucket by measurement. A title the operator has not
+// named still ends up here, which is the point.
 //   drm    an OMA DRM container (`odcf` magic) where the jar should be — encrypted, decided statically.
 //   phone  an SKT purchase check (XCE `SecureUtil`: MD5 of carrier + the buyer's phone number +
 //          SERVICE_ID == `MIDlet-Key`, docs/report/0386) AND the title quit on its own.
@@ -665,6 +671,7 @@ function sniffPlatform(path) {
 //          failing check draws «인증 되지 않은 컨텐츠» and then calls `System.exit` (docs/report/0420),
 //          so the rule is «every run quit, the unkeyed one included», not «0 paints». On the bd2337ff
 //          census that adds 2 of the 41 and no title that plays (those all end on `deadline`).
+//          Re-measured 2026-10-28 after the five were answered: 41 carry it and 41 play.
 const LOCK_KO = {
   drm: '암호로 잠긴 파일이라 여기서는 실행할 수 없어요.',
   phone: '구매한 휴대폰에서만 켜지도록 잠긴 파일이라 여기서는 실행할 수 없어요.',

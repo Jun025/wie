@@ -1,6 +1,7 @@
 #![no_std]
 extern crate alloc;
 
+mod class_patches;
 mod context;
 mod declared_field;
 pub mod guest_roots;

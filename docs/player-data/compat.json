@@ -6861,18 +6861,16 @@
    "platform": "SKT",
    "model": null,
    "title": "노리맥스영웅전",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
     "boot": "ok",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "no",
-    "speed": "unknown"
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "구매한 휴대폰에서만 켜지도록 잠긴 파일이라 여기서는 실행할 수 없어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "노리맥스영웅전"
   },
@@ -7570,18 +7568,16 @@
    "platform": "SKT",
    "model": null,
    "title": "삼국지연의2",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
     "boot": "ok",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "no",
-    "speed": "unknown"
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "구매한 휴대폰에서만 켜지도록 잠긴 파일이라 여기서는 실행할 수 없어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "삼국지연의2"
   },
@@ -7669,19 +7665,16 @@
    "platform": "SKT",
    "model": null,
    "title": "스페셜포스",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
     "boot": "ok",
     "render": "ok",
-    "input": "no",
+    "input": "ok",
     "longplay": "ok",
     "sound": "ok",
-    "speed": "unknown",
-    "progress": "stuck"
+    "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "구매한 휴대폰에서만 켜지도록 잠긴 파일이라 여기서는 실행할 수 없어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "스페셜포스"
   },
@@ -8186,18 +8179,16 @@
    "platform": "SKT",
    "model": null,
    "title": "테일즈판타지",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
     "boot": "ok",
-    "render": "no",
-    "input": "unknown",
-    "longplay": "unknown",
-    "sound": "no",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
     "speed": "unknown"
    },
-   "knownIssues_ko": [
-    "구매한 휴대폰에서만 켜지도록 잠긴 파일이라 여기서는 실행할 수 없어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "테일즈판타지 SKVM"
   },
@@ -8328,18 +8319,16 @@
    "platform": "SKT",
    "model": null,
    "title": "Chaos블레이드",
-   "status": "not-yet",
+   "status": "playable",
    "axes": {
     "boot": "ok",
-    "render": "no",
-    "input": "no",
-    "longplay": "unknown",
-    "sound": "no",
-    "speed": "unknown"
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok"
    },
-   "knownIssues_ko": [
-    "구매한 휴대폰에서만 켜지도록 잠긴 파일이라 여기서는 실행할 수 없어요."
-   ],
+   "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "Chaos블레이드"
   },
