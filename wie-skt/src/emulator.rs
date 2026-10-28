@@ -370,11 +370,13 @@ mod tests {
             ("probe.jar".into(), WIRING_PROBE_JAR.to_vec()),
             ("probe.sav".into(), vec![0]),
             ("probe.opt".into(), vec![0]),
+            ("probe.xor".into(), vec![0]),
         ]);
         let emulator = SktEmulator::from_archive(Box::new(TestPlatform::new()), files).unwrap();
 
         assert_eq!(emulator.system.filesystem().virtual_file("probe.sav"), None);
         assert_eq!(emulator.system.filesystem().virtual_file("probe.opt"), Some(vec![1]));
+        assert_eq!(emulator.system.filesystem().virtual_file("probe.xor"), Some(vec![1]));
     }
 
     #[test]

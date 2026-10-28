@@ -317,9 +317,13 @@ mod tests {
     fn mount_path_turns_the_owner_sound_on() {
         use wie_backend::owner_files::WIRING_PROBE_JAR;
 
-        let mut files = BTreeMap::from([("P/probe.sav".into(), vec![0]), ("P/probe.opt".into(), vec![0])]);
+        let mut files = BTreeMap::from([
+            ("P/probe.sav".into(), vec![0]),
+            ("P/probe.opt".into(), vec![0]),
+            ("P/probe.xor".into(), vec![0]),
+        ]);
         super::prepare_owner_files(&mut files, WIRING_PROBE_JAR);
-        assert_eq!(files, BTreeMap::from([("P/probe.opt".into(), vec![1])]));
+        assert_eq!(files, BTreeMap::from([("P/probe.opt".into(), vec![1]), ("P/probe.xor".into(), vec![1])]));
     }
 
     #[test]

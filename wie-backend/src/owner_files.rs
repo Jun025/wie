@@ -234,6 +234,17 @@ pub type XorRow = ([u8; 16], &'static str, [u8; 16], &'static [(usize, u8)]);
 /// XOR keeps the owner's bytes and the title's key out of the repo; the file MD5 keeps any other save
 /// from being touched.
 pub const OWNER_SOUND_OFF_XOR: &[XorRow] = &[
+    // Not a title: `WIRING_PROBE_JAR`, as above; the file is `[0]`.
+    (
+        [
+            0x26, 0x7b, 0x1e, 0x2a, 0x93, 0xff, 0x10, 0x59, 0x16, 0x5a, 0xc6, 0xe0, 0xd5, 0xc2, 0x3e, 0x4a,
+        ],
+        "probe.xor",
+        [
+            0x93, 0xb8, 0x85, 0xad, 0xfe, 0x0d, 0xa0, 0x89, 0xcd, 0xf6, 0x34, 0x90, 0x4f, 0xd5, 0x9f, 0x71,
+        ],
+        &[(0, 0x01)],
+    ),
     // LGT
     // 01f05f8231f4: `game_o.sav` (2,776 bytes) holds options and the owner's records. Plain +0x42 is
     // the music level (`0x9f552`: volume = level * 25; 0 never starts a clip) and the owner's is 0, a
@@ -250,12 +261,12 @@ pub const OWNER_SOUND_OFF_XOR: &[XorRow] = &[
     ),
 ];
 
-/// A «jar» no title ships, listed in both lists above: a carrier test mounting it with `probe.sav`
-/// and `probe.opt` sees the first dropped and the second rewritten only if `from_archive` calls
+/// A «jar» no title ships, listed in all three lists above: a carrier test mounting it with `probe.sav`,
+/// `probe.opt` and `probe.xor` sees the first dropped and the others rewritten only if `from_archive` calls
 /// `turn_owner_sound_on` — the rows alone cannot show that, since the real jars are game bytes.
 pub const WIRING_PROBE_JAR: &[u8] = b"wie owner-files wiring probe";
 
-/// Start the title with the sound on where the owner left it off: both lists above, for this jar.
+/// Start the title with the sound on where the owner left it off: all three lists above, for this jar.
 pub fn turn_owner_sound_on(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8]) {
     drop_owner_files(files, jar, OWNER_SOUND_OFF_SETTINGS);
     rewrite_owner_bytes(files, jar, OWNER_SOUND_OFF_BYTES);
@@ -445,5 +456,10 @@ mod tests {
         assert_eq!(md5::compute(WIRING_PROBE_JAR).0, md5("267b1e2a93ff1059165ac6e0d5c23e4a"));
         assert_eq!(names("267b1e2a93ff1059165ac6e0d5c23e4a"), Some(&["probe.sav"][..]));
         assert_eq!(row("267b1e2a93ff1059165ac6e0d5c23e4a"), Some(("probe.opt", 0, &[1][..])));
+        let xor = OWNER_SOUND_OFF_XOR.iter().find(|(m, ..)| *m == md5("267b1e2a93ff1059165ac6e0d5c23e4a"));
+        assert_eq!(
+            xor.map(|(_, n, f, e)| (*n, *f, *e)),
+            Some(("probe.xor", md5::compute([0]).0, &[(0, 0x01)][..]))
+        );
     }
 }
