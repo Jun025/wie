@@ -67,3 +67,5 @@ KTF 표본 15종(`f44271803135` 드래곤아이즈2 포함) probe A·B 전·후:
 - 증적(repo 밖): `~/orchestrator/reports/evidence/wie-ktf-innotia2-license-lock-normalize/`(두 판 경로 시트 · 전투 캡처 · 개악 3종 JSON · 3001 캡처).
 
 
+
+<!-- corpus-name-inflow v1 subjects=7 tree=ecaf255b78b07a9c B=721/332 P=0/0 S=38/18 -->
