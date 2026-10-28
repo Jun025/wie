@@ -66,4 +66,4 @@ KTF 표본 15종(`f44271803135` 드래곤아이즈2 포함) probe A·B 전·후:
 - `npm run audit` PASSED · census selftest 65/65 · `check-compat-revert` OK · `check-docs-report-serial` OK(0546 · 충돌 0).
 - 증적(repo 밖): `~/orchestrator/reports/evidence/wie-ktf-innotia2-license-lock-normalize/`(두 판 경로 시트 · 전투 캡처 · 개악 3종 JSON · 3001 캡처).
 
-<!-- corpus-name-inflow v1 subjects=7 tree=15765b2358236288 B=721/332 P=0/0 S=38/18 -->
+
