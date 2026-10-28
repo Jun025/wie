@@ -1,0 +1,11 @@
+{
+  "date": "2026-10-28",
+  "task": "wie-2026-10-26-lgt-01f05f8231f4-phone-lock-adopt-p0",
+  "title": "LGT 01f05f8231f4 동봉 저장의 «소리 끔»을 켬으로 — 암호화 저장은 XOR 행으로, LGT 마운트 경로에 owner_files 배선",
+  "summary": "game_o.sav 평문 +0x42(음악 크기 · 원 주인 0)를 새 설치 값 2로 바꾼다. 저장 암호가 XOR 흐름이고 체크섬이 XOR 선형이라 두 바이트 XOR(+0x42 ^0x02 · +0xad5 ^0x18)로 끝난다. 행은 동봉 파일 MD5 가 맞을 때만 적용된다. LGT from_archive 가 turn_owner_sound_on 을 부른다.",
+  "verification": "probe A 30초 짝 3회: 전 재생 0/0/0 → 후 6/6/2 · MIDI 1,930/1,930/1,496. 개악(체크섬 XOR 제외) 3회 모두 FAIL · 그림 0. census run/report: playable · 소리 ok. 평문 전·후 diff = +0x42 와 체크섬 바이트 하나(docs/report/0545).",
+  "proposals": [],
+  "adoptedProposals": [
+    "2026-10-26-lgt-01f05f8231f4-phone-lock#p0"
+  ]
+}

@@ -15,7 +15,7 @@ use jvm::{
     runtime::{JavaIoInputStream, JavaLangClassLoader},
 };
 
-use wie_backend::{Emulator, Event, Options, Pacing, Platform, System, TaskRunner, extract_zip};
+use wie_backend::{Emulator, Event, Options, Pacing, Platform, System, TaskRunner, extract_zip, owner_files::turn_owner_sound_on};
 use wie_core_arm::{Allocator, ArmCore};
 use wie_jvm_support::JvmSupport;
 use wie_util::{Result, WieError};
@@ -85,6 +85,12 @@ fn drop_orphan_entries(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8], table:
     }
 }
 
+/// Everything `from_archive` leaves unmounted or rewrites of the previous owner's files, for this jar.
+fn prepare_owner_files(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8]) {
+    drop_orphan_entries(files, jar, ORPHAN_ENTRIES);
+    turn_owner_sound_on(files, jar);
+}
+
 pub struct LgtEmulator {
     core: ArmCore,
     system: System,
@@ -105,7 +111,7 @@ impl LgtEmulator {
             .ok_or_else(|| WieError::FatalError("Missing LGT application JAR containing binary.mod".into()))?
             .clone();
         let jar = files[&jar_filename].clone();
-        drop_orphan_entries(&mut files, &jar, ORPHAN_ENTRIES);
+        prepare_owner_files(&mut files, &jar);
 
         Self::load(
             platform,
@@ -303,6 +309,17 @@ mod tests {
 
     fn archive(names: &[&str]) -> BTreeMap<String, Vec<u8>> {
         names.iter().map(|n| ((*n).to_owned(), vec![1])).collect()
+    }
+
+    // The rows are pinned in `wie-backend`; this pins that the LGT mount path applies them. The probe
+    // jar is not a zip holding `binary.mod`, so it cannot pass `from_archive` itself.
+    #[test]
+    fn mount_path_turns_the_owner_sound_on() {
+        use wie_backend::owner_files::WIRING_PROBE_JAR;
+
+        let mut files = BTreeMap::from([("P/probe.sav".into(), vec![0]), ("P/probe.opt".into(), vec![0])]);
+        super::prepare_owner_files(&mut files, WIRING_PROBE_JAR);
+        assert_eq!(files, BTreeMap::from([("P/probe.opt".into(), vec![1])]));
     }
 
     #[test]

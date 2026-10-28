@@ -1,7 +1,7 @@
 //! The original owner's files shipped inside an archive (a dump of their handset): some start a
 //! title in a state that is theirs, not a new player's. Each carrier's `from_archive` hands its
 //! file map and jar here before mounting; the lists are keyed by the MD5 of the jar, which names one
-//! build of one title whatever the carrier, so one list serves KTF and SKT alike.
+//! build of one title whatever the carrier, so one list serves KTF, SKT and LGT alike.
 
 use alloc::{borrow::ToOwned, collections::BTreeMap, format, string::String, vec::Vec};
 
@@ -225,6 +225,31 @@ pub const OWNER_SOUND_OFF_BYTES: &[([u8; 16], &str, usize, &[u8])] = &[
     ),
 ];
 
+/// (jar MD5, file, MD5 of the shipped file, (offset, XOR) pairs).
+pub type XorRow = ([u8; 16], &'static str, [u8; 16], &'static [(usize, u8)]);
+
+/// The same owner's «sound off», inside a save the title encrypts and checksums, so the bytes above
+/// cannot be written as plain values. The cipher is an XOR stream and the checksum XOR-linear, so a
+/// change of the plain value is the same XOR on the shipped bytes, checksum included. Committing the
+/// XOR keeps the owner's bytes and the title's key out of the repo; the file MD5 keeps any other save
+/// from being touched.
+pub const OWNER_SOUND_OFF_XOR: &[XorRow] = &[
+    // LGT
+    // 01f05f8231f4: `game_o.sav` (2,776 bytes) holds options and the owner's records. Plain +0x42 is
+    // the music level (`0x9f552`: volume = level * 25; 0 never starts a clip) and the owner's is 0, a
+    // fresh install's 2: ^0x02. The checksum (`0x69c6c`, last 4 bytes) moves by ^0x18 at +0xad5.
+    (
+        [
+            0xc5, 0x1c, 0x41, 0x1f, 0xd8, 0x16, 0xef, 0x80, 0x83, 0x19, 0x52, 0x25, 0xff, 0x06, 0x7c, 0xa8,
+        ],
+        "game_o.sav",
+        [
+            0x4d, 0xc2, 0xae, 0x9d, 0x81, 0xfe, 0x96, 0xee, 0x0d, 0xf2, 0x8c, 0x8e, 0x53, 0x0d, 0x16, 0xac,
+        ],
+        &[(0x42, 0x02), (0xad5, 0x18)],
+    ),
+];
+
 /// A «jar» no title ships, listed in both lists above: a carrier test mounting it with `probe.sav`
 /// and `probe.opt` sees the first dropped and the second rewritten only if `from_archive` calls
 /// `turn_owner_sound_on` — the rows alone cannot show that, since the real jars are game bytes.
@@ -234,6 +259,7 @@ pub const WIRING_PROBE_JAR: &[u8] = b"wie owner-files wiring probe";
 pub fn turn_owner_sound_on(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8]) {
     drop_owner_files(files, jar, OWNER_SOUND_OFF_SETTINGS);
     rewrite_owner_bytes(files, jar, OWNER_SOUND_OFF_BYTES);
+    xor_owner_bytes(files, jar, OWNER_SOUND_OFF_XOR);
 }
 
 /// Remove the files `table` names for this jar, bare and under either private directory spelling
@@ -264,11 +290,32 @@ pub fn rewrite_owner_bytes(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8], ta
     }
 }
 
+/// XOR the bytes `table` names for this jar into the file, only while it is the file shipped.
+pub fn xor_owner_bytes(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8], table: &[XorRow]) {
+    let hash = md5::compute(jar).0;
+    for (_, name, shipped, edits) in table.iter().filter(|(md5, ..)| *md5 == hash) {
+        for key in [(*name).to_owned(), format!("P/{name}"), format!("p/{name}")] {
+            let Some(data) = files.get_mut(&key).filter(|data| md5::compute(&data[..]).0 == *shipped) else {
+                continue;
+            };
+            for (offset, xor) in *edits {
+                if let Some(byte) = data.get_mut(*offset) {
+                    *byte ^= xor;
+                }
+            }
+            tracing::info!("Turning the original owner's sound on in {key}");
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::{collections::BTreeMap, string::ToString, vec, vec::Vec};
 
-    use super::{OWNER_SOUND_OFF_BYTES, OWNER_SOUND_OFF_SETTINGS, WIRING_PROBE_JAR, drop_owner_files, rewrite_owner_bytes, turn_owner_sound_on};
+    use super::{
+        OWNER_SOUND_OFF_BYTES, OWNER_SOUND_OFF_SETTINGS, OWNER_SOUND_OFF_XOR, WIRING_PROBE_JAR, drop_owner_files, rewrite_owner_bytes,
+        turn_owner_sound_on, xor_owner_bytes,
+    };
 
     fn md5(hex: &str) -> [u8; 16] {
         core::array::from_fn(|i| u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).unwrap())
@@ -329,6 +376,29 @@ mod tests {
         assert_eq!(files, archive());
     }
 
+    #[test]
+    fn owner_bytes_xored_only_while_the_file_is_the_shipped_one() {
+        let shipped = vec![1, 2, 3, 4];
+        let table: &[super::XorRow] = &[(md5::compute(b"listed").0, "s.sav", md5::compute(&shipped).0, &[(1, 0x0f), (3, 0x01)])];
+        let archive = |data: &[u8]| [("P/s.sav".to_string(), data.to_vec())].into_iter().collect::<BTreeMap<_, _>>();
+
+        let mut files = archive(&shipped);
+        xor_owner_bytes(&mut files, b"listed", table);
+        assert_eq!(files["P/s.sav"], [1, 0x0d, 3, 5]);
+
+        // Applied once: the rewritten file is no longer the shipped one.
+        xor_owner_bytes(&mut files, b"listed", table);
+        assert_eq!(files["P/s.sav"], [1, 0x0d, 3, 5]);
+
+        // Another owner's save under the same name, or another jar, is left as it came.
+        let mut files = archive(&[1, 2, 3, 5]);
+        xor_owner_bytes(&mut files, b"listed", table);
+        assert_eq!(files, archive(&[1, 2, 3, 5]));
+        let mut files = archive(&shipped);
+        xor_owner_bytes(&mut files, b"other", table);
+        assert_eq!(files, archive(&shipped));
+    }
+
     // Measured, not derivable: with these rows the titles play from the start (docs/report/0519, 0526,
     // 0537). The jars are game bytes and cannot be here, so this pins the rows rather than the effect.
     // The MD5s are `md5 -q <jar>` output pasted as-is, so a slip copying them into the byte rows fails here.
@@ -348,6 +418,13 @@ mod tests {
         assert_eq!(row("160e147e509a4f903a15be71086993e1"), Some(("sc.txt", 64, &b"1"[..]))); // ccb45e6b8d80
         assert_eq!(row("1229f411eefd064382d90a6d904f7c09"), Some(("option", 0, &[1][..]))); // f483ba078c14
         assert_eq!(row("a8a613b3af6cada57eab7852bf24f473"), Some(("ds2.opt", 0, &[1][..]))); // fb80e97cbc57
+
+        // LGT
+        let xor = OWNER_SOUND_OFF_XOR.iter().find(|(m, ..)| *m == md5("c51c411fd816ef8083195225ff067ca8")); // 01f05f8231f4
+        assert_eq!(
+            xor.map(|(_, n, f, e)| (*n, *f, *e)),
+            Some(("game_o.sav", md5("4dc2ae9d81fe96ee0df28c8e530d16ac"), &[(0x42, 0x02), (0xad5, 0x18)][..]))
+        );
     }
 
     // These titles keep their owner's progress in the file that holds «sound on», so it must never
