@@ -4990,6 +4990,7 @@ dependencies = [
  "jvm-bytecode",
  "jvm-class-proto",
  "jvm-types",
+ "md5",
  "rustjava-runtime",
  "spin",
  "test-utils",
