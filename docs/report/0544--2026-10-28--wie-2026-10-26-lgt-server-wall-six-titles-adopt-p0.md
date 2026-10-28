@@ -72,9 +72,20 @@ census 가 이 판을 `stuck` 으로 잰 까닭은 질문 창의 커서가 «아
 
 otterpebble `apps/featurephone/lib/compat.json` 은 다음 wie 릴리스 가져오기로 받는다. 이 회차에서 otterpebble 은 건드리지 않았다.
 
-### 9. 게이트
+### 9. 이용자 소식
+
+`docs/player-updates/2026-10-28-lgt-user-auth-answered.json`(`improvement`) 1건을 더했다. 종전에도 «예»를 고르면 오래 기다린 뒤 지나갔으므로 `fix` 가 아니라 `improvement` 로 적었다.
+
+### 10. 게이트
 
 - 네 게이트: fmt rc=0 · clippy `-D warnings` rc=0 · wasm clippy rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` rc=0(830 통과 · 0 실패) · beta clippy rc=0.
 - 엔진 러너 블록(릴리스 빌드): `draw_j2me`·`helloworld_ktf`·`helloworld_lgt`·`text_j2me` PASS. `keydraw_ktf`·`keydraw_lgt` 는 기본 `--max-ticks` 에서 `UNMEASURED`(`stop` = `max-ticks`, 8/27)였다. 0542 §9 와 같은 현상이다. `--max-ticks 2000000000` 으로 두 판 모두 PASS · rc=0 · 27/27(paints 79/55)이다.
 - `fake_server` 단위 테스트 `register_a_lgt_answers_the_registration_only`: 길이가 다 오기 전에는 답하지 않고, `A_LGT_` 가 아닌 요청에는 답하지 않는다.
 - `check-worklog-json` OK · `player-data` OK · `npm run audit` PASSED · `check-docs-report-serial` OK · census `selftest` 65/65.
+
+### 11. 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs` 를 기본 대상(이 브랜치의 추가·수정 파일 전체 본문)으로 돌렸다. 유입은 BOUNDED 와 SUFFIX-ATTACHED 를 함께 적는다(마지막 줄 표식).
+- 거의 전부가 `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 칸이다. 이 회차는 그 파일에서 한 행의 상태·요령 칸만 고쳤다.
+- 그 파일을 뺀 경로(코드·census·보고서·worklog)로는 BOUNDED 0 · SUFFIX-ATTACHED 1 이다. 그 1건은 census 에 원래 있던 요령 문장(«턴종료»)이고 게임 이름이 아니다.
+- 이 회차가 더한 줄에는 게임 이름이 없다(추가 줄 대조 0). 보고서·worklog·코드·이용자 소식은 sha12 또는 sha256 으로만 적었다.
