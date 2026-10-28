@@ -87,5 +87,5 @@ otterpebble `apps/featurephone/lib/compat.json` 은 다음 wie 릴리스 가져�
 
 `node scripts/corpus-name-inflow.mjs` 를 기본 대상(이 브랜치의 추가·수정 파일 전체 본문)으로 돌렸다. 유입은 BOUNDED 와 SUFFIX-ATTACHED 를 함께 적는다(마지막 줄 표식).
 - 거의 전부가 `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 칸이다. 이 회차는 그 파일에서 한 행의 상태·요령 칸만 고쳤다.
-- 그 파일을 뺀 경로(코드·census·보고서·worklog)로는 BOUNDED 0 · SUFFIX-ATTACHED 1 이다. 그 1건은 census 에 원래 있던 요령 문장(«턴종료»)이고 게임 이름이 아니다.
+- 그 파일을 뺀 경로(코드·census·보고서·worklog)로는 BOUNDED 0 · SUFFIX-ATTACHED 1 이다. 그 1건은 census 에 원래 있던 요령 문장 속 낱말이고 게임 이름이 아니다.
 - 이 회차가 더한 줄에는 게임 이름이 없다(추가 줄 대조 0). 보고서·worklog·코드·이용자 소식은 sha12 또는 sha256 으로만 적었다.
