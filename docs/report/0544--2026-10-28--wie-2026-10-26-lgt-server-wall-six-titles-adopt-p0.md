@@ -19,7 +19,7 @@
 ### 2. 벽이 아니었다 — 개악 대조의 결과
 
 티켓은 «행을 지우면 인증에서 멈춘다»를 대조로 기대했다. 실측은 다르다. **행을 지운 빌드도 «예»를 고르면 인증을 통과한다.**
-- 접속이 실패하면 `MC_netClose` 를 약 600번 되풀이한다(실측 602). 그 뒤 같은 성공 분기(`0x51820`)로 간다. 판정 함수 머리의 `cmp r0,#0xa; cmpne r0,#0` 이 0 을 성공으로 받는 자리다.
+- 접속이 실패하면 `MC_netClose` 를 약 600번 되풀이한다(실측 602). 그 뒤 같은 «인증에 성공하였습니다» 화면이 나온다(프레임). 호출부 `0x51750` 의 `cmp r0,#0xa; cmpne r0,#0` 은 0 도 성공 분기로 보낸다. 실패 경로가 실제로 0 을 돌려주는지는 추적하지 않았다.
 - 같은 키(`auth.keys`)로 두 빌드를 1초 간격 프레임으로 찍었다. «인증에 성공하였습니다»의 첫 프레임은 행이 있으면 `t033`, 없으면 `t057` 이었다. 마지막 확인 키는 약 19초에 눌렸다(load1 약 8).
 - 그러니 이 행이 바꾸는 것은 «멈춤 → 진행»이 아니다. **로딩 막대를 약 24초 덜 보는 것**과 **실패 재시도 대신 판정 함수가 읽는 성공 응답으로 지나가는 것**이다.
 
@@ -55,7 +55,11 @@ census 가 이 판을 `stuck` 으로 잰 까닭은 질문 창의 커서가 «아
 
 ### 6. census 긴 실행
 
-LONG_PLACEHOLDER
+행 있는 빌드로 census `run --only long`(600초, census 의 긴 키)을 한 번 더 돌렸다(`census-drive.sh` · long 임대 1건 · load1 8~12).
+- 프레임(`census-long-sheet.png`): 인증 뒤 동의 창 → «저장된 데이터를 확인중입니다» → 프롤로그 → 성 안 대화 → 숲 → 진영 대화까지 600초 동안 이어진다.
+- 소리: 재생 6회 · MIDI 이벤트 5244.
+- 그 실행에서 게임은 211.239.165.13:8035(다른 모드의 호스트, 표 밖)에 31번 접속했고 모두 실패했다. 게임은 매번 시한 뒤 계속 진행했다(§7).
+- 이 디렉터리로 `report` 를 다시 내면 이 판은 `playable` 이고, 축은 boot·render·input·longplay·sound·speed 가 모두 `ok`, progress 는 `n/a`(재지 않음)다. 벽 문구 없이 요령 한 줄만 남는다. 커밋한 `compat.json` 행과 같은 결론이다.
 
 ### 7. 한계
 
@@ -67,3 +71,10 @@ LONG_PLACEHOLDER
 ### 8. featurephone 셸 동기
 
 otterpebble `apps/featurephone/lib/compat.json` 은 다음 wie 릴리스 가져오기로 받는다. 이 회차에서 otterpebble 은 건드리지 않았다.
+
+### 9. 게이트
+
+- 네 게이트: fmt rc=0 · clippy `-D warnings` rc=0 · wasm clippy rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` rc=0(830 통과 · 0 실패) · beta clippy rc=0.
+- 엔진 러너 블록(릴리스 빌드): `draw_j2me`·`helloworld_ktf`·`helloworld_lgt`·`text_j2me` PASS. `keydraw_ktf`·`keydraw_lgt` 는 기본 `--max-ticks` 에서 `UNMEASURED`(`stop` = `max-ticks`, 8/27)였다. 0542 §9 와 같은 현상이다. `--max-ticks 2000000000` 으로 두 판 모두 PASS · rc=0 · 27/27(paints 79/55)이다.
+- `fake_server` 단위 테스트 `register_a_lgt_answers_the_registration_only`: 길이가 다 오기 전에는 답하지 않고, `A_LGT_` 가 아닌 요청에는 답하지 않는다.
+- `check-worklog-json` OK · `player-data` OK · `npm run audit` PASSED · `check-docs-report-serial` OK · census `selftest` 65/65.
