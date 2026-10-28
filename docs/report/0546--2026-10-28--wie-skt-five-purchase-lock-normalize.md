@@ -104,3 +104,8 @@ A·B **30쌍 전부 같은 판정 · 같은 종료**(PASS · deadline)다. 그�
 ### 7. 게임 파일명 유입
 
 표식은 커밋 뒤의 도구 출력 그대로다. 이 회차가 더한 줄의 게임 이름은 0이다(sha12 로만 적었다).
+
+도구 표기: BOUNDED 330건 · SUFFIX-ATTACHED 17건 — 전부 계약상 제목 목록인 `compat.json` 과
+`playability-census.mjs` 에 **이미 있던** 줄이다.
+
+<!-- corpus-name-inflow v1 subjects=10 tree=3716106b9239962c B=718/330 P=0/0 S=37/17 -->
