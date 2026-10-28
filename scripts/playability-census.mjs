@@ -741,14 +741,12 @@ const netWall = (connects) => connects >= 200;
 // Also any other wall a title cannot pass without us making up data, treated the same way (one line,
 // at most limited): the KTF install-license check — the engine would have to invent the record (0457).
 // caf9d76ffd13, b9bfcaf42722 and 0093012b8c36 left this table when the engine began answering for
-// their servers (wie_backend::fake_server · docs/report/0542), 3ff5948e235e too (docs/report/0544).
+// their servers (wie_backend::fake_server · docs/report/0542), 3ff5948e235e too (docs/report/0544),
+// 0fdf45ec169f too (docs/report/0548). 73f3a21e981c left it for HAND_NOTE: its play never needed the
+// server, only its ranking does (docs/report/0548).
 const HAND_WALL = {
   '974e0df9ab1e': '설치 인증(구매 기록)을 확인하는 단계에서 멈춰서, 여기서는 그 뒤로 진행할 수 없어요.',
   f770b15f8876: '설치 인증(구매 기록)을 확인하는 단계에서 멈춰서, 여기서는 그 뒤로 진행할 수 없어요.',
-  // Progress wave 4 (docs/report/0469 §2): the last screen of a `stuck` run, read off the frames.
-  '73f3a21e981c': '이름을 등록하려면 게임사 서버에 접속해야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.',
-  // Progress round 3 (docs/report/0507): a server step no answer passes, read off the frames.
-  '0fdf45ec169f': '게임을 시작하면 게임사 서버에 접속해야 하는데, 그 서버가 지금은 없어 «서버에 연결중입니다» 안내에서 넘어가지 않아요.',
   // 640428a9cf9e stays (docs/report/0543): its server sent 28 files (27 pictures + data.jar) that its
   // package does not carry, so no fake_server reply can stand in for them.
   '640428a9cf9e': '처음 실행할 때 게임사 서버에서 그림과 게임 데이터를 받아 와야 하는데, 그 서버가 지금은 없고 이 파일에는 그 데이터가 들어 있지 않아 여기서는 진행할 수 없어요. 같은 게임의 큰화면 판은 데이터가 함께 들어 있어서 할 수 있어요.',
@@ -769,6 +767,11 @@ const HAND_NOTE = {
     '처음부터 들어 있는 저장 칸을 «이어하기»로 고르면 «세이브 데이터가 강제로 변경되어 게임을 종료합니다» 안내 뒤 게임이 꺼져요.',
   ],
   '1a69522a7d43': ['랭킹의 «온라인 등록»은 게임사 서버가 지금은 없어 쓸 수 없어요. «예»를 고르면 «연결에 실패하였습니다» 안내가 뜨고, 확인을 누르면 주 메뉴로 돌아와요.'],
+  // docs/report/0548: with no server at all, «게임시작» runs the story into the shop (frames at 210 s).
+  '73f3a21e981c': [
+    '켤 때마다 정식사용자 인증을 하려고 게임사 서버에 접속하는데, 그 서버가 지금은 없어 «사용자인증에 실패하였습니다» 안내가 나와요. 확인을 누르면 메뉴로 가고, «게임시작»으로 이야기와 매장 운영을 할 수 있어요.',
+    '이벤트와 네트워크 메뉴의 랭킹은 이름을 등록하려고 게임사 서버에 접속하는데, 그 서버가 지금은 없어 쓸 수 없어요.',
+  ],
 };
 // How a title that works is moved forward — not a problem, so it ships as `playTips_ko`, not
 // `knownIssues_ko` (the shell lists the latter under «알려진 문제» · contract §1).
