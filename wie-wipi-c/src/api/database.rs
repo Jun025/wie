@@ -61,7 +61,7 @@ pub async fn open_database(context: &mut dyn WIPICContext, ptr_name: WIPICWord, 
 /// not a database — the guest reads it through `MC_knlGetResource` — so a create starts empty, as it
 /// does over a `P/` file. 974e0df9ab1e's installer opens `i_tile.dat` with mode 4, seeks to the end and
 /// writes the unpacked table there; seeded with the packed 164,919-byte jar entry, the table landed
-/// behind it and every tile read missed (a black field — docs/report/0546).
+/// behind it and every tile read missed (a black field — docs/report/0547).
 async fn open_database_seeded(
     context: &mut dyn WIPICContext,
     ptr_name: WIPICWord,

@@ -734,7 +734,7 @@ const netWall = (connects) => connects >= 200;
 // caf9d76ffd13, b9bfcaf42722 and 0093012b8c36 left this table when the engine began answering for
 // their servers (wie_backend::fake_server · docs/report/0542), 3ff5948e235e too (docs/report/0544).
 // 974e0df9ab1e and f770b15f8876 (the KTF install-licence check of 0457) left it when the operator lifted
-// that check for those two (binary_patches.toml · docs/report/0546).
+// that check for those two (binary_patches.toml · docs/report/0547).
 const HAND_WALL = {
   // Progress wave 4 (docs/report/0469 §2): the last screen of a `stuck` run, read off the frames.
   '73f3a21e981c': '이름을 등록하려면 게임사 서버에 접속해야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.',

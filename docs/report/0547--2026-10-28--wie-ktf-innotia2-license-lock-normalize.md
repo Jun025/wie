@@ -63,9 +63,11 @@ KTF 표본 15종(`f44271803135` 드래곤아이즈2 포함) probe A·B 전·후:
 
 - 4 게이트: fmt rc 0 · clippy `-D warnings` rc 0 · wasm32 rc 0 · `+beta` rc 0 · `RUST_MIN_STACK=4194304 cargo test --all` **834 passed / 0 failed**.
 - 러너 블록: draw · helloworld ×2 · text PASS · keydraw ×2 `--inject --expect-last-frame` PASS rc 0.
-- `npm run audit` PASSED · census selftest 65/65 · `check-compat-revert` OK · `check-docs-report-serial` OK(0546 · 충돌 0).
+- `npm run audit` PASSED · census selftest 65/65 · `check-compat-revert` OK · `check-docs-report-serial` OK(0547 · 충돌 0).
 - 증적(repo 밖): `~/orchestrator/reports/evidence/wie-ktf-innotia2-license-lock-normalize/`(두 판 경로 시트 · 전투 캡처 · 개악 3종 JSON · 3001 캡처).
 
 
 
-<!-- corpus-name-inflow v1 subjects=7 tree=ecaf255b78b07a9c B=721/332 P=0/0 S=38/18 -->
+
+
+<!-- corpus-name-inflow v1 subjects=6 tree=2d0b4dd9d57b1c10 B=718/330 P=0/0 S=37/17 -->
