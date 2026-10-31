@@ -657,6 +657,12 @@ function sniffPlatform(path) {
 // ── locked files: titles that cannot run anywhere but the original buyer's handset ────────────
 // Operator policy 2026-10-02: neither is to be unlocked (no phone-number recovery, no check bypass,
 // no decryption) — the census says so in the player's words instead of «아직 실행되지 않아요».
+// That policy is lifted ONE sha AT A TIME by the operator, never by a rule here: 2026-10-26 for one
+// LGT title and 2026-10-28 for five SKT ones, whose checks the engine now answers (the class-hash
+// table in `wie-jvm-support/src/class_patches.rs` — no number is read, recovered or stored). Nothing
+// below changed for them: `lockVerdict` asks whether the title still quits on its own, and an
+// unlocked one does not, so it leaves this bucket by measurement. A title the operator has not
+// named still ends up here, which is the point.
 //   drm    an OMA DRM container (`odcf` magic) where the jar should be — encrypted, decided statically.
 //   phone  an SKT purchase check (XCE `SecureUtil`: MD5 of carrier + the buyer's phone number +
 //          SERVICE_ID == `MIDlet-Key`, docs/report/0386) AND the title quit on its own.
@@ -665,6 +671,7 @@ function sniffPlatform(path) {
 //          failing check draws «인증 되지 않은 컨텐츠» and then calls `System.exit` (docs/report/0420),
 //          so the rule is «every run quit, the unkeyed one included», not «0 paints». On the bd2337ff
 //          census that adds 2 of the 41 and no title that plays (those all end on `deadline`).
+//          Re-measured 2026-10-28 after the five were answered: 41 carry it and 41 play.
 const LOCK_KO = {
   drm: '암호로 잠긴 파일이라 여기서는 실행할 수 없어요.',
   phone: '구매한 휴대폰에서만 켜지도록 잠긴 파일이라 여기서는 실행할 수 없어요.',
@@ -732,14 +739,12 @@ const netWall = (connects) => connects >= 200;
 // A server wall the count cannot see: the title asks once per answer, fails, and loops on the same question
 // (2 connects in probe A). Named one at a time from the frames and the stderr — docs/report/0445.
 // caf9d76ffd13, b9bfcaf42722 and 0093012b8c36 left this table when the engine began answering for
-// their servers (wie_backend::fake_server · docs/report/0542), 3ff5948e235e too (docs/report/0544).
+// their servers (wie_backend::fake_server · docs/report/0542), 3ff5948e235e too (docs/report/0544),
+// 0fdf45ec169f too (docs/report/0548). 73f3a21e981c left it for HAND_NOTE: its play never needed the
+// server, only its ranking does (docs/report/0548).
 // 974e0df9ab1e and f770b15f8876 (the KTF install-licence check of 0457) left it when the operator lifted
 // that check for those two (binary_patches.toml · docs/report/0547).
 const HAND_WALL = {
-  // Progress wave 4 (docs/report/0469 §2): the last screen of a `stuck` run, read off the frames.
-  '73f3a21e981c': '이름을 등록하려면 게임사 서버에 접속해야 하는데, 그 서버가 지금은 없어 여기서는 진행할 수 없어요.',
-  // Progress round 3 (docs/report/0507): a server step no answer passes, read off the frames.
-  '0fdf45ec169f': '게임을 시작하면 게임사 서버에 접속해야 하는데, 그 서버가 지금은 없어 «서버에 연결중입니다» 안내에서 넘어가지 않아요.',
   // 640428a9cf9e stays (docs/report/0543): its server sent 28 files (27 pictures + data.jar) that its
   // package does not carry, so no fake_server reply can stand in for them.
   '640428a9cf9e': '처음 실행할 때 게임사 서버에서 그림과 게임 데이터를 받아 와야 하는데, 그 서버가 지금은 없고 이 파일에는 그 데이터가 들어 있지 않아 여기서는 진행할 수 없어요. 같은 게임의 큰화면 판은 데이터가 함께 들어 있어서 할 수 있어요.',
@@ -760,6 +765,11 @@ const HAND_NOTE = {
     '처음부터 들어 있는 저장 칸을 «이어하기»로 고르면 «세이브 데이터가 강제로 변경되어 게임을 종료합니다» 안내 뒤 게임이 꺼져요.',
   ],
   '1a69522a7d43': ['랭킹의 «온라인 등록»은 게임사 서버가 지금은 없어 쓸 수 없어요. «예»를 고르면 «연결에 실패하였습니다» 안내가 뜨고, 확인을 누르면 주 메뉴로 돌아와요.'],
+  // docs/report/0548: with no server at all, «게임시작» runs the story into the shop (frames at 210 s).
+  '73f3a21e981c': [
+    '켤 때마다 정식사용자 인증을 하려고 게임사 서버에 접속하는데, 그 서버가 지금은 없어 «사용자인증에 실패하였습니다» 안내가 나와요. 확인을 누르면 메뉴로 가고, «게임시작»으로 이야기와 매장 운영을 할 수 있어요.',
+    '이벤트와 네트워크 메뉴의 랭킹은 이름을 등록하려고 게임사 서버에 접속하는데, 그 서버가 지금은 없어 쓸 수 없어요.',
+  ],
 };
 // How a title that works is moved forward — not a problem, so it ships as `playTips_ko`, not
 // `knownIssues_ko` (the shell lists the latter under «알려진 문제» · contract §1).

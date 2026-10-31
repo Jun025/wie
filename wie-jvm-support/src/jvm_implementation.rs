@@ -12,6 +12,8 @@ use jvm_types::{ClassAccessFlags, MethodAccessFlags};
 
 use wie_backend::YieldFuture;
 
+use crate::class_patches::ForcedBool;
+
 pub trait JvmImplementation: Clone {
     #[allow(clippy::type_complexity)]
     fn define_class_rust<'a, C, Context>(
@@ -41,7 +43,12 @@ impl JvmImplementation for RustJavaJvmImplementation {
         C: ?Sized + 'static + Send,
         Context: Sync + Send + DerefMut + Deref<Target = C> + Clone + 'static,
     {
-        Box::pin(InheritedMethods::wrap(jvm, ClassDefinitionImpl::from_class_proto(proto, context), None))
+        Box::pin(InheritedMethods::wrap(
+            jvm,
+            ClassDefinitionImpl::from_class_proto(proto, context),
+            None,
+            &[],
+        ))
     }
 
     async fn define_array_class(&self, _jvm: &Jvm, element_type_name: &str) -> JvmResult<Box<dyn ClassDefinition>> {
@@ -79,10 +86,17 @@ pub(crate) struct InheritedMethods {
     super_class: Option<Box<dyn ClassDefinition>>,
     // `Some` for a class defined from guest bytecode: its own methods yield, see `Preemptible`.
     guest_calls: Option<GuestCalls>,
+    // Non-empty only for a class `class_patches` names: those methods answer without running.
+    forced: &'static [ForcedBool],
 }
 
 impl InheritedMethods {
-    pub(crate) async fn wrap(jvm: &Jvm, inner: ClassDefinitionImpl, guest_calls: Option<GuestCalls>) -> JvmResult<Box<dyn ClassDefinition>> {
+    pub(crate) async fn wrap(
+        jvm: &Jvm,
+        inner: ClassDefinitionImpl,
+        guest_calls: Option<GuestCalls>,
+        forced: &'static [ForcedBool],
+    ) -> JvmResult<Box<dyn ClassDefinition>> {
         // The JVM resolves the superclass right after this returns anyway; doing it first only
         // moves it earlier, through the same loader (the one calling defineClass).
         let super_class = match ClassDefinition::super_class_name(&inner) {
@@ -94,6 +108,7 @@ impl InheritedMethods {
             inner,
             super_class,
             guest_calls,
+            forced,
         }))
     }
 }
@@ -126,6 +141,12 @@ impl ClassDefinition for InheritedMethods {
 
     fn method(&self, name: &str, descriptor: &str, is_static: bool) -> Option<Box<dyn Method>> {
         if let Some(method) = ClassDefinition::method(&self.inner, name, descriptor, is_static) {
+            if let Some(forced) = self.forced.iter().find(|x| x.name == name && x.descriptor == descriptor) {
+                return Some(Box::new(ForcedBoolMethod {
+                    inner: method,
+                    value: forced.value,
+                }));
+            }
             return Some(match &self.guest_calls {
                 Some(calls) => Box::new(Preemptible {
                     inner: method,
@@ -183,6 +204,35 @@ pub(crate) const GUEST_CALLS_PER_YIELD: u32 = 1_000;
 /// Guest method calls since the last forced yield, shared by every class one runtime defines.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct GuestCalls(Arc<AtomicU32>);
+
+/// A guest method answered with a fixed boolean, its body never entered — see `class_patches`.
+///
+/// `inner` is kept for the method's own identity (`name`/`descriptor`/`access_flags`), which a
+/// caller reads; only `run` is replaced.
+#[derive(Debug)]
+struct ForcedBoolMethod {
+    inner: Box<dyn Method>,
+    value: bool,
+}
+
+#[async_trait::async_trait]
+impl Method for ForcedBoolMethod {
+    fn name(&self) -> String {
+        self.inner.name()
+    }
+
+    fn descriptor(&self) -> String {
+        self.inner.descriptor()
+    }
+
+    fn access_flags(&self) -> MethodAccessFlags {
+        self.inner.access_flags()
+    }
+
+    async fn run(&self, _jvm: &Jvm, _args: Box<[JavaValue]>) -> JvmResult<JavaValue> {
+        Ok(JavaValue::Boolean(self.value))
+    }
+}
 
 #[derive(Debug)]
 struct Preemptible {
