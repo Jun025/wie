@@ -53,6 +53,22 @@ const DATABASE_HANDLE_MAGIC: u32 = 0x4D434442;
 const MAX_NAME_LEN: usize = 31; // leave a byte for null terminator inside the 32-byte field
 
 pub async fn open_database(context: &mut dyn WIPICContext, ptr_name: WIPICWord, mode: i32, r#type: i32) -> Result<i32> {
+    open_database_seeded(context, ptr_name, mode, r#type, false).await
+}
+
+/// `create_keeps_resource`: whether a mode-4 open keeps the jar resource of the same name as its
+/// contents. LGT's does (upstream's packaged-database rule). KTF's does not: a KTF jar resource is
+/// not a database — the guest reads it through `MC_knlGetResource` — so a create starts empty, as it
+/// does over a `P/` file. 974e0df9ab1e's installer opens `i_tile.dat` with mode 4, seeks to the end and
+/// writes the unpacked table there; seeded with the packed 164,919-byte jar entry, the table landed
+/// behind it and every tile read missed (a black field — docs/report/0547).
+async fn open_database_seeded(
+    context: &mut dyn WIPICContext,
+    ptr_name: WIPICWord,
+    mode: i32,
+    r#type: i32,
+    create_keeps_resource: bool,
+) -> Result<i32> {
     tracing::debug!("MC_dbOpenDataBase({ptr_name:#x}, {mode}, {type})");
 
     // Guest-provided C string — invalid UTF-8 must not bring down the
@@ -73,14 +89,15 @@ pub async fn open_database(context: &mut dyn WIPICContext, ptr_name: WIPICWord, 
         return Ok(-22); // M_E_BADRECID — closest WIPI parameter-error idiom in this file
     }
 
-    // A packaged resource backs the DB for every mode (mode 4 keeps it). A packaged
-    // KTF `P/` file only seeds a DB that has nothing saved yet — mode 4 is a create
-    // and starts empty, as it does with no package at all. Writes always go to the
-    // repository; the shipped `P/` bytes never change, and once saved, the saved
-    // record wins.
+    // A packaged resource backs the DB for every mode (on LGT mode 4 keeps it). A packaged
+    // KTF `P/` file — and on KTF a jar resource — only seeds a DB that has nothing saved
+    // yet: mode 4 is a create and starts empty, as it does with no package at all. Writes
+    // always go to the repository; the shipped bytes never change, and once saved, the
+    // saved record wins.
     let resource = read_packaged_resource(context, &name).await?;
-    let resource_backed = resource.is_some();
+    let resource_backed = resource.is_some() && create_keeps_resource;
     let packaged = match resource {
+        Some(_) if mode == 4 && !create_keeps_resource => None,
         Some(data) => Some(data),
         None if mode != 4 => context.system().filesystem().virtual_file(&name),
         None => None,
@@ -395,7 +412,7 @@ pub async fn open_database_lgt(context: &mut dyn WIPICContext, ptr_name: WIPICWo
         }
     }
 
-    open_database(context, ptr_name, mode, r#type).await
+    open_database_seeded(context, ptr_name, mode, r#type, true).await
 }
 
 pub async fn list_record_info(context: &mut dyn WIPICContext, ptr_name: WIPICWord, buf_ptr: WIPICWord, capacity: WIPICWord) -> Result<i32> {
@@ -1184,6 +1201,23 @@ mod tests {
             context.system().filesystem().virtual_file("FirstRun.dat").as_deref(),
             Some(&b"\x01\0\0\0"[..])
         );
+    }
+
+    /// Mode 4 over a jar resource of the same name: KTF starts empty, so an installer that seeks to
+    /// the end and writes the unpacked table writes it at 0; LGT keeps the resource (upstream's rule).
+    #[futures_test::test]
+    async fn create_mode_over_a_jar_resource_starts_empty_on_ktf_and_keeps_it_on_lgt() {
+        let mut context = database_test_context().with_resource("i_tile.dat", b"packed");
+        context.write_bytes(0x1000, b"i_tile.dat\0").unwrap();
+
+        let db_id = open_database(&mut context, 0x1000, 4, 1).await.unwrap();
+        assert_eq!(stream_read(&mut context, db_id, 0x2000, 6).await.unwrap(), -23); // M_E_EOF — nothing seeded
+
+        let db_id = open_database_lgt(&mut context, 0x1000, 4, 1).await.unwrap();
+        assert_eq!(stream_read(&mut context, db_id, 0x2000, 6).await.unwrap(), 6);
+        let mut data = [0; 6];
+        context.read_bytes(0x2000, &mut data).unwrap();
+        assert_eq!(&data, b"packed");
     }
 
     /// KTF slot 7 with a handle is the header's list; with two names it renames — the

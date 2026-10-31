@@ -4,7 +4,8 @@
 #   - hash-keyed: `hash` is the MD5 of the main guest binary (KTF
 #     `client.bin`, LGT `binary.mod`, etc.). Matched and installed on boot.
 #   - pattern-only (hash omitted): generic patterns that apply to any binary
-#     matching the bytes. Hash-keyed entries take priority.
+#     matching the bytes. KTF installs the generic entry, then a hash-keyed
+#     one on top of it; LGT installs hash-keyed entries only.
 #
 # Hook `pc`/`exit_pc` MUST have the Thumb bit (LSB=1); ARM-mode hooks are
 # not supported. Stack offsets are signed and measured from R7 (Thumb
@@ -120,3 +121,35 @@ expect = "16 d0"
 pc = 0x682cc
 bytes = "09 e0"
 expect = "09 d0"
+
+# KTF 974e0df9ab1e and f770b15f8876 (sha256 prefixes of the two packages; both carry this one
+# `client.bin1149832`) — an install-licence check, lifted for these two on the operator's instruction
+# of 2026-10-28 (docs/report/0457 found it; policy stays for every other locked title). No record is
+# made up: each patch only sends the check to the branch a licensed install takes.
+[[entry]]
+name = "KTF 974e0df9ab1e / f770b15f8876 install licence"
+hash = "a09d998a851b7806126b52b22b3eff89"
+
+# 0x12af8c: `if ((MC_knlGetAccessLevel() & 0xbc) == 0xbc)` read PHONENUMBER, else error 1001.
+# The kernel call (slot 13, unimplemented) → `movs r0, #0xbc; nop` — the only value 0457 can
+# argue for (a handset that ran this title had those bits).
+[[entry.patch]]
+pc = 0x12af9c
+bytes = "bc 20 c0 46"
+expect = "00 f0 90 f8"
+
+# 0x176a80: `r7 = licence(buf)` reads the record through MC_knlGetExecNames (2001/2002 on a bad
+# one), then `strcmp(aid, buf)`. → `movs r7, #1; b 0x176aac`, the strcmp-equal branch with r7 as
+# the call leaves it there (stored at 0x1768f6).
+[[entry.patch]]
+pc = 0x176a80
+bytes = "01 27 13 e0"
+expect = "b4 f7 e0 fa"
+
+# 0x176ab6: with `cert.c2s` present (both packages ship one), `0x12ae44` decrypts it and compares
+# its AID and its 12 owner bytes; 0 → error 3001. It keeps nothing (frees its buffer and returns
+# 1), so the call → `movs r0, #1; nop`.
+[[entry.patch]]
+pc = 0x176ab6
+bytes = "01 20 c0 46"
+expect = "b4 f7 c5 f9"
