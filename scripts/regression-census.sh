@@ -6,7 +6,8 @@
 #   bash scripts/regression-census.sh selftest  the comparison against two fake compats (regression-diff.mjs)
 #
 # 1. host-load-guard --status --recovered ≠ 0 → one «skipped» ledger line, rc 0.
-# 2. release wie_validate from origin/main in its own worktree (build-slot, short pool), copied into the round.
+# 2. release wie_validate from origin/main in its own worktree (build-slot, short pool), copied into the round;
+#    the census tools below run from that worktree at the same pin, or the round stops (INCOMPLETE stage=tool-pin).
 # 3. probes A·B on every title; then the 600 s long run on the guards (2 + live LGT 5) and on the rows whose
 #    probe axes moved since the previous round (the shipped compat when there is none).
 # 4. regression-diff.mjs: DOWN rows are candidates; candidates are re-measured once with the same binary
@@ -39,8 +40,10 @@ note() {
 }
 # A sound recipe (game_lab/recipes-sound/<sha12>.keys) prefixes the long run, as in the census rounds.
 with_recipes() { while read -r s; do if [[ -f $RECIPES/$s.keys ]]; then echo "$s 600 $RECIPES/$s.keys"; else echo "$s"; fi; done; }
-drive() { bash scripts/census-drive.sh --bin "$R/wie_validate" "$@"; }
-census_report() { node scripts/playability-census.mjs report --out "$1" --pin "$PIN" >/dev/null; }
+# The census and the diff run from the measured tree ($T), never from this checkout: the HAND_WALL/LOCK tables they
+# judge by move with the engine, and a checkout behind origin/main turned 4 rows into false suspects (2026-11-01).
+drive() { bash "$T/census-drive.sh" --bin "$R/wie_validate" "$@"; }
+census_report() { node "$T/playability-census.mjs" report --out "$1" --pin "$PIN" >/dev/null; }
 
 # The speed axis first, while the morning is quiet: its own guard (so a busy week is counted there too), builds and ledger line (perf-watch.sh header).
 # Its failure never stops this census.
@@ -66,12 +69,16 @@ if [[ ! -x $R/wie_validate ]]; then
   cp "$BUILD/target/release/wie_validate" "$R/wie_validate"
 fi
 PIN=$(cat "$R/pin")
-TOOL_PIN=$(git rev-parse HEAD)
+git -C "$BUILD" checkout -q --detach "$PIN" 2>/dev/null # a resumed round: the tree may have moved since its build
+TOOL_PIN=$(git -C "$BUILD" rev-parse HEAD 2>/dev/null)
+git -C "$BUILD" diff --quiet HEAD -- scripts 2>/dev/null || TOOL_PIN="$TOOL_PIN+dirty" # the sha alone would vouch for a local edit
+T=$BUILD/scripts
 
 incomplete() {
   note "WIE_REGRESSION_INCOMPLETE stage=$1 pin=${PIN:0:8} date=$DATE (상한 ${WIE_REGRESSION_MAX_SECS:-21600}s 또는 실패 — 같은 날 다시 돌리면 이어서 잰다)"
   exit 1
 }
+[[ $TOOL_PIN == "$PIN" ]] || incomplete tool-pin
 
 # Probes on every title, then the long run on the guards and the rows that moved.
 drive --out "$R/out" --only probe "${CORPUS[@]}" || incomplete probe
@@ -79,13 +86,13 @@ census_report "$R/out" || incomplete report
 PREV=$(ls -d "$ROOT"/*/compat.json 2>/dev/null | grep -v "^$R/" | sort | tail -1)
 {
   for s in $GUARDS; do echo "$s"; done
-  node scripts/regression-diff.mjs changed --base "${PREV:-$R/base-compat.json}" --new "$R/out/compat.json"
+  node "$T/regression-diff.mjs" changed --base "${PREV:-$R/base-compat.json}" --new "$R/out/compat.json"
 } | sort -u | with_recipes >"$R/long.titles"
 drive --out "$R/out" --only long --titles "$R/long.titles" "${CORPUS[@]}" || incomplete long
 census_report "$R/out" || incomplete report
 
 # The pair: every candidate once more, same binary, into its own out dir.
-n=$(node scripts/regression-diff.mjs candidates --base "$R/base-compat.json" --new "$R/out/compat.json" --long "$R/long.titles" \
+n=$(node "$T/regression-diff.mjs" candidates --base "$R/base-compat.json" --new "$R/out/compat.json" --long "$R/long.titles" \
   --population "$R/out/population.json" --pair-corpus "$R/pair-corpus" --pair-long "$R/pair.long.titles") || incomplete candidates
 pair=()
 if ((n > 0)); then
@@ -97,7 +104,7 @@ if ((n > 0)); then
 fi
 
 MD=$EVID/$DATE.md
-sus=$(node scripts/regression-diff.mjs report --base "$R/base-compat.json" --new "$R/out/compat.json" --long "$R/long.titles" ${pair[@]+"${pair[@]}"} \
+sus=$(node "$T/regression-diff.mjs" report --base "$R/base-compat.json" --new "$R/out/compat.json" --long "$R/long.titles" ${pair[@]+"${pair[@]}"} \
   --pin "$PIN" --tool-pin "$TOOL_PIN" --started "$(cat "$R/started")" --date "$DATE" --out "$MD") || incomplete diff
 cp "$R/out/compat.json" "$R/compat.json"
 # Keep this round and the one before it whole; older rounds keep only their compat.json (a round is ≈1.8 GB of frames, measured 2026-10-20).
