@@ -66,3 +66,5 @@
 - `check-worklog-json` · `check-docs-report-serial`(0551 을 #584 가 먼저 잡아 0552 로 옮김) · `check-doc-liveness-parity` · `player-data` OK.
 - 에뮬레이터는 census 의 `--jobs 3` 으로만 돌렸다. 단발 프로브는 0회다. `nohup` 은 0이고, 회차 끝에 내 `wv_2e66f9d6` 프로세스는 0이다.
 - 유입(`node scripts/corpus-name-inflow.mjs`): BOUNDED 0 · SUFFIX-ATTACHED 0.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=20ded8b531080603 B=0/0 P=0/0 S=0/0 -->
