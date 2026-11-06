@@ -32,3 +32,4 @@
 게임 파일명 유입: BOUNDED 0 · SUFFIX-ATTACHED 0 (`node scripts/corpus-name-inflow.mjs`).
 
 
+<!-- corpus-name-inflow v1 subjects=4 tree=ecce91cae226d058 B=0/0 P=0/0 S=0/0 -->
