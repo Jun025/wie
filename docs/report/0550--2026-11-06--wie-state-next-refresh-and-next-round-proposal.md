@@ -28,3 +28,7 @@
 - 제안 `2026-09-28-modified-utf8-classfile-constants#p0`(classfile 수정을 upstream 에 제안)은 dlunch/RustJava **#208 MERGED 2026-09-28** 로
   이미 이뤄졌다 → `docs/worklog/2026-11-06-state-next-refresh.json` 의 `declinedProposals` 로 처분했다.
   `patches/classfile` 제거 조건(crates.io 새 판) 확인은 이 회차 범위 밖이다.
+
+게임 파일명 유입: BOUNDED 0 · SUFFIX-ATTACHED 0 (`node scripts/corpus-name-inflow.mjs`).
+
+
