@@ -76,4 +76,4 @@
 - `RUST_MIN_STACK=4194304 cargo test --all` **837 passed / 0 failed**(build-slot).
 - `check-worklog-json` · `check-docs-report-serial`(0551 을 #584 가 먼저 잡아 0552 로 옮김) · `check-doc-liveness-parity` · `player-data` OK.
 - 에뮬레이터는 census 의 `--jobs 3` 으로만 돌렸다. 단발 프로브는 0회다. `nohup` 은 0이고, 회차 끝에 내 `wv_2e66f9d6` 프로세스는 0이다.
-- 유입(`node scripts/corpus-name-inflow.mjs`): BOUNDED 0 · SUFFIX-ATTACHED 0.
+- 유입(`node scripts/corpus-name-inflow.mjs`, 이 브랜치 대 `origin/main`): BOUNDED 718회/330쌍 · SUFFIX-ATTACHED 36회/16쌍이다. 두 바구니 모두 바뀐 파일 «전체»를 훑은 수이고, 걸린 것은 전부 `docs/player-data/compat.json` 의 기존 `title`·`fileTitle` 칸이다(0526 · 0543 과 같은 수). 이 회차가 그 파일에서 바꾼 것은 `progress` 값 1개다. 그 밖 파일의 걸림은 0이다. 첫 판의 «BOUNDED 0 · SUFFIX-ATTACHED 0»은 compat 을 건드리지 않았을 때의 수다. 회차 문서·worklog·소식은 타이틀을 sha12/sha256 으로만 적었다.
