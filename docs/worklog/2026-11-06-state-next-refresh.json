@@ -1,0 +1,22 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-11-06",
+  "task": "wie-state-next-refresh-and-next-round-proposal",
+  "title": "STATE.md «다음» 현행화 — 옛 ①~④ 완료로 접음 · 사료 이관 · 이미 이뤄진 제안 1건 처분",
+  "summary": "STATE.md 의 옛 «다음»·머리 블록·위치 표를 docs/state-next-history.md 로 그대로 옮기고 2026-11-06 실측으로 다시 썼다. 다음 후보 2건(upstream 2차 동기화 예행·분류 · 진도 ⒟ confirm-only-entry 15행)은 STATE.md §다음 에 적었고 발권은 총괄 몫이라 카드로 올리지 않았다. 제안 2026-09-28-modified-utf8-classfile-constants#p0 은 dlunch/RustJava #208(MERGED 2026-09-28)로 이미 이뤄져 처분한다. 코드 0줄.",
+  "changes": [
+    "STATE.md — 머리 블록·위치 표·§다음 재작성",
+    "docs/state-next-history.md 신규 — 옛 본문 그대로",
+    "docs/report/0550--2026-11-06--wie-state-next-refresh-and-next-round-proposal.md 신규"
+  ],
+  "verification": [
+    "gh pr list -R dlunch/RustJava --author Jun025 --state all → #208 classfile: decode CONSTANT_Utf8 as modified UTF-8 · MERGED 2026-09-28T07:09:23Z"
+  ],
+  "limits": [
+    "patches/classfile 의 제거 조건(README.md)이 충족됐는지는 재지 않았다 — crates.io 새 판 여부는 별건"
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": ["2026-09-28-modified-utf8-classfile-constants#p0"],
+  "declinedReasons": { "2026-09-28-modified-utf8-classfile-constants#p0": "resolved-by dlunch/RustJava#208" },
+  "proposals": []
+}
