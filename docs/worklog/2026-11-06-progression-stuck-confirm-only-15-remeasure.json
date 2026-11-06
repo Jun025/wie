@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-06",
+  "task": "wie-progression-stuck-confirm-only-15-remeasure",
+  "title": "0525 ⒟ 확인 키만 15행 현행 핀 재측 — 15행 모두 넘는 키 미발견",
+  "summary": "origin/main 2e66f9d6 에서 15행을 progress 600초 P·P2 로 쟀다. 짝 둘 다 ok 는 3행인데 셋 다 눈 확인에서 떨어졌다. compat 변경은 0이다. 2행 이상 겹치는 엔진 서명이 없어 엔진은 고치지 않았다. docs/report/0552.",
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "a0436eb1ddbb 놀이 중 ArrayIndexOutOfBounds(13 > 12) 를 던지는 자리 측정",
+      "plainSummary": "한 게임이 놀이 중에 배열 범위 밖 예외를 10분에 수백~수천 번 낸다. 게임 속 날짜도 그 동안 움직이지 않는다.",
+      "userBenefit": "그 예외가 엔진 쪽 값(예: 날짜·달력) 때문이라면, 고친 뒤 이 게임의 하루가 넘어가고 진도 막힘이 풀린다.",
+      "why": "0552 §3: 이 핀 600초 P 755 · P2 2514 번이다. 0525 의 150초 프로브는 0 이었다. 15행 중 런타임 예외가 이렇게 많은 행은 이 행뿐이다.",
+      "tradeoff": "게임 자신의 버그라면 고칠 것이 없다. 그 판정만 남는다.",
+      "effort": "S — 예외를 던지는 메서드와 배열 출처를 로그로 한 번 잡는다",
+      "target": "wie_validate 로그 → 해당 API 구현(wie_midp/wie_skvm)"
+    }
+  ]
+}
