@@ -1,8 +1,8 @@
 {
   "date": "2026-11-06",
   "task": "wie-progression-stuck-confirm-only-15-remeasure",
-  "title": "0525 ⒟ 확인 키만 15행 현행 핀 재측 — 15행 모두 넘는 키 미발견",
-  "summary": "origin/main 2e66f9d6 에서 15행을 progress 600초 P·P2 로 쟀다. 짝 둘 다 ok 는 3행인데 셋 다 눈 확인에서 떨어졌다. compat 변경은 0이다. 2행 이상 겹치는 엔진 서명이 없어 엔진은 고치지 않았다. docs/report/0552.",
+  "title": "0525 ⒟ 확인 키만 15행 현행 핀 재측 — fe76e641bb3d ok · 4행 눈 확인 되풀이 예외로 stuck",
+  "summary": "origin/main 2e66f9d6 에서 15행을 progress 600초 P·P2 로 쟀다. census 규칙으로는 5행 ok 인데, 눈으로도 진행인 fe76e641bb3d 1행만 compat 을 ok 로 바꿨다. 나머지 4행은 같은 상태 되풀이라 계약에 새로 넣은 «눈 확인 되풀이» 예외로 stuck 이다. 2행 이상 겹치는 엔진 서명이 없어 엔진은 고치지 않았다. docs/report/0552.",
   "proposals": [
     {
       "kind": "product",
