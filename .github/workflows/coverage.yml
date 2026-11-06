@@ -1,6 +1,14 @@
 name: coverage
 
-on: [push]
+# Weekly + by hand, not on every push (2026-11-07). At `on: [push]` this job was
+# 401 of ~1,480 job-minutes in the week GitHub stopped running Actions on this
+# fork "due to the scale of GitHub Actions usage" — 21 runs × ~19 min, every
+# branch push. It is not a required check, so nothing waits on it.
+# Ticket: wie-actions-usage-cut-after-github-fork-throttle.
+on:
+  schedule:
+    - cron: "47 19 * * 6" # Sat 19:47 UTC — once a week
+  workflow_dispatch:
 jobs:
   test:
     name: coverage
@@ -9,9 +17,11 @@ jobs:
       image: xd009642/tarpaulin:latest
       options: --security-opt seccomp=unconfined
     # ── Why this job exists and must stay green ──────────────────────────────
-    # Coverage is wired deliberately: it runs on EVERY push, not just main, so a
-    # branch that deletes tests shows up as a coverage drop before it merges.
-    # The failure mode this guards against is making the number go up by
+    # Coverage is wired deliberately. It used to run on EVERY push so a branch
+    # that deletes tests showed a drop before merging; since 2026-11-07 it runs
+    # weekly on main (see the trigger comment) — run it by hand
+    # (`gh workflow run coverage.yml -R Jun025/wie --ref <branch>`) on a branch
+    # that deletes or moves tests. The failure mode this guards against is making the number go up by
     # deleting tests rather than by covering code — if a change makes this job
     # awkward, fix the change, do not delete tests to make coverage "simpler".
     #

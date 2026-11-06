@@ -23,7 +23,20 @@
 #
 # ── Why the matrix ────────────────────────────────────────────────────────────
 # macOS/Ubuntu/Windows × stable/beta. A warning is a build failure here (-D
-# warnings), so a lint that only fires on one toolchain still reddens the PR.
+# warnings), so a lint that only fires on one toolchain still reddens the run.
+#
+# ── Why only ONE leg does work on PRs and main pushes (2026-11-07) ────────────
+# GitHub stopped running Actions on this fork on 2026-11-04 "due to the scale of
+# GitHub Actions usage" (Actions-tab banner). Rust CI was 854 of ~1,480 job-minutes
+# that week (21 runs × six legs). So on pull_request/push only ubuntu/stable runs
+# the gates; the other five legs still START — every step is skipped, the job
+# reports success — because three of them (`rust_ci (macos-latest, stable)`,
+# `rust_ci (windows-latest, stable)`, and ubuntu) are required-check NAMES in the
+# ruleset, and a name that never reports deadlocks the merge (Incident ledger).
+# A job-level `if:` would not do: a skipped matrix job reports one unexpanded name.
+# The full six-leg matrix runs weekly (schedule) and on workflow_dispatch — run it
+# by hand before landing anything platform-specific (Windows CRLF, path handling).
+# Ticket: wie-actions-usage-cut-after-github-fork-throttle.
 #
 # ── Why RUST_MIN_STACK=4194304 is not decorative ──────────────────────────────
 # The JVM/ARM interpreter recurses deeply enough to overflow the default test
@@ -41,8 +54,15 @@ on:
     types:
       - opened
       - synchronize
+  schedule:
+    - cron: "17 19 * * 6" # Sat 19:17 UTC — the full matrix, once a week
+  workflow_dispatch:
 
 name: Rust CI
+
+concurrency:
+  group: rust-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   rust_ci:
@@ -58,12 +78,18 @@ jobs:
         os: [macos-latest, ubuntu-latest, windows-latest]
         rust: [stable, beta]
 
+    # 'true' = this leg does the work. See «Why only ONE leg» in the header.
+    env:
+      FULL: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (matrix.os == 'ubuntu-latest' && matrix.rust == 'stable') }}
+
     steps:
       - uses: actions/checkout@v6
+        if: env.FULL == 'true'
         with:
           submodules: "recursive"
 
       - name: Cache cargo
+        if: env.FULL == 'true'
         uses: actions/cache@v5
         with:
           path: ~/.cargo
@@ -71,6 +97,7 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo
 
       - name: Cache cargo build
+        if: env.FULL == 'true'
         uses: actions/cache@v5
         with:
           path: target
@@ -78,13 +105,14 @@ jobs:
           restore-keys: ${{ runner.os }}-${{ matrix.rust }}-build-target-
 
       - uses: dtolnay/rust-toolchain@stable
+        if: env.FULL == 'true'
         with:
           toolchain: ${{ matrix.rust }}
           targets: wasm32-unknown-unknown
           components: rustfmt, clippy
 
       - name: Install required packages
-        if: matrix.os == 'ubuntu-latest'
+        if: env.FULL == 'true' && matrix.os == 'ubuntu-latest'
         # `update` is best-effort, `install` is not. The runner image ships
         # third-party repos we do not use (packages.microsoft.com); when one of
         # them 403s, `apt update` exits 100 and — under the default `bash -e` —
@@ -96,19 +124,22 @@ jobs:
         run: sudo apt-get update || true; sudo apt-get install -y libasound2-dev
 
       - name: Install required packages
-        if: matrix.os == 'windows-latest'
+        if: env.FULL == 'true' && matrix.os == 'windows-latest'
         run: choco install ninja
 
       - run: cargo fmt --all -- --check
+        if: env.FULL == 'true'
       - run: cargo clippy --all -- -D warnings
+        if: env.FULL == 'true'
       - run: cargo clippy --target wasm32-unknown-unknown -- -D warnings
+        if: env.FULL == 'true'
 
-      - if: matrix.os == 'windows-latest'
+      - if: env.FULL == 'true' && matrix.os == 'windows-latest'
         run: |
           $env:RUST_MIN_STACK=4194304
           cargo test --all
 
-      - if: matrix.os != 'windows-latest'
+      - if: env.FULL == 'true' && matrix.os != 'windows-latest'
         run: |
           export RUST_MIN_STACK=4194304
           cargo test --all
