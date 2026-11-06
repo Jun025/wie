@@ -308,4 +308,4 @@ S1 과 S2 는 서로 독립이다. 둘 다 우리 쪽만 바꾸므로 병렬로 
 | `Cargo.lock` 재생성이 `wasm-bindgen =0.2.108` 로 풀리는지 | 탐침 L1 은 lock 을 갱신했지만 wasm 빌드가 `wie-backend` 에서 먼저 죽었다. S3 에서 `npm run build:wasm` 이 판정한다 |
 | skt 축 신호 | 커밋된 skt 픽스처가 0 이다(조각 D 와 같다). `smoke_gate` skt 가 유일한 신호다 |
 
-<!-- corpus-name-inflow v1 subjects=2 tree=bd91d28f1b94caa9 B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=2 tree=244c5d2a4eace691 B=0/0 P=0/0 S=0/0 -->
