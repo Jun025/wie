@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-06",
+  "task": "wie-upstream-sync2-dry-run-classify",
+  "title": "upstream/main 2차 동기화 예행·분류 — 충돌 93 분류와 조각 계획",
+  "summary": "격리 워크트리에서 git merge upstream/main 을 예행했다(behind 173 · 충돌 93). 93개를 폐기 11 · 재적용 53 · 발신 29 로 분류했다(미분류 0 · 10월 0539~0548 행과 겹침 19). 예행 탐침 트리의 4게이트는 전부 red 이고 첫 벽은 wie-backend(executor·zip 9)다. 비용은 behind 수가 아니라 upstream 의 API 세 축(RustJava 0.4.1 · executor 재설계 · ARM AOT 가 binary_patches 삭제)이 정한다. 한 번에 병합은 no-go, 조각 계획(S1 RustJava 핀 → S2 executor → S3 병합)은 go. docs/report/0551.",
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "S1 — RustJava 핀을 우리 쪽에서 먼저 0.4.1 로 올린다 (upstream 병합 전)",
+      "plainSummary": "upstream 이 이미 올린 Java 실행기 판(0.1.1 → 0.4.1)을 우리 코드에서 먼저 따라간다. 병합 충돌의 가장 큰 단일 원인을 병합 전에 치운다.",
+      "userBenefit": "upstream 의 KTF/LGT Java 수정(GC·예외·필드 접근)을 받을 수 있는 길이 열린다. 병합 회차가 작아져 이용자에게 닿는 수정이 빨라진다.",
+      "why": "0551 §3: 발신 29 의 거의 전부와 Java 클래스 파일 충돌 대부분이 #1444 의 필드 owner 인자 하나 때문에 3-way 수정이 됐다. classfile 0.4.1 이 modified UTF-8 을 이미 디코딩해서 patches/classfile 도 지울 수 있다.",
+      "tradeoff": "핀 이동은 설계 작업이다(AGENTS.md 사건대장 · hardening.rs 가 계속 붙는지 다시 확인해야 한다). 너무 크면 0.1→0.3 과 0.3→0.4 두 조각으로 나눈다.",
+      "effort": "L — upstream 커밋 7개(#1430 · #1444 · #1489 · 0.3.3~0.3.5 · #1542 · 0.4.1)를 본으로 쓴다. 검증식은 0551 §7 S1 행.",
+      "target": "wie-jvm-support · wie-wipi-java · wie-midp · wie-skvm · wie-ktf · wie-lgt (Java 표면) · 루트 Cargo.toml"
+    },
+    {
+      "kind": "product",
+      "title": "S2 — wie-backend executor 를 upstream 의 sleep 마감·협동 폴링 의미로 옮긴다 (우리 pacing API 유지)",
+      "plainSummary": "upstream 이 바꾼 실행기 시간 의미(#1491 · #1429)를 우리 pacing 아래로 옮긴다. 병합 예행이 맨 처음 깨지는 자리를 병합 전에 맞춘다.",
+      "userBenefit": "병합 뒤 게임 속도와 타이머 동작이 갈라지지 않는다. 속도 축은 perf-watch 로 지킨다.",
+      "why": "0551 §5: ours·theirs 두 예행 탐침 모두 wie-backend(system.rs · task.rs · executor)에서 먼저 죽는다. 둘 다 충돌 목록 밖의 «조용한 병합» 파일이다.",
+      "tradeoff": "pacing 은 이번 가을에 속도 회귀를 여러 번 낸 축이다. test_pacing 수치와 perf-watch compare 가 그대로여야 착지한다.",
+      "effort": "M — executor.rs · system.rs · task.rs. S1 과 독립이라 병렬로 열 수 있다.",
+      "target": "wie-backend"
+    }
+  ]
+}
