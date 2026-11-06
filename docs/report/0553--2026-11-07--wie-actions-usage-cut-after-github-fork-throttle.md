@@ -36,3 +36,5 @@ web 은 죽은 두 브랜치(원격에 없음 — `git ls-remote --heads` 빈 �
 **검증** — 4게이트 + `cargo +beta clippy --all -- -D warnings` 로컬 green(`cargo test --all` 837 passed · 0 failed) ·
 `check-parked-workflows` · `check-doc-liveness-parity` · `check-linux-system-deps` · `check-parity-lock-wired` rc=0 ·
 워크플로 12개 YAML 파싱 OK. Actions 가 꺼져 있어 이 PR 의 CI 는 다시 켜지기 전까지 돌지 않는다.
+
+<!-- corpus-name-inflow v1 subjects=6 tree=4cded8869ea231b5 B=0/0 P=0/0 S=0/0 -->
