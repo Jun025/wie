@@ -2,7 +2,8 @@
 
 > 이 파일은 `STATE.md` 의 머리 인용 블록 · 「fork 의 현재 위치」 표 · `## 다음` 절 본문을
 > **2026-11-06 시점 그대로**(`origin/main` `2e66f9d6`) 옮긴 것이다. 고치지 않았다 — 옛 수치·판정은
-> 기록 시점의 값이다. 지금 칠 것은 `STATE.md` §다음 을 읽어라.
+> 기록 시점의 값이다. 지금 칠 것은 `STATE.md` §다음 을 읽어라. ★예외 하나 — 게임 이름 1종(2곳)은
+> `docs/lgt_abi.md` cp47 지시로 바꿨다(`scripts/corpus-name-inflow.mjs` 가 새 파일의 유입으로 센다).
 > 이관 회차: `docs/report/` 의 `wie-state-next-refresh-and-next-round-proposal` 항목.
 > 아래 «## 다음 (옛 본문)» 의 항목 ①~④ 와 «해소» 목록은 전부 끝났거나 닫혔다 — 처분 1줄씩은 `STATE.md` §다음.
 
@@ -128,7 +129,7 @@
     **202 단일 치환** · 공용 구현 자체(diff 0). ★**범위 = LGT «그리기» 한정**(`keydraw_ktf`·`helloworld_lgt` upstream PASS).
     ★★**D 로 넘어간 결정 항목**: 그 27줄을 ⒜upstream LGT 전용 유지(**SDK 기반 게스트가 깨진다**) ↔
     ⒝공용 복귀(**upstream LGT 리버스 1,095줄을 버린다**) 중 어디로 둘 것인가.
-    ★**코퍼스 없이 안전하게 못 정한다** — 단 축이 «좁혀졌다»: `docs/lgt_abi.md:930` 이 실제 clet 타이틀(놈ZERO)에서
+    ★**코퍼스 없이 안전하게 못 정한다** — 단 축이 «좁혀졌다»: `docs/lgt_abi.md:930` 이 실제 clet 타이틀(`docs/lgt_abi.md` cp47 의 LGT clet)에서
     「`GetScreenFrameBuffer` 가 준 포인터에 **직접** 픽셀을 쓴다」를 관측했다(= 우리 픽스처와 **같은 모양**) ⇒
     ★**위험이 «픽스처 편향»에 한정될 가능성은 낮아졌다.** ★**그래도 확정은 아니다**(실제 clet 이 upstream 의
     간접 체인을 걸을 수 있다) ⇒ ★**코퍼스가 생기면 «LGT 52건»을 먼저 돌려라.**
@@ -237,7 +238,7 @@
     대조는 `awk '$1==t'` **바이트 일치** ⇒ ★**한 건도 안 붙는다**(원문 겹침 **0** ↔ NFC 정규화 후 **52/52**).
     ★**정규화 후 드러나는 것**: baseline PASS **12건이 지금 FAIL**(+ baseline 에 없는 2건도 FAIL) ·
     ★**각 2회 재측 2/2 · paints 전건 0 · 사유는 하드 에러**(`panic: attempt to subtract with overflow` 2 ·
-    `net.wie.WieError` 11 · 데드라인 잡음 1). ★**그중 `놈ZERO` 는 `docs/lgt_abi.md` cp47 이 「PASS · 153 paints」로
+    `net.wie.WieError` 11 · 데드라인 잡음 1). ★**그중 «`docs/lgt_abi.md` cp47 의 LGT clet 타이틀» 는 `docs/lgt_abi.md` cp47 이 「PASS · 153 paints」로
     적어 둔 타이틀**이다 ⇒ 문서와 제품이 어긋났고 그것을 말할 게이트가 자기가 0건을 재는 줄 몰랐다.
     ★**이 회차는 고치지 않았다**(한 조각 규율 · 복원하면 즉시 12건 빨강이고 그 처분이 별 결정이다 ·
     `smoke_gate` 는 로컬 전용이라 CI 는 무영향) ⇒ 후속 제안 = `docs/worklog/2026-09-23-lgt-corpus-decides-graphics-wiring.json`
