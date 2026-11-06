@@ -1,7 +1,7 @@
 //! Runs the DoD ↔ `rust.yml` parity lock, and proves the lock is not vacuous.
 //!
 //! Wiring: this is a plain `#[test]`, so `cargo test --all` — itself one of the four documented
-//! gates — runs it on every PR, in all six `rust.yml` legs, with **zero workflow change**. The
+//! gates — runs it on every PR (ubuntu/stable; all six `rust.yml` legs weekly), with **zero workflow change**. The
 //! checker lives in a separate file that this one declares as a module, so deleting the checker
 //! is a compile error rather than a silent pass. (Deleting *both* files is still green; that
 //! ceiling is printed by `ceilings()` on every run rather than hidden here.)

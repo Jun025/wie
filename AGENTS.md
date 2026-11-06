@@ -80,7 +80,7 @@ separate ticket, cite the failing run in your report, and say plainly that CI is
 pre-existing reason.
 
 The marked region above is diffed against `rust.yml` by `wie_cli/tests/dod_ci_parity.rs`, which
-`cargo test --all` runs in all six legs. Of the four gates only the lint gate has ever caught anything
+`cargo test --all` runs in every leg that does work (on a PR only ubuntu/stable; all six weekly — `rust.yml` header). Of the four gates only the lint gate has ever caught anything
 on beta that stable missed — that is why beta is one line; add another only when a run makes you.
 What the parity test deliberately does not see it prints on every run;
 read that block rather than trusting the word "green". Why beta is one line, what it costs, and the

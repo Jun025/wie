@@ -31,12 +31,17 @@ name: Web (wasm build + Pages deploy)
 
 on:
   push:
-    # feat/ux-redesign is included so its push produces a Pages *preview*
-    # deployment (feat-ux-redesign.wie-web.pages.dev) for the user to review
-    # before any merge.
-    branches: [main, feat/cf-web-service, feat/ux-redesign]
+    # main only. feat/cf-web-service and feat/ux-redesign (Pages preview branches)
+    # were removed 2026-11-07 — neither exists on origin any more.
+    branches: [main]
   pull_request:
     types: [opened, synchronize]
+
+# A newer push to the same PR cancels the older run; main pushes are never
+# cancelled — they carry the D1 migration + prod deploy, which must not stop midway.
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
