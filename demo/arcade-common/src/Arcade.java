@@ -94,6 +94,10 @@ abstract class Arcade extends Canvas implements Runnable {
     // The round clock: milliseconds left, counted down only while playing, so every menu pauses it.
     int roundMs, leftMs;
     private long lastTick;
+    /** The last time given back (addTime): how much, and the frame it came, so the bar can show it. */
+    int chargeMs, chargeFrame = -CHARGE_F;
+    /** The longest chain of the round, for the end card. */
+    int bestChain;
 
     Arcade() {
         setFullScreenMode(true);
@@ -148,6 +152,16 @@ abstract class Arcade extends Canvas implements Runnable {
         if (vibrate && display != null) display.vibrate(ms);
     }
 
+    /** Gives back {@code ms} of round time during play, never past the full bar. */
+    void addTime(int ms) {
+        if (state != PLAY) return;
+        int add = Math.min(ms, roundMs - leftMs);
+        if (add <= 0) return;
+        leftMs += add;
+        chargeMs = add;
+        chargeFrame = frame;
+    }
+
     void toast(String text) {
         toast = text;
         toastUntil = System.currentTimeMillis() + 1200;
@@ -174,8 +188,8 @@ abstract class Arcade extends Canvas implements Runnable {
 
     // ---- the flow ----
     private void gameOver() {
+        state = OVER; // first, so a chain still in flight scores but gives no time back
         end();
-        state = OVER;
         overAt = System.currentTimeMillis();
         overFrame = frame;
         newBest = score > best[playLevel];
@@ -187,7 +201,8 @@ abstract class Arcade extends Canvas implements Runnable {
     }
 
     private void start() {
-        score = 0;
+        score = bestChain = 0;
+        chargeFrame = frame - CHARGE_F;
         playLevel = level;
         roundMs = leftMs = newGame(level);
         lastTick = System.currentTimeMillis();
@@ -809,13 +824,38 @@ abstract class Arcade extends Canvas implements Runnable {
         int tw = w - 16;
         g.setColor(SURFACE2);
         g.fillRoundRect(8, bar, tw, 7, 7, 7);
-        int fill = roundMs == 0 ? 0 : (int) ((long) tw * leftMs / roundMs);
-        boolean blink = leftMs * 10 < roundMs && state == PLAY && (frame / 2) % 2 == 1;
+        // Time given back shows for CHARGE_F frames: the new part of the bar is pale with a rim (켬: it
+        // grows in over GROW_F frames), and a pill above it carries a + and one pip per 300 ms.
+        int age = frame - chargeFrame;
+        boolean charged = age < CHARGE_F && state != OVER;
+        int shown = leftMs - (charged && motion == 0 && age < GROW_F ? chargeMs * (GROW_F - 1 - age) / GROW_F : 0);
+        int fill = roundMs == 0 ? 0 : (int) ((long) tw * shown / roundMs);
+        int old = roundMs == 0 || !charged ? fill : (int) ((long) tw * Math.max(0, leftMs - chargeMs) / roundMs);
+        boolean blink = !charged && leftMs * 10 < roundMs && state == PLAY && (frame / 2) % 2 == 1;
+        int color = leftMs * 5 < roundMs ? 0xE8685A : leftMs * 2 < roundMs ? 0xF2B84B : 0x4CC38A;
         if (fill > 0 && !blink) {
-            g.setColor(leftMs * 5 < roundMs ? 0xE8685A : leftMs * 2 < roundMs ? 0xF2B84B : 0x4CC38A);
+            g.setColor(color);
             g.fillRoundRect(8, bar, Math.max(fill, 7), 7, 7, 7);
         }
+        if (charged && fill > old) {
+            g.setColor(0x2E9E66);
+            g.fillRect(8 + old, bar - 2, fill - old, 11);
+            g.setColor(0xC9F5DC);
+            g.fillRect(9 + old, bar - 1, Math.max(1, fill - old - 2), 9);
+            int pips = Math.min(5, (chargeMs + 299) / 300), pw = 14 + 5 * pips;
+            int px = Math.max(w / 2 - 30, Math.min(w / 2 + 30, 8 + (old + fill) / 2)) - pw / 2;
+            g.setColor(0x2E9E66);
+            g.fillRoundRect(px, 2, pw, lineH + 2, 10, 10);
+            g.setColor(WHITE);
+            int my = 2 + (lineH + 2) / 2;
+            g.fillRect(px + 4, my - 1, 7, 3); // the +
+            g.fillRect(px + 6, my - 3, 3, 7);
+            for (int i = 0; i < pips; i++) g.fillRect(px + 14 + 5 * i, my - 3, 3, 7);
+        }
     }
+
+    /** Frames the time given back stays marked on the bar, and frames it takes to grow in (motion 켬). */
+    static final int CHARGE_F = 8, GROW_F = 3;
 
     /** The pause menu: the board is covered (no studying it while the clock is stopped). */
     private void paintPause(Graphics g, int w, int h) {
@@ -860,7 +900,7 @@ abstract class Arcade extends Canvas implements Runnable {
 
     private void paintOver(Graphics g, int w, int h) {
         int cw = w - 48;
-        int ch = 5 * lineH + 56;
+        int ch = 6 * lineH + 62;
         int x = 24, y = (h - ch) / 2;
         g.setColor(TEXT);
         g.fillRoundRect(x - 2, y - 2, cw + 4, ch + 4, 22, 22);
@@ -877,12 +917,15 @@ abstract class Arcade extends Canvas implements Runnable {
             g.setColor(newBest ? ACCENT : SUB);
             g.drawString(newBest ? "새 최고 기록이에요!" : "최고 " + best[playLevel], cx, y + 2 * lineH + 26, Graphics.TOP | Graphics.HCENTER);
         }
+        // Something to beat next round besides the score.
+        g.setColor(bestChain > 1 ? TEXT : SUB);
+        g.drawString(bestChain > 1 ? "가장 긴 연쇄 x" + bestChain : "다음엔 연쇄를 노려 봐요", cx, y + 3 * lineH + 32, Graphics.TOP | Graphics.HCENTER);
         g.setColor(SURFACE2);
-        g.fillRoundRect(cx - 60, y + 3 * lineH + 34, 120, lineH + 8, 16, 16);
+        g.fillRoundRect(cx - 60, y + 4 * lineH + 40, 120, lineH + 8, 16, 16);
         g.setColor(TEXT);
-        g.drawString("5 다시하기", cx, y + 3 * lineH + 38, Graphics.TOP | Graphics.HCENTER);
+        g.drawString("5 다시하기", cx, y + 4 * lineH + 44, Graphics.TOP | Graphics.HCENTER);
         g.setColor(SUB);
-        g.drawString("CLR 메뉴로", cx, y + 4 * lineH + 44, Graphics.TOP | Graphics.HCENTER);
+        g.drawString("CLR 메뉴로", cx, y + 5 * lineH + 50, Graphics.TOP | Graphics.HCENTER);
     }
 
     static void putInt(byte[] b, int at, int v) {
