@@ -17,7 +17,7 @@ import javax.microedition.media.Player;
 final class Sound {
     // A tick is 4 ms (timebase code 0x02). Notes are {midiNote, lengthInTicks}; note 0 is a rest.
     // Clip numbers are shared by every game: see the constants below.
-    static final int START = 0, GOOD = 1, MOVE = 2, OVER = 3, TOGGLE = 4, BIG = 5, BAD = 6;
+    static final int START = 0, GOOD = 1, MOVE = 2, OVER = 3, TOGGLE = 4, BIG = 5, BAD = 6, BIG3 = 7, BIG4 = 8;
     private static final int[][][] NOTES = {
         {{67, 20}, {71, 20}, {74, 20}, {79, 45}},
         {{81, 10}, {88, 18}},
@@ -26,8 +26,11 @@ final class Sound {
         {{74, 12}, {79, 16}},
         {{76, 12}, {79, 12}, {84, 12}, {88, 36}},
         {{58, 14}, {55, 30}},
+        // BIG, a fourth and then a fifth higher: the third and fourth-or-later step of a chain.
+        {{81, 12}, {84, 12}, {89, 12}, {93, 36}},
+        {{83, 10}, {86, 10}, {91, 10}, {95, 44}},
     };
-    private static final int[] PROGRAMS = {11, 13, 115, 11, 11, 13, 80};
+    private static final int[] PROGRAMS = {11, 13, 115, 11, 11, 13, 80, 13, 13};
 
     private final byte[][] clips = new byte[NOTES.length][];
     private Player current;
