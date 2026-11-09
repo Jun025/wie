@@ -44,3 +44,4 @@
 - `build` 산출물을 otterpebble `origin/main` 의 `compat-import.mjs` `validateCompat` 로 읽기 전용 실행했다. 위반 0 이다. 셸의 `normalizeCompat` 정렬 뒤에도 묶음의 첫 행은 하나도 바뀌지 않았다(안정 정렬).
 - 게임 이름 유입: `corpus-name-inflow` BOUNDED 362쌍(1112회) · SUFFIX-ATTACHED 16쌍(52회). 의도한 유입이다 — 공개 목록(`compat.json` 의 `title`·`game`·`fileTitle`)이 산출물이고, 이 문서의 판정 표가 묶음 이름을 적는다. 게임 바이트·리소스 내용·캡처는 0.
 
+<!-- corpus-name-inflow v1 subjects=4 tree=4c58d02fec72b3ef B=1112/362 P=3/3 S=52/16 -->
