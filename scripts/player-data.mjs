@@ -5,6 +5,7 @@
 //   node scripts/player-data.mjs                      check the committed data (CI: engine-contract.yml)
 //   node scripts/player-data.mjs --selftest           each rule must reject its mutation
 //   node scripts/player-data.mjs import <census.json> census `report` output -> docs/player-data/compat.json
+//   node scripts/player-data.mjs normalize            re-derive names/groups and order in docs/player-data/compat.json
 //   node scripts/player-data.mjs build --out <dir>    write the shipped compat.json + updates.json
 //                                                     (publish-artifact.yml; needs full history)
 //
@@ -53,7 +54,7 @@ const str = (v) => typeof v === 'string' && v.trim() !== '';
 // «[1]» of a re-download), carrier labels (platform is its own field), edit/patch tags, file version
 // numbers, a numeric id prefix. stripMarkers() drops them and returns what it dropped as `label`:
 // the screen-size variant if there was one, else the version — the shortest marker that can tell
-// two files apart. Only a name that collides after stripping gets that label, else « (2)» (§1).
+// two files apart. A label ships as `variant` only inside a same-name group, and only when unique there (§1).
 const SCREEN = /[\s-]*(작은화면|큰화면|큰화)$/;
 const VERSION = /[\s-]*v?(\d+(?:\.\d+)+)$/i;
 export function stripMarkers(raw) {
@@ -75,24 +76,53 @@ export function stripMarkers(raw) {
   return { title: t.replace(/\s+/g, ' ').trim(), label };
 }
 
-/** Sets `fileTitle` (kept for search/tracing) and a marker-free, per-platform-unique `title`. */
+// Same name twice on one platform, judged from archive metadata only (PID·Name·Ver·DisplaySize of
+// __adf__/app_info/.msd, entry list, main-jar hash — docs/report/0555). sha12 -> what the file name
+// cannot say: a different game's real name (`title`), or the label the census file name lost (`variant`).
+const SAME_NAME_HAND = {
+  '1cdea1985955': { title: '메이플스토리 마법사편' }, // PD001295 «메이플-마법사편» — not the same product as ↓
+  '3b5b98afa890': { title: '메이플스토리 전사편' }, // PD002198, file name «(전사편)»
+  '306dcdb03842': { variant: '큰화면' }, // DisplaySize 240*320 · Ver 01.00.05
+  e159b9727dbd: { variant: '작은화면' }, // 176*220 · 01.00.01
+  '4288d8c1c6ac': { variant: '큰화면' }, // 240*320 (file name «(큰화면)»)
+  '3ccc6cf147d2': { variant: '작은화면' }, // 176*220
+  '0bc9cc28c05a': { variant: '01.00.02' }, // app_info Ver
+  '6f170f692586': { variant: '01.00.04' },
+};
+// (platform, game) groups whose rows were judged the same game; any other group of ≥2 rows ships `undetermined`.
+const SAME_GAME = new Set(
+  [
+    ...['거상', '던파거너편', '리얼비트', '리얼싸커2009', '마린블루스', '마이프린세스2', '영웅전설4 주홍물방울', '이노티아1', '이노티아연대기2'],
+    ...['지크', '질주쾌감 스케쳐', '추억의달고나', '크아bnb2007', '투스워즈', '마스터오브소드2', '붕어빵타이쿤3', '영어뇌습격', '절묘한타이밍', '프린세스메이커4'],
+  ]
+    .map((t) => `KTF\t${t}`)
+    .concat(['LGT\t영웅서기3', 'SKT\t웰루시아', 'SKT\t프린세스메이커4']),
+);
+export const SAME_TITLE = ['same-game', 'undetermined'];
+
+/** Sets `fileTitle` (kept for search/tracing), a marker-free `title`, the carrier-free group key `game`, and `variant`. */
 export function retitle(entries) {
-  const out = entries.map((x) => ({ ...x, fileTitle: x.fileTitle ?? x.title, ...stripMarkers(x.fileTitle ?? x.title) }));
-  const groups = Map.groupBy(out, (x) => `${x.platform}\t${x.title}`);
-  for (const g of groups.values()) {
-    if (g.length < 2) continue;
-    g.sort((a, b) => a.label.length - b.label.length || a.label.localeCompare(b.label) || a.sha256.localeCompare(b.sha256));
-    const taken = new Set();
-    g.forEach((x, i) => {
-      let t = x.label && !g.some((y) => y !== x && y.label === x.label) ? `${x.title} (${x.label})` : x.title;
-      for (let n = 2; taken.has(t); n++) t = `${x.title} (${n})`;
-      taken.add(t);
-      x.title = t;
-    });
-  }
+  const out = entries.map(({ sameTitle, variant, ...x }) => {
+    const fileTitle = x.fileTitle ?? x.title;
+    const { title, label } = stripMarkers(fileTitle);
+    const hand = SAME_NAME_HAND[x.sha256.slice(0, 12)] ?? {};
+    return { ...x, fileTitle, title: hand.title ?? title, game: hand.title ?? title, label: hand.variant ?? label };
+  });
+  for (const g of Map.groupBy(out, (x) => `${x.platform}\t${x.game}`).values())
+    for (const x of g) {
+      x.variant = g.length > 1 && x.label && !g.some((y) => y !== x && y.label === x.label) ? x.label : null;
+      if (g.length > 1) x.sameTitle = SAME_GAME.has(`${x.platform}\t${x.game}`) ? 'same-game' : 'undetermined';
+    }
   return sortEntries(out.map(({ label, ...x }) => x));
 }
 const DISAMBIGUATOR = / \((\d+|작은화면|큰화면|v?\d+(?:\.\d+)+)\)$/;
+
+// The group's representative comes first — the shell reads a (platform, game) group's first row (§1).
+const STATUS_RANK = Object.fromEntries(STATUSES.map((s, i) => [s, i]));
+const okAxes = (x) => AXES.filter((a) => x.axes?.[a] === 'ok').length;
+const byRepresentative = (a, b) =>
+  STATUS_RANK[a.status] - STATUS_RANK[b.status] || okAxes(b) - okAxes(a) || (b.changes?.length ?? 0) - (a.changes?.length ?? 0) || a.sha256.localeCompare(b.sha256);
+const sortEntries = (es) => [...es].sort((a, b) => a.platform.localeCompare(b.platform) || a.game.localeCompare(b.game, 'ko') || byRepresentative(a, b));
 
 export function validateCompat(d) {
   const e = [];
@@ -103,6 +133,7 @@ export function validateCompat(d) {
   if (!Array.isArray(d.entries)) return [...e, 'compat: entries must be an array'];
   const seen = new Set();
   const names = new Set();
+  const perTitle = Map.groupBy(d.entries, (x) => `${x?.platform}\t${x?.title}`);
   d.entries.forEach((x, i) => {
     const at = `compat.entries[${i}]`;
     if (!x || typeof x !== 'object') return e.push(`${at}: not an object`);
@@ -113,11 +144,19 @@ export function validateCompat(d) {
     if (!(x.model === null || str(x.model))) e.push(`${at}: model must be a string or null`);
     if (!str(x.title)) e.push(`${at}: empty title`);
     else {
-      const base = x.title.replace(DISAMBIGUATOR, '');
-      if (stripMarkers(base).title !== base) e.push(`${at}: title carries a file marker — ${JSON.stringify(x.title)}`);
-      if (names.has(`${x.platform}\t${x.title}`)) e.push(`${at}: title ${JSON.stringify(x.title)} repeats within ${x.platform}`);
-      names.add(`${x.platform}\t${x.title}`);
+      if (stripMarkers(x.title).title !== x.title) e.push(`${at}: title carries a file marker — ${JSON.stringify(x.title)}`);
+      if (DISAMBIGUATOR.test(x.title)) e.push(`${at}: title carries an ordinal or variant label (that is \`variant\`, §1) — ${JSON.stringify(x.title)}`);
+      const key = `${x.platform}\t${x.title}\t${x.variant ?? ''}`;
+      if (x.variant != null && names.has(key)) e.push(`${at}: (platform, title, variant) ${JSON.stringify(key)} repeats`);
+      names.add(key);
+      if (!SAME_TITLE.includes(x.sameTitle) && perTitle.get(`${x.platform}\t${x.title}`).length > 1)
+        e.push(`${at}: title ${JSON.stringify(x.title)} repeats within ${x.platform} — a repeated title must be one game's files (sameTitle ${SAME_TITLE})`);
     }
+    if (!str(x.game)) e.push(`${at}: empty game (the carrier-free group key)`);
+    if (!(x.variant === null || str(x.variant))) e.push(`${at}: variant must be a string or null`);
+    const prev = d.entries[i - 1];
+    if (prev?.platform === x.platform && prev?.game === x.game && STATUSES.includes(prev.status) && STATUSES.includes(x.status) && byRepresentative(prev, x) > 0)
+      e.push(`${at}: comes after a worse row of its group ${JSON.stringify(x.game)} — the representative goes first (§1; \`node scripts/player-data.mjs normalize\`)`);
     if (!str(x.fileTitle)) e.push(`${at}: empty fileTitle (the file-derived name, kept for search)`);
     if (!STATUSES.includes(x.status)) e.push(`${at}: status not in ${STATUSES}`);
     for (const a of AXES) if (!AXIS_VALUES.includes(x.axes?.[a])) e.push(`${at}: axes.${a} not in ${AXIS_VALUES}`);
@@ -192,7 +231,6 @@ export function fromCensus(c) {
   }));
   return { schema: 1, generatedAt: c.generatedAt, enginePin: c.enginePin, entries: retitle(entries) };
 }
-const sortEntries = (es) => [...es].sort((a, b) => a.platform.localeCompare(b.platform) || a.title.localeCompare(b.title, 'ko') || a.sha256.localeCompare(b.sha256));
 
 function readUpdates() {
   return readdirSync(UPDATES)
@@ -234,7 +272,7 @@ export function assemble(compat, files, pinOf, wieHead) {
     for (const t of u.titles) // an all-titles update (titles: []) is news in updates.json, not a per-title row
       byTitle.set(t, [...(byTitle.get(t) ?? []), { date: u.date, enginePin: u.enginePin, summary_ko: u.summary_ko, kind: u.kind, pr: u.pr }]);
   return {
-    compat: { ...compat, entries: compat.entries.map((x) => ({ ...x, changes: byTitle.get(x.sha256) ?? [] })) },
+    compat: { ...compat, entries: sortEntries(compat.entries.map((x) => ({ ...x, changes: byTitle.get(x.sha256) ?? [] }))) },
     updates: { schema: 1, generatedAt: new Date().toISOString(), wieHead, entries },
   };
 }
@@ -259,8 +297,9 @@ function selftest() {
     schema: 1,
     generatedAt: '2026-09-27',
     enginePin: 'b'.repeat(40),
-    entries: [{ sha256: sha, platform: 'KTF', model: null, title: 't', fileTitle: '[큰화]t', status: 'playable', axes: Object.fromEntries(AXES.map((a) => [a, 'ok'])), knownIssues_ko: [], changes: [] }],
+    entries: [{ sha256: sha, platform: 'KTF', model: null, title: 't', game: 't', variant: null, fileTitle: '[큰화]t', status: 'playable', axes: Object.fromEntries(AXES.map((a) => [a, 'ok'])), knownIssues_ko: [], changes: [] }],
   };
+  const pair = [good.entries[0], { ...good.entries[0], sha256: 'c'.repeat(64) }].map((x) => ({ ...x, sameTitle: 'undetermined' }));
   const upd = { date: '2026-09-27', kind: 'fix', titles: [sha], summary_ko: '고쳤어요.', pr: 'https://github.com/Jun025/wie/pull/1' };
   const cases = [
     ['compat schema 2', { ...good, schema: 2 }, null],
@@ -280,6 +319,11 @@ function selftest() {
     ['title keeps a file version', { ...good, entries: [{ ...good.entries[0], title: 't 01.00.05' }] }, null],
     ['title keeps an edit tag', { ...good, entries: [{ ...good.entries[0], title: 't 2억에디트1' }] }, null],
     ['same title twice on one platform', { ...good, entries: [good.entries[0], { ...good.entries[0], sha256: 'c'.repeat(64) }] }, null],
+    ['title keeps an ordinal', { ...good, entries: [{ ...good.entries[0], title: 't (2)' }] }, null],
+    ['game dropped', { ...good, entries: [{ ...good.entries[0], game: undefined }] }, null],
+    ['representative not first', { ...good, entries: [{ ...pair[0], status: 'not-yet', knownIssues_ko: ['멈춰요.'] }, pair[1]] }, null],
+    ['same title, different-game verdict', { ...good, entries: pair.map((x) => ({ ...x, sameTitle: 'different-game' })) }, null],
+    ['same title and variant twice', { ...good, entries: pair.map((x) => ({ ...x, variant: '작은화면' })) }, null],
     ['fileTitle dropped', { ...good, entries: [{ ...good.entries[0], fileTitle: undefined }] }, null],
     ['update: title not in compat', good, [['2026-09-27-x.json', { ...upd, titles: ['c'.repeat(64)] }]]],
     ['update: date differs from name', good, [['2026-09-26-x.json', upd]]],
@@ -293,6 +337,10 @@ function selftest() {
   let bad = 0;
   if (errs(good, [['2026-09-27-x.json', upd]]).length) bad++, console.error('selftest: the good fixture is rejected');
   if (validateCompat({ ...good, entries: [{ ...good.entries[0], playTips_ko: ['확인 키로 시작해요.'] }] }).length) bad++, console.error('selftest: a row with playTips_ko is rejected');
+  if (validateCompat({ ...good, entries: pair }).length) bad++, console.error('selftest: a judged same-title pair is rejected');
+  const re = retitle([{ ...pair[1], title: 'x 1.04', fileTitle: undefined }, { ...pair[0], status: 'limited', knownIssues_ko: ['멈춰요.'], title: 'x', fileTitle: undefined }]);
+  if (re.map((x) => `${x.title}|${x.game}|${x.variant}|${x.sameTitle}|${x.sha256[0]}`).join(' ') !== 'x|x|1.04|undetermined|c x|x|null|undetermined|a')
+    bad++, console.error(`selftest: retitle must keep the name, move the label to variant and put the representative first, got ${JSON.stringify(re)}`);
   for (const [label, c, u] of cases) if (!errs(c, u).length) bad++, console.error(`selftest: NOT rejected — ${label}`);
   if (fromCensus({ ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, render: 'uniform', speed: 'n/a' } }] }).entries[0].axes.render !== 'no')
     bad++, console.error('selftest: census uniform must map to no');
@@ -354,7 +402,7 @@ function selftest() {
     rmSync(repo, { recursive: true, force: true });
   }
   if (bad) process.exit(1);
-  console.log(`player-data selftest: ${cases.length + 10} rules each reject their mutation`);
+  console.log(`player-data selftest: ${cases.length + 12} rules each reject their mutation`);
 }
 
 const [cmd, ...args] = process.argv.slice(2);
@@ -370,6 +418,11 @@ else if (cmd === 'import') {
   mkdirSync(join(ROOT, 'docs/player-data'), { recursive: true });
   writeFileSync(COMPAT, JSON.stringify(c, null, 1) + '\n');
   console.log(`imported ${c.entries.length} titles (pin ${c.enginePin.slice(0, 8)}) -> docs/player-data/compat.json`);
+} else if (cmd === 'normalize') {
+  // Re-derives title/game/variant/sameTitle from fileTitle and puts each group's representative first.
+  const c = JSON.parse(readFileSync(COMPAT, 'utf8'));
+  writeFileSync(COMPAT, JSON.stringify({ ...c, entries: retitle(c.entries) }, null, 1) + '\n');
+  console.log(`normalized ${c.entries.length} titles -> docs/player-data/compat.json`);
 } else if (!cmd || cmd === 'build') {
   const compat = JSON.parse(readFileSync(COMPAT, 'utf8'));
   const files = readUpdates();
@@ -396,6 +449,6 @@ else if (cmd === 'import') {
     console.log(`built -> ${args[oi + 1]}/{compat,updates}.json (${out.updates.entries.length} updates)`);
   }
 } else {
-  console.error('usage: player-data.mjs [--selftest | import <census compat.json> | build --out <dir>]');
+  console.error('usage: player-data.mjs [--selftest | import <census compat.json> | normalize | build --out <dir>]');
   process.exit(2);
 }

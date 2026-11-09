@@ -14,7 +14,8 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
 ```
 { schema: 1, generatedAt: "YYYY-MM-DD…", enginePin: <측정한 wie 커밋 40hex>,
   entries: [{ sha256: <64hex>, platform: "KTF"|"SKT"|"LGT"|"J2ME", model: "clet"|"aot-java"|null,
-              title: <표시 이름>, fileTitle: <파일에서 온 원 이름(검색·추적용)>, status: "playable"|"limited"|"not-yet",
+              title: <표시 이름>, game: <통신사 무관 묶음 키>, variant: <판 라벨>|null,
+              sameTitle?: "same-game"|"undetermined", fileTitle: <파일에서 온 원 이름(검색·추적용)>, status: "playable"|"limited"|"not-yet",
               axes: { boot, render, input, longplay, sound, speed: "ok"|"partial"|"no"|"unknown" },
               knownIssues_ko: [쉬운 한국어 문장],
               playTips_ko?: [쉬운 한국어 문장](선택 · 없으면 키 자체를 생략),
@@ -37,12 +38,23 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
 | `api` | `platform` + `model` | 전수 조사가 재는 값이 이것이다. `api`(WIPI-C/Java)는 측정 안 한 값이라 넣지 않았다 |
 | `verifiedAt`·`verifiedWieHead` 항목별 | 최상위 `generatedAt`·`enginePin` | 한 회차가 전건을 같은 핀으로 잰다 |
 
-★**표시 이름 규칙**(`stripMarkers`·`retitle` · 검사기가 «표식 잔존 0»과 «통신사 안 이름 중복 0»을 거부로 잡는다):
+★**표시 이름 규칙**(`stripMarkers`·`retitle` · 2026-11-10 «같은 게임 두 줄» 정리로 ` (2)` 순번 규칙을 승계해 바꿨다 · `docs/report/0555`):
 파일 표식 — 대괄호 태그·재다운로드 `[1]`·통신사 표기(`kt`·`KTF`·`lgt`·`skt`·`SKVM` — 통신사는 `platform` 이 따로 말한다)·
 `에디트`/`수정판`/`추가다운완료`·파일 판 번호(`1.04`·`01.00.05`)·숫자 id 접두 — 는 `title` 에서 빼고(`+` 는 띄어쓰기로) 원 이름은 `fileTitle` 에 둔다.
-**뺀 뒤 같은 통신사 안에서 겹칠 때만** 구별 표기를 붙인다: 뺀 표식 하나(화면 크기가 있으면 그것, 없으면 판 번호)가 그 묶음에서 유일하면 ` (작은화면)`처럼, 아니면 ` (2)`·` (3)`(표식 짧은 순 → sha256 순).
+`title` 에는 순번(` (2)`)도 판 라벨(` (작은화면)`)도 붙이지 않는다(검사기 거부).
+- `game` = 통신사와 무관한 묶음 키(= 표식 뺀 이름). 통신사만 다른 이식판은 같은 `game` 이다 — 셸은 «게임 한 줄 = 파일 N개»로 묶는다.
+- `variant` = 같은 (platform, game) 묶음 안에서 파일을 가르는 짧은 라벨(뺀 표식 중 화면 크기, 없으면 판 번호 · 그 묶음에서 유일할 때만) 또는 `null`.
+  혼자인 행은 늘 `null`. 파일 이름이 라벨을 잃은 판은 메타데이터(`DisplaySize`·`Ver`)에서 손으로 단다(`SAME_NAME_HAND`). (platform, title, variant) 는 라벨이 있을 때 유일하다.
+- `sameTitle` = 한 통신사 안에서 이름이 겹치는 행에만 실리는 판정: `same-game`(같은 게임의 다른 판 — 판올림·에디트·재다운로드 변형) ·
+  `undetermined`(판정 전 — 셸은 같은 게임처럼 묶되 «확인 중»으로 보일 수 있다). 판정 근거는 아카이브 메타데이터(`__adf__`/`app_info`/`.msd` 의
+  PID·이름·판·화면 크기, 항목 목록, 본체 jar 해시)뿐이다. **`different-game`(다른 게임이 같은 파일 이름)은 싣지 않는다** — 그 행은 `title`/`game` 자체를
+  바른 이름으로 고친다(`SAME_NAME_HAND` · 이름의 출처를 주석에). 겹치는 이름에 `sameTitle` 이 없으면 검사기가 거부한다.
+- **대표 행**: 같은 (platform, game) 안에서 ①status 좋은 순(playable > limited > not-yet) ②여섯 축 `ok` 수 많은 순 ③`changes` 많은 순 ④sha256 순으로
+  내보내고, 셸은 묶음의 **첫 행**을 대표로 읽는다(`build` 가 `changes` 를 붙인 뒤 다시 정렬한다 · 커밋 파일의 어긋남은 검사기가 거부 —
+  `node scripts/player-data.mjs normalize` 로 다시 맞춘다). 셸 가져오기의 정렬(platform → title)은 안정 정렬이라 이 순서를 지킨다.
+- ★행은 지우지 않는다 — 매칭 키는 파일 내용 sha256 이고, 이용자의 파일이 어느 판이든 «미확인»이 되면 안 된다.
 
-`changes` 의 `kind`·`pr` 과 `fileTitle` 은 셸 가져오기가 요구하지 않는 **추가 필드**다(모르는 키는 무시된다).
+`changes` 의 `kind`·`pr` 과 `fileTitle`·`game`·`variant`·`sameTitle` 은 셸 가져오기가 요구하지 않는 **추가 필드**다(모르는 키는 무시된다).
 
 ★**`knownIssues_ko` 와 `playTips_ko` 를 가른다**(2026-10-09):
 - `knownIssues_ko` = **안 되는 것**(빠진 소리·막히는 지점·서버 벽 등). 셸은 «알려진 문제»로 보인다. `playable` 이 아닌 행은 ≥1 줄(검사기 거부).
