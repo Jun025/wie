@@ -101,3 +101,5 @@ rAF 콜백은 vsync 뒤 0~1 ms 에 온다. 시계 읽기 1회 = 1 µs. 10 s 를 
 - 열린 PR 중 `wie-backend/src/executor.rs` 를 만지는 것: 0건(#583~#588 diff 파일 목록 조회 · 2026-11-11).
 
 **사용자 영향**: 셸이 아직 새 표면을 안 부르므로 오늘은 0 이다. 후속 `otterpebble-featurephone-heat-shell-idle-wake-and-speed-telemetry` 가 크레이트 문서대로 배선하면, sleep 박자로 도는 게임은 60Hz 기기에서 엔진 점유가 절반 안팎으로 준다. 박자는 같거나 정확해진다.
+
+<!-- corpus-name-inflow v1 subjects=12 tree=2cc0b2e3c1438972 B=14/11 P=1/1 S=0/0 -->
