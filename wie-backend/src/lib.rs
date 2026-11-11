@@ -16,6 +16,8 @@ mod system;
 mod task;
 mod task_runner;
 pub mod text_layout;
+#[cfg(test)]
+mod tick_occupancy;
 mod time;
 
 pub use self::{

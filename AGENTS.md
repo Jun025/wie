@@ -406,6 +406,7 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   `--speed x --paint-window a,b` counts paints in a guest-time window on the browser's own frames —
   how achieved play speed is measured where `wie_validate`'s never-sleeping loop cannot see it (`docs/report/0498`).
   `--cpu-throttle n` stands in for a slow device and prints the engine's `achieved_speed()` beside it (`docs/report/0532`).
+  `--wake-margin off --wake-margin 3` pairs today's tick against the host-wake loop on busy % — the engine's share of the main thread (`docs/report/0556`).
 
 ### Documented-command liveness — one weekly scheduled job, decided 2026-09-10
 

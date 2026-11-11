@@ -167,11 +167,14 @@ impl Executor {
     where
         T: Fn() -> Instant,
     {
-        self.tick_for(now, TICK_BUDGET_MS)
+        self.tick_for(now, TICK_BUDGET_MS, None)
     }
 
     /// `tick` with a host-chosen wall-clock budget in milliseconds instead of `TICK_BUDGET_MS`.
-    pub fn tick_for<T>(&mut self, now: T, budget_ms: u64) -> Result<()>
+    /// `max_wait`: the longest the tick waits for a paced wake before ending instead — `None` waits
+    /// for any inside the budget. A host that passes it ticks again itself when the wake is near
+    /// (`Platform::wake_margin_ms`).
+    pub fn tick_for<T>(&mut self, now: T, budget_ms: u64, max_wait: Option<u64>) -> Result<()>
     where
         T: Fn() -> Instant,
     {
@@ -202,11 +205,12 @@ impl Executor {
             // Every task is asleep. Ending the tick here used to put each wake on the host's frame
             // grid: 메이플스토리2007's sleep(60) woke 66.7 or 83.3ms later, never 60. A paced wake
             // that falls inside the budget is waited for instead — spending CPU the budget already
-            // allowed — and one past it still ends the tick.
+            // allowed — and one past it still ends the tick. So does one further than `max_wait`: the
+            // host comes back for it, and the wait was most of what an idle game cost (docs/report/0556).
             if let Some((next_wakeup, paced)) = next_wakeup
                 && current < next_wakeup
             {
-                if paced.is_none_or(|paced| paced > end) {
+                if paced.is_none_or(|paced| paced > end || max_wait.is_some_and(|max_wait| paced > current + max_wait)) {
                     break;
                 }
                 match wait_until(&now, current, next_wakeup) {
@@ -439,7 +443,7 @@ mod tests {
 
         // A 120Hz host's budget (`FramePacer::budget_for_period_us(8_333)`); ignoring it and
         // spending the 14ms default is exactly the overrun of an 8.3ms frame this API exists to prevent.
-        executor.tick_for(advancing_clock(0), 5).unwrap();
+        executor.tick_for(advancing_clock(0), 5, None).unwrap();
         assert_eq!(polls.load(Ordering::Relaxed), 5);
     }
 
@@ -472,6 +476,18 @@ mod tests {
         executor.tick(advancing_clock(0)).unwrap();
         assert!(!woke.load(Ordering::Relaxed));
         executor.tick(advancing_clock(40)).unwrap();
+        assert!(woke.load(Ordering::Relaxed));
+    }
+
+    #[test]
+    fn test_tick_ends_on_a_wake_past_its_max_wait() {
+        let mut executor = Executor::new();
+        // A host that ticks again for the wake itself (`Platform::wake_margin_ms`): 10ms is inside
+        // the budget but past a 3ms wait, so the tick ends; the host's tick 2ms before it waits.
+        let woke = sleeper(&mut executor, 10);
+        executor.tick_for(advancing_clock(0), 14, Some(3)).unwrap();
+        assert!(!woke.load(Ordering::Relaxed));
+        executor.tick_for(advancing_clock(8), 14, Some(3)).unwrap();
         assert!(woke.load(Ordering::Relaxed));
     }
 

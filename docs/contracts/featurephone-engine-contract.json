@@ -7,9 +7,9 @@
     "dir": "web/src/wasm",
     "files": ["wie_web.js", "wie_web_bg.wasm"],
     "glueFetchesWasmByName": "wie_web_bg.wasm",
-    "maxBytesNote": "다운로드 예산(상한). 소비자(otterpebble 피처폰 셸)가 첫 로딩에 그대로 받는 바이트다. ★«상한»이지 «핀»이 아니다 — 정상 성장은 통과하고 «계단»만 잡는다. files 의 전건이 여기 있어야 한다(fail-closed: 없으면 위반). 상한을 올리는 것은 정당하지만 «이 파일의 diff»로 남아 사람이 눈치챈다 — 그것이 이 예산의 전부다. 2026-09-16 실측 근거: 상한을 넘는 두 사건이 모두 이 창에 들어온다 — ⑴base swap 이 wie_web_bg.wasm 을 9,205,987 → 15,425,955(+67.6%)로 올렸고 107개 계약 검사 전건이 green 이었다 ⑵scripts/build-wasm.sh 의 wasm-opt 폴백(미설치·구 binaryen 파싱 실패)이 25,591,056(최적화본의 1.66배)을 낸다. ★⑵ 는 오탐이 아니라 «잡아야 할 것»이다: publish-artifact.yml 이 그 폴백판을 그대로 릴리스하면 소비자 다운로드가 조용히 1.66배가 된다.",
+    "maxBytesNote": "다운로드 예산(상한). 소비자(otterpebble 피처폰 셸)가 첫 로딩에 그대로 받는 바이트다. ★«상한»이지 «핀»이 아니다 — 정상 성장은 통과하고 «계단»만 잡는다. files 의 전건이 여기 있어야 한다(fail-closed: 없으면 위반). 상한을 올리는 것은 정당하지만 «이 파일의 diff»로 남아 사람이 눈치챈다 — 그것이 이 예산의 전부다. 2026-09-16 실측 근거: 상한을 넘는 두 사건이 모두 이 창에 들어온다 — ⑴base swap 이 wie_web_bg.wasm 을 9,205,987 → 15,425,955(+67.6%)로 올렸고 107개 계약 검사 전건이 green 이었다 ⑵scripts/build-wasm.sh 의 wasm-opt 폴백(미설치·구 binaryen 파싱 실패)이 25,591,056(최적화본의 1.66배)을 낸다. ★⑵ 는 오탐이 아니라 «잡아야 할 것»이다: publish-artifact.yml 이 그 폴백판을 그대로 릴리스하면 소비자 다운로드가 조용히 1.66배가 된다. 2026-11-11: wie_web.js 상한 40,000 → 42,000 — 호스트 깨움 메서드 3개(hostWakeNote)가 39,859 → 40,710 B 로 올렸다(docs/report/0556 · 같은 툴체인 로컬 빌드 전후).",
     "maxBytes": {
-      "wie_web.js": 40000,
+      "wie_web.js": 42000,
       "wie_web_bg.wasm": 20000000
     },
     "maxBytesMeasured": {
@@ -47,9 +47,13 @@
     "set_speed",
     "speed",
     "achieved_speed",
+    "set_wake_margin",
+    "wake_in_ms",
+    "wake_tick",
     "free"
   ],
   "setSpeedNote": "set_speed(speed: number) → number · speed() → number (2026-10-09). 게임 배속 1.0~2.0 «연속»(양자화 없음) — 범위 밖은 clamp, NaN·무한은 1.0, 반환값 = 실제 적용값. 게스트 시계(sleep·타이머·currentTimeMillis)가 배속으로 흐르고 바꾸는 순간 시각이 튀거나 되감기지 않는다. 틱 한 번의 벽시계 몫은 그대로라 CPU 가 모자라면 «낼 수 있는 만큼». 오디오 피치·템포는 바꾸지 않는다. 호출하지 않으면 1.0 = 종전 동작과 같다.",
+  "hostWakeNote": "set_wake_margin(ms?: number) · wake_in_ms() → number|undefined · wake_tick() (2026-11-11 · docs/report/0556 · opt-in). 부르지 않으면 종전과 같다(틱이 예산 안의 박자 깨움까지 시계를 읽으며 기다린다 — sleep 박자 게임이 60Hz 에서 쓰는 엔진 CPU 의 절반~2/3). set_wake_margin(ms) 뒤로는 틱이 깨움을 ms 까지만 기다리고 그보다 멀면 끝난다 — 셸이 매 tick/wake_tick 뒤 대기 중 타이머를 지우고 wake_in_ms() 가 수이면 setTimeout(wake_tick, 그 수) 를 건다(undefined = 걸지 않음: 게스트가 CPU 를 원하거나 키만 기다린다). ms 권장 3(WebKit 이 rAF 에서 건 타이머 지연 최대 3 ms 실측). wake_tick 은 프레임이 아니다(FramePacer 를 건드리지 않음 · 그리기는 tick 과 같이 처리). 일시정지·숨은 탭 = 타이머도 함께 끈다 · set_speed 뒤 = wake_in_ms() 를 다시 읽어 다시 건다. 호스트 계약 전문 = wie_featurephone/src/lib.rs 크레이트 문서 «Host wakes».",
   "achievedSpeedNote": "achieved_speed() → number (2026-10-21 · 정의 개정 2026-10-22 docs/report/0532). 최근 2초 틱 창에서 «실제로 낸 배속» = 게스트 시간 ÷ 벽시계, 단 게스트가 «밀린» 구간은 세지 않는다: ⑴틱 예산이 다 됐는데 게스트가 CPU 를 더 원했으면 그 틱의 예산 끝 → 다음 틱 시작 ⑵게스트가 시각을 기다리는 중(sleep·타이머·callSerially)이면 그 할 일 시각 + 1/60초 → 다음 틱 시작(틱 안에서 넘었어도 같다 — 느린 기기의 가벼운 게임). 아무 시각도 기다리지 않는(키 대기) 시간은 «제때»다. 기기가 따라가면 speed() 와 같고 그 이하만 나온다. 생성 직후·set_speed 직후 틱 2회 전까지는 speed() 를 돌려준다(set_speed 가 창을 비운다). 틱 사이 공백이 0.5초를 넘고 최근 2초의 가장 긴 간격의 8배도 넘으면(백그라운드 탭·셸 일시정지·앱 전환) 멈춤으로 보고 그 간격만 빼며 창은 둔다 — 멈춤 뒤 값은 멈춤 전 값이다. 매 프레임 느린 기기는 멈춤으로 안 본다. 굶는 게임의 하한 ≈ 0.84 × speed()(60Hz) — 엔진은 «더 원했다»만 알지 «얼마나»는 모른다(그 값은 상한이다).",
   "keyVocabularyNote": "셸이 engine.key_down/key_up 으로 «실제로 보내는» 이름. CALL·HANGUP 은 화면의 «통화»·«종료» 버튼이 보낸다(otterpebble apps/featurephone/app/player.tsx 의 <GameKey code=\"CALL\"|\"HANGUP\"> → RunningGame.press → emu.key_down · 2026-09-04 origin/main 실측). ★키보드 바인딩은 없다(KEY_MAP 에 0건) — 버튼만이다. VOLUME_UP·VOLUME_DOWN 은 «넣지 마라»: 셸이 엔진에 보내지 않고(호스트 게인 노드 setVolume 이 진다) 넣으면 계약이 쓰이지 않는 표면을 약속하게 된다.",
   "keyVocabulary": [

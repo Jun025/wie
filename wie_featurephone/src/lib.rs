@@ -10,6 +10,28 @@
 //!
 //! The crate is compiled only for `wasm32`; on every other target it is empty so
 //! that native workspace jobs keep building.
+//!
+//! # Host wakes (opt-in, 2026-11-11 · docs/report/0556)
+//!
+//! A guest that sleeps on a beat (`Thread.sleep(60)`, a WIPI timer) is woken on time by `tick`
+//! waiting for the wake inside its budget — reading the clock in a loop, which is most of what such
+//! a game costs the device at 60Hz. A host that calls `set_wake_margin(ms)` once takes that wait
+//! over: from then on a tick waits at most `ms` for a wake and ends otherwise, and the host ticks
+//! again in time for it. A host that never calls it runs exactly as before.
+//!
+//! - **After every `tick` and `wake_tick`**: `clearTimeout` the pending wake timer, read
+//!   `wake_in_ms()`, and if it is a number, `setTimeout(() => emu.wake_tick(), it)`. `undefined` =
+//!   no timer (the guest wants CPU — the next `tick` serves it — or waits on nothing but a key).
+//!   Arm it from there and not from a chain of timers of your own: WebKit fired a timer armed from
+//!   a frame callback at most 3ms late, a long chain of nested timers up to 7ms (measured headless
+//!   2026-11-11), and `ms` must cover that lateness or the wake is late by the difference.
+//! - **`ms` = 3** is the measured value for WebKit; a browser whose timers run later wants more,
+//!   at the cost of up to `ms` of waiting per wake. `undefined` turns it off again.
+//! - **`wake_tick` is not a frame**: it leaves the frame-interval pacing (`FramePacer`) alone, and
+//!   handles a redraw the same way `tick` does. Keep calling `tick` from `requestAnimationFrame`.
+//! - **Paused or hidden**: cancel the timer along with the frame loop; resume both together.
+//! - **`set_speed`**: the delay is in wall time and changes with the speed — re-read `wake_in_ms()`
+//!   and re-arm.
 #![cfg(target_arch = "wasm32")]
 
 extern crate alloc;
@@ -21,14 +43,14 @@ mod platform;
 mod screen;
 
 use alloc::sync::Arc;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 
 use js_sys::{Object, Reflect, Uint8Array};
 use wasm_bindgen::prelude::*;
 use web_sys::{AudioContext, GainNode, HtmlCanvasElement};
 
-use wie_backend::{AchievedSpeed, Emulator, Event, FramePacer, KeyCode, Options, SpeedClock, extract_zip};
+use wie_backend::{AchievedSpeed, Emulator, Event, FramePacer, Instant, KeyCode, Options, SpeedClock, TICK_BUDGET_MS, extract_zip};
 use wie_j2me::J2MEEmulator;
 use wie_ktf::KtfEmulator;
 use wie_lgt::{LgtEmulator, detect_compile_model};
@@ -68,6 +90,12 @@ pub struct WieEmulator {
     clock: Arc<SpeedClock>,
     // What `speed` actually comes to on this device (see `achieved_speed`).
     achieved: AchievedSpeed,
+    // Host wakes (crate doc): the margin, shared with `WebPlatform` (`u64::MAX` = off); the budget
+    // of the last frame tick; and whether the last tick ended starved, and the guest's next due work.
+    wake_margin: Arc<AtomicU64>,
+    budget: u64,
+    starved: bool,
+    due: Option<Instant>,
 }
 
 #[wasm_bindgen]
@@ -129,6 +157,7 @@ impl WieEmulator {
         let redraw: RedrawFlag = Arc::new(AtomicBool::new(true));
         let exited: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
         let clock = Arc::new(SpeedClock::new());
+        let wake_margin = Arc::new(AtomicU64::new(u64::MAX));
 
         let platform = Box::new(
             WebPlatform::new(
@@ -140,6 +169,7 @@ impl WieEmulator {
                 soundfont_url,
                 exited.clone(),
                 clock.clone(),
+                wake_margin.clone(),
             )
             .map_err(|e| JsValue::from_str(&format!("{e:?}")))?,
         );
@@ -162,6 +192,10 @@ impl WieEmulator {
             pacer: FramePacer::new(),
             clock,
             achieved: AchievedSpeed::default(),
+            wake_margin,
+            budget: TICK_BUDGET_MS,
+            starved: false,
+            due: None,
         })
     }
 
@@ -207,21 +241,57 @@ impl WieEmulator {
     /// returns `Ok(())` — the core is never advanced past its requested exit, so
     /// a render loop that keeps firing before JS observes the flag cannot crash.
     pub fn tick(&mut self) -> Result<(), JsValue> {
+        self.advance(false)
+    }
+
+    /// Opt in to host wakes: a tick waits at most `margin_ms` for a guest's wake. See crate doc.
+    pub fn set_wake_margin(&mut self, margin_ms: Option<u32>) {
+        self.wake_margin.store(margin_ms.map_or(u64::MAX, u64::from), Ordering::Relaxed);
+    }
+
+    /// Ms until `wake_tick` should run; `undefined` = no wake to time. See crate doc.
+    pub fn wake_in_ms(&self) -> Option<f64> {
+        let margin = self.margin()?;
+        let due = self.due.filter(|_| !self.starved && !self.exited.load(Ordering::Acquire))?;
+        Some(self.clock.wake_delay(js_sys::Date::now(), due, margin))
+    }
+
+    /// A tick for `wake_in_ms`'s timer, off the frame clock. See crate doc.
+    pub fn wake_tick(&mut self) -> Result<(), JsValue> {
+        self.advance(true)
+    }
+
+    fn margin(&self) -> Option<u64> {
+        Some(self.wake_margin.load(Ordering::Relaxed)).filter(|&ms| ms != u64::MAX)
+    }
+
+    fn advance(&mut self, wake: bool) -> Result<(), JsValue> {
         if self.exited.load(Ordering::Acquire) {
             return Ok(());
         }
         // The pacer works in wall time; the executor measures its budget on the guest clock, which
         // runs `speed` times as fast, so the same wall-clock slice is `speed` times the guest budget.
         let begin = js_sys::Date::now();
-        let budget = self.pacer.begin(begin as u64);
+        let budget = if wake {
+            // Not a frame: the pacer would read the interval as a faster display. The margin on top,
+            // since the wait before the wake is not the guest's slice (docs/report/0556).
+            self.budget + self.margin().unwrap_or(0).min(TICK_BUDGET_MS)
+        } else {
+            self.budget = self.pacer.begin(begin as u64);
+            self.budget
+        };
         let result = self.inner.tick_for(self.clock.budget(budget));
         let end = js_sys::Date::now();
-        self.pacer.end(end as u64);
+        if !wake {
+            self.pacer.end(end as u64);
+        }
         // Taken every tick, so the window is this tick; nothing else here reads the pacing counters.
         let pacing = self.inner.take_pacing();
+        self.starved = pacing.starved_ticks() > 0;
+        self.due = pacing.due();
         // The guest's next due work, on the wall clock.
-        let due = pacing.due().map(|due| self.clock.wall_at(end, due));
-        self.achieved.tick(begin, end, budget as f64, pacing.starved_ticks() > 0, due);
+        let due = self.due.map(|due| self.clock.wall_at(end, due));
+        self.achieved.tick(begin, end, budget as f64, self.starved, due);
         result.map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
         if self.redraw.swap(false, Ordering::AcqRel) {
             self.inner.handle_event(Event::Redraw);

@@ -86,7 +86,9 @@ impl System {
 
     pub fn tick_for(&mut self, budget_ms: u64) -> Result<()> {
         let platform = self.platform.clone();
-        let result = self.executor.tick_for(move || platform.now(), budget_ms);
+        // The executor counts in guest ms, which run `speed` times as fast (`SpeedClock::budget`).
+        let max_wait = platform.wake_margin_ms().map(|ms| (ms as f64 * platform.speed()) as u64);
+        let result = self.executor.tick_for(move || platform.now(), budget_ms, max_wait);
         self.flush_redraw();
         self.pacing.lock().tick_ended(self.executor.wants_cpu(), self.executor.next_due());
         result

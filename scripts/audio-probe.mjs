@@ -33,6 +33,12 @@
 //     --cpu-throttle <n> slow the page's CPU n times (CDP Emulation.setCPUThrottlingRate) from the
 //                        moment the engine is built — boot is not throttled. Repeatable like --speed:
 //                        each rate is its own run. How a slow device is stood in for (docs/report/0532).
+//     --wake-margin <ms|off>  run the shell's host-wake loop (`set_wake_margin(ms)`, then after every
+//                        tick a timer for `wake_in_ms()` that calls `wake_tick()` — wie_featurephone's
+//                        crate doc). Repeatable like --speed: each value is its own run, `off` the
+//                        loop as it is today. How the cost of waiting in a tick is measured (docs/report/0556).
+//     --browser <name>   chromium (default) or webkit — the engine of every iPhone browser. --cpu-throttle
+//                        is Chromium-only.
 //
 // What it reports per run (engine build × game):
 //   plays / stops / evicts / gains — messages audio.rs posted to the worklet port, counted by
@@ -53,6 +59,8 @@
 //   achieved — the engine's `achieved_speed()` sampled every 250 ms from 3 s on: median · min ·
 //     share of samples under 0.9 × speed (the shell's «실제 배속» line), and the frame (rAF-to-rAF)
 //     interval median · p95 · max over the same span. "-" for a build without the export.
+//   busy % · wake ticks — the share of wall time spent inside `tick()` and `wake_tick()` (the main
+//     thread the engine holds: what heats a phone), and how many `wake_tick()`s ran.
 //   ticks · paints · tick max / p99 ms · ticks over 50 ms — paints are the engine's putImageData
 //     calls (one per guest frame shown); tick times are the wall time of each `emu.tick()`, the call the
 //     shell makes once per frame: the page can paint and take input only between two of them.
@@ -76,7 +84,7 @@ const contract = JSON.parse(await readFile(path.join(root, "docs/contracts/featu
 const DEFAULT_KEYS = "OK OK LEFT_SOFT_KEY NUM5 DOWN OK DOWN OK UP OK LEFT OK RIGHT OK NUM5 LEFT_SOFT_KEY RIGHT_SOFT_KEY DOWN DOWN OK UP OK STAR HASH NUM1 OK OK";
 
 const args = process.argv.slice(2);
-const opt = { wasm: [], secs: 40, keyMs: 700, keys: DEFAULT_KEYS.split(" "), statsEvery: 10, json: false, soundfont: null, jobs: 3, games: [], speeds: [], throttles: [], window: null };
+const opt = { wasm: [], secs: 40, keyMs: 700, keys: DEFAULT_KEYS.split(" "), statsEvery: 10, json: false, soundfont: null, jobs: 3, games: [], speeds: [], throttles: [], window: null, margins: [], browser: "chromium" };
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
   const next = () => {
@@ -94,6 +102,8 @@ for (let i = 0; i < args.length; i++) {
   else if (a === "--speed") opt.speeds.push(Number(next()));
   else if (a === "--paint-window") opt.window = next().split(",").map(Number);
   else if (a === "--cpu-throttle") opt.throttles.push(Number(next()));
+  else if (a === "--wake-margin") opt.margins.push(next() === "off" ? null : Number(args[i]));
+  else if (a === "--browser") opt.browser = next();
   else if (a === "-h" || a === "--help") usage();
   else if (a.startsWith("--")) usage(`unknown option ${a}`);
   else opt.games.push(path.resolve(a));
@@ -102,6 +112,9 @@ if (opt.games.length === 0) usage("no game file given");
 if (opt.wasm.length === 0) opt.wasm.push(path.join(root, contract.artifacts.dir));
 if (opt.speeds.some((x) => !(x > 0))) usage("--speed must be a positive number");
 if (opt.throttles.some((x) => !(x >= 1))) usage("--cpu-throttle must be a number >= 1");
+if (opt.margins.some((x) => x !== null && !(x >= 0))) usage("--wake-margin must be a number >= 0 or off");
+if (!["chromium", "webkit"].includes(opt.browser)) usage("--browser must be chromium or webkit");
+if (opt.browser !== "chromium" && opt.throttles.length) usage("--cpu-throttle needs --browser chromium");
 if (opt.window && !(opt.window.length === 2 && opt.window[0] >= 0 && opt.window[1] > opt.window[0])) usage("--paint-window wants <a,b> with 0 <= a < b");
 if (!(opt.secs > 0) || !(opt.keyMs >= 0) || !(opt.statsEvery > 0) || !(opt.jobs >= 1)) usage("--secs / --key-ms / --stats-every / --jobs must be positive numbers");
 const unknownKeys = opt.keys.filter((k) => !(k in contract.keyMidpCodes));
@@ -111,7 +124,7 @@ function usage(err) {
   const help = readFileSync(fileURLToPath(import.meta.url), "utf8")
     .split("\n")
     .filter((l) => l.startsWith("//"))
-    .slice(0, 61)
+    .slice(0, 70)
     .map((l) => l.slice(3))
     .join("\n");
   if (err) console.error(`audio-probe: ${err}\n`);
@@ -240,7 +253,7 @@ const INIT = () => {
     };
 };
 
-const RUN = async ({ wasmIdx, gameIdx, gameName, secs, keyMs, keys, statsEvery, width, height, soundfontUrl, speed, window: win }) => {
+const RUN = async ({ wasmIdx, gameIdx, gameName, secs, keyMs, keys, statsEvery, width, height, soundfontUrl, speed, window: win, margin }) => {
   const probe = window.__probe;
   const mod = await import(`/wasm/${wasmIdx}/wie_web.js`);
   await mod.default(`/wasm/${wasmIdx}/wie_web_bg.wasm`);
@@ -259,6 +272,29 @@ const RUN = async ({ wasmIdx, gameIdx, gameName, secs, keyMs, keys, statsEvery, 
   document.body.appendChild(canvas);
   const emu = new mod.WieEmulator(gameName, bytes, canvas, ctx, master, width, height, soundfontUrl);
   const appliedSpeed = speed === undefined ? null : emu.set_speed(speed);
+  // The host-wake loop (--wake-margin): what the shell does after every tick.
+  let busyMs = 0;
+  let wakeTicks = 0;
+  let wakeTimer = null;
+  let wakeError = null;
+  const armWake = () => {
+    clearTimeout(wakeTimer);
+    const ms = margin === null || margin === undefined ? undefined : emu.wake_in_ms();
+    if (ms === undefined) return;
+    wakeTimer = setTimeout(() => {
+      const t = performance.now();
+      try {
+        emu.wake_tick();
+      } catch (e) {
+        wakeError = String(e);
+        return;
+      }
+      busyMs += performance.now() - t;
+      wakeTicks++;
+      armWake();
+    }, ms);
+  };
+  if (margin !== null && margin !== undefined) emu.set_wake_margin(margin);
   const rate = appliedSpeed ?? 1;
   if (win) secs = win[1] / rate;
   console.log("audio-probe:built"); // the probe throttles the CPU from here (--cpu-throttle)
@@ -284,8 +320,14 @@ const RUN = async ({ wasmIdx, gameIdx, gameName, secs, keyMs, keys, statsEvery, 
       const t = performance.now();
       emu.tick();
       tickMs.push(performance.now() - t);
+      busyMs += tickMs.at(-1);
+      armWake();
     } catch (e) {
       error = String(e);
+      break;
+    }
+    if (wakeError) {
+      error = wakeError;
       break;
     }
     if (emu.has_exited()) {
@@ -325,6 +367,8 @@ const RUN = async ({ wasmIdx, gameIdx, gameName, secs, keyMs, keys, statsEvery, 
     }
     await new Promise((r) => requestAnimationFrame(r));
   }
+  clearTimeout(wakeTimer);
+  const elapsedMs = performance.now() - start;
 
   // Per song, the synth of each play in order (MIDI plays only — PCM never touches a synth).
   const songs = new Map();
@@ -358,6 +402,9 @@ const RUN = async ({ wasmIdx, gameIdx, gameName, secs, keyMs, keys, statsEvery, 
     mixed: midiPlays.some((p) => p.sf) && midiPlays.some((p) => !p.sf),
     holdMaxMs: Math.max(0, ...midiPlays.map((p) => p.holdMs)),
     ticks: tickMs.length,
+    busyPct: (busyMs * 100) / elapsedMs,
+    wakeTicks,
+    margin: margin ?? null,
     paints: probe.paints,
     speed: appliedSpeed,
     paintsWindow: win ? probe.paintAt.filter((t) => t - start >= (win[0] * 1000) / rate && t - start < (win[1] * 1000) / rate).length : null,
@@ -375,18 +422,20 @@ const RUN = async ({ wasmIdx, gameIdx, gameName, secs, keyMs, keys, statsEvery, 
   };
 };
 
-const { chromium } = await import("playwright");
+const browserType = (await import("playwright"))[opt.browser];
 const launchArgs = ["--autoplay-policy=no-user-gesture-required", "--disable-background-timer-throttling", "--disable-renderer-backgrounding"];
 const pending = [];
 // Game-major: the builds of one game run back to back, so a before/after pair shares the load.
 const speeds = opt.speeds.length ? opt.speeds : [undefined];
 const throttles = opt.throttles.length ? opt.throttles : [undefined];
+const margins = opt.margins.length ? opt.margins : [undefined];
 for (let g = 0; g < opt.games.length; g++)
-  for (const c of throttles) for (const x of speeds) for (let w = 0; w < opt.wasm.length; w++) pending.push([w, g, x, c, pending.length]);
-const runOne = ([w, g, x, c]) =>
+  for (const c of throttles)
+    for (const x of speeds) for (const m of margins) for (let w = 0; w < opt.wasm.length; w++) pending.push([w, g, x, c, pending.length, m]);
+const runOne = ([w, g, x, c, , m]) =>
       (async () => {
         // One browser per run: nothing shared (audio thread, timers) between the runs being compared.
-        const browser = await chromium.launch({ headless: true, args: launchArgs });
+        const browser = await browserType.launch({ headless: true, args: opt.browser === "chromium" ? launchArgs : [] });
         try {
           const page = await browser.newPage();
           const pageErrors = [];
@@ -417,6 +466,7 @@ const runOne = ([w, g, x, c]) =>
             soundfontUrl: opt.soundfont ? "/soundfont" : undefined,
             speed: x,
             window: opt.window,
+            margin: m,
           })]).finally(() => clearTimeout(stuck));
           return { wasm: opt.wasm[w], game: opt.games[g], throttle: c ?? null, ...r, pageErrors };
         } catch (e) {
@@ -442,12 +492,13 @@ server.close();
 const f4 = (v) => (typeof v === "number" ? v.toFixed(4) : "-");
 for (const r of results) {
   if (opt.json) continue; // printed as each run finished
-  console.log(`\n■ ${path.basename(r.game)}  @ ${path.relative(root, r.wasm) || r.wasm}${r.speed ? `  ×${r.speed}` : ""}${r.throttle ? `  cpu/${r.throttle}` : ""}`);
+  console.log(`\n■ ${path.basename(r.game)}  @ ${path.relative(root, r.wasm) || r.wasm}${r.speed ? `  ×${r.speed}` : ""}${r.throttle ? `  cpu/${r.throttle}` : ""}${r.margin !== undefined && opt.margins.length ? `  wake ${r.margin ?? "off"}` : ""}  [${opt.browser}]`);
   if (r.error) console.log(`  stopped: ${r.error}`);
   if (r.plays === undefined) continue;
   console.log(`  plays ${r.plays} · stops ${r.stops} · evicts ${r.evicts} · gains [${r.gains.join(", ")}] · worklet ${r.worklet ? "yes" : "NO"}`);
   console.log(`  seq ${r.seq.map((s) => `${s.at}s=${s.sequences}${s.substitute ? "*" : ""}`).join(" ") || "-"}${r.seq.some((s) => s.substitute) ? "   (* no stats reply — distinct handles sent `ev`)" : ""}`);
   console.log(`  MIDI plays ${r.midiPlays} (soundfont ${r.sfPlays}) · songs ${r.songs} (repeated ${r.repeatedSongs}) · first≠next ${r.firstVsNext} · mixed ${r.mixed} · hold max ${r.holdMaxMs} ms · dropped while held ${r.drops.length} · soundfont ${r.sfReady ? `${r.sfReady.ok ? "ready" : "failed"} at ${r.sfReady.at} ms` : "-"}`);
+  console.log(`  busy ${r.busyPct.toFixed(1)}% · wake ticks ${r.wakeTicks}`);
   console.log(`  ticks ${r.ticks} · paints ${r.paints}${r.paintsWindow === null ? "" : ` (guest ${opt.window.join("–")} s: ${r.paintsWindow})`} · tick max ${r.tickMaxMs} ms · p99 ${r.tickP99Ms} ms · over 50 ms ${r.ticksOver50Ms}`);
   console.log(`  achieved median ${f4(r.achievedMedian)} · min ${f4(r.achievedMin)} · under 0.9×speed ${r.achievedUnder === null ? "-" : `${Math.round(r.achievedUnder * 100)}%`} · frame median ${r.frameMedianMs} ms · p95 ${r.frameP95Ms} ms · max ${r.frameMaxMs} ms`);
   console.log(`  rms mean ${f4(r.rmsMean)} · 2nd half ${f4(r.rmsSecondHalf)} · max ${f4(r.rmsMax)} · silent ${r.silentSeconds}/${r.seconds}s`);
