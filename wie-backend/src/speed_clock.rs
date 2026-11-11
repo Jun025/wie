@@ -78,6 +78,13 @@ impl SpeedClock {
         wall_ms + (guest.raw() as f64 - self.now(wall_ms).raw() as f64) / self.speed()
     }
 
+    /// Wall ms from `wall_ms` until `margin_ms` before guest time `due`: when a host whose ticks wait
+    /// at most `margin_ms` for a wake (`Platform::wake_margin_ms`) must tick again to make it. 0 if
+    /// it is already that close.
+    pub fn wake_delay(&self, wall_ms: f64, due: Instant, margin_ms: u64) -> f64 {
+        (self.wall_at(wall_ms, due) - wall_ms - margin_ms as f64).max(0.0)
+    }
+
     /// A tick budget of `wall_ms` wall-clock milliseconds, in guest milliseconds: the executor
     /// measures its budget on the guest clock, so without this a 2x tick would end after half
     /// of the host frame and the game would not get faster.
@@ -342,7 +349,7 @@ mod tests {
             wall.store(frame, Ordering::SeqCst);
             let (c, w) = (clock.clone(), wall.clone());
             executor
-                .tick_for(move || c.now(w.fetch_add(1, Ordering::SeqCst) as f64 / 10.0), clock.budget(14))
+                .tick_for(move || c.now(w.fetch_add(1, Ordering::SeqCst) as f64 / 10.0), clock.budget(14), None)
                 .unwrap();
             frame += 160;
         }
@@ -383,7 +390,7 @@ mod tests {
             wall.store(frame, Ordering::SeqCst);
             let (c, w) = (clock.clone(), wall.clone());
             executor
-                .tick_for(move || c.now(w.fetch_add(1, Ordering::SeqCst) as f64 / 10.0), clock.budget(14))
+                .tick_for(move || c.now(w.fetch_add(1, Ordering::SeqCst) as f64 / 10.0), clock.budget(14), None)
                 .unwrap();
             let end = wall.load(Ordering::SeqCst) as f64 / 10.0;
             let due = executor.next_due().map(|due| clock.wall_at(end, due));
