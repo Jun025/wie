@@ -116,7 +116,8 @@ pub async fn set_timer(
         async fn call(&self, context: &mut dyn WIPICContext, _: Box<[WIPICWord]>) -> Result<WIPICResult> {
             // Unset since. With Unset a no-op, a title that re-arms with Unset + Set kept the old
             // chain alive beside the new one, and its game loop ran two to four times per period
-            // (2d5cada03004: 37 callbacks/s of a 62ms timer; 3cc7a9b4cb15: 40/s of a 37ms one).
+            // (2d5cada03004: 37 callbacks/s of a 62ms timer; 3cc7a9b4cb15: 40/s of a 55ms one — its
+            // Sets read 36ms because it asks for its period less the frame's own time, docs/report/0557).
             let tick = context.system().pacing().ticks();
             let Some(param) = context.system().event_queue().fire_timer(self.ptr_timer, self.arming, tick) else {
                 return Ok(WIPICResult { results: Vec::new() });

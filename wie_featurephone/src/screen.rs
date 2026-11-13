@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 use core::cell::Cell;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use wasm_bindgen::Clamped;
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, ImageData};
@@ -16,6 +16,9 @@ use wie_util::Result;
 /// the flicker some titles showed (a forced mid-compose blit could expose a
 /// cleared-but-not-yet-drawn framebuffer).
 pub type RedrawFlag = Arc<AtomicBool>;
+
+/// Frames presented so far, shared with [`crate::WieEmulator::frames_painted`].
+pub type FrameCount = Arc<AtomicU32>;
 
 /// Browser screen backed by a 2D `<canvas>` context.
 ///
@@ -37,6 +40,7 @@ pub struct WebScreen {
     width: Cell<u32>,
     height: Cell<u32>,
     redraw: RedrawFlag,
+    frames: FrameCount,
 }
 
 // wasm32 in the browser is single-threaded; the JS handle is never sent across
@@ -52,6 +56,7 @@ impl WebScreen {
         width: u32,
         height: u32,
         redraw: RedrawFlag,
+        frames: FrameCount,
     ) -> Self {
         Self {
             ctx,
@@ -60,6 +65,7 @@ impl WebScreen {
             width: Cell::new(width),
             height: Cell::new(height),
             redraw,
+            frames,
         }
     }
 }
@@ -116,6 +122,7 @@ impl Screen for WebScreen {
         }
         // 2) … then present it in one atomic composited blit.
         let _ = self.ctx.draw_image_with_html_canvas_element(&self.back_canvas, 0.0, 0.0);
+        self.frames.fetch_add(1, Ordering::Relaxed);
     }
 
     fn width(&self) -> u32 {
