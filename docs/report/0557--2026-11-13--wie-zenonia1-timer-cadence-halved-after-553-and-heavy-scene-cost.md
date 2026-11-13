@@ -76,7 +76,7 @@
 - 왜 이것인가: `achieved_speed()` 는 굶는 게임에서 0.84 바닥에 붙고 셸의 포화 비율도 15 → 4회/초 하락에 72~82% 그대로였다(앱 쪽 회신 §1). 엔진은 «게임이 원한 주기»를 모른다(이 게임은 최소 15ms 를 늘 걸어 «늦음»으로 보이지도 않는다). 낸 화면 수는 플랫폼을 가리지 않는 가장 작은 사실이다. 타이머 발화 수는 넣지 않았다(WIPI-C 전용이고 이 게임에서는 화면 수와 같은 수다).
 - 한계: «제 속도»의 기준값은 주지 않는다. 다시 그릴 것이 없으면 안 그리는 게임은 낮게 읽힌다. 셸은 같은 세션 · 같은 게임 안의 변화로 읽어야 한다.
 - 시험: `contract-roundtrip.mjs` A(부팅 직후 0) · C(그리는 fixture 뒤 1 이상). ★**되돌리면 red**: `paint` 의 증가 줄을 지우면 C 가 `got 0` 으로 FAILED 다(68/69 · rc=1). 원복 69/69.
-- 계약 `artifacts.maxBytes["wie_web.js"]` 40,000 → 42,000. 로컬 빌드 39,859 → 40,126 B 다. PR #589 가 같은 줄을 같은 값으로 올린다(그쪽 40,710 B · 둘 다 착지하면 약 40,980 B).
+- 계약 `artifacts.maxBytes["wie_web.js"]` 40,000 → 42,000. 로컬 빌드 39,859 → 40,126 B 다. PR #589 가 같은 줄을 같은 값으로 올린다(그쪽 40,710 B · 둘 다 착지하면 약 40,980 B). 그 PR 과 같은 파일 둘(`lib.rs` · 계약 JSON)을 고치므로 넣는 자리를 그쪽 hunk 와 떼어 놓았다 — `git merge-tree` 로 맞대면 충돌 0 이다(텍스트 기준 · 합친 빌드는 돌리지 않았다).
 
 ### 5. 게이트
 - `cargo fmt --all -- --check` rc=0 · `cargo clippy --all -- -D warnings` rc=0 · `cargo clippy --target wasm32-unknown-unknown -- -D warnings` rc=0(+ `-p wie_featurephone` rc=0) · `RUST_MIN_STACK=4194304 cargo test --all` 54 스위트 837 pass · 0 fail.
@@ -92,4 +92,3 @@
 
 ### 7. 게임 파일명 유입
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 4쌍 + SUFFIX-ATTACHED 0쌍. 그 4쌍은 `wie-wipi-c/src/api/kernel.rs`(1) · `wie_featurephone/src/lib.rs`(3)에 `origin/main` 부터 있던 기존 주석이다. 이 회차가 그 두 파일을 고쳐 대상에 들어왔을 뿐이고, 이 회차 diff 의 추가 줄에 그 문자열은 0회다. 이 회차는 타이틀을 sha12 로만 적었다.
-<!-- corpus-name-inflow v1 subjects=7 tree=6f301a103492b447 B=4/4 P=1/1 S=0/0 -->

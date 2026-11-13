@@ -54,6 +54,8 @@ pub struct WieEmulator {
     fs_store: FsStore,
     db_store: DbStore,
     redraw: RedrawFlag,
+    // Frames `WebScreen` has presented (see `frames_painted`).
+    frames: FrameCount,
     // Sticky clean-exit flag, set by `WebPlatform::exit` when the core requests
     // a normal shutdown (the "[wie] emulator requested exit" path).
     exited: Arc<AtomicBool>,
@@ -68,8 +70,6 @@ pub struct WieEmulator {
     clock: Arc<SpeedClock>,
     // What `speed` actually comes to on this device (see `achieved_speed`).
     achieved: AchievedSpeed,
-    // Frames `WebScreen` has presented (see `frames_painted`).
-    frames: FrameCount,
 }
 
 #[wasm_bindgen]
@@ -129,9 +129,9 @@ impl WieEmulator {
         // Start "true" so the very first composed frame is shown even if a title
         // somehow paints before its first request_redraw.
         let redraw: RedrawFlag = Arc::new(AtomicBool::new(true));
+        let frames = FrameCount::default();
         let exited: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
         let clock = Arc::new(SpeedClock::new());
-        let frames = FrameCount::default();
 
         let platform = Box::new(
             WebPlatform::new(
@@ -159,13 +159,13 @@ impl WieEmulator {
             fs_store,
             db_store,
             redraw,
+            frames,
             exited,
             platform_kind,
             lgt_compile_model,
             pacer: FramePacer::new(),
             clock,
             achieved: AchievedSpeed::default(),
-            frames,
         })
     }
 
