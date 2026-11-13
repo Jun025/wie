@@ -444,6 +444,7 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     check('A: platform_kind() === "KTF"', emu.platform_kind() === "KTF", `got ${emu.platform_kind()}`);
     check("A: lgt_compile_model() undefined for non-LGT", emu.lgt_compile_model() === undefined, `got ${emu.lgt_compile_model()}`);
     check("A: has_exited() false at boot", emu.has_exited() === false);
+    check("A: frames_painted() is 0 at boot", emu.frames_painted() === 0, `got ${emu.frames_painted()}`);
 
     const runA = await tickLoop(emu, canvas, 20_000);
     check("A: tick loop survives (no throw)", runA.threw === null, runA.threw ?? `${runA.frames} frames`);
@@ -528,6 +529,8 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     const runC = await tickLoop(c.emu, c.canvas, 30_000, (px) => px > 0);
     check("C: tick loop survives (no throw)", runC.threw === null, runC.threw ?? `${runC.frames} frames`);
     check("C: canvas blit ASSERTED — fixture's rect reaches the canvas", runC.pixels > 0, `${runC.pixels} non-black px after ${runC.frames} frames`);
+    // The shell's frames/s is a difference of this counter: a fixture that reached the canvas counted.
+    check("C: frames_painted() counts the frames that reached the canvas", c.emu.frames_painted() > 0, `got ${c.emu.frames_painted()}`);
 
     // ── Scenario C-img: does Image.createImage(String) RESOLVE? (ASSERTED) ────
     // The one site of the six get_system_class_loader call sites whose behaviour
