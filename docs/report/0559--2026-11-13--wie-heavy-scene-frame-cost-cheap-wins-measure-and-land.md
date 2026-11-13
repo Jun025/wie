@@ -172,3 +172,5 @@ ARM 실행 루프 아래가 39.1% 다. 그 39.1% 의 분해:
 - 30Hz 흉내는 실 60Hz vsync 위에서 콜백을 거른 것이다. 실 30Hz 화면이 «긴 틱 직후 콜백»을 하는지는 모른다 — 그 갈래는
   시뮬레이션 시험(`run_following` 30Hz)으로만 덮었다.
 - 브라우저 수치는 Chromium(Playwright 1228) 하나. 위 자기 증폭 갈래는 Chromium 의 rAF 일정에서 나온 것이다.
+
+<!-- corpus-name-inflow v1 subjects=8 tree=0b5e95e0718b0442 B=7/4 P=1/1 S=0/0 -->
