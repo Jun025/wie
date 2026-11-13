@@ -9,6 +9,21 @@ use crate::executor::TICK_BUDGET_MS;
 // ~0.7ms of the frame, and a budget of 7 overran it (measured 2026-09-26 on a simulated vsync).
 const HOST_HEADROOM_US: u64 = 2_500;
 
+// The longest budget a slow frame clock gets: a 30Hz frame's worth (iOS Low Power Mode and Android
+// battery savers hold `requestAnimationFrame` at 30Hz). Capped at the 60Hz `TICK_BUDGET_MS` until
+// 2026-11-13, which left a 30Hz host idle for 19 of every 33ms while a heavy scene starved — LGT
+// 3cc7a9b4cb15's dusk village drew 7.5/s there against 15 at 60Hz (docs/report 0559). Not uncapped:
+// a 15Hz host would hold the page for 64ms at a time, past the 50ms long-task line.
+const MAX_BUDGET_MS: u64 = 30;
+// The shortest probed period that earns more than `TICK_BUDGET_MS`. A 60Hz host probed while its
+// ticks overran (a boot's long guest steps) reads anywhere above 16.7ms, and a budget raised from
+// that keeps every later interval as long: a busy browser calls back right after a long tick
+// instead of on the next vsync. Measured 2026-11-13 in Chromium: a 24.5ms probe, a 22ms budget and
+// 49 frames a second for 95s. The spot probe's two-thirds rule tells a 16.7ms frame only from an
+// estimate above 25ms — so this is 25 with jitter room. A 30Hz display (33.3ms) qualifies; between
+// 60 and ~36Hz the budget stays the 60Hz one, as it always was.
+const RAISE_FROM_US: u64 = 28_000;
+
 // Budget of a probe tick. A tick overruns its budget by up to ~1.6ms (measured 2026-09-25: p95 15.6
 // at budget 14), so 4 still fits a 160Hz frame.
 const PROBE_BUDGET_MS: u64 = 4;
@@ -27,7 +42,11 @@ const PROBE_GIVE_UP_TICKS: u32 = 120;
 const SPOT_EVERY: u32 = 120;
 
 // A window estimate this far above what the last full probe settled on means the display slowed
-// down or most recent frames overran; either way a full probe re-measures. The budget itself comes
+// down or most recent frames overran; either way a full probe re-measures. This far below means the
+// probe misread a faster display — a boot's long ticks read a 60Hz page as 30Hz, and a light guest
+// that ends its ticks early then shows the real 16.7ms frames (measured 2026-11-13 in Chromium:
+// 15s of 18 ticks a second past 16ms on a 60Hz page). The spot probe cannot see that one: it
+// compares against the window, which already reads 16.7ms. The budget itself comes
 // from the settled period, not the window: on a loaded host the window reads longer than the
 // display (late callbacks, overruns), and a budget that follows it feeds itself — overruns lengthen
 // the intervals, a longer estimate raises the budget, a larger budget overruns more. On a
@@ -59,9 +78,8 @@ enum Probe {
 /// Derives an `Emulator::tick_for` budget from the interval at which the host calls it.
 ///
 /// Call `begin` right before `tick_for` and `end` right after, with the host's wall clock in
-/// milliseconds. The budget never exceeds `TICK_BUDGET_MS`, so a host at 60Hz or slower behaves
-/// as with plain `tick` (bar one short probe tick every ~2s); only faster frame clocks get a
-/// smaller budget.
+/// milliseconds. A 60Hz host gets `TICK_BUDGET_MS`, as with plain `tick` (bar one short probe tick
+/// every ~2s); a faster frame clock gets less and a slower one more, up to `MAX_BUDGET_MS`.
 pub struct FramePacer {
     last_begin: Option<u64>,
     last_end: Option<u64>,
@@ -97,6 +115,7 @@ impl FramePacer {
 
         // The estimate before this sample, so a spot sample is compared against what it tests.
         let before = self.period_us();
+        let raised = self.settled_us.is_some_and(|settled| settled >= RAISE_FROM_US);
         if let Some(sample) = sample {
             if self.samples.len() == WINDOW {
                 self.samples.pop_front();
@@ -130,7 +149,11 @@ impl FramePacer {
                 self.probe = Probe::Idle { since_spot: 0 };
             }
             Probe::Idle { since_spot } => {
-                if sample.is_some() {
+                // A raised budget counts ticks, not samples. A busy browser calls back right after
+                // a tick that ran past its frame, which is no sample (`MIN_GAP_MS`), so counting
+                // samples stops the spot probe in exactly the case a raise must be able to leave —
+                // measured 2026-11-13: a 60Hz Chromium page held a 25ms budget for 70s.
+                if sample.is_some() || raised {
                     *since_spot += 1;
                 }
                 if *since_spot >= SPOT_EVERY {
@@ -140,7 +163,7 @@ impl FramePacer {
                 // Not on the few samples a probe leaves behind: their median swings on one frame.
                 if let (Some(settled), Some(period)) = (self.settled_us, self.period_us())
                     && self.samples.len() >= WINDOW / 2
-                    && period > settled + DRIFT_US
+                    && period.abs_diff(settled) > DRIFT_US
                 {
                     self.samples.clear();
                     self.probe = Probe::Full { ticks: 1 };
@@ -149,16 +172,20 @@ impl FramePacer {
             }
         }
 
-        match self.settled_us.or_else(|| self.period_us()) {
-            Some(period) => Self::budget_for_period_us(period),
-            None => TICK_BUDGET_MS,
+        // Only a probe's period may raise the budget past `TICK_BUDGET_MS`, and only one the spot
+        // probe can still correct (`RAISE_FROM_US`). The window never may: it reads the intervals
+        // this budget made (see `DRIFT_US`), so a budget that grows with it lengthens what it reads.
+        match (self.settled_us, self.period_us()) {
+            (Some(settled), _) if settled >= RAISE_FROM_US => Self::budget_for_period_us(settled),
+            (Some(period), _) | (None, Some(period)) => Self::budget_for_period_us(period).min(TICK_BUDGET_MS),
+            (None, None) => TICK_BUDGET_MS,
         }
     }
 
     /// Budget for a host that already knows its frame period, in microseconds
-    /// (60Hz = 16_667 -> 14, 120Hz = 8_333 -> 5).
+    /// (60Hz = 16_667 -> 14, 120Hz = 8_333 -> 5, 30Hz = 33_333 -> 30).
     pub fn budget_for_period_us(period_us: u64) -> u64 {
-        (period_us.saturating_sub(HOST_HEADROOM_US) / 1000).clamp(1, TICK_BUDGET_MS)
+        (period_us.saturating_sub(HOST_HEADROOM_US) / 1000).clamp(1, MAX_BUDGET_MS)
     }
 
     pub fn end(&mut self, now_ms: u64) {
@@ -182,7 +209,8 @@ impl FramePacer {
 mod tests {
     use alloc::vec::Vec;
 
-    use super::{FramePacer, PROBE_BUDGET_MS, SPOT_EVERY};
+    use super::{FramePacer, MAX_BUDGET_MS, PROBE_BUDGET_MS, PROBE_SAMPLES, SPOT_EVERY, WINDOW};
+    use crate::executor::TICK_BUDGET_MS;
 
     // Simulated host: a vsync every `period_us`; each tick runs for its budget plus `overrun_us`
     // (a busy guest uses all of it), and the next tick starts at the first vsync after it ends.
@@ -195,6 +223,22 @@ mod tests {
             let end = *clock_us + budget * 1000 + overrun_us;
             pacer.end(end / 1000);
             *clock_us = end.div_ceil(period_us) * period_us;
+        }
+        budgets
+    }
+
+    // A frame clock whose phase follows the page, as Chromium's does under load (measured
+    // 2026-11-13): the next callback comes one period after this one began, or right after the
+    // tick returns if it ran past that (22.7ms ticks, 22.9ms intervals), `gap_us` later. The pacer
+    // reads whole milliseconds, so a 200us gap counts as a sample about one time in five.
+    fn run_following(pacer: &mut FramePacer, clock_us: &mut u64, period_us: u64, overrun_us: u64, gap_us: u64, frames: usize) -> Vec<u64> {
+        let mut budgets = Vec::new();
+        for _ in 0..frames {
+            let budget = pacer.begin(*clock_us / 1000);
+            budgets.push(budget);
+            let end = *clock_us + budget * 1000 + overrun_us;
+            pacer.end(end / 1000);
+            *clock_us = (*clock_us + period_us).max(end + gap_us);
         }
         budgets
     }
@@ -295,12 +339,153 @@ mod tests {
     }
 
     #[test]
-    fn a_30hz_host_keeps_the_default_budget() {
-        // Never more than plain `tick` gives: a slow host would otherwise hand a guest 31ms slices.
+    fn a_30hz_host_gets_a_30hz_frame_budget() {
         let mut pacer = FramePacer::new();
         let mut clock = 1_000_000;
-        let budgets = run(&mut pacer, &mut clock, 33_333, 1_000, 400);
-        assert!(steady(&budgets[20..], 14), "{budgets:?}");
+        let budgets = run(&mut pacer, &mut clock, 33_333, 1_600, 400);
+        // A literal: comparing to `MAX_BUDGET_MS` would pass with the cap back at 14.
+        assert!(steady(&budgets[20..], 30), "{budgets:?}");
+        // The measured p95 overrun still lands inside the frame, so the budget does not cost a frame.
+        assert!(30 * 1000 + 1_600 < 33_333);
+    }
+
+    #[test]
+    fn a_host_slower_than_30hz_is_not_given_more_than_a_30hz_budget() {
+        let mut pacer = FramePacer::new();
+        let mut clock = 1_000_000;
+        let budgets = run(&mut pacer, &mut clock, 66_667, 1_000, 200);
+        assert!(steady(&budgets[20..], MAX_BUDGET_MS), "{budgets:?}");
+    }
+
+    // The self-amplifying case a budget above `TICK_BUDGET_MS` opens: a 60Hz host whose boot ticks
+    // miss every other frame is probed as 30Hz, and a 30ms budget then misses every other frame too,
+    // so every later interval agrees with the mistake. Only the spot probe can see past it.
+    #[test]
+    fn a_60hz_host_probed_as_30hz_at_boot_returns_to_the_60hz_budget() {
+        let mut pacer = FramePacer::new();
+        let mut clock = 1_000_000;
+        let boot = run(&mut pacer, &mut clock, 16_667, 20_000, 40);
+        assert_eq!(boot.last(), Some(&MAX_BUDGET_MS), "the boot is misread as 30Hz: {boot:?}");
+        let budgets = run(&mut pacer, &mut clock, 16_667, 1_000, 600);
+        // Back within one spot interval (SPOT_EVERY samples) and a full probe.
+        assert!(steady(&budgets[(SPOT_EVERY as usize + 20)..], TICK_BUDGET_MS), "{budgets:?}");
+    }
+
+    #[test]
+    fn a_60hz_host_probed_slow_while_its_frames_followed_the_page_keeps_the_60hz_budget() {
+        // The measured case: a boot whose ticks overran by ~20ms probed a 60Hz Chromium page at
+        // ~24ms. A budget raised from that (21) reads back as 21ms intervals, and the spot probe's
+        // 16.7ms sample is not under two thirds of 24 — the page stayed at 49 frames a second.
+        // A whole-millisecond gap, so every interval is a sample. Never raised; the misread itself
+        // is re-measured once the window shows 16.7ms (`DRIFT_US`).
+        let mut pacer = FramePacer::new();
+        let mut clock = 1_000_000;
+        run_following(&mut pacer, &mut clock, 16_667, 20_000, 1_000, 40);
+        let budgets = run_following(&mut pacer, &mut clock, 16_667, 1_000, 1_000, 600);
+        assert!(budgets.iter().all(|&b| b <= TICK_BUDGET_MS), "{budgets:?}");
+        assert!(steady(&budgets[(WINDOW / 2 + PROBE_SAMPLES + 20)..], TICK_BUDGET_MS), "{budgets:?}");
+    }
+
+    #[test]
+    fn a_60hz_host_probed_as_30hz_while_its_frames_followed_the_page_returns_to_the_60hz_budget() {
+        // Overran by more, the boot reads as 30Hz and earns the raise; the spot probe undoes it.
+        let mut pacer = FramePacer::new();
+        let mut clock = 1_000_000;
+        let boot = run_following(&mut pacer, &mut clock, 16_667, 26_000, 1_000, 40);
+        assert!(boot.iter().any(|&b| b > TICK_BUDGET_MS), "the boot earns the raise: {boot:?}");
+        let budgets = run_following(&mut pacer, &mut clock, 16_667, 1_000, 1_000, 600);
+        assert!(steady(&budgets[(SPOT_EVERY as usize + 20)..], TICK_BUDGET_MS), "{budgets:?}");
+    }
+
+    #[test]
+    fn a_60hz_page_that_calls_back_at_once_after_a_raised_tick_still_gets_its_spot_probe() {
+        // The second measured case: the browser called back 0.2ms after each 25ms tick, so four
+        // intervals in five were no sample, the spot probe never came, and the raise held for 70s.
+        let mut pacer = FramePacer::new();
+        let mut clock = 1_000_200;
+        let boot = run_following(&mut pacer, &mut clock, 16_667, 26_000, 200, 60);
+        assert!(boot.iter().any(|&b| b > TICK_BUDGET_MS), "the boot earns the raise: {boot:?}");
+        let budgets = run_following(&mut pacer, &mut clock, 16_667, 1_000, 200, 600);
+        assert!(steady(&budgets[(SPOT_EVERY as usize + 20)..], TICK_BUDGET_MS), "{budgets:?}");
+    }
+
+    #[test]
+    fn a_30hz_page_keeps_its_budget_when_some_ticks_run_past_the_frame() {
+        // Spot probes by tick must not eat a real 30Hz page: ticks end 0-4ms past a 30ms budget, so
+        // some run past 33.3ms and are called back at once, and a spot probe still reads 33.3ms.
+        let mut pacer = FramePacer::new();
+        let mut clock: u64 = 1_000_000;
+        let mut seed: u64 = 11;
+        let mut budgets = Vec::new();
+        for _ in 0..3000 {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            budgets.extend(run_following(&mut pacer, &mut clock, 33_333, (seed >> 33) % 4_000, 200, 1));
+        }
+        let late = &budgets[1000..];
+        assert!(late.iter().all(|&b| b <= MAX_BUDGET_MS), "{late:?}");
+        let full = late.iter().filter(|&&b| b == MAX_BUDGET_MS).count();
+        assert!(full * 10 >= late.len() * 7, "{full} of {} ticks at the 30Hz budget", late.len());
+    }
+
+    #[test]
+    fn a_60hz_host_probed_as_30hz_drops_the_raise_once_a_light_guest_shows_its_real_frames() {
+        // The third measured case: the raise held through a title screen whose ticks ended early, so
+        // the page kept 60 frames a second and only its game-frame ticks ran 20-30ms.
+        let mut pacer = FramePacer::new();
+        let mut clock = 1_000_000;
+        let boot = run(&mut pacer, &mut clock, 16_667, 20_000, 40);
+        assert!(boot.iter().any(|&b| b > TICK_BUDGET_MS), "the boot earns the raise: {boot:?}");
+        let mut budgets = Vec::new();
+        for _ in 0..300 {
+            budgets.push(pacer.begin(clock / 1000));
+            let end = clock + 3_000; // the guest sleeps: the tick ends long before its budget
+            pacer.end(end / 1000);
+            clock = end.div_ceil(16_667) * 16_667;
+        }
+        // One window's worth of samples to see it (`WINDOW / 2`), then a full probe.
+        assert!(steady(&budgets[(WINDOW / 2 + PROBE_SAMPLES + 4)..], TICK_BUDGET_MS), "{budgets:?}");
+    }
+
+    #[test]
+    fn a_laggy_30hz_host_never_drifts_past_its_budget_and_does_not_live_in_probes() {
+        // Callbacks land up to 3ms late and a busy guest's tick ends 0-4ms past its budget, so some
+        // 30ms ticks miss their frame and read as 15Hz. The cap holds the budget, and the drift
+        // re-probe brings a run of misses back to 30 rather than parking on the probe budget.
+        let mut pacer = FramePacer::new();
+        let mut clock: u64 = 1_000_000;
+        let mut seed: u64 = 7;
+        let mut rand = move |n: u64| {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            (seed >> 33) % n
+        };
+        let mut budgets = Vec::new();
+        for _ in 0..3000 {
+            let start = clock + rand(3_000);
+            let budget = pacer.begin(start / 1000);
+            budgets.push(budget);
+            let end = start + budget * 1000 + rand(4_000);
+            pacer.end(end / 1000);
+            clock = end.div_ceil(33_333) * 33_333;
+        }
+        let late = &budgets[1000..];
+        assert!(late.iter().all(|&b| b <= MAX_BUDGET_MS), "{late:?}");
+        let full = late.iter().filter(|&&b| b == MAX_BUDGET_MS).count();
+        assert!(full * 10 >= late.len() * 8, "{full} of {} ticks at the 30Hz budget", late.len());
+    }
+
+    #[test]
+    fn a_host_the_probe_gave_up_on_is_not_raised_past_the_default_by_its_window() {
+        // No settled probe: the budget falls back to the window, which a budget past the default
+        // would lengthen — so the fallback stays at `TICK_BUDGET_MS` however slow the window reads.
+        let mut pacer = FramePacer::new();
+        let mut t = 0;
+        for _ in 0..130 {
+            t += pacer.begin(t);
+            pacer.end(t);
+        }
+        let mut clock = t * 1000 + 1_000_000;
+        let budgets = run(&mut pacer, &mut clock, 33_333, 1_000, 200);
+        assert!(budgets[20..].iter().all(|&b| b <= TICK_BUDGET_MS), "{budgets:?}");
     }
 
     #[test]
