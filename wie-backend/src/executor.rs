@@ -20,7 +20,7 @@ type Task = Pin<Box<dyn Future<Output = Result<()>> + Send>>;
 // each frame. At 8ms a guest frame costing 8-16ms of emulation spilled into a second host frame
 // and ran at half its native rate; 14ms leaves ~2.7ms of a 60Hz frame to the host.
 // This is the default for hosts that do not know their frame interval; a host that does passes
-// its own budget to `tick_for` (see `FramePacer`, which derives it and never exceeds this value).
+// its own budget to `tick_for` (see `FramePacer`: less on a faster display, up to 30ms on a 30Hz one).
 pub const TICK_BUDGET_MS: u64 = 14;
 
 pub struct ExecutorInner {
