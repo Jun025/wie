@@ -89,3 +89,6 @@
 - 계수는 네이티브 `wie_validate`(틱 격자 없음)에서 셌다. 60Hz 브라우저 수치는 앱 쪽 회신의 것을 모형으로 검산했을 뿐 다시 재지 않았다.
 - 저녁 마을의 W 는 프로파일에서 역산했다. 네이티브로는 세이브를 넣을 길이 없어 인트로 성 대화까지만 직접 쟀다.
 - 기기 1대(M1 Max)다. 운영자 기기의 수치는 없다.
+
+### 7. 게임 파일명 유입
+`node scripts/corpus-name-inflow.mjs`: BOUNDED 4쌍 + SUFFIX-ATTACHED 0쌍. 그 4쌍은 `wie-wipi-c/src/api/kernel.rs`(1) · `wie_featurephone/src/lib.rs`(3)에 `origin/main` 부터 있던 기존 주석이다. 이 회차가 그 두 파일을 고쳐 대상에 들어왔을 뿐이고, 이 회차 diff 의 추가 줄에 그 문자열은 0회다. 이 회차는 타이틀을 sha12 로만 적었다.
