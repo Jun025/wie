@@ -37,8 +37,12 @@ on:
   pull_request:
     types: [opened, synchronize]
 
-# A newer push to the same PR cancels the older run; main pushes are never
-# cancelled — they carry the D1 migration + prod deploy, which must not stop midway.
+# A newer push to the same PR cancels the older run; a main-push run IN PROGRESS is
+# never cancelled — it carries the D1 migration + prod deploy, which must not stop
+# midway. (A main-push run still PENDING can be superseded by a newer main push —
+# harmless here: the newer deploy carries everything the skipped one would have.)
+# No `github.event_name` in the group, unlike rust.yml: this workflow has no
+# schedule/dispatch trigger, so nothing else shares refs/heads/main.
 concurrency:
   group: web-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -181,8 +185,8 @@ jobs:
 
       # Direct-Upload deploy on push only (not PRs). Gated on the token being
       # present (S3/S8 — secrets are referenced, never embedded). functions/ at
-      # the repo root is uploaded alongside the static assets. main → production,
-      # other branches → preview deployment.
+      # the repo root is uploaded alongside the static assets. Only main pushes
+      # reach this step now (→ production); the preview branches left the trigger.
       - name: Deploy to Cloudflare Pages
         # `id:` only — the step's behaviour, gating and inputs are untouched. The
         # verify step below needs `outputs.deployment-url`; the alternative is

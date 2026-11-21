@@ -27,7 +27,7 @@
 #
 # ── Why only ONE leg does work on PRs and main pushes (2026-11-07) ────────────
 # GitHub stopped running Actions on this fork on 2026-11-04 "due to the scale of
-# GitHub Actions usage" (Actions-tab banner). Rust CI was 854 of ~1,480 job-minutes
+# GitHub Actions usage" (Actions-tab banner). Rust CI was 854 of ~1,530 job-minutes
 # that week (21 runs × six legs). So on pull_request/push only ubuntu/stable runs
 # the gates; the other five legs still START — every step is skipped, the job
 # reports success — because three of them (`rust_ci (macos-latest, stable)`,
@@ -35,7 +35,16 @@
 # ruleset, and a name that never reports deadlocks the merge (Incident ledger).
 # A job-level `if:` would not do: a skipped matrix job reports one unexpanded name.
 # The full six-leg matrix runs weekly (schedule) and on workflow_dispatch — run it
-# by hand before landing anything platform-specific (Windows CRLF, path handling).
+# by hand before landing anything platform-specific (Windows CRLF, path handling):
+#
+#   gh workflow run rust.yml -R Jun025/wie --ref <branch>
+#
+# (`-R` matters: in a fork clone `gh` may pick the upstream repo.)
+# ★The price: on a PR, a green `rust_ci (macos-latest, stable)`, `rust_ci
+# (windows-latest, stable)` or any beta leg measured NOTHING — only the weekly run
+# and that hand run do. Who owns a red weekly run: AGENTS.md, under "Then read
+# the PR's CI". `FULL` below is the single switch for all of this; the parity lock
+# (wie_cli/tests/dod_ci_parity.rs, axis C) reddens if the PR leg drops out of it.
 # Ticket: wie-actions-usage-cut-after-github-fork-throttle.
 #
 # ── Why RUST_MIN_STACK=4194304 is not decorative ──────────────────────────────
@@ -60,8 +69,15 @@ on:
 
 name: Rust CI
 
+# A newer push to the same PR cancels the older run. `github.event_name` is in the
+# group because a schedule run's ref is refs/heads/main too: sharing a group with
+# main pushes, the week's only full matrix could sit pending behind one main-push
+# run and be REPLACED by the next (a pending run is superseded even with
+# cancel-in-progress false). What still holds for main pushes is narrower than
+# "never cancelled": a run IN PROGRESS is never cancelled; of three quick landings
+# the middle one can be superseded while pending.
 concurrency:
-  group: rust-ci-${{ github.ref }}
+  group: rust-ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:

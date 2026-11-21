@@ -43,4 +43,20 @@ web 은 죽은 두 브랜치(원격에 없음 — `git ls-remote --heads` 빈 �
 그 run 이 위 «스텝이 전부 skip 된 잡은 success 로 끝난다»의 첫 실측이다 — 결과는 `gh pr checks 586 -R Jun025/wie` 와
 이 티켓의 회신에 있다(여기 다시 적으면 그 커밋이 run 을 한 번 더 만든다).
 
+**[2026-11-22] 반려 수정(검수 F1~F4 · `wie-actions-usage-cut-after-github-fork-throttle-fix`)** — 게이트를 PR 에서 주간으로 옮긴 대가를
+에이전트가 읽는 자리에 적고, 주간 red 에 소유자를 붙이고, `FULL` 한 줄을 락에 넣었다.
+- **대가의 자리(F1)**: `rust.yml` 머리에 손 실행 명령 · `AGENTS.md` REQUIRED-CHECKS 블록 바로 아래에 «macOS·Windows 필수 검사의 PR green 은
+  아무것도 재지 않는다» · 「Then read the PR's CI」 문단을 현 사실로(coverage·5다리는 PR 에서 안 돈다 · 플랫폼에 닿는 PR 은 손 dispatch 결과를 인용).
+- **주간 red 소유(F2)**: doc-liveness 와 같은 꼴 — red 뒤 첫 게이트③ 회차가 `rust.yml`·`coverage.yml` 의 최근 schedule run 을 읽고 red 면 발권.
+  «목록이 비었거나 8일 넘게 낡았다»는 green 이 아니다(재개 뒤 schedule 이벤트 0건 — 이 날짜 `gh run list --event schedule` 최신이 11-04).
+  ★첫 주간 run 은 red 가 예정이다: beta clippy(`wie_cli/src/window.rs` · 분리 PR #591 미착지).
+- **`FULL` 락(F3)**: `dod_ci_parity` 에 축 C — `FULL:` 식에 `(matrix.os == 'ubuntu-latest' && matrix.rust == 'stable')` 가 `||` 대안으로 남아 있고
+  매트릭스에 그 다리가 있어야 green. 검수 개악 M-B(`FULL: ${{ github.event_name == 'schedule' }}`): 종전 rc=0 · 11 passed → **rc=101 · 2 failed**.
+  스텝 `if:` 는 여전히 안 본다(M-C) — 천장 10항에 적었고 1·9항을 «주간 run» 사실로 고쳤다.
+- **동시성(F4)**: `rust.yml` 그룹에 `github.event_name` — schedule run 의 ref 도 `refs/heads/main` 이라 main push 와 한 그룹이면 대기 중인
+  주간 run 이 다음 main push 에 대체된다. `web.yml` 은 schedule·dispatch 트리거가 없어 그룹은 그대로 두고 주석만 «진행 중인 run 은»으로 좁혔다.
+- **안 한 것**: 빈 다리의 `runs-on` 을 ubuntu 로 돌리기(검수 S5). `runs-on` 은 `env` 를 못 읽어 이벤트 조건을 한 번 더 적어야 하고, 두 식이
+  어긋나면 주간 run 의 macOS 다리가 ubuntu 에서 돌고도 그 이름으로 green 이 된다 — 착지 전에 돌려 볼 수 없는 경로에 조용한 고장점을 하나 더 만든다.
+- 분모 `~1,480`(4종 합)은 위 표의 `약 1,530`(전체)으로 맞췄다(`rust.yml`·`coverage.yml` 주석).
+
 <!-- corpus-name-inflow v1 subjects=6 tree=79d717ad7ba392b2 B=0/0 P=0/0 S=0/0 -->

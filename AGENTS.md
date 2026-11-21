@@ -242,10 +242,23 @@ round had not run it. Every fixture here is committed; no game files are involve
 gh pr checks <n> -R Jun025/wie          # every check, with its conclusion
 ```
 
-Local green predicts CI green for the four gates and no further — `coverage` (tarpaulin), the
-Windows/Ubuntu matrix and `engine-contract` run only up there. **Quote the
-result in the report even when it is red** — twice on this branch's lineage a CI-red PR was
-reported as complete, which is what makes this a gate and not a suggestion.
+Local green predicts CI green for the four gates and no further — `engine-contract`, `build-web` and
+the ubuntu/stable leg run only up there. **Quote the result in the report even when it is red** —
+twice on this branch's lineage a CI-red PR was reported as complete, which is what makes this a gate
+and not a suggestion.
+
+**That output is not a platform guarantee** (since 2026-11-07, `docs/report/0553`). On a PR only
+`rust_ci (ubuntu-latest, stable)` does work; the other five legs skip every step and report success,
+and `coverage` (tarpaulin) does not run at all. The full matrix and coverage run weekly on `main` and
+by hand — a PR that touches anything platform-specific (line endings, paths, a `cfg(windows)`) runs
+`gh workflow run rust.yml -R Jun025/wie --ref <branch>` and quotes *that* run; one that deletes or
+moves tests runs `gh workflow run coverage.yml -R Jun025/wie --ref <branch>`.
+
+**A red weekly run has an owner — same rule as doc-liveness below: the first gate③ round that runs
+after it.** Read both beside the PR's checks: `gh run list -R Jun025/wie --workflow=rust.yml --event schedule -L1`
+and `gh run list -R Jun025/wie --workflow=coverage.yml --event schedule -L1`. If red, file a ticket naming
+the leg and the failing step — do not fix inline, merge tickets do not change code. An empty list or a
+run older than 8 days is not a green: the schedule did not fire — say so in the reply and dispatch it by hand.
 
 Narrower commands are conveniences, not gates: `cargo build` (default member `wie_cli`),
 `cargo test -p <crate> <test_name>`, `cargo fmt` to fix formatting (`rustfmt.toml`: max_width=150).
@@ -669,6 +682,11 @@ created 2026-09-17T10:17:54+09:00 — rules `deletion`, `non_fast_forward`, `pul
 - `rust_ci (windows-latest, stable)`
 
 <!-- REQUIRED-CHECKS:END -->
+
+**Two of those five names measure nothing on a PR.** A PR green on `rust_ci (macos-latest, stable)`
+or `rust_ci (windows-latest, stable)` means the job started and skipped every step (2026-11-07 — the
+names must still report or the merge deadlocks; `rust.yml` header). What those platforms actually
+owe is in the weekly run and the hand dispatch — §Definition of Done, "Then read the PR's CI".
 
 **The three signals disagree, and the disagreement is the trap.** Measured 2026-09-17 12:4x:
 `branches/main/protection` still answers **404 "Branch not protected"** and `branches/main` reports

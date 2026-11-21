@@ -142,6 +142,47 @@ fn m6_toolchain_pin_file_breaks_the_default_mapping() {
     );
 }
 
+#[test]
+fn m7_full_loses_the_pr_leg() {
+    // 축 C — 검수 개악 M-B(2026-11-21): `FULL` 에서 PR 다리를 빼면 PR 의 6다리가 전부 빈 통과가 되고
+    // 필수 5종은 green 이다. 종전 락은 이것을 rc=0 · 11 passed 로 통과시켰다.
+    let yml = read(".github/workflows/rust.yml");
+    let m_b: String = yml
+        .lines()
+        .map(|l| match l.trim_start().starts_with("FULL:") {
+            true => "      FULL: ${{ github.event_name == 'schedule' }}\n".to_string(),
+            false => format!("{l}\n"),
+        })
+        .collect();
+    assert_ne!(m_b, yml, "개악 대조가 아무것도 바꾸지 못했다 — `FULL:` 줄이 표류했다");
+    let p = checker::parity(&read("AGENTS.md"), &m_b, &[]);
+    assert!(
+        p.problems().iter().any(|x| x.contains("축 C")),
+        "PR 다리가 빠진 `FULL` 을 못 잡았다\n{}",
+        p.render()
+    );
+
+    // 식은 그대로 두고 매트릭스 라벨만 바꾼다 — 식의 PR 대안이 어느 다리에도 안 맞는다.
+    let p = mutated(
+        "os: [macos-latest, ubuntu-latest, windows-latest]",
+        "os: [macos-latest, ubuntu-24.04, windows-latest]",
+    );
+    assert!(p.iter().any(|x| x.contains("축 C")), "매트릭스에서 사라진 PR 다리를 못 잡았다: {p:?}");
+
+    // `FULL:` 정의를 통째로 지운다 — 스텝의 `env.FULL == 'true'` 가 전부 거짓이 된다.
+    let gone: String = yml
+        .lines()
+        .filter(|l| !l.trim_start().starts_with("FULL:"))
+        .map(|l| format!("{l}\n"))
+        .collect();
+    let p = checker::parity(&read("AGENTS.md"), &gone, &[]);
+    assert!(
+        p.problems().iter().any(|x| x.contains("축 C")),
+        "`FULL:` 정의 소실을 못 잡았다\n{}",
+        p.render()
+    );
+}
+
 // ── 파서 자신의 가정 — wie 형식에 맞추며 «바꾼» 것들이 실제로 통하는지 ────────────────
 
 #[test]

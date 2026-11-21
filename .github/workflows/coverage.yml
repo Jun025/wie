@@ -1,7 +1,7 @@
 name: coverage
 
 # Weekly + by hand, not on every push (2026-11-07). At `on: [push]` this job was
-# 401 of ~1,480 job-minutes in the week GitHub stopped running Actions on this
+# 401 of ~1,530 job-minutes in the week GitHub stopped running Actions on this
 # fork "due to the scale of GitHub Actions usage" — 21 runs × ~19 min, every
 # branch push. It is not a required check, so nothing waits on it.
 # Ticket: wie-actions-usage-cut-after-github-fork-throttle.
