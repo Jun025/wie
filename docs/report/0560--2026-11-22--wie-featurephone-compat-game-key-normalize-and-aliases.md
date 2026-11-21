@@ -45,3 +45,4 @@
 - 정규화로만 합쳐진 통신사 사이 6묶음도 서술자를 봤다. Name 이 서로 같거나, 한쪽이 부제를 빼거나 연도 자리만 달리 쓴 정도이고 다른 게임을 가리키는 묶음은 없다. 이 6묶음은 이름 규칙으로 합친 것이라 판정 표의 대상은 아니다.
 - 네 게이트(`fmt --check` · `clippy --all -D warnings` · wasm clippy · `RUST_MIN_STACK=4194304 cargo test --all`) rc=0. ★`cargo +beta clippy --all -- -D warnings` 는 **rc=101** 이다 — `src/window.rs:217` 의 `unnecessary_as_slice`(beta 1.101 새 린트). 이 회차가 건드리지 않은 코드이고(이 PR 에 Rust 변경 0), 열린 PR #591(`wie-beta-clippy-red-window-as-mut-slice`)이 고친다. PR 의 beta 다리는 빈 통과라 PR green 은 이것을 덮지 않는다.
 - 착수 뒤 main 에 #585(0552)가 착지해 `compat.json` 과 계약을 건드렸다. 푸시 전이라 그 main 위로 옮겨 다시 생성했다(수치 같음 · `check-compat-revert` 로 확인).
+- 게임 이름 유입(`corpus-name-inflow`): BOUNDED 359쌍(1114회) · SUFFIX-ATTACHED 18쌍(56회). 의도한 유입이다 — 공개 목록(`compat.json` 의 `title`·`game`·`fileTitle`)이 산출물이고, 이 문서의 판정 표와 `SAME_NAME_HAND` 주석이 묶음 이름을 적는다. 게임 바이트·리소스 내용·캡처는 0.
