@@ -13,11 +13,11 @@
 // docs/player-updates/<YYYY-MM-DD>-<slug>.json — one change per file, so two PRs never touch
 // the same line. `build` derives each title's `changes` from those files: one source, not two.
 // ★No game bytes: titles, content hashes and sentences only.
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const COMPAT = join(ROOT, 'docs/player-data/compat.json');
@@ -87,14 +87,14 @@ const bySpelling = (a, b) =>
 // Judged from archive metadata only (PID·Name·Ver·DisplaySize of __adf__/app_info/.msd, entry list,
 // main-jar hash — docs/report/0555, 0560). sha12 -> what the file name cannot say: the game's real
 // name (`title` — a different game behind the same file name, or the same game under another name),
-// or the label the census file name lost (`variant`; a repackage of the same build shares its label).
+// or the label the census file name lost (`variant`). A repackage of a build that already carries the
+// label gets none: (platform, title, variant) stays unique, and the shell names that row by its hash.
 const SAME_NAME_HAND = {
   '1cdea1985955': { title: '메이플스토리 마법사편' }, // PD001295 «메이플-마법사편» — not the same product as ↓
   '3b5b98afa890': { title: '메이플스토리 전사편' }, // PD002198, file name «(전사편)»
   '52edc54e2b23': { title: '메이플스토리 마법사편' }, // SKT port of 1cdea1985955: .msd MIDlet-Name «메이플스토리마법사편» · 135/138 shared entries identical
   '1f0d7e81336a': { title: '영웅서기 1' }, // SKT port of KTF «영웅서기 1»: both descriptors name the same subtitle, 345/350 shared entries identical
   f981d228b757: { title: '물가에돌튕기기3' }, // __adf__ Name «물가에돌튕기기3» · PD005691 · same jar as 4a4d2ac046e5
-  ab64a56b2b44: { variant: '큰화면' }, // 240*320 · Ver 01.00.01 · same jar as 5bfe10a828 «큰화면» (AID differs)
   '306dcdb03842': { variant: '큰화면' }, // DisplaySize 240*320 · Ver 01.00.05
   e159b9727dbd: { variant: '작은화면' }, // 176*220 · 01.00.01
   '4288d8c1c6ac': { variant: '큰화면' }, // 240*320 (file name «(큰화면)»)
@@ -121,7 +121,7 @@ export function retitle(entries) {
     const fileTitle = x.fileTitle ?? x.title;
     const { title, label } = stripMarkers(fileTitle);
     const hand = SAME_NAME_HAND[x.sha256.slice(0, 12)] ?? {};
-    return { ...x, fileTitle, title: hand.title ?? title, label: hand.variant ?? label, handLabel: !!hand.variant };
+    return { ...x, fileTitle, title: hand.title ?? title, label: hand.variant ?? label };
   });
   for (const g of Map.groupBy(out, (x) => gameKey(x.title)).values()) {
     const spelling = g.map((x) => x.title).sort(bySpelling)[0];
@@ -129,11 +129,10 @@ export function retitle(entries) {
   }
   for (const g of Map.groupBy(out, (x) => `${x.platform}\t${x.game}`).values())
     for (const x of g) {
-      // A file-name label ships only when it tells the files apart; a hand label was read off the build itself.
-      x.variant = g.length > 1 && x.label && (x.handLabel || !g.some((y) => y !== x && !y.handLabel && y.label === x.label)) ? x.label : null;
+      x.variant = g.length > 1 && x.label && !g.some((y) => y !== x && y.label === x.label) ? x.label : null;
       if (g.length > 1) x.sameTitle = SAME_GAME.has(gameKey(`${x.platform}\t${x.game}`)) ? 'same-game' : 'undetermined';
     }
-  return sortEntries(out.map(({ label, handLabel, ...x }) => x));
+  return sortEntries(out.map(({ label, ...x }) => x));
 }
 const DISAMBIGUATOR = / \((\d+|작은화면|큰화면|v?\d+(?:\.\d+)+)\)$/;
 
@@ -152,7 +151,7 @@ export function validateCompat(d) {
   if (!HEX40.test(d.enginePin ?? '')) e.push('compat: enginePin must be 40 lowercase hex');
   if (!Array.isArray(d.entries)) return [...e, 'compat: entries must be an array'];
   const seen = new Set();
-  const names = new Map();
+  const names = new Set();
   for (const [k, g] of Map.groupBy(d.entries.filter((x) => str(x?.game)), (x) => gameKey(x.game))) {
     const spellings = [...new Set(g.map((x) => x.game))];
     if (spellings.length > 1) e.push(`compat: game ${JSON.stringify(k)} is spelled ${spellings.map((s) => JSON.stringify(s)).join(' / ')} — one game, one key (§1; \`node scripts/player-data.mjs normalize\`)`);
@@ -171,10 +170,8 @@ export function validateCompat(d) {
       if (stripMarkers(x.title).title !== x.title) e.push(`${at}: title carries a file marker — ${JSON.stringify(x.title)}`);
       if (DISAMBIGUATOR.test(x.title)) e.push(`${at}: title carries an ordinal or variant label (that is \`variant\`, §1) — ${JSON.stringify(x.title)}`);
       const key = `${x.platform}\t${x.title}\t${x.variant ?? ''}`;
-      // The same label twice = the same build repackaged, which only a same-game verdict can say.
-      if (x.variant != null && names.has(key) && !(x.sameTitle === 'same-game' && names.get(key) === 'same-game'))
-        e.push(`${at}: (platform, title, variant) ${JSON.stringify(key)} repeats outside a same-game group`);
-      names.set(key, x.sameTitle);
+      if (x.variant != null && names.has(key)) e.push(`${at}: (platform, title, variant) ${JSON.stringify(key)} repeats`);
+      names.add(key);
       if (!SAME_TITLE.includes(x.sameTitle) && perTitle.get(`${x.platform}\t${x.title}`).length > 1)
         e.push(`${at}: title ${JSON.stringify(x.title)} repeats within ${x.platform} — a repeated title must be one game's files (sameTitle ${SAME_TITLE})`);
     }
@@ -351,6 +348,8 @@ function selftest() {
     ['representative not first', { ...good, entries: [{ ...pair[0], status: 'not-yet', knownIssues_ko: ['멈춰요.'] }, pair[1]] }, null],
     ['same title, different-game verdict', { ...good, entries: pair.map((x) => ({ ...x, sameTitle: 'different-game' })) }, null],
     ['same title and variant twice', { ...good, entries: pair.map((x) => ({ ...x, variant: '작은화면' })) }, null],
+    // A same-game verdict does not open the rule: relabelling the small-screen build «큰화면» next to the real one must fail.
+    ['one label on two files of a same-game group', { ...good, entries: pair.map((x) => ({ ...x, sameTitle: 'same-game', variant: '큰화면' })) }, null],
     ['fileTitle dropped', { ...good, entries: [{ ...good.entries[0], fileTitle: undefined }] }, null],
     ['update: title not in compat', good, [['2026-09-27-x.json', { ...upd, titles: ['c'.repeat(64)] }]]],
     ['update: date differs from name', good, [['2026-09-26-x.json', upd]]],
@@ -368,8 +367,6 @@ function selftest() {
   const re = retitle([{ ...pair[1], title: 'x 1.04', fileTitle: undefined }, { ...pair[0], status: 'limited', knownIssues_ko: ['멈춰요.'], title: 'x', fileTitle: undefined }]);
   if (re.map((x) => `${x.title}|${x.game}|${x.variant}|${x.sameTitle}|${x.sha256[0]}`).join(' ') !== 'x|x|1.04|undetermined|c x|x|null|undetermined|a')
     bad++, console.error(`selftest: retitle must keep the name, move the label to variant and put the representative first, got ${JSON.stringify(re)}`);
-  if (validateCompat({ ...good, entries: pair.map((x) => ({ ...x, sameTitle: 'same-game', variant: '큰화면' })) }).length)
-    bad++, console.error('selftest: a same-game pair sharing one label (a repackaged build) is rejected');
   const sp = retitle([
     { ...good.entries[0], title: 'kbo 야구-x', fileTitle: undefined },
     { ...good.entries[0], sha256: 'c'.repeat(64), platform: 'LGT', title: 'KBO야구 x', fileTitle: undefined },
@@ -377,6 +374,8 @@ function selftest() {
   ]);
   if (sp.some((x) => x.game !== 'KBO야구 x' || x.title !== x.game || x.sameTitle))
     bad++, console.error(`selftest: names equal under gameKey must share the representative spelling on every carrier, got ${JSON.stringify(sp.map((x) => x.game))}`);
+  const hy = retitle([{ ...good.entries[0], title: 'a-b', fileTitle: undefined }, { ...good.entries[0], sha256: 'c'.repeat(64), platform: 'SKT', title: 'ab', fileTitle: undefined }]);
+  if (hy.some((x) => x.game !== 'ab')) bad++, console.error(`selftest: with capitals and spaces equal the spelling with fewer hyphens wins, got ${JSON.stringify(hy.map((x) => x.game))}`);
   for (const [label, c, u] of cases) if (!errs(c, u).length) bad++, console.error(`selftest: NOT rejected — ${label}`);
   if (fromCensus({ ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, render: 'uniform', speed: 'n/a' } }] }).entries[0].axes.render !== 'no')
     bad++, console.error('selftest: census uniform must map to no');
@@ -434,15 +433,28 @@ function selftest() {
     git('clone', '-q', '--depth', '1', pathToFileURL(repo).href, shallow);
     const c3 = checkedAt('2026-10-04T01:26:49.632Z', shallow);
     if (c3 !== '2026-10-04T01:26:49.632Z') bad++, console.error(`selftest: a shallow clone must keep the census time, got ${c3}`);
+    // Run through a symlink, the script must still run: an unknown command is rc=2, not a silent rc=0.
+    symlinkSync(fileURLToPath(import.meta.url), join(repo, 'link.mjs'));
+    const viaLink = spawnSync(process.execPath, [join(repo, 'link.mjs'), 'no-such-command']).status;
+    if (viaLink !== 2) bad++, console.error(`selftest: called through a symlink the script must still run (usage rc=2), got rc=${viaLink}`);
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }
   if (bad) process.exit(1);
-  console.log(`player-data selftest: ${cases.length + 14} rules each reject their mutation`);
+  console.log(`player-data selftest: ${cases.length + 15} rules each reject their mutation`);
 }
 
 const [cmd, ...args] = process.argv.slice(2);
-if (import.meta.url !== pathToFileURL(process.argv[1] ?? '').href);
+// Real paths on both sides: called through a symlinked path (macOS /var -> /private/var) the two
+// spellings differed, and the script printed nothing and exited 0 — a check that looked green.
+const isMain = () => {
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+};
+if (!isMain());
 else if (cmd === '--selftest') selftest();
 else if (cmd === 'import') {
   const c = fromCensus(JSON.parse(readFileSync(args[0], 'utf8')));
@@ -463,6 +475,9 @@ else if (cmd === 'import') {
   const compat = JSON.parse(readFileSync(COMPAT, 'utf8'));
   const files = readUpdates();
   const e = [...validateCompat(compat), ...validateUpdates(files, new Set(compat.entries.map((x) => x.sha256)))];
+  // The committed names are what retitle() derives, row for row — a hand edit, or a naming rule changed without `normalize`, shows here.
+  const drift = e.length ? -1 : retitle(compat.entries).findIndex((x, i) => JSON.stringify(x) !== JSON.stringify(compat.entries[i]));
+  if (drift >= 0) e.push(`compat.entries[${drift}]: differs from what retitle() derives (title/game/variant/sameTitle, order) — \`node scripts/player-data.mjs normalize\``);
   if (e.length) {
     console.error(`player-data: ${e.length} violations (docs/contracts/featurephone-public-data.md):\n  ${e.join('\n  ')}`);
     process.exit(1);
