@@ -134,4 +134,4 @@ $ node scripts/player-data.mjs
 SUFFIX-ATTACHED 16종은 `compat.json` 안의 더 긴 다른 제목(예: 뒤에 판 번호가 붙은 후속작)과 안내 문장 속 낱말이고, 이 PR 이 더한 줄에서 나온 것은 없다.
 게임 바이트 · 꾸러미 안 파일 본문 · 경로 유입 0. 장부에 든 해시는 꾸러미 sha256 앞 12자와 엔진 표에 이미 있던 MD5 · AID 뿐이다.
 
-
+<!-- corpus-name-inflow v1 subjects=19 tree=5847a05cd24ef904 B=1135/388 P=7/5 S=52/16 -->
