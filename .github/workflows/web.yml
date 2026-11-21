@@ -31,12 +31,21 @@ name: Web (wasm build + Pages deploy)
 
 on:
   push:
-    # feat/ux-redesign is included so its push produces a Pages *preview*
-    # deployment (feat-ux-redesign.wie-web.pages.dev) for the user to review
-    # before any merge.
-    branches: [main, feat/cf-web-service, feat/ux-redesign]
+    # main only. feat/cf-web-service and feat/ux-redesign (Pages preview branches)
+    # were removed 2026-11-07 — neither exists on origin any more.
+    branches: [main]
   pull_request:
     types: [opened, synchronize]
+
+# A newer push to the same PR cancels the older run; a main-push run IN PROGRESS is
+# never cancelled — it carries the D1 migration + prod deploy, which must not stop
+# midway. (A main-push run still PENDING can be superseded by a newer main push —
+# harmless here: the newer deploy carries everything the skipped one would have.)
+# No `github.event_name` in the group, unlike rust.yml: this workflow has no
+# schedule/dispatch trigger, so nothing else shares refs/heads/main.
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -176,8 +185,8 @@ jobs:
 
       # Direct-Upload deploy on push only (not PRs). Gated on the token being
       # present (S3/S8 — secrets are referenced, never embedded). functions/ at
-      # the repo root is uploaded alongside the static assets. main → production,
-      # other branches → preview deployment.
+      # the repo root is uploaded alongside the static assets. Only main pushes
+      # reach this step now (→ production); the preview branches left the trigger.
       - name: Deploy to Cloudflare Pages
         # `id:` only — the step's behaviour, gating and inputs are untouched. The
         # verify step below needs `outputs.deployment-url`; the alternative is
