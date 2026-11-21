@@ -1,10 +1,27 @@
 # STATE
 
-> 갱신 **2026-11-06**(`wie-state-next-refresh-and-next-round-proposal`). 2026-08-27 판본의 머리 블록과
-> 위치 표, 옛 `## 다음` 본문(①~④ 전부 끝남)은 **`docs/state-next-history.md`** 로 그대로 옮겼다.
+> 실측 기준일 **2026-11-22**(`wie-state-md-baseline-refresh-2026-11-22`).
+> ★**이 «기준일 + 날짜» 꼴은 기계가 읽는다** — `~/orchestrator-live/bin/state-baseline-lag-scan` 이 이 파일 머리 15줄 안의
+> 첫 `기준일 … YYYY-MM-DD` 를 `origin/main` 마지막 착지일과 견준다(14일 넘게 벌어지면 원장에 `STATE_BASELINE_LAG`).
+> 낱말을 바꾸면(예: «갱신») 판정에서 조용히 빠진다 — 낱말은 두고 날짜만 올려라.
+> 2026-08-27 판본의 머리 블록과 위치 표, 옛 `## 다음` 본문(①~④ 전부 끝남)은 **`docs/state-next-history.md`** 에 있다
+> (2026-11-06 이관 · `docs/report/0550`).
 > ★**`## 다음` 이 낡으면 이 레인은 굶는다** — 착지할 때마다 갱신하라.
 > ★★**새로 쓰는 항목도 diff·실측을 열고 써라** — 낡은 줄을 지운 자리에 새 부정확을 심으면 병은 그대로다.
 > ★`## 진행중` 과 `## 완료` 는 고정 안내다(정본 = 열린 PR 목록 · `docs/report/`).
+
+## fork 의 현재 위치 (2026-11-22 실측 · ★조회 시각과 함께 읽어라)
+
+| 축 | 값 |
+|---|---|
+| `git merge-base origin/main upstream/main` | `44fbf265`(2026-09-16 조각 D · PR #161 착지 이후 **불변** · 67일째) |
+| behind / ahead | **244** / 3,034 (`origin/main` `64ee6998` ↔ `upstream/main` `10620f82` 2026-11-21) · 11-06 에는 173 / 2,970 |
+| upstream 쪽 델타 | 243커밋(병합 제외) · 384파일 **+42,087/−11,755** · `git merge-tree` 충돌 파일 **136**(11-06 에는 93) |
+| RustJava | 우리 = crates.io `jvm*` `^0.1.1` ↔ upstream = `^0.4.2`(11-06 예행 때는 `^0.4.1`) |
+| compat (`docs/player-data/compat.json`) | 429행 · playable **426** · not-yet 2 · limited 1 · `progress=stuck` **90** · enginePin `4ac38566` |
+| GitHub Actions | 2026-11-04T05:40Z 뒤 run 0 → 11-19T14:59Z 에 첫 run(GitHub 쪽 정지 · `docs/report/0553`). 그 뒤 push·PR run 은 돈다. ★`schedule` 이벤트 run 은 11-04 이후 **0건**(아래 §다음 «상시») |
+
+## 진행중` 과 `## 완료` 는 고정 안내다(정본 = 열린 PR 목록 · `docs/report/`).
 
 ## fork 의 현재 위치 (2026-11-06 실측 · ★조회 시각과 함께 읽어라)
 
@@ -82,44 +99,80 @@
 > 형식: «무엇 · 왜 지금 · 근거 · size». 끝난 것은 아래 «완료로 접은 항목» 에 1줄씩만 둔다.
 > 사료(옛 본문 · 측정 서술 전문) = `docs/state-next-history.md`.
 
-다음은 아래 ⑴ 또는 ⑵ 다(둘 다 발권 전 · 발권은 총괄 몫).
+다음은 아래 ⑴ 이다(발권 전 · 발권은 총괄 몫). ⑵ 는 ⑴ 과 독립이다.
 
-**⑴ upstream 2차 동기화 — 먼저 «예행·분류» 회차**(측정 전용 · `main` 머지 0)
-- **무엇**: 격리 워크트리에서 `upstream/main` 을 병합 예행하고 충돌 93파일을 조각 B 형식(폐기·재적용·발신)으로
-  분류한 뒤, 예행 트리에서 4게이트 + `AGENTS.md` runner 블록을 돌려 «실제 병합 회차»의 조각 계획과 go/no-go 를 낸다.
-- **왜 지금**: merge-base 가 51일째 그대로이고 그동안 upstream 이 172커밋 나갔다(≈3.4커밋/일). 조각 D 는 behind
-  1,140 에서 결정 114개를 치렀다(`docs/report/0114`) — 173 인 지금이 가장 싸고, 기다릴수록 비싸진다.
-  upstream 델타가 `wie-core-arm`·`wie-ktf/src/runtime`·`wie-lgt/src/runtime`·`wie-wipi-c`·`wie-wipi-java`(org/kwis/msp)에
-  몰려 있어, 우리가 10월에 고친 벽·잠금 행과 같은 파일일 가능성이 높다 — 그 겹침을 재는 것이 이 회차의 몫이다.
-- **근거**: 위 위치 표(2026-11-06 실측) · 선례 = 조각 B·C·D(`docs/report/0113`·`0114`·`0117`~`0120`) ·
+**⑴ upstream 2차 동기화 — 조각 S1(RustJava 핀을 우리 쪽에서 먼저 올린다) · S2(executor·pacing)**
+- **무엇**: `docs/report/0551` §7 의 조각 계획 그대로다. S1 = 루트 `jvm*`·`rustjava-runtime` 을 upstream 이 쓰는 판으로
+  올린다(예행 때 `^0.4.1` · 11-22 의 upstream 은 `^0.4.2` — 착수할 때 다시 읽어라). S2 = `wie-backend` 의 `executor.rs`·
+  `system.rs`·`task.rs` 를 upstream 의 sleep 마감·협동 폴링 의미로 옮기고 우리 pacing API 는 지킨다.
+  둘 다 우리 쪽만 바꾸고 서로 독립이라 병렬로 열 수 있다. 병합 커밋(S3)은 둘이 착지한 뒤다.
+- **왜 지금**: «한 번에 병합»은 no-go 로 판정됐고 조각 계획은 go 다(0551 §0). 기다린 값이 수로 나왔다 —
+  11-06 → 11-22(16일) 사이 behind 173 → **244** · 충돌 파일 93 → **136**. merge-base 는 67일째 그대로다.
+- **근거**: 0551 §7(공통 검증식 V0 + 조각별 검증식) · 열린 제안 `2026-11-06-upstream-sync2-dry-run-classify#p0`(S1)·`#p1`(S2) ·
   병합 전략 = `merge`(squash 금지 · `AGENTS.md` §For the `-merge` task only).
-- **size**: M(예행·분류) → 실제 병합은 그 결과로 L 1건 또는 M 여러 건.
+- **size**: S1 = L(크면 S1a 0.1→0.3 · S1b 0.3→0.4 로 나눈다) · S2 = M.
+- ★**0551 의 93행 분류표는 11-06 트리의 것이다.** S3 을 열 때 표 전체를 그날의 `upstream/main` 에서 다시 잰다(0551 §1).
 
-**⑵ 진도 막힘 ⒟ «확인 키만으로 놀이 진입 · 정체 원인 미판정» 15행 — 현행 핀 재측 + 원인 판정**
-- **무엇**: `docs/report/0525` 원장(`…--ledger.csv` 의 `confirm-only-entry`)의 15행을 현행 `origin/main` 의 `progress`
-  축(P·P2 짝)으로 다시 재고, 여전히 `stuck` 인 행은 «넘는 키를 아직 모른다 / 엔진 벽 / 게임 설계» 중 하나로 가른다.
-  엔진 벽이 2행 이상 같은 서명으로 묶이면 그 하나를 고친다.
-- **왜 지금**: compat 에서 `ok` 가 아닌 축 중 가장 큰 것이 `progress=stuck` **91** 이고, 원인이 측정되지 않은 ⒟ 37행
-  (`key-path-not-found` 20 · `confirm-only-entry` 15 · `play-reached` 2)은 10-22 판정 이후 **한 행도 안 움직였다**
-  (2026-11-06 대조). 0525 §2⑶ 은 stuck 행의 예외가 «지난 핀 것»이었음을 보였다 — 그 뒤 엔진 커밋
-  (0539~0548 · 잠금·서버 벽 정상화)이 더 들어왔으니 재측만으로 뒤집히는 행이 있을 수 있다.
-- **근거**: `docs/report/0525`(판정표 · ⒜ 군집 가설 셋 중 둘 기각) · `docs/report/0393`·`0415`(진도 축 정의 · 짝 규칙).
-- **size**: M. 실행은 `bash scripts/census-drive.sh … --only progress --titles <15행>`(phase 단위 `--long` 임대 · `--jobs` 기본).
+**⑵ 「오래 하기」 이른 종료(`short`) 14행 — 한 번 더 재서 같은 값이 나오는 행만 `compat.json` 에 반영**
+- **무엇**: `docs/report/0561` §4 의 14행(전부 `playable → limited` 후보 · 네 축 `ok/ok/ok/short`)을 현행 핀에서 다시 재고,
+  이번에도 요청 시간 전에 끝난 행만 내린다. 내리는 행에는 이용자 소식(`docs/player-updates/`)을 쓴다.
+- **왜 지금**: 판정 규칙은 2026-11-22 에 착지했고(PR #594) 행은 일부러 안 고쳤다. 지금 `compat.json` 은 7~204초에 스스로 끝나는
+  14판을 `playable` 로 알린다. 그중 `4ece6eeeaa04` 는 주간 퇴행 감시의 가드 7행 중 하나다.
+- **근거**: 0561 §4 와 그 「반영할 때의 주의」(보관 기록의 이른 종료 20행 중 7행이 재측에서 600초를 채웠다 — 그래서 한 번 더 잰다).
+  14 는 하한이다. 나머지 389행은 보관 기록에 기댄다(전수 재측은 약 22시간이라 이 조각에 넣지 않는다).
+- **size**: M. 실행은 `bash scripts/census-drive.sh …`(phase 단위 `--long` 임대 · `--jobs` 기본).
+- ★`compat.json` 의 행을 고친다. PR #595 가 같은 파일에 칸을 더하므로 그 착지 뒤에 여는 편이 싸다.
 
-**상시 · 정해진 날** — 주간 퇴행 감시(`scripts/regression-census.sh`)는 launchd(`~/Library/LaunchAgents` 의 wie 퇴행 감시 plist)
-가 **매주 일요일 05:00** 에 돈다. 다음 = **2026-11-08(일) 05:00**. 0549(PR #582)부터 판정 도구를 측정 핀 트리에서
-돌리므로, 11-01 의 «도구 핀 ↔ 기준 핀 어긋남» 위양성 4건은 재발하지 않아야 한다 — 재발하면 0549 의 회귀다.
+**이미 발권돼 있다 — 다시 발권하지 마라**(2026-11-22 `~/orchestrator/tasks/` 조회 · 정본은 그 원장이고 이 줄은 금방 낡는다)
+- `wie-rust-audit-main-red-since-1119-advisory-batch`(M) — `main` 의 `cargo audit` red · advisory 13건 처분.
+- `wie-ktf-generic-hook-exact-equivalence-fix`(M).
+- hold 2건(선행 = PR #595 착지): `wie-ktf-local-net-fold-into-fake-server`(M) ·
+  `wie-featurephone-content-fingerprint-for-user-supplied-files`(L).
+
+**상시 · 정해진 날**
+- **주간 퇴행 감시**(`scripts/regression-census.sh`) — launchd 가 매주 일요일 05:00 에 돌린다. 마지막 완주 = **2026-11-15**
+  (측정 핀 `2e66f9d6` · 퇴행 의심 0). ★**2026-11-22 회차는 돌지 않았다** — 05:00 에 census 잠금을 다른 실행이 쥐고 있어
+  launchd 래퍼가 건너뛰었다(`~/logs/wie-regression-census.err` 끝줄 `skipped census-lock`). 그래서 11-22 에 착지한 10건
+  (엔진을 고친 0557·0559 포함)은 이 감시를 아직 한 번도 안 거쳤다. 정시로는 **2026-11-29(일) 05:00** 이 처음이다.
+  그 전에 손으로 1회 돌릴지는 총괄 판단이다(1회 약 2.8시간 · long 풀).
+- **CI 의 주 1회 축**(0553 · PR #586) — `rust.yml` 6다리 전부와 `coverage.yml` 은 schedule·수동 실행에서만 돈다(토 19:17Z · 19:47Z).
+  ★Actions 가 다시 돈 뒤(첫 run 11-19T14:59Z) `schedule` 이벤트 run 이 **0건**이다(2026-11-21T23Z 조회 ·
+  `gh api 'repos/Jun025/wie/actions/runs?event=schedule&created=>=2026-11-05' --jq .total_count`). 매일 00:00Z 의
+  Security audit 는 11-20·11-21 두 번 다 안 떴다. 토요일 cron 셋(11-21 19:17Z · 19:47Z · `doc-liveness` 20:35Z)은 조회 시각에
+  아직 run 이 없었는데, 이 저장소의 schedule 은 2~3시간 늦게 뜬 전례가 있어(`doc-liveness` 10-24 · 10-31) 이것만으로는 판정하지 않았다.
+  계속 0 이면 `AGENTS.md` «A red weekly run has an owner» 의 ⑶(8일 넘으면 손으로 1회 + 운영자에게 올림)이 걸린다.
+
+**사람 몫**(워커가 정할 수 없다)
+- **동작이 갈리는 6자리 — S3 전에 운영자가 고른다**(0551 §8): `HandsetProperty` `VOLUMELEVEL` · WIPI `Player.stop(null clip)` ·
+  `Player.stop` 반환 · MIDP `Canvas` GAME_A..D · LGT SVC 4개 · 파일시스템 이름공간(aid ↔ pid — ★저장 키가 바뀐다).
+  어느 쪽이든 합칠 수는 있다. 고르는 순간 게임이 보는 값이 바뀐다.
+- **upstream `AGENTS.md` 의 Attribution 조항을 받을지**(0551 §7 S4).
+- **PR #589**(0556 · 브라우저 틱 호스트 깨움 opt-in · 2026-11-11 개설) — Actions 정지 중에 열려 check 가 **0건**이고
+  required 미보고로 `BLOCKED` 다(11-22 조회 · 충돌은 없다). 새 커밋으로 head 를 바꿔야 run 이 생긴다(`gh run rerun` 으로는 안 온다).
+  그 회차를 여는 것은 총괄 몫이다.
 
 **보류 · 재개 조건이 따로 있는 축**(발권하지 마라 — 조건이 «새로» 생기면 연다)
-- **P4 — 엔진 고유분(②)을 upstream PR 로**: 2026-09-13 dlunch/wie #1419 1건 착지 · 그 밖 미착수.
-  IP 방침 선 안쪽만(공개 API 스텁 · 단위 시험 — `docs/lgt_abi.md`·`docs/reference/` 는 보내지 마라).
-  ⑴ 의 분류에서 «발신» 칸이 다시 나오면 그때 묶어 연다.
+- **P4 / S5 — 엔진 고유분을 upstream PR 로**: 2026-09-13 dlunch/wie #1419 1건 착지 · 그 밖 미착수. 0551 의 분류에서 «발신» **29**
+  파일이 나왔다. 재개 조건 = 운영자 확인(외부 저장소에 보낸다). IP 방침 선 안쪽만(공개 API 스텁 · 단위 시험 —
+  `docs/lgt_abi.md`·`docs/reference/` 는 보내지 마라) · 보내기 전에 주석·시험의 sha 접두와 타이틀 언급을 지운다(0551 §7 S5).
+- **진도 ⒟ `confirm-only-entry` 남은 14행** — 0552 가 원인을 전부 «넘는 키 미발견»으로 판정했다(엔진 벽 0 · 게임 설계 0).
+  재개 조건 = 그 판을 넘는 키 경로(`--keys`)가 새로 나올 때. 열린 제안 1건(`2026-11-06-progression-stuck-confirm-only-15-remeasure#p0` · S).
+  ⒟ 의 나머지 22행(`key-path-not-found` 20 · `play-reached` 2)은 `docs/report/0525`(10-22) 판정 그대로다 —
+  11-06 대조에서 한 행도 안 움직였고 그 뒤 이 행들을 다룬 회차가 없다.
+- **무거운 장면의 ARM 해석기 처리량**(L · 열린 제안 `2026-11-13-lgt-cadence-verdict-and-frames-painted#p0`) — 0559 가 싼 것 둘만 넣었다.
+  upstream 의 ARM AOT(#1415)가 S3 으로 들어온다. 그 뒤에 재서 남는 몫만 여는 순서가 싸다(이 회차의 읽기다 · 측정한 것이 아니다).
+- **60Hz 죽은 구간 14 → 15 ms**(0559 §5 · 이득 +4.7% 는 섰다) — 프레임 여백 0.5 ms 의 위험을 잴 실기기가 없어 넣지 않았다.
+  재개 조건 = 기기 측정.
 - **upstream #1260 후속(LGT misc index 9 · `Unknown SVC id 1409`)** — 재발권 금지. 해제 조건:
   ⑴실기 덤프 ⑵다른 구현체의 LGT misc 표 ⑶게임 바이너리 호출부 디스어셈 중 하나가 새로 생길 때.
   근거 3개 전문은 `docs/state-next-history.md`.
 - **upstream #1122(스테이지 5 정지)** — 종결(`docs/report/0509`). 재개 조건: 우리 빌드에서 정지를 새로 보고받을 때.
 
-### 완료로 접은 항목 (옛 `## 다음` — 다시 발권하지 마라 · 전문은 `docs/state-next-history.md`)
+### 완료로 접은 항목 (다시 발권하지 마라 · 옛 `## 다음` 전문은 `docs/state-next-history.md`)
+- **2026-11-06 후보 ⑴ upstream 2차 동기화 «예행·분류»** — 완료(`docs/report/0551` · PR #584 · 2026-11-22 착지).
+  충돌 93 = 폐기 11 · 재적용 53 · 발신 29 · 예행 트리 게이트 전부 red · «한 번에 병합» no-go · 조각 계획 S1~S5.
+- **2026-11-06 후보 ⑵ 진도 ⒟ `confirm-only-entry` 15행 현행 핀 재측** — 완료(`docs/report/0552` · PR #585 · 2026-11-22 착지).
+  1행 `ok` · 14행 `stuck` 유지(위 보류 축).
 - **① P1 RustJava `[patch]` fork 이탈** — 완료 2026-09-04(`docs/report/0022`). 핀 계단은 조각 D 에서 crates.io 로 끝났다.
 - **① P2 측정 게이트** — 완료 2026-09-03 · 재측 2026-09-16 (러너 이식 21줄 · 코퍼스는 이 머신 `game_lab/`에 있음 · `docs/report/0019`).
 - **① P3 조각 A~E** — A `0115` · B PR #158 · C `0113` · D **PR #161 착지**(merge-base 이동 — 위 위치 표) ·

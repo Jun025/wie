@@ -10,7 +10,7 @@
     "docs/report/0550--2026-11-06--wie-state-next-refresh-and-next-round-proposal.md 신규"
   ],
   "verification": [
-    "gh pr list -R dlunch/RustJava --author Jun025 --state all → #208 classfile: decode CONSTANT_Utf8 as modified UTF-8 · MERGED 2026-09-28T07:09:23Z"
+    "gh pr list -R dlunch/RustJava --author Jun025 --state all → #208 classfile: decode CONSTANT_Utf8 as modified UTF-8 · MERGED 2026-09-28T07:17:19Z"
   ],
   "limits": [
     "patches/classfile 의 제거 조건(README.md)이 충족됐는지는 재지 않았다 — crates.io 새 판 여부는 별건"

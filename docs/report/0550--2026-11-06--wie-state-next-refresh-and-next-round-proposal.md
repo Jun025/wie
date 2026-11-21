@@ -1,7 +1,7 @@
 ## [2026-11-06] STATE.md «다음» 현행화 — 옛 ①~④ 를 완료 1줄로 접고 사료는 `docs/state-next-history.md` 로 · 다음 후보 2건 (wie-state-next-refresh-and-next-round-proposal)
 
 **무엇을**: `STATE.md` 의 `## 다음`(약 300줄)과 머리 블록·「fork 의 현재 위치」 표(2026-08-27 기준)를
-`docs/state-next-history.md` 로 **그대로** 옮겼다(내용 수정 0). `STATE.md` 에는 2026-11-06 실측 위치 표와
+`docs/state-next-history.md` 로 **그대로** 옮겼다(예외 둘: 게임 이름 1종 2곳 → `docs/lgt_abi.md` cp47 지시 · 절 제목 1행에 «(옛)» 접두). `STATE.md` 에는 2026-11-06 실측 위치 표와
 «무엇 · 왜 지금 · 근거 · size» 형식의 후보 2건, 보류 축 3건, 완료로 접은 항목 6줄만 남겼다.
 `## 진행중`·`## 완료` 고정 안내는 그대로다. 코드 변경 0.
 
@@ -32,4 +32,4 @@
 게임 파일명 유입: BOUNDED 0 · SUFFIX-ATTACHED 0 (`node scripts/corpus-name-inflow.mjs`).
 
 
-<!-- corpus-name-inflow v1 subjects=4 tree=ecce91cae226d058 B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=5 tree=39cb2d5fa2f70109 B=0/0 P=0/0 S=0/0 -->

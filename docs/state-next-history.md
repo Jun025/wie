@@ -4,6 +4,7 @@
 > **2026-11-06 시점 그대로**(`origin/main` `2e66f9d6`) 옮긴 것이다. 고치지 않았다 — 옛 수치·판정은
 > 기록 시점의 값이다. 지금 칠 것은 `STATE.md` §다음 을 읽어라. ★예외 하나 — 게임 이름 1종(2곳)은
 > `docs/lgt_abi.md` cp47 지시로 바꿨다(`scripts/corpus-name-inflow.mjs` 가 새 파일의 유입으로 센다).
+> 그리고 절 제목 1행에 «(옛)» 접두를 붙였다(`STATE.md` 의 같은 이름 절과 구분 — 2026-11-22 덧붙임).
 > 이관 회차: `docs/report/` 의 `wie-state-next-refresh-and-next-round-proposal` 항목.
 > 아래 «## 다음 (옛 본문)» 의 항목 ①~④ 와 «해소» 목록은 전부 끝났거나 닫혔다 — 처분 1줄씩은 `STATE.md` §다음.
 
