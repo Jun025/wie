@@ -91,3 +91,5 @@
 **게이트**: 네 게이트 rc=0(이 PR 에 Rust 변경 0). `cargo +beta clippy --all -- -D warnings` 는 이 브랜치에서 **rc=101** — `src/window.rs:217` 한 건이고, main 에 착지한 #591(`8daeedaf`)이 고친 자리다. 이 브랜치는 그 main 을 받지 않았다(merge 결과의 beta 는 따로 재지 않았다).
 
 - 게임 이름 유입(`corpus-name-inflow`): BOUNDED 359쌍(1117회) · SUFFIX-ATTACHED 18쌍(56회). 의도한 유입이다 — 공개 목록(`compat.json` 의 `title`·`game`·`fileTitle`)이 산출물이고, 이 문서의 판정 표와 `SAME_NAME_HAND` 주석이 묶음 이름을 적는다. 게임 바이트·리소스 내용·캡처는 0.
+
+<!-- corpus-name-inflow v1 subjects=4 tree=86fe2d5652dfaffb B=1117/359 P=4/4 S=56/18 -->
