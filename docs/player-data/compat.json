@@ -7,7 +7,7 @@
    "sha256": "6e5a1f88f0c0eedc6991293085060c811e487a701073a9c0e7fb1ed559065924",
    "platform": "KTF",
    "model": null,
-   "title": "2006독일축구",
+   "title": "2006 독일축구",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -21,7 +21,7 @@
    "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "2006독일축구",
-   "game": "2006독일축구",
+   "game": "2006 독일축구",
    "variant": null
   },
   {
@@ -1089,27 +1089,6 @@
    "variant": null
   },
   {
-   "sha256": "c94d6477792690f014853bb4bec0a9f8b19bb238a070095b5766488ee15fe780",
-   "platform": "KTF",
-   "model": null,
-   "title": "드래곤나이트 ex",
-   "status": "playable",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "ok",
-    "sound": "ok",
-    "speed": "ok",
-    "progress": "ok"
-   },
-   "knownIssues_ko": [],
-   "changes": [],
-   "fileTitle": "드래곤나이트 ex",
-   "game": "드래곤나이트 ex",
-   "variant": null
-  },
-  {
    "sha256": "4a7e489bf6abdc13b375df637d0c93084a1cb4dcefad08b03df11d3a2457247a",
    "platform": "KTF",
    "model": null,
@@ -1131,6 +1110,28 @@
    "variant": null
   },
   {
+   "sha256": "c94d6477792690f014853bb4bec0a9f8b19bb238a070095b5766488ee15fe780",
+   "platform": "KTF",
+   "model": null,
+   "title": "드래곤나이트EX",
+   "status": "playable",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok",
+    "progress": "ok"
+   },
+   "knownIssues_ko": [],
+   "changes": [],
+   "fileTitle": "드래곤나이트 ex",
+   "game": "드래곤나이트EX",
+   "variant": null,
+   "sameTitle": "same-game"
+  },
+  {
    "sha256": "e9fac881e602dad311ee9422a127d31aa07e4dc6ca3e1a1e54e90b42276282d0",
    "platform": "KTF",
    "model": null,
@@ -1149,7 +1150,8 @@
    "changes": [],
    "fileTitle": "KT 드래곤나이트EX",
    "game": "드래곤나이트EX",
-   "variant": null
+   "variant": null,
+   "sameTitle": "same-game"
   },
   {
    "sha256": "4b8c8f5ff7d61e1964eb8784d60997bcf977050a9df96cf853a9643109fec7ce",
@@ -1961,27 +1963,6 @@
    "variant": null
   },
   {
-   "sha256": "f981d228b7577afaa5e02fc682f2bb1ad08835e21d539c5e852f3e5a931c0cab",
-   "platform": "KTF",
-   "model": null,
-   "title": "물가에 돌튕기기",
-   "status": "playable",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "ok",
-    "sound": "ok",
-    "speed": "ok",
-    "progress": "ok"
-   },
-   "knownIssues_ko": [],
-   "changes": [],
-   "fileTitle": "물가에+돌튕기기",
-   "game": "물가에 돌튕기기",
-   "variant": null
-  },
-  {
    "sha256": "6c96c5050b2bd85a29d470ece66296ad32ebfac42148ccd4bfc43b35f221ade1",
    "platform": "KTF",
    "model": null,
@@ -2021,7 +2002,30 @@
    "changes": [],
    "fileTitle": "물가에돌튕기기3",
    "game": "물가에돌튕기기3",
-   "variant": null
+   "variant": null,
+   "sameTitle": "same-game"
+  },
+  {
+   "sha256": "f981d228b7577afaa5e02fc682f2bb1ad08835e21d539c5e852f3e5a931c0cab",
+   "platform": "KTF",
+   "model": null,
+   "title": "물가에돌튕기기3",
+   "status": "playable",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok",
+    "progress": "ok"
+   },
+   "knownIssues_ko": [],
+   "changes": [],
+   "fileTitle": "물가에+돌튕기기",
+   "game": "물가에돌튕기기3",
+   "variant": null,
+   "sameTitle": "same-game"
   },
   {
    "sha256": "ae749cc5a777a94977a8fb132345ff3b9a788390716e4492ec1c672b9efd3cfa",
@@ -2599,7 +2603,7 @@
    "changes": [],
    "fileTitle": "붕어빵타이쿤3",
    "game": "붕어빵타이쿤3",
-   "variant": null,
+   "variant": "큰화면",
    "sameTitle": "same-game"
   },
   {
@@ -4826,6 +4830,28 @@
    "variant": null
   },
   {
+   "sha256": "1fe6c1c897d708dbb587a083dc450727c12de152de5e9e6458af75294a3061bb",
+   "platform": "KTF",
+   "model": null,
+   "title": "크로노스 윙",
+   "status": "playable",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok",
+    "progress": "ok"
+   },
+   "knownIssues_ko": [],
+   "changes": [],
+   "fileTitle": "크로노스윙",
+   "game": "크로노스 윙",
+   "variant": null,
+   "sameTitle": "same-game"
+  },
+  {
    "sha256": "d9384b388ea5bcc3f48c4096a183bac0f9b739f3072e1e80ce8173d613e0565d",
    "platform": "KTF",
    "model": null,
@@ -4847,28 +4873,8 @@
    "changes": [],
    "fileTitle": "크로노스 윙",
    "game": "크로노스 윙",
-   "variant": null
-  },
-  {
-   "sha256": "1fe6c1c897d708dbb587a083dc450727c12de152de5e9e6458af75294a3061bb",
-   "platform": "KTF",
-   "model": null,
-   "title": "크로노스윙",
-   "status": "playable",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "ok",
-    "sound": "ok",
-    "speed": "ok",
-    "progress": "ok"
-   },
-   "knownIssues_ko": [],
-   "changes": [],
-   "fileTitle": "크로노스윙",
-   "game": "크로노스윙",
-   "variant": null
+   "variant": null,
+   "sameTitle": "same-game"
   },
   {
    "sha256": "e56253df12f384cc63351a730ea8ec5b533624f175112a6173010bd289607c22",
@@ -5678,31 +5684,10 @@
    "variant": null
   },
   {
-   "sha256": "cdd3eb5f914270423b5687710c9aa2d9d2b12a198b5dfb4b623bea59f3ebc322",
-   "platform": "KTF",
-   "model": null,
-   "title": "kbo 프로야구 2009",
-   "status": "playable",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "ok",
-    "sound": "ok",
-    "speed": "ok",
-    "progress": "ok"
-   },
-   "knownIssues_ko": [],
-   "changes": [],
-   "fileTitle": "kbo 프로야구 2009",
-   "game": "kbo 프로야구 2009",
-   "variant": null
-  },
-  {
    "sha256": "4892a1abc0f8714d12f137fc568398977e00d75983587ad503b74ecc9a7cd327",
    "platform": "KTF",
    "model": null,
-   "title": "kbo프로야구 2009",
+   "title": "KBO프로야구2009",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -5716,8 +5701,31 @@
    "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "kbo프로야구 2009",
-   "game": "kbo프로야구 2009",
-   "variant": null
+   "game": "KBO프로야구2009",
+   "variant": null,
+   "sameTitle": "same-game"
+  },
+  {
+   "sha256": "cdd3eb5f914270423b5687710c9aa2d9d2b12a198b5dfb4b623bea59f3ebc322",
+   "platform": "KTF",
+   "model": null,
+   "title": "KBO프로야구2009",
+   "status": "playable",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok",
+    "progress": "ok"
+   },
+   "knownIssues_ko": [],
+   "changes": [],
+   "fileTitle": "kbo 프로야구 2009",
+   "game": "KBO프로야구2009",
+   "variant": null,
+   "sameTitle": "same-game"
   },
   {
    "sha256": "c5b3f6835d0044eca80fef8898c32c880b1d2c91cafe10306b48e19decda26d6",
@@ -6147,7 +6155,7 @@
    "sha256": "870cd071b4dcfb3123f6909bc8829b4d27df6f8b906bd043bd2706673028fb0f",
    "platform": "LGT",
    "model": "clet",
-   "title": "던전앤파이터귀검사",
+   "title": "던전앤파이터 귀검사",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -6164,7 +6172,7 @@
    ],
    "changes": [],
    "fileTitle": "던전앤파이터귀검사",
-   "game": "던전앤파이터귀검사",
+   "game": "던전앤파이터 귀검사",
    "variant": null
   },
   {
@@ -7040,7 +7048,7 @@
    "sha256": "2a57e33133b5c5d6889cb6db63e0fd35b40137e5b7ece1f079ab9a3b0595f5c6",
    "platform": "LGT",
    "model": "aot-java",
-   "title": "일지매영웅전기",
+   "title": "일지매 영웅전기",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -7054,7 +7062,7 @@
    "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "일지매영웅전기",
-   "game": "일지매영웅전기",
+   "game": "일지매 영웅전기",
    "variant": null
   },
   {
@@ -7401,7 +7409,7 @@
    "sha256": "1b107b96bf4ed7d2634d778fb45c9c3e3a887f37f35c1b73359ff44c0acb3674",
    "platform": "LGT",
    "model": "aot-java",
-   "title": "현영맞고2006",
+   "title": "현영맞고 2006",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -7415,7 +7423,7 @@
    "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "현영맞고2006",
-   "game": "현영맞고2006",
+   "game": "현영맞고 2006",
    "variant": null
   },
   {
@@ -8030,7 +8038,7 @@
    "sha256": "976141a9525b6decebee8bdcf2cf94da0efe7b53e4a99303aba661068c2f19d7",
    "platform": "SKT",
    "model": null,
-   "title": "메이플스토리-궁수편",
+   "title": "메이플스토리 궁수편",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -8047,14 +8055,14 @@
    ],
    "changes": [],
    "fileTitle": "메이플스토리-궁수편",
-   "game": "메이플스토리-궁수편",
+   "game": "메이플스토리 궁수편",
    "variant": null
   },
   {
    "sha256": "52edc54e2b231384001c5dbcb9a3334ee14b73bd2f10bef1d633003ecfd1dfc2",
    "platform": "SKT",
    "model": null,
-   "title": "메이플스토리-법사편",
+   "title": "메이플스토리 마법사편",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -8068,14 +8076,14 @@
    "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "메이플스토리-법사편",
-   "game": "메이플스토리-법사편",
+   "game": "메이플스토리 마법사편",
    "variant": null
   },
   {
    "sha256": "02bc66e85cf47d985ad80fdac686c84f12a85d267f4176535d8716dd0149a036",
    "platform": "SKT",
    "model": null,
-   "title": "메이플스토리-전사편",
+   "title": "메이플스토리 전사편",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -8089,7 +8097,7 @@
    "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "메이플스토리-전사편",
-   "game": "메이플스토리-전사편",
+   "game": "메이플스토리 전사편",
    "variant": null
   },
   {
@@ -8745,7 +8753,7 @@
    "sha256": "1f0d7e81336a8db3a8fa33aeb6e5a696f65e85885f1431efcdbb37f93da106ae",
    "platform": "SKT",
    "model": null,
-   "title": "영웅서기",
+   "title": "영웅서기 1",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -8759,7 +8767,7 @@
    "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "영웅서기-추가다운완료",
-   "game": "영웅서기",
+   "game": "영웅서기 1",
    "variant": null
   },
   {
