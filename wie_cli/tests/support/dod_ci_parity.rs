@@ -12,6 +12,9 @@
 //!            (they are axis B), and env assignments are kept (`RUST_MIN_STACK=…` is load-bearing).
 //!   axis B — the *toolchain set*. `strategy.matrix.rust` must equal the toolchains the DoD names
 //!            (a bare `cargo` means the default toolchain; `cargo +beta` names `beta`).
+//!   axis C — the *PR leg*. Since 2026-11-07 every step hangs on `env.FULL`, so that one expression
+//!            can empty all six legs while every required check stays green. It must keep
+//!            `PR_LEG` as a top-level `||` alternative, and the matrix must still carry that leg.
 //!
 //! The two axes are compared INDEPENDENTLY, not as a cross product. That is a deliberate ceiling
 //! inherited from the original: CI runs all four gates under both toolchains while the DoD only
@@ -29,6 +32,9 @@ pub const END: &str = "COMMIT-GATES:END";
 pub const TOOLCHAIN_PIN_FILES: [&str; 2] = ["rust-toolchain.toml", "rust-toolchain"];
 pub const DEFAULT_TOOLCHAIN: &str = "stable";
 
+/// The one leg that does the work on `pull_request`/`push` — it must stay an alternative of `FULL`.
+pub const PR_LEG: &str = "(matrix.os == 'ubuntu-latest' && matrix.rust == 'stable')";
+
 #[derive(Debug)]
 pub struct Report {
     pub ci_cmds: BTreeSet<String>,
@@ -40,6 +46,8 @@ pub struct Report {
     /// Non-cargo DoD lines (`rustup toolchain install …`). Same rule, other side.
     pub dod_non_cargo: Vec<String>,
     pub pinned: Vec<String>,
+    /// Axis C — why no leg is guaranteed to do the work on a PR. `None` = it is.
+    pub pr_leg: Option<String>,
     /// Hard failures that make comparison meaningless (missing markers, empty region).
     pub fatal: Vec<String>,
 }
@@ -56,6 +64,9 @@ impl Report {
         }
         if !self.pinned.is_empty() {
             p.push(format!("toolchain 고정 파일 {:?}", self.pinned));
+        }
+        if let Some(why) = &self.pr_leg {
+            p.push(format!("축 C(FULL — PR 다리): {why}"));
         }
         p
     }
@@ -99,6 +110,13 @@ impl Report {
             o.push_str(&format!("    ★ DoD 에만 있다 — CI 가 안 도는 toolchain 이다: {t}\n"));
         }
 
+        match &self.pr_leg {
+            None => o.push_str("\n  [축 C · FULL]  PR 에서 일하는 다리 ubuntu-latest/stable 이 `FULL` 식과 매트릭스에 남아 있다\n"),
+            Some(why) => o.push_str(&format!(
+                "\n  [축 C · FULL]\n    ★ {why}\n    ★ 이대로면 PR 의 여섯 다리가 전부 «빈 통과»이고 필수 검사는 green 이다.\n"
+            )),
+        }
+
         // Never silent about what was excluded — that is how a checker quietly stops checking.
         o.push_str(&format!("\n  [제외] CI 셋업 step {}건 (cargo 를 부르지 않는다)\n", self.ci_setup.len()));
         for s in &self.ci_setup {
@@ -138,7 +156,9 @@ impl Report {
 /// worklog copy carried 9 items while this carried 7).
 pub fn ceilings() -> String {
     "\n  [천장 — 이 검사가 «못 보는» 것 · ★이 목록이 «정본»이다(다른 곳의 목록은 그 시점 «사본»)]\n\
-     \x20   1. OS 축(macos/ubuntu/windows) — 로컬 재현 불가. CI 가 유일한 그물이다.\n\
+     \x20   1. OS 축(macos/ubuntu/windows) — 로컬 재현 불가. 그물은 CI 의 «주간 run»(schedule)과 손\n\
+     \x20      `workflow_dispatch` 뿐이다 — 2026-11-07 부터 PR·push 에서는 ubuntu/stable 한 다리만 일하고\n\
+     \x20      나머지 5다리(macos·windows·beta)의 PR green 은 «아무것도 재지 않는다»(`rust.yml` 머리).\n\
      \x20   2. 교차곱(4게이트 × 2toolchain) — 두 축을 «독립»으로만 본다(원본 판정 승계).\n\
      \x20   3. `rust.yml` 밖의 워크플로 — ★«못 보는 것»이 아니라 ★**«보지 않기로 «정한» 것»**이다.\n\
      \x20      ★2026-09-06 «확장하지 않기로» 결정했다(제안 2026-09-05-dod-ci-parity-checker#p1). 이유는\n\
@@ -167,7 +187,15 @@ pub fn ceilings() -> String {
      \x20      (한쪽만 지우면 컴파일이 깨져 red 다 — 그것이 이 2파일 구성의 이유다.)\n\
      \x20   8. 순서·중복 — 집합 비교라 스텝 «순서»와 «중복 실행»은 안 본다.\n\
      \x20   9. 줄끝(CRLF) — 정규화는 `tests/dod_ci_parity.rs` 의 `read()` «한 곳»에서 한다. 그것을 지우면\n\
-     \x20      «로컬은 green 이고 windows 다리만 red» 다(실측) — 로컬 그물이 없다.\n"
+     \x20      «로컬은 green 이고 windows 다리만 red» 다(실측) — 로컬 그물이 없다. ★그 windows 다리는\n\
+     \x20      이제 PR 에서 빈 통과다 ⇒ 그 red 는 «주간 run»·손 dispatch 에서만 보인다(PR 은 green 이다).\n\
+     \x20  10. `FULL` — 축 C 가 보는 것은 «`FULL:` 정의에 PR 다리가 `||` 대안으로 남아 있는가»와\n\
+     \x20      «매트릭스에 ubuntu-latest·stable 이 있는가»뿐이다. ★스텝의 `if:` 는 «안 본다»:\n\
+     \x20      게이트 스텝에 `if: false` 를 달거나 `env.FULL == 'true'` 를 다른 조건으로 바꿔도 green 이다\n\
+     \x20      (실측 2026-11-21 검수 개악 M-C: clippy 스텝 `if: false` → rc=0 · 11 passed). 식의 «뜻»도\n\
+     \x20      안 본다 — 대안의 글자 일치만 본다(같은 뜻의 다른 표기는 red 다 = 닫힌 쪽으로 틀린다).\n\
+     \x20      ★워크플로가 `env.FULL` 을 «아예 안 읽으면» 축 C 는 보지 않는다(`[축 C · FULL]` 줄은 그때도\n\
+     \x20      «남아 있다»고 찍는다) — 그 형상(변수 개명 등)은 `m7` 의 표류 가드(`FULL:` 줄을 못 찾으면 red)가 잡는다.\n"
         .into()
 }
 
@@ -300,6 +328,32 @@ pub fn parse_ci(text: &str) -> (Vec<String>, Vec<String>, BTreeSet<String>) {
     (cargo_cmds, setup, toolchains)
 }
 
+/// Axis C. `None` when the PR leg is guaranteed to do the work; otherwise why not.
+/// A workflow that never reads `env.FULL` has no switch to break (the pre-2026-11-07 shape).
+pub fn pr_leg_problem(rust_yml: &str) -> Option<String> {
+    let code: Vec<&str> = rust_yml.lines().map(str::trim).filter(|l| !l.starts_with('#')).collect();
+    if !code.iter().any(|l| l.contains("env.FULL")) {
+        return None;
+    }
+    let Some(expr) = code.iter().find_map(|l| l.strip_prefix("FULL:")) else {
+        return Some("스텝들이 `env.FULL` 을 읽는데 `FULL:` 정의가 없다 — 아무 스텝도 돌지 않는다".into());
+    };
+    let expr = expr.trim().trim_start_matches("${{").trim_end_matches("}}");
+    // ponytail: 글자 일치 — 괄호 안의 `||` 는 지금 식에 없다. 식이 중첩되면 진짜 파서가 필요하다.
+    if !expr.split("||").any(|alt| alt.trim() == PR_LEG) {
+        return Some(format!("`FULL` 식에 `|| {PR_LEG}` 대안이 없다: `{}`", expr.trim()));
+    }
+    let in_matrix = |key: &str, want: &str| {
+        code.iter()
+            .filter_map(|l| l.strip_prefix(key))
+            .any(|v| v.trim().trim_matches(['[', ']']).split(',').any(|x| x.trim() == want))
+    };
+    if !in_matrix("os:", "ubuntu-latest") || !in_matrix("rust:", "stable") {
+        return Some("매트릭스에 `ubuntu-latest` × `stable` 다리가 없다 — `FULL` 의 PR 대안이 어느 다리에도 안 맞는다".into());
+    }
+    None
+}
+
 /// Every fenced block inside the COMMIT-GATES marker region — NOT just the first one.
 /// The original reads "the first fenced block in §Definition of Done"; wie's region holds two
 /// (the four gates, then the beta lint gate), and reading only the first drops `beta` from axis B.
@@ -377,6 +431,7 @@ pub fn parity(agents_md: &str, rust_yml: &str, pin_files_present: &[&str]) -> Re
         ci_setup,
         dod_non_cargo,
         pinned: pin_files_present.iter().map(|s| s.to_string()).collect(),
+        pr_leg: pr_leg_problem(rust_yml),
         fatal,
     }
 }
