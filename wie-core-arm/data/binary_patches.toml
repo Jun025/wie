@@ -95,6 +95,8 @@ spill_back = true
 # Prefix `BX PC; NOP; STMFD SP!, {R0, LR}; CMP R2, #N` is specific to the
 # standard library helpers; the trailing `CMP R2` immediate is what
 # distinguishes them (`#3` for memcpy, `#4` for memset).
+# `memset` matched in all 264 packages and was not called once in the sweep above:
+# for it nothing has been compared, and it is here on a reading of the routine.
 [[entry.hook]]
 kind = "memcpy"
 pattern = "78 47 00 00 01 40 2d e9 03 00 52 e3"

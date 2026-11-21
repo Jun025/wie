@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-22",
+  "task": "wie-ktf-generic-hook-exact-equivalence-fix",
+  "title": "KTF 범용 훅을 게임 자신의 코드와 같은 결과로 + 그림자 대조 도구",
+  "summary": "측정이 찾은 2판과 이 회차 전수가 더 찾은 1판(d9384b388ea5)의 차이(스택 인라인 루프 1바이트 · 앞쪽 겹침 memcpy)를 닫았다. 전수 그림자 대조 264판 · 7,476,287회 · 불일치 0. 라이브러리 훅은 겹치는 호출과 호스트가 거절하는 접근을 게임 자신의 루틴에 넘기고, 인라인 루프 훅은 바이트 루프와 같은 결과로 복사한다. WIE_HOOK_MODE=shadow 대조와 scripts/hook-shadow-sweep.sh 를 개발 도구로 뒀다. docs/report/0562.",
+  "changes": [
+    "wie-core-arm hook.rs: 라이브러리 4종은 겹침·호스트 거절 시 게임 루틴으로(resume_original) · inline_copy 는 len+1 · 설치 때 조건 검사 꼴 확인 · 루프 2종은 copy_as_byte_loop · 못 닿는 범위는 unhook",
+    "wie-core-arm hook/shadow.rs: 그림자 대조(wasm32 제외) · wie_validate 가 WIE_HOOK_MODE=shadow 일 때만 켬",
+    "scripts/hook-shadow-sweep.sh: 전수 대조 표 · 불일치가 있으면 exit 1",
+    "binary_patches.toml · AGENTS.md: 범용 훅은 그림자 대조 불일치 0 인 것만 남긴다"
+  ],
+  "limits": "memset 훅은 264판에서 0회 발화라 대조한 호출이 없다. 속도는 재지 않았다. 브라우저 호스트로는 돌리지 않았다.",
+  "proposals": [
+    {
+      "kind": "meta",
+      "title": "memset 범용 훅 — 한 번도 불리지 않아 대조한 적이 없다: 발화시키거나 뺀다",
+      "plainSummary": "KTF 범용 훅 6종 중 memset 은 264판 모두에 걸리지만 측정과 이 회차 전수(각 30초)에서 0회 불렸다. 더 긴 실행이나 다른 키 대본으로 불리는 판을 찾아 그림자 대조를 하고, 끝내 불리지 않으면 패턴을 뺀다.",
+      "userBenefit": "이용자가 가진 KTF 원본이 «확인되지 않은 대체 루틴»을 타는 자리가 264곳에서 0곳이 된다. 불리는 판이 나오면 그 판에서 원본과 같은 결과인지가 수로 남는다.",
+      "why": "이 회차 실측: 전수 그림자 대조에서 memset 발화 0회(264곳). 범용 훅을 «불일치 0 을 확인한 것만 남긴다»는 규칙을 이 회차가 적었는데, memset 은 확인할 호출이 없었다.",
+      "tradeoff": "불리는 판을 찾는 데 판당 100초 이상의 실행이 필요할 수 있다(264판이면 long 임대 2~3시간). 빼면 memset 을 많이 부르는 판에서 가속을 잃지만, 지금까지 그런 판은 관측되지 않았다.",
+      "effort": "S",
+      "target": "wie-core-arm/data/binary_patches.toml · scripts/hook-shadow-sweep.sh"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}
