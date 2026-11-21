@@ -37,4 +37,10 @@ web 은 죽은 두 브랜치(원격에 없음 — `git ls-remote --heads` 빈 �
 `check-parked-workflows` · `check-doc-liveness-parity` · `check-linux-system-deps` · `check-parity-lock-wired` rc=0 ·
 워크플로 12개 YAML 파싱 OK. Actions 가 꺼져 있어 이 PR 의 CI 는 다시 켜지기 전까지 돌지 않는다.
 
+**[2026-11-22] 재배차 — Actions 가 다시 돈다** — `gh workflow run rust-audit.yaml --ref main` 이 run `44549723803`
+(2026-11-19T14:59:26Z)을 만들었다(종전 HTTP 422 사라짐 · 그 run 의 failure 는 11-01~11-04 의 Security audit 와 같은 기존 red).
+`origin/main` 은 11-07 이후 그대로(`2e66f9d68`)라 병합할 것이 없었고, 이 절을 담은 커밋이 정지 뒤 이 저장소의 첫 PR run 을 깨운다.
+그 run 이 위 «스텝이 전부 skip 된 잡은 success 로 끝난다»의 첫 실측이다 — 결과는 `gh pr checks 586 -R Jun025/wie` 와
+이 티켓의 회신에 있다(여기 다시 적으면 그 커밋이 run 을 한 번 더 만든다).
+
 <!-- corpus-name-inflow v1 subjects=6 tree=4cded8869ea231b5 B=0/0 P=0/0 S=0/0 -->
