@@ -1,7 +1,7 @@
 //! Runs the DoD ↔ `rust.yml` parity lock, and proves the lock is not vacuous.
 //!
 //! Wiring: this is a plain `#[test]`, so `cargo test --all` — itself one of the four documented
-//! gates — runs it on every PR, in all six `rust.yml` legs, with **zero workflow change**. The
+//! gates — runs it on every PR (ubuntu/stable; all six `rust.yml` legs weekly), with **zero workflow change**. The
 //! checker lives in a separate file that this one declares as a module, so deleting the checker
 //! is a compile error rather than a silent pass. (Deleting *both* files is still green; that
 //! ceiling is printed by `ceilings()` on every run rather than hidden here.)
@@ -138,6 +138,47 @@ fn m6_toolchain_pin_file_breaks_the_default_mapping() {
     assert!(
         p.problems().iter().any(|x| x.contains("toolchain 고정")),
         "핀 파일 출현을 못 잡았다\n{}",
+        p.render()
+    );
+}
+
+#[test]
+fn m7_full_loses_the_pr_leg() {
+    // 축 C — 검수 개악 M-B(2026-11-21): `FULL` 에서 PR 다리를 빼면 PR 의 6다리가 전부 빈 통과가 되고
+    // 필수 5종은 green 이다. 종전 락은 이것을 rc=0 · 11 passed 로 통과시켰다.
+    let yml = read(".github/workflows/rust.yml");
+    let m_b: String = yml
+        .lines()
+        .map(|l| match l.trim_start().starts_with("FULL:") {
+            true => "      FULL: ${{ github.event_name == 'schedule' }}\n".to_string(),
+            false => format!("{l}\n"),
+        })
+        .collect();
+    assert_ne!(m_b, yml, "개악 대조가 아무것도 바꾸지 못했다 — `FULL:` 줄이 표류했다");
+    let p = checker::parity(&read("AGENTS.md"), &m_b, &[]);
+    assert!(
+        p.problems().iter().any(|x| x.contains("축 C")),
+        "PR 다리가 빠진 `FULL` 을 못 잡았다\n{}",
+        p.render()
+    );
+
+    // 식은 그대로 두고 매트릭스 라벨만 바꾼다 — 식의 PR 대안이 어느 다리에도 안 맞는다.
+    let p = mutated(
+        "os: [macos-latest, ubuntu-latest, windows-latest]",
+        "os: [macos-latest, ubuntu-24.04, windows-latest]",
+    );
+    assert!(p.iter().any(|x| x.contains("축 C")), "매트릭스에서 사라진 PR 다리를 못 잡았다: {p:?}");
+
+    // `FULL:` 정의를 통째로 지운다 — 스텝의 `env.FULL == 'true'` 가 전부 거짓이 된다.
+    let gone: String = yml
+        .lines()
+        .filter(|l| !l.trim_start().starts_with("FULL:"))
+        .map(|l| format!("{l}\n"))
+        .collect();
+    let p = checker::parity(&read("AGENTS.md"), &gone, &[]);
+    assert!(
+        p.problems().iter().any(|x| x.contains("축 C")),
+        "`FULL:` 정의 소실을 못 잡았다\n{}",
         p.render()
     );
 }
