@@ -72,4 +72,4 @@ web 은 죽은 두 브랜치(원격에 없음 — `git ls-remote --heads` 빈 �
 - **N3**: 손 실행 명령 옆 — 그 브랜치의 워크플로에 `workflow_dispatch` 가 있어야 한다(#586 전에 갈라진 브랜치는 main 을 받기 전까지 안 된다 · 미실행).
 - **N5**: 파리티 락 천장 10항 — 워크플로가 `env.FULL` 을 아예 안 읽으면 축 C 는 보지 않는다(그 형상은 `m7` 의 표류 가드가 잡는다). 문자열만 · 로직 무변.
 
-<!-- corpus-name-inflow v1 subjects=8 tree=de1b96279b7e1011 B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=8 tree=5173d3381fe415a5 B=0/0 P=0/0 S=0/0 -->
