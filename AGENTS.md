@@ -77,7 +77,9 @@ cargo +beta clippy --all -- -D warnings            # rust.yml: the lint gate, ag
 **A new lint reddens code you did not write, so "I only touched config" does not exempt you.**
 **When beta reddens code you did not touch, split it off — do not fold it into your round.** Open a
 separate ticket, cite the failing run in your report, and say plainly that CI is red for a
-pre-existing reason.
+pre-existing reason. Since 2026-11-07 a PR's beta legs are empty passes, so the PR holds no failing run to
+cite: until landing the local gate above is the only beta net — quote its output and say the PR's green
+does not cover it.
 
 The marked region above is diffed against `rust.yml` by `wie_cli/tests/dod_ci_parity.rs`, which
 `cargo test --all` runs in every leg that does work (on a PR only ubuntu/stable; all six weekly — `rust.yml` header). Of the four gates only the lint gate has ever caught anything
@@ -252,13 +254,23 @@ and not a suggestion.
 and `coverage` (tarpaulin) does not run at all. The full matrix and coverage run weekly on `main` and
 by hand — a PR that touches anything platform-specific (line endings, paths, a `cfg(windows)`) runs
 `gh workflow run rust.yml -R Jun025/wie --ref <branch>` and quotes *that* run; one that deletes or
-moves tests runs `gh workflow run coverage.yml -R Jun025/wie --ref <branch>`.
+moves tests runs `gh workflow run coverage.yml -R Jun025/wie --ref <branch>`. Both need `workflow_dispatch`
+in that branch's own copy of the workflow — a branch cut before #586 landed cannot until it takes `main`.
 
 **A red weekly run has an owner — same rule as doc-liveness below: the first gate③ round that runs
 after it.** Read both beside the PR's checks: `gh run list -R Jun025/wie --workflow=rust.yml --event schedule -L1`
 and `gh run list -R Jun025/wie --workflow=coverage.yml --event schedule -L1`. If red, file a ticket naming
 the leg and the failing step — do not fix inline, merge tickets do not change code. An empty list or a
-run older than 8 days is not a green: the schedule did not fire — say so in the reply and dispatch it by hand.
+run older than 8 days is not a green — say so in the reply — but it is not by itself a reason to dispatch.
+Three cases, in order. ⑴ `main` has a hand run inside 8 days — ask, because a hand run is a
+`workflow_dispatch` event and the two lists above never show it:
+`gh run list -R Jun025/wie --workflow=rust.yml --branch main --event workflow_dispatch -L1` (same shape for
+`coverage.yml`). It stands in for the weekly run: judge it by the rule above and do not dispatch again.
+⑵ The first Saturday cron after #586 landed has not passed yet (times: each workflow's `schedule:`): the
+empty list is "not due yet" — write that, dispatch nothing. ⑶ No scheduled run for more than 8 days,
+counted from the last one or, with none ever, from #586's landing: dispatch **once** and raise it in the
+reply for the operator. A hand run that has itself aged past 8 days buys no second dispatch — write that
+the weekly net is down and the operator question is open.
 
 Narrower commands are conveniences, not gates: `cargo build` (default member `wie_cli`),
 `cargo test -p <crate> <test_name>`, `cargo fmt` to fix formatting (`rustfmt.toml`: max_width=150).

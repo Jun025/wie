@@ -61,4 +61,15 @@ web 은 죽은 두 브랜치(원격에 없음 — `git ls-remote --heads` 빈 �
 - `wie_validate.rs` 의 doc 주석 "runs it on all six matrix legs" 는 그대로다 — 제품 소스 파일이고, 그 파일을 건드리면 유입 도구가
   파일에 원래 있던 제목 3종을 이 PR 의 유입으로 센다(재 봄: B=4/3). 사실은 `AGENTS.md` 의 그 문단이 이제 말한다.
 
+**[2026-11-22] 재검 반려 수정(검수 N1 · `wie-actions-usage-cut-after-github-fork-throttle-fix2`)** — 직전 절이 더한 «빈 목록 → 손 dispatch»
+문장에 종료 조건이 없었다.
+- **N1**: 그 조건은 `--event schedule` 목록만 읽는데 처방이 만드는 run 은 `workflow_dispatch` 라, dispatch 를 해도 다음 회차가 읽는 목록은
+  그대로 비어 있다 ⇒ 게이트③ 회차마다 약 60 잡분(전체 매트릭스 약 41분 + coverage 약 19분 · 검수 실측) — 사용량을 줄이는 PR 이 더하는
+  유일한 사용량이었다. `AGENTS.md` 의 그 문장을 세 갈래로 고쳤다: ⑴8일 안의 `main` 손 run 은 주간 run 대신 읽고 다시 dispatch 하지 않는다
+  (읽는 명령 병기) ⑵착지 뒤 첫 토요일 cron 전의 빈 목록은 «미도래» ⑶schedule 이 8일 넘게 안 오면 dispatch 1회 + 운영자 확인 사안.
+  이 날짜의 값: `rust.yml`·`coverage.yml` × `schedule`·`workflow_dispatch`(`--branch main`) 네 목록 전부 빈 출력 · rc=0(2026-11-21T18:18Z · 착지 전이라 main 의 워크플로에 아직 schedule 이 없다 — 착지 직후가 ⑵다).
+- **N2**: 「When beta reddens …」 문단 — PR 의 beta 다리는 빈 통과라 인용할 failing run 이 PR 에 없다. 착지 전 beta 그물은 로컬 게이트 하나다.
+- **N3**: 손 실행 명령 옆 — 그 브랜치의 워크플로에 `workflow_dispatch` 가 있어야 한다(#586 전에 갈라진 브랜치는 main 을 받기 전까지 안 된다 · 미실행).
+- **N5**: 파리티 락 천장 10항 — 워크플로가 `env.FULL` 을 아예 안 읽으면 축 C 는 보지 않는다(그 형상은 `m7` 의 표류 가드가 잡는다). 문자열만 · 로직 무변.
+
 <!-- corpus-name-inflow v1 subjects=8 tree=de1b96279b7e1011 B=0/0 P=0/0 S=0/0 -->
