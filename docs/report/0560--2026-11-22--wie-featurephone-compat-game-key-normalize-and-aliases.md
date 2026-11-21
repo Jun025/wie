@@ -47,4 +47,4 @@
 - 착수 뒤 main 에 #585(0552)가 착지해 `compat.json` 과 계약을 건드렸다. 푸시 전이라 그 main 위로 옮겨 다시 생성했다(수치 같음 · `check-compat-revert` 로 확인).
 - 게임 이름 유입(`corpus-name-inflow`): BOUNDED 359쌍(1114회) · SUFFIX-ATTACHED 18쌍(56회). 의도한 유입이다 — 공개 목록(`compat.json` 의 `title`·`game`·`fileTitle`)이 산출물이고, 이 문서의 판정 표와 `SAME_NAME_HAND` 주석이 묶음 이름을 적는다. 게임 바이트·리소스 내용·캡처는 0.
 
-
+<!-- corpus-name-inflow v1 subjects=4 tree=91a1e1e1d745b2a4 B=1114/359 P=3/3 S=56/18 -->
