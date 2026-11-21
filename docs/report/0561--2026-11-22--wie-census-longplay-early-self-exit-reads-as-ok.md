@@ -105,4 +105,4 @@ fixed selftest rc=0
 - `short` 가 엔진 쪽인지는 B 로만 가른다. 이번 14행에는 «키 없이도 꺼지는» 판이 없었다.
 - 유입(`node scripts/corpus-name-inflow.mjs`, 이 브랜치 대 `origin/main`): BOUNDED 15회/15쌍 · SUFFIX-ATTACHED 1회/1쌍이다. 바뀐 파일 «전체»를 훑은 수다. BOUNDED 15 는 전부 `scripts/player-data.mjs` 에 이미 있던 이름 목록(#588)이고, SUFFIX-ATTACHED 1 은 `scripts/playability-census.mjs` 에 이미 있던 요령 문장의 한 낱말이다. 이 회차가 더한 줄에는 걸린 것이 없다.
 
-<!-- corpus-name-inflow v1 subjects=5 tree=46d767fa2a5fa874 B=15/15 P=3/3 S=1/1 -->
+<!-- corpus-name-inflow v1 subjects=5 tree=5c065bf988934023 B=15/15 P=3/3 S=1/1 -->
