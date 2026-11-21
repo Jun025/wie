@@ -5,13 +5,15 @@
 //   node scripts/player-data.mjs                      check the committed data (CI: engine-contract.yml)
 //   node scripts/player-data.mjs --selftest           each rule must reject its mutation
 //   node scripts/player-data.mjs import <census.json> census `report` output -> docs/player-data/compat.json
-//   node scripts/player-data.mjs normalize            re-derive names/groups and order in docs/player-data/compat.json
+//   node scripts/player-data.mjs normalize            re-derive names/groups, order and runtimeAdjustments in docs/player-data/compat.json
 //   node scripts/player-data.mjs build --out <dir>    write the shipped compat.json + updates.json
 //                                                     (publish-artifact.yml; needs full history)
 //
 // Sources: docs/player-data/compat.json (one census run, changes stripped) and
 // docs/player-updates/<YYYY-MM-DD>-<slug>.json — one change per file, so two PRs never touch
 // the same line. `build` derives each title's `changes` from those files: one source, not two.
+// docs/contracts/runtime-adjustments.tsv (the ledger of per-title engine adjustments) is the one
+// source of each row's `runtimeAdjustments`; the engine tables are held to it by `cargo test`.
 // ★No game bytes: titles, content hashes and sentences only.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -22,6 +24,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const ROOT = new URL('..', import.meta.url).pathname;
 const COMPAT = join(ROOT, 'docs/player-data/compat.json');
 const UPDATES = join(ROOT, 'docs/player-updates');
+const LEDGER = join(ROOT, 'docs/contracts/runtime-adjustments.tsv');
 
 // Same values as the shell importer (otterpebble apps/featurephone/scripts/compat-import.mjs).
 export const STATUSES = ['playable', 'limited', 'not-yet'];
@@ -40,6 +43,11 @@ export const EXTRA_AXIS_VALUES = { progress: ['ok', 'stuck'] };
 const EXTRA_AXIS_MAP = { progress: { ok: 'ok', stuck: 'stuck', error: 'stuck' } };
 export const PLATFORMS = ['KTF', 'SKT', 'LGT', 'J2ME'];
 export const KINDS = ['new-support', 'fix', 'improvement', 'sound', 'speed'];
+// `runtimeAdjustments` vocabulary (§1) — what the engine does for this one title after loading its file.
+export const ADJUSTMENTS = ['lock-lift', 'owner-file-skip', 'owner-file-bytes', 'orphan-flag', 'device-bound-save', 'local-server', 'display-size'];
+const LEDGER_CHANGES = ['memory-code', 'file-not-mounted', 'file-bytes', 'response', 'engine-setting'];
+const LEDGER_SCOPES = ['any', 'zip', 'aid'];
+const LEDGER_CLASSES = ['operator-directed', 'adopted', 'ratified-2026-11-20'];
 const HEX40 = /^[0-9a-f]{40}$/;
 const HEX64 = /^[0-9a-f]{64}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -115,9 +123,45 @@ const SAME_GAME = new Set(
 );
 export const SAME_TITLE = ['same-game', 'undetermined'];
 
-/** Sets `fileTitle` (kept for search/tracing), a marker-free `title`, the carrier-free group key `game`, and `variant`. */
-export function retitle(entries) {
-  const out = entries.map(({ sameTitle, variant, ...x }) => {
+/** sha12 -> kinds in ADJUSTMENTS order, from the ledger's rows (one row per engine key × package). */
+export function adjustmentsOf(ledger) {
+  const by = Map.groupBy(ledger.rows ?? [], (r) => r.package);
+  return new Map([...by].map(([sha12, rows]) => [sha12, ADJUSTMENTS.filter((k) => rows.some((r) => r.kind === k))]));
+}
+const LEDGER_COLUMNS = ['device', 'key', 'package', 'platform', 'title', 'kind', 'changes', 'scope', 'class', 'basis'];
+/** Tab-separated, `#` lines are comments, the first other line is the header. A row keeps its line number for messages. */
+export function parseLedger(text) {
+  const [header, ...body] = text.split(/\r?\n/).map((raw, i) => ({ line: i + 1, raw, cells: raw.split('\t') })).filter((x) => x.raw !== '' && !x.raw.startsWith('#'));
+  return { header: header?.cells ?? [], rows: body.map(({ line, cells }) => ({ line, cells, ...Object.fromEntries(LEDGER_COLUMNS.map((k, i) => [k, cells[i]])) })) };
+}
+const readLedger = () => parseLedger(readFileSync(LEDGER, 'utf8'));
+
+/** The ledger's own rules, and that each row names one compat row by its real platform and title. */
+export function validateLedger(l, entries) {
+  if (l.header.join('\t') !== LEDGER_COLUMNS.join('\t')) return [`ledger: header row must be ${LEDGER_COLUMNS.join(' <tab> ')}`];
+  const e = [];
+  const seen = new Set();
+  for (const r of l.rows) {
+    const at = `ledger line ${r.line} (${r.device} ${r.package})`;
+    if (r.cells.length !== LEDGER_COLUMNS.length) e.push(`${at}: ${r.cells.length} tab-separated cells, expected ${LEDGER_COLUMNS.length}`);
+    for (const k of LEDGER_COLUMNS) if (!str(r[k])) e.push(`${at}: empty ${k}${k === 'basis' ? ' — a row must say where it came from' : ''}`);
+    if (!ADJUSTMENTS.includes(r.kind)) e.push(`${at}: kind not in ${ADJUSTMENTS}`);
+    if (!LEDGER_CHANGES.includes(r.changes)) e.push(`${at}: changes not in ${LEDGER_CHANGES}`);
+    if (!LEDGER_SCOPES.includes(r.scope)) e.push(`${at}: scope not in ${LEDGER_SCOPES}`);
+    if (!LEDGER_CLASSES.includes(r.class)) e.push(`${at}: class not in ${LEDGER_CLASSES}`);
+    const id = `${r.device}\t${r.key}\t${r.package}`;
+    if (seen.has(id)) e.push(`${at}: repeats`);
+    seen.add(id);
+    const hit = /^[0-9a-f]{12}$/.test(r.package ?? '') ? entries.filter((x) => x.sha256?.startsWith(r.package)) : [];
+    if (hit.length !== 1) e.push(`${at}: package must be the first 12 hex of exactly one compat.json row (found ${hit.length})`);
+    else if (hit[0].platform !== r.platform || hit[0].title !== r.title) e.push(`${at}: platform/title differ from compat.json (${hit[0].platform} ${JSON.stringify(hit[0].title)})`);
+  }
+  return e;
+}
+
+/** Sets `fileTitle` (kept for search/tracing), a marker-free `title`, the carrier-free group key `game`, `variant`, and the ledger's `runtimeAdjustments`. */
+export function retitle(entries, adjustments = adjustmentsOf(readLedger())) {
+  const out = entries.map(({ sameTitle, variant, runtimeAdjustments, ...x }) => {
     const fileTitle = x.fileTitle ?? x.title;
     const { title, label } = stripMarkers(fileTitle);
     const hand = SAME_NAME_HAND[x.sha256.slice(0, 12)] ?? {};
@@ -132,7 +176,12 @@ export function retitle(entries) {
       x.variant = g.length > 1 && x.label && !g.some((y) => y !== x && y.label === x.label) ? x.label : null;
       if (g.length > 1) x.sameTitle = SAME_GAME.has(gameKey(`${x.platform}\t${x.game}`)) ? 'same-game' : 'undetermined';
     }
-  return sortEntries(out.map(({ label, ...x }) => x));
+  return sortEntries(
+    out.map(({ label, ...x }) => {
+      const kinds = adjustments.get(x.sha256.slice(0, 12));
+      return kinds ? { ...x, runtimeAdjustments: kinds } : x; // no key = no per-title adjustment (§1)
+    }),
+  );
 }
 const DISAMBIGUATOR = / \((\d+|작은화면|큰화면|v?\d+(?:\.\d+)+)\)$/;
 
@@ -192,6 +241,9 @@ export function validateCompat(d) {
     // so «no tips» has one spelling the shell can test.
     if ('playTips_ko' in x && !(Array.isArray(x.playTips_ko) && x.playTips_ko.length && x.playTips_ko.every(str)))
       e.push(`${at}: playTips_ko must be omitted or a non-empty array of non-empty strings`);
+    // Optional, and never hand-written: `build` refuses a value the ledger does not derive (below). No key = none.
+    if ('runtimeAdjustments' in x && !(Array.isArray(x.runtimeAdjustments) && x.runtimeAdjustments.length && x.runtimeAdjustments.every((k, j, a) => ADJUSTMENTS.includes(k) && a.indexOf(k) === j)))
+      e.push(`${at}: runtimeAdjustments must be omitted or a non-empty array of distinct ${ADJUSTMENTS}`);
     if (!Array.isArray(x.changes)) e.push(`${at}: changes must be an array`);
     else
       x.changes.forEach((c, j) => {
@@ -378,6 +430,27 @@ function selftest() {
   const hy = retitle([{ ...good.entries[0], title: 'a-b', fileTitle: undefined }, { ...good.entries[0], sha256: 'c'.repeat(64), platform: 'SKT', title: 'ab', fileTitle: undefined }]);
   if (hy.some((x) => x.game !== 'ab')) bad++, console.error(`selftest: with capitals and spaces equal the spelling with fewer hyphens wins, got ${JSON.stringify(hy.map((x) => x.game))}`);
   for (const [label, c, u] of cases) if (!errs(c, u).length) bad++, console.error(`selftest: NOT rejected — ${label}`);
+  // runtimeAdjustments: derived from the ledger, never typed in; a ledger row needs its basis and a real compat row.
+  const lrow = { line: 2, device: 'd', key: 'k', package: sha.slice(0, 12), platform: 'KTF', title: 't', kind: 'owner-file-bytes', changes: 'file-bytes', scope: 'zip', class: 'adopted', basis: 'PR #1' };
+  const tsv = (rows) => [LEDGER_COLUMNS, ...rows.map((r) => LEDGER_COLUMNS.map((k) => r[k]))].map((r) => r.join('\t')).join('\n');
+  const led = parseLedger(`# a comment\n${tsv([lrow, { ...lrow, key: 'k2', kind: 'lock-lift' }])}\n`);
+  if (led.rows.length !== 2 || validateLedger(led, good.entries).length) bad++, console.error(`selftest: the good ledger is rejected — ${validateLedger(led, good.entries)}`);
+  const ledgerCases = [
+    ['ledger row with no basis', tsv([{ ...lrow, basis: ' ' }])],
+    ['ledger row for a file not in compat', tsv([{ ...lrow, package: 'f'.repeat(12) }])],
+    ['ledger row with another title', tsv([{ ...lrow, title: 'u' }])],
+    ['ledger row with an unknown kind', tsv([{ ...lrow, kind: 'patch' }])],
+    ['ledger row with an unknown scope', tsv([{ ...lrow, scope: 'jar' }])],
+    ['ledger row twice', tsv([lrow, lrow])],
+    ['ledger row with spaces for tabs', tsv([lrow]).replace(/\t(?=KTF)/, '    ')],
+    ['ledger with another header', tsv([lrow]).replace('device', 'table')],
+  ];
+  for (const [label, text] of ledgerCases) if (!validateLedger(parseLedger(text), good.entries).length) bad++, console.error(`selftest: NOT rejected — ${label}`);
+  const adj = retitle([{ ...good.entries[0], runtimeAdjustments: ['display-size'] }, { ...good.entries[0], sha256: 'c'.repeat(64), title: 'u', runtimeAdjustments: ['lock-lift'] }], adjustmentsOf(led));
+  if (JSON.stringify(adj.map((x) => x.runtimeAdjustments ?? null)) !== '[["lock-lift","owner-file-bytes"],null]')
+    bad++, console.error(`selftest: runtimeAdjustments must be the ledger's kinds in vocabulary order, and absent off the ledger — got ${JSON.stringify(adj.map((x) => x.runtimeAdjustments ?? null))}`);
+  for (const [label, v] of [['empty runtimeAdjustments', []], ['unknown runtimeAdjustments kind', ['patch']], ['runtimeAdjustments kind twice', ['lock-lift', 'lock-lift']], ['runtimeAdjustments as a string', 'lock-lift']])
+    if (!validateCompat({ ...good, entries: [{ ...good.entries[0], runtimeAdjustments: v }] }).length) bad++, console.error(`selftest: NOT rejected — ${label}`);
   if (fromCensus({ ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, render: 'uniform', speed: 'n/a' } }] }).entries[0].axes.render !== 'no')
     bad++, console.error('selftest: census uniform must map to no');
   if (fromCensus({ ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, longplay: 'short' } }] }).entries[0].axes.longplay !== 'unknown')
@@ -444,7 +517,7 @@ function selftest() {
     rmSync(repo, { recursive: true, force: true });
   }
   if (bad) process.exit(1);
-  console.log(`player-data selftest: ${cases.length + 15} rules each reject their mutation`);
+  console.log(`player-data selftest: ${cases.length + ledgerCases.length + 4 + 15} rules each reject their mutation`);
 }
 
 const [cmd, ...args] = process.argv.slice(2);
@@ -477,16 +550,19 @@ else if (cmd === 'import') {
 } else if (!cmd || cmd === 'build') {
   const compat = JSON.parse(readFileSync(COMPAT, 'utf8'));
   const files = readUpdates();
-  const e = [...validateCompat(compat), ...validateUpdates(files, new Set(compat.entries.map((x) => x.sha256)))];
-  // The committed names are what retitle() derives, row for row — a hand edit, or a naming rule changed without `normalize`, shows here.
-  const drift = e.length ? -1 : retitle(compat.entries).findIndex((x, i) => JSON.stringify(x) !== JSON.stringify(compat.entries[i]));
-  if (drift >= 0) e.push(`compat.entries[${drift}]: differs from what retitle() derives (title/game/variant/sameTitle, order) — \`node scripts/player-data.mjs normalize\``);
+  const ledger = readLedger();
+  const e = [...validateCompat(compat), ...validateUpdates(files, new Set(compat.entries.map((x) => x.sha256))), ...validateLedger(ledger, compat.entries)];
+  // The committed names and runtimeAdjustments are what retitle() derives, row for row — a hand edit, a naming rule
+  // changed without `normalize`, or a ledger row added without it, shows here.
+  const drift = e.length ? -1 : retitle(compat.entries, adjustmentsOf(ledger)).findIndex((x, i) => JSON.stringify(x) !== JSON.stringify(compat.entries[i]));
+  if (drift >= 0) e.push(`compat.entries[${drift}]: differs from what retitle() derives (title/game/variant/sameTitle, order, runtimeAdjustments from the ledger) — \`node scripts/player-data.mjs normalize\``);
   if (e.length) {
     console.error(`player-data: ${e.length} violations (docs/contracts/featurephone-public-data.md):\n  ${e.join('\n  ')}`);
     process.exit(1);
   }
   const count = (k) => JSON.stringify(compat.entries.reduce((m, x) => ((m[x[k]] = (m[x[k]] ?? 0) + 1), m), {}));
-  console.log(`player-data OK — ${compat.entries.length} titles · status ${count('status')} · platform ${count('platform')} · ${files.length} updates`);
+  const adjusted = compat.entries.filter((x) => x.runtimeAdjustments);
+  console.log(`player-data OK — ${compat.entries.length} titles · status ${count('status')} · platform ${count('platform')} · ${files.length} updates · runtimeAdjustments on ${adjusted.length} rows (ledger ${ledger.rows.length} rows)`);
   if (cmd === 'build') {
     const oi = args.indexOf('--out');
     if (oi < 0) process.exit(2);

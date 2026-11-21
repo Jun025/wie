@@ -2,6 +2,10 @@
 //! title in a state that is theirs, not a new player's. Each carrier's `from_archive` hands its
 //! file map and jar here before mounting; the lists are keyed by the MD5 of the jar, which names one
 //! build of one title whatever the carrier, so one list serves KTF, SKT and LGT alike.
+//!
+//! Nothing here touches a file on disk — only the map about to be mounted. Every row is also a row of
+//! `docs/contracts/runtime-adjustments.tsv` (a test below holds the two together), and the lists are
+//! reached from `from_archive` only: the same title loaded as a bare `.jar` mounts nothing to drop.
 
 use alloc::{borrow::ToOwned, collections::BTreeMap, format, string::String, vec::Vec};
 
@@ -69,7 +73,7 @@ pub const OWNER_SOUND_OFF_SETTINGS: &[([u8; 16], &[&str])] = &[
         ],
         &["12_0.ida"],
     ),
-    // 8bfd08fe4370: 18 bytes; the title writes 18 bytes back when it is absent.
+    // 8bfd08fe4370 and 704839f1a6c8 (two packages, this one jar): 18 bytes; the title writes 18 bytes back when it is absent.
     (
         [
             0x01, 0xe6, 0x86, 0xc6, 0xfb, 0x5a, 0x46, 0xde, 0x39, 0xb3, 0x7e, 0xa4, 0x18, 0x51, 0x9e, 0x3b,
@@ -449,6 +453,17 @@ mod tests {
             assert_eq!(names(hex).filter(|names| names.contains(&file)), None, "{hex} {file}");
             assert_eq!(row(hex).map(|(name, ..)| name), Some(file), "{hex} {file}");
         }
+    }
+
+    /// `docs/contracts/runtime-adjustments.tsv` lists exactly these tables: a row added here without a
+    /// ledger row — or a ledger row left behind — fails (CLAUDE.md «게임 파일 무수정 원칙»).
+    #[test]
+    fn the_ledger_lists_exactly_these_tables() {
+        let probe = md5::compute(WIRING_PROBE_JAR).0;
+        let titles = |keys: Vec<[u8; 16]>| keys.into_iter().filter(move |key| *key != probe).map(test_utils::hex);
+        test_utils::assert_ledger_lists("owner-sound-off-settings", titles(OWNER_SOUND_OFF_SETTINGS.iter().map(|x| x.0).collect()));
+        test_utils::assert_ledger_lists("owner-sound-off-bytes", titles(OWNER_SOUND_OFF_BYTES.iter().map(|x| x.0).collect()));
+        test_utils::assert_ledger_lists("owner-sound-off-xor", titles(OWNER_SOUND_OFF_XOR.iter().map(|x| x.0).collect()));
     }
 
     #[test]

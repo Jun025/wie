@@ -322,7 +322,15 @@ impl FakeNet {
 mod tests {
     use alloc::vec;
 
-    use super::FakeNet;
+    use super::{FakeNet, SERVERS};
+
+    /// `docs/contracts/runtime-adjustments.tsv` lists exactly this table's titles: a row added here without a
+    /// ledger row — or a ledger row left behind — fails (CLAUDE.md «게임 파일 무수정 원칙»).
+    #[test]
+    fn the_ledger_lists_exactly_this_table() {
+        // One row per (title, host, port); the ledger's key is the title.
+        test_utils::assert_ledger_lists("fake-servers", SERVERS.iter().map(|x| x.aid.into()));
+    }
 
     // A title with no listed server keeps the old answers: no socket, so every caller's
     // «no network» branch is untouched.

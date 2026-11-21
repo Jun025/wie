@@ -365,7 +365,15 @@ mod tests {
     use wie_core_arm::{Allocator, ArmCore};
     use wie_util::{Result, WieError};
 
-    use super::{KtfJvmSupport, KtfTaskRunner, private_path};
+    use super::{DEVICE_BOUND_SAVES, KtfJvmSupport, KtfTaskRunner, OWNER_PROGRESS_SAVES, private_path};
+
+    /// `docs/contracts/runtime-adjustments.tsv` lists exactly these tables: a row added here without a
+    /// ledger row — or a ledger row left behind — fails (CLAUDE.md «게임 파일 무수정 원칙»).
+    #[test]
+    fn the_ledger_lists_exactly_these_tables() {
+        test_utils::assert_ledger_lists("device-bound-saves", DEVICE_BOUND_SAVES.iter().map(|x| test_utils::hex(x.0)));
+        test_utils::assert_ledger_lists("owner-progress-saves", OWNER_PROGRESS_SAVES.iter().map(|x| test_utils::hex(x.0)));
+    }
 
     #[test]
     fn private_directory_mounts_at_the_root_in_either_case() {

@@ -23,7 +23,8 @@
 //!
 //! Adding a row is an operator decision per title (the 2026-10-02 「인증 우회 0」 ruling is
 //! lifted one sha at a time), not an engine judgement. Do not generalise it into a rule that
-//! catches a sixth title for free.
+//! catches a sixth title for free. A row here is a row of `docs/contracts/runtime-adjustments.tsv`
+//! in the same change — the test below fails without it.
 
 /// A method whose body is skipped, answering `value` instead.
 #[derive(Debug)]
@@ -134,6 +135,13 @@ mod tests {
         assert!(!hashes.contains(&[0u8; 16]));
         assert!(PATCHES.iter().all(|x| !x.methods.is_empty()));
         assert!(PATCHES.iter().flat_map(|x| x.methods).all(|x| x.descriptor == IS_VALID));
+    }
+
+    /// `docs/contracts/runtime-adjustments.tsv` lists exactly this table: a row added here without a
+    /// ledger row — or a ledger row left behind — fails (CLAUDE.md «게임 파일 무수정 원칙»).
+    #[test]
+    fn the_ledger_lists_exactly_this_table() {
+        test_utils::assert_ledger_lists("class-patches", PATCHES.iter().map(|x| test_utils::hex(x.md5)));
     }
 
     /// A class nobody listed is not patched — the table's whole scope argument.

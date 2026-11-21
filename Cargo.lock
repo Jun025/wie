@@ -4936,6 +4936,7 @@ dependencies = [
  "smaf",
  "smaf-player",
  "spin",
+ "test-utils",
  "tracing",
  "wie-util",
  "zip",

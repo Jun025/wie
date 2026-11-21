@@ -108,7 +108,10 @@
    "changes": [],
    "fileTitle": "간호사타이쿤",
    "game": "간호사타이쿤",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "5a0fa312a793aee59d7a9cbda9f9671046e950e7b99e0c77b12f941fac28ef6e",
@@ -150,7 +153,10 @@
    "changes": [],
    "fileTitle": "강철의 연금술사2",
    "game": "강철의 연금술사2",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "f07cbc7828280b886fdef164b7a1fe16fff107ea60e4086a4167b61a551aef87",
@@ -299,7 +305,10 @@
    "changes": [],
    "fileTitle": "겟앰프드",
    "game": "겟앰프드",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "cb7c7f87f9e65cb754d5e79df9e8a46eae28e72a1227280bb4586eedc3ae46b6",
@@ -488,7 +497,10 @@
    "changes": [],
    "fileTitle": "금광을찾아서",
    "game": "금광을찾아서",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "232122cdfb92bfce20f454fbd41c20ef20721d93fdbd289f95415caa5c4878e1",
@@ -868,7 +880,10 @@
    "changes": [],
    "fileTitle": "kt 던전앤히어로",
    "game": "던전앤히어로",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "d4188f8ef8c48cc08c1b08972f463255fb7e156a5de477e537972826e63bb6cf",
@@ -1198,7 +1213,10 @@
    "changes": [],
    "fileTitle": "드래곤아이즈2",
    "game": "드래곤아이즈2",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "local-server"
+   ]
   },
   {
    "sha256": "859aa864797b0b2cfd0d247230351a58bdf6300c3c747ec5d526fe45a92721f4",
@@ -1540,7 +1558,10 @@
    "changes": [],
    "fileTitle": "리얼타짜맞고",
    "game": "리얼타짜맞고",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "4b1c1947950ee6e279807a6c8b10e04d548ce06e6b16e7a5fa83545cf02ac194",
@@ -1852,7 +1873,10 @@
    "changes": [],
    "fileTitle": "메이플스토리 도적편",
    "game": "메이플스토리 도적편",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "1cdea1985955460922ffda7a4729417b015d30b15a3db5c504a26ced37be7054",
@@ -2235,7 +2259,10 @@
    "changes": [],
    "fileTitle": "미니게임패밀리",
    "game": "미니게임패밀리",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "0c67145b11dff72242c85d83fb07f77216c71fdc16fc63a332e1830355e56d2a",
@@ -2298,7 +2325,10 @@
    "changes": [],
    "fileTitle": "KTF 미니미니오락실",
    "game": "미니미니오락실",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "6d63b4025bef5daa073bf4376aee9bb70e2981362c578f782cb9313dc94169d2",
@@ -2343,7 +2373,10 @@
    "changes": [],
    "fileTitle": "박명수호통맞고",
    "game": "박명수호통맞고",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "d552e095ddcfd388fcfea591275cfc768fd70facabfdac451880a45516ed372d",
@@ -2535,7 +2568,10 @@
    "changes": [],
    "fileTitle": "북천항해기2",
    "game": "북천항해기2",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "17423775854221e0c46348367e0834e823f62cccbfdae4510e202cc8ea4fec7f",
@@ -2628,7 +2664,10 @@
    "changes": [],
    "fileTitle": "블레이드마스터2",
    "game": "블레이드마스터2",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-bytes"
+   ]
   },
   {
    "sha256": "37326ecc6a092d5fcbc3dd9553f0b880f4622630ed4afd9af28beed918f52992",
@@ -2714,7 +2753,10 @@
    "changes": [],
    "fileTitle": "삼국축구대전",
    "game": "삼국축구대전",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "ae212f5390ce5362afce49fe01b3c4dabd9ca2a1e4bd91fe8c42317fe8d72e6a",
@@ -2882,7 +2924,10 @@
    "changes": [],
    "fileTitle": "소울카드마스터2",
    "game": "소울카드마스터2",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "2cbd63e4427a87748f53adecfb633a50874d0ed6dfa3ecd56292d9ef65169bb8",
@@ -3122,7 +3167,10 @@
    "changes": [],
    "fileTitle": "심시티 2억에디트1",
    "game": "심시티",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-bytes"
+   ]
   },
   {
    "sha256": "689c491586b91ed8afde488d092c777da0874b29250f0724d7a6c9ee1e690ba8",
@@ -3634,7 +3682,10 @@
    "changes": [],
    "fileTitle": "영웅전설3 하얀마녀",
    "game": "영웅전설3 하얀마녀",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "182fa44210dc07ab275906a6a5e1ff1c0467017ff6f71492a0db7a73c1db8e61",
@@ -3786,7 +3837,10 @@
    "changes": [],
    "fileTitle": "월드크래프트",
    "game": "월드크래프트",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "93d5b6b8ceb5cf4ce15784e369a7af9cd8ef7a49d6f15816d665aedadc487a4a",
@@ -3851,7 +3905,10 @@
    "fileTitle": "이노티아연대기2",
    "game": "이노티아연대기2",
    "variant": null,
-   "sameTitle": "same-game"
+   "sameTitle": "same-game",
+   "runtimeAdjustments": [
+    "lock-lift"
+   ]
   },
   {
    "sha256": "974e0df9ab1e51751efdef21a0fe324ad79917f41cd049fcfaf7c46c14f9e324",
@@ -3872,7 +3929,10 @@
    "fileTitle": "이노티아연대기2",
    "game": "이노티아연대기2",
    "variant": null,
-   "sameTitle": "same-game"
+   "sameTitle": "same-game",
+   "runtimeAdjustments": [
+    "lock-lift"
+   ]
   },
   {
    "sha256": "d5e996a531183929161da88c311dded208208dabb871b74a007c2dd9ffa415da",
@@ -3917,7 +3977,10 @@
    "changes": [],
    "fileTitle": "이니셜k",
    "game": "이니셜k",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "01e2715ba07a4ac6be046e30a54634fefbb3cb7b2a98adb9c1454dcb3a0c1e51",
@@ -4133,7 +4196,10 @@
    "changes": [],
    "fileTitle": "점핑펭",
    "game": "점핑펭",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "e3089e5e94267f284e4848b465db188e66397961360597bc9e4c3dfe2e78e748",
@@ -4266,7 +4332,10 @@
    "changes": [],
    "fileTitle": "지상렬신맞고",
    "game": "지상렬신맞고",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "704839f1a6c88dc8d4c8d15e26a3047d9109a3187a2a274ddfdc383be8dfcb93",
@@ -4288,7 +4357,10 @@
    "fileTitle": "지크 kt",
    "game": "지크",
    "variant": null,
-   "sameTitle": "same-game"
+   "sameTitle": "same-game",
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "8bfd08fe4370f63efff69c97e65faf5ec19840d8445bae6e46f4815a91a141c2",
@@ -4310,7 +4382,10 @@
    "fileTitle": "지크",
    "game": "지크",
    "variant": null,
-   "sameTitle": "same-game"
+   "sameTitle": "same-game",
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "306dcdb03842e63cdf414755e2adccb840ef36b54cd6c636199fc53cd301f95d",
@@ -4806,7 +4881,10 @@
    "changes": [],
    "fileTitle": "코에이삼국지2",
    "game": "코에이삼국지2",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "965eee81e44282457b30826ecfce62f9d2333b321e1c0ddba961a9f9b06a7655",
@@ -5207,7 +5285,10 @@
    "changes": [],
    "fileTitle": "티어즈오브메탈",
    "game": "티어즈오브메탈",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "device-bound-save"
+   ]
   },
   {
    "sha256": "74cb49013d6441f7eb0c719aa358ff55d82cf4577b22f2532b6574e278744078",
@@ -5312,7 +5393,10 @@
    "changes": [],
    "fileTitle": "[큰화]페이블오브나이트",
    "game": "페이블오브나이트",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "568c339a8c0761896f6f1991fc8f2bbebd7ff6ae64e9a4ba0f35c6a60f1cb7d2",
@@ -5445,7 +5529,10 @@
    "changes": [],
    "fileTitle": "피자타이쿤",
    "game": "피자타이쿤",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "97c4d85924b959360a9190522444a925d517b832685212cf8157688699e3226a",
@@ -5594,7 +5681,10 @@
    "changes": [],
    "fileTitle": "헬싱",
    "game": "헬싱",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "f12d97040c3333a09540024e13d4474a121a37e53aef6dff0c85ea71a6e23104",
@@ -5958,7 +6048,11 @@
    "changes": [],
    "fileTitle": "게임빌2010프로야구",
    "game": "게임빌2010프로야구",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "lock-lift",
+    "owner-file-bytes"
+   ]
   },
   {
    "sha256": "236c7da689f6bbb3b99f1e4a9271f24a68c84ae19e0ed39ad5d39abd4e7b5616",
@@ -6023,7 +6117,10 @@
    "changes": [],
    "fileTitle": "냐옹타이쿤2",
    "game": "냐옹타이쿤2",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "local-server"
+   ]
   },
   {
    "sha256": "b475b63996844c2b4108224ec6ddb15f31ba8ac336dffcbebc4985d29009e930",
@@ -6348,7 +6445,10 @@
    "changes": [],
    "fileTitle": "리듬스타2",
    "game": "리듬스타2",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "local-server"
+   ]
   },
   {
    "sha256": "863b8ab6a21df2c05e0d9ad085a5068fdf37433940093efe289b6459b7c1e7e9",
@@ -6479,7 +6579,10 @@
    "changes": [],
    "fileTitle": "몬스터마스터",
    "game": "몬스터마스터",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "local-server"
+   ]
   },
   {
    "sha256": "0baceb1dfe9c388d08e9225fabdf68ee82f289fa42fdfec9cfab77c78f553288",
@@ -6587,7 +6690,10 @@
    "changes": [],
    "fileTitle": "배틀몬스터",
    "game": "배틀몬스터",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "orphan-flag"
+   ]
   },
   {
    "sha256": "dddac90779620a9721cfd5a8f5cf1c1aded09857361fdb7638157d71f96ecc88",
@@ -6801,7 +6907,10 @@
    "changes": [],
    "fileTitle": "아니마",
    "game": "아니마",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "local-server"
+   ]
   },
   {
    "sha256": "fe76e641bb3df380b5a2cbd61b978c83c0cbead3ea3c13b6cf38b07571e74c5a",
@@ -7251,7 +7360,10 @@
    "changes": [],
    "fileTitle": "lgt 테라 영원의 혼돈",
    "game": "테라 영원의 혼돈",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "local-server"
+   ]
   },
   {
    "sha256": "f5e21001612d95d72f20277f9c42d19f6c2ee07c0dc93151ecccc257f95217b6",
@@ -7621,7 +7733,10 @@
    "changes": [],
    "fileTitle": "노리맥스영웅전",
    "game": "노리맥스영웅전",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "lock-lift"
+   ]
   },
   {
    "sha256": "a0436eb1ddbb0501ac3fe43a55c073b75b8344ffa2c1f297beeb2d204de44cae",
@@ -7663,7 +7778,10 @@
    "changes": [],
    "fileTitle": "다크슬레이어2",
    "game": "다크슬레이어2",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-bytes"
+   ]
   },
   {
    "sha256": "9aa31965cd1042844c47cdd6267a09eeb6477b674a00710571674114b4eac053",
@@ -7927,7 +8045,11 @@
    "changes": [],
    "fileTitle": "레스토랑타이쿤2006",
    "game": "레스토랑타이쿤2006",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip",
+    "display-size"
+   ]
   },
   {
    "sha256": "d3e3b16cefd000fa8fd26eefeee32660d59429cbcf46870aa2007e5a5121f9b6",
@@ -8400,7 +8522,10 @@
    "changes": [],
    "fileTitle": "삼국지연의2",
    "game": "삼국지연의2",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "lock-lift"
+   ]
   },
   {
    "sha256": "4f99be2762e2bd85c5882d81d598fffd0e42ca109ecd52dee6cf9fa15c2b998a",
@@ -8507,7 +8632,10 @@
    "changes": [],
    "fileTitle": "스페셜포스",
    "game": "스페셜포스",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "lock-lift"
+   ]
   },
   {
    "sha256": "e9ea67541b01c7215b211e67d948358db5eb7e3718f405f3966b1c6264747bdb",
@@ -8639,7 +8767,10 @@
    "changes": [],
    "fileTitle": "어스토니시아ep3",
    "game": "어스토니시아ep3",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-skip"
+   ]
   },
   {
    "sha256": "38277d63b0ba2803076c82ff36f5bc1435d227d0401e4e9eedc455d56da5a68a",
@@ -8681,7 +8812,10 @@
    "changes": [],
    "fileTitle": "에이지오브엠파이어2",
    "game": "에이지오브엠파이어2",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-bytes"
+   ]
   },
   {
    "sha256": "f483ba078c14a2ea0e19a0cbe28ce36ffe7e16b6afc6847aa67f4a54f66feb72",
@@ -8702,7 +8836,10 @@
    "changes": [],
    "fileTitle": "엑스맨",
    "game": "엑스맨",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-bytes"
+   ]
   },
   {
    "sha256": "0262a4fe3389fc957b2597e92f71a1c17db91e0728b656042b8a14f7f345c2af",
@@ -8941,7 +9078,10 @@
    "changes": [],
    "fileTitle": "코인마스터",
    "game": "코인마스터",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "owner-file-bytes"
+   ]
   },
   {
    "sha256": "71d1d8235bd1cbad0911d53af22d00ab7d1c23ad27e99defa58f9c9c15cc44a7",
@@ -9075,7 +9215,10 @@
    "changes": [],
    "fileTitle": "테일즈판타지 SKVM",
    "game": "테일즈판타지",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "lock-lift"
+   ]
   },
   {
    "sha256": "3eb73c20bbaea90fa348d1b61d82cf2378590ab5754848c448602328ffcd908e",
@@ -9187,7 +9330,10 @@
    "fileTitle": "프린세스메이커4 큰화면",
    "game": "프린세스메이커4",
    "variant": "큰화면",
-   "sameTitle": "same-game"
+   "sameTitle": "same-game",
+   "runtimeAdjustments": [
+    "owner-file-bytes"
+   ]
   },
   {
    "sha256": "640428a9cf9ede0b5b92b5b549b8a0e95d620a63ea084f848a4b2a54b0c01a38",
@@ -9231,7 +9377,10 @@
    "changes": [],
    "fileTitle": "Chaos블레이드",
    "game": "Chaos블레이드",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "lock-lift"
+   ]
   },
   {
    "sha256": "55c453b46254460145e7c9754f88af88aca3695928b0a98f47ce97a432842c24",

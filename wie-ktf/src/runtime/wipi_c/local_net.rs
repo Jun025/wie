@@ -182,7 +182,14 @@ impl MethodBody<WieError> for Callback {
 
 #[cfg(test)]
 mod tests {
-    use super::download_list_nothing;
+    use super::{SERVERS, download_list_nothing};
+
+    /// `docs/contracts/runtime-adjustments.tsv` lists exactly this table: a row added here without a
+    /// ledger row — or a ledger row left behind — fails (CLAUDE.md «게임 파일 무수정 원칙»).
+    #[test]
+    fn the_ledger_lists_exactly_this_table() {
+        test_utils::assert_ledger_lists("ktf-local-servers", SERVERS.iter().map(|x| x.aid.into()));
+    }
 
     #[test]
     fn the_list_request_is_answered_with_an_empty_list() {
