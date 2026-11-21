@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-13",
+  "task": "wie-zenonia1-timer-cadence-halved-after-553-and-heavy-scene-cost",
+  "title": "LGT 3cc7a9b4cb15 박자 판정(현행 55ms 가 정답) + 계기 표면 frames_painted()",
+  "summary": "#553 뒤 «박자 절반» 신고를 갈랐다. 게임 코드(0x19f18 · 주기 = 1000 ÷ (4×속도설정+6))와 환경설정 실측(55 → 166 → 100ms)으로 현행 초당 18프레임이 게임 자신의 주기이고, 그 전 36프레임은 타이머 사슬 둘이던 결함임을 확인했다. 타이머 코드는 바꾸지 않았다. 무거운 장면은 ARM 해석기 몫(프레임 비용의 약 80%)이고 «시계 읽기 7.5%»는 헛돌기였다. 셸이 느려짐을 수로 볼 수 있게 WieEmulator.frames_painted() 를 넣었다. docs/report/0557.",
+  "changes": [
+    "wie_featurephone: WieEmulator.frames_painted() — 게임이 화면에 낸 프레임 수(누적)",
+    "docs/contracts/featurephone-engine-contract.json: methods + framesPaintedNote · wie_web.js 상한 40,000 → 42,000",
+    "scripts/contract-roundtrip.mjs: A(부팅 직후 0) · C(그린 뒤 1 이상)",
+    "wie-wipi-c kernel.rs 주석: «37ms 타이머» → 55ms"
+  ],
+  "verification": "fmt · clippy(stable · wasm32) rc=0 · cargo test --all 54 스위트 837 pass · 러너 블록 6종 PASS · check-engine-contract 139 pass · contract-roundtrip 69/69(증가 줄 삭제 시 68/69). beta clippy 는 기존 red(src/window.rs:217 · 손대지 않은 트리에서도 같다).",
+  "limits": "계수는 네이티브 wie_validate 에서 셌다. 60Hz 브라우저 수치는 앱 쪽 회신의 것을 모형으로 검산만 했다. 기기 1대.",
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "ARM 해석기 처리량 — 무거운 장면에서 게임 본래 박자를 못 낸다",
+      "plainSummary": "KTF·LGT 게임의 화면이 복잡해지면 엔진이 한 프레임을 제때 못 만들어 게임이 느려진다. 그 시간의 약 80%가 ARM 명령을 하나씩 해석하는 루프(arm32_cpu Cpu::step)에서 쓰인다. 명령 해독을 캐시하거나 묶음 단위로 실행해 이 루프를 빠르게 한다.",
+      "userBenefit": "LGT 3cc7a9b4cb15 의 저녁 마을이 M1 에서 초당 15 → 18프레임(게임 본래 속도)으로, 그보다 2배 느린 기기에서 8 → 약 11프레임으로 오른다(해석기 1.5배 기준 모형 값). 같은 해석기를 쓰는 다른 KTF·LGT 타이틀의 무거운 장면도 같이 오른다.",
+      "why": "이 회차 실측: 브라우저 프로파일에서 벽시계의 57.2%(프레임당 37.9ms)가 해석기 함수 1개였고, 네이티브 표본도 같은 함수가 1위였다. 타이머·시계 읽기·틱 예산 쪽에는 한두 줄로 닫히는 이득이 없었다(0557 §3).",
+      "tradeoff": "arm32_cpu 는 외부 크레이트(0.1)라 포크하거나 upstream 에 기여해야 한다. 해석기를 바꾸면 KTF·LGT 전 타이틀의 회귀 전수가 필요하다. 먼저 명령당 고정비(run 루프의 reg_get 3회 · 10% 이하)부터 재는 작은 회차로 시작할 수 있다.",
+      "effort": "L",
+      "target": "wie-core-arm/src/engine/arm32_cpu.rs · arm32_cpu 크레이트"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}

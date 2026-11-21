@@ -1,0 +1,9 @@
+{
+  "date": "2026-11-06",
+  "kind": "improvement",
+  "titles": [
+    "fe76e641bb3df380b5a2cbd61b978c83c0cbead3ea3c13b6cf38b07571e74c5a"
+  ],
+  "summary_ko": "진도가 막힌다고 표시하던 LGT 게임 1개를 10분 동안 다시 해 봤어요. 방을 나와 거리로 가고 돈과 시간이 계속 늘어나서, 이제 진도 막힘 표시를 지웠어요.",
+  "pr": "https://github.com/Jun025/wie/pull/585"
+}

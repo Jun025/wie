@@ -28,7 +28,9 @@
 import { lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
 
-const MAP = { 'n/a': 'unknown', fail: 'no', none: 'no', uniform: 'no', error: 'no', silent: 'no', slow: 'no', stall: 'no' };
+// ponytail: `short` (the guest ended the long run early) is `unknown`, so it is never a side — a guard that
+// STARTS quitting early reads as «no long run this round», not as down. Rank it if that ever hides one.
+const MAP = { 'n/a': 'unknown', short: 'unknown', fail: 'no', none: 'no', uniform: 'no', error: 'no', silent: 'no', slow: 'no', stall: 'no' };
 const norm = (v) => MAP[v] ?? v ?? 'unknown';
 const RANK = { ok: 2, partial: 1, no: 0 };
 const STATUS = { playable: 2, limited: 1, 'not-yet': 0 };
@@ -191,6 +193,7 @@ if (cmd === 'changed') {
     ['an unchanged row with no long run this round is unchanged', !d.down.concat(d.up).some((x) => x.sha12.startsWith('3'))],
     ['a long-run row: longplay error is down', k(drift(base, { entries: [row(1, 'limited', ax({ longplay: 'error' }))] }, L1).down) === '1:longplay 1:status'],
     ['a long row whose long run never happened: silent is not down', drift(base, { entries: [row(1, 'limited', ax({ input: 'none', longplay: 'n/a', sound: 'silent' }))] }, L1).down.every((x) => x.axis !== 'sound')],
+    ['a long row whose long run ended early: unknown, not down', drift(base, { entries: [row(1, 'limited', ax({ longplay: 'short' }))] }, L1).down.length === 0],
     ['suspects count rows, not axes', suspectRows(confirm(d.down, d.down)) === 1],
     ['a long-run row: silent is down', k(drift(base, { entries: [row(1, 'playable', ax({ sound: 'silent' }))] }, L1).down) === '1:sound'],
     ['a wall keeps the measured status', k(drift(base, { entries: [row(3, 'limited', ax({ longplay: 'n/a' }), { knownIssues_ko: ['그 서버가 지금은 없어'] })] }).down) === '3:status'],
