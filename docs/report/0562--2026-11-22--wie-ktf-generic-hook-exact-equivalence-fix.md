@@ -81,7 +81,8 @@ assertion `left == right` failed: hooked (left) vs the routine itself (right)
 
 `bash scripts/hook-shadow-sweep.sh <out> <훅 걸린 KTF 264판>` — 실행 인자는 측정과 같다(census 탐침 A: `--inject --keep-timeout --timeout 30 --max-ticks 100000000000 --pacing 8 --relaunch 1`).
 `1fe6c1c897d7` 만 겹침 호출에 닿도록 `HOOK_SHADOW_TIMEOUT=100`. 동시 3개 · `build-slot --long` 임대 1건에 60판.
-바이너리 = 커밋 `0ed2001a2` 의 릴리스 빌드. 그 뒤의 커밋은 문서와 `binary_patches.toml` 주석뿐이다(`git diff 0ed2001a2 HEAD -- '*.rs'` 0줄).
+바이너리 = 커밋 `0ed2001a2` 의 릴리스 빌드. 그 뒤 이 브랜치가 더한 것은 문서와 `binary_patches.toml` 주석뿐이다(`git diff 0ed2001a2 ddca37673 -- '*.rs'` 0줄).
+전수가 도는 동안 main 이 움직였다(#592 · #584). 당긴 뒤의 확인은 이 절 끝에 따로 적는다.
 
 | 패턴 | 발화한 판 | 발화 = 대조 | 메모리 다름 | 결과 다름 | 보존 레지스터 다름 | 게임 코드에 넘김 | 건너뜀 · 원래 코드 실패 |
 |---|---|---|---|---|---|---|---|
@@ -115,7 +116,35 @@ assertion `left == right` failed: hooked (left) vs the routine itself (right)
   같은 판을 고친 빌드로 8회(이번 전수 1 · 훅 그대로 3 · 그림자 3 · 디버그 1), 측정 바이너리로 6회 더 돌려 14회 모두 30초를 채웠다. 고친 빌드 9회 중 1회 · 측정 바이너리 7회 중 0회(측정 전수 포함)다.
   이른 종료가 키가 닿는 시각에 달렸다는 것은 `docs/report/0561` 이 14판에서 본 바와 같지만, 이 1회가 부하 탓이라고 증명하지는 못했다.
 
-### 4. 한계
+**main 을 당긴 뒤(`c66136a68`)** — #592 가 해석기 실행 루프에서 SVC 검사 자리를 옮겼다(`arm32_cpu.rs` · 훅이 발화하는 길). 훅 코드는 그대로다.
+당긴 머리의 릴리스 빌드로 59판을 다시 돌렸다: 차이가 났던 3판 + 인라인 루프 패턴이 있는 14판 전부 + 겹침이 관측된 판 3 + sha 순 6번째마다(08:03 ~ 08:14 · load1 17.6 ~ 73.0).
+
+| 패턴 | 발화한 판 | 발화 = 대조 | 다름(메모리 · 결과 · 보존) | 게임 코드에 넘김 |
+|---|---|---|---|---|
+| `memcpy` | 59 | 3,278,173 | 0 | 2 |
+| `strcpy` | 18 | 2,749 | 0 | 4 |
+| `strlen` | 57 | 107,991 | 0 | 0 |
+| 레지스터 인라인 루프 | 6 | 904 | 0 | — |
+| 스택 인라인 루프 | 1 | 311 | 0 | — |
+| 합 | 59 | 3,390,128 | **0** | 6 |
+
+- `1fe6c1c897d7`(100초): 겹치는 2회에 다시 닿았고 다름 0. `f80ca6d2cb48`: 루프 311회 · 다름 0.
+- `d9384b388ea5` 는 이 실행(1,244,437회)에서 겹치는 호출에 닿지 않았다. 이 판의 겹침 대조는 당기기 전 빌드의 것(위 전수)뿐이다.
+- **당긴 머리로는 전수(264판)를 다시 돌리지 않았다.** 나머지 205판의 대조는 `0ed2001a2` 빌드의 것이다.
+
+### 4. 게이트 — 당긴 머리 `c66136a68`
+
+| 게이트 | 결과 |
+|---|---|
+| `cargo fmt --all -- --check` | rc=0 |
+| `cargo clippy --all -- -D warnings` | rc=0 |
+| `cargo clippy --target wasm32-unknown-unknown -- -D warnings` | rc=0(아래 한계의 마지막 줄을 볼 것) |
+| `cargo clippy --target wasm32-unknown-unknown -p wie-core-arm -p wie_featurephone -- -D warnings` | rc=0 |
+| `cargo +beta clippy --all -- -D warnings`(1.101.0-beta.2) | rc=0 |
+| `RUST_MIN_STACK=4194304 cargo test --all` | rc=0 · 54 스위트 · 854 pass · 0 fail |
+| 러너 블록 6종(`draw_j2me` · `helloworld_ktf` · `helloworld_lgt` · `keydraw_ktf` · `keydraw_lgt` · `text_j2me`) | 전부 PASS · rc=0(`keydraw_*` 는 `content true` · 마지막 화면 내용 있음 · 키 27/27) |
+
+### 5. 한계
 
 - **`memset` 은 한 번도 불리지 않았다**(264곳 · 0회 — 측정 때와 같다). 대조한 호출이 없으므로 «확인»이 아니다. `binary_patches.toml` 의 그 항목 주석에 그대로 적었다.
 - 발화하지 않은 곳은 대조가 없다. 입력은 탐침 A 한 가지 · 30초다.
@@ -126,6 +155,3 @@ assertion `left == right` failed: hooked (left) vs the routine itself (right)
 - 브라우저 호스트로는 돌리지 않았다(같은 크레이트 코드 · 그림자 모듈만 빠진다).
 - 조정 장부는 이 repo 에 없다. 규칙은 `binary_patches.toml` 의 범용 항목 머리 주석과 `AGENTS.md`(`hook-shadow-sweep.sh` 항)에 적었다.
 - `cargo clippy --target wasm32-unknown-unknown -- -D warnings`(네 게이트의 셋째)는 `wie-core-arm` 을 보지 않는다 — 기본 멤버인 루트 크레이트가 wasm 에서 엔진 크레이트에 기대지 않아, 이 파일을 고친 뒤에도 0.9초에 끝난다. 이 회차는 `-p wie-core-arm -p wie_featurephone` 을 붙여 따로 돌렸다(rc=0).
-- 유입(`node scripts/corpus-name-inflow.mjs`, 이 브랜치 대 `origin/main`): BOUNDED 4회/3쌍 · SUFFIX-ATTACHED 0회/0쌍이다. 바뀐 파일 «전체»를 훑은 수다. BOUNDED 4 는 전부 `wie_cli/src/bin/wie_validate.rs` 에 이미 있던 주석 줄이고, 이 회차가 그 파일에 더한 11줄에는 걸린 것이 없다.
-
-<!-- corpus-name-inflow v1 subjects=11 tree=665ca4e61c751caa B=4/3 P=5/2 S=0/0 -->
