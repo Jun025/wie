@@ -103,3 +103,6 @@ fixed selftest rc=0
 - 389행은 보관 기록에 기댄다(§1 ⑶). 다음 전수 재측에서 새 판정이 그대로 걸린다.
 - 이 측정은 부하가 높았다(load1 109 ~ 302). 판정이 `stop` 이라 벽시계 속도에는 안 기대지만, 키가 닿는 화면은 부하에 따라 달라질 수 있다.
 - `short` 가 엔진 쪽인지는 B 로만 가른다. 이번 14행에는 «키 없이도 꺼지는» 판이 없었다.
+- 유입(`node scripts/corpus-name-inflow.mjs`, 이 브랜치 대 `origin/main`): BOUNDED 15회/15쌍 · SUFFIX-ATTACHED 1회/1쌍이다. 바뀐 파일 «전체»를 훑은 수다. BOUNDED 15 는 전부 `scripts/player-data.mjs` 에 이미 있던 이름 목록(#588)이고, SUFFIX-ATTACHED 1 은 `scripts/playability-census.mjs` 에 이미 있던 요령 문장의 한 낱말이다. 이 회차가 더한 줄에는 걸린 것이 없다.
+
+<!-- corpus-name-inflow v1 subjects=5 tree=46d767fa2a5fa874 B=15/15 P=3/3 S=1/1 -->
