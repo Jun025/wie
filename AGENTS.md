@@ -423,7 +423,7 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   `WIE_HOOK_MODE=shadow`, `wie_validate` runs the title's own code beside every hook fire and compares
   what each left (what is compared and what is not: `hook/shadow.rs`). The sweep prints fires ·
   compared · mismatches per pattern and exits 1 on any mismatch. A site that never fired was not
-  compared, and a starved host reaches fewer calls — read `fires` and `load1` first (`docs/report/0562`).
+  compared, and a starved host reaches fewer calls — read `fires` and `load1` first (`docs/report/0565`).
 
 - **`scripts/audio-probe.mjs` — local only (it needs a game file), and it is how an audio change is
   checked in a real browser.** It boots the featurephone engine in headless Chromium through the

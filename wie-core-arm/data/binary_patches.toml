@@ -59,7 +59,7 @@
 # A generic hook is a faster way to the SAME result as the title's own code, and it stays here
 # only while the shadow comparison finds no difference: `scripts/hook-shadow-sweep.sh` over every
 # hooked KTF package (AGENTS.md; what is compared: `src/binary_patches/hook/shadow.rs`).
-# Last confirmed 2026-11-22 — 264 packages, 0 mismatches (docs/report/0562).
+# Last confirmed 2026-11-22 — 264 packages, 0 mismatches (docs/report/0565).
 # A call the engine cannot answer exactly is not answered: the library kinds hand overlapping
 # buffers and any access the host refuses to the title's own routine, and the loop kinds give such
 # a site back to the title's own loop.

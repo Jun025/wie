@@ -2,7 +2,7 @@
   "date": "2026-11-22",
   "task": "wie-ktf-generic-hook-exact-equivalence-fix",
   "title": "KTF 범용 훅을 게임 자신의 코드와 같은 결과로 + 그림자 대조 도구",
-  "summary": "측정이 찾은 2판과 이 회차 전수가 더 찾은 1판(d9384b388ea5)의 차이(스택 인라인 루프 1바이트 · 앞쪽 겹침 memcpy)를 닫았다. 전수 그림자 대조 264판 · 7,476,287회 · 불일치 0. 라이브러리 훅은 겹치는 호출과 호스트가 거절하는 접근을 게임 자신의 루틴에 넘기고, 인라인 루프 훅은 바이트 루프와 같은 결과로 복사한다. WIE_HOOK_MODE=shadow 대조와 scripts/hook-shadow-sweep.sh 를 개발 도구로 뒀다. docs/report/0562.",
+  "summary": "측정이 찾은 2판과 이 회차 전수가 더 찾은 1판(d9384b388ea5)의 차이(스택 인라인 루프 1바이트 · 앞쪽 겹침 memcpy)를 닫았다. 전수 그림자 대조 264판 · 7,476,287회 · 불일치 0. 라이브러리 훅은 겹치는 호출과 호스트가 거절하는 접근을 게임 자신의 루틴에 넘기고, 인라인 루프 훅은 바이트 루프와 같은 결과로 복사한다. WIE_HOOK_MODE=shadow 대조와 scripts/hook-shadow-sweep.sh 를 개발 도구로 뒀다. docs/report/0565.",
   "changes": [
     "wie-core-arm hook.rs: 라이브러리 4종은 겹침·호스트 거절 시 게임 루틴으로(resume_original) · inline_copy 는 len+1 · 설치 때 조건 검사 꼴 확인 · 루프 2종은 copy_as_byte_loop · 못 닿는 범위는 unhook",
     "wie-core-arm hook/shadow.rs: 그림자 대조(wasm32 제외) · wie_validate 가 WIE_HOOK_MODE=shadow 일 때만 켬",
