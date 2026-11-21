@@ -43,4 +43,4 @@ web 은 죽은 두 브랜치(원격에 없음 — `git ls-remote --heads` 빈 �
 그 run 이 위 «스텝이 전부 skip 된 잡은 success 로 끝난다»의 첫 실측이다 — 결과는 `gh pr checks 586 -R Jun025/wie` 와
 이 티켓의 회신에 있다(여기 다시 적으면 그 커밋이 run 을 한 번 더 만든다).
 
-<!-- corpus-name-inflow v1 subjects=6 tree=4cded8869ea231b5 B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=6 tree=79d717ad7ba392b2 B=0/0 P=0/0 S=0/0 -->
