@@ -58,5 +58,7 @@ web 은 죽은 두 브랜치(원격에 없음 — `git ls-remote --heads` 빈 �
 - **안 한 것**: 빈 다리의 `runs-on` 을 ubuntu 로 돌리기(검수 S5). `runs-on` 은 `env` 를 못 읽어 이벤트 조건을 한 번 더 적어야 하고, 두 식이
   어긋나면 주간 run 의 macOS 다리가 ubuntu 에서 돌고도 그 이름으로 green 이 된다 — 착지 전에 돌려 볼 수 없는 경로에 조용한 고장점을 하나 더 만든다.
 - 분모 `~1,480`(4종 합)은 위 표의 `약 1,530`(전체)으로 맞췄다(`rust.yml`·`coverage.yml` 주석).
+- `wie_validate.rs` 의 doc 주석 "runs it on all six matrix legs" 는 그대로다 — 제품 소스 파일이고, 그 파일을 건드리면 유입 도구가
+  파일에 원래 있던 제목 3종을 이 PR 의 유입으로 센다(재 봄: B=4/3). 사실은 `AGENTS.md` 의 그 문단이 이제 말한다.
 
 <!-- corpus-name-inflow v1 subjects=6 tree=79d717ad7ba392b2 B=0/0 P=0/0 S=0/0 -->
