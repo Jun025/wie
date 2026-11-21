@@ -273,6 +273,35 @@ mod tests {
         }
     }
 
+    /// `docs/contracts/runtime-adjustments.tsv` lists exactly this table: a row added here without a
+    /// ledger row — or a ledger row left behind — fails (CLAUDE.md «게임 파일 무수정 원칙»).
+    /// The counts its `memoryCode` states — how much loaded game code is rewritten — are this table's too.
+    #[test]
+    fn the_ledger_lists_exactly_this_table() {
+        let entries = parser::binary_patches();
+        let rewrites = |e: &Entry| e.patches.len() + e.patch_patterns.len() + e.hooks.len() + e.hook_patterns.len();
+        let keyed = entries
+            .iter()
+            .filter_map(|e| Some((test_utils::hex(e.hash?), rewrites(e))))
+            .collect::<Vec<_>>();
+        test_utils::assert_ledger_lists("binary-patches", keyed.iter().map(|(key, _)| key.clone()));
+
+        // A key two packages share counts once per package: a rewritten site is a site in one loaded title.
+        let packages = test_utils::ledger_keys("binary-patches");
+        let sites = packages.iter().map(|key| keyed.iter().find(|(k, _)| k == key).unwrap().1).sum::<usize>();
+        let rows = keyed.iter().map(|(_, n)| n).sum::<usize>();
+        let generic = entries.iter().filter(|e| e.hash.is_none()).map(rewrites).sum::<usize>();
+        for line in [
+            format!("lock-lift patches: {rows} table rows, {sites} sites in {} packages", packages.len()),
+            format!("generic hooks: {generic} patterns"),
+        ] {
+            assert!(
+                test_utils::LEDGER.lines().any(|x| x.trim_start_matches(['#', ' ']) == line),
+                "the ledger must state «{line}»"
+            );
+        }
+    }
+
     #[test]
     fn pattern_scan_capture_extracts_dst_src() {
         let tokens = [

@@ -356,7 +356,14 @@ impl SktMsd {
 mod tests {
     use alloc::{collections::BTreeMap, vec, vec::Vec};
 
-    use super::{SktEmulator, SktMsd};
+    use super::{DISPLAY_OVERRIDES, SktEmulator, SktMsd};
+
+    /// `docs/contracts/runtime-adjustments.tsv` lists exactly this table: a row added here without a
+    /// ledger row — or a ledger row left behind — fails (CLAUDE.md «게임 파일 무수정 원칙»).
+    #[test]
+    fn the_ledger_lists_exactly_this_table() {
+        test_utils::assert_ledger_lists("display-overrides", DISPLAY_OVERRIDES.iter().map(|x| test_utils::hex(x.0)));
+    }
 
     // The rows are pinned in `wie-backend`; this pins that the SKT mount path applies them.
     #[test]

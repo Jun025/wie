@@ -1,0 +1,103 @@
+# 한 판(한 빌드)에만 걸리는 «실행 중 조정» 장부 — 엔진 표 11개의 행 전부.
+#
+# 디스크의 게임 파일 · 코퍼스 · 이용자 업로드는 한 바이트도 고치지 않는다. 아래 행은 전부 엔진이 파일을 읽어 들인 뒤
+# 메모리 안에서만 걸린다. 한 줄 = (엔진 표의 키 × 그 키가 걸리는 꾸러미) · 탭 구분 · `#` 줄은 주석이다.
+# 엔진 표에 행을 더하거나 빼면 같은 PR 에서 이 장부도 고친다 — 어긋나면 두 곳이 red 다:
+#   ⑴ `cargo test` 의 `the_ledger_lists_exactly_*`(표마다 하나 · `test-utils/src/ledger.rs`)가 표의 키 집합과 이 장부의 키 집합을 양방향으로 대조한다.
+#   ⑵ `node scripts/player-data.mjs` 가 이 장부에서 `docs/player-data/compat.json` 의 `runtimeAdjustments` 칸을 다시 만들어 커밋된 값과 대조한다
+#      (칸 손 기입 금지 · 장부를 고친 뒤 `node scripts/player-data.mjs normalize`).
+# 행을 더할 수 있는 조건은 `CLAUDE.md` «게임 파일 무수정 원칙»이다.
+#
+# 열
+#   device    엔진 표(아래 목록)            key      그 표의 키(MD5 32hex 또는 AID)
+#   package   꾸러미 파일 sha256 앞 12자    platform · title   `compat.json` 의 그 행 그대로
+#   kind      `compat.json` `runtimeAdjustments` 에 실리는 값(`docs/contracts/featurephone-public-data.md` §1)
+#   changes   무엇을 바꾸나: memory-code(메모리에 올린 게임 코드) · file-not-mounted(꾸러미 안 파일을 가상 파일로 올리지 않음 — 값은 안 바꿈) ·
+#             file-bytes(올리는 가상 파일의 바이트) · response(게임이 받는 답을 엔진이 만듦) · engine-setting(엔진 쪽 설정 · 게임 바이트 무접촉)
+#   scope     언제 걸리나: any = 그 바이너리 · 클래스를 올리는 모든 길 / zip = zip 꾸러미로 올렸을 때만(`from_archive`) — 같은 게임을 맨 `.jar` 로 올리면 걸리지 않는다 /
+#             aid = 꾸러미 설명 파일의 AID 가 키와 같을 때 — 맨 `.jar` 로 올리면 파일 이름(확장자 제외)이 AID 와 같을 때만. 지원 목록 429행의 파일은 전부 zip 이다.
+#   class     operator-directed = 운영자가 그 판을 이름으로 지시 / adopted = 추천 카드를 운영자 · cockpit 이 채택 /
+#             ratified-2026-11-20 = 추천 채택 · 총괄 발권으로 들어왔고 운영자가 직접 지시한 줄은 없던 것 — 2026-11-20 처분 결정(카드 featurephone-in-memory-adjustments-ratify-decision · A 유지)으로 추인
+#   basis     도입 근거(운영자 지시 원장 줄 · 티켓 · PR · 회차 문서). 비우면 red.
+#
+# device → 엔진 표 · 키
+#   binary-patches            wie-core-arm/data/binary_patches.toml 의 `hash =` 가 있는 `[[entry]]` · md5(본체 바이너리: KTF `client.bin*` · LGT `binary.mod`) · 패치마다 `expect`(원래 바이트)가 맞아야 설치된다
+#   class-patches             wie-jvm-support/src/class_patches.rs `PATCHES` · md5(클래스 파일) · 클래스 바이트는 그대로 두고 메서드 1개의 답만 바꾼다
+#   owner-sound-off-settings  wie-backend/src/owner_files.rs `OWNER_SOUND_OFF_SETTINGS` · md5(본체 jar) · 시험용 `WIRING_PROBE_JAR` 행 제외(아래 두 표도)
+#   owner-sound-off-bytes     wie-backend/src/owner_files.rs `OWNER_SOUND_OFF_BYTES` · md5(본체 jar)
+#   owner-sound-off-xor       wie-backend/src/owner_files.rs `OWNER_SOUND_OFF_XOR` · md5(본체 jar) · 그 파일의 MD5 가 꾸러미에 든 것과 같을 때만 고친다
+#   orphan-entries            wie-lgt/src/emulator.rs `ORPHAN_ENTRIES` · md5(본체 jar) · 짝이 되는 저장 본체가 꾸러미에 없을 때만 뺀다
+#   display-overrides         wie-skt/src/emulator.rs `DISPLAY_OVERRIDES` · md5(본체 jar)
+#   device-bound-saves        wie-ktf/src/emulator.rs `DEVICE_BOUND_SAVES` · md5(본체 jar)
+#   owner-progress-saves      wie-ktf/src/emulator.rs `OWNER_PROGRESS_SAVES` · md5(본체 jar)
+#   fake-servers              wie-backend/src/fake_server.rs `SERVERS` · AID · 표는 (AID, 호스트, 포트)마다 한 행(7행 · AID 5개)이고 그 접속에만 답한다 — 외부 통신 0
+#   ktf-local-servers         wie-ktf/src/runtime/wipi_c/local_net.rs `SERVERS` · AID · 외부 통신 0
+#
+# 메모리에 올린 게임 «코드»를 고쳐 쓰는 곳 — 디스크 0 · 아래 두 줄의 수는 `binary_patches.toml` 에서 센 값이고 `cargo test` 가 대조한다
+#   lock-lift patches: 5 table rows, 8 sites in 3 packages
+#   generic hooks: 6 patterns
+#   잠금 해제 패치(위 첫 줄)는 판정을 바꾸고 아래 `binary-patches` 행으로 센다. 범용 훅(둘째 줄)은 해시 키가 없는 바이트 패턴 항목이라 한 판 전용 조정이
+#   아니다: KTF 에서 패턴이 맞는 자리마다 코드 2바이트를 호출 명령으로 덮어써 복사 · 채움 · 문자열 루프를 엔진이 대신한다(가속 · LGT 는 설치하지 않는다).
+#   실측 2026-11-21(엔진 2e66f9d68 · 지원 목록 429판을 6초씩 부팅해 설치 로그 줄을 셈): KTF 269판 중 264판 · 872곳. `runtimeAdjustments` 표식에 넣지 않는다.
+#
+# 참고 — 이 장부의 범위 밖(키 없이 전 타이틀에 걸리는 일반 경로 · 출처만 건다)
+#   출처: orchestrator `reports/wie-featurephone-game-byte-rewrite-paths-census-and-disposition.done.md` §2 · `reports/wie-featurephone-game-byte-rewrite-census-independent-verify.done.md` §3
+#   KTF 사설 폴더(`P/` · `p/`)를 루트에 올림(wie-ktf/src/emulator.rs `private_path`) · SKT 꾸러미 내용으로 화면 폭 추정(wie-skt/src/emulator.rs `package_display_size`) ·
+#   JVM 라이브러리 null 방어(wie-jvm-support/src/hardening.rs) · KTF 재배치표 선두 형식 로더(wie-ktf/src/runtime/relocated.rs) ·
+#   KTF 클래스 우선순위(…/net/wie/ktf_class_loader.rs) · KTF 데이터베이스 «만들기»는 빈 채 시작(wie-wipi-c/src/api/database.rs) · 꾸며 낸 단말 정보(전화번호 등) ·
+#   꾸며 낸 성공(통신망 연결 · 대화창 확인 · 진동) · 한 판만 부르는 플랫폼 API 의 최소 구현 · 파일 가려짐 · 클래스 경로 순서(wie-jvm-support/src/lib.rs)
+device	key	package	platform	title	kind	changes	scope	class	basis
+binary-patches	a09d998a851b7806126b52b22b3eff89	974e0df9ab1e	KTF	이노티아연대기2	lock-lift	memory-code	any	operator-directed	운영자 지시 2026-10-28(orchestrator 원장 inbox.log:1191) · 티켓 wie-ktf-innotia2-license-lock-normalize · PR #580 · docs/report/0547
+binary-patches	a09d998a851b7806126b52b22b3eff89	f770b15f8876	KTF	이노티아연대기2	lock-lift	memory-code	any	operator-directed	운영자 지시 2026-10-28(orchestrator 원장 inbox.log:1191) · 티켓 wie-ktf-innotia2-license-lock-normalize · PR #580 · docs/report/0547
+binary-patches	8629d3e8d1ca0e9e6add209c24349544	01f05f8231f4	LGT	게임빌2010프로야구	lock-lift	memory-code	any	operator-directed	운영자 지시 2026-10-26(orchestrator 원장 inbox.log:143) · 티켓 wie-lgt-gamevil2010-baseball-phone-lock-normalize · PR #573 · docs/report/0540
+class-patches	4bfb581b970002a6e15c8f2e0aa0db57	0ed66634d3dc	SKT	테일즈판타지	lock-lift	response	any	operator-directed	운영자 지시 2026-10-28(orchestrator 원장 inbox.log:1210) · 티켓 wie-skt-five-purchase-lock-normalize · PR #579 · docs/report/0546
+class-patches	1556bd6fd47112c01ce35f6495b79256	44b6356d13f8	SKT	스페셜포스	lock-lift	response	any	operator-directed	운영자 지시 2026-10-28(orchestrator 원장 inbox.log:1210) · 티켓 wie-skt-five-purchase-lock-normalize · PR #579 · docs/report/0546
+class-patches	c4aeeac1e2de7d9810c9bc86a7e7f4af	a42f77f44955	SKT	삼국지연의2	lock-lift	response	any	operator-directed	운영자 지시 2026-10-28(orchestrator 원장 inbox.log:1210) · 티켓 wie-skt-five-purchase-lock-normalize · PR #579 · docs/report/0546
+class-patches	b81f8753f4f1513f7c20355e92bd6c64	c33090c12755	SKT	노리맥스영웅전	lock-lift	response	any	operator-directed	운영자 지시 2026-10-28(orchestrator 원장 inbox.log:1210) · 티켓 wie-skt-five-purchase-lock-normalize · PR #579 · docs/report/0546
+class-patches	51c218d2d935eb9163adfa69838d889f	eefc947d8337	SKT	Chaos블레이드	lock-lift	response	any	operator-directed	운영자 지시 2026-10-28(orchestrator 원장 inbox.log:1210) · 티켓 wie-skt-five-purchase-lock-normalize · PR #579 · docs/report/0546
+owner-sound-off-settings	26c96035446a9831cd3f53f798487430	2fc792485d91	KTF	코에이삼국지2	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	총괄 발권 2026-10-02 · 티켓 wie-ktf-shipped-db-sound-off-and-save-transplant-scope · PR #449 · docs/report/0417
+owner-sound-off-settings	e91885fb2c0fec9ea97a0d29c15ed72f	3185174d2121	KTF	간호사타이쿤	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	총괄 발권 2026-10-02 · 티켓 wie-ktf-shipped-db-sound-off-and-save-transplant-scope · PR #449 · docs/report/0417
+owner-sound-off-settings	1c40aa0b3c04a76095aa686c28cfd046	34ab350dc98a	KTF	북천항해기2	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	GUI 발권 2026-10-04 · 티켓 wie-sound-silent-57-recipes-settings-and-aot · PR #473 · docs/report/0440
+owner-sound-off-settings	47e324c4315549d8047a5bfcbbf1ac19	36b82cb67723	KTF	점핑펭	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	GUI 발권 2026-10-04 · 티켓 wie-sound-silent-57-recipes-settings-and-aot · PR #473 · docs/report/0440
+owner-sound-off-settings	84052481ea39457ba8f8d7fb06252e57	5a59f62d1f1a	KTF	헬싱	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	cockpit 추천 채택 2026-10-13 · 티켓 wie-ktf-owner-sound-off-settings-two-titles · PR #552 · docs/report/0519
+owner-sound-off-settings	1a2123eb97e251dbcb4b490cee8630ea	5e53e490c6f1	KTF	삼국축구대전	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	총괄 발권 2026-10-02 · 티켓 wie-ktf-shipped-db-sound-off-and-save-transplant-scope · PR #449 · docs/report/0417
+owner-sound-off-settings	52fd30f71d5667962aa0ab99f47068b0	6a885f89343c	KTF	월드크래프트	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	총괄 발권 2026-10-02 · 티켓 wie-ktf-shipped-db-sound-off-and-save-transplant-scope · PR #449 · docs/report/0417
+owner-sound-off-settings	01e686c6fb5a46de39b37ea418519e3b	704839f1a6c8	KTF	지크	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	티켓 wie-census-wave6-lgt-interface-table-and-ktf-aot-sound · PR #453 · docs/report/0420
+owner-sound-off-settings	9382c54f44d6dcea90a909516c942ac6	7218e8720f8c	KTF	페이블오브나이트	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	티켓 wie-census-wave6-lgt-interface-table-and-ktf-aot-sound · PR #453 · docs/report/0420
+owner-sound-off-settings	01e686c6fb5a46de39b37ea418519e3b	8bfd08fe4370	KTF	지크	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	티켓 wie-census-wave6-lgt-interface-table-and-ktf-aot-sound · PR #453 · docs/report/0420
+owner-sound-off-settings	0f42b6ec0692fd2931207cb4751981c3	b907b0faf483	KTF	영웅전설3 하얀마녀	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	cockpit 추천 채택 2026-10-13 · 티켓 wie-ktf-owner-sound-off-settings-two-titles · PR #552 · docs/report/0519
+owner-sound-off-settings	cfa9e18607f6dc07c6548206bd25c2df	bfa8ec352451	KTF	미니게임패밀리	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	총괄 발권 2026-10-02 · 티켓 wie-ktf-shipped-db-sound-off-and-save-transplant-scope · PR #449 · docs/report/0417
+owner-sound-off-settings	75092ca024a3546608ca1047bd9d3006	c7f543c73b91	KTF	던전앤히어로	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	GUI 발권 2026-10-04 · 티켓 wie-sound-silent-57-recipes-settings-and-aot · PR #473 · docs/report/0440
+owner-sound-off-settings	64877e4b6d24502ab8db3eb05b6f48b2	db8ef04a6504	KTF	메이플스토리 도적편	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	GUI 발권 2026-10-04 · 티켓 wie-sound-silent-57-recipes-settings-and-aot · PR #473 · docs/report/0440
+owner-sound-off-settings	055529803d08ea816ba2122a7f8da687	de00506611a5	KTF	강철의 연금술사2	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	총괄 발권 2026-10-02 · 티켓 wie-ktf-shipped-db-sound-off-and-save-transplant-scope · PR #449 · docs/report/0417
+owner-sound-off-settings	08a2e46be3748168cc0b00215e578790	e085e193211d	KTF	겟앰프드	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	GUI 발권 2026-10-04 · 티켓 wie-sound-silent-57-recipes-settings-and-aot · PR #473 · docs/report/0440
+owner-sound-off-settings	0f327d60849776ae8915022a0fcbb566	7089dec0e8df	SKT	어스토니시아ep3	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	tower 추천 채택 2026-10-23 · 티켓 wie-skt-owner-sound-off-seven-titles-mount-path · PR #570 · docs/report/0537
+owner-sound-off-settings	2f75012556c0153f698cc16d170d9eb5	c361632541a7	SKT	레스토랑타이쿤2006	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	tower 추천 채택 2026-10-23 · 티켓 wie-skt-owner-sound-off-seven-titles-mount-path · PR #570 · docs/report/0537
+owner-sound-off-bytes	09bf6d6d5bf48fe659eeb1563ced5ab9	5aa438fbdc87	KTF	블레이드마스터2	owner-file-bytes	file-bytes	zip	ratified-2026-11-20	GUI 발권 2026-10-21 · 티켓 wie-sound-no-and-speed-unknown-remeasure · PR #558 · docs/report/0526
+owner-sound-off-bytes	8fc4f14b20e4cdd02639fd3226d2aaac	6c9f969f089f	KTF	심시티	owner-file-bytes	file-bytes	zip	ratified-2026-11-20	GUI 발권 2026-10-21 · 티켓 wie-sound-no-and-speed-unknown-remeasure · PR #558 · docs/report/0526
+owner-sound-off-bytes	02085b4b1dda8d3941a54d231d77d4e3	6e93f26fa2f5	SKT	코인마스터	owner-file-bytes	file-bytes	zip	ratified-2026-11-20	tower 추천 채택 2026-10-23 · 티켓 wie-skt-owner-sound-off-seven-titles-mount-path · PR #570 · docs/report/0537
+owner-sound-off-bytes	bdb4097414186a1c19d59c853deef642	abc0c5789259	SKT	에이지오브엠파이어2	owner-file-bytes	file-bytes	zip	ratified-2026-11-20	tower 추천 채택 2026-10-23 · 티켓 wie-skt-owner-sound-off-seven-titles-mount-path · PR #570 · docs/report/0537
+owner-sound-off-bytes	160e147e509a4f903a15be71086993e1	ccb45e6b8d80	SKT	프린세스메이커4	owner-file-bytes	file-bytes	zip	ratified-2026-11-20	tower 추천 채택 2026-10-23 · 티켓 wie-skt-owner-sound-off-seven-titles-mount-path · PR #570 · docs/report/0537
+owner-sound-off-bytes	1229f411eefd064382d90a6d904f7c09	f483ba078c14	SKT	엑스맨	owner-file-bytes	file-bytes	zip	ratified-2026-11-20	tower 추천 채택 2026-10-23 · 티켓 wie-skt-owner-sound-off-seven-titles-mount-path · PR #570 · docs/report/0537
+owner-sound-off-bytes	a8a613b3af6cada57eab7852bf24f473	fb80e97cbc57	SKT	다크슬레이어2	owner-file-bytes	file-bytes	zip	ratified-2026-11-20	tower 추천 채택 2026-10-23 · 티켓 wie-skt-owner-sound-off-seven-titles-mount-path · PR #570 · docs/report/0537
+owner-sound-off-xor	c51c411fd816ef8083195225ff067ca8	01f05f8231f4	LGT	게임빌2010프로야구	owner-file-bytes	file-bytes	zip	adopted	운영자 Tower 채택 2026-10-28 · 티켓 wie-2026-10-26-lgt-01f05f8231f4-phone-lock-adopt-p0(-fix) · PR #578 · docs/report/0545
+orphan-entries	06de2f8c4cf632e0784f9503b5b42023	a30bbe008b5e	LGT	배틀몬스터	orphan-flag	file-not-mounted	zip	adopted	cockpit 추천 채택 2026-09-26 · 티켓 wie-2026-09-26-battlemonster-orphan-save-flag-exclude-adopt-p0 · PR #318 · docs/report/0272
+display-overrides	2f75012556c0153f698cc16d170d9eb5	c361632541a7	SKT	레스토랑타이쿤2006	display-size	engine-setting	zip	adopted	cockpit 채택 2026-10-11 · 티켓 wie-skt-c361632541a7-img240-display-size-black-screen · PR #545 · docs/report/0512
+device-bound-saves	697ccf638df04b9827db67753427d58e	59263295de74	KTF	티어즈오브메탈	device-bound-save	file-not-mounted	zip	ratified-2026-11-20	티켓 wie-ktf-59263295de74-seed-save-file-address-read-adopt-p1 · PR #430 · docs/report/0398
+owner-progress-saves	e91885fb2c0fec9ea97a0d29c15ed72f	3185174d2121	KTF	간호사타이쿤	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	총괄 결정 2026-10-02(진도 이식 정책 ⒝) · 티켓 wie-shipped-save-progress-transplant-exclude-measured-titles · PR #451 · docs/report/0419
+owner-progress-saves	8c8040678637eaf320e443270ec9c1c0	3b82763edba8	KTF	리얼타짜맞고	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	총괄 결정 2026-10-02(진도 이식 정책 ⒝) · 티켓 wie-shipped-save-progress-transplant-exclude-measured-titles · PR #451 · docs/report/0419
+owner-progress-saves	59cababf2c20d6914356d792a478283f	4bcd17980c05	KTF	금광을찾아서	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	총괄 결정 2026-10-02(진도 이식 정책 ⒝) · 티켓 wie-shipped-save-progress-transplant-exclude-measured-titles · PR #451 · docs/report/0419
+owner-progress-saves	d1db89332624eef467ecd8b66aeecddb	4df05a4dc452	KTF	미니미니오락실	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	총괄 결정 2026-10-02(진도 이식 정책 ⒝) · 티켓 wie-shipped-save-progress-transplant-exclude-measured-titles · PR #451 · docs/report/0419
+owner-progress-saves	1a2123eb97e251dbcb4b490cee8630ea	5e53e490c6f1	KTF	삼국축구대전	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	총괄 결정 2026-10-02(진도 이식 정책 ⒝) · 티켓 wie-shipped-save-progress-transplant-exclude-measured-titles · PR #451 · docs/report/0419
+owner-progress-saves	52fd30f71d5667962aa0ab99f47068b0	6a885f89343c	KTF	월드크래프트	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	총괄 결정 2026-10-02(진도 이식 정책 ⒝) · 티켓 wie-shipped-save-progress-transplant-exclude-measured-titles · PR #451 · docs/report/0419
+owner-progress-saves	af3f39b604565b8116065af57cf55811	6b51d12b4be6	KTF	박명수호통맞고	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	총괄 결정 2026-10-02(진도 이식 정책 ⒝) · 티켓 wie-shipped-save-progress-transplant-exclude-measured-titles · PR #451 · docs/report/0419
+owner-progress-saves	36af8b87d8074646befb6458ce0f15ff	b1ec149b354c	KTF	피자타이쿤	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	총괄 결정 2026-10-02(진도 이식 정책 ⒝) · 티켓 wie-shipped-save-progress-transplant-exclude-measured-titles · PR #451 · docs/report/0419
+owner-progress-saves	3f5c5e5a4521870595c9bbfca782e806	e09aca27c132	KTF	지상렬신맞고	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	총괄 결정 2026-10-02(진도 이식 정책 ⒝) · 티켓 wie-shipped-save-progress-transplant-exclude-measured-titles · PR #451 · docs/report/0419
+owner-progress-saves	6a67a986b4611e5265e3d17d0501a6cd	eb1614abed70	KTF	소울카드마스터2	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	총괄 결정 2026-10-02(진도 이식 정책 ⒝) · 티켓 wie-shipped-save-progress-transplant-exclude-measured-titles · PR #451 · docs/report/0419
+owner-progress-saves	3dfdc14f9bbcda85edfd0639e72c8b40	edd11ce9b8d7	KTF	이니셜k	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	총괄 결정 2026-10-02(진도 이식 정책 ⒝) · 티켓 wie-shipped-save-progress-transplant-exclude-measured-titles · PR #451 · docs/report/0419
+fake-servers	0002D504	0093012b8c36	LGT	리듬스타2	local-server	response	aid	operator-directed	운영자 지시 2026-10-26(orchestrator 원장 inbox.log:116) · 티켓 wie-lgt-server-wall-six-titles-local-net-emulation · PR #575 · docs/report/0542
+fake-servers	0002B76D	0fdf45ec169f	LGT	테라 영원의 혼돈	local-server	response	aid	operator-directed	운영자 지시 2026-10-26(orchestrator 원장 inbox.log:116) · 티켓 wie-lgt-server-wall-remaining-two-tera-familymart · PR #581 · docs/report/0548
+fake-servers	0003266D	3ff5948e235e	LGT	아니마	local-server	response	aid	operator-directed	운영자 지시 2026-10-26(orchestrator 원장 inbox.log:116) · 티켓 wie-2026-10-26-lgt-server-wall-six-titles-adopt-p0 · PR #577 · docs/report/0544
+fake-servers	0002A61E	b9bfcaf42722	LGT	몬스터마스터	local-server	response	aid	operator-directed	운영자 지시 2026-10-26(orchestrator 원장 inbox.log:116) · 티켓 wie-lgt-server-wall-six-titles-local-net-emulation · PR #575 · docs/report/0542
+fake-servers	00026E9C	caf9d76ffd13	LGT	냐옹타이쿤2	local-server	response	aid	operator-directed	운영자 지시 2026-10-26(orchestrator 원장 inbox.log:116) · 티켓 wie-lgt-server-wall-six-titles-local-net-emulation · PR #575 · docs/report/0542
+ktf-local-servers	0103A2B4	f44271803135	KTF	드래곤아이즈2	local-server	response	aid	operator-directed	운영자 지시 2026-10-26(orchestrator 원장 inbox.log:120) · 티켓 wie-ktf-dragoneyes2-connecting-wall-offline-path · PR #574 · docs/report/0541
