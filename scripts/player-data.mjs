@@ -241,7 +241,8 @@ export function validateBuiltUpdates(d) {
 }
 
 // Census axis vocabulary (scripts/playability-census.mjs judge()) -> contract vocabulary.
-const AXIS_MAP = { ok: 'ok', 'n/a': 'unknown', fail: 'no', none: 'no', uniform: 'no', error: 'no', silent: 'no', slow: 'no', stall: 'no' };
+// `short` (a long run the guest ended early) measured nothing about the full time: unknown, never ok.
+const AXIS_MAP = { ok: 'ok', 'n/a': 'unknown', short: 'unknown', fail: 'no', none: 'no', uniform: 'no', error: 'no', silent: 'no', slow: 'no', stall: 'no' };
 export function fromCensus(c) {
   const entries = c.entries.map((x) => ({
     ...x,
@@ -379,6 +380,8 @@ function selftest() {
   for (const [label, c, u] of cases) if (!errs(c, u).length) bad++, console.error(`selftest: NOT rejected — ${label}`);
   if (fromCensus({ ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, render: 'uniform', speed: 'n/a' } }] }).entries[0].axes.render !== 'no')
     bad++, console.error('selftest: census uniform must map to no');
+  if (fromCensus({ ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, longplay: 'short' } }] }).entries[0].axes.longplay !== 'unknown')
+    bad++, console.error('selftest: census short (the long run ended early) must map to unknown');
   const withProgress = (v) => fromCensus({ ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, ...v } }] }).entries[0].axes;
   if (
     withProgress({ progress: 'stuck' }).progress !== 'stuck' ||
