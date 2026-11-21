@@ -77,6 +77,13 @@ jobs:
       # two lists differ, when an ignored ID is no longer reported (stale — delete
       # it), or when one has no §D row. Never blanket, never a whole crate.
       #
+      # ★Five more on 2026-11-22, same crate, same blocker (zip 9 only), each still
+      # by name. 0429/0546/0548 are again the extract-to-disk family
+      # (`ZipArchive::extract`, `ZipStreamReader`) — §D row D-2. 0545 (`aes-crypto`)
+      # and 0547 (`legacy-zip`) sit behind zip features this workspace does not
+      # enable, so the code is not compiled at all — §D row D-3; turning either
+      # feature on voids that row.
+      #
       # WHEN THIS GOES RED, READ THE LEDGER FIRST:
       #   docs/project-kb/02_status.md — "공급망 추적 대장"
       # Section A is what is still open; section C keeps the EXPOSURE VERDICT of
@@ -87,7 +94,7 @@ jobs:
       # quoting the row. Answering a repeat advisory from scratch is the waste
       # this exists to prevent.
       - name: cargo audit
-        run: cargo audit --ignore RUSTSEC-2026-0367 --ignore RUSTSEC-2026-0368 --ignore RUSTSEC-2026-0369
+        run: cargo audit --ignore RUSTSEC-2026-0367 --ignore RUSTSEC-2026-0368 --ignore RUSTSEC-2026-0369 --ignore RUSTSEC-2026-0429 --ignore RUSTSEC-2026-0545 --ignore RUSTSEC-2026-0546 --ignore RUSTSEC-2026-0547 --ignore RUSTSEC-2026-0548
 
       # THREE list ↔ reality comparisons, one step, ONE `cargo audit --json` (the third,
       # added 2026-10-23, is the named --ignore list above — see the checker's IGNORES block).
