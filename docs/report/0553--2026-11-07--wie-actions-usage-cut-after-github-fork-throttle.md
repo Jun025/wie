@@ -61,4 +61,4 @@ web 은 죽은 두 브랜치(원격에 없음 — `git ls-remote --heads` 빈 �
 - `wie_validate.rs` 의 doc 주석 "runs it on all six matrix legs" 는 그대로다 — 제품 소스 파일이고, 그 파일을 건드리면 유입 도구가
   파일에 원래 있던 제목 3종을 이 PR 의 유입으로 센다(재 봄: B=4/3). 사실은 `AGENTS.md` 의 그 문단이 이제 말한다.
 
-<!-- corpus-name-inflow v1 subjects=6 tree=79d717ad7ba392b2 B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=8 tree=de1b96279b7e1011 B=0/0 P=0/0 S=0/0 -->
