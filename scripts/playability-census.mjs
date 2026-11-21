@@ -40,7 +40,8 @@
 //           ponytail: an attract-mode title that animates on its own reads as "ok" —
 //           a per-shot diff against a time-aligned baseline is the upgrade if that bites.
 //   longplay  titles with boot/render/input ok get --long seconds of a looping key script
-//           with a shot every 20 s: error = FAIL line. Never `stall` (see judge()); the longest run
+//           with a shot every 20 s: error = FAIL line; short = the run ended before --long seconds
+//           without one (the guest quit — see longplayVerdict). Never `stall` (see judge()); the longest run
 //           of identical shots goes to census.tsv as `still`. A title whose 30 s probe already
 //           failed after painting is `error` without the long run.
 //   sound   ok = a Play with events reached the sink in ANY run (probes, long, speed); silent = none did. This is the
@@ -597,6 +598,7 @@ const ISSUE_KO = {
   'render:none': '게임 화면이 아직 나오지 않아요.',
   'input:none': '키를 눌러도 화면이 바뀌지 않을 수 있어요.',
   'longplay:error': '플레이 도중에 게임이 멈추거나 꺼질 수 있어요.',
+  'longplay:short': '오래 플레이해 보는 검사가 중간에 게임 종료로 끝나서, 오래 해도 잘 되는지는 아직 확인하지 못했어요.',
   'longplay:stall': '오래 플레이하면 화면이 멈춘 채로 있을 수 있어요.',
   'sound:silent': '소리가 나지 않을 수 있어요.',
   'speed:slow': '원래보다 조금 느리게 움직일 수 있어요.',
@@ -878,8 +880,20 @@ function knownIssues(ax, st, sha12, lock, net) {
 // the 200-line L.stderr tail — a lower bound.
 const UNCAUGHT = /uncaught exception in thread/i;
 const guestDied = (L, stderrPath) => (L.uncaught_threads ?? +(existsSync(stderrPath) && UNCAUGHT.test(readFileSync(stderrPath, 'latin1')))) > 0;
+// ── longplay: a run that ended before --long seconds did not measure them ───────────────────────
+// `stop` says which of wie_validate's four terminators ended the run; only `deadline` means the
+// requested time was served (the key script is longer than --long, so nothing else can). A guest
+// that quits by itself — `clean exit`, after the one relaunch — ends UNMEASURED, not FAIL, and read
+// `ok` on a 13 s run (f44271803135, 16 of 900 keys). That is `short`: not an error, not a survivor.
+// It ships as `unknown` (player-data.mjs), so the row is `limited` until a run lasts.
+// A record from before `stop` existed has none and keeps its old reading.
+const endedEarly = (L) => !!L.stop && L.stop !== 'deadline';
+// Whose doing, as far as the probes can say: probe B is the same title with no key for --secs. When
+// B quit too the keys are not what ends it; when B stayed up the key loop walked it out (a «종료»
+// menu item, a notice that exits) — the script's ceiling, a recipe's job.
+const shortWall = (L, B) => `ended early (${L.stop}) — the unkeyed probe ${B?.stop === 'clean exit' ? 'quit too' : 'stayed up'}`;
 const longplayVerdict = (probeErr, L, stderrPath) =>
-  probeErr ? 'error' : !L ? 'n/a' : L.result === 'FAIL' || guestDied(L, stderrPath) ? 'error' : 'ok';
+  probeErr ? 'error' : !L ? 'n/a' : L.result === 'FAIL' || guestDied(L, stderrPath) ? 'error' : endedEarly(L) ? 'short' : 'ok';
 // ponytail: no `stall` verdict. Measured on this census's first pass: of 40 runs with 4+ identical
 // 20 s shots, the ones opened were a sub-menu the key loop never backs out of (no CLR) and a
 // notice waiting for NUM1 — the script's ceiling, not a frozen engine — and on a starved host a
@@ -1067,6 +1081,16 @@ if (cmd === 'selftest') {
       ['an older run is read off its tail', longplayVerdict(false, { result: 'UNMEASURED' }, join(tmp, 'old.stderr')) === 'error'],
       ['the wall is the exception, not the next log line', uncaughtOf(readFileSync(join(tmp, 'old.stderr'), 'latin1')) === 'java.lang.NullPointerException\n\tat java/lang/Thread.run()V'],
     );
+    // A guest that quit by itself (f44271803135's shape: 13 s of 600, one relaunch, UNMEASURED) did not last.
+    const quit = { result: 'UNMEASURED', stop: 'clean exit', ms: 13000, input_steps: 16, input_steps_total: 900, relaunches: 1, uncaught_threads: 0 };
+    const shortAx = { boot: 'ok', render: 'ok', input: 'ok', longplay: longplayVerdict(false, quit, '/nonexistent'), sound: 'ok', speed: 'ok' };
+    cases.push(
+      ['a run the guest ended by itself is short, not ok', shortAx.longplay === 'short'],
+      ['a run that served its time is ok', longplayVerdict(false, { ...quit, stop: 'deadline' }, '/nonexistent') === 'ok'],
+      ['an early end with a FAIL or a dead thread is still an error', longplayVerdict(false, { ...quit, result: 'FAIL' }, '/nonexistent') === 'error' && longplayVerdict(false, { ...quit, uncaught_threads: 1 }, '/nonexistent') === 'error'],
+      ['a short row is not playable, and says so in its own sentence', status(shortAx) === 'limited' && knownIssues(shortAx, 'limited', '000000000000', null, null).join() === ISSUE_KO['longplay:short']],
+      ['the wall says whether the unkeyed probe quit too', shortWall(quit, { stop: 'clean exit' }) !== shortWall(quit, { stop: 'deadline' })],
+    );
     rmSync(tmp, { recursive: true, force: true });
   }
   // The host lock, through the real `run` path (an empty corpus, so nothing is validated): a
@@ -1237,7 +1261,8 @@ if (cmd === 'run') {
       const src = axis === 'progress' ? j.P : axis === 'longplay' && (j.L?.result === 'FAIL' || died) ? j.L : j.A;
       const stem = src === j.P ? 'P' : src === j.L ? 'L' : 'A';
       const reason = died ? `guest thread died: ${uncaughtOf(readFileSync(join(out, t.sha, 'L.stderr'), 'latin1')) ?? ''}` : src.reason;
-      const key = `${axis}:${v}\t${axis === 'sound' || axis === 'speed' || axis === 'input' || (axis === 'progress' && v === 'stuck') ? '' : wallOf(reason, join(out, t.sha, `${stem}.stderr`))}`;
+      const wall = axis === 'longplay' && v === 'short' ? shortWall(j.L, j.B) : wallOf(reason, join(out, t.sha, `${stem}.stderr`));
+      const key = `${axis}:${v}\t${axis === 'sound' || axis === 'speed' || axis === 'input' || (axis === 'progress' && v === 'stuck') ? '' : wall}`;
       if (!clusters.has(key)) clusters.set(key, []);
       clusters.get(key).push(`${t.sha.slice(0, 12)}(${platform.toLowerCase()})`);
     }
@@ -1253,11 +1278,11 @@ if (cmd === 'run') {
     `population: ${pop.files} files -> ${pop.titles.length} unique · excluded dirs ${JSON.stringify(pop.excluded)}`,
     `status: ${JSON.stringify(count('status'))}`,
     '',
-    '| axis | ' + ['ok', 'n/a', 'fail', 'uniform', 'none', 'error', 'stall', 'silent', 'slow', 'stuck'].join(' | ') + ' |',
-    '|---|' + '---|'.repeat(10),
+    '| axis | ' + ['ok', 'n/a', 'fail', 'uniform', 'none', 'error', 'short', 'stall', 'silent', 'slow', 'stuck'].join(' | ') + ' |',
+    '|---|' + '---|'.repeat(11),
     ...axes.map((a) => {
       const c = entries.reduce((m, e) => ((m[e.axes[a]] = (m[e.axes[a]] ?? 0) + 1), m), {});
-      return `| ${a} | ` + ['ok', 'n/a', 'fail', 'uniform', 'none', 'error', 'stall', 'silent', 'slow', 'stuck'].map((k) => c[k] ?? '').join(' | ') + ' |';
+      return `| ${a} | ` + ['ok', 'n/a', 'fail', 'uniform', 'none', 'error', 'short', 'stall', 'silent', 'slow', 'stuck'].map((k) => c[k] ?? '').join(' | ') + ' |';
     }),
     '',
     '## clusters (first wall, by title count)',
