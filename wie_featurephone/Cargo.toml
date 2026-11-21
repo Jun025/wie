@@ -56,6 +56,9 @@ web-sys = { version = "=0.3.85", features = [
     "MessageEvent",
 ] }
 console_error_panic_hook = "0.1"
+# Nothing in this build installs a `log` logger, yet the ARM interpreter (arm32_cpu) checks the
+# level on two `trace!` per guest instruction. Compiled out here only — the native hosts keep them.
+log = { version = "0.4", features = ["release_max_level_off"] }
 getrandom = { version = "^0.4", features = ["wasm_js"] } # transitive; broken without wasm_js in wasm build
 
 async-trait = { workspace = true }
