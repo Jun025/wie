@@ -127,3 +127,5 @@ assertion `left == right` failed: hooked (left) vs the routine itself (right)
 - 조정 장부는 이 repo 에 없다. 규칙은 `binary_patches.toml` 의 범용 항목 머리 주석과 `AGENTS.md`(`hook-shadow-sweep.sh` 항)에 적었다.
 - `cargo clippy --target wasm32-unknown-unknown -- -D warnings`(네 게이트의 셋째)는 `wie-core-arm` 을 보지 않는다 — 기본 멤버인 루트 크레이트가 wasm 에서 엔진 크레이트에 기대지 않아, 이 파일을 고친 뒤에도 0.9초에 끝난다. 이 회차는 `-p wie-core-arm -p wie_featurephone` 을 붙여 따로 돌렸다(rc=0).
 - 유입(`node scripts/corpus-name-inflow.mjs`, 이 브랜치 대 `origin/main`): BOUNDED 4회/3쌍 · SUFFIX-ATTACHED 0회/0쌍이다. 바뀐 파일 «전체»를 훑은 수다. BOUNDED 4 는 전부 `wie_cli/src/bin/wie_validate.rs` 에 이미 있던 주석 줄이고, 이 회차가 그 파일에 더한 11줄에는 걸린 것이 없다.
+
+<!-- corpus-name-inflow v1 subjects=11 tree=665ca4e61c751caa B=4/3 P=5/2 S=0/0 -->
