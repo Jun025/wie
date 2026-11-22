@@ -297,7 +297,14 @@ impl LgtAppInfo {
 mod tests {
     use alloc::{borrow::ToOwned, collections::BTreeMap, string::String, vec, vec::Vec};
 
-    use super::{LgtAppInfo, OrphanEntry, drop_orphan_entries};
+    use super::{LgtAppInfo, ORPHAN_ENTRIES, OrphanEntry, drop_orphan_entries};
+
+    /// `docs/contracts/runtime-adjustments.tsv` lists exactly this table: a row added here without a
+    /// ledger row — or a ledger row left behind — fails (CLAUDE.md «게임 파일 무수정 원칙»).
+    #[test]
+    fn the_ledger_lists_exactly_this_table() {
+        test_utils::assert_ledger_lists("orphan-entries", ORPHAN_ENTRIES.iter().map(|x| test_utils::hex(x.jar_md5)));
+    }
 
     fn table(jar: &[u8]) -> [OrphanEntry; 1] {
         [OrphanEntry {

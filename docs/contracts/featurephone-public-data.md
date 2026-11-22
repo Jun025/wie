@@ -19,6 +19,7 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
               axes: { boot, render, input, longplay, sound, speed: "ok"|"partial"|"no"|"unknown" },
               knownIssues_ko: [쉬운 한국어 문장],
               playTips_ko?: [쉬운 한국어 문장](선택 · 없으면 키 자체를 생략),
+              runtimeAdjustments?: ["lock-lift"|"owner-file-skip"|"owner-file-bytes"|"orphan-flag"|"device-bound-save"|"local-server"|"display-size"](선택 · 없으면 키 자체를 생략),
               changes: [{ date, enginePin, summary_ko, kind, pr }] }] }
 ```
 
@@ -62,7 +63,22 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
   `node scripts/player-data.mjs normalize` 로 다시 맞춘다). 셸 가져오기의 정렬(platform → title)은 안정 정렬이라 이 순서를 지킨다.
 - ★행은 지우지 않는다 — 매칭 키는 파일 내용 sha256 이고, 이용자의 파일이 어느 판이든 «미확인»이 되면 안 된다.
 
-`changes` 의 `kind`·`pr` 과 `fileTitle`·`game`·`variant`·`sameTitle` 은 셸 가져오기가 요구하지 않는 **추가 필드**다(모르는 키는 무시된다).
+`changes` 의 `kind`·`pr` 과 `fileTitle`·`game`·`variant`·`sameTitle`·`runtimeAdjustments` 는 셸 가져오기가 요구하지 않는 **추가 필드**다(모르는 키는 무시된다).
+
+★**`runtimeAdjustments` — 그 파일을 실행할 때 엔진이 «이 한 판에만» 거는 조정**(2026-11-22 · 선택 칸):
+디스크의 게임 파일은 고치지 않는다. 전부 엔진이 파일을 읽어 들인 뒤 메모리 안에서 걸리고, 행의 `sha256` 은 그대로 원본 파일의 것이다.
+- 값(이 순서 · 중복 없음): `lock-lift`(구매 휴대폰 · 설치 인증 잠금을 통과시킨다) · `owner-file-skip`(꾸러미에 든 이전 주인의 설정 · 진행 저장 일부를 올리지 않는다) ·
+  `owner-file-bytes`(이전 주인이 소리를 끈 설정의 1~4바이트를 «켬» 값으로 바꿔 올린다) · `orphan-flag`(짝이 되는 저장이 없는 «저장 있음» 표식을 올리지 않는다) ·
+  `device-bound-save`(이전 단말의 메모리 주소가 박힌 저장을 올리지 않는다) · `local-server`(사라진 게임사 서버의 답을 엔진 안에서 만들어 준다 · 외부 통신 0) ·
+  `display-size`(엔진 쪽 화면 크기를 그 판에 맞춘다).
+- **칸이 없는 행 = 한 판 전용 조정 없음.** 빈 배열은 싣지 않는다(검사기 거부 — «없음»의 표기를 하나로).
+- 원천은 장부 `docs/contracts/runtime-adjustments.tsv` 하나다. `retitle()` 이 장부에서 다시 만든 값과 커밋된 값이 다르면 검사기가 거부한다 —
+  손으로 쓰지 말고 장부를 고친 뒤 `normalize`. 장부 행은 지원 목록의 한 행(sha256 앞 12자 · platform · title)을 가리켜야 하고 도입 근거(`basis`)가 비면 거부된다.
+  장부와 엔진 표가 같은지는 `cargo test` 가 본다(`test-utils/src/ledger.rs`).
+- ★범위: 표식은 «그 행의 파일»(지원 목록의 꾸러미 zip)에 대한 것이다. jar 해시로 고르는 조정은 zip 꾸러미로 올렸을 때만 걸리고 같은 게임을 맨 `.jar` 로 올리면 걸리지 않는다.
+  AID 로 고르는 `local-server` 는 맨 `.jar` 면 파일 이름이 AID 와 같을 때만 걸린다. 행별 범위는 장부의 `scope` 열.
+- 전 타이틀에 걸리는 일반 구현(KTF 범용 훅 등)은 이 칸에 넣지 않는다 — 장부 머리 주석의 «메모리에 올린 게임 코드» · «참고» 절.
+- 기존 소비자: 셸 가져오기는 모르는 키를 검사하지 않고 그대로 통과시키므로(`...x`), 이 칸을 모르는 셸은 지금과 똑같이 동작한다. `status` 와 축은 이 칸과 무관하다. 셸 표시는 otterpebble 쪽 티켓 몫이다.
 
 ★**`knownIssues_ko` 와 `playTips_ko` 를 가른다**(2026-10-09):
 - `knownIssues_ko` = **안 되는 것**(빠진 소리·막히는 지점·서버 벽 등). 셸은 «알려진 문제»로 보인다. `playable` 이 아닌 행은 ≥1 줄(검사기 거부).

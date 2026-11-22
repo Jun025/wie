@@ -1,5 +1,16 @@
 # Game-specific binary patches consumed by `wie_core_arm::install_binary_patches`.
 #
+# What this table touches: nothing on disk. No game file, corpus file or user upload is rewritten;
+# every item below changes the copy of the game's code the engine has already loaded into memory.
+# Counted from this table on 2026-11-22:
+#   - hash-keyed `[[entry.patch]]`: 5 rows under 2 binaries = 8 rewritten sites in 3 packages. Each is
+#     a per-title lock lift, added only when the operator names the title, and each is a row of
+#     `docs/contracts/runtime-adjustments.tsv`.
+#   - hash-less `[[entry.hook]]`: 6 patterns. Not per-title: on KTF every match has 2 bytes of code
+#     overwritten with a call (measured 2026-11-21: 872 sites in 264 of the 269 KTF packages).
+# That ledger states the live counts, and `the_ledger_lists_exactly_this_table`
+# (`src/binary_patches.rs`) fails when they or the hash-keyed entries drift from this file.
+#
 # Each `[[entry]]` is either:
 #   - hash-keyed: `hash` is the MD5 of the main guest binary (KTF
 #     `client.bin`, LGT `binary.mod`, etc.). Matched and installed on boot.
