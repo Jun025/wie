@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-22",
+  "task": "wie-upstream-sync2-s2-backend-executor-sleep-deadline-cooperative-poll",
+  "title": "upstream 의 실행기 시간 의미를 우리 pacing 아래로 — sleep 마감은 부른 때부터 · 깨워진 태스크만 틱 안에서 다시",
+  "summary": "upstream #1491(sleep 마감을 부른 때부터 센다)과 #1429(깨워진 태스크만 틱 안에서 다시 돈다)의 의미를 wie-backend executor·system·task 에 옮겼다. 우리 pacing API(tick_for·wants_cpu·next_due·halt·clear·sleep_toward·TICK_BUDGET_MS)의 서명과 기본값은 그대로다. 걸린 태스크 옆에서 자는 스레드의 예산 안 깨움은 여전히 기다린다(upstream 과 다르게 둔 곳). docs/report/0570.",
+  "changes": [
+    "wie-backend executor.rs: last_now 삭제 · sleep(until)/sleep_toward(until, pace) · tick_for 의 idle(깨워진 태스크가 없으면 «모두 잠든 틱»과 같은 길) · spawn 이 깃발을 세움 · upstream 시험 2개 + 걸린 태스크 옆 깨움 시험 1개",
+    "wie-backend system.rs: sleep/guest_sleep/sleep_toward 가 부른 때의 시계로 마감을 만든다 · 1ms 폴링 판정(POLL_SLEEP_MS)이 여기로 옴 · poll_until(until, pace) 추가",
+    "wie-backend task.rs: SleepFuture::new(until) — upstream 과 같은 두 줄 · toward(until, pace)",
+    "wie-backend tests/system.rs: upstream 의 회귀 시험을 그대로(바이트 동일)",
+    "wie-midp event_queue.rs: 대기 루프가 폴링마다 시계를 한 번만 읽는다(poll_until)",
+    "wie-j2me tests/test_pacing.rs: 주석의 실측값 한 줄(sleep 늦음 p95 0 → 2)"
+  ],
+  "limits": "docs/report/0570 §8.",
+  "proposals": [],
+  "adoptedProposals": ["2026-11-06-upstream-sync2-dry-run-classify#p1"],
+  "declinedProposals": []
+}

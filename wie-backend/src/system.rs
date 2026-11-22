@@ -50,6 +50,12 @@ pub struct System {
     fake_net: Arc<Mutex<FakeNet>>,
 }
 
+// A sleep this short is a poll, not a pace: KTF 영웅서기4 re-arms MC_knlSetTimer(1) every frame to
+// mean "as soon as you can", and the MIDP event thread checks its queue every 1ms. Only a longer
+// sleep keeps a tick alive; waiting on these too turned 영웅서기4 from 36 into 93 frames/s — the
+// game itself 2.6x faster — and spun every idle tick to its budget.
+const POLL_SLEEP_MS: u64 = 1;
+
 /// Draws a guest-native screen onto the Java screen image before the host presents it: the image
 /// as it stands, and a writer onto the same pixels. Returns whether any native pixel went onto it.
 pub type ScreenCompositor = Box<dyn FnMut(&dyn Image, &mut dyn ImageBuffer) -> bool + Send>;
@@ -142,9 +148,9 @@ impl System {
     /// A guest `Thread.sleep`: records how late it woke (`Pacing`).
     pub async fn guest_sleep(&self, timeout: u64) {
         self.guest_slept();
-        let due = self.platform.now() + timeout;
-        self.sleep(timeout).await;
-        let late = self.platform.now().raw().saturating_sub(due.raw());
+        let now = self.platform.now();
+        self.sleep_from(now, timeout).await;
+        let late = self.platform.now().raw().saturating_sub((now + timeout).raw());
         self.pacing.lock().guest_slept(timeout, late);
     }
 
@@ -161,14 +167,30 @@ impl System {
     }
 
     pub fn sleep(&self, timeout: u64) -> SleepFuture {
-        SleepFuture::new(timeout, &self.executor)
+        self.sleep_from(self.platform.now(), timeout)
+    }
+
+    // The deadline counts from the call (upstream #1491), read by the caller as `now`.
+    fn sleep_from(&self, now: Instant, timeout: u64) -> SleepFuture {
+        let until = now + timeout;
+        if timeout > POLL_SLEEP_MS {
+            SleepFuture::new(until, &self.executor)
+        } else {
+            SleepFuture::toward(until, None, &self.executor)
+        }
     }
 
     /// `sleep(timeout)` on behalf of a wake at `pace`: the tick stays alive for `pace` as it would
     /// for a sleep that long, so a thread that polls every millisecond for a timer due at `pace`
     /// still runs it on time rather than on the host's next frame.
     pub fn sleep_toward(&self, timeout: u64, pace: Instant) -> SleepFuture {
-        SleepFuture::toward(timeout, pace, &self.executor)
+        self.poll_until(self.platform.now() + timeout, Some(pace))
+    }
+
+    /// A poll that sleeps until `until` and keeps a tick alive only for `pace` (`sleep_toward`), for
+    /// a caller that has just read the clock: `sleep(1)` would read it again for the deadline.
+    pub fn poll_until(&self, until: Instant, pace: Option<Instant>) -> SleepFuture {
+        SleepFuture::toward(until, pace, &self.executor)
     }
 
     pub fn current_task_id(&self) -> u64 {
