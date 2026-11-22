@@ -249,4 +249,4 @@ rAF 콜백은 vsync 뒤 0~1 ms 에 온다. 시계 읽기 1회 = 1 µs. 10 s 를 
 **사용자 영향**: 오늘은 0 이다(셸이 아직 켜지 않는다). 후속 셸 티켓이 켜면 sleep 박자 게임의 엔진 점유가 깨움 위치에 따라 0~61% 줄고, 타이머로 도는 KTF · LGT 게임과 프레임 일이 무거운 게임의 속도는 켜기 전과 같다.
 
 
-<!-- corpus-name-inflow v1 subjects=12 tree=0d8138736d776bd4 B=12/11 P=2/1 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=15 tree=2dcc17e665ab44a6 B=13/12 P=2/1 S=0/0 -->
