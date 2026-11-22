@@ -396,7 +396,9 @@ mod tests {
         assert_eq!(private_path("res/other.sav"), "res/other.sav");
     }
 
-    // The rows are pinned in `wie-backend`; this pins that the KTF mount path applies them.
+    // The rows are pinned in `wie-backend`; this pins that the KTF mount path applies them — and, with a
+    // jar sorting on either side of it, that the jar `from_archive` runs is the one `archive_jar` names
+    // (the rows key on that jar's MD5, so a loader that picks another jar leaves all three files as shipped).
     #[test]
     fn from_archive_turns_the_owner_sound_on() {
         use alloc::{collections::BTreeMap, vec};
@@ -404,7 +406,9 @@ mod tests {
 
         let files = BTreeMap::from([
             ("__adf__".into(), b"AID:probe\nPID:probe\nMClass:Probe\n".to_vec()),
+            ("a.jar".into(), b"not the jar".to_vec()),
             ("probe.jar".into(), WIRING_PROBE_JAR.to_vec()),
+            ("z.jar".into(), b"not the jar".to_vec()),
             ("P/probe.sav".into(), vec![0]),
             ("P/probe.opt".into(), vec![0]),
             ("P/probe.xor".into(), vec![0]),
@@ -413,6 +417,7 @@ mod tests {
             enable_gdbserver: false,
             profile: None,
         };
+        assert_eq!(super::KtfEmulator::archive_jar(&files), Some(WIRING_PROBE_JAR));
         let emulator = super::KtfEmulator::from_archive(Box::new(TestPlatform::new()), files, options).unwrap();
 
         assert_eq!(emulator.system.filesystem().virtual_file("probe.sav"), None);

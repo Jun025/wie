@@ -204,7 +204,7 @@ impl ByteWrite for KtfWIPICContext {
 }
 
 #[cfg(test)]
-mod test {
+pub(super) mod test {
     use alloc::{boxed::Box, sync::Arc};
     use core::{
         future::Future,
@@ -250,7 +250,15 @@ mod test {
     }
 
     fn run(body: fn(KtfWIPICContext) -> Pin<Box<dyn Future<Output = Result<()>> + Send>>) -> Result<()> {
-        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        run_on(TestPlatform::new(), "", body)
+    }
+
+    /// `body` on a fresh context of the title `aid`, ticked until it returns.
+    pub fn run_on<F>(platform: TestPlatform, aid: &str, body: F) -> Result<()>
+    where
+        F: FnOnce(KtfWIPICContext) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + 'static,
+    {
+        let mut system = System::new(Box::new(platform), "", aid, DefaultTaskRunner);
         let done = Arc::new(AtomicBool::new(false));
         let done_clone = done.clone();
         let mut system_clone = system.clone();

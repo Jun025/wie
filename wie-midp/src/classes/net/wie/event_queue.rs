@@ -306,12 +306,14 @@ impl EventQueue {
                 // it is the game running late — a held-back timer included, which `pace` leaves out.
                 let due = if callbacks_pending { Some(deadline) } else { earliest_timer };
                 context.system().pacing().guest_waiting_until(due);
-                while context.system().platform().now() < deadline {
-                    let tick = context.system().pacing().ticks();
-                    match pace(tick) {
-                        Some(pace) => context.system().sleep_toward(1, pace).await,
-                        None => context.system().sleep(1).await,
+                loop {
+                    // One clock read per poll: the wait's own check is also the poll's start.
+                    let now = context.system().platform().now();
+                    if now >= deadline {
+                        break;
                     }
+                    let tick = context.system().pacing().ticks();
+                    context.system().poll_until(now + 1, pace(tick)).await;
                     if !context.system().event_queue().is_empty() {
                         break;
                     }

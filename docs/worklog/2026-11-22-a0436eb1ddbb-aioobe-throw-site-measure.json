@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-22",
+  "task": "wie-a0436eb1ddbb-array-index-out-of-bounds-throw-site-measure",
+  "title": "a0436eb1ddbb 의 ArrayIndexOutOfBounds(13 > 12) — 던질 때 지도는 비어 있다 · 전 주인의 설정 파일이 저장 없는 «이어하기»로 보낸다 · 엔진 API 는 맞게 답한다",
+  "summary": "스크래치 계측(커밋 0)으로 던지는 자리(GameCanvas.h(II)B 오프셋 31 baload · 47×12 타일 지도 cq)를 잡았고, 게이트② 반려 뒤 던질 때의 지도를 직접 쟀다: 564칸 중 562칸이 -1 로, jar 자원 data/1.dat 의 값이 아니다. 원인도 쟀다 — 꾸러미에 실린 전 주인의 option.dat 가 두 저장 칸을 «저장 있음»으로 적고 있어 놀이가 이어하기 경로로 들어가는데, 그 경로가 읽을 …savedata.0 은 꾸러미에 없다(XFile.exists = 0). 게임은 그것을 실패로 다루지 않고 빈 지도로 놀이를 시작하고, 빈 지도에서는 방문객이 직선으로 157걸음을 가 지도 동쪽 끝을 넘는다. 엔진의 자원 읽기는 맞다: option.dat 만 뺀 스크래치 사본에서는 같은 키로 새 게임이 시작되고 getResourceAsStream(data/1.dat) · available() 566 · read 566 으로 지도가 자원과 칸 단위로 같으며 420초 동안 예외가 0번이다. 종전 요약의 «엔진 API 값은 이 계산에 들어가지 않는다»는 틀렸다 — 지도 내용은 자원이나 저장 파일, 곧 플랫폼 API 를 거친 데이터다. 판정: 엔진 API 탓(⒝) 아님 · 예외는 게임 코드가 내고 그 길로 보내는 것은 꾸러미의 파일 조합이다. 엔진과 compat 은 고치지 않았다. docs/report/0570.",
+  "limits": "원 단말에서 직접 본 것은 아니다. 대조는 option.dat 를 통째로 뺀 사본 하나(420초)다. 날짜 정체(progress=stuck)가 그 시작 상태 때문인지는 가르지 못했다 — 대조에서는 날짜가 갔지만 진도 정책의 판정 창으로 잰 것이 아니다. 재측정 R 의 마지막 94초 동안 에뮬레이터가 4개였다.",
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "a0436eb1ddbb — 전 주인의 option.dat 를 올리지 않아 새 게임으로 시작하게 한다",
+      "plainSummary": "이 판은 지금 누구에게나 «전 주인의 저장 이어하기»로 시작하는데 그 저장이 꾸러미에 없어서 빈 지도로 논다. 전 주인의 설정 파일 하나를 올리지 않으면 새 게임으로 시작한다.",
+      "userBenefit": "공원 지도가 제대로 실린 채 처음부터 논다. 방문객이 지도 밖으로 걸어 나가며 화면 윗줄과 캐릭터가 사라지던 일이 없어진다.",
+      "why": "docs/report/0570 §3-B: 원본 꾸러미는 r(B)V 가 0번 불리고 던질 때 지도 564칸 중 562칸이 -1 이다(예외 24번). option.dat 만 뺀 스크래치 사본은 같은 키로 r 이 불리고 지도가 data/1.dat 와 칸 단위로 같으며 420초 동안 예외 0번 · 날짜가 계속 간다.",
+      "tradeoff": "한 판에만 걸리는 행이라 운영자 채택과 장부(runtime-adjustments.tsv) 등재가 있어야 한다. 전 주인의 설정(소리 등)도 같이 빠져 게임 기본값으로 시작한다. 날짜 정체(progress=stuck)까지 풀리는지는 그때 진도 축을 다시 재야 안다.",
+      "effort": "S — 본체 jar MD5 키로 option.dat 를 올리지 않는 행 1개(지금 SKT 에는 소리 설정용 표만 있다) + 장부 1행 + 전/후 진도 재측정.",
+      "target": "wie-backend/src/owner_files.rs 또는 wie-skt/src/emulator.rs · docs/contracts/runtime-adjustments.tsv"
+    }
+  ],
+  "adoptedProposals": [
+    "2026-11-06-progression-stuck-confirm-only-15-remeasure#p0"
+  ],
+  "declinedProposals": []
+}

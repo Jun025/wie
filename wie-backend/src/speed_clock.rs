@@ -217,7 +217,7 @@ impl State {
 
 #[cfg(test)]
 mod tests {
-    use alloc::sync::Arc;
+    use alloc::{boxed::Box, sync::Arc};
     use core::{
         future::Future,
         pin::Pin,
@@ -226,7 +226,10 @@ mod tests {
     };
 
     use super::{AchievedSpeed, SpeedClock};
-    use crate::{executor::Executor, task::YieldFuture};
+    use crate::{
+        executor::Executor,
+        task::{SleepFuture, YieldFuture},
+    };
 
     #[test]
     fn timer_fires_per_tick_is_speed_on_average_and_one_at_1x() {
@@ -304,21 +307,6 @@ mod tests {
         assert_eq!(clock.wall_at(1500.0, crate::Instant::from_epoch_millis(2100)), 1600.0);
     }
 
-    struct YieldOnce(bool);
-
-    impl Future for YieldOnce {
-        type Output = ();
-
-        fn poll(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
-            if self.0 {
-                Poll::Ready(())
-            } else {
-                self.0 = true;
-                Poll::Pending
-            }
-        }
-    }
-
     // A guest sleep(100) on a host that ticks every 16ms with the 14ms budget, the wall clock
     // advancing 0.1ms per read. Returns the wall time the sleep took.
     fn sleep_100_wakes_after(speed: f64) -> f64 {
@@ -329,10 +317,11 @@ mod tests {
         let mut executor = Executor::new();
         let (slept, woke) = (Arc::new(AtomicU64::new(0)), Arc::new(AtomicBool::new(false)));
         let (slept_task, woke_task, wall_task, executor_task) = (slept.clone(), woke.clone(), wall.clone(), executor.clone());
+        let clock_task = clock.clone();
         executor.spawn(move || async move {
             slept_task.store(wall_task.load(Ordering::SeqCst), Ordering::SeqCst);
-            executor_task.sleep(100);
-            YieldOnce(false).await;
+            let now = clock_task.now(wall_task.load(Ordering::SeqCst) as f64 / 10.0);
+            SleepFuture::new(now + 100, &executor_task).await;
             slept_task.store(wall_task.load(Ordering::SeqCst) - slept_task.load(Ordering::SeqCst), Ordering::SeqCst);
             woke_task.store(true, Ordering::SeqCst);
         });
@@ -359,21 +348,25 @@ mod tests {
         assert!((49.0..=52.0).contains(&three), "3x clamped to 2x: {three}ms");
     }
 
+    // A guest's `sleep(ms)`, its deadline counted from the call on the test's clock.
+    type GuestSleep = Box<dyn Fn(u64) -> SleepFuture + Send + Sync>;
+
     // How a guest shaped like `guest` plays at `speed` on a host ticking every `frame_ms` with the
     // 14ms budget, the wall clock advancing 0.1ms per read: the achieved speed after 180 ticks, as
     // the browser host feeds it (`wie_featurephone`'s `tick`).
     fn achieved_on<F, Fut>(speed: f64, frame_ms: f64, guest: F) -> f64
     where
-        F: FnOnce(Executor) -> Fut + Send + 'static,
+        F: FnOnce(GuestSleep) -> Fut + Send + 'static,
         Fut: Future<Output = ()> + Send + 'static,
     {
         let clock = Arc::new(SpeedClock::new());
         let wall = Arc::new(AtomicU64::new(10_000_000)); // tenths of a ms
         clock.set_speed(1_000_000.0, speed);
         let mut executor = Executor::new();
-        let task_executor = executor.clone();
+        let (c, w, e) = (clock.clone(), wall.clone(), executor.clone());
+        let sleep: GuestSleep = Box::new(move |ms| SleepFuture::new(c.now(w.load(Ordering::SeqCst) as f64 / 10.0) + ms, &e));
         executor.spawn(move || async move {
-            guest(task_executor).await;
+            guest(sleep).await;
             Ok::<(), wie_util::WieError>(())
         });
 
@@ -395,7 +388,7 @@ mod tests {
 
     fn achieved<F, Fut>(speed: f64, guest: F) -> f64
     where
-        F: FnOnce(Executor) -> Fut + Send + 'static,
+        F: FnOnce(GuestSleep) -> Fut + Send + 'static,
         Fut: Future<Output = ()> + Send + 'static,
     {
         achieved_on(speed, 16.7, guest)
@@ -414,10 +407,9 @@ mod tests {
     #[test]
     fn a_guest_with_cpu_to_spare_achieves_its_speed() {
         for speed in [1.0, 2.0] {
-            let got = achieved(speed, |executor| async move {
+            let got = achieved(speed, |sleep| async move {
                 loop {
-                    executor.sleep(10);
-                    YieldOnce(false).await;
+                    sleep(10).await;
                 }
             });
             assert_eq!(got, speed);
@@ -426,7 +418,7 @@ mod tests {
 
     #[test]
     fn a_guest_parked_on_a_monitor_is_not_starved() {
-        // It spins every tick to its budget, but nothing in it wants the CPU.
+        // Nothing in it wants the CPU, and its ticks end at once.
         assert_eq!(achieved(2.0, |_| Parked), 2.0);
     }
 
@@ -443,10 +435,9 @@ mod tests {
     }
 
     // A game loop that sleeps 10ms a frame: never starved, whatever the host.
-    async fn sleeps_10(executor: Executor) {
+    async fn sleeps_10(sleep: GuestSleep) {
         loop {
-            executor.sleep(10);
-            YieldOnce(false).await;
+            sleep(10).await;
         }
     }
 

@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-22",
+  "task": "wie-upstream-sync2-s2-backend-executor-sleep-deadline-cooperative-poll",
+  "title": "upstream 의 실행기 시간 의미를 우리 pacing 아래로 — sleep 마감은 부른 때부터 · 깨워진 태스크만 틱 안에서 다시",
+  "summary": "upstream #1491(sleep 마감을 부른 때부터 센다)과 #1429(깨워진 태스크만 틱 안에서 다시 돈다)의 의미를 wie-backend executor·system·task 에 옮겼다. 우리 pacing API 의 서명과 기본값은 그대로다. ★판정(게이트② 실측 + 총괄 결정 2026-11-22): 받아들인다. perf-watch compare 가 브라우저 축 J2ME 표본 1건(835acd535a5f)을 «퇴행»으로 냈지만(그리기 42% 감소 · 짝 재측 41.7%) 퇴행이 아니라 게임이 요청한 속도로의 복귀다 — 그 판의 루프는 프레임당 33 ms 를 요청하고(바이트코드), 종전 엔진이 sleep 을 자기 전에 한 일만큼 일찍 끝내 23~28 ms 로 돌렸으며, 이식 뒤 33.0 ms(native) · 34.1 ms(browser)다. 그 판은 실제 경과 시간을 넘기므로 게임 진행 속도는 그대로이고 바뀌는 것은 화면 갱신 수(43 → 29 fps)다. ★그것은 그 표본 1판의 사실이다(게이트② 재검의 바이트코드 판별 · 핀 1a67c590): 느려지는 7판 중 경과 시간을 갱신에 넘기는 판은 그 1판뿐이고, 5판은 프레임마다 정해진 만큼 진행하는 루프라 게임 진행과 게임 안 시계가 루프 주기만큼(+14~+32%) 같이 느려지며, 1판은 가르지 못했다. 그 5판 중 4판의 루프 클래스는 OSS sleep 판 112개 중 100개(한 묶음)가 똑같이 쓴다. 총괄은 이것을 알고도 받아들인다고 재확인했고, 이용자 고지는 «전보다 느리게 돌 수 있다»로 고쳤다(판별 표 = docs/report/0573 §9). 영향 범위(게이트② 회신의 수): 지원 목록 429행 중 게스트 Thread.sleep 판은 SKT 2행뿐이고 둘 다 무변 · 이용자가 가져온 J2ME 파일은 잰 sleep 판 12개 중 7개가 느려진다(루프 주기 +14~+32%) · 무변 5 · 빨라진 판 0. 이용자 고지 = docs/player-updates/2026-11-22-j2me-runs-at-its-own-pace.json. test_pacing 은 주기·그리기 수가 같고 sleep 기준점만 2ms 옮겨졌다. KTF·LGT·SKT 표본과 무거운 장면 4판은 그대로다. docs/report/0573(§9 = 판정과 근거).",
+  "changes": [
+    "wie-backend executor.rs: last_now 삭제 · sleep(until)/sleep_toward(until, pace) · tick_for 의 idle(깨워진 태스크가 없으면 «모두 잠든 틱»과 같은 길) · spawn 이 깃발을 세움 · upstream 시험 2개 + 걸린 태스크 옆 깨움 시험 1개",
+    "wie-backend system.rs: sleep/guest_sleep/sleep_toward 가 부른 때의 시계로 마감을 만든다 · 1ms 폴링 판정(POLL_SLEEP_MS)이 여기로 옴 · poll_until(until, pace) 추가",
+    "wie-backend task.rs: SleepFuture::new(until) — upstream 과 같은 두 줄 · toward(until, pace)",
+    "wie-backend tests/system.rs: upstream 의 회귀 시험을 그대로(바이트 동일)",
+    "wie-midp event_queue.rs: 대기 루프가 폴링마다 시계를 한 번만 읽는다(poll_until)",
+    "wie-j2me tests/test_pacing.rs: 주석의 실측값 한 줄(sleep 늦음 p95 0 → 2)",
+    "docs/player-updates/2026-11-22-j2me-runs-at-its-own-pace.json: 이용자 고지 1건(-fix 회차 · 엔진 코드 변경 0 · -fix2 회차가 «진행 속도는 그대로» 절을 빼고 «느리게 돌 수 있다»로 고침)"
+  ],
+  "limits": "docs/report/0573 §8.",
+  "proposals": [],
+  "adoptedProposals": [
+    "2026-11-06-upstream-sync2-dry-run-classify#p1"
+  ],
+  "declinedProposals": [],
+  "proposalsNote": "첫 판이 올린 제안 1건(«느려지는 판이 몇 개인지 — 착지 결정용 A/B 전수»)은 착지 전에 게이트②가 그 측정을 했고(sleep 판 12개 · 정적 모집단 5행 — docs/report/0573 §9) 총괄이 결정해 뺐다. 열린 제안 0."
+}
