@@ -12,12 +12,15 @@
 # <at> counts from process start; --boot-secs is 12, so key time t is process time t + 12.
 # <out dir>/shots holds a frame every 10 s and at every key step — look at them: a profile of the wrong
 # screen is still a profile. They are game frames; keep <out dir> outside the repo.
-# RUST_LOG is passed through (default warn) and stderr goes to <out dir>/run.err, <out dir>/t0 holds the start
-# epoch: with a title's frame marker in the log, samples ÷ frames in the window is CPU per frame.
+# RUST_LOG is passed through (default warn) and stderr goes to <out dir>/run.err. With a per-frame marker line in
+# that log the table also gives «frames in the window» and the loop's CPU per frame — the figure to compare two
+# builds by. The marker defaults to a timer re-arm (`RUST_LOG=wie_wipi_c::api::kernel=debug`; one a frame on LGT
+# 3cc7a9b4cb15); FRAME_MARKER=<regex> names another title's. The window is where the samples are (the TOC's
+# start-date + first..last sample time), never <at>: xctrace attaches seconds late on a busy host.
 # Read shares, not sample counts: the loop's share of all samples moves with host load and with how
 # much of the scene the runner spends waiting on timers; the split inside the loop does not.
 set -u
-[[ $# -ge 5 ]] || { sed -n '2,18p' "$0" >&2; exit 2; }
+[[ $# -ge 5 ]] || { sed -n '2,21p' "$0" >&2; exit 2; }
 BIN=$1 GAME=$2 KEYS=$3 AT=$4 OUT=$5 WIN=${6:-8}
 cd "$(dirname "$0")/.." && mkdir -p "$OUT/shots" && rm -rf "$OUT/x.trace" # wie_validate does not create --shotdir
 date +%s >"$OUT/t0"
@@ -35,5 +38,6 @@ if kill -0 $XC 2>/dev/null; then kill -9 $XC; echo "arm-interp-profile: xctrace 
 wait $XC || { echo "arm-interp-profile: xctrace record failed — see $OUT/xctrace.log" >&2; exit 1; }
 kill $PID 2>/dev/null; wait $PID 2>/dev/null; trap - EXIT
 xcrun xctrace export --input "$OUT/x.trace" --xpath '/trace-toc/run[@number="1"]/data/table[@schema="time-profile"]' >"$OUT/time-profile.xml" 2>>"$OUT/xctrace.log" || { echo "arm-interp-profile: xctrace export failed — see $OUT/xctrace.log" >&2; exit 1; }
+xcrun xctrace export --input "$OUT/x.trace" --toc >"$OUT/toc.xml" 2>>"$OUT/xctrace.log"
 echo "load1=$(sysctl -n vm.loadavg | awk '{print $2}')"
-node scripts/arm-interp-profile.mjs "$OUT/time-profile.xml"
+node scripts/arm-interp-profile.mjs "$OUT/time-profile.xml" --toc "$OUT/toc.xml" --log "$OUT/run.err" --t0 "$(cat "$OUT/t0")" ${FRAME_MARKER:+--frame "$FRAME_MARKER"}

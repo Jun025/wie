@@ -2,8 +2,13 @@
 // Where the ARM interpreter's time goes, from an xctrace Time Profiler export of a native `wie_validate`
 // built with line tables. `scripts/arm-interp-profile.sh` records and exports; this file only aggregates.
 //
-//   node scripts/arm-interp-profile.mjs <time-profile.xml>
-//   node scripts/arm-interp-profile.mjs selftest     the parse and the buckets, on a made-up export (no game, no xctrace)
+//   node scripts/arm-interp-profile.mjs <time-profile.xml> [--toc <toc.xml> --log <run.err> [--frame <regex>] [--t0 <epoch s>]]
+//   node scripts/arm-interp-profile.mjs selftest     the parse, the buckets and the window, on a made-up export (no game, no xctrace)
+//
+// With `--toc` (`xctrace export --toc`) and `--log` (the run's stderr, carrying a per-frame marker line) it also
+// prints the frames inside the recording window and the loop's CPU per frame — the one figure here that host load
+// does not move. The window is where the samples are: the TOC's `start-date` plus the first and the last sample
+// time. It is NOT the `<at>` handed to the recorder: xctrace attaches late on a busy host and overruns its limit.
 //
 // Every sample under `ArmEngine::run` is given to its innermost frame that is not the standard library,
 // and that frame's source line is put in a bucket. The buckets are found by READING the sources the
@@ -71,7 +76,9 @@ function classifier(path) {
     }
     if (path.endsWith(OURS)) {
       const shim = at(/^struct Arm32CpuMemory/);
-      fn = (n) => (n >= shim ? '게스트 메모리 shim (read_page · get_page · r/w)' : '실행 루프 (ArmEngine::run)');
+      // Line 0 = code the line table gives no line. xctrace resolved the same addresses of one binary to `read_page`'s last
+      // line in one recording and to 0 in the next (6.3% ↔ 6.0%, docs/report/0575 §2) — so it is its own row, on neither side.
+      fn = (n) => (!n ? '우리 arm32_cpu.rs 줄 번호 없음 (루프 · shim 미분리)' : n >= shim ? '게스트 메모리 shim (read_page · get_page · r/w)' : '실행 루프 (ArmEngine::run)');
     } else if (/arm32_cpu[^/]*\/src\/(thumb|arm)\.rs$/.test(path)) {
       const mode = path.endsWith('thumb.rs') ? 'Thumb' : 'ARM';
       const table = at(/^const INST_MATCH_ORDER/);
@@ -95,35 +102,61 @@ function bucket(path, line) {
   return `그 밖 ${file}`;
 }
 
+// `arm32_cpu::Cpu::step`, mangled (`…9arm32_cpu…3Cpu4step…`) or not. Its one product caller is the run loop.
+// ── frames inside the recording window ───────────────────────────────────────────────────────────
+// `span` = [first, last] sample time in ns from the trace start; the log's timestamps are tracing's RFC 3339 UTC.
+const FRAME = /MC_knlSetTimer\(0x[0-9a-f]+, /; // a timer re-arm (LGT 3cc7a9b4cb15 arms one per frame — docs/report/0557 §1); not the «refused» line
+function frameWindow(toc, log, marker, span) {
+  const start = Date.parse(toc.match(/<start-date>([^<]+)</)?.[1] ?? '');
+  if (Number.isNaN(start)) return null;
+  const w = { from: start + span[0] / 1e6, to: start + span[1] / 1e6, toc: Number(toc.match(/<duration>([^<]+)</)?.[1]), frames: 0 };
+  for (const line of log.split('\n')) {
+    const t = marker.test(line) ? Date.parse(line.match(/\d{4}-\d\d-\d\dT[\d:.]+Z/)?.[0] ?? '') : NaN;
+    if (t >= w.from && t <= w.to) w.frames++;
+  }
+  return w;
+}
+
+const isStep = (f) => /arm32_cpu.*Cpu.*step/.test(f.attrs.name ?? '');
+// `<crate dir>/<file>:<line>` — the directory before the LAST `/src/` (a registry path has one earlier: `registry/src/…`).
+const label = ([path, line]) => `${path.slice(0, path.lastIndexOf('/src/')).split('/').pop()}/${path.split('/').pop()}:${line}`;
+
 // ── aggregate ────────────────────────────────────────────────────────────────────────────────────
 function aggregate(xml) {
   const { rows, deref, kid } = parse(xml);
   const count = (m, k) => m.set(k, (m.get(k) ?? 0) + 1);
-  const r = { total: 0, loop: 0, by: new Map(), lines: new Map(), outside: new Map() };
+  const r = { total: 0, loop: 0, loopNs: 0, span: [Infinity, -Infinity], by: new Map(), lines: new Map(), outside: new Map() };
   for (const row of rows) {
     const bt = kid(row, 'tagged-backtrace') ?? kid(row, 'backtrace');
     const frames = (bt?.kids.some((k) => k.tag === 'frame') ? bt : bt && kid(bt, 'backtrace'))?.kids.filter((k) => k.tag === 'frame').map(deref) ?? [];
     if (!frames.length) continue;
     r.total++;
+    const at = Number(kid(row, 'sample-time')?.text);
+    if (at < r.span[0]) r.span[0] = at;
+    if (at > r.span[1]) r.span[1] = at;
     const where = frames.map((f) => {
       const src = f.kids.find((k) => k.tag === 'source');
       const s = deref(src);
       const p = s && kid(s, 'path');
       return p ? [p.text, Number((src.attrs.line ?? s.attrs.line) || 0)] : null;
     });
-    // Under the run loop = some frame is in our engine file above the memory shim (the shim is also reached from host calls).
-    if (!where.some((w) => w && w[0].endsWith(OURS) && !bucket(w[0], w[1]).startsWith('게스트 메모리'))) {
+    // Under the run loop = some frame is in our engine file above the memory shim (the shim is also reached from host
+    // calls), OR some frame is `Cpu::step` itself. The second half is not redundant: a sample taken in `step`'s last
+    // instructions, after it popped its frame, unwinds WITHOUT its caller — the run loop, our only frame on that stack.
+    // That was 5~8% of the loop's samples and a different share in each build (docs/report/0575 §2).
+    if (!frames.some(isStep) && !where.some((w) => w && w[0].endsWith(OURS) && !bucket(w[0], w[1]).startsWith('게스트 메모리'))) {
       count(r.outside, (frames[0].attrs.name ?? '?').replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&').slice(0, 80));
       continue;
     }
     r.loop++;
+    r.loopNs += Number(kid(row, 'weight')?.text) || 1e6; // Time Profiler: 1 ms a sample
     const inner = where.find((w) => w && !w[0].includes('/rustc/') && !w[0].includes('/rustlib/'));
     if (!inner) {
       count(r.by, '표준 라이브러리만');
       continue;
     }
     count(r.by, bucket(inner[0], inner[1]));
-    count(r.lines, `${inner[0].split('/src/')[0].split('/').pop()}/${inner[0].split('/').pop()}:${inner[1]}`);
+    count(r.lines, label(inner));
   }
   return r;
 }
@@ -131,41 +164,51 @@ function aggregate(xml) {
 function selftest() {
   const d = mkdtempSync(join(tmpdir(), 'arm-interp-profile-'));
   const ours = join(d, OURS);
-  const thumb = join(d, 'arm32_cpu-9.9.9/src/thumb.rs');
+  const crate = join(d, 'registry/src/arm32_cpu-9.9.9/src'); // two `/src/`, like a real registry path
+  const thumb = join(crate, 'thumb.rs');
   const write = (f, lines) => {
     mkdirSync(dirname(f), { recursive: true });
     writeFileSync(f, lines.join('\n'));
   };
   write(ours, ['fn run() {', '    step();', '}', 'struct Arm32CpuMemory;', 'fn read_page() {}']); // run = 1-3, shim = 4+
   write(thumb, ['const INST_MATCH_ORDER: [u8; 1] = [0];', 'fn decode() {}', 'impl Cpu {', '    trace!("x");', '    let pc = 0;', '    match inst_type {', '        A => {}', '    }', '}']);
-  const frame = (id, path, line) => `<frame id="${id}" name="f${id}"><source line="${line}"><path id="p${id}">${path}</path></source></frame>`;
+  const frame = (id, path, line, name = `f${id}`) => `<frame id="${id}" name="${name}"><source line="${line}"><path id="p${id}">${path}</path></source></frame>`;
   const run = frame(1, ours, 2);
-  const row = (bt) => `<row><weight ref="w"/>${bt}</row>`;
+  const row = (bt, t = 5) => `<row><sample-time>${t}000000</sample-time><weight>1000000</weight>${bt}</row>`;
   const xml = `<trace-query-result><node>${[
-    row(`<tagged-backtrace id="a">${frame(2, thumb, 2)}${run}</tagged-backtrace>`), // decode
+    row(`<tagged-backtrace id="a">${frame(2, thumb, 2)}${run}</tagged-backtrace>`, 2), // decode
     row('<tagged-backtrace ref="a"/>'), //                                              decode again, by ref
     row(`<tagged-backtrace id="b">${frame(3, thumb, 4)}<frame ref="1"/></tagged-backtrace>`), // trace!
     row(`<tagged-backtrace id="c">${frame(4, thumb, 7)}<frame ref="1"/></tagged-backtrace>`), // an instruction's arm
     row(`<tagged-backtrace id="e">${frame(5, ours, 5)}<frame ref="1"/></tagged-backtrace>`), // our shim, under the loop
     row(`<tagged-backtrace id="g">${frame(6, ours, 5)}</tagged-backtrace>`), //                 our shim from a host call: outside
     row(`<tagged-backtrace id="h">${frame(7, '/x/rustc/core/num.rs', 1)}<frame ref="1"/></tagged-backtrace>`), // std above the loop
+    row(`<tagged-backtrace id="i">${frame(8, thumb, 5)}<frame ref="1"/></tagged-backtrace>`), // the preamble: after `impl`, before the `match`
+    row(`<tagged-backtrace id="k">${frame(11, ours, 0)}<frame ref="1"/></tagged-backtrace>`), // our file, no line: neither the loop nor the shim
+    // `Cpu::step` after it popped its frame: the run loop is missing from the stack, and it is still the loop
+    row(`<tagged-backtrace id="j">${frame(9, join(crate, 'lib.rs'), 170, '_RINvMs0_Cs5w_9arm32_cpuNtB6_3Cpu4stepNtNtNtCsad_12wie_core_arm')}${frame(10, '/x/main.rs', 1)}</tagged-backtrace>`, 9),
   ].join('')}</node></trace-query-result>`;
   const r = aggregate(xml);
   rmSync(d, { recursive: true, force: true });
   const got = [...r.by].map(([k, n]) => `${k.split(' (')[0]}=${n}`).sort().join(' ');
-  const want = ['Thumb 실행=1', 'Thumb 해독=2', 'log 수준 검사=1', '게스트 메모리 shim=1', '실행 루프=1'].sort().join(' ');
-  const ok = r.total === 7 && r.loop === 6 && got === want;
-  console.log(ok ? 'arm-interp-profile selftest: ok (7 samples · 6 under the loop · 5 buckets)' : `arm-interp-profile selftest: FAIL — total ${r.total} loop ${r.loop} · ${got}`);
-  process.exit(ok ? 0 : 1);
+  const want = ['Cpu::step 본체=1', '우리 arm32_cpu.rs 줄 번호 없음=1', 'Thumb 선행부=1', 'Thumb 실행=1', 'Thumb 해독=2', 'log 수준 검사=1', '게스트 메모리 shim=1', '실행 루프=1'].sort().join(' ');
+  // window: trace start 00:00:10Z, samples at 2~9 ms → [10.002, 10.009]. Two markers inside, one before, one after, one «refused» inside.
+  const log = ['09.999000Z DEBUG k: MC_knlSetTimer(0x1, 0x37, 0x0, 0x0)', '10.002000Z DEBUG k: MC_knlSetTimer(0x1, 0x37, 0x0, 0x0)', '10.005000Z DEBUG k: MC_knlSetTimer(0x1): still pending, refused', '10.009000Z DEBUG k: MC_knlSetTimer(0x1, 0x37, 0x0, 0x0)', '10.010000Z DEBUG k: MC_knlSetTimer(0x1, 0x37, 0x0, 0x0)'];
+  const w = frameWindow('<start-date>2026-01-01T09:00:10.000+09:00</start-date><duration>1.5</duration>', log.map((l) => `2026-01-01T00:00:${l}`).join('\n'), FRAME, r.span);
+  const checks = { total: r.total === 10, loop: r.loop === 9 && r.loopNs === 9e6, buckets: got === want, label: r.lines.get('arm32_cpu-9.9.9/thumb.rs:2') === 2, window: w?.frames === 2 && w.to - w.from === 7 };
+  const bad = Object.keys(checks).filter((k) => !checks[k]);
+  console.log(bad.length ? `arm-interp-profile selftest: FAIL (${bad.join(' · ')}) — total ${r.total} loop ${r.loop} · ${got} · frames ${w?.frames}` : 'arm-interp-profile selftest: ok (10 samples · 9 under the loop · 8 buckets · 2 frames in the window)');
+  process.exit(bad.length ? 1 : 0);
 }
 
-const file = process.argv[2];
+const [file, ...rest] = process.argv.slice(2);
 if (file === 'selftest') selftest();
+const opt = (name) => (rest.includes(name) ? rest[rest.indexOf(name) + 1] : undefined);
 if (!file) {
-  console.error('usage: node scripts/arm-interp-profile.mjs <time-profile.xml> | selftest   (see the header)');
+  console.error('usage: node scripts/arm-interp-profile.mjs <time-profile.xml> [--toc <toc.xml> --log <run.err> [--frame <regex>] [--t0 <epoch s>]] | selftest   (see the header)');
   process.exit(2);
 }
-const { total, loop, by, lines, outside } = aggregate(readFileSync(file, 'utf8'));
+const { total, loop, loopNs, span, by, lines, outside } = aggregate(readFileSync(file, 'utf8'));
 if (!total) {
   console.error('no samples with a backtrace in that export');
   process.exit(2);
@@ -173,6 +216,17 @@ if (!total) {
 const pct = (n, d) => ((100 * n) / d).toFixed(1).padStart(5);
 const sorted = (m) => [...m].sort((a, b) => b[1] - a[1]);
 console.log(`samples ${total} · under the ARM run loop ${loop} (${pct(loop, total).trim()}%)`);
+if (opt('--toc') && opt('--log')) {
+  const marker = opt('--frame') ? new RegExp(opt('--frame')) : FRAME;
+  const w = frameWindow(readFileSync(opt('--toc'), 'utf8'), readFileSync(opt('--log'), 'utf8'), marker, span);
+  if (!w) console.log('window: no <start-date> in that TOC');
+  else {
+    const t0 = Number(opt('--t0')) * 1000;
+    const rel = t0 ? ` · process t = ${((w.from - t0) / 1000).toFixed(1)}~${((w.to - t0) / 1000).toFixed(1)} s` : '';
+    console.log(`window (first..last sample): ${new Date(w.from).toISOString()} + ${((w.to - w.from) / 1000).toFixed(2)} s${rel} · TOC duration ${w.toc.toFixed(2)} s`);
+    console.log(w.frames ? `frames in the window: ${w.frames} (${marker}) · loop per frame ${(loopNs / 1e6 / w.frames).toFixed(2)} ms` : `frames in the window: 0 — no line matching ${marker} in the log (RUST_LOG=wie_wipi_c::api::kernel=debug?)`);
+  }
+}
 console.log('outside the loop, top self symbols (% of all samples):');
 for (const [k, n] of sorted(outside).slice(0, 5)) console.log(`  ${pct(n, total)}  ${k}`);
 console.log('inside the loop (% of loop samples):');

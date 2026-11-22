@@ -2,12 +2,17 @@
 # the heaviest scene a native run reaches without a save (docs/report/0557 §3 · 0559 §4).
 # Grammar: `--keys` help / `parse_keys` in wie_cli/src/bin/wie_validate.rs. Key names only — no game bytes.
 #
+# The path must not depend on WHEN the title's «press any key» becomes ready — on a busy host it is not
+# ready by the 8th OK, and a script that counts on that OK ends one key short, on the character screen
+# (load1 59, docs/report/0575 §2). So: two LEFTs after the wait. Whichever key opens the menu, the rest
+# are no-ops on it, and the menu is left on its first row. From there four OKs: first row → first (empty)
+# slot → «start a new game?» yes → the offered character.
+#
 # After the last OK the intro narrates by itself and then stops on the first dialogue page of the castle
 # scene, which waits for a key. No key is sent after that, so the page stays up: with `--boot-secs 12` it
-# is there by process time ~90 s on a busy host (80 s on a quiet one) and any later window profiles it.
-# A fixed earlier window does not: under load one run was in the castle and the next still in the
-# narration (docs/report/0575 §2). Look at the t100+ shots before reading a profile.
+# is there by process time ~100 s and any later window profiles it. Look at the t100+ shots before
+# reading a profile — a profile of the wrong screen is still a profile.
 #
 #   bash scripts/arm-interp-profile.sh <wie_validate> <game> docs/keys/lgt-3cc7a9b4cb15-intro-castle.keys 110 <out>
-OK:1 OK:1 OK:1 OK:1 OK:3 OK:4 OK:3 OK:4 WAIT:14 DOWN:0.5 OK:3 OK:4 OK:9
+OK:1 OK:1 OK:1 OK:1 OK:3 OK:4 OK:3 OK:4 WAIT:14 LEFT:2 LEFT:2 OK:3 OK:4 OK:4 OK:9
 WAIT:30 WAIT:30 WAIT:30 WAIT:30
