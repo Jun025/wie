@@ -377,13 +377,13 @@ pub fn get_media_method_table() -> Vec<WIPICMethodBody> {
 
 pub fn get_net_method_table() -> Vec<WIPICMethodBody> {
     vec![
-        local_net::connect.into_body(),
+        net::connect.into_body(),
         net::close.into_body(),
         local_net::socket.into_body(),
         gen_stub(3, "MC_netSocketConnect"),
         gen_stub(4, "MC_netSocketWrite"),
         gen_stub(5, "MC_netSocketRead"),
-        net::socket_close.into_body(),
+        local_net::socket_close.into_body(),
         gen_stub(7, "MC_netSocketBind"),
         gen_stub(8, "MC_netGetMaxPacketLength"),
         gen_stub(9, "MC_netSocketSendTo"),
@@ -426,7 +426,7 @@ fn net_extension_slot(function_id: u16) -> WIPICMethodBody {
         30 => local_net::socket_open.into_body(),
         31 => local_net::socket_send.into_body(),
         32 => local_net::socket_recv.into_body(),
-        33 => net::socket_close.into_body(),
+        33 => local_net::socket_close.into_body(),
         34 => net_open_by_host.into_body(),
         _ => gen_unnamed_table_stub(WIPICTableId::Net as _, "Net", function_id),
     }
