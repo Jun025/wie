@@ -152,7 +152,7 @@
 | `keydraw_lgt.zip` `--inject --expect-last-frame` | PASS · rc=0 · `content true` · paints 55 · 27/27 |
 | `text_j2me.jar` `--timeout 5` | PASS · rc=0 · paints 1 |
 
-위 표는 첫 커밋(`cddf25a4b`) 앞의 실행이다. 그 커밋 직전(13:29~13:30)과 이 문서를 마지막으로 고친 뒤(14:39~14:42)에 같은 묶음(fmt · clippy 4종 · `cargo test --all --no-fail-fast`)을 한 번씩 더 돌렸고 둘 다 전부 rc=0 · 869 passed 다. 마지막 실행 뒤에 바뀐 것은 이 문서의 이 문단과 끝의 유입 표식 한 줄뿐이다.
+위 표는 첫 커밋(`cddf25a4b`) 앞의 실행이다. 그 커밋 직전(13:29~13:30)과 이 문서를 마지막으로 고친 뒤(14:39~14:42)에 같은 묶음(fmt · clippy 4종 · `cargo test --all --no-fail-fast`)을 한 번씩 더 돌렸고 둘 다 전부 rc=0 · 869 passed 다. 그 뒤 연번을 한 번 더 옮기고(0571 → 0573 · #604 가 0571 을 먼저 잡았다) 같은 묶음을 다시 돌렸다(14:48~14:50 · 전부 rc=0 · 869 passed). 마지막 실행 뒤에 바뀐 것은 이 문단의 그 시각과 끝의 유입 표식 한 줄뿐이다.
 
 ### 6. upstream 병합 예행 탐침 — 전/후
 
@@ -188,4 +188,4 @@
 - `Executor::sleep` 의 깃발(§2 ⑵)과 예산 안 기다림(§2 ⑴)은 upstream 과 다르다. S3 에서 `executor.rs` 는 우리 쪽으로 풀고 upstream 시험 2개가 남아 있는지 본다.
 - 브라우저에서 «걸린 태스크가 있는 판의 틱이 실제로 짧아졌는지»(발열)는 따로 재지 않았다. PR #589 의 `tick_occupancy` 가 그 자다.
 
-<!-- corpus-name-inflow v1 subjects=9 tree=3cf7d305c1cbf604 B=6/5 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=9 tree=b171dfa00a3f8400 B=6/5 P=0/0 S=0/0 -->
