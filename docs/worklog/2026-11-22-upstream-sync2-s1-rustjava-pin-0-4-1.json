@@ -2,9 +2,9 @@
   "date": "2026-11-22",
   "task": "wie-upstream-sync2-s1-rustjava-pin-0-4-1-before-upstream-sync",
   "title": "조각 S1 — RustJava 핀을 0.1.1 에서 0.4.1 로 (upstream 병합 전 · 우리 쪽만)",
-  "summary": "루트 jvm* · rustjava-runtime 을 ^0.1.1 에서 ^0.4.1 로 올리고(lock 0.4.1) 그 판의 API 를 따라갔다 — 필드 접근 1,774곳에 owner 클래스 인자, Cow 이름, 네이티브 프레임 가드. patches/classfile 을 지웠고(코퍼스 클래스 14,730개에서 상수 해석 차이 0) zip 을 9.8.1 로 올려 감사 억제 8건을 0건으로 줄였다. cargo test --all 851 통과 · 4게이트 + beta clippy · 러너 블록 통과. 코퍼스 표본 68판(조정 행이 걸린 49판 전부 포함)의 부팅 + 그림 판정은 전/후 68/68 로 같고 perf-watch compare 퇴행 0. upstream 병합 예행의 충돌 파일은 137 → 143 으로 줄지 않았다 — 줄어든 것은 병합 뒤 손으로 API 를 옮길 곳(owner 없는 필드 접근 1,774 → 0). docs/report/0572.",
+  "summary": "루트 jvm* · rustjava-runtime 을 ^0.1.1 에서 =0.4.1 로 올리고(정확 고정) 그 판의 API 를 따라갔다 — 필드 접근 1,774곳에 owner 클래스 인자, Cow 이름, 네이티브 프레임 가드. patches/classfile 을 지웠고(코퍼스 클래스 14,730개에서 상수 해석 차이 0) zip 을 9.8.1 로 올려 감사 억제 8건을 0건으로 줄였다. cargo test --all 851 통과 · 4게이트 + beta clippy · 러너 블록 통과. 코퍼스 표본 68판(조정 행이 걸린 49판 전부 포함)의 부팅 + 그림 판정은 전/후 68/68 로 같다. 게이트② 반려 뒤(-fix): 전수 429행 전/후 짝(프로브 15초 · 부팅 · 그림 · 입력 · 소리)에서 다시 재어 남는 판정 변화 0, 다섯 크레이트를 =0.4.1 로 고정. 속도는 CPU 초가 전/후 같고(처음의 «CPU 3분의 1» 은 틀렸다) Java 조회 비용이 줄어 마감 없이 도는 SKT 표본 하나가 18 ~ 38% 더 그린다. upstream 병합 예행의 충돌 파일은 137 → 143 으로 줄지 않았다 — 줄어든 것은 병합 뒤 손으로 API 를 옮길 곳(owner 없는 필드 접근 1,774 → 0). docs/report/0572.",
   "changes": [
-    "루트 Cargo.toml: jvm · jvm-bytecode · jvm-class-proto · jvm-types · rustjava-runtime ^0.1.1 → ^0.4.1 (lock 0.4.1)",
+    "루트 Cargo.toml: jvm · jvm-bytecode · jvm-class-proto · jvm-types · rustjava-runtime ^0.1.1 → =0.4.1 (정확 고정 — 0.4.2 는 스택 깊이 512 에서 StackOverflowError)",
     "필드 접근 1,774곳에 owner 클래스 인자 (wie-midp · wie-wipi-java · wie-skvm · wie-lgt · wie-ktf · wie-jvm-support)",
     "name()/descriptor() → Cow, 네이티브 프레임 가드(NativeFrame), collect_garbage 의 anyhow 결과",
     "wie-jvm-support/src/declared_field.rs 삭제 — 새 판의 owner 인자가 같은 일을 한다",

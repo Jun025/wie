@@ -17,7 +17,7 @@
 | `git merge-base origin/main upstream/main` | `44fbf265`(2026-09-16 조각 D · PR #161 착지 이후 **불변** · 67일째) |
 | behind / ahead | **244** / 3,034 (`origin/main` `64ee6998` ↔ `upstream/main` `10620f82` 2026-11-21) · 11-06 에는 173 / 2,970 |
 | upstream 쪽 델타 | 243커밋(병합 제외) · 384파일 **+42,087/−11,755** · `git merge-tree` 충돌 파일 **136**(11-06 에는 93) |
-| RustJava | 우리 = crates.io `jvm*` `^0.4.1`(lock 0.4.1 · 조각 S1 · `docs/report/0572`) ↔ upstream = `^0.5.1`(11-22 #1630·#1631 · 11-06 예행 때는 `^0.4.1`) |
+| RustJava | 우리 = crates.io `jvm*` `=0.4.1`(정확 고정 · 조각 S1 · `docs/report/0572`) ↔ upstream = `^0.5.1`(11-22 #1630·#1631 · 11-06 예행 때는 `^0.4.1`) |
 | compat (`docs/player-data/compat.json`) | 429행 · playable **426** · not-yet 2 · limited 1 · `progress=stuck` **90** · enginePin `4ac38566` |
 | GitHub Actions | 2026-11-04T05:40Z 뒤 run 0 → 11-19T14:59Z 에 첫 run(GitHub 쪽 정지 · `docs/report/0553`). 그 뒤 push·PR run 은 돈다. ★`schedule` 이벤트 run 은 11-04 이후 **0건**(아래 §다음 «상시») |
 
@@ -89,8 +89,8 @@
 
 다음은 아래 ⑴ 이다(발권 전 · 발권은 총괄 몫). ⑵ 는 ⑴ 과 독립이다.
 
-**⑴ upstream 2차 동기화 — 조각 S1b(RustJava `^0.4.1` → upstream 이 쓰는 `^0.5.1`) · S2(executor·pacing)**
-- **무엇**: `docs/report/0551` §7 의 조각 계획 그대로다. S1 의 첫 조각(`^0.1.1` → `^0.4.1` · 필드 owner 인자 · `patches/classfile` 삭제 ·
+**⑴ upstream 2차 동기화 — 조각 S1b(RustJava `=0.4.1` → upstream 이 쓰는 `^0.5.1`) · S2(executor·pacing)**
+- **무엇**: `docs/report/0551` §7 의 조각 계획 그대로다. S1 의 첫 조각(`^0.1.1` → `=0.4.1` · 필드 owner 인자 · `patches/classfile` 삭제 ·
   zip 9)은 `docs/report/0572` 이 했다. 남은 S1b = upstream 이 11-22 에 올린 `^0.5.1`(#1630 · #1631)까지 — 0.4.2 가 더한
   Java 스택 깊이 상한(512 프레임 → `StackOverflowError`)이 여기 든다. S2 = `wie-backend` 의 `executor.rs`·
   `system.rs`·`task.rs` 를 upstream 의 sleep 마감·협동 폴링 의미로 옮기고 우리 pacing API 는 지킨다.
