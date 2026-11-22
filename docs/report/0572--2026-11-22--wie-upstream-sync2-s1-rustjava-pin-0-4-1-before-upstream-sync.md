@@ -153,3 +153,5 @@ PR 의 CI 가 도는 사이 `origin/main` 이 #599(`contentKey` · 새 크레이
 - §1 ~ §8 의 수는 병합 «전» 머리(`1b52120e7`)에서 잰 것이다. 병합 트리의 게이트 · 러너 블록 결과는 PR 본문에 적었다. 코퍼스 표본 · perf-watch · 병합 예행은 다시 재지 않았다 — #599 는 엔진의 Java 실행 경로를 건드리지 않고(로더가 jar 항목을 고르는 함수 하나를 거치게 한 것 · 새 크레이트 · 스크립트), 받은 뒤 `compat.json` 의 착지 기준 바뀐 행은 0 이다(`check-compat-revert.mjs`).
 
 **게임 파일명 유입**: `node scripts/corpus-name-inflow.mjs` — 유입 65건(BOUNDED) · 판단 필요 8건(SUFFIX-ATTACHED) · 대상 115파일. 둘 다 이 브랜치가 건드린 파일에 «이미 있던» 언급이다(`docs/project-kb/02_status.md` · LGT `jvm_support.rs` 의 주석 등 — 도구는 바뀐 파일의 본문 전체를 센다). 이 브랜치가 «더한 줄»에 든 것은 0건이다(도구가 낸 72쌍을 `git diff origin/main...HEAD` 의 추가 줄과 대조). SUFFIX-ATTACHED 8쌍도 같은 대조에서 0 이다.
+
+<!-- corpus-name-inflow v1 subjects=116 tree=19e2e1e8680905c9 B=115/65 P=11/2 S=10/8 -->
