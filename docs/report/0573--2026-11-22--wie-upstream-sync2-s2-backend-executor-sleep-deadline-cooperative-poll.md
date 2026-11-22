@@ -238,4 +238,4 @@
 
 **이 회차(`-fix`)가 더한 것과 게이트**: 문서 3건뿐이다 — 이 파일 · worklog · `docs/player-updates/2026-11-22-j2me-runs-at-its-own-pace.json`. 엔진 `*.rs` 변경 0 · pacing 값과 단언 상한 변경 0. `git merge-tree --write-tree origin/main HEAD` rc=0(main `76cc27c57` · #599 · #601 · #604 포함)이라 main 을 당기지 않았다. 문서를 고친 트리에서 2026-11-22 16:00~16:03 KST(load1 28~42 · `build-slot` 경유): `cargo fmt --all -- --check` rc=0 · `cargo clippy --all -- -D warnings` rc=0 · wasm32 clippy 2종(기본 · `-p wie-core-arm -p wie_featurephone`) rc=0 · `cargo +beta clippy --all -- -D warnings` rc=0(`1.101.0-beta.2`) · `RUST_MIN_STACK=4194304 cargo test --all --no-fail-fast` rc=0 · 시험 바이너리 55 · 869 passed · 0 failed(`test_pacing` 포함). `node scripts/player-data.mjs` OK(184 updates) · `check-worklog-json.mjs` OK · `check-compat-revert.mjs` «착지 기준 바뀐 행 0». 러너 블록은 다시 돌리지 않았다(엔진 소스가 §5 의 실행과 같다). 첫 판의 worklog 제안 1건(느려지는 판 A/B 전수)은 위 표가 그 측정이라 뺐다 — 열린 제안 0.
 
-<!-- corpus-name-inflow v1 subjects=9 tree=b171dfa00a3f8400 B=6/5 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=10 tree=be16257ad0d53365 B=6/5 P=0/0 S=0/0 -->
