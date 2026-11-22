@@ -105,7 +105,8 @@ fn a_deadline_game_loop_runs_at_the_period_it_asks_for() -> Result<()> {
         "{cross} of {redraws} paints started a host tick after their repaint — the engine is holding repaints \
          to the end of a tick again (#338): {pacing}"
     );
-    // Measured on this tree: p95 4 and 0. A getNextEvent that ignores the queue made it 21 and 4.
+    // Measured on this tree: p95 4 and 2. A getNextEvent that ignores the queue made it 21 and 4 — on
+    // a sleep that still counted from its step's start and so woke two reads early (upstream #1491).
     assert!(
         redraw_p95 <= 8,
         "repaint -> paint p95 {redraw_p95}ms — something is holding the paint event while the guest spins: {pacing}"
