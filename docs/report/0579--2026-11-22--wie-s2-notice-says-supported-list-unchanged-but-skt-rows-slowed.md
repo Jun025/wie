@@ -325,3 +325,5 @@
 - `1f0d7e81336a`(−3%)의 브라우저 값 · KTF 느려진 8행 가운데 브라우저로 본 것은 3행뿐이다.
 - 코퍼스 밖의 판.
 - 증적(sha12 와 수만 · 드라이버 포함): `~/orchestrator/reports/evidence/wie-s2-notice-says-supported-list-unchanged-but-skt-rows-slowed/`.
+
+<!-- corpus-name-inflow v1 subjects=3 tree=24fa8f66060d7909 B=0/0 P=0/0 S=0/0 -->
