@@ -40,6 +40,14 @@ fn jar_filename(aid: &str, files: &BTreeMap<String, Vec<u8>>) -> String {
     }
 }
 
+// The jar `from_archive` runs, under the name it is mounted by (`None` when the archive does not
+// hold it). `archive_jar` reads the same entry, so the jar that is hashed is the jar that runs.
+fn archive_jar_entry<'a>(aid: &str, files: &'a BTreeMap<String, Vec<u8>>) -> (String, Option<&'a Vec<u8>>) {
+    let filename = jar_filename(aid, files);
+    let jar = files.get(&filename);
+    (filename, jar)
+}
+
 /// Packaged saves written by the original owner's handset that no other host can load, keyed by the
 /// MD5 of the title's jar (the jar identifies the build, as in `wie-lgt`'s `ORPHAN_ENTRIES`).
 /// Deliberately a list, never a rule — most KTF archives ship saves that load fine, and dropping
@@ -211,8 +219,8 @@ impl KtfEmulator {
             tracing::warn!("Ignoring unsupported display size {width}x{height}: {error}");
         }
 
-        let jar_filename = jar_filename(&adf.aid, &files);
-        if let Some(jar) = files.get(&jar_filename).cloned() {
+        let (jar_filename, jar) = archive_jar_entry(&adf.aid, &files);
+        if let Some(jar) = jar.cloned() {
             drop_owner_files(&mut files, &jar, DEVICE_BOUND_SAVES);
             drop_owner_files(&mut files, &jar, OWNER_PROGRESS_SAVES);
             turn_owner_sound_on(&mut files, &jar);
@@ -237,6 +245,12 @@ impl KtfEmulator {
 
     pub fn loadable_archive(files: &BTreeMap<String, Vec<u8>>) -> bool {
         files.contains_key("__adf__")
+    }
+
+    /// The jar `from_archive` runs — the one the per-title tables above hash.
+    pub fn archive_jar(files: &BTreeMap<String, Vec<u8>>) -> Option<&[u8]> {
+        let adf = KtfAdf::parse(files.get("__adf__")?);
+        archive_jar_entry(&adf.aid, files).1.map(Vec::as_slice)
     }
 
     pub fn archive_title(files: &BTreeMap<String, Vec<u8>>) -> Option<String> {
@@ -365,7 +379,15 @@ mod tests {
     use wie_core_arm::{Allocator, ArmCore};
     use wie_util::{Result, WieError};
 
-    use super::{KtfJvmSupport, KtfTaskRunner, private_path};
+    use super::{DEVICE_BOUND_SAVES, KtfJvmSupport, KtfTaskRunner, OWNER_PROGRESS_SAVES, private_path};
+
+    /// `docs/contracts/runtime-adjustments.tsv` lists exactly these tables: a row added here without a
+    /// ledger row — or a ledger row left behind — fails (CLAUDE.md «게임 파일 무수정 원칙»).
+    #[test]
+    fn the_ledger_lists_exactly_these_tables() {
+        test_utils::assert_ledger_lists("device-bound-saves", DEVICE_BOUND_SAVES.iter().map(|x| test_utils::hex(x.0)));
+        test_utils::assert_ledger_lists("owner-progress-saves", OWNER_PROGRESS_SAVES.iter().map(|x| test_utils::hex(x.0)));
+    }
 
     #[test]
     fn private_directory_mounts_at_the_root_in_either_case() {
@@ -374,7 +396,9 @@ mod tests {
         assert_eq!(private_path("res/other.sav"), "res/other.sav");
     }
 
-    // The rows are pinned in `wie-backend`; this pins that the KTF mount path applies them.
+    // The rows are pinned in `wie-backend`; this pins that the KTF mount path applies them — and, with a
+    // jar sorting on either side of it, that the jar `from_archive` runs is the one `archive_jar` names
+    // (the rows key on that jar's MD5, so a loader that picks another jar leaves all three files as shipped).
     #[test]
     fn from_archive_turns_the_owner_sound_on() {
         use alloc::{collections::BTreeMap, vec};
@@ -382,7 +406,9 @@ mod tests {
 
         let files = BTreeMap::from([
             ("__adf__".into(), b"AID:probe\nPID:probe\nMClass:Probe\n".to_vec()),
+            ("a.jar".into(), b"not the jar".to_vec()),
             ("probe.jar".into(), WIRING_PROBE_JAR.to_vec()),
+            ("z.jar".into(), b"not the jar".to_vec()),
             ("P/probe.sav".into(), vec![0]),
             ("P/probe.opt".into(), vec![0]),
             ("P/probe.xor".into(), vec![0]),
@@ -391,6 +417,7 @@ mod tests {
             enable_gdbserver: false,
             profile: None,
         };
+        assert_eq!(super::KtfEmulator::archive_jar(&files), Some(WIRING_PROBE_JAR));
         let emulator = super::KtfEmulator::from_archive(Box::new(TestPlatform::new()), files, options).unwrap();
 
         assert_eq!(emulator.system.filesystem().virtual_file("probe.sav"), None);

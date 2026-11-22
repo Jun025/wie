@@ -5,7 +5,7 @@ use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 use rustjava_runtime::classes::java::lang::String;
 
-use wie_jvm_support::{WieJavaClassProto, WieJvmContext, get_declared_field, put_declared_field};
+use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
 use crate::classes::javax::microedition::lcdui::Display;
 
@@ -65,8 +65,7 @@ impl MIDlet {
 
         let display = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?;
 
-        put_declared_field(
-            jvm,
+        jvm.put_field(
             &mut this,
             "javax/microedition/midlet/MIDlet",
             DISPLAY_FIELD,
@@ -105,8 +104,7 @@ impl MIDlet {
 
     pub async fn display(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<Display>> {
         // A MIDlet subclass may declare its own `display` — the corpus has five (docs/report/0382).
-        get_declared_field(
-            jvm,
+        jvm.get_field(
             this,
             "javax/microedition/midlet/MIDlet",
             DISPLAY_FIELD,
@@ -186,7 +184,8 @@ mod test {
             Box::new(TestPlatform::new()),
             |jvm, _system| async move {
                 let mut midlet: ClassInstanceRef<MIDlet> = jvm.new_class("TestMIDlet", "()V", ()).await?.into();
-                jvm.put_field(&mut midlet, "display", "Ljavax/microedition/lcdui/Display;", None).await?;
+                jvm.put_field(&mut midlet, "TestMIDlet", "display", "Ljavax/microedition/lcdui/Display;", None)
+                    .await?;
 
                 assert!(
                     !MIDlet::display(&jvm, &midlet).await?.is_null(),

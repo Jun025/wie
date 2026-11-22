@@ -14,7 +14,7 @@
 //! ponytail: the guest's own malloc blocks are not scanned — a pointer kept only inside one is
 //! missed; scan the guest heap's allocated blocks if a title is seen losing an object that way.
 
-use alloc::{boxed::Box, collections::BTreeMap, collections::BTreeSet, string::String, vec, vec::Vec};
+use alloc::{borrow::Cow, boxed::Box, collections::BTreeMap, collections::BTreeSet, string::String, vec, vec::Vec};
 use core::{
     fmt::{self, Debug, Formatter},
     hash::{Hash, Hasher},
@@ -239,7 +239,7 @@ struct GuestRootsClass<M> {
 
 #[async_trait::async_trait]
 impl<M: GuestMemory> ClassDefinition for GuestRootsClass<M> {
-    fn name(&self) -> String {
+    fn name(&self) -> Cow<'_, str> {
         "net/wie/GuestRoots".into()
     }
 
@@ -298,11 +298,11 @@ impl<M> Debug for GuestRootsClass<M> {
 struct GuestRoot(u32);
 
 impl Field for GuestRoot {
-    fn name(&self) -> String {
-        alloc::format!("<guest-root-{:#x}>", self.0)
+    fn name(&self) -> Cow<'_, str> {
+        alloc::format!("<guest-root-{:#x}>", self.0).into()
     }
 
-    fn descriptor(&self) -> String {
+    fn descriptor(&self) -> Cow<'_, str> {
         "Ljava/lang/Object;".into()
     }
 

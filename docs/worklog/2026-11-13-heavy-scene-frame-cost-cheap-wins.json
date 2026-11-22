@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-13",
+  "task": "wie-heavy-scene-frame-cost-cheap-wins-measure-and-land",
+  "title": "무거운 장면 프레임 비용 — 싼 후보 4건 측정 · 명령당 고정비 · 30Hz 화면 틱 예산 착지",
+  "summary": "0557 후보 중 싼 4건을 브라우저 저녁 마을 자(60Hz · CPU 2배 느림 · 30Hz)로 쟀다. 넣은 것: ARM 실행 루프의 명령당 고정비(+6%) · wasm 빌드의 log 컴파일 제외(+7% 더) · FramePacer 가 30Hz 화면에 30ms 예산(30Hz 저녁 마을 8.1 → 17.5). 넣지 않은 것: -O3(이득 0 이하) · 60Hz 15ms(+4.7% 이나 프레임 여백 0.5ms). 30Hz 예산은 실 Chromium 에서 자기 증폭이 세 갈래로 났고 셋 다 시험과 함께 막았다. docs/report/0559.",
+  "changes": [
+    "wie-core-arm/src/engine/arm32_cpu.rs: run 루프 — SVC 검사·실패 메시지용 레지스터 읽기를 pc < 0x1000 가지 안으로",
+    "wie_featurephone/Cargo.toml: log release_max_level_off(wasm 전용 의존)",
+    "wie-backend/src/frame_pacer.rs: MAX_BUDGET_MS 30 · RAISE_FROM_US 28ms · 올린 예산 동안 표본 탐침을 틱으로 셈 · 드리프트 양방향 · 시험 19"
+  ],
+  "verification": "fmt · clippy(stable · wasm32) rc=0 · cargo test --all 54 스위트 846 pass · 러너 블록 6종 PASS · check-engine-contract 138 pass · contract-roundtrip 67/67 · npm run audit PASSED. 페이서 개악 6종 각각 red. beta clippy 는 기존 red(src/window.rs:217 · #591).",
+  "limits": "기기 1대(M1 Max) · Chromium 하나 · 30Hz 는 실 60Hz 위의 시간 기준 흉내. 해석기 분해는 네이티브 인트로 성 대화에서 쟀다.",
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "네이티브 호스트에서도 arm32_cpu 의 trace! 를 릴리스 빌드에서 빼기",
+      "plainSummary": "데스크톱 실행기(wie_cli)와 검증 러너(wie_validate)는 ARM 명령 하나마다 로그 수준을 두 번 검사한다. 로그를 켜지 않아도 드는 비용이다. 릴리스 빌드에서 가장 낮은 수준(trace)만 컴파일 단계에서 빼면 그 검사가 사라진다.",
+      "userBenefit": "네이티브에서 KTF·LGT 게임의 ARM 해석 시간이 최대 약 23% 준다(이 회차 프로파일 몫). 같은 줄을 wasm 에 넣었을 때 브라우저 저녁 마을이 +6~7% 빨라졌다. 전수 조사·퇴행 감시 같은 네이티브 측정도 그만큼 빨리 끝난다.",
+      "why": "이 회차 네이티브 프로파일(xctrace · 표본 8,575): ARM 실행 루프 표본의 23.1%가 log 레벨 검사(log lib.rs:1438 14.0% · arm32_cpu thumb.rs:113 9.1%)였다. wasm 쪽은 같은 이유로 이 회차에 이미 뺐다(docs/report/0559 §2·§4).",
+      "tradeoff": "릴리스 빌드에서 log 기반 크레이트의 trace 로그가 사라진다(arm32_cpu 의 명령 단위 추적 등 · wie 자신의 tracing 로그는 무관). 디버그 빌드는 그대로다. 네이티브 속도가 바뀌면 perf-watch 의 기준 핀 비교가 한 번 «빨라짐»으로 읽힌다.",
+      "effort": "S",
+      "target": "wie_cli/Cargo.toml(log release_max_level_debug) · Cargo.lock"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}

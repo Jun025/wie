@@ -327,6 +327,8 @@ jobs:
               # builds the draw fixture the round-trip asserts the blit with —
               # editing it changes what the contract check proves.
               - 'scripts/make-draw-fixture.mjs'
+              # imported by the round-trip the same way (Scenarios G/G2 derive their sizes from it).
+              - 'scripts/make-resize-fixture.mjs'
               # Scenario S's guest and the soundfont it serves (test inputs only — not artifact
               # inputs, so publish-artifact.yml's on.push.paths rightly does not list them).
               - 'scripts/make-sound-fixture.mjs'
@@ -339,7 +341,10 @@ jobs:
               - 'scripts/make-wipi-keydraw-fixture.sh'
               - 'docs/contracts/**'
               - 'test_data/**'
-              - 'data/**'
+              # include_str!'d engine tables (binary_patches.toml · lgt_java_abi.toml). Was a
+              # root-relative 'data/**' that matched 0 files after 2026-09-16 — a table-only PR
+              # skipped this check. Same line as publish-artifact.yml's on.push.paths.
+              - 'wie*/data/**'
               # Was 'fonts/**' until the upstream base swap: that directory no
               # longer exists (0 tracked files, 0 code references) and the
               # embedded font moved to assets/neodgm.ttf, which the browser host

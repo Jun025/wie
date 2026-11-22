@@ -77,10 +77,12 @@ cargo +beta clippy --all -- -D warnings            # rust.yml: the lint gate, ag
 **A new lint reddens code you did not write, so "I only touched config" does not exempt you.**
 **When beta reddens code you did not touch, split it off — do not fold it into your round.** Open a
 separate ticket, cite the failing run in your report, and say plainly that CI is red for a
-pre-existing reason.
+pre-existing reason. Since 2026-11-07 a PR's beta legs are empty passes, so the PR holds no failing run to
+cite: until landing the local gate above is the only beta net — quote its output and say the PR's green
+does not cover it.
 
 The marked region above is diffed against `rust.yml` by `wie_cli/tests/dod_ci_parity.rs`, which
-`cargo test --all` runs in all six legs. Of the four gates only the lint gate has ever caught anything
+`cargo test --all` runs in every leg that does work (on a PR only ubuntu/stable; all six weekly — `rust.yml` header). Of the four gates only the lint gate has ever caught anything
 on beta that stable missed — that is why beta is one line; add another only when a run makes you.
 What the parity test deliberately does not see it prints on every run;
 read that block rather than trusting the word "green". Why beta is one line, what it costs, and the
@@ -242,10 +244,33 @@ round had not run it. Every fixture here is committed; no game files are involve
 gh pr checks <n> -R Jun025/wie          # every check, with its conclusion
 ```
 
-Local green predicts CI green for the four gates and no further — `coverage` (tarpaulin), the
-Windows/Ubuntu matrix and `engine-contract` run only up there. **Quote the
-result in the report even when it is red** — twice on this branch's lineage a CI-red PR was
-reported as complete, which is what makes this a gate and not a suggestion.
+Local green predicts CI green for the four gates and no further — `engine-contract`, `build-web` and
+the ubuntu/stable leg run only up there. **Quote the result in the report even when it is red** —
+twice on this branch's lineage a CI-red PR was reported as complete, which is what makes this a gate
+and not a suggestion.
+
+**That output is not a platform guarantee** (since 2026-11-07, `docs/report/0553`). On a PR only
+`rust_ci (ubuntu-latest, stable)` does work; the other five legs skip every step and report success,
+and `coverage` (tarpaulin) does not run at all. The full matrix and coverage run weekly on `main` and
+by hand — a PR that touches anything platform-specific (line endings, paths, a `cfg(windows)`) runs
+`gh workflow run rust.yml -R Jun025/wie --ref <branch>` and quotes *that* run; one that deletes or
+moves tests runs `gh workflow run coverage.yml -R Jun025/wie --ref <branch>`. Both need `workflow_dispatch`
+in that branch's own copy of the workflow — a branch cut before #586 landed cannot until it takes `main`.
+
+**A red weekly run has an owner — same rule as doc-liveness below: the first gate③ round that runs
+after it.** Read both beside the PR's checks: `gh run list -R Jun025/wie --workflow=rust.yml --event schedule -L1`
+and `gh run list -R Jun025/wie --workflow=coverage.yml --event schedule -L1`. If red, file a ticket naming
+the leg and the failing step — do not fix inline, merge tickets do not change code. An empty list or a
+run older than 8 days is not a green — say so in the reply — but it is not by itself a reason to dispatch.
+Three cases, in order. ⑴ `main` has a hand run inside 8 days — ask, because a hand run is a
+`workflow_dispatch` event and the two lists above never show it:
+`gh run list -R Jun025/wie --workflow=rust.yml --branch main --event workflow_dispatch -L1` (same shape for
+`coverage.yml`). It stands in for the weekly run: judge it by the rule above and do not dispatch again.
+⑵ The first Saturday cron after #586 landed has not passed yet (times: each workflow's `schedule:`): the
+empty list is "not due yet" — write that, dispatch nothing. ⑶ No scheduled run for more than 8 days,
+counted from the last one or, with none ever, from #586's landing: dispatch **once** and raise it in the
+reply for the operator. A hand run that has itself aged past 8 days buys no second dispatch — write that
+the weekly net is down and the operator question is open.
 
 Narrower commands are conveniences, not gates: `cargo build` (default member `wie_cli`),
 `cargo test -p <crate> <test_name>`, `cargo fmt` to fix formatting (`rustfmt.toml`: max_width=150).
@@ -354,6 +379,12 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   the host lock `/tmp/wie-playability-census.lock` (fixed path, so scratch copies share it) and a second run
   **waits** for it — it does not fail. A dead holder's lock is reclaimed.
 
+- **`scripts/content-key.mjs` — local only (same reason); it writes and checks `compat.json`'s `contentKey`.**
+  `write` runs the `wie_identify` binary over the corpus files; `check` holds the committed values to that binary
+  **and** to the wasm `identify()` export, row by row (rc 2 = a row's file is not on disk, not a pass). The key is
+  never typed in and never re-derived in a script — change `wie_identify::identify`, then `write`. What CI can see
+  without game bytes (shape, every row keyed, the ledger's jar keys) is in `player-data.mjs` (`docs/report/0567`).
+
 - **`scripts/regression-census.sh` — local only (same reason); the weekly regression watch over that census.**
   It measures `origin/main` on every title and reports only rows that went DOWN against
   `docs/player-data/compat.json`, pair-confirmed; it never writes compat. Rules: `scripts/regression-diff.mjs`
@@ -392,6 +423,14 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   `window`. It exists because these sweeps lived only under `~/orchestrator/reports/evidence/…` until
   2026-09-20, which is the shape this lineage was once rejected for — and the round that moved them
   had itself re-implemented one of the three from scratch a round earlier without noticing it existed.
+
+- **`scripts/hook-shadow-sweep.sh` — local only (same reason); a round that adds or changes a generic
+  KTF hook RUNS IT, and a hook stays in `binary_patches.toml` only at 0 mismatches.** Under
+  `WIE_HOOK_MODE=shadow`, `wie_validate` runs the title's own code beside every hook fire and compares
+  what each left (what is compared and what is not: `hook/shadow.rs`). The sweep prints fires ·
+  compared · mismatches per pattern and exits 1 on any mismatch — a fire left uncompared is one
+  (`selftest` there). A site that never fired was not compared, and a starved host reaches fewer calls
+  — read `fires`, `load1` and the `handed to` line first (`docs/report/0565`, `0566`).
 
 - **`scripts/audio-probe.mjs` — local only (it needs a game file), and it is how an audio change is
   checked in a real browser.** It boots the featurephone engine in headless Chromium through the
@@ -671,6 +710,11 @@ created 2026-09-17T10:17:54+09:00 — rules `deletion`, `non_fast_forward`, `pul
 
 <!-- REQUIRED-CHECKS:END -->
 
+**Two of those five names measure nothing on a PR.** A PR green on `rust_ci (macos-latest, stable)`
+or `rust_ci (windows-latest, stable)` means the job started and skipped every step (2026-11-07 — the
+names must still report or the merge deadlocks; `rust.yml` header). What those platforms actually
+owe is in the weekly run and the hand dispatch — §Definition of Done, "Then read the PR's CI".
+
 **The three signals disagree, and the disagreement is the trap.** Measured 2026-09-17 12:4x:
 `branches/main/protection` still answers **404 "Branch not protected"** and `branches/main` reports
 `protection.enabled: false` — because **both report classic protection only, and this is a ruleset**.
@@ -755,7 +799,7 @@ above the engine reaches back into it.
 - `wie_wipi_c`, `wie_wipi_java`, `wie_midp`, `wie_skvm` — the emulated API surfaces.
 - `wie_ktf`, `wie_lgt`, `wie_skt`, `wie_j2me` — per-carrier entry points (`wie_ktf`/`wie_lgt` hold the heavy reverse-engineered runtimes).
 - `wie_cli` — native host (also `wie_validate`, a headless triage runner); `wie_featurephone` — browser host, empty library off `wasm32` (Constraint 7; renamed from `wie_web` 2026-09-11 — upstream uses that name).
-- `patches/classfile` — crates.io `classfile` 0.1.1 plus one fix (modified UTF-8 constants), via `[patch.crates-io]`; its `README.md` has the removal condition.
+- `wie_identify` — which game a file is, without booting it; the one place `contentKey` is computed (its binary writes `compat.json`'s, the browser's `identify()` export returns it).
 - `web/`, `functions/`, `migrations/`, `scripts/`, `docs/`, `data/`, `fonts/`, `test_data/` — non-Rust surfaces.
 
 **Full map: `docs/architecture.md`** — layer diagram, a role for every crate, and what each

@@ -42,9 +42,9 @@ impl V3 {
             return Err(jvm.exception("java/lang/NullPointerException", "V3 is null").await);
         }
         Ok([
-            jvm.get_field(this, "x", "I").await?,
-            jvm.get_field(this, "y", "I").await?,
-            jvm.get_field(this, "z", "I").await?,
+            jvm.get_field(this, "m/V3", "x", "I").await?,
+            jvm.get_field(this, "m/V3", "y", "I").await?,
+            jvm.get_field(this, "m/V3", "z", "I").await?,
         ])
     }
 
@@ -52,8 +52,8 @@ impl V3 {
         if this.is_null() {
             return Err(jvm.exception("java/lang/NullPointerException", "V3 is null").await);
         }
-        jvm.put_field(&mut this, "x", "I", v[0]).await?;
-        jvm.put_field(&mut this, "y", "I", v[1]).await?;
-        jvm.put_field(&mut this, "z", "I", v[2]).await
+        jvm.put_field(&mut this, "m/V3", "x", "I", v[0]).await?;
+        jvm.put_field(&mut this, "m/V3", "y", "I", v[1]).await?;
+        jvm.put_field(&mut this, "m/V3", "z", "I", v[2]).await
     }
 }

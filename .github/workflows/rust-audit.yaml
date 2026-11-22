@@ -64,18 +64,15 @@ jobs:
       # adopted quick-xml ^0.41, so `cargo update -p wayland-scanner` lifted us
       # to the patched 0.41.0 and the suppression is no longer needed.
       #
-      # ★The three `--ignore`s below (2026-10-23) are that rule applied, not an
-      # exception to it: zip 8.6.0 RUSTSEC-2026-0367/0368/0369 are fixed only in
-      # zip 9, and `rustjava-runtime` 0.1.1 (≤0.3.2) requires `^8.6` — leaving 8.x
-      # means moving the RustJava pin, a design task (AGENTS.md Constraint 8).
-      # All three are in `ZipArchive::extract` / `ZipStreamReader::extract`
-      # (writing entries to a directory); neither we nor rustjava-runtime call
-      # either — every use is `ZipArchive::new` + `by_name`/`by_index` into
-      # memory. Reachability argument and removal condition: ledger §D of
-      # docs/project-kb/02_status.md. The SAME list is on pr-audit.yml's audit
-      # line, and scripts/check-audit-warnings.mjs (next step) goes RED when the
-      # two lists differ, when an ignored ID is no longer reported (stale — delete
-      # it), or when one has no §D row. Never blanket, never a whole crate.
+      # The eight zip `--ignore`s of 2026-10-23 / 2026-11-22 (RUSTSEC-2026-0367/0368/
+      # 0369/0429/0545/0546/0547/0548) are GONE as of 2026-11-22: the RustJava pin
+      # moved to 0.4.1 (zip ^9.0.5) and wie-backend's own dependency to ^9.0, so the
+      # lockfile holds zip 9.8.1 only. Their verdicts are kept in ledger §C row C-16.
+      # The line below carries NO ignores again. If one is ever needed, it goes on
+      # this line AND pr-audit.yml's by name, with a ledger §D row —
+      # scripts/check-audit-warnings.mjs (next step) goes RED when the two lists
+      # differ, when an ignored ID is no longer reported (stale — delete it), or
+      # when one has no §D row. Never blanket, never a whole crate.
       #
       # WHEN THIS GOES RED, READ THE LEDGER FIRST:
       #   docs/project-kb/02_status.md — "공급망 추적 대장"
@@ -87,7 +84,7 @@ jobs:
       # quoting the row. Answering a repeat advisory from scratch is the waste
       # this exists to prevent.
       - name: cargo audit
-        run: cargo audit --ignore RUSTSEC-2026-0367 --ignore RUSTSEC-2026-0368 --ignore RUSTSEC-2026-0369
+        run: cargo audit
 
       # THREE list ↔ reality comparisons, one step, ONE `cargo audit --json` (the third,
       # added 2026-10-23, is the named --ignore list above — see the checker's IGNORES block).
@@ -107,10 +104,16 @@ jobs:
       #     That table declares "경고 수와 이 표의 행 수가 어긋나면 둘 중 하나가 낡은
       #     것이다" and then went stale for a month anyway — A-2/A-3 were upgraded away on
       #     2026-08-08 (22df9531) and chacha20 arrived, while three rows sat there. A human
-      #     realigned it; this makes the machine say it next time. SET equality, not count:
+      #     realigned it; this makes the machine say it next time. SETS, not counts:
       #     the 2026-09-06 incident had the count right and the composition wrong, and a
-      #     count cannot see a swap. Both directions are red, and an unreadable table is
-      #     ALSO red — a blind checker is how the ledger went quiet in the first place.
+      #     count cannot see a swap. An unreadable table is ALSO red — a blind checker is
+      #     how the ledger went quiet in the first place.
+      #     ★Asymmetric since 2026-11-22, same as (1): a §A row cargo-audit no longer
+      #     reports is RED (stale); a warning with no §A row is NOT — it is printed and
+      #     written to the job summary as «대장에 없는 새 경고 N건: …». Both directions
+      #     used to be red, and one freshly published tokio warning kept this job red for
+      #     10 days (10-24 → 11-02, run 40449806714) with no change to this repo. A new
+      #     VULNERABILITY is still red — the audit step above, and the checker again.
       #
       # Both comparisons read the SAME parsed warning set, so they cannot disagree about
       # what the warnings are. Cost: ~1s (measured warm locally: 0.89s / 1.09s).
@@ -119,5 +122,11 @@ jobs:
       # `pull_request` / `push` trigger (schedule + workflow_dispatch only), so it never
       # reports on a PR. Promoting it is a deliberate act — do it after the ledger check
       # has a track record, not before.
+      #
+      # `--selftest` runs first so a broken rule reddens instead of passing silently: it
+      # holds new-warning = green + summary line, new-vulnerability = red, stale row = red,
+      # on synthetic input (no cargo-audit, no network).
       - name: Expected-warning list and ledger §A match reality
-        run: node scripts/check-audit-warnings.mjs
+        run: |
+          node scripts/check-audit-warnings.mjs --selftest
+          node scripts/check-audit-warnings.mjs

@@ -7,12 +7,7 @@
 extern crate std;
 
 use alloc::{sync::Arc, vec::Vec};
-use core::{
-    future::Future,
-    pin::Pin,
-    sync::atomic::{AtomicU64, Ordering},
-    task::{Context, Poll},
-};
+use core::sync::atomic::{AtomicU64, Ordering};
 use std::{println, string::String};
 
 use spin::Mutex;
@@ -21,7 +16,7 @@ use crate::{
     executor::Executor,
     frame_pacer::FramePacer,
     speed_clock::{AchievedSpeed, SpeedClock},
-    task::YieldFuture,
+    task::{SleepFuture, YieldFuture},
 };
 
 // Wall µs a clock read costs; waiting for a wake is nothing but reads.
@@ -127,15 +122,15 @@ fn run(shape: Shape, speed: f64, period_us: u64, margin: Option<u64>, jitter_us:
                         work(SLICE_US);
                         YieldFuture::new().await;
                     }
+                    // `System::sleep`: the deadline counts from the call.
                     let due = task_now() + ms;
-                    task_executor.sleep(ms);
-                    Pending(false).await;
+                    SleepFuture::new(due, &task_executor).await;
                     task_late.lock().push(task_now().raw().saturating_sub(due.raw()));
                 }
                 Shape::Menu => {
                     work(POLL_WORK_US);
-                    task_executor.sleep(1);
-                    Pending(false).await;
+                    // `System::sleep` at `POLL_SLEEP_MS`: a poll, which keeps no tick alive.
+                    SleepFuture::toward(task_now() + 1, None, &task_executor).await;
                 }
             }
         }
@@ -192,21 +187,6 @@ fn run(shape: Shape, speed: f64, period_us: u64, margin: Option<u64>, jitter_us:
     split.late = core::mem::take(&mut *late.lock());
     executor.clear();
     split
-}
-
-// A future pending on its first poll: what `SleepFuture` is once `Executor::sleep` registered it.
-struct Pending(bool);
-
-impl Future for Pending {
-    type Output = ();
-    fn poll(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<()> {
-        if self.0 {
-            Poll::Ready(())
-        } else {
-            self.0 = true;
-            Poll::Pending
-        }
-    }
 }
 
 const SHAPES: [Shape; 4] = [Shape::Busy, Shape::Sleep(60), Shape::Sleep(20), Shape::Menu];
@@ -326,7 +306,7 @@ fn the_host_wake_hands_back_the_wait() {
             }
         }
     }
-    // Measured when written: 13.1s -> 6.7s of 120s. Not lower: where a sleep keeps landing just past
+    // Measured: 13.2s -> 6.8s of 120s (13.1 -> 6.7 before upstream #1491's sleep deadline). Not lower: where a sleep keeps landing just past
     // the display's vsync, today's tick waits less than the margin does (`tick_occupancy_table`).
     assert!(after_us * 10 < before_us * 6, "wait {after_us}us vs {before_us}us");
 }

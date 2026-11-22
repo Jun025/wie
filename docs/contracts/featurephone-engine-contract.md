@@ -27,6 +27,7 @@ GitHub Release 로 발행하고 `repository_dispatch` 로 수신부를 깨우면
 | 정상 종료 체인 | 코어 exit 요청 → `has_exited()` sticky true → 이후 `tick()` 안전 no-op → 세이브는 계속 읽힘 | 왕복(픽스처가 실제 clean-exit 수행) |
 | 세이브 블롭 | `WIESAV01` 매직의 불투명 블롭, 왕복 가능, 불량 블롭은 `false`(throw 아님) | 정적(소스 핀) + 왕복(export→import 실측) |
 | LGT 판별 | `lgt_compile_model()` ∈ {"clet","aot-java",undefined}, 생성 직후 유효 — 셸은 "aot-java" denylist | 왕복(KTF=undefined·LGT=clet 실측) |
+| 부팅 전 판별 | `identify(filename, data)` → `{ platform, model, contentKey }` 또는 `undefined` — 에뮬레이터를 만들지 않고 바이트를 읽기만 한다. `contentKey` 는 지원 목록의 같은 칸과 같은 계산(`wie_identify`) | 정적(export · 인자 2) + 왕복 I(부팅 뒤 값과 대조 · 맨 jar 는 Node 가 계산한 MD5 와 대조 · 바이트 불변) |
 | dispatch payload | `wie-artifact-published` + `version/wieHead/wasmUrl/glueUrl/wasmSha256/glueSha256` — 수신부는 키 누락 시 fail-closed | 정적(워크플로 텍스트 핀) |
 
 ## 커버리지 정직 고지 (못 잡는 것)

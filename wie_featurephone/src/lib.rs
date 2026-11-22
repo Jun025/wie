@@ -59,7 +59,7 @@ use wie_skt::SktEmulator;
 use crate::database::{DbStore, WebDatabaseRepository};
 use crate::filesystem::{FsStore, WebFilesystem};
 use crate::platform::WebPlatform;
-use crate::screen::{RedrawFlag, WebScreen};
+use crate::screen::{FrameCount, RedrawFlag, WebScreen};
 
 const SEP: char = '\u{1}';
 
@@ -69,6 +69,22 @@ pub fn init() {
     console_error_panic_hook::set_once();
 }
 
+/// Which game a file is, without booting it: `{ platform, model, contentKey }`, or `undefined` when no loader takes it.
+// One line, as on `achieved_speed`: this comment is copied into wie_web.js. The definition is
+// `wie_identify::identify`; `data` is copied in and read only — the caller's buffer is never written.
+#[wasm_bindgen]
+pub fn identify(filename: &str, data: &[u8]) -> Result<JsValue, JsValue> {
+    let Some(identity) = wie_identify::identify(filename, data) else {
+        return Ok(JsValue::UNDEFINED);
+    };
+    let text = |value: Option<&str>| value.map_or(JsValue::NULL, JsValue::from_str);
+    let object = Object::new();
+    Reflect::set(&object, &"platform".into(), &identity.platform.into())?;
+    Reflect::set(&object, &"model".into(), &text(identity.model))?;
+    Reflect::set(&object, &"contentKey".into(), &text(identity.content_key.as_deref()))?;
+    Ok(object.into())
+}
+
 /// A running emulator instance, owned by JS for the lifetime of one loaded app.
 #[wasm_bindgen]
 pub struct WieEmulator {
@@ -76,6 +92,8 @@ pub struct WieEmulator {
     fs_store: FsStore,
     db_store: DbStore,
     redraw: RedrawFlag,
+    // Frames `WebScreen` has presented (see `frames_painted`).
+    frames: FrameCount,
     // Sticky clean-exit flag, set by `WebPlatform::exit` when the core requests
     // a normal shutdown (the "[wie] emulator requested exit" path).
     exited: Arc<AtomicBool>,
@@ -155,13 +173,14 @@ impl WieEmulator {
         // Start "true" so the very first composed frame is shown even if a title
         // somehow paints before its first request_redraw.
         let redraw: RedrawFlag = Arc::new(AtomicBool::new(true));
+        let frames = FrameCount::default();
         let exited: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
         let clock = Arc::new(SpeedClock::new());
         let wake_margin = Arc::new(AtomicU64::new(u64::MAX));
 
         let platform = Box::new(
             WebPlatform::new(
-                WebScreen::new(ctx, back_canvas, back_ctx, width, height, redraw.clone()),
+                WebScreen::new(ctx, back_canvas, back_ctx, width, height, redraw.clone(), frames.clone()),
                 WebFilesystem::new(fs_store.clone()),
                 WebDatabaseRepository::new(db_store.clone()),
                 audio_ctx,
@@ -186,6 +205,7 @@ impl WieEmulator {
             fs_store,
             db_store,
             redraw,
+            frames,
             exited,
             platform_kind,
             lgt_compile_model,
@@ -320,6 +340,14 @@ impl WieEmulator {
     // (contract `artifacts.maxBytes`). The definition and its floor are on `wie_backend::AchievedSpeed`.
     pub fn achieved_speed(&self) -> f64 {
         self.achieved.get(self.clock.speed())
+    }
+
+    /// Frames the game has shown so far (wraps at 2^32); its change over time is the game's frames/s.
+    // One line, as above. `achieved_speed` bottoms out near 0.84 for a game short of CPU however
+    // short; this is the «how short»: an LGT title read 15 -> 4 frames/s with that figure flat
+    // (docs/report/0557).
+    pub fn frames_painted(&self) -> u32 {
+        self.frames.load(Ordering::Relaxed)
     }
 
     /// True once the emulator core requested a NORMAL shutdown (the

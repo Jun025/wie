@@ -104,12 +104,15 @@ impl WieAudioClip {
         }
 
         Self::release(jvm, context, &mut this).await?;
-        jvm.put_field(&mut this, "closed", "Z", false).await?;
+        jvm.put_field(&mut this, "net/wie/WieAudioClip", "closed", "Z", false).await?;
 
         let bytes: Vec<i8> = jvm.load_array(&data, offset as usize, buffer_size as usize).await?;
         let bytes: Vec<u8> = bytes.into_iter().map(|byte| byte as u8).collect();
         match context.system().audio().load_smaf(&bytes) {
-            Ok(handle) => jvm.put_field(&mut this, "audioHandle", "I", handle as i32 + 1).await?,
+            Ok(handle) => {
+                jvm.put_field(&mut this, "net/wie/WieAudioClip", "audioHandle", "I", handle as i32 + 1)
+                    .await?
+            }
             Err(error) => tracing::error!("net.wie.WieAudioClip::open: failed to load audio: {error:?}"),
         }
 
@@ -118,7 +121,7 @@ impl WieAudioClip {
 
     /// The loaded handle, or `None` if nothing is loaded or the clip was closed.
     async fn handle(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<Option<u32>> {
-        let closed: bool = jvm.get_field(this, "closed", "Z").await?;
+        let closed: bool = jvm.get_field(this, "net/wie/WieAudioClip", "closed", "Z").await?;
         if closed {
             return Ok(None);
         }
@@ -127,30 +130,30 @@ impl WieAudioClip {
     }
 
     async fn loaded(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<Option<u32>> {
-        let stored: i32 = jvm.get_field(this, "audioHandle", "I").await?;
+        let stored: i32 = jvm.get_field(this, "net/wie/WieAudioClip", "audioHandle", "I").await?;
 
         Ok((stored > 0).then(|| stored as u32 - 1))
     }
 
     async fn start(jvm: &Jvm, context: &mut WieJvmContext, this: &mut ClassInstanceRef<Self>, repeat: bool) -> JvmResult<()> {
         let Some(handle) = Self::handle(jvm, this).await? else {
-            jvm.put_field(this, "repeat", "Z", repeat).await?;
-            jvm.put_field(this, "paused", "Z", false).await?;
+            jvm.put_field(this, "net/wie/WieAudioClip", "repeat", "Z", repeat).await?;
+            jvm.put_field(this, "net/wie/WieAudioClip", "paused", "Z", false).await?;
             return Ok(());
         };
-        let looping: bool = jvm.get_field(this, "looping", "Z").await?;
+        let looping: bool = jvm.get_field(this, "net/wie/WieAudioClip", "looping", "Z").await?;
         if repeat && looping {
             return Ok(());
         }
         let now = context.system().platform().now().raw() as i64;
-        let sounding_until: i64 = jvm.get_field(this, "soundingUntil", "J").await?;
+        let sounding_until: i64 = jvm.get_field(this, "net/wie/WieAudioClip", "soundingUntil", "J").await?;
         if !repeat && now < sounding_until {
             return Ok(());
         }
 
-        jvm.put_field(this, "repeat", "Z", repeat).await?;
-        jvm.put_field(this, "paused", "Z", false).await?;
-        jvm.put_field(this, "looping", "Z", repeat).await?;
+        jvm.put_field(this, "net/wie/WieAudioClip", "repeat", "Z", repeat).await?;
+        jvm.put_field(this, "net/wie/WieAudioClip", "paused", "Z", false).await?;
+        jvm.put_field(this, "net/wie/WieAudioClip", "looping", "Z", repeat).await?;
         if repeat {
             Self::stop_orphan_loops(jvm, context).await?;
         }
@@ -159,7 +162,7 @@ impl WieAudioClip {
         }
         let duration = if repeat { None } else { context.system().audio().duration(handle) };
         let until = duration.map_or(0, |duration| now + duration as i64);
-        jvm.put_field(this, "soundingUntil", "J", until).await?;
+        jvm.put_field(this, "net/wie/WieAudioClip", "soundingUntil", "J", until).await?;
 
         Ok(())
     }
@@ -198,11 +201,11 @@ impl WieAudioClip {
     async fn release(jvm: &Jvm, context: &mut WieJvmContext, this: &mut ClassInstanceRef<Self>) -> JvmResult<()> {
         if let Some(handle) = Self::loaded(jvm, this).await? {
             let _ = context.system().audio().close(handle);
-            jvm.put_field(this, "audioHandle", "I", 0).await?;
+            jvm.put_field(this, "net/wie/WieAudioClip", "audioHandle", "I", 0).await?;
         }
-        jvm.put_field(this, "paused", "Z", false).await?;
-        jvm.put_field(this, "looping", "Z", false).await?;
-        jvm.put_field(this, "soundingUntil", "J", 0i64).await?;
+        jvm.put_field(this, "net/wie/WieAudioClip", "paused", "Z", false).await?;
+        jvm.put_field(this, "net/wie/WieAudioClip", "looping", "Z", false).await?;
+        jvm.put_field(this, "net/wie/WieAudioClip", "soundingUntil", "J", 0i64).await?;
 
         Ok(())
     }
@@ -252,16 +255,16 @@ impl WieAudioClip {
     }
 
     async fn wait_until_done(jvm: &Jvm, context: &mut WieJvmContext, this: &mut ClassInstanceRef<Self>) -> JvmResult<()> {
-        jvm.put_field(this, "blocking", "Z", true).await?;
-        jvm.put_field(this, "userStopped", "Z", false).await?;
+        jvm.put_field(this, "net/wie/WieAudioClip", "blocking", "Z", true).await?;
+        jvm.put_field(this, "net/wie/WieAudioClip", "userStopped", "Z", false).await?;
         let result = async {
             loop {
-                if jvm.get_field(this, "userStopped", "Z").await? {
+                if jvm.get_field(this, "net/wie/WieAudioClip", "userStopped", "Z").await? {
                     let exception = jvm.new_class("com/skt/m/UserStopException", "()V", ()).await?;
                     return Err(JavaError::JavaException(exception));
                 }
-                let paused: bool = jvm.get_field(this, "paused", "Z").await?;
-                let until: i64 = jvm.get_field(this, "soundingUntil", "J").await?;
+                let paused: bool = jvm.get_field(this, "net/wie/WieAudioClip", "paused", "Z").await?;
+                let until: i64 = jvm.get_field(this, "net/wie/WieAudioClip", "soundingUntil", "J").await?;
                 let now = context.system().platform().now().raw() as i64;
                 if !paused && now >= until {
                     return Ok(());
@@ -271,16 +274,16 @@ impl WieAudioClip {
             }
         }
         .await;
-        jvm.put_field(this, "blocking", "Z", false).await?;
+        jvm.put_field(this, "net/wie/WieAudioClip", "blocking", "Z", false).await?;
 
         result
     }
 
     /// stop()/close() from another thread while a sound thread's play() waits on this clip.
     async fn stop_user(jvm: &Jvm, this: &mut ClassInstanceRef<Self>) -> JvmResult<bool> {
-        let blocking: bool = jvm.get_field(this, "blocking", "Z").await?;
+        let blocking: bool = jvm.get_field(this, "net/wie/WieAudioClip", "blocking", "Z").await?;
         if blocking {
-            jvm.put_field(this, "userStopped", "Z", true).await?;
+            jvm.put_field(this, "net/wie/WieAudioClip", "userStopped", "Z", true).await?;
         }
 
         Ok(blocking)
@@ -297,9 +300,9 @@ impl WieAudioClip {
 
         if let Some(handle) = Self::handle(jvm, &this).await? {
             context.system().audio().stop(handle);
-            jvm.put_field(&mut this, "paused", "Z", true).await?;
-            jvm.put_field(&mut this, "looping", "Z", false).await?;
-            jvm.put_field(&mut this, "soundingUntil", "J", 0i64).await?;
+            jvm.put_field(&mut this, "net/wie/WieAudioClip", "paused", "Z", true).await?;
+            jvm.put_field(&mut this, "net/wie/WieAudioClip", "looping", "Z", false).await?;
+            jvm.put_field(&mut this, "net/wie/WieAudioClip", "soundingUntil", "J", 0i64).await?;
         }
 
         Ok(())
@@ -308,9 +311,9 @@ impl WieAudioClip {
     async fn resume(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("net.wie.WieAudioClip::resume({this:?})");
 
-        let paused: bool = jvm.get_field(&this, "paused", "Z").await?;
+        let paused: bool = jvm.get_field(&this, "net/wie/WieAudioClip", "paused", "Z").await?;
         if paused {
-            let repeat: bool = jvm.get_field(&this, "repeat", "Z").await?;
+            let repeat: bool = jvm.get_field(&this, "net/wie/WieAudioClip", "repeat", "Z").await?;
             Self::start(jvm, context, &mut this, repeat).await?;
         }
 
@@ -323,10 +326,10 @@ impl WieAudioClip {
         Self::stop_user(jvm, &mut this).await?;
         if let Some(handle) = Self::handle(jvm, &this).await? {
             context.system().audio().stop(handle);
-            jvm.put_field(&mut this, "looping", "Z", false).await?;
+            jvm.put_field(&mut this, "net/wie/WieAudioClip", "looping", "Z", false).await?;
         }
-        jvm.put_field(&mut this, "paused", "Z", false).await?;
-        jvm.put_field(&mut this, "soundingUntil", "J", 0i64).await?;
+        jvm.put_field(&mut this, "net/wie/WieAudioClip", "paused", "Z", false).await?;
+        jvm.put_field(&mut this, "net/wie/WieAudioClip", "soundingUntil", "J", 0i64).await?;
 
         Ok(())
     }
@@ -334,7 +337,7 @@ impl WieAudioClip {
     async fn close(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("net.wie.WieAudioClip::close({this:?})");
 
-        let closed: bool = jvm.get_field(&this, "closed", "Z").await?;
+        let closed: bool = jvm.get_field(&this, "net/wie/WieAudioClip", "closed", "Z").await?;
         // Ending a sound thread's play() ends its sound too — unlike an effect's open → play → close (header).
         if !closed
             && Self::stop_user(jvm, &mut this).await?
@@ -342,7 +345,7 @@ impl WieAudioClip {
         {
             context.system().audio().stop(handle);
         }
-        let looping: bool = jvm.get_field(&this, "looping", "Z").await?;
+        let looping: bool = jvm.get_field(&this, "net/wie/WieAudioClip", "looping", "Z").await?;
         if !closed
             && looping
             && let Some(handle) = Self::loaded(jvm, &this).await?
@@ -351,8 +354,8 @@ impl WieAudioClip {
             orphans.push(handle as i32 + 1);
             Self::set_orphan_loops(jvm, &orphans).await?;
         }
-        jvm.put_field(&mut this, "closed", "Z", true).await?;
-        jvm.put_field(&mut this, "paused", "Z", false).await?;
+        jvm.put_field(&mut this, "net/wie/WieAudioClip", "closed", "Z", true).await?;
+        jvm.put_field(&mut this, "net/wie/WieAudioClip", "paused", "Z", false).await?;
 
         Ok(())
     }

@@ -1,5 +1,18 @@
 # Game-specific binary patches consumed by `wie_core_arm::install_binary_patches`.
 #
+# What this table touches: nothing on disk. No game file, corpus file or user upload is rewritten;
+# every item below changes the copy of the game's code the engine has already loaded into memory.
+# Counted from this table on 2026-11-22:
+#   - hash-keyed `[[entry.patch]]`: 5 rows under 2 binaries = 8 rewritten sites in 3 packages. Each is
+#     a per-title lock lift, added only when the operator names the title, and each is a row of
+#     `docs/contracts/runtime-adjustments.tsv`.
+#   - hash-less `[[entry.hook]]`: 5 patterns. Not per-title: on KTF every match has 2 bytes of code
+#     overwritten with a call (608 sites in 264 of the 269 KTF packages: the 872 measured
+#     2026-11-21, less the `memset` site each of the 264 had until 2026-11-22) —
+#     except an `inline_copy` match whose loop test is another shape, which is left as it is.
+# That ledger states the live counts, and `the_ledger_lists_exactly_this_table`
+# (`src/binary_patches.rs`) fails when they or the hash-keyed entries drift from this file.
+#
 # Each `[[entry]]` is either:
 #   - hash-keyed: `hash` is the MD5 of the main guest binary (KTF
 #     `client.bin`, LGT `binary.mod`, etc.). Matched and installed on boot.
@@ -23,13 +36,18 @@
 # `inline_copy` fixed fields:
 #   - `len_offset`   — R7-relative offset of the length variable. Required if
 #                      the pattern has no `{len}` capture; forbidden if it does.
-#   - `spill_back`   — after the copy, also write back `dst += len`, `src += len`,
-#                      `len = 0` into their stack slots. Set true when the code
-#                      after the loop re-reads those variables.
+#   - `spill_back`   — after the copy, also write back `dst`/`src` advanced by
+#                      the bytes copied and `len = 0` into their stack slots.
+#                      Set true when the code after the loop re-reads those
+#                      variables.
 #
-# `inline_copy` requires the loop to use a DOWN-counter (length stored on the
-# stack and decremented to 0 to exit). UP-counter loops are NOT compatible —
-# zeroing the slot just resets the index and the loop restarts.
+# `inline_copy` is for one loop only: `while (len-- > 0) *dst++ = *src++;`. The
+# hook sits on the body and `{exit_b}`/`exit_pc` is the test the body branches
+# back to. That test runs first and has already taken one off `len`, so the hook
+# copies `len + 1` bytes, zeroes the slot, and lets the test end the loop. The
+# installer reads the test and skips a site where it is anything else (`--len`,
+# an up-counter, a test that is not straight before the body) — the count would
+# be off by one there, and the body pattern cannot tell.
 #
 # In addition to hooks, an entry may contain `[[entry.patch]]` items that
 # rewrite raw bytes at install time (no SVC, no runtime dispatch). A patch is
@@ -51,6 +69,14 @@
 # patches/hooks is fatal (likely a stale entry against an updated binary);
 # generic (hash-less) entries warn and continue.
 
+# A generic hook is a faster way to the SAME result as the title's own code, and it stays here
+# only while the shadow comparison finds no difference: `scripts/hook-shadow-sweep.sh` over every
+# hooked KTF package (AGENTS.md; what is compared: `src/binary_patches/hook/shadow.rs`).
+# Last confirmed 2026-11-22 — 264 packages, 0 mismatches (docs/report/0565; the hook side failing
+# to arrive back is counted since docs/report/0566).
+# A call the engine cannot answer exactly is not answered: the library kinds hand overlapping
+# buffers and any access the host refuses to the title's own routine, and the loop kinds give such
+# a site back to the title's own loop.
 [[entry]]
 name = "Generic compiler library / inline copy patterns"
 
@@ -59,7 +85,8 @@ name = "Generic compiler library / inline copy patterns"
 #   LDRB R3, [Rsrc];   STRB R3, [Rdst]
 #   MOV  R3, Rcount;   ADDS Rsrc, #1; ADDS Rdst, #1; SUBS Rcount, #1
 #   CMP  R3, #0;       BGT loop
-# `Rcount` holds `remaining - 1`, so actual byte count is `Rcount + 1`.
+# `Rcount` holds `remaining - 1`, so actual byte count is `Rcount + 1` — and 1
+# when `Rcount` comes in at zero or below: the loop copies before it tests.
 # Seen as the dominant per-frame hot path in mgh2's `copy_offscreen_to_screen`.
 # Bit-pattern tokens use `s`/`d`/`c` to capture src/dst/count register fields;
 # `exit_pc` is auto-derived as `match_end | 1` (right past the BGT).
@@ -68,9 +95,9 @@ kind = "reg_inline_copy"
 pattern = "0b00sss011 78 0b00ddd011 70 0b00ccc011 1c 01 0b00110sss 01 0b00110ddd 01 0b00111ccc 00 2b f7 dc"
 count_offset = 1
 
-# Thumb -O0 byte copy: `*dst++ = *src++` with `dst`/`src`/`len` all on the
-# stack. Src is reached via single-instruction `SUBS R4, R7, #4` (`3c 1f`),
-# so `src_offset` is pinned.
+# Thumb -O0 byte copy: the body of `while (len-- > 0) *dst++ = *src++;` with
+# `dst`/`src`/`len` all on the stack. Src is reached via single-instruction
+# `SUBS R4, R7, #4` (`3c 1f`), so `src_offset` is pinned.
 [[entry.hook]]
 kind = "inline_copy"
 pattern = "3d 1c {dst} 3d 29 68 3c 1f 22 68 08 1c 13 1c 1b 78 03 70 01 32 22 60 01 31 29 60 {exit_b} {exit_b}"
@@ -78,17 +105,17 @@ src_offset = -4
 len_offset = -12
 spill_back = true
 
-# RVCT __rt_memcpy / __rt_memset reached through a Thumb `BX PC` thunk.
+# RVCT __rt_memcpy reached through a Thumb `BX PC` thunk.
 # Prefix `BX PC; NOP; STMFD SP!, {R0, LR}; CMP R2, #N` is specific to the
 # standard library helpers; the trailing `CMP R2` immediate is what
 # distinguishes them (`#3` for memcpy, `#4` for memset).
+# `memset` (the same prefix with `04`) is NOT hooked, since 2026-11-22: the routine sits in all 264
+# packages and none of them calls it — 0 `BL` to it in any image against 6,253 to memcpy, and 0
+# fires in every sweep — so the rule above had no call to compare (docs/report/0576). A title
+# that does call it runs its own routine. Adding the row back takes a package where it fires.
 [[entry.hook]]
 kind = "memcpy"
 pattern = "78 47 00 00 01 40 2d e9 03 00 52 e3"
-
-[[entry.hook]]
-kind = "memset"
-pattern = "78 47 00 00 01 40 2d e9 04 00 52 e3"
 
 # RVCT Thumb strcpy / strlen with Mycroft's NUL-byte detection
 # (`0xFEFEFEFF`/`0x80808080` magic words).

@@ -14,6 +14,9 @@ mod thread_wrapper;
 
 pub type ThreadId = usize;
 
+#[cfg(not(target_arch = "wasm32"))]
+pub use self::binary_patches::hook_shadow;
+
 pub use self::{
     allocator::Allocator,
     binary_patches::{install_binary_patches, install_title_binary_patches},

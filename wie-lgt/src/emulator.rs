@@ -105,12 +105,9 @@ impl LgtEmulator {
 
         tracing::info!("Loading app {}, pid {}, mclass {}", app_info.aid, app_info.pid, app_info.mclass);
 
-        let jar_filename = files
-            .iter()
-            .find_map(|(filename, data)| (filename.ends_with(".jar") && Self::loadable_jar(data)).then_some(filename))
-            .ok_or_else(|| WieError::FatalError("Missing LGT application JAR containing binary.mod".into()))?
-            .clone();
-        let jar = files[&jar_filename].clone();
+        let (jar_filename, jar) = Self::archive_jar_entry(&files)
+            .map(|(filename, jar)| (filename.clone(), jar.clone()))
+            .ok_or_else(|| WieError::FatalError("Missing LGT application JAR containing binary.mod".into()))?;
         prepare_owner_files(&mut files, &jar);
 
         Self::load(
@@ -140,6 +137,17 @@ impl LgtEmulator {
 
     pub fn loadable_archive(files: &BTreeMap<String, Vec<u8>>) -> bool {
         files.contains_key("app_info")
+    }
+
+    fn archive_jar_entry(files: &BTreeMap<String, Vec<u8>>) -> Option<(&String, &Vec<u8>)> {
+        files
+            .iter()
+            .find(|(filename, data)| filename.ends_with(".jar") && Self::loadable_jar(data))
+    }
+
+    /// The jar `from_archive` runs — the one the per-title tables hash.
+    pub fn archive_jar(files: &BTreeMap<String, Vec<u8>>) -> Option<&[u8]> {
+        Self::archive_jar_entry(files).map(|(_, jar)| jar.as_slice())
     }
 
     pub fn archive_title(files: &BTreeMap<String, Vec<u8>>) -> Option<String> {
@@ -297,7 +305,14 @@ impl LgtAppInfo {
 mod tests {
     use alloc::{borrow::ToOwned, collections::BTreeMap, string::String, vec, vec::Vec};
 
-    use super::{LgtAppInfo, OrphanEntry, drop_orphan_entries};
+    use super::{LgtAppInfo, ORPHAN_ENTRIES, OrphanEntry, drop_orphan_entries};
+
+    /// `docs/contracts/runtime-adjustments.tsv` lists exactly this table: a row added here without a
+    /// ledger row — or a ledger row left behind — fails (CLAUDE.md «게임 파일 무수정 원칙»).
+    #[test]
+    fn the_ledger_lists_exactly_this_table() {
+        test_utils::assert_ledger_lists("orphan-entries", ORPHAN_ENTRIES.iter().map(|x| test_utils::hex(x.jar_md5)));
+    }
 
     fn table(jar: &[u8]) -> [OrphanEntry; 1] {
         [OrphanEntry {

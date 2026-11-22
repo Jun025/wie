@@ -61,7 +61,7 @@ impl BaseClip {
     ) -> JvmResult<i32> {
         tracing::debug!("org.kwis.msp.media.Clip::putData({this:?}, {buffer:?}, {offset}, {length})");
 
-        jvm.put_field(&mut this, "buffer", "[B", None).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/media/BaseClip", "buffer", "[B", None).await?;
         Self::load(jvm, &mut this, buffer, offset, length).await
     }
 
@@ -78,7 +78,8 @@ impl BaseClip {
             )
             .await?;
 
-        jvm.put_field(this, "player", "Ljavax/microedition/media/Player;", player).await?;
+        jvm.put_field(this, "org/kwis/msp/media/BaseClip", "player", "Ljavax/microedition/media/Player;", player)
+            .await?;
 
         Ok(length)
     }
@@ -86,15 +87,24 @@ impl BaseClip {
     async fn clear_data(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.media.BaseClip::clearData({this:?})");
 
-        let player: ClassInstanceRef<Player> = jvm.get_field(&this, "player", "Ljavax/microedition/media/Player;").await?;
+        let player: ClassInstanceRef<Player> = jvm
+            .get_field(&this, "org/kwis/msp/media/BaseClip", "player", "Ljavax/microedition/media/Player;")
+            .await?;
         if player.is_null() {
             return Ok(());
         }
 
         let _: () = jvm.invoke_virtual(&player, "javax/microedition/media/Player", "close", "()V", ()).await?;
 
-        jvm.put_field(&mut this, "player", "Ljavax/microedition/media/Player;", None).await?;
-        jvm.put_field(&mut this, "buffer", "[B", None).await?;
+        jvm.put_field(
+            &mut this,
+            "org/kwis/msp/media/BaseClip",
+            "player",
+            "Ljavax/microedition/media/Player;",
+            None,
+        )
+        .await?;
+        jvm.put_field(&mut this, "org/kwis/msp/media/BaseClip", "buffer", "[B", None).await?;
 
         Ok(())
     }
@@ -113,10 +123,10 @@ impl BaseClip {
         tracing::debug!("org.kwis.msp.media.BaseClip::setBuffer({this:?}, {buffer:?}, {size})");
 
         let written = Self::load(jvm, &mut this, buffer.clone(), 0, size).await?;
-        jvm.put_field(&mut this, "buffer", "[B", buffer).await?;
-        jvm.put_field(&mut this, "bufferSize", "I", size).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/media/BaseClip", "buffer", "[B", buffer).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/media/BaseClip", "bufferSize", "I", size).await?;
         let hash = Self::buffer_hash(jvm, &this).await?;
-        jvm.put_field(&mut this, "bufferHash", "I", hash).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/media/BaseClip", "bufferHash", "I", hash).await?;
 
         Ok(written == size)
     }
@@ -126,29 +136,31 @@ impl BaseClip {
         if this.is_null() {
             return Ok(());
         }
-        let buffer: ClassInstanceRef<Array<i8>> = jvm.get_field(this, "buffer", "[B").await?;
+        let buffer: ClassInstanceRef<Array<i8>> = jvm.get_field(this, "org/kwis/msp/media/BaseClip", "buffer", "[B").await?;
         if buffer.is_null() {
             return Ok(());
         }
         let hash = Self::buffer_hash(jvm, this).await?;
-        let loaded: i32 = jvm.get_field(this, "bufferHash", "I").await?;
+        let loaded: i32 = jvm.get_field(this, "org/kwis/msp/media/BaseClip", "bufferHash", "I").await?;
         if hash == loaded {
             return Ok(());
         }
 
-        let player: ClassInstanceRef<Player> = jvm.get_field(this, "player", "Ljavax/microedition/media/Player;").await?;
+        let player: ClassInstanceRef<Player> = jvm
+            .get_field(this, "org/kwis/msp/media/BaseClip", "player", "Ljavax/microedition/media/Player;")
+            .await?;
         if !player.is_null() {
             let _: () = jvm.invoke_virtual(&player, "javax/microedition/media/Player", "close", "()V", ()).await?;
         }
-        let size: i32 = jvm.get_field(this, "bufferSize", "I").await?;
+        let size: i32 = jvm.get_field(this, "org/kwis/msp/media/BaseClip", "bufferSize", "I").await?;
         Self::load(jvm, this, buffer, 0, size).await?;
-        jvm.put_field(this, "bufferHash", "I", hash).await
+        jvm.put_field(this, "org/kwis/msp/media/BaseClip", "bufferHash", "I", hash).await
     }
 
     // FNV-1a over the registered bytes.
     async fn buffer_hash(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<i32> {
-        let buffer: ClassInstanceRef<Array<i8>> = jvm.get_field(this, "buffer", "[B").await?;
-        let size: i32 = jvm.get_field(this, "bufferSize", "I").await?;
+        let buffer: ClassInstanceRef<Array<i8>> = jvm.get_field(this, "org/kwis/msp/media/BaseClip", "buffer", "[B").await?;
+        let size: i32 = jvm.get_field(this, "org/kwis/msp/media/BaseClip", "bufferSize", "I").await?;
         let length = (size.max(0) as usize).min(jvm.array_length(&buffer).await?);
         let bytes: alloc::vec::Vec<i8> = jvm.load_array(&buffer, 0, length).await?;
 

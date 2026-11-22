@@ -46,8 +46,9 @@ impl Message {
 
         let _: () = jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await?;
 
-        jvm.put_field(&mut this, "addr", "Ljava/lang/String;", addr).await?;
-        jvm.put_field(&mut this, "data", "[B", data).await?;
+        jvm.put_field(&mut this, "org/kwis/msf/io/Message", "addr", "Ljava/lang/String;", addr)
+            .await?;
+        jvm.put_field(&mut this, "org/kwis/msf/io/Message", "data", "[B", data).await?;
 
         Ok(())
     }
@@ -55,7 +56,7 @@ impl Message {
     async fn get_data(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<Array<i8>>> {
         tracing::debug!("org.kwis.msf.io.Message::getData({this:?})");
 
-        jvm.get_field(&this, "data", "[B").await
+        jvm.get_field(&this, "org/kwis/msf/io/Message", "data", "[B").await
     }
 }
 

@@ -30,7 +30,7 @@ const EXCLUSIVE: i32 = 1;
 macro_rules! forward {
     ($fn:ident, $name:literal, $desc:literal, ($($arg:ident: $ty:ty),*) -> $ret:ty) => {
         async fn $fn(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, $($arg: $ty),*) -> JvmResult<$ret> {
-            let choice: ClassInstanceRef<ChoiceGroup> = jvm.get_field(&this, "choice", CHOICE_DESC).await?;
+            let choice: ClassInstanceRef<ChoiceGroup> = jvm.get_field(&this, "javax/microedition/lcdui/List", "choice", CHOICE_DESC).await?;
             jvm.invoke_virtual(&choice, CHOICE, $name, $desc, ($($arg,)*)).await
         }
     };
@@ -170,12 +170,15 @@ impl List {
                 (choice.clone(),),
             )
             .await?;
-        jvm.put_field(&mut this, "choice", CHOICE_DESC, choice).await?;
-        jvm.put_field(&mut this, "listType", "I", list_type).await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/List", "choice", CHOICE_DESC, choice)
+            .await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/List", "listType", "I", list_type)
+            .await?;
         let select: ClassInstanceRef<Command> = jvm
             .get_static_field("javax/microedition/lcdui/List", "SELECT_COMMAND", COMMAND_DESC)
             .await?;
-        jvm.put_field(&mut this, "selectCommand", COMMAND_DESC, select).await
+        jvm.put_field(&mut this, "javax/microedition/lcdui/List", "selectCommand", COMMAND_DESC, select)
+            .await
     }
 
     forward!(size, "size", "()I", () -> i32);
@@ -202,7 +205,8 @@ impl List {
         mut this: ClassInstanceRef<Self>,
         command: ClassInstanceRef<Command>,
     ) -> JvmResult<()> {
-        jvm.put_field(&mut this, "selectCommand", COMMAND_DESC, command).await
+        jvm.put_field(&mut this, "javax/microedition/lcdui/List", "selectCommand", COMMAND_DESC, command)
+            .await
     }
 
     async fn handle_key_event(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, event_type: i32, code: i32) -> JvmResult<()> {
@@ -210,12 +214,14 @@ impl List {
             .invoke_special(&this, "javax/microedition/lcdui/Form", "handleKeyEvent", "(II)V", (event_type, code))
             .await?;
 
-        let list_type: i32 = jvm.get_field(&this, "listType", "I").await?;
+        let list_type: i32 = jvm.get_field(&this, "javax/microedition/lcdui/List", "listType", "I").await?;
         let fire = code == MIDPKeyCode::FIRE as i32 || code == MIDPKeyCode::KEY_NUM5 as i32;
         if list_type != IMPLICIT || !fire || event_type != KeyboardEventType::KeyPressed as i32 {
             return Ok(());
         }
-        let command: ClassInstanceRef<Command> = jvm.get_field(&this, "selectCommand", COMMAND_DESC).await?;
+        let command: ClassInstanceRef<Command> = jvm
+            .get_field(&this, "javax/microedition/lcdui/List", "selectCommand", COMMAND_DESC)
+            .await?;
         if command.is_null() {
             return Ok(());
         }

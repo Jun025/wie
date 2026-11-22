@@ -105,10 +105,19 @@ impl XTextField {
         }
 
         let text = Self::truncate_text(jvm, text, max_size).await?;
-        jvm.put_field(&mut this, "text", "Ljava/lang/String;", text).await?;
-        jvm.put_field(&mut this, "maxSize", "I", max_size).await?;
-        jvm.put_field(&mut this, "constraints", "I", constraints).await?;
-        jvm.put_field(&mut this, "canvas", "Ljavax/microedition/lcdui/Canvas;", canvas).await?;
+        jvm.put_field(&mut this, "com/xce/lcdui/XTextField", "text", "Ljava/lang/String;", text)
+            .await?;
+        jvm.put_field(&mut this, "com/xce/lcdui/XTextField", "maxSize", "I", max_size).await?;
+        jvm.put_field(&mut this, "com/xce/lcdui/XTextField", "constraints", "I", constraints)
+            .await?;
+        jvm.put_field(
+            &mut this,
+            "com/xce/lcdui/XTextField",
+            "canvas",
+            "Ljavax/microedition/lcdui/Canvas;",
+            canvas,
+        )
+        .await?;
 
         Ok(())
     }
@@ -124,16 +133,16 @@ impl XTextField {
     }
 
     async fn get_max_size(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        jvm.get_field(&this, "maxSize", "I").await
+        jvm.get_field(&this, "com/xce/lcdui/XTextField", "maxSize", "I").await
     }
 
     async fn get_text(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<String>> {
         tracing::debug!("com.xce.lcdui.XTextField::getText({this:?})");
-        jvm.get_field(&this, "text", "Ljava/lang/String;").await
+        jvm.get_field(&this, "com/xce/lcdui/XTextField", "text", "Ljava/lang/String;").await
     }
 
     async fn has_focus(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<bool> {
-        jvm.get_field(&this, "focus", "Z").await
+        jvm.get_field(&this, "com/xce/lcdui/XTextField", "focus", "Z").await
     }
 
     async fn input_char(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, key: JavaChar) -> JvmResult<()> {
@@ -145,9 +154,9 @@ impl XTextField {
 
     /// Appends unless the field is full; ends any multitap cycle either way. Returns whether the text changed.
     async fn append(jvm: &Jvm, this: &mut ClassInstanceRef<Self>, key: JavaChar) -> JvmResult<bool> {
-        jvm.put_field(this, "tapKey", "I", 0).await?;
+        jvm.put_field(this, "com/xce/lcdui/XTextField", "tapKey", "I", 0).await?;
         let mut text = Self::text(jvm, this).await?;
-        let max_size: i32 = jvm.get_field(this, "maxSize", "I").await?;
+        let max_size: i32 = jvm.get_field(this, "com/xce/lcdui/XTextField", "maxSize", "I").await?;
         if text.chars().count() as i32 >= max_size {
             return Ok(false);
         }
@@ -158,7 +167,7 @@ impl XTextField {
 
     async fn set_focus(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, focus: bool) -> JvmResult<()> {
         tracing::debug!("com.xce.lcdui.XTextField::setFocus({this:?}, {focus})");
-        jvm.put_field(&mut this, "focus", "Z", focus).await?;
+        jvm.put_field(&mut this, "com/xce/lcdui/XTextField", "focus", "Z", focus).await?;
 
         if focus {
             jvm.put_static_field(NAME, "focused", DESCRIPTOR, this).await?;
@@ -188,10 +197,10 @@ impl XTextField {
                 .await);
         }
 
-        jvm.put_field(&mut this, "x", "I", x).await?;
-        jvm.put_field(&mut this, "y", "I", y).await?;
-        jvm.put_field(&mut this, "width", "I", width).await?;
-        jvm.put_field(&mut this, "height", "I", height).await
+        jvm.put_field(&mut this, "com/xce/lcdui/XTextField", "x", "I", x).await?;
+        jvm.put_field(&mut this, "com/xce/lcdui/XTextField", "y", "I", y).await?;
+        jvm.put_field(&mut this, "com/xce/lcdui/XTextField", "width", "I", width).await?;
+        jvm.put_field(&mut this, "com/xce/lcdui/XTextField", "height", "I", height).await
     }
 
     async fn key_pressed(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>, key_code: i32) -> JvmResult<()> {
@@ -202,7 +211,7 @@ impl XTextField {
 
     /// keyPressed's work; returns whether the text changed (a changed field has repainted itself).
     pub async fn take_key(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, key_code: i32) -> JvmResult<bool> {
-        let focus: bool = jvm.get_field(&this, "focus", "Z").await?;
+        let focus: bool = jvm.get_field(&this, "com/xce/lcdui/XTextField", "focus", "Z").await?;
         if !focus {
             return Ok(false);
         }
@@ -210,7 +219,7 @@ impl XTextField {
         let changed = match key_code {
             0x30..=0x39 => Self::multitap(jvm, context, &mut this, key_code).await?,
             CLEAR => {
-                jvm.put_field(&mut this, "tapKey", "I", 0).await?;
+                jvm.put_field(&mut this, "com/xce/lcdui/XTextField", "tapKey", "I", 0).await?;
                 let mut text = Self::text(jvm, &this).await?;
                 let changed = text.pop().is_some();
                 if changed {
@@ -229,21 +238,21 @@ impl XTextField {
 
     /// Returns whether the text changed.
     async fn multitap(jvm: &Jvm, context: &mut WieJvmContext, this: &mut ClassInstanceRef<Self>, key_code: i32) -> JvmResult<bool> {
-        let constraints: i32 = jvm.get_field(this, "constraints", "I").await?;
+        let constraints: i32 = jvm.get_field(this, "com/xce/lcdui/XTextField", "constraints", "I").await?;
         let mode = if matches!(constraints & CONSTRAINT_MASK, NUMERIC | PHONENUMBER | DECIMAL) {
             Mode::Digit
         } else {
             Mode::Upper
         };
         let now = context.system().platform().now().raw() as i64;
-        let tap_key: i32 = jvm.get_field(this, "tapKey", "I").await?;
-        let tap_time: i64 = jvm.get_field(this, "tapTime", "J").await?;
+        let tap_key: i32 = jvm.get_field(this, "com/xce/lcdui/XTextField", "tapKey", "I").await?;
+        let tap_time: i64 = jvm.get_field(this, "com/xce/lcdui/XTextField", "tapTime", "J").await?;
         let again = tap_key == key_code && now - tap_time < MULTITAP_MS;
         let mut text = Self::text(jvm, this).await?;
-        let max_size: i32 = jvm.get_field(this, "maxSize", "I").await?;
+        let max_size: i32 = jvm.get_field(this, "com/xce/lcdui/XTextField", "maxSize", "I").await?;
 
         let mut tokens = if again {
-            vec![char::from_u32(jvm.get_field::<JavaChar>(this, "tapChar", "C").await? as u32).unwrap_or(' ')]
+            vec![char::from_u32(jvm.get_field::<JavaChar>(this, "com/xce/lcdui/XTextField", "tapChar", "C").await? as u32).unwrap_or(' ')]
         } else {
             vec![]
         };
@@ -252,7 +261,7 @@ impl XTextField {
         // nothing to cycle and appends even when pressed again. A full field takes no new
         // character, and the refused key starts no cycle that would rewrite the last one.
         if (text.chars().count() - edit.delete + edit.insert.len()) as i32 > max_size {
-            jvm.put_field(this, "tapKey", "I", 0).await?;
+            jvm.put_field(this, "com/xce/lcdui/XTextField", "tapKey", "I", 0).await?;
             return Ok(false);
         }
         for _ in 0..edit.delete {
@@ -260,20 +269,21 @@ impl XTextField {
         }
         text.extend(edit.insert);
         Self::put_text(jvm, this, &text).await?;
-        jvm.put_field(this, "tapKey", "I", key_code).await?;
-        jvm.put_field(this, "tapChar", "C", tokens[0] as JavaChar).await?;
-        jvm.put_field(this, "tapTime", "J", now).await?;
+        jvm.put_field(this, "com/xce/lcdui/XTextField", "tapKey", "I", key_code).await?;
+        jvm.put_field(this, "com/xce/lcdui/XTextField", "tapChar", "C", tokens[0] as JavaChar)
+            .await?;
+        jvm.put_field(this, "com/xce/lcdui/XTextField", "tapTime", "J", now).await?;
         Ok(true)
     }
 
     async fn text(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<RustString> {
-        let text: ClassInstanceRef<String> = jvm.get_field(this, "text", "Ljava/lang/String;").await?;
+        let text: ClassInstanceRef<String> = jvm.get_field(this, "com/xce/lcdui/XTextField", "text", "Ljava/lang/String;").await?;
         JavaLangString::to_rust_string(jvm, &text).await
     }
 
     async fn put_text(jvm: &Jvm, this: &mut ClassInstanceRef<Self>, text: &str) -> JvmResult<()> {
         let text: ClassInstanceRef<String> = JavaLangString::from_rust_string(jvm, text).await?.into();
-        jvm.put_field(this, "text", "Ljava/lang/String;", text).await
+        jvm.put_field(this, "com/xce/lcdui/XTextField", "text", "Ljava/lang/String;", text).await
     }
 
     async fn key_repeated(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>, key_code: i32) -> JvmResult<()> {
@@ -299,11 +309,11 @@ impl XTextField {
             return Err(jvm.exception("java/lang/NullPointerException", "graphics is null").await);
         }
 
-        let text: ClassInstanceRef<String> = jvm.get_field(&this, "text", "Ljava/lang/String;").await?;
-        let x: i32 = jvm.get_field(&this, "x", "I").await?;
-        let y: i32 = jvm.get_field(&this, "y", "I").await?;
-        let width: i32 = jvm.get_field(&this, "width", "I").await?;
-        let height: i32 = jvm.get_field(&this, "height", "I").await?;
+        let text: ClassInstanceRef<String> = jvm.get_field(&this, "com/xce/lcdui/XTextField", "text", "Ljava/lang/String;").await?;
+        let x: i32 = jvm.get_field(&this, "com/xce/lcdui/XTextField", "x", "I").await?;
+        let y: i32 = jvm.get_field(&this, "com/xce/lcdui/XTextField", "y", "I").await?;
+        let width: i32 = jvm.get_field(&this, "com/xce/lcdui/XTextField", "width", "I").await?;
+        let height: i32 = jvm.get_field(&this, "com/xce/lcdui/XTextField", "height", "I").await?;
         let clip_x: i32 = jvm
             .invoke_virtual(&graphics, "javax/microedition/lcdui/Graphics", "getClipX", "()I", ())
             .await?;
@@ -351,11 +361,13 @@ impl XTextField {
     async fn repaint(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("com.xce.lcdui.XTextField::repaint({this:?})");
 
-        let canvas: ClassInstanceRef<Canvas> = jvm.get_field(&this, "canvas", "Ljavax/microedition/lcdui/Canvas;").await?;
-        let x: i32 = jvm.get_field(&this, "x", "I").await?;
-        let y: i32 = jvm.get_field(&this, "y", "I").await?;
-        let width: i32 = jvm.get_field(&this, "width", "I").await?;
-        let height: i32 = jvm.get_field(&this, "height", "I").await?;
+        let canvas: ClassInstanceRef<Canvas> = jvm
+            .get_field(&this, "com/xce/lcdui/XTextField", "canvas", "Ljavax/microedition/lcdui/Canvas;")
+            .await?;
+        let x: i32 = jvm.get_field(&this, "com/xce/lcdui/XTextField", "x", "I").await?;
+        let y: i32 = jvm.get_field(&this, "com/xce/lcdui/XTextField", "y", "I").await?;
+        let width: i32 = jvm.get_field(&this, "com/xce/lcdui/XTextField", "width", "I").await?;
+        let height: i32 = jvm.get_field(&this, "com/xce/lcdui/XTextField", "height", "I").await?;
         jvm.invoke_virtual(&canvas, "javax/microedition/lcdui/Canvas", "repaint", "(IIII)V", (x, y, width, height))
             .await
     }
@@ -367,10 +379,11 @@ impl XTextField {
             return Err(jvm.exception("java/lang/IllegalArgumentException", "maxSize must not be negative").await);
         }
 
-        let text: ClassInstanceRef<String> = jvm.get_field(&this, "text", "Ljava/lang/String;").await?;
+        let text: ClassInstanceRef<String> = jvm.get_field(&this, "com/xce/lcdui/XTextField", "text", "Ljava/lang/String;").await?;
         let text = Self::truncate_text(jvm, text, max_size).await?;
-        jvm.put_field(&mut this, "text", "Ljava/lang/String;", text).await?;
-        jvm.put_field(&mut this, "maxSize", "I", max_size).await
+        jvm.put_field(&mut this, "com/xce/lcdui/XTextField", "text", "Ljava/lang/String;", text)
+            .await?;
+        jvm.put_field(&mut this, "com/xce/lcdui/XTextField", "maxSize", "I", max_size).await
     }
 
     async fn set_text(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, text: ClassInstanceRef<String>) -> JvmResult<()> {
@@ -380,10 +393,11 @@ impl XTextField {
             return Err(jvm.exception("java/lang/NullPointerException", "text is null").await);
         }
 
-        let max_size: i32 = jvm.get_field(&this, "maxSize", "I").await?;
+        let max_size: i32 = jvm.get_field(&this, "com/xce/lcdui/XTextField", "maxSize", "I").await?;
         let text = Self::truncate_text(jvm, text, max_size).await?;
-        jvm.put_field(&mut this, "tapKey", "I", 0).await?;
-        jvm.put_field(&mut this, "text", "Ljava/lang/String;", text).await
+        jvm.put_field(&mut this, "com/xce/lcdui/XTextField", "tapKey", "I", 0).await?;
+        jvm.put_field(&mut this, "com/xce/lcdui/XTextField", "text", "Ljava/lang/String;", text)
+            .await
     }
 }
 
@@ -439,12 +453,12 @@ mod tests {
             width: i32,
             height: i32,
         ) -> JvmResult<()> {
-            let count: i32 = jvm.get_field(&this, "repaintCount", "I").await?;
-            jvm.put_field(&mut this, "repaintCount", "I", count + 1).await?;
-            jvm.put_field(&mut this, "repaintX", "I", x).await?;
-            jvm.put_field(&mut this, "repaintY", "I", y).await?;
-            jvm.put_field(&mut this, "repaintWidth", "I", width).await?;
-            jvm.put_field(&mut this, "repaintHeight", "I", height).await
+            let count: i32 = jvm.get_field(&this, "test/TrackingCanvas", "repaintCount", "I").await?;
+            jvm.put_field(&mut this, "test/TrackingCanvas", "repaintCount", "I", count + 1).await?;
+            jvm.put_field(&mut this, "test/TrackingCanvas", "repaintX", "I", x).await?;
+            jvm.put_field(&mut this, "test/TrackingCanvas", "repaintY", "I", y).await?;
+            jvm.put_field(&mut this, "test/TrackingCanvas", "repaintWidth", "I", width).await?;
+            jvm.put_field(&mut this, "test/TrackingCanvas", "repaintHeight", "I", height).await
         }
 
         async fn paint(
@@ -517,10 +531,26 @@ mod tests {
             let clip_height: i32 = jvm
                 .invoke_virtual(&this, "javax/microedition/lcdui/Graphics", "getClipHeight", "()I", ())
                 .await?;
-            jvm.put_field(&mut this, "observedClipX", "I", clip_x).await?;
-            jvm.put_field(&mut this, "observedClipY", "I", clip_y).await?;
-            jvm.put_field(&mut this, "observedClipWidth", "I", clip_width).await?;
-            jvm.put_field(&mut this, "observedClipHeight", "I", clip_height).await
+            jvm.put_field(&mut this, "javax/microedition/lcdui/TrackingGraphics", "observedClipX", "I", clip_x)
+                .await?;
+            jvm.put_field(&mut this, "javax/microedition/lcdui/TrackingGraphics", "observedClipY", "I", clip_y)
+                .await?;
+            jvm.put_field(
+                &mut this,
+                "javax/microedition/lcdui/TrackingGraphics",
+                "observedClipWidth",
+                "I",
+                clip_width,
+            )
+            .await?;
+            jvm.put_field(
+                &mut this,
+                "javax/microedition/lcdui/TrackingGraphics",
+                "observedClipHeight",
+                "I",
+                clip_height,
+            )
+            .await
         }
     }
 
@@ -603,11 +633,11 @@ mod tests {
 
                 // 'd' and 'e' each repainted the field; this is the third.
                 let _: () = jvm.invoke_virtual(&field, "com/xce/lcdui/XTextField", "repaint", "()V", ()).await?;
-                assert_eq!(jvm.get_field::<i32>(&canvas, "repaintCount", "I").await?, 3);
-                assert_eq!(jvm.get_field::<i32>(&canvas, "repaintX", "I").await?, 3);
-                assert_eq!(jvm.get_field::<i32>(&canvas, "repaintY", "I").await?, 5);
-                assert_eq!(jvm.get_field::<i32>(&canvas, "repaintWidth", "I").await?, 40);
-                assert_eq!(jvm.get_field::<i32>(&canvas, "repaintHeight", "I").await?, 12);
+                assert_eq!(jvm.get_field::<i32>(&canvas, "test/TrackingCanvas", "repaintCount", "I").await?, 3);
+                assert_eq!(jvm.get_field::<i32>(&canvas, "test/TrackingCanvas", "repaintX", "I").await?, 3);
+                assert_eq!(jvm.get_field::<i32>(&canvas, "test/TrackingCanvas", "repaintY", "I").await?, 5);
+                assert_eq!(jvm.get_field::<i32>(&canvas, "test/TrackingCanvas", "repaintWidth", "I").await?, 40);
+                assert_eq!(jvm.get_field::<i32>(&canvas, "test/TrackingCanvas", "repaintHeight", "I").await?, 12);
 
                 let _: () = jvm
                     .invoke_virtual(&field, "com/xce/lcdui/XTextField", "setBounds", "(IIII)V", (1, 2, 0, 0))
@@ -674,7 +704,7 @@ mod tests {
                 let name = field(&jvm, &canvas, 5, 0).await?;
                 // 2 → A, 2 again → B (cycled in place), 3 → D.
                 assert_eq!(press(&jvm, &name, &[0x32, 0x32, 0x33]).await?, "BD");
-                assert_eq!(jvm.get_field::<i32>(&canvas, "repaintCount", "I").await?, 3);
+                assert_eq!(jvm.get_field::<i32>(&canvas, "test/TrackingCanvas", "repaintCount", "I").await?, 3);
                 // CLEAR deletes and ends the cycle: 3 again is a new letter.
                 assert_eq!(press(&jvm, &name, &[8, 0x33]).await?, "BD");
                 // A held digit does not cycle.
@@ -685,7 +715,7 @@ mod tests {
                 let _: () = jvm.invoke_virtual(&name, X, "setText", "(Ljava/lang/String;)V", (wxyz,)).await?;
                 assert_eq!(press(&jvm, &name, &[0x33, 0x34, 0x34]).await?, "WXYZD");
                 // Only keys that changed the text repainted: 2 2 3 · CLEAR · 3 · 3 (4 4 were refused).
-                assert_eq!(jvm.get_field::<i32>(&canvas, "repaintCount", "I").await?, 6);
+                assert_eq!(jvm.get_field::<i32>(&canvas, "test/TrackingCanvas", "repaintCount", "I").await?, 6);
 
                 // 2f5246006bd8's 9-digit field: `new XTextField("", 9, 2, canvas)` (NUMERIC).
                 let number = field(&jvm, &canvas, 9, 2).await?;
@@ -749,7 +779,7 @@ mod tests {
                     assert!(press(&jvm, &handler, key).await?);
                 }
                 assert_eq!(text(&jvm).await?, "KM");
-                assert_eq!(jvm.get_field::<i32>(&canvas, "repaintCount", "I").await?, 5);
+                assert_eq!(jvm.get_field::<i32>(&canvas, "test/TrackingCanvas", "repaintCount", "I").await?, 5);
                 // A key the field does not take (UP) goes back to the title.
                 assert!(!press(&jvm, &handler, 141).await?);
 
@@ -800,10 +830,26 @@ mod tests {
                     )
                     .await?;
 
-                assert_eq!(jvm.get_field::<i32>(&graphics, "observedClipX", "I").await?, 3);
-                assert_eq!(jvm.get_field::<i32>(&graphics, "observedClipY", "I").await?, 5);
-                assert_eq!(jvm.get_field::<i32>(&graphics, "observedClipWidth", "I").await?, 4);
-                assert_eq!(jvm.get_field::<i32>(&graphics, "observedClipHeight", "I").await?, 6);
+                assert_eq!(
+                    jvm.get_field::<i32>(&graphics, "javax/microedition/lcdui/TrackingGraphics", "observedClipX", "I")
+                        .await?,
+                    3
+                );
+                assert_eq!(
+                    jvm.get_field::<i32>(&graphics, "javax/microedition/lcdui/TrackingGraphics", "observedClipY", "I")
+                        .await?,
+                    5
+                );
+                assert_eq!(
+                    jvm.get_field::<i32>(&graphics, "javax/microedition/lcdui/TrackingGraphics", "observedClipWidth", "I")
+                        .await?,
+                    4
+                );
+                assert_eq!(
+                    jvm.get_field::<i32>(&graphics, "javax/microedition/lcdui/TrackingGraphics", "observedClipHeight", "I")
+                        .await?,
+                    6
+                );
                 assert_eq!(
                     jvm.invoke_virtual::<_, i32>(&graphics, "javax/microedition/lcdui/Graphics", "getClipX", "()I", ())
                         .await?,

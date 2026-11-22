@@ -1115,6 +1115,13 @@ fn main() {
     }
 
     let args = Args::parse();
+    // `WIE_HOOK_MODE=shadow`: every generic KTF hook is compared, as it fires, against the title's own
+    // code on the same arguments (`wie_core_arm::hook_shadow`), and the counters ride on the result
+    // line as `hook_shadow`. Unset, nothing changes. Sweep with `scripts/hook-shadow-sweep.sh`.
+    let hook_shadow = std::env::var("WIE_HOOK_MODE").as_deref() == Ok("shadow");
+    if hook_shadow {
+        wie_core_arm::hook_shadow::enable();
+    }
     let start = StdInstant::now();
     if let Some(every) = args.gc_stress {
         wie_jvm_support::guest_roots::set_gc_stress(every);
@@ -1201,6 +1208,10 @@ fn main() {
     let json = match &result.db {
         Some(db) => format!("{},\"db\":{db}}}", &json[..json.len() - 1]),
         None => json,
+    };
+    let json = match hook_shadow {
+        true => format!("{},\"hook_shadow\":{}}}", &json[..json.len() - 1], wie_core_arm::hook_shadow::report()),
+        false => json,
     };
     let json = match args.gc_stress {
         Some(_) => {

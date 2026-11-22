@@ -62,7 +62,8 @@ impl ShellCard {
 
         let _: () = jvm.invoke_special(&this, "org/kwis/msp/lcdui/Card", "<init>", "()V", ()).await?;
 
-        jvm.put_field(&mut this, "shell", "Lorg/kwis/msp/lwc/ShellComponent;", shell).await
+        jvm.put_field(&mut this, "net/wie/ShellCard", "shell", "Lorg/kwis/msp/lwc/ShellComponent;", shell)
+            .await
     }
 
     async fn paint(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, g: ClassInstanceRef<Graphics>) -> JvmResult<()> {
@@ -116,7 +117,8 @@ impl ShellCard {
     }
 
     async fn shell(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<ShellComponent>> {
-        jvm.get_field(this, "shell", "Lorg/kwis/msp/lwc/ShellComponent;").await
+        jvm.get_field(this, "net/wie/ShellCard", "shell", "Lorg/kwis/msp/lwc/ShellComponent;")
+            .await
     }
 
     pub async fn focus(jvm: &Jvm) -> JvmResult<ClassInstanceRef<Component>> {
@@ -166,7 +168,7 @@ impl ShellCard {
             return Ok(None);
         }
         let card_canvas = Display::card_canvas(jvm, &display).await?;
-        let cards = jvm.get_field(&card_canvas, "cards", "Ljava/util/Vector;").await?;
+        let cards = jvm.get_field(&card_canvas, "net/wie/CardCanvas", "cards", "Ljava/util/Vector;").await?;
         let length: i32 = jvm.invoke_virtual(&cards, "java/util/Vector", "size", "()I", ()).await?;
 
         for i in 0..length {
@@ -176,7 +178,9 @@ impl ShellCard {
             if card.is_null() || !jvm.is_instance(&**card, "net/wie/ShellCard") {
                 continue;
             }
-            let shell: ClassInstanceRef<ShellComponent> = jvm.get_field(&card, "shell", "Lorg/kwis/msp/lwc/ShellComponent;").await?;
+            let shell: ClassInstanceRef<ShellComponent> = jvm
+                .get_field(&card, "net/wie/ShellCard", "shell", "Lorg/kwis/msp/lwc/ShellComponent;")
+                .await?;
             if !shell.is_null() && shell.identity() == component.identity() {
                 return Ok(Some(card));
             }
@@ -241,8 +245,8 @@ mod test {
         }
 
         async fn bump(jvm: &Jvm, this: &mut ClassInstanceRef<Self>, field: &str) -> JvmResult<()> {
-            let count: i32 = jvm.get_field(this, field, "I").await?;
-            jvm.put_field(this, field, "I", count + 1).await
+            let count: i32 = jvm.get_field(this, "test/TestShell", field, "I").await?;
+            jvm.put_field(this, "test/TestShell", field, "I", count + 1).await
         }
 
         async fn paint(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, _: ClassInstanceRef<Graphics>) -> JvmResult<()> {
@@ -288,10 +292,10 @@ mod test {
         }
 
         async fn repaint(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, x: i32, y: i32, w: i32, h: i32) -> JvmResult<()> {
-            jvm.put_field(&mut this, "repaintX", "I", x).await?;
-            jvm.put_field(&mut this, "repaintY", "I", y).await?;
-            jvm.put_field(&mut this, "repaintWidth", "I", w).await?;
-            jvm.put_field(&mut this, "repaintHeight", "I", h).await?;
+            jvm.put_field(&mut this, "test/SpyCardCanvas", "repaintX", "I", x).await?;
+            jvm.put_field(&mut this, "test/SpyCardCanvas", "repaintY", "I", y).await?;
+            jvm.put_field(&mut this, "test/SpyCardCanvas", "repaintWidth", "I", w).await?;
+            jvm.put_field(&mut this, "test/SpyCardCanvas", "repaintHeight", "I", h).await?;
             // Forward, so a serviceRepaints that only paints pending regions (#345) still sees one.
             jvm.invoke_special(&this, "javax/microedition/lcdui/Canvas", "repaint", "(IIII)V", (x, y, w, h))
                 .await
@@ -333,8 +337,8 @@ mod test {
             _: i32,
             _: ClassInstanceRef<Object>,
         ) -> JvmResult<bool> {
-            let heard: i32 = jvm.get_field(&this, "heard", "I").await?;
-            jvm.put_field(&mut this, "heard", "I", heard + 1).await?;
+            let heard: i32 = jvm.get_field(&this, "test/TestGrab", "heard", "I").await?;
+            jvm.put_field(&mut this, "test/TestGrab", "heard", "I", heard + 1).await?;
             Ok(true)
         }
     }
@@ -364,11 +368,25 @@ mod test {
             )
             .await?;
         let mut display: ClassInstanceRef<Display> = jvm.instantiate_class("org/kwis/msp/lcdui/Display").await?.into();
-        jvm.put_field(&mut display, "cardCanvas", "Lnet/wie/CardCanvas;", canvas.clone()).await?;
-        jvm.put_field(&mut display, "midpDisplay", "Ljavax/microedition/lcdui/Display;", midp_display)
-            .await?;
+        jvm.put_field(
+            &mut display,
+            "org/kwis/msp/lcdui/Display",
+            "cardCanvas",
+            "Lnet/wie/CardCanvas;",
+            canvas.clone(),
+        )
+        .await?;
+        jvm.put_field(
+            &mut display,
+            "org/kwis/msp/lcdui/Display",
+            "midpDisplay",
+            "Ljavax/microedition/lcdui/Display;",
+            midp_display,
+        )
+        .await?;
         let mut jlet = jvm.instantiate_class("test/TestJlet").await?;
-        jvm.put_field(&mut jlet, "dis", "Lorg/kwis/msp/lcdui/Display;", display).await?;
+        jvm.put_field(&mut jlet, "org/kwis/msp/lcdui/Jlet", "dis", "Lorg/kwis/msp/lcdui/Display;", display)
+            .await?;
         jvm.put_static_field("org/kwis/msp/lcdui/Jlet", "currentJlet", "Lorg/kwis/msp/lcdui/Jlet;", jlet)
             .await?;
 
@@ -413,10 +431,11 @@ mod test {
             cmp: ClassInstanceRef<Component>,
             o: ClassInstanceRef<Object>,
         ) -> JvmResult<()> {
-            let count: i32 = jvm.get_field(&this, "count", "I").await?;
-            jvm.put_field(&mut this, "count", "I", count + 1).await?;
-            jvm.put_field(&mut this, "cmp", "Lorg/kwis/msp/lwc/Component;", cmp).await?;
-            jvm.put_field(&mut this, "o", "Ljava/lang/Object;", o).await
+            let count: i32 = jvm.get_field(&this, "test/TestListener", "count", "I").await?;
+            jvm.put_field(&mut this, "test/TestListener", "count", "I", count + 1).await?;
+            jvm.put_field(&mut this, "test/TestListener", "cmp", "Lorg/kwis/msp/lwc/Component;", cmp)
+                .await?;
+            jvm.put_field(&mut this, "test/TestListener", "o", "Ljava/lang/Object;", o).await
         }
     }
 
@@ -459,18 +478,18 @@ mod test {
             _: i32,
             o: ClassInstanceRef<Object>,
         ) -> JvmResult<bool> {
-            jvm.put_field(&mut this, "o", "Ljava/lang/Object;", o).await?;
+            jvm.put_field(&mut this, "test/TestEventListener", "o", "Ljava/lang/Object;", o).await?;
             match (r#type, arg1) {
                 (1, 1) => {
-                    let n: i32 = jvm.get_field(&this, "focusGained", "I").await?;
-                    jvm.put_field(&mut this, "focusGained", "I", n + 1).await?;
+                    let n: i32 = jvm.get_field(&this, "test/TestEventListener", "focusGained", "I").await?;
+                    jvm.put_field(&mut this, "test/TestEventListener", "focusGained", "I", n + 1).await?;
                     Ok(false)
                 }
                 (3, 1) => {
-                    let n: i32 = jvm.get_field(&this, "keys", "I").await?;
-                    jvm.put_field(&mut this, "keys", "I", n + 1).await?;
-                    jvm.put_field(&mut this, "lastKey", "I", arg2).await?;
-                    let take: i32 = jvm.get_field(&this, "take", "I").await?;
+                    let n: i32 = jvm.get_field(&this, "test/TestEventListener", "keys", "I").await?;
+                    jvm.put_field(&mut this, "test/TestEventListener", "keys", "I", n + 1).await?;
+                    jvm.put_field(&mut this, "test/TestEventListener", "lastKey", "I", arg2).await?;
+                    let take: i32 = jvm.get_field(&this, "test/TestEventListener", "take", "I").await?;
                     Ok(arg2 == take)
                 }
                 _ => Ok(false),
@@ -492,7 +511,7 @@ mod test {
                 let count = |name: &'static str| {
                     let shell = shell.clone();
                     let jvm = jvm.clone();
-                    async move { jvm.get_field::<i32>(&shell, name, "I").await }
+                    async move { jvm.get_field::<i32>(&shell, "test/TestShell", name, "I").await }
                 };
                 let card_count = || {
                     let canvas = canvas.clone();
@@ -542,10 +561,10 @@ mod test {
                     .invoke_virtual(&shell, "org/kwis/msp/lwc/Component", "repaint", "(IIII)V", (1, 2, 3, 4))
                     .await?;
                 let region = [
-                    jvm.get_field::<i32>(&canvas, "repaintX", "I").await?,
-                    jvm.get_field::<i32>(&canvas, "repaintY", "I").await?,
-                    jvm.get_field::<i32>(&canvas, "repaintWidth", "I").await?,
-                    jvm.get_field::<i32>(&canvas, "repaintHeight", "I").await?,
+                    jvm.get_field::<i32>(&canvas, "test/SpyCardCanvas", "repaintX", "I").await?,
+                    jvm.get_field::<i32>(&canvas, "test/SpyCardCanvas", "repaintY", "I").await?,
+                    jvm.get_field::<i32>(&canvas, "test/SpyCardCanvas", "repaintWidth", "I").await?,
+                    jvm.get_field::<i32>(&canvas, "test/SpyCardCanvas", "repaintHeight", "I").await?,
                 ];
                 assert_eq!(region, [1, 2, 3, 4]);
 
@@ -725,7 +744,7 @@ mod test {
                 let count = || {
                     let listener = listener.clone();
                     let jvm = jvm.clone();
-                    async move { jvm.get_field::<i32>(&listener, "count", "I").await }
+                    async move { jvm.get_field::<i32>(&listener, "test/TestListener", "count", "I").await }
                 };
 
                 key(WIPIKeyCode::FIRE).await?;
@@ -754,8 +773,10 @@ mod test {
                 key(WIPIKeyCode::DOWN).await?;
                 key(WIPIKeyCode::FIRE).await?;
                 assert_eq!(count().await?, 1);
-                let cmp: ClassInstanceRef<Component> = jvm.get_field(&listener, "cmp", "Lorg/kwis/msp/lwc/Component;").await?;
-                let o: ClassInstanceRef<Object> = jvm.get_field(&listener, "o", "Ljava/lang/Object;").await?;
+                let cmp: ClassInstanceRef<Component> = jvm
+                    .get_field(&listener, "test/TestListener", "cmp", "Lorg/kwis/msp/lwc/Component;")
+                    .await?;
+                let o: ClassInstanceRef<Object> = jvm.get_field(&listener, "test/TestListener", "o", "Ljava/lang/Object;").await?;
                 assert_eq!(cmp.identity(), button.identity());
                 assert_eq!(o.identity(), tag.identity());
 
@@ -799,7 +820,8 @@ mod test {
                     )
                     .await?;
                 let mut listener = jvm.new_class("test/TestEventListener", "()V", ()).await?;
-                jvm.put_field(&mut listener, "take", "I", WIPIKeyCode::NUM1 as i32).await?;
+                jvm.put_field(&mut listener, "test/TestEventListener", "take", "I", WIPIKeyCode::NUM1 as i32)
+                    .await?;
                 let tag: ClassInstanceRef<Object> = jvm.new_class("java/lang/Object", "()V", ()).await?.into();
                 let _: () = jvm
                     .invoke_virtual(
@@ -815,7 +837,7 @@ mod test {
                 let field_ = |name: &'static str| {
                     let listener = listener.clone();
                     let jvm = jvm.clone();
-                    async move { jvm.get_field::<i32>(&listener, name, "I").await }
+                    async move { jvm.get_field::<i32>(&listener, "test/TestEventListener", name, "I").await }
                 };
                 let typed = || {
                     let field = field.clone();
@@ -837,7 +859,7 @@ mod test {
                 };
 
                 assert_eq!(field_("focusGained").await?, 1, "show() gave the field the focus and told its listener");
-                let o: ClassInstanceRef<Object> = jvm.get_field(&listener, "o", "Ljava/lang/Object;").await?;
+                let o: ClassInstanceRef<Object> = jvm.get_field(&listener, "test/TestEventListener", "o", "Ljava/lang/Object;").await?;
                 assert_eq!(o.identity(), tag.identity());
 
                 // Taken by the listener: the field never sees it.
@@ -972,8 +994,8 @@ mod test {
                     .new_class("net/wie/ShellCard", "(Lorg/kwis/msp/lwc/ShellComponent;)V", (shell.clone(),))
                     .await?;
                 let grab = jvm.new_class("test/TestGrab", "()V", ()).await?;
-                let shell_keys = || jvm.get_field::<i32>(&shell, "keyCount", "I");
-                let heard = || jvm.get_field::<i32>(&grab, "heard", "I");
+                let shell_keys = || jvm.get_field::<i32>(&shell, "test/TestShell", "keyCount", "I");
+                let heard = || jvm.get_field::<i32>(&grab, "test/TestGrab", "heard", "I");
                 let press = |key: i32| jvm.invoke_virtual::<_, bool>(&card, "net/wie/ShellCard", "keyNotify", "(II)Z", (1, key));
 
                 let _: () = jvm

@@ -56,8 +56,10 @@ impl Ticker {
         }
 
         let _: () = jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await?;
-        jvm.put_field(&mut this, "text", "Ljava/lang/String;", text).await?;
-        jvm.put_field(&mut this, "scrollOffset", "I", 0).await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/Ticker", "text", "Ljava/lang/String;", text)
+            .await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/Ticker", "scrollOffset", "I", 0)
+            .await?;
 
         Ok(())
     }
@@ -65,7 +67,9 @@ impl Ticker {
     async fn advance(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, width: i32) -> JvmResult<bool> {
         tracing::debug!("javax.microedition.lcdui.Ticker::advance({this:?}, {width})");
 
-        let text: ClassInstanceRef<String> = jvm.get_field(&this, "text", "Ljava/lang/String;").await?;
+        let text: ClassInstanceRef<String> = jvm
+            .get_field(&this, "javax/microedition/lcdui/Ticker", "text", "Ljava/lang/String;")
+            .await?;
         let text = JavaLangString::to_rust_string(jvm, &text)
             .await?
             .replace("\r\n", " ")
@@ -73,14 +77,15 @@ impl Ticker {
         if text.is_empty() {
             return Ok(false);
         }
-        let offset: i32 = jvm.get_field(&this, "scrollOffset", "I").await?;
+        let offset: i32 = jvm.get_field(&this, "javax/microedition/lcdui/Ticker", "scrollOffset", "I").await?;
         let offset = offset + TICKER_SCROLL_STEP;
         let offset = if offset >= string_width(context.system().platform().font(), &text, 10.0).ceil() as i32 + TITLE_HORIZONTAL_PADDING {
             TITLE_HORIZONTAL_PADDING - width
         } else {
             offset
         };
-        jvm.put_field(&mut this, "scrollOffset", "I", offset).await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/Ticker", "scrollOffset", "I", offset)
+            .await?;
         Ok(true)
     }
 
@@ -117,13 +122,15 @@ impl Ticker {
             )
             .await?;
 
-        let text: ClassInstanceRef<String> = jvm.get_field(&this, "text", "Ljava/lang/String;").await?;
+        let text: ClassInstanceRef<String> = jvm
+            .get_field(&this, "javax/microedition/lcdui/Ticker", "text", "Ljava/lang/String;")
+            .await?;
         let text = JavaLangString::to_rust_string(jvm, &text)
             .await?
             .replace("\r\n", " ")
             .replace(['\r', '\n'], " ");
         let text = JavaLangString::from_rust_string(jvm, &text).await?;
-        let scroll_offset: i32 = jvm.get_field(&this, "scrollOffset", "I").await?;
+        let scroll_offset: i32 = jvm.get_field(&this, "javax/microedition/lcdui/Ticker", "scrollOffset", "I").await?;
         let _: () = jvm
             .invoke_virtual(&graphics, "javax/microedition/lcdui/Graphics", "setColor", "(I)V", (BLACK,))
             .await?;
@@ -142,7 +149,8 @@ impl Ticker {
     async fn get_string(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<String>> {
         tracing::debug!("javax.microedition.lcdui.Ticker::getString({this:?})");
 
-        jvm.get_field(&this, "text", "Ljava/lang/String;").await
+        jvm.get_field(&this, "javax/microedition/lcdui/Ticker", "text", "Ljava/lang/String;")
+            .await
     }
 
     async fn set_string(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, text: ClassInstanceRef<String>) -> JvmResult<()> {
@@ -152,8 +160,10 @@ impl Ticker {
             return Err(jvm.exception("java/lang/NullPointerException", "Ticker text is null").await);
         }
 
-        jvm.put_field(&mut this, "text", "Ljava/lang/String;", text).await?;
-        jvm.put_field(&mut this, "scrollOffset", "I", 0).await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/Ticker", "text", "Ljava/lang/String;", text)
+            .await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/Ticker", "scrollOffset", "I", 0)
+            .await?;
 
         let midlet: ClassInstanceRef<MIDlet> = jvm
             .get_static_field("javax/microedition/midlet/MIDlet", "currentMIDlet", "Ljavax/microedition/midlet/MIDlet;")
@@ -254,7 +264,14 @@ mod test {
 
     async fn pixels(jvm: &Jvm, display: &ClassInstanceRef<Display>) -> JvmResult<Vec<u8>> {
         let _: () = jvm.invoke_virtual(display, DISPLAY, "handlePaintEvent", "()V", ()).await?;
-        let image: ClassInstanceRef<Image> = jvm.get_field(display, "screenImage", "Ljavax/microedition/lcdui/Image;").await?;
+        let image: ClassInstanceRef<Image> = jvm
+            .get_field(
+                display,
+                "javax/microedition/lcdui/Display",
+                "screenImage",
+                "Ljavax/microedition/lcdui/Image;",
+            )
+            .await?;
         Ok(Image::image(jvm, &image).await?.raw().into_owned())
     }
 
@@ -265,7 +282,7 @@ mod test {
             Box::new([get_protos().into(), [TickerMidlet::as_proto()].into()]),
             Box::new(TestPlatform::with_clock(clock.clone())),
             move |jvm, system| async move {
-                jvm.push_native_frame();
+                let frame = jvm.push_native_frame(&[]);
                 let midlet: ClassInstanceRef<MIDlet> = jvm.new_class("test/TickerMidlet", "()V", ()).await?.into();
                 let display = MIDlet::display(&jvm, &midlet).await?;
                 let text = JavaLangString::from_rust_string(&jvm, "News\r\nNext\nEnd\r!").await?;
@@ -297,7 +314,7 @@ mod test {
                     .await?;
                 let initial = pixels(&jvm, &display).await?;
                 pump(&jvm, &system, &clock, 101).await?;
-                let step: i32 = jvm.get_field(&ticker, "scrollOffset", "I").await?;
+                let step: i32 = jvm.get_field(&ticker, "javax/microedition/lcdui/Ticker", "scrollOffset", "I").await?;
                 assert!(step > 0, "a due event must move the ticker");
                 assert_ne!(initial, pixels(&jvm, &display).await?);
 
@@ -310,36 +327,53 @@ mod test {
                         (second.clone(),),
                     )
                     .await?;
-                assert_eq!(jvm.get_field::<i32>(&ticker, "scrollOffset", "I").await?, step);
+                assert_eq!(
+                    jvm.get_field::<i32>(&ticker, "javax/microedition/lcdui/Ticker", "scrollOffset", "I")
+                        .await?,
+                    step
+                );
                 pump(&jvm, &system, &clock, 101).await?;
-                assert_eq!(jvm.get_field::<i32>(&ticker, "scrollOffset", "I").await?, step * 2);
-                jvm.pop_frame();
-                jvm.collect_garbage()?;
+                assert_eq!(
+                    jvm.get_field::<i32>(&ticker, "javax/microedition/lcdui/Ticker", "scrollOffset", "I")
+                        .await?,
+                    step * 2
+                );
+                drop(frame);
+                jvm.collect_garbage().unwrap();
                 drop(first_root);
                 assert!(
-                    jvm.collect_garbage()? > 0,
+                    jvm.collect_garbage().unwrap() > 0,
                     "the shared ticker and pending timers must release the old Form"
                 );
 
-                jvm.push_native_frame();
+                let frame = jvm.push_native_frame(&[]);
                 let original = jvm.invoke_virtual(&ticker, TICKER, "getString", "()Ljava/lang/String;", ()).await?;
                 assert_eq!(JavaLangString::to_rust_string(&jvm, &original).await?, "News\r\nNext\nEnd\r!");
                 let normalized = JavaLangString::from_rust_string(&jvm, "News Next End !").await?;
                 let _: () = jvm
                     .invoke_virtual(&ticker, TICKER, "setString", "(Ljava/lang/String;)V", (normalized,))
                     .await?;
-                assert_eq!(jvm.get_field::<i32>(&ticker, "scrollOffset", "I").await?, 0);
+                assert_eq!(
+                    jvm.get_field::<i32>(&ticker, "javax/microedition/lcdui/Ticker", "scrollOffset", "I")
+                        .await?,
+                    0
+                );
                 assert_eq!(initial, pixels(&jvm, &display).await?, "line endings must render as separators");
                 pump(&jvm, &system, &clock, 101).await?;
                 let replacement = JavaLangString::from_rust_string(&jvm, "Fresh").await?;
                 let _: () = jvm
                     .invoke_virtual(&ticker, TICKER, "setString", "(Ljava/lang/String;)V", (replacement,))
                     .await?;
-                assert_eq!(jvm.get_field::<i32>(&ticker, "scrollOffset", "I").await?, 0);
+                assert_eq!(
+                    jvm.get_field::<i32>(&ticker, "javax/microedition/lcdui/Ticker", "scrollOffset", "I")
+                        .await?,
+                    0
+                );
                 assert_ne!(initial, pixels(&jvm, &display).await?);
                 pump(&jvm, &system, &clock, 101).await?;
                 assert_eq!(
-                    jvm.get_field::<i32>(&ticker, "scrollOffset", "I").await?,
+                    jvm.get_field::<i32>(&ticker, "javax/microedition/lcdui/Ticker", "scrollOffset", "I")
+                        .await?,
                     step,
                     "old text timers must be stale"
                 );
@@ -348,7 +382,7 @@ mod test {
                 let mut offset = step;
                 for _ in 0..200 {
                     pump(&jvm, &system, &clock, 101).await?;
-                    let next: i32 = jvm.get_field(&ticker, "scrollOffset", "I").await?;
+                    let next: i32 = jvm.get_field(&ticker, "javax/microedition/lcdui/Ticker", "scrollOffset", "I").await?;
                     wrapped |= next < offset;
                     offset = next;
                     if wrapped && offset >= 0 {
@@ -360,7 +394,11 @@ mod test {
                     .invoke_virtual(&second, DISPLAYABLE, "setTicker", "(Ljavax/microedition/lcdui/Ticker;)V", (None,))
                     .await?;
                 pump(&jvm, &system, &clock, 101).await?;
-                assert_eq!(jvm.get_field::<i32>(&ticker, "scrollOffset", "I").await?, offset);
+                assert_eq!(
+                    jvm.get_field::<i32>(&ticker, "javax/microedition/lcdui/Ticker", "scrollOffset", "I")
+                        .await?,
+                    offset
+                );
                 assert!(system.event_queue().pop().is_none(), "detaching must stop recurring ticks");
 
                 let _: () = jvm
@@ -377,7 +415,11 @@ mod test {
                     .invoke_virtual(&display, DISPLAY, "setCurrent", "(Ljavax/microedition/lcdui/Displayable;)V", (hidden,))
                     .await?;
                 pump(&jvm, &system, &clock, 101).await?;
-                assert_eq!(jvm.get_field::<i32>(&ticker, "scrollOffset", "I").await?, offset);
+                assert_eq!(
+                    jvm.get_field::<i32>(&ticker, "javax/microedition/lcdui/Ticker", "scrollOffset", "I")
+                        .await?,
+                    offset
+                );
                 let hidden_text = JavaLangString::from_rust_string(&jvm, "Hidden").await?;
                 let _: () = jvm
                     .invoke_virtual(&ticker, TICKER, "setString", "(Ljava/lang/String;)V", (hidden_text,))
@@ -398,9 +440,13 @@ mod test {
                     .invoke_virtual(&ticker, TICKER, "setString", "(Ljava/lang/String;)V", (empty,))
                     .await?;
                 pump(&jvm, &system, &clock, 101).await?;
-                assert_eq!(jvm.get_field::<i32>(&ticker, "scrollOffset", "I").await?, 0);
+                assert_eq!(
+                    jvm.get_field::<i32>(&ticker, "javax/microedition/lcdui/Ticker", "scrollOffset", "I")
+                        .await?,
+                    0
+                );
                 assert!(system.event_queue().pop().is_none(), "empty text must not keep a timer alive");
-                jvm.pop_frame();
+                drop(frame);
                 drop((ticker_root, second_root));
                 Ok(())
             },

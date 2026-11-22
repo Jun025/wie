@@ -619,7 +619,7 @@ mod test {
                     )
                     .await?;
                 let player = Clip::player(&jvm, &clip).await?;
-                let handle: i32 = jvm.get_field(&player, "audioHandle", "I").await?;
+                let handle: i32 = jvm.get_field(&player, "net/wie/SmafPlayer", "audioHandle", "I").await?;
 
                 let _: () = jvm.invoke_static("org/kwis/msp/media/Volume", "set", "(I)V", (60,)).await?;
                 let handset: i32 = jvm.invoke_static("org/kwis/msp/media/Volume", "get", "()I", ()).await?;

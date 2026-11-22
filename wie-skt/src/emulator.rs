@@ -142,15 +142,26 @@ fn class_utf8_constants(class: &[u8]) -> Vec<&[u8]> {
     strings
 }
 
+// The descriptor `from_archive` reads, and the jar beside it under the same name (`None` when the
+// archive does not hold it). `archive_jar` reads the same entry, so the jar that is hashed is the
+// jar that runs.
+type ArchiveEntries<'a> = ((&'a String, &'a Vec<u8>), String, Option<&'a Vec<u8>>);
+
+fn archive_entries(files: &BTreeMap<String, Vec<u8>>) -> Option<ArchiveEntries<'_>> {
+    let msd = files.iter().find(|x| x.0.ends_with(".msd"))?;
+    let jar_filename = msd.0.replace(".msd", ".jar");
+    let jar = files.get(&jar_filename);
+    Some((msd, jar_filename, jar))
+}
+
 impl SktEmulator {
     pub fn from_archive(platform: Box<dyn Platform>, mut files: BTreeMap<String, Vec<u8>>) -> Result<Self> {
-        let msd_file = files.iter().find(|x| x.0.ends_with(".msd")).unwrap();
+        let (msd_file, jar_filename, jar) = archive_entries(&files).unwrap();
         let msd = SktMsd::parse(msd_file.0, msd_file.1);
 
         tracing::info!("Loading app {}, mclass {}", msd.id, msd.main_class);
 
-        let jar_filename = msd_file.0.replace(".msd", ".jar");
-        if let Some((width, height)) = files.get(&jar_filename).and_then(|jar| package_display_size(jar))
+        if let Some((width, height)) = jar.and_then(|jar| package_display_size(jar))
             && width < platform.screen().width()
         {
             tracing::info!("Package holds no assets wider than {width}: display {width}x{height}");
@@ -158,7 +169,7 @@ impl SktEmulator {
                 tracing::warn!("Ignoring unsupported display size {width}x{height}: {error}");
             }
         }
-        if let Some(jar) = files.get(&jar_filename).cloned() {
+        if let Some(jar) = jar.cloned() {
             turn_owner_sound_on(&mut files, &jar);
         }
 
@@ -173,6 +184,11 @@ impl SktEmulator {
 
     pub fn loadable_archive(files: &BTreeMap<String, Vec<u8>>) -> bool {
         files.iter().any(|x| x.0.ends_with(".msd"))
+    }
+
+    /// The jar `from_archive` runs — the one the per-title tables hash.
+    pub fn archive_jar(files: &BTreeMap<String, Vec<u8>>) -> Option<&[u8]> {
+        archive_entries(files)?.2.map(Vec::as_slice)
     }
 
     pub fn archive_title(files: &BTreeMap<String, Vec<u8>>) -> Option<String> {
@@ -356,9 +372,18 @@ impl SktMsd {
 mod tests {
     use alloc::{collections::BTreeMap, vec, vec::Vec};
 
-    use super::{SktEmulator, SktMsd};
+    use super::{DISPLAY_OVERRIDES, SktEmulator, SktMsd};
 
-    // The rows are pinned in `wie-backend`; this pins that the SKT mount path applies them.
+    /// `docs/contracts/runtime-adjustments.tsv` lists exactly this table: a row added here without a
+    /// ledger row — or a ledger row left behind — fails (CLAUDE.md «게임 파일 무수정 원칙»).
+    #[test]
+    fn the_ledger_lists_exactly_this_table() {
+        test_utils::assert_ledger_lists("display-overrides", DISPLAY_OVERRIDES.iter().map(|x| test_utils::hex(x.0)));
+    }
+
+    // The rows are pinned in `wie-backend`; this pins that the SKT mount path applies them — and, with a
+    // jar sorting on either side of it, that the jar `from_archive` runs is the one `archive_jar` names
+    // (the rows key on that jar's MD5, so a loader that picks another jar leaves all three files as shipped).
     #[test]
     fn from_archive_turns_the_owner_sound_on() {
         use alloc::boxed::Box;
@@ -367,11 +392,14 @@ mod tests {
 
         let files = BTreeMap::from([
             ("probe.msd".into(), b"MIDlet-1: probe,,Probe\nDD-ProgName: probe\n".to_vec()),
+            ("a.jar".into(), b"not the jar".to_vec()),
             ("probe.jar".into(), WIRING_PROBE_JAR.to_vec()),
+            ("z.jar".into(), b"not the jar".to_vec()),
             ("probe.sav".into(), vec![0]),
             ("probe.opt".into(), vec![0]),
             ("probe.xor".into(), vec![0]),
         ]);
+        assert_eq!(SktEmulator::archive_jar(&files), Some(WIRING_PROBE_JAR));
         let emulator = SktEmulator::from_archive(Box::new(TestPlatform::new()), files).unwrap();
 
         assert_eq!(emulator.system.filesystem().virtual_file("probe.sav"), None);

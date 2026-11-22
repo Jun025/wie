@@ -53,6 +53,12 @@
 > `| **C-2**<br>(구 **A-2**)` 로 시작하므로 **세지 않는다**(구 ID 병기는 셀 «안»에 있다) —
 > ★**C 는 「이미 해소된 것의 노출 판정 보존」이고 그 절이 스스로 이 불변식 «밖»이라고 적는다.**
 > ⇒ ★**행을 지우지 말고 C 로 «옮겨라»** — 그것이 이 검사를 통과시키는 유일한 정상 경로다.
+>
+> ★★**[2026-11-22] 새 «경고»는 red 가 아니다 — 이제 워크플로 동작도 그렇다**(`wie-rust-audit-new-warning-reds-ledger-a-and-c6-package-name`).
+> 위 09-08 의 «양방향 red» 는 그날부터 11-22 까지의 동작이다: §A 에 행이 없는 새 경고 1건(`tokio@1.53.1` RUSTSEC-2026-0386)이
+> 취약점 0 인 채로 일일 감사를 10일(10-24 ~ 11-02) 붉혔다. 지금은 **§A 에만 있는 행(낡았다) · 절 머리 건수 불일치 · 못 읽은 표 · 새 «취약점»** 만 red 이고,
+> **§A 에 없는 새 경고**는 잡 요약에 «대장에 없는 새 경고 N건: …» 한 줄로 뜬다(rc 0) — 그 줄을 보면 A 에 등재하고 도달성 판정을 써라.
+> 세 형상은 `node scripts/check-audit-warnings.mjs --selftest` 가 묶고, 매일 그 잡이 본 검사 앞에 돌린다.
 
 ### A. 권고·공급망 2건 — **전건 비게이팅 경고**(`cargo audit` 무-플래그 **exit 0 · vulnerabilities 0**)
 
@@ -63,6 +69,10 @@
 > 두 워크플로의 `cargo audit` 줄에 있다. ★그 셋은 **경고가 아니라 취약점**이라 이 A 표(경고 집합)의 불변식 «밖»이고,
 > 정본은 아래 **§D** 다(`wie-rust-audit-main-red-since-1018-advisory-batch`). 위 머리의 `vulnerabilities 0` 은 «무-플래그»
 > 기준으로는 이제 거짓이다 — 무-플래그 `cargo audit` 은 **3건 · exit 1**, 워크플로의 억제 붙은 줄이 **0건 · exit 0** 이다.
+> ★**[2026-11-22] 재측**(`wie-rust-audit-main-red-since-1119-advisory-batch` · cargo-audit 0.22.2 · advisory-db **1,555** `55e1c3df` ·
+> lock 557 패키지): 이름 억제는 **8건**(zip — §D D-1·D-2·D-3)이 됐고 무-플래그 `cargo audit` 은 **8건 · exit 1** 이다.
+> 이 표는 **A-4 `chacha20` 가 해소돼 C-10 으로 옮겨졌고**(0.10.1 → 0.10.2) **A-5 `chrono` 가 새로 등재**돼 행 수는 그대로 2다.
+> ★**[2026-11-22 · 같은 날 뒤 회차] 이름 억제는 다시 0건이다**(`wie-upstream-sync2-s1-rustjava-pin-0-4-1-before-upstream-sync` · lock **559** 패키지): RustJava 핀을 0.4.1 로 올리며 zip 8.6.0 이 lockfile 에서 빠져 §D 의 세 행이 **C-16** 으로 갔다. 무-플래그 `cargo audit` 은 **0건 · exit 0**(경고 2건 그대로)이다.
 
 > ★★**2026-09-19 — 이 대장이 처음으로 «되살아난 해소분»을 만났다.** `Security audit`(schedule)이 **3일 연속 red**
 > 였고(09-17·18·19), 원인은 새 자문이 아니라 ★**base swap `36df9c31` 이 `Cargo.lock` 을 통째로 갈아
@@ -87,13 +97,13 @@
 | # | 대상 | 권고 | 성격 | 설치 버전 → 패치 | 판정 | 다음 행동 |
 |---|---|---|---|---|---|---|
 | **A-1** | `ttf-parser` | RUSTSEC-2026-0192 | `unmaintained`(informational) | `0.25.1` → **`patched = []`** | **수용 유지** — 버전업으로 안 풀린다 | 아래 로드맵 5번(ab_glyph→skrifa)에서 계속 추적. **착수 아님** |
-| **A-4** | `chacha20` | **권고 없음**(yanked) | 취약점 아님 — 레지스트리 신호 | `0.10.1`(yanked) → `0.10.2`(2026-08-27) | ★**도달 불가**(3축 · 근거 아래 ⓓ) — 상향은 가능 | 간접(`wie_cli → rodio → rand → chacha20`)이라 `cargo update -p chacha20`. **별건 발권 대상** |
+| **A-5** | `chrono` | RUSTSEC-2026-0543 | `unmaintained`(informational) | `0.4.45` → **`patched = []`** | **수용 유지** — 결함 경로가 있는 자문이 아니라 «유지보수 종료» 신호이고 전 판본이 해당이라 버전업으로 안 풀린다. ★**배포 WASM 에 실린다**(`cargo tree -p wie_featurephone --target wasm32-unknown-unknown -i chrono` → 정상 출력) — 소비자는 `wie-lgt/src/runtime/stdlib.rs:2`(직접)와 `rustjava-runtime 0.1.1`(`java.util.Date`·`GregorianCalendar`·`SimpleDateFormat`) 둘 | `rustjava-runtime` 은 **0.1.1 ~ 0.4.2 전부 `chrono ^0.4`**(crates.io 인덱스 2026-11-22 실측)라 우리 쪽만 걷어내도 경고는 남는다 — RustJava 가 chrono 를 버릴 때 함께 본다. **착수 아님** |
 
 > ★**A-4 의 «설치 버전» 이 `0.10.0` → `0.10.1` 로 움직였다**(2026-09-19 · base swap `36df9c31` 이 옮겼다 —
 > 우리가 올린 것이 아니다). ★**ⓓ 의 판정은 그대로 선다** — 그 절이 이미 「`0.10.0`(2026-02-07) · `0.10.1`(2026-06-24)
 > **둘 다 yanked**」로 두 판본을 함께 재어 두었고, 비-yanked 최신은 여전히 `0.10.2` 다. ⇒ **처분(별건 발권)도 불변.**
 
-#### ⓓ A-4 `chacha20` 0.10.0 yanked — ★**«암호 결함»이 아니라 «SSE4.1 명령을 SSE2 경로에 넣은» 이식성 결함이다**
+#### ⓓ (구 **A-4** · 2026-11-22 해소분 → C-10) `chacha20` 0.10.0 yanked — ★**«암호 결함»이 아니라 «SSE4.1 명령을 SSE2 경로에 넣은» 이식성 결함이다**
 
 ★**성격부터 가른다**(ⓑ 와 같은 형태): advisory-db 에 `chacha20` 권고는 **없다**. `yanked` 는 crates.io
 인덱스 상태이고 `cargo audit` 도 `warning: yanked` 로만 보고한다(**exit 0**). ⇒ **«알려진 취약점» 신호가 아니다.**
@@ -256,12 +266,18 @@ x86_64 에서도 돈다. **그 축들이 좁히는 것은 «AVX2 없는 x86» �
 | **C-2**<br>(구 **A-2**) | RUSTSEC-2026-0221 | `event-listener`(간접 — `[patch]` RustJava `jvm` 단독 소비) | ★**해소 2026-08-08** — `22df9531`(PR **#55** · `wie-supply-chain-cargo-updates-a2-a3`) 에서 `5.4.1` → **`5.4.2`** = 권고 `patched = [">= 5.4.2"]` 경계 도달. **2026-09-08 `Cargo.lock` 재확인 = `5.4.2`** | ★**도달 불가**(2축 · 위 ⓐ) — 상향 «전»에도 타지 않았다 | ★**상향으로 «버전축»은 영구 해소** — 이제 도달성 판정 없이도 경고가 없다. ⓐ 의 2축은 **`jvm` 이 `listener!`/`Event::with_tag` 를 안 쓴다**는 그때의 fork 소스 실측이라, **RustJava 핀을 옮기면 다시 재라**(다시 affected 구간으로 내려갈 때만 필요) |
 | **C-3**<br>(구 **A-3**) | **권고 없음**(yanked) | `spin`(직접 — `Cargo.toml:46` · 워크스페이스 6 크레이트 상속) | ★**해소 2026-08-08** — 같은 커밋 `22df9531` 에서 `0.12.0`(yanked) → **`0.12.2`**. **2026-09-08 `Cargo.lock` 재확인 = `0.12.2`** | ★**도달 불가**(feature 축 · 위 ⓑ) — 상향 «전»에도 타지 않았다 | ★**`default-features = false, features = ["spin_mutex","rwlock"]` 가 전제다** — `once`/`lazylock`/`lock_api` 를 켜면 ⓑ 의 판정이 무효가 된다(0.12.1·0.12.2 결함이 정확히 그 두 축이다) |
 | **C-4** | RUSTSEC-2026-0285 | `rustls`(간접 — `wie`/`wie-app` → `sentry 0.49.2` → `ureq 3.4.1` → `rustls`) | ★**해소 2026-09-19** — `0.23.44` → **`0.23.45`** = 권고 `Upgrade to >=0.23.45` 경계 도달(`Cargo.lock` 2줄 · `Cargo.toml` 무접촉) | ★**노출 분석을 «하지 않았다» — 버전축으로만 닫았다.** 잰 것은 «범위» 하나뿐이다: ★**배포되는 WASM 아티팩트에는 없다** — `cargo tree -p wie_featurephone --target wasm32-unknown-unknown -i rustls` → **`did not match any packages`**(대조군 `wie-backend` 는 정상 출력 ⇒ 빈 답이 아니라 «부재»다). 도달면은 **네이티브 데스크톱/앱 호스트뿐**이고, TLS 핸드셰이크 경로를 우리가 타는지는 **재지 않았다** | ★**`sentry@0.49.2`/`ureq@3.4.1` 기준의 «경로» 실측이다** — 그 둘을 올리면 다시 재라. ★**도달성 판정이 «없으므로» 이 행을 「안 탄다」의 근거로 인용하지 마라** — 다시 affected 구간으로 내려가면 그때 처음부터 재야 한다 |
-
 | **C-5** | RUSTSEC-2026-0338 · 0340 · 0343 | `quinn-proto`(간접 — `sentry 0.49.2` → `reqwest` → `quinn` → `quinn-proto`, ★**lockfile 에만 있다**) | ★**해소 2026-10-23** — `cargo update -p quinn-proto` **0.11.17 → 0.11.19**(권고 `>=0.11.18`) | ★**빌드 그래프 0** — `cargo tree -i quinn-proto -e all --target all` → `nothing to print`(활성 feature 로는 컴파일조차 안 된다). 도달성 판정이 아니라 «부재» 실측이다 | ★**`sentry@0.49.2` 의 feature 조합 기준** — sentry 를 올리거나 `reqwest` 의 http3/QUIC feature 가 켜지면 다시 재라 |
-| **C-6** | RUSTSEC-2026-0346 · 0347 · 0348 · 0349 | `rustls`(간접 — C-4 와 같은 `sentry → ureq → rustls`) | ★**해소 2026-10-23** — `cargo update -p rustls` **0.23.45 → 0.23.46**(권고 `>=0.23.46`) | ★**버전축으로만 닫았다**(C-4 와 같은 처분) — WASM 아티팩트에는 없다(`cargo tree -p wie-featurephone --target wasm32-unknown-unknown -i rustls` → `nothing to print`). 네이티브 호스트의 TLS 경로를 타는지는 **재지 않았다** | ★**`sentry@0.49.2`/`ureq@3.4.1` 기준의 «경로» 실측** — 그 둘을 올리면 다시 재라. 「안 탄다」의 근거로 인용하지 마라 |
+| **C-6** | RUSTSEC-2026-0346 · 0347 · 0348 · 0349 | `rustls`(간접 — C-4 와 같은 `sentry → ureq → rustls`) | ★**해소 2026-10-23** — `cargo update -p rustls` **0.23.45 → 0.23.46**(권고 `>=0.23.46`) | ★**버전축으로만 닫았다**(C-4 와 같은 처분) — WASM 아티팩트에는 없다(`cargo tree -p wie_featurephone --target wasm32-unknown-unknown -i rustls` → rc=101 «package ID specification rustls did not match any packages» — `wie_featurephone` 의 해소 그래프에 `rustls` 가 아예 없다 · `--target all` 도 같다 · 2026-11-22 cargo 1.99.0 재측. ★종전 인용 `-p wie-featurephone` 은 없는 패키지 이름이었고 cargo 는 그것을 오류 없이 받아 **다른(더 넓은) 범위**를 쟀다 — 그때의 `nothing to print` 는 이 패키지에 대한 답이 아니었다). 네이티브 호스트의 TLS 경로를 타는지는 **재지 않았다** | ★**`sentry@0.49.2`/`ureq@3.4.1` 기준의 «경로» 실측** — 그 둘을 올리면 다시 재라. 「안 탄다」의 근거로 인용하지 마라 |
 | **C-7** | RUSTSEC-2026-0382 | `rustls-webpki`(간접 — `rustls` 경유) | ★**해소 2026-10-23** — **0.103.15 → 0.103.16**(권고 `>=0.103.16, <0.104.0-alpha.1`) | ★**버전축으로만 닫았다** — WASM 에 없다(같은 명령 `nothing to print`) | ★**C-6 과 같다** — `rustls` 를 0.24 계열로 올리면 `rustls-webpki` 계열도 바뀌니 다시 재라 |
 | **C-8** | RUSTSEC-2026-0381 | `webpki-roots`(간접 — `sentry → ureq → webpki-roots`) | ★**해소 2026-10-23** — **1.0.9 → 1.0.11**(권고 `>=1.0.10`) | ★**버전축으로만 닫았다**(번들 루트 인증서 목록 갱신) — WASM 에 없다 | ★**`ureq@3.4.1` 기준** — ureq 를 올리면 다시 재라 |
 | **C-9** | RUSTSEC-2026-0383 | `webpki-root-certs`(간접 — `rustls-platform-verifier` 경유, ★**lockfile 에만 있다**) | ★**해소 2026-10-23** — **1.0.9 → 1.0.11**(권고 `>=1.0.10`) | ★**빌드 그래프 0** — `cargo tree -i webpki-root-certs -e all --target all` → `nothing to print` | ★**C-5 와 같다** — sentry/reqwest feature 조합이 바뀌면 다시 재라 |
+| **C-10**<br>(구 **A-4**) | **권고 없음**(yanked) | `chacha20`(간접 — `wie_cli → rodio → rand_distr → rand → chacha20`) | ★**해소 2026-11-22** — `cargo update -p chacha20` **0.10.1(yanked) → 0.10.2** | ★**도달 불가**(3축 · 위 ⓓ) — 상향 «전»에도 타지 않았다. WASM 아티팩트에는 없다(`cargo tree -p wie_featurephone --target wasm32-unknown-unknown -i chacha20` → `did not match any packages`) | ★**상향으로 «버전축»은 해소** — ⓓ 의 축1 은 `rodio@0.22.2` 소스 실측이라, lockfile 이 통째로 바뀌어 yanked 판본으로 돌아가면 그때 다시 재라 |
+| **C-11** | RUSTSEC-2026-0446 · 0448 · 0455 · 0552 · 0553 · 0554 | `actix-http`(간접 — `wie`(네이티브 호스트 `wie_cli`) → `sentry 0.49.2` 의 **선택** 의존 `sentry-actix`, ★**lockfile 에만 있다**) | ★**해소 2026-11-22** — `cargo update -p actix-http` **3.13.5 → 3.22.0**(권고 하한 중 최고 `>=3.21.3`) | ★**빌드 그래프 0** — `cargo tree -i actix-http -e all --target all` → `nothing to print`(sentry 의 `actix` feature 를 켜지 않아 컴파일조차 안 된다 · 우리는 HTTP 서버를 띄우지 않는다). 도달성 판정이 아니라 «부재» 실측이다 | ★**`sentry@0.49.2` 의 feature 조합 기준** — sentry 를 올리거나 `actix` feature 가 켜지면 다시 재라 |
+| **C-12** | RUSTSEC-2026-0447 | `actix-web`(간접 — C-11 과 같은 `sentry-actix` 경유, ★**lockfile 에만 있다**) | ★**해소 2026-11-22** — `cargo update -p actix-web` **4.15.0 → 4.20.0**(권고 `>=4.18.2`) | ★**빌드 그래프 0** — `cargo tree -i actix-web -e all --target all` → `nothing to print` | ★**C-11 과 같다** |
+| **C-13** | RUSTSEC-2026-0538 | `quinn-udp`(간접 — `sentry 0.49.2` → `reqwest` → `quinn` → `quinn-udp`, ★**lockfile 에만 있다**) | ★**해소 2026-11-22** — `cargo update -p quinn-udp` **0.5.15 → 0.5.16**(권고 `>=0.5.16, <0.6.0`) | ★**빌드 그래프 0** — `cargo tree -i quinn-udp -e all --target all` → `nothing to print` | ★**C-5 와 같다** — sentry/reqwest 의 http3/QUIC feature 조합이 바뀌면 다시 재라 |
+| **C-14** | RUSTSEC-2026-0486(`unsound` 경고) | `rustix` 1.1.x(간접 — `winit` 의 리눅스 백엔드: `polling`·`wayland-*`·`x11rb`·`softbuffer`·`drm-ffi`·`gethostname`. `0.38.44` 는 비해당) | ★**해소 2026-11-22** — `cargo update -p rustix@1.1.4` **1.1.4 → 1.1.6**(권고 `>=1.1.6`) | ★**버전축으로만 닫았다.** 잰 것은 범위뿐이다 — 결함은 `rustix::fs` 의 xattr 6함수이고 우리 `.rs` 에 `xattr` 호출 **0건** · 리눅스 데스크톱 호스트에서만 컴파일된다(이 Mac 의 호스트 타깃 `cargo tree -i rustix@1.1.6` → `nothing to print`) · WASM 에 없다(`did not match any packages`). 위 소비 크레이트들이 xattr 를 부르는지는 **재지 않았다** | ★**`winit@0.30.13` 의 리눅스 의존 기준** — winit 을 올리거나 rustix 가 1.1.6 아래로 내려가면 다시 재라. 「안 탄다」의 근거로 인용하지 마라 |
+| **C-15** | RUSTSEC-2026-0386(`unsound` 경고) | `tokio`(간접 — `sentry 0.49.2` 의 선택 의존 `reqwest`·`sentry-actix` 계열, ★**lockfile 에만 있다**) | ★**해소 2026-11-22** — `cargo update -p tokio` **1.53.1 → 1.54.1**(권고 `>=1.53.3`) | ★**빌드 그래프 0** — `cargo tree -i tokio -e all --target all` → `nothing to print` | ★**C-11 과 같다** — sentry 의 feature 조합이 바뀌어 tokio 가 그래프에 들어오면 다시 재라 |
+| **C-16**<br>(구 **D-1 · D-2 · D-3**) | RUSTSEC-2026-0367 · 0368 · 0369 · 0429 · 0545 · 0546 · 0547 · 0548 | `zip`(직접 — `wie-backend/Cargo.toml` · 간접 — `rustjava-runtime`) | ★**해소 2026-11-22**(`wie-upstream-sync2-s1-rustjava-pin-0-4-1-before-upstream-sync`) — RustJava 핀 `^0.1.1` → `^0.4.1`(`rustjava-runtime 0.4.1` 은 `zip ^9.0.5`) + `wie-backend` `zip ^8.6` → `^9.0` 로 lockfile 의 zip 이 **8.6.0 → 9.8.1** 하나가 됐다. 두 워크플로의 `--ignore` 8개를 지웠고 무-플래그 `cargo audit` 이 **0건**이다 | ★**도달 불가였다**(상향 «전» 판정 — 구 D 행의 논증 그대로): 0367·0368·0369·0429·0546·0548 은 «파일시스템으로 풀기» API(`ZipArchive::extract`·`extract_unwrapped_root_dir`·`ZipStreamReader`·`read_zipfile_from_stream`)의 결함이고 두 소비자 모두 `ZipArchive::new(Cursor)` + `by_index`/`by_name` 으로 메모리에 읽기만 했다(호출 **0건**). 0545(`aes-crypto`)·0547(`legacy-zip`)은 꺼진 feature 뒤라 컴파일되지 않았다 | ★**버전축으로 닫았다** — zip 이 9.0.5 아래로 되돌아가면(base swap · lock 재생성) 여덟 건이 다시 뜬다. 위 호출 0건은 `wie-backend/src/lib.rs`(2026-11-22)와 `rustjava-runtime 0.1.1` 소스 실측이라, 판을 되돌리지 않더라도 `extract`·`ZipStreamReader` 를 쓰기 시작하면(0548 의 수정은 옵트인 `enforce_header_consistency(true)`) 다시 재라. zip 9 는 엔트리 이름을 «UTF-8 플래그»가 아니라 «바이트가 UTF-8 로 유효한가»로 읽는다 — 코퍼스 대조는 `docs/report/0572` |
 
 > ★★**C-1·C-2 는 «되살아났다가 복원됐다» — 이 표를 「한 번 해소하면 끝」으로 읽지 마라.**
 > 2026-09-19 `wie-security-audit-schedule-red-three-days-unattended`:
@@ -300,7 +316,8 @@ rodio 요구가 `^0.3.2` 라 **rodio 를 건드리지 않고** 패치판으로 �
 
 | # | 자문 | 대상 | 왜 못 올렸나 | ★도달성 논증 | 해제 조건 |
 |---|---|---|---|---|---|
-| **D-1** | RUSTSEC-2026-0367 · RUSTSEC-2026-0368 · RUSTSEC-2026-0369 | `zip` **8.6.0**(직접 — `wie-backend/Cargo.toml:22` `^8.6` · 간접 — `rustjava-runtime 0.1.1` `^8.6`) | 패치는 **zip 9.0.0 이상에만** 있다(8.x 백포트 없음). `rustjava-runtime` 은 **0.1.1 ~ 0.3.2 전부 `^8.6`**, `^9.0.5` 는 **0.3.3 부터**(crates.io 인덱스 실측). wie-backend 만 9 로 올리면 8.6.0 이 rustjava 쪽에 남아 자문은 그대로다 ⇒ ★**RustJava 핀 이동(Constraint 8 · 설계 사안) 없이는 못 닫는다** | 세 자문 모두 **«파일시스템으로 풀기»** API 의 결함이다 — `ZipArchive::extract`/`extract_unwrapped_root_dir`(SUID 비트 보존 · 바깥을 가리키는 심링크 생성)와 `ZipStreamReader::extract`(심링크 너머로 권한 적용). ⑴**우리 소스 축**: `.rs` 전수에서 `zip` 사용처는 `wie-backend/src/lib.rs` 하나 — `ZipArchive::new(Cursor)` + `by_index`(`:88`)/`by_name`(`:117`)로 **메모리 `Vec<u8>` 에 읽기만** 하고 `extract`·`ZipStreamReader` ★**0건**. ⑵**rustjava-runtime 0.1.1 축**: `use zip::ZipArchive` 는 `classes/java/util/zip/zip_file.rs` 하나 — `ZipArchive::new(Cursor)` + `by_name`(`:96`·`:147`)뿐, `extract` ★**0건**. ⑶**호스트 축**: 배포 아티팩트(wasm32)에는 쓸 파일시스템이 없다 | ★**`rustjava-runtime` 을 `>=0.3.3` 로 옮겨 lockfile 의 zip 이 `>=9.0.0` 이 되면** 무-억제 `cargo audit` 이 이 셋을 더는 내지 않고, IGNORES 절이 «낡은 억제»로 **red** 를 낸다 — 그때 두 워크플로의 `--ignore` 3개를 지우고 이 행을 C 로 옮겨라. ⑴⑵ 는 **그 판본의 소스 실측**이라 `rustjava-runtime`·`wie-backend` 의 zip 사용이 바뀌면(특히 `extract` 도입) 다시 재라 |
+
+> ★**[2026-11-22] 이 표는 지금 0행이다** — D-1·D-2·D-3(zip 8건)은 lockfile 의 zip 이 9.8.1 이 되어 해소됐고 판정은 **C-16** 으로 옮겼다. 두 워크플로의 `cargo audit` 줄에 `--ignore` 는 다시 0개다.
 
 ## 두 트랙 — 엔진 정상화 현황
 

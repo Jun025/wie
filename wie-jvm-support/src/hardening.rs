@@ -217,20 +217,24 @@ impl MethodBody<JavaError, dyn Runtime> for InputStreamReaderRead {
             return Ok(JavaValue::Int(0));
         }
 
-        let charset = JavaLangString::to_rust_string(jvm, &jvm.get_field(&this, "charset", "Ljava/lang/String;").await?).await?;
-        let input: Box<dyn ClassInstance> = jvm.get_field(&this, "in", "Ljava/io/InputStream;").await?;
-        let mut write_buf: Box<dyn ClassInstance> = jvm.get_field(&this, "writeBuf", "[C").await?;
-        let pending: i32 = jvm.get_field(&this, "writeBufSize", "I").await?;
+        let charset = JavaLangString::to_rust_string(
+            jvm,
+            &jvm.get_field(&this, "java/io/InputStreamReader", "charset", "Ljava/lang/String;").await?,
+        )
+        .await?;
+        let input: Box<dyn ClassInstance> = jvm.get_field(&this, "java/io/InputStreamReader", "in", "Ljava/io/InputStream;").await?;
+        let mut write_buf: Box<dyn ClassInstance> = jvm.get_field(&this, "java/io/InputStreamReader", "writeBuf", "[C").await?;
+        let pending: i32 = jvm.get_field(&this, "java/io/InputStreamReader", "writeBufSize", "I").await?;
         let mut chars: Vec<JavaChar> = jvm.load_array(&write_buf, 0, pending as usize).await?;
-        let mut read_buf: Box<dyn ClassInstance> = jvm.get_field(&this, "readBuf", "[B").await?;
-        let carried: i32 = jvm.get_field(&this, "readBufSize", "I").await?;
+        let mut read_buf: Box<dyn ClassInstance> = jvm.get_field(&this, "java/io/InputStreamReader", "readBuf", "[B").await?;
+        let carried: i32 = jvm.get_field(&this, "java/io/InputStreamReader", "readBufSize", "I").await?;
         let mut bytes: Vec<u8> = jvm
             .load_array::<i8>(&read_buf, 0, carried as usize)
             .await?
             .into_iter()
             .map(|b| b as u8)
             .collect();
-        let mut end_of_input: bool = jvm.get_field(&this, "endOfInput", "Z").await?;
+        let mut end_of_input: bool = jvm.get_field(&this, "java/io/InputStreamReader", "endOfInput", "Z").await?;
 
         while (chars.len() as i32) < length && !end_of_input {
             if !chars.is_empty()
@@ -273,18 +277,23 @@ impl MethodBody<JavaError, dyn Runtime> for InputStreamReaderRead {
         let rest = &chars[out..];
         if rest.len() > jvm.array_length(&write_buf).await? {
             write_buf = jvm.instantiate_array("C", rest.len()).await?;
-            jvm.put_field(&mut this, "writeBuf", "[C", write_buf.clone()).await?;
+            jvm.put_field(&mut this, "java/io/InputStreamReader", "writeBuf", "[C", write_buf.clone())
+                .await?;
         }
         jvm.store_array(&mut write_buf, 0, rest.to_vec()).await?;
-        jvm.put_field(&mut this, "writeBufSize", "I", rest.len() as i32).await?;
+        jvm.put_field(&mut this, "java/io/InputStreamReader", "writeBufSize", "I", rest.len() as i32)
+            .await?;
         if bytes.len() > jvm.array_length(&read_buf).await? {
             read_buf = jvm.instantiate_array("B", bytes.len()).await?;
-            jvm.put_field(&mut this, "readBuf", "[B", read_buf.clone()).await?;
+            jvm.put_field(&mut this, "java/io/InputStreamReader", "readBuf", "[B", read_buf.clone())
+                .await?;
         }
         jvm.store_array(&mut read_buf, 0, bytes.iter().map(|&b| b as i8).collect::<Vec<_>>())
             .await?;
-        jvm.put_field(&mut this, "readBufSize", "I", bytes.len() as i32).await?;
-        jvm.put_field(&mut this, "endOfInput", "Z", end_of_input).await?;
+        jvm.put_field(&mut this, "java/io/InputStreamReader", "readBufSize", "I", bytes.len() as i32)
+            .await?;
+        jvm.put_field(&mut this, "java/io/InputStreamReader", "endOfInput", "Z", end_of_input)
+            .await?;
 
         Ok(JavaValue::Int(out as i32))
     }
@@ -554,7 +563,7 @@ mod tests {
     fn exception_class(err: JavaError) -> String {
         let JavaError::JavaException(instance) = err;
 
-        instance.class_definition().name()
+        instance.class_definition().name().into_owned()
     }
 
     /// The three null arguments the dropped fork guarded, plus `String`'s array constructors

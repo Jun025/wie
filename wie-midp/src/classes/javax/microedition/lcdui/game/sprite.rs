@@ -20,6 +20,7 @@ use crate::classes::javax::microedition::lcdui::{
 // its reference pixel in place when the transform changes, as the reference implementation does.
 pub struct Sprite;
 
+const CLASS: &str = "javax/microedition/lcdui/game/Sprite";
 const LAYER: &str = "javax/microedition/lcdui/game/Layer";
 
 impl Sprite {
@@ -114,8 +115,8 @@ impl Sprite {
         if image.is_null() {
             return Err(jvm.exception("java/lang/NullPointerException", "image is null").await);
         }
-        let width: i32 = jvm.get_field(&image, "w", "I").await?;
-        let height: i32 = jvm.get_field(&image, "h", "I").await?;
+        let width: i32 = jvm.get_field(&image, "javax/microedition/lcdui/Image", "w", "I").await?;
+        let height: i32 = jvm.get_field(&image, "javax/microedition/lcdui/Image", "h", "I").await?;
 
         Self::init(jvm, context, this, image, width, height).await
     }
@@ -138,8 +139,8 @@ impl Sprite {
         if other.is_null() {
             return Err(jvm.exception("java/lang/NullPointerException", "sprite is null").await);
         }
-        let width: i32 = jvm.get_field(&other, "width", "I").await?;
-        let height: i32 = jvm.get_field(&other, "height", "I").await?;
+        let width: i32 = jvm.get_field(&other, "javax/microedition/lcdui/game/Layer", "width", "I").await?;
+        let height: i32 = jvm.get_field(&other, "javax/microedition/lcdui/game/Layer", "height", "I").await?;
         let _: () = jvm.invoke_special(&this, LAYER, "<init>", "(II)V", (width, height)).await?;
 
         for name in [
@@ -157,14 +158,23 @@ impl Sprite {
             "collWidth",
             "collHeight",
         ] {
-            let value: i32 = jvm.get_field(&other, name, "I").await?;
-            jvm.put_field(&mut this, name, "I", value).await?;
+            let value: i32 = jvm.get_field(&other, "javax/microedition/lcdui/game/Sprite", name, "I").await?;
+            jvm.put_field(&mut this, "javax/microedition/lcdui/game/Sprite", name, "I", value).await?;
         }
-        let visible: bool = jvm.get_field(&other, "visible", "Z").await?;
-        jvm.put_field(&mut this, "visible", "Z", visible).await?;
-        let image: ClassInstanceRef<Image> = jvm.get_field(&other, "image", "Ljavax/microedition/lcdui/Image;").await?;
-        jvm.put_field(&mut this, "image", "Ljavax/microedition/lcdui/Image;", image).await?;
-        let seq: ClassInstanceRef<Array<i32>> = jvm.get_field(&other, "seq", "[I").await?;
+        let visible: bool = jvm.get_field(&other, "javax/microedition/lcdui/game/Layer", "visible", "Z").await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/Layer", "visible", "Z", visible)
+            .await?;
+        let image: ClassInstanceRef<Image> = jvm
+            .get_field(
+                &other,
+                "javax/microedition/lcdui/game/Sprite",
+                "image",
+                "Ljavax/microedition/lcdui/Image;",
+            )
+            .await?;
+        jvm.put_field(&mut this, CLASS, "image", "Ljavax/microedition/lcdui/Image;", image)
+            .await?;
+        let seq: ClassInstanceRef<Array<i32>> = jvm.get_field(&other, "javax/microedition/lcdui/game/Sprite", "seq", "[I").await?;
         if !seq.is_null() {
             let values: Vec<i32> = jvm.load_array(&seq, 0, jvm.array_length(&seq).await?).await?;
             Self::store_sequence(jvm, &mut this, &values).await?;
@@ -183,37 +193,40 @@ impl Sprite {
         if image.is_null() {
             return Err(jvm.exception("java/lang/NullPointerException", "image is null").await);
         }
-        let image_width: i32 = jvm.get_field(&image, "w", "I").await?;
-        let image_height: i32 = jvm.get_field(&image, "h", "I").await?;
+        let image_width: i32 = jvm.get_field(&image, "javax/microedition/lcdui/Image", "w", "I").await?;
+        let image_height: i32 = jvm.get_field(&image, "javax/microedition/lcdui/Image", "h", "I").await?;
         if frame_width < 1 || frame_height < 1 || image_width % frame_width != 0 || image_height % frame_height != 0 {
             return Err(jvm.exception("java/lang/IllegalArgumentException", "invalid frame size").await);
         }
 
         let raw_frames = (image_width / frame_width) * (image_height / frame_height);
-        let old_raw_frames: i32 = jvm.get_field(this, "rawFrames", "I").await?;
+        let old_raw_frames: i32 = jvm.get_field(this, "javax/microedition/lcdui/game/Sprite", "rawFrames", "I").await?;
 
-        jvm.put_field(this, "image", "Ljavax/microedition/lcdui/Image;", image).await?;
-        jvm.put_field(this, "frameWidth", "I", frame_width).await?;
-        jvm.put_field(this, "frameHeight", "I", frame_height).await?;
-        jvm.put_field(this, "rawFrames", "I", raw_frames).await?;
-        jvm.put_field(this, "collX", "I", 0).await?;
-        jvm.put_field(this, "collY", "I", 0).await?;
-        jvm.put_field(this, "collWidth", "I", frame_width).await?;
-        jvm.put_field(this, "collHeight", "I", frame_height).await?;
+        jvm.put_field(this, CLASS, "image", "Ljavax/microedition/lcdui/Image;", image).await?;
+        jvm.put_field(this, CLASS, "frameWidth", "I", frame_width).await?;
+        jvm.put_field(this, CLASS, "frameHeight", "I", frame_height).await?;
+        jvm.put_field(this, "javax/microedition/lcdui/game/Sprite", "rawFrames", "I", raw_frames)
+            .await?;
+        jvm.put_field(this, "javax/microedition/lcdui/game/Sprite", "collX", "I", 0).await?;
+        jvm.put_field(this, "javax/microedition/lcdui/game/Sprite", "collY", "I", 0).await?;
+        jvm.put_field(this, "javax/microedition/lcdui/game/Sprite", "collWidth", "I", frame_width)
+            .await?;
+        jvm.put_field(this, "javax/microedition/lcdui/game/Sprite", "collHeight", "I", frame_height)
+            .await?;
         // fewer frames than before: the old sequence may point past the end, so fall back to the default one
         if raw_frames < old_raw_frames {
-            jvm.put_field(this, "seq", "[I", None).await?;
-            jvm.put_field(this, "seqIndex", "I", 0).await?;
+            jvm.put_field(this, "javax/microedition/lcdui/game/Sprite", "seq", "[I", None).await?;
+            jvm.put_field(this, "javax/microedition/lcdui/game/Sprite", "seqIndex", "I", 0).await?;
         }
 
-        let transform: i32 = jvm.get_field(this, "transform", "I").await?;
+        let transform: i32 = jvm.get_field(this, CLASS, "transform", "I").await?;
         let (width, height) = if matches!(transform, 4..=7) {
             (frame_height, frame_width)
         } else {
             (frame_width, frame_height)
         };
-        jvm.put_field(this, "width", "I", width).await?;
-        jvm.put_field(this, "height", "I", height).await?;
+        jvm.put_field(this, LAYER, "width", "I", width).await?;
+        jvm.put_field(this, LAYER, "height", "I", height).await?;
 
         Ok(())
     }
@@ -235,21 +248,21 @@ impl Sprite {
     async fn store_sequence(jvm: &Jvm, this: &mut ClassInstanceRef<Self>, values: &[i32]) -> JvmResult<()> {
         let mut seq = jvm.instantiate_array("I", values.len()).await?;
         jvm.store_array(&mut seq, 0, values.to_vec()).await?;
-        jvm.put_field(this, "seq", "[I", seq).await
+        jvm.put_field(this, "javax/microedition/lcdui/game/Sprite", "seq", "[I", seq).await
     }
 
     async fn sequence_length(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<i32> {
-        let seq: ClassInstanceRef<Array<i32>> = jvm.get_field(this, "seq", "[I").await?;
+        let seq: ClassInstanceRef<Array<i32>> = jvm.get_field(this, "javax/microedition/lcdui/game/Sprite", "seq", "[I").await?;
         if seq.is_null() {
-            jvm.get_field(this, "rawFrames", "I").await
+            jvm.get_field(this, "javax/microedition/lcdui/game/Sprite", "rawFrames", "I").await
         } else {
             Ok(jvm.array_length(&seq).await? as i32)
         }
     }
 
     async fn raw_frame(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<i32> {
-        let seq: ClassInstanceRef<Array<i32>> = jvm.get_field(this, "seq", "[I").await?;
-        let index: i32 = jvm.get_field(this, "seqIndex", "I").await?;
+        let seq: ClassInstanceRef<Array<i32>> = jvm.get_field(this, "javax/microedition/lcdui/game/Sprite", "seq", "[I").await?;
+        let index: i32 = jvm.get_field(this, "javax/microedition/lcdui/game/Sprite", "seqIndex", "I").await?;
         if seq.is_null() {
             Ok(index)
         } else {
@@ -261,15 +274,16 @@ impl Sprite {
         if index < 0 || index >= Self::sequence_length(jvm, &this).await? {
             return Err(jvm.exception("java/lang/IndexOutOfBoundsException", "frame index out of range").await);
         }
-        jvm.put_field(&mut this, "seqIndex", "I", index).await
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/Sprite", "seqIndex", "I", index)
+            .await
     }
 
     async fn get_frame(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        jvm.get_field(&this, "seqIndex", "I").await
+        jvm.get_field(&this, "javax/microedition/lcdui/game/Sprite", "seqIndex", "I").await
     }
 
     async fn get_raw_frame_count(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        jvm.get_field(&this, "rawFrames", "I").await
+        jvm.get_field(&this, "javax/microedition/lcdui/game/Sprite", "rawFrames", "I").await
     }
 
     async fn get_frame_sequence_length(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
@@ -277,15 +291,23 @@ impl Sprite {
     }
 
     async fn next_frame(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
-        let index: i32 = jvm.get_field(&this, "seqIndex", "I").await?;
+        let index: i32 = jvm.get_field(&this, "javax/microedition/lcdui/game/Sprite", "seqIndex", "I").await?;
         let length = Self::sequence_length(jvm, &this).await?.max(1);
-        jvm.put_field(&mut this, "seqIndex", "I", (index + 1) % length).await
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/Sprite", "seqIndex", "I", (index + 1) % length)
+            .await
     }
 
     async fn prev_frame(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
-        let index: i32 = jvm.get_field(&this, "seqIndex", "I").await?;
+        let index: i32 = jvm.get_field(&this, "javax/microedition/lcdui/game/Sprite", "seqIndex", "I").await?;
         let length = Self::sequence_length(jvm, &this).await?.max(1);
-        jvm.put_field(&mut this, "seqIndex", "I", (index + length - 1) % length).await
+        jvm.put_field(
+            &mut this,
+            "javax/microedition/lcdui/game/Sprite",
+            "seqIndex",
+            "I",
+            (index + length - 1) % length,
+        )
+        .await
     }
 
     async fn set_frame_sequence(
@@ -294,13 +316,14 @@ impl Sprite {
         mut this: ClassInstanceRef<Self>,
         seq: ClassInstanceRef<Array<i32>>,
     ) -> JvmResult<()> {
-        jvm.put_field(&mut this, "seqIndex", "I", 0).await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/Sprite", "seqIndex", "I", 0)
+            .await?;
         if seq.is_null() {
-            return jvm.put_field(&mut this, "seq", "[I", None).await;
+            return jvm.put_field(&mut this, "javax/microedition/lcdui/game/Sprite", "seq", "[I", None).await;
         }
 
         let values: Vec<i32> = jvm.load_array(&seq, 0, jvm.array_length(&seq).await?).await?;
-        let raw_frames: i32 = jvm.get_field(&this, "rawFrames", "I").await?;
+        let raw_frames: i32 = jvm.get_field(&this, "javax/microedition/lcdui/game/Sprite", "rawFrames", "I").await?;
         if values.is_empty() {
             return Err(jvm.exception("java/lang/IllegalArgumentException", "empty frame sequence").await);
         }
@@ -312,34 +335,34 @@ impl Sprite {
     }
 
     async fn define_reference_pixel(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, x: i32, y: i32) -> JvmResult<()> {
-        jvm.put_field(&mut this, "refX", "I", x).await?;
-        jvm.put_field(&mut this, "refY", "I", y).await
+        jvm.put_field(&mut this, CLASS, "refX", "I", x).await?;
+        jvm.put_field(&mut this, CLASS, "refY", "I", y).await
     }
 
     // The reference pixel, in painter's coordinates.
     async fn ref_pixel(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<(i32, i32)> {
-        let x: i32 = jvm.get_field(this, "x", "I").await?;
-        let y: i32 = jvm.get_field(this, "y", "I").await?;
-        let transform: i32 = jvm.get_field(this, "transform", "I").await?;
+        let x: i32 = jvm.get_field(this, LAYER, "x", "I").await?;
+        let y: i32 = jvm.get_field(this, LAYER, "y", "I").await?;
+        let transform: i32 = jvm.get_field(this, CLASS, "transform", "I").await?;
         let (dx, dy) = Self::transformed_ref(jvm, this, transform).await?;
 
         Ok((x + dx, y + dy))
     }
 
     async fn transformed_ref(jvm: &Jvm, this: &ClassInstanceRef<Self>, transform: i32) -> JvmResult<(i32, i32)> {
-        let ref_x: i32 = jvm.get_field(this, "refX", "I").await?;
-        let ref_y: i32 = jvm.get_field(this, "refY", "I").await?;
-        let frame_width: i32 = jvm.get_field(this, "frameWidth", "I").await?;
-        let frame_height: i32 = jvm.get_field(this, "frameHeight", "I").await?;
+        let ref_x: i32 = jvm.get_field(this, CLASS, "refX", "I").await?;
+        let ref_y: i32 = jvm.get_field(this, CLASS, "refY", "I").await?;
+        let frame_width: i32 = jvm.get_field(this, CLASS, "frameWidth", "I").await?;
+        let frame_height: i32 = jvm.get_field(this, CLASS, "frameHeight", "I").await?;
 
         Ok(destination_point(transform, ref_x, ref_y, frame_width, frame_height))
     }
 
     async fn place_ref_pixel(jvm: &Jvm, this: &mut ClassInstanceRef<Self>, x: i32, y: i32) -> JvmResult<()> {
-        let transform: i32 = jvm.get_field(this, "transform", "I").await?;
+        let transform: i32 = jvm.get_field(this, CLASS, "transform", "I").await?;
         let (dx, dy) = Self::transformed_ref(jvm, this, transform).await?;
-        jvm.put_field(this, "x", "I", x - dx).await?;
-        jvm.put_field(this, "y", "I", y - dy).await
+        jvm.put_field(this, LAYER, "x", "I", x - dx).await?;
+        jvm.put_field(this, LAYER, "y", "I", y - dy).await
     }
 
     async fn set_ref_pixel_position(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, x: i32, y: i32) -> JvmResult<()> {
@@ -359,17 +382,17 @@ impl Sprite {
             return Err(jvm.exception("java/lang/IllegalArgumentException", "invalid transform").await);
         }
         let (ref_x, ref_y) = Self::ref_pixel(jvm, &this).await?;
-        jvm.put_field(&mut this, "transform", "I", transform).await?;
+        jvm.put_field(&mut this, CLASS, "transform", "I", transform).await?;
 
-        let frame_width: i32 = jvm.get_field(&this, "frameWidth", "I").await?;
-        let frame_height: i32 = jvm.get_field(&this, "frameHeight", "I").await?;
+        let frame_width: i32 = jvm.get_field(&this, CLASS, "frameWidth", "I").await?;
+        let frame_height: i32 = jvm.get_field(&this, CLASS, "frameHeight", "I").await?;
         let (width, height) = if matches!(transform, 4..=7) {
             (frame_height, frame_width)
         } else {
             (frame_width, frame_height)
         };
-        jvm.put_field(&mut this, "width", "I", width).await?;
-        jvm.put_field(&mut this, "height", "I", height).await?;
+        jvm.put_field(&mut this, LAYER, "width", "I", width).await?;
+        jvm.put_field(&mut this, LAYER, "height", "I", height).await?;
 
         Self::place_ref_pixel(jvm, &mut this, ref_x, ref_y).await
     }
@@ -386,25 +409,27 @@ impl Sprite {
         if width < 0 || height < 0 {
             return Err(jvm.exception("java/lang/IllegalArgumentException", "negative collision size").await);
         }
-        jvm.put_field(&mut this, "collX", "I", x).await?;
-        jvm.put_field(&mut this, "collY", "I", y).await?;
-        jvm.put_field(&mut this, "collWidth", "I", width).await?;
-        jvm.put_field(&mut this, "collHeight", "I", height).await
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/Sprite", "collX", "I", x).await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/Sprite", "collY", "I", y).await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/Sprite", "collWidth", "I", width)
+            .await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/Sprite", "collHeight", "I", height)
+            .await
     }
 
     async fn paint(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, mut graphics: ClassInstanceRef<Graphics>) -> JvmResult<()> {
         if graphics.is_null() {
             return Err(jvm.exception("java/lang/NullPointerException", "graphics is null").await);
         }
-        let visible: bool = jvm.get_field(&this, "visible", "Z").await?;
+        let visible: bool = jvm.get_field(&this, "javax/microedition/lcdui/game/Layer", "visible", "Z").await?;
         if !visible {
             return Ok(());
         }
 
         let state = SpriteState::load(jvm, &this).await?;
         let image = state.backend_image(jvm).await?;
-        let translate_x: i32 = jvm.get_field(&graphics, "translateX", "I").await?;
-        let translate_y: i32 = jvm.get_field(&graphics, "translateY", "I").await?;
+        let translate_x: i32 = jvm.get_field(&graphics, "javax/microedition/lcdui/Graphics", "translateX", "I").await?;
+        let translate_y: i32 = jvm.get_field(&graphics, "javax/microedition/lcdui/Graphics", "translateY", "I").await?;
         let clip = Graphics::clip(jvm, &graphics).await?;
         let mut canvas = Graphics::canvas(jvm, &mut graphics).await?;
 
@@ -515,14 +540,14 @@ impl Sprite {
         if image.is_null() {
             return Err(jvm.exception("java/lang/NullPointerException", "image is null").await);
         }
-        let visible: bool = jvm.get_field(&this, "visible", "Z").await?;
+        let visible: bool = jvm.get_field(&this, "javax/microedition/lcdui/game/Layer", "visible", "Z").await?;
         if !visible {
             return Ok(false);
         }
 
         let sprite = SpriteState::load(jvm, &this).await?;
-        let width: i32 = jvm.get_field(&image, "w", "I").await?;
-        let height: i32 = jvm.get_field(&image, "h", "I").await?;
+        let width: i32 = jvm.get_field(&image, "javax/microedition/lcdui/Image", "w", "I").await?;
+        let height: i32 = jvm.get_field(&image, "javax/microedition/lcdui/Image", "h", "I").await?;
         let Some(rect) = intersect(sprite.collision_rect(), (x, y, width, height)) else {
             return Ok(false);
         };
@@ -538,8 +563,8 @@ impl Sprite {
     }
 
     async fn both_visible<T>(jvm: &Jvm, a: &ClassInstanceRef<Self>, b: &ClassInstanceRef<T>) -> JvmResult<bool> {
-        let a_visible: bool = jvm.get_field(a, "visible", "Z").await?;
-        let b_visible: bool = jvm.get_field(b, "visible", "Z").await?;
+        let a_visible: bool = jvm.get_field(a, "javax/microedition/lcdui/game/Layer", "visible", "Z").await?;
+        let b_visible: bool = jvm.get_field(b, "javax/microedition/lcdui/game/Layer", "visible", "Z").await?;
 
         Ok(a_visible && b_visible)
     }
@@ -592,27 +617,27 @@ struct SpriteState {
 
 impl SpriteState {
     async fn load(jvm: &Jvm, this: &ClassInstanceRef<Sprite>) -> JvmResult<Self> {
-        let image: ClassInstanceRef<Image> = jvm.get_field(this, "image", "Ljavax/microedition/lcdui/Image;").await?;
-        let image_width: i32 = jvm.get_field(&image, "w", "I").await?;
-        let frame_width: i32 = jvm.get_field(this, "frameWidth", "I").await?;
-        let frame_height: i32 = jvm.get_field(this, "frameHeight", "I").await?;
+        let image: ClassInstanceRef<Image> = jvm.get_field(this, CLASS, "image", "Ljavax/microedition/lcdui/Image;").await?;
+        let image_width: i32 = jvm.get_field(&image, "javax/microedition/lcdui/Image", "w", "I").await?;
+        let frame_width: i32 = jvm.get_field(this, CLASS, "frameWidth", "I").await?;
+        let frame_height: i32 = jvm.get_field(this, CLASS, "frameHeight", "I").await?;
         let columns = (image_width / frame_width).max(1);
         let frame = Sprite::raw_frame(jvm, this).await?;
 
         Ok(Self {
             image,
-            x: jvm.get_field(this, "x", "I").await?,
-            y: jvm.get_field(this, "y", "I").await?,
+            x: jvm.get_field(this, LAYER, "x", "I").await?,
+            y: jvm.get_field(this, LAYER, "y", "I").await?,
             frame_x: (frame % columns) * frame_width,
             frame_y: (frame / columns) * frame_height,
             frame_width,
             frame_height,
-            transform: jvm.get_field(this, "transform", "I").await?,
+            transform: jvm.get_field(this, CLASS, "transform", "I").await?,
             collision: (
-                jvm.get_field(this, "collX", "I").await?,
-                jvm.get_field(this, "collY", "I").await?,
-                jvm.get_field(this, "collWidth", "I").await?,
-                jvm.get_field(this, "collHeight", "I").await?,
+                jvm.get_field(this, "javax/microedition/lcdui/game/Sprite", "collX", "I").await?,
+                jvm.get_field(this, "javax/microedition/lcdui/game/Sprite", "collY", "I").await?,
+                jvm.get_field(this, "javax/microedition/lcdui/game/Sprite", "collWidth", "I").await?,
+                jvm.get_field(this, "javax/microedition/lcdui/game/Sprite", "collHeight", "I").await?,
             ),
         })
     }

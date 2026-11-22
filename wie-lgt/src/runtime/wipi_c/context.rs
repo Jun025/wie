@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, collections::BTreeMap, format, vec, vec::Vec};
+use alloc::{boxed::Box, collections::BTreeMap, format, string::ToString, vec, vec::Vec};
 
 use jvm::{
     Jvm,
@@ -97,10 +97,9 @@ impl LgtWIPICContext {
     }
 
     async fn collect_garbage(&self) -> Result<()> {
-        match self.jvm.collect_garbage() {
-            Ok(_) => Ok(()),
-            Err(error) => Err(JvmSupport::to_wie_err(&self.jvm, error).await),
-        }
+        self.jvm.collect_garbage().map_err(|error| WieError::FatalError(error.to_string()))?;
+
+        Ok(())
     }
 
     pub fn new(core: ArmCore, system: System, jvm: Jvm) -> Self {

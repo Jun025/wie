@@ -218,13 +218,21 @@ impl ShellComponent {
     async fn set_title(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, title: ClassInstanceRef<Component>) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.lwc.ShellComponent::setTitle({this:?}, {title:?})");
 
-        jvm.put_field(&mut this, "cmpTitle", "Lorg/kwis/msp/lwc/Component;", title).await
+        jvm.put_field(
+            &mut this,
+            "org/kwis/msp/lwc/ShellComponent",
+            "cmpTitle",
+            "Lorg/kwis/msp/lwc/Component;",
+            title,
+        )
+        .await
     }
 
     async fn get_title(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<Component>> {
         tracing::debug!("org.kwis.msp.lwc.ShellComponent::getTitle({this:?})");
 
-        jvm.get_field(&this, "cmpTitle", "Lorg/kwis/msp/lwc/Component;").await
+        jvm.get_field(&this, "org/kwis/msp/lwc/ShellComponent", "cmpTitle", "Lorg/kwis/msp/lwc/Component;")
+            .await
     }
 
     // The javadoc: a key goes to the component that has the focus (setFocus). This layer lays nothing

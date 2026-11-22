@@ -91,7 +91,7 @@ impl XOWorld {
         }
         let mut array = jvm.instantiate_array("B", data.len() as _).await?;
         jvm.array_raw_buffer_mut(&mut array).await?.write(0, &data)?;
-        jvm.put_field(&mut this, field, "[B", array).await?;
+        jvm.put_field(&mut this, "m/XO_World", field, "[B", array).await?;
         Ok(0)
     }
 
@@ -128,7 +128,7 @@ impl XOWorld {
     async fn dispose(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("m.XO_World::dispose({this:?})");
         for field in [MODEL, TEXTURE, ACTIONS] {
-            jvm.put_field(&mut this, field, "[B", None).await?;
+            jvm.put_field(&mut this, "m/XO_World", field, "[B", None).await?;
         }
         Ok(())
     }
@@ -139,8 +139,8 @@ impl XOWorld {
             return Err(jvm.exception("java/lang/NullPointerException", "world is null").await);
         }
         for field in [MODEL, TEXTURE, ACTIONS] {
-            let data: ClassInstanceRef<Array<i8>> = jvm.get_field(&other, field, "[B").await?;
-            jvm.put_field(&mut this, field, "[B", data).await?;
+            let data: ClassInstanceRef<Array<i8>> = jvm.get_field(&other, "m/XO_World", field, "[B").await?;
+            jvm.put_field(&mut this, "m/XO_World", field, "[B", data).await?;
         }
         Ok(())
     }
@@ -164,7 +164,7 @@ impl XOWorld {
         tracing::debug!("m.XO_World::setClip({this:?}, {x}, {y}, {w}, {h})");
         let mut clip = jvm.instantiate_array("I", 4).await?;
         jvm.store_array(&mut clip, 0, [x, y, w, h]).await?;
-        jvm.put_field(&mut this, "clip", "[I", clip).await
+        jvm.put_field(&mut this, "m/XO_World", "clip", "[I", clip).await
     }
 
     // parallel projection: screen = (cx, cy) + (view · v) · (sx, sy) / 4096
@@ -183,14 +183,14 @@ impl XOWorld {
         let m = A3::get(jvm, &view).await?;
         let mut array = jvm.instantiate_array("I", 16).await?;
         jvm.store_array(&mut array, 0, m.into_iter().chain([sx, sy, cx, cy])).await?;
-        jvm.put_field(&mut this, "view", "[I", array).await
+        jvm.put_field(&mut this, "m/XO_World", "view", "[I", array).await
     }
 
     // frame is 16.16 fixed point, like getMaxFrame's result
     async fn set_posture(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, action: i32, frame: i32) -> JvmResult<()> {
         tracing::debug!("m.XO_World::setPosture({this:?}, {action}, {frame})");
-        jvm.put_field(&mut this, "action", "I", action).await?;
-        jvm.put_field(&mut this, "frame", "I", frame).await
+        jvm.put_field(&mut this, "m/XO_World", "action", "I", action).await?;
+        jvm.put_field(&mut this, "m/XO_World", "frame", "I", frame).await
     }
 
     async fn get_max_frame(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>, action: i32) -> JvmResult<i32> {
@@ -211,7 +211,7 @@ impl XOWorld {
             tracing::warn!("m.XO_World::draw without a model");
             return Ok(());
         };
-        let view: ClassInstanceRef<Array<i32>> = jvm.get_field(&this, "view", "[I").await?;
+        let view: ClassInstanceRef<Array<i32>> = jvm.get_field(&this, "m/XO_World", "view", "[I").await?;
         if view.is_null() {
             tracing::warn!("m.XO_World::draw before setView");
             return Ok(());
@@ -219,13 +219,13 @@ impl XOWorld {
         let view = jvm.load_array::<i32>(&view, 0, 16).await?;
         let texture = Self::bytes(jvm, &this, TEXTURE).await?.and_then(|d| mascot::parse_bmp(&d));
         let actions = Self::bytes(jvm, &this, ACTIONS).await?.and_then(|d| mascot::parse_mtra(&d));
-        let action: i32 = jvm.get_field(&this, "action", "I").await?;
-        let frame: i32 = jvm.get_field(&this, "frame", "I").await?;
+        let action: i32 = jvm.get_field(&this, "m/XO_World", "action", "I").await?;
+        let frame: i32 = jvm.get_field(&this, "m/XO_World", "frame", "I").await?;
 
-        let translate_x: i32 = jvm.get_field(&graphics, "translateX", "I").await?;
-        let translate_y: i32 = jvm.get_field(&graphics, "translateY", "I").await?;
+        let translate_x: i32 = jvm.get_field(&graphics, "javax/microedition/lcdui/Graphics", "translateX", "I").await?;
+        let translate_y: i32 = jvm.get_field(&graphics, "javax/microedition/lcdui/Graphics", "translateY", "I").await?;
         let mut clip = Graphics::clip(jvm, &graphics).await?;
-        let world_clip: ClassInstanceRef<Array<i32>> = jvm.get_field(&this, "clip", "[I").await?;
+        let world_clip: ClassInstanceRef<Array<i32>> = jvm.get_field(&this, "m/XO_World", "clip", "[I").await?;
         if !world_clip.is_null() {
             let c = jvm.load_array::<i32>(&world_clip, 0, 4).await?;
             clip = clip.intersect(&Clip {
@@ -299,7 +299,7 @@ impl XOWorld {
     }
 
     async fn bytes(jvm: &Jvm, this: &ClassInstanceRef<Self>, field: &str) -> JvmResult<Option<Vec<u8>>> {
-        let array: ClassInstanceRef<Array<i8>> = jvm.get_field(this, field, "[B").await?;
+        let array: ClassInstanceRef<Array<i8>> = jvm.get_field(this, "m/XO_World", field, "[B").await?;
         if array.is_null() {
             return Ok(None);
         }

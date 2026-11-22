@@ -4,7 +4,7 @@ use jvm::{ClassInstance, ClassInstanceRef, Jvm, Result as JvmResult};
 use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 
-use wie_jvm_support::{WieJavaClassProto, WieJvmContext, get_declared_field};
+use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 use wie_midp::classes::{
     javax::microedition::lcdui::{Canvas as MidpCanvas, Graphics as MidpGraphics},
     net::wie::MIDPKeyCode,
@@ -148,7 +148,8 @@ impl CardCanvas {
             .await?;
 
         let cards = jvm.new_class("java/util/Vector", "()V", ()).await?;
-        jvm.put_field(&mut this, "cards", "Ljava/util/Vector;", cards).await?;
+        jvm.put_field(&mut this, "net/wie/CardCanvas", "cards", "Ljava/util/Vector;", cards)
+            .await?;
 
         Ok(())
     }
@@ -158,16 +159,16 @@ impl CardCanvas {
 
         // The clip Display set is the repaint area; the per-card reset below would widen it back
         // to the whole screen, so keep it (absolute coordinates) and re-apply it inside each card.
-        let clip_x: i32 = jvm.get_field(&g, "clipX", "I").await?;
-        let clip_y: i32 = jvm.get_field(&g, "clipY", "I").await?;
-        let clip_width: i32 = jvm.get_field(&g, "clipWidth", "I").await?;
-        let clip_height: i32 = jvm.get_field(&g, "clipHeight", "I").await?;
+        let clip_x: i32 = jvm.get_field(&g, "javax/microedition/lcdui/Graphics", "clipX", "I").await?;
+        let clip_y: i32 = jvm.get_field(&g, "javax/microedition/lcdui/Graphics", "clipY", "I").await?;
+        let clip_width: i32 = jvm.get_field(&g, "javax/microedition/lcdui/Graphics", "clipWidth", "I").await?;
+        let clip_height: i32 = jvm.get_field(&g, "javax/microedition/lcdui/Graphics", "clipHeight", "I").await?;
 
         let graphics = jvm
             .new_class("org/kwis/msp/lcdui/Graphics", "(Ljavax/microedition/lcdui/Graphics;)V", (g,))
             .await?;
 
-        let cards = jvm.get_field(&this, "cards", "Ljava/util/Vector;").await?;
+        let cards = jvm.get_field(&this, "net/wie/CardCanvas", "cards", "Ljava/util/Vector;").await?;
         let length: i32 = jvm.invoke_virtual(&cards, "java/util/Vector", "size", "()I", ()).await?;
 
         // An opaque card hides every card under it that it covers, and those are not painted at all:
@@ -183,7 +184,7 @@ impl CardCanvas {
             let y: i32 = jvm.invoke_virtual(&card, "org/kwis/msp/lcdui/Card", "getY", "()I", ()).await?;
             let w: i32 = jvm.invoke_virtual(&card, "org/kwis/msp/lcdui/Card", "getWidth", "()I", ()).await?;
             let h: i32 = jvm.invoke_virtual(&card, "org/kwis/msp/lcdui/Card", "getHeight", "()I", ()).await?;
-            let transparent: bool = get_declared_field(jvm, &card, "org/kwis/msp/lcdui/Card", "transparent", "Z").await?;
+            let transparent: bool = jvm.get_field(&card, "org/kwis/msp/lcdui/Card", "transparent", "Z").await?;
             stack.push((card, [x, y, w, h], transparent));
         }
 
@@ -232,7 +233,7 @@ impl CardCanvas {
 
         let key_code = WIPIKeyCode::from_midp_raw(key_code);
 
-        let cards = jvm.get_field(&this, "cards", "Ljava/util/Vector;").await?;
+        let cards = jvm.get_field(&this, "net/wie/CardCanvas", "cards", "Ljava/util/Vector;").await?;
         let length = jvm.invoke_virtual(&cards, "java/util/Vector", "size", "()I", ()).await?;
 
         for i in (0..length).rev() {
@@ -256,7 +257,7 @@ impl CardCanvas {
 
         let key_code = WIPIKeyCode::from_midp_raw(key_code);
 
-        let cards = jvm.get_field(&this, "cards", "Ljava/util/Vector;").await?;
+        let cards = jvm.get_field(&this, "net/wie/CardCanvas", "cards", "Ljava/util/Vector;").await?;
         let length = jvm.invoke_virtual(&cards, "java/util/Vector", "size", "()I", ()).await?;
 
         for i in (0..length).rev() {
@@ -280,7 +281,7 @@ impl CardCanvas {
 
         let key_code = WIPIKeyCode::from_midp_raw(key_code);
 
-        let cards = jvm.get_field(&this, "cards", "Ljava/util/Vector;").await?;
+        let cards = jvm.get_field(&this, "net/wie/CardCanvas", "cards", "Ljava/util/Vector;").await?;
         let length = jvm.invoke_virtual(&cards, "java/util/Vector", "size", "()I", ()).await?;
 
         for i in (0..length).rev() {
@@ -306,8 +307,10 @@ impl CardCanvas {
             return Ok(());
         }
 
-        let cards = jvm.get_field(&this, "cards", "Ljava/util/Vector;").await?;
-        let canvas: ClassInstanceRef<MidpCanvas> = jvm.get_field(&c, "canvas", "Ljavax/microedition/lcdui/Canvas;").await?;
+        let cards = jvm.get_field(&this, "net/wie/CardCanvas", "cards", "Ljava/util/Vector;").await?;
+        let canvas: ClassInstanceRef<MidpCanvas> = jvm
+            .get_field(&c, "org/kwis/msp/lcdui/Card", "canvas", "Ljavax/microedition/lcdui/Canvas;")
+            .await?;
         let index: i32 = jvm
             .invoke_virtual(&cards, "java/util/Vector", "indexOf", "(Ljava/lang/Object;)I", (c.clone(),))
             .await?;
@@ -338,7 +341,7 @@ impl CardCanvas {
     async fn pop_card(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<Card>> {
         tracing::debug!("net.wie.CardCanvas::popCard({this:?})");
 
-        let cards = jvm.get_field(&this, "cards", "Ljava/util/Vector;").await?;
+        let cards = jvm.get_field(&this, "net/wie/CardCanvas", "cards", "Ljava/util/Vector;").await?;
         let length: i32 = jvm.invoke_virtual(&cards, "java/util/Vector", "size", "()I", ()).await?;
         if length == 0 {
             return Ok(None.into());
@@ -374,7 +377,7 @@ impl CardCanvas {
             return Ok(false);
         }
 
-        let cards = jvm.get_field(&this, "cards", "Ljava/util/Vector;").await?;
+        let cards = jvm.get_field(&this, "net/wie/CardCanvas", "cards", "Ljava/util/Vector;").await?;
         let index: i32 = jvm
             .invoke_virtual(&cards, "java/util/Vector", "indexOf", "(Ljava/lang/Object;)I", (card.clone(),))
             .await?;
@@ -405,14 +408,14 @@ impl CardCanvas {
     async fn count_card(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
         tracing::debug!("net.wie.CardCanvas::countCard({this:?})");
 
-        let cards = jvm.get_field(&this, "cards", "Ljava/util/Vector;").await?;
+        let cards = jvm.get_field(&this, "net/wie/CardCanvas", "cards", "Ljava/util/Vector;").await?;
         jvm.invoke_virtual(&cards, "java/util/Vector", "size", "()I", ()).await
     }
 
     async fn remove_all_cards(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("net.wie.CardCanvas::removeAllCards");
 
-        let cards = jvm.get_field(&this, "cards", "Ljava/util/Vector;").await?;
+        let cards = jvm.get_field(&this, "net/wie/CardCanvas", "cards", "Ljava/util/Vector;").await?;
         let length = jvm.invoke_virtual(&cards, "java/util/Vector", "size", "()I", ()).await?;
 
         for i in 0..length {
@@ -451,7 +454,7 @@ impl CardCanvas {
     ) -> JvmResult<()> {
         tracing::debug!("net.wie.CardCanvas::handleNotifyEvent({this:?}, {type}, {param1}, {param2})");
 
-        let cards = jvm.get_field(&this, "cards", "Ljava/util/Vector;").await?;
+        let cards = jvm.get_field(&this, "net/wie/CardCanvas", "cards", "Ljava/util/Vector;").await?;
         let length: i32 = jvm.invoke_virtual(&cards, "java/util/Vector", "size", "()I", ()).await?;
         if length == 0 {
             return Ok(());

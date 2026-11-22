@@ -146,7 +146,7 @@ impl DefinedClasses {
     pub fn sever(&self) {
         // Taken, not iterated in place: these definitions hold this list through their context.
         let mut classes = core::mem::take(&mut *self.0.lock());
-        let by_name = classes.iter().map(|x| (x.name(), x.clone())).collect::<BTreeMap<_, _>>();
+        let by_name = classes.iter().map(|x| (x.name().into_owned(), x.clone())).collect::<BTreeMap<_, _>>();
 
         let mut pending = Vec::new();
         for class in &mut classes {
@@ -181,7 +181,7 @@ impl DefinedClasses {
             if !(*definition).as_any().is::<ClassDefinitionImpl>() {
                 continue;
             }
-            let mut class = by_name.get(&name);
+            let mut class = by_name.get(&*name);
             while let Some(definition) = class {
                 for field in definition.fields() {
                     if !field.access_flags().contains(FieldAccessFlags::STATIC)

@@ -65,11 +65,12 @@ impl ArmEngine for Arm32CpuEngine {
         let stop_reason = loop {
             let pc = self.cpu.reg_get(Mode::User, reg::PC);
 
-            if self.is_svc_exception() {
-                break self.read_svc_result()?;
-            }
-
+            // This loop runs once per guest instruction, so nothing is read here that only a rare
+            // path needs. An SVC leaves pc on its vector (0x08), inside the null page.
             if pc < 0x1000 {
+                if self.is_svc_exception() {
+                    break self.read_svc_result()?;
+                }
                 // Same reason as the undefined-instruction message below: the register dump the
                 // caller prints is taken after the context is restored, so lr here is the only
                 // record of which call site branched to null.
@@ -86,14 +87,17 @@ impl ArmEngine for Arm32CpuEngine {
                 break EngineStopReason::Yield;
             }
 
-            let cpsr = self.cpu.reg_get(Mode::User, reg::CPSR);
-            let lr = self.cpu.reg_get(Mode::User, reg::LR);
             let mut arm32cpu_memory = self.mem.as_arm32cpu_memory();
 
             if !(self.cpu.step(&mut arm32cpu_memory)) {
                 // The caller's register dump is taken after every `run_function` on the way out has
                 // restored its caller's context, so it shows the thread's initial registers (PC 0),
                 // not these. This message is the only record of where the fault was.
+                // Read back rather than saved before every step: an instruction `step` rejects has
+                // written nothing but pc, and the undefined exception it raised kept the cpsr in its
+                // own spsr and banked its own lr (`undefined_instruction_names_the_faulting_pc_and_lr`).
+                let cpsr = self.cpu.reg_get(Mode::Undefined, reg::SPSR);
+                let lr = self.cpu.reg_get(Mode::User, reg::LR);
                 return Err(WieError::FatalError(self.undefined_instruction_message(pc, cpsr, lr)));
             }
             instructions_executed += 1;

@@ -34,6 +34,14 @@ test-utils = { workspace = true }
 [dev-dependencies]
 jvm = { workspace = true } # wie_validate's exception-tally test drives the real `Jvm::exception`
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# arm32_cpu checks the `log` level on two `trace!` per guest instruction: 23% of the interpreter loop in
+# a native profile (docs/report/0559 §4). Release builds compile `log`'s trace level out; debug builds,
+# debug/info, and our own `tracing` logs are untouched (wie_cli/tests/log_static_level.rs).
+# Native targets only: wie_featurephone sets `release_max_level_off`, and `log` refuses to compile with
+# two of these features — a wasm32 build that selects both crates would unify them.
+log = { version = "0.4", features = ["release_max_level_debug"] }
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys = { version = "=0.3.85" }                        # We need 0.3.85 to not break midir wasm build
 getrandom = { version = "^0.4", features = ["wasm_js"] } # not direct dependency, but broken without it in wasm build

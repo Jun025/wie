@@ -100,8 +100,9 @@ impl SmafPlayer {
         let audio_handle = context.system().audio().load(&data).unwrap();
         let length_ms = sequence_length_ms(&parse_smaf_in(&data)).max(context.system().audio().duration(audio_handle).unwrap_or(0));
 
-        jvm.put_field(&mut this, "audioHandle", "I", audio_handle as i32).await?;
-        jvm.put_field(&mut this, "lengthMs", "J", length_ms as i64).await?;
+        jvm.put_field(&mut this, "net/wie/SmafPlayer", "audioHandle", "I", audio_handle as i32)
+            .await?;
+        jvm.put_field(&mut this, "net/wie/SmafPlayer", "lengthMs", "J", length_ms as i64).await?;
 
         Ok(())
     }
@@ -111,7 +112,7 @@ impl SmafPlayer {
     // here — and until 2026-09-27 that replayed the music with `repeat = false`, so it never
     // looped (measured in the browser: `play R` → `stop` → `play` in the same instant).
     async fn start(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> Result<()> {
-        let repeat: bool = jvm.get_field(&this, "repeat", "Z").await?;
+        let repeat: bool = jvm.get_field(&this, "net/wie/SmafPlayer", "repeat", "Z").await?;
 
         Self::start_with_repeat(jvm, context, this, repeat).await
     }
@@ -119,18 +120,18 @@ impl SmafPlayer {
     async fn start_with_repeat(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, repeat: bool) -> Result<()> {
         tracing::debug!("net.wie.SmafPlayer::start({this:?}, {repeat})");
 
-        let audio_handle: i32 = jvm.get_field(&this, "audioHandle", "I").await?;
-        jvm.put_field(&mut this, "repeat", "Z", repeat).await?;
-        jvm.put_field(&mut this, "started", "Z", true).await?;
+        let audio_handle: i32 = jvm.get_field(&this, "net/wie/SmafPlayer", "audioHandle", "I").await?;
+        jvm.put_field(&mut this, "net/wie/SmafPlayer", "repeat", "Z", repeat).await?;
+        jvm.put_field(&mut this, "net/wie/SmafPlayer", "started", "Z", true).await?;
         let now = context.system().platform().now().raw() as i64;
-        jvm.put_field(&mut this, "startedAt", "J", now).await?;
+        jvm.put_field(&mut this, "net/wie/SmafPlayer", "startedAt", "J", now).await?;
         let generation = Self::next_generation(jvm, &mut this).await?;
 
         context.system().audio().play(audio_handle as u32, repeat).unwrap();
 
         // Only a player somebody listens to arms a timer — the rest keep today's behaviour exactly.
-        let length_ms: i64 = jvm.get_field(&this, "lengthMs", "J").await?;
-        let listeners: ClassInstanceRef<Vector> = jvm.get_field(&this, "listeners", "Ljava/util/Vector;").await?;
+        let length_ms: i64 = jvm.get_field(&this, "net/wie/SmafPlayer", "lengthMs", "J").await?;
+        let listeners: ClassInstanceRef<Vector> = jvm.get_field(&this, "net/wie/SmafPlayer", "listeners", "Ljava/util/Vector;").await?;
         if length_ms > 0 && !listeners.is_null() {
             let player = jvm.new_global_ref(&this).unwrap();
             schedule_end_of_media(jvm.clone(), context.system().clone(), player, generation, now as u64 + length_ms as u64);
@@ -142,8 +143,8 @@ impl SmafPlayer {
     async fn stop(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> Result<()> {
         tracing::debug!("net.wie.SmafPlayer::stop({this:?})");
 
-        let audio_handle: i32 = jvm.get_field(&this, "audioHandle", "I").await?;
-        jvm.put_field(&mut this, "started", "Z", false).await?;
+        let audio_handle: i32 = jvm.get_field(&this, "net/wie/SmafPlayer", "audioHandle", "I").await?;
+        jvm.put_field(&mut this, "net/wie/SmafPlayer", "started", "Z", false).await?;
         Self::next_generation(jvm, &mut this).await?;
 
         let system = context.system();
@@ -156,10 +157,10 @@ impl SmafPlayer {
     async fn close(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> Result<()> {
         tracing::debug!("net.wie.SmafPlayer::close({this:?})");
 
-        jvm.put_field(&mut this, "started", "Z", false).await?;
+        jvm.put_field(&mut this, "net/wie/SmafPlayer", "started", "Z", false).await?;
         Self::next_generation(jvm, &mut this).await?;
 
-        let audio_handle: i32 = jvm.get_field(&this, "audioHandle", "I").await?;
+        let audio_handle: i32 = jvm.get_field(&this, "net/wie/SmafPlayer", "audioHandle", "I").await?;
 
         let system = context.system();
 
@@ -204,10 +205,10 @@ impl SmafPlayer {
     async fn get_state(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> Result<i32> {
         tracing::debug!("net.wie.SmafPlayer::getState({this:?})");
 
-        let started: bool = jvm.get_field(&this, "started", "Z").await?;
-        let repeat: bool = jvm.get_field(&this, "repeat", "Z").await?;
-        let started_at: i64 = jvm.get_field(&this, "startedAt", "J").await?;
-        let length_ms: i64 = jvm.get_field(&this, "lengthMs", "J").await?;
+        let started: bool = jvm.get_field(&this, "net/wie/SmafPlayer", "started", "Z").await?;
+        let repeat: bool = jvm.get_field(&this, "net/wie/SmafPlayer", "repeat", "Z").await?;
+        let started_at: i64 = jvm.get_field(&this, "net/wie/SmafPlayer", "startedAt", "J").await?;
+        let length_ms: i64 = jvm.get_field(&this, "net/wie/SmafPlayer", "lengthMs", "J").await?;
         let now = context.system().platform().now().raw() as i64;
 
         Ok(if playing(started, repeat, now - started_at, length_ms) {
@@ -236,7 +237,7 @@ impl SmafPlayer {
         if count == 0 || count < -1 {
             return Err(jvm.exception("java/lang/IllegalArgumentException", "Invalid loop count").await);
         }
-        jvm.put_field(&mut this, "repeat", "Z", count != 1).await?;
+        jvm.put_field(&mut this, "net/wie/SmafPlayer", "repeat", "Z", count != 1).await?;
 
         Ok(())
     }
@@ -254,10 +255,11 @@ impl SmafPlayer {
         if listener.is_null() {
             return Ok(());
         }
-        let mut listeners: ClassInstanceRef<Vector> = jvm.get_field(&this, "listeners", "Ljava/util/Vector;").await?;
+        let mut listeners: ClassInstanceRef<Vector> = jvm.get_field(&this, "net/wie/SmafPlayer", "listeners", "Ljava/util/Vector;").await?;
         if listeners.is_null() {
             listeners = jvm.new_class("java/util/Vector", "()V", ()).await?.into();
-            jvm.put_field(&mut this, "listeners", "Ljava/util/Vector;", listeners.clone()).await?;
+            jvm.put_field(&mut this, "net/wie/SmafPlayer", "listeners", "Ljava/util/Vector;", listeners.clone())
+                .await?;
         }
         let present: bool = jvm
             .invoke_virtual(&listeners, "java/util/Vector", "contains", "(Ljava/lang/Object;)Z", (listener.clone(),))
@@ -279,7 +281,7 @@ impl SmafPlayer {
     ) -> Result<()> {
         tracing::debug!("net.wie.SmafPlayer::removePlayerListener({this:?}, {listener:?})");
 
-        let listeners: ClassInstanceRef<Vector> = jvm.get_field(&this, "listeners", "Ljava/util/Vector;").await?;
+        let listeners: ClassInstanceRef<Vector> = jvm.get_field(&this, "net/wie/SmafPlayer", "listeners", "Ljava/util/Vector;").await?;
         if !listeners.is_null() {
             let _: bool = jvm
                 .invoke_virtual(&listeners, "java/util/Vector", "removeElement", "(Ljava/lang/Object;)Z", (listener,))
@@ -290,8 +292,8 @@ impl SmafPlayer {
     }
 
     async fn next_generation(jvm: &Jvm, this: &mut ClassInstanceRef<Self>) -> Result<i32> {
-        let generation = jvm.get_field::<i32>(this, "generation", "I").await?.wrapping_add(1);
-        jvm.put_field(this, "generation", "I", generation).await?;
+        let generation = jvm.get_field::<i32>(this, "net/wie/SmafPlayer", "generation", "I").await?.wrapping_add(1);
+        jvm.put_field(this, "net/wie/SmafPlayer", "generation", "I", generation).await?;
 
         Ok(generation)
     }
@@ -300,23 +302,23 @@ impl SmafPlayer {
     /// a loop posts END_OF_MEDIA at every pass, as MIDP's `setLoopCount` specifies, and re-arms.
     async fn end_of_media(jvm: &Jvm, system: &System, player: &GlobalRef<Self>, generation: i32, due: u64) -> Result<()> {
         let mut this = (**player).clone();
-        let current: i32 = jvm.get_field(&this, "generation", "I").await?;
+        let current: i32 = jvm.get_field(&this, "net/wie/SmafPlayer", "generation", "I").await?;
         if current != generation {
             return Ok(());
         }
-        let repeat: bool = jvm.get_field(&this, "repeat", "Z").await?;
+        let repeat: bool = jvm.get_field(&this, "net/wie/SmafPlayer", "repeat", "Z").await?;
         if !repeat {
-            jvm.put_field(&mut this, "started", "Z", false).await?;
+            jvm.put_field(&mut this, "net/wie/SmafPlayer", "started", "Z", false).await?;
         }
 
-        let listeners: ClassInstanceRef<Vector> = jvm.get_field(&this, "listeners", "Ljava/util/Vector;").await?;
+        let listeners: ClassInstanceRef<Vector> = jvm.get_field(&this, "net/wie/SmafPlayer", "listeners", "Ljava/util/Vector;").await?;
         let listeners: ClassInstanceRef<Array<PlayerListener>> = jvm
             .invoke_virtual(&listeners, "java/util/Vector", "toArray", "()[Ljava/lang/Object;", ())
             .await?;
         let event: ClassInstanceRef<String> = jvm
             .get_static_field("javax/microedition/media/PlayerListener", "END_OF_MEDIA", "Ljava/lang/String;")
             .await?;
-        let length_ms: i64 = jvm.get_field(&this, "lengthMs", "J").await?;
+        let length_ms: i64 = jvm.get_field(&this, "net/wie/SmafPlayer", "lengthMs", "J").await?;
         for listener in jvm.load_array(&listeners, 0, jvm.array_length(&listeners).await?).await? {
             let media_time = jvm.new_class("java/lang/Long", "(J)V", (length_ms,)).await?;
             let _: () = jvm
@@ -330,7 +332,7 @@ impl SmafPlayer {
                 .await?;
         }
 
-        if repeat && jvm.get_field::<i32>(&this, "generation", "I").await? == generation {
+        if repeat && jvm.get_field::<i32>(&this, "net/wie/SmafPlayer", "generation", "I").await? == generation {
             let player = jvm.new_global_ref(&this).unwrap();
             schedule_end_of_media(jvm.clone(), system.clone(), player, generation, due + length_ms as u64);
         }
@@ -360,12 +362,13 @@ impl SmafPlayer {
 
     // One control object a player, answering both VolumeControl and ToneControl.
     async fn control(jvm: &Jvm, mut this: ClassInstanceRef<Self>) -> Result<ClassInstanceRef<Control>> {
-        let control: ClassInstanceRef<Control> = jvm.get_field(&this, "control", "Lnet/wie/PlayerControl;").await?;
+        let control: ClassInstanceRef<Control> = jvm.get_field(&this, "net/wie/SmafPlayer", "control", "Lnet/wie/PlayerControl;").await?;
         if !control.is_null() {
             return Ok(control);
         }
         let control = jvm.new_class("net/wie/PlayerControl", "(Lnet/wie/SmafPlayer;)V", (this.clone(),)).await?;
-        jvm.put_field(&mut this, "control", "Lnet/wie/PlayerControl;", control.clone()).await?;
+        jvm.put_field(&mut this, "net/wie/SmafPlayer", "control", "Lnet/wie/PlayerControl;", control.clone())
+            .await?;
 
         Ok(control.into())
     }
@@ -591,7 +594,7 @@ mod test {
                     (sequence,),
                 )
                 .await?;
-            let length_ms: i64 = jvm.get_field(&player, "lengthMs", "J").await?;
+            let length_ms: i64 = jvm.get_field(&player, "net/wie/SmafPlayer", "lengthMs", "J").await?;
             assert_eq!(length_ms, 500);
             call(&player, "close").await?;
 
@@ -697,7 +700,7 @@ mod test {
                                 (stream, content_type),
                             )
                             .await?;
-                        jvm.put_field(&mut player, "lengthMs", "J", 500i64).await?;
+                        jvm.put_field(&mut player, "net/wie/SmafPlayer", "lengthMs", "J", 500i64).await?;
                         let _: () = jvm
                             .invoke_virtual(&player, "javax/microedition/media/Player", "setLoopCount", "(I)V", (loop_count,))
                             .await?;
@@ -806,7 +809,7 @@ mod test {
                 )
                 .await?;
 
-            let length_ms: i64 = jvm.get_field(&player, "lengthMs", "J").await?;
+            let length_ms: i64 = jvm.get_field(&player, "net/wie/SmafPlayer", "lengthMs", "J").await?;
             assert!(length_ms > 0, "lengthMs {length_ms}");
 
             Ok(())

@@ -75,8 +75,10 @@ impl ButtonComponent {
         tracing::debug!("org.kwis.msp.lwc.ButtonComponent::<init>({this:?}, {string:?}, {image:?})");
 
         let _: () = jvm.invoke_special(&this, "org/kwis/msp/lwc/Component", "<init>", "()V", ()).await?;
-        jvm.put_field(&mut this, "str", "Ljava/lang/String;", string).await?;
-        jvm.put_field(&mut this, "img", "Lorg/kwis/msp/lcdui/Image;", image).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/lwc/ButtonComponent", "str", "Ljava/lang/String;", string)
+            .await?;
+        jvm.put_field(&mut this, "org/kwis/msp/lwc/ButtonComponent", "img", "Lorg/kwis/msp/lcdui/Image;", image)
+            .await?;
 
         Ok(())
     }
@@ -90,8 +92,16 @@ impl ButtonComponent {
     ) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.lwc.ButtonComponent::setActionListener({this:?}, {listener:?}, {object:?})");
 
-        jvm.put_field(&mut this, "l", "Lorg/kwis/msp/lwc/ActionListener;", listener).await?;
-        jvm.put_field(&mut this, "o", "Ljava/lang/Object;", object).await?;
+        jvm.put_field(
+            &mut this,
+            "org/kwis/msp/lwc/ButtonComponent",
+            "l",
+            "Lorg/kwis/msp/lwc/ActionListener;",
+            listener,
+        )
+        .await?;
+        jvm.put_field(&mut this, "org/kwis/msp/lwc/ButtonComponent", "o", "Ljava/lang/Object;", object)
+            .await?;
 
         Ok(())
     }
@@ -105,11 +115,15 @@ impl ButtonComponent {
         if r#type != 1 || key != WIPIKeyCode::FIRE as i32 {
             return Ok(true);
         }
-        let listener: ClassInstanceRef<ActionListener> = jvm.get_field(&this, "l", "Lorg/kwis/msp/lwc/ActionListener;").await?;
+        let listener: ClassInstanceRef<ActionListener> = jvm
+            .get_field(&this, "org/kwis/msp/lwc/ButtonComponent", "l", "Lorg/kwis/msp/lwc/ActionListener;")
+            .await?;
         if listener.is_null() {
             return Ok(true);
         }
-        let object: ClassInstanceRef<Object> = jvm.get_field(&this, "o", "Ljava/lang/Object;").await?;
+        let object: ClassInstanceRef<Object> = jvm
+            .get_field(&this, "org/kwis/msp/lwc/ButtonComponent", "o", "Ljava/lang/Object;")
+            .await?;
         let button: ClassInstanceRef<Component> = this.instance.into();
         let _: () = jvm
             .invoke_virtual(
@@ -167,9 +181,13 @@ mod tests {
                 )
                 .await?;
 
-            let kept: ClassInstanceRef<Object> = jvm.get_field(&button, "o", "Ljava/lang/Object;").await?;
+            let kept: ClassInstanceRef<Object> = jvm
+                .get_field(&button, "org/kwis/msp/lwc/ButtonComponent", "o", "Ljava/lang/Object;")
+                .await?;
             assert_eq!(kept.identity(), tag.identity());
-            let label: ClassInstanceRef<Object> = jvm.get_field(&button, "str", "Ljava/lang/String;").await?;
+            let label: ClassInstanceRef<Object> = jvm
+                .get_field(&button, "org/kwis/msp/lwc/ButtonComponent", "str", "Ljava/lang/String;")
+                .await?;
             assert_eq!(label.identity(), text.identity());
 
             Ok(())

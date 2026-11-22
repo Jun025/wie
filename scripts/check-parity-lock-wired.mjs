@@ -28,7 +28,8 @@
 // by the next person, so the axis now asserts the PATH, which is what actually aims
 // the module at the checker and is load-bearing under any spelling. Nothing stops
 // being caught: dropping the attribute leaves `mod checker;` unresolvable, which
-// this guard still reddens AND `cargo test --all` fails on in all six legs (rc=101).
+// this guard still reddens AND `cargo test --all` fails on in every leg that does work (rc=101 — on a
+// PR that is ubuntu/stable only; all six legs weekly, `rust.yml` header).
 //
 // Axis ⑷ is NOT relaxed, and the measurement says why: with the files present and
 // the #[path] intact, a test that declares the module but never calls it compiles

@@ -1,0 +1,22 @@
+# wie_identify — which game a file is, answered without booting it: the one computation behind
+# `docs/player-data/compat.json`'s `contentKey` (native: the `wie_identify` binary, run by
+# `scripts/content-key.mjs`) and the browser's `identify()` export (`wie_featurephone`).
+# Ours, not upstream's — hence the underscore, like `wie_cli` and `wie_featurephone`.
+
+[package]
+name = "wie_identify"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+md5 = { workspace = true }
+
+wie-backend = { workspace = true }
+wie-ktf = { workspace = true }
+wie-lgt = { workspace = true }
+wie-skt = { workspace = true }
+
+[dev-dependencies]
+zip = { version = "^9.0", features = ["deflate"], default-features = false }

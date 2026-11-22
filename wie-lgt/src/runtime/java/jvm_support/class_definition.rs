@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, format, string::String, sync::Arc, vec, vec::Vec};
+use alloc::{borrow::Cow, boxed::Box, format, string::String, sync::Arc, vec, vec::Vec};
 use core::{fmt, fmt::Debug, fmt::Formatter, mem::offset_of, mem::size_of, ops::Deref, ops::DerefMut};
 
 use jvm::{ClassDefinition, ClassInstance, Field, JavaError, JavaType, JavaValue, Jvm, Method, Result as JvmResult};
@@ -436,6 +436,7 @@ impl JavaClassDefinition {
 
         jvm.put_field(
             class_object,
+            "java/lang/Class",
             CLASS_NATIVE_NAME_FIELD,
             WORD_FIELD_DESCRIPTOR,
             self.descriptor()?.ptr_name as i32,
@@ -596,8 +597,8 @@ impl JavaClassDefinition {
 
                 let method = if let Some(parent_method) = parent_methods.get(index).and_then(|entry| entry.method.as_ref()) {
                     Some((
-                        parent_method.name(),
-                        parent_method.descriptor(),
+                        parent_method.name().into_owned(),
+                        parent_method.descriptor().into_owned(),
                         parent_method.access_flags() & !MethodAccessFlags::ABSTRACT,
                     ))
                 } else {
@@ -788,7 +789,7 @@ impl JavaClassDefinition {
 
         let known_classes = hierarchy
             .into_iter()
-            .map(|class| Ok((ClassDefinition::name(&class), class.methods()?)))
+            .map(|class| Ok((ClassDefinition::name(&class).into_owned(), class.methods()?)))
             .collect::<Result<Vec<_>>>()?;
         JavaVtable::read(&self.core, self.ptr_vtable()?, self.descriptor()?.vtable_count as usize, &known_classes)
     }
@@ -815,7 +816,13 @@ impl EmulatedFunction<(), u32, ()> for JavaClassGetterProxy {
                 JavaError::JavaException(instance) => WieError::JavaException(JavaValueCodec::new(core).object_to_raw(&*instance)),
             })?;
             self.jvm
-                .put_field(&mut java_class, CLASS_INITIALIZATION_STATE_FIELD, WORD_FIELD_DESCRIPTOR, 5i32)
+                .put_field(
+                    &mut java_class,
+                    "java/lang/Class",
+                    CLASS_INITIALIZATION_STATE_FIELD,
+                    WORD_FIELD_DESCRIPTOR,
+                    5i32,
+                )
                 .await
                 .map_err(|error| match error {
                     JavaError::JavaException(instance) => WieError::JavaException(JavaValueCodec::new(core).object_to_raw(&*instance)),
@@ -828,17 +835,19 @@ impl EmulatedFunction<(), u32, ()> for JavaClassGetterProxy {
 
 #[async_trait::async_trait]
 impl ClassDefinition for JavaClassDefinition {
-    fn name(&self) -> String {
+    fn name(&self) -> Cow<'_, str> {
         // Still a panic — a bad pointer here has no safe answer — but one that names which link
         // of class → descriptor → name broke. `InvalidMemoryAccess(0)` alone could not tell a
         // null class from a null descriptor or a null name (배틀몬스터, 2026-09-25).
-        self.try_name().unwrap_or_else(|error| {
-            let ptr_descriptor = self.raw().map(|raw| raw.ptr_descriptor);
-            panic!(
-                "LGT class {:#x} (descriptor {ptr_descriptor:x?}) has no readable name: {error:?}",
-                self.ptr_raw
-            )
-        })
+        self.try_name()
+            .unwrap_or_else(|error| {
+                let ptr_descriptor = self.raw().map(|raw| raw.ptr_descriptor);
+                panic!(
+                    "LGT class {:#x} (descriptor {ptr_descriptor:x?}) has no readable name: {error:?}",
+                    self.ptr_raw
+                )
+            })
+            .into()
     }
 
     fn super_class_name(&self) -> Option<String> {

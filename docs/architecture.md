@@ -55,10 +55,10 @@ embeds the engine as WASM. Nothing above the engine is allowed to reach back int
 | `wie_wipi_java`, `wie_midp`, `wie_skvm` | The emulated Java class libraries — WIPI (`org.kwis.msp.*`), MIDP (`javax.microedition.*`), and SK-VM respectively. |
 | `wie_ktf`, `wie_lgt`, `wie_skt`, `wie_j2me` | Per-platform entry points: archive layout, boot/relocation, and which API surfaces get wired. `wie_ktf`/`wie_lgt` carry the heavy reverse-engineered runtimes. |
 | `wie_cli` | Native host. Also ships `src/bin/wie_validate.rs`, a headless PASS/FAIL triage runner for batch game validation. |
+| `wie_identify` | Which game a file is, without booting it: picks the jar the loader would run and returns `<container>:<md5>` plus platform and LGT compile model. The one computation behind `compat.json`'s `contentKey` (its binary, run by `scripts/content-key.mjs`) and the browser's `identify()` export. |
 | `wie_featurephone` | Browser host (renamed from `wie_web` 2026-09-11 — upstream uses that name for its own web app). Compiles to an empty library off `wasm32` on purpose, so native workspace jobs stay green. |
 | `wie_ktf_dump` | Dev-only binary: dumps a KTF game's relocated `client.bin` for IDA/Ghidra. |
 | `test_utils` | Shared in-memory `Platform`/`Filesystem`/`Database`/JVM fixtures for tests. |
-| `patches/classfile` | Vendored crates.io `classfile` 0.1.1 with one fix (modified UTF-8 in class constants), applied by the root `[patch.crates-io]`. Its `README.md` says when to delete it. |
 
 ### Non-Rust surfaces
 
@@ -92,7 +92,7 @@ In this repository, the observable startup flow is:
 1. `wie` reads the input file and identifies the archive format.
 2. It constructs the matching platform emulator (`KtfEmulator`, `LgtEmulator`, `SktEmulator`, or `J2MEEmulator`).
 3. The selected emulator builds a `wie_backend::System`, injects the host `Platform`, and starts the platform-specific boot sequence.
-4. The main loop repeatedly calls `Emulator::tick()` and forwards host events into the emulator. `tick()` runs for the default 14ms budget; a host that knows its frame interval calls `Emulator::tick_for(budget_ms)` instead — the browser hosts derive the budget with `wie_backend::FramePacer` so a 120Hz display is not handed a 60Hz frame's worth of emulation per frame.
+4. The main loop repeatedly calls `Emulator::tick()` and forwards host events into the emulator. `tick()` runs for the default 14ms budget; a host that knows its frame interval calls `Emulator::tick_for(budget_ms)` instead — the browser hosts derive the budget with `wie_backend::FramePacer` so a 120Hz display is not handed a 60Hz frame's worth of emulation per frame, and a 30Hz one (a phone's battery saver) gets its whole frame rather than 14ms of it.
 
 This means `wie` is mostly a development-oriented host adapter and format dispatcher; the real platform behavior lives in the platform crates, and the same backend abstractions are intended to be driven by the web frontend as well.
 

@@ -39,15 +39,15 @@ pub struct SleepFuture {
 }
 
 impl SleepFuture {
-    pub fn new(timeout: u64, executor: &Executor) -> Self {
+    pub fn new(until: Instant, executor: &Executor) -> Self {
         // we need executor from outside before rust `context_ext` stabilization
-        executor.sleep(timeout);
+        executor.sleep(until);
 
         Self { polled: false }
     }
 
-    pub(crate) fn toward(timeout: u64, pace: Instant, executor: &Executor) -> Self {
-        executor.sleep_toward(timeout, Some(pace));
+    pub(crate) fn toward(until: Instant, pace: Option<Instant>, executor: &Executor) -> Self {
+        executor.sleep_toward(until, pace);
 
         Self { polled: false }
     }

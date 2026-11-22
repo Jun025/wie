@@ -3,14 +3,17 @@
 //! Nothing here opens a host socket, in the native host or in the browser: a guest connect to a
 //! listed (title, host, port) reaches one of the responders below, and every other connect fails
 //! exactly as it did before this module existed. A title is listed by its `AID` (the carrier's
-//! content id from `app_info`, unique across the 91 LGT files of the corpus) — a connect is only
-//! answered for the title whose server it was, so a second title that happens to dial the same host
-//! is not handed a reply written for someone else.
+//! content id from `app_info`, unique across the 91 LGT files of the corpus; the one KTF row's is in
+//! one file of it) — a connect is only answered for the title whose server it was, so a second title
+//! that happens to dial the same host is not handed a reply written for someone else.
+//!
+//! This is the one table for every carrier. What differs per carrier is the shape of the socket
+//! calls that reach it: LGT's are `wie_wipi_c::api::net`, KTF's `wie_ktf`'s `local_net`.
 //!
 //! A responder sees the bytes the guest has written so far on one connection and answers with the
 //! bytes the guest will read. The replies are the smallest ones the title's own parser accepts as
 //! «success»; the real server's shape is unknown. docs/report/0542 has, per title, the parser read
-//! off the image and what each reply byte satisfies.
+//! off the image and what each reply byte satisfies (0541 for the KTF row).
 
 use alloc::{
     collections::{BTreeMap, VecDeque},
@@ -80,6 +83,16 @@ const SERVERS: &[Server] = &[
         host: [222, 122, 160, 61],
         port: 11003,
         respond: certify_lgt01,
+    },
+    // f44271803135 (KTF): the boot's download check asks which of its eight `P/` files to fetch. The
+    // archive ships all eight at the sizes the image itself hard-codes, so the answer is «none»; the
+    // title then marks the download complete in its `option` record and never dials again. Without a
+    // reply it re-dials forever on «CONNECTING» (docs/report/0541).
+    Server {
+        aid: "0103A2B4",
+        host: [211, 110, 18, 253],
+        port: 8503,
+        respond: download_list_nothing,
     },
 ];
 
@@ -183,6 +196,25 @@ fn certify_lgt01(request: &mut Vec<u8>) -> Option<Vec<u8>> {
     packet.starts_with(b"LGT\x01").then(|| vec![2, 0, 0, 0, 1, 1])
 }
 
+/// f44271803135's download protocol: `[len u16 LE][id u16 LE][body]`, `len` counting from `id`.
+/// Request `0x2af8` asks for the file list; reply `0x2af9` is `[count u8]` then per file
+/// `[name len u8][name][size u32 LE]` (client parser at image 0x1025b6). Count 0 leaves the
+/// sizes the image hard-codes, which the shipped files already match.
+///
+/// Each write is read as one whole packet and nothing is kept for the next — how this row answered
+/// before it moved here, and what the title was measured against (it sends the request in one write).
+fn download_list_nothing(request: &mut Vec<u8>) -> Option<Vec<u8>> {
+    const LIST_REQUEST: u16 = 0x2af8;
+    const LIST_REPLY: u16 = 0x2af9;
+
+    let written = core::mem::take(request);
+    let id = u16::from_le_bytes(written.get(2..4)?.try_into().ok()?);
+    (id == LIST_REQUEST).then(|| {
+        let [lo, hi] = LIST_REPLY.to_le_bytes();
+        vec![3, 0, lo, hi, 0]
+    })
+}
+
 /// The first whole packet in `request`, removed from it; None until one has arrived. `length` reads
 /// the packet's total length from its first bytes.
 fn take_packet(request: &mut Vec<u8>, length: fn(&[u8]) -> usize) -> Option<Vec<u8>> {
@@ -203,6 +235,7 @@ pub struct FakeNet {
     next_fd: i32,
 }
 
+#[derive(Default)]
 struct FakeSocket {
     respond: Option<Respond>,
     request: Vec<u8>,
@@ -232,17 +265,20 @@ impl FakeNet {
         }
         let fd = self.next_fd;
         self.next_fd += 1;
-        self.sockets.insert(
-            fd,
-            FakeSocket {
-                respond: None,
-                request: Vec::new(),
-                reply: VecDeque::new(),
-                read_cb: None,
-            },
-        );
+        self.sockets.insert(fd, FakeSocket::default());
 
         Some(fd)
+    }
+
+    /// The same under a descriptor the caller picks, for a carrier whose title has always been handed
+    /// one fixed value: a fresh socket there, replacing the one before it. False for an unlisted title.
+    pub fn socket_at(&mut self, fd: i32) -> bool {
+        if !self.online() {
+            return false;
+        }
+        self.sockets.insert(fd, FakeSocket::default());
+
+        true
     }
 
     /// `host` as the four address bytes in dial order, `port` in host order. False when nothing
@@ -322,7 +358,26 @@ impl FakeNet {
 mod tests {
     use alloc::vec;
 
-    use super::FakeNet;
+    use super::{FakeNet, SERVERS};
+
+    /// `docs/contracts/runtime-adjustments.tsv` lists exactly this table's titles: a row added here without a
+    /// ledger row — or a ledger row left behind — fails (CLAUDE.md «게임 파일 무수정 원칙»).
+    #[test]
+    fn the_ledger_lists_exactly_this_table() {
+        // One row per (title, host, port); the ledger's key is the title.
+        test_utils::assert_ledger_lists("fake-servers", SERVERS.iter().map(|x| x.aid.into()));
+    }
+
+    // `connect` takes the first row that matches, so a second row for the same (title, host, port)
+    // would never answer.
+    #[test]
+    fn each_connect_has_one_row() {
+        let rows = SERVERS
+            .iter()
+            .map(|x| (x.aid, x.host, x.port))
+            .collect::<alloc::collections::BTreeSet<_>>();
+        assert_eq!(rows.len(), SERVERS.len());
+    }
 
     // A title with no listed server keeps the old answers: no socket, so every caller's
     // «no network» branch is untouched.
@@ -422,6 +477,33 @@ mod tests {
         let mut other = b"LGT\x05".to_vec();
         other.resize(60, 0);
         assert_eq!(net.write(fd, &other), Some(false));
+    }
+
+    // f44271803135 (KTF), on the one descriptor its title is handed: the list request — 158 bytes in the
+    // measured run, here its header alone — gets the empty list. Every write is its own packet: another
+    // id or a short write gets nothing and leaves nothing behind for the request that follows.
+    #[test]
+    fn download_list_nothing_answers_each_write_alone() {
+        let mut net = FakeNet::new("0103A2B4");
+        assert!(net.socket_at(0x4c4e));
+        assert_eq!(net.write(0x4c4e, &[2, 0, 0xf8, 0x2a]), None); // not connected yet
+        assert!(!net.connect(0x4c4e, [211, 110, 18, 253], 8504));
+        assert!(net.connect(0x4c4e, [211, 110, 18, 253], 8503));
+        assert_eq!(net.read(0x4c4e, 16), Some(vec![]));
+
+        assert_eq!(net.write(0x4c4e, &[2, 0, 0xfb, 0x2a]), Some(false));
+        assert_eq!(net.write(0x4c4e, &[2]), Some(false));
+        let mut request = vec![156, 0, 0xf8, 0x2a];
+        request.resize(158, 0);
+        assert_eq!(net.write(0x4c4e, &request), Some(true));
+        assert_eq!(net.read(0x4c4e, 2), Some(vec![3, 0]));
+        assert_eq!(net.read(0x4c4e, 16), Some(vec![0xf9, 0x2a, 0]));
+
+        // `MC_netSocket` again is a fresh socket on the same descriptor: an unread reply does not survive it.
+        assert_eq!(net.write(0x4c4e, &[2, 0, 0xf8, 0x2a]), Some(true));
+        assert!(net.socket_at(0x4c4e));
+        assert_eq!(net.read(0x4c4e, 16), None);
+        assert!(!FakeNet::new("00000000").socket_at(0x4c4e));
     }
 
     // b9bfcaf42722: hello, then the certificate with its length at offset 6.

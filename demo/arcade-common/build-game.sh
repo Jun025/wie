@@ -41,3 +41,11 @@ cp "$game/LICENSE" "$out/classes/LICENSE.txt"
 "$bin/jar" --create --file "$out/$name.jar" --manifest "$game/MANIFEST.MF" \
   --date 2026-01-01T00:00:00Z -C "$out/classes" .
 shasum -a 256 "$out/$name.jar"
+# A game's checks (<game-dir>/test/*.java, a main each) run on the build JDK against the classes just
+# built and the stubs, which therefore return harmless values. Never packaged; a red check fails the build.
+if [[ -d "$game/test" ]]; then
+  mkdir -p "$out/test"
+  "$bin/javac" -nowarn -Xlint:-options --release 7 -encoding UTF-8 -cp "$out/stubs:$out/classes" -d "$out/test" \
+    $(find "$game/test" -name '*.java' | sort)
+  for t in $(cd "$game/test" && ls *.java); do "$bin/java" -cp "$out/stubs:$out/classes:$out/test" "${t%.java}"; done
+fi

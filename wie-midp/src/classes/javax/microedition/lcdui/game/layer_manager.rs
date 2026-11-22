@@ -70,15 +70,23 @@ impl LayerManager {
     async fn init(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         let _: () = jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await?;
         Self::store(jvm, &mut this, Vec::new()).await?;
-        jvm.put_field(&mut this, "viewWidth", "I", i32::MAX).await?;
-        jvm.put_field(&mut this, "viewHeight", "I", i32::MAX).await
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/LayerManager", "viewWidth", "I", i32::MAX)
+            .await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/LayerManager", "viewHeight", "I", i32::MAX)
+            .await
     }
 
     // ponytail: the whole list is reloaded and rewritten on each change; games hold a handful of
     // layers and change them rarely, so a size field with spare capacity would buy nothing.
     async fn load(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<Vec<ClassInstanceRef<Layer>>> {
-        let layers: ClassInstanceRef<Array<ClassInstanceRef<Layer>>> =
-            jvm.get_field(this, "layers", "[Ljavax/microedition/lcdui/game/Layer;").await?;
+        let layers: ClassInstanceRef<Array<ClassInstanceRef<Layer>>> = jvm
+            .get_field(
+                this,
+                "javax/microedition/lcdui/game/LayerManager",
+                "layers",
+                "[Ljavax/microedition/lcdui/game/Layer;",
+            )
+            .await?;
         let length = jvm.array_length(&layers).await?;
 
         jvm.load_array(&layers, 0, length).await
@@ -88,7 +96,14 @@ impl LayerManager {
         let mut array = jvm.instantiate_array("Ljavax/microedition/lcdui/game/Layer;", layers.len()).await?;
         jvm.store_array(&mut array, 0, layers).await?;
 
-        jvm.put_field(this, "layers", "[Ljavax/microedition/lcdui/game/Layer;", array).await
+        jvm.put_field(
+            this,
+            "javax/microedition/lcdui/game/LayerManager",
+            "layers",
+            "[Ljavax/microedition/lcdui/game/Layer;",
+            array,
+        )
+        .await
     }
 
     async fn without(jvm: &Jvm, this: &ClassInstanceRef<Self>, layer: &ClassInstanceRef<Layer>) -> JvmResult<Vec<ClassInstanceRef<Layer>>> {
@@ -133,8 +148,14 @@ impl LayerManager {
     }
 
     async fn get_size(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        let layers: ClassInstanceRef<Array<ClassInstanceRef<Layer>>> =
-            jvm.get_field(&this, "layers", "[Ljavax/microedition/lcdui/game/Layer;").await?;
+        let layers: ClassInstanceRef<Array<ClassInstanceRef<Layer>>> = jvm
+            .get_field(
+                &this,
+                "javax/microedition/lcdui/game/LayerManager",
+                "layers",
+                "[Ljavax/microedition/lcdui/game/Layer;",
+            )
+            .await?;
 
         Ok(jvm.array_length(&layers).await? as i32)
     }
@@ -151,10 +172,14 @@ impl LayerManager {
         if width < 0 || height < 0 {
             return Err(jvm.exception("java/lang/IllegalArgumentException", "negative view size").await);
         }
-        jvm.put_field(&mut this, "viewX", "I", x).await?;
-        jvm.put_field(&mut this, "viewY", "I", y).await?;
-        jvm.put_field(&mut this, "viewWidth", "I", width).await?;
-        jvm.put_field(&mut this, "viewHeight", "I", height).await
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/LayerManager", "viewX", "I", x)
+            .await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/LayerManager", "viewY", "I", y)
+            .await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/LayerManager", "viewWidth", "I", width)
+            .await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/LayerManager", "viewHeight", "I", height)
+            .await
     }
 
     // As the reference implementation: the view window's top-left lands at (x, y), drawing is
@@ -170,10 +195,14 @@ impl LayerManager {
         if graphics.is_null() {
             return Err(jvm.exception("java/lang/NullPointerException", "graphics is null").await);
         }
-        let view_x: i32 = jvm.get_field(&this, "viewX", "I").await?;
-        let view_y: i32 = jvm.get_field(&this, "viewY", "I").await?;
-        let view_width: i32 = jvm.get_field(&this, "viewWidth", "I").await?;
-        let view_height: i32 = jvm.get_field(&this, "viewHeight", "I").await?;
+        let view_x: i32 = jvm.get_field(&this, "javax/microedition/lcdui/game/LayerManager", "viewX", "I").await?;
+        let view_y: i32 = jvm.get_field(&this, "javax/microedition/lcdui/game/LayerManager", "viewY", "I").await?;
+        let view_width: i32 = jvm
+            .get_field(&this, "javax/microedition/lcdui/game/LayerManager", "viewWidth", "I")
+            .await?;
+        let view_height: i32 = jvm
+            .get_field(&this, "javax/microedition/lcdui/game/LayerManager", "viewHeight", "I")
+            .await?;
 
         let clip_x: i32 = jvm.invoke_virtual(&graphics, GRAPHICS, "getClipX", "()I", ()).await?;
         let clip_y: i32 = jvm.invoke_virtual(&graphics, GRAPHICS, "getClipY", "()I", ()).await?;
@@ -190,7 +219,7 @@ impl LayerManager {
         }
 
         for layer in Self::load(jvm, &this).await?.into_iter().rev() {
-            let visible: bool = jvm.get_field(&layer, "visible", "Z").await?;
+            let visible: bool = jvm.get_field(&layer, "javax/microedition/lcdui/game/Layer", "visible", "Z").await?;
             if visible {
                 let _: () = jvm
                     .invoke_virtual(

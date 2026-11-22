@@ -13,11 +13,13 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
 
 ```
 { schema: 1, generatedAt: "YYYY-MM-DD…", enginePin: <측정한 wie 커밋 40hex>,
-  entries: [{ sha256: <64hex>, platform: "KTF"|"SKT"|"LGT"|"J2ME", model: "clet"|"aot-java"|null,
-              title: <표시 이름>, fileTitle: <파일에서 온 원 이름(검색·추적용)>, status: "playable"|"limited"|"not-yet",
+  entries: [{ sha256: <64hex>, contentKey: "zip:<32hex>"|"jar:<32hex>"|null, platform: "KTF"|"SKT"|"LGT"|"J2ME", model: "clet"|"aot-java"|null,
+              title: <표시 이름>, game: <통신사 무관 묶음 키>, variant: <판 라벨>|null,
+              sameTitle?: "same-game"|"undetermined", fileTitle: <파일에서 온 원 이름(검색·추적용)>, status: "playable"|"limited"|"not-yet",
               axes: { boot, render, input, longplay, sound, speed: "ok"|"partial"|"no"|"unknown" },
               knownIssues_ko: [쉬운 한국어 문장],
               playTips_ko?: [쉬운 한국어 문장](선택 · 없으면 키 자체를 생략),
+              runtimeAdjustments?: ["lock-lift"|"owner-file-skip"|"owner-file-bytes"|"orphan-flag"|"device-bound-save"|"local-server"|"display-size"](선택 · 없으면 키 자체를 생략),
               changes: [{ date, enginePin, summary_ko, kind, pr }] }] }
 ```
 
@@ -37,12 +39,64 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
 | `api` | `platform` + `model` | 전수 조사가 재는 값이 이것이다. `api`(WIPI-C/Java)는 측정 안 한 값이라 넣지 않았다 |
 | `verifiedAt`·`verifiedWieHead` 항목별 | 최상위 `generatedAt`·`enginePin` | 한 회차가 전건을 같은 핀으로 잰다 |
 
-★**표시 이름 규칙**(`stripMarkers`·`retitle` · 검사기가 «표식 잔존 0»과 «통신사 안 이름 중복 0»을 거부로 잡는다):
+★**표시 이름 규칙**(`stripMarkers`·`retitle` · 2026-11-10 «같은 게임 두 줄» 정리로 ` (2)` 순번 규칙을 승계해 바꿨다 · `docs/report/0555`):
 파일 표식 — 대괄호 태그·재다운로드 `[1]`·통신사 표기(`kt`·`KTF`·`lgt`·`skt`·`SKVM` — 통신사는 `platform` 이 따로 말한다)·
 `에디트`/`수정판`/`추가다운완료`·파일 판 번호(`1.04`·`01.00.05`)·숫자 id 접두 — 는 `title` 에서 빼고(`+` 는 띄어쓰기로) 원 이름은 `fileTitle` 에 둔다.
-**뺀 뒤 같은 통신사 안에서 겹칠 때만** 구별 표기를 붙인다: 뺀 표식 하나(화면 크기가 있으면 그것, 없으면 판 번호)가 그 묶음에서 유일하면 ` (작은화면)`처럼, 아니면 ` (2)`·` (3)`(표식 짧은 순 → sha256 순).
+`title` 에는 순번(` (2)`)도 판 라벨(` (작은화면)`)도 붙이지 않는다(검사기 거부).
+- `game` = 통신사와 무관한 묶음 키(= 표식 뺀 이름). 통신사만 다른 이식판은 같은 `game` 이다 — 셸은 «게임 한 줄 = 파일 N개»로 묶는다.
+  ★**한 게임에 표기는 하나다**(2026-11-22 · `docs/report/0560`): 정규화(`gameKey` = NFKC · 소문자 · 공백과 하이픈 제거 — 셸 `normalizeGameKey` 와 같은 식)하면 같은 이름은
+  통신사와 무관하게 같은 `game`·`title` 을 쓴다. 정규화하면 같은데 `game` 이 갈리면 검사기가 거부한다.
+  **대표 표기** = 그 묶음의 표기 가운데 ①대문자가 많은 것(`KBO`·`EX`) ②띄어 쓴 곳이 많은 것 ③하이픈이 적은 것 ④문자 코드 순으로 맨 앞.
+  이름이 아예 달라 정규화로 못 만나는 같은 게임(통신사별 약칭 등)은 메타데이터로 확인한 뒤 `SAME_NAME_HAND` 가 `title` 을 맞춘다.
+- `variant` = 같은 (platform, game) 묶음 안에서 파일을 가르는 짧은 라벨(뺀 표식 중 화면 크기, 없으면 판 번호 · 그 묶음에서 유일할 때만) 또는 `null`.
+  혼자인 행은 늘 `null`. 파일 이름이 라벨을 잃은 판은 메타데이터(`DisplaySize`·`Ver`)에서 손으로 단다(`SAME_NAME_HAND`). (platform, title, variant) 는 라벨이 있을 때 유일하다 — 예외 없음.
+  본체가 같은 재포장(설치 칸 AID 만 다른 파일)이 이미 라벨을 가진 판 옆에 있으면 그 행은 `null` 로 둔다(셸은 해시 라벨 `파일 #…` 로 보인다).
+  같은 라벨을 둘이 나눠 갖게 하면 «다른 판에 같은 라벨» 오기를 검사기가 못 가른다(`docs/report/0560` §검수 뒤 고침).
+  커밋된 `title`/`game`/`variant`/`sameTitle` 과 행 순서는 `retitle()` 이 `fileTitle` 에서 다시 만든 것과 같아야 한다(검사기 거부 — 손으로 고치지 말고 `SAME_NAME_HAND`·`SAME_GAME` 을 고친 뒤 `normalize`).
+- `sameTitle` = 한 통신사 안에서 이름이 겹치는 행에만 실리는 판정: `same-game`(같은 게임의 다른 판 — 판올림·에디트·재다운로드 변형) ·
+  `undetermined`(판정 전 — 셸은 같은 게임처럼 묶되 «확인 중»으로 보일 수 있다). 판정 근거는 아카이브 메타데이터(`__adf__`/`app_info`/`.msd` 의
+  PID·이름·판·화면 크기, 항목 목록, 본체 jar 해시)뿐이다. **`different-game`(다른 게임이 같은 파일 이름)은 싣지 않는다** — 그 행은 `title`/`game` 자체를
+  바른 이름으로 고친다(`SAME_NAME_HAND` · 이름의 출처를 주석에). 겹치는 이름에 `sameTitle` 이 없으면 검사기가 거부한다.
+  이름이 닮았을 뿐인 다른 게임(후속작·외전·통신사 전용판)은 합치지 않는다 — 판정 표는 `docs/report/0555`·`0560`.
+- **대표 행**: 같은 (platform, game) 안에서 ①status 좋은 순(playable > limited > not-yet) ②여섯 축 `ok` 수 많은 순 ③`changes` 많은 순 ④sha256 순으로
+  내보내고, 셸은 묶음의 **첫 행**을 대표로 읽는다(`build` 가 `changes` 를 붙인 뒤 다시 정렬한다 · 커밋 파일의 어긋남은 검사기가 거부 —
+  `node scripts/player-data.mjs normalize` 로 다시 맞춘다). 셸 가져오기의 정렬(platform → title)은 안정 정렬이라 이 순서를 지킨다.
+- ★행은 지우지 않는다 — 매칭 키는 파일 내용 sha256 이고, 이용자의 파일이 어느 판이든 «미확인»이 되면 안 된다.
 
-`changes` 의 `kind`·`pr` 과 `fileTitle` 은 셸 가져오기가 요구하지 않는 **추가 필드**다(모르는 키는 무시된다).
+`changes` 의 `kind`·`pr` 과 `contentKey`·`fileTitle`·`game`·`variant`·`sameTitle`·`runtimeAdjustments` 는 셸 가져오기가 요구하지 않는 **추가 필드**다(모르는 키는 무시된다).
+
+★**`runtimeAdjustments` — 그 파일을 실행할 때 엔진이 «이 한 판에만» 거는 조정**(2026-11-22 · 선택 칸):
+디스크의 게임 파일은 고치지 않는다. 전부 엔진이 파일을 읽어 들인 뒤 메모리 안에서 걸리고, 행의 `sha256` 은 그대로 원본 파일의 것이다.
+- 값(이 순서 · 중복 없음): `lock-lift`(구매 휴대폰 · 설치 인증 잠금을 통과시킨다) · `owner-file-skip`(꾸러미에 든 이전 주인의 설정 · 진행 저장 일부를 올리지 않는다) ·
+  `owner-file-bytes`(이전 주인이 소리를 끈 설정의 1~4바이트를 «켬» 값으로 바꿔 올린다) · `orphan-flag`(짝이 되는 저장이 없는 «저장 있음» 표식을 올리지 않는다) ·
+  `device-bound-save`(이전 단말의 메모리 주소가 박힌 저장을 올리지 않는다) · `local-server`(사라진 게임사 서버의 답을 엔진 안에서 만들어 준다 · 외부 통신 0) ·
+  `display-size`(엔진 쪽 화면 크기를 그 판에 맞춘다).
+- **칸이 없는 행 = 한 판 전용 조정 없음.** 빈 배열은 싣지 않는다(검사기 거부 — «없음»의 표기를 하나로).
+- 원천은 장부 `docs/contracts/runtime-adjustments.tsv` 하나다. `retitle()` 이 장부에서 다시 만든 값과 커밋된 값이 다르면 검사기가 거부한다 —
+  손으로 쓰지 말고 장부를 고친 뒤 `normalize`. 장부 행은 지원 목록의 한 행(sha256 앞 12자 · platform · title)을 가리켜야 하고 도입 근거(`basis`)가 비면 거부된다.
+  장부와 엔진 표가 같은지는 `cargo test` 가 본다(`test-utils/src/ledger.rs`).
+- ★범위: 표식은 «그 행의 파일»(지원 목록의 꾸러미 zip)에 대한 것이다. jar 해시로 고르는 조정은 zip 꾸러미로 올렸을 때만 걸리고 같은 게임을 맨 `.jar` 로 올리면 걸리지 않는다.
+  AID 로 고르는 `local-server` 는 맨 `.jar` 면 파일 이름이 AID 와 같을 때만 걸린다. 행별 범위는 장부의 `scope` 열.
+- 전 타이틀에 걸리는 일반 구현(KTF 범용 훅 등)은 이 칸에 넣지 않는다 — 장부 머리 주석의 «메모리에 올린 게임 코드» · «참고» 절.
+- 기존 소비자: 셸 가져오기는 모르는 키를 검사하지 않고 그대로 통과시키므로(`...x`), 이 칸을 모르는 셸은 지금과 똑같이 동작한다. `status` 와 축은 이 칸과 무관하다. 셸 표시는 otterpebble 쪽 티켓 몫이다.
+
+★**`contentKey` — 묶음 껍데기가 달라도 같은 «게임 내용 지문»**(2026-11-22 · 선택 칸 · `docs/report/0567`):
+이용자는 파일을 각자 구해 온다. 같은 게임이어도 다시 묶은 zip 이면 `sha256` 이 달라 목록에서 못 찾는다 — 그 파일을 알아보는 둘째 키다. 행의 정체성은 여전히 `sha256` 이다.
+- 값 = `zip:<32hex>` — 엔진이 그 꾸러미에서 골라 실행하는 **본체 jar 의 MD5**(엔진의 한 판 전용 조정 표가 쓰는 바로 그 키 · 장부 `key` 열). jar 하나만 올린 파일은 `jar:<32hex>` 로 접두가 다르다.
+  꾸러미에 그 jar 가 없으면 `null`(그 파일은 부팅도 못 한다). 지금 429행은 전부 `zip:` 이다.
+- ★**같은 게임 알아보기용이다 · 무결성·보안 판정에 쓰지 않는다.** MD5 는 일부러 맞춘 충돌을 막지 못한다 — 지문이 같다는 것은 «목록의 그 게임과 본체가 같아 보인다»까지이고, «변조되지 않았다»·«안전하다»의 근거가 아니다.
+- **같다고 보는 것**: zip 항목 순서 · 압축 방식 · 시각 · 감싼 폴더(엔진 `extract_zip` 이 이미 벗겨 읽는다) · 꾸러미 설명 파일(`__adf__`·`app_info`·`.msd`) · 이전 주인의 저장과 설정 · 내려받은 부속 파일.
+  **다르다고 보는 것**: 본체 jar 의 한 바이트 · 담긴 방식(zip 꾸러미냐 맨 jar 냐).
+- 왜 부속 파일과 설명 파일을 뺐나(코퍼스 429행 실측): 본체 jar 가 같은 묶음 21개(42행) 가운데 지원 상태가 갈리는 묶음은 0이다. 설명 파일까지 넣으면 9묶음, 전 파일을 넣으면 8묶음만 남는다 —
+  남의 폰에서 뜬 덤프는 저장 파일이 달라 전 파일 지문으로는 거의 못 알아본다. 설명 파일이 다른 12묶음은 전부 설치 칸 식별자(AID 와 거기서 파생된 칸)만 달랐다.
+- ★한계(소비자가 알아야 할 것): 지문이 같아도 **행의 측정이 그대로 옮겨 가는 것은 아니다.** ①AID 로 거는 `local-server` 는 설명 파일의 AID 가 달라지면 걸리지 않는다
+  ②부속 파일(이전 주인의 저장 · 내려받은 데이터)이 다르면 시작 상태가 다를 수 있다 ③`jar:` 로 올린 파일은 설명 파일 없이 뜨고 zip 에서만 거는 조정(장부 `scope` 가 `zip` 인 행)이 걸리지 않는다 —
+  그래서 접두가 달라 꾸러미 행과 같은 값이 되지 않는다(`:` 뒤 32자가 같으면 «같은 본체를 꾸러미 없이 올린 것»이다).
+  한 지문을 여러 행이 나눠 갖는다(지금 21개). 그 행들의 `status` 가 갈리면 지문만으로 상태를 정할 수 없다 — `node scripts/player-data.mjs` 가 그 묶음을 출력한다(지금 0).
+- 엔진 쪽 같은 값: wasm `identify(filename, data).contentKey`(`docs/contracts/featurephone-engine-contract.json` `identifyNote`). 계산은 `wie_identify::identify` 한 곳이고 이 칸도 그 함수가 낸 값이다.
+- **손으로 쓰지 않는다.** `node scripts/content-key.mjs write` 가 로컬 코퍼스의 파일에서 써 넣는다(게임 파일을 읽으므로 로컬 전용). 검사기는 ①형식 ②커밋된 목록의 모든 행에 칸이 있는지
+  ③장부의 `scope` 가 `zip` 인 행의 `key` 와 그 행의 지문이 같은지(게임 파일 없이 CI 에서 본다 · 지금 40행)를 거부 조건으로 본다. 파일과 맞는지 전수 대조는 `node scripts/content-key.mjs check`(로컬).
+- 기존 소비자: 모르는 키는 그대로 통과하므로(`...x`) 이 칸을 모르는 셸은 지금과 똑같이 동작한다. 셸이 이 칸으로 파일을 알아보는 일은 otterpebble 쪽 티켓 몫이다.
 
 ★**`knownIssues_ko` 와 `playTips_ko` 를 가른다**(2026-10-09):
 - `knownIssues_ko` = **안 되는 것**(빠진 소리·막히는 지점·서버 벽 등). 셸은 «알려진 문제»로 보인다. `playable` 이 아닌 행은 ≥1 줄(검사기 거부).
@@ -62,11 +116,11 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
 | boot | A·B 중 하나라도 그렸다, 또는 A 가 실패하지 않았다 | 둘 다 한 장도 못 그리고 A 실패 | – |
 | render | 두 가지 색 이상인 화면이 한 장이라도 있다 | 한 색뿐(uniform) 또는 그린 적 없음 | – |
 | input | A 에 B 가 한 번도 안 보인 화면이 있다(키가 화면을 바꿨다) | 없다, 또는 키 입력 중 panic | 앞 두 축이 ok 가 아니다 |
-| longplay | 600초 반복 키 조작에서 실패 줄이 없다 | 실패(또는 30초 안에 그린 뒤 오류) | 앞 셋이 ok 가 아니라 재지 않았다 |
+| longplay | 600초 반복 키 조작을 끝까지 했고 실패 줄이 없다 | 실패(또는 30초 안에 그린 뒤 오류) | 앞 셋이 ok 가 아니라 재지 않았다 · 또는 게임이 600초 전에 스스로 끝났다(전수 도구 값 `short` → 가져오기가 `unknown` 으로 옮긴다 · 2026-11-22~) |
 | sound | 이벤트가 든 재생이 엔진 → 싱크까지 왔다 | 30초 안에 한 번도 없다 | 부팅 안 됨 |
 | speed | 늦음 비율 ≥ 0.9(헤드리스 하한, 또는 브라우저 2회가 서로 10% 안) | 브라우저 2회가 서로 10% 안이고 < 0.9 | 그 밖 — 헤드리스 하나로는 «느림»을 판정하지 않는다(부하 속 측정은 하한) |
 
-| progress(선택 · **공개 값 `ok`·`stuck`**) | `ok`: 진도 정책 키로 N분 조작하는 동안 마지막 1/3 안에 새 화면(16×16 휘도 지문)이 나왔다(정책 v2 = 새 화면이 60초 없을 때만 뒤로·오른쪽 소프트키·다음 항목을 섞는다 · 2026-10-02~) | `stuck`: 마지막 1/3 동안 새 화면 0 — 짝 재측 2회가 같을 때만(실행 FAIL 도 `stuck`) | 키 없음 — 재지 않았다(대부분) |
+| progress(선택 · **공개 값 `ok`·`stuck`**) | `ok`: 진도 정책 키로 N분 조작하는 동안 마지막 1/3 안에 새 화면(16×16 휘도 지문)이 나왔다(정책 v2 = 새 화면이 60초 없을 때만 뒤로·오른쪽 소프트키·다음 항목을 섞는다 · 2026-10-02~) | `stuck`: 마지막 1/3 동안 새 화면 0 — 짝 재측 2회가 같을 때만(실행 FAIL 도 `stuck`) · 또는 아래 «눈 확인 되풀이» 예외 | 키 없음 — 재지 않았다(대부분) |
 
 등급 = `playable`: boot·render·input·longplay 넷 다 `ok` · `limited`: boot·render 만 `ok` · `not-yet`: 그 밖.
 ★예외 하나 — **통신망 벽**(전수 도구 `netWall`): 30초 프로브 A 에서 접속을 200회 이상 되풀이한 타이틀(옛 통신사 서버 없이는 못 넘어간다 · `docs/report/0432` · 횟수는 프로브 전체 stderr 의 접속 줄 수 `net_connects` — 2026-10-04 전에는 마지막 200줄만 셌다 · `docs/report/0433`)은 넷이 `ok` 여도 `limited` 이고, `knownIssues_ko` 는 그 안내 한 줄뿐이다(`docs/report/0416`).
@@ -76,7 +130,8 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
 
 가져오기(`player-data.mjs import`)가 전수 조사의 축 어휘를 계약 어휘로 바꾼다:
 `ok→ok` · `n/a→unknown` · `fail`·`none`·`uniform`·`error`·`silent`→`no`(여섯 축). progress 만 `ok→ok` · `stuck`·`error`→`stuck` · `n/a`→키 없음.
-`progress` 는 **선택 축**이다 — 전수 조사가 잰 행에만 실리고(`n/a` 면 키 없음), 셸 가져오기는 여섯 축만 검사하며 나머지 키는 그대로 통과시킨다(otterpebble `compat-import.mjs` 의 `...x`). ★값 어휘가 여섯 축과 **다르다** — 셸 `PROGRESS_UI`(otterpebble `lib/compat.ts` · #1244)는 `ok`·`stuck` 만 그리고 모르는 값은 칸을 숨기므로, `no` 로 실으면 막힌 행만 사라져 «좋은 쪽만 보이는» 표시가 된다. 그래서 `stuck` 을 그대로 싣는다(`scripts/player-data.mjs` 의 `EXTRA_AXIS_VALUES`). 레시피(제목별 키)로 잰 결과는 원칙적으로 싣지 않는다 — 이 축의 정의는 «정책 키». ★예외 하나(2026-10-10 · `docs/report/0502`): 그 레시피를 이용자 문장으로 옮긴 `playTips_ko` 가 **같은 행에 함께 실리고**, 레시피 접두 + 정책 키 판의 짝(P·P2)이 **둘 다** `ok` 이며, 두 판의 마지막 1/3 화면을 사람이 놀이로 확인했을 때만 `ok` 를 싣는다 — 요령을 따라 하는 이용자에게 참인 배지다. 화면 새로움은 커서·창 깜박임을 진행과 못 가르므로(0502 §1 실측: 레시피 P `ok` 19 중 7 이 메뉴·창·커서) 눈 확인 없이 레시피 `ok` 를 싣지 않는다. 등급(`status`)에는 넣지 않았다. `partial` 은 지금 아무 측정도 내지 않는다.
+`progress` 는 **선택 축**이다 — 전수 조사가 잰 행에만 실리고(`n/a` 면 키 없음), 셸 가져오기는 여섯 축만 검사하며 나머지 키는 그대로 통과시킨다(otterpebble `compat-import.mjs` 의 `...x`). ★값 어휘가 여섯 축과 **다르다** — 셸 `PROGRESS_UI`(otterpebble `lib/compat.ts` · #1244)는 `ok`·`stuck` 만 그리고 모르는 값은 칸을 숨기므로, `no` 로 실으면 막힌 행만 사라져 «좋은 쪽만 보이는» 표시가 된다. 그래서 `stuck` 을 그대로 싣는다(`scripts/player-data.mjs` 의 `EXTRA_AXIS_VALUES`). 레시피(제목별 키)로 잰 결과는 원칙적으로 싣지 않는다 — 이 축의 정의는 «정책 키». ★예외 하나(2026-10-10 · `docs/report/0502`): 그 레시피를 이용자 문장으로 옮긴 `playTips_ko` 가 **같은 행에 함께 실리고**, 레시피 접두 + 정책 키 판의 짝(P·P2)이 **둘 다** `ok` 이며, 두 판의 마지막 1/3 화면을 사람이 놀이로 확인했을 때만 `ok` 를 싣는다 — 요령을 따라 하는 이용자에게 참인 배지다. 화면 새로움은 커서·창 깜박임을 진행과 못 가르므로(0502 §1 실측: 레시피 P `ok` 19 중 7 이 메뉴·창·커서) 눈 확인 없이 레시피 `ok` 를 싣지 않는다. ★예외 둘(2026-11-06 · `docs/report/0552`) — **눈 확인 되풀이**: 정책 키 판(레시피 0)에서 도구 값이 `ok` 여도(P `ok`, 또는 P `stuck` 에 P2 `ok`), t380~t600 화면을 사람이 봤을 때 **같은 상태의 되풀이**(같은 창·같은 대사·같은 위치를 오가고 재화·날짜·시계 변화 0)면 `stuck` 을 싣는다. 그 회차 문서에 행마다 **증적 화면 경로**를 적어야 한다 — 경로 없는 `stuck` 유지는 이 예외가 아니다. ★좁게 쓴다: 이 예외는 `ok` → `stuck` 한 방향뿐이고, 눈으로 진행(재화·날짜·장소 변화)이 하나라도 보이면 도구 값 `ok` 를 뒤집지 않는다. 도구 값 `stuck` 을 눈으로 `ok` 로 올리는 데는 쓰지 않는다. 이유는 레시피 예외와 같다 — 화면 새로움은 커서·창 깜박임을 진행과 못 가르고, 상점 «잔액 부족» 루프를 «진행됨»으로 알리면 공개 값이 거짓이 된다.
+등급(`status`)에는 넣지 않았다. `partial` 은 지금 아무 측정도 내지 않는다.
 
 ## 2. `updates.json` — 한 항목 한 파일
 
@@ -106,6 +161,9 @@ YAML 이 아니라 JSON 인 이유: 파서 의존을 새로 들이지 않는다(
 
 ## 4. 갱신
 
-- 전수 조사를 다시 돌린 뒤: `node scripts/player-data.mjs import <report 가 쓴 compat.json>` → 커밋.
+- 전수 조사를 다시 돌린 뒤: `node scripts/player-data.mjs import <report 가 쓴 compat.json>` → `node scripts/content-key.mjs write`(가져오기는 `contentKey` 를 만들지 않는다 — 없으면 검사기가 거부) → `node scripts/content-key.mjs check` → 커밋.
+  ★`check` 는 로컬에서만 돌고(게임 파일을 읽는다), 빼먹으면 CI 가 대신 잡지 못한다: CI 가 사실과 대조하는 지문은 장부(`docs/contracts/runtime-adjustments.tsv`)에 `scope` 가 `zip` 으로 오른 꾸러미뿐이다
+  (몇 개인지: `awk -F'\t' '$8=="zip"{print $3}' docs/contracts/runtime-adjustments.tsv | sort -u | wc -l` · 전체 행 수는 `node scripts/player-data.mjs` 의 `titles`). 그 밖의 행은 형식만 맞으면 통과한다 —
+  끝 글자를 바꿔도, `null` 로 바꿔도, **다른 행의 지문으로 바꿔치기해도 rc=0** 이다(다른 게임이 같은 게임으로 읽히는 형상 · 2026-11-22 검수 실측). 그 행들을 지키는 것은 `check` 뿐이다.
 - 게임 동작을 바꾸는 PR: 항목 파일 1개를 같은 PR 에 넣는다(`AGENTS.md` §Landing paperwork).
 - ★main 을 머지한 브랜치가 그 «머지 전» 측정으로 compat.json 을 다시 쓰면 받은 행이 옛 값으로 되돌아간다 — `node scripts/check-compat-revert.mjs`(`contract` 잡)가 red 로 낸다. 의도한 되돌림은 그 PR 의 worklog `intendedCompatReverts: ["<sha12>:<필드>"]` 로만 통과한다.

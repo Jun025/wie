@@ -92,10 +92,10 @@ impl Component {
         let _: () = jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await?;
         // -1 is the javadoc's own "no background" value (setBackground: 「지정을 해제 할경우 -1값」).
         // The canonical per-widget default is not in the API-only class files, so none is invented.
-        jvm.put_field(&mut this, "bg", "I", -1).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/lwc/Component", "bg", "I", -1).await?;
         // The javadoc gives fg no value at all (「기본값은 각 컴포넌트에 따라 다르게」), so the API's only
         // documented "no colour" value is reused rather than a colour invented: -1 (setBackground, paintContent).
-        jvm.put_field(&mut this, "fg", "I", -1).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/lwc/Component", "fg", "I", -1).await?;
 
         Ok(())
     }
@@ -105,26 +105,26 @@ impl Component {
     async fn set_background(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, bg: i32) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.lwc.Component::setBackground({this:?}, {bg:#x})");
 
-        jvm.put_field(&mut this, "bg", "I", bg).await
+        jvm.put_field(&mut this, "org/kwis/msp/lwc/Component", "bg", "I", bg).await
     }
 
     async fn get_background(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
         tracing::debug!("org.kwis.msp.lwc.Component::getBackground({this:?})");
 
-        jvm.get_field(&this, "bg", "I").await
+        jvm.get_field(&this, "org/kwis/msp/lwc/Component", "bg", "I").await
     }
 
     // The text colour TextComponent.paint uses. ca7fa8ade8ad calls setForeground(I) at boot, right after setBackground.
     async fn set_foreground(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, fg: i32) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.lwc.Component::setForeground({this:?}, {fg:#x})");
 
-        jvm.put_field(&mut this, "fg", "I", fg).await
+        jvm.put_field(&mut this, "org/kwis/msp/lwc/Component", "fg", "I", fg).await
     }
 
     async fn get_foreground(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
         tracing::debug!("org.kwis.msp.lwc.Component::getForeground({this:?})");
 
-        jvm.get_field(&this, "fg", "I").await
+        jvm.get_field(&this, "org/kwis/msp/lwc/Component", "fg", "I").await
     }
 
     async fn key_notify(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, r#type: i32, chr: i32) -> JvmResult<bool> {
@@ -173,12 +173,12 @@ impl Component {
         tracing::debug!("org.kwis.msp.lwc.Component::configure({this:?}, {x}, {y}, {w}, {h}, {mask})");
 
         if mask & POS_MASK != 0 {
-            jvm.put_field(&mut this, "x", "I", x).await?;
-            jvm.put_field(&mut this, "y", "I", y).await?;
+            jvm.put_field(&mut this, "org/kwis/msp/lwc/Component", "x", "I", x).await?;
+            jvm.put_field(&mut this, "org/kwis/msp/lwc/Component", "y", "I", y).await?;
         }
         if mask & SIZE_MASK != 0 {
-            jvm.put_field(&mut this, "w", "I", w).await?;
-            jvm.put_field(&mut this, "h", "I", h).await?;
+            jvm.put_field(&mut this, "org/kwis/msp/lwc/Component", "w", "I", w).await?;
+            jvm.put_field(&mut this, "org/kwis/msp/lwc/Component", "h", "I", h).await?;
         }
 
         Ok(())
@@ -297,25 +297,25 @@ impl Component {
     async fn get_height(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
         tracing::debug!("org.kwis.msp.lwc.Component::getHeight({this:?})");
 
-        jvm.get_field(&this, "h", "I").await
+        jvm.get_field(&this, "org/kwis/msp/lwc/Component", "h", "I").await
     }
 
     async fn get_width(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
         tracing::debug!("org.kwis.msp.lwc.Component::getWidth({this:?})");
 
-        jvm.get_field(&this, "w", "I").await
+        jvm.get_field(&this, "org/kwis/msp/lwc/Component", "w", "I").await
     }
 
     async fn get_x(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
         tracing::debug!("org.kwis.msp.lwc.Component::getX({this:?})");
 
-        jvm.get_field(&this, "x", "I").await
+        jvm.get_field(&this, "org/kwis/msp/lwc/Component", "x", "I").await
     }
 
     async fn get_y(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
         tracing::debug!("org.kwis.msp.lwc.Component::getY({this:?})");
 
-        jvm.get_field(&this, "y", "I").await
+        jvm.get_field(&this, "org/kwis/msp/lwc/Component", "y", "I").await
     }
 
     // No-op: the javadoc's layout places a component's *children*, and the stock containers' own
@@ -494,7 +494,7 @@ mod tests {
         run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
             let shell = jvm.new_class("org/kwis/msp/lwc/ShellComponent", "()V", ()).await?;
             for field in ["x", "y", "w", "h"] {
-                let value: i32 = jvm.get_field(&shell, field, "I").await?;
+                let value: i32 = jvm.get_field(&shell, "org/kwis/msp/lwc/ShellComponent", field, "I").await?;
                 assert_eq!(value, 0, "{field}");
             }
 

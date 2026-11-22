@@ -97,9 +97,51 @@ rAF 콜백은 vsync 뒤 0~1 ms 에 온다. 시계 읽기 1회 = 1 µs. 10 s 를 
 - 기기 계측은 없다. 아이폰의 발열·충전 멈춤과의 연결은 «엔진이 메인 스레드를 쥔 비율»까지만 잰 것이다. 블릿·합성·오디오 워클릿은 호스트 몫 열에 섞여 있고 따로 재지 않았다.
 - 아이폰 Safari 의 rAF 가 120Hz 로 도는지(ProMotion) 확인하지 못했다. 60Hz 면 이 PR 의 효과가 표 1 의 60Hz 열이고, 120Hz 면 작다.
 - 하네스의 일 비용(조각 0.5 ms · 프레임 2~4 ms)은 합성값이다. 실엔진 대조 1종(`pace_j2me`)이 방향과 크기를 확인했을 뿐, 타이틀 분포(바쁨 대 수면 비율)는 재지 않았다.
-- upstream 2차 동기화(wie#584 · 0551) 충돌 면: 0551 표 15행 `wie-backend/src/executor.rs`(이미 3way-edit · 최고 위험 행)에 «`tick_for` 3번째 인자 `max_wait` + 대기 분기 1조건»이 더해진다. 또 `system.rs:87`(`tick_for` 호출) · `platform.rs`(기본 메서드 1개)가 upstream 의 같은 파일 변경과 겹친다. upstream 의 «깨움 없으면 루프 탈출»·`sleep(until)` 재설계 위에 재적용할 항목이 하나 는다.
+- (2026-11-11 기준 · 그 뒤 S2 가 #603 으로 착지해 이 면은 §7 에서 실제로 합쳤다) upstream 2차 동기화(wie#584 · 0551) 충돌 면: 0551 표 15행 `wie-backend/src/executor.rs`(이미 3way-edit · 최고 위험 행)에 «`tick_for` 3번째 인자 `max_wait` + 대기 분기 1조건»이 더해진다. 또 `system.rs:87`(`tick_for` 호출) · `platform.rs`(기본 메서드 1개)가 upstream 의 같은 파일 변경과 겹친다. upstream 의 «깨움 없으면 루프 탈출»·`sleep(until)` 재설계 위에 재적용할 항목이 하나 는다.
 - 열린 PR 중 `wie-backend/src/executor.rs` 를 만지는 것: 0건(#583~#588 diff 파일 목록 조회 · 2026-11-11).
+
+### 7. 머지 뒤 재계측 (2026-11-23 · `origin/main` `8fcd668c` 를 브랜치에 머지)
+
+이 PR 은 `2e66f9d6` 기점이었고 그 뒤 main 이 190커밋 나갔다. 그중 틱·프레임 비용 축은 둘이다: #592(0559 · `FramePacer` 가 30Hz 화면에 30 ms 예산)와 #603(0573 · upstream #1491 «sleep 마감은 부른 때부터» · #1429 «깨워진 태스크만 틱 안에서 다시»).
+
+**합친 자리(텍스트가 아니라 뜻으로 읽었다).**
+- 충돌은 1곳 — `executor.rs` `tick_for` 의 깨움 대기 분기다. #603 이 그 분기를 «전원 수면» 에서 «폴링할 것이 없다(`idle` — 걸린 태스크만 남았거나 전원 수면)» 로 넓히고 «잠든 태스크가 없으면 끝» 을 더했다. `max_wait` 판정을 그 새 구조 안의 같은 `break` 조건에 넣었다: `paced > end || paced > current + max_wait`. 그래서 모니터 `wait` 에 걸린 스레드 옆에서 자는 게임 스레드도 같은 길로 양보한다 — `test_tick_ends_on_a_wake_past_its_max_wait` 를 걸린 태스크가 있는 경우까지 돌게 넓혔다.
+- `wants_cpu` 는 #603 뒤 «yield 한 태스크가 있었다» 만 뜻한다. 양보로 끝난 틱은 `false` 라 `wake_in_ms()` 가 수를 낸다(뜻 그대로).
+- `POLL_SLEEP_MS` 판정이 `Executor` 에서 `System::sleep` 으로 옮겨졌다. 양보 판정은 여전히 `paced` 만 본다. 하네스의 메뉴 형상이 그 규칙을 따라 `SleepFuture::toward(…, None, …)` 로 잔다(전에는 `Executor::sleep(1)` 이 안에서 갈랐다).
+- 하네스의 sleep 은 `SleepFuture::new(부른 때 + n)` 이다(#1491 의 `sleep(until)`). `system.rs` 의 `max_wait` 한 줄 · `speed_clock.rs` 의 `wake_delay` · `wie_featurephone` 의 3표면은 자동 병합이고 읽어서 뜻이 그대로임을 확인했다. `wake_tick` 예산 «직전 rAF 예산 + ε» 는 30Hz 에서 30 + 3 ms 가 된다.
+
+**하네스 표(§1) — 48줄 중 수가 움직인 것은 sleep(60) · 1배 · 60Hz 의 before 1줄과 메뉴 120Hz 의 소수 첫째 자리다.**
+
+| 칸 | 11-11 (`2e66f9d6` 기점) | 11-23 (머지 뒤) |
+|---|---|---|
+| ⒝ sleep(60) · 1배 · 60Hz · before em/wait/busy % | 4.7 / 10.6 / 15.3 | 4.7 / **11.3** / **16.0** |
+| 같은 칸 achieved(before) | 0.989 | 0.985 |
+| ⒞ 메뉴 · 120Hz busy % | 0.7 | 0.6 |
+| 12칸 대기 합(120 s 중) before → after | 13.1 s → 6.7 s | 13.2 s → 6.8 s (51%) |
+| 그 밖의 before/after 전 칸 · ε 쓸기 표(§3) · late · frames | — | 글자까지 같다 |
+
+바뀐 한 칸은 #1491 그 자체다: sleep 이 «부른 때» 부터 세어져 그 칸의 위상이 한 눈금 옮겨졌다. after 열과 박자(late p50/max · 게임 프레임 수)는 그대로다. 원표는 증거 디렉터리 `harness-table-merged-20261123.txt` 다.
+
+**실엔진 대조(§2 와 같은 명령 · 머지 뒤 빌드 · 2회 · load1 6~7).**
+
+| 브라우저 | 배속 | busy % off → 3 (1회차 / 2회차) | paints off → 3 | tick p99 ms off → 3 | wake ticks |
+|---|---|---|---|---|---|
+| Chromium | 1 | 15.2 → 6.4 / 11.5 → 4.4 | 399→400 / 400→400 | 9→4 / 8→1 | 311 / 379 |
+| Chromium | 2 | 25.6 → 10.3 / 21.1 → 12.3 | 797→798 / 797→798 | 12→1 / 11→5 | 754 / 532 |
+| WebKit | 1 | 14.0 → 6.7 / **4.9 → 6.8** | 400→400 / 400→401 | 9→5 / 3→1 | 318 / 399 |
+| WebKit | 2 | 19.4 → 12.9 / 34.5 → 12.0 | 799→799 / 799→800 | 10→5 / 14→1 | 561 / 797 |
+
+- 8짝 중 7짝이 줄었다(off 11.5~34.5% → 3 은 4.4~12.9%). 11-11 의 폭(9.0~35.9 → 3.8~14.7)과 같은 자리다.
+- **늘어난 1짝(WebKit · 1배 · 2회차 4.9 → 6.8)** 은 §1 의 «위상이 잠기는 칸» 이 실엔진에서 나온 것이다. 그 회차의 off 는 깨움이 예산 밖 틈에 떨어져 거의 안 돌았고 대신 늦게 깼다(achieved min 0.981 — 3 은 1.000). 호스트 깨움은 ε 만큼은 늘 돈다.
+- paints 는 전 짝 같거나 +1 이고, 3 의 achieved 는 전 회차 min = 배속이다(off 는 8회 중 6회가 min < 배속).
+- #603 뒤 이 픽스처의 off busy 가 달라졌다고 말할 근거는 없다 — off 는 11-11 에도 회차마다 9~36% 로 출렁였다.
+
+**개악 대조(머지 뒤 트리에서 다시).** ⒜ 양보 제거 → 4건 RED(`tick_occupancy` 3 + `test_tick_ends_on_a_wake_past_its_max_wait`). ⒝ ε 제거 → `a_paced_sleep_keeps_…` RED. 되돌린 뒤 `cmp` 로 원본과 같음을 확인했다.
+
+**그 밖에 달라진 수.**
+- `wie_web.js`: 머지 뒤 41,624 B(상한 42,000 · 남은 폭 376 B). main 의 `frames_painted` · `identify` 가 같은 상한 안에 들어왔다.
+- `cargo +beta clippy --all -- -D warnings`: 11-11 에는 red(`src/window.rs` · 이 PR 밖)였고 지금은 rc=0 이다(beta 1.101.0-beta.2).
+- §5 의 답과 §6 의 판정은 바뀌지 않는다 — 근거 칸(⒜ 88.2 → 86.7 · sleep(20) 39.8 → 67.5 / 18.2 → 34.5)이 그대로다.
 
 **사용자 영향**: 셸이 아직 새 표면을 안 부르므로 오늘은 0 이다. 후속 `otterpebble-featurephone-heat-shell-idle-wake-and-speed-telemetry` 가 크레이트 문서대로 배선하면, sleep 박자로 도는 게임은 60Hz 기기에서 엔진 점유가 절반 안팎으로 준다. 박자는 같거나 정확해진다.
 
-<!-- corpus-name-inflow v1 subjects=12 tree=2cc0b2e3c1438972 B=14/11 P=1/1 S=0/0 -->
