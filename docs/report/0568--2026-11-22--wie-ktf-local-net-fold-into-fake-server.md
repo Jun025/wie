@@ -55,15 +55,15 @@ KTF 쪽에 남긴 것은 6개 함수(`socket` · `socket_open` · `socket_send` 
 
 | 판 | 프로브 | 쌍 | 판정 같음 | 통신 호출 순서 같음 | DB 통계 같음 | 전의 결과 | 후의 결과 |
 |---|---|---|---|---|---|---|---|
-| `f44271803135` 드래곤아이즈2 (KTF) | A | 7 | 6/7 | 7/7 | 7/7 | PASS 2 · UNMEASURED(clean exit) 5 | PASS 3 · UNMEASURED(clean exit) 4 |
+| `f44271803135` (KTF) | A | 7 | 6/7 | 7/7 | 7/7 | PASS 2 · UNMEASURED(clean exit) 5 | PASS 3 · UNMEASURED(clean exit) 4 |
 | 〃 | B | 4 | 4/4 | 4/4(접속 0) | 4/4 | PASS 4 | PASS 4 |
 | 〃 | L | 3 | 3/3 | 3/3 | 3/3 | PASS 3 · 키 11/11 | PASS 3 · 키 11/11 |
-| `caf9d76ffd13` 냐옹타이쿤2 | A | 7 | 7/7 | 6/7 | 7/7 | PASS 7 | PASS 7 |
+| `caf9d76ffd13` (LGT) | A | 7 | 7/7 | 6/7 | 7/7 | PASS 7 | PASS 7 |
 | 〃 | B | 4 | 4/4 | 4/4(접속 0) | 4/4 | PASS 4 | PASS 4 |
-| `b9bfcaf42722` 몬스터마스터 | A · B | 4 · 4 | 8/8 | 8/8 | 8/8 | PASS 8 | PASS 8 |
-| `0093012b8c36` 리듬스타2 | A · B | 4 · 4 | 8/8 | 8/8 | 8/8 | PASS 8 | PASS 8 |
-| `3ff5948e235e` 아니마 | A · B | 4 · 4 | 8/8 | 8/8 | 8/8 | PASS 8 | PASS 8 |
-| `0fdf45ec169f` 테라 영원의 혼돈 | A · B | 4 · 4 | 8/8 | 8/8 | 8/8 | PASS 8 | PASS 8 |
+| `b9bfcaf42722` (LGT) | A · B | 4 · 4 | 8/8 | 8/8 | 8/8 | PASS 8 | PASS 8 |
+| `0093012b8c36` (LGT) | A · B | 4 · 4 | 8/8 | 8/8 | 8/8 | PASS 8 | PASS 8 |
+| `3ff5948e235e` (LGT) | A · B | 4 · 4 | 8/8 | 8/8 | 8/8 | PASS 8 | PASS 8 |
+| `0fdf45ec169f` (LGT) | A · B | 4 · 4 | 8/8 | 8/8 | 8/8 | PASS 8 | PASS 8 |
 
 합계 57쌍 · 판정 같음 56 · 통신 호출 순서 같음 56 · 실패(FAIL) 0 · load1 20~117.
 
@@ -113,4 +113,4 @@ KTF 쪽에 남긴 것은 6개 함수(`socket` · `socket_open` · `socket_send` 
 
 ### 8. 게임 파일명 유입
 
-INFLOW_LINE
+`node scripts/corpus-name-inflow.mjs`(이 브랜치가 `origin/main` 대비 바꾼 파일 6개): 유입 44회 / 37쌍(BOUNDED) · 판단 필요 0건(SUFFIX-ATTACHED). 전부 장부 `docs/contracts/runtime-adjustments.tsv` 의 `title` 칸에 원래 있던 값이다 — 이 PR 은 그 파일에서 주석 3줄과 한 줄의 `device` 칸만 고쳤다. 이 문서와 코드 4파일이 더한 줄에서는 0 이다(판을 sha 앞 12자로만 부른다).
