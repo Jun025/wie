@@ -184,4 +184,4 @@ SUFFIX-ATTACHED 16종은 `compat.json` 안의 더 긴 다른 제목과 안내 �
 - 문서: 계약 §1 `contentKey` 절에 «같은 게임 알아보기용 · 무결성·보안 판정에 쓰지 않는다», §4 갱신 순서에 `write` 뒤 `check` 와 그 한계(장부 밖 393행은 다른 행의 지문으로 바꿔치기해도 CI rc=0).
 - 남긴 것: 지문이 같은 묶음의 `status` 가 갈려도 검사기는 rc=0 이다(red 면 참인 데이터를 막는다). 「갈린 묶음은 상태를 물려주지 않는다」는 셸 쪽 요건이다.
 
-<!-- corpus-name-inflow v1 subjects=23 tree=24c4b2709eb871bc B=1156/410 P=7/5 S=52/16 -->
+<!-- corpus-name-inflow v1 subjects=23 tree=dab29c8f94c6abf0 B=1156/410 P=7/5 S=52/16 -->
