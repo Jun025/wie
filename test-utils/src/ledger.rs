@@ -12,7 +12,7 @@ pub const LEDGER: &str = include_str!("../../docs/contracts/runtime-adjustments.
 const COLUMNS: &str = "device\tkey\tpackage\tplatform\ttitle\tkind\tchanges\tscope\tclass\tbasis";
 
 /// Every engine table the ledger covers. A table added here needs its own `assert_ledger_lists` call.
-const DEVICES: [&str; 11] = [
+const DEVICES: [&str; 10] = [
     "binary-patches",
     "class-patches",
     "owner-sound-off-settings",
@@ -23,7 +23,6 @@ const DEVICES: [&str; 11] = [
     "device-bound-saves",
     "owner-progress-saves",
     "fake-servers",
-    "ktf-local-servers",
 ];
 
 /// The ledger's rows, one per (engine key, package), as their tab-separated cells.
