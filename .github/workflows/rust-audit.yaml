@@ -114,10 +114,16 @@ jobs:
       #     That table declares "경고 수와 이 표의 행 수가 어긋나면 둘 중 하나가 낡은
       #     것이다" and then went stale for a month anyway — A-2/A-3 were upgraded away on
       #     2026-08-08 (22df9531) and chacha20 arrived, while three rows sat there. A human
-      #     realigned it; this makes the machine say it next time. SET equality, not count:
+      #     realigned it; this makes the machine say it next time. SETS, not counts:
       #     the 2026-09-06 incident had the count right and the composition wrong, and a
-      #     count cannot see a swap. Both directions are red, and an unreadable table is
-      #     ALSO red — a blind checker is how the ledger went quiet in the first place.
+      #     count cannot see a swap. An unreadable table is ALSO red — a blind checker is
+      #     how the ledger went quiet in the first place.
+      #     ★Asymmetric since 2026-11-22, same as (1): a §A row cargo-audit no longer
+      #     reports is RED (stale); a warning with no §A row is NOT — it is printed and
+      #     written to the job summary as «대장에 없는 새 경고 N건: …». Both directions
+      #     used to be red, and one freshly published tokio warning kept this job red for
+      #     10 days (10-24 → 11-02, run 40449806714) with no change to this repo. A new
+      #     VULNERABILITY is still red — the audit step above, and the checker again.
       #
       # Both comparisons read the SAME parsed warning set, so they cannot disagree about
       # what the warnings are. Cost: ~1s (measured warm locally: 0.89s / 1.09s).
@@ -126,5 +132,11 @@ jobs:
       # `pull_request` / `push` trigger (schedule + workflow_dispatch only), so it never
       # reports on a PR. Promoting it is a deliberate act — do it after the ledger check
       # has a track record, not before.
+      #
+      # `--selftest` runs first so a broken rule reddens instead of passing silently: it
+      # holds new-warning = green + summary line, new-vulnerability = red, stale row = red,
+      # on synthetic input (no cargo-audit, no network).
       - name: Expected-warning list and ledger §A match reality
-        run: node scripts/check-audit-warnings.mjs
+        run: |
+          node scripts/check-audit-warnings.mjs --selftest
+          node scripts/check-audit-warnings.mjs
