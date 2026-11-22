@@ -41,20 +41,21 @@ impl PlayerControl {
 
     async fn init(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, player: ClassInstanceRef<SmafPlayer>) -> Result<()> {
         let _: () = jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await?;
-        jvm.put_field(&mut this, "player", "Lnet/wie/SmafPlayer;", player).await?;
-        jvm.put_field(&mut this, "level", "I", 100).await
+        jvm.put_field(&mut this, "net/wie/PlayerControl", "player", "Lnet/wie/SmafPlayer;", player)
+            .await?;
+        jvm.put_field(&mut this, "net/wie/PlayerControl", "level", "I", 100).await
     }
 
     async fn handle(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> Result<u32> {
-        let player: ClassInstanceRef<SmafPlayer> = jvm.get_field(this, "player", "Lnet/wie/SmafPlayer;").await?;
-        let handle: i32 = jvm.get_field(&player, "audioHandle", "I").await?;
+        let player: ClassInstanceRef<SmafPlayer> = jvm.get_field(this, "net/wie/PlayerControl", "player", "Lnet/wie/SmafPlayer;").await?;
+        let handle: i32 = jvm.get_field(&player, "net/wie/SmafPlayer", "audioHandle", "I").await?;
 
         Ok(handle as u32)
     }
 
     async fn apply(jvm: &Jvm, context: &mut WieJvmContext, this: &ClassInstanceRef<Self>) -> Result<()> {
-        let level: i32 = jvm.get_field(this, "level", "I").await?;
-        let muted: bool = jvm.get_field(this, "muted", "Z").await?;
+        let level: i32 = jvm.get_field(this, "net/wie/PlayerControl", "level", "I").await?;
+        let muted: bool = jvm.get_field(this, "net/wie/PlayerControl", "muted", "Z").await?;
         let volume = if muted { 0.0 } else { level as f32 / 100.0 };
         // a closed player has no handle left; its volume no longer matters
         let _ = context.system().audio().set_volume(Self::handle(jvm, this).await?, volume);
@@ -63,24 +64,24 @@ impl PlayerControl {
     }
 
     async fn set_mute(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, muted: bool) -> Result<()> {
-        jvm.put_field(&mut this, "muted", "Z", muted).await?;
+        jvm.put_field(&mut this, "net/wie/PlayerControl", "muted", "Z", muted).await?;
         Self::apply(jvm, context, &this).await
     }
 
     async fn is_muted(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> Result<bool> {
-        jvm.get_field(&this, "muted", "Z").await
+        jvm.get_field(&this, "net/wie/PlayerControl", "muted", "Z").await
     }
 
     async fn set_level(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, level: i32) -> Result<i32> {
         let level = level.clamp(0, 100);
-        jvm.put_field(&mut this, "level", "I", level).await?;
+        jvm.put_field(&mut this, "net/wie/PlayerControl", "level", "I", level).await?;
         Self::apply(jvm, context, &this).await?;
 
         Ok(level)
     }
 
     async fn get_level(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> Result<i32> {
-        jvm.get_field(&this, "level", "I").await
+        jvm.get_field(&this, "net/wie/PlayerControl", "level", "I").await
     }
 
     async fn set_sequence(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>, sequence: ClassInstanceRef<Array<i8>>) -> Result<()> {
@@ -95,7 +96,7 @@ impl PlayerControl {
         if context.system().audio().replace(Self::handle(jvm, &this).await?, parsed).is_err() {
             return Err(jvm.exception("java/lang/IllegalStateException", "player is closed").await);
         }
-        let mut player: ClassInstanceRef<SmafPlayer> = jvm.get_field(&this, "player", "Lnet/wie/SmafPlayer;").await?;
-        jvm.put_field(&mut player, "lengthMs", "J", length_ms as i64).await
+        let mut player: ClassInstanceRef<SmafPlayer> = jvm.get_field(&this, "net/wie/PlayerControl", "player", "Lnet/wie/SmafPlayer;").await?;
+        jvm.put_field(&mut player, "net/wie/SmafPlayer", "lengthMs", "J", length_ms as i64).await
     }
 }

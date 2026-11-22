@@ -63,14 +63,22 @@ impl GTextField {
     async fn get_g_text_listener(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<GTextListener>> {
         tracing::debug!("com.ktf.kfc.GTextField::getGTextListener({this:?})");
 
-        let listener: ClassInstanceRef<GTextListener> = jvm.get_field(&this, "listener", "Lcom/ktf/kfc/GTextListener;").await?;
+        let listener: ClassInstanceRef<GTextListener> = jvm
+            .get_field(&this, "com/ktf/kfc/GTextField", "listener", "Lcom/ktf/kfc/GTextListener;")
+            .await?;
         if !listener.is_null() {
             return Ok(listener);
         }
         let listener: ClassInstanceRef<GTextListener> = jvm.new_class("com/ktf/kfc/GTextListener", "()V", ()).await?.into();
         let mut this = this;
-        jvm.put_field(&mut this, "listener", "Lcom/ktf/kfc/GTextListener;", listener.clone())
-            .await?;
+        jvm.put_field(
+            &mut this,
+            "com/ktf/kfc/GTextField",
+            "listener",
+            "Lcom/ktf/kfc/GTextListener;",
+            listener.clone(),
+        )
+        .await?;
         Ok(listener)
     }
 }

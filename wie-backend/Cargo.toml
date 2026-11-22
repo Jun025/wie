@@ -19,7 +19,7 @@ image = { version = "^0.25", features = ["bmp", "gif", "jpeg", "png"], default-f
 num-traits = { version = "^0.2", default-features = false }
 smaf = { version = "^0.1.2" }
 smaf-player = { version = "^0.1.2" }
-zip = { version = "^8.6", features = ["deflate"], default-features = false }
+zip = { version = "^9.0", features = ["deflate"], default-features = false }
 
 wie-util = { workspace = true }
 

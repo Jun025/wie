@@ -43,7 +43,8 @@ impl FormComponent {
         let _: () = jvm
             .invoke_special(&this, "org/kwis/msp/lwc/ContainerComponent", "<init>", "()V", ())
             .await?;
-        jvm.put_field(&mut this, "vertical", "Z", vertical).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/lwc/FormComponent", "vertical", "Z", vertical)
+            .await?;
         Ok(())
     }
 
@@ -76,7 +77,7 @@ mod tests {
         run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
             for vertical in [true, false] {
                 let form = jvm.new_class("org/kwis/msp/lwc/FormComponent", "(Z)V", (vertical,)).await?;
-                let kept: bool = jvm.get_field(&form, "vertical", "Z").await?;
+                let kept: bool = jvm.get_field(&form, "org/kwis/msp/lwc/FormComponent", "vertical", "Z").await?;
                 assert_eq!(kept, vertical);
                 let bg: i32 = jvm
                     .invoke_virtual(&form, "org/kwis/msp/lwc/Component", "getBackground", "()I", ())

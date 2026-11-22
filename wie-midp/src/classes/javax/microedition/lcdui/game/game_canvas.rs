@@ -70,8 +70,14 @@ impl GameCanvas {
             )
             .await?;
 
-        jvm.put_field(&mut this, "offscreenImage", "Ljavax/microedition/lcdui/Image;", image)
-            .await?;
+        jvm.put_field(
+            &mut this,
+            "javax/microedition/lcdui/game/GameCanvas",
+            "offscreenImage",
+            "Ljavax/microedition/lcdui/Image;",
+            image,
+        )
+        .await?;
 
         Ok(())
     }
@@ -79,7 +85,14 @@ impl GameCanvas {
     async fn get_graphics(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<Graphics>> {
         tracing::debug!("javax.microedition.lcdui.game.GameCanvas::getGraphics({this:?})");
 
-        let offscreen_image: ClassInstanceRef<Image> = jvm.get_field(&this, "offscreenImage", "Ljavax/microedition/lcdui/Image;").await?;
+        let offscreen_image: ClassInstanceRef<Image> = jvm
+            .get_field(
+                &this,
+                "javax/microedition/lcdui/game/GameCanvas",
+                "offscreenImage",
+                "Ljavax/microedition/lcdui/Image;",
+            )
+            .await?;
         let graphics = jvm
             .new_class(
                 "javax/microedition/lcdui/Graphics",
@@ -102,7 +115,14 @@ impl GameCanvas {
     async fn paint(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>, g: ClassInstanceRef<Graphics>) -> JvmResult<()> {
         tracing::debug!("javax.microedition.lcdui.game.GameCanvas::paint({this:?}, {g:?})");
 
-        let offscreen_image: ClassInstanceRef<Image> = jvm.get_field(&this, "offscreenImage", "Ljavax/microedition/lcdui/Image;").await?;
+        let offscreen_image: ClassInstanceRef<Image> = jvm
+            .get_field(
+                &this,
+                "javax/microedition/lcdui/game/GameCanvas",
+                "offscreenImage",
+                "Ljavax/microedition/lcdui/Image;",
+            )
+            .await?;
 
         let _: () = jvm
             .invoke_virtual(
@@ -136,9 +156,12 @@ impl GameCanvas {
     }
 
     async fn get_key_states(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        let held: i32 = jvm.get_field(&this, "keysHeld", "I").await?;
-        let latched: i32 = jvm.get_field(&this, "keysLatched", "I").await?;
-        jvm.put_field(&mut this, "keysLatched", "I", 0).await?;
+        let held: i32 = jvm.get_field(&this, "javax/microedition/lcdui/game/GameCanvas", "keysHeld", "I").await?;
+        let latched: i32 = jvm
+            .get_field(&this, "javax/microedition/lcdui/game/GameCanvas", "keysLatched", "I")
+            .await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/GameCanvas", "keysLatched", "I", 0)
+            .await?;
 
         Ok(held | latched)
     }
@@ -149,14 +172,21 @@ impl GameCanvas {
     async fn handle_key_event(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, event_type: i32, code: i32) -> JvmResult<()> {
         let bit = game_key_bit(code);
         if bit != 0 {
-            let held: i32 = jvm.get_field(&this, "keysHeld", "I").await?;
+            let held: i32 = jvm.get_field(&this, "javax/microedition/lcdui/game/GameCanvas", "keysHeld", "I").await?;
             match KeyboardEventType::from_raw(event_type) {
                 Some(KeyboardEventType::KeyPressed) => {
-                    let latched: i32 = jvm.get_field(&this, "keysLatched", "I").await?;
-                    jvm.put_field(&mut this, "keysHeld", "I", held | bit).await?;
-                    jvm.put_field(&mut this, "keysLatched", "I", latched | bit).await?;
+                    let latched: i32 = jvm
+                        .get_field(&this, "javax/microedition/lcdui/game/GameCanvas", "keysLatched", "I")
+                        .await?;
+                    jvm.put_field(&mut this, "javax/microedition/lcdui/game/GameCanvas", "keysHeld", "I", held | bit)
+                        .await?;
+                    jvm.put_field(&mut this, "javax/microedition/lcdui/game/GameCanvas", "keysLatched", "I", latched | bit)
+                        .await?;
                 }
-                Some(KeyboardEventType::KeyReleased) => jvm.put_field(&mut this, "keysHeld", "I", held & !bit).await?,
+                Some(KeyboardEventType::KeyReleased) => {
+                    jvm.put_field(&mut this, "javax/microedition/lcdui/game/GameCanvas", "keysHeld", "I", held & !bit)
+                        .await?
+                }
                 _ => {}
             }
         }

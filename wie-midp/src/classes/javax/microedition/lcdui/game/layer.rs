@@ -45,50 +45,56 @@ impl Layer {
 
     async fn init(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, width: i32, height: i32) -> JvmResult<()> {
         let _: () = jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await?;
-        jvm.put_field(&mut this, "width", "I", width).await?;
-        jvm.put_field(&mut this, "height", "I", height).await?;
-        jvm.put_field(&mut this, "visible", "Z", true).await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/Layer", "width", "I", width)
+            .await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/Layer", "height", "I", height)
+            .await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/Layer", "visible", "Z", true)
+            .await?;
 
         Ok(())
     }
 
     async fn set_position(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, x: i32, y: i32) -> JvmResult<()> {
-        jvm.put_field(&mut this, "x", "I", x).await?;
-        jvm.put_field(&mut this, "y", "I", y).await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/Layer", "x", "I", x).await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/Layer", "y", "I", y).await?;
 
         Ok(())
     }
 
     async fn r#move(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, dx: i32, dy: i32) -> JvmResult<()> {
-        let x: i32 = jvm.get_field(&this, "x", "I").await?;
-        let y: i32 = jvm.get_field(&this, "y", "I").await?;
-        jvm.put_field(&mut this, "x", "I", x.wrapping_add(dx)).await?;
-        jvm.put_field(&mut this, "y", "I", y.wrapping_add(dy)).await?;
+        let x: i32 = jvm.get_field(&this, "javax/microedition/lcdui/game/Layer", "x", "I").await?;
+        let y: i32 = jvm.get_field(&this, "javax/microedition/lcdui/game/Layer", "y", "I").await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/Layer", "x", "I", x.wrapping_add(dx))
+            .await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/Layer", "y", "I", y.wrapping_add(dy))
+            .await?;
 
         Ok(())
     }
 
     async fn get_x(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        jvm.get_field(&this, "x", "I").await
+        jvm.get_field(&this, "javax/microedition/lcdui/game/Layer", "x", "I").await
     }
 
     async fn get_y(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        jvm.get_field(&this, "y", "I").await
+        jvm.get_field(&this, "javax/microedition/lcdui/game/Layer", "y", "I").await
     }
 
     async fn get_width(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        jvm.get_field(&this, "width", "I").await
+        jvm.get_field(&this, "javax/microedition/lcdui/game/Layer", "width", "I").await
     }
 
     async fn get_height(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        jvm.get_field(&this, "height", "I").await
+        jvm.get_field(&this, "javax/microedition/lcdui/game/Layer", "height", "I").await
     }
 
     async fn set_visible(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, visible: bool) -> JvmResult<()> {
-        jvm.put_field(&mut this, "visible", "Z", visible).await
+        jvm.put_field(&mut this, "javax/microedition/lcdui/game/Layer", "visible", "Z", visible)
+            .await
     }
 
     async fn is_visible(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<bool> {
-        jvm.get_field(&this, "visible", "Z").await
+        jvm.get_field(&this, "javax/microedition/lcdui/game/Layer", "visible", "Z").await
     }
 }

@@ -29,9 +29,9 @@ async fn handle_java_interface_svc(core: &mut ArmCore, jvm: &mut Jvm, id: SvcId)
 
     // A frame per call, as for the guest's calls to host methods (`JavaMethodProxy::call`).
     wie_jvm_support::guest_roots::stress_collect(jvm, core.id());
-    jvm.push_native_frame();
+    let frame = jvm.push_native_frame(&[]);
     let result = handle_java_interface_svc_in_frame(core, jvm, id, lr).await;
-    jvm.pop_frame();
+    drop(frame);
     result
 }
 
@@ -272,7 +272,10 @@ async fn register_java_string(core: &mut ArmCore, jvm: &mut Jvm, offset: u32, le
         .get_static_field("net/wie/KtfClassLoader", "instance", "Lnet/wie/KtfClassLoader;")
         .await
         .unwrap();
-    let strings_field: ClassInstanceRef<Vector> = jvm.get_field(&ktf_class_loader, "nativeStrings", "Ljava/util/Vector;").await.unwrap();
+    let strings_field: ClassInstanceRef<Vector> = jvm
+        .get_field(&ktf_class_loader, "net/wie/KtfClassLoader", "nativeStrings", "Ljava/util/Vector;")
+        .await
+        .unwrap();
     let _: bool = jvm
         .invoke_virtual(&strings_field, "java/util/Vector", "add", "(Ljava/lang/Object;)Z", (instance.clone(),))
         .await

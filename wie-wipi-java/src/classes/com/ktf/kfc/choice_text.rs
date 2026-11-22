@@ -45,13 +45,14 @@ impl ChoiceText {
         tracing::debug!("com.ktf.kfc.ChoiceText::<init>({this:?}, {choices:?})");
 
         let _: () = jvm.invoke_special(&this, "org/kwis/msp/lwc/Component", "<init>", "()V", ()).await?;
-        jvm.put_field(&mut this, "choices", "[Ljava/lang/String;", choices).await
+        jvm.put_field(&mut this, "com/ktf/kfc/ChoiceText", "choices", "[Ljava/lang/String;", choices)
+            .await
     }
 
     async fn get_selected_index(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
         tracing::debug!("com.ktf.kfc.ChoiceText::getSelectedIndex({this:?})");
 
-        jvm.get_field(&this, "selected", "I").await
+        jvm.get_field(&this, "com/ktf/kfc/ChoiceText", "selected", "I").await
     }
 
     // 1 = KEY_PRESSED as net.wie.CardCanvas sends it. Every key answers true, as Component's stub did.
@@ -63,7 +64,7 @@ impl ChoiceText {
             x if x == WIPIKeyCode::RIGHT as i32 => 1,
             _ => return Ok(true),
         };
-        let choices: ClassInstanceRef<Array<String>> = jvm.get_field(&this, "choices", "[Ljava/lang/String;").await?;
+        let choices: ClassInstanceRef<Array<String>> = jvm.get_field(&this, "com/ktf/kfc/ChoiceText", "choices", "[Ljava/lang/String;").await?;
         if r#type != 1 || choices.is_null() {
             return Ok(true);
         }
@@ -71,8 +72,9 @@ impl ChoiceText {
         if length == 0 {
             return Ok(true);
         }
-        let selected: i32 = jvm.get_field(&this, "selected", "I").await?;
-        jvm.put_field(&mut this, "selected", "I", (selected + step).rem_euclid(length)).await?;
+        let selected: i32 = jvm.get_field(&this, "com/ktf/kfc/ChoiceText", "selected", "I").await?;
+        jvm.put_field(&mut this, "com/ktf/kfc/ChoiceText", "selected", "I", (selected + step).rem_euclid(length))
+            .await?;
 
         Ok(true)
     }

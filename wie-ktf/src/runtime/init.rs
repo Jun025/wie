@@ -35,10 +35,10 @@ async fn handle_init_svc(core: &mut ArmCore, jvm: &mut Jvm, id: SvcId) -> Result
         id,
         InitSvcId::JavaThrow | InitSvcId::JavaThrowInstance | InitSvcId::JavaNew | InitSvcId::JavaArrayNew
     );
-    if frame {
+    let native_frame = frame.then(|| {
         wie_jvm_support::guest_roots::stress_collect(jvm, core.id());
-        jvm.push_native_frame();
-    }
+        jvm.push_native_frame(&[])
+    });
     let result = async {
         match id {
             InitSvcId::GetInterface => get_interface(core, core.read_param(0)?).await?.write(core, lr),
@@ -52,9 +52,7 @@ async fn handle_init_svc(core: &mut ArmCore, jvm: &mut Jvm, id: SvcId) -> Result
         }
     }
     .await;
-    if frame {
-        jvm.pop_frame();
-    }
+    drop(native_frame);
     result
 }
 

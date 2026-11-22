@@ -96,8 +96,10 @@ impl TextField {
                 (label, text),
             )
             .await?;
-        jvm.put_field(&mut this, "maxSize", "I", max_size).await?;
-        jvm.put_field(&mut this, "constraints", "I", constraints).await
+        jvm.put_field(&mut this, "javax/microedition/lcdui/TextField", "maxSize", "I", max_size)
+            .await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/TextField", "constraints", "I", constraints)
+            .await
     }
 
     async fn get_string(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<String>> {
@@ -123,24 +125,26 @@ impl TextField {
     }
 
     async fn get_max_size(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        jvm.get_field(&this, "maxSize", "I").await
+        jvm.get_field(&this, "javax/microedition/lcdui/TextField", "maxSize", "I").await
     }
 
     async fn set_max_size(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, max_size: i32) -> JvmResult<i32> {
         if max_size <= 0 {
             return Err(jvm.exception("java/lang/IllegalArgumentException", "maxSize must be positive").await);
         }
-        jvm.put_field(&mut this, "maxSize", "I", max_size).await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/TextField", "maxSize", "I", max_size)
+            .await?;
 
         Ok(max_size)
     }
 
     async fn get_constraints(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        jvm.get_field(&this, "constraints", "I").await
+        jvm.get_field(&this, "javax/microedition/lcdui/TextField", "constraints", "I").await
     }
 
     async fn set_constraints(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, constraints: i32) -> JvmResult<()> {
-        jvm.put_field(&mut this, "constraints", "I", constraints).await
+        jvm.put_field(&mut this, "javax/microedition/lcdui/TextField", "constraints", "I", constraints)
+            .await
     }
 }
 

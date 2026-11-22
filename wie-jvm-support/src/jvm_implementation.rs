@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, string::String, sync::Arc, vec::Vec};
+use alloc::{borrow::Cow, boxed::Box, string::String, sync::Arc, vec::Vec};
 use core::{
     ops::{Deref, DerefMut},
     pin::Pin,
@@ -115,7 +115,7 @@ impl InheritedMethods {
 
 #[async_trait::async_trait]
 impl ClassDefinition for InheritedMethods {
-    fn name(&self) -> String {
+    fn name(&self) -> Cow<'_, str> {
         ClassDefinition::name(&self.inner)
     }
 
@@ -217,11 +217,11 @@ struct ForcedBoolMethod {
 
 #[async_trait::async_trait]
 impl Method for ForcedBoolMethod {
-    fn name(&self) -> String {
+    fn name(&self) -> Cow<'_, str> {
         self.inner.name()
     }
 
-    fn descriptor(&self) -> String {
+    fn descriptor(&self) -> Cow<'_, str> {
         self.inner.descriptor()
     }
 
@@ -242,11 +242,11 @@ struct Preemptible {
 
 #[async_trait::async_trait]
 impl Method for Preemptible {
-    fn name(&self) -> String {
+    fn name(&self) -> Cow<'_, str> {
         self.inner.name()
     }
 
-    fn descriptor(&self) -> String {
+    fn descriptor(&self) -> Cow<'_, str> {
         self.inner.descriptor()
     }
 

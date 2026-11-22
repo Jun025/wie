@@ -67,7 +67,8 @@ impl DialogComponent {
 
         let _: () = jvm.invoke_special(&this, "org/kwis/msp/lwc/ShellComponent", "<init>", "()V", ()).await?;
 
-        jvm.put_field(&mut this, "type", "I", dialog_type).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/lwc/DialogComponent", "type", "I", dialog_type)
+            .await?;
 
         // The javadoc sizes the dialog by "the component added to it", and ca7fa8ade8ad reads that
         // component back with getComponent(0) straight after construction — so it is the dialog's
@@ -107,7 +108,7 @@ impl DialogComponent {
     // pressed nothing is the known cost, and it is preferred to DLG_CANCEL only because
     // cancelling is what stops a boot-time dialog from proceeding.
     async fn do_modal(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-        let dialog_type: i32 = jvm.get_field(&this, "type", "I").await?;
+        let dialog_type: i32 = jvm.get_field(&this, "org/kwis/msp/lwc/DialogComponent", "type", "I").await?;
 
         tracing::warn!("stub org.kwis.msp.lwc.DialogComponent::doModal({this:?}) type={dialog_type}");
 

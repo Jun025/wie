@@ -3,7 +3,6 @@ extern crate alloc;
 
 mod class_patches;
 mod context;
-mod declared_field;
 pub mod guest_roots;
 mod hardening;
 mod jvm_implementation;
@@ -20,7 +19,6 @@ use wie_backend::System;
 use wie_util::{Result, WieError};
 
 pub use context::{WieJavaClassProto, WieJvmContext};
-pub use declared_field::{get_declared_field, put_declared_field};
 pub use jvm_implementation::{JvmImplementation, RustJavaJvmImplementation};
 use runtime::{DefinedClasses, JvmRuntime};
 
@@ -87,6 +85,7 @@ impl JvmSupport {
                 runtime.current_task_id()
             },
             properties,
+            None,
         )
         .await
         .map_err(|x| WieError::FatalError(format!("Failed to create JVM: {x}")))?;

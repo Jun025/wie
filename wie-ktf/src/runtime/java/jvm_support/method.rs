@@ -1,4 +1,5 @@
 use alloc::{
+    borrow::Cow,
     boxed::Box,
     format,
     string::{String, ToString},
@@ -390,16 +391,16 @@ impl JavaMethod {
 
 #[async_trait::async_trait]
 impl Method for JavaMethod {
-    fn name(&self) -> String {
+    fn name(&self) -> Cow<'_, str> {
         let name = self.name().unwrap();
 
-        name.name().into()
+        Cow::Owned(name.name().into())
     }
 
-    fn descriptor(&self) -> String {
+    fn descriptor(&self) -> Cow<'_, str> {
         let name = self.name().unwrap();
 
-        name.descriptor().into()
+        Cow::Owned(name.descriptor().into())
     }
 
     async fn run(&self, jvm: &Jvm, args: Box<[JavaValue]>) -> JvmResult<JavaValue> {
@@ -479,9 +480,9 @@ where
         // the guest heap ran out after ~7.5 minutes). What the guest keeps is rooted by the guest
         // root scan instead (`wie_jvm_support::guest_roots`).
         wie_jvm_support::guest_roots::stress_collect(&self.jvm, core.id());
-        self.jvm.push_native_frame();
+        let frame = self.jvm.push_native_frame(&[]);
         let result = self.proto.body.call(&self.jvm, &mut context, args.into_boxed_slice()).await;
-        self.jvm.pop_frame();
+        drop(frame);
         if let Err(JavaError::JavaException(x)) = result {
             // if we executed this from rust code, we should propagate this down
             if lr == RUN_FUNCTION_LR {

@@ -91,7 +91,7 @@ impl GFormComponent {
         bounds.extend([x, y, width, height]);
         let mut array = jvm.instantiate_array("I", bounds.len()).await?;
         jvm.store_array(&mut array, 0, bounds).await?;
-        jvm.put_field(&mut this, "bounds", "[I", array).await?;
+        jvm.put_field(&mut this, "com/ktf/kfc/GFormComponent", "bounds", "[I", array).await?;
 
         Ok(index)
     }
@@ -118,7 +118,9 @@ impl GFormComponent {
             let focused = !focus.is_null() && focus.identity() == child.identity();
 
             if jvm.is_instance(&**child, "org/kwis/msp/lwc/ButtonComponent") {
-                let image: ClassInstanceRef<Image> = jvm.get_field(&child, "img", "Lorg/kwis/msp/lcdui/Image;").await?;
+                let image: ClassInstanceRef<Image> = jvm
+                    .get_field(&child, "org/kwis/msp/lwc/ButtonComponent", "img", "Lorg/kwis/msp/lcdui/Image;")
+                    .await?;
                 if !image.is_null() {
                     let _: () = jvm
                         .invoke_virtual(
@@ -139,7 +141,7 @@ impl GFormComponent {
                     .await?;
                 Self::set_color(jvm, &g, 0).await?;
                 if jvm.is_instance(&**child, "org/kwis/msp/lwc/TextComponent") {
-                    let typed: ClassInstanceRef<Array<JavaChar>> = jvm.get_field(&child, "m_td", "[C").await?;
+                    let typed: ClassInstanceRef<Array<JavaChar>> = jvm.get_field(&child, "org/kwis/msp/lwc/TextComponent", "m_td", "[C").await?;
                     if !typed.is_null() {
                         let length = jvm.array_length(&typed).await? as i32;
                         let _: () = jvm
@@ -153,8 +155,9 @@ impl GFormComponent {
                             .await?;
                     }
                 } else if jvm.is_instance(&**child, "com/ktf/kfc/ChoiceText") {
-                    let choices: ClassInstanceRef<Array<String>> = jvm.get_field(&child, "choices", "[Ljava/lang/String;").await?;
-                    let selected: i32 = jvm.get_field(&child, "selected", "I").await?;
+                    let choices: ClassInstanceRef<Array<String>> =
+                        jvm.get_field(&child, "com/ktf/kfc/ChoiceText", "choices", "[Ljava/lang/String;").await?;
+                    let selected: i32 = jvm.get_field(&child, "com/ktf/kfc/ChoiceText", "selected", "I").await?;
                     if !choices.is_null() && (selected as usize) < jvm.array_length(&choices).await? {
                         let choice: ClassInstanceRef<String> = jvm.load_array(&choices, selected as usize, 1).await?.remove(0);
                         if !choice.is_null() {
@@ -190,7 +193,7 @@ impl GFormComponent {
     }
 
     async fn bounds(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<Vec<i32>> {
-        let array: ClassInstanceRef<Array<i32>> = jvm.get_field(this, "bounds", "[I").await?;
+        let array: ClassInstanceRef<Array<i32>> = jvm.get_field(this, "com/ktf/kfc/GFormComponent", "bounds", "[I").await?;
         if array.is_null() {
             return Ok(Vec::new());
         }

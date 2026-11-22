@@ -30,15 +30,17 @@ impl Reference {
 
     async fn init(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, referent: ClassInstanceRef<Object>) -> JvmResult<()> {
         let _: () = jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await?;
-        jvm.put_field(&mut this, "referent", "Ljava/lang/Object;", referent).await
+        jvm.put_field(&mut this, "java/lang/ref/Reference", "referent", "Ljava/lang/Object;", referent)
+            .await
     }
 
     async fn get(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<Object>> {
-        jvm.get_field(&this, "referent", "Ljava/lang/Object;").await
+        jvm.get_field(&this, "java/lang/ref/Reference", "referent", "Ljava/lang/Object;").await
     }
 
     async fn clear(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
-        jvm.put_field(&mut this, "referent", "Ljava/lang/Object;", None).await
+        jvm.put_field(&mut this, "java/lang/ref/Reference", "referent", "Ljava/lang/Object;", None)
+            .await
     }
 }
 

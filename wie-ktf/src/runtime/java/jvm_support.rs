@@ -224,7 +224,7 @@ impl KtfJvmSupport {
         main_class_name: &str,
     ) -> Result<()> {
         let ptr_functions: i32 = jvm
-            .get_field(&class_loader, "nativeFunctions", "I")
+            .get_field(&class_loader, "net/wie/KtfClassLoader", "nativeFunctions", "I")
             .or_else(async |error| Err(JvmSupport::to_wie_err(jvm, error).await))
             .await?;
         let functions: ExeInterfaceFunctions = read_generic(core, ptr_functions as u32)?;
@@ -546,7 +546,9 @@ mod test {
             let ptr_functions = Allocator::alloc(&mut core, size_of::<ExeInterfaceFunctions>() as u32)?;
             let mut functions = ExeInterfaceFunctions::zeroed();
             write_generic(&mut core, ptr_functions, functions)?;
-            jvm.put_field(&mut loader, "nativeFunctions", "I", ptr_functions as i32).await.unwrap();
+            jvm.put_field(&mut loader, "net/wie/KtfClassLoader", "nativeFunctions", "I", ptr_functions as i32)
+                .await
+                .unwrap();
 
             let missing_name = JavaLangString::from_rust_string(&jvm, "test/Missing").await.unwrap();
             let missing: ClassInstanceRef<Class> = jvm
@@ -656,9 +658,8 @@ mod test {
 
             let before_root = classes[0].field("root", "Ljava/lang/Object;", true)?.unwrap();
             let after_root = classes[3].field("root", "Ljava/lang/Object;", true)?.unwrap();
-            jvm.pop_frame();
             jvm.collect_garbage().unwrap();
-            jvm.push_native_frame();
+            let frame = jvm.push_native_frame(&[]);
             let mut objects = Vec::new();
             for _ in 0..3 {
                 let object = jvm.new_class("java/lang/Object", "()V", ()).await.unwrap();
@@ -666,18 +667,18 @@ mod test {
             }
             classes[0].write_static_field(&before_root, objects[0])?;
             classes[3].write_static_field(&after_root, objects[1])?;
-            jvm.pop_frame();
+            drop(frame);
             jvm.collect_garbage().unwrap();
             let instance_size = size_of::<RawJavaClassInstance>() as u32;
             assert!(Allocator::is_allocated(&core, objects[0], instance_size)?);
             assert!(Allocator::is_allocated(&core, objects[1], instance_size)?);
             assert!(!Allocator::is_allocated(&core, objects[2], instance_size)?);
 
-            jvm.push_native_frame();
+            let frame = jvm.push_native_frame(&[]);
             let replacement = jvm.new_class("java/lang/Object", "()V", ()).await.unwrap();
             let replacement = KtfJvmSupport::class_instance_raw(&replacement);
             classes[0].write_static_field(&before_root, replacement)?;
-            jvm.pop_frame();
+            drop(frame);
             jvm.collect_garbage().unwrap();
             assert!(!Allocator::is_allocated(&core, objects[0], instance_size)?);
             assert!(Allocator::is_allocated(&core, objects[1], instance_size)?);
@@ -689,10 +690,10 @@ mod test {
             assert!(!Allocator::is_allocated(&core, objects[1], instance_size)?);
             assert!(!Allocator::is_allocated(&core, replacement, instance_size)?);
             assert_eq!(initialization_count.load(Ordering::Relaxed), 0);
-            jvm.push_native_frame();
+            let frame = jvm.push_native_frame(&[]);
             jvm.ensure_initialized(&jvm.resolve_class("test/Before").await.unwrap()).await.unwrap();
             assert_eq!(initialization_count.load(Ordering::Relaxed), 1);
-            jvm.pop_frame();
+            drop(frame);
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
@@ -846,7 +847,7 @@ mod test {
                 .invoke_static("java/lang/ClassLoader", "getSystemClassLoader", "()Ljava/lang/ClassLoader;", [])
                 .await
                 .unwrap();
-            jvm.put_field(&mut loader, "parent", "Ljava/lang/ClassLoader;", system_loader)
+            jvm.put_field(&mut loader, "java/lang/ClassLoader", "parent", "Ljava/lang/ClassLoader;", system_loader)
                 .await
                 .unwrap();
 
@@ -874,7 +875,9 @@ mod test {
             let mut functions = ExeInterfaceFunctions::zeroed();
             functions.fn_get_class = core.make_svc_stub(7, 0u32)?;
             write_generic(&mut core, ptr_functions, functions)?;
-            jvm.put_field(&mut loader, "nativeFunctions", "I", ptr_functions as i32).await.unwrap();
+            jvm.put_field(&mut loader, "net/wie/KtfClassLoader", "nativeFunctions", "I", ptr_functions as i32)
+                .await
+                .unwrap();
 
             for (name, native) in natives {
                 assert!(!jvm.has_class(name));
@@ -916,12 +919,18 @@ mod test {
 
             let midlet: ClassInstanceRef<MIDlet> = jvm.new_class("net/wie/WIPIMIDlet", "()V", ()).await.unwrap().into();
             let display: ClassInstanceRef<MidpDisplay> = MIDlet::display(&jvm, &midlet).await.unwrap();
-            let paint_disabled: bool = jvm.get_field(&display, "paintDisabled", "Z").await.unwrap();
+            let paint_disabled: bool = jvm
+                .get_field(&display, "javax/microedition/lcdui/Display", "paintDisabled", "Z")
+                .await
+                .unwrap();
             assert!(!paint_disabled);
 
             KtfJvmSupport::disable_midp_paint(&jvm).await.unwrap();
 
-            let paint_disabled: bool = jvm.get_field(&display, "paintDisabled", "Z").await.unwrap();
+            let paint_disabled: bool = jvm
+                .get_field(&display, "javax/microedition/lcdui/Display", "paintDisabled", "Z")
+                .await
+                .unwrap();
             assert!(paint_disabled);
 
             let string1 = JavaLangString::from_rust_string(&jvm, "test1").await.unwrap();
@@ -1577,7 +1586,7 @@ mod test {
             let method = class.method("valueOf", "(I)Ljava/lang/String;", true)?.unwrap();
             let raw: RawJavaMethod = read_generic(&core, method.ptr_raw)?;
 
-            jvm.push_native_frame(); // the long-lived host frame a game loop runs under
+            let frame = jvm.push_native_frame(&[]); // the long-lived host frame a game loop runs under
             let ptr_string: u32 = core.run_function(raw.fn_body, &[0, 1234]).await?;
             let string: Box<dyn jvm::ClassInstance> = Box::new(JavaClassInstance::from_raw(ptr_string, &core));
             assert_eq!(JavaLangString::to_rust_string(&jvm, &string).await.unwrap(), "1234");
@@ -1586,7 +1595,7 @@ mod test {
 
             jvm.collect_garbage().unwrap();
             assert!(!Allocator::is_allocated(&core, ptr_string, size_of::<RawJavaClassInstance>() as u32)?);
-            jvm.pop_frame();
+            drop(frame);
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
@@ -1613,7 +1622,7 @@ mod test {
             let class = jvm.resolve_class("java/lang/Object").await.unwrap();
             let ptr_class = KtfJvmSupport::class_definition_raw(&*class.definition)?;
 
-            jvm.push_native_frame(); // the long-lived host frame a game loop runs under
+            let frame = jvm.push_native_frame(&[]); // the long-lived host frame a game loop runs under
             let ptr_object: u32 = core.run_function(java_new, &[ptr_class]).await?;
             let ptr_array: u32 = core.run_function(java_array_new, &[b'I' as u32, 4]).await?;
             clear_guest_registers(&mut core);
@@ -1621,7 +1630,7 @@ mod test {
             jvm.collect_garbage().unwrap();
             assert!(!Allocator::is_allocated(&core, ptr_object, size_of::<RawJavaClassInstance>() as u32)?);
             assert!(!Allocator::is_allocated(&core, ptr_array, size_of::<RawJavaClassInstance>() as u32)?);
-            jvm.pop_frame();
+            drop(frame);
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())
@@ -1645,11 +1654,11 @@ mod test {
             let (jvm, mut core) = init_jvm(&mut system_clone).await?;
             let instance_size = size_of::<RawJavaClassInstance>() as u32;
             for holder in ["object", "storage", "element", "storage end"] {
-                jvm.push_native_frame();
+                let frame = jvm.push_native_frame(&[]);
                 let array = jvm.instantiate_array("I", 4).await.unwrap();
                 let ptr_array = KtfJvmSupport::class_instance_raw(&array);
                 drop(array);
-                jvm.pop_frame();
+                drop(frame);
                 // KTF storage: the vtable-index word, the length, then the elements.
                 let ptr_fields: u32 = read_generic(&core, ptr_array)?;
                 let word = match holder {
