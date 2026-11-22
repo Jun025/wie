@@ -121,4 +121,4 @@ KTF 쪽에 남긴 것은 6개 함수(`socket` · `socket_open` · `socket_send` 
 
 아래 표식은 §2 에 한 줄을 덧붙인 회차(`wie-ktf-kept-differences-have-no-tests-six-call-shapes` · 0577)가 다시 찍은 것이다 — 본문이 바뀌면 표식을 갈아야 해서다. 위의 44회 / 37쌍은 #601 때의 값이고, 그때 표식은 `subjects=6 tree=7ea0bffb8f35de82 B=44/37 P=2/1 S=0/0` 였다.
 
-<!-- corpus-name-inflow v1 subjects=4 tree=e32d14f0f4d652ac B=1/1 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=4 tree=7261af2138f04e92 B=1/1 P=0/0 S=0/0 -->
