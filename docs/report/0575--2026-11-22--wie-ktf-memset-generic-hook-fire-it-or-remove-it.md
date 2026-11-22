@@ -168,3 +168,5 @@ test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 108 filtered out
 
 유입(`node scripts/corpus-name-inflow.mjs`, 이 브랜치 대 `origin/main`): BOUNDED 44회/37쌍 · SUFFIX-ATTACHED 0회/0쌍이다. 바뀐 파일 «전체»를 훑은 수다.
 44 는 전부 `docs/contracts/runtime-adjustments.tsv` 에 이미 있던 행이다(이 회차가 그 파일에서 고친 것은 이름 없는 주석 2줄). 이 브랜치가 더한 줄에 걸린 것은 0 이다.
+
+<!-- corpus-name-inflow v1 subjects=5 tree=bc45ab8625cd6de7 B=44/37 P=14/3 S=0/0 -->
