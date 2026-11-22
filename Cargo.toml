@@ -71,13 +71,18 @@ clap = { version = "^4.6", features = ["derive"] }
 dyn-clone = { version = "^1.0", default-features = false }
 encoding_rs = { version = "^0.8", default-features = false, features = ["alloc"] }
 futures = { version = "^0.3", default-features = false, features = ["alloc"] }
-jvm = { version = "^0.4.1" }
-jvm-bytecode = { version = "^0.4.1" }
-jvm-class-proto = { version = "^0.4.1" }
-jvm-types = { version = "^0.4.1" }
+# RustJava — the five crates below are pinned EXACTLY (`=0.4.1`), not `^0.4.1`. `jvm` 0.4.2 adds
+# `MAX_STACK_DEPTH = 512` and throws `StackOverflowError` past it — a behaviour change no title was
+# measured under — and dependabot reads this manifest daily, so a caret would leave one `Cargo.lock`
+# line as the only thing holding it. Moving the pin is a measured round (census pair), not a bump.
+# `classfile` is theirs too but only transitive (via `jvm-bytecode`), so the lock is what holds it.
+jvm = { version = "=0.4.1" }
+jvm-bytecode = { version = "=0.4.1" }
+jvm-class-proto = { version = "=0.4.1" }
+jvm-types = { version = "=0.4.1" }
 lazy_static = { version = "^1.5", default-features = false }
 md5 = { version = "^0.8", default-features = false }
-rustjava-runtime = { version = "^0.4.1" }
+rustjava-runtime = { version = "=0.4.1" }
 serde = { version = "^1", default-features = false, features = ["derive", "alloc"] }
 # Use Rustls with ureq to support Android without OpenSSL or JVM certificate-verifier setup.
 sentry = { version = "^0.49", default-features = false, features = [
