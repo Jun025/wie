@@ -128,3 +128,7 @@ main 을 머지로 당겼다(`e50af53be` · 충돌 0 · 리베이스 아님) —
 후속 제안은 새로 내지 않았다(worklog 없음).
 
 증적(개수와 sha12 만): `~/orchestrator/reports/evidence/wie-ktf-generic-hook-exact-equivalence-fix2/`.
+
+유입(`node scripts/corpus-name-inflow.mjs`, 이 브랜치 대 `origin/main`): BOUNDED 48회/40쌍 · SUFFIX-ATTACHED 0회/0쌍이다. 바뀐 파일 «전체»를 훑은 수다.
+48 중 44 는 `docs/contracts/runtime-adjustments.tsv`(#595 가 main 에 들인 장부의 기존 행 — 이 회차가 그 파일에 더한 것은 이름 없는 주석 2줄)이고 4 는 `wie_cli/src/bin/wie_validate.rs` 에 이미 있던 주석 줄이다(`0565` 와 같은 4).
+이 브랜치가 더한 줄에 걸린 것은 0 이다. `0565` 에 있던 표식은 이 회차가 그 파일과 대상 파일들을 고쳐 낡았으므로 떼고 아래에 새로 찍는다.
