@@ -5,6 +5,8 @@ use wie_util::{ByteRead, Result, WieError};
 use crate::ArmCore;
 
 mod hook;
+#[cfg(not(target_arch = "wasm32"))]
+pub use hook::shadow as hook_shadow;
 mod parser;
 mod patch;
 
