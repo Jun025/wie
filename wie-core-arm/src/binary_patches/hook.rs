@@ -723,6 +723,11 @@ mod tests {
     /// generic entry installed over it (exactly one of its patterns must match) — and returns `r0` and the
     /// first 0x100 bytes of `DATA` from each. A hook is right when the two are equal.
     async fn own_and_hooked(code: &[u8], data: &[u8], args: &[u32]) -> Result<Vec<(u32, Vec<u8>)>> {
+        own_and_installed(code, data, args, 1).await
+    }
+
+    /// `own_and_hooked` for a routine the generic entry must install `installs` hooks on.
+    async fn own_and_installed(code: &[u8], data: &[u8], args: &[u32], installs: usize) -> Result<Vec<(u32, Vec<u8>)>> {
         let mut runs = Vec::new();
         for hooked in [false, true] {
             let mut core = ArmCore::new(false, None)?;
@@ -730,7 +735,8 @@ mod tests {
             core.map(DATA, 0x2000)?;
             core.write_bytes(DATA, data)?;
             if hooked {
-                assert_eq!(crate::install_binary_patches(&mut core, &[], &[(CODE, code.len() as u32)])?, 1);
+                let installed = crate::install_binary_patches(&mut core, &[], &[(CODE, code.len() as u32)])?;
+                assert_eq!(installed, installs, "hooks installed (left) vs expected (right)");
             }
             core.inner.lock().engine.reg_write(ArmRegister::SP, DATA + 0x2000);
             let r0: u32 = core.run_function(CODE | 1, args).await?;
@@ -808,6 +814,34 @@ mod tests {
         Ok(())
     }
 
+    /// The body pattern also matches loops whose test is another shape, and `len + 1` is the wrong
+    /// count for them: such a site gets no hook (`test_decrements_first`) and the loop runs itself.
+    #[futures_test::test]
+    async fn inline_copy_is_not_installed_on_another_loop_shape() -> Result<()> {
+        // `while (--len > 0)`: the same slots, one iteration fewer.
+        let mut pre_decrement = STACK_LOOP;
+        pre_decrement[6..18].copy_from_slice(&[0x1a, 0x68, 0x01, 0x3a, 0x1a, 0x60, 0x11, 0x1c, 0x00, 0x29, 0x00, 0xdc]);
+        // The `len-- > 0` test itself, but not straight before the body: `len` drops once more in between.
+        #[rustfmt::skip]
+        let test_apart = [
+            &STACK_LOOP[..18],
+            &[0x10, 0xe0], // b exit
+            &[0x1a, 0x68, 0x01, 0x3a, 0x1a, 0x60], // len = len - 1 (r3 is still &len)
+            &STACK_LOOP[20..46], // body
+            &[0xe5, 0xe7, 0x70, 0x47], // b test; exit: bx lr
+        ]
+        .concat();
+
+        for (shape, code, copied) in [("--len > 0", &pre_decrement[..], 7), ("test apart from the body", &test_apart[..], 4)] {
+            let runs = own_and_installed(code, &stack_loop_data(0x40, 8), &[DATA + 0x80], 0).await?;
+            let mut expected = [0xee_u8; 9];
+            expected[..copied].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7][..copied]);
+            assert_eq!(runs[0].1[0x40..0x49], expected, "{shape}: the loop itself copies {copied} bytes");
+            assert_eq!(runs[1].1, runs[0].1, "{shape}: with the generic entry (left) vs the loop itself (right)");
+        }
+        Ok(())
+    }
+
     /// The register loop the `reg_inline_copy` pattern matches — `r0` = dst, `r1` = src, `r2` = count —
     /// then hands back where `src` stopped, having stored where `dst` and `count` did at `DATA + 0x60`.
     #[rustfmt::skip]
@@ -825,7 +859,7 @@ mod tests {
     #[futures_test::test]
     async fn reg_inline_copy_matches_the_loop() -> Result<()> {
         let data: Vec<u8> = (1..=64).collect();
-        for (dst, count, copied) in [(0x20, 7, 8), (0x20, 0, 1), (0x20, -5i32 as u32, 1), (3, 11, 12)] {
+        for (dst, count, copied) in [(0x20, 7, 8), (0x20, 0, 1), (0x20, -1i32 as u32, 1), (0x20, -5i32 as u32, 1), (3, 11, 12)] {
             let runs = own_and_hooked(&REGISTER_LOOP, &data, &[DATA + dst, DATA, count]).await?;
             assert_eq!(
                 runs[0].0,
@@ -868,37 +902,86 @@ mod tests {
         Ok(())
     }
 
-    /// The shadow comparison has to be able to go red: one call, judged against the hook kind that
-    /// belongs on the routine and against one that does not. (Nothing else calls `shadow::fire` in
-    /// this binary, so the counters are this test's.)
+    /// A guest stopped inside a Thumb routine at `CODE`, as `shadow::fire` finds it.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn at_a_fire(code: &[u8], data: &[u8], site: u32) -> Result<ArmCore> {
+        let mut core = ArmCore::new(false, None)?;
+        core.load(code, CODE, code.len())?;
+        core.map(DATA, 0x2000)?;
+        core.write_bytes(DATA, data)?;
+        core.write_bytes(site, &[BINARY_PATCH_SVC as u8, 0xdf])?;
+        let mut inner = core.inner.lock();
+        inner.engine.reg_write(ArmRegister::SP, DATA + 0x2000);
+        let cpsr = inner.engine.reg_read(ArmRegister::Cpsr);
+        inner.engine.reg_write(ArmRegister::Cpsr, (cpsr & !0x3f) | 0x1f | 0x20);
+        drop(inner);
+        Ok(core)
+    }
+
+    /// The shadow comparison has to be able to go red: the same routine judged against the hook kind
+    /// that belongs on it — apart, and overlapping either way, where the hook hands the call to the
+    /// routine (`own`) and has to arrive back with it — and against a kind that does not belong.
+    /// (No other test puts these two kinds through `shadow::fire`, so their counters are this test's.)
     #[cfg(not(target_arch = "wasm32"))]
     #[futures_test::test]
     async fn shadow_passes_the_right_hook_and_catches_a_wrong_one() -> Result<()> {
         let return_to = 0x50001;
-        for kind in [HookKind::Memcpy, HookKind::Memset] {
-            let mut core = ArmCore::new(false, None)?;
-            core.load(&FORWARD_MEMCPY, CODE, FORWARD_MEMCPY.len())?;
-            core.map(DATA, 0x2000)?;
-            core.write_bytes(DATA, &(1..=64).collect::<Vec<u8>>())?;
-            core.write_bytes(CODE, &[BINARY_PATCH_SVC as u8, 0xdf])?;
+        let mut returned = Vec::new();
+        for (kind, dst, src) in [
+            (HookKind::Memcpy, DATA + 0x80, DATA),
+            (HookKind::Memcpy, DATA + 3, DATA),
+            (HookKind::Memcpy, DATA, DATA + 3),
+            (HookKind::Memset, DATA + 0x80, DATA),
+        ] {
+            let mut core = at_a_fire(&FORWARD_MEMCPY, &(1..=64).collect::<Vec<u8>>(), CODE)?;
             {
                 let mut inner = core.inner.lock();
-                inner.engine.reg_write(ArmRegister::R0, DATA + 0x80);
-                inner.engine.reg_write(ArmRegister::R1, DATA);
+                inner.engine.reg_write(ArmRegister::R0, dst);
+                inner.engine.reg_write(ArmRegister::R1, src);
                 inner.engine.reg_write(ArmRegister::R2, 32);
-                inner.engine.reg_write(ArmRegister::SP, DATA + 0x2000);
                 inner.engine.reg_write(ArmRegister::LR, return_to);
-                let cpsr = inner.engine.reg_read(ArmRegister::Cpsr);
-                inner.engine.reg_write(ArmRegister::Cpsr, (cpsr & !0x3f) | 0x1f | 0x20);
             }
             let displaced = [FORWARD_MEMCPY[0], FORWARD_MEMCPY[1]];
-            assert_eq!(shadow::fire(&mut core, CODE | 1, kind, displaced, return_to).await?.0, return_to);
+            returned.push(shadow::fire(&mut core, CODE | 1, kind, displaced, return_to).await?.0);
         }
         let report = shadow::report();
-        let right =
-            r#""memcpy":{"fires":1,"compared":1,"mem_mismatch":0,"result_mismatch":0,"callee_saved_mismatch":0,"own":0,"skipped":0,"own_fault":0}"#;
+        let right = concat!(
+            r#""memcpy":{"fires":3,"compared":3,"mem_mismatch":0,"result_mismatch":0,"callee_saved_mismatch":0,"#,
+            r#""own":2,"skipped":0,"own_fault":0,"hook_fault":0}"#
+        );
         let wrong = r#""memset":{"fires":1,"compared":1,"mem_mismatch":1,"result_mismatch":0,"#;
         assert!(report.contains(right) && report.contains(wrong), "{report}");
+        assert_eq!(returned, [return_to; 4]);
+        Ok(())
+    }
+
+    /// A hook that sends the title somewhere its own code does not go never arrives at the point the
+    /// comparison is made at. That is counted — not dropped as a fire with nothing to compare.
+    /// (No other test puts `inline_copy` through `shadow::fire`.)
+    #[cfg(not(target_arch = "wasm32"))]
+    #[futures_test::test]
+    async fn shadow_counts_a_hook_that_never_reaches_the_resume_point() -> Result<()> {
+        let body = CODE + 20;
+        let mut data = stack_loop_data(0x40, 8);
+        data[0x74..0x78].copy_from_slice(&7u32.to_le_bytes()); // as the body finds it
+        let mut core = at_a_fire(&STACK_LOOP, &data, body)?;
+        core.inner.lock().engine.reg_write(ArmRegister::R7, DATA + 0x80);
+        let astray = InlineCopy {
+            dst_offset: -8,
+            src_offset: -4,
+            len_offset: -12,
+            exit_pc: 0x7000_0001, // nothing is mapped there; the loop's test is at `CODE + 2`
+            spill_back: true,
+        };
+        let displaced = [STACK_LOOP[20], STACK_LOOP[21]];
+        shadow::fire(&mut core, body | 1, HookKind::InlineCopy(astray), displaced, 0).await?;
+
+        let report = shadow::report();
+        let row = concat!(
+            r#""inline_copy":{"fires":1,"compared":0,"mem_mismatch":0,"result_mismatch":0,"callee_saved_mismatch":0,"#,
+            r#""own":0,"skipped":0,"own_fault":0,"hook_fault":1}"#
+        );
+        assert!(report.contains(row) && report.contains("HOOK-FAULT inline_copy site=0x20014"), "{report}");
         Ok(())
     }
 

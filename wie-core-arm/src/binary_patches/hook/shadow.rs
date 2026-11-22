@@ -18,8 +18,9 @@
 //! body's temporaries after a loop — the title's code and the engine leave different values there.
 //!
 //! `skipped` fires were not compared (range unreadable, or over 8 MiB); `own_fault` is the title's
-//! own code not reaching the resume point. A run proves nothing about a site that never fired:
-//! read `fires` before `mismatch`. Sweep a corpus with `scripts/hook-shadow-sweep.sh`.
+//! own code not reaching the resume point, and `hook_fault` is the hook's side not reaching it — the
+//! worst a hook can do, and a mismatch like the three above. A run proves nothing about a site that
+//! never fired: read `fires` before `mismatch`. Sweep a corpus with `scripts/hook-shadow-sweep.sh`.
 use alloc::{format, string::String, vec, vec::Vec};
 use core::sync::atomic::{AtomicBool, AtomicU64, Ordering::Relaxed};
 
@@ -35,7 +36,7 @@ use crate::{
 };
 
 const KINDS: [&str; 6] = ["memcpy", "memset", "strcpy", "strlen", "inline_copy", "reg_inline_copy"];
-const STATS: [&str; 8] = [
+const STATS: [&str; 9] = [
     "fires",
     "compared",
     "mem_mismatch",
@@ -44,6 +45,7 @@ const STATS: [&str; 8] = [
     "own",
     "skipped",
     "own_fault",
+    "hook_fault",
 ];
 const FIRES: usize = 0;
 const COMPARED: usize = 1;
@@ -53,9 +55,10 @@ const CALLEE: usize = 4;
 const OWN: usize = 5;
 const SKIPPED: usize = 6;
 const OWN_FAULT: usize = 7;
+const HOOK_FAULT: usize = 8;
 
 static ENABLED: AtomicBool = AtomicBool::new(false);
-static COUNTS: [[AtomicU64; 8]; 6] = [const { [const { AtomicU64::new(0) }; 8] }; 6];
+static COUNTS: [[AtomicU64; 9]; 6] = [const { [const { AtomicU64::new(0) }; 9] }; 6];
 static NOTES: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 const MARGIN: u32 = 32;
@@ -183,6 +186,10 @@ pub(super) async fn fire(core: &mut ArmCore, hook_pc: u32, kind: HookKind, displ
     let reached = run_to(core, end);
     let (regs, mem, slots_after) = state(core);
     let resume = JumpTo(regs[15] | ((regs[16] >> 5) & 1));
+    if !reached {
+        counts[HOOK_FAULT].fetch_add(1, Relaxed);
+        note(format!("HOOK-FAULT {} site={site:#x} stopped={:#x}", KINDS[k], regs[15]));
+    }
     let (Some((own_regs, Some(own_mem), own_slots)), true, Some(mem)) = (own, reached, mem) else {
         return Ok(resume);
     };
