@@ -137,3 +137,5 @@
 - 문서 검사: `check-worklog-json` · `check-docs-report-serial` · `check-doc-liveness-parity` · `player-data` · `check-compat-revert`(착지 기준 바뀐 행 0) 모두 OK.
 - PR 의 beta 다리는 빈 통과라 위 로컬 `+beta` 출력이 beta 쪽의 유일한 그물이다.
 - 게임 파일명 유입: `node scripts/corpus-name-inflow.mjs` — 유입 0건(BOUNDED) · 판단 필요 0건(SUFFIX-ATTACHED) · 대상 2파일. 문서에는 sha12 · 난독화된 클래스 · 메서드 이름 · jar 안 자원 이름 · 게임이 여는 파일 이름 · 칸 값 · 횟수만 있다.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=a4099a95288aa705 B=0/0 P=0/0 S=0/0 -->
