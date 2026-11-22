@@ -36,8 +36,9 @@ impl ProgressComponent {
     async fn init(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<ProgressComponent>, interactive: bool, max: i32) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.lwc.ProgressComponent::<init>({this:?}, {interactive}, {max})");
         let _: () = jvm.invoke_special(&this, "org/kwis/msp/lwc/Component", "<init>", "()V", ()).await?;
-        jvm.put_field(&mut this, "interactive", "Z", interactive).await?;
-        jvm.put_field(&mut this, "max", "I", max).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/lwc/ProgressComponent", "interactive", "Z", interactive)
+            .await?;
+        jvm.put_field(&mut this, "org/kwis/msp/lwc/ProgressComponent", "max", "I", max).await?;
         Ok(())
     }
 
@@ -45,18 +46,19 @@ impl ProgressComponent {
     // ponytail: step is the javadoc default 1 (setStep is not implemented), so `value - value % step` is a no-op.
     async fn set_value(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<ProgressComponent>, value: i32) -> JvmResult<i32> {
         tracing::debug!("org.kwis.msp.lwc.ProgressComponent::setValue({this:?}, {value})");
-        let max: i32 = jvm.get_field(&this, "max", "I").await?;
+        let max: i32 = jvm.get_field(&this, "org/kwis/msp/lwc/ProgressComponent", "max", "I").await?;
         let value = value.min(max).max(0);
-        jvm.put_field(&mut this, "value", "I", value).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/lwc/ProgressComponent", "value", "I", value)
+            .await?;
         Ok(value)
     }
 
     async fn get_value(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<ProgressComponent>) -> JvmResult<i32> {
-        jvm.get_field(&this, "value", "I").await
+        jvm.get_field(&this, "org/kwis/msp/lwc/ProgressComponent", "value", "I").await
     }
 
     async fn get_max_value(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<ProgressComponent>) -> JvmResult<i32> {
-        jvm.get_field(&this, "max", "I").await
+        jvm.get_field(&this, "org/kwis/msp/lwc/ProgressComponent", "max", "I").await
     }
 
     // Margins only shape the painted bar, which this layer does not paint.

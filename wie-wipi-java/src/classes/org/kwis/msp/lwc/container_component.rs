@@ -159,8 +159,8 @@ impl ContainerComponent {
             if child.is_null() {
                 continue;
             }
-            let x: i32 = jvm.get_field(&child, "x", "I").await?;
-            let y: i32 = jvm.get_field(&child, "y", "I").await?;
+            let x: i32 = jvm.get_field(&child, "org/kwis/msp/lwc/Component", "x", "I").await?;
+            let y: i32 = jvm.get_field(&child, "org/kwis/msp/lwc/Component", "y", "I").await?;
             let _: () = jvm
                 .invoke_virtual(&g, "org/kwis/msp/lcdui/Graphics", "translate", "(II)V", (x, y))
                 .await?;
@@ -185,13 +185,22 @@ impl ContainerComponent {
     // directly, and a guest subclass may too, so an eagerly created list would be missing on
     // exactly those containers.
     async fn children(jvm: &Jvm, mut this: ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<Vector>> {
-        let children: ClassInstanceRef<Vector> = jvm.get_field(&this, "children", "Ljava/util/Vector;").await?;
+        let children: ClassInstanceRef<Vector> = jvm
+            .get_field(&this, "org/kwis/msp/lwc/ContainerComponent", "children", "Ljava/util/Vector;")
+            .await?;
         if !children.is_null() {
             return Ok(children);
         }
 
         let children: ClassInstanceRef<Vector> = jvm.new_class("java/util/Vector", "()V", ()).await?.into();
-        jvm.put_field(&mut this, "children", "Ljava/util/Vector;", children.clone()).await?;
+        jvm.put_field(
+            &mut this,
+            "org/kwis/msp/lwc/ContainerComponent",
+            "children",
+            "Ljava/util/Vector;",
+            children.clone(),
+        )
+        .await?;
 
         Ok(children)
     }

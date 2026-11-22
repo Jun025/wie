@@ -61,13 +61,19 @@ impl TextComponent {
         // TODO constant. 0: CONSTRAINT_ANY
         let im_handler = jvm.new_class("org/kwis/msp/lcdui/InputMethodHandler", "(I)V", (0,)).await?;
 
-        jvm.put_field(&mut this, "imHandler", "Lorg/kwis/msp/lcdui/InputMethodHandler;", im_handler)
-            .await?;
+        jvm.put_field(
+            &mut this,
+            "org/kwis/msp/lwc/TextComponent",
+            "imHandler",
+            "Lorg/kwis/msp/lcdui/InputMethodHandler;",
+            im_handler,
+        )
+        .await?;
 
         // Never null: 9789fec50f39's TextFieldComponent subclass reads `m_td.length` in its own
         // keyNotify before handing the key on, so a null buffer was an NPE on the first key.
         let empty = jvm.instantiate_array("C", 0).await?;
-        jvm.put_field(&mut this, "m_td", "[C", empty).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/lwc/TextComponent", "m_td", "[C", empty).await?;
 
         Ok(())
     }
@@ -77,13 +83,14 @@ impl TextComponent {
     async fn set_max_length(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<TextComponent>, max_length: i32) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.lwc.TextComponent::setMaxLength({this:?}, {max_length})");
 
-        jvm.put_field(&mut this, "maxLength", "I", max_length).await
+        jvm.put_field(&mut this, "org/kwis/msp/lwc/TextComponent", "maxLength", "I", max_length)
+            .await
     }
 
     async fn get_max_length(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<TextComponent>) -> JvmResult<i32> {
         tracing::debug!("org.kwis.msp.lwc.TextComponent::getMaxLength({this:?})");
 
-        jvm.get_field(&this, "maxLength", "I").await
+        jvm.get_field(&this, "org/kwis/msp/lwc/TextComponent", "maxLength", "I").await
     }
 
     // m_td is the text, whoever wrote it: setString, a typed key, or a guest subclass directly.
@@ -103,13 +110,13 @@ impl TextComponent {
         } else {
             jvm.invoke_virtual(&data, "java/lang/String", "toCharArray", "()[C", ()).await?
         };
-        jvm.put_field(&mut this, "m_td", "[C", chars).await
+        jvm.put_field(&mut this, "org/kwis/msp/lwc/TextComponent", "m_td", "[C", chars).await
     }
 
     async fn get_string(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<TextComponent>) -> JvmResult<ClassInstanceRef<String>> {
         tracing::debug!("org.kwis.msp.lwc.TextComponent::getString({this:?})");
 
-        let text: ClassInstanceRef<Array<JavaChar>> = jvm.get_field(&this, "m_td", "[C").await?;
+        let text: ClassInstanceRef<Array<JavaChar>> = jvm.get_field(&this, "org/kwis/msp/lwc/TextComponent", "m_td", "[C").await?;
 
         Ok(jvm.new_class("java/lang/String", "([C)V", (text,)).await?.into())
     }
@@ -128,7 +135,7 @@ impl TextComponent {
         if r#type != 1 {
             return Ok(true);
         }
-        let handler: ClassInstanceRef<InputMethodHandler> = jvm.get_field(&this, "imHandler", IM_HANDLER).await?;
+        let handler: ClassInstanceRef<InputMethodHandler> = jvm.get_field(&this, "org/kwis/msp/lwc/TextComponent", "imHandler", IM_HANDLER).await?;
         if key == STAR {
             // ponytail: '*' as the mode key is assumed (docs/report/0428 §2); a title that draws its
             // own mode key would want this off.
@@ -137,7 +144,7 @@ impl TextComponent {
                 .map(|()| true);
         }
 
-        let typed: ClassInstanceRef<Array<JavaChar>> = jvm.get_field(&this, "m_td", "[C").await?;
+        let typed: ClassInstanceRef<Array<JavaChar>> = jvm.get_field(&this, "org/kwis/msp/lwc/TextComponent", "m_td", "[C").await?;
         let mut text: Vec<JavaChar> = if typed.is_null() {
             Vec::new()
         } else {
@@ -151,7 +158,7 @@ impl TextComponent {
         // setMaxLength caps the text: 0c67145b11df sets 4 on both name boxes, and typing past it
         // killed its game thread (`ArrayIndexOutOfBoundsException: 16 > 8` — an array sized for
         // the cap) so the name form never closed. A key that would pass the cap does nothing.
-        let max_length: i32 = jvm.get_field(&this, "maxLength", "I").await?;
+        let max_length: i32 = jvm.get_field(&this, "org/kwis/msp/lwc/TextComponent", "maxLength", "I").await?;
         if max_length > 0 && kept + edit.insert.len() > max_length as usize {
             return Ok(true);
         }
@@ -160,7 +167,7 @@ impl TextComponent {
 
         let mut buffer = jvm.instantiate_array("C", text.len()).await?;
         jvm.store_array(&mut buffer, 0, text).await?;
-        jvm.put_field(&mut this, "m_td", "[C", buffer).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/lwc/TextComponent", "m_td", "[C", buffer).await?;
 
         Ok(true)
     }
@@ -174,12 +181,12 @@ impl TextComponent {
     async fn paint(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<TextComponent>, g: ClassInstanceRef<Graphics>) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.lwc.TextComponent::paint({this:?}, {g:?})");
 
-        let w: i32 = jvm.get_field(&this, "w", "I").await?;
-        let h: i32 = jvm.get_field(&this, "h", "I").await?;
+        let w: i32 = jvm.get_field(&this, "org/kwis/msp/lwc/TextComponent", "w", "I").await?;
+        let h: i32 = jvm.get_field(&this, "org/kwis/msp/lwc/TextComponent", "h", "I").await?;
         if w <= 0 || h <= 0 {
             return Ok(());
         }
-        let bg: i32 = jvm.get_field(&this, "bg", "I").await?;
+        let bg: i32 = jvm.get_field(&this, "org/kwis/msp/lwc/TextComponent", "bg", "I").await?;
         if bg != -1 {
             let _: () = jvm.invoke_virtual(&g, "org/kwis/msp/lcdui/Graphics", "setColor", "(I)V", (bg,)).await?;
             let _: () = jvm
@@ -187,7 +194,7 @@ impl TextComponent {
                 .await?;
         }
 
-        let typed: ClassInstanceRef<Array<JavaChar>> = jvm.get_field(&this, "m_td", "[C").await?;
+        let typed: ClassInstanceRef<Array<JavaChar>> = jvm.get_field(&this, "org/kwis/msp/lwc/TextComponent", "m_td", "[C").await?;
         if typed.is_null() {
             return Ok(());
         }
@@ -195,11 +202,12 @@ impl TextComponent {
         if length == 0 {
             return Ok(());
         }
-        let handler: ClassInstanceRef<InputMethodHandler> = jvm.get_field(&this, "imHandler", IM_HANDLER).await?;
+        let handler: ClassInstanceRef<InputMethodHandler> = jvm.get_field(&this, "org/kwis/msp/lwc/TextComponent", "imHandler", IM_HANDLER).await?;
         let constraint: i32 = if handler.is_null() {
             0
         } else {
-            jvm.get_field(&handler, "constraint", "I").await?
+            jvm.get_field(&handler, "org/kwis/msp/lcdui/InputMethodHandler", "constraint", "I")
+                .await?
         };
         let text = if constraint == CONSTRAINT_PASSWORD {
             let mut stars = jvm.instantiate_array("C", length).await?;
@@ -209,7 +217,7 @@ impl TextComponent {
             typed
         };
 
-        let fg: i32 = jvm.get_field(&this, "fg", "I").await?;
+        let fg: i32 = jvm.get_field(&this, "org/kwis/msp/lwc/TextComponent", "fg", "I").await?;
         let _: () = jvm
             .invoke_virtual(&g, "org/kwis/msp/lcdui/Graphics", "setColor", "(I)V", (if fg == -1 { 0 } else { fg },))
             .await?;
@@ -231,7 +239,8 @@ impl TextComponent {
     /// the input method: numeric constraints type digits.
     pub async fn set_constraint<T>(jvm: &Jvm, this: &mut ClassInstanceRef<T>, constraint: i32) -> JvmResult<()> {
         let handler = jvm.new_class("org/kwis/msp/lcdui/InputMethodHandler", "(I)V", (constraint,)).await?;
-        jvm.put_field(this, "imHandler", IM_HANDLER, handler).await
+        jvm.put_field(this, "org/kwis/msp/lwc/TextComponent", "imHandler", IM_HANDLER, handler)
+            .await
     }
 }
 
@@ -303,7 +312,7 @@ mod tests {
             let field = jvm
                 .new_class("org/kwis/msp/lwc/TextFieldComponent", "(Ljava/lang/String;I)V", (null, 0))
                 .await?;
-            let td: ClassInstanceRef<Array<JavaChar>> = jvm.get_field(&field, "m_td", "[C").await?;
+            let td: ClassInstanceRef<Array<JavaChar>> = jvm.get_field(&field, "org/kwis/msp/lwc/TextComponent", "m_td", "[C").await?;
             assert!(!td.is_null(), "m_td is null before any key");
             assert_eq!(jvm.array_length(&td).await?, 0);
 

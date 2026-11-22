@@ -1,4 +1,10 @@
-use alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::Vec};
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
 
 use spin::Mutex;
 
@@ -77,9 +83,7 @@ impl KtfWIPICContext {
             },
             None => None,
         };
-        if let Err(err) = self.jvm.collect_garbage() {
-            return Err(JvmSupport::to_wie_err(&self.jvm, err).await);
-        }
+        self.jvm.collect_garbage().map_err(|error| WieError::FatalError(error.to_string()))?;
 
         if let Some(data) = &data {
             self.resources.lock().insert(name.into(), data.clone());

@@ -247,7 +247,7 @@ impl LgtJvmSupport {
         let mut names = get_wipi_java_protos().iter().map(|proto| proto.name.to_string()).collect::<Vec<_>>();
         names.extend(get_midp_protos().iter().map(|proto| proto.name.to_string()));
         for ptr_class in Self::generated_class_pointers(jvm, definition).await? {
-            names.push(ClassDefinition::name(&JavaClassDefinition::from_raw(ptr_class, definition.core())));
+            names.push(ClassDefinition::name(&JavaClassDefinition::from_raw(ptr_class, definition.core())).into_owned());
         }
         names.sort();
         names.dedup();
@@ -282,7 +282,12 @@ impl LgtJvmSupport {
         let generated = Self::generated_class_pointers(jvm, definition).await?;
         let names = generated
             .iter()
-            .map(|ptr_class| Ok((*ptr_class, ClassDefinition::name(&JavaClassDefinition::from_raw(*ptr_class, core)))))
+            .map(|ptr_class| {
+                Ok((
+                    *ptr_class,
+                    ClassDefinition::name(&JavaClassDefinition::from_raw(*ptr_class, core)).into_owned(),
+                ))
+            })
             .collect::<Result<Vec<_>>>()?;
 
         let mut bound = 0;
@@ -343,7 +348,7 @@ impl LgtJvmSupport {
             return Ok(Vec::new());
         };
         let generated_classes: i32 = jvm
-            .get_field(&loader, "generatedClasses", "I")
+            .get_field(&loader, "net/wie/LgtClassLoader", "generatedClasses", "I")
             .await
             .map_err(|JavaError::JavaException(instance)| WieError::JavaException(Self::class_instance_raw(&*instance)))?;
 
@@ -1192,7 +1197,7 @@ pub(crate) mod tests {
                 (28, "insertElementAt", "(Ljava/lang/Object;I)V"),
             ] {
                 let method = vector_methods[index].method.as_ref().unwrap();
-                assert_eq!((method.name().as_str(), method.descriptor().as_str()), (name, descriptor));
+                assert_eq!((&*method.name(), &*method.descriptor()), (name, descriptor));
                 let target: u32 = read_generic(&core, vector_definition.ptr_vtable()? + ((index + 1) * 4) as u32)?;
                 assert_eq!(target, method.target()?);
             }
@@ -1209,7 +1214,7 @@ pub(crate) mod tests {
             let reader_methods = reader_definition.vtable_entries(&jvm).await?;
             for (index, name, descriptor) in [(11usize, "read", "([C)I"), (18, "close", "()V")] {
                 let method = reader_methods[index].method.as_ref().unwrap();
-                assert_eq!((method.name().as_str(), method.descriptor().as_str()), (name, descriptor));
+                assert_eq!((&*method.name(), &*method.descriptor()), (name, descriptor));
                 let target: u32 = read_generic(&core, reader_definition.ptr_vtable()? + ((index + 1) * 4) as u32)?;
                 assert_eq!(target, method.target()?);
             }
@@ -1226,7 +1231,7 @@ pub(crate) mod tests {
             let input_stream_reader_methods = input_stream_reader_definition.vtable_entries(&jvm).await?;
             for (index, name, descriptor) in [(11usize, "read", "([C)I"), (18, "close", "()V")] {
                 let method = input_stream_reader_methods[index].method.as_ref().unwrap();
-                assert_eq!((method.name().as_str(), method.descriptor().as_str()), (name, descriptor));
+                assert_eq!((&*method.name(), &*method.descriptor()), (name, descriptor));
                 let target: u32 = read_generic(&core, input_stream_reader_definition.ptr_vtable()? + ((index + 1) * 4) as u32)?;
                 assert_eq!(target, method.target()?);
             }
@@ -1352,7 +1357,7 @@ pub(crate) mod tests {
                 (18, "destroyApp", "(Z)V"),
             ] {
                 let method = direct_jlet_methods[index].method.as_ref().unwrap();
-                assert_eq!((method.name().as_str(), method.descriptor().as_str()), (name, descriptor));
+                assert_eq!((&*method.name(), &*method.descriptor()), (name, descriptor));
                 let target: u32 = read_generic(&core, direct_jlet_definition.ptr_vtable()? + ((index + 1) * 4) as u32)?;
                 assert_eq!(target, method.target()?);
             }
@@ -1462,9 +1467,12 @@ pub(crate) mod tests {
             let initialized_class_object: u32 = core.run_function(descriptor.fn_get_initialized_class, &[]).await?;
             assert_eq!(initialized_class_object, class_object);
             assert_ne!(java_class_instance.ptr_fields()?, class_fields);
-            let native_name: i32 = jvm.get_field(&java_class, CLASS_NATIVE_NAME_FIELD, WORD_FIELD_DESCRIPTOR).await.unwrap();
+            let native_name: i32 = jvm
+                .get_field(&java_class, "java/lang/Class", CLASS_NATIVE_NAME_FIELD, WORD_FIELD_DESCRIPTOR)
+                .await
+                .unwrap();
             let initialization_state: i32 = jvm
-                .get_field(&java_class, CLASS_INITIALIZATION_STATE_FIELD, WORD_FIELD_DESCRIPTOR)
+                .get_field(&java_class, "java/lang/Class", CLASS_INITIALIZATION_STATE_FIELD, WORD_FIELD_DESCRIPTOR)
                 .await
                 .unwrap();
             assert_eq!(native_name as u32, descriptor.ptr_name);
@@ -1494,7 +1502,7 @@ pub(crate) mod tests {
             let class_object_again: u32 = core.run_function(descriptor.fn_get_class, &[]).await?;
             assert_eq!(class_object_again, class_object);
             let initialization_state: i32 = jvm
-                .get_field(&java_class, CLASS_INITIALIZATION_STATE_FIELD, WORD_FIELD_DESCRIPTOR)
+                .get_field(&java_class, "java/lang/Class", CLASS_INITIALIZATION_STATE_FIELD, WORD_FIELD_DESCRIPTOR)
                 .await
                 .unwrap();
             assert_eq!(initialization_state, 5);
@@ -1548,7 +1556,12 @@ pub(crate) mod tests {
             let short_initialized_class: u32 = core.run_function(short_descriptor.fn_get_initialized_class, &[]).await?;
             assert_eq!(short_initialized_class, short_class_object);
             let initialization_state: i32 = jvm
-                .get_field(&short_java_class, CLASS_INITIALIZATION_STATE_FIELD, WORD_FIELD_DESCRIPTOR)
+                .get_field(
+                    &short_java_class,
+                    "java/lang/Class",
+                    CLASS_INITIALIZATION_STATE_FIELD,
+                    WORD_FIELD_DESCRIPTOR,
+                )
                 .await
                 .unwrap();
             assert_eq!(initialization_state, 5);
@@ -1615,10 +1628,11 @@ pub(crate) mod tests {
 
             let mut field_child_instance: Box<dyn ClassInstance> = Box::new(JavaClassInstance::new(&mut core, &field_child_definition)?);
             let ptr_fields = field_child_instance.as_any().downcast_ref::<JavaClassInstance>().unwrap().ptr_fields()?;
-            jvm.put_field(&mut field_child_instance, "own0", "I", 0x1234_5678i32).await.unwrap();
+            // Through the field itself: this class is never registered with the JVM, so it has no name to resolve.
+            field_child_instance.put_field(own0, JavaValue::Int(0x1234_5678)).unwrap();
             assert_eq!(read_generic::<u32, _>(&core, ptr_fields + 6 * size_of::<u32>() as u32)?, 0x1234_5678);
             write_generic(&mut core, ptr_fields + 7 * size_of::<u32>() as u32, 0x7654_3210u32)?;
-            let own1: i32 = jvm.get_field(&field_child_instance, "own1", "I").await.unwrap();
+            let own1: i32 = field_child_instance.get_field(own1).unwrap().into();
             assert_eq!(own1, 0x7654_3210);
 
             done_clone.store(true, Ordering::Relaxed);
@@ -1672,22 +1686,24 @@ pub(crate) mod tests {
             let slot = |index: u32| ptr_fields + index * size_of::<u32>() as u32;
 
             // Host write → guest view.
-            jvm.put_field(&mut instance, "j", "J", 0x0123_4567_89ab_cdefi64).await.unwrap();
+            // Through the field itself: this class is never registered with the JVM, so it has no name to resolve.
+            let field = |name: &str, descriptor: &str| ClassDefinition::field(&definition, name, descriptor, false).unwrap();
+            instance.put_field(&*field("j", "J"), JavaValue::Long(0x0123_4567_89ab_cdefi64)).unwrap();
             assert_eq!(read_generic::<u32, _>(&core, slot(j))?, 0x0123_4567);
             assert_eq!(read_generic::<u32, _>(&core, slot(j + 1))?, 0x89ab_cdef);
-            jvm.put_field(&mut instance, "d", "D", 1.5f64).await.unwrap();
+            instance.put_field(&*field("d", "D"), JavaValue::Double(1.5)).unwrap();
             assert_eq!(read_generic::<u32, _>(&core, slot(d))?, (1.5f64.to_bits() >> 32) as u32);
             assert_eq!(read_generic::<u32, _>(&core, slot(d + 1))?, 1.5f64.to_bits() as u32);
 
             // Guest write (high, then low) → host view.
             write_generic(&mut core, slot(j), 0x7654_3210u32)?;
             write_generic(&mut core, slot(j + 1), 0xfedc_ba98u32)?;
-            let value: i64 = jvm.get_field(&instance, "j", "J").await.unwrap();
+            let value: i64 = instance.get_field(&*field("j", "J")).unwrap().into();
             assert_eq!(value as u64, 0x7654_3210_fedc_ba98);
 
             // Host round trip, as every Rust-declared field is used.
-            jvm.put_field(&mut instance, "d", "D", -2.25f64).await.unwrap();
-            let value: f64 = jvm.get_field(&instance, "d", "D").await.unwrap();
+            instance.put_field(&*field("d", "D"), JavaValue::Double(-2.25)).unwrap();
+            let value: f64 = instance.get_field(&*field("d", "D")).unwrap().into();
             assert_eq!(value, -2.25);
 
             done_clone.store(true, Ordering::Relaxed);
@@ -1716,7 +1732,7 @@ pub(crate) mod tests {
         let time: i64 = jvm
             .invoke_virtual(&this, "java/util/TimerTask", "scheduledExecutionTime", "()J", ())
             .await?;
-        let own: i32 = jvm.get_field(&this, "own", "I").await?;
+        let own: i32 = jvm.get_field(&this, "net/wie/test/GuestTask", "own", "I").await?;
         GUEST_TASK_OWN.store(own.into(), Ordering::Relaxed);
         GUEST_TASK_SEEN.store(time, Ordering::Relaxed);
         Ok(())
@@ -1771,12 +1787,14 @@ pub(crate) mod tests {
                     .map(|index| read_generic::<u32, _>(&core, ptr_fields + index * 4))
                     .collect::<Result<Vec<_>>>()
             };
-            jvm.put_field(&mut task, "own", "I", 0x1234_5678i32).await.unwrap();
+            jvm.put_field(&mut task, "net/wie/test/GuestTask", "own", "I", 0x1234_5678i32)
+                .await
+                .unwrap();
             let before = words()?;
             assert_eq!(before[6], 0x1234_5678);
 
             // The exact write the Timer thread makes each tick (value = the measured one).
-            jvm.put_field(&mut task, "lastScheduledExecutionTime", "J", 1790431442004i64)
+            jvm.put_field(&mut task, "java/util/TimerTask", "lastScheduledExecutionTime", "J", 1790431442004i64)
                 .await
                 .unwrap();
             assert_eq!(words()?, before, "host field wrote into or past the instance");
@@ -1906,7 +1924,9 @@ pub(crate) mod tests {
                 5
             );
             let ptr_fields = instance.as_any().downcast_ref::<JavaClassInstance>().unwrap().ptr_fields()?;
-            jvm.put_field(&mut instance, "own", "I", 0x1234_5678i32).await.unwrap();
+            jvm.put_field(&mut instance, "net/wie/test/GuestThread", "own", "I", 0x1234_5678i32)
+                .await
+                .unwrap();
             let past = read_generic::<u32, _>(&core, ptr_fields + 5 * 4)?;
             let _: () = jvm
                 .invoke_special(&instance, "net/wie/test/GuestThread", "<init>", "()V", ())
@@ -2064,7 +2084,7 @@ pub(crate) mod tests {
                 (18, "destroyApp", "(Z)V"),
             ] {
                 let method = methods[index].method.as_ref().unwrap();
-                assert_eq!((method.name().as_str(), method.descriptor().as_str()), (name, descriptor));
+                assert_eq!((&*method.name(), &*method.descriptor()), (name, descriptor));
                 assert_eq!(
                     read_generic::<u32, _>(&core, definition.ptr_vtable()? + ((index + 1) * size_of::<u32>()) as u32)?,
                     method.target()?
@@ -2240,7 +2260,7 @@ pub(crate) mod tests {
                     .get(index)
                     .and_then(|entry| entry.method.as_ref())
                     .unwrap_or_else(|| panic!("{class_name} vtable index {index} is empty, so the guest gets a missing-entry stub"));
-                assert_eq!((method.name().as_str(), method.descriptor().as_str()), (name, descriptor));
+                assert_eq!((&*method.name(), &*method.descriptor()), (name, descriptor));
             }
 
             done_clone.store(true, Ordering::Relaxed);

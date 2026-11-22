@@ -799,7 +799,6 @@ above the engine reaches back into it.
 - `wie_ktf`, `wie_lgt`, `wie_skt`, `wie_j2me` — per-carrier entry points (`wie_ktf`/`wie_lgt` hold the heavy reverse-engineered runtimes).
 - `wie_cli` — native host (also `wie_validate`, a headless triage runner); `wie_featurephone` — browser host, empty library off `wasm32` (Constraint 7; renamed from `wie_web` 2026-09-11 — upstream uses that name).
 - `wie_identify` — which game a file is, without booting it; the one place `contentKey` is computed (its binary writes `compat.json`'s, the browser's `identify()` export returns it).
-- `patches/classfile` — crates.io `classfile` 0.1.1 plus one fix (modified UTF-8 constants), via `[patch.crates-io]`; its `README.md` has the removal condition.
 - `web/`, `functions/`, `migrations/`, `scripts/`, `docs/`, `data/`, `fonts/`, `test_data/` — non-Rust surfaces.
 
 **Full map: `docs/architecture.md`** — layer diagram, a role for every crate, and what each

@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, format, string::String, sync::Arc, vec, vec::Vec};
+use alloc::{borrow::Cow, boxed::Box, format, string::String, sync::Arc, vec, vec::Vec};
 use core::{fmt, fmt::Debug, fmt::Formatter, ops::Deref, ops::DerefMut};
 
 use jvm::{JavaError, JavaType, JavaValue, Jvm, Method, Result as JvmResult};
@@ -143,12 +143,16 @@ impl JavaMethod {
 
 #[async_trait::async_trait]
 impl Method for JavaMethod {
-    fn name(&self) -> String {
-        String::from_utf8(read_null_terminated_string_bytes(&self.core, self.raw().unwrap().ptr_name).unwrap()).unwrap()
+    fn name(&self) -> Cow<'_, str> {
+        String::from_utf8(read_null_terminated_string_bytes(&self.core, self.raw().unwrap().ptr_name).unwrap())
+            .unwrap()
+            .into()
     }
 
-    fn descriptor(&self) -> String {
-        String::from_utf8(read_null_terminated_string_bytes(&self.core, self.raw().unwrap().ptr_descriptor).unwrap()).unwrap()
+    fn descriptor(&self) -> Cow<'_, str> {
+        String::from_utf8(read_null_terminated_string_bytes(&self.core, self.raw().unwrap().ptr_descriptor).unwrap())
+            .unwrap()
+            .into()
     }
 
     async fn run(&self, jvm: &Jvm, args: Box<[JavaValue]>) -> JvmResult<JavaValue> {
@@ -229,9 +233,9 @@ where
         // for a game loop, one that never returns, so nothing it made was ever collected
         // (1b107b96bf4e). What the guest keeps is rooted by the guest root scan instead.
         wie_jvm_support::guest_roots::stress_collect(&self.jvm, core.id());
-        self.jvm.push_native_frame();
+        let frame = self.jvm.push_native_frame(&[]);
         let result = self.proto.body.call(&self.jvm, &mut self.context.clone(), args.into_boxed_slice()).await;
-        self.jvm.pop_frame();
+        drop(frame);
         let result = match result {
             Ok(value) => value,
             Err(JavaError::JavaException(instance)) => return Err(WieError::JavaException(codec.object_to_raw(&*instance))),
@@ -319,7 +323,7 @@ mod tests {
             let method = class.definition.method("valueOf", "(I)Ljava/lang/String;", true).unwrap();
             let target = method.as_any().downcast_ref::<JavaMethod>().unwrap().target()?;
 
-            jvm.push_native_frame(); // the long-lived host frame a game loop runs under
+            let frame = jvm.push_native_frame(&[]); // the long-lived host frame a game loop runs under
             let ptr_string: u32 = core.run_function(target, &[1234]).await?;
             let string = LgtJvmSupport::class_instance_from_raw(&core, ptr_string)?;
             assert_eq!(JavaLangString::to_rust_string(&jvm, &string).await.unwrap(), "1234");
@@ -327,7 +331,7 @@ mod tests {
 
             jvm.collect_garbage().unwrap();
             assert!(!Allocator::is_allocated(&core, ptr_string, 12)?);
-            jvm.pop_frame();
+            drop(frame);
 
             done_clone.store(true, Ordering::Relaxed);
             Ok(())

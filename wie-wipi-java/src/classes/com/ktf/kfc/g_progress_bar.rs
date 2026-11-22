@@ -47,14 +47,14 @@ impl GProgressBar {
     async fn set_maximum(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, maximum: i32) -> JvmResult<bool> {
         tracing::debug!("com.ktf.kfc.GProgressBar::setMaximum({this:?}, {maximum})");
 
-        jvm.put_field(&mut this, "maximum", "I", maximum).await?;
+        jvm.put_field(&mut this, "com/ktf/kfc/GProgressBar", "maximum", "I", maximum).await?;
         Ok(true)
     }
 
     async fn set_value(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, value: i32) -> JvmResult<bool> {
         tracing::debug!("com.ktf.kfc.GProgressBar::setValue({this:?}, {value})");
 
-        jvm.put_field(&mut this, "value", "I", value).await?;
+        jvm.put_field(&mut this, "com/ktf/kfc/GProgressBar", "value", "I", value).await?;
         Ok(true)
     }
 }
@@ -77,8 +77,8 @@ mod tests {
             assert!(set);
             let set: bool = jvm.invoke_virtual(&bar, "com/ktf/kfc/GProgressBar", "setValue", "(I)Z", (3,)).await?;
             assert!(set);
-            assert_eq!(jvm.get_field::<i32>(&bar, "maximum", "I").await?, 8);
-            assert_eq!(jvm.get_field::<i32>(&bar, "value", "I").await?, 3);
+            assert_eq!(jvm.get_field::<i32>(&bar, "com/ktf/kfc/GProgressBar", "maximum", "I").await?, 8);
+            assert_eq!(jvm.get_field::<i32>(&bar, "com/ktf/kfc/GProgressBar", "value", "I").await?, 3);
 
             Ok(())
         })

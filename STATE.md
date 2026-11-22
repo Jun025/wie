@@ -17,7 +17,7 @@
 | `git merge-base origin/main upstream/main` | `44fbf265`(2026-09-16 조각 D · PR #161 착지 이후 **불변** · 67일째) |
 | behind / ahead | **244** / 3,034 (`origin/main` `64ee6998` ↔ `upstream/main` `10620f82` 2026-11-21) · 11-06 에는 173 / 2,970 |
 | upstream 쪽 델타 | 243커밋(병합 제외) · 384파일 **+42,087/−11,755** · `git merge-tree` 충돌 파일 **136**(11-06 에는 93) |
-| RustJava | 우리 = crates.io `jvm*` `^0.1.1` ↔ upstream = `^0.4.2`(11-06 예행 때는 `^0.4.1`) |
+| RustJava | 우리 = crates.io `jvm*` `=0.4.1`(정확 고정 · 조각 S1 · `docs/report/0572`) ↔ upstream = `^0.5.1`(11-22 #1630·#1631 · 11-06 예행 때는 `^0.4.1`) |
 | compat (`docs/player-data/compat.json`) | 429행 · playable **426** · not-yet 2 · limited 1 · `progress=stuck` **90** · enginePin `4ac38566` |
 | GitHub Actions | 2026-11-04T05:40Z 뒤 run 0 → 11-19T14:59Z 에 첫 run(GitHub 쪽 정지 · `docs/report/0553`). 그 뒤 push·PR run 은 돈다. ★`schedule` 이벤트 run 은 11-04 이후 **0건**(아래 §다음 «상시») |
 
@@ -89,16 +89,17 @@
 
 다음은 아래 ⑴ 이다(발권 전 · 발권은 총괄 몫). ⑵ 는 ⑴ 과 독립이다.
 
-**⑴ upstream 2차 동기화 — 조각 S1(RustJava 핀을 우리 쪽에서 먼저 올린다) · S2(executor·pacing)**
-- **무엇**: `docs/report/0551` §7 의 조각 계획 그대로다. S1 = 루트 `jvm*`·`rustjava-runtime` 을 upstream 이 쓰는 판으로
-  올린다(예행 때 `^0.4.1` · 11-22 의 upstream 은 `^0.4.2` — 착수할 때 다시 읽어라). S2 = `wie-backend` 의 `executor.rs`·
+**⑴ upstream 2차 동기화 — 조각 S1b(RustJava `=0.4.1` → upstream 이 쓰는 `^0.5.1`) · S2(executor·pacing)**
+- **무엇**: `docs/report/0551` §7 의 조각 계획 그대로다. S1 의 첫 조각(`^0.1.1` → `=0.4.1` · 필드 owner 인자 · `patches/classfile` 삭제 ·
+  zip 9)은 `docs/report/0572` 이 했다. 남은 S1b = upstream 이 11-22 에 올린 `^0.5.1`(#1630 · #1631)까지 — 0.4.2 가 더한
+  Java 스택 깊이 상한(512 프레임 → `StackOverflowError`)이 여기 든다. S2 = `wie-backend` 의 `executor.rs`·
   `system.rs`·`task.rs` 를 upstream 의 sleep 마감·협동 폴링 의미로 옮기고 우리 pacing API 는 지킨다.
   둘 다 우리 쪽만 바꾸고 서로 독립이라 병렬로 열 수 있다. 병합 커밋(S3)은 둘이 착지한 뒤다.
 - **왜 지금**: «한 번에 병합»은 no-go 로 판정됐고 조각 계획은 go 다(0551 §0). 기다린 값이 수로 나왔다 —
   11-06 → 11-22(16일) 사이 behind 173 → **244** · 충돌 파일 93 → **136**. merge-base 는 67일째 그대로다.
-- **근거**: 0551 §7(공통 검증식 V0 + 조각별 검증식) · 열린 제안 `2026-11-06-upstream-sync2-dry-run-classify#p0`(S1)·`#p1`(S2) ·
+- **근거**: 0551 §7(공통 검증식 V0 + 조각별 검증식) · 열린 제안 `2026-11-22-upstream-sync2-s1-rustjava-pin-0-4-1#p0`(S1b)·`2026-11-06-upstream-sync2-dry-run-classify#p1`(S2) ·
   병합 전략 = `merge`(squash 금지 · `AGENTS.md` §For the `-merge` task only).
-- **size**: S1 = L(크면 S1a 0.1→0.3 · S1b 0.3→0.4 로 나눈다) · S2 = M.
+- **size**: S1b = M(upstream #1630 은 15파일 +43/−36) · S2 = M.
 - ★**0551 의 93행 분류표는 11-06 트리의 것이다.** S3 을 열 때 표 전체를 그날의 `upstream/main` 에서 다시 잰다(0551 §1).
 
 **⑵ 「오래 하기」 이른 종료(`short`) 14행 — 한 번 더 재서 같은 값이 나오는 행만 `compat.json` 에 반영**

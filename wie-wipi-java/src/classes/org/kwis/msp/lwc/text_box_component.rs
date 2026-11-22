@@ -48,7 +48,8 @@ impl TextBoxComponent {
             .invoke_static("org/kwis/msp/lcdui/Font", "getDefaultFont", "()Lorg/kwis/msp/lcdui/Font;", ())
             .await?;
         let font_height: i32 = jvm.invoke_virtual(&font, "org/kwis/msp/lcdui/Font", "getHeight", "()I", ()).await?;
-        jvm.put_field(&mut this, "h", "I", font_height + 2).await
+        jvm.put_field(&mut this, "org/kwis/msp/lwc/TextBoxComponent", "h", "I", font_height + 2)
+            .await
     }
 
     // (data, constraints, h) — the javadoc's order: the last int is the box's initial height.
@@ -73,6 +74,6 @@ impl TextBoxComponent {
                 (data, constraint),
             )
             .await?;
-        jvm.put_field(&mut this, "h", "I", h).await
+        jvm.put_field(&mut this, "org/kwis/msp/lwc/TextBoxComponent", "h", "I", h).await
     }
 }

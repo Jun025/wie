@@ -61,10 +61,11 @@ impl Clip {
         tracing::debug!("org.kwis.msp.media.Clip::<init>({this:?}, {type:?})");
 
         let _: () = jvm.invoke_special(&this, "org/kwis/msp/media/BaseClip", "<init>", "()V", ()).await?;
-        jvm.put_field(&mut this, "type", "Ljava/lang/String;", r#type).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/media/Clip", "type", "Ljava/lang/String;", r#type)
+            .await?;
         // Full volume until the game says otherwise — not the field's 0, which a game that reads
         // `getVolume` back into `setVolume` would turn into silence.
-        jvm.put_field(&mut this, "volume", "I", 100).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/media/Clip", "volume", "I", 100).await?;
 
         Ok(())
     }
@@ -161,7 +162,7 @@ impl Clip {
             return Ok(false);
         }
 
-        jvm.put_field(&mut this, "volume", "I", level).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/media/Clip", "volume", "I", level).await?;
         Self::apply_volume(jvm, context, &this).await?;
 
         Ok(true)
@@ -173,8 +174,8 @@ impl Clip {
         if player.is_null() {
             return Ok(());
         }
-        let level: i32 = jvm.get_field(this, "volume", "I").await?;
-        let handle: i32 = jvm.get_field(&player, "audioHandle", "I").await?;
+        let level: i32 = jvm.get_field(this, "org/kwis/msp/media/Clip", "volume", "I").await?;
+        let handle: i32 = jvm.get_field(&player, "net/wie/SmafPlayer", "audioHandle", "I").await?;
         let _ = context.system().audio().set_volume(handle as u32, level as f32 / 100.0);
 
         Ok(())
@@ -216,13 +217,13 @@ impl Clip {
     async fn get_type(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<String>> {
         tracing::debug!("org.kwis.msp.media.Clip::getType({this:?})");
 
-        jvm.get_field(&this, "type", "Ljava/lang/String;").await
+        jvm.get_field(&this, "org/kwis/msp/media/Clip", "type", "Ljava/lang/String;").await
     }
 
     async fn set_position(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, milliseconds: i32) -> JvmResult<bool> {
         tracing::debug!("org.kwis.msp.media.Clip::setPosition({this:?}, {milliseconds})");
 
-        jvm.put_field(&mut this, "position", "I", milliseconds).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/media/Clip", "position", "I", milliseconds).await?;
 
         Ok(true)
     }
@@ -230,13 +231,13 @@ impl Clip {
     async fn get_position(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
         tracing::debug!("org.kwis.msp.media.Clip::getPosition({this:?})");
 
-        jvm.get_field(&this, "position", "I").await
+        jvm.get_field(&this, "org/kwis/msp/media/Clip", "position", "I").await
     }
 
     async fn set_stop_time(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, milliseconds: i32) -> JvmResult<bool> {
         tracing::debug!("org.kwis.msp.media.Clip::setStopTime({this:?}, {milliseconds})");
 
-        jvm.put_field(&mut this, "stopTime", "I", milliseconds).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/media/Clip", "stopTime", "I", milliseconds).await?;
 
         Ok(true)
     }
@@ -244,13 +245,13 @@ impl Clip {
     async fn get_stop_time(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
         tracing::debug!("org.kwis.msp.media.Clip::getStopTime({this:?})");
 
-        jvm.get_field(&this, "stopTime", "I").await
+        jvm.get_field(&this, "org/kwis/msp/media/Clip", "stopTime", "I").await
     }
 
     async fn get_volume(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
         tracing::debug!("org.kwis.msp.media.Clip::getVolume({this:?})");
 
-        jvm.get_field(&this, "volume", "I").await
+        jvm.get_field(&this, "org/kwis/msp/media/Clip", "volume", "I").await
     }
 
     // A null clip has no player. `Player.stop(null)` is how several KTF titles silence a clip
@@ -259,7 +260,8 @@ impl Clip {
         if this.is_null() {
             return Ok(ClassInstanceRef::new(None));
         }
-        jvm.get_field(this, "player", "Ljavax/microedition/media/Player;").await
+        jvm.get_field(this, "org/kwis/msp/media/BaseClip", "player", "Ljavax/microedition/media/Player;")
+            .await
     }
 }
 

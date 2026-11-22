@@ -413,11 +413,17 @@ mod test {
             mut this: ClassInstanceRef<Self>,
             _graphics: ClassInstanceRef<Graphics>,
         ) -> JvmResult<()> {
-            let paints: i32 = jvm.get_field(&this, "paints", "I").await?;
-            jvm.put_field(&mut this, "paints", "I", paints + 1).await?;
+            let paints: i32 = jvm
+                .get_field(&this, "javax/microedition/lcdui/TestServicingCanvas", "paints", "I")
+                .await?;
+            jvm.put_field(&mut this, "javax/microedition/lcdui/TestServicingCanvas", "paints", "I", paints + 1)
+                .await?;
             // Stop a recursion here rather than overflow the test thread; the count shows it.
             if paints < 8 {
-                if jvm.get_field(&this, "repaints", "Z").await? {
+                if jvm
+                    .get_field(&this, "javax/microedition/lcdui/TestServicingCanvas", "repaints", "Z")
+                    .await?
+                {
                     let _: () = jvm.invoke_virtual(&this, "javax/microedition/lcdui/Canvas", "repaint", "()V", ()).await?;
                 }
                 let _: () = jvm
@@ -442,7 +448,10 @@ mod test {
                     (canvas.clone(),),
                 )
                 .await?;
-            let paints = || async { jvm.get_field::<i32>(&canvas, "paints", "I").await };
+            let paints = || async {
+                jvm.get_field::<i32>(&canvas, "javax/microedition/lcdui/TestServicingCanvas", "paints", "I")
+                    .await
+            };
             let base = paints().await?;
 
             // serviceRepaints inside paint: nothing is pending, so it must not paint again.
@@ -466,12 +475,17 @@ mod test {
 
             // A repaint asked for inside paint belongs to the next paint, not to a nested one.
             let mut servicing = canvas.clone();
-            jvm.put_field(&mut servicing, "repaints", "Z", true).await?;
+            jvm.put_field(&mut servicing, "javax/microedition/lcdui/TestServicingCanvas", "repaints", "Z", true)
+                .await?;
             let _: () = jvm
                 .invoke_virtual(&display, "javax/microedition/lcdui/Display", "handlePaintEvent", "()V", ())
                 .await?;
             assert_eq!(paints().await? - base, 3, "serviceRepaints inside paint nested a paint");
-            assert!(jvm.get_field::<bool>(&display, "repaintPending", "Z").await?, "and it stays pending");
+            assert!(
+                jvm.get_field::<bool>(&display, "javax/microedition/lcdui/Display", "repaintPending", "Z")
+                    .await?,
+                "and it stays pending"
+            );
             Ok(())
         })
     }
@@ -534,7 +548,8 @@ mod test {
                 let value: i32 = jvm
                     .invoke_virtual(&graphics, "javax/microedition/lcdui/Graphics", method, "()I", ())
                     .await?;
-                jvm.put_field(&mut this, field, "I", value).await?;
+                jvm.put_field(&mut this, "javax/microedition/lcdui/TestRecordingCanvas", field, "I", value)
+                    .await?;
             }
 
             let _: () = jvm
@@ -545,22 +560,36 @@ mod test {
         }
 
         async fn size_changed(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, width: i32, height: i32) -> JvmResult<()> {
-            let count: i32 = jvm.get_field(&this, "sizeChangedCount", "I").await?;
-            jvm.put_field(&mut this, "sizeChangedCount", "I", count + 1).await?;
-            jvm.put_field(&mut this, "lastWidth", "I", width).await?;
-            jvm.put_field(&mut this, "lastHeight", "I", height).await
+            let count: i32 = jvm
+                .get_field(&this, "javax/microedition/lcdui/TestRecordingCanvas", "sizeChangedCount", "I")
+                .await?;
+            jvm.put_field(
+                &mut this,
+                "javax/microedition/lcdui/TestRecordingCanvas",
+                "sizeChangedCount",
+                "I",
+                count + 1,
+            )
+            .await?;
+            jvm.put_field(&mut this, "javax/microedition/lcdui/TestRecordingCanvas", "lastWidth", "I", width)
+                .await?;
+            jvm.put_field(&mut this, "javax/microedition/lcdui/TestRecordingCanvas", "lastHeight", "I", height)
+                .await
         }
 
         async fn key_pressed(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, code: i32) -> JvmResult<()> {
-            jvm.put_field(&mut this, "pressed", "I", code).await
+            jvm.put_field(&mut this, "javax/microedition/lcdui/TestRecordingCanvas", "pressed", "I", code)
+                .await
         }
 
         async fn key_repeated(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, code: i32) -> JvmResult<()> {
-            jvm.put_field(&mut this, "repeated", "I", code).await
+            jvm.put_field(&mut this, "javax/microedition/lcdui/TestRecordingCanvas", "repeated", "I", code)
+                .await
         }
 
         async fn key_released(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, code: i32) -> JvmResult<()> {
-            jvm.put_field(&mut this, "released", "I", code).await
+            jvm.put_field(&mut this, "javax/microedition/lcdui/TestRecordingCanvas", "released", "I", code)
+                .await
         }
     }
 
@@ -595,22 +624,36 @@ mod test {
         }
 
         async fn size_changed(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, width: i32, height: i32) -> JvmResult<()> {
-            let count: i32 = jvm.get_field(&this, "sizeChangedCount", "I").await?;
-            jvm.put_field(&mut this, "sizeChangedCount", "I", count + 1).await?;
-            jvm.put_field(&mut this, "lastWidth", "I", width).await?;
-            jvm.put_field(&mut this, "lastHeight", "I", height).await
+            let count: i32 = jvm
+                .get_field(&this, "javax/microedition/lcdui/TestRecordingGameCanvas", "sizeChangedCount", "I")
+                .await?;
+            jvm.put_field(
+                &mut this,
+                "javax/microedition/lcdui/TestRecordingGameCanvas",
+                "sizeChangedCount",
+                "I",
+                count + 1,
+            )
+            .await?;
+            jvm.put_field(&mut this, "javax/microedition/lcdui/TestRecordingGameCanvas", "lastWidth", "I", width)
+                .await?;
+            jvm.put_field(&mut this, "javax/microedition/lcdui/TestRecordingGameCanvas", "lastHeight", "I", height)
+                .await
         }
 
         async fn key_pressed(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, code: i32) -> JvmResult<()> {
-            jvm.put_field(&mut this, "pressed", "I", code).await
+            jvm.put_field(&mut this, "javax/microedition/lcdui/TestRecordingGameCanvas", "pressed", "I", code)
+                .await
         }
 
         async fn key_repeated(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, code: i32) -> JvmResult<()> {
-            jvm.put_field(&mut this, "repeated", "I", code).await
+            jvm.put_field(&mut this, "javax/microedition/lcdui/TestRecordingGameCanvas", "repeated", "I", code)
+                .await
         }
 
         async fn key_released(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, code: i32) -> JvmResult<()> {
-            jvm.put_field(&mut this, "released", "I", code).await
+            jvm.put_field(&mut this, "javax/microedition/lcdui/TestRecordingGameCanvas", "released", "I", code)
+                .await
         }
     }
 
@@ -694,18 +737,23 @@ mod test {
                                 .await?,
                             height
                         );
-                        assert_eq!(jvm.get_field::<i32>(&canvas, "sizeChangedCount", "I").await?, callback_count);
-                        assert_eq!(jvm.get_field::<i32>(&canvas, "lastHeight", "I").await?, height);
+                        assert_eq!(jvm.get_field::<i32>(&canvas, class, "sizeChangedCount", "I").await?, callback_count);
+                        assert_eq!(jvm.get_field::<i32>(&canvas, class, "lastHeight", "I").await?, height);
                         let _: () = jvm
                             .invoke_virtual(&display, "javax/microedition/lcdui/Display", "handlePaintEvent", "()V", ())
                             .await?;
                         if !game_canvas {
                             for coordinate in ["translateX", "clipX", "clipY"] {
-                                assert_eq!(jvm.get_field::<i32>(&canvas, coordinate, "I").await?, 0);
+                                assert_eq!(jvm.get_field::<i32>(&canvas, class, coordinate, "I").await?, 0);
                             }
-                            assert_eq!(jvm.get_field::<i32>(&canvas, "translateY", "I").await? == 0, fullscreen);
-                            assert_eq!(jvm.get_field::<i32>(&canvas, "clipWidth", "I").await?, 320);
-                            assert_eq!(jvm.get_field::<i32>(&canvas, "clipHeight", "I").await?, height);
+                            assert_eq!(
+                                jvm.get_field::<i32>(&canvas, "javax/microedition/lcdui/TestRecordingCanvas", "translateY", "I")
+                                    .await?
+                                    == 0,
+                                fullscreen
+                            );
+                            assert_eq!(jvm.get_field::<i32>(&canvas, class, "clipWidth", "I").await?, 320);
+                            assert_eq!(jvm.get_field::<i32>(&canvas, class, "clipHeight", "I").await?, height);
                         }
                         let mut graphics: ClassInstanceRef<Graphics> = jvm
                             .invoke_virtual(
@@ -733,7 +781,7 @@ mod test {
                                 (event_type as i32, key),
                             )
                             .await?;
-                        assert_eq!(jvm.get_field::<i32>(&canvas, field, "I").await?, key);
+                        assert_eq!(jvm.get_field::<i32>(&canvas, class, field, "I").await?, key);
                     }
                 }
                 Ok(())
@@ -782,7 +830,8 @@ mod test {
                         .await?;
                     let expected = if standard { standard_code } else { key };
                     assert_eq!(
-                        jvm.get_field::<i32>(&canvas, "pressed", "I").await?,
+                        jvm.get_field::<i32>(&canvas, "javax/microedition/lcdui/TestRecordingCanvas", "pressed", "I")
+                            .await?,
                         expected,
                         "standard={standard} key={key}"
                     );

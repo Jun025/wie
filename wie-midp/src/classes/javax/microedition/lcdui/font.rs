@@ -166,27 +166,27 @@ impl Font {
         tracing::warn!("stub javax.microedition.lcdui.Font::getFont({face:?}, {style:?}, {size:?})");
 
         let mut instance: ClassInstanceRef<Font> = jvm.new_class("javax/microedition/lcdui/Font", "()V", []).await?.into();
-        jvm.put_field(&mut instance, "face", "I", face).await?;
-        jvm.put_field(&mut instance, "style", "I", style).await?;
-        jvm.put_field(&mut instance, "size", "I", size).await?;
+        jvm.put_field(&mut instance, "javax/microedition/lcdui/Font", "face", "I", face).await?;
+        jvm.put_field(&mut instance, "javax/microedition/lcdui/Font", "style", "I", style).await?;
+        jvm.put_field(&mut instance, "javax/microedition/lcdui/Font", "size", "I", size).await?;
 
         Ok(instance)
     }
 
     async fn get_face(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Font>) -> JvmResult<i32> {
-        jvm.get_field(&this, "face", "I").await
+        jvm.get_field(&this, "javax/microedition/lcdui/Font", "face", "I").await
     }
 
     async fn get_style(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Font>) -> JvmResult<i32> {
-        jvm.get_field(&this, "style", "I").await
+        jvm.get_field(&this, "javax/microedition/lcdui/Font", "style", "I").await
     }
 
     async fn get_size(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Font>) -> JvmResult<i32> {
-        jvm.get_field(&this, "size", "I").await
+        jvm.get_field(&this, "javax/microedition/lcdui/Font", "size", "I").await
     }
 
     async fn style_bit(jvm: &Jvm, this: &ClassInstanceRef<Font>, bit: i32) -> JvmResult<bool> {
-        let style: i32 = jvm.get_field(this, "style", "I").await?;
+        let style: i32 = jvm.get_field(this, "javax/microedition/lcdui/Font", "style", "I").await?;
 
         Ok(if bit == 0 { style == 0 } else { style & bit != 0 })
     }

@@ -43,7 +43,7 @@ const CONCRETE: [&str; 3] = [
 fn exception_class(err: JavaError) -> String {
     let JavaError::JavaException(instance) = err;
 
-    instance.class_definition().name()
+    instance.class_definition().name().into_owned()
 }
 
 #[test]

@@ -121,7 +121,9 @@ impl TextComponentHandler {
         tracing::debug!("com.xce.lcdui.TextComponentHandler::keyPressed({this:?}, {key})");
 
         const NAME: &str = "com/xce/lcdui/TextComponent";
-        let component: ClassInstanceRef<TextComponent> = jvm.get_field(&this, "component", "Lcom/xce/lcdui/TextComponent;").await?;
+        let component: ClassInstanceRef<TextComponent> = jvm
+            .get_field(&this, "com/xce/lcdui/TextComponentHandler", "component", "Lcom/xce/lcdui/TextComponent;")
+            .await?;
         if component.is_null() {
             let field = XTextField::focused(jvm).await?;
             return if field.is_null() {
@@ -135,7 +137,7 @@ impl TextComponentHandler {
             CLEAR => {
                 let _: () = jvm.invoke_virtual(&component, NAME, "delete", "()V", ()).await?;
                 // The letter being cycled may be the one just deleted: replace would write at caret-1.
-                jvm.put_field(&mut this, "tapKey", "I", 0).await?;
+                jvm.put_field(&mut this, "com/xce/lcdui/TextComponentHandler", "tapKey", "I", 0).await?;
             }
             LEFT | RIGHT => {
                 // moveCursor calls our clear() itself and repaints.
@@ -151,11 +153,17 @@ impl TextComponentHandler {
 
                 // Latin renders as typed, so the letter being cycled is the whole composition.
                 let now = context.system().platform().now().raw() as i64;
-                let tap_key: i32 = jvm.get_field(&this, "tapKey", "I").await?;
-                let tap_time: i64 = jvm.get_field(&this, "tapTime", "J").await?;
+                let tap_key: i32 = jvm.get_field(&this, "com/xce/lcdui/TextComponentHandler", "tapKey", "I").await?;
+                let tap_time: i64 = jvm.get_field(&this, "com/xce/lcdui/TextComponentHandler", "tapTime", "J").await?;
                 let again = tap_key == key && now - tap_time < MULTITAP_MS;
                 let mut tokens = if again {
-                    vec![char::from_u32(jvm.get_field::<JavaChar>(&this, "tapChar", "C").await? as u32).unwrap_or(' ')]
+                    vec![
+                        char::from_u32(
+                            jvm.get_field::<JavaChar>(&this, "com/xce/lcdui/TextComponentHandler", "tapChar", "C")
+                                .await? as u32,
+                        )
+                        .unwrap_or(' '),
+                    ]
                 } else {
                     vec![]
                 };
@@ -171,9 +179,18 @@ impl TextComponentHandler {
                 let after: i32 = jvm.invoke_virtual(&component, NAME, "size", "()I", ()).await?;
                 // A full field ignores insert; cycling then would rewrite the last character instead.
                 let typed = after > before || (again && edit.delete > 0);
-                jvm.put_field(&mut this, "tapKey", "I", if typed { key } else { 0 }).await?;
-                jvm.put_field(&mut this, "tapChar", "C", tokens[0] as JavaChar).await?;
-                jvm.put_field(&mut this, "tapTime", "J", now).await?;
+                jvm.put_field(
+                    &mut this,
+                    "com/xce/lcdui/TextComponentHandler",
+                    "tapKey",
+                    "I",
+                    if typed { key } else { 0 },
+                )
+                .await?;
+                jvm.put_field(&mut this, "com/xce/lcdui/TextComponentHandler", "tapChar", "C", tokens[0] as JavaChar)
+                    .await?;
+                jvm.put_field(&mut this, "com/xce/lcdui/TextComponentHandler", "tapTime", "J", now)
+                    .await?;
             }
             _ => return Ok(false),
         }
@@ -196,14 +213,21 @@ impl TextComponentHandler {
     ) -> JvmResult<()> {
         tracing::debug!("com.xce.lcdui.TextComponentHandler::setTextComponent({this:?}, {component:?})");
 
-        jvm.put_field(&mut this, "component", "Lcom/xce/lcdui/TextComponent;", component).await?;
-        jvm.put_field(&mut this, "tapKey", "I", 0).await
+        jvm.put_field(
+            &mut this,
+            "com/xce/lcdui/TextComponentHandler",
+            "component",
+            "Lcom/xce/lcdui/TextComponent;",
+            component,
+        )
+        .await?;
+        jvm.put_field(&mut this, "com/xce/lcdui/TextComponentHandler", "tapKey", "I", 0).await
     }
 
     async fn clear(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("com.xce.lcdui.TextComponentHandler::clear({this:?})");
 
-        jvm.put_field(&mut this, "tapKey", "I", 0).await
+        jvm.put_field(&mut this, "com/xce/lcdui/TextComponentHandler", "tapKey", "I", 0).await
     }
 }
 
@@ -358,22 +382,22 @@ mod tests {
         async fn init(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, constraints: i32, max_size: i32) -> JvmResult<()> {
             let _: () = jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await?;
             Self::set(jvm, &mut this, alloc::string::String::new()).await?;
-            jvm.put_field(&mut this, "constraints", "I", constraints).await?;
-            jvm.put_field(&mut this, "maxSize", "I", max_size).await
+            jvm.put_field(&mut this, "test/EditField", "constraints", "I", constraints).await?;
+            jvm.put_field(&mut this, "test/EditField", "maxSize", "I", max_size).await
         }
 
         async fn get(jvm: &Jvm, this: &ClassInstanceRef<Self>) -> JvmResult<alloc::string::String> {
-            let text: ClassInstanceRef<String> = jvm.get_field(this, "text", "Ljava/lang/String;").await?;
+            let text: ClassInstanceRef<String> = jvm.get_field(this, "test/EditField", "text", "Ljava/lang/String;").await?;
             JavaLangString::to_rust_string(jvm, &text).await
         }
 
         async fn set(jvm: &Jvm, this: &mut ClassInstanceRef<Self>, text: alloc::string::String) -> JvmResult<()> {
             let text: ClassInstanceRef<String> = JavaLangString::from_rust_string(jvm, &text).await?.into();
-            jvm.put_field(this, "text", "Ljava/lang/String;", text).await
+            jvm.put_field(this, "test/EditField", "text", "Ljava/lang/String;", text).await
         }
 
         async fn get_constraints(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
-            jvm.get_field(&this, "constraints", "I").await
+            jvm.get_field(&this, "test/EditField", "constraints", "I").await
         }
 
         async fn size(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
@@ -382,7 +406,7 @@ mod tests {
 
         async fn insert(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, c: JavaChar) -> JvmResult<()> {
             let mut text = Self::get(jvm, &this).await?;
-            if (text.len() as i32) < jvm.get_field::<i32>(&this, "maxSize", "I").await? {
+            if (text.len() as i32) < jvm.get_field::<i32>(&this, "test/EditField", "maxSize", "I").await? {
                 text.push(c as u8 as char);
             }
             Self::set(jvm, &mut this, text).await
@@ -402,7 +426,7 @@ mod tests {
         }
 
         async fn move_cursor(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, key: i32) -> JvmResult<()> {
-            jvm.put_field(&mut this, "moved", "I", key).await
+            jvm.put_field(&mut this, "test/EditField", "moved", "I", key).await
         }
 
         async fn repaint(_: &Jvm, _: &mut WieJvmContext, _: ClassInstanceRef<Self>) -> JvmResult<()> {
@@ -455,7 +479,7 @@ mod tests {
                 assert!(press(j, h, 0x34).await?);
                 assert_eq!(EditField::get(&jvm, &name).await?, "KAA");
                 assert!(press(j, h, 142).await?);
-                assert_eq!(jvm.get_field::<i32>(&name, "moved", "I").await?, 142);
+                assert_eq!(jvm.get_field::<i32>(&name, "test/EditField", "moved", "I").await?, 142);
                 assert!(!press(j, h, 0x23).await?); // '#': no mode switch here
 
                 // NUMERIC (85f03ca7389e's 11-digit field) takes the digit itself.

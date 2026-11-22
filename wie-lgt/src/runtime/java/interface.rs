@@ -83,7 +83,7 @@ async fn handle_java_system_svc(
     let (_, lr) = core.read_pc_lr()?;
     // A frame per call, as for the guest's calls to host methods (`JavaMethodProxy::call`).
     wie_jvm_support::guest_roots::stress_collect(jvm, core.id());
-    jvm.push_native_frame();
+    let frame = jvm.push_native_frame(&[]);
     let result: Result<()> = async {
         match JavaSystemSvcId::try_from(id)? {
             JavaSystemSvcId::InterfaceUnk0 => EmulatedFunction::call(&java_unk0, core, &mut ()).await?.write(core, lr),
@@ -144,7 +144,7 @@ async fn handle_java_system_svc(
         }
     }
     .await;
-    jvm.pop_frame();
+    drop(frame);
 
     match result {
         Ok(()) => Ok(JumpTo(lr)),
@@ -213,7 +213,7 @@ async fn java_string_literal(core: &mut ArmCore, jvm: &mut Jvm, _runtime_context
         .await
         .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))?;
     let native_strings: ClassInstanceRef<Vector> = jvm
-        .get_field(&class_loader, "nativeStrings", "Ljava/util/Vector;")
+        .get_field(&class_loader, "net/wie/LgtClassLoader", "nativeStrings", "Ljava/util/Vector;")
         .await
         .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))?;
     let _: bool = jvm
@@ -239,7 +239,10 @@ async fn java_get_interface_method_table(
 ) -> Result<u32> {
     let interface_name = String::from_utf8(read_null_terminated_string_bytes(core, ptr_interface_name)?)
         .map_err(|error| WieError::FatalError(format!("Invalid LGT interface class name: {error}")))?;
-    let receiver_name = LgtJvmSupport::class_instance_from_raw(core, ptr_instance)?.class_definition().name();
+    let receiver_name = LgtJvmSupport::class_instance_from_raw(core, ptr_instance)?
+        .class_definition()
+        .name()
+        .into_owned();
     let key = (receiver_name, interface_name);
     if let Some(table) = tables.lock().get(&key) {
         return Ok(*table);
@@ -454,7 +457,7 @@ async fn java_register_class(core: &mut ArmCore, jvm: &mut Jvm, ptr_class: u32) 
         .await
         .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))?;
     let generated_classes: i32 = jvm
-        .get_field(&loader, "generatedClasses", "I")
+        .get_field(&loader, "net/wie/LgtClassLoader", "generatedClasses", "I")
         .await
         .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))?;
     LgtJvmSupport::register_generated_class(core, jvm, ptr_class, generated_classes as u32, loader).await?;
@@ -476,16 +479,22 @@ async fn java_resolve_class(core: &mut ArmCore, jvm: &mut Jvm, ptr_class: u32, _
 async fn java_initialize_class(core: &mut ArmCore, jvm: &mut Jvm, ptr_class_object: u32, callback: u32) -> Result<()> {
     let mut class_object = LgtJvmSupport::class_instance_from_raw(core, ptr_class_object)?;
     let ready: i32 = jvm
-        .get_field(&class_object, CLASS_INITIALIZATION_STATE_FIELD, WORD_FIELD_DESCRIPTOR)
+        .get_field(&class_object, "java/lang/Class", CLASS_INITIALIZATION_STATE_FIELD, WORD_FIELD_DESCRIPTOR)
         .await
         .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))?;
     if ready == 5 {
         return Ok(());
     }
 
-    jvm.put_field(&mut class_object, CLASS_INITIALIZATION_STATE_FIELD, WORD_FIELD_DESCRIPTOR, 5i32)
-        .await
-        .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))?;
+    jvm.put_field(
+        &mut class_object,
+        "java/lang/Class",
+        CLASS_INITIALIZATION_STATE_FIELD,
+        WORD_FIELD_DESCRIPTOR,
+        5i32,
+    )
+    .await
+    .map_err(|JavaError::JavaException(instance)| WieError::JavaException(LgtJvmSupport::class_instance_raw(&*instance)))?;
     if callback != 0 {
         let _: () = core.run_function(callback, &[]).await?;
     }
@@ -1021,15 +1030,18 @@ mod tests {
             let (mut jvm, mut core, _) = init_jvm(&system_clone).await?;
             // The guest's own call: what the constructor allocates is held by this frame only
             // until it returns, as it is when an AOT method runs `new Stack()`.
-            jvm.push_native_frame();
+            let frame = jvm.push_native_frame(&[]);
             let class_object = jvm.resolve_class("java/util/Stack").await.unwrap().java_class();
             let ptr_stack = java_instantiate(&mut core, &mut jvm, LgtJvmSupport::class_instance_raw(&*class_object)).await?;
             let stack = LgtJvmSupport::class_instance_from_raw(&core, ptr_stack)?;
             let _: () = jvm.invoke_special(&stack, "java/util/Stack", "<init>", "()V", ()).await.unwrap();
-            let element_data: Box<dyn ClassInstance> = jvm.get_field(&stack, "elementData", "[Ljava/lang/Object;").await.unwrap();
+            let element_data: Box<dyn ClassInstance> = jvm
+                .get_field(&stack, "java/util/Vector", "elementData", "[Ljava/lang/Object;")
+                .await
+                .unwrap();
             let ptr_element_data = LgtJvmSupport::class_instance_raw(&*element_data);
             drop(element_data);
-            jvm.pop_frame();
+            drop(frame);
             // The guest holds the Stack in a register; the guest root scan must see it there.
             let mut context = core.save_context();
             context.r4 = ptr_stack;
@@ -1090,15 +1102,18 @@ mod tests {
 
         system.spawn(async move || {
             let (mut jvm, mut core, _) = init_jvm(&system_clone).await?;
-            jvm.push_native_frame();
+            let frame = jvm.push_native_frame(&[]);
             let class_object = jvm.resolve_class("java/util/Stack").await.unwrap().java_class();
             let ptr_stack = java_instantiate(&mut core, &mut jvm, LgtJvmSupport::class_instance_raw(&*class_object)).await?;
             let stack = LgtJvmSupport::class_instance_from_raw(&core, ptr_stack)?;
             let _: () = jvm.invoke_special(&stack, "java/util/Stack", "<init>", "()V", ()).await.unwrap();
-            let element_data: Box<dyn ClassInstance> = jvm.get_field(&stack, "elementData", "[Ljava/lang/Object;").await.unwrap();
+            let element_data: Box<dyn ClassInstance> = jvm
+                .get_field(&stack, "java/util/Vector", "elementData", "[Ljava/lang/Object;")
+                .await
+                .unwrap();
             let ptr_element_data = LgtJvmSupport::class_instance_raw(&*element_data);
             drop((stack, element_data));
-            jvm.pop_frame();
+            drop(frame);
             clear_guest_registers(&mut core);
 
             jvm.collect_garbage().unwrap();
@@ -1130,11 +1145,11 @@ mod tests {
         system.spawn(async move || {
             let (mut jvm, mut core, _) = init_jvm(&system_clone).await?;
             for holder in ["object", "storage", "element", "storage end"] {
-                jvm.push_native_frame();
+                let frame = jvm.push_native_frame(&[]);
                 let array = jvm.instantiate_array("I", 4).await.unwrap();
                 let ptr_array = LgtJvmSupport::class_instance_raw(&*array);
                 drop(array);
-                jvm.pop_frame();
+                drop(frame);
                 let ptr_fields: u32 = read_generic(&core, ptr_array + 8)?;
                 let word = match holder {
                     "object" => ptr_array,

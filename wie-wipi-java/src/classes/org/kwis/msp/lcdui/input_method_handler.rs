@@ -73,9 +73,11 @@ impl InputMethodHandler {
         tracing::debug!("org.kwis.msp.lcdui.InputMethodHandler::<init>({this:?}, {constraint})");
 
         let _: () = jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await?;
-        jvm.put_field(&mut this, "constraint", "I", constraint).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/lcdui/InputMethodHandler", "constraint", "I", constraint)
+            .await?;
         // A handset starts a text field in Korean.
-        jvm.put_field(&mut this, "mode", "I", HANGUL_MODE).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/lcdui/InputMethodHandler", "mode", "I", HANGUL_MODE)
+            .await?;
 
         Ok(())
     }
@@ -85,7 +87,8 @@ impl InputMethodHandler {
     async fn set_current_mode(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, mode: i32) -> JvmResult<bool> {
         tracing::warn!("stub org.kwis.msp.lcdui.InputMethodHandler::setCurrentMode({this:?}, {mode})");
 
-        jvm.put_field(&mut this, "mode", "I", mode).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/lcdui/InputMethodHandler", "mode", "I", mode)
+            .await?;
         Self::end_composition(jvm, &mut this).await?;
 
         Ok(true)
@@ -96,15 +99,22 @@ impl InputMethodHandler {
     pub async fn change_current_mode_to_next(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.lcdui.InputMethodHandler::changeCurrentModeToNext({this:?})");
 
-        let mode: i32 = jvm.get_field(&this, "mode", "I").await?;
-        jvm.put_field(&mut this, "mode", "I", (mode + 1).rem_euclid(MODES.len() as i32)).await?;
+        let mode: i32 = jvm.get_field(&this, "org/kwis/msp/lcdui/InputMethodHandler", "mode", "I").await?;
+        jvm.put_field(
+            &mut this,
+            "org/kwis/msp/lcdui/InputMethodHandler",
+            "mode",
+            "I",
+            (mode + 1).rem_euclid(MODES.len() as i32),
+        )
+        .await?;
         Self::end_composition(jvm, &mut this).await
     }
 
     async fn get_current_mode(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
         tracing::debug!("org.kwis.msp.lcdui.InputMethodHandler::getCurrentMode({this:?})");
 
-        jvm.get_field(&this, "mode", "I").await
+        jvm.get_field(&this, "org/kwis/msp/lcdui/InputMethodHandler", "mode", "I").await
     }
 
     // wie draws no symbol card, so hiding one is already the resting state.
@@ -133,7 +143,14 @@ impl InputMethodHandler {
     async fn notify_key_input(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>, key: i32, r#type: i32) -> JvmResult<bool> {
         tracing::debug!("org.kwis.msp.lcdui.InputMethodHandler::notifyKeyInput({this:?}, {key}, {type})");
 
-        let listener: ClassInstanceRef<InputMethodListener> = jvm.get_field(&this, "listener", "Lorg/kwis/msp/lcdui/InputMethodListener;").await?;
+        let listener: ClassInstanceRef<InputMethodListener> = jvm
+            .get_field(
+                &this,
+                "org/kwis/msp/lcdui/InputMethodHandler",
+                "listener",
+                "Lorg/kwis/msp/lcdui/InputMethodListener;",
+            )
+            .await?;
         if listener.is_null() {
             return Ok(false); // javadoc: no listener -> false, nothing done
         }
@@ -145,7 +162,7 @@ impl InputMethodHandler {
         };
 
         // Resolved on the listener's own class: the interface proto here declares no methods.
-        let class = listener.class_definition().name();
+        let class = listener.class_definition().name().into_owned();
         for op in edit.ops() {
             let (c, mode) = match op {
                 Op::Insert(c) => (c, INSERT),
@@ -173,13 +190,16 @@ impl InputMethodHandler {
         key: i32,
         text: Option<&[JavaChar]>,
     ) -> JvmResult<Option<Edit>> {
-        let constraint: i32 = jvm.get_field(&this, "constraint", "I").await?;
+        let constraint: i32 = jvm.get_field(&this, "org/kwis/msp/lcdui/InputMethodHandler", "constraint", "I").await?;
         let mode = if NUMERIC_CONSTRAINTS.contains(&constraint) {
             Mode::Digit
         } else {
-            MODES[jvm.get_field::<i32>(&this, "mode", "I").await?.rem_euclid(MODES.len() as i32) as usize]
+            MODES[jvm
+                .get_field::<i32>(&this, "org/kwis/msp/lcdui/InputMethodHandler", "mode", "I")
+                .await?
+                .rem_euclid(MODES.len() as i32) as usize]
         };
-        let composing: ClassInstanceRef<Array<JavaChar>> = jvm.get_field(&this, "composing", "[C").await?;
+        let composing: ClassInstanceRef<Array<JavaChar>> = jvm.get_field(&this, "org/kwis/msp/lcdui/InputMethodHandler", "composing", "[C").await?;
         let mut tokens: Vec<char> = if composing.is_null() {
             Vec::new()
         } else {
@@ -195,17 +215,20 @@ impl InputMethodHandler {
         }
 
         let edit = if key == CLEAR {
-            jvm.put_field(&mut this, "lastKey", "I", 0).await?;
+            jvm.put_field(&mut this, "org/kwis/msp/lcdui/InputMethodHandler", "lastKey", "I", 0)
+                .await?;
             keypad::back(mode, &mut tokens).unwrap_or(Edit {
                 delete: 1,
                 insert: Vec::new(),
             })
         } else if (b'0' as i32..=b'9' as i32).contains(&key) {
             let now = context.system().platform().now().raw() as i64;
-            let last_key: i32 = jvm.get_field(&this, "lastKey", "I").await?;
-            let last_at: i64 = jvm.get_field(&this, "lastAt", "J").await?;
-            jvm.put_field(&mut this, "lastKey", "I", key).await?;
-            jvm.put_field(&mut this, "lastAt", "J", now).await?;
+            let last_key: i32 = jvm.get_field(&this, "org/kwis/msp/lcdui/InputMethodHandler", "lastKey", "I").await?;
+            let last_at: i64 = jvm.get_field(&this, "org/kwis/msp/lcdui/InputMethodHandler", "lastAt", "J").await?;
+            jvm.put_field(&mut this, "org/kwis/msp/lcdui/InputMethodHandler", "lastKey", "I", key)
+                .await?;
+            jvm.put_field(&mut this, "org/kwis/msp/lcdui/InputMethodHandler", "lastAt", "J", now)
+                .await?;
             keypad::press(
                 mode,
                 &mut tokens,
@@ -219,15 +242,17 @@ impl InputMethodHandler {
         let mut composing = jvm.instantiate_array("C", tokens.len()).await?;
         jvm.store_array(&mut composing, 0, tokens.into_iter().map(|c| c as JavaChar).collect::<Vec<_>>())
             .await?;
-        jvm.put_field(&mut this, "composing", "[C", composing).await?;
+        jvm.put_field(&mut this, "org/kwis/msp/lcdui/InputMethodHandler", "composing", "[C", composing)
+            .await?;
 
         Ok(Some(edit))
     }
 
     async fn end_composition(jvm: &Jvm, this: &mut ClassInstanceRef<Self>) -> JvmResult<()> {
         let empty = jvm.instantiate_array("C", 0).await?;
-        jvm.put_field(this, "composing", "[C", empty).await?;
-        jvm.put_field(this, "lastKey", "I", 0).await
+        jvm.put_field(this, "org/kwis/msp/lcdui/InputMethodHandler", "composing", "[C", empty)
+            .await?;
+        jvm.put_field(this, "org/kwis/msp/lcdui/InputMethodHandler", "lastKey", "I", 0).await
     }
 
     // wie has no input method, so the listener is never called back; it is kept so the
@@ -240,8 +265,14 @@ impl InputMethodHandler {
     ) -> JvmResult<()> {
         tracing::warn!("stub org.kwis.msp.lcdui.InputMethodHandler::setInputMethodListener({this:?}, {listener:?})");
 
-        jvm.put_field(&mut this, "listener", "Lorg/kwis/msp/lcdui/InputMethodListener;", listener)
-            .await
+        jvm.put_field(
+            &mut this,
+            "org/kwis/msp/lcdui/InputMethodHandler",
+            "listener",
+            "Lorg/kwis/msp/lcdui/InputMethodListener;",
+            listener,
+        )
+        .await
     }
 }
 
@@ -277,7 +308,7 @@ mod tests {
         async fn init(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
             let _: () = jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await?;
             let empty = JavaLangString::from_rust_string(jvm, "").await?;
-            jvm.put_field(&mut this, "text", "Ljava/lang/String;", empty).await
+            jvm.put_field(&mut this, "test/Recorder", "text", "Ljava/lang/String;", empty).await
         }
         async fn changed(
             jvm: &Jvm,
@@ -287,7 +318,7 @@ mod tests {
             len: i32,
             mode: i32,
         ) -> JvmResult<()> {
-            let text = JavaLangString::to_rust_string(jvm, &jvm.get_field(&this, "text", "Ljava/lang/String;").await?).await?;
+            let text = JavaLangString::to_rust_string(jvm, &jvm.get_field(&this, "test/Recorder", "text", "Ljava/lang/String;").await?).await?;
             let mut text: Vec<char> = text.chars().collect();
             let got: Vec<JavaChar> = jvm.load_array(&chars, 0, len as usize).await?;
             match mode {
@@ -301,7 +332,7 @@ mod tests {
                 }
             }
             let text = JavaLangString::from_rust_string(jvm, &text.into_iter().collect::<String>()).await?;
-            jvm.put_field(&mut this, "text", "Ljava/lang/String;", text).await
+            jvm.put_field(&mut this, "test/Recorder", "text", "Ljava/lang/String;", text).await
         }
     }
 
@@ -326,7 +357,7 @@ mod tests {
                 .await?;
             assert!(consumed, "key {key} not consumed");
         }
-        JavaLangString::to_rust_string(jvm, &jvm.get_field(&listener, "text", "Ljava/lang/String;").await?).await
+        JavaLangString::to_rust_string(jvm, &jvm.get_field(&listener, "test/Recorder", "text", "Ljava/lang/String;").await?).await
     }
 
     // 1e43e2e0055f's shop-name prompt: the stub consumed no key and called no listener, so the

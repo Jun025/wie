@@ -79,7 +79,7 @@ impl A3 {
         }
         let mut m = [0; 12];
         for (v, name) in m.iter_mut().zip(FIELDS) {
-            *v = jvm.get_field(this, name, "I").await?;
+            *v = jvm.get_field(this, "m/A3", name, "I").await?;
         }
         Ok(m)
     }
@@ -89,7 +89,7 @@ impl A3 {
             return Err(jvm.exception("java/lang/NullPointerException", "A3 is null").await);
         }
         for (v, name) in m.iter().zip(FIELDS) {
-            jvm.put_field(&mut this, name, "I", *v).await?;
+            jvm.put_field(&mut this, "m/A3", name, "I", *v).await?;
         }
         Ok(())
     }

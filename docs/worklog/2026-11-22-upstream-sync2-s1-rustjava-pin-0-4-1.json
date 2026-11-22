@@ -1,0 +1,43 @@
+{
+  "date": "2026-11-22",
+  "task": "wie-upstream-sync2-s1-rustjava-pin-0-4-1-before-upstream-sync",
+  "title": "조각 S1 — RustJava 핀을 0.1.1 에서 0.4.1 로 (upstream 병합 전 · 우리 쪽만)",
+  "summary": "루트 jvm* · rustjava-runtime 을 ^0.1.1 에서 =0.4.1 로 올리고(정확 고정) 그 판의 API 를 따라갔다 — 필드 접근 1,774곳에 owner 클래스 인자, Cow 이름, 네이티브 프레임 가드. patches/classfile 을 지웠고(코퍼스의 .class 엔트리 14,730개에서 상수 해석 차이 0 — 그중 12,950개는 vendor_sdk 의 SDK jar 이고 게임 꾸러미(working + broken) 쪽은 1,778개다) zip 을 9.8.1 로 올려 감사 억제 8건을 0건으로 줄였다. cargo test --all 851 통과(최종 트리 864) · 4게이트 + beta clippy · 러너 블록 통과. 코퍼스 표본 68판(조정 행이 걸린 49판 전부 포함)의 부팅 + 그림 판정은 전/후 68/68 로 같다. 게이트② 반려 뒤(-fix): 전수 429행 전/후 짝(프로브 15초 · 부팅 · 그림 · 입력 · 소리)에서 다시 재어 남는 판정 변화 0, 다섯 크레이트를 =0.4.1 로 고정. 속도는 CPU 초가 전/후 같고(처음의 «CPU 3분의 1» 은 틀렸다) Java 조회 비용이 줄어 마감 없이 도는 SKT 표본 하나가 최종 트리(같은 날 착지한 S2 #603 을 받은 뒤)에서 52 ~ 53% 더 그린다(S2 를 받기 전 짝에서는 18 ~ 38%). 게이트② 재검 뒤(-fix2 · 문서만): 재검이 지원 목록 SKT 82행을 전/후 동시 짝으로 다 쟀다 — 그리기 +10% 이상이 2회 재현된 행 5(+12 ~ 55%) · +4 ~ 13% 2행 · 나머지 75행 ±3% 안 · KTF · LGT 표본 44행에서 0행 · 브라우저에서도 한 행 +53%. 이용자에게 보이는 변화라 고지 1건(docs/player-updates/2026-11-22-some-skt-games-run-faster.json)을 더했다. 기준은 이 PR 바로 전의 main(#603 뒤)이고 #603 전과 견준 82행의 수는 없다. upstream 병합 예행의 충돌 파일은 137 → 143 으로 줄지 않았다 — 줄어든 것은 병합 뒤 손으로 API 를 옮길 곳(owner 없는 필드 접근 1,774 → 0). docs/report/0572.",
+  "changes": [
+    "루트 Cargo.toml: jvm · jvm-bytecode · jvm-class-proto · jvm-types · rustjava-runtime ^0.1.1 → =0.4.1 (정확 고정 — 0.4.2 는 스택 깊이 512 에서 StackOverflowError)",
+    "필드 접근 1,774곳에 owner 클래스 인자 (wie-midp · wie-wipi-java · wie-skvm · wie-lgt · wie-ktf · wie-jvm-support)",
+    "name()/descriptor() → Cow, 네이티브 프레임 가드(NativeFrame), collect_garbage 의 anyhow 결과",
+    "wie-jvm-support/src/declared_field.rs 삭제 — 새 판의 owner 인자가 같은 일을 한다",
+    "patches/classfile 삭제 (crates.io classfile 0.4.1 이 modified UTF-8 을 읽는다)",
+    "wie-backend zip ^8.6 → ^9.0 · 두 감사 워크플로의 --ignore 8개 삭제 · 대장 §D → C-16"
+  ],
+  "limits": [
+    "lock 은 0.4.2 가 아니라 0.4.1 이다 — 0.4.2 는 Java 스택 깊이 상한(512)을 더한다",
+    "upstream 은 2026-11-22 에 ^0.5.1 로 갔다 — 이 조각은 거기까지 가지 않는다",
+    "GC 루트 설계(우리 guest_roots ↔ upstream ExternalRoots)는 그대로다 — S3 의 몫"
+  ],
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "S1b — RustJava 핀을 0.4.1 에서 upstream 이 쓰는 0.5.1 로",
+      "plainSummary": "upstream 이 2026-11-22 에 Java 실행기 판을 0.5.1 로 올렸다. 우리 핀을 거기까지 마저 올린다.",
+      "userBenefit": "병합 회차가 Java 실행기 판 차이를 지지 않는다. 깊은 재귀가 탭을 죽이는 대신 Java 의 StackOverflowError 로 끝난다.",
+      "why": "이 회차에 0.4.1 까지 올리고 보니 upstream/main 은 #1630 · #1631 로 ^0.5.1 이다. jvm 0.4.1 과 0.5.1 의 공개 함수 서명은 같고 upstream 의 0.5.0 커밋은 15파일 +43/−36 이다.",
+      "tradeoff": "0.4.2 부터 Java 프레임 512 깊이에서 StackOverflowError 를 던진다. 지금은 상한이 없어서, 깊은 재귀로 도는 판이 있으면 동작이 바뀐다 — 표본 재생으로 확인해야 한다.",
+      "effort": "M — upstream 263e6ac9b(#1630) · 24b670780(#1631)을 본으로 쓴다. 검증식은 0551 §7 의 V0 + 이 회차의 표본.",
+      "target": "루트 Cargo.toml · wie-jvm-support · wie-ktf · wie-lgt 의 jvm_support"
+    },
+    {
+      "kind": "meta",
+      "title": "perf-watch native 축 — Java 로 도는 표본은 tick 이 아닌 분모로 잰다",
+      "plainSummary": "주간 속도 감시의 native 축은 «5천만 tick 당 CPU 시간» 이다. Java 로 도는 판(J2ME · SKT)은 게임이 자는 동안에도 tick 이 늘어서, Java 실행 비용이 바뀌는 변경을 사이에 두면 이 값이 같은 단위가 아니다. 그 표본들은 CPU 초와 그린 장수(또는 게임 루프 횟수)로 재게 한다.",
+      "userBenefit": "Java 게임이 실제로 느려졌을 때 주간 감시가 놓치지 않고, 느려지지도 빨라지지도 않은 CPU 를 «3분의 1 로 줄었다» 고 읽는 거짓 개선도 나오지 않는다.",
+      "why": "이 PR 의 perf-watch compare 가 J2ME 표본 835acd535a5f 에 −67% 를 냈는데 CPU 초는 전/후가 같았다(0572 §6 · §10-2). 후는 같은 일을 빨리 끝내고 자는 시간이 길어 빈 tick 이 1.5 ~ 2.2배(SKT 표본 abc0c5789259 는 27 ~ 50배)였다. 다음 주간 회차는 이 핀을 사이에 두고 J2ME · SKT 표본에 «개선» 을 낼 것이고, 분모가 부풀면 진짜 CPU 퇴행도 가려진다.",
+      "tradeoff": "그린 장수는 호스트 부하를 타므로 전/후를 같은 순간에 나란히 돌려야 한다. KTF · LGT 표본과 판정 규칙이 둘로 갈리고, 고정 표본 7개 중 Java 로 도는 3개(J2ME 2 · SKT 1)를 위해 도구가 그만큼 복잡해진다.",
+      "effort": "S — scripts/perf-watch.sh 의 native 행에서 Java 표본만 분모를 바꾸고 selftest 에 한 경우를 더한다. 0572 §10-2 의 방법(동시 짝 · CPU 초 · paints/초 · 게임이 청한 sleep)이 본이다.",
+      "target": "scripts/perf-watch.sh (native 축 · selftest)"
+    }
+  ],
+  "adoptedProposals": ["2026-11-06-upstream-sync2-dry-run-classify#p0"],
+  "declinedProposals": []
+}

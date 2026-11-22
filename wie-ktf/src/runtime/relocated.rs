@@ -238,10 +238,10 @@ async fn dispatch(core: &mut ArmCore, jvm: &mut Jvm, id: SvcId) -> Result<()> {
                 slot,
                 MN_THROW | MN_THROW_INSTANCE | MN_NEW | MN_ARRAY_NEW | MN_PRIMITIVE_ARRAY_NEW | MN_MULTI_ARRAY_NEW
             );
-            if frame {
+            let native_frame = frame.then(|| {
                 wie_jvm_support::guest_roots::stress_collect(jvm, core.id());
-                jvm.push_native_frame();
-            }
+                jvm.push_native_frame(&[])
+            });
             tracing::trace!(
                 "MNInterface +{slot:#x}({:#x}, {:#x}, {:#x}) from {lr:#x}",
                 core.read_param(0)?,
@@ -249,9 +249,7 @@ async fn dispatch(core: &mut ArmCore, jvm: &mut Jvm, id: SvcId) -> Result<()> {
                 core.read_param(2)?
             );
             let result = call_slot(core, jvm, slot, lr).await;
-            if frame {
-                jvm.pop_frame();
-            }
+            drop(native_frame);
             result
         }
     }
