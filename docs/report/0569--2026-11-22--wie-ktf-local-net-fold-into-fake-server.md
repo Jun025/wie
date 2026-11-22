@@ -116,4 +116,4 @@ KTF 쪽에 남긴 것은 6개 함수(`socket` · `socket_open` · `socket_send` 
 
 `node scripts/corpus-name-inflow.mjs`(이 브랜치가 `origin/main` 대비 바꾼 파일 6개): 유입 44회 / 37쌍(BOUNDED) · 판단 필요 0건(SUFFIX-ATTACHED). 전부 장부 `docs/contracts/runtime-adjustments.tsv` 의 `title` 칸에 원래 있던 값이다 — 이 PR 은 그 파일에서 주석 3줄과 한 줄의 `device` 칸만 고쳤다. 이 문서와 코드 4파일이 더한 줄에서는 0 이다(판을 sha 앞 12자로만 부른다).
 
-<!-- corpus-name-inflow v1 subjects=6 tree=be6a62fc45474038 B=44/37 P=2/1 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=6 tree=09e66a7c4576ac1d B=44/37 P=2/1 S=0/0 -->
