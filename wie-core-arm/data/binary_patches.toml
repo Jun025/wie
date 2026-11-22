@@ -111,7 +111,7 @@ spill_back = true
 # distinguishes them (`#3` for memcpy, `#4` for memset).
 # `memset` (the same prefix with `04`) is NOT hooked, since 2026-11-22: the routine sits in all 264
 # packages and none of them calls it — 0 `BL` to it in any image against 6,253 to memcpy, and 0
-# fires in every sweep — so the rule above had no call to compare (docs/report/0573). A title
+# fires in every sweep — so the rule above had no call to compare (docs/report/0575). A title
 # that does call it runs its own routine. Adding the row back takes a package where it fires.
 [[entry.hook]]
 kind = "memcpy"

@@ -129,7 +129,7 @@
 - `HookKind::Memset` · 파서의 `memset` 종류 · `stdlib::memset`(LGT 가 쓴다) · 시험 `memset_dispatch_fills_bytes` 는 남겼다. 이 표는 upstream 과 같이 가는 파일이고 `memset` 행도 upstream 에서 온 것이다 — 다음 upstream 동기 때 이 행이 되돌아오지 않게 볼 것(까닭은 표의 주석에 있다).
 - 스윕 스크립트 표의 `memset` 줄은 남겼다. 누가 행을 다시 넣으면 그 줄에 발화 수가 찍힌다.
 
-### 5. 게이트 — 이 회차 트리(`origin/main` `08875c372` + 이 변경)
+### 5. 게이트 — main 을 당긴 머리(`f9799f1e6` 를 머지 · 충돌 0 · 리베이스 아님)
 
 | 게이트 | 결과 |
 |---|---|
@@ -142,6 +142,11 @@
 | `cargo test -p wie-core-arm --lib binary_patches` | 64 passed · 0 failed |
 | 러너 블록(문서대로 debug) | 6종 PASS · 6종 모두 rc=0 — `keydraw_ktf` paints 79 · 27/27 · 마지막 화면 내용 있음 · `keydraw_lgt` paints 55 · 27/27 · 마지막 화면 내용 있음 |
 | `node scripts/player-data.mjs` · `npm run audit` · `node scripts/check-worklog-json.mjs` · `bash scripts/hook-shadow-sweep.sh selftest` | rc=0 · `429 titles … 183 updates` · `AUDIT PASSED` · `selftest ok` |
+
+- 당기기 전 트리(`08875c372` + 이 변경)에서도 같은 게이트 전부 rc=0 이었다(`cargo test --all` 57 스위트 · 870 passed).
+- main 이 그 사이 들인 것은 #601(KTF 가짜 서버 1행을 `fake_server` 표로 옮김)이다. 훅 · 패치 표 코드는 건드리지 않는다(`git diff 08875c372 f9799f1e6 -- wie-core-arm` 0줄).
+  **§2 · §3 의 실행은 당기기 전 빌드의 것이고, 당긴 머리로는 다시 돌리지 않았다.**
+- 연번: 처음 받은 `0573` 을 열린 PR #603 이 먼저 들고 있어 `0575` 로 옮겼다(도구가 준 번호).
 
 가드가 수를 잠그는지: 장부 주석을 `generic hooks: 6 patterns` 로 되돌리고 `the_ledger_lists_exactly_this_table` 을 돌리면 red 다.
 
