@@ -96,7 +96,9 @@ pub async fn socket_recv(context: &mut dyn WIPICContext, fd: i32, buf: WIPICWord
 }
 
 /// Net slots 6 and 33 `(fd)` — close. The answer stays the stub's `M_E_ERROR`, which is what the title
-/// got while it was measured; its socket lasts until the next `MC_netSocket` replaces it.
+/// got while it was measured; its socket lasts until the next `MC_netSocket` replaces it. The title
+/// never reads the answer — its one close, image 0x103dee, goes straight on to `MC_netClose` — so 0
+/// would play the same and is no reason to move (docs/report/0577).
 pub async fn socket_close(context: &mut dyn WIPICContext, fd: i32) -> Result<i32> {
     if fd != LOCAL_FD {
         return net::socket_close(context, fd).await;
@@ -129,5 +131,155 @@ impl MethodBody<WieError> for Callback {
         context.call_function(self.cb, &self.args).await?;
 
         Ok(WIPICResult { results: Vec::new() })
+    }
+}
+
+// What the header's list keeps apart from LGT's shape, through the table the guest calls — so the slot
+// a call sits in is held too. The values are f44271803135's measured run (docs/report/0541, 0569 §1).
+#[cfg(test)]
+mod tests {
+    use alloc::{boxed::Box, vec};
+
+    use test_utils::{TestClock, TestPlatform};
+    use wie_util::{ByteRead, ByteWrite, Result, WieError, read_generic, write_generic};
+    use wie_wipi_c::WIPICContext;
+
+    use crate::runtime::{
+        svc_ids::WIPICTableId,
+        wipi_c::{
+            context::{KtfWIPICContext, test::run_on},
+            method_table::get_method_body,
+        },
+    };
+
+    const FD: u32 = 0x4c4e; // written out: a test that read `LOCAL_FD` would follow it anywhere
+    const HOST: u32 = 0xfd12_6ed3; // inet_addr("211.110.18.253"), as the title passes it
+    const PORT: u32 = 0x3721; // htons(8503)
+    const UNSET: [u32; 2] = [0x5a5a_5a5a; 2];
+
+    async fn call(context: &mut KtfWIPICContext, slot: u16, args: &[u32]) -> Result<i32> {
+        let body = get_method_body(WIPICTableId::Net, slot).unwrap();
+
+        Ok(body.call(context, args.into()).await?.results[0] as i32)
+    }
+
+    /// A guest `cb(fd, result, param)` that stores `fd` and `result` at `param`, and a block for it.
+    fn callback(context: &mut KtfWIPICContext) -> Result<(u32, u32)> {
+        let code = context.alloc_raw(6)?;
+        write_generic(context, code, [0x6010u16, 0x6051, 0x4770])?; // str r0,[r2]; str r1,[r2,#4]; bx lr
+        let seen = context.alloc_raw(8)?;
+        write_generic(context, seen, UNSET)?;
+
+        Ok((code | 1, seen))
+    }
+
+    /// What the callback stored at `seen`, once it has — or `UNSET` after `millis` of the clock.
+    async fn wait(context: &mut KtfWIPICContext, clock: &TestClock, seen: u32, millis: u64) -> Result<[u32; 2]> {
+        let until = clock.peek() + millis;
+        loop {
+            let stored: [u32; 2] = read_generic(context, seen)?;
+            if stored != UNSET || clock.peek() >= until {
+                return Ok(stored);
+            }
+            context.system().yield_now().await;
+        }
+    }
+
+    #[test]
+    fn listed_title_is_answered_in_the_shape_it_was_measured_against() -> Result<()> {
+        // 1µs a read: time passes with the executor's turns, never with the host's load
+        let clock = TestClock::stepping_micros(1);
+        run_on(TestPlatform::with_clock(clock.clone()), "0103A2B4", move |mut context| {
+            Box::pin(async move {
+                let (cb, seen) = callback(&mut context)?;
+
+                // one socket, always the same descriptor — not LGT's 0, 1, 2…
+                assert_eq!(call(&mut context, 2, &[2, 1]).await?, FD as i32);
+                assert_eq!(call(&mut context, 2, &[2, 1]).await?, FD as i32);
+
+                // slot 30 answers through the callback, a millisecond later and not before
+                let asked = clock.peek();
+                assert_eq!(call(&mut context, 30, &[FD, HOST, PORT, 0, cb, seen]).await?, 0);
+                assert_eq!(wait(&mut context, &clock, seen, 50).await?, [FD, 0]);
+                assert_eq!(clock.peek() - asked, 1, "the connect callback's delay");
+
+                // slot 31 takes the list request whole; slot 13 is accepted and never fires, even
+                // with the reply already waiting (LGT's would fire at once)
+                let buf = context.alloc_raw(158)?;
+                let mut request = vec![156, 0, 0xf8, 0x2a];
+                request.resize(158, 0);
+                context.write_bytes(buf, &request)?;
+                assert_eq!(call(&mut context, 31, &[FD, buf, 158]).await?, 158);
+                write_generic(&mut context, seen, UNSET)?;
+                assert_eq!(call(&mut context, 13, &[FD, cb, seen]).await?, 0);
+                assert_eq!(wait(&mut context, &clock, seen, 5).await?, UNSET);
+
+                // slot 32 reads it back, then would block
+                assert_eq!(call(&mut context, 32, &[FD, buf, 16, 3000]).await?, 5);
+                let mut reply = [0; 5];
+                context.read_bytes(buf, &mut reply)?;
+                assert_eq!(reply, [3, 0, 0xf9, 0x2a, 0]);
+                assert_eq!(call(&mut context, 32, &[FD, buf, 16, 3000]).await?, -19);
+
+                // both closes answer M_E_ERROR and leave the socket (LGT's: 0, socket gone)
+                for close in [6, 33] {
+                    assert_eq!(call(&mut context, close, &[FD]).await?, -1, "slot {close}");
+                    assert!(context.system().fake_net().contains(FD as i32), "slot {close}");
+                }
+
+                // any other host or port is refused through the same callback
+                assert_eq!(call(&mut context, 30, &[FD, HOST, PORT + 0x100, 0, cb, seen]).await?, 0);
+                assert_eq!(wait(&mut context, &clock, seen, 50).await?, [FD, u32::MAX]);
+
+                Ok(())
+            })
+        })
+    }
+
+    #[test]
+    fn a_descriptor_this_file_did_not_hand_out_is_fatal() -> Result<()> {
+        fn fatal(result: Result<i32>) -> bool {
+            matches!(result, Err(WieError::Unimplemented(_)))
+        }
+
+        // an unlisted title: no socket, and the slots are the fatal stubs they have always been
+        run_on(TestPlatform::new(), "00000000", |mut context| {
+            Box::pin(async move {
+                assert_eq!(call(&mut context, 2, &[2, 1]).await?, -1);
+                for (slot, args) in [
+                    (30, &[u32::MAX, HOST, PORT, 0, 0, 0][..]),
+                    (31, &[u32::MAX, 0, 0]),
+                    (32, &[u32::MAX, 0, 0, 3000]),
+                    (13, &[u32::MAX, 0, 0]),
+                ] {
+                    assert!(fatal(call(&mut context, slot, args).await), "slot {slot}");
+                }
+                assert_eq!(call(&mut context, 6, &[u32::MAX]).await?, -1);
+                assert_eq!(call(&mut context, 33, &[u32::MAX]).await?, -1);
+
+                Ok(())
+            })
+        })?;
+
+        // the listed title, on a descriptor that is not its one (0 is what LGT's shape would hand it) —
+        // and at LGT's connect, write and read, which KTF's table still does not have
+        run_on(TestPlatform::new(), "0103A2B4", |mut context| {
+            Box::pin(async move {
+                assert_eq!(call(&mut context, 2, &[2, 1]).await?, FD as i32);
+                for (slot, args) in [
+                    (30, &[0, HOST, PORT, 0, 0, 0][..]),
+                    (31, &[0, 0, 0]),
+                    (32, &[0, 0, 0, 3000]),
+                    (13, &[0, 0, 0]),
+                ] {
+                    assert!(fatal(call(&mut context, slot, args).await), "slot {slot}");
+                }
+                for slot in 3..=5 {
+                    assert!(fatal(call(&mut context, slot, &[FD, HOST, PORT, 0, 0]).await), "slot {slot}");
+                }
+
+                Ok(())
+            })
+        })
     }
 }

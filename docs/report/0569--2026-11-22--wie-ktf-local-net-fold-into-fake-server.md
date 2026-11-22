@@ -49,6 +49,8 @@ KTF 쪽에 남긴 것은 6개 함수(`socket` · `socket_open` · `socket_send` 
 
 달라진 곳은 측정 경로 밖 둘이다. ⑴ 연결에 성공하기 «전»이나 거절된 «뒤»의 쓰기: 전에는 목록 요청이면 응답을 쌓았고, 지금은 쌓지 않는다(`FakeNet` 은 연결된 소켓에만 답한다 — LGT 5종이 쓰는 규칙이다). 이 판은 성공 콜백 뒤에만 쓴다. ⑵ 로그 문구 3줄(`MC_netConnect` 의 모듈 경로와 «local server» → «callback M_E_SUCCESS (fake server)» · 슬롯 31 의 «reply Some(5)» → «reply queued» · 닫기 줄의 모듈 경로). 전수 도구의 접속 횟수 정규식(`MC_netConnect`)에 걸리는 줄 수는 같다.
 
+«표 밖 KTF 판 … 같다» 줄의 가장자리 하나(2026-11-22 덧붙임 · 게이트② F2 · `wie-ktf-kept-differences-have-no-tests-six-call-shapes`): 표가 하나가 되면서 `online()` 은 통신사를 가리지 않고 AID 만 본다. 그래서 AID `0103A2B4` 를 가진 LGT 파일은 전에는 `MC_netConnect` 실패 콜백을 받았고 이제는 성공 콜백과 `MC_netSocket` fd 를 받는다. 반대 방향(LGT 5개 AID 를 가진 KTF 파일)은 전에도 열려 있었고 fd 만 0 에서 `0x4c4e` 로 바뀐다. 코퍼스 실례는 0건이다(검수 실측: KTF 286개 중 `0103A2B4` 는 `f44271803135` 하나 · LGT 91개 중 0개 · LGT 5개 AID 를 가진 KTF 0개) — 이용자가 올린 파일에서만 생길 수 있다.
+
 ### 3. 전후 측정 — 6종 · 같은 명령 · 같은 지표
 
 두 릴리스 바이너리(전 = `origin/main` `524c400b1` · 후 = 그 위 이 변경 1커밋 `0738d2d16`)를 쌍마다 «동시에» 띄웠다(같은 부하 분). 인자는 전수 도구의 프로브 그대로다: A `--inject --keep-timeout --timeout 30 --max-ticks 100000000000 --relaunch 1 --pacing 8`(정책 키 27개) · B 는 `--inject-keys 0 --shot-every 1`(키 0). KTF 판은 레시피 L(`game_lab/recipes/f44271803135-newgame.keys` · 180초 · `--relaunch 1`)을 더 쟀다. 코퍼스 파일은 그대로 읽기만 했다. 임대는 판마다 `build-slot run --long` 1건이다(동시 실행 2).
@@ -117,4 +119,6 @@ KTF 쪽에 남긴 것은 6개 함수(`socket` · `socket_open` · `socket_send` 
 
 `node scripts/corpus-name-inflow.mjs`(이 브랜치가 `origin/main` 대비 바꾼 파일 6개): 유입 44회 / 37쌍(BOUNDED) · 판단 필요 0건(SUFFIX-ATTACHED). 전부 장부 `docs/contracts/runtime-adjustments.tsv` 의 `title` 칸에 원래 있던 값이다 — 이 PR 은 그 파일에서 주석 3줄과 한 줄의 `device` 칸만 고쳤다. 이 문서와 코드 4파일이 더한 줄에서는 0 이다(판을 sha 앞 12자로만 부른다).
 
-<!-- corpus-name-inflow v1 subjects=6 tree=7ea0bffb8f35de82 B=44/37 P=2/1 S=0/0 -->
+아래 표식은 §2 에 한 줄을 덧붙인 회차(`wie-ktf-kept-differences-have-no-tests-six-call-shapes` · 0577)가 다시 찍은 것이다 — 본문이 바뀌면 표식을 갈아야 해서다. 위의 44회 / 37쌍은 #601 때의 값이고, 그때 표식은 `subjects=6 tree=7ea0bffb8f35de82 B=44/37 P=2/1 S=0/0` 였다.
+
+<!-- corpus-name-inflow v1 subjects=4 tree=7261af2138f04e92 B=1/1 P=0/0 S=0/0 -->
