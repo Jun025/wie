@@ -139,3 +139,5 @@ speed 가 갈린 것은 이 변경이 아니라 호스트 부하다:
 - 루트 패키지 `wie`(upstream 의 실행기 · `cargo build` 기본 멤버)는 `wie_cli` 에 기대지 않아 이 feature 를 받지 않는다.
   티켓 범위(`wie_cli` · `wie_validate`) 밖이라 두었다.
 - `docs/player-updates/` 항목은 쓰지 않았다 — 피처폰 사이트에서 판이 도는 방식은 바뀌지 않는다.
+
+<!-- corpus-name-inflow v1 subjects=5 tree=c54f12dd658b14d6 B=0/0 P=0/0 S=0/0 -->
