@@ -94,7 +94,8 @@ mod tests {
 
     const KTF: &[u8] = include_bytes!("../../test_data/helloworld_ktf.zip");
     const LGT: &[u8] = include_bytes!("../../test_data/helloworld_lgt.zip");
-    const J2ME: &[u8] = include_bytes!("../../test_data/draw_j2me.jar");
+    // The committed container of `draw_j2me.jar` (a bare `*.jar` is git-ignored): the jar is its one entry.
+    const J2ME: &[u8] = include_bytes!("../../test_data/draw_j2me.zip");
 
     fn md5_of(data: &[u8]) -> String {
         format!("{:x}", md5::compute(data))
@@ -130,9 +131,10 @@ mod tests {
         assert_eq!((lgt.platform, lgt.model), ("LGT", Some("clet")));
         assert_eq!(lgt.content_key, Some(format!("zip:{}", md5_of(the_jar(&extract_zip(LGT).unwrap())))));
 
-        let j2me = identify("a.jar", J2ME).unwrap();
+        let jar = the_jar(&extract_zip(J2ME).unwrap()).clone();
+        let j2me = identify("a.jar", &jar).unwrap();
         assert_eq!((j2me.platform, j2me.model), ("J2ME", None));
-        assert_eq!(j2me.content_key, Some(format!("jar:{}", md5_of(J2ME))));
+        assert_eq!(j2me.content_key, Some(format!("jar:{}", md5_of(&jar))));
     }
 
     #[test]

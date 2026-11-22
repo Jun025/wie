@@ -375,7 +375,7 @@ await page.goto(base + "/");
 page.setDefaultTimeout(120_000);
 
 // Scenario I's expected key for the bare jar: `jar:` + the file's own MD5, computed HERE — not by the engine.
-const drawJarKey = `jar:${createHash("md5").update(await readFile(path.join(root, "test_data/draw_j2me.jar"))).digest("hex")}`;
+const drawJarKey = `jar:${createHash("md5").update(drawFixtureJar()).digest("hex")}`;
 
 const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys, img, resLine, resize, soundMark, drawJarKey }) => {
   const steps = [];
