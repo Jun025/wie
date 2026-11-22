@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-22",
+  "task": "wie-ktf-memset-generic-hook-fire-it-or-remove-it",
+  "title": "KTF 범용 훅 memset — 어느 판도 부르지 않는 루틴이라 패턴을 뺐다",
+  "summary": "채택 제안 2026-11-22-ktf-generic-hook-exact-equivalence#p0 의 집행. 훅 걸린 KTF 264판의 이미지에서 memset 루틴 입구로 가는 호출 명령은 0건이다(memcpy 6,253 · strlen 2,922 · strcpy 580). 입구를 가리키는 꼴이 하나라도 있는 12판을 120초씩 키 대본 둘로 그림자 대조했다: 발화 7,546,379 = 대조 · 불일치 0 · memset 발화 0. 패턴을 빼 범용 훅은 5종이다. docs/report/0576.",
+  "changes": [
+    "wie-core-arm/data/binary_patches.toml: memset 행 삭제 · 머리 주석 6 → 5 patterns · 872 → 608곳",
+    "docs/contracts/runtime-adjustments.tsv: 주석의 수(generic hooks: 5 patterns · 608곳)",
+    "scripts/hook-shadow-sweep.sh: HOOK_SHADOW_KEYS 로 키 대본 교체"
+  ],
+  "limits": "정적 계수는 이미지에 적힌 분기 · 포인터만 본다. 실행 대조는 후보 12판뿐이고 전수 264판은 길게 돌리지 않았다. 코퍼스 밖의 판은 보지 못했다.",
+  "proposals": [
+    {
+      "kind": "meta",
+      "title": "패치 표만 고친 착지는 엔진 릴리스가 서지 않는다 — 발행 경로 목록의 `data/**` 가 옮겨 간 디렉터리를 가리킨다",
+      "plainSummary": "게임별 패치 표(`wie-core-arm/data/binary_patches.toml`)만 바뀐 변경이 main 에 들어가도 새 엔진이 발행되지 않는다. 발행 워크플로의 경로 목록에는 저장소 루트의 `data/**` 만 있는데 그 디렉터리는 지금 없다. 두 워크플로의 목록에 `wie-core-arm/data/**` 를 더한다.",
+      "userBenefit": "패치 표의 변경(잠금 해제 행 · 범용 훅 가감)이 다른 변경을 기다리지 않고 그 착지로 이용자 쪽 엔진에 실린다.",
+      "why": "이 회차 실측: 이 PR 이 바꾸는 엔진 파일은 그 표 하나이고, `publish-artifact.yml` 의 `on.push.paths` 와 `engine-contract.yml` 의 `engine` 필터 어디에도 그 경로가 없다(`data/**` 는 있으나 루트에 `data/` 가 없다 — `ls data` 실패). 표는 `include_str!` 로 wasm 에 들어간다.",
+      "tradeoff": "경로 목록 두 곳을 같이 고쳐야 한다(Constraint 4 — 두 목록은 맞춰 둔다). 표의 주석만 고친 착지도 릴리스를 세운다(`Cargo.toml` 주석과 같은 성질).",
+      "effort": "S",
+      "target": ".github/workflows/publish-artifact.yml · .github/workflows/engine-contract.yml"
+    }
+  ],
+  "adoptedProposals": ["2026-11-22-ktf-generic-hook-exact-equivalence#p0"],
+  "declinedProposals": []
+}

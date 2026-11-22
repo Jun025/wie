@@ -14,7 +14,7 @@
 # One `build-slot run --long` lease per HOOK_SHADOW_PHASE packages (default 60 ≈ 10 min: 3 at a
 # time, 30 s each) — never wrap this script itself in build-slot (CLAUDE.md «측정 스윕»).
 # HOOK_SHADOW_TIMEOUT=<s> (default 30) is wie_validate's --timeout; the other arguments are the
-# census's probe A. A starved host reaches fewer calls: read `fires` (and load1) before `mismatch`,
+# census's probe A. HOOK_SHADOW_KEYS=<script> replaces its 27 keys (wie_validate's --keys). A starved host reaches fewer calls: read `fires` (and load1) before `mismatch`,
 # and re-run a package by deleting its result. An overlapping call is reached on some runs and not
 # on others: "0 mismatches" covers it only on a run whose `handed to the title's own routine` line
 # names that package.
@@ -55,7 +55,7 @@ case ${1:-} in
   sha=$(shasum -a 256 "$2" | cut -c1-12)
   [[ -s $out/$sha.json ]] && exit 0
   WIE_HOOK_MODE=shadow RUST_LOG=error "$BIN" --inject --keep-timeout --timeout "${HOOK_SHADOW_TIMEOUT:-30}" \
-    --max-ticks 100000000000 --pacing 8 --relaunch 1 "$2" 2>/dev/null | tail -1 |
+    --max-ticks 100000000000 --pacing 8 --relaunch 1 ${HOOK_SHADOW_KEYS:+--keys "$HOOK_SHADOW_KEYS"} "$2" 2>/dev/null | tail -1 |
     sed "s/}\$/,\"package\":\"$sha\",\"load1\":$(sysctl -n vm.loadavg | cut -d' ' -f2)}/" >"$out/$sha.tmp"
   mv "$out/$sha.tmp" "$out/$sha.json"
   exit 0
