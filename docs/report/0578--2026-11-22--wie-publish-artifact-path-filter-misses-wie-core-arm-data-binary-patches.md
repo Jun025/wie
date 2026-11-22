@@ -82,3 +82,5 @@ miss  data/x.toml
 - `actionlint`(1.7.12) 두 파일: rc=1 · 지적 2건은 `publish-artifact.yml:162` 의 shellcheck SC2086(info · `$LICENSES` 의 의도된 단어 분리)이고 `origin/main` 의 파일에서도 같은 2건이다. `-ignore SC2086` 로는 rc=0 — 이 diff 가 더한 지적 0.
 - 워크플로를 읽는 repo 검사: `check-doc-liveness-parity` · `check-parked-workflows` · `check-parity-lock-wired` · `check-upstream-guard-wired` 전부 rc=0.
 - `check-engine-contract.mjs` 가 `publish-artifact.yml` 에서 읽는 것은 dispatch 페이로드와 자산 이름이고 경로 목록이 아니다 — 두 필터의 «같이 맞춘다»(Constraint 4)를 기계로 잡는 검사는 없다.
+
+<!-- corpus-name-inflow v1 subjects=3 tree=b6b7b3e049351680 B=0/0 P=0/0 S=0/0 -->
