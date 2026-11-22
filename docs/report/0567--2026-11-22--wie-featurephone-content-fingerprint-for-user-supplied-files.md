@@ -171,4 +171,4 @@ rc=1
 SUFFIX-ATTACHED 16종은 `compat.json` 안의 더 긴 다른 제목과 안내 문장 속 낱말이고, 이 PR 이 더한 줄에서 나온 것은 없다.
 게임 바이트 · 꾸러미 안 파일 본문 · 경로 유입 0. 새로 실린 해시는 본체 jar 의 MD5(지문)이고, 그중 장부에 오른 것은 엔진 표에 이미 있던 값이다.
 
-<!-- corpus-name-inflow v1 subjects=23 tree=82995195d49c3877 B=1156/410 P=7/5 S=52/16 -->
+<!-- corpus-name-inflow v1 subjects=23 tree=24c4b2709eb871bc B=1156/410 P=7/5 S=52/16 -->
