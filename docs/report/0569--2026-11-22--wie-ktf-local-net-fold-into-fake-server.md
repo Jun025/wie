@@ -93,16 +93,16 @@ KTF 쪽에 남긴 것은 6개 함수(`socket` · `socket_open` · `socket_send` 
 
 ### 6. 게이트
 
-`origin/main` 이 작업 중 `07c92f5ab`(#596 · #597 착지)로 나아가 머지로 당겼다(충돌 0). 아래는 전부 당긴 트리에서 돌렸다.
+`origin/main` 이 작업 중 두 번 나아갔다 — `07c92f5ab`(#596 · #597 착지), 이어 `b6ef84444`(#598 착지 · KTF 범용 훅 경로와 장부 머리 주석). 둘 다 머지로 당겼다(충돌 0). 아래는 두 번째로 당긴 트리 `52314d5ce` 에서 다시 돌린 값이다(첫 번째로 당긴 트리 `73c9b9fd6` 에서도 전부 rc=0 · 856 통과였다).
 
 | 게이트 | 결과 |
 |---|---|
 | `cargo fmt --all -- --check` | rc=0 |
 | `cargo clippy --all -- -D warnings` | rc=0(`wie-backend` · `test-utils` · `wie-ktf` 를 다시 검사시켜 확인) |
 | `cargo clippy --target wasm32-unknown-unknown -- -D warnings` | rc=0 — 이 줄은 루트 패키지만 봐서 고친 두 crate 를 지나지 않는다. `-p wie_featurephone` 을 붙여 따로 돌렸다: `wie-backend` · `wie-ktf` · `wie_featurephone` 검사 · rc=0 |
-| `RUST_MIN_STACK=4194304 cargo test --all` | rc=0 · 856 통과 · 0 실패 |
+| `RUST_MIN_STACK=4194304 cargo test --all` | rc=0 · 865 통과 · 0 실패 |
 | `cargo +beta clippy --all -- -D warnings` | rc=0. 매니페스트 경고 9줄(`unused dependency` · `wie_cli` 7 · `test-utils` 1 · `wie-util` 1)은 이 PR 이전부터 있고 rc 를 바꾸지 않는다. PR 의 beta 다리는 빈 통과이므로 beta 는 이 로컬 실행이 유일한 근거다 |
-| 러너 블록 | `draw_j2me.jar` · `helloworld_ktf.zip` · `helloworld_lgt.zip` PASS rc=0 · `keydraw_ktf.zip` · `keydraw_lgt.zip` `--inject --expect-last-frame` PASS rc=0(키 27/27 · paints 79 · 55) · `text_j2me.jar` `--timeout 5` PASS rc=0 · load1 47. 픽스처 재생성 뒤 `git status` 변화 0 |
+| 러너 블록 | `draw_j2me.jar` · `helloworld_ktf.zip` · `helloworld_lgt.zip` PASS rc=0 · `keydraw_ktf.zip` · `keydraw_lgt.zip` `--inject --expect-last-frame` PASS rc=0(키 27/27 · paints 79 · 55) · `text_j2me.jar` `--timeout 5` PASS rc=0 · load1 26. 픽스처 재생성 뒤 `git status` 변화 0 |
 | 그 밖 | `node scripts/player-data.mjs` OK · `--selftest` 59 · `check-compat-revert`(착지 기준 바뀐 행 0) · `check-docs-report-serial`(열린 PR claim 충돌 0) · `check-worklog-json` · `check-doc-liveness-parity` · `npm run audit` — 전부 rc=0 |
 
 ### 7. 한계
@@ -110,10 +110,9 @@ KTF 쪽에 남긴 것은 6개 함수(`socket` · `socket_open` · `socket_send` 
 - 닫기의 -1 은 시험이 지키지 않는다. `wie-ktf` 에는 `WIPICContext` 시험 문맥이 없어(`wie-wipi-c` 의 `TestContext` 는 그 crate 의 `cfg(test)` 안에 있다) KTF 쪽 6개 함수는 합치기 전과 같이 단위 시험이 없고, 근거는 §3 의 10쌍이다.
 - 닫기가 0 을 답해도 이 판이 같은 지점에 가는지는 재지 않았다. 0 으로 바꾸는 것은 동작 변경이라 이 회차의 범위 밖이다.
 - 측정은 `wie_validate`(네이티브 · 벽시계)다. 브라우저 호스트에서는 재지 않았다. 고친 코드는 두 호스트가 같이 쓰는 crate 이고 `System` 별 상태로 옮긴 것이 호스트에 따라 달라질 자리는 없다.
+- §3 의 쌍은 전부 #598 을 당기기 «전»에 쟀다. #598 이 고친 곳은 `wie-core-arm` 의 훅 경로이고 이 PR 이 고친 6파일과 겹치는 것은 장부의 주석 줄뿐이지만, 당긴 뒤의 머리로 6종을 다시 재지는 않았다 — 그 트리의 근거는 §6 의 게이트와 러너 블록이다.
 - §3 의 load1 은 20~117 이었다. 같은 쌍을 동시에 띄워 부하를 나눴지만, 갈린 2쌍의 귀속은 재측 횟수(6쌍 · 대조 6쌍)에 기대고 있다.
 
 ### 8. 게임 파일명 유입
 
 `node scripts/corpus-name-inflow.mjs`(이 브랜치가 `origin/main` 대비 바꾼 파일 6개): 유입 44회 / 37쌍(BOUNDED) · 판단 필요 0건(SUFFIX-ATTACHED). 전부 장부 `docs/contracts/runtime-adjustments.tsv` 의 `title` 칸에 원래 있던 값이다 — 이 PR 은 그 파일에서 주석 3줄과 한 줄의 `device` 칸만 고쳤다. 이 문서와 코드 4파일이 더한 줄에서는 0 이다(판을 sha 앞 12자로만 부른다).
-
-<!-- corpus-name-inflow v1 subjects=6 tree=09e66a7c4576ac1d B=44/37 P=2/1 S=0/0 -->
