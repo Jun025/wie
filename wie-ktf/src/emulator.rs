@@ -40,6 +40,14 @@ fn jar_filename(aid: &str, files: &BTreeMap<String, Vec<u8>>) -> String {
     }
 }
 
+// The jar `from_archive` runs, under the name it is mounted by (`None` when the archive does not
+// hold it). `archive_jar` reads the same entry, so the jar that is hashed is the jar that runs.
+fn archive_jar_entry<'a>(aid: &str, files: &'a BTreeMap<String, Vec<u8>>) -> (String, Option<&'a Vec<u8>>) {
+    let filename = jar_filename(aid, files);
+    let jar = files.get(&filename);
+    (filename, jar)
+}
+
 /// Packaged saves written by the original owner's handset that no other host can load, keyed by the
 /// MD5 of the title's jar (the jar identifies the build, as in `wie-lgt`'s `ORPHAN_ENTRIES`).
 /// Deliberately a list, never a rule — most KTF archives ship saves that load fine, and dropping
@@ -211,8 +219,8 @@ impl KtfEmulator {
             tracing::warn!("Ignoring unsupported display size {width}x{height}: {error}");
         }
 
-        let jar_filename = jar_filename(&adf.aid, &files);
-        if let Some(jar) = files.get(&jar_filename).cloned() {
+        let (jar_filename, jar) = archive_jar_entry(&adf.aid, &files);
+        if let Some(jar) = jar.cloned() {
             drop_owner_files(&mut files, &jar, DEVICE_BOUND_SAVES);
             drop_owner_files(&mut files, &jar, OWNER_PROGRESS_SAVES);
             turn_owner_sound_on(&mut files, &jar);
@@ -237,6 +245,12 @@ impl KtfEmulator {
 
     pub fn loadable_archive(files: &BTreeMap<String, Vec<u8>>) -> bool {
         files.contains_key("__adf__")
+    }
+
+    /// The jar `from_archive` runs — the one the per-title tables above hash.
+    pub fn archive_jar(files: &BTreeMap<String, Vec<u8>>) -> Option<&[u8]> {
+        let adf = KtfAdf::parse(files.get("__adf__")?);
+        archive_jar_entry(&adf.aid, files).1.map(Vec::as_slice)
     }
 
     pub fn archive_title(files: &BTreeMap<String, Vec<u8>>) -> Option<String> {

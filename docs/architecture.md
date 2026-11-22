@@ -55,6 +55,7 @@ embeds the engine as WASM. Nothing above the engine is allowed to reach back int
 | `wie_wipi_java`, `wie_midp`, `wie_skvm` | The emulated Java class libraries — WIPI (`org.kwis.msp.*`), MIDP (`javax.microedition.*`), and SK-VM respectively. |
 | `wie_ktf`, `wie_lgt`, `wie_skt`, `wie_j2me` | Per-platform entry points: archive layout, boot/relocation, and which API surfaces get wired. `wie_ktf`/`wie_lgt` carry the heavy reverse-engineered runtimes. |
 | `wie_cli` | Native host. Also ships `src/bin/wie_validate.rs`, a headless PASS/FAIL triage runner for batch game validation. |
+| `wie_identify` | Which game a file is, without booting it: picks the jar the loader would run and returns `<container>:<md5>` plus platform and LGT compile model. The one computation behind `compat.json`'s `contentKey` (its binary, run by `scripts/content-key.mjs`) and the browser's `identify()` export. |
 | `wie_featurephone` | Browser host (renamed from `wie_web` 2026-09-11 — upstream uses that name for its own web app). Compiles to an empty library off `wasm32` on purpose, so native workspace jobs stay green. |
 | `wie_ktf_dump` | Dev-only binary: dumps a KTF game's relocated `client.bin` for IDA/Ghidra. |
 | `test_utils` | Shared in-memory `Platform`/`Filesystem`/`Database`/JVM fixtures for tests. |

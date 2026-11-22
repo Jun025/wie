@@ -5262,6 +5262,19 @@ dependencies = [
  "wie-lgt",
  "wie-skt",
  "wie-util",
+ "wie_identify",
+]
+
+[[package]]
+name = "wie_identify"
+version = "0.1.4"
+dependencies = [
+ "md5",
+ "wie-backend",
+ "wie-ktf",
+ "wie-lgt",
+ "wie-skt",
+ "zip",
 ]
 
 [[package]]

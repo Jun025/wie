@@ -70,3 +70,4 @@ wie-j2me = { workspace = true }
 wie-ktf = { workspace = true }
 wie-lgt = { workspace = true }
 wie-skt = { workspace = true }
+wie_identify = { path = "../wie_identify" }

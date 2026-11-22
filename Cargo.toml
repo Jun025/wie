@@ -16,6 +16,7 @@ members = [
     "wie-web",
     "wie_cli",
     "wie_featurephone",
+    "wie_identify",
 ]
 
 # wie-app is upstream's Tauri desktop shell. It arrived with the 2026-09-16

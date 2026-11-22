@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-22",
+  "task": "wie-featurephone-content-fingerprint-for-user-supplied-files",
+  "title": "게임 내용 지문 contentKey — 지원 목록 칸 + 부팅 전 판별 함수 identify()",
+  "summary": "이용자가 각자 구해 온 파일이 지원 목록의 판과 안쪽 본체가 같고 묶음만 다를 때 알아볼 수 있게, 엔진이 실행하는 본체 jar 의 MD5 를 지문으로 정해 compat.json 429행에 싣고 같은 계산을 wasm identify() 로 냈다. 계산은 새 크레이트 wie_identify 한 곳이다. 지원 상태 · 조정 표 · 차단 규칙 변경 0. docs/report/0567.",
+  "changes": [
+    "wie_identify(새 크레이트): identify(filename, data) → 통신사 · LGT 컴파일 모델 · contentKey. 네이티브 바이너리 wie_identify 와 wasm 내보내기가 같은 함수를 부른다",
+    "wie-ktf · wie-lgt · wie-skt: archive_jar() — from_archive 가 실행하는 jar 를 그대로 돌려준다(동작 변경 0)",
+    "wie_featurephone: identify() 내보내기 · 계약 JSON glueExports.identify + identifyNote",
+    "docs/player-data/compat.json: 429행에 contentKey(+429줄 · 그 밖 변화 0)",
+    "scripts/player-data.mjs: contentKey 형식 · 전 행 보유 · 장부 jar 키 대조 · 묶음 수 출력 / scripts/content-key.mjs(로컬): write · check · --selftest",
+    "scripts/check-engine-contract.mjs · contract-roundtrip.mjs(시나리오 I)"
+  ],
+  "verification": "커밋된 값 == 네이티브 == wasm identify() 429/429 · 행의 통신사 · 모델 == identify() 429/429 · 장부 jar 키 40행 일치. 계산 한 줄을 바꾸면 cargo test 와 429행 대조가 red(0567 §4).",
+  "limits": "지문이 같다고 측정이 그대로 옮겨 가지는 않는다 — AID 키 조정(local-server) · 부속 파일 차이 · 맨 jar 경로는 지문 밖이다(공개 데이터 계약 §1 «한계»). 코퍼스 안의 같은 본체 묶음은 21개뿐이라 남의 덤프에서 상태가 갈리는 빈도는 재지 못했다.",
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "내용이 같은 파일 3쌍이 지원 목록에서 서로 다른 게임 이름으로 두 줄",
+      "plainSummary": "안쪽 파일이 전부 같고 zip 껍데기만 다른 파일 3쌍(2f84b8cc870d/9e2307e4fa88 · 4120f27288ab/739c7657c1f2 · 8b01d4ae6af4/d60c34ffc9f6)이 파일 이름이 달라서 지원 목록에 서로 다른 게임으로 실려 있다. 이름 표(SAME_NAME_HAND)에서 한 이름으로 맞춘다.",
+      "userBenefit": "지원 목록에서 같은 게임이 두 이름으로 따로 보이지 않고 한 줄(파일 2개)로 묶인다. 한쪽 이름으로만 찾던 이용자가 다른 쪽 파일을 가진 경우에도 같은 게임임을 알 수 있다.",
+      "why": "이 회차에서 지문을 매겨 보니 지문이 같은 21묶음 중 3묶음의 game 값이 서로 달랐다. 세 쌍 모두 꾸러미 안 파일이 한 바이트도 다르지 않다(0567 §2). 이름 정규화 회차(0555 · 0560)의 판정 표에는 이 여섯 파일이 없다.",
+      "tradeoff": "어느 이름을 대표로 할지는 꾸러미 설명 파일의 이름 칸을 보고 정해야 한다. title/game 이 바뀌면 셸의 주소와 묶음이 따라 바뀌므로 0560 과 같은 방식의 착지 사전 증거가 필요하다.",
+      "effort": "S",
+      "target": "scripts/player-data.mjs SAME_NAME_HAND · docs/player-data/compat.json"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}

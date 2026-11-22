@@ -30,6 +30,9 @@
 //   This is the one call site of the six in the get_system_class_loader
 //   migration whose behaviour CHANGED (it used to throw IOException every time);
 //   before this fixture nothing in the repo executed either half.
+// Scenario I (the three fixtures above, BEFORE each boot — identify(), ASSERTED):
+//   `identify(filename, bytes)` answers platform/model as the booted instance does, keys the
+//   bare jar by the file's own MD5 (computed in Node), and leaves the caller's bytes unchanged.
 // Scenario D (same J2ME instance — KEY DELIVERY, ASSERTED):
 //   Scenario A's sweep only proves key_down/key_up don't throw, which an engine
 //   that drops every event also passes. Here the fixture's keyPressed() paints a
@@ -226,6 +229,7 @@
 //   WIE_CHROME_CHANNEL=chrome  — use a system Chrome instead of the playwright
 //                                bundled chromium (local dev convenience).
 
+import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -370,7 +374,10 @@ page.on("pageerror", (e) => consoleLog.push(`[pageerror] ${e.message}`));
 await page.goto(base + "/");
 page.setDefaultTimeout(120_000);
 
-const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys, img, resLine, resize, soundMark }) => {
+// Scenario I's expected key for the bare jar: `jar:` + the file's own MD5, computed HERE — not by the engine.
+const drawJarKey = `jar:${createHash("md5").update(drawFixtureJar()).digest("hex")}`;
+
+const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys, img, resLine, resize, soundMark, drawJarKey }) => {
   const steps = [];
   // wie_featurephone 은 게스트 stdout 을 console.log 로 낸다(Platform::write_stdout ->
   // web_sys::console::log_1). 원 함수를 그대로 호출하므로 Node 쪽 진단 수집은
@@ -428,6 +435,13 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     const emu = new mod.WieEmulator(fixture, bytes, canvas, undefined, undefined, contract.screen.width, contract.screen.height);
     return { emu, canvas };
   };
+  // Scenario I: identify() says BEFORE boot what the booted instance says after, and only reads the bytes.
+  const identifyFixture = async (mod, fixture) => {
+    const bytes = new Uint8Array(await (await fetch(`/fixtures/${fixture}`)).arrayBuffer());
+    const copy = bytes.slice();
+    const id = mod.identify(fixture, bytes);
+    return { ...id, untouched: bytes.length === copy.length && bytes.every((v, i) => v === copy[i]) };
+  };
 
   try {
     // ── Scenario A: KTF fixture, featurephone PRIMARY init path ──────────────
@@ -439,6 +453,9 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     mod.init();
     check("A: default(WebAssembly.Module) + init()", true);
 
+    const idA = await identifyFixture(mod, "helloworld_ktf.zip");
+    check("I: identify(KTF zip) → platform KTF · model null · zip:<md5> · bytes untouched", idA.platform === "KTF" && idA.model === null && /^zip:[0-9a-f]{32}$/.test(idA.contentKey) && idA.untouched, JSON.stringify(idA));
+    check("I: identify() of a file no loader takes → undefined", mod.identify("x.jad", new Uint8Array([1])) === undefined);
     const { emu, canvas } = await bootFixture(mod, "helloworld_ktf.zip");
     check("A: new WieEmulator(7 args) boots KTF fixture", true);
     check('A: platform_kind() === "KTF"', emu.platform_kind() === "KTF", `got ${emu.platform_kind()}`);
@@ -496,6 +513,8 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     const le32 = (n) => [n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255];
     const lstr = (t) => [...le32(t.length), ...new TextEncoder().encode(t)];
     const seed = new Uint8Array([...new TextEncoder().encode(contract.saveMagic), ...le32(1), ...lstr("roundtrip"), ...lstr("marker"), ...le32(1), ...le32(1), ...le32(1), 7, ...le32(0)]);
+    const idB = await identifyFixture(mod2, "helloworld_lgt.zip");
+    check("I: identify(LGT zip) → platform LGT · model clet · zip:<md5>", idB.platform === "LGT" && idB.model === "clet" && /^zip:[0-9a-f]{32}$/.test(idB.contentKey), JSON.stringify(idB));
     const b = await bootFixture(mod2, "helloworld_lgt.zip");
     check("B: import_saves(seeded DB record) → true", b.emu.import_saves(seed) === true);
     check('B: platform_kind() === "LGT"', b.emu.platform_kind() === "LGT", `got ${b.emu.platform_kind()}`);
@@ -524,6 +543,8 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
 
     // ── Scenario C: J2ME draw fixture — canvas blit, ASSERTED not reported ───
     const markC = guestOut.length;
+    const idC = await identifyFixture(mod2, "draw_j2me.jar");
+    check("I: identify(bare jar) → platform J2ME · jar:<md5 of the file>", idC.platform === "J2ME" && idC.model === null && idC.contentKey === drawJarKey && idC.untouched, `${JSON.stringify(idC)} vs ${drawJarKey}`);
     const c = await bootFixture(mod2, "draw_j2me.jar");
     check('C: platform_kind() === "J2ME"', c.emu.platform_kind() === "J2ME", `got ${c.emu.platform_kind()}`);
     const runC = await tickLoop(c.emu, c.canvas, 30_000, (px) => px > 0);
@@ -1095,7 +1116,7 @@ const steps = await page.evaluate(async ({ contract, representativeKeys, ktfKeys
     check("scenario aborted by exception", false, (e && e.stack) || String(e));
   }
   return steps;
-}, { contract, representativeKeys: REPRESENTATIVE_KEYS, ktfKeys: KTF_KEYS, img: IMG, resLine, resize: RESIZE, soundMark: SOUND_MARK });
+}, { contract, representativeKeys: REPRESENTATIVE_KEYS, ktfKeys: KTF_KEYS, img: IMG, resLine, resize: RESIZE, soundMark: SOUND_MARK, drawJarKey });
 
 await browser.close();
 server.close();
