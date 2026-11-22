@@ -144,6 +144,12 @@ upstream 이 같은 일을 한 커밋(`5fb65ee82` #1430 · `228e3ff48` #1444 · 
 | J2ME 코퍼스 | `compat.json` 에 J2ME 행이 없다. 러너 블록의 `draw_j2me.jar` · `text_j2me.jar` 가 유일한 신호다 |
 | 0.4.1 이 바꾼 실행기 의미 가운데 표본이 타지 않았을 수 있는 것 | `invokespecial` 의 `AbstractMethodError` · 인터페이스 메서드 해소(가장 구체적인 선언 고르기) · GC 가 활성 모니터를 루트로 치는 것. 시험 851개와 표본 68판이 거친 만큼만 확인됐다 |
 
-**게임 파일명 유입**: `node scripts/corpus-name-inflow.mjs` — 유입 65건(BOUNDED) · 판단 필요 8건(SUFFIX-ATTACHED) · 대상 115파일. 둘 다 이 브랜치가 건드린 파일에 «이미 있던» 언급이다(`docs/project-kb/02_status.md` · LGT `jvm_support.rs` 의 주석 등 — 도구는 바뀐 파일의 본문 전체를 센다). 이 브랜치가 «더한 줄»에 든 것은 0건이다(도구가 낸 72쌍을 `git diff origin/main...HEAD` 의 추가 줄과 대조). SUFFIX-ATTACHED 8쌍도 같은 대조에서 0 이다.
+### 9. PR 을 연 뒤 — main 병합 1회 (#599)
 
-<!-- corpus-name-inflow v1 subjects=115 tree=aaa52bd08ec5a068 B=115/65 P=11/2 S=10/8 -->
+PR 의 CI 가 도는 사이 `origin/main` 이 #599(`contentKey` · 새 크레이트 `wie_identify`)로 전진해 PR 이 CONFLICTING 이 됐다. `git merge origin/main` 으로 받았다(rebase · force-push 없음).
+
+- 충돌 2파일: `AGENTS.md` · `Cargo.toml` — 둘 다 같은 자리다(main 이 `patches/classfile` 줄 옆에 `wie_identify` 줄을 더했다). `wie_identify` 줄은 받고 `patches/classfile` 줄은 뺐다.
+- ★충돌 밖에서 고친 것 하나: `wie_identify/Cargo.toml` 의 dev 의존 `zip ^8.6` → `^9.0`. 그대로 두면 lock 에 zip 8.6.0 이 되살아나 §4 에서 푼 자문 8건이 다시 뜬다. 병합 뒤 lock 의 zip 은 9.8.1 하나이고 `cargo audit` 은 취약점 0 이다.
+- §1 ~ §8 의 수는 병합 «전» 머리(`1b52120e7`)에서 잰 것이다. 병합 트리의 게이트 · 러너 블록 결과는 PR 본문에 적었다. 코퍼스 표본 · perf-watch · 병합 예행은 다시 재지 않았다 — #599 는 엔진의 Java 실행 경로를 건드리지 않고(로더가 jar 항목을 고르는 함수 하나를 거치게 한 것 · 새 크레이트 · 스크립트), 받은 뒤 `compat.json` 의 착지 기준 바뀐 행은 0 이다(`check-compat-revert.mjs`).
+
+**게임 파일명 유입**: `node scripts/corpus-name-inflow.mjs` — 유입 65건(BOUNDED) · 판단 필요 8건(SUFFIX-ATTACHED) · 대상 115파일. 둘 다 이 브랜치가 건드린 파일에 «이미 있던» 언급이다(`docs/project-kb/02_status.md` · LGT `jvm_support.rs` 의 주석 등 — 도구는 바뀐 파일의 본문 전체를 센다). 이 브랜치가 «더한 줄»에 든 것은 0건이다(도구가 낸 72쌍을 `git diff origin/main...HEAD` 의 추가 줄과 대조). SUFFIX-ATTACHED 8쌍도 같은 대조에서 0 이다.
