@@ -15,7 +15,8 @@ use spin::Mutex;
 use crate::{
     executor::Executor,
     frame_pacer::FramePacer,
-    speed_clock::{AchievedSpeed, SpeedClock},
+    pacing::Pacing,
+    speed_clock::{AchievedSpeed, SpeedClock, max_wait},
     task::{SleepFuture, YieldFuture},
 };
 
@@ -27,18 +28,24 @@ const SLICE_US: u64 = 500;
 // a sleep does not lock onto the display's phase — a fixed one made sleep(60) at 2x land in the
 // same gap after every budget, and that is a property of the simulation, not of a game.
 const FRAME_SLICES: (u64, u64) = (4, 8);
+// The same of a heavy one: 15-20ms, more than a 60Hz tick's budget, so every game frame is cut by
+// one. Where a wake tick may run is what this shape is for: with a budget of its own from wherever
+// its timer fired it ran past the next vsync, and the game lost 1.5-11% of its frames at 60Hz.
+const HEAVY_FRAME_SLICES: (u64, u64) = (30, 40);
 // Wall µs a frame callback runs after its vsync, at most.
 const CALLBACK_LATE_US: u64 = 1_000;
 // Wall µs of one poll.
 const POLL_WORK_US: u64 = 50;
 const SECONDS: u64 = 10;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum Shape {
     // Never sleeps: a title that wants more CPU than a frame has.
     Busy,
     // `FRAME_SLICES` of work then `sleep(n)`, for ever (메이플스토리2007's sleep(60)).
     Sleep(u64),
+    // `HEAVY_FRAME_SLICES` of work then `sleep(n)`.
+    HeavySleep(u64),
     // An event thread polling every 1ms for a key that never comes (`POLL_SLEEP_MS`).
     Menu,
 }
@@ -63,6 +70,12 @@ struct Split {
     late: Vec<u64>,
     // `AchievedSpeed` at the end, fed every tick as the browser host feeds it.
     achieved: f64,
+    // The host's wake ticks: all, those in which the guest did not run, those still running at the
+    // next vsync, and the longest.
+    wake_ticks: u64,
+    wake_ticks_idle: u64,
+    wake_ticks_past_vsync: u64,
+    wake_tick_max_us: u64,
 }
 
 impl Split {
@@ -108,7 +121,12 @@ fn run(shape: Shape, speed: f64, period_us: u64, margin: Option<u64>, jitter_us:
         move || clock.now(wall.load(Ordering::SeqCst) as f64 / 1000.0)
     };
     let (task_executor, task_late, task_now) = (executor.clone(), late.clone(), guest_now.clone());
-    let mut frame_work = Jitter(3, FRAME_SLICES.1 - FRAME_SLICES.0);
+    let slices = if let Shape::HeavySleep(_) = shape {
+        HEAVY_FRAME_SLICES
+    } else {
+        FRAME_SLICES
+    };
+    let mut frame_work = Jitter(3, slices.1 - slices.0);
     executor.spawn(move || async move {
         // Not `loop`: a task that never returns has type `!`, which `spawn` does not take.
         for _ in 0.. {
@@ -117,8 +135,8 @@ fn run(shape: Shape, speed: f64, period_us: u64, margin: Option<u64>, jitter_us:
                     work(SLICE_US);
                     YieldFuture::new().await;
                 }
-                Shape::Sleep(ms) => {
-                    for _ in 0..FRAME_SLICES.0 + frame_work.next() {
+                Shape::Sleep(ms) | Shape::HeavySleep(ms) => {
+                    for _ in 0..slices.0 + frame_work.next() {
                         work(SLICE_US);
                         YieldFuture::new().await;
                     }
@@ -137,26 +155,40 @@ fn run(shape: Shape, speed: f64, period_us: u64, margin: Option<u64>, jitter_us:
     });
 
     let budget = FramePacer::budget_for_period_us(period_us);
-    let max_wait = margin.map(|ms| clock.budget(ms));
+    let max_wait = margin.map(|ms| max_wait(ms, speed));
     let mut jitter = Jitter(7, jitter_us);
     let mut callback_late = Jitter(11, CALLBACK_LATE_US);
     let mut split = Split::default();
     let start = wall.load(Ordering::SeqCst);
     let mut achieved = AchievedSpeed::default();
-    let mut tick = |executor: &mut Executor, split: &mut Split, budget: u64| {
+    // As `System::tick_for` keeps them. `budget`: `None` is a wake tick, the rest of the last frame
+    // tick (`Executor::resume_tick`). Returns the µs emulated.
+    let mut pacing = Pacing::default();
+    let mut frame_end = 0.0;
+    let mut tick = |executor: &mut Executor, split: &mut Split, pacing: &mut Pacing, budget: Option<u64>| {
         let (w0, e0) = (wall.load(Ordering::SeqCst), emulated.load(Ordering::SeqCst));
         let read = {
             let (wall, clock) = (wall.clone(), clock.clone());
             move || clock.now(wall.fetch_add(READ_US, Ordering::SeqCst) as f64 / 1000.0)
         };
-        executor.tick_for(read, clock.budget(budget), max_wait).unwrap();
+        let begin = w0 as f64 / 1000.0;
+        match budget {
+            Some(budget) => {
+                frame_end = begin + budget as f64;
+                executor.tick_for(read, clock.budget(budget), max_wait).unwrap()
+            }
+            None => executor.resume_tick(read, max_wait).unwrap(),
+        }
         let (w1, e1) = (wall.load(Ordering::SeqCst), emulated.load(Ordering::SeqCst));
         split.emulate_us += e1 - e0;
         split.wait_us += (w1 - w0) - (e1 - e0);
         split.ticks += 1;
-        let (begin, end) = (w0 as f64 / 1000.0, w1 as f64 / 1000.0);
-        let due = executor.next_due().map(|due| clock.wall_at(end, due));
-        achieved.tick(begin, end, budget as f64, executor.wants_cpu(), due);
+        let end = w1 as f64 / 1000.0;
+        pacing.tick_ended(executor.wants_cpu(), executor.next_due(), executor.next_wake());
+        let due = pacing.due().map(|due| clock.wall_at(end, due));
+        // The browser host's `advance`: a wake tick's budget is what the frame's had left.
+        achieved.tick(begin, end, (frame_end - begin).max(0.0), executor.wants_cpu(), due);
+        e1 - e0
     };
     for frame in 1..=SECONDS * 1_000_000 / period_us {
         let vsync = start + frame * period_us;
@@ -165,21 +197,23 @@ fn run(shape: Shape, speed: f64, period_us: u64, margin: Option<u64>, jitter_us:
             continue;
         }
         wall.store(vsync + callback_late.next(), Ordering::SeqCst);
-        tick(&mut executor, &mut split, budget);
-        // The host-wake loop (crate doc of `wie_featurephone`, `wake_in_ms`): after a tick, a timer
-        // for the next paced wake, unless the guest still wants CPU or the next frame comes first.
-        while let Some(ms) = margin {
-            let next = executor.next_due().filter(|_| !executor.wants_cpu());
-            let Some(due) = next else { break };
-            let now_us = wall.load(Ordering::SeqCst);
-            let fire = now_us + (clock.wake_delay(now_us as f64 / 1000.0, due, ms) * 1000.0) as u64 + jitter.next();
-            // The next frame callback: the first vsync after this tick ended.
-            if fire >= start + ((now_us - start) / period_us + 1) * period_us {
+        tick(&mut executor, &mut split, &mut pacing, Some(budget));
+        // The host-wake loop (crate doc of `wie_featurephone`): after every tick a timer for
+        // `wake_in_ms`, which the next frame callback cancels if it comes first.
+        while let Some(margin) = margin {
+            let Some(due) = pacing.wake() else { break };
+            let now = wall.load(Ordering::SeqCst);
+            let fire = now + (clock.wake_delay(now as f64 / 1000.0, due, margin) * 1000.0) as u64 + jitter.next();
+            if fire >= vsync + period_us {
                 break;
             }
-            wall.store(fire.max(now_us), Ordering::SeqCst);
-            // The margin on top: the wait before the wake is not the guest's slice (`wake_tick`).
-            tick(&mut executor, &mut split, budget + ms);
+            wall.store(fire, Ordering::SeqCst);
+            let emulated = tick(&mut executor, &mut split, &mut pacing, None);
+            let end = wall.load(Ordering::SeqCst);
+            split.wake_ticks += 1;
+            split.wake_ticks_idle += u64::from(emulated == 0);
+            split.wake_ticks_past_vsync += u64::from(end >= vsync + period_us);
+            split.wake_tick_max_us = split.wake_tick_max_us.max(end - fire);
         }
     }
     split.wall_us = wall.load(Ordering::SeqCst) - start;
@@ -189,7 +223,14 @@ fn run(shape: Shape, speed: f64, period_us: u64, margin: Option<u64>, jitter_us:
     split
 }
 
-const SHAPES: [Shape; 4] = [Shape::Busy, Shape::Sleep(60), Shape::Sleep(20), Shape::Menu];
+const SHAPES: [Shape; 6] = [
+    Shape::Busy,
+    Shape::Sleep(60),
+    Shape::Sleep(20),
+    Shape::HeavySleep(60),
+    Shape::HeavySleep(20),
+    Shape::Menu,
+];
 const SPEEDS: [f64; 3] = [1.0, 1.5, 2.0];
 const PERIODS: [u64; 2] = [16_667, 8_333];
 // The margin the browser host is told to use: WebKit's setTimeout, armed from a frame callback,
@@ -199,7 +240,7 @@ const WEBKIT_JITTER_US: u64 = 3_000;
 
 fn row(label: &str, shape: Shape, speed: f64, period_us: u64, s: &Split) -> String {
     std::format!(
-        "| {label} | {shape:?} | {speed}x | {}Hz | {:.1} | {:.1} | {:.1} | {:.1} | {} | {} | {} | {:.3} |",
+        "| {label} | {shape:?} | {speed}x | {}Hz | {:.1} | {:.1} | {:.1} | {:.1} | {} | {} | {} | {:.3} | {} | {} |",
         (1e6 / period_us as f64).round(),
         s.pct(s.emulate_us),
         s.pct(s.wait_us),
@@ -209,13 +250,17 @@ fn row(label: &str, shape: Shape, speed: f64, period_us: u64, s: &Split) -> Stri
         s.late_max(),
         s.late.len(),
         s.achieved,
+        s.wake_ticks,
+        s.wake_ticks_idle,
     )
 }
 
 #[test]
 fn tick_occupancy_table() {
-    println!("| host | shape | speed | display | emulate % | wait % | host % | busy % | late p50 | late max | frames | achieved |");
-    println!("|---|---|---|---|---|---|---|---|---|---|---|---|");
+    println!(
+        "| host | shape | speed | display | emulate % | wait % | host % | busy % | late p50 | late max | frames | achieved | wake ticks | idle |"
+    );
+    println!("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
     for shape in SHAPES {
         for period in PERIODS {
             for speed in SPEEDS {
@@ -247,7 +292,8 @@ fn tick_occupancy_table() {
     }
 }
 
-const SLEEPERS: [Shape; 2] = [Shape::Sleep(60), Shape::Sleep(20)];
+const LIGHT: [Shape; 2] = [Shape::Sleep(60), Shape::Sleep(20)];
+const SLEEPERS: [Shape; 4] = [Shape::Sleep(60), Shape::Sleep(20), Shape::HeavySleep(60), Shape::HeavySleep(20)];
 
 #[test]
 fn a_paced_sleep_keeps_its_timing_when_the_host_wakes_it() {
@@ -258,18 +304,24 @@ fn a_paced_sleep_keeps_its_timing_when_the_host_wakes_it() {
                 let after = run(shape, speed, period, Some(MARGIN_MS), WEBKIT_JITTER_US);
                 let case = std::format!("{shape:?} {speed}x {period}us");
                 assert!(before.late.len() > 100, "{case}: {}", before.late.len());
-                // As many game frames (a frame either way at the end of the run), none of them later.
+                // As many game frames (a frame either way at the end of the run), and none later than
+                // a wake can be on either host: one in the gap a tick leaves the host waits for the
+                // next frame callback (plus the clock's last ms). The host's timer firing a full
+                // margin late puts a wake at the very end of the budget there too, so the two maxima
+                // are a millisecond or two apart either way — not the same sample.
                 assert!(
                     after.late.len() * 100 >= before.late.len() * 99,
                     "{case}: {} vs {}",
                     after.late.len(),
                     before.late.len()
                 );
+                let gap_us = period - FramePacer::budget_for_period_us(period) * 1000 + CALLBACK_LATE_US;
+                let bound = (gap_us as f64 * speed / 1000.0) as u64 + 2;
                 assert!(
-                    after.late_max() <= before.late_max(),
-                    "{case}: late max {} > {}",
-                    after.late_max(),
-                    before.late_max()
+                    before.late_max() <= bound && after.late_max() <= bound,
+                    "{case}: late max {} -> {} > {bound}",
+                    before.late_max(),
+                    after.late_max()
                 );
                 assert!(
                     after.late_p50() <= before.late_p50(),
@@ -298,17 +350,66 @@ fn the_host_wake_hands_back_the_wait() {
             for speed in SPEEDS {
                 let before = run(shape, speed, period, None, 0);
                 let after = run(shape, speed, period, Some(MARGIN_MS), WEBKIT_JITTER_US);
+                let case = std::format!("{shape:?} {speed}x {period}us");
                 // Per game frame, the wait is the margin (plus the clock's last ms), not what is left of the budget.
                 let bound = after.late.len() as u64 * (MARGIN_MS + 1) * 1_000;
-                assert!(after.wait_us <= bound, "{shape:?} {speed}x {period}us: wait {} > {bound}", after.wait_us);
-                before_us += before.wait_us;
-                after_us += after.wait_us;
+                assert!(after.wait_us <= bound, "{case}: wait {} > {bound}", after.wait_us);
+                // And in no cell more than today's: the host comes back only for a wake today's tick
+                // waits for. While it came back for any wake, 5 of the 12 light cells waited more.
+                assert!(after.wait_us <= before.wait_us, "{case}: wait {} > {}", after.wait_us, before.wait_us);
+                if LIGHT.contains(&shape) {
+                    before_us += before.wait_us;
+                    after_us += after.wait_us;
+                }
             }
         }
     }
-    // Measured: 13.2s -> 6.8s of 120s (13.1 -> 6.7 before upstream #1491's sleep deadline). Not lower: where a sleep keeps landing just past
-    // the display's vsync, today's tick waits less than the margin does (`tick_occupancy_table`).
-    assert!(after_us * 10 < before_us * 6, "wait {after_us}us vs {before_us}us");
+    // The light shapes, measured: 13.2s -> 3.6s of 120s. Not lower: where a sleep keeps landing in
+    // the gap a tick leaves the host, neither host waits for it (`tick_occupancy_table`).
+    assert!(after_us * 10 < before_us * 4, "wait {after_us}us vs {before_us}us");
+}
+
+// A 30Hz display too (`FramePacer`'s 30ms budget): the longest a wake tick could hold the page.
+const WAKE_PERIODS: [u64; 3] = [33_333, 16_667, 8_333];
+
+#[test]
+fn a_wake_tick_ends_inside_its_frame() {
+    println!("| shape | speed | display | frames off | frames | wake ticks | idle | past the next vsync | longest ms |");
+    println!("|---|---|---|---|---|---|---|---|---|");
+    let mut wake_ticks = 0;
+    for shape in SLEEPERS {
+        for period in WAKE_PERIODS {
+            for speed in SPEEDS {
+                let before = run(shape, speed, period, None, 0);
+                let after = run(shape, speed, period, Some(MARGIN_MS), WEBKIT_JITTER_US);
+                let case = std::format!("{shape:?} {speed}x {period}us");
+                println!(
+                    "| {shape:?} | {speed}x | {}Hz | {} | {} | {} | {} | {} | {:.1} |",
+                    (1e6 / period as f64).round(),
+                    before.late.len(),
+                    after.late.len(),
+                    after.wake_ticks,
+                    after.wake_ticks_idle,
+                    after.wake_ticks_past_vsync,
+                    after.wake_tick_max_us as f64 / 1000.0
+                );
+                // It is the rest of the frame tick (`Executor::resume_tick`), so it ends where that would
+                // have: before the next vsync, and the frame after it is not missed.
+                assert_eq!(after.wake_ticks_past_vsync, 0, "{case}");
+                // And the guest runs in every one: the tick waits as long as the host's timer aims
+                // ahead (`max_wait`), so none ends on the wake it was called for.
+                assert_eq!(after.wake_ticks_idle, 0, "{case}");
+                wake_ticks += after.wake_ticks;
+                assert!(
+                    after.late.len() * 100 >= before.late.len() * 99,
+                    "{case}: {} vs {}",
+                    after.late.len(),
+                    before.late.len()
+                );
+            }
+        }
+    }
+    assert!(wake_ticks > 1_000, "{wake_ticks}");
 }
 
 #[test]

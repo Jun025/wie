@@ -93,6 +93,14 @@ impl SpeedClock {
     }
 }
 
+/// `Platform::wake_margin_ms` at play `speed`, in the executor's guest ms (`Executor::tick_for`'s
+/// `max_wait`). Rounded up: the host's timer aims `margin_ms` of wall time before the wake
+/// (`SpeedClock::wake_delay`), and a tick that waits less than that ends on the wake it was called
+/// for — at 1.5x, 4 of 4.5 guest ms, so the host came back a second time, by then late.
+pub(crate) fn max_wait(margin_ms: u64, speed: f64) -> u64 {
+    (margin_ms as f64 * speed).ceil() as u64
+}
+
 /// How many times one guest timer may fire in host tick `tick` at play `speed` (WIPI
 /// `MC_knlSetTimer`'s once-per-host-frame rule, `docs/report/0384`): `speed` per tick on average,
 /// as `floor(speed * (tick + 1)) - floor(speed * tick)` — 1 at 1x, 1 and 2 alternating at 1.5x,

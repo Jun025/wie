@@ -39,8 +39,21 @@ pub struct WebPlatform {
     exited: Arc<AtomicBool>,
     // The play-speed clock `now()` reads, shared with `WieEmulator::set_speed`.
     clock: Arc<SpeedClock>,
-    // `WieEmulator::set_wake_margin`'s value; `u64::MAX` = not set.
-    wake_margin: Arc<AtomicU64>,
+    host_wake: Arc<HostWake>,
+}
+
+// Host wakes (crate doc), shared with `WieEmulator`.
+pub struct HostWake {
+    // `set_wake_margin`'s value; `u64::MAX` = not set.
+    pub margin_ms: AtomicU64,
+    // The tick now running is a `wake_tick`.
+    pub in_wake_tick: AtomicBool,
+}
+
+impl HostWake {
+    pub fn margin_ms(&self) -> Option<u64> {
+        Some(self.margin_ms.load(Ordering::Relaxed)).filter(|&ms| ms != u64::MAX)
+    }
 }
 
 // Single-threaded browser runtime; the only non-Send field is the JS audio
@@ -59,7 +72,7 @@ impl WebPlatform {
         soundfont_url: Option<String>,
         exited: Arc<AtomicBool>,
         clock: Arc<SpeedClock>,
-        wake_margin: Arc<AtomicU64>,
+        host_wake: Arc<HostWake>,
     ) -> Result<Self> {
         Ok(Self {
             screen,
@@ -71,7 +84,7 @@ impl WebPlatform {
             soundfont_url,
             exited,
             clock,
-            wake_margin,
+            host_wake,
         })
     }
 }
@@ -94,7 +107,11 @@ impl Platform for WebPlatform {
     }
 
     fn wake_margin_ms(&self) -> Option<u64> {
-        Some(self.wake_margin.load(Ordering::Relaxed)).filter(|&ms| ms != u64::MAX)
+        self.host_wake.margin_ms()
+    }
+
+    fn in_wake_tick(&self) -> bool {
+        self.host_wake.in_wake_tick.load(Ordering::Relaxed)
     }
 
     fn database_repository(&self) -> &dyn DatabaseRepository {

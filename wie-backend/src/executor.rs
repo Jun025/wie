@@ -32,6 +32,9 @@ pub struct ExecutorInner {
     // (wake, the wake a tick stays alive for — `None` for a poll, see `System::sleep`)
     sleeping_tasks: BTreeMap<usize, (Instant, Option<Instant>)>,
     last_task_id: usize,
+    // Where the last tick's budget ended, and whether the tick got there.
+    tick_end: Instant,
+    tick_spent: bool,
 }
 
 pub trait AsyncCallable<R>: Send
@@ -107,6 +110,8 @@ impl Executor {
             tasks: BTreeMap::new(),
             sleeping_tasks: BTreeMap::new(),
             last_task_id: 0,
+            tick_end: Instant::from_epoch_millis(0),
+            tick_spent: true,
         }));
 
         Self {
@@ -179,8 +184,30 @@ impl Executor {
     where
         T: Fn() -> Instant,
     {
-        self.woken.0.store(false, Ordering::Relaxed);
         let end = now() + budget_ms;
+        self.inner.lock().tick_end = end;
+        self.run_until(now, end, max_wait)
+    }
+
+    /// The rest of the last `tick_for`, for the host that comes back for the wake it ended on
+    /// (`max_wait`): it runs to where that tick's budget ended, as the tick would have had it waited
+    /// for the wake itself. With a budget of its own from wherever the host's timer fired it ran past
+    /// the next vsync, and a game frame of 15-20ms lost 1.5-11% of its frames at 60Hz
+    /// (docs/report/0556 §8).
+    pub fn resume_tick<T>(&mut self, now: T, max_wait: Option<u64>) -> Result<()>
+    where
+        T: Fn() -> Instant,
+    {
+        let end = self.inner.lock().tick_end;
+        self.run_until(now, end, max_wait)
+    }
+
+    fn run_until<T>(&mut self, now: T, end: Instant, max_wait: Option<u64>) -> Result<()>
+    where
+        T: Fn() -> Instant,
+    {
+        self.woken.0.store(false, Ordering::Relaxed);
+        self.inner.lock().tick_spent = false;
         // The last step left no task asking to be polled again: those not asleep are parked.
         let mut idle = false;
         loop {
@@ -190,6 +217,7 @@ impl Executor {
             let mut current = now();
 
             if current > end {
+                self.inner.lock().tick_spent = true;
                 break;
             }
 
@@ -242,6 +270,16 @@ impl Executor {
     /// see `System::sleep`), the next time a sleeping guest has work. `None` if no task sleeps so.
     pub fn next_due(&self) -> Option<Instant> {
         self.inner.lock().sleeping_tasks.values().filter_map(|x| x.1).min()
+    }
+
+    /// After a tick: `next_due` if that tick's budget reaches it and is not spent — the wake the tick
+    /// would have waited for, and ended on only for being further than `max_wait`. What the host of
+    /// `Platform::wake_margin_ms` comes back for with `resume_tick`; any other is the next frame's, as
+    /// it is without `max_wait`.
+    pub fn next_wake(&self) -> Option<Instant> {
+        let inner = self.inner.lock();
+        let due = inner.sleeping_tasks.values().filter_map(|x| x.1).min();
+        due.filter(|&due| !inner.tick_spent && due <= inner.tick_end)
     }
 
     pub fn current_task_id(&self) -> u64 {
@@ -559,9 +597,43 @@ mod tests {
             let woke = sleeper(&mut executor, 10);
             executor.tick_for(advancing_clock(0), 14, Some(3)).unwrap();
             assert!(!woke.load(Ordering::Relaxed), "parked: {parked}");
+            assert_eq!(executor.next_wake().map(|x| x.raw()), Some(10), "the host comes back for it");
             executor.tick_for(advancing_clock(8), 14, Some(3)).unwrap();
             assert!(woke.load(Ordering::Relaxed), "parked: {parked}");
         }
+    }
+
+    #[test]
+    fn test_a_resumed_tick_ends_where_its_tick_would_have() {
+        // The host's wake tick is the rest of the frame tick: a guest that sleeps to 10 and then
+        // wants CPU for ever gets the 4ms the 14ms budget still held, not a budget of its own.
+        let mut executor = Executor::new();
+        let polls = Arc::new(AtomicU64::new(0));
+        let (polls_clone, executor_clone) = (polls.clone(), executor.clone());
+        executor.spawn(move || async move {
+            SleepFuture::new(Instant::from_epoch_millis(10), &executor_clone).await;
+            for _ in 0..1000 {
+                polls_clone.fetch_add(1, Ordering::Relaxed);
+                YieldOnce(false).await;
+            }
+        });
+        executor.tick_for(advancing_clock(0), 14, Some(3)).unwrap();
+        assert_eq!(polls.load(Ordering::Relaxed), 0);
+        executor.resume_tick(advancing_clock(8), Some(3)).unwrap();
+        assert_eq!(polls.load(Ordering::Relaxed), 5, "polled at 10..=14");
+
+        // A wake the budget does not reach is the next frame's, not the host's to come back for; so
+        // is one the host came back for too late.
+        let mut executor = Executor::new();
+        let woke = sleeper(&mut executor, 30);
+        executor.tick_for(advancing_clock(0), 14, Some(3)).unwrap();
+        assert_eq!(executor.next_wake().map(|x| x.raw()), None);
+        let mut executor = Executor::new();
+        let woke_late = sleeper(&mut executor, 10);
+        executor.tick_for(advancing_clock(0), 14, Some(3)).unwrap();
+        executor.resume_tick(advancing_clock(20), Some(3)).unwrap();
+        assert!(!woke.load(Ordering::Relaxed) && !woke_late.load(Ordering::Relaxed));
+        assert_eq!(executor.next_wake().map(|x| x.raw()), None, "or it would be called back for ever");
     }
 
     #[test]

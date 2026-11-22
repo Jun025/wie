@@ -17,6 +17,12 @@ pub trait Platform: Send + Sync {
     fn wake_margin_ms(&self) -> Option<u64> {
         None
     }
+    /// Whether the tick now starting is one of those ticks: the rest of that host's last frame tick,
+    /// not a frame of its own. It runs to where that tick's budget ended, whatever budget it is
+    /// given, and under its number (`Executor::resume_tick`, `Pacing::tick_resumed`).
+    fn in_wake_tick(&self) -> bool {
+        false
+    }
     fn database_repository(&self) -> &dyn DatabaseRepository;
     fn filesystem(&self) -> &dyn Filesystem;
     fn audio_sink(&self) -> Box<dyn AudioSink>;

@@ -16,6 +16,10 @@
 //! - `due`         at the end of the last tick, the earliest guest time a waiting guest has work
 //!   due: a paced sleep's wake (`Executor::next_due`), a pending WIPI timer or `callSerially` slice
 //!   (`guest_waiting_until`). `None` = nothing waits on a time (a guest idle until a key).
+//! - `wake`        the part of `due` the last tick would have stayed alive for: a paced wake inside
+//!   its budget (`Executor::next_wake`), unless it ended starved. What a host that wakes the guest
+//!   itself comes back for (`Platform::wake_margin_ms`) — never the event loop's polled work, which
+//!   is the host frame's (docs/report/0556 §8).
 
 use alloc::{format, string::String, vec::Vec};
 
@@ -66,18 +70,27 @@ pub struct Pacing {
     gc_ms: u64,
     starved_ticks: u64,
     due: Option<Instant>,
+    wake: Option<Instant>,
     // What the event loop's current wait is for (`guest_waiting_until`); state, not a window figure.
     waiting_until: Option<Instant>,
 }
 
 impl Pacing {
-    pub(crate) fn tick_ended(&mut self, starved: bool, due: Option<Instant>) {
+    pub(crate) fn tick_ended(&mut self, starved: bool, due: Option<Instant>, wake: Option<Instant>) {
         self.ticks += 1;
         self.starved_ticks += u64::from(starved);
+        self.wake = wake.filter(|_| !starved);
         self.due = match (due, self.waiting_until) {
             (Some(a), Some(b)) => Some(a.min(b)),
             (a, b) => a.or(b),
         };
+    }
+
+    /// A host's wake tick begins (`Platform::in_wake_tick`): the rest of the tick before it, whose
+    /// number it runs under. Counted as a tick of its own it handed a WIPI timer a second share of
+    /// fires inside one host frame (`timer_fires_per_tick`: a 10ms timer 58 -> 94 fires/s).
+    pub(crate) fn tick_resumed(&mut self) {
+        self.ticks = self.ticks.saturating_sub(1);
     }
 
     /// The event loop is waiting, and has guest work due at `due` (a timer, a `callSerially` slice)
@@ -90,6 +103,11 @@ impl Pacing {
     /// `due` of the last tick (module doc).
     pub fn due(&self) -> Option<Instant> {
         self.due
+    }
+
+    /// `wake` of the last tick (module doc).
+    pub fn wake(&self) -> Option<Instant> {
+        self.wake
     }
 
     pub fn guest_yielded(&mut self) {
@@ -197,7 +215,7 @@ mod tests {
         pacing.redraw_requested(Instant::from_epoch_millis(12)); // coalesced into the first
         pacing.paint_started(Instant::from_epoch_millis(13));
         pacing.redraw_requested(Instant::from_epoch_millis(20));
-        pacing.tick_ended(false, None);
+        pacing.tick_ended(false, None, None);
         pacing.paint_started(Instant::from_epoch_millis(36));
         pacing.paint_started(Instant::from_epoch_millis(40)); // no request: a paint, not a redraw
 
@@ -231,16 +249,36 @@ mod tests {
         let at = Instant::from_epoch_millis;
         let due = |pacing: &Pacing| pacing.due().map(|x| x.raw());
         let mut pacing = Pacing::default();
-        pacing.tick_ended(false, Some(at(50)));
+        pacing.tick_ended(false, Some(at(50)), None);
         assert_eq!(due(&pacing), Some(50));
         pacing.guest_waiting_until(Some(at(30)));
         let _ = pacing.take();
-        pacing.tick_ended(false, Some(at(50)));
+        pacing.tick_ended(false, Some(at(50)), None);
         assert_eq!(due(&pacing), Some(30), "the timer the event loop waits for");
-        pacing.tick_ended(false, None);
+        pacing.tick_ended(false, None, None);
         assert_eq!(due(&pacing), Some(30));
         pacing.guest_waiting_until(None);
-        pacing.tick_ended(false, None);
+        pacing.tick_ended(false, None, None);
         assert_eq!(due(&pacing), None);
+    }
+
+    #[test]
+    fn wake_is_the_paced_wake_alone_and_a_resumed_tick_keeps_its_number() {
+        let at = Instant::from_epoch_millis;
+        let read = |pacing: &Pacing| (pacing.due().map(|x| x.raw()), pacing.wake().map(|x| x.raw()));
+        let mut pacing = Pacing::default();
+        pacing.guest_waiting_until(Some(at(30)));
+        pacing.tick_ended(false, None, None);
+        assert_eq!(read(&pacing), (Some(30), None), "polled work is due, and no wake");
+        pacing.tick_ended(false, Some(at(50)), Some(at(50)));
+        assert_eq!(read(&pacing), (Some(30), Some(50)));
+        pacing.tick_ended(true, Some(at(50)), Some(at(50)));
+        assert_eq!(read(&pacing), (Some(30), None), "a starved guest is served by the next frame");
+
+        assert_eq!(pacing.ticks(), 3);
+        pacing.tick_resumed();
+        assert_eq!(pacing.ticks(), 2, "the wake tick runs as the tick before it");
+        pacing.tick_ended(false, None, None);
+        assert_eq!(pacing.ticks(), 3);
     }
 }

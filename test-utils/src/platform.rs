@@ -108,6 +108,8 @@ pub struct TestPlatform {
     clock: Option<TestClock>,
     audio_log: Arc<Mutex<Vec<AudioCommand>>>,
     speed: f64,
+    wake_margin_ms: Option<u64>,
+    in_wake_tick: Arc<AtomicBool>,
 }
 
 impl Default for TestPlatform {
@@ -127,6 +129,8 @@ impl TestPlatform {
             clock: None,
             audio_log: Arc::default(),
             speed: 1.0,
+            wake_margin_ms: None,
+            in_wake_tick: Arc::default(),
         }
     }
 
@@ -143,6 +147,8 @@ impl TestPlatform {
             clock: None,
             audio_log: Arc::default(),
             speed: 1.0,
+            wake_margin_ms: None,
+            in_wake_tick: Arc::default(),
         }
     }
 
@@ -156,6 +162,8 @@ impl TestPlatform {
             clock: Some(clock),
             audio_log: Arc::default(),
             speed: 1.0,
+            wake_margin_ms: None,
+            in_wake_tick: Arc::default(),
         }
     }
 }
@@ -165,6 +173,19 @@ impl TestPlatform {
     pub fn with_speed(mut self, speed: f64) -> Self {
         self.speed = speed;
         self
+    }
+
+    /// A host that wakes the guest itself: `Platform::wake_margin_ms` reports `margin_ms`, and the
+    /// flag returned by [`Self::wake_tick_flag`] says which of its ticks are wake ticks.
+    pub fn with_wake_margin(mut self, margin_ms: u64) -> Self {
+        self.wake_margin_ms = Some(margin_ms);
+        self
+    }
+
+    /// What `Platform::in_wake_tick` reports: set it around a tick that is the host's wake tick.
+    /// Take this BEFORE boxing the platform.
+    pub fn wake_tick_flag(&self) -> Arc<AtomicBool> {
+        self.in_wake_tick.clone()
     }
 
     /// Every command the guest sent the audio sink, in order. Take this BEFORE boxing the
@@ -207,6 +228,14 @@ impl Platform for TestPlatform {
 
     fn speed(&self) -> f64 {
         self.speed
+    }
+
+    fn wake_margin_ms(&self) -> Option<u64> {
+        self.wake_margin_ms
+    }
+
+    fn in_wake_tick(&self) -> bool {
+        self.in_wake_tick.load(Ordering::SeqCst)
     }
 
     fn database_repository(&self) -> &dyn DatabaseRepository {
