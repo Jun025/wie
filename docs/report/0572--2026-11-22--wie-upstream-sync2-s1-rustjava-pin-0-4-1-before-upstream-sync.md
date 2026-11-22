@@ -145,3 +145,5 @@ upstream 이 같은 일을 한 커밋(`5fb65ee82` #1430 · `228e3ff48` #1444 · 
 | 0.4.1 이 바꾼 실행기 의미 가운데 표본이 타지 않았을 수 있는 것 | `invokespecial` 의 `AbstractMethodError` · 인터페이스 메서드 해소(가장 구체적인 선언 고르기) · GC 가 활성 모니터를 루트로 치는 것. 시험 851개와 표본 68판이 거친 만큼만 확인됐다 |
 
 **게임 파일명 유입**: `node scripts/corpus-name-inflow.mjs` — 유입 65건(BOUNDED) · 판단 필요 8건(SUFFIX-ATTACHED) · 대상 115파일. 둘 다 이 브랜치가 건드린 파일에 «이미 있던» 언급이다(`docs/project-kb/02_status.md` · LGT `jvm_support.rs` 의 주석 등 — 도구는 바뀐 파일의 본문 전체를 센다). 이 브랜치가 «더한 줄»에 든 것은 0건이다(도구가 낸 72쌍을 `git diff origin/main...HEAD` 의 추가 줄과 대조). SUFFIX-ATTACHED 8쌍도 같은 대조에서 0 이다.
+
+<!-- corpus-name-inflow v1 subjects=115 tree=aaa52bd08ec5a068 B=115/65 P=11/2 S=10/8 -->
