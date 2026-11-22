@@ -14,6 +14,8 @@
 // the same line. `build` derives each title's `changes` from those files: one source, not two.
 // docs/contracts/runtime-adjustments.tsv (the ledger of per-title engine adjustments) is the one
 // source of each row's `runtimeAdjustments`; the engine tables are held to it by `cargo test`.
+// Each row's `contentKey` is what the engine computes from the file (`wie_identify`), written by
+// scripts/content-key.mjs from the local corpus; here it is held to the ledger's jar keys.
 // ★No game bytes: titles, content hashes and sentences only.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
@@ -50,6 +52,8 @@ const LEDGER_SCOPES = ['any', 'zip', 'aid'];
 const LEDGER_CLASSES = ['operator-directed', 'adopted', 'ratified-2026-11-20'];
 const HEX40 = /^[0-9a-f]{40}$/;
 const HEX64 = /^[0-9a-f]{64}$/;
+// `contentKey` (§1): the container the engine loaded, and the MD5 of the jar it runs.
+const CONTENT_KEY = /^(zip|jar):[0-9a-f]{32}$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const PR = /^https:\/\/github\.com\/Jun025\/wie\/pull\/\d+$/;
 const FILE = /^(\d{4}-\d{2}-\d{2})-[a-z0-9][a-z0-9-]*\.json$/;
@@ -155,6 +159,9 @@ export function validateLedger(l, entries) {
     const hit = /^[0-9a-f]{12}$/.test(r.package ?? '') ? entries.filter((x) => x.sha256?.startsWith(r.package)) : [];
     if (hit.length !== 1) e.push(`${at}: package must be the first 12 hex of exactly one compat.json row (found ${hit.length})`);
     else if (hit[0].platform !== r.platform || hit[0].title !== r.title) e.push(`${at}: platform/title differ from compat.json (${hit[0].platform} ${JSON.stringify(hit[0].title)})`);
+    // A zip-scoped table keys on the MD5 of the package's jar — the same value as that row's contentKey.
+    else if (r.scope === 'zip' && 'contentKey' in hit[0] && hit[0].contentKey !== `zip:${r.key}`)
+      e.push(`${at}: the engine table keys this package by jar ${String(r.key).slice(0, 12)}, compat.json contentKey says ${JSON.stringify(hit[0].contentKey)} — never typed in: \`node scripts/content-key.mjs write\``);
   }
   return e;
 }
@@ -244,6 +251,8 @@ export function validateCompat(d) {
     // Optional, and never hand-written: `build` refuses a value the ledger does not derive (below). No key = none.
     if ('runtimeAdjustments' in x && !(Array.isArray(x.runtimeAdjustments) && x.runtimeAdjustments.length && x.runtimeAdjustments.every((k, j, a) => ADJUSTMENTS.includes(k) && a.indexOf(k) === j)))
       e.push(`${at}: runtimeAdjustments must be omitted or a non-empty array of distinct ${ADJUSTMENTS}`);
+    // Optional for a consumer; computed from the file, never typed in (the check below and the ledger hold it).
+    if ('contentKey' in x && !(x.contentKey === null || CONTENT_KEY.test(x.contentKey))) e.push(`${at}: contentKey must be null or <zip|jar>:<32 lowercase hex>`);
     if (!Array.isArray(x.changes)) e.push(`${at}: changes must be an array`);
     else
       x.changes.forEach((c, j) => {
@@ -253,6 +262,21 @@ export function validateCompat(d) {
       });
   });
   return e;
+}
+
+/** The committed list carries a contentKey on every row (null = the engine finds no jar in that file): a row without one was never measured. */
+export function missingContentKeys(entries) {
+  const missing = entries.filter((x) => !('contentKey' in x));
+  return missing.length
+    ? [`compat: ${missing.length} rows have no contentKey (${missing.slice(0, 5).map((x) => x.sha256.slice(0, 12)).join(' ')}${missing.length > 5 ? ' …' : ''}) — \`node scripts/content-key.mjs write\` (reads the local corpus; never typed in)`]
+    : [];
+}
+
+/** contentKey groups: how many keys, how many shared by ≥2 rows, and the shared ones whose rows differ in status. */
+export function contentKeyGroups(entries) {
+  const groups = [...Map.groupBy(entries.filter((x) => x.contentKey), (x) => x.contentKey).values()];
+  const shared = groups.filter((g) => g.length > 1);
+  return { distinct: groups.length, shared, split: shared.filter((g) => new Set(g.map((x) => x.status)).size > 1) };
 }
 
 /** `files` = [[filename, parsed]]; `shas` = the compat sha256 set. */
@@ -373,7 +397,7 @@ function selftest() {
     schema: 1,
     generatedAt: '2026-09-27',
     enginePin: 'b'.repeat(40),
-    entries: [{ sha256: sha, platform: 'KTF', model: null, title: 't', game: 't', variant: null, fileTitle: '[큰화]t', status: 'playable', axes: Object.fromEntries(AXES.map((a) => [a, 'ok'])), knownIssues_ko: [], changes: [] }],
+    entries: [{ sha256: sha, contentKey: `zip:${'9'.repeat(32)}`, platform: 'KTF', model: null, title: 't', game: 't', variant: null, fileTitle: '[큰화]t', status: 'playable', axes: Object.fromEntries(AXES.map((a) => [a, 'ok'])), knownIssues_ko: [], changes: [] }],
   };
   const pair = [good.entries[0], { ...good.entries[0], sha256: 'c'.repeat(64) }].map((x) => ({ ...x, sameTitle: 'undetermined' }));
   const upd = { date: '2026-09-27', kind: 'fix', titles: [sha], summary_ko: '고쳤어요.', pr: 'https://github.com/Jun025/wie/pull/1' };
@@ -431,9 +455,9 @@ function selftest() {
   if (hy.some((x) => x.game !== 'ab')) bad++, console.error(`selftest: with capitals and spaces equal the spelling with fewer hyphens wins, got ${JSON.stringify(hy.map((x) => x.game))}`);
   for (const [label, c, u] of cases) if (!errs(c, u).length) bad++, console.error(`selftest: NOT rejected — ${label}`);
   // runtimeAdjustments: derived from the ledger, never typed in; a ledger row needs its basis and a real compat row.
-  const lrow = { line: 2, device: 'd', key: 'k', package: sha.slice(0, 12), platform: 'KTF', title: 't', kind: 'owner-file-bytes', changes: 'file-bytes', scope: 'zip', class: 'adopted', basis: 'PR #1' };
+  const lrow = { line: 2, device: 'd', key: '9'.repeat(32), package: sha.slice(0, 12), platform: 'KTF', title: 't', kind: 'owner-file-bytes', changes: 'file-bytes', scope: 'zip', class: 'adopted', basis: 'PR #1' };
   const tsv = (rows) => [LEDGER_COLUMNS, ...rows.map((r) => LEDGER_COLUMNS.map((k) => r[k]))].map((r) => r.join('\t')).join('\n');
-  const led = parseLedger(`# a comment\n${tsv([lrow, { ...lrow, key: 'k2', kind: 'lock-lift' }])}\n`);
+  const led = parseLedger(`# a comment\n${tsv([lrow, { ...lrow, key: 'k2', scope: 'any', kind: 'lock-lift' }])}\n`);
   if (led.rows.length !== 2 || validateLedger(led, good.entries).length) bad++, console.error(`selftest: the good ledger is rejected — ${validateLedger(led, good.entries)}`);
   const ledgerCases = [
     ['ledger row with no basis', tsv([{ ...lrow, basis: ' ' }])],
@@ -444,6 +468,7 @@ function selftest() {
     ['ledger row twice', tsv([lrow, lrow])],
     ['ledger row with spaces for tabs', tsv([lrow]).replace(/\t(?=KTF)/, '    ')],
     ['ledger with another header', tsv([lrow]).replace('device', 'table')],
+    ['ledger jar key that is not the row\'s contentKey', tsv([{ ...lrow, key: '8'.repeat(32) }])],
   ];
   for (const [label, text] of ledgerCases) if (!validateLedger(parseLedger(text), good.entries).length) bad++, console.error(`selftest: NOT rejected — ${label}`);
   const adj = retitle([{ ...good.entries[0], runtimeAdjustments: ['display-size'] }, { ...good.entries[0], sha256: 'c'.repeat(64), title: 'u', runtimeAdjustments: ['lock-lift'] }], adjustmentsOf(led));
@@ -451,6 +476,16 @@ function selftest() {
     bad++, console.error(`selftest: runtimeAdjustments must be the ledger's kinds in vocabulary order, and absent off the ledger — got ${JSON.stringify(adj.map((x) => x.runtimeAdjustments ?? null))}`);
   for (const [label, v] of [['empty runtimeAdjustments', []], ['unknown runtimeAdjustments kind', ['patch']], ['runtimeAdjustments kind twice', ['lock-lift', 'lock-lift']], ['runtimeAdjustments as a string', 'lock-lift']])
     if (!validateCompat({ ...good, entries: [{ ...good.entries[0], runtimeAdjustments: v }] }).length) bad++, console.error(`selftest: NOT rejected — ${label}`);
+  // contentKey: a shape, on every committed row, and the group counts the OK line prints.
+  for (const [label, v] of [['contentKey without its container', '9'.repeat(32)], ['contentKey in capitals', `zip:${'A'.repeat(32)}`], ['contentKey of a whole-file sha256', `zip:${sha}`], ['empty contentKey', '']])
+    if (!validateCompat({ ...good, entries: [{ ...good.entries[0], contentKey: v }] }).length) bad++, console.error(`selftest: NOT rejected — ${label}`);
+  if (validateCompat({ ...good, entries: [{ ...good.entries[0], contentKey: null }] }).length || missingContentKeys([{ ...good.entries[0], contentKey: null }]).length)
+    bad++, console.error('selftest: a row whose file holds no jar (contentKey null) is rejected');
+  const { contentKey: _, ...unkeyed } = good.entries[0];
+  if (missingContentKeys(good.entries).length || !missingContentKeys([unkeyed]).length) bad++, console.error('selftest: a row with no contentKey must be reported, and a keyed one must not');
+  const groups = contentKeyGroups([...pair, { ...pair[0], sha256: 'd'.repeat(64), contentKey: `zip:${'7'.repeat(32)}` }, { ...pair[0], sha256: 'e'.repeat(64), contentKey: null }]);
+  if (groups.distinct !== 2 || groups.shared.length !== 1 || groups.split.length !== 0 || contentKeyGroups([pair[0], { ...pair[1], status: 'limited' }]).split.length !== 1)
+    bad++, console.error(`selftest: contentKeyGroups must count keys, shared keys and shared keys with differing status, got ${JSON.stringify(groups)}`);
   if (fromCensus({ ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, render: 'uniform', speed: 'n/a' } }] }).entries[0].axes.render !== 'no')
     bad++, console.error('selftest: census uniform must map to no');
   if (fromCensus({ ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, longplay: 'short' } }] }).entries[0].axes.longplay !== 'unknown')
@@ -517,7 +552,7 @@ function selftest() {
     rmSync(repo, { recursive: true, force: true });
   }
   if (bad) process.exit(1);
-  console.log(`player-data selftest: ${cases.length + ledgerCases.length + 4 + 15} rules each reject their mutation`);
+  console.log(`player-data selftest: ${cases.length + ledgerCases.length + 4 + 15 + 7} rules each reject their mutation`);
 }
 
 const [cmd, ...args] = process.argv.slice(2);
@@ -551,7 +586,7 @@ else if (cmd === 'import') {
   const compat = JSON.parse(readFileSync(COMPAT, 'utf8'));
   const files = readUpdates();
   const ledger = readLedger();
-  const e = [...validateCompat(compat), ...validateUpdates(files, new Set(compat.entries.map((x) => x.sha256))), ...validateLedger(ledger, compat.entries)];
+  const e = [...validateCompat(compat), ...missingContentKeys(compat.entries), ...validateUpdates(files, new Set(compat.entries.map((x) => x.sha256))), ...validateLedger(ledger, compat.entries)];
   // The committed names and runtimeAdjustments are what retitle() derives, row for row — a hand edit, a naming rule
   // changed without `normalize`, or a ledger row added without it, shows here.
   const drift = e.length ? -1 : retitle(compat.entries, adjustmentsOf(ledger)).findIndex((x, i) => JSON.stringify(x) !== JSON.stringify(compat.entries[i]));
@@ -563,6 +598,10 @@ else if (cmd === 'import') {
   const count = (k) => JSON.stringify(compat.entries.reduce((m, x) => ((m[x[k]] = (m[x[k]] ?? 0) + 1), m), {}));
   const adjusted = compat.entries.filter((x) => x.runtimeAdjustments);
   console.log(`player-data OK — ${compat.entries.length} titles · status ${count('status')} · platform ${count('platform')} · ${files.length} updates · runtimeAdjustments on ${adjusted.length} rows (ledger ${ledger.rows.length} rows)`);
+  // A key shared by rows of differing status cannot hand a status to a file known only by its key — list them (§1).
+  const keys = contentKeyGroups(compat.entries);
+  const sha12s = (g) => g.map((x) => `${x.sha256.slice(0, 12)}=${x.status}`).join('/');
+  console.log(`contentKey — ${keys.distinct} distinct on ${compat.entries.filter((x) => x.contentKey).length} rows · ${keys.shared.length} shared by ${keys.shared.flat().length} rows · ${keys.split.length} shared with differing status${keys.split.length ? `: ${keys.split.map(sha12s).join(' · ')}` : ''}`);
   if (cmd === 'build') {
     const oi = args.indexOf('--out');
     if (oi < 0) process.exit(2);

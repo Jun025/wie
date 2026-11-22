@@ -47,6 +47,22 @@ pub fn init() {
     console_error_panic_hook::set_once();
 }
 
+/// Which game a file is, without booting it: `{ platform, model, contentKey }`, or `undefined` when no loader takes it.
+// One line, as on `achieved_speed`: this comment is copied into wie_web.js. The definition is
+// `wie_identify::identify`; `data` is copied in and read only — the caller's buffer is never written.
+#[wasm_bindgen]
+pub fn identify(filename: &str, data: &[u8]) -> Result<JsValue, JsValue> {
+    let Some(identity) = wie_identify::identify(filename, data) else {
+        return Ok(JsValue::UNDEFINED);
+    };
+    let text = |value: Option<&str>| value.map_or(JsValue::NULL, JsValue::from_str);
+    let object = Object::new();
+    Reflect::set(&object, &"platform".into(), &identity.platform.into())?;
+    Reflect::set(&object, &"model".into(), &text(identity.model))?;
+    Reflect::set(&object, &"contentKey".into(), &text(identity.content_key.as_deref()))?;
+    Ok(object.into())
+}
+
 /// A running emulator instance, owned by JS for the lifetime of one loaded app.
 #[wasm_bindgen]
 pub struct WieEmulator {

@@ -13,7 +13,7 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
 
 ```
 { schema: 1, generatedAt: "YYYY-MM-DD…", enginePin: <측정한 wie 커밋 40hex>,
-  entries: [{ sha256: <64hex>, platform: "KTF"|"SKT"|"LGT"|"J2ME", model: "clet"|"aot-java"|null,
+  entries: [{ sha256: <64hex>, contentKey: "zip:<32hex>"|"jar:<32hex>"|null, platform: "KTF"|"SKT"|"LGT"|"J2ME", model: "clet"|"aot-java"|null,
               title: <표시 이름>, game: <통신사 무관 묶음 키>, variant: <판 라벨>|null,
               sameTitle?: "same-game"|"undetermined", fileTitle: <파일에서 온 원 이름(검색·추적용)>, status: "playable"|"limited"|"not-yet",
               axes: { boot, render, input, longplay, sound, speed: "ok"|"partial"|"no"|"unknown" },
@@ -63,7 +63,7 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
   `node scripts/player-data.mjs normalize` 로 다시 맞춘다). 셸 가져오기의 정렬(platform → title)은 안정 정렬이라 이 순서를 지킨다.
 - ★행은 지우지 않는다 — 매칭 키는 파일 내용 sha256 이고, 이용자의 파일이 어느 판이든 «미확인»이 되면 안 된다.
 
-`changes` 의 `kind`·`pr` 과 `fileTitle`·`game`·`variant`·`sameTitle`·`runtimeAdjustments` 는 셸 가져오기가 요구하지 않는 **추가 필드**다(모르는 키는 무시된다).
+`changes` 의 `kind`·`pr` 과 `contentKey`·`fileTitle`·`game`·`variant`·`sameTitle`·`runtimeAdjustments` 는 셸 가져오기가 요구하지 않는 **추가 필드**다(모르는 키는 무시된다).
 
 ★**`runtimeAdjustments` — 그 파일을 실행할 때 엔진이 «이 한 판에만» 거는 조정**(2026-11-22 · 선택 칸):
 디스크의 게임 파일은 고치지 않는다. 전부 엔진이 파일을 읽어 들인 뒤 메모리 안에서 걸리고, 행의 `sha256` 은 그대로 원본 파일의 것이다.
@@ -79,6 +79,24 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
   AID 로 고르는 `local-server` 는 맨 `.jar` 면 파일 이름이 AID 와 같을 때만 걸린다. 행별 범위는 장부의 `scope` 열.
 - 전 타이틀에 걸리는 일반 구현(KTF 범용 훅 등)은 이 칸에 넣지 않는다 — 장부 머리 주석의 «메모리에 올린 게임 코드» · «참고» 절.
 - 기존 소비자: 셸 가져오기는 모르는 키를 검사하지 않고 그대로 통과시키므로(`...x`), 이 칸을 모르는 셸은 지금과 똑같이 동작한다. `status` 와 축은 이 칸과 무관하다. 셸 표시는 otterpebble 쪽 티켓 몫이다.
+
+★**`contentKey` — 묶음 껍데기가 달라도 같은 «게임 내용 지문»**(2026-11-22 · 선택 칸 · `docs/report/0567`):
+이용자는 파일을 각자 구해 온다. 같은 게임이어도 다시 묶은 zip 이면 `sha256` 이 달라 목록에서 못 찾는다 — 그 파일을 알아보는 둘째 키다. 행의 정체성은 여전히 `sha256` 이다.
+- 값 = `zip:<32hex>` — 엔진이 그 꾸러미에서 골라 실행하는 **본체 jar 의 MD5**(엔진의 한 판 전용 조정 표가 쓰는 바로 그 키 · 장부 `key` 열). jar 하나만 올린 파일은 `jar:<32hex>` 로 접두가 다르다.
+  꾸러미에 그 jar 가 없으면 `null`(그 파일은 부팅도 못 한다). 지금 429행은 전부 `zip:` 이다.
+- ★**같은 게임 알아보기용이다 · 무결성·보안 판정에 쓰지 않는다.** MD5 는 일부러 맞춘 충돌을 막지 못한다 — 지문이 같다는 것은 «목록의 그 게임과 본체가 같아 보인다»까지이고, «변조되지 않았다»·«안전하다»의 근거가 아니다.
+- **같다고 보는 것**: zip 항목 순서 · 압축 방식 · 시각 · 감싼 폴더(엔진 `extract_zip` 이 이미 벗겨 읽는다) · 꾸러미 설명 파일(`__adf__`·`app_info`·`.msd`) · 이전 주인의 저장과 설정 · 내려받은 부속 파일.
+  **다르다고 보는 것**: 본체 jar 의 한 바이트 · 담긴 방식(zip 꾸러미냐 맨 jar 냐).
+- 왜 부속 파일과 설명 파일을 뺐나(코퍼스 429행 실측): 본체 jar 가 같은 묶음 21개(42행) 가운데 지원 상태가 갈리는 묶음은 0이다. 설명 파일까지 넣으면 9묶음, 전 파일을 넣으면 8묶음만 남는다 —
+  남의 폰에서 뜬 덤프는 저장 파일이 달라 전 파일 지문으로는 거의 못 알아본다. 설명 파일이 다른 12묶음은 전부 설치 칸 식별자(AID 와 거기서 파생된 칸)만 달랐다.
+- ★한계(소비자가 알아야 할 것): 지문이 같아도 **행의 측정이 그대로 옮겨 가는 것은 아니다.** ①AID 로 거는 `local-server` 는 설명 파일의 AID 가 달라지면 걸리지 않는다
+  ②부속 파일(이전 주인의 저장 · 내려받은 데이터)이 다르면 시작 상태가 다를 수 있다 ③`jar:` 로 올린 파일은 설명 파일 없이 뜨고 zip 에서만 거는 조정(장부 `scope` 가 `zip` 인 행)이 걸리지 않는다 —
+  그래서 접두가 달라 꾸러미 행과 같은 값이 되지 않는다(`:` 뒤 32자가 같으면 «같은 본체를 꾸러미 없이 올린 것»이다).
+  한 지문을 여러 행이 나눠 갖는다(지금 21개). 그 행들의 `status` 가 갈리면 지문만으로 상태를 정할 수 없다 — `node scripts/player-data.mjs` 가 그 묶음을 출력한다(지금 0).
+- 엔진 쪽 같은 값: wasm `identify(filename, data).contentKey`(`docs/contracts/featurephone-engine-contract.json` `identifyNote`). 계산은 `wie_identify::identify` 한 곳이고 이 칸도 그 함수가 낸 값이다.
+- **손으로 쓰지 않는다.** `node scripts/content-key.mjs write` 가 로컬 코퍼스의 파일에서 써 넣는다(게임 파일을 읽으므로 로컬 전용). 검사기는 ①형식 ②커밋된 목록의 모든 행에 칸이 있는지
+  ③장부의 `scope` 가 `zip` 인 행의 `key` 와 그 행의 지문이 같은지(게임 파일 없이 CI 에서 본다 · 지금 40행)를 거부 조건으로 본다. 파일과 맞는지 전수 대조는 `node scripts/content-key.mjs check`(로컬).
+- 기존 소비자: 모르는 키는 그대로 통과하므로(`...x`) 이 칸을 모르는 셸은 지금과 똑같이 동작한다. 셸이 이 칸으로 파일을 알아보는 일은 otterpebble 쪽 티켓 몫이다.
 
 ★**`knownIssues_ko` 와 `playTips_ko` 를 가른다**(2026-10-09):
 - `knownIssues_ko` = **안 되는 것**(빠진 소리·막히는 지점·서버 벽 등). 셸은 «알려진 문제»로 보인다. `playable` 이 아닌 행은 ≥1 줄(검사기 거부).
@@ -143,6 +161,8 @@ YAML 이 아니라 JSON 인 이유: 파서 의존을 새로 들이지 않는다(
 
 ## 4. 갱신
 
-- 전수 조사를 다시 돌린 뒤: `node scripts/player-data.mjs import <report 가 쓴 compat.json>` → 커밋.
+- 전수 조사를 다시 돌린 뒤: `node scripts/player-data.mjs import <report 가 쓴 compat.json>` → `node scripts/content-key.mjs write`(가져오기는 `contentKey` 를 만들지 않는다 — 없으면 검사기가 거부) → `node scripts/content-key.mjs check` → 커밋.
+  ★`check` 는 로컬에서만 돌고(게임 파일을 읽는다), 빼먹으면 CI 가 대신 잡지 못한다: CI 가 사실과 대조하는 지문은 장부에 오른 꾸러미 36개뿐이다. 장부 밖 393행은 형식만 맞으면 통과한다 —
+  끝 글자를 바꿔도, `null` 로 바꿔도, **다른 행의 지문으로 바꿔치기해도 rc=0** 이다(다른 게임이 같은 게임으로 읽히는 형상 · 2026-11-22 검수 실측). 그 행들을 지키는 것은 `check` 뿐이다.
 - 게임 동작을 바꾸는 PR: 항목 파일 1개를 같은 PR 에 넣는다(`AGENTS.md` §Landing paperwork).
 - ★main 을 머지한 브랜치가 그 «머지 전» 측정으로 compat.json 을 다시 쓰면 받은 행이 옛 값으로 되돌아간다 — `node scripts/check-compat-revert.mjs`(`contract` 잡)가 red 로 낸다. 의도한 되돌림은 그 PR 의 worklog `intendedCompatReverts: ["<sha12>:<필드>"]` 로만 통과한다.

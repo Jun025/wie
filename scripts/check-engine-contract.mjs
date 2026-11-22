@@ -73,6 +73,8 @@ if (glue) {
   else bad("glue export drift: `default` (wasm-bindgen __wbg_init) missing or not a function");
   if (typeof glue.init === "function") ok("glue export: init (panic hook) is a function");
   else bad("glue export drift: `init` missing or not a function");
+  if (typeof glue.identify === "function" && glue.identify.length === 2) ok("glue export: identify(filename, data) is a function");
+  else bad("glue export drift: `identify` missing or not a 2-argument function — the shell asks it which game a file is before booting");
   if (typeof glue.WieEmulator === "function") {
     ok("glue export: WieEmulator class present");
     const arity = glue.WieEmulator.length;
