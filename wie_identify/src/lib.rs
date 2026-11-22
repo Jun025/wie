@@ -198,4 +198,42 @@ mod tests {
         assert!(identify("a.zip", b"not a zip").is_none());
         assert!(identify("a.jad", b"MIDlet-Name: g\n").is_none());
     }
+
+    // Hand-made archives with more than one jar: the corpus barely has any (2 of 429 rows, both SKT),
+    // and files from outside it are what the key is for. Each carrier's `from_archive` reads the same
+    // entry its `archive_jar` does, so the jar asserted here is the jar the loader runs.
+    #[test]
+    fn with_several_jars_the_key_is_the_one_the_loader_runs() {
+        fn archive(entries: &[(&str, &[u8])]) -> Vec<u8> {
+            zip_of(entries.iter().map(|&(name, data)| (name.into(), data)), CompressionMethod::Stored)
+        }
+        let zip_key = |jar: &[u8]| Some(format!("zip:{}", md5_of(jar)));
+
+        // KTF: `<AID>.jar` wins, wherever it sorts.
+        let ktf = archive(&[("__adf__", b"AID:B\n"), ("A.jar", b"jar a"), ("B.jar", b"jar b")]);
+        assert_eq!(key("a.zip", &ktf), zip_key(b"jar b"));
+        // KTF: no `<AID>.jar` and a single jar — that jar.
+        let ktf = archive(&[("__adf__", b"AID:B\n"), ("A.jar", b"jar a")]);
+        assert_eq!(key("a.zip", &ktf), zip_key(b"jar a"));
+        // KTF: no `<AID>.jar` and two jars — the loader runs neither, so there is no key.
+        let ktf = archive(&[("__adf__", b"AID:C\n"), ("A.jar", b"jar a"), ("B.jar", b"jar b")]);
+        let ktf = identify("a.zip", &ktf).unwrap();
+        assert_eq!((ktf.platform, ktf.content_key), ("KTF", None));
+
+        // SKT: the jar named after the descriptor — neither the first nor the last.
+        let skt = archive(&[
+            ("a.jar", b"jar a"),
+            ("g.msd", b"MIDlet-Name: g\n"),
+            ("g.jar", b"jar g"),
+            ("z.jar", b"jar z"),
+        ]);
+        assert_eq!(key("a.zip", &skt), zip_key(b"jar g"));
+
+        // LGT: the first jar that holds `binary.mod`, past one that does not.
+        let without = archive(&[("res.dat", b"x")]);
+        let with = archive(&[("binary.mod", b"x")]);
+        let lgt = archive(&[("app_info", b"AID:A1\n"), ("a.jar", &without), ("b.jar", &with)]);
+        let lgt = identify("a.zip", &lgt).unwrap();
+        assert_eq!((lgt.platform, lgt.content_key), ("LGT", zip_key(&with)));
+    }
 }

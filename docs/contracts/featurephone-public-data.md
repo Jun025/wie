@@ -84,6 +84,7 @@ otterpebble #1141)가 받는 **그 스키마 그대로**다. 두 소비자가 �
 이용자는 파일을 각자 구해 온다. 같은 게임이어도 다시 묶은 zip 이면 `sha256` 이 달라 목록에서 못 찾는다 — 그 파일을 알아보는 둘째 키다. 행의 정체성은 여전히 `sha256` 이다.
 - 값 = `zip:<32hex>` — 엔진이 그 꾸러미에서 골라 실행하는 **본체 jar 의 MD5**(엔진의 한 판 전용 조정 표가 쓰는 바로 그 키 · 장부 `key` 열). jar 하나만 올린 파일은 `jar:<32hex>` 로 접두가 다르다.
   꾸러미에 그 jar 가 없으면 `null`(그 파일은 부팅도 못 한다). 지금 429행은 전부 `zip:` 이다.
+- ★**같은 게임 알아보기용이다 · 무결성·보안 판정에 쓰지 않는다.** MD5 는 일부러 맞춘 충돌을 막지 못한다 — 지문이 같다는 것은 «목록의 그 게임과 본체가 같아 보인다»까지이고, «변조되지 않았다»·«안전하다»의 근거가 아니다.
 - **같다고 보는 것**: zip 항목 순서 · 압축 방식 · 시각 · 감싼 폴더(엔진 `extract_zip` 이 이미 벗겨 읽는다) · 꾸러미 설명 파일(`__adf__`·`app_info`·`.msd`) · 이전 주인의 저장과 설정 · 내려받은 부속 파일.
   **다르다고 보는 것**: 본체 jar 의 한 바이트 · 담긴 방식(zip 꾸러미냐 맨 jar 냐).
 - 왜 부속 파일과 설명 파일을 뺐나(코퍼스 429행 실측): 본체 jar 가 같은 묶음 21개(42행) 가운데 지원 상태가 갈리는 묶음은 0이다. 설명 파일까지 넣으면 9묶음, 전 파일을 넣으면 8묶음만 남는다 —
@@ -160,6 +161,8 @@ YAML 이 아니라 JSON 인 이유: 파서 의존을 새로 들이지 않는다(
 
 ## 4. 갱신
 
-- 전수 조사를 다시 돌린 뒤: `node scripts/player-data.mjs import <report 가 쓴 compat.json>` → `node scripts/content-key.mjs write`(가져오기는 `contentKey` 를 만들지 않는다 — 없으면 검사기가 거부) → 커밋.
+- 전수 조사를 다시 돌린 뒤: `node scripts/player-data.mjs import <report 가 쓴 compat.json>` → `node scripts/content-key.mjs write`(가져오기는 `contentKey` 를 만들지 않는다 — 없으면 검사기가 거부) → `node scripts/content-key.mjs check` → 커밋.
+  ★`check` 는 로컬에서만 돌고(게임 파일을 읽는다), 빼먹으면 CI 가 대신 잡지 못한다: CI 가 사실과 대조하는 지문은 장부에 오른 꾸러미 36개뿐이다. 장부 밖 393행은 형식만 맞으면 통과한다 —
+  끝 글자를 바꿔도, `null` 로 바꿔도, **다른 행의 지문으로 바꿔치기해도 rc=0** 이다(다른 게임이 같은 게임으로 읽히는 형상 · 2026-11-22 검수 실측). 그 행들을 지키는 것은 `check` 뿐이다.
 - 게임 동작을 바꾸는 PR: 항목 파일 1개를 같은 PR 에 넣는다(`AGENTS.md` §Landing paperwork).
 - ★main 을 머지한 브랜치가 그 «머지 전» 측정으로 compat.json 을 다시 쓰면 받은 행이 옛 값으로 되돌아간다 — `node scripts/check-compat-revert.mjs`(`contract` 잡)가 red 로 낸다. 의도한 되돌림은 그 PR 의 worklog `intendedCompatReverts: ["<sha12>:<필드>"]` 로만 통과한다.

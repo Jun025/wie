@@ -171,4 +171,17 @@ rc=1
 SUFFIX-ATTACHED 16종은 `compat.json` 안의 더 긴 다른 제목과 안내 문장 속 낱말이고, 이 PR 이 더한 줄에서 나온 것은 없다.
 게임 바이트 · 꾸러미 안 파일 본문 · 경로 유입 0. 새로 실린 해시는 본체 jar 의 MD5(지문)이고, 그중 장부에 오른 것은 엔진 표에 이미 있던 값이다.
 
+### 9. 게이트② 반려 R1 — jar 가 둘 이상인 꾸러미 (`wie-featurephone-content-fingerprint-for-user-supplied-files-fix`)
+
+검수가 `archive_jar` 에 넣은 개악 둘(KTF → 첫 번째 `.jar` · SKT → 마지막 `.jar`)이 `cargo test` 에서 살아남았다. 시험 고정물이 전부 jar 1개짜리였고, 코퍼스에서 jar 가 둘 이상인 꾸러미는 2행(둘 다 SKT)뿐이다.
+
+- **시험**: `wie_identify` 에 `with_several_jars_the_key_is_the_one_the_loader_runs` — 손으로 짠 합성 꾸러미 다섯 형상(게임 파일 0).
+  KTF `AID:B` + `A.jar` + `B.jar` → `B.jar` · KTF AID jar 없음 + jar 1개 → 그 jar · KTF AID jar 없음 + jar 2개 → 키 없음 · SKT `a.jar` + `g.msd` + `g.jar` + `z.jar` → `g.jar` · LGT `binary.mod` 없는 `a.jar` + 있는 `b.jar` → `b.jar`.
+- **구조**: KTF · SKT 도 LGT 처럼 묶었다. 종전에는 `from_archive` 와 `archive_jar` 가 같은 이름 함수를 각자 부른 뒤 각자 `files.get` 했다. 이제 고른 항목(이름 + jar)을 돌려주는 함수 하나(KTF `archive_jar_entry` · SKT `archive_entries`)를 양쪽이 읽는다.
+  로더가 실행하는 줄은 같은 이름 계산 · 같은 `get` 이다(SKT 의 설명 파일 고르기도 같은 `find`). `from_archive` 가 그 함수를 거치므로 위 시험이 보는 jar 가 곧 로더가 실행하는 jar 다.
+- **개악 대조**(`cargo test -p wie_identify -p wie-ktf -p wie-lgt -p wie-skt`): 검수의 둘 — KTF `archive_jar` → 첫 번째 `.jar` rc=101 · SKT `archive_jar` → 마지막 `.jar` rc=101. 묶은 함수 쪽 둘(로더와 지문이 함께 틀어지는 형상) — KTF rc=101 · SKT rc=101. 넷 다 새 시험이 red, 되돌리면 rc=0.
+- **동작 0 의 증거**: `content-key.mjs check` — 커밋된 값 == native 429/429 · native == wasm 429/429 · 행의 통신사/모델 == identify 429/429(wasm · native 를 이 커밋에서 다시 지은 뒤). `compat.json` diff 0. 러너 블록 6종 PASS.
+- 문서: 계약 §1 `contentKey` 절에 «같은 게임 알아보기용 · 무결성·보안 판정에 쓰지 않는다», §4 갱신 순서에 `write` 뒤 `check` 와 그 한계(장부 밖 393행은 다른 행의 지문으로 바꿔치기해도 CI rc=0).
+- 남긴 것: 지문이 같은 묶음의 `status` 가 갈려도 검사기는 rc=0 이다(red 면 참인 데이터를 막는다). 「갈린 묶음은 상태를 물려주지 않는다」는 셸 쪽 요건이다.
+
 <!-- corpus-name-inflow v1 subjects=23 tree=24c4b2709eb871bc B=1156/410 P=7/5 S=52/16 -->

@@ -142,20 +142,26 @@ fn class_utf8_constants(class: &[u8]) -> Vec<&[u8]> {
     strings
 }
 
-// The package's jar sits beside its descriptor, under the same name.
-fn jar_filename(msd_filename: &str) -> String {
-    msd_filename.replace(".msd", ".jar")
+// The descriptor `from_archive` reads, and the jar beside it under the same name (`None` when the
+// archive does not hold it). `archive_jar` reads the same entry, so the jar that is hashed is the
+// jar that runs.
+type ArchiveEntries<'a> = ((&'a String, &'a Vec<u8>), String, Option<&'a Vec<u8>>);
+
+fn archive_entries(files: &BTreeMap<String, Vec<u8>>) -> Option<ArchiveEntries<'_>> {
+    let msd = files.iter().find(|x| x.0.ends_with(".msd"))?;
+    let jar_filename = msd.0.replace(".msd", ".jar");
+    let jar = files.get(&jar_filename);
+    Some((msd, jar_filename, jar))
 }
 
 impl SktEmulator {
     pub fn from_archive(platform: Box<dyn Platform>, mut files: BTreeMap<String, Vec<u8>>) -> Result<Self> {
-        let msd_file = files.iter().find(|x| x.0.ends_with(".msd")).unwrap();
+        let (msd_file, jar_filename, jar) = archive_entries(&files).unwrap();
         let msd = SktMsd::parse(msd_file.0, msd_file.1);
 
         tracing::info!("Loading app {}, mclass {}", msd.id, msd.main_class);
 
-        let jar_filename = jar_filename(msd_file.0);
-        if let Some((width, height)) = files.get(&jar_filename).and_then(|jar| package_display_size(jar))
+        if let Some((width, height)) = jar.and_then(|jar| package_display_size(jar))
             && width < platform.screen().width()
         {
             tracing::info!("Package holds no assets wider than {width}: display {width}x{height}");
@@ -163,7 +169,7 @@ impl SktEmulator {
                 tracing::warn!("Ignoring unsupported display size {width}x{height}: {error}");
             }
         }
-        if let Some(jar) = files.get(&jar_filename).cloned() {
+        if let Some(jar) = jar.cloned() {
             turn_owner_sound_on(&mut files, &jar);
         }
 
@@ -182,8 +188,7 @@ impl SktEmulator {
 
     /// The jar `from_archive` runs — the one the per-title tables hash.
     pub fn archive_jar(files: &BTreeMap<String, Vec<u8>>) -> Option<&[u8]> {
-        let msd = files.keys().find(|name| name.ends_with(".msd"))?;
-        files.get(&jar_filename(msd)).map(Vec::as_slice)
+        archive_entries(files)?.2.map(Vec::as_slice)
     }
 
     pub fn archive_title(files: &BTreeMap<String, Vec<u8>>) -> Option<String> {
