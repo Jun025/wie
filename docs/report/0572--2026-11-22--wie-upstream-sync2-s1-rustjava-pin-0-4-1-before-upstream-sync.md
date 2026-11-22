@@ -157,7 +157,7 @@ PR 의 CI 가 도는 사이 `origin/main` 이 #599(`contentKey` · 새 크레이
 
 ### 10. 게이트② 반려 뒤 — main 을 다시 받고 F1 ~ F7 을 닫는다 (`…-fix` · 2026-11-22 15:50 ~)
 
-게이트②(`1b52120e` 를 본 검수 · request-changes · F1 ~ F9)의 필수 수정 셋과 그 밖의 발견 F4 ~ F7 이다. F8 · F9 는 기록만이라 손대지 않았다. §10-1 ~ §10-6 의 수는 코드 트리 `ad44df027`(= PR 머리 `01680fa5c` + `origin/main` `76cc27c57` 일반 병합 + `=0.4.1` 고정)에서 쟀다. ★그 사이 main 이 또 전진해 한 번 더 받았다 — **최종 코드 트리는 `b32eb6dcd`** 이고 거기서 다시 잰 것은 §10-7 에 있다.
+게이트②(`1b52120e` 를 본 검수 · request-changes · F1 ~ F9)의 필수 수정 셋과 그 밖의 발견 F4 ~ F7 이다. F8 · F9 는 기록만이라 손대지 않았다. §10-1 ~ §10-6 의 수는 코드 트리 `ad44df027`(= PR 머리 `01680fa5c` + `origin/main` `76cc27c57` 일반 병합 + `=0.4.1` 고정)에서 쟀다. ★그 사이 main 이 또 전진해 한 번 더 받았다 — 그 트리(`b32eb6dcd`)에서 다시 잰 것은 §10-7 에 있다. 그 직후 공개된 자문 하나를 닫으려고 `url` 을 한 판 올렸다(§10-8) — **최종 코드 트리는 `a9344ff5b`** 다.
 
 #### 10-1. main 병합 한 번 더 · lock · 감사 (F1) · `=0.4.1` (F5)
 
@@ -299,7 +299,7 @@ PR 의 CI 가 도는 사이 `origin/main` 이 #599(`contentKey` · 새 크레이
 
 #### 10-7. census 가 도는 사이 main 이 또 전진했다 — 한 번 더 받고 최종 트리에서 다시 쟀다
 
-§10-1 ~ §10-5 를 재는 2시간 반 사이 `origin/main` 이 7건(`d65954359` #606 · `2dfff4f2d` 0570 · `0b50fb735` #608 · `e843ce009` #609 · `b52f6c46f` 0573 · `90861ad7a` #610 · `afd4b0627` #607) 더 전진했다. 그 가운데 **0573(조각 S2)은 실행기의 시간 의미를 바꾼다** — `sleep(n)` 의 마감을 «그 step 이 시작한 때 + n» 에서 «부른 때 + n» 으로 센다. `git merge origin/main` 으로 받았다(병합 커밋 `b32eb6dcd` · 충돌 0). **최종 코드 트리 = `b32eb6dcd`** 이고 그 뒤 더한 것은 이 문서뿐이다. 이 트리에서 다시 잰 것:
+§10-1 ~ §10-5 를 재는 2시간 반 사이 `origin/main` 이 7건(`d65954359` #606 · `2dfff4f2d` 0570 · `0b50fb735` #608 · `e843ce009` #609 · `b52f6c46f` 0573 · `90861ad7a` #610 · `afd4b0627` #607) 더 전진했다. 그 가운데 **0573(조각 S2)은 실행기의 시간 의미를 바꾼다** — `sleep(n)` 의 마감을 «그 step 이 시작한 때 + n» 에서 «부른 때 + n» 으로 센다. `git merge origin/main` 으로 받았다(병합 커밋 `b32eb6dcd` · 충돌 0). 이 트리(`b32eb6dcd`)에서 다시 잰 것(그 뒤의 `url` 한 판은 §10-8):
 
 | 잰 것(최종 트리 `b32eb6dcd` · 18:39 ~ 18:56 · load1 5 ~ 15) | 값 |
 |---|---|
@@ -327,6 +327,16 @@ PR 의 CI 가 도는 사이 `origin/main` 이 #599(`contentKey` · 새 크레이
 **코퍼스 — 최종 트리의 전/후 짝(표본 28행)**. 전수를 한 번 더 돌릴 시간은 없었다. `compat.json` 의 playable 행을 통신사마다 sha 순 한가운데서 8개씩(KTF 8 · LGT 8 · SKT 8) + §10-3 의 1차에서 달랐던 4행 + `abc0c5789259`(그 5행 중 1행은 24개와 겹쳐 합 28행 — KTF 11 · LGT 9 · SKT 8)를 같은 도구 · `--secs 15` 로 쟀다(18:47 ~ 18:56 · load1 6 ~ 10): **28행 모두 부팅 · 그림 · 입력 · 소리 · 속도가 전/후 같다** · `result` 다른 행 0 · 첫 예외 다른 행 0 · 예외 수 다른 행 1.
 
 - ★남는 틈: §10-3 의 전수 429행 · §10-5 의 탐침은 `ad44df027` ↔ `76cc27c57` 에서 잰 것이다. 최종 트리(이 핀 + 0573 의 실행기)의 코퍼스 실행은 위 28행이 전부다. 0573 은 그 PR 에서 따로 쟀고(`docs/report/0573`) 이 핀과 겹치는 파일은 `event_queue.rs` 하나(병합 충돌 0 · 시험 통과)다.
+
+#### 10-8. 최종 머리를 올린 직후 새 자문이 공개됐다 — `url` 2.5.8 → 2.5.9
+
+§10-7 의 머리(`87473430a`)를 올리자 `pr_audit` 이 red 였다(`https://github.com/Jun025/wie/actions/runs/45010063304/job/137170212896` · `error: 1 vulnerability found!`). **RUSTSEC-2026-0592** — `url` 2.5.8 · 중첩 `blob:` URL 에서 `Url::origin()` 의 스택 오버플로 · 해법 «2.5.9 이상». 같은 트리의 로컬 `cargo audit` 은 18:45 에 취약점 0 이었으니 그 뒤에 자문 DB 에 들어온 것이다. 이 PR 이 들인 것이 아니다 — `url` 2.5.8 은 `origin/main`(`afd4b0627`)과 갈라진 자리(`1853f3b6f`)의 lock 에도 그대로 있고, 같은 시각 `origin/main` 의 무-플래그 `cargo audit` 은 9건(zip 8 + 이것)이다.
+
+그래도 이 PR 은 감사 억제를 0개로 만든 PR 이라, 억제하지 않고 **올려서 닫았다**(`cargo update -p url` — `url` 2.5.8 → 2.5.9 · 딸려 온 `form_urlencoded` 1.2.2 → 1.2.3 · lock 4줄 · 커밋 `a9344ff5b`). 무-플래그 `cargo audit` rc=0 · 취약점 **0** · 경고 2 · `check-audit-warnings.mjs` rc=0.
+
+- **최종 코드 트리 = `a9344ff5b`**. 이 트리에서 다시 돈 것: `cargo metadata --locked --offline` rc=0 · `cargo fmt --all -- --check` rc=0 · `cargo clippy --all -- -D warnings` rc=0 · wasm32 clippy(기본 + `-p wie-core-arm -p wie_featurephone`) rc=0 · `cargo +beta clippy --all -- -D warnings` rc=0 · `RUST_MIN_STACK=4194304 cargo test --all` rc=0 — **58 스위트 · 864 passed · 0 failed** · 러너 블록 6종 PASS rc=0(`keydraw_ktf` `paints` 79 · `keydraw_lgt` 55 · 둘 다 `content` true · `input_steps` 27/27) · 이 트리에서 새로 빌드한 wasm 으로 `content-key.mjs check` rc=0(429/429 · 429/429 · 429/429) · `check-engine-contract.mjs` rc=0(140 pass) — 19:00 ~ 19:08 · load1 6.
+- ★이 트리에서 다시 재지 «않은» 것: §10-7 의 속도 4짝과 표본 28행(`b32eb6dcd` 에서 쟀다) · §10-3 의 전수 census. `url` 은 `rustjava-runtime` 이 끌어오는 URL 파서의 패치 판이다.
+- main 쪽은 그대로 red 다 — 일일 감사(`rust-audit.yaml`)가 main 에서 이 자문을 잡을 것이고, 이 PR 이 먼저 착지하면 닫힌다.
 
 **게임 파일명 유입**: `node scripts/corpus-name-inflow.mjs` — 유입 65건(BOUNDED) · 판단 필요 8건(SUFFIX-ATTACHED) · 대상 115파일. 둘 다 이 브랜치가 건드린 파일에 «이미 있던» 언급이다(`docs/project-kb/02_status.md` · LGT `jvm_support.rs` 의 주석 등 — 도구는 바뀐 파일의 본문 전체를 센다). 이 브랜치가 «더한 줄»에 든 것은 0건이다(도구가 낸 72쌍을 `git diff origin/main...HEAD` 의 추가 줄과 대조). SUFFIX-ATTACHED 8쌍도 같은 대조에서 0 이다.
 
