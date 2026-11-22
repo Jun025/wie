@@ -26,16 +26,28 @@
 // A human fixed it on 2026-09-08; this makes the machine say it next time. It reads
 // the SAME `actual` computed above, so the two checks can never disagree about what
 // the warnings are.
+// ★ASYMMETRIC since 2026-11-22, the same way the first check always was: a warning with
+// no §A row is PRINTED (and written to the job summary) but is NOT red; a §A row with no
+// warning is red. Until then both directions were red, so every freshly published
+// unsound/yanked/unmaintained advisory reddened the daily job with no change to this repo
+// (10 days, 2026-10-24 → 11-02, on one tokio warning — run 40449806714). A new
+// VULNERABILITY is still red: the audit step says so, and the IGNORES block below says so
+// again so this script's verdict does not depend on the step before it.
+// `--selftest` holds all three shapes, hermetically (no cargo-audit, no network).
 //
 // THIRD CHECK (2026-10-23): the named `--ignore`s on the audit line of rust-audit.yaml and
 // pr-audit.yml — same list in both, every ID still reported by the unignored audit below,
 // and every ID argued in ledger §D. See the IGNORES block at the bottom.
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { execFile } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 
 const EXPECTED_FILE = ".github/rust-audit-expected-warnings.json";
 const LEDGER_FILE = "docs/project-kb/02_status.md";
+const AUDIT_WORKFLOWS = [".github/workflows/rust-audit.yaml", ".github/workflows/pr-audit.yml"];
 const key = (w) => `${w.package}@${w.version} ${w.kind}${w.advisory ? ` (${w.advisory})` : ""}`;
 
 // The ledger states kind in prose ("`unmaintained`(informational)", "취약점 아님 — 레지스트리
@@ -48,6 +60,8 @@ const idOf = (w) => `${w.package}@${w.version} ${w.advisory ?? w.kind}`;
 // step's job, not ours: we still want to read the JSON, so a non-zero exit with
 // parseable stdout is not an error here.
 const auditJson = async () => {
+  // --selftest 전용 이음매 — 워크플로에 이 변수를 두지 마라(실제 감사 대신 파일을 읽는다).
+  if (process.env.WIE_AUDIT_JSON) return JSON.parse(await readFile(process.env.WIE_AUDIT_JSON, "utf8"));
   try {
     const { stdout } = await promisify(execFile)("cargo", ["audit", "--json"], { maxBuffer: 64 * 1024 * 1024 });
     return JSON.parse(stdout);
@@ -56,6 +70,8 @@ const auditJson = async () => {
     throw e;
   }
 };
+
+if (process.argv.includes("--selftest")) process.exit(selftest());
 
 const report = await auditJson();
 const actual = Object.entries(report.warnings ?? {}).flatMap(([kind, items]) =>
@@ -132,18 +148,25 @@ if (rowLines.length === 0 || unparsed.length > 0) {
   console.log(`  §A 행 ${rows.length}건 · 경고 ${actual.length}건 · 절 머리 선언 ${declared ?? "?"}건`);
   for (const r of rows.filter((r) => auditKeys.has(idOf(r)))) console.log(`    · 일치: ${r.id} ${idOf(r)}`);
 
-  if (onlyAudit.length || onlyRow.length || (declared !== undefined && Number(declared) !== rows.length)) {
+  // 새 경고(§A 에 행이 없다)는 red 가 아니다 — «보이게»만 한다(stdout + 잡 요약). 새 자문은 이 repo 의
+  // 변경 없이 뜨므로, 그것이 매일 잡을 붉히면 red 가 신호이기를 그친다(머리 주석 ★ASYMMETRIC).
+  if (onlyAudit.length) {
+    const line = `대장에 없는 새 경고 ${onlyAudit.length}건: ${onlyAudit.map(idOf).join(", ")}`;
+    console.log(`\n  ★${line}`);
+    console.log("  이것은 red 가 아니다. 살펴본 뒤 «A 에 등재하고 도달성 판정을 써라»(등재한 뒤에는 그 행이 낡으면 red 다).");
+    if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${line}\n`);
+  }
+
+  const miscounted = declared !== undefined && Number(declared) !== rows.length;
+  if (onlyRow.length || miscounted) {
     failed = true;
-    console.log("\n  ❌ 대장 A 가 낡았다 — 그 절이 스스로 적은 「경고 수와 행 수가 어긋나면 둘 중 하나가 낡은 것이다」에 걸렸다:");
-    for (const w of onlyAudit) console.log(`    + 경고에만 있다(§A 에 행이 없다): ${idOf(w)}`);
+    console.log("\n  ❌ 대장 A 가 낡았다 — §A 에 있는 행을 cargo audit 이 더는 내지 않거나, 절 머리의 건수가 행 수와 다르다:");
     for (const r of onlyRow) console.log(`    - §A 에만 있다(경고가 없다 = 해소됐다): ${r.id} ${idOf(r)}`);
-    if (declared !== undefined && Number(declared) !== rows.length) {
-      console.log(`    ! 절 머리가 ${declared}건이라 적었는데 실제 행은 ${rows.length}건이다`);
-    }
-    console.log("  ★처방: 해소분은 «C 로 옮겨라»(행을 지우지 마라 — 구 ID 병기) · 새 경고는 «A 에 등재하고 도달성 판정을 써라».");
+    if (miscounted) console.log(`    ! 절 머리가 ${declared}건이라 적었는데 실제 행은 ${rows.length}건이다`);
+    console.log("  ★처방: 해소분은 «C 로 옮겨라»(행을 지우지 마라 — 구 ID 병기).");
     console.log("  ★번호를 재사용하지 마라 — 회차 기록·로드맵이 그 ID 로 이 표를 가리킨다.");
   } else {
-    console.log("\nOK 대장 A 가 실제와 일치한다");
+    console.log(`\nOK 대장 A 에 낡은 행이 없다${onlyAudit.length ? " (대장에 없는 새 경고는 위에 갈라 적었다)" : " — 실제와 일치한다"}`);
   }
 }
 
@@ -153,7 +176,6 @@ if (rowLines.length === 0 || unparsed.length > 0) {
 //   ⑵ 억제한 ID 를 cargo audit 이 더는 내지 않는다(위 auditJson 은 무-억제로 돈다) — 해소됐으니 지워라.
 //      남겨 두면 같은 ID 가 나중에 «다른 판본»에서 되살아나도 아무도 못 본다.
 //   ⑶ 억제한 ID 에 대장 §D 행(줄머리 `| **D-<n>** |`)이 없다 — 논증 없는 억제다.
-const AUDIT_WORKFLOWS = [".github/workflows/rust-audit.yaml", ".github/workflows/pr-audit.yml"];
 console.log(`\nIGNORES  --ignore ↔ cargo audit 실제 · ${AUDIT_WORKFLOWS.length} 워크플로 · ${LEDGER_FILE} §D`);
 const ignoreSets = [];
 for (const f of AUDIT_WORKFLOWS) {
@@ -172,6 +194,9 @@ if (ignoreSets.length === AUDIT_WORKFLOWS.length) {
   const dRows = ledger.split("\n").filter((l) => /^\|\s*\*\*D-\d+\*\*\s*\|/.test(l));
   const stale = [...a.ids].filter((x) => !reported.has(x));
   const unargued = [...a.ids].filter((x) => !dRows.some((l) => l.includes(x)));
+  // 억제되지 않은 취약점 = 새 취약점. 워크플로에서는 앞의 `cargo audit` 단계가 먼저 붉지만, 위에서 새 «경고»를
+  // 풀어 준 이 검사기가 «취약점»까지 푼 것으로 읽히지 않게 여기서도 red 로 낸다(--selftest ⒝ 가 묶는다).
+  const unignored = [...reported].filter((x) => !a.ids.has(x));
   console.log(`  억제 ${a.ids.size}건 · §D 행 ${dRows.length}건`);
   for (const x of a.ids) if (!diff.includes(x) && !stale.includes(x) && !unargued.includes(x)) console.log(`    · 유효: ${x}`);
   if (diff.length) {
@@ -186,10 +211,70 @@ if (ignoreSets.length === AUDIT_WORKFLOWS.length) {
     failed = true;
     console.log(`  ❌ §D 행이 없는 억제: ${unargued.join(" ")} — 도달성 논증 없이 억제하지 마라(Constraint 5)`);
   }
-  if (!diff.length && !stale.length && !unargued.length) console.log("\nOK 억제 목록이 두 워크플로·실제·§D 와 일치한다");
+  if (unignored.length) {
+    failed = true;
+    console.log(`  ❌ 억제되지 않은 취약점 ${unignored.length}건: ${unignored.join(" ")} — 취약점은 red 다(올려서 닫거나, 못 올리면 §D 에 논증을 쓰고 이름으로 억제)`);
+  }
+  if (!diff.length && !stale.length && !unargued.length && !unignored.length) console.log("\nOK 억제 목록이 두 워크플로·실제·§D 와 일치한다");
 }
 
 if (failed) {
   console.log("\nAUDIT-WARNINGS FAILED ❌");
   process.exit(1);
+}
+
+// ── --selftest ───────────────────────────────────────────────────────────────────
+// 판정 «규칙»을 잰다(이 repo 의 대장이 지금 맞는가가 아니다): 임시 디렉터리에 최소 대장·기대 목록·두 워크플로를
+// 쓰고, 합성 `cargo audit --json` 을 WIE_AUDIT_JSON 으로 물려 «이 스크립트 자신»을 CLI 로 돌린다.
+function selftest() {
+  const warn = (name, id) => ({ package: { name, version: "1.0.0" }, advisory: { id } });
+  const base = () => ({
+    vulnerabilities: { count: 1, list: [{ advisory: { id: "RUSTSEC-2000-0009" } }] },
+    warnings: { unmaintained: [warn("aaa", "RUSTSEC-2000-0001")] },
+  });
+  const expectedBase = [{ package: "aaa", version: "1.0.0", kind: "unmaintained", advisory: "RUSTSEC-2000-0001" }];
+  const NEW_WARNING = "대장에 없는 새 경고 1건: bbb@1.0.0 RUSTSEC-2000-0002";
+  const cases = [
+    { name: "기준 — 전부 일치", want: 0, out: /OK 대장 A 에 낡은 행이 없다 — 실제와 일치한다/ },
+    {
+      name: "⒜ 새 경고 1건 → rc=0 + 요약 줄",
+      edit: (r) => (r.warnings.unsound = [warn("bbb", "RUSTSEC-2000-0002")]),
+      want: 0,
+      out: new RegExp(NEW_WARNING),
+      summary: `${NEW_WARNING}\n`,
+    },
+    {
+      name: "⒝ 새 취약점 1건 → red",
+      edit: (r) => r.vulnerabilities.list.push({ advisory: { id: "RUSTSEC-2000-0010" } }),
+      want: 1,
+      out: /억제되지 않은 취약점 1건: RUSTSEC-2000-0010/,
+    },
+    // 기대 목록도 같이 비워, red 가 «기대 목록 GONE» 이 아니라 LEDGER-A 에서 나는지를 가른다.
+    { name: "⒞ 대장에만 있는 낡은 행 → red", edit: (r) => (r.warnings = {}), expected: [], want: 1, out: /§A 에만 있다\(경고가 없다 = 해소됐다\): A-1 aaa@1\.0\.0 RUSTSEC-2000-0001/ },
+  ];
+  let bad = 0;
+  for (const c of cases) {
+    const tmp = mkdtempSync(join(tmpdir(), "audit-warnings-selftest-"));
+    const put = (f, body) => (mkdirSync(dirname(join(tmp, f)), { recursive: true }), writeFileSync(join(tmp, f), body));
+    const report = base();
+    c.edit?.(report);
+    put("audit.json", JSON.stringify(report));
+    put("summary.md", "");
+    put(EXPECTED_FILE, JSON.stringify({ expected: c.expected ?? expectedBase }));
+    put(LEDGER_FILE, "### A. 권고·공급망 1건\n| **A-1** | `aaa` | RUSTSEC-2000-0001 | x | `1.0.0` → 없음 | x | x |\n| **D-1** | RUSTSEC-2000-0009 | x |\n");
+    for (const f of AUDIT_WORKFLOWS) put(f, "        run: cargo audit --ignore RUSTSEC-2000-0009\n");
+    const r = spawnSync(process.execPath, [import.meta.filename], {
+      cwd: tmp,
+      encoding: "utf8",
+      env: { ...process.env, WIE_AUDIT_JSON: join(tmp, "audit.json"), GITHUB_STEP_SUMMARY: join(tmp, "summary.md") },
+    });
+    const summary = readFileSync(join(tmp, "summary.md"), "utf8");
+    rmSync(tmp, { recursive: true, force: true });
+    const ok = r.status === c.want && c.out.test(r.stdout) && summary === (c.summary ?? "");
+    if (!ok) bad++;
+    console.log(`${ok ? "selftest PASS" : "selftest FAIL"} — ${c.name} (rc=${r.status}, want ${c.want}${summary ? ` · 요약 «${summary.trim()}»` : ""})`);
+    if (!ok) console.log(r.stdout.replace(/^/gm, "    | ") + r.stderr);
+  }
+  console.log(`\ncheck-audit-warnings --selftest: ${cases.length}케이스 ${bad ? `중 ${bad}건 불일치` : "전건 일치"}`);
+  return bad ? 1 : 0;
 }
