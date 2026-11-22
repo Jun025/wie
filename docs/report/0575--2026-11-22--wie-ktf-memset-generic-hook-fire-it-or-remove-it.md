@@ -165,3 +165,6 @@ test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 108 filtered out
 - **이 PR 만으로는 착지해도 엔진 릴리스가 서지 않는다.** 바뀐 엔진 파일은 `wie-core-arm/data/binary_patches.toml` 하나인데 `publish-artifact.yml` 의 `on.push.paths` 에는 `data/**`(저장소 루트 — 지금은 없는 디렉터리)만 있다. 뺀 표는 다음 릴리스에 같이 실린다. worklog 제안 1건으로 올렸다.
 
 증적(개수와 sha12 만): `~/orchestrator/reports/evidence/wie-ktf-memset-generic-hook-fire-it-or-remove-it/`.
+
+유입(`node scripts/corpus-name-inflow.mjs`, 이 브랜치 대 `origin/main`): BOUNDED 44회/37쌍 · SUFFIX-ATTACHED 0회/0쌍이다. 바뀐 파일 «전체»를 훑은 수다.
+44 는 전부 `docs/contracts/runtime-adjustments.tsv` 에 이미 있던 행이다(이 회차가 그 파일에서 고친 것은 이름 없는 주석 2줄). 이 브랜치가 더한 줄에 걸린 것은 0 이다.
