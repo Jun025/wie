@@ -2,7 +2,7 @@
   "date": "2026-11-22",
   "task": "wie-upstream-sync2-s2-backend-executor-sleep-deadline-cooperative-poll",
   "title": "upstream 의 실행기 시간 의미를 우리 pacing 아래로 — sleep 마감은 부른 때부터 · 깨워진 태스크만 틱 안에서 다시",
-  "summary": "upstream #1491(sleep 마감을 부른 때부터 센다)과 #1429(깨워진 태스크만 틱 안에서 다시 돈다)의 의미를 wie-backend executor·system·task 에 옮겼다. 우리 pacing API(tick_for·wants_cpu·next_due·halt·clear·sleep_toward·TICK_BUDGET_MS)의 서명과 기본값은 그대로다. 걸린 태스크 옆에서 자는 스레드의 예산 안 깨움은 여전히 기다린다(upstream 과 다르게 둔 곳). docs/report/0570.",
+  "summary": "upstream #1491(sleep 마감을 부른 때부터 센다)과 #1429(깨워진 태스크만 틱 안에서 다시 돈다)의 의미를 wie-backend executor·system·task 에 옮겼다. 우리 pacing API 의 서명과 기본값은 그대로다. ★지금 상태로는 착지시키지 않는다: perf-watch compare 15칸 중 브라우저 축 J2ME 표본 1건(835acd535a5f)이 퇴행(그리기 42% 감소 · 짝 재측 41.7%)이고, 원인이 옮긴 의미 #1491 그 자체다(그 판은 제 프레임 시간보다 빨리 돌고 있었다). 받아들일지는 운영자 결정이다. test_pacing 은 주기·그리기 수가 같고 sleep 기준점만 2ms 옮겨졌다. KTF·LGT·SKT 표본과 무거운 장면 4판은 그대로다. docs/report/0571.",
   "changes": [
     "wie-backend executor.rs: last_now 삭제 · sleep(until)/sleep_toward(until, pace) · tick_for 의 idle(깨워진 태스크가 없으면 «모두 잠든 틱»과 같은 길) · spawn 이 깃발을 세움 · upstream 시험 2개 + 걸린 태스크 옆 깨움 시험 1개",
     "wie-backend system.rs: sleep/guest_sleep/sleep_toward 가 부른 때의 시계로 마감을 만든다 · 1ms 폴링 판정(POLL_SLEEP_MS)이 여기로 옴 · poll_until(until, pace) 추가",
@@ -11,8 +11,21 @@
     "wie-midp event_queue.rs: 대기 루프가 폴링마다 시계를 한 번만 읽는다(poll_until)",
     "wie-j2me tests/test_pacing.rs: 주석의 실측값 한 줄(sleep 늦음 p95 0 → 2)"
   ],
-  "limits": "docs/report/0570 §8.",
-  "proposals": [],
-  "adoptedProposals": ["2026-11-06-upstream-sync2-dry-run-classify#p1"],
+  "limits": "docs/report/0571 §8.",
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "sleep 마감 의미(#1491)로 느려지는 판이 몇 개인지 — 착지 결정용 A/B 전수",
+      "plainSummary": "sleep 으로 박자를 잡는 판을 origin/main 엔진과 PR #603 엔진으로 나란히 돌려 그리기 수가 얼마나 주는지 판별로 센다. 지금 아는 것은 표본 2개(42% · 1.6%)뿐이다.",
+      "userBenefit": "«게임이 원래 속도로 느려진다»를 받아들일지 정할 때, 몇 개의 게임이 얼마나 느려지는지를 보고 정할 수 있다. 착지한다면 이용자에게 알릴 목록(업데이트 소식)이 같이 나온다.",
+      "why": "이 회차 실측: perf-watch compare 의 브라우저 축에서 J2ME 표본 835acd535a5f 가 30초 그리기 1244~1319 → 879~882(짝 재측 41.7%)로 퇴행 판정됐다. 그 판은 sleep(프레임 시간 − 걸린 시간) 루프이고 종전 엔진이 sleep 을 일찍 끝내 제 프레임 시간보다 빨리 돌렸다. upstream 병합(S3)이 같은 의미를 가져오므로 이 수는 그때도 필요하다.",
+      "tradeoff": "J2ME 판만 걸리는지, WIPI Java(KTF·LGT 의 Java 판)도 걸리는지 모른다 — 넓게 재면 long 임대 수 시간이다. 창 안 게스트 sleep 수가 0 인 판(타이머 박자)은 미리 걸러 낼 수 있다.",
+      "effort": "M",
+      "target": "scripts/playability-census.mjs 의 --pacing 계수(sleeps · paints) A/B · PR #603 브랜치"
+    }
+  ],
+  "adoptedProposals": [
+    "2026-11-06-upstream-sync2-dry-run-classify#p1"
+  ],
   "declinedProposals": []
 }

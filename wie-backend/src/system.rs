@@ -50,9 +50,9 @@ pub struct System {
     fake_net: Arc<Mutex<FakeNet>>,
 }
 
-// A sleep this short is a poll, not a pace: KTF 영웅서기4 re-arms MC_knlSetTimer(1) every frame to
+// A sleep this short is a poll, not a pace: one KTF title re-arms MC_knlSetTimer(1) every frame to
 // mean "as soon as you can", and the MIDP event thread checks its queue every 1ms. Only a longer
-// sleep keeps a tick alive; waiting on these too turned 영웅서기4 from 36 into 93 frames/s — the
+// sleep keeps a tick alive; waiting on these too took that title from 36 to 93 frames/s — the
 // game itself 2.6x faster — and spun every idle tick to its budget.
 const POLL_SLEEP_MS: u64 = 1;
 
