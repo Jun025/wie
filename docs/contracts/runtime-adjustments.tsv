@@ -1,4 +1,4 @@
-# 한 판(한 빌드)에만 걸리는 «실행 중 조정» 장부 — 엔진 표 11개의 행 전부.
+# 한 판(한 빌드)에만 걸리는 «실행 중 조정» 장부 — 엔진 표 10개의 행 전부.
 #
 # 디스크의 게임 파일 · 코퍼스 · 이용자 업로드는 한 바이트도 고치지 않는다. 아래 행은 전부 엔진이 파일을 읽어 들인 뒤
 # 메모리 안에서만 걸린다. 한 줄 = (엔진 표의 키 × 그 키가 걸리는 꾸러미) · 탭 구분 · `#` 줄은 주석이다.
@@ -30,8 +30,8 @@
 #   display-overrides         wie-skt/src/emulator.rs `DISPLAY_OVERRIDES` · md5(본체 jar)
 #   device-bound-saves        wie-ktf/src/emulator.rs `DEVICE_BOUND_SAVES` · md5(본체 jar)
 #   owner-progress-saves      wie-ktf/src/emulator.rs `OWNER_PROGRESS_SAVES` · md5(본체 jar)
-#   fake-servers              wie-backend/src/fake_server.rs `SERVERS` · AID · 표는 (AID, 호스트, 포트)마다 한 행(7행 · AID 5개)이고 그 접속에만 답한다 — 외부 통신 0
-#   ktf-local-servers         wie-ktf/src/runtime/wipi_c/local_net.rs `SERVERS` · AID · 외부 통신 0
+#   fake-servers              wie-backend/src/fake_server.rs `SERVERS` · AID · 표는 (AID, 호스트, 포트)마다 한 행(8행 · AID 6개 — LGT 5 · KTF 1)이고 그 접속에만 답한다 — 외부 통신 0 ·
+#                             통신사마다 다른 것은 소켓 호출 모양뿐이다(LGT wie-wipi-c/src/api/net.rs · KTF wie-ktf/src/runtime/wipi_c/local_net.rs — 둘 다 이 표만 읽는다)
 #
 # 메모리에 올린 게임 «코드»를 고쳐 쓰는 곳 — 디스크 0 · 아래 두 줄의 수는 `binary_patches.toml` 에서 센 값이고 `cargo test` 가 대조한다
 #   lock-lift patches: 5 table rows, 8 sites in 3 packages
@@ -100,4 +100,4 @@ fake-servers	0002B76D	0fdf45ec169f	LGT	테라 영원의 혼돈	local-server	resp
 fake-servers	0003266D	3ff5948e235e	LGT	아니마	local-server	response	aid	operator-directed	운영자 지시 2026-10-26(orchestrator 원장 inbox.log:116) · 티켓 wie-2026-10-26-lgt-server-wall-six-titles-adopt-p0 · PR #577 · docs/report/0544
 fake-servers	0002A61E	b9bfcaf42722	LGT	몬스터마스터	local-server	response	aid	operator-directed	운영자 지시 2026-10-26(orchestrator 원장 inbox.log:116) · 티켓 wie-lgt-server-wall-six-titles-local-net-emulation · PR #575 · docs/report/0542
 fake-servers	00026E9C	caf9d76ffd13	LGT	냐옹타이쿤2	local-server	response	aid	operator-directed	운영자 지시 2026-10-26(orchestrator 원장 inbox.log:116) · 티켓 wie-lgt-server-wall-six-titles-local-net-emulation · PR #575 · docs/report/0542
-ktf-local-servers	0103A2B4	f44271803135	KTF	드래곤아이즈2	local-server	response	aid	operator-directed	운영자 지시 2026-10-26(orchestrator 원장 inbox.log:120) · 티켓 wie-ktf-dragoneyes2-connecting-wall-offline-path · PR #574 · docs/report/0541
+fake-servers	0103A2B4	f44271803135	KTF	드래곤아이즈2	local-server	response	aid	operator-directed	운영자 지시 2026-10-26(orchestrator 원장 inbox.log:120) · 티켓 wie-ktf-dragoneyes2-connecting-wall-offline-path · PR #574 · docs/report/0541
