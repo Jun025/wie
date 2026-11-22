@@ -146,7 +146,7 @@
 - 당기기 전 트리(`08875c372` + 이 변경)에서도 같은 게이트 전부 rc=0 이었다(`cargo test --all` 57 스위트 · 870 passed).
 - main 이 그 사이 들인 것은 #601(KTF 가짜 서버 1행을 `fake_server` 표로 옮김)이다. 훅 · 패치 표 코드는 건드리지 않는다(`git diff 08875c372 f9799f1e6 -- wie-core-arm` 0줄).
   **§2 · §3 의 실행은 당기기 전 빌드의 것이고, 당긴 머리로는 다시 돌리지 않았다.**
-- 연번: 처음 받은 `0573` 을 열린 PR #603 이 먼저 들고 있어 `0575` 로 옮겼다(도구가 준 번호).
+- 연번: 도구가 준 `0573` · `0575` 를 push 전에 열린 PR #603 · #607 이 차례로 먼저 들어 `0576` 로 옮겼다.
 
 가드가 수를 잠그는지: 장부 주석을 `generic hooks: 6 patterns` 로 되돌리고 `the_ledger_lists_exactly_this_table` 을 돌리면 red 다.
 
@@ -168,5 +168,3 @@ test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 108 filtered out
 
 유입(`node scripts/corpus-name-inflow.mjs`, 이 브랜치 대 `origin/main`): BOUNDED 44회/37쌍 · SUFFIX-ATTACHED 0회/0쌍이다. 바뀐 파일 «전체»를 훑은 수다.
 44 는 전부 `docs/contracts/runtime-adjustments.tsv` 에 이미 있던 행이다(이 회차가 그 파일에서 고친 것은 이름 없는 주석 2줄). 이 브랜치가 더한 줄에 걸린 것은 0 이다.
-
-<!-- corpus-name-inflow v1 subjects=5 tree=bc45ab8625cd6de7 B=44/37 P=14/3 S=0/0 -->

@@ -2,7 +2,7 @@
   "date": "2026-11-22",
   "task": "wie-ktf-memset-generic-hook-fire-it-or-remove-it",
   "title": "KTF 범용 훅 memset — 어느 판도 부르지 않는 루틴이라 패턴을 뺐다",
-  "summary": "채택 제안 2026-11-22-ktf-generic-hook-exact-equivalence#p0 의 집행. 훅 걸린 KTF 264판의 이미지에서 memset 루틴 입구로 가는 호출 명령은 0건이다(memcpy 6,253 · strlen 2,922 · strcpy 580). 입구를 가리키는 꼴이 하나라도 있는 12판을 120초씩 키 대본 둘로 그림자 대조했다: 발화 7,546,379 = 대조 · 불일치 0 · memset 발화 0. 패턴을 빼 범용 훅은 5종이다. docs/report/0575.",
+  "summary": "채택 제안 2026-11-22-ktf-generic-hook-exact-equivalence#p0 의 집행. 훅 걸린 KTF 264판의 이미지에서 memset 루틴 입구로 가는 호출 명령은 0건이다(memcpy 6,253 · strlen 2,922 · strcpy 580). 입구를 가리키는 꼴이 하나라도 있는 12판을 120초씩 키 대본 둘로 그림자 대조했다: 발화 7,546,379 = 대조 · 불일치 0 · memset 발화 0. 패턴을 빼 범용 훅은 5종이다. docs/report/0576.",
   "changes": [
     "wie-core-arm/data/binary_patches.toml: memset 행 삭제 · 머리 주석 6 → 5 patterns · 872 → 608곳",
     "docs/contracts/runtime-adjustments.tsv: 주석의 수(generic hooks: 5 patterns · 608곳)",
