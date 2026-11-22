@@ -170,5 +170,3 @@ rc=1
 이 PR 이 새로 적은 제목은 이 문서 §2 표의 20종과 「지크」 언급이다. 전부 `compat.json` 에 이미 있는 표시 이름 그대로다. `scripts/player-data.mjs` · `wie-lgt/src/emulator.rs` · `wie_featurephone/src/lib.rs` 에서 잡힌 제목은 종전부터 있던 주석과 표이고 이 PR 이 더한 줄에는 없다.
 SUFFIX-ATTACHED 16종은 `compat.json` 안의 더 긴 다른 제목과 안내 문장 속 낱말이고, 이 PR 이 더한 줄에서 나온 것은 없다.
 게임 바이트 · 꾸러미 안 파일 본문 · 경로 유입 0. 새로 실린 해시는 본체 jar 의 MD5(지문)이고, 그중 장부에 오른 것은 엔진 표에 이미 있던 값이다.
-
-
