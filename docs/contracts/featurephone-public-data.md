@@ -162,7 +162,8 @@ YAML 이 아니라 JSON 인 이유: 파서 의존을 새로 들이지 않는다(
 ## 4. 갱신
 
 - 전수 조사를 다시 돌린 뒤: `node scripts/player-data.mjs import <report 가 쓴 compat.json>` → `node scripts/content-key.mjs write`(가져오기는 `contentKey` 를 만들지 않는다 — 없으면 검사기가 거부) → `node scripts/content-key.mjs check` → 커밋.
-  ★`check` 는 로컬에서만 돌고(게임 파일을 읽는다), 빼먹으면 CI 가 대신 잡지 못한다: CI 가 사실과 대조하는 지문은 장부에 오른 꾸러미 36개뿐이다. 장부 밖 393행은 형식만 맞으면 통과한다 —
+  ★`check` 는 로컬에서만 돌고(게임 파일을 읽는다), 빼먹으면 CI 가 대신 잡지 못한다: CI 가 사실과 대조하는 지문은 장부(`docs/contracts/runtime-adjustments.tsv`)에 `scope` 가 `zip` 으로 오른 꾸러미뿐이다
+  (몇 개인지: `awk -F'\t' '$8=="zip"{print $3}' docs/contracts/runtime-adjustments.tsv | sort -u | wc -l` · 전체 행 수는 `node scripts/player-data.mjs` 의 `titles`). 그 밖의 행은 형식만 맞으면 통과한다 —
   끝 글자를 바꿔도, `null` 로 바꿔도, **다른 행의 지문으로 바꿔치기해도 rc=0** 이다(다른 게임이 같은 게임으로 읽히는 형상 · 2026-11-22 검수 실측). 그 행들을 지키는 것은 `check` 뿐이다.
 - 게임 동작을 바꾸는 PR: 항목 파일 1개를 같은 PR 에 넣는다(`AGENTS.md` §Landing paperwork).
 - ★main 을 머지한 브랜치가 그 «머지 전» 측정으로 compat.json 을 다시 쓰면 받은 행이 옛 값으로 되돌아간다 — `node scripts/check-compat-revert.mjs`(`contract` 잡)가 red 로 낸다. 의도한 되돌림은 그 PR 의 worklog `intendedCompatReverts: ["<sha12>:<필드>"]` 로만 통과한다.

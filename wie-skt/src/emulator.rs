@@ -381,7 +381,9 @@ mod tests {
         test_utils::assert_ledger_lists("display-overrides", DISPLAY_OVERRIDES.iter().map(|x| test_utils::hex(x.0)));
     }
 
-    // The rows are pinned in `wie-backend`; this pins that the SKT mount path applies them.
+    // The rows are pinned in `wie-backend`; this pins that the SKT mount path applies them — and, with a
+    // jar sorting on either side of it, that the jar `from_archive` runs is the one `archive_jar` names
+    // (the rows key on that jar's MD5, so a loader that picks another jar leaves all three files as shipped).
     #[test]
     fn from_archive_turns_the_owner_sound_on() {
         use alloc::boxed::Box;
@@ -390,11 +392,14 @@ mod tests {
 
         let files = BTreeMap::from([
             ("probe.msd".into(), b"MIDlet-1: probe,,Probe\nDD-ProgName: probe\n".to_vec()),
+            ("a.jar".into(), b"not the jar".to_vec()),
             ("probe.jar".into(), WIRING_PROBE_JAR.to_vec()),
+            ("z.jar".into(), b"not the jar".to_vec()),
             ("probe.sav".into(), vec![0]),
             ("probe.opt".into(), vec![0]),
             ("probe.xor".into(), vec![0]),
         ]);
+        assert_eq!(SktEmulator::archive_jar(&files), Some(WIRING_PROBE_JAR));
         let emulator = SktEmulator::from_archive(Box::new(TestPlatform::new()), files).unwrap();
 
         assert_eq!(emulator.system.filesystem().virtual_file("probe.sav"), None);
