@@ -1,23 +1,19 @@
-//! A title's dead server, answered inside the emulator — never a real host.
+//! KTF's socket calls, wired to the title's dead server — never a real host.
 //!
-//! Only titles listed in [`SERVERS`] see any of this; for every other title `MC_netConnect` and
-//! `MC_netSocket` fail exactly as before (`wie_wipi_c::api::net`). A listed title gets a working
-//! connection whose only peer is its row's `reply`.
+//! The servers and their replies are `wie_backend::fake_server`'s, the one table for every carrier;
+//! this file is only the shape KTF calls them in. A title with no row there sees the network fail
+//! exactly as before: `MC_netConnect` and `MC_netSocket` through `wie_wipi_c::api::net`, and the
+//! slots below as the fatal stubs they have always been.
 //!
-//! The one row today is f44271803135 (AID `0103A2B4`), measured in docs/report/ for
-//! wie-ktf-dragoneyes2-connecting-wall-offline-path. Its boot reads a saved `option` record and, when
-//! the «download complete» byte there is 0, asks its download server which of its eight `P/` files
-//! to fetch. The archive ships all eight at the sizes the image itself hard-codes, so the server's
-//! answer could only ever be «nothing»: a file list naming no file. The client then finds every file
-//! complete, sets the byte, saves `option` and starts the game. Without a reply it re-dials forever
-//! on «CONNECTING» — the client has no timeout in that state.
-//!
-//! ponytail: one pending-reply buffer for the whole process — one listed title, one socket. Per-System
-//! state when two listed sockets can be open at once (the LGT server-wall round is the merge point).
+//! What keeps these apart from `api::net`'s `MC_netSocket*` (LGT's shape) is what f44271803135 — the
+//! one KTF title listed, docs/report/0541 — was measured against:
+//! - connect, write and read are extension slots 30–32, with their own argument lists;
+//! - the connect's callback comes a tick later, not at once;
+//! - `MC_netSetReadCB` is taken and never fires;
+//! - the title has one socket, and it is always [`LOCAL_FD`];
+//! - closing it answers `M_E_ERROR` and leaves it be, as the stub did.
 
 use alloc::{boxed::Box, vec, vec::Vec};
-
-use spin::Mutex;
 
 use wipi_types::wipic::WIPICWord;
 
@@ -31,62 +27,12 @@ const LOCAL_FD: i32 = 0x4c4e;
 /// WIPI-C `M_E_WOULDBLOCK`: nothing to read yet.
 const WOULD_BLOCK: i32 = -19;
 
-struct LocalServer {
-    aid: &'static str,
-    addr: [u8; 4],
-    port: u16,
-    /// One whole request packet as the client wrote it → the bytes the server sends back.
-    reply: fn(&[u8]) -> Option<Vec<u8>>,
-}
-
-const SERVERS: &[LocalServer] = &[LocalServer {
-    aid: "0103A2B4",
-    addr: [211, 110, 18, 253],
-    port: 8503,
-    reply: download_list_nothing,
-}];
-
-/// f44271803135's download protocol: `[len u16 LE][id u16 LE][body]`, `len` counting from `id`.
-/// Request `0x2af8` asks for the file list; reply `0x2af9` is `[count u8]` then per file
-/// `[name len u8][name][size u32 LE]` (client parser at image 0x1025b6). Count 0 leaves the
-/// sizes the image hard-codes, which the shipped files already match.
-fn download_list_nothing(request: &[u8]) -> Option<Vec<u8>> {
-    const LIST_REQUEST: u16 = 0x2af8;
-    const LIST_REPLY: u16 = 0x2af9;
-
-    let id = u16::from_le_bytes(request.get(2..4)?.try_into().ok()?);
-    (id == LIST_REQUEST).then(|| {
-        let [lo, hi] = LIST_REPLY.to_le_bytes();
-        vec![3, 0, lo, hi, 0]
-    })
-}
-
-static PENDING: Mutex<Vec<u8>> = Mutex::new(Vec::new());
-
-fn server_for(context: &mut dyn WIPICContext) -> Option<&'static LocalServer> {
-    let aid = context.system().aid();
-    SERVERS.iter().find(|server| server.aid == aid)
-}
-
-/// Net slot 0. A listed title's network comes up; anyone else's fails as before.
-pub async fn connect(context: &mut dyn WIPICContext, cb: WIPICWord, param: WIPICWord) -> Result<i32> {
-    if server_for(context).is_none() {
-        return net::connect(context, cb, param).await;
-    }
-
-    tracing::warn!("MC_netConnect({cb:#x}, {param:#x}) -> local server");
-    context.spawn(Box::new(Callback { cb, args: vec![0, param] }))?; // M_E_SUCCESS
-
-    Ok(0)
-}
-
-/// Net slot 2.
+/// Net slot 2. A listed title gets its one socket, fresh on every call; anyone else's fails as before.
 pub async fn socket(context: &mut dyn WIPICContext, domain: i32, r#type: i32) -> Result<i32> {
-    if server_for(context).is_none() {
+    if !context.system().fake_net().socket_at(LOCAL_FD) {
         return net::socket(context, domain, r#type).await;
     }
 
-    PENDING.lock().clear();
     Ok(LOCAL_FD)
 }
 
@@ -107,7 +53,7 @@ pub async fn socket_open(
     }
 
     let port = (port as u16).swap_bytes(); // MC_utilHtons'd
-    let ours = server_for(context).is_some_and(|server| server.addr == addr.to_le_bytes() && server.port == port);
+    let ours = context.system().fake_net().connect(fd, addr.to_le_bytes(), port);
     tracing::warn!("Net slot 30({addr:#x}, {port}) -> {}", if ours { "local server" } else { "refused" });
 
     let result = if ours { 0 } else { u32::MAX }; // M_E_SUCCESS / M_E_ERROR
@@ -128,9 +74,8 @@ pub async fn socket_send(context: &mut dyn WIPICContext, fd: i32, buf: WIPICWord
 
     let mut request = vec![0; len.max(0) as usize];
     context.read_bytes(buf, &mut request)?;
-    let reply = server_for(context).and_then(|server| (server.reply)(&request));
-    tracing::warn!("Net slot 31({len} bytes) -> reply {:?}", reply.as_ref().map(Vec::len));
-    PENDING.lock().extend(reply.unwrap_or_default());
+    let replied = context.system().fake_net().write(fd, &request) == Some(true);
+    tracing::warn!("Net slot 31({len} bytes) -> {}", if replied { "reply queued" } else { "no reply" });
 
     Ok(len)
 }
@@ -141,17 +86,24 @@ pub async fn socket_recv(context: &mut dyn WIPICContext, fd: i32, buf: WIPICWord
         return Err(WieError::Unimplemented(alloc::format!("Net slot 32 on fd {fd}")));
     }
 
-    let bytes = {
-        let mut pending = PENDING.lock();
-        let n = pending.len().min(len.max(0) as usize);
-        pending.drain(..n).collect::<Vec<u8>>()
-    };
+    let bytes = context.system().fake_net().read(fd, len.max(0) as usize).unwrap_or_default();
     if bytes.is_empty() {
         return Ok(WOULD_BLOCK);
     }
     context.write_bytes(buf, &bytes)?;
 
     Ok(bytes.len() as _)
+}
+
+/// Net slots 6 and 33 `(fd)` — close. The answer stays the stub's `M_E_ERROR`, which is what the title
+/// got while it was measured; its socket lasts until the next `MC_netSocket` replaces it.
+pub async fn socket_close(context: &mut dyn WIPICContext, fd: i32) -> Result<i32> {
+    if fd != LOCAL_FD {
+        return net::socket_close(context, fd).await;
+    }
+    tracing::warn!("stub MC_netSocketClose({fd})");
+
+    Ok(-1)
 }
 
 /// Net slot 13 `MC_netSetReadCB(fd, cb, param)` — the client registers it after a `WOULDBLOCK`.
@@ -177,24 +129,5 @@ impl MethodBody<WieError> for Callback {
         context.call_function(self.cb, &self.args).await?;
 
         Ok(WIPICResult { results: Vec::new() })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{SERVERS, download_list_nothing};
-
-    /// `docs/contracts/runtime-adjustments.tsv` lists exactly this table: a row added here without a
-    /// ledger row — or a ledger row left behind — fails (CLAUDE.md «게임 파일 무수정 원칙»).
-    #[test]
-    fn the_ledger_lists_exactly_this_table() {
-        test_utils::assert_ledger_lists("ktf-local-servers", SERVERS.iter().map(|x| x.aid.into()));
-    }
-
-    #[test]
-    fn the_list_request_is_answered_with_an_empty_list() {
-        assert_eq!(download_list_nothing(&[2, 0, 0xf8, 0x2a]), Some(alloc::vec![3, 0, 0xf9, 0x2a, 0]));
-        assert_eq!(download_list_nothing(&[2, 0, 0xfb, 0x2a]), None);
-        assert_eq!(download_list_nothing(&[2]), None);
     }
 }
