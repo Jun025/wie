@@ -377,4 +377,4 @@ PR 의 CI 가 도는 사이 `origin/main` 이 #599(`contentKey` · 새 크레이
 
 **게임 파일명 유입**: `node scripts/corpus-name-inflow.mjs` — 유입 65건(BOUNDED) · 판단 필요 8건(SUFFIX-ATTACHED) · 대상 115파일. 둘 다 이 브랜치가 건드린 파일에 «이미 있던» 언급이다(`docs/project-kb/02_status.md` · LGT `jvm_support.rs` 의 주석 등 — 도구는 바뀐 파일의 본문 전체를 센다). 이 브랜치가 «더한 줄»에 든 것은 0건이다(도구가 낸 72쌍을 `git diff origin/main...HEAD` 의 추가 줄과 대조). SUFFIX-ATTACHED 8쌍도 같은 대조에서 0 이다.
 
-<!-- corpus-name-inflow v1 subjects=116 tree=14f39f510666e6f5 B=115/65 P=17/2 S=10/8 -->
+<!-- corpus-name-inflow v1 subjects=117 tree=4a3a9e67829d6c62 B=115/65 P=18/2 S=10/8 -->
