@@ -5225,6 +5225,7 @@ dependencies = [
  "getrandom 0.4.3",
  "hqx",
  "jvm",
+ "log",
  "midir",
  "png 0.17.16",
  "rodio",

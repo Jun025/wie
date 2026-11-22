@@ -1,0 +1,15 @@
+{
+ "date": "2026-11-22",
+ "task": "wie-native-release-build-compile-out-arm32-cpu-trace",
+ "title": "네이티브 릴리스 빌드에서 log 의 trace 수준을 컴파일 단계에서 뺌",
+ "summary": "wie_cli/Cargo.toml 에 log release_max_level_debug 한 줄(네이티브 타깃 전용)을 넣어, 릴리스로 빌드한 wie_cli · wie_validate 에서 arm32_cpu 가 명령마다 하던 trace 수준 검사 2회를 없앴다. 해석기가 바쁜 장면(LGT 3cc7a9b4cb15)의 50M 틱당 CPU 가 중앙값 -11.5%(3회 짝 측정), 쉬는 시간이 대부분인 판은 그대로. 전수 조사 표본 10판의 판정 변화 0. wasm 산출물 입력 변화 0. docs/report/0571.",
+ "changes": [
+  "wie_cli/Cargo.toml: [target.'cfg(not(target_arch = \"wasm32\"))'.dependencies] log release_max_level_debug — wasm 의 release_max_level_off 와 한 빌드에서 만나면 log 가 compile_error 를 내므로 타깃 조건을 달았다",
+  "wie_cli/tests/log_static_level.rs: 디버그는 Trace · 릴리스는 Debug 를 단언하는 시험 1건",
+  "Cargo.lock: wie_cli 의존 목록에 log 한 줄"
+ ],
+ "limits": "호스트 load1 100~355 에서 쟀다(CPU 시간 · 같은 분 짝). xctrace 프로파일은 다시 재지 않았다. 루트 패키지 wie(upstream 실행기)는 이 feature 를 받지 않는다.",
+ "proposals": [],
+ "adoptedProposals": ["2026-11-13-heavy-scene-frame-cost-cheap-wins#p0"],
+ "declinedProposals": []
+}
