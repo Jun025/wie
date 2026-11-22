@@ -193,13 +193,17 @@ impl System {
     /// for a sleep that long, so a thread that polls every millisecond for a timer due at `pace`
     /// still runs it on time rather than on the host's next frame.
     pub fn sleep_toward(&self, timeout: u64, pace: Instant) -> SleepFuture {
-        self.poll_until(self.platform.now() + timeout, Some(pace))
+        self.poll_until(self.platform.now() + timeout, Some(pace), Some(pace))
     }
 
     /// A poll that sleeps until `until` and keeps a tick alive only for `pace` (`sleep_toward`), for
     /// a caller that has just read the clock: `sleep(1)` would read it again for the deadline.
-    pub fn poll_until(&self, until: Instant, pace: Option<Instant>) -> SleepFuture {
-        SleepFuture::toward(until, pace, &self.executor)
+    /// `work`: when the caller next has something to do — its polls before then find nothing, `None`
+    /// until an event comes. A tick that ends on a wake for the host to come back for
+    /// (`Platform::wake_margin_ms`) skips those polls, and only those: with work before that wake it
+    /// waits itself, as on a host without a margin.
+    pub fn poll_until(&self, until: Instant, pace: Option<Instant>, work: Option<Instant>) -> SleepFuture {
+        SleepFuture::idle_toward(until, pace, work.unwrap_or(Instant::from_epoch_millis(u64::MAX)), &self.executor)
     }
 
     pub fn current_task_id(&self) -> u64 {

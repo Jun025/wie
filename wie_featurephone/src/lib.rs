@@ -18,9 +18,17 @@
 //! cost that wait is depends on where its wakes fall in the frame: simulated at 60Hz, about two
 //! thirds of the engine's CPU in 4 shapes of 6 and about a tenth in the other 2; at 120Hz 7-43%
 //! (`wie-backend`'s `tick_occupancy`). A host that calls `set_wake_margin(ms)` once takes that wait
-//! over: from then on a tick waits at most `ms` for a wake and ends otherwise, and the host comes
-//! back for it. The guest runs on the same schedule either way — the same wakes, the same game
-//! frames; only the waiting moves to the host. A host that never calls it runs exactly as before.
+//! over: from then on a tick ends on a wake further off than `ms` — and than the 4ms a nested
+//! browser timer cannot fire inside — and the host comes back for it. The guest runs on the same
+//! schedule either way — the same wakes, the same game frames, the same timer fires; only the
+//! waiting moves to the host. A host that never calls it runs exactly as before.
+//!
+//! That holds because a tick hands over only a wake nothing polls before. While it waits for a
+//! wake itself, a tick also runs every poll beside it a millisecond apart: a 1ms WIPI timer, one
+//! that already fired its share of the frame, `callSerially`, a thread in a `sleep(1)` loop. With
+//! such work due before the wake the tick goes on waiting itself, margin or not — a host that came
+//! back only for the wake ran those 8-50% less often (docs/report/0556 §9). So a game with a timer
+//! beside a thread that sleeps on a beat gains little or nothing from the margin, and loses nothing.
 //!
 //! - **After every `tick` and `wake_tick`**: `clearTimeout` the pending wake timer, read
 //!   `wake_in_ms()`, and if it is a number, `setTimeout(() => emu.wake_tick(), it)`. Arm it from
@@ -39,7 +47,11 @@
 //!   same way `tick` does. Called after that budget is spent it does nothing. Keep calling `tick`
 //!   from `requestAnimationFrame`.
 //! - **`ms` = 3** is the measured value for WebKit; a browser whose timers run later wants more,
-//!   at the cost of up to `ms` of waiting per wake. `undefined` turns it off again.
+//!   at the cost of up to `ms` of waiting per wake. `undefined` turns it off again. A timer later
+//!   than `ms` is a slower game, not only a late wake: simulated `sleep(20)` at 2x on 60Hz ran 719
+//!   game frames in 10s without a margin and with timers up to 3ms late, and 644 / 611 / 602
+//!   with timers up to 8 / 12 / 20ms late — where `achieved_speed()` still read
+//!   1.85-1.93 (a device whose timers alone run late, as in a low-power mode).
 //! - **Paused or hidden**: cancel the timer along with the frame loop; resume both together.
 //! - **`set_speed`**: the delay is in wall time and changes with the speed — re-read `wake_in_ms()`
 //!   and re-arm.

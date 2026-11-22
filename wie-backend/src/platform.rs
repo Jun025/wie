@@ -11,9 +11,11 @@ pub trait Platform: Send + Sync {
     fn speed(&self) -> f64 {
         1.0
     }
-    /// Wall-clock ms a tick may spend waiting for a guest's paced wake; a wake further off ends the
-    /// tick and the host ticks again in time for it (`SpeedClock::wake_delay`). `None` — every host
-    /// that does not schedule such ticks — waits for any wake inside the budget (`Executor::tick_for`).
+    /// Wall-clock ms before a guest's paced wake at which the host ticks again for it
+    /// (`SpeedClock::wake_delay`): a tick ends on a wake further off than that, and than a host timer
+    /// can fire (`speed_clock::max_wait`), unless a poll has work before it (`System::poll_until`).
+    /// `None` — every host that does not schedule such ticks — waits for any wake inside the budget
+    /// (`Executor::tick_for`).
     fn wake_margin_ms(&self) -> Option<u64> {
         None
     }

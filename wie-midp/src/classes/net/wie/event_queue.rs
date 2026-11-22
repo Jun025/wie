@@ -304,6 +304,7 @@ impl EventQueue {
                 };
                 // What this wait is for, for `AchievedSpeed`: a host that does not tick again before
                 // it is the game running late — a held-back timer included, which `pace` leaves out.
+                // And the first of its polls that finds work (`System::poll_until`).
                 let due = if callbacks_pending { Some(deadline) } else { earliest_timer };
                 context.system().pacing().guest_waiting_until(due);
                 loop {
@@ -313,7 +314,7 @@ impl EventQueue {
                         break;
                     }
                     let tick = context.system().pacing().ticks();
-                    context.system().poll_until(now + 1, pace(tick)).await;
+                    context.system().poll_until(now + 1, pace(tick), due).await;
                     if !context.system().event_queue().is_empty() {
                         break;
                     }
@@ -792,49 +793,75 @@ mod test {
         Ok(())
     }
 
-    // How often a WIPI timer fires over 120 frames of a 60Hz host, how many wake ticks that host
-    // ran, and how many host frames the engine counted (`Pacing::ticks`). The guest re-arms the timer `after_ms` ahead on every fire (`pace_after` as in
-    // `guest_timers_on_a_frame_grid`); with `beat_ms`, a second thread sleeps on that beat beside
-    // it. `margin`: `None` is a host that ticks once per frame. `Some(ms)` is the host of
+    // What runs on the host of `on_a_host`. `timer`: a WIPI timer the guest re-arms that many ms
+    // ahead on every fire, with `pace_after` as in `guest_timers_on_a_frame_grid`. `beat_ms`: a thread
+    // that sleeps on that beat. `poller`: a thread in a `sleep(1)` loop — a poll (`POLL_SLEEP_MS`).
+    #[derive(Clone, Copy, Debug, Default)]
+    struct Guest {
+        timer: Option<(u64, Option<u64>)>,
+        beat_ms: Option<u64>,
+        poller: bool,
+    }
+
+    // What `on_a_host` counted: timer fires and poller rounds, the host's wake ticks, the host
+    // frames the engine counted (`Pacing::ticks`), and the guest ms the 120 frames took.
+    #[derive(Debug, PartialEq)]
+    struct HostRun {
+        fires: u64,
+        wake_ticks: u64,
+        ticks: u64,
+        elapsed: u64,
+    }
+
+    // `guest` over 120 frames of a 60Hz host at play `speed`. The test clock is the guest clock, so a
+    // host frame is 16.67 x `speed` of its ms and the tick budget 14 x `speed` (`SpeedClock::budget`).
+    // `margin`: `None` is a host that ticks once per frame. `Some(ms)` is the host of
     // `Platform::wake_margin_ms`, as the browser host runs it (`wie_featurephone`'s crate doc and
     // `advance`): after every tick it takes the pacing counters, and for `Pacing::wake` it comes
     // back `SpeedClock::wake_delay` later with a wake tick — unless the next frame comes first —
     // on a timer that fires no sooner than `timer_floor_ms` (a browser's is 1ms, 4ms once nested).
-    fn timer_fires_on_a_host(
-        after_ms: u64,
-        pace_after: Option<u64>,
-        beat_ms: Option<u64>,
-        margin: Option<u64>,
-        timer_floor_ms: u64,
-    ) -> Result<(u64, u64, u64)> {
-        const FRAME_MS: u64 = 17;
+    fn on_a_host(guest: Guest, speed: f64, margin: Option<u64>, timer_floor_ms: u64) -> Result<HostRun> {
+        let frame_ms = (16.667 * speed).round() as u64;
+        let budget = (14.0 * speed) as u64;
         let clock = TestClock::stepping_micros(10);
-        let platform = TestPlatform::with_clock(clock.clone());
+        let platform = TestPlatform::with_clock(clock.clone()).with_speed(speed);
         let platform = margin.into_iter().fold(platform, TestPlatform::with_wake_margin);
         let in_wake_tick = platform.wake_tick_flag();
         let mut system = System::new(Box::new(platform), "", "", DefaultTaskRunner);
         let fires = Arc::new(AtomicU64::new(0));
-        let (system_task, fires_task) = (system.clone(), fires.clone());
-        system.spawn(async move || {
-            let jvm = JvmSupport::new_jvm(&system_task, None, Box::new([get_protos().into()]), &[], RustJavaJvmImplementation).await?;
-            for _ in 0..1_000_000 {
-                let due = system_task.platform().now() + after_ms;
-                let (system_timer, fires_timer) = (system_task.clone(), fires_task.clone());
-                system_task.event_queue().push(Event::guest_timer(
-                    due,
-                    pace_after.map_or(u64::MAX, |x| system_task.pacing().ticks() + x),
-                    move || async move {
-                        fires_timer.fetch_add(1, Ordering::SeqCst);
-                        // The key is what makes getNextEvent return; the timer itself is consumed internally.
-                        system_timer.event_queue().push(Event::Keydown(KeyCode::NUM1));
-                        Ok(())
-                    },
-                ));
-                get_next_event(jvm.clone()).await;
-            }
-            Ok(())
-        });
-        if let Some(beat_ms) = beat_ms {
+        if let Some((after_ms, pace_after)) = guest.timer {
+            let (system_task, fires_task) = (system.clone(), fires.clone());
+            system.spawn(async move || {
+                let jvm = JvmSupport::new_jvm(&system_task, None, Box::new([get_protos().into()]), &[], RustJavaJvmImplementation).await?;
+                for _ in 0..1_000_000 {
+                    let due = system_task.platform().now() + after_ms;
+                    let (system_timer, fires_timer) = (system_task.clone(), fires_task.clone());
+                    system_task.event_queue().push(Event::guest_timer(
+                        due,
+                        pace_after.map_or(u64::MAX, |x| system_task.pacing().ticks() + x),
+                        move || async move {
+                            fires_timer.fetch_add(1, Ordering::SeqCst);
+                            // The key is what makes getNextEvent return; the timer itself is consumed internally.
+                            system_timer.event_queue().push(Event::Keydown(KeyCode::NUM1));
+                            Ok(())
+                        },
+                    ));
+                    get_next_event(jvm.clone()).await;
+                }
+                Ok(())
+            });
+        }
+        if guest.poller {
+            let (system_poller, fires_poller) = (system.clone(), fires.clone());
+            system.spawn(async move || {
+                for _ in 0..1_000_000 {
+                    fires_poller.fetch_add(1, Ordering::SeqCst);
+                    system_poller.sleep(1).await;
+                }
+                Ok(())
+            });
+        }
+        if let Some(beat_ms) = guest.beat_ms {
             let system_beat = system.clone();
             system.spawn(async move || {
                 for _ in 0..1_000_000 {
@@ -844,29 +871,64 @@ mod test {
             });
         }
 
-        // At 1x and never re-anchored, the guest clock is the wall clock.
+        // Guest ms = wall ms x `speed` from 0 on.
         let speed_clock = SpeedClock::new();
+        speed_clock.set_speed(0.0, speed);
         let mut wake_ticks = 0;
+        let start = clock.peek();
         for _ in 0..120 {
-            system.tick()?;
-            let next_frame = (clock.peek() / FRAME_MS + 1) * FRAME_MS;
+            let budget_end = clock.peek() + budget;
+            system.tick_for(budget)?;
+            let next_frame = (clock.peek() / frame_ms + 1) * frame_ms;
             while let Some(margin) = margin {
                 let Some(due) = system.pacing().take().wake() else { break };
                 let now = clock.peek();
-                let fire = now + (speed_clock.wake_delay(now as f64, due, margin) as u64).max(timer_floor_ms);
+                let delay = (speed_clock.wake_delay(now as f64 / speed, due, margin) * speed) as u64;
+                let fire = now + delay.max((timer_floor_ms as f64 * speed).ceil() as u64);
                 if fire >= next_frame {
                     break;
                 }
                 clock.set(fire);
                 in_wake_tick.store(true, Ordering::SeqCst);
-                let result = system.tick();
+                let result = system.tick_for(budget);
                 in_wake_tick.store(false, Ordering::SeqCst);
                 result?;
                 wake_ticks += 1;
+                // A wake tick is the rest of its frame's tick, whatever budget it is handed: it ends
+                // where that tick's budget did (`Executor::resume_tick`), a clock read or two past.
+                let end = clock.peek();
+                assert!(
+                    end <= budget_end + 1,
+                    "{guest:?} at {speed}x: a wake tick ran to {end}, {} guest ms past its frame tick's budget",
+                    end - budget_end
+                );
             }
             clock.set(next_frame);
         }
-        Ok((fires.load(Ordering::SeqCst), wake_ticks, system.pacing().ticks()))
+        Ok(HostRun {
+            fires: fires.load(Ordering::SeqCst),
+            wake_ticks,
+            ticks: system.pacing().ticks(),
+            elapsed: clock.peek() - start,
+        })
+    }
+
+    // `on_a_host` at 1x for a WIPI timer, as (fires, wake ticks, host frames counted); with
+    // `beat_ms`, a second thread sleeps on that beat beside it.
+    fn timer_fires_on_a_host(
+        after_ms: u64,
+        pace_after: Option<u64>,
+        beat_ms: Option<u64>,
+        margin: Option<u64>,
+        timer_floor_ms: u64,
+    ) -> Result<(u64, u64, u64)> {
+        let guest = Guest {
+            timer: Some((after_ms, pace_after)),
+            beat_ms,
+            poller: false,
+        };
+        let run = on_a_host(guest, 1.0, margin, timer_floor_ms)?;
+        Ok((run.fires, run.wake_ticks, run.ticks))
     }
 
     #[test]
@@ -902,6 +964,59 @@ mod test {
             assert!(wake_ticks > 0, "the host never came back for the 40ms beat");
             assert_eq!(on, off, "a 10ms timer beside a 40ms beat, timers no sooner than {timer_floor_ms}ms");
         }
+        Ok(())
+    }
+
+    #[test]
+    fn a_poll_beside_a_paced_wake_runs_as_often_on_a_host_that_wakes_the_guest() -> Result<()> {
+        // A tick that waits for a paced wake runs every poll beside it, a millisecond apart, for as
+        // long as it waits: a 1ms WIPI timer beside a thread on a 30ms beat fires 567 times in 120
+        // frames, not the 119 it fires alone. A host that takes that wait over
+        // (`Platform::wake_margin_ms`) and came back only for the wake ran those polls 8-50% less
+        // often — the game slower for having opted in. So a tick hands over only a wake no poll has
+        // work before (`System::poll_until`), and none nearer than a host timer can fire
+        // (`speed_clock::max_wait`): docs/report/0556 §9.
+        let timer = |after_ms, pace_after, beat_ms| Guest {
+            timer: Some((after_ms, pace_after)),
+            beat_ms,
+            poller: false,
+        };
+        let guests = [
+            // MC_knlSetTimer(1), and a 10ms timer re-armed in the tick it fired in, beside a beat.
+            timer(1, None, Some(30)),
+            timer(1, None, Some(40)),
+            timer(1, None, Some(60)),
+            timer(10, Some(1), Some(30)),
+            timer(10, Some(1), Some(40)),
+            // A thread in a `Thread.sleep(1)` loop beside one: the same poll, with no event loop.
+            Guest {
+                timer: None,
+                beat_ms: Some(30),
+                poller: true,
+            },
+            // A 25ms timer that paces its own tick: the host does come back for this one, and at 2x
+            // most frames — where a wake tick with a budget of its own runs past the frame's
+            // (`on_a_host` asserts it does not).
+            timer(25, Some(0), None),
+        ];
+        let mut wake_ticks = 0;
+        for speed in [1.0, 1.5, 2.0] {
+            for guest in guests {
+                let off = on_a_host(guest, speed, None, 0)?;
+                for timer_floor_ms in [1, 4] {
+                    let on = on_a_host(guest, speed, Some(3), timer_floor_ms)?;
+                    wake_ticks += on.wake_ticks;
+                    assert_eq!(
+                        (on.fires, on.elapsed, on.ticks),
+                        (off.fires, off.elapsed, off.ticks),
+                        "{guest:?} at {speed}x, timers no sooner than {timer_floor_ms}ms: (fires, guest ms, host frames) with {} wake ticks",
+                        on.wake_ticks
+                    );
+                }
+            }
+        }
+        // And it is not that the host never comes back: the paced timer and the beats still hand over.
+        assert!(wake_ticks > 300, "{wake_ticks}");
         Ok(())
     }
 

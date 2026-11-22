@@ -93,12 +93,20 @@ impl SpeedClock {
     }
 }
 
-/// `Platform::wake_margin_ms` at play `speed`, in the executor's guest ms (`Executor::tick_for`'s
-/// `max_wait`). Rounded up: the host's timer aims `margin_ms` of wall time before the wake
-/// (`SpeedClock::wake_delay`), and a tick that waits less than that ends on the wake it was called
-/// for — at 1.5x, 4 of 4.5 guest ms, so the host came back a second time, by then late.
+// A browser timer armed from a timer's own callback fires no sooner than this many ms once the chain
+// is five deep (HTML Standard, timers: nesting level), whatever delay it was given.
+const HOST_TIMER_FLOOR_MS: u64 = 4;
+
+/// How far off a paced wake must be for a tick to end on it and leave it to the host
+/// (`Executor::tick_for`'s `max_wait`), in the executor's guest ms at play `speed`:
+/// `Platform::wake_margin_ms`, and no nearer than a host timer can fire. The host's timer aims
+/// `margin_ms` of wall time before the wake (`SpeedClock::wake_delay`), so one for a wake 3.5ms off
+/// is a 0.5ms timer; clamped to 4ms it came after the wake, and a 10ms WIPI timer beside a 40ms beat
+/// drifted from 207 fires to 191 in 120 frames at 2x (docs/report/0556 §9). Rounded up: a tick that
+/// waits less than the host aims ahead ends on the wake it was called for — at 1.5x, 4 of 4.5 guest
+/// ms, so the host came back a second time, by then late.
 pub(crate) fn max_wait(margin_ms: u64, speed: f64) -> u64 {
-    (margin_ms as f64 * speed).ceil() as u64
+    (margin_ms.max(HOST_TIMER_FLOOR_MS) as f64 * speed).ceil() as u64
 }
 
 /// How many times one guest timer may fire in host tick `tick` at play `speed` (WIPI

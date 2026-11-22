@@ -351,7 +351,8 @@ fn the_host_wake_hands_back_the_wait() {
                 let before = run(shape, speed, period, None, 0);
                 let after = run(shape, speed, period, Some(MARGIN_MS), WEBKIT_JITTER_US);
                 let case = std::format!("{shape:?} {speed}x {period}us");
-                // Per game frame, the wait is the margin (plus the clock's last ms), not what is left of the budget.
+                // Per game frame, the wait is what a tick waits itself (`max_wait`: the margin, or the
+                // 4ms of a host timer's floor), not what is left of the budget.
                 let bound = after.late.len() as u64 * (MARGIN_MS + 1) * 1_000;
                 assert!(after.wait_us <= bound, "{case}: wait {} > {bound}", after.wait_us);
                 // And in no cell more than today's: the host comes back only for a wake today's tick
