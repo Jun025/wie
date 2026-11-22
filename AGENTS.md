@@ -418,6 +418,14 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   2026-09-20, which is the shape this lineage was once rejected for — and the round that moved them
   had itself re-implemented one of the three from scratch a round earlier without noticing it existed.
 
+- **`scripts/hook-shadow-sweep.sh` — local only (same reason); a round that adds or changes a generic
+  KTF hook RUNS IT, and a hook stays in `binary_patches.toml` only at 0 mismatches.** Under
+  `WIE_HOOK_MODE=shadow`, `wie_validate` runs the title's own code beside every hook fire and compares
+  what each left (what is compared and what is not: `hook/shadow.rs`). The sweep prints fires ·
+  compared · mismatches per pattern and exits 1 on any mismatch — a fire left uncompared is one
+  (`selftest` there). A site that never fired was not compared, and a starved host reaches fewer calls
+  — read `fires`, `load1` and the `handed to` line first (`docs/report/0565`, `0566`).
+
 - **`scripts/audio-probe.mjs` — local only (it needs a game file), and it is how an audio change is
   checked in a real browser.** It boots the featurephone engine in headless Chromium through the
   shell's own path (`AudioContext` → worklet → master gain → analyser), cycles keys, and prints per
