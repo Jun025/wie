@@ -105,12 +105,9 @@ impl LgtEmulator {
 
         tracing::info!("Loading app {}, pid {}, mclass {}", app_info.aid, app_info.pid, app_info.mclass);
 
-        let jar_filename = files
-            .iter()
-            .find_map(|(filename, data)| (filename.ends_with(".jar") && Self::loadable_jar(data)).then_some(filename))
-            .ok_or_else(|| WieError::FatalError("Missing LGT application JAR containing binary.mod".into()))?
-            .clone();
-        let jar = files[&jar_filename].clone();
+        let (jar_filename, jar) = Self::archive_jar_entry(&files)
+            .map(|(filename, jar)| (filename.clone(), jar.clone()))
+            .ok_or_else(|| WieError::FatalError("Missing LGT application JAR containing binary.mod".into()))?;
         prepare_owner_files(&mut files, &jar);
 
         Self::load(
@@ -140,6 +137,17 @@ impl LgtEmulator {
 
     pub fn loadable_archive(files: &BTreeMap<String, Vec<u8>>) -> bool {
         files.contains_key("app_info")
+    }
+
+    fn archive_jar_entry(files: &BTreeMap<String, Vec<u8>>) -> Option<(&String, &Vec<u8>)> {
+        files
+            .iter()
+            .find(|(filename, data)| filename.ends_with(".jar") && Self::loadable_jar(data))
+    }
+
+    /// The jar `from_archive` runs — the one the per-title tables hash.
+    pub fn archive_jar(files: &BTreeMap<String, Vec<u8>>) -> Option<&[u8]> {
+        Self::archive_jar_entry(files).map(|(_, jar)| jar.as_slice())
     }
 
     pub fn archive_title(files: &BTreeMap<String, Vec<u8>>) -> Option<String> {

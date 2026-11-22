@@ -16,6 +16,7 @@ members = [
     "wie-web",
     "wie_cli",
     "wie_featurephone",
+    "wie_identify",
     "patches/classfile",
 ]
 

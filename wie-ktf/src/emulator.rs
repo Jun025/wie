@@ -239,6 +239,12 @@ impl KtfEmulator {
         files.contains_key("__adf__")
     }
 
+    /// The jar `from_archive` runs — the one the per-title tables above hash.
+    pub fn archive_jar(files: &BTreeMap<String, Vec<u8>>) -> Option<&[u8]> {
+        let adf = KtfAdf::parse(files.get("__adf__")?);
+        files.get(&jar_filename(&adf.aid, files)).map(Vec::as_slice)
+    }
+
     pub fn archive_title(files: &BTreeMap<String, Vec<u8>>) -> Option<String> {
         let title = KtfAdf::parse(files.get("__adf__")?).name;
         (!title.is_empty()).then_some(title)

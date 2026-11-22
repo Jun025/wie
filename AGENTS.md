@@ -379,6 +379,12 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   the host lock `/tmp/wie-playability-census.lock` (fixed path, so scratch copies share it) and a second run
   **waits** for it — it does not fail. A dead holder's lock is reclaimed.
 
+- **`scripts/content-key.mjs` — local only (same reason); it writes and checks `compat.json`'s `contentKey`.**
+  `write` runs the `wie_identify` binary over the corpus files; `check` holds the committed values to that binary
+  **and** to the wasm `identify()` export, row by row (rc 2 = a row's file is not on disk, not a pass). The key is
+  never typed in and never re-derived in a script — change `wie_identify::identify`, then `write`. What CI can see
+  without game bytes (shape, every row keyed, the ledger's jar keys) is in `player-data.mjs` (`docs/report/0567`).
+
 - **`scripts/regression-census.sh` — local only (same reason); the weekly regression watch over that census.**
   It measures `origin/main` on every title and reports only rows that went DOWN against
   `docs/player-data/compat.json`, pair-confirmed; it never writes compat. Rules: `scripts/regression-diff.mjs`
@@ -784,6 +790,7 @@ above the engine reaches back into it.
 - `wie_wipi_c`, `wie_wipi_java`, `wie_midp`, `wie_skvm` — the emulated API surfaces.
 - `wie_ktf`, `wie_lgt`, `wie_skt`, `wie_j2me` — per-carrier entry points (`wie_ktf`/`wie_lgt` hold the heavy reverse-engineered runtimes).
 - `wie_cli` — native host (also `wie_validate`, a headless triage runner); `wie_featurephone` — browser host, empty library off `wasm32` (Constraint 7; renamed from `wie_web` 2026-09-11 — upstream uses that name).
+- `wie_identify` — which game a file is, without booting it; the one place `contentKey` is computed (its binary writes `compat.json`'s, the browser's `identify()` export returns it).
 - `patches/classfile` — crates.io `classfile` 0.1.1 plus one fix (modified UTF-8 constants), via `[patch.crates-io]`; its `README.md` has the removal condition.
 - `web/`, `functions/`, `migrations/`, `scripts/`, `docs/`, `data/`, `fonts/`, `test_data/` — non-Rust surfaces.
 

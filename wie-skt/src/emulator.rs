@@ -142,6 +142,11 @@ fn class_utf8_constants(class: &[u8]) -> Vec<&[u8]> {
     strings
 }
 
+// The package's jar sits beside its descriptor, under the same name.
+fn jar_filename(msd_filename: &str) -> String {
+    msd_filename.replace(".msd", ".jar")
+}
+
 impl SktEmulator {
     pub fn from_archive(platform: Box<dyn Platform>, mut files: BTreeMap<String, Vec<u8>>) -> Result<Self> {
         let msd_file = files.iter().find(|x| x.0.ends_with(".msd")).unwrap();
@@ -149,7 +154,7 @@ impl SktEmulator {
 
         tracing::info!("Loading app {}, mclass {}", msd.id, msd.main_class);
 
-        let jar_filename = msd_file.0.replace(".msd", ".jar");
+        let jar_filename = jar_filename(msd_file.0);
         if let Some((width, height)) = files.get(&jar_filename).and_then(|jar| package_display_size(jar))
             && width < platform.screen().width()
         {
@@ -173,6 +178,12 @@ impl SktEmulator {
 
     pub fn loadable_archive(files: &BTreeMap<String, Vec<u8>>) -> bool {
         files.iter().any(|x| x.0.ends_with(".msd"))
+    }
+
+    /// The jar `from_archive` runs — the one the per-title tables hash.
+    pub fn archive_jar(files: &BTreeMap<String, Vec<u8>>) -> Option<&[u8]> {
+        let msd = files.keys().find(|name| name.ends_with(".msd"))?;
+        files.get(&jar_filename(msd)).map(Vec::as_slice)
     }
 
     pub fn archive_title(files: &BTreeMap<String, Vec<u8>>) -> Option<String> {
