@@ -93,4 +93,4 @@
 
 ### 7. 게임 파일명 유입
 
-@@INFLOW@@
+`node scripts/corpus-name-inflow.mjs`(이 브랜치가 `origin/main` 대비 바꾼 파일 4개): 유입 1회 / 1쌍(BOUNDED) · 판단 필요 0건(SUFFIX-ATTACHED). 그 1회는 `wie-ktf/src/runtime/wipi_c/context.rs` 의 `ResourceCache` 주석에 원래 있던 이름이다 — 이 PR 은 그 파일의 시험 모듈만 고쳤고 그 주석은 건드리지 않았다. 이 문서와 새 시험 · 0569 에 덧붙인 줄에서는 0 이다(판을 sha 앞 12자로만 부른다).
