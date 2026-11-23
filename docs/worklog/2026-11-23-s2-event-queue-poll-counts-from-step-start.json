@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-23",
+  "task": "wie-s2-event-queue-poll-deadline-from-after-paint-costs-throughput",
+  "title": "#603 이 들여온 이벤트 큐 폴 마감 처리량 손실을 닫는다 — 폴은 그 step 이 시작한 때부터 센다",
+  "summary": "MIDP 이벤트 스레드의 1 ms 큐 폴 마감을 «그 step 이 시작한 때 + 1 ms»로 되돌렸다(System::poll · Executor::step_started — 잠금 밖 AtomicU64). #603 은 sleep 마감을 «부른 때부터»로 옮기며 이 내부 폴까지 옮겨, 그리기를 막 끝낸 이벤트 스레드가 그리기 끝 + 1 ms 까지 큐를 보지 않았다. 게스트 Thread.sleep 의 의미는 그대로다(test_pacing 의 수가 main 과 한 칸도 다르지 않다). 지원 목록에서 그 꼴(잠 없이 repaint · yield 로 그리기 완료를 기다리며 도는 판)은 SKT 82행 중 1행(b42e4242866b) · KTF 표본 80행 중 0 · LGT 표본 40행 중 0 이다. 그 행은 게임 안 장면 둘에서도 잠 없이 돌고, #603 의 손실은 첫 화면 −11 ~ −13% · 게임 안 −32 ~ −36% · −8 ~ −10% 였다. 고친 뒤 #603 전 수준으로 정확히 돌아온다(#603 병합 + 이 수정만 얹은 판 ÷ 전 = +0.4% · +0.9% · −0.5% · −0.0%). #603 이 요청한 속도로 돌려놓은 행은 다시 빨라지지 않는다(SKT 7행 · KTF 3행 고친 뒤 = 후). 유휴 화면의 CPU 는 늘지 않는다 — 첫 판(step 시작 시각을 잠금 안에 적음)은 3 ~ 4% 늘었고 그것을 60 Hz 로 쉬어 가는 스크래치 호스트 측정이 잡아 원자 변수로 옮겼다. 고친 줄을 잠그는 시험 1개(멈춘 시계)를 더했다. 0573 §9 와 그 worklog 의 틀린 정적 계수에 «0579 가 정정했다» 한 줄을 달았다. 이용자 고지 1건(docs/player-updates/2026-11-23-one-skt-game-back-to-its-speed.json). docs/report/0581.",
+  "changes": [
+    "wie-backend/src/executor.rs — Executor::step_started(AtomicU64 · step 이 적는다) · step_started()",
+    "wie-backend/src/system.rs — System::poll(pace)(step 시작 + POLL_SLEEP_MS) · System::poll_until 삭제(호출자 0)",
+    "wie-midp/src/classes/net/wie/event_queue.rs — 대기 루프가 poll 을 부른다 · 시험 a_repaint_handed_over_in_the_step_of_a_paint_is_looked_at_in_the_next_step",
+    "docs/player-updates/2026-11-23-one-skt-game-back-to-its-speed.json",
+    "docs/report/0573(§9 머리 한 줄) · docs/worklog/2026-11-22-upstream-sync2-s2-executor-sleep-deadline-cooperative-poll.json(summary 끝 한 줄)",
+    "docs/report/0581"
+  ],
+  "limits": [
+    "측정 호스트가 다른 레인의 부하로 굶었다(load1 7 ~ 236 · CPU 몫 0.20 ~ 0.99). 판정은 같은 순간의 세 판 사이의 비와 계수(그리기 지연 p50 · yield 수 · sleep 수)로 했다.",
+    "훑기 202행은 첫 판으로 쟀다. 커밋한 판은 핵심 행 · 장면 둘 · 요청한 속도로 돌아간 2행 · 유휴 4행만 다시 쟀다.",
+    "브라우저(wasm)로는 재지 않았다. KTF 189행 · LGT 38행은 재지 않았다.",
+    "S3(upstream 병합)에서 executor.rs 의 step_started 를 지우는 쪽으로 풀면 이 손실이 돌아오고 새 시험이 red 가 된다."
+  ],
+  "proposals": [],
+  "adoptedProposals": [],
+  "declinedProposals": [],
+  "proposalsNote": "제안 0. KTF 704839f1a6c8 이 띄운 순서를 따라 두 속도로 갈리는 까닭은 읽지 않았고 회신에만 적었다."
+}
