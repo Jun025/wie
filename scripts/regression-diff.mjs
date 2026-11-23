@@ -118,7 +118,7 @@ function markdown({ base, cur, long, res, pin, toolPin, started, now = Math.floo
   return [
     `# wie 주간 퇴행 감시 — ${date}`,
     '',
-    `- 측정 바이너리 핀: \`${pin}\` (origin/main · release \`wie_validate\`)`,
+    `- 측정 바이너리 핀: \`${pin}\` (release \`wie_validate\` · 주간 감시면 origin/main, 손으로 돌렸으면 넘긴 sha)`,
     `- 도구 핀: \`${toolPin}\` · 대조 기준: \`docs/player-data/compat.json\` (enginePin \`${base.enginePin}\` · ${base.entries.length}행)`,
     `- 걸린 시간: ${elapsed}s (${(elapsed / 3600).toFixed(2)}h) · 이번 회차 측정 행 ${cur.entries.length} · 미측 ${res.unmeasured.length} · 장주행(L 600s) 대상 ${long.size}행`,
     `- ★퇴행 의심(짝 재현) **${sus}행** · 내림 후보 ${new Set(res.cands.map((c) => c.sha12)).size}행(${res.cands.length}건) · 올림(참고) ${res.up.length} · 정책 행 축 변화(참고) ${res.policy.length} — compat 는 고치지 않았다`,

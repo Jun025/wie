@@ -57,7 +57,7 @@ git -c merge.conflictStyle=zdiff3 merge --no-commit --no-ff upstream/main   # rc
 
 | 0551 # | 경로 | 0551 | 이 회차 | 왜 |
 |---:|---|---|---|---|
-| 14 | `wie-backend/src/canvas/lbmp.rs` | 폐기 · theirs | **재적용 · ours** | upstream 판은 «대체판»이지만 동작이 다르다: 모든 형을 `ArgbPixel` 로 돌려주고, 형 8 · 16 의 마스크를 투명으로 풀고, 크기 불일치와 `mask > 1` 을 거부한다. 코퍼스의 LBMP 378장(작업 목록 372 + 그 밖 6)에 크기 불일치 · `mask > 1` · 잘린 파일은 0 이고, 마스크가 선 형 8 · 16 이 361장(5판)이다 — 그 361장은 우리 판에서 불투명하게, upstream 판에서 투명하게 그려진다. 옮기는 것은 전/후를 재는 일이라 제안 1건으로 올렸다(worklog) |
+| 14 | `wie-backend/src/canvas/lbmp.rs` | 폐기 · theirs | **재적용 · ours** | upstream 판은 «대체판»이지만 동작이 다르다: 모든 형을 `ArgbPixel` 로 돌려주고, 형 8 · 16 의 마스크를 투명으로 풀고, 크기 불일치와 `mask > 1` 을 거부한다. 코퍼스의 LBMP **6,202장**(zip 꾸러미 378 + 8바이트 머리가 붙은 SKT jar 5,824)에 크기 불일치 · `mask > 1` · 잘린 파일은 0 이고, 마스크가 선 형 8 · 16 이 **4,628장(35판 = zip 5 + SKT 30)**이다 — 그 4,628장은 우리 판에서 불투명하게, upstream 판에서 투명하게 그려진다(★정정 2026-11-24 · §11 F1 — 처음 적은 378장 · 361장 · 5판은 `PK` 로 시작하는 꾸러미만 센 수였다). 옮기는 것은 전/후를 재는 일이라 제안 1건으로 올렸다(worklog) |
 | 51 | `wie-lgt/src/runtime/stdlib.rs` | 폐기 · theirs | **재적용 · 3way-edit** | 0551 의 판정은 «이름 수준»이었다. 본문을 읽으면 `malloc`(실패 시 우리 0 ↔ upstream 치명 오류) · `strncmp` · `strtol` 이 다르다. 우리 본문을 두고 upstream 만 가진 슬롯(strtok · memcmp · memchr · abort · realloc · `0x450`)을 더했다 |
 | 72 | `wie-wipi-c/src/api/util.rs` | 폐기 · theirs | **발신 · union** | `inet_addr("010.001.002.003")` 이 우리는 풀리고 upstream 은 `INADDR_NONE` 이다 |
 
@@ -167,7 +167,7 @@ git -c merge.conflictStyle=zdiff3 merge --no-commit --no-ff upstream/main   # rc
 
 **자동 병합이 떨어뜨린 것**(0551 §6): `binary_patches/{parser,patch}.rs` · `lib.rs` 의 `mod` 두 줄 · `wie-core-arm/Cargo.toml` 의 세 의존 · `GeneralUser.sf3` — 전부 복원(§3 ⑴ · ⑪). `get_protos()` 의 덩어리 밖 중복은 이번 트리에서는 `ImageObserver` 1건이었다.
 
-**upstream 이 지워 같이 빠진 시험**: `wie-wipi-java` 의 merge-base 스텁 시험 4개(`backlight` · `event_queue` · `vibrator` · `volume` — upstream #1441 정책) + 우리 LED 시험 1개(0551 #76 의 처분) · `wie-util` 의 `read_generic_reads_into_initialized_storage`. upstream 시험 가운데 «upstream 쪽 동작»을 단언해 싣지 않은 것은 크레이트별 노트에 이름으로 있다(부록 B). 그래서 `coverage.yml` 을 이 브랜치에서 손으로 돌렸다(§8-6).
+**upstream 이 지워 같이 빠진 시험**(★이 문단의 6개는 «이름 기준 24개»의 일부다 — 정정 §11 F4): `wie-wipi-java` 의 merge-base 스텁 시험 4개(`backlight` · `event_queue` · `vibrator` · `volume` — upstream #1441 정책) + 우리 LED 시험 1개(0551 #76 의 처분) · `wie-util` 의 `read_generic_reads_into_initialized_storage`. upstream 시험 가운데 «upstream 쪽 동작»을 단언해 싣지 않은 것은 크레이트별 노트에 이름으로 있다(부록 B). 그래서 `coverage.yml` 을 이 브랜치에서 손으로 돌렸다(§8-6).
 
 **포크 규칙에 걸려 고친 upstream 파일 하나**: `wie-skvm/tests/data/resource.jar`(116바이트 · 2바이트짜리 `data.bin` 하나) → `resource.zip`. `audit-no-leak.sh` 는 추적되는 `.jar` 를 거부한다(Constraint 9). 같은 바이트다.
 
@@ -326,6 +326,35 @@ node scripts/check-compat-revert.mjs
 - **S5(발신)는 하지 않았다.** 발신 급은 54파일이다(0551 은 29).
 - **`compat.json` 의 행은 고치지 않았다.**
 - 제안 1건(worklog): SKT LBMP 의 마스크 투명(§2 의 #14).
+
+### 11. 정정 — 게이트② 검수가 남긴 것 (2026-11-24 · `wie-upstream-sync2-s4-post-merge-cleanup` · `docs/report/0592`)
+
+이 절은 착지 뒤에 더했다. 코드와 판단은 그대로고 «적힌 수와 표지»만 고친다. 수의 출처는 게이트② 회신
+(`~/orchestrator/reports/wie-upstream-sync2-s3-merge-upstream-main.review.md` §2)이고, F4 는 0592 에서 다시 셌다.
+
+- **F1 — LBMP 수(§2 #14 · worklog 제안 `#p0`)**: 378장 · 361장 · 5판 → **6,202장 · 마스크가 선 형 8 · 16 이 4,628장 · 35판**.
+  증적의 `lbmp_scan.py` 가 `PK` 로 시작하는 꾸러미만 열었다. SKT 의 jar 는 앞에 8바이트 머리가 붙어 있어 빠졌다
+  (고유 432꾸러미: zip 378장 + 머리 붙은 jar 5,824장 · 판은 zip 5 + SKT 30). upstream 판이 더 엄격한 자리
+  (크기 불일치 · `mask > 1` · 잘린 파일)에 걸리는 파일은 6,202장 전체에서도 0장이다 — 그 문장은 그대로 선다.
+  «우리 디코더를 둔다»는 판단도 그대로다. 달라지는 것은 옮길 때 화면이 바뀌는 폭이다(13배). 제안 `#p0` 의 `why` ·
+  `tradeoff` · `effort` 를 같은 수로 고쳤다. ★그 제안은 이 정정으로 채택되지 않는다.
+- **F3 — 회신의 «PR 의 CI» 칸**: S3 회신 §4 에 자리표시자 `@@CI_FINAL@@` 가 남았다. 그 자리의 값은 이렇다.
+  검수 시각(2026-11-24 03:01 KST · 머리 `b7dae368a`): `build-web` · `contract` · `pr_audit` · `rust_ci (ubuntu-latest, stable)`(8m50s) pass,
+  빈 통과 레그 넷 pass, ★`rust_ci (macos-latest, stable)` 은 러너 미배정으로 cancelled — `ci-presence` rc=5 `CI_INFRA_UNACQUIRED`(green 아님).
+  착지 직전(11-23T19:10Z · 총괄의 rerun 뒤): `ci-presence` rc=0 `CI_GREEN … 5건 전건 완료·성공`
+  (`-merge` 회신). §8-6 의 표는 머리 `c7dfac8a7` 의 것이고 핀 `b7dae368a` 의 것이 아니다. 회신 파일은 저장소 밖 원장이라 고치지 않았다.
+- **F4 — 빠진 시험 수(§7)**: «6개»는 이름 기준으로 **24개**다(`a3217eac0` 에 있고 `de0969794` 에 없는 시험 이름 · 0592 에서 `git grep` 으로 다시 세어 24).
+  §7 이 적은 6(`wie-wipi-java` 스텁 4 + LED 1 + `wie-util` 1) · upstream 이 이름을 바꾸거나 다시 써서 대응 시험이 있는 6
+  (`nested_arm_calls_share_the_instruction_budget` · `run_reports_executed_instructions_at_budget_and_return_boundaries` ·
+  `test_copy_area_uses_source_snapshot_for_overlap` · `delete_record_removes_record_and_rejects_unknown_id` ·
+  `graphics_2d_copy_xor_clip_and_pixel_operations_use_the_target_canvas` · `unsupported_call_and_device_install_operations_report_failure`) ·
+  **대응 이름 없이 사라진 12**(`wie-backend/src/system/file_system.rs` 6 · `wie-jvm-support/src/runtime/file.rs` 3 · `test_canvas` ·
+  `decodes_static_icon_after_animation` · `database_path_includes_db_segment`). 12개는 전부 upstream 이 자기 코드의 시험을 갈아 치운 것이고
+  우리 값 자리의 시험은 아니다. upstream 시험 가운데 싣지 않은 것은 검수가 32개로 셌다(0592 의 같은 `git grep` 으로는 31개 · 부록 B 에 이름이 없는 것이 10개).
+  그중 `fixed_records_persist_size_and_support_crud` 는 0592 이 upstream 의 `api/database.rs` 를 제 경로에 되살리면서 다시 돈다.
+- **F9 — 증적 표지**: 증적 `census-regression.md` 머리의 «측정 바이너리 핀 `c7dfac8a7…` (origin/main · release)» 에서 `origin/main` 은 틀렸다.
+  그 sha 는 이 브랜치의 머리다. `scripts/regression-diff.mjs` 가 그 낱말을 고정 문구로 찍었다 — 주간 감시는 늘 `origin/main` 을 재서 맞았고,
+  브랜치에서 손으로 돌린 이 회차에서 틀렸다. 0592 이 그 문구를 고쳤다. 증적 파일은 저장소 밖이라 그대로다.
 
 ### 부록 A. 분류표 — 147행 · 미분류 0
 

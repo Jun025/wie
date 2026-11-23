@@ -5,7 +5,7 @@
 //! (different handle, and its file slots moved to `api/fs.rs` on another store), so the two met in every
 //! merge and ours had to win whole. The name is the fix: `api/database.rs` is now upstream's file, byte for
 //! byte — compiled, and like `api/fs.rs` NOT wired into our tables. Edit it here and the conflict is back.
-//! Fork changes go in this file (`docs/report/0590`; why the stores cannot be mixed: `docs/report/0586` 부록 B).
+//! Fork changes go in this file (`docs/report/0592`; why the stores cannot be mixed: `docs/report/0586` 부록 B).
 
 use alloc::{borrow::ToOwned, boxed::Box, str, string::String, vec, vec::Vec};
 use core::mem::size_of;
