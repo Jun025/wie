@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-23",
+  "task": "wie-upstream-sync2-s1b-rustjava-pin-0-5-1",
+  "title": "조각 S1b — RustJava 핀을 =0.4.1 에서 upstream 이 쓰는 0.5.1 로 (우리 쪽만 · 병합 커밋 아님)",
+  "summary": "루트 jvm* · rustjava-runtime 을 =0.4.1 에서 upstream 이 쓰는 0.5.1 로 올렸다(정확 고정 유지 · upstream #1630 · #1631 의 꼴 · 병합 커밋 아님). 깨진 호출부는 JavaType 의 자리 14파일과 default_of 1곳뿐이고, LGT localtime 을 jiff 로 옮겨 chrono 를 그래프에서 뺐다. patches/ 는 이미 없다(처분할 패치 0). 전 · 후 · 깊이 계측 판을 같은 순간에 세 프로세스로 돌려 146행(SKT 82 전부 · KTF · LGT 표본 57 · 가드 7)을 쟀다: 판정이 달라진 행 0 · 패닉 0 · 깊이 상한(512)에 닿은 행 0(가장 깊은 값 45). KTF · LGT 나머지 283행은 후 바이너리의 부팅 + 그림만 쟀고 실패는 compat.json 이 이미 not-yet 으로 적은 2행뿐이다(전 바이너리도 같은 줄로 실패). 속도는 달라진다: 그리기가 두 번 모두 +10% 이상인 행이 SKT 6(+12 ~ 45%) · KTF 3(+28 ~ 91%) · LGT 2(+19 ~ 33%)이고 CPU 초는 전/후 같다 — 0.5.0 의 조회 캐시가 필드 · 메서드 해소를 처음 한 번으로 줄였다. 이용자에게 보이는 변화라 고지 1건을 더했다. cargo test --all 880 통과 · 4게이트 + beta clippy · 러너 블록 · wasm 표면 계약 통과. upstream 병합 예행의 충돌 파일은 146 → 147(덩어리 666 → 663)로 줄지 않았다.",
+  "changes": [
+    "루트 Cargo.toml: jvm · jvm-bytecode · jvm-class-proto · jvm-types · rustjava-runtime =0.4.1 → =0.5.1 (정확 고정은 지킨다 · upstream 은 ^0.5.1 · lock 은 같은 0.5.1)",
+    "JavaType 을 jvm_types 에서 가져온다 — 14파일 (upstream #1630 의 꼴) · JavaType::default() → JavaValue::default_of() 1곳",
+    "wie-lgt: localtime 의 날짜 계산을 chrono 에서 jiff 로 (upstream #1631 의 꼴) — chrono 가 lock 에서 빠진다 · 시험 localtime_fills_tm_in_kst 추가",
+    "Cargo.lock: classfile 0.5.1 · jiff 1.0.2 · parking_lot 0.13.0 등 8개 추가 · chrono 제거 (560 → 567 패키지)",
+    "docs/player-updates/2026-11-23-some-games-run-faster-after-java-engine-update.json (kind: speed)",
+    "STATE.md «다음» ⑴ 을 S3(병합 커밋)으로"
+  ],
+  "verification": [
+    "cargo fmt --check · clippy --all -D warnings · wasm32 clippy · +beta clippy rc=0",
+    "RUST_MIN_STACK=4194304 cargo test --all rc=0 — 58 스위트 · 880 passed · 0 failed (hardening 8 · guest_roots 2 · class_patches 3 · 장부 가드 7 · modified_utf8 포함)",
+    "러너 블록 6종 PASS rc=0 (keydraw_ktf paints 79 · keydraw_lgt 55)",
+    "npm run build:wasm rc=0 → check-engine-contract.mjs 143 pass · 0 violation",
+    "cargo audit: 취약점 0 → 0 · unmaintained 경고 2 → 1 (chrono 가 빠짐)",
+    "전 · 후 · 계측 판 동시 실행 146행: result 다른 행 0 · 패닉 0 · 첫 Java 예외 다른 행 0 · StackOverflowError 0 · 최대 깊이 45",
+    "KTF · LGT 나머지 283행 부팅 + 그림(후): PASS 281 · FAIL 2 (compat 의 not-yet 2행 · 전도 같은 실패)"
+  ],
+  "limits": [
+    "KTF · LGT 나머지 283행은 전/후 짝 · 깊이를 재지 않았다 (후의 부팅 + 그림만)",
+    "오래 하기 600초 · 소리 · 입력 축(census 판정)은 재지 않았다 — 키 27개 · 30초 한 번(가드 120초 · 2회)",
+    "브라우저에서의 속도는 재지 않았다 (wasm 빌드와 표면 계약 · PR 의 contract 잡까지)",
+    "깊이 상한은 == 512 판정이라 네이티브 프레임을 사이에 두면 건너뛸 수 있다 (upstream 코드)",
+    "wie_validate 의 java_exceptions 는 StackOverflowError 를 세지 못한다 (Jvm::exception 을 지나지 않는다) — 계측 빌드로 쟀다",
+    "InheritedMethods · hardening.rs 는 그대로 뒀다"
+  ],
+  "proposals": [],
+  "adoptedProposals": [
+    "2026-11-22-upstream-sync2-s1-rustjava-pin-0-4-1#p0"
+  ],
+  "declinedProposals": []
+}

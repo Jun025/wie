@@ -75,7 +75,7 @@ futures = { version = "^0.3", default-features = false, features = ["alloc"] }
 # far changed what a guest sees (0.4.2: `MAX_STACK_DEPTH = 512` → `StackOverflowError`; 0.5.0: cached
 # member resolution, slot-laid-out fields), and dependabot reads this manifest daily, so a caret would
 # leave one `Cargo.lock` line as the only thing holding it. Moving the pin is a measured round
-# (`docs/report/0583`), not a bump.
+# (`docs/report/0584`), not a bump.
 # `classfile` is theirs too but only transitive (via `jvm-bytecode`), so the lock is what holds it.
 jvm = { version = "=0.5.1" }
 jvm-bytecode = { version = "=0.5.1" }
