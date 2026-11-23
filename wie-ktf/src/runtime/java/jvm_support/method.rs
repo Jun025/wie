@@ -11,9 +11,9 @@ use core::{
     mem::{offset_of, size_of},
     ops::{Deref, DerefMut},
 };
-use jvm::{ClassInstance, JavaError, JavaType, JavaValue, Jvm, Method, Result as JvmResult};
+use jvm::{ClassInstance, JavaError, JavaValue, Jvm, Method, Result as JvmResult};
 use jvm_class_proto::JavaMethodProto;
-use jvm_types::MethodAccessFlags;
+use jvm_types::{JavaType, MethodAccessFlags};
 use wipi_types::ktf::java::{
     JavaExceptionHandler as RawJavaExceptionHandler, JavaMethodDefinition as RawJavaMethod,
     JavaMethodExceptionTableEntry as RawJavaMethodExceptionTableEntry,

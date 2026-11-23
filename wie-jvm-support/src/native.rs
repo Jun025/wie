@@ -1,6 +1,7 @@
 use alloc::{boxed::Box, vec::Vec};
 
-use jvm::{ClassInstance, JavaType, JavaValue};
+use jvm::{ClassInstance, JavaValue};
+use jvm_types::JavaType;
 
 pub trait NativeJavaValueCodec {
     /// Turns a guest word into a JVM object, or `None` when the word does not denote a live one.
