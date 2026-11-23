@@ -88,3 +88,14 @@ fn a_poll_counts_from_its_own_step_so_an_idle_tick_ends_after_a_long_one() -> Re
     }
     Ok(())
 }
+
+#[futures_test::test]
+async fn files_are_scoped_by_the_aid_not_the_pid() {
+    // fork: upstream scopes guest files by the pid (#1520). Ours stays on the aid — the key every
+    // existing save is stored under (docs/report/0551 §8, 0586).
+    let system = System::new(Box::new(TestPlatform::new()), "the-pid", "the-aid", DefaultTaskRunner);
+    assert_eq!(system.filesystem().write("save.dat", 0, b"x").await, 1);
+    let files = system.platform().filesystem();
+    assert!(files.exists("the-aid", "save.dat").await);
+    assert!(!files.exists("the-pid", "save.dat").await);
+}
