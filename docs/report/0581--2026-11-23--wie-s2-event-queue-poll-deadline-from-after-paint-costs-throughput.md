@@ -362,3 +362,5 @@ PR 의 CI 는 회신에 적는다(이 파일은 그 커밋 안에 있다).
 ### §10 증적
 
 `~/orchestrator/reports/evidence/wie-s2-event-queue-poll-deadline-from-after-paint-costs-throughput/`(sha12 와 수만 · 경로 · 타이틀 없음): 훑기 `skt-a` · `skt-b` · `ktf-s1` · `ktf-s2` · `lgt-s` · 재측 `rerun-*` · 핵심 행 `key-*` · `s2fix-*` · 60 Hz 호스트 `host60-*` · 띄운 순서 `order-*` · 커밋한 판 `final-*` 의 `.jsonl` 과 묶음별 `.log`, 드라이버 `drv/`(`pair.py` · `assemble.py` · `dist.py` · 묶음별 `p1` · `r1` ~ `r7` · 스크래치 호스트 패치 `host60.py`), 키 대본 `keys/`.
+
+<!-- corpus-name-inflow v1 subjects=8 tree=23487f6cd9989485 B=6/5 P=0/0 S=0/0 -->
