@@ -1,4 +1,20 @@
-@AGENTS.md
+## `AGENTS.md` 는 기동 때 실리지 않는다 — 필요한 절을 그때 읽어라
+
+(2026-11-24 · `wie-claude-md-stop-importing-agents-md-wholesale-load-on-demand` — 종전 이 파일 첫 줄의 통째 import 가 65KB 를 모든 세션에 실었다. 정본은 그대로 `AGENTS.md` 이고, 이 절은 «언제 어느 절을 읽는가»만 적는다.)
+
+- ★**세션 첫 행동: `AGENTS.md` 를 맨 위부터 «## Definition of Done» 제목 앞까지 읽어라** — «## Goal» · «## Constraints» · «### Held by you, not by a machine»(맨 앞 40여 줄). 그 표가 축소 금지 목록의 정본이다.
+- 그 읽기가 빠졌을 때를 대비한 **제목 목록**이다 — 본문·근거는 `AGENTS.md` 에만 있으니 이 문구로 판단하지 말고 그 절을 읽어라:
+  1 커밋 전 게이트 4종 · 2 coverage 배선 · 3 featurephone 엔진 계약 · 4 `contract` 잡 always-run · 5 `cargo audit` 무시 0 · 6 엔진 크레이트 `no_std` · 7 `wie_featurephone` 의 wasm32 게이트 · 8 버전 핀 · RustJava `rev` 핀 · 9 게임 바이트 0 · 10 시크릿 · 11 D1 마이그레이션 · 12 `main` 직접 커밋 금지.
+  Held by you: 게임 바이트 0 · 시크릿 · 외부 계약은 참조만 · 공개 이력 재작성 금지 · 로컬 표면만.
+- **절 색인** — 왼쪽 일을 «하기 전에» 오른쪽 절을 읽는다. 제목으로 찾는다(`grep -n '^##' AGENTS.md` · 줄번호는 매주 바뀐다). 컨텍스트가 압축된 뒤에는 읽었던 절이 남아 있지 않다 — 다시 읽어라.
+  - 커밋 · PR 전(문서만 고쳤어도) · 엔진 코드를 만졌다 · `wie_validate` 의 FAIL/UNMEASURED 를 읽는다 · PR 의 CI 를 읽는다 → «## Definition of Done» 의 «### The four gates»
+  - `web/` · `functions/` · `scripts/` · `migrations/` 를 만진다 · local-only 스크립트(census · smoke_gate · audio-probe · perf-watch …)를 돌린다 → «### Web-surface commands»
+  - 회차 기록(`docs/report/`) · worklog · player-updates · 원장 파일 충돌 · 후속 제안 → «### Landing paperwork»(그 아래 «#### Worklog» · «#### Proposal threshold»)
+  - 브랜치 · 커밋 · PR 을 연다 → «### Git Workflow»
+  - `-merge` 티켓 → «### For the `-merge` task only»
+  - `AGENTS.md` 에 fenced `sh` 블록을 더한다 · 주간 doc-liveness 가 red → «### Documented-command liveness»
+  - 같은 증상을 전에 겪었는지 · required check · 버전 핀 · paths-filter → «## Incident ledger (사건 대장)»
+  - 코드 스타일 · 크레이트 지도 · ponytail/MCP → «## Reference»(«### Code Style» · «### Layout» · «### Agent Environment»)
 
 ## 착수 규율
 
@@ -22,13 +38,13 @@
 - ★**완주 = PR 을 열어 둔 상태이지 머지가 아니다.** 브랜치 push + PR 생성까지가 네 몫이고,
   **머지와 브랜치 삭제는 검수 approve 후 별도 `-merge` 티켓의 몫**이다.
   **네 PR 을 네가 머지하지 마라** — CI green 은 필요조건일 뿐 승인이 아니다.
-  (정본 = `AGENTS.md` §Git Workflow · Constraint 12. 위 `@AGENTS.md` 로 이미 로드됨.)
+  (정본 = `AGENTS.md` §Git Workflow · Constraint 12.)
   ★이 조항이 리터럴로 적힌 이유: 종전 헌장이 «완주 = main 에 머지» 라고 가르쳐
   **동일 실패형이 5건** 났다(`wie-agents-md-gate2-contradiction-fix`, 2026-08-02).
 
 ## 에이전트 개발환경
 
-정본은 `AGENTS.md`(위 `@AGENTS.md` 로 이미 로드됨)다. 이 절은 진입점만 가리킨다.
+정본은 `AGENTS.md` 다(기동 때 실리지 않는다 — 맨 위 색인). 이 절은 진입점만 가리킨다.
 
 - **커밋 전 게이트**: `AGENTS.md` §Definition of Done 의 4종. `cargo clippy --workspace` 만으로는
   CI 를 예측하지 못한다 — `-D warnings`·wasm 타깃·`RUST_MIN_STACK=4194304` 까지 맞춰 돌려라.
@@ -42,7 +58,7 @@
   ⒝`nohup … &` 로 회차 밖에 떨어뜨리지 마라(부모가 launchd 가 되면 회차 종료·STUCK 판정이 못 본다) — 회차를 끝낼 때 **자기가 띄운 프로세스 0** 을 확인한다.
   ⒞드라이버 안에 `host-load-guard --status --recovered` 대기 폴링을 넣지 마라 — 임대 대기가 그 역할이다(hold-mode 는 observe 라 그 폴링은 아무것도 기다리지 않는다). 폭은 census 기본 `--jobs`(≤ 3)를 따른다.
 - ★**축소 금지 목록 = `AGENTS.md` §Constraints 표**(12행 + «Held by you» 절).
-  ★**여기에 재열거하지 않는다** — 같은 사실을 두 곳에 적으면 한쪽이 낡는다.
+  ★**여기에 재열거하지 않는다**(맨 위의 것은 제목뿐이다) — 같은 사실을 두 곳에 적으면 한쪽이 낡는다.
   **ponytail 은 명시되지 않은 요구사항을 범위 밖으로 취급하므로** 그 표에 걸리는 제안은
   false positive 로 간주하고, 집행이 필요하면 별도 티켓으로 올려라.
 - **ponytail 모드는 `full` 고정**(`ultra` 전환 금지). `/ponytail-audit` 결과는 **리포트일 뿐**이며
