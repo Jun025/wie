@@ -1,6 +1,6 @@
 use alloc::{format, string::String, vec::Vec};
-use chrono::{DateTime, Datelike, FixedOffset, TimeZone, Timelike};
 use core::cmp::min;
+use jiff::{Timestamp, tz::Offset};
 
 use wie_backend::System;
 use wie_core_arm::{Allocator, ArmCore, EmulatedFunction, ResultWriter, SvcId, stdlib};
@@ -224,8 +224,8 @@ async fn localtime(core: &mut ArmCore, _: &mut (), ptr_time: u32) -> Result<u32>
     let time: u32 = read_generic(core, ptr_time)?;
 
     // TODO kst only for now
-    let kst = FixedOffset::east_opt(9 * 3600).unwrap();
-    let dt: DateTime<FixedOffset> = kst.timestamp_opt(time as _, 0).unwrap();
+    let kst = Offset::constant(9);
+    let dt = kst.to_datetime(Timestamp::from_second(time.into()).unwrap());
 
     // TODO tm struct
     write_generic(core, result, dt.second() as u32)?;
@@ -234,10 +234,10 @@ async fn localtime(core: &mut ArmCore, _: &mut (), ptr_time: u32) -> Result<u32>
     write_generic(core, result + 0x0c, dt.day() as u32)?;
     write_generic(core, result + 0x10, (dt.month() as u32) - 1)?; // months since January
     write_generic(core, result + 0x14, (dt.year() as u32) - 1900)?; // years since 1900
-    write_generic(core, result + 0x18, dt.weekday().num_days_from_sunday() as u32)?; // days since Sunday
-    write_generic(core, result + 0x1c, dt.ordinal() as u32)?; // days since January 1
+    write_generic(core, result + 0x18, dt.weekday().to_sunday_zero_offset() as u32)?; // days since Sunday
+    write_generic(core, result + 0x1c, dt.day_of_year() as u32)?; // days since January 1
     write_generic(core, result + 0x20, 0u32)?; // DST flag
-    write_generic(core, result + 0x24, kst.local_minus_utc() as u32)?; // timezone offset in seconds
+    write_generic(core, result + 0x24, kst.seconds() as u32)?; // timezone offset in seconds
     write_generic(core, result + 0x28, 0u32)?; // timezone abbreviation ptr
 
     Ok(result)
@@ -344,10 +344,34 @@ mod tests {
     use test_utils::TestPlatform;
     use wie_backend::{DefaultTaskRunner, System};
     use wie_core_arm::{Allocator, ArmCore};
-    use wie_util::{ByteRead, ByteWrite, Result};
+    use wie_util::{ByteRead, ByteWrite, Result, read_generic, write_generic};
 
-    use super::{free, malloc, parse_long, rand, register_stdlib_svc_handler, srand};
+    use super::{free, localtime, malloc, parse_long, rand, register_stdlib_svc_handler, srand};
     use crate::runtime::{SVC_CATEGORY_STDLIB, svc_ids::StdlibSvcId};
+
+    /// `localtime` fills the guest's `tm` in KST. The expected fields are calendar facts, not this
+    /// code's output: the date library under it was swapped (chrono → jiff, with RustJava 0.5.1).
+    #[test]
+    fn localtime_fills_tm_in_kst() -> Result<()> {
+        let mut core = ArmCore::new(false, None)?;
+        Allocator::init(&mut core)?;
+        let ptr_time = Allocator::alloc(&mut core, 4)?;
+
+        // sec, min, hour, mday, mon (0-based), year - 1900, wday (0 = Sunday), day of year (1-based, as before), dst, offset
+        for (time, expected) in [
+            (0u32, [0u32, 0, 9, 1, 0, 70, 4, 1, 0, 32_400]),             // 1970-01-01 09:00:00 KST, a Thursday
+            (1_000_000_000, [40, 46, 10, 9, 8, 101, 0, 252, 0, 32_400]), // 2001-09-09 10:46:40 KST, a Sunday
+        ] {
+            write_generic(&mut core, ptr_time, time)?;
+            let tm = localtime(&mut core, &mut (), ptr_time).now_or_never().unwrap()?;
+            for (i, want) in expected.into_iter().enumerate() {
+                let got: u32 = read_generic(&core, tm + 4 * i as u32)?;
+                assert_eq!(got, want, "time {time}, tm word {i}");
+            }
+        }
+
+        Ok(())
+    }
 
     #[test]
     fn random_state_is_shared_by_system_clones_and_process_local() -> Result<()> {

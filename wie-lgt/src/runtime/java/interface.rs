@@ -7,9 +7,10 @@ use core::{
 use spin::Mutex;
 
 use jvm::{
-    ClassInstance, ClassInstanceRef, JavaError, JavaType, Jvm,
+    ClassInstance, ClassInstanceRef, JavaError, Jvm,
     runtime::{JavaLangClass, JavaLangClassLoader, JavaLangString},
 };
+use jvm_types::JavaType;
 use rustjava_runtime::classes::java::util::Vector;
 use wipi_types::lgt::java::{LgtJavaClass as RawJavaClass, LgtJavaClassDescriptor as RawJavaClassDescriptor, LgtJavaClassLink as RawJavaClassLink};
 

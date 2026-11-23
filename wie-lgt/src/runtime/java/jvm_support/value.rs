@@ -83,7 +83,8 @@ mod tests {
         sync::atomic::Ordering,
     };
 
-    use jvm::{JavaType, JavaValue};
+    use jvm::JavaValue;
+    use jvm_types::JavaType;
     use wipi_types::lgt::java::{
         LgtJavaClass as RawJavaClass, LgtJavaClassDescriptor as RawJavaClassDescriptor, LgtJavaClassInstance as RawJavaClassInstance,
     };

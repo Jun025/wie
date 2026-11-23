@@ -1,8 +1,8 @@
 use alloc::{borrow::Cow, collections::BTreeMap, format, string::String, vec::Vec};
 use core::fmt::{self, Debug, Formatter};
 
-use jvm::{Field, JavaType, JavaValue};
-use jvm_types::FieldAccessFlags;
+use jvm::{Field, JavaValue};
+use jvm_types::{FieldAccessFlags, JavaType};
 use spin::Mutex;
 use wipi_types::lgt::java::LgtJavaClassField as RawJavaField;
 
@@ -155,7 +155,7 @@ impl JavaHostField {
             .lock()
             .get(&(core.id(), ptr_instance))
             .and_then(|fields| fields.get(&self.name).cloned())
-            .unwrap_or_else(|| JavaType::parse(&self.descriptor).default())
+            .unwrap_or_else(|| JavaValue::default_of(&JavaType::parse(&self.descriptor)))
     }
 
     pub fn put(&self, core: &ArmCore, ptr_instance: u32, value: JavaValue) {
