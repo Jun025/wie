@@ -862,7 +862,7 @@
    "contentKey": "zip:b2b5de7ea9bce1315f28b788495596a9",
    "platform": "KTF",
    "model": null,
-   "title": "던전앤파이터 격투가",
+   "title": "던전앤파이터 격투가편",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -876,8 +876,35 @@
    "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "던전앤파이터 격투가",
-   "game": "던전앤파이터 격투가",
-   "variant": null
+   "game": "던전앤파이터 격투가편",
+   "variant": null,
+   "sameTitle": "same-game"
+  },
+  {
+   "sha256": "739c7657c1f2fb9ade708d7552f58779e1b0666b5feb5e80713e4ace9d06b637",
+   "contentKey": "zip:b2b5de7ea9bce1315f28b788495596a9",
+   "platform": "KTF",
+   "model": null,
+   "title": "던전앤파이터 격투가편",
+   "status": "playable",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok",
+    "progress": "stuck"
+   },
+   "knownIssues_ko": [],
+   "playTips_ko": [
+    "처음 메뉴에서 아래 방향키로 «새로하기»를 고르고 저장 칸을 확인 키로 정한 뒤 초기화 확인은 숫자 1 키로 넘기면 거리를 방향키로 다닐 수 있어요."
+   ],
+   "changes": [],
+   "fileTitle": "던파격투가편",
+   "game": "던전앤파이터 격투가편",
+   "variant": null,
+   "sameTitle": "same-game"
   },
   {
    "sha256": "8b01d4ae6af4e61306a32288577f503f33ba47b4b84200df73258d065f0b2a23",
@@ -899,7 +926,31 @@
    "changes": [],
    "fileTitle": "던전앤파이터 귀검사",
    "game": "던전앤파이터 귀검사",
-   "variant": null
+   "variant": null,
+   "sameTitle": "same-game"
+  },
+  {
+   "sha256": "d60c34ffc9f60077839f0f2fc04bcdf89b27f82f82840fdb921a4f100175e1a1",
+   "contentKey": "zip:25be32d932cdd7911f4d0b8c4c838568",
+   "platform": "KTF",
+   "model": null,
+   "title": "던전앤파이터 귀검사",
+   "status": "playable",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok",
+    "progress": "ok"
+   },
+   "knownIssues_ko": [],
+   "changes": [],
+   "fileTitle": "던파귀검사2006",
+   "game": "던전앤파이터 귀검사",
+   "variant": null,
+   "sameTitle": "same-game"
   },
   {
    "sha256": "c7f543c73b9103d57b5e9e5b825e6bdb595de812fbccf81b718db8d2e94fa756",
@@ -974,53 +1025,6 @@
    "game": "던파거너편",
    "variant": null,
    "sameTitle": "same-game"
-  },
-  {
-   "sha256": "739c7657c1f2fb9ade708d7552f58779e1b0666b5feb5e80713e4ace9d06b637",
-   "contentKey": "zip:b2b5de7ea9bce1315f28b788495596a9",
-   "platform": "KTF",
-   "model": null,
-   "title": "던파격투가편",
-   "status": "playable",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "ok",
-    "sound": "ok",
-    "speed": "ok",
-    "progress": "stuck"
-   },
-   "knownIssues_ko": [],
-   "playTips_ko": [
-    "처음 메뉴에서 아래 방향키로 «새로하기»를 고르고 저장 칸을 확인 키로 정한 뒤 초기화 확인은 숫자 1 키로 넘기면 거리를 방향키로 다닐 수 있어요."
-   ],
-   "changes": [],
-   "fileTitle": "던파격투가편",
-   "game": "던파격투가편",
-   "variant": null
-  },
-  {
-   "sha256": "d60c34ffc9f60077839f0f2fc04bcdf89b27f82f82840fdb921a4f100175e1a1",
-   "contentKey": "zip:25be32d932cdd7911f4d0b8c4c838568",
-   "platform": "KTF",
-   "model": null,
-   "title": "던파귀검사2006",
-   "status": "playable",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "ok",
-    "sound": "ok",
-    "speed": "ok",
-    "progress": "ok"
-   },
-   "knownIssues_ko": [],
-   "changes": [],
-   "fileTitle": "던파귀검사2006",
-   "game": "던파귀검사2006",
-   "variant": null
   },
   {
    "sha256": "155972cac6641e918c62b9c18cc859a74bc5cbab48bb42cbb4068e31a95485ad",
@@ -8170,7 +8174,7 @@
    "contentKey": "zip:55e612d06e19932f2fab508aa777fd94",
    "platform": "SKT",
    "model": null,
-   "title": "당골왕",
+   "title": "당신은골프왕",
    "status": "playable",
    "axes": {
     "boot": "ok",
@@ -8184,8 +8188,9 @@
    "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "당골왕",
-   "game": "당골왕",
-   "variant": null
+   "game": "당신은골프왕",
+   "variant": null,
+   "sameTitle": "same-game"
   },
   {
    "sha256": "9e2307e4fa88b6ceba9ab387aea325d7011ea895eab12cba4d818f3e5711f1a9",
@@ -8207,7 +8212,8 @@
    "changes": [],
    "fileTitle": "당신은골프왕",
    "game": "당신은골프왕",
-   "variant": null
+   "variant": null,
+   "sameTitle": "same-game"
   },
   {
    "sha256": "3bafa1f1eed27d6819cefe6b6e2612a9373cabd81fec3f6db335ea641951a19c",

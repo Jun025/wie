@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-24",
+  "task": "wie-featurephone-identical-content-three-pairs-listed-under-different-game-names",
+  "title": "안쪽 파일이 전부 같은 3쌍을 지원 목록에서 한 이름으로 맞췄다",
+  "summary": "지문(contentKey)이 같은데 game 이 갈린 묶음을 다시 재니 3묶음 그대로였다(21묶음 중 3). 세 쌍 모두 꾸러미 안 항목이 이름과 내용까지 전부 같고 설명 파일도 같다. scripts/player-data.mjs 의 SAME_NAME_HAND 에 4행, SAME_GAME 에 3묶음을 더하고 normalize 로 docs/player-data/compat.json 을 다시 만들었다. 행 429 불변 · sha256 집합 불변 · distinct game 364 → 361 · 바뀐 행 6(title 이 바뀐 행 4) · status 와 축 값 변경 0. docs/report/0587.",
+  "changes": [
+    "scripts/player-data.mjs: SAME_NAME_HAND 4행 · SAME_GAME 3묶음",
+    "docs/player-data/compat.json: normalize 결과(6행의 title · game · sameTitle 과 행 순서)",
+    "docs/report/0587"
+  ],
+  "limits": "규칙과 검사기 코드는 바꾸지 않았다. 셸(otterpebble)은 고치지 않았다. 셸 첫 화면의 게임 수 표시가 3 줄어드는 것이 셸 시각 회귀 기준에 미치는 영향은 0587 에 적었다.",
+  "proposals": [],
+  "adoptedProposals": ["2026-11-22-featurephone-content-fingerprint#p0"],
+  "declinedProposals": [],
+  "proposalsNote": "제안 0."
+}
