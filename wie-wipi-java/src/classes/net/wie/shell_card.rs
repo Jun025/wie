@@ -846,7 +846,7 @@ mod test {
                         let s: ClassInstanceRef<String> = jvm
                             .invoke_virtual(&field, "org/kwis/msp/lwc/TextComponent", "getString", "()Ljava/lang/String;", ())
                             .await?;
-                        JvmResult::Ok(JavaLangString::to_rust_string(&jvm, &s).await?)
+                        JavaLangString::to_rust_string(&jvm, &s).await
                     }
                 };
                 let press = |code: WIPIKeyCode| {

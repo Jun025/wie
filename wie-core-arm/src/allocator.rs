@@ -17,6 +17,10 @@ pub struct Allocator;
 
 impl Allocator {
     pub fn init(core: &mut ArmCore) -> Result<()> {
+        // fork: the whole heap stays mapped, as it was before the 2026-11-23 upstream merge. Upstream
+        // commits heap pages as allocations reach them (the `map` calls in the two allocators, no-ops
+        // here), which turns a guest read or write of heap it never allocated into a fault — titles
+        // were measured with that access succeeding.
         core.map(HEAP_BASE, HEAP_SIZE)?;
 
         ListAllocator::init(core, HEAP_BASE, HEAP_SIZE / 2)?;
@@ -62,14 +66,26 @@ impl Allocator {
 
 #[cfg(test)]
 mod tests {
-    use wie_util::Result;
+    use wie_util::{Result, read_generic};
 
-    use crate::{Allocator, ArmCore};
+    use crate::{
+        Allocator, ArmCore,
+        core::{HEAP_BASE, HEAP_SIZE},
+    };
 
     #[test]
     fn allocation_status_tracks_bucket_and_list_allocations() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
+        assert_eq!(
+            read_generic::<u32, _>(&core, HEAP_BASE + HEAP_SIZE / 4)?,
+            0,
+            "heap the guest never allocated still reads (fork: the whole heap is mapped)"
+        );
 
         let bucket = Allocator::alloc(&mut core, 12)?;
         let list = Allocator::alloc(&mut core, 1024)?;
@@ -88,7 +104,11 @@ mod tests {
     // A block goes back to the allocator that owns its address, whatever size the caller claims.
     #[test]
     fn free_follows_the_address_not_the_size() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
 
         let list = Allocator::alloc(&mut core, 1024)?;

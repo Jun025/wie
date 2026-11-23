@@ -1,17 +1,17 @@
 #![no_std]
 extern crate alloc;
 
+mod aot;
 mod audio_sink;
 mod database;
 mod filesystem;
+mod host;
 mod indexed_db_store;
 mod util;
 mod window;
 
 use alloc::{
-    borrow::ToOwned,
     boxed::Box,
-    collections::BTreeMap,
     string::{String, ToString},
     sync::Arc,
     vec::Vec,
@@ -27,57 +27,30 @@ use tracing_web::MakeConsoleWriter;
 use wasm_bindgen::{JsError, prelude::*};
 use web_sys::HtmlCanvasElement;
 
-use wie_backend::{Emulator, Event, Font, FramePacer, Instant, KeyCode, Options, Platform, Screen, extract_zip};
-use wie_j2me::J2MEEmulator;
-use wie_ktf::KtfEmulator;
-use wie_lgt::LgtEmulator;
-use wie_skt::SktEmulator;
+use wie_backend::{
+    DatabaseRepository as BackendDatabaseRepository, Emulator, Event, Filesystem, Font, FramePacer, Instant, KeyCode, Options, Platform, Screen,
+};
 
 use self::{
     audio_sink::{AudioPlayer, AudioSink},
     database::DatabaseRepository,
     filesystem::WebFilesystem,
+    host::WasmHost,
     window::WindowImpl,
 };
 
-enum ArchivePlatform {
-    Ktf,
-    Lgt,
-    Skt,
-}
-
-fn parse_archive(buf: &[u8]) -> anyhow::Result<(ArchivePlatform, BTreeMap<String, Vec<u8>>)> {
-    let files = extract_zip(buf)?;
-
-    if !files.keys().any(|name| name.to_ascii_lowercase().ends_with(".jar")) {
-        anyhow::bail!("Archive does not contain a JAR file");
-    }
-
-    let platform = if KtfEmulator::loadable_archive(&files) {
-        ArchivePlatform::Ktf
-    } else if LgtEmulator::loadable_archive(&files) {
-        ArchivePlatform::Lgt
-    } else if SktEmulator::loadable_archive(&files) {
-        ArchivePlatform::Skt
-    } else {
-        anyhow::bail!("Unknown archive format");
-    };
-
-    Ok((platform, files))
-}
-
-fn jar_app_id<'a>(filename: &'a str, buf: &[u8]) -> &'a str {
-    if KtfEmulator::loadable_jar(buf) || LgtEmulator::loadable_jar(buf) || SktEmulator::loadable_jar(buf) {
-        &filename[..filename.len() - 4]
-    } else {
-        filename
-    }
+#[wasm_bindgen(module = "panic.ts")]
+extern "C" {
+    #[wasm_bindgen(js_name = recordPanic)]
+    fn record_panic(message: &str);
 }
 
 struct WieWebPlatform {
     audio_player: AudioPlayer,
-    database_repository: DatabaseRepository,
-    filesystem: WebFilesystem,
+    database_repository: Box<dyn BackendDatabaseRepository>,
+    filesystem: Box<dyn Filesystem>,
+    host: Option<WasmHost>,
+    exited: Arc<AtomicBool>,
     font: Font,
     window: WindowImpl,
 }
@@ -87,11 +60,17 @@ unsafe impl Sync for WieWebPlatform {}
 unsafe impl Send for WieWebPlatform {}
 
 impl WieWebPlatform {
-    fn new(window: WindowImpl, font: Font, audio_player: AudioPlayer) -> Self {
+    fn new(window: WindowImpl, font: Font, audio_player: AudioPlayer, host: Option<WasmHost>, exited: Arc<AtomicBool>) -> Self {
+        let (database_repository, filesystem): (Box<dyn BackendDatabaseRepository>, Box<dyn Filesystem>) = match &host {
+            Some(host) => (Box::new(host.clone()), Box::new(host.clone())),
+            None => (Box::new(DatabaseRepository::new()), Box::new(WebFilesystem::new())),
+        };
         Self {
             audio_player,
-            database_repository: DatabaseRepository::new(),
-            filesystem: WebFilesystem::new(),
+            database_repository,
+            filesystem,
+            host,
+            exited,
             font,
             window,
         }
@@ -108,18 +87,17 @@ impl Platform for WieWebPlatform {
     }
 
     fn now(&self) -> Instant {
-        let date = js_sys::Date::new_0();
-        let millis = date.value_of();
+        let millis = self.host.as_ref().map_or_else(js_sys::Date::now, WasmHost::now);
 
         Instant::from_epoch_millis(millis as _)
     }
 
-    fn database_repository(&self) -> &dyn wie_backend::DatabaseRepository {
-        &self.database_repository
+    fn database_repository(&self) -> &dyn BackendDatabaseRepository {
+        self.database_repository.as_ref()
     }
 
-    fn filesystem(&self) -> &dyn wie_backend::Filesystem {
-        &self.filesystem
+    fn filesystem(&self) -> &dyn Filesystem {
+        self.filesystem.as_ref()
     }
 
     fn audio_sink(&self) -> Box<dyn wie_backend::AudioSink> {
@@ -136,9 +114,16 @@ impl Platform for WieWebPlatform {
         tracing::info!("{}", string);
     }
 
-    fn exit(&self) {}
+    fn exit(&self) {
+        self.exited.store(true, Ordering::SeqCst);
+    }
 
     fn vibrate(&self, duration_ms: u64, intensity: u8) {
+        if let Some(host) = &self.host {
+            host.vibrate(duration_ms as f64, intensity);
+            return;
+        }
+
         if duration_ms == 0 || intensity == 0 {
             return;
         }
@@ -157,6 +142,8 @@ impl Platform for WieWebPlatform {
 pub struct WieWeb {
     emulator: Box<dyn Emulator>,
     audio_player: AudioPlayer,
+    host: Option<WasmHost>,
+    exited: Arc<AtomicBool>,
     should_redraw: Arc<AtomicBool>,
     key_events: HashMap<KeyCode, f64>,
     pacer: FramePacer,
@@ -196,105 +183,65 @@ impl ImportedAppMetadata {
 
 #[wasm_bindgen(js_name = extractAppMetadata)]
 pub fn extract_app_metadata(filename: &str, buf: &[u8]) -> Result<ImportedAppMetadata, JsError> {
-    let lowercase_filename = filename.to_ascii_lowercase();
-    let metadata = if lowercase_filename.ends_with(".zip") {
-        let (platform, files) = parse_archive(buf).map_err(|error| JsError::new(&error.to_string()))?;
-        match platform {
-            ArchivePlatform::Ktf => KtfEmulator::archive_id(&files)
-                .zip(KtfEmulator::archive_title(&files))
-                .map(|(id, title)| (id, title, KtfEmulator::archive_icon(&files))),
-            ArchivePlatform::Lgt => LgtEmulator::archive_id(&files)
-                .zip(LgtEmulator::archive_title(&files))
-                .map(|(id, title)| (id, title, LgtEmulator::archive_icon(&files))),
-            ArchivePlatform::Skt => SktEmulator::archive_id(&files)
-                .zip(SktEmulator::archive_title(&files))
-                .map(|(id, title)| (id, title, SktEmulator::archive_icon(&files))),
-        }
-    } else if lowercase_filename.ends_with(".jar") {
-        let filename = filename.rsplit('/').next().unwrap();
-        J2MEEmulator::jar_metadata(buf)
-            .map_err(|error| JsError::new(&error.to_string()))?
-            .map(|(title, icon)| (jar_app_id(filename, buf).to_owned(), title, icon))
-    } else {
-        return Err(JsError::new("Unknown file format"));
-    };
-    let (id, title, icon) = metadata.ok_or_else(|| JsError::new("App metadata does not contain an ID, title or entry point"))?;
-
+    let file_type = wie::determine_file_type(filename, buf).map_err(|error| JsError::new(&error.to_string()))?;
+    let metadata = wie::extract_app_metadata(filename, buf, file_type).map_err(|error| JsError::new(&error.to_string()))?;
     Ok(ImportedAppMetadata {
-        id,
-        title,
-        icon: icon.unwrap_or_default(),
+        id: metadata.id,
+        title: metadata.title,
+        icon: metadata.icon.unwrap_or_default(),
     })
+}
+
+#[wasm_bindgen(js_name = appPlatform)]
+pub fn app_platform(filename: &str, buf: &[u8]) -> Result<String, JsError> {
+    let file_type = wie::determine_file_type(filename, buf).map_err(|error| JsError::new(&error.to_string()))?;
+    Ok(file_type.name().into())
 }
 
 #[wasm_bindgen]
 impl WieWeb {
     #[wasm_bindgen(constructor)]
-    pub fn new(filename: &str, buf: &[u8], canvas: HtmlCanvasElement, font_data: Vec<u8>) -> Result<WieWeb, JsError> {
-        let audio_player = AudioPlayer::new();
-        let result = (|| {
+    pub fn new(
+        filename: &str,
+        buf: &[u8],
+        canvas: HtmlCanvasElement,
+        font_data: Vec<u8>,
+        audio_player: AudioPlayer,
+        host: Option<WasmHost>,
+    ) -> Result<WieWeb, JsError> {
+        (|| {
             let should_redraw = Arc::new(AtomicBool::new(true));
+            let exited = Arc::new(AtomicBool::new(false));
             let window = WindowImpl::new(canvas, should_redraw.clone());
             let font = Font::try_from_vec(font_data)?;
-            let platform = Box::new(WieWebPlatform::new(window, font, audio_player.clone()));
+            let platform = Box::new(WieWebPlatform::new(window, font, audio_player.clone(), host.clone(), exited.clone()));
             let options = Options {
                 enable_gdbserver: false,
+                aot: Some(Box::new(aot::WasmExecutor::default())),
                 profile: None,
             };
 
-            let emulator: Box<dyn Emulator> = if filename.to_ascii_lowercase().ends_with(".zip") {
-                let (archive_platform, files) = parse_archive(buf)?;
-
-                match archive_platform {
-                    ArchivePlatform::Ktf => Box::new(KtfEmulator::from_archive(platform, files, options)?),
-                    ArchivePlatform::Lgt => Box::new(LgtEmulator::from_archive(platform, files, options)?),
-                    ArchivePlatform::Skt => Box::new(SktEmulator::from_archive(platform, files)?),
-                }
-            } else if filename.to_ascii_lowercase().ends_with(".jar") {
-                let filename_without_path = filename.rsplit('/').next().unwrap().to_owned();
-                let app_id = jar_app_id(&filename_without_path, buf);
-
-                if KtfEmulator::loadable_jar(buf) {
-                    Box::new(KtfEmulator::from_jar(
-                        platform,
-                        &filename_without_path,
-                        buf.to_vec(),
-                        app_id,
-                        app_id,
-                        None,
-                        options,
-                    )?)
-                } else if LgtEmulator::loadable_jar(buf) {
-                    Box::new(LgtEmulator::from_jar(
-                        platform,
-                        &filename_without_path,
-                        buf.to_vec(),
-                        app_id,
-                        app_id,
-                        None,
-                        options,
-                    )?)
-                } else if SktEmulator::loadable_jar(buf) {
-                    Box::new(SktEmulator::from_jar(platform, &filename_without_path, buf.to_vec(), app_id, None)?)
-                } else {
-                    Box::new(J2MEEmulator::from_jar(platform, &filename_without_path, buf.to_vec())?)
-                }
-            } else {
-                anyhow::bail!("Unknown file format");
-            };
+            let emulator = wie::load_emulator(filename, buf.to_vec(), platform, options)?;
 
             anyhow::Ok(Self {
                 emulator,
-                audio_player: audio_player.clone(),
+                audio_player,
+                host,
+                exited,
                 should_redraw,
                 key_events: HashMap::new(),
                 pacer: FramePacer::new(),
             })
-        })();
-        if result.is_err() {
-            audio_player.dispose();
-        }
-        result.map_err(|e| JsError::new(&e.to_string()))
+        })()
+        .map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    pub fn is_preparing(&self) -> bool {
+        self.emulator.is_preparing()
+    }
+
+    pub fn is_exited(&self) -> bool {
+        self.exited.load(Ordering::SeqCst)
     }
 
     pub fn update(&mut self) -> Result<(), JsError> {
@@ -303,8 +250,7 @@ impl WieWeb {
             self.should_redraw.store(false, Ordering::SeqCst)
         }
 
-        let date = js_sys::Date::new_0();
-        let millis = date.value_of();
+        let millis = self.host.as_ref().map_or_else(js_sys::Date::now, WasmHost::now);
 
         for (key, key_millis) in self.key_events.iter_mut() {
             if millis - *key_millis > 100.0 {
@@ -320,8 +266,7 @@ impl WieWeb {
     }
 
     pub fn key_down(&mut self, key: String) -> Result<(), JsError> {
-        let date = js_sys::Date::new_0();
-        let millis = date.value_of();
+        let millis = self.host.as_ref().map_or_else(js_sys::Date::now, WasmHost::now);
         let key = KeyCode::parse(&key);
 
         self.emulator.handle_event(Event::Keydown(key));
@@ -338,15 +283,14 @@ impl WieWeb {
 
         Ok(())
     }
-
-    pub fn set_pcm_volume(&self, volume: f32) {
-        audio_sink::set_pcm_volume(volume);
-    }
 }
 
 #[wasm_bindgen(start)]
 pub fn start() {
-    console_error_panic_hook::set_once();
+    extern crate std;
+    use std::panic;
+
+    panic::set_hook(Box::new(|info| record_panic(&info.to_string())));
 
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_ansi(false)

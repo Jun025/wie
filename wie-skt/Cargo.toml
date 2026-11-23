@@ -24,3 +24,4 @@ jvm = { workspace = true }
 
 [dev-dependencies]
 test-utils = { workspace = true }
+zip = { workspace = true }

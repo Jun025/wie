@@ -13,7 +13,7 @@ use wie_backend::{Event, text_layout::wrap};
 use wie_jvm_support::{JvmSupport, WieJavaClassProto, WieJvmContext};
 
 use crate::classes::javax::microedition::{
-    lcdui::{Alert, Displayable, Graphics, Image, Ticker},
+    lcdui::{Alert, Displayable, Graphics, Image, Item, Ticker},
     midlet::MIDlet,
 };
 
@@ -22,6 +22,8 @@ const TITLE_HORIZONTAL_PADDING: i32 = 4;
 const TITLE_VERTICAL_PADDING: i32 = 2;
 const TICKER_HEIGHT: i32 = 16;
 const TICKER_INTERVAL_MS: u64 = 100;
+// fork: upstream makes the command band 16 on an SKVM Canvas (#1581). Ours is 18 everywhere — the height a
+// Canvas with commands reports is what the support list was measured with.
 const SOFTKEY_HEIGHT: i32 = 18;
 // Full mark-and-sweep cost ~10ms per paint on 배틀몬스터's heap, a fifth of its frame budget.
 // Garbage now lives up to this long; before upstream `95555afe` it lived until the guest called gc().
@@ -61,6 +63,7 @@ impl Display {
             parent_class: Some("java/lang/Object"),
             interfaces: vec![],
             methods: vec![
+                JavaMethodProto::new("<clinit>", "()V", Self::cl_init, MethodAccessFlags::STATIC),
                 JavaMethodProto::new("<init>", "()V", Self::init, MethodAccessFlags::empty()),
                 JavaMethodProto::new(
                     "setCurrent",
@@ -84,6 +87,20 @@ impl Display {
                 JavaMethodProto::new("getHeight", "()I", Self::get_height, MethodAccessFlags::empty()),
                 JavaMethodProto::new("callSerially", "(Ljava/lang/Runnable;)V", Self::call_serially, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("vibrate", "(I)Z", Self::vibrate, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("isColor", "()Z", Self::is_color, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("flashBacklight", "(I)Z", Self::flash_backlight, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("numAlphaLevels", "()I", Self::num_alpha_levels, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("numColors", "()I", Self::num_colors, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getColor", "(I)I", Self::get_color, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getBorderStyle", "(Z)I", Self::get_border_style, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getBestImageWidth", "(I)I", Self::get_best_image_width, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getBestImageHeight", "(I)I", Self::get_best_image_height, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new(
+                    "setCurrentItem",
+                    "(Ljavax/microedition/lcdui/Item;)V",
+                    Self::set_current_item,
+                    MethodAccessFlags::PUBLIC,
+                ),
                 JavaMethodProto::new(
                     "getDisplay",
                     "(Ljavax/microedition/midlet/MIDlet;)Ljavax/microedition/lcdui/Display;",
@@ -109,7 +126,7 @@ impl Display {
                     "getScreenGraphics",
                     "()Ljavax/microedition/lcdui/Graphics;",
                     Self::screen_graphics,
-                    MethodAccessFlags::empty(),
+                    MethodAccessFlags::STATIC,
                 ),
                 JavaMethodProto::new(
                     "getContentHeight",
@@ -130,8 +147,18 @@ impl Display {
             fields: vec![
                 JavaFieldProto::new("isInFullScreenMode", "Z", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("currentDisplayable", "Ljavax/microedition/lcdui/Displayable;", FieldAccessFlags::PRIVATE),
-                JavaFieldProto::new("screenImage", "Ljavax/microedition/lcdui/Image;", FieldAccessFlags::PRIVATE),
-                JavaFieldProto::new("screenGraphics", "Ljavax/microedition/lcdui/Graphics;", FieldAccessFlags::PRIVATE),
+                // The Canvas whose hideNotify is running, so a switch made from inside it does not call it again.
+                JavaFieldProto::new("hidingDisplayable", "Ljavax/microedition/lcdui/Displayable;", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new(
+                    "screenImage",
+                    "Ljavax/microedition/lcdui/Image;",
+                    FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC,
+                ),
+                JavaFieldProto::new(
+                    "screenGraphics",
+                    "Ljavax/microedition/lcdui/Graphics;",
+                    FieldAccessFlags::PRIVATE | FieldAccessFlags::STATIC,
+                ),
                 JavaFieldProto::new("width", "I", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("height", "I", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("paintDisabled", "Z", FieldAccessFlags::PRIVATE),
@@ -152,20 +179,15 @@ impl Display {
         }
     }
 
-    async fn init(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
-        tracing::debug!("javax.microedition.lcdui.Display::<init>({this:?})");
+    async fn cl_init(jvm: &Jvm, context: &mut WieJvmContext) -> JvmResult<()> {
+        tracing::debug!("javax.microedition.lcdui.Display::<clinit>()");
 
-        let _: () = jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await?;
-
+        // Vendor APIs can access the shared screen before a MIDlet is constructed.
         let (width, height) = {
             let platform = context.system().platform();
             let screen = platform.screen();
             (screen.width() as i32, screen.height() as i32)
         };
-
-        jvm.put_field(&mut this, "javax/microedition/lcdui/Display", "width", "I", width).await?;
-        jvm.put_field(&mut this, "javax/microedition/lcdui/Display", "height", "I", height)
-            .await?;
 
         let screen_image = jvm
             .invoke_static(
@@ -185,22 +207,36 @@ impl Display {
             )
             .await?;
 
-        jvm.put_field(
-            &mut this,
+        jvm.put_static_field(
             "javax/microedition/lcdui/Display",
             "screenImage",
             "Ljavax/microedition/lcdui/Image;",
             screen_image,
         )
         .await?;
-        jvm.put_field(
-            &mut this,
+        jvm.put_static_field(
             "javax/microedition/lcdui/Display",
             "screenGraphics",
             "Ljavax/microedition/lcdui/Graphics;",
             screen_graphics,
         )
         .await?;
+
+        Ok(())
+    }
+
+    async fn init(jvm: &Jvm, context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
+        tracing::debug!("javax.microedition.lcdui.Display::<init>({this:?})");
+
+        let _: () = jvm.invoke_special(&this, "java/lang/Object", "<init>", "()V", ()).await?;
+        let (width, height) = {
+            let platform = context.system().platform();
+            let screen = platform.screen();
+            (screen.width() as i32, screen.height() as i32)
+        };
+        jvm.put_field(&mut this, "javax/microedition/lcdui/Display", "width", "I", width).await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/Display", "height", "I", height)
+            .await?;
 
         Ok(())
     }
@@ -454,7 +490,31 @@ impl Display {
         let same_displayable = !old_displayable.is_null() && !displayable.is_null() && old_displayable.identity() == displayable.identity();
         const CANVAS: &str = "javax/microedition/lcdui/Canvas";
         if !old_displayable.is_null() && !same_displayable && jvm.is_instance(&**old_displayable, CANVAS) {
-            let _: () = jvm.invoke_virtual(&old_displayable, CANVAS, "hideNotify", "()V", ()).await?;
+            // A hideNotify that itself switches screens re-enters here with the same screen still current
+            // (it recursed until the host stack overflowed). It is told once, and the switch it made
+            // supersedes this one — the end upstream reaches by switching before the callback.
+            let hiding: ClassInstanceRef<Displayable> = jvm
+                .get_field(
+                    &this,
+                    "javax/microedition/lcdui/Display",
+                    "hidingDisplayable",
+                    "Ljavax/microedition/lcdui/Displayable;",
+                )
+                .await?;
+            if hiding.is_null() || hiding.identity() != old_displayable.identity() {
+                const HIDING: (&str, &str, &str) = (
+                    "javax/microedition/lcdui/Display",
+                    "hidingDisplayable",
+                    "Ljavax/microedition/lcdui/Displayable;",
+                );
+                jvm.put_field(&mut this, HIDING.0, HIDING.1, HIDING.2, old_displayable.clone()).await?;
+                let hidden: JvmResult<()> = jvm.invoke_virtual(&old_displayable, CANVAS, "hideNotify", "()V", ()).await;
+                jvm.put_field(&mut this, HIDING.0, HIDING.1, HIDING.2, None).await?;
+                hidden?;
+                if !Self::is_current(jvm, &this, &old_displayable).await? {
+                    return Ok(());
+                }
+            }
         }
         if !old_displayable.is_null() && !same_displayable {
             let _: () = jvm
@@ -527,6 +587,23 @@ impl Display {
         repaint_result?;
 
         Ok(())
+    }
+
+    async fn is_current(jvm: &Jvm, this: &ClassInstanceRef<Self>, displayable: &ClassInstanceRef<Displayable>) -> JvmResult<bool> {
+        let current: ClassInstanceRef<Displayable> = jvm
+            .get_field(
+                this,
+                "javax/microedition/lcdui/Display",
+                "currentDisplayable",
+                "Ljavax/microedition/lcdui/Displayable;",
+            )
+            .await?;
+
+        Ok(if current.is_null() || displayable.is_null() {
+            current.is_null() && displayable.is_null()
+        } else {
+            current.identity() == displayable.identity()
+        })
     }
 
     async fn schedule_alert_timeout(jvm: &Jvm, context: &mut WieJvmContext, this: ClassInstanceRef<Self>, generation: i32) -> JvmResult<()> {
@@ -792,6 +869,65 @@ impl Display {
         Ok(true)
     }
 
+    async fn is_color(_jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<bool> {
+        tracing::warn!("stub javax.microedition.lcdui.Display::isColor({this:?})");
+
+        Ok(true)
+    }
+
+    async fn flash_backlight(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>, duration: i32) -> JvmResult<bool> {
+        tracing::warn!("stub javax.microedition.lcdui.Display::flashBacklight({this:?}, {duration})");
+
+        if duration < 0 {
+            return Err(jvm.exception("java/lang/IllegalArgumentException", "duration is negative").await);
+        }
+
+        Ok(false)
+    }
+
+    async fn num_alpha_levels(_jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::warn!("stub javax.microedition.lcdui.Display::numAlphaLevels({this:?})");
+
+        Ok(256)
+    }
+
+    async fn num_colors(_jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::warn!("stub javax.microedition.lcdui.Display::numColors({this:?})");
+
+        Ok(1 << 24)
+    }
+
+    async fn get_color(_jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>, color_specifier: i32) -> JvmResult<i32> {
+        tracing::warn!("stub javax.microedition.lcdui.Display::getColor({this:?}, {color_specifier})");
+
+        // COLOR_BACKGROUND and COLOR_HIGHLIGHTED_FOREGROUND are light, the rest are dark.
+        Ok(if matches!(color_specifier, 0 | 3) { WHITE } else { 0 })
+    }
+
+    async fn get_border_style(_jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>, highlighted: bool) -> JvmResult<i32> {
+        tracing::warn!("stub javax.microedition.lcdui.Display::getBorderStyle({this:?}, {highlighted})");
+
+        Ok(0) // Graphics.SOLID
+    }
+
+    async fn get_best_image_width(_jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>, image_type: i32) -> JvmResult<i32> {
+        tracing::warn!("stub javax.microedition.lcdui.Display::getBestImageWidth({this:?}, {image_type})");
+
+        Ok(16)
+    }
+
+    async fn get_best_image_height(_jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>, image_type: i32) -> JvmResult<i32> {
+        tracing::warn!("stub javax.microedition.lcdui.Display::getBestImageHeight({this:?}, {image_type})");
+
+        Ok(16)
+    }
+
+    async fn set_current_item(_jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>, item: ClassInstanceRef<Item>) -> JvmResult<()> {
+        tracing::warn!("stub javax.microedition.lcdui.Display::setCurrentItem({this:?}, {item:?})");
+
+        Ok(())
+    }
+
     async fn repaint(
         jvm: &Jvm,
         context: &mut WieJvmContext,
@@ -1020,8 +1156,7 @@ impl Display {
             )
             .await?;
         let screen_graphics: ClassInstanceRef<Graphics> = jvm
-            .get_field(
-                &this,
+            .get_static_field(
                 "javax/microedition/lcdui/Display",
                 "screenGraphics",
                 "Ljavax/microedition/lcdui/Graphics;",
@@ -1143,12 +1278,7 @@ impl Display {
         // flushes an off-screen buffer leaves it unchanged and is not repainted over.
         let disable_paint: bool = jvm.get_field(&this, "javax/microedition/lcdui/Display", "paintDisabled", "Z").await?;
         let screen_image: ClassInstanceRef<Image> = jvm
-            .get_field(
-                &this,
-                "javax/microedition/lcdui/Display",
-                "screenImage",
-                "Ljavax/microedition/lcdui/Image;",
-            )
+            .get_static_field("javax/microedition/lcdui/Display", "screenImage", "Ljavax/microedition/lcdui/Image;")
             .await?;
         let mut native_drawn = false;
         if context.system().has_screen_compositor() {
@@ -1320,11 +1450,10 @@ impl Display {
         Ok(())
     }
 
-    async fn screen_graphics(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<Graphics>> {
-        tracing::debug!("javax.microedition.lcdui.Display::getScreenGraphics({this:?})");
+    async fn screen_graphics(jvm: &Jvm, _context: &mut WieJvmContext) -> JvmResult<ClassInstanceRef<Graphics>> {
+        tracing::debug!("javax.microedition.lcdui.Display::getScreenGraphics()");
 
-        jvm.get_field(
-            &this,
+        jvm.get_static_field(
             "javax/microedition/lcdui/Display",
             "screenGraphics",
             "Ljavax/microedition/lcdui/Graphics;",
@@ -2552,8 +2681,7 @@ mod test {
 
             let display: ClassInstanceRef<Display> = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?.into();
             let mut graphics: ClassInstanceRef<Graphics> = jvm
-                .invoke_virtual(
-                    &display,
+                .invoke_static(
                     "javax/microedition/lcdui/Display",
                     "getScreenGraphics",
                     "()Ljavax/microedition/lcdui/Graphics;",
@@ -2782,8 +2910,7 @@ mod test {
                 .invoke_virtual(&display, "javax/microedition/lcdui/Display", "handlePaintEvent", "()V", ())
                 .await?;
             let mut graphics: ClassInstanceRef<Graphics> = jvm
-                .invoke_virtual(
-                    &display,
+                .invoke_static(
                     "javax/microedition/lcdui/Display",
                     "getScreenGraphics",
                     "()Ljavax/microedition/lcdui/Graphics;",

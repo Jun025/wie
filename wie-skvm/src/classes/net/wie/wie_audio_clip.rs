@@ -437,7 +437,10 @@ mod test {
     /// A minimal SMAF: one `SEQU` chunk, two notes 50 × 20 ms apart, then end of stream.
     fn smaf() -> Vec<u8> {
         let sequence = [0x00, 0x01, 0x0a, 0x32, 0x01, 0x0a, 0, 0, 0, 0];
-        let mut smaf = b"MMMD\0\0\0\0SEQU".to_vec();
+        // The header carries the real length: `smaf` 0.1.4 reads only that much (0.1.2 ignored it).
+        let mut smaf = b"MMMD".to_vec();
+        smaf.extend_from_slice(&(8 + sequence.len() as u32 + 2).to_be_bytes());
+        smaf.extend_from_slice(b"SEQU");
         smaf.extend_from_slice(&(sequence.len() as u32).to_be_bytes());
         smaf.extend_from_slice(&sequence);
         smaf.extend_from_slice(&[0, 0]);
@@ -474,9 +477,9 @@ mod test {
             let formats: ClassInstanceRef<Array<String>> = jvm
                 .invoke_static("com/skt/m/AudioSystem", "getClipFormats", "()[Ljava/lang/String;", ())
                 .await?;
-            assert_eq!(jvm.array_length(&formats).await?, 0);
+            assert_eq!(jvm.array_length(&formats).await?, 1); // upstream: ["mmf"], the one format getAudioClip takes
 
-            let name = JavaLangString::from_rust_string(&jvm, "audio/mpeg").await?;
+            let name = JavaLangString::from_rust_string(&jvm, "mmf").await?;
             let clip: ClassInstanceRef<AudioClip> = jvm
                 .invoke_static(
                     "com/skt/m/AudioSystem",

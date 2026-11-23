@@ -163,7 +163,7 @@ pub(super) async fn fire(core: &mut ArmCore, hook_pc: u32, kind: HookKind, displ
     };
 
     // The title's own code, then back to the fire.
-    core.write_bytes(site, &displaced)?;
+    core.write_code(site, &displaced)?;
     core.inner.lock().engine.reg_write(ArmRegister::PC, hook_pc);
     let own = run_to(core, end).then(|| state(core));
     core.write_bytes(base, &before)?;
@@ -171,7 +171,7 @@ pub(super) async fn fire(core: &mut ArmCore, hook_pc: u32, kind: HookKind, displ
         core.write_bytes(base, bytes)?;
     }
     core.restore_context(&entry);
-    core.write_bytes(site, &[0x80, 0xdf])?;
+    core.write_code(site, &[0x80, 0xdf])?;
     if own.is_none() {
         counts[OWN_FAULT].fetch_add(1, Relaxed);
         note(format!("OWN-FAULT {} site={site:#x}", KINDS[k]));

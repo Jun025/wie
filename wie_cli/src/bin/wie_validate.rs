@@ -528,6 +528,10 @@ impl DbStats {
 
 #[async_trait::async_trait]
 impl DatabaseRepository for MemDbRepository {
+    async fn create(&self, name: &str, app_id: &str) {
+        self.store.lock().unwrap().entry((app_id.to_string(), name.to_string())).or_default();
+    }
+
     async fn open(&self, name: &str, app_id: &str) -> Box<dyn Database> {
         let key = (app_id.to_string(), name.to_string());
         self.store.lock().unwrap().entry(key.clone()).or_default();
@@ -1948,6 +1952,7 @@ fn build_emulator(
 ) -> std::result::Result<(Box<dyn Emulator>, String), (String, String)> {
     let options = Options {
         enable_gdbserver: false,
+        aot: None, // interpreter only: adopting upstream's ARM AOT is a separate, measured round
         profile,
     };
 
@@ -1981,7 +1986,7 @@ fn build_emulator(
             let e = LgtEmulator::from_jar(platform, &name, buf, stem, stem, None, options).map_err(|e| ("lgt".to_string(), format!("{e}")))?;
             Ok((Box::new(e), "lgt".into()))
         } else if SktEmulator::loadable_jar(&buf) {
-            let e = SktEmulator::from_jar(platform, &name, buf, stem, None).map_err(|e| ("skt".to_string(), format!("{e}")))?;
+            let e = SktEmulator::from_jar(platform, &name, buf, stem).map_err(|e| ("skt".to_string(), format!("{e}")))?;
             Ok((Box::new(e), "skt".into()))
         } else {
             let e = J2MEEmulator::from_jar(platform, &name, buf).map_err(|e| ("j2me".to_string(), format!("{e}")))?;

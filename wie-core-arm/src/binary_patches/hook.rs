@@ -246,7 +246,7 @@ pub fn apply_hooks(core: &mut ArmCore, entry_name: &str, hooks: &[Hook]) -> Resu
         core.read_bytes(patch_addr, &mut displaced)?;
         registry.insert(hook.pc, (hook.kind, displaced));
         let instruction: u16 = 0xdf00 | (BINARY_PATCH_SVC as u16 & 0xff);
-        core.write_bytes(patch_addr, &instruction.to_le_bytes())?;
+        core.write_code(patch_addr, &instruction.to_le_bytes())?;
         tracing::info!("Hook installed at {:#x}: {:?}", hook.pc, hook.kind);
     }
     if !hooks.is_empty() {
@@ -402,7 +402,7 @@ fn copy_as_byte_loop(core: &mut ArmCore, dst: u32, src: u32, len: u32) -> Result
 /// from this fire on.
 fn unhook(core: &mut ArmCore, hook_pc: u32, displaced: [u8; 2]) -> Result<JumpTo> {
     tracing::warn!("hook at {hook_pc:#x}: a copy the host cannot carry out; the loop is left to run itself");
-    core.write_bytes(hook_pc & !1, &displaced)?;
+    core.write_code(hook_pc & !1, &displaced)?;
     Ok(JumpTo(hook_pc))
 }
 
@@ -518,7 +518,11 @@ mod tests {
                 kind: HookKind::Memcpy,
             }],
         );
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         core.map(0x2000, 0x1000)?;
 
         let err = resolve_hooks(&mut core, &entry, &[]).unwrap_err();
@@ -536,7 +540,11 @@ mod tests {
                 kind: HookKind::Memcpy,
             }],
         );
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         core.map(0x2000, 0x1000)?;
         core.write_bytes(0x2000, &[0xaa, 0xbb])?;
 
@@ -551,7 +559,11 @@ mod tests {
 
     #[futures_test::test]
     async fn memcpy_dispatch_copies_bytes_and_returns_via_lr() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         core.map(0x10000, 0x1000)?;
 
         let src = 0x10000u32;
@@ -581,7 +593,11 @@ mod tests {
 
     #[futures_test::test]
     async fn memset_dispatch_fills_bytes() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         core.map(0x10000, 0x1000)?;
 
         let dst = 0x10000u32;
@@ -607,7 +623,11 @@ mod tests {
 
     #[futures_test::test]
     async fn strcpy_dispatch_copies_null_terminated_string_and_returns_via_lr() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         core.map(0x10000, 0x1000)?;
 
         let src = 0x10000u32;
@@ -643,7 +663,11 @@ mod tests {
 
     #[futures_test::test]
     async fn strlen_dispatch_returns_length_in_r0() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         core.map(0x10000, 0x1000)?;
 
         let str_ptr = 0x10100u32;
@@ -669,7 +693,11 @@ mod tests {
 
     #[futures_test::test]
     async fn inline_copy_dispatch_reads_frame_copies_and_jumps_to_exit() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         core.map(0x10000, 0x2000)?;
 
         let src = 0x10000u32;
@@ -730,7 +758,11 @@ mod tests {
     async fn own_and_installed(code: &[u8], data: &[u8], args: &[u32], installs: usize) -> Result<Vec<(u32, Vec<u8>)>> {
         let mut runs = Vec::new();
         for hooked in [false, true] {
-            let mut core = ArmCore::new(false, None)?;
+            let mut core = ArmCore::new(wie_backend::Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
             core.load(code, CODE, code.len())?;
             core.map(DATA, 0x2000)?;
             core.write_bytes(DATA, data)?;
@@ -905,7 +937,11 @@ mod tests {
     /// A guest stopped inside a Thumb routine at `CODE`, as `shadow::fire` finds it.
     #[cfg(not(target_arch = "wasm32"))]
     fn at_a_fire(code: &[u8], data: &[u8], site: u32) -> Result<ArmCore> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         core.load(code, CODE, code.len())?;
         core.map(DATA, 0x2000)?;
         core.write_bytes(DATA, data)?;
@@ -1009,7 +1045,11 @@ mod tests {
 
     #[futures_test::test]
     async fn install_then_execute_hits_dispatcher_end_to_end() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         core.map(0x20000, 0x2000)?;
         core.map(0x30000, 0x1000)?;
 
@@ -1080,7 +1120,11 @@ mod tests {
 
     #[test]
     fn pattern_scan_matches_single_hit() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         core.map(0x50000, 0x200)?;
 
         let pat_bytes = [0xaa, 0xbb, 0xcc, 0xdd];
@@ -1137,7 +1181,11 @@ mod tests {
 
     #[test]
     fn pattern_duplicate_pc_warns_once_and_skips() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         core.map(0x60000, 0x100)?;
         core.write_bytes(0x60010, &[0x11, 0x22, 0x33, 0x44])?;
 

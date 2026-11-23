@@ -10,7 +10,10 @@ use rustjava_runtime::classes::java::{lang::Object, util::Vector};
 
 use crate::classes::{
     net::wie::ShellCard,
-    org::kwis::msp::{lcdui::Graphics, lwc::EventListener},
+    org::kwis::msp::{
+        lcdui::{Card, Graphics},
+        lwc::EventListener,
+    },
 };
 
 // The javadoc's EventListener.eventNotify types (FOCUS_NOTIFY 1 · KEY_NOTIFY 3).
@@ -58,6 +61,32 @@ impl Component {
                     Self::set_event_listener,
                     MethodAccessFlags::PUBLIC,
                 ),
+                // upstream's Component signatures we did not carry (2026-11-23 merge) — stubs there and here.
+                // Appended, not interleaved, so nothing above moves. upstream's `focused` instance field
+                // is not taken: see evtListeners below.
+                JavaMethodProto::new("getXOnScreen", "()I", Self::get_x_on_screen, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getYOnScreen", "()I", Self::get_y_on_screen, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("canHandleInput", "()Z", Self::can_handle_input, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("isValid", "()Z", Self::is_valid, MethodAccessFlags::PROTECTED),
+                JavaMethodProto::new("calcPreferredSize", "(I)V", Self::calc_preferred_size, MethodAccessFlags::PROTECTED),
+                JavaMethodProto::new("getPreferredWidth", "()I", Self::get_preferred_width, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getPreferredHeight", "()I", Self::get_preferred_height, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new(
+                    "getPreferredHeight",
+                    "(I)I",
+                    Self::get_preferred_height_for_width,
+                    MethodAccessFlags::PUBLIC,
+                ),
+                JavaMethodProto::new(
+                    "paintContent",
+                    "(Lorg/kwis/msp/lcdui/Graphics;)V",
+                    Self::paint_content,
+                    MethodAccessFlags::PUBLIC,
+                ),
+                JavaMethodProto::new("invalidate", "()V", Self::invalidate, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("pointerNotify", "(III)Z", Self::pointer_notify, MethodAccessFlags::PROTECTED),
+                JavaMethodProto::new("processEvent", "(IIII)Z", Self::process_event, MethodAccessFlags::PROTECTED),
+                JavaMethodProto::new("getCard", "()Lorg/kwis/msp/lcdui/Card;", Self::get_card, MethodAccessFlags::PUBLIC),
             ],
             fields: vec![
                 JavaFieldProto::new("bg", "I", FieldAccessFlags::PRIVATE),
@@ -411,6 +440,91 @@ impl Component {
             .await?;
 
         Ok(!focused.is_null() && focused.identity() == this.identity())
+    }
+    async fn get_x_on_screen(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::getXOnScreen({this:?})");
+
+        Ok(0)
+    }
+
+    async fn get_y_on_screen(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::getYOnScreen({this:?})");
+
+        Ok(0)
+    }
+
+    async fn can_handle_input(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<bool> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::canHandleInput({this:?})");
+
+        Ok(false)
+    }
+
+    async fn is_valid(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<bool> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::isValid({this:?})");
+
+        Ok(false)
+    }
+
+    async fn calc_preferred_size(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, width: i32) -> JvmResult<()> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::calcPreferredSize({this:?}, {width:?})");
+
+        Ok(())
+    }
+
+    async fn get_preferred_width(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::getPreferredWidth({this:?})");
+
+        Ok(0)
+    }
+
+    async fn get_preferred_height(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<i32> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::getPreferredHeight({this:?})");
+
+        Ok(0)
+    }
+
+    async fn get_preferred_height_for_width(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, width: i32) -> JvmResult<i32> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::getPreferredHeight({this:?}, {width:?})");
+
+        Ok(0)
+    }
+
+    async fn paint_content(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, graphics: ClassInstanceRef<Graphics>) -> JvmResult<()> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::paintContent({this:?}, {graphics:?})");
+
+        Ok(())
+    }
+
+    async fn invalidate(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::invalidate({this:?})");
+
+        Ok(())
+    }
+
+    async fn pointer_notify(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, event_type: i32, x: i32, y: i32) -> JvmResult<bool> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::pointerNotify({this:?}, {event_type:?}, {x:?}, {y:?})");
+
+        Ok(false)
+    }
+
+    async fn process_event(
+        _: &Jvm,
+        _: &mut WieJvmContext,
+        this: ClassInstanceRef<Self>,
+        event_type: i32,
+        subtype: i32,
+        param1: i32,
+        param2: i32,
+    ) -> JvmResult<bool> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::processEvent({this:?}, {event_type:?}, {subtype:?}, {param1:?}, {param2:?})");
+
+        Ok(false)
+    }
+
+    async fn get_card(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<ClassInstanceRef<Card>> {
+        tracing::warn!("stub org.kwis.msp.lwc.Component::getCard({this:?})");
+
+        Ok(None.into())
     }
 }
 

@@ -7,10 +7,7 @@ use alloc::{
     vec::Vec,
 };
 
-use jvm::{
-    ClassInstance, Result as JvmResult,
-    runtime::{JavaIoInputStream, JavaLangString},
-};
+use jvm::{Result as JvmResult, runtime::JavaLangString};
 
 use wie_backend::{DefaultTaskRunner, Emulator, Event, Pacing, Platform, System, extract_zip};
 use wie_jvm_support::{JvmSupport, RustJavaJvmImplementation};
@@ -23,11 +20,10 @@ pub struct J2MEEmulator {
 impl J2MEEmulator {
     pub fn jar_metadata(jar: &[u8]) -> Result<Option<(String, Option<Vec<u8>>)>> {
         let files = extract_zip(jar)?;
-        let Some(manifest) = files.get("META-INF/MANIFEST.MF") else {
+        let Some((_, manifest)) = files.iter().find(|(path, _)| path.eq_ignore_ascii_case("META-INF/MANIFEST.MF")) else {
             return Ok(None);
         };
         let descriptor = J2MEDescriptor::parse(manifest);
-
         if descriptor.name.is_empty() || descriptor.main_class_name.is_empty() {
             return Ok(None);
         }
@@ -44,31 +40,37 @@ impl J2MEEmulator {
     pub fn from_jad_jar(platform: Box<dyn Platform>, jad: Vec<u8>, jar_filename: String, jar: Vec<u8>) -> Result<Self> {
         let descriptor = J2MEDescriptor::parse(&jad);
 
+        // fork: the storage id stays the suite name (`MIDlet-Name`), as it was before the 2026-11-23
+        // upstream merge. Upstream keys storage by the `MIDlet-1` title, which would orphan saves.
+        let id = descriptor.properties.get("MIDlet-Name").cloned().unwrap_or_default();
+
         let files = [(jar_filename.to_owned(), jar)].into_iter().collect();
-        Self::load(
-            platform,
-            &jar_filename,
-            &descriptor.name,
-            Some(descriptor.main_class_name),
-            descriptor.properties,
-            &files,
-        )
+        Self::load(platform, &jar_filename, &id, descriptor, &files)
     }
 
     pub fn from_jar(platform: Box<dyn Platform>, jar_filename: &str, jar: Vec<u8>) -> Result<Self> {
+        let contents = extract_zip(&jar)?;
+        let (_, manifest) = contents
+            .iter()
+            .find(|(path, _)| path.eq_ignore_ascii_case("META-INF/MANIFEST.MF"))
+            .ok_or_else(|| WieError::FatalError("JAR manifest not found".into()))?;
+        let descriptor = J2MEDescriptor::parse(manifest);
         let files = [(jar_filename.to_owned(), jar)].into_iter().collect();
 
-        Self::load(platform, jar_filename, jar_filename, None, BTreeMap::new(), &files)
+        // fork: a bare jar keeps the file name as its storage id (same reason as `from_jad_jar`).
+        Self::load(platform, jar_filename, jar_filename, descriptor, &files)
     }
 
     fn load(
         platform: Box<dyn Platform>,
         jar_filename: &str,
         id: &str,
-        main_class_name: Option<String>,
-        properties: BTreeMap<String, String>,
+        descriptor: J2MEDescriptor,
         files: &BTreeMap<String, Vec<u8>>,
     ) -> Result<Self> {
+        if descriptor.name.is_empty() || descriptor.main_class_name.is_empty() {
+            return Err(WieError::FatalError("MIDlet-1 name or main class not found".into()));
+        }
         let system = System::new(platform, id, id, DefaultTaskRunner);
 
         for (path, data) in files {
@@ -78,18 +80,13 @@ impl J2MEEmulator {
         let mut system_clone = system.clone();
         let jar_filename = jar_filename.to_owned();
 
-        system.spawn(async move || Self::do_start(&mut system_clone, jar_filename, properties, main_class_name).await);
+        system.spawn(async move || Self::do_start(&mut system_clone, jar_filename, descriptor.properties, descriptor.main_class_name).await);
 
         Ok(J2MEEmulator { system })
     }
 
     #[tracing::instrument(name = "start", skip_all)]
-    async fn do_start(
-        system: &mut System,
-        jar_filename: String,
-        properties: BTreeMap<String, String>,
-        main_class_name: Option<String>,
-    ) -> Result<()> {
+    async fn do_start(system: &mut System, jar_filename: String, properties: BTreeMap<String, String>, main_class_name: String) -> Result<()> {
         let properties = properties
             .into_iter()
             .map(|(k, v)| (format!("wie.appProperty.{k}"), v))
@@ -110,7 +107,7 @@ impl J2MEEmulator {
             .chain(properties.iter().map(|(k, v)| (k.as_ref(), v.as_ref())))
             .collect::<Vec<_>>();
 
-        let protos = [wie_midp::get_protos().into()];
+        let protos = [wie_midp::get_protos().into(), wie_midp_vendor::get_protos().into()];
         let jvm = JvmSupport::new_jvm(system, Some(&jar_filename), Box::new(protos), &properties, RustJavaJvmImplementation).await?;
         // A J2ME title is written for the standard key codes (-1..-7); SKVM shares wie-midp and keeps SKT's.
         if let Err(error) = jvm
@@ -120,51 +117,7 @@ impl J2MEEmulator {
             return Err(JvmSupport::to_wie_err(&jvm, error).await);
         }
 
-        let main_class_name = if let Some(x) = main_class_name {
-            x.replace('.', "/")
-        } else {
-            let class_loader = jvm
-                .invoke_static("java/lang/ClassLoader", "getSystemClassLoader", "()Ljava/lang/ClassLoader;", ())
-                .await
-                .unwrap();
-
-            // TODO Use JarFile::getManifest
-            let resource_name = JavaLangString::from_rust_string(&jvm, "META-INF/MANIFEST.MF").await.unwrap();
-            let resource_stream = jvm
-                .invoke_virtual(
-                    &class_loader,
-                    "java/lang/ClassLoader",
-                    "getResourceAsStream",
-                    "(Ljava/lang/String;)Ljava/io/InputStream;",
-                    (resource_name.clone(),),
-                )
-                .await
-                .unwrap();
-            let data = JavaIoInputStream::read_until_end(&jvm, &resource_stream).await.unwrap();
-
-            let descriptor = J2MEDescriptor::parse(&data);
-
-            for (k, v) in descriptor.properties {
-                let property_key = format!("wie.appProperty.{k}");
-                let property_key = JavaLangString::from_rust_string(&jvm, &property_key).await.unwrap();
-                let property_value = JavaLangString::from_rust_string(&jvm, &v).await.unwrap();
-
-                let _: Option<Box<dyn ClassInstance>> = jvm
-                    .invoke_static(
-                        "java/lang/System",
-                        "setProperty",
-                        "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;",
-                        (property_key, property_value),
-                    )
-                    .await
-                    .unwrap();
-            }
-
-            if descriptor.main_class_name.is_empty() {
-                return Err(WieError::FatalError("Main class not found".into()));
-            }
-            descriptor.main_class_name.replace('.', "/")
-        };
+        let main_class_name = main_class_name.replace('.', "/");
 
         // Resolve with the system loader before entering the rustjar-loaded Launcher.
         if let Err(error) = jvm.resolve_class(&main_class_name).await {
@@ -189,6 +142,10 @@ impl Drop for J2MEEmulator {
 }
 
 impl Emulator for J2MEEmulator {
+    fn is_preparing(&self) -> bool {
+        false
+    }
+
     fn handle_event(&mut self, event: Event) {
         self.system.event_queue().push(event)
     }
@@ -213,10 +170,6 @@ impl J2MEDescriptor {
     pub fn parse(data: &[u8]) -> Self {
         let lines = data.split(|x| *x == b'\n');
 
-        let mut name = String::new();
-        let mut main_class_name = String::new();
-        let mut icon = String::new();
-        let mut midlet_icon = String::new();
         let mut properties = BTreeMap::new();
         let mut logical_lines: Vec<String> = Vec::new();
 
@@ -248,13 +201,25 @@ impl J2MEDescriptor {
             let key = key.trim();
             let value = value.trim();
             properties.insert(key.to_string(), value.to_string());
+        }
 
-            match key {
-                "MIDlet-Name" => name = value.to_string(),
+        Self::from_properties(properties)
+    }
+
+    fn from_properties(properties: BTreeMap<String, String>) -> Self {
+        let mut name = String::new();
+        let mut main_class_name = String::new();
+        let mut icon = String::new();
+        let mut midlet_icon = String::new();
+
+        for (key, value) in &properties {
+            match key.as_str() {
                 "MIDlet-Icon" => icon = value.to_string(),
                 "MIDlet-1" => {
                     let mut values = value.split(',');
-                    values.next();
+                    if let Some(value) = values.next() {
+                        name = value.trim().to_string();
+                    }
                     if let Some(value) = values.next() {
                         midlet_icon = value.trim().to_string();
                     }
@@ -281,7 +246,42 @@ impl J2MEDescriptor {
 
 #[cfg(test)]
 mod tests {
-    use super::J2MEDescriptor;
+    extern crate std;
+
+    use alloc::{boxed::Box, string::ToString, vec::Vec};
+    use std::io::{Cursor, Write};
+
+    use test_utils::TestPlatform;
+    use zip::{ZipWriter, write::SimpleFileOptions};
+
+    use super::{J2MEDescriptor, J2MEEmulator};
+
+    #[test]
+    // fork: upstream asserts "App title" (the `MIDlet-1` title) for all four ids below; ours keep the
+    // pre-merge storage ids — the file name for a bare jar, `MIDlet-Name` with a descriptor.
+    fn jar_and_jad_keep_their_storage_ids() {
+        let manifest = b"MIDlet-Name: My MIDlet Suite\nMIDlet-1: App title, , example.Main\n";
+        for path in ["META-INF/MANIFEST.MF", "meta-inf/manifest.mf", "Meta-Inf/Manifest.Mf"] {
+            let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
+            writer.start_file(path, SimpleFileOptions::default()).unwrap();
+            writer.write_all(manifest).unwrap();
+            // fork: our `extract_zip` strips a directory that wraps every entry, so the jar needs one outside it.
+            writer.start_file("example/Main.class", SimpleFileOptions::default()).unwrap();
+            let jar = writer.finish().unwrap().into_inner();
+            let (title, _) = J2MEEmulator::jar_metadata(&jar).unwrap().unwrap();
+            assert_eq!(title, "App title");
+
+            for filename in ["original.jar", "renamed.jar"] {
+                let emulator = J2MEEmulator::from_jar(Box::new(TestPlatform::new()), filename, jar.clone()).unwrap();
+                assert_eq!(emulator.system.pid(), filename);
+                assert_eq!(emulator.system.aid(), filename);
+                let emulator =
+                    J2MEEmulator::from_jad_jar(Box::new(TestPlatform::new()), manifest.to_vec(), filename.to_string(), jar.clone()).unwrap();
+                assert_eq!(emulator.system.pid(), "My MIDlet Suite");
+                assert_eq!(emulator.system.aid(), "My MIDlet Suite");
+            }
+        }
+    }
 
     #[test]
     fn parses_utf8_midlet_metadata() {
@@ -299,7 +299,7 @@ mod tests {
     fn ignores_malformed_manifest_lines() {
         let descriptor = J2MEDescriptor::parse(b"invalid line\nMIDlet-1: incomplete\n\xff\nMIDlet-Name: Valid App\n");
 
-        assert_eq!(descriptor.name, "Valid App");
+        assert_eq!(descriptor.name, "incomplete");
         assert!(descriptor.main_class_name.is_empty());
     }
 

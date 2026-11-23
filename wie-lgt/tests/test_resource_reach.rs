@@ -62,6 +62,7 @@ pub fn bundled_resource_reaches_the_lgt_guest() -> Result<()> {
         archive,
         Options {
             enable_gdbserver: false,
+            aot: None,
             profile: None,
         },
     )?;

@@ -72,14 +72,12 @@ use wie_util::keypad::{self, MULTITAP_MS, Mode};
 use wie_util::{Result, read_generic, write_generic, write_null_terminated_string_bytes, write_null_terminated_table};
 use wie_wipi_c::{
     MethodImpl, WIPICContext, WIPICMethodBody, WIPICResult,
-    api::{database, graphics as shared_graphics, kernel, media, misc, net},
+    api::{database, graphics as shared_graphics, kernel, media, misc, net, serial, term_res, uic},
 };
 
 use context::LgtWIPICContext;
 
-use crate::runtime::{SVC_CATEGORY_WIPIC, svc_ids::WIPICSvcId};
-
-const TIME_VALUE_PTR: u32 = 0x7fff1004;
+use crate::runtime::{SVC_CATEGORY_WIPIC, globals::TIME_VALUE_PTR, svc_ids::WIPICSvcId};
 
 struct WIPICMethodResult {
     result: WIPICResult,
@@ -100,6 +98,8 @@ struct CMethodProxy {
 }
 
 async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm), id: SvcId) -> Result<()> {
+    // upstream #1542: Java temporaries a call makes (resource-name strings …) go when it returns.
+    let _frame = jvm.push_native_frame(&[]);
     let wipic_context = LgtWIPICContext::new(core.clone(), system.clone(), jvm.clone());
     let (_, lr) = core.read_pc_lr()?;
     // An unmapped id names its arguments and the guest return address, so the next round can read
@@ -262,6 +262,28 @@ async fn handle_wipic_svc(core: &mut ArmCore, (system, jvm): &mut (System, Jvm),
         WIPICSvcId::BackLight => misc::back_light.into_body(),
         WIPICSvcId::Unk16 => unk16.into_body(),
         WIPICSvcId::ListDataStores => list_data_stores.into_body(),
+        // Ids only upstream maps (`svc_ids.rs`): its shared bodies, as upstream wires them.
+        WIPICSvcId::Execute => kernel::execute.into_body(),
+        WIPICSvcId::GetAccessLevel => kernel::get_access_level.into_body(),
+        WIPICSvcId::EncodeImage => shared_graphics::encode_image.into_body(),
+        WIPICSvcId::SerialOpen => serial::open.into_body(),
+        WIPICSvcId::SerialWrite => serial::write.into_body(),
+        WIPICSvcId::SerialSetWriteCallback => serial::set_write_callback.into_body(),
+        WIPICSvcId::SerialClose => serial::close.into_body(),
+        WIPICSvcId::UicPaint => uic::paint.into_body(),
+        WIPICSvcId::UicHandleEvent => uic::handle_event.into_body(),
+        WIPICSvcId::UicSetFgColor => uic::set_fg_color.into_body(),
+        WIPICSvcId::UicSetBgColor => uic::set_bg_color.into_body(),
+        WIPICSvcId::UicSetLabelAlignment => uic::set_label_alignment.into_body(),
+        WIPICSvcId::UicDeleteText => uic::delete_text.into_body(),
+        WIPICSvcId::UicGetTextSize => uic::get_text_size.into_body(),
+        WIPICSvcId::UicGetText => uic::get_text.into_body(),
+        WIPICSvcId::TermResGetCount => term_res::get_count.into_body(),
+        WIPICSvcId::TermResGetList => term_res::get_list.into_body(),
+        WIPICSvcId::TermResGetFormat => term_res::get_format.into_body(),
+        WIPICSvcId::TermResGetSize => term_res::get_size.into_body(),
+        WIPICSvcId::TermResGetUiName => term_res::get_ui_name.into_body(),
+        WIPICSvcId::GetVolume => media::get_volume.into_body(),
     };
 
     EmulatedFunction::call(
@@ -1517,6 +1539,71 @@ mod tests {
             system.tick()?;
         }
 
+        Ok(())
+    }
+
+    /// upstream #1542, with the native frame it added to `handle_wipic_svc`.
+    #[test]
+    fn resource_calls_release_java_temporaries() -> Result<()> {
+        use jvm::{ClassInstance, runtime::JavaLangString};
+        use wie_backend::Options;
+        use wie_util::write_null_terminated_string_bytes;
+
+        use crate::runtime::LgtJvmSupport;
+
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let task_system = system.clone();
+        let done = Arc::new(AtomicBool::new(false));
+        let task_done = done.clone();
+        system.spawn(async move || {
+            let mut core = ArmCore::new(Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
+            Allocator::init(&mut core)?;
+            let mut registers = core.save_context();
+            registers.sp = Allocator::alloc(&mut core, 0x100)? + 0x100;
+            core.restore_context(&registers);
+            let jvm = LgtJvmSupport::init(&mut core, &task_system, None, &[]).await?;
+            register_wipic_svc_handler(&mut core, &task_system, &jvm)?;
+            let name = Allocator::alloc(&mut core, 8)?;
+            write_null_terminated_string_bytes(&mut core, name, b"missing")?;
+            let lookup = core.make_svc_stub(SVC_CATEGORY_WIPIC, WIPICSvcId::GetResourceId)?;
+            for _ in 0..8 {
+                let result: u32 = core.run_function(lookup, &[name, 0, 0, 0, 0, 0, 0, 0, 0]).await?;
+                assert_eq!(result as i32, -12);
+                assert!(
+                    jvm.collect_garbage().unwrap() >= 2,
+                    "Resource lookup strings must not accumulate in the guest frame"
+                );
+            }
+            {
+                let _frame = jvm.push_native_frame(&[]);
+                let original = {
+                    let _frame = jvm.push_native_frame(&[]);
+                    let name = JavaLangString::from_rust_string(&jvm, "copied thread").await.unwrap();
+                    jvm.new_class("java/lang/Thread", "(Ljava/lang/String;)V", (name,)).await.unwrap()
+                };
+                let copied = jvm.shallow_clone(&original).unwrap();
+                // Only the copy remains rooted, so its runtime fields must retain the name.
+                jvm.collect_garbage().unwrap();
+                let thread_name: Box<dyn ClassInstance> = jvm
+                    .invoke_virtual(&copied, "java/lang/Thread", "getName", "()Ljava/lang/String;", ())
+                    .await
+                    .unwrap();
+                assert_eq!(JavaLangString::to_rust_string(&jvm, &thread_name).await.unwrap(), "copied thread");
+            }
+            assert!(
+                jvm.collect_garbage().unwrap() >= 3,
+                "The copied thread, name and character array must be released"
+            );
+            task_done.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
         Ok(())
     }
 }

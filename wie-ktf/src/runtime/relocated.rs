@@ -99,6 +99,8 @@ pub async fn load(core: &mut ArmCore, jvm: &Jvm, data: &[u8], bss_size: u32) -> 
         relocate(core, address)?;
     }
     wie_jvm_support::guest_roots::add_region(core.id(), IMAGE_BASE, image.len() as u32 + bss_size);
+    // Every load path ends here (upstream AOT): left out, `is_preparing` stays true for this image.
+    core.prepare_execution().await?;
 
     register_init_svc_handler(core, jvm)?;
     core.register_svc_handler(SVC_CATEGORY_RELOCATED, handle_svc, jvm)?;
@@ -535,7 +537,7 @@ pub(crate) fn enter(core: &mut ArmCore) -> Result<Option<Entry>> {
     core.restore_context(&ArmCoreContext {
         fp: ptr_thread_context,
         sp: java_sp - NATIVE_STACK_GAP,
-        ..context.clone()
+        ..context
     });
 
     Ok(Some(Entry {
@@ -610,7 +612,11 @@ mod tests {
 
     // A JVM over an empty image whose header has the words the loader reads, and a thread context.
     async fn init(system: &mut System) -> Result<(Jvm, ArmCore, u32)> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
         let mut context = core.save_context();
         let stack = Allocator::alloc(&mut core, 0x10000)?;
@@ -620,7 +626,7 @@ mod tests {
         let ptr_thread_context = Allocator::alloc(&mut core, size_of::<KtfJvmThreadContext>() as u32)?;
         write_generic(&mut core, ptr_thread_context, KtfJvmThreadContext::zeroed())?;
         KtfJvmSupport::set_current_thread_context(&mut core, ptr_thread_context)?;
-        let (jvm, _) = KtfJvmSupport::init(&mut core, system, None).await?;
+        let (jvm, _) = KtfJvmSupport::init(&mut core, system, None, &[]).await?;
 
         core.load(&[0; IMAGE_SIZE as usize], IMAGE_BASE, IMAGE_SIZE as usize)?;
         write_generic(&mut core, IMAGE_BASE + 0x0c, IMAGE_BASE + 0x100)?; // constant data

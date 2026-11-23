@@ -6,10 +6,22 @@ use wipi_types::wipic::WIPICWord;
 
 use crate::context::WIPICContext;
 
+pub async fn htonl(_context: &mut dyn WIPICContext, val: WIPICWord) -> Result<WIPICWord> {
+    tracing::debug!("MC_utilHtonl({val:#x})");
+
+    Ok(val.swap_bytes())
+}
+
 pub async fn htons(_context: &mut dyn WIPICContext, val: WIPICWord) -> Result<WIPICWord> {
     tracing::debug!("MC_utilHtons({val})");
 
     Ok((val as u16).to_be() as _) // XXX we're always on little endian
+}
+
+pub async fn ntohs(_context: &mut dyn WIPICContext, val: WIPICWord) -> Result<WIPICWord> {
+    tracing::debug!("MC_utilNtohs({val})");
+
+    Ok(u16::from_be(val as u16) as _) // XXX we're always on little endian
 }
 
 /// LGT WIPIC 904 (`inet_addr`) and KTF util slot 4 (`MC_utilInetAddrInt`): a dotted quad to an address in network order, `0xffffffff`
@@ -34,4 +46,33 @@ fn parse_dotted_quad(text: &[u8]) -> Option<[u8; 4]> {
     }
 
     parts.next().is_none().then_some(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use wie_util::{ByteWrite, Result};
+
+    use crate::context::test::TestContext;
+
+    use super::inet_addr;
+
+    #[futures_test::test]
+    async fn ipv4_conversion_returns_network_order() -> Result<()> {
+        let mut context = TestContext::new();
+        for (text, expected) in [
+            (b"127.0.0.1\0".as_slice(), [127, 0, 0, 1]),
+            (b"192.168.1.25\0".as_slice(), [192, 168, 1, 25]),
+            (b"0.0.0.0\0".as_slice(), [0, 0, 0, 0]),
+            // ours: leading zeros are decimal digits (`Ipv4Addr::from_str`, upstream's parser, refuses them)
+            (b"010.001.002.003\0".as_slice(), [10, 1, 2, 3]),
+        ] {
+            context.write_bytes(0x1000, text)?;
+            assert_eq!(inet_addr(&mut context, 0x1000).await?.to_le_bytes(), expected);
+        }
+        for text in [b"256.0.0.1\0".as_slice(), b"invalid\0".as_slice(), b"\xff\0".as_slice()] {
+            context.write_bytes(0x1000, text)?;
+            assert_eq!(inet_addr(&mut context, 0x1000).await?, u32::MAX);
+        }
+        Ok(())
+    }
 }

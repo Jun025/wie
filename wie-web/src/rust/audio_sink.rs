@@ -8,20 +8,14 @@ extern "C" {
     #[derive(Clone)]
     pub type AudioPlayer;
 
-    #[wasm_bindgen(constructor)]
-    pub fn new() -> AudioPlayer;
-
-    #[wasm_bindgen(method)]
+    #[wasm_bindgen(method, structural)]
     pub fn dispose(this: &AudioPlayer);
 
-    #[wasm_bindgen(method)]
+    #[wasm_bindgen(method, structural)]
     fn play(this: &AudioPlayer, handle: u32, duration: f64, events: Array, repeat: bool);
 
-    #[wasm_bindgen(method)]
+    #[wasm_bindgen(method, structural)]
     fn stop(this: &AudioPlayer, handle: u32);
-
-    #[wasm_bindgen(js_name = setPcmVolume)]
-    pub fn set_pcm_volume(value: f32);
 }
 
 pub struct AudioSink {

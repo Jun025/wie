@@ -1,12 +1,10 @@
-import { extractAppMetadata } from "@pkg";
 import { Check, CircleHelp, EllipsisVertical, Globe2, Plus, Settings, Trash2, Upload, X, createIcons } from "lucide";
 
-import { AppLibraryStore, AppMetadata } from "./app_library_store";
-import { SettingsController } from "./settings";
+import type { LibraryApp, Wie } from "./backend";
+import { t } from "./i18n";
+import type { SettingsController } from "./settings";
 
 const APPS_PER_PAGE = 12;
-const WELCOME_STORAGE_KEY = "wie_welcome_seen";
-const HELP_STORAGE_KEY = "wie_help_dismissed";
 const icons = {
   Check,
   CircleHelp,
@@ -19,8 +17,7 @@ const icons = {
   X,
 };
 
-export const initializeLibrary = async (launchApp: (app: AppMetadata, archive: Uint8Array) => Promise<void>, settings: SettingsController) => {
-  const store = await AppLibraryStore.open();
+export const initializeLibrary = async (backend: Wie, launchApp: (app: LibraryApp) => Promise<void>, settings: SettingsController) => {
   const libraryView = document.getElementById("library-view") as HTMLDivElement;
   const libraryPages = document.getElementById("library-pages") as HTMLDivElement;
   const pageIndicators = document.getElementById("page-indicators") as HTMLDivElement;
@@ -44,12 +41,12 @@ export const initializeLibrary = async (launchApp: (app: AppMetadata, archive: U
   const welcomeDialog = document.getElementById("welcome-dialog") as HTMLDialogElement;
   const dismissWelcome = document.getElementById("dismiss-welcome") as HTMLButtonElement;
 
-  hideHelp.checked = localStorage.getItem(HELP_STORAGE_KEY) === "true";
+  hideHelp.checked = settings.get("helpDismissed");
 
-  let apps = await store.list();
+  let apps = await backend.listApps();
   let manageMode = false;
   let appStarting = false;
-  let pendingDelete: AppMetadata;
+  let pendingDelete: LibraryApp;
   const iconUrls = new Set<string>();
   let dragPointer: number | undefined;
   let dragStartX = 0;
@@ -57,6 +54,12 @@ export const initializeLibrary = async (launchApp: (app: AppMetadata, archive: U
   let dragging = false;
   let suppressClick = false;
   let currentPageIndex = 0;
+  let importStatusText = () => "";
+
+  const setImportStatus = (text: () => string) => {
+    importStatusText = text;
+    importStatus.textContent = text();
+  };
 
   const closeMenu = () => {
     menu.classList.remove("visible");
@@ -65,9 +68,29 @@ export const initializeLibrary = async (launchApp: (app: AppMetadata, archive: U
 
   const openImportDialog = () => {
     closeMenu();
-    importStatus.textContent = "";
+    setImportStatus(() => "");
     importStatus.classList.remove("error");
     importDialog.showModal();
+  };
+
+  const updateLabels = () => {
+    importStatus.textContent = importStatusText();
+    manageAppsLabel.textContent = t(manageMode ? "manageDone" : "deleteApps");
+    const pages = libraryPages.querySelectorAll<HTMLElement>(".library-page");
+    pages.forEach((page, index) => {
+      page.setAttribute("aria-label", t("libraryPage", { page: index + 1, count: pages.length }));
+    });
+    const addButton = libraryPages.querySelector<HTMLButtonElement>(".add-app")!;
+    addButton.title = t("addApp");
+    addButton.setAttribute("aria-label", t("addApp"));
+    addButton.querySelector(".app-title")!.textContent = t("addApp");
+    libraryPages.querySelectorAll<HTMLButtonElement>(".delete-app-button").forEach((button, index) => {
+      button.title = t("deleteApp", { title: apps[index].title });
+      button.setAttribute("aria-label", button.title);
+    });
+    Array.from(pageIndicators.children).forEach((indicator, index) => {
+      indicator.setAttribute("aria-label", t("goToPage", { page: index + 1 }));
+    });
   };
 
   const renderLibrary = (targetPageIndex = currentPageIndex) => {
@@ -80,14 +103,13 @@ export const initializeLibrary = async (launchApp: (app: AppMetadata, archive: U
     libraryView.classList.toggle("manage-mode", manageMode);
     menuManageApps.disabled = apps.length === 0;
     menuManageApps.setAttribute("aria-pressed", String(manageMode));
-    manageAppsLabel.textContent = manageMode ? "삭제 완료" : "앱 삭제";
 
     const oldManageIcon = menuManageApps.querySelector("svg, i");
     const manageIcon = document.createElement("i");
     manageIcon.dataset.lucide = manageMode ? "check" : "trash-2";
     oldManageIcon?.replaceWith(manageIcon);
 
-    const entries: Array<AppMetadata | undefined> = [...apps, undefined];
+    const entries: Array<LibraryApp | undefined> = [...apps, undefined];
     const pageCount = Math.ceil(entries.length / APPS_PER_PAGE);
     currentPageIndex = Math.max(0, Math.min(targetPageIndex, pageCount - 1));
     libraryPages.classList.toggle("draggable", pageCount > 1);
@@ -95,15 +117,12 @@ export const initializeLibrary = async (launchApp: (app: AppMetadata, archive: U
     for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
       const page = document.createElement("section");
       page.className = "library-page";
-      page.setAttribute("aria-label", `${pageIndex + 1} / ${pageCount} 페이지`);
 
       for (const app of entries.slice(pageIndex * APPS_PER_PAGE, (pageIndex + 1) * APPS_PER_PAGE)) {
         if (!app) {
           const addButton = document.createElement("button");
           addButton.className = "app-entry add-app";
           addButton.type = "button";
-          addButton.title = "앱 추가";
-          addButton.setAttribute("aria-label", "앱 추가");
 
           const icon = document.createElement("span");
           icon.className = "app-icon add-app-icon";
@@ -113,7 +132,6 @@ export const initializeLibrary = async (launchApp: (app: AppMetadata, archive: U
 
           const label = document.createElement("span");
           label.className = "app-title";
-          label.textContent = "앱 추가";
           addButton.append(icon, label);
           addButton.addEventListener("click", openImportDialog);
           page.appendChild(addButton);
@@ -173,15 +191,11 @@ export const initializeLibrary = async (launchApp: (app: AppMetadata, archive: U
           appStarting = true;
           launchButton.disabled = true;
           try {
-            const archive = await store.getArchive(app.id);
-            if (!archive) {
-              throw new Error("저장된 앱 파일을 찾을 수 없습니다.");
-            }
             if (!hideHelp.checked) {
               helpDialog.showModal();
               await new Promise<void>(resolve => helpDialog.addEventListener("close", () => resolve(), { once: true }));
             }
-            await launchApp(app, archive);
+            await launchApp(app);
           } catch (error) {
             window.alert(String(error));
           } finally {
@@ -193,8 +207,6 @@ export const initializeLibrary = async (launchApp: (app: AppMetadata, archive: U
         const deleteButton = document.createElement("button");
         deleteButton.className = "delete-app-button";
         deleteButton.type = "button";
-        deleteButton.title = `${app.title} 삭제`;
-        deleteButton.setAttribute("aria-label", `${app.title} 삭제`);
         const trash = document.createElement("i");
         trash.dataset.lucide = "trash-2";
         deleteButton.appendChild(trash);
@@ -213,7 +225,6 @@ export const initializeLibrary = async (launchApp: (app: AppMetadata, archive: U
       const indicator = document.createElement("button");
       indicator.className = "page-indicator";
       indicator.type = "button";
-      indicator.setAttribute("aria-label", `${pageIndex + 1} 페이지로 이동`);
       indicator.classList.toggle("active", pageIndex === currentPageIndex);
       indicator.addEventListener("click", () => {
         libraryPages.scrollTo({ left: pageIndex * libraryPages.firstElementChild!.clientWidth, behavior: "smooth" });
@@ -221,6 +232,7 @@ export const initializeLibrary = async (launchApp: (app: AppMetadata, archive: U
       pageIndicators.appendChild(indicator);
     }
 
+    updateLabels();
     pageIndicators.hidden = pageCount < 2;
     libraryPages.scrollLeft = currentPageIndex * libraryPages.firstElementChild!.clientWidth;
     createIcons({ icons, root: libraryView });
@@ -325,7 +337,10 @@ export const initializeLibrary = async (launchApp: (app: AppMetadata, archive: U
     helpDialog.showModal();
   });
   helpDialog.addEventListener("close", () => {
-    localStorage.setItem(HELP_STORAGE_KEY, String(hideHelp.checked));
+    void settings.set("helpDismissed", hideHelp.checked).catch(error => {
+      hideHelp.checked = settings.get("helpDismissed");
+      window.alert(t("settingsSaveFailed", { error: String(error) }));
+    });
   });
 
   const importFiles = async (files: File[]) => {
@@ -335,10 +350,9 @@ export const initializeLibrary = async (launchApp: (app: AppMetadata, archive: U
 
     chooseArchive.disabled = true;
     importStatus.classList.remove("error");
-    importStatus.textContent = `${files.length}개 앱 파일을 확인하는 중입니다.`;
+    setImportStatus(() => t("checkingFiles", { count: files.length }));
 
     try {
-      const knownApps = new Map(apps.map(app => [app.id, app.title]));
       const failures: string[] = [];
       let addedCount = 0;
 
@@ -346,40 +360,18 @@ export const initializeLibrary = async (launchApp: (app: AppMetadata, archive: U
         try {
           const filename = file.name.toLowerCase();
           if (!filename.endsWith(".zip") && !filename.endsWith(".jar")) {
-            throw new Error("ZIP 또는 JAR 파일이 아닙니다.");
+            throw new Error(t("invalidArchive"));
           }
 
-          const archive = new Uint8Array(await file.arrayBuffer());
-          const extracted = extractAppMetadata(file.name, archive);
-          try {
-            const duplicateTitle = knownApps.get(extracted.id);
-            if (duplicateTitle) {
-              throw new Error(`이미 라이브러리에 추가된 앱입니다: ${duplicateTitle}`);
-            }
-
-            const icon = extracted.icon;
-            const metadata: AppMetadata = {
-              id: extracted.id,
-              title: extracted.title,
-              filename: file.name,
-              addedAt: Date.now(),
-            };
-            if (icon.length > 0) {
-              metadata.icon = new Blob([new Uint8Array(icon).buffer]);
-            }
-            await store.add(metadata, archive);
-            knownApps.set(metadata.id, metadata.title);
-            addedCount += 1;
-          } finally {
-            extracted.free();
-          }
+          await backend.importApp(file);
+          addedCount += 1;
         } catch (error) {
           failures.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
 
       if (addedCount > 0) {
-        apps = await store.list();
+        apps = await backend.listApps();
         renderLibrary(Math.floor(apps.length / APPS_PER_PAGE));
       }
 
@@ -387,12 +379,14 @@ export const initializeLibrary = async (launchApp: (app: AppMetadata, archive: U
         importDialog.close();
       } else {
         importStatus.classList.add("error");
-        const result = addedCount > 0 ? `${addedCount}개 앱을 추가했습니다. ` : "";
-        importStatus.textContent = `${result}추가하지 못한 파일: ${failures.join(" / ")}`;
+        setImportStatus(() => {
+          const result = addedCount > 0 ? `${t("appsAdded", { count: addedCount })} ` : "";
+          return `${result}${t("importFailures", { files: failures.join(" / ") })}`;
+        });
       }
     } catch (error) {
       importStatus.classList.add("error");
-      importStatus.textContent = `앱을 추가할 수 없습니다. ${String(error)}`;
+      setImportStatus(() => t("importFailed", { error: String(error) }));
     } finally {
       chooseArchive.disabled = false;
       archiveInput.value = "";
@@ -430,26 +424,31 @@ export const initializeLibrary = async (launchApp: (app: AppMetadata, archive: U
   confirmDelete.addEventListener("click", async () => {
     confirmDelete.disabled = true;
     try {
-      await store.delete(pendingDelete.id);
-      apps = await store.list();
+      await backend.deleteApp(pendingDelete.id);
+      apps = await backend.listApps();
       if (apps.length === 0) {
         manageMode = false;
       }
       deleteDialog.close();
       renderLibrary();
     } catch (error) {
-      window.alert(`앱을 삭제할 수 없습니다. ${String(error)}`);
+      window.alert(t("deleteFailed", { error: String(error) }));
     } finally {
       confirmDelete.disabled = false;
     }
   });
-  dismissWelcome.addEventListener("click", () => {
-    localStorage.setItem(WELCOME_STORAGE_KEY, "true");
-    welcomeDialog.close();
+  dismissWelcome.addEventListener("click", async () => {
+    try {
+      await settings.set("welcomeSeen", true);
+      welcomeDialog.close();
+    } catch (error) {
+      window.alert(t("settingsSaveFailed", { error: String(error) }));
+    }
   });
 
+  document.addEventListener("wie:languagechange", updateLabels);
   renderLibrary();
-  if (!localStorage.getItem(WELCOME_STORAGE_KEY)) {
+  if (!settings.get("welcomeSeen")) {
     welcomeDialog.showModal();
   }
 };

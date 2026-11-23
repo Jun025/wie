@@ -265,12 +265,7 @@ mod test {
     async fn pixels(jvm: &Jvm, display: &ClassInstanceRef<Display>) -> JvmResult<Vec<u8>> {
         let _: () = jvm.invoke_virtual(display, DISPLAY, "handlePaintEvent", "()V", ()).await?;
         let image: ClassInstanceRef<Image> = jvm
-            .get_field(
-                display,
-                "javax/microedition/lcdui/Display",
-                "screenImage",
-                "Ljavax/microedition/lcdui/Image;",
-            )
+            .get_static_field("javax/microedition/lcdui/Display", "screenImage", "Ljavax/microedition/lcdui/Image;")
             .await?;
         Ok(Image::image(jvm, &image).await?.raw().into_owned())
     }
@@ -346,7 +341,7 @@ mod test {
                     "the shared ticker and pending timers must release the old Form"
                 );
 
-                let frame = jvm.push_native_frame(&[]);
+                let _frame = jvm.push_native_frame(&[]);
                 let original = jvm.invoke_virtual(&ticker, TICKER, "getString", "()Ljava/lang/String;", ()).await?;
                 assert_eq!(JavaLangString::to_rust_string(&jvm, &original).await?, "News\r\nNext\nEnd\r!");
                 let normalized = JavaLangString::from_rust_string(&jvm, "News Next End !").await?;
@@ -446,7 +441,6 @@ mod test {
                     0
                 );
                 assert!(system.event_queue().pop().is_none(), "empty text must not keep a timer alive");
-                drop(frame);
                 drop((ticker_root, second_root));
                 Ok(())
             },

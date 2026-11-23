@@ -1,6 +1,6 @@
 # STATE
 
-> 실측 기준일 **2026-11-22**(`wie-state-md-baseline-refresh-2026-11-22`).
+> 실측 기준일 **2026-11-23**(`wie-upstream-sync2-s3-merge-upstream-main` · 위치 표와 `## 다음` ⑴ 만 다시 쟀다 — 나머지 줄은 2026-11-22 의 것이다).
 > ★**이 «기준일 + 날짜» 꼴은 기계가 읽는다** — `~/orchestrator-live/bin/state-baseline-lag-scan` 이 이 파일 머리 15줄 안의
 > 첫 `기준일 … YYYY-MM-DD` 를 `origin/main` 마지막 착지일과 견준다(14일 넘게 벌어지면 원장에 `STATE_BASELINE_LAG`).
 > 낱말을 바꾸면(예: «갱신») 판정에서 조용히 빠진다 — 낱말은 두고 날짜만 올려라.
@@ -10,13 +10,13 @@
 > ★★**새로 쓰는 항목도 diff·실측을 열고 써라** — 낡은 줄을 지운 자리에 새 부정확을 심으면 병은 그대로다.
 > ★`## 진행중` 과 `## 완료` 는 고정 안내다(정본 = 열린 PR 목록 · `docs/report/`).
 
-## fork 의 현재 위치 (2026-11-22 실측 · ★조회 시각과 함께 읽어라)
+## fork 의 현재 위치 (2026-11-23 실측 · ★조회 시각과 함께 읽어라)
 
 | 축 | 값 |
 |---|---|
-| `git merge-base origin/main upstream/main` | `44fbf265`(2026-09-16 조각 D · PR #161 착지 이후 **불변** · 67일째) |
-| behind / ahead | **244** / 3,034 (`origin/main` `64ee6998` ↔ `upstream/main` `10620f82` 2026-11-21) · 11-06 에는 173 / 2,970 |
-| upstream 쪽 델타 | 243커밋(병합 제외) · 384파일 **+42,087/−11,755** · `git merge-tree` 충돌 파일 **136**(11-06 에는 93) |
+| `git merge-base origin/main upstream/main` | `44fbf265`(2026-09-16 조각 D · PR #161 착지 이후 **불변** · 68일째). ★조각 S3 의 병합 커밋(PR #617 · `docs/report/0586`)이 착지하면 `d5242bbf`(upstream 2026-11-23)로 옮겨 간다 |
+| behind / ahead | **252** / 3,196 (`origin/main` `642110d1` ↔ `upstream/main` `d5242bbf` 2026-11-23) · 11-06 에는 173 / 2,970. S3 이 착지하면 behind 는 그 뒤 upstream 이 더한 만큼만 남는다 |
+| upstream 쪽 델타 | 251커밋(병합 제외) · 388파일 **+42,250/−11,800** · `git merge-tree` 충돌 파일 **147**(11-06 에는 93) — S3 이 전부 풀었다(0586 부록 A) |
 | RustJava | 우리 = crates.io `jvm*` `=0.5.1`(정확 고정 · 조각 S1b · `docs/report/0584`) ↔ upstream = `^0.5.1`(11-22 #1630·#1631 · lock 0.5.1 로 같은 판) |
 | compat (`docs/player-data/compat.json`) | 429행 · playable **426** · not-yet 2 · limited 1 · `progress=stuck` **90** · enginePin `4ac38566` |
 | GitHub Actions | 2026-11-04T05:40Z 뒤 run 0 → 11-19T14:59Z 에 첫 run(GitHub 쪽 정지 · `docs/report/0553`). 그 뒤 push·PR run 은 돈다. ★`schedule` 이벤트 run 은 11-04 이후 **0건**(아래 §다음 «상시») |
@@ -89,17 +89,19 @@
 
 다음은 아래 ⑴ 이다(발권 전 · 발권은 총괄 몫). ⑵ 는 ⑴ 과 독립이다.
 
-**⑴ upstream 2차 동기화 — 조각 S3(병합 커밋 `git merge upstream/main`)**
-- **무엇**: `docs/report/0551` §7 의 S3 행 그대로다 — 남은 충돌 해소 + §6 의 조용한 병합 확인. 앞 조각은 다 했다:
-  S1(`^0.1.1` → `=0.4.1` · `docs/report/0572`) · S1b(`=0.4.1` → `=0.5.1` · `docs/report/0584`) · S2(executor·pacing · #603 계열).
-  ★S1b 가 착지하기 전에는 열지 않는다(RustJava 판이 다르면 병합 커밋이 그 차이까지 진다).
-- **왜 지금**: «한 번에 병합»은 no-go 로 판정됐고 조각 계획은 go 다(0551 §0). 기다린 값이 수로 나왔다 —
-  11-06 → 11-23(17일) 사이 behind 173 → **248** · 충돌 파일 93 → **147**(이 조각 뒤 · 0584 §8). merge-base 는 68일째 그대로다.
-- **근거**: 0551 §7(공통 검증식 V0 + S3 검증식) · §8(사람이 정할 것 6자리 — S3 전에) ·
-  병합 전략 = `merge`(squash 금지 · `AGENTS.md` §For the `-merge` task only).
-- **size**: L.
-- ★**0551 의 93행 분류표는 11-06 트리의 것이다.** S3 을 열 때 표 전체를 그날의 `upstream/main` 에서 다시 잰다(0551 §1).
-  충돌 «수»는 S1 · S1b 로 줄지 않았다 — 줄어든 것은 병합 뒤의 이식 일이다(0572 §7 · 0584 §8).
+**⑴ upstream 2차 동기화 — 조각 S4(병합 뒤 정리) · S3 이 착지한 뒤에**
+- **지금**: 조각 S3(병합 커밋 `git merge upstream/main` · upstream `d5242bbf`)은 **PR #617 로 열려 있다**(`docs/report/0586` · 착지는 검수 뒤 `-merge` 티켓 · `merge_strategy: merge`).
+  동작이 갈리는 자리는 전부 우리 값이고(총괄 판정 2026-11-23), 우리 두 호스트는 병합 뒤에도 해석기로 돈다(`Options.aot = None`).
+- **무엇**: `docs/report/0551` §7 의 S4 행 + 0586 §10 이 남긴 것 — `tag-release.yaml` PARKED 머리의 나머지 문구 ·
+  upstream `AGENTS.md` 의 Attribution 조항(사람 결정) · `docs/lgt.md` 의 upstream 판을 받을지 ·
+  `wie-wipi-c/src/api/database.rs` 가 upstream 의 같은 경로와 병합마다 충돌하는 것(우리 모듈 이름 바꾸기) ·
+  `wie-ktf/Cargo.toml` 의 안 쓰는 `anyhow`.
+- **왜 지금**: S3 이 착지하면 merge-base 가 68일 만에 움직인다. 그 직후가 «다음 병합이 다시 충돌할 자리»를 가장 싸게 치우는 때다.
+- **근거**: 0551 §7(S4 의 검증식 — V0 · `check-doc-liveness-parity` · `check-parked-workflows`) · 0586 §10.
+- **size**: S.
+- ★**«upstream 값으로 옮기기»는 S4 가 아니다.** 0586 §5 · 부록 B 의 약 150자리(우리 값을 지킨 곳)와 ARM AOT 채택은
+  자리마다 전/후를 재는 별 티켓이다(총괄 판정). 그중 하나를 제안으로 올렸다 — SKT LBMP 의 마스크 투명
+  (`2026-11-23-upstream-sync2-s3-merge-upstream-main#p0`).
 
 **⑵ 「오래 하기」 이른 종료(`short`) 14행 — 한 번 더 재서 같은 값이 나오는 행만 `compat.json` 에 반영**
 - **무엇**: `docs/report/0561` §4 의 14행(전부 `playable → limited` 후보 · 네 축 `ok/ok/ok/short`)을 현행 핀에서 다시 재고,
@@ -142,14 +144,13 @@
     그래도 0 이면 `AGENTS.md` «A red weekly run has an owner» 의 ⑶(8일 넘으면 손으로 1회 + 운영자에게 올림)이 걸린다.
 
 **사람 몫**(워커가 정할 수 없다)
-- **동작이 갈리는 6자리 — S3 전에 운영자가 고른다**(0551 §8): `HandsetProperty` `VOLUMELEVEL` · WIPI `Player.stop(null clip)` ·
-  `Player.stop` 반환 · MIDP `Canvas` GAME_A..D · LGT SVC 4개 · 파일시스템 이름공간(aid ↔ pid — ★저장 키가 바뀐다).
-  어느 쪽이든 합칠 수는 있다. 고르는 순간 게임이 보는 값이 바뀐다.
+- **동작이 갈리는 6자리** — ★**정해졌다(총괄 판정 2026-11-23): 전부 우리 값.** S3(PR #617)이 그대로 지켰고 시험으로 고정했다
+  (0586 §4). 자리 하나를 upstream 값으로 옮기려면 그 자리의 전/후를 재는 별 티켓을 낸다 — 그것을 여는 것이 사람 몫이다.
 - **upstream `AGENTS.md` 의 Attribution 조항을 받을지**(0551 §7 S4).
 
 **보류 · 재개 조건이 따로 있는 축**(발권하지 마라 — 조건이 «새로» 생기면 연다)
-- **P4 / S5 — 엔진 고유분을 upstream PR 로**: 2026-09-13 dlunch/wie #1419 1건 착지 · 그 밖 미착수. 0551 의 분류에서 «발신» **29**
-  파일이 나왔다. 재개 조건 = 운영자 확인(외부 저장소에 보낸다). IP 방침 선 안쪽만(공개 API 스텁 · 단위 시험 —
+- **P4 / S5 — 엔진 고유분을 upstream PR 로**: 2026-09-13 dlunch/wie #1419 1건 착지 · 그 밖 미착수. 분류에서 «발신»은 0551 에 **29**,
+  S3 의 재분류(0586 부록 A)에 **54** 파일이다. 재개 조건 = 운영자 확인(외부 저장소에 보낸다). IP 방침 선 안쪽만(공개 API 스텁 · 단위 시험 —
   `docs/lgt_abi.md`·`docs/reference/` 는 보내지 마라) · 보내기 전에 주석·시험의 sha 접두와 타이틀 언급을 지운다(0551 §7 S5).
 - **진도 ⒟ `confirm-only-entry` 남은 14행** — 0552 가 원인을 전부 «넘는 키 미발견»으로 판정했다(엔진 벽 0 · 게임 설계 0).
   재개 조건 = 그 판을 넘는 키 경로(`--keys`)가 새로 나올 때. 그 회차의 열린 제안 1건(`2026-11-06-progression-stuck-confirm-only-15-remeasure#p0` · S)은
@@ -157,7 +158,8 @@
   ⒟ 의 나머지 22행(`key-path-not-found` 20 · `play-reached` 2)은 `docs/report/0525`(10-22) 판정 그대로다 —
   11-06 대조에서 한 행도 안 움직였고 그 뒤 이 행들을 다룬 회차가 없다.
 - **무거운 장면의 ARM 해석기 처리량**(L · 열린 제안 `2026-11-13-lgt-cadence-verdict-and-frames-painted#p0`) — 0559 가 싼 것 둘만 넣었다.
-  upstream 의 ARM AOT(#1415)가 S3 으로 들어온다. 그 뒤에 재서 남는 몫만 여는 순서가 싸다(이 회차의 읽기다 · 측정한 것이 아니다).
+  upstream 의 ARM AOT(#1415)는 S3(PR #617)으로 트리에 들어오지만 우리 두 호스트는 켜지 않는다(`Options.aot = None` · 0586 §0-2).
+  AOT 를 켜는 조각을 먼저 재고 남는 몫만 여는 순서가 싸다. ★null 페이지 읽기 0 규칙은 AOT 로 컴파일된 코드에서 성립하지 않는다(0586 §9).
 - **60Hz 죽은 구간 14 → 15 ms**(0559 §5 · 이득 +4.7% 는 섰다) — 프레임 여백 0.5 ms 의 위험을 잴 실기기가 없어 넣지 않았다.
   재개 조건 = 기기 측정.
 - **upstream #1260 후속(LGT misc index 9 · `Unknown SVC id 1409`)** — 재발권 금지. 해제 조건:

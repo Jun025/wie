@@ -3,13 +3,16 @@ use alloc::vec;
 use jvm::{ClassInstanceRef, Jvm, Result};
 use jvm_class_proto::JavaMethodProto;
 use jvm_types::{ClassAccessFlags, MethodAccessFlags};
-use rustjava_runtime::classes::java::lang::{Object, String};
+use rustjava_runtime::classes::java::{
+    io::{DataInputStream, DataOutputStream, InputStream, OutputStream},
+    lang::String,
+};
 
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
 
+use crate::classes::javax::microedition::io::Connection;
+
 // class javax.microedition.io.Connector
-// wie has no network, so every open fails the way a phone out of coverage does: an IOException
-// the title's own handler already expects. Without the class the lookup itself is fatal.
 pub struct Connector;
 
 impl Connector {
@@ -28,13 +31,37 @@ impl Connector {
                 JavaMethodProto::new(
                     "open",
                     "(Ljava/lang/String;I)Ljavax/microedition/io/Connection;",
-                    Self::open_mode,
+                    Self::open_with_mode,
                     MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
                 ),
                 JavaMethodProto::new(
                     "open",
                     "(Ljava/lang/String;IZ)Ljavax/microedition/io/Connection;",
-                    Self::open_mode_timeouts,
+                    Self::open_with_mode_and_timeouts,
+                    MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+                ),
+                JavaMethodProto::new(
+                    "openInputStream",
+                    "(Ljava/lang/String;)Ljava/io/InputStream;",
+                    Self::open_input_stream,
+                    MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+                ),
+                JavaMethodProto::new(
+                    "openDataInputStream",
+                    "(Ljava/lang/String;)Ljava/io/DataInputStream;",
+                    Self::open_data_input_stream,
+                    MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+                ),
+                JavaMethodProto::new(
+                    "openOutputStream",
+                    "(Ljava/lang/String;)Ljava/io/OutputStream;",
+                    Self::open_output_stream,
+                    MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+                ),
+                JavaMethodProto::new(
+                    "openDataOutputStream",
+                    "(Ljava/lang/String;)Ljava/io/DataOutputStream;",
+                    Self::open_data_output_stream,
                     MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
                 ),
             ],
@@ -43,24 +70,63 @@ impl Connector {
         }
     }
 
-    async fn open(jvm: &Jvm, _: &mut WieJvmContext, name: ClassInstanceRef<String>) -> Result<ClassInstanceRef<Object>> {
-        tracing::warn!("javax.microedition.io.Connector::open({name:?}) — no network");
+    // No protocol is supported yet. fork: the three `open` overloads fail the way a phone out of coverage does — a
+    // plain IOException, which is what the support list was measured with — where upstream throws
+    // ConnectionNotFoundException (as the stream helpers below still do).
+    async fn open(jvm: &Jvm, _: &mut WieJvmContext, name: ClassInstanceRef<String>) -> Result<ClassInstanceRef<Connection>> {
+        tracing::warn!("stub javax.microedition.io.Connector::open({name:?})");
 
         Err(jvm.exception("java/io/IOException", "no network").await)
     }
 
-    async fn open_mode(jvm: &Jvm, context: &mut WieJvmContext, name: ClassInstanceRef<String>, _mode: i32) -> Result<ClassInstanceRef<Object>> {
-        Self::open(jvm, context, name).await
+    async fn open_with_mode(jvm: &Jvm, _: &mut WieJvmContext, name: ClassInstanceRef<String>, mode: i32) -> Result<ClassInstanceRef<Connection>> {
+        tracing::warn!("stub javax.microedition.io.Connector::open({name:?}, {mode})");
+
+        Err(jvm.exception("java/io/IOException", "no network").await)
     }
 
-    async fn open_mode_timeouts(
+    async fn open_with_mode_and_timeouts(
         jvm: &Jvm,
-        context: &mut WieJvmContext,
+        _: &mut WieJvmContext,
         name: ClassInstanceRef<String>,
-        _mode: i32,
-        _timeouts: bool,
-    ) -> Result<ClassInstanceRef<Object>> {
-        Self::open(jvm, context, name).await
+        mode: i32,
+        timeouts: bool,
+    ) -> Result<ClassInstanceRef<Connection>> {
+        tracing::warn!("stub javax.microedition.io.Connector::open({name:?}, {mode}, {timeouts})");
+
+        Err(jvm.exception("java/io/IOException", "no network").await)
+    }
+
+    async fn open_input_stream(jvm: &Jvm, _: &mut WieJvmContext, name: ClassInstanceRef<String>) -> Result<ClassInstanceRef<InputStream>> {
+        tracing::warn!("stub javax.microedition.io.Connector::openInputStream({name:?})");
+
+        Err(jvm
+            .exception("javax/microedition/io/ConnectionNotFoundException", "Unsupported protocol")
+            .await)
+    }
+
+    async fn open_data_input_stream(jvm: &Jvm, _: &mut WieJvmContext, name: ClassInstanceRef<String>) -> Result<ClassInstanceRef<DataInputStream>> {
+        tracing::warn!("stub javax.microedition.io.Connector::openDataInputStream({name:?})");
+
+        Err(jvm
+            .exception("javax/microedition/io/ConnectionNotFoundException", "Unsupported protocol")
+            .await)
+    }
+
+    async fn open_output_stream(jvm: &Jvm, _: &mut WieJvmContext, name: ClassInstanceRef<String>) -> Result<ClassInstanceRef<OutputStream>> {
+        tracing::warn!("stub javax.microedition.io.Connector::openOutputStream({name:?})");
+
+        Err(jvm
+            .exception("javax/microedition/io/ConnectionNotFoundException", "Unsupported protocol")
+            .await)
+    }
+
+    async fn open_data_output_stream(jvm: &Jvm, _: &mut WieJvmContext, name: ClassInstanceRef<String>) -> Result<ClassInstanceRef<DataOutputStream>> {
+        tracing::warn!("stub javax.microedition.io.Connector::openDataOutputStream({name:?})");
+
+        Err(jvm
+            .exception("javax/microedition/io/ConnectionNotFoundException", "Unsupported protocol")
+            .await)
     }
 }
 

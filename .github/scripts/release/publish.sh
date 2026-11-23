@@ -5,57 +5,51 @@ set -euo pipefail
 repo="repos/$GITHUB_REPOSITORY"
 tag=$RELEASE_TAG
 
-artifact_notes() {
-  cat <<EOF
-## Artifact notes
-
-- The macOS artifacts are not notarized.
-- Android AAB files cannot be installed directly on a device.
-- The iOS \`.xcarchive.zip\` is not an IPA for device installation, TestFlight, or App Store submission.
-EOF
-}
-
 if [[ "$CHANNEL" == stable ]]; then
-  if release=$(gh api "$repo/releases/tags/$tag" 2>/dev/null); then
-    release_id=$(jq -r '.id' <<< "$release")
-  else
-    initial_body=$(artifact_notes)
-    release=$(gh api --method POST "$repo/releases" -f tag_name="$tag" -f target_commitish="$TARGET_SHA" -f name="$tag" -f body="$initial_body" -F draft=true -F prerelease=false)
+  if ! release_id=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json databaseId --jq '.databaseId' 2>/dev/null); then
+    release=$(gh api --method POST "$repo/releases" -f tag_name="$tag" -f name="$tag" -F draft=true -F prerelease=false)
     release_id=$(jq -r '.id' <<< "$release")
   fi
 
+  # The updater picks its installer by "<os>-<arch>-<bundle type>", falling back to "<os>-<arch>".
+  platforms='{}'
+  while read -r target asset; do
+    platforms=$(jq --arg target "$target" --arg url "https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$asset" \
+      --rawfile signature "release-assets/$asset.sig" '.[$target] = {url: $url, signature: ($signature | rtrimstr("\n"))}' <<< "$platforms")
+  done <<EOF
+windows-x86_64-nsis wie-$tag-windows-x86_64-unsigned-setup.exe
+windows-x86_64-msi wie-$tag-windows-x86_64-unsigned.msi
+windows-aarch64-nsis wie-$tag-windows-aarch64-unsigned-setup.exe
+windows-aarch64-msi wie-$tag-windows-aarch64-unsigned.msi
+linux-x86_64-appimage wie-$tag-linux-x86_64.AppImage
+linux-aarch64-appimage wie-$tag-linux-aarch64.AppImage
+linux-x86_64-deb wie-$tag-linux-x86_64.deb
+linux-aarch64-deb wie-$tag-linux-aarch64.deb
+darwin-x86_64 wie-$tag-macos-universal-unsigned.app.tar.gz
+darwin-aarch64 wie-$tag-macos-universal-unsigned.app.tar.gz
+EOF
+  jq -n --arg version "${tag#v}" --argjson platforms "$platforms" '{version: $version, platforms: $platforms}' > release-assets/latest.json
+
   gh release upload "$tag" release-assets/* --clobber --repo "$GITHUB_REPOSITORY"
 
-  generate_notes_args=(--method POST "$repo/releases/generate-notes" -f tag_name="$tag" -f target_commitish="$TARGET_SHA")
+  generate_notes_args=(--method POST "$repo/releases/generate-notes" -f tag_name="$tag")
   if [[ -n "$PREVIOUS_TAG" ]]; then
     generate_notes_args+=(-f previous_tag_name="$PREVIOUS_TAG")
   fi
   notes=$(gh api "${generate_notes_args[@]}" --jq '.body')
-  body="$(artifact_notes)
-
-## Changes
+  body="## Changes
 
 $notes"
   gh api --method PATCH "$repo/releases/$release_id" -f name="$tag" -f body="$body" -F draft=false -F prerelease=false >/dev/null
 else
-  if [[ $(gh api "$repo/git/ref/heads/main" --jq '.object.sha') != "$TARGET_SHA" ]]; then
-    echo "Skipping stale nightly before any release mutation"
-    exit 0
-  fi
-
-  if release=$(gh api "$repo/releases/tags/$tag" 2>/dev/null); then
-    release_id=$(jq -r '.id' <<< "$release")
-  else
-    initial_body=$(artifact_notes)
-    release=$(gh api --method POST "$repo/releases" -f tag_name="$tag" -f target_commitish="$TARGET_SHA" -f name=nightly -f body="$initial_body" -F draft=true -F prerelease=true)
+  if ! release_id=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json databaseId --jq '.databaseId' 2>/dev/null); then
+    release=$(gh api --method POST "$repo/releases" -f tag_name="$tag" -f target_commitish="$TARGET_SHA" -f name=nightly -F draft=true -F prerelease=true)
     release_id=$(jq -r '.id' <<< "$release")
   fi
 
   gh release upload "$tag" release-assets/* --clobber --repo "$GITHUB_REPOSITORY"
 
-  body="$(artifact_notes)
-
-## Nightly
+  body="## Nightly
 
 - Target SHA: \`$TARGET_SHA\`"
   gh api --method PATCH "$repo/releases/$release_id" -f name=nightly -f body="$body" -F draft=false -F prerelease=true >/dev/null

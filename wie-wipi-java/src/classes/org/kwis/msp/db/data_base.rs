@@ -109,6 +109,7 @@ impl DataBase {
             access_flags: ClassAccessFlags::PUBLIC,
         }
     }
+
     async fn init(jvm: &Jvm, _: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, record_store: ClassInstanceRef<RecordStore>) -> JvmResult<()> {
         tracing::debug!("org.kwis.msp.db.DataBase::<init>({this:?}, {record_store:?})");
 
@@ -134,7 +135,7 @@ impl DataBase {
         record_size: i32,
         create: bool,
     ) -> JvmResult<ClassInstanceRef<DataBase>> {
-        tracing::warn!("org.kwis.msp.db.DataBase::openDataBase({data_base_name:?}, {record_size}, {create})");
+        tracing::debug!("org.kwis.msp.db.DataBase::openDataBase({data_base_name:?}, {record_size}, {create})");
 
         let result = jvm
             .invoke_static(

@@ -8,11 +8,13 @@ import "webpack-dev-server";
 // @ts-ignore: allowImportingTsExtensions
 import commonConfig from "./webpack.config.common.ts";
 
-const config: webpack.Configuration = merge(commonConfig("development"), {
+const config: webpack.Configuration = merge(commonConfig, {
   mode: "development",
   devtool: "eval-source-map",
   devServer: {
     open: false,
+    host: process.env.TAURI_DEV_HOST ?? "localhost",
+    port: 8080,
     static: [
       path.join(import.meta.dirname, "dist"),
       path.join(import.meta.dirname, "public"),

@@ -32,6 +32,7 @@ impl Canvas {
                     MethodAccessFlags::PROTECTED | MethodAccessFlags::ABSTRACT,
                 ),
                 JavaMethodProto::new("getGameAction", "(I)I", Self::get_game_action, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getKeyCode", "(I)I", Self::get_key_code, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("keyPressed", "(I)V", Self::key_pressed, MethodAccessFlags::PROTECTED),
                 JavaMethodProto::new("keyRepeated", "(I)V", Self::key_repeated, MethodAccessFlags::PROTECTED),
                 JavaMethodProto::new("keyReleased", "(I)V", Self::key_released, MethodAccessFlags::PROTECTED),
@@ -39,17 +40,20 @@ impl Canvas {
                 JavaMethodProto::new("hideNotify", "()V", Self::hide_notify, MethodAccessFlags::PROTECTED),
                 JavaMethodProto::new("setFullScreenMode", "(Z)V", Self::set_full_screen_mode, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("isDoubleBuffered", "()Z", Self::is_double_buffered, MethodAccessFlags::PUBLIC),
-                // A keypad handset with no touch screen — what every title here was built for.
-                JavaMethodProto::new("hasPointerEvents", "()Z", Self::no, MethodAccessFlags::PUBLIC),
-                JavaMethodProto::new("hasPointerMotionEvents", "()Z", Self::no, MethodAccessFlags::PUBLIC),
-                JavaMethodProto::new("hasRepeatEvents", "()Z", Self::yes, MethodAccessFlags::PUBLIC),
-                JavaMethodProto::new("pointerPressed", "(II)V", Self::pointer_event, MethodAccessFlags::PROTECTED),
-                JavaMethodProto::new("pointerReleased", "(II)V", Self::pointer_event, MethodAccessFlags::PROTECTED),
-                JavaMethodProto::new("pointerDragged", "(II)V", Self::pointer_event, MethodAccessFlags::PROTECTED),
-                JavaMethodProto::new("getKeyCode", "(I)I", Self::get_key_code, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("hasPointerEvents", "()Z", Self::has_pointer_events, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new(
+                    "hasPointerMotionEvents",
+                    "()Z",
+                    Self::has_pointer_motion_events,
+                    MethodAccessFlags::PUBLIC,
+                ),
+                JavaMethodProto::new("hasRepeatEvents", "()Z", Self::has_repeat_events, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getKeyName", "(I)Ljava/lang/String;", Self::get_key_name, MethodAccessFlags::PUBLIC),
-                // wie private methods
-                JavaMethodProto::new("handleKeyEvent", "(II)V", Self::handle_key_event, MethodAccessFlags::empty()),
+                JavaMethodProto::new("pointerPressed", "(II)V", Self::pointer_pressed, MethodAccessFlags::PROTECTED),
+                JavaMethodProto::new("pointerReleased", "(II)V", Self::pointer_released, MethodAccessFlags::PROTECTED),
+                JavaMethodProto::new("pointerDragged", "(II)V", Self::pointer_dragged, MethodAccessFlags::PROTECTED),
+                // Protected so vendor canvases in other Java packages can translate key codes.
+                JavaMethodProto::new("handleKeyEvent", "(II)V", Self::handle_key_event, MethodAccessFlags::PROTECTED),
                 JavaMethodProto::new(
                     "handlePaintEvent",
                     "(Ljavax/microedition/lcdui/Graphics;)V",
@@ -107,6 +111,8 @@ impl Canvas {
     ) -> JvmResult<()> {
         tracing::debug!("javax.microedition.lcdui.Canvas::repaint({this:?}, {x}, {y}, {width}, {height})");
 
+        // fork: upstream returns here when width or height is not positive. Ours hands every request
+        // on — Display.repaint then paints the whole content area — as before the 2026-11-23 merge.
         let display: ClassInstanceRef<Display> = jvm
             .invoke_virtual(
                 &this,
@@ -161,6 +167,9 @@ impl Canvas {
             Some(MIDPKeyCode::LEFT) => 2,  // LEFT
             Some(MIDPKeyCode::RIGHT) => 5, // RIGHT
             Some(MIDPKeyCode::FIRE) => 8,  // FIRE,
+            // fork: upstream also maps KEY_NUM1/3/7/9 to GAME_A..D here. Ours never mapped a number key
+            // to a game action (GAME_A..D exist only in getKeyCode and GameCanvas.getKeyStates, as 7 9 * #),
+            // and the support list was measured that way (`docs/report/0551` §8).
             _ => 0,
         };
 
@@ -211,16 +220,22 @@ impl Canvas {
         Ok(true)
     }
 
-    async fn no(_: &Jvm, _: &mut WieJvmContext, _: ClassInstanceRef<Self>) -> JvmResult<bool> {
+    async fn has_pointer_events(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<bool> {
+        tracing::warn!("stub javax.microedition.lcdui.Canvas::hasPointerEvents({this:?})");
+
         Ok(false)
     }
 
-    async fn yes(_: &Jvm, _: &mut WieJvmContext, _: ClassInstanceRef<Self>) -> JvmResult<bool> {
-        Ok(true)
+    async fn has_pointer_motion_events(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<bool> {
+        tracing::warn!("stub javax.microedition.lcdui.Canvas::hasPointerMotionEvents({this:?})");
+
+        Ok(false)
     }
 
-    async fn pointer_event(_: &Jvm, _: &mut WieJvmContext, _: ClassInstanceRef<Self>, _: i32, _: i32) -> JvmResult<()> {
-        Ok(())
+    async fn has_repeat_events(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<bool> {
+        tracing::debug!("javax.microedition.lcdui.Canvas::hasRepeatEvents({this:?})");
+
+        Ok(true)
     }
 
     // The inverse of getGameAction.
@@ -262,7 +277,31 @@ impl Canvas {
         Ok(JavaLangString::from_rust_string(jvm, &name).await?.into())
     }
 
-    async fn handle_key_event(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>, event_type: i32, code: i32) -> JvmResult<()> {
+    async fn pointer_pressed(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, x: i32, y: i32) -> JvmResult<()> {
+        tracing::debug!("javax.microedition.lcdui.Canvas::pointerPressed({this:?}, {x}, {y})");
+
+        Ok(())
+    }
+
+    async fn pointer_released(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, x: i32, y: i32) -> JvmResult<()> {
+        tracing::debug!("javax.microedition.lcdui.Canvas::pointerReleased({this:?}, {x}, {y})");
+
+        Ok(())
+    }
+
+    async fn pointer_dragged(_: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>, x: i32, y: i32) -> JvmResult<()> {
+        tracing::debug!("javax.microedition.lcdui.Canvas::pointerDragged({this:?}, {x}, {y})");
+
+        Ok(())
+    }
+
+    async fn handle_key_event(
+        jvm: &Jvm,
+        _context: &mut WieJvmContext,
+        mut this: ClassInstanceRef<Self>,
+        event_type: i32,
+        code: i32,
+    ) -> JvmResult<()> {
         tracing::debug!("javax.microedition.lcdui.Canvas::handleKeyEvent({this:?}, {event_type}, {code})");
 
         let event_type = if let Some(event_type) = KeyboardEventType::from_raw(event_type) {
@@ -270,8 +309,31 @@ impl Canvas {
         } else {
             return Err(jvm.exception("java/lang/IllegalArgumentException", "Invalid keyboard event type").await);
         };
+        // fork: upstream derives the GameCanvas key bit from getGameAction. Ours comes from `game_key_bit`
+        // (number keys steer, GAME_A..D are 7 9 * #) and never calls into the guest for it.
+        let bit = game_key_bit(code);
         // The queue carries SKT codes (Screens, GameCanvas key states read them); translate only here.
         let code = if standard_key_codes(jvm).await? { to_standard(code) } else { code };
+
+        if bit != 0 {
+            let held: i32 = jvm.get_field(&this, "javax/microedition/lcdui/Displayable", "heldGameKeys", "I").await?;
+            match event_type {
+                KeyboardEventType::KeyPressed => {
+                    let pressed: i32 = jvm
+                        .get_field(&this, "javax/microedition/lcdui/Displayable", "pressedGameKeys", "I")
+                        .await?;
+                    jvm.put_field(&mut this, "javax/microedition/lcdui/Displayable", "heldGameKeys", "I", held | bit)
+                        .await?;
+                    jvm.put_field(&mut this, "javax/microedition/lcdui/Displayable", "pressedGameKeys", "I", pressed | bit)
+                        .await?;
+                }
+                KeyboardEventType::KeyReleased => {
+                    jvm.put_field(&mut this, "javax/microedition/lcdui/Displayable", "heldGameKeys", "I", held & !bit)
+                        .await?;
+                }
+                _ => {}
+            }
+        }
 
         let _: () = match event_type {
             KeyboardEventType::KeyPressed => {
@@ -312,6 +374,25 @@ impl Canvas {
 
         Ok(())
     }
+}
+
+// GameCanvas.*_PRESSED bit for a key: 1 << the key's game action. The number keys stand in for the
+// d-pad as on most handsets (2/4/6/8, 5 = fire), so a keypad-only player can still steer.
+fn game_key_bit(code: i32) -> i32 {
+    let action = match MIDPKeyCode::from_raw(code) {
+        Some(MIDPKeyCode::UP | MIDPKeyCode::KEY_NUM2) => 1,
+        Some(MIDPKeyCode::LEFT | MIDPKeyCode::KEY_NUM4) => 2,
+        Some(MIDPKeyCode::RIGHT | MIDPKeyCode::KEY_NUM6) => 5,
+        Some(MIDPKeyCode::DOWN | MIDPKeyCode::KEY_NUM8) => 6,
+        Some(MIDPKeyCode::FIRE | MIDPKeyCode::KEY_NUM5) => 8,
+        Some(MIDPKeyCode::KEY_NUM7) => 9,   // GAME_A
+        Some(MIDPKeyCode::KEY_NUM9) => 10,  // GAME_B
+        Some(MIDPKeyCode::KEY_STAR) => 11,  // GAME_C
+        Some(MIDPKeyCode::KEY_POUND) => 12, // GAME_D
+        _ => return 0,
+    };
+
+    1 << action
 }
 
 async fn standard_key_codes(jvm: &Jvm) -> JvmResult<bool> {
@@ -357,8 +438,8 @@ fn from_standard(code: i32) -> i32 {
 
 #[cfg(test)]
 mod test {
-    use alloc::{boxed::Box, vec};
-    use jvm::{ClassInstanceRef, Jvm, Result as JvmResult, runtime::JavaLangString};
+    use alloc::{boxed::Box, vec, vec::Vec};
+    use jvm::{ClassInstanceRef, JavaError, Jvm, Result as JvmResult, runtime::JavaLangString};
     use jvm_class_proto::{JavaClassProto, JavaFieldProto, JavaMethodProto};
     use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
     use test_utils::run_jvm_test;
@@ -508,14 +589,21 @@ mod test {
                     JavaMethodProto::new("keyPressed", "(I)V", Self::key_pressed, MethodAccessFlags::PROTECTED),
                     JavaMethodProto::new("keyRepeated", "(I)V", Self::key_repeated, MethodAccessFlags::PROTECTED),
                     JavaMethodProto::new("keyReleased", "(I)V", Self::key_released, MethodAccessFlags::PROTECTED),
+                    JavaMethodProto::new("showNotify", "()V", Self::show_notify, MethodAccessFlags::PROTECTED),
+                    JavaMethodProto::new("hideNotify", "()V", Self::hide_notify, MethodAccessFlags::PROTECTED),
                 ],
                 fields: vec![
+                    JavaFieldProto::new("shown", "Z", FieldAccessFlags::PUBLIC),
+                    JavaFieldProto::new("redirectDisplay", "Ljavax/microedition/lcdui/Display;", FieldAccessFlags::PUBLIC),
+                    JavaFieldProto::new("redirect", "Ljavax/microedition/lcdui/Displayable;", FieldAccessFlags::PUBLIC),
                     JavaFieldProto::new("translateX", "I", FieldAccessFlags::PUBLIC),
                     JavaFieldProto::new("translateY", "I", FieldAccessFlags::PUBLIC),
                     JavaFieldProto::new("clipX", "I", FieldAccessFlags::PUBLIC),
                     JavaFieldProto::new("clipY", "I", FieldAccessFlags::PUBLIC),
                     JavaFieldProto::new("clipWidth", "I", FieldAccessFlags::PUBLIC),
                     JavaFieldProto::new("clipHeight", "I", FieldAccessFlags::PUBLIC),
+                    JavaFieldProto::new("paintCount", "I", FieldAccessFlags::PUBLIC),
+                    JavaFieldProto::new("repaintDuringPaint", "Z", FieldAccessFlags::PUBLIC),
                     JavaFieldProto::new("sizeChangedCount", "I", FieldAccessFlags::PUBLIC),
                     JavaFieldProto::new("lastWidth", "I", FieldAccessFlags::PUBLIC),
                     JavaFieldProto::new("lastHeight", "I", FieldAccessFlags::PUBLIC),
@@ -537,6 +625,11 @@ mod test {
             mut this: ClassInstanceRef<Self>,
             graphics: ClassInstanceRef<Graphics>,
         ) -> JvmResult<()> {
+            let count: i32 = jvm
+                .get_field(&this, "javax/microedition/lcdui/TestRecordingCanvas", "paintCount", "I")
+                .await?;
+            jvm.put_field(&mut this, "javax/microedition/lcdui/TestRecordingCanvas", "paintCount", "I", count + 1)
+                .await?;
             for (field, method) in [
                 ("translateX", "getTranslateX"),
                 ("translateY", "getTranslateY"),
@@ -549,6 +642,25 @@ mod test {
                     .invoke_virtual(&graphics, "javax/microedition/lcdui/Graphics", method, "()I", ())
                     .await?;
                 jvm.put_field(&mut this, "javax/microedition/lcdui/TestRecordingCanvas", field, "I", value)
+                    .await?;
+            }
+
+            if jvm
+                .get_field::<bool>(&this, "javax/microedition/lcdui/TestRecordingCanvas", "repaintDuringPaint", "Z")
+                .await?
+            {
+                jvm.put_field(
+                    &mut this,
+                    "javax/microedition/lcdui/TestRecordingCanvas",
+                    "repaintDuringPaint",
+                    "Z",
+                    false,
+                )
+                .await?;
+                jvm.invoke_virtual::<_, ()>(&this, "javax/microedition/lcdui/Canvas", "repaint", "(IIII)V", (4, 5, 6, 7))
+                    .await?;
+                // Servicing repaints from inside paint must leave the request above for the next cycle.
+                jvm.invoke_virtual::<_, ()>(&this, "javax/microedition/lcdui/Canvas", "serviceRepaints", "()V", ())
                     .await?;
             }
 
@@ -590,6 +702,44 @@ mod test {
         async fn key_released(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>, code: i32) -> JvmResult<()> {
             jvm.put_field(&mut this, "javax/microedition/lcdui/TestRecordingCanvas", "released", "I", code)
                 .await
+        }
+
+        async fn show_notify(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            jvm.put_field(&mut this, "javax/microedition/lcdui/TestRecordingCanvas", "shown", "Z", true)
+                .await
+        }
+
+        async fn hide_notify(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            jvm.put_field(&mut this, "javax/microedition/lcdui/TestRecordingCanvas", "shown", "Z", false)
+                .await?;
+
+            let redirect: ClassInstanceRef<Canvas> = jvm
+                .get_field(
+                    &this,
+                    "javax/microedition/lcdui/TestRecordingCanvas",
+                    "redirect",
+                    "Ljavax/microedition/lcdui/Displayable;",
+                )
+                .await?;
+            if redirect.is_null() {
+                return Ok(());
+            }
+            let display: ClassInstanceRef<Display> = jvm
+                .get_field(
+                    &this,
+                    "javax/microedition/lcdui/TestRecordingCanvas",
+                    "redirectDisplay",
+                    "Ljavax/microedition/lcdui/Display;",
+                )
+                .await?;
+            jvm.invoke_virtual(
+                &display,
+                "javax/microedition/lcdui/Display",
+                "setCurrent",
+                "(Ljavax/microedition/lcdui/Displayable;)V",
+                (redirect,),
+            )
+            .await
         }
     }
 
@@ -663,11 +813,63 @@ mod test {
             Box::new([get_protos().into(), [RecordingCanvas::as_proto(), RecordingGameCanvas::as_proto()].into()]),
             |jvm| async move {
                 let display: ClassInstanceRef<Display> = jvm.new_class("javax/microedition/lcdui/Display", "()V", ()).await?.into();
-                for (class, game_canvas) in [
-                    ("javax/microedition/lcdui/TestRecordingCanvas", false),
-                    ("javax/microedition/lcdui/TestRecordingGameCanvas", true),
+                let mut recording_canvas: ClassInstanceRef<Canvas> = None.into();
+                for (class, game_canvas, skvm) in [
+                    ("javax/microedition/lcdui/TestRecordingCanvas", false, false),
+                    ("javax/microedition/lcdui/TestRecordingGameCanvas", true, false),
+                    ("javax/microedition/lcdui/TestRecordingCanvas", false, true),
+                    ("javax/microedition/lcdui/TestRecordingGameCanvas", true, true),
                 ] {
-                    let canvas: ClassInstanceRef<Canvas> = jvm.new_class(class, "()V", ()).await?.into();
+                    if skvm {
+                        let key = JavaLangString::from_rust_string(&jvm, "m.SK_VM").await?;
+                        let value = JavaLangString::from_rust_string(&jvm, "10").await?;
+                        let _: ClassInstanceRef<()> = jvm
+                            .invoke_static(
+                                "java/lang/System",
+                                "setProperty",
+                                "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;",
+                                (key, value),
+                            )
+                            .await?;
+                    }
+                    let mut canvas: ClassInstanceRef<Canvas> = jvm.new_class(class, "()V", ()).await?.into();
+                    assert_eq!(
+                        jvm.invoke_virtual::<_, i32>(&canvas, "javax/microedition/lcdui/Displayable", "getHeight", "()I", ())
+                            .await?,
+                        if skvm { 224 } else { 240 }
+                    );
+                    for (action, expected_key) in [
+                        (1, MIDPKeyCode::UP),
+                        (6, MIDPKeyCode::DOWN),
+                        (2, MIDPKeyCode::LEFT),
+                        (5, MIDPKeyCode::RIGHT),
+                        (8, MIDPKeyCode::FIRE),
+                        // fork: GAME_A..D are 7 9 * # here (upstream 1 3 7 9), and getGameAction maps no
+                        // number key back to them.
+                        (9, MIDPKeyCode::KEY_NUM7),
+                        (10, MIDPKeyCode::KEY_NUM9),
+                        (11, MIDPKeyCode::KEY_STAR),
+                        (12, MIDPKeyCode::KEY_POUND),
+                    ] {
+                        let key: i32 = jvm
+                            .invoke_virtual(&canvas, "javax/microedition/lcdui/Canvas", "getKeyCode", "(I)I", (action,))
+                            .await?;
+                        assert_eq!(key, expected_key as i32);
+                        assert_eq!(
+                            jvm.invoke_virtual::<_, i32>(&canvas, "javax/microedition/lcdui/Canvas", "getGameAction", "(I)I", (key,))
+                                .await?,
+                            if action < 9 { action } else { 0 }
+                        );
+                    }
+                    for action in [-1, 0, 3, 4, 7, 13] {
+                        let result = jvm
+                            .invoke_virtual::<_, i32>(&canvas, "javax/microedition/lcdui/Canvas", "getKeyCode", "(I)I", (action,))
+                            .await;
+                        let Err(JavaError::JavaException(exception)) = result else {
+                            panic!("Expected IllegalArgumentException for action {action}");
+                        };
+                        assert!(jvm.is_instance(&*exception, "java/lang/IllegalArgumentException"));
+                    }
                     let title = JavaLangString::from_rust_string(&jvm, "Canvas title").await?;
                     let _: () = jvm
                         .invoke_virtual(
@@ -689,13 +891,15 @@ mod test {
                             "javax/microedition/lcdui/Displayable",
                             "addCommand",
                             "(Ljavax/microedition/lcdui/Command;)V",
-                            (command,),
+                            (command.clone(),),
                         )
                         .await?;
                     let decorated_height: i32 = jvm
                         .invoke_virtual(&canvas, "javax/microedition/lcdui/Displayable", "getHeight", "()I", ())
                         .await?;
-                    assert!(decorated_height < 240);
+                    // fork: 18 on SKVM too (upstream 16) — display.rs SOFTKEY_HEIGHT.
+                    let command_height = 18;
+                    assert_eq!(decorated_height, 240 - 16 - command_height);
                     if game_canvas {
                         let graphics: ClassInstanceRef<Graphics> = jvm
                             .invoke_virtual(
@@ -722,6 +926,15 @@ mod test {
                             (canvas.clone(),),
                         )
                         .await?;
+                    // The recording canvas is shown when it becomes current and hidden once the game canvas replaces it.
+                    if !game_canvas {
+                        recording_canvas = canvas.clone();
+                    }
+                    assert_eq!(
+                        jvm.get_field::<bool>(&recording_canvas, "javax/microedition/lcdui/TestRecordingCanvas", "shown", "Z")
+                            .await?,
+                        !game_canvas
+                    );
                     for (fullscreen, callback_count, event_type, field, key) in [
                         (false, 1, KeyboardEventType::KeyPressed, "pressed", MIDPKeyCode::KEY_NUM1),
                         (true, 2, KeyboardEventType::KeyRepeated, "repeated", MIDPKeyCode::KEY_NUM2),
@@ -752,12 +965,19 @@ mod test {
                                     == 0,
                                 fullscreen
                             );
-                            assert_eq!(jvm.get_field::<i32>(&canvas, class, "clipWidth", "I").await?, 320);
-                            assert_eq!(jvm.get_field::<i32>(&canvas, class, "clipHeight", "I").await?, height);
+                            assert_eq!(
+                                jvm.get_field::<i32>(&canvas, "javax/microedition/lcdui/TestRecordingCanvas", "clipWidth", "I")
+                                    .await?,
+                                320
+                            );
+                            assert_eq!(
+                                jvm.get_field::<i32>(&canvas, "javax/microedition/lcdui/TestRecordingCanvas", "clipHeight", "I")
+                                    .await?,
+                                height
+                            );
                         }
                         let mut graphics: ClassInstanceRef<Graphics> = jvm
-                            .invoke_virtual(
-                                &display,
+                            .invoke_static(
                                 "javax/microedition/lcdui/Display",
                                 "getScreenGraphics",
                                 "()Ljavax/microedition/lcdui/Graphics;",
@@ -772,6 +992,44 @@ mod test {
                             let pixel = image.get_pixel(x, y);
                             assert_eq!((pixel.r, pixel.g, pixel.b) == (0x22, 0xaa, 0x44), fullscreen);
                         }
+                        if !game_canvas && callback_count == 1 {
+                            for bounds in [(10, 20, 30, 40), (25, 5, 40, 25)] {
+                                jvm.invoke_virtual::<_, ()>(&canvas, "javax/microedition/lcdui/Canvas", "repaint", "(IIII)V", bounds)
+                                    .await?;
+                            }
+                            jvm.invoke_virtual::<_, ()>(&canvas, "javax/microedition/lcdui/Canvas", "serviceRepaints", "()V", ())
+                                .await?;
+                            for (field, expected) in [("clipX", 10), ("clipY", 5), ("clipWidth", 55), ("clipHeight", 55)] {
+                                assert_eq!(jvm.get_field::<i32>(&canvas, class, field, "I").await?, expected);
+                            }
+
+                            jvm.put_field(&mut canvas, class, "repaintDuringPaint", "Z", true).await?;
+                            jvm.invoke_virtual::<_, ()>(&canvas, "javax/microedition/lcdui/Canvas", "repaint", "(IIII)V", (-5, -6, 10, 12))
+                                .await?;
+                            for expected in [[0, 0, 5, 6], [4, 5, 6, 7]] {
+                                jvm.invoke_virtual::<_, ()>(&canvas, "javax/microedition/lcdui/Canvas", "serviceRepaints", "()V", ())
+                                    .await?;
+                                for (field, value) in ["clipX", "clipY", "clipWidth", "clipHeight"].into_iter().zip(expected) {
+                                    assert_eq!(jvm.get_field::<i32>(&canvas, class, field, "I").await?, value);
+                                }
+                            }
+                            let count: i32 = jvm.get_field(&canvas, class, "paintCount", "I").await?;
+                            for bounds in [(0, 0, 0, 10), (0, 0, -1, -1), (400, 0, 10, 10)] {
+                                jvm.invoke_virtual::<_, ()>(&canvas, "javax/microedition/lcdui/Canvas", "repaint", "(IIII)V", bounds)
+                                    .await?;
+                            }
+                            jvm.invoke_virtual::<_, ()>(&canvas, "javax/microedition/lcdui/Canvas", "serviceRepaints", "()V", ())
+                                .await?;
+                            // fork: upstream drops a repaint whose width or height is not positive, so nothing is
+                            // painted here. Ours keeps the request (Display.repaint paints the whole content area).
+                            assert_eq!(jvm.get_field::<i32>(&canvas, class, "paintCount", "I").await?, count + 1);
+                            jvm.invoke_virtual::<_, ()>(&canvas, "javax/microedition/lcdui/Canvas", "repaint", "()V", ())
+                                .await?;
+                            jvm.invoke_virtual::<_, ()>(&canvas, "javax/microedition/lcdui/Canvas", "serviceRepaints", "()V", ())
+                                .await?;
+                            assert_eq!(jvm.get_field::<i32>(&canvas, class, "clipWidth", "I").await?, 320);
+                            assert_eq!(jvm.get_field::<i32>(&canvas, class, "clipHeight", "I").await?, height);
+                        }
                         let _: () = jvm
                             .invoke_virtual(
                                 &display,
@@ -783,7 +1041,219 @@ mod test {
                             .await?;
                         assert_eq!(jvm.get_field::<i32>(&canvas, class, field, "I").await?, key);
                     }
+                    if game_canvas {
+                        // fork: GAME_A and GAME_B are KEY_NUM7 and KEY_NUM9 here (upstream KEY_NUM1 and KEY_NUM3), so
+                        // GAME_A is pressed first; it is then released and GAME_B tapped between two polls.
+                        let _: () = jvm
+                            .invoke_virtual(
+                                &display,
+                                "javax/microedition/lcdui/Display",
+                                "handleKeyEvent",
+                                "(II)V",
+                                (KeyboardEventType::KeyPressed as i32, MIDPKeyCode::KEY_NUM7 as i32),
+                            )
+                            .await?;
+                        let tap = [
+                            (KeyboardEventType::KeyReleased as i32, MIDPKeyCode::KEY_NUM7 as i32),
+                            (KeyboardEventType::KeyPressed as i32, MIDPKeyCode::KEY_NUM9 as i32),
+                            (KeyboardEventType::KeyReleased as i32, MIDPKeyCode::KEY_NUM9 as i32),
+                        ];
+                        let mut states = Vec::new();
+                        for events in [&[][..], &tap[..], &[][..]] {
+                            for &event in events {
+                                let _: () = jvm
+                                    .invoke_virtual(&display, "javax/microedition/lcdui/Display", "handleKeyEvent", "(II)V", event)
+                                    .await?;
+                            }
+                            let state: i32 = jvm
+                                .invoke_virtual(&canvas, "javax/microedition/lcdui/game/GameCanvas", "getKeyStates", "()I", ())
+                                .await?;
+                            states.push(state);
+                        }
+                        assert_eq!(states, [1 << 9, 1 << 10, 0]);
+
+                        // A key held while another screen takes over reads as unpressed once this canvas is shown again.
+                        let _: () = jvm
+                            .invoke_virtual(
+                                &display,
+                                "javax/microedition/lcdui/Display",
+                                "handleKeyEvent",
+                                "(II)V",
+                                (KeyboardEventType::KeyPressed as i32, MIDPKeyCode::KEY_NUM7 as i32),
+                            )
+                            .await?;
+                        for shown in [recording_canvas.clone(), canvas.clone()] {
+                            let _: () = jvm
+                                .invoke_virtual(
+                                    &display,
+                                    "javax/microedition/lcdui/Display",
+                                    "setCurrent",
+                                    "(Ljavax/microedition/lcdui/Displayable;)V",
+                                    (shown,),
+                                )
+                                .await?;
+                        }
+                        let state: i32 = jvm
+                            .invoke_virtual(&canvas, "javax/microedition/lcdui/game/GameCanvas", "getKeyStates", "()I", ())
+                            .await?;
+                        assert_eq!(state, 0);
+
+                        // With a second command the left soft key opens the command menu, which then consumes the UP release.
+                        let label = JavaLangString::from_rust_string(&jvm, "More").await?;
+                        let extra: ClassInstanceRef<Command> = jvm
+                            .new_class("javax/microedition/lcdui/Command", "(Ljava/lang/String;II)V", (label, 4, 1))
+                            .await?
+                            .into();
+                        let _: () = jvm
+                            .invoke_virtual(
+                                &canvas,
+                                "javax/microedition/lcdui/Displayable",
+                                "addCommand",
+                                "(Ljavax/microedition/lcdui/Command;)V",
+                                (extra.clone(),),
+                            )
+                            .await?;
+                        for event in [
+                            (KeyboardEventType::KeyPressed as i32, MIDPKeyCode::UP as i32),
+                            (KeyboardEventType::KeyPressed as i32, MIDPKeyCode::LEFT_SOFT_KEY as i32),
+                            (KeyboardEventType::KeyReleased as i32, MIDPKeyCode::UP as i32),
+                            (KeyboardEventType::KeyPressed as i32, MIDPKeyCode::RIGHT_SOFT_KEY as i32),
+                        ] {
+                            let _: () = jvm
+                                .invoke_virtual(&display, "javax/microedition/lcdui/Display", "handleKeyEvent", "(II)V", event)
+                                .await?;
+                        }
+                        let state: i32 = jvm
+                            .invoke_virtual(&canvas, "javax/microedition/lcdui/game/GameCanvas", "getKeyStates", "()I", ())
+                            .await?;
+                        assert_eq!(state, 0);
+                        let _: () = jvm
+                            .invoke_virtual(
+                                &canvas,
+                                "javax/microedition/lcdui/Displayable",
+                                "removeCommand",
+                                "(Ljavax/microedition/lcdui/Command;)V",
+                                (extra,),
+                            )
+                            .await?;
+                    }
+                    let _: () = jvm
+                        .invoke_virtual(
+                            &canvas,
+                            "javax/microedition/lcdui/Displayable",
+                            "removeCommand",
+                            "(Ljavax/microedition/lcdui/Command;)V",
+                            (command,),
+                        )
+                        .await?;
+                    let _: () = jvm
+                        .invoke_virtual(
+                            &canvas,
+                            "javax/microedition/lcdui/Displayable",
+                            "setTitle",
+                            "(Ljava/lang/String;)V",
+                            (ClassInstanceRef::<()>::new(None),),
+                        )
+                        .await?;
+                    let height = if skvm { 224 } else { 240 };
+                    assert_eq!(
+                        jvm.invoke_virtual::<_, i32>(&canvas, "javax/microedition/lcdui/Displayable", "getHeight", "()I", ())
+                            .await?,
+                        height
+                    );
+                    assert_eq!(jvm.get_field::<i32>(&canvas, class, "lastHeight", "I").await?, height);
+                    let _: () = jvm
+                        .invoke_virtual(&canvas, "javax/microedition/lcdui/Canvas", "repaint", "(IIII)V", (0, 0, 320, 240))
+                        .await?;
+                    let _: () = jvm
+                        .invoke_virtual(&canvas, "javax/microedition/lcdui/Canvas", "serviceRepaints", "()V", ())
+                        .await?;
+                    let mut graphics: ClassInstanceRef<Graphics> = jvm
+                        .invoke_static(
+                            "javax/microedition/lcdui/Display",
+                            "getScreenGraphics",
+                            "()Ljavax/microedition/lcdui/Graphics;",
+                            (),
+                        )
+                        .await?;
+                    let image_ref = Graphics::image(&jvm, &mut graphics).await?;
+                    let bottom = Image::image(&jvm, &image_ref).await?.get_pixel(319, 239);
+                    assert_eq!((bottom.r, bottom.g, bottom.b), (0x22, 0xaa, 0x44));
                 }
+
+                // The first canvas switches to `redirect` from hideNotify, which supersedes the switch to `superseded`.
+                let class = "javax/microedition/lcdui/TestRecordingCanvas";
+                let mut first: ClassInstanceRef<Canvas> = jvm.new_class(class, "()V", ()).await?.into();
+                let superseded: ClassInstanceRef<Canvas> = jvm.new_class(class, "()V", ()).await?.into();
+                let redirect: ClassInstanceRef<Canvas> = jvm.new_class(class, "()V", ()).await?.into();
+                jvm.put_field(
+                    &mut first,
+                    class,
+                    "redirectDisplay",
+                    "Ljavax/microedition/lcdui/Display;",
+                    display.clone(),
+                )
+                .await?;
+                jvm.put_field(&mut first, class, "redirect", "Ljavax/microedition/lcdui/Displayable;", redirect.clone())
+                    .await?;
+                for shown in [first, superseded.clone()] {
+                    let _: () = jvm
+                        .invoke_virtual(
+                            &display,
+                            "javax/microedition/lcdui/Display",
+                            "setCurrent",
+                            "(Ljavax/microedition/lcdui/Displayable;)V",
+                            (shown,),
+                        )
+                        .await?;
+                }
+                let current: ClassInstanceRef<Canvas> = jvm
+                    .invoke_virtual(
+                        &display,
+                        "javax/microedition/lcdui/Display",
+                        "getCurrent",
+                        "()Ljavax/microedition/lcdui/Displayable;",
+                        (),
+                    )
+                    .await?;
+                assert_eq!(current.identity(), redirect.identity());
+                assert!(jvm.get_field::<bool>(&redirect, class, "shown", "Z").await?);
+                assert!(!jvm.get_field::<bool>(&superseded, class, "shown", "Z").await?);
+
+                // A hideNotify that switches to the screen already being shown must not cancel that screen's activation.
+                let mut hidden: ClassInstanceRef<Canvas> = jvm.new_class(class, "()V", ()).await?.into();
+                jvm.put_field(
+                    &mut hidden,
+                    class,
+                    "redirectDisplay",
+                    "Ljavax/microedition/lcdui/Display;",
+                    display.clone(),
+                )
+                .await?;
+                jvm.put_field(
+                    &mut hidden,
+                    class,
+                    "redirect",
+                    "Ljavax/microedition/lcdui/Displayable;",
+                    superseded.clone(),
+                )
+                .await?;
+                for shown in [hidden, superseded.clone()] {
+                    let _: () = jvm
+                        .invoke_virtual(
+                            &display,
+                            "javax/microedition/lcdui/Display",
+                            "setCurrent",
+                            "(Ljavax/microedition/lcdui/Displayable;)V",
+                            (shown,),
+                        )
+                        .await?;
+                }
+                assert!(jvm.get_field::<bool>(&superseded, class, "shown", "Z").await?);
+                assert!(
+                    jvm.invoke_virtual::<_, bool>(&superseded, "javax/microedition/lcdui/Displayable", "isShown", "()Z", ())
+                        .await?
+                );
                 Ok(())
             },
         )

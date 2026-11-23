@@ -1,6 +1,6 @@
 use alloc::vec;
 
-use jvm::{Array, ClassInstanceRef, Jvm, Result as JvmResult};
+use jvm::{Array, ClassInstanceRef, Jvm, Result as JvmResult, runtime::JavaLangString};
 use jvm_class_proto::JavaMethodProto;
 use jvm_types::{ClassAccessFlags, MethodAccessFlags};
 use rustjava_runtime::classes::java::lang::String;
@@ -63,6 +63,9 @@ impl AudioSystem {
         if name.is_null() {
             return Err(jvm.exception("java/lang/NullPointerException", "format is null").await);
         }
+        if JavaLangString::to_rust_string(jvm, &name).await? != "mmf" {
+            return Err(jvm.exception("com/skt/m/UnsupportedFormatException", "Unsupported audio format").await);
+        }
 
         let audio_clip = jvm.new_class("net/wie/WieAudioClip", "(Ljava/lang/String;)V", (name,)).await?;
 
@@ -70,9 +73,12 @@ impl AudioSystem {
     }
 
     async fn get_clip_formats(jvm: &Jvm, _context: &mut WieJvmContext) -> JvmResult<ClassInstanceRef<Array<String>>> {
-        tracing::warn!("stub com.skt.m.AudioSystem::getClipFormats()");
+        tracing::debug!("com.skt.m.AudioSystem::getClipFormats()");
 
-        Ok(jvm.instantiate_array("Ljava/lang/String;", 0).await?.into())
+        let mut formats = jvm.instantiate_array("Ljava/lang/String;", 1).await?;
+        let format = JavaLangString::from_rust_string(jvm, "mmf").await?;
+        jvm.store_array(&mut formats, 0, [format]).await?;
+        Ok(formats.into())
     }
 
     // Volume is 0..MAX_VOLUME per format, and it scales all of the game's sound: every clip an SKT
@@ -140,6 +146,20 @@ mod test {
                 panic!("AudioSystem.getAudioClip accepted a null format");
             };
             assert!(jvm.is_instance(&*exception, "java/lang/NullPointerException"));
+
+            let unsupported = JavaLangString::from_rust_string(&jvm, "audio/mpeg").await?;
+            let clip_result: JvmResult<ClassInstanceRef<AudioClip>> = jvm
+                .invoke_static(
+                    "com/skt/m/AudioSystem",
+                    "getAudioClip",
+                    "(Ljava/lang/String;)Lcom/skt/m/AudioClip;",
+                    (unsupported,),
+                )
+                .await;
+            let Err(JavaError::JavaException(exception)) = clip_result else {
+                panic!("AudioSystem.getAudioClip accepted an unsupported format");
+            };
+            assert!(jvm.is_instance(&*exception, "com/skt/m/UnsupportedFormatException"));
 
             for method in ["getMaxVolume", "getVolume"] {
                 let volume_result: JvmResult<i32> = jvm

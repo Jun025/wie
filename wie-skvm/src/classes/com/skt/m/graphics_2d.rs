@@ -6,10 +6,7 @@ use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 
 use wie_backend::canvas::{Clip, Color, PixelType, Rgb8Pixel};
 use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
-use wie_midp::classes::javax::microedition::{
-    lcdui::{Graphics, Image},
-    midlet::MIDlet,
-};
+use wie_midp::classes::javax::microedition::lcdui::{Graphics, Image};
 
 // class com.skt.m.Graphics2D
 pub struct Graphics2D;
@@ -136,7 +133,7 @@ impl Graphics2D {
     }
 
     // KEmulator's Graphics2D.captureLCD crops the screen back buffer: `Image.createImage(backBuffer, x, y, w, h, 0)`.
-    // Ours is the current Display's screen image — what the last paint presented.
+    // Ours is Display's screen image — what the last paint presented.
     async fn capture_lcd(jvm: &Jvm, _context: &mut WieJvmContext, x: i32, y: i32, width: i32, height: i32) -> JvmResult<ClassInstanceRef<Image>> {
         tracing::debug!("com.skt.m.Graphics2D::captureLCD({x}, {y}, {width}, {height})");
 
@@ -155,36 +152,25 @@ impl Graphics2D {
             )
             .await?;
 
-        let midlet: ClassInstanceRef<MIDlet> = jvm
-            .get_static_field("javax/microedition/midlet/MIDlet", "currentMIDlet", "Ljavax/microedition/midlet/MIDlet;")
+        let screen: ClassInstanceRef<Image> = jvm
+            .get_static_field("javax/microedition/lcdui/Display", "screenImage", "Ljavax/microedition/lcdui/Image;")
             .await?;
-        if midlet.is_null() {
-            return Ok(image);
-        }
-        let display = MIDlet::display(jvm, &midlet).await?;
-        if display.is_null() {
-            return Ok(image);
-        }
-        let mut screen_graphics: ClassInstanceRef<Graphics> = jvm
-            .invoke_virtual(
-                &display,
-                "javax/microedition/lcdui/Display",
-                "getScreenGraphics",
-                "()Ljavax/microedition/lcdui/Graphics;",
-                (),
-            )
-            .await?;
-        let screen = Graphics::image(jvm, &mut screen_graphics).await?;
-        let screen = Image::image(jvm, &screen).await?;
-
-        let mut canvas = Image::canvas(jvm, &image).await?;
-        let clip = Clip {
-            x: 0,
-            y: 0,
-            width: width as _,
-            height: height as _,
-        };
-        canvas.draw(0, 0, width as _, height as _, &*screen, x, y, clip);
+        let source = Image::image(jvm, &screen).await?;
+        Image::canvas(jvm, &image).await?.draw(
+            0,
+            0,
+            width as _,
+            height as _,
+            &*source,
+            x,
+            y,
+            Clip {
+                x: 0,
+                y: 0,
+                width: width as _,
+                height: height as _,
+            },
+        );
 
         Ok(image)
     }
@@ -422,9 +408,64 @@ mod test {
     use super::Graphics2D;
 
     #[test]
-    fn graphics_2d_copy_xor_clip_and_pixel_operations_use_the_target_canvas() {
+    fn captured_lcd_region_is_an_independent_screen_snapshot() {
         run_jvm_test(
             Box::new([wie_midp::get_protos().into(), [Graphics2D::as_proto()].into()]),
+            |jvm| async move {
+                let graphics: ClassInstanceRef<Graphics> = jvm
+                    .invoke_static(
+                        "javax/microedition/lcdui/Display",
+                        "getScreenGraphics",
+                        "()Ljavax/microedition/lcdui/Graphics;",
+                        (),
+                    )
+                    .await?;
+                let _: () = jvm
+                    .invoke_virtual(&graphics, "javax/microedition/lcdui/Graphics", "setColor", "(I)V", (0x123456,))
+                    .await?;
+                let _: () = jvm
+                    .invoke_virtual(&graphics, "javax/microedition/lcdui/Graphics", "fillRect", "(IIII)V", (3, 4, 2, 1))
+                    .await?;
+                let _: () = jvm
+                    .invoke_virtual(&graphics, "javax/microedition/lcdui/Graphics", "translate", "(II)V", (10, 20))
+                    .await?;
+                let _: () = jvm
+                    .invoke_virtual(&graphics, "javax/microedition/lcdui/Graphics", "setClip", "(IIII)V", (0, 0, 1, 1))
+                    .await?;
+                let captured: ClassInstanceRef<Image> = jvm
+                    .invoke_static(
+                        "com/skt/m/Graphics2D",
+                        "captureLCD",
+                        "(IIII)Ljavax/microedition/lcdui/Image;",
+                        (3, 4, 2, 1),
+                    )
+                    .await?;
+                let _: () = jvm
+                    .invoke_virtual(&graphics, "javax/microedition/lcdui/Graphics", "reset", "()V", ())
+                    .await?;
+                let _: () = jvm
+                    .invoke_virtual(&graphics, "javax/microedition/lcdui/Graphics", "setColor", "(I)V", (0,))
+                    .await?;
+                let _: () = jvm
+                    .invoke_virtual(&graphics, "javax/microedition/lcdui/Graphics", "fillRect", "(IIII)V", (3, 4, 2, 1))
+                    .await?;
+                let captured = Image::image(&jvm, &captured).await?;
+                assert_eq!((captured.width(), captured.height()), (2, 1));
+                for color in captured.colors() {
+                    assert_eq!((color.a, color.r, color.g, color.b), (255, 0x12, 0x34, 0x56));
+                }
+                Ok(())
+            },
+        )
+        .unwrap();
+    }
+
+    // Upstream's test of the same name expects the untouched pixels white: its `Image.createImage(w, h)`
+    // starts white, ours starts black (wie-midp).
+    #[test]
+    fn graphics_2d_raster_modes_clip_and_pixel_operations_use_the_target_canvas() {
+        run_jvm_test(
+            Box::new([wie_midp::get_protos().into(), [Graphics2D::as_proto(), XDisplay::as_proto()].into()]),
             |jvm| async move {
                 let target: ClassInstanceRef<Image> = jvm
                     .invoke_static(
@@ -516,7 +557,7 @@ mod test {
                         "com/skt/m/Graphics2D",
                         "drawImage",
                         "(IILjavax/microedition/lcdui/Image;IIIII)V",
-                        (0, 0, source, 0, 0, 1, 1, xor_mode),
+                        (0, 0, source.clone(), 0, 0, 1, 1, xor_mode),
                     )
                     .await?;
 
@@ -538,6 +579,35 @@ mod test {
                 assert_eq!((inverted.r, inverted.g, inverted.b), (0xff, 0xff, 0xff));
                 let outside_clip = target_image.get_pixel(3, 0);
                 assert_eq!((outside_clip.r, outside_clip.g, outside_clip.b), (0, 0, 0));
+
+                for (mode, expected) in [("DRAW_AND", [0x100402, 0x020446]), ("DRAW_OR", [0xf23ffe, 0xbbfdff])] {
+                    let mode: i32 = jvm.get_static_field("com/skt/m/Graphics2D", mode, "I").await?;
+                    for x in 0..2 {
+                        let _: () = jvm
+                            .invoke_virtual(&graphics_2d, "com/skt/m/Graphics2D", "setPixel", "(III)V", (x, 0, 0x123456))
+                            .await?;
+                    }
+                    let _: () = jvm
+                        .invoke_virtual(
+                            &graphics_2d,
+                            "com/skt/m/Graphics2D",
+                            "drawImage",
+                            "(IILjavax/microedition/lcdui/Image;IIIII)V",
+                            (0, 0, source.clone(), 0, 0, 3, 1, mode),
+                        )
+                        .await?;
+                    for (x, expected) in expected.into_iter().enumerate() {
+                        let actual: i32 = jvm
+                            .invoke_virtual(&graphics_2d, "com/skt/m/Graphics2D", "getPixel", "(II)I", (x as i32, 0))
+                            .await?;
+                        assert_eq!(actual, expected);
+                    }
+                    let target_image = Image::image(&jvm, &target).await?;
+                    for x in [0, 3] {
+                        let untouched = target_image.get_pixel(x, 0);
+                        assert_eq!((untouched.r, untouched.g, untouched.b), (0, 0, 0));
+                    }
+                }
 
                 let _: () = jvm
                     .invoke_virtual(&graphics_2d, "com/skt/m/Graphics2D", "invertRect", "(IIII)V", (0, 0, 0, 1))
@@ -659,11 +729,9 @@ mod test {
             ]),
             Box::new(TestPlatform::new()),
             |jvm, _system| async move {
-                let midlet: ClassInstanceRef<MIDlet> = jvm.new_class("TestMIDlet", "()V", ()).await?.into();
-                let display = MIDlet::display(&jvm, &midlet).await?;
+                let _midlet: ClassInstanceRef<MIDlet> = jvm.new_class("TestMIDlet", "()V", ()).await?.into();
                 let screen: ClassInstanceRef<Graphics> = jvm
-                    .invoke_virtual(
-                        &display,
+                    .invoke_static(
                         "javax/microedition/lcdui/Display",
                         "getScreenGraphics",
                         "()Ljavax/microedition/lcdui/Graphics;",

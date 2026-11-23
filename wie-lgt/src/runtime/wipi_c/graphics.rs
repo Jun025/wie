@@ -15,8 +15,8 @@ use wie_wipi_c::{
     api::graphics::{self as shared_graphics, FrameBuffer, PixelOpArgs, WIPICGraphicsContextIdx, decode_image_framebuffer, primitives},
 };
 
-const GRAPHICS_STATE_ROOT: u32 = 0x7fff1008;
-const DISPLAY_PROPERTIES_ROOT: u32 = 0x7fff1010;
+use crate::runtime::globals::{DISPLAY_PROPERTIES_ROOT, GRAPHICS_STATE_ROOT};
+
 const FRAMEBUFFER_DEPTH: u32 = 16;
 
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -1100,7 +1100,11 @@ mod tests {
 
     #[test]
     fn process_state_initializes_once_for_the_clet_lifecycle() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
 
         init_process_state(&mut core, 240, 320)?;
@@ -1121,7 +1125,11 @@ mod tests {
 
     #[test]
     fn display_properties_update_physical_display_state() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
 
         set_display_property(&mut core, &mut (), 0, 0x64, 240, 0).now_or_never().unwrap()?;
@@ -1145,7 +1153,11 @@ mod tests {
     // `helloworld_lgt` both PASS, so nothing else in this repo executes this path.
     #[test]
     fn display_property_svc_reaches_graphics_through_the_import_table() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
         let mut context = core.save_context();
         let stack = Allocator::alloc(&mut core, 0x100)?;

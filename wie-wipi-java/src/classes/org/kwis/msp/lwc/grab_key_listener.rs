@@ -2,10 +2,10 @@ use alloc::vec;
 
 use jvm_class_proto::JavaMethodProto;
 use jvm_types::{ClassAccessFlags, MethodAccessFlags};
+
 use wie_jvm_support::WieJavaClassProto;
 
-// interface org.kwis.msp.lwc.GrabKeyListener — `grabKeyNotify(type, key, param)`, the signature
-// 85e94babc247's client.bin carries.
+// interface org.kwis.msp.lwc.GrabKeyListener
 pub struct GrabKeyListener;
 
 impl GrabKeyListener {

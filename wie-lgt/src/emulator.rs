@@ -28,6 +28,8 @@ struct LgtTaskRunner {
 
 #[async_trait::async_trait]
 impl TaskRunner for LgtTaskRunner {
+    // fork: the exception ledger is per emulated thread and lives behind one fixed cell
+    // (`runtime/java/exception.rs`), so a task needs no state of its own — upstream allocates one here.
     async fn run(&self, future: Pin<Box<dyn Future<Output = Result<()>> + Send>>) -> Result<()> {
         self.core.run_in_thread(async move || future.await)?.await
     }
@@ -110,15 +112,7 @@ impl LgtEmulator {
             .ok_or_else(|| WieError::FatalError("Missing LGT application JAR containing binary.mod".into()))?;
         prepare_owner_files(&mut files, &jar);
 
-        Self::load(
-            platform,
-            &jar_filename,
-            &app_info.pid,
-            &app_info.aid,
-            Some(app_info.mclass),
-            &files,
-            options,
-        )
+        Self::load(platform, &jar_filename, app_info, &files, options)
     }
 
     pub fn from_jar(
@@ -132,7 +126,15 @@ impl LgtEmulator {
     ) -> Result<Self> {
         let files = [(jar_filename.to_owned(), jar)].into_iter().collect();
 
-        Self::load(platform, jar_filename, pid, aid, main_class_name, &files, options)
+        let app_info = LgtAppInfo {
+            name: String::new(),
+            aid: aid.to_owned(),
+            pid: pid.to_owned(),
+            mclass: main_class_name.unwrap_or_default(),
+            slvl: None,
+        };
+
+        Self::load(platform, jar_filename, app_info, &files, options)
     }
 
     pub fn loadable_archive(files: &BTreeMap<String, Vec<u8>>) -> bool {
@@ -175,14 +177,12 @@ impl LgtEmulator {
     fn load(
         platform: Box<dyn Platform>,
         jar_filename: &str,
-        pid: &str,
-        aid: &str,
-        main_class_name: Option<String>,
+        app_info: LgtAppInfo,
         files: &BTreeMap<String, Vec<u8>>,
-        mut options: Options,
+        options: Options,
     ) -> Result<Self> {
-        let mut core = ArmCore::new(options.enable_gdbserver, options.profile.take())?;
-        let system = System::new(platform, pid, aid, LgtTaskRunner { core: core.clone() });
+        let mut core = ArmCore::new(options)?;
+        let system = System::new(platform, &app_info.pid, &app_info.aid, LgtTaskRunner { core: core.clone() });
 
         for (filename, data) in files {
             let filename = filename.trim_start_matches("P/");
@@ -191,23 +191,21 @@ impl LgtEmulator {
 
         Allocator::init(&mut core)?;
 
-        let main_class_name = main_class_name.map(|x| x.replace('.', "/"));
-
         let mut core_clone = core.clone();
         let mut system_clone = system.clone();
-        let main_class_name_clone = main_class_name.clone();
         // The filesystem keys above drop the `P/` prefix, so the classpath name must drop it
         // the same way, or an entrypoint stored as `P/<name>.jar` names an entry that does not exist.
         let jar_filename = jar_filename.trim_start_matches("P/").to_owned();
 
-        system.spawn(async move || Self::do_start(&mut core_clone, &mut system_clone, jar_filename, main_class_name_clone).await);
+        system.spawn(async move || Self::do_start(&mut core_clone, &mut system_clone, jar_filename, app_info).await);
 
         Ok(Self { core, system })
     }
 
     #[tracing::instrument(name = "start", skip_all)]
-    async fn do_start(core: &mut ArmCore, system: &mut System, jar_filename: String, _main_class_name: Option<String>) -> Result<()> {
-        let jvm = LgtJvmSupport::init(core, system, Some(&jar_filename)).await?;
+    async fn do_start(core: &mut ArmCore, system: &mut System, jar_filename: String, app_info: LgtAppInfo) -> Result<()> {
+        let properties = app_info.slvl.iter().map(|x| ("wie.slvl", x.as_str())).collect::<Vec<_>>();
+        let jvm = LgtJvmSupport::init(core, system, Some(&jar_filename), &properties).await?;
 
         let class_loader = match JavaLangClassLoader::get_system_class_loader(&jvm).await {
             Ok(class_loader) => class_loader,
@@ -249,6 +247,10 @@ impl Drop for LgtEmulator {
 }
 
 impl Emulator for LgtEmulator {
+    fn is_preparing(&self) -> bool {
+        self.core.is_preparing()
+    }
+
     fn handle_event(&mut self, event: Event) {
         self.system.event_queue().push(event)
     }
@@ -274,6 +276,7 @@ struct LgtAppInfo {
     aid: String,
     pid: String,
     mclass: String,
+    slvl: Option<String>,
 }
 
 impl LgtAppInfo {
@@ -282,6 +285,7 @@ impl LgtAppInfo {
         let mut aid = String::new();
         let mut pid = String::new();
         let mut mclass = String::new();
+        let mut slvl = None;
 
         let mut lines = data.split(|x| *x == b'\n');
 
@@ -294,10 +298,18 @@ impl LgtAppInfo {
                 pid = String::from_utf8_lossy(&line[4..]).into();
             } else if line.starts_with(b"MClass:") {
                 mclass = String::from_utf8_lossy(&line[7..]).into();
+            } else if line.starts_with(b"SLvl:") {
+                slvl = Some(String::from_utf8_lossy(&line[5..]).trim().into());
             }
         }
 
-        Self { name, aid, pid, mclass }
+        Self {
+            name,
+            aid,
+            pid,
+            mclass,
+            slvl,
+        }
     }
 }
 
@@ -373,11 +385,12 @@ mod tests {
     #[test]
     fn parse_app_info_name() {
         let app_info =
-            LgtAppInfo::parse(b"PID:pid\nAID:aid\nName:\xbf\xb5\xbf\xf5\xbc\xad\xb1\xe24-\xc8\xaf\xbf\xb5\xc0\xc7\xb0\xa1\xb8\xe9\nMClass:Clet\n");
+            LgtAppInfo::parse(b"PID:pid\nAID:aid\nName:\xbf\xb5\xbf\xf5\xbc\xad\xb1\xe24-\xc8\xaf\xbf\xb5\xc0\xc7\xb0\xa1\xb8\xe9\nMClass:Clet\nSLvl:0000000000000000000001C7E33D2FBC\n");
 
         assert_eq!(app_info.name, "영웅서기4-환영의가면");
         assert_eq!(app_info.aid, "aid");
         assert_eq!(app_info.pid, "pid");
         assert_eq!(app_info.mclass, "Clet");
+        assert_eq!(app_info.slvl.as_deref(), Some("0000000000000000000001C7E33D2FBC"));
     }
 }

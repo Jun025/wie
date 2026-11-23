@@ -2,6 +2,8 @@ use wie_util::Result;
 
 use crate::{Allocator, ArmCore, context::ArmCoreContext};
 
+// fork: 1 MB, as before the 2026-11-23 upstream merge (upstream: 64 KB). The stack is a heap block, so
+// a guest that recurses past it writes into its neighbours rather than faulting.
 const STACK_SIZE: u32 = 0x100000; // 1 MB
 
 pub struct ThreadState {

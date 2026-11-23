@@ -1,5 +1,5 @@
-mod control;
-mod control_interfaces;
+pub mod control;
+mod control_interface;
 mod controllable;
 mod manager;
 mod media_exception;
@@ -7,11 +7,6 @@ mod player;
 mod player_listener;
 
 pub use self::{
-    control::Control,
-    control_interfaces::{ToneControl, VolumeControl},
-    controllable::Controllable,
-    manager::Manager,
-    media_exception::MediaException,
-    player::Player,
+    control_interface::Control, controllable::Controllable, manager::Manager, media_exception::MediaException, player::Player,
     player_listener::PlayerListener,
 };

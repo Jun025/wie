@@ -1144,7 +1144,7 @@ mod tests {
         let system_clone = system.clone();
 
         system.spawn(async move || {
-            let (mut jvm, mut core, _) = init_jvm(&system_clone).await?;
+            let (jvm, mut core, _) = init_jvm(&system_clone).await?;
             for holder in ["object", "storage", "element", "storage end"] {
                 let frame = jvm.push_native_frame(&[]);
                 let array = jvm.instantiate_array("I", 4).await.unwrap();
@@ -1245,7 +1245,11 @@ mod tests {
         // linker walks over slots whose name and descriptor pointers are both null. Dereferencing
         // one killed the VM at boot with "Invalid memory access; address: 0" (five AOT-Java
         // titles, all in the instance-field table).
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
 
         let ptr_name = Allocator::alloc(&mut core, 5)?;
@@ -1274,13 +1278,17 @@ mod tests {
         let system_clone = system.clone();
 
         system.spawn(async move || {
-            let mut core = ArmCore::new(false, None)?;
+            let mut core = ArmCore::new(wie_backend::Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
             Allocator::init(&mut core)?;
             let mut context = core.save_context();
             let stack = Allocator::alloc(&mut core, 0x100)?;
             context.sp = stack + 0x100;
             core.restore_context(&context);
-            let mut jvm = LgtJvmSupport::init(&mut core, &system_clone, None).await?;
+            let mut jvm = LgtJvmSupport::init(&mut core, &system_clone, None, &[]).await?;
             let class_name = "org/kwis/msp/lcdui/Font";
             jvm.resolve_class(class_name).await.unwrap();
 

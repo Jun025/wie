@@ -58,6 +58,7 @@ pub fn bundled_resource_reaches_the_ktf_guest() -> Result<()> {
         archive,
         Options {
             enable_gdbserver: false,
+            aot: None,
             profile: None,
         },
     )?;

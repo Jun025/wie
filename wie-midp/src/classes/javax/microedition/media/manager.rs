@@ -1,6 +1,6 @@
 use alloc::vec;
 
-use jvm::{ClassInstanceRef, Jvm, Result, runtime::JavaLangString};
+use jvm::{Array, ClassInstanceRef, Jvm, Result, runtime::JavaLangString};
 use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 use rustjava_runtime::classes::java::{io::InputStream, lang::String};
@@ -36,6 +36,18 @@ impl Manager {
                     "playTone",
                     "(III)V",
                     Self::play_tone,
+                    MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+                ),
+                JavaMethodProto::new(
+                    "getSupportedProtocols",
+                    "(Ljava/lang/String;)[Ljava/lang/String;",
+                    Self::get_supported_protocols,
+                    MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+                ),
+                JavaMethodProto::new(
+                    "getSupportedContentTypes",
+                    "(Ljava/lang/String;)[Ljava/lang/String;",
+                    Self::get_supported_content_types,
                     MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
                 ),
             ],
@@ -111,5 +123,83 @@ impl Manager {
         let data = jvm.instantiate_array("B", 0).await?;
         let stream = jvm.new_class("java/io/ByteArrayInputStream", "([B)V", (data,)).await?;
         Ok(jvm.new_class("net/wie/SmafPlayer", "(Ljava/io/InputStream;)V", (stream,)).await?.into())
+    }
+
+    async fn get_supported_protocols(
+        jvm: &Jvm,
+        _: &mut WieJvmContext,
+        content_type: ClassInstanceRef<String>,
+    ) -> Result<ClassInstanceRef<Array<String>>> {
+        tracing::debug!("javax.microedition.media.Manager::getSupportedProtocols({content_type:?})");
+
+        Ok(jvm.instantiate_array("Ljava/lang/String;", 0).await?.into())
+    }
+
+    async fn get_supported_content_types(
+        jvm: &Jvm,
+        _: &mut WieJvmContext,
+        protocol: ClassInstanceRef<String>,
+    ) -> Result<ClassInstanceRef<Array<String>>> {
+        tracing::debug!("javax.microedition.media.Manager::getSupportedContentTypes({protocol:?})");
+
+        let mut types = jvm.instantiate_array("Ljava/lang/String;", usize::from(protocol.is_null())).await?;
+        if protocol.is_null() {
+            let content_type = JavaLangString::from_rust_string(jvm, "application/vnd.smaf").await?;
+            jvm.store_array(&mut types, 0, [content_type]).await?;
+        }
+        Ok(types.into())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use alloc::boxed::Box;
+
+    use jvm::{Array, ClassInstanceRef, runtime::JavaLangString};
+    use rustjava_runtime::classes::java::lang::String;
+    use test_utils::run_jvm_test;
+    use wie_util::Result;
+
+    use crate::{classes::javax::microedition::media::Player, get_protos};
+
+    #[test]
+    fn supported_content_types_match_player_creation() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            let content_types: ClassInstanceRef<Array<String>> = jvm
+                .invoke_static(
+                    "javax/microedition/media/Manager",
+                    "getSupportedContentTypes",
+                    "(Ljava/lang/String;)[Ljava/lang/String;",
+                    (None,),
+                )
+                .await?;
+            assert_eq!(jvm.array_length(&content_types).await?, 1);
+            let content_type: ClassInstanceRef<String> = jvm.load_array(&content_types, 0, 1).await?.remove(0);
+            assert_eq!(JavaLangString::to_rust_string(&jvm, &content_type).await?, "application/vnd.smaf");
+            for protocol in ["http", "file", "", "unknown"] {
+                let protocol = JavaLangString::from_rust_string(&jvm, protocol).await?;
+                let types: ClassInstanceRef<Array<String>> = jvm
+                    .invoke_static(
+                        "javax/microedition/media/Manager",
+                        "getSupportedContentTypes",
+                        "(Ljava/lang/String;)[Ljava/lang/String;",
+                        (protocol,),
+                    )
+                    .await?;
+                assert_eq!(jvm.array_length(&types).await?, 0);
+            }
+            let data = jvm.instantiate_array("B", 0).await?;
+            let stream = jvm.new_class("java/io/ByteArrayInputStream", "([B)V", (data,)).await?;
+            let player: ClassInstanceRef<Player> = jvm
+                .invoke_static(
+                    "javax/microedition/media/Manager",
+                    "createPlayer",
+                    "(Ljava/io/InputStream;Ljava/lang/String;)Ljavax/microedition/media/Player;",
+                    (stream, content_type),
+                )
+                .await?;
+            assert!(jvm.is_instance(&**player, "javax/microedition/media/Player"));
+            Ok(())
+        })
     }
 }

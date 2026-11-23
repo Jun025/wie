@@ -36,6 +36,10 @@ impl WebDatabaseRepository {
 
 #[async_trait::async_trait]
 impl DatabaseRepository for WebDatabaseRepository {
+    async fn create(&self, name: &str, app_id: &str) {
+        self.store.lock().unwrap().entry(Self::key(name, app_id)).or_default();
+    }
+
     async fn open(&self, name: &str, app_id: &str) -> Box<dyn Database> {
         let key = Self::key(name, app_id);
         self.store.lock().unwrap().entry(key.clone()).or_default();

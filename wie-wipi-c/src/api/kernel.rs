@@ -309,7 +309,7 @@ pub async fn printk(context: &mut dyn WIPICContext, ptr_format: WIPICWord, a0: W
     tracing::debug!("MC_knlPrintk({ptr_format:#x}, {a0:#x}, {a1:#x}, {a2:#x}, {a3:#x})");
 
     let format_string = read_null_terminated_string_bytes(context, ptr_format)?;
-    let result = sprintf(context, &format_string, &[a0, a1, a2, a3])?;
+    let result = sprintf(context, &format_string, [a0, a1, a2, a3].into_iter().map(Ok))?;
     let result = encoding_rs::EUC_KR.decode(&result).0;
 
     context.system().platform().write_stdout(result.as_bytes());
@@ -332,7 +332,7 @@ pub async fn sprintk(
     tracing::debug!("MC_knlSprintk({dest:#x}, {ptr_format:#x}, {a1}, {a2}, {a3}, {a4}, {a5})",);
 
     let format_string = read_null_terminated_string_bytes(context, ptr_format)?;
-    let result = sprintf(context, &format_string, &[a0, a1, a2, a3, a4, a5])?;
+    let result = sprintf(context, &format_string, [a0, a1, a2, a3, a4, a5].into_iter().map(Ok))?;
 
     write_null_terminated_string_bytes(context, dest, &result)?;
 
@@ -361,10 +361,38 @@ pub async fn exit(context: &mut dyn WIPICContext, code: i32) -> Result<()> {
     context.system().exit_from_guest().await
 }
 
+pub async fn execute(_context: &mut dyn WIPICContext, name: WIPICWord, parameter_count: i32) -> Result<i32> {
+    tracing::warn!("stub MC_knlExecute({name:#x}, {parameter_count})");
+    Ok(-9) // M_E_INVALID: the execution name does not identify an installed program.
+}
+
+pub async fn get_exec_names(
+    _context: &mut dyn WIPICContext,
+    program_name: WIPICWord,
+    version: WIPICWord,
+    vendor: WIPICWord,
+    buf: WIPICWord,
+    buf_size: i32,
+) -> Result<i32> {
+    tracing::warn!("stub MC_knlGetExecNames({program_name:#x}, {version:#x}, {vendor:#x}, {buf:#x}, {buf_size})");
+
+    Ok(0)
+}
+
 pub async fn get_cur_program_id(_context: &mut dyn WIPICContext) -> Result<WIPICWord> {
     tracing::warn!("stub MC_knlGetCurProgramID()");
 
     Ok(1)
+}
+
+pub async fn get_access_level(context: &mut dyn WIPICContext) -> Result<i32> {
+    tracing::debug!("MC_knlGetAccessLevel()");
+
+    // The app descriptor carries the access level granted to the app, as hex.
+    // Some descriptors store a wider value; the permission masks are in the low word.
+    let slvl = context.java_property("wie.slvl").await?;
+
+    Ok(slvl.and_then(|x| u128::from_str_radix(&x, 16).ok()).unwrap_or(0) as i32)
 }
 
 pub async fn get_program_name(context: &mut dyn WIPICContext, name_buf: WIPICWord, buf_size: i32) -> Result<i32> {

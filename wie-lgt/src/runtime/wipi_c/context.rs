@@ -1,8 +1,15 @@
-use alloc::{boxed::Box, collections::BTreeMap, format, string::ToString, vec, vec::Vec};
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    format,
+    string::{String, ToString},
+    vec,
+    vec::Vec,
+};
 
 use jvm::{
-    Jvm,
-    runtime::{JavaIoInputStream, JavaLangClassLoader},
+    ClassInstance, Jvm,
+    runtime::{JavaIoInputStream, JavaLangClassLoader, JavaLangString},
 };
 use wipi_types::wipic::{WIPICIndirectPtr, WIPICWord};
 
@@ -11,6 +18,8 @@ use wie_core_arm::{Allocator, ArmCore};
 use wie_jvm_support::JvmSupport;
 use wie_util::{ByteRead, ByteWrite, Result, WieError, read_generic, write_generic};
 use wie_wipi_c::{WIPICContext, WIPICMethodBody};
+
+use crate::runtime::with_arm_context;
 
 // `alloc`/`free` live outside the impl so the free(NULL) guard can be tested with a bare
 // `ArmCore` — building an `LgtWIPICContext` needs a full `Jvm`, which is why the guard went
@@ -149,7 +158,10 @@ impl WIPICContext for LgtWIPICContext {
     }
 
     async fn call_function(&mut self, address: WIPICWord, args: &[WIPICWord]) -> Result<WIPICWord> {
-        self.core.run_function(address, args).await
+        self.core
+            .run_function(address, args)
+            .await
+            .map_err(|error| with_arm_context(&self.core, error))
     }
 
     fn spawn(&mut self, callback: WIPICMethodBody) -> Result<()> {
@@ -174,6 +186,20 @@ impl WIPICContext for LgtWIPICContext {
         });
 
         Ok(())
+    }
+
+    async fn java_property(&self, name: &str) -> Result<Option<String>> {
+        let name = JavaLangString::from_rust_string(&self.jvm, name).await.unwrap();
+        let value: Option<Box<dyn ClassInstance>> = self
+            .jvm
+            .invoke_static("java/lang/System", "getProperty", "(Ljava/lang/String;)Ljava/lang/String;", (name,))
+            .await
+            .unwrap();
+
+        Ok(match value {
+            Some(value) => Some(JavaLangString::to_rust_string(&self.jvm, &value).await.unwrap()),
+            None => None,
+        })
     }
 
     async fn get_resource_size(&self, name: &str) -> Result<Option<usize>> {
@@ -330,7 +356,11 @@ mod tests {
     /// still untested. Removing the guard makes `0 - 4` underflow, which panics this test.
     #[test]
     fn free_null_handle_is_a_no_op_and_real_handle_still_frees() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
 
         free_indirect(&mut core, WIPICIndirectPtr(0))?;

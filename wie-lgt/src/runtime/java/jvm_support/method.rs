@@ -352,7 +352,11 @@ mod tests {
         let system_clone = system.clone();
 
         system.spawn(async move || {
-            let mut core = ArmCore::new(false, None)?;
+            let mut core = ArmCore::new(wie_backend::Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
             Allocator::init(&mut core)?;
 
             let mut context = core.save_context();
@@ -470,7 +474,11 @@ mod tests {
         let system_clone = system.clone();
 
         system.spawn(async move || {
-            let mut core = ArmCore::new(false, None)?;
+            let mut core = ArmCore::new(wie_backend::Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
             Allocator::init(&mut core)?;
             let stack = Allocator::alloc(&mut core, 0x1000)?;
             let mut context = core.save_context();
@@ -566,7 +574,11 @@ mod tests {
         let system_clone = system.clone();
 
         system.spawn(async move || {
-            let mut core = ArmCore::new(false, None)?;
+            let mut core = ArmCore::new(wie_backend::Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
             Allocator::init(&mut core)?;
             let stack = Allocator::alloc(&mut core, 0x1000)?;
             let mut context = core.save_context();
@@ -601,7 +613,7 @@ mod tests {
             )?;
 
             // The caller's own try.
-            let mut caller = context.clone();
+            let mut caller = context;
             caller.lr = 0x4001;
             core.restore_context(&caller);
             exception::push(&mut core)?;
@@ -610,7 +622,7 @@ mod tests {
             let result = JavaMethod::from_raw(ptr_method, &core).run(&jvm, Box::new([])).await;
             assert!(result.is_err());
 
-            let mut throw = context.clone();
+            let mut throw = context;
             throw.lr = 0;
             core.restore_context(&throw);
             assert_eq!(exception::unwind(&mut core, 0x1234)?, Some(0x4001));
@@ -633,7 +645,11 @@ mod tests {
         let system_clone = system.clone();
 
         system.spawn(async move || {
-            let mut core = ArmCore::new(false, None)?;
+            let mut core = ArmCore::new(wie_backend::Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
             Allocator::init(&mut core)?;
 
             let mut context = core.save_context();

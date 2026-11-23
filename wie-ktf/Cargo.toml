@@ -7,6 +7,7 @@ description.workspace = true
 repository.workspace = true
 
 [dependencies]
+anyhow = { workspace = true }
 async-recursion = { workspace = true }
 async-trait = { workspace = true }
 bitflags = { workspace = true }
@@ -32,3 +33,4 @@ wie-wipi-java = { workspace = true }
 
 [dev-dependencies]
 test-utils = { workspace = true }
+zip = { workspace = true }

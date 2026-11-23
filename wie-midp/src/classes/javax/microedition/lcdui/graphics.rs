@@ -570,6 +570,7 @@ impl Graphics {
 
         Ok(())
     }
+
     async fn draw_substring(
         jvm: &Jvm,
         context: &mut WieJvmContext,
@@ -894,7 +895,7 @@ impl Graphics {
         jvm: &Jvm,
         _: &mut WieJvmContext,
         mut this: ClassInstanceRef<Graphics>,
-        rgb_data: ClassInstanceRef<Array<i8>>,
+        rgb_data: ClassInstanceRef<Array<i32>>,
         offset: i32,
         scan_length: i32,
         x: i32,
@@ -907,8 +908,23 @@ impl Graphics {
             "javax.microedition.lcdui.Graphics::drawRGB({this:?}, {rgb_data:?}, {offset}, {scan_length}, {x}, {y}, {width}, {height}, {process_alpha})"
         );
 
-        // TODO proper scanlength support
-        let pixel_data: Vec<i32> = jvm.load_array(&rgb_data, offset as _, (width * height) as _).await?;
+        if rgb_data.is_null() {
+            return Err(jvm.exception("java/lang/NullPointerException", "rgbData is null").await);
+        }
+        if width <= 0 || height <= 0 {
+            return Ok(());
+        }
+        let first_row = i64::from(offset);
+        let last_row = first_row + i64::from(height - 1) * i64::from(scan_length);
+        let length = jvm.array_length(&rgb_data).await? as i64;
+        if first_row.min(last_row) < 0 || first_row.max(last_row) + i64::from(width) > length {
+            return Err(jvm.exception("java/lang/ArrayIndexOutOfBoundsException", "source is too small").await);
+        }
+        let mut pixel_data: Vec<i32> = Vec::new();
+        for row in 0..height {
+            let source = first_row + i64::from(row) * i64::from(scan_length);
+            pixel_data.extend(jvm.load_array::<i32>(&rgb_data, source as _, width as _).await?);
+        }
 
         let mut canvas = Self::canvas(jvm, &mut this).await?;
 
@@ -1529,6 +1545,80 @@ mod test {
             assert_eq!((color.r, color.g, color.b), (0x00, 0x00, 0x00));
             let color = backend_image.get_pixel(3, 2);
             assert_eq!((color.r, color.g, color.b), (0x00, 0x00, 0x00));
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_draw_region_applies_transform_and_anchor() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            let (image, graphics) = new_graphics(&jvm).await?;
+
+            let mut rgb_data = jvm.instantiate_array("I", 2).await?;
+            jvm.store_array(&mut rgb_data, 0, [0xffff0000u32 as i32, 0xff0000ffu32 as i32]).await?;
+            let source: ClassInstanceRef<Image> = jvm
+                .invoke_static(
+                    "javax/microedition/lcdui/Image",
+                    "createRGBImage",
+                    "([IIIZ)Ljavax/microedition/lcdui/Image;",
+                    (rgb_data, 2, 1, true),
+                )
+                .await?;
+            // TRANS_MIRROR with RIGHT | TOP: the mirrored row ends at x = 10.
+            let _: () = jvm
+                .invoke_virtual(
+                    &graphics,
+                    "javax/microedition/lcdui/Graphics",
+                    "drawRegion",
+                    "(Ljavax/microedition/lcdui/Image;IIIIIIII)V",
+                    [
+                        source.clone().into(),
+                        0.into(),
+                        0.into(),
+                        2.into(),
+                        1.into(),
+                        2.into(),
+                        10.into(),
+                        0.into(),
+                        (8 | 16).into(),
+                    ],
+                )
+                .await?;
+            // TRANS_ROT90 with LEFT | TOP: the row becomes a column running downwards.
+            let _: () = jvm
+                .invoke_virtual(
+                    &graphics,
+                    "javax/microedition/lcdui/Graphics",
+                    "drawRegion",
+                    "(Ljavax/microedition/lcdui/Image;IIIIIIII)V",
+                    [
+                        source.into(),
+                        0.into(),
+                        0.into(),
+                        2.into(),
+                        1.into(),
+                        5.into(),
+                        20.into(),
+                        0.into(),
+                        (4 | 16).into(),
+                    ],
+                )
+                .await?;
+
+            let backend_image = Image::image(&jvm, &image).await?;
+            for (x, y, expected) in [
+                (8, 0, (0x00, 0x00, 0xff)),
+                (9, 0, (0xff, 0x00, 0x00)),
+                // fork: untouched pixels are black here — a new image is not filled with white (image.rs).
+                (10, 0, (0x00, 0x00, 0x00)),
+                (20, 0, (0xff, 0x00, 0x00)),
+                (20, 1, (0x00, 0x00, 0xff)),
+                (21, 0, (0x00, 0x00, 0x00)),
+            ] {
+                let color = backend_image.get_pixel(x, y);
+                assert_eq!((color.r, color.g, color.b), expected, "({x}, {y})");
+            }
 
             Ok(())
         })

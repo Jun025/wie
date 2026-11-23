@@ -12,6 +12,7 @@ mod pacing;
 mod platform;
 mod screen;
 mod speed_clock;
+mod storage_request;
 mod system;
 mod task;
 mod task_runner;
@@ -30,7 +31,8 @@ pub use self::{
     platform::{Filesystem, Platform},
     screen::Screen,
     speed_clock::{AchievedSpeed, MAX_SPEED, MIN_SPEED, SpeedClock, timer_fires_per_tick},
-    system::{Event, FilesystemOverlay, KeyCode, System, parse_smaf_in, parse_tone_sequence, tone},
+    storage_request::StorageRequest,
+    system::{Event, FilesystemOverlay, KeyCode, System, normalize_guest_path, parse_smaf_in, parse_tone_sequence, tone},
     task::YieldFuture,
     task_runner::{DefaultTaskRunner, TaskRunner},
     time::Instant,
@@ -44,6 +46,7 @@ use alloc::{
     vec::Vec,
 };
 
+use wie_core_arm_aot::CompiledExecutor;
 use wie_util::{Result, WieError};
 
 pub trait Emulator {
@@ -60,6 +63,9 @@ pub trait Emulator {
 
     /// The engine's pacing counters since the last call (`Pacing`).
     fn take_pacing(&mut self) -> Pacing;
+
+    /// upstream: the AOT translator is still compiling the guest image (`Options::aot`).
+    fn is_preparing(&self) -> bool;
 }
 
 pub struct ProfileSample {
@@ -75,6 +81,7 @@ pub type ProfileCallback = Box<dyn FnMut(Vec<ProfileSample>) + Send + Sync>;
 
 pub struct Options {
     pub enable_gdbserver: bool,
+    pub aot: Option<Box<dyn CompiledExecutor>>,
     pub profile: Option<ProfileCallback>,
 }
 

@@ -163,6 +163,9 @@ impl Displayable {
                 JavaFieldProto::new("sizeDirty", "Z", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("sizeNotifying", "Z", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("commandMenuOpen", "Z", FieldAccessFlags::PRIVATE),
+                // Game key state polled by GameCanvas: one bit per game action, at the position of the action's value.
+                JavaFieldProto::new("heldGameKeys", "I", FieldAccessFlags::PRIVATE),
+                JavaFieldProto::new("pressedGameKeys", "I", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("commandMenuIndex", "I", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new("isInFullScreenMode", "Z", FieldAccessFlags::PRIVATE),
             ],
@@ -398,6 +401,11 @@ impl Displayable {
         jvm.put_field(&mut this, "javax/microedition/lcdui/Displayable", "commandMenuOpen", "Z", false)
             .await?;
         jvm.put_field(&mut this, "javax/microedition/lcdui/Displayable", "commandMenuIndex", "I", -1)
+            .await?;
+        // Releases while another screen is current never arrive here, so every key starts unpressed when shown again.
+        jvm.put_field(&mut this, "javax/microedition/lcdui/Displayable", "heldGameKeys", "I", 0)
+            .await?;
+        jvm.put_field(&mut this, "javax/microedition/lcdui/Displayable", "pressedGameKeys", "I", 0)
             .await?;
 
         Ok(())
@@ -653,7 +661,7 @@ impl Displayable {
                     .await?,
             )
         };
-        let content_height: i32 = jvm
+        let mut content_height: i32 = jvm
             .invoke_static(
                 "javax/microedition/lcdui/Display",
                 "getContentHeight",
@@ -661,6 +669,25 @@ impl Displayable {
                 (this.clone(), width, height),
             )
             .await?;
+
+        if jvm.is_instance(&***this, "javax/microedition/lcdui/Canvas") {
+            let fullscreen: bool = jvm
+                .invoke_virtual(this, "javax/microedition/lcdui/Displayable", "isFullScreen", "()Z", ())
+                .await?;
+            let commands: i32 = jvm
+                .invoke_virtual(this, "javax/microedition/lcdui/Displayable", "getCommandCount", "()I", ())
+                .await?;
+            if !fullscreen && commands == 0 {
+                let key = JavaLangString::from_rust_string(jvm, "m.SK_VM").await?;
+                let version: ClassInstanceRef<String> = jvm
+                    .invoke_static("java/lang/System", "getProperty", "(Ljava/lang/String;)Ljava/lang/String;", (key,))
+                    .await?;
+                if !version.is_null() {
+                    // SK-VM FAQ 4.8 leaves 16 paintable pixels beyond the reported Canvas height.
+                    content_height = (content_height - 16).max(0);
+                }
+            }
+        }
 
         Ok((width.max(0), content_height))
     }
@@ -962,6 +989,11 @@ impl Displayable {
                             .await;
                     }
                     jvm.put_field(&mut this, "javax/microedition/lcdui/Displayable", "commandMenuOpen", "Z", true)
+                        .await?;
+                    // The open menu consumes key releases, so keys held at this point would otherwise stay reported.
+                    jvm.put_field(&mut this, "javax/microedition/lcdui/Displayable", "heldGameKeys", "I", 0)
+                        .await?;
+                    jvm.put_field(&mut this, "javax/microedition/lcdui/Displayable", "pressedGameKeys", "I", 0)
                         .await?;
                     jvm.put_field(&mut this, "javax/microedition/lcdui/Displayable", "commandMenuIndex", "I", 0)
                         .await?;

@@ -16,6 +16,7 @@ fn boot(ticks: usize) -> Result<()> {
     let archive = extract_zip(include_bytes!("data/helloworld_ktf.zip"))?;
     let options = Options {
         enable_gdbserver: false,
+        aot: None,
         profile: None,
     };
     let mut emulator = KtfEmulator::from_archive(Box::new(TestPlatform::new()), archive, options)?;

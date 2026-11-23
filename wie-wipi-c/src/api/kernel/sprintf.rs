@@ -11,7 +11,7 @@ const MAX_WIDTH: usize = 4096;
 /// else: a title whose strings are UTF-8 (8f7758fa43b6's `5.BAR`) got each undecodable byte back as
 /// `&#65533;`, 88 bytes in became 171 out, and that overran its 152-byte stack buffer into the saved
 /// return address.
-pub fn sprintf(context: &(impl ByteRead + ?Sized), format_bytes: &[u8], args: &[u32]) -> Result<Vec<u8>> {
+pub fn sprintf(context: &(impl ByteRead + ?Sized), format_bytes: &[u8], args: impl Iterator<Item = Result<u32>>) -> Result<Vec<u8>> {
     let chars = |bytes: &[u8]| bytes.iter().map(|&b| b as char).collect::<String>();
     let result = self::format(&chars(format_bytes), args, &mut |ptr| {
         Ok(chars(&read_null_terminated_string_bytes(context, ptr)?))
@@ -20,10 +20,10 @@ pub fn sprintf(context: &(impl ByteRead + ?Sized), format_bytes: &[u8], args: &[
     Ok(result.chars().map(|c| c as u8).collect())
 }
 
-fn format(format: &str, args: &[u32], read_string: &mut dyn FnMut(u32) -> Result<String>) -> Result<String> {
+fn format(format: &str, args: impl Iterator<Item = Result<u32>>, read_string: &mut dyn FnMut(u32) -> Result<String>) -> Result<String> {
     let mut result = String::with_capacity(format.len());
     let mut chars = format.chars();
-    let mut arg_iter = args.iter();
+    let mut arg_iter = args;
 
     while let Some(x) = chars.next() {
         if x != '%' {
@@ -60,9 +60,9 @@ fn format(format: &str, args: &[u32], read_string: &mut dyn FnMut(u32) -> Result
                     // ILP32 ABI: long is one word; only long long occupies two
                     let long = longs >= 2;
                     let raw = if long {
-                        next_arg64(&mut arg_iter)
+                        next_arg64(&mut arg_iter)?
                     } else {
-                        next_arg(&mut arg_iter) as u64
+                        next_arg(&mut arg_iter)? as u64
                     };
                     let (sign, digits) = if c == 'u' {
                         ("", format!("{raw}"))
@@ -74,7 +74,7 @@ fn format(format: &str, args: &[u32], read_string: &mut dyn FnMut(u32) -> Result
                     break;
                 }
                 's' => {
-                    let ptr = next_arg(&mut arg_iter);
+                    let ptr = next_arg(&mut arg_iter)?;
                     let text = if ptr == 0 { "(null)".into() } else { read_string(ptr)? };
                     let text: String = text.chars().take(precision.unwrap_or(usize::MAX)).collect();
                     if left {
@@ -85,14 +85,14 @@ fn format(format: &str, args: &[u32], read_string: &mut dyn FnMut(u32) -> Result
                     break;
                 }
                 'c' => {
-                    result.push(next_arg(&mut arg_iter) as u8 as char);
+                    result.push(next_arg(&mut arg_iter)? as u8 as char);
                     break;
                 }
                 'x' => {
                     let arg = if longs >= 2 {
-                        next_arg64(&mut arg_iter)
+                        next_arg64(&mut arg_iter)?
                     } else {
-                        next_arg(&mut arg_iter) as u64
+                        next_arg(&mut arg_iter)? as u64
                     };
                     result += &pad_integer("", format!("{arg:x}"), w, left, flag == Some('0'), precision);
                     break;
@@ -100,6 +100,7 @@ fn format(format: &str, args: &[u32], read_string: &mut dyn FnMut(u32) -> Result
                 'l' => longs += 1,
                 '-' if width.is_none() && precision.is_none() => left = true,
                 '.' if precision.is_none() => precision = Some(0),
+                '*' if precision.is_some() => precision = Some(next_arg(&mut arg_iter)? as usize),
                 '0'..='9' if precision.is_some() => {
                     precision = Some(precision.unwrap_or(0).saturating_mul(10).saturating_add(c.to_digit(10).unwrap() as usize))
                 }
@@ -141,19 +142,19 @@ fn pad_integer(sign: &str, mut digits: String, width: usize, left: bool, zero: b
     }
 }
 
-fn next_arg<'a>(arg_iter: &mut impl Iterator<Item = &'a u32>) -> u32 {
-    arg_iter.next().copied().unwrap_or_else(|| {
+fn next_arg(arg_iter: &mut impl Iterator<Item = Result<u32>>) -> Result<u32> {
+    Ok(arg_iter.next().transpose()?.unwrap_or_else(|| {
         tracing::warn!("printf: more format specifiers than arguments");
         0
-    })
+    }))
 }
 
 // long arguments occupy two consecutive words, low word first
-fn next_arg64<'a>(arg_iter: &mut impl Iterator<Item = &'a u32>) -> u64 {
-    let low = next_arg(arg_iter) as u64;
-    let high = next_arg(arg_iter) as u64;
+fn next_arg64(arg_iter: &mut impl Iterator<Item = Result<u32>>) -> Result<u64> {
+    let low = next_arg(arg_iter)? as u64;
+    let high = next_arg(arg_iter)? as u64;
 
-    (high << 32) | low
+    Ok((high << 32) | low)
 }
 
 #[cfg(test)]
@@ -184,7 +185,7 @@ mod test {
     }
 
     fn format(format_string: &str, args: &[u32]) -> Result<String> {
-        super::format(format_string, args, &mut |_| Ok("stub".to_string()))
+        super::format(format_string, args.iter().copied().map(Ok), &mut |_| Ok("stub".to_string()))
     }
 
     #[test]
@@ -291,10 +292,14 @@ mod test {
         memory.bytes[0x40..0x40 + guest_string.len()].copy_from_slice(&guest_string);
         memory.bytes[0x40 + guest_string.len()] = 0;
 
-        let format = encoding_rs::EUC_KR.encode("안녕 %s %c %d %u %x").0;
-        let result = super::sprintf(&memory, &format, &[0x40, b'A' as u32, (-7i32) as u32, 42, 0xbeef])?;
+        let format = encoding_rs::EUC_KR.encode("안녕 %s %c %d %u %x %.2s %.*s").0;
+        let result = super::sprintf(
+            &memory,
+            &format,
+            [0x40, b'A' as u32, (-7i32) as u32, 42, 0xbeef, 0x40, 4, 0x40].into_iter().map(Ok),
+        )?;
 
-        let expected = "안녕 세계 A -7 42 beef";
+        let expected = "안녕 세계 A -7 42 beef 세 세계";
         assert_eq!(encoding_rs::EUC_KR.decode(&result).0, expected);
         assert_eq!(result, encoding_rs::EUC_KR.encode(expected).0.into_owned());
 
@@ -309,7 +314,7 @@ mod test {
         let utf8 = "종목|".as_bytes();
         memory.bytes[0x40..0x40 + utf8.len()].copy_from_slice(utf8);
 
-        let result = super::sprintf(&memory, b"%s%s%c", &[0x40, 0x40, 0xb7])?;
+        let result = super::sprintf(&memory, b"%s%s%c", [0x40, 0x40, 0xb7].into_iter().map(Ok))?;
 
         assert_eq!(result, [utf8, utf8, &[0xb7]].concat());
 

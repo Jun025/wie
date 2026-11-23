@@ -12,18 +12,31 @@ use core::mem::size_of;
 
 use wie_backend::{
     Event,
-    canvas::{ArgbPixel, Clip, Color, Image, ImageBuffer, PixelType, Rgb565Pixel, VecImageBuffer, string_width},
+    canvas::{ArgbPixel, Clip, Color, FONT_SIZE, Image, ImageBuffer, PixelType, Rgb565Pixel, VecImageBuffer, encode_bmp, string_width},
 };
 use wie_util::{Result, read_generic, write_generic};
 
 use wipi_types::wipic::{WIPICDisplayInfo, WIPICFramebuffer, WIPICGraphicsContext, WIPICImage, WIPICIndirectPtr, WIPICWord};
 
-use crate::context::WIPICContext;
+use crate::{context::WIPICContext, globals::SCREEN_FRAMEBUFFER_PTR};
 
 use self::image::create_wipi_image;
 
-const FRAMEBUFFER_DEPTH: u32 = 16; // XXX hardcode to 16bpp as some game requires 16bpp framebuffer
-const SCREEN_FRAMEBUFFER_PTR: u32 = 0x7fff1000;
+const FRAMEBUFFER_DEPTH: u32 = 16; // XXX hardcode to 16bpp as some apps require a 16bpp framebuffer
+
+/// Upstream's `MC_grpFillPolygon` stub. LGT's `0xf0` stays on our `draw_polygon` (the outline).
+pub async fn fill_polygon(
+    _context: &mut dyn WIPICContext,
+    dst: WIPICIndirectPtr,
+    x_points: WIPICWord,
+    y_points: WIPICWord,
+    n_points: i32,
+    pgc: WIPICWord,
+) -> Result<()> {
+    tracing::warn!("stub MC_grpFillPolygon({:#x}, {x_points:#x}, {y_points:#x}, {n_points}, {pgc:#x})", dst.0);
+
+    Ok(())
+}
 
 pub async fn get_screen_framebuffer(context: &mut dyn WIPICContext, a0: WIPICWord) -> Result<WIPICIndirectPtr> {
     screen_framebuffer(context, a0, 0)
@@ -471,7 +484,13 @@ pub async fn encode_image(
         return Ok(0);
     }
 
-    let data = wie_backend::canvas::encode_bmp(&*image, x0 as _, y0 as _, (x1 - x0) as _, (y1 - y0) as _)?;
+    let mut region = VecImageBuffer::<ArgbPixel>::new((x1 - x0) as u32, (y1 - y0) as u32);
+    for row in y0..y1 {
+        for col in x0..x1 {
+            region.put_pixel(col - x0, row - y0, image.get_pixel(col, row));
+        }
+    }
+    let data = encode_bmp(&region)?;
     let memory = context.alloc(data.len() as WIPICWord)?;
     let ptr_data = context.data_ptr(memory)?;
     context.write_bytes(ptr_data, &data)?;
@@ -485,6 +504,16 @@ pub async fn encode_image(
 pub async fn destroy_image(context: &mut dyn WIPICContext, image: WIPICIndirectPtr) -> Result<()> {
     tracing::debug!("MC_grpDestroyImage({:#x})", image.0);
 
+    if image.0 == 0 {
+        return Ok(()); // see `get_image_property`
+    }
+    // The pixels (and an LGT image's mask) are their own allocations; freeing only the record leaked them.
+    let backing: WIPICImage = read_generic(context, context.data_ptr(image)?)?;
+    for buf in [backing.img.buf, backing.mask.buf] {
+        if buf.0 != 0 {
+            context.free(buf)?;
+        }
+    }
     context.free(image)?;
 
     Ok(())
@@ -898,7 +927,7 @@ pub async fn get_string_width(context: &mut dyn WIPICContext, font: i32, ptr_str
     let Some(string) = primitives::read_text(context, ptr_string, length)? else {
         return Ok(0);
     };
-    Ok(string_width(context.system().platform().font(), &string, 10.0) as i32)
+    Ok(string_width(context.system().platform().font(), &string, FONT_SIZE) as i32)
 }
 
 pub async fn draw_string(
@@ -1185,11 +1214,35 @@ pub async fn get_framebuffer_bpp(context: &mut dyn WIPICContext, framebuffer: WI
 mod tests {
     use alloc::boxed::Box;
 
-    use wie_backend::canvas::VecImageBuffer;
+    use test_utils::TestPlatform;
+
+    use wie_backend::{DefaultTaskRunner, System, canvas::VecImageBuffer};
+    use wie_util::ByteWrite;
 
     use crate::{MethodImpl, context::test::TestContext};
 
     use super::*;
+
+    #[futures_test::test]
+    async fn strings_are_positioned_at_the_requested_baseline() -> Result<()> {
+        let system = System::new(Box::new(TestPlatform::new()), "test-pid", "test-aid", DefaultTaskRunner);
+        let mut context = TestContext::with_system(system);
+        let destination = create_offscreen_framebuffer(&mut context, 32, 32).await?;
+        let framebuffer = FrameBuffer(read_generic(&context, context.data_ptr(destination)?)?);
+        framebuffer.write(&mut context, &[0; 32 * 32 * 2])?;
+        let graphics = context.alloc_raw(size_of::<WIPICGraphicsContext>() as u32)?;
+        init_context(&mut context, graphics).await?;
+        set_context(&mut context, graphics, WIPICGraphicsContextIdx::FgPixelIdx, 0xffff).await?;
+        let text = context.alloc_raw(3)?;
+        context.write_bytes(text, &[0xb0, 0xa1, 0])?;
+        draw_string(&mut context, destination, 2, 16, text, -1, graphics).await?;
+
+        let bottom = 16 + get_font_descent(&mut context, 0).await?;
+        let image = framebuffer.image(&mut context)?;
+        assert!((0..16).any(|y| (0..32).any(|x| image.get_pixel(x, y).r != 0)));
+        assert!((bottom..32).all(|y| (0..32).all(|x| image.get_pixel(x, y).r == 0)));
+        Ok(())
+    }
 
     /// 3151fdc167b6 sets TRANS and ALPHA by storing words at +0x1c and +0x20 itself, between
     /// `MC_grpSetContext` calls for the rest (docs/report/0463).
@@ -1249,6 +1302,13 @@ mod tests {
         write_generic(&mut context, output, [999i32; 5])?;
         get.call(&mut context, Box::new([ptr_context, 0, output])).await?;
         assert_eq!(read_generic::<[i32; 5], _>(&context, output)?, [-5, -8, 176, 220, 999]);
+
+        let graphics: WIPICGraphicsContext = read_generic(&context, ptr_context)?;
+        assert_eq!(graphics.mask & 1, 1);
+        set.call(&mut context, Box::new([ptr_context, 0, 0])).await?;
+        let graphics: WIPICGraphicsContext = read_generic(&context, ptr_context)?;
+        assert_eq!(graphics.mask & 1, 0);
+        assert_eq!(graphics.fgpxl, 0x12345678);
 
         write_generic(&mut context, input, [-12i32, 34])?;
         set.call(&mut context, Box::new([ptr_context, 10, input])).await?;

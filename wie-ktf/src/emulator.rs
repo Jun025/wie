@@ -15,7 +15,7 @@ use wie_jvm_support::JvmSupport;
 use wie_util::{Result, WieError, write_generic};
 
 use crate::{
-    adf::{KtfAdf, find_client_bin},
+    adf::{KtfAdf, find_client_bin, validate_client_bin_entry},
     runtime::{KtfJvmSupport, KtfJvmThreadContext},
 };
 
@@ -226,7 +226,7 @@ impl KtfEmulator {
             turn_owner_sound_on(&mut files, &jar);
         }
 
-        Self::load(platform, &jar_filename, &adf.pid, &adf.aid, Some(adf.mclass), &files, options)
+        Self::load(platform, &jar_filename, adf, &files, options)
     }
 
     pub fn from_jar(
@@ -240,7 +240,16 @@ impl KtfEmulator {
     ) -> Result<Self> {
         let files = [(jar_filename.to_owned(), jar)].into_iter().collect();
 
-        Self::load(platform, jar_filename, pid, aid, main_class_name, &files, options)
+        let adf = KtfAdf {
+            name: String::new(),
+            aid: aid.to_owned(),
+            pid: pid.to_owned(),
+            mclass: main_class_name.unwrap_or_default(),
+            display_size: None,
+            slvl: None,
+        };
+
+        Self::load(platform, jar_filename, adf, &files, options)
     }
 
     pub fn loadable_archive(files: &BTreeMap<String, Vec<u8>>) -> bool {
@@ -271,20 +280,37 @@ impl KtfEmulator {
         find_client_bin(jar).is_ok()
     }
 
-    fn load(
-        platform: Box<dyn Platform>,
-        jar_filename: &str,
-        pid: &str,
-        aid: &str,
-        main_class_name: Option<String>,
-        files: &BTreeMap<String, Vec<u8>>,
-        mut options: Options,
-    ) -> Result<Self> {
-        let mut core = ArmCore::new(options.enable_gdbserver, options.profile.take())?;
-        let system = System::new(platform, pid, aid, KtfTaskRunner { core: core.clone() });
+    pub fn validate_archive(files: &BTreeMap<String, Vec<u8>>) -> Result<()> {
+        let adf = files
+            .get("__adf__")
+            .ok_or_else(|| WieError::FatalError("Missing __adf__ in KTF archive".into()))?;
+        // fork: the jar `from_archive` runs — `<AID>.jar`, or the archive's only jar (`jar_filename`).
+        let (jar_filename, jar) = archive_jar_entry(&KtfAdf::parse(adf).aid, files);
+        let jar = jar
+            .or_else(|| files.iter().find(|(path, _)| private_path(path) == jar_filename).map(|(_, jar)| jar))
+            .ok_or_else(|| WieError::FatalError(format!("Missing {jar_filename} in KTF archive")))?;
+        Self::validate_jar(jar)
+    }
+
+    pub fn validate_jar(jar: &[u8]) -> Result<()> {
+        let (filename, client_bin) = find_client_bin(jar)?;
+        validate_client_bin_entry(&filename, &client_bin)
+    }
+
+    fn load(platform: Box<dyn Platform>, jar_filename: &str, adf: KtfAdf, files: &BTreeMap<String, Vec<u8>>, options: Options) -> Result<Self> {
+        let mut core = ArmCore::new(options)?;
+        let system = System::new(platform, &adf.pid, &adf.aid, KtfTaskRunner { core: core.clone() });
 
         for (path, data) in files {
-            system.filesystem().add_virtual(private_path(path), data.clone());
+            let path = private_path(path);
+            // Upstream runs `validate_jar` here. fork: only the header verdict is taken this early — a jar
+            // that is not a zip, or holds no client.bin, reports from the start task as it always has.
+            if path == jar_filename
+                && let Ok((filename, client_bin)) = find_client_bin(data)
+            {
+                validate_client_bin_entry(&filename, &client_bin)?;
+            }
+            system.filesystem().add_virtual(path, data.clone());
         }
 
         Allocator::init(&mut core)?;
@@ -292,23 +318,22 @@ impl KtfEmulator {
         let mut core_clone = core.clone();
         let mut system_clone = system.clone();
         let jar_filename_clone = jar_filename.to_owned();
-        system.spawn(async move || Self::start(&mut core_clone, &mut system_clone, jar_filename_clone, main_class_name).await);
+        system.spawn(async move || Self::start(&mut core_clone, &mut system_clone, jar_filename_clone, adf).await);
 
         Ok(Self { core, system })
     }
 
     #[tracing::instrument(name = "start", skip_all)]
-    async fn start(core: &mut ArmCore, system: &mut System, jar_filename: String, main_class_name: Option<String>) -> Result<()> {
-        let (jvm, class_loader) = KtfJvmSupport::init(core, system, Some(&jar_filename)).await?;
-        let clet_mode = main_class_name.as_deref().is_some_and(is_clet_mode);
+    async fn start(core: &mut ArmCore, system: &mut System, jar_filename: String, adf: KtfAdf) -> Result<()> {
+        let properties = adf.slvl.iter().map(|x| ("wie.slvl", x.as_str())).collect::<Vec<_>>();
+        let (jvm, class_loader) = KtfJvmSupport::init(core, system, Some(&jar_filename), &properties).await?;
+        let clet_mode = is_clet_mode(&adf.mclass);
 
-        let main_class_name = if let Some(x) = main_class_name {
-            x
-        } else {
+        if adf.mclass.is_empty() {
             return Err(WieError::FatalError("Main class not found".into()));
-        };
+        }
 
-        let main_class_name = main_class_name.replace('.', "/");
+        let main_class_name = adf.mclass.replace('.', "/");
 
         let main_class_name_java = JavaLangString::from_rust_string(&jvm, &main_class_name).await.unwrap();
         let _main_class: Box<dyn ClassInstance> = jvm
@@ -322,6 +347,8 @@ impl KtfEmulator {
             .await
             .unwrap();
 
+        // fork: upstream dropped this with its own GC-root visitor (#1542). Ours roots a native class's
+        // statics through its registration, so it stays.
         KtfJvmSupport::register_static_classes(core, &jvm, class_loader, &main_class_name).await?;
 
         let mut args_array = jvm.instantiate_array("Ljava/lang/String;", 1).await.unwrap();
@@ -350,6 +377,10 @@ impl Drop for KtfEmulator {
 }
 
 impl Emulator for KtfEmulator {
+    fn is_preparing(&self) -> bool {
+        self.core.is_preparing()
+    }
+
     fn handle_event(&mut self, event: Event) {
         self.system.event_queue().push(event)
     }
@@ -415,6 +446,7 @@ mod tests {
         ]);
         let options = Options {
             enable_gdbserver: false,
+            aot: None,
             profile: None,
         };
         assert_eq!(super::KtfEmulator::archive_jar(&files), Some(WIRING_PROBE_JAR));
@@ -437,6 +469,25 @@ mod tests {
         assert_eq!(super::jar_filename("A", &files(&["__adf__"])), "A.jar");
     }
 
+    // `validate_archive` reads the jar `from_archive` runs: the only jar when `<AID>.jar` is absent,
+    // and a jar shipped under the private directory. (An empty jar is "found, not a zip".)
+    #[test]
+    fn validate_archive_finds_the_jar_from_archive_runs() {
+        use alloc::{collections::BTreeMap, string::ToString, vec::Vec};
+
+        let validate = |names: &[&str]| {
+            let mut files = names.iter().map(|name| (name.to_string(), Vec::new())).collect::<BTreeMap<_, _>>();
+            files.insert("__adf__".into(), b"AID:A\n".to_vec());
+            super::KtfEmulator::validate_archive(&files).unwrap_err().to_string()
+        };
+
+        assert!(validate(&[]).contains("Missing A.jar"));
+        assert!(validate(&["B.jar", "C.jar"]).contains("Missing A.jar"));
+        for found in [&["A.jar"][..], &["B.jar"], &["P/A.jar"], &["p/A.jar"]] {
+            assert!(!validate(found).contains("Missing"), "{found:?}");
+        }
+    }
+
     #[test]
     fn clet_mode_is_selected_from_adf_mclass() {
         assert!(super::is_clet_mode("Clet"));
@@ -446,7 +497,11 @@ mod tests {
 
     #[test]
     fn switches_jvm_thread_context_between_tasks() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
 
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", KtfTaskRunner { core: core.clone() });
