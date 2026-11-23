@@ -106,3 +106,5 @@
 ### 8. 게임 파일명 유입
 
 - 게임 이름 유입(`corpus-name-inflow`): BOUNDED 369쌍(1112회) · SUFFIX-ATTACHED 16쌍(52회). 이 회차가 더한 이름은 장부 한 줄의 `title` 칸 하나다(장부의 열이 `compat.json` 그 행의 `title` 을 그대로 요구한다). 나머지는 `compat.json` 을 건드려 파일 전체가 대상이 된 것이고 공개 목록의 `title` · `game` 값이다. 이 문서 · 소식 · worklog 는 그 판을 sha12 로만 적는다. 게임 바이트 · 자원 내용 · 캡처는 0.
+
+<!-- corpus-name-inflow v1 subjects=11 tree=fa0088cfe19eb694 B=1112/369 P=3/1 S=52/16 -->
