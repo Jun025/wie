@@ -2,6 +2,8 @@
 # Weekly speed watch: is origin/main slower than the pin the last round measured? The compat census
 # (regression-census.sh) watches «does it still work»; this watches «how fast», which it cannot see.
 # Local only — the samples are git-ignored game bytes (Constraint 9). Judging and the axes: perf-watch.mjs header.
+# ★The native axis judges on two units: CPU per 50M ticks, and — on the Java-run samples that draw — CPU per 1000
+#  paints, because a tick is not a unit of work while a Java game sleeps (perf-watch.mjs header · docs/report/0588).
 #   bash scripts/perf-watch.sh                      weekly (regression-census.sh calls it): A = the last round's pin
 #                                                   (bd770b73 when there is none), B = origin/main
 #   bash scripts/perf-watch.sh compare <A> <B> <out>  any two revs (or build dirs) — the bisect and the live check
