@@ -37,3 +37,5 @@
 
 - `node scripts/player-data.mjs` rc=0(429 titles · 186 updates).
 - 네 게이트 · beta lint · CI 값은 회신에 적는다.
+
+<!-- corpus-name-inflow v1 subjects=3 tree=939c3addc959c7b5 B=0/0 P=0/0 S=0/0 -->
