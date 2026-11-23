@@ -307,14 +307,10 @@ impl EventQueue {
                 // And the first of its polls that finds work (`System::poll_until`).
                 let due = if callbacks_pending { Some(deadline) } else { earliest_timer };
                 context.system().pacing().guest_waiting_until(due);
-                loop {
-                    // One clock read per poll: the wait's own check is also the poll's start.
-                    let now = context.system().platform().now();
-                    if now >= deadline {
-                        break;
-                    }
+                // One clock read per poll: the poll itself counts from its step's start (`System::poll`).
+                while context.system().platform().now() < deadline {
                     let tick = context.system().pacing().ticks();
-                    context.system().poll_until(now + 1, pace(tick), due).await;
+                    context.system().poll(pace(tick), due).await;
                     if !context.system().event_queue().is_empty() {
                         break;
                     }
@@ -469,7 +465,7 @@ mod test {
     use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 
     use test_utils::{TestClock, TestPlatform, run_jvm_test_with_system};
-    use wie_backend::{DefaultTaskRunner, Event, Instant, KeyCode, SpeedClock, System};
+    use wie_backend::{DefaultTaskRunner, Event, Instant, KeyCode, SpeedClock, System, YieldFuture};
     use wie_jvm_support::{JvmSupport, RustJavaJvmImplementation, WieJavaClassProto, WieJvmContext};
     use wie_util::Result;
 
@@ -1287,6 +1283,53 @@ mod test {
             completed.load(Ordering::SeqCst),
             "an event queued mid-wait must be returned within a millisecond"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_repaint_handed_over_in_the_step_of_a_paint_is_looked_at_in_the_next_step() -> Result<()> {
+        // A game thread that spins on Thread.yield until its paint lands, with no sleep: the event
+        // thread paints for 3ms of a step and goes back to an empty queue, and the game thread —
+        // polled after it in that same step — hands over the next repaint. The 1ms poll counts from
+        // that step's start, so it is already up; counted from the paint's end (`now + 1`) the event
+        // thread sat out another millisecond of game-thread spinning per frame (SKT b42e4242866b
+        // 387 -> 329 paints/s after #603).
+        let clock = TestClock::new();
+        let mut system = System::new(Box::new(TestPlatform::with_clock(clock.clone())), "", "", DefaultTaskRunner);
+        let painted = Arc::new(AtomicBool::new(false));
+        let completed = Arc::new(AtomicBool::new(false));
+        let (system_task, clock_task, painted_task, completed_task) = (system.clone(), clock.clone(), painted.clone(), completed.clone());
+        system.spawn(async move || {
+            let jvm = JvmSupport::new_jvm(&system_task, None, Box::new([get_protos().into()]), &[], RustJavaJvmImplementation).await?;
+            let queue = jvm
+                .invoke_static("net/wie/EventQueue", "getEventQueue", "()Lnet/wie/EventQueue;", ())
+                .await
+                .unwrap();
+            let event = jvm.instantiate_array("I", 4).await.unwrap();
+            // The paint: this step started 3ms ago by the time the thread is back at its queue.
+            clock_task.advance(3);
+            painted_task.store(true, Ordering::SeqCst);
+            let _: () = jvm
+                .invoke_virtual(&queue, "net/wie/EventQueue", "getNextEvent", "([I)V", (event,))
+                .await
+                .unwrap();
+            completed_task.store(true, Ordering::SeqCst);
+            // Let the enclosing tick finish after this task completes.
+            clock_task.advance(100);
+            Ok(())
+        });
+        let (system_game, painted_game) = (system.clone(), painted.clone());
+        system.spawn(async move || {
+            while !painted_game.load(Ordering::SeqCst) {
+                YieldFuture::new().await;
+            }
+            system_game.event_queue().push(Event::Redraw);
+            Ok(())
+        });
+
+        system.tick()?;
+        assert_eq!(clock.peek(), 103, "the wait must not outlast the step after the paint's");
+        assert!(completed.load(Ordering::SeqCst));
         Ok(())
     }
 

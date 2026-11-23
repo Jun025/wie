@@ -2,7 +2,7 @@ use alloc::{boxed::Box, collections::BTreeMap, sync::Arc, task::Wake};
 use core::{
     future::Future,
     pin::Pin,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
     task::{Context, Poll, Waker},
 };
 
@@ -91,6 +91,9 @@ pub struct Executor {
     halted: Arc<AtomicBool>,
     // Set when a task polled in the current step asks to be polled again, or one is spawned.
     woken: Arc<Woken>,
+    // When the step now running started, in epoch millis (`step_started`). Outside the lock for
+    // the reason `halted` is: it is written once per step.
+    step_started: Arc<AtomicU64>,
 }
 
 // The waker every task is polled with. Who calls it tells a task that wants to run (`YieldFuture`,
@@ -126,6 +129,7 @@ impl Executor {
             inner,
             halted: Arc::new(AtomicBool::new(false)),
             woken: Arc::new(Woken(AtomicBool::new(false))),
+            step_started: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -298,7 +302,14 @@ impl Executor {
         self.inner.lock().current_task_id.unwrap() as _
     }
 
+    /// When the step the running task is polled in started — where a poll's period counts from
+    /// (`System::poll`). A guest's sleep does not use it: that counts from the call (`sleep`).
+    pub(crate) fn step_started(&self) -> Instant {
+        Instant::from_epoch_millis(self.step_started.load(Ordering::Relaxed))
+    }
+
     fn step(&mut self, now: Instant) -> Result<()> {
+        self.step_started.store(now.raw(), Ordering::Relaxed);
         self.woken.0.store(false, Ordering::Relaxed);
         let waker = Waker::from(self.woken.clone());
 

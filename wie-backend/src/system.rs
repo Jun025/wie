@@ -220,6 +220,17 @@ impl System {
         SleepFuture::idle_toward(until, pace, work.unwrap_or(Instant::from_epoch_millis(u64::MAX)), &self.executor)
     }
 
+    /// The event thread's look at its queue, one `POLL_SLEEP_MS` after the step it runs in started,
+    /// keeping a tick alive only for `pace` (`sleep_toward`). Not counted from the call as a guest's
+    /// sleep is (`sleep_from`): nobody asked for this wait, and a thread that has just spent its
+    /// step painting has been away from its queue for longer already. Counted from the paint's end,
+    /// a game thread spinning on `Thread.yield` until its paint lands spun 1ms more per frame before
+    /// its next repaint was looked at (b42e4242866b: 387 -> 329 paints/s).
+    /// `work` as in `poll_until`.
+    pub fn poll(&self, pace: Option<Instant>, work: Option<Instant>) -> SleepFuture {
+        self.poll_until(self.executor.step_started() + POLL_SLEEP_MS, pace, work)
+    }
+
     pub fn current_task_id(&self) -> u64 {
         self.executor.current_task_id()
     }
