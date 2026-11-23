@@ -647,15 +647,21 @@ mod test {
     }
 
     async fn get_next_event(jvm: Jvm) {
+        next_event_kind(jvm).await;
+    }
+
+    // `getNextEvent`, and the kind of the event it handed back (`EventQueueEvent`).
+    async fn next_event_kind(jvm: Jvm) -> i32 {
         let queue = jvm
             .invoke_static("net/wie/EventQueue", "getEventQueue", "()Lnet/wie/EventQueue;", ())
             .await
             .unwrap();
-        let event = jvm.instantiate_array("I", 4).await.unwrap();
+        let event: ClassInstanceRef<Array<i32>> = jvm.instantiate_array("I", 4).await.unwrap().into();
         let _: () = jvm
-            .invoke_virtual(&queue, "net/wie/EventQueue", "getNextEvent", "([I)V", (event,))
+            .invoke_virtual(&queue, "net/wie/EventQueue", "getNextEvent", "([I)V", (event.clone(),))
             .await
             .unwrap();
+        jvm.load_array::<i32>(&event, 0, 1).await.unwrap()[0]
     }
 
     #[test]
@@ -796,21 +802,68 @@ mod test {
     // What runs on the host of `on_a_host`. `timer`: a WIPI timer the guest re-arms that many ms
     // ahead on every fire, with `pace_after` as in `guest_timers_on_a_frame_grid`. `beat_ms`: a thread
     // that sleeps on that beat. `poller`: a thread in a `sleep(1)` loop — a poll (`POLL_SLEEP_MS`).
+    // `repaint`: whoever has the beat — the thread, or without one the timer's callback — asks for a
+    // repaint on every beat, and the event loop counts the Redraws it is handed. `call_serially`: a
+    // `callSerially` chain on the event loop, each run queueing itself again.
     #[derive(Clone, Copy, Debug, Default)]
     struct Guest {
         timer: Option<(u64, Option<u64>)>,
         beat_ms: Option<u64>,
         poller: bool,
+        repaint: Option<Repaint>,
+        call_serially: bool,
     }
 
-    // What `on_a_host` counted: timer fires and poller rounds, the host's wake ticks, the host
-    // frames the engine counted (`Pacing::ticks`), and the guest ms the 120 frames took.
+    // The two ways a guest asks for a repaint.
+    #[derive(Clone, Copy, Debug)]
+    enum Repaint {
+        // `Display.repaint`: the engine hands the Redraw on (`System::request_redraw`).
+        Engine,
+        // WIPI-C `MC_grpRepaint`: the host does, when it finds the screen's flag set (`Screen::request_redraw`).
+        Screen,
+    }
+
+    impl Repaint {
+        fn request(self, system: &System) {
+            match self {
+                Self::Engine => system.request_redraw(),
+                Self::Screen => system.platform().screen().request_redraw().unwrap(),
+            }
+        }
+    }
+
+    // What `on_a_host` counted: timer fires and poller rounds, beats, Redraws handed to the event
+    // loop, `callSerially` runs, the host's wake ticks, the host frames the engine counted
+    // (`Pacing::ticks`), and the guest ms the 120 frames took.
     #[derive(Debug, PartialEq)]
     struct HostRun {
         fires: u64,
+        beats: u64,
+        redraws: u64,
+        callbacks: u64,
         wake_ticks: u64,
         ticks: u64,
         elapsed: u64,
+    }
+
+    extern crate std;
+
+    // `ChainedCallback` runs so far. Per thread: a guest runs on the thread of the test that ticks it.
+    std::thread_local! {
+        static CALLBACK_RUNS: core::cell::Cell<u64> = const { core::cell::Cell::new(0) };
+    }
+
+    struct ChainedCallback;
+
+    impl ChainedCallback {
+        async fn run(jvm: &Jvm, _context: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<()> {
+            CALLBACK_RUNS.with(|runs| runs.set(runs.get() + 1));
+            let queue = jvm
+                .invoke_static("net/wie/EventQueue", "getEventQueue", "()Lnet/wie/EventQueue;", ())
+                .await?;
+            jvm.invoke_virtual(&queue, "net/wie/EventQueue", "callSerially", "(Ljava/lang/Runnable;)V", (this,))
+                .await
+        }
     }
 
     // `guest` over 120 frames of a 60Hz host at play `speed`. The test clock is the guest clock, so a
@@ -820,6 +873,8 @@ mod test {
     // `advance`): after every tick it takes the pacing counters, and for `Pacing::wake` it comes
     // back `SpeedClock::wake_delay` later with a wake tick — unless the next frame comes first —
     // on a timer that fires no sooner than `timer_floor_ms` (a browser's is 1ms, 4ms once nested).
+    // Either host hands the screen's redraw flag back as an `Event::Redraw` where `advance` does:
+    // after a tick it does not come back for, or failing that before the next frame's.
     fn on_a_host(guest: Guest, speed: f64, margin: Option<u64>, timer_floor_ms: u64) -> Result<HostRun> {
         let frame_ms = (16.667 * speed).round() as u64;
         let budget = (14.0 * speed) as u64;
@@ -827,26 +882,65 @@ mod test {
         let platform = TestPlatform::with_clock(clock.clone()).with_speed(speed);
         let platform = margin.into_iter().fold(platform, TestPlatform::with_wake_margin);
         let in_wake_tick = platform.wake_tick_flag();
+        let screen_redraw = platform.redraw_flag();
         let mut system = System::new(Box::new(platform), "", "", DefaultTaskRunner);
         let fires = Arc::new(AtomicU64::new(0));
-        if let Some((after_ms, pace_after)) = guest.timer {
-            let (system_task, fires_task) = (system.clone(), fires.clone());
+        let beats = Arc::new(AtomicU64::new(0));
+        let redraws = Arc::new(AtomicU64::new(0));
+        CALLBACK_RUNS.with(|runs| runs.set(0));
+        if guest.timer.is_some() || guest.repaint.is_some() || guest.call_serially {
+            let (system_task, fires_task, beats_task, redraws_task) = (system.clone(), fires.clone(), beats.clone(), redraws.clone());
+            let callback_proto = WieJavaClassProto {
+                name: "net/wie/ChainedCallback",
+                parent_class: Some("java/lang/Object"),
+                interfaces: vec!["java/lang/Runnable"],
+                methods: vec![JavaMethodProto::new("run", "()V", ChainedCallback::run, MethodAccessFlags::PUBLIC)],
+                fields: vec![],
+                access_flags: ClassAccessFlags::PUBLIC,
+            };
             system.spawn(async move || {
-                let jvm = JvmSupport::new_jvm(&system_task, None, Box::new([get_protos().into()]), &[], RustJavaJvmImplementation).await?;
+                let jvm = JvmSupport::new_jvm(
+                    &system_task,
+                    None,
+                    Box::new([get_protos().into(), Box::new([callback_proto])]),
+                    &[],
+                    RustJavaJvmImplementation,
+                )
+                .await?;
+                if guest.call_serially {
+                    let queue = jvm
+                        .invoke_static("net/wie/EventQueue", "getEventQueue", "()Lnet/wie/EventQueue;", ())
+                        .await
+                        .unwrap();
+                    let callback = jvm.instantiate_class("net/wie/ChainedCallback").await.unwrap();
+                    let _: () = jvm
+                        .invoke_virtual(&queue, "net/wie/EventQueue", "callSerially", "(Ljava/lang/Runnable;)V", (callback,))
+                        .await
+                        .unwrap();
+                }
                 for _ in 0..1_000_000 {
-                    let due = system_task.platform().now() + after_ms;
-                    let (system_timer, fires_timer) = (system_task.clone(), fires_task.clone());
-                    system_task.event_queue().push(Event::guest_timer(
-                        due,
-                        pace_after.map_or(u64::MAX, |x| system_task.pacing().ticks() + x),
-                        move || async move {
-                            fires_timer.fetch_add(1, Ordering::SeqCst);
-                            // The key is what makes getNextEvent return; the timer itself is consumed internally.
-                            system_timer.event_queue().push(Event::Keydown(KeyCode::NUM1));
-                            Ok(())
-                        },
-                    ));
-                    get_next_event(jvm.clone()).await;
+                    if let Some((after_ms, pace_after)) = guest.timer {
+                        let due = system_task.platform().now() + after_ms;
+                        let (system_timer, fires_timer, beats_timer) = (system_task.clone(), fires_task.clone(), beats_task.clone());
+                        system_task.event_queue().push(Event::guest_timer(
+                            due,
+                            pace_after.map_or(u64::MAX, |x| system_task.pacing().ticks() + x),
+                            move || async move {
+                                fires_timer.fetch_add(1, Ordering::SeqCst);
+                                if let (Some(repaint), None) = (guest.repaint, guest.beat_ms) {
+                                    beats_timer.fetch_add(1, Ordering::SeqCst);
+                                    repaint.request(&system_timer);
+                                }
+                                // The key is what makes getNextEvent return; the timer itself is consumed internally.
+                                system_timer.event_queue().push(Event::Keydown(KeyCode::NUM1));
+                                Ok(())
+                            },
+                        ));
+                    }
+                    // A Redraw is counted and the wait goes on: it is the timer's key that ends it.
+                    while next_event_kind(jvm.clone()).await == EventQueueEvent::RepaintEvent as i32 {
+                        redraws_task.fetch_add(1, Ordering::SeqCst);
+                    }
                 }
                 Ok(())
             });
@@ -862,9 +956,13 @@ mod test {
             });
         }
         if let Some(beat_ms) = guest.beat_ms {
-            let system_beat = system.clone();
+            let (system_beat, beats_beat) = (system.clone(), beats.clone());
             system.spawn(async move || {
                 for _ in 0..1_000_000 {
+                    beats_beat.fetch_add(1, Ordering::SeqCst);
+                    if let Some(repaint) = guest.repaint {
+                        repaint.request(&system_beat);
+                    }
                     system_beat.sleep(beat_ms).await;
                 }
                 Ok(())
@@ -874,14 +972,29 @@ mod test {
         // Guest ms = wall ms x `speed` from 0 on.
         let speed_clock = SpeedClock::new();
         speed_clock.set_speed(0.0, speed);
+        let hand_on_redraw = |system: &System| {
+            if screen_redraw.swap(false, Ordering::SeqCst) {
+                system.event_queue().push(Event::Redraw);
+            }
+        };
         let mut wake_ticks = 0;
+        // The last tick ended on a wake the host is to come back for: its frame is not over.
+        let mut resumes = false;
         let start = clock.peek();
         for _ in 0..120 {
             let budget_end = clock.peek() + budget;
+            if resumes {
+                hand_on_redraw(&system);
+            }
             system.tick_for(budget)?;
             let next_frame = (clock.peek() / frame_ms + 1) * frame_ms;
-            while let Some(margin) = margin {
-                let Some(due) = system.pacing().take().wake() else { break };
+            loop {
+                let wake = system.pacing().take().wake();
+                resumes = wake.is_some();
+                let Some((due, margin)) = wake.zip(margin) else {
+                    hand_on_redraw(&system);
+                    break;
+                };
                 let now = clock.peek();
                 let delay = (speed_clock.wake_delay(now as f64 / speed, due, margin) * speed) as u64;
                 let fire = now + delay.max((timer_floor_ms as f64 * speed).ceil() as u64);
@@ -907,6 +1020,9 @@ mod test {
         }
         Ok(HostRun {
             fires: fires.load(Ordering::SeqCst),
+            beats: beats.load(Ordering::SeqCst),
+            redraws: redraws.load(Ordering::SeqCst),
+            callbacks: CALLBACK_RUNS.with(|runs| runs.get()),
             wake_ticks,
             ticks: system.pacing().ticks(),
             elapsed: clock.peek() - start,
@@ -925,7 +1041,7 @@ mod test {
         let guest = Guest {
             timer: Some((after_ms, pace_after)),
             beat_ms,
-            poller: false,
+            ..Guest::default()
         };
         let run = on_a_host(guest, 1.0, margin, timer_floor_ms)?;
         Ok((run.fires, run.wake_ticks, run.ticks))
@@ -979,7 +1095,7 @@ mod test {
         let timer = |after_ms, pace_after, beat_ms| Guest {
             timer: Some((after_ms, pace_after)),
             beat_ms,
-            poller: false,
+            ..Guest::default()
         };
         let guests = [
             // MC_knlSetTimer(1), and a 10ms timer re-armed in the tick it fired in, beside a beat.
@@ -990,9 +1106,17 @@ mod test {
             timer(10, Some(1), Some(40)),
             // A thread in a `Thread.sleep(1)` loop beside one: the same poll, with no event loop.
             Guest {
-                timer: None,
                 beat_ms: Some(30),
                 poller: true,
+                ..Guest::default()
+            },
+            // A `callSerially` chain beside one: the event loop polls toward the end of its 16ms
+            // slice, where the next run is. Left out of what the tick is told, a 40ms beat's host ran
+            // the chain 164 -> 153 times at 2x.
+            Guest {
+                beat_ms: Some(40),
+                call_serially: true,
+                ..Guest::default()
             },
             // A 25ms timer that paces its own tick: the host does come back for this one, and at 2x
             // most frames — where a wake tick with a budget of its own runs past the frame's
@@ -1007,9 +1131,9 @@ mod test {
                     let on = on_a_host(guest, speed, Some(3), timer_floor_ms)?;
                     wake_ticks += on.wake_ticks;
                     assert_eq!(
-                        (on.fires, on.elapsed, on.ticks),
-                        (off.fires, off.elapsed, off.ticks),
-                        "{guest:?} at {speed}x, timers no sooner than {timer_floor_ms}ms: (fires, guest ms, host frames) with {} wake ticks",
+                        (on.fires, on.callbacks, on.elapsed, on.ticks),
+                        (off.fires, off.callbacks, off.elapsed, off.ticks),
+                        "{guest:?} at {speed}x, timers no sooner than {timer_floor_ms}ms: (fires, callSerially runs, guest ms, host frames) with {} wake ticks",
                         on.wake_ticks
                     );
                 }
@@ -1017,6 +1141,95 @@ mod test {
         }
         // And it is not that the host never comes back: the paced timer and the beats still hand over.
         assert!(wake_ticks > 300, "{wake_ticks}");
+        Ok(())
+    }
+
+    #[test]
+    fn a_repaint_reaches_the_guest_once_per_host_frame_on_a_host_that_wakes_the_guest() -> Result<()> {
+        // A repaint goes on to the event loop when the host frame's tick is over — one a frame, though
+        // a thread that repaints and sleeps 10ms asks three times in a 2x frame. A host that takes the
+        // tick's wait over (`Platform::wake_margin_ms`) ends that tick two or three times a frame; handed
+        // on at each end, the same thread was painted on every beat (119 -> 359 Redraws in 120 frames),
+        // and a game that moves in `paint()` ran that much faster for its host having opted in
+        // (docs/report/0556 §10). It goes on only from a tick the host does not come back for.
+        let beat = |beat_ms| Guest {
+            beat_ms: Some(beat_ms),
+            repaint: Some(Repaint::Engine),
+            ..Guest::default()
+        };
+        let guests = [
+            // `Display.repaint` then `Thread.sleep`, on a beat shorter than a tick's budget.
+            beat(10),
+            beat(20),
+            // WIPI-C `MC_grpRepaint` from a timer that fires twice in a 2x frame: the host's half of
+            // the same rule (`on_a_host`, as `wie_featurephone`'s `advance`).
+            Guest {
+                timer: Some((12, Some(0))),
+                repaint: Some(Repaint::Screen),
+                ..Guest::default()
+            },
+        ];
+        let (mut wake_ticks, mut unpainted) = (0, 0);
+        for speed in [1.0, 1.5, 2.0] {
+            for guest in guests {
+                let off = on_a_host(guest, speed, None, 0)?;
+                assert!(off.redraws > 90, "{guest:?} at {speed}x: {} Redraws", off.redraws);
+                unpainted += off.beats - off.redraws;
+                for timer_floor_ms in [1, 4] {
+                    let on = on_a_host(guest, speed, Some(3), timer_floor_ms)?;
+                    wake_ticks += on.wake_ticks;
+                    assert_eq!(
+                        (on.redraws, on.beats, on.elapsed, on.ticks),
+                        (off.redraws, off.beats, off.elapsed, off.ticks),
+                        "{guest:?} at {speed}x, timers no sooner than {timer_floor_ms}ms: (Redraws, beats, guest ms, host frames) with {} wake ticks",
+                        on.wake_ticks
+                    );
+                }
+                // A host whose timer always loses to the next frame never runs the wake tick that would
+                // end the frame's tick. The frame is over all the same, and the next one starts by
+                // handing the repaint on: one for every beat it gets to, at most one a frame. Handed on
+                // only where a tick ends, the 10ms beat — whose every tick ends on a wake — was never
+                // painted at all.
+                let late = on_a_host(guest, speed, Some(3), 1_000)?;
+                assert_eq!(late.wake_ticks, 0);
+                assert!(
+                    late.redraws + 1 >= late.beats.min(off.redraws),
+                    "{guest:?} at {speed}x, a host that never comes back: {} Redraws for {} beats, {} without a margin",
+                    late.redraws,
+                    late.beats,
+                    off.redraws
+                );
+            }
+        }
+        // And these are the shapes it is about: more beats than frames, and a host that does come back.
+        assert!(
+            unpainted > 500 && wake_ticks > 1_000,
+            "{unpainted} beats unpainted, {wake_ticks} wake ticks"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_repaint_waits_for_the_host_s_wake_tick_only_on_a_host_that_comes_back() -> Result<()> {
+        // A guest that repaints and sleeps 10ms, on a clock that stands still: the tick ends on a wake
+        // inside its budget — to a host with a margin, the tick it comes back for, so the repaint
+        // waits for that wake tick. A host without one comes back for nothing: there every tick end
+        // hands the repaint on, as it always has.
+        for (margin, handed_on) in [(None, true), (Some(3), false)] {
+            let platform = TestPlatform::with_clock(TestClock::new());
+            let platform = margin.into_iter().fold(platform, TestPlatform::with_wake_margin);
+            let mut system = System::new(Box::new(platform), "", "", DefaultTaskRunner);
+            let system_task = system.clone();
+            system.spawn(async move || {
+                system_task.request_redraw();
+                system_task.sleep(10).await;
+                Ok(())
+            });
+            system.tick()?;
+            assert_eq!(system.pacing().wake().map(|x| x.raw()), margin.map(|_| 10), "margin {margin:?}");
+            let redraw = matches!(system.event_queue().pop(), Some(Event::Redraw));
+            assert_eq!(redraw, handed_on, "margin {margin:?}");
+        }
         Ok(())
     }
 

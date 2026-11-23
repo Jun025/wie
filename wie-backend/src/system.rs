@@ -98,17 +98,31 @@ impl System {
             self.pacing.lock().tick_resumed();
             self.executor.resume_tick(move || platform.now(), max_wait)
         } else {
+            // What the frame before still holds: its tick ended on a wake the host never came back for.
+            self.flush_redraw();
             self.executor.tick_for(move || platform.now(), budget_ms, max_wait)
         };
-        self.flush_redraw();
-        self.pacing
-            .lock()
-            .tick_ended(self.executor.wants_cpu(), self.executor.next_due(), self.executor.next_wake());
+        // Only a host with a margin comes back for a wake.
+        let wake = self.executor.next_wake().filter(|_| max_wait.is_some());
+        let frame_over = {
+            let mut pacing = self.pacing.lock();
+            pacing.tick_ended(self.executor.wants_cpu(), self.executor.next_due(), wake);
+            pacing.wake().is_none()
+        };
+        if frame_over {
+            self.flush_redraw();
+        }
         result
     }
 
-    /// A guest repaint. Its Redraw reaches the event queue at the end of the tick — when the host
-    /// used to deliver it — unless a guest thread is spinning on Thread.yield first: a second yield
+    /// A guest repaint. Its Redraw reaches the event queue at the end of the host frame's tick — one
+    /// a frame, however often the guest asks. A tick that ends on a wake the host comes back for
+    /// (`Pacing::wake`) is not that end; the last wake tick after it is. Handed on at each of them, a
+    /// thread that repaints and sleeps 20ms was painted 1971 times in 20s at 2x, not the 1154 of a
+    /// host that ticks once a frame: a game that moves in `paint()` ran that much faster for its host
+    /// having opted in (docs/report/0556 §10).
+    ///
+    /// Unless a guest thread is spinning on Thread.yield first: a second yield
     /// from one thread with no sleep of its own between is a thread waiting for something, and
     /// 배틀몬스터's game thread waits for its paint that way (the tick end cost it a host frame per
     /// game frame: 13.9 -> 20fps of its 20). A single yield is left alone — 메이플스토리2007 yields

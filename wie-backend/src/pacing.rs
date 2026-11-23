@@ -19,7 +19,9 @@
 //! - `wake`        the part of `due` the last tick would have stayed alive for: a paced wake inside
 //!   its budget (`Executor::next_wake`), unless it ended starved. What a host that wakes the guest
 //!   itself comes back for (`Platform::wake_margin_ms`) — never the event loop's polled work, which
-//!   is the host frame's (docs/report/0556 §8).
+//!   is the host frame's (docs/report/0556 §8) — and `None` on a host that does not. So `None` is
+//!   also «the host frame's tick is over»: only then does a repaint go on to the guest, from the
+//!   engine (`System::request_redraw`) and from the host (`Screen::request_redraw`) alike.
 
 use alloc::{format, string::String, vec::Vec};
 

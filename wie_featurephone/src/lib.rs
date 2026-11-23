@@ -19,9 +19,12 @@
 //! thirds of the engine's CPU in 4 shapes of 6 and about a tenth in the other 2; at 120Hz 7-43%
 //! (`wie-backend`'s `tick_occupancy`). A host that calls `set_wake_margin(ms)` once takes that wait
 //! over: from then on a tick ends on a wake further off than `ms` — and than the 4ms a nested
-//! browser timer cannot fire inside — and the host comes back for it. The guest runs on the same
-//! schedule either way — the same wakes, the same game frames, the same timer fires; only the
-//! waiting moves to the host. A host that never calls it runs exactly as before.
+//! browser timer cannot fire inside — and the host comes back for it. What the guest gets is the
+//! same in number either way — as many wakes, as many game frames, as many timer fires — and only
+//! the waiting moves to the host. Where inside a host frame each of them falls is not the same: a
+//! 1ms timer another thread arms while the event loop waits for a key fires as often, and later on
+//! average (beside a 10ms beat 3.8 -> 6.2 guest ms at 1x, 4.0 -> 8.7 at 2x; docs/report/0556 §9).
+//! A host that never calls it runs exactly as before.
 //!
 //! That holds because a tick hands over only a wake nothing polls before. While it waits for a
 //! wake itself, a tick also runs every poll beside it a millisecond apart: a 1ms WIPI timer, one
@@ -40,12 +43,18 @@
 //!   `tick` serves the guest as it does on a host without a margin: it wants CPU; or its wake falls
 //!   after that budget; or what it waits for is polled, not paced — a key, `callSerially`, a 1ms
 //!   WIPI timer, a timer that already fired its share this frame. Coming back for those ran such
-//!   timers 2-17 times as fast as the host's frames allow (docs/report/0556 §8).
+//!   timers 2-17 times as fast as the host's frames allow (docs/report/0556 §8). Or the tick waited
+//!   for the wake itself, so did not end on it: a poll has work before that wake (above); or it
+//!   was nearer than a tick waits — `ms`, and never less than 4ms.
 //! - **`wake_tick` is not a frame but the rest of the last `tick`**: it ends where that tick's
 //!   budget ended — never past the next vsync, whatever the display — is the same host frame to a
-//!   WIPI timer, leaves the frame-interval pacing (`FramePacer`) alone, and handles a redraw the
-//!   same way `tick` does. Called after that budget is spent it does nothing. Keep calling `tick`
-//!   from `requestAnimationFrame`.
+//!   WIPI timer, and leaves the frame-interval pacing (`FramePacer`) alone. Called after that
+//!   budget is spent it does nothing. Keep calling `tick` from `requestAnimationFrame`.
+//! - **A repaint still reaches the game once per host frame**, where that frame's tick is over:
+//!   after the `tick` or `wake_tick` that leaves no wake to come back for, or — the timer having
+//!   lost to the next frame — before the next `tick`. The host has nothing to do for it. Handed on
+//!   after every one of them, a game that repaints and then sleeps 20ms was painted 1971 times in
+//!   20s at 2x where a host without a margin paints it 1154 times (docs/report/0556 §10).
 //! - **`ms` = 3** is the measured value for WebKit; a browser whose timers run later wants more,
 //!   at the cost of up to `ms` of waiting per wake. `undefined` turns it off again. A timer later
 //!   than `ms` is a slower game, not only a late wake: simulated `sleep(20)` at 2x on 60Hz ran 719
@@ -324,6 +333,11 @@ impl WieEmulator {
             self.frame_end = begin + budget as f64;
             budget
         };
+        // A redraw the frame before still holds: its tick ended on a wake this host never came back
+        // for (a timer that lost to the next frame), so that frame is over without its wake tick.
+        if !wake && self.wake.is_some() {
+            self.hand_on_redraw();
+        }
         self.host_wake.in_wake_tick.store(wake, Ordering::Relaxed);
         let result = self.inner.tick_for(self.clock.budget(budget));
         let end = js_sys::Date::now();
@@ -337,10 +351,19 @@ impl WieEmulator {
         let due = pacing.due().map(|due| self.clock.wall_at(end, due));
         self.achieved.tick(begin, end, budget as f64, pacing.starved_ticks() > 0, due);
         result.map_err(|e| JsValue::from_str(&format!("{e:?}")))?;
+        // Once per host frame, as the engine hands on a guest's own repaint (`System::request_redraw`):
+        // not after a tick the host comes back for, or a game that asks before and after that wake
+        // is painted twice in the frame.
+        if self.wake.is_none() {
+            self.hand_on_redraw();
+        }
+        Ok(())
+    }
+
+    fn hand_on_redraw(&mut self) {
         if self.redraw.swap(false, Ordering::AcqRel) {
             self.inner.handle_event(Event::Redraw);
         }
-        Ok(())
     }
 
     /// Set the play speed: the game runs `speed` times as fast as real time. Continuous in
