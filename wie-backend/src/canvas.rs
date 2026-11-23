@@ -1718,7 +1718,7 @@ mod tests {
 
         assert_eq!(image.width(), 2);
         assert_eq!(image.height(), 2);
-        assert_eq!(image.bytes_per_pixel(), 1);
+        assert_eq!(image.bytes_per_pixel(), 4);
 
         let expected = [(252, 0, 0), (0, 252, 0), (0, 0, 255), (252, 252, 255)];
         for (i, &(r, g, b)) in expected.iter().enumerate() {

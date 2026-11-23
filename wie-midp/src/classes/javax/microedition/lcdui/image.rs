@@ -769,10 +769,6 @@ mod tests {
         test_utils::run_jvm_test(Box::new([crate::get_protos().into()]), |jvm| async move {
             for kind in [8u32, 16, 2] {
                 for masked in [0u32, 1] {
-                    // fork: wie-backend's LBMP decoder is still ours, which reads a mask plane for type 2 only.
-                    if masked != 0 && kind != 2 {
-                        continue;
-                    }
                     let pixels = match kind {
                         8 => vec![0xe0; 18],
                         16 => [0x00, 0xf8].repeat(18),
