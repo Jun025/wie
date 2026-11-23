@@ -28,6 +28,7 @@ EVID=${WIE_REGRESSION_EVIDENCE:-$HOME/orchestrator/reports/evidence/wie-weekly-r
 BUILD=${WIE_REGRESSION_BUILD_TREE:-$HOME/worktrees/wie-regression-build}
 read -r -a CORPUS <<<"${WIE_CORPUS:-$REPO/game_lab/working $REPO/game_lab/broken}"
 RECIPES=${WIE_RECIPES:-$REPO/game_lab/recipes-sound}
+LONG_RECIPES=${WIE_LONG_RECIPES:-$REPO/game_lab/recipes-long}
 OB=$HOME/orchestrator-live/bin
 NOTE=${WIE_REGRESSION_NOTE:-$OB/note} # a dry run points this at /usr/bin/true so the ledger never hears it
 export CENSUS_DEADLINE=$((T0 + ${WIE_REGRESSION_MAX_SECS:-21600}))
@@ -38,8 +39,15 @@ note() {
   echo "regression-census: $1" >&2
   if [[ -x $NOTE ]]; then printf '%s\n' "$1" | "$NOTE"; fi
 }
-# A sound recipe (game_lab/recipes-sound/<sha12>.keys) prefixes the long run, as in the census rounds.
-with_recipes() { while read -r s; do if [[ -f $RECIPES/$s.keys ]]; then echo "$s 600 $RECIPES/$s.keys"; else echo "$s"; fi; done; }
+# A recipe prefixes the long run, as in the census rounds. game_lab/recipes-long/<sha12>.keys first: the key order
+# a row's shipped longplay `ok` was measured with, because the default loop walks that title into its own quit item
+# (docs/report/0561 and the round after it) — measured without it, such a row reads `short`, which is a DOWN here.
+# Then game_lab/recipes-sound/<sha12>.keys (music that starts in play).
+with_recipes() {
+  while read -r s; do
+    if [[ -f $LONG_RECIPES/$s.keys ]]; then echo "$s 600 $LONG_RECIPES/$s.keys"; elif [[ -f $RECIPES/$s.keys ]]; then echo "$s 600 $RECIPES/$s.keys"; else echo "$s"; fi
+  done
+}
 # The census and the diff run from the measured tree ($T), never from this checkout: the HAND_WALL/LOCK tables they
 # judge by move with the engine, and a checkout behind origin/main turned 4 rows into false suspects (2026-11-01).
 drive() { bash "$T/census-drive.sh" --bin "$R/wie_validate" "$@"; }
