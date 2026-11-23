@@ -47,3 +47,5 @@
 - `node scripts/check-compat-revert.mjs` → `compat-revert: OK — 브랜치가 main 을 받은 적이 없다 · 착지 기준 바뀐 행 4` rc=0. 이 검사는 `title` · `status` 등을 보고 `game` · `sameTitle` 은 보지 않는다 — 4 는 `title` 이 바뀐 행이고, `sameTitle` 만 새로 실린 2행을 더하면 §2 의 6 이다.
 
 - 게임 이름 유입(`corpus-name-inflow`): BOUNDED 350쌍(1089회) · SUFFIX-ATTACHED 18쌍(60회). 의도한 유입이다 — 공개 목록(`compat.json` 의 `title`·`game`)이 산출물이고 `SAME_NAME_HAND`·`SAME_GAME` 이 그 이름을 적는다. 이 문서에는 이름을 적지 않았다. 게임 바이트·리소스 내용·캡처는 0.
+
+<!-- corpus-name-inflow v1 subjects=4 tree=0df5f7cc84491f95 B=1089/350 P=4/4 S=60/18 -->
