@@ -1,5 +1,8 @@
 use alloc::{format, string::String, vec::Vec};
-use core::cmp::min;
+use core::{
+    cmp::{Ordering, min},
+    iter::from_fn,
+};
 use jiff::{Timestamp, tz::Offset};
 
 use wie_backend::System;
@@ -9,7 +12,7 @@ use wie_util::{
 };
 use wie_wipi_c::api::kernel;
 
-use crate::runtime::{SVC_CATEGORY_STDLIB, svc_ids::StdlibSvcId};
+use crate::runtime::{SVC_CATEGORY_STDLIB, globals::STRTOK_STATE, svc_ids::StdlibSvcId};
 
 pub fn register_stdlib_svc_handler(core: &mut ArmCore, system: &System) -> Result<()> {
     async fn handle_stdlib_svc(core: &mut ArmCore, system: &mut System, id: SvcId) -> Result<()> {
@@ -32,14 +35,20 @@ pub fn register_stdlib_svc_handler(core: &mut ArmCore, system: &System) -> Resul
             x if x == StdlibSvcId::Strchr as u32 => EmulatedFunction::call(&strchr, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Strstr as u32 => EmulatedFunction::call(&strstr, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Strlen as u32 => EmulatedFunction::call(&stdlib::strlen, core, &mut ()).await?.write(core, lr),
+            x if x == StdlibSvcId::Strtok as u32 => EmulatedFunction::call(&strtok, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Memcpy as u32 => EmulatedFunction::call(&stdlib::memcpy, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Memmove as u32 => EmulatedFunction::call(&stdlib::memmove, core, &mut ()).await?.write(core, lr),
+            x if x == StdlibSvcId::Memcmp as u32 => EmulatedFunction::call(&memcmp, core, &mut ()).await?.write(core, lr),
+            x if x == StdlibSvcId::Memchr as u32 => EmulatedFunction::call(&memchr, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Memset as u32 => EmulatedFunction::call(&stdlib::memset, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Time as u32 => EmulatedFunction::call(&time, core, system).await?.write(core, lr),
             x if x == StdlibSvcId::Localtime as u32 => EmulatedFunction::call(&localtime, core, &mut ()).await?.write(core, lr),
-            x if x == StdlibSvcId::Unk3 as u32 => EmulatedFunction::call(&unk3, core, &mut ()).await?.write(core, lr),
+            x if x == StdlibSvcId::Atexit as u32 => EmulatedFunction::call(&atexit, core, &mut ()).await?.write(core, lr),
+            x if x == StdlibSvcId::Abort as u32 => EmulatedFunction::call(&abort, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Malloc as u32 => EmulatedFunction::call(&malloc, core, &mut ()).await?.write(core, lr),
+            x if x == StdlibSvcId::Realloc as u32 => EmulatedFunction::call(&realloc, core, &mut ()).await?.write(core, lr),
             x if x == StdlibSvcId::Free as u32 => EmulatedFunction::call(&free, core, &mut ()).await?.write(core, lr),
+            x if x == StdlibSvcId::Unk450 as u32 => EmulatedFunction::call(&unk450, core, &mut ()).await?.write(core, lr),
             _ => Err(WieError::FatalError(format!("Unknown lgt stdlib import: {:#x}", id.0))),
         }
     }
@@ -69,27 +78,23 @@ async fn sprintf(core: &mut ArmCore, _: &mut (), ptr_dst: u32, ptr_format: u32, 
     tracing::debug!("sprintf({ptr_dst:#x}, {ptr_format:#x}, {a0:#x}, {a1:#x}, {a2:#x}, {a3:#x}, {a4:#x}, {a5:#x})");
 
     let format = read_null_terminated_string_bytes(core, ptr_format)?;
-    let result = kernel::sprintf(core, &format, &[a0, a1, a2, a3, a4, a5])?;
+    let result = kernel::sprintf(core, &format, [a0, a1, a2, a3, a4, a5].into_iter().map(Ok))?;
     write_null_terminated_string_bytes(core, ptr_dst, &result)?;
 
     Ok(result.len() as u32)
 }
 
-// `ap` is the address of the first variadic word. Only as many words as the format can consume
-// are read (two per conversion covers `%lld`), and reading stops at the first unmapped one.
-async fn vsprintf(core: &mut ArmCore, _: &mut (), ptr_dst: u32, ptr_format: u32, ap: u32) -> Result<u32> {
-    tracing::debug!("vsprintf({ptr_dst:#x}, {ptr_format:#x}, {ap:#x})");
+// `ap` is the address of the first variadic word; a word is read only when the format consumes it.
+async fn vsprintf(core: &mut ArmCore, _: &mut (), ptr_dst: u32, ptr_format: u32, mut ptr_args: u32) -> Result<u32> {
+    tracing::debug!("vsprintf({ptr_dst:#x}, {ptr_format:#x}, {ptr_args:#x})");
 
     let format = read_null_terminated_string_bytes(core, ptr_format)?;
-    let wanted = format.iter().filter(|&&x| x == b'%').count() * 2;
-    let mut args = Vec::with_capacity(wanted);
-    for i in 0..wanted as u32 {
-        match read_generic::<u32, _>(core, ap + i * 4) {
-            Ok(word) => args.push(word),
-            Err(_) => break,
-        }
-    }
-    let result = kernel::sprintf(core, &format, &args)?;
+    let args = from_fn(|| {
+        let value = read_generic(core, ptr_args);
+        ptr_args = ptr_args.wrapping_add(4);
+        Some(value)
+    });
+    let result = kernel::sprintf(core, &format, args)?;
     write_null_terminated_string_bytes(core, ptr_dst, &result)?;
 
     Ok(result.len() as u32)
@@ -146,6 +151,64 @@ async fn strcmp(core: &mut ArmCore, _: &mut (), ptr_str1: u32, ptr_str2: u32) ->
     let str2 = read_null_terminated_string_bytes(core, ptr_str2)?;
 
     Ok(str1.cmp(&str2) as u32)
+}
+
+const COPY_CHUNK: usize = 4096;
+
+async fn strtok(core: &mut ArmCore, _: &mut (), ptr_str: u32, ptr_delimiters: u32) -> Result<u32> {
+    let mut cursor = if ptr_str == 0 { read_generic(core, STRTOK_STATE)? } else { ptr_str };
+    let delimiters = read_null_terminated_string_bytes(core, ptr_delimiters)?;
+    let mut token = 0;
+    while cursor != 0 {
+        let byte: u8 = read_generic(core, cursor)?;
+        if byte == 0 {
+            cursor = 0;
+            break;
+        }
+        if delimiters.contains(&byte) {
+            if token != 0 {
+                write_generic(core, cursor, 0u8)?;
+                cursor = cursor.wrapping_add(1);
+                break;
+            }
+        } else if token == 0 {
+            token = cursor;
+        }
+        cursor = cursor.wrapping_add(1);
+    }
+    write_generic(core, STRTOK_STATE, cursor)?;
+    Ok(token)
+}
+
+async fn memcmp(core: &mut ArmCore, _: &mut (), ptr_first: u32, ptr_second: u32, len: u32) -> Result<u32> {
+    let mut first = [0; COPY_CHUNK];
+    let mut second = [0; COPY_CHUNK];
+    let mut offset = 0;
+    while offset < len {
+        let chunk = ((len - offset) as usize).min(COPY_CHUNK);
+        core.read_bytes(ptr_first.wrapping_add(offset), &mut first[..chunk])?;
+        core.read_bytes(ptr_second.wrapping_add(offset), &mut second[..chunk])?;
+        let result = first[..chunk].cmp(&second[..chunk]);
+        if result != Ordering::Equal {
+            return Ok(result as u32);
+        }
+        offset += chunk as u32;
+    }
+    Ok(0)
+}
+
+async fn memchr(core: &mut ArmCore, _: &mut (), ptr: u32, value: u32, len: u32) -> Result<u32> {
+    let mut buf = [0; COPY_CHUNK];
+    let mut offset = 0;
+    while offset < len {
+        let chunk = ((len - offset) as usize).min(COPY_CHUNK);
+        core.read_bytes(ptr.wrapping_add(offset), &mut buf[..chunk])?;
+        if let Some(index) = buf[..chunk].iter().position(|byte| *byte == value as u8) {
+            return Ok(ptr.wrapping_add(offset).wrapping_add(index as u32));
+        }
+        offset += chunk as u32;
+    }
+    Ok(0)
 }
 
 async fn atoi(core: &mut ArmCore, _: &mut (), ptr_str: u32) -> Result<u32> {
@@ -251,12 +314,21 @@ async fn unk2(_core: &mut ArmCore, _: &mut (), a0: u32) -> Result<()> {
     Ok(())
 }
 
-async fn unk3(core: &mut ArmCore, _: &mut (), a0: u32) -> Result<()> {
-    tracing::warn!("unk3({a0:#x})");
+// upstream #1502. Until the 2026-11-23 merge this slot (then `unk3`, unchanged base code) ran the
+// callback at once — at registration.
+async fn atexit(_core: &mut ArmCore, _: &mut (), callback: u32) -> Result<u32> {
+    tracing::warn!("stub atexit({callback:#x})");
 
-    let _: () = core.run_function(a0, &[]).await?;
+    Ok(0)
+}
 
-    Ok(())
+async fn abort(_core: &mut ArmCore, _: &mut ()) -> Result<()> {
+    Err(WieError::FatalError("Guest called abort()".into()))
+}
+
+async fn unk450(_core: &mut ArmCore, _: &mut ()) -> Result<f64> {
+    tracing::warn!("stub lgt stdlib unk450");
+    Ok(0.0)
 }
 
 async fn strncmp(core: &mut ArmCore, _: &mut (), ptr_str1: u32, ptr_str2: u32, size: u32) -> Result<u32> {
@@ -309,6 +381,22 @@ async fn free(core: &mut ArmCore, _: &mut (), ptr: u32) -> Result<()> {
     Allocator::free(core, block, total)
 }
 
+// upstream #1481's `realloc`, on our block header (`MALLOC_HEADER`): a failed allocation answers NULL
+// and leaves the old block alone, as C does.
+async fn realloc(core: &mut ArmCore, context: &mut (), ptr: u32, size: u32) -> Result<u32> {
+    if size == 0 {
+        free(core, context, ptr).await?;
+        return Ok(0);
+    }
+    let new_ptr = malloc(core, context, size).await?;
+    if ptr != 0 && new_ptr != 0 {
+        let old_total: u32 = read_generic(core, ptr - MALLOC_HEADER)?;
+        stdlib::memcpy(core, context, new_ptr, ptr, size.min(old_total - MALLOC_HEADER)).await?;
+        free(core, context, ptr).await?;
+    }
+    Ok(new_ptr)
+}
+
 async fn strstr(core: &mut ArmCore, _: &mut (), ptr_haystack: u32, ptr_needle: u32) -> Result<u32> {
     tracing::debug!("strstr({ptr_haystack:#x}, {ptr_needle:#x})");
 
@@ -344,16 +432,20 @@ mod tests {
     use test_utils::TestPlatform;
     use wie_backend::{DefaultTaskRunner, System};
     use wie_core_arm::{Allocator, ArmCore};
-    use wie_util::{ByteRead, ByteWrite, Result, read_generic, write_generic};
+    use wie_util::{ByteRead, ByteWrite, Result, WieError, read_generic, read_null_terminated_string_bytes, write_generic};
 
-    use super::{free, localtime, malloc, parse_long, rand, register_stdlib_svc_handler, srand};
+    use super::{STRTOK_STATE, free, localtime, malloc, parse_long, rand, register_stdlib_svc_handler, srand};
     use crate::runtime::{SVC_CATEGORY_STDLIB, svc_ids::StdlibSvcId};
 
     /// `localtime` fills the guest's `tm` in KST. The expected fields are calendar facts, not this
     /// code's output: the date library under it was swapped (chrono → jiff, with RustJava 0.5.1).
     #[test]
     fn localtime_fills_tm_in_kst() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
         let ptr_time = Allocator::alloc(&mut core, 4)?;
 
@@ -375,8 +467,16 @@ mod tests {
 
     #[test]
     fn random_state_is_shared_by_system_clones_and_process_local() -> Result<()> {
-        let mut first = ArmCore::new(false, None)?;
-        let mut second = ArmCore::new(false, None)?;
+        let mut first = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
+        let mut second = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         let mut first_system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
         let mut second_system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
         let mut first_system_clone = first_system.clone();
@@ -407,7 +507,11 @@ mod tests {
         let system_clone = system.clone();
 
         system.spawn(async move || {
-            let mut core = ArmCore::new(false, None)?;
+            let mut core = ArmCore::new(wie_backend::Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
             Allocator::init(&mut core)?;
             let stack = Allocator::alloc(&mut core, 0x1000)?;
             let mut context = core.save_context();
@@ -448,7 +552,11 @@ mod tests {
         let system_clone = system.clone();
 
         system.spawn(async move || {
-            let mut core = ArmCore::new(false, None)?;
+            let mut core = ArmCore::new(wie_backend::Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
             Allocator::init(&mut core)?;
             let stack = Allocator::alloc(&mut core, 0x1000)?;
             let mut context = core.save_context();
@@ -521,7 +629,11 @@ mod tests {
         let system_clone = system.clone();
 
         system.spawn(async move || {
-            let mut core = ArmCore::new(false, None)?;
+            let mut core = ArmCore::new(wie_backend::Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
             Allocator::init(&mut core)?;
             let stack = Allocator::alloc(&mut core, 0x1000)?;
             let mut context = core.save_context();
@@ -561,7 +673,11 @@ mod tests {
         let system_clone = system.clone();
 
         system.spawn(async move || {
-            let mut core = ArmCore::new(false, None)?;
+            let mut core = ArmCore::new(wie_backend::Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
             Allocator::init(&mut core)?;
             let stack = Allocator::alloc(&mut core, 0x1000)?;
             let mut context = core.save_context();
@@ -602,7 +718,11 @@ mod tests {
         let system_clone = system.clone();
 
         system.spawn(async move || {
-            let mut core = ArmCore::new(false, None)?;
+            let mut core = ArmCore::new(wie_backend::Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
             Allocator::init(&mut core)?;
             let stack = Allocator::alloc(&mut core, 0x1000)?;
             let mut context = core.save_context();
@@ -642,5 +762,152 @@ mod tests {
         assert_eq!(parse_long(b"zz", 10), (0, 0));
         assert_eq!(parse_long(b"99999999999", 10), (i32::MAX, 11));
         assert_eq!(parse_long(b"-99999999999", 10), (i32::MIN, 12));
+    }
+
+    // ── upstream's tests for the slots the 2026-11-23 merge brought in (strtok · memcmp · memchr ·
+    // realloc · atexit · abort) and for its lazy `vsprintf` argument reads. ──
+
+    fn stdlib_core() -> Result<ArmCore> {
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
+        Allocator::init(&mut core)?;
+        core.map(0x10000, 0x10000)?;
+        let mut context = core.save_context();
+        context.sp = 0x18000;
+        core.restore_context(&context);
+        let system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        register_stdlib_svc_handler(&mut core, &system)?;
+        Ok(core)
+    }
+
+    #[test]
+    fn tokenization_resumes_in_guest_memory_and_accepts_changing_delimiters() -> Result<()> {
+        let mut core = stdlib_core()?;
+        let tokenize = core.make_svc_stub(SVC_CATEGORY_STDLIB, 0x413u32)?;
+        core.write_bytes(0x10000, b",one;;two:three,,\0")?;
+        core.write_bytes(0x11000, b",;\0;:\0,\0\0")?;
+        assert_eq!(core.run_function::<u32>(tokenize, &[0x10000, 0x11000]).now_or_never().unwrap()?, 0x10001);
+        assert_eq!(read_null_terminated_string_bytes(&core, 0x10001)?, b"one");
+        assert_eq!(read_generic::<u32, _>(&core, STRTOK_STATE)?, 0x10005);
+
+        let mut resumed = core.clone();
+        assert_eq!(resumed.run_function::<u32>(tokenize, &[0, 0x11003]).now_or_never().unwrap()?, 0x10006);
+        assert_eq!(read_null_terminated_string_bytes(&core, 0x10006)?, b"two");
+        assert_eq!(core.run_function::<u32>(tokenize, &[0, 0x11006]).now_or_never().unwrap()?, 0x1000a);
+        assert_eq!(read_null_terminated_string_bytes(&core, 0x1000a)?, b"three");
+        assert_eq!(core.run_function::<u32>(tokenize, &[0, 0x11006]).now_or_never().unwrap()?, 0);
+        assert_eq!(core.run_function::<u32>(tokenize, &[0, 0x11006]).now_or_never().unwrap()?, 0);
+
+        core.write_bytes(0x10000, b"whole,string\0")?;
+        assert_eq!(core.run_function::<u32>(tokenize, &[0x10000, 0x11008]).now_or_never().unwrap()?, 0x10000);
+        assert_eq!(read_null_terminated_string_bytes(&core, 0x10000)?, b"whole,string");
+        assert_eq!(core.run_function::<u32>(tokenize, &[0, 0x11008]).now_or_never().unwrap()?, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn variadic_formatting_reads_only_consumed_guest_arguments() -> Result<()> {
+        let mut core = stdlib_core()?;
+        let format = core.make_svc_stub(SVC_CATEGORY_STDLIB, 0x3f9u32)?;
+        core.write_bytes(0x11000, b"%u %u %u %u %u %u %u %u\0")?;
+        for index in 0..8 {
+            write_generic(&mut core, 0x1ffe0 + index * 4, index + 1)?;
+        }
+        assert_eq!(
+            core.run_function::<u32>(format, &[0x10000, 0x11000, 0x1ffe0]).now_or_never().unwrap()?,
+            15
+        );
+        assert_eq!(read_null_terminated_string_bytes(&core, 0x10000)?, b"1 2 3 4 5 6 7 8");
+
+        core.write_bytes(0x11000, b"literal %%\0")?;
+        assert_eq!(core.run_function::<u32>(format, &[0x10000, 0x11000, 0x20000]).now_or_never().unwrap()?, 9);
+        assert_eq!(read_null_terminated_string_bytes(&core, 0x10000)?, b"literal %");
+
+        core.write_bytes(0x11000, b"%s:%llx\0")?;
+        core.write_bytes(0x12000, b"value\0")?;
+        write_generic(&mut core, 0x1fff4, 0x12000u32)?;
+        write_generic(&mut core, 0x1fff8, 0x89abcdefu32)?;
+        write_generic(&mut core, 0x1fffc, 0x01234567u32)?;
+        core.run_function::<u32>(format, &[0x10000, 0x11000, 0x1fff4]).now_or_never().unwrap()?;
+        assert_eq!(read_null_terminated_string_bytes(&core, 0x10000)?, b"value:123456789abcdef");
+
+        core.write_bytes(0x11000, b"%u %u\0")?;
+        assert!(matches!(
+            core.run_function::<u32>(format, &[0x10000, 0x11000, 0x1fffc]).now_or_never().unwrap(),
+            Err(WieError::InvalidMemoryAccess(0x20000))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn memcmp_and_memchr_imports_scan_guest_bytes_across_chunks() -> Result<()> {
+        let mut core = stdlib_core()?;
+        core.map(0x20000, 0x10000)?;
+        let source = (0..5001).map(|index| (index % 251 + 1) as u8).collect::<alloc::vec::Vec<_>>();
+        core.write_bytes(0x10000, &source)?;
+        core.write_bytes(0x20000, &source)?;
+
+        let compare = core.make_svc_stub(SVC_CATEGORY_STDLIB, 0x416u32)?;
+        assert_eq!(core.run_function::<u32>(compare, &[0x10000, 0x20000, 5001]).now_or_never().unwrap()?, 0);
+        core.write_bytes(0x11000, b"\0\x80")?;
+        core.write_bytes(0x21000, b"\0\x7f")?;
+        for (first, second, sign) in [(0x10000, 0x20000, 1), (0x20000, 0x10000, -1)] {
+            let result = core.run_function::<u32>(compare, &[first, second, 5001]).now_or_never().unwrap()? as i32;
+            assert_eq!(result.signum(), sign);
+        }
+        assert_eq!(core.run_function::<u32>(compare, &[0x30000, 0x30000, 0]).now_or_never().unwrap()?, 0);
+
+        let find = core.make_svc_stub(SVC_CATEGORY_STDLIB, 0x417u32)?;
+        core.write_bytes(0x2ec78, &[1; 5000])?;
+        core.write_bytes(0x2fffe, b"\0\x80")?;
+        for (value, len, expected) in [(0x180, 5000, 0x2ffff), (0, 5000, 0x2fffe), (1, 5000, 0x2ec78), (0x80, 4999, 0)] {
+            assert_eq!(core.run_function::<u32>(find, &[0x2ec78, value, len]).now_or_never().unwrap()?, expected);
+        }
+        assert_eq!(core.run_function::<u32>(find, &[0x30000, 0, 0]).now_or_never().unwrap()?, 0);
+        Ok(())
+    }
+
+    /// `realloc` (0x427) on our block header: the bytes move, the old block goes back, and a failed
+    /// allocation answers NULL with the old block untouched — `malloc`'s NULL contract, which upstream's
+    /// own `realloc` does not have (it fails the run). `atexit` (0x424) registers without running the
+    /// callback; `abort` (0x425) ends the run.
+    #[test]
+    fn realloc_atexit_and_abort_imports_answer() -> Result<()> {
+        let mut core = stdlib_core()?;
+        let allocate = core.make_svc_stub(SVC_CATEGORY_STDLIB, 0x426u32)?;
+        let resize = core.make_svc_stub(SVC_CATEGORY_STDLIB, 0x427u32)?;
+        let release = core.make_svc_stub(SVC_CATEGORY_STDLIB, 0x428u32)?;
+
+        let mut ptr = core.run_function::<u32>(allocate, &[16]).now_or_never().unwrap()?;
+        core.write_bytes(ptr, b"0123456789abcdef")?;
+        for size in [5000, 8] {
+            ptr = core.run_function::<u32>(resize, &[ptr, size]).now_or_never().unwrap()?;
+            assert_ne!(ptr, 0);
+            let mut bytes = [0; 8];
+            core.read_bytes(ptr, &mut bytes)?;
+            assert_eq!(&bytes, b"01234567");
+        }
+        assert_eq!(core.run_function::<u32>(resize, &[ptr, 0x8000_0000]).now_or_never().unwrap()?, 0);
+        let mut bytes = [0; 8];
+        core.read_bytes(ptr, &mut bytes)?;
+        assert_eq!(&bytes, b"01234567", "a failed realloc leaves the old block");
+        assert_eq!(core.run_function::<u32>(resize, &[ptr, 0]).now_or_never().unwrap()?, 0);
+        let fresh = core.run_function::<u32>(resize, &[0, 32]).now_or_never().unwrap()?;
+        assert_ne!(fresh, 0);
+        core.run_function::<u32>(release, &[fresh]).now_or_never().unwrap()?;
+
+        // 0x30000 is unmapped: running the callback would fault.
+        let register = core.make_svc_stub(SVC_CATEGORY_STDLIB, 0x424u32)?;
+        assert_eq!(core.run_function::<u32>(register, &[0x30001]).now_or_never().unwrap()?, 0);
+
+        let abort = core.make_svc_stub(SVC_CATEGORY_STDLIB, 0x425u32)?;
+        assert!(matches!(
+            core.run_function::<u32>(abort, &[]).now_or_never().unwrap(),
+            Err(WieError::FatalError(message)) if message == "Guest called abort()"
+        ));
+        Ok(())
     }
 }

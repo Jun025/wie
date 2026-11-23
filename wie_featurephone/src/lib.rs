@@ -230,6 +230,7 @@ impl WieEmulator {
 
         let options = Options {
             enable_gdbserver: false,
+            aot: None, // interpreter only: adopting upstream's ARM AOT is a separate, measured round
             profile: None,
         };
 
@@ -639,7 +640,7 @@ fn build_emulator(
             ))
         } else if SktEmulator::loadable_jar(&data) {
             Ok((
-                Box::new(SktEmulator::from_jar(platform, name, data, name_without_ext, None).map_err(|e| format!("{e:?}"))?),
+                Box::new(SktEmulator::from_jar(platform, name, data, name_without_ext).map_err(|e| format!("{e:?}"))?),
                 "SKT",
                 None,
             ))

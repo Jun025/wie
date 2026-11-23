@@ -1045,7 +1045,11 @@ mod tests {
     /// this runtime registered itself, so only a guest-supplied pointer sees the difference.
     #[test]
     fn try_name_reports_an_unreadable_class_instead_of_panicking() -> Result<()> {
-        let core = ArmCore::new(false, None)?;
+        let core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
 
         let class = JavaClassDefinition::from_raw(0x104c_02b4, &core);
 
@@ -1061,7 +1065,12 @@ mod tests {
     #[test]
     #[should_panic(expected = "LGT class 0x0 (descriptor Err(InvalidMemoryAccess(0))) has no readable name: InvalidMemoryAccess(0)")]
     fn name_panic_names_the_broken_link() {
-        let core = ArmCore::new(false, None).unwrap();
+        let core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })
+        .unwrap();
         jvm::ClassDefinition::name(&JavaClassDefinition::from_raw(0, &core));
     }
 }

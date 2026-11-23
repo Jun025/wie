@@ -1,7 +1,7 @@
 use alloc::{borrow::Cow, boxed::Box, format, vec, vec::Vec};
 use core::marker::PhantomData;
 
-use bytemuck::{Zeroable, cast_vec};
+use bytemuck::{Zeroable, cast_slice, cast_vec};
 
 use jvm::{
     Array, ArrayRawBufferMut, ClassInstanceRef, Jvm, Result as JvmResult,
@@ -34,6 +34,14 @@ impl Image {
                 JavaMethodProto::new("<init>", "()V", Self::init_empty, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getWidth", "()I", Self::get_width, MethodAccessFlags::PUBLIC),
                 JavaMethodProto::new("getHeight", "()I", Self::get_height, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("isMutable", "()Z", Self::is_mutable, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new("getRGB", "([IIIIIII)V", Self::get_rgb, MethodAccessFlags::PUBLIC),
+                JavaMethodProto::new(
+                    "createRGBImage",
+                    "([IIIZ)Ljavax/microedition/lcdui/Image;",
+                    Self::create_rgb_image,
+                    MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+                ),
                 JavaMethodProto::new(
                     "getGraphics",
                     "()Ljavax/microedition/lcdui/Graphics;",
@@ -64,14 +72,6 @@ impl Image {
                     Self::create_image_from_image,
                     MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
                 ),
-                // MIDP 2.0 — the rest of the creation surface. A general MIDP game reaches for these where the
-                // carrier titles never did (2026-10-08 open-source corpus round).
-                JavaMethodProto::new(
-                    "createImage",
-                    "(Ljava/io/InputStream;)Ljavax/microedition/lcdui/Image;",
-                    Self::create_image_from_stream,
-                    MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
-                ),
                 JavaMethodProto::new(
                     "createImage",
                     "(Ljavax/microedition/lcdui/Image;IIIII)Ljavax/microedition/lcdui/Image;",
@@ -79,13 +79,11 @@ impl Image {
                     MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
                 ),
                 JavaMethodProto::new(
-                    "createRGBImage",
-                    "([IIIZ)Ljavax/microedition/lcdui/Image;",
-                    Self::create_rgb_image,
+                    "createImage",
+                    "(Ljava/io/InputStream;)Ljavax/microedition/lcdui/Image;",
+                    Self::create_image_from_stream,
                     MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
                 ),
-                JavaMethodProto::new("getRGB", "([IIIIIII)V", Self::get_rgb, MethodAccessFlags::PUBLIC),
-                JavaMethodProto::new("isMutable", "()Z", Self::is_mutable, MethodAccessFlags::PUBLIC),
             ],
             fields: vec![
                 JavaFieldProto::new("w", "I", FieldAccessFlags::PRIVATE),
@@ -135,6 +133,8 @@ impl Image {
             jvm,
             width as _,
             height as _,
+            // fork: upstream fills a new mutable image with white (255). Ours stays transparent black,
+            // which is what every screen and fixture here was measured with.
             &vec![0; (width * height * bytes_per_pixel) as usize],
             bytes_per_pixel as _,
         )
@@ -270,15 +270,23 @@ impl Image {
         if rgb.is_null() {
             return Err(jvm.exception("java/lang/NullPointerException", "rgb is null").await);
         }
-        let count = (width as i64) * (height as i64);
-        if width <= 0 || height <= 0 || count > jvm.array_length(&rgb).await? as i64 {
-            return Err(jvm.exception("java/lang/IllegalArgumentException", "invalid size").await);
+        if width <= 0 || height <= 0 {
+            return Err(jvm
+                .exception("java/lang/IllegalArgumentException", "image dimensions must be positive")
+                .await);
         }
-        let pixels: Vec<i32> = jvm.load_array(&rgb, 0, count as _).await?;
-        let opaque = if process_alpha { 0 } else { 0xff00_0000u32 };
-        let raw: Vec<u32> = pixels.into_iter().map(|p| p as u32 | opaque).collect();
+        let count = i64::from(width) * i64::from(height);
+        if count > jvm.array_length(&rgb).await? as i64 {
+            return Err(jvm.exception("java/lang/ArrayIndexOutOfBoundsException", "rgb is too small").await);
+        }
 
-        Self::create_image_instance(jvm, width as _, height as _, bytemuck::cast_slice(&raw), 4).await
+        let mut pixels: Vec<i32> = jvm.load_array(&rgb, 0, count as usize).await?;
+        if !process_alpha {
+            for pixel in &mut pixels {
+                *pixel |= 0xff000000u32 as i32;
+            }
+        }
+        Self::create_image_instance(jvm, width as _, height as _, cast_slice(&pixels), 4).await
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -286,40 +294,52 @@ impl Image {
         jvm: &Jvm,
         _: &mut WieJvmContext,
         this: ClassInstanceRef<Self>,
-        mut rgb: ClassInstanceRef<Array<i32>>,
+        mut rgb_data: ClassInstanceRef<Array<i32>>,
         offset: i32,
-        scan_length: i32,
+        scanlength: i32,
         x: i32,
         y: i32,
         width: i32,
         height: i32,
     ) -> JvmResult<()> {
-        tracing::debug!("javax.microedition.lcdui.Image::getRGB({this:?}, {offset}, {scan_length}, {x}, {y}, {width}, {height})");
+        tracing::debug!("javax.microedition.lcdui.Image::getRGB({this:?}, {rgb_data:?}, {offset}, {scanlength}, {x}, {y}, {width}, {height})");
 
-        if rgb.is_null() {
-            return Err(jvm.exception("java/lang/NullPointerException", "rgb is null").await);
+        let image_width: i32 = jvm.get_field(&this, "javax/microedition/lcdui/Image", "w", "I").await?;
+        let image_height: i32 = jvm.get_field(&this, "javax/microedition/lcdui/Image", "h", "I").await?;
+        if x < 0 || y < 0 || i64::from(x) + i64::from(width) > i64::from(image_width) || i64::from(y) + i64::from(height) > i64::from(image_height) {
+            return Err(jvm.exception("java/lang/IllegalArgumentException", "region exceeds image bounds").await);
         }
-        let image = Image::image(jvm, &this).await?;
-        let inside = x >= 0 && y >= 0 && width >= 0 && height >= 0 && (x + width) as u32 <= image.width() && (y + height) as u32 <= image.height();
-        if !inside {
-            return Err(jvm.exception("java/lang/IllegalArgumentException", "region outside the image").await);
+        if width <= 0 || height <= 0 {
+            return Ok(());
         }
-        let length = jvm.array_length(&rgb).await? as i64;
+        if rgb_data.is_null() {
+            return Err(jvm.exception("java/lang/NullPointerException", "rgbData is null").await);
+        }
+        if i64::from(scanlength).abs() < i64::from(width) {
+            return Err(jvm
+                .exception("java/lang/IllegalArgumentException", "scanlength is smaller than width")
+                .await);
+        }
+        let first_row = i64::from(offset);
+        let last_row = first_row + i64::from(height - 1) * i64::from(scanlength);
+        let length = jvm.array_length(&rgb_data).await? as i64;
+        if first_row.min(last_row) < 0 || first_row.max(last_row) + i64::from(width) > length {
+            return Err(jvm
+                .exception("java/lang/ArrayIndexOutOfBoundsException", "destination is too small")
+                .await);
+        }
+
+        let image = Self::image(jvm, &this).await?;
         for row in 0..height {
-            let start = offset as i64 + row as i64 * scan_length as i64;
-            if start < 0 || start + width as i64 > length {
-                return Err(jvm.exception("java/lang/ArrayIndexOutOfBoundsException", "rgbData too small").await);
-            }
-            let line: Vec<i32> = (0..width)
-                .map(|col| ArgbPixel::from_color(image.get_pixel(x + col, y + row)) as i32)
+            let pixels: Vec<i32> = (0..width)
+                .map(|column| ArgbPixel::from_color(image.get_pixel(x + column, y + row)) as i32)
                 .collect();
-            jvm.store_array(&mut rgb, start as _, line).await?;
+            let destination = first_row + i64::from(row) * i64::from(scanlength);
+            jvm.store_array(&mut rgb_data, destination as _, pixels).await?;
         }
-
         Ok(())
     }
 
-    // Only createImage(int, int) makes a mutable image; every other factory decodes or copies into an immutable one.
     async fn is_mutable(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Self>) -> JvmResult<bool> {
         jvm.get_field(&this, "javax/microedition/lcdui/Image", "mutable", "Z").await
     }
@@ -505,12 +525,8 @@ where
 
         let offset = (((y as u32) * self.width() + (x as u32)) * self.bytes_per_pixel()) as usize;
 
-        let raw_bytes = colors
-            .iter()
-            .flat_map(|color| bytemuck::bytes_of(&T::from_color(*color)).to_vec())
-            .collect::<Vec<_>>();
-
-        self.raw_buffer.write(offset as _, &raw_bytes).unwrap();
+        let raw = colors.iter().copied().map(T::from_color).collect::<Vec<_>>();
+        self.raw_buffer.write(offset, bytemuck::cast_slice(&raw)).unwrap();
     }
 
     fn xor_pixel(&mut self, x: i32, y: i32, color: Color) {
@@ -530,7 +546,305 @@ where
 
 #[cfg(test)]
 mod tests {
+    use jvm::JavaError;
+
     use super::*;
+
+    #[test]
+    fn rgb_images_copy_pixels_and_validate_reads() -> wie_util::Result<()> {
+        test_utils::run_jvm_test(Box::new([crate::get_protos().into()]), |jvm| async move {
+            let blank: ClassInstanceRef<Image> = jvm
+                .invoke_static(
+                    "javax/microedition/lcdui/Image",
+                    "createImage",
+                    "(II)Ljavax/microedition/lcdui/Image;",
+                    (2, 1),
+                )
+                .await?;
+            assert!(
+                jvm.invoke_virtual::<_, bool>(&blank, "javax/microedition/lcdui/Image", "isMutable", "()Z", ())
+                    .await?
+            );
+            let blank_pixels = jvm.instantiate_array("I", 2).await?;
+            let _: () = jvm
+                .invoke_virtual(
+                    &blank,
+                    "javax/microedition/lcdui/Image",
+                    "getRGB",
+                    "([IIIIIII)V",
+                    (blank_pixels.clone(), 0, 2, 0, 0, 2, 1),
+                )
+                .await?;
+            // fork: a new mutable image is transparent black here, not upstream's white (create_image).
+            assert_eq!(jvm.load_array::<i32>(&blank_pixels, 0, 2).await?, [0, 0]);
+            let source = [0x00112233, 0x80445566u32 as i32, 0xff778899u32 as i32, 0xffaabbccu32 as i32];
+            let mut pixels = jvm.instantiate_array("I", source.len()).await?;
+            jvm.store_array(&mut pixels, 0, source).await?;
+            for process_alpha in [true, false] {
+                let image: ClassInstanceRef<Image> = jvm
+                    .invoke_static(
+                        "javax/microedition/lcdui/Image",
+                        "createRGBImage",
+                        "([IIIZ)Ljavax/microedition/lcdui/Image;",
+                        (pixels.clone(), 2, 2, process_alpha),
+                    )
+                    .await?;
+                assert!(
+                    !jvm.invoke_virtual::<_, bool>(&image, "javax/microedition/lcdui/Image", "isMutable", "()Z", ())
+                        .await?
+                );
+                // fork: upstream's getGraphics throws IllegalStateException on an immutable image and asserts it
+                // here. Ours still hands out a Graphics, as before the 2026-11-23 merge.
+
+                jvm.store_array(&mut pixels, 0, [0i32; 4]).await?;
+                for (offset, scanlength, positions) in [(1, 3, [1, 2, 4, 5]), (4, -3, [4, 5, 1, 2])] {
+                    let mut output = jvm.instantiate_array("I", 7).await?;
+                    jvm.store_array(&mut output, 0, [-1i32; 7]).await?;
+                    let _: () = jvm
+                        .invoke_virtual(
+                            &image,
+                            "javax/microedition/lcdui/Image",
+                            "getRGB",
+                            "([IIIIIII)V",
+                            (output.clone(), offset, scanlength, 0, 0, 2, 2),
+                        )
+                        .await?;
+                    let mut expected = [-1i32; 7];
+                    for (position, color) in positions.into_iter().zip(source) {
+                        expected[position] = if process_alpha { color } else { color | 0xff000000u32 as i32 };
+                    }
+                    assert_eq!(jvm.load_array::<i32>(&output, 0, 7).await?, expected);
+                }
+
+                let mut output = jvm.instantiate_array("I", 4).await?;
+                let _: () = jvm
+                    .invoke_virtual(
+                        &image,
+                        "javax/microedition/lcdui/Image",
+                        "getRGB",
+                        "([IIIIIII)V",
+                        (output.clone(), 0, 1, 1, 1, 1, 1),
+                    )
+                    .await?;
+                assert_eq!(jvm.load_array::<i32>(&output, 0, 1).await?, [source[3]]);
+
+                // A cropped column, then the whole image rotated a quarter turn clockwise (TRANS_ROT90).
+                for ((x, width, transform), (out_width, out_height), positions) in
+                    [((1, 1, 0), (1, 2), &[1, 3][..]), ((0, 2, 5), (2, 2), &[2, 0, 3, 1][..])]
+                {
+                    let region: ClassInstanceRef<Image> = jvm
+                        .invoke_static(
+                            "javax/microedition/lcdui/Image",
+                            "createImage",
+                            "(Ljavax/microedition/lcdui/Image;IIIII)Ljavax/microedition/lcdui/Image;",
+                            (image.clone(), x, 0, width, 2, transform),
+                        )
+                        .await?;
+                    let _: () = jvm
+                        .invoke_virtual(
+                            &region,
+                            "javax/microedition/lcdui/Image",
+                            "getRGB",
+                            "([IIIIIII)V",
+                            (output.clone(), 0, out_width, 0, 0, out_width, out_height),
+                        )
+                        .await?;
+                    let expected: Vec<i32> = positions
+                        .iter()
+                        .map(|&position| {
+                            if process_alpha {
+                                source[position]
+                            } else {
+                                source[position] | 0xff000000u32 as i32
+                            }
+                        })
+                        .collect();
+                    assert_eq!(jvm.load_array::<i32>(&output, 0, expected.len()).await?, expected);
+                }
+                for (width, transform) in [(2, 0), (1, 8)] {
+                    let result = jvm
+                        .invoke_static::<_, ClassInstanceRef<Image>>(
+                            "javax/microedition/lcdui/Image",
+                            "createImage",
+                            "(Ljavax/microedition/lcdui/Image;IIIII)Ljavax/microedition/lcdui/Image;",
+                            (image.clone(), 1, 0, width, 2, transform),
+                        )
+                        .await;
+                    let Err(JavaError::JavaException(exception)) = result else {
+                        panic!("invalid region or transform succeeded")
+                    };
+                    assert!(jvm.is_instance(&*exception, "java/lang/IllegalArgumentException"));
+                }
+                jvm.store_array(&mut output, 0, [42i32; 4]).await?;
+                for (offset, scanlength, x, y, width, height, error) in [
+                    (0, 2, -1, 0, 1, 1, "java/lang/IllegalArgumentException"),
+                    (0, 2, 2, 0, 1, 1, "java/lang/IllegalArgumentException"),
+                    (0, 2, 0, 2, 1, 1, "java/lang/IllegalArgumentException"),
+                    (0, 1, 0, 0, 2, 1, "java/lang/IllegalArgumentException"),
+                    (0, -2, 0, 0, 2, 2, "java/lang/ArrayIndexOutOfBoundsException"),
+                    (1, 2, 0, 0, 2, 2, "java/lang/ArrayIndexOutOfBoundsException"),
+                ] {
+                    let result = jvm
+                        .invoke_virtual::<_, ()>(
+                            &image,
+                            "javax/microedition/lcdui/Image",
+                            "getRGB",
+                            "([IIIIIII)V",
+                            (output.clone(), offset, scanlength, x, y, width, height),
+                        )
+                        .await;
+                    let Err(JavaError::JavaException(exception)) = result else {
+                        panic!("invalid read succeeded")
+                    };
+                    assert!(jvm.is_instance(&*exception, error));
+                    assert_eq!(jvm.load_array::<i32>(&output, 0, 4).await?, [42; 4]);
+                }
+                let null: ClassInstanceRef<Array<i32>> = None.into();
+                let _: () = jvm
+                    .invoke_virtual(
+                        &image,
+                        "javax/microedition/lcdui/Image",
+                        "getRGB",
+                        "([IIIIIII)V",
+                        (null.clone(), -1, 0, 0, 0, 0, 2),
+                    )
+                    .await?;
+                let result = jvm
+                    .invoke_virtual::<_, ()>(
+                        &image,
+                        "javax/microedition/lcdui/Image",
+                        "getRGB",
+                        "([IIIIIII)V",
+                        (null, 0, 2, 0, 0, 2, 2),
+                    )
+                    .await;
+                let Err(JavaError::JavaException(exception)) = result else {
+                    panic!("null read succeeded")
+                };
+                assert!(jvm.is_instance(&*exception, "java/lang/NullPointerException"));
+                jvm.store_array(&mut pixels, 0, source).await?;
+            }
+            let garbage = jvm.instantiate_array("B", 4).await?;
+            let stream = jvm.new_class("java/io/ByteArrayInputStream", "([B)V", (garbage,)).await?;
+            let result = jvm
+                .invoke_static::<_, ClassInstanceRef<Image>>(
+                    "javax/microedition/lcdui/Image",
+                    "createImage",
+                    "(Ljava/io/InputStream;)Ljavax/microedition/lcdui/Image;",
+                    (stream,),
+                )
+                .await;
+            let Err(JavaError::JavaException(exception)) = result else {
+                panic!("undecodable stream succeeded")
+            };
+            // fork: the stream overload still decodes through the byte-array one, so undecodable data is an
+            // IllegalArgumentException here (upstream: IOException).
+            assert!(jvm.is_instance(&*exception, "java/lang/IllegalArgumentException"));
+            for (width, height, null, error) in [
+                (0, 2, false, "java/lang/IllegalArgumentException"),
+                (2, -1, false, "java/lang/IllegalArgumentException"),
+                (3, 2, false, "java/lang/ArrayIndexOutOfBoundsException"),
+                (2, 2, true, "java/lang/NullPointerException"),
+            ] {
+                let data: ClassInstanceRef<Array<i32>> = if null { None.into() } else { pixels.clone().into() };
+                let result = jvm
+                    .invoke_static::<_, ClassInstanceRef<Image>>(
+                        "javax/microedition/lcdui/Image",
+                        "createRGBImage",
+                        "([IIIZ)Ljavax/microedition/lcdui/Image;",
+                        (data, width, height, true),
+                    )
+                    .await;
+                let Err(JavaError::JavaException(exception)) = result else {
+                    panic!("invalid image creation succeeded")
+                };
+                assert!(jvm.is_instance(&*exception, error));
+            }
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn lbmp_images_preserve_grayscale_and_transparency_when_drawn() -> wie_util::Result<()> {
+        test_utils::run_jvm_test(Box::new([crate::get_protos().into()]), |jvm| async move {
+            for kind in [8u32, 16, 2] {
+                for masked in [0u32, 1] {
+                    // fork: wie-backend's LBMP decoder is still ours, which reads a mask plane for type 2 only.
+                    if masked != 0 && kind != 2 {
+                        continue;
+                    }
+                    let pixels = match kind {
+                        8 => vec![0xe0; 18],
+                        16 => [0x00, 0xf8].repeat(18),
+                        // Vertical bitplanes: first plane carries the high bit.
+                        _ => vec![0xcc, 0xcc, 0, 1, 0xaa, 0xaa, 0, 1],
+                    };
+                    let size = if kind == 2 { pixels.len() / 2 } else { pixels.len() };
+                    let mut data = vec![0];
+                    data.extend_from_slice(b"LBMP");
+                    for value in [kind, 2, 9, size as u32, masked] {
+                        data.extend_from_slice(&value.to_le_bytes());
+                    }
+                    data.extend_from_slice(&pixels);
+                    if masked != 0 {
+                        data.extend_from_slice(&[1, 0, 0, 1]);
+                    }
+                    let mut array = jvm.instantiate_array("B", data.len()).await?;
+                    jvm.array_raw_buffer_mut(&mut array).await?.write(0, &data)?;
+                    let image: ClassInstanceRef<Image> = jvm
+                        .invoke_static(
+                            "javax/microedition/lcdui/Image",
+                            "createImage",
+                            "([BII)Ljavax/microedition/lcdui/Image;",
+                            (array, 1, (data.len() - 1) as i32),
+                        )
+                        .await?;
+                    let background = [0xff0000ffu32; 18];
+                    let target = Image::create_image_instance(&jvm, 2, 9, bytemuck::cast_slice(&background), 4).await?;
+                    let graphics = jvm
+                        .new_class(
+                            "javax/microedition/lcdui/Graphics",
+                            "(Ljavax/microedition/lcdui/Image;)V",
+                            (target.clone(),),
+                        )
+                        .await?;
+                    let _: () = jvm
+                        .invoke_virtual(
+                            &graphics,
+                            "javax/microedition/lcdui/Graphics",
+                            "drawImage",
+                            "(Ljavax/microedition/lcdui/Image;III)V",
+                            (image, 0, 0, 0),
+                        )
+                        .await?;
+                    let rendered = Image::image(&jvm, &target).await?;
+                    for y in 0..9 {
+                        for x in 0..2 {
+                            let expected = if masked != 0 && ((x, y) == (0, 0) || (x, y) == (1, 8)) {
+                                (255, 0, 0, 255)
+                            } else if kind == 2 {
+                                let gray = if y == 8 {
+                                    if x == 0 { 255 } else { 0 }
+                                } else {
+                                    255 - (y % 4) as u8 * 85
+                                };
+                                (255, gray, gray, gray)
+                            } else {
+                                (255, if kind == 8 { 252 } else { 255 }, 0, 0)
+                            };
+                            let actual = rendered.get_pixel(x, y);
+                            assert_eq!(
+                                (actual.a, actual.r, actual.g, actual.b),
+                                expected,
+                                "type {kind}, mask {masked}, ({x}, {y})"
+                            );
+                        }
+                    }
+                }
+            }
+            Ok(())
+        })
+    }
 
     async fn check_pixel_buffer<T: PixelType>(jvm: &Jvm, pixels: [T::DataType; 2]) -> JvmResult<()> {
         let size = size_of::<T::DataType>();
@@ -539,6 +853,23 @@ mod tests {
         let actual = buffer.get_pixel(1, 0);
         let expected = T::to_color(pixels[1]);
         assert_eq!((actual.a, actual.r, actual.g, actual.b), (expected.a, expected.r, expected.g, expected.b));
+        let colors = [T::to_color(pixels[1]), T::to_color(pixels[0])];
+        buffer.put_pixels(0, 0, 2, &colors);
+        assert_eq!(&*buffer.raw(), bytemuck::cast_slice(&[pixels[1], pixels[0]]));
+        let output = jvm.instantiate_array("I", 2).await?;
+        let _: () = jvm
+            .invoke_virtual(
+                &image,
+                "javax/microedition/lcdui/Image",
+                "getRGB",
+                "([IIIIIII)V",
+                (output.clone(), 0, 2, 0, 0, 2, 1),
+            )
+            .await?;
+        assert_eq!(
+            jvm.load_array::<i32>(&output, 0, 2).await?,
+            colors.map(|color| ArgbPixel::from_color(color) as i32)
+        );
 
         let color = Color {
             a: 255,
@@ -547,7 +878,7 @@ mod tests {
             b: 31,
         };
         buffer.xor_pixel(1, 0, color);
-        let expected = [pixels[0], T::xor_color(pixels[1], color)];
+        let expected = [pixels[1], T::xor_color(pixels[0], color)];
         assert_eq!(&*buffer.raw(), bytemuck::cast_slice(&expected));
         Ok(())
     }

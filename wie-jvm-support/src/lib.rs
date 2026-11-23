@@ -12,7 +12,7 @@ mod runtime;
 use alloc::{boxed::Box, format};
 use rustjava_runtime::RT_RUSTJAR;
 
-use jvm::{JavaError, Jvm, runtime::JavaLangString};
+use jvm::{JavaError, JavaValue, Jvm, runtime::JavaLangString};
 use rustjava_runtime::Runtime;
 
 use wie_backend::System;
@@ -59,6 +59,7 @@ impl JvmSupport {
     where
         T: JvmImplementation + Sync + Send + 'static,
     {
+        let external_roots = implementation.external_roots();
         let runtime = JvmRuntime::new(system.clone(), implementation, protos);
 
         let class_path = if let Some(x) = jar_name {
@@ -85,7 +86,7 @@ impl JvmSupport {
                 runtime.current_task_id()
             },
             properties,
-            None,
+            external_roots,
         )
         .await
         .map_err(|x| WieError::FatalError(format!("Failed to create JVM: {x}")))?;
@@ -106,6 +107,8 @@ impl JvmSupport {
 
     pub async fn to_wie_err(jvm: &Jvm, err: JavaError) -> WieError {
         let JavaError::JavaException(x) = err;
+        // upstream #1542: the exception is only on the Rust stack here — root it while the trace allocates.
+        let _frame = jvm.push_native_frame(&[JavaValue::Object(Some(x.clone()))]);
         // Formatting the trace allocates, so it fails where the heap is exhausted — an exception
         // that reached the host must still become an error there, not a panic.
         let trace = async {

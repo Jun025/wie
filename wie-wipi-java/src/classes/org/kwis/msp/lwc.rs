@@ -9,6 +9,7 @@ mod form_component;
 mod grab_key_listener;
 mod label_component;
 mod progress_component;
+mod proxy_card;
 mod shell_component;
 mod text_box_component;
 mod text_component;
@@ -26,6 +27,7 @@ pub use self::{
     grab_key_listener::GrabKeyListener,
     label_component::LabelComponent,
     progress_component::ProgressComponent,
+    proxy_card::ProxyCard,
     shell_component::ShellComponent,
     text_box_component::TextBoxComponent,
     text_component::TextComponent,

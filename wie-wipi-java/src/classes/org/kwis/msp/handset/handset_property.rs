@@ -105,7 +105,8 @@ mod test {
                 )
                 .await?;
 
-            assert!(JavaLangString::to_rust_string(&jvm, &value).await?.parse::<i32>().is_ok());
+            // "3", not upstream's "100" (#1507): the support list was measured on this value (docs/report/0551 §8).
+            assert_eq!(JavaLangString::to_rust_string(&jvm, &value).await?, "3");
             Ok(())
         })
     }

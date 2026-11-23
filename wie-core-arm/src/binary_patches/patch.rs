@@ -1,6 +1,6 @@
 use alloc::{format, string::String, vec::Vec};
 
-use wie_util::{ByteRead, ByteWrite, Result, WieError};
+use wie_util::{ByteRead, Result, WieError};
 
 use super::{Entry, PatternToken, hook::Hook, scan_pattern};
 use crate::ArmCore;
@@ -100,7 +100,7 @@ fn apply_patches(core: &mut ArmCore, entry_name: &str, patches: &[Patch]) -> Res
         reject_emergent_svc(core, entry_name, patch)?;
     }
     for patch in patches {
-        core.write_bytes(patch.addr, &patch.bytes)?;
+        core.write_code(patch.addr, &patch.bytes)?;
         tracing::info!("Patch applied at {:#x} ({} bytes)", patch.addr, patch.bytes.len());
     }
     if !patches.is_empty() {
@@ -189,6 +189,8 @@ fn hex_dump(bytes: &[u8]) -> String {
 mod tests {
     use alloc::{vec, vec::Vec};
 
+    use wie_util::ByteWrite;
+
     use super::*;
     use crate::binary_patches::{
         PatternToken,
@@ -208,7 +210,11 @@ mod tests {
 
     #[test]
     fn resolve_patches_pc_passes_through() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         let mut entry = empty_entry("pc-pass");
         entry.patches.push(PatchSpec {
             pc: 0x1000,
@@ -225,7 +231,11 @@ mod tests {
 
     #[test]
     fn resolve_patches_pattern_multi_match_applies_offset() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         core.map(0x40000, 0x100)?;
         // Lay the same 4-byte pattern at two locations
         core.write_bytes(0x40000, &[0xaa, 0xbb, 0xcc, 0xdd])?;
@@ -251,7 +261,11 @@ mod tests {
 
     #[test]
     fn resolve_patches_pattern_offset_overflow_is_fatal() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         // match_addr (0x1000_0000) + offset (0xffff_ffff) overflows u32.
         core.map(0x1000_0000, 0x10)?;
         core.write_bytes(0x1000_0000, &[0xaa, 0xbb])?;
@@ -272,7 +286,11 @@ mod tests {
 
     #[test]
     fn resolve_patches_pattern_zero_match_warns_and_skips() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         core.map(0x40000, 0x40)?;
         // Memory is zeros; nothing matches.
         let mut entry = empty_entry("zero-match");
@@ -289,7 +307,11 @@ mod tests {
 
     #[test]
     fn apply_patches_happy_path_pc() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         core.map(0x2000, 0x100)?;
         core.write_bytes(0x2000, &[0xaa, 0xbb, 0xcc, 0xdd])?;
 
@@ -308,7 +330,11 @@ mod tests {
 
     #[test]
     fn apply_patches_expect_mismatch_does_not_write() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         core.map(0x2000, 0x100)?;
         core.write_bytes(0x2000, &[0xaa, 0xbb, 0xcc, 0x00])?;
 
@@ -330,7 +356,11 @@ mod tests {
     fn apply_patches_verifies_all_before_writing_any() -> Result<()> {
         // Two patches: the first would succeed, the second's expect mismatches.
         // Two-phase apply must leave both regions untouched.
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         core.map(0x2000, 0x100)?;
         core.write_bytes(0x2000, &[0xaa, 0xbb])?;
         core.write_bytes(0x2010, &[0x99, 0x88])?; // mismatches second patch's expect
@@ -364,7 +394,11 @@ mod tests {
     fn apply_patches_rejects_emergent_svc_after_patch() -> Result<()> {
         // Guest byte at addr+1 is 0xdf; a 1-byte patch writing 0x80 at addr
         // would synthesize SVC #0x80 (`80 df` LE) with the unmodified neighbor.
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         core.map(0x2000, 0x100)?;
         core.write_bytes(0x2000, &[0x00, 0xdf])?;
 
@@ -387,7 +421,11 @@ mod tests {
     fn apply_patches_rejects_emergent_svc_before_patch() -> Result<()> {
         // Guest byte at addr-1 is 0x80; a patch writing 0xdf as its first byte
         // synthesizes SVC #0x80 with the unmodified preceding byte.
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         core.map(0x2000, 0x100)?;
         core.write_bytes(0x2000, &[0x80, 0x00, 0x00])?;
 
@@ -403,7 +441,11 @@ mod tests {
 
     #[test]
     fn apply_patches_without_expect_writes_with_warn() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         core.map(0x2000, 0x100)?;
         core.write_bytes(0x2000, &[0x11, 0x22])?;
 

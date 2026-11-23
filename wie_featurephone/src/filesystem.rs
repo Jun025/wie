@@ -48,6 +48,26 @@ impl WebFilesystem {
 
 #[async_trait::async_trait]
 impl Filesystem for WebFilesystem {
+    async fn remove(&self, aid: &str, path: &str) -> bool {
+        let Some(key) = self.key(aid, path) else {
+            return false;
+        };
+        self.store.lock().unwrap().remove(&key).is_some()
+    }
+
+    async fn usage(&self, aid: &str) -> u64 {
+        let Some((owner, _)) = self.key(aid, "x") else {
+            return 0;
+        };
+        self.store
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|((file_owner, _), _)| *file_owner == owner)
+            .map(|(_, data)| data.len() as u64)
+            .sum()
+    }
+
     async fn exists(&self, aid: &str, path: &str) -> bool {
         let Some(key) = self.key(aid, path) else {
             return false;

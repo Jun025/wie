@@ -1,4 +1,4 @@
-use alloc::{boxed::Box, vec, vec::Vec};
+use alloc::{boxed::Box, string::String, vec, vec::Vec};
 
 use wipi_types::wipic::{WIPICIndirectPtr, WIPICWord};
 
@@ -20,6 +20,7 @@ pub trait WIPICContext: ByteRead + ByteWrite + Send + Sync {
     async fn call_function(&mut self, address: WIPICWord, args: &[WIPICWord]) -> Result<WIPICWord>;
     fn system(&mut self) -> &mut System;
     fn spawn(&mut self, callback: WIPICMethodBody) -> Result<()>;
+    async fn java_property(&self, name: &str) -> Result<Option<String>>;
     async fn get_resource_size(&self, name: &str) -> Result<Option<usize>>;
     async fn read_resource(&self, name: &str) -> Result<Vec<u8>>;
     /// `pace_from`: `wie_backend::Event::guest_timer`.
@@ -87,7 +88,7 @@ impl ResultConverter<()> for () {
 
 #[cfg(test)]
 pub mod test {
-    use alloc::{boxed::Box, format, string::String, vec::Vec};
+    use alloc::{boxed::Box, format, string::String, sync::Arc, vec::Vec};
 
     use wipi_types::wipic::{WIPICIndirectPtr, WIPICWord};
 
@@ -98,9 +99,11 @@ pub mod test {
 
     const TEST_MEMORY_SIZE: usize = 0x20000;
     const TEST_ALLOC_START: usize = 0x10000;
+    const GLOBAL_DATA_BASE: u32 = 0x7fff0000;
 
     pub struct TestContext {
         memory: [u8; TEST_MEMORY_SIZE],
+        global_data: [u8; 0x10000],
         last_alloc: usize,
         system: Option<System>,
         resources: Vec<(String, Vec<u8>)>,
@@ -109,6 +112,8 @@ pub mod test {
         pub call_args: Vec<(WIPICWord, Vec<WIPICWord>)>,
         pub spawned: Vec<WIPICMethodBody>,
         pub wide_graphics_context: bool,
+        /// Guest functions a test registers (upstream's double); an address not listed here answers 0.
+        pub functions: Vec<(WIPICWord, Arc<WIPICMethodBody>)>,
     }
 
     impl TestContext {
@@ -116,6 +121,7 @@ pub mod test {
         pub fn new() -> Self {
             Self {
                 memory: [0; TEST_MEMORY_SIZE],
+                global_data: [0; 0x10000],
                 last_alloc: TEST_ALLOC_START,
                 system: None,
                 resources: Vec::new(),
@@ -124,12 +130,14 @@ pub mod test {
                 call_args: Vec::new(),
                 spawned: Vec::new(),
                 wide_graphics_context: false,
+                functions: Vec::new(),
             }
         }
 
         pub fn with_system(system: System) -> Self {
             Self {
                 memory: [0; TEST_MEMORY_SIZE],
+                global_data: [0; 0x10000],
                 last_alloc: TEST_ALLOC_START,
                 system: Some(system),
                 resources: Vec::new(),
@@ -138,6 +146,7 @@ pub mod test {
                 call_args: Vec::new(),
                 spawned: Vec::new(),
                 wide_graphics_context: false,
+                functions: Vec::new(),
             }
         }
 
@@ -175,7 +184,11 @@ pub mod test {
         async fn call_function(&mut self, address: WIPICWord, args: &[WIPICWord]) -> Result<WIPICWord> {
             self.calls.push(address);
             self.call_args.push((address, args.to_vec()));
-            Ok(0)
+            let Some(callback) = self.functions.iter().find(|(ptr, _)| *ptr == address).map(|(_, f)| f.clone()) else {
+                return Ok(0);
+            };
+            let result = callback.call(self, args.to_vec().into_boxed_slice()).await?;
+            Ok(result.results[0])
         }
 
         fn system(&mut self) -> &mut System {
@@ -185,6 +198,10 @@ pub mod test {
         fn spawn(&mut self, callback: WIPICMethodBody) -> Result<()> {
             self.spawned.push(callback);
             Ok(())
+        }
+
+        async fn java_property(&self, _name: &str) -> Result<Option<String>> {
+            Ok(None)
         }
 
         async fn get_resource_size(&self, name: &str) -> Result<Option<usize>> {
@@ -229,7 +246,13 @@ pub mod test {
 
     impl ByteWrite for TestContext {
         fn write_bytes(&mut self, address: u32, data: &[u8]) -> wie_util::Result<()> {
-            self.memory[range(address, data.len())?].copy_from_slice(data);
+            if address >= GLOBAL_DATA_BASE {
+                let offset = (address - GLOBAL_DATA_BASE) as usize;
+                let global = self.global_data.get_mut(offset..offset + data.len());
+                global.ok_or(wie_util::WieError::InvalidMemoryAccess(address))?.copy_from_slice(data);
+            } else {
+                self.memory[range(address, data.len())?].copy_from_slice(data);
+            }
 
             Ok(())
         }
@@ -237,7 +260,13 @@ pub mod test {
 
     impl ByteRead for TestContext {
         fn read_bytes(&self, address: u32, result: &mut [u8]) -> wie_util::Result<usize> {
-            result.copy_from_slice(&self.memory[range(address, result.len())?]);
+            if address >= GLOBAL_DATA_BASE {
+                let offset = (address - GLOBAL_DATA_BASE) as usize;
+                let global = self.global_data.get(offset..offset + result.len());
+                result.copy_from_slice(global.ok_or(wie_util::WieError::InvalidMemoryAccess(address))?);
+            } else {
+                result.copy_from_slice(&self.memory[range(address, result.len())?]);
+            }
 
             Ok(result.len())
         }

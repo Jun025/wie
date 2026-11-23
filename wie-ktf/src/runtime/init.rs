@@ -17,6 +17,7 @@ use crate::{
         relocated,
         svc_ids::InitSvcId,
         wipi_c::{interface::get_wipic_knl_interface, register_wipic_svc_handler},
+        with_arm_context,
     },
 };
 
@@ -88,6 +89,8 @@ pub async fn load_native(
     // metadata-region collision is implausible; tighten patterns rather than
     // narrow the range if that ever becomes false.
     wie_core_arm::install_binary_patches(core, data, &[(IMAGE_BASE, data.len() as u32)])?;
+    // After the patches: an AOT translation reads the image as it will run.
+    core.prepare_execution().await?;
 
     // The KTF SDK runtime asks for this interface by name at init; an image without it was not built
     // on that runtime (the repo's own keydraw fixture — `wipi` crate, packed graphics context).
@@ -97,8 +100,11 @@ pub async fn load_native(
 
     tracing::debug!("Loaded at {IMAGE_BASE:#x}, size {:#x}, bss {bss_size:#x}", data.len());
 
-    let wipi_exe = core.run_function(IMAGE_BASE + 1, &[bss_size]).await?;
-    tracing::debug!("Got wipi_exe {wipi_exe:#x}");
+    let ptr_wipi_exe = core
+        .run_function(IMAGE_BASE + 1, &[bss_size])
+        .await
+        .map_err(|error| with_arm_context(core, error))?;
+    tracing::debug!("Got wipi_exe {ptr_wipi_exe:#x}");
 
     let ptr_param_0 = Allocator::alloc(core, size_of::<InitParam0>() as u32)?;
     write_generic(core, ptr_param_0, InitParam0 { unk: 0 })?;
@@ -126,7 +132,7 @@ pub async fn load_native(
     let ptr_param_4 = Allocator::alloc(core, size_of::<InitParam4>() as u32)?;
     write_generic(core, ptr_param_4, param_4)?;
 
-    let wipi_exe: WipiExe = read_generic(core, wipi_exe)?;
+    let wipi_exe: WipiExe = read_generic(core, ptr_wipi_exe)?;
     let exe_interface: ExeInterface = read_generic(core, wipi_exe.ptr_exe_interface)?;
     let exe_interface_functions: ExeInterfaceFunctions = read_generic(core, exe_interface.ptr_functions)?;
 
@@ -136,14 +142,18 @@ pub async fn load_native(
             exe_interface_functions.fn_init,
             &[ptr_param_0, ptr_current_jvm_thread_context, ptr_jvm_context, ptr_param_3, ptr_param_4],
         )
-        .await?;
+        .await
+        .map_err(|error| with_arm_context(core, error))?;
 
     if result != 0 {
         return Err(WieError::FatalError(format!("Init failed with code {result:#x}")));
     }
 
     // call init
-    let result = core.run_function::<u32>(wipi_exe.fn_init, &[]).await?;
+    let result = core
+        .run_function::<u32>(wipi_exe.fn_init, &[])
+        .await
+        .map_err(|error| with_arm_context(core, error))?;
     if result != 0 {
         return Err(WieError::FatalError(format!("wipi init failed with code {result:#x}")));
     }
@@ -206,7 +216,11 @@ mod tests {
     // null native jump at the first `throw` (docs/report/0438 §3).
     #[test]
     fn init_param_4_wires_throw_instance() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
         // Any handler: stubs need their category registered, and this test never calls one.
         core.register_svc_handler(SVC_CATEGORY_INIT, alloc, &())?;

@@ -102,6 +102,7 @@ pub fn guest_line_complete(seen: &str, prefix: &str) -> bool {
 pub struct TestPlatform {
     screen: TestScreen,
     event_handler: Option<Box<dyn Fn(TestPlatformEvent) + Sync + Send>>,
+    audio_handler: Option<Arc<dyn Fn(AudioCommand) + Sync + Send>>,
     fs: Arc<MemoryFilesystem>,
     db: Arc<MemoryDatabaseRepository>,
     font: Font,
@@ -123,6 +124,7 @@ impl TestPlatform {
         Self {
             screen: TestScreen::default(),
             event_handler: None,
+            audio_handler: None,
             fs: Arc::new(MemoryFilesystem::default()),
             db: Arc::new(MemoryDatabaseRepository::default()),
             font: Font::try_from_static(include_bytes!("../../assets/neodgm.ttf")).unwrap(),
@@ -141,6 +143,7 @@ impl TestPlatform {
         Self {
             screen: TestScreen::default(),
             event_handler: Some(Box::new(event_handler)),
+            audio_handler: None,
             fs: Arc::new(MemoryFilesystem::default()),
             db: Arc::new(MemoryDatabaseRepository::default()),
             font: Font::try_from_static(include_bytes!("../../assets/neodgm.ttf")).unwrap(),
@@ -156,6 +159,7 @@ impl TestPlatform {
         Self {
             screen: TestScreen::default(),
             event_handler: None,
+            audio_handler: None,
             fs: Arc::new(MemoryFilesystem::default()),
             db: Arc::new(MemoryDatabaseRepository::default()),
             font: Font::try_from_static(include_bytes!("../../assets/neodgm.ttf")).unwrap(),
@@ -164,6 +168,27 @@ impl TestPlatform {
             speed: 1.0,
             wake_margin_ms: None,
             in_wake_tick: Arc::default(),
+        }
+    }
+
+    pub fn with_audio_handler<T>(mut self, audio_handler: T) -> Self
+    where
+        T: Fn(AudioCommand) + Sync + Send + 'static,
+    {
+        self.audio_handler = Some(Arc::new(audio_handler));
+        self
+    }
+
+    pub fn with_paint_handler<T>(paint_handler: T) -> Self
+    where
+        T: Fn(&dyn Image) + Sync + Send + 'static,
+    {
+        Self {
+            screen: TestScreen {
+                paint_handler: Some(Box::new(paint_handler)),
+                ..TestScreen::default()
+            },
+            ..Self::new()
         }
     }
 }
@@ -247,7 +272,7 @@ impl Platform for TestPlatform {
     }
 
     fn audio_sink(&self) -> Box<dyn AudioSink> {
-        Box::new(TestAudioSink(self.audio_log.clone()))
+        Box::new(TestAudioSink(self.audio_log.clone(), self.audio_handler.clone()))
     }
 
     fn write_stdout(&self, buf: &[u8]) {
@@ -277,12 +302,16 @@ struct MemoryDatabaseRepository {
 
 #[async_trait::async_trait]
 impl DatabaseRepository for MemoryDatabaseRepository {
+    async fn create(&self, name: &str, app_id: &str) {
+        self.store.lock().entry((app_id.to_string(), name.to_string())).or_default();
+    }
+
+    // fork: `open` creates, as every host of ours does (`DatabaseRepository::open`).
     async fn open(&self, name: &str, app_id: &str) -> Box<dyn Database> {
-        let key = (app_id.to_string(), name.to_string());
-        self.store.lock().entry(key.clone()).or_default();
+        self.create(name, app_id).await;
         Box::new(MemoryDatabase {
             store: self.store.clone(),
-            key,
+            key: (app_id.to_string(), name.to_string()),
         })
     }
 
@@ -351,13 +380,18 @@ impl Database for MemoryDatabase {
     }
 }
 
-pub struct TestAudioSink(Arc<Mutex<Vec<AudioCommand>>>);
+pub struct TestAudioSink(Arc<Mutex<Vec<AudioCommand>>>, Option<Arc<dyn Fn(AudioCommand) + Sync + Send>>);
 
 impl AudioSink for TestAudioSink {
     fn send(&self, command: AudioCommand) {
+        if let Some(handler) = &self.1 {
+            handler(command.clone());
+        }
         self.0.lock().push(command);
     }
 }
+
+type PaintHandler = dyn Fn(&dyn Image) + Sync + Send;
 
 impl Default for TestScreen {
     fn default() -> Self {
@@ -366,6 +400,7 @@ impl Default for TestScreen {
             redraw_requested: Default::default(),
             width: AtomicU32::new(320),
             height: AtomicU32::new(240),
+            paint_handler: None,
         }
     }
 }
@@ -396,6 +431,7 @@ pub struct TestScreen {
     redraw_requested: Arc<AtomicBool>,
     width: AtomicU32,
     height: AtomicU32,
+    paint_handler: Option<Box<PaintHandler>>,
 }
 
 impl TestScreen {
@@ -423,7 +459,10 @@ impl Screen for TestScreen {
         Ok(())
     }
 
-    fn paint(&self, _image: &dyn Image) {
+    fn paint(&self, image: &dyn Image) {
+        if let Some(handler) = &self.paint_handler {
+            handler(image);
+        }
         self.paints.fetch_add(1, Ordering::SeqCst);
     }
 

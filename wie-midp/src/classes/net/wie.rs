@@ -4,6 +4,7 @@ mod event_queue;
 mod item_state_event;
 mod launcher;
 mod player_control;
+mod record_enumeration;
 mod smaf_player;
 mod wie_error;
 
@@ -14,6 +15,7 @@ pub use self::{
     item_state_event::ItemStateEvent,
     launcher::Launcher,
     player_control::PlayerControl,
+    record_enumeration::RecordEnumeration,
     smaf_player::SmafPlayer,
     wie_error::WieError,
 };

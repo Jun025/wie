@@ -1,7 +1,6 @@
 use alloc::{
     borrow::Cow,
     boxed::Box,
-    format,
     string::{String, ToString},
     vec,
     vec::Vec,
@@ -26,10 +25,7 @@ use wie_core_arm::{
 use wie_jvm_support::native::{NativeJavaValueCodec, decode_method_arguments, encode_method_arguments, method_argument_word_count};
 use wie_util::{ByteWrite, Result, WieError, read_generic, read_null_terminated_string_bytes, write_generic};
 
-use crate::{
-    emulator::IMAGE_BASE,
-    runtime::{SVC_CATEGORY_JAVA, java::JavaSvcFunctions, java::jvm_support::JavaClassDefinition},
-};
+use crate::runtime::{SVC_CATEGORY_JAVA, java::JavaSvcFunctions, java::jvm_support::JavaClassDefinition, with_arm_context};
 
 use super::{KtfJvmSupport, class_instance::JavaClassInstance, name::JavaFullName, value::JavaValueCodec};
 
@@ -139,35 +135,27 @@ impl JavaMethod {
         // outermost frame whose caller is the Rust JVM rather than another ARM trampoline.
         async fn run_with_unwind(core: &mut ArmCore, mut pc: u32, mut args: Vec<u32>) -> Result<JavaMethodRunResult> {
             let caller_context = core.save_context();
-
             loop {
                 match core.run_function::<JavaMethodRunResult>(pc, &args).await {
-                    Ok(r) => {
-                        core.restore_context(&caller_context);
-                        return Ok(r);
-                    }
+                    Ok(r) => return Ok(r),
                     Err(WieError::JavaExceptionUnwind {
                         context_base,
                         target,
                         next_pc,
                     }) => {
                         tracing::debug!("Resuming via exception restore: pc={next_pc:#x}, context_base={context_base:#x}, target={target:#x}");
+                        core.restore_context(&caller_context);
                         pc = next_pc;
                         args = vec![context_base, target];
                     }
                     Err(e) => {
                         let error = match e {
-                            error @ WieError::JavaException(_) => error,
-                            error => {
-                                let context = core.dump_reg_stack(IMAGE_BASE);
-                                match error {
-                                    WieError::Unimplemented(message) => WieError::Unimplemented(format!("{message}{context}")),
-                                    WieError::FatalError(message) => WieError::FatalError(format!("{message}{context}")),
-                                    error => WieError::FatalError(format!("{error}{context}")),
-                                }
+                            error @ WieError::JavaException(_) => {
+                                core.restore_context(&caller_context);
+                                error
                             }
+                            error => with_arm_context(core, error),
                         };
-                        core.restore_context(&caller_context);
                         return Err(error);
                     }
                 }
@@ -279,7 +267,7 @@ impl JavaMethod {
         } else {
             (
                 offset_of!(RawJavaExceptionHandler, current_pc) as u32,
-                offset_of!(RawJavaExceptionHandler, unk3) as u32,
+                offset_of!(RawJavaExceptionHandler, ptr_exception_class_instance) as u32,
             )
         };
         // ponytail: a step cap instead of cycle detection — a chain this long is already corrupt.
@@ -292,18 +280,25 @@ impl JavaMethod {
             if relocated.is_some() && !crate::runtime::relocated::entry_owns_record(core, ptr_handler)? {
                 break;
             }
-            let exception_handler: RawJavaExceptionHandler = read_generic(core, ptr_handler)?;
-            let current_pc: u32 = read_generic(core, ptr_handler + pc_offset)?;
-
-            let method = JavaMethod::from_raw(exception_handler.ptr_method, core);
-            let exception_table = method.exception_table()?;
+            // Word by word: a method without catches links only the record's header (method, this, old
+            // handler) with no saved context after it (upstream #1542), so nothing past the header is
+            // read until its method has a catch to look at.
+            let ptr_method: u32 = read_generic(core, ptr_handler)?;
+            let ptr_old_handler: u32 = read_generic(core, ptr_handler + offset_of!(RawJavaExceptionHandler, ptr_old_handler) as u32)?;
+            let exception_table = JavaMethod::from_raw(ptr_method, core).exception_table()?;
+            let current_pc: u32 = if exception_table.is_empty() {
+                0
+            } else {
+                read_generic(core, ptr_handler + pc_offset)?
+            };
 
             for entry in exception_table {
                 if entry.from_pc <= current_pc
                     && current_pc < entry.to_pc
                     && Self::exception_class_matches(core, jvm, &*exception, relocated.map(|x| x.names), entry.ptr_class)?
                 {
-                    let restore_context: u32 = read_generic(core, exception_handler.ptr_functions + 4)?;
+                    let ptr_functions: u32 = read_generic(core, ptr_handler + offset_of!(RawJavaExceptionHandler, ptr_functions) as u32)?;
+                    let restore_context: u32 = read_generic(core, ptr_functions + 4)?;
                     let contexts_base = ptr_handler + 24;
 
                     // The catch block reads its `e` from this slot (`wipi_types` calls it `unk3`), and no
@@ -319,11 +314,7 @@ impl JavaMethod {
                     // The frames above the catching one are gone, and so are their records.
                     KtfJvmSupport::set_current_java_exception_handler(core, ptr_handler)?;
 
-                    tracing::debug!(
-                        "Java exception handler found: {:#x}, method: {:#x}",
-                        entry.target,
-                        exception_handler.ptr_method
-                    );
+                    tracing::debug!("Java exception handler found: {:#x}, method: {:#x}", entry.target, ptr_method);
 
                     // The record is this entry's (checked above), so the relocated runtime resumes it in
                     // place, as `map_exception_unwind` does for a jump: the handler's frame is below.
@@ -337,7 +328,7 @@ impl JavaMethod {
                     });
                 }
             }
-            ptr_handler = exception_handler.ptr_old_handler;
+            ptr_handler = ptr_old_handler;
         }
 
         Err(WieError::JavaException(KtfJvmSupport::class_instance_raw(&exception)))

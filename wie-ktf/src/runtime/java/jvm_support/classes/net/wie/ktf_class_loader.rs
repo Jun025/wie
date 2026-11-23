@@ -57,6 +57,7 @@ impl KtfClassLoader {
             ],
             fields: vec![
                 JavaFieldProto::new("nativeFunctions", "I", FieldAccessFlags::PRIVATE),
+                // fork: upstream dropped this with its GC-root visitor; ours keeps the image's string literals alive here.
                 JavaFieldProto::new("nativeStrings", "Ljava/util/Vector;", FieldAccessFlags::PRIVATE),
                 JavaFieldProto::new(
                     "instance",

@@ -134,7 +134,11 @@ mod tests {
     /// The live half is asserted too, so "always null" is not a passing shortcut.
     #[test]
     fn a_reference_to_a_dead_instance_decodes_to_null() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
         let codec = JavaValueCodec::new(&core);
         let r#type = JavaType::Class(String::from("java/lang/Object"));
@@ -162,7 +166,11 @@ mod tests {
     /// Restoring that call turns this test into that panic.
     #[test]
     fn a_reference_whose_class_word_is_unreadable_decodes_to_null() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
         let codec = JavaValueCodec::new(&core);
         let r#type = JavaType::Class(String::from("java/lang/Object"));

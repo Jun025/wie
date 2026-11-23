@@ -63,8 +63,9 @@ impl Audio {
         Ok(())
     }
 
-    pub fn play(&mut self, audio_handle: AudioHandle, repeat: bool) -> Result<(), AudioError> {
+    pub fn play(&mut self, audio_handle: AudioHandle, repeat: bool) -> Result<u64, AudioError> {
         let sequence = self.files.get(&audio_handle).cloned().ok_or(AudioError::InvalidHandle)?;
+        let duration = sequence.duration;
 
         self.stop(audio_handle);
         self.playing.insert(audio_handle);
@@ -75,7 +76,7 @@ impl Audio {
             repeat,
         });
 
-        Ok(())
+        Ok(duration)
     }
 
     /// Milliseconds from the start of the sequence to its last event.

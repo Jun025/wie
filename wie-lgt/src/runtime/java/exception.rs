@@ -6,7 +6,8 @@ use bytemuck::{Pod, Zeroable};
 use wie_core_arm::{Allocator, ArmCore, ArmCoreContext, RUN_FUNCTION_LR};
 use wie_util::{Result, WieError, read_generic, write_generic};
 
-const SUPPORT_CONTEXT_BASE: u32 = 0x7fff0000;
+use crate::runtime::globals::SUPPORT_CONTEXT_BASE;
+
 const FRAME_WORDS: u32 = 19;
 const CONSUMED_CAP: usize = 16;
 
@@ -335,7 +336,11 @@ mod tests {
 
     #[test]
     fn exception_frame_restores_guest_context() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
         init(&mut core)?;
 
@@ -385,7 +390,11 @@ mod tests {
     // enclosing try's frame (the review trace: POP released the outer 0x4a85c380).
     #[test]
     fn catch_that_pops_leaves_the_enclosing_frame_on_the_chain() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
         init(&mut core)?;
 
@@ -407,7 +416,11 @@ mod tests {
     // end of its try must still release its frame, and nothing stale may be left to resume into.
     #[test]
     fn catch_that_returns_without_pop_leaves_no_dead_frame() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
         init(&mut core)?;
 
@@ -431,7 +444,11 @@ mod tests {
 
     #[test]
     fn rethrow_from_catch_reaches_the_enclosing_frame() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
         init(&mut core)?;
 
@@ -463,7 +480,11 @@ mod tests {
 
     #[test]
     fn cx_thumb_catch_calls_function_with_try() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
         init(&mut core)?;
 
@@ -479,7 +500,11 @@ mod tests {
 
     #[test]
     fn cx_thumb_catch_with_nested_try_same_sp() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
         init(&mut core)?;
 
@@ -503,7 +528,11 @@ mod tests {
 
     #[test]
     fn cx_thumb_catch_recurses() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
         init(&mut core)?;
 
@@ -527,7 +556,11 @@ mod tests {
     // entry below its base, the nested frame would stay on the chain and catch the throw.
     #[test]
     fn cx_thumb_catch_throws_after_nested_try_before_own_pop() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
         init(&mut core)?;
 
@@ -547,7 +580,11 @@ mod tests {
     // unwind discards them rather than letting them pile up for a later pop at that sp to match.
     #[test]
     fn enclosing_frame_discards_entries_of_catches_that_never_pop() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
         init(&mut core)?;
 
@@ -573,7 +610,11 @@ mod tests {
     // The throw that follows in paint's caller must reach the caller's own frame, not a dead one.
     #[test]
     fn release_to_drops_frames_a_rust_invoked_guest_call_left_behind() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
         init(&mut core)?;
 
@@ -598,7 +639,11 @@ mod tests {
     // its own, so release_to frees nothing rather than walking into the enclosing frames.
     #[test]
     fn release_to_frees_nothing_when_the_mark_left_the_chain() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
         init(&mut core)?;
 
@@ -618,7 +663,11 @@ mod tests {
     // restored thread 1's registers.
     #[test]
     fn exception_frames_are_per_thread() -> Result<()> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
         init(&mut core)?;
 

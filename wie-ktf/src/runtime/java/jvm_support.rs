@@ -107,7 +107,12 @@ const CLASS_RECORDS_START: u32 = CLASS_REGION_BASE + 0x1000;
 pub struct KtfJvmSupport;
 
 impl KtfJvmSupport {
-    pub async fn init(core: &mut ArmCore, system: &mut System, jar_name: Option<&str>) -> Result<(Jvm, Box<dyn ClassInstance>)> {
+    pub async fn init(
+        core: &mut ArmCore,
+        system: &mut System,
+        jar_name: Option<&str>,
+        properties: &[(&str, &str)],
+    ) -> Result<(Jvm, Box<dyn ClassInstance>)> {
         let jvm_context = InitParam2 {
             unk1: 0,
             unk2: 0,
@@ -125,7 +130,7 @@ impl KtfJvmSupport {
 
         let protos = [wie_wipi_java::get_protos().into(), wie_midp::get_protos().into()];
         let jvm_implementation = KtfJvmImplementation::new(core);
-        let jvm = JvmSupport::new_jvm(system, jar_name, Box::new(protos), &[], jvm_implementation.clone()).await?;
+        let jvm = JvmSupport::new_jvm(system, jar_name, Box::new(protos), properties, jvm_implementation.clone()).await?;
         guest_roots::install(&jvm, core);
         register_java_interface_svc_handler(core, &jvm)?;
 
@@ -451,13 +456,13 @@ impl KtfJvmSupport {
 mod test {
     use alloc::{boxed::Box, sync::Arc, vec, vec::Vec};
     use core::{
-        mem::size_of,
+        mem::{offset_of, size_of},
         sync::atomic::{AtomicBool, AtomicUsize, Ordering},
     };
 
     use bytemuck::Zeroable;
     use jvm::{
-        ClassInstanceRef, JavaValue, Jvm,
+        ClassInstance, ClassInstanceRef, JavaValue, Jvm,
         runtime::{JavaLangClass, JavaLangString},
     };
     use jvm_class_proto::{JavaClassProto, JavaFieldProto, JavaMethodProto};
@@ -466,9 +471,9 @@ mod test {
     use wipi_types::ktf::{
         ExeInterfaceFunctions,
         java::{
-            JavaClass as RawJavaClass, JavaClassInstance as RawJavaClassInstance, JavaExceptionHandler as RawJavaExceptionHandler,
-            JavaFieldDefinition as RawJavaField, JavaMethodDefinition as RawJavaMethod,
-            JavaMethodExceptionTableEntry as RawJavaMethodExceptionTableEntry,
+            JavaClass as RawJavaClass, JavaClassDescriptor as RawJavaClassDescriptor, JavaClassInstance as RawJavaClassInstance,
+            JavaExceptionHandler as RawJavaExceptionHandler, JavaFieldDefinition as RawJavaField, JavaMethodDefinition as RawJavaMethod,
+            JavaMethodExceptionTableEntry as RawJavaMethodExceptionTableEntry, WIPIJBInterface,
         },
     };
 
@@ -476,19 +481,26 @@ mod test {
     use wie_core_arm::{Allocator, ArmCore};
     use wie_jvm_support::native::encode_method_arguments;
     use wie_midp::classes::javax::microedition::{lcdui::Display as MidpDisplay, midlet::MIDlet};
-    use wie_util::{Result, WieError, read_generic, write_generic};
+    use wie_util::{ByteWrite, Result, WieError, read_generic, write_generic, write_null_terminated_string_bytes, write_null_terminated_table};
 
-    use crate::runtime::java::{JavaSvcFunctions, handle_java_svc, interface};
+    use crate::runtime::java::{
+        JavaSvcFunctions, handle_java_svc,
+        interface::{self, get_wipi_jb_interface},
+    };
 
     use super::{
-        ClassLoaderContext, JavaArrayClassInstance, JavaClassDefinition, JavaClassInstance, JavaMethod, KtfClassLoader, KtfJvmSupport,
-        KtfJvmThreadContext, value::JavaValueCodec,
+        ClassLoaderContext, JavaArrayClassInstance, JavaClassDefinition, JavaClassInstance, JavaMethod, JavaMethodResult, KtfClassLoader,
+        KtfJvmSupport, KtfJvmThreadContext, name::JavaFullName, value::JavaValueCodec,
     };
 
     use test_utils::{TestClock, TestPlatform};
 
     async fn init_jvm(system: &mut System) -> Result<(Jvm, ArmCore)> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
 
         let mut context = core.save_context();
@@ -500,7 +512,7 @@ mod test {
         write_generic(&mut core, ptr_thread_context, KtfJvmThreadContext::zeroed())?;
         KtfJvmSupport::set_current_thread_context(&mut core, ptr_thread_context)?;
 
-        let (jvm, _) = KtfJvmSupport::init(&mut core, system, None).await?;
+        let (jvm, _) = KtfJvmSupport::init(&mut core, system, None, &[]).await?;
 
         Ok((jvm, core))
     }
@@ -766,7 +778,7 @@ mod test {
         let done_clone = done.clone();
         let mut system_clone = system.clone();
         system.spawn(async move || {
-            let (jvm, mut core) = init_jvm(&mut system_clone).await?;
+            let (jvm, core) = init_jvm(&mut system_clone).await?;
 
             let ptr_jvm_context = super::CLASS_REGION_BASE;
             let mut headers = Vec::new();
@@ -905,7 +917,6 @@ mod test {
         }
         Ok(())
     }
-
     #[test]
     fn test_jvm_support() -> Result<()> {
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
@@ -915,7 +926,7 @@ mod test {
         let done_clone = done.clone();
         let mut system_clone = system.clone();
         system.spawn(async move || {
-            let (jvm, _core) = init_jvm(&mut system_clone).await?;
+            let (jvm, mut core) = init_jvm(&mut system_clone).await?;
 
             let midlet: ClassInstanceRef<MIDlet> = jvm.new_class("net/wie/WIPIMIDlet", "()V", ()).await.unwrap().into();
             let display: ClassInstanceRef<MidpDisplay> = MIDlet::display(&jvm, &midlet).await.unwrap();
@@ -932,6 +943,21 @@ mod test {
                 .await
                 .unwrap();
             assert!(paint_disabled);
+
+            let class = jvm.resolve_class("javax/microedition/lcdui/Display").await.unwrap();
+            let class = class.definition.as_any().downcast_ref::<JavaClassDefinition>().unwrap();
+            let field = class.field("paintDisabled", "Z", false)?.unwrap();
+            assert!(class.field("paintDisabled", "Z", true)?.is_none());
+            assert!(class.field("paintDisabled", "I", false)?.is_none());
+            assert!(class.field("missing", "Z", false)?.is_none());
+            let mut raw: RawJavaField = read_generic(&core, field.ptr_raw)?;
+            let flags = raw.access_flags;
+            raw.access_flags |= u32::from(FieldAccessFlags::STATIC.bits());
+            write_generic(&mut core, field.ptr_raw, raw)?;
+            assert!(class.field("paintDisabled", "Z", false)?.is_none());
+            assert_eq!(class.field("paintDisabled", "Z", true)?.unwrap().ptr_raw, field.ptr_raw);
+            raw.access_flags = flags;
+            write_generic(&mut core, field.ptr_raw, raw)?;
 
             let string1 = JavaLangString::from_rust_string(&jvm, "test1").await.unwrap();
             let string2 = JavaLangString::from_rust_string(&jvm, "test2").await.unwrap();
@@ -986,6 +1012,122 @@ mod test {
     }
 
     #[test]
+    fn test_native_virtual_overrides() -> Result<()> {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        let mut system_clone = system.clone();
+        system.spawn(async move || {
+            let (jvm, mut core) = init_jvm(&mut system_clone).await?;
+            let object = jvm.resolve_class("java/lang/Object").await.unwrap();
+            let ptr_object = KtfJvmSupport::class_definition_raw(&*object.definition)?;
+            let name = JavaFullName::new(0, "value", "()I").as_bytes();
+            let ptr_name = Allocator::alloc(&mut core, name.len() as u32)?;
+            core.write_bytes(ptr_name, &name)?;
+
+            let mut classes: Vec<u32> = Vec::new();
+            let mut methods = Vec::new();
+            for (name, parent, flags, slots, value) in [
+                ("test/Base", None, Some(MethodAccessFlags::PRIVATE), &[0][..], 1),
+                (
+                    "test/Abstract",
+                    Some(0),
+                    Some(MethodAccessFlags::PUBLIC | MethodAccessFlags::ABSTRACT),
+                    &[0, 1][..],
+                    0,
+                ),
+                ("other/Concrete", Some(1), Some(MethodAccessFlags::PUBLIC), &[0, 1, 2][..], 42),
+                ("other/Inherited", Some(2), None, &[0, 1, 2][..], 0),
+                ("other/Sibling", Some(1), Some(MethodAccessFlags::PUBLIC), &[0, 1, 3][..], 84),
+                ("test/PackageBase", Some(0), Some(MethodAccessFlags::empty()), &[0, 4][..], 10),
+                ("other/Unrelated", Some(5), Some(MethodAccessFlags::PUBLIC), &[0, 4, 5][..], 20),
+                ("test/Bridge", Some(5), Some(MethodAccessFlags::PROTECTED), &[0, 4, 6][..], 30),
+                ("other/BridgeLeaf", Some(7), Some(MethodAccessFlags::PUBLIC), &[0, 4, 6, 7][..], 40),
+            ] {
+                // fork: a class record has to sit in reach of an object header (`CLASS_REGION_BASE`).
+                let ptr_class = KtfJvmSupport::alloc_class_record(&mut core)?;
+                if let Some(flags) = flags {
+                    let ptr_method = Allocator::alloc(&mut core, size_of::<RawJavaMethod>() as u32)?;
+                    let mut method = RawJavaMethod::zeroed();
+                    if !flags.contains(MethodAccessFlags::ABSTRACT) {
+                        method.fn_body = Allocator::alloc(&mut core, 4)? | 1;
+                        core.write_bytes(method.fn_body & !1, &[value, 0x20, 0x70, 0x47])?; // movs r0, #value; bx lr
+                    }
+                    method.ptr_class = ptr_class;
+                    method.ptr_name = ptr_name;
+                    method.access_flags = flags.bits();
+                    method.index_in_vtable = (slots.len() - 1) as u16;
+                    write_generic(&mut core, ptr_method, method)?;
+                    methods.push(ptr_method);
+                }
+
+                // Native descriptors include inherited declarations, and their vtables
+                // have an explicit count rather than a terminating null pointer.
+                let ptr_methods = Allocator::alloc(&mut core, (slots.len() as u32 + 1) * 4)?;
+                let pointers = slots.iter().map(|&index| methods[index]).collect::<Vec<_>>();
+                write_null_terminated_table(&mut core, ptr_methods, &pointers)?;
+                let ptr_vtable = Allocator::alloc(&mut core, slots.len() as u32 * 4)?;
+                for (index, pointer) in pointers.iter().enumerate() {
+                    write_generic(&mut core, ptr_vtable + index as u32 * 4, *pointer)?;
+                }
+                let ptr_class_name = Allocator::alloc(&mut core, name.len() as u32 + 1)?;
+                write_null_terminated_string_bytes(&mut core, ptr_class_name, name.as_bytes())?;
+                let ptr_descriptor = Allocator::alloc(&mut core, size_of::<RawJavaClassDescriptor>() as u32)?;
+                let mut descriptor = RawJavaClassDescriptor::zeroed();
+                descriptor.ptr_name = ptr_class_name;
+                descriptor.ptr_parent_class = parent.map(|index: usize| classes[index]).unwrap_or(ptr_object);
+                descriptor.ptr_methods = ptr_methods;
+                descriptor.method_count = slots.len() as u16;
+                descriptor.access_flag = ClassAccessFlags::PUBLIC.bits();
+                if flags.is_some_and(|flags| flags.contains(MethodAccessFlags::ABSTRACT)) {
+                    descriptor.access_flag |= ClassAccessFlags::ABSTRACT.bits();
+                }
+                write_generic(&mut core, ptr_descriptor, descriptor)?;
+                write_generic(
+                    &mut core,
+                    ptr_class,
+                    RawJavaClass {
+                        ptr_next: ptr_class + 4,
+                        unk1: 0,
+                        ptr_descriptor,
+                        ptr_vtable,
+                        vtable_count: slots.len() as u16,
+                        unk_flag: 0x8080,
+                    },
+                )?;
+                let class = JavaClassDefinition::from_raw(ptr_class, &core);
+                jvm.register_class(Box::new(class), None).await.unwrap();
+                classes.push(ptr_class);
+            }
+
+            for (index, declaration, expected) in [(2, 1, 42), (3, 1, 42), (4, 1, 84), (6, 4, 10), (7, 4, 30), (8, 4, 40)] {
+                let class = JavaClassDefinition::from_raw(classes[index], &core);
+                let instance = jvm.instantiate_class(&class.name()?).await.unwrap();
+                let base_method: RawJavaMethod = read_generic(&core, methods[declaration])?;
+                let vtable = class.ptr_vtable()?;
+                let ptr_target: u32 = read_generic(&core, vtable + u32::from(base_method.index_in_vtable) * 4)?;
+                let target: RawJavaMethod = read_generic(&core, ptr_target)?;
+                assert_eq!(target.access_flags & MethodAccessFlags::ABSTRACT.bits(), 0);
+                let value: u32 = core
+                    .run_function(target.fn_body, &[0, KtfJvmSupport::class_instance_raw(&instance)])
+                    .await?;
+                assert_eq!(value, expected);
+                assert_eq!(read_generic::<u32, _>(&core, vtable)?, methods[0]);
+                assert_eq!(base_method.index_in_vtable, 1);
+            }
+            let abstract_class = JavaClassDefinition::from_raw(classes[1], &core);
+            assert_eq!(read_generic::<u32, _>(&core, abstract_class.ptr_vtable()? + 4)?, methods[1]);
+
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+        while !done.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+        Ok(())
+    }
+
+    #[test]
     fn test_non_native_method_through_native_entry() -> Result<()> {
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
         let done = Arc::new(AtomicBool::new(false));
@@ -1018,7 +1160,17 @@ mod test {
             // the host implementation's Java prototype is not marked native.
             let result: u32 = core.run_function(raw.fn_body_native_or_exception_table, &[0, ptr_args]).await?;
             let result: Box<dyn jvm::ClassInstance> = Box::new(JavaClassInstance::from_raw(result, &core));
+            jvm.collect_garbage().unwrap();
             assert_eq!(JavaLangString::to_rust_string(&jvm, &result).await.unwrap(), "화장");
+
+            let caller = core.save_context();
+            let result = method.run(vec![chars.into(), (-1).into(), 2.into()].into_boxed_slice()).await;
+            assert!(matches!(result, Err(WieError::JavaException(_))));
+            let restored = core.save_context();
+            assert_eq!(
+                (restored.r0, restored.r1, restored.sp, restored.lr, restored.pc),
+                (caller.r0, caller.r1, caller.sp, caller.lr, caller.pc)
+            );
 
             write_generic(&mut core, ptr_args + 4, (-1i32) as u32)?;
             let result = core.run_function::<u32>(raw.fn_body_native_or_exception_table, &[0, ptr_args]).await;
@@ -1114,6 +1266,20 @@ mod test {
                 let _ = interface::call_native(&mut core, &mut (), raw.fn_body_native_or_exception_table, container).await?;
                 let slot: [u32; 2] = [read_generic(&core, container)?, read_generic(&core, container + 4)?];
                 assert_eq!(slot[..expected.len()], expected[..], "{name}, call_native");
+                if name == "arraycopy" {
+                    core.load(&[0x55, 0x24, 0x00, 0xe8], 0x10000, 0x1000)?; // movs r4, #0x55; undefined
+                    let mut faulting_method = raw;
+                    faulting_method.fn_body_native_or_exception_table = 0x10001;
+                    write_generic(&mut core, method.ptr_raw, faulting_method)?;
+                    let result = method.run(args.into_boxed_slice()).await;
+                    let Err(WieError::FatalError(message)) = result else {
+                        panic!("Expected an ARM instruction fault");
+                    };
+                    // fork: the fault's pc is in the message; the register dump under it is the caller's,
+                    // as our `run_function` restores its caller on an error too (upstream: the fault's, R4 0x55).
+                    assert!(message.contains("Undefined instruction at pc=0x10002"), "{message}");
+                    write_generic(&mut core, method.ptr_raw, raw)?;
+                }
             }
 
             done_clone.store(true, Ordering::Relaxed);
@@ -1239,7 +1405,10 @@ mod test {
             ));
 
             let handler: RawJavaExceptionHandler = read_generic(&core, ptr_handler)?;
-            assert_eq!(handler.unk3, ptr_exception, "the catch block reads `e` from this slot");
+            assert_eq!(
+                handler.ptr_exception_class_instance, ptr_exception,
+                "the catch block reads `e` from this slot"
+            );
             assert_eq!(handler.current_pc, 0x1dd, "the handler runs at its target");
 
             // A `finally` rethrows from its own body, which no range covers: it leaves this frame
@@ -1399,6 +1568,14 @@ mod test {
 
     #[test]
     fn test_exception_class_matches_raw_class_and_vtable() -> Result<()> {
+        async fn throw_from_nested_call(core: &mut ArmCore, (jvm, ptr_exception): &mut (Jvm, u32)) -> Result<JavaMethodResult> {
+            let mut context = core.save_context();
+            context.r4 = 0x99;
+            core.restore_context(&context);
+            let exception = Box::new(JavaClassInstance::from_raw(*ptr_exception, core));
+            JavaMethod::handle_exception(core, jvm, exception).await
+        }
+
         let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
 
         let done = Arc::new(AtomicBool::new(false));
@@ -1470,6 +1647,104 @@ mod test {
             let ptr_exception = KtfJvmSupport::class_instance_raw(&exception);
             let result = JavaMethod::handle_exception(&mut core, &jvm, exception).await;
             assert!(matches!(result, Err(WieError::JavaException(ptr)) if ptr == ptr_exception));
+
+            core.map(0x10000, 0x1000)?;
+            write_generic(
+                &mut core,
+                0x10000,
+                RawJavaMethod {
+                    fn_body_native_or_exception_table: 0x10100,
+                    exception_table_count: 1,
+                    ..RawJavaMethod::zeroed()
+                },
+            )?;
+            write_generic(&mut core, 0x10100, 0x10120u32)?;
+            write_generic(
+                &mut core,
+                0x10120,
+                RawJavaMethodExceptionTableEntry {
+                    from_pc: 1,
+                    to_pc: 2,
+                    target: 3,
+                    ptr_class: runtime_exception_class.ptr_raw,
+                },
+            )?;
+            write_generic(
+                &mut core,
+                0x10200,
+                RawJavaExceptionHandler {
+                    ptr_method: 0x10000,
+                    current_pc: 1,
+                    ptr_exception_class_instance: 0xdeadbeef,
+                    ptr_functions: 0x10300,
+                    ..RawJavaExceptionHandler::zeroed()
+                },
+            )?;
+            write_generic(&mut core, 0x10304, 0x10401u32)?;
+            let thread_context = KtfJvmSupport::current_thread_context(&core)?;
+            write_generic(
+                &mut core,
+                thread_context + offset_of!(KtfJvmThreadContext, current_java_exception_handler) as u32,
+                0x10200u32,
+            )?;
+            let exception = Box::new(JavaClassInstance::from_raw(ptr_exception, &core));
+            let result = JavaMethod::handle_exception(&mut core, &jvm, exception).await;
+            assert!(matches!(
+                result,
+                Err(WieError::JavaExceptionUnwind {
+                    context_base: 0x10218,
+                    target: 3,
+                    next_pc: 0x10401
+                })
+            ));
+            let caught: u32 = read_generic(&core, 0x10210)?;
+            assert_eq!(caught, ptr_exception);
+            write_generic(&mut core, 0x10600, RawJavaMethod::zeroed())?;
+            // A method without catches links only its header, with no saved context.
+            write_generic(&mut core, 0x1fff4, [0x10600u32, 0, 0x10200])?;
+            write_generic(
+                &mut core,
+                thread_context + offset_of!(KtfJvmThreadContext, current_java_exception_handler) as u32,
+                0x1fff4u32,
+            )?;
+            let exception = Box::new(JavaClassInstance::from_raw(ptr_exception, &core));
+            let result = JavaMethod::handle_exception(&mut core, &jvm, exception).await;
+            // fork: ours walks on to the caller's record at 0x10200 (docs/report/0445) — which the catch
+            // above left running at its target (pc 3, docs/report/0448), outside its range. Uncaught.
+            assert!(matches!(result, Err(WieError::JavaException(ptr)) if ptr == ptr_exception));
+            write_generic(
+                &mut core,
+                thread_context + offset_of!(KtfJvmThreadContext, current_java_exception_handler) as u32,
+                0x10200u32,
+            )?;
+            let caught = Box::new(JavaClassInstance::from_raw(caught, &core)) as Box<dyn ClassInstance>;
+            let _: () = jvm
+                .invoke_virtual(&caught, "java/lang/Throwable", "printStackTrace", "()V", ())
+                .await
+                .unwrap();
+
+            core.register_svc_handler(5, throw_from_nested_call, &(jvm, ptr_exception))?;
+            let throwing = core.make_svc_stub(5, 0u32)?;
+            let ptr_interface = get_wipi_jb_interface(&mut core)?;
+            let interface: WIPIJBInterface = read_generic(&core, ptr_interface)?;
+            let mut caller = core.save_context();
+            caller.r4 = 0x55;
+            core.restore_context(&caller);
+            // fork: our `run_function` puts the caller's context aside on the host, not on the guest stack.
+            let handler_sp = caller.sp;
+            write_generic(&mut core, 0x10218 + 9 * 4, handler_sp)?;
+            write_generic(&mut core, 0x10400, [0x4620u16, 0x4770])?; // mov r0, r4; bx lr
+            for (entry, args) in [
+                (interface.fn_java_jump_1, vec![0, throwing]),
+                (interface.fn_java_jump_2, vec![0, 0, throwing]),
+                (interface.fn_java_jump_3, vec![0, 0, 0, throwing]),
+                (interface.fn_call_native, vec![throwing, 0x10500]),
+            ] {
+                // fork: back inside the try range — a catch moves the record's pc to its target (0448).
+                write_generic(&mut core, 0x10200 + offset_of!(RawJavaExceptionHandler, current_pc) as u32, 1u32)?;
+                let result: u32 = core.run_function(entry, &args).await?;
+                assert_eq!(result, caller.r4);
+            }
 
             done_clone.store(true, Ordering::Relaxed);
 

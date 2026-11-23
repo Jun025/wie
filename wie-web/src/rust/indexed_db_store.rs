@@ -25,6 +25,12 @@ extern "C" {
     async fn delete(this: &IndexedDBStore, key: &JsValue);
 }
 
+#[wasm_bindgen(module = "/src/ts/filesystem_store.ts")]
+extern "C" {
+    #[wasm_bindgen(js_name = openFilesystemStore)]
+    async fn open_filesystem_store() -> IndexedDBStore;
+}
+
 unsafe impl Sync for IndexedDBStore {}
 unsafe impl Send for IndexedDBStore {}
 
@@ -61,9 +67,30 @@ impl Store {
         Self { js }
     }
 
-    pub async fn get_all_keys(&self) -> Vec<String> {
+    pub async fn open_filesystem() -> Self {
+        let js = run_js_future(async { open_filesystem_store().await }).await;
+        Self { js }
+    }
+
+    pub async fn get_all_keys(&self) -> Vec<StoreKey> {
         let js: IndexedDBStore = self.js.clone().into();
-        run_js_future(async move { js.get_all_keys().await.iter().filter_map(|key| key.as_string()).collect() }).await
+        run_js_future(async move {
+            js.get_all_keys()
+                .await
+                .iter()
+                .filter_map(|key| {
+                    if let Some(key) = key.as_string() {
+                        Some(StoreKey::String(key))
+                    } else if Array::is_array(&key) {
+                        let pair = Array::from(&key);
+                        Some(StoreKey::Pair(pair.get(0).as_string()?, pair.get(1).as_string()?))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        })
+        .await
     }
 
     pub async fn get(&self, key: StoreKey) -> Option<Vec<u8>> {

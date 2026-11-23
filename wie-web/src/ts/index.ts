@@ -1,67 +1,172 @@
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import * as Sentry from "@sentry/browser";
+import { wasmIntegration } from "@sentry/wasm";
 
+import { recordPageView } from "./analytics";
 import { runApp } from "./app";
-import { AppMetadata } from "./app_library_store";
+import { initializeWie, type LibraryApp } from "./backend";
+import { getLocale, initializeLocalization, t } from "./i18n";
 import { initializeLibrary } from "./library";
+import { rustPanic } from "./panic";
 import { initializeSettings } from "./settings";
 
-Sentry.init({
-  dsn: "https://fa9187d6bd7dd43ae621f26d33641f81@o106536.ingest.us.sentry.io/4512048969678848",
-});
-
-const originalConsoleError = console.error;
-console.error = (...args: unknown[]) => {
-  window.alert(String(args[0]));
-  originalConsoleError(...args);
-};
-
 const main = async () => {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.ENVIRONMENT,
+    release: process.env.SENTRY_RELEASE,
+    integrations: [wasmIntegration()],
+    // Ad scripts, injected browser scripts, and dropped connections are outside the app's control.
+    denyUrls: [/googlesyndication\.com/],
+    ignoreErrors: [
+      "Non-Error promise rejection captured with value: undefined",
+      "Blocked a frame with origin",
+      "Failed to fetch",
+      "Load failed",
+      "Response body loading was aborted",
+    ],
+  });
+  const native = isTauri();
+  const backend = await initializeWie();
+  document.documentElement.classList.add(backend.rendering === "native" ? "native" : "browser");
+  const output = document.getElementById("player-output") as HTMLDivElement;
+  if (backend.rendering === "canvas") {
+    output.className = "canvas-wrapper";
+    const canvas = document.createElement("canvas");
+    canvas.id = "canvas";
+    canvas.width = 240;
+    canvas.height = 320;
+    output.prepend(canvas);
+  } else {
+    output.className = "native-preparation";
+    // Soft keys fill the top row, so the toolbar buttons flank CLR where a handset has its call and end keys.
+    const keypadClearRow = document.querySelector(".button-container p:nth-child(4)")!;
+    keypadClearRow.prepend(document.getElementById("back-to-library")!);
+    keypadClearRow.append(document.getElementById("app-settings")!);
+  }
+
+  if (native) {
+    document.addEventListener("click", event => {
+      const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[data-external-link]") : null;
+      if (!link) return;
+      event.preventDefault();
+      void invoke("plugin:opener|open_url", { url: link.href }).catch(() => {});
+    });
+  }
+
   const libraryView = document.getElementById("library-view") as HTMLDivElement;
   const playerView = document.getElementById("player-view") as HTMLElement;
-  const settings = initializeSettings();
-  const fontResponse = await fetch(
-    new URL("../../../assets/neodgm.ttf", import.meta.url),
-  );
-  if (!fontResponse.ok) {
-    throw new Error(
-      `Failed to load font: ${fontResponse.status} ${fontResponse.statusText}`,
-    );
-  }
-  const fontData = new Uint8Array(await fontResponse.arrayBuffer());
+  const settings = await initializeSettings(backend);
+  let pageLeaving = false;
+  window.addEventListener("pagehide", () => { pageLeaving = true; });
+  window.addEventListener("pageshow", () => {
+    pageLeaving = false;
+    if (!libraryView.hidden) recordPageView();
+  });
 
-  const routeToApp = (app: AppMetadata, archive: Uint8Array) =>
-    new Promise<void>((resolve, reject) => {
-      libraryView.hidden = true;
-      playerView.hidden = false;
-
-      let disposeApp: () => void;
-      const routeToLibrary = (error?: unknown) => {
-        disposeApp();
-        playerView.hidden = true;
-        libraryView.hidden = false;
-
-        if (error !== undefined) {
-          reject(error);
-        } else {
-          resolve();
-        }
+  const routeToApp = async (app: LibraryApp) => {
+    let failed = false;
+    let crashed = false;
+    Sentry.setContext("emulated_app", { id: app.id, title: app.title, filename: app.filename });
+    libraryView.hidden = true;
+    playerView.hidden = false;
+    try {
+      failed = await runApp(backend, app, settings);
+      if (failed) window.alert(t("restartRequired"));
+    } catch (error) {
+      failed = true;
+      const failure = rustPanic ?? error;
+      const panicked = rustPanic !== undefined;
+      // A trap or stack overflow aborts WASM mid-call like a panic, so the instance cannot run again.
+      crashed = panicked || failure instanceof WebAssembly.RuntimeError || failure instanceof RangeError;
+      const showError = () => {
+        window.alert(native ? t("restartRequired") : String(failure));
+        if (crashed && !native) window.location.reload();
       };
-
-      try {
-        disposeApp = runApp(app, archive, fontData, settings, routeToLibrary);
-      } catch (error) {
+      if (Sentry.isEnabled()) {
+        const eventId = Sentry.captureException(failure, {
+          mechanism: { type: "wie", handled: !crashed },
+          captureContext: { tags: { error_kind: panicked ? "panic" : crashed ? "trap" : "handled" } },
+        });
+        Sentry.showReportDialog({
+          eventId,
+          lang: getLocale(),
+          onError: showError,
+          ...(native ? { subtitle: t("restartRequired") } : crashed ? {
+            subtitle: t("emulatorStopped"),
+            onClose: () => window.location.reload(),
+          } : {}),
+        });
+      } else {
+        showError();
+      }
+    } finally {
+      Sentry.setContext("emulated_app", null);
+      Sentry.getCurrentScope().setFingerprint([]);
+      if (native && failed) {
+        const warning = document.getElementById("player-warning") as HTMLElement;
+        warning.textContent = t("restartRequired");
+        warning.setAttribute("role", "alert");
+        warning.hidden = false;
+        playerView.querySelectorAll<HTMLButtonElement>("button").forEach(button => { button.disabled = true; });
+      } else if (!crashed) {
         playerView.hidden = true;
         libraryView.hidden = false;
-        reject(error);
+        if (!pageLeaving) recordPageView();
       }
-    });
+    }
+  };
 
-  await initializeLibrary(routeToApp, settings);
+  await initializeLibrary(backend, routeToApp, settings);
+
+  const advertisingScripts = document.getElementById("advertising-scripts") as HTMLTemplateElement;
+  try {
+    const advertising = native
+      ? await invoke<"adsense" | "adsense-test" | "sponsor">("initialize_advertising")
+      : "adsense";
+    if (advertising === "sponsor") {
+      document.querySelector(".adsbygoogle")!.remove();
+      document.querySelector<HTMLElement>(".library-sponsor")!.hidden = false;
+    } else {
+      document.querySelector(".library-sponsor")!.remove();
+      if (advertising === "adsense-test" || process.env.NODE_ENV !== "production") {
+        document.querySelector<HTMLElement>(".adsbygoogle")!.dataset.adtest = "on";
+      }
+      document.head.append(document.importNode(advertisingScripts.content, true));
+    }
+  } catch (error) {
+    Sentry.captureException(error);
+    console.error("Advertising initialization failed", error);
+    document.querySelector(".library-ad")!.remove();
+  } finally {
+    advertisingScripts.remove();
+  }
 };
 
 const start = () => {
-  void main().catch((error) => {
-    console.error(`라이브러리를 열 수 없습니다. ${String(error)}`, error);
+  initializeLocalization();
+  const reloadKey = "wie:asset-reload";
+  void main().then(() => {
+    try {
+      sessionStorage.removeItem(reloadKey);
+    } catch {
+      // Disabled session storage must not prevent startup.
+    }
+  }).catch(error => {
+    if (error instanceof Error && (error.name === "ChunkLoadError" || error instanceof WebAssembly.CompileError)) {
+      try {
+        if (!sessionStorage.getItem(reloadKey)) {
+          sessionStorage.setItem(reloadKey, "1");
+          window.location.reload();
+          return;
+        }
+      } catch {
+        // Preserve the original error if a reload cannot be guarded.
+      }
+    }
+    Sentry.captureException(error);
+    window.alert(isTauri() ? t("restartRequired") : t("libraryOpenFailed", { error: String(error) }));
+    console.error(t("libraryOpenFailed", { error: String(error) }), error);
   });
 };
 

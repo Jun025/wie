@@ -19,6 +19,12 @@ impl DatabaseRepository {
 
 #[async_trait::async_trait]
 impl wie_backend::DatabaseRepository for DatabaseRepository {
+    async fn create(&self, name: &str, app_id: &str) {
+        let db_name = format!("wie_{app_id}");
+        let store = Store::open(&db_name, &db_name).await;
+        store.set(StoreKey::Pair(name.to_string(), String::new()), &[]).await;
+    }
+
     async fn open(&self, name: &str, app_id: &str) -> Box<dyn wie_backend::Database> {
         let db_name = format!("wie_{app_id}");
         let store = Store::open(&db_name, &db_name).await;
@@ -31,25 +37,14 @@ impl wie_backend::DatabaseRepository for DatabaseRepository {
     async fn exists(&self, name: &str, app_id: &str) -> bool {
         let db_name = format!("wie_{app_id}");
         let store = Store::open(&db_name, &db_name).await;
-        store.get_all_keys().await.iter().any(|key| key.starts_with(name))
+        store.get_all_keys().await.iter().any(|key| match key {
+            StoreKey::String(key) => key.strip_prefix(name).is_some_and(|id| id.parse::<RecordId>().is_ok()),
+            StoreKey::Pair(key, suffix) => key == name && suffix.is_empty(),
+        })
     }
 
     async fn delete(&self, _name: &str, _app_id: &str) -> bool {
         true // TODO
-    }
-
-    async fn usage(&self, app_id: &str) -> u64 {
-        let db_name = format!("wie_{app_id}");
-        let store = Store::open(&db_name, &db_name).await;
-        let mut usage = 0;
-
-        for key in store.get_all_keys().await {
-            if let Some(data) = store.get(StoreKey::String(key)).await {
-                usage += data.len() as u64;
-            }
-        }
-
-        usage
     }
 }
 
@@ -98,7 +93,10 @@ impl wie_backend::Database for Database {
             .get_all_keys()
             .await
             .iter()
-            .filter_map(|key| key.strip_prefix(self.key_prefix.as_str()).and_then(|tail| tail.parse::<RecordId>().ok()))
+            .filter_map(|key| match key {
+                StoreKey::String(key) => key.strip_prefix(self.key_prefix.as_str()).and_then(|tail| tail.parse::<RecordId>().ok()),
+                StoreKey::Pair(_, _) => None,
+            })
             .collect()
     }
 }

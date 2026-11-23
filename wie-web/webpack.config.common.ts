@@ -1,11 +1,12 @@
 import path from "path";
 import os from "os";
 import { spawn } from "child_process";
+import { mkdir } from "fs/promises";
 
 import webpack from "webpack";
-import HtmlBundlerPlugin from "html-bundler-webpack-plugin";
 import TsConfigPathsPlugin from "tsconfig-paths-webpack-plugin";
 import CopyPlugin from "copy-webpack-plugin";
+import { createSentrySDK } from "sentry";
 
 class WasmPackPlugin {
   readonly crateDir: string;
@@ -31,15 +32,25 @@ class WasmPackPlugin {
       needsBuild = [...modified].some(f => f === cargoToml || f.startsWith(rustDir + path.sep));
     });
 
-    compiler.hooks.beforeCompile.tapPromise("WasmPackPlugin", () => {
-      if (!needsBuild) return Promise.resolve();
+    compiler.hooks.beforeCompile.tapPromise("WasmPackPlugin", async () => {
+      if (!needsBuild) return;
       needsBuild = false;
-      return new Promise<void>((resolve, reject) => {
-        const args = ["build", this.crateDir, "--target", "bundler", dev ? "--dev" : "--release"];
+      await new Promise<void>((resolve, reject) => {
+        const args = ["build", this.crateDir, "--target", "bundler", ...(dev ? ["--dev"] : ["--profile", "web"])];
         const proc = spawn("wasm-pack", args, { stdio: "inherit", env });
         proc.on("exit", code => code === 0 ? resolve() : reject(new Error(`wasm-pack exited with code ${code}`)));
         proc.on("error", reject);
       });
+      if (!dev) {
+        const debugDir = path.resolve(this.crateDir, "../target/sentry");
+        await mkdir(debugDir, { recursive: true });
+        await createSentrySDK()["wasm-split"]({
+          input: path.join(this.crateDir, "pkg/wie_web_bg.wasm"),
+          debugOut: path.join(debugDir, "wie_web.debug.wasm"),
+          strip: true,
+          stripNames: true,
+        });
+      }
     });
 
     compiler.hooks.afterCompile.tap("WasmPackPlugin", compilation => {
@@ -49,11 +60,15 @@ class WasmPackPlugin {
   }
 }
 
-
-const commonConfig = (mode: "development" | "production"): webpack.Configuration => ({
+const commonConfig: webpack.Configuration = {
   context: import.meta.dirname,
+  entry: { index: "./src/html/index.html" },
+  experiments: { html: true, css: true },
   output: {
     path: path.resolve(import.meta.dirname, "dist"),
+    filename: "assets/js/[name].[contenthash:8].js",
+    cssFilename: "assets/css/[name].[contenthash:8].css",
+    htmlFilename: "[name].html",
     clean: true,
   },
   ignoreWarnings: [
@@ -83,10 +98,6 @@ const commonConfig = (mode: "development" | "production"): webpack.Configuration
         },
       },
       {
-        test: /\.(css|sass|scss)$/,
-        use: ["css-loader", "sass-loader"],
-      },
-      {
         test: /\.(ico|png|jp?g|webp|svg)$/,
         type: "asset/resource",
         generator: {
@@ -103,24 +114,17 @@ const commonConfig = (mode: "development" | "production"): webpack.Configuration
     ],
   },
   plugins: [
-    new HtmlBundlerPlugin({
-      entry: {
-        index: {
-          import: "src/html/index.html",
-          data: { adtest: mode !== "production" },
-        },
-      },
-      js: {
-        filename: "assets/js/[name].[contenthash:8].js",
-      },
-      css: {
-        filename: "assets/css/[name].[contenthash:8].css",
-      },
+    new webpack.EnvironmentPlugin({
+      ENVIRONMENT: "development",
+      SENTRY_DSN: "",
+      SENTRY_RELEASE: "local",
     }),
     new WasmPackPlugin(import.meta.dirname),
     new CopyPlugin({
       patterns: [
         { from: path.resolve(import.meta.dirname, "public"), to: "." },
+        { from: path.resolve(import.meta.dirname, "../assets/1mgm.sf2"), to: "." },
+        { from: path.resolve(import.meta.dirname, "../assets/1mgm.txt"), to: "." },
         {
           from: path.resolve(import.meta.dirname, "../node_modules/spessasynth_lib/dist/spessasynth_processor.min.js"),
           to: ".",
@@ -128,6 +132,6 @@ const commonConfig = (mode: "development" | "production"): webpack.Configuration
       ],
     }),
   ],
-});
+};
 
 export default commonConfig;

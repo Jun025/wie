@@ -53,6 +53,12 @@ impl Font {
                     Self::get_default_font,
                     MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
                 ),
+                JavaMethodProto::new(
+                    "getFont",
+                    "(I)Ljavax/microedition/lcdui/Font;",
+                    Self::get_font_by_specifier,
+                    MethodAccessFlags::PUBLIC | MethodAccessFlags::STATIC,
+                ),
             ],
             fields: vec![
                 JavaFieldProto::new("face", "I", FieldAccessFlags::PRIVATE),
@@ -171,6 +177,13 @@ impl Font {
         jvm.put_field(&mut instance, "javax/microedition/lcdui/Font", "size", "I", size).await?;
 
         Ok(instance)
+    }
+
+    async fn get_font_by_specifier(jvm: &Jvm, _: &mut WieJvmContext, font_specifier: i32) -> JvmResult<ClassInstanceRef<Font>> {
+        tracing::warn!("stub javax.microedition.lcdui.Font::getFont({font_specifier})");
+
+        jvm.invoke_static("javax/microedition/lcdui/Font", "getDefaultFont", "()Ljavax/microedition/lcdui/Font;", ())
+            .await
     }
 
     async fn get_face(jvm: &Jvm, _: &mut WieJvmContext, this: ClassInstanceRef<Font>) -> JvmResult<i32> {

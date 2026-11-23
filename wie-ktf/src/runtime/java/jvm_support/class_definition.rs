@@ -1,4 +1,4 @@
-use alloc::{borrow::Cow, boxed::Box, string::String, vec, vec::Vec};
+use alloc::{borrow::Cow, boxed::Box, format, string::String, vec, vec::Vec};
 use core::{
     fmt::{self, Debug, Formatter},
     mem::size_of,
@@ -8,7 +8,10 @@ use core::{
 use jvm::{ClassDefinition, ClassInstance, Field, JavaValue, Jvm, Method, Result as JvmResult};
 use jvm_class_proto::JavaClassProto;
 use jvm_types::{ClassAccessFlags, FieldAccessFlags, JavaType, MethodAccessFlags};
-use wipi_types::ktf::java::{JavaClass as RawJavaClass, JavaClassDescriptor as RawJavaClassDescriptor};
+use wipi_types::ktf::java::{
+    JavaClass as RawJavaClass, JavaClassDescriptor as RawJavaClassDescriptor, JavaFieldDefinition as RawJavaField,
+    JavaMethodDefinition as RawJavaMethod,
+};
 
 use wie_core_arm::{Allocator, ArmCore};
 use wie_jvm_support::native::NativeJavaValueCodec;
@@ -20,8 +23,8 @@ use wie_util::{
 use crate::runtime::java::JavaSvcFunctions;
 
 use super::{
-    KtfJvmSupport, KtfJvmWord, Result, class_instance::JavaClassInstance, field::JavaField, method::JavaMethod, value::JavaValueCodec,
-    vtable::JavaVtable,
+    KtfJvmSupport, KtfJvmWord, Result, class_instance::JavaClassInstance, field::JavaField, method::JavaMethod, name::JavaFullName,
+    value::JavaValueCodec, vtable::JavaVtable,
 };
 
 #[derive(Clone)]
@@ -242,32 +245,46 @@ impl JavaClassDefinition {
     }
 
     pub fn method(&self, name: &str, descriptor: &str, is_static: bool) -> Result<Option<JavaMethod>> {
-        let methods = self.methods()?;
-
-        for method in methods {
-            let full_name = method.name()?;
-            if full_name.name() == name
-                && full_name.descriptor() == descriptor
-                && method.access_flags().contains(MethodAccessFlags::STATIC) == is_static
-            {
-                return Ok(Some(method));
+        let raw: RawJavaClass = read_generic(&self.core, self.ptr_raw)?;
+        let class: RawJavaClassDescriptor = read_generic(&self.core, raw.ptr_descriptor)?;
+        let mut cursor = class.ptr_methods;
+        while cursor != 0 {
+            let ptr_method: u32 = read_generic(&self.core, cursor)?;
+            if ptr_method == 0 {
+                break;
             }
+            let raw: RawJavaMethod = read_generic(&self.core, ptr_method)?;
+            if raw.ptr_class == self.ptr_raw
+                && MethodAccessFlags::from_bits_truncate(raw.access_flags).contains(MethodAccessFlags::STATIC) == is_static
+                && JavaFullName::matches(&self.core, raw.ptr_name, name, descriptor)?
+            {
+                return Ok(Some(JavaMethod::from_raw(ptr_method, &self.core)));
+            }
+            cursor += 4;
         }
 
         Ok(None)
     }
 
     pub fn field(&self, name: &str, descriptor: &str, is_static: bool) -> Result<Option<JavaField>> {
-        let fields = self.fields()?;
-
-        for field in fields {
-            let full_name = field.name()?;
-            if full_name.name() == name
-                && full_name.descriptor() == descriptor
-                && field.access_flags().contains(FieldAccessFlags::STATIC) == is_static
-            {
-                return Ok(Some(field));
+        let raw: RawJavaClass = read_generic(&self.core, self.ptr_raw)?;
+        let class: RawJavaClassDescriptor = read_generic(&self.core, raw.ptr_descriptor)?;
+        let mut cursor = class.ptr_fields_or_element_type;
+        if cursor == 0 || read_generic::<u8, _>(&self.core, class.ptr_name)? == b'[' {
+            return Ok(None);
+        }
+        loop {
+            let ptr_field: u32 = read_generic(&self.core, cursor)?;
+            if ptr_field == 0 {
+                break;
             }
+            let raw: RawJavaField = read_generic(&self.core, ptr_field)?;
+            if FieldAccessFlags::from_bits_truncate(raw.access_flags as _).contains(FieldAccessFlags::STATIC) == is_static
+                && JavaFullName::matches(&self.core, raw.ptr_name, name, descriptor)?
+            {
+                return Ok(Some(JavaField::from_raw(ptr_field, &self.core)));
+            }
+            cursor += 4;
         }
 
         Ok(None)
@@ -321,8 +338,11 @@ impl ClassDefinition for JavaClassDefinition {
             .collect()
     }
 
-    async fn prepare(&self, _: &Jvm) -> JvmResult<()> {
-        Ok(())
+    async fn prepare(&self, jvm: &Jvm) -> JvmResult<()> {
+        match JavaVtable::resolve_overrides(&mut self.core.clone(), self) {
+            Ok(()) => Ok(()),
+            Err(e) => Err(jvm.exception("net/wie/WieError", &format!("Failed to prepare class: {e}")).await),
+        }
     }
 
     fn method(&self, name: &str, descriptor: &str, is_static: bool) -> Option<Box<dyn Method>> {

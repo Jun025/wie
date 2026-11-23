@@ -50,6 +50,10 @@ on:
 permissions:
   contents: read
 
+env:
+  ENVIRONMENT: ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || 'nightly' }}
+  SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+
 jobs:
   context:
     name: Resolve release context
@@ -60,6 +64,7 @@ jobs:
       run_number: ${{ steps.context.outputs.run_number }}
       should_build: ${{ steps.context.outputs.should_build }}
       target_sha: ${{ steps.context.outputs.target_sha }}
+      tauri_config: ${{ steps.context.outputs.tauri_config }}
       app_version: ${{ steps.context.outputs.app_version }}
       previous_tag: ${{ steps.context.outputs.previous_tag }}
       release_tag: ${{ steps.context.outputs.release_tag }}
@@ -78,13 +83,15 @@ jobs:
   web:
     name: Build web frontend
     needs: context
+    env:
+      SENTRY_RELEASE: ${{ needs.context.outputs.app_version }}
     if: needs.context.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout target
         uses: actions/checkout@v7
         with:
-          ref: ${{ needs.context.outputs.target_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
           submodules: recursive
 
@@ -123,9 +130,23 @@ jobs:
           tool: wasm-pack
 
       - name: Build production frontend
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
         run: |
           npm ci
           npm run build:prod
+          if [ "$ENVIRONMENT" = nightly ]; then
+            printf 'User-agent: *\nDisallow: /\n' > wie-web/dist/robots.txt
+          fi
+
+      - name: Upload WASM debug information
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+        run: npx sentry debug-files upload --include-sources --wait target/sentry/wie_web.debug.wasm
 
       - name: Save Cargo cache
         if: github.ref == 'refs/heads/main'
@@ -156,63 +177,96 @@ jobs:
           if-no-files-found: error
 
   windows:
-    name: Build Windows x64
+    name: Build Windows ${{ matrix.arch }}
+    env:
+      SENTRY_RELEASE: ${{ needs.context.outputs.app_version }}
     needs:
       - context
       - web
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - arch: aarch64
+            runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout target
         uses: actions/checkout@v7
         with:
-          ref: ${{ needs.context.outputs.target_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
           submodules: recursive
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-pc-windows-msvc
-
-      - name: Download web frontend
-        uses: actions/download-artifact@v8
-        with:
-          name: web-frontend
-          path: wie-web/dist
+          targets: ${{ matrix.target }}
 
       - name: Build unsigned installers
         uses: tauri-apps/tauri-action@v1
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
           projectPath: wie-app
+          retryAttempts: 2
           args: >-
-            --config '{"version":"${{ needs.context.outputs.app_version }}","build":{"beforeBuildCommand":""}}'
-            --ci --target x86_64-pc-windows-msvc --bundles msi,nsis --no-sign
+            --config '${{ needs.context.outputs.tauri_config }}'
+            --ci --target ${{ matrix.target }} --bundles msi,nsis
+
+      - name: Upload native debug information
+        shell: bash
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+        run: npx --yes sentry debug-files upload --include-sources --wait target/${{ matrix.target }}/release/*.pdb
 
       - name: Package installers
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
-          Copy-Item (Get-ChildItem target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi | Select-Object -First 1) "dist/wie-${{ needs.context.outputs.asset_identity }}-windows-x86_64-unsigned.msi"
-          Copy-Item (Get-ChildItem target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe | Select-Object -First 1) "dist/wie-${{ needs.context.outputs.asset_identity }}-windows-x86_64-unsigned-setup.exe"
+          Copy-Item (Get-ChildItem target/${{ matrix.target }}/release/bundle/msi/*.msi | Select-Object -First 1) "dist/wie-${{ needs.context.outputs.asset_identity }}-windows-${{ matrix.arch }}-unsigned.msi"
+          Copy-Item (Get-ChildItem target/${{ matrix.target }}/release/bundle/nsis/*-setup.exe | Select-Object -First 1) "dist/wie-${{ needs.context.outputs.asset_identity }}-windows-${{ matrix.arch }}-unsigned-setup.exe"
+          if ($env:ENVIRONMENT -eq 'production') {
+            Copy-Item target/${{ matrix.target }}/release/bundle/msi/*.msi.sig "dist/wie-${{ needs.context.outputs.asset_identity }}-windows-${{ matrix.arch }}-unsigned.msi.sig"
+            Copy-Item target/${{ matrix.target }}/release/bundle/nsis/*-setup.exe.sig "dist/wie-${{ needs.context.outputs.asset_identity }}-windows-${{ matrix.arch }}-unsigned-setup.exe.sig"
+          }
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: release-windows
+          name: release-windows-${{ matrix.arch }}
           path: dist/*
           if-no-files-found: error
 
   linux:
-    name: Build Linux x64
+    name: Build Linux ${{ matrix.arch }}
+    env:
+      SENTRY_RELEASE: ${{ needs.context.outputs.app_version }}
     needs:
       - context
       - web
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-26.04
+            target: x86_64-unknown-linux-gnu
+          - arch: aarch64
+            runner: ubuntu-26.04-arm
+            target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout target
         uses: actions/checkout@v7
         with:
-          ref: ${{ needs.context.outputs.target_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
           submodules: recursive
 
@@ -224,73 +278,163 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-unknown-linux-gnu
+          targets: ${{ matrix.target }}
 
-      - name: Download web frontend
-        uses: actions/download-artifact@v8
+      - name: Install Tauri CLI
+        uses: taiki-e/install-action@v2
         with:
-          name: web-frontend
-          path: wie-web/dist
+          tool: tauri-cli
 
-      - name: Build unsigned packages
+      - name: Build Linux executable
         uses: tauri-apps/tauri-action@v1
         with:
+          tauriScript: cargo tauri
           projectPath: wie-app
+          retryAttempts: 2
           args: >-
-            --config '{"version":"${{ needs.context.outputs.app_version }}","build":{"beforeBuildCommand":""}}'
-            --ci --target x86_64-unknown-linux-gnu --bundles appimage,deb --no-sign
+            --config '${{ needs.context.outputs.tauri_config }}'
+            --ci --target ${{ matrix.target }} --no-bundle
+
+      - name: Upload native debug information
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+        run: |
+          binary=target/${{ matrix.target }}/release/wie-app
+          objcopy --only-keep-debug "$binary" "$binary.debug"
+          strip --strip-debug "$binary"
+          npx --yes sentry debug-files upload --include-sources --wait "$binary.debug"
+
+      - name: Bundle stripped Linux executable
+        working-directory: wie-app
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: >-
+          cargo tauri bundle
+          --config '${{ needs.context.outputs.tauri_config }}'
+          --ci --target ${{ matrix.target }} --bundles appimage,deb
 
       - name: Package bundles
         run: |
           mkdir -p dist
-          cp target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage "dist/wie-${{ needs.context.outputs.asset_identity }}-linux-x86_64-unsigned.AppImage"
-          cp target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb "dist/wie-${{ needs.context.outputs.asset_identity }}-linux-x86_64-unsigned.deb"
+          cp target/${{ matrix.target }}/release/bundle/appimage/*.AppImage "dist/wie-${{ needs.context.outputs.asset_identity }}-linux-${{ matrix.arch }}.AppImage"
+          cp target/${{ matrix.target }}/release/bundle/deb/*.deb "dist/wie-${{ needs.context.outputs.asset_identity }}-linux-${{ matrix.arch }}.deb"
+          if [ "$ENVIRONMENT" = production ]; then
+            cp target/${{ matrix.target }}/release/bundle/appimage/*.AppImage.sig "dist/wie-${{ needs.context.outputs.asset_identity }}-linux-${{ matrix.arch }}.AppImage.sig"
+            cp target/${{ matrix.target }}/release/bundle/deb/*.deb.sig "dist/wie-${{ needs.context.outputs.asset_identity }}-linux-${{ matrix.arch }}.deb.sig"
+          fi
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: release-linux
+          name: release-linux-${{ matrix.arch }}
           path: dist/*
           if-no-files-found: error
 
-  macos:
-    name: Build macOS universal
+  macos_build:
+    name: Build macOS ${{ matrix.target }}
+    env:
+      SENTRY_RELEASE: ${{ needs.context.outputs.app_version }}
     needs:
       - context
       - web
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [aarch64-apple-darwin, x86_64-apple-darwin]
     runs-on: macos-latest
     steps:
       - name: Checkout target
         uses: actions/checkout@v7
         with:
-          ref: ${{ needs.context.outputs.target_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
           submodules: recursive
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: ${{ matrix.target }}
 
-      - name: Download web frontend
-        uses: actions/download-artifact@v8
-        with:
-          name: web-frontend
-          path: wie-web/dist
-
-      - name: Build unsigned universal bundles
+      - name: Build macOS executable
         uses: tauri-apps/tauri-action@v1
         with:
           projectPath: wie-app
+          retryAttempts: 2
           args: >-
-            --config '{"version":"${{ needs.context.outputs.app_version }}","build":{"beforeBuildCommand":""}}'
-            --ci --target universal-apple-darwin --bundles app,dmg --no-sign
+            --config '${{ needs.context.outputs.tauri_config }}'
+            --ci --target ${{ matrix.target }} --no-bundle
+
+      - name: Upload native debug information
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+        run: |
+          xcrun dsymutil target/${{ matrix.target }}/release/wie-app
+          npx --yes sentry debug-files upload --include-sources --wait target/${{ matrix.target }}/release/wie-app.dSYM
+
+      - name: Upload macOS executable
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/wie-app
+          if-no-files-found: error
+
+  macos:
+    name: Bundle macOS universal
+    needs:
+      - context
+      - macos_build
+    runs-on: macos-latest
+    steps:
+      - name: Checkout target
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Tauri CLI
+        uses: taiki-e/install-action@v2
+        with:
+          tool: tauri-cli
+
+      - name: Download macOS executables
+        uses: actions/download-artifact@v8
+        with:
+          pattern: '*-apple-darwin'
+          path: target
+
+      - name: Merge macOS executables
+        run: |
+          binary=target/universal-apple-darwin/release/wie-app
+          mkdir -p "$(dirname "$binary")"
+          xcrun lipo -create target/aarch64-apple-darwin/wie-app target/x86_64-apple-darwin/wie-app -output "$binary"
+          chmod +x "$binary"
+
+      - name: Bundle unsigned universal executable
+        working-directory: wie-app
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: >-
+          cargo tauri bundle
+          --config '${{ needs.context.outputs.tauri_config }}'
+          --ci --target universal-apple-darwin --bundles app,dmg
 
       - name: Package bundles
         run: |
           mkdir -p dist
           ditto -c -k --keepParent target/universal-apple-darwin/release/bundle/macos/*.app "dist/wie-${{ needs.context.outputs.asset_identity }}-macos-universal-unsigned.app.zip"
           cp target/universal-apple-darwin/release/bundle/dmg/*.dmg "dist/wie-${{ needs.context.outputs.asset_identity }}-macos-universal-unsigned.dmg"
+          if [ "$ENVIRONMENT" = production ]; then
+            cp target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz "dist/wie-${{ needs.context.outputs.asset_identity }}-macos-universal-unsigned.app.tar.gz"
+            cp target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz.sig "dist/wie-${{ needs.context.outputs.asset_identity }}-macos-universal-unsigned.app.tar.gz.sig"
+          fi
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v7
@@ -301,6 +445,8 @@ jobs:
 
   android:
     name: Build Android aarch64
+    env:
+      SENTRY_RELEASE: ${{ needs.context.outputs.app_version }}
     needs:
       - context
       - web
@@ -309,7 +455,7 @@ jobs:
       - name: Checkout target
         uses: actions/checkout@v7
         with:
-          ref: ${{ needs.context.outputs.target_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
           submodules: recursive
 
@@ -331,12 +477,6 @@ jobs:
         with:
           targets: aarch64-linux-android
 
-      - name: Download web frontend
-        uses: actions/download-artifact@v8
-        with:
-          name: web-frontend
-          path: wie-web/dist
-
       - name: Install Tauri CLI
         uses: taiki-e/install-action@v2
         with:
@@ -344,16 +484,16 @@ jobs:
 
       - name: Initialize Android project
         working-directory: wie-app
-        run: cargo tauri android init --config '{"version":"${{ needs.context.outputs.app_version }}"}' --ci
+        run: cargo tauri android init --config '${{ needs.context.outputs.tauri_config }}' --ci
 
       - name: Generate Android icons
         working-directory: wie-app
         run: cargo tauri icon ../wie-web/src/assets/favicon.png
 
-      - name: Configure Android signing
+      - name: Configure Android release
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: bash .github/scripts/release/configure-android-signing.sh
+        run: bash .github/scripts/release/configure-android-release.sh
 
       - name: Build signed Android packages
         uses: tauri-apps/tauri-action@v1
@@ -365,9 +505,17 @@ jobs:
           tauriScript: cargo tauri
           projectPath: wie-app
           mobile: android
+          retryAttempts: 2
           args: >-
-            --config '{"version":"${{ needs.context.outputs.app_version }}","build":{"beforeBuildCommand":""}}'
+            --config '${{ needs.context.outputs.tauri_config }}'
             --target aarch64 --apk --aab --ci
+
+      - name: Upload native debug information
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+        run: npx --yes sentry debug-files upload --include-sources --wait target/aarch64-linux-android/release/libwie_app.so
 
       - name: Package Android bundles
         run: |
@@ -384,15 +532,17 @@ jobs:
 
   ios:
     name: Build iOS aarch64
+    env:
+      SENTRY_RELEASE: ${{ needs.context.outputs.app_version }}
     needs:
       - context
       - web
-    runs-on: macos-latest
+    runs-on: xcode-27
     steps:
       - name: Checkout target
         uses: actions/checkout@v7
         with:
-          ref: ${{ needs.context.outputs.target_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
           submodules: recursive
 
@@ -400,12 +550,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-ios
-
-      - name: Download web frontend
-        uses: actions/download-artifact@v8
-        with:
-          name: web-frontend
-          path: wie-web/dist
 
       - name: Install iOS build dependencies
         run: arch -arm64 brew reinstall xcodegen libimobiledevice
@@ -417,7 +561,7 @@ jobs:
 
       - name: Initialize iOS project
         working-directory: wie-app
-        run: cargo tauri ios init --config '{"version":"${{ needs.context.outputs.app_version }}"}' --ci
+        run: cargo tauri ios init --config '${{ needs.context.outputs.tauri_config }}' --ci
 
       - name: Generate iOS icons
         working-directory: wie-app
@@ -426,18 +570,27 @@ jobs:
       - name: Build unsigned iOS archive
         uses: tauri-apps/tauri-action@v1
         with:
+          retryAttempts: 2
           tauriScript: cargo tauri
           projectPath: wie-app
           mobile: ios
           args: >-
-            --config '{"version":"${{ needs.context.outputs.app_version }}","build":{"beforeBuildCommand":""}}'
+            --config '${{ needs.context.outputs.tauri_config }}'
             --target aarch64 --no-sign --archive-only
             --build-number ${{ needs.context.outputs.run_number }} --ci
+
+      - name: Upload native debug information
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+        run: npx --yes sentry debug-files upload --include-sources --wait wie-app/gen/apple/build/wie-app_iOS.xcarchive/dSYMs
 
       - name: Package iOS archive
         run: |
           mkdir -p dist
           archive=$(find target wie-app/gen -type d -name '*.xcarchive' -print -quit)
+          rm -rf "$archive/dSYMs"
           ditto -c -k --keepParent "$archive" "dist/wie-${{ needs.context.outputs.asset_identity }}-ios-aarch64-unsigned.xcarchive.zip"
 
       - name: Upload iOS artifacts
@@ -492,6 +645,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     concurrency:
       group: release-publisher-${{ github.repository }}
       cancel-in-progress: false
@@ -505,7 +660,7 @@ jobs:
       - name: Checkout release scripts
         uses: actions/checkout@v7
         with:
-          ref: ${{ needs.context.outputs.target_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Download build artifacts
@@ -514,6 +669,11 @@ jobs:
           pattern: release-*
           path: release-assets
           merge-multiple: true
+
+      - name: Attest release artifacts
+        uses: actions/attest@v4
+        with:
+          subject-path: release-assets/*
 
       - name: Publish GitHub release
         run: bash .github/scripts/release/publish.sh

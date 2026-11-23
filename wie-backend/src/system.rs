@@ -29,7 +29,7 @@ pub use self::{
     audio::parse_smaf_in,
     audio_formats::{parse_tone_sequence, tone},
     event_queue::{Event, KeyCode},
-    file_system::FilesystemOverlay,
+    file_system::{FilesystemOverlay, normalize_guest_path},
 };
 
 #[derive(Clone)]
@@ -73,6 +73,8 @@ impl System {
             pid: pid.to_owned(),
             aid: aid.to_owned(), // TODO create metadata dictionary or something
             executor: Executor::new(),
+            // fork: files stay scoped by the aid. Upstream moved this to the pid; here that would
+            // change the key every existing save is stored under (docs/report/0551 §8).
             filesystem: FilesystemOverlay::new(platform.clone(), aid),
             platform,
             event_queue: Arc::new(RwLock::new(EventQueue::new())),

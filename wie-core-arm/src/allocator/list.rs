@@ -38,6 +38,7 @@ impl ListAllocator {
     pub fn init(core: &mut ArmCore, base_address: u32, size: u32) -> Result<()> {
         let header = ListAllocationHeader::new(size, false);
 
+        core.map(base_address, size_of::<ListAllocationHeader>() as u32)?;
         write_generic(core, base_address, header)?;
 
         Ok(())
@@ -51,11 +52,13 @@ impl ListAllocator {
         let previous_header: ListAllocationHeader = read_generic(core, address)?;
 
         let header = ListAllocationHeader::new(size_to_alloc, true);
+        core.map(address, size_to_alloc)?;
         write_generic(core, address, header)?;
 
         // write next
         if previous_header.size() > size_to_alloc {
             let next_header = ListAllocationHeader::new(previous_header.size() - size_to_alloc, false);
+            core.map(address + size_to_alloc, size_of::<ListAllocationHeader>() as u32)?;
             write_generic(core, address + size_to_alloc, next_header)?;
         }
 
@@ -98,7 +101,11 @@ impl ListAllocator {
             return Ok(false);
         }
 
-        let header: ListAllocationHeader = read_generic(core, header_address)?;
+        // Only block headers are guaranteed to be committed, so an arbitrary address may be unmapped.
+        let header: ListAllocationHeader = match read_generic(core, header_address) {
+            Err(WieError::InvalidMemoryAccess(_)) => return Ok(false),
+            header => header?,
+        };
         let allocation_size = (size as usize + size_of::<ListAllocationHeader>()).next_multiple_of(4) as u32 + CANARY_SIZE;
         Ok(header.in_use() && header.size() == allocation_size)
     }
@@ -179,8 +186,12 @@ mod tests {
 
     #[test]
     fn test_allocator() -> Result<()> {
-        let mut core = ArmCore::new(false, None).unwrap();
-        core.map(0x40000000, 0x1000)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })
+        .unwrap();
 
         ListAllocator::init(&mut core, 0x40000000, 0x1000)?;
         let address = ListAllocator::alloc(&mut core, 0x40000000, 0x1000, 4)?;
@@ -192,8 +203,12 @@ mod tests {
 
     #[test]
     fn test_coalesce_adjacent_free_blocks() -> Result<()> {
-        let mut core = ArmCore::new(false, None).unwrap();
-        core.map(0x40000000, 0x1000)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })
+        .unwrap();
 
         ListAllocator::init(&mut core, 0x40000000, 0x400)?;
         let a = ListAllocator::alloc(&mut core, 0x40000000, 0x400, 0x100)?;
@@ -211,8 +226,12 @@ mod tests {
 
     #[test]
     fn test_double_free_returns_error() -> Result<()> {
-        let mut core = ArmCore::new(false, None).unwrap();
-        core.map(0x40000000, 0x1000)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })
+        .unwrap();
 
         ListAllocator::init(&mut core, 0x40000000, 0x1000)?;
         let address = ListAllocator::alloc(&mut core, 0x40000000, 0x1000, 4)?;
@@ -227,8 +246,12 @@ mod tests {
 
     #[test]
     fn test_corrupted_canary_returns_error() -> Result<()> {
-        let mut core = ArmCore::new(false, None).unwrap();
-        core.map(0x40000000, 0x1000)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })
+        .unwrap();
 
         ListAllocator::init(&mut core, 0x40000000, 0x1000)?;
         let address = ListAllocator::alloc(&mut core, 0x40000000, 0x1000, 4)?;

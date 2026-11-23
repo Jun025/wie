@@ -16,6 +16,7 @@ use super::{
     stdlib::register_stdlib_svc_handler,
     svc_ids::{InitSvcId, JavaSystemSvcId},
     wipi_c::register_wipic_svc_handler,
+    with_arm_context,
 };
 
 pub(crate) fn register_init_svc_handler(core: &mut ArmCore, ptr_jar_path: u32) -> Result<()> {
@@ -42,6 +43,7 @@ async fn handle_init_svc(core: &mut ArmCore, ptr_jar_path: &mut u32, id: SvcId) 
 
 pub async fn load_native(core: &mut ArmCore, system: &mut System, jvm: &Jvm, jar_path: &str, data: &[u8]) -> Result<()> {
     let entrypoint = load_executable(core, data)?;
+    core.prepare_execution().await?;
     register_wipic_svc_handler(core, system, jvm)?;
     register_stdlib_svc_handler(core, system)?;
     let ptr_jar_path_value = Allocator::alloc(core, (jar_path.len() + 1) as u32)?;
@@ -75,7 +77,10 @@ pub async fn load_native(core: &mut ArmCore, system: &mut System, jvm: &Jvm, jar
     tracing::debug!("ptr_init_param_2: {ptr_init_param_2:#x}");
 
     tracing::debug!("Calling entrypoint {entrypoint:#x}");
-    let _: () = core.run_function(entrypoint + 1, &[ptr_init_param_1, ptr_init_param_2, 0]).await?;
+    let _: () = core
+        .run_function(entrypoint + 1, &[ptr_init_param_1, ptr_init_param_2, 0])
+        .await
+        .map_err(|error| with_arm_context(core, error))?;
 
     let init_param_1: InitParam1 = read_generic(core, ptr_init_param_1)?;
 
@@ -91,7 +96,10 @@ pub async fn load_native(core: &mut ArmCore, system: &mut System, jvm: &Jvm, jar
     let init_struct: InitStruct = read_generic(core, init_param_1.ptr_init_struct)?;
 
     tracing::debug!("Calling initializer at {:#x}", init_struct.fn_init);
-    let _: () = core.run_function(init_struct.fn_init, &[]).await?;
+    let _: () = core
+        .run_function(init_struct.fn_init, &[])
+        .await
+        .map_err(|error| with_arm_context(core, error))?;
 
     Ok(())
 }
@@ -246,14 +254,18 @@ mod tests {
         let system_clone = system.clone();
 
         system.spawn(async move || {
-            let mut core = ArmCore::new(false, None)?;
+            let mut core = ArmCore::new(wie_backend::Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
             Allocator::init(&mut core)?;
             let mut context = core.save_context();
             let stack = Allocator::alloc(&mut core, 0x100)?;
             context.sp = stack + 0x100;
             core.restore_context(&context);
 
-            let jvm = LgtJvmSupport::init(&mut core, &system_clone, None).await?;
+            let jvm = LgtJvmSupport::init(&mut core, &system_clone, None, &[]).await?;
             register_init_svc_handler(&mut core, 0)?;
             register_java_system_svc_handler(&mut core, &jvm, 0)?;
 

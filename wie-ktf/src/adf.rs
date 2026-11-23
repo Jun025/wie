@@ -16,6 +16,7 @@ pub struct KtfAdf {
     pub pid: String,
     pub mclass: String,
     pub display_size: Option<(u32, u32)>,
+    pub slvl: Option<String>,
 }
 
 impl KtfAdf {
@@ -25,6 +26,7 @@ impl KtfAdf {
         let mut pid = String::new();
         let mut mclass = String::new();
         let mut display_size = None;
+        let mut slvl = None;
 
         let mut lines = data.split(|x| *x == b'\n');
 
@@ -39,6 +41,8 @@ impl KtfAdf {
                 mclass = String::from_utf8_lossy(&line[7..]).trim().into();
             } else if line.starts_with(b"DisplaySize:") {
                 display_size = parse_display_size(&line[12..]);
+            } else if line.starts_with(b"SLvl:") {
+                slvl = Some(String::from_utf8_lossy(&line[5..]).trim().into());
             }
         }
 
@@ -48,6 +52,7 @@ impl KtfAdf {
             pid,
             mclass,
             display_size,
+            slvl,
         }
     }
 }
@@ -99,11 +104,28 @@ pub fn is_relocation_prefixed(data: &[u8], bss_size: u32) -> bool {
     offsets.clone().zip(offsets.skip(1)).all(|(a, b)| a < b) && word(1 + count).is_some_and(|last| last < image_len)
 }
 
+pub fn validate_client_bin(data: &[u8]) -> Result<()> {
+    // The supported image starts with a Thumb branch followed by the KTF format header.
+    if !data.starts_with(&[0x04, 0xe0, 0xc0, 0x46, 0x24, 0x02, 0x04, 0x20, 0x01, 0x00, 0x02, 0x00]) {
+        return Err(WieError::FatalError("Unsupported KTF client.bin format".into()));
+    }
+    Ok(())
+}
+
+/// `validate_client_bin` for a jar entry: the relocation-table-prefixed images `runtime::relocated`
+/// loads pass too (fork — upstream knows only the stub form).
+pub fn validate_client_bin_entry(filename: &str, data: &[u8]) -> Result<()> {
+    if parse_bss_size(filename).is_ok_and(|bss_size| is_relocation_prefixed(data, bss_size)) {
+        return Ok(());
+    }
+    validate_client_bin(data)
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::vec::Vec;
 
-    use super::{KtfAdf, is_relocation_prefixed, parse_bss_size};
+    use super::{KtfAdf, is_relocation_prefixed, parse_bss_size, validate_client_bin, validate_client_bin_entry};
 
     fn words(values: &[u32]) -> Vec<u8> {
         values.iter().flat_map(|value| value.to_le_bytes()).collect()
@@ -125,14 +147,30 @@ mod tests {
     }
 
     #[test]
+    fn validation_accepts_the_stub_and_the_relocation_prefixed_image_only() {
+        let stub = [0x04, 0xe0, 0xc0, 0x46, 0x24, 0x02, 0x04, 0x20, 0x01, 0x00, 0x02, 0x00, 0, 0];
+        assert!(validate_client_bin(&stub).is_ok());
+        assert!(validate_client_bin_entry("client.bin1096", &stub).is_ok());
+
+        let relocated = words(&[64, 3, 0, 8, 12, 0, 0, 0, 0]);
+        assert!(validate_client_bin(&relocated).is_err());
+        assert!(validate_client_bin_entry("client.bin64", &relocated).is_ok());
+        // the filename's bss size is what tells a relocation table from garbage
+        assert!(validate_client_bin_entry("client.bin1096", &relocated).is_err());
+        assert!(validate_client_bin_entry("client.bin64", &[0u8; 64]).is_err());
+    }
+
+    #[test]
     fn parse_adf_full() {
-        let data = b"Name:\xc2\xa5\xbf\xe4\xc2\xa5\xbf\xe4\xc5\xb8\xc0\xcc\xc4\xef2\nAID:foo\nPID:bar\nMClass:baz\nDisplaySize:176*220\n";
+        let data =
+            b"Name:\xc2\xa5\xbf\xe4\xc2\xa5\xbf\xe4\xc5\xb8\xc0\xcc\xc4\xef2\nAID:foo\nPID:bar\nMClass:baz\nDisplaySize:176*220\nSLvl:00142FBC\n";
         let adf = KtfAdf::parse(data);
         assert_eq!(adf.name, "짜요짜요타이쿤2");
         assert_eq!(adf.aid, "foo");
         assert_eq!(adf.pid, "bar");
         assert_eq!(adf.mclass, "baz");
         assert_eq!(adf.display_size, Some((176, 220)));
+        assert_eq!(adf.slvl.as_deref(), Some("00142FBC"));
     }
 
     #[test]

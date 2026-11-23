@@ -2,6 +2,7 @@ use alloc::vec;
 
 use jvm_class_proto::JavaMethodProto;
 use jvm_types::{ClassAccessFlags, MethodAccessFlags};
+
 use wie_jvm_support::WieJavaClassProto;
 
 // interface javax.microedition.rms.RecordFilter

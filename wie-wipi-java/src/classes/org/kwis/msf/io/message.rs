@@ -64,7 +64,7 @@ impl Message {
 mod tests {
     use alloc::boxed::Box;
 
-    use jvm::{ClassInstanceRef, runtime::JavaLangString};
+    use jvm::{Array, ClassInstanceRef, runtime::JavaLangString};
 
     use test_utils::run_jvm_test;
     use wie_util::Result;
@@ -90,6 +90,25 @@ mod tests {
             let data = jvm.invoke_virtual(&message, "org/kwis/msf/io/Message", "getData", "()[B", ()).await?;
             assert_eq!(jvm.load_array::<i8>(&data, 0, 3).await?, [1i8, 2, 3]);
 
+            Ok(())
+        })
+    }
+
+    // upstream's test (2026-11-23 merge): getData hands back the caller's own array, not a copy.
+    #[test]
+    fn message_retains_the_supplied_buffer() -> Result<()> {
+        run_jvm_test(Box::new([get_protos().into()]), |jvm| async move {
+            let address = JavaLangString::from_rust_string(&jvm, "127.0.0.1:1234").await?;
+            let mut data = jvm.instantiate_array("B", 2).await?;
+            jvm.store_array(&mut data, 0, [12i8, 34]).await?;
+            let message = jvm
+                .new_class("org/kwis/msf/io/Message", "(Ljava/lang/String;[B)V", (address, data.clone()))
+                .await?;
+            let buffer: ClassInstanceRef<Array<i8>> = jvm.invoke_virtual(&message, "org/kwis/msf/io/Message", "getData", "()[B", ()).await?;
+            assert_eq!(jvm.load_array::<i8>(&buffer, 0, 2).await?, [12i8, 34]);
+
+            jvm.store_array(&mut data, 1, [56i8]).await?;
+            assert_eq!(jvm.load_array::<i8>(&buffer, 0, 2).await?, [12i8, 56]);
             Ok(())
         })
     }

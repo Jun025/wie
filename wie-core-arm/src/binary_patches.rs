@@ -379,7 +379,11 @@ mod tests {
 
         #[test]
         fn install_entry_returns_patch_plus_hook_count() -> Result<()> {
-            let mut core = ArmCore::new(false, None)?;
+            let mut core = ArmCore::new(wie_backend::Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
             core.map(0x2000, 0x100)?;
             core.write_bytes(0x2000, &[0xaa, 0xbb])?;
 
@@ -403,7 +407,11 @@ mod tests {
         fn install_entries_stacks_a_title_entry_on_the_generic_one() -> Result<()> {
             // KTF: generic hooks plus a hash-keyed patch in one install — the SVC dispatcher can
             // only be registered once, so two separate installs fail at boot.
-            let mut core = ArmCore::new(false, None)?;
+            let mut core = ArmCore::new(wie_backend::Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
             core.map(0x2000, 0x100)?;
             core.write_bytes(0x2000, &[0xaa, 0xbb])?;
 
@@ -430,7 +438,11 @@ mod tests {
 
         #[test]
         fn install_entry_specific_entry_with_zero_results_is_fatal() -> Result<()> {
-            let mut core = ArmCore::new(false, None)?;
+            let mut core = ArmCore::new(wie_backend::Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
             // Map a region with bytes that won't match the patch pattern.
             core.map(0x2000, 0x40)?;
 
@@ -449,7 +461,11 @@ mod tests {
 
         #[test]
         fn install_entry_generic_entry_with_zero_results_is_ok() -> Result<()> {
-            let mut core = ArmCore::new(false, None)?;
+            let mut core = ArmCore::new(wie_backend::Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
             core.map(0x2000, 0x40)?;
 
             let mut entry = empty_entry("generic-empty", None);
@@ -470,7 +486,11 @@ mod tests {
             // Hook pattern matches at 0x3000 (Thumb hook PC = 0x3001), patch
             // pattern matches at 0x3000 too — the SVC region [0x3000, 0x3002)
             // overlaps the patch [0x3000, 0x3002). Must fatal before any write.
-            let mut core = ArmCore::new(false, None)?;
+            let mut core = ArmCore::new(wie_backend::Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
             core.map(0x3000, 0x40)?;
             core.write_bytes(0x3000, &[0x70, 0xb5, 0x00, 0x00])?;
 
@@ -500,7 +520,11 @@ mod tests {
             // Patch at [0x4000, 0x4002), hook at 0x4003 (Thumb, SVC at
             // [0x4002, 0x4004)). Adjacent regions, no overlap. Both writes
             // must end up in memory.
-            let mut core = ArmCore::new(false, None)?;
+            let mut core = ArmCore::new(wie_backend::Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
             core.map(0x4000, 0x40)?;
             core.write_bytes(0x4000, &[0xaa, 0xbb, 0xcc, 0xdd])?;
 
@@ -528,7 +552,11 @@ mod tests {
 
         #[test]
         fn install_entry_pattern_patch_expect_mismatch_is_fatal() -> Result<()> {
-            let mut core = ArmCore::new(false, None)?;
+            let mut core = ArmCore::new(wie_backend::Options {
+                enable_gdbserver: false,
+                aot: None,
+                profile: None,
+            })?;
             core.map(0x5000, 0x40)?;
             core.write_bytes(0x5000, &[0x10, 0x20, 0x30, 0x40])?;
 

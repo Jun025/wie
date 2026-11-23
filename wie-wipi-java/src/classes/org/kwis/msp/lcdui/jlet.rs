@@ -188,14 +188,13 @@ impl Jlet {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{boxed::Box, sync::Arc, vec};
-    use core::sync::atomic::{AtomicBool, Ordering};
+    use alloc::{boxed::Box, vec};
 
     use jvm::{ClassInstanceRef, Jvm, Result as JvmResult};
     use jvm_class_proto::{JavaFieldProto, JavaMethodProto};
     use jvm_types::{ClassAccessFlags, FieldAccessFlags, MethodAccessFlags};
 
-    use test_utils::{TestPlatform, run_jvm_test, run_jvm_test_until_exit, run_jvm_test_with_system};
+    use test_utils::{run_jvm_test, run_jvm_test_until_exit};
     use wie_jvm_support::{WieJavaClassProto, WieJvmContext};
     use wie_util::Result;
 

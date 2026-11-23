@@ -53,10 +53,10 @@ impl LgtJvmSupport {
         JavaHostField::forget_core(core);
     }
 
-    pub async fn init(core: &mut ArmCore, system: &System, jar_name: Option<&str>) -> Result<Jvm> {
+    pub async fn init(core: &mut ArmCore, system: &System, jar_name: Option<&str>, properties: &[(&str, &str)]) -> Result<Jvm> {
         let protos = [get_midp_protos().into(), get_wipi_java_protos().into()];
         let implementation = LgtJvmImplementation::new(core)?;
-        let jvm = JvmSupport::new_jvm(system, jar_name, Box::new(protos), &[], implementation.clone()).await?;
+        let jvm = JvmSupport::new_jvm(system, jar_name, Box::new(protos), properties, implementation.clone()).await?;
         guest_roots::install(&jvm, core);
 
         let class = match implementation
@@ -688,7 +688,11 @@ pub(crate) mod tests {
     }
 
     pub(crate) async fn init_jvm(system: &System) -> Result<(Jvm, ArmCore, LgtJvmImplementation)> {
-        let mut core = ArmCore::new(false, None)?;
+        let mut core = ArmCore::new(wie_backend::Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })?;
         Allocator::init(&mut core)?;
 
         let mut context = core.save_context();

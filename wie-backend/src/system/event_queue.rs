@@ -60,6 +60,8 @@ impl KeyCode {
             "#" => KeyCode::HASH,
             "*" => KeyCode::STAR,
             "CLR" => KeyCode::CLEAR,
+            "SOFT1" => KeyCode::LEFT_SOFT_KEY,
+            "SOFT2" => KeyCode::RIGHT_SOFT_KEY,
             _ => unimplemented!("Unknown key: {string}"),
         }
     }
@@ -69,6 +71,7 @@ type TimerCallback = Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = Result<()>>
 
 pub enum Event {
     Redraw,
+    Repaint,
     Keydown(KeyCode),
     Keyup(KeyCode),
     Keyrepeat(KeyCode),
@@ -131,6 +134,9 @@ impl EventQueue {
             return;
         }
         if matches!(event, Event::Redraw) && self.events.iter().any(|event| matches!(event, Event::Redraw)) {
+            return;
+        }
+        if matches!(event, Event::Repaint) && self.events.iter().any(|event| matches!(event, Event::Repaint)) {
             return;
         }
         self.events.push_back(event);
@@ -205,6 +211,7 @@ mod tests {
         queue.push(Event::Keyrepeat(KeyCode::DOWN));
         for _ in 0..100 {
             queue.push(Event::Redraw);
+            queue.push(Event::Repaint);
         }
         queue.push(Event::Keyup(KeyCode::DOWN));
 
@@ -212,6 +219,7 @@ mod tests {
         assert!(matches!(queue.pop(), Some(Event::Keyrepeat(KeyCode::DOWN))));
         assert!(matches!(queue.pop(), Some(Event::Keyup(KeyCode::DOWN))));
         assert!(matches!(queue.pop(), Some(Event::Redraw)));
+        assert!(matches!(queue.pop(), Some(Event::Repaint)));
         // A repaint requested while painting still needs another delivery.
         queue.push(Event::Redraw);
         assert!(matches!(queue.pop(), Some(Event::Redraw)));

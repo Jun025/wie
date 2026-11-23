@@ -1,10 +1,11 @@
 use alloc::vec;
 
-use jvm_types::ClassAccessFlags;
+use jvm_class_proto::JavaMethodProto;
+use jvm_types::{ClassAccessFlags, MethodAccessFlags};
+
 use wie_jvm_support::WieJavaClassProto;
 
 // interface org.kwis.msp.lcdui.InputMethodListener
-// Registered so KTF init-time load_java_class resolves it; games implement it themselves.
 pub struct InputMethodListener;
 
 impl InputMethodListener {
@@ -13,9 +14,13 @@ impl InputMethodListener {
             name: "org/kwis/msp/lcdui/InputMethodListener",
             parent_class: None,
             interfaces: vec![],
-            methods: vec![],
+            methods: vec![JavaMethodProto::new_abstract(
+                "notifyTextChanged",
+                "([CII)V",
+                MethodAccessFlags::PUBLIC | MethodAccessFlags::ABSTRACT,
+            )],
             fields: vec![],
-            access_flags: ClassAccessFlags::INTERFACE,
+            access_flags: ClassAccessFlags::PUBLIC | ClassAccessFlags::INTERFACE | ClassAccessFlags::ABSTRACT,
         }
     }
 }

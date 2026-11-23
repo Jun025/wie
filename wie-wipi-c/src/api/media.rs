@@ -203,6 +203,11 @@ pub async fn clip_get_data(_context: &mut dyn WIPICContext, clip: WIPICWord, buf
     Ok(0)
 }
 
+pub async fn clip_clear_data(_context: &mut dyn WIPICContext, clip: WIPICWord) -> Result<i32> {
+    tracing::warn!("stub MC_mdaClipClearData({clip:#x})");
+    Ok(0)
+}
+
 pub async fn clip_set_position(_context: &mut dyn WIPICContext, clip: WIPICWord, ms: WIPICWord) -> Result<WIPICWord> {
     tracing::warn!("stub MC_mdaClipSetPosition({clip:#x}, {ms:#x})");
 
@@ -250,6 +255,11 @@ pub async fn set_volume(context: &mut dyn WIPICContext, volume: i32) -> Result<(
     context.system().audio().set_master_volume(volume as f32 / 100.0);
 
     Ok(())
+}
+
+pub async fn get_default_volume(_context: &mut dyn WIPICContext, category: WIPICWord) -> Result<i32> {
+    tracing::warn!("stub OEMC_mdaGetDefaultVolume({category:#x})");
+    Ok(0)
 }
 
 // Events follow the WIPI media model (AromaWIPI javadoc, `org.kwis.msp.media.Player`, the Java face

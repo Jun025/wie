@@ -303,6 +303,33 @@ pub enum WIPICSvcId {
     // 0x25a and calls `f(2, 1)` at 0x3ebc4, then tests `< 0` and -14/-7/-99; -1 takes its own
     // «socket failed» branch. Which socket variant it is does not matter while there is no network.
     SocketAlt = 0x7d0,
+    // Ids only upstream maps (2026-11-23 merge), routed to its shared `wie_wipi_c::api` bodies. Ids both
+    // sides map keep our meaning above — where upstream's differs (0x68 · 0x6a · 0xeb · 0xf0 · 0x190..0x1a0 ·
+    // 0x19c · 0x320..0x323 · 0x338 · 0x44c · 0x4b6 · 0x4c0 · 0x4ce) the round record of ticket
+    // `wie-upstream-sync2-s3-merge-upstream-main` (`docs/report/`) lists it.
+    // 0x19f (upstream `fs::tell`) is left out: it takes a handle of upstream's file table, and ours
+    // serves 0x190.. from `api::database`.
+    Execute = 0x67,
+    GetAccessLevel = 0x6e,
+    EncodeImage = 0xed,
+    SerialOpen = 0x2bc,
+    SerialWrite = 0x2bd,
+    SerialSetWriteCallback = 0x2c0,
+    SerialClose = 0x2c1,
+    UicPaint = 0x325,
+    UicHandleEvent = 0x328,
+    UicSetFgColor = 0x330,
+    UicSetBgColor = 0x331,
+    UicSetLabelAlignment = 0x334,
+    UicDeleteText = 0x33f,
+    UicGetTextSize = 0x342,
+    UicGetText = 0x343,
+    TermResGetCount = 0x44d,
+    TermResGetList = 0x44e,
+    TermResGetFormat = 0x44f,
+    TermResGetSize = 0x450,
+    TermResGetUiName = 0x451,
+    GetVolume = 0x4bf,
 }
 
 impl TryFrom<SvcId> for WIPICSvcId {
@@ -433,6 +460,27 @@ impl TryFrom<SvcId> for WIPICSvcId {
             0x581 => Self::Unk16,
             0x44c => Self::ListDataStores,
             0x7d0 => Self::SocketAlt,
+            0x67 => Self::Execute,
+            0x6e => Self::GetAccessLevel,
+            0xed => Self::EncodeImage,
+            0x2bc => Self::SerialOpen,
+            0x2bd => Self::SerialWrite,
+            0x2c0 => Self::SerialSetWriteCallback,
+            0x2c1 => Self::SerialClose,
+            0x325 => Self::UicPaint,
+            0x328 => Self::UicHandleEvent,
+            0x330 => Self::UicSetFgColor,
+            0x331 => Self::UicSetBgColor,
+            0x334 => Self::UicSetLabelAlignment,
+            0x33f => Self::UicDeleteText,
+            0x342 => Self::UicGetTextSize,
+            0x343 => Self::UicGetText,
+            0x44d => Self::TermResGetCount,
+            0x44e => Self::TermResGetList,
+            0x44f => Self::TermResGetFormat,
+            0x450 => Self::TermResGetSize,
+            0x451 => Self::TermResGetUiName,
+            0x4bf => Self::GetVolume,
             _ => return Err(wie_util::WieError::FatalError(alloc::format!("Unknown LGT WIPIC SVC id {}", value.0))),
         })
     }
@@ -486,18 +534,24 @@ pub enum StdlibSvcId {
     Strchr = 0x40b,
     Strstr = 0x410,
     Strlen = 0x411,
+    Strtok = 0x413,
     Memcpy = 0x414,
     Memmove = 0x415,
+    Memcmp = 0x416,
+    Memchr = 0x417,
     Memset = 0x418,
     Time = 0x41a,
     Localtime = 0x420,
-    Unk3 = 0x424,
+    Atexit = 0x424,
+    Abort = 0x425,
     /// Identified from the caller, not guessed: the only call site measured (b7699c10dfd1, 2026-09-27)
     /// is C++ `operator new` — `if (size == 0) size = 1; p = f(size); if (p) return p;` else the
     /// exception path.
     Malloc = 0x426,
+    Realloc = 0x427,
     /// Its pair, from the same image: `operator delete` is `if (p) f(p);`, reaching this slot.
     Free = 0x428,
+    Unk450 = 0x450,
 }
 
 impl From<StdlibSvcId> for u32 {
@@ -590,6 +644,18 @@ mod tests {
         let id = WIPICSvcId::try_from(SvcId(0xcf)).expect("SVC 207 (MC_grpGetContext) must be in the table");
         assert!(matches!(id, WIPICSvcId::GetContext));
         assert_eq!(u32::from(id), 207);
+    }
+
+    /// The four ids whose meaning differs from upstream's table keep ours (operator ruling 2026-11-23,
+    /// `docs/report/0551` §8): upstream reads them as `Exit` · `FillPolygon` · `FsAvailable` ·
+    /// `TermResGetSupportedGroups`. `handle_wipic_svc` matches on these variants by name, so a merge
+    /// that takes upstream's rows fails here or fails to compile there.
+    #[test]
+    fn wipic_svcs_0x68_0xf0_0x19c_0x44c_keep_the_fork_meaning() {
+        assert!(matches!(WIPICSvcId::try_from(SvcId(0x68)), Ok(WIPICSvcId::TerminateProgram)));
+        assert!(matches!(WIPICSvcId::try_from(SvcId(0xf0)), Ok(WIPICSvcId::DrawPolygon)));
+        assert!(matches!(WIPICSvcId::try_from(SvcId(0x19c)), Ok(WIPICSvcId::ListDatabases)));
+        assert!(matches!(WIPICSvcId::try_from(SvcId(0x44c)), Ok(WIPICSvcId::ListDataStores)));
     }
 
     /// `MC_netSocketConnect` (603 = `0x25b`) is in the table. fe76e641bb3d died on

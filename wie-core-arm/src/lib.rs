@@ -2,6 +2,7 @@
 extern crate alloc;
 
 mod allocator;
+mod aot;
 mod binary_patches;
 mod context;
 mod core;

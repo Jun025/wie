@@ -211,6 +211,7 @@ impl EventQueue {
             if let Some(x) = maybe_event {
                 let event_data = match x {
                     Event::Redraw => vec![EventQueueEvent::RepaintEvent as _, 0, 0, 0],
+                    Event::Repaint => vec![EventQueueEvent::RepaintEvent as _, 1, 0, 0],
                     Event::Keydown(x) => vec![
                         EventQueueEvent::KeyEvent as _,
                         KeyboardEventType::KeyPressed as _,
@@ -363,6 +364,15 @@ impl EventQueue {
 
         match event_kind {
             EventQueueEvent::RepaintEvent => {
+                // Native repaint requests must invalidate the display before servicing it.
+                if event[1] != 0 {
+                    let _: () = jvm
+                        .invoke_virtual(&display, "javax/microedition/lcdui/Display", "repaint", "(IIII)V", (0, 0, -1, -1))
+                        .await?;
+                }
+                // fork: upstream services the repaint here (it paints only when one is pending). Ours paints
+                // on every delivered event, as before the 2026-11-23 merge — hosts answer request_redraw
+                // with Event::Redraw and native (Clet) screens are presented from this paint.
                 let _: () = jvm
                     .invoke_virtual(&display, "javax/microedition/lcdui/Display", "handlePaintEvent", "()V", ())
                     .await?;
@@ -471,7 +481,7 @@ mod test {
 
     use crate::{
         classes::javax::microedition::{
-            lcdui::{Display, Graphics, Image},
+            lcdui::{Graphics, Image},
             midlet::MIDlet,
         },
         get_protos,
@@ -1429,17 +1439,8 @@ mod test {
 
         async fn run(jvm: &Jvm, _context: &mut WieJvmContext, mut this: ClassInstanceRef<Self>) -> JvmResult<()> {
             let count: i32 = jvm.get_field(&this, "net/wie/RecurringCallback", "count", "I").await?;
-            let display: ClassInstanceRef<Display> = jvm
-                .get_field(
-                    &this,
-                    "javax/microedition/lcdui/Displayable",
-                    "currentDisplay",
-                    "Ljavax/microedition/lcdui/Display;",
-                )
-                .await?;
             let mut graphics: ClassInstanceRef<Graphics> = jvm
-                .invoke_virtual(
-                    &display,
+                .invoke_static(
                     "javax/microedition/lcdui/Display",
                     "getScreenGraphics",
                     "()Ljavax/microedition/lcdui/Graphics;",

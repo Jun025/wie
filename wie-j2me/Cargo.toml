@@ -16,7 +16,9 @@ jvm = { workspace = true }
 wie-backend = { workspace = true }
 wie-jvm-support = { workspace = true }
 wie-midp = { workspace = true }
+wie-midp-vendor = { workspace = true }
 wie-util = { workspace = true }
 
 [dev-dependencies]
 test-utils = { workspace = true }
+zip = { workspace = true }

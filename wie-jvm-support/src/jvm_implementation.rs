@@ -5,7 +5,7 @@ use core::{
     sync::atomic::{AtomicU32, Ordering},
 };
 
-use jvm::{ClassDefinition, ClassInstance, Field, JavaValue, Jvm, Method, Result as JvmResult};
+use jvm::{ClassDefinition, ClassInstance, ExternalRoots, Field, JavaValue, Jvm, Method, Result as JvmResult};
 use jvm_bytecode::{ArrayClassDefinitionImpl, ClassDefinitionImpl};
 use jvm_class_proto::JavaClassProto;
 use jvm_types::{ClassAccessFlags, MethodAccessFlags};
@@ -15,6 +15,10 @@ use wie_backend::YieldFuture;
 use crate::class_patches::ForcedBool;
 
 pub trait JvmImplementation: Clone {
+    fn external_roots(&self) -> Option<Box<dyn ExternalRoots>> {
+        None
+    }
+
     #[allow(clippy::type_complexity)]
     fn define_class_rust<'a, C, Context>(
         &'a self,
