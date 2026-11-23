@@ -8,12 +8,15 @@
   Held by you: 게임 바이트 0 · 시크릿 · 외부 계약은 참조만 · 공개 이력 재작성 금지 · 로컬 표면만.
 - **절 색인** — 왼쪽 일을 «하기 전에» 오른쪽 절을 읽는다. 제목으로 찾는다(`grep -n '^##' AGENTS.md` · 줄번호는 매주 바뀐다). 컨텍스트가 압축된 뒤에는 읽었던 절이 남아 있지 않다 — 다시 읽어라.
   - 커밋 · PR 전(문서만 고쳤어도) · 엔진 코드를 만졌다 · `wie_validate` 의 FAIL/UNMEASURED 를 읽는다 · PR 의 CI 를 읽는다 → «## Definition of Done» 의 «### The four gates»
-  - `web/` · `functions/` · `scripts/` · `migrations/` 를 만진다 · local-only 스크립트(census · smoke_gate · audio-probe · perf-watch …)를 돌린다 → «### Web-surface commands»
-  - 회차 기록(`docs/report/`) · worklog · player-updates · 원장 파일 충돌 · 후속 제안 → «### Landing paperwork»(그 아래 «#### Worklog» · «#### Proposal threshold»)
+  - `web/` · `functions/` · `scripts/` · `migrations/` 를 만진다 · local-only 스크립트(census · smoke_gate · audio-probe · perf-watch …)를 돌린다 · 회신에 «게임 파일명 유입» 수를 적는다(다시 세지 말고 `corpus-name-inflow.mjs` 를 돌린다) → «### Web-surface commands»
+  - PR 을 내기 전(모든 회차 — 회차 기록은 회차마다의 의무다) · 회차 기록(`docs/report/`) · worklog · player-updates · 원장 파일 충돌 · 후속 제안 → «### Landing paperwork»(그 아래 «#### Worklog» · «#### Proposal threshold»)
   - 브랜치 · 커밋 · PR 을 연다 → «### Git Workflow»
-  - `-merge` 티켓 → «### For the `-merge` task only»
+  - `-merge` 티켓 → «### For the `-merge` task only»(머지 방식 · `--delete-branch`). ★그 절이 전부가 아니다 — 착지시키는 회차(게이트③)는 아래 셋도 읽고, 한 일을 회신에 인용한다:
+    - «### Web-surface commands» 의 `npm run verify` 항 — 착지 뒤 운영 별칭(`WIE_BASE=https://wie-web.pages.dev`)에 `scripts/verify-browser.mjs` 를 손으로 돌린다(착지마다 · 명령과 통과 기준은 그 항에). 배포 스텝이 red 면 착지시킨 회차가 소유한다.
+    - «### The four gates» 말미 — 주간 `rust.yml` · `coverage.yml` 의 schedule 실행을 PR 검사 옆에서 «보러 간다». red 면 그 뒤 첫 게이트③ 회차가 소유한다(티켓 발권 · 손 dispatch 는 그 절의 세 경우대로).
+    - «### Documented-command liveness» — 주간 doc-liveness 의 마지막 schedule 실행도 같은 소유 규칙이다.
   - `AGENTS.md` 에 fenced `sh` 블록을 더한다 · 주간 doc-liveness 가 red → «### Documented-command liveness»
-  - 같은 증상을 전에 겪었는지 · required check · 버전 핀 · paths-filter → «## Incident ledger (사건 대장)»
+  - 같은 증상을 전에 겪었는지 · required check · 버전 핀 · paths-filter · `Cargo.toml` 을 만진다(주석만이어도 착지하면 릴리스가 선다) → «## Incident ledger (사건 대장)»
   - 코드 스타일 · 크레이트 지도 · ponytail/MCP → «## Reference»(«### Code Style» · «### Layout» · «### Agent Environment»)
 
 ## 착수 규율
