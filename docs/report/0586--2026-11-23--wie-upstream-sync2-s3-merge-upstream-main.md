@@ -1416,3 +1416,5 @@ Slice: 14 unmerged paths (wie-skvm 10 · wie-skt 2 · wie-j2me 2; the two `Cargo
 ### 끝. 게임 파일명 유입
 
 `node scripts/corpus-name-inflow.mjs`(이 브랜치가 main 대비 더하거나 고친 318파일): **유입 88건(BOUNDED)** + **판단 필요 9건(SUFFIX-ATTACHED)**. 전부 `origin/main` 에 이미 있던 `.rs` · `.toml` 의 주석이다 — 병합이 그 파일들을 다시 건드려 대상에 들었을 뿐이다(가장 많은 곳: `wie-lgt/data/lgt_java_abi.toml` · `wie-lgt/src/runtime/java/jvm_support.rs` · `wie-skvm/.../wie_audio_clip.rs`). 이 브랜치가 `origin/main` 대비 코드(`*.rs` · `*.toml` · `*.mjs` · `*.sh`)에 더한 한글 줄은 2줄이고 둘 다 upstream 의 줄이다 — 이 회차가 쓴 것은 0줄이다. 이 회차가 쓴 문서(이 기록 · worklog · 고지 · `STATE.md`)만 넣어 돌리면 BOUNDED 0 · SUFFIX-ATTACHED 0 이다.
+
+
