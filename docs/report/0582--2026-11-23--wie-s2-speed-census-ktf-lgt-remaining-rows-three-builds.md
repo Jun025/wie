@@ -186,3 +186,5 @@
 ### 8. 증적
 
 `~/orchestrator/reports/evidence/wie-s2-speed-census-ktf-lgt-remaining-rows-three-builds/`(저장소 밖 · sha12 와 수만 · 경로 · 타이틀 없음): 묶음별 `.jsonl` · `.log` · 행 목록 `.list` · `judge-sweep.txt` · `judge-rerun.txt` · `table-reproduced.md` · `census-{pre,now}-axes.tsv` · `leases.log` · `df-start.txt` · `df-end.txt` · 드라이버 `drv/` · 키 대본 `keys/`.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=7794629bd9379693 B=0/0 P=0/0 S=0/0 -->
