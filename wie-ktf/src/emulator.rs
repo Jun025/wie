@@ -49,7 +49,7 @@ fn archive_jar_entry<'a>(aid: &str, files: &'a BTreeMap<String, Vec<u8>>) -> (St
 }
 
 /// Packaged saves written by the original owner's handset that no other host can load, keyed by the
-/// MD5 of the title's jar (the jar identifies the build, as in `wie-lgt`'s `ORPHAN_ENTRIES`).
+/// MD5 of the title's jar (the jar identifies the build, as in `wie-backend`'s `ORPHAN_ENTRIES`).
 /// Deliberately a list, never a rule — most KTF archives ship saves that load fine, and dropping
 /// every `P/` save would change their start state. A dropped title boots as a fresh install does:
 /// with no save, and writes its own.

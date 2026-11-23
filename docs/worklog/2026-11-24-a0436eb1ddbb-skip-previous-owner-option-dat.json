@@ -1,0 +1,28 @@
+{
+ "date": "2026-11-24",
+ "task": "wie-a0436eb1ddbb-skip-previous-owner-option-dat-so-it-starts-a-new-game",
+ "title": "SKT a0436eb1ddbb — 저장 없는 «저장 있음» 표식(option.dat)을 올리지 않아 새 게임으로 시작한다",
+ "summary": "제안 2026-11-22-a0436eb1ddbb-aioobe-throw-site-measure#p0(운영자 tower 채택 2026-11-24)를 넣었다. SKT a0436eb1ddbb 에서 전 주인의 option.dat 를 올리지 않는다 — 그 파일이 가리키는 저장 칸 둘이 꾸러미에 하나도 없을 때만이고, 디스크의 파일은 바꾸지 않는다. 장치는 «짝 없는 저장 표식» 표(orphan-flag)이고 wie-lgt 에서 wie-backend 로 옮겨 SKT 도 쓴다. 같은 순간 전/후 측정(census 진도 정책 600초 · P · P2): 지도 적재 r(B)V 0번 → 2번, 지도 564칸이 -1 562칸 → 자원 분포 그대로, 날짜는 40초부터 정지 → 52~91일 진행. 진도 표기는 stuck → ok(싣는 빌드 짝 정체 180 · 100초 · 선 200초 — 선 가까이다). docs/report/0590.",
+ "changes": [
+  "wie-backend/src/owner_files.rs: ORPHAN_ENTRIES · drop_orphan_entries 를 wie-lgt 에서 옮겨 LGT · SKT 의 from_archive 가 같이 쓴다 · SKT 행 1개(jar MD5 699700ed…c92c · option.dat · 저장 칸 둘이 하나도 없을 때만)",
+  "docs/contracts/runtime-adjustments.tsv 1행 · docs/player-data/compat.json 의 runtimeAdjustments 칸 1행(orphan-flag)",
+  "docs/player-updates/2026-11-24-one-skt-game-starts-a-new-game.json"
+ ],
+ "verification": [
+  "네 게이트 + beta clippy rc=0 · cargo test --all 981 passed(시험 4개를 wie-lgt 에서 wie-backend 로 옮기며 3개로 합쳤다)",
+  "개악 1건: 표의 MD5 조건을 항상 참으로 바꾸면 orphan_flag_dropped_for_listed_jar_only 가 red",
+  "node scripts/player-data.mjs · --selftest rc=0 · runtimeAdjustments 50행(장부 55행)",
+  "전/후 같은 순간 3런 × 2판: «전» r(B)V 0 · 빈 지도 · 날짜 정지 / «후» r(B)V 2 · 자원 지도 · 날짜 진행 · 600초 창 예외는 양쪽 0"
+ ],
+ "limits": [
+  "진도 값은 판정선 가까이다: «후» 네 런의 정체 180 · 100 · 210 · 220초(선 200초). 계측 빌드의 짝은 stuck 으로 읽힌다 — 새 게임 소지금이 0원이라 정책 키가 상점의 «구입비용 부족» 창에 갇히는 구간이 런마다 다르게 온다",
+  "새 게임의 소지금 0원은 게임 코드가 넣는 값으로 읽었을 뿐 재지 않았다. 안내를 따라가면 돈이 나오는지도 재지 않았다",
+  "600초 창에서는 «전»도 예외가 0번이다(0570 에서도 898초에야 났다). 예외 수가 아니라 지도 내용과 적재 호출로 효과를 갈랐다",
+  "측정 내내 호스트 load1 132~196. 조용한 호스트에서의 값은 재지 않았다"
+ ],
+ "proposals": [],
+ "adoptedProposals": [
+  "2026-11-22-a0436eb1ddbb-aioobe-throw-site-measure#p0"
+ ],
+ "declinedProposals": []
+}

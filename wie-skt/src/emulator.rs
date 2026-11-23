@@ -15,7 +15,7 @@ use wie_backend::{
     DefaultTaskRunner, Emulator, Event, Pacing, Platform, System,
     canvas::{decode_res, encode_png},
     extract_zip,
-    owner_files::turn_owner_sound_on,
+    owner_files::{ORPHAN_ENTRIES, drop_orphan_entries, turn_owner_sound_on},
 };
 use wie_jvm_support::{JvmSupport, RustJavaJvmImplementation};
 use wie_util::{Result, WieError};
@@ -170,6 +170,7 @@ impl SktEmulator {
             }
         }
         if let Some(jar) = jar.cloned() {
+            drop_orphan_entries(&mut files, &jar, ORPHAN_ENTRIES);
             turn_owner_sound_on(&mut files, &jar);
         }
 
@@ -409,9 +410,9 @@ mod tests {
 
     // The rows are pinned in `wie-backend`; this pins that the SKT mount path applies them — and, with a
     // jar sorting on either side of it, that the jar `from_archive` runs is the one `archive_jar` names
-    // (the rows key on that jar's MD5, so a loader that picks another jar leaves all three files as shipped).
+    // (the rows key on that jar's MD5, so a loader that picks another jar leaves all four files as shipped).
     #[test]
-    fn from_archive_turns_the_owner_sound_on() {
+    fn from_archive_prepares_the_owner_files() {
         use alloc::boxed::Box;
         use test_utils::TestPlatform;
         use wie_backend::owner_files::WIRING_PROBE_JAR;
@@ -424,6 +425,9 @@ mod tests {
             ("probe.sav".into(), vec![0]),
             ("probe.opt".into(), vec![0]),
             ("probe.xor".into(), vec![0]),
+            ("probe.flag".into(), vec![0]),
+            // A listed title's flag file under any other jar is mounted as shipped.
+            ("option.dat".into(), vec![7]),
         ]);
         assert_eq!(SktEmulator::archive_jar(&files), Some(WIRING_PROBE_JAR));
         let emulator = SktEmulator::from_archive(Box::new(TestPlatform::new()), files).unwrap();
@@ -431,6 +435,8 @@ mod tests {
         assert_eq!(emulator.system.filesystem().virtual_file("probe.sav"), None);
         assert_eq!(emulator.system.filesystem().virtual_file("probe.opt"), Some(vec![1]));
         assert_eq!(emulator.system.filesystem().virtual_file("probe.xor"), Some(vec![1]));
+        assert_eq!(emulator.system.filesystem().virtual_file("probe.flag"), None);
+        assert_eq!(emulator.system.filesystem().virtual_file("option.dat"), Some(vec![7]));
     }
 
     #[test]
