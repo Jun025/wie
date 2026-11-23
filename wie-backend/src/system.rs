@@ -17,6 +17,7 @@ use crate::{
     fake_server::FakeNet,
     pacing::Pacing,
     platform::Platform,
+    speed_clock::max_wait,
     task::{SleepFuture, YieldFuture},
     task_runner::TaskRunner,
     time::Instant,
@@ -92,14 +93,36 @@ impl System {
 
     pub fn tick_for(&mut self, budget_ms: u64) -> Result<()> {
         let platform = self.platform.clone();
-        let result = self.executor.tick_for(move || platform.now(), budget_ms);
-        self.flush_redraw();
-        self.pacing.lock().tick_ended(self.executor.wants_cpu(), self.executor.next_due());
+        let max_wait = platform.wake_margin_ms().map(|ms| max_wait(ms, platform.speed()));
+        let result = if platform.in_wake_tick() {
+            self.pacing.lock().tick_resumed();
+            self.executor.resume_tick(move || platform.now(), max_wait)
+        } else {
+            // What the frame before still holds: its tick ended on a wake the host never came back for.
+            self.flush_redraw();
+            self.executor.tick_for(move || platform.now(), budget_ms, max_wait)
+        };
+        // Only a host with a margin comes back for a wake.
+        let wake = self.executor.next_wake().filter(|_| max_wait.is_some());
+        let frame_over = {
+            let mut pacing = self.pacing.lock();
+            pacing.tick_ended(self.executor.wants_cpu(), self.executor.next_due(), wake);
+            pacing.wake().is_none()
+        };
+        if frame_over {
+            self.flush_redraw();
+        }
         result
     }
 
-    /// A guest repaint. Its Redraw reaches the event queue at the end of the tick — when the host
-    /// used to deliver it — unless a guest thread is spinning on Thread.yield first: a second yield
+    /// A guest repaint. Its Redraw reaches the event queue at the end of the host frame's tick — one
+    /// a frame, however often the guest asks. A tick that ends on a wake the host comes back for
+    /// (`Pacing::wake`) is not that end; the last wake tick after it is. Handed on at each of them, a
+    /// thread that repaints and sleeps 20ms was painted 1971 times in 20s at 2x, not the 1154 of a
+    /// host that ticks once a frame: a game that moves in `paint()` ran that much faster for its host
+    /// having opted in (docs/report/0556 §10).
+    ///
+    /// Unless a guest thread is spinning on Thread.yield first: a second yield
     /// from one thread with no sleep of its own between is a thread waiting for something, and
     /// 배틀몬스터's game thread waits for its paint that way (the tick end cost it a host frame per
     /// game frame: 13.9 -> 20fps of its 20). A single yield is left alone — 메이플스토리2007 yields
@@ -184,7 +207,17 @@ impl System {
     /// for a sleep that long, so a thread that polls every millisecond for a timer due at `pace`
     /// still runs it on time rather than on the host's next frame.
     pub fn sleep_toward(&self, timeout: u64, pace: Instant) -> SleepFuture {
-        SleepFuture::toward(self.platform.now() + timeout, Some(pace), &self.executor)
+        self.poll_until(self.platform.now() + timeout, Some(pace), Some(pace))
+    }
+
+    /// A poll that sleeps until `until` and keeps a tick alive only for `pace` (`sleep_toward`), for
+    /// a caller that has just read the clock: `sleep(1)` would read it again for the deadline.
+    /// `work`: when the caller next has something to do — its polls before then find nothing, `None`
+    /// until an event comes. A tick that ends on a wake for the host to come back for
+    /// (`Platform::wake_margin_ms`) skips those polls, and only those: with work before that wake it
+    /// waits itself, as on a host without a margin.
+    pub fn poll_until(&self, until: Instant, pace: Option<Instant>, work: Option<Instant>) -> SleepFuture {
+        SleepFuture::idle_toward(until, pace, work.unwrap_or(Instant::from_epoch_millis(u64::MAX)), &self.executor)
     }
 
     /// The event thread's look at its queue, one `POLL_SLEEP_MS` after the step it runs in started,
@@ -193,8 +226,9 @@ impl System {
     /// step painting has been away from its queue for longer already. Counted from the paint's end,
     /// a game thread spinning on `Thread.yield` until its paint lands spun 1ms more per frame before
     /// its next repaint was looked at (b42e4242866b: 387 -> 329 paints/s).
-    pub fn poll(&self, pace: Option<Instant>) -> SleepFuture {
-        SleepFuture::toward(self.executor.step_started() + POLL_SLEEP_MS, pace, &self.executor)
+    /// `work` as in `poll_until`.
+    pub fn poll(&self, pace: Option<Instant>, work: Option<Instant>) -> SleepFuture {
+        self.poll_until(self.executor.step_started() + POLL_SLEEP_MS, pace, work)
     }
 
     pub fn current_task_id(&self) -> u64 {

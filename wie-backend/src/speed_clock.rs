@@ -78,12 +78,35 @@ impl SpeedClock {
         wall_ms + (guest.raw() as f64 - self.now(wall_ms).raw() as f64) / self.speed()
     }
 
+    /// Wall ms from `wall_ms` until `margin_ms` before guest time `due`: when a host whose ticks wait
+    /// at most `margin_ms` for a wake (`Platform::wake_margin_ms`) must tick again to make it. 0 if
+    /// it is already that close.
+    pub fn wake_delay(&self, wall_ms: f64, due: Instant, margin_ms: u64) -> f64 {
+        (self.wall_at(wall_ms, due) - wall_ms - margin_ms as f64).max(0.0)
+    }
+
     /// A tick budget of `wall_ms` wall-clock milliseconds, in guest milliseconds: the executor
     /// measures its budget on the guest clock, so without this a 2x tick would end after half
     /// of the host frame and the game would not get faster.
     pub fn budget(&self, wall_ms: u64) -> u64 {
         (wall_ms as f64 * self.speed()) as u64
     }
+}
+
+// A browser timer armed from a timer's own callback fires no sooner than this many ms once the chain
+// is five deep (HTML Standard, timers: nesting level), whatever delay it was given.
+const HOST_TIMER_FLOOR_MS: u64 = 4;
+
+/// How far off a paced wake must be for a tick to end on it and leave it to the host
+/// (`Executor::tick_for`'s `max_wait`), in the executor's guest ms at play `speed`:
+/// `Platform::wake_margin_ms`, and no nearer than a host timer can fire. The host's timer aims
+/// `margin_ms` of wall time before the wake (`SpeedClock::wake_delay`), so one for a wake 3.5ms off
+/// is a 0.5ms timer; clamped to 4ms it came after the wake, and a 10ms WIPI timer beside a 40ms beat
+/// drifted from 207 fires to 191 in 120 frames at 2x (docs/report/0556 §9). Rounded up: a tick that
+/// waits less than the host aims ahead ends on the wake it was called for — at 1.5x, 4 of 4.5 guest
+/// ms, so the host came back a second time, by then late.
+pub(crate) fn max_wait(margin_ms: u64, speed: f64) -> u64 {
+    (margin_ms.max(HOST_TIMER_FLOOR_MS) as f64 * speed).ceil() as u64
 }
 
 /// How many times one guest timer may fire in host tick `tick` at play `speed` (WIPI
@@ -331,7 +354,7 @@ mod tests {
             wall.store(frame, Ordering::SeqCst);
             let (c, w) = (clock.clone(), wall.clone());
             executor
-                .tick_for(move || c.now(w.fetch_add(1, Ordering::SeqCst) as f64 / 10.0), clock.budget(14))
+                .tick_for(move || c.now(w.fetch_add(1, Ordering::SeqCst) as f64 / 10.0), clock.budget(14), None)
                 .unwrap();
             frame += 160;
         }
@@ -376,7 +399,7 @@ mod tests {
             wall.store(frame, Ordering::SeqCst);
             let (c, w) = (clock.clone(), wall.clone());
             executor
-                .tick_for(move || c.now(w.fetch_add(1, Ordering::SeqCst) as f64 / 10.0), clock.budget(14))
+                .tick_for(move || c.now(w.fetch_add(1, Ordering::SeqCst) as f64 / 10.0), clock.budget(14), None)
                 .unwrap();
             let end = wall.load(Ordering::SeqCst) as f64 / 10.0;
             let due = executor.next_due().map(|due| clock.wall_at(end, due));

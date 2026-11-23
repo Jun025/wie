@@ -47,7 +47,12 @@ impl SleepFuture {
     }
 
     pub(crate) fn toward(until: Instant, pace: Option<Instant>, executor: &Executor) -> Self {
-        executor.sleep_toward(until, pace);
+        Self::idle_toward(until, pace, until, executor)
+    }
+
+    // `toward`, for a poll that finds nothing to do before `work` (`System::poll_until`).
+    pub(crate) fn idle_toward(until: Instant, pace: Option<Instant>, work: Instant, executor: &Executor) -> Self {
+        executor.sleep_toward(until, pace, work);
 
         Self { polled: false }
     }

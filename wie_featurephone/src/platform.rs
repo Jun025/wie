@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use js_sys::{Function, Reflect};
 use wasm_bindgen::{JsCast, JsValue};
@@ -39,6 +39,21 @@ pub struct WebPlatform {
     exited: Arc<AtomicBool>,
     // The play-speed clock `now()` reads, shared with `WieEmulator::set_speed`.
     clock: Arc<SpeedClock>,
+    host_wake: Arc<HostWake>,
+}
+
+// Host wakes (crate doc), shared with `WieEmulator`.
+pub struct HostWake {
+    // `set_wake_margin`'s value; `u64::MAX` = not set.
+    pub margin_ms: AtomicU64,
+    // The tick now running is a `wake_tick`.
+    pub in_wake_tick: AtomicBool,
+}
+
+impl HostWake {
+    pub fn margin_ms(&self) -> Option<u64> {
+        Some(self.margin_ms.load(Ordering::Relaxed)).filter(|&ms| ms != u64::MAX)
+    }
 }
 
 // Single-threaded browser runtime; the only non-Send field is the JS audio
@@ -57,6 +72,7 @@ impl WebPlatform {
         soundfont_url: Option<String>,
         exited: Arc<AtomicBool>,
         clock: Arc<SpeedClock>,
+        host_wake: Arc<HostWake>,
     ) -> Result<Self> {
         Ok(Self {
             screen,
@@ -68,6 +84,7 @@ impl WebPlatform {
             soundfont_url,
             exited,
             clock,
+            host_wake,
         })
     }
 }
@@ -87,6 +104,14 @@ impl Platform for WebPlatform {
 
     fn speed(&self) -> f64 {
         self.clock.speed()
+    }
+
+    fn wake_margin_ms(&self) -> Option<u64> {
+        self.host_wake.margin_ms()
+    }
+
+    fn in_wake_tick(&self) -> bool {
+        self.host_wake.in_wake_tick.load(Ordering::Relaxed)
     }
 
     fn database_repository(&self) -> &dyn DatabaseRepository {
