@@ -101,3 +101,5 @@ Java 표본 셋의 **같은 실행**에서 두 분모를 나란히 계산했다(
 
 ### 7. 게임 파일명 유입
 
+`node scripts/corpus-name-inflow.mjs`(이 브랜치가 main 대비 더하거나 고친 5파일): **유입 0건(BOUNDED)** + **판단 필요 0건(SUFFIX-ATTACHED)**. 표본은 sha12 로만 적었다.
+
