@@ -31,12 +31,11 @@ export const SOUND_MARK = "snd:play";
 // wie_audio_clip tests. 5 s, not less: at host load ~340 a 2 s note had ended before the
 // round-trip's `stats` came back (measured — 1 run in 3).
 const SEQUENCE = [0x00, 0x2c, 0x80, 0x7a, 0x00, 0x00, 0x00, 0x00];
-export const SMAF_BYTES = Buffer.concat([
-  Buffer.from("MMMD\0\0\0\0SEQU", "latin1"),
-  Buffer.from([0, 0, 0, SEQUENCE.length]),
-  Buffer.from(SEQUENCE),
-  Buffer.from([0, 0]),
-]);
+// The `MMMD` length is the real one (everything after the 8-byte header): smaf 0.1.4 reads no
+// further than it says, so the 0 this fixture carried until the 2026-11-23 upstream merge parsed
+// to an empty sequence — every Scenario S check that listens went silent.
+const SMAF_BODY = Buffer.concat([Buffer.from("SEQU", "latin1"), Buffer.from([0, 0, 0, SEQUENCE.length]), Buffer.from(SEQUENCE), Buffer.from([0, 0])]);
+export const SMAF_BYTES = Buffer.concat([Buffer.from("MMMD", "latin1"), Buffer.from([0, 0, 0, SMAF_BODY.length]), SMAF_BODY]);
 
 const CANVAS = "javax/microedition/lcdui/Canvas";
 const DISPLAY = "javax/microedition/lcdui/Display";

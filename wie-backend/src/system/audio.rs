@@ -139,8 +139,10 @@ impl Audio {
 // A KTF title hands `MC_mdaClipPutData` a 13,000-byte buffer holding a 10,201-byte SMAF file;
 // `Smaf::parse` reads chunks up to the end of the slice and needs exactly the CRC after the last
 // one, so the padding failed the whole parse and every play was an empty sequence. When the whole
-// buffer yields nothing, parse it again cut at the length the `MMMD` header declares. Only then:
-// a header that misstates its length (0 in a committed test) still parses whole, as it always did.
+// buffer yields nothing, parse it again cut at the length the `MMMD` header declares.
+// Since smaf 0.1.4 (2026-11-23 upstream merge) the parser itself stops at that length, so a header
+// that understates it no longer parses whole: a declared 0 is an empty sequence. Of 6,692 SMAF
+// entries in the local corpus 172 understate their length and none declares 0 (docs/report/0585).
 // Public because MIDP's `SmafPlayer` measures the clip length off the same events.
 // The declared length is a u32 straight from the file: `saturating_add`, or a broken header near
 // u32::MAX overflows (a debug panic on wasm32, where usize is 32 bits).
