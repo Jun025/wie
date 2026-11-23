@@ -256,4 +256,4 @@
 
 **이 회차(`-fix2`)가 더한 것과 게이트**: 문서 3건뿐이다 — 고지 항목의 `summary_ko`(«게임 안의 시간과 진행 속도는 그대로이고» 절을 빼고 «전보다 느리게 돌거나»를 넣었다) · 이 파일(머리 판정 문단 · 사용자 영향 · 이 절의 판별 표) · worklog `summary`. 엔진 `*.rs` 변경 0 · 다시 잰 것 0. 작업 자리는 레인 트리 `~/worktrees/wie-3` 이다(배차가 `wie-2` → `wie-3` 로 옮겼다). `git merge-tree --write-tree origin/main HEAD` rc=0(main `2dfff4f2d`)이라 main 을 당기지 않았다. 문서를 고친 트리에서 2026-11-22 16:31~16:38 KST(load1 38~61 · `build-slot` 경유): `cargo fmt --all -- --check` rc=0 · `cargo clippy --all -- -D warnings` rc=0 · `cargo clippy --target wasm32-unknown-unknown -- -D warnings` rc=0 · `cargo +beta clippy --all -- -D warnings` rc=0(`1.101.0-beta.2`) · `RUST_MIN_STACK=4194304 cargo test --all --no-fail-fast` rc=0 · 시험 바이너리 55 · 869 passed · 0 failed. `node scripts/player-data.mjs` OK(184 updates) · `check-worklog-json.mjs` OK. 러너 블록은 다시 돌리지 않았다(엔진 소스가 §5 의 실행과 같다). 새 제안 0.
 
-<!-- corpus-name-inflow v1 subjects=10 tree=a64d3f9db86499a6 B=6/5 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=8 tree=23487f6cd9989485 B=6/5 P=0/0 S=0/0 -->
