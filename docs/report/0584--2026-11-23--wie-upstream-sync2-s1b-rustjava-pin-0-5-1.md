@@ -278,3 +278,5 @@ paints(30초에 그린 장수)의 후/전 비 · 1회 · paints 20 미만인 행
 ### 10. 게임 파일명 유입
 
 `node scripts/corpus-name-inflow.mjs`(이 브랜치가 main 대비 더하거나 고친 22파일): **유입 14건(BOUNDED)** + **판단 필요 1건(SUFFIX-ATTACHED)**. 열다섯 건 모두 `wie-lgt` 의 `.rs` 다섯 파일(`interface.rs` · `jvm_support/class_definition.rs` · `method.rs` · `value.rs` · `stdlib.rs`)에 main 부터 있던 주석이고, 이 조각은 그 파일들의 import 줄 · `localtime` · 시험만 고쳤다 — 이 조각이 더한 `.rs` · `.toml` 69줄에 한글은 0줄이다. 이 회차가 쓴 문서(이 기록 · worklog · 고지 · `STATE.md`)와 `Cargo.toml` 만 넣어 돌리면 BOUNDED 0 · SUFFIX-ATTACHED 0 이다.
+
+<!-- corpus-name-inflow v1 subjects=22 tree=80a9080137a685ab B=18/14 P=6/1 S=1/1 -->
