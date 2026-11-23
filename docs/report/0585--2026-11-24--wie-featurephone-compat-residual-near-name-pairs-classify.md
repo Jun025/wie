@@ -43,3 +43,5 @@
 - 네 게이트(`fmt --check` · `clippy --all -D warnings` · wasm clippy · `RUST_MIN_STACK=4194304 cargo test --all`) rc=0 · `cargo +beta clippy --all -- -D warnings` rc=0(PR 의 beta 다리는 빈 통과라 이 로컬 실행이 beta 의 유일한 근거다).
 
 - 게임 이름 유입(`corpus-name-inflow`): BOUNDED 351쌍(1093회) · SUFFIX-ATTACHED 17쌍(54회). 의도한 유입이다 — 공개 목록(`compat.json` 의 `title`·`game`)이 산출물이고, 이 문서의 판정 표와 `SAME_NAME_HAND` 주석이 묶음 이름을 적는다. 게임 바이트·리소스 내용·캡처는 0.
+
+
