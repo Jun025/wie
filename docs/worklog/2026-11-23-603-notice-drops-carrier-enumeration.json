@@ -1,0 +1,15 @@
+{
+  "date": "2026-11-23",
+  "task": "wie-603-player-notice-lists-skt-ktf-only-but-lgt-rows-slowed-too",
+  "title": "#603 고지의 통신사 열거 「SKT, KTF」 를 없앴다 — LGT 2행도 같은 이유로 느려졌다",
+  "summary": "이용자 고지 docs/player-updates/2026-11-22-j2me-runs-at-its-own-pace.json 의 마지막 문장에서 통신사 열거를 뺐다(「지원 목록에 있는 SKT, KTF 게임 가운데 일부도」 → 「지원 목록에 있는 게임 가운데 일부도」). 0582 가 남은 LGT 38행에서 2행이 같은 이유로 느려진 것을 쟀다(−7.3% · −16.7% · 게임이 요청한 잠을 따라 도는 행). 지원 목록은 SKT 82 · KTF 269 · LGT 78 이 전부라 셋을 다 적으면 열거가 정보를 주지 않아 늘리지 않고 없앴다. 같은 열거는 다른 발행 문서에 없다(player-updates 186개 중 이 1개 · compat.json 0 · web · functions · contracts 0). 엔진 · compat.json 변경 0 · 새 측정 0. docs/report/0583.",
+  "changes": [
+    "docs/player-updates/2026-11-22-j2me-runs-at-its-own-pace.json: summary_ko 의 마지막 문장",
+    "docs/report/0583"
+  ],
+  "limits": "새로 잰 것은 없다(수는 0582 와 그 검수의 것). #605 고지의 「다른 게임은 달라지지 않아요」 는 0582 의 빨라진 KTF 10행 · LGT 2행이 어느 착지의 몫인지 갈리지 않아 고치지 않았다.",
+  "proposals": [],
+  "adoptedProposals": ["2026-11-23-s2-speed-census-ktf-lgt-remaining-rows#p0"],
+  "declinedProposals": [],
+  "proposalsNote": "제안 0. 0582 의 제안(고지에 LGT 를 더한다)을 채택했다 — 문안은 열거를 늘리는 대신 없앴다."
+}
