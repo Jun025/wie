@@ -107,6 +107,7 @@ const SAME_NAME_HAND = {
   '52edc54e2b23': { title: '메이플스토리 마법사편' }, // SKT port of 1cdea1985955: .msd MIDlet-Name «메이플스토리마법사편» · 135/138 shared entries identical
   '1f0d7e81336a': { title: '영웅서기 1' }, // SKT port of KTF «영웅서기 1»: both descriptors name the same subtitle, 345/350 shared entries identical
   f981d228b757: { title: '물가에돌튕기기3' }, // __adf__ Name «물가에돌튕기기3» · PD005691 · same jar as 4a4d2ac046e5
+  d1fba7ad5d1f: { title: '영웅전설3 하얀마녀' }, // same product as b907b0faf483: PD004460 · Name «영웅전설3» · Ver 01.00.02 both, 243/244 jar entries identical; both Desc carry the subtitle (0585)
   '306dcdb03842': { variant: '큰화면' }, // DisplaySize 240*320 · Ver 01.00.05
   e159b9727dbd: { variant: '작은화면' }, // 176*220 · 01.00.01
   '4288d8c1c6ac': { variant: '큰화면' }, // 240*320 (file name «(큰화면)»)
@@ -120,6 +121,7 @@ const SAME_GAME = new Set(
     ...['거상', '던파거너편', '리얼비트', '리얼싸커2009', '마린블루스', '마이프린세스2', '영웅전설4 주홍물방울', '이노티아1', '이노티아연대기2'],
     ...['지크', '질주쾌감 스케쳐', '추억의달고나', '크아bnb2007', '투스워즈', '마스터오브소드2', '붕어빵타이쿤3', '영어뇌습격', '절묘한타이밍', '프린세스메이커4'],
     ...['크로노스 윙', 'KBO프로야구2009', '드래곤나이트EX', '물가에돌튕기기3'], // 0560
+    ...['영웅전설3 하얀마녀'], // 0585
   ]
     .map((t) => `KTF\t${t}`)
     .concat(['LGT\t영웅서기3', 'SKT\t웰루시아', 'SKT\t프린세스메이커4'])

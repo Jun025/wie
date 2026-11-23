@@ -3810,28 +3810,6 @@
    "variant": null
   },
   {
-   "sha256": "d1fba7ad5d1fcc11cb9d4daded9c117d4569cf8282903c57cdf14404bdb90c91",
-   "contentKey": "zip:a0104577016d25197aa3b6e6136548be",
-   "platform": "KTF",
-   "model": null,
-   "title": "영웅전설3",
-   "status": "playable",
-   "axes": {
-    "boot": "ok",
-    "render": "ok",
-    "input": "ok",
-    "longplay": "ok",
-    "sound": "ok",
-    "speed": "ok",
-    "progress": "ok"
-   },
-   "knownIssues_ko": [],
-   "changes": [],
-   "fileTitle": "영웅전설3",
-   "game": "영웅전설3",
-   "variant": null
-  },
-  {
    "sha256": "b907b0faf483d99a13c0abf9ed8b3dbcb1a6ab7a0ef7a2b7a7a00f3da4b59bba",
    "contentKey": "zip:0f42b6ec0692fd2931207cb4751981c3",
    "platform": "KTF",
@@ -3852,9 +3830,33 @@
    "fileTitle": "영웅전설3 하얀마녀",
    "game": "영웅전설3 하얀마녀",
    "variant": null,
+   "sameTitle": "same-game",
    "runtimeAdjustments": [
     "owner-file-skip"
    ]
+  },
+  {
+   "sha256": "d1fba7ad5d1fcc11cb9d4daded9c117d4569cf8282903c57cdf14404bdb90c91",
+   "contentKey": "zip:a0104577016d25197aa3b6e6136548be",
+   "platform": "KTF",
+   "model": null,
+   "title": "영웅전설3 하얀마녀",
+   "status": "playable",
+   "axes": {
+    "boot": "ok",
+    "render": "ok",
+    "input": "ok",
+    "longplay": "ok",
+    "sound": "ok",
+    "speed": "ok",
+    "progress": "ok"
+   },
+   "knownIssues_ko": [],
+   "changes": [],
+   "fileTitle": "영웅전설3",
+   "game": "영웅전설3 하얀마녀",
+   "variant": null,
+   "sameTitle": "same-game"
   },
   {
    "sha256": "182fa44210dc07ab275906a6a5e1ff1c0467017ff6f71492a0db7a73c1db8e61",
