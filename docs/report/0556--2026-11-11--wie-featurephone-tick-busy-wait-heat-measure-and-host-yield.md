@@ -494,3 +494,6 @@ rAF 콜백은 vsync 뒤 0~1 ms 에 온다. 시계 읽기 1회 = 1 µs. 10 s 를 
 
 **사용자 영향**: 0 이다. 셸이 아직 켜지 않았고, 끈 호스트의 수는 main 과 같다.
 
+
+
+<!-- corpus-name-inflow v1 subjects=17 tree=51dbb505f8e444f9 B=13/12 P=2/1 S=0/0 -->
