@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-23",
+  "task": "wie-8b01d4ae6af4-memcpy-hook-own-fault-one-in-two-at-sixty-seconds",
+  "title": "8b01d4ae6af4 의 memcpy own_fault — 널 도착지가 아니라 게스트 스택 넘침. 훅이 틀린 자리는 없고 방아쇠는 못 갈랐다",
+  "summary": "PR 608 검수 F6 의 재측정(측정만 · 엔진 변경 0). 고치지 않은 main 빌드 · 기본 키 대본: 그림자 60초 0/10 · 120초 1/10 · 훅 60초 0/10 · 120초 0/10. 굶긴 14초 런까지 합쳐 그림자 3/205 · 훅 0/146 · 훅 없음 0/109. 결함 난 호출의 도착지는 스택 버퍼(sp+0x18)이고 sp 는 게스트 스택(1 MiB) 바닥 밑이다: 판 자신의 memcpy 는 첫 명령 push 에서 죽고(own_fault) 엔진 루틴은 스택을 쓰지 않아 한 단 더 간다. 결함 런 3건의 대조 91,141회 불일치 0. 부르는 쪽은 판의 이벤트 처리기(0x1013d4)이고 키 이벤트 한 번 안에서 29,000회쯤 다시 불린다. 같은 처리기 꼴의 이미지는 264판 중 11. 못 가른 것: 훅 모드 · 훅 없는 실행에서도 나는가(p 약 0.09) · 되부름을 시작시키는 것. docs/report/0580.",
+  "changes": [
+    "docs/report/0580--2026-11-23--wie-8b01d4ae6af4-memcpy-hook-own-fault-one-in-two-at-sixty-seconds.md",
+    "docs/worklog/2026-11-23-8b01-memcpy-own-fault-is-guest-stack-overflow.json"
+  ],
+  "verification": "증적(저장소 밖): ~/orchestrator/reports/evidence/wie-8b01d4ae6af4-memcpy-hook-own-fault-one-in-two-at-sixty-seconds/ — 런별 결과 줄 · 캡처 · 계측 패치(instrument*.diff) · 정적 계수 스크립트.",
+  "limits": "FAIL 3건이 전부 그림자 런이다. 훅 모드 · 훅 없는 실행의 FAIL 은 잡지 못했다. 깊은 스택을 뜬 계측 빌드로는 FAIL 0/318 이라 되부르는 바깥 함수를 보지 못했다. 같은 꼴의 나머지 10판은 굶겨 돌리지 않았다.",
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "굶은 호스트에서 키 입력 직후 게스트 스택이 넘치는 판 — 이벤트 처리기 진입을 계측해 첫 레코드와 되부르는 함수를 잡는다",
+      "plainSummary": "한 KTF 게임(같은 처리기를 가진 판이 264판 중 11)이 타이틀 화면에서 키를 받은 직후 드물게 죽는다. 게임 자신의 이벤트 처리기가 키 한 번 안에서 29,000회쯤 다시 불려 스택 1 MiB 를 다 쓴다. 처리기(0x1013d4) 진입 때의 레코드 내용과 그 위 스택을 뜨는 스크래치 계측으로 굶긴 14초 런을 FAIL 이 잡힐 때까지 돌려, 첫 레코드의 종류 · 되부르는 함수 · 그때 다른 게스트 콜백이 도중이었는지를 적는다. 같은 계측을 훅 모드와 훅 없는 실행에도 건다.",
+      "userBenefit": "느린 기기나 바쁜 탭에서 이 게임들이 시작 화면에서 멈추는 일이 실제로 있는지, 있다면 엔진이 고칠 수 있는 것인지가 정해진다.",
+      "why": "이 회차 실측: FAIL 3건 모두 키 처리(keyNotify) 안 · 죽은 주소 0x3FFFFFD4(스택 바닥 밑) · memcpy 발화가 PASS 런보다 29,000회쯤 많다 · 이어진 두 호출 사이 sp 가 0x24 내려가고 레코드 포인터가 0x1c 올라간다. 3건 모두 굶은 런이다(load1 82 또는 벽시계의 1/5 · 1/10). 첫 계측은 스택 40낱말만 떠서 처리기의 틀 안만 보였다.",
+      "tradeoff": "드문 사건이라 잡는 데 회수가 든다(굶긴 묶음 하나에서 2/32, 나머지 그림자 96회에서 0 · load1 80 위에서는 0/72). 계측은 저장소 밖 스크래치 빌드여야 한다. 원인이 게임 자신의 결함으로 끝나면 엔진이 고칠 것이 없을 수 있다.",
+      "effort": "M",
+      "target": "wie-ktf(키 · 타이머 콜백 전달 경로) · scripts/hook-shadow-sweep.sh(own_fault 가 스택 밖 sp 에서 난 것을 구분해 적기)"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}
