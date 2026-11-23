@@ -1,6 +1,14 @@
-# LGT Platform Architecture
+# LGT — fork notes
 
-LGT (LG Telecom) is a carrier, and LGT devices shipped with their own WIPI implementation. Currently only **Clet** (C native apps) execution is implemented. Java app support is not yet implemented.
+> **This file is what `docs/lgt.md` held in this fork until 2026-11-24** (`docs/report/0590`). The platform
+> reference — packaging, native bootstrap, the AOT Java ABI and import table `0x64` — is `docs/lgt.md`, which is
+> now upstream's file carried byte-identical so that upstream's edits merge clean. **Do not edit `docs/lgt.md`
+> here; fork-side notes go in this file.** What stays here: how this fork emulates LGT, and the §7
+> reverse-engineering record (superseded, kept for the trail). An older document that cites «`docs/lgt.md` §7»
+> means §7 of this file.
+
+LGT (LG Telecom) is a carrier, and LGT devices shipped with their own WIPI implementation. Clets (C native apps)
+and AOT-compiled Java apps both run — the sections below say how.
 
 ## App Structure
 

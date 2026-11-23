@@ -1,3 +1,12 @@
+//! The fork's database slots — every KTF/LGT database and file slot our tables serve, on
+//! `platform().database_repository()`.
+//!
+//! This was `api/database.rs` until 2026-11-24. Upstream rewrote that path as its own `MC_db*` record API
+//! (different handle, and its file slots moved to `api/fs.rs` on another store), so the two met in every
+//! merge and ours had to win whole. The name is the fix: `api/database.rs` is now upstream's file, byte for
+//! byte — compiled, and like `api/fs.rs` NOT wired into our tables. Edit it here and the conflict is back.
+//! Fork changes go in this file (`docs/report/0590`; why the stores cannot be mixed: `docs/report/0586` 부록 B).
+
 use alloc::{borrow::ToOwned, boxed::Box, str, string::String, vec, vec::Vec};
 use core::mem::size_of;
 

@@ -308,7 +308,7 @@ pub enum WIPICSvcId {
     // 0x19c · 0x320..0x323 · 0x338 · 0x44c · 0x4b6 · 0x4c0 · 0x4ce) the round record of ticket
     // `wie-upstream-sync2-s3-merge-upstream-main` (`docs/report/`) lists it.
     // 0x19f (upstream `fs::tell`) is left out: it takes a handle of upstream's file table, and ours
-    // serves 0x190.. from `api::database`.
+    // serves 0x190.. from `api::fork_database`.
     Execute = 0x67,
     GetAccessLevel = 0x6e,
     EncodeImage = 0xed,

@@ -68,7 +68,7 @@ embeds the engine as WASM. Nothing above the engine is allowed to reach back int
 | `functions/` | Cloudflare Pages Functions (the API). `functions/_lib/` is import-only (Pages does not route `_`-prefixed paths); `functions/api/` is the routed surface. |
 | `migrations/` | D1 SQL migrations, auto-applied to the prod DB on `main` pushes. |
 | `scripts/` | Build and gate scripts: `build-wasm.sh`, `check-engine-contract.mjs`, `contract-roundtrip.mjs`, `audit-no-leak.sh`, `verify-browser.mjs`, `smoke_gate.sh`, `lgt_render_probe.sh`. |
-| `docs/` | This file, per-platform RE notes (`ktf.md`, `lgt.md`, `lgt_abi.md`), `contracts/` (the featurephone consumer pin), `project-kb/`, `verification/` screenshots, `worklog/`. |
+| `docs/` | This file, per-platform RE notes (`ktf.md`, `lgt.md` — upstream's, carried as is — `lgt-fork-notes.md`, `lgt_abi.md`), `contracts/` (the featurephone consumer pin), `project-kb/`, `verification/` screenshots, `worklog/`. |
 | `data/`, `fonts/`, `test_data/` | Binary-patch table, the bundled `neodgm.ttf`, and the hello-world fixtures the tests and the round-trip gate boot. |
 
 ## Why Most Crates Are `no_std`

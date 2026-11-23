@@ -280,7 +280,7 @@ impl WieEmulator {
     /// `놈3` its splash — while the other 15 die at *boot*, before anything a
     /// render path could reach. So the model is not a rendering predicate in
     /// either direction. A shell that wants a runnability denylist owns it
-    /// per-title; see `docs/lgt.md` §7 and `docs/project-kb/02_status.md`.
+    /// per-title; see `docs/lgt-fork-notes.md` §7 and `docs/project-kb/02_status.md`.
     pub fn lgt_compile_model(&self) -> Option<String> {
         self.lgt_compile_model.map(str::to_owned)
     }
