@@ -216,6 +216,8 @@
 - **판정의 방향은 그대로다.** 고정 걸음 판은 «일 + 정해진 만큼 잠»으로 설계됐고 원 단말은 요청한 만큼 잔다 — 종전 엔진이 잠을 일찍 끝내 게임 자체를 설계보다 빠르게 돌렸다. **총괄 재확인(티켓 `…-fix2`): 게임 진행이 14 ~ 32% 느려진다는 것을 알고도 받아들인다.** 고친 것은 이용자 고지 문장이다 — «진행 속도는 그대로» 절을 빼고 «전보다 느리게 돌 수 있다»고 말한다.
 - 검수가 재지 못한 것 그대로: 고정 걸음 5판의 진행 속도를 실행으로 재지는 않았다(바이트코드 구조 + 루프 주기 실측을 합친 판정). 묶음의 나머지 96판은 루프 클래스가 같다는 것만 확인했고 돌리지 않았으며 `tickMs` 를 판마다 바꾸는지는 보지 않았다.
 
+★**0579 가 정정했다(2026-11-23 덧붙임)**: 아래 표와 그 밑 문단의 «지원 목록의 게스트 sleep 판은 SKT 2행뿐 · KTF · LGT 0»은 틀린 계수다 — 32바이트 머리 뒤에 zip 이 오는 jar 를 열지 못한 수이고, 엔진 계수기로는 SKT 78/82행 · KTF 표본 60/80행 · LGT 표본 6/40행이 게스트 sleep 을 부르며 그중 SKT 8행 · KTF 표본 8행이 #603 으로 느려졌다(`docs/report/0579` §2 · §3 · §7).
+
 **영향 범위 — 정적**(파일 안 Java 클래스의 `java/lang/Thread.sleep` 호출 자리):
 
 | 모집단 | 파일 | sleep 호출 판 |
@@ -254,4 +256,4 @@
 
 **이 회차(`-fix2`)가 더한 것과 게이트**: 문서 3건뿐이다 — 고지 항목의 `summary_ko`(«게임 안의 시간과 진행 속도는 그대로이고» 절을 빼고 «전보다 느리게 돌거나»를 넣었다) · 이 파일(머리 판정 문단 · 사용자 영향 · 이 절의 판별 표) · worklog `summary`. 엔진 `*.rs` 변경 0 · 다시 잰 것 0. 작업 자리는 레인 트리 `~/worktrees/wie-3` 이다(배차가 `wie-2` → `wie-3` 로 옮겼다). `git merge-tree --write-tree origin/main HEAD` rc=0(main `2dfff4f2d`)이라 main 을 당기지 않았다. 문서를 고친 트리에서 2026-11-22 16:31~16:38 KST(load1 38~61 · `build-slot` 경유): `cargo fmt --all -- --check` rc=0 · `cargo clippy --all -- -D warnings` rc=0 · `cargo clippy --target wasm32-unknown-unknown -- -D warnings` rc=0 · `cargo +beta clippy --all -- -D warnings` rc=0(`1.101.0-beta.2`) · `RUST_MIN_STACK=4194304 cargo test --all --no-fail-fast` rc=0 · 시험 바이너리 55 · 869 passed · 0 failed. `node scripts/player-data.mjs` OK(184 updates) · `check-worklog-json.mjs` OK. 러너 블록은 다시 돌리지 않았다(엔진 소스가 §5 의 실행과 같다). 새 제안 0.
 
-<!-- corpus-name-inflow v1 subjects=10 tree=a64d3f9db86499a6 B=6/5 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=8 tree=23487f6cd9989485 B=6/5 P=0/0 S=0/0 -->

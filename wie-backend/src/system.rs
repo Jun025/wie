@@ -184,13 +184,17 @@ impl System {
     /// for a sleep that long, so a thread that polls every millisecond for a timer due at `pace`
     /// still runs it on time rather than on the host's next frame.
     pub fn sleep_toward(&self, timeout: u64, pace: Instant) -> SleepFuture {
-        self.poll_until(self.platform.now() + timeout, Some(pace))
+        SleepFuture::toward(self.platform.now() + timeout, Some(pace), &self.executor)
     }
 
-    /// A poll that sleeps until `until` and keeps a tick alive only for `pace` (`sleep_toward`), for
-    /// a caller that has just read the clock: `sleep(1)` would read it again for the deadline.
-    pub fn poll_until(&self, until: Instant, pace: Option<Instant>) -> SleepFuture {
-        SleepFuture::toward(until, pace, &self.executor)
+    /// The event thread's look at its queue, one `POLL_SLEEP_MS` after the step it runs in started,
+    /// keeping a tick alive only for `pace` (`sleep_toward`). Not counted from the call as a guest's
+    /// sleep is (`sleep_from`): nobody asked for this wait, and a thread that has just spent its
+    /// step painting has been away from its queue for longer already. Counted from the paint's end,
+    /// a game thread spinning on `Thread.yield` until its paint lands spun 1ms more per frame before
+    /// its next repaint was looked at (b42e4242866b: 387 -> 329 paints/s).
+    pub fn poll(&self, pace: Option<Instant>) -> SleepFuture {
+        SleepFuture::toward(self.executor.step_started() + POLL_SLEEP_MS, pace, &self.executor)
     }
 
     pub fn current_task_id(&self) -> u64 {
