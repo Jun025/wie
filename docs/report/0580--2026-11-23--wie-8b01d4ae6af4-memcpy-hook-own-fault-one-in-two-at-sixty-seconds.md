@@ -150,3 +150,5 @@ PASS 39회는 전부 키 27/27 뒤 같은 장면(새 게임 도입부의 대화 
 - 계측 빌드는 같은 트리에 오류 수준 로그와 `WIE_HOOK_MODE=none`(범용 항목 미설치)만 더한 스크래치 빌드다(`instrument.py` · `instrument*.diff` — 증적). 저장소에는 넣지 않았다. 첫 계측은 스택을 40낱말만 떠서 처리기의 틀 안만 보였고, 768낱말로 늘린 두 번째 빌드로는 FAIL 을 잡지 못했다(0/318).
 - 처리기 `0x1013d4` 의 갈래와 표의 뜻은 역어셈블로 읽은 것이다. 되부르는 바깥 함수는 보지 못했다.
 - 증적(sha12 와 수 · 드라이버 · 캡처 · 클라이언트 이미지 사본 — 전부 저장소 밖): `~/orchestrator/reports/evidence/wie-8b01d4ae6af4-memcpy-hook-own-fault-one-in-two-at-sixty-seconds/`.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=488f17d2f69bed56 B=0/0 P=0/0 S=0/0 -->
