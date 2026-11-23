@@ -150,4 +150,4 @@ selftest: `node scripts/perf-watch.mjs selftest` **29/29 · rc 0**(종전 26 —
 
 **F4** 의 재계산은 §4 ⑸ 에 있다. 게임 파일명 유입(§7)은 이 회차의 커밋 뒤에 다시 돌렸다 — 수는 같다(0 · 0).
 
-<!-- corpus-name-inflow v1 subjects=5 tree=5e3a26a3639d6c92 B=0/0 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=5 tree=44400676c8e50878 B=0/0 P=0/0 S=0/0 -->
