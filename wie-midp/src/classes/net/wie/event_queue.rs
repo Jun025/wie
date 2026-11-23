@@ -829,17 +829,55 @@ mod test {
     }
 
     // What `on_a_host` counted: timer fires and poller rounds, beats, Redraws handed to the event
-    // loop, `callSerially` runs, the host's wake ticks, the host frames the engine counted
-    // (`Pacing::ticks`), and the guest ms the 120 frames took.
+    // loop — in all, the most in one host frame, and the most frames one took to get there from the
+    // repaint that asked for it — `callSerially` runs, the host's wake ticks, the host frames the
+    // engine counted (`Pacing::ticks`), and the guest ms the 120 frames took.
     #[derive(Debug, PartialEq)]
     struct HostRun {
         fires: u64,
         beats: u64,
         redraws: u64,
+        redraws_in_a_frame: u64,
+        redraw_frames_late: u64,
         callbacks: u64,
         wake_ticks: u64,
         ticks: u64,
         elapsed: u64,
+    }
+
+    // Which host frame each repaint was asked for in, and its Redraw handed to the event loop in.
+    #[derive(Default)]
+    struct RedrawLog {
+        // The host frame now, from 1.
+        frame: AtomicU64,
+        // The frame of the oldest repaint whose Redraw has not come yet; 0 for none.
+        asked: AtomicU64,
+        // The frame of the last Redraw, and how many that frame has had.
+        last: AtomicU64,
+        in_last: AtomicU64,
+        most_in_a_frame: AtomicU64,
+        most_frames_late: AtomicU64,
+    }
+
+    impl RedrawLog {
+        fn asked(&self) {
+            let _ = self
+                .asked
+                .compare_exchange(0, self.frame.load(Ordering::SeqCst), Ordering::SeqCst, Ordering::SeqCst);
+        }
+
+        fn handed_on(&self) {
+            let frame = self.frame.load(Ordering::SeqCst);
+            if self.last.swap(frame, Ordering::SeqCst) != frame {
+                self.in_last.store(0, Ordering::SeqCst);
+            }
+            let in_frame = self.in_last.fetch_add(1, Ordering::SeqCst) + 1;
+            self.most_in_a_frame.fetch_max(in_frame, Ordering::SeqCst);
+            let asked = self.asked.swap(0, Ordering::SeqCst);
+            if asked != 0 {
+                self.most_frames_late.fetch_max(frame - asked, Ordering::SeqCst);
+            }
+        }
     }
 
     extern crate std;
@@ -872,6 +910,12 @@ mod test {
     // Either host hands the screen's redraw flag back as an `Event::Redraw` where `advance` does:
     // after a tick it does not come back for, or failing that before the next frame's.
     fn on_a_host(guest: Guest, speed: f64, margin: Option<u64>, timer_floor_ms: u64) -> Result<HostRun> {
+        on_a_host_with_timers(guest, speed, margin, &[timer_floor_ms])
+    }
+
+    // `on_a_host` with a timer floor for each frame in turn: one longer than a frame is a frame the
+    // host's timer loses to the next, so it does not come back in it.
+    fn on_a_host_with_timers(guest: Guest, speed: f64, margin: Option<u64>, timer_floors_ms: &[u64]) -> Result<HostRun> {
         let frame_ms = (16.667 * speed).round() as u64;
         let budget = (14.0 * speed) as u64;
         let clock = TestClock::stepping_micros(10);
@@ -883,9 +927,11 @@ mod test {
         let fires = Arc::new(AtomicU64::new(0));
         let beats = Arc::new(AtomicU64::new(0));
         let redraws = Arc::new(AtomicU64::new(0));
+        let log = Arc::new(RedrawLog::default());
         CALLBACK_RUNS.with(|runs| runs.set(0));
         if guest.timer.is_some() || guest.repaint.is_some() || guest.call_serially {
             let (system_task, fires_task, beats_task, redraws_task) = (system.clone(), fires.clone(), beats.clone(), redraws.clone());
+            let log_task = log.clone();
             let callback_proto = WieJavaClassProto {
                 name: "net/wie/ChainedCallback",
                 parent_class: Some("java/lang/Object"),
@@ -918,6 +964,7 @@ mod test {
                     if let Some((after_ms, pace_after)) = guest.timer {
                         let due = system_task.platform().now() + after_ms;
                         let (system_timer, fires_timer, beats_timer) = (system_task.clone(), fires_task.clone(), beats_task.clone());
+                        let log_timer = log_task.clone();
                         system_task.event_queue().push(Event::guest_timer(
                             due,
                             pace_after.map_or(u64::MAX, |x| system_task.pacing().ticks() + x),
@@ -925,6 +972,7 @@ mod test {
                                 fires_timer.fetch_add(1, Ordering::SeqCst);
                                 if let (Some(repaint), None) = (guest.repaint, guest.beat_ms) {
                                     beats_timer.fetch_add(1, Ordering::SeqCst);
+                                    log_timer.asked();
                                     repaint.request(&system_timer);
                                 }
                                 // The key is what makes getNextEvent return; the timer itself is consumed internally.
@@ -936,6 +984,7 @@ mod test {
                     // A Redraw is counted and the wait goes on: it is the timer's key that ends it.
                     while next_event_kind(jvm.clone()).await == EventQueueEvent::RepaintEvent as i32 {
                         redraws_task.fetch_add(1, Ordering::SeqCst);
+                        log_task.handed_on();
                     }
                 }
                 Ok(())
@@ -952,11 +1001,12 @@ mod test {
             });
         }
         if let Some(beat_ms) = guest.beat_ms {
-            let (system_beat, beats_beat) = (system.clone(), beats.clone());
+            let (system_beat, beats_beat, log_beat) = (system.clone(), beats.clone(), log.clone());
             system.spawn(async move || {
                 for _ in 0..1_000_000 {
                     beats_beat.fetch_add(1, Ordering::SeqCst);
                     if let Some(repaint) = guest.repaint {
+                        log_beat.asked();
                         repaint.request(&system_beat);
                     }
                     system_beat.sleep(beat_ms).await;
@@ -977,7 +1027,9 @@ mod test {
         // The last tick ended on a wake the host is to come back for: its frame is not over.
         let mut resumes = false;
         let start = clock.peek();
-        for _ in 0..120 {
+        for frame in 0..120 {
+            log.frame.store(frame as u64 + 1, Ordering::SeqCst);
+            let timer_floor_ms = timer_floors_ms[frame % timer_floors_ms.len()];
             let budget_end = clock.peek() + budget;
             if resumes {
                 hand_on_redraw(&system);
@@ -1018,6 +1070,8 @@ mod test {
             fires: fires.load(Ordering::SeqCst),
             beats: beats.load(Ordering::SeqCst),
             redraws: redraws.load(Ordering::SeqCst),
+            redraws_in_a_frame: log.most_in_a_frame.load(Ordering::SeqCst),
+            redraw_frames_late: log.most_frames_late.load(Ordering::SeqCst),
             callbacks: CALLBACK_RUNS.with(|runs| runs.get()),
             wake_ticks,
             ticks: system.pacing().ticks(),
@@ -1165,7 +1219,7 @@ mod test {
                 ..Guest::default()
             },
         ];
-        let (mut wake_ticks, mut unpainted) = (0, 0);
+        let (mut wake_ticks, mut unpainted, mut some_wake_ticks) = (0, 0, 0);
         for speed in [1.0, 1.5, 2.0] {
             for guest in guests {
                 let off = on_a_host(guest, speed, None, 0)?;
@@ -1195,12 +1249,30 @@ mod test {
                     late.beats,
                     off.redraws
                 );
+                // Between the two, a host whose timer wins two frames and loses the third: a repaint
+                // held back for a wake tick that then never runs is where one could be left behind,
+                // or handed on beside the next. Still at most one Redraw a frame, each in the frame
+                // after its repaint at the latest — as without a margin.
+                let some = on_a_host_with_timers(guest, speed, Some(3), &[1, 1, 30])?;
+                some_wake_ticks += some.wake_ticks;
+                assert_eq!(
+                    (
+                        off.redraws_in_a_frame,
+                        off.redraw_frames_late,
+                        some.redraws_in_a_frame,
+                        some.redraw_frames_late
+                    ),
+                    (1, 1, 1, 1),
+                    "{guest:?} at {speed}x: (most Redraws in a frame, most frames from a repaint to its Redraw) without a margin, \
+                     and on a host that comes back two frames in three ({} wake ticks)",
+                    some.wake_ticks
+                );
             }
         }
         // And these are the shapes it is about: more beats than frames, and a host that does come back.
         assert!(
-            unpainted > 500 && wake_ticks > 1_000,
-            "{unpainted} beats unpainted, {wake_ticks} wake ticks"
+            unpainted > 500 && wake_ticks > 1_000 && some_wake_ticks > 500,
+            "{unpainted} beats unpainted, {wake_ticks} wake ticks, {some_wake_ticks} on the host that comes back in some frames"
         );
         Ok(())
     }
