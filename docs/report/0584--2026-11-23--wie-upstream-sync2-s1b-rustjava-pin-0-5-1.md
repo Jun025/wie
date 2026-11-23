@@ -274,3 +274,7 @@ paints(30초에 그린 장수)의 후/전 비 · 1회 · paints 20 미만인 행
 | 게임이 `StringBuffer` · `Vector` 를 상속해 `append(String)` · `ensureCapacity` 를 덮어쓴 판의 수 | 0.5.1 이 그 내부 호출을 직접 쓰기로 바꿨다(§4). 코퍼스에서 세지 않았다 — SKT 82행의 첫 Java 예외 · 판정은 전/후 같다 |
 | J2ME 코퍼스 | `compat.json` 에 J2ME 행이 없다. 러너 블록의 `draw_j2me.jar` · `text_j2me.jar` 가 유일한 신호다 |
 | 릴리스 빌드에서 종전에 호스트 스택이 넘치던 Java 깊이 | 재지 않았다. 상한 512 가 «종전에 돌던 깊이»를 자르는지는 깊이가 45 를 넘는 판이 나와야 물을 수 있다 |
+
+### 10. 게임 파일명 유입
+
+`node scripts/corpus-name-inflow.mjs`(이 브랜치가 main 대비 더하거나 고친 22파일): **유입 14건(BOUNDED)** + **판단 필요 1건(SUFFIX-ATTACHED)**. 열다섯 건 모두 `wie-lgt` 의 `.rs` 다섯 파일(`interface.rs` · `jvm_support/class_definition.rs` · `method.rs` · `value.rs` · `stdlib.rs`)에 main 부터 있던 주석이고, 이 조각은 그 파일들의 import 줄 · `localtime` · 시험만 고쳤다 — 이 조각이 더한 `.rs` · `.toml` 69줄에 한글은 0줄이다. 이 회차가 쓴 문서(이 기록 · worklog · 고지 · `STATE.md`)와 `Cargo.toml` 만 넣어 돌리면 BOUNDED 0 · SUFFIX-ATTACHED 0 이다.
