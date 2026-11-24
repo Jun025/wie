@@ -78,3 +78,5 @@
 ### 6. 게임 파일명 유입
 
 `node scripts/corpus-name-inflow.mjs`: BOUNDED 330 · SUFFIX-ATTACHED 17. 전부 `compat.json` 에 원래 있던 제목 줄이다(이 회차가 그 파일에서 바꾼 것은 `1b3b4868d46e` 행의 `sound` 칸과 안내 문장뿐이고 더한 제목 줄은 0).
+
+<!-- corpus-name-inflow v1 subjects=5 tree=c1a01df87e2e4ed1 B=1066/330 P=0/0 S=56/17 -->
