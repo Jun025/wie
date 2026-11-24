@@ -93,4 +93,4 @@ selftest: 26/26
 - 네 게이트(build-slot): fmt · `clippy --all -D warnings` · wasm clippy · `RUST_MIN_STACK=4194304 cargo test --all`(983 passed · 0 failed) 전부 rc=0. `cargo +beta clippy --all -- -D warnings` rc=0.
 - 착지 사전 증거: `origin/main` 과 이 브랜치를 병합한 스크래치 트리에서 `player-data.mjs build` → otterpebble `origin/main`(`59f4c0ada`) 스크래치에 `compat-import` → `vitest run` 72 파일 · 983 통과 rc=0 · `build` rc=0(`support-counts-check: OK`). 상태별 행 수를 박아 둔 자리에서 red 가 난 것은 없다.
 
-<!-- corpus-name-inflow v1 subjects=8 tree=e367d9e5961ed037 B=1086/348 P=3/3 S=53/17 -->
+
