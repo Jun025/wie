@@ -29,8 +29,8 @@
 # GitHub stopped running Actions on this fork on 2026-11-04 "due to the scale of
 # GitHub Actions usage" (Actions-tab banner). Rust CI was 854 of ~1,530 job-minutes
 # that week (21 runs × six legs). So on pull_request/push only ubuntu/stable runs
-# the gates; the other five legs still START — every step is skipped, the job
-# reports success — because three of them (`rust_ci (macos-latest, stable)`,
+# the gates; the other five legs still START (on an ubuntu runner since 2026-11-25 —
+# see `runs-on`) — every step is skipped, the job reports success — because three of them (`rust_ci (macos-latest, stable)`,
 # `rust_ci (windows-latest, stable)`, and ubuntu) are required-check NAMES in the
 # ruleset, and a name that never reports deadlocks the merge (Incident ledger).
 # A job-level `if:` would not do: a skipped matrix job reports one unexpanded name.
@@ -82,7 +82,14 @@ concurrency:
 
 jobs:
   rust_ci:
-    runs-on: ${{ matrix.os }}
+    # The empty-pass legs (FULL false) run on ubuntu: the job NAME comes from the
+    # matrix, not from runs-on, so `rust_ci (macos-latest, stable)` still reports.
+    # Why: from 2026-11-23 GitHub's hosted macOS arm64 pool left 49 of ~160 macOS
+    # legs unacquired ("not acquired by Runner of type hosted", cancelled at 15 min)
+    # — a leg that skips every step was holding the merge on a runner it never used.
+    # Keep the event list in step with FULL's below (a FULL leg must get its own OS).
+    # Ticket: wie-ci-macos-stable-leg-runner-unacquired-stalls-pr-landing.
+    runs-on: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && matrix.os || 'ubuntu-latest' }}
     strategy:
       # One leg failing must not cancel the other five. Without this, a single
       # red leg leaves the rest `cancelled`, and `gh pr checks` renders all six
