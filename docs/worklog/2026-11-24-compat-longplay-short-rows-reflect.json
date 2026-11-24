@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-24",
+  "task": "wie-compat-longplay-short-rows-remeasure-with-title-recipes-and-reflect",
+  "title": "「오래 하기」가 일찍 끝난 14행 — 다시 재서 반영 · 주간 감시가 short 를 내림으로 센다",
+  "summary": "0561 의 short 14행을 지금 엔진으로 두 번씩 쟀다. 13행은 제목별 키 순서(또는 기본 키 대본)로 두 번 다 600초를 채워 그대로, 서버 벽 1행(689c491586b9)은 limited 로 내렸다. 나머지 playable 385행은 지금 엔진의 600초 기록이 없다(docs/report/0593 §1).",
+  "proposals": [
+    {
+      "kind": "product",
+      "title": "보관 기록이 «다시 켜기 1회 뒤 채움» 인 57행을 지금 엔진으로 600초 다시 재기",
+      "plainSummary": "지원 목록에서 «오래 해도 잘 됨»으로 적힌 게임 중, 예전 측정에서 한 번 꺼졌다가 다시 켜서 10분을 채운 57개를 지금 엔진으로 다시 잰다.",
+      "userBenefit": "10분을 못 버티는데 «잘 됨»으로 적힌 게임이 남아 있으면 이용자가 그 표기를 믿고 고른다. 0561 이 찾은 14개가 전부 이 모양에서 나왔다.",
+      "why": "playable 426행 중 385행은 지금 엔진의 600초 기록이 없다(0593 §1). 그중 이 57행이 0561 의 short 14행과 같은 형상이라 가장 먼저 볼 묶음이다.",
+      "tradeoff": "600초 × 57 = 3개 동시로 약 3시간 + 긴 슬롯 대기. short 로 나온 행마다 키 순서를 만들고 두 번 다시 재는 품이 든다.",
+      "effort": "L",
+      "target": "scripts/census-drive.sh --only long --titles <57행> · 결과는 player-data.mjs import-rows 로만 반영"
+    }
+  ],
+  "verification": "docs/report/0593"
+}

@@ -3323,19 +3323,18 @@
    "platform": "KTF",
    "model": null,
    "title": "아르덴전기",
-   "status": "playable",
+   "status": "limited",
    "axes": {
     "boot": "ok",
     "render": "ok",
     "input": "ok",
-    "longplay": "ok",
+    "longplay": "unknown",
     "sound": "no",
     "speed": "unknown",
     "progress": "stuck"
    },
    "knownIssues_ko": [
-    "여기서 볼 수 있는 처음 화면과 안내 화면에서는 게임이 소리를 틀지 않아요. 그 뒤 화면은 아래 서버 문제로 들어갈 수 없어요.",
-    "게임을 시작할 때 옛 통신사 서버에 접속해야 해서, 여기서는 «네트워크 접속 실패» 안내가 나온 뒤 처음으로 돌아가요."
+    "게임을 시작하려면 옛 통신사 서버에서 추가 데이터를 받아야 하는데, 그 서버가 지금은 없어 «네트워크 접속이 실패 하였습니다» 안내가 나온 뒤 게임이 꺼져요."
    ],
    "changes": [],
    "fileTitle": "아르덴전기",

@@ -31,7 +31,7 @@ import { extname, join } from 'node:path';
 
 // `short` (the guest ended the long run early) is a measured value here, ranked with `no`: a row the shipped
 // page calls longplay `ok` that now quits by itself went down. It read `unknown` until the 14 rows that already
-// did so were settled in compat (docs/report/0561, then the round that re-measured them) — before that the guard 4ece6eeeaa04 would have been a
+// did so were settled in compat (docs/report/0561, then 0593 re-measured them) — before that the guard 4ece6eeeaa04 would have been a
 // suspect every week. The shipped page writes such a row as `unknown` (player-data.mjs), which is still never a
 // side: a row already taken down for it does not come back as a candidate.
 const MAP = { 'n/a': 'unknown', fail: 'no', none: 'no', uniform: 'no', error: 'no', silent: 'no', slow: 'no', stall: 'no' };
