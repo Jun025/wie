@@ -47,7 +47,7 @@
 #   출처: orchestrator `reports/wie-featurephone-game-byte-rewrite-paths-census-and-disposition.done.md` §2 · `reports/wie-featurephone-game-byte-rewrite-census-independent-verify.done.md` §3
 #   KTF 사설 폴더(`P/` · `p/`)를 루트에 올림(wie-ktf/src/emulator.rs `private_path`) · SKT 꾸러미 내용으로 화면 폭 추정(wie-skt/src/emulator.rs `package_display_size`) ·
 #   JVM 라이브러리 null 방어(wie-jvm-support/src/hardening.rs) · KTF 재배치표 선두 형식 로더(wie-ktf/src/runtime/relocated.rs) ·
-#   KTF 클래스 우선순위(…/net/wie/ktf_class_loader.rs) · KTF 데이터베이스 «만들기»는 빈 채 시작(wie-wipi-c/src/api/database.rs) · 꾸며 낸 단말 정보(전화번호 등) ·
+#   KTF 클래스 우선순위(…/net/wie/ktf_class_loader.rs) · KTF 데이터베이스 «만들기»는 빈 채 시작(wie-wipi-c/src/api/fork_database.rs) · 꾸며 낸 단말 정보(전화번호 등) ·
 #   꾸며 낸 성공(통신망 연결 · 대화창 확인 · 진동) · 한 판만 부르는 플랫폼 API 의 최소 구현 · 파일 가려짐 · 클래스 경로 순서(wie-jvm-support/src/lib.rs)
 device	key	package	platform	title	kind	changes	scope	class	basis
 binary-patches	a09d998a851b7806126b52b22b3eff89	974e0df9ab1e	KTF	이노티아연대기2	lock-lift	memory-code	any	operator-directed	운영자 지시 2026-10-28(orchestrator 원장 inbox.log:1191) · 티켓 wie-ktf-innotia2-license-lock-normalize · PR #580 · docs/report/0547

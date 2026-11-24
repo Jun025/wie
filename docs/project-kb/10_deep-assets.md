@@ -1,7 +1,7 @@
 # wie 고유 기술자산 요약 (10_deep-assets)
 
 > 이 레포가 수십 라운드의 리버스엔지니어링으로 축적한 **고유 자산의 기획-계층 요약**. 원문(SoT)은
-> `docs/lgt_abi.md`(§7 전체 트레일 cp1~cp59) · `docs/lgt.md` · `docs/reference/`(ezi_dispatch_reference ·
+> `docs/lgt_abi.md`(§7 전체 트레일 cp1~cp59) · `docs/lgt-fork-notes.md`(2026-11-24 까지 `docs/lgt.md`) · `docs/reference/`(ezi_dispatch_reference ·
 > lgt_0x64_ordinal_table · AromaWIPI 자료) · `docs/ktf.md`. 여기엔 결론·경계·용어만 담는다.
 
 ## §7 벽 — LGT AOT-Java(ez-i) 렌더 (★2026-09-21 재기준선으로 전제 교체됨)

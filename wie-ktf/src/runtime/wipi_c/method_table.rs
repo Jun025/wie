@@ -9,7 +9,7 @@ use wie_core_arm::ArmCore;
 use wie_util::{ByteRead, ByteWrite, Result, WieError, read_generic, write_generic};
 use wie_wipi_c::{
     MethodImpl, WIPICContext, WIPICMethodBody,
-    api::{database, graphics, im, kernel, media, misc, net, uic, util},
+    api::{fork_database, graphics, im, kernel, media, misc, net, uic, util},
 };
 
 use super::local_net;
@@ -697,15 +697,15 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
         // The header's record database, in header order — slots 3, 7 and 10 measured with a handle
         // from slot 0 in r0 and the header's arguments after it (docs/report of this round).
         WIPICTableId::Database if function_id <= 10 && ![8, 9].contains(&function_id) => Some(match function_id {
-            0 => database::open_record_database.into_body(),
-            1 => database::close_database.into_body(),
-            2 => database::delete_database.into_body(),
-            3 => database::insert_record.into_body(),
-            4 => database::select_record.into_body(),
-            5 => database::update_record.into_body(),
-            6 => database::delete_record.into_body(),
-            7 => database::list_record.into_body(),
-            _ => database::get_number_of_records.into_body(),
+            0 => fork_database::open_record_database.into_body(),
+            1 => fork_database::close_database.into_body(),
+            2 => fork_database::delete_database.into_body(),
+            3 => fork_database::insert_record.into_body(),
+            4 => fork_database::select_record.into_body(),
+            5 => fork_database::update_record.into_body(),
+            6 => fork_database::delete_record.into_body(),
+            7 => fork_database::list_record.into_body(),
+            _ => fork_database::get_number_of_records.into_body(),
         }),
         WIPICTableId::Database => {
             if function_id < 64 {
@@ -722,29 +722,29 @@ pub fn get_method_body(table_id: WIPICTableId, function_id: u16) -> Option<WIPIC
             }
         }
         // fork: upstream names this table for what the header calls it (MC_fs*) and serves it from
-        // `api::fs`. The ids are the same numbers as before; each still runs our `api::database` body,
+        // `api::fs`. The ids are the same numbers as before; each still runs our `api::fork_database` body,
         // which is what the saves in the support list were measured on.
         WIPICTableId::Fs => match WIPICFsMethodId::try_from(function_id).ok()? {
-            WIPICFsMethodId::Open => Some(database::open_database.into_body()),
-            WIPICFsMethodId::Read => Some(database::stream_read.into_body()),
-            WIPICFsMethodId::Write => Some(database::stream_write.into_body()),
-            WIPICFsMethodId::Close => Some(database::close_database.into_body()),
-            WIPICFsMethodId::Seek => Some(database::select_record_ktf.into_body()),
-            WIPICFsMethodId::FileAttribute => Some(database::stat_by_name_ktf.into_body()),
-            WIPICFsMethodId::Remove => Some(database::delete_record_ktf.into_body()),
-            WIPICFsMethodId::Rename => Some(database::list_record_or_rename_ktf.into_body()),
-            WIPICFsMethodId::MkDir => Some(database::sort_records.into_body()),
+            WIPICFsMethodId::Open => Some(fork_database::open_database.into_body()),
+            WIPICFsMethodId::Read => Some(fork_database::stream_read.into_body()),
+            WIPICFsMethodId::Write => Some(fork_database::stream_write.into_body()),
+            WIPICFsMethodId::Close => Some(fork_database::close_database.into_body()),
+            WIPICFsMethodId::Seek => Some(fork_database::select_record_ktf.into_body()),
+            WIPICFsMethodId::FileAttribute => Some(fork_database::stat_by_name_ktf.into_body()),
+            WIPICFsMethodId::Remove => Some(fork_database::delete_record_ktf.into_body()),
+            WIPICFsMethodId::Rename => Some(fork_database::list_record_or_rename_ktf.into_body()),
+            WIPICFsMethodId::MkDir => Some(fork_database::sort_records.into_body()),
             WIPICFsMethodId::RmDir => Some(gen_stub(9, "MC_dbGetAccessMode")),
-            WIPICFsMethodId::List => Some(database::get_number_of_records.into_body()),
+            WIPICFsMethodId::List => Some(fork_database::get_number_of_records.into_body()),
             // Not the header's `MC_dbGetRecordSize(fd)`: the three callers in the corpus (two engines) pass
             // nothing and compare the answer, signed, against a byte count — a save's length, or 0x176f
             // at boot — so it is slot 12's free-storage answer (`docs/report/0438` §2).
-            WIPICFsMethodId::TotalSpace => Some(database::list_databases.into_body()),
-            WIPICFsMethodId::Available => Some(database::list_databases.into_body()),
+            WIPICFsMethodId::TotalSpace => Some(fork_database::list_databases.into_body()),
+            WIPICFsMethodId::Available => Some(fork_database::list_databases.into_body()),
             WIPICFsMethodId::SetMode => Some(gen_stub(13, "MC_dbUnk13")),
             WIPICFsMethodId::GetCounts => Some(gen_stub(14, "MC_dbUnk14")),
-            WIPICFsMethodId::Tell => Some(database::file_size_ktf.into_body()),
-            WIPICFsMethodId::Exists => Some(database::exists_database_ktf.into_body()),
+            WIPICFsMethodId::Tell => Some(fork_database::file_size_ktf.into_body()),
+            WIPICFsMethodId::Exists => Some(fork_database::exists_database_ktf.into_body()),
         },
         WIPICTableId::Interface7 => {
             if function_id < 64 {
