@@ -953,12 +953,13 @@ impl Graphics {
         // WIPI pixels are 0x00RRGGBB with no alpha byte (the first implementation, 840014d9, read them as
         // opaque RGB). Passing them as ARGB made every pixel transparent: a540945188ca draws all its art and
         // glyphs through here and showed empty frames (docs/report/0420).
+        // `bpl` is bytes per line (upstream's `bpl / 4`): 1b3b4868d46e draws its road as w x 2 strips with bpl 4w.
         jvm.invoke_virtual(
             &midp_graphics,
             "javax/microedition/lcdui/Graphics",
             "drawRGB",
             "([IIIIIIIZ)V",
-            (rgb_pixels, offset, bpl, x, y, width, height, false),
+            (rgb_pixels, offset, bpl / 4, x, y, width, height, false),
         )
         .await
     }
@@ -1182,9 +1183,8 @@ impl Graphics {
         let (Some(x), Some(y)) = (x.checked_add(translate_x), y.checked_add(translate_y)) else {
             return Err(jvm.exception("java/lang/IllegalArgumentException", "region exceeds image bounds").await);
         };
-        // `bpl` counts ints, as in setRGBPixels above (upstream reads both as bytes, `bpl / 4`): what a
-        // guest reads here it must be able to write back with the same arguments.
-        let scanlength = bpl;
+        // `bpl` is bytes per line, as upstream reads it: 1b3b4868d46e asks for a 127x64 region with bpl 508.
+        let scanlength = bpl / 4;
         let _: () = jvm
             .invoke_virtual(
                 &image,
@@ -1214,7 +1214,7 @@ impl Graphics {
 mod test {
     use alloc::boxed::Box;
 
-    use jvm::ClassInstanceRef;
+    use jvm::{ClassInstanceRef, JavaError};
     use rustjava_runtime::classes::java::lang::String;
     use test_utils::run_jvm_test;
     use wie_midp::classes::javax::microedition::lcdui::Image as MidpImage;
@@ -1552,8 +1552,8 @@ mod test {
         })
     }
 
-    // upstream's getRGBPixels (2026-11-23 merge), with our `bpl` unit: translated, alpha stripped,
-    // and what it read goes back through setRGBPixels unchanged.
+    // upstream's getRGBPixels (2026-11-23 merge): translated, alpha stripped, `bpl` in bytes (12 = 3 ints a
+    // row), and what it read goes back through setRGBPixels unchanged.
     #[test]
     fn test_get_rgb_pixels_round_trips_through_set_rgb_pixels() -> Result<()> {
         run_jvm_test(Box::new([wie_midp::get_protos().into(), get_protos().into()]), |jvm| async move {
@@ -1591,7 +1591,7 @@ mod test {
                     "org/kwis/msp/lcdui/Graphics",
                     "getRGBPixels",
                     "(IIII[III)V",
-                    (0, 0, 2, 2, output.clone(), 1, 3),
+                    (0, 0, 2, 2, output.clone(), 1, 12),
                 )
                 .await?;
             assert_eq!(
@@ -1605,7 +1605,7 @@ mod test {
                     "org/kwis/msp/lcdui/Graphics",
                     "setRGBPixels",
                     "(IIII[III)V",
-                    (-1, 0, 2, 2, output.clone(), 1, 3),
+                    (-1, 0, 2, 2, output.clone(), 1, 12),
                 )
                 .await?;
             assert_eq!(
@@ -1613,6 +1613,74 @@ mod test {
                     .await?,
                 0x00ffff
             );
+
+            Ok(())
+        })
+    }
+
+    // The arguments 1b3b4868d46e passes (measured 2026-11-24): a 127x64 read into a 15000-int array with
+    // bpl 508 — bytes, so rows sit 127 ints apart and 8128 ints are written. Read as an int count the last
+    // row would start at 32004 and Image.getRGB rightly throws, which is what held that title at loading.
+    #[test]
+    fn test_rgb_pixels_take_bpl_in_bytes() -> Result<()> {
+        run_jvm_test(Box::new([wie_midp::get_protos().into(), get_protos().into()]), |jvm| async move {
+            let image: ClassInstanceRef<Image> = jvm
+                .invoke_static("org/kwis/msp/lcdui/Image", "createImage", "(II)Lorg/kwis/msp/lcdui/Image;", (127, 64))
+                .await?;
+            let graphics: ClassInstanceRef<Graphics> = jvm
+                .invoke_virtual(&image, "org/kwis/msp/lcdui/Image", "getGraphics", "()Lorg/kwis/msp/lcdui/Graphics;", ())
+                .await?;
+
+            // setRGBPixels as the title's road strips: w x 2 with bpl 4w. The second row is the ints right
+            // after the first, not the ones 4w further on.
+            let mut strip = jvm.instantiate_array("I", 6).await?;
+            jvm.store_array(&mut strip, 0, [0x111111i32, 0x222222, 0x333333, 0x444444, 0x555555, 0x666666])
+                .await?;
+            let _: () = jvm
+                .invoke_virtual(
+                    &graphics,
+                    "org/kwis/msp/lcdui/Graphics",
+                    "setRGBPixels",
+                    "(IIII[III)V",
+                    (124, 62, 3, 2, strip, 0, 12),
+                )
+                .await?;
+
+            let mut output = jvm.instantiate_array("I", 15000).await?;
+            jvm.store_array(&mut output, 0, alloc::vec![-1i32; 15000]).await?;
+            let _: () = jvm
+                .invoke_virtual(
+                    &graphics,
+                    "org/kwis/msp/lcdui/Graphics",
+                    "getRGBPixels",
+                    "(IIII[III)V",
+                    (0, 0, 127, 64, output.clone(), 0, 508),
+                )
+                .await?;
+            assert_eq!(jvm.load_array::<i32>(&output, 62 * 127 + 124, 3).await?, [0x111111, 0x222222, 0x333333]);
+            assert_eq!(
+                jvm.load_array::<i32>(&output, 63 * 127 + 124, 4).await?,
+                [0x444444, 0x555555, 0x666666, -1]
+            );
+
+            // One int short of 127 * 64 is out of range and stays an exception, with nothing written (7 is
+            // no pixel the image holds).
+            let mut short = jvm.instantiate_array("I", 127 * 64 - 1).await?;
+            jvm.store_array(&mut short, 0, alloc::vec![7i32; 127 * 64 - 1]).await?;
+            let result = jvm
+                .invoke_virtual::<_, ()>(
+                    &graphics,
+                    "org/kwis/msp/lcdui/Graphics",
+                    "getRGBPixels",
+                    "(IIII[III)V",
+                    (0, 0, 127, 64, short.clone(), 0, 508),
+                )
+                .await;
+            let Err(JavaError::JavaException(exception)) = result else {
+                panic!("read past the array succeeded")
+            };
+            assert!(jvm.is_instance(&*exception, "java/lang/ArrayIndexOutOfBoundsException"));
+            assert_eq!(jvm.load_array::<i32>(&short, 0, 127 * 64 - 1).await?, alloc::vec![7i32; 127 * 64 - 1]);
 
             Ok(())
         })
