@@ -94,3 +94,5 @@ selftest: 26/26
 - 착지 사전 증거: `origin/main` 과 이 브랜치를 병합한 스크래치 트리에서 `player-data.mjs build` → otterpebble `origin/main`(`59f4c0ada`) 스크래치에 `compat-import` → `vitest run` 72 파일 · 983 통과 rc=0 · `build` rc=0(`support-counts-check: OK`). 상태별 행 수를 박아 둔 자리에서 red 가 난 것은 없다.
 
 
+
+<!-- corpus-name-inflow v1 subjects=8 tree=e1fead64aecf453a B=1086/348 P=3/3 S=53/17 -->
