@@ -63,3 +63,6 @@
 
 - 자가시험: `playability-census.mjs selftest` 70/70 · `player-data.mjs --selftest` 76 규칙 · `player-data.mjs` OK(429 · `playable` 425 · `limited` 2 · `not-yet` 2).
 - 네 게이트(build-slot): fmt · `clippy --all -D warnings` · wasm clippy · `RUST_MIN_STACK=4194304 cargo test --all`(985 passed · 0 failed) 전부 rc=0. `cargo +beta clippy --all -- -D warnings` rc=0. 엔진 코드 변경 0.
+
+
+<!-- corpus-name-inflow v1 subjects=5 tree=b54926514c8199a0 B=1066/330 P=0/0 S=57/18 -->
