@@ -711,7 +711,7 @@ created 2026-09-17T10:17:54+09:00 — rules `deletion`, `non_fast_forward`, `pul
 <!-- REQUIRED-CHECKS:END -->
 
 **Two of those five names measure nothing on a PR.** A PR green on `rust_ci (macos-latest, stable)`
-or `rust_ci (windows-latest, stable)` means the job started and skipped every step (2026-11-07 — the
+or `rust_ci (windows-latest, stable)` means the job started — on an ubuntu runner since 2026-11-25 — and skipped every step (2026-11-07 — the
 names must still report or the merge deadlocks; `rust.yml` header). What those platforms actually
 owe is in the weekly run and the hand dispatch — §Definition of Done, "Then read the PR's CI".
 
