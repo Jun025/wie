@@ -953,7 +953,7 @@ impl Graphics {
         // WIPI pixels are 0x00RRGGBB with no alpha byte (the first implementation, 840014d9, read them as
         // opaque RGB). Passing them as ARGB made every pixel transparent: a540945188ca draws all its art and
         // glyphs through here and showed empty frames (docs/report/0420).
-        // `bpl` is bytes per line (upstream's `bpl / 4`): 1b3b4868d46e draws its road as w x 2 strips with bpl 4w.
+        // `bpl` is bytes per line (upstream's `bpl / 4`): 1b3b4868d46e draws w x 2 strips with bpl 4w.
         jvm.invoke_virtual(
             &midp_graphics,
             "javax/microedition/lcdui/Graphics",
@@ -1631,7 +1631,7 @@ mod test {
                 .invoke_virtual(&image, "org/kwis/msp/lcdui/Image", "getGraphics", "()Lorg/kwis/msp/lcdui/Graphics;", ())
                 .await?;
 
-            // setRGBPixels as the title's road strips: w x 2 with bpl 4w. The second row is the ints right
+            // setRGBPixels as the title calls it: w x 2 with bpl 4w. The second row is the ints right
             // after the first, not the ones 4w further on.
             let mut strip = jvm.instantiate_array("I", 6).await?;
             jvm.store_array(&mut strip, 0, [0x111111i32, 0x222222, 0x333333, 0x444444, 0x555555, 0x666666])

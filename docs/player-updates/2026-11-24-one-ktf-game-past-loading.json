@@ -1,0 +1,10 @@
+{
+  "date": "2026-11-24",
+  "kind": "fix",
+  "titles": [
+    "1b3b4868d46e2ffa5a64466f523ac591265840ebde220d035b2563a2e7f478de",
+    "d9afc4db742cf67b1151745add87f99862044a035df3c39f98d5cd48c79e0988"
+  ],
+  "summary_ko": "KTF 게임 하나가 처음 로딩 화면에서 넘어가지 못하던 문제를 고쳤어요. 다른 KTF 게임 하나에서 국기와 배경 그림이 빠져 보이던 것도 함께 고쳤어요.",
+  "pr": "https://github.com/Jun025/wie/pull/628"
+}
