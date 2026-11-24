@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-24",
+  "task": "wie-perf-watch-native-axis-java-samples-use-cpu-seconds-and-paints-not-ticks",
+  "title": "perf-watch native 축 — Java 로 돌며 그리는 표본은 tick 이 아니라 그린 장수로 나눈다",
+  "summary": "주간 속도 감시의 native 축은 «5천만 tick 당 CPU 시간» 하나였다. Java 로 도는 판은 게임이 자는 동안에도 tick 이 늘어서, Java 실행 비용이 바뀌는 변경을 사이에 두면 그 값이 같은 단위가 아니다. 고정 표본 가운데 Java 로 돌며 그리는 둘(J2ME 835acd535a5f · SKT d1234e0ddb75)을 «1000 paints 당 CPU ms» 로 재게 했고, 그 짝은 두 쪽이 같은 순간에 뜬 것만 센다. 한 번 그리고 쉬는 J2ME 표본 8238f5449347 은 나눌 그린 장수가 없어 tick 그대로 둔다. 스크립트만 바꿨다(엔진 *.rs 0).",
+  "changes": [
+    "scripts/perf-watch.mjs: SAMPLES 의 per: 'paint' · nativeMetric() · per paint 실행은 --max-ticks 를 풀어 두 쪽이 60초를 같이 돈다 · judge() 가 같은 순간에 뜨지 않은 per paint 짝을 세지 않는다 · 증적 md 머리에 두 단위 한 줄 · 원자료 표에 CPU ms · ticks · paints",
+    "scripts/perf-watch.mjs selftest 18 → 26: tick 만 부푼 입력에 개선 없음 · CPU 초가 늘고 tick 이 더 는 입력에 경보 → 퇴행 · 떨어져 뜬 짝은 미측정",
+    "scripts/perf-watch.sh · AGENTS.md: 두 판정 단위 한 줄씩",
+    "게이트② 반려 뒤(-fix · docs/report/0588 §8): 표본의 단위 조회와 두 쪽 띄우기를 nativePair() 한 함수로 빼 selftest 가 실제 표본 sha12 로 그 함수를 지난다(per 표본 집합 정확 일치 단언 포함) · 두 쪽이 출발 시각을 각자 찍는다 · 전 짝 무효 표본도 단위를 싣는다 · 증적 md 머리에 Java 세 표본의 ok 가 뜻하지 않는 것과 부하로 부호가 바뀐다는 두 줄 · selftest 26 → 29"
+  ],
+  "limits": [
+    "wie_validate 의 루프는 쉬지 않아 CPU 초는 스케줄러가 준 몫이다 — 게임이 자기 박자(sleep · 타이머)에 묶여 있고 CPU 가 넉넉하면 «paints 당 CPU» 는 그 박자를 읽을 뿐 Java 실행 비용을 보지 못한다 (docs/report/0588 §4)",
+    "d1234e0ddb75 는 타이머 박자(약 19 paints/초)에 묶인 판이라 굶지 않는 한 새 단위로도 움직이지 않는다",
+    "표본은 바꾸지 않았다 (티켓 경계) — 마감 없이 도는 Java 판은 고정 표본에 없다",
+    "835acd535a5f 는 같은 두 빌드가 한가한 호스트에서는 도구 규칙으로 퇴행, 바쁜 호스트에서는 ok 다 (0572 §10-2 의 8짝을 새 분모로 재계산 — docs/report/0588 §4 ⑸) · 식과 문턱은 그대로 두고 증적 md 머리에 적었다",
+    "perf-watch selftest 는 CI 에서 돌지 않는다 — run() 이 nativePair() 를 부르는 한 줄과 --max-ticks 풀기는 selftest 가 보지 못한다"
+  ],
+  "proposals": [],
+  "adoptedProposals": ["2026-11-22-upstream-sync2-s1-rustjava-pin-0-4-1#p1"],
+  "declinedProposals": []
+}

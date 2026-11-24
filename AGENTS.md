@@ -390,7 +390,7 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   `docs/player-data/compat.json`, pair-confirmed; it never writes compat. Rules: `scripts/regression-diff.mjs`
   header (`selftest` there). Output: `~/orchestrator/reports/evidence/wie-weekly-regression/<date>.md` + one ledger line.
   Its first step is **`scripts/perf-watch.sh`, the speed axis** the census cannot see: fixed samples, last round's pin
-  against `origin/main` side by side, native CPU per 50M ticks + browser paints per 30 s, pair-confirmed
+  against `origin/main` side by side, native CPU per 50M ticks (per 1000 paints on the Java-run samples that draw — two judging units) + browser paints per 30 s, pair-confirmed
   (`WIE_PERF_REGRESSION` / `WIE_PERF_CLEAR`, each with `unmeasured=<k>/<owed>` / `WIE_PERF_SKIPPED streak=` in round
   dates / `WIE_PERF_INCOMPLETE stage=measure` when under half was judged — that one never moves the baseline).
   Test it with `bash scripts/perf-watch.sh selftest` (sandboxed), never by running the weekly path. Its `compare <A> <B>` is how a speed
@@ -711,7 +711,7 @@ created 2026-09-17T10:17:54+09:00 — rules `deletion`, `non_fast_forward`, `pul
 <!-- REQUIRED-CHECKS:END -->
 
 **Two of those five names measure nothing on a PR.** A PR green on `rust_ci (macos-latest, stable)`
-or `rust_ci (windows-latest, stable)` means the job started and skipped every step (2026-11-07 — the
+or `rust_ci (windows-latest, stable)` means the job started — on an ubuntu runner since 2026-11-25 — and skipped every step (2026-11-07 — the
 names must still report or the merge deadlocks; `rust.yml` header). What those platforms actually
 owe is in the weekly run and the hand dispatch — §Definition of Done, "Then read the PR's CI".
 

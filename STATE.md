@@ -87,21 +87,8 @@
 > 형식: «무엇 · 왜 지금 · 근거 · size». 끝난 것은 아래 «완료로 접은 항목» 에 1줄씩만 둔다.
 > 사료(옛 본문 · 측정 서술 전문) = `docs/state-next-history.md`.
 
-다음은 아래 ⑴ 이다(발권 전 · 발권은 총괄 몫). ⑵ 는 ⑴ 과 독립이다.
-
-**⑴ upstream 2차 동기화 — 조각 S4(병합 뒤 정리) · S3 이 착지한 뒤에**
-- **지금**: 조각 S3(병합 커밋 `git merge upstream/main` · upstream `d5242bbf`)은 **PR #617 로 열려 있다**(`docs/report/0586` · 착지는 검수 뒤 `-merge` 티켓 · `merge_strategy: merge`).
-  동작이 갈리는 자리는 전부 우리 값이고(총괄 판정 2026-11-23), 우리 두 호스트는 병합 뒤에도 해석기로 돈다(`Options.aot = None`).
-- **무엇**: `docs/report/0551` §7 의 S4 행 + 0586 §10 이 남긴 것 — `tag-release.yaml` PARKED 머리의 나머지 문구 ·
-  upstream `AGENTS.md` 의 Attribution 조항(사람 결정) · `docs/lgt.md` 의 upstream 판을 받을지 ·
-  `wie-wipi-c/src/api/database.rs` 가 upstream 의 같은 경로와 병합마다 충돌하는 것(우리 모듈 이름 바꾸기) ·
-  `wie-ktf/Cargo.toml` 의 안 쓰는 `anyhow`.
-- **왜 지금**: S3 이 착지하면 merge-base 가 68일 만에 움직인다. 그 직후가 «다음 병합이 다시 충돌할 자리»를 가장 싸게 치우는 때다.
-- **근거**: 0551 §7(S4 의 검증식 — V0 · `check-doc-liveness-parity` · `check-parked-workflows`) · 0586 §10.
-- **size**: S.
-- ★**«upstream 값으로 옮기기»는 S4 가 아니다.** 0586 §5 · 부록 B 의 약 150자리(우리 값을 지킨 곳)와 ARM AOT 채택은
-  자리마다 전/후를 재는 별 티켓이다(총괄 판정). 그중 하나를 제안으로 올렸다 — SKT LBMP 의 마스크 투명
-  (`2026-11-23-upstream-sync2-s3-merge-upstream-main#p0`).
+⑴(upstream 2차 동기화 — 조각 S4)은 끝나 «완료로 접은 항목» 첫 줄로 갔다(2026-11-24 · `docs/report/0592`). 남은 것은 아래 ⑵ 다.
+번호는 그대로 둔다 — ⑵ 를 고치는 형제 PR 과 같은 줄을 건드리지 않으려는 것이다.
 
 **⑵ 「오래 하기」 이른 종료(`short`) 14행 — 한 번 더 재서 같은 값이 나오는 행만 `compat.json` 에 반영**
 - **무엇**: `docs/report/0561` §4 의 14행(전부 `playable → limited` 후보 · 네 축 `ok/ok/ok/short`)을 현행 핀에서 다시 재고,
@@ -146,7 +133,7 @@
 **사람 몫**(워커가 정할 수 없다)
 - **동작이 갈리는 6자리** — ★**정해졌다(총괄 판정 2026-11-23): 전부 우리 값.** S3(PR #617)이 그대로 지켰고 시험으로 고정했다
   (0586 §4). 자리 하나를 upstream 값으로 옮기려면 그 자리의 전/후를 재는 별 티켓을 낸다 — 그것을 여는 것이 사람 몫이다.
-- **upstream `AGENTS.md` 의 Attribution 조항을 받을지**(0551 §7 S4).
+- **upstream `AGENTS.md` 의 Attribution 조항을 받을지**(0551 §7 S4) — 조항 원문 · 지금 이미 있는 표기 · 선택지 셋은 `docs/report/0592` §5.
 
 **보류 · 재개 조건이 따로 있는 축**(발권하지 마라 — 조건이 «새로» 생기면 연다)
 - **P4 / S5 — 엔진 고유분을 upstream PR 로**: 2026-09-13 dlunch/wie #1419 1건 착지 · 그 밖 미착수. 분류에서 «발신»은 0551 에 **29**,
@@ -168,6 +155,13 @@
 - **upstream #1122(스테이지 5 정지)** — 종결(`docs/report/0509`). 재개 조건: 우리 빌드에서 정지를 새로 보고받을 때.
 
 ### 완료로 접은 항목 (다시 발권하지 마라 · 옛 `## 다음` 전문은 `docs/state-next-history.md`)
+- **upstream 2차 동기화 조각 S1 ~ S4** — 완료. S3 = 병합 커밋(PR #617 · `de096979` · 2026-11-23 착지 · `docs/report/0586`) ·
+  S4 = 병합 뒤 정리(`docs/report/0592`). S4 가 한 것: `tag-release.yaml` PARKED 머리를 지금의 스크립트대로 ·
+  `docs/lgt.md` 와 `wie-wipi-c/src/api/database.rs` 를 upstream 판 그대로 두고 우리 것은 `docs/lgt-fork-notes.md` ·
+  `wie-wipi-c/src/api/fork_database.rs` 로 옮김. ★그 두 upstream 파일은 여기서 고치지 마라 — 고치면 병합마다 다시 충돌한다.
+  `wie-ktf/Cargo.toml` 의 안 쓰는 `anyhow` 는 일부러 뒀다(그 파일이 upstream 과 바이트가 같다 · 0592 §4).
+  «upstream 값으로 옮기기»(0586 §5 · 부록 B 의 약 150자리 · ARM AOT)는 자리마다 전/후를 재는 별 티켓이다 —
+  열린 제안 1건: SKT LBMP 의 마스크 투명(`2026-11-23-upstream-sync2-s3-merge-upstream-main#p0` · 범위 35판).
 - **2026-11-06 후보 ⑴ upstream 2차 동기화 «예행·분류»** — 완료(`docs/report/0551` · PR #584 · 2026-11-22 착지).
   충돌 93 = 폐기 11 · 재적용 53 · 발신 29 · 예행 트리 게이트 전부 red · «한 번에 병합» no-go · 조각 계획 S1~S5.
 - **2026-11-06 후보 ⑵ 진도 ⒟ `confirm-only-entry` 15행 현행 핀 재측** — 완료(`docs/report/0552` · PR #585 · 2026-11-22 착지).

@@ -4,14 +4,17 @@
 # untriaged. NOT ADOPTED — it is the front half of the release pipeline
 # release.yaml parks (read that file's header first):
 #   * dispatched on main it runs .github/scripts/release/tag-version.sh, which
-#     `cargo set-version`s the whole workspace, pushes a `v*` tag plus a
-#     `release/v*` branch, opens a version-bump PR, and then
-#     `gh workflow run release.yaml` — the parked Tauri release pipeline, whose
-#     only live trigger IS workflow_dispatch. So this file is the one path that
-#     can still start release.yaml here;
-#   * its next-version read is `select(.name == "wie-app")`, the crate Cargo.toml
-#     EXCLUDES from the workspace; and version bumps touch **/Cargo.toml, which
-#     is publish-artifact.yml's release trigger once that PR lands.
+#     `cargo set-version`s the whole workspace, commits "Release X.Y.Z", tags it
+#     `v*` and `git push --atomic`s that commit STRAIGHT TO `main` with the tag —
+#     no branch, no PR, no review gate (upstream 6503cf38, 2026-09-26; the
+#     `release/v*` branch, the version-bump PR and the `gh workflow run
+#     release.yaml` step this header used to describe are gone from the script);
+#   * upstream starts release.yaml from that tag push (`on.push.tags: v*`). OUR
+#     release.yaml is parked without that trigger, so here the tag would start
+#     nothing — this file no longer reaches release.yaml at all;
+#   * what it would still do here, if that push were accepted: every
+#     **/Cargo.toml changes on `main`, and that glob is publish-artifact.yml's
+#     release trigger — an engine artifact release plus an otterpebble dispatch.
 # Its triggers are unchanged from upstream — upstream already ships it
 # dispatch-only — so parking here means: the decision is written down, and
 # scripts/check-parked-workflows.mjs (PARKED) reddens if an upstream merge ever
