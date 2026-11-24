@@ -15,7 +15,9 @@
 //        [--secs 30] [--long 600] [--only probe|long|speed] <corpus dir>...
 //   node scripts/playability-census.mjs run … --only progress [--progress 1800] [--titles <file>] [--as P|P2] [--policy v1]
 //   node scripts/playability-census.mjs run … --only long --titles <file>   the long run, recipe-prefixed
-//        (`<sha12> [secs] [recipe keys file]`; keep the recipes in game_lab/ — they spell a title's menus)
+//        (`<sha12> [secs] [recipe keys file]`; keep the recipes in game_lab/ — they spell a title's menus.
+//        game_lab/recipes-long/<sha12>.keys is the key order a row's shipped longplay `ok` was measured with:
+//        the default loop below walks those titles into their own quit item, so without it they read `short`)
 //   node scripts/playability-census.mjs run … --budget <secs>   stop handing out titles after <secs> (wait for
 //        the census lock included); exit 3 = more remain. One lease per call — `scripts/census-drive.sh` loops it.
 //   node scripts/playability-census.mjs report --out <dir> --pin <wie sha>
@@ -750,6 +752,10 @@ const HAND_WALL = {
   // 640428a9cf9e stays (docs/report/0543): its server sent 28 files (27 pictures + data.jar) that its
   // package does not carry, so no fake_server reply can stand in for them.
   '640428a9cf9e': '처음 실행할 때 게임사 서버에서 그림과 게임 데이터를 받아 와야 하는데, 그 서버가 지금은 없고 이 파일에는 그 데이터가 들어 있지 않아 여기서는 진행할 수 없어요. 같은 게임의 큰화면 판은 데이터가 함께 들어 있어서 할 수 있어요.',
+  // 689c491586b9: its first screen asks to download ~700 KB more; «1.예» ends on «네트워크 접속이 실패 하였습니다 · 다시
+  // 시작하세요» and the guest quits, «2.아니오» quits too (frames of both, 2026-11-24). Known since docs/report/0440 · 0470,
+  // but the row stayed `playable` with the line typed into compat by hand; no key order reaches play, so it is a wall.
+  '689c491586b9': '게임을 시작하려면 옛 통신사 서버에서 추가 데이터를 받아야 하는데, 그 서버가 지금은 없어 «네트워크 접속이 실패 하였습니다» 안내가 나온 뒤 게임이 꺼져요.',
 };
 // A line a player needs that no axis can say, added after the axis lines: how a `stuck` title was
 // moved on by hand (a recipe run, docs/report/0442 · 0469), or what a fix still leaves out. Measured

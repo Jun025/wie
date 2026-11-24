@@ -5,6 +5,7 @@
 //   node scripts/player-data.mjs                      check the committed data (CI: engine-contract.yml)
 //   node scripts/player-data.mjs --selftest           each rule must reject its mutation
 //   node scripts/player-data.mjs import <census.json> census `report` output -> docs/player-data/compat.json
+//   node scripts/player-data.mjs import-rows <census.json>  a partial re-measure: only the rows that file lists
 //   node scripts/player-data.mjs normalize            re-derive names/groups, order and runtimeAdjustments in docs/player-data/compat.json
 //   node scripts/player-data.mjs build --out <dir>    write the shipped compat.json + updates.json
 //                                                     (publish-artifact.yml; needs full history)
@@ -334,6 +335,39 @@ export function fromCensus(c) {
   return { schema: 1, generatedAt: c.generatedAt, enginePin: c.enginePin, entries: retitle(entries) };
 }
 
+// A partial re-measure (a `--titles` census over a few rows) replaces what it measured, row by row: `status`,
+// the issue lines and the tips (the census derives all three) and every axis the run read. An axis it says
+// nothing about — `n/a`: a speed reading under 0.9 on a busy host, progress not run — keeps the committed
+// value. `short` is a reading (the long run happened and the guest ended it), so it lands as `unknown`.
+// What a census does not make stays as committed: contentKey, names, order, runtimeAdjustments, `generatedAt`,
+// and every row the file does not list. Refused, nothing written: a row the page does not have (new rows come
+// in by `import`), and a row with no long run — its census `limited` would only mean «not run this time».
+export function mergeCensusRows(compat, census) {
+  const by = new Map(census.entries.map((x) => [x.sha256, x]));
+  const have = new Set(compat.entries.map((e) => e.sha256));
+  const e = [...by.keys()].filter((s) => !have.has(s)).map((s) => `${s.slice(0, 12)}: not a row of the committed compat.json`);
+  for (const [s, x] of by) if (have.has(s) && (x.axes?.longplay ?? 'n/a') === 'n/a' && x.status !== 'not-yet') e.push(`${s.slice(0, 12)}: no long run in this census — leave the row out or run it`);
+  if (e.length) throw new Error(e.join('\n  '));
+  const entries = compat.entries.map((row) => {
+    const x = by.get(row.sha256);
+    if (!x) return row;
+    const axes = { ...row.axes };
+    for (const a of [...AXES, ...EXTRA_AXES]) {
+      const v = x.axes?.[a];
+      if (v !== undefined && v !== 'n/a') axes[a] = (EXTRA_AXIS_MAP[a] ?? AXIS_MAP)[v] ?? `?${v}`;
+    }
+    // Rebuilt key by key so a row keeps its committed key order (tips sit after the issue lines, as `report` writes them).
+    const out = {};
+    for (const [k, v] of Object.entries(row)) {
+      if (k === 'playTips_ko') continue;
+      out[k] = k === 'status' ? x.status : k === 'axes' ? axes : k === 'knownIssues_ko' ? x.knownIssues_ko : v;
+      if (k === 'knownIssues_ko' && x.playTips_ko?.length) out.playTips_ko = x.playTips_ko;
+    }
+    return out;
+  });
+  return { ...compat, entries };
+}
+
 function readUpdates() {
   return readdirSync(UPDATES)
     .filter((f) => f.endsWith('.json'))
@@ -492,6 +526,32 @@ function selftest() {
     bad++, console.error('selftest: census uniform must map to no');
   if (fromCensus({ ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, longplay: 'short' } }] }).entries[0].axes.longplay !== 'unknown')
     bad++, console.error('selftest: census short (the long run ended early) must map to unknown');
+  {
+    const row = (ch, extra = {}) => ({ ...good.entries[0], sha256: ch.repeat(64), ...extra });
+    const page = { ...good, entries: [row('a', { axes: { ...good.entries[0].axes, progress: 'ok' }, playTips_ko: ['tip'], changes: [] }), row('c', { title: 'u', game: 'u', fileTitle: 'u' })] };
+    const censusRow = (ch, axes, extra = {}) => ({ sha256: ch.repeat(64), status: 'limited', axes: { ...Object.fromEntries(AXES.map((a) => [a, 'ok'])), progress: 'n/a', ...axes }, knownIssues_ko: ['문장'], ...extra });
+    const m = mergeCensusRows(page, { entries: [censusRow('a', { longplay: 'short', speed: 'n/a' })] }).entries;
+    const refused = (c) => {
+      try {
+        mergeCensusRows(page, c);
+        return false;
+      } catch {
+        return true;
+      }
+    };
+    const rowCases = [
+      ['an early end lands as unknown, with the census status and sentence', m[0].axes.longplay === 'unknown' && m[0].status === 'limited' && m[0].knownIssues_ko[0] === '문장'],
+      ['an axis the run did not read keeps the committed value', m[0].axes.speed === 'ok' && m[0].axes.progress === 'ok'],
+      ['what a census does not make is kept', m[0].contentKey === page.entries[0].contentKey && m[0].fileTitle === page.entries[0].fileTitle],
+      ['tips the census no longer gives are dropped, key order kept', !('playTips_ko' in m[0]) && Object.keys(m[0]).join() === Object.keys(page.entries[0]).filter((k) => k !== 'playTips_ko').join()],
+      ['tips land after the issue lines', Object.keys(mergeCensusRows(page, { entries: [censusRow('c', {}, { status: 'playable', playTips_ko: ['t'] })] }).entries[1]).join().includes('knownIssues_ko,playTips_ko')],
+      ['a row the file does not list is untouched', JSON.stringify(m[1]) === JSON.stringify(page.entries[1])],
+      ['a row the page does not have is refused', refused({ entries: [censusRow('d', { longplay: 'short' })] })],
+      ['a row with no long run is refused', refused({ entries: [censusRow('a', { longplay: 'n/a' })] })],
+      ['a merged page still validates', validateCompat({ ...page, entries: m }).length === 0],
+    ];
+    for (const [name, ok] of rowCases) if (!ok) bad++, console.error(`selftest: import-rows — ${name}`);
+  }
   const withProgress = (v) => fromCensus({ ...good, entries: [{ ...good.entries[0], axes: { ...good.entries[0].axes, ...v } }] }).entries[0].axes;
   if (
     withProgress({ progress: 'stuck' }).progress !== 'stuck' ||
@@ -554,7 +614,7 @@ function selftest() {
     rmSync(repo, { recursive: true, force: true });
   }
   if (bad) process.exit(1);
-  console.log(`player-data selftest: ${cases.length + ledgerCases.length + 4 + 15 + 7} rules each reject their mutation`);
+  console.log(`player-data selftest: ${cases.length + ledgerCases.length + 4 + 15 + 7 + 9} rules each reject their mutation`);
 }
 
 const [cmd, ...args] = process.argv.slice(2);
@@ -579,6 +639,27 @@ else if (cmd === 'import') {
   mkdirSync(join(ROOT, 'docs/player-data'), { recursive: true });
   writeFileSync(COMPAT, JSON.stringify(c, null, 1) + '\n');
   console.log(`imported ${c.entries.length} titles (pin ${c.enginePin.slice(0, 8)}) -> docs/player-data/compat.json`);
+} else if (cmd === 'import-rows') {
+  const compat = JSON.parse(readFileSync(COMPAT, 'utf8'));
+  const census = JSON.parse(readFileSync(args[0], 'utf8'));
+  let c;
+  try {
+    c = mergeCensusRows(compat, census);
+  } catch (err) {
+    console.error(`import-rows refused, nothing written:\n  ${err.message}`);
+    process.exit(1);
+  }
+  // A row that went down may no longer be its group's representative: the same re-derivation `normalize` does.
+  c = { ...c, entries: retitle(c.entries) };
+  const e = validateCompat(c);
+  if (e.length) {
+    console.error(`import-rows refused — ${e.length} violations, nothing written:\n  ${e.slice(0, 20).join('\n  ')}`);
+    process.exit(1);
+  }
+  const before = new Map(compat.entries.map((x) => [x.sha256, JSON.stringify(x)]));
+  const moved = c.entries.filter((x) => JSON.stringify(x) !== before.get(x.sha256));
+  writeFileSync(COMPAT, JSON.stringify(c, null, 1) + '\n');
+  console.log(`import-rows: ${census.entries.length} rows read · ${moved.length} changed${moved.length ? ` (${moved.map((x) => `${x.sha256.slice(0, 12)}=${x.status}`).join(' ')})` : ''} -> docs/player-data/compat.json`);
 } else if (cmd === 'normalize') {
   // Re-derives title/game/variant/sameTitle from fileTitle and puts each group's representative first.
   const c = JSON.parse(readFileSync(COMPAT, 'utf8'));
@@ -620,6 +701,6 @@ else if (cmd === 'import') {
     console.log(`built -> ${args[oi + 1]}/{compat,updates}.json (${out.updates.entries.length} updates)`);
   }
 } else {
-  console.error('usage: player-data.mjs [--selftest | import <census compat.json> | normalize | build --out <dir>]');
+  console.error('usage: player-data.mjs [--selftest | import <census compat.json> | import-rows <census compat.json> | normalize | build --out <dir>]');
   process.exit(2);
 }

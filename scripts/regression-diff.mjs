@@ -13,7 +13,8 @@
 // shipped one (`ok`/`no`/`unknown`, docs/player-data/compat.json) — mapped as scripts/player-data.mjs does.
 // A row goes DOWN on an axis only from a measured value to a worse measured one; `unknown` is never a side.
 //   boot · render · input   every row (the 30 s probes A·B run on every title).
-//   longplay                only rows in --long whose 600 s run happened this round.
+//   longplay                only rows in --long whose 600 s run happened this round. A run the guest ended
+//                           early (`short`) happened: against a base `ok` it is DOWN, like `error`.
 //   sound                   --long rows both ways; elsewhere only UP — a probe that heard nothing says
 //                           nothing about a title whose music starts past the title screen (census header).
 //   speed                   both ways, but headless never says `slow`, so in practice only `ok` -> `unknown`, ignored.
@@ -28,11 +29,14 @@
 import { lstatSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
 
-// ponytail: `short` (the guest ended the long run early) is `unknown`, so it is never a side — a guard that
-// STARTS quitting early reads as «no long run this round», not as down. Rank it if that ever hides one.
-const MAP = { 'n/a': 'unknown', short: 'unknown', fail: 'no', none: 'no', uniform: 'no', error: 'no', silent: 'no', slow: 'no', stall: 'no' };
+// `short` (the guest ended the long run early) is a measured value here, ranked with `no`: a row the shipped
+// page calls longplay `ok` that now quits by itself went down. It read `unknown` until the 14 rows that already
+// did so were settled in compat (docs/report/0561, then 0593 re-measured them) — before that the guard 4ece6eeeaa04 would have been a
+// suspect every week. The shipped page writes such a row as `unknown` (player-data.mjs), which is still never a
+// side: a row already taken down for it does not come back as a candidate.
+const MAP = { 'n/a': 'unknown', fail: 'no', none: 'no', uniform: 'no', error: 'no', silent: 'no', slow: 'no', stall: 'no' };
 const norm = (v) => MAP[v] ?? v ?? 'unknown';
-const RANK = { ok: 2, partial: 1, no: 0 };
+const RANK = { ok: 2, partial: 1, no: 0, short: 0 };
 const STATUS = { playable: 2, limited: 1, 'not-yet': 0 };
 const PROBE_AXES = ['boot', 'render', 'input'];
 const AXES = [...PROBE_AXES, 'longplay', 'sound', 'speed'];
@@ -193,7 +197,17 @@ if (cmd === 'changed') {
     ['an unchanged row with no long run this round is unchanged', !d.down.concat(d.up).some((x) => x.sha12.startsWith('3'))],
     ['a long-run row: longplay error is down', k(drift(base, { entries: [row(1, 'limited', ax({ longplay: 'error' }))] }, L1).down) === '1:longplay 1:status'],
     ['a long row whose long run never happened: silent is not down', drift(base, { entries: [row(1, 'limited', ax({ input: 'none', longplay: 'n/a', sound: 'silent' }))] }, L1).down.every((x) => x.axis !== 'sound')],
-    ['a long row whose long run ended early: unknown, not down', drift(base, { entries: [row(1, 'limited', ax({ longplay: 'short' }))] }, L1).down.length === 0],
+    ['a long row whose long run ended early is down, and its status with it', k(drift(base, { entries: [row(1, 'limited', ax({ longplay: 'short' }))] }, L1).down) === '1:longplay 1:status'],
+    ['a row the page already lists as ended early (unknown) is not a candidate again', drift({ entries: [row(1, 'limited', ax({ longplay: 'unknown' }))] }, { entries: [row(1, 'limited', ax({ longplay: 'short' }))] }, L1).down.length === 0],
+    ['an early end outside --long is not read at all', drift(base, { entries: [row(1, 'limited', ax({ longplay: 'short' }))] }).down.length === 0],
+    ['an early end that fills its time again is an up, not a candidate', (() => {
+      const r = drift({ entries: [row(1, 'limited', ax({ longplay: 'unknown' }))] }, { entries: [row(1, 'playable', ax())] }, L1);
+      return r.down.length === 0 && k(r.up) === '1:status';
+    })()],
+    ['the pair re-runs the long run for an early end, and confirms it', (() => {
+      const early = drift(base, { entries: [row(1, 'limited', ax({ longplay: 'short' }))] }, L1).down;
+      return early.every((c) => needsLong(c, L1)) && suspectRows(confirm(early, early)) === 1 && suspectRows(confirm(early, [])) === 0;
+    })()],
     ['suspects count rows, not axes', suspectRows(confirm(d.down, d.down)) === 1],
     ['a long-run row: silent is down', k(drift(base, { entries: [row(1, 'playable', ax({ sound: 'silent' }))] }, L1).down) === '1:sound'],
     ['a wall keeps the measured status', k(drift(base, { entries: [row(3, 'limited', ax({ longplay: 'n/a' }), { knownIssues_ko: ['그 서버가 지금은 없어'] })] }).down) === '3:status'],
