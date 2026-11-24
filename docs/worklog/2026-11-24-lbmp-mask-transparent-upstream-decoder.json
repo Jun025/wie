@@ -2,7 +2,7 @@
   "date": "2026-11-24",
   "task": "wie-2026-11-23-lbmp-mask-transparent-upstream-decoder-adopt-p0",
   "title": "SKT 그림(LBMP)의 마스크를 투명으로 — upstream 디코더로 옮겼다",
-  "summary": "제안 2026-11-23-upstream-sync2-s3-merge-upstream-main#p0 을 채택해 이 회차(docs/report/0593)에서 구현했다. wie-backend/src/canvas/lbmp.rs 를 upstream 판(바이트 동일)으로 두고, wie-midp image.rs 의 형 8·16 마스크 건너뛰기 3줄을 지웠다. 코퍼스 429꾸러미의 LBMP 6,202장 가운데 upstream 의 엄격한 검사에 걸리는 파일은 0장이고, 마스크 선 형 8·16 4,628장(35판)은 이제 마스크 자리가 투명으로 그려진다.",
+  "summary": "제안 2026-11-23-upstream-sync2-s3-merge-upstream-main#p0 을 채택해 이 회차(docs/report/0594)에서 구현했다. wie-backend/src/canvas/lbmp.rs 를 upstream 판(바이트 동일)으로 두고, wie-midp image.rs 의 형 8·16 마스크 건너뛰기 3줄을 지웠다. 코퍼스 429꾸러미의 LBMP 6,202장 가운데 upstream 의 엄격한 검사에 걸리는 파일은 0장이고, 마스크 선 형 8·16 4,628장(35판)은 이제 마스크 자리가 투명으로 그려진다.",
   "changes": [
     "wie-backend/src/canvas/lbmp.rs = upstream/main 판",
     "wie-backend/src/canvas.rs test_decode_lbmp_rgb332: bytes_per_pixel 1 -> 4 (모든 형이 ArgbPixel)",
