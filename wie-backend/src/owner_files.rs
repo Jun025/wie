@@ -265,12 +265,60 @@ pub const OWNER_SOUND_OFF_XOR: &[XorRow] = &[
     ),
 ];
 
-/// A «jar» no title ships, listed in all three lists above: a carrier test mounting it with `probe.sav`,
-/// `probe.opt` and `probe.xor` sees the first dropped and the others rewritten only if `from_archive` calls
-/// `turn_owner_sound_on` — the rows alone cannot show that, since the real jars are game bytes.
+/// A save *flag* of the original owner, shipped in the archive without the save *data* it flags:
+/// «continue» is offered, opens nothing, and the title plays on in a zero state. Dropped, the title
+/// starts as a fresh install does. Deliberately a list, never a rule — other titles ship complete
+/// saves beside the jar, so "hide every save-looking file" would change a live title — and
+/// `unless_present` keeps the flag whenever any of the data it flags is really there (a player's own
+/// dump of the same build, saves included, loads as it came). Reached from LGT's and SKT's
+/// `from_archive`; KTF has no row and does not call it.
+pub struct OrphanEntry {
+    pub jar_md5: [u8; 16],
+    pub drop: &'static str,
+    pub unless_present: &'static [&'static str],
+}
+
+pub const ORPHAN_ENTRIES: &[OrphanEntry] = &[
+    // Not a title: `WIRING_PROBE_JAR`, as above.
+    OrphanEntry {
+        jar_md5: [
+            0x26, 0x7b, 0x1e, 0x2a, 0x93, 0xff, 0x10, 0x59, 0x16, 0x5a, 0xc6, 0xe0, 0xd5, 0xc2, 0x3e, 0x4a,
+        ],
+        drop: "probe.flag",
+        unless_present: &["probe.data"],
+    },
+    // LGT
+    // a30bbe008b5e (AID 00025C2B): `mastercom.sav` byte[3]=01 says "a save exists", `master.sav` is
+    // absent, so «continue» opens nothing and drops the player into a zero-state village that ignores
+    // input (docs/report/0272).
+    OrphanEntry {
+        jar_md5: [
+            0x06, 0xde, 0x2f, 0x8c, 0x4c, 0xf6, 0x32, 0xe0, 0x78, 0x4f, 0x95, 0x03, 0xb5, 0xb4, 0x20, 0x23,
+        ],
+        drop: "mastercom.sav",
+        unless_present: &["master.sav"],
+    },
+    // SKT
+    // a0436eb1ddbb: `option.dat` marks both save slots as saved and neither slot file is shipped, so
+    // the title takes «continue», loads nothing and plays on an empty map — visitors walk off its
+    // east edge and every such frame throws (docs/report/0570). The file holds the owner's options
+    // too; without it the title writes its defaults (docs/report/0590).
+    OrphanEntry {
+        jar_md5: [
+            0x69, 0x97, 0x00, 0xed, 0xc3, 0x1e, 0xec, 0xe1, 0xc7, 0xd5, 0xe7, 0xb6, 0x4c, 0x3c, 0xc9, 0x2c,
+        ],
+        drop: "option.dat",
+        unless_present: &["norysavedata.0", "norysavedata.1"],
+    },
+];
+
+/// A «jar» no title ships, listed in all four lists above: a carrier test mounting it with `probe.sav`,
+/// `probe.opt`, `probe.xor` and `probe.flag` sees the first and last dropped and the others rewritten
+/// only if `from_archive` calls `turn_owner_sound_on` and `drop_orphan_entries` — the rows alone cannot
+/// show that, since the real jars are game bytes.
 pub const WIRING_PROBE_JAR: &[u8] = b"wie owner-files wiring probe";
 
-/// Start the title with the sound on where the owner left it off: all three lists above, for this jar.
+/// Start the title with the sound on where the owner left it off: the three sound lists above, for this jar.
 pub fn turn_owner_sound_on(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8]) {
     drop_owner_files(files, jar, OWNER_SOUND_OFF_SETTINGS);
     rewrite_owner_bytes(files, jar, OWNER_SOUND_OFF_BYTES);
@@ -287,6 +335,28 @@ pub fn drop_owner_files(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8], table
                 if files.remove(&key).is_some() {
                     tracing::info!("Not mounting the original owner's {key}");
                 }
+            }
+        }
+    }
+}
+
+/// Remove the save flags `table` names for this jar, unless data they flag is in the archive too.
+/// Both are looked up bare and under `P/`: LGT mounts those two spellings at the same path, SKT
+/// ships them bare.
+pub fn drop_orphan_entries(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8], table: &[OrphanEntry]) {
+    let hash = md5::compute(jar).0;
+    let keys = |name: &str| [name.to_owned(), format!("P/{name}")];
+    for entry in table.iter().filter(|entry| entry.jar_md5 == hash) {
+        if entry
+            .unless_present
+            .iter()
+            .any(|data| keys(data).iter().any(|key| files.contains_key(key)))
+        {
+            continue;
+        }
+        for key in keys(entry.drop) {
+            if files.remove(&key).is_some() {
+                tracing::info!("Not mounting orphan save flag {key} (none of {:?})", entry.unless_present);
             }
         }
     }
@@ -328,8 +398,8 @@ mod tests {
     use alloc::{collections::BTreeMap, string::ToString, vec, vec::Vec};
 
     use super::{
-        OWNER_SOUND_OFF_BYTES, OWNER_SOUND_OFF_SETTINGS, OWNER_SOUND_OFF_XOR, WIRING_PROBE_JAR, drop_owner_files, rewrite_owner_bytes,
-        turn_owner_sound_on, xor_owner_bytes,
+        ORPHAN_ENTRIES, OWNER_SOUND_OFF_BYTES, OWNER_SOUND_OFF_SETTINGS, OWNER_SOUND_OFF_XOR, OrphanEntry, WIRING_PROBE_JAR, drop_orphan_entries,
+        drop_owner_files, rewrite_owner_bytes, turn_owner_sound_on, xor_owner_bytes,
     };
 
     fn md5(hex: &str) -> [u8; 16] {
@@ -414,6 +484,65 @@ mod tests {
         assert_eq!(files, archive(&shipped));
     }
 
+    fn orphan_table(jar: &[u8]) -> [OrphanEntry; 1] {
+        [OrphanEntry {
+            jar_md5: md5::compute(jar).0,
+            drop: "flag.sav",
+            unless_present: &["slot.0", "slot.1"],
+        }]
+    }
+
+    fn archive(names: &[&str]) -> BTreeMap<alloc::string::String, Vec<u8>> {
+        names.iter().map(|name| (name.to_string(), vec![1])).collect()
+    }
+
+    #[test]
+    fn orphan_flag_dropped_for_listed_jar_only() {
+        for flag in ["flag.sav", "P/flag.sav"] {
+            let mut files = archive(&["app.jar", "app_info", flag]);
+            drop_orphan_entries(&mut files, b"listed", &orphan_table(b"listed"));
+            assert_eq!(files.keys().collect::<Vec<_>>(), ["app.jar", "app_info"], "{flag}");
+        }
+
+        // Any other jar — every other title — mounts exactly what it shipped, under the real table too
+        // (a file named like a listed title's flag included).
+        let shipped = archive(&["app.jar", "flag.sav", "mastercom.sav", "option.dat", "P/maplesave1.do"]);
+        let mut files = shipped.clone();
+        drop_orphan_entries(&mut files, b"other", &orphan_table(b"listed"));
+        drop_orphan_entries(&mut files, b"other", ORPHAN_ENTRIES);
+        assert_eq!(files, shipped);
+    }
+
+    #[test]
+    fn orphan_flag_kept_when_any_of_its_data_is_present() {
+        for data in ["slot.0", "slot.1", "P/slot.0", "P/slot.1"] {
+            let shipped = archive(&["flag.sav", data]);
+            let mut files = shipped.clone();
+            drop_orphan_entries(&mut files, b"listed", &orphan_table(b"listed"));
+            assert_eq!(files, shipped, "{data}");
+        }
+    }
+
+    // Measured, not derivable (docs/report/0272, 0590); the MD5s are `md5 -q <jar>` output pasted as-is.
+    #[test]
+    fn orphan_rows_cover_the_measured_titles() {
+        let row = |hex: &str| ORPHAN_ENTRIES.iter().find(|e| e.jar_md5 == md5(hex)).map(|e| (e.drop, e.unless_present));
+        assert_eq!(row("06de2f8c4cf632e0784f9503b5b42023"), Some(("mastercom.sav", &["master.sav"][..]))); // a30bbe008b5e
+        assert_eq!(
+            row("699700edc31eece1c7d5e7b64c3cc92c"), // a0436eb1ddbb
+            Some(("option.dat", &["norysavedata.0", "norysavedata.1"][..]))
+        );
+        // One row per jar: a second row could drop what the first one's `unless_present` keeps.
+        assert_eq!(
+            ORPHAN_ENTRIES
+                .iter()
+                .map(|e| e.jar_md5)
+                .collect::<alloc::collections::BTreeSet<_>>()
+                .len(),
+            ORPHAN_ENTRIES.len()
+        );
+    }
+
     // Measured, not derivable: with these rows the titles play from the start (docs/report/0519, 0526,
     // 0537). The jars are game bytes and cannot be here, so this pins the rows rather than the effect.
     // The MD5s are `md5 -q <jar>` output pasted as-is, so a slip copying them into the byte rows fails here.
@@ -464,6 +593,7 @@ mod tests {
         test_utils::assert_ledger_lists("owner-sound-off-settings", titles(OWNER_SOUND_OFF_SETTINGS.iter().map(|x| x.0).collect()));
         test_utils::assert_ledger_lists("owner-sound-off-bytes", titles(OWNER_SOUND_OFF_BYTES.iter().map(|x| x.0).collect()));
         test_utils::assert_ledger_lists("owner-sound-off-xor", titles(OWNER_SOUND_OFF_XOR.iter().map(|x| x.0).collect()));
+        test_utils::assert_ledger_lists("orphan-entries", titles(ORPHAN_ENTRIES.iter().map(|x| x.jar_md5).collect()));
     }
 
     #[test]
@@ -476,5 +606,7 @@ mod tests {
             xor.map(|(_, n, f, e)| (*n, *f, *e)),
             Some(("probe.xor", md5::compute([0]).0, &[(0, 0x01)][..]))
         );
+        let orphan = ORPHAN_ENTRIES.iter().find(|e| e.jar_md5 == md5("267b1e2a93ff1059165ac6e0d5c23e4a"));
+        assert_eq!(orphan.map(|e| (e.drop, e.unless_present)), Some(("probe.flag", &["probe.data"][..])));
     }
 }

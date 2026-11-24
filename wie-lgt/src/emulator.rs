@@ -15,7 +15,10 @@ use jvm::{
     runtime::{JavaIoInputStream, JavaLangClassLoader},
 };
 
-use wie_backend::{Emulator, Event, Options, Pacing, Platform, System, TaskRunner, extract_zip, owner_files::turn_owner_sound_on};
+use wie_backend::{
+    Emulator, Event, Options, Pacing, Platform, System, TaskRunner, extract_zip,
+    owner_files::{ORPHAN_ENTRIES, drop_orphan_entries, turn_owner_sound_on},
+};
 use wie_core_arm::{Allocator, ArmCore};
 use wie_jvm_support::JvmSupport;
 use wie_util::{Result, WieError};
@@ -40,50 +43,6 @@ impl TaskRunner for LgtTaskRunner {
 
     fn hold_others(&self, on: bool) -> bool {
         self.core.hold_others(on)
-    }
-}
-
-/// Per-title archive entries that are NOT mounted, because the archive is a dump of a previous
-/// owner's phone and the entry is a save *flag* whose save *data* the dump does not carry.
-///
-/// Keyed by the MD5 of the application jar, not by the archive: `from_archive` never sees the
-/// archive bytes, and the jar is what identifies the title build (the same idiom as
-/// `wie-core-arm`'s binary patch table). Deliberately a list, never a rule — other titles ship
-/// complete saves beside the jar (`P/maplesave1.do` …), so "hide every save-looking file" would
-/// change a live title. `unless_present` keeps the entry whenever the data it flags is really there.
-struct OrphanEntry {
-    jar_md5: [u8; 16],
-    drop: &'static str,
-    unless_present: &'static str,
-}
-
-const ORPHAN_ENTRIES: &[OrphanEntry] = &[
-    // 배틀몬스터 (AID 00025C2B · archive sha256 a30bbe008b5e5704…, the otterpebble registration key).
-    // `mastercom.sav` byte[3]=01 says "a save exists", `master.sav` is absent, so 이어하기 opens
-    // nothing and drops the player into a zero-state village that ignores input (docs/report/0272).
-    OrphanEntry {
-        jar_md5: [
-            0x06, 0xde, 0x2f, 0x8c, 0x4c, 0xf6, 0x32, 0xe0, 0x78, 0x4f, 0x95, 0x03, 0xb5, 0xb4, 0x20, 0x23,
-        ],
-        drop: "mastercom.sav",
-        unless_present: "master.sav",
-    },
-];
-
-/// Remove the entries `table` names for this jar. A file is looked up both bare and under `P/`,
-/// because `load` mounts both spellings at the same path.
-fn drop_orphan_entries(files: &mut BTreeMap<String, Vec<u8>>, jar: &[u8], table: &[OrphanEntry]) {
-    let hash = md5::compute(jar).0;
-    let has = |files: &BTreeMap<String, Vec<u8>>, name: &str| files.contains_key(name) || files.contains_key(&format!("P/{name}"));
-    for entry in table.iter().filter(|e| e.jar_md5 == hash) {
-        if has(files, entry.unless_present) {
-            continue;
-        }
-        for key in [entry.drop.to_owned(), format!("P/{}", entry.drop)] {
-            if files.remove(&key).is_some() {
-                tracing::info!("Not mounting orphan save flag {key} (no {})", entry.unless_present);
-            }
-        }
     }
 }
 
@@ -315,71 +274,24 @@ impl LgtAppInfo {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{borrow::ToOwned, collections::BTreeMap, string::String, vec, vec::Vec};
+    use alloc::{collections::BTreeMap, vec};
 
-    use super::{LgtAppInfo, ORPHAN_ENTRIES, OrphanEntry, drop_orphan_entries};
-
-    /// `docs/contracts/runtime-adjustments.tsv` lists exactly this table: a row added here without a
-    /// ledger row — or a ledger row left behind — fails (CLAUDE.md «게임 파일 무수정 원칙»).
-    #[test]
-    fn the_ledger_lists_exactly_this_table() {
-        test_utils::assert_ledger_lists("orphan-entries", ORPHAN_ENTRIES.iter().map(|x| test_utils::hex(x.jar_md5)));
-    }
-
-    fn table(jar: &[u8]) -> [OrphanEntry; 1] {
-        [OrphanEntry {
-            jar_md5: md5::compute(jar).0,
-            drop: "mastercom.sav",
-            unless_present: "master.sav",
-        }]
-    }
-
-    fn archive(names: &[&str]) -> BTreeMap<String, Vec<u8>> {
-        names.iter().map(|n| ((*n).to_owned(), vec![1])).collect()
-    }
+    use super::LgtAppInfo;
 
     // The rows are pinned in `wie-backend`; this pins that the LGT mount path applies them. The probe
     // jar is not a zip holding `binary.mod`, so it cannot pass `from_archive` itself.
     #[test]
-    fn mount_path_turns_the_owner_sound_on() {
+    fn mount_path_prepares_the_owner_files() {
         use wie_backend::owner_files::WIRING_PROBE_JAR;
 
         let mut files = BTreeMap::from([
             ("P/probe.sav".into(), vec![0]),
             ("P/probe.opt".into(), vec![0]),
             ("P/probe.xor".into(), vec![0]),
+            ("P/probe.flag".into(), vec![0]),
         ]);
         super::prepare_owner_files(&mut files, WIRING_PROBE_JAR);
         assert_eq!(files, BTreeMap::from([("P/probe.opt".into(), vec![1]), ("P/probe.xor".into(), vec![1])]));
-    }
-
-    #[test]
-    fn orphan_flag_dropped_for_listed_jar_only() {
-        let mut files = archive(&["app.jar", "app_info", "mastercom.sav"]);
-        drop_orphan_entries(&mut files, b"listed", &table(b"listed"));
-        assert!(!files.contains_key("mastercom.sav"));
-        assert!(files.contains_key("app_info"));
-
-        // Any other jar — every other title — mounts exactly what it shipped.
-        let mut files = archive(&["app.jar", "mastercom.sav", "P/maplesave1.do"]);
-        drop_orphan_entries(&mut files, b"other", &table(b"listed"));
-        assert_eq!(files.len(), 3);
-    }
-
-    #[test]
-    fn orphan_flag_kept_when_its_data_is_present() {
-        for data in ["master.sav", "P/master.sav"] {
-            let mut files = archive(&["mastercom.sav", data]);
-            drop_orphan_entries(&mut files, b"listed", &table(b"listed"));
-            assert!(files.contains_key("mastercom.sav"), "{data}");
-        }
-    }
-
-    #[test]
-    fn orphan_flag_dropped_under_p_prefix() {
-        let mut files = archive(&["P/mastercom.sav"]);
-        drop_orphan_entries(&mut files, b"listed", &table(b"listed"));
-        assert!(files.is_empty());
     }
 
     #[test]

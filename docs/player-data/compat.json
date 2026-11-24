@@ -8110,13 +8110,16 @@
     "longplay": "ok",
     "sound": "ok",
     "speed": "ok",
-    "progress": "stuck"
+    "progress": "ok"
    },
    "knownIssues_ko": [],
    "changes": [],
    "fileTitle": "skt 노리타이쿤",
    "game": "노리타이쿤",
-   "variant": null
+   "variant": null,
+   "runtimeAdjustments": [
+    "orphan-flag"
+   ]
   },
   {
    "sha256": "fb80e97cbc57454f9b0a21c3fc4f60db40bb8a71c75f316ee545e21ccc442072",

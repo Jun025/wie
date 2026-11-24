@@ -27,7 +27,7 @@
 #   owner-sound-off-settings  wie-backend/src/owner_files.rs `OWNER_SOUND_OFF_SETTINGS` · md5(본체 jar) · 시험용 `WIRING_PROBE_JAR` 행 제외(아래 두 표도)
 #   owner-sound-off-bytes     wie-backend/src/owner_files.rs `OWNER_SOUND_OFF_BYTES` · md5(본체 jar)
 #   owner-sound-off-xor       wie-backend/src/owner_files.rs `OWNER_SOUND_OFF_XOR` · md5(본체 jar) · 그 파일의 MD5 가 꾸러미에 든 것과 같을 때만 고친다
-#   orphan-entries            wie-lgt/src/emulator.rs `ORPHAN_ENTRIES` · md5(본체 jar) · 짝이 되는 저장 본체가 꾸러미에 없을 때만 뺀다
+#   orphan-entries            wie-backend/src/owner_files.rs `ORPHAN_ENTRIES` · md5(본체 jar) · 그 표식이 가리키는 저장 본체가 꾸러미에 하나도 없을 때만 뺀다 · 시험용 행 제외 · LGT · SKT 의 `from_archive` 가 건다
 #   display-overrides         wie-skt/src/emulator.rs `DISPLAY_OVERRIDES` · md5(본체 jar)
 #   device-bound-saves        wie-ktf/src/emulator.rs `DEVICE_BOUND_SAVES` · md5(본체 jar)
 #   owner-progress-saves      wie-ktf/src/emulator.rs `OWNER_PROGRESS_SAVES` · md5(본체 jar)
@@ -85,6 +85,7 @@ owner-sound-off-bytes	1229f411eefd064382d90a6d904f7c09	f483ba078c14	SKT	엑스�
 owner-sound-off-bytes	a8a613b3af6cada57eab7852bf24f473	fb80e97cbc57	SKT	다크슬레이어2	owner-file-bytes	file-bytes	zip	ratified-2026-11-20	tower 추천 채택 2026-10-23 · 티켓 wie-skt-owner-sound-off-seven-titles-mount-path · PR #570 · docs/report/0537
 owner-sound-off-xor	c51c411fd816ef8083195225ff067ca8	01f05f8231f4	LGT	게임빌2010프로야구	owner-file-bytes	file-bytes	zip	adopted	운영자 Tower 채택 2026-10-28 · 티켓 wie-2026-10-26-lgt-01f05f8231f4-phone-lock-adopt-p0(-fix) · PR #578 · docs/report/0545
 orphan-entries	06de2f8c4cf632e0784f9503b5b42023	a30bbe008b5e	LGT	배틀몬스터	orphan-flag	file-not-mounted	zip	adopted	cockpit 추천 채택 2026-09-26 · 티켓 wie-2026-09-26-battlemonster-orphan-save-flag-exclude-adopt-p0 · PR #318 · docs/report/0272
+orphan-entries	699700edc31eece1c7d5e7b64c3cc92c	a0436eb1ddbb	SKT	노리타이쿤	orphan-flag	file-not-mounted	zip	adopted	운영자 tower 채택 2026-11-24(추천 카드 2026-11-22-a0436eb1ddbb-aioobe-throw-site-measure#p0) · 티켓 wie-a0436eb1ddbb-skip-previous-owner-option-dat-so-it-starts-a-new-game · PR #622 · docs/report/0590
 display-overrides	2f75012556c0153f698cc16d170d9eb5	c361632541a7	SKT	레스토랑타이쿤2006	display-size	engine-setting	zip	adopted	cockpit 채택 2026-10-11 · 티켓 wie-skt-c361632541a7-img240-display-size-black-screen · PR #545 · docs/report/0512
 device-bound-saves	697ccf638df04b9827db67753427d58e	59263295de74	KTF	티어즈오브메탈	device-bound-save	file-not-mounted	zip	ratified-2026-11-20	티켓 wie-ktf-59263295de74-seed-save-file-address-read-adopt-p1 · PR #430 · docs/report/0398
 owner-progress-saves	e91885fb2c0fec9ea97a0d29c15ed72f	3185174d2121	KTF	간호사타이쿤	owner-file-skip	file-not-mounted	zip	ratified-2026-11-20	총괄 결정 2026-10-02(진도 이식 정책 ⒝) · 티켓 wie-shipped-save-progress-transplant-exclude-measured-titles · PR #451 · docs/report/0419
