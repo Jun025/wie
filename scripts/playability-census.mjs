@@ -778,6 +778,10 @@ const HAND_NOTE = {
     '켤 때마다 정식사용자 인증을 하려고 게임사 서버에 접속하는데, 그 서버가 지금은 없어 «사용자인증에 실패하였습니다» 안내가 나와요. 확인을 누르면 메뉴로 가고, «게임시작»으로 이야기와 매장 운영을 할 수 있어요.',
     '이벤트와 네트워크 메뉴의 랭킹은 이름을 등록하려고 게임사 서버에 접속하는데, 그 서버가 지금은 없어 쓸 수 없어요.',
   ],
+  // Two lines that lived only in compat.json, typed in by hand (docs/report/0479 · the wave-4 follow-up): a census
+  // re-import of the row dropped them. Same words, now derived here (docs/report/0595).
+  c3057f46c59b: ['미션에 실패한 뒤 나오는 메뉴에서 «튜토리얼»에 커서를 두면 화면이 멈춰요. «다시하기»를 고르면 이어서 할 수 있어요.'],
+  '77c2d0bcd435': ['서버에 접속하는 단계에서 «네트워크 문제로 서버에 접속하지 못하였습니다» 안내가 나와, 여기서는 그 뒤로 진행할 수 없어요.'],
 };
 // How a title that works is moved forward — not a problem, so it ships as `playTips_ko`, not
 // `knownIssues_ko` (the shell lists the latter under «알려진 문제» · contract §1).
