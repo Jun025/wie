@@ -454,9 +454,13 @@ mod tests {
             let mut context = super::test::new_context(&mut system_task).await?;
             context.spawn(Box::new(Probe(held_task, ran_task)))
         });
-        while !ran.load(Ordering::Relaxed) {
+        for _ in 0..1000 {
+            if ran.load(Ordering::Relaxed) {
+                break;
+            }
             system.tick()?;
         }
+        assert!(ran.load(Ordering::Relaxed), "the spawned callback ran");
         assert!(held.load(Ordering::Relaxed));
         Ok(())
     }

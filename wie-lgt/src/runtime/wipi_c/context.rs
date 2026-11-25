@@ -402,9 +402,13 @@ mod tests {
             let (jvm, core, _) = init_jvm(&system_task).await?;
             LgtWIPICContext::new(core, system_task.clone(), jvm).spawn(Box::new(Probe(held_task, ran_task)))
         });
-        while !ran.load(Ordering::Relaxed) {
+        for _ in 0..1000 {
+            if ran.load(Ordering::Relaxed) {
+                break;
+            }
             system.tick()?;
         }
+        assert!(ran.load(Ordering::Relaxed), "the spawned callback ran");
         assert!(held.load(Ordering::Relaxed));
         Ok(())
     }
