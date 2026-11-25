@@ -256,7 +256,7 @@ pub(super) mod test {
 
     use super::KtfWIPICContext;
 
-    async fn new_context(system: &mut System) -> Result<KtfWIPICContext> {
+    pub(super) async fn new_context(system: &mut System) -> Result<KtfWIPICContext> {
         let mut core = ArmCore::new(wie_backend::Options {
             enable_gdbserver: false,
             aot: None,
@@ -407,6 +407,58 @@ mod tests {
             }
             Ok(())
         })
+    }
+
+    /// A spawned callback (clip status, socket) goes in through `wie_wipi_c::call_spawned`: it runs
+    /// holding the others. This locks the call site only — the wait and its cap are `wie-wipi-c`'s
+    /// tests; with the direct `callback.call` back here every one of those stayed green.
+    #[test]
+    fn a_spawned_callback_runs_held() -> Result<()> {
+        use alloc::vec::Vec;
+        use core::{future::Future, pin::Pin};
+
+        use wie_backend::TaskRunner;
+        use wie_util::WieError;
+        use wie_wipi_c::{MethodBody, WIPICResult};
+
+        struct OneHold(AtomicBool);
+
+        #[async_trait::async_trait]
+        impl TaskRunner for OneHold {
+            async fn run(&self, future: Pin<Box<dyn Future<Output = Result<()>> + Send>>) -> Result<()> {
+                future.await
+            }
+
+            fn hold_others(&self, on: bool) -> bool {
+                self.0.swap(on, Ordering::Relaxed)
+            }
+        }
+
+        struct Probe(Arc<AtomicBool>, Arc<AtomicBool>);
+
+        #[async_trait::async_trait]
+        impl MethodBody<WieError> for Probe {
+            async fn call(&self, context: &mut dyn WIPICContext, _: Box<[u32]>) -> Result<WIPICResult> {
+                self.0.store(context.system().guest_hold_others(true), Ordering::Relaxed);
+                self.1.store(true, Ordering::Relaxed);
+                Ok(WIPICResult { results: Vec::new() })
+            }
+        }
+
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", OneHold(AtomicBool::new(false)));
+        let (held, ran) = (Arc::new(AtomicBool::new(false)), Arc::new(AtomicBool::new(false)));
+        let (held_task, ran_task) = (held.clone(), ran.clone());
+        let mut system_task = system.clone();
+
+        system.spawn(async move || {
+            let mut context = super::test::new_context(&mut system_task).await?;
+            context.spawn(Box::new(Probe(held_task, ran_task)))
+        });
+        while !ran.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+        assert!(held.load(Ordering::Relaxed));
+        Ok(())
     }
 
     #[test]
