@@ -159,4 +159,4 @@
 - 게임 랩 게이트 `scripts/smoke_gate.sh`(ktf + lgt · 기준선 242행 · §5 와 같은 16부 · 이 head 의 디버그 `wie_validate`): 16부 전부 `OK: no regressions vs baseline.` — 확인 242 · 부재 0 · 회귀 0 · 돌린 판 244 PASS / 0 FAIL. long 풀(1칸)을 다른 레인의 스윕이 25분 넘게 잡고 있어, 임대 1건당 3부(약 15분)로 짠 드라이버(`fix/smoke-phases.sh`)를 «short 임대 1건당 1부(약 4분)»로 돌렸다 — §5 와 같은 꼴 · 에뮬레이터 1 · load1 3.4 ~ 17.9.
 - wasm 계약 3종(로컬 `scripts/build-wasm.sh` rc 0 뒤): `check-engine-contract.mjs` rc 0(`OK — engine surface matches the pinned featurephone contract.`) · `check-audio-worklet.mjs --require-soundfont` rc 0 · `contract-roundtrip.mjs` rc 0(`OK — boot round-trip matches the pinned featurephone contract.`). 내보내는 표면은 바뀌지 않았다.
 
-<!-- corpus-name-inflow v1 subjects=7 tree=94056e951fca4992 B=3/2 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=8 tree=4d1ec471007fb2dd B=3/2 P=0/0 S=0/0 -->
