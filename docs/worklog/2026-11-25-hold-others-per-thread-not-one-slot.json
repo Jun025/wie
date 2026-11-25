@@ -1,0 +1,24 @@
+{
+  "date": "2026-11-25",
+  "task": "wie-arm-hold-others-single-slot-callback-steals-and-clears-another-threads-hold",
+  "title": "붙듦(hold_others)을 스레드마다 하나씩 — 콜백이 키 · 그리기 처리기의 붙듦을 가져가거나 지우지 않는다",
+  "summary": "PR #630 재검수가 남긴 N1 · N2 · N3 · N5 의 집행. ArmCore::hold_others 의 한 칸(holder.swap)을 붙든 스레드 목록(ArmCore.holders)으로 바꿨다 — 스레드는 자기 붙듦만 걸고 지우고, wait_for_holder 는 «붙든 채 잘린 다른 스레드»가 있으면 붙든 스레드도 기다린다. 호출부(키 · 그리기 · call_spawned)의 동작하는 줄은 그대로다. 자연 실행에서는 두 방식 모두 가져감 0(지금 85런 · 한 칸 85런 — 검수의 1/8 은 재현되지 않았다). 붙든 키 처리기를 호스트 호출에 세워 그 길을 일부러 연 실행에서 한 칸은 12/12 런에서 처리기의 붙듦을 잃고 지금은 0/12. 강제 재현 겹침 0/6 유지(NOFIX 4/6). docs/report/0601.",
+  "changes": [
+    "wie-core-arm/src/core.rs: holder(AtomicUsize 한 칸) → holders(붙든 스레드 id 목록) · hold_others 는 자기 것만 · wait_for_holder 는 붙든 채 잘린 다른 스레드 전부를 본다 · 끝난 스레드는 목록에서 빠진다 · 시험 another_thread_taking_a_hold_leaves_the_holders_in_place · another_thread_letting_go_leaves_the_holders_in_place · a_holder_parked_in_a_host_call_keeps_nobody_off",
+    "wie-wipi-c/src/context.rs: 상한 시험의 붙듦 모형이 «콜백 스레드의 것»과 걸고 지운 횟수를 가른다(N3) · a_spawned_callback_runs_at_the_cap_and_takes_no_hold · call_spawned 주석",
+    "wie-ktf · wie-lgt runtime/wipi_c/context.rs: 배선 시험 a_spawned_callback_runs_held 의 루프에 상한(N5)",
+    "wie-backend/src/task_runner.rs: hold_others 문서 — 붙듦은 그 스레드의 것",
+    "docs/report/0601--2026-11-25--wie-arm-hold-others-single-slot-callback-steals-and-clears-another-threads-hold.md"
+  ],
+  "verification": "docs/report/0601 · 증적(저장소 밖): ~/orchestrator/reports/evidence/wie-arm-hold-others-single-slot-callback-steals-and-clears-another-threads-hold/",
+  "limits": [
+    "N1 의 자연 빈도는 다시 잡지 못했다(한 칸 36런 0회 · 검수 8런 1회) — 근거는 강제 실행(PARKKEY 손잡이)과 실제 ArmCore 시험이다",
+    "MC_netConnect 콜백은 여전히 실판에서 재지 못했다 · 그 «자는 스레드»가 기다림과 붙듦을 받는 것 자체(순비용)는 그대로다",
+    "둘이 동시에 붙들 때 뒤에 온 쪽이 기다리는 새 길은 이 회차 99런에서 0차례라 그 기다림이 길어지는 판은 보지 못했다(상한은 HOLD_ROUNDS 그대로)",
+    "call_spawned 가 상한(250ms)에서 붙듦 없이 들어가는 규칙은 그대로 두었다 — 만든 사정은 사라졌지만 그 동작을 바꾸는 측정은 이 티켓 밖이다",
+    "관측만 하고 재지 않은 것: 붙든 스레드를 200차례 다 기다리고 그냥 도는 일이 세 판에서 매 런 있다(두 방식 같음 · 85런 합 59회)"
+  ],
+  "proposals": [],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}
