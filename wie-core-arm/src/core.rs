@@ -101,6 +101,8 @@ pub struct ArmCore {
     // runs a nested guest call, these are the only copy of what the outer guest code held — the
     // arguments of the host method it called included. See `guest_root_words`.
     saved_contexts: Arc<Mutex<BTreeMap<u64, ArmCoreContext>>>,
+    // The threads holding the others. See `hold_others`.
+    holders: Arc<Mutex<Vec<ThreadId>>>,
 }
 
 static NEXT_SAVED_CONTEXT: AtomicU64 = AtomicU64::new(0);
@@ -155,6 +157,7 @@ impl ArmCore {
             inner: Arc::new(Mutex::new(inner)),
             threads: Arc::new(Mutex::new(BTreeMap::new())),
             saved_contexts: Arc::new(Mutex::new(BTreeMap::new())),
+            holders: Arc::new(Mutex::new(Vec::new())),
         };
 
         if enable_gdbserver {
@@ -249,6 +252,7 @@ impl ArmCore {
     pub fn delete_thread_context(&self, thread_id: ThreadId) {
         tracing::info!("Terminate thread: {thread_id}");
 
+        self.holders.lock().retain(|id| *id != thread_id);
         // Release the thread lock before freeing its stack.
         let _thread_state = self.threads.lock().remove(&thread_id);
     }
@@ -300,17 +304,26 @@ impl ArmCore {
     /// Returns whether the current thread already held them, so a nested holder (a paint run from
     /// inside a key handler) can leave the outer hold in place.
     pub fn hold_others(&self, on: bool) -> bool {
-        let current = self.current_thread_id();
-        let mut threads = self.threads.lock();
-        let state = current.and_then(|id| threads.get_mut(&id));
-        state.is_some_and(|state| core::mem::replace(&mut state.holds, on))
+        let Some(current) = self.current_thread_id() else {
+            return false;
+        };
+        let mut holders = self.holders.lock();
+        let held = holders.contains(&current);
+        holders.retain(|id| *id != current);
+        if on {
+            holders.push(current);
+        }
+        held
     }
 
     async fn wait_for_holder(&self) {
         for _ in 0..HOLD_ROUNDS {
+            if self.holders.lock().is_empty() {
+                return;
+            }
             let current = self.current_thread_id();
-            let sliced_holder = |(id, state): (&ThreadId, &ThreadState)| Some(*id) != current && state.holds && state.preempted;
-            if current.is_none() || !self.threads.lock().iter().any(sliced_holder) {
+            let sliced = |id: &ThreadId| Some(*id) != current && self.threads.lock().get(id).is_some_and(|state| state.preempted);
+            if current.is_none() || !self.holders.lock().iter().any(sliced) {
                 return;
             }
             YieldFuture::new().await;

@@ -14,8 +14,6 @@ pub struct ThreadState {
     /// Sliced out by the instruction budget between two guest instructions, rather than parked
     /// in a host call. See [`ArmCore::others_preempted`].
     pub preempted: bool,
-    /// Set by this thread, for this thread. See [`ArmCore::hold_others`].
-    pub holds: bool,
 }
 
 impl ThreadState {
@@ -47,7 +45,6 @@ impl ThreadState {
             stack_base: stack_base as _,
             stack_size: STACK_SIZE as _,
             preempted: false,
-            holds: false,
         })
     }
 }
