@@ -105,13 +105,50 @@ error[E0425]: cannot find value `WIE_PATCH` in crate `arm32_cpu`
 - 루프가 프로세스 표본에서 차지하는 몫은 40.1~54.9% → 30.7~35.1% 다. 이 수는 러너가 타이머를 기다리는 몫과 부하로 움직이므로
   판단에 쓰지 않았다(스크립트 머리말).
 
-### 6. 회귀 그물
+### 6. 회귀 그물 — `smoke_gate` ktf · lgt 전/후
 
-측정 중이다(long 슬롯 대기) — 이 PR 의 다음 커밋이 채운다.
+`scripts/smoke_gate.sh`(뜨고 그린다 · `--timeout 15` · 재시도 2)를 기준 목록의 KTF · LGT 전부에 전 · 후 두 빌드로 돌렸다. 묶음
+(KTF 48 · 48 · 48 · 46 + LGT 54)마다 전과 후가 **같은 순간에** 돈다(에뮬레이터 2개 동시). 빌드는 §5 의 release 바이너리다
+(`BIN=` — 스크립트 기본값인 debug 가 아니다). load1 5.8~16.8.
+
+| | 전 `933bf58da` | 후 `973534619` |
+|---|---|---|
+| KTF — 돌린 판 · PASS · 기준 대조 | 190 · 190 · checked 190 · absent 0 · **regressions 0** | 190 · 190 · checked 190 · absent 0 · **regressions 0** |
+| LGT — 돌린 판 · PASS · 기준 대조 | 54 · 54 · checked 52 · absent 0 · **regressions 0** | 54 · 54 · checked 52 · absent 0 · **regressions 0** |
+
+- 기준 목록의 KTF 190 · LGT 52 행 전부를 대조했다(absent 0). LGT 는 기준에 없는 2판이 코퍼스에 더 있어 54판이 돌았고 그 둘도 양쪽 PASS 다.
+- 스크립트는 판마다 마지막 판정만 찍는다 — 재시도로 PASS 가 된 판이 있었는지는 이 출력으로 알 수 없다.
+- 러너 블록(커밋된 6개 픽스처)은 §8.
 
 ### 7. perf-watch compare
 
-측정 중이다(long 슬롯 대기) — 이 PR 의 다음 커밋이 채운다.
+`bash scripts/perf-watch.sh compare 933bf58da 973534619` 의 빌드 · 측정 · 판정(A = main `933bf58da7c7` · B = 이 브랜치 `973534619285` ·
+두 rev 를 `git archive` 에서 따로 지은 네이티브 + wasm · 표본마다 A 와 B 가 같은 순간에 돈다 · 3회 · load1 4~28.6).
+**퇴행 0 · 1차 경보 0 · 미측정 0/15 · 편차에 묻힘 0**(짝 재측 4~6회는 걸리지 않았다). 느려짐 % 는 «B 가 A 보다 얼마나 느린가»라 음수가 빨라진 것이다.
+
+| 축 | 표본 | 회별 느려짐 % | 중앙값 | 문턱 | 판정 |
+|---|---|---|---|---|---|
+| native(50M tick 당 CPU ms) | LGT `3cc7a9b4cb15` | −7.2 · −5.3 · −5.8 | **−5.8** | 5 | ok |
+| native | KTF `155972cac664` | −4.7 · −1.4 · −2.2 | **−2.2** | 5 | ok |
+| native | LGT `0606d43702e7` | −0.4 · −0.4 · −0.5 | −0.4 | 5 | ok |
+| native | KTF `1065985081fc` | 0.5 · 0.1 · −0.1 | 0.1 | 5 | ok |
+| native | J2ME `8238f5449347` | 0.1 · 0.4 · 0 | 0.1 | 5 | ok |
+| native/paint | J2ME `835acd535a5f` · SKT `d1234e0ddb75` | −0.5 · 0.4 · 0 / −1.2 · 0.4 · 0 | 0 / 0 | 5 | ok |
+| browser(30 s paints) | KTF `155972cac664` | −1.2 · −2 · −3.3 | −2 | 5 | ok |
+| browser | LGT `3cc7a9b4cb15` | −2 · −28.7 · −1.7 | −2 | 25.3 | ok |
+| browser | LGT `0606d43702e7` | 6.1 · −5 · 3.3 | 3.3 | 9.4 | ok |
+| browser | KTF `1065985081fc` | 0 · 0 · 0 | 0 | 5 | ok |
+| browser | J2ME 2 · SKT 2 | −0.4~0.7 | −0.2~0.2 | 5 | ok |
+
+- **ARM 을 타지 않는 표본(J2ME · SKT)은 움직이지 않았다**(±0.5% 안 · 한 회 −1.2) — 바뀐 것이 ARM 해석기뿐이라는 것과 맞는다.
+- 네이티브에서 ARM 으로 무거운 두 표본이 빨라졌다(−5.8 · −2.2%). §5 의 −24% 보다 작은 까닭은 단위다: 이 축은 프로세스 CPU 전체를
+  tick 으로 나누고, 해석 루프는 그 프로세스 표본의 31~55% 다(나머지는 러너가 타이머를 기다리며 도는 몫 · §5).
+- **브라우저 고정 표본에서는 이득이 작다**(KTF `155972cac664` 30초에 396 · 394 · 404 → 401 · 402 · 418 장 = +1.3~3.5% · LGT `3cc7a9b4cb15`
+  390 · 399 → 398 · 406 장 = +1.8~2.1%). 이 표본들의 30초 구간(부팅 · 타이틀)은 틱 예산을 다 쓰는 장면이 아니라 게임 자신의 박자에
+  묶여 있어서다. 0575 가 겨눈 것은 틱 예산을 매번 다 쓰는 장면(저녁 마을)이고, 그 장면의 브라우저 쌍은 이 회차에 뜨지 않았다(§9).
+- LGT `3cc7a9b4cb15` 브라우저 2회째(A 286 · B 401 · load1 28.6)는 A 쪽이 굶은 실행이다 — 도구도 편차 12.6 으로 읽어 문턱을 25.3 으로 올렸다. 이득의 근거로 쓰지 않는다.
+- LGT `0606d43702e7` 브라우저는 부호가 회마다 바뀐다(6.1 · −5 · 3.3 · 편차 4.7) — 같은 표본의 네이티브는 −0.4% 로 서 있으므로 잡음으로 읽었다.
+- 증적 md 와 원자료(`perf.md` · `native.jsonl` · `browser.jsonl`)는 저장소 밖 증거 폴더에 있다(§10).
 
 ### 8. 게이트
 
@@ -141,3 +178,12 @@ error[E0425]: cannot find value `WIE_PATCH` in crate `arm32_cpu`
 - smoke 는 «뜨고 그린다»까지만 본다. 해독의 같음은 §4 의 전수 대조가 증명이고 smoke 는 그 위의 실기 확인이다.
 - ARM(비-Thumb) 해독은 그대로 순차 대조다(티켓 경계 · 성 대화에서 Thumb 99.69%).
 - upstream 에 같은 변경을 내는 일은 하지 않았다(티켓 경계 · 저장소 밖 행위).
+
+### 10. 증거 · 재현
+
+- 저장소 밖 `~/orchestrator/reports/evidence/wie-arm-interpreter-thumb-decode-single-table-lookup-vendor-arm32-cpu-into-patches/`:
+  `profile/` = 여섯 실행의 집계 표 · `time-profile.xml` · `toc.xml` · 프레임 표식 줄(§5 의 수는 `scripts/arm-interp-profile.mjs` 로 다시 낼 수 있다) ·
+  `perf/` = `perf.md` · `native.jsonl` · `browser.jsonl` · `smoke/` = 묶음별 전/후 요약 줄 · `gates/` = 게이트 로그. 캡처(게임 화면)와 표본 경로는 두지 않았다.
+- 프로파일 1회: `~/orchestrator-live/bin/build-slot run --long -- env RUST_LOG=wie_wipi_c::api::kernel=debug bash scripts/arm-interp-profile.sh <wie_validate> <게임> docs/keys/lgt-3cc7a9b4cb15-intro-castle.keys 110 <out> 8`
+  (빌드와 `.dSYM` 은 그 스크립트 머리말대로).
+- 타르볼과의 차이: `diff -r ~/.cargo/registry/src/*/arm32_cpu-0.1.2/src patches/arm32_cpu/src`.
