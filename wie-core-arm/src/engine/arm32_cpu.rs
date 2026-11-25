@@ -110,7 +110,6 @@ impl ArmEngine for Arm32CpuEngine {
         let mut budget_consumed = 0;
         let mut interpret_one = false;
         let mut lookup_entry = true;
-        let mut code_page = CodePage::NONE;
         let stop_reason = loop {
             let pc = self.cpu.reg_get(Mode::User, reg::PC);
 
@@ -173,8 +172,6 @@ impl ArmEngine for Arm32CpuEngine {
                         Err(error) => {
                             tracing::warn!(%error, "ARM AOT execution failed; using interpreter");
                             self.aot = None;
-                            // Compiled code reached pages directly since the pointer was last taken.
-                            code_page = CodePage::NONE;
                             CompiledExit::Dispatch
                         }
                     };
@@ -210,12 +207,7 @@ impl ArmEngine for Arm32CpuEngine {
             } else {
                 None
             };
-            // With an AOT backend, compiled code and the cache-maintenance decode above touch pages
-            // outside the shim, so the pointer is taken afresh (see `CodePage`).
-            if self.aot.is_some() || pc & !PAGE_MASK != code_page.base {
-                code_page = self.mem.code_page(pc);
-            }
-            let mut arm32cpu_memory = Arm32CpuMemory::new(&mut self.mem, code_page);
+            let mut arm32cpu_memory = self.mem.as_arm32cpu_memory();
             if !(self.cpu.step(&mut arm32cpu_memory)) {
                 // The caller's register dump is taken after every `run_function` on the way out has
                 // restored its caller's context, so it shows the thread's initial registers (PC 0),
@@ -415,19 +407,8 @@ impl EmulatedMemory {
         }
     }
 
-    #[cfg(test)]
     fn as_arm32cpu_memory(&mut self) -> Arm32CpuMemory<'_> {
-        Arm32CpuMemory::new(self, CodePage::NONE)
-    }
-
-    fn code_page(&mut self, pc: u32) -> CodePage {
-        match self.pages[pc as usize / PAGE_SIZE].bytes.as_deref_mut() {
-            Some(bytes) => CodePage {
-                base: pc & !PAGE_MASK,
-                bytes,
-            },
-            None => CodePage::NONE,
-        }
+        Arm32CpuMemory::new(self)
     }
 
     fn map(&mut self, address: u32, size: usize) {
@@ -506,38 +487,15 @@ impl EmulatedMemory {
     }
 }
 
-/// The mapped page `run` is executing from: a shim access inside it skips the page-table walk
-/// (docs/report/0575 §5 ⒜). It names a location, never a copy, so nothing about it goes stale:
-/// - a guest store into code goes through the same pointer, and the next fetch reads it;
-/// - host writes (hook install · `unhook` · binary patches · loaders) happen between `run` calls,
-///   and each call starts from `NONE`;
-/// - a page-table entry is written by `EmulatedMemory::map` (fills an empty entry, never frees or replaces
-///   one; not reachable during `run`) or by a compiled executor, around which `run` retakes or drops it.
-#[derive(Clone, Copy)]
-struct CodePage {
-    /// Never equal to a page address while `bytes` is null (page addresses have the low 16 bits clear).
-    base: u32,
-    bytes: *mut [u8; PAGE_SIZE],
-}
-
-impl CodePage {
-    const NONE: Self = Self {
-        base: 1,
-        bytes: core::ptr::null_mut(),
-    };
-}
-
 struct Arm32CpuMemory<'a> {
     emulated_memory: &'a mut EmulatedMemory,
-    code_page: CodePage,
     memory_error: Option<u32>,
 }
 
 impl<'a> Arm32CpuMemory<'a> {
-    fn new(emulated_memory: &'a mut EmulatedMemory, code_page: CodePage) -> Self {
+    fn new(emulated_memory: &'a mut EmulatedMemory) -> Self {
         Self {
             emulated_memory,
-            code_page,
             memory_error: None,
         }
     }
@@ -561,13 +519,6 @@ impl<'a> Arm32CpuMemory<'a> {
 
     fn get_page(&mut self, addr: u32) -> Option<&mut [u8; PAGE_SIZE]> {
         let page_address = addr & !PAGE_MASK;
-        if page_address == self.code_page.base {
-            // SAFETY: `bytes` came from a live `&mut` to this page's box, taken by `run` right before
-            // the step (`EmulatedMemory::code_page`); the box is never freed or replaced, and while the
-            // pointer is held no other reference to this page is made — the shim's own accesses all come
-            // here, and with an AOT backend (whose paths read pages directly) `run` retakes it every step.
-            return Some(unsafe { &mut *self.code_page.bytes });
-        }
         let page_data = self.emulated_memory.pages[page_address as usize / PAGE_SIZE].bytes.as_deref_mut();
 
         if let Some(x) = page_data {
@@ -1227,40 +1178,6 @@ mod tests {
                 (EngineStopReason::End, true) | (EngineStopReason::Yield, false)
             ));
         }
-    }
-
-    #[test]
-    fn rewritten_code_on_the_executing_page_runs_its_new_bytes() {
-        // `run` keeps a pointer to the page it executes from (`CodePage`), never a copy of it.
-        fn run_to_lr(engine: &mut Arm32CpuEngine, pc: u32) -> u32 {
-            engine.reg_write(ArmRegister::Cpsr, 0x10);
-            engine.reg_write(ArmRegister::PC, pc | 1);
-            engine.reg_write(ArmRegister::LR, 0x40000);
-            assert!(matches!(engine.run(0x40000, 100).unwrap().stop_reason, EngineStopReason::End));
-            engine.reg_read(ArmRegister::R2)
-        }
-        let mut engine = Arm32CpuEngine::new();
-        engine.mem_map(0x10000, 0x20000, MemoryPermission::ReadWriteExecute);
-
-        // A guest store rewrites `movs r2, #1` to `movs r2, #7` after the page is cached, before its fetch:
-        // strh r1, [r0]; nop; nop; movs r2, #1; bx lr
-        engine
-            .mem_write(0x10000, &[0x01, 0x80, 0xc0, 0x46, 0xc0, 0x46, 0x01, 0x22, 0x70, 0x47])
-            .unwrap();
-        engine.reg_write(ArmRegister::R0, 0x10006);
-        engine.reg_write(ArmRegister::R1, 0x2207);
-        assert_eq!(run_to_lr(&mut engine, 0x10000), 7);
-        let mut written = [0; 2];
-        engine.mem_read(0x10006, 2, &mut written).unwrap();
-        assert_eq!(written, [0x07, 0x22], "the store reached memory, not a cached copy");
-
-        // A host write between runs (hook install · `unhook` · binary patches): `movs r2, #9`.
-        engine.mem_write(0x10006, &[0x09, 0x22]).unwrap();
-        assert_eq!(run_to_lr(&mut engine, 0x10006), 9);
-
-        // Across a page boundary: movs r2, #3 | (next page) bx lr.
-        engine.mem_write(0x1fffe, &[0x03, 0x22, 0x70, 0x47]).unwrap();
-        assert_eq!(run_to_lr(&mut engine, 0x1fffe), 3);
     }
 
     #[test]
