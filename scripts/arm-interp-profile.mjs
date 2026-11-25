@@ -82,10 +82,11 @@ function classifier(path) {
     } else if (/arm32_cpu[^/]*\/src\/(thumb|arm)\.rs$/.test(path)) {
       const mode = path.endsWith('thumb.rs') ? 'Thumb' : 'ARM';
       const table = at(/^const INST_MATCH_ORDER/);
+      const lookup = at(/^const DECODE_TABLE/) < Infinity; // patches/arm32_cpu: same lines, no walk
       const impl = at(/^impl Cpu \{/);
       const body = at(/^\s*match inst_type \{/, impl);
       fn = (n) =>
-        logLines.has(n) ? 'log 수준 검사 (trace!)' : n >= table && n < impl ? `${mode} 해독 (패턴 표 선형 대조)` : n >= impl && n < body ? `${mode} 선행부 (인출 · CPSR · PC 전진)` : `${mode} 실행 (명령별)`;
+        logLines.has(n) ? 'log 수준 검사 (trace!)' : n >= table && n < impl ? `${mode} 해독 (${lookup ? '256칸 표 찾기' : '패턴 표 선형 대조'})` : n >= impl && n < body ? `${mode} 선행부 (인출 · CPSR · PC 전진)` : `${mode} 실행 (명령별)`;
     }
   }
   sources.set(path, fn);
