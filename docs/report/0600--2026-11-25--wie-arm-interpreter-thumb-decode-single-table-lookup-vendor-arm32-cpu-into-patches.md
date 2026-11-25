@@ -187,3 +187,6 @@ error[E0425]: cannot find value `WIE_PATCH` in crate `arm32_cpu`
 - 프로파일 1회: `~/orchestrator-live/bin/build-slot run --long -- env RUST_LOG=wie_wipi_c::api::kernel=debug bash scripts/arm-interp-profile.sh <wie_validate> <게임> docs/keys/lgt-3cc7a9b4cb15-intro-castle.keys 110 <out> 8`
   (빌드와 `.dSYM` 은 그 스크립트 머리말대로).
 - 타르볼과의 차이: `diff -r ~/.cargo/registry/src/*/arm32_cpu-0.1.2/src patches/arm32_cpu/src`.
+
+
+<!-- corpus-name-inflow v1 subjects=48 tree=bfc55fd5ffe95517 B=0/0 P=2/2 S=0/0 -->
