@@ -11,7 +11,7 @@
 
 **사용자 영향** — 그 KTF 판이 시작 화면에서 소리가 바뀐 직후 드물게 멈추던 길이 닫혔다(강제 재현에서 겹침 · 오류 · 넘침 0). 클립 상태 · 소켓 콜백을 쓰는 KTF · LGT 판 전부가 같은 길을 탄다. 비용은 콜백 지연이다: 대상 세 판에서 최대 79ms · 상한 도달 0(§2 · §3), KTF 60판 표본에서 콜백 90개 중 상한(250ms) 도달 2(§4). 붙든 동안 다른 스레드가 밀린 차례는 어디서도 0 이었다.
 
-증적(전부 저장소 밖 · sha12 만): `~/orchestrator/reports/evidence/wie-wipi-c-callback-spawnproxy-wait-preempted-and-hold-others-like-key-and-draw/` — 런별 결과 줄(`runs/<묶음>/*.json`) · 드라이버(`run.sh` · `phase.sh` · `chunks.sh` · `smoke-parts.sh`) · 집계(`tally.py`). 계측 패치는 `/tmp/spawnhold/tree` 의 스크래치 작업 트리(`git diff`)다.
+증적(전부 저장소 밖 · sha12 만): `~/orchestrator/reports/evidence/wie-wipi-c-callback-spawnproxy-wait-preempted-and-hold-others-like-key-and-draw/` — 런별 결과 줄(`runs/<묶음>/*.json`) · 드라이버(`run.sh` · `phase.sh` · `chunks.sh` · `smoke-parts.sh`) · 집계(`tally.py`). 계측 패치는 같은 곳의 `scratch-instrument.diff` 다.
 
 ### 1. 측정 방법
 
@@ -91,4 +91,4 @@
 
 `corpus-name-inflow`: BOUNDED 3회 / 2쌍 · SUFFIX-ATTACHED 0. 셋 다 이 회차가 한 줄씩 고친 `wie-ktf` · `wie-lgt` 의 `runtime/wipi_c/context.rs` 에 **이미 있던 주석**이다(파일을 고쳐 파일 전체가 대상이 됐다) — 이 회차가 더한 이름은 0. 이 문서 · worklog · 소식은 판을 sha12 로만 적는다. 게임 바이트 · 캡처는 0.
 
-<!-- corpus-name-inflow v1 subjects=7 tree=d5975ca4449efd9a B=3/2 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=7 tree=94056e951fca4992 B=3/2 P=0/0 S=0/0 -->
