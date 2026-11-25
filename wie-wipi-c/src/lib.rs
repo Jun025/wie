@@ -6,7 +6,7 @@ mod context;
 mod globals;
 mod method;
 
-pub use self::context::{WIPICContext, WIPICResult};
+pub use self::context::{WIPICContext, WIPICResult, call_spawned};
 pub use self::method::{MethodBody, MethodImpl};
 
 use alloc::boxed::Box;

@@ -159,7 +159,7 @@ impl WIPICContext for KtfWIPICContext {
         impl AsyncCallable<Result<()>> for SpawnProxy {
             async fn call(mut self) -> Result<()> {
                 self.context.jvm.attach_thread(None).await.unwrap();
-                self.callback.call(&mut self.context, Box::new([])).await?;
+                wie_wipi_c::call_spawned(&mut self.context, &self.callback).await?;
                 self.context.jvm.detach_thread().unwrap();
 
                 Ok(())
