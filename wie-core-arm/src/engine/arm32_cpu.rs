@@ -173,6 +173,8 @@ impl ArmEngine for Arm32CpuEngine {
                         Err(error) => {
                             tracing::warn!(%error, "ARM AOT execution failed; using interpreter");
                             self.aot = None;
+                            // Compiled code reached pages directly since the pointer was last taken.
+                            code_page = CodePage::NONE;
                             CompiledExit::Dispatch
                         }
                     };
@@ -509,8 +511,8 @@ impl EmulatedMemory {
 /// - a guest store into code goes through the same pointer, and the next fetch reads it;
 /// - host writes (hook install · `unhook` · binary patches · loaders) happen between `run` calls,
 ///   and each call starts from `NONE`;
-/// - the only writer of a page-table entry is `EmulatedMemory::map`, which fills an empty entry and
-///   never frees or replaces one, and it is not reachable during `run`.
+/// - a page-table entry is written by `EmulatedMemory::map` (fills an empty entry, never frees or replaces
+///   one; not reachable during `run`) or by a compiled executor, around which `run` retakes or drops it.
 #[derive(Clone, Copy)]
 struct CodePage {
     /// Never equal to a page address while `bytes` is null (page addresses have the low 16 bits clear).
