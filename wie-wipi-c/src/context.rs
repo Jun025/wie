@@ -86,6 +86,41 @@ impl ResultConverter<()> for () {
     }
 }
 
+/// Longest a spawned callback waits for the other guest threads to reach a host call — a key's cap
+/// (`KEY_WAITS_FOR_GUEST_MS`, docs/report/0430).
+const CALLBACK_WAITS_FOR_GUEST_MS: u32 = 250;
+
+/// Runs a callback `WIPICContext::spawn` put on its own guest thread (clip status, socket) the way a
+/// key and a paint run: not in the middle of another guest thread's code, and not sliced into by one.
+/// 8b01d4ae6af4's event pump checks a busy flag and then dequeues; a clip callback that came in while
+/// the main thread was sliced between the two ran the main thread's record, the main thread ran the
+/// callback's, both drove the title's one script runner at once and it ended in a stack overflow
+/// (docs/report/0591). The wait is capped: past it the callback runs anyway, as it did before — and
+/// without the hold. The hold has one slot, and the thread still sliced out at the cap can be a key
+/// or paint handler holding it; taking the slot there left the rest of that handler unheld
+/// (503d5d2f196b, every run — docs/report/0598 §8).
+pub async fn call_spawned(context: &mut dyn WIPICContext, callback: &WIPICMethodBody) -> Result<()> {
+    let mut waited = 0;
+    while waited < CALLBACK_WAITS_FOR_GUEST_MS && context.system().guest_others_preempted() {
+        context.system().sleep(1).await;
+        waited += 1;
+    }
+    if waited > 0 {
+        tracing::debug!("spawned callback waited {waited}ms for a guest thread sliced out mid-code");
+    }
+
+    let hold = waited < CALLBACK_WAITS_FOR_GUEST_MS;
+    if hold {
+        context.system().guest_hold_others(true);
+    }
+    let result = callback.call(context, Box::new([])).await;
+    if hold {
+        context.system().guest_hold_others(false);
+    }
+
+    result.map(|_| ())
+}
+
 #[cfg(test)]
 pub mod test {
     use alloc::{boxed::Box, format, string::String, sync::Arc, vec::Vec};
@@ -275,9 +310,131 @@ pub mod test {
 
 #[cfg(test)]
 mod tests {
-    use alloc::vec;
+    use alloc::{boxed::Box, sync::Arc, vec, vec::Vec};
+    use core::{
+        future::Future,
+        pin::Pin,
+        sync::atomic::{AtomicBool, AtomicU32, Ordering},
+    };
 
-    use super::{ResultConverter, test::TestContext};
+    use test_utils::TestPlatform;
+    use wie_backend::{AsyncCallable, System, TaskRunner};
+    use wie_util::{Result, WieError};
+    use wipi_types::wipic::WIPICWord;
+
+    use crate::{MethodBody, WIPICMethodBody};
+
+    use super::{ResultConverter, WIPICContext, WIPICResult, call_spawned, test::TestContext};
+
+    /// Another guest thread stays sliced out mid-code for the first `left` asks; one hold flag.
+    struct SlicedRunner {
+        left: Arc<AtomicU32>,
+        held: Arc<AtomicBool>,
+        asks: Arc<AtomicU32>,
+    }
+
+    #[async_trait::async_trait]
+    impl TaskRunner for SlicedRunner {
+        async fn run(&self, future: Pin<Box<dyn Future<Output = Result<()>> + Send>>) -> Result<()> {
+            future.await
+        }
+
+        fn others_preempted(&self) -> bool {
+            self.asks.fetch_add(1, Ordering::Relaxed);
+            let left = self.left.load(Ordering::Relaxed);
+            self.left.store(left.saturating_sub(1), Ordering::Relaxed);
+            left > 0
+        }
+
+        fn hold_others(&self, on: bool) -> bool {
+            self.held.swap(on, Ordering::Relaxed)
+        }
+    }
+
+    /// Records (asks left, held) when the guest callback runs.
+    struct Probe {
+        left: Arc<AtomicU32>,
+        held: Arc<AtomicBool>,
+        seen: Arc<Seen>,
+    }
+
+    #[derive(Default)]
+    struct Seen {
+        ran: AtomicBool,
+        left: AtomicU32,
+        held: AtomicBool,
+    }
+
+    #[async_trait::async_trait]
+    impl MethodBody<WieError> for Probe {
+        async fn call(&self, _: &mut dyn WIPICContext, _: Box<[WIPICWord]>) -> Result<WIPICResult> {
+            self.seen.ran.store(true, Ordering::Relaxed);
+            self.seen.left.store(self.left.load(Ordering::Relaxed), Ordering::Relaxed);
+            self.seen.held.store(self.held.load(Ordering::Relaxed), Ordering::Relaxed);
+            Ok(WIPICResult { results: Vec::new() })
+        }
+    }
+
+    /// Runs a probe through `call_spawned` on its own task, with another thread sliced out for the
+    /// first `left` asks and the hold slot starting at `held`. Returns (what the probe saw, the hold
+    /// slot after, asks made).
+    fn run_spawned(left: u32, held: bool) -> (Arc<Seen>, bool, u32) {
+        let (left, held, asks) = (
+            Arc::new(AtomicU32::new(left)),
+            Arc::new(AtomicBool::new(held)),
+            Arc::new(AtomicU32::new(0)),
+        );
+        let runner = SlicedRunner {
+            left: left.clone(),
+            held: held.clone(),
+            asks: asks.clone(),
+        };
+        let mut system = System::new(Box::new(TestPlatform::new()), "pid", "aid", runner);
+        let seen = Arc::new(Seen::default());
+        let callback: WIPICMethodBody = Box::new(Probe {
+            left,
+            held: held.clone(),
+            seen: seen.clone(),
+        });
+
+        struct Spawned(TestContext, WIPICMethodBody);
+        impl AsyncCallable<Result<()>> for Spawned {
+            async fn call(mut self) -> Result<()> {
+                call_spawned(&mut self.0, &self.1).await
+            }
+        }
+        system.spawn(Spawned(TestContext::with_system(system.clone()), callback));
+        for _ in 0..1000 {
+            if seen.ran.load(Ordering::Relaxed) {
+                break;
+            }
+            system.tick().unwrap();
+        }
+
+        (seen, held.load(Ordering::Relaxed), asks.load(Ordering::Relaxed))
+    }
+
+    // 8b01d4ae6af4: a clip callback ran the main thread's record from inside its sliced event pump.
+    #[test]
+    fn a_spawned_callback_waits_for_a_sliced_thread_and_runs_held() {
+        let (seen, held_after, _) = run_spawned(3, false);
+
+        assert!(seen.ran.load(Ordering::Relaxed));
+        assert_eq!(seen.left.load(Ordering::Relaxed), 0, "ran only once the other thread reached a host call");
+        assert!(seen.held.load(Ordering::Relaxed), "ran holding the others");
+        assert!(!held_after, "and let go after");
+    }
+
+    // 503d5d2f196b: a thread that never reached a host call was the key handler holding the others;
+    // the callback that came in at the cap took its hold and cleared it on the way out.
+    #[test]
+    fn a_spawned_callback_runs_at_the_cap_and_leaves_the_hold_alone() {
+        let (seen, held_after, asks) = run_spawned(u32::MAX, true); // never clears; someone else holds
+
+        assert!(seen.ran.load(Ordering::Relaxed), "the wait is capped");
+        assert_eq!(asks, 250, "at a key's cap, one ask per ms");
+        assert!(held_after, "the holder's hold is still there");
+    }
 
     #[test]
     fn convert_u64_splits_low_and_high_words() {

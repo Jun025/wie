@@ -12,7 +12,9 @@ use crate::{WIPICResult, context::WIPICContext, method::MethodBody};
 const M_E_WOULDBLOCK: i32 = -19;
 
 /// `cb(args…)` on the next turn of the executor, as the handset delivers network callbacks;
-/// `MC_netConnect`'s after a 1ms sleep, as it always has.
+/// `MC_netConnect`'s after a 1ms sleep, as it always has. That sleep is a thread of its own, which
+/// then spawns the call: `call_spawned` waits for the other guest threads before the body, and they
+/// are back in the middle of their code after a sleep inside it (docs/report/0598 §8).
 struct Callback {
     cb: WIPICWord,
     args: Vec<WIPICWord>,
@@ -24,6 +26,12 @@ impl MethodBody<WieError> for Callback {
     async fn call(&self, context: &mut dyn WIPICContext, _: Box<[WIPICWord]>) -> Result<WIPICResult> {
         if self.delay {
             context.system().sleep(1).await; // simulate some delay
+            context.spawn(Box::new(Callback {
+                cb: self.cb,
+                args: self.args.clone(),
+                delay: false,
+            }))?;
+            return Ok(WIPICResult { results: Vec::new() });
         }
 
         context.call_function(self.cb, &self.args).await?;
@@ -200,11 +208,14 @@ pub async fn set_write_cb(context: &mut dyn WIPICContext, fd: i32, cb: WIPICWord
 mod tests {
     use crate::context::test::TestContext;
 
-    use alloc::{boxed::Box, vec};
+    use alloc::{boxed::Box, sync::Arc, vec};
+    use core::sync::atomic::{AtomicBool, Ordering};
 
     use test_utils::TestPlatform;
     use wie_backend::{DefaultTaskRunner, System};
     use wie_util::{ByteRead, ByteWrite};
+
+    use crate::context::call_spawned;
 
     use super::{WIPICContext, connect, set_read_cb, set_write_cb, socket, socket_connect, socket_read, socket_write};
 
@@ -228,6 +239,36 @@ mod tests {
         let callback = context.spawned.pop().unwrap();
         callback.call(&mut context, Box::new([])).await.unwrap();
         assert_eq!(context.call_args, [(0x24501, vec![u32::MAX, u32::MAX, 7])]);
+    }
+
+    // `MC_netConnect`'s callback slept 1ms inside its body — after `call_spawned`'s wait — and went
+    // into whatever guest code the others had got to meanwhile. The sleep's thread makes no guest
+    // call; the call is spawned after it, and so waits like any other.
+    #[test]
+    fn connect_callback_is_spawned_after_its_sleep_test() {
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", DefaultTaskRunner);
+        let mut context = TestContext::with_system(system.clone());
+        let done = Arc::new(AtomicBool::new(false));
+        let done_clone = done.clone();
+        system.spawn(async move || {
+            connect(&mut context, 0x4a24d, 7).await?;
+            let sleeper = context.spawned.pop().unwrap();
+            call_spawned(&mut context, &sleeper).await?;
+            assert!(context.calls.is_empty(), "no guest call from the thread that slept");
+
+            let callback = context.spawned.pop().unwrap();
+            call_spawned(&mut context, &callback).await?;
+            assert_eq!(context.call_args, [(0x4a24d, vec![u32::MAX, 7])]); // `cb(M_E_ERROR, param)`
+            done_clone.store(true, Ordering::Relaxed);
+            Ok(())
+        });
+        for _ in 0..100 {
+            if done.load(Ordering::Relaxed) {
+                break;
+            }
+            system.tick().unwrap();
+        }
+        assert!(done.load(Ordering::Relaxed));
     }
 
     // b9bfcaf42722's certificate exchange through the WIPI-C calls, in the order and with the

@@ -173,7 +173,7 @@ impl WIPICContext for LgtWIPICContext {
         impl AsyncCallable<Result<()>> for SpawnProxy {
             async fn call(mut self) -> Result<()> {
                 self.context.jvm.attach_thread(None).await.unwrap();
-                self.callback.call(&mut self.context, Box::new([])).await?;
+                wie_wipi_c::call_spawned(&mut self.context, &self.callback).await?;
                 self.context.jvm.detach_thread().unwrap();
 
                 Ok(())
@@ -346,6 +346,66 @@ mod tests {
             system.tick()?;
         }
 
+        Ok(())
+    }
+
+    /// A spawned callback (clip status, socket) goes in through `wie_wipi_c::call_spawned`: it runs
+    /// holding the others. This locks the call site only — the wait and its cap are `wie-wipi-c`'s
+    /// tests; with the direct `callback.call` back here every one of those stayed green.
+    #[test]
+    fn a_spawned_callback_runs_held() -> Result<()> {
+        use alloc::{boxed::Box, sync::Arc, vec::Vec};
+        use core::{
+            future::Future,
+            pin::Pin,
+            sync::atomic::{AtomicBool, Ordering},
+        };
+
+        use test_utils::TestPlatform;
+        use wie_backend::{System, TaskRunner};
+        use wie_util::WieError;
+        use wie_wipi_c::{MethodBody, WIPICContext, WIPICResult};
+
+        use super::LgtWIPICContext;
+        use crate::runtime::java::init_jvm;
+
+        struct OneHold(AtomicBool);
+
+        #[async_trait::async_trait]
+        impl TaskRunner for OneHold {
+            async fn run(&self, future: Pin<Box<dyn Future<Output = Result<()>> + Send>>) -> Result<()> {
+                future.await
+            }
+
+            fn hold_others(&self, on: bool) -> bool {
+                self.0.swap(on, Ordering::Relaxed)
+            }
+        }
+
+        struct Probe(Arc<AtomicBool>, Arc<AtomicBool>);
+
+        #[async_trait::async_trait]
+        impl MethodBody<WieError> for Probe {
+            async fn call(&self, context: &mut dyn WIPICContext, _: Box<[u32]>) -> Result<WIPICResult> {
+                self.0.store(context.system().guest_hold_others(true), Ordering::Relaxed);
+                self.1.store(true, Ordering::Relaxed);
+                Ok(WIPICResult { results: Vec::new() })
+            }
+        }
+
+        let mut system = System::new(Box::new(TestPlatform::new()), "", "", OneHold(AtomicBool::new(false)));
+        let (held, ran) = (Arc::new(AtomicBool::new(false)), Arc::new(AtomicBool::new(false)));
+        let (held_task, ran_task) = (held.clone(), ran.clone());
+        let system_task = system.clone();
+
+        system.spawn(async move || {
+            let (jvm, core, _) = init_jvm(&system_task).await?;
+            LgtWIPICContext::new(core, system_task.clone(), jvm).spawn(Box::new(Probe(held_task, ran_task)))
+        });
+        while !ran.load(Ordering::Relaxed) {
+            system.tick()?;
+        }
+        assert!(held.load(Ordering::Relaxed));
         Ok(())
     }
 
