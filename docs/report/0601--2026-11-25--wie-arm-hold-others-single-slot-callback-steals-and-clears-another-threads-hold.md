@@ -181,3 +181,5 @@
 
 `corpus-name-inflow`(대상 7파일): BOUNDED 3회 / 2쌍 · SUFFIX-ATTACHED 0. 셋 다 이 회차가 시험 몇 줄을 고친 `wie-ktf` · `wie-lgt` 의 `runtime/wipi_c/context.rs` 에 **이미 있던 주석**이다(`0598` §7 과 같은 세 줄 — 파일을 고쳐 파일 전체가 대상이 됐다). 이 회차가 더한 줄에는 한글이 없다 — 더한 이름 0. 이 문서 · worklog 는 판을 sha12 로만 적는다. 게임 바이트 · 캡처는 0.
 
+
+<!-- corpus-name-inflow v1 subjects=7 tree=e07c1949010133d5 B=3/2 P=0/0 S=0/0 -->
