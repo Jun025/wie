@@ -20,6 +20,7 @@ members = [
     "wie_cli",
     "wie_featurephone",
     "wie_identify",
+    "patches/arm32_cpu",
 ]
 
 # wie-app is upstream's Tauri desktop shell. It arrived with the 2026-09-16
@@ -150,6 +151,14 @@ wie-wipi-java = { version = "0.2.32", path = "wie-wipi-java" }
 futures-test = { version = "^0.3" }
 
 test-utils = { path = "test-utils" }
+
+# Thumb decode as one table lookup instead of a 21-row linear match — 25% of the ARM run loop
+# (docs/report/0575 §2). The patch only applies while its version satisfies wie-core-arm's
+# requirement; past that cargo warns once and silently builds the registry crate, so
+# wie-core-arm's `arm32_cpu_patch_is_applied` test reads Cargo.lock and goes red instead.
+# When to drop this line and the directory: patches/arm32_cpu/README.md.
+[patch.crates-io]
+arm32_cpu = { path = "patches/arm32_cpu" }
 
 [package]
 name = "wie"

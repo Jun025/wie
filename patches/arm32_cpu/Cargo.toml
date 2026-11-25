@@ -1,0 +1,20 @@
+# Vendored copy of crates.io `arm32_cpu` 0.1.2 (dlunch/arm32_cpu @ 7488118a), applied through
+# `[patch.crates-io]` in the workspace root. One change: Thumb decode is a 256-entry table lookup
+# (src/thumb.rs). Why and when to drop it: README.md.
+[package]
+name = "arm32_cpu"
+description = "An ARM32 emulator with ARMv4T and ARMv5 ARM/Thumb instruction support"
+authors = ["Sean Purcell <me@seanp.xyz>", "Daniel Prilik <danielprilik@gmail.com>", "Inseok Lee <me@dlun.ch>"]
+version = "0.1.2"
+publish = false
+license = "MIT"
+edition = "2018"
+readme = "README.md"
+documentation = "https://docs.rs/arm32_cpu"
+homepage = "https://github.com/dlunch/arm32_cpu"
+repository = "https://github.com/dlunch/arm32_cpu"
+keywords = ["emulator", "emulation", "arm", "armv4t", "armv5"]
+categories = ["emulators"]
+
+[dependencies]
+log = "0.4"
