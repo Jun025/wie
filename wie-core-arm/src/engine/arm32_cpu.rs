@@ -10,6 +10,13 @@ use wie_core_arm_aot::{
 };
 use wie_util::{Result, WieError};
 
+// The ARM interpreter must be the vendored `patches/arm32_cpu` (Thumb decode table), not the registry
+// crate. A `[patch.crates-io]` entry whose version no longer satisfies our `arm32_cpu` requirement is
+// dropped — with no warning while that directory is a workspace member — and the build stays green on
+// the registry crate. Only the patched crate exports this marker, so that fallback is a compile error
+// here. What to do: patches/arm32_cpu/README.md.
+const _: () = arm32_cpu::WIE_PATCH;
+
 use crate::{
     aot::Aot,
     engine::{ArmEngine, ArmRegister, EngineRunResult, EngineStopReason, MemoryPermission},

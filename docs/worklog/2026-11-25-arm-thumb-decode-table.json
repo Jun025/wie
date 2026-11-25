@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-25",
+  "task": "wie-arm-interpreter-thumb-decode-single-table-lookup-vendor-arm32-cpu-into-patches",
+  "title": "ARM 해석기 — Thumb 해독을 256칸 표 한 번 찾기로 (arm32_cpu 0.1.2 를 patches/ 로 들임)",
+  "summary": "외부 크레이트 arm32_cpu 0.1.2 를 patches/arm32_cpu 로 들이고 Thumb 명령 해독을 21줄 표 순차 대조에서 상위 바이트로 256칸 표를 한 번 찾는 것으로 바꿨다. 같음은 가능한 Thumb 워드 65,536개 전부를 옛 해독과 대조하는 시험으로 증명한다. 네이티브 성 대화(LGT 3cc7a9b4cb15)에서 프레임당 해석 루프가 22.37 → 16.99 ms(-24.1% · 3회씩 · 짝 범위 -19.4~-28.3%)다. 패치가 빠진 빌드는 컴파일 오류다.",
+  "changes": [
+    "patches/arm32_cpu: 발행 타르볼(dlunch/arm32_cpu@7488118a) + 해독 표(src/thumb.rs) · 선택 기능 serde-serialize/advanced_disasm 제거 · 타르볼 자신의 린트 지적 allow 1줄 · WIE_PATCH 표식 · README(출처 · 변경 · 가드 · 버릴 조건)",
+    "Cargo.toml: members 1줄 + [patch.crates-io] 절 신설 · Cargo.lock: arm32_cpu 항목의 source/checksum 빠짐",
+    "wie-core-arm/src/engine/arm32_cpu.rs: const _: () = arm32_cpu::WIE_PATCH — 레지스트리 판으로 돌아간 빌드는 컴파일되지 않는다",
+    "scripts/arm-interp-profile.mjs: 해독 묶음의 이름을 소스에서 읽는다(표 찾기 / 순차 대조)",
+    "docs/architecture.md: 디렉터리 표에 patches/ 행 · docs/player-updates: speed 1건"
+  ],
+  "verification": [
+    "65,536 워드 전수 대조 시험 통과 · 표 한 칸 개악(table[0xd0] = Branch) red(0xd000) · 요구 버전을 ^0.1.3 으로 올린 미적용 형상에서 E0425 컴파일 오류",
+    "0575 의 자(arm-interp-profile · 성 대화 · 3회씩): 전 23.25 · 21.69 · 22.17 ms → 후 17.49 · 16.66 · 16.82 ms",
+    "네 게이트 + beta clippy rc 0 · 러너 블록 6건 PASS · build:wasm → check-engine-contract(143 pass) → contract-roundtrip OK",
+    "smoke_gate ktf · lgt 전/후 · perf-watch compare — docs/report/0600 §6 · §7"
+  ],
+  "limits": [
+    "장면 1개 · 기기 1대. 브라우저 저녁 마을 쌍(0575 §1)은 다시 뜨지 않았다 — 화면/초 효과는 여전히 모형 값이다",
+    "미적용 형상에서 cargo 는 경고를 내지 않는다(들인 디렉터리가 멤버라서) — 가드는 컴파일 표식 하나뿐이다",
+    "ARM(비-Thumb) 해독은 그대로 순차 대조다 · upstream 0.1.3(Thumb-2 B.W)으로 옮기지 않았다(동작 변경 · 별도 회차)",
+    "upstream 에 같은 변경을 내는 일은 하지 않았다(저장소 밖 행위 · 운영자 몫)"
+  ],
+  "proposals": [],
+  "adoptedProposals": ["2026-11-22-arm-interpreter-throughput-step1#p0"],
+  "declinedProposals": []
+}
