@@ -86,3 +86,9 @@
 - `set_timer` 로 오는 콜백(클립의 END_OF_DATA · `MC_knlSetTimer`)은 이 길이 아니다 — 범위 밖이고, 그 길의 끼어듦은 관측하지 않았다.
 - 원 단말이 콜백을 어느 문맥에서 부르는지는 여전히 재지 못했다(실기 없음).
 - 붙듦은 «가장 최근에 붙든 스레드 하나»만 기억한다(`hold_others` 의 기존 성질) — 키 처리기가 붙든 채 잘려 있을 때 콜백이 상한을 넘겨 들어오면 키의 붙듦을 가져간다. 그리기 길과 같은 성질이고, 이 회차 측정에서 상한 도달은 0 이다.
+
+### 7. 게임 이름 유입
+
+`corpus-name-inflow`: BOUNDED 3회 / 2쌍 · SUFFIX-ATTACHED 0. 셋 다 이 회차가 한 줄씩 고친 `wie-ktf` · `wie-lgt` 의 `runtime/wipi_c/context.rs` 에 **이미 있던 주석**이다(파일을 고쳐 파일 전체가 대상이 됐다) — 이 회차가 더한 이름은 0. 이 문서 · worklog · 소식은 판을 sha12 로만 적는다. 게임 바이트 · 캡처는 0.
+
+<!-- corpus-name-inflow v1 subjects=7 tree=c3b997b83f978e38 B=3/2 P=0/0 S=0/0 -->
