@@ -89,7 +89,7 @@
 
 ### 7. 게임 이름 유입
 
-`corpus-name-inflow`: BOUNDED 3회 / 2쌍 · SUFFIX-ATTACHED 0. 셋 다 이 회차가 한 줄씩 고친 `wie-ktf` · `wie-lgt` 의 `runtime/wipi_c/context.rs` 에 **이미 있던 주석**이다(파일을 고쳐 파일 전체가 대상이 됐다) — 이 회차가 더한 이름은 0. 이 문서 · worklog · 소식은 판을 sha12 로만 적는다. 게임 바이트 · 캡처는 0.
+`corpus-name-inflow`: BOUNDED 3회 / 2쌍 · SUFFIX-ATTACHED 0. 셋 다 이 회차가 한 줄씩 고친 `wie-ktf` · `wie-lgt` 의 `runtime/wipi_c/context.rs` 에 **이미 있던 주석**이다(파일을 고쳐 파일 전체가 대상이 됐다) — 이 회차가 더한 이름은 0. 수정 회차(§8)가 같은 두 파일에 시험을 더하고 `wie-wipi-c/src/api/net.rs` 를 고친 뒤에도 같다(대상 8파일 · BOUNDED 3회 / 2쌍 · SUFFIX-ATTACHED 0). 이 문서 · worklog · 소식은 판을 sha12 로만 적는다. 게임 바이트 · 캡처는 0.
 
 ### 8. 게이트② 수정 회차 (`…-fix` · 같은 PR)
 
