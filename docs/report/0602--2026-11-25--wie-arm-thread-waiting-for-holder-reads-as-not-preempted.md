@@ -140,4 +140,4 @@ load1 6.4 ~ 12.4. 앞의 5런(`hunt-new` · 경계 계수기 없는 빌드)의 �
 
 ### 8. 게임 이름 유입
 
-INFLOW_TEXT
+`corpus-name-inflow`(대상 4파일): BOUNDED 0회 / 0쌍 · SUFFIX-ATTACHED 0 — 유입 0건 · 판단 필요 0건. 이 문서 · worklog 는 판을 sha12 로만 적는다. 게임 바이트 · 캡처는 0.
