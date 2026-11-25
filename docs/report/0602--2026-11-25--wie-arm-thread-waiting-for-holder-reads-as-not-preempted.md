@@ -124,7 +124,11 @@ load1 6.4 ~ 12.4. 앞의 5런(`hunt-new` · 경계 계수기 없는 빌드)의 �
 
 ### 6. 회귀
 
-GATES_TEXT
+- 네 게이트 + `cargo +beta clippy --all -- -D warnings`(트리 `d7f3c5a4f` · `gates-final.out`): rc 0 · 0 · 0 · 0 · 0. `cargo test --all` 72 바이너리 · **1,053 passed / 0 failed**(`main` 1,050 + 새 시험 3).
+- 엔진 러너 6종(디버그 · `runner-wasm.out`): `draw_j2me` · `helloworld_ktf` · `helloworld_lgt` · `text_j2me` PASS · `keydraw_ktf` PASS · paints 79 · rc 0 · `keydraw_lgt` PASS · paints 55 · rc 0(`0601` 과 같다).
+- wasm 계약 3종(로컬 `scripts/build-wasm.sh` rc 0 뒤): `check-engine-contract.mjs` rc 0 · `check-audio-worklet.mjs --require-soundfont` rc 0 · `contract-roundtrip.mjs` rc 0. 내보내는 표면은 바뀌지 않았다.
+- `scripts/smoke_gate.sh` ktf + lgt(기준선 242행 · 이 head 의 디버그 `wie_validate`): `0598` 의 16판씩 부(그 부들의 ktf · lgt 행 = 이 head 의 기준선 242행임을 해시로 다시 확인)를 short 임대 1건당 1부 · 두 줄기로 — **16부 전부 `OK: no regressions vs baseline.`** · 확인 242 · 부재 0 · 회귀 0(`smoke/`).
+- `check-compat-revert.mjs --head HEAD --base origin/main`: `compat-revert: OK … 착지 기준 바뀐 행 0`. `check-docs-report-serial` OK · `check-worklog-json` OK · `player-data.mjs` rc 0.
 
 ### 7. 한계
 
