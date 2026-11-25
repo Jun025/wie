@@ -287,9 +287,12 @@ impl ArmCore {
     /// out by the instruction budget, not parked in a host call (sleep, wait, I/O). Host code that
     /// hands the guest an event can wait for this to clear: a handset does not deliver a key into
     /// the middle of another thread's frame (docs/report/0430).
+    ///
+    /// A thread that woke from its slice and is waiting for a holder is still in the middle
+    /// (docs/report/0602), so this reads a mark of its own, not the one that wait reads.
     pub fn others_preempted(&self) -> bool {
         let current = self.current_thread_id();
-        self.threads.lock().iter().any(|(id, state)| Some(*id) != current && state.preempted)
+        self.threads.lock().iter().any(|(id, state)| Some(*id) != current && state.mid_code)
     }
 
     /// While `on`, the current thread holds the others: whenever it is sliced out mid-code, no
@@ -330,11 +333,12 @@ impl ArmCore {
         }
     }
 
-    fn set_preempted(&self, thread_id: Option<ThreadId>, preempted: bool) {
+    fn mark_sliced(&self, thread_id: Option<ThreadId>, preempted: bool, mid_code: bool) {
         if let Some(id) = thread_id
             && let Some(state) = self.threads.lock().get_mut(&id)
         {
             state.preempted = preempted;
+            state.mid_code = mid_code;
         }
     }
 
@@ -510,8 +514,11 @@ impl ArmCore {
     {
         self.prepare_function_call(address, params)?;
 
+        // The thread, from a slice that cut it between two instructions until it runs again.
+        let mut mid_code = None;
         loop {
             self.wait_for_holder().await;
+            self.mark_sliced(mid_code.take(), false, false);
             let (result, should_yield) = {
                 let mut inner = self.inner.lock();
                 let budget = inner.instructions_remaining;
@@ -546,14 +553,18 @@ impl ArmCore {
                 // call has not started yet, and the frame around it is half done. Left unmarked, a
                 // paint read the thread as parked and freed what its frame was filling
                 // (3ccc6cf147d2, docs/report/0506).
-                let preempted = if matches!(result, EngineStopReason::Yield | EngineStopReason::Svc { .. }) {
+                let sliced = if matches!(result, EngineStopReason::Yield | EngineStopReason::Svc { .. }) {
                     self.current_thread_id()
                 } else {
                     None
                 };
-                self.set_preempted(preempted, true);
+                self.mark_sliced(sliced, true, true);
                 YieldFuture::new().await;
-                self.set_preempted(preempted, false);
+                // Awake. On an `svc` the host call starts now; between two instructions the thread
+                // stays mid-code until the wait at the top of the loop lets it run. `preempted`
+                // clears here either way: kept through that wait, two holders wait for each other.
+                mid_code = sliced.filter(|_| matches!(result, EngineStopReason::Yield));
+                self.mark_sliced(sliced, false, mid_code.is_some());
             }
 
             match result {
@@ -1778,6 +1789,132 @@ mod tests {
         assert!(core.others_preempted(), "out of budget on the svc, before the host call runs");
         while sliced.as_mut().poll(&mut cx).is_pending() {}
         assert!(!core.others_preempted());
+    }
+
+    /// `nop` x 15,000, then `tail`, at `address`: one slice and a half.
+    fn load_spin(core: &mut ArmCore, address: u32, tail: &[u8]) {
+        let mut spin = [0xc0, 0x46].repeat(15_000); // nop
+        spin.extend_from_slice(tail);
+        core.load(&spin, address, spin.len()).unwrap();
+    }
+
+    // A thread that wakes from a slice to find a sliced-out holder waits for it, still mid-code. It
+    // read as parked, and a callback that asked once the holder had reached a host call ran beside it.
+    #[test]
+    fn a_thread_kept_off_by_a_holder_still_counts_as_preempted() {
+        async fn park(_: &mut ArmCore, _: &mut ()) -> Result<()> {
+            YieldFuture::new().await;
+            Ok(())
+        }
+
+        let mut core = ArmCore::new(Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })
+        .unwrap();
+        crate::Allocator::init(&mut core).unwrap();
+        core.register_svc_handler(1, park, &()).unwrap();
+        load_spin(&mut core, 0x1000, &[0x70, 0x47]); // bx lr
+        load_spin(&mut core, 0x20000, &[0x01, 0xdf, 0x70, 0x47]); // svc #1; bx lr
+
+        let mut cx = Context::from_waker(Waker::noop());
+        let mut runner = core.clone();
+        let mut kept_off = pin!(
+            core.run_in_thread(move || async move { runner.run_function::<()>(0x1001, &[]).await })
+                .unwrap()
+        );
+        let mut runner = core.clone();
+        let mut holder = pin!(
+            core.run_in_thread(move || async move {
+                runner.hold_others(true);
+                runner.run_function::<()>(0x20001, &[]).await?;
+                runner.hold_others(false);
+                Ok(())
+            })
+            .unwrap()
+        );
+
+        assert!(kept_off.as_mut().poll(&mut cx).is_pending(), "sliced out");
+        assert!(holder.as_mut().poll(&mut cx).is_pending(), "sliced out holding");
+        assert!(kept_off.as_mut().poll(&mut cx).is_pending(), "awake, waiting for the holder");
+        assert!(holder.as_mut().poll(&mut cx).is_pending(), "the holder is parked in its host call");
+        assert!(core.others_preempted(), "5,000 instructions short of its end and not in a host call");
+
+        assert!(kept_off.as_mut().poll(&mut cx).is_pending(), "runs now, to the end of the budget");
+        assert!(matches!(kept_off.as_mut().poll(&mut cx), Poll::Ready(Ok(()))));
+        assert!(!core.others_preempted());
+        assert!(matches!(holder.as_mut().poll(&mut cx), Poll::Ready(Ok(()))));
+    }
+
+    // Two holders can be sliced out at once: the second waited its `HOLD_ROUNDS` and ran anyway. The
+    // one that wakes first waits for the other — which must not wait back, or both sit out the cap.
+    #[test]
+    fn two_sliced_holders_do_not_wait_for_each_other() {
+        let mut core = ArmCore::new(Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })
+        .unwrap();
+        crate::Allocator::init(&mut core).unwrap();
+        load_spin(&mut core, 0x1000, &[0x70, 0x47]); // bx lr
+
+        let mut cx = Context::from_waker(Waker::noop());
+        let holder = || {
+            let mut runner = core.clone();
+            Box::pin(
+                core.run_in_thread(move || async move {
+                    runner.hold_others(true);
+                    runner.run_function::<()>(0x1001, &[]).await
+                })
+                .unwrap(),
+            )
+        };
+        let (mut first, mut second) = (holder(), holder());
+
+        assert!(first.as_mut().poll(&mut cx).is_pending(), "sliced out holding");
+        for _ in 0..HOLD_ROUNDS {
+            assert!(second.as_mut().poll(&mut cx).is_pending(), "waits for the first");
+        }
+        assert!(
+            second.as_mut().poll(&mut cx).is_pending(),
+            "past the cap: ran, and is sliced out holding too"
+        );
+
+        assert!(first.as_mut().poll(&mut cx).is_pending(), "awake, waiting for the second");
+        assert!(
+            matches!(second.as_mut().poll(&mut cx), Poll::Ready(Ok(()))),
+            "the second runs: the first is awake, not sliced out"
+        );
+        while first.as_mut().poll(&mut cx).is_pending() {}
+    }
+
+    // A hold left behind by a thread that ended would keep `wait_for_holder` off its fast path for good.
+    #[test]
+    fn a_thread_that_ends_holding_leaves_no_hold_behind() {
+        let core = ArmCore::new(Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })
+        .unwrap();
+        crate::Allocator::init(&mut core.clone()).unwrap();
+        let runner = core.clone();
+        let mut thread = Box::pin(
+            core.run_in_thread(move || async move {
+                runner.hold_others(true);
+                Ok(())
+            })
+            .unwrap(),
+        );
+        assert!(matches!(
+            thread.as_mut().poll(&mut Context::from_waker(Waker::noop())),
+            Poll::Ready(Ok(()))
+        ));
+        assert_eq!(core.holders.lock().len(), 1);
+        drop(thread);
+        assert!(core.holders.lock().is_empty());
     }
 
     #[test]

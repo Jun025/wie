@@ -11,9 +11,14 @@ pub struct ThreadState {
     pub context: ArmCoreContext,
     pub stack_base: usize,
     pub stack_size: usize,
-    /// Sliced out by the instruction budget between two guest instructions, rather than parked
-    /// in a host call. See [`ArmCore::others_preempted`].
+    /// Sliced out by the instruction budget and not polled since. What a thread waiting for a
+    /// holder reads (`ArmCore::hold_others`): it clears the moment the thread wakes, so two holders
+    /// never wait for each other.
     pub preempted: bool,
+    /// In the middle of guest code but not running it: sliced out between two guest instructions
+    /// rather than parked in a host call, and — unlike `preempted` — still so while it is awake
+    /// waiting for a holder. See [`ArmCore::others_preempted`].
+    pub mid_code: bool,
 }
 
 impl ThreadState {
@@ -45,6 +50,7 @@ impl ThreadState {
             stack_base: stack_base as _,
             stack_size: STACK_SIZE as _,
             preempted: false,
+            mid_code: false,
         })
     }
 }
