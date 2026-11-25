@@ -95,10 +95,8 @@ const CALLBACK_WAITS_FOR_GUEST_MS: u32 = 250;
 /// 8b01d4ae6af4's event pump checks a busy flag and then dequeues; a clip callback that came in while
 /// the main thread was sliced between the two ran the main thread's record, the main thread ran the
 /// callback's, both drove the title's one script runner at once and it ended in a stack overflow
-/// (docs/report/0591). The wait is capped: past it the callback runs anyway, as it did before — and
-/// without the hold. The hold has one slot, and the thread still sliced out at the cap can be a key
-/// or paint handler holding it; taking the slot there left the rest of that handler unheld
-/// (503d5d2f196b, every run — docs/report/0598 §8).
+/// (docs/report/0591). The wait is capped: past it the callback runs anyway, as it did before — one
+/// plain call, no hold. 503d5d2f196b and 155972cac664 reach the cap on every run (docs/report/0598 §8).
 pub async fn call_spawned(context: &mut dyn WIPICContext, callback: &WIPICMethodBody) -> Result<()> {
     let mut waited = 0;
     while waited < CALLBACK_WAITS_FOR_GUEST_MS && context.system().guest_others_preempted() {
@@ -326,10 +324,13 @@ mod tests {
 
     use super::{ResultConverter, WIPICContext, WIPICResult, call_spawned, test::TestContext};
 
-    /// Another guest thread stays sliced out mid-code for the first `left` asks; one hold flag.
+    /// Another guest thread stays sliced out mid-code for the first `left` asks. A hold is its
+    /// thread's own, as `ArmCore`'s: `held` is the callback thread's, and `touched` counts how often
+    /// it took or dropped one.
     struct SlicedRunner {
         left: Arc<AtomicU32>,
         held: Arc<AtomicBool>,
+        touched: Arc<AtomicU32>,
         asks: Arc<AtomicU32>,
     }
 
@@ -347,6 +348,7 @@ mod tests {
         }
 
         fn hold_others(&self, on: bool) -> bool {
+            self.touched.fetch_add(1, Ordering::Relaxed);
             self.held.swap(on, Ordering::Relaxed)
         }
     }
@@ -376,17 +378,19 @@ mod tests {
     }
 
     /// Runs a probe through `call_spawned` on its own task, with another thread sliced out for the
-    /// first `left` asks and the hold slot starting at `held`. Returns (what the probe saw, the hold
-    /// slot after, asks made).
-    fn run_spawned(left: u32, held: bool) -> (Arc<Seen>, bool, u32) {
-        let (left, held, asks) = (
+    /// first `left` asks. Returns (what the probe saw, the callback thread's hold after, times it
+    /// took or dropped a hold, asks made).
+    fn run_spawned(left: u32) -> (Arc<Seen>, bool, u32, u32) {
+        let (left, held, touched, asks) = (
             Arc::new(AtomicU32::new(left)),
-            Arc::new(AtomicBool::new(held)),
+            Arc::new(AtomicBool::new(false)),
+            Arc::new(AtomicU32::new(0)),
             Arc::new(AtomicU32::new(0)),
         );
         let runner = SlicedRunner {
             left: left.clone(),
             held: held.clone(),
+            touched: touched.clone(),
             asks: asks.clone(),
         };
         let mut system = System::new(Box::new(TestPlatform::new()), "pid", "aid", runner);
@@ -411,29 +415,34 @@ mod tests {
             system.tick().unwrap();
         }
 
-        (seen, held.load(Ordering::Relaxed), asks.load(Ordering::Relaxed))
+        (
+            seen,
+            held.load(Ordering::Relaxed),
+            touched.load(Ordering::Relaxed),
+            asks.load(Ordering::Relaxed),
+        )
     }
 
     // 8b01d4ae6af4: a clip callback ran the main thread's record from inside its sliced event pump.
     #[test]
     fn a_spawned_callback_waits_for_a_sliced_thread_and_runs_held() {
-        let (seen, held_after, _) = run_spawned(3, false);
+        let (seen, held_after, touched, _) = run_spawned(3);
 
         assert!(seen.ran.load(Ordering::Relaxed));
         assert_eq!(seen.left.load(Ordering::Relaxed), 0, "ran only once the other thread reached a host call");
         assert!(seen.held.load(Ordering::Relaxed), "ran holding the others");
         assert!(!held_after, "and let go after");
+        assert_eq!(touched, 2, "one hold, taken and dropped");
     }
 
-    // 503d5d2f196b: a thread that never reached a host call was the key handler holding the others;
-    // the callback that came in at the cap took its hold and cleared it on the way out.
+    // 503d5d2f196b · 155972cac664: a thread that never reaches a host call in a key's wait.
     #[test]
-    fn a_spawned_callback_runs_at_the_cap_and_leaves_the_hold_alone() {
-        let (seen, held_after, asks) = run_spawned(u32::MAX, true); // never clears; someone else holds
+    fn a_spawned_callback_runs_at_the_cap_and_takes_no_hold() {
+        let (seen, _, touched, asks) = run_spawned(u32::MAX); // never clears
 
         assert!(seen.ran.load(Ordering::Relaxed), "the wait is capped");
         assert_eq!(asks, 250, "at a key's cap, one ask per ms");
-        assert!(held_after, "the holder's hold is still there");
+        assert_eq!(touched, 0, "one plain call: no hold taken, none dropped");
     }
 
     #[test]

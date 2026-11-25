@@ -1,7 +1,7 @@
 use alloc::{borrow::ToOwned, boxed::Box, collections::BTreeMap, format, string::String, sync::Arc, vec, vec::Vec};
 use core::{
     mem::size_of,
-    sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering},
+    sync::atomic::{AtomicU32, AtomicU64, Ordering},
 };
 
 use spin::Mutex;
@@ -101,8 +101,8 @@ pub struct ArmCore {
     // runs a nested guest call, these are the only copy of what the outer guest code held — the
     // arguments of the host method it called included. See `guest_root_words`.
     saved_contexts: Arc<Mutex<BTreeMap<u64, ArmCoreContext>>>,
-    // The thread `hold_others` named, or 0.
-    holder: Arc<AtomicUsize>,
+    // The threads holding the others. See `hold_others`.
+    holders: Arc<Mutex<Vec<ThreadId>>>,
 }
 
 static NEXT_SAVED_CONTEXT: AtomicU64 = AtomicU64::new(0);
@@ -157,7 +157,7 @@ impl ArmCore {
             inner: Arc::new(Mutex::new(inner)),
             threads: Arc::new(Mutex::new(BTreeMap::new())),
             saved_contexts: Arc::new(Mutex::new(BTreeMap::new())),
-            holder: Arc::new(AtomicUsize::new(0)),
+            holders: Arc::new(Mutex::new(Vec::new())),
         };
 
         if enable_gdbserver {
@@ -252,6 +252,7 @@ impl ArmCore {
     pub fn delete_thread_context(&self, thread_id: ThreadId) {
         tracing::info!("Terminate thread: {thread_id}");
 
+        self.holders.lock().retain(|id| *id != thread_id);
         // Release the thread lock before freeing its stack.
         let _thread_state = self.threads.lock().remove(&thread_id);
     }
@@ -296,22 +297,33 @@ impl ArmCore {
     /// to its next blocking host call. A key handler that frees what another thread's frame draws
     /// needs this (docs/report/0430). Capped at [`HOLD_ROUNDS`] rounds per wait.
     ///
+    /// The hold is the thread's own: taking or dropping it leaves every other thread's as it was,
+    /// and two holders keep out of each other's sliced code. It was one slot once, and a spawned
+    /// callback took a key handler's hold and cleared it on the way out (docs/report/0601).
+    ///
     /// Returns whether the current thread already held them, so a nested holder (a paint run from
     /// inside a key handler) can leave the outer hold in place.
     pub fn hold_others(&self, on: bool) -> bool {
-        let current = self.current_thread_id().unwrap_or(0);
-        let previous = self.holder.swap(if on { current } else { 0 }, Ordering::Relaxed);
-        current != 0 && previous == current
+        let Some(current) = self.current_thread_id() else {
+            return false;
+        };
+        let mut holders = self.holders.lock();
+        let held = holders.contains(&current);
+        holders.retain(|id| *id != current);
+        if on {
+            holders.push(current);
+        }
+        held
     }
 
     async fn wait_for_holder(&self) {
         for _ in 0..HOLD_ROUNDS {
-            let holder = self.holder.load(Ordering::Relaxed);
-            if holder == 0 {
+            if self.holders.lock().is_empty() {
                 return;
             }
             let current = self.current_thread_id();
-            if current.is_none_or(|id| id == holder) || !self.threads.lock().get(&holder).is_some_and(|state| state.preempted) {
+            let sliced = |id: &ThreadId| Some(*id) != current && self.threads.lock().get(id).is_some_and(|state| state.preempted);
+            if current.is_none() || !self.holders.lock().iter().any(sliced) {
                 return;
             }
             YieldFuture::new().await;
@@ -1564,8 +1576,9 @@ mod tests {
         assert_eq!(calls.load(Ordering::Relaxed), 10_000);
     }
 
-    #[test]
-    fn a_holder_sliced_out_keeps_the_others_off_guest_code() {
+    /// Thread 1 holds the others and is sliced out mid-code; thread 2 does `first` and then calls
+    /// guest code. Returns the guest calls thread 2 got in while thread 1 was sliced out.
+    fn guest_calls_into_a_sliced_holder(first: fn(&ArmCore)) -> u32 {
         async fn count(_: &mut ArmCore, calls: &mut Arc<AtomicU32>) -> Result<()> {
             calls.fetch_add(1, Ordering::Relaxed);
             Ok(())
@@ -1591,23 +1604,82 @@ mod tests {
             core.run_in_thread(move || async move {
                 runner.hold_others(true);
                 runner.run_function::<()>(0x1001, &[]).await?;
-                runner.hold_others(false);
+                assert!(runner.hold_others(false), "the hold is still this thread's when it lets go");
                 Ok(())
             })
             .unwrap()
         );
         let mut runner = core.clone();
         let mut other = pin!(
-            core.run_in_thread(move || async move { runner.run_function::<()>(0x20001, &[]).await })
-                .unwrap()
+            core.run_in_thread(move || async move {
+                first(&runner);
+                runner.run_function::<()>(0x20001, &[]).await
+            })
+            .unwrap()
         );
 
         assert!(holder.as_mut().poll(&mut cx).is_pending());
         assert!(other.as_mut().poll(&mut cx).is_pending());
-        assert_eq!(calls.load(Ordering::Relaxed), 0, "the holder is sliced out mid-code");
+        let calls_while_sliced = calls.load(Ordering::Relaxed);
         assert!(matches!(holder.as_mut().poll(&mut cx), Poll::Ready(Ok(()))));
         while other.as_mut().poll(&mut cx).is_pending() {}
         assert_eq!(calls.load(Ordering::Relaxed), 1, "and runs once the holder lets go");
+
+        calls_while_sliced
+    }
+
+    #[test]
+    fn a_holder_sliced_out_keeps_the_others_off_guest_code() {
+        assert_eq!(guest_calls_into_a_sliced_holder(|_| {}), 0, "the holder is sliced out mid-code");
+    }
+
+    // 155972cac664: a spawned callback that had waited took the hold of a handler parked in a host
+    // call, and the rest of that handler ran unheld (docs/report/0601).
+    #[test]
+    fn another_thread_taking_a_hold_leaves_the_holders_in_place() {
+        let calls = guest_calls_into_a_sliced_holder(|core| assert!(!core.hold_others(true), "not this thread's yet"));
+        assert_eq!(calls, 0, "a second holder stays out of the first one's sliced code too");
+    }
+
+    // MC_netConnect's sleeping thread cleared a key handler's hold on its way out (docs/report/0601).
+    #[test]
+    fn another_thread_letting_go_leaves_the_holders_in_place() {
+        let calls = guest_calls_into_a_sliced_holder(|core| assert!(!core.hold_others(false), "it held nothing"));
+        assert_eq!(calls, 0);
+    }
+
+    #[test]
+    fn a_holder_parked_in_a_host_call_keeps_nobody_off() {
+        let mut core = ArmCore::new(Options {
+            enable_gdbserver: false,
+            aot: None,
+            profile: None,
+        })
+        .unwrap();
+        crate::Allocator::init(&mut core).unwrap();
+        core.load(&[0x70, 0x47], 0x1000, 2).unwrap(); // bx lr
+
+        let mut cx = Context::from_waker(Waker::noop());
+        let runner = core.clone();
+        let mut holder = pin!(
+            core.run_in_thread(move || async move {
+                runner.hold_others(true);
+                YieldFuture::new().await;
+                Ok(())
+            })
+            .unwrap()
+        );
+        let mut runner = core.clone();
+        let mut other = pin!(
+            core.run_in_thread(move || async move { runner.run_function::<()>(0x1001, &[]).await })
+                .unwrap()
+        );
+
+        assert!(holder.as_mut().poll(&mut cx).is_pending());
+        assert!(
+            matches!(other.as_mut().poll(&mut cx), Poll::Ready(Ok(()))),
+            "the hold covers sliced guest code only"
+        );
     }
 
     #[test]
