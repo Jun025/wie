@@ -113,3 +113,5 @@ Stacked Borrows 와 Tree Borrows 양쪽에서 통과(각 6 passed · 미정의 �
   `thumb.rs:105` · `arm.rs:100` 이 인출 줄). 저장소에 넣지 않았다 — 크레이트가 바뀌면 낡는 줄 번호다.
 - 원자료(6회의 export · TOC · 표 · 호출자 가름 · 개악 로그 · Miri 로그 · 패치)는 저장소 밖
   `~/orchestrator/reports/evidence/wie-arm-interpreter-instruction-fetch-skip-page-table-within-same-64kb-page/` 에 있다.
+
+<!-- corpus-name-inflow v1 subjects=2 tree=148a7ee9c03d3344 B=0/0 P=0/0 S=0/0 -->
