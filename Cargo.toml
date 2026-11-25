@@ -154,8 +154,9 @@ test-utils = { path = "test-utils" }
 
 # Thumb decode as one table lookup instead of a 21-row linear match — 25% of the ARM run loop
 # (docs/report/0575 §2). The patch only applies while its version satisfies wie-core-arm's
-# requirement; past that cargo warns once and silently builds the registry crate, so
-# wie-core-arm's `arm32_cpu_patch_is_applied` test reads Cargo.lock and goes red instead.
+# requirement; past that cargo builds the registry crate and stays green (no warning either, while
+# the directory is a workspace member), so wie-core-arm names `arm32_cpu::WIE_PATCH`, which only
+# the patched copy exports — the fallback is a compile error instead.
 # When to drop this line and the directory: patches/arm32_cpu/README.md.
 [patch.crates-io]
 arm32_cpu = { path = "patches/arm32_cpu" }

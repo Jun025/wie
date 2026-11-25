@@ -69,6 +69,7 @@ embeds the engine as WASM. Nothing above the engine is allowed to reach back int
 | `migrations/` | D1 SQL migrations, auto-applied to the prod DB on `main` pushes. |
 | `scripts/` | Build and gate scripts: `build-wasm.sh`, `check-engine-contract.mjs`, `contract-roundtrip.mjs`, `audit-no-leak.sh`, `verify-browser.mjs`, `smoke_gate.sh`, `lgt_render_probe.sh`. |
 | `docs/` | This file, per-platform RE notes (`ktf.md`, `lgt.md` — upstream's, carried as is — `lgt-fork-notes.md`, `lgt_abi.md`), `contracts/` (the featurephone consumer pin), `project-kb/`, `verification/` screenshots, `worklog/`. |
+| `patches/` | Vendored crates.io crates with one change each, applied by the root `Cargo.toml`'s `[patch.crates-io]` and listed in `members`. Each directory's `README.md` names the source version, the change, and when to drop it. Today: `arm32_cpu` (Thumb decode table). |
 | `data/`, `fonts/`, `test_data/` | Binary-patch table, the bundled `neodgm.ttf`, and the hello-world fixtures the tests and the round-trip gate boot. |
 
 ## Why Most Crates Are `no_std`

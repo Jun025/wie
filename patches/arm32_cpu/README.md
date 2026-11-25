@@ -26,8 +26,11 @@ Diff against the tarball: `diff -r ~/.cargo/registry/src/*/arm32_cpu-0.1.2/src p
 
 **The guard.** A `[patch.crates-io]` entry is used only while its version satisfies the dependents'
 requirement (`wie-core-arm/Cargo.toml`: `^0.1.2`). If an upstream merge raises that to a version
-this directory does not have, cargo prints one `patch ... was not used` warning and builds the
-registry crate — green, and without the table. `wie-core-arm/src/engine/arm32_cpu.rs` names
+this directory does not have, cargo builds the registry crate — green, and without the table. It
+does not even print its `patch ... was not used` warning while this directory is a workspace member
+(measured 2026-11-25 with the requirement at `^0.1.3`: `Adding arm32_cpu v0.1.3`, nothing else), and
+`Cargo.lock` then holds two `arm32_cpu` entries, one of them still without a `source` line — so a
+test reading the lockfile for that line would have to be written with care, and would only run where tests run. `wie-core-arm/src/engine/arm32_cpu.rs` names
 `arm32_cpu::WIE_PATCH`, which only this copy exports, so that fallback is a compile error instead.
 When it fires: re-vendor the new release here and re-apply the change (the table, the oracle test,
 the marker), or drop the patch as below.
