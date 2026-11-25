@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-25",
+  "task": "wie-arm-thread-waiting-for-holder-reads-as-not-preempted",
+  "title": "잘린 뒤 붙든 스레드를 기다리는 스레드도 «코드 한가운데»로 센다 — others_preempted 와 wait_for_holder 가 읽는 표시를 가른다",
+  "summary": "PR #633 게이트② 검수 F1 · F2 · F3 의 집행이자 2026-11-25-hold-others-per-thread-not-one-slot#p0 의 채택. ThreadState 에 mid_code 를 더해 others_preempted 가 읽게 했다 — 잘린 순간부터 다시 돌 때까지 서고, 깨어나 wait_for_holder 에서 붙든 스레드를 기다리는 동안에도 서 있다. wait_for_holder 가 읽는 preempted 는 종전대로 깨어나자마자 내려가므로 붙든 스레드 둘의 상호 대기는 생기지 않는다(시험으로 못박음). 검수 프로브는 main 에서 red · head 에서 green. 앞 회차가 적은 «병합 head 강제 재현 겹침 1/60»은 엔진의 겹침이 아니라 진단 탐침의 셈 오류였다(탐침이 인터프리터의 예산 검사보다 앞에 있어 슬라이스가 실행기 진입 명령에서 끝나면 진입을 두 번 셌다). docs/report/0602.",
+  "changes": [
+    "wie-core-arm/src/thread.rs: ThreadState.mid_code · preempted 의 문서(이제 wait_for_holder 만 읽는다)",
+    "wie-core-arm/src/core.rs: others_preempted 가 mid_code 를 읽는다 · set_preempted → mark_sliced(두 표시) · run_function_inner 가 명령 사이에서 잘린 스레드의 mid_code 를 기다림을 지날 때까지 남긴다 · 시험 a_thread_kept_off_by_a_holder_still_counts_as_preempted(검수 F1 프로브) · two_sliced_holders_do_not_wait_for_each_other(F2) · a_thread_that_ends_holding_leaves_no_hold_behind(F3) · a_budget_that_runs_out_on_an_svc_counts_as_preempted 에 한 걸음",
+    "docs/report/0602--2026-11-25--wie-arm-thread-waiting-for-holder-reads-as-not-preempted.md"
+  ],
+  "verification": "docs/report/0602 · 증적(저장소 밖): ~/orchestrator/reports/evidence/wie-arm-thread-waiting-for-holder-reads-as-not-preempted/",
+  "limits": [
+    "닫은 길은 실측에서 한 번도 밟히지 않았다 — others_preempted 를 물은 순간 «새 표시만 참»이던 일 0회. 근거는 시험(main red)과 개악이다",
+    "call_spawned 의 상한(250ms) 규칙은 손대지 않았다(티켓 밖)"
+  ],
+  "proposals": [],
+  "adoptedProposals": ["2026-11-25-hold-others-per-thread-not-one-slot#p0"],
+  "declinedProposals": []
+}
