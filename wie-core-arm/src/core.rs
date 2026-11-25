@@ -1763,6 +1763,7 @@ mod tests {
     #[test]
     fn a_budget_that_runs_out_on_an_svc_counts_as_preempted() {
         async fn host_call(_: &mut ArmCore, _: &mut ()) -> Result<()> {
+            YieldFuture::new().await;
             Ok(())
         }
 
@@ -1787,6 +1788,8 @@ mod tests {
         );
         assert!(sliced.as_mut().poll(&mut cx).is_pending());
         assert!(core.others_preempted(), "out of budget on the svc, before the host call runs");
+        assert!(sliced.as_mut().poll(&mut cx).is_pending());
+        assert!(!core.others_preempted(), "parked in the host call now");
         while sliced.as_mut().poll(&mut cx).is_pending() {}
         assert!(!core.others_preempted());
     }
