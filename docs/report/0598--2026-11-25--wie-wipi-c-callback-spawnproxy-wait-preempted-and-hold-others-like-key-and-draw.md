@@ -76,7 +76,7 @@
 - 네 게이트(`cargo fmt --all -- --check` · `cargo clippy --all -- -D warnings` · wasm clippy · `RUST_MIN_STACK=4194304 cargo test --all`) + `cargo +beta clippy --all -- -D warnings`: 전부 통과(`cargo test --all` 실패 0).
 - 새 시험 `wie-wipi-c` `a_spawned_callback_waits_for_a_sliced_thread_and_runs_held`: 기다림 루프를 빼면 `left: 3 · right: 0` 으로 빨갛게 된다(확인함).
 - 엔진 러너(§The four gates 의 ENGINE-RUNNER 블록): `draw_j2me.jar` · `helloworld_ktf.zip` · `helloworld_lgt.zip` · `text_j2me.jar` PASS · `keydraw_ktf.zip` PASS · paints 79 · rc 0 · `keydraw_lgt.zip` PASS · paints 55 · rc 0(디버그 빌드 · short 임대 1건).
-- 게임 랩 게이트 `scripts/smoke_gate.sh`(ktf + lgt · 기준선 242행): SMOKE_PLACEHOLDER
+- 게임 랩 게이트 `scripts/smoke_gate.sh`(ktf + lgt · 기준선 242행): 16부 전부 `OK: no regressions vs baseline.` — 기준선 242행 확인 · 부재 0 · 회귀 0 · 돌린 판 244 PASS / 0 FAIL(기준선 밖 LGT 2판 포함). 이 브랜치의 디버그 `wie_validate` · 기본 `TIMEOUT 15`. long 풀이 막혀 있어 `WORKING_DIR` 을 16판씩 나눈 심링크 디렉터리 + 그 판들만 뽑은 `BASELINE` 으로 16부를 short 임대 하나씩 차례로 돌렸다(`smoke-parts.sh` · 에뮬레이터 1).
 - `0430` · `0506` 경로 무변경: `git diff origin/main` 에 `wie-midp` · `wie-core-arm` 파일 0.
 
 ### 6. 한계
