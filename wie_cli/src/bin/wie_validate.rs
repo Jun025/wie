@@ -1960,7 +1960,7 @@ struct AotCache {
 }
 
 impl AotCache {
-    /// A title's record is 14 to 15 MB (docs/report/0610): room for one binary's pass over the local corpus.
+    /// A title's record is 21 to 25 MB (docs/report/0610): room for one binary's pass over the local corpus.
     const MAX_BYTES: u64 = 8 << 30;
 
     fn for_this_binary() -> Option<Self> {
