@@ -170,3 +170,5 @@ AOT 배선은 게스트 명령 하나마다 백엔드가 붙어 있는지를 세
   «실행 도중 백엔드를 버린 그 한 번의 run»에서만 일한다 — 지우면 upstream 과의 차이가 3곳 줄지만 이 회차의 범위(검사를 루프 밖으로)가 아니라 두었다.
 - 원자료(15회의 표 · TOC · export · 디스어셈블 · 후보 패치 2종 · 게이트 로그 · 드라이버)는 저장소 밖
   `~/orchestrator/reports/evidence/wie-arm-interpreter-skip-per-instruction-aot-check-when-no-backend/` 에 있다.
+
+<!-- corpus-name-inflow v1 subjects=4 tree=4d8fb85d6581ded6 B=0/0 P=0/0 S=0/0 -->
