@@ -1,0 +1,40 @@
+{
+  "date": "2026-11-26",
+  "task": "wie-arm-aot-native-executor-on-validate-runner-measure-go-no-go",
+  "title": "upstream ARM AOT 를 검증 러너에서 켜서 쟀다 — 지금 배선 그대로는 느려지고 선점이 사라진다 · 브라우저 배선은 열지 않는다",
+  "summary": "측정 기록이다(엔진 · 러너 코드 차이 0줄 — 스위치 커밋을 같은 브랜치에서 되돌렸다). wie_validate 에 WIE_AOT=native 스위치를 달아 LGT 3cc7a9b4cb15 성 대화를 끔/켬 같은 순간 짝 3회로 쟀다: 프레임당 실행 루프 14.51 → 20.09 ms(+38.5% · 세 짝 모두 느려짐), 첫 화면 0.45 → 1.33 s, 피크 RSS 38 → 273 MB. 원인은 LGT 54판 전부가 명령 캐시를 통째로 비워 컴파일한 영역이 다 버려지고, 그 뒤로 진입을 놓칠 때마다 Aot::recompile 이 버린 목록 3,526개를 훑는 것이다(루프 표본의 90%). 그 훑기만 건너뛴 스크래치 변형은 1.70 ms(-88.3%)였다. 컴파일된 코드는 명령 예산을 세지 않아 붙든 스레드 · 선점 시험 11건 중 8건이 red 이고, 널 페이지 읽기는 폴트로 끝난다. smoke_gate 는 켠 채로 KTF 190 · LGT 54 전부 PASS. 판정 no-go. docs/report/0607.",
+  "changes": [
+    "docs/report/0607 · STATE.md «다음» ⑵ 를 다음 조각으로 바꾸고 끝난 것을 접음 · «보류»의 ⒟ 줄에 잰 수를 적음",
+    "wie_cli/src/bin/wie_validate.rs · wie_cli/Cargo.toml · Cargo.lock: 스위치 커밋 09b820ba9 를 5258efc26 이 되돌렸다(차이 0줄)"
+  ],
+  "verification": [
+    "arm-interp-profile(성 대화 · xctrace 8초 창) 끔 · 켬 · 변형 3바퀴 9회 — 회마다 캡처를 기준 화면과 대조(98.3 ~ 99.6%)",
+    "첫 화면 · 피크 RSS 3짝(/usr/bin/time -l) · perf-watch 네이티브 축 3회(ARM 표본 넷 전부 +17 ~ +45%)",
+    "KTF 155972cac664 부팅 화면 3짝: 1.50 → 0.78 ms(-47.7%) — KTF 는 캐시를 비우지 않는다(38판 중 0)",
+    "smoke_gate 켬: LGT 54/54 · KTF 190/190 · 기준 대조 퇴행 0",
+    "스크래치 시험: 20만 명령 루프가 내준 횟수 해석기 20 · AOT 0 / core.rs 시험 11건 AOT 를 붙이면 8 red / ldr r0,[r0](r0=0) 해석기 Ok(0) · AOT Invalid memory access",
+    "장부의 binary-patches 세 행 끔/켬: 패치 로그가 AOT 설치 앞 · 두 팔 다 잠금을 지나감 · 범용 훅 shadow 어긋남 0",
+    "네 게이트 + beta clippy: 스위치를 얹은 트리와 이 PR 의 머리 — docs/report/0607 §8"
+  ],
+  "limits": [
+    "장면은 LGT 1판과 KTF 1판(가벼운 부팅 화면) · 기기 1대 · 3바퀴",
+    "브라우저(wasm 코드 생성기)는 돌리지 않았다 — -88% 는 네이티브 cranelift 의 값이다",
+    "지속 캐시 없이 쟀다(첫 화면 · RSS · perf-watch 는 처음 여는 판의 값)",
+    "smoke_gate 의 끔 팔은 기준 목록과 0603 §6 이 대신했다",
+    "«컴파일된 대기 루프면 탭이 선다»는 두 관측에서 나온 추론이고 그런 판을 보지는 못했다"
+  ],
+  "proposals": [
+    {
+      "title": "네이티브에서 ARM AOT 를 우리 규칙에 맞춘다 — 예산 · 널 읽기 · 버린 목록 훑기, 그리고 같은 자로 다시 잰다",
+      "kind": "product",
+      "plainSummary": "upstream 의 ARM 사전 번역(AOT)을 검증 러너에서만 켜고, 지금 깨지는 세 자리를 고친다: 컴파일된 코드가 명령 예산을 세지 않는 것, 널 주소 읽기가 0 이 아니라 오류로 끝나는 것, 게임이 명령 캐시를 비운 뒤로 버린 영역 목록을 매번 훑는 것. 그런 다음 같은 장면을 다시 잰다. 브라우저와 제품 기본값은 건드리지 않는다.",
+      "userBenefit": "당장은 없다(네이티브 측정 조각). 이 조각이 서면 브라우저에 AOT 를 붙일지 잴 수 있게 되고, 붙으면 무거운 장면(성 대화 · 저녁 마을)의 화면 수가 는다 — 네이티브에서 잰 천장은 프레임당 해석 14.51 → 1.70 ms 다.",
+      "why": "켠 실행을 재 보니(docs/report/0607) 배선 그대로는 LGT 가 +38.5% 느려지고 선점 시험 11건 중 8건이 red 이며 널 읽기가 폴트로 끝난다. 그런데 훑기 한 줄을 건너뛴 스크래치 변형은 같은 장면에서 -88.3% 였다. 해석기 조각 ⒟(묶음 실행 · L)의 어림은 -6.7 ms 이고 가장 어려운 자리(블록 단위 예산)가 같다.",
+      "tradeoff": "upstream 의 파일(wie-core-arm/src/aot.rs · 코드 생성기)을 고치게 돼 병합 때마다 충돌 자리가 는다. 코드 생성기가 둘(cranelift · wasm)이라 브라우저로 갈 때 같은 일을 한 번 더 한다. 네이티브 값이 브라우저에서 얼마나 남는지는 그때 재야 안다.",
+      "effort": "L(예산을 영역 경계에서 세는 길로 풀리면 M) · risk high — 초안 전문은 docs/report/0607 §7",
+      "target": "wie-core-arm/src/aot.rs · wie-core-arm/src/engine/arm32_cpu.rs · wie-core-arm-native · wie_cli/src/bin/wie_validate.rs(스위치)"
+    }
+  ],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}
