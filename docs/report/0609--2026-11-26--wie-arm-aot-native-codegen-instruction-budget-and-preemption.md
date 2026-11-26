@@ -273,6 +273,9 @@ if pc < 0x1000 || pc == frame.end || frame.budget == 0 { return Ok(CompiledExit:
   (72줄 · **1069 passed** · 0 failed — 0608 의 1066 + 새 시험 3) · `cargo +beta clippy --all -- -D warnings` rc 0.
 - 러너 블록(엔진 코드를 만졌다 · 디버그 빌드 · `982c4c009`): 여섯 픽스처 전부 PASS — 스위치 끔 · 켬 둘 다(`keydraw_*` 는 `--inject --expect-last-frame` · 키 27/27 ·
   paints 끔 79 · 55 / 켬 57 · 52).
+- `node scripts/check-worklog-json.mjs` OK · `node scripts/check-docs-report-serial.mjs` OK(0609 · 열린 PR claim 충돌 0) · `bash scripts/audit-no-leak.sh` PASSED ·
+  `node scripts/player-data.mjs` OK.
+- 게임 파일명 유입(`node scripts/corpus-name-inflow.mjs`): **0회 / 0쌍(BOUNDED)** · 판단 필요 **0건(SUFFIX-ATTACHED)**.
 - 회차를 끝낼 때 내가 띄운 프로세스 0.
 
 ### 10. 한계 · 하지 않은 것
