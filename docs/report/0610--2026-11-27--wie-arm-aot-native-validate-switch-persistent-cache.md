@@ -259,7 +259,8 @@ LGT = `3cc7a9b4cb15` 성 대화 첫 쪽(`docs/keys/lgt-3cc7a9b4cb15-intro-castle
   §5 의 «디버그 빗나감이 기한을 넘는다»는 실제 판의 크기에서 나는 일이다.
 - **제품 기본값**: `wie_featurephone/src/lib.rs` 는 건드리지 않았다(`aot: None`). `wie_validate` 는 `WIE_AOT=native` 일 때만 실행기와 캐시를 만든다 — 변수가 없으면
   캐시 디렉터리도 만들지 않는다(`AotCache` 는 그 `then` 안에서만 생긴다 · 이 회차의 끔 실행 뒤 사용자 캐시 디렉터리에 `validate-native-aot/` 가 없다).
-- 게임 파일명 유입은 맨 아래 표식 줄에 있다(`node scripts/corpus-name-inflow.mjs`).
+- 게임 파일명 유입(`node scripts/corpus-name-inflow.mjs`): **4회 / 3쌍(BOUNDED)** · 판단 필요 **0건(SUFFIX-ATTACHED)**. 넷 다 `wie_validate.rs` 에 main 부터 있던 주석 줄이다
+  (도구는 고친 파일의 본문 전체를 본다) — 이 PR 이 더한 줄에 든 것은 0 이다(`git diff origin/main...HEAD` 의 `+` 줄에서 세 이름을 세어 0 · 0 · 0).
 
 ### 8. 한계 · 하지 않은 것
 
