@@ -24,7 +24,6 @@ wie-backend = { workspace = true }
 wie-util = { workspace = true }
 
 wie-core-arm = { workspace = true } # wie_validate reads the SVC stub high-water mark
-wie-core-arm-native = { workspace = true } # wie_validate's WIE_AOT=native switch; already linked through test-utils
 wie-j2me = { workspace = true }
 wie-jvm-support = { workspace = true } # wie_validate --gc-stress
 wie-ktf = { workspace = true }
