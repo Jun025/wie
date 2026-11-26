@@ -114,7 +114,8 @@ impl Arm32CpuEngine {
     // today). `run`'s loop below is upstream's, and it asks whether a backend is attached three
     // times per guest instruction, reloading the answer after every `step`. This one reads nothing
     // per instruction but pc. A second loop rather than a flag hoisted out of the first: the flag
-    // measured no gain, this one −7% of the loop's time per frame (docs/report/0603 §3).
+    // measured no gain, this one −10.7% of the loop's time per frame — the mean of three runs, the
+    // least of them −7.3% (docs/report/0603 §3).
     // The two loops must stop at the same place with the same result —
     // `the_loop_without_a_backend_stops_where_the_loop_with_one_does`.
     fn run_interpreter(&mut self, end: u32, count: u32) -> Result<EngineRunResult> {
@@ -175,6 +176,8 @@ impl ArmEngine for Arm32CpuEngine {
         let stop_reason = loop {
             let pc = self.cpu.reg_get(Mode::User, reg::PC);
 
+            // fork: `run_interpreter` is this loop's twin. A stop added here (a break, a return, a `?`)
+            // goes there too — the test named there counts the stops of both and reddens on one alone.
             // This loop runs once per guest instruction, so nothing is read here that only a rare
             // path needs. An SVC leaves pc on its vector (0x08), inside the null page.
             if pc < 0x1000 {
@@ -1251,27 +1254,30 @@ mod tests {
             use ArmRegister::*;
             [R0, R1, R2, R3, R4, R5, R6, R7, R8, SB, SL, FP, IP, SP, LR, PC, Cpsr]
         };
-        // (thumb code at 0x1000, r0, budgets of the successive runs) -> the way the last run stops
-        let cases: [(&[u8], u32, &[u32], &str); 7] = [
-            (&[0xc0, 0x46, 0xc0, 0x46, 0x70, 0x47], 0, &[0, 2], "yield after 2"), // nop; nop; bx lr
-            (&[0xc0, 0x46, 0xc0, 0x46, 0x70, 0x47], 0, &[2, 10], "end after 1"),
-            (&[0xc0, 0x46, 0xc0, 0x46, 0x70, 0x47], 0, &[3], "end after 3"), // at the end with the budget spent: the end wins
-            (&[0xc0, 0x46, 0x2a, 0xdf], 0, &[10], "svc 42 lr=0x1004 spsr=0x3f after 2"), // nop; svc 42
+        // (thumb code at 0x1000, r0, end, budgets of the successive runs) -> the way the last run stops
+        let cases: [(&[u8], u32, u32, &[u32], &str); 8] = [
+            (&[0xc0, 0x46, 0xc0, 0x46, 0x70, 0x47], 0, 0x2000, &[0, 2], "yield after 2"), // nop; nop; bx lr
+            (&[0xc0, 0x46, 0xc0, 0x46, 0x70, 0x47], 0, 0x2000, &[2, 10], "end after 1"),
+            (&[0xc0, 0x46, 0xc0, 0x46, 0x70, 0x47], 0, 0x2000, &[3], "end after 3"), // at the end with the budget spent: the end wins
+            (&[0xc0, 0x46, 0x2a, 0xdf], 0, 0x2000, &[10], "svc 42 lr=0x1004 spsr=0x3f after 2"), // nop; svc 42
+            (&[0xc0, 0x46, 0x2a, 0xdf], 0, 0x08, &[10], "svc 42 lr=0x1004 spsr=0x3f after 2"), // the end on the svc vector, in the null page: the svc wins
             (
                 &[0xc0, 0x46, 0x00, 0xe8],
                 0,
+                0x2000,
                 &[10],
                 "Fatal error: Undefined instruction at pc=0x1002 (thumb) insn=0xe800 lr=0x2000",
             ),
-            (&[0xc0, 0x46, 0x00, 0x47], 0, &[10], "Invalid memory access; address: 0"), // nop; bx r0 → pc 0
+            (&[0xc0, 0x46, 0x00, 0x47], 0, 0x2000, &[10], "Invalid memory access; address: 0"), // nop; bx r0 → pc 0
             (
                 &[0xc0, 0x46, 0x00, 0x68],
                 0x5000_0000,
+                0x2000,
                 &[10],
                 "Invalid memory access; address: 1342177280",
             ), // nop; ldr r0, [r0]
         ];
-        for (code, r0, budgets, expected) in cases {
+        for (code, r0, end, budgets, expected) in cases {
             let outcomes = [None, Some(Box::new(DeferredExecutor(Default::default())) as Box<dyn CompiledExecutor>)].map(|backend| {
                 let with_backend = backend.is_some();
                 let mut engine = Arm32CpuEngine::with_backend(backend);
@@ -1284,7 +1290,7 @@ mod tests {
                 engine.reg_write(ArmRegister::R0, r0);
                 let mut stop = String::new();
                 for &budget in budgets {
-                    stop = match engine.run(0x2000, budget) {
+                    stop = match engine.run(end, budget) {
                         Ok(EngineRunResult {
                             stop_reason,
                             budget_consumed,
@@ -1308,6 +1314,24 @@ mod tests {
             assert_eq!(outcomes[0].0, expected);
             assert_eq!(outcomes[0], outcomes[1], "{expected}");
         }
+
+        // The cases walk the stops the loops have today; a stop added to one loop walks none of them.
+        // So the stops of each loop are counted in the source: the lines that leave it.
+        let stops = |function: &str| {
+            include_str!("arm32_cpu.rs")
+                .lines()
+                .skip_while(|line| !line.contains(function))
+                .skip_while(|line| !line.contains("let stop_reason = loop {"))
+                .take_while(|line| *line != "        };")
+                .filter(|line| !line.trim_start().starts_with("//") && ["break ", "return ", "?"].iter().any(|exit| line.contains(exit)))
+                .count()
+        };
+        assert_eq!(
+            (stops("fn run_interpreter("), stops("fn run(&mut self, end: u32, count: u32)")),
+            (6, 7),
+            "a loop gained or lost a stop. Upstream's has one the other cannot reach (a fault in compiled code); \
+             any other goes into both loops and into the cases above, and then into these two numbers"
+        );
     }
 
     #[test]
