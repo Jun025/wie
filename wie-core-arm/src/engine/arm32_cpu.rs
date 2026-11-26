@@ -109,8 +109,63 @@ impl Arm32CpuEngine {
     }
 }
 
+impl Arm32CpuEngine {
+    // fork: the instruction loop of an engine with no AOT backend (featurephone and `wie_validate`
+    // today). `run`'s loop below is upstream's, and it asks whether a backend is attached three
+    // times per guest instruction, reloading the answer after every `step`. This one reads nothing
+    // per instruction but pc. A second loop rather than a flag hoisted out of the first: the flag
+    // measured no gain, this one −7% of the loop's time per frame (docs/report/0603 §3).
+    // The two loops must stop at the same place with the same result —
+    // `the_loop_without_a_backend_stops_where_the_loop_with_one_does`.
+    fn run_interpreter(&mut self, end: u32, count: u32) -> Result<EngineRunResult> {
+        let mut budget_consumed = 0;
+        let stop_reason = loop {
+            let pc = self.cpu.reg_get(Mode::User, reg::PC);
+
+            // The comments on these two paths are in `run`.
+            if pc < 0x1000 {
+                if self.is_svc_exception() {
+                    break self.read_svc_result()?;
+                }
+                let lr = self.cpu.reg_get(Mode::User, reg::LR);
+                tracing::error!("guest branched to {pc:#x}, lr={lr:#x}");
+                return Err(WieError::InvalidMemoryAccess(pc));
+            }
+
+            if pc == end {
+                break EngineStopReason::End;
+            }
+
+            if budget_consumed == count {
+                break EngineStopReason::Yield;
+            }
+
+            let mut arm32cpu_memory = self.mem.as_arm32cpu_memory();
+            if !(self.cpu.step(&mut arm32cpu_memory)) {
+                let cpsr = self.cpu.reg_get(Mode::Undefined, reg::SPSR);
+                let lr = self.cpu.reg_get(Mode::User, reg::LR);
+                return Err(WieError::FatalError(self.undefined_instruction_message(pc, cpsr, lr)));
+            }
+            if let Some(x) = arm32cpu_memory.memory_error {
+                return Err(WieError::InvalidMemoryAccess(x));
+            }
+            budget_consumed += 1;
+        };
+
+        Ok(EngineRunResult {
+            stop_reason,
+            budget_consumed,
+        })
+    }
+}
+
 impl ArmEngine for Arm32CpuEngine {
     fn run(&mut self, end: u32, count: u32) -> Result<EngineRunResult> {
+        // fork: see `run_interpreter`. A backend never appears during a run; one dropped during a
+        // run (a failed execution, below) finishes that run in this loop.
+        if self.aot.is_none() {
+            return self.run_interpreter(end, count);
+        }
         if let Some(aot) = &mut self.aot {
             aot.poll_recompilations();
         }
@@ -142,7 +197,7 @@ impl ArmEngine for Arm32CpuEngine {
                 break EngineStopReason::Yield;
             }
 
-            // fork: without an AOT backend this loop reads nothing but pc per instruction — the cpsr
+            // fork: once the backend is gone this loop reads nothing but pc per instruction — the cpsr
             // read, the cache-maintenance decode and the post-step reads below serve AOT entry lookup
             // only (docs/report/0559 §4 priced two reads here at 23% of the interpreter loop).
             let cpsr = if self.aot.is_some() {
@@ -1184,6 +1239,74 @@ mod tests {
                 (result.stop_reason, at_end),
                 (EngineStopReason::End, true) | (EngineStopReason::Yield, false)
             ));
+        }
+    }
+
+    // `run` has two instruction loops: `run_interpreter` when no backend is attached, and upstream's
+    // loop when one is. A backend that has compiled nothing interprets every instruction through the
+    // second, so the two must agree on every way a run stops.
+    #[test]
+    fn the_loop_without_a_backend_stops_where_the_loop_with_one_does() {
+        const REGISTERS: [ArmRegister; 17] = {
+            use ArmRegister::*;
+            [R0, R1, R2, R3, R4, R5, R6, R7, R8, SB, SL, FP, IP, SP, LR, PC, Cpsr]
+        };
+        // (thumb code at 0x1000, r0, budgets of the successive runs) -> the way the last run stops
+        let cases: [(&[u8], u32, &[u32], &str); 7] = [
+            (&[0xc0, 0x46, 0xc0, 0x46, 0x70, 0x47], 0, &[0, 2], "yield after 2"), // nop; nop; bx lr
+            (&[0xc0, 0x46, 0xc0, 0x46, 0x70, 0x47], 0, &[2, 10], "end after 1"),
+            (&[0xc0, 0x46, 0xc0, 0x46, 0x70, 0x47], 0, &[3], "end after 3"), // at the end with the budget spent: the end wins
+            (&[0xc0, 0x46, 0x2a, 0xdf], 0, &[10], "svc 42 lr=0x1004 spsr=0x3f after 2"), // nop; svc 42
+            (
+                &[0xc0, 0x46, 0x00, 0xe8],
+                0,
+                &[10],
+                "Fatal error: Undefined instruction at pc=0x1002 (thumb) insn=0xe800 lr=0x2000",
+            ),
+            (&[0xc0, 0x46, 0x00, 0x47], 0, &[10], "Invalid memory access; address: 0"), // nop; bx r0 → pc 0
+            (
+                &[0xc0, 0x46, 0x00, 0x68],
+                0x5000_0000,
+                &[10],
+                "Invalid memory access; address: 1342177280",
+            ), // nop; ldr r0, [r0]
+        ];
+        for (code, r0, budgets, expected) in cases {
+            let outcomes = [None, Some(Box::new(DeferredExecutor(Default::default())) as Box<dyn CompiledExecutor>)].map(|backend| {
+                let with_backend = backend.is_some();
+                let mut engine = Arm32CpuEngine::with_backend(backend);
+                assert_eq!(engine.aot.is_some(), with_backend);
+                engine.mem_map(0x1000, 0x1000, MemoryPermission::ReadWriteExecute);
+                engine.mem_write(0x1000, code).unwrap();
+                engine.reg_write(ArmRegister::Cpsr, 0x3f);
+                engine.reg_write(ArmRegister::PC, 0x1001);
+                engine.reg_write(ArmRegister::LR, 0x2000);
+                engine.reg_write(ArmRegister::R0, r0);
+                let mut stop = String::new();
+                for &budget in budgets {
+                    stop = match engine.run(0x2000, budget) {
+                        Ok(EngineRunResult {
+                            stop_reason,
+                            budget_consumed,
+                        }) => match stop_reason {
+                            EngineStopReason::End => alloc::format!("end after {budget_consumed}"),
+                            EngineStopReason::Yield => alloc::format!("yield after {budget_consumed}"),
+                            EngineStopReason::Svc { category, lr, spsr } => {
+                                alloc::format!("svc {category} lr={lr:#x} spsr={spsr:#x} after {budget_consumed}")
+                            }
+                        },
+                        Err(error) => alloc::format!("{error}"),
+                    };
+                }
+                assert_eq!(
+                    engine.aot.is_some(),
+                    with_backend,
+                    "the backend stayed attached: the second loop is the one that ran"
+                );
+                (stop, REGISTERS.map(|register| engine.reg_read(register)))
+            });
+            assert_eq!(outcomes[0].0, expected);
+            assert_eq!(outcomes[0], outcomes[1], "{expected}");
         }
     }
 

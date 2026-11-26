@@ -1,0 +1,28 @@
+{
+  "date": "2026-11-26",
+  "task": "wie-arm-interpreter-skip-per-instruction-aot-check-when-no-backend",
+  "title": "ARM 해석기 — AOT 백엔드가 없는 엔진은 명령마다 백엔드를 묻지 않는 루프로 돈다",
+  "summary": "채택된 제안(백엔드가 없을 때 명령마다 하는 AOT 검사를 거치지 않게)의 첫 일로 S3 병합 앞뒤(a3217eac0 · de0969794)를 같은 순간 짝 3회로 쟀다: LGT 3cc7a9b4cb15 성 대화에서 프레임당 실행 루프 21.34 → 22.57 ms(+5.8% · 세 짝 모두 +4.7 ~ +6.9%)로 차이가 실재했다. 지금 main 에서 후보 둘을 같이 쟀다 — 백엔드 유무를 지역 깃발로만 뺀 것은 16.93 → 16.85 ms(-0.5% · 방향 엇갈림)로 잡히지 않았고, 백엔드가 없으면 따로 둔 루프로 넘어가는 것은 16.93 → 15.12 ms(-10.7% · 세 번 모두 -7.3 ~ -13.9%)였다. 뒤의 것을 넣었다. upstream 의 루프는 고치지 않았다. docs/report/0603.",
+  "changes": [
+    "wie-core-arm/src/engine/arm32_cpu.rs: run 이 aot 가 None 이면 맨 앞에서 run_interpreter(새 루프 · 명령당 PC 하나만 읽는다)로 넘어간다 · upstream 루프 본문 무변경(주석 1줄 문구만)",
+    "같은 파일 시험 1건: the_loop_without_a_backend_stops_where_the_loop_with_one_does — 두 루프가 멈춘 사유 · 쓴 예산 · 레지스터 17개에서 같은지 7가지로 견준다",
+    "docs/report/0603 · docs/player-updates: speed 1건"
+  ],
+  "verification": [
+    "0599 §1 의 자(arm-interp-profile · 성 대화 · xctrace 8초 창): S3 앞뒤 3짝 + 기준/깃발/가름 3바퀴 = 15회, 회마다 캡처를 기준 화면과 대조",
+    "run 의 디스어셈블: 백엔드 없는 경로가 게스트 명령 하나에 35 → 17 명령(S3 앞과 같은 열) · 넣는 소스로 지은 빌드의 run 은 잰 빌드와 명령 851개 열이 같다",
+    "개악 5종: 새 시험이 3종을 잡고(예산/끝 순서 · SVC 가지 · 메모리 오류), 백엔드가 있어도 새 루프로 보내면 AOT 시험 9건 red, 새 루프로 보내지 않으면 green(느려질 뿐)",
+    "perf-watch 브라우저 축(wasm · 3회): 퇴행 0 · 미측정 0/8 · KTF 155972cac664 그리기 수 +3.9 ~ +5.4%",
+    "네 게이트 + beta clippy · 러너 블록 6건 · wasm 계약 · smoke_gate — docs/report/0603 §6 · §7"
+  ],
+  "limits": [
+    "장면 1개(LGT 1판 · 네이티브) · 기기 1대 · 3바퀴. 측정 내내 다른 레인의 부하가 있었다(load1 6 ~ 105)",
+    "브라우저 축에서 성 대화의 LGT 판(3cc7a9b4cb15)은 30초 그리기 수가 빌드와 무관하게 300 안팎과 410 안팎으로 갈려 읽을 수 없었다",
+    "long 풀을 다른 저장소의 스위트가 내내 쥐고 있어 프로파일 · 브라우저 축 · smoke_gate 를 phase 마다 short 임대로 돌렸다",
+    "루프가 둘이 됐다(35줄이 겹친다) — 한쪽만 고치면 갈리고, 그것을 잡는 것은 새 시험 1건이다",
+    "upstream 루프 안에 남은 fork 검사 3곳은 이제 실행 도중 백엔드를 버린 run 에서만 일한다 — 지우지 않았다(범위 밖)"
+  ],
+  "proposals": [],
+  "adoptedProposals": ["2026-11-25-arm-interpreter-fetch-code-page-measured-not-landed#p0"],
+  "declinedProposals": []
+}
