@@ -246,8 +246,10 @@ impl ArmEngine for Arm32CpuEngine {
                     self.cpu.reg_set(Mode::User, reg::CPSR, frame.cpsr);
                     if exit == CompiledExit::GuestFault {
                         // fork: the interpreter reads 0 through a null pointer (`Arm32CpuMemory::read_page`).
-                        // Compiled code cannot: its fault is terminal, with flags and partial effects
-                        // not reconstructed, so the instruction cannot be handed back for a retry.
+                        // The native executor hands such an access back as `InterpretOne` and never gets
+                        // here with one (`compiled_code_reads_through_null_like_the_interpreter`). What is
+                        // left is an executor whose fault is terminal as the trait allows — flags and
+                        // partial effects not reconstructed — where the instruction cannot be retried.
                         if frame.fault_address < NULL_READ_LIMIT && self.mem.pages[0].bytes.is_none() {
                             tracing::warn!(
                                 "guest touched the null page ({:#x}) in AOT-compiled code at pc={:#x}; a read here is 0 in the interpreter",
@@ -1453,6 +1455,10 @@ mod tests {
 
     impl Engines {
         fn new(bytes: &[u8]) -> Self {
+            Self::at(0x1000, bytes)
+        }
+
+        fn at(address: u32, bytes: &[u8]) -> Self {
             let executor = TestNativeExecutor::new();
             let executed = executor.executed.clone();
             let mut engines = Self {
@@ -1461,11 +1467,11 @@ mod tests {
                 executed,
             };
             for engine in [&mut engines.interpreted, &mut engines.native] {
-                engine.mem_map(0x1000, bytes.len(), MemoryPermission::ReadWriteExecute);
-                engine.mem_write(0x1000, bytes).unwrap();
+                engine.mem_map(address, bytes.len(), MemoryPermission::ReadWriteExecute);
+                engine.mem_write(address, bytes).unwrap();
                 engine.mem_map(0x20000, 0x20000, MemoryPermission::ReadWrite);
             }
-            engines.native.record_image(0x1000, bytes.len());
+            engines.native.record_image(address, bytes.len());
             let preparation = engines.native.begin_preparation().unwrap().unwrap();
             let artifact = futures::executor::block_on(preparation).unwrap();
             engines.native.finish_preparation(Ok(artifact));
@@ -1535,6 +1541,42 @@ mod tests {
                     "memory page {page:#x}"
                 );
             }
+        }
+    }
+
+    // 2b1ed0c8d061 reads through a null pointer and goes on (docs/report/0391). Compiled code faulted
+    // there instead: `Invalid memory access; address: 0` (docs/report/0607 §6).
+    #[test]
+    fn compiled_code_reads_through_null_like_the_interpreter() {
+        // ldr r0, [r0]; bx lr / ldmia r0, {r1, r2}; bx lr / str r0, [r0]; bx lr
+        let code = [0xe590_0000_u32, 0xe12f_ff1e, 0xe890_0006, 0xe12f_ff1e, 0xe580_0000, 0xe12f_ff1e];
+        // Not at 0x1000: a host page is 64 KB, so code there maps the null page and every read hits memory.
+        let mut engines = Engines::at(0x30000, &code.into_iter().flat_map(u32::to_le_bytes).collect::<Vec<_>>());
+        assert!(engines.native.mem.pages[0].bytes.is_none());
+        for (pc, r0, expected) in [
+            (0x30000, 0, "Ok(0)"),
+            (0x30000, 0xffc, "Ok(0)"),
+            (0x30008, 0, "Ok(0)"),
+            (0x30008, 0xffc, "Err(InvalidMemoryAccess(4096))"), // the second word is past the limit
+            (0x30000, 0x1000, "Err(InvalidMemoryAccess(4096))"),
+            (0x30010, 0, "Err(InvalidMemoryAccess(0))"), // a write still faults
+        ] {
+            let key = RegionKey {
+                pc,
+                thumb: false,
+                cpu_mode: 0x1f,
+            };
+            assert!(engines.native.aot.as_ref().unwrap().entries.contains_key(&key), "{pc:#x} is compiled");
+            engines.reset(pc, 0x1f, &[(ArmRegister::R0, r0), (ArmRegister::R1, 0x55), (ArmRegister::R2, 0x55)]);
+            for (name, engine) in [("interpreter", &mut engines.interpreted), ("AOT", &mut engines.native)] {
+                let registers = engine
+                    .run(0x8000, u32::MAX)
+                    .map(|_| [ArmRegister::R0, ArmRegister::R1, ArmRegister::R2].map(|register| engine.reg_read(register)));
+                let outcome = registers.map(|[r0, r1, r2]| if pc == 0x30008 { r1 | r2 } else { r0 });
+                assert_eq!(alloc::format!("{outcome:?}"), expected, "{name}, pc={pc:#x}, r0={r0:#x}");
+            }
+            assert_eq!(engines.executed.load(Ordering::Relaxed), expected == "Ok(0)", "the return is native code");
+            assert!(engines.native.aot.is_some(), "the backend stays");
         }
     }
 

@@ -213,6 +213,12 @@ impl CompiledExecutor for NativeExecutor {
             let exit = unsafe { entry(frame, access.pages().as_mut_ptr(), transfer_words) };
             match exit {
                 0 => {}
+                // fork: a guest READ through a null pointer is 0 on this engine (`Arm32CpuMemory::read_page`,
+                // docs/report/0391), and generated code faults on any unmapped page. Its page guard runs
+                // before the instruction changes anything and the fault publishes that instruction's pc, so
+                // the access goes back to the interpreter to be done again: a read gets its 0 there, a write
+                // faults there as it did here. 0x1000 is `NULL_READ_LIMIT`.
+                6 if frame.fault_address < 0x1000 => return Ok(CompiledExit::InterpretOne),
                 6 => return Ok(CompiledExit::GuestFault),
                 _ => return Err(WieError::FatalError(format!("Native ARM AOT returned invalid exit {exit}"))),
             }
@@ -629,7 +635,8 @@ mod tests {
             let handle = artifact.regions[1].handle;
             frame.regs[4] = 0xffff_fff9;
             access.pages[0xffff].bytes = Some(Box::new([0x55; 0x10000]));
-            assert!(executor.execute(handle, &mut frame, &mut access).unwrap() == CompiledExit::GuestFault);
+            // fork: upstream expects `GuestFault`. The fault is on the null page, which `execute` hands back.
+            assert!(executor.execute(handle, &mut frame, &mut access).unwrap() == CompiledExit::InterpretOne);
             assert_eq!((frame.regs[15], frame.fault_address, frame.regs[4]), (0x100c, 1, 0xffff_fff9));
             assert_eq!(&access.pages[0xffff].bytes.as_ref().unwrap()[0xfff8..], &[0x55; 8]);
             access.pages[0].bytes = Some(Box::new([0; 0x10000]));

@@ -1557,11 +1557,25 @@ mod tests {
         Ok(())
     }
 
+    // The eleven budget and hold tests from here to `under_aot` run twice: on the interpreter as written, and
+    // again in that module with the native AOT backend attached. This is the engine the current run builds.
+    extern crate std;
+    std::thread_local!(static UNDER_AOT: core::cell::Cell<bool> = const { core::cell::Cell::new(false) });
+
+    fn engine_under_test() -> Option<Box<dyn wie_core_arm_aot::CompiledExecutor>> {
+        UNDER_AOT.get().then(|| Box::new(test_utils::TestNativeExecutor::new()) as _)
+    }
+
+    /// Call once the guest code is loaded. On the interpreter there is nothing to prepare.
+    fn compile(core: &mut ArmCore) {
+        futures::executor::block_on(core.prepare_execution()).unwrap();
+    }
+
     #[test]
     fn yields_every_ten_thousand_instructions_across_svc() {
         let mut core = ArmCore::new(Options {
             enable_gdbserver: false,
-            aot: None,
+            aot: engine_under_test(),
             profile: None,
         })
         .unwrap();
@@ -1573,6 +1587,7 @@ mod tests {
         let mut code = [0x01, 0x30, 0x01, 0xdf].repeat(10_000); // add r0, #1; svc #1
         code.extend_from_slice(&[0x70, 0x47]); // bx lr
         core.load(&code, 0x1000, code.len()).unwrap();
+        compile(&mut core);
 
         let observer = core.clone();
         let mut run = pin!(core.run_function::<u32>(0x1001, &[0]));
@@ -1597,7 +1612,7 @@ mod tests {
 
         let mut core = ArmCore::new(Options {
             enable_gdbserver: false,
-            aot: None,
+            aot: engine_under_test(),
             profile: None,
         })
         .unwrap();
@@ -1608,6 +1623,7 @@ mod tests {
         spin.extend_from_slice(&[0x70, 0x47]); // bx lr
         core.load(&spin, 0x1000, spin.len()).unwrap();
         core.load(&[0x01, 0xdf, 0x70, 0x47], 0x20000, 4).unwrap(); // svc #1; bx lr
+        compile(&mut core);
 
         let mut cx = Context::from_waker(Waker::noop());
         let mut runner = core.clone();
@@ -1663,12 +1679,13 @@ mod tests {
     fn a_holder_parked_in_a_host_call_keeps_nobody_off() {
         let mut core = ArmCore::new(Options {
             enable_gdbserver: false,
-            aot: None,
+            aot: engine_under_test(),
             profile: None,
         })
         .unwrap();
         crate::Allocator::init(&mut core).unwrap();
         core.load(&[0x70, 0x47], 0x1000, 2).unwrap(); // bx lr
+        compile(&mut core);
 
         let mut cx = Context::from_waker(Waker::noop());
         let runner = core.clone();
@@ -1697,7 +1714,7 @@ mod tests {
     fn a_nested_hold_reports_the_outer_one() {
         let mut core = ArmCore::new(Options {
             enable_gdbserver: false,
-            aot: None,
+            aot: engine_under_test(),
             profile: None,
         })
         .unwrap();
@@ -1728,7 +1745,7 @@ mod tests {
 
         let mut core = ArmCore::new(Options {
             enable_gdbserver: false,
-            aot: None,
+            aot: engine_under_test(),
             profile: None,
         })
         .unwrap();
@@ -1738,6 +1755,7 @@ mod tests {
         spin.extend_from_slice(&[0x70, 0x47]); // bx lr
         core.load(&spin, 0x1000, spin.len()).unwrap();
         core.load(&[0x01, 0xdf, 0x70, 0x47], 0x20000, 4).unwrap(); // svc #1; bx lr
+        compile(&mut core);
 
         let mut cx = Context::from_waker(Waker::noop());
         let mut runner = core.clone();
@@ -1769,7 +1787,7 @@ mod tests {
 
         let mut core = ArmCore::new(Options {
             enable_gdbserver: false,
-            aot: None,
+            aot: engine_under_test(),
             profile: None,
         })
         .unwrap();
@@ -1779,6 +1797,7 @@ mod tests {
         let mut code = [0xc0, 0x46].repeat(INSTRUCTIONS_PER_YIELD as usize - 1); // nop
         code.extend_from_slice(&[0x01, 0xdf, 0x70, 0x47]); // svc #1; bx lr
         core.load(&code, 0x1000, code.len()).unwrap();
+        compile(&mut core);
 
         let mut cx = Context::from_waker(Waker::noop());
         let mut runner = core.clone();
@@ -1812,7 +1831,7 @@ mod tests {
 
         let mut core = ArmCore::new(Options {
             enable_gdbserver: false,
-            aot: None,
+            aot: engine_under_test(),
             profile: None,
         })
         .unwrap();
@@ -1820,6 +1839,7 @@ mod tests {
         core.register_svc_handler(1, park, &()).unwrap();
         load_spin(&mut core, 0x1000, &[0x70, 0x47]); // bx lr
         load_spin(&mut core, 0x20000, &[0x01, 0xdf, 0x70, 0x47]); // svc #1; bx lr
+        compile(&mut core);
 
         let mut cx = Context::from_waker(Waker::noop());
         let mut runner = core.clone();
@@ -1856,12 +1876,13 @@ mod tests {
     fn two_sliced_holders_do_not_wait_for_each_other() {
         let mut core = ArmCore::new(Options {
             enable_gdbserver: false,
-            aot: None,
+            aot: engine_under_test(),
             profile: None,
         })
         .unwrap();
         crate::Allocator::init(&mut core).unwrap();
         load_spin(&mut core, 0x1000, &[0x70, 0x47]); // bx lr
+        compile(&mut core);
 
         let mut cx = Context::from_waker(Waker::noop());
         let holder = || {
@@ -1898,7 +1919,7 @@ mod tests {
     fn a_thread_that_ends_holding_leaves_no_hold_behind() {
         let core = ArmCore::new(Options {
             enable_gdbserver: false,
-            aot: None,
+            aot: engine_under_test(),
             profile: None,
         })
         .unwrap();
@@ -1918,6 +1939,56 @@ mod tests {
         assert_eq!(core.holders.lock().len(), 1);
         drop(thread);
         assert!(core.holders.lock().is_empty());
+    }
+
+    /// The eleven above with the native AOT backend attached (docs/report/0607 §6 ⑶). Compiled code does not
+    /// count its instructions against the budget, so no thread is ever sliced out inside it, and the eight
+    /// marked rows fail at the first place they expect one to be. `should_panic` keeps that count in the
+    /// gates: a marked row that starts passing reddens, and the round that makes compiled code yield takes
+    /// its mark off.
+    mod under_aot {
+        struct Reset;
+
+        impl Drop for Reset {
+            fn drop(&mut self) {
+                super::UNDER_AOT.set(false); // the harness may run the next test on this thread
+            }
+        }
+
+        macro_rules! rerun {
+            ($($(#[$unmet:meta])? $name:ident)*) => {$(
+                #[test]
+                $(#[$unmet])?
+                fn $name() {
+                    super::UNDER_AOT.set(true);
+                    let _reset = Reset;
+                    super::$name()
+                }
+            )*};
+        }
+
+        rerun! {
+            // The first slice ends after 10,000 `svc`s, not 5,000: the `add`s between them are not counted.
+            #[should_panic(expected = "left: 10000")]
+            yields_every_ten_thousand_instructions_across_svc
+            #[should_panic(expected = "holder.as_mut().poll(&mut cx).is_pending()")]
+            a_holder_sliced_out_keeps_the_others_off_guest_code
+            #[should_panic(expected = "holder.as_mut().poll(&mut cx).is_pending()")]
+            another_thread_taking_a_hold_leaves_the_holders_in_place
+            #[should_panic(expected = "holder.as_mut().poll(&mut cx).is_pending()")]
+            another_thread_letting_go_leaves_the_holders_in_place
+            a_holder_parked_in_a_host_call_keeps_nobody_off
+            a_nested_hold_reports_the_outer_one
+            #[should_panic(expected = "sliced.as_mut().poll(&mut cx).is_pending()")]
+            only_a_thread_sliced_out_mid_code_counts_as_preempted
+            #[should_panic(expected = "out of budget on the svc")]
+            a_budget_that_runs_out_on_an_svc_counts_as_preempted
+            #[should_panic(expected = "sliced out")]
+            a_thread_kept_off_by_a_holder_still_counts_as_preempted
+            #[should_panic(expected = "sliced out holding")]
+            two_sliced_holders_do_not_wait_for_each_other
+            a_thread_that_ends_holding_leaves_no_hold_behind
+        }
     }
 
     #[test]
