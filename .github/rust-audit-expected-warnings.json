@@ -17,9 +17,8 @@
     "",
     "To update: run the checker; it prints the exact entry to add or the exact line to delete."
   ],
-  "measured": "2026-11-21T22:48Z",
+  "measured": "2026-11-26T07:16Z",
   "expected": [
-    { "package": "ttf-parser", "version": "0.25.1", "kind": "unmaintained", "advisory": "RUSTSEC-2026-0192" },
-    { "package": "chrono", "version": "0.4.45", "kind": "unmaintained", "advisory": "RUSTSEC-2026-0543" }
+    { "package": "ttf-parser", "version": "0.25.1", "kind": "unmaintained", "advisory": "RUSTSEC-2026-0192" }
   ]
 }

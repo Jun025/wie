@@ -60,7 +60,7 @@
 > **§A 에 없는 새 경고**는 잡 요약에 «대장에 없는 새 경고 N건: …» 한 줄로 뜬다(rc 0) — 그 줄을 보면 A 에 등재하고 도달성 판정을 써라.
 > 세 형상은 `node scripts/check-audit-warnings.mjs --selftest` 가 묶고, 매일 그 잡이 본 검사 앞에 돌린다.
 
-### A. 권고·공급망 2건 — **전건 비게이팅 경고**(`cargo audit` 무-플래그 **exit 0 · vulnerabilities 0**)
+### A. 권고·공급망 1건 — **전건 비게이팅 경고**(`cargo audit` 무-플래그 **exit 0 · vulnerabilities 0**)
 
 실측 기준: `cargo-audit 0.22.2` · advisory-db **1,251 advisories** ·
 `Cargo.lock` **557 패키지** · **2026-09-19 재측**(`wie-security-audit-schedule-red-three-days-unattended`).
@@ -73,6 +73,7 @@
 > lock 557 패키지): 이름 억제는 **8건**(zip — §D D-1·D-2·D-3)이 됐고 무-플래그 `cargo audit` 은 **8건 · exit 1** 이다.
 > 이 표는 **A-4 `chacha20` 가 해소돼 C-10 으로 옮겨졌고**(0.10.1 → 0.10.2) **A-5 `chrono` 가 새로 등재**돼 행 수는 그대로 2다.
 > ★**[2026-11-22 · 같은 날 뒤 회차] 이름 억제는 다시 0건이다**(`wie-upstream-sync2-s1-rustjava-pin-0-4-1-before-upstream-sync` · lock **559** 패키지): RustJava 핀을 0.4.1 로 올리며 zip 8.6.0 이 lockfile 에서 빠져 §D 의 세 행이 **C-16** 으로 갔다. 무-플래그 `cargo audit` 은 **0건 · exit 0**(경고 2건 그대로)이다.
+> ★**[2026-11-26] 이 표는 1행이다**(`wie-rust-audit-ledger-a-stale-chrono-row-reds-daily-schedule-since-1124` · cargo-audit 0.22.2 · lock **602** 패키지): **A-5 `chrono` 가 해소돼 C-17 로 옮겨졌다** — PR #616(2026-11-23 · 조각 S1b)이 `chrono` 를 lockfile 에서 뺐는데 이 표와 기대 목록이 따라오지 않아 일일 감사가 11-24 ~ 26 사흘 red 였다(run `45353827542` · `45563278336` · `45769680060`). ★**lock 이 바뀌어 «경고가 사라지는» 경우는 PR 단계에서 안 걸린다** — 이 대조는 일일 잡에서만 돈다(`pr-audit.yml` 은 `cargo audit` 만 돌린다 · 기록된 결정). 크레이트를 lock 에서 빼거나 올리는 PR 은 그 PR 에서 `node scripts/check-audit-warnings.mjs` 를 손으로 돌려 기대 목록과 이 표를 같이 내려라.
 
 > ★★**2026-09-19 — 이 대장이 처음으로 «되살아난 해소분»을 만났다.** `Security audit`(schedule)이 **3일 연속 red**
 > 였고(09-17·18·19), 원인은 새 자문이 아니라 ★**base swap `36df9c31` 이 `Cargo.lock` 을 통째로 갈아
@@ -97,7 +98,6 @@
 | # | 대상 | 권고 | 성격 | 설치 버전 → 패치 | 판정 | 다음 행동 |
 |---|---|---|---|---|---|---|
 | **A-1** | `ttf-parser` | RUSTSEC-2026-0192 | `unmaintained`(informational) | `0.25.1` → **`patched = []`** | **수용 유지** — 버전업으로 안 풀린다 | 아래 로드맵 5번(ab_glyph→skrifa)에서 계속 추적. **착수 아님** |
-| **A-5** | `chrono` | RUSTSEC-2026-0543 | `unmaintained`(informational) | `0.4.45` → **`patched = []`** | **수용 유지** — 결함 경로가 있는 자문이 아니라 «유지보수 종료» 신호이고 전 판본이 해당이라 버전업으로 안 풀린다. ★**배포 WASM 에 실린다**(`cargo tree -p wie_featurephone --target wasm32-unknown-unknown -i chrono` → 정상 출력) — 소비자는 `wie-lgt/src/runtime/stdlib.rs:2`(직접)와 `rustjava-runtime 0.1.1`(`java.util.Date`·`GregorianCalendar`·`SimpleDateFormat`) 둘 | `rustjava-runtime` 은 **0.1.1 ~ 0.4.2 전부 `chrono ^0.4`**(crates.io 인덱스 2026-11-22 실측)라 우리 쪽만 걷어내도 경고는 남는다 — RustJava 가 chrono 를 버릴 때 함께 본다. **착수 아님** |
 
 > ★**A-4 의 «설치 버전» 이 `0.10.0` → `0.10.1` 로 움직였다**(2026-09-19 · base swap `36df9c31` 이 옮겼다 —
 > 우리가 올린 것이 아니다). ★**ⓓ 의 판정은 그대로 선다** — 그 절이 이미 「`0.10.0`(2026-02-07) · `0.10.1`(2026-06-24)
@@ -278,6 +278,7 @@ x86_64 에서도 돈다. **그 축들이 좁히는 것은 «AVX2 없는 x86» �
 | **C-14** | RUSTSEC-2026-0486(`unsound` 경고) | `rustix` 1.1.x(간접 — `winit` 의 리눅스 백엔드: `polling`·`wayland-*`·`x11rb`·`softbuffer`·`drm-ffi`·`gethostname`. `0.38.44` 는 비해당) | ★**해소 2026-11-22** — `cargo update -p rustix@1.1.4` **1.1.4 → 1.1.6**(권고 `>=1.1.6`) | ★**버전축으로만 닫았다.** 잰 것은 범위뿐이다 — 결함은 `rustix::fs` 의 xattr 6함수이고 우리 `.rs` 에 `xattr` 호출 **0건** · 리눅스 데스크톱 호스트에서만 컴파일된다(이 Mac 의 호스트 타깃 `cargo tree -i rustix@1.1.6` → `nothing to print`) · WASM 에 없다(`did not match any packages`). 위 소비 크레이트들이 xattr 를 부르는지는 **재지 않았다** | ★**`winit@0.30.13` 의 리눅스 의존 기준** — winit 을 올리거나 rustix 가 1.1.6 아래로 내려가면 다시 재라. 「안 탄다」의 근거로 인용하지 마라 |
 | **C-15** | RUSTSEC-2026-0386(`unsound` 경고) | `tokio`(간접 — `sentry 0.49.2` 의 선택 의존 `reqwest`·`sentry-actix` 계열, ★**lockfile 에만 있다**) | ★**해소 2026-11-22** — `cargo update -p tokio` **1.53.1 → 1.54.1**(권고 `>=1.53.3`) | ★**빌드 그래프 0** — `cargo tree -i tokio -e all --target all` → `nothing to print` | ★**C-11 과 같다** — sentry 의 feature 조합이 바뀌어 tokio 가 그래프에 들어오면 다시 재라 |
 | **C-16**<br>(구 **D-1 · D-2 · D-3**) | RUSTSEC-2026-0367 · 0368 · 0369 · 0429 · 0545 · 0546 · 0547 · 0548 | `zip`(직접 — `wie-backend/Cargo.toml` · 간접 — `rustjava-runtime`) | ★**해소 2026-11-22**(`wie-upstream-sync2-s1-rustjava-pin-0-4-1-before-upstream-sync`) — RustJava 핀 `^0.1.1` → `^0.4.1`(`rustjava-runtime 0.4.1` 은 `zip ^9.0.5`) + `wie-backend` `zip ^8.6` → `^9.0` 로 lockfile 의 zip 이 **8.6.0 → 9.8.1** 하나가 됐다. 두 워크플로의 `--ignore` 8개를 지웠고 무-플래그 `cargo audit` 이 **0건**이다 | ★**도달 불가였다**(상향 «전» 판정 — 구 D 행의 논증 그대로): 0367·0368·0369·0429·0546·0548 은 «파일시스템으로 풀기» API(`ZipArchive::extract`·`extract_unwrapped_root_dir`·`ZipStreamReader`·`read_zipfile_from_stream`)의 결함이고 두 소비자 모두 `ZipArchive::new(Cursor)` + `by_index`/`by_name` 으로 메모리에 읽기만 했다(호출 **0건**). 0545(`aes-crypto`)·0547(`legacy-zip`)은 꺼진 feature 뒤라 컴파일되지 않았다 | ★**버전축으로 닫았다** — zip 이 9.0.5 아래로 되돌아가면(base swap · lock 재생성) 여덟 건이 다시 뜬다. 위 호출 0건은 `wie-backend/src/lib.rs`(2026-11-22)와 `rustjava-runtime 0.1.1` 소스 실측이라, 판을 되돌리지 않더라도 `extract`·`ZipStreamReader` 를 쓰기 시작하면(0548 의 수정은 옵트인 `enforce_header_consistency(true)`) 다시 재라. zip 9 는 엔트리 이름을 «UTF-8 플래그»가 아니라 «바이트가 UTF-8 로 유효한가»로 읽는다 — 코퍼스 대조는 `docs/report/0572` |
+| **C-17**<br>(구 **A-5**) | RUSTSEC-2026-0543(`unmaintained` 경고) | `chrono`(직접 — `wie-lgt` · 간접 — `rustjava-runtime`) | ★**해소 2026-11-23** — PR **#616**(`cbb7bcb5d` · 조각 S1b · `docs/report/0584`): RustJava 핀 `=0.4.1` → `=0.5.1`(`rustjava-runtime 0.5.1` 이 날짜 계산을 `jiff` 로 옮겼다) + `wie-lgt` 의 `chrono ^0.4` → `jiff ^1.0` 로 lockfile 에서 `chrono 0.4.45` 가 빠졌다(`name = "chrono"` **0건** · 2026-11-26 재확인). ★**올린 것이 아니라 «걷어냈다»** — 권고가 `patched = []` 라 올릴 판본이 없었다 | ★**결함 경로가 있는 자문이 아니었다**(구 A-5 의 판정 그대로) — «유지보수 종료» 신호이고 전 판본이 해당이었다. 해소 «전»에는 ★**배포 WASM 에 실려 있었다**(소비자 = `wie-lgt` 의 `runtime/stdlib.rs` 직접 + `rustjava-runtime 0.1.1` 의 `java.util.Date`·`GregorianCalendar`·`SimpleDateFormat`). 지금은 없다 — `cargo tree -p wie_featurephone --target wasm32-unknown-unknown -i chrono` → `did not match any packages`(2026-11-26) | ★**«부재»로 닫았다 — `chrono` 가 lock 에 다시 들어오면 경고도 그날 돌아온다**(전 판본 해당 · `patched = []`). 들어오는 길은 셋이다: ⑴RustJava 핀이 0.5.1 아래로 내려간다(`rustjava-runtime` 0.1.1 ~ 0.4.2 는 전부 `chrono ^0.4` — crates.io 인덱스 2026-11-22 실측) ⑵우리 크레이트가 `chrono` 를 다시 의존한다 ⑶lockfile 이 통째로 바뀐다. 그때는 새 A 번호로 등재하라(A-5 는 재사용하지 않는다). 대신 들어온 `jiff 1.0.2` 는 2026-11-26 `cargo audit` 에 경고 0건이다 |
 
 > ★★**C-1·C-2 는 «되살아났다가 복원됐다» — 이 표를 「한 번 해소하면 끝」으로 읽지 마라.**
 > 2026-09-19 `wie-security-audit-schedule-red-three-days-unattended`:
