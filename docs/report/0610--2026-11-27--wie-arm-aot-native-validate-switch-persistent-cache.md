@@ -315,4 +315,4 @@ LGT = `3cc7a9b4cb15` 성 대화 첫 쪽(`docs/keys/lgt-3cc7a9b4cb15-intro-castle
   `Cargo.toml` · `Cargo.lock` 무변경 · 제품 기본값(`aot: None`) 무변경 · 브라우저 배선 0.
 - 검수 nit 5(같은 책임의 구현이 `src/cli/aot_cache.rs` · `wie-app/src/aot_cache.rs` 에 이미 있다)는 손대지 않았다 — 검수도 재사용이 어렵다고 적었다(§1 의 «새 의존은 없다» 줄).
 
-<!-- corpus-name-inflow v1 subjects=6 tree=20efb02d6cdcb516 B=4/3 P=0/0 S=0/0 -->
+<!-- corpus-name-inflow v1 subjects=6 tree=b50443b037b193b9 B=4/3 P=0/0 S=0/0 -->
