@@ -346,3 +346,82 @@ KTF·LGT 의 그리기 경로는 여전히 왕복 검사의 단언 밖이다 ⑶
   남은 `CLAUDE.md` «자율운영 SOP» 블록은 **되살리면 안 된다** — 그 4개 조항은 전부
   `AGENTS.md` §Session Discipline 에 있고, 첫 조항 「확인 없이 이어서 완료한다」는 현행
   `CLAUDE.md` §착수 규율(**티켓 없는 착수 금지**)과 **정면으로 충돌**한다.
+
+---
+
+## 2026-11-26 이관 — 2026-11-22 ~ 11-24 판의 위치 표 · `## 다음` 본문
+
+> `STATE.md` 의 머리 첫 줄 · 「fork 의 현재 위치」 표 · `## 다음` 의 ⑴ 안내 · ⑵ · «총괄 발권 대기» · «이미 발권» · «상시» 를
+> **2026-11-26 이관 직전 그대로**(`origin/main` `e0199943`) 옮긴 것이다. 고치지 않았다 — 수치·판정은 기록 시점의 값이다.
+> 여기 적힌 일은 전부 끝났다(처분 1줄씩은 `STATE.md` §다음 «완료로 접은 항목»). 이관 회차: `docs/report/0605`.
+
+### (옛) 머리 첫 줄
+
+> 실측 기준일 **2026-11-23**(`wie-upstream-sync2-s3-merge-upstream-main` · 위치 표와 `## 다음` ⑴ 만 다시 쟀다 — 나머지 줄은 2026-11-22 의 것이다).
+
+### (옛) fork 의 현재 위치 (2026-11-23 실측)
+
+| 축 | 값 |
+|---|---|
+| `git merge-base origin/main upstream/main` | `44fbf265`(2026-09-16 조각 D · PR #161 착지 이후 **불변** · 68일째). ★조각 S3 의 병합 커밋(PR #617 · `docs/report/0586`)이 착지하면 `d5242bbf`(upstream 2026-11-23)로 옮겨 간다 |
+| behind / ahead | **252** / 3,196 (`origin/main` `642110d1` ↔ `upstream/main` `d5242bbf` 2026-11-23) · 11-06 에는 173 / 2,970. S3 이 착지하면 behind 는 그 뒤 upstream 이 더한 만큼만 남는다 |
+| upstream 쪽 델타 | 251커밋(병합 제외) · 388파일 **+42,250/−11,800** · `git merge-tree` 충돌 파일 **147**(11-06 에는 93) — S3 이 전부 풀었다(0586 부록 A) |
+| RustJava | 우리 = crates.io `jvm*` `=0.5.1`(정확 고정 · 조각 S1b · `docs/report/0584`) ↔ upstream = `^0.5.1`(11-22 #1630·#1631 · lock 0.5.1 로 같은 판) |
+| compat (`docs/player-data/compat.json`) | 429행 · playable **426** · not-yet 2 · limited 1 · `progress=stuck` **90** · enginePin `4ac38566` |
+| GitHub Actions | 2026-11-04T05:40Z 뒤 run 0 → 11-19T14:59Z 에 첫 run(GitHub 쪽 정지 · `docs/report/0553`). 그 뒤 push·PR run 은 돈다. ★`schedule` 이벤트 run 은 11-04 이후 **0건**(아래 §다음 «상시») |
+
+### (옛) 다음 — ⑴ 안내 · ⑵ · 총괄 발권 대기 · 이미 발권 · 상시
+
+⑴(upstream 2차 동기화 — 조각 S4)은 끝나 «완료로 접은 항목» 첫 줄로 갔다(2026-11-24 · `docs/report/0592`). 남은 것은 아래 ⑵ 다.
+번호는 그대로 둔다 — ⑵ 를 고치는 형제 PR 과 같은 줄을 건드리지 않으려는 것이다.
+
+**⑵ 「오래 하기」 이른 종료(`short`) 14행 — 한 번 더 재서 같은 값이 나오는 행만 `compat.json` 에 반영**
+- **무엇**: `docs/report/0561` §4 의 14행(전부 `playable → limited` 후보 · 네 축 `ok/ok/ok/short`)을 현행 핀에서 다시 재고,
+  이번에도 요청 시간 전에 끝난 행만 내린다. 내리는 행에는 이용자 소식(`docs/player-updates/`)을 쓴다.
+- **왜 지금**: 판정 규칙은 2026-11-22 에 착지했고(PR #594) 행은 일부러 안 고쳤다. 지금 `compat.json` 은 7~204초에 스스로 끝나는
+  14판을 `playable` 로 알린다. 그중 `4ece6eeeaa04` 는 주간 퇴행 감시의 가드 7행 중 하나다.
+- **근거**: 0561 §4 와 그 「반영할 때의 주의」(보관 기록의 이른 종료 20행 중 7행이 재측에서 600초를 채웠다 — 그래서 한 번 더 잰다).
+  14 는 하한이다. 나머지 389행은 보관 기록에 기댄다(전수 재측은 약 22시간이라 이 조각에 넣지 않는다).
+- **size**: M. 실행은 `bash scripts/census-drive.sh …`(phase 단위 `--long` 임대 · `--jobs` 기본).
+- ★`compat.json` 의 행을 고친다. 같은 파일에 `runtimeAdjustments` 칸을 더한 PR #595 는 2026-11-22 에 착지했다(11-21T23:25Z) — 그 위에서 연다.
+
+**총괄 발권 대기**(레인이 칠 수 있는 일이다 · 사람 결정이 아니다 · 티켓을 내는 것만 총괄 몫)
+- **PR #589 에 CI 를 받는다**(0556 · 브라우저 틱 호스트 깨움 opt-in · 2026-11-11 개설 · S) — Actions 정지 중에 열려 check 가 **0건**이고
+  required 미보고로 머지가 막혀 있다(11-22 조회 · `gh pr checks 589` = `no checks reported`). 새 커밋으로 head 를 바꿔야 run 이 생긴다
+  (`gh run rerun` 으로는 안 온다).
+
+**이미 발권돼 있다 — 다시 발권하지 마라**(2026-11-22 `~/orchestrator/tasks/` 조회 · 정본은 그 원장이고 이 줄은 금방 낡는다)
+- `wie-rust-audit-main-red-since-1119-advisory-batch`(M) — `main` 의 `cargo audit` red · advisory 13건 처분.
+- `wie-ktf-generic-hook-exact-equivalence-fix`(M).
+- hold 2건: `wie-ktf-local-net-fold-into-fake-server`(M) · `wie-featurephone-content-fingerprint-for-user-supplied-files`(L).
+  선행이던 PR #595 는 2026-11-22 에 착지했다(11-21T23:25Z). hold 를 푸는 것은 총괄이다.
+- `wie-schedule-events-stopped-since-1104-reregister`(S) — 아래 «상시»의 schedule 미발화 조사.
+
+**상시 · 정해진 날**
+- **주간 퇴행 감시**(`scripts/regression-census.sh`) — launchd 가 매주 일요일 05:00 에 돌린다. 마지막 완주 = **2026-11-15**
+  (측정 핀 `2e66f9d6` · 퇴행 의심 0). ★**2026-11-22 회차는 돌지 않았다** — 05:00 에 census 잠금을 다른 실행이 쥐고 있어
+  launchd 래퍼가 건너뛰었다(`~/logs/wie-regression-census.err` 끝줄 `skipped census-lock`). 그래서 11-22 에 착지한 10건
+  (엔진을 고친 0557·0559 포함)은 이 감시를 아직 한 번도 안 거쳤다. 정시로는 **2026-11-29(일) 05:00** 이 처음이다.
+  그 전에 손으로 1회 돌릴지는 총괄 판단이다(1회 약 2.8시간 · long 풀).
+- **CI 의 주 1회 축**(0553 · PR #586) — `rust.yml` 6다리 전부와 `coverage.yml` 은 schedule·수동 실행에서만 돈다(토 19:17Z · 19:47Z).
+  ★**이 저장소의 `schedule` 이벤트는 2026-11-04T05:40Z 의 Security audit 를 끝으로 한 번도 발화하지 않았다.** Actions 가 다시 돈 뒤
+  (첫 run 11-19T14:59Z)로도 **0건**이다(2026-11-21T23:29Z 조회 ·
+  `gh api 'repos/Jun025/wie/actions/runs?event=schedule&created=>=2026-11-05' --jq .total_count`).
+  - 매일 00:00Z 의 Security audit 는 11-20 · 11-21 두 번을 통째로 걸렀다. 이 워크플로는 예정보다 5시간 21분~6시간 1분 늦게 뜨곤 했는데
+    (11-01~11-04 의 네 run) 그 폭을 한참 넘겼다 ⇒ «늦는 중»이 아니라 «안 뜬다»다.
+  - 0553 뒤 첫 토요일 cron 셋도 조회 시각까지 발화하지 않았다: `rust.yml` 11-21 19:17Z(4시간 12분 경과) · `coverage.yml` 19:47Z
+    (3시간 42분) · `doc-liveness` 20:35Z(2시간 54분 · 이 워크플로의 지연 전례는 10-10~10-31 네 run 에서 2시간 1분~3시간 12분).
+  - ⇒ 주 1회 그물(6다리 · coverage)은 아직 한 번도 안 돌았고, 일일 감사(마지막 11-04)와 `doc-liveness`(마지막 10-31)도 서 있다.
+    원인 조사·재등록 티켓 `wie-schedule-events-stopped-since-1104-reregister` 가 발권돼 있다(위 «이미 발권» 줄).
+    그래도 0 이면 `AGENTS.md` «A red weekly run has an owner» 의 ⑶(8일 넘으면 손으로 1회 + 운영자에게 올림)이 걸린다.
+
+### (옛) 보류 — 2026-11-26 에 고쳐 쓴 두 항목의 종전 문안
+
+- **진도 ⒟ `confirm-only-entry` 남은 14행** — 0552 가 원인을 전부 «넘는 키 미발견»으로 판정했다(엔진 벽 0 · 게임 설계 0).
+  재개 조건 = 그 판을 넘는 키 경로(`--keys`)가 새로 나올 때. 그 회차의 열린 제안 1건(`2026-11-06-progression-stuck-confirm-only-15-remeasure#p0` · S)은
+  14행을 넘기는 제안이 아니다 — 그중 한 판(`a0436eb1ddbb`)이 놀이 중에 내는 배열 범위 밖 예외의 자리를 재는 별개의 조사다.
+  ⒟ 의 나머지 22행(`key-path-not-found` 20 · `play-reached` 2)은 `docs/report/0525`(10-22) 판정 그대로다 —
+  11-06 대조에서 한 행도 안 움직였고 그 뒤 이 행들을 다룬 회차가 없다.
+- **무거운 장면의 ARM 해석기 처리량**(L · 열린 제안 `2026-11-13-lgt-cadence-verdict-and-frames-painted#p0`) — 0559 가 싼 것 둘만 넣었다.
+  upstream 의 ARM AOT(#1415)는 S3(PR #617)으로 트리에 들어오지만 우리 두 호스트는 켜지 않는다(`Options.aot = None` · 0586 §0-2).
+  AOT 를 켜는 조각을 먼저 재고 남는 몫만 여는 순서가 싸다. ★null 페이지 읽기 0 규칙은 AOT 로 컴파일된 코드에서 성립하지 않는다(0586 §9).
