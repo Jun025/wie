@@ -294,3 +294,5 @@ if pc < 0x1000 || pc == frame.end || frame.budget == 0 { return Ok(CompiledExit:
 - **`smoke_gate` 는 부팅 15초의 «뜨고 그린다»만 본다**(0608 과 같다).
 - 드라이버를 `scripts/` 에 두지 않았다: 프로파일 · `smoke_gate` 는 저장소의 스크립트를 그대로 불렀고, 스크래치에 둔 것은 한 회를 부르는 래퍼 · 줄기를 나누는 래퍼 ·
   캡처를 견주는 몇 줄이다(0608 의 것을 경로만 바꿔 썼다). 임대는 실행 · phase 마다 1건이다.
+
+<!-- corpus-name-inflow v1 subjects=10 tree=ecd3f6f60909670f B=0/0 P=0/0 S=0/0 -->
