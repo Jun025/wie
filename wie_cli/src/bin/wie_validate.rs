@@ -1952,7 +1952,9 @@ fn build_emulator(
 ) -> std::result::Result<(Box<dyn Emulator>, String), (String, String)> {
     let options = Options {
         enable_gdbserver: false,
-        aot: None, // interpreter only: adopting upstream's ARM AOT is a separate, measured round
+        // Interpreter only by default. `WIE_AOT=native` is the measurement switch (docs/report/0607): upstream's
+        // cranelift backend with no persistent cache, so every run pays the whole compile. Unset, nothing changes.
+        aot: (std::env::var("WIE_AOT").as_deref() == Ok("native")).then(|| Box::new(wie_core_arm_native::NativeExecutor::new(None)) as _),
         profile,
     };
 
