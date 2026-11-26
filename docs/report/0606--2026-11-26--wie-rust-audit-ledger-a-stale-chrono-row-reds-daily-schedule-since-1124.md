@@ -33,4 +33,6 @@
 
 **사용자 영향**: 없다. 게임이 도는 방식 · 배포 아티팩트 · 지원 목록은 그대로다. 매일 도는 보안 감사가 다시 green 이 되어, 다음에 진짜 취약점이 떴을 때 red 가 묻히지 않는다.
 
+**게임 파일명 유입**(`node scripts/corpus-name-inflow.mjs` · 대상 3파일): BOUNDED 18회/12쌍 · SUFFIX-ATTACHED 2회/2쌍 — 전부 `docs/project-kb/02_status.md` 에 이 회차 전부터 있던 언급이다(도구는 고친 파일의 «본문 전체»를 읽는다). 이 브랜치가 «더한 줄»에는 0건이다(`git diff origin/main...HEAD` 의 `+` 줄을 그 제목들로 대조).
+
 **남은 것**: 착지 뒤 첫 schedule run 이 green 인지는 `-merge` 회차가 본다. 남은 경고는 `ttf-parser 0.25.1`(A-1) 하나이고 이 회차는 건드리지 않았다.
