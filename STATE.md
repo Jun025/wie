@@ -1,25 +1,26 @@
 # STATE
 
-> 실측 기준일 **2026-11-23**(`wie-upstream-sync2-s3-merge-upstream-main` · 위치 표와 `## 다음` ⑴ 만 다시 쟀다 — 나머지 줄은 2026-11-22 의 것이다).
+> 실측 기준일 **2026-11-26**(`wie-state-next-refresh-2026-11-26-all-listed-items-landed` · 위치 표와 `## 다음` 을 다시 쟀다 — «사람 몫»과 «보류»의 60Hz · #1260 · #1122 · P4/S5 줄은 2026-11-22 ~ 24 의 것이다).
 > ★**이 «기준일 + 날짜» 꼴은 기계가 읽는다** — `~/orchestrator-live/bin/state-baseline-lag-scan` 이 이 파일 머리 15줄 안의
 > 첫 `기준일 … YYYY-MM-DD` 를 `origin/main` 마지막 착지일과 견준다(14일 넘게 벌어지면 원장에 `STATE_BASELINE_LAG`).
 > 낱말을 바꾸면(예: «갱신») 판정에서 조용히 빠진다 — 낱말은 두고 날짜만 올려라.
 > 2026-08-27 판본의 머리 블록과 위치 표, 옛 `## 다음` 본문(①~④ 전부 끝남)은 **`docs/state-next-history.md`** 에 있다
-> (2026-11-06 이관 · `docs/report/0550`).
+> (2026-11-06 이관 · `docs/report/0550`). 2026-11-22 ~ 24 판의 위치 표와 `## 다음` 본문(⑵ · 발권 대기 · 이미 발권 — 전부 끝남)도
+> 같은 파일 끝에 있다(2026-11-26 이관 · `docs/report/0605`).
 > ★**`## 다음` 이 낡으면 이 레인은 굶는다** — 착지할 때마다 갱신하라.
 > ★★**새로 쓰는 항목도 diff·실측을 열고 써라** — 낡은 줄을 지운 자리에 새 부정확을 심으면 병은 그대로다.
 > ★`## 진행중` 과 `## 완료` 는 고정 안내다(정본 = 열린 PR 목록 · `docs/report/`).
 
-## fork 의 현재 위치 (2026-11-23 실측 · ★조회 시각과 함께 읽어라)
+## fork 의 현재 위치 (2026-11-26 실측 · ★조회 시각과 함께 읽어라)
 
 | 축 | 값 |
 |---|---|
-| `git merge-base origin/main upstream/main` | `44fbf265`(2026-09-16 조각 D · PR #161 착지 이후 **불변** · 68일째). ★조각 S3 의 병합 커밋(PR #617 · `docs/report/0586`)이 착지하면 `d5242bbf`(upstream 2026-11-23)로 옮겨 간다 |
-| behind / ahead | **252** / 3,196 (`origin/main` `642110d1` ↔ `upstream/main` `d5242bbf` 2026-11-23) · 11-06 에는 173 / 2,970. S3 이 착지하면 behind 는 그 뒤 upstream 이 더한 만큼만 남는다 |
-| upstream 쪽 델타 | 251커밋(병합 제외) · 388파일 **+42,250/−11,800** · `git merge-tree` 충돌 파일 **147**(11-06 에는 93) — S3 이 전부 풀었다(0586 부록 A) |
-| RustJava | 우리 = crates.io `jvm*` `=0.5.1`(정확 고정 · 조각 S1b · `docs/report/0584`) ↔ upstream = `^0.5.1`(11-22 #1630·#1631 · lock 0.5.1 로 같은 판) |
-| compat (`docs/player-data/compat.json`) | 429행 · playable **426** · not-yet 2 · limited 1 · `progress=stuck` **90** · enginePin `4ac38566` |
-| GitHub Actions | 2026-11-04T05:40Z 뒤 run 0 → 11-19T14:59Z 에 첫 run(GitHub 쪽 정지 · `docs/report/0553`). 그 뒤 push·PR run 은 돈다. ★`schedule` 이벤트 run 은 11-04 이후 **0건**(아래 §다음 «상시») |
+| `git merge-base origin/main upstream/main` | `d5242bbf`(upstream 2026-11-23). 조각 S3 의 병합 커밋(PR #617 · `docs/report/0586`)이 착지하며 `44fbf265` 에서 옮겨 왔다 |
+| behind / ahead | **23** / 3,305 (`origin/main` `e0199943` ↔ `upstream/main` `0cf877c3` 2026-11-26) · 11-23 에는 252 / 3,196 |
+| upstream 쪽 델타 | 23커밋(병합 제외) · 100파일 **+5,988/−1,383** · `git merge-tree` 충돌 파일 **46** |
+| RustJava | 우리 = crates.io `jvm*` `=0.5.1`(정확 고정 · 조각 S1b · `docs/report/0584`) ↔ upstream = `^0.5.1`(lock 0.5.1 로 같은 판) |
+| compat (`docs/player-data/compat.json`) | 429행 · playable **425** · limited 2 · not-yet 2 · `progress=stuck` **89** · enginePin `4ac38566` |
+| GitHub Actions | push · PR run 은 돈다. `schedule` 이벤트는 2026-11-22T04:52Z 부터 다시 발화한다(11-04 ~ 11-21 은 0건 · `docs/report/0553`) — 11-26 까지 5건, 전부 일일 Security audit 이고 마지막 3건이 red 다(아래 §다음 ⑴ · «상시») |
 
 ## 진행중
 
@@ -87,48 +88,43 @@
 > 형식: «무엇 · 왜 지금 · 근거 · size». 끝난 것은 아래 «완료로 접은 항목» 에 1줄씩만 둔다.
 > 사료(옛 본문 · 측정 서술 전문) = `docs/state-next-history.md`.
 
-⑴(upstream 2차 동기화 — 조각 S4)은 끝나 «완료로 접은 항목» 첫 줄로 갔다(2026-11-24 · `docs/report/0592`). 남은 것은 아래 ⑵ 다.
-번호는 그대로 둔다 — ⑵ 를 고치는 형제 PR 과 같은 줄을 건드리지 않으려는 것이다.
+2026-11-22 ~ 24 판에 적혀 있던 일(⑵ · «총괄 발권 대기» · «이미 발권» 5건)은 전부 끝나 «완료로 접은 항목»으로 갔다.
+아래 둘은 **후보**다 — 2026-11-26 조회에 `~/orchestrator/tasks/` 에 티켓이 없다(발권은 총괄 몫 · 발권 여부의 정본은 그 원장이다).
 
-**⑵ 「오래 하기」 이른 종료(`short`) 14행 — 한 번 더 재서 같은 값이 나오는 행만 `compat.json` 에 반영**
-- **무엇**: `docs/report/0561` §4 의 14행(전부 `playable → limited` 후보 · 네 축 `ok/ok/ok/short`)을 현행 핀에서 다시 재고,
-  이번에도 요청 시간 전에 끝난 행만 내린다. 내리는 행에는 이용자 소식(`docs/player-updates/`)을 쓴다.
-- **왜 지금**: 판정 규칙은 2026-11-22 에 착지했고(PR #594) 행은 일부러 안 고쳤다. 지금 `compat.json` 은 7~204초에 스스로 끝나는
-  14판을 `playable` 로 알린다. 그중 `4ece6eeeaa04` 는 주간 퇴행 감시의 가드 7행 중 하나다.
-- **근거**: 0561 §4 와 그 「반영할 때의 주의」(보관 기록의 이른 종료 20행 중 7행이 재측에서 600초를 채웠다 — 그래서 한 번 더 잰다).
-  14 는 하한이다. 나머지 389행은 보관 기록에 기댄다(전수 재측은 약 22시간이라 이 조각에 넣지 않는다).
-- **size**: M. 실행은 `bash scripts/census-drive.sh …`(phase 단위 `--long` 임대 · `--jobs` 기본).
-- ★`compat.json` 의 행을 고친다. 같은 파일에 `runtimeAdjustments` 칸을 더한 PR #595 는 2026-11-22 에 착지했다(11-21T23:25Z) — 그 위에서 연다.
+**⑴ 일일 Security audit 가 사흘째 red — 감사 대장의 낡은 `chrono` 행을 내린다**
+- **무엇**: `.github/rust-audit-expected-warnings.json` 의 `chrono 0.4.45`(RUSTSEC-2026-0543) 항목과 `docs/project-kb/02_status.md` §A 의
+  A-5 행을 내린다(§A 머리 건수 2 → 1 · 노출 판정은 선례 A-4 → C-10 처럼 §C 로 옮겨 남긴다).
+- **왜 지금**: schedule run 이 2026-11-24 · 25 · 26 세 번 연속 failure 다(`45353827542` · `45563278336` · `45769680060`). 새 취약점이 아니다 —
+  스텝 `Expected-warning list and ledger §A match reality` 가 «§A 에만 있다(경고가 없다 = 해소됐다): A-5 chrono» 로 선다.
+  `chrono` 는 조각 S1b(`docs/report/0584`)가 `Cargo.lock` 에서 뺐다. 이 red 가 서 있는 동안은 새 취약점이 떠도 같은 색이다.
+- **근거**: `gh run view 45769680060 -R Jun025/wie --log-failed` · `Cargo.lock` 에 `name = "chrono"` 0건 · 로컬 `node scripts/check-audit-warnings.mjs` rc=1(같은 문면).
+  이 검사는 일일 잡에서만 돈다(`pr-audit.yml` 은 돌리지 않는다) — 그래서 lock 을 바꾼 PR 에서는 안 걸렸다.
+- **size**: S. 확인은 그 스크립트 rc=0 과 브랜치의 `gh workflow run rust-audit.yaml -R Jun025/wie --ref <branch>` 1회.
 
-**총괄 발권 대기**(레인이 칠 수 있는 일이다 · 사람 결정이 아니다 · 티켓을 내는 것만 총괄 몫)
-- **PR #589 에 CI 를 받는다**(0556 · 브라우저 틱 호스트 깨움 opt-in · 2026-11-11 개설 · S) — Actions 정지 중에 열려 check 가 **0건**이고
-  required 미보고로 머지가 막혀 있다(11-22 조회 · `gh pr checks 589` = `no checks reported`). 새 커밋으로 head 를 바꿔야 run 이 생긴다
-  (`gh run rerun` 으로는 안 온다).
-
-**이미 발권돼 있다 — 다시 발권하지 마라**(2026-11-22 `~/orchestrator/tasks/` 조회 · 정본은 그 원장이고 이 줄은 금방 낡는다)
-- `wie-rust-audit-main-red-since-1119-advisory-batch`(M) — `main` 의 `cargo audit` red · advisory 13건 처분.
-- `wie-ktf-generic-hook-exact-equivalence-fix`(M).
-- hold 2건: `wie-ktf-local-net-fold-into-fake-server`(M) · `wie-featurephone-content-fingerprint-for-user-supplied-files`(L).
-  선행이던 PR #595 는 2026-11-22 에 착지했다(11-21T23:25Z). hold 를 푸는 것은 총괄이다.
-- `wie-schedule-events-stopped-since-1104-reregister`(S) — 아래 «상시»의 schedule 미발화 조사.
+**⑵ upstream ARM AOT 를 켠 실행을 잰다 — 네이티브 먼저 · 측정과 go/no-go 까지**
+- **무엇**: 검증 러너(`wie_validate`)에 upstream 의 네이티브 실행기(`wie-core-arm-native` 의 `NativeExecutor`)를 붙이는 측정용 스위치를 브랜치에서 만들고,
+  0575 의 자(`scripts/arm-interp-profile.sh` · 네이티브 성 대화 LGT `3cc7a9b4cb15`)로 끔/켬을 같은 순간 짝으로 잰다. 켠 채로 `smoke_gate` ktf · lgt 를
+  돌려 달라지는 판을 센다. 제품 기본값(`aot: None`)은 바꾸지 않는다.
+- **왜 지금**: 재개 조건이 섰다. AOT 는 S3(PR #617)으로 트리에 들어왔고, 해석기 쪽 싼 조각은 다 썼다(아래 «보류»의 ARM 줄).
+  해석기에 남은 조각은 ⒟ 묶음 실행뿐이고 그것은 L 이다(전수 회귀 132 임대 · 42시간 — 0575 §5 · §6). 그것을 열기 전에 이미 트리에 있는 것을 잰다.
+- **근거**: 0586 §0-2 · §9(«AOT 를 켠 실행은 재지 않았다» · null 페이지 읽기 0 규칙은 AOT 코드에서 성립하지 않는다) · 0575 §5 ·
+  끈 자리 = `wie_cli/src/bin/wie_validate.rs` 와 `wie_featurephone/src/lib.rs` 의 `aot: None` · upstream 의 본보기 = `src/cli.rs`(네이티브) · `wie-web/src/rust/aot.rs`(브라우저).
+- **size**: M. 브라우저 쪽 배선은 이 측정의 수를 보고 따로 연다.
 
 **상시 · 정해진 날**
 - **주간 퇴행 감시**(`scripts/regression-census.sh`) — launchd 가 매주 일요일 05:00 에 돌린다. 마지막 완주 = **2026-11-15**
-  (측정 핀 `2e66f9d6` · 퇴행 의심 0). ★**2026-11-22 회차는 돌지 않았다** — 05:00 에 census 잠금을 다른 실행이 쥐고 있어
-  launchd 래퍼가 건너뛰었다(`~/logs/wie-regression-census.err` 끝줄 `skipped census-lock`). 그래서 11-22 에 착지한 10건
-  (엔진을 고친 0557·0559 포함)은 이 감시를 아직 한 번도 안 거쳤다. 정시로는 **2026-11-29(일) 05:00** 이 처음이다.
+  (측정 핀 `2e66f9d6` · 퇴행 의심 0). 2026-11-22 회차는 census 잠금에 걸려 건너뛰었고(`~/logs/wie-regression-census.err` 끝줄
+  `skipped census-lock`) 그 뒤 손 실행도 없다(증거 디렉터리의 마지막 파일 `2026-11-15.md`). 그 핀 뒤의 착지 **53건**(first-parent ·
+  S3 병합과 0596 ~ 0604 의 엔진 수정 포함)은 이 감시를 아직 한 번도 안 거쳤다. 다음 정시 = **2026-11-29(일) 05:00**.
   그 전에 손으로 1회 돌릴지는 총괄 판단이다(1회 약 2.8시간 · long 풀).
 - **CI 의 주 1회 축**(0553 · PR #586) — `rust.yml` 6다리 전부와 `coverage.yml` 은 schedule·수동 실행에서만 돈다(토 19:17Z · 19:47Z).
-  ★**이 저장소의 `schedule` 이벤트는 2026-11-04T05:40Z 의 Security audit 를 끝으로 한 번도 발화하지 않았다.** Actions 가 다시 돈 뒤
-  (첫 run 11-19T14:59Z)로도 **0건**이다(2026-11-21T23:29Z 조회 ·
-  `gh api 'repos/Jun025/wie/actions/runs?event=schedule&created=>=2026-11-05' --jq .total_count`).
-  - 매일 00:00Z 의 Security audit 는 11-20 · 11-21 두 번을 통째로 걸렀다. 이 워크플로는 예정보다 5시간 21분~6시간 1분 늦게 뜨곤 했는데
-    (11-01~11-04 의 네 run) 그 폭을 한참 넘겼다 ⇒ «늦는 중»이 아니라 «안 뜬다»다.
-  - 0553 뒤 첫 토요일 cron 셋도 조회 시각까지 발화하지 않았다: `rust.yml` 11-21 19:17Z(4시간 12분 경과) · `coverage.yml` 19:47Z
-    (3시간 42분) · `doc-liveness` 20:35Z(2시간 54분 · 이 워크플로의 지연 전례는 10-10~10-31 네 run 에서 2시간 1분~3시간 12분).
-  - ⇒ 주 1회 그물(6다리 · coverage)은 아직 한 번도 안 돌았고, 일일 감사(마지막 11-04)와 `doc-liveness`(마지막 10-31)도 서 있다.
-    원인 조사·재등록 티켓 `wie-schedule-events-stopped-since-1104-reregister` 가 발권돼 있다(위 «이미 발권» 줄).
-    그래도 0 이면 `AGENTS.md` «A red weekly run has an owner» 의 ⑶(8일 넘으면 손으로 1회 + 운영자에게 올림)이 걸린다.
+  `schedule` 이벤트는 워크플로 넷을 disable → enable 한 뒤(`wie-schedule-events-stopped-since-1104-reregister`) **2026-11-22T04:52Z 부터 다시 발화한다**
+  (2026-11-26 조회 **5건** · `gh api 'repos/Jun025/wie/actions/runs?event=schedule&created=>=2026-11-05' --jq .total_count`).
+  - 5건은 전부 일일 Security audit 다: 11-22 · 11-23 success · 11-24 · 25 · 26 failure(위 ⑴).
+  - 토요일 cron 셋(`rust.yml` · `coverage.yml` · `doc-liveness` 20:35Z)은 재발화 뒤 첫 차례가 **2026-11-28** 이다. `rust.yml` · `coverage.yml` 의
+    schedule run 은 아직 0건이고 `main` 의 손 실행도 0건이다 — 주 1회 그물(6다리 · coverage)은 한 번도 안 돌았다. `doc-liveness` 의 마지막은 10-31 이다.
+  - 11-28 에도 안 뜨면 그 뒤 첫 게이트③ 회차가 `AGENTS.md` «A red weekly run has an owner» 의 ⑶(손으로 1회 + 운영자에게 올림)을 진다
+    (#586 착지 2026-11-21T18:41Z 에서 8일 = 11-29T18:41Z).
 
 **사람 몫**(워커가 정할 수 없다)
 - **동작이 갈리는 6자리** — ★**정해졌다(총괄 판정 2026-11-23): 전부 우리 값.** S3(PR #617)이 그대로 지켰고 시험으로 고정했다
@@ -139,14 +135,15 @@
 - **P4 / S5 — 엔진 고유분을 upstream PR 로**: 2026-09-13 dlunch/wie #1419 1건 착지 · 그 밖 미착수. 분류에서 «발신»은 0551 에 **29**,
   S3 의 재분류(0586 부록 A)에 **54** 파일이다. 재개 조건 = 운영자 확인(외부 저장소에 보낸다). IP 방침 선 안쪽만(공개 API 스텁 · 단위 시험 —
   `docs/lgt_abi.md`·`docs/reference/` 는 보내지 마라) · 보내기 전에 주석·시험의 sha 접두와 타이틀 언급을 지운다(0551 §7 S5).
-- **진도 ⒟ `confirm-only-entry` 남은 14행** — 0552 가 원인을 전부 «넘는 키 미발견»으로 판정했다(엔진 벽 0 · 게임 설계 0).
-  재개 조건 = 그 판을 넘는 키 경로(`--keys`)가 새로 나올 때. 그 회차의 열린 제안 1건(`2026-11-06-progression-stuck-confirm-only-15-remeasure#p0` · S)은
-  14행을 넘기는 제안이 아니다 — 그중 한 판(`a0436eb1ddbb`)이 놀이 중에 내는 배열 범위 밖 예외의 자리를 재는 별개의 조사다.
+- **진도 ⒟ `confirm-only-entry` 남은 13행** — 0552 가 14행의 원인을 «넘는 키 미발견»으로 판정했다(엔진 벽 0 · 게임 설계 0).
+  재개 조건 = 그 판을 넘는 키 경로(`--keys`)가 새로 나올 때. 14행 중 `a0436eb1ddbb` 는 키가 아닌 길로 풀렸다 — 꾸러미에 실린 전 주인의
+  저장 표식을 올리지 않아 새 게임으로 시작하고 진도가 `ok` 가 됐다(`docs/report/0570` → `0590` · PR #622).
   ⒟ 의 나머지 22행(`key-path-not-found` 20 · `play-reached` 2)은 `docs/report/0525`(10-22) 판정 그대로다 —
   11-06 대조에서 한 행도 안 움직였고 그 뒤 이 행들을 다룬 회차가 없다.
-- **무거운 장면의 ARM 해석기 처리량**(L · 열린 제안 `2026-11-13-lgt-cadence-verdict-and-frames-painted#p0`) — 0559 가 싼 것 둘만 넣었다.
-  upstream 의 ARM AOT(#1415)는 S3(PR #617)으로 트리에 들어오지만 우리 두 호스트는 켜지 않는다(`Options.aot = None` · 0586 §0-2).
-  AOT 를 켜는 조각을 먼저 재고 남는 몫만 여는 순서가 싸다. ★null 페이지 읽기 0 규칙은 AOT 로 컴파일된 코드에서 성립하지 않는다(0586 §9).
+- **무거운 장면의 ARM 해석기 처리량 — 남은 조각 ⒟ 묶음 실행**(L · 0575 §5) — 제안은 채택돼 조각으로 나갔다: 0575(측정 · 선택지) →
+  ⒝ Thumb 해독 표 착지(0600 · 네이티브 성 대화 프레임당 22.37 → 16.99 ms) · ⒜ 인출 경로는 재 보니 이득이 없어 안 넣음(0599) ·
+  S3 가 들여온 명령당 백엔드 검사를 루프 밖으로(0603 · 16.93 → 15.12 ms · 가드 0604). 재개 조건 = 위 ⑵(AOT 를 켠 실행)의 수가 나온 뒤.
+  ★null 페이지 읽기 0 규칙은 AOT 로 컴파일된 코드에서 성립하지 않는다(0586 §9). upstream `arm32_cpu` 에 같은 변경을 내는 일(0575 §5 ⒞)은 운영자 몫이다.
 - **60Hz 죽은 구간 14 → 15 ms**(0559 §5 · 이득 +4.7% 는 섰다) — 프레임 여백 0.5 ms 의 위험을 잴 실기기가 없어 넣지 않았다.
   재개 조건 = 기기 측정.
 - **upstream #1260 후속(LGT misc index 9 · `Unknown SVC id 1409`)** — 재발권 금지. 해제 조건:
@@ -155,13 +152,18 @@
 - **upstream #1122(스테이지 5 정지)** — 종결(`docs/report/0509`). 재개 조건: 우리 빌드에서 정지를 새로 보고받을 때.
 
 ### 완료로 접은 항목 (다시 발권하지 마라 · 옛 `## 다음` 전문은 `docs/state-next-history.md`)
+- **2026-11-22 판 ⑵ 「오래 하기」 이른 종료 14행** — 완료(`docs/report/0593` · PR #625 · 13행 그대로 · 1행 `limited`). 후속 57행 재측 = `0595`
+  (PR #627 · `status` 내림 0) · 거기서 나온 `1b3b4868d46e` 의 로딩 멈춤 수리 = `0596`.
+- **PR #589 에 CI 받기**(0556 · 브라우저 틱 호스트 깨움 opt-in) — MERGED 2026-11-23T04:03Z.
+- **2026-11-22 판 «이미 발권» 5건** — 전부 완료: `cargo audit` advisory 13건(`0563`) · KTF 범용 훅 동치(`0565` · `0566`) · KTF 로컬 넷(`0569`) ·
+  내용 지문(`0567`) · schedule 재등록(티켓 `wie-schedule-events-stopped-since-1104-reregister` · 발화 재개 값은 위 «상시»).
 - **upstream 2차 동기화 조각 S1 ~ S4** — 완료. S3 = 병합 커밋(PR #617 · `de096979` · 2026-11-23 착지 · `docs/report/0586`) ·
   S4 = 병합 뒤 정리(`docs/report/0592`). S4 가 한 것: `tag-release.yaml` PARKED 머리를 지금의 스크립트대로 ·
   `docs/lgt.md` 와 `wie-wipi-c/src/api/database.rs` 를 upstream 판 그대로 두고 우리 것은 `docs/lgt-fork-notes.md` ·
   `wie-wipi-c/src/api/fork_database.rs` 로 옮김. ★그 두 upstream 파일은 여기서 고치지 마라 — 고치면 병합마다 다시 충돌한다.
   `wie-ktf/Cargo.toml` 의 안 쓰는 `anyhow` 는 일부러 뒀다(그 파일이 upstream 과 바이트가 같다 · 0592 §4).
   «upstream 값으로 옮기기»(0586 §5 · 부록 B 의 약 150자리 · ARM AOT)는 자리마다 전/후를 재는 별 티켓이다 —
-  열린 제안 1건: SKT LBMP 의 마스크 투명(`2026-11-23-upstream-sync2-s3-merge-upstream-main#p0` · 범위 35판).
+  그 첫 자리인 SKT LBMP 의 마스크 투명(35판)은 `docs/report/0594` 로 착지했다.
 - **2026-11-06 후보 ⑴ upstream 2차 동기화 «예행·분류»** — 완료(`docs/report/0551` · PR #584 · 2026-11-22 착지).
   충돌 93 = 폐기 11 · 재적용 53 · 발신 29 · 예행 트리 게이트 전부 red · «한 번에 병합» no-go · 조각 계획 S1~S5.
 - **2026-11-06 후보 ⑵ 진도 ⒟ `confirm-only-entry` 15행 현행 핀 재측** — 완료(`docs/report/0552` · PR #585 · 2026-11-22 착지).
