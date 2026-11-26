@@ -1,4 +1,8 @@
-use alloc::{collections::BTreeMap, format};
+use alloc::{
+    collections::{BTreeMap, BTreeSet},
+    format,
+    vec::Vec,
+};
 use core::mem::{offset_of, size_of, swap};
 
 use cranelift_codegen::{
@@ -7,12 +11,13 @@ use cranelift_codegen::{
     isa::TargetIsa,
 };
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Switch, Variable};
+use spin::RwLock;
 
 use wie_core_arm_aot::{
-    CompiledExit, RunFrame,
+    CodeImage, CompiledExit, RunFrame,
     ir::{
-        self, AluOp, BranchTarget, Condition, Instruction, MemoryOperand, Operand, Operation, Reg, RegionFlow, RegionIr, RegisterUsage, Shift,
-        ShiftAmount, Width,
+        self, AluOp, BasicBlock, BranchTarget, Condition, Instruction, MemoryOperand, Operand, Operation, Reg, RegionFlow, RegionIr, RegisterUsage,
+        Shift, ShiftAmount, Width,
     },
 };
 use wie_util::{Result, WieError};
@@ -25,6 +30,7 @@ pub(crate) fn emit_region(
     context: &mut Context,
     builder_context: &mut FunctionBuilderContext,
     isa: &dyn TargetIsa,
+    heads: &RwLock<Heads>, // fork
 ) -> Result<()> {
     // The IR is public input: reject out-of-frame registers before creating native accesses.
     let register = |register: &Reg| {
@@ -125,6 +131,8 @@ pub(crate) fn emit_region(
             Operation::Nop => {}
         }
     }
+    // fork: before the dead stores go, so that none is dropped across the head of a run.
+    split_runs(ir, &heads.read()[usize::from(ir.entry.thumb)]);
     for block in &mut ir.blocks {
         block.eliminate_dead_alu_stores();
     }
@@ -139,17 +147,24 @@ pub(crate) fn emit_region(
     let fault = builder.create_block();
     builder.append_block_param(fault, types::I32);
     builder.append_block_param(fault, types::I32);
-    let entries: BTreeMap<_, _> = ir
-        .blocks
-        .iter()
-        .flat_map(|block| &block.instructions)
-        .map(|instruction| (instruction.pc.get(), builder.create_block()))
-        .collect();
+    // fork: the fault's third parameter, `resume`, `short` and the heads-only blocks below — see `Emitter::budget`.
+    builder.append_block_param(fault, types::I32);
+    let resume = builder.create_block();
+    let short = builder.create_block();
+    builder.append_block_param(short, types::I32);
+    let mut entries = BTreeMap::new();
+    for block in &ir.blocks {
+        for (index, instruction) in block.instructions.iter().enumerate() {
+            entries.insert(instruction.pc.get(), if index == 0 { builder.create_block() } else { resume });
+        }
+    }
     let mut emitter = Emitter {
         registers: [GuestRegister::Frame; 16],
         translated: [None; 16],
         status: None,
         budget: None, // fork
+        rest: 0,      // fork
+        resume,       // fork
         exchange: None,
         builder,
         frame,
@@ -214,10 +229,6 @@ pub(crate) fn emit_region(
     let low = emitter.builder.ins().band_imm_s(pc, (1 << shift) - 1);
     let unaligned = emitter.builder.ins().icmp_imm_s(IntCC::NotEqual, low, 0);
     emitter.guard(unaligned);
-    // fork: nothing runs on a spent budget. Past this an instruction is only reached with some left.
-    let left = emitter.budget_left();
-    let spent = emitter.builder.ins().icmp_imm_s(IntCC::Equal, left, 0);
-    emitter.guard(spent);
     // Instruction-sized keys let Cranelift use dense jump tables for sequential code.
     let mut switch = Switch::new();
     let mut previous = None;
@@ -235,41 +246,56 @@ pub(crate) fn emit_region(
         previous = Some(slot);
     }
     switch.emit(&mut emitter.builder, index, dispatch);
-    for (instruction, flags_live) in ir.blocks.iter().flat_map(|block| &block.instructions).zip(flow.live_flag_updates) {
-        emitter.pc = instruction.pc.get();
-        emitter.builder.switch_to_block(emitter.entries[&emitter.pc]);
-        if emitter.pc < 0x1000 {
-            emitter.builder.ins().jump(dispatch, &[]);
-            continue;
-        }
-        // fork: one off the budget per guest instruction — a conditional one that is skipped too, as the
-        // interpreter steps over it. `commit` leaves before the next one when that was the last.
-        let left = emitter.budget_left();
-        let left = emitter.builder.ins().iadd_imm_s(left, -1);
-        emitter.set_budget_left(left);
-        let fallthrough = emitter.pc.wrapping_add(u32::from(instruction.size));
-        let skipped = if instruction.condition != Condition::Always {
-            let condition = emitter.condition(&instruction.condition);
-            let execute = emitter.builder.create_block();
-            let skip = emitter.builder.create_block();
-            emitter.builder.ins().brif(condition, execute, &[], skip, &[]);
-            emitter.builder.switch_to_block(execute);
-            Some(skip)
-        } else {
-            None
-        };
-        let next = emitter.operation(instruction, flags_live);
-        let fixed = instruction.fixed_successor(emitter.thumb);
-        if let Some(skip) = skipped {
-            if next.is_some() || fixed != Some(fallthrough) {
-                emitter.commit(next, fixed, fallthrough);
-            } else {
-                emitter.builder.ins().jump(skip, &[]);
+    // fork: upstream gives every instruction its own block and its own entry. Here a run is one straight piece
+    // of code entered at its head only (`Emitter::budget`); the body below the head is upstream's, and
+    // `commit` ends the block on the run's last instruction alone.
+    let mut flags = flow.live_flag_updates.into_iter();
+    for block in &ir.blocks {
+        for (index, (instruction, flags_live)) in block.instructions.iter().zip(flags.by_ref()).enumerate() {
+            let rest = block.instructions.len() - index;
+            emitter.pc = instruction.pc.get();
+            emitter.rest = rest as u32;
+            if index == 0 {
+                emitter.builder.switch_to_block(emitter.entries[&emitter.pc]);
+                if emitter.pc < 0x1000 {
+                    emitter.builder.ins().jump(dispatch, &[]);
+                    continue;
+                }
+                // The whole run off the budget at once — a conditional instruction that is skipped too, as
+                // the interpreter steps over it. A budget that does not cover the run leaves it untouched.
+                let left = emitter.budget_left();
+                let uncovered = emitter.builder.ins().icmp_imm_s(IntCC::UnsignedLessThan, left, rest as i64);
+                let pc = emitter.builder.ins().iconst(types::I32, i64::from(emitter.pc));
+                let covered = emitter.builder.create_block();
+                emitter.builder.ins().brif(uncovered, short, &[pc.into()], covered, &[]);
+                emitter.builder.switch_to_block(covered);
+                let left = emitter.builder.ins().iadd_imm_s(left, -(rest as i64));
+                emitter.set_budget_left(left);
             }
-            emitter.builder.switch_to_block(skip);
-            emitter.commit(None, Some(fallthrough), fallthrough);
-        } else {
-            emitter.commit(next, fixed, fallthrough);
+            let fallthrough = emitter.pc.wrapping_add(u32::from(instruction.size));
+            let skipped = if instruction.condition != Condition::Always {
+                let condition = emitter.condition(&instruction.condition);
+                let execute = emitter.builder.create_block();
+                let skip = emitter.builder.create_block();
+                emitter.builder.ins().brif(condition, execute, &[], skip, &[]);
+                emitter.builder.switch_to_block(execute);
+                Some(skip)
+            } else {
+                None
+            };
+            let next = emitter.operation(instruction, flags_live);
+            let fixed = instruction.fixed_successor(emitter.thumb);
+            if let Some(skip) = skipped {
+                if next.is_some() || fixed != Some(fallthrough) {
+                    emitter.commit(next, fixed, fallthrough);
+                } else {
+                    emitter.builder.ins().jump(skip, &[]);
+                }
+                emitter.builder.switch_to_block(skip);
+                emitter.commit(None, Some(fallthrough), fallthrough);
+            } else {
+                emitter.commit(next, fixed, fallthrough);
+            }
         }
     }
     if let Some(exchange) = emitter.exchange {
@@ -285,19 +311,30 @@ pub(crate) fn emit_region(
         emitter.store_register(&Reg::PC, next);
         emitter.builder.ins().jump(dispatch, &[]);
     }
+    // fork: a run the budget does not cover. Its head is entered along an internal edge too, which publishes no pc.
+    emitter.builder.switch_to_block(short);
+    let pc = emitter.builder.block_params(short)[0];
+    emitter.store_register(&Reg::PC, pc);
+    emitter.builder.ins().jump(resume, &[]);
     let publish = emitter.builder.create_block();
     emitter.builder.append_block_param(publish, types::I32);
-    for (block, exit) in [(dispatch, CompiledExit::Dispatch), (fault, CompiledExit::GuestFault)] {
+    for (block, exit) in [
+        (dispatch, CompiledExit::Dispatch),
+        (resume, CompiledExit::InterpretOne), // fork
+        (fault, CompiledExit::GuestFault),
+    ] {
         emitter.builder.switch_to_block(block);
         if exit == CompiledExit::GuestFault {
             let pc = emitter.builder.block_params(fault)[0];
             let address = emitter.builder.block_params(fault)[1];
             emitter.store_register(&Reg::PC, pc);
             emitter.store_frame(offset_of!(RunFrame, fault_address), address);
-            // fork: the faulting instruction did not run, so it gives its count back: the interpreter does
-            // it again and counts it there (`InterpretOne`, a null read), or the run ends.
+            // fork: the faulting instruction and the ones after it in its run did not run, and the head
+            // took them all off: they go back. The interpreter does the instruction again and counts it
+            // there (`InterpretOne`, a null read), or the run ends.
+            let rest = emitter.builder.block_params(fault)[2];
             let left = emitter.budget_left();
-            let left = emitter.builder.ins().iadd_imm_s(left, 1);
+            let left = emitter.builder.ins().iadd(left, rest);
             emitter.set_budget_left(left);
         }
         let reason = emitter.builder.ins().iconst(types::I32, exit as i64);
@@ -323,6 +360,123 @@ pub(crate) fn emit_region(
     emitter.builder.seal_all_blocks();
     emitter.builder.finalize(isa.frontend_config());
     Ok(())
+}
+
+/// fork: the addresses code is entered at from elsewhere, ARM's then Thumb's — every one the executor has
+/// seen an image name (`entry_addresses`). An instruction at one of them heads a run (`split_runs`).
+///
+/// The decoder's blocks do not say where a region is entered from outside it. Its sweep roots a region at the
+/// first address nothing covers yet, which after a function is the literal pool or the padding behind it; what
+/// decodes there runs on into the next function, whose first instruction is then the middle of a block. A call
+/// from another region lands there, and so does a branch into a region that never saw it. With the decoder's
+/// heads alone 9% of the instructions of an LGT title went through the interpreter an entry at a time (0612 §2).
+pub(crate) type Heads = [BTreeSet<u32>; 2];
+
+/// fork: add the addresses `images` name to `heads` — the target of every branch, and every word that is
+/// itself an address inside the images (a function's in a literal pool or a table, called through a register;
+/// odd for Thumb). Each image is read as instructions of both sets and as data at once, the way the decoder
+/// sweeps it, so some of these nothing ever enters: a head too many is one check more, one too few sends every
+/// entry there to the interpreter.
+pub(crate) fn entry_addresses(images: &[CodeImage], heads: &mut Heads) {
+    // The engine's images are in address order; in any other order some words are not recognised.
+    let inside = |address: u32| {
+        let index = images.partition_point(|image| image.address <= address);
+        index
+            .checked_sub(1)
+            .is_some_and(|index| ((address - images[index].address) as usize) < images[index].bytes.len())
+    };
+    for image in images {
+        let skip = image.address.wrapping_neg() as usize % 4;
+        let words = image.bytes.get(skip..).unwrap_or_default().as_chunks::<4>().0;
+        for (index, word) in words.iter().enumerate() {
+            let raw = u32::from_le_bytes(*word);
+            if raw & 1 != 0 && inside(raw & !1) {
+                heads[1].insert(raw & !1);
+            } else if raw & 3 == 0 && inside(raw) {
+                heads[0].insert(raw);
+            }
+            // B, BL under any condition, and BLX with its half-word bit.
+            if raw & 0x0e00_0000 == 0x0a00_0000 {
+                let pc = image.address.wrapping_add((skip + index * 4) as u32);
+                let target = pc.wrapping_add(8).wrapping_add_signed(((raw << 8) as i32) >> 6);
+                if raw >> 28 == 15 {
+                    heads[1].insert(target.wrapping_add((raw >> 23) & 2));
+                } else {
+                    heads[0].insert(target);
+                }
+            }
+        }
+        let skip = image.address as usize % 2;
+        let halves = image.bytes.get(skip..).unwrap_or_default().as_chunks::<2>().0;
+        for (index, half) in halves.iter().enumerate() {
+            let raw = u16::from_le_bytes(*half);
+            let pc = image.address.wrapping_add((skip + index * 2) as u32);
+            let target = match raw >> 11 {
+                // B<cond>; 0xde and 0xdf are undefined/SWI.
+                0x1a | 0x1b if (raw >> 8) & 15 < 14 => pc.wrapping_add(4).wrapping_add_signed(i32::from(raw as u8 as i8) * 2),
+                0x1c => pc.wrapping_add(4).wrapping_add_signed(i32::from(((raw & 0x7ff) << 5) as i16) >> 4),
+                // BL and BLX, a prefix and the suffix behind it.
+                0x1e => {
+                    let Some(suffix) = halves.get(index + 1).map(|half| u16::from_le_bytes(*half)) else {
+                        continue;
+                    };
+                    let target = pc
+                        .wrapping_add(4)
+                        .wrapping_add_signed((i32::from(raw & 0x07ff) << 21) >> 9)
+                        .wrapping_add(u32::from(suffix & 0x07ff) << 1);
+                    match suffix >> 11 {
+                        0x1f => target,
+                        0x1d if suffix & 1 == 0 => {
+                            heads[0].insert(target & !3);
+                            continue;
+                        }
+                        _ => continue,
+                    }
+                }
+                _ => continue,
+            };
+            heads[1].insert(target);
+        }
+    }
+}
+
+/// fork: cut the blocks into runs — straight pieces every instruction of which hands over to the next one
+/// in memory, whether it executes or its condition skips it. Entered at its head, a run runs whole unless an
+/// instruction faults, which is what lets the head count it at once (`Emitter::budget`). The decoder's blocks
+/// are runs already but for an instruction that leaves without writing pc (an MSR that may change the mode);
+/// the IR is public input and promises none of it. A run also ends before an address in `heads`, and before
+/// a push of lr: the first instruction of a function, which a call through a pointer made at run time reaches
+/// with no image naming it.
+fn split_runs(ir: &mut RegionIr, heads: &BTreeSet<u32>) {
+    let thumb = ir.entry.thumb;
+    let mut runs = Vec::with_capacity(ir.blocks.len());
+    for block in ir.blocks.drain(..) {
+        let mut run: Vec<Instruction> = Vec::new();
+        for instruction in block.instructions {
+            if let Some(previous) = run.last() {
+                let next = previous.pc.get().wrapping_add(u32::from(previous.size));
+                // The null page is never run from compiled code: an instruction there is a run of its own.
+                if next != instruction.pc.get()
+                    || previous.operation.writes_pc()
+                    || previous.fixed_successor(thumb) != Some(next)
+                    || previous.pc.get() < 0x1000
+                    || next < 0x1000
+                    || heads.contains(&next)
+                    || matches!(&instruction.operation, Operation::MultipleTransfer { base, registers, load: false, write_back: true, .. }
+                        if *base == Reg::SP && registers & (1 << Reg::LR.index()) != 0)
+                {
+                    runs.push(BasicBlock {
+                        instructions: core::mem::take(&mut run),
+                    });
+                }
+            }
+            run.push(instruction);
+        }
+        if !run.is_empty() {
+            runs.push(BasicBlock { instructions: run });
+        }
+    }
+    ir.blocks = runs;
 }
 
 #[derive(Clone, Copy)]
@@ -351,7 +505,18 @@ struct Emitter<'a> {
     // regions run until they leave, loops included, so a thread in compiled code was never sliced out and
     // the holds and preemption that hang on a slice did nothing (docs/report/0609). What is left lives where
     // the guest registers do: in the frame, or in a host local in a loop that caches them (`cache_loop`).
+    //
+    // It is counted a run at a time (`split_runs`, docs/report/0612): the head of a run takes the whole run
+    // off, and when what is left does not cover it the region returns `InterpretOne` with pc on that head —
+    // the interpreter then runs exactly what is left, so a slice still ends on the instruction it would end
+    // on without compiled code. One check an instruction, on the edge to the next, was a conditional exit an
+    // instruction for Cranelift to carry: +0.2 to +0.8 s to the first frame and +0.8 ms a frame (0609 §2, §3).
+    // So only the head of a run is an entry. Upstream's switch lands on any instruction; here one inside a
+    // run lands on `resume`, which is `InterpretOne` as well, an instruction at a time up to the next head.
     budget: Option<Variable>,
+    /// The instructions of the current run from the current one on: what a fault here gives back.
+    rest: u32,
+    resume: Block,
     exchange: Option<Block>,
     frame: Value,
     pages: Value,
@@ -484,24 +649,23 @@ impl Emitter<'_> {
     }
 
     fn commit(&mut self, next: Option<NextPc>, fixed: Option<u32>, fallthrough: u32) {
+        // fork: only the last instruction of a run leaves it (`split_runs`); the others run on into the next.
+        if self.rest > 1 {
+            return;
+        }
+        // Internal edges need no published PC.
         if let Some(pc) = fixed {
-            let target = self.entries.get(&pc).copied().filter(|_| pc >= 0x1000);
-            // fork: upstream publishes pc on the edges that leave only («Internal edges need no published PC»)
-            // and jumps along the others. An internal edge leaves too when the budget is spent, with pc on the
-            // instruction not yet run. The registers and flags published then are what the instructions so
-            // far stored: a value the region proved dead (`eliminate_dead_alu_stores`, `live_flag_updates`) is
-            // not made up, and the instructions that overwrite it run next wherever the thread resumes.
-            let value = self.builder.ins().iconst(types::I32, i64::from(pc));
-            self.store_register(&Reg::PC, value);
-            match target {
-                Some(target) => {
-                    let left = self.budget_left();
-                    self.builder.ins().brif(left, target, &[], self.dispatch, &[]);
-                }
-                None => {
-                    self.builder.ins().jump(self.dispatch, &[]);
-                }
+            // fork: `&& target != self.resume` — an edge into the middle of a run leaves like one out of the
+            // region. The head an internal edge reaches may hand its run back; it publishes its own pc then
+            // (`short`), and the flags in the frame are what the instructions so far stored: an update the
+            // region proved dead (`live_flag_updates`) is not made up, and the instructions that overwrite it
+            // run next wherever the thread resumes.
+            let target = self.entries.get(&pc).copied().filter(|&target| pc >= 0x1000 && target != self.resume);
+            if target.is_none() {
+                let value = self.builder.ins().iconst(types::I32, i64::from(pc));
+                self.store_register(&Reg::PC, value);
             }
+            self.builder.ins().jump(target.unwrap_or(self.dispatch), &[]);
         } else {
             let next = match next {
                 Some(NextPc::Exchange(value)) => {
@@ -957,6 +1121,7 @@ impl Emitter<'_> {
 #[cfg(test)]
 mod tests {
     use alloc::{vec, vec::Vec};
+    use spin::RwLock;
 
     use cranelift_codegen::{
         control::ControlPlane,
@@ -969,6 +1134,41 @@ mod tests {
     };
 
     use super::*;
+
+    // fork
+    #[test]
+    fn images_name_the_addresses_code_is_entered_at() {
+        let image = |address, bytes: Vec<u8>| CodeImage { address, bytes };
+        let images = [
+            image(
+                0x8000,
+                [
+                    0xea00_0002_u32, // b 0x8010
+                    0x1b00_0005,     // blne 0x8020
+                    0xfb00_03fc,     // blx 0x9002, to Thumb
+                    0x0000_9005,     // a Thumb function's address
+                    0x0000_8008,     // an ARM one's
+                    0x7000_0000,     // an address outside the images
+                    0x0000_8006,     // inside them, and no instruction's
+                ]
+                .into_iter()
+                .flat_map(u32::to_le_bytes)
+                .collect(),
+            ),
+            image(
+                0x9000,
+                // beq 0x9010; b 0x9000; bl 0x9100; blx 0x8020, to ARM; swi; undefined
+                [0xd006_u16, 0xe7fd, 0xf000, 0xf87c, 0xf7ff, 0xe80a, 0xdf00, 0xde00]
+                    .into_iter()
+                    .flat_map(u16::to_le_bytes)
+                    .collect(),
+            ),
+        ];
+        let mut heads = Heads::default();
+        entry_addresses(&images, &mut heads);
+        assert_eq!(heads[0].iter().copied().collect::<Vec<_>>(), [0x8008, 0x8010, 0x8020]);
+        assert_eq!(heads[1].iter().copied().collect::<Vec<_>>(), [0x9000, 0x9002, 0x9004, 0x9010, 0x9100]);
+    }
 
     #[test]
     fn dead_flags_and_fixed_backedges_compile_for_both_host_isas() {
@@ -1103,7 +1303,15 @@ mod tests {
             context.func.signature.returns.push(AbiParam::new(types::I32));
             let flow = ir.control_flow();
             assert_eq!(flow.live_flag_updates[..5], [2, 0, 0, 0, 0]);
-            emit_region(&mut ir, flow, &mut context, &mut FunctionBuilderContext::new(), isa.as_ref()).unwrap();
+            emit_region(
+                &mut ir,
+                flow,
+                &mut context,
+                &mut FunctionBuilderContext::new(),
+                isa.as_ref(),
+                &RwLock::default(),
+            )
+            .unwrap();
             let blocks: Vec<_> = context.func.layout.blocks().collect();
             let mut backedge = false;
             let mut calls = 0;
