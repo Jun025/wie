@@ -4,6 +4,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use arm32_cpu::{Cpu, Memory, Mode, reg};
 use hashbrown::HashMap;
 
+// fork: `NULL_READ_LIMIT` is ours (the interpreter and the native executor share the one constant).
 use wie_core_arm_aot::{
     CodeImage, CompiledArtifact, CompiledExecutor, CompiledExit, CompiledHandle, ExecutionAccess, MemoryPage, NULL_READ_LIMIT, PreparationFuture,
     PreparationState, RegionKey, RunFrame,
