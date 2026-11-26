@@ -5,8 +5,8 @@ use arm32_cpu::{Cpu, Memory, Mode, reg};
 use hashbrown::HashMap;
 
 use wie_core_arm_aot::{
-    CodeImage, CompiledArtifact, CompiledExecutor, CompiledExit, CompiledHandle, ExecutionAccess, MemoryPage, PreparationFuture, PreparationState,
-    RegionKey, RunFrame,
+    CodeImage, CompiledArtifact, CompiledExecutor, CompiledExit, CompiledHandle, ExecutionAccess, MemoryPage, NULL_READ_LIMIT, PreparationFuture,
+    PreparationState, RegionKey, RunFrame,
 };
 use wie_util::{Result, WieError};
 
@@ -223,6 +223,9 @@ impl ArmEngine for Arm32CpuEngine {
                         regs: core::array::from_fn(|index| self.cpu.reg_get(Mode::User, index as u8)),
                         cpsr,
                         end,
+                        // fork: compiled code counts against the same budget as the loop around it. Upstream
+                        // hands none over and adds nothing back, so a run in compiled code never yields.
+                        budget: count - budget_consumed,
                         ..RunFrame::default()
                     };
                     let result = {
@@ -240,6 +243,8 @@ impl ArmEngine for Arm32CpuEngine {
                             CompiledExit::Dispatch
                         }
                     };
+                    // fork: what the call ran. An executor that does not count hands the field back as it was.
+                    budget_consumed = count - frame.budget.min(count - budget_consumed);
                     for (index, value) in frame.regs.into_iter().enumerate() {
                         self.cpu.reg_set(Mode::User, index as u8, value);
                     }
@@ -452,7 +457,6 @@ impl ArmRegister {
 const TOTAL_MEMORY: u64 = 0x100000000;
 const PAGE_SIZE: usize = 0x10000;
 const PAGE_MASK: u32 = (PAGE_SIZE - 1) as _;
-const NULL_READ_LIMIT: u32 = 0x1000;
 static ZERO_PAGE: [u8; PAGE_SIZE] = [0; PAGE_SIZE];
 // ponytail: one flag per process, not per engine — per-engine needs a field on EmulatedMemory.
 static NULL_READ_SEEN: AtomicBool = AtomicBool::new(false);
@@ -911,6 +915,40 @@ mod tests {
         engine.run(0x2000, 10).unwrap();
         assert!(!engine.aot.as_ref().unwrap().entries.contains_key(&key));
         assert_eq!(responses.lock().requests.len(), 4);
+    }
+
+    // fork: `invalidated_span` covers every dropped region, not the last one dropped. With the span
+    // overwritten instead of widened, a region dropped earlier lies outside it, is never recompiled and
+    // stays interpreted for good — correct, slower, and seen by no other test.
+    #[test]
+    fn regions_dropped_apart_both_recompile_on_entry() {
+        for order in [[0x1000, 0x8000], [0x8000, 0x1000]] {
+            let responses = Arc::new(Mutex::new(Responses::default()));
+            let mut aot = Aot::new(Box::new(DeferredExecutor(responses.clone())));
+            let mut memory = EmulatedMemory::new();
+            memory.map(0x1000, 0x10000);
+            for pc in order {
+                memory.write_range(pc, &[1, 0x30, 0x70, 0x47]).unwrap(); // adds r0, #1; bx lr
+                aot.record_image(pc, 4);
+            }
+            let preparation = aot.begin(&memory).unwrap().unwrap();
+            let compiled = artifact(&responses.lock().requests[0], 0);
+            assert!(responses.lock().ready.take().unwrap().send(Ok(compiled)).is_ok());
+            assert!(aot.finish(futures::executor::block_on(preparation)));
+            for pc in order {
+                aot.invalidate(u64::from(pc)..u64::from(pc) + 4);
+            }
+            assert!(aot.entries.is_empty());
+            for (recompiled, pc) in order.into_iter().enumerate() {
+                let key = RegionKey {
+                    pc,
+                    thumb: true,
+                    cpu_mode: 0x1f,
+                };
+                aot.recompile(&key, &memory);
+                assert_eq!(responses.lock().requests.len(), 2 + recompiled, "{pc:#x} of {order:x?}");
+            }
+        }
     }
 
     // fork: binary patches and hooks rewrite guest code from the host (`ArmCore::write_code`), and no
@@ -1494,11 +1532,21 @@ mod tests {
         }
 
         fn compare_run(&mut self, end: u32) -> bool {
+            self.compare_slice(end, u32::MAX).is_some()
+        }
+
+        // fork: upstream's `compare_run` with a budget, and with the count the two engines report held equal —
+        // compiled code runs as many instructions of a budget as the interpreter does.
+        fn compare_slice(&mut self, end: u32, count: u32) -> Option<EngineRunResult> {
             let pc = self.native.reg_read(ArmRegister::PC);
-            let expected = self.interpreted.run(end, u32::MAX);
-            let actual = self.native.run(end, u32::MAX);
+            let expected = self.interpreted.run(end, count);
+            let actual = self.native.run(end, count);
             match (actual, expected) {
                 (Ok(actual), Ok(expected)) => {
+                    assert_eq!(
+                        actual.budget_consumed, expected.budget_consumed,
+                        "instructions run, pc={pc:#x}, end={end:#x}"
+                    );
                     for index in 0..=16 {
                         assert_eq!(
                             self.native.cpu.reg_get(arm32_cpu::Mode::User, index),
@@ -1523,12 +1571,12 @@ mod tests {
                         }
                         _ => panic!("different stop reasons"),
                     }
-                    true
+                    Some(actual)
                 }
-                (Err(WieError::InvalidMemoryAccess(_)), Err(WieError::InvalidMemoryAccess(_))) => false,
+                (Err(WieError::InvalidMemoryAccess(_)), Err(WieError::InvalidMemoryAccess(_))) => None,
                 (Err(actual), Err(expected)) => {
                     assert_eq!(alloc::format!("{actual:?}"), alloc::format!("{expected:?}"));
-                    false
+                    None
                 }
                 _ => panic!("different execution outcomes"),
             }
@@ -1721,7 +1769,10 @@ mod tests {
         for opcode in [0xee07_0f35u32, 0xee07_0f15] {
             engines.native.mem_write(0x1000, &[1, 0x20]).unwrap();
             engines.reset(0x1001, 0x3f, &[]);
-            assert_eq!(engines.native.run(0x8000, 2).unwrap().budget_consumed, 0);
+            // fork: upstream tells compiled from interpreted by the count, 0 against 2. Compiled code counts
+            // here, so `executed` tells them apart and the count is 2 either way.
+            assert_eq!(engines.native.run(0x8000, 2).unwrap().budget_consumed, 2);
+            assert!(engines.executed.load(Ordering::Relaxed));
             assert_eq!(engines.native.reg_read(ArmRegister::R0), 1);
 
             engines.native.mem_write(0x1000, &[2, 0x20]).unwrap();
@@ -1740,6 +1791,7 @@ mod tests {
             assert!(!engines.native.aot.as_ref().unwrap().entries.contains_key(&key));
             engines.reset(0x1001, 0x3f, &[]);
             assert_eq!(engines.native.run(0x8000, 2).unwrap().budget_consumed, 2);
+            assert!(!engines.executed.load(Ordering::Relaxed)); // fork
             assert_eq!(engines.native.reg_read(ArmRegister::R0), 2);
             let deadline = Instant::now() + Duration::from_secs(10);
             while !engines.native.aot.as_ref().unwrap().entries.contains_key(&key) {
@@ -1748,7 +1800,8 @@ mod tests {
                 thread::yield_now();
             }
             engines.reset(0x1001, 0x3f, &[]);
-            assert_eq!(engines.native.run(0x8000, 2).unwrap().budget_consumed, 0);
+            assert_eq!(engines.native.run(0x8000, 2).unwrap().budget_consumed, 2);
+            assert!(engines.executed.load(Ordering::Relaxed)); // fork
             assert_eq!(engines.native.reg_read(ArmRegister::R0), 2);
 
             // Install the original bytes again before testing the next CP15 operation.
@@ -1884,8 +1937,10 @@ mod tests {
         }
     }
 
+    // fork: upstream's `native_loops_and_interior_entries_run_without_interpreter_budget`. Its loop ran to
+    // the end on a budget of 1 and reported 0 run; ours stops after one instruction (docs/report/0609).
     #[test]
-    fn native_loops_and_interior_entries_run_without_interpreter_budget() {
+    fn native_loops_and_interior_entries_count_against_the_budget() {
         // subs r0,#1; bne 0x1000; bx lr
         let bytes: Vec<_> = [0x3801u16, 0xd1fd, 0x4770].into_iter().flat_map(u16::to_le_bytes).collect();
         let mut engines = Engines::new(&bytes);
@@ -1900,8 +1955,15 @@ mod tests {
         assert_eq!(engines.native.reg_read(ArmRegister::PC), 0x1000);
         assert_eq!(engines.native.reg_read(ArmRegister::R0), 3);
         let result = engines.native.run(0x8000, 1).unwrap();
+        assert!(matches!(result.stop_reason, EngineStopReason::Yield));
+        assert_eq!(result.budget_consumed, 1);
+        assert_eq!(
+            (engines.native.reg_read(ArmRegister::PC), engines.native.reg_read(ArmRegister::R0)),
+            (0x1002, 2)
+        );
+        let result = engines.native.run(0x8000, 100).unwrap();
         assert!(matches!(result.stop_reason, EngineStopReason::End));
-        assert_eq!(result.budget_consumed, 0);
+        assert_eq!(result.budget_consumed, 6); // bne, then subs and bne twice, then bx lr
         assert_eq!(engines.native.reg_read(ArmRegister::R0), 0);
 
         // Carry flows through ADC and RRX. MSR then predicates both uses of the
@@ -1952,6 +2014,52 @@ mod tests {
             engines.reset(0x1001, 0x3f, &[(ArmRegister::R4, 0x8000)]);
             engines.compare_run(0x8000);
             assert_eq!(engines.native.reg_read(ArmRegister::R1), 1);
+        }
+    }
+
+    // fork: a budget that runs out in compiled code stops the run where the interpreter stops it — the same
+    // pc, registers, flags, memory and count — wherever the slice falls: in a loop that keeps its registers
+    // and flags in host locals, on a conditional instruction that is skipped, between a call and its return.
+    #[test]
+    fn compiled_code_is_sliced_where_the_interpreter_is() {
+        let words = |code: &[u32]| code.iter().flat_map(|word| word.to_le_bytes()).collect::<Vec<_>>();
+        // add r1,r1,r0; addne r2,r2,r1; addeq r3,r3,r1; subs r0,r0,#1; bne 0x1000; bx lr
+        let arm_loop = words(&[0xe081_1000, 0x1082_2001, 0x0083_3001, 0xe250_0001, 0x1aff_fffa, 0xe12f_ff1e]);
+        // bl 0x1008; adds r0,#1; bx r4; adds r1,#1; bx lr
+        let thumb_call: Vec<_> = [0xf000u16, 0xf802, 0x3001, 0x4720, 0x3101, 0x4770]
+            .into_iter()
+            .flat_map(u16::to_le_bytes)
+            .collect();
+        let cases: [(&[u8], u32, u32, &[(ArmRegister, u32)], u32); 3] = [
+            (&arm_loop, 0x1000, 0x1f, &[(ArmRegister::R0, 3), (ArmRegister::R1, 5)], 16),
+            (&arm_loop, 0x1000, 0x4000_001f, &[(ArmRegister::R0, 3), (ArmRegister::R1, 5)], 16),
+            (&thumb_call, 0x1001, 0x3f, &[(ArmRegister::R4, 0x8000)], 5),
+        ];
+        for (code, pc, cpsr, registers, instructions) in cases {
+            let mut engines = Engines::new(code);
+            for count in 1..=instructions {
+                engines.reset(pc, cpsr, registers);
+                let mut run = 0;
+                loop {
+                    let result = engines.compare_slice(0x8000, count).expect("no fault");
+                    run += result.budget_consumed;
+                    if matches!(result.stop_reason, EngineStopReason::End) {
+                        break;
+                    }
+                    assert_eq!(result.budget_consumed, count, "a slice runs its whole budget");
+                }
+                assert_eq!(run, instructions, "slices of {count}");
+            }
+        }
+
+        // A null read goes back to the interpreter, which counts it. Were it counted in the compiled attempt
+        // too, a budget of 1 would be spent before the interpreter's turn, every time.
+        let mut engines = Engines::at(0x30000, &words(&[0xe590_0000, 0xe12f_ff1e])); // ldr r0,[r0]; bx lr
+        engines.reset(0x30000, 0x1f, &[]);
+        for engine in [&mut engines.interpreted, &mut engines.native] {
+            let result = engine.run(0x8000, 1).unwrap();
+            assert!(matches!(result.stop_reason, EngineStopReason::Yield));
+            assert_eq!((result.budget_consumed, engine.reg_read(ArmRegister::PC)), (1, 0x30004));
         }
     }
 }

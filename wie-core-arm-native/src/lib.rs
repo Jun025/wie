@@ -24,7 +24,7 @@ use spin::Mutex;
 
 use wie_core_arm_aot::{
     CodeImage, CompileRequest, CompiledArtifact, CompiledExecutor, CompiledExit, CompiledHandle, CompiledRegion, ExecutionAccess, ManifestRegion,
-    MemoryPage, PreparationFuture, RunFrame,
+    MemoryPage, NULL_READ_LIMIT, PreparationFuture, RunFrame,
     ir::{RegionFlow, RegionIr},
 };
 use wie_util::{Result, WieError};
@@ -217,13 +217,15 @@ impl CompiledExecutor for NativeExecutor {
                 // docs/report/0391), and generated code faults on any unmapped page. Its page guard runs
                 // before the instruction changes anything and the fault publishes that instruction's pc, so
                 // the access goes back to the interpreter to be done again: a read gets its 0 there, a write
-                // faults there as it did here. 0x1000 is `NULL_READ_LIMIT`.
-                6 if frame.fault_address < 0x1000 => return Ok(CompiledExit::InterpretOne),
+                // faults there as it did here.
+                6 if frame.fault_address < NULL_READ_LIMIT => return Ok(CompiledExit::InterpretOne),
                 6 => return Ok(CompiledExit::GuestFault),
                 _ => return Err(WieError::FatalError(format!("Native ARM AOT returned invalid exit {exit}"))),
             }
             let pc = frame.regs[15];
-            if pc < 0x1000 || pc == frame.end {
+            // fork: `budget == 0` — the next region would leave on its first instruction with pc where it
+            // is, and this loop would resolve it again for good.
+            if pc < 0x1000 || pc == frame.end || frame.budget == 0 {
                 return Ok(CompiledExit::Dispatch);
             }
             let Some(next) = access.resolve(pc, frame.cpsr) else {
@@ -916,6 +918,116 @@ mod tests {
         assert_eq!(frame.regs[0], 42);
         assert_eq!(frame.regs[15], 0x2000);
         assert_eq!(frame.cpsr, 0x3f);
+    }
+
+    // fork: the budget in generated code (docs/report/0609). A region leaves with `Dispatch` on the first
+    // instruction its budget does not cover, and hands back what is left of it.
+    #[test]
+    fn a_region_stops_on_the_instruction_its_budget_does_not_cover() {
+        let mut executor = NativeExecutor::new(None);
+        let add = |register| Operation::Alu {
+            op: AluOp::Add,
+            destination: Some(Reg::new(register)),
+            left: Value::Register(Reg::new(register)),
+            right: Operand {
+                value: Value::Immediate(1),
+                shift: Shift::Lsl,
+                amount: ShiftAmount::Immediate(0),
+            },
+            set_flags: false,
+        };
+        // add r0,#1; addeq r1,#1; str r0,[r2]; add r0,#1; b 0x2000 — and at 0x2000: add r3,#1
+        let mut first = region(0x1000, &[&[(0x1000, 4), (0x1004, 4), (0x1008, 4), (0x100c, 4), (0x1010, 4)]]);
+        for (instruction, operation) in first.ir.blocks[0].instructions.iter_mut().zip([
+            add(0),
+            add(1),
+            Operation::Store {
+                value: Value::Register(Reg::new(0)),
+                address: MemoryOperand {
+                    base: Value::Register(Reg::new(2)),
+                    offset: Operand {
+                        value: Value::Immediate(0),
+                        shift: Shift::Lsl,
+                        amount: ShiftAmount::Immediate(0),
+                    },
+                    subtract: false,
+                    pre_index: true,
+                    write_back: None,
+                },
+                width: Width::Word,
+            },
+            add(0),
+            Operation::Branch {
+                target: BranchTarget::Address(MemoryAddress::new(0x2000)),
+                link: None,
+                exchange: false,
+            },
+        ]) {
+            instruction.operation = operation;
+        }
+        first.ir.blocks[0].instructions[1].condition = Condition::Eq;
+        let mut second = region(0x2000, &[&[(0x2000, 4)]]);
+        second.ir.blocks[0].instructions[0].operation = add(3);
+        let regions = block_on(executor.prepare(request([Some(first), Some(second)].into_iter())))
+            .unwrap()
+            .regions;
+        let mut access = Access {
+            pages: (0..0x10000)
+                .map(|_| MemoryPage::default())
+                .collect::<Vec<_>>()
+                .into_boxed_slice()
+                .try_into()
+                .ok()
+                .unwrap(),
+            entries: regions
+                .iter()
+                .flat_map(|region| {
+                    region
+                        .manifest
+                        .instruction_pcs
+                        .iter()
+                        .map(|&pc| (RegionKey { pc, ..region.manifest.entry }, region.handle))
+                })
+                .collect(),
+        };
+        access.pages[1].bytes = Some(Box::new([0; 0x10000]));
+        // budget -> pc, r0, r1, r3, the word stored, the budget handed back
+        for (budget, expected) in [
+            (0, (0x1000, 0, 0, 0, 0, 0)), // nothing runs
+            (1, (0x1004, 1, 0, 0, 0, 0)),
+            (2, (0x1008, 1, 0, 0, 0, 0)), // a skipped instruction is counted
+            (3, (0x100c, 1, 0, 0, 1, 0)),
+            (5, (0x2000, 2, 0, 0, 1, 0)), // spent on the branch: the next region is not entered
+            (6, (0x2004, 2, 0, 1, 1, 0)),
+            (9, (0x2004, 2, 0, 1, 1, 3)),
+        ] {
+            access.pages[1].bytes.as_mut().unwrap()[..4].fill(0);
+            let mut frame = RunFrame {
+                cpsr: 0x1f,
+                end: 0x3000,
+                budget,
+                ..RunFrame::default()
+            };
+            frame.regs[2] = 0x10000;
+            frame.regs[15] = 0x1000;
+            assert!(executor.execute(regions[0].handle, &mut frame, &mut access).unwrap() == CompiledExit::Dispatch);
+            let stored = u32::from_le_bytes(access.pages[1].bytes.as_ref().unwrap()[..4].try_into().unwrap());
+            assert_eq!(
+                (frame.regs[15], frame.regs[0], frame.regs[1], frame.regs[3], stored, frame.budget),
+                expected,
+                "budget {budget}"
+            );
+        }
+        // The instruction that faults did not run and is not counted: two ran before it.
+        let mut frame = RunFrame {
+            cpsr: 0x1f,
+            budget: 5,
+            ..RunFrame::default()
+        };
+        frame.regs[2] = 0x20000;
+        frame.regs[15] = 0x1000;
+        assert!(executor.execute(regions[0].handle, &mut frame, &mut access).unwrap() == CompiledExit::GuestFault);
+        assert_eq!((frame.regs[15], frame.fault_address, frame.budget), (0x1008, 0x20000, 3));
     }
 
     #[test]

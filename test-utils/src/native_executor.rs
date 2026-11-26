@@ -40,9 +40,10 @@ impl CompiledExecutor for TestNativeExecutor {
     }
 
     fn execute(&mut self, handle: CompiledHandle, frame: &mut RunFrame, access: &mut dyn ExecutionAccess) -> Result<CompiledExit> {
-        let pc = frame.regs[15];
+        let (pc, budget) = (frame.regs[15], frame.budget);
         let result = self.inner.execute(handle, frame, access);
-        if result.is_ok() && frame.regs[15] != pc {
+        // fork: `|| frame.budget != budget` — a loop sliced after one whole turn is back on the pc it started from.
+        if result.is_ok() && (frame.regs[15] != pc || frame.budget != budget) {
             self.executed.store(true, Ordering::Relaxed);
         }
         result

@@ -1561,9 +1561,15 @@ mod tests {
     // again in that module with the native AOT backend attached. This is the engine the current run builds.
     extern crate std;
     std::thread_local!(static UNDER_AOT: core::cell::Cell<bool> = const { core::cell::Cell::new(false) });
+    // The backend of the current `under_aot` run sets this once compiled code has run an instruction.
+    std::thread_local!(static COMPILED_RAN: core::cell::RefCell<Option<Arc<core::sync::atomic::AtomicBool>>> = const { core::cell::RefCell::new(None) });
 
     fn engine_under_test() -> Option<Box<dyn wie_core_arm_aot::CompiledExecutor>> {
-        UNDER_AOT.get().then(|| Box::new(test_utils::TestNativeExecutor::new()) as _)
+        UNDER_AOT.get().then(|| {
+            let executor = test_utils::TestNativeExecutor::new();
+            COMPILED_RAN.set(Some(executor.executed.clone()));
+            Box::new(executor) as _
+        })
     }
 
     /// Call once the guest code is loaded. On the interpreter there is nothing to prepare.
@@ -1941,12 +1947,13 @@ mod tests {
         assert!(core.holders.lock().is_empty());
     }
 
-    /// The eleven above with the native AOT backend attached (docs/report/0607 §6 ⑶). Compiled code does not
-    /// count its instructions against the budget, so no thread is ever sliced out inside it, and the eight
-    /// marked rows fail at the first place they expect one to be. `should_panic` keeps that count in the
-    /// gates: a marked row that starts passing reddens, and the round that makes compiled code yield takes
-    /// its mark off.
+    /// The eleven above with the native AOT backend attached. Compiled code counts its instructions against
+    /// the budget (docs/report/0609), so a thread is sliced out inside it where the interpreter slices it and
+    /// every row passes unchanged. `COMPILED` holds the row to having run compiled code; a `HOST_ONLY` row
+    /// loads no guest code, and passes here with nothing compiled to pass through.
     mod under_aot {
+        use core::sync::atomic::Ordering;
+
         struct Reset;
 
         impl Drop for Reset {
@@ -1955,39 +1962,34 @@ mod tests {
             }
         }
 
+        const COMPILED: bool = true;
+        const HOST_ONLY: bool = false;
+
         macro_rules! rerun {
-            ($($(#[$unmet:meta])? $name:ident)*) => {$(
+            ($($name:ident $ran:ident)*) => {$(
                 #[test]
-                $(#[$unmet])?
                 fn $name() {
                     super::UNDER_AOT.set(true);
                     let _reset = Reset;
-                    super::$name()
+                    super::$name();
+                    let ran = super::COMPILED_RAN.take().expect("the row attached the backend");
+                    assert_eq!(ran.load(Ordering::Relaxed), $ran, "compiled code ran");
                 }
             )*};
         }
 
         rerun! {
-            // The first slice ends after 10,000 `svc`s, not 5,000: the `add`s between them are not counted.
-            #[should_panic(expected = "left: 10000")]
-            yields_every_ten_thousand_instructions_across_svc
-            #[should_panic(expected = "holder.as_mut().poll(&mut cx).is_pending()")]
-            a_holder_sliced_out_keeps_the_others_off_guest_code
-            #[should_panic(expected = "holder.as_mut().poll(&mut cx).is_pending()")]
-            another_thread_taking_a_hold_leaves_the_holders_in_place
-            #[should_panic(expected = "holder.as_mut().poll(&mut cx).is_pending()")]
-            another_thread_letting_go_leaves_the_holders_in_place
-            a_holder_parked_in_a_host_call_keeps_nobody_off
-            a_nested_hold_reports_the_outer_one
-            #[should_panic(expected = "sliced.as_mut().poll(&mut cx).is_pending()")]
-            only_a_thread_sliced_out_mid_code_counts_as_preempted
-            #[should_panic(expected = "out of budget on the svc")]
-            a_budget_that_runs_out_on_an_svc_counts_as_preempted
-            #[should_panic(expected = "sliced out")]
-            a_thread_kept_off_by_a_holder_still_counts_as_preempted
-            #[should_panic(expected = "sliced out holding")]
-            two_sliced_holders_do_not_wait_for_each_other
-            a_thread_that_ends_holding_leaves_no_hold_behind
+            yields_every_ten_thousand_instructions_across_svc COMPILED
+            a_holder_sliced_out_keeps_the_others_off_guest_code COMPILED
+            another_thread_taking_a_hold_leaves_the_holders_in_place COMPILED
+            another_thread_letting_go_leaves_the_holders_in_place COMPILED
+            a_holder_parked_in_a_host_call_keeps_nobody_off COMPILED
+            a_nested_hold_reports_the_outer_one HOST_ONLY
+            only_a_thread_sliced_out_mid_code_counts_as_preempted COMPILED
+            a_budget_that_runs_out_on_an_svc_counts_as_preempted COMPILED
+            a_thread_kept_off_by_a_holder_still_counts_as_preempted COMPILED
+            two_sliced_holders_do_not_wait_for_each_other COMPILED
+            a_thread_that_ends_holding_leaves_no_hold_behind HOST_ONLY
         }
     }
 

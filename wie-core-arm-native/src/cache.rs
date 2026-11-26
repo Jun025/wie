@@ -46,6 +46,7 @@ pub(crate) fn key(isa: &dyn TargetIsa, request: &CompileRequest) -> [u8; 32] {
         offset_of!(RunFrame, regs),
         offset_of!(RunFrame, cpsr),
         offset_of!(RunFrame, fault_address),
+        offset_of!(RunFrame, budget), // fork
         size_of::<MemoryPage>(),
         align_of::<MemoryPage>(),
         offset_of!(MemoryPage, bytes),

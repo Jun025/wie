@@ -137,6 +137,12 @@ pub(crate) fn emit_region(
     let transfer = builder.block_params(entry)[2];
     let dispatch = builder.create_block();
     let fault = builder.create_block();
+    // fork: compiled code counts its instructions against the run's budget (`RunFrame::budget`). Upstream's
+    // regions run until they leave, loops included, so a thread in compiled code was never sliced out and
+    // the holds and preemption that hang on a slice did nothing (docs/report/0609).
+    let exhausted = builder.create_block();
+    builder.append_block_param(exhausted, types::I32);
+    let budget = builder.declare_var(types::I32);
     builder.append_block_param(fault, types::I32);
     builder.append_block_param(fault, types::I32);
     let entries: BTreeMap<_, _> = ir
@@ -163,6 +169,8 @@ pub(crate) fn emit_region(
         dispatch,
         fault,
     };
+    let left = emitter.load_frame(offset_of!(RunFrame, budget)); // fork
+    emitter.builder.def_var(budget, left);
     let mut usage = RegisterUsage::default();
     for instruction in ir.blocks.iter().flat_map(|block| &block.instructions) {
         usage.observe(&instruction.operation);
@@ -232,6 +240,17 @@ pub(crate) fn emit_region(
             emitter.builder.ins().jump(dispatch, &[]);
             continue;
         }
+        // fork: one off the budget per guest instruction — a conditional one that is skipped too, as the
+        // interpreter steps over it. With none left the region leaves on this instruction, not yet run.
+        {
+            let left = emitter.builder.use_var(budget);
+            let run = emitter.builder.create_block();
+            let pc = emitter.builder.ins().iconst(types::I32, i64::from(emitter.pc));
+            emitter.builder.ins().brif(left, run, &[], exhausted, &[pc.into()]);
+            emitter.builder.switch_to_block(run);
+            let left = emitter.builder.ins().iadd_imm_s(left, -1);
+            emitter.builder.def_var(budget, left);
+        }
         let fallthrough = emitter.pc.wrapping_add(u32::from(instruction.size));
         let skipped = if instruction.condition != Condition::Always {
             let condition = emitter.condition(&instruction.condition);
@@ -270,6 +289,13 @@ pub(crate) fn emit_region(
         emitter.store_register(&Reg::PC, next);
         emitter.builder.ins().jump(dispatch, &[]);
     }
+    // fork: out of budget. The registers and flags published are what the instructions before this one
+    // stored: a value the region proved dead (`eliminate_dead_alu_stores`, `live_flag_updates`) is not
+    // made up here, and the instructions that overwrite it run next wherever the thread resumes.
+    emitter.builder.switch_to_block(exhausted);
+    let pc = emitter.builder.block_params(exhausted)[0];
+    emitter.store_register(&Reg::PC, pc);
+    emitter.builder.ins().jump(dispatch, &[]);
     let publish = emitter.builder.create_block();
     emitter.builder.append_block_param(publish, types::I32);
     for (block, exit) in [(dispatch, CompiledExit::Dispatch), (fault, CompiledExit::GuestFault)] {
@@ -279,11 +305,19 @@ pub(crate) fn emit_region(
             let address = emitter.builder.block_params(fault)[1];
             emitter.store_register(&Reg::PC, pc);
             emitter.store_frame(offset_of!(RunFrame, fault_address), address);
+            // fork: the faulting instruction did not run, so it gives its count back: the interpreter does
+            // it again and counts it there (`InterpretOne`, a null read), or the run ends.
+            let left = emitter.builder.use_var(budget);
+            let left = emitter.builder.ins().iadd_imm_s(left, 1);
+            emitter.builder.def_var(budget, left);
         }
         let reason = emitter.builder.ins().iconst(types::I32, exit as i64);
         emitter.builder.ins().jump(publish, &[reason.into()]);
     }
     emitter.builder.switch_to_block(publish);
+    // fork: every exit hands back what is left.
+    let left = emitter.builder.use_var(budget);
+    emitter.store_frame(offset_of!(RunFrame, budget), left);
     for (index, register) in emitter.registers.into_iter().enumerate() {
         if let GuestRegister::Local(var) = register {
             let value = emitter.builder.use_var(var);
