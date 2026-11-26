@@ -279,3 +279,5 @@ LGT = `3cc7a9b4cb15` 성 대화 첫 쪽(`docs/keys/lgt-3cc7a9b4cb15-intro-castle
 - 드라이버를 `scripts/` 에 두지 않았다: 프로파일 · `smoke_gate` 는 저장소의 스크립트를 그대로 불렀고, 스크래치에 둔 것은 한 회를 부르는 래퍼 · 줄기를 나누는 래퍼 ·
   캡처를 견주는 몇 줄이다(0609 의 것에 팔 이름과 캐시 디렉터리만 더했다). 임대는 실행 · phase 마다 1건이다. 표 · 래퍼 · 게이트 로그는 저장소 밖
   `~/orchestrator/reports/evidence/wie-arm-aot-native-validate-switch-persistent-cache/` 에 있다.
+
+<!-- corpus-name-inflow v1 subjects=6 tree=20efb02d6cdcb516 B=4/3 P=0/0 S=0/0 -->
