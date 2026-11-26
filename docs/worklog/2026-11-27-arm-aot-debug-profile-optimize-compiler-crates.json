@@ -1,0 +1,29 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-11-27",
+  "task": "wie-arm-aot-native-debug-profile-optimize-cranelift-then-validate-default-on-verdict",
+  "title": "디버그 빌드에서 AOT 컴파일러 쪽 크레이트 다섯만 최적화 — 빈 캐시 첫 화면 20 ~ 27초 → 3.9 · 3.0초 · 검증 러너 기본 켬 가능(기본값은 다음 티켓)",
+  "summary": "2026-11-27-arm-aot-validate-switch-persistent-cache#p0 의 앞 절반(컴파일러 쪽 크레이트만 최적화)을 했다. Cargo.toml 의 dev 프로파일에 다섯 줄 — cranelift-codegen · cranelift-frontend · regalloc2 · sha2 는 opt-level 3, wie-core-arm-native 는 1. 0610 이 스크래치로 잰 열넷을 열두 변형으로 갈랐다: cranelift 8개만으로는 LGT 6.7 · KTF 5.3초로 모자라고, regalloc2 · wie-core-arm-native · sha2(캐시 기록 20 ~ 45 MB 의 해시)가 각각 0.3 ~ 1.4초를 낸다. smallvec · rustc-hash · bumpalo 와 나머지 cranelift 여섯은 값을 내지 않는다. 디버그 · 빈 캐시 · 첫 화면까지 LGT 3cc7a9b4cb15 20.4 → 3.9초, KTF 155972cac664 26.6 → 3.0초(끔 2.9 · 1.6초 · 적중 2.95 · 1.75초). 값은 깨끗한 디버그 빌드의 CPU +17%(272 → 318초 · 벽시계 86 → 89초)이고 한 줄 수정 뒤의 증분 빌드는 그대로다. 디버그 smoke_gate(기한 15초 그대로 · 빈 캐시에서 시작) 244판(LGT 54 · KTF 190)은 끔 244 PASS · 켬 244 PASS · 판정이 달라진 판 0 · regressions 0 — 판정은 «검증 러너 기본 켬 가능»이다. 검증 러너의 기본값과 제품 기본값(aot: None)은 바꾸지 않았다 — 바꾸는 일의 범위는 STATE.md «다음» ⑴ 과 docs/report/0611 §4 에 적었다(발권은 총괄 몫이라 카드로 올리지 않았다). docs/report/0611.",
+  "changes": [
+    "Cargo.toml — [profile.dev.package.*] 다섯 줄(cranelift-codegen · cranelift-frontend · regalloc2 · sha2 = 3 · wie-core-arm-native = 1) + 까닭 주석. Cargo.lock 무변경 · 새 의존 0 · 코드 0줄",
+    "STATE.md — «다음» ⑴ 을 «검증 러너 기본 켬»으로 바꿈 · 끝난 ⒞ 를 접음",
+    "docs/report/0611 — 회차 기록(변형 표 · 빌드 시간 표 · smoke_gate 끔/켬 · 판정 · CI)"
+  ],
+  "verification": [
+    "열두 변형 × LGT · KTF × 2짝(H · E 는 4짝) 빈 캐시 첫 화면 76회 — 전부 PASS · rc 0 · 최적화한 변형은 전부 기한 15 · 20초 안",
+    "커밋된 Cargo.toml 로 지은 바이너리의 끔 · 빗나감 · 적중 2짝 12회 — 전부 PASS: LGT 2.88 · 3.88 · 2.95초 / KTF 1.58 · 2.97 · 1.75초",
+    "깨끗한 디버그 빌드(cargo build -p wie_cli --bin wie_validate · jobs 5) 지금 3회 82 ~ 105초 · CPU 263 ~ 281초 / 고른 다섯 88.7초 · CPU 318초. 증분(함수 본문 한 줄) 엔진 5.2 → 4.9초 · wie-core-arm-native 1.72 → 1.70초",
+    "디버그 smoke_gate 끔 · 켬(빈 캐시에서 시작) 나란히: 244 PASS × 2 · 판정이 다른 판 0 · regressions 0 · absent 0 · FAIL 줄 0 · 켬이 쓴 기록 209건 4.36 GiB",
+    "네 게이트 + beta clippy · 러너 블록 여섯 픽스처(끔 · 빈 캐시 · 적중) — docs/report/0611 §6"
+  ],
+  "limits": [
+    "검증 러너의 기본값은 그대로다(WIE_AOT=native 가 있을 때만 켠다) — 이 회차는 막던 까닭을 풀고 판정만 냈다",
+    "장면은 LGT 1판 · KTF 1판 · 기기 1대 · 변형마다 2짝. 같은 변형이 묶음 사이에 0.6 ~ 0.7초 흩어진다 — 0.5초 아래의 차이는 가르지 않았다",
+    "깨끗한 빌드 시간은 다른 레인의 부하가 있는 호스트에서 변형마다 1회다 — 벽시계보다 CPU 를 읽을 것",
+    "opt-level 2 · s 와 열넷 밖의 크레이트(hashbrown · rayon 등)는 재지 않았다",
+    "CI 의 target 캐시 키는 Cargo.lock 의 해시뿐이라, 착지 뒤 Cargo.lock 이 다음에 바뀔 때까지는 실행마다 다섯 크레이트와 그 위를 다시 짓는다(docs/report/0611 §5)"
+  ],
+  "proposals": [],
+  "adoptedProposals": ["2026-11-27-arm-aot-validate-switch-persistent-cache#p0"],
+  "declinedProposals": []
+}
