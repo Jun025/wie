@@ -149,6 +149,7 @@ pub(crate) fn emit_region(
         registers: [GuestRegister::Frame; 16],
         translated: [None; 16],
         status: None,
+        budget: None,
         exchange: None,
         builder,
         frame,
@@ -198,6 +199,11 @@ pub(crate) fn emit_region(
             nzcv: core::array::from_fn(|_| emitter.builder.declare_var(types::I32)),
         });
         emitter.set_cpsr_bits(u32::MAX, cpsr);
+        // fork: see `Emitter::budget`.
+        let left = emitter.load_frame(offset_of!(RunFrame, budget));
+        let var = emitter.builder.declare_var(types::I32);
+        emitter.builder.def_var(var, left);
+        emitter.budget = Some(var);
     }
     let pc = emitter.load_frame(offset_of!(RunFrame, regs) + 15 * size_of::<u32>());
     let shift = if ir.entry.thumb { 1 } else { 2 };
@@ -208,6 +214,10 @@ pub(crate) fn emit_region(
     let low = emitter.builder.ins().band_imm_s(pc, (1 << shift) - 1);
     let unaligned = emitter.builder.ins().icmp_imm_s(IntCC::NotEqual, low, 0);
     emitter.guard(unaligned);
+    // fork: nothing runs on a spent budget. Past this an instruction is only reached with some left.
+    let left = emitter.budget_left();
+    let spent = emitter.builder.ins().icmp_imm_s(IntCC::Equal, left, 0);
+    emitter.guard(spent);
     // Instruction-sized keys let Cranelift use dense jump tables for sequential code.
     let mut switch = Switch::new();
     let mut previous = None;
@@ -232,6 +242,11 @@ pub(crate) fn emit_region(
             emitter.builder.ins().jump(dispatch, &[]);
             continue;
         }
+        // fork: one off the budget per guest instruction — a conditional one that is skipped too, as the
+        // interpreter steps over it. `commit` leaves before the next one when that was the last.
+        let left = emitter.budget_left();
+        let left = emitter.builder.ins().iadd_imm_s(left, -1);
+        emitter.set_budget_left(left);
         let fallthrough = emitter.pc.wrapping_add(u32::from(instruction.size));
         let skipped = if instruction.condition != Condition::Always {
             let condition = emitter.condition(&instruction.condition);
@@ -279,11 +294,20 @@ pub(crate) fn emit_region(
             let address = emitter.builder.block_params(fault)[1];
             emitter.store_register(&Reg::PC, pc);
             emitter.store_frame(offset_of!(RunFrame, fault_address), address);
+            // fork: the faulting instruction did not run, so it gives its count back: the interpreter does
+            // it again and counts it there (`InterpretOne`, a null read), or the run ends.
+            let left = emitter.budget_left();
+            let left = emitter.builder.ins().iadd_imm_s(left, 1);
+            emitter.set_budget_left(left);
         }
         let reason = emitter.builder.ins().iconst(types::I32, exit as i64);
         emitter.builder.ins().jump(publish, &[reason.into()]);
     }
     emitter.builder.switch_to_block(publish);
+    if let Some(var) = emitter.budget {
+        let left = emitter.builder.use_var(var); // fork
+        emitter.store_frame(offset_of!(RunFrame, budget), left);
+    }
     for (index, register) in emitter.registers.into_iter().enumerate() {
         if let GuestRegister::Local(var) = register {
             let value = emitter.builder.use_var(var);
@@ -323,6 +347,11 @@ struct Emitter<'a> {
     registers: [GuestRegister; 16],
     translated: [Option<(Value, Value)>; 16],
     status: Option<StatusVariables>,
+    // fork: compiled code counts its instructions against the run's budget (`RunFrame::budget`). Upstream's
+    // regions run until they leave, loops included, so a thread in compiled code was never sliced out and
+    // the holds and preemption that hang on a slice did nothing (docs/report/0609). What is left lives where
+    // the guest registers do: in the frame, or in a host local in a loop that caches them (`cache_loop`).
+    budget: Option<Variable>,
     exchange: Option<Block>,
     frame: Value,
     pages: Value,
@@ -344,6 +373,20 @@ impl Emitter<'_> {
 
     fn store_frame(&mut self, offset: usize, value: Value) {
         self.builder.ins().store(MemFlagsData::trusted(), value, self.frame, offset as i32);
+    }
+
+    fn budget_left(&mut self) -> Value {
+        match self.budget {
+            Some(var) => self.builder.use_var(var),
+            None => self.load_frame(offset_of!(RunFrame, budget)),
+        }
+    }
+
+    fn set_budget_left(&mut self, left: Value) {
+        match self.budget {
+            Some(var) => self.builder.def_var(var, left),
+            None => self.store_frame(offset_of!(RunFrame, budget), left),
+        }
     }
 
     fn register(&mut self, register: &Reg) -> Value {
@@ -440,14 +483,24 @@ impl Emitter<'_> {
     }
 
     fn commit(&mut self, next: Option<NextPc>, fixed: Option<u32>, fallthrough: u32) {
-        // Internal edges need no published PC.
         if let Some(pc) = fixed {
             let target = self.entries.get(&pc).copied().filter(|_| pc >= 0x1000);
-            if target.is_none() {
-                let value = self.builder.ins().iconst(types::I32, i64::from(pc));
-                self.store_register(&Reg::PC, value);
+            // fork: upstream publishes pc on the edges that leave only («Internal edges need no published PC»)
+            // and jumps along the others. An internal edge leaves too when the budget is spent, with pc on the
+            // instruction not yet run. The registers and flags published then are what the instructions so
+            // far stored: a value the region proved dead (`eliminate_dead_alu_stores`, `live_flag_updates`) is
+            // not made up, and the instructions that overwrite it run next wherever the thread resumes.
+            let value = self.builder.ins().iconst(types::I32, i64::from(pc));
+            self.store_register(&Reg::PC, value);
+            match target {
+                Some(target) => {
+                    let left = self.budget_left();
+                    self.builder.ins().brif(left, target, &[], self.dispatch, &[]);
+                }
+                None => {
+                    self.builder.ins().jump(self.dispatch, &[]);
+                }
             }
-            self.builder.ins().jump(target.unwrap_or(self.dispatch), &[]);
         } else {
             let next = match next {
                 Some(NextPc::Exchange(value)) => {

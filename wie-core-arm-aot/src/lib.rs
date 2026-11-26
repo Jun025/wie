@@ -113,7 +113,7 @@ pub enum CompiledExit {
     GuestFault = 6,
 }
 
-#[derive(Default)]
+// fork: `Default` is written out below, for `budget`.
 #[repr(C)]
 pub struct RunFrame {
     pub regs: [u32; 16],
@@ -122,7 +122,30 @@ pub struct RunFrame {
     pub end: u32,
     pub fault_address: u32,
     pub scratch: u32,
+    /// fork: guest instructions this call may still run. Generated code that counts takes one off per
+    /// instruction and, with none left, returns `Dispatch` with pc on the instruction it did not run — the
+    /// place the interpreter stops a run whose budget is spent (docs/report/0609). An executor that does not
+    /// count leaves the field as it found it.
+    pub budget: u32,
 }
+
+// fork: a frame nobody budgeted runs as upstream's does, until the code leaves.
+impl Default for RunFrame {
+    fn default() -> Self {
+        Self {
+            regs: [0; 16],
+            cpsr: 0,
+            end: 0,
+            fault_address: 0,
+            scratch: 0,
+            budget: u32::MAX,
+        }
+    }
+}
+
+/// fork: a guest READ below this address of unmapped memory is 0, not a fault (docs/report/0391). Here
+/// because the interpreter (`wie-core-arm`) and the native executor both decide on it.
+pub const NULL_READ_LIMIT: u32 = 0x1000;
 
 /// The owning guest page directory entry. Generated code reads the nullable page pointer at offset zero.
 /// `Option<Box<T>>` for sized T has the pointer layout, with zero representing None.
@@ -197,12 +220,13 @@ mod tests {
 
     #[test]
     fn generated_code_frame_has_a_fixed_plain_data_layout() {
-        assert_eq!(size_of::<RunFrame>(), 80);
+        assert_eq!(size_of::<RunFrame>(), 84);
         assert_eq!(align_of::<RunFrame>(), 4);
         assert_eq!(offset_of!(RunFrame, regs), 0);
         assert_eq!(offset_of!(RunFrame, cpsr), 64);
         assert_eq!(offset_of!(RunFrame, end), 68);
         assert_eq!(offset_of!(RunFrame, fault_address), 72);
         assert_eq!(offset_of!(RunFrame, scratch), 76);
+        assert_eq!(offset_of!(RunFrame, budget), 80);
     }
 }
