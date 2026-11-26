@@ -5678,6 +5678,7 @@ dependencies = [
  "web-sys",
  "wie-backend",
  "wie-core-arm",
+ "wie-core-arm-native",
  "wie-j2me",
  "wie-jvm-support",
  "wie-ktf",

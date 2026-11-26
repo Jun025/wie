@@ -34,6 +34,12 @@ pub(crate) struct Aot {
     ranges: Vec<Range<u64>>,
     regions: Vec<CompiledRegion>,
     invalidated: Vec<ManifestRegion>,
+    // fork: every address a dropped region has covered — it only grows. `recompile` runs on every entry
+    // lookup that misses, and upstream's walks all of `invalidated` each time. An LGT title flushes the
+    // whole instruction cache dozens of times a run, which leaves thousands of regions there, and a pc
+    // that can never be compiled (an SVC stub, outside every image) misses for good: that walk was 90% of
+    // the run loop (docs/report/0607 §3). A pc outside the span is in none of them, so it skips the walk.
+    invalidated_span: Range<u64>,
     recompilations: Vec<Recompilation>,
 }
 
@@ -46,6 +52,7 @@ impl Aot {
             ranges: Vec::new(),
             regions: Vec::new(),
             invalidated: Vec::new(),
+            invalidated_span: 0..0,
             recompilations: Vec::new(),
         }
     }
@@ -111,6 +118,15 @@ impl Aot {
                 self.entries.remove(&RegionKey { pc, ..region.manifest.entry });
             }
             self.executor.release(region.handle);
+            // fork: see `invalidated_span`.
+            for code in &region.manifest.code_ranges {
+                let span = &self.invalidated_span;
+                self.invalidated_span = if span.is_empty() {
+                    code.clone()
+                } else {
+                    span.start.min(code.start)..span.end.max(code.end)
+                };
+            }
             self.invalidated.push(region.manifest);
         }
         for pending in &mut self.recompilations {
@@ -119,6 +135,10 @@ impl Aot {
     }
 
     pub fn recompile(&mut self, key: &RegionKey, memory: &EmulatedMemory) {
+        // fork: see `invalidated_span`.
+        if !self.invalidated_span.contains(&u64::from(key.pc)) {
+            return;
+        }
         let Some(index) = self.invalidated.iter().position(|region| {
             region.entry.thumb == key.thumb
                 && region.entry.cpu_mode == key.cpu_mode
