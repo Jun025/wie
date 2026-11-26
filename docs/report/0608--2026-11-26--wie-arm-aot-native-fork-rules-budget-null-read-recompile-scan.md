@@ -285,6 +285,8 @@ Acceptance: `under_aot` 11건의 `should_panic` 0 · `yields_every_ten_thousand_
 - `tests::under_aot` 는 `--test-threads=1` 로도 green 이다(스레드 지역 스위치가 다음 시험으로 새지 않는다 — 41 passed).
 - `node scripts/check-worklog-json.mjs` OK(495 파일) · `node scripts/check-docs-report-serial.mjs` OK(0608 · 열린 PR claim 충돌 0) · `bash scripts/audit-no-leak.sh`
   AUDIT PASSED · `node scripts/player-data.mjs` OK(429행 · 고지 추가 0). 유입 표식은 이 파일 끝.
+- 게임 파일명 유입(`node scripts/corpus-name-inflow.mjs`): BOUNDED **4회 / 3쌍** · SUFFIX-ATTACHED **0**. 넷 다 `wie_cli/src/bin/wie_validate.rs` 에 main 부터
+  있던 주석이다 — 도구는 고친 파일의 본문 전체를 보고, 이 브랜치가 그 파일에 더한 줄(스위치 3줄)에는 0 이다(세 이름 모두 main 과 같은 횟수).
 - 오른쪽 열은 문서 커밋 직전의 작업 트리에서 돌렸다. 그 뒤 더한 것은 유입 표식 줄뿐이다(코드 0줄).
 
 - ★**이 PR 은 착지하면 릴리스가 선다.** `**/*.rs` · `**/Cargo.toml` · `Cargo.lock` 이 `publish-artifact.yml` 의 경로 필터에 있다. `wie-core-arm/src/aot.rs` 는
@@ -311,3 +313,4 @@ Acceptance: `under_aot` 11건의 `should_panic` 0 · `yields_every_ten_thousand_
 - 드라이버를 `scripts/` 에 두지 않았다: 프로파일 · `smoke_gate` · `perf-watch` 는 저장소의 스크립트를 그대로 불렀고, 스크래치에 둔 것은 한 회를 부르는 래퍼 ·
   줄기를 나누는 래퍼 · 캡처를 견주는 몇 줄이다(0607 §9 와 같은 꼴). 임대는 실행 · phase 마다 1건이다(가장 긴 것 약 5분).
 
+<!-- corpus-name-inflow v1 subjects=10 tree=ea2120bda0f871e2 B=4/3 P=0/0 S=0/0 -->
