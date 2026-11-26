@@ -45,11 +45,11 @@ aot: (std::env::var("WIE_AOT").as_deref() == Ok("native"))
 
 | | |
 |---|---|
-| 자리 | 사용자 캐시 디렉터리의 `validate-native-aot/`(macOS `~/Library/Caches/net.dlunch.wie/` · Linux `~/.cache/wie/` — `directories::ProjectDirs`). `WIE_AOT_CACHE_DIR=<dir>` 이 있으면 그 자리. 저장소 안에는 아무것도 쓰지 않는다 |
+| 자리 | 사용자 캐시 디렉터리의 `validate-native-aot/`(macOS `~/Library/Caches/net.dlunch.wie/` · Linux `~/.cache/wie/` — `directories::ProjectDirs`). `WIE_AOT_CACHE_DIR=<dir>` 이 있으면 그 자리(빈 값은 «없음»으로 읽는다 — §9). 저장소 안에는 아무것도 쓰지 않는다 |
 | 파일 | 컴파일 요청 하나에 파일 하나. 이름 = `<이 바이너리의 길이>-<mtime ns>-<실행기의 키 64자>` |
 | 크기 | 판당 21.4 MB(LGT) · 24.5 MB(KTF) — 0608 이 잰 14 ~ 15 MB 에서 늘었다(예산이 든 코드). `smoke_gate` 의 244판을 한 번 돌리면 209건 · 4.36 GiB(§4) |
-| 지우는 규칙 | 빗나감에서는 아무것도 지우지 않는다(낡은 기록은 «다른 이름»이라 읽히지 않는다). **저장할 때** 디렉터리 합이 상한(8 GiB)을 넘으면 쓴 지 오래된 파일부터 지운다 — 옛 바이너리의 기록이 나가는 자리가 여기다. 방금 쓴 기록은 지우지 않는다 |
-| 쓰기 | 옆에 `….<pid>.tmp` 로 쓰고 `rename` — 쓰다가 죽은 실행과 같은 판을 동시에 도는 두 실행이 반쪽 기록을 남기지 않는다. 남은 `.tmp` 는 다른 파일과 같이 오래되면 나간다 |
+| 지우는 규칙 | 빗나감에서는 아무것도 지우지 않는다(낡은 기록은 «다른 이름»이라 읽히지 않는다). **저장할 때** 이 캐시가 쓴 이름(위 «파일» 칸의 꼴과 그 `.<pid>.tmp`)의 합이 상한(8 GiB)을 넘으면 그 가운데 쓴 지 오래된 것부터 지운다 — 옛 바이너리의 기록이 나가는 자리가 여기다. 방금 쓴 기록은 지우지 않는다. **그 꼴이 아닌 파일 · 하위 디렉터리는 세지도 지우지도 않는다**(§9 — 처음 올린 판은 디렉터리의 모든 파일을 지웠다) |
+| 쓰기 | 옆에 `….<pid>.tmp` 로 쓰고 `rename` — 쓰다가 죽은 실행과 같은 판을 동시에 도는 두 실행이 반쪽 기록을 남기지 않는다. 남은 `.tmp` 는 다른 기록과 같이 오래되면 나간다 |
 | 캐시를 못 쓸 때 | 캐시 디렉터리를 알 수 없거나 자기 바이너리를 못 읽으면 캐시 없이 돈다(종전의 켬). 읽기 · 쓰기 오류는 실행기가 경고만 찍고 컴파일한다(upstream 의 처리 그대로) |
 
 - **기록은 그것을 쓴 바이너리만 읽는다 — 이름 머리의 길이 · mtime 이 그 표식이다.** 실행기의 키(`wie-core-arm-native/src/cache.rs`)는 게스트 이미지 · 컴파일 한도 ·
@@ -64,7 +64,7 @@ aot: (std::env::var("WIE_AOT").as_deref() == Ok("native"))
 - **지속 캐시는 첫 준비에만 쓰인다**(`NativeExecutor::prepare` 의 `cache.take()` — upstream). 게스트가 명령 캐시를 비운 뒤의 재컴파일(LGT 54판 전부 · 0607 §3)은
   캐시를 타지 않는다.
 
-**시험 1건**(`aot_cache_misses_other_keys_and_other_binaries_and_drops_the_oldest_over_its_cap` · `wie_validate` 의 시험 모듈):
+**시험**(`aot_cache_misses_other_keys_and_other_binaries_and_drops_the_oldest_over_its_cap` · `wie_validate` 의 시험 모듈 · 수정 회차가 더한 둘은 §9):
 빗나감은 디렉터리도 만들지 않는다 · 쓴 기록은 통째로 바뀐다 · **다른 키는 빗나간다**(`RunFrame` 의 배치나 게스트 이미지가 바뀌면 실행기가 건네는 키가 바뀐다 —
 `offset_of!(RunFrame, budget)` 가 그 입력 하나다) · **다른 바이너리는 빗나간다** · 상한을 넘으면 가장 오래 전에 쓴 기록이 나가고(누가 썼든) 방금 쓴 것은 남는다 ·
 `.tmp` 가 남지 않는다. 실행기 쪽의 같은 축 — «저장소가 다른 키로 만든 기록을 돌려줘도 실행기가 버리고 다시 컴파일한다» — 은 upstream 시험
@@ -268,9 +268,11 @@ LGT = `3cc7a9b4cb15` 성 대화 첫 쪽(`docs/keys/lgt-3cc7a9b4cb15-intro-castle
 - **검증 러너의 기본값은 바꾸지 않았다**(티켓의 경계 — 판정만 낸다). 저장소 안에서 `WIE_AOT` 를 켜는 스크립트 · CI 는 여전히 0 이다.
 - **캐시의 상한(8 GiB)은 상수다.** 환경 변수로 빼지 않았다 — 바꿀 일이 생기면 그때 뺀다. 지우는 순서는 «쓴 지 오래된 것부터»이고 «읽은 지 오래된 것부터»가
   아니다(적중해도 시각을 고치지 않는다): 상한이 한 바이너리의 코퍼스 한 바퀴보다 크게 잡혀 있는 동안에는 두 규칙이 같은 것(옛 바이너리의 기록)을 지운다.
-- **상한을 넘겨 지우는 것은 시험(10바이트 상한)으로만 봤다.** 실제 디렉터리가 8 GiB 에 닿게 돌려 보지는 않았다.
+- **상한을 넘겨 지우는 것은 시험(10 · 40바이트 상한)으로만 봤다.** 실제 디렉터리가 8 GiB 에 닿게 돌려 보지는 않았다.
 - **바이너리 표식은 길이 + mtime 이다**(내용 해시가 아니다 — 디버그 바이너리 128 MB 를 실행마다 해시하지 않으려고). 바이너리를 `cp` 로 옮기면 mtime 이 바뀌어
   식는다(`cp -p` 는 유지한다). 측정에 쓴 스크래치 사본은 한 번 복사한 뒤 그대로 썼다.
+  - **반대 방향도 있다**: `cp -p` · `touch -r` · `rsync -t` 로 길이와 mtime 이 같아진 «다른 빌드»는 앞 빌드의 기록을 적중할 수 있다. 실행기의 키와 기록의 SHA-256 이
+    «다른 게임의 코드»는 막는다 — 남는 것은 생성기만 바뀌고 길이가 같은 빌드가 시각까지 물려받은 경우다(게이트② 검수 minor 4).
 - **KTF 의 «적중이 빗나감보다 높다»(§2)는 가르지 않았다.** 무거운 KTF 장면이 이 자에 없다(0607 §3 과 같은 한계).
 - **`perf-watch` 네이티브 축은 다시 재지 않았다**(티켓의 표에 없다).
 - **브라우저(wasm 생성기)는 건드리지 않았다.** upstream 에 PR 을 보내지 않았다.
@@ -279,5 +281,38 @@ LGT = `3cc7a9b4cb15` 성 대화 첫 쪽(`docs/keys/lgt-3cc7a9b4cb15-intro-castle
 - 드라이버를 `scripts/` 에 두지 않았다: 프로파일 · `smoke_gate` 는 저장소의 스크립트를 그대로 불렀고, 스크래치에 둔 것은 한 회를 부르는 래퍼 · 줄기를 나누는 래퍼 ·
   캡처를 견주는 몇 줄이다(0609 의 것에 팔 이름과 캐시 디렉터리만 더했다). 임대는 실행 · phase 마다 1건이다. 표 · 래퍼 · 게이트 로그는 저장소 밖
   `~/orchestrator/reports/evidence/wie-arm-aot-native-validate-switch-persistent-cache/` 에 있다.
+
+### 9. 게이트② 수정 회차 (wie-arm-aot-native-validate-switch-persistent-cache-fix)
+
+검수(PR #642 · request-changes · pin `269a8001`)의 필수 수정 1 과 minor 2 · 3 · 4 를 같은 브랜치에 고쳤다. 측정 표(§2 ~ §4)는 다시 재지 않았다 — 바뀐 것은 정리 경로와
+디렉터리를 고르는 한 줄뿐이다.
+
+| 검수 | 처음 올린 판 | 고친 뒤 |
+|---|---|---|
+| 필수 1(major) | `store` 의 정리가 디렉터리의 **모든 항목**을 세고 오래된 것부터 지웠다 — `WIE_AOT_CACHE_DIR` 을 남의 파일이 든 디렉터리로 주면 그 파일이 지워진다 | **이 캐시가 쓴 이름만 세고 지운다**(`AotCache::wrote` — `<hex>-<hex>-<64 hex>` 와 그 `.<pid>.tmp` · 소문자 hex · 보통 파일만). 다른 이름 · 하위 디렉터리는 합에도 삭제에도 들지 않는다 |
+| 〃 의 부수 | 하위 디렉터리의 길이가 합에 들고, `remove_file` 이 실패해도 합에서 뺐다 | 하위 디렉터리는 걸러진다 · 합에서 빼는 것은 «지워졌다»와 «이미 없다(다른 실행이 먼저 지웠다)»뿐이다 — 못 지운 파일은 그대로 자리를 차지한 것으로 센다 |
+| minor 2 | `WIE_AOT_CACHE_DIR=""` 이면 기록이 작업 디렉터리(대개 저장소)에 떨어졌다 | 빈 값은 미설정으로 읽는다(`AotCache::directory`) — 기본 자리를 쓴다 |
+| minor 3 | 정리 루프가 방금 쓴 기록을 만나면 멈췄다(`break`) — 그보다 뒤 시각의 기록(동시에 도는 다른 실행의 것)이 있으면 상한을 넘긴 채 끝난다 | 건너뛴다(`continue`) |
+| minor 4 | 한계 절이 «`cp` 로 옮기면 식는다»만 적었다 | 반대 방향 한 줄(§8 — 길이 · mtime 이 같아진 다른 빌드는 앞 빌드의 기록을 적중할 수 있다) |
+
+- **두 꼴 가운데 이름 필터를 골랐다**(다른 꼴 = `WIE_AOT_CACHE_DIR` 아래 전용 하위 디렉터리). 까닭: 하위 디렉터리 꼴은 «그 디렉터리 안의 것은 전부 지워도 된다»는 가정을 한 칸
+  아래로 옮길 뿐이고, 필터는 디렉터리가 어디든 «이 캐시가 쓴 이름만 지운다»가 성립한다. 이미 채운 캐시의 자리도 바뀌지 않는다.
+- **시험**(`wie_validate` 의 시험 모듈 · 전부 `AotCache` 의 제품 코드를 그대로 부른다):
+  - `aot_cache_cap_never_deletes_a_file_it_did_not_write`(새로) — 한 시간 전 mtime 의 남의 파일 다섯(메모 · 키가 아닌 꼬리 · 확장자가 붙은 것 · 대문자 · pid 가 숫자가
+    아닌 `.tmp`)과 기록 이름을 한 하위 디렉터리 · 이 캐시의 버려진 `.tmp` 하나를 둔 디렉터리에 상한 40바이트로 저장한다. 남의 것은 전부 남고 · 합에 들지 않고 ·
+    상한을 넘기면 버려진 `.tmp` 만 나간다. **고치기 전 코드에서 red 1회**: `panicked … users-own-notes.txt is not this cache's to delete`(첫 `store` 가 지웠다).
+  - `aot_cache_directory_treats_an_empty_override_as_unset`(새로) — 빈 값 = 미설정 · `""` 이 디렉터리로 나오지 않는다 · 값이 있으면 그 값.
+  - 기존 시험에 한 줄 — 방금 쓴 기록보다 **뒤** 시각의 기록도 상한을 넘기면 나간다. `continue` 를 `break` 로 되돌리면 red(`left: 2 right: 1`) · `is_file()` 을 빼면 위 새
+    시험이 red(`only what this cache wrote is counted`) — 둘 다 한 번씩 돌려 보고 되돌렸다. 기존 시험의 바이너리 표식은 `this` · `rebuilt` 에서 `a-1` · `b-2` 로 바꿨다
+    (필터가 보는 꼴이어야 정리 대상이 된다).
+  - 시험이 없는 것: «못 지운 파일은 합에서 빼지 않는다» — `remove_file` 이 실패하는 파일을 플랫폼과 무관하게 만들 길이 없어 시험하지 않았다(코드 네 줄 · 눈으로 본 것).
+- **끝에서 끝까지 한 번씩**(디버그 바이너리 · `test_data/helloworld_ktf.zip` · 캐시 디렉터리에 한 시간 전 mtime 의 남의 파일 하나를 미리 둠 · `RUST_LOG=warn,wie_core_arm_native=info`):
+  빗나감 `PASS` · rc 0 · «Stored native ARM AOT cache» 1줄 / 적중 `PASS` · rc 0 · «persistent cache hit» 1줄 · 경고 0줄 · 두 번 다 디렉터리는 기록 1건 + 그 남의 파일.
+  빈 `WIE_AOT_CACHE_DIR=` 로 빈 스크래치 디렉터리에서 1회: `PASS` · rc 0 · 그 디렉터리에 생긴 파일 0 · 기록은 기본 자리(`validate-native-aot/`)에 1건(확인 뒤 지웠다 —
+  그 자리는 이 실행 전에 없었다).
+- **검사**(이 회차의 `*.rs` 가 끝난 나무): `cargo fmt --all -- --check` rc 0 · `cargo clippy --all -- -D warnings` rc 0 · `cargo clippy --target wasm32-unknown-unknown -- -D warnings`
+  rc 0 · `cargo +beta clippy --all -- -D warnings` rc 0 · `RUST_MIN_STACK=4194304 cargo test --all` rc 0 — 결과 줄 72개 · **1072 passed · 0 failed**(§7 의 1070 + 새 시험 2건).
+  `Cargo.toml` · `Cargo.lock` 무변경 · 제품 기본값(`aot: None`) 무변경 · 브라우저 배선 0.
+- 검수 nit 5(같은 책임의 구현이 `src/cli/aot_cache.rs` · `wie-app/src/aot_cache.rs` 에 이미 있다)는 손대지 않았다 — 검수도 재사용이 어렵다고 적었다(§1 의 «새 의존은 없다» 줄).
 
 <!-- corpus-name-inflow v1 subjects=6 tree=20efb02d6cdcb516 B=4/3 P=0/0 S=0/0 -->
