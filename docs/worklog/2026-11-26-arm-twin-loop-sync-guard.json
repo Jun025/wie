@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-26",
+  "task": "wie-arm-interpreter-twin-loop-sync-guard-and-null-page-order-test",
+  "title": "ARM 해석기 쌍둥이 루프 — upstream 루프 본문 안 표지 · 멈춤 갈래 수 단언 · 널 페이지 안의 끝 주소 1건 · 주석 수치 정정",
+  "summary": "PR #635 게이트② 검수의 minor F1 · F2 · F3 을 닫았다(제안 채택이 아니라 검수 발견이 출처다). upstream 의 run 루프 본문 안에 쌍둥이 run_interpreter 를 가리키는 주석 2줄을 두고, 동기화 시험에 끝 주소가 널 페이지 안인 경우 1건과 두 루프의 멈춤 갈래 수(6 · 7) 단언을 더했다. run_interpreter 주석의 -7% 는 0603 §3 평균 -10.7% 로 고쳤다. 루프 동작 무변경. docs/report/0604.",
+  "changes": [
+    "wie-core-arm/src/engine/arm32_cpu.rs: upstream run 루프 본문 안(널 페이지 검사 위 · fork 가 이미 고친 덩어리)에 쌍둥이 표지 주석 2줄",
+    "같은 파일 시험 the_loop_without_a_backend_stops_where_the_loop_with_one_does: 경우 7 → 8(끝 주소 = SVC 벡터 0x08) · 소스에서 센 멈춤 줄 수 단언 (run_interpreter 6, upstream 루프 7)",
+    "같은 파일 run_interpreter 머리 주석: -7% → -10.7%(세 회 평균 · 최소 -7.3%)"
+  ],
+  "verification": [
+    "개악 5종 전부 red: 한 루프에만 멈춤 추가(양쪽 각각) · 두 루프에 더하고 수는 그대로 · 끝 검사를 널 페이지 검사 앞으로(양쪽 각각)",
+    "네 게이트 + beta clippy · 러너 블록 — docs/report/0604 §4"
+  ],
+  "limits": [
+    "멈춤 수는 소스의 줄을 센다 — 멈추지 않는 새 갈래는 수에 잡히지 않는다(있는 경우들과 표지의 몫)",
+    "널 페이지 안의 끝 주소는 제품 호출자가 넘기지 않는 값이다 — 순서를 붙드는 경우일 뿐이다"
+  ],
+  "proposals": [],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}
