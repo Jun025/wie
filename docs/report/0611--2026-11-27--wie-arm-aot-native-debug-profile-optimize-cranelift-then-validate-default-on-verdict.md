@@ -180,3 +180,5 @@
 - release 바이너리의 값(0610 §3)은 다시 재지 않았다 — dev 프로파일은 release 에 닿지 않는다. `perf-watch` · 브라우저는 건드리지 않았다. upstream 에 PR 을 보내지 않았다.
 - 측정 래퍼는 스크래치에 뒀다(변형 하나를 짓는 것 · 첫 화면 한 묶음 · `smoke_gate` 줄기를 나누는 것 — `scripts/smoke_gate.sh` 는 그대로 불렀다). 임대는 빌드마다
   short 1건 · 측정 묶음마다 long 1건이다(스윕 전체를 한 임대로 감싼 것 0 · 에뮬레이터 동시 ≤ 3).
+
+<!-- corpus-name-inflow v1 subjects=4 tree=94d141acf49b3204 B=0/0 P=0/0 S=0/0 -->
