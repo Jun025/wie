@@ -440,13 +440,18 @@ pub(crate) fn entry_addresses(images: &[CodeImage], heads: &mut Heads) {
     }
 }
 
+/// fork: the longest run. An entry past a head is the interpreter's up to the next head, an instruction a
+/// call into this crate — the entry no image named, the instruction behind a null read, the one a slice ended
+/// before. This bounds each of those; a head every sixteen instructions of straight code is one check in sixteen.
+const MAX_RUN: usize = 16;
+
 /// fork: cut the blocks into runs — straight pieces every instruction of which hands over to the next one
 /// in memory, whether it executes or its condition skips it. Entered at its head, a run runs whole unless an
 /// instruction faults, which is what lets the head count it at once (`Emitter::budget`). The decoder's blocks
 /// are runs already but for an instruction that leaves without writing pc (an MSR that may change the mode);
-/// the IR is public input and promises none of it. A run also ends before an address in `heads`, and before
-/// a push of lr: the first instruction of a function, which a call through a pointer made at run time reaches
-/// with no image naming it.
+/// the IR is public input and promises none of it. A run also ends before an address in `heads`, before a
+/// push of lr — the first instruction of a function, which a call through a pointer made at run time reaches
+/// with no image naming it — and at `MAX_RUN` instructions.
 fn split_runs(ir: &mut RegionIr, heads: &BTreeSet<u32>) {
     let thumb = ir.entry.thumb;
     let mut runs = Vec::with_capacity(ir.blocks.len());
@@ -461,6 +466,7 @@ fn split_runs(ir: &mut RegionIr, heads: &BTreeSet<u32>) {
                     || previous.fixed_successor(thumb) != Some(next)
                     || previous.pc.get() < 0x1000
                     || next < 0x1000
+                    || run.len() == MAX_RUN
                     || heads.contains(&next)
                     || matches!(&instruction.operation, Operation::MultipleTransfer { base, registers, load: false, write_back: true, .. }
                         if *base == Reg::SP && registers & (1 << Reg::LR.index()) != 0)

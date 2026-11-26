@@ -1089,7 +1089,7 @@ mod tests {
 
     // fork: where a run is entered from outside its region (`codegen::Heads`). The decoder's blocks do not say.
     #[test]
-    fn an_address_an_image_names_and_a_push_of_lr_are_entries() {
+    fn an_address_an_image_names_a_push_of_lr_and_every_sixteenth_instruction_are_entries() {
         let mut executor = NativeExecutor::new(None);
         let prepare = |executor: &mut NativeExecutor, images: Arc<[CodeImage]>| {
             // Three nops at 0x1000, and at 0x8000: nop; push {r4, lr}; nop.
@@ -1102,7 +1102,14 @@ mod tests {
                 write_back: true,
                 load: false,
             };
-            let mut input = request([Some(region(0x1000, &[&[(0x1000, 4), (0x1004, 4), (0x1008, 4)]])), Some(function)].into_iter());
+            // And twenty nops in a row at 0xc000.
+            let long: Vec<_> = (0..20).map(|index| (0xc000 + index * 4, 4)).collect();
+            let regions = [
+                Some(region(0x1000, &[&[(0x1000, 4), (0x1004, 4), (0x1008, 4)]])),
+                Some(function),
+                Some(region(0xc000, &[&long])),
+            ];
+            let mut input = request(regions.into_iter());
             input.images = images;
             block_on(executor.prepare(input)).unwrap().regions
         };
@@ -1117,17 +1124,17 @@ mod tests {
             entries: Vec::new(),
         };
         access.pages[2].bytes = Some(Box::new([0; 0x10000]));
-        // entry pc -> exit, pc, what was taken off a budget of 10
+        // entry pc -> exit, pc, what was taken off a budget of 30
         let mut enter = |executor: &mut NativeExecutor, handle, pc| {
             let mut frame = RunFrame {
                 cpsr: 0x1f,
-                budget: 10,
+                budget: 30,
                 ..RunFrame::default()
             };
             frame.regs[13] = 0x20010;
             frame.regs[15] = pc;
             let exit = executor.execute(handle, &mut frame, &mut access).unwrap() as u32;
-            (exit, frame.regs[15], 10 - frame.budget)
+            (exit, frame.regs[15], 30 - frame.budget)
         };
         let dispatch = CompiledExit::Dispatch as u32;
         let interpret = CompiledExit::InterpretOne as u32;
@@ -1140,6 +1147,11 @@ mod tests {
         assert_eq!(enter(&mut executor, regions[1].handle, 0x8004), (dispatch, 0x800c, 2));
         assert_eq!(enter(&mut executor, regions[1].handle, 0x8008), (interpret, 0x8008, 0));
         assert_eq!(enter(&mut executor, regions[1].handle, 0x8000), (dispatch, 0x800c, 3));
+
+        // Sixteen instructions are a run: the seventeenth of the twenty heads the next.
+        assert_eq!(enter(&mut executor, regions[2].handle, 0xc000), (dispatch, 0xc050, 20));
+        assert_eq!(enter(&mut executor, regions[2].handle, 0xc040), (dispatch, 0xc050, 4));
+        assert_eq!(enter(&mut executor, regions[2].handle, 0xc03c), (interpret, 0xc03c, 0));
 
         // An image with a call to 0x1004 (bl, from 0x2000): the run is cut there.
         let call = CodeImage {
