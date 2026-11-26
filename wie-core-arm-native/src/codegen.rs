@@ -149,7 +149,7 @@ pub(crate) fn emit_region(
         registers: [GuestRegister::Frame; 16],
         translated: [None; 16],
         status: None,
-        budget: None,
+        budget: None, // fork
         exchange: None,
         builder,
         frame,
@@ -375,6 +375,7 @@ impl Emitter<'_> {
         self.builder.ins().store(MemFlagsData::trusted(), value, self.frame, offset as i32);
     }
 
+    // fork: the budget's two homes (`Emitter::budget`) — these two and their callers are not upstream's.
     fn budget_left(&mut self) -> Value {
         match self.budget {
             Some(var) => self.builder.use_var(var),

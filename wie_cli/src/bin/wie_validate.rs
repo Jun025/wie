@@ -1943,6 +1943,91 @@ fn frozen_tail(hashes: &[u64]) -> u64 {
     hashes.windows(2).rev().take_while(|w| w[0] == w[1]).count() as u64
 }
 
+/// `WIE_AOT=native`'s persistent cache: one file per compile request, in the user cache directory
+/// (`WIE_AOT_CACHE_DIR` overrides it) and never in the repo — a record is a title's code compiled to host code.
+///
+/// **A record is only ever read back by the binary that wrote it.** The executor's key covers the guest images, the
+/// compile limits, the host ISA and `RunFrame`'s layout; a change to the code generator that moves none of those
+/// would otherwise hand a *validator* the previous build's code, and the run would measure the wrong engine without
+/// saying so. So the file name leads with this binary's length and mtime: every rebuild starts cold.
+///
+/// Nothing is deleted on a miss — stale records are other names, never read. `store` deletes oldest-written first
+/// until the directory is back under `max_bytes`, which is where earlier builds' records go.
+struct AotCache {
+    directory: PathBuf,
+    binary: String,
+    max_bytes: u64,
+}
+
+impl AotCache {
+    /// A title's record is 14 to 15 MB (docs/report/0610): room for one binary's pass over the local corpus.
+    const MAX_BYTES: u64 = 8 << 30;
+
+    fn for_this_binary() -> Option<Self> {
+        let directory = std::env::var_os("WIE_AOT_CACHE_DIR").map(PathBuf::from).or_else(|| {
+            Some(
+                directories::ProjectDirs::from("net", "dlunch", "wie")?
+                    .cache_dir()
+                    .join("validate-native-aot"),
+            )
+        })?;
+        // ponytail: the whole binary is the identity, so an unrelated rebuild also starts cold. Narrow it to the
+        // generator's sources if that cold start ever hurts.
+        let binary = fs::metadata(std::env::current_exe().ok()?).ok()?;
+        let modified = binary.modified().ok()?.duration_since(UNIX_EPOCH).ok()?.as_nanos();
+        Some(Self {
+            directory,
+            binary: format!("{:x}-{modified:x}", binary.len()),
+            max_bytes: Self::MAX_BYTES,
+        })
+    }
+
+    fn path(&self, key: &[u8; 32]) -> PathBuf {
+        let key: String = key.iter().map(|byte| format!("{byte:02x}")).collect();
+        self.directory.join(format!("{}-{key}", self.binary))
+    }
+}
+
+impl wie_core_arm_native::NativeCache for AotCache {
+    fn load(&mut self, key: &[u8; 32]) -> WieResult<Option<Vec<u8>>> {
+        match fs::read(self.path(key)) {
+            Ok(record) => Ok(Some(record)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(wie_util::WieError::FatalError(error.to_string())),
+        }
+    }
+
+    fn store(&mut self, key: &[u8; 32], record: &[u8]) -> WieResult<()> {
+        let io = |error: std::io::Error| wie_util::WieError::FatalError(error.to_string());
+        fs::create_dir_all(&self.directory).map_err(io)?;
+        // Written beside its name and renamed onto it: a run killed mid-write, or two runs of one title, never
+        // leave a half record under a name `load` reads. A leftover `.tmp` ages out like any other file.
+        let path = self.path(key);
+        let partial = path.with_extension(format!("{}.tmp", std::process::id()));
+        fs::write(&partial, record).map_err(io)?;
+        fs::rename(&partial, &path).map_err(io)?;
+
+        let mut files: Vec<_> = fs::read_dir(&self.directory)
+            .map_err(io)?
+            .filter_map(|entry| {
+                let entry = entry.ok()?;
+                let metadata = entry.metadata().ok()?;
+                Some((metadata.modified().ok()?, metadata.len(), entry.path()))
+            })
+            .collect();
+        files.sort_unstable();
+        let mut total: u64 = files.iter().map(|(_, length, _)| length).sum();
+        for (_, length, file) in files {
+            if total <= self.max_bytes || file == path {
+                break;
+            }
+            let _ = fs::remove_file(file); // another run may have removed it first
+            total -= length;
+        }
+        Ok(())
+    }
+}
+
 #[allow(clippy::type_complexity)]
 fn build_emulator(
     platform: Box<dyn Platform>,
@@ -1953,8 +2038,13 @@ fn build_emulator(
     let options = Options {
         enable_gdbserver: false,
         // Interpreter only by default. `WIE_AOT=native` is the measurement switch (docs/report/0607): upstream's
-        // cranelift backend with no persistent cache, so every run pays the whole compile. Unset, nothing changes.
-        aot: (std::env::var("WIE_AOT").as_deref() == Ok("native")).then(|| Box::new(wie_core_arm_native::NativeExecutor::new(None)) as _),
+        // cranelift backend, with `AotCache` below so a second run of the same title by the same binary skips the
+        // compile (docs/report/0610). Unset, nothing changes.
+        aot: (std::env::var("WIE_AOT").as_deref() == Ok("native")).then(|| {
+            Box::new(wie_core_arm_native::NativeExecutor::new(
+                AotCache::for_this_binary().map(|cache| Box::new(cache) as _),
+            )) as _
+        }),
         profile,
     };
 
@@ -2151,6 +2241,50 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
 
 #[cfg(test)]
 mod tests {
+    /// `WIE_AOT=native`'s cache: a record misses under any other key (what a changed `RunFrame` layout or guest
+    /// image produces) and under any other binary, a write replaces the record whole, and the size cap deletes
+    /// the oldest-written records — never the one just stored.
+    #[test]
+    fn aot_cache_misses_other_keys_and_other_binaries_and_drops_the_oldest_over_its_cap() {
+        use wie_core_arm_native::NativeCache;
+        let directory = std::env::temp_dir().join(format!("wie-validate-aot-cache-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        let cache = |binary: &str, max_bytes| super::AotCache {
+            directory: directory.clone(),
+            binary: binary.into(),
+            max_bytes,
+        };
+        let mut this = cache("this", 10);
+        assert_eq!(this.load(&[1; 32]).unwrap(), None);
+        assert!(!directory.exists(), "a miss creates nothing");
+
+        for record in [&b"first"[..], b"again"] {
+            this.store(&[1; 32], record).unwrap();
+            assert_eq!(this.load(&[1; 32]).unwrap().as_deref(), Some(record));
+        }
+        assert_eq!(this.load(&[2; 32]).unwrap(), None, "another key");
+        assert_eq!(cache("rebuilt", 10).load(&[1; 32]).unwrap(), None, "another binary");
+
+        // 5 + 5 bytes fill the cap; a third record pushes out the one written longest ago, whoever wrote it.
+        cache("rebuilt", 10).store(&[1; 32], b"other").unwrap();
+        let old = std::time::SystemTime::now() - std::time::Duration::from_secs(60);
+        std::fs::File::options()
+            .write(true)
+            .open(this.path(&[1; 32]))
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+        this.store(&[2; 32], b"third").unwrap();
+        assert_eq!(this.load(&[1; 32]).unwrap(), None, "the oldest record went");
+        assert_eq!(this.load(&[2; 32]).unwrap().as_deref(), Some(&b"third"[..]));
+        assert_eq!(cache("rebuilt", 10).load(&[1; 32]).unwrap().as_deref(), Some(&b"other"[..]));
+        // A record larger than the cap is kept: it is what the next run reads.
+        this.store(&[3; 32], b"larger than the cap").unwrap();
+        assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1, "nothing partial is left behind");
+        assert!(this.load(&[3; 32]).unwrap().is_some());
+        std::fs::remove_dir_all(&directory).unwrap();
+    }
+
     /// Policy v2's splice: escape keys land at `now`, the pending script (keys and step shots)
     /// moves back by the escape's length, `--shot-every` frames stay put, and the stall clock
     /// restarts where the escape ends.
