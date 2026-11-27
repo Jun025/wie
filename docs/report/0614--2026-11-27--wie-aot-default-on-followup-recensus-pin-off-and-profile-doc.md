@@ -109,6 +109,9 @@ game-lab-recensus: 1 game(s) · engine=interpreter (WIE_AOT=off) · corpus=game_
 - 문서 검사: `check-engine-runner-fixtures.mjs` OK · `check-doc-liveness-parity.mjs` OK(26줄 — fenced `sh` 블록은 고치지 않았다 · 워크플로 무변경) ·
   `check-worklog-json.mjs` OK · `check-docs-report-serial.mjs` OK(0614 · 열린 PR claim 충돌 0) · `player-data.mjs` rc 0 · `npm run audit` PASSED. `AGENTS.md` 840줄(상한 850).
 - 측정 바이너리(§1 · §2)는 플래그 문서를 다듬기 전의 디버그 빌드다 — 그 뒤 `*.rs` 에서 바뀐 것은 `///` 주석 네 줄(`--help` 의 글)뿐이다.
+- 게임 파일명 유입(`node scripts/corpus-name-inflow.mjs`): **6회 / 4쌍(BOUNDED)** · 판단 필요 **0회 / 0쌍(SUFFIX-ATTACHED)**. 여섯 다 main 부터 있던 줄이다 — 도구는 고친
+  파일의 본문 전체를 본다(`game-lab-recensus.sh` 머리 주석의 예시 둘 · `wie_validate.rs` 주석 넷). 이 PR 이 더한 줄에 든 것은 0 이다(`git diff origin/main...HEAD` 의 `+`
+  줄에서 그 네 낱말을 세어 0 · 0 · 0 · 0).
 - 이 회차가 띄운 것은 전부 차례로 돌았다(동시 실행 1) · 지속 캐시는 `WIE_AOT_CACHE_DIR` 로 스크래치에 두었다 · 출력은 전부 repo 와 `game_lab/` 밖이다.
 
 ### 5. 한계 · 하지 않은 것
