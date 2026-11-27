@@ -16,6 +16,7 @@
 | `smoke_gate` release 244판 | 244 PASS · 0 FAIL | **244 PASS · 0 FAIL**(빈 캐시에서 시작) |
 | 끔과 판정이 다른 판 · 기준선 대비 regressions | — | **0 · 0**(디버그 · release 둘 다 · 재시도로 PASS 가 된 판도 0 — §3) |
 | 러너 블록 여섯 픽스처(디버그 · 문서의 명령 그대로) | 6/6 `PASS` · rc 0 | **6/6 `PASS` · rc 0**(빈 캐시 · 그 캐시로 다시 — §4) |
+| **main 병합 뒤**(#644 의 생성기 · 디버그 244판 · §9) | (0612 §4 — 244 PASS) | **244 PASS · 0 FAIL** · regressions 0 · 재시도 0 |
 | doc-liveness(ubuntu x86-64 · 브랜치 손 실행) | — | run `45926844387` · **success** — 러너 블록 6/6 `PASS` · `cargo test --all` 1073 passed(§5) |
 
 ### 1. 스위치 — `WIE_AOT`
@@ -193,7 +194,9 @@ run **`45926844387`** · `workflow_dispatch` · head `5ef684df8`(이 PR 의 코�
   `contract` 7분 16초 · `build-web` 6분 24초 · 나머지 `rust_ci` 다섯 다리는 PR 에서 빈 통과다(`AGENTS.md`). 그 green 은 다른 OS 를 덮지 않으므로
   **여섯 다리 전부를 손으로 1회 돌렸다**: `gh workflow run rust.yml -R Jun025/wie --ref <이 브랜치>` → run **`45938137002`** · `success` — ubuntu · macOS · Windows 의
   stable · beta 여섯 다리가 `cargo test --all` 을 돌았고(357 ~ 1365초) 여섯 로그 모두에 `aot_is_on_unless_wie_aot_is_off_and_a_mistyped_switch_is_refused_test ... ok` 가 있다.
-  곧 검증 러너가 세 OS 에서 변수 없이 픽스처를 컴파일해 기록을 쓰고, `off` 에서는 쓰지 않는다. 이 뒤의 커밋은 이 문서뿐이다.
+  곧 검증 러너가 세 OS 에서 변수 없이 픽스처를 컴파일해 기록을 쓰고, `off` 에서는 쓰지 않는다.
+- **main 을 병합한 커밋 `9b1eb8283`**(§9): `gh pr checks 645` 전부 pass — `rust_ci (ubuntu-latest, stable)` 6분 12초 · `contract` 7분 15초 · `build-web` 6분 44초 · PR `MERGEABLE`.
+  로컬의 네 게이트 + beta clippy 도 그 나무에서 rc 0 이고 `cargo test --all` 은 **1075 passed · 0 failed**(main 의 1074 + 1)다. 이 뒤의 커밋은 이 문서뿐이다.
 
 ### 8. 한계 · 하지 않은 것
 
@@ -222,4 +225,23 @@ run **`45926844387`** · `workflow_dispatch` · head `5ef684df8`(이 PR 의 코�
   한 칸이라 임대마다 5분씩 기다리는 것을 보고 KTF 를 임대 1건(13 ~ 17분)으로 묶은 드라이버로 바꿨다(바꿀 때 도는 실행은 없었다).
 - `Cargo.toml` 둘의 주석은 고치지 않았다(§6). upstream 에 PR 을 보내지 않았다. 머지 0 · force-push 0 · 게임 파일 무수정.
 
-<!-- corpus-name-inflow v1 subjects=12 tree=7741d22d6c213dbb B=4/3 P=0/0 S=1/1 -->
+### 9. main 병합 뒤 — 올라가 있는 동안 생성기가 바뀌었다(#644)
+
+이 PR 이 열려 있는 동안 #644(다른 레인 · `docs/report/0612`)가 착지했다: 생성기가 예산을 run 의 머리에서 한 번에 세고, `wie-core-arm/src/engine/arm32_cpu.rs` 도 고쳤다.
+`STATE.md` 가 충돌해 main 을 병합했다(커밋 `9b1eb8283` · 원장 규칙대로 합집합 — «다음»에는 아직 열려 있는 브라우저 배선만 남기고, 끝난 두 줄 0612 · 0613 을 접은 항목에 둘 다 뒀다 ·
+force-push 0). **그래서 §3 의 표는 «#644 전의 생성기»로 잰 값이다.** 이 PR 의 head 가 실제로 싣는 것은 그 생성기 + 이 PR 의 기본값이다.
+
+| 병합된 나무(`9b1eb8283`)에서 | 결과 |
+|---|---|
+| 네 게이트 + beta clippy | 전부 rc 0 · `cargo test --all` 결과 줄 73개 · **1075 passed · 0 failed** |
+| **`smoke_gate` 디버그 244판 · 기본(켬) · 빈 캐시에서 시작**(§3 과 같은 래퍼 · 임대 2건 291 · 1019초) | **244 PASS · 0 FAIL** · 기준선 242행 대비 regressions 0 · absent 0 · 줄기 6개 rc 0 · 러너 호출 244회 전부 `PASS`(재시도 0) · load1 12.7 · 6.5 |
+| 그 팔이 쓴 캐시 기록 | 209건 · **3.16 GiB**(#644 전의 생성기로는 4.36 GiB) |
+| 러너 블록 — 기본(켬) 첫 실행 · 다시 · `WIE_AOT=off` | 18회 전부 `PASS` · rc 0 · ARM 픽스처 넷이 «Stored» → «cache hit» · `keydraw_*` paints 79 · 55 · 27/27 키(§4 와 같다) |
+| PR 의 CI | 전부 pass(§7) |
+
+- **다시 돌리지 않은 팔**: 병합된 나무의 끔 팔과 release 두 팔. 그 엔진의 같은 표는 #644 가 자기 커밋으로 냈다 — 0612 §4: 디버그 · release 각각 끔 244 · 켬(`WIE_AOT=native` · 빈 캐시) 244 PASS ·
+  판정이 달라진 판 0 · regressions 0. 그 «켬»은 이 PR 의 기본과 같은 실행기다(다른 것은 변수를 읽는 식과 기록의 자리뿐이다). 이 회차의 기한 안에 넣을 수 있던 것은
+  기본 바이너리(디버그)의 켬 팔 하나였다.
+- doc-liveness(`45926844387`)와 여섯 다리 손 실행(`45938137002`)은 병합 전의 커밋(`5ef684df8` · `0f53496ca`)에서 돌았다. 병합 뒤 ubuntu 다리는 PR 의 CI 가 다시 돌았고(1075 passed),
+  macOS · Windows 다리와 ubuntu 의 러너 블록은 병합 뒤 다시 돌리지 않았다 — #644 의 생성기는 그 다리들에서 `wie-core-arm-native` 자신의 시험으로만 돈 상태다(주간 실행이 덮는다).
+- 이 회차가 병합 뒤 기본 자리에 쓴 기록(213건 · 3.16 GiB)도 지웠다.
