@@ -167,8 +167,8 @@ Compiled code is kept per title in the user cache directory's `validate-native-a
 cold.** Cold, a real title compiles before it draws: first frame 1–1.4 s later than the interpreter's and
 a peak of 630–840 MB instead of ~310 (debug, `docs/report/0611` §1); the fixtures here are too small to show it.
 **Numbers that stand for the product's engine pin `WIE_AOT=off` themselves** — `perf-watch` (native axis),
-`playability-census.mjs` (`compat.json`), `arm-interp-profile.sh`, `hook-shadow-sweep.sh`; the last two take
-`WIE_AOT=native` to measure the other arm. Measuring speed by hand? Say which engine in the same line.
+`playability-census.mjs` (`compat.json`), `game-lab-recensus.sh`, `arm-interp-profile.sh`, `hook-shadow-sweep.sh`; the
+last three take `WIE_AOT=native` to measure the other arm. Measuring speed by hand? Say which engine in the same line.
 
 **`keydraw_*` without `--inject` reports FAIL, and that is the CORRECT result — you did not break it.**
 Those two fixtures paint only in response to a key.
@@ -378,7 +378,9 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   they are a pair.** The runner re-validates an already-sorted corpus **read-only** and leaves one JSON
   per game in `game_lab/reports-YYYY-MM-DD/`; the generator turns that directory into a per-game bucket
   map via `--reports`. **Pointing the runner's `--out` at `game_lab/reports/` is refused (exit 3) — in
-  any spelling.** If you widen a claim here, widen the predicate in the same PR. Start it as
+  any spelling.** It runs the interpreter (`WIE_AOT=off`, pinned in the script — the July column is the
+  interpreter's); `WIE_AOT=native` is the other arm, into `reports-<date>-aot/`. If you widen a claim
+  here, widen the predicate in the same PR. Start it as
   `bash scripts/game-lab-recensus.sh --dry-run` to see what a full run would cost before spending 45
   minutes **of this Mac** (`docs/report/0173`).
 

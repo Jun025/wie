@@ -52,6 +52,18 @@
 # It is also invisible to CI, like everything else that touches `game_lab/`: the
 # corpus holds real game bytes (Constraint 9), so no check can ever run this.
 #
+# ── Which engine: the interpreter (`WIE_AOT=off`), pinned here ────────────────
+# `wie_validate` runs ARM guests under native AOT by default since 2026-11-27
+# (docs/report/0613). This script does not follow that default: the July column it
+# exists to be compared with was measured by the interpreter — the only engine
+# there was — and the interpreter is still what the product ships. Same shape as
+# `hook-shadow-sweep.sh` and `arm-interp-profile.sh`: `WIE_AOT` defaults to off
+# here, and `WIE_AOT=native bash scripts/game-lab-recensus.sh …` measures the
+# other arm on purpose. That arm's default output is `reports-<today>-aot/`, so
+# the two engines never share a column; the first output line names the engine.
+# Any other value is refused before a game runs — the validator exits 2 on it
+# with no JSON line, which the loop below would file as a hang, once per game.
+#
 # ── Usage ────────────────────────────────────────────────────────────────────
 #   bash scripts/game-lab-recensus.sh                       # full corpus -> game_lab/reports-<today>/
 #   bash scripts/game-lab-recensus.sh --limit 3 --dry-run   # what would run, writing nothing
@@ -68,7 +80,8 @@ ROOT="game_lab"
 BASELINE="$ROOT/reports"         # ★ the July column — never a legal --out
 BIN="target/debug/wie_validate"
 CORPUS="$ROOT/broken"
-OUT="$ROOT/reports-$(date +%F)"
+OUT=""
+AOT="${WIE_AOT:-off}"            # ★ the interpreter unless told `native` — header «Which engine»
 TIMEOUT=20
 KILL=50
 NICE=15
@@ -90,10 +103,20 @@ while [ $# -gt 0 ]; do
     --shots)      SHOTS=1; shift;;
     --dry-run)    DRYRUN=1; shift;;
     --from-stdin) FROM_STDIN=1; shift;;
-    -h|--help)    sed -n '1,60p' "$0"; exit 0;;
+    -h|--help)    sed -n '/^set -euo/q;p' "$0"; exit 0;;
     *) echo "unknown arg: $1" >&2; exit 2;;
   esac
 done
+
+case "$AOT" in
+  off)    ENGINE="interpreter (WIE_AOT=off)";;
+  native) ENGINE="native AOT (WIE_AOT=native)";;
+  *) echo "game-lab-recensus: WIE_AOT=$AOT is not a value — off (the default here: the interpreter) or native" >&2; exit 2;;
+esac
+if [ -z "$OUT" ]; then
+  OUT="$ROOT/reports-$(date +%F)"
+  [ "$AOT" = off ] || OUT="$OUT-aot"
+fi
 
 # ── Fail-closed: the baseline column is not an output directory ──────────────
 # ★Compared as RESOLVED PATHS, not as strings. The first version of this guard
@@ -234,7 +257,7 @@ fi
 dupstems=$(printf '%s\n' "${files[@]}" | sed 's#.*/##; s#\.[^.]*$##' | sort | uniq -d)
 collisions=$(printf '%s' "$dupstems" | grep -c . || true)
 
-echo "game-lab-recensus: ${#files[@]} game(s) · corpus=$CORPUS · out=$OUT · timeout=${TIMEOUT}s kill=${KILL}s nice=$NICE"
+echo "game-lab-recensus: ${#files[@]} game(s) · engine=$ENGINE · corpus=$CORPUS · out=$OUT · timeout=${TIMEOUT}s kill=${KILL}s nice=$NICE"
 [ "$collisions" -gt 0 ] && {
   echo "  ★ $collisions stem(s) appear under more than one carrier — those are written as <bucket>__<stem>.{json,log,png} so neither copy is overwritten"
   echo "      ★except per-step PNGs under shots/ with --shots: the validator names those itself, from a BARE stem. And this list comes from THIS run's files, so a partial run cannot see a collision at all."
@@ -312,7 +335,7 @@ for f in "${files[@]}"; do
   # macOS has no `timeout`, and SIGALRM can be masked by heavy ARM emulation, so a
   # background `kill -9` is the only reliable bound on a hung tick(). Lifted from
   # classify.sh, which has run this for the whole corpus.
-  nice -n "$NICE" "$BIN" "$f" --inject --timeout "$TIMEOUT" "${shotargs[@]}" \
+  WIE_AOT="$AOT" nice -n "$NICE" "$BIN" "$f" --inject --timeout "$TIMEOUT" "${shotargs[@]}" \
     >"$OUT/${key}.out" 2>"$OUT/${key}.log" &
   vpid=$!
   i=0

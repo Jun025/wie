@@ -1,0 +1,24 @@
+{
+ "schema": "wie-worklog/1",
+ "date": "2026-11-27",
+ "task": "wie-aot-default-on-followup-recensus-pin-off-and-profile-doc",
+ "title": "AOT 기본 켬(#645) 뒤 남은 두 자리 — 재센서스를 해석기에 고정 · --profile-out 문서에 엔진",
+ "summary": "PR #645 검수의 비차단 지적 셋을 처리했다. game-lab-recensus.sh 는 WIE_AOT 를 주지 않으면 해석기(off)로 돌고(7월 기준선이 해석기로 잰 열이다), WIE_AOT=native 를 주면 켠 팔을 reports-<날짜>-aot/ 로 잰다 · 첫 출력 줄이 엔진을 적고 그 밖의 값은 돌리기 전에 exit 2 로 거절한다. wie_validate --profile-out 의 플래그 문서에 엔진과 표본의 뜻을 적었다 — 실제 두 판으로 재니 표본은 두 엔진에서 같은 스택 · 같은 몫이고(겹침 98.7 ~ 99.6% · 해석기끼리 99.0 ~ 99.6%) 호스트 시간은 어느 쪽에서도 말해 주지 않는다. Cargo.toml 의 주석도 지금의 말로 고쳤다(.rs 편집으로 릴리스가 어차피 한 번 선다). 측정은 docs/report/0614.",
+ "changes": [
+  "scripts/game-lab-recensus.sh — WIE_AOT 기본 off · native 는 -aot 출력 · 틀린 값 거절 · 첫 줄에 engine=",
+  "wie_cli/src/bin/wie_validate.rs — --profile-out 플래그 문서 · 머리 주석의 «스스로 끔을 넘기는 도구» 목록(동작 무변경)",
+  "AGENTS.md(같은 목록 · 재센서스 항) · STATE.md(«다음» 의 같은 목록) · Cargo.toml(주석) · docs/report/0614"
+ ],
+ "verification": [
+  "네 게이트 + beta clippy rc 0 · cargo test --all 1075 passed",
+  "커밋된 픽스처 한 판으로 재센서스를 끔 / 켬 / 틀린 값으로 — 캐시 기록과 RUST_LOG=info 의 AOT 줄로 넘어간 엔진을 확인 · 7월 기준선과 summary.tsv 머리 · JSON 키 대조 · census-map 이 읽는다",
+  "--profile-out 을 LGT · KTF 한 판씩 끔 · 켬(빈 캐시) · 켬(적중) · 끔 한 번 더로 — docs/report/0614 §2"
+ ],
+ "limits": [
+  "켠 팔로 broken/ 187판을 돌려 보지 않았다(티켓 밖 · 이 Mac 45분)",
+  "--profile-out 측정은 타이머에 맞춰 도는 부팅 화면 두 장면 · 판마다 1회 · 디버그 — 해석기가 밀리는 장면은 재지 않았다"
+ ],
+ "proposals": [],
+ "adoptedProposals": [],
+ "declinedProposals": []
+}

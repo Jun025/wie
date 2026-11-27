@@ -92,7 +92,7 @@
 지금 **후보는 0건**이다. 네이티브 ARM AOT 줄기에 열려 있는 것은 하나(브라우저 배선)이고, 발권 여부의 정본은 `~/orchestrator/tasks/` 다.
 
 - **브라우저 배선** — 티켓 없음 · 후보로도 아직 아니다(범위 = 0607 §7 끝 · wasm 생성기에 예산을 한 번 더). 제품 기본값은 `aot: None` 그대로다.
-  그때까지 **제품의 엔진(해석기)을 재는 수는 `WIE_AOT=off` 로 잰다** — `perf-watch` 네이티브 축 · `playability-census.mjs` · `arm-interp-profile.sh` ·
+  그때까지 **제품의 엔진(해석기)을 재는 수는 `WIE_AOT=off` 로 잰다** — `perf-watch` 네이티브 축 · `playability-census.mjs` · `game-lab-recensus.sh`(0614) · `arm-interp-profile.sh` ·
   `hook-shadow-sweep.sh` 는 스스로 고정한다(0613 §2). 브라우저에 AOT 가 붙는 PR 이 census 의 고정을 푼다.
 - 검증 러너는 이제 기본으로 네이티브 생성기를 돈다 — **생성기(`wie-core-arm-native`)를 고치는 PR 은 `smoke_gate` 를 기본값(켬)과 `WIE_AOT=off` 로 나란히 본다**
   (지금의 생성기 = 0612 · 그 표는 0612 와 0613 §3 에 있다). 로컬 `wie` 의 캐시에는 바이너리 표식이 없다(0610 §6).
