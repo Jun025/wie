@@ -135,7 +135,7 @@
 //! the interpreter runs only what the compiler leaves to it. `WIE_AOT=off` is the interpreter alone — what
 //! this binary did before, and what the product still ships (`wie_featurephone`: `aot: None`), so a number
 //! that stands for the product's engine is measured with it: `perf-watch`'s native axis, the playability
-//! census, `arm-interp-profile.sh` and `hook-shadow-sweep.sh` set it themselves. `WIE_AOT=native` (the old
+//! census, `game-lab-recensus.sh`, `arm-interp-profile.sh` and `hook-shadow-sweep.sh` set it themselves. `WIE_AOT=native` (the old
 //! opt-in) and an empty value mean the default; any other value is refused with exit 2 and no result line,
 //! because a mistyped off switch would otherwise measure the other engine without saying so. J2ME and SKT
 //! have no ARM core and run the same either way.
@@ -774,6 +774,16 @@ struct Args {
     /// same format as `wie --profile-out`). OFF by default: without it no file is
     /// created and the JSON line is unchanged. KTF/LGT only; J2ME/SKT have no ARM
     /// core, so the file stays empty. Stacks are guest addresses, not game bytes.
+    ///
+    /// The run is whichever engine `WIE_AOT` picks — native AOT by default, the
+    /// interpreter with `WIE_AOT=off` — and a sample means the same under both: one
+    /// per run slice, taken where the guest stood when the slice ended (a host call,
+    /// a return, or the 10,000-instruction budget, which compiled code spends at the
+    /// same instruction). It counts what the guest did, never host time: two real
+    /// titles gave the same stacks in the same shares under both engines — as alike
+    /// as two interpreter runs (docs/report/0614 §2) — while the host time behind a
+    /// frame was 14.7 ms interpreted and 1.9 ms compiled on one of them (0612).
+    /// Where the host's time goes is `scripts/arm-interp-profile.sh`'s question.
     #[arg(long)]
     profile_out: Option<PathBuf>,
     /// Tick as a host with this display rate would: each tick gets the budget

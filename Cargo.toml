@@ -56,9 +56,10 @@ opt-level = 1
 opt-level = 1
 
 # The native ARM AOT's compiler, optimized in debug builds too. Unoptimized, a debug `wie_validate` under
-# `WIE_AOT=native` spends 20 ~ 28 s on a title's first run (empty cache) — past `smoke_gate.sh`'s 15 s — and
-# with these five it is about 4 s (LGT) / 3 s (KTF). They are the ones that pay out of the fourteen measured
-# (docs/report/0611): the other six cranelift crates, `smallvec`, `rustc-hash` and `bumpalo` moved nothing.
+# native AOT (its default — `WIE_AOT=off` is the interpreter) spends 20 ~ 28 s on a title's first run (empty
+# cache) — past `smoke_gate.sh`'s 15 s — and with these five it is about 4 s (LGT) / 3 s (KTF). They are the
+# ones that pay out of the fourteen measured (docs/report/0611): the other six cranelift crates, `smallvec`,
+# `rustc-hash` and `bumpalo` moved nothing.
 # `sha2` is here because every cache record (20 ~ 45 MB) is hashed on store and on load. Cost: a clean debug
 # build of `wie_validate` takes 17% more CPU (272 → 318 s; +3 s of 86 on the wall at `jobs = 5`); a one-line
 # edit rebuilds as fast as before. All five are reachable only through `wie-core-arm-native`, and the dev
