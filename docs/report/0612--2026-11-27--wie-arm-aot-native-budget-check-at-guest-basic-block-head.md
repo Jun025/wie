@@ -339,3 +339,5 @@ release · `BIN=`) · 줄기 3개(에뮬레이터 ≤ 3) · (팔, 묶음)마다 
   패치 · 래퍼 · 표 · 게이트 로그 · 변이 로그는 저장소 밖 `~/orchestrator/reports/evidence/wie-arm-aot-native-budget-check-at-guest-basic-block-head/` 에 있다.
 - 드라이버를 `scripts/` 에 두지 않았다: 프로파일 · `smoke_gate` 는 저장소의 스크립트를 그대로 불렀고, 스크래치에 둔 것은 한 회를 부르는 래퍼 · 줄기를 나누는 래퍼 · 캡처를 견주는 몇 줄이다
   (0609 ~ 0611 의 것에 팔 이름만 바꿨다). 임대는 실행 · phase 마다 1건이다(스윕 전체를 한 임대로 감싼 것 0 · 에뮬레이터 동시 ≤ 3).
+
+<!-- corpus-name-inflow v1 subjects=8 tree=09b363209c8c8de4 B=0/0 P=0/0 S=0/0 -->
