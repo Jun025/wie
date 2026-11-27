@@ -122,3 +122,5 @@ game-lab-recensus: 1 game(s) · engine=interpreter (WIE_AOT=off) · corpus=game_
 - §2 는 판마다 1회 · 디버그 바이너리다. 겹침 98.7 ~ 99.6% 를 «같다»로 읽는 근거는 끔 ↔ 끔 바닥과 견준 것이다(표의 마지막 줄).
 - `lgt_render_probe.sh` 는 여전히 기본값(켬)을 따른다 — 저장된 기준선과 견주는 도구가 아니라서 #645 의 기준에 들지 않는다(검수도 들지 않았다).
 - 재센서스의 `-aot` 접미는 **기본 출력에만** 붙는다. `--out` 을 직접 주고 두 팔을 같은 디렉터리에 쓰면 섞인다 — 첫 줄의 엔진 표시가 유일한 기록이다(JSON 에는 엔진 칸이 없다).
+
+<!-- corpus-name-inflow v1 subjects=7 tree=9b516d713d1c5c29 B=6/4 P=0/0 S=0/0 -->
