@@ -186,7 +186,14 @@ run **`45926844387`** · `workflow_dispatch` · head `5ef684df8`(이 PR 의 코�
   (`check-docs-report-serial.mjs --next-serial`). 이미 올린 첫 커밋 `5ef684df8` 의 제목에는 «(0612)» 가 남아 있다 — 공개 이력은 고쳐 쓰지 않는다.
 - **측정 바이너리와 doc-liveness 는 `5ef684df8` 이다.** 그 커밋 뒤에 `*.rs` 에서 바뀐 것: 단위 시험을 해석기로 돌리는 `cfg!(test)` 가지(§1 — 시험이 아닌 빌드에서는
   같은 코드다 · 그 커밋에 있던 «시험은 기록을 남기지 않는다» 가지를 갈음했다) · 새 시험의 기한 2 → 20초 · 주석의 연번.
-- 게임 파일명 유입 수와 이 PR 의 CI 결과는 PR 을 연 뒤 이 자리에 적는다.
+- 게임 파일명 유입(`node scripts/corpus-name-inflow.mjs`): **4회 / 3쌍(BOUNDED)** · 판단 필요 **1회 / 1쌍(SUFFIX-ATTACHED)**. BOUNDED 넷은 `wie_validate.rs` 에
+  main 부터 있던 주석 줄이고, SUFFIX-ATTACHED 하나는 `playability-census.mjs` 에 main 부터 있던 주석 속 메뉴 낱말이다(제목 언급이 아니다) — 도구는 고친 파일의
+  본문 전체를 본다. 이 PR 이 더한 줄에 든 것은 0 이다(`git diff origin/main...HEAD` 의 `+` 줄에서 그 네 낱말을 세어 0 · 0 · 0 · 0).
+- **이 PR 의 CI**(PR #645 · head `0f53496ca` — `*.rs` 가 최종인 커밋): `gh pr checks 645 -R Jun025/wie` 전부 pass — `rust_ci (ubuntu-latest, stable)` 6분 46초 ·
+  `contract` 7분 16초 · `build-web` 6분 24초 · 나머지 `rust_ci` 다섯 다리는 PR 에서 빈 통과다(`AGENTS.md`). 그 green 은 다른 OS 를 덮지 않으므로
+  **여섯 다리 전부를 손으로 1회 돌렸다**: `gh workflow run rust.yml -R Jun025/wie --ref <이 브랜치>` → run **`45938137002`** · `success` — ubuntu · macOS · Windows 의
+  stable · beta 여섯 다리가 `cargo test --all` 을 돌았고(357 ~ 1365초) 여섯 로그 모두에 `aot_is_on_unless_wie_aot_is_off_and_a_mistyped_switch_is_refused_test ... ok` 가 있다.
+  곧 검증 러너가 세 OS 에서 변수 없이 픽스처를 컴파일해 기록을 쓰고, `off` 에서는 쓰지 않는다. 이 뒤의 커밋은 이 문서뿐이다.
 
 ### 8. 한계 · 하지 않은 것
 
