@@ -129,6 +129,22 @@
 //! `scripts/lgt_render_probe.sh` and the AGENTS.md runner block; no workflow runs
 //! this binary, so `--expect-last-frame` is a tool for those callers, not a CI gate
 //! by itself.
+//!
+//! ── `WIE_AOT`: ARM guests run under the native AOT executor unless told `off` ─
+//! Since docs/report/0613 a KTF or LGT guest is compiled to host code (`wie-core-arm-native`, cranelift) and
+//! the interpreter runs only what the compiler leaves to it. `WIE_AOT=off` is the interpreter alone — what
+//! this binary did before, and what the product still ships (`wie_featurephone`: `aot: None`), so a number
+//! that stands for the product's engine is measured with it: `perf-watch`'s native axis, the playability
+//! census, `arm-interp-profile.sh` and `hook-shadow-sweep.sh` set it themselves. `WIE_AOT=native` (the old
+//! opt-in) and an empty value mean the default; any other value is refused with exit 2 and no result line,
+//! because a mistyped off switch would otherwise measure the other engine without saying so. J2ME and SKT
+//! have no ARM core and run the same either way.
+//!
+//! Compiled code is kept between runs (`AotCache` below): one record per title under the user cache
+//! directory's `validate-native-aot/` (`WIE_AOT_CACHE_DIR` moves it), 21 to 25 MB each, capped at 8 GiB.
+//! Only the binary that wrote a record reads it, so every rebuild starts cold: a title's first run then
+//! compiles before it draws (first frame 1 to 2 s into a release run, 3 to 4 s into a debug one) and peaks
+//! at 0.4 to 0.85 GB; a run that finds its record peaks at 0.1 to 0.4 GB (docs/report/0610 §3, 0611 §1).
 
 extern crate alloc;
 
@@ -1943,7 +1959,20 @@ fn frozen_tail(hashes: &[u64]) -> u64 {
     hashes.windows(2).rev().take_while(|w| w[0] == w[1]).count() as u64
 }
 
-/// `WIE_AOT=native`'s persistent cache: one file per compile request, in the user cache directory
+/// `WIE_AOT`, read: `Ok(true)` = native ARM AOT (unset, empty, or the old opt-in `native`), `Ok(false)` = `off`.
+/// Anything else is an error rather than a guess — the header says why.
+fn aot_switch(value: Option<&std::ffi::OsStr>) -> std::result::Result<bool, String> {
+    match value.map(|value| value.to_str()) {
+        None | Some(Some("" | "native")) => Ok(true),
+        Some(Some("off")) => Ok(false),
+        Some(_) => Err(format!(
+            "WIE_AOT={:?} is not a value: `off` is the interpreter alone; unset (or `native`) is native ARM AOT, the default",
+            value.unwrap_or_default()
+        )),
+    }
+}
+
+/// The native AOT's persistent cache: one file per compile request, in the user cache directory
 /// (`WIE_AOT_CACHE_DIR` overrides it) and never in the repo — a record is a title's code compiled to host code.
 ///
 /// **A record is only ever read back by the binary that wrote it.** The executor's key covers the guest images, the
@@ -2061,12 +2090,20 @@ fn build_emulator(
     buf: Vec<u8>,
     profile: Option<ProfileCallback>,
 ) -> std::result::Result<(Box<dyn Emulator>, String), (String, String)> {
+    // A bad `WIE_AOT` ends the process here, before anything ran: exit 2 and no result line, as for a bad flag.
+    // This file's own tests run the interpreter whatever the variable says: they assert tick counts (a guest that
+    // exits on its first tick), and under AOT ticks also pass while the compiler runs — one such assert raced
+    // (docs/report/0613 §1). The default is held on the real binary, in `tests/validate_aot_switch.rs`.
+    let aot = !cfg!(test)
+        && aot_switch(std::env::var_os("WIE_AOT").as_deref()).unwrap_or_else(|message| {
+            eprintln!("wie_validate: {message}");
+            std::process::exit(2)
+        });
     let options = Options {
         enable_gdbserver: false,
-        // Interpreter only by default. `WIE_AOT=native` is the measurement switch (docs/report/0607): upstream's
-        // cranelift backend, with `AotCache` below so a second run of the same title by the same binary skips the
-        // compile (docs/report/0610). Unset, nothing changes.
-        aot: (std::env::var("WIE_AOT").as_deref() == Ok("native")).then(|| {
+        // Native ARM AOT unless `WIE_AOT=off` (header): upstream's cranelift backend, with `AotCache` above so a
+        // second run of the same title by the same binary skips the compile (docs/report/0610).
+        aot: aot.then(|| {
             Box::new(wie_core_arm_native::NativeExecutor::new(
                 AotCache::for_this_binary().map(|cache| Box::new(cache) as _),
             )) as _
@@ -2267,7 +2304,7 @@ fn fail(platform: &str, reason: String, ticks: u64, paints: u64, content: bool) 
 
 #[cfg(test)]
 mod tests {
-    /// `WIE_AOT=native`'s cache: a record misses under any other key (what a changed `RunFrame` layout or guest
+    /// The AOT cache: a record misses under any other key (what a changed `RunFrame` layout or guest
     /// image produces) and under any other binary, a write replaces the record whole, and the size cap deletes
     /// the oldest-written records — never the one just stored.
     #[test]

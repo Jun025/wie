@@ -1,0 +1,27 @@
+{
+  "schema": "wie-worklog/1",
+  "date": "2026-11-27",
+  "task": "wie-arm-aot-native-validate-runner-default-on-with-off-switch",
+  "title": "검증 러너의 네이티브 ARM AOT 를 기본 켬으로 — WIE_AOT=off 로 끈다 · 해석기를 재는 도구 넷은 끔으로 고정",
+  "summary": "2026-11-27-arm-aot-validate-switch-persistent-cache#p0 의 뒤 절반(검증 러너의 기본값)을 했다 — 앞 절반은 0611 이 했고 그 ref 는 그때 채택으로 닫혔다. wie_validate 는 WIE_AOT 가 없거나 비었거나 native 면 ARM 게스트를 컴파일해 돌고, off 면 해석기만 쓰고, 그 밖의 값은 exit 2 로 거절한다(잘못 친 끔이 조용히 켬으로 도는 것을 막는다). 해석기의 수를 재는 도구는 스스로 끔을 넘긴다: perf-watch 네이티브 축 · playability-census(compat.json) 는 항상, arm-interp-profile.sh · hook-shadow-sweep.sh 는 기본으로(WIE_AOT=native 를 주면 켠 팔). 제품 기본값(aot: None) · 브라우저 · compat.json 은 그대로다. 측정값과 doc-liveness(ubuntu x86-64) 실행은 docs/report/0613.",
+  "changes": [
+    "wie_cli/src/bin/wie_validate.rs — aot: 식을 기본 켬으로 · 판독 함수 aot_switch · 머리 주석에 스위치와 캐시 · 그 파일의 단위 시험은 해석기로 돈다(cfg!(test) — 틱 수 단언이 켠 채로는 경합했다)",
+    "wie_cli/tests/validate_aot_switch.rs(새로) — 캐시 기록으로 켬 / 끔 / 거절을 본다 · validate_stub_hits.rs · validate_profile_out.rs 는 기록을 임시 디렉터리로",
+    "scripts/perf-watch.mjs · playability-census.mjs — WIE_AOT=off 고정 · arm-interp-profile.sh · hook-shadow-sweep.sh — 기본 끔",
+    "AGENTS.md(러너 블록 · smoke_gate 항) · STATE.md(«다음» ⑴ 을 접음) · docs/report/0613"
+  ],
+  "verification": [
+    "네 게이트 + beta clippy · cargo test --all 1073 passed(main 1072 + 새 시험 1)",
+    "smoke_gate 244판 디버그 · release 를 끔 / 기본(켬)으로 나란히 · 러너 블록 여섯 픽스처 — docs/report/0613 §3 · §4",
+    "doc-liveness 를 브랜치에서 손으로 1회(ubuntu x86-64 · 네 게이트 + 러너 블록) — docs/report/0613 §5",
+    "perf-watch selftest 30/30(새 경우 1) · 가짜 러너로 census 와 hook-shadow-sweep 이 넘기는 값을 확인"
+  ],
+  "limits": [
+    "playability-census 와 hook-shadow-sweep 의 고정은 티켓이 이름으로 든 것이 아니다 — 같은 기준(그 수가 해석기의 수인가)으로 더했고 빼려면 각각 한 줄이다",
+    "lgt_render_probe.sh · game-lab-recensus.sh 는 기본값(켬)을 따른다 — 켠 채로 돌려 보지는 않았다",
+    "캐시의 상한 8 GiB 는 상수 그대로다 · 새로 지은 바이너리는 캐시가 식는다(244판 한 바퀴 = 기록 209건 4.4 GiB)"
+  ],
+  "proposals": [],
+  "adoptedProposals": [],
+  "declinedProposals": []
+}
