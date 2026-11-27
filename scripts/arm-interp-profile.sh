@@ -17,14 +17,16 @@
 # builds by. The marker defaults to a timer re-arm (`RUST_LOG=wie_wipi_c::api::kernel=debug`; one a frame on LGT
 # 3cc7a9b4cb15); FRAME_MARKER=<regex> names another title's. The window is where the samples are (the TOC's
 # start-date + first..last sample time), never <at>: xctrace attaches seconds late on a busy host.
+# The run is the INTERPRETER: WIE_AOT defaults to off here, though wie_validate itself defaults to native AOT
+# (docs/report/0612). To profile the AOT arm say so — `WIE_AOT=native bash scripts/arm-interp-profile.sh …`.
 # Read shares, not sample counts: the loop's share of all samples moves with host load and with how
 # much of the scene the runner spends waiting on timers; the split inside the loop does not.
 set -u
-[[ $# -ge 5 ]] || { sed -n '2,21p' "$0" >&2; exit 2; }
+[[ $# -ge 5 ]] || { sed -n '2,23p' "$0" >&2; exit 2; }
 BIN=$1 GAME=$2 KEYS=$3 AT=$4 OUT=$5 WIN=${6:-8}
 cd "$(dirname "$0")/.." && mkdir -p "$OUT/shots" && rm -rf "$OUT/x.trace" # wie_validate does not create --shotdir
 date +%s >"$OUT/t0"
-RUST_LOG=${RUST_LOG:-warn} RUST_MIN_STACK=4194304 "$BIN" --inject --boot-secs 12 --max-ticks 100000000000 --keys "$KEYS" --keep-timeout --timeout $((AT + WIN + 900)) --shotdir "$OUT/shots" --shot-every 10 "$GAME" >"$OUT/run.json" 2>"$OUT/run.err" &
+WIE_AOT=${WIE_AOT:-off} RUST_LOG=${RUST_LOG:-warn} RUST_MIN_STACK=4194304 "$BIN" --inject --boot-secs 12 --max-ticks 100000000000 --keys "$KEYS" --keep-timeout --timeout $((AT + WIN + 900)) --shotdir "$OUT/shots" --shot-every 10 "$GAME" >"$OUT/run.json" 2>"$OUT/run.err" &
 PID=$!
 trap 'kill $PID 2>/dev/null' EXIT
 perl -e "sleep $AT"

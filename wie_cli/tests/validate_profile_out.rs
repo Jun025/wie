@@ -3,6 +3,10 @@
 
 use std::process::Command;
 
+fn scratch() -> std::path::PathBuf {
+    std::env::temp_dir().join(format!("wie_validate_profile_out_{}", std::process::id()))
+}
+
 fn run(extra: &[&std::ffi::OsStr]) -> String {
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../test_data/helloworld_ktf.zip");
     let out = Command::new(env!("CARGO_BIN_EXE_wie_validate"))
@@ -10,6 +14,7 @@ fn run(extra: &[&std::ffi::OsStr]) -> String {
         .args(extra)
         .arg(fixture)
         .env_remove("RUST_LOG")
+        .env("WIE_AOT_CACHE_DIR", scratch().join("aot")) // native AOT is the default: keep its records in the test's own directory
         .output()
         .expect("wie_validate did not start");
     let stdout = String::from_utf8(out.stdout).unwrap();
@@ -32,7 +37,7 @@ fn run(extra: &[&std::ffi::OsStr]) -> String {
 
 #[test]
 fn profile_out_writes_folded_stacks_only_when_asked_test() {
-    let dir = std::env::temp_dir().join(format!("wie_validate_profile_out_{}", std::process::id()));
+    let dir = scratch();
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("p.folded");
 

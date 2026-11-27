@@ -20,7 +20,7 @@
 //            ≥ 100 ticks (SKT ticks are paced: ~950 in 30 s). 60 s, not 30: under load the idle-bound samples
 //            stopped at the deadline short of 50M, and a deadline run's cost per tick moves with where the game
 //            got to (stickfight, one binary against itself in the same minute: +7 % and +18 %) — that spread lands in the threshold.
-//            slower = B/A − 1.
+//            slower = B/A − 1. Both sides run with WIE_AOT=off (the interpreter — nativeOne()).
 //            ★The Java-run samples that draw (`per: 'paint'` in SAMPLES) are judged on another unit: CPU ms per 1000
 //            paints over the whole 60 s (no tick backstop, so A and B run the same window). A tick is not a unit of
 //            work there — this loop never sleeps, so ticks also pass while the game sleeps, and a change in what
@@ -161,7 +161,9 @@ export function nativeMetric(r, per) {
 
 async function nativeOne(bin, game, per, exec) {
   const unit = per && { per, t0: Date.now() }; // its own launch time, not a value handed in: judge() holds the pair to it
-  const { out, err } = await exec('/usr/bin/time', ['-p', bin, '--timeout', '60', ...(per === 'paint' ? ['--max-ticks', '100000000000'] : []), game]);
+  // WIE_AOT=off: this axis is the interpreter's — the engine the product ships and the one every stored baseline was
+  // measured on. wie_validate compiles ARM guests by default since docs/report/0612; an older side A ignores the variable.
+  const { out, err } = await exec('/usr/bin/time', ['-p', bin, '--timeout', '60', ...(per === 'paint' ? ['--max-ticks', '100000000000'] : []), game], { env: { ...process.env, WIE_AOT: 'off' } });
   const line = out.trim().split('\n').reverse().find((l) => l.startsWith('{'));
   const user = Number(/^user\s+([\d.]+)/m.exec(err)?.[1]);
   const sys = Number(/^sys\s+([\d.]+)/m.exec(err)?.[1]);
@@ -317,8 +319,10 @@ async function selftest() {
   // run. `sha12` picks the unit (a real SAMPLES row), `sample` only names the case. gap: b's stamp moved, as a
   // hand-joined row would have it.
   const jrows = [];
-  const stand = (p, ms) => (_cmd, args) =>
+  const aot = new Set();
+  const stand = (p, ms) => (_cmd, args, opts) =>
     new Promise((res) => {
+      aot.add(opts?.env?.WIE_AOT);
       const [cpuMs, ticks, paints] = p[args[1].startsWith('a') ? 0 : 1];
       setTimeout(res, ms, { out: JSON.stringify({ stop: 'deadline', ticks, paints, ms: 60000 }) + '\n', err: `real 60.00\nuser ${cpuMs / 1000}\nsys 0.00\n` });
     });
@@ -349,6 +353,7 @@ async function selftest() {
     ['per paint 는 마감까지 돈 실행 · paints ≥ 100 만 센다', nativeMetric({ stop: 'max-ticks', cpuMs: 9000, ticks: 5e7, paints: 900 }, 'paint') === null && nativeMetric({ stop: 'deadline', cpuMs: 9000, ticks: 5e7, paints: 1 }, 'paint') === null],
     ['per paint 표본은 정확히 835acd535a5f · d1234e0ddb75 둘(8238f5449347 과 KTF · LGT 는 tick 그대로)', SAMPLES.filter((s) => s.per).map((s) => `${s.sha12}:${s.per}:${s.axes.includes('native')}`).sort().join() === '835acd535a5f:paint:true,d1234e0ddb75:paint:true'],
     ['전 짝이 무효인 per paint 표본도 미측정 행에 단위(per)를 싣는다', jv.starved.verdict === 'unmeasured' && jv.starved.pairs === 0 && jv.starved.per === 'paint'],
+    ['네이티브 축의 실행은 전부 WIE_AOT=off 로 뜬다(해석기 — 러너의 기본값은 AOT 다)', [...aot].join() === 'off'],
     ['두 쪽은 각자 띄운 시각을 찍는다 — 나란히 띄운 짝은 프로세스가 1초 넘게 돌아도 센다(순차로 띄우면 미측정)', jv.together.pairs === 2],
   );
   const lost = rows.filter((r) => r.sample === 'lostpair').map((r) => ({ ...r, sample: '0606d43702e7' }));

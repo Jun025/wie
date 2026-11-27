@@ -14,6 +14,11 @@ fn fixture(name: &str) -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../test_data").join(name)
 }
 
+/// Native AOT is the default, so an ARM run writes a cache record: here, not in the user's cache directory.
+fn aot_cache() -> std::path::PathBuf {
+    std::env::temp_dir().join(format!("wie_validate_stub_hits_aot_{}", std::process::id()))
+}
+
 fn run(fixture_name: &str) -> String {
     run_path(&fixture(fixture_name))
 }
@@ -24,6 +29,7 @@ fn run_path(path: &std::path::Path) -> String {
         .args(["--timeout", "2"])
         .arg(path)
         .env_remove("RUST_LOG")
+        .env("WIE_AOT_CACHE_DIR", aot_cache())
         .output()
         .expect("wie_validate did not start");
     let stdout = String::from_utf8(out.stdout).expect("stdout is UTF-8");
@@ -64,6 +70,7 @@ fn number(object: &str, key: &str) -> u64 {
 #[test]
 fn stub_hits_and_svc_stub_slots_are_on_the_cli_line_test() {
     let line = run("helloworld_ktf.zip");
+    let _ = std::fs::remove_dir_all(aot_cache());
 
     let stubs = object(&line, "stub_hits");
     assert!(number(stubs, "count") >= 1, "a KTF boot hits the Font stubs: {stubs}");

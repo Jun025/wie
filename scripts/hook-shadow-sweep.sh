@@ -18,6 +18,9 @@
 # and re-run a package by deleting its result. An overlapping call is reached on some runs and not
 # on others: "0 mismatches" covers it only on a run whose `handed to the title's own routine` line
 # names that package.
+# WIE_AOT defaults to off here (the interpreter), though wie_validate itself defaults to native AOT: under AOT every
+# fire rewrites the hook site twice and discards the compiled region each time, and one title reached half the calls
+# in the same run (docs/report/0607 §6). `WIE_AOT=native bash scripts/hook-shadow-sweep.sh …` sweeps that arm.
 set -u
 cd "$(dirname "$0")/.."
 BIN=${WIE_VALIDATE:-target/release/wie_validate}
@@ -54,7 +57,7 @@ case ${1:-} in
 --one) # one package
   sha=$(shasum -a 256 "$2" | cut -c1-12)
   [[ -s $out/$sha.json ]] && exit 0
-  WIE_HOOK_MODE=shadow RUST_LOG=error "$BIN" --inject --keep-timeout --timeout "${HOOK_SHADOW_TIMEOUT:-30}" \
+  WIE_AOT=${WIE_AOT:-off} WIE_HOOK_MODE=shadow RUST_LOG=error "$BIN" --inject --keep-timeout --timeout "${HOOK_SHADOW_TIMEOUT:-30}" \
     --max-ticks 100000000000 --pacing 8 --relaunch 1 ${HOOK_SHADOW_KEYS:+--keys "$HOOK_SHADOW_KEYS"} "$2" 2>/dev/null | tail -1 |
     sed "s/}\$/,\"package\":\"$sha\",\"load1\":$(sysctl -n vm.loadavg | cut -d' ' -f2)}/" >"$out/$sha.tmp"
   mv "$out/$sha.tmp" "$out/$sha.json"
