@@ -160,7 +160,10 @@ impl Emitter<'_> {
     fn guard_page(&mut self, unmapped: Value, address: Value) {
         let next = self.builder.create_block();
         let pc = self.builder.ins().iconst(types::I32, i64::from(self.pc));
-        self.builder.ins().brif(unmapped, self.fault, &[pc.into(), address.into()], next, &[]);
+        let rest = self.builder.ins().iconst(types::I32, i64::from(self.rest)); // fork
+        self.builder
+            .ins()
+            .brif(unmapped, self.fault, &[pc.into(), address.into(), rest.into()], next, &[]);
         self.builder.switch_to_block(next);
     }
 
@@ -234,7 +237,10 @@ impl Emitter<'_> {
             let value = self.builder.ins().ireduce(types::I32, result);
             let fault = self.builder.ins().ushr_imm_s(result, 32);
             let next = self.builder.create_block();
-            self.builder.ins().brif(fault, self.fault, &[pc.into(), value.into()], next, &[]);
+            let rest = self.builder.ins().iconst(types::I32, i64::from(self.rest)); // fork
+            self.builder
+                .ins()
+                .brif(fault, self.fault, &[pc.into(), value.into(), rest.into()], next, &[]);
             self.builder.switch_to_block(next);
             return (load && registers & 0x8000 != 0).then(|| self.pc_write(value, true));
         }

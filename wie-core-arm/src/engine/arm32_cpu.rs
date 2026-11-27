@@ -1533,7 +1533,15 @@ mod tests {
         }
 
         fn compare_run(&mut self, end: u32) -> bool {
-            self.compare_slice(end, u32::MAX).is_some()
+            let pc = self.native.reg_read(ArmRegister::PC);
+            let result = self.compare_slice(end, u32::MAX);
+            // fork: upstream asserts this in the comparison, of every run. A budget shorter than the run of
+            // instructions it starts on is the interpreter's whole (docs/report/0612), so `compare_slice`
+            // leaves it to its callers.
+            if result.as_ref().is_some_and(|result| result.budget_consumed > 0) {
+                assert!(self.executed.load(Ordering::Relaxed), "native code must execute at {pc:#x}");
+            }
+            result.is_some()
         }
 
         // fork: upstream's `compare_run` with a budget, and with the count the two engines report held equal —
@@ -1554,9 +1562,6 @@ mod tests {
                             self.interpreted.cpu.reg_get(arm32_cpu::Mode::User, index),
                             "register {index}, pc={pc:#x}, end={end:#x}"
                         );
-                    }
-                    if expected.budget_consumed > 0 {
-                        assert!(self.executed.load(Ordering::Relaxed), "native code must execute at {pc:#x}");
                     }
                     match (&actual.stop_reason, expected.stop_reason) {
                         (EngineStopReason::End, EngineStopReason::End) | (EngineStopReason::Yield, EngineStopReason::Yield) => {}
@@ -1597,18 +1602,30 @@ mod tests {
     // there instead: `Invalid memory access; address: 0` (docs/report/0607 §6).
     #[test]
     fn compiled_code_reads_through_null_like_the_interpreter() {
-        // ldr r0, [r0]; bx lr / ldmia r0, {r1, r2}; bx lr / str r0, [r0]; bx lr
-        let code = [0xe590_0000_u32, 0xe12f_ff1e, 0xe890_0006, 0xe12f_ff1e, 0xe580_0000, 0xe12f_ff1e];
+        // mov r3, r3; ldr r0, [r0]; bx lr / mov r3, r3; ldmia r0, {r1, r2}; bx lr / mov r3, r3; str r0, [r0]; bx lr
+        // The mov is what shows the access was reached in native code: a run that faults on its first
+        // instruction hands back the frame it was given.
+        let code = [
+            0xe1a0_3003_u32,
+            0xe590_0000,
+            0xe12f_ff1e,
+            0xe1a0_3003,
+            0xe890_0006,
+            0xe12f_ff1e,
+            0xe1a0_3003,
+            0xe580_0000,
+            0xe12f_ff1e,
+        ];
         // Not at 0x1000: a host page is 64 KB, so code there maps the null page and every read hits memory.
         let mut engines = Engines::at(0x30000, &code.into_iter().flat_map(u32::to_le_bytes).collect::<Vec<_>>());
         assert!(engines.native.mem.pages[0].bytes.is_none());
         for (pc, r0, expected) in [
             (0x30000, 0, "Ok(0)"),
             (0x30000, 0xffc, "Ok(0)"),
-            (0x30008, 0, "Ok(0)"),
-            (0x30008, 0xffc, "Err(InvalidMemoryAccess(4096))"), // the second word is past the limit
+            (0x3000c, 0, "Ok(0)"),
+            (0x3000c, 0xffc, "Err(InvalidMemoryAccess(4096))"), // the second word is past the limit
             (0x30000, 0x1000, "Err(InvalidMemoryAccess(4096))"),
-            (0x30010, 0, "Err(InvalidMemoryAccess(0))"), // a write still faults
+            (0x30018, 0, "Err(InvalidMemoryAccess(0))"), // a write still faults
         ] {
             let key = RegionKey {
                 pc,
@@ -1621,10 +1638,11 @@ mod tests {
                 let registers = engine
                     .run(0x8000, u32::MAX)
                     .map(|_| [ArmRegister::R0, ArmRegister::R1, ArmRegister::R2].map(|register| engine.reg_read(register)));
-                let outcome = registers.map(|[r0, r1, r2]| if pc == 0x30008 { r1 | r2 } else { r0 });
+                let outcome = registers.map(|[r0, r1, r2]| if pc == 0x3000c { r1 | r2 } else { r0 });
                 assert_eq!(alloc::format!("{outcome:?}"), expected, "{name}, pc={pc:#x}, r0={r0:#x}");
             }
-            assert_eq!(engines.executed.load(Ordering::Relaxed), expected == "Ok(0)", "the return is native code");
+            // The return behind a null read is the interpreter's: it is past the head of its run.
+            assert!(engines.executed.load(Ordering::Relaxed), "the access is reached in native code");
             assert!(engines.native.aot.is_some(), "the backend stays");
         }
     }
@@ -1929,7 +1947,14 @@ mod tests {
                                 flags | 0x0800_001f,
                                 &[(ArmRegister::R0, left), (ArmRegister::R1, right), (ArmRegister::R7, 0x21000)],
                             );
-                            engines.compare_run(0x8000);
+                            // fork: a chain is one run, and one entered past its head is the interpreter's
+                            // to the end (docs/report/0612). Upstream ran every entry in native code.
+                            if start == 0 {
+                                engines.compare_run(0x8000);
+                            } else {
+                                engines.compare_slice(0x8000, u32::MAX);
+                                assert!(!engines.executed.load(Ordering::Relaxed), "{entry:#x} is past the head of its run");
+                            }
                         }
                     }
                 }
@@ -1940,6 +1965,7 @@ mod tests {
 
     // fork: upstream's `native_loops_and_interior_entries_run_without_interpreter_budget`. Its loop ran to
     // the end on a budget of 1 and reported 0 run; ours stops after one instruction (docs/report/0609).
+    // An interior entry is the interpreter's up to the next head (0612) — every one here reaches the loop's.
     #[test]
     fn native_loops_and_interior_entries_count_against_the_budget() {
         // subs r0,#1; bne 0x1000; bx lr
@@ -2050,17 +2076,22 @@ mod tests {
                     assert_eq!(result.budget_consumed, count, "a slice runs its whole budget");
                 }
                 assert_eq!(run, instructions, "slices of {count}");
+                // Not every slice: one that does not cover the run it starts on is the interpreter's whole
+                // (the loop's five under a budget of four). Every slicing covers the return's run of one.
+                assert!(engines.executed.load(Ordering::Relaxed), "slices of {count}: native code ran");
             }
         }
 
-        // A null read goes back to the interpreter, which counts it. Were it counted in the compiled attempt
-        // too, a budget of 1 would be spent before the interpreter's turn, every time.
+        // A null read goes back to the interpreter, which counts it — it and the return behind it, which the
+        // head of their run had taken off the budget with it. Were either still counted in the compiled
+        // attempt, the budget of 2 that covers the run would be spent before the interpreter finished it.
         let mut engines = Engines::at(0x30000, &words(&[0xe590_0000, 0xe12f_ff1e])); // ldr r0,[r0]; bx lr
-        engines.reset(0x30000, 0x1f, &[]);
-        for engine in [&mut engines.interpreted, &mut engines.native] {
-            let result = engine.run(0x8000, 1).unwrap();
-            assert!(matches!(result.stop_reason, EngineStopReason::Yield));
-            assert_eq!((result.budget_consumed, engine.reg_read(ArmRegister::PC)), (1, 0x30004));
+        for count in [1, 2] {
+            engines.reset(0x30000, 0x1f, &[]);
+            let first = engines.compare_slice(0x8000, count).expect("no fault");
+            assert_eq!(first.budget_consumed, count);
+            assert_eq!(matches!(first.stop_reason, EngineStopReason::End), count == 2);
+            assert_eq!(engines.native.reg_read(ArmRegister::PC), if count == 2 { 0x8000 } else { 0x30004 });
         }
     }
 }
