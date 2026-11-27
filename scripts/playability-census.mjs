@@ -212,7 +212,7 @@ function population(dirs) {
 function validate(args, killAfterSecs, stderrPath) {
   return new Promise((done) => {
     // WIE_AOT=off: compat.json is a claim about the engine the product ships, and that is the interpreter
-    // (wie_featurephone: `aot: None`). wie_validate's own default is native AOT (docs/report/0612).
+    // (wie_featurephone: `aot: None`). wie_validate's own default is native AOT (docs/report/0613).
     const child = spawn(opt.bin, args, { env: { ...process.env, RUST_LOG: 'warn', RUST_MIN_STACK: '4194304', WIE_AOT: 'off' } });
     let stdout = '';
     const tail = [];

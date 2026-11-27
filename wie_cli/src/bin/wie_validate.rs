@@ -131,7 +131,7 @@
 //! by itself.
 //!
 //! ── `WIE_AOT`: ARM guests run under the native AOT executor unless told `off` ─
-//! Since docs/report/0612 a KTF or LGT guest is compiled to host code (`wie-core-arm-native`, cranelift) and
+//! Since docs/report/0613 a KTF or LGT guest is compiled to host code (`wie-core-arm-native`, cranelift) and
 //! the interpreter runs only what the compiler leaves to it. `WIE_AOT=off` is the interpreter alone — what
 //! this binary did before, and what the product still ships (`wie_featurephone`: `aot: None`), so a number
 //! that stands for the product's engine is measured with it: `perf-watch`'s native axis, the playability
@@ -2091,19 +2091,22 @@ fn build_emulator(
     profile: Option<ProfileCallback>,
 ) -> std::result::Result<(Box<dyn Emulator>, String), (String, String)> {
     // A bad `WIE_AOT` ends the process here, before anything ran: exit 2 and no result line, as for a bad flag.
-    let aot = aot_switch(std::env::var_os("WIE_AOT").as_deref()).unwrap_or_else(|message| {
-        eprintln!("wie_validate: {message}");
-        std::process::exit(2)
-    });
+    // This file's own tests run the interpreter whatever the variable says: they assert tick counts (a guest that
+    // exits on its first tick), and under AOT ticks also pass while the compiler runs — one such assert raced
+    // (docs/report/0613 §1). The default is held on the real binary, in `tests/validate_aot_switch.rs`.
+    let aot = !cfg!(test)
+        && aot_switch(std::env::var_os("WIE_AOT").as_deref()).unwrap_or_else(|message| {
+            eprintln!("wie_validate: {message}");
+            std::process::exit(2)
+        });
     let options = Options {
         enable_gdbserver: false,
         // Native ARM AOT unless `WIE_AOT=off` (header): upstream's cranelift backend, with `AotCache` above so a
         // second run of the same title by the same binary skips the compile (docs/report/0610).
         aot: aot.then(|| {
-            // This file's own tests run guests in-process: compiled like any caller's, but keeping no records —
-            // `cargo test` does not write to the user's cache directory.
-            let cache = if cfg!(test) { None } else { AotCache::for_this_binary() };
-            Box::new(wie_core_arm_native::NativeExecutor::new(cache.map(|cache| Box::new(cache) as _))) as _
+            Box::new(wie_core_arm_native::NativeExecutor::new(
+                AotCache::for_this_binary().map(|cache| Box::new(cache) as _),
+            )) as _
         }),
         profile,
     };

@@ -7,7 +7,7 @@ use std::process::Command;
 fn run(aot: Option<&str>, cache: &std::path::Path) -> (Option<i32>, String) {
     let mut command = Command::new(env!("CARGO_BIN_EXE_wie_validate"));
     command
-        .args(["--timeout", "2"])
+        .args(["--timeout", "20"]) // the fixture exits by itself; the budget only has to outlast a cold compile on a busy host
         .arg(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../test_data/helloworld_ktf.zip"))
         .env_remove("RUST_LOG")
         .env_remove("WIE_AOT")

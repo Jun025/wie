@@ -158,14 +158,14 @@ arrived. Built by `node scripts/make-pace-fixture.mjs`, byte-stable on regenerat
 <!-- ENGINE-RUNNER:END -->
 
 **These lines run the ARM fixtures under native AOT — `wie_validate`'s default since 2026-11-27
-(`docs/report/0612`). `WIE_AOT=off` is the interpreter alone, which is what the product ships**
+(`docs/report/0613`). `WIE_AOT=off` is the interpreter alone, which is what the product ships**
 (`wie_featurephone`: `aot: None`); any other value exits 2 with no result line. So a FAIL has one more
 step before ⑴–⑷ below: run it again with `WIE_AOT=off`. A verdict only one engine gives is that engine's.
 Compiled code is kept per title in the user cache directory's `validate-native-aot/` (macOS
 `~/Library/Caches/net.dlunch.wie/`, Linux `~/.cache/wie/`; `WIE_AOT_CACHE_DIR=<dir>` moves it; capped at
 8 GiB, oldest record out first) and **only the binary that wrote a record reads it — every rebuild starts
-cold.** Cold, a real title compiles before it draws: first frame about 1 s later than the interpreter's and
-a peak of 630–840 MB instead of ~310 (debug); the fixtures here are too small to show it.
+cold.** Cold, a real title compiles before it draws: first frame 1–1.4 s later than the interpreter's and
+a peak of 630–840 MB instead of ~310 (debug, `docs/report/0611` §1); the fixtures here are too small to show it.
 **Numbers that stand for the product's engine pin `WIE_AOT=off` themselves** — `perf-watch` (native axis),
 `playability-census.mjs` (`compat.json`), `arm-interp-profile.sh`, `hook-shadow-sweep.sh`; the last two take
 `WIE_AOT=native` to measure the other arm. Measuring speed by hand? Say which engine in the same line.
@@ -372,7 +372,7 @@ after every deploy. The one after that does **not** run in CI and is **local-onl
   Since 2026-11-27 it sweeps KTF/LGT under native AOT (the validator's default, cache as in §The four
   gates): a freshly built binary compiles every title on its first sweep — 209 records, 4.4 GiB for the
   244-title catalog — inside the same `TIMEOUT` 15. `WIE_AOT=off bash scripts/smoke_gate.sh` is the
-  interpreter sweep; a regression under one engine only is that engine's (`docs/report/0612`).
+  interpreter sweep; a regression under one engine only is that engine's (`docs/report/0613`).
 
 - **`scripts/game-lab-recensus.sh` + `scripts/game-lab-census-map.mjs` — local only, same reason, and
   they are a pair.** The runner re-validates an already-sorted corpus **read-only** and leaves one JSON

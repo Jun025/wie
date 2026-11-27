@@ -18,7 +18,7 @@
 # 3cc7a9b4cb15); FRAME_MARKER=<regex> names another title's. The window is where the samples are (the TOC's
 # start-date + first..last sample time), never <at>: xctrace attaches seconds late on a busy host.
 # The run is the INTERPRETER: WIE_AOT defaults to off here, though wie_validate itself defaults to native AOT
-# (docs/report/0612). To profile the AOT arm say so — `WIE_AOT=native bash scripts/arm-interp-profile.sh …`.
+# (docs/report/0613). To profile the AOT arm say so — `WIE_AOT=native bash scripts/arm-interp-profile.sh …`.
 # Read shares, not sample counts: the loop's share of all samples moves with host load and with how
 # much of the scene the runner spends waiting on timers; the split inside the loop does not.
 set -u

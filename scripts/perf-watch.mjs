@@ -162,7 +162,7 @@ export function nativeMetric(r, per) {
 async function nativeOne(bin, game, per, exec) {
   const unit = per && { per, t0: Date.now() }; // its own launch time, not a value handed in: judge() holds the pair to it
   // WIE_AOT=off: this axis is the interpreter's — the engine the product ships and the one every stored baseline was
-  // measured on. wie_validate compiles ARM guests by default since docs/report/0612; an older side A ignores the variable.
+  // measured on. wie_validate compiles ARM guests by default since docs/report/0613; an older side A ignores the variable.
   const { out, err } = await exec('/usr/bin/time', ['-p', bin, '--timeout', '60', ...(per === 'paint' ? ['--max-ticks', '100000000000'] : []), game], { env: { ...process.env, WIE_AOT: 'off' } });
   const line = out.trim().split('\n').reverse().find((l) => l.startsWith('{'));
   const user = Number(/^user\s+([\d.]+)/m.exec(err)?.[1]);
