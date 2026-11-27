@@ -40,6 +40,9 @@ pub(crate) fn key(isa: &dyn TargetIsa, request: &CompileRequest) -> [u8; 32] {
             hash.update(field.as_bytes());
         }
     }
+    // fork: the generated code changed shape with nothing below moving, and upstream's `AOT_CACHE_VERSION` is
+    // not ours to bump: a record of the generator that counted an instruction at a time must miss (docs/report/0612).
+    hash.update(b"budget counted a run at a time");
     for field in [
         size_of::<RunFrame>(),
         align_of::<RunFrame>(),

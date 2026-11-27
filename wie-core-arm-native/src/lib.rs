@@ -20,7 +20,7 @@ use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{FuncId, Module, default_libcall_names};
 use futures::channel::oneshot;
 use rayon::iter::{IntoParallelIterator, ParallelBridge, ParallelIterator};
-use spin::Mutex;
+use spin::{Mutex, RwLock};
 
 use wie_core_arm_aot::{
     CodeImage, CompileRequest, CompiledArtifact, CompiledExecutor, CompiledExit, CompiledHandle, CompiledRegion, ExecutionAccess, ManifestRegion,
@@ -101,6 +101,9 @@ struct Modules {
 pub struct NativeExecutor {
     modules: Arc<Mutex<Modules>>,
     cache: Option<Box<dyn NativeCache>>,
+    // fork: kept from one preparation to the next. A recompilation's images are the dropped region's own
+    // code, and the calls into it are in images an earlier preparation was given.
+    heads: Arc<RwLock<codegen::Heads>>,
 }
 
 impl NativeExecutor {
@@ -108,6 +111,7 @@ impl NativeExecutor {
         Self {
             modules: Arc::new(Mutex::new(Modules::default())),
             cache,
+            heads: Arc::default(), // fork
         }
     }
 }
@@ -116,9 +120,12 @@ impl CompiledExecutor for NativeExecutor {
     fn prepare(&mut self, request: CompileRequest) -> PreparationFuture {
         let modules = Arc::downgrade(&self.modules);
         let cache = self.cache.take();
+        let heads = self.heads.clone(); // fork
         let (sender, receiver) = oneshot::channel();
         rayon::spawn(move || {
             let prepared = (|| -> Result<_> {
+                // fork: on a cache hit too — the record's code has its heads, a later recompilation asks here.
+                codegen::entry_addresses(&request.images, &mut heads.write());
                 let cache = if let Some(mut cache) = cache {
                     let module = create_module(false)?;
                     let key = cache::key(module.0.as_ref().unwrap().isa(), &request);
@@ -137,7 +144,7 @@ impl CompiledExecutor for NativeExecutor {
                 } else {
                     None
                 };
-                let compiled = compile(request, cache.is_some())?;
+                let compiled = compile(request, cache.is_some(), &heads)?;
                 let pending = cache
                     .and_then(|(cache, key)| cache::encode(&key, compiled.iter().flat_map(|(_, regions)| regions)).map(|bytes| (cache, key, bytes)));
                 Ok((compiled, pending))
@@ -213,6 +220,8 @@ impl CompiledExecutor for NativeExecutor {
             let exit = unsafe { entry(frame, access.pages().as_mut_ptr(), transfer_words) };
             match exit {
                 0 => {}
+                // fork: a run the budget does not cover, or an entry into the middle of one (`Emitter::budget`).
+                4 => return Ok(CompiledExit::InterpretOne),
                 // fork: a guest READ through a null pointer is 0 on this engine (`Arm32CpuMemory::read_page`,
                 // docs/report/0391), and generated code faults on any unmapped page. Its page guard runs
                 // before the instruction changes anything and the fault publishes that instruction's pc, so
@@ -223,8 +232,7 @@ impl CompiledExecutor for NativeExecutor {
                 _ => return Err(WieError::FatalError(format!("Native ARM AOT returned invalid exit {exit}"))),
             }
             let pc = frame.regs[15];
-            // fork: `budget == 0` — the next region would leave on its first instruction with pc where it
-            // is, and this loop would resolve it again for good.
+            // fork: `budget == 0` — the next region would only hand its first run back.
             if pc < 0x1000 || pc == frame.end || frame.budget == 0 {
                 return Ok(CompiledExit::Dispatch);
             }
@@ -243,7 +251,7 @@ fn create_module(optimize: bool) -> Result<ModuleOwner> {
     Ok(ModuleOwner(Some(JITModule::new(builder))))
 }
 
-fn compile(request: CompileRequest, cache: bool) -> Result<Vec<(ModuleOwner, Vec<PendingRegion>)>> {
+fn compile(request: CompileRequest, cache: bool, heads: &RwLock<codegen::Heads>) -> Result<Vec<(ModuleOwner, Vec<PendingRegion>)>> {
     let batches: Vec<_> = request
         .coalesced_regions()
         .flatten()
@@ -275,6 +283,7 @@ fn compile(request: CompileRequest, cache: bool) -> Result<Vec<(ModuleOwner, Vec
                     &mut compiler.builder_context,
                     region.ir,
                     flow,
+                    heads,
                 )?;
                 let code = if cache {
                     let code = compiler.context.compiled_code().unwrap();
@@ -372,6 +381,7 @@ fn compile_region(
     builder_context: &mut FunctionBuilderContext,
     mut ir: RegionIr,
     flow: RegionFlow,
+    heads: &RwLock<codegen::Heads>, // fork
 ) -> Result<(FuncId, ManifestRegion)> {
     module.clear_context(context);
     let pointer = module.isa().pointer_type();
@@ -381,7 +391,7 @@ fn compile_region(
         .declare_anonymous_function(&context.func.signature)
         .map_err(|error| WieError::FatalError(format!("Declaring native ARM AOT region: {error}")))?;
     context.func.name = UserFuncName::user(0, function.as_u32());
-    codegen::emit_region(&mut ir, flow, context, builder_context, module.isa())?;
+    codegen::emit_region(&mut ir, flow, context, builder_context, module.isa(), heads)?;
     module
         .define_function(function, context)
         .map_err(|error| WieError::FatalError(format!("Compiling native ARM AOT region: {error}")))?;
@@ -557,8 +567,10 @@ mod tests {
                 fail: attempt == 4,
             };
             let mut executor = NativeExecutor::new(Some(Box::new(cache)));
-            let mut instructions = region(0x1000, &[&[(0x1000, 4), (0x1004, 4), (0x1008, 4), (0x100c, 4)]]);
-            for (instruction, operation) in instructions.ir.blocks[0].instructions.iter_mut().zip([
+            // fork: upstream has the four in one block and enters the last of them again after its fault. Only
+            // the head of a run is an entry here (`Emitter::budget`), so the transfer is a block of its own.
+            let mut instructions = region(0x1000, &[&[(0x1000, 4), (0x1004, 4), (0x1008, 4)], &[(0x100c, 4)]]);
+            for (instruction, operation) in instructions.ir.blocks.iter_mut().flat_map(|block| &mut block.instructions).zip([
                 Operation::Alu {
                     op: AluOp::Add,
                     destination: Some(Reg::new(0)),
@@ -920,10 +932,11 @@ mod tests {
         assert_eq!(frame.cpsr, 0x3f);
     }
 
-    // fork: the budget in generated code (docs/report/0609). A region leaves with `Dispatch` on the first
-    // instruction its budget does not cover, and hands back what is left of it.
+    // fork: the budget in generated code (docs/report/0609, 0612). The head of a run takes the whole run off
+    // the budget; a run the budget does not cover is not started, and neither is one entered past its head —
+    // both come back as `InterpretOne` with the frame as it was.
     #[test]
-    fn a_region_stops_on_the_instruction_its_budget_does_not_cover() {
+    fn a_region_runs_the_runs_its_budget_covers_and_hands_back_the_rest() {
         let mut executor = NativeExecutor::new(None);
         let add = |register| Operation::Alu {
             op: AluOp::Add,
@@ -936,9 +949,23 @@ mod tests {
             },
             set_flags: false,
         };
-        // add r0,#1; addeq r1,#1; str r0,[r2]; add r0,#1; b 0x2000 — and at 0x2000: add r3,#1
-        let mut first = region(0x1000, &[&[(0x1000, 4), (0x1004, 4), (0x1008, 4), (0x100c, 4), (0x1010, 4)]]);
-        for (instruction, operation) in first.ir.blocks[0].instructions.iter_mut().zip([
+        // add r0,#1; addeq r1,#1; str r0,[r2]; add r0,#1; b 0x1018 — a run of five — then add r3,#1; b 0x8000,
+        // a run of two the first reaches along an edge inside the region, and b 0x1004, into the middle of
+        // the first, which the decoder would not hand over. In another region: add r4,#1; b 0x9000.
+        let branch = |target| Operation::Branch {
+            target: BranchTarget::Address(MemoryAddress::new(target)),
+            link: None,
+            exchange: false,
+        };
+        let mut first = region(
+            0x1000,
+            &[
+                &[(0x1000, 4), (0x1004, 4), (0x1008, 4), (0x100c, 4), (0x1010, 4)],
+                &[(0x1018, 4), (0x101c, 4)],
+                &[(0x1020, 4)],
+            ],
+        );
+        for (instruction, operation) in first.ir.blocks.iter_mut().flat_map(|block| &mut block.instructions).zip([
             add(0),
             add(1),
             Operation::Store {
@@ -957,20 +984,27 @@ mod tests {
                 width: Width::Word,
             },
             add(0),
-            Operation::Branch {
-                target: BranchTarget::Address(MemoryAddress::new(0x2000)),
-                link: None,
-                exchange: false,
-            },
+            branch(0x1018),
+            add(3),
+            branch(0x8000),
+            branch(0x1004),
         ]) {
             instruction.operation = operation;
         }
         first.ir.blocks[0].instructions[1].condition = Condition::Eq;
-        let mut second = region(0x2000, &[&[(0x2000, 4)]]);
-        second.ir.blocks[0].instructions[0].operation = add(3);
+        let mut second = region(0x8000, &[&[(0x8000, 4), (0x8004, 4)]]);
+        second.ir.blocks[0].instructions[0].operation = add(4);
+        second.ir.blocks[0].instructions[1].operation = branch(0x9000);
         let regions = block_on(executor.prepare(request([Some(first), Some(second)].into_iter())))
             .unwrap()
             .regions;
+        // Every instruction stays in the manifest: the engine enters at any of them, and gets the ones past
+        // a head back.
+        assert_eq!(
+            regions[0].manifest.instruction_pcs,
+            [0x1000, 0x1004, 0x1008, 0x100c, 0x1010, 0x1018, 0x101c, 0x1020]
+        );
+        assert_eq!(regions[1].manifest.instruction_pcs, [0x8000, 0x8004]);
         let mut access = Access {
             pages: (0..0x10000)
                 .map(|_| MemoryPage::default())
@@ -991,15 +1025,27 @@ mod tests {
                 .collect(),
         };
         access.pages[1].bytes = Some(Box::new([0; 0x10000]));
-        // budget -> pc, r0, r1, r3, the word stored, the budget handed back
-        for (budget, expected) in [
-            (0, (0x1000, 0, 0, 0, 0, 0)), // nothing runs
-            (1, (0x1004, 1, 0, 0, 0, 0)),
-            (2, (0x1008, 1, 0, 0, 0, 0)), // a skipped instruction is counted
-            (3, (0x100c, 1, 0, 0, 1, 0)),
-            (5, (0x2000, 2, 0, 0, 1, 0)), // spent on the branch: the next region is not entered
-            (6, (0x2004, 2, 0, 1, 1, 0)),
-            (9, (0x2004, 2, 0, 1, 1, 3)),
+        let dispatch = CompiledExit::Dispatch as u32;
+        let interpret = CompiledExit::InterpretOne as u32;
+        // (entry pc, budget) -> exit, pc, r0, r1, r3, r4, the word stored, the budget handed back
+        for ((entry, budget), expected) in [
+            ((0x1000, 0), (interpret, 0x1000, 0, 0, 0, 0, 0, 0)), // nothing runs
+            ((0x1000, 4), (interpret, 0x1000, 0, 0, 0, 0, 0, 4)), // one short of the run: none of it runs
+            // A skipped instruction is counted. The edge inside the region published no pc; the head it
+            // reaches does, when it hands its run back.
+            ((0x1000, 5), (interpret, 0x1018, 2, 0, 0, 0, 1, 0)),
+            ((0x1000, 6), (interpret, 0x1018, 2, 0, 0, 0, 1, 1)),
+            ((0x1000, 7), (dispatch, 0x8000, 2, 0, 1, 0, 1, 0)), // spent on the way out: the next region is not entered
+            ((0x1000, 8), (interpret, 0x8000, 2, 0, 1, 0, 1, 1)), // entered, and its run of two is not covered
+            ((0x1000, 9), (dispatch, 0x9000, 2, 0, 1, 1, 1, 0)),
+            ((0x1000, 12), (dispatch, 0x9000, 2, 0, 1, 1, 1, 3)),
+            ((0x1004, 12), (interpret, 0x1004, 0, 0, 0, 0, 0, 12)), // an entry past the head of a run
+            ((0x1010, 12), (interpret, 0x1010, 0, 0, 0, 0, 0, 12)),
+            ((0x101c, 12), (interpret, 0x101c, 0, 0, 0, 0, 0, 12)),
+            ((0x8004, 12), (interpret, 0x8004, 0, 0, 0, 0, 0, 12)),
+            ((0x1018, 12), (dispatch, 0x9000, 0, 0, 1, 1, 0, 8)), // the head of the second run is an entry
+            // A branch into the middle of a run leaves the region with its pc published, and is handed back there.
+            ((0x1020, 12), (interpret, 0x1004, 0, 0, 0, 0, 0, 11)),
         ] {
             access.pages[1].bytes.as_mut().unwrap()[..4].fill(0);
             let mut frame = RunFrame {
@@ -1009,16 +1055,27 @@ mod tests {
                 ..RunFrame::default()
             };
             frame.regs[2] = 0x10000;
-            frame.regs[15] = 0x1000;
-            assert!(executor.execute(regions[0].handle, &mut frame, &mut access).unwrap() == CompiledExit::Dispatch);
+            frame.regs[15] = entry;
+            let handle = access.resolve(entry, frame.cpsr).unwrap();
+            let exit = executor.execute(handle, &mut frame, &mut access).unwrap() as u32;
             let stored = u32::from_le_bytes(access.pages[1].bytes.as_ref().unwrap()[..4].try_into().unwrap());
             assert_eq!(
-                (frame.regs[15], frame.regs[0], frame.regs[1], frame.regs[3], stored, frame.budget),
+                (
+                    exit,
+                    frame.regs[15],
+                    frame.regs[0],
+                    frame.regs[1],
+                    frame.regs[3],
+                    frame.regs[4],
+                    stored,
+                    frame.budget
+                ),
                 expected,
-                "budget {budget}"
+                "entry {entry:#x} budget {budget}"
             );
         }
-        // The instruction that faults did not run and is not counted: two ran before it.
+        // The instruction that faults did not run, nor did the two behind it in its run: the head took five
+        // off and three come back.
         let mut frame = RunFrame {
             cpsr: 0x1f,
             budget: 5,
@@ -1028,6 +1085,87 @@ mod tests {
         frame.regs[15] = 0x1000;
         assert!(executor.execute(regions[0].handle, &mut frame, &mut access).unwrap() == CompiledExit::GuestFault);
         assert_eq!((frame.regs[15], frame.fault_address, frame.budget), (0x1008, 0x20000, 3));
+    }
+
+    // fork: where a run is entered from outside its region (`codegen::Heads`). The decoder's blocks do not say.
+    #[test]
+    fn an_address_an_image_names_a_push_of_lr_and_every_sixteenth_instruction_are_entries() {
+        let mut executor = NativeExecutor::new(None);
+        let prepare = |executor: &mut NativeExecutor, images: Arc<[CodeImage]>| {
+            // Three nops at 0x1000, and at 0x8000: nop; push {r4, lr}; nop.
+            let mut function = region(0x8000, &[&[(0x8000, 4), (0x8004, 4), (0x8008, 4)]]);
+            function.ir.blocks[0].instructions[1].operation = Operation::MultipleTransfer {
+                base: Reg::SP,
+                registers: 0x4010,
+                increment: false,
+                before: true,
+                write_back: true,
+                load: false,
+            };
+            // And twenty nops in a row at 0xc000.
+            let long: Vec<_> = (0..20).map(|index| (0xc000 + index * 4, 4)).collect();
+            let regions = [
+                Some(region(0x1000, &[&[(0x1000, 4), (0x1004, 4), (0x1008, 4)]])),
+                Some(function),
+                Some(region(0xc000, &[&long])),
+            ];
+            let mut input = request(regions.into_iter());
+            input.images = images;
+            block_on(executor.prepare(input)).unwrap().regions
+        };
+        let mut access = Access {
+            pages: (0..0x10000)
+                .map(|_| MemoryPage::default())
+                .collect::<Vec<_>>()
+                .into_boxed_slice()
+                .try_into()
+                .ok()
+                .unwrap(),
+            entries: Vec::new(),
+        };
+        access.pages[2].bytes = Some(Box::new([0; 0x10000]));
+        // entry pc -> exit, pc, what was taken off a budget of 30
+        let mut enter = |executor: &mut NativeExecutor, handle, pc| {
+            let mut frame = RunFrame {
+                cpsr: 0x1f,
+                budget: 30,
+                ..RunFrame::default()
+            };
+            frame.regs[13] = 0x20010;
+            frame.regs[15] = pc;
+            let exit = executor.execute(handle, &mut frame, &mut access).unwrap() as u32;
+            (exit, frame.regs[15], 30 - frame.budget)
+        };
+        let dispatch = CompiledExit::Dispatch as u32;
+        let interpret = CompiledExit::InterpretOne as u32;
+
+        // No image names it: 0x1004 is the middle of the one run.
+        let regions = prepare(&mut executor, Arc::from([]));
+        assert_eq!(enter(&mut executor, regions[0].handle, 0x1000), (dispatch, 0x100c, 3));
+        assert_eq!(enter(&mut executor, regions[0].handle, 0x1004), (interpret, 0x1004, 0));
+        // The push heads a run wherever it is: entered there, it and the nop behind it run.
+        assert_eq!(enter(&mut executor, regions[1].handle, 0x8004), (dispatch, 0x800c, 2));
+        assert_eq!(enter(&mut executor, regions[1].handle, 0x8008), (interpret, 0x8008, 0));
+        assert_eq!(enter(&mut executor, regions[1].handle, 0x8000), (dispatch, 0x800c, 3));
+
+        // Sixteen instructions are a run: the seventeenth of the twenty heads the next.
+        assert_eq!(enter(&mut executor, regions[2].handle, 0xc000), (dispatch, 0xc050, 20));
+        assert_eq!(enter(&mut executor, regions[2].handle, 0xc040), (dispatch, 0xc050, 4));
+        assert_eq!(enter(&mut executor, regions[2].handle, 0xc03c), (interpret, 0xc03c, 0));
+
+        // An image with a call to 0x1004 (bl, from 0x2000): the run is cut there.
+        let call = CodeImage {
+            address: 0x2000,
+            bytes: 0xebff_fbff_u32.to_le_bytes().to_vec(),
+        };
+        let regions = prepare(&mut executor, Arc::from([call]));
+        assert_eq!(enter(&mut executor, regions[0].handle, 0x1004), (dispatch, 0x100c, 2));
+        assert_eq!(enter(&mut executor, regions[0].handle, 0x1000), (dispatch, 0x100c, 3));
+        assert_eq!(enter(&mut executor, regions[0].handle, 0x1008), (interpret, 0x1008, 0));
+
+        // A recompilation is given the dropped region's own code, not its callers': the call is remembered.
+        let regions = prepare(&mut executor, Arc::from([]));
+        assert_eq!(enter(&mut executor, regions[0].handle, 0x1004), (dispatch, 0x100c, 2));
     }
 
     #[test]
